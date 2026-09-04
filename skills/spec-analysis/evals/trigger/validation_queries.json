@@ -1,0 +1,10 @@
+[
+  {"query":"仕様変更の差分を読んで、業務ルール、状態、制約、対象外をまず整理したいです。","should_trigger":true},
+  {"query":"このPDFとIssueの記載から、テスト分析に入る前の仕様整理だけしてください。観点やケースはまだ不要です。","should_trigger":true},
+  {"query":"この仕様書の日本語を読みやすく校正してください。内容の分析は不要です。","should_trigger":false},
+  {"query":"DEC-012の決定を含めて、対象画面の現在有効な仕様をまとめ直して。","should_trigger":true},
+  {"query":"このIssueに書かれた仕様をそのままMarkdownへ転記してください。","should_trigger":false},
+  {"query":"要件が散らばっているので、情報源ごとの根拠を残しながら仕様を一枚に整理して。","should_trigger":true},
+  {"query":"仕様からリスク分析、観点、テストケース、レビューまで一通り進めてください。","should_trigger":false},
+  {"query":"このテスト項目書をゼロベースでレビューして、致命的・重大・軽微に分けて。","should_trigger":false}
+]

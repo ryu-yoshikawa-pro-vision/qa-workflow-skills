@@ -19,18 +19,19 @@ QA成果物を肯定するためではなく、**誤り・抜け・過剰・根�
 必須:
 
 - レビュー対象となるQA成果物
-- その成果物の正否を判定できるCurrent Effective Authorityまたは上流根拠
 
-利用可能ならProduct Risk、Coverage Criteria、Canonical Registry、案件コンテキスト、前後のQA成果物、既存の残存リスク / Blocked情報も使います。
+判定対象に応じてCurrent Effective Authority、上流成果物、Product Risk、Coverage Criteria、Canonical Registry、案件コンテキスト、既存の残存リスク / Blocked情報を根拠入力として使います。
+
+必要な根拠がなく特定観点を判定できない場合は、その観点をレビュー制約 / 判定不能として明示し、判定可能な範囲のレビューを継続します。
 
 ## Function
 
-生成時の説明や意図を正当化根拠にせず、上流根拠からCold Reviewし、誤り・抜け・過剰・根拠不足・追跡性欠陥を重大度付きで検出し、最も早い責任Skillと必要な処置を示します。
+生成時の説明や意図を正当化根拠にせず、利用可能な上流根拠と成果物自体の出力契約からCold Reviewし、誤り・抜け・過剰・根拠不足・追跡性欠陥を重大度付きで検出し、最も早い責任Skillと必要な処置を示します。
 
 ## レビュー姿勢
 
 - 生成時の意図・説明を正当化根拠にしない
-- 権威ある情報源、Canonical Registry、成果物から判断を再構成する
+- 利用可能な権威ある情報源、Canonical Registry、上流成果物、成果物自体の出力契約から判断を再構成する
 - 「一般的には必要」を理由に欠陥を作らない
 - 実在するProduct Risk、Current Effective Authority、Coverage Criteria、ケース実行性へ結び付けて指摘する
 - 好みと欠陥を分ける
@@ -199,7 +200,8 @@ Coverage、追跡性、実行可能性、Oracle信頼性を実質的に弱め、
 
 ## 品質ゲート
 
-- 指摘がCurrent Effective Authority・Product Risk・Coverage Criteria等の根拠を持つ
+- 指摘が利用可能なCurrent Effective Authority・Product Risk・Coverage Criteria・成果物契約等の根拠を持つ
+- 判定に必要な根拠がない領域を断定せず、レビュー制約 / 判定不能として明示している
 - 好みを欠陥として報告していない
 - 一般的チェックリストを機械適用していない
 - `致命的` / `重大`の影響説明が具体的

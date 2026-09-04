@@ -1,0 +1,14 @@
+[
+  {"query":"AuthorityからTest Caseまで、どこか抜けていないかカバレッジを分析してください。","should_trigger":true},
+  {"query":"この観点設計が定義したCoverage Criteriaを本当に満たしているか確認してください。","should_trigger":true},
+  {"query":"仕様とQ&Aを統合してCurrent Effective Authorityを解決して。","should_trigger":false},
+  {"query":"このCoverage Itemからテストケースを追加作成してください。","should_trigger":false},
+  {"query":"この未回答事項をBlockerか要確認か分類して。","should_trigger":false},
+  {"query":"TR→TCN→Coverage Item→Test Caseの閉鎖性を確認して、未カバーを洗い出して。","should_trigger":true},
+  {"query":"Product Riskが下流のTest Requirementやケースから消えていないか追跡して。","should_trigger":true},
+  {"query":"Coverage Itemのうちケース化されていないものと、そのDispositionが妥当か見て。","should_trigger":true},
+  {"query":"期待結果が仕様と逆になっていないか、ケース品質を徹底レビューして。","should_trigger":false},
+  {"query":"このテスト項目書をCold Reviewして、致命的・重大・軽微に分けてください。","should_trigger":false},
+  {"query":"このTRから不足しているTest Conditionを新しく設計してください。","should_trigger":false},
+  {"query":"Pairwiseの全2-wise組合せが生成Coverage Itemに入っているかカバレッジ確認して。","should_trigger":true}
+]

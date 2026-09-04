@@ -24,12 +24,18 @@ skills/
 ├── qa-workflow/
 │   ├── SKILL.md
 │   ├── references/guidance.md
+│   ├── evals/trigger/
+│   │   ├── train_queries.json
+│   │   └── validation_queries.json
 │   └── assets/
 │       ├── project-context-template.md
 │       └── workflow-state-template.md
 ├── spec-analysis/
 │   ├── SKILL.md
 │   ├── references/guidance.md
+│   ├── evals/trigger/
+│   │   ├── train_queries.json
+│   │   └── validation_queries.json
 │   └── assets/output-template.md
 ├── question-analysis/
 ├── test-analysis/
@@ -42,9 +48,10 @@ skills/
 
 各QA Skillは同じ責務分離を持ちます。
 
-- `SKILL.md`: Skillの発見、使用条件、実行契約、出力責務
-- `references/guidance.md`: 詳細な判断基準、手順、停止条件、品質ゲート
+- `SKILL.md`: Skillの発見、使用条件、実行契約、Input / Function / Outputインターフェース
+- `references/guidance.md`: 詳細な入力条件、判断基準、手順、停止条件、品質ゲート
 - `assets/output-template.md`: 既定の出力形式
+- `evals/trigger/`: descriptionの発火精度を評価する固定train / validation query
 
 案件固有形式がある場合は、Skillの意味上の出力契約と必要な追跡性を維持できる限り案件固有形式を優先できます。
 
@@ -63,6 +70,18 @@ SkillはYAML frontmatterの`name`と同じCanonical Skill名で参照します�
 | `coverage-analysis` | カバレッジ分析 | Coverage Analysis |
 | `adversarial-review` | 反証レビュー | Adversarial Review |
 | `qa-workflow` | QA Workflow | ルーティング / 完了判断 |
+
+## Trigger Eval
+
+9 Skillすべてにdescription発火精度を確認するTrigger Evalを用意します。
+
+- 1 Skillあたり20 query
+- train 12件（should-trigger 6 / should-not-trigger 6）
+- validation 8件（should-trigger 4 / should-not-trigger 4）
+- 合計180 query
+- should-not-triggerは隣接Skillとのnear-missを重点化
+
+descriptionを調整するときはtrainの失敗を改善材料とし、validationは汎化性能確認に使います。実行方法と判定基準は [`EVALS.md`](EVALS.md) を参照してください。
 
 ## フルワークフロー
 

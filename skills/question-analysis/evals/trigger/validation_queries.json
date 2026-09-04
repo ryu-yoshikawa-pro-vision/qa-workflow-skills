@@ -1,0 +1,10 @@
+[
+  {"query":"この成果物全体をCold Reviewして重大度付きで欠陥を指摘して。","should_trigger":false},
+  {"query":"Q&A表の質問番号を001から振り直してください。","should_trigger":false},
+  {"query":"仕様からケースまで必要な工程を判断して一通り進めて。","should_trigger":false},
+  {"query":"QRY-003の回答が曖昧です。正式DecisionにするのかAssumptionにするのか判断材料を整理して。","should_trigger":true},
+  {"query":"この仕様不足について、回答なしでどの成果物まで安全に作れるか判定してほしい。","should_trigger":true},
+  {"query":"この質問文をステークホルダー向けに丁寧なメールへ書き換えて。","should_trigger":false},
+  {"query":"テストケースのPASS条件が未承認の前提に依存しています。どう扱うべきか分類してください。","should_trigger":true},
+  {"query":"既存の質問一覧に、すでにDecisionで解消済みの質問が混ざっていないか整理して。","should_trigger":true}
+]

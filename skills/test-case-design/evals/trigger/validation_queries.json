@@ -1,0 +1,10 @@
+[
+  {"query":"CI一覧から、テスターが迷わないテストケースだけ作ってください。新しい観点は追加しないで。","should_trigger":true},
+  {"query":"既存のTest ConditionをChromeで実施できる具体的な手動テストケースにして。","should_trigger":true},
+  {"query":"この未回答仕様がないとケースを作れないか分類してください。","should_trigger":false},
+  {"query":"仕様から観点とケースまで必要なSkillを判断して全部進めて。","should_trigger":false},
+  {"query":"この観点を『確認する』だけの曖昧な記載ではなく、操作と観測結果が分かる形に直して。","should_trigger":true},
+  {"query":"このケース表をCSVへ変換してください。","should_trigger":false},
+  {"query":"権限Aでこの値を入力するケースについて、開始状態から期待結果まで明確にして。","should_trigger":true},
+  {"query":"テストケースとは何か一般論を説明してください。","should_trigger":false}
+]
