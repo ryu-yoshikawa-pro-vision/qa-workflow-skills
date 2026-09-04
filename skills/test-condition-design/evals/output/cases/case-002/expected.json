@@ -1,0 +1,1 @@
+{"known_test_requirements":["TR-001"],"known_authorities":["SPEC-001"],"known_product_risks":["RISK-001"],"bva":[{"boundary":100,"increment":1,"mode":"2-value","required_values":[100,101]}],"required_transitions":[{"from":"draft","event":"publish","to":"published"},{"from":"published","event":"archive","to":"archived"}]}

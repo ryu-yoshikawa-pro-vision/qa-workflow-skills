@@ -1,120 +1,34 @@
 # Agent Skills Eval方針
 
-このリポジトリでは、Agent Skillsの形式適合とは別に、Skillの発火・出力品質・Workflow全体挙動を段階的に評価します。
+このリポジトリでは、Agent Skillsの形式適合、Skill選択、機械判定可能なOutput契約、意味品質、Workflow全体挙動を分離して評価します。
 
-`evals/`、`EVALS.md`、train / validation分割はこのリポジトリ独自の開発・評価用拡張です。Agent Skills Specificationの必須標準ディレクトリではありません。
+`evals/`、`EVALS.md`、train / validation分割、Deterministic Output Evalのdataset / graderはこのリポジトリ独自の開発・評価拡張です。Agent Skills Specificationの必須標準ディレクトリではありません。
 
 ## 評価レイヤー
 
-本リポジトリでは次を分離します。
-
 1. **Spec Validation**: `SKILL.md` frontmatter / 命名規則等のAgent Skills仕様適合
-2. **Trigger Eval**: `description`によるSkill選択・誤発火・routingの評価
-3. **Output Quality Eval**: Skill利用時の成果物品質をbaselineと比較する評価（将来）
-4. **Workflow E2E Eval**: `qa-workflow`から担当Skillへ遷移して要求成果物まで完了できるかの評価（将来）
+2. **Trigger Eval**: `description`によるSkill選択・誤発火・routing
+3. **Deterministic Output Eval**: 機械判定可能なOutput契約、ID・参照・閉鎖性・Invariant
+4. **Semantic Output Eval**: 意味解釈が必要な成果物品質（将来）
+5. **Workflow E2E Eval**: `qa-workflow`から担当Skillへ遷移し要求成果物まで完了できるか（将来）
 
-Trigger EvalがPASSしてもOutput品質やWorkflow E2Eを保証しません。
+どのレイヤーも単独ではQA成果物品質全体を保証しません。
 
-## Trigger Evalの目的
+---
 
-YAML frontmatterの`description`は、AgentがSkillをロードするか判断する主要な情報です。Trigger Evalでは次を確認します。
+# Trigger Eval
 
-- Skillが必要な要求で発火するか（should-trigger）
-- 隣接Skillや別作業が必要な要求で誤発火しないか（should-not-trigger）
-- 複数の近接Skillが利用可能な状態で正しいSkillへroutingできるか
-- 明らかに無関係なnegativeではなく、語彙や目的が近いnear-missを区別できるか
+## Canonical / Diagnostic
 
-## Canonical Mode
+Canonical Trigger Evalは**9 Skillすべてを同一Agent client上で同時に利用可能**にし、queryごとにclean contextで独立実行します。Target Trigger / Unexpected Trigger / Routing Correctnessを確認します。
 
-Canonical Trigger Evalは、**9 Skillすべてを同一Agent client上で同時に利用可能な状態**で実施します。
+対象Skill: `qa-workflow`, `spec-analysis`, `question-analysis`, `test-analysis`, `test-requirement-design`, `test-condition-design`, `test-case-design`, `coverage-analysis`, `adversarial-review`。
 
-対象Skill:
+対象Skill単独または限定Skillだけを利用可能にする実行はDiagnostic Modeです。Canonical Trigger Scoreには使いません。
 
-- `qa-workflow`
-- `spec-analysis`
-- `question-analysis`
-- `test-analysis`
-- `test-requirement-design`
-- `test-condition-design`
-- `test-case-design`
-- `coverage-analysis`
-- `adversarial-review`
+既定では各queryを3回実行し、`trigger_rate = 発火回数 / 実行回数`を使います。`should_trigger: true`は`> 0.5`、falseは`< 0.5`を既定とします。回答内容から発火を推測せず、Skill loadingを観測できるlog等を使用します。
 
-実行原則:
-
-```text
-9 SkillすべてをAgent clientへ登録 / 利用可能化
-  ↓
-各queryをclean contextで独立実行
-  ↓
-実際にロードされたSkillを実行ログ等で確認
-  ↓
-should_triggerと比較
-  ↓
-近接Skillを含むroutingの妥当性を確認
-```
-
-全9 Skillを同時に利用可能にする理由は、Trigger Evalの目的が対象Skill単独の発火能力だけではなく、**近接Skillが競合する実運用に近い条件で正しいSkillを選択できるか**を評価することだからです。
-
-例:
-
-```text
-query: このテストケースを重大度付きでレビューして
-
-期待:
-- test-case-design: 発火しない
-- adversarial-review: 発火する
-```
-
-`test-case-design`が発火しなかった事実だけではrouting成功とは判定しません。
-
-## Diagnostic Mode
-
-対象Skill単独、または限定したSkillだけをAgent clientへ登録して実行する方式です。
-
-用途:
-
-- 発火失敗の原因調査
-- description単体の挙動確認
-- 近接Skillとの競合切り分け
-- Agent client固有のSkill discovery / loading問題の切り分け
-
-Diagnostic Modeの結果は**Canonical Trigger Scoreとして扱いません**。Canonical Modeで失敗した理由を調査する補助評価です。
-
-## Trigger評価概念
-
-### Target Trigger
-
-対象Skillが期待どおり発火 / 非発火したかを評価します。
-
-既存datasetの`should_trigger`はこの評価に使用します。
-
-```text
-trigger_rate = 対象Skillが発火した回数 / 実行回数
-```
-
-既定では各queryを3回実行し、閾値を`0.5`とします。
-
-- `should_trigger: true` → `trigger_rate > 0.5`でTarget Trigger PASS
-- `should_trigger: false` → `trigger_rate < 0.5`でTarget Trigger PASS
-
-閾値を変更する場合は同じ評価群へ一貫して適用し、理由を記録します。
-
-### Unexpected Trigger
-
-対象queryで、should-not-triggerである近接Skillや無関係Skillが誤ってロードされなかったかを確認します。
-
-単一Skillの`trigger_rate`だけでなく、1実行で実際にロードされたSkill集合を記録できるAgent clientではUnexpected Triggerも評価します。
-
-### Routing Correctness
-
-複数Skill候補が利用可能な状況で、ユーザー要求に対して期待するSkillまたはSkill経路へroutingされたかを評価します。
-
-現行datasetはSkillごとの`should_trigger`形式を維持します。完全なrouting runnerは今回実装しません。Canonical Modeでは、同一query実行時のロードSkill集合を観測し、Target TriggerとUnexpected Triggerを合わせてRouting Correctnessを判断できるよう記録します。
-
-## Dataset配置
-
-各Skill配下に固定のtrain / validation queryを持ちます。
+## Dataset
 
 ```text
 skills/<skill-name>/evals/trigger/
@@ -122,125 +36,180 @@ skills/<skill-name>/evals/trigger/
 └── validation_queries.json
 ```
 
-現在のbaseline dataset:
-
-- 1 Skillあたり20 query
-- train: 12件（should-trigger 6 / should-not-trigger 6）
-- validation: 8件（should-trigger 4 / should-not-trigger 4）
+- train: 12件 / Skill（positive 6 / negative 6）
+- validation: 8件 / Skill（positive 4 / negative 4）
 - 9 Skill合計: 180 query
 
-## Query形式
+現descriptionと180 queryはbaseline取得前のため固定します。description選定後、train / validationに未使用のfresh queryでfinal holdoutを行い、holdout queryは最終評価直前または別PRで作成します。
 
-```json
-[
-  {
-    "query": "この変更で何を重点的にテストすべきか、Product Riskを評価して整理してください。",
-    "should_trigger": true
-  },
-  {
-    "query": "このCoverage Itemを実施手順と期待結果のあるケースにして。",
-    "should_trigger": false
-  }
-]
-```
+baseline取得後は、QA専門用語を使わない依頼、省略表現、曖昧依頼、長いcontext、誤字 / 表記揺れ、暗黙的Skill要求等を別変更で追加検討します。
 
-## 重点near-miss
+---
 
-特に次の境界を重点確認します。
+# Deterministic Output Eval
 
-- `spec-analysis` ↔ `question-analysis`
-- `test-analysis` ↔ `test-requirement-design`
-- `test-requirement-design` ↔ `test-condition-design`
-- `test-condition-design` ↔ `test-case-design`
-- `coverage-analysis` ↔ `adversarial-review`
-- `qa-workflow` ↔ 個別Skill
+## 目的
 
-## 発火判定
-
-回答内容から「発火したはず」と推測しません。
-
-Agentの実行ログ、Skill loading log、tool call history、verbose output等から、対象Skillの`SKILL.md`が実際にロードされたかを確認します。Agent clientがSkill loadingを観測できない場合は、その制約を記録し、Canonical Trigger Scoreを確定したと扱いません。
-
-各queryは独立したclean contextで実行します。前queryでロードされたSkillや会話履歴が次queryへ影響する状態を避けます。
-
-## Description最適化ループ
-
-現在のdescriptionをbaselineとして固定し、Trigger Eval結果を見る前に最適化しません。
-
-1. 現在のdescriptionでCanonical Modeのtrain / validation baselineを取得する
-2. trainの失敗を原因分析する
-3. should-trigger失敗ならdescriptionが狭すぎないか確認する
-4. should-not-trigger誤発火なら隣接Skillとの境界が曖昧でないか確認する
-5. 個別queryの語句を足すのではなく、失敗の一般カテゴリを表現する
-6. descriptionを修正してtrainを再実行する
-7. validationは汎化性能確認に使用する
-8. validationの個別queryへ過適合する修正は行わない
-9. 最終候補をvalidation結果とrouting失敗内容で比較する
-
-baseline比較可能性を維持するため、description最適化中は既存train / validation queryを不用意に入れ替えません。
-
-## Final Holdout方針
-
-現時点ではholdout queryをリポジトリへ追加しません。
-
-Description選定完了後、train / validationの最適化に一度も使用していないfresh queryで最終generalization checkを行います。
-
-目安:
-
-- Skillごと、またはroutingリスクの高い重点Skillへ5〜10件程度
-- train / validationの表現を単純に言い換えただけのqueryを避ける
-- description最適化担当が事前に内容へ適合させない運用にする
-
-真のholdout性を維持するため、datasetは別PRまたは最終評価直前に作成します。
-
-## Baseline取得後のdataset拡張方針
-
-既存180 queryはbaseline取得前に固定済みなので、明確なラベル誤りやSkill責務矛盾がない限り今回変更しません。
-
-baseline取得後は別変更として、次の自然なユーザー表現を追加候補とします。
-
-- 実運用由来の自然な依頼
-- QA専門用語を使わない依頼
-- 省略表現
-- 曖昧な依頼
-- 長い案件コンテキスト付き依頼
-- 誤字・表記揺れ
-- 暗黙的なSkill要求
-
-追加時は既存baselineと混同しないようversion / 変更理由を記録します。
-
-## Output Quality Eval（将来）
-
-Trigger Evalとは別PRで扱います。候補:
+各SkillのOutput契約 / 品質ゲートのうち、**意味解釈なしで正否を決められる部分だけ**を機械評価します。
 
 ```text
-skills/<skill-name>/evals/evals.json
+明確に機械判定できる      → ERROR assertion
+疑わしいが誤検知し得る    → WARNING assertion
+意味評価が必要             → Semantic Output Evalへ残す
 ```
 
-将来的にはwith-skill / without-skill比較、deterministic grader、必要に応じたLLM grader、token / duration / stability等を検討します。今回これらのrunnerやframeworkは実装しません。
+独自weighted scoreは作りません。ERROR pass/fail、assertion pass rate、WARNING件数を保持します。
 
-## Workflow E2E Eval（将来）
+## Canonical Output制約
 
-`qa-workflow`のTrigger EvalだけではWorkflow全体の正しさを保証しません。次タスクでは実Agent client上で次を評価します。
+初期Deterministic Evalは、各Skillの既定`assets/output-template.md`を使ったMarkdownだけをCanonical対象とします。
 
-- 正しい開始Skillを選べる
-- 不要なSkillを通らない
-- 既存成果物を再利用できる
-- Blocked範囲だけ停止できる
-- 上流変更時に影響範囲だけ`要再検証`へ戻せる
-- 要求成果物で終了できる
-- 個別SkillのDomain Logicを`qa-workflow`が肩代わりしない
+`qa-workflow`は`assets/workflow-state-template.md`を基準とし、routing fixtureでは`開始Skill` / `最終Skill`を明示します。
 
-Agent Skills Specificationは、Skill AからSkill Bを呼ぶ共通Skill-to-Skill APIを規定しません。本リポジトリのWorkflow E2Eは、**同一Agent client上で9 Skillすべてが利用可能で、Agentが必要なSkillを追加ロード / 利用できる環境**を前提として評価します。
+案件固有フォーマットを許容するSkill契約自体は変更しません。任意形式を万能parserで解析することは今回のscope外です。
 
-特定Clientへの対応済みを事前に断定しません。Compatibilityは実Agent client上のE2E Evalで確認します。
+## Dataset
+
+```text
+skills/<skill-name>/evals/
+├── trigger/
+│   ├── train_queries.json
+│   └── validation_queries.json
+└── output/
+    ├── evals.json
+    └── cases/
+        ├── case-001/
+        │   ├── input.md
+        │   └── expected.json
+        └── case-002/
+            ├── input.md
+            └── expected.json
+```
+
+9 Skillすべてに最低2ケースあります。`expected.json`はGolden文章ではなく、known IDs、fixture-backed closure、Risk level、Pairwise factor/value/constraint、状態遷移、既知欠陥等の既知事実だけを持ちます。
+
+## Grader Architecture
+
+```text
+scripts/evals/deterministic/
+├── run.py
+├── markdown_parser.py
+├── result.py
+├── common.py
+├── validators/
+│   ├── qa_workflow.py
+│   ├── spec_analysis.py
+│   ├── question_analysis.py
+│   ├── test_analysis.py
+│   ├── test_requirement_design.py
+│   ├── test_condition_design.py
+│   ├── test_case_design.py
+│   ├── coverage_analysis.py
+│   └── adversarial_review.py
+└── tests/
+    └── test_deterministic.py
+```
+
+Python標準ライブラリだけを使用します。共通層はMarkdown table解析、ID抽出 / 一意性、参照存在、allowed values、required fields、Disposition、graph closure、Pairwise feasible / covered pair計算、結果集計を担当します。Skill固有契約だけを各validatorへ置きます。
+
+Assertion ID一覧は`scripts/evals/deterministic/ASSERTIONS.md`を正本とします。
+
+## ERROR / WARNING
+
+ERROR例:
+- 重複ID
+- IDと分類不一致
+- unknown upstream reference
+- Risk Matrix不一致
+- fixture上流項目の未閉鎖
+- Pairwise 2-wise不足
+- 致命的 + 残存リスク受容
+- `完了` + Blocked / 要再検証
+
+WARNING例:
+- 期待結果中の「正常」「正しく」「問題ない」「適切」
+- 他Test Case依存らしき表現
+- Product Risk表へProject Riskらしき語が混入
+
+WARNINGだけではEval全体をfailにしません。
+
+## CLI
+
+Agent実行とOutput保存はgraderの責務外です。
+
+```bash
+python scripts/evals/deterministic/run.py \
+  --skill test-case-design \
+  --eval-id TC-OUT-001 \
+  --output path/to/generated-output.md
+```
+
+```bash
+python scripts/evals/deterministic/run.py \
+  --skill all \
+  --output-root path/to/saved-outputs
+```
+
+all modeは`<output-root>/<skill>/<eval-id>.md`を探索します。
+
+## 主要Invariant
+
+- **spec-analysis**: ID / 分類、SRC参照、Current Effective Authority種別・関係・参照、撤回 / 置換済みDecision禁止
+- **question-analysis**: Q ID、分類 / 正規化先、再開Skill、Blocker-Blocked整合、Assumption状態 / ASM ID、fixture-backed分類
+- **test-analysis**: RISK ID、必須列、Impact / Likelihood 1..4、4x4 Risk Matrix再計算、参照、testability / technique values
+- **test-requirement-design**: TR ID、Authority / Risk参照、優先度、観測方法、Disposition、Authority / Risk closure、最高Risk優先度継承
+- **test-condition-design**: TCN / CI ID、親TCN、参照、TR closure、Disposition、Pairwise 2-wise、fixture-backed状態遷移 / BVA
+- **test-case-design**: TC ID、Low-Level必須列、上流 / Authority参照、CI / TCN closure、Disposition、優先度維持、番号付き期待結果と根拠対応、曖昧表現WARNING
+- **coverage-analysis**: fixture graphからGap / orphanを独立再計算し、Outputの認識、Blocked誤分類、修正Skillを確認
+- **adversarial-review**: REV ID、重大度、対象、修正Skill、処置、致命的受容禁止、重大受容時承認、重大度別件数、fixture-backed決定論的欠陥
+- **qa-workflow**: Workflow / Skill状態、Canonical Skill名、Blocked / 要再検証残存時の完了禁止、fixture-backed routing
+
+## Semantic Output Evalへ残すもの
+
+Deterministic EvalでERRORにしません。
+
+- 仕様内容そのものの正しさ / 抽出網羅性
+- Current Effective Authority解決の意味的妥当性
+- 本当にBlocker / 要確認 / 仮定可能か
+- Product Riskの意味的なImpact / Likelihood妥当性
+- Test Requirementが適切な検証責務か
+- 技法選択自体が妥当か
+- Coverage Criteriaの意味的十分性
+- Error Guessing / scenarioの妥当性
+- Oracle内容の意味的正しさ
+- Test Case文章の明瞭さ（WARNING以上の断定）
+- Coverageが製品リスクに対して十分か
+- Adversarial Reviewの指摘内容 / 重大度の意味的正しさ
+- Workflow routingが実案件上最適か（fixtureで明示されたケースを除く）
+
+## Grader Self-Test
+
+各validatorについてvalid fixtureがPASSし、deliberately invalid fixtureで期待AssertionがFAILするunit testを持ちます。
+
+重点: Risk Matrix誤り、重複ID、unknown reference、未閉鎖Coverage、Pairwise不足Pair、致命的 + 残存リスク受容、Workflow完了 + Blocked。
+
+CIでunit testを実行します。
+
+---
+
+# Semantic Output Eval（将来）
+
+LLM Judge等を導入する場合もDeterministic assertionと混同しません。with-skill / without-skill、検証責務・Coverage・Oracle・第三者実施可能性などの意味評価は別PRで扱います。今回は実装しません。
+
+---
+
+# Workflow E2E Eval（将来）
+
+Deterministic `qa-workflow` validatorは出力された状態 / routing判断の整合だけを評価します。実Agent client上で、正しい開始Skill load、不要Skill回避、既存成果物再利用、局所Blocked、変更伝播、要求成果物での終了、Domain Logic肩代わり防止を確認するE2Eは別評価です。
+
+Agent Skills Specificationは共通Skill-to-Skill APIを規定しません。特定ClientのCompatibilityはE2Eで確認します。
 
 ## 現在の状態
 
-- 9 Skill分のTrigger Eval dataset作成済み
-- 1 Skillあたり20件、合計180件
-- train / validation固定分割済み
-- baseline取得前のためdescription未最適化
-- Canonical Modeの実Trigger Eval結果は未取得
-- holdout queryは未作成
-- Output Quality Eval / Workflow E2E Evalは未実装
+- 9 Skill Trigger dataset: 180 query、未変更
+- description: 未変更
+- Deterministic Output Eval: 9 Skill × 2 case以上
+- Deterministic grader: 実装済み
+- LLM Judge: 未導入
+- Semantic Output Eval: 未実装
+- Workflow E2E Eval: 未実装
