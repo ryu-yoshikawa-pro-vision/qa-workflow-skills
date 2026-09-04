@@ -12,7 +12,7 @@ Test Requirementを、**どの条件・観点で検証するか**へ展開し、
 
 利用可能なら仕様分析、`test-analysis`、不明点・矛盾分析、案件コンテキスト、Product Risk、状態モデル / 業務ルール、Current Effective Authorityも使います。
 
-## Oracle Authority
+## Current Effective Authority
 
 Test Condition / Coverage Itemの期待挙動は、Test Requirementが参照するCurrent Effective Authorityへ追跡します。
 
@@ -144,10 +144,11 @@ Coverage Criteriaから導かれる、具体的にカバーすべき要素です
 適用条件: 複数の独立軸があり、全組合せが大きすぎ、相互作用リスクが説明できる場合。
 
 - Factor / Value候補と制約を先に明示する
-- Pairwiseと表現する場合は、成立可能な全Value Pairが少なくとも1ケースへ含まれることを、ツール出力または明示的なPair Coverage確認で検証できること
+- Pairwiseと表現する場合は、成立可能な全Value Pairが少なくとも1つの生成済みCoverage Item（組合せ）へ含まれることを、ツール出力または明示的なPair Coverage確認で検証できること
 - 制約で成立しないPairは`成立不能`として根拠を残す
+- Factor / Value / Constraint、生成Coverage Item、2-wise Coverage確認根拠を追跡できる形で残す
 
-全2-wise Coverageを確認できない場合はPairwiseと呼ばず「代表組合せ」と表現します。
+全2-wise Coverageを確認できない場合はPairwiseと呼ばず「代表組合せ」と表現します。Coverage ItemからTest Caseへの展開は`test-case-design`へ委ねます。
 
 ### エラー推測
 
@@ -204,9 +205,9 @@ Coverage Item ID例: `TCN-001-CI01`。
 - 適用技法
 - Coverage Criteria
 - Coverage Item（必要時）
-- Oracle Authority
+- Current Effective Authority
 
-採用しないTest Requirement / Coverage候補にはDispositionと理由が必要です。`重複`の場合はカバー先も必要です。
+採用しないTest Requirement / Coverage候補にはDispositionと理由が必要です。`重複`の場合はカバー先も必要です。Pairwiseを使う場合はFactor / Value / Constraint、生成Coverage Item、2-wise Coverage確認根拠も必要です。
 
 ## 停止条件
 
@@ -215,7 +216,7 @@ Coverage Item ID例: `TCN-001-CI01`。
 - Test Requirementの意味が曖昧で条件へ展開できない
 - Current Effective Authorityを解決できない
 - 期待挙動を未承認推論で補完しないと条件を作れない
-- 重要な状態 / 権限 / 境界定義の矛盾が未解決
+- Coverage Criteriaまたは期待挙動の確定に必要な状態 / 権限 / 境界定義の矛盾が未解決
 - Coverage Criteriaを定義するために不可欠な仕様がない
 
 低リスクの追加観点が不明、任意Error Guessing仮説が不足、全組合せが巨大という理由だけでは停止しません。
@@ -232,10 +233,10 @@ Coverage Item ID例: `TCN-001-CI01`。
 - Coverage Itemの明示 / 内包判断が基準に従っている
 - BVAの具体Coverage Itemが2-value / 3-value規則に従っている
 - 状態遷移で既定の全有効遷移Coverageを満たすか、採用しない遷移にDispositionがある
-- Pairwiseと呼ぶ場合に2-wise保証の証拠がある
+- Pairwiseと呼ぶ場合、成立可能な全Value Pairが生成Coverage Itemへ含まれる2-wise保証の証拠がある
 - Error Guessingを完全網羅と表現していない
-- Product Riskから未定義Oracleを創作していない
-- 実行手順へ先回りしていない
+- Product Riskから未定義の期待結果を創作していない
+- 実行手順 / Test Caseへ先回りしていない
 - 優先度を理由なく下げていない
 
 ## 次の担当Skill

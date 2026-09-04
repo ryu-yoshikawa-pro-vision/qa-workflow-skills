@@ -16,12 +16,18 @@
 
 ## 分析項目
 
-| 項目ID | カテゴリ | 内容 | 分類 | 情報源 / Canonical Registry参照 | 現在有効か | 上書き / 置換関係 | 備考 |
+| 項目ID | カテゴリ | 内容 | 分類 | 情報源 / Canonical Registry参照 | 現在有効か | 補足 / 上書き / 置換関係 | 備考 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | SPEC-001 |  |  | SPEC |  |  |  |  |
 | DEC-001 |  |  | DECISION |  |  |  |  |
 | INF-001 |  |  | INFERENCE |  |  |  |  |
 | UNK-001 |  |  | UNKNOWN |  |  |  |  |
+
+## Current Effective Authority
+
+| Authority ID | 種別 | 現在有効な内容 | 適用範囲 | 情報源 / Canonical Registry | 関係 | 関連Authority ID |
+| --- | --- | --- | --- | --- | --- | --- |
+|  | SPEC / DECISION / 承認済みASM |  |  |  | 独立 / 補足 / 上書き / 置換 / 未定義部分の補完 |  |
 
 ## 業務ルール
 

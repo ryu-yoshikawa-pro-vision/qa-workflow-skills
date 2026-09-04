@@ -50,14 +50,14 @@ Coverage Itemは`test-condition-design`の内部成果物です。反証レビ�
 製品の期待挙動を判断するときは、単に`SPEC` / `DECISION` / `承認済み ASM`を列挙するのではなく、対象スコープで現在有効なAuthorityを確定します。
 
 1. Canonical Decision Registryから、状態が`有効`で対象スコープに適用される`DECISION`をすべてAuthority候補として識別する。既存`SPEC` / 旧`DECISION`を上書きしていない補足Decisionも候補に含める
-2. 有効`DECISION`が既存Authorityと重なる場合は、上書き / 置換対象と影響範囲から現在有効な内容を解決する。未定義領域を補足するDecisionは既存Authorityと共存できる
+2. 有効`DECISION`が既存Authorityと重なる場合は、補足 / 上書き / 置換関係、関連Authority、影響範囲から現在有効な内容を解決する。未定義領域を補足するDecisionは既存Authorityと共存できる
 3. `SPEC`は、まず各情報源内で対象Version / Scopeに適用される現行版を版・更新時点から特定する
 4. 現行版の`SPEC`候補間では案件固有の情報源優先順位を適用する。鮮度だけを理由に低優先度情報源を高優先度情報源より優先しない
 5. `承認済み ASM`は有効な`SPEC` / `DECISION`で未定義の隙間だけを暫定的に補える
 6. `ASM`が有効な`SPEC` / `DECISION`と競合する場合、`ASM`で上書きせず、正式な仕様更新または`DECISION`として解決する
-7. 同一スコープで有効Authorityが競合し、Decision置換関係・情報源優先順位等で解決できない場合は`question-analysis`へ送り、影響範囲をBlockedとする
+7. 同一スコープで有効Authorityが競合し、Decision関係・情報源優先順位等で解決できない場合は`question-analysis`へ送り、影響範囲をBlockedとする
 
-`DEC-xxx` / `ASM-xxx`の状態と置換関係はProject Contextまたは案件で明示されたCanonical Registryを正本とします。
+`DEC-xxx` / `ASM-xxx`の状態と関係はProject Contextまたは案件で明示されたCanonical Registryを正本とします。`spec-analysis`では解決済みAuthorityを正規化ビューとして明示します。
 
 ## 成果物チェーンの閉鎖原則
 
@@ -229,14 +229,14 @@ adversarial-review
 - 各担当Skillの品質ゲートを満たす
 - 必要な追跡性がある
 - 出力されたすべてのTest Caseがローレベルで単独実施可能
-- すべての重要期待結果に一意なCurrent Effective Authority根拠がある
+- PASS / FAIL判定に使用する各期待結果に一意なCurrent Effective Authority根拠がある
 - 必要なカバレッジ分析・反証レビューが完了している
 - `要再検証`の対象が残っていない
 - 対象スコープ内にBlockedが残っていない
-- 反証レビューの`致命的`指摘がすべて修正済み、またはBlockedとして利用停止されている
-- `重大`指摘が修正済み、明示的な承認根拠付きで残存リスクとして受容、またはBlockedとなっている
+- 反証レビューの`致命的`指摘がすべて修正済み
+- `重大`指摘が修正済み、または明示的な承認根拠付きで残存リスクとして受容されている
 
-Blockedが残る場合は、Blocked範囲と再開条件を明示して`部分完了（Blockedあり）`または`Blocked`とします。
+`致命的` / `重大`指摘がBlockedとなっている場合、その範囲は利用停止できますが、対象スコープ内にBlockedが残るためWorkflow全体は`完了`にせず、Blocked範囲と再開条件を明示して`部分完了（Blockedあり）`または`Blocked`とします。
 
 ## 品質ゲート
 

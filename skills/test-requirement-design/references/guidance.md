@@ -15,7 +15,7 @@ Test Requirementはこのワークフロー固有の中間成果物であり、C
 
 利用可能なら`test-analysis`のProduct Risk / テスト重点、案件コンテキスト、不明点・矛盾分析、テストレベル / 観測方法も使います。
 
-## Oracle Authority
+## Current Effective Authority
 
 Test Requirementが製品の期待挙動を含む場合、対象スコープで解決済みのCurrent Effective Authorityへ追跡します。
 
@@ -25,7 +25,7 @@ Current Effective Authority候補は次です。
 - 状態が`有効`の`DECISION`
 - 有効な`SPEC` / `DECISION`で未定義の隙間を補う`承認済み ASM`
 
-Product Risk、実装、既存テスト、一般的慣習、未承認`INFERENCE`は単独で期待挙動を確定するAuthorityにはできません。`撤回` / `置換済み`Decisionを現在のOracleへ使いません。
+Product Risk、実装、既存テスト、一般的慣習、未承認`INFERENCE`は単独で期待挙動を確定するAuthorityにはできません。`撤回` / `置換済み`Decisionを現在の根拠へ使いません。
 
 ## 抽象度
 
@@ -129,7 +129,7 @@ Product Riskが未評価でも上流責務自体が明確ならTest Requirement�
 - 対象内の各Product RiskがTest Requirementまたは明示Dispositionへ閉じている
 - 上流記載の単なる言い換えではなく検証責務になっている
 - Product Riskを期待挙動のAuthorityにしていない
-- 未承認`INFERENCE`を完成済み要求のOracleにしていない
+- 未承認`INFERENCE`を完成済み要求の根拠にしていない
 - 「何を検証するか」に留まり、具体条件 / 手順を先回りしていない
 - 要求同士の重複・過剰統合がない
 - Product Riskが低いという理由だけで上流項目を消していない

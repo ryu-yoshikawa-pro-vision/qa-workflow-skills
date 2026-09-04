@@ -58,11 +58,12 @@ Coverage、追跡性、実行可能性、Oracle信頼性を実質的に弱め、
 - IDが分類と一致しているか
 - `DEC-xxx`をCanonical Registryと別IDで重複管理していないか
 - 対象スコープに適用される有効Decisionを、上書き有無に関係なくAuthority候補として確認しているか
-- `撤回` / `置換済み`Decisionを現在のOracleにしていないか
+- `撤回` / `置換済み`Decisionを現在の根拠にしていないか
 - 有効Decisionの補足 / 上書き / 置換関係と影響範囲が追跡できるか
 - `ASM`で有効な`SPEC` / `DECISION`を上書きしていないか
 - 各情報源の現行版を特定した後に情報源優先順位を適用しているか
 - 鮮度だけで低優先度情報源を優先していないか
+- Current Effective Authorityの正規化ビューに対象範囲の有効`SPEC` / `DECISION` / `承認済み ASM`が反映されているか
 - 実装・既存テストを仕様Authorityへ昇格していないか
 - 同一スコープの有効Authority競合を未解決のまま下流へ流していないか
 
@@ -108,7 +109,7 @@ Coverage、追跡性、実行可能性、Oracle信頼性を実質的に弱め、
 - Coverage Itemの明示 / 内包判断が一意か
 - BVAの具体項目が採用方式に合うか
 - 状態遷移で対象範囲内の全有効遷移がCoverageまたは妥当なDispositionへ閉じているか
-- Pairwiseを名乗る2-wise保証があるか
+- Pairwiseを名乗る場合、成立可能な全Value Pairが生成Coverage Itemへ含まれる2-wise保証があるか
 - Error Guessingを完全網羅と表現していないか
 
 ### ローレベルTest Case
@@ -121,8 +122,8 @@ Coverage、追跡性、実行可能性、Oracle信頼性を実質的に弱め、
 - 別ケースの暗黙状態へ依存していないか
 - 正式用語を使っているか
 - 期待結果が観測可能か
-- 重要期待結果ごとにCurrent Effective Authorityへ一意に追跡できるか
-- Product Risk / 実装 / 既存テストを未定義Oracleにしていないか
+- PASS / FAIL判定に使用する各期待結果がCurrent Effective Authorityへ一意に追跡できるか
+- Product Risk / 実装 / 既存テストを未定義の期待結果にしていないか
 - 許可されていないDB / API / ログ観測を要求していないか
 - 優先度を理由なく下げていないか
 - 重複または過剰統合がないか

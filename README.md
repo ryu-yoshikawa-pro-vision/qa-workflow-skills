@@ -13,7 +13,7 @@
 - 対象内の上流項目を無言で落とさず、下流成果物または明示Dispositionへ閉じる
 - すべてのTest Caseを、ケース単体で開始状態・準備・操作・入力・PASS条件を判断できる粒度にする
 - `Current Effective Authority / Product Risk → Test Requirement → Test Condition → Coverage Item → Test Case` を追跡できる
-- Coverage Analysisと反証レビューで抜け・過剰・不正Disposition・根拠のないOracleを検出する
+- Coverage Analysisと反証レビューで抜け・過剰・不正Disposition・根拠のない期待結果を検出する
 
 毎回繰り返す回帰テストスイートの選定・保守・実行管理は主対象ではありません。
 
@@ -93,7 +93,7 @@ adversarial-review
 期待挙動は固定順位で決めず、対象スコープで現在有効なAuthorityを解決します。
 
 - 状態が`有効`で対象スコープに適用される`DECISION`は、既存仕様の上書き有無に関係なくAuthority候補とする
-- 有効`DECISION`が既存`SPEC` / 旧`DECISION`と重なる場合は、上書き / 置換関係と影響範囲で解決する
+- 有効`DECISION`が既存`SPEC` / 旧`DECISION`と重なる場合は、補足 / 上書き / 置換関係と影響範囲で解決する
 - `SPEC`は各情報源の現行版を版・更新時点から特定した後、案件固有の情報源優先順位を適用する
 - 鮮度だけを理由に低優先度情報源を高優先度情報源より優先しない
 - `承認済み ASM`は有効な`SPEC` / `DECISION`で未定義の隙間だけを暫定的に補完する
@@ -127,7 +127,7 @@ adversarial-review
 - BVA: 2-valueを既定とし、必要時3-value。採用方式から具体Coverage Itemを定義
 - Decision Table: 実行可能ルールを候補化し、採用またはDisposition
 - 状態遷移: 対象範囲内の全有効遷移Coverageを既定
-- Pairwise: 成立可能な全Value Pairの2-wise Coverageを確認できる場合だけPairwiseと呼ぶ
+- Pairwise: 成立可能な全Value Pairが生成Coverage Itemへ含まれる2-wise Coverageを確認できる場合だけPairwiseと呼ぶ
 - Error Guessing: 選択した失敗仮説だけをCoverage対象とし、完全網羅とは表現しない
 
 ### ローレベルTest Case
@@ -140,7 +140,7 @@ adversarial-review
 4. 何を入力・選択するか
 5. 何が起きればPASSか
 
-重要期待結果はCurrent Effective Authorityへ追跡し、複数の重要期待結果がある場合は期待結果ごとにAuthorityを対応付けます。
+PASS / FAIL判定に使用する各期待結果はCurrent Effective Authorityへ追跡し、複数ある場合は期待結果ごとにAuthorityを対応付けます。
 
 ### Blocker / Disposition
 

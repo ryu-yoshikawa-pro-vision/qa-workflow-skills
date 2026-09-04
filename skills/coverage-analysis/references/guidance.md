@@ -71,7 +71,7 @@ Product Riskが高いにもかかわらず未カバーまたは未受容の残�
 - 境界値 → 採用した2-value / 3-valueの具体項目があるか
 - デシジョンテーブル → 実行可能ルールが採用または妥当なDispositionへ位置づけられているか
 - 状態遷移 → 対象範囲内の全有効遷移がCoverage Itemまたは妥当なDispositionへ位置づけられているか
-- Pairwise → 全成立可能Pairの2-wise保証があるか
+- Pairwise → 成立可能な全Value Pairが生成Coverage Itemへ含まれる2-wise保証があるか
 - シナリオ → 主経路 / 必要代替・例外経路が採用または妥当なDispositionへ位置づけられているか
 
 技法名が書かれているだけでは充足としません。
@@ -105,7 +105,7 @@ DispositionのないCoverage ItemはCoverage Gapです。
 - どのTest Condition / Coverage Itemを確認するか分かる
 - 実施可能な具体性がある
 - PASS / FAILを判断できる期待結果がある
-- 重要期待結果がCurrent Effective Authorityへ一意に追跡できる
+- PASS / FAIL判定に使用する各期待結果がCurrent Effective Authorityへ一意に追跡できる
 
 詳細なケース品質レビューは`adversarial-review`が担当します。
 
@@ -137,7 +137,7 @@ Test CaseやTest ConditionがCurrent Effective Authority / Test Requirement / Pr
 
 ### 重複
 
-複数ケースが同じ前提、操作、データ意味、Oracleを持ち、新しいCoverageを追加していない。
+複数ケースが同じ前提、操作、データ意味、期待結果を持ち、新しいCoverageを追加していない。
 
 ### 過剰
 
@@ -206,6 +206,7 @@ Current Effective Authorityと矛盾する成果物、または`要再検証`の
 - Current Effective AuthorityとProduct RiskがTest Requirementまたは明示Dispositionへ閉じている
 - 各Test Requirement / Test Condition / Coverage Itemが下流成果物または明示Dispositionへ閉じている
 - Coverage Criteriaと候補Dispositionの妥当性を確認している
+- PairwiseではFactor / Value / Constraintと生成Coverage Itemに基づく2-wise保証を確認している
 - 下流成果物不存在を正しく未カバーと判定している
 - 不十分なTest CaseをCoverage Evidenceとして数えていない
 - 高Product Risk Gapを見落としていない

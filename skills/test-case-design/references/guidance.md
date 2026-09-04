@@ -24,7 +24,7 @@ Test Condition / Coverage Itemを、**第三者がケース単体を読んで迷
 4. 何を入力 / 選択するか
 5. 何が起きればPASSか
 
-別ケース、口頭説明、暗黙知を読まないと重要部分を判断できる場合は未完成です。低優先度ケースもこの具体度を下げません。
+別ケース、口頭説明、暗黙知を読まないと必要情報を判断できる場合は未完成です。低優先度ケースもこの具体度を下げません。
 
 ## Current Effective Authority
 
@@ -42,14 +42,14 @@ Product Risk、実装、既存Test Case、一般的UI慣習、未承認`INFERENC
 
 ### 複数期待結果の根拠
 
-1ケースに複数の重要期待結果がある場合は、期待結果番号とCurrent Effective Authorityを対応付けます。
+1ケースにPASS / FAIL判定に使用する期待結果が複数ある場合は、各期待結果番号とCurrent Effective Authorityを対応付けます。
 
 例:
 
 - 期待結果1 → `SPEC-003`
 - 期待結果2 → `DEC-002`
 
-複数根拠を1セルへ並べるだけで、どの期待結果をどの根拠が支えるか不明な状態にしません。
+複数根拠を1セルへ並べるだけで、どの期待結果をどの根拠が支えるか不明な状態にしません。PASS / FAIL判定に使用しない説明的な中間状態は、期待結果として過剰に列挙しません。
 
 ## Coverage Item / Test Conditionの閉鎖
 
@@ -107,7 +107,7 @@ UI中心のシステムテストでは原則UIから観測可能な結果を使�
 
 ### 6. 多段手順と期待結果・根拠を対応付ける
 
-中間結果が次操作の成立条件または合否判定に重要な場合は、手順番号、期待結果番号、必要ならCurrent Effective Authorityを対応させます。
+中間結果が次操作の成立条件またはPASS / FAIL判定に必要な場合は、手順番号、期待結果番号、必要ならCurrent Effective Authorityを対応させます。
 
 単なる画面遷移等、合否へ意味を持たない中間状態まで過剰に分解しません。
 
@@ -141,7 +141,7 @@ UI中心のシステムテストでは原則UIから観測可能な結果を使�
 - テストデータ
 - 実施手順
 - 期待結果
-- 重要期待結果ごとのCurrent Effective Authority
+- PASS / FAIL判定に使用する各期待結果のCurrent Effective Authority
 - 必要時の事後状態 / 後処理
 
 Test Caseへ展開しないCoverage Item / 内包Test Conditionには、上流ID、Disposition、理由 / 根拠が必要です。
@@ -165,9 +165,9 @@ Test Caseへ展開しないCoverage Item / 内包Test Conditionには、上流ID
 - 現在レベルの各Coverage Item / 内包Test ConditionがTest Caseまたは明示Dispositionへ閉じている
 - 別ケースの実行結果へ暗黙依存していない
 - 開始者 / 開始状態、準備、操作、入力 / 選択、合格条件が明確
-- 重要期待結果がCurrent Effective Authorityへ追跡できる
-- 複数重要期待結果の根拠対応が一意
-- Product Risk / 実装 / 既存テストから未定義Oracleを創作していない
+- PASS / FAIL判定に使用する各期待結果がCurrent Effective Authorityへ追跡できる
+- 複数のPASS / FAIL判定用期待結果がある場合の根拠対応が一意
+- Product Risk / 実装 / 既存テストから未定義の期待結果を創作していない
 - 観測できない結果を期待結果にしていない
 - 1ケースで複数Coverage Itemをカバーする場合も関連IDをすべて保持している
 - 統合後も関連IDと最高優先度を失っていない
