@@ -229,7 +229,7 @@ adversarial-review
 - 各担当Skillの品質ゲートを満たす
 - 必要な追跡性がある
 - 出力されたすべてのTest Caseがローレベルで単独実施可能
-- PASS / FAIL判定に使用する各期待結果に一意なCurrent Effective Authority根拠がある
+- PASS / FAIL判定に使用する各期待結果が、1件以上のCurrent Effective AuthorityまたはAuthority集合へ曖昧なく追跡できる
 - 必要なカバレッジ分析・反証レビューが完了している
 - `要再検証`の対象が残っていない
 - 対象スコープ内にBlockedが残っていない
