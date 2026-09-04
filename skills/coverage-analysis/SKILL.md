@@ -1,6 +1,6 @@
 ---
 name: coverage-analysis
-description: Current Effective Authority、Product Risk、Test Requirement、Test Condition、Coverage Item、Test Caseの追跡関係と意味上のCoverageを分析し、各層が下流成果物または明示Dispositionへ閉じているか、未カバー・不正Disposition・孤立・重複・根拠不足がないか確認するSkill。
+description: Current Effective Authority、Product Risk、Test Requirement、Test Condition、Coverage Item、Test Caseの追跡関係と意味上のCoverageを分析し、各層が下流成果物または明示Dispositionへ閉じているか、未カバー・不正Disposition・孤立・重複・根拠不足がないか確認するSkill。テスト設計全体の抜け・過剰・閉鎖性を確認するときに使用する。
 ---
 
 # カバレッジ分析

@@ -27,11 +27,13 @@
 
 対象スコープごとに、現在有効な期待挙動を次の順で解決します。
 
-1. 状態が`有効`の`DECISION`が特定の`SPEC`または旧`DECISION`を明示的に上書き・置換している場合、そのスコープでは当該`DECISION`を採用する
-2. 上書きする有効な`DECISION`がない場合、案件固有の情報源優先順位と鮮度から現在有効な`SPEC`を採用する
-3. `承認済み ASM`は、有効な`SPEC` / `DECISION`で未定義の隙間だけを暫定的に補える
-4. `ASM`が有効な`SPEC` / `DECISION`と競合する場合、`ASM`を優先せず、正式な仕様更新または`DECISION`として解決する
-5. 同一スコープで複数の有効Authorityが競合し、優先順位・鮮度・置換関係で解決できない場合は`question-analysis`へ送る
+1. Canonical Decision Registryから、状態が`有効`で対象スコープに適用される`DECISION`をすべてAuthority候補として識別する。既存`SPEC` / 旧`DECISION`を上書きしていない補足Decisionも候補に含める
+2. 有効`DECISION`が既存`SPEC` / 旧`DECISION`と同じ挙動領域に重なる場合は、上書き / 置換対象、影響範囲、Decision同士の関係から現在有効な内容を解決する。未定義領域を補足するDecisionは既存Authorityと共存できる
+3. `SPEC`については、まず各情報源内で対象Version / Scopeに適用される現行版を版・更新時点から特定する
+4. 現行版の`SPEC`候補間では案件固有の情報源優先順位を適用する。鮮度だけを理由に低優先度情報源を高優先度情報源より優先しない
+5. `承認済み ASM`は、有効な`SPEC` / `DECISION`で未定義の隙間だけを暫定的に補える
+6. `ASM`が有効な`SPEC` / `DECISION`と競合する場合、`ASM`を優先せず、正式な仕様更新または`DECISION`として解決する
+7. 同一スコープで複数の有効Authorityが競合し、Decisionの置換関係・情報源優先順位等で解決できない場合は`question-analysis`へ送る
 
 Canonical Decision Registryでは、`有効`の`DEC-xxx`だけをCurrent Effective Authority候補とします。`撤回` / `置換済み`のDecisionを現在のOracleに使いません。
 
@@ -39,11 +41,11 @@ Canonical Decision Registryでは、`有効`の`DEC-xxx`だけをCurrent Effecti
 
 ### `SPEC`
 
-案件で権威ある情報源に明記され、現在の情報源優先順位・鮮度で有効と判断できる挙動。
+案件で権威ある情報源に明記され、対象Version / Scopeに適用される現行版として有効と判断できる挙動。
 
 ### `DECISION`
 
-正式に確定した挙動。元仕様や旧Decisionを補足・上書きする場合は、置換対象と影響範囲をCanonical Decision Registryで追跡します。
+正式に確定した挙動。未定義部分を補足する場合もCurrent Effective Authority候補です。元仕様や旧Decisionを上書き・置換する場合は、置換対象と影響範囲をCanonical Decision Registryで追跡します。
 
 ### `INFERENCE`
 
@@ -57,9 +59,10 @@ Canonical Decision Registryでは、`有効`の`DEC-xxx`だけをCurrent Effecti
 
 - 案件固有の優先順位が定義されている場合だけ適用する
 - 全案件共通の固定優先順位を作らない
-- 情報源の版・更新時点が判断に影響する場合は鮮度を確認する
+- 鮮度は、まず同一情報源内で対象Version / Scopeに適用される現行版を特定するために使う
+- 複数情報源間の優先順位は案件固有の情報源優先順位で決め、鮮度だけで優先順位を逆転させない
 - 矛盾時はCurrent Effective Authorityを採用しつつ、競合証拠も保持する
-- 優先順位・鮮度・Decision置換関係で解決できない重大矛盾は`question-analysis`へ送る
+- Decision置換関係・情報源優先順位で解決できない重大矛盾は`question-analysis`へ送る
 - 実装が正本でない場合、上位仕様と異なる実装へ仕様を合わせない
 - 既存テストの期待結果を、そのテストに書かれているという理由だけで`SPEC`にしない
 
@@ -67,7 +70,7 @@ Canonical Decision Registryでは、`有効`の`DEC-xxx`だけをCurrent Effecti
 
 1. 対象機能、変更、画面、ユーザー / ロール、業務フロー、明示的対象外を整理する
 2. 実際に使用した情報源を後から追跡できる粒度で記録する
-3. Canonical Decision / Assumption Registryの状態・置換関係を確認する
+3. Canonical Decision / Assumption Registryの状態・影響範囲・置換関係を確認する
 4. 対象スコープごとにCurrent Effective Authorityを解決する
 5. 対象範囲に関係する独立したルール・挙動を抽出する
 6. 権威ある情報源の正式用語を維持する
@@ -87,7 +90,7 @@ Canonical Decision Registryでは、`有効`の`DEC-xxx`だけをCurrent Effecti
 - 分析範囲と制約
 - 実際に使用した情報源
 - 分類と一致する安定IDを持つ分析項目
-- Current Effective Authorityと置換関係
+- Current Effective Authorityと補足 / 上書き / 置換関係
 - 業務ルール
 - 状態 / 遷移
 - 処理 / 業務フロー
@@ -112,9 +115,12 @@ Canonical Decision Registryでは、`有効`の`DEC-xxx`だけをCurrent Effecti
 
 - IDが分類と一致している
 - `DEC-xxx`を重複採番していない
+- 対象スコープに適用される有効Decisionを、上書き有無に関係なくAuthority候補として確認している
 - `撤回` / `置換済み`Decisionを現在のOracleに使っていない
 - `ASM`で有効な`SPEC` / `DECISION`を上書きしていない
-- `SPEC`が権威ある根拠と鮮度に支えられている
+- 各情報源の現行版を特定した後に情報源優先順位を適用している
+- 鮮度だけで低優先度情報源を優先していない
+- `SPEC`が権威ある根拠に支えられている
 - `INFERENCE`を事実扱いしていない
 - `UNKNOWN`を一般論で埋めていない
 - 実装差分に合わせて仕様を書き換えていない

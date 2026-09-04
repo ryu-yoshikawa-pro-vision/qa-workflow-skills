@@ -17,7 +17,7 @@
 
 ## Product Risk一覧
 
-| リスクID | 製品上のリスク / 失敗 | 関連仕様 / 変更 | 影響度 | 発生可能性 | レベル | 根拠 |
+| リスクID | 製品上のリスク / 失敗 | 関連Current Effective Authority / 変更 / 依存 | 影響度 | 発生可能性 | レベル | 根拠 |
 | --- | --- | --- | ---: | ---: | --- | --- |
 | RISK-001 |  |  |  |  | 高 / 中 / 低 |  |
 
@@ -29,7 +29,7 @@
 
 ## 選択したテスト技法
 
-| テスト技法 | 適用領域 | 選択理由 | 関連Product Risk / 仕様 | `test-condition-design`への着眼点 |
+| テスト技法 | 適用領域 | 選択理由 | 関連Product Risk / Current Effective Authority | `test-condition-design`への着眼点 |
 | --- | --- | --- | --- | --- |
 |  |  |  |  |  |
 

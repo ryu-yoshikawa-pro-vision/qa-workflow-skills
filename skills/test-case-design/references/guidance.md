@@ -26,23 +26,23 @@ Test Condition / Coverage Itemを、**第三者がケース単体を読んで迷
 
 別ケース、口頭説明、暗黙知を読まないと重要部分を判断できる場合は未完成です。低優先度ケースもこの具体度を下げません。
 
-## Oracle Authority
+## Current Effective Authority
 
 完成済みTest Caseの期待結果は、対象スコープのCurrent Effective Authorityへ追跡します。
 
 利用可能なAuthorityは次です。
 
 - 現在有効な`SPEC`
-- 状態が`有効`の`DECISION`
+- 状態が`有効`で対象スコープに適用される`DECISION`
 - 有効な`SPEC` / `DECISION`で未定義の隙間を補う`承認済み ASM`
 
-Product Risk、実装、既存Test Case、一般的UI慣習、未承認`INFERENCE`、テスターの常識は単独でOracle Authorityにしません。`撤回` / `置換済み`DecisionをOracleへ使いません。
+Product Risk、実装、既存Test Case、一般的UI慣習、未承認`INFERENCE`、テスターの常識は単独でCurrent Effective Authorityにしません。`撤回` / `置換済み`Decisionを現在の根拠へ使いません。
 
 期待結果を決められない場合は`question-analysis`へ戻します。
 
 ### 複数期待結果の根拠
 
-1ケースに複数の重要期待結果がある場合は、期待結果番号とOracle Authorityを対応付けます。
+1ケースに複数の重要期待結果がある場合は、期待結果番号とCurrent Effective Authorityを対応付けます。
 
 例:
 
@@ -51,11 +51,27 @@ Product Risk、実装、既存Test Case、一般的UI慣習、未承認`INFERENC
 
 複数根拠を1セルへ並べるだけで、どの期待結果をどの根拠が支えるか不明な状態にしません。
 
+## Coverage Item / Test Conditionの閉鎖
+
+現在レベルで採用済みの各Coverage Itemは、次のいずれかへ位置づけます。
+
+- 1件以上のTest Caseへ接続
+- 別テストレベル
+- 残存リスク
+- 対象外
+- Blocked
+
+Coverage Itemを独立表示せずTest Conditionへ内包している場合も、そのTest Conditionを同じようにTest Caseまたは明示Dispositionへ閉じます。
+
+1つのTest Caseが複数Coverage Itemをカバーする場合は、すべてのCoverage Item IDを同じTest Caseへ関連付けます。複数項目を1ケースでカバーできること自体を`重複`Dispositionにはしません。
+
+ケース化しない項目のDispositionは`qa-workflow`の共通Disposition条件に従います。Product Riskが低いことだけを理由に`対象外`へ送りません。
+
 ## テストデータ / 状態 / 環境
 
 必要なユーザー、データ、状態、環境は原則として準備可能として設計します。
 
-設計時点ですでに準備不能と分かる条件はケース化せず、制約 / 残存 / 対象外として扱います。実施時に初めて準備不能と分かった場合は、その時点で実施対象から除外または見直します。
+設計時点ですでに準備不能と分かる条件はケース化せず、妥当なDispositionへ位置づけます。実施時に初めて準備不能と分かった場合は、その時点で実施対象から除外または見直します。
 
 ## 優先度
 
@@ -69,7 +85,7 @@ Test Caseは、カバーするTest Condition / Coverage Item / Test Requirement�
 
 タイトル / 目的から何を確認するケースか一意に分かるようにします。
 
-複数Coverage Itemを1ケースでまとめてよいのは、前提条件、操作経路、テストデータ区分、Oracleが実質的に同じ場合です。無関係な目的を1ケースへ詰めません。
+複数Coverage Itemを1ケースでまとめてよいのは、前提条件、操作経路、テストデータ区分、期待結果が実質的に同じ場合です。無関係な目的を1ケースへ詰めません。
 
 ### 2. 前提条件を明示する
 
@@ -91,7 +107,7 @@ UI中心のシステムテストでは原則UIから観測可能な結果を使�
 
 ### 6. 多段手順と期待結果・根拠を対応付ける
 
-中間結果が次操作の成立条件または合否判定に重要な場合は、手順番号、期待結果番号、必要ならOracle Authorityを対応させます。
+中間結果が次操作の成立条件または合否判定に重要な場合は、手順番号、期待結果番号、必要ならCurrent Effective Authorityを対応させます。
 
 単なる画面遷移等、合否へ意味を持たない中間状態まで過剰に分解しません。
 
@@ -105,11 +121,11 @@ UI中心のシステムテストでは原則UIから観測可能な結果を使�
 
 ### 9. 重複を統合する
 
-前提、操作、データ意味、Oracleが同一で、違いが説明列だけの場合は統合を検討します。関連Test Condition / Coverage Item IDを失わないようにします。
+前提、操作、データ意味、期待結果が同一で、違いが説明列だけの場合は統合を検討します。関連Test Condition / Coverage Item IDを失わないようにします。
 
 ## ケース分離の判断
 
-開始状態、操作経路、Oracle、失敗時の意味、独立性、挙動を変えるデータ区分が異なる場合は分離します。観点名が違うだけでは分離理由になりません。
+開始状態、操作経路、期待結果、失敗時の意味、独立性、挙動を変えるデータ区分が異なる場合は分離します。観点名が違うだけでは分離理由になりません。
 
 ## 意味上の出力契約
 
@@ -128,6 +144,8 @@ UI中心のシステムテストでは原則UIから観測可能な結果を使�
 - 重要期待結果ごとのCurrent Effective Authority
 - 必要時の事後状態 / 後処理
 
+Test Caseへ展開しないCoverage Item / 内包Test Conditionには、上流ID、Disposition、理由 / 根拠が必要です。
+
 ## 停止条件
 
 次の場合、影響ケースをBlockedとします。
@@ -144,19 +162,20 @@ UI中心のシステムテストでは原則UIから観測可能な結果を使�
 ## 品質ゲート
 
 - **出力したすべてのTest Case**がローレベル完了基準を満たす
+- 現在レベルの各Coverage Item / 内包Test ConditionがTest Caseまたは明示Dispositionへ閉じている
 - 別ケースの実行結果へ暗黙依存していない
 - 開始者 / 開始状態、準備、操作、入力 / 選択、合格条件が明確
 - 重要期待結果がCurrent Effective Authorityへ追跡できる
 - 複数重要期待結果の根拠対応が一意
 - Product Risk / 実装 / 既存テストから未定義Oracleを創作していない
 - 観測できない結果を期待結果にしていない
-- 必要Test Condition / Coverage Itemがケースへ落ちている
+- 1ケースで複数Coverage Itemをカバーする場合も関連IDをすべて保持している
 - 統合後も関連IDと最高優先度を失っていない
 - 正式用語を使っている
 - 曖昧な「正常」「正しい」「適切」を具体結果の代わりに使っていない
 
 ## 次の担当Skill
 
-- Oracle / 期待挙動不明 → `question-analysis`
+- Current Effective Authority / 期待挙動不明 → `question-analysis`
 - Coverage Item不足 / 条件不備 → `test-condition-design`
 - Coverage確認 → `coverage-analysis`

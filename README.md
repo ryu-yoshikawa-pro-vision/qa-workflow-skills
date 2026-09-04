@@ -92,9 +92,11 @@ adversarial-review
 
 期待挙動は固定順位で決めず、対象スコープで現在有効なAuthorityを解決します。
 
-- 有効な`DECISION`が旧仕様・旧Decisionを上書きする場合はそのスコープでDecisionを採用
-- それ以外は情報源優先順位・鮮度に従って現在有効な`SPEC`を採用
-- `承認済み ASM`は有効な`SPEC` / `DECISION`で未定義の隙間だけを暫定的に補完
+- 状態が`有効`で対象スコープに適用される`DECISION`は、既存仕様の上書き有無に関係なくAuthority候補とする
+- 有効`DECISION`が既存`SPEC` / 旧`DECISION`と重なる場合は、上書き / 置換関係と影響範囲で解決する
+- `SPEC`は各情報源の現行版を版・更新時点から特定した後、案件固有の情報源優先順位を適用する
+- 鮮度だけを理由に低優先度情報源を高優先度情報源より優先しない
+- `承認済み ASM`は有効な`SPEC` / `DECISION`で未定義の隙間だけを暫定的に補完する
 - 解決不能なAuthority競合はBlocker
 
 ### ID / Canonical Registry
@@ -145,6 +147,8 @@ adversarial-review
 Blockerは可能な限り影響範囲だけを停止します。
 
 対象内項目を下流へ展開しない場合は、理由に応じて別テストレベル / 残存リスク / 対象外 / Blocked等へ明示的に位置づけます。低Product Riskだけを理由に`対象外`へ送りません。
+
+Full Workflowで対象スコープ内にBlockedが残る場合、Blocked以外の範囲は完了できますが、Workflow全体は`部分完了（Blockedあり）`または`Blocked`として扱い、無条件に`完了`とはしません。
 
 ### 上流修正
 

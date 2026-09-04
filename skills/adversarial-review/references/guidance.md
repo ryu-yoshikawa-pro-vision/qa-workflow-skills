@@ -38,7 +38,7 @@ QA成果物を肯定するためではなく、**誤り・抜け・過剰・根�
 
 Coverage、追跡性、実行可能性、Oracle信頼性を実質的に弱め、通常は利用前に修正すべき。
 
-処置は`修正済み`、権限を持つユーザー / ステークホルダーが明示的に`残存リスクとして受容`、または`Blocked`です。
+処置は`修正済み`、権限を持つユーザー / ステークホルダーが明示的に`残存リスクとして受容`、または`Blocked`です。残存リスクとして受容する場合は、誰のどの承認に基づくかを追跡できる承認参照を記録します。
 
 ### `軽微`
 
@@ -57,10 +57,12 @@ Coverage、追跡性、実行可能性、Oracle信頼性を実質的に弱め、
 - `SPEC` / `DECISION` / `INFERENCE` / `UNKNOWN`を混同していないか
 - IDが分類と一致しているか
 - `DEC-xxx`をCanonical Registryと別IDで重複管理していないか
+- 対象スコープに適用される有効Decisionを、上書き有無に関係なくAuthority候補として確認しているか
 - `撤回` / `置換済み`Decisionを現在のOracleにしていないか
-- 有効Decisionの上書き / 置換対象と影響範囲が追跡できるか
+- 有効Decisionの補足 / 上書き / 置換関係と影響範囲が追跡できるか
 - `ASM`で有効な`SPEC` / `DECISION`を上書きしていないか
-- 情報源優先順位・鮮度を正しく適用しているか
+- 各情報源の現行版を特定した後に情報源優先順位を適用しているか
+- 鮮度だけで低優先度情報源を優先していないか
 - 実装・既存テストを仕様Authorityへ昇格していないか
 - 同一スコープの有効Authority競合を未解決のまま下流へ流していないか
 
@@ -115,13 +117,13 @@ Coverage、追跡性、実行可能性、Oracle信頼性を実質的に弱め、
 
 さらに:
 
+- 現在レベルの各Coverage Item / 内包Test ConditionがTest Caseまたは明示Dispositionへ閉じているか
 - 別ケースの暗黙状態へ依存していないか
 - 正式用語を使っているか
 - 期待結果が観測可能か
 - 重要期待結果ごとにCurrent Effective Authorityへ一意に追跡できるか
 - Product Risk / 実装 / 既存テストを未定義Oracleにしていないか
 - 許可されていないDB / API / ログ観測を要求していないか
-- 必要Coverage Itemがケースへ落ちているか
 - 優先度を理由なく下げていないか
 - 重複または過剰統合がないか
 
@@ -157,7 +159,7 @@ Coverage、追跡性、実行可能性、Oracle信頼性を実質的に弱め、
 - Product Risk / テスト重点 → `test-analysis`
 - Test Requirement / 上流Disposition → `test-requirement-design`
 - Test Condition / Coverage Criteria / Coverage Item / 候補Disposition → `test-condition-design`
-- Test Case → `test-case-design`
+- Test Case / Coverage ItemからTest Caseへの閉鎖 → `test-case-design`
 - Coverage判定 → `coverage-analysis`
 - 案件固有設定 / Canonical Registry → Project Context / 仕様決定
 
@@ -179,6 +181,7 @@ Coverage、追跡性、実行可能性、Oracle信頼性を実質的に弱め、
 - 影響
 - 推奨修正先Skill
 - 処置状態
+- `重大`を残存リスクとして受容する場合の処置根拠 / 承認参照
 
 ## 品質ゲート
 
@@ -187,7 +190,7 @@ Coverage、追跡性、実行可能性、Oracle信頼性を実質的に弱め、
 - 一般的チェックリストを機械適用していない
 - `致命的` / `重大`の影響説明が具体的
 - `致命的`を残存リスク受容だけで完了させていない
-- `重大`の残存リスク受容に明示的な承認がある
+- `重大`の残存リスク受容に明示的な承認があり、承認参照を追跡できる
 - 高Product Riskの未カバーを無処置で見逃していない
 - 修正先が最も早い責任Skillになっている
 - 本Skill自身が他層成果物を書き換えていない

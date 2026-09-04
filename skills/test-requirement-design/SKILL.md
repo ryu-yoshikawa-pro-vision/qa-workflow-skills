@@ -7,7 +7,7 @@ description: Current Effective Authorityとテスト分析から、何を検証�
 
 ## 実行契約
 
-1. 実行前に `references/guidance.md` を読み、要求の抽象度、上流項目の閉鎖、分割・統合、追跡性、Oracle Authority、停止条件、品質ゲートに従います。
+1. 実行前に `references/guidance.md` を読み、要求の抽象度、上流項目の閉鎖、分割・統合、追跡性、Current Effective Authority、停止条件、品質ゲートに従います。
 2. Test Requirementは「何を検証するか」に留め、具体条件、組合せ、実行手順を書きません。
 3. 期待挙動はCurrent Effective Authorityへ追跡し、Product Risk、実装、既存テスト、未承認INFERENCEだけで製品挙動を確定しません。
 4. 対象範囲内のCurrent Effective Authority / Product Riskを、Test Requirementまたは明示Dispositionへ閉じます。
