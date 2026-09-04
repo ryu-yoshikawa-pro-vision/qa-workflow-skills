@@ -18,7 +18,7 @@ description: Current Effective Authority、Product Risk、Test Requirement、Tes
 
 ## 出力
 
-カバレッジ範囲、Authority / Product Riskの閉鎖状況、追跡マトリクス、Coverage Criteria充足、Coverage候補Disposition妥当性、Coverage ItemのDisposition、未カバー / 孤立 / 重複 / 根拠不足、推奨修正先を示します。
+カバレッジ範囲、Authority / Product Riskの閉鎖状況、追跡マトリクス、Coverage Criteria充足、Coverage候補Disposition妥当性、Coverage ItemのDisposition、未カバー / 不正Disposition / 孤立 / 重複 / 根拠不足、残存リスク / Blocked、推奨修正先を示します。
 
 ## リソース
 

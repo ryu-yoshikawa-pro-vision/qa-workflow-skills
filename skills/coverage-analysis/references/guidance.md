@@ -105,7 +105,7 @@ DispositionのないCoverage ItemはCoverage Gapです。
 - どのTest Condition / Coverage Itemを確認するか分かる
 - 実施可能な具体性がある
 - PASS / FAILを判断できる期待結果がある
-- PASS / FAIL判定に使用する各期待結果がCurrent Effective Authorityへ一意に追跡できる
+- PASS / FAIL判定に使用する各期待結果が、1件以上のCurrent Effective AuthorityまたはAuthority集合へ曖昧なく追跡できる
 
 詳細なケース品質レビューは`adversarial-review`が担当します。
 

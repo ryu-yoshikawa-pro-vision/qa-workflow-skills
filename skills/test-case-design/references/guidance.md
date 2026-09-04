@@ -40,16 +40,16 @@ Product Risk、実装、既存Test Case、一般的UI慣習、未承認`INFERENC
 
 期待結果を決められない場合は`question-analysis`へ戻します。
 
-### 複数期待結果の根拠
+### 複数期待結果・複数Authorityの根拠
 
-1ケースにPASS / FAIL判定に使用する期待結果が複数ある場合は、各期待結果番号とCurrent Effective Authorityを対応付けます。
+PASS / FAIL判定に使用する各期待結果は、それを成立させる1件以上のCurrent Effective Authorityへ曖昧なく対応付けます。1つの期待結果を複数Authorityが共同で支える場合は、Authority集合として追跡できる形にします。
 
 例:
 
 - 期待結果1 → `SPEC-003`
-- 期待結果2 → `DEC-002`
+- 期待結果2 → `SPEC-004` + `DEC-002`
 
-複数根拠を1セルへ並べるだけで、どの期待結果をどの根拠が支えるか不明な状態にしません。PASS / FAIL判定に使用しない説明的な中間状態は、期待結果として過剰に列挙しません。
+複数根拠を1セルへ並べるだけで、どの期待結果をどの根拠または根拠集合が支えるか不明な状態にしません。PASS / FAIL判定に使用しない説明的な中間状態は、期待結果として過剰に列挙しません。
 
 ## Coverage Item / Test Conditionの閉鎖
 
@@ -141,7 +141,7 @@ UI中心のシステムテストでは原則UIから観測可能な結果を使�
 - テストデータ
 - 実施手順
 - 期待結果
-- PASS / FAIL判定に使用する各期待結果のCurrent Effective Authority
+- PASS / FAIL判定に使用する各期待結果を支える1件以上のCurrent Effective Authority
 - 必要時の事後状態 / 後処理
 
 Test Caseへ展開しないCoverage Item / 内包Test Conditionには、上流ID、Disposition、理由 / 根拠が必要です。
@@ -165,8 +165,8 @@ Test Caseへ展開しないCoverage Item / 内包Test Conditionには、上流ID
 - 現在レベルの各Coverage Item / 内包Test ConditionがTest Caseまたは明示Dispositionへ閉じている
 - 別ケースの実行結果へ暗黙依存していない
 - 開始者 / 開始状態、準備、操作、入力 / 選択、合格条件が明確
-- PASS / FAIL判定に使用する各期待結果がCurrent Effective Authorityへ追跡できる
-- 複数のPASS / FAIL判定用期待結果がある場合の根拠対応が一意
+- PASS / FAIL判定に使用する各期待結果が、1件以上のCurrent Effective AuthorityまたはAuthority集合へ曖昧なく追跡できる
+- 複数のPASS / FAIL判定用期待結果がある場合も、期待結果と根拠 / 根拠集合の対応が曖昧でない
 - Product Risk / 実装 / 既存テストから未定義の期待結果を創作していない
 - 観測できない結果を期待結果にしていない
 - 1ケースで複数Coverage Itemをカバーする場合も関連IDをすべて保持している

@@ -122,7 +122,7 @@ Coverage、追跡性、実行可能性、Oracle信頼性を実質的に弱め、
 - 別ケースの暗黙状態へ依存していないか
 - 正式用語を使っているか
 - 期待結果が観測可能か
-- PASS / FAIL判定に使用する各期待結果がCurrent Effective Authorityへ一意に追跡できるか
+- PASS / FAIL判定に使用する各期待結果が、1件以上のCurrent Effective AuthorityまたはAuthority集合へ曖昧なく追跡できるか
 - Product Risk / 実装 / 既存テストを未定義の期待結果にしていないか
 - 許可されていないDB / API / ログ観測を要求していないか
 - 優先度を理由なく下げていないか
