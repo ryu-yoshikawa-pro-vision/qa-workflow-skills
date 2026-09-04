@@ -1,6 +1,6 @@
 ---
 name: test-case-design
-description: テスト観点・条件とCoverage Itemを、第三者が迷わず実施できるローレベルテストケースへ変換するSkill。前提条件、テストデータ、手順、観測可能な期待結果、Oracle根拠、独立性を明確にしたテスト項目書を作るときに使用する。
+description: Test ConditionとCoverage Itemを、第三者が迷わず実施できるローレベルTest Caseへ変換するSkill。前提条件、テストデータ、手順、観測可能な期待結果、Current Effective Authority、独立性を明確にしたテスト項目書を作るときに使用する。
 ---
 
 # ローレベルテストケース設計
@@ -8,8 +8,8 @@ description: テスト観点・条件とCoverage Itemを、第三者が迷わず
 ## 実行契約
 
 1. 実行前に `references/guidance.md` を読み、ケース粒度、独立性、Oracle、統合 / 分離、停止条件、品質ゲートに従います。
-2. 各重要ケースは単体で、開始者 / 開始状態、準備対象、操作、入力 / 選択、合格条件を判断できる具体度にします。
-3. 完成済みケースの期待結果は原則 `SPEC` / `DECISION` / `承認済み ASM` へ追跡します。未承認INFERENCE、Product Risk、実装、既存テスト、一般慣習だけでOracleを確定しません。
+2. 出力するすべてのケースは単体で、開始者 / 開始状態、準備対象、操作、入力 / 選択、合格条件を判断できる具体度にします。
+3. 完成済みケースの期待結果はCurrent Effective Authorityへ追跡します。未承認INFERENCE、Product Risk、実装、既存テスト、一般慣習だけでOracleを確定しません。
 4. 多段手順では、合否判定や次操作に重要な中間結果を該当手順番号と対応付けます。
 5. 別ケースの独立性や再実行性へ影響する場合だけ、事後状態 / 後処理を明示します。
 6. 必要なユーザー・データ・状態・環境は原則準備可能として設計しますが、既知の準備不能条件はケース化しません。
@@ -18,7 +18,7 @@ description: テスト観点・条件とCoverage Itemを、第三者が迷わず
 
 ## 出力
 
-安定ID、目的、関連観点 / Coverage Item / 要求、前提条件、テストデータ、実施手順、具体的期待結果、Oracle根拠、必要時の事後状態を持つローレベルテストケースを作ります。
+安定ID、目的、関連Test Condition / Coverage Item / Test Requirement、前提条件、テストデータ、実施手順、具体的期待結果、Current Effective Authority、必要時の事後状態を持つローレベルTest Caseを作ります。
 
 ## リソース
 

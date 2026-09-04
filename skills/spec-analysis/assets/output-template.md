@@ -10,24 +10,18 @@
 
 ## 情報源一覧
 
-| 情報源ID | 情報源 | 権威 / 優先順位 | 対象範囲 | 参照 / 備考 |
-| --- | --- | --- | --- | --- |
-| SRC-001 |  |  |  |  |
+| 情報源ID | 情報源 | 権威 / 優先順位 | 鮮度 / バージョン | 対象範囲 | 参照 / 備考 |
+| --- | --- | --- | --- | --- | --- |
+| SRC-001 |  |  |  |  |  |
 
 ## 分析項目
 
-| 項目ID | カテゴリ | 内容 | 分類 | 情報源 / Canonical Decision参照 | 備考 |
-| --- | --- | --- | --- | --- | --- |
-| SPEC-001 |  |  | SPEC / DECISION / INFERENCE / UNKNOWN |  |  |
-
-IDは分類と一致させます。
-
-- `SPEC-xxx`: SPEC
-- `DEC-xxx`: DECISION
-- `INF-xxx`: INFERENCE
-- `UNK-xxx`: UNKNOWN
-
-`DEC-xxx`はCanonical Decision Registryの既存IDを参照し、重複採番しません。
+| 項目ID | カテゴリ | 内容 | 分類 | 情報源 / Canonical Registry参照 | 現在有効か | 上書き / 置換関係 | 備考 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| SPEC-001 |  |  | SPEC |  |  |  |  |
+| DEC-001 |  |  | DECISION |  |  |  |  |
+| INF-001 |  |  | INFERENCE |  |  |  |  |
+| UNK-001 |  |  | UNKNOWN |  |  |  |  |
 
 ## 業務ルール
 

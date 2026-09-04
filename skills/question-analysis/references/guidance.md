@@ -6,7 +6,7 @@
 
 ## 入力
 
-利用可能な仕様分析、権威ある情報源、案件コンテキスト、確定事項、既存質問 / 回答、実装証拠、対象QA成果物を使います。
+利用可能な仕様分析、Current Effective Authority、権威ある情報源、案件コンテキスト、Canonical Decision / Assumption Registry、既存質問 / 回答、実装証拠、対象QA成果物を使います。
 
 ## 分類基準
 
@@ -17,7 +17,7 @@
 例:
 
 - 成功条件 / 期待結果を決められない
-- 相互排他的な仕様が同優先度で残る
+- 相互排他的な有効Authorityが残る
 - 主要業務ルールをどちらとして扱うべきか決められない
 - 対象範囲そのものを特定できない
 - 完成済みTest CaseのPASS / FAILが未承認仮定に依存する
@@ -32,7 +32,7 @@ Blockerは重要そうかではなく、**現在要求されている成果物�
 
 最終Oracleを確定しない分析・ドラフト等の範囲で、明示的な暫定仮定を置けば安全に作業を継続できる事項。
 
-仮定は`SPEC`ではありません。完成済みTest CaseのPASS / FAILへ使用するには、権限を持つユーザー / ステークホルダーの明示承認が必要です。
+仮定は`SPEC`ではありません。完成済みTest CaseのPASS / FAILへ使用するには、権限を持つユーザー / ステークホルダーの明示承認とCanonical Assumption Registryへの記録が必要です。
 
 ### `提案・任意`
 
@@ -42,31 +42,52 @@ Blockerは重要そうかではなく、**現在要求されている成果物�
 
 仮定候補は本Skillで提案できますが、`承認済み ASM-xxx`の正本はProject Contextまたは案件で明示されたCanonical Assumption Registryです。
 
-- 本Skillで独自に別IDを再採番しない
+- 提案段階ではCanonical ASM IDを必須にしない
 - AI自身の判断で`承認済み`へ変更しない
-- 承認後はCanonical Registryへ反映してからOracleへ利用する
+- 承認後にCanonical Registryへ採番・反映してからOracleへ利用する
+- 有効な`SPEC` / `DECISION`と競合する仮定を`承認済み ASM`として上書き利用しない
+- 正式挙動として確定した内容はAssumptionのまま残さず、仕様更新または`DECISION`へ正規化する
+
+## 回答の正規化
+
+質問への回答を受けた後は、その回答を下流へ直接流さず、期待挙動のAuthorityとして次のいずれかへ正規化します。
+
+### 情報源自体が更新された
+
+更新された権威ある情報源を`SPEC`として扱い、`spec-analysis`で再解析します。
+
+### ステークホルダー判断として正式に確定した
+
+Canonical Decision Registryへ`DEC-xxx`として記録し、状態・影響範囲・上書き / 置換対象を明示します。
+
+### 暫定的な前提としてのみ合意した
+
+Canonical Assumption Registryへ`ASM-xxx`として記録し、`承認済み`にします。有効な`SPEC` / `DECISION`を上書きする用途には使いません。
+
+回答の意味がどれに当たるか判断できない場合は、勝手に`DECISION` / `ASM`へ昇格させず再確認します。
 
 ## 判断順序
 
 質問化する前に次を順番に確認します。
 
-1. 案件固有の情報源優先順位で解決できないか
+1. Current Effective Authorityで解決済みではないか
 2. 既存`DECISION`で解決済みではないか
 3. `承認済み ASM`で暫定解決済みではないか
 4. 高優先度仕様と実装が違うだけではないか
 5. 本当に下流判断に影響するか
 6. 最終成果物のPASS / FAILがその未確定事項へ依存するか
 
-上位情報源で期待挙動が決まっている実装差分を、製品仕様の質問へ戻しません。
+上位Authorityで期待挙動が決まっている実装差分を、製品仕様の質問へ戻しません。
 
 ## 手順
 
 1. 曖昧表現、矛盾、欠落、未定義優先順位、Oracle不足、暗黙仮定等の候補を抽出する
-2. 既存質問、回答、決定、情報源優先順位を確認し、重複・解決済みを除外する
+2. 既存質問、回答、Current Effective Authorityを確認し、重複・解決済みを除外する
 3. 影響成果物と範囲を特定する
 4. `Blocker` / `要確認` / `仮定可能` / `提案・任意`へ分類する
 5. Blocker範囲を局所化する
-6. 仮定を使う場合は内容、根拠、影響範囲、状態を明示し、承認済みならCanonical Registryへ反映する
+6. 仮定を使う場合は内容、根拠、影響範囲、状態を明示する
+7. 回答後は`SPEC` / `DECISION` / `承認済み ASM`のいずれかへ正規化してから、意味が変わる最も早いSkillへ戻す
 
 ## 意味上の出力契約
 
@@ -80,7 +101,8 @@ Blockerは重要そうかではなく、**現在要求されている成果物�
 - 回答がない場合の扱い
 - 仮定可能なら仮定案
 - Blocked範囲
-- 回答後の再開先Skill
+- 回答後の正規化先
+- 再開先Skill
 
 ## 停止・継続判断
 
@@ -100,6 +122,8 @@ Blockerは重要そうかではなく、**現在要求されている成果物�
 - `要確認`を暗黙の期待挙動へ変えていない
 - `仮定可能`を仕様扱いしていない
 - `承認済み ASM`は明示承認とCanonical Registryを根拠にしている
+- `ASM`で有効な`SPEC` / `DECISION`を上書きしていない
+- 回答後の期待挙動を生の会話情報のままOracleへ流していない
 - 実装差分を不要な仕様質問へ戻していない
 - 各論点の再開先がCanonical Skill名で一意に分かる
 
@@ -107,8 +131,8 @@ Blockerは重要そうかではなく、**現在要求されている成果物�
 
 論点解消後は、意味が変わる最も早い担当Skillへ戻します。
 
-- 仕様モデルが変わる → `spec-analysis`
+- 仕様モデル / Current Effective Authorityが変わる → `spec-analysis`
 - Product Risk / テスト重点が変わる → `test-analysis`
-- テスト要求が変わる → `test-requirement-design`
-- 条件 / Coverage Itemが変わる → `test-condition-design`
-- ケース / Oracleだけが変わる → `test-case-design`
+- Test Requirementが変わる → `test-requirement-design`
+- Test Condition / Coverage Itemが変わる → `test-condition-design`
+- Test Case / Oracleだけが変わる → `test-case-design`

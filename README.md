@@ -6,13 +6,14 @@
 
 対象機能について、次の状態を作ります。
 
-- 製品の期待挙動を権威ある情報源へ追跡できる
+- 現在有効な製品の期待挙動を権威ある情報源・正式決定へ追跡できる
 - 不明点・矛盾・仮定を仕様と混同しない
 - Product Riskに応じてテスト重点・深度を決める
 - 適切なテスト技法とCoverage Criteriaから必要なCoverage Itemを識別する
-- テストケース単体で、開始状態・準備・操作・入力・合格条件を判断できる
-- `Source / Decision / Approved Assumption → Test Requirement → Test Condition → Coverage Item → Test Case`を追跡できる
-- カバレッジ分析と反証レビューで抜け・過剰・根拠のないOracleを検出する
+- 対象内の上流項目を無言で落とさず、下流成果物または明示Dispositionへ閉じる
+- すべてのTest Caseを、ケース単体で開始状態・準備・操作・入力・PASS条件を判断できる粒度にする
+- `Current Effective Authority / Product Risk → Test Requirement → Test Condition → Coverage Item → Test Case` を追跡できる
+- Coverage Analysisと反証レビューで抜け・過剰・不正Disposition・根拠のないOracleを検出する
 
 毎回繰り返す回帰テストスイートの選定・保守・実行管理は主対象ではありません。
 
@@ -45,7 +46,7 @@ skills/
 - `references/guidance.md`: 詳細な判断基準、手順、停止条件、品質ゲート
 - `assets/output-template.md`: 既定の出力形式
 
-テンプレートには判断ロジックを置きません。案件固有形式がある場合は、Skillの意味上の出力契約と必要な追跡性を維持できる限り案件固有形式を優先できます。
+案件固有形式がある場合は、Skillの意味上の出力契約と必要な追跡性を維持できる限り案件固有形式を優先できます。
 
 ## Skill参照規則
 
@@ -53,7 +54,7 @@ SkillはYAML frontmatterの`name`と同じCanonical Skill名で参照します�
 
 | Canonical Skill名 | 日本語名称 | 主な成果物 |
 | --- | --- | --- |
-| `spec-analysis` | 仕様分析 | 仕様分析 |
+| `spec-analysis` | 仕様分析 | 仕様分析 / Current Effective Authority |
 | `question-analysis` | 不明点・矛盾分析 | 不明点・矛盾 / 仮定候補 |
 | `test-analysis` | テスト分析 | Product Risk / テスト重点 |
 | `test-requirement-design` | テスト要求設計 | Test Requirement |
@@ -87,7 +88,16 @@ adversarial-review
 
 ## 基本原則
 
-### 情報源とID
+### Current Effective Authority
+
+期待挙動は固定順位で決めず、対象スコープで現在有効なAuthorityを解決します。
+
+- 有効な`DECISION`が旧仕様・旧Decisionを上書きする場合はそのスコープでDecisionを採用
+- それ以外は情報源優先順位・鮮度に従って現在有効な`SPEC`を採用
+- `承認済み ASM`は有効な`SPEC` / `DECISION`で未定義の隙間だけを暫定的に補完
+- 解決不能なAuthority競合はBlocker
+
+### ID / Canonical Registry
 
 - `SPEC-xxx`: 権威ある情報源に明記された仕様
 - `DEC-xxx`: 正式に確定した決定
@@ -95,37 +105,32 @@ adversarial-review
 - `UNK-xxx`: 根拠不足で確定できない事項
 - `ASM-xxx`: 明示的な仮定
 
-`DEC-xxx`と`ASM-xxx`はProject Contextまたは案件で明示された同等のCanonical Registryへ一意に記録します。
-
-### Oracle Authority
-
-完成済みTest Caseの期待結果は原則として次へ追跡します。
-
-1. `SPEC`
-2. `DECISION`
-3. `承認済み ASM`
-
-Product Risk、実装、既存テスト、一般的慣習、未承認推論は単独でOracle Authorityにしません。複数の重要期待結果がある場合は、期待結果ごとにOracle Authorityを対応付けます。
-
-### Assumption
-
-分析・ドラフトでは明示的仮定で継続できる場合がありますが、完成済みTest CaseのPASS / FAILが未承認Assumptionに依存する範囲はBlockerです。
+`DEC-xxx` / `ASM-xxx`はProject Contextまたは案件で明示された同等のCanonical Registryへ一意に記録します。
 
 ### Product Risk
 
 テスト深度・優先度の判断にはProduct Riskを使います。Project Riskはリスク評価へ混ぜません。
 
-案件固有方式がない場合は4×4のRisk Matrixを使用し、重大Impactが単純な積算によってLowへ落ちないようにします。
+案件固有方式がない場合は4×4 Risk Matrixを使います。Product RiskはCoverageの深度を変えるために使い、対象内の仕様・要求を無言で削除する理由にはしません。
 
-### Coverage Criteria / Coverage Item
+### Coverageの閉鎖性
 
-複数候補を持つ技法では、**候補母集団 → Coverage Criteria → Coverage Item → 除外 / 削減候補のDisposition**の順に設計します。
+フルワークフローでは、対象内のCurrent Effective Authority、Product Risk、Test Requirement、Test Condition、Coverage Itemを、下流成果物または明示Dispositionへ閉じます。
 
-技法名を書いただけでCoverage済みとは判断しません。
+複数候補を持つ技法では、**候補母集団 → Coverage Criteria → Coverage Item → 採用しない候補のDisposition**の順に設計します。
+
+### 主な技法の既定
+
+- 同値分割: 対象Partitionを候補化し、採用またはDisposition
+- BVA: 2-valueを既定とし、必要時3-value。採用方式から具体Coverage Itemを定義
+- Decision Table: 実行可能ルールを候補化し、採用またはDisposition
+- 状態遷移: 対象範囲内の全有効遷移Coverageを既定
+- Pairwise: 成立可能な全Value Pairの2-wise Coverageを確認できる場合だけPairwiseと呼ぶ
+- Error Guessing: 選択した失敗仮説だけをCoverage対象とし、完全網羅とは表現しない
 
 ### ローレベルTest Case
 
-重要ケースはケース単体から次を判断できる具体度にします。
+出力するすべてのTest Caseは、ケース単体から次を判断できる具体度にします。
 
 1. 誰が / どの状態で開始するか
 2. 何を準備するか
@@ -133,17 +138,17 @@ Product Risk、実装、既存テスト、一般的慣習、未承認推論は�
 4. 何を入力・選択するか
 5. 何が起きればPASSか
 
-### 優先度
+重要期待結果はCurrent Effective Authorityへ追跡し、複数の重要期待結果がある場合は期待結果ごとにAuthorityを対応付けます。
 
-下流成果物は関連上流成果物の最も高い優先度を既定で引き継ぎます。優先度を下げる場合は理由を明示します。
+### Blocker / Disposition
 
-### Blocker
+Blockerは可能な限り影響範囲だけを停止します。
 
-不明点は影響成果物に応じて`Blocker` / `要確認` / `仮定可能` / `提案・任意`へ分類し、Blockerは可能な限り影響範囲だけを停止します。
+対象内項目を下流へ展開しない場合は、理由に応じて別テストレベル / 残存リスク / 対象外 / Blocked等へ明示的に位置づけます。低Product Riskだけを理由に`対象外`へ送りません。
 
 ### 上流修正
 
-上流成果物の意味を変更した場合は、影響する下流成果物だけを再検証します。無関係な成果物を全再生成しません。
+上流成果物の意味を変更した場合は、影響する下流成果物だけを`要再検証`として再確認します。無関係な成果物を全再生成しません。
 
 ## 標準との関係
 

@@ -10,13 +10,13 @@ Test Condition / Coverage Itemを、**第三者がケース単体を読んで迷
 
 - 対象Test Condition
 - 必要なCoverage Item、またはCoverage Item内包済みの具体Test Condition
-- 期待挙動を判断できる上流根拠
+- 期待挙動を判断できるCurrent Effective Authority
 
-利用可能ならTest Requirement、上流根拠、Product Risk / 優先度、案件コンテキスト、テストレベル / 観測方法、正式用語、既知制約も使います。
+利用可能ならTest Requirement、Product Risk / 優先度、案件コンテキスト、テストレベル / 観測方法、正式用語、既知制約も使います。
 
 ## ローレベル完了基準
 
-各重要ケースについて、ケース単体から次を一意に判断できなければなりません。
+**出力するすべてのTest Case**について、ケース単体から次を一意に判断できなければなりません。
 
 1. 誰が / どの状態で開始するか
 2. 何を準備するか
@@ -24,17 +24,19 @@ Test Condition / Coverage Itemを、**第三者がケース単体を読んで迷
 4. 何を入力 / 選択するか
 5. 何が起きればPASSか
 
-別ケース、口頭説明、暗黙知を読まないと重要部分を判断できる場合は未完成です。
+別ケース、口頭説明、暗黙知を読まないと重要部分を判断できる場合は未完成です。低優先度ケースもこの具体度を下げません。
 
 ## Oracle Authority
 
-完成済みTest Caseの期待結果は原則として次へ追跡します。
+完成済みTest Caseの期待結果は、対象スコープのCurrent Effective Authorityへ追跡します。
 
-1. `SPEC`
-2. `DECISION`
-3. `承認済み ASM`
+利用可能なAuthorityは次です。
 
-Product Risk、実装、既存Test Case、一般的UI慣習、未承認`INFERENCE`、テスターの常識は単独でOracle Authorityにしません。
+- 現在有効な`SPEC`
+- 状態が`有効`の`DECISION`
+- 有効な`SPEC` / `DECISION`で未定義の隙間を補う`承認済み ASM`
+
+Product Risk、実装、既存Test Case、一般的UI慣習、未承認`INFERENCE`、テスターの常識は単独でOracle Authorityにしません。`撤回` / `置換済み`DecisionをOracleへ使いません。
 
 期待結果を決められない場合は`question-analysis`へ戻します。
 
@@ -123,14 +125,14 @@ UI中心のシステムテストでは原則UIから観測可能な結果を使�
 - テストデータ
 - 実施手順
 - 期待結果
-- 重要期待結果ごとのOracle Authority
+- 重要期待結果ごとのCurrent Effective Authority
 - 必要時の事後状態 / 後処理
 
 ## 停止条件
 
 次の場合、影響ケースをBlockedとします。
 
-- PASS条件を決めるOracle Authorityがない
+- PASS条件を決めるCurrent Effective Authorityがない
 - PASS条件が未承認Assumptionに依存する
 - 前提状態や操作対象が重大に不明で具体手順を書けない
 - 相反する期待挙動が未解決
@@ -141,9 +143,10 @@ UI中心のシステムテストでは原則UIから観測可能な結果を使�
 
 ## 品質ゲート
 
+- **出力したすべてのTest Case**がローレベル完了基準を満たす
 - 別ケースの実行結果へ暗黙依存していない
 - 開始者 / 開始状態、準備、操作、入力 / 選択、合格条件が明確
-- 重要期待結果に`SPEC` / `DECISION` / `承認済み ASM`の根拠がある
+- 重要期待結果がCurrent Effective Authorityへ追跡できる
 - 複数重要期待結果の根拠対応が一意
 - Product Risk / 実装 / 既存テストから未定義Oracleを創作していない
 - 観測できない結果を期待結果にしていない
