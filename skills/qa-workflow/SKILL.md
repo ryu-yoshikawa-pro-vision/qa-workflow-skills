@@ -14,6 +14,12 @@ description: 新規機能・変更機能・指定対象機能を、仕様分析�
 5. 案件固有情報を新規に整理する場合は `assets/project-context-template.md` を利用できます。既存の案件コンテキストがある場合はそちらを優先します。
 6. Workflow状態を明示する必要がある場合だけ `assets/workflow-state-template.md` を使用します。
 
+## インターフェース
+
+- **Input**: ユーザー要求、要求する最終成果物、対象範囲、利用可能な情報源 / 既存QA成果物。案件コンテキスト、進行モード、既知のBlocked / 残存リスク / `要再検証`状態は利用可能な場合に補助入力とします。
+- **Function**: 要求成果物に必要な開始Skillを決め、既存成果物の再利用可否、Skillルーティング、Blocked / 再開、上流変更の伝播、修正ルーティング、Workflow完了状態を制御します。
+- **Output**: ユーザーが要求した最終QA成果物と、必要に応じてWorkflow状態、Blocked範囲、残存リスク、`要再検証`対象、再開先Skillを返します。
+
 ## 担当Skill
 
 | Canonical Skill名 | 日本語名称 | 主な成果物 |

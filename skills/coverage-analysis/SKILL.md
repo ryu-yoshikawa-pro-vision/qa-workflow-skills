@@ -16,9 +16,11 @@ description: Current Effective Authority、Product Risk、Test Requirement、Tes
 7. 既定出力形式が必要な場合は `assets/output-template.md` を使用します。
 8. 他Skillを参照するときはCanonical Skill名を使用します。
 
-## 出力
+## インターフェース
 
-カバレッジ範囲、Authority / Product Riskの閉鎖状況、追跡マトリクス、Coverage Criteria充足、Coverage候補Disposition妥当性、Coverage ItemのDisposition、未カバー / 不正Disposition / 孤立 / 重複 / 根拠不足、残存リスク / Blocked、推奨修正先を示します。
+- **Input**: Partialでは比較対象となる成果物と期待する上流 / 下流関係またはCoverage Criteria。Full Workflowでは対象スコープのCurrent Effective AuthorityからTest Caseまでの利用可能な成果物、Coverage Criteria、Disposition情報。
+- **Function**: 各層の意味上の追跡関係、閉鎖性、Coverage Criteria充足、Disposition妥当性を確認し、未カバー・不正Disposition・孤立・重複・根拠不足を検出します。
+- **Output**: カバレッジ範囲、Authority / Product Riskの閉鎖状況、追跡マトリクス、Coverage Criteria充足、Coverage候補Disposition妥当性、Coverage ItemのDisposition、未カバー / 不正Disposition / 孤立 / 重複 / 根拠不足、残存リスク / Blocked、推奨修正先を示します。
 
 ## リソース
 

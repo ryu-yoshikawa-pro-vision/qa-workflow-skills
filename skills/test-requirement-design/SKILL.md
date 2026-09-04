@@ -14,9 +14,11 @@ description: Current Effective Authorityとテスト分析から、何を検証�
 5. 既定出力形式が必要な場合は `assets/output-template.md` を使用します。
 6. 他Skillを参照するときはCanonical Skill名を使用します。
 
-## 出力
+## インターフェース
 
-安定したID、検証責務、Current Effective Authority、関連Product Risk、優先度、テストレベル / 観測方法を持つTest Requirementと、Test Requirementを作らない上流項目のDispositionを作ります。
+- **Input**: 対象範囲のCurrent Effective Authorityとテスト対象範囲。Product Risk / テスト重点、案件コンテキスト、テストレベル / 観測方法は利用可能な場合に補助入力とします。
+- **Function**: 上流AuthorityとProduct Riskを、「何を検証・保証すべきか」という検証責務へ変換し、Test Requirementまたは明示Dispositionへ閉じます。
+- **Output**: 安定したID、検証責務、Current Effective Authority、関連Product Risk、優先度、テストレベル / 観測方法を持つTest Requirementと、Test Requirementを作らない上流項目のDispositionを作ります。
 
 ## リソース
 

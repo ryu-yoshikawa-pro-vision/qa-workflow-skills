@@ -14,9 +14,11 @@ description: Figma、要件書、Q&A、リポジトリ、リリース資料な�
 5. 既定出力形式が必要な場合は `assets/output-template.md` を使用します。案件固有形式がある場合は、意味上の出力契約と追跡性を維持する限りそちらを優先します。
 6. 他Skillを参照するときはCanonical Skill名を使用します。
 
-## 出力
+## インターフェース
 
-追跡可能な仕様分析。対象範囲内の現在有効な期待挙動が情報源またはCanonical Registryへ戻れ、業務ルール、状態・遷移、フロー、制約、不明点を必要に応じて表現できる状態にします。
+- **Input**: 対象機能・挙動について利用できる権威ある情報源またはCanonical Registry上の有効Authority。案件コンテキスト、変更差分、実装情報、既存QA成果物は利用可能な場合に補助入力とします。
+- **Function**: 情報を`SPEC` / `DECISION` / `INFERENCE` / `UNKNOWN`へ分類し、対象スコープのCurrent Effective Authorityを解決して、後続QA設計で使える追跡可能な仕様モデルへ変換します。
+- **Output**: 追跡可能な仕様分析。対象範囲内の現在有効な期待挙動が情報源またはCanonical Registryへ戻れ、業務ルール、状態・遷移、フロー、制約、不明点を必要に応じて表現できる状態にします。
 
 ## リソース
 

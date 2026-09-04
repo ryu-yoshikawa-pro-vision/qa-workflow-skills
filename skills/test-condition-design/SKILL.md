@@ -15,9 +15,11 @@ description: Test Requirementを、どの条件・観点で検証するかへ展
 6. 既定出力形式が必要な場合は `assets/output-template.md` を使用します。
 7. 他Skillを参照するときはCanonical Skill名を使用します。
 
-## 出力
+## インターフェース
 
-Test Condition、適用技法、Coverage Criteria、必要なCoverage Item、関連Test Requirement / Authority / Product Risk、優先度、Test RequirementとCoverage候補のDispositionを作ります。
+- **Input**: 何を検証するかが明確なTest Requirementまたは同等の成果物。Current Effective Authority、Product Risk、状態モデル / 業務ルール等は利用可能な場合に補助入力とします。
+- **Function**: Test Requirementを検証条件へ展開し、問題構造に合う技法、Coverage Criteria、Coverage Item、採用しない候補のDispositionを定義します。
+- **Output**: Test Condition、適用技法、Coverage Criteria、必要なCoverage Item、関連Test Requirement / Authority / Product Risk、優先度、Test RequirementとCoverage候補のDispositionを作ります。
 
 ## リソース
 

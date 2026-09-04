@@ -6,7 +6,16 @@
 
 ## 入力
 
-利用可能な仕様分析、Current Effective Authority、権威ある情報源、案件コンテキスト、Canonical Decision / Assumption Registry、既存質問 / 回答、実装証拠、対象QA成果物を使います。
+必須:
+
+- 分類対象となる不明点、矛盾、欠落、未解決事項
+- その論点を判断できる仕様分析、Current Effective Authority、権威ある情報源、Canonical Registry、対象QA成果物等の根拠
+
+利用可能なら案件コンテキスト、既存質問 / 回答、実装証拠、前後のQA成果物も使います。
+
+## Function
+
+各未解決事項を下流成果物への影響で`Blocker` / `要確認` / `仮定可能` / `提案・任意`へ分類し、停止・継続範囲、回答なしの場合の扱い、回答後のAuthority正規化先と再開先Skillを決めます。
 
 ## 分類基準
 
@@ -89,7 +98,7 @@ Canonical Assumption Registryへ`ASM-xxx`として記録し、`承認済み`に�
 6. 仮定を使う場合は内容、根拠、影響範囲、状態を明示する
 7. 回答後は`SPEC` / `DECISION` / `承認済み ASM`のいずれかへ正規化してから、意味が変わる最も早いSkillへ戻す
 
-## 意味上の出力契約
+## 出力
 
 各分類対象の未解決事項について次を伝えます。
 

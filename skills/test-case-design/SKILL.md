@@ -16,9 +16,11 @@ description: Test ConditionとCoverage Itemを、第三者が迷わず実施で�
 7. 既定出力形式が必要な場合は `assets/output-template.md` を使用します。
 8. 他Skillを参照するときはCanonical Skill名を使用します。
 
-## 出力
+## インターフェース
 
-安定ID、目的、関連Test Condition / Coverage Item / Test Requirement、前提条件、テストデータ、実施手順、具体的期待結果、Current Effective Authority、必要時の事後状態を持つローレベルTest Caseを作ります。
+- **Input**: 対象Test Condition、必要なCoverage ItemまたはCoverage Item内包済みの具体Test Condition、期待挙動を判断できるCurrent Effective Authority。
+- **Function**: Test Condition / Coverage Itemを、第三者が単独実施してPASS / FAILを判断できるローレベルTest Caseへ変換し、ケース化しない項目は明示Dispositionへ閉じます。
+- **Output**: 安定ID、目的、関連Test Condition / Coverage Item / Test Requirement、前提条件、テストデータ、実施手順、具体的期待結果、Current Effective Authority、必要時の事後状態を持つローレベルTest Caseを作ります。
 
 ## リソース
 

@@ -8,17 +8,28 @@ Current Effective Authority、Product Risk、Test Requirement、Test Condition�
 
 ## 入力
 
-分析対象に応じて次を使います。
+### Partial
 
-- Current Effective Authority
-- Product Risk
-- Test Requirement
-- Test Condition
-- Coverage Item
-- Test Case
+必須:
+
+- 比較対象となるQA成果物
+- その成果物について確認したい上流 / 下流関係、Coverage Criteria、またはDisposition判断基準
+
+比較対象が1層だけでも、その層のCoverage CriteriaやDisposition妥当性を評価できる根拠があればPartial分析できます。
+
+### Full Workflow
+
+必須:
+
+- 対象スコープで利用可能なCurrent Effective Authority、Product Risk、Test Requirement、Test Condition、Coverage Item、Test Case
 - 適用技法 / Coverage Criteria
-- Coverage候補のDisposition
-- 対象外 / 残存リスク / Blocked情報
+- Coverage候補と各層のDisposition情報
+
+存在すべき下流成果物が欠けている場合は、入力不足として停止せず未カバー候補として扱います。
+
+## Function
+
+対象モードに応じて、各層の意味上の追跡関係、閉鎖性、Coverage Criteria充足、Disposition妥当性を確認し、未カバー・不正Disposition・孤立・重複・根拠不足・不整合を検出します。
 
 ## 分析モード
 
@@ -173,7 +184,7 @@ Current Effective Authorityと矛盾する成果物、または`要再検証`の
 
 ユーザーが「分析して修正まで」と依頼しても、`qa-workflow`を介して担当Skillへ戻します。
 
-## 意味上の出力契約
+## 出力
 
 - 分析範囲 / モード
 - Current Effective Authority / Product Riskの閉鎖状況
