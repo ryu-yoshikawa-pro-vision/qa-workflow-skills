@@ -11,7 +11,7 @@
 - Product Riskに応じてテスト重点・深度を決める
 - 適切なテスト技法とCoverage Criteriaから必要なCoverage Itemを識別する
 - テストケース単体で、開始状態・準備・操作・入力・合格条件を判断できる
-- `Source → Specification → Test Requirement → Test Condition → Coverage Item → Test Case` を追跡できる
+- `Source / Decision / Approved Assumption → Test Requirement → Test Condition → Coverage Item → Test Case`を追跡できる
 - カバレッジ分析と反証レビューで抜け・過剰・根拠のないOracleを検出する
 
 毎回繰り返す回帰テストスイートの選定・保守・実行管理は主対象ではありません。
@@ -45,35 +45,25 @@ skills/
 - `references/guidance.md`: 詳細な判断基準、手順、停止条件、品質ゲート
 - `assets/output-template.md`: 既定の出力形式
 
-テンプレートには判断ロジックを置きません。案件固有のExcel、Spreadsheet、文書形式がある場合は、Skillの意味上の出力契約と必要な追跡性を維持できる限り案件固有形式を優先できます。
+テンプレートには判断ロジックを置きません。案件固有形式がある場合は、Skillの意味上の出力契約と必要な追跡性を維持できる限り案件固有形式を優先できます。
 
 ## Skill参照規則
 
-Skillは必ずYAML frontmatterの`name`と同じCanonical Skill名で参照します。
+SkillはYAML frontmatterの`name`と同じCanonical Skill名で参照します。順番だけの呼称は使用しません。
 
-例:
+| Canonical Skill名 | 日本語名称 | 主な成果物 |
+| --- | --- | --- |
+| `spec-analysis` | 仕様分析 | 仕様分析 |
+| `question-analysis` | 不明点・矛盾分析 | 不明点・矛盾 / 仮定候補 |
+| `test-analysis` | テスト分析 | Product Risk / テスト重点 |
+| `test-requirement-design` | テスト要求設計 | Test Requirement |
+| `test-condition-design` | テスト観点・条件設計 | Test Condition / Coverage Item |
+| `test-case-design` | ローレベルテストケース設計 | Test Case |
+| `coverage-analysis` | カバレッジ分析 | Coverage Analysis |
+| `adversarial-review` | 反証レビュー | Adversarial Review |
+| `qa-workflow` | QA Workflow | ルーティング / 完了判断 |
 
-- `spec-analysis`（仕様分析）
-- `test-condition-design`（テスト観点・条件設計）
-- `test-case-design`（ローレベルテストケース設計）
-
-`Skill 05`、`スキル06`のような順番だけの呼称は使用しません。順序はWorkflowが表現し、Skill識別子には含めません。
-
-## Skill一覧
-
-| Canonical Skill名 | 日本語名称 | 主な問い | 主な成果物 |
-| --- | --- | --- | --- |
-| `spec-analysis` | 仕様分析 | 製品はどう動くべきか？ | 仕様分析 |
-| `question-analysis` | 不明点・矛盾分析 | 分からないことのうち、どれが設計を止めるか？ | 不明点・矛盾分析 |
-| `test-analysis` | テスト分析 | どこが壊れると困り、どこを厚く確認すべきか？ | Product Risk / テスト重点 |
-| `test-requirement-design` | テスト要求設計 | 何を保証する必要があるか？ | テスト要求 |
-| `test-condition-design` | テスト観点・条件設計 | どんな条件をカバーすれば十分か？ | テスト観点・条件 / Coverage Item |
-| `test-case-design` | ローレベルテストケース設計 | 実際に何をして、何が起きれば合格か？ | ローレベルテストケース |
-| `coverage-analysis` | カバレッジ分析 | 必要なものがケースまで落ちているか？ | カバレッジ分析 |
-| `adversarial-review` | 反証レビュー | 誤り・抜け・過剰がないか？ | 反証レビュー |
-| `qa-workflow` | QA Workflow | どのSkillをどの順で使うか？ | ルーティング / 完了判断 |
-
-## 既定フロー
+## フルワークフロー
 
 ```text
 spec-analysis
@@ -93,38 +83,47 @@ coverage-analysis
 adversarial-review
 ```
 
-必要な有効成果物が既に存在する場合は、最も近い必要Skillから開始します。
+フルワークフローを使う場合は、`qa-workflow`と8個のQA Skillが利用可能であることを前提とします。有効な既存成果物がある場合は最も近い必要Skillから開始します。
 
 ## 基本原則
 
-### 情報源への忠実性
+### 情報源とID
 
-- `SPEC`: 権威ある情報源に明記された仕様
-- `DECISION`: 正式に確定した決定
-- `INFERENCE`: 根拠はあるが未確定の推論
-- `UNKNOWN`: 根拠不足で確定できない事項
+- `SPEC-xxx`: 権威ある情報源に明記された仕様
+- `DEC-xxx`: 正式に確定した決定
+- `INF-xxx`: 根拠はあるが未確定の推論
+- `UNK-xxx`: 根拠不足で確定できない事項
+- `ASM-xxx`: 明示的な仮定
 
-`INFERENCE`や`UNKNOWN`を暗黙に仕様へ昇格させません。
+`DEC-xxx`と`ASM-xxx`はProject Contextまたは案件で明示された同等のCanonical Registryへ一意に記録します。
 
 ### Oracle Authority
 
-完成済みテストケースの期待結果は原則として次へ追跡します。
+完成済みTest Caseの期待結果は原則として次へ追跡します。
 
 1. `SPEC`
 2. `DECISION`
 3. `承認済み ASM`
 
-Product Risk、実装、既存テスト、一般的慣習、未承認の推論は単独でOracle Authorityにしません。
+Product Risk、実装、既存テスト、一般的慣習、未承認推論は単独でOracle Authorityにしません。複数の重要期待結果がある場合は、期待結果ごとにOracle Authorityを対応付けます。
+
+### Assumption
+
+分析・ドラフトでは明示的仮定で継続できる場合がありますが、完成済みTest CaseのPASS / FAILが未承認Assumptionに依存する範囲はBlockerです。
 
 ### Product Risk
 
-テスト深度・優先度の判断にはProduct Riskを使います。人員、納期、予算、環境準備などのProject Riskはリスクスコアへ混ぜません。
+テスト深度・優先度の判断にはProduct Riskを使います。Project Riskはリスク評価へ混ぜません。
 
-### テストレベル
+案件固有方式がない場合は4×4のRisk Matrixを使用し、重大Impactが単純な積算によってLowへ落ちないようにします。
 
-指定がなく、依頼が別レベルを明示していない場合はシステムテストを既定とします。
+### Coverage Criteria / Coverage Item
 
-### ローレベルテストケース
+複数候補を持つ技法では、**候補母集団 → Coverage Criteria → Coverage Item → 除外 / 削減候補のDisposition**の順に設計します。
+
+技法名を書いただけでCoverage済みとは判断しません。
+
+### ローレベルTest Case
 
 重要ケースはケース単体から次を判断できる具体度にします。
 
@@ -132,15 +131,19 @@ Product Risk、実装、既存テスト、一般的慣習、未承認の推論�
 2. 何を準備するか
 3. 何を操作するか
 4. 何を入力・選択するか
-5. 何が起きれば合格か
+5. 何が起きればPASSか
 
-### Coverage Criteria / Coverage Item
+### 優先度
 
-技法名を書いただけでカバレッジ済みとは判断しません。何をカバーすれば十分かを定義し、必要な具体要素をCoverage Itemとして追跡します。
+下流成果物は関連上流成果物の最も高い優先度を既定で引き継ぎます。優先度を下げる場合は理由を明示します。
 
 ### Blocker
 
-不明点は影響する成果物に応じて`Blocker` / `要確認` / `仮定可能` / `提案・任意`に分類します。Blockerは可能な限り影響範囲だけを停止します。
+不明点は影響成果物に応じて`Blocker` / `要確認` / `仮定可能` / `提案・任意`へ分類し、Blockerは可能な限り影響範囲だけを停止します。
+
+### 上流修正
+
+上流成果物の意味を変更した場合は、影響する下流成果物だけを再検証します。無関係な成果物を全再生成しません。
 
 ## 標準との関係
 

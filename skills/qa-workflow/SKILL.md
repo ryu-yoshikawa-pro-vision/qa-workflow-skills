@@ -7,11 +7,12 @@ description: 新規機能・変更機能・指定対象機能を、仕様分析�
 
 ## 実行契約
 
-1. 実行前に `references/guidance.md` を読み、開始点、再利用、停止・再開、修正ルーティング、完了条件に従います。
+1. 実行前に `references/guidance.md` を読み、開始点、再利用、停止・再開、変更伝播、修正ルーティング、完了条件に従います。
 2. 詳細なQA判断は担当Skillへ委譲し、このSkillで重複定義しません。
-3. Skillを参照するときは必ずCanonical Skill名を使います。例: `test-condition-design`（テスト観点・条件設計）。`Skill 05`のような番号だけの参照は禁止します。
-4. 案件固有情報を新規に整理する場合は `assets/project-context-template.md` を利用できます。既存の案件コンテキストがある場合はそちらを優先します。
-5. Workflow状態を明示する必要がある場合だけ `assets/workflow-state-template.md` を使用します。
+3. Skillを参照するときは必ずCanonical Skill名を使います。例: `test-condition-design`（テスト観点・条件設計）。番号だけの参照は使用しません。
+4. フルワークフローを実行する場合は、`qa-workflow`と8個の担当QA Skillが利用可能であることを確認します。必要Skillが利用できない場合は、そのSkillが必要な範囲をBlockedとして扱います。
+5. 案件固有情報を新規に整理する場合は `assets/project-context-template.md` を利用できます。既存の案件コンテキストがある場合はそちらを優先します。
+6. Workflow状態を明示する必要がある場合だけ `assets/workflow-state-template.md` を使用します。
 
 ## 担当Skill
 
