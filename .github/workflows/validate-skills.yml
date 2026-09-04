@@ -1,0 +1,121 @@
+name: Validate Agent Skills
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install official skills-ref
+        run: >-
+          python -m pip install
+          "git+https://github.com/agentskills/agentskills.git@69ef37e9424c0a7ea9dd2293b559e43ec8176379#subdirectory=skills-ref"
+
+      - name: Validate Agent Skills specification
+        shell: bash
+        run: |
+          set -euo pipefail
+          for skill in skills/*; do
+            test -f "$skill/SKILL.md"
+            skills-ref validate "$skill"
+          done
+
+      - name: Validate repository eval structure
+        run: |
+          python - <<'PY'
+          import json
+          import re
+          from pathlib import Path
+
+          expected = [
+              "qa-workflow",
+              "spec-analysis",
+              "question-analysis",
+              "test-analysis",
+              "test-requirement-design",
+              "test-condition-design",
+              "test-case-design",
+              "coverage-analysis",
+              "adversarial-review",
+          ]
+
+          skill_root = Path("skills")
+          actual = sorted(
+              p.name for p in skill_root.iterdir()
+              if p.is_dir() and (p / "SKILL.md").is_file()
+          )
+          assert sorted(expected) == actual, (expected, actual)
+
+          names = []
+          total_queries = 0
+
+          for name in expected:
+              skill_file = skill_root / name / "SKILL.md"
+              text = skill_file.read_text(encoding="utf-8")
+              assert text.startswith("---\n"), skill_file
+              parts = text.split("---", 2)
+              assert len(parts) == 3, skill_file
+              frontmatter = parts[1]
+
+              name_match = re.search(r"^name:\s*(.+?)\s*$", frontmatter, re.MULTILINE)
+              description_match = re.search(
+                  r"^description:\s*(.+?)\s*$", frontmatter, re.MULTILINE
+              )
+              assert name_match, f"missing name: {skill_file}"
+              assert description_match, f"missing description: {skill_file}"
+
+              declared_name = name_match.group(1)
+              description = description_match.group(1)
+              assert declared_name == name, (skill_file, declared_name, name)
+              assert description, f"empty description: {skill_file}"
+              names.append(declared_name)
+
+              datasets = [
+                  ("train_queries.json", 12, 6, 6),
+                  ("validation_queries.json", 8, 4, 4),
+              ]
+              for filename, expected_count, expected_true, expected_false in datasets:
+                  path = skill_root / name / "evals" / "trigger" / filename
+                  data = json.loads(path.read_text(encoding="utf-8"))
+                  assert isinstance(data, list), path
+                  assert len(data) == expected_count, (path, len(data))
+                  assert all(isinstance(item, dict) for item in data), path
+                  assert all(
+                      isinstance(item.get("query"), str) and item["query"].strip()
+                      for item in data
+                  ), path
+                  assert all(
+                      isinstance(item.get("should_trigger"), bool)
+                      for item in data
+                  ), path
+                  positives = sum(item["should_trigger"] is True for item in data)
+                  negatives = sum(item["should_trigger"] is False for item in data)
+                  assert positives == expected_true, (path, positives)
+                  assert negatives == expected_false, (path, negatives)
+                  total_queries += len(data)
+
+          assert len(names) == len(set(names)) == 9, names
+          assert total_queries == 180, total_queries
+
+          for doc in (Path("README.md"), Path("EVALS.md")):
+              text = doc.read_text(encoding="utf-8")
+              missing = [name for name in expected if f"`{name}`" not in text]
+              assert not missing, (doc, missing)
+
+          print("Skill count: 9")
+          print("Each skill: train=12 (6/6), validation=8 (4/4)")
+          print("Total trigger queries: 180")
+          PY

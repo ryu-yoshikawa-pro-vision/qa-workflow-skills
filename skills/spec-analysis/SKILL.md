@@ -7,12 +7,13 @@ description: Figma、要件書、Q&A、リポジトリ、リリース資料な�
 
 ## 実行契約
 
-1. 実行前に `references/guidance.md` を読み、情報源の扱い、Current Effective Authority、分析手順、停止条件、品質ゲートに従います。
-2. 案件固有の情報源優先順位・正式用語・対象範囲・Canonical Registryがある場合はそれを優先します。
-3. 未定義の製品挙動を補完せず、`SPEC` / `DECISION` / `INFERENCE` / `UNKNOWN` を区別します。
-4. テスト要求・テスト観点・テストケースを先回りして作りません。
-5. 既定出力形式が必要な場合は `assets/output-template.md` を使用します。案件固有形式がある場合は、意味上の出力契約と追跡性を維持する限りそちらを優先します。
-6. 他Skillを参照するときはCanonical Skill名を使用します。
+1. 案件固有の情報源優先順位・正式用語・対象範囲・Canonical Registryがある場合はそれを優先します。
+2. 未定義の製品挙動を補完せず、`SPEC` / `DECISION` / `INFERENCE` / `UNKNOWN`を区別します。
+3. Test Requirement・Test Condition・Test Caseを先回りして作りません。
+4. 通常の仕様抽出、分類、停止条件、最低品質確認は`references/guidance.md`に従います。
+5. 複数Authority、version差、情報源競合、Decisionの補足 / 上書き / 置換、承認済みASMの適用判断が必要な場合だけ`references/authority-resolution.md`を追加で読みます。
+6. 既定出力形式が必要な場合は`assets/output-template.md`を使用します。案件固有形式がある場合は意味上の出力契約と追跡性を維持する限りそちらを優先します。
+7. 他Skillを参照するときはCanonical Skill名を使用します。
 
 ## インターフェース
 
@@ -20,7 +21,17 @@ description: Figma、要件書、Q&A、リポジトリ、リリース資料な�
 - **Function**: 情報を`SPEC` / `DECISION` / `INFERENCE` / `UNKNOWN`へ分類し、対象スコープのCurrent Effective Authorityを解決して、後続QA設計で使える追跡可能な仕様モデルへ変換します。
 - **Output**: 追跡可能な仕様分析。対象範囲内の現在有効な期待挙動が情報源またはCanonical Registryへ戻れ、業務ルール、状態・遷移、フロー、制約、不明点を必要に応じて表現できる状態にします。
 
+## 基本停止条件
+
+- 対象挙動についてAuthority候補となる権威ある情報源または有効Registry Authorityがない
+- 対象範囲を意味のある程度に特定できない
+- 必要資料へアクセスできず信頼できる分析が成立しない
+- Current Effective Authorityを解決できない重大競合がある
+
+局所的なUNKNOWNや非Blocker欠落だけで全体停止しません。
+
 ## リソース
 
-- 詳細判断基準: `references/guidance.md`
+- 通常の仕様分析: `references/guidance.md`
+- Authority競合 / version / Decision / ASMの詳細解決: `references/authority-resolution.md`
 - 既定出力形式: `assets/output-template.md`

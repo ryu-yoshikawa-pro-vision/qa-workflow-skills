@@ -7,12 +7,12 @@ description: Test Requirementを、どの条件・観点で検証するかへ展
 
 ## 実行契約
 
-1. 実行前に `references/guidance.md` を読み、Test Requirementの閉鎖、技法選択、Coverage Criteria / Coverage Item、Disposition、停止条件、品質ゲートに従います。
-2. 技法を適用したという事実だけでカバレッジ済みと判断せず、「何をカバーすれば十分か」を明示します。
-3. 複数候補を持つ場合は候補母集団を先に識別し、採用しない候補も明示Dispositionへ位置づけます。
-4. 期待挙動をProduct Riskやテスト仮説から創作しません。
-5. 実行手順は `test-case-design`（ローレベルテストケース設計）に委ねます。
-6. 既定出力形式が必要な場合は `assets/output-template.md` を使用します。
+1. Test Requirementを「どの条件・観点で検証するか」へ展開し、実行手順は`test-case-design`へ委ねます。
+2. 複数候補を持つ場合は候補母集団を先に識別し、Coverage Criteria、Coverage Item、採用しない候補のDispositionを明示します。
+3. 期待挙動をProduct Riskやテスト仮説から創作しません。
+4. Coverage設計の基本手順、閉鎖、Disposition、停止条件、最低品質は`references/guidance.md`に従います。
+5. 同値分割、BVA、Decision Table、状態遷移、Pairwise、Error Guessing、Scenario等を実際に適用する場合だけ`references/coverage-techniques.md`を追加で読み、採用技法の規則を使います。
+6. 既定出力形式が必要な場合は`assets/output-template.md`を使用します。
 7. 他Skillを参照するときはCanonical Skill名を使用します。
 
 ## インターフェース
@@ -21,7 +21,17 @@ description: Test Requirementを、どの条件・観点で検証するかへ展
 - **Function**: Test Requirementを検証条件へ展開し、問題構造に合う技法、Coverage Criteria、Coverage Item、採用しない候補のDispositionを定義します。
 - **Output**: Test Condition、適用技法、Coverage Criteria、必要なCoverage Item、関連Test Requirement / Authority / Product Risk、優先度、Test RequirementとCoverage候補のDispositionを作ります。
 
+## 基本停止条件
+
+- Test Requirementの意味が曖昧で条件へ展開できない
+- Current Effective Authorityを解決できない
+- 未承認推論で期待挙動を補わないと条件を作れない
+- Coverage Criteriaを定義するために不可欠な仕様がない
+
+低リスクの追加観点が不明、任意Error Guessing仮説が不足、全組合せが巨大という理由だけでは停止しません。
+
 ## リソース
 
-- 詳細判断基準: `references/guidance.md`
+- Coverage設計の基本契約: `references/guidance.md`
+- 技法固有のCoverage規則: `references/coverage-techniques.md`
 - 既定出力形式: `assets/output-template.md`

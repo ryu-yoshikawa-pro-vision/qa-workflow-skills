@@ -1,8 +1,8 @@
-# 仕様分析 詳細判断基準
+# 仕様分析 通常ガイダンス
 
 ## 目的
 
-権威ある情報源とCanonical Registry上の有効Authorityを、後続QA設計で利用できる追跡可能な仕様モデルへ整理します。テスト要求・テスト観点・テストケースへ先回りしません。
+権威ある情報源とCanonical Registry上の有効Authorityを、後続QA設計で利用できる追跡可能な仕様モデルへ整理します。Test Requirement・Test Condition・Test Caseへ先回りしません。
 
 ## 入力
 
@@ -10,89 +10,66 @@
 
 利用可能なら案件コンテキスト、情報源優先順位、対象範囲、正式用語、Canonical Decision / Assumption Registry、変更差分、Issue / チケット、実装情報、既存QA成果物も使います。
 
-既存QA成果物と実装は補助証拠であり、自動的に仕様の権威にはしません。
+既存QA成果物と実装は補助証拠であり、自動的に仕様Authorityへ昇格させません。
 
 ## IDと情報分類
-
-分析項目は分類と一致するIDを使用します。
 
 - `SPEC-xxx`: 権威ある情報源に明記された仕様
 - `DEC-xxx`: 正式に確定した決定
 - `INF-xxx`: 根拠はあるが未確定の推論
 - `UNK-xxx`: 根拠不足で確定できない事項
 
-`DEC-xxx`はCanonical Decision Registryの既存IDを参照します。同じ決定を仕様分析側で別IDとして再採番しません。
-
-## Current Effective Authorityの解決
-
-対象スコープごとに、現在有効な期待挙動を次の順で解決します。
-
-1. Canonical Decision Registryから、状態が`有効`で対象スコープに適用される`DECISION`をすべてAuthority候補として識別する。既存`SPEC` / 旧`DECISION`を上書きしていない補足Decisionも候補に含める
-2. 有効`DECISION`が既存`SPEC` / 旧`DECISION`と同じ挙動領域に重なる場合は、補足 / 上書き / 置換関係、関連Authority、影響範囲から現在有効な内容を解決する。未定義領域を補足するDecisionは既存Authorityと共存できる
-3. `SPEC`については、まず各情報源内で対象Version / Scopeに適用される現行版を版・更新時点から特定する
-4. 現行版の`SPEC`候補間では案件固有の情報源優先順位を適用する。鮮度だけを理由に低優先度情報源を高優先度情報源より優先しない
-5. `承認済み ASM`は、有効な`SPEC` / `DECISION`で未定義の隙間だけを暫定的に補える
-6. `ASM`が有効な`SPEC` / `DECISION`と競合する場合、`ASM`を優先せず、正式な仕様更新または`DECISION`として解決する
-7. 同一スコープで複数の有効Authorityが競合し、Decisionの関係・情報源優先順位等で解決できない場合は`question-analysis`へ送る
-
-Canonical Decision Registryでは、`有効`の`DEC-xxx`だけをCurrent Effective Authority候補とします。`撤回` / `置換済み`のDecisionを現在の根拠に使いません。
-
-解決後は、対象範囲の`SPEC` / `DECISION` / `承認済み ASM`をCurrent Effective Authorityの正規化ビューとして明示し、情報源またはCanonical Registryへ追跡できる状態にします。
-
-## 情報分類
+`DEC-xxx`はCanonical Decision Registryの既存IDを参照し、同じ決定を別IDで再採番しません。
 
 ### `SPEC`
 
-案件で権威ある情報源に明記され、対象Version / Scopeに適用される現行版として有効と判断できる挙動。
+案件で権威ある情報源に明記され、対象Version / Scopeに適用される現行挙動です。
 
 ### `DECISION`
 
-正式に確定した挙動。未定義部分を補足する場合もCurrent Effective Authority候補です。元仕様や旧Decisionを補足・上書き・置換する場合は、関係、関連Authority、影響範囲をCanonical Decision Registryで追跡します。
+正式に確定した挙動です。Decisionの補足 / 上書き / 置換や他Authorityとの競合判断が必要な場合は`authority-resolution.md`を読みます。
 
 ### `INFERENCE`
 
-証拠に基づく合理的解釈だが、明記・確定されていない内容。`SPEC`として扱いません。
+証拠に基づく合理的解釈ですが、明記・確定されていない内容です。`SPEC`として扱いません。
 
 ### `UNKNOWN`
 
-利用可能な根拠だけでは結論を出せない内容。一般的慣習や類似製品の挙動で埋めません。
+利用可能な根拠だけでは結論を出せない内容です。一般的慣習や類似製品挙動で埋めません。
 
-## 情報源の判断基準
+## 情報源の基本判断
 
-- 案件固有の優先順位が定義されている場合だけ適用する
-- 全案件共通の固定優先順位を作らない
-- 鮮度は、まず同一情報源内で対象Version / Scopeに適用される現行版を特定するために使う
-- 複数情報源間の優先順位は案件固有の情報源優先順位で決め、鮮度だけで優先順位を逆転させない
-- 矛盾時はCurrent Effective Authorityを採用しつつ、競合証拠も保持する
-- Decision関係・情報源優先順位で解決できない重大矛盾は`question-analysis`へ送る
-- 実装が正本でない場合、上位仕様と異なる実装へ仕様を合わせない
-- 既存テストの期待結果を、そのテストに書かれているという理由だけで`SPEC`にしない
+- 案件固有の優先順位が定義されている場合はそれを使う
+- 全案件共通の固定情報源順位を作らない
+- 実装が正本でない場合、仕様と異なる実装へ仕様を合わせない
+- 既存Test Caseの期待結果を、それが既存ケースに書かれているという理由だけで`SPEC`にしない
+- 重大な情報源競合や版差がある場合は`authority-resolution.md`でCurrent Effective Authorityを解決する
 
 ## 手順
 
-1. 対象機能、変更、画面、ユーザー / ロール、業務フロー、明示的対象外を整理する
-2. 実際に使用した情報源とCanonical Registryを後から追跡できる粒度で記録する
-3. Canonical Decision / Assumption Registryの状態・影響範囲・関係を確認する
-4. 対象スコープごとにCurrent Effective Authorityを解決し、正規化ビューを作る
-5. 対象範囲に関係する独立したルール・挙動を抽出する
+1. 対象機能、変更、画面、ユーザー / ロール、業務フロー、明示対象外を整理する
+2. 実際に使用した情報源 / Canonical Registryを追跡可能な粒度で記録する
+3. 対象範囲に関係する独立したルール・挙動を抽出する
+4. `SPEC` / `DECISION` / `INFERENCE` / `UNKNOWN`を分類する
+5. 必要な範囲でCurrent Effective Authorityを解決する。複数Authority等の詳細判断が必要なら`authority-resolution.md`を読む
 6. 権威ある情報源の正式用語を維持する
-7. 必要に応じて権限、公開 / 表示、上限、条件分岐、優先順位等の業務ルールを構造化する
-8. 意味のある状態がある場合だけ状態・遷移を整理する
+7. 必要に応じて権限、表示、上限、条件分岐、優先順位等の業務ルールを構造化する
+8. 意味のある状態がある場合だけ状態 / 遷移を整理する
 9. 順序に意味がある場合だけ業務フローを整理する
-10. 明示された最小 / 最大、形式、件数、サイズ、日時、権限、性能、整合性等の制約を抽出する
+10. 明示された境界、形式、件数、サイズ、日時、権限、性能、整合性等の制約を抽出する
 11. `INFERENCE` / `UNKNOWN` / 矛盾を根拠と影響範囲付きで保持する
 12. 内部整合性を確認する
 
-文章1文ごとに機械分割せず、意味が異なるルールを件数削減目的で統合しません。未定義の数値境界を創作しません。
+文章1文ごとに機械分割せず、意味が異なるルールを件数削減目的で統合しません。未定義の境界を創作しません。
 
-## 意味上の出力契約
+## 出力
 
-必要に応じて次を表現できる仕様分析を作ります。
+必要に応じて次を表現します。
 
-- 分析範囲と制約
-- 実際に使用した情報源 / Canonical Registry
+- 分析範囲 / 制約
+- 使用した情報源 / Canonical Registry
 - 分類と一致する安定IDを持つ分析項目
-- Current Effective Authorityの正規化ビューと補足 / 上書き / 置換関係
+- Current Effective Authorityの正規化ビュー
 - 業務ルール
 - 状態 / 遷移
 - 処理 / 業務フロー
@@ -106,35 +83,30 @@ Canonical Decision Registryでは、`有効`の`DEC-xxx`だけをCurrent Effecti
 
 次の場合、影響範囲をBlockedとします。
 
-- 対象挙動についてCurrent Effective Authority候補となる権威ある情報源またはCanonical Registry上の有効Authorityがない
+- Authority候補となる権威ある情報源またはCanonical Registry上の有効Authorityがない
 - 対象範囲を意味のある程度に特定できない
-- 必要資料 / Canonical Registryへアクセスできず信頼できる分析が成立しない
-- Current Effective Authorityを解決できない重大矛盾がある
+- 必要資料 / Registryへアクセスできず信頼できる分析が成立しない
+- Current Effective Authorityを解決できない重大競合がある
 
-軽微な欠落、非Blockerの`UNKNOWN`、明示された推論、一部範囲だけの矛盾では全体停止しません。
+軽微な欠落、非Blockerの`UNKNOWN`、明示した推論、一部範囲だけの矛盾では全体停止しません。
 
 ## 品質ゲート
 
 - IDが分類と一致している
 - `DEC-xxx`を重複採番していない
-- 対象スコープに適用される有効Decisionを、上書き有無に関係なくAuthority候補として確認している
-- `撤回` / `置換済み`Decisionを現在の根拠に使っていない
-- `ASM`で有効な`SPEC` / `DECISION`を上書きしていない
-- 各情報源の現行版を特定した後に情報源優先順位を適用している
-- 鮮度だけで低優先度情報源を優先していない
 - `SPEC`が権威ある根拠に支えられている
 - `INFERENCE`を事実扱いしていない
 - `UNKNOWN`を一般論で埋めていない
 - 実装差分に合わせて仕様を書き換えていない
-- 既存テストを仕様の権威にしていない
-- Current Effective Authorityの正規化ビューに対象範囲の有効`SPEC` / `DECISION` / `承認済み ASM`が反映されている
+- 既存テストを仕様Authorityにしていない
+- Current Effective Authorityが必要な範囲は解決済み
 - 対象範囲内の現在有効な期待挙動が根拠へ追跡できる
 - 関係のない周辺機能を追加していない
-- テストレベル・観測方法・テスト要求・観点・ケース設計を先回りしていない
+- 下流QA設計へ先回りしていない
 
 ## 次の担当Skill
 
 - 不明点・矛盾の分類が必要 → `question-analysis`
 - テスト重点・Product Risk分析が必要 → `test-analysis`
 
-実際の遷移は`qa-workflow`のルーティングに従います。
+実際のroutingは`qa-workflow`へ委ねます。

@@ -1,42 +1,15 @@
 # QAテスト分析・設計 Agent Skills
 
-新規機能・変更機能・指定対象機能を分析し、**テスト実施者が迷わず実行できるローレベルテストケースまで落とし込む**ためのAgent Skills群です。
-
-## 目的
-
-対象機能について、次の状態を作ります。
-
-- 現在有効な製品の期待挙動を権威ある情報源・正式決定へ追跡できる
-- 不明点・矛盾・仮定を仕様と混同しない
-- Product Riskに応じてテスト重点・深度を決める
-- 適切なテスト技法とCoverage Criteriaから必要なCoverage Itemを識別する
-- 対象内の上流項目を無言で落とさず、下流成果物または明示Dispositionへ閉じる
-- すべてのTest Caseを、ケース単体で開始状態・準備・操作・入力・PASS条件を判断できる粒度にする
-- `Current Effective Authority / Product Risk → Test Requirement → Test Condition → Coverage Item → Test Case` を追跡できる
-- Coverage Analysisと反証レビューで抜け・過剰・不正Disposition・根拠のない期待結果を検出する
+新規機能・変更機能・指定対象機能を分析し、**テスト実施者が迷わず実行できるローレベルTest Caseまで落とし込む**ためのAgent Skills群です。
 
 毎回繰り返す回帰テストスイートの選定・保守・実行管理は主対象ではありません。
 
-## 構造
+## Skill構成
 
 ```text
 skills/
 ├── qa-workflow/
-│   ├── SKILL.md
-│   ├── references/guidance.md
-│   ├── evals/trigger/
-│   │   ├── train_queries.json
-│   │   └── validation_queries.json
-│   └── assets/
-│       ├── project-context-template.md
-│       └── workflow-state-template.md
 ├── spec-analysis/
-│   ├── SKILL.md
-│   ├── references/guidance.md
-│   ├── evals/trigger/
-│   │   ├── train_queries.json
-│   │   └── validation_queries.json
-│   └── assets/output-template.md
 ├── question-analysis/
 ├── test-analysis/
 ├── test-requirement-design/
@@ -46,44 +19,129 @@ skills/
 └── adversarial-review/
 ```
 
-各QA Skillは同じ責務分離を持ちます。
+各Skillは`skills/<skill-name>/SKILL.md`を持つ独立Skillです。`qa-workflow`も同じく1つのAgent Skillとして扱います。
 
-- `SKILL.md`: Skillの発見、使用条件、実行契約、Input / Function / Outputインターフェース
-- `references/guidance.md`: 詳細な入力条件、判断基準、手順、停止条件、品質ゲート
-- `assets/output-template.md`: 既定の出力形式
-- `evals/trigger/`: descriptionの発火精度を評価する固定train / validation query
-
-案件固有形式がある場合は、Skillの意味上の出力契約と必要な追跡性を維持できる限り案件固有形式を優先できます。
-
-## Skill参照規則
-
-SkillはYAML frontmatterの`name`と同じCanonical Skill名で参照します。順番だけの呼称は使用しません。
-
-| Canonical Skill名 | 日本語名称 | 主な成果物 |
+| Canonical Skill名 | 責務 | 主な成果物 |
 | --- | --- | --- |
-| `spec-analysis` | 仕様分析 | 仕様分析 / Current Effective Authority |
-| `question-analysis` | 不明点・矛盾分析 | 不明点・矛盾 / 仮定候補 |
-| `test-analysis` | テスト分析 | Product Risk / テスト重点 |
-| `test-requirement-design` | テスト要求設計 | Test Requirement |
-| `test-condition-design` | テスト観点・条件設計 | Test Condition / Coverage Item |
-| `test-case-design` | ローレベルテストケース設計 | Test Case |
-| `coverage-analysis` | カバレッジ分析 | Coverage Analysis |
-| `adversarial-review` | 反証レビュー | Adversarial Review |
-| `qa-workflow` | QA Workflow | ルーティング / 完了判断 |
+| `qa-workflow` | 開始点、再利用、routing、Blocked、再開、変更伝播、完了状態のOrchestration | Workflow状態 / routing |
+| `spec-analysis` | 仕様分類とCurrent Effective Authority解決 | 仕様分析 / Current Effective Authority |
+| `question-analysis` | 未解決事項の分類、停止・継続、回答正規化 | 不明点・矛盾分析 |
+| `test-analysis` | Product Risk、テスト重点、深度、テストレベル、技法選択 | テスト分析 |
+| `test-requirement-design` | 上流Authority / Riskを検証責務へ変換 | Test Requirement |
+| `test-condition-design` | Test Requirementを条件・Coverage Criteria / Itemへ展開 | Test Condition / Coverage Item |
+| `test-case-design` | Coverageを第三者が実施可能なケースへ具体化 | Low-Level Test Case |
+| `coverage-analysis` | 成果物チェーンのCoverage / 閉鎖性 / Gap分析 | Coverage Analysis |
+| `adversarial-review` | QA成果物をCold Reviewし重大度付き欠陥を検出 | Adversarial Review |
 
-## Trigger Eval
+## 成果物チェーン
 
-9 Skillすべてにdescription発火精度を確認するTrigger Evalを用意します。
+```text
+Current Effective Authority
+  ↓
+Test Requirement
+  ↓
+Test Condition
+  ↓
+Coverage Item
+  ↓
+Test Case
+  ↓
+Coverage Analysis
+```
 
-- 1 Skillあたり20 query
-- train 12件（should-trigger 6 / should-not-trigger 6）
-- validation 8件（should-trigger 4 / should-not-trigger 4）
-- 合計180 query
-- should-not-triggerは隣接Skillとのnear-missを重点化
+Product Riskはテスト深度・優先度を決める横断入力として下流へ追跡します。反証レビューは各成果物層へ適用できます。
 
-descriptionを調整するときはtrainの失敗を改善材料とし、validationは汎化性能確認に使います。実行方法と判定基準は [`EVALS.md`](EVALS.md) を参照してください。
+## Domain LogicのSingle Source of Truth
 
-## フルワークフロー
+工程固有の判断規則は担当SkillをSingle Source of Truthとします。`qa-workflow`や他Skillへ詳細アルゴリズムをコピーしません。
+
+| Domain Logic | Single Source of Truth |
+| --- | --- |
+| Current Effective Authority / SPEC・DECISION・ASMの解決 | `spec-analysis` |
+| Blocker / 要確認 / 仮定可能 / 提案・任意の分類、回答正規化 | `question-analysis` |
+| Product Risk採点、Risk Matrix、設計深度 | `test-analysis` |
+| Test Requirementの粒度・閉鎖 | `test-requirement-design` |
+| Coverage Criteria / Coverage Item、BVA / Pairwise / 状態遷移等の技法 | `test-condition-design` |
+| Low-Level Test Case具体性、期待結果 / Oracleの具体化 | `test-case-design` |
+| Coverage / 閉鎖性 / Gap判定 | `coverage-analysis` |
+| Cold Review、重大度、修正責務 | `adversarial-review` |
+| Skill routing、Blocked状態、停止 / 再開、変更伝播、Workflow完了 | `qa-workflow` |
+
+レビュー系Skillは担当Skillの成果物契約違反を検出できますが、担当Skill固有の詳細規則を別の正本として再定義しません。
+
+## Progressive Disclosure方針
+
+情報を次の3種類に分けます。
+
+### A. 常に必要
+
+Skill責務、Input / Function / Output、禁止事項、基本停止条件、最低品質条件など、毎回必要な契約です。`SKILL.md`へ置きます。
+
+### B. 条件付きで必要
+
+特定状況だけで必要な詳細判断です。`references/`へ置き、`SKILL.md`から**いつ読むか**を明示します。
+
+今回、条件付き詳細が大きい次のSkillだけreferenceを細分化しています。
+
+- `spec-analysis`: Authority競合 / version / Decision / ASM解決
+- `test-condition-design`: テスト技法固有のCoverage規則
+- `adversarial-review`: レビュー対象成果物に応じた詳細プローブ
+
+その他のSkillは、現行`guidance.md`の大半が毎回の中心判断に関係するため、分割のための分割を行いません。
+
+### C. 出力形式だけ
+
+出力templateや固定resourceは`assets/`に置きます。判断規則をtemplateへ重複定義しません。
+
+## Agent Skills仕様ベースの構造
+
+Agent Skills Specificationに基づく部分:
+
+```text
+skills/<skill-name>/
+├── SKILL.md       # 必須
+├── references/    # 任意
+├── assets/        # 任意
+└── scripts/       # 必要な場合のみ
+```
+
+Agent Skills Specificationは`SKILL.md`を必須とし、`references/`、`assets/`、`scripts/`等を任意resourceとして扱います。追加ファイル / ディレクトリも許容されますが、以下の`evals/`命名や評価方式自体はSpecificationの標準要件ではありません。
+
+## このリポジトリ独自の開発・評価拡張
+
+```text
+EVALS.md
+skills/<skill-name>/evals/trigger/
+├── train_queries.json
+└── validation_queries.json
+```
+
+また、`qa-workflow`のProject Context / Workflow State、9 Skillを横断するOrchestration意味論もこのリポジトリ固有です。
+
+Trigger Eval datasetはAgent Skills公開のdescription最適化ガイドを参考にしていますが、`evals/trigger/`は本リポジトリの配置規約です。
+
+## qa-workflowのRuntime前提
+
+`qa-workflow`は、**同一Agent client上で9 Skillすべてが利用可能で、Agentが要求に応じて必要なSkillを追加ロード / 利用できる環境**を前提とします。
+
+Agent Skills Specificationは、Skill AがSkill Bを標準APIでinvokeする共通Skill-to-Skill protocolを規定していません。そのため、このWorkflow前提をAgent Skills標準仕様そのものとは扱いません。
+
+特定Agent clientについて「対応済み」と事前に断定しません。Compatibilityは実Agent client上のWorkflow E2E Evalで確認します。
+
+## Workflowの基本原則
+
+`qa-workflow`はDomain Logicを肩代わりせず、次だけを制御します。
+
+- 要求成果物に必要な開始Skillを決める
+- 有効な既存成果物を再利用する
+- 必要Skillへroutingする
+- Blockedを影響範囲へ局所化する
+- 停止 / 再開を管理する
+- 上流変更時に影響下流だけを`要再検証`へ戻す
+- 修正を最も早い責任Skillへ返す
+- Full Workflowの状態と完了を判定する
+
+既定経路:
 
 ```text
 spec-analysis
@@ -103,78 +161,43 @@ coverage-analysis
 adversarial-review
 ```
 
-フルワークフローを使う場合は、`qa-workflow`と8個のQA Skillが利用可能であることを前提とします。有効な既存成果物がある場合は最も近い必要Skillから開始します。
+これは依存関係を示す既定経路であり、全依頼で全Skillを実行する義務ではありません。
 
-## 基本原則
+## Trigger Eval
 
-### Current Effective Authority
+現在、9 Skillすべてに固定Trigger Eval datasetがあります。
 
-期待挙動は固定順位で決めず、対象スコープで現在有効なAuthorityを解決します。
+- train: 12件 / Skill（positive 6 / negative 6）
+- validation: 8件 / Skill（positive 4 / negative 4）
+- 合計: 180 query
 
-- 状態が`有効`で対象スコープに適用される`DECISION`は、既存仕様の上書き有無に関係なくAuthority候補とする
-- 有効`DECISION`が既存`SPEC` / 旧`DECISION`と重なる場合は、補足 / 上書き / 置換関係と影響範囲で解決する
-- `SPEC`は各情報源の現行版を版・更新時点から特定した後、案件固有の情報源優先順位を適用する
-- 鮮度だけを理由に低優先度情報源を高優先度情報源より優先しない
-- `承認済み ASM`は有効な`SPEC` / `DECISION`で未定義の隙間だけを暫定的に補完する
-- 解決不能なAuthority競合はBlocker
+Canonical Trigger Evalは9 Skillすべてを同時に利用可能にした状態で実施します。Skill単独 / 限定登録はDiagnostic Modeです。
 
-### ID / Canonical Registry
+現在のdescriptionをbaselineとして使用するため、実Trigger Eval結果取得前にはdescriptionを最適化しません。詳細は`EVALS.md`を参照してください。
 
-- `SPEC-xxx`: 権威ある情報源に明記された仕様
-- `DEC-xxx`: 正式に確定した決定
-- `INF-xxx`: 根拠はあるが未確定の推論
-- `UNK-xxx`: 根拠不足で確定できない事項
-- `ASM-xxx`: 明示的な仮定
+## Evalの今後
 
-`DEC-xxx` / `ASM-xxx`はProject Contextまたは案件で明示された同等のCanonical Registryへ一意に記録します。
+Trigger EvalとOutput Quality Eval / Workflow E2E Evalは分離します。
 
-### Product Risk
+今後の主な評価:
 
-テスト深度・優先度の判断にはProduct Riskを使います。Project Riskはリスク評価へ混ぜません。
+- Canonical Trigger baseline取得
+- description optimization
+- fresh queryによるfinal holdout
+- Output Quality Eval（with-skill / baseline比較等）
+- `qa-workflow` Workflow E2E Eval
 
-案件固有方式がない場合は4×4 Risk Matrixを使います。Product RiskはCoverageの深度を変えるために使い、対象内の仕様・要求を無言で削除する理由にはしません。
+空のEval frameworkやholdout datasetを先行作成しません。
 
-### Coverageの閉鎖性
+## Validation
 
-フルワークフローでは、対象内のCurrent Effective Authority、Product Risk、Test Requirement、Test Condition、Coverage Itemを、下流成果物または明示Dispositionへ閉じます。
+Agent Skills仕様適合と、このリポジトリ独自の構造検査を分離します。
 
-複数候補を持つ技法では、**候補母集団 → Coverage Criteria → Coverage Item → 採用しない候補のDisposition**の順に設計します。
+- **公式仕様検証**: GitHub Actionsで公式`skills-ref validate <skill-directory>`を9 Skillへ実行
+- **リポジトリ独自検査**: 9 Skill数、frontmatter最低項目、nameとdirectory一致、JSON parse、train / validation件数、boolean型、positive / negative件数、README / EVALSのSkill記載を確認
 
-### 主な技法の既定
-
-- 同値分割: 対象Partitionを候補化し、採用またはDisposition
-- BVA: 2-valueを既定とし、必要時3-value。採用方式から具体Coverage Itemを定義
-- Decision Table: 実行可能ルールを候補化し、採用またはDisposition
-- 状態遷移: 対象範囲内の全有効遷移Coverageを既定
-- Pairwise: 成立可能な全Value Pairが生成Coverage Itemへ含まれる2-wise Coverageを確認できる場合だけPairwiseと呼ぶ
-- Error Guessing: 選択した失敗仮説だけをCoverage対象とし、完全網羅とは表現しない
-
-### ローレベルTest Case
-
-出力するすべてのTest Caseは、ケース単体から次を判断できる具体度にします。
-
-1. 誰が / どの状態で開始するか
-2. 何を準備するか
-3. 何を操作するか
-4. 何を入力・選択するか
-5. 何が起きればPASSか
-
-PASS / FAIL判定に使用する各期待結果はCurrent Effective Authorityへ追跡し、複数ある場合は期待結果ごとにAuthorityを対応付けます。
-
-### Blocker / Disposition
-
-Blockerは可能な限り影響範囲だけを停止します。
-
-対象内項目を下流へ展開しない場合は、理由に応じて別テストレベル / 残存リスク / 対象外 / Blocked等へ明示的に位置づけます。低Product Riskだけを理由に`対象外`へ送りません。
-
-Full Workflowで対象スコープ内にBlockedが残る場合、Blocked以外の範囲は完了できますが、Workflow全体は`部分完了（Blockedあり）`または`Blocked`として扱い、無条件に`完了`とはしません。
-
-### 上流修正
-
-上流成果物の意味を変更した場合は、影響する下流成果物だけを`要再検証`として再確認します。無関係な成果物を全再生成しません。
+CIで使用する`skills-ref`は再現性のため公式`agentskills/agentskills`の特定commitへpinします。
 
 ## 標準との関係
 
-Agent Skillsの公開仕様に合わせ、各Skillを`SKILL.md`を持つ独立ディレクトリとして構成しています。
-
-ISTQB、IVEC、ISO/IEC/IEEE 29119等は、このワークフローの目的に必要な考え方だけをテーラリングして利用し、完全準拠やテストプロセス全体の再現は目的としません。
+ISTQB、IVEC、ISO/IEC/IEEE 29119等は、このWorkflowの目的に必要な考え方だけをテーラリングして利用し、完全準拠やテストプロセス全体の再現は目的としません。

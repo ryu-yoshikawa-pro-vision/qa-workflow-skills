@@ -1,8 +1,8 @@
-# ローレベルテストケース設計 詳細判断基準
+# ローレベルTest Case設計 詳細判断基準
 
 ## 目的
 
-Test Condition / Coverage Itemを、**第三者がケース単体を読んで迷わず実施し、PASS / FAILを判断できるローレベルTest Case**へ変換します。
+Test Condition / Coverage Itemを、**第三者がケース単体を読んで迷わず実施し、PASS / FAILを判断できるLow-Level Test Case**へ変換します。
 
 ## 入力
 
@@ -14,7 +14,7 @@ Test Condition / Coverage Itemを、**第三者がケース単体を読んで迷
 
 利用可能ならTest Requirement、Product Risk / 優先度、案件コンテキスト、テストレベル / 観測方法、正式用語、既知制約も使います。
 
-## ローレベル完了基準
+## Low-Level完了基準
 
 **出力するすべてのTest Case**について、ケース単体から次を一意に判断できなければなりません。
 
@@ -26,30 +26,24 @@ Test Condition / Coverage Itemを、**第三者がケース単体を読んで迷
 
 別ケース、口頭説明、暗黙知を読まないと必要情報を判断できる場合は未完成です。低優先度ケースもこの具体度を下げません。
 
-## Current Effective Authority
+## Current Effective Authority / Oracle
 
-完成済みTest Caseの期待結果は、対象スコープのCurrent Effective Authorityへ追跡します。
+完成済みTest Caseの期待結果は、`spec-analysis`で解決済みのCurrent Effective Authority、または同等に有効性が確認された上流成果物へ追跡します。
 
-利用可能なAuthorityは次です。
+本SkillはSPEC / DECISION / ASMの優先関係やversionを再解決しません。Current Effective Authorityが未解決・競合・陳腐化している場合は`spec-analysis`または`question-analysis`へ戻します。
 
-- 現在有効な`SPEC`
-- 状態が`有効`で対象スコープに適用される`DECISION`
-- 有効な`SPEC` / `DECISION`で未定義の隙間を補う`承認済み ASM`
-
-Product Risk、実装、既存Test Case、一般的UI慣習、未承認`INFERENCE`、テスターの常識は単独でCurrent Effective Authorityにしません。`撤回` / `置換済み`Decisionを現在の根拠へ使いません。
-
-期待結果を決められない場合は`question-analysis`へ戻します。
+Product Risk、実装、既存Test Case、一般的UI慣習、未承認`INFERENCE`、テスターの常識だけで未定義Oracleを確定しません。
 
 ### 複数期待結果・複数Authorityの根拠
 
-PASS / FAIL判定に使用する各期待結果は、それを成立させる1件以上のCurrent Effective Authorityへ曖昧なく対応付けます。1つの期待結果を複数Authorityが共同で支える場合は、Authority集合として追跡できる形にします。
+PASS / FAIL判定に使用する各期待結果は、それを成立させる1件以上のCurrent Effective Authorityへ曖昧なく対応付けます。1つの期待結果を複数Authorityが共同で支える場合はAuthority集合として追跡できる形にします。
 
 例:
 
 - 期待結果1 → `SPEC-003`
 - 期待結果2 → `SPEC-004` + `DEC-002`
 
-複数根拠を1セルへ並べるだけで、どの期待結果をどの根拠または根拠集合が支えるか不明な状態にしません。PASS / FAIL判定に使用しない説明的な中間状態は、期待結果として過剰に列挙しません。
+複数根拠を1セルへ並べるだけで、どの期待結果をどの根拠が支えるか不明な状態にしません。PASS / FAIL判定に使用しない説明的な中間状態を期待結果として過剰列挙しません。
 
 ## Coverage Item / Test Conditionの閉鎖
 
@@ -65,19 +59,19 @@ Coverage Itemを独立表示せずTest Conditionへ内包している場合も�
 
 1つのTest Caseが複数Coverage Itemをカバーする場合は、すべてのCoverage Item IDを同じTest Caseへ関連付けます。複数項目を1ケースでカバーできること自体を`重複`Dispositionにはしません。
 
-ケース化しない項目のDispositionは`qa-workflow`の共通Disposition条件に従います。Product Riskが低いことだけを理由に`対象外`へ送りません。
+共通Dispositionは`qa-workflow`、Coverage Itemの成立・Coverage Criteria詳細は`test-condition-design`を正本とします。
 
 ## テストデータ / 状態 / 環境
 
 必要なユーザー、データ、状態、環境は原則として準備可能として設計します。
 
-設計時点ですでに準備不能と分かる条件はケース化せず、妥当なDispositionへ位置づけます。実施時に初めて準備不能と分かった場合は、その時点で実施対象から除外または見直します。
+設計時点ですでに準備不能と分かる条件はケース化せず妥当なDispositionへ位置づけます。実施時に初めて準備不能と分かった場合は、その時点で実施対象から除外または見直します。
 
 ## 優先度
 
 Test Caseは、カバーするTest Condition / Coverage Item / Test Requirementの最も高い優先度を既定で引き継ぎます。
 
-優先度を下げる場合は、別テストレベル、重複Coverage、対象外等の理由を明示します。複数Coverage Itemを1ケースへ統合した場合も最も高い優先度を失いません。
+優先度を下げる場合は理由を明示します。複数Coverage Itemを1ケースへ統合した場合も最も高い優先度を失いません。
 
 ## 手順
 
@@ -103,7 +97,7 @@ Coverage Itemを実行できる具体データへ変換します。準備方法�
 
 観測可能な結果を具体的に記載します。「正常」「正しく」「問題ない」「適切なメッセージ」等を具体結果の代わりに使いません。
 
-UI中心のシステムテストでは原則UIから観測可能な結果を使い、案件で許可されていないDB / API / ログ観測を勝手にOracleへ追加しません。
+UI中心のシステムテストでは原則UIから観測可能な結果を使い、案件で許可されていないDB / API / log観測を勝手にOracleへ追加しません。
 
 ### 6. 多段手順と期待結果・根拠を対応付ける
 
@@ -127,11 +121,11 @@ UI中心のシステムテストでは原則UIから観測可能な結果を使�
 
 開始状態、操作経路、期待結果、失敗時の意味、独立性、挙動を変えるデータ区分が異なる場合は分離します。観点名が違うだけでは分離理由になりません。
 
-## 意味上の出力契約
+## 出力
 
 各Test Caseに必要な情報:
 
-- 安定ID（例: `TC-001`）
+- 安定ID
 - タイトル / 目的
 - 関連Test Condition
 - 関連Coverage Item（明示時）
@@ -141,7 +135,7 @@ UI中心のシステムテストでは原則UIから観測可能な結果を使�
 - テストデータ
 - 実施手順
 - 期待結果
-- PASS / FAIL判定に使用する各期待結果を支える1件以上のCurrent Effective Authority
+- PASS / FAIL判定に使用する各期待結果を支えるCurrent Effective Authority
 - 必要時の事後状態 / 後処理
 
 Test Caseへ展開しないCoverage Item / 内包Test Conditionには、上流ID、Disposition、理由 / 根拠が必要です。
@@ -161,12 +155,11 @@ Test Caseへ展開しないCoverage Item / 内包Test Conditionには、上流ID
 
 ## 品質ゲート
 
-- **出力したすべてのTest Case**がローレベル完了基準を満たす
-- 現在レベルの各Coverage Item / 内包Test ConditionがTest Caseまたは明示Dispositionへ閉じている
+- 出力したすべてのTest CaseがLow-Level完了基準を満たす
+- 各Coverage Item / 内包Test ConditionがTest Caseまたは明示Dispositionへ閉じている
 - 別ケースの実行結果へ暗黙依存していない
 - 開始者 / 開始状態、準備、操作、入力 / 選択、合格条件が明確
-- PASS / FAIL判定に使用する各期待結果が、1件以上のCurrent Effective AuthorityまたはAuthority集合へ曖昧なく追跡できる
-- 複数のPASS / FAIL判定用期待結果がある場合も、期待結果と根拠 / 根拠集合の対応が曖昧でない
+- PASS / FAIL判定に使用する各期待結果がCurrent Effective Authorityへ曖昧なく追跡できる
 - Product Risk / 実装 / 既存テストから未定義の期待結果を創作していない
 - 観測できない結果を期待結果にしていない
 - 1ケースで複数Coverage Itemをカバーする場合も関連IDをすべて保持している
@@ -176,6 +169,7 @@ Test Caseへ展開しないCoverage Item / 内包Test Conditionには、上流ID
 
 ## 次の担当Skill
 
-- Current Effective Authority / 期待挙動不明 → `question-analysis`
+- Current Effective Authority自体の解決不備 → `spec-analysis`
+- 未解決期待挙動 / Oracle不明 → `question-analysis`
 - Coverage Item不足 / 条件不備 → `test-condition-design`
 - Coverage確認 → `coverage-analysis`

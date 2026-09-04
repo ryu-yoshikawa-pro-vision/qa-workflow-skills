@@ -1,42 +1,53 @@
-# 反証レビュー 詳細判断基準
+# 反証レビュー 基本ガイダンス
 
 ## 目的
 
-QA成果物を肯定するためではなく、**誤り・抜け・過剰・根拠不足・追跡性欠陥**を見つけるためにレビューします。
+QA成果物を肯定するためではなく、誤り・抜け・過剰・根拠不足・追跡性欠陥をCold Reviewし、重大度と修正先を示します。
 
-対象:
-
-- 仕様分析 / Current Effective Authority
-- 不明点・矛盾分析 / Assumption管理
-- テスト分析 / Product Risk
-- Test Requirement
-- Test Condition / Coverage Item
-- ローレベルTest Case
-- Coverage Analysis
+成果物別の詳細プローブは対象成果物に応じたreferenceだけを読みます。
 
 ## 入力
 
 必須:
 
-- レビュー対象となるQA成果物
+- レビュー対象QA成果物
 
-判定対象に応じてCurrent Effective Authority、上流成果物、Product Risk、Coverage Criteria、Canonical Registry、案件コンテキスト、既存の残存リスク / Blocked情報を根拠入力として使います。
+判定対象に応じて利用:
 
-必要な根拠がなく特定観点を判定できない場合は、その観点をレビュー制約 / 判定不能として明示し、判定可能な範囲のレビューを継続します。
+- Current Effective Authority
+- Product Risk
+- Coverage Criteria
+- Canonical Registry
+- 案件コンテキスト
+- 前後QA成果物
+- 既存の残存リスク / Blocked情報
 
-## Function
-
-生成時の説明や意図を正当化根拠にせず、利用可能な上流根拠と成果物自体の出力契約からCold Reviewし、誤り・抜け・過剰・根拠不足・追跡性欠陥を重大度付きで検出し、最も早い責任Skillと必要な処置を示します。
+必要根拠がない観点は断定せず、レビュー制約 / 判定不能として明示します。判定可能な範囲は継続します。
 
 ## レビュー姿勢
 
 - 生成時の意図・説明を正当化根拠にしない
-- 利用可能な権威ある情報源、Canonical Registry、上流成果物、成果物自体の出力契約から判断を再構成する
+- 利用可能な上流根拠と成果物から判断を再構成する
 - 「一般的には必要」を理由に欠陥を作らない
-- 実在するProduct Risk、Current Effective Authority、Coverage Criteria、ケース実行性へ結び付けて指摘する
 - 好みと欠陥を分ける
+- 工程固有の詳細規則は担当SkillをSingle Source of Truthとする
 
-同一AIが自己レビューする場合も、生成時の推論を引き継いで正当化せずCold Reviewとして上流根拠から再判定します。
+同一AIが自己レビューする場合も、生成時の推論をそのまま引き継がずCold Reviewします。
+
+## Domain Logic参照先
+
+| 対象 | 詳細判断の正本 |
+| --- | --- |
+| Current Effective Authority / 仕様分類 | `spec-analysis` |
+| 不明点 / Assumption / 回答正規化 | `question-analysis` |
+| Product Risk | `test-analysis` |
+| Test Requirement | `test-requirement-design` |
+| Coverage Criteria / Item / 技法 | `test-condition-design` |
+| Low-Level Test Case / Oracle | `test-case-design` |
+| Coverage / Gap | `coverage-analysis` |
+| 重大度 / Cold Review処置 | `adversarial-review` |
+
+本Skillのprobeは「どこを疑うか」を示します。担当Skillの詳細アルゴリズムを別正本として複製しません。
 
 ## 重大度
 
@@ -44,15 +55,17 @@ QA成果物を肯定するためではなく、**誤り・抜け・過剰・根�
 
 成果物が重大に誤ったQA判断 / 実行を導き、修正なしで安全に利用できない。
 
-例: 期待結果がCurrent Effective Authorityと逆、主要業務責務が大規模欠落、Oracle創作、追跡関係破綻。
+例: 期待結果が有効Authorityと逆、主要責務の大規模欠落、Oracle創作、追跡関係の重大破綻。
 
-処置は`修正済み`または`Blocked`のみです。残存リスク受容だけで利用可能状態にしません。
+処置は`修正済み`または`Blocked`です。残存リスク受容だけで利用可能状態にしません。
 
 ### `重大`
 
-Coverage、追跡性、実行可能性、Oracle信頼性を実質的に弱め、通常は利用前に修正すべき。
+Coverage、追跡性、実行可能性、Oracle信頼性等を実質的に弱め、通常は利用前に修正すべき。
 
-処置は`修正済み`、権限を持つユーザー / ステークホルダーが明示的に`残存リスクとして受容`、または`Blocked`です。残存リスクとして受容する場合は、誰のどの承認に基づくかを追跡できる承認参照を記録します。
+処置は`修正済み`、権限を持つユーザー / ステークホルダーによる明示的な`残存リスクとして受容`、または`Blocked`です。
+
+残存リスクとして受容する場合は承認参照を記録します。
 
 ### `軽微`
 
@@ -62,106 +75,21 @@ Coverage、追跡性、実行可能性、Oracle信頼性を実質的に弱め、
 
 現在の欠陥ではない任意改善。
 
-重大度は好みや修正工数ではなく成果物利用時の影響で決めます。
+重大度は好みや修正工数ではなく、成果物利用時の影響で決めます。
 
-## 成果物別プローブ
+## 対象別reference
 
-### 仕様分析 / Current Effective Authority
+レビュー対象に応じて必要なreferenceだけを読みます。
 
-- `SPEC` / `DECISION` / `INFERENCE` / `UNKNOWN`を混同していないか
-- IDが分類と一致しているか
-- `DEC-xxx`をCanonical Registryと別IDで重複管理していないか
-- 対象スコープに適用される有効Decisionを、上書き有無に関係なくAuthority候補として確認しているか
-- `撤回` / `置換済み`Decisionを現在の根拠にしていないか
-- 有効Decisionの補足 / 上書き / 置換関係と影響範囲が追跡できるか
-- `ASM`で有効な`SPEC` / `DECISION`を上書きしていないか
-- 各情報源の現行版を特定した後に情報源優先順位を適用しているか
-- 鮮度だけで低優先度情報源を優先していないか
-- Current Effective Authorityの正規化ビューに対象範囲の有効`SPEC` / `DECISION` / `承認済み ASM`が反映されているか
-- 実装・既存テストを仕様Authorityへ昇格していないか
-- 同一スコープの有効Authority競合を未解決のまま下流へ流していないか
+- 仕様分析 / Current Effective Authority / 不明点 / Assumption → `authority-question-probes.md`
+- Product Risk / Test Requirement / Test Condition / Coverage Item / Test Case → `test-design-probes.md`
+- Coverage Analysis / 残存リスク → `coverage-probes.md`
 
-### 不明点・Assumption
-
-- 本来Blockerの事項を`要確認` / `仮定可能`へ下げていないか
-- 最終PASS条件が未承認Assumptionへ依存していないか
-- AI自身の判断で`ASM-xxx`を`承認済み`にしていないか
-- 正式挙動として確定した回答をAssumptionのまま残していないか
-- 回答後の期待挙動が`SPEC` / `DECISION` / `承認済み ASM`へ正規化されているか
-- 解決済み事項を再質問していないか
-- Blocked範囲を必要以上に広げていないか
-
-### テスト分析 / Product Risk
-
-- Product Riskだけをリスク評価へ使っているか
-- Risk Matrixを正しく適用しているか
-- 判断材料不足だけを理由に発生可能性1へ下げていないか
-- 影響度4を低リスク扱いしていないか
-- リスクレベルが設計深度へ接続されているか
-- 低Product Riskを上流責務の無言削除理由にしていないか
-- 一般的QAチェックリストを根拠なくスコープ化していないか
-
-### Test Requirement
-
-- 各Test RequirementがCurrent Effective Authorityへ追跡できるか
-- 対象内の各Current Effective AuthorityがTest Requirementまたは明示Dispositionへ閉じているか
-- 対象内の各Product RiskがTest Requirementまたは明示Dispositionへ閉じているか
-- 上流記載の言い換えだけでなく検証責務になっているか
-- Product Riskや実装から期待挙動を創作していないか
-- 無関係な責務を過剰統合していないか
-- 優先度を理由なく下げていないか
-
-### Test Condition / Coverage Item
-
-- 現在レベルの各Test RequirementがTest Conditionまたは明示Dispositionへ閉じているか
-- 候補母集団を識別せず恣意的に項目を省略していないか
-- 採用しない候補にDispositionと理由があるか
-- 低Product Riskだけを理由に`対象外`を使用していないか
-- `成立不能`に仕様 / モデル / 制約の根拠があるか
-- `重複`に具体的カバー先があるか
-- 適用技法にCoverage Criteriaがあるか
-- Coverage Itemの明示 / 内包判断が一意か
-- BVAの具体項目が採用方式に合うか
-- 状態遷移で対象範囲内の全有効遷移がCoverageまたは妥当なDispositionへ閉じているか
-- Pairwiseを名乗る場合、成立可能な全Value Pairが生成Coverage Itemへ含まれる2-wise保証があるか
-- Error Guessingを完全網羅と表現していないか
-
-### ローレベルTest Case
-
-**出力されたすべてのTest Case**について、開始者 / 開始状態、準備、操作、入力 / 選択、PASS条件を確認します。
-
-さらに:
-
-- 現在レベルの各Coverage Item / 内包Test ConditionがTest Caseまたは明示Dispositionへ閉じているか
-- 別ケースの暗黙状態へ依存していないか
-- 正式用語を使っているか
-- 期待結果が観測可能か
-- PASS / FAIL判定に使用する各期待結果が、1件以上のCurrent Effective AuthorityまたはAuthority集合へ曖昧なく追跡できるか
-- Product Risk / 実装 / 既存テストを未定義の期待結果にしていないか
-- 許可されていないDB / API / ログ観測を要求していないか
-- 優先度を理由なく下げていないか
-- 重複または過剰統合がないか
-
-### Coverage Analysis
-
-- Current Effective Authority / Product RiskからTest Caseまでの各層が下流接続または明示Dispositionへ閉じているか
-- Product Riskが下流へ接続されず消えていないか
-- 件数比較を意味上のCoverageとして扱っていないか
-- Coverage Criteriaと候補Dispositionの妥当性を確認しているか
-- 下流成果物不存在を未カバーではなくBlockedと誤判定していないか
-- 高Product Risk Gapを見落としていないか
-- 不十分なTest CaseをCoverage済みと誤認していないか
-- `要再検証`の成果物を最新成果物として数えていないか
-
-## 残存リスクのレビュー
-
-高Product Riskを意図的な未カバーとして`残存リスク`へ位置づける場合は、少なくとも`重大`候補として扱い、未カバー内容・影響・受容根拠を確認します。明示的な受容がない場合は処置済みとみなしません。
-
-重大度が`致命的`に相当するかは、未カバーによる成果物利用時の影響で判断します。
+複数成果物を横断レビューする場合は該当するreferenceを複数読みます。
 
 ## 機能固有の欠陥プローブ
 
-仕様・Product Riskに関連する場合だけ、リロード、二重操作、セッション切れ、複数タブ、空値、境界、特殊文字 / IME、権限変更、状態復旧、日時境界、互換性等を検討します。
+リロード、二重操作、セッション切れ、複数タブ、空値、境界、特殊文字 / IME、権限変更、状態復旧、日時境界、互換性等は、仕様・Product Risk・既存失敗等の根拠がある場合だけ検討します。
 
 一覧に存在するという理由だけで「抜け」と判定しません。
 
@@ -182,7 +110,7 @@ Coverage、追跡性、実行可能性、Oracle信頼性を実質的に弱め、
 
 ## 再レビュー
 
-`致命的` / `重大`修正後は影響範囲を再レビューします。修正が下流の意味・追跡関係を変える場合は`qa-workflow`の変更伝播規則に従います。
+`致命的` / `重大`修正後は影響範囲を再レビューします。修正が下流の意味・追跡関係を変える場合は`qa-workflow`の変更伝播へ戻します。
 
 ## 出力
 
@@ -198,18 +126,17 @@ Coverage、追跡性、実行可能性、Oracle信頼性を実質的に弱め、
 - 処置状態
 - `重大`を残存リスクとして受容する場合の処置根拠 / 承認参照
 
+判定できない範囲はレビュー制約として別途明示します。
+
 ## 品質ゲート
 
-- 指摘が利用可能なCurrent Effective Authority・Product Risk・Coverage Criteria・成果物契約等の根拠を持つ
-- 判定に必要な根拠がない領域を断定せず、レビュー制約 / 判定不能として明示している
+- 指摘が利用可能なAuthority・Product Risk・Coverage Criteria・成果物契約等の根拠を持つ
+- 根拠不足の観点を断定していない
 - 好みを欠陥として報告していない
 - 一般的チェックリストを機械適用していない
 - `致命的` / `重大`の影響説明が具体的
 - `致命的`を残存リスク受容だけで完了させていない
-- `重大`の残存リスク受容に明示的な承認があり、承認参照を追跡できる
-- 高Product Riskの未カバーを無処置で見逃していない
+- `重大`の残存リスク受容に明示承認と承認参照がある
 - 修正先が最も早い責任Skillになっている
-- 本Skill自身が他層成果物を書き換えていない
+- 工程固有のDomain Logicを本Skillで再定義していない
 - 修正後の再レビュー範囲が妥当
-
-本Skillは正式なISTQB / ISOのインスペクション手順そのものではなく、このワークフロー向けの反証レビューです。

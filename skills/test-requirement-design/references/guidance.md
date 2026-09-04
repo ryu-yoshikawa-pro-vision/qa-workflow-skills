@@ -17,15 +17,11 @@ Test Requirementはこのワークフロー固有の中間成果物であり、C
 
 ## Current Effective Authority
 
-Test Requirementが製品の期待挙動を含む場合、対象スコープで解決済みのCurrent Effective Authorityへ追跡します。
+Test Requirementが製品の期待挙動を含む場合、`spec-analysis`で解決済みのCurrent Effective Authority、または同等に有効性が確認された上流成果物へ追跡します。
 
-Current Effective Authority候補は次です。
+本SkillはSPEC / DECISION / ASMの優先関係、version、情報源競合を再解決しません。Current Effective Authorityが未解決・陳腐化・競合状態なら`spec-analysis`へ戻します。
 
-- 現在有効な`SPEC`
-- 状態が`有効`の`DECISION`
-- 有効な`SPEC` / `DECISION`で未定義の隙間を補う`承認済み ASM`
-
-Product Risk、実装、既存テスト、一般的慣習、未承認`INFERENCE`は単独で期待挙動を確定するAuthorityにはできません。`撤回` / `置換済み`Decisionを現在の根拠へ使いません。
+Product Risk、実装、既存テスト、一般的慣習、未承認`INFERENCE`だけで製品期待挙動を確定しません。
 
 ## 抽象度
 
@@ -45,7 +41,7 @@ Test Requirementは「何を検証するか」を表します。
 - 境界値の具体展開
 - 組合せ表
 - 実行手順
-- テストケースの前提 / データ / Step
+- Test Caseの前提 / データ / Step
 
 Test Requirementは上流記載の言い換えだけでは不十分です。「何を保証すればその上流責務が検証されたと言えるか」が独立して分かる検証責務へ変換します。
 
@@ -75,7 +71,7 @@ Test Requirementは上流記載の言い換えだけでは不十分です。「�
 
 Product Riskが低いことだけを理由に、Current Effective AuthorityまたはProduct Riskを下流から消しません。
 
-Dispositionの意味は`qa-workflow`の共通Dispositionに従います。
+共通Dispositionの意味は`qa-workflow`、要求化固有の判断は本Skillを正本とします。
 
 ## 分割・統合の判断
 
@@ -85,7 +81,7 @@ Dispositionの意味は`qa-workflow`の共通Dispositionに従います。
 
 ## 優先度
 
-関連Product Riskがある場合は、その最も高いリスクレベルを既定優先度として引き継ぎます。案件固有の明示的重点がある場合はそれも考慮できます。
+関連Product Riskがある場合は、その最も高いRisk levelを既定優先度として引き継ぎます。案件固有の明示的重点がある場合はそれも考慮できます。
 
 上流より優先度を下げる場合は、別テストレベル、重複責務等の理由を明示します。理由なく高い上流優先度を下げません。
 
@@ -98,7 +94,7 @@ Dispositionの意味は`qa-workflow`の共通Dispositionに従います。
 5. 各Test Requirementが少なくとも1つのCurrent Effective Authorityへ戻れることを確認する
 6. 対象内のCurrent Effective Authority / Product Riskに未処理項目がないことを確認する
 
-## 意味上の出力契約
+## 出力
 
 各Test Requirementに必要な情報:
 

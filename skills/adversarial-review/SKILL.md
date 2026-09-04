@@ -7,21 +7,33 @@ description: 仕様分析、不明点・仮定、テスト分析、テスト要�
 
 ## 実行契約
 
-1. 実行前に `references/guidance.md` を読み、レビュー観点、重大度、修正責務、再レビュー範囲、品質ゲートに従います。
-2. 成果物を肯定するためではなく、誤り・抜け・過剰・根拠不足を見つけるためにレビューします。
-3. 判断は利用可能な権威ある情報源、上流根拠、成果物の出力契約から再構成し、生成時の説明や意図を正当化根拠にしません。
-4. `致命的`指摘は修正済み、またはBlockedとして利用停止されるまで利用可能状態にしません。`重大`指摘は修正、明示的な残存リスク受容、またはBlockedの処置を必要とします。
-5. 修正が必要でも本Skill自身が他層成果物を再設計せず、`qa-workflow`を介して最も近い担当Skillへ戻します。
-6. 既定出力形式が必要な場合は `assets/output-template.md` を使用します。
-7. 他Skillを参照するときはCanonical Skill名を使用します。
+1. 成果物を肯定するためではなく、誤り・抜け・過剰・根拠不足・追跡性欠陥を見つけるためにCold Reviewします。
+2. 生成時の説明や意図を正当化根拠にせず、利用可能な上流根拠と成果物から判断します。
+3. 重大度、処置、修正routing、レビュー制約の基本は`references/guidance.md`に従います。
+4. 仕様分析 / 不明点をレビューする場合だけ`references/authority-question-probes.md`を追加で読みます。
+5. Product Risk / Test Requirement / Test Condition / Coverage Item / Test Caseをレビューする場合だけ`references/test-design-probes.md`を追加で読みます。
+6. Coverage Analysis / 残存リスクをレビューする場合だけ`references/coverage-probes.md`を追加で読みます。
+7. 工程固有の詳細Domain Logicは担当SkillをSingle Source of Truthとし、本Skillへ別正本として複製しません。
+8. 修正が必要でも本Skill自身が他層成果物を再設計せず、`qa-workflow`を介して最も早い責任Skillへ戻します。
+9. 既定出力形式が必要な場合は`assets/output-template.md`を使用します。
 
 ## インターフェース
 
-- **Input**: レビュー対象QA成果物。Current Effective Authority、上流成果物、Product Risk、Coverage Criteria、Canonical Registry、案件コンテキスト等は、判定対象に応じて利用する根拠入力とします。
-- **Function**: 生成時の意図を引き継がず、利用可能な上流根拠と成果物自体の契約からCold Reviewし、誤り・抜け・過剰・根拠不足・追跡性欠陥を重大度付きで検出して責任Skillへ戻します。根拠不足で判定できない領域はレビュー制約として明示します。
-- **Output**: 重大度、対象、問題、根拠、影響、推奨修正先、処置状態を持つ反証レビュー結果を作ります。`重大`を残存リスクとして受容する場合は、処置根拠 / 承認参照も記録します。
+- **Input**: レビュー対象QA成果物。Current Effective Authority、Product Risk、Coverage Criteria、Canonical Registry、案件コンテキスト、前後成果物等は判定対象に応じた根拠入力とします。
+- **Function**: 生成時の意図を引き継がずCold Reviewし、判定可能な範囲で誤り・抜け・過剰・根拠不足・追跡性欠陥を重大度付きで検出して責任Skillへ戻します。
+- **Output**: 重大度、対象、問題、根拠、影響、推奨修正先、処置状態を持つ反証レビュー結果。判定に必要な根拠がない観点はレビュー制約 / 判定不能として明示します。
+
+## 基本原則
+
+- 必要根拠が不足する観点だけを判定不能とし、判定可能な他範囲は継続する
+- 好みを欠陥として報告しない
+- 一般的チェックリストを根拠なく機械適用しない
+- 工程固有ルールの詳細正誤は担当Skillの契約を基準とする
 
 ## リソース
 
-- 詳細判断基準: `references/guidance.md`
+- 重大度 / 処置 / routing / 品質ゲート: `references/guidance.md`
+- 仕様分析 / 不明点プローブ: `references/authority-question-probes.md`
+- テスト設計成果物プローブ: `references/test-design-probes.md`
+- Coverage Analysis / 残存リスクプローブ: `references/coverage-probes.md`
 - 既定出力形式: `assets/output-template.md`

@@ -6,6 +6,8 @@ Current Effective Authority、Product Risk、Test Requirement、Test Condition�
 
 ケース件数やリンク数だけでCoverageを判断しません。
 
+Coverage Criteria / Coverage Itemをどう設計するか、BVA / Pairwise / 状態遷移等の技法固有ルールは`test-condition-design`をSingle Source of Truthとします。本Skillではそれらを再定義せず、入力されたCoverage Criteriaと候補集合に対する充足・閉鎖性を評価します。
+
 ## 入力
 
 ### Partial
@@ -35,11 +37,11 @@ Current Effective Authority、Product Risk、Test Requirement、Test Condition�
 
 ### Partial
 
-ユーザーが指定した成果物間だけを比較します。
+ユーザーが指定した成果物間、Coverage Criteria、Dispositionだけを比較します。
 
 ### Full Workflow
 
-次の閉鎖性をすべて確認します。
+次の閉鎖性を確認します。
 
 1. Current Effective Authority → Test Requirement または明示Disposition
 2. Product Risk → Test Requirement または明示Disposition
@@ -54,50 +56,50 @@ Current Effective Authority、Product Risk、Test Requirement、Test Condition�
 
 ### Current Effective Authority Coverage
 
-対象範囲内の現在有効な仕様・決定・承認済み仮定について、Test Requirementへ意味上の対応があるか、または明示Dispositionがあるか確認します。
+対象範囲内の現在有効なAuthorityについて、Test Requirementへ意味上の対応があるか、または明示Dispositionがあるか確認します。
 
-`撤回` / `置換済み`Decisionを現在有効な上流根拠として数えません。
+Current Effective Authority自体の解決正当性は`spec-analysis`を正本とします。本SkillでSPEC / DECISION / ASMの優先関係を再解決しません。
 
 IDがリンクされているだけで検証責務が意味を確認していなければCoverageとはみなしません。
 
 ### Product Risk Coverage
 
-対象範囲内の各Product Riskについて、次を確認します。
+対象範囲内の各Product Riskについて次を確認します。
 
 - 1つ以上のTest Requirementへ接続されているか
 - 接続先の優先度・設計深度へProduct Riskが反映されているか
-- Test Requirementへ接続しない場合は、別テストレベル / 残存リスク / 対象外 / BlockedのDispositionがあるか
+- 接続しない場合は妥当なDispositionがあるか
 
-Product Riskが高いにもかかわらず未カバーまたは未受容の残存リスクとなっている場合は、重大なCoverage Gap候補として明示します。
+Risk Matrixの採点自体は`test-analysis`を正本とします。
 
 ### Test Requirement Coverage
 
-各Test Requirementについて、Test Conditionへ展開されているか、または別テストレベル / 残存リスク / 対象外 / Blockedへ位置づけられているか確認します。
+各Test RequirementがTest Conditionへ展開されているか、または妥当なDispositionへ位置づけられているか確認します。
 
 ### Coverage Criteria充足
 
-`test-condition-design`が定義したCoverage Criteriaと候補Dispositionを確認します。
+`test-condition-design`が出力したCoverage Criteria、候補母集団、Coverage Item、候補Dispositionを入力として確認します。
 
-- 同値分割 → 対象Partitionが採用または妥当なDispositionへ位置づけられているか
-- 境界値 → 採用した2-value / 3-valueの具体項目があるか
-- デシジョンテーブル → 実行可能ルールが採用または妥当なDispositionへ位置づけられているか
-- 状態遷移 → 対象範囲内の全有効遷移がCoverage Itemまたは妥当なDispositionへ位置づけられているか
-- Pairwise → 成立可能な全Value Pairが生成Coverage Itemへ含まれる2-wise保証があるか
-- シナリオ → 主経路 / 必要代替・例外経路が採用または妥当なDispositionへ位置づけられているか
+- Coverage Criteriaを満たすCoverage Item / Test Case Evidenceがあるか
+- 候補母集団の各対象候補が採用または妥当なDispositionへ閉じているか
+- 技法名だけを書いてCoverage済みとしていないか
+- Coverage Criteria自体が欠落・曖昧・不整合なら、CriteriaをこのSkillで再設計せず`test-condition-design`へ修正routingする
 
-技法名が書かれているだけでは充足としません。
+技法固有の「何をCoverage Criteriaとすべきか」は本Skillへ複製しません。
 
 ### Coverage候補Dispositionの妥当性
 
-各候補Dispositionを、`qa-workflow`と`test-condition-design`の使用条件に照らして確認します。
+各候補Dispositionを、`qa-workflow`の共通Dispositionと`test-condition-design`の工程固有条件に照らして確認します。
 
-特に次をGapとして扱います。
+特に次をGap候補として扱います。
 
-- 低Product Riskだけを理由に`対象外`へ送っている
-- 根拠なく`成立不能`としている
-- カバー先なしに`重複`としている
-- 対象内の未カバー項目を理由なしに`残存リスク`へ送っている
-- 設計可能な項目を便宜的に`Blocked`へ送っている
+- 低Product Riskだけを理由に`対象外`
+- 根拠のない`成立不能`
+- カバー先のない`重複`
+- 対象内未カバーを理由なしに`残存リスク`
+- 設計可能な項目を便宜的に`Blocked`
+
+詳細条件の正本は担当Skillです。本Skillは成果物上の根拠と閉鎖状況を検査します。
 
 ### Coverage Item Coverage
 
@@ -116,27 +118,27 @@ DispositionのないCoverage ItemはCoverage Gapです。
 - どのTest Condition / Coverage Itemを確認するか分かる
 - 実施可能な具体性がある
 - PASS / FAILを判断できる期待結果がある
-- PASS / FAIL判定に使用する各期待結果が、1件以上のCurrent Effective AuthorityまたはAuthority集合へ曖昧なく追跡できる
+- PASS / FAIL判定に使う期待結果がCurrent Effective Authorityへ追跡できる
 
-詳細なケース品質レビューは`adversarial-review`が担当します。
+Low-Level Case / Oracleの詳細品質は`test-case-design`、重大度付きCold Reviewは`adversarial-review`を正本とします。
 
 ## Product Riskとの深度対応
 
-高Product Risk領域では、選択技法のCoverage Criteria、境界 / 状態 / 権限 / エラー・復旧、Coverage削減理由を確認します。
+高Product Risk領域で設計深度が不足していないか、低Product Risk領域で根拠のない過剰展開がないかを確認します。
 
-低Product Risk領域では一般エッジケースの過剰展開を確認しますが、低リスクという理由だけで対象内項目がチェーンから消えていないことも確認します。
+具体的なRisk採点・深度定義は`test-analysis`を正本とし、本Skillで再採点しません。
 
 ## 検出対象
 
 ### 未カバー
 
-上流責務、Product Risk、Test Requirement、Coverage Item等に必要な下流検証または明示Dispositionがない。
+上流責務、Product Risk、Test Requirement、Coverage Item等に必要な下流検証またはDispositionがない。
 
-期待される下流成果物が存在しないこと自体も未カバーとして判定可能です。
+期待される下流成果物が存在しないこと自体も未カバーとして判定できます。
 
 ### 不正Disposition
 
-Dispositionは存在するが、使用条件を満たさない。
+Dispositionは存在するが、担当Skillの使用条件を満たさない。
 
 ### 孤立
 
@@ -144,50 +146,48 @@ Dispositionは存在するが、使用条件を満たさない。
 
 ### 根拠不足
 
-Test CaseやTest ConditionがCurrent Effective Authority / Test Requirement / Product Riskと意味的につながらない。
+Test CaseやTest Conditionが上流成果物と意味的につながらない。
 
 ### 重複
 
-複数ケースが同じ前提、操作、データ意味、期待結果を持ち、新しいCoverageを追加していない。
+複数成果物が同じ検証責務を持ち、新しいCoverageを追加していない。
 
 ### 過剰
 
-Product Riskや仕様根拠のない一般的エッジケース、全組合せ、非機能項目等が展開されている。
+仕様・Product Risk・Coverage Criteria等の根拠がない検証が展開されている。
 
 ### 古い / 不整合
 
-Current Effective Authorityと矛盾する成果物、または`要再検証`のまま残る成果物がある。
+上流成果物と矛盾する、または`要再検証`のまま残る成果物がある。
 
 ## 手順
 
 1. 分析モードと対象範囲を定義する
-2. Current Effective AuthorityとProduct Riskの対象集合を確定する
-3. 各層のIDと上流 / 下流リンク、Dispositionを収集する
+2. 上流Authority / Product Riskの対象集合を確認する
+3. 各層のID、上流 / 下流リンク、Dispositionを収集する
 4. Authority / Product Risk → Test Requirementの閉鎖性を確認する
-5. Test Requirement以降の各層が下流成果物または明示Dispositionへ閉じているか確認する
-6. Coverage Criteriaと候補Dispositionの妥当性を確認する
+5. Test Requirement以降の各層が下流成果物またはDispositionへ閉じているか確認する
+6. 入力済みCoverage Criteriaの充足と候補Dispositionを確認する
 7. Test CaseがCoverage Evidence最低条件を満たすか確認する
 8. Product Riskに対する深度不足 / 過剰を確認する
 9. Gap、不正Disposition、孤立、重複、根拠不足、不整合を分類する
 10. 修正が必要な最も近い担当Skillを示す
 
-## 修正ルーティング
+## 修正routing
 
 本Skill自身が他層成果物を再設計しません。
 
 - Current Effective Authority / 仕様モデル → `spec-analysis`
 - Oracle / 不明点 / Assumption → `question-analysis`
 - Product Risk / テスト重点 → `test-analysis`
-- Test Requirement / 上流項目Disposition → `test-requirement-design`
+- Test Requirement / 上流Disposition → `test-requirement-design`
 - Test Condition / Coverage Criteria / Coverage Item / 候補Disposition → `test-condition-design`
 - Test Case → `test-case-design`
-
-ユーザーが「分析して修正まで」と依頼しても、`qa-workflow`を介して担当Skillへ戻します。
 
 ## 出力
 
 - 分析範囲 / モード
-- Current Effective Authority / Product Riskの閉鎖状況
+- Authority / Product Riskの閉鎖状況
 - Coverage Matrix
 - Coverage Criteria充足状況
 - Coverage候補Dispositionの妥当性
@@ -199,25 +199,22 @@ Current Effective Authorityと矛盾する成果物、または`要再検証`の
 
 ## 停止条件
 
-次の場合は、その比較範囲をBlockedとします。
+次の場合、その比較範囲をBlockedとします。
 
 - 必要ファイル / 情報へアクセスできず比較対象を読めない
-- Current Effective Authorityを確定できない
-- 成果物のID / 意味が壊れており、何と何を比較すべきか特定できない
-- Coverage Criteria自体が未定義で十分性を判定できない
+- Current Effective Authorityを確定できないため上流集合を決められない
+- 成果物のID / 意味が壊れており比較関係を特定できない
+- Coverage Criteria自体が未定義で、十分性を判定する基準がない
 
 期待される下流成果物が単に存在しない場合はBlockedではなく未カバーです。
-
-一部リンクだけ比較不能なら、他の比較可能範囲は継続します。
 
 ## 品質ゲート
 
 - 件数だけでCoverageを判断していない
-- IDリンクの存在だけでCoverage済みとしていない
-- Current Effective AuthorityとProduct RiskがTest Requirementまたは明示Dispositionへ閉じている
-- 各Test Requirement / Test Condition / Coverage Itemが下流成果物または明示Dispositionへ閉じている
-- Coverage Criteriaと候補Dispositionの妥当性を確認している
-- PairwiseではFactor / Value / Constraintと生成Coverage Itemに基づく2-wise保証を確認している
+- IDリンクの存在だけでCoverage済みにしていない
+- 各層が下流成果物または妥当なDispositionへ閉じている
+- 入力済みCoverage Criteriaの充足を確認している
+- Coverage Criteriaを本Skillで再設計していない
 - 下流成果物不存在を正しく未カバーと判定している
 - 不十分なTest CaseをCoverage Evidenceとして数えていない
 - 高Product Risk Gapを見落としていない
