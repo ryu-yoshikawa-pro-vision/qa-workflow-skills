@@ -124,6 +124,29 @@ class SemanticCliTests(unittest.TestCase):
             self.assertEqual(completed.returncode, 2)
             self.assertEqual(completed.stdout, "")
 
+    def test_utf8_judge_protocol_round_trip(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            skills_root = self.make_fixture(tmp_path)
+            candidate_text = "名称「日本語テスト✅」を保存する → 完了"
+            candidate = tmp_path / "candidate.md"
+            candidate.write_text(candidate_text, encoding="utf-8")
+            judge = tmp_path / "judge.py"
+            judge.write_text(
+                "import json, sys\n"
+                "prompt = sys.stdin.buffer.read().decode('utf-8')\n"
+                f"assert {candidate_text!r} in prompt\n"
+                "response = {'criteria':[{'id':'SEM-EX-001','evaluable':True,'rating':4,'reason':'日本語理由✅','evidence':['記号「→」を確認']}] }\n"
+                "sys.stdout.buffer.write(json.dumps(response, ensure_ascii=False).encode('utf-8'))\n",
+                encoding="utf-8",
+            )
+            completed = self.run_cli(skills_root, candidate, judge)
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            payload = json.loads(completed.stdout)
+            self.assertEqual(payload["verdict"], "pass")
+            self.assertEqual(payload["criteria"][0]["reason"], "日本語理由✅")
+            self.assertEqual(payload["criteria"][0]["evidence"], ["記号「→」を確認"])
+
 
 if __name__ == "__main__":
     unittest.main()

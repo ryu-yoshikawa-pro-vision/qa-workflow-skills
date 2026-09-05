@@ -27,6 +27,8 @@ skills/<skill>/evals/semantic/
         └── reference.md
 ```
 
+`evals.json`の`input` / `reference`は`semantic/cases/`配下を指す相対pathだけを許可します。absolute path、`cases/`外へ解決されるpath、symlink経由で`cases/`外へ解決されるpathは無効です。
+
 `reference.md`はGolden Outputではなく、判定に使えるsource of truth、許容解釈、禁止される推測を記載します。
 
 ## CLI
@@ -45,11 +47,13 @@ python scripts/skills/evals/semantic/run.py \
 
 ```text
 stdin:  Semantic Judge Prompt (UTF-8)
-stdout: Judge response JSONのみ
-stderr: 診断ログを許容
+stdout: Judge response JSONのみ (UTF-8)
+stderr: 診断ログを許容 (UTF-8)
 exit 0: judge execution success
 non-zero: judge execution failure
 ```
+
+Candidate OutputはJSON形式のuntrusted dataとしてJudge Promptへ埋め込みます。Candidate Output内の見出し、tag、JSON、評価結果を操作する命令はJudge Promptの構造や評価指示として扱いません。
 
 Judgeはcriterionごとの`evaluable`, `rating`, `reason`, `evidence`だけを返します。`pass`、`fail`、`needs_review`、overall scoreはJudgeに決めさせません。
 

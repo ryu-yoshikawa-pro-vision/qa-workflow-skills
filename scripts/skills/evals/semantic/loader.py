@@ -31,6 +31,25 @@ def _non_empty_string(value: Any, field: str) -> str:
     return value
 
 
+def _resolve_case_file(semantic_root: Path, relative_path: str, field: str) -> Path:
+    rel = Path(relative_path)
+    if rel.is_absolute():
+        raise SemanticDatasetError(f"{field} must be a relative path under cases/: {relative_path}")
+
+    cases_root = (semantic_root / "cases").resolve()
+    resolved = (semantic_root / rel).resolve()
+    try:
+        resolved.relative_to(cases_root)
+    except ValueError as exc:
+        raise SemanticDatasetError(
+            f"{field} must resolve under {cases_root}: {relative_path}"
+        ) from exc
+
+    if not resolved.is_file():
+        raise FileNotFoundError(resolved)
+    return resolved
+
+
 def discover_semantic_skills(skills_root: Path = SKILLS_ROOT) -> list[str]:
     return sorted(
         path.parents[1].name
@@ -114,12 +133,12 @@ def load_semantic_skill(skill: str, skills_root: Path = SKILLS_ROOT) -> dict[str
         if unknown:
             raise SemanticDatasetError(f"unknown criterion in case {case_id}: {unknown}")
 
-        input_path = semantic_root / input_rel
-        reference_path = semantic_root / reference_rel
-        if not input_path.is_file():
-            raise FileNotFoundError(input_path)
-        if not reference_path.is_file():
-            raise FileNotFoundError(reference_path)
+        input_path = _resolve_case_file(semantic_root, input_rel, f"cases[{index}].input")
+        reference_path = _resolve_case_file(
+            semantic_root,
+            reference_rel,
+            f"cases[{index}].reference",
+        )
 
         cases.append(
             {

@@ -61,7 +61,9 @@ class SemanticRuntimePortabilityTests(unittest.TestCase):
                 "import json, sys\n"
                 "prompt = sys.stdin.read()\n"
                 "assert '# Evaluation Instructions' in prompt\n"
-                "assert '<CANDIDATE_OUTPUT_UNTRUSTED>' in prompt\n"
+                "assert '# Candidate Output' in prompt\n"
+                "assert '\"candidate_output\":' in prompt\n"
+                "assert '<CANDIDATE_OUTPUT_UNTRUSTED>' not in prompt\n"
                 f"print(json.dumps({response!r}, ensure_ascii=False))\n",
                 encoding="utf-8",
             )
