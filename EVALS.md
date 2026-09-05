@@ -216,7 +216,8 @@ Deterministic EvalでERRORにしません。
 CIでは次を実行します。
 
 ```bash
-python -m compileall -q scripts/evals/deterministic skills
+python -m compileall -q scripts/evals/deterministic
+python -m compileall -q skills/*/evals/deterministic
 python -m unittest discover -s scripts/evals/deterministic/tests -v
 ```
 
