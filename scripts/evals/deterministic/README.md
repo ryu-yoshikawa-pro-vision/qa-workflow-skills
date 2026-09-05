@@ -4,9 +4,9 @@ Canonical `assets/output-template.md`（`qa-workflow`はWorkflow State template�
 
 ## Scope
 
-このgraderがERRORとして扱うのは、ID形式、重複、参照整合、allowed values、Risk Matrix、fixture-backed closure、Pairwise 2-wise coverage、重大度/処置Invariant、Workflow state invariant等、決定論的に判定できる契約です。
+ERRORは、ID形式、重複、参照整合、required fields、allowed values、Risk Matrix、fixture-backed closure、Pairwise、重大度/処置Invariant、Workflow state invariant等、決定論的に判定できる契約に限定します。
 
-曖昧語や他ケース依存らしき表現など、誤検知し得るものはWARNINGです。仕様内容の妥当性、Blocker分類、Oracleの意味的正しさ、網羅性の十分性などはSemantic Output Evalへ残します。
+誤検知し得るものはWARNING、意味解釈が必要な品質はSemantic Output Evalの対象です。
 
 ## Architecture
 
@@ -19,10 +19,12 @@ scripts/evals/deterministic/
 ├── validators/
 │   └── <9 skill validators>
 └── tests/
-    └── test_deterministic.py
+    ├── test_deterministic.py
+    ├── test_false_pass_regressions.py
+    └── test_cli_integration.py
 ```
 
-共通層はMarkdown table解析、ID抽出・一意性、参照確認、allowed values、Disposition、graph closure、Pairwise組合せ、結果集計を担当します。Skill固有の契約だけを各validatorへ置きます。
+共通層はMarkdown table解析、ID抽出、重複・allowed values・required fields、共通graph計算、Pairwiseの組合せ数学、結果集計を担当します。Disposition、Closure、Pairwise Output構造、Review、Workflow状態等のSkill固有ルールは各validatorに置きます。
 
 ## CLI
 
@@ -35,7 +37,7 @@ python scripts/evals/deterministic/run.py \
   --output path/to/generated-output.md
 ```
 
-複数case:
+全case:
 
 ```bash
 python scripts/evals/deterministic/run.py \
@@ -43,8 +45,10 @@ python scripts/evals/deterministic/run.py \
   --output-root path/to/saved-outputs
 ```
 
-all modeでは`<output-root>/<skill>/<eval-id>.md`を評価します。Agent APIを呼び出す機能は持ちません。
+all modeではmanifestに定義された全Outputを要求します。Agent APIを呼び出す機能は持ちません。
 
 ## Result
 
 JSONで`status`, `summary`, `assertions`を返します。WARNINGは全体failへ直結しません。独自weighted scoreは計算しません。
+
+評価契約の正本は`EVALS.md`、Assertion IDの正本は`ASSERTIONS.md`です。

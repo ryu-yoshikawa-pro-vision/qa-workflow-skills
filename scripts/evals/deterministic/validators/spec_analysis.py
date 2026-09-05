@@ -21,61 +21,29 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     result = EvalResult("spec-analysis", eval_id)
     tables = parse_tables(text)
 
-    refs_table = find_table(
-        tables,
-        section_contains="情報源 / Canonical Registry参照一覧",
-        required_headers=("参照ID",),
-    )
-    items_table = find_table(
-        tables,
-        section_contains="分析項目",
-        required_headers=("項目ID", "分類"),
-    )
-    authorities_table = find_table(
-        tables,
-        section_contains="Current Effective Authority",
-        required_headers=("Authority ID", "種別"),
-    )
+    refs_table = find_table(tables, section_contains="情報源 / Canonical Registry参照一覧", required_headers=("参照ID",))
+    items_table = find_table(tables, section_contains="分析項目", required_headers=("項目ID", "分類"))
+    authorities_table = find_table(tables, section_contains="Current Effective Authority", required_headers=("Authority ID", "種別"))
     structure_ok = all(t is not None for t in (refs_table, items_table, authorities_table))
     result.add(
         "SPEC-D012",
         structure_ok,
         "Canonical spec-analysis tables must exist",
-        evidence={
-            "missing": [
-                label
-                for label, table in (
-                    ("情報源 / Canonical Registry参照一覧", refs_table),
-                    ("分析項目", items_table),
-                    ("Current Effective Authority", authorities_table),
-                )
-                if table is None
-            ]
-        }
-        if not structure_ok
-        else None,
+        evidence={"missing": [label for label, table in (("情報源 / Canonical Registry参照一覧", refs_table), ("分析項目", items_table), ("Current Effective Authority", authorities_table)) if table is None]} if not structure_ok else None,
     )
 
-    refs = nonempty_rows(refs_table, "参照ID")
+    refs = nonempty_rows(refs_table)
     items = nonempty_rows(items_table)
     authorities = nonempty_rows(authorities_table)
 
-    add_required_fields_assertion(
-        result,
-        "SPEC-D014",
-        items,
-        ("項目ID", "内容", "分類", "情報源 / Canonical Registry参照"),
-        "項目ID",
-        "Analysis item",
-    )
-    add_required_fields_assertion(
-        result,
-        "SPEC-D015",
-        authorities,
-        ("Authority ID", "種別", "現在有効な内容", "適用範囲", "情報源 / Canonical Registry", "関係"),
-        "Authority ID",
-        "Current Effective Authority",
-    )
+    add_required_fields_assertion(result, "SPEC-D016", refs, ("参照ID", "情報源 / Canonical Registry"), "参照ID", "Source reference")
+    src_ids = [clean(r.get("参照ID", "")) for r in refs]
+    bad_src_ids = [src_id for src_id in src_ids if not ID_PATTERNS["SRC"].fullmatch(src_id)]
+    result.add("SPEC-D017", not bad_src_ids, "Source reference IDs must use SRC-xxx", evidence=bad_src_ids or None)
+    add_duplicate_assertion(result, "SPEC-D018", src_ids, "Source reference IDs")
+
+    add_required_fields_assertion(result, "SPEC-D014", items, ("項目ID", "内容", "分類", "情報源 / Canonical Registry参照"), "項目ID", "Analysis item")
+    add_required_fields_assertion(result, "SPEC-D015", authorities, ("Authority ID", "種別", "現在有効な内容", "適用範囲", "情報源 / Canonical Registry", "関係"), "Authority ID", "Current Effective Authority")
 
     bad_ids, bad_class, item_ids = [], [], []
     eligible_local: set[str] = set()
@@ -86,12 +54,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         pattern = ID_PATTERNS.get(CLASS_TO_PREFIX.get(classification, ""))
         if not pattern or not pattern.fullmatch(item_id):
             bad_ids.append(item_id)
-        expected_prefix = {
-            "SPEC": "SPEC-",
-            "DECISION": "DEC-",
-            "INFERENCE": "INF-",
-            "UNKNOWN": "UNK-",
-        }.get(classification)
+        expected_prefix = {"SPEC": "SPEC-", "DECISION": "DEC-", "INFERENCE": "INF-", "UNKNOWN": "UNK-"}.get(classification)
         if not expected_prefix or not item_id.startswith(expected_prefix):
             bad_class.append({"id": item_id, "classification": classification})
         if classification in {"SPEC", "DECISION"} and item_id:
@@ -101,7 +64,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     result.add("SPEC-D002", not bad_class, "Analysis item ID and classification must agree", evidence=bad_class or None)
     add_duplicate_assertion(result, "SPEC-D003", item_ids, "Analysis item IDs")
 
-    known_src = {clean(r.get("参照ID", "")) for r in refs}
+    known_src = set(src_ids)
     unknown_src = []
     for row in items:
         for ref in ids_in(row.get("情報源 / Canonical Registry参照", "")):
@@ -146,12 +109,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             expected_type = None
         if expected_type is None or actual_type != expected_type:
             type_mismatches.append({"id": aid, "expected_type": expected_type, "actual_type": actual_type})
-    result.add(
-        "SPEC-D010",
-        not type_mismatches,
-        "Current Effective Authority ID and type must agree; INF/UNK cannot be Authority",
-        evidence=type_mismatches or None,
-    )
+    result.add("SPEC-D010", not type_mismatches, "Current Effective Authority ID and type must agree; INF/UNK cannot be Authority", evidence=type_mismatches or None)
 
     required_issues = []
     if "required_analysis_ids" in expected:
@@ -166,8 +124,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
 
     approval_issues = []
     if "approved_assumptions" in expected:
-        approved = expected["approved_assumptions"]
-        approved_ids = set(approved) if isinstance(approved, dict) else set(approved)
+        approved_ids = set(expected["approved_assumptions"])
         for row in authorities:
             aid = clean(row.get("Authority ID", ""))
             if ID_PATTERNS["ASM"].fullmatch(aid) and aid not in approved_ids:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ..common import ID_PATTERNS, PRIORITIES, RISK_LEVEL_ORDER, add_allowed_assertion, add_duplicate_assertion, clean, ids_in, nonempty_rows
+from ..common import ID_PATTERNS, PRIORITIES, RISK_LEVEL_ORDER, add_allowed_assertion, add_duplicate_assertion, add_required_fields_assertion, clean, ids_in, nonempty_rows
 from ..markdown_parser import find_table, parse_tables
 from ..result import EvalResult
 
@@ -29,7 +29,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     if isinstance(expected.get("product_risk_levels"), dict):
         known_risks |= set(expected["product_risk_levels"])
 
-    ua, ur, missing = [], [], []
+    ua, ur = [], []
     for row in trs:
         tid = clean(row.get("テスト要求ID", ""))
         for ref in ids_in(row.get("Current Effective Authority", "")):
@@ -38,17 +38,25 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         for ref in ids_in(row.get("関連Product Risk", "")):
             if risk_spec and ref not in known_risks:
                 ur.append({"tr": tid, "reference": ref})
-        for f in ("テスト要求", "Current Effective Authority", "優先度", "テストレベル / 観測方法"):
-            if not clean(row.get(f, "")):
-                missing.append({"tr": tid, "field": f})
     result.add("TR-D003", not ua, "Authority references must exist", evidence=ua or None)
     result.add("TR-D004", not ur, "Product Risk references must exist", evidence=ur or None)
     add_allowed_assertion(result, "TR-D005", (r.get("優先度", "") for r in trs), PRIORITIES, "Priority")
-    result.add("TR-D006", not missing, "Required Test Requirement fields must exist", evidence=missing or None)
+    add_required_fields_assertion(result, "TR-D006", trs, ("テスト要求", "Current Effective Authority", "優先度", "テストレベル / 観測方法"), "テスト要求ID", "Test Requirement")
 
     add_allowed_assertion(result, "TR-D007", (r.get("Disposition", "") for r in disposed), DISPOSITIONS, "Disposition")
     no_reason = [clean(r.get("上流ID", "")) for r in disposed if not clean(r.get("理由 / 根拠", ""))]
     result.add("TR-D008", not no_reason, "Disposition rows require reason/evidence", evidence=no_reason or None)
+
+    disposition_known = set()
+    disposition_check = False
+    if "known_authorities" in expected:
+        disposition_known |= set(expected["known_authorities"])
+        disposition_check = True
+    if "known_product_risks" in expected:
+        disposition_known |= set(expected["known_product_risks"])
+        disposition_check = True
+    unknown_disposed = sorted({clean(r.get("上流ID", "")) for r in disposed if disposition_check and clean(r.get("上流ID", "")) and clean(r.get("上流ID", "")) not in disposition_known})
+    result.add("TR-D013", not unknown_disposed, "Disposition upstream IDs must exist when fixture upstream sets are specified", evidence=unknown_disposed or None)
 
     linked_auth = {ref for row in trs for ref in ids_in(row.get("Current Effective Authority", "")) if ref in known_auth}
     linked_risk = {ref for row in trs for ref in ids_in(row.get("関連Product Risk", "")) if ref in known_risks}

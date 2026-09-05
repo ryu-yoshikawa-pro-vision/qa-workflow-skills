@@ -111,6 +111,8 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
 
     add_allowed_assertion(result, "TCN-D010", (r.get("Disposition", "") for r in tr_disposed), TR_DISPOSITIONS, "TR Disposition")
     add_allowed_assertion(result, "TCN-D011", (r.get("Disposition", "") for r in candidate_disposed), DISPOSITIONS, "Coverage candidate Disposition")
+    unknown_disposed_trs = sorted({clean(r.get("テスト要求ID", "")) for r in tr_disposed if tr_spec and clean(r.get("テスト要求ID", "")) and clean(r.get("テスト要求ID", "")) not in known_trs})
+    result.add("TCN-D029", not unknown_disposed_trs, "Disposition Test Requirement IDs must exist when fixture Test Requirements are specified", evidence=unknown_disposed_trs or None)
 
     bad_disp = []
     for row in tr_disposed + candidate_disposed:
@@ -141,11 +143,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         for row in factor_rows:
             actual_factors.setdefault(clean(row.get("Factor", "")), set()).add(clean(row.get("Value", "")))
         expected_factors = {k: set(v) for k, v in pairwise.get("factors", {}).items()}
-        mismatch = {
-            k: {"expected": sorted(expected_factors.get(k, set())), "actual": sorted(actual_factors.get(k, set()))}
-            for k in sorted(set(expected_factors) | set(actual_factors))
-            if actual_factors.get(k, set()) != expected_factors.get(k, set())
-        }
+        mismatch = {k: {"expected": sorted(expected_factors.get(k, set())), "actual": sorted(actual_factors.get(k, set()))} for k in sorted(set(expected_factors) | set(actual_factors)) if actual_factors.get(k, set()) != expected_factors.get(k, set())}
         result.add("TCN-D014", not mismatch, "Pairwise Factor/Value universe must match fixture", evidence=mismatch or None)
 
         parsed_rows = []
@@ -171,11 +169,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         for ciid, combo, errors in parsed_rows:
             extra = sorted(set(combo) - expected_factor_names)
             missing_names = sorted(expected_factor_names - set(combo))
-            invalid_values = [
-                {"factor": factor, "value": value}
-                for factor, value in combo.items()
-                if factor in expected_factors and value not in expected_factors[factor]
-            ]
+            invalid_values = [{"factor": factor, "value": value} for factor, value in combo.items() if factor in expected_factors and value not in expected_factors[factor]]
             if extra:
                 unknown_factor.append({"coverage_item": ciid, "factors": extra})
             if invalid_values:
@@ -217,11 +211,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         for t in transitions:
             matched = False
             for row in rows:
-                if not (
-                    clean(row.get("現在状態", "")) == t["from"]
-                    and clean(row.get("イベント / 操作", "")) == t["event"]
-                    and clean(row.get("期待する次状態 / 結果", "")) == t["to"]
-                ):
+                if not (clean(row.get("現在状態", "")) == t["from"] and clean(row.get("イベント / 操作", "")) == t["event"] and clean(row.get("期待する次状態 / 結果", "")) == t["to"]):
                     continue
                 ci_refs = [ref for ref in ids_in(row.get("対応Coverage Item ID", "")) if ID_PATTERNS["CI"].fullmatch(ref)]
                 if ci_refs and all(ref in ci_set for ref in ci_refs):
@@ -259,10 +249,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     ci_missing = []
     for row in ci:
         ciid = clean(row.get("Coverage Item ID", "")) or "<unknown>"
-        absent = [
-            f for f in ("Coverage Item ID", "観点ID", "Coverage Item", "導出元の技法 / 基準", "期待挙動の根拠", "優先度")
-            if not clean(row.get(f, ""))
-        ]
+        absent = [f for f in ("Coverage Item ID", "観点ID", "Coverage Item", "導出元の技法 / 基準", "期待挙動の根拠", "優先度") if not clean(row.get(f, ""))]
         if absent:
             ci_missing.append({"ci": ciid, "fields": absent})
     result.add("TCN-D024", not ci_missing, "Coverage Item required fields must exist", evidence=ci_missing or None)

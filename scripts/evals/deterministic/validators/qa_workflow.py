@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ..common import CANONICAL_SKILLS, add_allowed_assertion, clean, nonempty_rows
+from ..common import CANONICAL_SKILLS, add_allowed_assertion, add_duplicate_assertion, clean, nonempty_rows
 from ..markdown_parser import find_table, parse_bullets, parse_tables
 from ..result import EvalResult
 
@@ -18,18 +18,19 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
 
     overall = clean(bullets.get("Workflow全体状態", ""))
     result.add("WF-D001", overall in WORKFLOW_STATES, "Workflow overall state must be allowed", evidence=overall if overall not in WORKFLOW_STATES else None)
-    invalid_names = sorted({clean(r.get("Skill", "")) for r in rows if clean(r.get("Skill", "")) not in CANONICAL_SKILLS})
+    skill_names = [clean(r.get("Skill", "")) for r in rows]
+    invalid_names = sorted({name for name in skill_names if name not in CANONICAL_SKILLS})
     result.add("WF-D002", not invalid_names, "Workflow Skill rows must use Canonical Skill names", evidence=invalid_names or None)
+    add_duplicate_assertion(result, "WF-D012", skill_names, "Workflow Skill rows")
     add_allowed_assertion(result, "WF-D003", (r.get("状態", "") for r in rows), SKILL_STATES, "Skill state")
 
     blocked = [clean(r.get("Skill", "")) for r in rows if clean(r.get("状態", "")) == "Blocked"]
     recheck = [clean(r.get("Skill", "")) for r in rows if clean(r.get("状態", "")) == "要再検証"]
-    running = [clean(r.get("Skill", "")) for r in rows if clean(r.get("状態", "")) == "実行中"]
-    incomplete = sorted(set(blocked + running))
-    result.add("WF-D004", not (overall == "完了" and incomplete), "Workflow cannot be 完了 while Blocked or 実行中 remains", evidence=incomplete or None)
+    in_progress = [clean(r.get("Skill", "")) for r in rows if clean(r.get("状態", "")) == "実行中"]
+    result.add("WF-D004", not (overall == "完了" and (blocked or in_progress)), "Workflow cannot be 完了 while Blocked or 実行中 remains", evidence=blocked + in_progress or None)
     result.add("WF-D005", not (overall == "完了" and recheck), "Workflow cannot be 完了 while 要再検証 remains", evidence=recheck or None)
-    result.add("WF-D010", overall != "部分完了（Blockedあり）" or bool(blocked), "部分完了（Blockedあり） requires at least one Blocked Skill", evidence={"blocked_skills": blocked} if overall == "部分完了（Blockedあり）" and not blocked else None)
-    result.add("WF-D011", overall != "Blocked" or bool(blocked), "Blocked workflow state requires at least one Blocked Skill", evidence={"blocked_skills": blocked} if overall == "Blocked" and not blocked else None)
+    result.add("WF-D010", not (overall == "部分完了（Blockedあり）" and not blocked), "部分完了（Blockedあり） requires at least one Blocked Skill", evidence={"blocked_skills": blocked} if overall == "部分完了（Blockedあり）" and not blocked else None)
+    result.add("WF-D011", not (overall == "Blocked" and not blocked), "Blocked workflow state requires at least one Blocked Skill", evidence={"blocked_skills": blocked} if overall == "Blocked" and not blocked else None)
 
     exp_start = expected.get("expected_start_skill")
     exp_final = expected.get("expected_final_skill")

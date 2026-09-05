@@ -8,6 +8,7 @@ from ..result import EvalResult
 
 SEVERITIES = {"致命的", "重大", "軽微", "提案"}
 TREATMENTS = {"未処置", "修正済み", "残存リスクとして受容", "Blocked"}
+REPAIR_TARGETS = CANONICAL_SKILLS | {"Project Context / 仕様決定"}
 
 
 def _normalize_treatment(value: str) -> str:
@@ -25,14 +26,9 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
 
     summary = nonempty_rows(summary_table)
     findings = nonempty_rows(findings_table)
-    add_required_fields_assertion(
-        result,
-        "REV-D012",
-        findings,
-        ("指摘ID", "重要度", "対象成果物 / 位置", "問題", "根拠", "影響", "推奨修正", "修正Skill / 層", "処置"),
-        "指摘ID",
-        "Review finding",
-    )
+    add_required_fields_assertion(result, "REV-D012", findings, ("指摘ID", "重要度", "対象成果物 / 位置", "問題", "根拠", "影響", "推奨修正", "修正Skill / 層", "処置"), "指摘ID", "Review finding")
+    add_allowed_assertion(result, "REV-D013", (r.get("重要度", "") for r in summary), SEVERITIES, "Summary severity")
+    add_duplicate_assertion(result, "REV-D014", [clean(r.get("重要度", "")) for r in summary], "Summary severity")
 
     ids = [clean(r.get("指摘ID", "")) for r in findings]
     bad = [v for v in ids if not ID_PATTERNS["REV"].fullmatch(v)]
@@ -52,8 +48,8 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                 unknown.append({"finding": row.get("指摘ID"), "targets": refs})
     result.add("REV-D005", not unknown, "Finding target artifacts must exist", evidence=unknown or None)
 
-    bad_skills = sorted({clean(r.get("修正Skill / 層", "")) for r in findings if clean(r.get("修正Skill / 層", "")) and clean(r.get("修正Skill / 層", "")) not in CANONICAL_SKILLS})
-    result.add("REV-D006", not bad_skills, "Repair Skill must be canonical", evidence=bad_skills or None)
+    bad_targets = sorted({clean(r.get("修正Skill / 層", "")) for r in findings if clean(r.get("修正Skill / 層", "")) and clean(r.get("修正Skill / 層", "")) not in REPAIR_TARGETS})
+    result.add("REV-D006", not bad_targets, "Repair target must be allowed by the adversarial-review contract", evidence=bad_targets or None)
 
     fatal = [clean(r.get("指摘ID", "")) for r in findings if clean(r.get("重要度", "")) == "致命的" and _normalize_treatment(r.get("処置", "")) == "残存リスクとして受容"]
     result.add("REV-D007", not fatal, "Fatal findings cannot be accepted as residual risk", evidence=fatal or None)
@@ -89,11 +85,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     for defect in expected.get("expected_defects", []):
         target = defect["target_id"]
         contains = defect.get("contains")
-        matched = any(
-            target in ids_in(r.get("対象成果物 / 位置", ""))
-            and (not contains or contains in r.get("問題", "") or contains in r.get("根拠", ""))
-            for r in findings
-        )
+        matched = any(target in ids_in(r.get("対象成果物 / 位置", "")) and (not contains or contains in r.get("問題", "") or contains in r.get("根拠", "")) for r in findings)
         if not matched:
             missed.append(defect)
     result.add("REV-D010", not missed, "Fixture-backed deterministic defects must be identified without exact prose matching", evidence=missed or None)

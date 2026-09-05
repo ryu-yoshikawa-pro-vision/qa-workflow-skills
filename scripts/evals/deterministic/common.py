@@ -85,24 +85,6 @@ def add_required_fields_assertion(result: EvalResult, assertion_id: str, rows: S
     result.add(assertion_id, not missing, f"{label} required fields must be present", evidence=missing or None)
 
 
-def add_reference_assertion(result: EvalResult, assertion_id: str, rows: Sequence[Mapping[str, str]], fields: Sequence[str], known_ids: set[str], label: str, *, ignore_patterns: tuple[re.Pattern[str], ...] = ()) -> None:
-    unknown: list[dict[str, str]] = []
-    for row in rows:
-        for field in fields:
-            for ref in ids_in(row.get(field, "")):
-                if any(p.fullmatch(ref) for p in ignore_patterns):
-                    continue
-                if ref not in known_ids:
-                    unknown.append({"field": field, "reference": ref})
-    result.add(assertion_id, not unknown, f"{label} references must exist", evidence=unknown or None)
-
-
-def check_expected_closure(upstream_ids: Iterable[str], linked_ids: Iterable[str], disposition_ids: Iterable[str]) -> list[str]:
-    linked = set(linked_ids)
-    disposed = set(disposition_ids)
-    return sorted(set(upstream_ids) - linked - disposed)
-
-
 def compute_graph_gaps(graph: Mapping) -> set[str]:
     node_types = graph.get("node_types", {})
     edges = graph.get("edges", [])
@@ -125,21 +107,6 @@ def compute_graph_gaps(graph: Mapping) -> set[str]:
         elif node_type == "CI" and "TC" not in target_types:
             gaps.add(node)
     return gaps
-
-
-def parse_combination(value: str) -> dict[str, str]:
-    result: dict[str, str] = {}
-    for part in re.split(r"[;,]\s*", value.strip()):
-        if not part:
-            continue
-        if "=" in part:
-            key, val = part.split("=", 1)
-        elif ":" in part or "：" in part:
-            key, val = re.split(r"[:：]", part, maxsplit=1)
-        else:
-            continue
-        result[clean(key)] = clean(val)
-    return result
 
 
 def assignment_forbidden(assignment: Mapping[str, str], forbidden_constraints: Sequence[Mapping[str, str]]) -> bool:

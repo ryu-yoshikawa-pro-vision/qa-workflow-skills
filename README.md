@@ -98,16 +98,15 @@ skills/<skill-name>/evals/
 ## Eval
 
 ### Trigger Eval
-Skill選択精度を評価します。datasetは9 Skill × 20 query = 180 queryです。Canonical Modeは9 Skill同時利用、単独SkillはDiagnostic Modeです。
+
+9 Skillの選択精度を評価します。Canonical Modeは9 Skill同時利用、単独・限定SkillはDiagnostic Modeです。
 
 ### Deterministic Output Eval
-Canonical output templateを使った出力について、ID / 参照 / allowed values / required fields / Risk Matrix / closure / Pairwise / review・Workflow invariant等、機械判定可能な契約だけを評価します。
 
-`known_*`は「参照可能なID集合」、`required_*`は「Outputへ実際に存在すべきEntity」です。キー未指定と空集合は区別します。
+9 SkillのCanonical outputについて、ID、参照整合、required fields、Risk Matrix、成果物閉鎖、Pairwise、review / Workflow invariant等、意味解釈なしで判定できる契約を評価します。
 
-必須Output tableやrequired Entityの欠落はERRORです。`--skill all`はmanifest上の全Outputファイルを要求し、欠落が1件でもあればFAILします。
-
-Pairwise生成組合せはFactor / Value / constraintだけでなく、参照するCoverage Item IDの実在性・一意性も検査します。fixture-backed状態遷移も実在するCoverage Item IDへ閉鎖する必要があります。
+- `known_*`: Outputから参照可能な既知集合。キー未指定なら対応する参照検査を行わない。
+- `required_*`: Outputに実際に存在しなければならないEntity / 値。
 
 ```bash
 python scripts/evals/deterministic/run.py \
@@ -116,13 +115,7 @@ python scripts/evals/deterministic/run.py \
   --output path/to/generated-output.md
 ```
 
-Deterministic Evalだけで意味品質全体を保証しません。`assertion_pass_rate`はAssertionのpass比率であり、QA品質の総合点ではありません。詳細は`EVALS.md`を参照してください。
-
-### 評価レイヤー
-- Trigger Eval
-- Deterministic Output Eval
-- Semantic Output Eval
-- Workflow E2E Eval
+Deterministic Evalだけで成果物の意味品質全体を保証しません。詳細な評価契約、dataset、CLI、ERROR / WARNING、Semantic Evalとの境界は`EVALS.md`を正本とします。
 
 ## qa-workflow Runtime前提
 
@@ -130,7 +123,7 @@ Deterministic Evalだけで意味品質全体を保証しません。`assertion_
 
 ## Validation
 
-CIで、公式`skills-ref validate`、Trigger dataset構造、Deterministic Output Eval dataset構造、grader unit / integration testを分離して実行します。
+CIで、公式`skills-ref validate`、Trigger dataset構造、Deterministic Output Eval dataset構造、grader unit / regression / CLI integration testを分離して実行します。
 
 ## 標準との関係
 

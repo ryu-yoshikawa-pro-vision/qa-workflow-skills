@@ -23,39 +23,16 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     q_table = find_table(tables, section_contains="不明点 / 質問一覧", required_headers=("ID", "分類"))
     a_table = find_table(tables, section_contains="仮定候補", required_headers=("仮定候補", "状態"))
     b_table = find_table(tables, section_contains="Blocked範囲", required_headers=("Blocker ID",))
-    missing_tables = [
-        label for label, table in (("不明点 / 質問一覧", q_table), ("仮定候補", a_table), ("Blocked範囲", b_table)) if table is None
-    ]
+    missing_tables = [label for label, table in (("不明点 / 質問一覧", q_table), ("仮定候補", a_table), ("Blocked範囲", b_table)) if table is None]
     result.add("QUESTION-D011", not missing_tables, "Canonical question-analysis tables must exist", evidence=missing_tables or None)
 
     questions = nonempty_rows(q_table)
     assumptions = nonempty_rows(a_table)
     blocked = nonempty_rows(b_table)
 
-    add_required_fields_assertion(
-        result,
-        "QUESTION-D012",
-        questions,
-        ("ID", "問題 / 質問", "根拠", "分類", "影響範囲 / 成果物", "回答なしの場合の扱い", "回答後の正規化先", "再開Skill"),
-        "ID",
-        "Question",
-    )
-    add_required_fields_assertion(
-        result,
-        "QUESTION-D013",
-        blocked,
-        ("Blocker ID", "Blocked成果物 / 範囲", "必要な決定 / 情報源", "再開Skill"),
-        "Blocker ID",
-        "Blocked scope",
-    )
-    add_required_fields_assertion(
-        result,
-        "QUESTION-D014",
-        assumptions,
-        ("仮定候補", "状態", "根拠 / 理由", "影響範囲"),
-        "Canonical ASM ID",
-        "Assumption candidate",
-    )
+    add_required_fields_assertion(result, "QUESTION-D012", questions, ("ID", "問題 / 質問", "根拠", "分類", "影響範囲 / 成果物", "回答なしの場合の扱い", "回答後の正規化先", "再開Skill"), "ID", "Question")
+    add_required_fields_assertion(result, "QUESTION-D013", blocked, ("Blocker ID", "Blocked成果物 / 範囲", "必要な決定 / 情報源", "再開Skill"), "Blocker ID", "Blocked scope")
+    add_required_fields_assertion(result, "QUESTION-D014", assumptions, ("仮定候補", "状態", "根拠 / 理由", "影響範囲"), "Canonical ASM ID", "Assumption candidate")
 
     ids = [clean(r.get("ID", "")) for r in questions]
     bad = [v for v in ids if not ID_PATTERNS["QUESTION"].fullmatch(v)]
@@ -64,11 +41,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     add_allowed_assertion(result, "QUESTION-D003", (r.get("分類", "") for r in questions), CLASSIFICATIONS, "Classification")
     add_allowed_assertion(result, "QUESTION-D004", (r.get("回答後の正規化先", "") for r in questions), NORMALIZATIONS, "Normalization target")
 
-    invalid_skills = sorted({
-        clean(r.get("再開Skill", ""))
-        for r in questions + blocked
-        if clean(r.get("再開Skill", "")) and clean(r.get("再開Skill", "")) not in CANONICAL_SKILLS
-    })
+    invalid_skills = sorted({clean(r.get("再開Skill", "")) for r in questions + blocked if clean(r.get("再開Skill", "")) and clean(r.get("再開Skill", "")) not in CANONICAL_SKILLS})
     result.add("QUESTION-D005", not invalid_skills, "Resume skills must be Canonical Skill names", evidence=invalid_skills or None)
 
     blocker_ids = {clean(r.get("ID", "")) for r in questions if clean(r.get("分類", "")) == "Blocker"}
@@ -93,8 +66,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
 
     mismatch = []
     if "approved_assumptions" in expected:
-        approvals = expected["approved_assumptions"]
-        approval_ids = set(approvals) if isinstance(approvals, dict) else set(approvals)
+        approval_ids = set(expected["approved_assumptions"])
         for row in assumptions:
             asm = clean(row.get("Canonical ASM ID", ""))
             if clean(row.get("状態", "")) == "承認済み" and asm not in approval_ids:
@@ -103,12 +75,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
 
     required_approved = set(expected.get("required_approved_assumptions", []))
     missing_required_approved = sorted(required_approved - approved_output_ids)
-    result.add(
-        "QUESTION-D015",
-        not missing_required_approved,
-        "Fixture-required approved assumptions must appear as approved Canonical ASM entries",
-        evidence=missing_required_approved or None,
-    )
+    result.add("QUESTION-D015", not missing_required_approved, "Fixture-required approved assumptions must appear as approved Canonical ASM entries", evidence=missing_required_approved or None)
 
     expected_cls = expected.get("expected_classifications", {})
     actual = {clean(r.get("ID", "")): clean(r.get("分類", "")) for r in questions}

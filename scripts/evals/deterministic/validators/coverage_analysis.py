@@ -6,16 +6,6 @@ from ..common import CANONICAL_SKILLS, clean, compute_graph_gaps, ids_in, nonemp
 from ..markdown_parser import find_table, parse_tables
 from ..result import EvalResult
 
-EXPECTED_FIX_SKILL = {
-    "Authority": "spec-analysis",
-    "Oracle": "question-analysis",
-    "Risk": "test-analysis",
-    "TR": "test-requirement-design",
-    "TCN": "test-condition-design",
-    "CI": "test-condition-design",
-    "TC": "test-case-design",
-}
-
 
 def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     result = EvalResult("coverage-analysis", eval_id)

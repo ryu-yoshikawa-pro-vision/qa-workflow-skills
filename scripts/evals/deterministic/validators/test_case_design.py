@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from ..common import ID_PATTERNS, PRIORITIES, RISK_LEVEL_ORDER, add_allowed_assertion, add_duplicate_assertion, clean, ids_in, nonempty_rows
+from ..common import ID_PATTERNS, PRIORITIES, RISK_LEVEL_ORDER, add_allowed_assertion, add_duplicate_assertion, add_required_fields_assertion, clean, ids_in, nonempty_rows
 from ..markdown_parser import find_table, parse_tables
 from ..result import EvalResult
 
@@ -26,14 +26,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     result.add("TC-D001", not bad, "Test Case IDs must use TC-xxx", evidence=bad or None)
     add_duplicate_assertion(result, "TC-D002", ids, "Test Case IDs")
     add_allowed_assertion(result, "TC-D003", (r.get("優先度", "") for r in cases), PRIORITIES, "Test Case priority")
-
-    required = ("タイトル / 目的", "関連観点ID", "関連テスト要求ID", "優先度", "前提条件", "テストデータ", "実施手順", "期待結果", "期待結果の根拠")
-    missing = []
-    for row in cases:
-        for f in required:
-            if not clean(row.get(f, "")):
-                missing.append({"tc": row.get("テストケースID"), "field": f})
-    result.add("TC-D004", not missing, "Low-Level Test Case required fields must exist", evidence=missing or None)
+    add_required_fields_assertion(result, "TC-D004", cases, ("タイトル / 目的", "関連観点ID", "関連テスト要求ID", "優先度", "前提条件", "テストデータ", "実施手順", "期待結果", "期待結果の根拠"), "テストケースID", "Low-Level Test Case")
 
     tcn_spec = "known_test_conditions" in expected
     ci_spec = "known_coverage_items" in expected
@@ -46,11 +39,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     unknown, missing_auth = [], []
     for row in cases:
         tcid = clean(row.get("テストケースID", ""))
-        for field, known, specified in (
-            ("関連観点ID", known_tcn, tcn_spec),
-            ("関連Coverage Item ID", known_ci, ci_spec),
-            ("関連テスト要求ID", known_tr, tr_spec),
-        ):
+        for field, known, specified in (("関連観点ID", known_tcn, tcn_spec), ("関連Coverage Item ID", known_ci, ci_spec), ("関連テスト要求ID", known_tr, tr_spec)):
             for ref in ids_in(row.get(field, "")):
                 if specified and ref not in known:
                     unknown.append({"tc": tcid, "field": field, "reference": ref})
@@ -64,6 +53,14 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     result.add("TC-D006", not missing_auth, "Every Test Case must map PASS/FAIL expectations to at least one Authority", evidence=missing_auth or None)
 
     disposed_ids = {clean(r.get("上流ID", "")) for r in disposed}
+    disposition_known = set()
+    if tcn_spec:
+        disposition_known |= known_tcn
+    if ci_spec:
+        disposition_known |= known_ci
+    unknown_disposed = sorted({upstream for upstream in disposed_ids if upstream and (tcn_spec or ci_spec) and upstream not in disposition_known})
+    result.add("TC-D014", not unknown_disposed, "Disposition upstream IDs must exist when fixture Test Conditions or Coverage Items are specified", evidence=unknown_disposed or None)
+
     linked_ci = {ref for row in cases for ref in ids_in(row.get("関連Coverage Item ID", "")) if ref in known_ci}
     embedded_tcn = {ref for row in cases for ref in ids_in(row.get("関連観点ID", "")) if ref in known_tcn}
     if "coverage_closure_ids" in expected:
@@ -88,7 +85,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             actual = clean(row.get("優先度", ""))
             if RISK_LEVEL_ORDER.get(actual, 0) < RISK_LEVEL_ORDER.get(high, 0) and not clean(row.get("備考", "")):
                 issues.append({"tc": row.get("テストケースID"), "expected_at_least": high, "actual": actual})
-    result.add("TC-D010", not issues, "Test Case priority must preserve the highest linked Coverage Item priority unless an override reason is provided", evidence=issues or None)
+    result.add("TC-D010", not issues, "Merged Test Cases must preserve highest Coverage Item priority unless override is explained", evidence=issues or None)
 
     ambiguous = []
     for row in cases:
