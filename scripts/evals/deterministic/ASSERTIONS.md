@@ -80,7 +80,7 @@
 - `TR-D006` 必須フィールド
 - `TR-D007` Disposition
 - `TR-D008` Disposition理由
-- `TR-D009` Authority/Risk閉鎖
+- `TR-D009` Authority/RiskのTRまたはDispositionへの排他的閉鎖
 - `TR-D010` 最高Risk優先度継承 / override理由
 - `TR-D011` Canonical必須テーブル存在
 - `TR-D012` fixture-required Test Requirement存在
@@ -101,7 +101,7 @@
 - `TCN-D010` TR Disposition
 - `TCN-D011` Coverage候補Disposition
 - `TCN-D012` Disposition理由 / 重複カバー先整合
-- `TCN-D013` TR閉鎖
+- `TCN-D013` TRのTest ConditionまたはDispositionへの排他的閉鎖
 - `TCN-D014` fixture Pairwise Factor/Value整合
 - `TCN-D015` feasible pairの2-wise 100% coverage
 - `TCN-D016` fixture状態遷移から実在Coverage Itemへのclosure
@@ -126,7 +126,7 @@
 - `TC-D004` Low-Level必須フィールド
 - `TC-D005` 上流/Authority参照
 - `TC-D006` 期待結果Authority存在
-- `TC-D007` CI/内包TCN閉鎖
+- `TC-D007` CI/内包TCNのTest CaseまたはDispositionへの排他的閉鎖
 - `TC-D008` Disposition
 - `TC-D009` Disposition理由
 - `TC-D010` 最高CI優先度維持 / override理由
