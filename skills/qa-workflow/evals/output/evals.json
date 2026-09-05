@@ -1,0 +1,8 @@
+{
+  "skill": "qa-workflow",
+  "canonical_output": true,
+  "cases": [
+    {"id":"WF-OUT-001","input":"cases/case-001/input.md","expected":"cases/case-001/expected.json"},
+    {"id":"WF-OUT-002","input":"cases/case-002/input.md","expected":"cases/case-002/expected.json"}
+  ]
+}

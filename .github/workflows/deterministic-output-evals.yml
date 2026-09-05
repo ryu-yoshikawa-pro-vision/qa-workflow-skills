@@ -1,0 +1,58 @@
+name: Validate Deterministic Output Evals
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deterministic-output-evals:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Validate output eval datasets
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          skills = [
+              "qa-workflow", "spec-analysis", "question-analysis", "test-analysis",
+              "test-requirement-design", "test-condition-design", "test-case-design",
+              "coverage-analysis", "adversarial-review",
+          ]
+          total = 0
+          for skill in skills:
+              root = Path("skills") / skill / "evals" / "output"
+              data = json.loads((root / "evals.json").read_text(encoding="utf-8"))
+              assert data["skill"] == skill
+              cases = data.get("cases", [])
+              assert len(cases) >= 2, (skill, len(cases))
+              ids = [case["id"] for case in cases]
+              assert len(ids) == len(set(ids)), (skill, ids)
+              for case in cases:
+                  input_path = root / case["input"]
+                  expected_path = root / case["expected"]
+                  assert input_path.is_file(), input_path
+                  assert expected_path.is_file(), expected_path
+                  assert "output-template.md" in input_path.read_text(encoding="utf-8") or skill == "qa-workflow", input_path
+                  assert isinstance(json.loads(expected_path.read_text(encoding="utf-8")), dict)
+                  total += 1
+          assert total >= 18, total
+          print(f"Deterministic output eval cases: {total}")
+          PY
+
+      - name: Compile deterministic grader
+        run: python -m compileall -q scripts/evals/deterministic
+
+      - name: Run deterministic grader unit tests
+        run: python -m unittest discover -s scripts/evals/deterministic/tests -v

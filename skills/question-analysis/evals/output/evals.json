@@ -1,0 +1,1 @@
+{"skill":"question-analysis","canonical_output":true,"cases":[{"id":"QUESTION-OUT-001","input":"cases/case-001/input.md","expected":"cases/case-001/expected.json"},{"id":"QUESTION-OUT-002","input":"cases/case-002/input.md","expected":"cases/case-002/expected.json"}]}

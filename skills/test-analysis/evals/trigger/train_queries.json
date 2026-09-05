@@ -1,0 +1,14 @@
+[
+  {"query":"既存ケースがProduct Riskを十分カバーしているか追跡分析して。","should_trigger":false},
+  {"query":"新しい権限機能の影響範囲とリスクを見て、テストの深さと優先度を決めたい。","should_trigger":true},
+  {"query":"この変更で何を重点的にテストすべきか、Product Riskを評価して整理してください。","should_trigger":true},
+  {"query":"この機能はシステムテストでどこまで見るべきか、観測方法も含めて分析して。","should_trigger":true},
+  {"query":"このAuthorityとRiskから、何を保証すべきかTest Requirementを書いて。","should_trigger":false},
+  {"query":"この資料群から現行仕様と未確定事項を整理してください。","should_trigger":false},
+  {"query":"このCoverage Itemを実施手順と期待結果のあるケースにして。","should_trigger":false},
+  {"query":"この不明点がBlockerか要確認か分類してください。","should_trigger":false},
+  {"query":"仕様は整理済みです。次にリスクベースでテスト重点と適用技法を決めてください。","should_trigger":true},
+  {"query":"変更差分と過去不具合を踏まえて、どの領域を高・中・低リスクで扱うか決めて。","should_trigger":true},
+  {"query":"今回の改修はどの失敗が怖いか、影響度と発生可能性を根拠付きで評価して。","should_trigger":true},
+  {"query":"高リスク領域について具体的な境界値とCoverage Itemを出してください。","should_trigger":false}
+]

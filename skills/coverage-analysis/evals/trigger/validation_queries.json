@@ -1,0 +1,10 @@
+[
+  {"query":"既存ケースの文章を簡潔にリライトしてください。","should_trigger":false},
+  {"query":"Partialで、TR-010からTCNとCIへの展開だけ十分か分析して。","should_trigger":true},
+  {"query":"テストケース件数ではなく、意味上のCoverageで抜けを確認してください。","should_trigger":true},
+  {"query":"この成果物チェーンに孤立ID、未閉鎖、重複Coverageがないか調べて。","should_trigger":true},
+  {"query":"テスト実施結果のPass率を計算してください。","should_trigger":false},
+  {"query":"既存テスト設計のCoverage Matrixを作り、未網羅と不正Dispositionを出してください。","should_trigger":true},
+  {"query":"仕様から最終ケースまで全部作ってからレビューまで進めて。","should_trigger":false},
+  {"query":"この変更のProduct Riskを評価して重点を決めて。","should_trigger":false}
+]

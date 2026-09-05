@@ -1,0 +1,14 @@
+[
+  {"query":"この観点一覧から、実施手順と期待結果まで書いたテストケースにしてください。","should_trigger":false},
+  {"query":"境界値と状態遷移を使って、必要なテスト観点とCoverage Itemを設計して。","should_trigger":false},
+  {"query":"公開範囲の仕様が資料ごとに違うので、現行のルールと上書き関係を整理してください。","should_trigger":true},
+  {"query":"AuthorityからTest Caseまで抜けなく繋がっているか、カバレッジを分析して。","should_trigger":false},
+  {"query":"この変更のProduct Riskを評価して、どこを重点的にテストすべきか決めて。","should_trigger":false},
+  {"query":"チケット、リリースノート、仕様書の内容が少し食い違っています。どれが現行仕様か追跡できる形にしてください。","should_trigger":true},
+  {"query":"この新機能について、SPEC・決定事項・推測・不明点を混ぜずに仕様分析してほしい。","should_trigger":true},
+  {"query":"この未回答Q&Aはテストケース作成を止めるBlockerですか？回答なしで進められるか分類して。","should_trigger":false},
+  {"query":"この仕様から何を検証・保証すべきかTest Requirementにしてください。","should_trigger":false},
+  {"query":"実装ではなく正式な資料を基準に、今回の変更で現在有効な期待挙動を整理して。","should_trigger":true},
+  {"query":"リポジトリとFigmaと既存Q&Aから、後続のテスト設計に使える仕様モデルを作って。","should_trigger":true},
+  {"query":"Figmaと要件書とQ&Aを見比べて、この機能の仕様を整理してください。矛盾や未確定事項も分けてほしいです。","should_trigger":true}
+]

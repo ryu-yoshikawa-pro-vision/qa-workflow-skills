@@ -1,0 +1,14 @@
+[
+  {"query":"TR-003に境界があるので、BVAのCoverage Criteriaと具体的なCoverage Itemを設計して。","should_trigger":true},
+  {"query":"このCoverage Itemを前提条件・手順・期待結果のケースにして。","should_trigger":false},
+  {"query":"このTest Requirementを、どの条件・観点で確認するかへ展開してください。","should_trigger":true},
+  {"query":"同値分割で候補母集団を出し、採用しない候補もDisposition付きで整理して。","should_trigger":true},
+  {"query":"この状態モデルから、全有効遷移をカバーするテスト条件を作ってください。","should_trigger":true},
+  {"query":"TCNとCIがTest Caseに全部繋がっているかカバレッジ分析して。","should_trigger":false},
+  {"query":"仕様資料を統合してCurrent Effective Authorityを作って。","should_trigger":false},
+  {"query":"デシジョンテーブルが適切そうなので、条件と実行可能ルールをCoverage Itemにしてください。","should_trigger":true},
+  {"query":"権限×公開範囲×状態の組合せをPairwiseで設計できるか確認し、必要なCoverage Itemを出して。","should_trigger":true},
+  {"query":"Authorityから何を保証すべきかTest Requirementだけ作って。","should_trigger":false},
+  {"query":"このテスト観点一覧をCold Reviewして重大度付きで問題を出して。","should_trigger":false},
+  {"query":"この変更のProduct Riskを4×4で評価して。","should_trigger":false}
+]

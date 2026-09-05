@@ -1,0 +1,10 @@
+[
+  {"query":"このテスト分析自体をCold Reviewして重大な欠陥を探してください。","should_trigger":false},
+  {"query":"高リスク項目だけExcelの上に並び替えてください。","should_trigger":false},
+  {"query":"境界値分析や状態遷移を使うべき領域を、具体ケースには落とさず選定してください。","should_trigger":true},
+  {"query":"既存仕様と今回の差分から、回帰影響候補とProduct Riskを整理して。","should_trigger":true},
+  {"query":"テストケースを書く前に、何をなぜどの深さで確認するか戦略を決めたいです。","should_trigger":true},
+  {"query":"実装変更は小さいですが業務影響が大きそうです。リスク評価とテスト重点をしてください。","should_trigger":true},
+  {"query":"この不具合票の重大度をBugのSeverityとして分類してください。","should_trigger":false},
+  {"query":"仕様から最終テストケースまで工程ごとに全部進めてください。","should_trigger":false}
+]

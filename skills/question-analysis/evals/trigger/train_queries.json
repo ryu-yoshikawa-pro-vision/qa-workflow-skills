@@ -1,0 +1,14 @@
+[
+  {"query":"Figma、要件書、Q&Aを統合して、現在有効な仕様を整理してください。","should_trigger":false},
+  {"query":"TRからTCまでの追跡に抜けがないかカバレッジ分析してください。","should_trigger":false},
+  {"query":"Current Effective AuthorityからTest Requirementを設計してください。","should_trigger":false},
+  {"query":"未回答の質問が12件あります。Blocker、要確認、仮定可能、任意に仕分けしてください。","should_trigger":true},
+  {"query":"この前提を仮定してケース作成まで進めてよいのか、それとも正式確認が必要か見て。","should_trigger":true},
+  {"query":"この不明点は回答がないとテスト設計を止めるべきですか？Blockerか要確認か分類してください。","should_trigger":true},
+  {"query":"この変更のProduct Riskとテスト重点を決めてください。","should_trigger":false},
+  {"query":"仕様書とQ&Aで公開範囲の説明が矛盾しています。どこまで作業を続けられるか判断して。","should_trigger":true},
+  {"query":"期待結果を決められない項目だけ洗い出して、回答が必要な範囲を局所化してください。","should_trigger":true},
+  {"query":"Coverage Itemから第三者が実施できるテストケースを書いて。","should_trigger":false},
+  {"query":"このTest Requirementを境界値や状態遷移の観点へ展開してください。","should_trigger":false},
+  {"query":"DECと仕様が競合しているように見えます。解消済みか未解決か確認して、未解決なら扱いを決めて。","should_trigger":true}
+]

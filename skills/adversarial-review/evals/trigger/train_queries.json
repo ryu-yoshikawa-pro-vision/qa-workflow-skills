@@ -1,0 +1,14 @@
+[
+  {"query":"作成者の意図は考慮せず、仕様根拠からこのテスト項目書の誤りを洗い出して。","should_trigger":true},
+  {"query":"Coverage Analysis自体が妥当か、見落としや誤判定をレビューして。","should_trigger":true},
+  {"query":"このTest Requirementから不足するCoverage Itemを新しく設計して。","should_trigger":false},
+  {"query":"Authority→TR→TCN→CI→TCが全部閉じているかCoverage Matrixで確認して。","should_trigger":false},
+  {"query":"Figmaと要件書を統合して仕様分析してください。","should_trigger":false},
+  {"query":"このTest Requirement一覧に、根拠のない期待や過剰統合がないかCold Reviewして。","should_trigger":true},
+  {"query":"この観点一覧を具体的なテストケースへ変換してください。","should_trigger":false},
+  {"query":"期待結果がAuthorityと矛盾していないか、追跡性も含めて反証的に確認してください。","should_trigger":true},
+  {"query":"このQA成果物をゼロベースで反証レビューして、致命的・重大・軽微・提案に分けてください。","should_trigger":true},
+  {"query":"このテスト観点とケースを徹底レビューして、利用前に直すべき重大欠陥を指摘して。","should_trigger":true},
+  {"query":"未カバーCoverage Itemと不正Dispositionだけを分析してください。","should_trigger":false},
+  {"query":"この仕様不足がBlockerか仮定可能か分類して。","should_trigger":false}
+]

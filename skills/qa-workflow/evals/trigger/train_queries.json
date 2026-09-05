@@ -1,0 +1,14 @@
+[
+  {"query":"新機能の仕様から最終的なテスト項目書まで作りたいです。必要な工程を判断して進めて。","should_trigger":true},
+  {"query":"資料と既存テストが混在しています。使える成果物を再利用しながら必要なSkillだけ通して完成させて。","should_trigger":true},
+  {"query":"この変更について、QA分析から反証レビューまでフルで実施してください。","should_trigger":true},
+  {"query":"TR一覧からCoverage CriteriaとCoverage Itemだけ作って。ケースは不要です。","should_trigger":false},
+  {"query":"この仕様資料からテスト分析、観点、テストケース、カバレッジ確認まで一通り進めてください。","should_trigger":true},
+  {"query":"途中で仕様不明があればその範囲だけ止め、それ以外はテストケースまで進めてください。","should_trigger":true},
+  {"query":"この未回答事項をBlockerか要確認か分類するだけでいいです。","should_trigger":false},
+  {"query":"仕様分析済みなので、この変更のProduct Riskだけ評価してください。","should_trigger":false},
+  {"query":"Coverage Itemは完成済みです。テストケースだけ具体化してください。","should_trigger":false},
+  {"query":"既存の仕様分析はあります。どこから再利用できるか判断して、テストケース作成まで続けてください。","should_trigger":true},
+  {"query":"FigmaとQ&Aから現在有効な仕様だけ整理してください。テスト分析は不要です。","should_trigger":false},
+  {"query":"AuthorityとRiskはあります。Test Requirementだけ設計してください。","should_trigger":false}
+]

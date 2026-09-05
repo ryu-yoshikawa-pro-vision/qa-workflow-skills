@@ -1,0 +1,1 @@
+{"known_authorities":["SPEC-001","SPEC-002"],"required_risks":{"RISK-001":{"impact":2,"likelihood":2,"risk_level":"中"},"RISK-002":{"impact":1,"likelihood":4,"risk_level":"中"}},"required_techniques":["境界値分析","デシジョンテーブル"]}

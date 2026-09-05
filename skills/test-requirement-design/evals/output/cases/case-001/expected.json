@@ -1,0 +1,1 @@
+{"known_authorities":["SPEC-001","SPEC-002"],"known_product_risks":["RISK-001","RISK-002"],"product_risk_levels":{"RISK-001":"高","RISK-002":"中"},"required_test_requirements":["TR-001"],"required_linked_upstream_ids":["SPEC-001","RISK-001","RISK-002"],"expected_dispositions":{"SPEC-002":"対象外"}}

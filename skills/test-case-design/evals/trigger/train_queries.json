@@ -1,0 +1,14 @@
+[
+  {"query":"既存Test CaseがCoverage Criteriaを満たしているか分析して。","should_trigger":false},
+  {"query":"TCN-004-CI02を前提条件、データ、操作、期待結果まで具体化して。","should_trigger":true},
+  {"query":"この資料から仕様とDecisionを整理してください。","should_trigger":false},
+  {"query":"このテストケースの誤りや根拠不足を重大度付きでレビューして。","should_trigger":false},
+  {"query":"このCoverage Itemを、別ケースを読まなくても実行できるローレベルケースへ落として。","should_trigger":true},
+  {"query":"このTRをBVAや状態遷移のCoverage Itemへ展開して。","should_trigger":false},
+  {"query":"何を保証すべきかTest Requirementを設計して。","should_trigger":false},
+  {"query":"観点一覧はできています。次にケース単体でPASS/FAILを判断できるテスト項目書にしてください。","should_trigger":true},
+  {"query":"同じ操作経路のCoverage Itemは必要なら統合しつつ、関連IDを残してケース化してください。","should_trigger":true},
+  {"query":"この変更のProduct Riskと重点領域を分析して。","should_trigger":false},
+  {"query":"手順と期待結果を番号対応させ、各PASS条件のAuthorityも追跡できるようにして。","should_trigger":true},
+  {"query":"このTest ConditionとCoverage Itemから、第三者がそのまま実施できるテストケースを書いてください。","should_trigger":true}
+]

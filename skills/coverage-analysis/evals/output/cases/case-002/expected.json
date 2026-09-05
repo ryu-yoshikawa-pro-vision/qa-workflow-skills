@@ -1,0 +1,1 @@
+{"graph":{"node_types":{"RISK-001":"Risk","TR-001":"TR","TCN-001":"TCN","TC-001":"TC","TR-002":"TR"},"edges":[["RISK-001","TR-001"],["TR-001","TCN-001"],["TCN-001","TC-001"]],"dispositions":{}},"expected_fix_skills":{"TR-002":"test-requirement-design"}}

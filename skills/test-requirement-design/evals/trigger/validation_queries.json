@@ -1,0 +1,10 @@
+[
+  {"query":"このRiskとAuthorityを使って、システムテストで保証すべき内容を要求化してください。","should_trigger":true},
+  {"query":"テスト観点へ落とす前に、検証すべき責務の粒度を整えたいです。","should_trigger":true},
+  {"query":"TR一覧のIDだけ連番に直してください。","should_trigger":false},
+  {"query":"この要件書をそのままテストケース形式へ変換してください。","should_trigger":false},
+  {"query":"仕様分析からテストケースまで一連の工程を自動で進めて。","should_trigger":false},
+  {"query":"権限、公開範囲、状態変更の責務を、必要なら分割してTest Requirementにしてください。","should_trigger":true},
+  {"query":"対象内の仕様を漏らさず、Test RequirementまたはDispositionへ閉じてください。","should_trigger":true},
+  {"query":"このTest Requirement一覧の品質を反証レビューして。","should_trigger":false}
+]

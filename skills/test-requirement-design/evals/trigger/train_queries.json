@@ -1,0 +1,14 @@
+[
+  {"query":"複数資料から現在有効な仕様を解決してください。","should_trigger":false},
+  {"query":"AuthorityからTest Caseまで閉じているかCoverage Matrixを作って。","should_trigger":false},
+  {"query":"この仕様群を上流の言い換えではなく、テストで保証すべき要求に変換して。","should_trigger":true},
+  {"query":"Product Riskを優先度に反映しつつ、何を確認すれば責務を保証できるか定義して。","should_trigger":true},
+  {"query":"Authorityごとに、どのTest Requirementへ繋がるか追跡できる形で設計してください。","should_trigger":true},
+  {"query":"TR-001について境界値、状態遷移、正常異常のCoverage Itemまで展開して。","should_trigger":false},
+  {"query":"この機能のテスト要求をTR-001のようなID付きで作ってください。条件値や手順はまだ不要です。","should_trigger":true},
+  {"query":"この変更のProduct Riskとテスト重点を分析してください。","should_trigger":false},
+  {"query":"仕様分析とリスク分析は済んでいます。具体ケースにはせず、検証責務を整理してください。","should_trigger":true},
+  {"query":"未回答事項がBlockerか仮定可能か分類して。","should_trigger":false},
+  {"query":"Current Effective AuthorityとProduct Riskから、何を検証・保証すべきかTest Requirementを作ってください。","should_trigger":true},
+  {"query":"このTest Conditionを具体的な操作手順と期待結果へ落として。","should_trigger":false}
+]

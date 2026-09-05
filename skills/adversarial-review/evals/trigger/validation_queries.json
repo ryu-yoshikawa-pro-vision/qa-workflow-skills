@@ -1,0 +1,10 @@
+[
+  {"query":"仕様からケースまで一通り作成し、最後にレビューもしてください。","should_trigger":false},
+  {"query":"既存のQA設計を肯定せず、抜け・過剰・Oracle創作がないか厳しく見て。","should_trigger":true},
+  {"query":"この仕様分析からケースまでの成果物一式を最終品質レビューしてください。","should_trigger":true},
+  {"query":"修正済みのテスト設計を再レビューして、致命的と重大が残っていないか確認して。","should_trigger":true},
+  {"query":"この変更のProduct Riskを評価してテスト重点を決めて。","should_trigger":false},
+  {"query":"この成果物で本当にテスターが誤判断しないか、重大度付きで欠陥を探してください。","should_trigger":true},
+  {"query":"このレビューコメントを丁寧な日本語に書き換えて。","should_trigger":false},
+  {"query":"PRのコード差分だけを一般的なコードレビューとして確認してください。","should_trigger":false}
+]

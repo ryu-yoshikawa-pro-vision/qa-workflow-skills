@@ -1,0 +1,10 @@
+[
+  {"query":"Test Requirement一覧から、ケース作成前のテスト観点とCoverage Criteriaを設計したい。","should_trigger":true},
+  {"query":"正常系だけでなく仕様根拠のある例外経路も含め、シナリオCoverageを作って。","should_trigger":true},
+  {"query":"この観点表の列幅を整えて見やすくしてください。","should_trigger":false},
+  {"query":"未確定仕様をBlockerか要確認か仕分けして。","should_trigger":false},
+  {"query":"Pairwiseの一般的な意味を初心者向けに説明して。","should_trigger":false},
+  {"query":"仕様からケースまで全部の工程を順番に進めて。","should_trigger":false},
+  {"query":"高リスクのTRについて、境界・状態・権限のどこを深く見るべきか条件設計してください。","should_trigger":true},
+  {"query":"テストケースの手順はまだ書かず、必要なCoverage Itemまで具体化してください。","should_trigger":true}
+]

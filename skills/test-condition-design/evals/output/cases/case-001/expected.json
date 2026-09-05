@@ -1,0 +1,1 @@
+{"known_test_requirements":["TR-001"],"known_authorities":["SPEC-001"],"known_product_risks":["RISK-001"],"required_test_conditions":["TCN-001"],"required_coverage_items":["TCN-001-CI01"],"pairwise":{"factors":{"Role":["admin","member"],"Browser":["Chrome","Edge"],"Flag":["on","off"]},"forbidden_constraints":[{"Role":"member","Flag":"off"}],"require_pairwise":true}}
