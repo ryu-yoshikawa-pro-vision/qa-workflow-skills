@@ -36,8 +36,18 @@ def _resolve_case_file(semantic_root: Path, relative_path: str, field: str) -> P
     if rel.is_absolute():
         raise SemanticDatasetError(f"{field} must be a relative path under cases/: {relative_path}")
 
-    cases_root = (semantic_root / "cases").resolve()
-    resolved = (semantic_root / rel).resolve()
+    semantic_root_resolved = semantic_root.resolve()
+    cases_root = (semantic_root_resolved / "cases").resolve()
+    try:
+        cases_root.relative_to(semantic_root_resolved)
+    except ValueError as exc:
+        raise SemanticDatasetError(
+            f"cases directory must resolve under semantic root: {cases_root}"
+        ) from exc
+    if not cases_root.is_dir():
+        raise FileNotFoundError(cases_root)
+
+    resolved = (semantic_root_resolved / rel).resolve()
     try:
         resolved.relative_to(cases_root)
     except ValueError as exc:

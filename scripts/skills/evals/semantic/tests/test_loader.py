@@ -142,6 +142,30 @@ class SemanticLoaderTests(unittest.TestCase):
             with self.assertRaises(SemanticDatasetError):
                 load_semantic_skill("example-skill", skills_root)
 
+    def test_cases_directory_symlink_escape_raises(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            skills_root = self.make_fixture(tmp_path)
+            semantic = skills_root / "example-skill/evals/semantic"
+            cases = semantic / "cases"
+            case = cases / "case-001"
+            (case / "input.md").unlink()
+            (case / "reference.md").unlink()
+            case.rmdir()
+            cases.rmdir()
+
+            outside_case = tmp_path / "outside-cases" / "case-001"
+            outside_case.mkdir(parents=True)
+            (outside_case / "input.md").write_text("outside input", encoding="utf-8")
+            (outside_case / "reference.md").write_text("outside reference", encoding="utf-8")
+            try:
+                cases.symlink_to(tmp_path / "outside-cases", target_is_directory=True)
+            except (OSError, NotImplementedError) as exc:
+                self.skipTest(f"directory symlink is not available: {exc}")
+
+            with self.assertRaises(SemanticDatasetError):
+                load_semantic_skill("example-skill", skills_root)
+
 
 if __name__ == "__main__":
     unittest.main()
