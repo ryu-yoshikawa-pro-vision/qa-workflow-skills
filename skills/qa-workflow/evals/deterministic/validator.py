@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from ..common import CANONICAL_SKILLS, add_allowed_assertion, add_duplicate_assertion, clean, nonempty_rows
-from ..markdown_parser import find_table, parse_bullets, parse_tables
-from ..result import EvalResult
+from scripts.evals.deterministic.common import CANONICAL_SKILLS, add_allowed_assertion, add_duplicate_assertion, clean, nonempty_rows
+from scripts.evals.deterministic.markdown_parser import find_table, parse_bullets, parse_tables
+from scripts.evals.deterministic.result import EvalResult
 
 WORKFLOW_STATES = {"未開始", "実行中", "部分完了（Blockedあり）", "Blocked", "完了"}
 SKILL_STATES = {"未開始", "実行中", "要再検証", "Blocked", "完了", "再利用", "省略"}

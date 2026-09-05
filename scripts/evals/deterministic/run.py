@@ -7,11 +7,12 @@ import sys
 
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
-    from scripts.evals.deterministic.validators import VALIDATORS
+    from scripts.evals.deterministic.loader import load_validators
 else:
-    from .validators import VALIDATORS
+    from .loader import load_validators
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
+VALIDATORS = load_validators()
 
 
 def load_eval_definition(skill: str, eval_id: str) -> tuple[dict, dict]:

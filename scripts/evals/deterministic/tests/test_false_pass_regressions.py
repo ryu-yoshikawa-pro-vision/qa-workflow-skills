@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import unittest
 
+from scripts.evals.deterministic.loader import load_validators
 from scripts.evals.deterministic.markdown_parser import parse_tables
-from scripts.evals.deterministic.validators import VALIDATORS
+
+
+VALIDATORS = load_validators()
 
 
 class FalsePassRegressionTests(unittest.TestCase):

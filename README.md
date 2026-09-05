@@ -87,11 +87,24 @@ skills/<skill-name>/
 
 ```text
 EVALS.md
-scripts/evals/deterministic/
 skills/<skill-name>/evals/
 ├── trigger/
-└── output/
+├── output/
+└── deterministic/
+    └── validator.py
+
+scripts/evals/deterministic/
+├── run.py
+├── loader.py
+├── markdown_parser.py
+├── common.py
+├── result.py
+└── tests/
 ```
+
+Skill固有のTrigger dataset、Output fixture、Deterministic validatorは各Skillの`evals/`配下に置きます。runner、validator loader、Markdown parser、共通utility、result model、grader self-testは`scripts/evals/deterministic/`のshared Eval Runtimeとして共有します。
+
+`skills/<skill-name>/`をコピーするとSkill固有の評価datasetとvalidatorも一緒に移動しますが、Deterministic Eval実行環境全体がSkill単体で自己完結するわけではありません。実行には`shared Eval Runtime`相当が別途必要です。
 
 `evals/`やgraderはAgent Skills Specificationの必須標準機能ではありません。
 

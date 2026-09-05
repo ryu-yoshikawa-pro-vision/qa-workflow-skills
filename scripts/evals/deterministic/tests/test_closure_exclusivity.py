@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import unittest
 
-from scripts.evals.deterministic.validators import VALIDATORS
+from scripts.evals.deterministic.loader import load_validators
+
+
+VALIDATORS = load_validators()
 
 
 class ClosureExclusivityRegressionTests(unittest.TestCase):
