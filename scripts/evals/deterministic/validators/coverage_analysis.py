@@ -24,13 +24,15 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     item_table = find_table(tables, section_contains="Coverage ItemのDisposition", required_headers=("Coverage Item ID / 項目", "Disposition"))
     matrix_table = find_table(tables, section_contains="カバレッジマトリクス", required_headers=("上流ID / 挙動", "カバレッジ", "修正Skill / 層"))
     orphan_table = find_table(tables, section_contains="陳腐化 / 孤立分析", required_headers=("成果物ID", "分類", "修正Skill / 層"))
-    missing_tables = [label for label, table in (
-        ("Authority / Product Riskの閉鎖状況", authority_table),
-        ("Coverage ItemのDisposition", item_table),
-        ("カバレッジマトリクス", matrix_table),
-        ("陳腐化 / 孤立分析", orphan_table),
-    ) if table is None]
-    result.add("COV-D007", not missing_tables, "Canonical coverage-analysis tables must exist", evidence=missing_tables or None)
+
+    # Coverage AnalysisはPartial実行を許容するため、個別ビューは分析対象に応じて省略できる。
+    # Canonicalな最低必須Outputはカバレッジマトリクスとする。
+    result.add(
+        "COV-D007",
+        matrix_table is not None,
+        "Coverage matrix must exist",
+        evidence="カバレッジマトリクス" if matrix_table is None else None,
+    )
 
     authority_rows = nonempty_rows(authority_table)
     item_rows = nonempty_rows(item_table)
