@@ -13,13 +13,35 @@ from ..common import (
     feasible_pairs,
     ids_in,
     nonempty_rows,
-    parse_combination,
 )
 from ..markdown_parser import find_table, parse_tables
 from ..result import EvalResult
 
 DISPOSITIONS = {"対象外", "別テストレベル", "残存リスク", "成立不能", "重複", "Blocked"}
 TR_DISPOSITIONS = {"別テストレベル", "残存リスク", "対象外", "Blocked"}
+
+
+def _parse_pairwise_combination(value: str) -> tuple[dict[str, str], list[str]]:
+    combo: dict[str, str] = {}
+    errors: list[str] = []
+    for raw in re.split(r"[;,]\s*", value.strip()):
+        token = clean(raw)
+        if not token:
+            continue
+        if "=" not in token:
+            errors.append(f"invalid token: {token}")
+            continue
+        factor, val = token.split("=", 1)
+        factor = clean(factor)
+        val = clean(val)
+        if not factor or not val:
+            errors.append(f"invalid token: {token}")
+            continue
+        if factor in combo:
+            errors.append(f"duplicate factor: {factor}")
+            continue
+        combo[factor] = val
+    return combo, errors
 
 
 def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
@@ -126,12 +148,27 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         }
         result.add("TCN-D014", not mismatch, "Pairwise Factor/Value universe must match fixture", evidence=mismatch or None)
 
-        parsed_rows = [(clean(r.get("Coverage Item ID", "")), parse_combination(r.get("組合せ", ""))) for r in combo_rows]
+        parsed_rows = []
+        parse_errors = []
+        combo_ci_ids = []
+        for row in combo_rows:
+            ciid = clean(row.get("Coverage Item ID", ""))
+            combo, errors = _parse_pairwise_combination(row.get("組合せ", ""))
+            combo_ci_ids.append(ciid)
+            parsed_rows.append((ciid, combo, errors))
+            if errors:
+                parse_errors.append({"coverage_item": ciid, "errors": errors})
+
+        unknown_combo_ci = sorted({ciid for ciid in combo_ci_ids if ciid not in ci_set})
+        result.add("TCN-D026", not unknown_combo_ci, "Pairwise generated combinations must reference existing Coverage Item IDs", evidence=unknown_combo_ci or None)
+        add_duplicate_assertion(result, "TCN-D027", combo_ci_ids, "Pairwise generated Coverage Item IDs")
+        result.add("TCN-D028", not parse_errors, "Pairwise generated combinations must use unique Factor=Value tokens", evidence=parse_errors or None)
+
         expected_factor_names = set(expected_factors)
         forbidden = pairwise.get("forbidden_constraints", [])
         unknown_factor, unknown_value, forbidden_combo, missing_factor = [], [], [], []
         valid_combos = []
-        for ciid, combo in parsed_rows:
+        for ciid, combo, errors in parsed_rows:
             extra = sorted(set(combo) - expected_factor_names)
             missing_names = sorted(expected_factor_names - set(combo))
             invalid_values = [
@@ -145,9 +182,9 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                 unknown_value.append({"coverage_item": ciid, "values": invalid_values})
             if missing_names:
                 missing_factor.append({"coverage_item": ciid, "factors": missing_names})
-            if not extra and not invalid_values and not missing_names and assignment_forbidden(combo, forbidden):
+            if not errors and not extra and not invalid_values and not missing_names and assignment_forbidden(combo, forbidden):
                 forbidden_combo.append({"coverage_item": ciid, "combination": combo})
-            if not extra and not invalid_values and not missing_names and not assignment_forbidden(combo, forbidden):
+            if ciid in ci_set and not errors and not extra and not invalid_values and not missing_names and not assignment_forbidden(combo, forbidden):
                 valid_combos.append(combo)
 
         result.add("TCN-D018", not unknown_factor, "Generated Pairwise combinations must not contain unknown Factors", evidence=unknown_factor or None)
@@ -167,6 +204,9 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             ("TCN-D019", "No fixture-backed Pairwise combination check required"),
             ("TCN-D020", "No fixture-backed Pairwise combination check required"),
             ("TCN-D021", "No fixture-backed Pairwise combination check required"),
+            ("TCN-D026", "No fixture-backed Pairwise Coverage Item check required"),
+            ("TCN-D027", "No fixture-backed Pairwise Coverage Item uniqueness check required"),
+            ("TCN-D028", "No fixture-backed Pairwise token check required"),
         ):
             result.add(aid, True, msg)
 
@@ -175,16 +215,21 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         rows = nonempty_rows(find_table(tables, section_contains="状態遷移表", required_headers=("現在状態", "イベント / 操作", "期待する次状態 / 結果", "対応Coverage Item ID")))
         missing_trans = []
         for t in transitions:
-            matched = any(
-                clean(r.get("現在状態", "")) == t["from"]
-                and clean(r.get("イベント / 操作", "")) == t["event"]
-                and clean(r.get("期待する次状態 / 結果", "")) == t["to"]
-                and clean(r.get("対応Coverage Item ID", ""))
-                for r in rows
-            )
+            matched = False
+            for row in rows:
+                if not (
+                    clean(row.get("現在状態", "")) == t["from"]
+                    and clean(row.get("イベント / 操作", "")) == t["event"]
+                    and clean(row.get("期待する次状態 / 結果", "")) == t["to"]
+                ):
+                    continue
+                ci_refs = [ref for ref in ids_in(row.get("対応Coverage Item ID", "")) if ID_PATTERNS["CI"].fullmatch(ref)]
+                if ci_refs and all(ref in ci_set for ref in ci_refs):
+                    matched = True
+                    break
             if not matched and not t.get("disposition"):
                 missing_trans.append(t)
-        result.add("TCN-D016", not missing_trans, "Fixture valid transitions must close to Coverage Item or explicit fixture disposition", evidence=missing_trans or None)
+        result.add("TCN-D016", not missing_trans, "Fixture valid transitions must close to existing Coverage Items or explicit fixture disposition", evidence=missing_trans or None)
     else:
         result.add("TCN-D016", True, "No fixture-backed state-transition check required")
 

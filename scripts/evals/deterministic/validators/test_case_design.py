@@ -86,9 +86,9 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         if linked:
             high = max((ci_priorities[r] for r in linked), key=lambda x: RISK_LEVEL_ORDER.get(x, 0))
             actual = clean(row.get("優先度", ""))
-            if RISK_LEVEL_ORDER.get(actual, 0) < RISK_LEVEL_ORDER.get(high, 0):
+            if RISK_LEVEL_ORDER.get(actual, 0) < RISK_LEVEL_ORDER.get(high, 0) and not clean(row.get("備考", "")):
                 issues.append({"tc": row.get("テストケースID"), "expected_at_least": high, "actual": actual})
-    result.add("TC-D010", not issues, "Merged Test Cases must preserve highest Coverage Item priority", evidence=issues or None)
+    result.add("TC-D010", not issues, "Test Case priority must preserve the highest linked Coverage Item priority unless an override reason is provided", evidence=issues or None)
 
     ambiguous = []
     for row in cases:

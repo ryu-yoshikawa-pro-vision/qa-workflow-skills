@@ -9,8 +9,8 @@
 1. **Spec Validation**: `SKILL.md` frontmatter / 命名規則等のAgent Skills仕様適合
 2. **Trigger Eval**: `description`によるSkill選択・誤発火・routing
 3. **Deterministic Output Eval**: 機械判定可能なOutput契約、ID・参照・閉鎖性・Invariant
-4. **Semantic Output Eval**: 意味解釈が必要な成果物品質（将来）
-5. **Workflow E2E Eval**: `qa-workflow`から担当Skillへ遷移し要求成果物まで完了できるか（将来）
+4. **Semantic Output Eval**: 意味解釈が必要な成果物品質
+5. **Workflow E2E Eval**: `qa-workflow`から担当Skillへ遷移し要求成果物まで完了できるか
 
 どのレイヤーも単独ではQA成果物品質全体を保証しません。
 
@@ -40,9 +40,9 @@ skills/<skill-name>/evals/trigger/
 - validation: 8件 / Skill（positive 4 / negative 4）
 - 9 Skill合計: 180 query
 
-現descriptionと180 queryはbaseline取得前のため固定します。description選定後、train / validationに未使用のfresh queryでfinal holdoutを行い、holdout queryは最終評価直前または別PRで作成します。
+train / validation datasetはdescription最適化の比較基準として固定します。description選定後のgeneralization checkでは、train / validationに使用していないfresh queryをholdoutとして使用します。
 
-baseline取得後は、QA専門用語を使わない依頼、省略表現、曖昧依頼、長いcontext、誤字 / 表記揺れ、暗黙的Skill要求等を別変更で追加検討します。
+Dataset拡張では、QA専門用語を使わない依頼、省略表現、曖昧依頼、長いcontext、誤字 / 表記揺れ、暗黙的Skill要求等を扱います。
 
 ---
 
@@ -55,7 +55,7 @@ baseline取得後は、QA専門用語を使わない依頼、省略表現、曖�
 ```text
 明確に機械判定できる      → ERROR assertion
 疑わしいが誤検知し得る    → WARNING assertion
-意味評価が必要             → Semantic Output Evalへ残す
+意味評価が必要             → Semantic Output Eval
 ```
 
 独自weighted scoreは作りません。ERROR pass/fail、assertion pass rate、WARNING件数を保持します。
@@ -64,11 +64,11 @@ baseline取得後は、QA専門用語を使わない依頼、省略表現、曖�
 
 ## Canonical Output制約
 
-初期Deterministic Evalは、各Skillの既定`assets/output-template.md`を使ったMarkdownだけをCanonical対象とします。
+Deterministic Evalは、各Skillの既定`assets/output-template.md`を使ったMarkdownをCanonical対象とします。
 
 `qa-workflow`は`assets/workflow-state-template.md`を基準とし、routing fixtureでは`開始Skill` / `最終Skill`を明示します。
 
-案件固有フォーマットを許容するSkill契約自体は変更しません。任意形式を万能parserで解析することは今回のscope外です。
+案件固有フォーマットはCanonical Deterministic Evalの解析対象外です。案件固有フォーマットを許容するSkill契約自体は変更しません。
 
 ## Dataset
 
@@ -88,14 +88,12 @@ skills/<skill-name>/evals/
             └── expected.json
 ```
 
-9 Skillすべてに最低2ケースあります。`expected.json`はGolden文章ではなく、known IDs、fixture-backed closure、Risk level、Pairwise factor/value/constraint、状態遷移、既知欠陥等の既知事実だけを持ちます。
-
-`known_*`と`required_*`は意味を分けます。
+9 Skillすべてに最低2ケースあります。`expected.json`はGolden文章ではなく、known IDs、required IDs、fixture-backed closure、Risk level、Pairwise factor/value/constraint、状態遷移、既知欠陥等の既知事実だけを持ちます。
 
 - `known_*`: Output中で参照可能なID集合。キー未指定ならその集合による参照検査を行わない。
 - `required_*`: Outputに実際に存在しなければならないID / Entity集合。
 
-したがって`known_authorities`等は、**キー未指定**と**キーあり + 空集合**を区別します。後者は「このEvalで参照可能な対象が0件」を意味します。
+`known_authorities`等は、**キー未指定**と**キーあり + 空集合**を区別します。後者は「このEvalで参照可能な対象が0件」を意味します。
 
 ## Required Output
 
@@ -103,19 +101,26 @@ Canonical Evalでvalidatorが利用する必須テーブル自体が欠落して
 
 0件が正常なDisposition / Blocked / 仮定候補 / 指摘一覧等は、存在必須でも行数0を許容する場合があります。すべての表へ1件以上を強制しません。
 
+`question-analysis`では、`required_approved_assumptions`に指定されたASMが`承認済み`としてOutputへ存在する必要があります。
+
+`test-analysis`では、fixtureが`required_techniques` / `required_testability`を持つ場合、指定された技法 / テスト可能性がOutputへ存在する必要があります。
+
 ## ERROR / WARNING
 
 ERROR例:
 - 必須Output table / required Entity欠落
+- 必須フィールド欠落
 - 重複ID
 - IDと分類不一致
 - unknown upstream reference
 - Risk Matrix不一致
 - fixture上流項目の未閉鎖
 - Pairwise生成組合せの未知Factor / Value、Constraint違反、必要Factor欠落
+- Pairwise生成組合せの未知Coverage Item ID / Coverage Item ID重複 / 不正token
 - Pairwise 2-wise不足
+- 状態遷移が存在しないCoverage Item IDを参照
 - 致命的 + 残存リスク受容
-- `完了` + Blocked / 要再検証
+- Workflow状態Invariant違反
 
 WARNING例:
 - 期待結果中の「正常」「正しく」「問題ない」「適切」
@@ -143,18 +148,22 @@ python scripts/evals/deterministic/run.py \
 
 all modeは`<output-root>/<skill>/<eval-id>.md`を探索し、manifestに定義された**全Outputの存在を必須**とします。1件でも欠落すれば`missing_outputs`へ記録してFAILします。
 
-## Pairwise
+## Pairwise / 状態遷移
 
 Pairwise fixtureでは、2-wise Coverage計算の前に生成組合せそのものを検査します。
 
 1. Factor / Value universe
-2. 生成組合せの未知Factor
-3. 未定義Value
-4. forbidden constraint違反
-5. 必要Factor欠落
-6. 有効な生成組合せだけを使ったfeasible pair 100% Coverage
+2. `Factor=Value` token形式とFactor重複
+3. 生成組合せの未知Factor
+4. 未定義Value
+5. forbidden constraint違反
+6. 必要Factor欠落
+7. 生成組合せが参照するCoverage Item IDの実在性 / 一意性
+8. 有効な生成組合せだけを使ったfeasible pair 100% Coverage
 
 `代表組合せ`にはPairwise保証を要求しません。
+
+fixture-backed状態遷移では、required transitionの`対応Coverage Item ID`がCanonical Coverage Item一覧に存在する必要があります。fixtureに明示Dispositionがある遷移はCoverage Item参照を要求しません。
 
 ## Markdown parser制約
 
@@ -182,7 +191,7 @@ Deterministic EvalでERRORにしません。
 
 各validatorについてvalid fixtureがPASSし、deliberately invalid fixtureで期待AssertionがFAILするunit testを持ちます。
 
-false-pass回帰として、空Output、required table / Entity欠落、expected空集合、Authority型不一致、Pairwise不正組合せ、expected修正対象欠落、承認不一致、Markdown列数不一致を検査します。
+回帰テストでは、空Output、required table / Entity / field欠落、expected空集合、Authority型不一致、Pairwise不正組合せ / 不正Coverage Item参照、状態遷移の不正Coverage Item参照、required technique / testability / approved ASM欠落、Workflow状態Invariant、承認不一致、Markdown列数不一致を検査します。
 
 CLI integration testではvalid outputのexit 0、invalid outputのexit 1、all modeのOutput欠落non-zeroを確認します。
 
@@ -190,24 +199,22 @@ CIでcompileとunit / integration testを実行します。
 
 ---
 
-# Semantic Output Eval（将来）
+# Semantic Output Eval
 
-LLM Judge等を導入する場合もDeterministic assertionと混同しません。with-skill / without-skill、検証責務・Coverage・Oracle・第三者実施可能性などの意味評価は別PRで扱います。今回は実装しません。
+LLM Judge等を使用する意味評価はDeterministic assertionと分離します。with-skill / without-skill、検証責務・Coverage・Oracle・第三者実施可能性などが対象です。
 
 ---
 
-# Workflow E2E Eval（将来）
+# Workflow E2E Eval
 
-Deterministic `qa-workflow` validatorは出力された状態 / routing判断の整合だけを評価します。実Agent client上で、正しい開始Skill load、不要Skill回避、既存成果物再利用、局所Blocked、変更伝播、要求成果物での終了、Domain Logic肩代わり防止を確認するE2Eは別評価です。
+Deterministic `qa-workflow` validatorは出力された状態 / routing判断の整合だけを評価します。実Agent client上でのSkill load、不要Skill回避、既存成果物再利用、局所Blocked、変更伝播、要求成果物での終了、Domain Logic肩代わり防止はE2Eで評価します。
 
 Agent Skills Specificationは共通Skill-to-Skill APIを規定しません。特定ClientのCompatibilityはE2Eで確認します。
 
-## 現在の状態
+## 実装状態
 
-- 9 Skill Trigger dataset: 180 query、未変更
-- description: 未変更
+- 9 Skill Trigger dataset: 180 query
 - Deterministic Output Eval: 9 Skill × 2 case以上
 - Deterministic grader: 実装済み
-- LLM Judge: 未導入
 - Semantic Output Eval: 未実装
 - Workflow E2E Eval: 未実装

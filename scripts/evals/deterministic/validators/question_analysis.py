@@ -1,6 +1,14 @@
 from __future__ import annotations
 
-from ..common import CANONICAL_SKILLS, ID_PATTERNS, add_allowed_assertion, add_duplicate_assertion, clean, nonempty_rows
+from ..common import (
+    CANONICAL_SKILLS,
+    ID_PATTERNS,
+    add_allowed_assertion,
+    add_duplicate_assertion,
+    add_required_fields_assertion,
+    clean,
+    nonempty_rows,
+)
 from ..markdown_parser import find_table, parse_tables
 from ..result import EvalResult
 
@@ -23,6 +31,32 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     questions = nonempty_rows(q_table)
     assumptions = nonempty_rows(a_table)
     blocked = nonempty_rows(b_table)
+
+    add_required_fields_assertion(
+        result,
+        "QUESTION-D012",
+        questions,
+        ("ID", "問題 / 質問", "根拠", "分類", "影響範囲 / 成果物", "回答なしの場合の扱い", "回答後の正規化先", "再開Skill"),
+        "ID",
+        "Question",
+    )
+    add_required_fields_assertion(
+        result,
+        "QUESTION-D013",
+        blocked,
+        ("Blocker ID", "Blocked成果物 / 範囲", "必要な決定 / 情報源", "再開Skill"),
+        "Blocker ID",
+        "Blocked scope",
+    )
+    add_required_fields_assertion(
+        result,
+        "QUESTION-D014",
+        assumptions,
+        ("仮定候補", "状態", "根拠 / 理由", "影響範囲"),
+        "Canonical ASM ID",
+        "Assumption candidate",
+    )
+
     ids = [clean(r.get("ID", "")) for r in questions]
     bad = [v for v in ids if not ID_PATTERNS["QUESTION"].fullmatch(v)]
     result.add("QUESTION-D001", not bad, "Question IDs must use Q-xxx", evidence=bad or None)
@@ -45,12 +79,16 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
 
     add_allowed_assertion(result, "QUESTION-D007", (r.get("状態", "") for r in assumptions), ASSUMPTION_STATES, "Assumption state")
     bad_asm = []
+    approved_output_ids = set()
     for row in assumptions:
         asm = clean(row.get("Canonical ASM ID", ""))
         if asm and not ID_PATTERNS["ASM"].fullmatch(asm):
             bad_asm.append(asm)
-        if clean(row.get("状態", "")) == "承認済み" and not asm:
-            bad_asm.append("<missing approved ASM ID>")
+        if clean(row.get("状態", "")) == "承認済み":
+            if not asm:
+                bad_asm.append("<missing approved ASM ID>")
+            elif ID_PATTERNS["ASM"].fullmatch(asm):
+                approved_output_ids.add(asm)
     result.add("QUESTION-D008", not bad_asm, "Canonical ASM IDs must be valid when present and required for approved assumptions", evidence=bad_asm or None)
 
     mismatch = []
@@ -62,6 +100,15 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             if clean(row.get("状態", "")) == "承認済み" and asm not in approval_ids:
                 mismatch.append(asm)
     result.add("QUESTION-D009", not mismatch, "Approved assumptions must exist in fixture approval data", evidence=mismatch or None)
+
+    required_approved = set(expected.get("required_approved_assumptions", []))
+    missing_required_approved = sorted(required_approved - approved_output_ids)
+    result.add(
+        "QUESTION-D015",
+        not missing_required_approved,
+        "Fixture-required approved assumptions must appear as approved Canonical ASM entries",
+        evidence=missing_required_approved or None,
+    )
 
     expected_cls = expected.get("expected_classifications", {})
     actual = {clean(r.get("ID", "")): clean(r.get("分類", "")) for r in questions}

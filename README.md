@@ -98,16 +98,16 @@ skills/<skill-name>/evals/
 ## Eval
 
 ### Trigger Eval
-Skill選択精度を評価します。現行baselineは9 Skill × 20 query = 180 queryです。Canonical Modeは9 Skill同時利用、単独SkillはDiagnostic Modeです。
+Skill選択精度を評価します。datasetは9 Skill × 20 query = 180 queryです。Canonical Modeは9 Skill同時利用、単独SkillはDiagnostic Modeです。
 
 ### Deterministic Output Eval
-Canonical output templateを使った出力について、ID / 参照 / allowed values / Risk Matrix / closure / Pairwise / review・Workflow invariant等、機械判定可能な契約だけを評価します。
+Canonical output templateを使った出力について、ID / 参照 / allowed values / required fields / Risk Matrix / closure / Pairwise / review・Workflow invariant等、機械判定可能な契約だけを評価します。
 
 `known_*`は「参照可能なID集合」、`required_*`は「Outputへ実際に存在すべきEntity」です。キー未指定と空集合は区別します。
 
 必須Output tableやrequired Entityの欠落はERRORです。`--skill all`はmanifest上の全Outputファイルを要求し、欠落が1件でもあればFAILします。
 
-Pairwiseは2-wise Coverageだけでなく、生成組合せの未知Factor / Value、forbidden constraint、必要Factor欠落を先に検査します。
+Pairwise生成組合せはFactor / Value / constraintだけでなく、参照するCoverage Item IDの実在性・一意性も検査します。fixture-backed状態遷移も実在するCoverage Item IDへ閉鎖する必要があります。
 
 ```bash
 python scripts/evals/deterministic/run.py \
@@ -118,8 +118,9 @@ python scripts/evals/deterministic/run.py \
 
 Deterministic Evalだけで意味品質全体を保証しません。`assertion_pass_rate`はAssertionのpass比率であり、QA品質の総合点ではありません。詳細は`EVALS.md`を参照してください。
 
-### 将来
-- Trigger baseline / description optimization / final holdout
+### 評価レイヤー
+- Trigger Eval
+- Deterministic Output Eval
 - Semantic Output Eval
 - Workflow E2E Eval
 

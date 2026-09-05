@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import Counter
 
-from ..common import CANONICAL_SKILLS, ID_PATTERNS, add_allowed_assertion, add_duplicate_assertion, clean, ids_in, nonempty_rows
+from ..common import CANONICAL_SKILLS, ID_PATTERNS, add_allowed_assertion, add_duplicate_assertion, add_required_fields_assertion, clean, ids_in, nonempty_rows
 from ..markdown_parser import find_table, parse_tables
 from ..result import EvalResult
 
@@ -25,6 +25,15 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
 
     summary = nonempty_rows(summary_table)
     findings = nonempty_rows(findings_table)
+    add_required_fields_assertion(
+        result,
+        "REV-D012",
+        findings,
+        ("指摘ID", "重要度", "対象成果物 / 位置", "問題", "根拠", "影響", "推奨修正", "修正Skill / 層", "処置"),
+        "指摘ID",
+        "Review finding",
+    )
+
     ids = [clean(r.get("指摘ID", "")) for r in findings]
     bad = [v for v in ids if not ID_PATTERNS["REV"].fullmatch(v)]
     result.add("REV-D001", not bad, "Review finding IDs must use REV-xxx", evidence=bad or None)

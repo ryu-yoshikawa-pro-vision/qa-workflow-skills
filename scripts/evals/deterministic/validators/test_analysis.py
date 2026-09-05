@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ..common import ID_PATTERNS, add_duplicate_assertion, clean, ids_in, nonempty_rows
+from ..common import ID_PATTERNS, add_duplicate_assertion, add_required_fields_assertion, clean, ids_in, nonempty_rows
 from ..markdown_parser import find_table, parse_tables
 from ..result import EvalResult
 
@@ -76,6 +76,23 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                 unknown.append({"risk": row.get("リスクID"), "reference": ref})
     result.add("RISK-D006", not unknown, "Risk references must exist in fixture data", evidence=unknown or None)
 
+    add_required_fields_assertion(
+        result,
+        "RISK-D012",
+        techniques,
+        ("テスト技法", "適用領域", "選択理由"),
+        "テスト技法",
+        "Selected technique",
+    )
+    add_required_fields_assertion(
+        result,
+        "RISK-D013",
+        testability,
+        ("要件 / 懸念", "操作可能か", "観測可能か", "合否判定可能か", "選択テストレベル"),
+        "要件 / 懸念",
+        "Testability",
+    )
+
     invalid = []
     for row in testability:
         for f in ("操作可能か", "観測可能か", "合否判定可能か"):
@@ -112,4 +129,23 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             if actual != expected_values:
                 required_issues.append({"id": rid, "expected": expected_values, "actual": actual})
     result.add("RISK-D011", not required_issues, "Fixture-required Product Risks must be present with expected matrix values", evidence=required_issues or None)
+
+    required_techniques = set(expected.get("required_techniques", []))
+    actual_techniques = {clean(r.get("テスト技法", "")) for r in techniques if clean(r.get("テスト技法", ""))}
+    missing_techniques = sorted(required_techniques - actual_techniques)
+    result.add("RISK-D014", not missing_techniques, "Fixture-required techniques must be selected", evidence=missing_techniques or None)
+
+    testability_mismatch = None
+    if "required_testability" in expected:
+        required_values = expected["required_testability"]
+        matched = any(all(clean(row.get(field, "")) == clean(str(value)) for field, value in required_values.items()) for row in testability)
+        if not matched:
+            testability_mismatch = {
+                "expected": required_values,
+                "actual": [
+                    {field: clean(row.get(field, "")) for field in required_values}
+                    for row in testability
+                ],
+            }
+    result.add("RISK-D015", testability_mismatch is None, "Fixture-required testability values must appear in a testability row", evidence=testability_mismatch)
     return result

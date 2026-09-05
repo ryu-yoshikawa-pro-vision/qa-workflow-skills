@@ -24,8 +24,12 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
 
     blocked = [clean(r.get("Skill", "")) for r in rows if clean(r.get("状態", "")) == "Blocked"]
     recheck = [clean(r.get("Skill", "")) for r in rows if clean(r.get("状態", "")) == "要再検証"]
-    result.add("WF-D004", not (overall == "完了" and blocked), "Workflow cannot be 完了 while Blocked remains", evidence=blocked or None)
+    running = [clean(r.get("Skill", "")) for r in rows if clean(r.get("状態", "")) == "実行中"]
+    incomplete = sorted(set(blocked + running))
+    result.add("WF-D004", not (overall == "完了" and incomplete), "Workflow cannot be 完了 while Blocked or 実行中 remains", evidence=incomplete or None)
     result.add("WF-D005", not (overall == "完了" and recheck), "Workflow cannot be 完了 while 要再検証 remains", evidence=recheck or None)
+    result.add("WF-D010", overall != "部分完了（Blockedあり）" or bool(blocked), "部分完了（Blockedあり） requires at least one Blocked Skill", evidence={"blocked_skills": blocked} if overall == "部分完了（Blockedあり）" and not blocked else None)
+    result.add("WF-D011", overall != "Blocked" or bool(blocked), "Blocked workflow state requires at least one Blocked Skill", evidence={"blocked_skills": blocked} if overall == "Blocked" and not blocked else None)
 
     exp_start = expected.get("expected_start_skill")
     exp_final = expected.get("expected_final_skill")

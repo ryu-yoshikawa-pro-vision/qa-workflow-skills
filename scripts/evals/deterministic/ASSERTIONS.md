@@ -4,12 +4,14 @@
 - `WF-D001` Workflow全体状態 allowed values
 - `WF-D002` Skill名がCanonical
 - `WF-D003` Skill状態 allowed values
-- `WF-D004` Blocked残存時に完了禁止
-- `WF-D005` 要再検証残存時に完了禁止
+- `WF-D004` 完了時のBlocked / 実行中残存禁止
+- `WF-D005` 完了時の要再検証残存禁止
 - `WF-D006` fixture-backed開始Skill
 - `WF-D007` fixture-backed最終Skill
 - `WF-D008` fixture-backed利用Skill
 - `WF-D009` Workflow状態テーブル必須
+- `WF-D010` 部分完了（Blockedあり）にはBlocked Skillが必要
+- `WF-D011` Blocked状態にはBlocked Skillが必要
 
 ## spec-analysis
 - `SPEC-D001` 分析項目ID形式
@@ -25,6 +27,8 @@
 - `SPEC-D011` fixture-required分析項目 / Current Authority存在
 - `SPEC-D012` Canonical必須テーブル存在
 - `SPEC-D013` fixture-backed承認済みASM整合
+- `SPEC-D014` 分析項目必須フィールド
+- `SPEC-D015` Current Effective Authority必須フィールド
 
 ## question-analysis
 - `QUESTION-D001` Q ID形式
@@ -38,6 +42,10 @@
 - `QUESTION-D009` fixture承認情報との整合
 - `QUESTION-D010` fixture-backed分類
 - `QUESTION-D011` Canonical必須テーブル存在
+- `QUESTION-D012` 質問行必須フィールド
+- `QUESTION-D013` Blocked範囲必須フィールド
+- `QUESTION-D014` 仮定候補必須フィールド
+- `QUESTION-D015` fixture-required承認済みASM存在
 
 ## test-analysis
 - `RISK-D001` RISK ID形式
@@ -51,6 +59,10 @@
 - `RISK-D009` Project Riskらしき語のWARNING
 - `RISK-D010` Canonical必須テーブル存在
 - `RISK-D011` fixture-required Product Risk存在 / 値一致
+- `RISK-D012` 選択技法行必須フィールド
+- `RISK-D013` Testability行必須フィールド
+- `RISK-D014` fixture-required技法存在
+- `RISK-D015` fixture-required Testability値一致
 
 ## test-requirement-design
 - `TR-D001` TR ID形式
@@ -82,7 +94,7 @@
 - `TCN-D013` TR閉鎖
 - `TCN-D014` fixture Pairwise Factor/Value整合
 - `TCN-D015` feasible pairの2-wise 100% coverage
-- `TCN-D016` fixture状態遷移closure
+- `TCN-D016` fixture状態遷移が実在Coverage Itemへ閉鎖
 - `TCN-D017` fixture-backed BVA値
 - `TCN-D018` Pairwise生成組合せの未知Factor禁止
 - `TCN-D019` Pairwise生成組合せの未知Value禁止
@@ -92,6 +104,9 @@
 - `TCN-D023` fixture-required Test Condition / Coverage Item存在
 - `TCN-D024` Coverage Item必須フィールド
 - `TCN-D025` 明示Coverage Item Authority参照整合
+- `TCN-D026` Pairwise生成組合せが実在Coverage Item IDを参照
+- `TCN-D027` Pairwise生成組合せのCoverage Item ID一意性
+- `TCN-D028` Pairwise生成組合せtoken形式 / Factor重複禁止
 
 ## test-case-design
 - `TC-D001` TC ID形式
@@ -103,7 +118,7 @@
 - `TC-D007` CI/内包TCN閉鎖
 - `TC-D008` Disposition
 - `TC-D009` Disposition理由
-- `TC-D010` 最高CI優先度維持
+- `TC-D010` 最高CI優先度維持またはoverride理由
 - `TC-D011` 番号付き期待結果と根拠対応
 - `TC-D012` Canonical必須テーブル存在
 - `TC-D013` fixture-required Test Case存在
@@ -117,7 +132,7 @@
 - `COV-D004` fixture graph孤立ノード認識
 - `COV-D005` fixture-backed修正対象存在 / 修正Skill一致
 - `COV-D006` 修正Skill Canonical
-- `COV-D007` Canonical必須テーブル存在
+- `COV-D007` Canonical最低必須カバレッジマトリクス存在
 
 ## adversarial-review
 - `REV-D001` REV ID形式
@@ -131,3 +146,4 @@
 - `REV-D009` 重大度別件数整合
 - `REV-D010` fixture-backed決定論的欠陥検出
 - `REV-D011` Canonical必須テーブル存在
+- `REV-D012` 指摘行必須フィールド

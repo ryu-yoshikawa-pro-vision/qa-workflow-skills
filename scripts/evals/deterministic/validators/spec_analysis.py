@@ -4,6 +4,7 @@ from ..common import (
     ID_PATTERNS,
     add_allowed_assertion,
     add_duplicate_assertion,
+    add_required_fields_assertion,
     clean,
     ids_in,
     nonempty_rows,
@@ -58,6 +59,23 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     refs = nonempty_rows(refs_table, "参照ID")
     items = nonempty_rows(items_table)
     authorities = nonempty_rows(authorities_table)
+
+    add_required_fields_assertion(
+        result,
+        "SPEC-D014",
+        items,
+        ("項目ID", "内容", "分類", "情報源 / Canonical Registry参照"),
+        "項目ID",
+        "Analysis item",
+    )
+    add_required_fields_assertion(
+        result,
+        "SPEC-D015",
+        authorities,
+        ("Authority ID", "種別", "現在有効な内容", "適用範囲", "情報源 / Canonical Registry", "関係"),
+        "Authority ID",
+        "Current Effective Authority",
+    )
 
     bad_ids, bad_class, item_ids = [], [], []
     eligible_local: set[str] = set()
