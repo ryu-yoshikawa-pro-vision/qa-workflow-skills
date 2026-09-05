@@ -4,4 +4,4 @@
 
 Current Effective Authority: SPEC-001。
 Product Risk: RISK-001 = 中。
-Test Requirementは1件以上作成し、システムテスト / UI観測とする。
+Test Requirementを1件以上作成し、テストレベル / 観測方法を明示する。

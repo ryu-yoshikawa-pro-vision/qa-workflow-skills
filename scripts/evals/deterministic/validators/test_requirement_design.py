@@ -59,6 +59,17 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     missing_closure = sorted(closure_universe - linked_auth - linked_risk - disposed_ids)
     result.add("TR-D009", not missing_closure, "Fixture upstream Authority/Risk must close to TR or Disposition", evidence=missing_closure or None)
 
+    required_links = set(expected.get("required_linked_upstream_ids", []))
+    missing_required_links = sorted(required_links - linked_auth - linked_risk)
+    result.add("TR-D014", not missing_required_links, "Fixture-required upstream IDs must link to Test Requirements", evidence=missing_required_links or None)
+
+    actual_dispositions = {clean(r.get("上流ID", "")): clean(r.get("Disposition", "")) for r in disposed if clean(r.get("上流ID", ""))}
+    disposition_mismatch = []
+    for upstream_id, disposition in expected.get("expected_dispositions", {}).items():
+        if actual_dispositions.get(upstream_id) != disposition:
+            disposition_mismatch.append({"id": upstream_id, "expected": disposition, "actual": actual_dispositions.get(upstream_id)})
+    result.add("TR-D015", not disposition_mismatch, "Fixture-backed upstream Dispositions must match", evidence=disposition_mismatch or None)
+
     levels = expected.get("product_risk_levels", {})
     overrides = set(expected.get("priority_override_trs", []))
     issues = []

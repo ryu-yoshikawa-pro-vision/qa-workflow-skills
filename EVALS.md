@@ -91,6 +91,9 @@ skills/<skill-name>/evals/
 - キー未指定とキーあり+空集合は区別する。
 - `approved_assumptions`: 承認済みとしてOutputに登場できるCanonical ASM IDのlist。
 - `required_approved_assumptions`: Outputに承認済みとして存在しなければならないCanonical ASM IDのlist。
+- `expected_normalizations`: fixtureで明示された質問IDごとの回答後正規化先。
+- `required_linked_upstream_ids` / `expected_dispositions`: fixtureで上流の閉じ方を明示する場合に、Test Requirementへの接続とDispositionを個別に評価する。
+- `expected_numbered_authorities`: fixtureで番号付き期待結果を明示する場合に、Test Caseの期待結果番号とAuthority対応をCanonical形式で評価する。
 
 ## Required Output / Required Entity
 
@@ -202,7 +205,7 @@ Deterministic EvalでERRORにしません。
 
 ## Grader Self-Test
 
-`test_deterministic.py`、`test_false_pass_regressions.py`、`test_cli_integration.py`で、正常Output、決定論的な不正Output、CLI exit codeを検証します。
+`test_deterministic.py`、`test_false_pass_regressions.py`、`test_fixture_contract_regressions.py`、`test_cli_integration.py`で、正常Output、決定論的な不正Output、fixture契約、CLI exit codeを検証します。
 
 CIでは次を実行します。
 

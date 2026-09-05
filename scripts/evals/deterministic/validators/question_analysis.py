@@ -78,10 +78,18 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     result.add("QUESTION-D015", not missing_required_approved, "Fixture-required approved assumptions must appear as approved Canonical ASM entries", evidence=missing_required_approved or None)
 
     expected_cls = expected.get("expected_classifications", {})
-    actual = {clean(r.get("ID", "")): clean(r.get("分類", "")) for r in questions}
-    mm = []
+    actual_cls = {clean(r.get("ID", "")): clean(r.get("分類", "")) for r in questions}
+    classification_mismatch = []
     for qid, cls in expected_cls.items():
-        if actual.get(qid) != cls:
-            mm.append({"id": qid, "expected": cls, "actual": actual.get(qid)})
-    result.add("QUESTION-D010", not mm, "Fixture-backed classifications must match", evidence=mm or None)
+        if actual_cls.get(qid) != cls:
+            classification_mismatch.append({"id": qid, "expected": cls, "actual": actual_cls.get(qid)})
+    result.add("QUESTION-D010", not classification_mismatch, "Fixture-backed classifications must match", evidence=classification_mismatch or None)
+
+    expected_normalizations = expected.get("expected_normalizations", {})
+    actual_normalizations = {clean(r.get("ID", "")): clean(r.get("回答後の正規化先", "")) for r in questions}
+    normalization_mismatch = []
+    for qid, target in expected_normalizations.items():
+        if actual_normalizations.get(qid) != target:
+            normalization_mismatch.append({"id": qid, "expected": target, "actual": actual_normalizations.get(qid)})
+    result.add("QUESTION-D016", not normalization_mismatch, "Fixture-backed normalization targets must match", evidence=normalization_mismatch or None)
     return result

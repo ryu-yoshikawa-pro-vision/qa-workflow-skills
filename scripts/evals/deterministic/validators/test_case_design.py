@@ -11,6 +11,15 @@ VAGUE_TERMS = ("正常", "正しく", "問題ない", "適切")
 DEPENDENCY_TERMS = ("実行後", "前ケース", "上記ケース", "前のケース")
 
 
+def _numbered_authority_mappings(value: str) -> dict[str, set[str]]:
+    markers = list(re.finditer(r"(?:期待結果|根拠)\s*(\d+)\s*[→:：]", value or ""))
+    mappings: dict[str, set[str]] = {}
+    for index, marker in enumerate(markers):
+        end = markers[index + 1].start() if index + 1 < len(markers) else len(value)
+        mappings[marker.group(1)] = set(ids_in(value[marker.end():end]))
+    return mappings
+
+
 def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     result = EvalResult("test-case-design", eval_id)
     tables = parse_tables(text)
@@ -87,13 +96,34 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                 issues.append({"tc": row.get("テストケースID"), "expected_at_least": high, "actual": actual})
     result.add("TC-D010", not issues, "Merged Test Cases must preserve highest Coverage Item priority unless override is explained", evidence=issues or None)
 
-    ambiguous = []
+    numbered_issues = []
+    case_by_id = {clean(r.get("テストケースID", "")): r for r in cases}
     for row in cases:
-        ex = re.findall(r"期待結果\s*(\d+)", row.get("期待結果", ""))
-        roots = re.findall(r"(?:期待結果|根拠)\s*(\d+)\s*[→:：]", row.get("期待結果の根拠", ""))
-        if len(set(ex)) > 1 and not set(ex).issubset(set(roots)):
-            ambiguous.append(clean(row.get("テストケースID", "")))
-    result.add("TC-D011", not ambiguous, "Numbered PASS/FAIL expectations should have corresponding numbered Authority mappings", evidence=ambiguous or None)
+        tcid = clean(row.get("テストケースID", ""))
+        expectation_numbers = set(re.findall(r"期待結果\s*(\d+)", row.get("期待結果", "")))
+        root_numbers = set(_numbered_authority_mappings(row.get("期待結果の根拠", "")))
+        if len(expectation_numbers) > 1 and not expectation_numbers.issubset(root_numbers):
+            numbered_issues.append({"tc": tcid, "reason": "missing numbered Authority mapping"})
+
+    for tcid, expected_mapping in expected.get("expected_numbered_authorities", {}).items():
+        row = case_by_id.get(tcid)
+        if row is None:
+            numbered_issues.append({"tc": tcid, "reason": "missing Test Case"})
+            continue
+        expectation_numbers = set(re.findall(r"期待結果\s*(\d+)", row.get("期待結果", "")))
+        actual_mapping = _numbered_authority_mappings(row.get("期待結果の根拠", ""))
+        for number, expected_ids in expected_mapping.items():
+            number = str(number)
+            if number not in expectation_numbers:
+                numbered_issues.append({"tc": tcid, "number": number, "reason": "missing expectation number"})
+                continue
+            actual_ids = actual_mapping.get(number)
+            expected_ids_set = set(expected_ids)
+            if actual_ids is None:
+                numbered_issues.append({"tc": tcid, "number": number, "reason": "missing Authority mapping"})
+            elif actual_ids != expected_ids_set:
+                numbered_issues.append({"tc": tcid, "number": number, "expected": sorted(expected_ids_set), "actual": sorted(actual_ids)})
+    result.add("TC-D011", not numbered_issues, "Numbered PASS/FAIL expectations must have matching numbered Authority mappings, including fixture-backed mappings when supplied", evidence=numbered_issues or None)
 
     vague, deps = [], []
     for row in cases:

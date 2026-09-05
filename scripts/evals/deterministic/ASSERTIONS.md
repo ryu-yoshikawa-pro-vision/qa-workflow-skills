@@ -52,6 +52,7 @@
 - `QUESTION-D013` Blocked範囲必須フィールド
 - `QUESTION-D014` 仮定候補必須フィールド
 - `QUESTION-D015` fixture-required承認済みASM存在
+- `QUESTION-D016` fixture-backed回答後正規化先
 
 ## test-analysis
 - `RISK-D001` RISK ID形式
@@ -84,6 +85,8 @@
 - `TR-D011` Canonical必須テーブル存在
 - `TR-D012` fixture-required Test Requirement存在
 - `TR-D013` Disposition上流IDのfixture既知集合整合
+- `TR-D014` fixture-required上流TR接続
+- `TR-D015` fixture-backed上流Disposition
 
 ## test-condition-design
 - `TCN-D001` TCN ID形式
@@ -127,7 +130,7 @@
 - `TC-D008` Disposition
 - `TC-D009` Disposition理由
 - `TC-D010` 最高CI優先度維持 / override理由
-- `TC-D011` 番号付き期待結果と根拠対応
+- `TC-D011` 番号付き期待結果と根拠対応 / fixture-backed Authority対応
 - `TC-D012` Canonical必須テーブル存在
 - `TC-D013` fixture-required Test Case存在
 - `TC-D014` Disposition上流IDのfixture既知集合整合

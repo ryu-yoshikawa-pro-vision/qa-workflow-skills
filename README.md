@@ -105,7 +105,7 @@ skills/<skill-name>/evals/
 
 9 SkillのCanonical outputについて、ID、参照整合、required fields、Risk Matrix、成果物閉鎖、Pairwise、review / Workflow invariant等、意味解釈なしで判定できる契約を評価します。
 
-- `known_*`: Outputから参照可能な既知集合。キー未指定なら対応する参照検査を行わない。
+- `known_*`: fixture側で既知の参照集合。Skill自身がOutput内で生成するEntityの扱いは各Skill契約に従う。キー未指定なら対応する参照検査を行わない。
 - `required_*`: Outputに実際に存在しなければならないEntity / 値。
 
 ```bash
