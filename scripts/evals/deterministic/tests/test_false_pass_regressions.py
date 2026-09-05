@@ -183,6 +183,13 @@ class FalsePassRegressionTests(unittest.TestCase):
             with self.subTest(assertion_id=aid):
                 self.assert_fails("question-analysis", base.replace(old, new), {"approved_assumptions": ["ASM-001"]}, aid)
 
+    def test_question_fixture_normalization(self):
+        expected = {"expected_normalizations": {"Q-001": "未確定"}}
+        matching = self._question_base().replace("| DECISION | spec-analysis |", "| 未確定 | spec-analysis |")
+        self.assert_passes("question-analysis", matching, expected)
+        self.assert_fails("question-analysis", self._question_base(), expected, "QUESTION-D016")
+        self.assert_passes("question-analysis", self._question_base(), {})
+
     def test_required_technique_and_testability(self):
         base = self._risk_base()
         expected = {"required_techniques": ["状態遷移"], "required_testability": {"操作可能か": "可", "観測可能か": "可", "合否判定可能か": "可"}}
@@ -331,6 +338,62 @@ class FalsePassRegressionTests(unittest.TestCase):
         tc_expected = {"known_test_conditions": ["TCN-001"], "known_coverage_items": ["TCN-001-CI01"], "known_test_requirements": ["TR-001"], "known_authorities": ["SPEC-001"]}
         self.assert_fails("test-case-design", tc, tc_expected, "TC-D014")
 
+    def test_fixture_required_tr_links_and_dispositions(self):
+        text = """# TR
+## テスト要求一覧
+| テスト要求ID | テスト要求 | Current Effective Authority | 関連Product Risk | 優先度 | テストレベル / 観測方法 |
+| --- | --- | --- | --- | --- | --- |
+| TR-001 | 保存条件を検証 | SPEC-001 | RISK-001, RISK-002 | 高 | システム / UI |
+## Test Requirementを作らない上流項目
+| 上流ID | 種別 | Disposition | 理由 / 根拠 |
+| --- | --- | --- | --- |
+| SPEC-002 | Authority | 対象外 | 今回の対象外 |
+"""
+        expected = {
+            "known_authorities": ["SPEC-001", "SPEC-002"],
+            "known_product_risks": ["RISK-001", "RISK-002"],
+            "product_risk_levels": {"RISK-001": "高", "RISK-002": "中"},
+            "required_linked_upstream_ids": ["SPEC-001", "RISK-001", "RISK-002"],
+            "expected_dispositions": {"SPEC-002": "対象外"},
+        }
+        self.assert_passes("test-requirement-design", text, expected)
+
+        risk_as_disposition = text.replace("RISK-001, RISK-002", "RISK-001").replace(
+            "| SPEC-002 | Authority | 対象外 | 今回の対象外 |",
+            "| SPEC-002 | Authority | 対象外 | 今回の対象外 |\n| RISK-002 | Product Risk | 対象外 | 今回の対象外 |",
+        )
+        self.assert_fails("test-requirement-design", risk_as_disposition, expected, "TR-D014")
+        self.assert_fails("test-requirement-design", text.replace("| SPEC-002 | Authority | 対象外 | 今回の対象外 |\n", ""), expected, "TR-D015")
+        self.assert_fails("test-requirement-design", text.replace("| SPEC-002 | Authority | 対象外 |", "| SPEC-002 | Authority | 残存リスク |"), expected, "TR-D015")
+
+    def test_fixture_numbered_authority_mapping(self):
+        text = """# TC
+## テストケース一覧
+| テストケースID | タイトル / 目的 | 関連観点ID | 関連Coverage Item ID | 関連テスト要求ID | 優先度 | 前提条件 | テストデータ | 実施手順 | 期待結果 | 期待結果の根拠 | 備考 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| TC-001 | 保存 | TCN-001 | TCN-001-CI01, TCN-001-CI02 | TR-001 | 高 | ログイン済み | valid | 保存する | 期待結果1: 保存済み表示; 期待結果2: 編集不可表示 | 期待結果1→SPEC-001; 期待結果2→DEC-001 | |
+## Test Caseへ展開しないCoverage Item / Test Condition
+| 上流ID | 種別 | Disposition | 理由 / 根拠 |
+| --- | --- | --- | --- |
+"""
+        expected = {
+            "known_test_requirements": ["TR-001"],
+            "known_test_conditions": ["TCN-001"],
+            "known_coverage_items": ["TCN-001-CI01", "TCN-001-CI02"],
+            "coverage_closure_ids": ["TCN-001-CI01", "TCN-001-CI02"],
+            "known_authorities": ["SPEC-001", "DEC-001"],
+            "coverage_item_priorities": {"TCN-001-CI01": "中", "TCN-001-CI02": "高"},
+            "expected_numbered_authorities": {"TC-001": {"1": ["SPEC-001"], "2": ["DEC-001"]}},
+        }
+        self.assert_passes("test-case-design", text, expected)
+
+        unnumbered = text.replace("期待結果1: 保存済み表示; 期待結果2: 編集不可表示", "保存済み表示; 編集不可表示").replace("期待結果1→SPEC-001; 期待結果2→DEC-001", "SPEC-001; DEC-001")
+        self.assert_fails("test-case-design", unnumbered, expected, "TC-D011")
+        reversed_mapping = text.replace("期待結果1→SPEC-001; 期待結果2→DEC-001", "期待結果1→DEC-001; 期待結果2→SPEC-001")
+        self.assert_fails("test-case-design", reversed_mapping, expected, "TC-D011")
+        missing_second = text.replace("期待結果1→SPEC-001; 期待結果2→DEC-001", "期待結果1→SPEC-001")
+        self.assert_fails("test-case-design", missing_second, expected, "TC-D011")
+
     def test_coverage_expected_fix_target_must_exist(self):
         text = """# Coverage
 ## カバレッジマトリクス
@@ -398,10 +461,21 @@ class FalsePassRegressionTests(unittest.TestCase):
             "expected_final_skill": "test-case-design",
             "expected_skills": ["test-analysis", "test-requirement-design", "test-condition-design", "test-case-design"],
             "expected_overall_state": "部分完了（Blockedあり）",
-            "expected_skill_states": {"test-analysis": "Blocked"},
+            "expected_skill_states": {
+                "test-analysis": "Blocked",
+                "test-requirement-design": "完了",
+                "test-condition-design": "完了",
+                "test-case-design": "完了",
+            },
         }
 
-        def workflow(overall: str, test_analysis_state: str, tr_state: str = "完了") -> str:
+        def workflow(
+            overall: str,
+            test_analysis_state: str,
+            tr_state: str = "完了",
+            tcn_state: str = "完了",
+            tc_state: str = "完了",
+        ) -> str:
             return f"""- Workflow全体状態: {overall}
 - 開始Skill: test-analysis
 - 最終Skill: test-case-design
@@ -409,13 +483,14 @@ class FalsePassRegressionTests(unittest.TestCase):
 | --- | --- | --- | --- |
 | test-analysis | {test_analysis_state} | Risk | |
 | test-requirement-design | {tr_state} | TR | |
-| test-condition-design | 完了 | TCN | |
-| test-case-design | 完了 | TC | |
+| test-condition-design | {tcn_state} | TCN | |
+| test-case-design | {tc_state} | TC | |
 """
 
         self.assert_passes("qa-workflow", workflow("部分完了（Blockedあり）", "Blocked"), expected)
         self.assert_fails("qa-workflow", workflow("完了", "Blocked"), expected, "WF-D013")
-        self.assert_fails("qa-workflow", workflow("部分完了（Blockedあり）", "完了", "Blocked"), expected, "WF-D014")
+        self.assert_fails("qa-workflow", workflow("部分完了（Blockedあり）", "完了"), expected, "WF-D014")
+        self.assert_fails("qa-workflow", workflow("部分完了（Blockedあり）", "Blocked", tcn_state="Blocked"), expected, "WF-D014")
 
     def test_test_case_priority_override_requires_reason(self):
         base = """# TC
