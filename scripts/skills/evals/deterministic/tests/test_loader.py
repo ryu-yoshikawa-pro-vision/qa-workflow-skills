@@ -4,56 +4,59 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from scripts.skills.evals.deterministic.loader import (
-    SKILLS_ROOT,
-    discover_output_eval_skills,
-    load_validators,
-)
+from scripts.skills.evals.deterministic.loader import discover_output_eval_skills, load_validators
 
 
 class ValidatorLoaderTests(unittest.TestCase):
-    def _validator_path(self, skills_root: Path, skill: str) -> Path:
+    def _create_output_manifest(self, skills_root: Path, skill: str) -> Path:
         output_root = skills_root / skill / "evals" / "output"
         output_root.mkdir(parents=True)
         (output_root / "evals.json").write_text('{"cases": []}\n', encoding="utf-8")
         return skills_root / skill / "evals" / "deterministic" / "validator.py"
 
-    def test_loads_all_output_eval_validators(self) -> None:
-        repo_root = Path(__file__).resolve().parents[5]
-        expected_skills_root = repo_root / "skills"
-        self.assertEqual(SKILLS_ROOT, expected_skills_root)
-        expected = sorted(
-            manifest.parents[2].name
-            for manifest in expected_skills_root.glob("*/evals/output/evals.json")
-        )
-        self.assertTrue(expected)
-        self.assertEqual(discover_output_eval_skills(), expected)
-        validators = load_validators()
-        self.assertEqual(sorted(validators), expected)
-        self.assertTrue(all(callable(validate) for validate in validators.values()))
+    def _write_validator(self, path: Path, source: str) -> None:
+        path.parent.mkdir(parents=True)
+        path.write_text(source, encoding="utf-8")
 
-    def test_missing_validator_is_not_silently_skipped(self) -> None:
+    def test_discovers_output_eval_skill_from_explicit_skills_root(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            skills_root = Path(tmp)
-            self._validator_path(skills_root, "missing")
+            skills_root = Path(tmp) / "skills"
+            path = self._create_output_manifest(skills_root, "example-skill")
+            self._write_validator(path, "def validate(text, expected, eval_id):\n    return text, expected, eval_id\n")
+            self.assertEqual(discover_output_eval_skills(skills_root), ["example-skill"])
+
+    def test_loads_validator_from_explicit_skills_root(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            skills_root = Path(tmp) / "skills"
+            path = self._create_output_manifest(skills_root, "example-skill")
+            self._write_validator(path, "def validate(text, expected, eval_id):\n    return text, expected, eval_id\n")
+            validators = load_validators(skills_root)
+            self.assertEqual(set(validators), {"example-skill"})
+            self.assertEqual(
+                validators["example-skill"]("output", {"known": True}, "EXAMPLE"),
+                ("output", {"known": True}, "EXAMPLE"),
+            )
+
+    def test_missing_validator_raises(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            skills_root = Path(tmp) / "skills"
+            self._create_output_manifest(skills_root, "example-skill")
             with self.assertRaises(FileNotFoundError):
                 load_validators(skills_root)
 
-    def test_validator_must_export_validate_callable(self) -> None:
+    def test_validate_must_be_callable(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            skills_root = Path(tmp)
-            path = self._validator_path(skills_root, "no-validate")
-            path.parent.mkdir(parents=True)
-            path.write_text("VALUE = 1\n", encoding="utf-8")
+            skills_root = Path(tmp) / "skills"
+            path = self._create_output_manifest(skills_root, "example-skill")
+            self._write_validator(path, "validate = 1\n")
             with self.assertRaises(TypeError):
                 load_validators(skills_root)
 
-    def test_malformed_validator_does_not_load(self) -> None:
+    def test_malformed_validator_raises(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            skills_root = Path(tmp)
-            path = self._validator_path(skills_root, "malformed")
-            path.parent.mkdir(parents=True)
-            path.write_text("def validate(:\n", encoding="utf-8")
+            skills_root = Path(tmp) / "skills"
+            path = self._create_output_manifest(skills_root, "example-skill")
+            self._write_validator(path, "def validate(:\n")
             with self.assertRaises(SyntaxError):
                 load_validators(skills_root)
 

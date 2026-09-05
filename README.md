@@ -100,9 +100,21 @@ scripts/skills/evals/deterministic/
 ├── common.py
 ├── result.py
 └── tests/
+    ├── test_loader.py
+    └── test_markdown_parser.py
+
+tests/skills/evals/deterministic/
+├── test_deterministic.py
+├── test_false_pass_regressions.py
+├── test_closure_exclusivity.py
+├── test_cli_integration.py
+├── test_repository_integration.py
+└── test_runtime_portability.py
 ```
 
 Skill固有のTrigger dataset、Output fixture、Deterministic validatorは各Skillの`evals/`配下に置きます。runner、validator loader、Markdown parser、共通utility、result model、grader self-testは`scripts/skills/evals/deterministic/`のshared Eval Runtimeとして共有します。
+
+`scripts/skills/evals/deterministic/tests/`はShared Runtime固有のself-testを保持し、`tests/skills/evals/deterministic/`はこのリポジトリのvalidator・assertion・CLI・portability contractを検証します。
 
 Skillを利用するだけの場合は`skills/<skill-name>/`のみをコピーします。Evalも含めてSkillを移植する場合は、`skills/<skill-name>/`（Skill Package）と`scripts/skills/evals/`（Shared Skill Eval Runtime）をコピーします。`scripts/skills/evals/`はAgent Skills Specificationが要求する標準ディレクトリではなく、このリポジトリ独自の評価Runtimeです。
 
@@ -136,7 +148,7 @@ Deterministic Evalだけで成果物の意味品質全体を保証しません�
 
 ## Validation
 
-CIで、公式`skills-ref validate`、Trigger dataset構造、Deterministic Output Eval dataset構造、grader unit / regression / CLI integration testを分離して実行します。
+CIで、公式`skills-ref validate`、Trigger dataset構造、Deterministic Output Eval dataset構造、Shared Runtime self-test、repository-specific Deterministic contract testを分離して実行します。
 
 ## 標準との関係
 

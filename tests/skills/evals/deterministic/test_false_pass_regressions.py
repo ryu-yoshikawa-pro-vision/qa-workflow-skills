@@ -3,7 +3,6 @@ from __future__ import annotations
 import unittest
 
 from scripts.skills.evals.deterministic.loader import load_validators
-from scripts.skills.evals.deterministic.markdown_parser import parse_tables
 
 
 VALIDATORS = load_validators()
@@ -508,22 +507,6 @@ class FalsePassRegressionTests(unittest.TestCase):
         expected = {"known_test_conditions": ["TCN-001"], "known_coverage_items": ["TCN-001-CI01"], "known_test_requirements": ["TR-001"], "known_authorities": ["SPEC-001"], "coverage_item_priorities": {"TCN-001-CI01": "高"}}
         self.assert_fails("test-case-design", base.format(note=""), expected, "TC-D010")
         self.assert_passes("test-case-design", base.format(note="低リスクの補助確認として優先度を下げる"), expected)
-
-    def test_parser_supports_escaped_pipe(self):
-        tables = parse_tables("""## T
-| A | B |
-| --- | --- |
-| x\\|y | z |
-""")
-        self.assertEqual(tables[0].rows[0]["A"], "x|y")
-
-    def test_parser_rejects_column_mismatch(self):
-        with self.assertRaises(ValueError):
-            parse_tables("""## T
-| A | B |
-| --- | --- |
-| 1 | 2 | 3 |
-""")
 
 
 if __name__ == "__main__":

@@ -23,14 +23,21 @@ scripts/skills/evals/deterministic/
 ├── ASSERTIONS.md
 ├── README.md
 └── tests/
-    ├── test_deterministic.py
-    ├── test_false_pass_regressions.py
-    ├── test_closure_exclusivity.py
     ├── test_loader.py
-    └── test_cli_integration.py
+    └── test_markdown_parser.py
+
+tests/skills/evals/deterministic/
+├── test_deterministic.py
+├── test_false_pass_regressions.py
+├── test_closure_exclusivity.py
+├── test_cli_integration.py
+├── test_repository_integration.py
+└── test_runtime_portability.py
 ```
 
 Skill固有のDisposition、Closure、Pairwise Output構造、Review、Workflow状態等の評価ルールは、各Skillの`evals/deterministic/validator.py`に置きます。共通層はrunner、validator loader、Markdown table解析、ID抽出、重複・allowed values・required fields、共通graph計算、Pairwiseの組合せ数学、結果集計を担当します。
+
+`scripts/skills/evals/deterministic/tests/`はShared Runtime固有test、`tests/skills/evals/deterministic/`はqa-workflow-skills固有のvalidator・CLI・integration testを保持します。
 
 `loader.py`は既存の`skills/*/evals/output/evals.json`をOutput Eval対象の正本としてSkillを発見し、同じSkillの`evals/deterministic/validator.py`をfilesystem pathからloadします。Skill名にハイフンが含まれていても通常のPython package importへ変換しません。対象Skillのvalidator欠落、module load失敗、`validate` callable欠落はエラーとし、silent skipしません。
 

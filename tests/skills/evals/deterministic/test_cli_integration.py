@@ -8,7 +8,7 @@ import tempfile
 import unittest
 
 
-REPO_ROOT = Path(__file__).resolve().parents[5]
+REPO_ROOT = Path(__file__).resolve().parents[4]
 RUNNER = REPO_ROOT / "scripts" / "skills" / "evals" / "deterministic" / "run.py"
 
 VALID_RISK_OUTPUT = """# テスト分析

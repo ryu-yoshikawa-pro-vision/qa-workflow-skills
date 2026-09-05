@@ -211,14 +211,20 @@ Deterministic EvalでERRORにしません。
 
 ## Grader Self-Test
 
-`test_deterministic.py`、`test_false_pass_regressions.py`、`test_closure_exclusivity.py`、`test_loader.py`、`test_cli_integration.py`で、正常Output、決定論的な不正Output、closure exclusivity、validator discovery / loading failure、CLI exit codeを検証します。
+Shared Runtime Self-Testは`scripts/skills/evals/deterministic/tests/`に置き、任意の`skills_root`に対するvalidator discovery / loading contractとMarkdown parserの汎用契約を検証します。
+
+Repository Deterministic Contract Testは`tests/skills/evals/deterministic/`に置き、このリポジトリのvalidator assertion、false-pass regression、closure exclusivity、CLI contract、Output Eval manifestとvalidatorの対応、1 Skill + Shared Skill Eval Runtimeの移植可能性を検証します。
+
+Canonical 9 Skillの存在とAgent Skills仕様適合は`Validate Agent Skills`で検証します。
 
 CIでは次を実行します。
 
 ```bash
 python -m compileall -q scripts/skills/evals/deterministic
 python -m compileall -q skills/*/evals/deterministic
+python -m compileall -q tests/skills/evals/deterministic
 python -m unittest discover -s scripts/skills/evals/deterministic/tests -v
+python -m unittest discover -s tests/skills/evals/deterministic -v
 ```
 
 ---
