@@ -13,6 +13,8 @@
 - `WF-D010` 部分完了（Blockedあり）にはBlocked Skillが必要
 - `WF-D011` Blocked状態にはBlocked Skillが必要
 - `WF-D012` Workflow Skill行一意性
+- `WF-D013` fixture-backed Workflow全体状態
+- `WF-D014` fixture-backed Skill状態
 
 ## spec-analysis
 - `SPEC-D001` 分析項目ID形式
@@ -151,7 +153,7 @@
 - `REV-D007` 致命的+残存リスク受容禁止
 - `REV-D008` 重大+残存リスク受容の承認参照 / fixture照合
 - `REV-D009` 重大度別件数整合
-- `REV-D010` fixture-backed決定論的欠陥検出
+- `REV-D010` fixture-backed決定論的欠陥 / 指定属性検出
 - `REV-D011` Canonical必須テーブル存在
 - `REV-D012` 指摘必須フィールド
 - `REV-D013` 指摘概要Severity allowed values

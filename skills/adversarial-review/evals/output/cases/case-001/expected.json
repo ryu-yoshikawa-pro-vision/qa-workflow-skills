@@ -1,1 +1,1 @@
-{"known_artifact_ids":["TC-001"],"expected_defects":[{"target_id":"TC-001","contains":"Authority"}]}
+{"known_artifact_ids":["TC-001"],"expected_defects":[{"target_id":"TC-001","contains":"Authority","severity":"重大","repair_target":"test-case-design"}]}

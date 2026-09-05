@@ -114,7 +114,7 @@ def assignment_forbidden(assignment: Mapping[str, str], forbidden_constraints: S
 
 
 def feasible_pairs(factors: Mapping[str, Sequence[str]], forbidden_constraints: Sequence[Mapping[str, str]]) -> set[tuple[str, str, str, str]]:
-    names = list(factors)
+    names = sorted(factors)
     valid_assignments = [
         assignment
         for assignment in (dict(zip(names, values)) for values in product(*(factors[name] for name in names)))

@@ -211,6 +211,59 @@ class FalsePassRegressionTests(unittest.TestCase):
         expected["pairwise"]["require_pairwise"] = True
         self.assert_fails("test-condition-design", text, expected, "TCN-D015")
 
+    def test_pairwise_factor_order_is_canonical(self):
+        text = """# TCN
+## Test Conditionへ展開しないTest Requirement
+| テスト要求ID | Disposition | 理由 / 根拠 |
+| --- | --- | --- |
+## テスト観点・条件一覧
+| 観点ID | テスト要求ID | テスト観点 / 条件 | テスト技法 / 根拠 | Coverage Criteria | 優先度 |
+| --- | --- | --- | --- | --- | --- |
+| TCN-001 | TR-001 | 組合せ | Pairwise | 全2-wise | 高 |
+## Coverage Item一覧
+| Coverage Item ID | 観点ID | Coverage Item | 導出元の技法 / 基準 | 期待挙動の根拠 | 優先度 |
+| --- | --- | --- | --- | --- | --- |
+| TCN-001-CI01 | TCN-001 | combo1 | Pairwise | SPEC-001 | 高 |
+| TCN-001-CI02 | TCN-001 | combo2 | Pairwise | SPEC-001 | 高 |
+| TCN-001-CI03 | TCN-001 | combo3 | Pairwise | SPEC-001 | 高 |
+| TCN-001-CI04 | TCN-001 | combo4 | Pairwise | SPEC-001 | 高 |
+## Coverage候補のDisposition
+| 候補 | 導出元 | Disposition | 理由 / 根拠 | カバー先 |
+| --- | --- | --- | --- | --- |
+## Factor / Value / Constraint
+| Factor | Value |
+| --- | --- |
+| Role | admin |
+| Role | member |
+| Browser | Chrome |
+| Browser | Edge |
+| Flag | on |
+| Flag | off |
+## 生成組合せ
+| Coverage Item ID | 組合せ |
+| --- | --- |
+| TCN-001-CI01 | Role=admin; Browser=Chrome; Flag=on |
+| TCN-001-CI02 | Role=admin; Browser=Edge; Flag=off |
+| TCN-001-CI03 | Role=member; Browser=Chrome; Flag=off |
+| TCN-001-CI04 | Role=member; Browser=Edge; Flag=on |
+"""
+        expected = {
+            "known_test_requirements": ["TR-001"],
+            "known_authorities": ["SPEC-001"],
+            "pairwise": {
+                "factors": {
+                    "Role": ["admin", "member"],
+                    "Browser": ["Chrome", "Edge"],
+                    "Flag": ["on", "off"],
+                },
+                "forbidden_constraints": [],
+                "require_pairwise": True,
+            },
+        }
+        self.assert_passes("test-condition-design", text, expected)
+        missing = text.replace("| TCN-001-CI04 | Role=member; Browser=Edge; Flag=on |\n", "")
+        self.assert_fails("test-condition-design", missing, expected, "TCN-D015")
+
     def test_pairwise_generated_coverage_item_integrity(self):
         text, expected = self._pairwise_base()
         self.assert_fails("test-condition-design", text.replace("| TCN-001-CI01 | A=0; B=0 |", "| TCN-001-CI99 | A=0; B=0 |"), expected, "TCN-D026")
@@ -246,6 +299,20 @@ class FalsePassRegressionTests(unittest.TestCase):
 | SPEC-999 | Authority | 対象外 | スコープ外 |
 """
         self.assert_fails("test-requirement-design", tr, {"known_authorities": ["SPEC-001"], "known_product_risks": ["RISK-001"]}, "TR-D013")
+
+        risk_disposition = """# TR
+## テスト要求一覧
+| テスト要求ID | テスト要求 | Current Effective Authority | 関連Product Risk | 優先度 | テストレベル / 観測方法 |
+| --- | --- | --- | --- | --- | --- |
+| TR-001 | 保存を検証 | SPEC-001 | | 高 | システム / UI |
+## Test Requirementを作らない上流項目
+| 上流ID | 種別 | Disposition | 理由 / 根拠 |
+| --- | --- | --- | --- |
+| RISK-001 | Product Risk | 対象外 | スコープ外 |
+"""
+        risk_expected = {"known_authorities": ["SPEC-001"], "product_risk_levels": {"RISK-001": "高"}}
+        self.assert_passes("test-requirement-design", risk_disposition, risk_expected)
+        self.assert_fails("test-requirement-design", risk_disposition.replace("| RISK-001 | Product Risk |", "| RISK-999 | Product Risk |"), risk_expected, "TR-D013")
 
         tcn, expected = self._pairwise_base()
         tcn = tcn.replace("| --- | --- | --- |\n## テスト観点", "| --- | --- | --- |\n| TR-999 | 対象外 | 理由 |\n## テスト観点")
@@ -285,6 +352,29 @@ class FalsePassRegressionTests(unittest.TestCase):
         self.assert_fails("adversarial-review", self._review_base().replace("| 提案 | 0 |", "| unknown | 0 |"), expected, "REV-D013")
         self.assert_fails("adversarial-review", self._review_base().replace("| 軽微 | 0 |", "| 重大 | 0 |"), expected, "REV-D014")
 
+    def test_adversarial_fixture_expected_attributes(self):
+        expected = {
+            "known_artifact_ids": ["TC-001"],
+            "expected_defects": [
+                {
+                    "target_id": "TC-001",
+                    "contains": "Authority",
+                    "severity": "重大",
+                    "repair_target": "test-case-design",
+                }
+            ],
+        }
+        base = self._review_base()
+        self.assert_passes("adversarial-review", base, expected)
+
+        severity_mismatch = base.replace("| 重大 | 1 |", "| 重大 | 0 |").replace("| 軽微 | 0 |", "| 軽微 | 1 |").replace("| REV-001 | 重大 |", "| REV-001 | 軽微 |")
+        self.assert_fails("adversarial-review", severity_mismatch, expected, "REV-D010")
+        self.assert_fails("adversarial-review", self._review_base("spec-analysis"), expected, "REV-D010")
+
+        optional_expected = {"known_artifact_ids": ["TC-001"], "expected_defects": [{"target_id": "TC-001", "contains": "Authority"}]}
+        optional_text = self._review_base("spec-analysis").replace("| 重大 | 1 |", "| 重大 | 0 |").replace("| 軽微 | 0 |", "| 軽微 | 1 |").replace("| REV-001 | 重大 |", "| REV-001 | 軽微 |")
+        self.assert_passes("adversarial-review", optional_text, optional_expected)
+
     def test_adversarial_finding_required_fields(self):
         text = self._review_base().replace("| REV-001 | 重大 | TC-001 | 根拠が不足 | Authority参照なし | 合否判定不能 | 根拠を追加 | test-case-design |", "| REV-001 | 重大 | TC-001 |  |  |  | 根拠を追加 |  |")
         self.assert_fails("adversarial-review", text, {"known_artifact_ids": ["TC-001"]}, "REV-D012")
@@ -301,6 +391,31 @@ class FalsePassRegressionTests(unittest.TestCase):
         self.assert_fails("qa-workflow", workflow("Blocked", "| test-case-design | 完了 | v1 | |"), {}, "WF-D011")
         duplicate = workflow("実行中", "| test-case-design | 実行中 | v1 | |\n| test-case-design | 完了 | v1 | |")
         self.assert_fails("qa-workflow", duplicate, {}, "WF-D012")
+
+    def test_workflow_fixture_expected_states(self):
+        expected = {
+            "expected_start_skill": "test-analysis",
+            "expected_final_skill": "test-case-design",
+            "expected_skills": ["test-analysis", "test-requirement-design", "test-condition-design", "test-case-design"],
+            "expected_overall_state": "部分完了（Blockedあり）",
+            "expected_skill_states": {"test-analysis": "Blocked"},
+        }
+
+        def workflow(overall: str, test_analysis_state: str, tr_state: str = "完了") -> str:
+            return f"""- Workflow全体状態: {overall}
+- 開始Skill: test-analysis
+- 最終Skill: test-case-design
+| Skill | 状態 | 成果物 / バージョン | Blocker / 備考 |
+| --- | --- | --- | --- |
+| test-analysis | {test_analysis_state} | Risk | |
+| test-requirement-design | {tr_state} | TR | |
+| test-condition-design | 完了 | TCN | |
+| test-case-design | 完了 | TC | |
+"""
+
+        self.assert_passes("qa-workflow", workflow("部分完了（Blockedあり）", "Blocked"), expected)
+        self.assert_fails("qa-workflow", workflow("完了", "Blocked"), expected, "WF-D013")
+        self.assert_fails("qa-workflow", workflow("部分完了（Blockedあり）", "完了", "Blocked"), expected, "WF-D014")
 
     def test_test_case_priority_override_requires_reason(self):
         base = """# TC

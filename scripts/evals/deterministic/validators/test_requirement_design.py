@@ -47,14 +47,8 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     no_reason = [clean(r.get("上流ID", "")) for r in disposed if not clean(r.get("理由 / 根拠", ""))]
     result.add("TR-D008", not no_reason, "Disposition rows require reason/evidence", evidence=no_reason or None)
 
-    disposition_known = set()
-    disposition_check = False
-    if "known_authorities" in expected:
-        disposition_known |= set(expected["known_authorities"])
-        disposition_check = True
-    if "known_product_risks" in expected:
-        disposition_known |= set(expected["known_product_risks"])
-        disposition_check = True
+    disposition_known = (known_auth if auth_spec else set()) | (known_risks if risk_spec else set())
+    disposition_check = auth_spec or risk_spec
     unknown_disposed = sorted({clean(r.get("上流ID", "")) for r in disposed if disposition_check and clean(r.get("上流ID", "")) and clean(r.get("上流ID", "")) not in disposition_known})
     result.add("TR-D013", not unknown_disposed, "Disposition upstream IDs must exist when fixture upstream sets are specified", evidence=unknown_disposed or None)
 

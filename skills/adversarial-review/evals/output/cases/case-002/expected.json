@@ -1,1 +1,1 @@
-{"known_artifact_ids":["TCN-001-CI01"],"expected_defects":[{"target_id":"TCN-001-CI01"}]}
+{"known_artifact_ids":["TCN-001-CI01"],"expected_defects":[{"target_id":"TCN-001-CI01","severity":"致命的"}]}

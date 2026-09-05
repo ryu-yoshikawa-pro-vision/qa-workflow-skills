@@ -1,1 +1,1 @@
-{"expected_start_skill":"test-analysis","expected_final_skill":"test-case-design","expected_skills":["test-analysis","test-requirement-design","test-condition-design","test-case-design"]}
+{"expected_start_skill":"test-analysis","expected_final_skill":"test-case-design","expected_skills":["test-analysis","test-requirement-design","test-condition-design","test-case-design"],"expected_overall_state":"部分完了（Blockedあり）","expected_skill_states":{"test-analysis":"Blocked"}}

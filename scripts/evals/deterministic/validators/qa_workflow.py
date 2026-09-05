@@ -43,4 +43,23 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     actual_used = {clean(r.get("Skill", "")) for r in rows if clean(r.get("状態", "")) not in {"未開始", "省略"}}
     missing = sorted(expected_skills - actual_used)
     result.add("WF-D008", not missing, "Expected routing Skills must be represented as used/reused/in-progress/completed", evidence=missing or None)
+
+    overall_specified = "expected_overall_state" in expected
+    expected_overall = expected.get("expected_overall_state")
+    result.add(
+        "WF-D013",
+        not overall_specified or overall == expected_overall,
+        "Fixture expected Workflow overall state must match",
+        evidence={"expected": expected_overall, "actual": overall} if overall_specified and overall != expected_overall else None,
+    )
+
+    expected_skill_states = expected.get("expected_skill_states", {})
+    actual_skill_states = {clean(row.get("Skill", "")): clean(row.get("状態", "")) for row in rows}
+    state_mismatches = []
+    if "expected_skill_states" in expected:
+        for skill, expected_state in expected_skill_states.items():
+            actual_state = actual_skill_states.get(skill)
+            if actual_state != expected_state:
+                state_mismatches.append({"skill": skill, "expected": expected_state, "actual": actual_state})
+    result.add("WF-D014", not state_mismatches, "Fixture expected Skill states must match", evidence=state_mismatches or None)
     return result

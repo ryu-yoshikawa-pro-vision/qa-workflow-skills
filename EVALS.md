@@ -86,7 +86,7 @@ skills/<skill-name>/evals/
 
 ### expected.jsonの基本契約
 
-- `known_*`: Output中で参照可能なID集合。キー未指定ならその集合による参照検査を行わない。
+- `known_*`: fixture側で既知の外部参照集合。キー未指定ならその集合による参照検査を行わない。Skill自身がOutput内で生成するEntityは各Skill契約に従い追加で有効な参照対象になり得る。`spec-analysis`ではOutput内で正しく生成されたSPEC / DECISION等がCurrent Effective Authority候補になり得る。
 - `required_*`: Outputに実際に存在しなければならないID / Entity / 値。
 - キー未指定とキーあり+空集合は区別する。
 - `approved_assumptions`: 承認済みとしてOutputに登場できるCanonical ASM IDのlist。
@@ -100,7 +100,7 @@ Canonical Evalで必須テーブル自体が欠落している場合はERRORで�
 
 ## 参照整合
 
-Output中で明示されたIDは、fixtureが対応するknown集合を指定している場合、その集合に存在する必要があります。
+Output中で明示されたIDは、fixtureが対応するknown集合を指定している場合、その集合または各Skill契約上Output内で正当に生成された参照対象に存在する必要があります。`known_*`だけを全Skill共通のstrict whitelistとして扱いません。
 
 - `spec-analysis`: 分析項目が参照するSRC、Current Effective Authority / 関連Authority
 - `test-requirement-design`: Authority / Product RiskとDispositionの上流ID
@@ -147,6 +147,7 @@ fixture-backed状態遷移は、required transitionが実在するCoverage Item�
 - `致命的` + `残存リスクとして受容`は禁止。
 - `重大` + `残存リスクとして受容`はfixture承認情報がある場合、その参照と一致する必要がある。
 - 指摘概要の重要度は`致命的 / 重大 / 軽微 / 提案`のみで、各重要度は一意。
+- `expected_defects`に`severity`または`repair_target`が指定された場合だけ、対象Findingの重大度または修正先との一致をfixture-backed条件として要求する。
 
 ## Workflow State
 
@@ -156,7 +157,7 @@ Workflow状態表はCanonical Skill名・Skill状態・Skill行一意性を検�
 - `部分完了（Blockedあり）`: 1件以上のBlocked Skillが必要。
 - `Blocked`: 1件以上のBlocked Skillが必要。
 
-fixtureに開始Skill / 最終Skill / 利用Skillが明示されている場合はOutputされたrouting判断と比較します。
+fixtureに開始Skill / 最終Skill / 利用Skillが明示されている場合はOutputされたrouting判断と比較します。`expected_overall_state`または`expected_skill_states`が指定された場合は、Workflow全体状態または各Skill状態との一致も検査します。
 
 ## Markdown parser制約
 

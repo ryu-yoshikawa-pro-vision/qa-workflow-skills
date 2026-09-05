@@ -85,8 +85,16 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     for defect in expected.get("expected_defects", []):
         target = defect["target_id"]
         contains = defect.get("contains")
-        matched = any(target in ids_in(r.get("対象成果物 / 位置", "")) and (not contains or contains in r.get("問題", "") or contains in r.get("根拠", "")) for r in findings)
+        severity = defect.get("severity")
+        repair_target = defect.get("repair_target")
+        matched = any(
+            target in ids_in(row.get("対象成果物 / 位置", ""))
+            and (not contains or contains in row.get("問題", "") or contains in row.get("根拠", ""))
+            and (severity is None or clean(row.get("重要度", "")) == severity)
+            and (repair_target is None or clean(row.get("修正Skill / 層", "")) == repair_target)
+            for row in findings
+        )
         if not matched:
             missed.append(defect)
-    result.add("REV-D010", not missed, "Fixture-backed deterministic defects must be identified without exact prose matching", evidence=missed or None)
+    result.add("REV-D010", not missed, "Fixture-backed deterministic defects and specified attributes must match", evidence=missed or None)
     return result
