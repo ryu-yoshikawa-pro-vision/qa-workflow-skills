@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from collections import Counter
 
-from scripts.evals.deterministic.common import CANONICAL_SKILLS, ID_PATTERNS, add_allowed_assertion, add_duplicate_assertion, add_required_fields_assertion, clean, ids_in, nonempty_rows
-from scripts.evals.deterministic.markdown_parser import find_table, parse_tables
-from scripts.evals.deterministic.result import EvalResult
+from scripts.skills.evals.deterministic.common import CANONICAL_SKILLS, ID_PATTERNS, add_allowed_assertion, add_duplicate_assertion, add_required_fields_assertion, clean, ids_in, nonempty_rows
+from scripts.skills.evals.deterministic.markdown_parser import find_table, parse_tables
+from scripts.skills.evals.deterministic.result import EvalResult
 
 SEVERITIES = {"致命的", "重大", "軽微", "提案"}
 TREATMENTS = {"未処置", "修正済み", "残存リスクとして受容", "Blocked"}

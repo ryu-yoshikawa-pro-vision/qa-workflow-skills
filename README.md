@@ -93,18 +93,30 @@ skills/<skill-name>/evals/
 └── deterministic/
     └── validator.py
 
-scripts/evals/deterministic/
+scripts/skills/evals/deterministic/
 ├── run.py
 ├── loader.py
 ├── markdown_parser.py
 ├── common.py
 ├── result.py
 └── tests/
+    ├── test_loader.py
+    └── test_markdown_parser.py
+
+tests/skills/evals/deterministic/
+├── test_deterministic.py
+├── test_false_pass_regressions.py
+├── test_closure_exclusivity.py
+├── test_cli_integration.py
+├── test_repository_integration.py
+└── test_runtime_portability.py
 ```
 
-Skill固有のTrigger dataset、Output fixture、Deterministic validatorは各Skillの`evals/`配下に置きます。runner、validator loader、Markdown parser、共通utility、result model、grader self-testは`scripts/evals/deterministic/`のshared Eval Runtimeとして共有します。
+Skill固有のTrigger dataset、Output fixture、Deterministic validatorは各Skillの`evals/`配下に置きます。runner、validator loader、Markdown parser、共通utility、result model、grader self-testは`scripts/skills/evals/deterministic/`のshared Eval Runtimeとして共有します。
 
-`skills/<skill-name>/`をコピーするとSkill固有の評価datasetとvalidatorも一緒に移動しますが、Deterministic Eval実行環境全体がSkill単体で自己完結するわけではありません。実行には`shared Eval Runtime`相当が別途必要です。
+`scripts/skills/evals/deterministic/tests/`はShared Runtime固有のself-testを保持し、`tests/skills/evals/deterministic/`はこのリポジトリのvalidator・assertion・CLI・portability contractを検証します。
+
+Skillを利用するだけの場合は`skills/<skill-name>/`のみをコピーします。Evalも含めてSkillを移植する場合は、`skills/<skill-name>/`（Skill Package）と`scripts/skills/evals/`（Shared Skill Eval Runtime）をコピーします。`scripts/skills/evals/`はAgent Skills Specificationが要求する標準ディレクトリではなく、このリポジトリ独自の評価Runtimeです。
 
 `evals/`やgraderはAgent Skills Specificationの必須標準機能ではありません。
 
@@ -122,7 +134,7 @@ Skill固有のTrigger dataset、Output fixture、Deterministic validatorは各Sk
 - `required_*`: Outputに実際に存在しなければならないEntity / 値。
 
 ```bash
-python scripts/evals/deterministic/run.py \
+python scripts/skills/evals/deterministic/run.py \
   --skill test-case-design \
   --eval-id TC-OUT-001 \
   --output path/to/generated-output.md
@@ -136,7 +148,7 @@ Deterministic Evalだけで成果物の意味品質全体を保証しません�
 
 ## Validation
 
-CIで、公式`skills-ref validate`、Trigger dataset構造、Deterministic Output Eval dataset構造、grader unit / regression / CLI integration testを分離して実行します。
+CIで、公式`skills-ref validate`、Trigger dataset構造、Deterministic Output Eval dataset構造、Shared Runtime self-test、repository-specific Deterministic contract testを分離して実行します。
 
 ## 標準との関係
 

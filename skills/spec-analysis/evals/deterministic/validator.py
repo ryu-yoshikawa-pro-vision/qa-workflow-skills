@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from scripts.evals.deterministic.common import (
+from scripts.skills.evals.deterministic.common import (
     ID_PATTERNS,
     add_allowed_assertion,
     add_duplicate_assertion,
@@ -9,8 +9,8 @@ from scripts.evals.deterministic.common import (
     ids_in,
     nonempty_rows,
 )
-from scripts.evals.deterministic.markdown_parser import find_table, parse_tables
-from scripts.evals.deterministic.result import EvalResult
+from scripts.skills.evals.deterministic.markdown_parser import find_table, parse_tables
+from scripts.skills.evals.deterministic.result import EvalResult
 
 CLASS_TO_PREFIX = {"SPEC": "SPEC", "DECISION": "DECISION", "INFERENCE": "INFERENCE", "UNKNOWN": "UNKNOWN"}
 AUTHORITY_TYPES = {"SPEC", "DECISION", "承認済みASM"}

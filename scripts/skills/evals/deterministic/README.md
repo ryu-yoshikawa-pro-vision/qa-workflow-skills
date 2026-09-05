@@ -14,7 +14,7 @@ ERRORは、ID形式、重複、参照整合、required fields、allowed values�
 skills/<skill-name>/evals/deterministic/
 └── validator.py
 
-scripts/evals/deterministic/
+scripts/skills/evals/deterministic/
 ├── run.py
 ├── loader.py
 ├── markdown_parser.py
@@ -23,25 +23,32 @@ scripts/evals/deterministic/
 ├── ASSERTIONS.md
 ├── README.md
 └── tests/
-    ├── test_deterministic.py
-    ├── test_false_pass_regressions.py
-    ├── test_closure_exclusivity.py
     ├── test_loader.py
-    └── test_cli_integration.py
+    └── test_markdown_parser.py
+
+tests/skills/evals/deterministic/
+├── test_deterministic.py
+├── test_false_pass_regressions.py
+├── test_closure_exclusivity.py
+├── test_cli_integration.py
+├── test_repository_integration.py
+└── test_runtime_portability.py
 ```
 
 Skill固有のDisposition、Closure、Pairwise Output構造、Review、Workflow状態等の評価ルールは、各Skillの`evals/deterministic/validator.py`に置きます。共通層はrunner、validator loader、Markdown table解析、ID抽出、重複・allowed values・required fields、共通graph計算、Pairwiseの組合せ数学、結果集計を担当します。
 
+`scripts/skills/evals/deterministic/tests/`はShared Runtime固有test、`tests/skills/evals/deterministic/`はqa-workflow-skills固有のvalidator・CLI・integration testを保持します。
+
 `loader.py`は既存の`skills/*/evals/output/evals.json`をOutput Eval対象の正本としてSkillを発見し、同じSkillの`evals/deterministic/validator.py`をfilesystem pathからloadします。Skill名にハイフンが含まれていても通常のPython package importへ変換しません。対象Skillのvalidator欠落、module load失敗、`validate` callable欠落はエラーとし、silent skipしません。
 
-Skill配下のvalidatorは`scripts.evals.deterministic.common`、`markdown_parser`、`result`をshared Eval Runtimeとして再利用します。`skills/<skill-name>/`をコピーするとSkill固有のdatasetとvalidatorは一緒に移動しますが、Deterministic Eval実行環境全体がSkill単体で自己完結するわけではありません。
+Skill配下のvalidatorは`scripts.skills.evals.deterministic.common`、`markdown_parser`、`result`をshared Eval Runtimeとして再利用します。Skillを利用するだけなら`skills/<skill-name>/`のみでよく、Evalも含めて移植する場合は`skills/<skill-name>/`と`scripts/skills/evals/`を一緒にコピーします。後者はこのリポジトリ独自のShared Skill Eval Runtimeであり、Agent Skills Specificationの必須構造ではありません。
 
 ## CLI
 
 単一case:
 
 ```bash
-python scripts/evals/deterministic/run.py \
+python scripts/skills/evals/deterministic/run.py \
   --skill test-case-design \
   --eval-id TC-OUT-001 \
   --output path/to/generated-output.md
@@ -50,7 +57,7 @@ python scripts/evals/deterministic/run.py \
 全case:
 
 ```bash
-python scripts/evals/deterministic/run.py \
+python scripts/skills/evals/deterministic/run.py \
   --skill all \
   --output-root path/to/saved-outputs
 ```

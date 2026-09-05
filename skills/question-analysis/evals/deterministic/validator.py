@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from scripts.evals.deterministic.common import (
+from scripts.skills.evals.deterministic.common import (
     CANONICAL_SKILLS,
     ID_PATTERNS,
     add_allowed_assertion,
@@ -9,8 +9,8 @@ from scripts.evals.deterministic.common import (
     clean,
     nonempty_rows,
 )
-from scripts.evals.deterministic.markdown_parser import find_table, parse_tables
-from scripts.evals.deterministic.result import EvalResult
+from scripts.skills.evals.deterministic.markdown_parser import find_table, parse_tables
+from scripts.skills.evals.deterministic.result import EvalResult
 
 CLASSIFICATIONS = {"Blocker", "要確認", "仮定可能", "提案・任意"}
 NORMALIZATIONS = {"SPEC", "DECISION", "ASM", "未確定"}

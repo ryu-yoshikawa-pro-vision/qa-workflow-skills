@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from scripts.evals.deterministic.common import (
+from scripts.skills.evals.deterministic.common import (
     ID_PATTERNS,
     PRIORITIES,
     add_allowed_assertion,
@@ -14,8 +14,8 @@ from scripts.evals.deterministic.common import (
     ids_in,
     nonempty_rows,
 )
-from scripts.evals.deterministic.markdown_parser import find_table, parse_tables
-from scripts.evals.deterministic.result import EvalResult
+from scripts.skills.evals.deterministic.markdown_parser import find_table, parse_tables
+from scripts.skills.evals.deterministic.result import EvalResult
 
 DISPOSITIONS = {"対象外", "別テストレベル", "残存リスク", "成立不能", "重複", "Blocked"}
 TR_DISPOSITIONS = {"別テストレベル", "残存リスク", "対象外", "Blocked"}

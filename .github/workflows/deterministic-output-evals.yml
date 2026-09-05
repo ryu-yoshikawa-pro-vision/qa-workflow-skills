@@ -51,10 +51,14 @@ jobs:
           print(f"Deterministic output eval cases: {total}")
           PY
 
-      - name: Compile deterministic grader and Skill validators
+      - name: Compile deterministic grader, Skill validators, and repository tests
         run: |
-          python -m compileall -q scripts/evals/deterministic
+          python -m compileall -q scripts/skills/evals/deterministic
           python -m compileall -q skills/*/evals/deterministic
+          python -m compileall -q tests/skills/evals/deterministic
 
-      - name: Run deterministic grader unit tests
-        run: python -m unittest discover -s scripts/evals/deterministic/tests -v
+      - name: Run shared deterministic runtime unit tests
+        run: python -m unittest discover -s scripts/skills/evals/deterministic/tests -v
+
+      - name: Run repository deterministic eval tests
+        run: python -m unittest discover -s tests/skills/evals/deterministic -v

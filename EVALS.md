@@ -86,9 +86,9 @@ skills/<skill-name>/evals/
 
 9 Skillすべてに最低2ケースあります。`expected.json`はGolden文章ではなく、graderが比較する既知事実だけを持ちます。
 
-Skill固有のTrigger dataset、Output fixture、Deterministic validatorは各Skillの`evals/`配下に置きます。`scripts/evals/deterministic/`はrunner、validator loader、Markdown parser、共通utility、result model、grader self-testを提供するshared Eval Runtimeです。
+Skill固有のTrigger dataset、Output fixture、Deterministic validatorは各Skillの`evals/`配下に置きます。`scripts/skills/evals/deterministic/`はrunner、validator loader、Markdown parser、共通utility、result model、grader self-testを提供するshared Eval Runtimeです。
 
-`skills/<skill-name>/`をコピーするとSkill固有のdatasetとvalidatorは一緒に移動しますが、Deterministic Eval実行環境全体がSkill単体で自己完結するわけではありません。実行にはshared Eval Runtime相当が必要です。
+Skillを利用するだけの場合は`skills/<skill-name>/`のみをコピーします。Evalも含めてSkillを移植する場合は、`skills/<skill-name>/`（Skill Package）と`scripts/skills/evals/`（Shared Skill Eval Runtime）をコピーします。`scripts/skills/evals/`はAgent Skills Specificationが要求する標準ディレクトリではなく、このリポジトリ独自の評価Runtimeです。
 
 ### expected.jsonの基本契約
 
@@ -177,14 +177,14 @@ Canonical Markdown tableのみを対象とします。セル内のescaped pipe `
 Agent実行とOutput保存はgraderの責務外です。
 
 ```bash
-python scripts/evals/deterministic/run.py \
+python scripts/skills/evals/deterministic/run.py \
   --skill test-case-design \
   --eval-id TC-OUT-001 \
   --output path/to/generated-output.md
 ```
 
 ```bash
-python scripts/evals/deterministic/run.py \
+python scripts/skills/evals/deterministic/run.py \
   --skill all \
   --output-root path/to/saved-outputs
 ```
@@ -211,14 +211,20 @@ Deterministic EvalでERRORにしません。
 
 ## Grader Self-Test
 
-`test_deterministic.py`、`test_false_pass_regressions.py`、`test_closure_exclusivity.py`、`test_loader.py`、`test_cli_integration.py`で、正常Output、決定論的な不正Output、closure exclusivity、validator discovery / loading failure、CLI exit codeを検証します。
+Shared Runtime Self-Testは`scripts/skills/evals/deterministic/tests/`に置き、任意の`skills_root`に対するvalidator discovery / loading contractとMarkdown parserの汎用契約を検証します。
+
+Repository Deterministic Contract Testは`tests/skills/evals/deterministic/`に置き、このリポジトリのvalidator assertion、false-pass regression、closure exclusivity、CLI contract、Output Eval manifestとvalidatorの対応、1 Skill + Shared Skill Eval Runtimeの移植可能性を検証します。
+
+Canonical 9 Skillの存在とAgent Skills仕様適合は`Validate Agent Skills`で検証します。
 
 CIでは次を実行します。
 
 ```bash
-python -m compileall -q scripts/evals/deterministic
+python -m compileall -q scripts/skills/evals/deterministic
 python -m compileall -q skills/*/evals/deterministic
-python -m unittest discover -s scripts/evals/deterministic/tests -v
+python -m compileall -q tests/skills/evals/deterministic
+python -m unittest discover -s scripts/skills/evals/deterministic/tests -v
+python -m unittest discover -s tests/skills/evals/deterministic -v
 ```
 
 ---
