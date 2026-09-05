@@ -6,12 +6,12 @@ from pathlib import Path
 import sys
 
 if __package__ in {None, ""}:
-    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
-    from scripts.evals.deterministic.loader import load_validators
+    sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+    from scripts.skills.evals.deterministic.loader import load_validators
 else:
     from .loader import load_validators
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
+REPO_ROOT = Path(__file__).resolve().parents[4]
 VALIDATORS = load_validators()
 
 

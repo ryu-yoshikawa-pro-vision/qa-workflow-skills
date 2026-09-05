@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import unittest
 
-from scripts.evals.deterministic.loader import load_validators
-from scripts.evals.deterministic.markdown_parser import parse_tables
+from scripts.skills.evals.deterministic.loader import load_validators
+from scripts.skills.evals.deterministic.markdown_parser import parse_tables
 
 
 VALIDATORS = load_validators()

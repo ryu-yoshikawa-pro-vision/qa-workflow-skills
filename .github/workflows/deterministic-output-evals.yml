@@ -53,8 +53,8 @@ jobs:
 
       - name: Compile deterministic grader and Skill validators
         run: |
-          python -m compileall -q scripts/evals/deterministic
+          python -m compileall -q scripts/skills/evals/deterministic
           python -m compileall -q skills/*/evals/deterministic
 
       - name: Run deterministic grader unit tests
-        run: python -m unittest discover -s scripts/evals/deterministic/tests -v
+        run: python -m unittest discover -s scripts/skills/evals/deterministic/tests -v

@@ -14,7 +14,7 @@ ERRORは、ID形式、重複、参照整合、required fields、allowed values�
 skills/<skill-name>/evals/deterministic/
 └── validator.py
 
-scripts/evals/deterministic/
+scripts/skills/evals/deterministic/
 ├── run.py
 ├── loader.py
 ├── markdown_parser.py
@@ -34,14 +34,14 @@ Skill固有のDisposition、Closure、Pairwise Output構造、Review、Workflow�
 
 `loader.py`は既存の`skills/*/evals/output/evals.json`をOutput Eval対象の正本としてSkillを発見し、同じSkillの`evals/deterministic/validator.py`をfilesystem pathからloadします。Skill名にハイフンが含まれていても通常のPython package importへ変換しません。対象Skillのvalidator欠落、module load失敗、`validate` callable欠落はエラーとし、silent skipしません。
 
-Skill配下のvalidatorは`scripts.evals.deterministic.common`、`markdown_parser`、`result`をshared Eval Runtimeとして再利用します。`skills/<skill-name>/`をコピーするとSkill固有のdatasetとvalidatorは一緒に移動しますが、Deterministic Eval実行環境全体がSkill単体で自己完結するわけではありません。
+Skill配下のvalidatorは`scripts.skills.evals.deterministic.common`、`markdown_parser`、`result`をshared Eval Runtimeとして再利用します。Skillを利用するだけなら`skills/<skill-name>/`のみでよく、Evalも含めて移植する場合は`skills/<skill-name>/`と`scripts/skills/evals/`を一緒にコピーします。後者はこのリポジトリ独自のShared Skill Eval Runtimeであり、Agent Skills Specificationの必須構造ではありません。
 
 ## CLI
 
 単一case:
 
 ```bash
-python scripts/evals/deterministic/run.py \
+python scripts/skills/evals/deterministic/run.py \
   --skill test-case-design \
   --eval-id TC-OUT-001 \
   --output path/to/generated-output.md
@@ -50,7 +50,7 @@ python scripts/evals/deterministic/run.py \
 全case:
 
 ```bash
-python scripts/evals/deterministic/run.py \
+python scripts/skills/evals/deterministic/run.py \
   --skill all \
   --output-root path/to/saved-outputs
 ```

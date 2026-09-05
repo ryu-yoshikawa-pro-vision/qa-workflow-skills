@@ -4,20 +4,11 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from scripts.evals.deterministic.loader import load_validators
-
-
-EXPECTED_SKILLS = {
-    "qa-workflow",
-    "spec-analysis",
-    "question-analysis",
-    "test-analysis",
-    "test-requirement-design",
-    "test-condition-design",
-    "test-case-design",
-    "coverage-analysis",
-    "adversarial-review",
-}
+from scripts.skills.evals.deterministic.loader import (
+    SKILLS_ROOT,
+    discover_output_eval_skills,
+    load_validators,
+)
 
 
 class ValidatorLoaderTests(unittest.TestCase):
@@ -28,8 +19,17 @@ class ValidatorLoaderTests(unittest.TestCase):
         return skills_root / skill / "evals" / "deterministic" / "validator.py"
 
     def test_loads_all_output_eval_validators(self) -> None:
+        repo_root = Path(__file__).resolve().parents[5]
+        expected_skills_root = repo_root / "skills"
+        self.assertEqual(SKILLS_ROOT, expected_skills_root)
+        expected = sorted(
+            manifest.parents[2].name
+            for manifest in expected_skills_root.glob("*/evals/output/evals.json")
+        )
+        self.assertTrue(expected)
+        self.assertEqual(discover_output_eval_skills(), expected)
         validators = load_validators()
-        self.assertEqual(set(validators), EXPECTED_SKILLS)
+        self.assertEqual(sorted(validators), expected)
         self.assertTrue(all(callable(validate) for validate in validators.values()))
 
     def test_missing_validator_is_not_silently_skipped(self) -> None:

@@ -86,9 +86,9 @@ skills/<skill-name>/evals/
 
 9 Skillすべてに最低2ケースあります。`expected.json`はGolden文章ではなく、graderが比較する既知事実だけを持ちます。
 
-Skill固有のTrigger dataset、Output fixture、Deterministic validatorは各Skillの`evals/`配下に置きます。`scripts/evals/deterministic/`はrunner、validator loader、Markdown parser、共通utility、result model、grader self-testを提供するshared Eval Runtimeです。
+Skill固有のTrigger dataset、Output fixture、Deterministic validatorは各Skillの`evals/`配下に置きます。`scripts/skills/evals/deterministic/`はrunner、validator loader、Markdown parser、共通utility、result model、grader self-testを提供するshared Eval Runtimeです。
 
-`skills/<skill-name>/`をコピーするとSkill固有のdatasetとvalidatorは一緒に移動しますが、Deterministic Eval実行環境全体がSkill単体で自己完結するわけではありません。実行にはshared Eval Runtime相当が必要です。
+Skillを利用するだけの場合は`skills/<skill-name>/`のみをコピーします。Evalも含めてSkillを移植する場合は、`skills/<skill-name>/`（Skill Package）と`scripts/skills/evals/`（Shared Skill Eval Runtime）をコピーします。`scripts/skills/evals/`はAgent Skills Specificationが要求する標準ディレクトリではなく、このリポジトリ独自の評価Runtimeです。
 
 ### expected.jsonの基本契約
 
@@ -177,14 +177,14 @@ Canonical Markdown tableのみを対象とします。セル内のescaped pipe `
 Agent実行とOutput保存はgraderの責務外です。
 
 ```bash
-python scripts/evals/deterministic/run.py \
+python scripts/skills/evals/deterministic/run.py \
   --skill test-case-design \
   --eval-id TC-OUT-001 \
   --output path/to/generated-output.md
 ```
 
 ```bash
-python scripts/evals/deterministic/run.py \
+python scripts/skills/evals/deterministic/run.py \
   --skill all \
   --output-root path/to/saved-outputs
 ```
@@ -216,9 +216,9 @@ Deterministic EvalでERRORにしません。
 CIでは次を実行します。
 
 ```bash
-python -m compileall -q scripts/evals/deterministic
+python -m compileall -q scripts/skills/evals/deterministic
 python -m compileall -q skills/*/evals/deterministic
-python -m unittest discover -s scripts/evals/deterministic/tests -v
+python -m unittest discover -s scripts/skills/evals/deterministic/tests -v
 ```
 
 ---
