@@ -54,10 +54,13 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
 
     linked_auth = {ref for row in trs for ref in ids_in(row.get("Current Effective Authority", "")) if ref in known_auth}
     linked_risk = {ref for row in trs for ref in ids_in(row.get("関連Product Risk", "")) if ref in known_risks}
+    linked_upstream = linked_auth | linked_risk
     disposed_ids = {clean(r.get("上流ID", "")) for r in disposed}
     closure_universe = (known_auth if auth_spec else set()) | (known_risks if risk_spec else set())
-    missing_closure = sorted(closure_universe - linked_auth - linked_risk - disposed_ids)
-    result.add("TR-D009", not missing_closure, "Fixture upstream Authority/Risk must close to TR or Disposition", evidence=missing_closure or None)
+    missing_closure = sorted(closure_universe - linked_upstream - disposed_ids)
+    duplicate_closure = sorted(linked_upstream & disposed_ids)
+    closure_evidence = {"missing": missing_closure, "linked_and_disposed": duplicate_closure} if missing_closure or duplicate_closure else None
+    result.add("TR-D009", not missing_closure and not duplicate_closure, "Fixture upstream Authority/Risk must close exclusively to a Test Requirement or Disposition", evidence=closure_evidence)
 
     required_links = set(expected.get("required_linked_upstream_ids", []))
     missing_required_links = sorted(required_links - linked_auth - linked_risk)
