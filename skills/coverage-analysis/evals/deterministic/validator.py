@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-from ..common import CANONICAL_SKILLS, clean, compute_graph_gaps, ids_in, nonempty_rows
-from ..markdown_parser import find_table, parse_tables
-from ..result import EvalResult
+from scripts.evals.deterministic.common import CANONICAL_SKILLS, clean, compute_graph_gaps, ids_in, nonempty_rows
+from scripts.evals.deterministic.markdown_parser import find_table, parse_tables
+from scripts.evals.deterministic.result import EvalResult
 
 
 def validate(text: str, expected: dict, eval_id: str) -> EvalResult:

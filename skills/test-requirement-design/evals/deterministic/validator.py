@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from ..common import ID_PATTERNS, PRIORITIES, RISK_LEVEL_ORDER, add_allowed_assertion, add_duplicate_assertion, add_required_fields_assertion, clean, ids_in, nonempty_rows
-from ..markdown_parser import find_table, parse_tables
-from ..result import EvalResult
+from scripts.evals.deterministic.common import ID_PATTERNS, PRIORITIES, RISK_LEVEL_ORDER, add_allowed_assertion, add_duplicate_assertion, add_required_fields_assertion, clean, ids_in, nonempty_rows
+from scripts.evals.deterministic.markdown_parser import find_table, parse_tables
+from scripts.evals.deterministic.result import EvalResult
 
 DISPOSITIONS = {"別テストレベル", "残存リスク", "対象外", "Blocked"}
 

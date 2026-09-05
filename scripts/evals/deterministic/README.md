@@ -11,20 +11,30 @@ ERRORは、ID形式、重複、参照整合、required fields、allowed values�
 ## Architecture
 
 ```text
+skills/<skill-name>/evals/deterministic/
+└── validator.py
+
 scripts/evals/deterministic/
 ├── run.py
+├── loader.py
 ├── markdown_parser.py
 ├── result.py
 ├── common.py
-├── validators/
-│   └── <9 skill validators>
+├── ASSERTIONS.md
+├── README.md
 └── tests/
     ├── test_deterministic.py
     ├── test_false_pass_regressions.py
+    ├── test_closure_exclusivity.py
+    ├── test_loader.py
     └── test_cli_integration.py
 ```
 
-共通層はMarkdown table解析、ID抽出、重複・allowed values・required fields、共通graph計算、Pairwiseの組合せ数学、結果集計を担当します。Disposition、Closure、Pairwise Output構造、Review、Workflow状態等のSkill固有ルールは各validatorに置きます。
+Skill固有のDisposition、Closure、Pairwise Output構造、Review、Workflow状態等の評価ルールは、各Skillの`evals/deterministic/validator.py`に置きます。共通層はrunner、validator loader、Markdown table解析、ID抽出、重複・allowed values・required fields、共通graph計算、Pairwiseの組合せ数学、結果集計を担当します。
+
+`loader.py`は既存の`skills/*/evals/output/evals.json`をOutput Eval対象の正本としてSkillを発見し、同じSkillの`evals/deterministic/validator.py`をfilesystem pathからloadします。Skill名にハイフンが含まれていても通常のPython package importへ変換しません。対象Skillのvalidator欠落、module load失敗、`validate` callable欠落はエラーとし、silent skipしません。
+
+Skill配下のvalidatorは`scripts.evals.deterministic.common`、`markdown_parser`、`result`をshared Eval Runtimeとして再利用します。`skills/<skill-name>/`をコピーするとSkill固有のdatasetとvalidatorは一緒に移動しますが、Deterministic Eval実行環境全体がSkill単体で自己完結するわけではありません。
 
 ## CLI
 

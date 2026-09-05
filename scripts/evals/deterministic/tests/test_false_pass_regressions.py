@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import unittest
 
+from scripts.evals.deterministic.loader import load_validators
 from scripts.evals.deterministic.markdown_parser import parse_tables
-from scripts.evals.deterministic.validators import VALIDATORS
+
+
+VALIDATORS = load_validators()
 
 
 class FalsePassRegressionTests(unittest.TestCase):
@@ -357,7 +360,6 @@ class FalsePassRegressionTests(unittest.TestCase):
             "expected_dispositions": {"SPEC-002": "対象外"},
         }
         self.assert_passes("test-requirement-design", text, expected)
-
         risk_as_disposition = text.replace("RISK-001, RISK-002", "RISK-001").replace(
             "| SPEC-002 | Authority | 対象外 | 今回の対象外 |",
             "| SPEC-002 | Authority | 対象外 | 今回の対象外 |\n| RISK-002 | Product Risk | 対象外 | 今回の対象外 |",

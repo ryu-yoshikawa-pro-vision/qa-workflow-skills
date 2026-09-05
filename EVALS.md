@@ -71,18 +71,24 @@ skills/<skill-name>/evals/
 ├── trigger/
 │   ├── train_queries.json
 │   └── validation_queries.json
-└── output/
-    ├── evals.json
-    └── cases/
-        ├── case-001/
-        │   ├── input.md
-        │   └── expected.json
-        └── case-002/
-            ├── input.md
-            └── expected.json
+├── output/
+│   ├── evals.json
+│   └── cases/
+│       ├── case-001/
+│       │   ├── input.md
+│       │   └── expected.json
+│       └── case-002/
+│           ├── input.md
+│           └── expected.json
+└── deterministic/
+    └── validator.py
 ```
 
 9 Skillすべてに最低2ケースあります。`expected.json`はGolden文章ではなく、graderが比較する既知事実だけを持ちます。
+
+Skill固有のTrigger dataset、Output fixture、Deterministic validatorは各Skillの`evals/`配下に置きます。`scripts/evals/deterministic/`はrunner、validator loader、Markdown parser、共通utility、result model、grader self-testを提供するshared Eval Runtimeです。
+
+`skills/<skill-name>/`をコピーするとSkill固有のdatasetとvalidatorは一緒に移動しますが、Deterministic Eval実行環境全体がSkill単体で自己完結するわけではありません。実行にはshared Eval Runtime相当が必要です。
 
 ### expected.jsonの基本契約
 
@@ -205,12 +211,12 @@ Deterministic EvalでERRORにしません。
 
 ## Grader Self-Test
 
-`test_deterministic.py`、`test_false_pass_regressions.py`、`test_fixture_contract_regressions.py`、`test_cli_integration.py`で、正常Output、決定論的な不正Output、fixture契約、CLI exit codeを検証します。
+`test_deterministic.py`、`test_false_pass_regressions.py`、`test_closure_exclusivity.py`、`test_loader.py`、`test_cli_integration.py`で、正常Output、決定論的な不正Output、closure exclusivity、validator discovery / loading failure、CLI exit codeを検証します。
 
 CIでは次を実行します。
 
 ```bash
-python -m compileall -q scripts/evals/deterministic
+python -m compileall -q scripts/evals/deterministic skills
 python -m unittest discover -s scripts/evals/deterministic/tests -v
 ```
 
