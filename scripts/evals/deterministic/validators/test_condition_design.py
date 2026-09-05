@@ -131,7 +131,9 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     linked_trs = {ref for row in tcn for ref in ids_in(row.get("テスト要求ID", "")) if ref in known_trs}
     disposed_trs = {clean(r.get("テスト要求ID", "")) for r in tr_disposed}
     missing_tr = sorted(known_trs - linked_trs - disposed_trs) if tr_spec else []
-    result.add("TCN-D013", not missing_tr, "Each fixture TR must close to TCN or Disposition", evidence=missing_tr or None)
+    duplicate_closure = sorted(linked_trs & disposed_trs) if tr_spec else []
+    closure_evidence = {"missing": missing_tr, "linked_and_disposed": duplicate_closure} if missing_tr or duplicate_closure else None
+    result.add("TCN-D013", not missing_tr and not duplicate_closure, "Each fixture TR must close exclusively to a Test Condition or Disposition", evidence=closure_evidence)
 
     pairwise = expected.get("pairwise")
     if pairwise:
