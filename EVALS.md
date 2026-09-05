@@ -60,6 +60,8 @@ baseline取得後は、QA専門用語を使わない依頼、省略表現、曖�
 
 独自weighted scoreは作りません。ERROR pass/fail、assertion pass rate、WARNING件数を保持します。
 
+`assertion_pass_rate`は全Assertion中の`status=pass`比率であり、QA品質の総合点ではありません。
+
 ## Canonical Output制約
 
 初期Deterministic Evalは、各Skillの既定`assets/output-template.md`を使ったMarkdownだけをCanonical対象とします。
@@ -88,40 +90,29 @@ skills/<skill-name>/evals/
 
 9 Skillすべてに最低2ケースあります。`expected.json`はGolden文章ではなく、known IDs、fixture-backed closure、Risk level、Pairwise factor/value/constraint、状態遷移、既知欠陥等の既知事実だけを持ちます。
 
-## Grader Architecture
+`known_*`と`required_*`は意味を分けます。
 
-```text
-scripts/evals/deterministic/
-├── run.py
-├── markdown_parser.py
-├── result.py
-├── common.py
-├── validators/
-│   ├── qa_workflow.py
-│   ├── spec_analysis.py
-│   ├── question_analysis.py
-│   ├── test_analysis.py
-│   ├── test_requirement_design.py
-│   ├── test_condition_design.py
-│   ├── test_case_design.py
-│   ├── coverage_analysis.py
-│   └── adversarial_review.py
-└── tests/
-    └── test_deterministic.py
-```
+- `known_*`: Output中で参照可能なID集合。キー未指定ならその集合による参照検査を行わない。
+- `required_*`: Outputに実際に存在しなければならないID / Entity集合。
 
-Python標準ライブラリだけを使用します。共通層はMarkdown table解析、ID抽出 / 一意性、参照存在、allowed values、required fields、Disposition、graph closure、Pairwise feasible / covered pair計算、結果集計を担当します。Skill固有契約だけを各validatorへ置きます。
+したがって`known_authorities`等は、**キー未指定**と**キーあり + 空集合**を区別します。後者は「このEvalで参照可能な対象が0件」を意味します。
 
-Assertion ID一覧は`scripts/evals/deterministic/ASSERTIONS.md`を正本とします。
+## Required Output
+
+Canonical Evalでvalidatorが利用する必須テーブル自体が欠落している場合はERRORです。fixtureが`required_*`を持つ場合、必要Entityの欠落もERRORです。
+
+0件が正常なDisposition / Blocked / 仮定候補 / 指摘一覧等は、存在必須でも行数0を許容する場合があります。すべての表へ1件以上を強制しません。
 
 ## ERROR / WARNING
 
 ERROR例:
+- 必須Output table / required Entity欠落
 - 重複ID
 - IDと分類不一致
 - unknown upstream reference
 - Risk Matrix不一致
 - fixture上流項目の未閉鎖
+- Pairwise生成組合せの未知Factor / Value、Constraint違反、必要Factor欠落
 - Pairwise 2-wise不足
 - 致命的 + 残存リスク受容
 - `完了` + Blocked / 要再検証
@@ -150,19 +141,24 @@ python scripts/evals/deterministic/run.py \
   --output-root path/to/saved-outputs
 ```
 
-all modeは`<output-root>/<skill>/<eval-id>.md`を探索します。
+all modeは`<output-root>/<skill>/<eval-id>.md`を探索し、manifestに定義された**全Outputの存在を必須**とします。1件でも欠落すれば`missing_outputs`へ記録してFAILします。
 
-## 主要Invariant
+## Pairwise
 
-- **spec-analysis**: ID / 分類、SRC参照、Current Effective Authority種別・関係・参照、撤回 / 置換済みDecision禁止
-- **question-analysis**: Q ID、分類 / 正規化先、再開Skill、Blocker-Blocked整合、Assumption状態 / ASM ID、fixture-backed分類
-- **test-analysis**: RISK ID、必須列、Impact / Likelihood 1..4、4x4 Risk Matrix再計算、参照、testability / technique values
-- **test-requirement-design**: TR ID、Authority / Risk参照、優先度、観測方法、Disposition、Authority / Risk closure、最高Risk優先度継承
-- **test-condition-design**: TCN / CI ID、親TCN、参照、TR closure、Disposition、Pairwise 2-wise、fixture-backed状態遷移 / BVA
-- **test-case-design**: TC ID、Low-Level必須列、上流 / Authority参照、CI / TCN closure、Disposition、優先度維持、番号付き期待結果と根拠対応、曖昧表現WARNING
-- **coverage-analysis**: fixture graphからGap / orphanを独立再計算し、Outputの認識、Blocked誤分類、修正Skillを確認
-- **adversarial-review**: REV ID、重大度、対象、修正Skill、処置、致命的受容禁止、重大受容時承認、重大度別件数、fixture-backed決定論的欠陥
-- **qa-workflow**: Workflow / Skill状態、Canonical Skill名、Blocked / 要再検証残存時の完了禁止、fixture-backed routing
+Pairwise fixtureでは、2-wise Coverage計算の前に生成組合せそのものを検査します。
+
+1. Factor / Value universe
+2. 生成組合せの未知Factor
+3. 未定義Value
+4. forbidden constraint違反
+5. 必要Factor欠落
+6. 有効な生成組合せだけを使ったfeasible pair 100% Coverage
+
+`代表組合せ`にはPairwise保証を要求しません。
+
+## Markdown parser制約
+
+Canonical Markdown tableのみを対象とします。セル内のescaped pipe `\|`はセル内容として扱います。headerとrowの列数不一致はsilent truncateせず構造エラーとしてCLIをnon-zeroにします。
 
 ## Semantic Output Evalへ残すもの
 
@@ -186,9 +182,11 @@ Deterministic EvalでERRORにしません。
 
 各validatorについてvalid fixtureがPASSし、deliberately invalid fixtureで期待AssertionがFAILするunit testを持ちます。
 
-重点: Risk Matrix誤り、重複ID、unknown reference、未閉鎖Coverage、Pairwise不足Pair、致命的 + 残存リスク受容、Workflow完了 + Blocked。
+false-pass回帰として、空Output、required table / Entity欠落、expected空集合、Authority型不一致、Pairwise不正組合せ、expected修正対象欠落、承認不一致、Markdown列数不一致を検査します。
 
-CIでunit testを実行します。
+CLI integration testではvalid outputのexit 0、invalid outputのexit 1、all modeのOutput欠落non-zeroを確認します。
+
+CIでcompileとunit / integration testを実行します。
 
 ---
 

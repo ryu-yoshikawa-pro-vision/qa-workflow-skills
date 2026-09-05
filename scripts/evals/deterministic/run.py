@@ -41,10 +41,13 @@ def main() -> int:
     args = parser.parse_args()
 
     results: list[dict] = []
+    missing_outputs: list[str] = []
+
     if args.skill != "all":
         if not args.eval_id or not args.output:
             parser.error("--eval-id and --output are required unless --skill all")
         results.append(grade(args.skill, args.eval_id, args.output))
+        payload = results[0]
     else:
         if not args.output_root:
             parser.error("--output-root is required with --skill all")
@@ -52,17 +55,20 @@ def main() -> int:
             eval_file = REPO_ROOT / "skills" / skill / "evals" / "output" / "evals.json"
             data = json.loads(eval_file.read_text(encoding="utf-8"))
             for case in data.get("cases", []):
-                output = args.output_root / skill / f"{case['id']}.md"
+                relative = f"{skill}/{case['id']}.md"
+                output = args.output_root / relative
                 if output.is_file():
                     results.append(grade(skill, case["id"], output))
+                else:
+                    missing_outputs.append(relative)
+        payload = {
+            "status": "fail"
+            if missing_outputs or any(r["status"] == "fail" for r in results)
+            else "pass",
+            "missing_outputs": missing_outputs,
+            "results": results,
+        }
 
-    if not results:
-        print(json.dumps({"status": "fail", "error": "no output files were graded"}, ensure_ascii=False))
-        return 2
-    payload = results[0] if len(results) == 1 else {
-        "status": "fail" if any(r["status"] == "fail" for r in results) else "pass",
-        "results": results,
-    }
     rendered = json.dumps(payload, ensure_ascii=False, indent=2)
     if args.result:
         args.result.parent.mkdir(parents=True, exist_ok=True)

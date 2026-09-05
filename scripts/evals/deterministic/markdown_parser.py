@@ -17,8 +17,31 @@ def _split_row(line: str) -> list[str]:
         line = line[1:]
     if line.endswith("|"):
         line = line[:-1]
-    # Canonical templates do not require escaped pipes in cells.
-    return [cell.strip() for cell in line.split("|")]
+
+    cells: list[str] = []
+    buf: list[str] = []
+    escaped = False
+    for ch in line:
+        if escaped:
+            if ch == "|":
+                buf.append("|")
+            else:
+                buf.append("\\")
+                buf.append(ch)
+            escaped = False
+            continue
+        if ch == "\\":
+            escaped = True
+            continue
+        if ch == "|":
+            cells.append("".join(buf).strip())
+            buf = []
+            continue
+        buf.append(ch)
+    if escaped:
+        buf.append("\\")
+    cells.append("".join(buf).strip())
+    return cells
 
 
 def _is_separator(line: str) -> bool:
@@ -39,13 +62,24 @@ def parse_tables(text: str) -> list[MarkdownTable]:
             continue
         if stripped.startswith("|") and i + 1 < len(lines) and _is_separator(lines[i + 1]):
             headers = _split_row(lines[i])
+            separator = _split_row(lines[i + 1])
+            if len(separator) != len(headers):
+                raise ValueError(
+                    f"Markdown table separator column count mismatch in section '{section}': "
+                    f"headers={len(headers)} separator={len(separator)}"
+                )
             rows: list[dict[str, str]] = []
             i += 2
+            row_number = 0
             while i < len(lines) and lines[i].strip().startswith("|"):
+                row_number += 1
                 cells = _split_row(lines[i])
-                if len(cells) < len(headers):
-                    cells.extend([""] * (len(headers) - len(cells)))
-                rows.append(dict(zip(headers, cells[: len(headers)])))
+                if len(cells) != len(headers):
+                    raise ValueError(
+                        f"Markdown table row column count mismatch in section '{section}' row {row_number}: "
+                        f"headers={len(headers)} cells={len(cells)}"
+                    )
+                rows.append(dict(zip(headers, cells)))
                 i += 1
             tables.append(MarkdownTable(section=section, headers=headers, rows=rows))
             continue
