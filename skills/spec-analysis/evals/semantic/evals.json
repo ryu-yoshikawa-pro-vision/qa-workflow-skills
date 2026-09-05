@@ -1,0 +1,7 @@
+{
+  "skill": "spec-analysis",
+  "cases": [
+    {"id":"SPEC-SEM-001","input":"cases/case-001/input.md","reference":"cases/case-001/reference.md","criteria":["SEM-SPEC-001","SEM-SPEC-003","SEM-SPEC-004","SEM-SPEC-005"]},
+    {"id":"SPEC-SEM-002","input":"cases/case-002/input.md","reference":"cases/case-002/reference.md","criteria":["SEM-SPEC-001","SEM-SPEC-002","SEM-SPEC-004","SEM-SPEC-006"]}
+  ]
+}

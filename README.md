@@ -87,34 +87,47 @@ skills/<skill-name>/
 
 ```text
 EVALS.md
+
 skills/<skill-name>/evals/
 ├── trigger/
 ├── output/
-└── deterministic/
-    └── validator.py
+├── deterministic/
+│   └── validator.py
+└── semantic/
+    ├── rubric.json
+    ├── evals.json
+    └── cases/
+        ├── case-001/
+        │   ├── input.md
+        │   └── reference.md
+        └── case-002/
+            ├── input.md
+            └── reference.md
 
-scripts/skills/evals/deterministic/
-├── run.py
-├── loader.py
-├── markdown_parser.py
-├── common.py
-├── result.py
-└── tests/
-    ├── test_loader.py
-    └── test_markdown_parser.py
+scripts/skills/evals/
+├── deterministic/
+│   ├── run.py
+│   ├── loader.py
+│   ├── markdown_parser.py
+│   ├── common.py
+│   ├── result.py
+│   └── tests/
+└── semantic/
+    ├── run.py
+    ├── loader.py
+    ├── prompt_builder.py
+    ├── result.py
+    ├── validate.py
+    └── tests/
 
-tests/skills/evals/deterministic/
-├── test_deterministic.py
-├── test_false_pass_regressions.py
-├── test_closure_exclusivity.py
-├── test_cli_integration.py
-├── test_repository_integration.py
-└── test_runtime_portability.py
+tests/skills/evals/
+├── deterministic/
+└── semantic/
 ```
 
-Skill固有のTrigger dataset、Output fixture、Deterministic validatorは各Skillの`evals/`配下に置きます。runner、validator loader、Markdown parser、共通utility、result model、grader self-testは`scripts/skills/evals/deterministic/`のshared Eval Runtimeとして共有します。
+Skill固有のTrigger dataset、Output fixture、Deterministic validator、Semantic rubric / fixtureは各Skillの`evals/`配下に置きます。
 
-`scripts/skills/evals/deterministic/tests/`はShared Runtime固有のself-testを保持し、`tests/skills/evals/deterministic/`はこのリポジトリのvalidator・assertion・CLI・portability contractを検証します。
+`scripts/skills/evals/deterministic/tests/`と`scripts/skills/evals/semantic/tests/`はShared Runtime固有のportable self-testを保持します。`tests/skills/evals/`はこのリポジトリ固有のSkill構造、dataset、validator contract、CLI、portabilityを検証します。
 
 Skillを利用するだけの場合は`skills/<skill-name>/`のみをコピーします。Evalも含めてSkillを移植する場合は、`skills/<skill-name>/`（Skill Package）と`scripts/skills/evals/`（Shared Skill Eval Runtime）をコピーします。`scripts/skills/evals/`はAgent Skills Specificationが要求する標準ディレクトリではなく、このリポジトリ独自の評価Runtimeです。
 
@@ -140,7 +153,19 @@ python scripts/skills/evals/deterministic/run.py \
   --output path/to/generated-output.md
 ```
 
-Deterministic Evalだけで成果物の意味品質全体を保証しません。詳細な評価契約、dataset、CLI、ERROR / WARNING、Semantic Evalとの境界は`EVALS.md`を正本とします。
+### Semantic Output Eval
+
+Deterministicでは確定できない意味的正しさ、妥当性、十分性、適切な抽象度、根拠整合、明瞭性を、Skill固有rubricとSemantic fixtureに基づくLLM Judgeで評価します。Judgeはcriterionごとのratingと根拠だけを返し、criterion statusとoverall verdictはShared Runtimeが算出します。
+
+```bash
+python scripts/skills/evals/semantic/run.py \
+  --skill test-case-design \
+  --eval-id TC-SEM-001 \
+  --output path/to/generated-output.md \
+  --judge-command python path/to/judge_adapter.py
+```
+
+Agent実行とCandidate Output生成はDeterministic / Semantic Runtimeの責務外です。詳細な評価契約、dataset、CLI、Judge contract、Deterministic / Semantic境界は`EVALS.md`を正本とします。
 
 ## qa-workflow Runtime前提
 
@@ -148,7 +173,7 @@ Deterministic Evalだけで成果物の意味品質全体を保証しません�
 
 ## Validation
 
-CIで、公式`skills-ref validate`、Trigger dataset構造、Deterministic Output Eval dataset構造、Shared Runtime self-test、repository-specific Deterministic contract testを分離して実行します。
+CIで、公式`skills-ref validate`、Trigger dataset構造、Deterministic Output Eval、Semantic Output Evalを分離して検証します。外部LLM APIはCIから呼ばず、Semantic judge execution contractはfake judgeで検証します。
 
 ## 標準との関係
 

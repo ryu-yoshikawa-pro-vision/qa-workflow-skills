@@ -1,0 +1,12 @@
+{
+  "skill": "test-case-design",
+  "criteria": [
+    {"id":"SEM-TC-001","title":"第三者実行可能性","description":"初見実施者が追加解釈なしで実行できるか。","critical":true},
+    {"id":"SEM-TC-002","title":"開始状態・準備","description":"必要な開始状態・環境・準備が十分か。","critical":true},
+    {"id":"SEM-TC-003","title":"操作具体性","description":"操作対象・入力・順序が曖昧でないか。","critical":true},
+    {"id":"SEM-TC-004","title":"観測可能性","description":"期待結果が実際に観測可能なPASS/FAIL条件になっているか。","critical":true},
+    {"id":"SEM-TC-005","title":"Oracle正しさ","description":"期待結果がAuthorityの意味と一致しているか。","critical":true},
+    {"id":"SEM-TC-006","title":"Coverage具体化","description":"Coverage Itemの意図をケースへ正しく具体化しているか。","critical":true},
+    {"id":"SEM-TC-007","title":"過剰・重複抑制","description":"不要な手順・ケース分割・重複がないか。","critical":false}
+  ]
+}

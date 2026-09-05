@@ -1,0 +1,10 @@
+{
+  "skill": "question-analysis",
+  "criteria": [
+    {"id":"SEM-QUESTION-001","title":"不明点検出","description":"意味上重要な欠落・矛盾・曖昧さを検出できているか。","critical":true},
+    {"id":"SEM-QUESTION-002","title":"分類妥当性","description":"Blocker / 要確認 / 仮定可能 / 提案・任意の分類が意味的に妥当か。","critical":true},
+    {"id":"SEM-QUESTION-003","title":"Blocked範囲","description":"Blockerが止める成果物範囲を必要最小限に限定しているか。","critical":true},
+    {"id":"SEM-QUESTION-004","title":"Assumption統制","description":"承認されていない仮定を確定仕様として扱っていないか。","critical":true},
+    {"id":"SEM-QUESTION-005","title":"質問の意思決定可能性","description":"質問が回答者にとって具体的で、回答後の判断が進む形になっているか。","critical":false}
+  ]
+}

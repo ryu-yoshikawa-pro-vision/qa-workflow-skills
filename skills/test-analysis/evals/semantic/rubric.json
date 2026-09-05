@@ -1,0 +1,11 @@
+{
+  "skill": "test-analysis",
+  "criteria": [
+    {"id":"SEM-RISK-001","title":"Product Risk識別","description":"変更内容から重要な製品失敗リスクを適切に識別できているか。","critical":true},
+    {"id":"SEM-RISK-002","title":"Impact妥当性","description":"Impact判断が実際のユーザー・業務影響に基づいているか。","critical":false},
+    {"id":"SEM-RISK-003","title":"Likelihood妥当性","description":"変更量・複雑性・依存等からLikelihoodを合理的に判断しているか。","critical":false},
+    {"id":"SEM-RISK-004","title":"テスト重点・深度","description":"リスクに応じた重点・深度になっているか。","critical":true},
+    {"id":"SEM-RISK-005","title":"技法選択","description":"問題構造に対して適切なテスト技法を選択しているか。","critical":false},
+    {"id":"SEM-RISK-006","title":"Testability","description":"操作・観測・Oracleを踏まえたtestability / test level判断が妥当か。","critical":false}
+  ]
+}

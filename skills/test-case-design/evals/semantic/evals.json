@@ -1,0 +1,7 @@
+{
+  "skill": "test-case-design",
+  "cases": [
+    {"id":"TC-SEM-001","input":"cases/case-001/input.md","reference":"cases/case-001/reference.md","criteria":["SEM-TC-001","SEM-TC-002","SEM-TC-003","SEM-TC-004","SEM-TC-005","SEM-TC-006"]},
+    {"id":"TC-SEM-002","input":"cases/case-002/input.md","reference":"cases/case-002/reference.md","criteria":["SEM-TC-001","SEM-TC-002","SEM-TC-003","SEM-TC-004","SEM-TC-005","SEM-TC-007"]}
+  ]
+}

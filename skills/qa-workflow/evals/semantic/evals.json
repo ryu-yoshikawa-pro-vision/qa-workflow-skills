@@ -1,0 +1,7 @@
+{
+  "skill": "qa-workflow",
+  "cases": [
+    {"id":"WF-SEM-001","input":"cases/case-001/input.md","reference":"cases/case-001/reference.md","criteria":["SEM-WF-001","SEM-WF-002","SEM-WF-003","SEM-WF-005"]},
+    {"id":"WF-SEM-002","input":"cases/case-002/input.md","reference":"cases/case-002/reference.md","criteria":["SEM-WF-003","SEM-WF-004","SEM-WF-005"]}
+  ]
+}
