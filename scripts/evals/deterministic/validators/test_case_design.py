@@ -72,14 +72,17 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
 
     linked_ci = {ref for row in cases for ref in ids_in(row.get("関連Coverage Item ID", "")) if ref in known_ci}
     embedded_tcn = {ref for row in cases for ref in ids_in(row.get("関連観点ID", "")) if ref in known_tcn}
+    linked_upstream = linked_ci | embedded_tcn
     if "coverage_closure_ids" in expected:
         universe = set(expected["coverage_closure_ids"])
     elif ci_spec:
         universe = known_ci
     else:
         universe = set()
-    missing_closure = sorted(universe - linked_ci - embedded_tcn - disposed_ids)
-    result.add("TC-D007", not missing_closure, "Coverage Item/Test Condition must close to Test Case or Disposition", evidence=missing_closure or None)
+    missing_closure = sorted(universe - linked_upstream - disposed_ids)
+    duplicate_closure = sorted(linked_upstream & disposed_ids)
+    closure_evidence = {"missing": missing_closure, "linked_and_disposed": duplicate_closure} if missing_closure or duplicate_closure else None
+    result.add("TC-D007", not missing_closure and not duplicate_closure, "Coverage Item/Test Condition must close exclusively to a Test Case or Disposition", evidence=closure_evidence)
 
     add_allowed_assertion(result, "TC-D008", (r.get("Disposition", "") for r in disposed), DISPOSITIONS, "Disposition")
     no_reason = [clean(r.get("上流ID", "")) for r in disposed if not clean(r.get("理由 / 根拠", ""))]
