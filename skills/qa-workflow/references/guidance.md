@@ -238,3 +238,17 @@ Coverage Analysis / Adversarial Review等で欠陥を見つけた場合は、最
 - 修正を最も早い責任Skillへ戻している
 - 上流修正後の影響下流だけを`要再検証`している
 - 完了判定が成果物の存在だけでなく状態・閉鎖性・各担当Skillの契約を見ている
+
+## 出力前自己検証
+
+最終出力前に、本Skill自身のInput / Output Contract、停止条件、既存の品質ゲートをOrchestration成果物へ再適用します。品質基準は本ガイダンスの既存定義を正本とし、Self-Validation専用のrubricやチェックリストを別定義しません。
+
+確認対象は開始Skill、既存成果物の再利用、Blocked / 再開、変更伝播、修正routing、Workflow完了判定など、本Skillが所有するOrchestration契約に限ります。他SkillのDomain Logicを再評価・再設計しません。
+
+1. 自身の品質ゲートを満たしているか確認する
+2. 明白かつ局所的で、新しいDomain判断を必要としないOrchestration契約違反だけを最大1回修正する
+3. 修正後は修正箇所を含めて最終確認する。最終確認で問題が残っても2回目の自動修正は行わない
+4. 解消に新しいAuthority、上流判断、他SkillのDomain Logicが必要な場合は自力で補完しない
+5. その場合は既存の停止条件・Blocked・routingに従う
+
+Self-Validationの経緯、PASS表示、修正履歴は通常成果物へ出力せず、現在有効な最終状態だけを返します。

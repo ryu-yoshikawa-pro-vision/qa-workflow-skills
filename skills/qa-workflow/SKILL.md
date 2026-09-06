@@ -15,6 +15,7 @@ description: 新規機能・変更機能・指定対象機能を、仕様分析�
 6. 開始点、再利用、Blocked / 再開、変更伝播、修正routing、Workflow完了判定の詳細が必要な場合は`references/guidance.md`を読みます。
 7. 案件固有情報を新規整理する場合は必要に応じて`assets/project-context-template.md`を利用できます。
 8. Workflow状態を明示する必要がある場合だけ`assets/workflow-state-template.md`を使用します。
+9. 最終出力前に、本Skill自身のInput / Output Contract・停止条件・品質ゲートを対象成果物へ適用して自己検証します。明白かつ局所的で新しいDomain判断を必要としないOrchestration契約違反だけを最大1回修正し、修正後は修正箇所を含めて最終確認します。最終確認で問題が残る場合は2回目の自動修正を行わず、既存の停止条件・Blocked・routingに従います。自己検証でも他SkillのDomain Logicを再判定・再設計しません。
 
 ## インターフェース
 

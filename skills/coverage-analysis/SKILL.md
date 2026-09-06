@@ -15,6 +15,7 @@ description: Current Effective Authority、Product Risk、Test Requirement、Tes
 6. ギャップを発見しても本Skill自身が他層成果物を再設計せず、`qa-workflow`を介して最も近い担当Skillへ戻します。
 7. 既定出力形式が必要な場合は `assets/output-template.md` を使用します。
 8. 他Skillを参照するときはCanonical Skill名を使用します。
+9. 最終出力前に、本Skill自身のInput / Output Contract・停止条件・品質ゲートを対象成果物へ適用して自己検証します。明白かつ局所的で新しいDomain判断を必要としない契約違反だけを最大1回修正し、修正後は修正箇所を含めて最終確認します。最終確認で問題が残る場合は2回目の自動修正を行わず、他層のDomain LogicやCoverage Criteriaを再設計せず既存の停止条件・Blocked・routingに従います。
 
 ## インターフェース
 

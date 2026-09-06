@@ -14,6 +14,14 @@
 
 どのレイヤーも単独ではQA成果物品質全体を保証しません。
 
+## Runtime Self-Validationとの境界
+
+- **Runtime Self-Validation**: 各Skillが最終出力前に、自身のInput / Output Contract、停止条件、既存の品質ゲートを対象成果物へ再適用する実行時処理です。明白・局所的・新しいDomain判断不要な契約違反だけを最大1回修正し、修正後に最終確認します。
+- **Deterministic Output Eval**: 開発・回帰時に、意味解釈なしで機械判定できるOutput Contractを外部graderで評価します。
+- **Semantic Output Eval**: 開発・回帰時に、意味理解が必要な成果物品質を外部LLM Judgeで評価します。
+
+Runtime Self-ValidationはSkill instruction内で完結し、Skill実行時に`scripts/skills/evals/deterministic/`または`scripts/skills/evals/semantic/`のRuntimeを呼び出しません。Deterministic assertionやSemantic rubricをRuntime Self-Validation用の別基準として複製せず、通常成果物へ自己検証ログや評価結果も追加しません。
+
 ---
 
 # Trigger Eval

@@ -135,3 +135,15 @@ Product Riskが未評価でも上流責務自体が明確ならTest Requirement�
 
 - 不明点・期待挙動不明 → `question-analysis`
 - Test Condition / Coverage Item設計 → `test-condition-design`
+
+## 出力前自己検証
+
+最終出力前に、本Skill自身のInput / Output Contract、停止条件、既存の品質ゲートを対象成果物へ再適用します。品質基準は本ガイダンスの既存定義を正本とし、Self-Validation専用のrubricやチェックリストを別定義しません。
+
+1. 自身の品質ゲートを満たしているか確認する
+2. 明白かつ局所的で、新しいDomain判断を必要としない契約違反だけを最大1回修正する
+3. 修正後は修正箇所を含めて最終確認する。最終確認で問題が残っても2回目の自動修正は行わない
+4. 解消に新しいAuthority、上流判断、他SkillのDomain Logicが必要な場合は自力で補完しない
+5. その場合は既存の停止条件・Blocked・routingに従う
+
+未解決AuthorityやProduct RiskをSelf-Validationの名目で再解釈せず、要求の抽象度や責務境界を超えて下流設計へ進みません。Self-Validationの経緯、PASS表示、修正履歴は通常成果物へ出力せず、現在有効な最終状態だけを返します。

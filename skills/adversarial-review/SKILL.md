@@ -16,6 +16,7 @@ description: 仕様分析、不明点・仮定、テスト分析、テスト要�
 7. 工程固有の詳細Domain Logicは担当SkillをSingle Source of Truthとし、本Skillへ別正本として複製しません。
 8. 修正が必要でも本Skill自身が他層成果物を再設計せず、`qa-workflow`を介して最も早い責任Skillへ戻します。
 9. 既定出力形式が必要な場合は`assets/output-template.md`を使用します。
+10. 最終出力前に、本Skill自身のInput / Output Contract・停止条件・品質ゲートをレビュー結果へ適用して自己検証します。明白かつ局所的で新しいDomain判断を必要としない契約違反だけを最大1回修正し、修正後は修正箇所を含めて最終確認します。最終確認で問題が残る場合は2回目の自動修正を行わず、既存の停止条件・Blocked・routingに従います。Self-Validationは自身の出力契約確認に限定し、レビュー結果自体へ新たな意味評価を重ねません。
 
 ## インターフェース
 

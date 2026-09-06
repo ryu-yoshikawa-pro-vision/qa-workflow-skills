@@ -169,3 +169,15 @@ Coverage Item ID例: `TCN-001-CI01`。
 
 - 不明点・期待挙動不明 → `question-analysis`
 - Low-Level Test Case設計 → `test-case-design`
+
+## 出力前自己検証
+
+最終出力前に、本Skill自身のInput / Output Contract、停止条件、既存の品質ゲートを対象成果物へ再適用します。品質基準は本ガイダンスと、採用技法について必要な場合に参照する`coverage-techniques.md`の既存定義を正本とし、Self-Validation専用のrubricやチェックリストを別定義しません。
+
+1. 自身の品質ゲートを満たしているか確認する
+2. 明白かつ局所的で、新しいDomain判断を必要としない契約違反だけを最大1回修正する
+3. 修正後は修正箇所を含めて最終確認する。最終確認で問題が残っても2回目の自動修正は行わない
+4. 解消に新しいAuthority、上流判断、他SkillのDomain Logicが必要な場合は自力で補完しない
+5. その場合は既存の停止条件・Blocked・routingに従う
+
+Self-Validationを理由にCoverage Strategyを根本から再設計したり、未定義の期待結果を追加したりしません。Self-Validationの経緯、PASS表示、修正履歴は通常成果物へ出力せず、現在有効な最終状態だけを返します。
