@@ -1,0 +1,10 @@
+{
+  "skill": "qa-workflow",
+  "criteria": [
+    {"id":"SEM-WF-001","title":"開始Skill判断","description":"要求と既存成果物の状態に対し、開始Skillが意味的に適切か。","critical":true},
+    {"id":"SEM-WF-002","title":"成果物再利用判断","description":"利用可能な既存成果物を不必要に再生成せず、古い成果物を誤って再利用していないか。","critical":false},
+    {"id":"SEM-WF-003","title":"Blocked範囲の局所化","description":"不明点によって必要以上の工程を停止していないか。逆に、停止すべき範囲を継続していないか。","critical":true},
+    {"id":"SEM-WF-004","title":"変更伝播","description":"upstream変更時に影響を受ける下流だけを適切に再検証・再実行しているか。","critical":true},
+    {"id":"SEM-WF-005","title":"完了判断","description":"必要成果物・未解決事項を踏まえて完了判定が意味的に妥当か。","critical":true}
+  ]
+}

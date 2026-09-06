@@ -1,0 +1,10 @@
+{
+  "skill": "coverage-analysis",
+  "criteria": [
+    {"id":"SEM-COV-001","title":"意味的Coverage","description":"IDが接続されているだけでなく、下流成果物が上流意図を実際に検証しているか。","critical":true},
+    {"id":"SEM-COV-002","title":"Gap検出","description":"重要な未網羅を正しく見つけているか。","critical":true},
+    {"id":"SEM-COV-003","title":"Product Risk十分性","description":"重要Product Riskに対してcoverageが十分か。","critical":true},
+    {"id":"SEM-COV-004","title":"過剰・重複","description":"意味上不要な重複coverageを適切に識別しているか。","critical":false},
+    {"id":"SEM-COV-005","title":"修正先判断","description":"Gapの原因層と修正Skill判断が意味的に適切か。","critical":false}
+  ]
+}

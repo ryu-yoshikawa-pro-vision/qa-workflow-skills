@@ -1,0 +1,11 @@
+{
+  "skill": "spec-analysis",
+  "criteria": [
+    {"id":"SEM-SPEC-001","title":"仕様内容の忠実な抽出","description":"sourceの意味を変えずに仕様化できているか。","critical":true},
+    {"id":"SEM-SPEC-002","title":"分類妥当性","description":"SPEC / DECISION / INFERENCE / UNKNOWNの意味的分類が適切か。","critical":true},
+    {"id":"SEM-SPEC-003","title":"Current Effective Authority","description":"version差・上書き・撤回を考慮し、現在有効なAuthorityを正しく解決しているか。","critical":true},
+    {"id":"SEM-SPEC-004","title":"競合情報の扱い","description":"矛盾する情報源を都合よく統合せず、競合として扱えているか。","critical":true},
+    {"id":"SEM-SPEC-005","title":"網羅性","description":"対象範囲に存在する重要仕様を意味的に取りこぼしていないか。","critical":true},
+    {"id":"SEM-SPEC-006","title":"推測抑制","description":"明示されていない内容をSPEC / DECISIONとして確定していないか。","critical":true}
+  ]
+}

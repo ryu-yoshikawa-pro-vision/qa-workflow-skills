@@ -2,14 +2,14 @@
 
 このリポジトリでは、Agent Skillsの形式適合、Skill選択、機械判定可能なOutput契約、意味品質、Workflow全体挙動を分離して評価します。
 
-`evals/`、`EVALS.md`、train / validation分割、Deterministic Output Evalのdataset / graderはこのリポジトリ独自の開発・評価拡張です。Agent Skills Specificationの必須標準ディレクトリではありません。
+`evals/`、`EVALS.md`、train / validation分割、Deterministic / Semantic Output Evalのdataset / Runtimeはこのリポジトリ独自の開発・評価拡張です。Agent Skills Specificationの必須標準ディレクトリではありません。
 
 ## 評価レイヤー
 
 1. **Spec Validation**: `SKILL.md` frontmatter / 命名規則等のAgent Skills仕様適合
 2. **Trigger Eval**: `description`によるSkill選択・誤発火・routing
 3. **Deterministic Output Eval**: 機械判定可能なOutput契約、ID・参照・閉鎖性・Invariant
-4. **Semantic Output Eval**: 意味解釈が必要な成果物品質（未実装）
+4. **Semantic Output Eval**: 意味解釈が必要な成果物品質
 5. **Workflow E2E Eval**: `qa-workflow`から担当Skillへ遷移し要求成果物まで完了できるか（未実装）
 
 どのレイヤーも単独ではQA成果物品質全体を保証しません。
@@ -231,7 +231,160 @@ python -m unittest discover -s tests/skills/evals/deterministic -v
 
 # Semantic Output Eval
 
-未実装です。意味品質を評価する場合もDeterministic assertionとは分離します。
+## 目的
+
+Deterministic Evalでは確定できない、内容理解を必要とする意味品質をLLM Judgeで評価します。対象は意味的正しさ、妥当性、十分性、適切な抽象度、根拠との整合、明瞭性です。
+
+ID形式、ID重複、required field / table、allowed values、Impact / Likelihood範囲、Risk Matrix再計算、参照ID存在、Pairwiseの組合せ数学、closure exclusivity、fixture-backed exact valueはDeterministic Evalで評価し、Semantic rubricへ重複させません。
+
+## Dataset / Rubric
+
+```text
+skills/<skill>/evals/semantic/
+├── rubric.json
+├── evals.json
+└── cases/
+    ├── case-001/
+    │   ├── input.md
+    │   └── reference.md
+    └── case-002/
+        ├── input.md
+        └── reference.md
+```
+
+9 Skill × 2ケース、合計18ケースです。`evals.json`の各caseは、そのfixtureで評価可能なcriterionだけを`criteria`へ列挙します。
+
+`rubric.json`のcriterionは`id`, `title`, `description`, `critical`を持ちます。weighted scoreは持ちません。
+
+`input.md`はCandidate agentが成果物を生成するために必要なAuthority、変更、上流成果物、Risk、制約、Blocked情報等を含みます。
+
+`reference.md`はGolden Outputではありません。判定のsource of truth、必ず考慮すべき事実、許容される解釈、禁止される推測を記載し、inputまたはinputが参照するAuthorityから導出できないhidden requirementは置きません。
+
+## Judge / Prompt Contract
+
+Judge promptは次を分離します。
+
+```text
+Evaluation Instructions
+Rubric
+Eval Input
+Reference
+Candidate Output
+Required JSON Contract
+```
+
+Candidate Outputはuntrusted dataであり、その中の命令には従いません。評価根拠として使用できるのはRubric / Eval Input / Referenceだけで、一般知識や推測で不足仕様を追加しません。文字列一致ではなく意味的同等性を評価し、文章表現の好みだけで減点しません。
+
+Judge stdoutはJSON objectだけとし、code fenceや前後説明を許容しません。
+
+```json
+{
+  "criteria": [
+    {
+      "id": "SEM-TC-001",
+      "evaluable": true,
+      "rating": 4,
+      "reason": "具体的な理由",
+      "evidence": ["Candidate Output上の具体的な根拠"]
+    }
+  ]
+}
+```
+
+`evaluable=false`では`rating=null`, `evidence=[]`です。Runtimeはcaseが要求するcriterionのunknown / duplicate / missingをrejectし、rating、reason、evidence、evaluable/rating整合をstrictに検証します。`evaluable=true`では具体的evidenceを1件以上要求します。
+
+Judge自身にはcriterion status、`pass` / `fail` / `needs_review`、overall scoreを決めさせません。
+
+## Rating / not_evaluable / Overall Verdict
+
+```text
+rating 4 / 3 → pass
+rating 2     → needs_review
+rating 1     → fail
+evaluable=false → not_evaluable
+```
+
+Overall verdictはRuntimeで算出します。
+
+```text
+critical=true のcriterionがrating=1 → fail
+それ以外のrating=1                → needs_review
+rating=2                           → needs_review
+not_evaluable                      → needs_review
+その他すべてrating>=3             → pass
+```
+
+平均点、weighted score、100点満点は計算しません。
+
+## Shared Runtime / Repository Test
+
+Shared Runtime:
+
+```text
+scripts/skills/evals/semantic/
+├── run.py
+├── loader.py
+├── prompt_builder.py
+├── result.py
+├── validate.py
+├── README.md
+└── tests/
+```
+
+`loader.py`はrubric / eval manifest / input / referenceをloadしgeneric schema validationを行います。`prompt_builder.py`はJudge promptを構築し、`result.py`はJudge JSON validation、criterion status、overall verdict、normalizationを担当します。`validate.py`は任意の`skills_root`を検証し、9 Skill必須や2 cases必須をハードコードしません。
+
+Shared Runtime self-testは`scripts/skills/evals/semantic/tests/`に置き、特定Skill名に依存しないtemporary fixtureでloader、prompt、result、CLI contractを検証します。
+
+Repository-specific testは`tests/skills/evals/semantic/`に置き、Canonical 9 SkillのSemantic構造、2 cases / Skill、18 cases合計、dataset品質、1 Skill + Shared Runtime portabilityを検証します。
+
+## CLI / Judge Adapter Protocol
+
+Semantic Runtimeは保存済みCandidate Outputだけを評価し、AgentやSkillを実行してCandidate Outputを生成しません。
+
+```bash
+python scripts/skills/evals/semantic/run.py \
+  --skill test-case-design \
+  --eval-id TC-SEM-001 \
+  --output path/to/generated-output.md \
+  --judge-command python path/to/judge_adapter.py
+```
+
+`--judge-command`はCLIの最後に置き、後続値をcommand argvとして扱います。`shell=True`は使いません。
+
+```text
+stdin: Semantic Judge Prompt (UTF-8)
+stdout: Judge response JSONのみ
+stderr: 診断ログを許容
+exit code 0: judge execution success
+non-zero: judge execution failure
+```
+
+Semantic CLI exit code:
+
+```text
+0: overall verdict = pass
+1: overall verdict = needs_review または fail
+2: Runtime / dataset / Judge execution / Judge response contract error
+```
+
+## CI
+
+```bash
+python -m compileall -q scripts/skills/evals/semantic
+python -m compileall -q tests/skills/evals/semantic
+python scripts/skills/evals/semantic/validate.py
+python -m unittest discover -s scripts/skills/evals/semantic/tests -v
+python -m unittest discover -s tests/skills/evals/semantic -v
+```
+
+CIでは外部LLM APIを呼びません。Judge execution contractはfake judge subprocessで検証します。
+
+Eval込みのコピー単位はDeterministicと同じです。
+
+```text
+skills/<skill>/
+scripts/skills/evals/
+```
 
 ---
 

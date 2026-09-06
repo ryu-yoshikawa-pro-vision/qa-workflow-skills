@@ -1,0 +1,10 @@
+{
+  "skill": "adversarial-review",
+  "criteria": [
+    {"id":"SEM-REV-001","title":"実在欠陥検出","description":"成果物に存在する重要な意味欠陥を検出できているか。","critical":true},
+    {"id":"SEM-REV-002","title":"False Positive抑制","description":"問題ではない箇所を欠陥として扱っていないか。","critical":true},
+    {"id":"SEM-REV-003","title":"重大度","description":"欠陥影響に対する重大度判断が妥当か。","critical":false},
+    {"id":"SEM-REV-004","title":"根拠","description":"指摘が対象成果物・Authority等の具体根拠に結びついているか。","critical":true},
+    {"id":"SEM-REV-005","title":"修正先","description":"問題の原因層に対する修正Skill / Project Context routingが適切か。","critical":false}
+  ]
+}

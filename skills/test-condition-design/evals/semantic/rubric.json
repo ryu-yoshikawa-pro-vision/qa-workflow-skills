@@ -1,0 +1,11 @@
+{
+  "skill": "test-condition-design",
+  "criteria": [
+    {"id":"SEM-TCN-001","title":"Requirement展開","description":"Test Requirementを意味のあるTest Conditionへ展開できているか。","critical":true},
+    {"id":"SEM-TCN-002","title":"技法選択","description":"状態遷移・境界値・同値分割・組合せ等の技法選択が問題構造に合っているか。","critical":false},
+    {"id":"SEM-TCN-003","title":"Coverage Criteria十分性","description":"何を満たせば十分かが意味的に適切か。","critical":true},
+    {"id":"SEM-TCN-004","title":"Coverage Item代表性","description":"Coverage ItemがCriteriaを実際に代表・具体化しているか。","critical":true},
+    {"id":"SEM-TCN-005","title":"冗長性抑制","description":"同じ意味の条件を不要に重複させていないか。","critical":false},
+    {"id":"SEM-TCN-006","title":"Disposition妥当性","description":"採用しない候補のDispositionが意味的に妥当か。","critical":false}
+  ]
+}

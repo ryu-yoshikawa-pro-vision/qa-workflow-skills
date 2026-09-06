@@ -1,0 +1,10 @@
+{
+  "skill": "test-requirement-design",
+  "criteria": [
+    {"id":"SEM-TR-001","title":"Authority整合","description":"Test RequirementがCurrent Effective Authorityと意味的に一致しているか。","critical":true},
+    {"id":"SEM-TR-002","title":"Product Risk対応","description":"重要Product Riskに対する検証責務を持っているか。","critical":true},
+    {"id":"SEM-TR-003","title":"抽象度","description":"Test Requirementとして適切な抽象度であり、具体手順へ落ちすぎていないか。","critical":false},
+    {"id":"SEM-TR-004","title":"検証責務の十分性","description":"必要な保証責務を漏らしていないか。","critical":true},
+    {"id":"SEM-TR-005","title":"過剰要求抑制","description":"AuthorityやRiskに根拠のない要求を作っていないか。","critical":true}
+  ]
+}

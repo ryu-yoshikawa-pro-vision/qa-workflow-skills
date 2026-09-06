@@ -1,0 +1,7 @@
+{
+  "skill": "adversarial-review",
+  "cases": [
+    {"id":"REV-SEM-001","input":"cases/case-001/input.md","reference":"cases/case-001/reference.md","criteria":["SEM-REV-001","SEM-REV-002","SEM-REV-003","SEM-REV-004","SEM-REV-005"]},
+    {"id":"REV-SEM-002","input":"cases/case-002/input.md","reference":"cases/case-002/reference.md","criteria":["SEM-REV-001","SEM-REV-002","SEM-REV-004","SEM-REV-005"]}
+  ]
+}

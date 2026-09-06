@@ -1,0 +1,7 @@
+{
+  "skill": "test-condition-design",
+  "cases": [
+    {"id":"TCN-SEM-001","input":"cases/case-001/input.md","reference":"cases/case-001/reference.md","criteria":["SEM-TCN-001","SEM-TCN-002","SEM-TCN-003","SEM-TCN-004"]},
+    {"id":"TCN-SEM-002","input":"cases/case-002/input.md","reference":"cases/case-002/reference.md","criteria":["SEM-TCN-001","SEM-TCN-002","SEM-TCN-003","SEM-TCN-005","SEM-TCN-006"]}
+  ]
+}
