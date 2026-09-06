@@ -14,6 +14,7 @@ description: 仕様・QA成果物の曖昧さ、矛盾、欠落、未解決事�
 5. Blockerは可能な限り影響範囲だけに限定します。
 6. 既定出力形式が必要な場合は `assets/output-template.md` を使用します。
 7. 他Skillを参照するときはCanonical Skill名を使用します。
+8. 最終出力前に、実際に利用した入力が本SkillのInput Contractを満たし、停止条件に該当する未解決状態がないか確認します。あわせて、生成した成果物へ本Skill自身のOutput Contract・品質ゲートを適用して自己検証します。明白かつ局所的で新しいDomain判断を必要としない契約違反だけを最大1回修正し、修正後は修正箇所を含めて最終確認します。未解決事項やAssumptionの分類・承認状態をSelf-Validationの名目で変更せず、Authority不足や上流判断不足があれば既存の停止条件・Blocked・routingに従います。最終確認後も本Skill自身の契約違反が残り、既存の停止条件・Blocked・routingに該当しない場合は2回目の自動修正を行わず、その成果物を契約適合済み・完成済みとして扱わず、現在残る契約上の制約だけを明示します。Self-Validationの経緯や修正回数は出力しません。
 
 ## インターフェース
 

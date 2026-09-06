@@ -221,3 +221,15 @@ Test CaseやTest Conditionが上流成果物と意味的につながらない。
 - 低Product Riskを無言削除の理由にしていない
 - Gapの修正先が最も近い責任Skillになっている
 - 本Skill自身が他層成果物を再設計していない
+
+## 出力前自己検証
+
+最終出力前に、実際に利用した入力が本SkillのInput Contractを満たし、入力・Authority・判断状態に停止条件へ該当する未解決状態がないか確認します。あわせて、生成した成果物へ本SkillのOutput Contractと既存の品質ゲートを再適用します。品質基準は本ガイダンスと各担当Skillの既存契約を正本とし、Self-Validation専用のrubricやチェックリストを別定義しません。
+
+1. 実際に利用した入力がInput Contractを満たし、停止条件へ該当する未解決状態がないか確認する
+2. 生成した成果物がOutput Contractと既存の品質ゲートを満たしているか確認する
+3. 明白かつ局所的で、新しいDomain判断を必要としない契約違反だけを最大1回修正する
+4. 修正後は修正箇所を含めて最終確認する。解消に新しいAuthority、上流判断、他SkillのDomain Logicが必要な場合は自力で補完せず、既存の停止条件・Blocked・routingに従う
+5. 最終確認後も本Skill自身の契約違反が残り、既存の停止条件・Blocked・routingに該当しない場合は、2回目の自動修正を行わず、その成果物を契約適合済み・完成済みとして扱わない。現在残っている契約上の制約だけを明示する
+
+Self-ValidationでCoverage Criteriaや他層成果物を再設計せず、発見した責務外問題は既存routingへ戻します。既存の`Blocked`定義を未解消ローカル違反へ広げません。Self-Validationの実行経緯、修正回数、修正前状態、PASS / FAIL等の評価ログは通常成果物へ出力せず、現在有効な状態と未解消の契約上の制約だけを返します。
