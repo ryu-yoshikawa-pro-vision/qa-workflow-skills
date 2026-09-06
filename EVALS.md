@@ -16,7 +16,7 @@
 
 ## Runtime Self-Validationとの境界
 
-- **Runtime Self-Validation**: 各Skillが最終出力前に、自身のInput / Output Contract、停止条件、既存の品質ゲートを対象成果物へ再適用する実行時処理です。明白・局所的・新しいDomain判断不要な契約違反だけを最大1回修正し、修正後に最終確認します。
+- **Runtime Self-Validation**: 各Skillが最終出力前に、実際に利用した入力についてInput Contractと停止条件を確認し、生成成果物についてOutput Contractと既存の品質ゲートを確認する実行時処理です。明白・局所的・新しいDomain判断不要な契約違反だけを最大1回修正し、修正後に最終確認します。最終確認後も本Skill自身の契約違反が残り、既存の停止条件・Blocked・routingに該当しない場合は、2回目の自動修正や無理なBlocked化を行わず、その成果物を契約適合済み・完成済みとして扱わず、現在残る契約上の制約だけを明示します。
 - **Deterministic Output Eval**: 開発・回帰時に、意味解釈なしで機械判定できるOutput Contractを外部graderで評価します。
 - **Semantic Output Eval**: 開発・回帰時に、意味理解が必要な成果物品質を外部LLM Judgeで評価します。
 

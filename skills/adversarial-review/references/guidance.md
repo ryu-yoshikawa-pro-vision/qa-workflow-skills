@@ -143,14 +143,14 @@ Coverage、追跡性、実行可能性、Oracle信頼性等を実質的に弱め
 
 ## 出力前自己検証
 
-最終出力前に、本Skill自身のInput / Output Contract、停止条件、既存の品質ゲートをレビュー結果へ再適用します。品質基準は本ガイダンスと対象成果物に応じて利用した既存referenceを正本とし、Self-Validation専用のrubricやチェックリストを別定義しません。
+最終出力前に、実際に利用した入力が本SkillのInput Contractを満たし、入力・Authority・判断状態に停止条件へ該当する未解決状態がないか確認します。あわせて、生成したレビュー結果へ本SkillのOutput Contractと既存の品質ゲートを再適用します。品質基準は本ガイダンスと対象成果物に応じて利用した既存referenceを正本とし、Self-Validation専用のrubricやチェックリストを別定義しません。
 
-確認対象は本Skill自身のレビュー出力契約に限ります。Self-Validationでレビュー結果そのものへ新しいSemantic Judgeを重ねたり、対象成果物を再度Cold Reviewしたりしません。
+確認対象は本Skill自身が生成したFinding / Severity / Evidence / Repair Target等を含むレビュー出力契約に限ります。Self-Validationで対象成果物を再度Cold Reviewしたり、レビュー結果そのものへ新しいSemantic Judgeを重ねたりしません。
 
-1. 自身の品質ゲートを満たしているか確認する
-2. 明白かつ局所的で、新しいDomain判断を必要としない契約違反だけを最大1回修正する
-3. 修正後は修正箇所を含めて最終確認する。最終確認で問題が残っても2回目の自動修正は行わない
-4. 解消に新しいAuthority、上流判断、他SkillのDomain Logicが必要な場合は自力で補完しない
-5. その場合は既存の停止条件・Blocked・routingに従う
+1. 実際に利用した入力がInput Contractを満たし、停止条件へ該当する未解決状態がないか確認する
+2. 生成したレビュー結果がOutput Contractと既存の品質ゲートを満たしているか確認する
+3. 明白かつ局所的で、新しいDomain判断を必要としない契約違反だけを最大1回修正する
+4. 修正後は修正箇所を含めて最終確認する。解消に新しいAuthority、上流判断、他SkillのDomain Logicが必要な場合は自力で補完せず、既存の停止条件・Blocked・routingに従う
+5. 最終確認後も本Skill自身の契約違反が残り、既存の停止条件・Blocked・routingに該当しない場合は、2回目の自動修正を行わず、そのレビュー結果を契約適合済み・完成済みとして扱わない。現在残っている契約上の制約だけを明示する
 
-Self-Validationの経緯、PASS表示、修正履歴は通常成果物へ出力せず、現在有効な最終状態だけを返します。
+既存の`Blocked`定義を未解消ローカル違反へ広げません。Self-Validationの実行経緯、修正回数、修正前状態、PASS / FAIL等の評価ログは通常成果物へ出力せず、現在有効な状態と未解消の契約上の制約だけを返します。
