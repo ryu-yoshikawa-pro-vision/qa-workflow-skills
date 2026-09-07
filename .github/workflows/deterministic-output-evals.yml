@@ -19,50 +19,6 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Temporary Japanese terminology residual check
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          roots = [Path("README.md"), Path("EVALS.md")]
-          roots.extend(Path("skills").glob("*/SKILL.md"))
-          roots.extend(Path("skills").glob("*/references/*.md"))
-          roots.extend(Path("skills").glob("*/assets/*.md"))
-          roots.extend([
-              Path("scripts/skills/evals/deterministic/README.md"),
-              Path("scripts/skills/evals/deterministic/ASSERTIONS.md"),
-              Path("scripts/skills/evals/semantic/README.md"),
-          ])
-
-          forbidden = [
-              "Current Effective Authority", "Authority ID", "Related Authority ID", "Authority conflict",
-              "Canonical Registry", "Product Risk", "Project Risk", "Test Requirement", "Test Condition",
-              "Coverage Criteria", "Coverage Item", "Coverage Analysis", "Low-Level Test Case", "Disposition",
-              "Blocked", "Blocker", "routing", "Full Workflow", "Domain Logic", "Single Source of Truth",
-              "Self-Validation", "Input Contract", "Output Contract", "Cold Review", "Oracle", "Assumption",
-              "Candidate Output", "Semantic Output Eval", "Deterministic Output Eval", "Trigger Eval",
-              "Spec Validation", "Workflow E2E Eval", "Decision Table", "Error Guessing",
-          ]
-
-          findings = []
-          for path in sorted(set(roots)):
-              if not path.is_file():
-                  continue
-              for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-                  for term in forbidden:
-                      if term in line:
-                          findings.append(f"{path}:{lineno}: {term}: {line}")
-          if findings:
-              print("\n".join(findings))
-              raise SystemExit(1)
-          print(f"Japanese terminology residual check: PASS ({len(set(roots))} files scanned)")
-          PY
-
-      - name: Temporary git diff check
-        run: |
-          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
-          git diff --check FETCH_HEAD HEAD
-
       - name: Validate output eval datasets
         run: |
           python - <<'PY'
