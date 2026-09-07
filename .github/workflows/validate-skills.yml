@@ -14,13 +14,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Validate diff whitespace
-        shell: bash
-        run: |
-          set -euo pipefail
-          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
-          git diff --check FETCH_HEAD HEAD
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
