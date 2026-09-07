@@ -21,7 +21,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     result = EvalResult("spec-analysis", eval_id)
     tables = parse_tables(text)
 
-    refs_table = find_table(tables, section_contains="情報源 / 正本一覧参照一覧", required_headers=("参照ID",))
+    refs_table = find_table(tables, section_contains="情報源 / 正本参照一覧", required_headers=("参照ID",))
     items_table = find_table(tables, section_contains="分析項目", required_headers=("項目ID", "分類"))
     authorities_table = find_table(tables, section_contains="現在有効な仕様根拠", required_headers=("仕様根拠ID", "種別"))
     structure_ok = all(t is not None for t in (refs_table, items_table, authorities_table))
@@ -29,7 +29,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         "SPEC-D012",
         structure_ok,
         "仕様分析の正規テーブルが存在すること",
-        evidence={"missing": [label for label, table in (("情報源 / 正本一覧参照一覧", refs_table), ("分析項目", items_table), ("現在有効な仕様根拠", authorities_table)) if table is None]} if not structure_ok else None,
+        evidence={"missing": [label for label, table in (("情報源 / 正本参照一覧", refs_table), ("分析項目", items_table), ("現在有効な仕様根拠", authorities_table)) if table is None]} if not structure_ok else None,
     )
 
     refs = nonempty_rows(refs_table)
@@ -42,7 +42,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     result.add("SPEC-D017", not bad_src_ids, "情報源参照IDがSRC-xxx形式であること", evidence=bad_src_ids or None)
     add_duplicate_assertion(result, "SPEC-D018", src_ids, "情報源参照ID")
 
-    add_required_fields_assertion(result, "SPEC-D014", items, ("項目ID", "内容", "分類", "情報源 / 正本一覧参照"), "項目ID", "分析項目")
+    add_required_fields_assertion(result, "SPEC-D014", items, ("項目ID", "内容", "分類", "情報源 / 正本参照"), "項目ID", "分析項目")
     add_required_fields_assertion(result, "SPEC-D015", authorities, ("仕様根拠ID", "種別", "現在有効な内容", "適用範囲", "情報源 / 正本一覧", "関係"), "仕様根拠ID", "現在有効な仕様根拠")
 
     bad_ids, bad_class, item_ids = [], [], []
@@ -67,7 +67,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     known_src = set(src_ids)
     unknown_src = []
     for row in items:
-        for ref in ids_in(row.get("情報源 / 正本一覧参照", "")):
+        for ref in ids_in(row.get("情報源 / 正本参照", "")):
             if ID_PATTERNS["SRC"].fullmatch(ref) and ref not in known_src:
                 unknown_src.append({"item": row.get("項目ID"), "reference": ref})
     result.add("SPEC-D004", not unknown_src, "参照したSRC IDが存在すること", evidence=unknown_src or None)
@@ -120,7 +120,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         missing = sorted(set(expected["required_current_authorities"]) - set(authority_ids))
         if missing:
             required_issues.append({"kind": "current_authority", "missing": missing})
-    result.add("SPEC-D011", not required_issues, "fixtureで必須の分析項目と現在有効な仕様根拠が存在すること", evidence=required_issues or None)
+    result.add("SPEC-D011", not required_issues, "フィクスチャで必須の分析項目と現在有効な仕様根拠が存在すること", evidence=required_issues or None)
 
     approval_issues = []
     if "approved_assumptions" in expected:
@@ -129,5 +129,5 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             aid = clean(row.get("仕様根拠ID", ""))
             if ID_PATTERNS["ASM"].fullmatch(aid) and aid not in approved_ids:
                 approval_issues.append(aid)
-    result.add("SPEC-D013", not approval_issues, "fixtureで参照するASMの仕様根拠が承認済みであること", evidence=approval_issues or None)
+    result.add("SPEC-D013", not approval_issues, "フィクスチャで参照するASMの仕様根拠が承認済みであること", evidence=approval_issues or None)
     return result

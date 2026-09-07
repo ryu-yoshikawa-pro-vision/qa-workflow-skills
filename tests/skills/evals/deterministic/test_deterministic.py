@@ -20,12 +20,12 @@ class DeterministicValidatorTests(unittest.TestCase):
 
     def test_spec_analysis_valid_and_duplicate_id(self):
         valid = """# 仕様分析
-## 情報源 / 正本一覧参照一覧
+## 情報源 / 正本参照一覧
 | 参照ID | 情報源 / 正本一覧 | 権威 / 優先順位 | 鮮度 / バージョン | 対象範囲 | 参照 / 備考 |
 | --- | --- | --- | --- | --- | --- |
 | SRC-001 | 要件書 | 正本 | v1 | 設定 | - |
 ## 分析項目
-| 項目ID | カテゴリ | 内容 | 分類 | 情報源 / 正本一覧参照 | 現在有効か | 補足 / 上書き / 置換関係 | 備考 |
+| 項目ID | カテゴリ | 内容 | 分類 | 情報源 / 正本参照 | 現在有効か | 補足 / 上書き / 置換関係 | 備考 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | SPEC-001 | 保存 | 保存できる | SPEC | SRC-001 | Yes | 独立 | - |
 ## 現在有効な仕様根拠
@@ -44,7 +44,7 @@ class DeterministicValidatorTests(unittest.TestCase):
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Q-001 | 遷移先不明 | SPECなし | ブロッカー | TC | 停止 | 未確定 | test-case-design |
 ## 仮定候補
-| 仮定候補 | 状態 | 根拠 / 理由 | 影響範囲 | 正本ASM ID |
+| 仮定候補 | 状態 | 根拠 / 理由 | 影響範囲 | 正式ASM ID |
 | --- | --- | --- | --- | --- |
 ## ブロック中範囲
 | ブロッカーID | ブロック中成果物 / 範囲 | 必要な決定 / 情報源 | 再開Skill |
@@ -177,7 +177,7 @@ class DeterministicValidatorTests(unittest.TestCase):
 ## 指摘一覧
 | 指摘ID | 重要度 | 対象成果物 / 位置 | 問題 | 根拠 | 影響 | 推奨修正 | 修正Skill / 層 | 処置 | 処置根拠 / 承認参照 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| REV-001 | 重大 | TC-001 | 仕様根拠参照不明 | 仕様根拠 | 判定根拠不明 | 修正 | test-case-design | 修正済み | |
+| REV-001 | 重大 | TC-001 | 仕様根拠参照不明 | 仕様根拠 | 期待結果の根拠不明 | 修正 | test-case-design | 修正済み | |
 """
         exp={"known_artifact_ids":["TC-001"],"expected_defects":[{"target_id":"TC-001","contains":"仕様根拠"}]}
         self.assert_pass("adversarial-review",valid,exp)
