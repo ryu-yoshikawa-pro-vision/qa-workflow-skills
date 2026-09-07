@@ -17,13 +17,13 @@ class ClosureExclusivityRegressionTests(unittest.TestCase):
     def test_test_requirement_cannot_link_and_dispose_same_upstream(self) -> None:
         text = """# テスト要求
 ## テスト要求一覧
-| テスト要求ID | テスト要求 | Current Effective Authority | 関連Product Risk | 優先度 | テストレベル / 観測方法 |
+| テスト要求ID | テスト要求 | 現在有効な仕様根拠 | 関連プロダクトリスク | 優先度 | テストレベル / 観測方法 |
 | --- | --- | --- | --- | --- | --- |
 | TR-001 | 保存を検証する | SPEC-001 | RISK-001 | 高 | システム / UI |
-## Test Requirementを作らない上流項目
-| 上流ID | 種別 | Disposition | 理由 / 根拠 |
+## テスト要求を作らない上流項目
+| 上流ID | 種別 | 扱い | 理由 / 根拠 |
 | --- | --- | --- | --- |
-| SPEC-001 | Authority | 対象外 | 対象外と判断 |
+| SPEC-001 | 仕様根拠 | 対象外 | 対象外と判断 |
 """
         expected = {
             "known_authorities": ["SPEC-001"],
@@ -33,19 +33,19 @@ class ClosureExclusivityRegressionTests(unittest.TestCase):
 
     def test_test_condition_cannot_link_and_dispose_same_requirement(self) -> None:
         text = """# テスト観点・条件
-## Test Conditionへ展開しないTest Requirement
-| テスト要求ID | Disposition | 理由 / 根拠 |
+## テスト条件へ展開しないテスト要求
+| テスト要求ID | 扱い | 理由 / 根拠 |
 | --- | --- | --- |
-| TR-001 | Blocked | 必要情報不足 |
+| TR-001 | ブロック中 | 必要情報不足 |
 ## テスト観点・条件一覧
-| 観点ID | テスト要求ID | テスト観点 / 条件 | テスト技法 / 根拠 | Coverage Criteria | 優先度 |
+| 観点ID | テスト要求ID | テスト観点 / 条件 | テスト技法 / 根拠 | カバレッジ基準 | 優先度 |
 | --- | --- | --- | --- | --- | --- |
 | TCN-001 | TR-001 | 保存条件を確認する | 状態遷移 / 状態変化あり | 有効遷移 | 高 |
-## Coverage Item一覧
-| Coverage Item ID | 観点ID | Coverage Item | 導出元の技法 / 基準 | 期待挙動の根拠 | 優先度 |
+## カバレッジ項目一覧
+| カバレッジ項目ID | 観点ID | カバレッジ項目 | 導出元の技法 / 基準 | 期待挙動の根拠 | 優先度 |
 | --- | --- | --- | --- | --- | --- |
-## Coverage候補のDisposition
-| 候補 | 導出元 | Disposition | 理由 / 根拠 | カバー先 |
+## カバレッジ候補の扱い
+| 候補 | 導出元 | 扱い | 理由 / 根拠 | カバー先 |
 | --- | --- | --- | --- | --- |
 """
         expected = {"known_test_requirements": ["TR-001"]}
@@ -54,13 +54,13 @@ class ClosureExclusivityRegressionTests(unittest.TestCase):
     def test_test_case_cannot_link_and_dispose_same_coverage_item(self) -> None:
         text = """# テストケース
 ## テストケース一覧
-| テストケースID | タイトル / 目的 | 関連観点ID | 関連Coverage Item ID | 関連テスト要求ID | 優先度 | 前提条件 | テストデータ | 実施手順 | 期待結果 | 期待結果の根拠 |
+| テストケースID | タイトル / 目的 | 関連観点ID | 関連カバレッジ項目ID | 関連テスト要求ID | 優先度 | 前提条件 | テストデータ | 実施手順 | 期待結果 | 期待結果の根拠 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | TC-001 | 保存確認 | TCN-001 | TCN-001-CI01 | TR-001 | 高 | ログイン済み | 有効値 | 保存する | 保存済み表示 | SPEC-001 |
-## Test Caseへ展開しないCoverage Item / Test Condition
-| 上流ID | 種別 | Disposition | 理由 / 根拠 |
+## テストケースへ展開しないカバレッジ項目 / テスト条件
+| 上流ID | 種別 | 扱い | 理由 / 根拠 |
 | --- | --- | --- | --- |
-| TCN-001-CI01 | Coverage Item | 残存リスク | 意図的に未カバー |
+| TCN-001-CI01 | カバレッジ項目 | 残存リスク | 意図的に未カバー |
 """
         expected = {
             "known_test_conditions": ["TCN-001"],
