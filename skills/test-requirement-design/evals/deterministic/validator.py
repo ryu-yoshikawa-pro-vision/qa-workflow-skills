@@ -50,7 +50,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     disposition_known = (known_auth if auth_spec else set()) | (known_risks if risk_spec else set())
     disposition_check = auth_spec or risk_spec
     unknown_disposed = sorted({clean(r.get("上流ID", "")) for r in disposed if disposition_check and clean(r.get("上流ID", "")) and clean(r.get("上流ID", "")) not in disposition_known})
-    result.add("TR-D013", not unknown_disposed, "fixtureで上流集合を指定した場合、扱い対象の上流IDが存在すること", evidence=unknown_disposed or None)
+    result.add("TR-D013", not unknown_disposed, "フィクスチャで上流集合を指定した場合、扱い対象の上流IDが存在すること", evidence=unknown_disposed or None)
 
     linked_auth = {ref for row in trs for ref in ids_in(row.get("現在有効な仕様根拠", "")) if ref in known_auth}
     linked_risk = {ref for row in trs for ref in ids_in(row.get("関連プロダクトリスク", "")) if ref in known_risks}
@@ -60,18 +60,18 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     missing_closure = sorted(closure_universe - linked_upstream - disposed_ids)
     duplicate_closure = sorted(linked_upstream & disposed_ids)
     closure_evidence = {"missing": missing_closure, "linked_and_disposed": duplicate_closure} if missing_closure or duplicate_closure else None
-    result.add("TR-D009", not missing_closure and not duplicate_closure, "fixtureの上流仕様根拠 / リスクがテスト要求または扱いのどちらか一方へ閉じること", evidence=closure_evidence)
+    result.add("TR-D009", not missing_closure and not duplicate_closure, "フィクスチャの上流仕様根拠 / リスクがテスト要求または扱いのどちらか一方へ閉じること", evidence=closure_evidence)
 
     required_links = set(expected.get("required_linked_upstream_ids", []))
     missing_required_links = sorted(required_links - linked_auth - linked_risk)
-    result.add("TR-D014", not missing_required_links, "fixtureで必須の上流IDがテスト要求へ接続されていること", evidence=missing_required_links or None)
+    result.add("TR-D014", not missing_required_links, "フィクスチャで必須の上流IDがテスト要求へ接続されていること", evidence=missing_required_links or None)
 
     actual_dispositions = {clean(r.get("上流ID", "")): clean(r.get("扱い", "")) for r in disposed if clean(r.get("上流ID", ""))}
     disposition_mismatch = []
     for upstream_id, disposition in expected.get("expected_dispositions", {}).items():
         if actual_dispositions.get(upstream_id) != disposition:
             disposition_mismatch.append({"id": upstream_id, "expected": disposition, "actual": actual_dispositions.get(upstream_id)})
-    result.add("TR-D015", not disposition_mismatch, "fixtureで指定した上流項目の扱いが一致すること", evidence=disposition_mismatch or None)
+    result.add("TR-D015", not disposition_mismatch, "フィクスチャで指定した上流項目の扱いが一致すること", evidence=disposition_mismatch or None)
 
     levels = expected.get("product_risk_levels", {})
     overrides = set(expected.get("priority_override_trs", []))
@@ -89,5 +89,5 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     required_missing = []
     if "required_test_requirements" in expected:
         required_missing = sorted(set(expected["required_test_requirements"]) - set(tr_ids))
-    result.add("TR-D012", not required_missing, "fixtureで必須のテスト要求が存在すること", evidence=required_missing or None)
+    result.add("TR-D012", not required_missing, "フィクスチャで必須のテスト要求が存在すること", evidence=required_missing or None)
     return result

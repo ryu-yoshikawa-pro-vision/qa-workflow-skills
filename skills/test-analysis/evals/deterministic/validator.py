@@ -74,7 +74,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                 unknown.append({"risk": row.get("リスクID"), "reference": ref})
             elif ref.startswith("DEP-") and dep_spec and ref not in known_deps:
                 unknown.append({"risk": row.get("リスクID"), "reference": ref})
-    result.add("RISK-D006", not unknown, "リスク参照がfixtureデータに存在すること", evidence=unknown or None)
+    result.add("RISK-D006", not unknown, "リスク参照がフィクスチャデータに存在すること", evidence=unknown or None)
 
     add_required_fields_assertion(
         result,
@@ -128,12 +128,12 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             }
             if actual != expected_values:
                 required_issues.append({"id": rid, "expected": expected_values, "actual": actual})
-    result.add("RISK-D011", not required_issues, "fixtureで必須のプロダクトリスクが期待するマトリクス値で存在すること", evidence=required_issues or None)
+    result.add("RISK-D011", not required_issues, "フィクスチャで必須のプロダクトリスクが期待するマトリクス値で存在すること", evidence=required_issues or None)
 
     required_techniques = set(expected.get("required_techniques", []))
     actual_techniques = {clean(r.get("テスト技法", "")) for r in techniques if clean(r.get("テスト技法", ""))}
     missing_techniques = sorted(required_techniques - actual_techniques)
-    result.add("RISK-D014", not missing_techniques, "fixtureで必須のテスト技法が選択されていること", evidence=missing_techniques or None)
+    result.add("RISK-D014", not missing_techniques, "フィクスチャで必須のテスト技法が選択されていること", evidence=missing_techniques or None)
 
     testability_mismatch = None
     if "required_testability" in expected:
@@ -147,5 +147,5 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                     for row in testability
                 ],
             }
-    result.add("RISK-D015", testability_mismatch is None, "fixtureで必須のテスト可能性値がテスト可能性行に存在すること", evidence=testability_mismatch)
+    result.add("RISK-D015", testability_mismatch is None, "フィクスチャで必須のテスト可能性値がテスト可能性行に存在すること", evidence=testability_mismatch)
     return result

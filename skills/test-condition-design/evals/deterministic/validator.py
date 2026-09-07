@@ -112,7 +112,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     add_allowed_assertion(result, "TCN-D010", (r.get("扱い", "") for r in tr_disposed), TR_DISPOSITIONS, "テスト要求の扱い")
     add_allowed_assertion(result, "TCN-D011", (r.get("扱い", "") for r in candidate_disposed), DISPOSITIONS, "カバレッジ候補の扱い")
     unknown_disposed_trs = sorted({clean(r.get("テスト要求ID", "")) for r in tr_disposed if tr_spec and clean(r.get("テスト要求ID", "")) and clean(r.get("テスト要求ID", "")) not in known_trs})
-    result.add("TCN-D029", not unknown_disposed_trs, "fixtureでテスト要求を指定した場合、扱い対象のテスト要求IDが存在すること", evidence=unknown_disposed_trs or None)
+    result.add("TCN-D029", not unknown_disposed_trs, "フィクスチャでテスト要求を指定した場合、扱い対象のテスト要求IDが存在すること", evidence=unknown_disposed_trs or None)
 
     bad_disp = []
     for row in tr_disposed + candidate_disposed:
@@ -133,7 +133,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     missing_tr = sorted(known_trs - linked_trs - disposed_trs) if tr_spec else []
     duplicate_closure = sorted(linked_trs & disposed_trs) if tr_spec else []
     closure_evidence = {"missing": missing_tr, "linked_and_disposed": duplicate_closure} if missing_tr or duplicate_closure else None
-    result.add("TCN-D013", not missing_tr and not duplicate_closure, "各fixtureテスト要求がテスト条件または扱いのどちらか一方へ閉じること", evidence=closure_evidence)
+    result.add("TCN-D013", not missing_tr and not duplicate_closure, "各フィクスチャテスト要求がテスト条件または扱いのどちらか一方へ閉じること", evidence=closure_evidence)
 
     pairwise = expected.get("pairwise")
     if pairwise:
@@ -146,7 +146,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             actual_factors.setdefault(clean(row.get("因子", "")), set()).add(clean(row.get("値", "")))
         expected_factors = {k: set(v) for k, v in pairwise.get("factors", {}).items()}
         mismatch = {k: {"expected": sorted(expected_factors.get(k, set())), "actual": sorted(actual_factors.get(k, set()))} for k in sorted(set(expected_factors) | set(actual_factors)) if actual_factors.get(k, set()) != expected_factors.get(k, set())}
-        result.add("TCN-D014", not mismatch, "Pairwiseの因子 / 値の集合がfixtureと一致すること", evidence=mismatch or None)
+        result.add("TCN-D014", not mismatch, "Pairwiseの因子 / 値の集合がフィクスチャと一致すること", evidence=mismatch or None)
 
         parsed_rows = []
         parse_errors = []
@@ -184,7 +184,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                 valid_combos.append(combo)
 
         result.add("TCN-D018", not unknown_factor, "Pairwise生成組合せに未知の因子を含めないこと", evidence=unknown_factor or None)
-        result.add("TCN-D019", not unknown_value, "Pairwise生成組合せの値がfixtureの因子集合に存在すること", evidence=unknown_value or None)
+        result.add("TCN-D019", not unknown_value, "Pairwise生成組合せの値がフィクスチャの因子集合に存在すること", evidence=unknown_value or None)
         result.add("TCN-D020", not forbidden_combo, "Pairwise生成組合せが禁止制約に違反しないこと", evidence=forbidden_combo or None)
         result.add("TCN-D021", not missing_factor, "Pairwise生成組合せが必要なすべての因子を含むこと", evidence=missing_factor or None)
 
@@ -193,16 +193,16 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         missing_pairs = sorted(feasible - covered)
         result.add("TCN-D015", not pairwise.get("require_pairwise", True) or not missing_pairs, "Pairwise出力が成立可能な値ペアを100%カバーすること", evidence={"missing_pairs": missing_pairs} if missing_pairs else None)
     else:
-        result.add("TCN-D014", True, "fixtureによるPairwise因子集合の指定なし")
-        result.add("TCN-D015", True, "fixtureによるPairwiseカバレッジ確認は不要")
+        result.add("TCN-D014", True, "フィクスチャによるPairwise因子集合の指定なし")
+        result.add("TCN-D015", True, "フィクスチャによるPairwiseカバレッジ確認は不要")
         for aid, msg in (
-            ("TCN-D018", "fixtureによるPairwise組合せ確認は不要"),
-            ("TCN-D019", "fixtureによるPairwise組合せ確認は不要"),
-            ("TCN-D020", "fixtureによるPairwise組合せ確認は不要"),
-            ("TCN-D021", "fixtureによるPairwise組合せ確認は不要"),
-            ("TCN-D026", "fixtureによるPairwiseカバレッジ項目確認は不要"),
-            ("TCN-D027", "fixtureによるPairwiseカバレッジ項目一意性確認は不要"),
-            ("TCN-D028", "fixtureによるPairwiseトークン確認は不要"),
+            ("TCN-D018", "フィクスチャによるPairwise組合せ確認は不要"),
+            ("TCN-D019", "フィクスチャによるPairwise組合せ確認は不要"),
+            ("TCN-D020", "フィクスチャによるPairwise組合せ確認は不要"),
+            ("TCN-D021", "フィクスチャによるPairwise組合せ確認は不要"),
+            ("TCN-D026", "フィクスチャによるPairwiseカバレッジ項目確認は不要"),
+            ("TCN-D027", "フィクスチャによるPairwiseカバレッジ項目一意性確認は不要"),
+            ("TCN-D028", "フィクスチャによるPairwiseトークン確認は不要"),
         ):
             result.add(aid, True, msg)
 
@@ -221,9 +221,9 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                     break
             if not matched and not t.get("disposition"):
                 missing_trans.append(t)
-        result.add("TCN-D016", not missing_trans, "fixtureの有効な状態遷移が既存カバレッジ項目または明示したfixture上の扱いへ閉じること", evidence=missing_trans or None)
+        result.add("TCN-D016", not missing_trans, "フィクスチャの有効な状態遷移が既存カバレッジ項目または明示したフィクスチャ上の扱いへ閉じること", evidence=missing_trans or None)
     else:
-        result.add("TCN-D016", True, "fixtureによる状態遷移確認は不要")
+        result.add("TCN-D016", True, "フィクスチャによる状態遷移確認は不要")
 
     bva = expected.get("bva", [])
     if bva:
@@ -233,9 +233,9 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             for value in case.get("required_values", []):
                 if not re.search(rf"(?<![\w.]){re.escape(str(value))}(?![\w.])", coverage_text):
                     missing_values.append(value)
-        result.add("TCN-D017", not missing_values, "fixtureで指定したBVA必須値がカバレッジ項目に含まれること", evidence=missing_values or None)
+        result.add("TCN-D017", not missing_values, "フィクスチャで指定したBVA必須値がカバレッジ項目に含まれること", evidence=missing_values or None)
     else:
-        result.add("TCN-D017", True, "fixtureによるBVA確認は不要")
+        result.add("TCN-D017", True, "フィクスチャによるBVA確認は不要")
 
     required_entity_issues = []
     if "required_test_conditions" in expected:
@@ -246,7 +246,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         missing_ids = sorted(set(expected["required_coverage_items"]) - ci_set)
         if missing_ids:
             required_entity_issues.append({"kind": "coverage_item", "missing": missing_ids})
-    result.add("TCN-D023", not required_entity_issues, "fixtureで必須のテスト条件とカバレッジ項目が存在すること", evidence=required_entity_issues or None)
+    result.add("TCN-D023", not required_entity_issues, "フィクスチャで必須のテスト条件とカバレッジ項目が存在すること", evidence=required_entity_issues or None)
 
     ci_missing = []
     for row in ci:
@@ -262,5 +262,5 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             for ref in ids_in(row.get("期待挙動の根拠", "")):
                 if ref.startswith(("SPEC-", "DEC-", "ASM-")) and ref not in known_auth:
                     ci_unknown_auth.append({"ci": row.get("カバレッジ項目ID"), "reference": ref})
-    result.add("TCN-D025", not ci_unknown_auth, "fixtureで仕様根拠を指定した場合、カバレッジ項目の明示的な仕様根拠参照が存在すること", evidence=ci_unknown_auth or None)
+    result.add("TCN-D025", not ci_unknown_auth, "フィクスチャで仕様根拠を指定した場合、カバレッジ項目の明示的な仕様根拠参照が存在すること", evidence=ci_unknown_auth or None)
     return result
