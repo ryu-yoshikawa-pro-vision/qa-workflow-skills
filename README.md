@@ -105,6 +105,21 @@ flowchart TD
 
 図中の修正routingや再開先の詳細は`qa-workflow`が管理し、各工程固有の判断規則は担当SkillをSingle Source of Truthとします。
 
+### 各工程をQA業務として言い換えると
+
+| # | QA業務 | 実際にやること | 主な成果物 | 対応Skill |
+| --- | --- | --- | --- | --- |
+| 1 | QA対象・スコープ確認 | 何をQAするのか、どこまでを対象とするか、要求成果物と利用可能な既存成果物を確認し、必要な開始 / 再開工程を決める | 対象範囲、Workflow状態 | `qa-workflow` |
+| 2 | 仕様整理・仕様分析 | Figma、要件書、Q&A、リポジトリ、リリース資料などを確認し、現在有効な仕様と根拠を整理する | Current Effective Authority、仕様分析 | `spec-analysis` |
+| 3 | 不明点・矛盾整理 | 仕様やQA成果物の不足・矛盾・曖昧さを整理し、Blocked範囲、継続可否、回答後の再開先を決める | Blocker、要確認、仮定可能事項、再開先 | `question-analysis` |
+| 4 | テスト分析 | 変更影響とProduct Riskを分析し、何をなぜどの深さでテストするかを決める | Product Risk、テスト重点、テストレベル、観測方法 | `test-analysis` |
+| 5 | テスト要求設計 | Current Effective AuthorityとProduct Riskから、何を検証・保証すべきかを定義する | Test Requirement | `test-requirement-design` |
+| 6 | テスト観点・条件設計 | Test Requirementを、どの条件・観点・組合せで検証するかへ展開する | Test Condition、Coverage Criteria、Coverage Item | `test-condition-design` |
+| 7 | Low-Level Test Case設計 | 第三者が単独で実施し、PASS / FAILを判断できる具体的な前提条件・手順・期待結果へ落とし込む | Low-Level Test Case | `test-case-design` |
+| 8 | 網羅性・追跡性確認 | AuthorityからTest Caseまでの意味上のつながり、Coverage Criteria充足、未カバー・重複・根拠不足を確認する | Coverage Analysis、Gap、残存リスク | `coverage-analysis` |
+| 9 | 反証レビュー | 成果物をCold Reviewし、誤り・抜け・過剰・根拠不足・追跡性欠陥を重大度付きで検出する | Adversarial Review結果 | `adversarial-review` |
+| 10 | 修正routing・完了判断 | 指摘を最も早い責任工程へ戻し、影響範囲だけを修正・再検証して、Blocked / 要再検証を含むWorkflow全体状態を判定する | 完了 / 部分完了（Blockedあり） / Blocked | `qa-workflow` |
+
 ## 成果物チェーン
 
 ```text
