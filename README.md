@@ -31,17 +31,17 @@ skills/
 | `coverage-analysis` | Coverage / 閉鎖性 / Gap |
 | `adversarial-review` | Cold Review / 重大度 |
 
-## 現行QA業務フロー（テスト分析・設計）
+## テスト分析・設計フロー
 
-以下は、対象範囲の成果物を新規に作成する場合のFull Workflowの代表経路です。実際には要求成果物と有効な既存成果物に応じて開始工程を決め、途中工程からの開始、既存成果物の再利用、不要工程の省略を行います。
+以下は、このSkill群が扱うFull Workflowの代表経路です。実際には要求成果物と有効な既存成果物に応じて開始工程を決め、途中工程からの開始、既存成果物の再利用、不要工程の省略を行います。
 
-通常のQA業務を主経路とし、Blocked、修正routing、上流変更による`要再検証`は下段の制御フローへ分離しています。不明点・矛盾はどの工程からでも`question-analysis`へroutingでき、解消後は影響する再開先工程へ戻ります。
+基本フローを主経路とし、Blocked、修正routing、上流変更による`要再検証`は下段の制御フローへ分離しています。不明点・矛盾はどの工程からでも`question-analysis`へroutingでき、解消後は影響する再開先工程へ戻ります。
 
 ```mermaid
 flowchart TB
-    subgraph MAIN["通常のQA業務フロー"]
+    subgraph MAIN["基本フロー"]
         direction LR
-        A[QA対象・スコープ確認]
+        A[対象・スコープ確認]
 
         subgraph UNDERSTAND["① 対象を理解する"]
             direction LR
@@ -69,10 +69,10 @@ flowchart TB
 
     subgraph CONTROL["問題・変更がある場合"]
         direction LR
-        K[不明点を解消し<br/>影響範囲を特定]
-        L[最も早い責任工程へrouting]
-        M[影響範囲のみ修正・再検証]
-        N[必要な網羅性・追跡性確認 /<br/>反証レビューを再実行]
+        K[影響範囲を特定]
+        L[影響する工程へrouting]
+        M[必要範囲のみ<br/>継続・修正・再検証]
+        N[必要な網羅性・追跡性確認 /<br/>反証レビューを実行・再実行]
         K --> L --> M --> N
     end
 
@@ -84,15 +84,17 @@ flowchart TB
     N --> J
 ```
 
+修正が必要な場合は最も早い責任工程へ、Blocked解除後は回答に応じた再開先工程へroutingします。上流変更時は影響する範囲だけを担当工程へ戻します。
+
 Full Workflowは、要求成果物が必要な品質条件を満たし、必要なCoverage Analysis / Adversarial Reviewが完了し、対象スコープ内にBlocked・`要再検証`・利用停止が必要な未処置指摘が残っていないときに完了します。詳細な完了条件、修正routing、再開先の判断は`qa-workflow`を正本とします。
 
-### 各工程をQA業務として言い換えると
+### 各工程の役割
 
 `qa-workflow`は独立した前後工程ではなく、開始工程の決定から既存成果物の再利用、Blocked・再開・routing・変更伝播・`要再検証`・修正routing・完了判定までWorkflow全体を横断して管理します。
 
-| # | QA業務 | 実際にやること | 主な成果物 | 対応Skill |
+| # | 工程 | 実際にやること | 主な成果物 | 対応Skill |
 | --- | --- | --- | --- | --- |
-| 1 | QA対象・スコープ確認 | 何をQAするのか、どこまでが対象かを確認し、要求成果物と利用可能な既存成果物から必要な開始工程を決める | 対象範囲の確認結果、開始 / 再開先、Workflow状態 | `qa-workflow` |
+| 1 | 対象・スコープ確認 | 対象とする機能・挙動・範囲を確認し、要求成果物と利用可能な既存成果物から必要な開始工程を決める | 対象範囲の確認結果、開始 / 再開先、Workflow状態 | `qa-workflow` |
 | 2 | 仕様整理・仕様分析 | Figma、要件書、Q&A、リポジトリ、リリース資料などを確認し、現在有効な仕様と根拠を整理する | Current Effective Authority、仕様分析 | `spec-analysis` |
 | 3 | 不明点・矛盾整理 | 仕様やQA成果物の不足・矛盾・曖昧さを整理し、Blocked範囲、継続可否、回答後の再開先を決める | Blocker、要確認、仮定可能事項、再開先 | `question-analysis` |
 | 4 | テスト分析 | 変更影響とProduct Riskを分析し、何をなぜどの深さでテストするかを決める | Product Risk、テスト重点、テストレベル、観測方法 | `test-analysis` |
