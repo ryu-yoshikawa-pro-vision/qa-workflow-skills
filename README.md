@@ -44,25 +44,26 @@ flowchart TD
     C[必要な開始 / 再開工程を決定]
     D[仕様分析]
     E[不明点・矛盾分析]
-    F{設計を継続できるか}
-    G[関係者へ確認]
-    H[回答・判断を反映]
-    I[影響する再開先工程へrouting]
-    J[テスト分析]
-    K[テスト要求設計]
-    L[テスト観点・条件設計<br/>Test Condition / Coverage Item]
-    M[Low-Level Test Case設計]
-    N[Coverage Analysis]
-    O[Adversarial Review]
-    P{重大な問題・抜けがあるか}
-    Q[最も早い責任工程を特定]
-    R[影響範囲のみ修正・再検証]
-    S{Blocked / 要再検証の最終状態}
-    T[影響範囲を担当工程で再検証]
-    U[必要なCoverage / Reviewを再実行]
-    V[部分完了<br/>Blockedあり]
-    W[Blocked]
-    X[完了]
+    F{未解決事項の影響}
+    G[局所Blockedを記録<br/>影響しない範囲は継続]
+    H[関係者へ確認]
+    I[回答・判断を反映]
+    J[影響する再開先工程へrouting]
+    K[テスト分析]
+    L[テスト要求設計]
+    M[テスト観点・条件設計<br/>Test Condition / Coverage Item]
+    N[Low-Level Test Case設計]
+    O[Coverage Analysis]
+    P[Adversarial Review]
+    Q{重大な問題・抜けがあるか}
+    R[最も早い責任工程を特定]
+    S[影響範囲のみ修正・再検証]
+    T{Blocked / 要再検証の最終状態}
+    U[影響範囲を担当工程で再検証]
+    V[必要なCoverage / Reviewを再実行]
+    W[部分完了<br/>Blockedあり]
+    X[Blocked]
+    Y[完了]
 
     A --> B
     B --> C
@@ -70,30 +71,36 @@ flowchart TD
     D --> E
     E --> F
 
-    F -->|継続可能| J
-    F -->|Blockerあり| G
-    G --> H
+    F -->|継続可能| K
+    F -->|局所Blocked| G
+    G --> K
+    G -.-> H
     H --> I
-    I --> C
+    I --> J
+    J --> C
+    F -->|全体Blocked| X
 
-    J --> K
     K --> L
     L --> M
     M --> N
     N --> O
-
     O --> P
-    P -->|あり| Q
-    Q --> R
-    R --> U
-    U --> S
 
-    P -->|なし| S
-    S -->|要再検証あり| T
-    T --> U
-    S -->|局所Blockedあり| V
-    S -->|全体Blocked| W
-    S -->|なし| X
+    P --> Q
+    Q -->|あり| R
+    R --> S
+    S --> V
+    V --> T
+
+    Q -->|なし| T
+    T -->|要再検証あり| U
+    U --> V
+    T -->|局所Blockedあり| W
+    T -->|全体Blocked| X
+    T -->|なし| Y
+
+    W -.->|Blocked解除後| J
+    X -.->|Blocked解除後| J
 ```
 
 図中の修正routingや再開先の詳細は`qa-workflow`が管理し、各工程固有の判断規則は担当SkillをSingle Source of Truthとします。
