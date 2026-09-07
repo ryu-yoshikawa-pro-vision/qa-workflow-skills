@@ -55,16 +55,21 @@ flowchart TB
 
         subgraph VERIFY["③ 設計を検証する"]
             direction LR
-            H[網羅性・追跡性確認] --> I[反証レビュー] --> J{完了条件を満たすか}
+            H[網羅性・追跡性確認] --> I[反証レビュー]
         end
 
-        A --> B
-        D --> E
-        G --> H
+        J{完了条件を満たすか}
+        O[完了]
+        P[部分完了<br/>Blockedあり]
+        Q[Blocked]
 
-        J -->|はい| O[完了]
-        J -->|局所Blockedあり| P[部分完了<br/>Blockedあり]
-        J -->|全体Blocked| Q[Blocked]
+        A --> UNDERSTAND
+        UNDERSTAND --> DESIGN
+        DESIGN --> VERIFY
+        VERIFY --> J
+        J -->|はい| O
+        J -->|局所Blockedあり| P
+        J -->|全体Blocked| Q
     end
 
     subgraph CONTROL["問題・変更がある場合"]
@@ -76,12 +81,8 @@ flowchart TB
         K --> L --> M --> N
     end
 
-    C -.->|Blocked / 未解決| K
-    I -.->|問題・抜け| K
-    J -->|要再検証あり| K
-    P -.->|Blocked解除| K
-    Q -.->|Blocked解除| K
-    N --> J
+    MAIN -->|問題・変更 / Blocked / 要再検証| CONTROL
+    CONTROL -->|必要範囲の対応後| MAIN
 ```
 
 修正が必要な場合は最も早い責任工程へ、Blocked解除後は回答に応じた再開先工程へroutingします。上流変更時は影響する範囲だけを担当工程へ戻します。
