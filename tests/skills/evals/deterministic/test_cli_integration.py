@@ -12,8 +12,8 @@ REPO_ROOT = Path(__file__).resolve().parents[4]
 RUNNER = REPO_ROOT / "scripts" / "skills" / "evals" / "deterministic" / "run.py"
 
 VALID_RISK_OUTPUT = """# テスト分析
-## Product Risk一覧
-| リスクID | 製品上のリスク / 失敗 | 関連Current Effective Authority / 変更 / 依存 | 影響度 | 発生可能性 | レベル | 根拠 |
+## プロダクトリスク一覧
+| リスクID | 製品上のリスク / 失敗 | 関連する現在有効な仕様根拠 / 変更 / 依存 | 影響度 | 発生可能性 | レベル | 根拠 |
 | --- | --- | --- | --- | --- | --- | --- |
 | RISK-001 | 誤保存 | SPEC-001 / CHG-001 | 4 | 2 | 高 | 保存処理の全面変更 |
 ## 選択したテスト技法

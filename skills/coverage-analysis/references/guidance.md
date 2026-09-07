@@ -2,143 +2,143 @@
 
 ## 目的
 
-Current Effective Authority、Product Risk、Test Requirement、Test Condition、Coverage Item、Test Caseの意味上のつながりを確認し、**対象範囲内の項目が下流成果物または明示Dispositionへ閉じているか**を分析します。
+現在有効な仕様根拠、プロダクトリスク、テスト要求、テスト条件、カバレッジ項目、テストケースの意味上のつながりを確認し、**対象範囲内の項目が下流成果物または明示した扱いへ閉じているか**を分析します。
 
-ケース件数やリンク数だけでCoverageを判断しません。
+ケース件数やリンク数だけでカバレッジを判断しません。
 
-Coverage Criteria / Coverage Itemをどう設計するか、BVA / Pairwise / 状態遷移等の技法固有ルールは`test-condition-design`をSingle Source of Truthとします。本Skillではそれらを再定義せず、入力されたCoverage Criteriaと候補集合に対する充足・閉鎖性を評価します。
+カバレッジ基準 / カバレッジ項目をどう設計するか、BVA / Pairwise / 状態遷移等の技法固有ルールは`test-condition-design`を正本とします。本Skillではそれらを再定義せず、入力されたカバレッジ基準と候補集合に対する充足・閉鎖性を評価します。
 
 ## 入力
 
-### Partial
+### 部分分析
 
 必須:
 
 - 比較対象となるQA成果物
-- その成果物について確認したい上流 / 下流関係、Coverage Criteria、またはDisposition判断基準
+- その成果物について確認したい上流 / 下流関係、カバレッジ基準、または扱いの判断基準
 
-比較対象が1層だけでも、その層のCoverage CriteriaやDisposition妥当性を評価できる根拠があればPartial分析できます。
+比較対象が1層だけでも、その層のカバレッジ基準や扱いの妥当性を評価できる根拠があれば部分分析できます。
 
-### Full Workflow
+### 全体ワークフロー
 
 必須:
 
-- 対象スコープで利用可能なCurrent Effective Authority、Product Risk、Test Requirement、Test Condition、Coverage Item、Test Case
-- 適用技法 / Coverage Criteria
-- Coverage候補と各層のDisposition情報
+- 対象スコープで利用可能な現在有効な仕様根拠、プロダクトリスク、テスト要求、テスト条件、カバレッジ項目、テストケース
+- 適用技法 / カバレッジ基準
+- カバレッジ候補と各層の扱い情報
 
 存在すべき下流成果物が欠けている場合は、入力不足として停止せず未カバー候補として扱います。
 
-## Function
+## 処理
 
-対象モードに応じて、各層の意味上の追跡関係、閉鎖性、Coverage Criteria充足、Disposition妥当性を確認し、未カバー・不正Disposition・孤立・重複・根拠不足・不整合を検出します。
+対象モードに応じて、各層の意味上の追跡関係、閉鎖性、カバレッジ基準充足、扱いの妥当性を確認し、未カバー・不正な扱い・孤立・重複・根拠不足・不整合を検出します。
 
 ## 分析モード
 
-### Partial
+### 部分分析
 
-ユーザーが指定した成果物間、Coverage Criteria、Dispositionだけを比較します。
+ユーザーが指定した成果物間、カバレッジ基準、扱いだけを比較します。
 
-### Full Workflow
+### 全体ワークフロー
 
 次の閉鎖性を確認します。
 
-1. Current Effective Authority → Test Requirement または明示Disposition
-2. Product Risk → Test Requirement または明示Disposition
-3. Test Requirement → Test Condition または明示Disposition
-4. Test Condition → Coverage Item（明示時）またはTest Case（内包時）、あるいは明示Disposition
-5. Coverage Item → Test Case または明示Disposition
-6. Coverage候補 → Coverage Item または妥当な候補Disposition
+1. 現在有効な仕様根拠 → テスト要求 または明示した扱い
+2. プロダクトリスク → テスト要求 または明示した扱い
+3. テスト要求 → テスト条件 または明示した扱い
+4. テスト条件 → カバレッジ項目（明示時）またはテストケース（内包時）、あるいは明示した扱い
+5. カバレッジ項目 → テストケース または明示した扱い
+6. カバレッジ候補 → カバレッジ項目 または妥当な候補の扱い
 
-必要に応じてCurrent Effective Authority → Test CaseのEnd-to-End追跡も確認します。
+必要に応じて現在有効な仕様根拠 → テストケースのE2E追跡も確認します。
 
-## Coverageの判断基準
+## カバレッジの判断基準
 
-### Current Effective Authority Coverage
+### 現在有効な仕様根拠のカバレッジ
 
-対象範囲内の現在有効なAuthorityについて、Test Requirementへ意味上の対応があるか、または明示Dispositionがあるか確認します。
+対象範囲内の現在有効な仕様根拠について、テスト要求へ意味上の対応があるか、または明示した扱いがあるか確認します。
 
-Current Effective Authority自体の解決正当性は`spec-analysis`を正本とします。本SkillでSPEC / DECISION / ASMの優先関係を再解決しません。
+現在有効な仕様根拠自体の解決正当性は`spec-analysis`を正本とします。本SkillでSPEC / DECISION / ASMの優先関係を再解決しません。
 
-IDがリンクされているだけで検証責務が意味を確認していなければCoverageとはみなしません。
+IDがリンクされているだけで検証責務が意味を確認していなければカバレッジとはみなしません。
 
-### Product Risk Coverage
+### プロダクトリスクのカバレッジ
 
-対象範囲内の各Product Riskについて次を確認します。
+対象範囲内の各プロダクトリスクについて次を確認します。
 
-- 1つ以上のTest Requirementへ接続されているか
-- 接続先の優先度・設計深度へProduct Riskが反映されているか
-- 接続しない場合は妥当なDispositionがあるか
+- 1つ以上のテスト要求へ接続されているか
+- 接続先の優先度・設計深度へプロダクトリスクが反映されているか
+- 接続しない場合は妥当な扱いがあるか
 
-Risk Matrixの採点自体は`test-analysis`を正本とします。
+リスクマトリクスの採点自体は`test-analysis`を正本とします。
 
-### Test Requirement Coverage
+### テスト要求のカバレッジ
 
-各Test RequirementがTest Conditionへ展開されているか、または妥当なDispositionへ位置づけられているか確認します。
+各テスト要求がテスト条件へ展開されているか、または妥当な扱いへ位置づけられているか確認します。
 
-### Coverage Criteria充足
+### カバレッジ基準充足
 
-`test-condition-design`が出力したCoverage Criteria、候補母集団、Coverage Item、候補Dispositionを入力として確認します。
+`test-condition-design`が出力したカバレッジ基準、候補母集団、カバレッジ項目、候補の扱いを入力として確認します。
 
-- Coverage Criteriaを満たすCoverage Item / Test Case Evidenceがあるか
-- 候補母集団の各対象候補が採用または妥当なDispositionへ閉じているか
-- 技法名だけを書いてCoverage済みとしていないか
-- Coverage Criteria自体が欠落・曖昧・不整合なら、CriteriaをこのSkillで再設計せず`test-condition-design`へ修正routingする
+- カバレッジ基準を満たすカバレッジ項目 / テストケース証拠があるか
+- 候補母集団の各対象候補が採用または妥当な扱いへ閉じているか
+- 技法名だけを書いてカバレッジ済みとしていないか
+- カバレッジ基準自体が欠落・曖昧・不整合なら、基準をこのSkillで再設計せず`test-condition-design`へ修正ルーティングする
 
-技法固有の「何をCoverage Criteriaとすべきか」は本Skillへ複製しません。
+技法固有の「何をカバレッジ基準とすべきか」は本Skillへ複製しません。
 
-### Coverage候補Dispositionの妥当性
+### カバレッジ候補の扱いの妥当性
 
-各候補Dispositionを、`qa-workflow`の共通Dispositionと`test-condition-design`の工程固有条件に照らして確認します。
+各候補の扱いを、`qa-workflow`の共通の扱いと`test-condition-design`の工程固有条件に照らして確認します。
 
-特に次をGap候補として扱います。
+特に次をギャップ候補として扱います。
 
-- 低Product Riskだけを理由に`対象外`
+- 低プロダクトリスクだけを理由に`対象外`
 - 根拠のない`成立不能`
 - カバー先のない`重複`
 - 対象内未カバーを理由なしに`残存リスク`
-- 設計可能な項目を便宜的に`Blocked`
+- 設計可能な項目を便宜的に`ブロック中`
 
 詳細条件の正本は担当Skillです。本Skillは成果物上の根拠と閉鎖状況を検査します。
 
-### Coverage Item Coverage
+### カバレッジ項目のカバレッジ
 
-明示Coverage Itemは最終的に次のいずれかへ位置づけます。
+明示カバレッジ項目は最終的に次のいずれかへ位置づけます。
 
-- Test Caseでカバー
+- テストケースでカバー
 - 別テストレベル
 - 残存リスク
 - 対象外
-- Blocked
+- ブロック中
 
-DispositionのないCoverage ItemはCoverage Gapです。
+扱いのないカバレッジ項目はカバレッジギャップです。
 
-### Test CaseをCoverage Evidenceとして扱う最低条件
+### テストケースをカバレッジ証拠として扱う最低条件
 
-- どのTest Condition / Coverage Itemを確認するか分かる
+- どのテスト条件 / カバレッジ項目を確認するか分かる
 - 実施可能な具体性がある
 - PASS / FAILを判断できる期待結果がある
-- PASS / FAIL判定に使う期待結果がCurrent Effective Authorityへ追跡できる
+- PASS / FAIL判定に使う期待結果が現在有効な仕様根拠へ追跡できる
 
-Low-Level Case / Oracleの詳細品質は`test-case-design`、重大度付きCold Reviewは`adversarial-review`を正本とします。
+詳細テストケース / 期待結果の根拠の詳細品質は`test-case-design`、重大度付き独立レビューは`adversarial-review`を正本とします。
 
-## Product Riskとの深度対応
+## プロダクトリスクとの深度対応
 
-高Product Risk領域で設計深度が不足していないか、低Product Risk領域で根拠のない過剰展開がないかを確認します。
+高プロダクトリスク領域で設計深度が不足していないか、低プロダクトリスク領域で根拠のない過剰展開がないかを確認します。
 
-具体的なRisk採点・深度定義は`test-analysis`を正本とし、本Skillで再採点しません。
+具体的なリスク採点・深度定義は`test-analysis`を正本とし、本Skillで再採点しません。
 
 ## 検出対象
 
 ### 未カバー
 
-上流責務、Product Risk、Test Requirement、Coverage Item等に必要な下流検証またはDispositionがない。
+上流責務、プロダクトリスク、テスト要求、カバレッジ項目等に必要な下流検証または扱いがない。
 
 期待される下流成果物が存在しないこと自体も未カバーとして判定できます。
 
-### 不正Disposition
+### 不正な扱い
 
-Dispositionは存在するが、担当Skillの使用条件を満たさない。
+扱いは存在するが、担当Skillの使用条件を満たさない。
 
 ### 孤立
 
@@ -146,15 +146,15 @@ Dispositionは存在するが、担当Skillの使用条件を満たさない。
 
 ### 根拠不足
 
-Test CaseやTest Conditionが上流成果物と意味的につながらない。
+テストケースやテスト条件が上流成果物と意味的につながらない。
 
 ### 重複
 
-複数成果物が同じ検証責務を持ち、新しいCoverageを追加していない。
+複数成果物が同じ検証責務を持ち、新しいカバレッジを追加していない。
 
 ### 過剰
 
-仕様・Product Risk・Coverage Criteria等の根拠がない検証が展開されている。
+仕様・プロダクトリスク・カバレッジ基準等の根拠がない検証が展開されている。
 
 ### 古い / 不整合
 
@@ -163,73 +163,73 @@ Test CaseやTest Conditionが上流成果物と意味的につながらない。
 ## 手順
 
 1. 分析モードと対象範囲を定義する
-2. 上流Authority / Product Riskの対象集合を確認する
-3. 各層のID、上流 / 下流リンク、Dispositionを収集する
-4. Authority / Product Risk → Test Requirementの閉鎖性を確認する
-5. Test Requirement以降の各層が下流成果物またはDispositionへ閉じているか確認する
-6. 入力済みCoverage Criteriaの充足と候補Dispositionを確認する
-7. Test CaseがCoverage Evidence最低条件を満たすか確認する
-8. Product Riskに対する深度不足 / 過剰を確認する
-9. Gap、不正Disposition、孤立、重複、根拠不足、不整合を分類する
+2. 上流仕様根拠 / プロダクトリスクの対象集合を確認する
+3. 各層のID、上流 / 下流リンク、扱いを収集する
+4. 仕様根拠 / プロダクトリスク → テスト要求の閉鎖性を確認する
+5. テスト要求以降の各層が下流成果物または扱いへ閉じているか確認する
+6. 入力済みカバレッジ基準の充足と候補の扱いを確認する
+7. テストケースがカバレッジ証拠の最低条件を満たすか確認する
+8. プロダクトリスクに対する深度不足 / 過剰を確認する
+9. ギャップ、不正な扱い、孤立、重複、根拠不足、不整合を分類する
 10. 修正が必要な最も近い担当Skillを示す
 
-## 修正routing
+## 修正ルーティング
 
 本Skill自身が他層成果物を再設計しません。
 
-- Current Effective Authority / 仕様モデル → `spec-analysis`
-- Oracle / 不明点 / Assumption → `question-analysis`
-- Product Risk / テスト重点 → `test-analysis`
-- Test Requirement / 上流Disposition → `test-requirement-design`
-- Test Condition / Coverage Criteria / Coverage Item / 候補Disposition → `test-condition-design`
-- Test Case → `test-case-design`
+- 現在有効な仕様根拠 / 仕様モデル → `spec-analysis`
+- 期待結果の根拠 / 不明点 / 仮定 → `question-analysis`
+- プロダクトリスク / テスト重点 → `test-analysis`
+- テスト要求 / 上流の扱い → `test-requirement-design`
+- テスト条件 / カバレッジ基準 / カバレッジ項目 / 候補の扱い → `test-condition-design`
+- テストケース → `test-case-design`
 
 ## 出力
 
 - 分析範囲 / モード
-- Authority / Product Riskの閉鎖状況
-- Coverage Matrix
-- Coverage Criteria充足状況
-- Coverage候補Dispositionの妥当性
-- Coverage ItemのDisposition
-- 未カバー / 不正Disposition / 孤立 / 根拠不足 / 重複 / 不整合
-- Product Riskに対する深度不足 / 過剰
+- 仕様根拠 / プロダクトリスクの閉鎖状況
+- カバレッジマトリクス
+- カバレッジ基準充足状況
+- カバレッジ候補の扱いの妥当性
+- カバレッジ項目の扱い
+- 未カバー / 不正な扱い / 孤立 / 根拠不足 / 重複 / 不整合
+- プロダクトリスクに対する深度不足 / 過剰
 - 推奨修正先Skill
-- 残存リスク / Blocked
+- 残存リスク / ブロック中
 
 ## 停止条件
 
-次の場合、その比較範囲をBlockedとします。
+次の場合、その比較範囲をブロック中とします。
 
 - 必要ファイル / 情報へアクセスできず比較対象を読めない
-- Current Effective Authorityを確定できないため上流集合を決められない
+- 現在有効な仕様根拠を確定できないため上流集合を決められない
 - 成果物のID / 意味が壊れており比較関係を特定できない
-- Coverage Criteria自体が未定義で、十分性を判定する基準がない
+- カバレッジ基準自体が未定義で、十分性を判定する基準がない
 
-期待される下流成果物が単に存在しない場合はBlockedではなく未カバーです。
+期待される下流成果物が単に存在しない場合はブロック中ではなく未カバーです。
 
 ## 品質ゲート
 
-- 件数だけでCoverageを判断していない
-- IDリンクの存在だけでCoverage済みにしていない
-- 各層が下流成果物または妥当なDispositionへ閉じている
-- 入力済みCoverage Criteriaの充足を確認している
-- Coverage Criteriaを本Skillで再設計していない
+- 件数だけでカバレッジを判断していない
+- IDリンクの存在だけでカバレッジ済みにしていない
+- 各層が下流成果物または妥当な扱いへ閉じている
+- 入力済みカバレッジ基準の充足を確認している
+- カバレッジ基準を本Skillで再設計していない
 - 下流成果物不存在を正しく未カバーと判定している
-- 不十分なTest CaseをCoverage Evidenceとして数えていない
-- 高Product Risk Gapを見落としていない
-- 低Product Riskを無言削除の理由にしていない
-- Gapの修正先が最も近い責任Skillになっている
+- 不十分なテストケースをカバレッジ証拠として数えていない
+- 高プロダクトリスクのギャップを見落としていない
+- 低プロダクトリスクを無言削除の理由にしていない
+- ギャップの修正先が最も近い責任Skillになっている
 - 本Skill自身が他層成果物を再設計していない
 
 ## 出力前自己検証
 
-最終出力前に、実際に利用した入力が本SkillのInput Contractを満たし、入力・Authority・判断状態に停止条件へ該当する未解決状態がないか確認します。あわせて、生成した成果物へ本SkillのOutput Contractと既存の品質ゲートを再適用します。品質基準は本ガイダンスと各担当Skillの既存契約を正本とし、Self-Validation専用のrubricやチェックリストを別定義しません。
+最終出力前に、実際に利用した入力が本Skillの入力契約を満たし、入力・仕様根拠・判断状態に停止条件へ該当する未解決状態がないか確認します。あわせて、生成した成果物へ本Skillの出力契約と既存の品質ゲートを再適用します。品質基準は本ガイダンスと各担当Skillの既存契約を正本とし、自己検証専用のルーブリックやチェックリストを別定義しません。
 
-1. 実際に利用した入力がInput Contractを満たし、停止条件へ該当する未解決状態がないか確認する
-2. 生成した成果物がOutput Contractと既存の品質ゲートを満たしているか確認する
-3. 明白かつ局所的で、新しいDomain判断を必要としない契約違反だけを最大1回修正する
-4. 修正後は修正箇所を含めて最終確認する。解消に新しいAuthority、上流判断、他SkillのDomain Logicが必要な場合は自力で補完せず、既存の停止条件・Blocked・routingに従う
-5. 最終確認後も本Skill自身の契約違反が残り、既存の停止条件・Blocked・routingに該当しない場合は、2回目の自動修正を行わず、その成果物を契約適合済み・完成済みとして扱わない。現在残っている契約上の制約だけを明示する
+1. 実際に利用した入力が入力契約を満たし、停止条件へ該当する未解決状態がないか確認する
+2. 生成した成果物が出力契約と既存の品質ゲートを満たしているか確認する
+3. 明白かつ局所的で、新しい領域判断を必要としない契約違反だけを最大1回修正する
+4. 修正後は修正箇所を含めて最終確認する。解消に新しい仕様根拠、上流判断、他Skillの工程固有ロジックが必要な場合は自力で補完せず、既存の停止条件・ブロック中・ルーティングに従う
+5. 最終確認後も本Skill自身の契約違反が残り、既存の停止条件・ブロック中・ルーティングに該当しない場合は、2回目の自動修正を行わず、その成果物を契約適合済み・完成済みとして扱わない。現在残っている契約上の制約だけを明示する
 
-Self-ValidationでCoverage Criteriaや他層成果物を再設計せず、発見した責務外問題は既存routingへ戻します。既存の`Blocked`定義を未解消ローカル違反へ広げません。Self-Validationの実行経緯、修正回数、修正前状態、PASS / FAIL等の評価ログは通常成果物へ出力せず、現在有効な状態と未解消の契約上の制約だけを返します。
+自己検証でカバレッジ基準や他層成果物を再設計せず、発見した責務外問題は既存ルーティングへ戻します。既存の`ブロック中`定義を未解消ローカル違反へ広げません。自己検証の実行経緯、修正回数、修正前状態、PASS / FAIL等の評価ログは通常成果物へ出力せず、現在有効な状態と未解消の契約上の制約だけを返します。

@@ -68,12 +68,12 @@ def add_duplicate_assertion(result: EvalResult, assertion_id: str, values: Seque
         if value:
             counts[value] += 1
     dupes = sorted(v for v, c in counts.items() if c > 1)
-    result.add(assertion_id, not dupes, f"{label} must be unique", evidence={"duplicates": dupes} if dupes else None)
+    result.add(assertion_id, not dupes, f"{label}が一意であること", evidence={"duplicates": dupes} if dupes else None)
 
 
 def add_allowed_assertion(result: EvalResult, assertion_id: str, values: Iterable[str], allowed: set[str], label: str) -> None:
     invalid = sorted({clean(v) for v in values if clean(v) and clean(v) not in allowed})
-    result.add(assertion_id, not invalid, f"{label} must use allowed values", evidence={"invalid": invalid, "allowed": sorted(allowed)} if invalid else None)
+    result.add(assertion_id, not invalid, f"{label}が許可値を使用していること", evidence={"invalid": invalid, "allowed": sorted(allowed)} if invalid else None)
 
 
 def add_required_fields_assertion(result: EvalResult, assertion_id: str, rows: Sequence[Mapping[str, str]], fields: Sequence[str], row_id_field: str, label: str) -> None:
@@ -82,7 +82,7 @@ def add_required_fields_assertion(result: EvalResult, assertion_id: str, rows: S
         missing_fields = [field for field in fields if not clean(row.get(field, ""))]
         if missing_fields:
             missing.append({"row": clean(row.get(row_id_field, "")) or "<unknown>", "fields": missing_fields})
-    result.add(assertion_id, not missing, f"{label} required fields must be present", evidence=missing or None)
+    result.add(assertion_id, not missing, f"{label}の必須項目が存在すること", evidence=missing or None)
 
 
 def compute_graph_gaps(graph: Mapping) -> set[str]:

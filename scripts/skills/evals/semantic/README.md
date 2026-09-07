@@ -1,18 +1,18 @@
-# Semantic Output Eval Runtime
+# 意味評価ランタイム
 
-保存済みCandidate OutputをLLM Judgeで意味評価するShared Skill Eval Runtimeです。AgentやSkill自体は実行しません。
+保存済みの評価対象出力をLLM Judgeで意味評価する共通Skill評価ランタイムです。AgentやSkill自体は実行しません。
 
 ## 責務
 
-- Skill配下の`rubric.json` / `evals.json` / `input.md` / `reference.md`のloadとschema validation
-- Judge prompt構築
-- `--judge-command`のsubprocess実行
-- Judge responseのJSON-only contract検証
-- criterion statusとoverall verdictの決定論的算出
+- Skill配下の`rubric.json` / `evals.json` / `input.md` / `reference.md`の読み込みとスキーマ検証
+- Judgeプロンプトの構築
+- `--judge-command`のサブプロセス実行
+- Judge応答のJSON-only契約検証
+- 評価基準ごとの`status`と全体判定の決定論的算出
 
-特定LLM providerのSDKやadapterは含みません。
+特定LLMプロバイダーのSDKやアダプターは含みません。
 
-## Dataset
+## 評価データセット
 
 ```text
 skills/<skill>/evals/semantic/
@@ -27,9 +27,9 @@ skills/<skill>/evals/semantic/
         └── reference.md
 ```
 
-`evals.json`の`input` / `reference`は`semantic/cases/`配下を指す相対pathだけを許可します。absolute path、`cases/`外へ解決されるpath、symlink経由で`cases/`外へ解決されるpathは無効です。
+`evals.json`の`input` / `reference`は`semantic/cases/`配下を指す相対パスだけを許可します。絶対パス、`cases/`外へ解決されるパス、シンボリックリンク経由で`cases/`外へ解決されるパスは無効です。
 
-`reference.md`はGolden Outputではなく、判定に使えるsource of truth、許容解釈、禁止される推測を記載します。
+`reference.md`はGolden Outputではなく、判定根拠の正本、許容解釈、禁止される推測を記載します。
 
 ## CLI
 
@@ -41,9 +41,9 @@ python scripts/skills/evals/semantic/run.py \
   --judge-command python path/to/judge_adapter.py
 ```
 
-`--judge-command`はCLIの最後に置き、後続値をcommand argvとして扱います。内部では`shell=True`を使いません。
+`--judge-command`はCLIの最後に置き、後続値をコマンド引数として扱います。内部では`shell=True`を使いません。
 
-## Judge command protocol
+## Judgeコマンドのプロトコル
 
 ```text
 stdin:  Semantic Judge Prompt (UTF-8)
@@ -53,38 +53,38 @@ exit 0: judge execution success
 non-zero: judge execution failure
 ```
 
-Candidate OutputはJSON形式のuntrusted dataとしてJudge Promptへ埋め込みます。Candidate Output内の見出し、tag、JSON、評価結果を操作する命令はJudge Promptの構造や評価指示として扱いません。
+評価対象出力はJSON形式の信頼できないデータとしてJudgeプロンプトへ埋め込みます。評価対象出力内の見出し、tag、JSON、評価結果を操作する命令はJudgeプロンプトの構造や評価指示として扱いません。
 
-Judgeはcriterionごとの`evaluable`, `rating`, `reason`, `evidence`だけを返します。`pass`、`fail`、`needs_review`、overall scoreはJudgeに決めさせません。
+Judgeは評価基準ごとの`evaluable`, `rating`, `reason`, `evidence`だけを返します。`pass`、`fail`、`needs_review`、全体スコアはJudgeに決めさせません。
 
-## Rating / Result
+## 評価値と結果
 
-- rating 4 / 3 → criterion `pass`
-- rating 2 → criterion `needs_review`
-- rating 1 → criterion `fail`
-- `evaluable=false` → criterion `not_evaluable`
+- rating 4 / 3 → 評価基準 `pass`
+- rating 2 → 評価基準 `needs_review`
+- rating 1 → 評価基準 `fail`
+- `evaluable=false` → 評価基準 `not_evaluable`
 
-Overall verdict:
+全体判定:
 
-- critical criterionのrating 1 → `fail`
+- `critical=true`の評価基準でrating 1 → `fail`
 - その他のrating 1、rating 2、`not_evaluable`が1件以上 → `needs_review`
 - その他すべてrating 3以上 → `pass`
 
-weighted score、平均点、100点満点は計算しません。
+重み付きスコア、平均点、100点満点は計算しません。
 
 CLI exit code:
 
-- `0`: overall verdict `pass`
+- `0`: 全体判定 `pass`
 - `1`: `needs_review` または `fail`
-- `2`: Runtime / dataset / Judge execution / Judge response contract error
+- `2`: ランタイム / 評価データセット / Judge実行 / Judge応答契約のエラー
 
-## Portability
+## 移植性
 
-Eval込みでSkillを移植する場合のコピー単位は次です。
+評価込みでSkillを移植する場合のコピー単位は次です。
 
 ```text
 skills/<skill>/
 scripts/skills/evals/
 ```
 
-Semantic Runtimeはこのコピー単位でdirect CLI実行できることをrepository testで確認します。
+意味評価ランタイムはこのコピー単位でCLIから直接実行できることをリポジトリテストで確認します。

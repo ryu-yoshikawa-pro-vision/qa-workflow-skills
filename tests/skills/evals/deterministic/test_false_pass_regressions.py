@@ -20,16 +20,16 @@ class FalsePassRegressionTests(unittest.TestCase):
 
     def _spec_base(self) -> str:
         return """# 仕様分析
-## 情報源 / Canonical Registry参照一覧
-| 参照ID | 情報源 / Canonical Registry |
+## 情報源 / 正本参照一覧
+| 参照ID | 情報源 / 正本一覧 |
 | --- | --- |
 | SRC-001 | 要件書 |
 ## 分析項目
-| 項目ID | 内容 | 分類 | 情報源 / Canonical Registry参照 |
+| 項目ID | 内容 | 分類 | 情報源 / 正本参照 |
 | --- | --- | --- | --- |
 | SPEC-001 | 保存できる | SPEC | SRC-001 |
-## Current Effective Authority
-| Authority ID | 種別 | 現在有効な内容 | 適用範囲 | 情報源 / Canonical Registry | 関係 | 関連Authority ID |
+## 現在有効な仕様根拠
+| 仕様根拠ID | 種別 | 現在有効な内容 | 適用範囲 | 情報源 / 正本一覧 | 関係 | 関連仕様根拠ID |
 | --- | --- | --- | --- | --- | --- | --- |
 | SPEC-001 | SPEC | 保存できる | 保存画面 | SRC-001 | 独立 | |
 """
@@ -39,21 +39,21 @@ class FalsePassRegressionTests(unittest.TestCase):
 ## 不明点 / 質問一覧
 | ID | 問題 / 質問 | 根拠 | 分類 | 影響範囲 / 成果物 | 回答なしの場合の扱い | 回答後の正規化先 | 再開Skill |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Q-001 | 保存条件を確認する | 仕様に記載なし | Blocker | Test Requirement | 対象範囲を停止 | DECISION | spec-analysis |
+| Q-001 | 保存条件を確認する | 仕様に記載なし | ブロッカー | テスト要求 | 対象範囲を停止 | DECISION | spec-analysis |
 ## 仮定候補
-| 仮定候補 | 状態 | 根拠 / 理由 | 影響範囲 | Canonical ASM ID |
+| 仮定候補 | 状態 | 根拠 / 理由 | 影響範囲 | 正式ASM ID |
 | --- | --- | --- | --- | --- |
 | タイムゾーンはJST | 承認済み | ステークホルダー承認 | 日時表示 | ASM-001 |
-## Blocked範囲
-| Blocker ID | Blocked成果物 / 範囲 | 必要な決定 / 情報源 | 再開Skill |
+## ブロック中範囲
+| ブロッカーID | ブロック中成果物 / 範囲 | 必要な決定 / 情報源 | 再開Skill |
 | --- | --- | --- | --- |
-| Q-001 | Test Requirement | 保存条件の決定 | spec-analysis |
+| Q-001 | テスト要求 | 保存条件の決定 | spec-analysis |
 """
 
     def _risk_base(self) -> str:
         return """# テスト分析
-## Product Risk一覧
-| リスクID | 製品上のリスク / 失敗 | 関連Current Effective Authority / 変更 / 依存 | 影響度 | 発生可能性 | レベル | 根拠 |
+## プロダクトリスク一覧
+| リスクID | 製品上のリスク / 失敗 | 関連する現在有効な仕様根拠 / 変更 / 依存 | 影響度 | 発生可能性 | レベル | 根拠 |
 | --- | --- | --- | --- | --- | --- | --- |
 | RISK-001 | 誤保存 | SPEC-001 / CHG-001 | 4 | 2 | 高 | 保存処理の変更 |
 ## 選択したテスト技法
@@ -68,29 +68,29 @@ class FalsePassRegressionTests(unittest.TestCase):
 
     def _pairwise_base(self, combination: str = "A=0; B=0") -> tuple[str, dict]:
         text = f"""# TCN
-## Test Conditionへ展開しないTest Requirement
-| テスト要求ID | Disposition | 理由 / 根拠 |
+## テスト条件へ展開しないテスト要求
+| テスト要求ID | 扱い | 理由 / 根拠 |
 | --- | --- | --- |
 ## テスト観点・条件一覧
-| 観点ID | テスト要求ID | テスト観点 / 条件 | テスト技法 / 根拠 | Coverage Criteria | 優先度 |
+| 観点ID | テスト要求ID | テスト観点 / 条件 | テスト技法 / 根拠 | カバレッジ基準 | 優先度 |
 | --- | --- | --- | --- | --- | --- |
 | TCN-001 | TR-001 | 組合せ | Pairwise | 全2-wise | 高 |
-## Coverage Item一覧
-| Coverage Item ID | 観点ID | Coverage Item | 導出元の技法 / 基準 | 期待挙動の根拠 | 優先度 |
+## カバレッジ項目一覧
+| カバレッジ項目ID | 観点ID | カバレッジ項目 | 導出元の技法 / 基準 | 期待挙動の根拠 | 優先度 |
 | --- | --- | --- | --- | --- | --- |
 | TCN-001-CI01 | TCN-001 | combo | Pairwise | SPEC-001 | 高 |
-## Coverage候補のDisposition
-| 候補 | 導出元 | Disposition | 理由 / 根拠 | カバー先 |
+## カバレッジ候補の扱い
+| 候補 | 導出元 | 扱い | 理由 / 根拠 | カバー先 |
 | --- | --- | --- | --- | --- |
-## Factor / Value / Constraint
-| Factor | Value |
+## 因子 / 値 / 制約
+| 因子 | 値 |
 | --- | --- |
 | A | 0 |
 | A | 1 |
 | B | 0 |
 | B | 1 |
 ## 生成組合せ
-| Coverage Item ID | 組合せ |
+| カバレッジ項目ID | 組合せ |
 | --- | --- |
 | TCN-001-CI01 | {combination} |
 """
@@ -117,7 +117,7 @@ class FalsePassRegressionTests(unittest.TestCase):
 ## 指摘一覧
 | 指摘ID | 重要度 | 対象成果物 / 位置 | 問題 | 根拠 | 影響 | 推奨修正 | 修正Skill / 層 | 処置 | 処置根拠 / 承認参照 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| REV-001 | 重大 | TC-001 | 根拠が不足 | Authority参照なし | 合否判定不能 | 根拠を追加 | {repair_target} | 修正済み | |
+| REV-001 | 重大 | TC-001 | 根拠が不足 | 仕様根拠参照なし | 合否判定不能 | 根拠を追加 | {repair_target} | 修正済み | |
 """
 
     def test_empty_output_fails_for_all_skills(self):
@@ -180,7 +180,7 @@ class FalsePassRegressionTests(unittest.TestCase):
         for old, new, aid in [
             ("保存条件を確認する", "", "QUESTION-D012"),
             ("仕様に記載なし", "", "QUESTION-D012"),
-            ("| Q-001 | Test Requirement | 保存条件の決定 |", "| Q-001 |  | 保存条件の決定 |", "QUESTION-D013"),
+            ("| Q-001 | テスト要求 | 保存条件の決定 |", "| Q-001 |  | 保存条件の決定 |", "QUESTION-D013"),
         ]:
             with self.subTest(assertion_id=aid):
                 self.assert_fails("question-analysis", base.replace(old, new), {"approved_assumptions": ["ASM-001"]}, aid)
@@ -222,25 +222,25 @@ class FalsePassRegressionTests(unittest.TestCase):
 
     def test_pairwise_factor_order_is_canonical(self):
         text = """# TCN
-## Test Conditionへ展開しないTest Requirement
-| テスト要求ID | Disposition | 理由 / 根拠 |
+## テスト条件へ展開しないテスト要求
+| テスト要求ID | 扱い | 理由 / 根拠 |
 | --- | --- | --- |
 ## テスト観点・条件一覧
-| 観点ID | テスト要求ID | テスト観点 / 条件 | テスト技法 / 根拠 | Coverage Criteria | 優先度 |
+| 観点ID | テスト要求ID | テスト観点 / 条件 | テスト技法 / 根拠 | カバレッジ基準 | 優先度 |
 | --- | --- | --- | --- | --- | --- |
 | TCN-001 | TR-001 | 組合せ | Pairwise | 全2-wise | 高 |
-## Coverage Item一覧
-| Coverage Item ID | 観点ID | Coverage Item | 導出元の技法 / 基準 | 期待挙動の根拠 | 優先度 |
+## カバレッジ項目一覧
+| カバレッジ項目ID | 観点ID | カバレッジ項目 | 導出元の技法 / 基準 | 期待挙動の根拠 | 優先度 |
 | --- | --- | --- | --- | --- | --- |
 | TCN-001-CI01 | TCN-001 | combo1 | Pairwise | SPEC-001 | 高 |
 | TCN-001-CI02 | TCN-001 | combo2 | Pairwise | SPEC-001 | 高 |
 | TCN-001-CI03 | TCN-001 | combo3 | Pairwise | SPEC-001 | 高 |
 | TCN-001-CI04 | TCN-001 | combo4 | Pairwise | SPEC-001 | 高 |
-## Coverage候補のDisposition
-| 候補 | 導出元 | Disposition | 理由 / 根拠 | カバー先 |
+## カバレッジ候補の扱い
+| 候補 | 導出元 | 扱い | 理由 / 根拠 | カバー先 |
 | --- | --- | --- | --- | --- |
-## Factor / Value / Constraint
-| Factor | Value |
+## 因子 / 値 / 制約
+| 因子 | 値 |
 | --- | --- |
 | Role | admin |
 | Role | member |
@@ -249,7 +249,7 @@ class FalsePassRegressionTests(unittest.TestCase):
 | Flag | on |
 | Flag | off |
 ## 生成組合せ
-| Coverage Item ID | 組合せ |
+| カバレッジ項目ID | 組合せ |
 | --- | --- |
 | TCN-001-CI01 | Role=admin; Browser=Chrome; Flag=on |
 | TCN-001-CI02 | Role=admin; Browser=Edge; Flag=off |
@@ -288,7 +288,7 @@ class FalsePassRegressionTests(unittest.TestCase):
     def test_state_transition_requires_existing_coverage_item(self):
         text, expected = self._pairwise_base()
         text += """\n## 状態遷移表
-| 現在状態 | イベント / 操作 | 期待する次状態 / 結果 | 対応Coverage Item ID |
+| 現在状態 | イベント / 操作 | 期待する次状態 / 結果 | 対応カバレッジ項目ID |
 | --- | --- | --- | --- |
 | draft | publish | published | TCN-999-CI99 |
 """
@@ -299,29 +299,29 @@ class FalsePassRegressionTests(unittest.TestCase):
     def test_disposition_targets_must_exist_when_fixture_sets_are_present(self):
         tr = """# TR
 ## テスト要求一覧
-| テスト要求ID | テスト要求 | Current Effective Authority | 関連Product Risk | 優先度 | テストレベル / 観測方法 |
+| テスト要求ID | テスト要求 | 現在有効な仕様根拠 | 関連プロダクトリスク | 優先度 | テストレベル / 観測方法 |
 | --- | --- | --- | --- | --- | --- |
 | TR-001 | 保存を検証 | SPEC-001 | RISK-001 | 高 | システム / UI |
-## Test Requirementを作らない上流項目
-| 上流ID | 種別 | Disposition | 理由 / 根拠 |
+## テスト要求を作らない上流項目
+| 上流ID | 種別 | 扱い | 理由 / 根拠 |
 | --- | --- | --- | --- |
-| SPEC-999 | Authority | 対象外 | スコープ外 |
+| SPEC-999 | 仕様根拠 | 対象外 | スコープ外 |
 """
         self.assert_fails("test-requirement-design", tr, {"known_authorities": ["SPEC-001"], "known_product_risks": ["RISK-001"]}, "TR-D013")
 
         risk_disposition = """# TR
 ## テスト要求一覧
-| テスト要求ID | テスト要求 | Current Effective Authority | 関連Product Risk | 優先度 | テストレベル / 観測方法 |
+| テスト要求ID | テスト要求 | 現在有効な仕様根拠 | 関連プロダクトリスク | 優先度 | テストレベル / 観測方法 |
 | --- | --- | --- | --- | --- | --- |
 | TR-001 | 保存を検証 | SPEC-001 | | 高 | システム / UI |
-## Test Requirementを作らない上流項目
-| 上流ID | 種別 | Disposition | 理由 / 根拠 |
+## テスト要求を作らない上流項目
+| 上流ID | 種別 | 扱い | 理由 / 根拠 |
 | --- | --- | --- | --- |
-| RISK-001 | Product Risk | 対象外 | スコープ外 |
+| RISK-001 | プロダクトリスク | 対象外 | スコープ外 |
 """
         risk_expected = {"known_authorities": ["SPEC-001"], "product_risk_levels": {"RISK-001": "高"}}
         self.assert_passes("test-requirement-design", risk_disposition, risk_expected)
-        self.assert_fails("test-requirement-design", risk_disposition.replace("| RISK-001 | Product Risk |", "| RISK-999 | Product Risk |"), risk_expected, "TR-D013")
+        self.assert_fails("test-requirement-design", risk_disposition.replace("| RISK-001 | プロダクトリスク |", "| RISK-999 | プロダクトリスク |"), risk_expected, "TR-D013")
 
         tcn, expected = self._pairwise_base()
         tcn = tcn.replace("| --- | --- | --- |\n## テスト観点", "| --- | --- | --- |\n| TR-999 | 対象外 | 理由 |\n## テスト観点")
@@ -329,13 +329,13 @@ class FalsePassRegressionTests(unittest.TestCase):
 
         tc = """# TC
 ## テストケース一覧
-| テストケースID | タイトル / 目的 | 関連観点ID | 関連Coverage Item ID | 関連テスト要求ID | 優先度 | 前提条件 | テストデータ | 実施手順 | 期待結果 | 期待結果の根拠 | 備考 |
+| テストケースID | タイトル / 目的 | 関連観点ID | 関連カバレッジ項目ID | 関連テスト要求ID | 優先度 | 前提条件 | テストデータ | 実施手順 | 期待結果 | 期待結果の根拠 | 備考 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | TC-001 | 保存 | TCN-001 | TCN-001-CI01 | TR-001 | 高 | ログイン済み | valid | 保存する | 保存済み表示 | SPEC-001 | |
-## Test Caseへ展開しないCoverage Item / Test Condition
-| 上流ID | 種別 | Disposition | 理由 / 根拠 |
+## テストケースへ展開しないカバレッジ項目 / テスト条件
+| 上流ID | 種別 | 扱い | 理由 / 根拠 |
 | --- | --- | --- | --- |
-| TCN-999-CI99 | Coverage Item | 対象外 | スコープ外 |
+| TCN-999-CI99 | カバレッジ項目 | 対象外 | スコープ外 |
 """
         tc_expected = {"known_test_conditions": ["TCN-001"], "known_coverage_items": ["TCN-001-CI01"], "known_test_requirements": ["TR-001"], "known_authorities": ["SPEC-001"]}
         self.assert_fails("test-case-design", tc, tc_expected, "TC-D014")
@@ -343,13 +343,13 @@ class FalsePassRegressionTests(unittest.TestCase):
     def test_fixture_required_tr_links_and_dispositions(self):
         text = """# TR
 ## テスト要求一覧
-| テスト要求ID | テスト要求 | Current Effective Authority | 関連Product Risk | 優先度 | テストレベル / 観測方法 |
+| テスト要求ID | テスト要求 | 現在有効な仕様根拠 | 関連プロダクトリスク | 優先度 | テストレベル / 観測方法 |
 | --- | --- | --- | --- | --- | --- |
 | TR-001 | 保存条件を検証 | SPEC-001 | RISK-001, RISK-002 | 高 | システム / UI |
-## Test Requirementを作らない上流項目
-| 上流ID | 種別 | Disposition | 理由 / 根拠 |
+## テスト要求を作らない上流項目
+| 上流ID | 種別 | 扱い | 理由 / 根拠 |
 | --- | --- | --- | --- |
-| SPEC-002 | Authority | 対象外 | 今回の対象外 |
+| SPEC-002 | 仕様根拠 | 対象外 | 今回の対象外 |
 """
         expected = {
             "known_authorities": ["SPEC-001", "SPEC-002"],
@@ -361,21 +361,21 @@ class FalsePassRegressionTests(unittest.TestCase):
         self.assert_passes("test-requirement-design", text, expected)
 
         risk_as_disposition = text.replace("RISK-001, RISK-002", "RISK-001").replace(
-            "| SPEC-002 | Authority | 対象外 | 今回の対象外 |",
-            "| SPEC-002 | Authority | 対象外 | 今回の対象外 |\n| RISK-002 | Product Risk | 対象外 | 今回の対象外 |",
+            "| SPEC-002 | 仕様根拠 | 対象外 | 今回の対象外 |",
+            "| SPEC-002 | 仕様根拠 | 対象外 | 今回の対象外 |\n| RISK-002 | プロダクトリスク | 対象外 | 今回の対象外 |",
         )
         self.assert_fails("test-requirement-design", risk_as_disposition, expected, "TR-D014")
-        self.assert_fails("test-requirement-design", text.replace("| SPEC-002 | Authority | 対象外 | 今回の対象外 |\n", ""), expected, "TR-D015")
-        self.assert_fails("test-requirement-design", text.replace("| SPEC-002 | Authority | 対象外 |", "| SPEC-002 | Authority | 残存リスク |"), expected, "TR-D015")
+        self.assert_fails("test-requirement-design", text.replace("| SPEC-002 | 仕様根拠 | 対象外 | 今回の対象外 |\n", ""), expected, "TR-D015")
+        self.assert_fails("test-requirement-design", text.replace("| SPEC-002 | 仕様根拠 | 対象外 |", "| SPEC-002 | 仕様根拠 | 残存リスク |"), expected, "TR-D015")
 
     def test_fixture_numbered_authority_mapping(self):
         text = """# TC
 ## テストケース一覧
-| テストケースID | タイトル / 目的 | 関連観点ID | 関連Coverage Item ID | 関連テスト要求ID | 優先度 | 前提条件 | テストデータ | 実施手順 | 期待結果 | 期待結果の根拠 | 備考 |
+| テストケースID | タイトル / 目的 | 関連観点ID | 関連カバレッジ項目ID | 関連テスト要求ID | 優先度 | 前提条件 | テストデータ | 実施手順 | 期待結果 | 期待結果の根拠 | 備考 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | TC-001 | 保存 | TCN-001 | TCN-001-CI01, TCN-001-CI02 | TR-001 | 高 | ログイン済み | valid | 保存する | 期待結果1: 保存済み表示; 期待結果2: 編集不可表示 | 期待結果1→SPEC-001; 期待結果2→DEC-001 | |
-## Test Caseへ展開しないCoverage Item / Test Condition
-| 上流ID | 種別 | Disposition | 理由 / 根拠 |
+## テストケースへ展開しないカバレッジ項目 / テスト条件
+| 上流ID | 種別 | 扱い | 理由 / 根拠 |
 | --- | --- | --- | --- |
 """
         expected = {
@@ -399,7 +399,7 @@ class FalsePassRegressionTests(unittest.TestCase):
     def test_coverage_expected_fix_target_must_exist(self):
         text = """# Coverage
 ## カバレッジマトリクス
-| 上流層 | 上流ID / 挙動 | 下流層 | 下流ID / Disposition | カバレッジ | 修正Skill / 層 |
+| 上流層 | 上流ID / 挙動 | 下流層 | 下流ID / 扱い | カバレッジ | 修正Skill / 層 |
 | --- | --- | --- | --- | --- | --- |
 | TR | TR-001 | TCN | TCN-001 | 網羅済み | test-condition-design |
 """
@@ -412,7 +412,7 @@ class FalsePassRegressionTests(unittest.TestCase):
     def test_adversarial_repair_targets_and_summary_contract(self):
         expected = {"known_artifact_ids": ["TC-001"]}
         self.assert_passes("adversarial-review", self._review_base("test-case-design"), expected)
-        self.assert_passes("adversarial-review", self._review_base("Project Context / 仕様決定"), expected)
+        self.assert_passes("adversarial-review", self._review_base("案件コンテキスト / 仕様決定"), expected)
         self.assert_fails("adversarial-review", self._review_base("unknown-target"), expected, "REV-D006")
         self.assert_fails("adversarial-review", self._review_base().replace("| 提案 | 0 |", "| unknown | 0 |"), expected, "REV-D013")
         self.assert_fails("adversarial-review", self._review_base().replace("| 軽微 | 0 |", "| 重大 | 0 |"), expected, "REV-D014")
@@ -423,7 +423,7 @@ class FalsePassRegressionTests(unittest.TestCase):
             "expected_defects": [
                 {
                     "target_id": "TC-001",
-                    "contains": "Authority",
+                    "contains": "仕様根拠",
                     "severity": "重大",
                     "repair_target": "test-case-design",
                 }
@@ -436,24 +436,24 @@ class FalsePassRegressionTests(unittest.TestCase):
         self.assert_fails("adversarial-review", severity_mismatch, expected, "REV-D010")
         self.assert_fails("adversarial-review", self._review_base("spec-analysis"), expected, "REV-D010")
 
-        optional_expected = {"known_artifact_ids": ["TC-001"], "expected_defects": [{"target_id": "TC-001", "contains": "Authority"}]}
+        optional_expected = {"known_artifact_ids": ["TC-001"], "expected_defects": [{"target_id": "TC-001", "contains": "仕様根拠"}]}
         optional_text = self._review_base("spec-analysis").replace("| 重大 | 1 |", "| 重大 | 0 |").replace("| 軽微 | 0 |", "| 軽微 | 1 |").replace("| REV-001 | 重大 |", "| REV-001 | 軽微 |")
         self.assert_passes("adversarial-review", optional_text, optional_expected)
 
     def test_adversarial_finding_required_fields(self):
-        text = self._review_base().replace("| REV-001 | 重大 | TC-001 | 根拠が不足 | Authority参照なし | 合否判定不能 | 根拠を追加 | test-case-design |", "| REV-001 | 重大 | TC-001 |  |  |  | 根拠を追加 |  |")
+        text = self._review_base().replace("| REV-001 | 重大 | TC-001 | 根拠が不足 | 仕様根拠参照なし | 合否判定不能 | 根拠を追加 | test-case-design |", "| REV-001 | 重大 | TC-001 |  |  |  | 根拠を追加 |  |")
         self.assert_fails("adversarial-review", text, {"known_artifact_ids": ["TC-001"]}, "REV-D012")
 
     def test_workflow_state_invariants_and_duplicate_skill(self):
         def workflow(overall: str, rows: str) -> str:
-            return f"""- Workflow全体状態: {overall}
-| Skill | 状態 | 成果物 / バージョン | Blocker / 備考 |
+            return f"""- ワークフロー全体状態: {overall}
+| Skill | 状態 | 成果物 / バージョン | ブロッカー / 備考 |
 | --- | --- | --- | --- |
 {rows}
 """
         self.assert_fails("qa-workflow", workflow("完了", "| test-case-design | 実行中 | v1 | |"), {}, "WF-D004")
-        self.assert_fails("qa-workflow", workflow("部分完了（Blockedあり）", "| test-case-design | 完了 | v1 | |"), {}, "WF-D010")
-        self.assert_fails("qa-workflow", workflow("Blocked", "| test-case-design | 完了 | v1 | |"), {}, "WF-D011")
+        self.assert_fails("qa-workflow", workflow("部分完了（ブロック中あり）", "| test-case-design | 完了 | v1 | |"), {}, "WF-D010")
+        self.assert_fails("qa-workflow", workflow("ブロック中", "| test-case-design | 完了 | v1 | |"), {}, "WF-D011")
         duplicate = workflow("実行中", "| test-case-design | 実行中 | v1 | |\n| test-case-design | 完了 | v1 | |")
         self.assert_fails("qa-workflow", duplicate, {}, "WF-D012")
 
@@ -462,9 +462,9 @@ class FalsePassRegressionTests(unittest.TestCase):
             "expected_start_skill": "test-analysis",
             "expected_final_skill": "test-case-design",
             "expected_skills": ["test-analysis", "test-requirement-design", "test-condition-design", "test-case-design"],
-            "expected_overall_state": "部分完了（Blockedあり）",
+            "expected_overall_state": "部分完了（ブロック中あり）",
             "expected_skill_states": {
-                "test-analysis": "Blocked",
+                "test-analysis": "ブロック中",
                 "test-requirement-design": "完了",
                 "test-condition-design": "完了",
                 "test-case-design": "完了",
@@ -478,10 +478,10 @@ class FalsePassRegressionTests(unittest.TestCase):
             tcn_state: str = "完了",
             tc_state: str = "完了",
         ) -> str:
-            return f"""- Workflow全体状態: {overall}
+            return f"""- ワークフロー全体状態: {overall}
 - 開始Skill: test-analysis
 - 最終Skill: test-case-design
-| Skill | 状態 | 成果物 / バージョン | Blocker / 備考 |
+| Skill | 状態 | 成果物 / バージョン | ブロッカー / 備考 |
 | --- | --- | --- | --- |
 | test-analysis | {test_analysis_state} | Risk | |
 | test-requirement-design | {tr_state} | TR | |
@@ -489,19 +489,19 @@ class FalsePassRegressionTests(unittest.TestCase):
 | test-case-design | {tc_state} | TC | |
 """
 
-        self.assert_passes("qa-workflow", workflow("部分完了（Blockedあり）", "Blocked"), expected)
-        self.assert_fails("qa-workflow", workflow("完了", "Blocked"), expected, "WF-D013")
-        self.assert_fails("qa-workflow", workflow("部分完了（Blockedあり）", "完了"), expected, "WF-D014")
-        self.assert_fails("qa-workflow", workflow("部分完了（Blockedあり）", "Blocked", tcn_state="Blocked"), expected, "WF-D014")
+        self.assert_passes("qa-workflow", workflow("部分完了（ブロック中あり）", "ブロック中"), expected)
+        self.assert_fails("qa-workflow", workflow("完了", "ブロック中"), expected, "WF-D013")
+        self.assert_fails("qa-workflow", workflow("部分完了（ブロック中あり）", "完了"), expected, "WF-D014")
+        self.assert_fails("qa-workflow", workflow("部分完了（ブロック中あり）", "ブロック中", tcn_state="ブロック中"), expected, "WF-D014")
 
     def test_test_case_priority_override_requires_reason(self):
         base = """# TC
 ## テストケース一覧
-| テストケースID | タイトル / 目的 | 関連観点ID | 関連Coverage Item ID | 関連テスト要求ID | 優先度 | 前提条件 | テストデータ | 実施手順 | 期待結果 | 期待結果の根拠 | 備考 |
+| テストケースID | タイトル / 目的 | 関連観点ID | 関連カバレッジ項目ID | 関連テスト要求ID | 優先度 | 前提条件 | テストデータ | 実施手順 | 期待結果 | 期待結果の根拠 | 備考 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | TC-001 | 保存 | TCN-001 | TCN-001-CI01 | TR-001 | 低 | ログイン済み | valid | 保存する | 保存済み表示 | SPEC-001 | {note} |
-## Test Caseへ展開しないCoverage Item / Test Condition
-| 上流ID | 種別 | Disposition | 理由 / 根拠 |
+## テストケースへ展開しないカバレッジ項目 / テスト条件
+| 上流ID | 種別 | 扱い | 理由 / 根拠 |
 | --- | --- | --- | --- |
 """
         expected = {"known_test_conditions": ["TCN-001"], "known_coverage_items": ["TCN-001-CI01"], "known_test_requirements": ["TR-001"], "known_authorities": ["SPEC-001"], "coverage_item_priorities": {"TCN-001-CI01": "高"}}
