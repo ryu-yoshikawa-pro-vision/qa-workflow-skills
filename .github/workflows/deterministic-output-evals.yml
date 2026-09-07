@@ -61,7 +61,7 @@ jobs:
       - name: Temporary git diff check
         run: |
           git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
-          git diff --check FETCH_HEAD...HEAD
+          git diff --check FETCH_HEAD HEAD
 
       - name: Validate output eval datasets
         run: |
