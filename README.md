@@ -31,6 +31,81 @@ skills/
 | `coverage-analysis` | Coverage / 閉鎖性 / Gap |
 | `adversarial-review` | Cold Review / 重大度 |
 
+## テスト分析・設計フロー
+
+以下は、このSkill群が扱うFull Workflowの代表経路です。実際には要求成果物と有効な既存成果物に応じて開始工程を決め、途中工程からの開始、既存成果物の再利用、不要工程の省略を行います。
+
+基本フローを主経路とし、Blocked、修正routing、上流変更による`要再検証`は下段の制御フローへ分離しています。不明点・矛盾はどの工程からでも`question-analysis`へroutingでき、解消後は影響する再開先工程へ戻ります。
+
+```mermaid
+flowchart TB
+    subgraph MAIN["基本フロー"]
+        direction LR
+        A[対象・スコープ確認]
+
+        subgraph UNDERSTAND["① 対象を理解する"]
+            direction LR
+            B[仕様整理・仕様分析] --> C[不明点・矛盾整理] --> D[テスト分析]
+        end
+
+        subgraph DESIGN["② テストを設計する"]
+            direction LR
+            E[テスト要求設計] --> F[テスト観点・条件設計] --> G[テストケース設計]
+        end
+
+        subgraph VERIFY["③ 設計を検証する"]
+            direction LR
+            H[網羅性・追跡性確認] --> I[反証レビュー]
+        end
+
+        J{完了条件を満たすか}
+        O[完了]
+        P[部分完了<br/>Blockedあり]
+        Q[Blocked]
+
+        A --> UNDERSTAND
+        UNDERSTAND --> DESIGN
+        DESIGN --> VERIFY
+        VERIFY --> J
+        J -->|はい| O
+        J -->|局所Blockedあり| P
+        J -->|全体Blocked| Q
+    end
+
+    subgraph CONTROL["問題・変更がある場合"]
+        direction LR
+        K[影響範囲を特定]
+        L[影響する工程へrouting]
+        M[必要範囲のみ<br/>継続・修正・再検証]
+        N[必要な網羅性・追跡性確認 /<br/>反証レビューを実行・再実行]
+        K --> L --> M --> N
+    end
+
+    MAIN -->|問題・変更 / Blocked / 要再検証| CONTROL
+    CONTROL -->|必要範囲の対応後| MAIN
+```
+
+修正が必要な場合は最も早い責任工程へ、Blocked解除後は回答に応じた再開先工程へroutingします。上流変更時は影響する範囲だけを担当工程へ戻します。
+
+Full Workflowは、要求成果物が必要な品質条件を満たし、必要なCoverage Analysis / Adversarial Reviewが完了し、対象スコープ内にBlocked・`要再検証`・利用停止が必要な未処置指摘が残っていないときに完了します。詳細な完了条件、修正routing、再開先の判断は`qa-workflow`を正本とします。
+
+### 各工程の役割
+
+`qa-workflow`は独立した前後工程ではなく、開始工程の決定から既存成果物の再利用、Blocked・再開・routing・変更伝播・`要再検証`・修正routing・完了判定までWorkflow全体を横断して管理します。
+
+| # | 工程 | 実際にやること | 主な成果物 | 対応Skill |
+| --- | --- | --- | --- | --- |
+| 1 | 対象・スコープ確認 | 対象とする機能・挙動・範囲を確認し、要求成果物と利用可能な既存成果物から必要な開始工程を決める | 対象範囲の確認結果、開始 / 再開先、Workflow状態 | `qa-workflow` |
+| 2 | 仕様整理・仕様分析 | Figma、要件書、Q&A、リポジトリ、リリース資料などを確認し、現在有効な仕様と根拠を整理する | Current Effective Authority、仕様分析 | `spec-analysis` |
+| 3 | 不明点・矛盾整理 | 仕様やQA成果物の不足・矛盾・曖昧さを整理し、Blocked範囲、継続可否、回答後の再開先を決める | Blocker、要確認、仮定可能事項、再開先 | `question-analysis` |
+| 4 | テスト分析 | 変更影響とProduct Riskを分析し、何をなぜどの深さでテストするかを決める | Product Risk、テスト重点、テストレベル、観測方法 | `test-analysis` |
+| 5 | テスト要求設計 | Current Effective AuthorityとProduct Riskから、何を検証・保証すべきかを定義する | Test Requirement | `test-requirement-design` |
+| 6 | テスト観点・条件設計 | Test Requirementを、どの条件・観点・組合せで検証するかへ展開する | Test Condition、Coverage Criteria、Coverage Item | `test-condition-design` |
+| 7 | テストケース設計 | 第三者が単独で実施し、PASS / FAILを判断できる具体的な前提条件・手順・期待結果へ落とし込む | Low-Level Test Case | `test-case-design` |
+| 8 | 網羅性・追跡性確認 | AuthorityからTest Caseまでの意味上のつながり、Coverage Criteria充足、未カバー・重複・根拠不足を確認する | Coverage Analysis、Gap、残存リスク | `coverage-analysis` |
+| 9 | 反証レビュー | 成果物をCold Reviewし、誤り・抜け・過剰・根拠不足・追跡性欠陥を重大度付きで検出する | Adversarial Review結果 | `adversarial-review` |
+| 10 | 修正routing・完了判断 | 指摘を最も早い責任工程へroutingし、影響範囲だけが担当Skillで修正・再検証されるよう制御し、Blocked / 要再検証を含むWorkflow全体状態を判定する | 完了 / 部分完了（Blockedあり） / Blocked | `qa-workflow` |
+
 ## 成果物チェーン
 
 ```text
