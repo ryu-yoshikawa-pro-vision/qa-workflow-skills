@@ -36,8 +36,8 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     exp_final = expected.get("expected_final_skill")
     actual_start = clean(bullets.get("開始Skill", ""))
     actual_final = clean(bullets.get("最終Skill", ""))
-    result.add("WF-D006", not exp_start or actual_start == exp_start, "fixtureで期待する開始Skillがルーティング判断と一致すること", evidence={"expected": exp_start, "actual": actual_start} if exp_start and actual_start != exp_start else None)
-    result.add("WF-D007", not exp_final or actual_final == exp_final, "fixtureで期待する最終Skillがルーティング判断と一致すること", evidence={"expected": exp_final, "actual": actual_final} if exp_final and actual_final != exp_final else None)
+    result.add("WF-D006", not exp_start or actual_start == exp_start, "フィクスチャで期待する開始Skillがルーティング判断と一致すること", evidence={"expected": exp_start, "actual": actual_start} if exp_start and actual_start != exp_start else None)
+    result.add("WF-D007", not exp_final or actual_final == exp_final, "フィクスチャで期待する最終Skillがルーティング判断と一致すること", evidence={"expected": exp_final, "actual": actual_final} if exp_final and actual_final != exp_final else None)
 
     expected_skills = set(expected.get("expected_skills", []))
     actual_used = {clean(r.get("Skill", "")) for r in rows if clean(r.get("状態", "")) not in {"未開始", "省略"}}
@@ -49,7 +49,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     result.add(
         "WF-D013",
         not overall_specified or overall == expected_overall,
-        "fixtureで期待するワークフロー全体状態が一致すること",
+        "フィクスチャで期待するワークフロー全体状態が一致すること",
         evidence={"expected": expected_overall, "actual": overall} if overall_specified and overall != expected_overall else None,
     )
 
@@ -61,5 +61,5 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             actual_state = actual_skill_states.get(skill)
             if actual_state != expected_state:
                 state_mismatches.append({"skill": skill, "expected": expected_state, "actual": actual_state})
-    result.add("WF-D014", not state_mismatches, "fixtureで期待するSkill状態が一致すること", evidence=state_mismatches or None)
+    result.add("WF-D014", not state_mismatches, "フィクスチャで期待するSkill状態が一致すること", evidence=state_mismatches or None)
     return result

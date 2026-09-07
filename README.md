@@ -27,7 +27,7 @@ skills/
 | `test-analysis` | プロダクトリスク / 重点 / 深度 |
 | `test-requirement-design` | テスト要求としての検証責務 |
 | `test-condition-design` | テスト条件 / カバレッジ基準 / カバレッジ項目 |
-| `test-case-design` | 詳細テストケース / 判定根拠の具体化 |
+| `test-case-design` | 詳細テストケース / 期待結果の根拠の具体化 |
 | `coverage-analysis` | カバレッジ / 閉鎖性 / ギャップ |
 | `adversarial-review` | 独立レビュー / 重大度 |
 
@@ -124,18 +124,18 @@ flowchart TB
 
 プロダクトリスクは深度・優先度の横断入力です。
 
-## 領域固有ロジックの正本
+## 工程固有ロジックの正本
 
 工程固有ルールは担当Skillを正本とし、`qa-workflow`やレビューSkillへ詳細アルゴリズムを複製しません。
 
-| 領域固有ロジック | 正本 |
+| 工程固有ロジック | 正本 |
 | --- | --- |
 | 現在有効な仕様根拠 / SPEC・DECISION・ASM | `spec-analysis` |
 | 不明点 / 仮定 | `question-analysis` |
 | プロダクトリスク | `test-analysis` |
 | テスト要求 | `test-requirement-design` |
 | カバレッジ基準 / カバレッジ項目 / テスト技法 | `test-condition-design` |
-| 詳細テストケース / 判定根拠 | `test-case-design` |
+| 詳細テストケース / 期待結果の根拠 | `test-case-design` |
 | カバレッジ / ギャップ | `coverage-analysis` |
 | 独立レビュー / 重大度 | `adversarial-review` |
 | ルーティング / ブロック中 / 再開 / ワークフロー完了 | `qa-workflow` |
@@ -200,13 +200,13 @@ tests/skills/evals/
 └── semantic/
 ```
 
-Skill固有の発火評価データセット、出力fixture、決定論的validator、意味評価rubric / fixtureは各Skillの`evals/`配下に置きます。
+Skill固有の発火評価データセット、出力フィクスチャ、決定論的validator、意味評価ルーブリック / フィクスチャは各Skillの`evals/`配下に置きます。
 
 `scripts/skills/evals/deterministic/tests/`と`scripts/skills/evals/semantic/tests/`は共通ランタイム固有の移植可能な自己テストを保持します。`tests/skills/evals/`はこのリポジトリ固有のSkill構造、評価データセット、validator契約、CLI、移植性を検証します。
 
 Skillを利用するだけの場合は`skills/<skill-name>/`のみをコピーします。評価も含めてSkillを移植する場合は、`skills/<skill-name>/`（Skill Package）と`scripts/skills/evals/`（共通Skill評価ランタイム）をコピーします。`scripts/skills/evals/`はAgent Skills Specificationが要求する標準ディレクトリではなく、このリポジトリ独自の評価ランタイムです。
 
-`evals/`やgraderはAgent Skills Specificationの必須標準機能ではありません。
+`evals/`や評価プログラムはAgent Skills Specificationの必須標準機能ではありません。
 
 ## 評価
 
@@ -216,9 +216,9 @@ Skillを利用するだけの場合は`skills/<skill-name>/`のみをコピー�
 
 ### 決定論的出力評価
 
-9 Skillの正本出力について、ID、参照整合、必須フィールド、リスクマトリクス、成果物閉鎖、Pairwise、レビュー / ワークフローの不変条件など、意味解釈なしで判定できる契約を評価します。
+9 Skillの正規出力について、ID、参照整合、必須フィールド、リスクマトリクス、成果物閉鎖、Pairwise、レビュー / ワークフローの不変条件など、意味解釈なしで判定できる契約を評価します。
 
-- `known_*`: fixture側で既知の参照集合。Skill自身が出力内で生成するEntityの扱いは各Skill契約に従う。キー未指定なら対応する参照検査を行わない。
+- `known_*`: フィクスチャ側で既知の参照集合。Skill自身が出力内で生成するEntityの扱いは各Skill契約に従う。キー未指定なら対応する参照検査を行わない。
 - `required_*`: 出力に実際に存在しなければならないEntity / 値。
 
 ```bash
@@ -230,7 +230,7 @@ python scripts/skills/evals/deterministic/run.py \
 
 ### 意味評価
 
-決定論的評価では確定できない意味的正しさ、妥当性、十分性、適切な抽象度、根拠整合、明瞭性を、Skill固有rubricと意味評価fixtureに基づくLLM Judgeで評価します。Judgeはcriterionごとの`rating`と根拠だけを返し、criterion `status`と全体判定は共通ランタイムが算出します。
+決定論的評価では確定できない意味的正しさ、妥当性、十分性、適切な抽象度、根拠整合、明瞭性を、Skill固有のルーブリックと意味評価フィクスチャに基づくLLM Judgeで評価します。Judgeは評価基準ごとの`rating`と根拠だけを返し、各評価基準の`status`と全体判定は共通ランタイムが算出します。
 
 ```bash
 python scripts/skills/evals/semantic/run.py \
@@ -244,11 +244,11 @@ Agent実行と評価対象出力の生成は決定論的 / 意味評価ランタ
 
 ## qa-workflowのランタイム前提
 
-同一Agent client上で9 Skillすべてが利用可能で、Agentが必要なSkillを追加ロード / 利用できる環境を前提とします。Agent Skills Specificationが共通Skill-to-Skill APIを保証するとは扱いません。
+同一のAgentクライアント上で9 Skillすべてが利用可能で、Agentが必要なSkillを追加で読み込み / 利用できる環境を前提とします。Agent Skills Specificationが共通Skill-to-Skill APIを保証するとは扱いません。
 
 ## 検証
 
-CIで、公式`skills-ref validate`、発火評価データセット構造、決定論的出力評価、意味評価を分離して検証します。外部LLM APIはCIから呼ばず、Semantic judge execution contractはfake judgeで検証します。
+CIで、公式`skills-ref validate`、発火評価データセット構造、決定論的出力評価、意味評価を分離して検証します。外部LLM APIはCIから呼ばず、意味評価Judgeの実行契約はテスト用Judgeで検証します。
 
 ## 標準との関係
 

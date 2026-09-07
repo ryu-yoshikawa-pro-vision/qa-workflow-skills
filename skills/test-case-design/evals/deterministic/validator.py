@@ -68,7 +68,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     if ci_spec:
         disposition_known |= known_ci
     unknown_disposed = sorted({upstream for upstream in disposed_ids if upstream and (tcn_spec or ci_spec) and upstream not in disposition_known})
-    result.add("TC-D014", not unknown_disposed, "fixtureでテスト条件またはカバレッジ項目を指定した場合、扱い対象の上流IDが存在すること", evidence=unknown_disposed or None)
+    result.add("TC-D014", not unknown_disposed, "フィクスチャでテスト条件またはカバレッジ項目を指定した場合、扱い対象の上流IDが存在すること", evidence=unknown_disposed or None)
 
     linked_ci = {ref for row in cases for ref in ids_in(row.get("関連カバレッジ項目ID", "")) if ref in known_ci}
     embedded_tcn = {ref for row in cases for ref in ids_in(row.get("関連観点ID", "")) if ref in known_tcn}
@@ -126,7 +126,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                 numbered_issues.append({"tc": tcid, "number": number, "reason": "missing Authority mapping"})
             elif actual_ids != expected_ids_set:
                 numbered_issues.append({"tc": tcid, "number": number, "expected": sorted(expected_ids_set), "actual": sorted(actual_ids)})
-    result.add("TC-D011", not numbered_issues, "番号付きPASS / FAIL期待結果が対応する番号付き仕様根拠を持ち、fixture指定時はその対応と一致すること", evidence=numbered_issues or None)
+    result.add("TC-D011", not numbered_issues, "番号付きPASS / FAIL期待結果が対応する番号付き仕様根拠を持ち、フィクスチャ指定時はその対応と一致すること", evidence=numbered_issues or None)
 
     vague, deps = [], []
     for row in cases:
@@ -141,5 +141,5 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     required_missing = []
     if "required_test_cases" in expected:
         required_missing = sorted(set(expected["required_test_cases"]) - set(ids))
-    result.add("TC-D013", not required_missing, "fixtureで必須のテストケースが存在すること", evidence=required_missing or None)
+    result.add("TC-D013", not required_missing, "フィクスチャで必須のテストケースが存在すること", evidence=required_missing or None)
     return result

@@ -38,7 +38,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         unknown = sorted({r for r in output_refs if r not in known})
     else:
         unknown = []
-    result.add("COV-D001", not unknown, "カバレッジ出力の参照がfixtureグラフに存在すること", evidence=unknown or None)
+    result.add("COV-D001", not unknown, "カバレッジ出力の参照がフィクスチャグラフに存在すること", evidence=unknown or None)
 
     gaps = compute_graph_gaps(graph)
     recognized, blocked = set(), []
@@ -53,7 +53,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             if "ブロック中" in status:
                 blocked.append(gap)
     result.add("COV-D002", gaps.issubset(recognized), "計算されたグラフギャップがカバレッジ分析で認識されていること", evidence={"computed": sorted(gaps), "recognized": sorted(recognized)} if not gaps.issubset(recognized) else None)
-    result.add("COV-D003", not blocked, "fixture上の根拠なしに下流成果物の欠落をブロック中へ分類しないこと", evidence=sorted(set(blocked)) or None)
+    result.add("COV-D003", not blocked, "フィクスチャ上の根拠なしに下流成果物の欠落をブロック中へ分類しないこと", evidence=sorted(set(blocked)) or None)
 
     node_types = graph.get("node_types", {})
     edges = graph.get("edges", [])
@@ -62,7 +62,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         incoming[dst].add(src)
     orphan = [n for n, t in node_types.items() if t in {"TR", "TCN", "CI", "TC"} and not incoming.get(n)]
     reported = {ref for row in orphan_rows if "孤立" in clean(row.get("分類", "")) for ref in ids_in(row.get("成果物ID", ""))}
-    result.add("COV-D004", set(orphan).issubset(reported) if orphan else True, "fixtureグラフの孤立ノードが存在する場合に報告されていること", evidence={"computed": orphan, "reported": sorted(reported)} if orphan and not set(orphan).issubset(reported) else None)
+    result.add("COV-D004", set(orphan).issubset(reported) if orphan else True, "フィクスチャグラフの孤立ノードが存在する場合に報告されていること", evidence={"computed": orphan, "reported": sorted(reported)} if orphan and not set(orphan).issubset(reported) else None)
 
     expected_fix = expected.get("expected_fix_skills", {})
     mismatches = []

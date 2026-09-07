@@ -68,7 +68,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                 major.append({"id": rid, "expected_approval": required_approval, "actual": approval_cell})
         elif not approval_cell:
             major.append({"id": rid, "expected_approval": None, "actual": approval_cell})
-    result.add("REV-D008", not major, "重大な残存リスク受容には、fixture指定時は承認参照、それ以外では理由 / 承認参照が必要であること", evidence=major or None)
+    result.add("REV-D008", not major, "重大な残存リスク受容には、フィクスチャ指定時は承認参照、それ以外では理由 / 承認参照が必要であること", evidence=major or None)
 
     actual = Counter(clean(r.get("重要度", "")) for r in findings)
     summary_counts, bad_count = {}, []
@@ -96,5 +96,5 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         )
         if not matched:
             missed.append(defect)
-    result.add("REV-D010", not missed, "fixtureで指定した決定論的欠陥と属性が一致すること", evidence=missed or None)
+    result.add("REV-D010", not missed, "フィクスチャで指定した決定論的欠陥と属性が一致すること", evidence=missed or None)
     return result
