@@ -126,7 +126,7 @@ Skillを利用するだけの場合は`skills/<skill-name>/`のみをコピー�
 - `coverage-analysis`: fixture graph上のnode
 - `adversarial-review`: 対象成果物
 
-`spec-analysis`の情報源行は`SRC-xxx`の一意な`参照ID`と`情報源 / Canonical Registry`を持ちます。
+`spec-analysis`の情報源行は`SRC-xxx`の一意な`参照ID`と`情報源 / 正本一覧`を持ちます。
 
 ## プロダクトリスク
 
@@ -277,7 +277,7 @@ Evaluation Instructions
 Rubric
 Eval Input
 Reference
-Candidate Output
+評価対象出力
 Required JSON Contract
 ```
 
@@ -293,7 +293,7 @@ Judge stdoutはJSON objectだけとし、code fenceや前後説明を許容し�
       "evaluable": true,
       "rating": 4,
       "reason": "具体的な理由",
-      "evidence": ["Candidate Output上の具体的な根拠"]
+      "evidence": ["評価対象出力上の具体的な根拠"]
     }
   ]
 }
