@@ -33,77 +33,58 @@ skills/
 
 ## 現行QA業務フロー（テスト分析・設計）
 
-以下は、対象範囲の成果物を新規に作成する場合のFull Workflowの代表経路です。実際には要求成果物と有効な既存成果物に応じて開始 / 再開工程を決め、途中工程からの開始、既存成果物の再利用、不要工程の省略を行います。
+以下は、対象範囲の成果物を新規に作成する場合のFull Workflowの代表経路です。実際には要求成果物と有効な既存成果物に応じて開始工程を決め、途中工程からの開始、既存成果物の再利用、不要工程の省略を行います。
 
-不明点・矛盾はどの工程からでも`question-analysis`へroutingでき、解消後は影響する再開先工程へ戻ります。上流成果物の意味が変わった場合も、無関係な成果物を全再生成せず、影響する下流だけを`要再検証`として扱います。
+通常のQA業務を主経路とし、Blocked、修正routing、上流変更による`要再検証`は下段の制御フローへ分離しています。不明点・矛盾はどの工程からでも`question-analysis`へroutingでき、解消後は影響する再開先工程へ戻ります。
 
 ```mermaid
-flowchart TD
-    A[QA対象の発生<br/>新規機能・変更機能・指定対象機能]
-    B[対象範囲・要求成果物・既存成果物を確認]
-    C[必要な開始工程を決定]
-    D[仕様分析]
-    E[不明点・矛盾分析]
-    F{未解決事項の影響}
-    G[局所Blockedを記録<br/>影響しない範囲は継続]
-    H[関係者へ確認]
-    I[回答・判断を反映]
-    J[影響する再開先工程へrouting]
-    K[テスト分析]
-    L[テスト要求設計]
-    M[テスト観点・条件設計<br/>Test Condition / Coverage Item]
-    N[Low-Level Test Case設計]
-    O[Coverage Analysis]
-    P[Adversarial Review]
-    Q{重大な問題・抜けがあるか}
-    R[最も早い責任工程を特定]
-    S[影響範囲のみ修正・再検証]
-    T{Blocked / 要再検証の最終状態}
-    U[影響範囲を担当工程で再検証]
-    V[必要なCoverage / Reviewを再実行]
-    W[部分完了<br/>Blockedあり]
-    X[Blocked]
-    Y[完了]
+flowchart TB
+    subgraph MAIN["通常のQA業務フロー"]
+        direction LR
+        A[QA対象・スコープ確認]
 
-    A --> B
-    B --> C
-    C -->|Full Workflow代表経路| D
-    D --> E
-    E --> F
+        subgraph UNDERSTAND["① 対象を理解する"]
+            direction LR
+            B[仕様整理・仕様分析] --> C[不明点・矛盾整理] --> D[テスト分析]
+        end
 
-    F -->|継続可能| K
-    F -->|局所Blocked| G
-    G --> K
-    G -.-> H
-    H --> I
-    I --> J
-    J --> S
-    F -->|全体Blocked| X
+        subgraph DESIGN["② テストを設計する"]
+            direction LR
+            E[テスト要求設計] --> F[テスト観点・条件設計] --> G[テストケース設計]
+        end
 
-    K --> L
-    L --> M
-    M --> N
-    N --> O
-    O --> P
+        subgraph VERIFY["③ 設計を検証する"]
+            direction LR
+            H[網羅性・追跡性確認] --> I[反証レビュー] --> J{完了条件を満たすか}
+        end
 
-    P --> Q
-    Q -->|あり| R
-    R --> S
-    S --> V
-    V --> T
+        A --> B
+        D --> E
+        G --> H
 
-    Q -->|なし| T
-    T -->|要再検証あり| U
-    U --> V
-    T -->|局所Blockedあり| W
-    T -->|全体Blocked| X
-    T -->|なし| Y
+        J -->|はい| O[完了]
+        J -->|局所Blockedあり| P[部分完了<br/>Blockedあり]
+        J -->|全体Blocked| Q[Blocked]
+    end
 
-    W -.->|Blocked解除後| J
-    X -.->|Blocked解除後| J
+    subgraph CONTROL["問題・変更がある場合"]
+        direction LR
+        K[不明点を解消し<br/>影響範囲を特定]
+        L[最も早い責任工程へrouting]
+        M[影響範囲のみ修正・再検証]
+        N[必要な網羅性・追跡性確認 /<br/>反証レビューを再実行]
+        K --> L --> M --> N
+    end
+
+    C -.->|Blocked / 未解決| K
+    I -.->|問題・抜け| K
+    J -->|要再検証あり| K
+    P -.->|Blocked解除| K
+    Q -.->|Blocked解除| K
+    N --> J
 ```
 
-図中の修正routingや再開先の詳細は`qa-workflow`が管理し、各工程固有の判断規則は担当SkillをSingle Source of Truthとします。
+Full Workflowは、要求成果物が必要な品質条件を満たし、必要なCoverage Analysis / Adversarial Reviewが完了し、対象スコープ内にBlocked・`要再検証`・利用停止が必要な未処置指摘が残っていないときに完了します。詳細な完了条件、修正routing、再開先の判断は`qa-workflow`を正本とします。
 
 ### 各工程をQA業務として言い換えると
 
@@ -117,7 +98,7 @@ flowchart TD
 | 4 | テスト分析 | 変更影響とProduct Riskを分析し、何をなぜどの深さでテストするかを決める | Product Risk、テスト重点、テストレベル、観測方法 | `test-analysis` |
 | 5 | テスト要求設計 | Current Effective AuthorityとProduct Riskから、何を検証・保証すべきかを定義する | Test Requirement | `test-requirement-design` |
 | 6 | テスト観点・条件設計 | Test Requirementを、どの条件・観点・組合せで検証するかへ展開する | Test Condition、Coverage Criteria、Coverage Item | `test-condition-design` |
-| 7 | Low-Level Test Case設計 | 第三者が単独で実施し、PASS / FAILを判断できる具体的な前提条件・手順・期待結果へ落とし込む | Low-Level Test Case | `test-case-design` |
+| 7 | テストケース設計 | 第三者が単独で実施し、PASS / FAILを判断できる具体的な前提条件・手順・期待結果へ落とし込む | Low-Level Test Case | `test-case-design` |
 | 8 | 網羅性・追跡性確認 | AuthorityからTest Caseまでの意味上のつながり、Coverage Criteria充足、未カバー・重複・根拠不足を確認する | Coverage Analysis、Gap、残存リスク | `coverage-analysis` |
 | 9 | 反証レビュー | 成果物をCold Reviewし、誤り・抜け・過剰・根拠不足・追跡性欠陥を重大度付きで検出する | Adversarial Review結果 | `adversarial-review` |
 | 10 | 修正routing・完了判断 | 指摘を最も早い責任工程へroutingし、影響範囲だけが担当Skillで修正・再検証されるよう制御し、Blocked / 要再検証を含むWorkflow全体状態を判定する | 完了 / 部分完了（Blockedあり） / Blocked | `qa-workflow` |
