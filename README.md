@@ -41,7 +41,7 @@ skills/
 flowchart TD
     A[QA対象の発生<br/>新規機能・変更機能・指定対象機能]
     B[対象範囲・要求成果物・既存成果物を確認]
-    C[必要な開始 / 再開工程を決定]
+    C[必要な開始工程を決定]
     D[仕様分析]
     E[不明点・矛盾分析]
     F{未解決事項の影響}
@@ -77,7 +77,7 @@ flowchart TD
     G -.-> H
     H --> I
     I --> J
-    J --> C
+    J --> S
     F -->|全体Blocked| X
 
     K --> L
@@ -107,9 +107,11 @@ flowchart TD
 
 ### 各工程をQA業務として言い換えると
 
+`qa-workflow`は独立した前後工程ではなく、開始工程の決定から既存成果物の再利用、Blocked・再開・routing・変更伝播・`要再検証`・修正routing・完了判定までWorkflow全体を横断して管理します。
+
 | # | QA業務 | 実際にやること | 主な成果物 | 対応Skill |
 | --- | --- | --- | --- | --- |
-| 1 | QA対象・スコープ確認 | 何をQAするのか、どこまでを対象とするか、要求成果物と利用可能な既存成果物を確認し、必要な開始 / 再開工程を決める | 対象範囲、Workflow状態 | `qa-workflow` |
+| 1 | QA対象・スコープ確認 | 何をQAするのか、どこまでが対象かを確認し、要求成果物と利用可能な既存成果物から必要な開始工程を決める | 対象範囲の確認結果、開始 / 再開先、Workflow状態 | `qa-workflow` |
 | 2 | 仕様整理・仕様分析 | Figma、要件書、Q&A、リポジトリ、リリース資料などを確認し、現在有効な仕様と根拠を整理する | Current Effective Authority、仕様分析 | `spec-analysis` |
 | 3 | 不明点・矛盾整理 | 仕様やQA成果物の不足・矛盾・曖昧さを整理し、Blocked範囲、継続可否、回答後の再開先を決める | Blocker、要確認、仮定可能事項、再開先 | `question-analysis` |
 | 4 | テスト分析 | 変更影響とProduct Riskを分析し、何をなぜどの深さでテストするかを決める | Product Risk、テスト重点、テストレベル、観測方法 | `test-analysis` |
@@ -118,7 +120,7 @@ flowchart TD
 | 7 | Low-Level Test Case設計 | 第三者が単独で実施し、PASS / FAILを判断できる具体的な前提条件・手順・期待結果へ落とし込む | Low-Level Test Case | `test-case-design` |
 | 8 | 網羅性・追跡性確認 | AuthorityからTest Caseまでの意味上のつながり、Coverage Criteria充足、未カバー・重複・根拠不足を確認する | Coverage Analysis、Gap、残存リスク | `coverage-analysis` |
 | 9 | 反証レビュー | 成果物をCold Reviewし、誤り・抜け・過剰・根拠不足・追跡性欠陥を重大度付きで検出する | Adversarial Review結果 | `adversarial-review` |
-| 10 | 修正routing・完了判断 | 指摘を最も早い責任工程へ戻し、影響範囲だけを修正・再検証して、Blocked / 要再検証を含むWorkflow全体状態を判定する | 完了 / 部分完了（Blockedあり） / Blocked | `qa-workflow` |
+| 10 | 修正routing・完了判断 | 指摘を最も早い責任工程へroutingし、影響範囲だけが担当Skillで修正・再検証されるよう制御し、Blocked / 要再検証を含むWorkflow全体状態を判定する | 完了 / 部分完了（Blockedあり） / Blocked | `qa-workflow` |
 
 ## 成果物チェーン
 
