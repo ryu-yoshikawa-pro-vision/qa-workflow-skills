@@ -49,8 +49,8 @@ Skill | 対象 / 実行範囲 | 状態 | 成果物 / バージョン | ブロッ
 
 状態・validatorの最低契約は次とします。
 
-- `WF-D006`: `expected_start_skill`は維持し、開始対象を区別するfixtureでは`expected_start_target`と出力された`開始対象 / 実行範囲`も比較する
-- `WF-D007`: `expected_final_skill`は維持し、最終対象を区別するfixtureでは`expected_final_target`と出力された`最終対象 / 実行範囲`も比較する
+- `WF-D006`: `expected_start_skill`は維持する。実際の`開始Skill`が複数用途Skillなら、fixtureに`expected_start_target`があるかにかかわらず`開始対象 / 実行範囲`を必須とし、定義済み正規値であることを検証する。fixtureに`expected_start_target`がある場合は、さらにその期待値と一致することを検証する
+- `WF-D007`: `expected_final_skill`は維持する。実際の`最終Skill`が複数用途Skillなら、fixtureに`expected_final_target`があるかにかかわらず`最終対象 / 実行範囲`を必須とし、定義済み正規値であることを検証する。fixtureに`expected_final_target`がある場合は、さらにその期待値と一致することを検証する
 - `WF-D008`: 「Skillを少なくとも一度利用したか」という既存の意味では`expected_skills`をSkill単位のまま維持する。特定対象の利用が必須な場合は後述の対象別期待状態等で検証する
 - `WF-D012`: Skill名単独の重複禁止ではなく、同じ`(Skill, 対象 / 実行範囲)`の不正な重複を検出する
 - `WF-D014`: Skill名だけの辞書ではなく、`(Skill, 対象 / 実行範囲)`ごとの状態を比較できるようにする

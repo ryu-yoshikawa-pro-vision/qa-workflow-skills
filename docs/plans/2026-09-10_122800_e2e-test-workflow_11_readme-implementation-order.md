@@ -43,7 +43,7 @@ READMEへ各Skillの細かなPlaywright判断ロジックを複製しません�
 - 14 Skill構成と責務境界を確定
 - 条件分岐型の代表経路へ更新
 - `Skill + 対象 / 実行範囲`状態へ変更し、`test-analysis` / `coverage-analysis` / `adversarial-review`の正規対象値を共通契約どおりに固定
-- `WF-D006` / `WF-D007`は対象識別が必要なfixtureだけtarget-aware、`WF-D008`はSkill利用有無の既存意味を維持、`WF-D012` / `WF-D014`は`(Skill, 対象)`単位で検証
+- `WF-D006` / `WF-D007`は実際の開始 / 最終Skillが複数用途Skillならfixtureの期待target有無にかかわらずtarget必須・正規値を検証し、期待targetがある場合は一致まで検証する。`WF-D008`はSkill利用有無の既存意味を維持し、`WF-D012` / `WF-D014`は`(Skill, 対象)`単位で検証
 - `expected_start_target` / `expected_final_target` / `expected_scoped_skill_states`等、対象別期待値を表現できるfixture契約を追加し、必要な場合は実出力の`開始対象 / 実行範囲` / `最終対象 / 実行範囲`と比較して、対象を失って誤PASSする回帰を検出
 - 複数用途Skillの`対象 / 実行範囲`は実際の状態行で常に定義済み正規値を必須とし、空欄や非正規値を決定論的に検出。単一用途Skillでは空欄を許容
 - 指定URL、ブロック、再開、完了条件を定義
