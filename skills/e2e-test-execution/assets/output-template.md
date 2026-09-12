@@ -28,7 +28,7 @@
 
 ## webServer process ownership（webServerがある場合）
 
-`setup / dependency / webServer / teardown`欄は実効設定のraw factを記録し、serverごとの所有・再利用・cleanupの導出結果はこの表を正本にします。setup欄へownershipの結論を重複記載させません。webServerなしならownership行は不要です。webServerが未確認 / 確認不能ならrunnerを開始せず、架空のserver識別子を作らずownership行を0件にできます。確認済みのwebServerが複数ある場合も1 process 1行とし、自由記述1セルへまとめません。実効設定で期待される全serverを記録し、既存 / 再利用processは今回run非所有・cleanup対象外、今回runが起動したprocessは所有とcleanup対象の扱いを明示します。
+実行条件の`run外準備`行は、準備の有無を問わず必ず記録します。`setup / dependency / webServer / teardown`欄は実効設定のraw factを記録し、serverごとの所有・再利用・cleanupの導出結果はこの表を正本にします。`reuseExistingServer=true`だけからactual reuseを導出せず、実行前から存在して再利用したprocessと今回runが新規起動したprocessを実測事実として区別します。setup欄へownershipの結論を重複記載させません。webServerなしならownership行は不要です。webServerが未確認 / 確認不能ならrunnerを開始せず、架空のserver識別子を作らずownership行を0件にできます。確認済みのwebServerが複数ある場合も1 process 1行とし、自由記述1セルへまとめません。実効設定で期待される全serverを記録し、既存 / 再利用processは今回run非所有・cleanup対象外、今回runが起動したprocessは所有とcleanup対象の扱いを明示します。
 
 | server識別子 | 起動状態 | 今回run所有か | 既存 / 再利用か | cleanup対象か | 根拠 |
 | --- | --- | --- | --- | --- | --- |

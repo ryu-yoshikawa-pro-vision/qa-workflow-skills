@@ -1,6 +1,6 @@
 [
   {"query":"このREADMEの誤字だけ直してください。","should_trigger":false},
-  {"query":"この機能のQA成果物一式を作ってください。途中成果物も必要ですが最終的にはローレベルケースが欲しいです。","should_trigger":true},
+  {"query":"TC-205をPlaywrightでE2E化してください。","should_trigger":true},
   {"query":"このテスト項目書だけを反証レビューしてください。修正や再設計はしないで。","should_trigger":false},
   {"query":"continuousで、Blocker以外は止まらずに仕様整理から最終レビューまで進めてください。","should_trigger":true},
   {"query":"既存Playwright testを修正して。","should_trigger":true},

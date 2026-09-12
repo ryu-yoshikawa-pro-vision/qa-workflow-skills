@@ -33,7 +33,16 @@ def _is_relative_reference(value: str) -> bool:
 
 def _is_unconfirmed_expected_behavior(value: str) -> bool:
     value = clean(value)
-    return bool(value) and any(marker in value for marker in UNCONFIRMED_EXPECTED_BEHAVIOR_MARKERS)
+    if not value:
+        return False
+    return any(
+        value == marker
+        or value.startswith(f"{marker}（")
+        or value.startswith(f"{marker}(")
+        or value.startswith(f"{marker}:")
+        or value.startswith(f"{marker}：")
+        for marker in UNCONFIRMED_EXPECTED_BEHAVIOR_MARKERS
+    )
 
 
 def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
@@ -212,6 +221,8 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     block_only_artifact_issues = []
     if block_only:
         no_change_file_markers = {"", "なし", "対象なし", "未実施", "-"}
+        if ref_values:
+            block_only_artifact_issues.append({"refs": ref_values, "reason": "実装前blockなのにE2E実装参照がある"})
         for row in nonempty_rows(files_table):
             file_value = clean(row.get("ファイル", ""))
             if file_value not in no_change_file_markers:

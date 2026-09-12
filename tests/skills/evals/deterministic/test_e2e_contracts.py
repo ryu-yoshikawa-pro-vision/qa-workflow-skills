@@ -591,19 +591,51 @@ class E2EContractTests(unittest.TestCase):
             {},
             "E2E-IMPL-D021",
         )
-        block_only_with_artifacts = implementation_block.replace(
+        self.assert_pass(
+            "e2e-test-implementation",
+            implementation.replace(
+                "| login flow | TC-101 | tests/auth/login.spec.ts > login succeeds | dashboardが表示される | 新規実装 |",
+                "| login flow | TC-101 | tests/auth/login.spec.ts > login succeeds | ステータスに「未確認」と表示される | 新規実装 |",
+            ),
+            {},
+        )
+        self.assert_pass(
+            "e2e-test-implementation",
+            implementation.replace(
+                "| login flow | TC-101 | tests/auth/login.spec.ts > login succeeds | dashboardが表示される | 新規実装 |",
+                "| login flow | TC-101 | tests/auth/login.spec.ts > login succeeds | 未指定の場合はデフォルト値を表示する | 既存E2E拡張 |",
+            ),
+            {},
+        )
+        block_only_with_file = implementation_block.replace(
             "| なし | 変更なし |  |",
             "| tests/auth/login.spec.ts | login testを追加 | data-testid |",
-        ).replace(
+        )
+        self.assert_fails("e2e-test-implementation", block_only_with_file, {}, "E2E-IMPL-D022")
+        block_only_with_pass = implementation_block.replace(
             "| lint / typecheck / discovery | - | 未実施 | 実装前blockのため未実施 |",
             "| lint / typecheck / discovery | npm run lint | PASS | 実E2Eではない |",
         )
-        self.assert_fails("e2e-test-implementation", block_only_with_artifacts, {}, "E2E-IMPL-D022")
+        self.assert_fails("e2e-test-implementation", block_only_with_pass, {}, "E2E-IMPL-D022")
+        block_only_with_ref = implementation_block.replace(
+            "| --- | --- | --- | --- | --- |\n## 変更・再利用したファイル",
+            "| --- | --- | --- | --- | --- |\n| tests/auth/login.spec.ts > login succeeds | tests/auth/login.spec.ts | login succeeds |  | 新規実装 |\n## 変更・再利用したファイル",
+        )
+        self.assert_fails("e2e-test-implementation", block_only_with_ref, {}, "E2E-IMPL-D022")
+        mixed_implementation = implementation.replace(
+            "| login flow | TC-101 | tests/auth/login.spec.ts > login succeeds | dashboardが表示される | 新規実装 |\n",
+            "| login flow | TC-101 | tests/auth/login.spec.ts > login succeeds | dashboardが表示される | 新規実装 |\n| payment flow |  | ユーザー明示E2E対象 | 未確認 | ブロック中 |\n",
+        ).replace(
+            "| login flow | なし |  | e2e-test-execution |",
+            "| login flow | なし |  | e2e-test-execution |\n| payment flow | ブロック中 | inspection情報不足 | e2e-test-inspection |",
+        )
+        self.assert_pass("e2e-test-implementation", mixed_implementation, {})
 
         execution = self.execution_output()
         for mutated in (
             execution.replace("| 対象URL / origin | https://app.test | 実対象 | raw fact |", "| 対象URL / origin |  | 実対象 | raw fact |"),
             execution.replace("| 実行入口 / command chain | npm run test:e2e | repo | raw fact |", "| 実行入口 / command chain |  | repo | raw fact |"),
+            execution.replace("| run外準備 | 対象なし | repo | raw fact |\n", ""),
         ):
             self.assert_fails("e2e-test-execution", mutated, {}, "E2E-EXEC-D018")
 
@@ -739,6 +771,22 @@ class E2EContractTests(unittest.TestCase):
         )
         self.assert_pass(
             "e2e-test-execution",
+            execution.replace(
+                "| 必要な認証 / テストデータ / 開始状態 | test user / clean account | repo | raw fact |",
+                "| 必要な認証 / テストデータ / 開始状態 | ステータス「未実施」の申請データをseed済み | repo | raw fact |",
+            ),
+            {},
+        )
+        self.assert_pass(
+            "e2e-test-execution",
+            execution.replace(
+                "| cleanup方法 | runner teardown / run外なし | repo | raw fact |",
+                "| cleanup方法 | 「未実施」状態のテストレコードをAPIで削除する | repo | raw fact |",
+            ),
+            {},
+        )
+        self.assert_pass(
+            "e2e-test-execution",
             execution.replace("| テスト対象version / build ID | build-1 | 実対象 | raw fact |", "| テスト対象version / build ID | 未確認 | 実対象 | 確認不能 |"),
             {},
         )
@@ -797,11 +845,33 @@ class E2EContractTests(unittest.TestCase):
             "| app | 実行前から存在 | 今回runは所有しない | 既存process再利用 | 対象外 | reuseExistingServer=true |",
         )
         self.assert_pass("e2e-test-execution", reuse_existing, {})
-        contradictory_reuse = execution.replace(
+        reuse_new = execution.replace(
             "| setup / dependency / webServer / teardown | runner / none / webServer設定あり / runner | repo | raw fact |",
             "| setup / dependency / webServer / teardown | runner / none / reuseExistingServer=true / runner | repo | raw fact |",
         )
-        self.assert_fails("e2e-test-execution", contradictory_reuse, {}, "E2E-EXEC-D025")
+        self.assert_pass("e2e-test-execution", reuse_new, {})
+        self.assert_pass("e2e-test-execution", reuse_existing, {"expected_webserver_reuse": {"app": True}})
+        self.assert_fails(
+            "e2e-test-execution",
+            reuse_new,
+            {"expected_webserver_reuse": {"app": True}},
+            "E2E-EXEC-D025",
+        )
+        contradictory_reuse_owner = reuse_existing.replace(
+            "| app | 実行前から存在 | 今回runは所有しない | 既存process再利用 | 対象外 | reuseExistingServer=true |",
+            "| app | 実行前から存在 | 今回runが所有 | 既存process再利用 | 対象外 | reuseExistingServer=true |",
+        )
+        self.assert_fails("e2e-test-execution", contradictory_reuse_owner, {}, "E2E-EXEC-D025")
+        contradictory_reuse_cleanup = reuse_existing.replace(
+            "| app | 実行前から存在 | 今回runは所有しない | 既存process再利用 | 対象外 | reuseExistingServer=true |",
+            "| app | 実行前から存在 | 今回runは所有しない | 既存process再利用 | 対象 | reuseExistingServer=true |",
+        )
+        self.assert_fails("e2e-test-execution", contradictory_reuse_cleanup, {}, "E2E-EXEC-D025")
+        contradictory_new = reuse_new.replace(
+            "| app | 今回runが起動 | 今回runが所有 | 新規起動 | 対象 | Playwright webServer |",
+            "| app | 今回runが起動 | 今回runは所有しない | 新規起動 | 対象外 | Playwright webServer |",
+        )
+        self.assert_fails("e2e-test-execution", contradictory_new, {}, "E2E-EXEC-D025")
         unknown_webserver = preflight_block.replace(
             "| setup / dependency / webServer / teardown | runner / none / webServer設定あり / runner | repo | raw fact |",
             "| setup / dependency / webServer / teardown | runner / none / webServer=未確認 / runner | repo | raw fact |",

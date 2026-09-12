@@ -112,6 +112,23 @@ jobs:
                   assert negatives == expected_false, (path, negatives)
                   total_queries += len(data)
 
+              train_queries = {
+                  item["query"]
+                  for item in json.loads(
+                      (skill_root / name / "evals" / "trigger" / "train_queries.json").read_text(encoding="utf-8")
+                  )
+              }
+              validation_queries = {
+                  item["query"]
+                  for item in json.loads(
+                      (skill_root / name / "evals" / "trigger" / "validation_queries.json").read_text(encoding="utf-8")
+                  )
+              }
+              assert train_queries.isdisjoint(validation_queries), (
+                  name,
+                  sorted(train_queries & validation_queries),
+              )
+
           assert len(names) == len(set(names)) == 14, names
           assert total_queries == 280, total_queries
 

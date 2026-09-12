@@ -30,6 +30,7 @@ RUN_START_REQUIRED_CONDITIONS = {
     "副作用の許可範囲 / 最大回数",
     "cleanup方法",
 }
+REQUIRED_EXECUTION_CONDITIONS = RUN_START_REQUIRED_CONDITIONS | {"run外準備"}
 
 
 def _webserver_candidate(setup_value: str) -> str:
@@ -106,7 +107,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     result.add("E2E-EXEC-D001", not missing, "executionの正規テーブルが存在すること", evidence=missing or None)
 
     condition_rows = nonempty_rows(conditions)
-    required_condition_labels = RUN_START_REQUIRED_CONDITIONS | {"branch / HEAD / working tree", "テスト対象version / build ID"}
+    required_condition_labels = REQUIRED_EXECUTION_CONDITIONS | {"branch / HEAD / working tree", "テスト対象version / build ID"}
     missing_condition = sorted(required_condition_labels - {clean(row.get("項目", "")) for row in condition_rows})
     result.add("E2E-EXEC-D002", not missing_condition, "実行入口・実効設定・revision・対象versionを確認すること", evidence=missing_condition or None)
     condition_by_item = {clean(row.get("項目", "")): row for row in condition_rows}
@@ -180,7 +181,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         for label in sorted(RUN_START_REQUIRED_CONDITIONS):
             row = condition_by_item.get(label)
             value = clean(row.get("値", "")) if row else ""
-            if any(marker in value for marker in UNKNOWN_SAFETY_MARKERS):
+            if _is_explicit_unavailable(value, set(UNKNOWN_SAFETY_MARKERS)):
                 started_safety_issues.append({"項目": label, "値": value})
     result.add(
         "E2E-EXEC-D026",
@@ -221,8 +222,6 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         clean(str(server_id)): bool(reuse)
         for server_id, reuse in expected.get("expected_webserver_reuse", {}).items()
     }
-    if "reuseExistingServer=true" in setup_value and len(webserver_rows) == 1:
-        expected_reuse.setdefault(actual_webserver_ids[0] if actual_webserver_ids else "", True)
     for row in webserver_rows:
         missing_fields = [
             field
