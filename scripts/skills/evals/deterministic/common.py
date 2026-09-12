@@ -63,6 +63,11 @@ def clean(value: str) -> str:
     return value.strip().strip("`")
 
 
+def has_value(value: str) -> bool:
+    """Return whether a contract field contains a value or explicit state."""
+    return clean(value) not in {"", "-", "—", "N/A", "n/a"}
+
+
 def ids_in(value: str) -> list[str]:
     return ALL_ID_RE.findall(value or "")
 

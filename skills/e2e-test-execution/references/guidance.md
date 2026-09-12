@@ -8,7 +8,20 @@ config → project → file / describe / test → CLIの上書きを、今回対
 
 ## 準備とcleanup
 
-runnerが管理するsetup / teardownをrun外で二重実行しません。run外処理はrepoで定義されinspection等で確認済みのseed / API / cleanupだけを使い、新しい方式を作りません。process interruptionや通信断でcleanup結果が確認できない場合は`未確認`です。
+runnerが管理するsetup / teardownをrun外で二重実行しません。`webServer`は今回runが起動したprocess、実行前から存在するprocess、`reuseExistingServer`等で再利用した既存processを区別し、今回runが所有していない既存processをcleanup目的で終了しません。複数webServerがある場合も各processについてownershipとcleanup対象を記録します。run外処理はrepoで定義されinspection等で確認済みのseed / API / cleanupだけを使い、新しい方式を作りません。process interruptionや通信断でcleanup結果が確認できない場合は`未確認`です。
+
+## Playwright値域とworkflow状態
+
+Playwrightの値域をworkflow状態と混在させません。公式APIが提供する契約は次のとおりです。
+
+| 情報 | 許可されるraw値 |
+| --- | --- |
+| `TestResult.status` | `passed` / `failed` / `timedOut` / `skipped` / `interrupted` |
+| `TestCase.expectedStatus` | `passed` / `failed` / `timedOut` / `skipped` / `interrupted` |
+| `TestCase.outcome()` | `skipped` / `expected` / `unexpected` / `flaky` |
+| `FullResult.status` / reporterのrun全体status | `passed` / `failed` / `timedout` / `interrupted` |
+
+`未実行`、`未確認`、`確認不能`、`構造化結果不完全`はPlaywright raw status / outcomeではなく、workflow上の状態または取得不能状態として別列へ保持します。利用したreporter / APIが直接提供していないraw値をprocess exit codeから作りません。
 
 ## 構造化結果
 

@@ -129,13 +129,14 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     execution_mismatches = []
     for item in expected_e2e_execution:
         ref = clean(str(item.get("implementation_ref", "")))
-        match = next((row for row in e2e_result_rows if ref and ref in " ".join(row.values())), None)
+        match = next((row for row in e2e_result_rows if ref and clean(row.get("上流ID / 挙動", "")) == ref), None)
         if match is None:
             execution_mismatches.append({"implementation_ref": ref, "reason": "missing"})
             continue
-        result_ref = " ".join(
+        result_ref = clean(match.get("下流ID / 扱い", ""))
+        result_context = " ".join(
             clean(match.get(field, ""))
-            for field in ("下流ID / 扱い", "根拠 / ギャップ", "推奨対応")
+            for field in ("根拠 / ギャップ", "推奨対応")
             if clean(match.get(field, ""))
         )
         outcome = " ".join(
@@ -147,9 +148,9 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             execution_mismatches.append({"implementation_ref": ref, "reason": "result reference missing"})
         if not outcome:
             execution_mismatches.append({"implementation_ref": ref, "reason": "result or unexecuted reason missing"})
-        if "result_ref" in item and clean(str(item["result_ref"])) not in result_ref:
+        if "result_ref" in item and clean(str(item["result_ref"])) != result_ref:
             execution_mismatches.append({"implementation_ref": ref, "reason": "expected result reference missing", "expected": item["result_ref"]})
-        if "result_contains" in item and str(item["result_contains"]) not in result_ref + " " + outcome:
+        if "result_contains" in item and str(item["result_contains"]) not in result_ref + " " + result_context + " " + outcome:
             execution_mismatches.append({"implementation_ref": ref, "reason": "expected result text missing"})
     if expected_e2e_execution:
         result.add("COV-D011", not execution_mismatches, "E2E実装参照からresolved primary TestCase / 実行結果と結果または未実行理由へ追跡できること", evidence=execution_mismatches or None)

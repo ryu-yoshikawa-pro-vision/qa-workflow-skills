@@ -1,15 +1,15 @@
 # Eval Input
 ## Authority
-- 名称は1〜50文字。
-- 空文字は保存不可。
-- 51文字以上は保存不可。
+- TC-101: ログイン後に注文履歴を表示できる。
+- TC-102: 注文履歴の詳細を開くと対象注文の明細が表示される。
 
-## Coverage
-- TC-001: 1文字で保存成功。
-- TC-002: 50文字で保存成功。
-- TC-003: 51文字で保存失敗。
-- TC-004: 51文字で保存失敗（TC-003と同じ前提・操作・Oracle）。
-- 空文字の確認ケースはない。
+## E2E実装
+- `tests/orders/order.spec.ts > order history`はTC-101に対応する。
+- `tests/orders/order.spec.ts > order detail`はTC-102に対応する。
+
+## 実行結果
+- `order history`は`result-1`として実行済み。
+- `order detail`は未実行で、環境到達性の確認が必要。
 
 ## 目的
-意味的Gapと重複を同時に分析する。
+既存QA ID graphの閉鎖性と、E2E実装参照から実行結果への追跡を混ぜずに分析する。

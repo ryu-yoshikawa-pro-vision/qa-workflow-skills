@@ -26,9 +26,11 @@
 
 ## resolved primary結果 / attempt結果
 
-| resolved primary TestCase参照 | 結果 | expectedStatus | outcome | retry attempt数（別集計） | 初回 / retry履歴 | 実行結果参照 |
-| --- | --- | --- | --- | ---: | --- | --- |
-| session-test-1 | passed | passed | expected | 1 | passed (retry 0) | result.jsonの対象参照 |
+| 論理的な要求primary対象 | resolved primary TestCase参照 | 実行開始 | 結果 | expectedStatus | outcome | retry attempt数（別集計） | 初回 / retry履歴 | 実行結果参照 |
+| --- | --- | --- | --- | --- | --- | ---: | --- | --- |
+| login-flow | session-test-1 | 開始 | passed | passed | expected | 1 | passed (retry 0) | result.jsonの対象参照 |
+
+開始していないresolved primaryは、`結果`へPlaywright値や`未実行`を入れず、未実行理由を記録します。`expectedStatus` / `outcome`もPlaywrightが返していない限り空欄にします。
 
 ## TC・E2E・実行・分析追跡
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from scripts.skills.evals.deterministic.common import ID_PATTERNS, clean, add_duplicate_assertion, nonempty_rows
+from scripts.skills.evals.deterministic.common import ID_PATTERNS, add_duplicate_assertion, clean, has_value, nonempty_rows
 from scripts.skills.evals.deterministic.markdown_parser import find_table, parse_tables
 from scripts.skills.evals.deterministic.result import EvalResult
 
@@ -28,7 +28,8 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     ref_table = find_table(tables, section_contains="E2E実装参照", required_headers=("E2E実装参照", "test file", "Playwright title path", "扱い"))
     files_table = find_table(tables, section_contains="変更・再利用したファイル", required_headers=("ファイル", "変更内容 / 再利用理由"))
     validation_table = find_table(tables, section_contains="静的・軽量検証", required_headers=("検証", "実行command / 条件", "結果", "非破壊確認 / 未実施理由"))
-    missing = [name for name, table in (("実装対象", target_table), ("実装前の状態", state_table), ("E2E実装参照", ref_table), ("変更・再利用したファイル", files_table), ("静的・軽量検証", validation_table)) if table is None]
+    diff_table = find_table(tables, section_contains="inspection差分・ブロック・要再検証", required_headers=("範囲", "状態", "理由 / 影響", "次の担当"))
+    missing = [name for name, table in (("実装対象", target_table), ("実装前の状態", state_table), ("E2E実装参照", ref_table), ("変更・再利用したファイル", files_table), ("静的・軽量検証", validation_table), ("inspection差分・ブロック・要再検証", diff_table)) if table is None]
     result.add("E2E-IMPL-D001", not missing, "implementationの正規テーブルが存在すること", evidence=missing or None)
 
     targets = nonempty_rows(target_table)
@@ -54,12 +55,67 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     actual_state = {clean(row.get("項目", "")) for row in state_rows}
     missing_state = sorted(required_state - actual_state)
     result.add("E2E-IMPL-D007", not missing_state, "実装前のbranch・HEAD・working tree・競合・inspection差分を確認すること", evidence=missing_state or None)
+    state_by_item = {clean(row.get("項目", "")): row for row in state_rows}
+    state_value_issues = []
+    for label in sorted(required_state):
+        row = state_by_item.get(label)
+        if row is None:
+            continue
+        missing_fields = [field for field in ("値", "確認元") if not has_value(row.get(field, ""))]
+        if missing_fields:
+            state_value_issues.append({"項目": label, "fields": missing_fields})
+    result.add(
+        "E2E-IMPL-D016",
+        not missing_state and not state_value_issues,
+        "実装前のbranch・HEAD・working tree・競合・inspection差分に値または明示状態と確認元があること",
+        evidence={"missing_items": missing_state, "missing_values": state_value_issues}
+        if missing_state or state_value_issues
+        else None,
+    )
 
     validation_rows = nonempty_rows(validation_table)
     invalid_results = sorted({clean(row.get("結果", "")) for row in validation_rows if clean(row.get("結果", "")) not in VALID_RESULTS})
     result.add("E2E-IMPL-D008", not invalid_results, "静的・軽量検証結果が許可値であること", evidence=invalid_results or None)
-    failed_without_reason = [clean(row.get("検証", "")) for row in validation_rows if clean(row.get("結果", "")) in {"FAIL", "ブロック中"} and not clean(row.get("非破壊確認 / 未実施理由", ""))]
+    failed_without_reason = [clean(row.get("検証", "")) for row in validation_rows if clean(row.get("結果", "")) in {"FAIL", "ブロック中"} and not has_value(row.get("非破壊確認 / 未実施理由", ""))]
     result.add("E2E-IMPL-D009", not failed_without_reason, "検証FAIL / ブロック中に理由があること", evidence=failed_without_reason or None)
+    validation_issues = []
+    for row in validation_rows:
+        check = clean(row.get("検証", ""))
+        outcome = clean(row.get("結果", ""))
+        missing_fields = []
+        if not has_value(check):
+            missing_fields.append("検証")
+        if not has_value(outcome):
+            missing_fields.append("結果")
+        if outcome == "PASS":
+            if not has_value(row.get("実行command / 条件", "")):
+                missing_fields.append("実行command / 条件")
+            if not has_value(row.get("非破壊確認 / 未実施理由", "")):
+                missing_fields.append("非破壊確認 / 未実施理由")
+        elif outcome in {"FAIL", "未実施", "ブロック中", "確認不能"} and not has_value(row.get("非破壊確認 / 未実施理由", "")):
+            missing_fields.append("非破壊確認 / 未実施理由")
+        if missing_fields:
+            validation_issues.append({"検証": check or "<unknown>", "fields": missing_fields})
+    result.add(
+        "E2E-IMPL-D014",
+        bool(validation_rows) and not validation_issues,
+        "静的・軽量検証が1行以上あり、実施結果または未実施理由を持つこと",
+        evidence={"missing_rows": not validation_rows, "issues": validation_issues}
+        if not validation_rows or validation_issues
+        else None,
+    )
+    failed_checks = [clean(row.get("検証", "")) for row in validation_rows if clean(row.get("結果", "")) == "FAIL"]
+    diff_rows = nonempty_rows(diff_table)
+    unresolved_statuses = {"要再検証", "ブロック中"}
+    failed_marked_complete = bool(failed_checks) and not any(clean(row.get("状態", "")) in unresolved_statuses for row in diff_rows)
+    result.add(
+        "E2E-IMPL-D015",
+        not failed_marked_complete,
+        "静的検証FAILを完了扱いせず、要再検証またはブロック中へ閉じること",
+        evidence={"failed_checks": failed_checks, "states": [clean(row.get("状態", "")) for row in diff_rows]}
+        if failed_marked_complete
+        else None,
+    )
 
     expected_refs = {clean(str(ref)) for ref in expected.get("required_e2e_refs", [])}
     missing_refs = sorted(expected_refs - set(ref_values))

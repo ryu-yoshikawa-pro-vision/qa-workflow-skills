@@ -19,6 +19,7 @@
 | Playwright run全体status |  | reporter / API / 確認不能 | raw fact / 確認不能 |
 | CLI process exit code |  | process | raw fact |
 | run-level / global error |  | reporter / process | raw fact |
+| runner開始 |  | execution | raw fact |
 | result artifactの今回run生成・更新 |  | filesystem / reporter | raw fact |
 
 ## logical primary対象の解決
@@ -37,7 +38,7 @@
 
 | resolved primary TestCase参照 | attempt番号 | 実行区分 | status | expectedStatus | outcome | retry番号 | duration | error / errors |
 | --- | ---: | --- | --- | --- | --- | ---: | --- | --- |
-| session-test-1 | 1 | 要求primary test | passed / failed / timedOut / skipped / interrupted | passed | expected / unexpected / flaky | 0 |  |  |
+| session-test-1 | 1 | 要求primary test | passed / failed / timedOut / skipped / interrupted | passed / failed / timedOut / skipped / interrupted | skipped / expected / unexpected / flaky | 0 |  |  |
 
 ## working tree・証跡
 
@@ -46,6 +47,7 @@
 | working tree |  |  |  |
 | output / report / snapshot / source |  |  |  |
 | trace / screenshot / video / HTML report / network / storageState |  |  |  |
+| stale artifactの今回結果利用 |  |  | 未利用 / 利用していないことを確認 |
 
 ## cleanup・残存副作用
 
@@ -54,4 +56,4 @@
 | runner管理 / run外処理 | 成功 / 失敗 / 未確認 / 対象なし / 意図的に残した状態 |  |  |
 
 - 実行成果物状態: 完了 / ブロック中 / 要再確認
-- ブロック中:
+- ブロック中: preflight blockの場合はrunner未開始・artifact未生成の理由

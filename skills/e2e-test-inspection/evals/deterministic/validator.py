@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import re
 
-from scripts.skills.evals.deterministic.common import ID_PATTERNS, clean, add_duplicate_assertion, nonempty_rows
+from scripts.skills.evals.deterministic.common import ID_PATTERNS, add_duplicate_assertion, clean, has_value, nonempty_rows
 from scripts.skills.evals.deterministic.markdown_parser import find_table, parse_tables
 from scripts.skills.evals.deterministic.result import EvalResult
 
 HANDLINGS = {"新規E2E実装", "既存E2E再利用", "既存E2E拡張", "E2E対象外", "ブロック中", "要再判断"}
 SOURCE_TOKENS = {"repo", "実対象", "ユーザー提供情報", "未確認", "確認不能"}
+FEASIBILITY_STATES = {"実装可能", "未確認", "ブロック中", "要再判断", "対象外"}
 
 
 def _has_named_rows(rows: list[dict[str, str]], labels: set[str], field: str) -> list[str]:
@@ -47,18 +48,75 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     freshness = nonempty_rows(freshness_table)
     required_freshness = {"branch", "commit", "working tree", "テスト環境URL / origin", "実対象確認日時", "version / build ID"}
     missing_freshness = _has_named_rows(freshness, required_freshness, "項目")
-    result.add("E2E-INSP-D005", not missing_freshness, "branch・commit・working tree・URL・確認日時・versionの鮮度情報があること", evidence=missing_freshness or None)
+    freshness_by_item = {clean(row.get("項目", "")): row for row in freshness}
+    freshness_value_issues = []
+    for label in sorted(required_freshness):
+        row = freshness_by_item.get(label)
+        if row is None:
+            continue
+        missing_fields = [
+            field
+            for field in ("値", "確認元", "確認日時 / commit")
+            if not has_value(row.get(field, ""))
+        ]
+        if missing_fields:
+            freshness_value_issues.append({"項目": label, "fields": missing_fields})
+    result.add(
+        "E2E-INSP-D005",
+        not missing_freshness and not freshness_value_issues,
+        "branch・commit・working tree・URL・確認日時・versionの鮮度情報が値または明示状態を持つこと",
+        evidence={"missing_items": missing_freshness, "missing_values": freshness_value_issues}
+        if missing_freshness or freshness_value_issues
+        else None,
+    )
 
     safety = nonempty_rows(safety_table)
     required_safety = {"URL / origin", "副作用", "run外の準備", "runner管理setup / cleanup", "証跡・認証状態"}
     missing_safety = _has_named_rows(safety, required_safety, "条件")
-    result.add("E2E-INSP-D006", not missing_safety, "安全条件・準備・cleanup・証跡の確認行があること", evidence=missing_safety or None)
+    safety_by_condition = {clean(row.get("条件", "")): row for row in safety}
+    safety_value_issues = []
+    for label in sorted(required_safety):
+        row = safety_by_condition.get(label)
+        if row is None:
+            continue
+        missing_fields = [
+            field
+            for field in ("状態", "根拠 / 許可", "実行主体 / cleanup制約")
+            if not has_value(row.get(field, ""))
+        ]
+        if missing_fields:
+            safety_value_issues.append({"条件": label, "fields": missing_fields})
+    result.add(
+        "E2E-INSP-D006",
+        not missing_safety and not safety_value_issues,
+        "安全条件・準備・cleanup・証跡の状態、根拠 / 許可、実行主体を値または明示状態で確認すること",
+        evidence={"missing_items": missing_safety, "missing_values": safety_value_issues}
+        if missing_safety or safety_value_issues
+        else None,
+    )
 
     relations = nonempty_rows(relation_table)
+    facts = nonempty_rows(fact_table)
+    empty_required_tables = [
+        name
+        for name, rows in (
+            ("対象決定", targets),
+            ("実装・実行に影響する事実", facts),
+            ("安全条件・準備・cleanup", safety),
+            ("既存E2Eとの関係", relations),
+        )
+        if not rows
+    ]
+    result.add(
+        "E2E-INSP-D013",
+        not empty_required_tables,
+        "inspectionの対象・事実・安全条件・既存E2E関係に有効なデータ行があること",
+        evidence=empty_required_tables or None,
+    )
+
     relation_bad = sorted({clean(row.get("扱い", "")) for row in relations if clean(row.get("扱い", "")) and clean(row.get("扱い", "")) not in HANDLINGS | {"既存E2Eで十分にカバー済み"}})
     result.add("E2E-INSP-D007", not relation_bad, "既存E2Eとの関係が許可された扱いであること", evidence=relation_bad or None)
 
-    facts = nonempty_rows(fact_table)
     missing_fact_labels = _has_named_rows(facts, set(expected.get("required_fact_labels", [])), "事実")
     result.add("E2E-INSP-D008", not missing_fact_labels, "フィクスチャで必須のinspection事実が存在すること", evidence=missing_fact_labels or None)
 
@@ -70,6 +128,28 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     required_tc_ids = {clean(str(tc)) for tc in expected.get("required_tc_ids", [])}
     missing_required_tc = sorted(required_tc_ids - set(tc_ids))
     result.add("E2E-INSP-D010", not missing_required_tc, "TCあり経路で指定TC IDが保持されること", evidence=missing_required_tc or None)
+
+    feasibility = nonempty_rows(feasibility_table)
+    feasibility_issues = []
+    for row in feasibility:
+        state = clean(row.get("実装可否 / 状態", ""))
+        missing_fields = [
+            field
+            for field in ("範囲", "実装可否 / 状態", "理由", "次の担当")
+            if not has_value(row.get(field, ""))
+        ]
+        if state and state not in FEASIBILITY_STATES:
+            missing_fields.append("実装可否 / 状態(許可値)")
+        if missing_fields:
+            feasibility_issues.append({"範囲": clean(row.get("範囲", "")) or "<unknown>", "fields": missing_fields})
+    result.add(
+        "E2E-INSP-D014",
+        bool(feasibility) and not feasibility_issues,
+        "実装可否・未確認・ブロックの状態と理由・次の担当が明示されていること",
+        evidence={"missing_rows": not feasibility, "issues": feasibility_issues}
+        if not feasibility or feasibility_issues
+        else None,
+    )
 
     if expected.get("tc_absent"):
         fabricated = sorted(set(re.findall(r"\bTC-\d{3}\b", text)))

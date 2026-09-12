@@ -149,14 +149,12 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             }
     result.add("RISK-D015", testability_mismatch is None, "フィクスチャで必須のテスト可能性値がテスト可能性行に存在すること", evidence=testability_mismatch)
 
-    selection_requested = "E2E対象選定" in clean(" ".join(parse_tables(text)[0].headers if parse_tables(text) else [])) or "対象 / 実行範囲: E2E対象選定" in text
     selection_table = find_table(
         tables,
         section_contains="E2E対象選定",
         required_headers=("自動化目的", "候補範囲", "技術非依存の判断基準 / 根拠"),
     )
-    if expected.get("require_e2e_selection"):
-        selection_requested = True
+    selection_requested = bool(expected.get("require_e2e_selection") or selection_table is not None or "対象 / 実行範囲: E2E対象選定" in text)
     result.add(
         "RISK-D016",
         not selection_requested or selection_table is not None,
@@ -171,5 +169,12 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             absent = [field for field in fields if not clean(row.get(field, ""))]
             if absent:
                 missing_selection.append({"fields": absent})
-        result.add("RISK-D017", not missing_selection, "E2E対象選定行の技術非依存契約が埋まっていること", evidence=missing_selection or None)
+        result.add(
+            "RISK-D017",
+            bool(selection_rows) and not missing_selection,
+            "E2E対象選定に自動化目的・候補範囲・技術非依存の判断基準 / 根拠を持つ有効行があること",
+            evidence={"missing_rows": not selection_rows, "invalid_rows": missing_selection}
+            if not selection_rows or missing_selection
+            else None,
+        )
     return result

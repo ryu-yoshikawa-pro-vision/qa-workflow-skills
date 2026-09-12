@@ -1,3 +1,4 @@
 # 正本
 
 cleanupを未確認として保持し、resolved 0件の理由を残す。process成功だけで完全実行やcleanup成功と扱わず、安全な完了・自動再実行へ進めない。
+`reuseExistingServer=true`で実行前から存在したprocessは今回runの所有外として記録し、cleanupで終了しない。今回runが起動したprocessとのownershipを混同しない。

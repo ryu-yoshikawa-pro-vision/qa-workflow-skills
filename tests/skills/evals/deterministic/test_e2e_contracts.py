@@ -119,6 +119,7 @@ class E2EContractTests(unittest.TestCase):
 | Playwright run全体status | passed | reporter | raw fact |
 | CLI process exit code | 0 | process | raw fact |
 | run-level / global error | なし | reporter | raw fact |
+| runner開始 | はい | execution | raw fact |
 | result artifactの今回run生成・更新 | はい | filesystem | raw fact |
 ## logical primary対象の解決
 | 論理的な要求primary対象 | E2E実装参照 / TC ID（存在時のみ） | resolved primary TestCase数 | 未実行 / 解決不能理由 |
@@ -138,6 +139,7 @@ class E2EContractTests(unittest.TestCase):
 | working tree | clean | clean | 変更なし |
 | output / report / snapshot / source | なし | result.json | 今回run |
 | trace / screenshot / video / HTML report / network / storageState | なし | trace.zip | secretなし |
+| stale artifactの今回結果利用 | なし | なし | 利用していない |
 ## cleanup・残存副作用
 | cleanup対象 / 実行主体 | 状態 | 結果 / 残存副作用 | 確認元 |
 | --- | --- | --- | --- |
@@ -199,9 +201,9 @@ class E2EContractTests(unittest.TestCase):
 | --- | --- | ---: | ---: | --- | --- |
 | login-flow | tests/auth/login.spec.ts > login succeeds {tc_id} | 1 | 1 |  |  |
 ## resolved primary結果 / attempt結果
-| resolved primary TestCase参照 | 結果 | expectedStatus | outcome | retry attempt数（別集計） | 初回 / retry履歴 | 実行結果参照 |
-| --- | --- | --- | --- | ---: | --- | --- |
-| result-1 | passed | passed | expected | 1 | passed (retry 0) | result.json |
+| 論理的な要求primary対象 | resolved primary TestCase参照 | 実行開始 | 結果 | expectedStatus | outcome | retry attempt数（別集計） | 初回 / retry履歴 | 実行結果参照 |
+| --- | --- | --- | --- | --- | --- | ---: | --- | --- |
+| login-flow | result-1 | 開始 | passed | passed | expected | 1 | passed (retry 0) | result.json |
 ## TC・E2E・実行・分析追跡
 | TC ID（存在時のみ） | E2E実装参照 | resolved primary TestCase / 実行結果参照 | 分析結果参照 | 報告上の扱い |
 | --- | --- | --- | --- | --- |
@@ -318,7 +320,13 @@ class E2EContractTests(unittest.TestCase):
             "e2e-test-result-analysis",
             analysis.replace("| 必要 | cleanup確認ログ | cleanupが成功しているか | cleanupのみ | e2e-test-execution |", "| 必要 | cleanup確認ログ | cleanupが成功しているか | cleanupのみ | e2e-test-result-analysis |"),
             {"additional_execution_required": True},
-            "E2E-AN-D005",
+            "E2E-AN-D010",
+        )
+        self.assert_fails(
+            "e2e-test-result-analysis",
+            analysis.replace("tests/auth/login.spec.ts > login succeeds", "tests/auth/login.spec.ts > login succeeds as admin"),
+            {"required_e2e_ref": "tests/auth/login.spec.ts > login succeeds"},
+            "E2E-AN-D007",
         )
 
         report = self.reporting_output()
@@ -328,8 +336,8 @@ class E2EContractTests(unittest.TestCase):
             {"expected_logical_primary_count": 1, "expected_resolved_primary_count": 1, "required_cleanup_text": "成功"},
         )
         retry_report = report.replace(
-            "| result-1 | passed | passed | expected | 1 | passed (retry 0) | result.json |",
-            "| result-1 | passed | passed | flaky | 2 | failed (retry 0) -> passed (retry 1) | result.json |",
+            "| login-flow | result-1 | 開始 | passed | passed | expected | 1 | passed (retry 0) | result.json |",
+            "| login-flow | result-1 | 開始 | passed | passed | flaky | 2 | failed (retry 0) -> passed (retry 1) | result.json |",
         )
         retry_report_expected = {
             "expected_logical_primary_count": 1,
@@ -350,6 +358,160 @@ class E2EContractTests(unittest.TestCase):
             {"expected_logical_primary_count": 1, "expected_resolved_primary_count": 1},
             "E2E-REPORT-D005",
         )
+
+    def test_e2e_false_pass_regressions_for_review_findings(self):
+        inspection = self.inspection_output()
+        for mutated, assertion_id in (
+            (inspection.replace("| branch | feat/e2e | repo | 2026-09-12 |", "| branch |  | repo | 2026-09-12 |"), "E2E-INSP-D005"),
+            (inspection.replace("| commit | abc123 | repo | 2026-09-12 |", "| commit |  | repo | 2026-09-12 |"), "E2E-INSP-D005"),
+            (inspection.replace("| テスト環境URL / origin | https://app.test | 実対象 | 2026-09-12 |", "| テスト環境URL / origin |  | 実対象 | 2026-09-12 |"), "E2E-INSP-D005"),
+            (inspection.replace("| 副作用 | テストデータのみ | ユーザー提供情報 | runner cleanup |", "| 副作用 |  | ユーザー提供情報 | runner cleanup |"), "E2E-INSP-D006"),
+            (inspection.replace("| URL / origin | 許可済み | ユーザー提供情報 | execution |", "| URL / origin | 許可済み |  | execution |"), "E2E-INSP-D006"),
+        ):
+            self.assert_fails("e2e-test-inspection", mutated, {}, assertion_id)
+
+        selection_only = """# テスト分析
+## プロダクトリスク一覧
+| リスクID | 製品上のリスク / 失敗 | 関連する現在有効な仕様根拠 / 変更 / 依存 | 影響度 | 発生可能性 | レベル | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| RISK-001 | login失敗 | SPEC-001 | 4 | 2 | 高 | 変更 |
+## 選択したテスト技法
+| テスト技法 | 適用領域 | 選択理由 |
+| --- | --- | --- |
+| シナリオ | login | 主要経路 |
+## テスト可能性 / テストレベル判断
+| 要件 / 懸念 | 操作可能か | 観測可能か | 合否判定可能か | 選択テストレベル |
+| --- | --- | --- | --- | --- |
+| login | 可 | 可 | 可 | システム |
+- 対象 / 実行範囲: E2E対象選定
+## E2E対象選定
+| 自動化目的 | 候補範囲 | 技術非依存の判断基準 / 根拠 |
+| --- | --- | --- |
+"""
+        self.assert_fails("test-analysis", selection_only, {}, "RISK-D017")
+
+        implementation = self.implementation_output()
+        empty_validation = implementation.replace(
+            "| lint / typecheck / discovery | npm run lint | PASS | 実E2Eではない |\n", ""
+        )
+        self.assert_fails("e2e-test-implementation", empty_validation, {}, "E2E-IMPL-D014")
+        no_reason = implementation.replace(
+            "| lint / typecheck / discovery | npm run lint | PASS | 実E2Eではない |",
+            "| lint / typecheck / discovery | - | 未実施 |  |",
+        )
+        self.assert_fails("e2e-test-implementation", no_reason, {}, "E2E-IMPL-D014")
+        failed_as_complete = implementation.replace(
+            "| lint / typecheck / discovery | npm run lint | PASS | 実E2Eではない |",
+            "| lint / typecheck / discovery | npm run lint | FAIL | lint error |",
+        )
+        self.assert_fails("e2e-test-implementation", failed_as_complete, {}, "E2E-IMPL-D015")
+
+        execution = self.execution_output()
+        for mutated in (
+            execution.replace("| 対象URL / origin | https://app.test | 実対象 | raw fact |", "| 対象URL / origin |  | 実対象 | raw fact |"),
+            execution.replace("| 実行入口 / command chain | npm run test:e2e | repo | raw fact |", "| 実行入口 / command chain |  | repo | raw fact |"),
+        ):
+            self.assert_fails("e2e-test-execution", mutated, {}, "E2E-EXEC-D018")
+
+        preflight_block = execution
+        preflight_block = preflight_block.replace(
+            "| login-flow | tests/auth/login.spec.ts > login succeeds / TC-101 | 1 |  |",
+            "| login-flow | tests/auth/login.spec.ts > login succeeds / TC-101 | 0 | credential不足でrunner未開始 |",
+        )
+        preflight_block = preflight_block.replace(
+            "| result-1 | login-flow | tests/auth/login.spec.ts > login succeeds | chromium | 0 | 開始 | passed |\n", ""
+        )
+        preflight_block = preflight_block.replace(
+            "| result-1 | 1 | 要求primary test | passed | passed | expected | 0 | 10ms |  |\n", ""
+        )
+        preflight_block = preflight_block.replace("| runner開始 | はい | execution | raw fact |", "| runner開始 | いいえ | execution | raw fact |")
+        preflight_block = preflight_block.replace(
+            "| result artifactの今回run生成・更新 | はい | filesystem | raw fact |",
+            "| result artifactの今回run生成・更新 | 未生成 | filesystem | raw fact |",
+        )
+        preflight_block = preflight_block.replace(
+            "| output / report / snapshot / source | なし | result.json | 今回run |",
+            "| output / report / snapshot / source | なし | なし | runner未開始で今回run結果なし |",
+        )
+        preflight_block = preflight_block.replace(
+            "- 実行成果物状態: 完了\n- ブロック中: なし",
+            "- 実行成果物状態: ブロック中\n- ブロック中: credential不足のため実行しなかった。stale artifactを今回結果として利用していない。",
+        )
+        self.assert_pass("e2e-test-execution", preflight_block, {})
+
+        stale_artifact = execution.replace(
+            "| result artifactの今回run生成・更新 | はい | filesystem | raw fact |",
+            "| result artifactの今回run生成・更新 | 未生成 | filesystem | raw fact |",
+        ).replace(
+            "| output / report / snapshot / source | なし | result.json | 今回run |",
+            "| output / report / snapshot / source | なし | result.json | stale artifactは利用していない |",
+        )
+        self.assert_fails("e2e-test-execution", stale_artifact, {}, "E2E-EXEC-D005")
+
+        reuse_existing = execution.replace(
+            "| setup / dependency / webServer / teardown | runner / none / app / runner | repo | raw fact |",
+            "| setup / dependency / webServer / teardown | runner / none / reuseExistingServer=true（実行前から存在、終了対象外） / runner | repo | raw fact |",
+        )
+        self.assert_pass("e2e-test-execution", reuse_existing, {})
+        self.assert_fails(
+            "e2e-test-execution",
+            reuse_existing.replace("（実行前から存在、終了対象外）", ""),
+            {},
+            "E2E-EXEC-D020",
+        )
+
+        for mutated, assertion_id in (
+            (execution.replace("| result-1 | 1 | 要求primary test | passed | passed | expected | 0 | 10ms |  |", "| result-1 | 1 | 要求primary test | timedout | passed | expected | 0 | 10ms |  |"), "E2E-EXEC-D010"),
+            (execution.replace("| result-1 | 1 | 要求primary test | passed | passed | expected | 0 | 10ms |  |", "| result-1 | 1 | 要求primary test | passed | passed | timedOut | 0 | 10ms |  |"), "E2E-EXEC-D010"),
+            (execution.replace("| result-1 | 1 | 要求primary test | passed | passed | expected | 0 | 10ms |  |", "| result-1 | 1 | 要求primary test | passed | passed | 未実行 | 0 | 10ms |  |"), "E2E-EXEC-D010"),
+            (execution.replace("| result-1 | 1 | 要求primary test | passed | passed | expected | 0 | 10ms |  |", "| result-1 | 1 | 要求primary test | passed | invalid | expected | 0 | 10ms |  |"), "E2E-EXEC-D010"),
+            (execution.replace("| Playwright run全体status | passed | reporter | raw fact |", "| Playwright run全体status | passed | process exit code | raw fact |"), "E2E-EXEC-D003"),
+        ):
+            self.assert_fails("e2e-test-execution", mutated, {}, assertion_id)
+
+        report = self.reporting_output()
+        resolved_row = "| login-flow | result-1 | 開始 | passed | passed | expected | 1 | passed (retry 0) | result.json |"
+        for mutated, assertion_id in (
+            (report.replace(resolved_row, resolved_row.replace("| 開始 | passed | passed |", "| 開始 | timedout | passed |")), "E2E-REPORT-D017"),
+            (report.replace(resolved_row, resolved_row.replace("| expected | 1 |", "| timedOut | 1 |")), "E2E-REPORT-D017"),
+            (report.replace(resolved_row, resolved_row.replace("| expected | 1 |", "| 未実行 | 1 |")), "E2E-REPORT-D017"),
+            (report.replace(resolved_row, resolved_row.replace("| passed | passed | expected |", "| passed | invalid | expected |")), "E2E-REPORT-D017"),
+            (report.replace("| Playwright run全体status | passed | reporter | raw fact |", "| Playwright run全体status | passed | process exit code | raw fact |"), "E2E-REPORT-D003"),
+        ):
+            self.assert_fails("e2e-test-reporting", mutated, {}, assertion_id)
+
+        partial = report.replace(
+            "| login-flow | tests/auth/login.spec.ts > login succeeds TC-101 | 1 | 1 |  |  |",
+            "| login-flow | tests/auth/login.spec.ts > login succeeds TC-101 | 3 | 2 |  |  |",
+        )
+        self.assert_fails("e2e-test-reporting", partial, {}, "E2E-REPORT-D005")
+        unresolved_logical = report.replace(
+            "| login-flow | tests/auth/login.spec.ts > login succeeds TC-101 | 1 | 1 |  |  |",
+            "| login-flow | tests/auth/login.spec.ts > login succeeds TC-101 | 0 | 0 |  |  |",
+        ).replace(resolved_row + "\n", "")
+        self.assert_fails("e2e-test-reporting", unresolved_logical, {}, "E2E-REPORT-D005")
+        unresolved_reason_placeholder = report.replace(
+            "| login-flow | tests/auth/login.spec.ts > login succeeds TC-101 | 1 | 1 |  |  |",
+            "| login-flow | tests/auth/login.spec.ts > login succeeds TC-101 | 2 | 1 |  | なし |",
+        )
+        self.assert_fails("e2e-test-reporting", unresolved_reason_placeholder, {}, "E2E-REPORT-D005")
+        retry_count_as_resolved = report.replace(
+            "| login-flow | tests/auth/login.spec.ts > login succeeds TC-101 | 1 | 1 |  |  |",
+            "| login-flow | tests/auth/login.spec.ts > login succeeds TC-101 | 2 | 2 |  |  |",
+        )
+        self.assert_fails("e2e-test-reporting", retry_count_as_resolved, {}, "E2E-REPORT-D005")
+        trace_empty = report.replace(
+            "| TC-101 | tests/auth/login.spec.ts > login succeeds | result-1 | analysis.md | 実行済み |\n", ""
+        )
+        self.assert_fails("e2e-test-reporting", trace_empty, {}, "E2E-REPORT-D018")
+        not_started = report.replace(
+            "| login-flow | tests/auth/login.spec.ts > login succeeds TC-101 | 1 | 1 |  |  |",
+            "| login-flow | tests/auth/login.spec.ts > login succeeds TC-101 | 1 | 0 |  | credential不足のため未実行 |",
+        ).replace(
+            resolved_row,
+            "| login-flow | result-1 | 未開始 | credential不足のため未実行 |  |  | 0 |  | execution.md |",
+        )
+        self.assert_pass("e2e-test-reporting", not_started, {})
 
     def test_tc_free_paths_do_not_fabricate_tc_ids(self):
         self.assert_pass(
@@ -496,6 +658,22 @@ class E2EContractTests(unittest.TestCase):
                 "expected_e2e_execution": [{"implementation_ref": "tests/auth/login.spec.ts > login succeeds", "result_ref": "result-1", "result_contains": "passed"}],
             },
         )
+        self.assert_fails(
+            "coverage-analysis",
+            coverage.replace("| E2E | tests/auth/login.spec.ts > login succeeds | 実行結果 | result-1 |", "| E2E | tests/auth/login.spec.ts > login succeeds | 実行結果 | result-10 |"),
+            {
+                "expected_e2e_execution": [{"implementation_ref": "tests/auth/login.spec.ts > login succeeds", "result_ref": "result-1"}],
+            },
+            "COV-D011",
+        )
+        self.assert_fails(
+            "coverage-analysis",
+            coverage.replace("tests/auth/login.spec.ts > login succeeds | 実行結果", "tests/auth/login.spec.ts > login as admin | 実行結果"),
+            {
+                "expected_e2e_execution": [{"implementation_ref": "tests/auth/login.spec.ts > login succeeds", "result_ref": "result-1"}],
+            },
+            "COV-D011",
+        )
 
         review = """# Review
 ## 指摘概要
@@ -519,50 +697,80 @@ class E2EContractTests(unittest.TestCase):
 
     def test_qa_workflow_routing_fixture_covers_plan_cases(self):
         cases_path = REPO_ROOT / "skills" / "qa-workflow" / "evals" / "deterministic" / "routing_cases.json"
+        candidates_path = REPO_ROOT / "skills" / "qa-workflow" / "evals" / "deterministic" / "routing_candidate_outputs.json"
         cases = json.loads(cases_path.read_text(encoding="utf-8"))
+        candidates = json.loads(candidates_path.read_text(encoding="utf-8"))
         self.assertEqual(len(cases), 29)
+        self.assertEqual(len(candidates), 29)
+        self.assertEqual({case["id"] for case in cases}, {candidate["id"] for candidate in candidates})
         default_targets = {
             "test-analysis": "テスト分析",
             "coverage-analysis": "テスト設計",
             "adversarial-review": "テスト設計成果物",
         }
         multi_use = set(default_targets)
+        cases_by_id = {case["id"]: case for case in cases}
+        candidates_by_id = {candidate["id"]: candidate for candidate in candidates}
 
-        for case in cases:
-            with self.subTest(case=case["id"]):
-                targets = dict(case.get("targets", {}))
-                for skill in case["skills"]:
-                    if skill in multi_use:
-                        targets.setdefault(skill, default_targets[skill])
-                rows = []
-                for skill in case["skills"]:
-                    rows.append(
-                        f"| {skill} | {targets.get(skill, '')} | {case.get('states', {}).get(skill, '完了')} | {case['id']} | |"
-                    )
-                start_target = targets.get(case["start"], "")
-                final_target = targets.get(case["final"], "")
-                output = f"""# Workflow
-- ワークフロー全体状態: {case['overall']}
-- 開始Skill: {case['start']}
-- 開始対象 / 実行範囲: {start_target}
-- 最終Skill: {case['final']}
-- 最終対象 / 実行範囲: {final_target}
+        def expected_for(case):
+            targets = dict(case.get("targets", {}))
+            for skill in case["skills"]:
+                if skill in multi_use:
+                    targets.setdefault(skill, default_targets[skill])
+            expected = {
+                "expected_start_skill": case["start"],
+                "expected_final_skill": case["final"],
+                "expected_skills": case["skills"],
+                "expected_overall_state": case["overall"],
+                "expected_skill_states": {skill: case.get("states", {}).get(skill, "完了") for skill in case["skills"]},
+            }
+            if case["start"] in multi_use:
+                expected["expected_start_target"] = case.get("start_target", targets.get(case["start"], ""))
+            if case["final"] in multi_use:
+                expected["expected_final_target"] = case.get("final_target", targets.get(case["final"], ""))
+            return expected
+
+        def render(candidate):
+            targets = dict(candidate.get("targets", {}))
+            rows = []
+            for skill in candidate["skills"]:
+                rows.append(
+                    f"| {skill} | {targets.get(skill, '')} | {candidate.get('states', {}).get(skill, '完了')} | {candidate['id']} | |"
+                )
+            return f"""# Workflow
+- ワークフロー全体状態: {candidate['overall']}
+- 開始Skill: {candidate['start']}
+- 開始対象 / 実行範囲: {candidate.get('start_target', targets.get(candidate['start'], ''))}
+- 最終Skill: {candidate['final']}
+- 最終対象 / 実行範囲: {candidate.get('final_target', targets.get(candidate['final'], ''))}
 | Skill | 対象 / 実行範囲 | 状態 | 成果物 / バージョン | ブロッカー / 備考 |
 | --- | --- | --- | --- | --- |
 {chr(10).join(rows)}
 """
-                expected = {
-                    "expected_start_skill": case["start"],
-                    "expected_final_skill": case["final"],
-                    "expected_skills": case["skills"],
-                    "expected_overall_state": case["overall"],
-                    "expected_skill_states": {skill: case.get("states", {}).get(skill, "完了") for skill in case["skills"]},
-                }
-                if case["start"] in multi_use:
-                    expected["expected_start_target"] = start_target
-                if case["final"] in multi_use:
-                    expected["expected_final_target"] = final_target
-                self.assert_pass("qa-workflow", output, expected)
+
+        for case in cases:
+            with self.subTest(case=case["id"]):
+                self.assertTrue(case.get("input_conditions", "").strip())
+                self.assert_pass("qa-workflow", render(candidates_by_id[case["id"]]), expected_for(case))
+
+        direct_implementation = dict(candidates_by_id["WF-E2E-002"])
+        direct_implementation["start"] = "e2e-test-implementation"
+        direct_implementation["skills"] = ["e2e-test-implementation"]
+        self.assert_fails(
+            "qa-workflow",
+            render(direct_implementation),
+            expected_for(cases_by_id["WF-E2E-002"]),
+            "WF-D006",
+        )
+        unnecessary_design = dict(candidates_by_id["WF-E2E-003"])
+        unnecessary_design["start"] = "test-analysis"
+        unnecessary_design["skills"] = ["test-analysis", "test-case-design", "e2e-test-implementation"]
+        self.assert_fails(
+            "qa-workflow",
+            render(unnecessary_design),
+            expected_for(cases_by_id["WF-E2E-003"]),
+            "WF-D006",
+        )
 
 
 if __name__ == "__main__":

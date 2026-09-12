@@ -7,14 +7,15 @@ description: inspectionで確認済みのE2E対象と事実を既存repo構造�
 
 ## 実行契約
 
-1. 有効な`e2e-test-inspection`成果物または同等の確認済み情報と、詳細TC、明示E2E対象、既存E2E実装参照のいずれかを入力にします。
-2. TCあり経路では元TCの期待結果を実装都合で変更しません。TCなし経路では明示対象・確認済み期待挙動・仕様根拠を使い、TC / TC IDを創作しません。
-3. コード変更前にbranch、HEAD、working tree、変更予定ファイルとの競合、inspectionからのrepo構造差分を確認します。競合しない既存変更を一律に停止理由にしません。
-4. 既存spec、fixture、helper、Page Object、config、locator方針を優先し、存在しない抽象化やURL・fixture・locatorを推測しません。
-5. secret / 認証情報をコードへ埋め込まず、inspectionで確認したorigin・副作用・データ・cleanup制約を超えません。
-6. 実装後は対象repoの既存verify / test validation / lint / typecheck / test discovery等から、実対象E2E、外部I/O、状態変更を含まない検証だけを実施します。安全性を確認できない検証や本実行はここで行わず、未実施理由を残します。
-7. E2E実装参照は、既存識別子またはrepo-relative test path + Playwright title pathで保持します。project、repeat、retryは実行単位情報として分離します。
-8. 静的検証失敗を成功扱いにせず、inspection差分・ブロック・`要再検証`を明示します。
+1. 詳細判断が必要な場合は最初に`references/guidance.md`を読み、既存構造の再利用・軽量検証・TCなし契約に従います。
+2. 有効な`e2e-test-inspection`成果物または同等の確認済み情報と、詳細TC、明示E2E対象、既存E2E実装参照のいずれかを入力にします。
+3. TCあり経路では元TCの期待結果を実装都合で変更しません。TCなし経路では明示対象・確認済み期待挙動・仕様根拠を使い、TC / TC IDを創作しません。
+4. コード変更前にbranch、HEAD、working tree、変更予定ファイルとの競合、inspectionからのrepo構造差分を確認します。競合しない既存変更を一律に停止理由にしません。
+5. 既存spec、fixture、helper、Page Object、config、locator方針を優先し、存在しない抽象化やURL・fixture・locatorを推測しません。
+6. secret / 認証情報をコードへ埋め込まず、inspectionで確認したorigin・副作用・データ・cleanup制約を超えません。
+7. 実装後は対象repoの既存verify / test validation / lint / typecheck / test discovery等から、実対象E2E、外部I/O、状態変更を含まない検証だけを実施します。安全性を確認できない検証や本実行はここで行わず、未実施理由を残します。
+8. E2E実装参照は、既存識別子またはrepo-relative test path + Playwright title pathで保持します。project、repeat、retryは実行単位情報として分離します。
+9. 静的検証失敗を成功扱いにせず、inspection差分・ブロック・`要再検証`を明示します。
 
 ## 実装しないこと
 

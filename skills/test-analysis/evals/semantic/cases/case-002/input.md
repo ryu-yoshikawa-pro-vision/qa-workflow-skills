@@ -1,17 +1,11 @@
 # Eval Input
 ## 変更内容
-ファイル処理を同期処理から状態を持つ非同期処理へ変更する。
-状態:
-queued → processing → completed
-processing → failed
-failed → retrying → processing
+注文履歴の主要利用者経路を、繰り返し確認する価値のあるUIシステムテスト候補としてE2E自動化の対象選定にかける。
 
 ## 制約
-- 1ファイル最大1GB。
-- 外部ストレージ障害時はfailedとなり、ユーザーが再試行できる。
-- completedだけが結果閲覧可能。
-- UIから状態と再試行操作を観測できる。
-- 内部queueの実装詳細はUIから直接観測できない。
+- 自動化目的、候補範囲、技術非依存の判断基準 / 根拠を決める。
+- locator、fixture、Playwright config、webServer、実装コスト、実装可否は`e2e-test-inspection`の責務であり、ここでは判断しない。
+- Product Riskとテスト重点は通常のテスト分析契約に従う。
 
 ## 目的
-リスク、技法、testabilityとtest levelを判断する。
+注文履歴をE2E対象として選定する価値を、技術に依存しない根拠で整理する。

@@ -402,6 +402,6 @@ scripts/skills/evals/
 
 決定論的な`qa-workflow` validatorは、開始・省略・再利用・ブロック・再開・修正routing、対象 / 実行範囲付き状態、TCあり / TCなし経路の成果物整合を評価します。実Agentクライアント上のSkill読み込み・遷移・実runtime操作は、利用可能なクライアント環境がある場合に限って別途評価し、dataset検証を実Agent発火PASSとは扱いません。
 
-Planで定義した29件のrouting fixtureは`skills/qa-workflow/evals/deterministic/routing_cases.json`に保持し、リポジトリ決定論的テストで開始・省略・再利用・ブロック・再開・修正routingの代表経路を検証します。
+Planで定義した29件のrouting fixtureは、入力条件と独立した期待routingを`skills/qa-workflow/evals/deterministic/routing_cases.json`へ、検証対象のcandidate outputを`routing_candidate_outputs.json`へ分離して保持します。リポジトリ決定論的テストではcandidateを期待routingから生成せず、開始・省略・再利用・ブロック・再開・修正routingの代表経路と誤route回帰を検証します。
 
 Agent Skills Specificationは共通Skill-to-Skill APIを規定しません。特定クライアントとの互換性はE2Eで確認します。
