@@ -34,12 +34,14 @@ scripts/skills/sync-skills.cmd
 
 ```bat
 @echo off
-setlocal
+setlocal EnableExtensions DisableDelayedExpansion
 ```
 
-バッチ内部で使用する `SOURCE`、`TARGET`、同期件数等の作業用環境変数は `setlocal` の範囲に閉じ、呼び出し元の環境変数を変更しない。
+バッチ内部で使用する `REPO_ROOT`、`SOURCE`、`TARGET`、同期件数等の作業用環境変数は `setlocal` の範囲に閉じ、呼び出し元の環境変数を変更しない。
 
-今回の処理では `EnableDelayedExpansion` を必要としない実装を優先し、不要に有効化しない。
+`EnableExtensions` を明示的に有効化し、`for /d` やパス解決でWindowsバッチの標準機能を利用できる状態を固定する。`DisableDelayedExpansion` も明示し、呼び出し元が `cmd /v:on` 等で起動されていても delayed expansion を引き継がない。
+
+今回の処理では delayed expansion を必要としない実装とし、途中で有効化しない。
 
 同期先は環境変数 `QA_WORKFLOW_SKILLS_SYNC_TARGET` から取得する。
 
@@ -63,19 +65,22 @@ $env:QA_WORKFLOW_SKILLS_SYNC_TARGET = 'C:\work\qa\qa-training-store\.agents\skil
 
 ### パス解決
 
-同期元・同期先は処理開始時に1回だけフルパスへ解決し、以後は解決済みの値だけを使用する。パス比較や `robocopy` 呼び出しのたびに個別の正規化処理を重ねない。
+リポジトリルート、同期元、同期先は処理開始時に1回だけフルパスへ解決し、以後は解決済みの値だけを使用する。パス比較や `robocopy` 呼び出しのたびに個別の正規化処理を重ねない。
 
-同期元はカレントディレクトリではなく、`sync-skills.cmd` 自身の配置場所を基準に `qa-workflow-skills/skills/` を解決する。
+`REPO_ROOT` は `sync-skills.cmd` 自身の配置場所を基準に `qa-workflow-skills` のリポジトリルートを解決する。
+
+`SOURCE` は `REPO_ROOT\skills` とする。
 
 概念上は次の関係とする。
 
 ```text
 sync-skills.cmd
   ↓ 自身の配置場所を基準に解決
-qa-workflow-skills/skills/
+qa-workflow-skills/          = REPO_ROOT
+└─ skills/                   = SOURCE
 ```
 
-同期先は `QA_WORKFLOW_SKILLS_SYNC_TARGET` の値をフルパスへ解決する。
+同期先は `QA_WORKFLOW_SKILLS_SYNC_TARGET` の値を `TARGET` としてフルパスへ解決する。
 
 相対パスが指定された場合は、バッチ実行時のカレントディレクトリを基準に解決してよい。ただし、READMEの利用例は誤解を避けるため絶対パスを使用する。
 
@@ -130,16 +135,20 @@ Skill Packageは `skills/<skill-name>/` 配下をそのまま同期し、`SKILL.
 同期開始前に次を確認し、満たさない場合は非0で終了する。
 
 - `QA_WORKFLOW_SKILLS_SYNC_TARGET` が定義され、空でない。
-- 同期元 `skills/` が存在する。
+- `REPO_ROOT` と同期元 `skills/` が存在する。
 - 同期先ディレクトリが既に存在する。
-- 同期先が同期元 `skills/` と同一ではない。
-- 同期先が同期元 `skills/` 配下ではない。
+- 同期先が `REPO_ROOT` と同一ではない。
+- 同期先が `REPO_ROOT` 配下ではない。
+
+今回の用途では `qa-workflow-skills` リポジトリ自身の配下を正当な同期先として扱わない。`skills/` だけでなくリポジトリ全体を保護対象とし、環境変数の誤設定で正本リポジトリ内へSkillディレクトリを作成・更新しないようにする。
+
+Windowsのパス比較では大文字小文字を区別せず、ディレクトリ境界を考慮する。単純な文字列prefix比較により、別名ディレクトリを誤って配下判定しないようにする。
 
 同期先ディレクトリはバッチ側で自動作成しない。
 
 同期対象Skillが0件かどうかは事前走査せず、Skill列挙・同期と同じ1回のループ内で件数を数え、ループ完了後に判定する。
 
-`.agents/skills/` という名前か、特定リポジトリ配下か、`.git` が存在するか等の追加判定は行わない。今回の安全境界は、同期元自身またはその配下への誤同期を防ぎ、明示された既存ディレクトリへだけ同期するところまでとする。
+`.agents/skills/` という名前か、特定リポジトリ配下か、`.git` が存在するか等の追加判定は行わない。今回の安全境界は、`qa-workflow-skills` リポジトリ自身またはその配下への誤同期を防ぎ、明示された既存ディレクトリへだけ同期するところまでとする。
 
 ## `robocopy` の終了コード
 
@@ -159,7 +168,7 @@ if errorlevel 8 (
 )
 ```
 
-`%ERRORLEVEL%` を展開して数値比較する処理や、そのためだけの `EnableDelayedExpansion` は追加しない。
+`%ERRORLEVEL%` を展開して数値比較する処理や、そのためだけの delayed expansion は追加しない。
 
 1 Skillの同期に失敗した場合は、その時点で処理を終了し、後続Skillは同期しない。
 
@@ -187,6 +196,7 @@ if errorlevel 8 (
 - 同期先には `.agents/skills/` 等のSkillルートを指定すること
 - 同期先固有Skillは保持されること
 - 同名Skillは `qa-workflow-skills` を正本として更新されること
+- `qa-workflow-skills` リポジトリ自身またはその配下は同期先に指定できないこと
 - 同期元からSkill自体を削除しても、同期先の旧Skillは自動削除されないこと
 - Skill一覧は動的検出されること
 - 同期失敗時は自動再試行せず、原因解消後に再実行すること
@@ -206,7 +216,7 @@ README.md
 Windowsの一時ディレクトリを使い、少なくとも次を確認する。
 
 1. `QA_WORKFLOW_SKILLS_SYNC_TARGET` が未設定または空の場合、コピーせず非0終了する。
-2. 存在しない同期先、同期元 `skills/` 自身、またはその配下を指定した場合、コピーせず非0終了する。
+2. 存在しない同期先、`qa-workflow-skills` リポジトリルート自身、またはその配下を指定した場合、コピーせず非0終了する。
 3. 絶対パス、相対パス、空白を含むパス、末尾 `\` の有無で期待どおり同じ同期先を解決できる。
 4. `SKILL.md` を持つ全Skillが1回の列挙で同期され、同期件数が正しく出力される。
 5. 同期対象Skillが0件の場合、ループ完了後に非0終了する。
@@ -217,6 +227,8 @@ Windowsの一時ディレクトリを使い、少なくとも次を確認する�
 10. コピー失敗時に長時間の再試行を行わないことを確認する。
 11. 途中のSkillで失敗した場合、それ以前の正常同期済みSkillがrollbackされず、原因解消後の再実行で全対象Skillを再同期できることを確認する。
 12. バッチ終了後に、バッチ内部の作業用環境変数が呼び出し元へ残らないことを確認する。
+13. 呼び出し元で delayed expansion が有効な状態でも、バッチ内部では `DisableDelayedExpansion` が有効になり、パス解釈が呼び出し元設定へ依存しないことを確認する。
+14. `REPO_ROOT` と同名prefixを持つ別ディレクトリを誤って配下と判定しないことを確認する。
 
 リポジトリ側では次を確認する。
 
@@ -227,9 +239,9 @@ Windowsの一時ディレクトリを使い、少なくとも次を確認する�
 
 ## 実装順序
 
-1. `scripts/skills/sync-skills.cmd` を追加し、`@echo off` と `setlocal` で開始する。
-2. 環境変数を取得し、同期元・同期先を1回だけフルパスへ解決する。
-3. 同期元・同期先の安全確認を実装する。
+1. `scripts/skills/sync-skills.cmd` を追加し、`@echo off` と `setlocal EnableExtensions DisableDelayedExpansion` で開始する。
+2. 環境変数を取得し、`REPO_ROOT`、同期元、同期先を1回だけフルパスへ解決する。
+3. `REPO_ROOT` 自身またはその配下を同期先として拒否する安全確認を実装する。
 4. `skills/` 直下を1回だけ列挙し、`SKILL.md` を持つSkillを同期する。
 5. 各Skillを `robocopy /MIR /R:0 /W:0` で同期し、直後の `if errorlevel 8` で失敗時に即時停止する。
 6. 同期件数を数え、0件なら非0終了する。
@@ -237,7 +249,7 @@ Windowsの一時ディレクトリを使い、少なくとも次を確認する�
 8. `README.md` を更新する。
 9. 既存のSkill構造検証と `git diff --check` を実行する。
 
-実装本体は、`setlocal`、環境変数取得、パス解決、安全確認、1回のSkill列挙、Skill単位の `robocopy`、終了コード判定、同期件数判定までに留める。
+実装本体は、`setlocal EnableExtensions DisableDelayedExpansion`、環境変数取得、パス解決、安全確認、1回のSkill列挙、Skill単位の `robocopy`、終了コード判定、同期件数判定までに留める。
 
 ## 対象外
 
@@ -263,9 +275,10 @@ Windowsの一時ディレクトリを使い、少なくとも次を確認する�
 - 環境変数で指定した既存Skillルートへ、`qa-workflow-skills/skills/` の全Skillを動的に同期できる。
 - 同期先固有Skillを削除・変更しない。
 - 同期対象の同名Skill内は同期元と一致する。
-- 同期元 `skills/` またはその配下への誤同期を拒否する。
-- `setlocal` によりバッチ内部の作業用環境変数を呼び出し元へ残さない。
-- 同期元・同期先を処理開始時に1回だけフルパスへ解決し、以後は解決済みパスを使用する。
+- `qa-workflow-skills` リポジトリルート自身またはその配下への誤同期を拒否する。
+- `setlocal EnableExtensions DisableDelayedExpansion` により、必要なcommand extensionsを有効化しつつ、呼び出し元のdelayed expansion設定に依存しない。
+- バッチ内部の作業用環境変数を呼び出し元へ残さない。
+- リポジトリルート、同期元、同期先を処理開始時に1回だけフルパスへ解決し、以後は解決済みパスを使用する。
 - Skill列挙を同期対象確認と同期処理で重複させない。
 - `robocopy /MIR /R:0 /W:0` を使用し、直後の `if errorlevel 8` で終了コード8以上を失敗扱いする。
 - コピー失敗時に長時間の再試行を行わない。
