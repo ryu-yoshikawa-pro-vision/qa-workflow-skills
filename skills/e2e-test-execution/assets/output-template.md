@@ -17,10 +17,18 @@
 | 項目 | 値 | 確認元 | raw fact / 導出値 |
 | --- | --- | --- | --- |
 | Playwright run全体status |  | reporter / API / 確認不能 | raw fact / 確認不能 |
-| CLI process exit code |  | process | raw fact |
-| run-level / global error |  | reporter / process | raw fact |
+| CLI process exit code |  | process / 未実施 | raw fact / 確認不能 |
+| run-level / global error |  | reporter / process / 未実施 | raw fact / 確認不能 |
 | runner開始 |  | execution | raw fact |
 | result artifactの今回run生成・更新 |  | filesystem / reporter | raw fact |
+
+## webServer process ownership（webServerがある場合）
+
+webServerが複数ある場合も1 process 1行とし、自由記述1セルへまとめません。既存 / 再利用processは今回run非所有・cleanup対象外、今回runが起動したprocessは所有とcleanup対象の扱いを明示します。
+
+| server識別子 | 起動状態 | 今回run所有か | 既存 / 再利用か | cleanup対象か | 根拠 |
+| --- | --- | --- | --- | --- | --- |
+| frontend | 今回runが起動 / 実行前から存在 | 今回runが所有 / 今回runは所有しない | 新規起動 / 既存process再利用 | 対象 / 対象外 |  |
 
 ## logical primary対象の解決
 

@@ -14,7 +14,7 @@ description: inspectionで確認済みのE2E対象と事実を既存repo構造�
 5. 既存spec、fixture、helper、Page Object、config、locator方針を優先し、存在しない抽象化やURL・fixture・locatorを推測しません。
 6. secret / 認証情報をコードへ埋め込まず、inspectionで確認したorigin・副作用・データ・cleanup制約を超えません。
 7. 実装後は対象repoの既存verify / test validation / lint / typecheck / test discovery等から、実対象E2E、外部I/O、状態変更を含まない検証だけを実施します。安全性を確認できない検証や本実行はここで行わず、未実施理由を残します。
-8. E2E実装参照は、既存識別子またはrepo-relative test path + Playwright title pathで保持します。project、repeat、retryは実行単位情報として分離します。
+8. 実装対象とE2E実装参照はそれぞれ最低1件記録します。E2E実装参照は、既存識別子またはrepo-relative test path + Playwright title pathで保持します。project、repeat、retryは実行単位情報として分離します。
 9. 静的検証失敗を成功扱いにせず、inspection差分・ブロック・`要再検証`を明示します。
 
 ## 実装しないこと
@@ -23,7 +23,7 @@ description: inspectionで確認済みのE2E対象と事実を既存repo構造�
 
 ## 出力
 
-`assets/output-template.md`を基本形として、実装対象、TCまたは明示対象、変更 / 再利用ファイル、E2E実装参照、branch / HEAD / working tree、静的・軽量検証結果、inspection差分、ブロック / `要再検証`を記録します。
+`assets/output-template.md`を基本形として、1件以上の実装対象、TCまたは明示対象、変更 / 再利用ファイル、1件以上のE2E実装参照、branch / HEAD / working tree、静的・軽量検証結果、inspection差分、ブロック / `要再検証`を記録します。
 
 ## 次の担当
 

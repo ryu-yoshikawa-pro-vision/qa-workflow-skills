@@ -33,6 +33,23 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     result.add("E2E-IMPL-D001", not missing, "implementationの正規テーブルが存在すること", evidence=missing or None)
 
     targets = nonempty_rows(target_table)
+    target_issues = []
+    for row in targets:
+        missing_fields = [
+            field
+            for field in ("E2E対象 / 識別子", "明示対象 / 既存E2E参照", "確認済み期待挙動", "扱い")
+            if not has_value(row.get(field, ""))
+        ]
+        if missing_fields:
+            target_issues.append({"target": clean(row.get("E2E対象 / 識別子", "")) or "<unknown>", "fields": missing_fields})
+    result.add(
+        "E2E-IMPL-D018",
+        bool(targets) and not target_issues,
+        "実装対象を最低1件、識別子・入力参照・確認済み期待挙動付きで記録すること",
+        evidence={"missing_rows": not targets, "issues": target_issues}
+        if not targets or target_issues
+        else None,
+    )
     target_handling_bad = sorted({clean(row.get("扱い", "")) for row in targets if clean(row.get("扱い", "")) not in IMPLEMENTATION_HANDLINGS})
     result.add("E2E-IMPL-D002", not target_handling_bad, "実装対象の扱いが許可値であること", evidence=target_handling_bad or None)
     tc_ids = [clean(row.get("TC ID（存在時のみ）", "")) for row in targets if clean(row.get("TC ID（存在時のみ）", ""))]
@@ -40,6 +57,23 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     result.add("E2E-IMPL-D003", not invalid_tc, "存在するTC IDが既存TC形式であること", evidence=invalid_tc or None)
 
     refs = nonempty_rows(ref_table)
+    ref_contract_issues = []
+    for row in refs:
+        missing_fields = [
+            field
+            for field in ("E2E実装参照", "test file", "Playwright title path", "扱い")
+            if not has_value(row.get(field, ""))
+        ]
+        if missing_fields:
+            ref_contract_issues.append({"ref": clean(row.get("E2E実装参照", "")) or "<unknown>", "fields": missing_fields})
+    result.add(
+        "E2E-IMPL-D019",
+        bool(refs) and not ref_contract_issues,
+        "E2E実装参照を最低1件、repo-relative pathとtitle path付きで記録すること",
+        evidence={"missing_rows": not refs, "issues": ref_contract_issues}
+        if not refs or ref_contract_issues
+        else None,
+    )
     ref_values = [clean(row.get("E2E実装参照", "")) for row in refs if clean(row.get("E2E実装参照", ""))]
     add_duplicate_assertion(result, "E2E-IMPL-D004", ref_values, "E2E実装参照")
     invalid_refs = [ref for ref in ref_values if not _is_relative_reference(ref)]

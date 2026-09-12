@@ -8,7 +8,7 @@ config → project → file / describe / test → CLIの上書きを、今回対
 
 ## 準備とcleanup
 
-runnerが管理するsetup / teardownをrun外で二重実行しません。`webServer`は今回runが起動したprocess、実行前から存在するprocess、`reuseExistingServer`等で再利用した既存processを区別し、今回runが所有していない既存processをcleanup目的で終了しません。複数webServerがある場合も各processについてownershipとcleanup対象を記録します。run外処理はrepoで定義されinspection等で確認済みのseed / API / cleanupだけを使い、新しい方式を作りません。process interruptionや通信断でcleanup結果が確認できない場合は`未確認`です。
+runnerが管理するsetup / teardownをrun外で二重実行しません。`webServer`は今回runが起動したprocess、実行前から存在するprocess、`reuseExistingServer`等で再利用した既存processを区別し、今回runが所有していない既存processをcleanup目的で終了しません。複数webServerがある場合も、`webServer process ownership`表へprocessごとに1行を置き、ownership・既存 / 再利用・cleanup対象・根拠を個別に記録します。1行へ複数serverをまとめたり、別serverのownershipを省略したりしません。run外処理はrepoで定義されinspection等で確認済みのseed / API / cleanupだけを使い、新しい方式を作りません。process interruptionや通信断でcleanup結果が確認できない場合は`未確認`です。
 
 ## Playwright値域とworkflow状態
 
@@ -28,6 +28,8 @@ Playwrightの値域をworkflow状態と混在させません。公式APIが提�
 各logical primary対象がresolved primary TestCaseへ1件以上解決したかを先に確認し、解決できなければ理由を残します。次に各resolved primary TestCaseの結果または未実行理由を確認します。dependency / teardown testは要求primary数へ混ぜません。`timedOut` / `interrupted`はPlaywright statusとして保持し、`outcome`は別の導出結果として扱います。
 
 `FullResult.status`や`repeatEachIndex`を利用したresult形式が直接提供しないなら、process exit codeや別ログからraw fieldへ推測転記しません。必要な値は`確認不能`または`構造化結果不完全`にし、導出値と分けます。
+
+runnerを開始していないpreflight blockでは、`FullResult.status`の成功値、数値のprocess exit code、reporter由来のrun結果、resolved / attempt result、runner cleanupの`成功`を記録しません。Playwright raw欄へ`未実施`を代入するのではなく、run全体status等は`未確認` / `確認不能`、process exit codeとrun-level errorは`未実施`等のworkflow上の明示状態へ分け、ブロック理由を記録します。logical primaryは最低1件残し、resolved / attemptが0件である理由を示します。
 
 ## 変更と証跡
 

@@ -29,8 +29,8 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     tables = parse_tables(text)
     env = find_table(tables, section_contains="対象・環境", required_headers=("項目", "値", "参照 / 確認元"))
     run = find_table(tables, section_contains="run全体結果", required_headers=("項目", "値", "確認元", "raw fact / 導出値"))
-    primary = find_table(tables, section_contains="primary対象集計", required_headers=("論理的な要求primary対象", "resolved primary TestCase数", "実際に開始したresolved primary TestCase数", "未実行logical理由", "未実行resolved理由"))
-    resolved = find_table(tables, section_contains="resolved primary結果 / attempt結果", required_headers=("論理的な要求primary対象", "resolved primary TestCase参照", "実行開始", "結果", "expectedStatus", "outcome", "retry attempt数（別集計）", "初回 / retry履歴", "実行結果参照"))
+    primary = find_table(tables, section_contains="primary対象集計", required_headers=("論理的な要求primary対象", "E2E実装参照", "TC ID（存在時のみ）", "resolved primary TestCase数", "実際に開始したresolved primary TestCase数", "未実行logical理由", "未実行resolved理由"))
+    resolved = find_table(tables, section_contains="resolved primary結果 / attempt結果", required_headers=("論理的な要求primary対象", "resolved primary TestCase参照", "実行開始", "結果", "未実行理由", "expectedStatus", "outcome", "retry attempt数（別集計）", "初回 / retry履歴", "実行結果参照"))
     trace = find_table(tables, section_contains="TC・E2E・実行・分析追跡", required_headers=("E2E実装参照", "resolved primary TestCase / 実行結果参照", "分析結果参照"))
     cleanup = find_table(tables, section_contains="cleanup・証跡・残存リスク", required_headers=("項目", "状態 / 内容", "安全な参照"))
     missing = [name for name, table in (("対象・環境", env), ("run全体結果", run), ("primary対象集計", primary), ("resolved primary結果 / attempt結果", resolved), ("TC・E2E・実行・分析追跡", trace), ("cleanup・証跡・残存リスク", cleanup)) if table is None]
@@ -84,6 +84,23 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     primary_rows = nonempty_rows(primary)
     primary_names = [clean(row.get("論理的な要求primary対象", "")) for row in primary_rows]
     add_duplicate_assertion(result, "E2E-REPORT-D004", primary_names, "論理的な要求primary対象")
+    primary_field_issues = []
+    for row in primary_rows:
+        missing_fields = [
+            field
+            for field in ("論理的な要求primary対象", "E2E実装参照", "resolved primary TestCase数", "実際に開始したresolved primary TestCase数")
+            if not has_value(row.get(field, ""))
+        ]
+        if missing_fields:
+            primary_field_issues.append({"logical": clean(row.get("論理的な要求primary対象", "")) or "<unknown>", "fields": missing_fields})
+    result.add(
+        "E2E-REPORT-D019",
+        bool(primary_rows) and not primary_field_issues,
+        "reporting対象として開始したlogical primaryを最低1件、対象・E2E実装参照・件数付きで記録すること",
+        evidence={"missing_rows": not primary_rows, "issues": primary_field_issues}
+        if not primary_rows or primary_field_issues
+        else None,
+    )
     resolved_rows = nonempty_rows(resolved)
     resolved_by_logical: dict[str, list[dict[str, str]]] = {}
     for row in resolved_rows:
@@ -117,13 +134,17 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     for row in resolved_rows:
         missing_fields = [
             field
-            for field in ("論理的な要求primary対象", "resolved primary TestCase参照", "実行開始", "結果", "実行結果参照")
+            for field in ("論理的な要求primary対象", "resolved primary TestCase参照", "実行開始")
             if not has_value(row.get(field, ""))
         ]
         expected_status = clean(row.get("expectedStatus", ""))
         outcome = clean(row.get("outcome", ""))
         started = clean(row.get("実行開始", "")) in STARTED_MARKERS
         if started:
+            if not has_value(row.get("結果", "")):
+                missing_fields.append("結果")
+            if not has_value(row.get("実行結果参照", "")):
+                missing_fields.append("実行結果参照")
             if not expected_status or expected_status not in EXPECTED_STATUSES:
                 missing_fields.append("expectedStatus(許可値)")
             if not outcome or outcome not in OUTCOMES:
@@ -131,8 +152,12 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             if clean(row.get("結果", "")) not in TEST_STATUSES:
                 missing_fields.append("結果(TestResult.status許可値)")
         else:
-            if not _has_unexecuted_reason(row.get("結果", "")):
+            if not _has_unexecuted_reason(row.get("未実行理由", "")):
                 missing_fields.append("未実行理由")
+            if has_value(row.get("結果", "")):
+                missing_fields.append("結果(未開始では空欄)")
+            if has_value(row.get("実行結果参照", "")):
+                missing_fields.append("実行結果参照(未開始では空欄)")
             if expected_status and expected_status not in EXPECTED_STATUSES:
                 missing_fields.append("expectedStatus(許可値)")
             if outcome and outcome not in OUTCOMES:
@@ -159,11 +184,44 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     result.add("E2E-REPORT-D015", not retry_history_issues, "retry発生時に初回 / retry履歴を保持すること", evidence=retry_history_issues or None)
 
     trace_rows = nonempty_rows(trace)
+    primary_refs = {
+        clean(row.get("論理的な要求primary対象", "")): clean(row.get("E2E実装参照", ""))
+        for row in primary_rows
+        if clean(row.get("論理的な要求primary対象", "")) and clean(row.get("E2E実装参照", ""))
+    }
+    expected_trace_pairs: set[tuple[str, str]] = set()
+    for row in primary_rows:
+        logical = clean(row.get("論理的な要求primary対象", ""))
+        implementation_ref = clean(row.get("E2E実装参照", ""))
+        if not logical or not implementation_ref:
+            continue
+        logical_resolved = resolved_by_logical.get(logical, [])
+        if not logical_resolved:
+            expected_trace_pairs.add((implementation_ref, logical))
+            continue
+        for resolved_row in logical_resolved:
+            resolved_ref = clean(resolved_row.get("resolved primary TestCase参照", ""))
+            result_ref = clean(resolved_row.get("実行結果参照", ""))
+            trace_ref = result_ref if clean(resolved_row.get("実行開始", "")) in STARTED_MARKERS else resolved_ref
+            if trace_ref:
+                expected_trace_pairs.add((implementation_ref, trace_ref))
+    trace_pairs: set[tuple[str, str]] = set()
     trace_issues = []
     for row in trace_rows:
-        if not clean(row.get("E2E実装参照", "")) or not clean(row.get("resolved primary TestCase / 実行結果参照", "")):
-            trace_issues.append(clean(row.get("E2E実装参照", "")) or "<unknown>")
-    result.add("E2E-REPORT-D009", not trace_issues, "E2E実装参照から実行結果参照へ追跡できること", evidence=trace_issues or None)
+        implementation_ref = clean(row.get("E2E実装参照", ""))
+        execution_ref = clean(row.get("resolved primary TestCase / 実行結果参照", ""))
+        pair = (implementation_ref, execution_ref)
+        if not implementation_ref or not execution_ref:
+            trace_issues.append({"implementation_ref": implementation_ref or "<unknown>", "reason": "implementation and execution references are required"})
+            continue
+        if implementation_ref not in set(primary_refs.values()):
+            trace_issues.append({"implementation_ref": implementation_ref, "reason": "implementation reference is not a reporting target"})
+        allowed_execution_refs = {expected_ref for expected_impl, expected_ref in expected_trace_pairs if expected_impl == implementation_ref}
+        if execution_ref not in allowed_execution_refs:
+            trace_issues.append({"implementation_ref": implementation_ref, "execution_ref": execution_ref, "reason": "execution reference is not linked to a resolved/logical target"})
+        trace_pairs.add(pair)
+    missing_trace_pairs = sorted(expected_trace_pairs - trace_pairs)
+    result.add("E2E-REPORT-D009", not trace_issues and not missing_trace_pairs, "E2E実装参照から実際のresolved / logical追跡参照へ完全一致で辿れること", evidence={"invalid": trace_issues, "missing": missing_trace_pairs} if trace_issues or missing_trace_pairs else None)
     trace_required = bool(primary_rows or resolved_rows)
     result.add(
         "E2E-REPORT-D018",

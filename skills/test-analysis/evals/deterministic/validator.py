@@ -154,14 +154,14 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         section_contains="E2E対象選定",
         required_headers=("自動化目的", "候補範囲", "技術非依存の判断基準 / 根拠"),
     )
-    selection_requested = bool(expected.get("require_e2e_selection") or selection_table is not None or "対象 / 実行範囲: E2E対象選定" in text)
+    selection_requested = bool(expected.get("require_e2e_selection") or "対象 / 実行範囲: E2E対象選定" in text)
     result.add(
         "RISK-D016",
         not selection_requested or selection_table is not None,
         "E2E対象選定時に自動化目的・候補範囲・技術非依存の判断基準 / 根拠が存在すること",
         evidence={"missing_table": "E2E対象選定"} if selection_requested and selection_table is None else None,
     )
-    if selection_table is not None:
+    if selection_requested:
         selection_rows = nonempty_rows(selection_table)
         missing_selection = []
         for row in selection_rows:

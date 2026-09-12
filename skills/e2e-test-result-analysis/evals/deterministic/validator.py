@@ -31,8 +31,45 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     required_facts = {"E2E対象 / logical primary", "E2E実装参照", "resolved primary TestCase / 実行結果参照", "Playwright status / outcome / expectedStatus", "run全体status / process exit code / run-level error", "cleanup状態 / 残存副作用"}
     missing_facts = sorted(required_facts - fact_labels)
     result.add("E2E-AN-D002", not missing_facts, "実行事実・参照・cleanupを保持すること", evidence=missing_facts or None)
+    fact_value_issues = []
+    for row in facts:
+        label = clean(row.get("項目", ""))
+        if label not in required_facts:
+            continue
+        missing_fields = [
+            field
+            for field in ("値", "参照")
+            if not has_value(row.get(field, ""))
+        ]
+        if missing_fields:
+            fact_value_issues.append({"項目": label or "<unknown>", "fields": missing_fields})
+    result.add(
+        "E2E-AN-D012",
+        not missing_facts and not fact_value_issues,
+        "必須の実行事実が値と参照を伴い、空欄のまま残らないこと",
+        evidence={"missing_items": missing_facts, "missing_values": fact_value_issues}
+        if missing_facts or fact_value_issues
+        else None,
+    )
 
     judgements = nonempty_rows(judgement_table)
+    judgement_issues = []
+    for row in judgements:
+        missing_fields = [
+            field
+            for field in ("対象参照", "判定状態", "原因", "再現性", "根拠")
+            if not has_value(row.get(field, ""))
+        ]
+        if missing_fields:
+            judgement_issues.append({"対象参照": clean(row.get("対象参照", "")) or "<unknown>", "fields": missing_fields})
+    result.add(
+        "E2E-AN-D013",
+        bool(judgements) and not judgement_issues,
+        "判定を最低1行記録し、状態・原因・根拠・再現性を空欄にしないこと",
+        evidence={"missing_rows": not judgements, "issues": judgement_issues}
+        if not judgements or judgement_issues
+        else None,
+    )
     invalid_states = sorted({clean(row.get("判定状態", "")) for row in judgements if clean(row.get("判定状態", "")) not in JUDGEMENT_STATES})
     invalid_repro = sorted({clean(row.get("再現性", "")) for row in judgements if clean(row.get("再現性", "")) not in REPRODUCIBILITY})
     result.add("E2E-AN-D003", not invalid_states, "判定状態が許可値であること", evidence=invalid_states or None)
@@ -69,6 +106,12 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         "追加実行が必要またはブロック中なら、証拠・仮説・実行範囲・担当を必ず明示すること",
         evidence=additional_issues or None,
     )
+    result.add(
+        "E2E-AN-D014",
+        bool(additional),
+        "追加実行判断を最低1行明示すること",
+        evidence="追加実行判断なし" if not additional else None,
+    )
 
     routing = nonempty_rows(routing_table)
     invalid_targets = []
@@ -88,7 +131,20 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         cleanup_text = " ".join(row.get("値", "") for row in facts)
         cleanup_expected = clean(str(expected["required_cleanup_text"]))
         result.add("E2E-AN-D009", cleanup_expected in cleanup_text, "cleanup未確認等の状態を分析へ伝播すること", evidence=cleanup_expected if cleanup_expected not in cleanup_text else None)
-    if expected.get("additional_execution_required"):
+    if "additional_execution_required" in expected:
+        required = expected["additional_execution_required"]
         matching = [row for row in additional if clean(row.get("追加実行の必要性", "")) == "必要" and clean(row.get("実行担当", "")) == "e2e-test-execution" and has_value(row.get("取得したい証拠", "")) and has_value(row.get("検証する仮説", "")) and has_value(row.get("必要な実行範囲", ""))]
-        result.add("E2E-AN-D011", bool(matching), "fixtureが追加実行を要求する場合、目的・仮説・範囲・execution routingがあること", evidence="追加実行要求なし" if not matching else None)
+        if required is True:
+            result.add("E2E-AN-D011", bool(matching), "fixtureが追加実行を要求する場合、目的・仮説・範囲・execution routingがあること", evidence="追加実行要求なし" if not matching else None)
+        else:
+            contradictory = sorted({clean(row.get("追加実行の必要性", "")) for row in additional if clean(row.get("追加実行の必要性", "")) in {"必要", "ブロック中"}})
+            explicit_not_required = any(clean(row.get("追加実行の必要性", "")) == "不要" for row in additional)
+            result.add(
+                "E2E-AN-D011",
+                not contradictory and explicit_not_required,
+                "fixtureが追加実行不要を指定する場合、必要 / ブロック中を出力せず不要を明示すること",
+                evidence={"contradictory": contradictory, "explicit_not_required": explicit_not_required}
+                if contradictory or not explicit_not_required
+                else None,
+            )
     return result

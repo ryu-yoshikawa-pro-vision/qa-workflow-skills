@@ -16,6 +16,20 @@ EXECUTION_CLASSES = {"要求primary test", "project dependencyとして付随実
 CLEANUP_STATES = {"成功", "失敗", "未確認", "対象なし", "意図的に残した状態", "一部失敗"}
 STARTED_MARKERS = {"開始", "開始済み", "実行済み", "はい"}
 NOT_STARTED_MARKERS = {"", "未開始", "未実行", "未実施", "いいえ", "対象なし"}
+NON_OWNER_MARKERS = {"今回runは所有しない", "今回runが所有しない", "所有しない", "非所有", "今回runの所有ではない"}
+NOT_CLEANUP_MARKERS = {"対象外", "対象なし", "cleanup対象外", "終了対象外", "終了しない", "しない"}
+
+
+def _webserver_configured(setup_value: str) -> bool:
+    value = clean(setup_value)
+    parts = [clean(part) for part in value.split("/")]
+    candidate = parts[2] if len(parts) >= 4 else value
+    lowered = candidate.lower()
+    if not candidate or lowered in {"none", "n/a", "対象なし", "未使用", "なし", "-"}:
+        return False
+    if "webserver" in lowered and any(token in lowered for token in ("none", "なし", "対象なし", "未使用")):
+        return False
+    return True
 
 
 def _as_nonnegative_int(value: str) -> int | None:
@@ -31,6 +45,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     bullets = parse_bullets(text)
     conditions = find_table(tables, section_contains="実行条件", required_headers=("項目", "値", "確認元", "raw fact / 導出値"))
     run_table = find_table(tables, section_contains="Playwright run結果", required_headers=("項目", "値", "確認元", "raw fact / 導出値"))
+    webserver_table = find_table(tables, section_contains="webServer process ownership", required_headers=("server識別子", "起動状態", "今回run所有か", "既存 / 再利用か", "cleanup対象か", "根拠"))
     logical_table = find_table(tables, section_contains="logical primary対象の解決", required_headers=("論理的な要求primary対象", "resolved primary TestCase数", "未実行 / 解決不能理由"))
     resolved_table = find_table(tables, section_contains="resolved primary TestCase結果", required_headers=("resolved primary TestCase参照", "論理要求primary対象", "実行開始", "結果 / 未実行理由"))
     attempt_table = find_table(tables, section_contains="attempt結果", required_headers=("resolved primary TestCase参照", "attempt番号", "実行区分", "status", "expectedStatus", "outcome", "retry番号"))
@@ -119,6 +134,37 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         not ownership_issues,
         "webServerの今回run所有processと既存再利用processを区別し、非所有processをcleanup終了しないこと",
         evidence=ownership_issues or None,
+    )
+
+    webserver_configured = _webserver_configured(setup_value)
+    webserver_rows = nonempty_rows(webserver_table)
+    webserver_issues = []
+    if webserver_configured and not webserver_rows:
+        webserver_issues.append("webServerごとのownership / cleanup表がない")
+    for row in webserver_rows:
+        missing_fields = [
+            field
+            for field in ("server識別子", "起動状態", "今回run所有か", "既存 / 再利用か", "cleanup対象か", "根拠")
+            if not has_value(row.get(field, ""))
+        ]
+        if missing_fields:
+            webserver_issues.append({"server": clean(row.get("server識別子", "")) or "<unknown>", "fields": missing_fields})
+            continue
+        owner = clean(row.get("今回run所有か", ""))
+        existing = clean(row.get("既存 / 再利用か", ""))
+        cleanup = clean(row.get("cleanup対象か", ""))
+        existing_process = any(token in existing for token in ("既存", "再利用", "reuseExistingServer"))
+        if existing_process and owner not in NON_OWNER_MARKERS:
+            webserver_issues.append({"server": row.get("server識別子"), "reason": "既存 / 再利用processは今回run非所有である必要がある"})
+        if existing_process and cleanup not in NOT_CLEANUP_MARKERS:
+            webserver_issues.append({"server": row.get("server識別子"), "reason": "既存 / 再利用processはcleanup対象外である必要がある"})
+        if not existing_process and owner not in NON_OWNER_MARKERS and not any(token in owner for token in ("今回runが所有", "今回run所有", "所有")):
+            webserver_issues.append({"server": row.get("server識別子"), "reason": "今回runが起動したprocessのownershipが明示されていない"})
+    result.add(
+        "E2E-EXEC-D025",
+        not webserver_issues,
+        "webServerがある場合、各processの起動状態・ownership・再利用状態・cleanup対象を個別に記録すること",
+        evidence=webserver_issues or None,
     )
 
     worktree_rows = nonempty_rows(worktree_table)
@@ -240,12 +286,53 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     cleanup_unconfirmed = any(clean(row.get("状態", "")) in {"失敗", "未確認", "一部失敗"} for row in cleanup_rows)
     result.add("E2E-EXEC-D013", execution_state in {"完了", "ブロック中", "要再確認"} and not (cleanup_unconfirmed and execution_state == "完了"), "cleanup失敗 / 未確認を安全な完了扱いにせず、実行成果物状態を明示すること", evidence={"cleanup": [row.get("状態") for row in cleanup_rows], "execution_state": execution_state} if execution_state not in {"完了", "ブロック中", "要再確認"} or (cleanup_unconfirmed and execution_state == "完了") else None)
 
+    runner_not_started_issues = []
+    if runner_value in NOT_STARTED_MARKERS:
+        if run_status in FULL_RESULT_STATUSES:
+            runner_not_started_issues.append({"field": "Playwright run全体status", "value": run_status})
+        process_exit = clean(run_value_by_item.get("CLI process exit code", {}).get("値", ""))
+        if re.fullmatch(r"-?\d+", process_exit):
+            runner_not_started_issues.append({"field": "CLI process exit code", "value": process_exit})
+        run_error = clean(run_value_by_item.get("run-level / global error", {}).get("値", ""))
+        if run_error.lower() in {"none", "no error", "なし", "無"}:
+            runner_not_started_issues.append({"field": "run-level / global error", "value": run_error})
+        if resolved_rows:
+            runner_not_started_issues.append({"field": "resolved primary TestCase", "count": len(resolved_rows)})
+        if attempts:
+            runner_not_started_issues.append({"field": "attempt", "count": len(attempts)})
+        successful_cleanup = [clean(row.get("状態", "")) for row in cleanup_rows if clean(row.get("状態", "")) == "成功"]
+        if successful_cleanup:
+            runner_not_started_issues.append({"field": "cleanup", "value": successful_cleanup})
+        for row in webserver_rows:
+            server = clean(row.get("server識別子", "")) or "<unknown>"
+            startup = clean(row.get("起動状態", ""))
+            owner = clean(row.get("今回run所有か", ""))
+            cleanup = clean(row.get("cleanup対象か", ""))
+            if any(marker in startup for marker in ("今回runが起動", "今回run起動", "起動済み")):
+                runner_not_started_issues.append({"field": "webServer起動", "server": server, "value": startup})
+            if owner not in NON_OWNER_MARKERS and any(marker in owner for marker in ("今回runが所有", "今回run所有")):
+                runner_not_started_issues.append({"field": "webServer ownership", "server": server, "value": owner})
+            if cleanup in {"対象", "cleanup対象", "終了対象"}:
+                runner_not_started_issues.append({"field": "webServer cleanup", "server": server, "value": cleanup})
+    result.add(
+        "E2E-EXEC-D024",
+        not runner_not_started_issues,
+        "runner未開始時にPlaywright run由来のraw fact・結果・成功cleanupを保持しないこと",
+        evidence=runner_not_started_issues or None,
+    )
+
     if expected.get("tc_absent"):
         fabricated = sorted(set(re.findall(r"\bTC-\d{3}\b", text)))
         result.add("E2E-EXEC-D014", not fabricated, "TCなし経路でTC IDを創作しないこと", evidence=fabricated or None)
     if "expected_logical_primary_count" in expected:
         mismatch = len(logical_rows) != int(expected["expected_logical_primary_count"])
         result.add("E2E-EXEC-D015", not mismatch, "logical primary対象数がフィクスチャと一致すること", evidence={"expected": expected["expected_logical_primary_count"], "actual": len(logical_rows)} if mismatch else None)
+    result.add(
+        "E2E-EXEC-D023",
+        bool(logical_rows),
+        "execution対象として開始した成果物にはlogical primary対象を最低1件記録すること",
+        evidence="logical primary対象なし" if not logical_rows else None,
+    )
     if "expected_resolved_primary_count" in expected:
         mismatch = len(resolved_rows) != int(expected["expected_resolved_primary_count"])
         result.add("E2E-EXEC-D016", not mismatch, "resolved primary TestCase数がフィクスチャと一致すること", evidence={"expected": expected["expected_resolved_primary_count"], "actual": len(resolved_rows)} if mismatch else None)

@@ -4,7 +4,11 @@
 
 論理的な要求primary対象、Playwrightが解決したresolved primary TestCase、各attemptを別の単位で保持します。project / repeatEach等でresolved件数が増え、retryでattemptが増えます。dependency / teardown testは要求primary集計へ混ぜません。
 
-logical primaryがresolved 0件の場合は、未実行 / 解決不能理由をlogical単位で示します。resolved primaryごとに結果または未実行理由がない場合も完全実行としません。resolved primaryを開始していない場合は、`expectedStatus` / `outcome`へ`未実行`などの擬似値を入れず、結果欄を空欄にしたうえで未実行理由を別集計へ記録します。
+logical primaryがresolved 0件の場合は、未実行 / 解決不能理由をlogical単位で示します。resolved primaryごとに結果または未実行理由がない場合も完全実行としません。resolved primaryを開始していない場合は、`結果`と`実行結果参照`を空欄にし、`未実行理由`へworkflow側の理由を記録します。`expectedStatus` / `outcome`へ`未実行`などの擬似値を入れません。preflight blockでresolved自体がない場合は、logical primaryの識別子・理由へ追跡し、架空のresolved result参照を作りません。
+
+## 追跡参照の完全性
+
+`TC・E2E・実行・分析追跡`の`E2E実装参照`はprimary対象集計の安定参照と完全一致させます。開始済みresolved primaryは、その行の`実行結果参照`と完全一致させ、未開始resolved primaryはresolved TestCase参照、resolved自体が0件ならlogical primary識別子を使います。trace行を1件置くだけでは不十分で、全対象の対応行が必要です。存在しないresult参照や別E2E実装参照は記録しません。分析を実施していない正常runでは`分析結果参照`を空欄にできます。
 
 ## 結果と分析
 

@@ -19,9 +19,9 @@ def _has_named_rows(rows: list[dict[str, str]], labels: set[str], field: str) ->
 def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     result = EvalResult("e2e-test-inspection", eval_id)
     tables = parse_tables(text)
-    target_table = find_table(tables, section_contains="対象決定", required_headers=("E2E対象 / 識別子", "TC ID（存在時のみ）", "E2E実装参照", "扱い"))
+    target_table = find_table(tables, section_contains="対象決定", required_headers=("E2E対象 / 識別子", "TC ID（存在時のみ）", "E2E実装参照", "決定根拠", "扱い"))
     freshness_table = find_table(tables, section_contains="確認元・鮮度", required_headers=("項目", "値", "確認元"))
-    fact_table = find_table(tables, section_contains="実装・実行に影響する事実", required_headers=("事実", "内容", "確認元"))
+    fact_table = find_table(tables, section_contains="実装・実行に影響する事実", required_headers=("事実", "内容", "確認元", "実装 / 実行への影響"))
     safety_table = find_table(tables, section_contains="安全条件・準備・cleanup", required_headers=("条件", "状態", "根拠 / 許可"))
     relation_table = find_table(tables, section_contains="既存E2Eとの関係", required_headers=("対象", "扱い", "既存E2E実装参照"))
     feasibility_table = find_table(tables, section_contains="実装可否・未確認・ブロック", required_headers=("範囲", "実装可否 / 状態", "理由", "次の担当"))
@@ -37,6 +37,23 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     result.add("E2E-INSP-D001", not missing, "inspectionの正規テーブルが存在すること", evidence=missing or None)
 
     targets = nonempty_rows(target_table)
+    target_value_issues = []
+    for row in targets:
+        missing_fields = [
+            field
+            for field in ("E2E対象 / 識別子", "決定根拠", "扱い")
+            if not has_value(row.get(field, ""))
+        ]
+        if missing_fields:
+            target_value_issues.append({"target": clean(row.get("E2E対象 / 識別子", "")) or "<unknown>", "fields": missing_fields})
+    result.add(
+        "E2E-INSP-D015",
+        bool(targets) and not target_value_issues,
+        "対象決定を最低1件、識別子・決定根拠・扱い付きで記録すること",
+        evidence={"missing_rows": not targets, "issues": target_value_issues}
+        if not targets or target_value_issues
+        else None,
+    )
     invalid_handling = sorted({clean(row.get("扱い", "")) for row in targets if clean(row.get("扱い", "")) not in HANDLINGS})
     result.add("E2E-INSP-D002", not invalid_handling, "E2E対象の扱いが許可値であること", evidence=invalid_handling or None)
     tc_ids = [clean(row.get("TC ID（存在時のみ）", "")) for row in targets if clean(row.get("TC ID（存在時のみ）", ""))]
@@ -97,6 +114,23 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
 
     relations = nonempty_rows(relation_table)
     facts = nonempty_rows(fact_table)
+    fact_value_issues = []
+    for row in facts:
+        missing_fields = [
+            field
+            for field in ("事実", "内容", "確認元", "実装 / 実行への影響")
+            if not has_value(row.get(field, ""))
+        ]
+        if missing_fields:
+            fact_value_issues.append({"事実": clean(row.get("事実", "")) or "<unknown>", "fields": missing_fields})
+    result.add(
+        "E2E-INSP-D016",
+        bool(facts) and not fact_value_issues,
+        "実装・実行に影響する事実を内容・確認元・影響付きで記録すること",
+        evidence={"missing_rows": not facts, "issues": fact_value_issues}
+        if not facts or fact_value_issues
+        else None,
+    )
     empty_required_tables = [
         name
         for name, rows in (

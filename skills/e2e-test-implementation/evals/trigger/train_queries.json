@@ -4,7 +4,7 @@
   {"query":"既存E2Eを再利用できるか確認済みです。必要なPlaywrightテストとfixtureだけを更新し、静的検証してください。","should_trigger":true},
   {"query":"inspection結果で注文履歴のE2E対象は確定しています。コード変更を行い、実行はまだしないでください。","should_trigger":true},
   {"query":"inspection結果を前提に、test identifierを優先したPlaywright実装とlint・typecheckを行ってください。","should_trigger":true},
-  {"query":"Playwright E2Eの実装差分を作り、安全な軽量検証結果を記録してください。","should_trigger":true},
+  {"query":"inspectionで確認済みのPlaywright E2E実装差分を作り、安全な軽量検証結果を記録してください。","should_trigger":true},
   {"query":"TC-302のE2Eコードを追加して、inspectionなしでそのまま実装してください。","should_trigger":false},
   {"query":"既存のPlaywrightテストをローカル実行して、rawなrun結果を収集してください。","should_trigger":false},
   {"query":"Playwrightの失敗を原因分析し、追加実行の依頼を作ってください。","should_trigger":false},
