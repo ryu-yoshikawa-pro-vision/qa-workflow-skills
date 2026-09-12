@@ -2,3 +2,10 @@
 __pycache__/
 *.py[cod]
 *$py.class
+AGENTS.md
+CHANGELOG.md
+CODE_REVIEW.md
+CODE_REVIEW.md
+MIGRATION.md
+PLANS.md
+SECURITY.md
