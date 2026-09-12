@@ -9,6 +9,9 @@
 | Playwright project |  |  | raw fact |
 | retries / repeatEach / workers / parallel |  |  | raw fact |
 | setup / dependency / webServer / teardown |  |  | raw fact |
+| 必要な認証 / テストデータ / 開始状態 |  |  | raw fact / 確認不能 |
+| 副作用の許可範囲 / 最大回数 |  |  | raw fact / 確認不能 |
+| cleanup方法 |  |  | raw fact / 確認不能 |
 | branch / HEAD / working tree |  |  | raw fact |
 | テスト対象version / build ID |  |  | raw fact / 確認不能 |
 
@@ -24,7 +27,7 @@
 
 ## webServer process ownership（webServerがある場合）
 
-webServerが複数ある場合も1 process 1行とし、自由記述1セルへまとめません。既存 / 再利用processは今回run非所有・cleanup対象外、今回runが起動したprocessは所有とcleanup対象の扱いを明示します。
+webServerなしならownership行は不要です。webServerが未確認 / 確認不能ならrunnerを開始せず、架空のserver識別子を作らずownership行を0件にできます。確認済みのwebServerが複数ある場合も1 process 1行とし、自由記述1セルへまとめません。実効設定で期待される全serverを記録し、既存 / 再利用processは今回run非所有・cleanup対象外、今回runが起動したprocessは所有とcleanup対象の扱いを明示します。
 
 | server識別子 | 起動状態 | 今回run所有か | 既存 / 再利用か | cleanup対象か | 根拠 |
 | --- | --- | --- | --- | --- | --- |
@@ -61,7 +64,8 @@ webServerが複数ある場合も1 process 1行とし、自由記述1セルへ�
 
 | cleanup対象 / 実行主体 | 状態 | 結果 / 残存副作用 | 確認元 |
 | --- | --- | --- | --- |
-| runner管理 / run外処理 | 成功 / 失敗 / 未確認 / 対象なし / 意図的に残した状態 |  |  |
+| runner管理 | 成功 / 失敗 / 未確認 / 対象なし / 意図的に残した状態 |  |  |
+| run外処理 | 成功 / 失敗 / 未確認 / 対象なし / 意図的に残した状態 |  |  |
 
 - 実行成果物状態: 完了 / ブロック中 / 要再確認
 - ブロック中: preflight blockの場合はrunner未開始・artifact未生成の理由

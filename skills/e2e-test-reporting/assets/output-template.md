@@ -30,13 +30,15 @@
 | --- | --- | --- | --- | --- | --- | --- | ---: | --- | --- |
 | login-flow | session-test-1 | 開始 | passed |  | passed | expected | 1 | passed (retry 0) | result-1 |
 
-開始していないresolved primaryは、`結果`と`実行結果参照`を空欄にし、`未実行理由`へworkflow側の理由を記録します。`expectedStatus` / `outcome`もPlaywrightが返していない限り空欄にします。resolved primary自体が0件のpreflight blockでは、traceの実行参照欄に架空のresultを置かず、logical primary識別子または未実行理由を参照します。
+開始していないresolved primaryは、`結果`と`実行結果参照`を空欄にし、`未実行理由`へworkflow側の理由を記録します。`expectedStatus` / `outcome`もPlaywrightが返していない限り空欄にします。resolved primary自体が0件のpreflight blockでは、traceの実行参照欄に架空のresultや未実行理由そのものを識別子として置かず、logical primary識別子を参照し、未実行理由は専用列へ記録します。
 
 ## TC・E2E・実行・分析追跡
 
 | TC ID（存在時のみ） | E2E実装参照 | resolved primary TestCase / 実行結果参照 | 分析結果参照 | 報告上の扱い |
 | --- | --- | --- | --- | --- |
 |  | tests/example.spec.ts > login | result-1 |  |  |
+
+`e2e-test-result-analysis`を実施したreportでは、対応する分析成果物の安定参照を空欄にせず、fixtureまたは入力で指定された参照と完全一致させます。分析を実施していない正常runでは`分析結果参照`を空欄にできます。resolvedごとに分析成果物が異なる場合はtrace行ごとに対応付け、同じ参照を推測で使い回しません。
 
 ## cleanup・証跡・残存リスク
 

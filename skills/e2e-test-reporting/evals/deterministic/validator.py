@@ -229,6 +229,52 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         "E2E対象・resolved結果が存在する経路では追跡表に1件以上の有効行があること",
         evidence={"trace_required": trace_required, "trace_rows": len(trace_rows)} if trace_required and not trace_rows else None,
     )
+    analysis_required = expected.get("analysis_performed") is True or "required_analysis_ref" in expected or "expected_analysis_refs" in expected
+    analysis_issues = []
+    expected_analysis_ref = clean(str(expected.get("required_analysis_ref", "")))
+    expected_analysis_refs = expected.get("expected_analysis_refs", {})
+    if analysis_required:
+        for row in trace_rows:
+            implementation_ref = clean(row.get("E2E実装参照", ""))
+            execution_ref = clean(row.get("resolved primary TestCase / 実行結果参照", ""))
+            actual_analysis_ref = clean(row.get("分析結果参照", ""))
+            if not has_value(actual_analysis_ref):
+                analysis_issues.append({"implementation_ref": implementation_ref, "execution_ref": execution_ref, "reason": "分析実施済みなのに分析結果参照が空欄"})
+                continue
+            required_for_trace = ""
+            if isinstance(expected_analysis_refs, dict):
+                required_for_trace = clean(
+                    str(
+                        expected_analysis_refs.get(
+                            f"{implementation_ref}|{execution_ref}",
+                            expected_analysis_refs.get(execution_ref, ""),
+                        )
+                    )
+                )
+            if required_for_trace and actual_analysis_ref != required_for_trace:
+                analysis_issues.append(
+                    {
+                        "implementation_ref": implementation_ref,
+                        "execution_ref": execution_ref,
+                        "expected": required_for_trace,
+                        "actual": actual_analysis_ref,
+                    }
+                )
+            elif expected_analysis_ref and actual_analysis_ref != expected_analysis_ref:
+                analysis_issues.append(
+                    {
+                        "implementation_ref": implementation_ref,
+                        "execution_ref": execution_ref,
+                        "expected": expected_analysis_ref,
+                        "actual": actual_analysis_ref,
+                    }
+                )
+    result.add(
+        "E2E-REPORT-D020",
+        not analysis_issues,
+        "分析実施済みのreportでは分析結果参照をtrace単位で完全一致させ、未実施runでは空欄を許容すること",
+        evidence=analysis_issues or None,
+    )
 
     cleanup_rows = nonempty_rows(cleanup)
     cleanup_text = " ".join(row.get("状態 / 内容", "") for row in cleanup_rows)

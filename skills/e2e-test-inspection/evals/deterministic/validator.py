@@ -148,8 +148,21 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         evidence=empty_required_tables or None,
     )
 
-    relation_bad = sorted({clean(row.get("扱い", "")) for row in relations if clean(row.get("扱い", "")) and clean(row.get("扱い", "")) not in HANDLINGS | {"既存E2Eで十分にカバー済み"}})
-    result.add("E2E-INSP-D007", not relation_bad, "既存E2Eとの関係が許可された扱いであること", evidence=relation_bad or None)
+    relation_issues = []
+    allowed_relation_handlings = HANDLINGS | {"既存E2Eで十分にカバー済み"}
+    for row in relations:
+        target = clean(row.get("対象", ""))
+        handling = clean(row.get("扱い", ""))
+        missing_fields = []
+        if not has_value(target):
+            missing_fields.append("対象")
+        if not has_value(handling):
+            missing_fields.append("扱い")
+        elif handling not in allowed_relation_handlings:
+            missing_fields.append("扱い(許可値)")
+        if missing_fields:
+            relation_issues.append({"対象": target or "<unknown>", "fields": missing_fields})
+    result.add("E2E-INSP-D007", not relation_issues, "既存E2Eとの関係が対象ごとに正規の扱いを持つこと", evidence=relation_issues or None)
 
     missing_fact_labels = _has_named_rows(facts, set(expected.get("required_fact_labels", [])), "事実")
     result.add("E2E-INSP-D008", not missing_fact_labels, "フィクスチャで必須のinspection事実が存在すること", evidence=missing_fact_labels or None)

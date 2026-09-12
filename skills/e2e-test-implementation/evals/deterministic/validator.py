@@ -7,6 +7,7 @@ from scripts.skills.evals.deterministic.markdown_parser import find_table, parse
 from scripts.skills.evals.deterministic.result import EvalResult
 
 IMPLEMENTATION_HANDLINGS = {"新規実装", "既存E2E再利用", "既存E2E拡張", "ブロック中"}
+COMPLETED_HANDLINGS = {"新規実装", "既存E2E再利用", "既存E2E拡張"}
 VALID_RESULTS = {"PASS", "FAIL", "未実施", "ブロック中", "確認不能"}
 EXECUTION_PATTERNS = (
     re.compile(r"(?:Playwright|E2E)[^\n]{0,20}(?:実行|再実行|起動)", re.IGNORECASE),
@@ -35,17 +36,25 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     targets = nonempty_rows(target_table)
     target_issues = []
     for row in targets:
+        handling = clean(row.get("扱い", ""))
+        has_input_source = any(
+            has_value(row.get(field, ""))
+            for field in ("TC ID（存在時のみ）", "明示対象 / 既存E2E参照")
+        )
         missing_fields = [
             field
-            for field in ("E2E対象 / 識別子", "明示対象 / 既存E2E参照", "確認済み期待挙動", "扱い")
+            for field in ("E2E対象 / 識別子", "確認済み期待挙動", "扱い")
             if not has_value(row.get(field, ""))
         ]
+        if not has_input_source:
+            missing_fields.append("入力元（TC ID / 明示対象 / 既存E2E参照のいずれか）")
         if missing_fields:
             target_issues.append({"target": clean(row.get("E2E対象 / 識別子", "")) or "<unknown>", "fields": missing_fields})
+    completed_targets = [row for row in targets if clean(row.get("扱い", "")) in COMPLETED_HANDLINGS]
     result.add(
         "E2E-IMPL-D018",
         bool(targets) and not target_issues,
-        "実装対象を最低1件、識別子・入力参照・確認済み期待挙動付きで記録すること",
+        "実装対象を最低1件、TC / 明示対象 / 既存E2E参照のいずれか、識別子・確認済み期待挙動付きで記録すること",
         evidence={"missing_rows": not targets, "issues": target_issues}
         if not targets or target_issues
         else None,
@@ -68,10 +77,10 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             ref_contract_issues.append({"ref": clean(row.get("E2E実装参照", "")) or "<unknown>", "fields": missing_fields})
     result.add(
         "E2E-IMPL-D019",
-        bool(refs) and not ref_contract_issues,
-        "E2E実装参照を最低1件、repo-relative pathとtitle path付きで記録すること",
-        evidence={"missing_rows": not refs, "issues": ref_contract_issues}
-        if not refs or ref_contract_issues
+        (not completed_targets) or (bool(refs) and not ref_contract_issues),
+        "実装・再利用・拡張が成立した場合はE2E実装参照を最低1件、repo-relative pathとtitle path付きで記録し、実装前blockでは0件を許容すること",
+        evidence={"missing_rows": not refs, "issues": ref_contract_issues, "refs_required": bool(completed_targets)}
+        if (completed_targets and (not refs or ref_contract_issues))
         else None,
     )
     ref_values = [clean(row.get("E2E実装参照", "")) for row in refs if clean(row.get("E2E実装参照", ""))]
@@ -149,6 +158,26 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         evidence={"failed_checks": failed_checks, "states": [clean(row.get("状態", "")) for row in diff_rows]}
         if failed_marked_complete
         else None,
+    )
+    block_target_rows = [row for row in targets if clean(row.get("扱い", "")) == "ブロック中"]
+    block_issues = []
+    if block_target_rows:
+        blocked_rows = [row for row in diff_rows if clean(row.get("状態", "")) == "ブロック中"]
+        if not blocked_rows:
+            block_issues.append("ブロック対象に対応するブロック中の理由・次の担当がない")
+        for row in blocked_rows:
+            missing_fields = [
+                field
+                for field in ("範囲", "理由 / 影響", "次の担当")
+                if not has_value(row.get(field, ""))
+            ]
+            if missing_fields:
+                block_issues.append({"範囲": clean(row.get("範囲", "")) or "<unknown>", "fields": missing_fields})
+    result.add(
+        "E2E-IMPL-D020",
+        not block_issues,
+        "実装前blockでは架空のE2E実装参照を要求せず、block理由・不足範囲・次の担当を記録すること",
+        evidence=block_issues or None,
     )
 
     expected_refs = {clean(str(ref)) for ref in expected.get("required_e2e_refs", [])}

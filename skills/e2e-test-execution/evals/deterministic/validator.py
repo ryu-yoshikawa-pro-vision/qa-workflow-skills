@@ -18,18 +18,36 @@ STARTED_MARKERS = {"開始", "開始済み", "実行済み", "はい"}
 NOT_STARTED_MARKERS = {"", "未開始", "未実行", "未実施", "いいえ", "対象なし"}
 NON_OWNER_MARKERS = {"今回runは所有しない", "今回runが所有しない", "所有しない", "非所有", "今回runの所有ではない"}
 NOT_CLEANUP_MARKERS = {"対象外", "対象なし", "cleanup対象外", "終了対象外", "終了しない", "しない"}
+RUN_NOT_STARTED_ERROR_STATES = {"未実施", "未確認", "確認不能", "対象なし"}
+UNKNOWN_SAFETY_MARKERS = ("未確認", "確認不能", "不明", "未取得", "未指定", "確認待ち")
+RUN_START_REQUIRED_CONDITIONS = {
+    "対象URL / origin",
+    "実行入口 / command chain",
+    "Playwright project",
+    "retries / repeatEach / workers / parallel",
+    "setup / dependency / webServer / teardown",
+    "必要な認証 / テストデータ / 開始状態",
+    "副作用の許可範囲 / 最大回数",
+    "cleanup方法",
+}
 
 
-def _webserver_configured(setup_value: str) -> bool:
+def _webserver_candidate(setup_value: str) -> str:
     value = clean(setup_value)
     parts = [clean(part) for part in value.split("/")]
-    candidate = parts[2] if len(parts) >= 4 else value
+    return parts[2] if len(parts) >= 4 else value
+
+
+def _webserver_state(setup_value: str) -> str:
+    candidate = _webserver_candidate(setup_value)
     lowered = candidate.lower()
     if not candidate or lowered in {"none", "n/a", "対象なし", "未使用", "なし", "-"}:
-        return False
+        return "none"
+    if any(marker in candidate for marker in UNKNOWN_SAFETY_MARKERS):
+        return "unknown"
     if "webserver" in lowered and any(token in lowered for token in ("none", "なし", "対象なし", "未使用")):
-        return False
-    return True
+        return "none"
+    return "configured"
 
 
 def _as_nonnegative_int(value: str) -> int | None:
@@ -37,6 +55,32 @@ def _as_nonnegative_int(value: str) -> int | None:
     if not re.fullmatch(r"\d+", value):
         return None
     return int(value)
+
+
+def _is_run_owned(value: str) -> bool:
+    value = clean(value)
+    return value not in NON_OWNER_MARKERS and any(token in value for token in ("今回runが所有", "今回run所有"))
+
+
+def _is_cleanup_target(value: str) -> bool:
+    value = clean(value)
+    if not value or any(marker in value for marker in NOT_CLEANUP_MARKERS):
+        return False
+    return any(marker in value for marker in ("対象", "cleanup対象", "終了対象"))
+
+
+def _cleanup_subject(value: str) -> str | None:
+    value = clean(value)
+    if any(marker in value for marker in ("runner管理", "Playwright runner", "runner cleanup")):
+        return "runner"
+    if any(marker in value for marker in ("run外", "外部cleanup", "run外処理")):
+        return "external"
+    return None
+
+
+def _is_explicit_unavailable(value: str, allowed: set[str]) -> bool:
+    value = clean(value)
+    return value in allowed or any(value.startswith(f"{state}（") for state in allowed)
 
 
 def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
@@ -55,7 +99,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     result.add("E2E-EXEC-D001", not missing, "executionの正規テーブルが存在すること", evidence=missing or None)
 
     condition_rows = nonempty_rows(conditions)
-    required_condition_labels = {"対象URL / origin", "実行入口 / command chain", "Playwright project", "retries / repeatEach / workers / parallel", "setup / dependency / webServer / teardown", "branch / HEAD / working tree", "テスト対象version / build ID"}
+    required_condition_labels = RUN_START_REQUIRED_CONDITIONS | {"branch / HEAD / working tree", "テスト対象version / build ID"}
     missing_condition = sorted(required_condition_labels - {clean(row.get("項目", "")) for row in condition_rows})
     result.add("E2E-EXEC-D002", not missing_condition, "実行入口・実効設定・revision・対象versionを確認すること", evidence=missing_condition or None)
     condition_by_item = {clean(row.get("項目", "")): row for row in condition_rows}
@@ -124,6 +168,19 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         if not artifact_ok
         else None,
     )
+    started_safety_issues = []
+    if runner_started:
+        for label in sorted(RUN_START_REQUIRED_CONDITIONS):
+            row = condition_by_item.get(label)
+            value = clean(row.get("値", "")) if row else ""
+            if any(marker in value for marker in UNKNOWN_SAFETY_MARKERS):
+                started_safety_issues.append({"項目": label, "値": value})
+    result.add(
+        "E2E-EXEC-D026",
+        not started_safety_issues,
+        "runner開始済みなら実行開始前に確定が必要な安全情報を未確認のまま実行しないこと",
+        evidence=started_safety_issues or None,
+    )
     setup_value = clean(condition_by_item.get("setup / dependency / webServer / teardown", {}).get("値", ""))
     ownership_issues = []
     if "reuseExistingServer" in setup_value or "既存processを再利用" in setup_value or "既存プロセスを再利用" in setup_value:
@@ -136,11 +193,40 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         evidence=ownership_issues or None,
     )
 
-    webserver_configured = _webserver_configured(setup_value)
+    webserver_state = _webserver_state(setup_value)
     webserver_rows = nonempty_rows(webserver_table)
     webserver_issues = []
-    if webserver_configured and not webserver_rows:
+    actual_webserver_ids = [clean(row.get("server識別子", "")) for row in webserver_rows if clean(row.get("server識別子", ""))]
+    expected_webserver_ids = {
+        clean(str(server_id))
+        for server_id in expected.get("expected_webserver_ids", [])
+        if clean(str(server_id))
+    }
+    if webserver_state == "configured" and not webserver_rows:
         webserver_issues.append("webServerごとのownership / cleanup表がない")
+    if webserver_state == "unknown":
+        if runner_started:
+            webserver_issues.append("webServerが未確認 / 確認不能なのにrunnerを開始している")
+        if webserver_rows:
+            webserver_issues.append("webServer未確認時に架空または未確認のownership行を作成している")
+    if webserver_state == "none" and webserver_rows:
+        webserver_issues.append("webServerなしなのにownership行がある")
+    if expected.get("expected_webserver_ids") is not None and set(actual_webserver_ids) != expected_webserver_ids:
+        webserver_issues.append(
+            {
+                "reason": "実効webServer集合とownership表のserver集合が一致しない",
+                "expected": sorted(expected_webserver_ids),
+                "actual": sorted(actual_webserver_ids),
+            }
+        )
+    if len(actual_webserver_ids) != len(set(actual_webserver_ids)):
+        webserver_issues.append({"reason": "ownership表のserver識別子が重複している", "actual": actual_webserver_ids})
+    expected_reuse = {
+        clean(str(server_id)): bool(reuse)
+        for server_id, reuse in expected.get("expected_webserver_reuse", {}).items()
+    }
+    if "reuseExistingServer=true" in setup_value and len(webserver_rows) == 1:
+        expected_reuse.setdefault(actual_webserver_ids[0] if actual_webserver_ids else "", True)
     for row in webserver_rows:
         missing_fields = [
             field
@@ -153,13 +239,29 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         owner = clean(row.get("今回run所有か", ""))
         existing = clean(row.get("既存 / 再利用か", ""))
         cleanup = clean(row.get("cleanup対象か", ""))
+        startup = clean(row.get("起動状態", ""))
+        if runner_value in NOT_STARTED_MARKERS and any(marker in f"{startup} {existing}" for marker in ("起動なし", "未開始", "対象なし")):
+            continue
         existing_process = any(token in existing for token in ("既存", "再利用", "reuseExistingServer"))
-        if existing_process and owner not in NON_OWNER_MARKERS:
+        new_process = "新規" in existing
+        if not existing_process and not new_process:
+            webserver_issues.append({"server": row.get("server識別子"), "reason": "既存 / 再利用かが新規または既存 / 再利用として閉じていない"})
+        if existing_process and _is_run_owned(owner):
             webserver_issues.append({"server": row.get("server識別子"), "reason": "既存 / 再利用processは今回run非所有である必要がある"})
-        if existing_process and cleanup not in NOT_CLEANUP_MARKERS:
+        if existing_process and _is_cleanup_target(cleanup):
             webserver_issues.append({"server": row.get("server識別子"), "reason": "既存 / 再利用processはcleanup対象外である必要がある"})
-        if not existing_process and owner not in NON_OWNER_MARKERS and not any(token in owner for token in ("今回runが所有", "今回run所有", "所有")):
-            webserver_issues.append({"server": row.get("server識別子"), "reason": "今回runが起動したprocessのownershipが明示されていない"})
+        if existing_process and any(token in startup for token in ("今回runが起動", "今回run起動")):
+            webserver_issues.append({"server": row.get("server識別子"), "reason": "既存 / 再利用processを今回run起動として記録している"})
+        if new_process:
+            if "今回runが起動" not in startup and "今回run起動" not in startup:
+                webserver_issues.append({"server": row.get("server識別子"), "reason": "新規serverは今回run起動である必要がある"})
+            if not _is_run_owned(owner):
+                webserver_issues.append({"server": row.get("server識別子"), "reason": "今回runが起動したprocessは今回run所有である必要がある"})
+            if not _is_cleanup_target(cleanup):
+                webserver_issues.append({"server": row.get("server識別子"), "reason": "今回runが起動したprocessはcleanup対象である必要がある"})
+        server_id = clean(row.get("server識別子", ""))
+        if server_id in expected_reuse and expected_reuse[server_id] != existing_process:
+            webserver_issues.append({"server": server_id, "reason": "setup / fixtureが示すreuse状態とownership表が一致しない"})
     result.add(
         "E2E-EXEC-D025",
         not webserver_issues,
@@ -282,7 +384,18 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
 
     cleanup_rows = nonempty_rows(cleanup_table)
     invalid_cleanup = sorted({clean(row.get("状態", "")) for row in cleanup_rows if clean(row.get("状態", "")) not in CLEANUP_STATES})
-    result.add("E2E-EXEC-D012", bool(cleanup_rows) and not invalid_cleanup, "cleanup状態が成功・失敗・未確認等を区別していること", evidence={"missing_cleanup_rows": not cleanup_rows, "invalid": invalid_cleanup} if not cleanup_rows or invalid_cleanup else None)
+    cleanup_contract_issues = []
+    for row in cleanup_rows:
+        missing_fields = [
+            field
+            for field in ("cleanup対象 / 実行主体", "状態", "結果 / 残存副作用", "確認元")
+            if not has_value(row.get(field, ""))
+        ]
+        if _cleanup_subject(row.get("cleanup対象 / 実行主体", "")) is None:
+            missing_fields.append("cleanup実行主体( runner管理 / run外処理 )")
+        if missing_fields:
+            cleanup_contract_issues.append({"fields": missing_fields})
+    result.add("E2E-EXEC-D012", bool(cleanup_rows) and not invalid_cleanup and not cleanup_contract_issues, "cleanup状態と実行主体を区別し、結果・確認元を記録すること", evidence={"missing_cleanup_rows": not cleanup_rows, "invalid": invalid_cleanup, "contract": cleanup_contract_issues} if not cleanup_rows or invalid_cleanup or cleanup_contract_issues else None)
     cleanup_unconfirmed = any(clean(row.get("状態", "")) in {"失敗", "未確認", "一部失敗"} for row in cleanup_rows)
     result.add("E2E-EXEC-D013", execution_state in {"完了", "ブロック中", "要再確認"} and not (cleanup_unconfirmed and execution_state == "完了"), "cleanup失敗 / 未確認を安全な完了扱いにせず、実行成果物状態を明示すること", evidence={"cleanup": [row.get("状態") for row in cleanup_rows], "execution_state": execution_state} if execution_state not in {"完了", "ブロック中", "要再確認"} or (cleanup_unconfirmed and execution_state == "完了") else None)
 
@@ -296,13 +409,31 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         run_error = clean(run_value_by_item.get("run-level / global error", {}).get("値", ""))
         if run_error.lower() in {"none", "no error", "なし", "無"}:
             runner_not_started_issues.append({"field": "run-level / global error", "value": run_error})
+        if not _is_explicit_unavailable(run_error, RUN_NOT_STARTED_ERROR_STATES):
+            runner_not_started_issues.append({"field": "run-level / global error", "value": run_error, "reason": "runner未開始時はPlaywright由来の具体的errorを記録できない"})
         if resolved_rows:
             runner_not_started_issues.append({"field": "resolved primary TestCase", "count": len(resolved_rows)})
         if attempts:
             runner_not_started_issues.append({"field": "attempt", "count": len(attempts)})
-        successful_cleanup = [clean(row.get("状態", "")) for row in cleanup_rows if clean(row.get("状態", "")) == "成功"]
+        successful_cleanup = []
+        external_cleanup = []
+        ambiguous_cleanup = []
+        for row in cleanup_rows:
+            if clean(row.get("状態", "")) != "成功":
+                continue
+            subject = _cleanup_subject(row.get("cleanup対象 / 実行主体", ""))
+            if subject == "runner":
+                successful_cleanup.append(row.get("cleanup対象 / 実行主体", ""))
+            elif subject == "external":
+                external_cleanup.append(row.get("cleanup対象 / 実行主体", ""))
+            elif subject is None:
+                ambiguous_cleanup.append(row.get("cleanup対象 / 実行主体", ""))
         if successful_cleanup:
-            runner_not_started_issues.append({"field": "cleanup", "value": successful_cleanup})
+            runner_not_started_issues.append({"field": "runner管理cleanup", "value": successful_cleanup})
+        if external_cleanup and not any(marker in setup_value for marker in ("run外", "seed", "API", "外部準備")):
+            runner_not_started_issues.append({"field": "run外cleanup", "value": external_cleanup, "reason": "runner開始前に対応するrun外準備が確認できない"})
+        if ambiguous_cleanup:
+            runner_not_started_issues.append({"field": "cleanup実行主体不明", "value": ambiguous_cleanup})
         for row in webserver_rows:
             server = clean(row.get("server識別子", "")) or "<unknown>"
             startup = clean(row.get("起動状態", ""))
@@ -310,9 +441,9 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             cleanup = clean(row.get("cleanup対象か", ""))
             if any(marker in startup for marker in ("今回runが起動", "今回run起動", "起動済み")):
                 runner_not_started_issues.append({"field": "webServer起動", "server": server, "value": startup})
-            if owner not in NON_OWNER_MARKERS and any(marker in owner for marker in ("今回runが所有", "今回run所有")):
+            if _is_run_owned(owner):
                 runner_not_started_issues.append({"field": "webServer ownership", "server": server, "value": owner})
-            if cleanup in {"対象", "cleanup対象", "終了対象"}:
+            if _is_cleanup_target(cleanup):
                 runner_not_started_issues.append({"field": "webServer cleanup", "server": server, "value": cleanup})
     result.add(
         "E2E-EXEC-D024",
