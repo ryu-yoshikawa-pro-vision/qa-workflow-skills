@@ -8,7 +8,7 @@
   {"query":"この未回答事項をBlockerか要確認か分類するだけでいいです。","should_trigger":false},
   {"query":"仕様分析済みなので、この変更のProduct Riskだけ評価してください。","should_trigger":false},
   {"query":"Coverage Itemは完成済みです。テストケースだけ具体化してください。","should_trigger":false},
-  {"query":"TC-301のE2Eコードを追加して。inspection情報がないため必要な確認から実装・実行・報告まで工程を判断して進めてください。","should_trigger":true},
+  {"query":"TC-301のE2Eコードを追加して。","should_trigger":true},
   {"query":"FigmaとQ&Aから現在有効な仕様だけ整理してください。テスト分析は不要です。","should_trigger":false},
   {"query":"AuthorityとRiskはあります。Test Requirementだけ設計してください。","should_trigger":false}
 ]

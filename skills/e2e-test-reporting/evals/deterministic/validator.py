@@ -229,11 +229,27 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         "E2E対象・resolved結果が存在する経路では追跡表に1件以上の有効行があること",
         evidence={"trace_required": trace_required, "trace_rows": len(trace_rows)} if trace_required and not trace_rows else None,
     )
-    analysis_required = expected.get("analysis_performed") is True or "required_analysis_ref" in expected or "expected_analysis_refs" in expected
+    analysis_performed = expected.get("analysis_performed")
+    analysis_required = analysis_performed is True or (
+        analysis_performed is not False
+        and ("required_analysis_ref" in expected or "expected_analysis_refs" in expected)
+    )
     analysis_issues = []
     expected_analysis_ref = clean(str(expected.get("required_analysis_ref", "")))
     expected_analysis_refs = expected.get("expected_analysis_refs", {})
-    if analysis_required:
+    if analysis_performed is False:
+        for row in trace_rows:
+            actual_analysis_ref = clean(row.get("分析結果参照", ""))
+            if actual_analysis_ref:
+                analysis_issues.append(
+                    {
+                        "implementation_ref": clean(row.get("E2E実装参照", "")),
+                        "execution_ref": clean(row.get("resolved primary TestCase / 実行結果参照", "")),
+                        "actual": actual_analysis_ref,
+                        "reason": "分析未実施なのに分析結果参照がある",
+                    }
+                )
+    elif analysis_required:
         for row in trace_rows:
             implementation_ref = clean(row.get("E2E実装参照", ""))
             execution_ref = clean(row.get("resolved primary TestCase / 実行結果参照", ""))
@@ -272,7 +288,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     result.add(
         "E2E-REPORT-D020",
         not analysis_issues,
-        "分析実施済みのreportでは分析結果参照をtrace単位で完全一致させ、未実施runでは空欄を許容すること",
+        "分析実施済みのreportでは分析結果参照をtrace単位で完全一致させ、明示された分析未実施runでは参照を残さないこと",
         evidence=analysis_issues or None,
     )
 

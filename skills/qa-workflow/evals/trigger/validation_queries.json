@@ -3,8 +3,8 @@
   {"query":"この機能のQA成果物一式を作ってください。途中成果物も必要ですが最終的にはローレベルケースが欲しいです。","should_trigger":true},
   {"query":"このテスト項目書だけを反証レビューしてください。修正や再設計はしないで。","should_trigger":false},
   {"query":"continuousで、Blocker以外は止まらずに仕様整理から最終レビューまで進めてください。","should_trigger":true},
-  {"query":"既存Playwright testを修正して。inspection情報がないため必要な確認から実装・実行まで工程を判断して進めて。","should_trigger":true},
-  {"query":"この画面のPlaywright E2Eを追加して。inspection情報がないため対象確認から実装まで必要な工程を進めて。","should_trigger":true},
+  {"query":"既存Playwright testを修正して。","should_trigger":true},
+  {"query":"この画面のPlaywright E2Eを追加して。","should_trigger":true},
   {"query":"QA Workflowという言葉の意味を一般論として説明してください。","should_trigger":false},
   {"query":"既存成果物間のカバレッジだけ確認してください。新規設計は不要です。","should_trigger":false}
 ]

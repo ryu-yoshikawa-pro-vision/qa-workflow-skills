@@ -19,7 +19,7 @@ NOT_STARTED_MARKERS = {"", "未開始", "未実行", "未実施", "いいえ", "
 NON_OWNER_MARKERS = {"今回runは所有しない", "今回runが所有しない", "所有しない", "非所有", "今回runの所有ではない"}
 NOT_CLEANUP_MARKERS = {"対象外", "対象なし", "cleanup対象外", "終了対象外", "終了しない", "しない"}
 RUN_NOT_STARTED_ERROR_STATES = {"未実施", "未確認", "確認不能", "対象なし"}
-UNKNOWN_SAFETY_MARKERS = ("未確認", "確認不能", "不明", "未取得", "未指定", "確認待ち")
+UNKNOWN_SAFETY_MARKERS = ("未確認", "確認不能", "不明", "未取得", "未指定", "確認待ち", "未実施")
 RUN_START_REQUIRED_CONDITIONS = {
     "対象URL / origin",
     "実行入口 / command chain",
@@ -81,6 +81,13 @@ def _cleanup_subject(value: str) -> str | None:
 def _is_explicit_unavailable(value: str, allowed: set[str]) -> bool:
     value = clean(value)
     return value in allowed or any(value.startswith(f"{state}（") for state in allowed)
+
+
+def _external_preparation_performed(condition_by_item: dict[str, dict[str, str]]) -> bool:
+    value = clean(condition_by_item.get("run外準備", {}).get("値", ""))
+    if value in {"実施", "実施済み"}:
+        return True
+    return value.startswith(("実施（", "実施(", "実施:", "実施："))
 
 
 def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
@@ -182,17 +189,6 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         evidence=started_safety_issues or None,
     )
     setup_value = clean(condition_by_item.get("setup / dependency / webServer / teardown", {}).get("値", ""))
-    ownership_issues = []
-    if "reuseExistingServer" in setup_value or "既存processを再利用" in setup_value or "既存プロセスを再利用" in setup_value:
-        if not any(token in setup_value for token in ("終了対象外", "終了しない", "cleanup対象外", "所有しない")):
-            ownership_issues.append("reuseExistingServerで再利用した既存processをcleanup終了対象外としていない")
-    result.add(
-        "E2E-EXEC-D020",
-        not ownership_issues,
-        "webServerの今回run所有processと既存再利用processを区別し、非所有processをcleanup終了しないこと",
-        evidence=ownership_issues or None,
-    )
-
     webserver_state = _webserver_state(setup_value)
     webserver_rows = nonempty_rows(webserver_table)
     webserver_issues = []
@@ -398,6 +394,20 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     result.add("E2E-EXEC-D012", bool(cleanup_rows) and not invalid_cleanup and not cleanup_contract_issues, "cleanup状態と実行主体を区別し、結果・確認元を記録すること", evidence={"missing_cleanup_rows": not cleanup_rows, "invalid": invalid_cleanup, "contract": cleanup_contract_issues} if not cleanup_rows or invalid_cleanup or cleanup_contract_issues else None)
     cleanup_unconfirmed = any(clean(row.get("状態", "")) in {"失敗", "未確認", "一部失敗"} for row in cleanup_rows)
     result.add("E2E-EXEC-D013", execution_state in {"完了", "ブロック中", "要再確認"} and not (cleanup_unconfirmed and execution_state == "完了"), "cleanup失敗 / 未確認を安全な完了扱いにせず、実行成果物状態を明示すること", evidence={"cleanup": [row.get("状態") for row in cleanup_rows], "execution_state": execution_state} if execution_state not in {"完了", "ブロック中", "要再確認"} or (cleanup_unconfirmed and execution_state == "完了") else None)
+    external_cleanup_success = [
+        row.get("cleanup対象 / 実行主体", "")
+        for row in cleanup_rows
+        if clean(row.get("状態", "")) == "成功" and _cleanup_subject(row.get("cleanup対象 / 実行主体", "")) == "external"
+    ]
+    external_cleanup_without_preparation = bool(external_cleanup_success) and not _external_preparation_performed(condition_by_item)
+    result.add(
+        "E2E-EXEC-D027",
+        not external_cleanup_without_preparation,
+        "run外cleanupの成功は、独立した実行条件のrun外準備が実施済みの場合だけ許容すること",
+        evidence={"cleanup": external_cleanup_success, "run外準備": condition_by_item.get("run外準備", {}).get("値", "")}
+        if external_cleanup_without_preparation
+        else None,
+    )
 
     runner_not_started_issues = []
     if runner_value in NOT_STARTED_MARKERS:
@@ -430,7 +440,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                 ambiguous_cleanup.append(row.get("cleanup対象 / 実行主体", ""))
         if successful_cleanup:
             runner_not_started_issues.append({"field": "runner管理cleanup", "value": successful_cleanup})
-        if external_cleanup and not any(marker in setup_value for marker in ("run外", "seed", "API", "外部準備")):
+        if external_cleanup and not _external_preparation_performed(condition_by_item):
             runner_not_started_issues.append({"field": "run外cleanup", "value": external_cleanup, "reason": "runner開始前に対応するrun外準備が確認できない"})
         if ambiguous_cleanup:
             runner_not_started_issues.append({"field": "cleanup実行主体不明", "value": ambiguous_cleanup})

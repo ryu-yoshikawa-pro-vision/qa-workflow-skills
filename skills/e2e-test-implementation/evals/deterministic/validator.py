@@ -9,6 +9,16 @@ from scripts.skills.evals.deterministic.result import EvalResult
 IMPLEMENTATION_HANDLINGS = {"新規実装", "既存E2E再利用", "既存E2E拡張", "ブロック中"}
 COMPLETED_HANDLINGS = {"新規実装", "既存E2E再利用", "既存E2E拡張"}
 VALID_RESULTS = {"PASS", "FAIL", "未実施", "ブロック中", "確認不能"}
+UNCONFIRMED_EXPECTED_BEHAVIOR_MARKERS = (
+    "未確認",
+    "確認不能",
+    "不明",
+    "未確定",
+    "確認待ち",
+    "未取得",
+    "未指定",
+    "未実施",
+)
 EXECUTION_PATTERNS = (
     re.compile(r"(?:Playwright|E2E)[^\n]{0,20}(?:実行|再実行|起動)", re.IGNORECASE),
     re.compile(r"(?:実行|再実行|起動)[^\n]{0,20}(?:Playwright|E2E)", re.IGNORECASE),
@@ -19,6 +29,11 @@ NEGATED_EXECUTION = re.compile(r"(?:しない|しません|せず|行わない|�
 def _is_relative_reference(value: str) -> bool:
     value = clean(value)
     return bool(value) and not re.match(r"^(?:[A-Za-z]:[\\/]|/|https?://)", value) and ".." not in value.split(" > ")[0].split("/")
+
+
+def _is_unconfirmed_expected_behavior(value: str) -> bool:
+    value = clean(value)
+    return bool(value) and any(marker in value for marker in UNCONFIRMED_EXPECTED_BEHAVIOR_MARKERS)
 
 
 def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
@@ -58,6 +73,20 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         evidence={"missing_rows": not targets, "issues": target_issues}
         if not targets or target_issues
         else None,
+    )
+    unconfirmed_completed_targets = [
+        {
+            "target": clean(row.get("E2E対象 / 識別子", "")) or "<unknown>",
+            "expected_behavior": clean(row.get("確認済み期待挙動", "")),
+        }
+        for row in completed_targets
+        if _is_unconfirmed_expected_behavior(row.get("確認済み期待挙動", ""))
+    ]
+    result.add(
+        "E2E-IMPL-D021",
+        not unconfirmed_completed_targets,
+        "実装・再利用・拡張が成立した対象は、確認済み期待挙動を未確認・不明のまま完了扱いにしないこと",
+        evidence=unconfirmed_completed_targets or None,
     )
     target_handling_bad = sorted({clean(row.get("扱い", "")) for row in targets if clean(row.get("扱い", "")) not in IMPLEMENTATION_HANDLINGS})
     result.add("E2E-IMPL-D002", not target_handling_bad, "実装対象の扱いが許可値であること", evidence=target_handling_bad or None)
@@ -178,6 +207,23 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         not block_issues,
         "実装前blockでは架空のE2E実装参照を要求せず、block理由・不足範囲・次の担当を記録すること",
         evidence=block_issues or None,
+    )
+    block_only = bool(targets) and all(clean(row.get("扱い", "")) == "ブロック中" for row in targets)
+    block_only_artifact_issues = []
+    if block_only:
+        no_change_file_markers = {"", "なし", "対象なし", "未実施", "-"}
+        for row in nonempty_rows(files_table):
+            file_value = clean(row.get("ファイル", ""))
+            if file_value not in no_change_file_markers:
+                block_only_artifact_issues.append({"ファイル": file_value, "reason": "実装前blockなのに変更・再利用ファイルがある"})
+        passed_validations = [clean(row.get("検証", "")) for row in validation_rows if clean(row.get("結果", "")) == "PASS"]
+        if passed_validations:
+            block_only_artifact_issues.append({"検証": passed_validations, "reason": "実装前blockなのに実装成果物のPASS検証がある"})
+    result.add(
+        "E2E-IMPL-D022",
+        not block_only_artifact_issues,
+        "全対象が実装前blockの場合、実装済みを示す変更ファイルやPASS検証を残さないこと。成立対象との混在は対象単位で許容すること",
+        evidence=block_only_artifact_issues or None,
     )
 
     expected_refs = {clean(str(ref)) for ref in expected.get("required_e2e_refs", [])}

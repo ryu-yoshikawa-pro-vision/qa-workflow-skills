@@ -8,7 +8,7 @@ description: 検証済みのPlaywright実行結果と、実施済みの場合は
 ## 実行契約
 
 1. 詳細判断が必要な場合は最初に`references/guidance.md`を読み、集計単位・raw値域・安全な共有の契約に従います。
-2. 検証済み実行結果を必須入力とし、`e2e-test-result-analysis`を実施した場合だけ検証済み分析結果を利用します。分析済み結果からの途中開始では、URL、project、実行日時、E2E実装参照等の実行事実へ辿れることを確認します。分析実施済みなら対応する分析成果物参照をtrace行ごとに保持し、未実施の正常runでは空欄を許容します。
+2. 検証済み実行結果を必須入力とし、`e2e-test-result-analysis`を実施した場合だけ検証済み分析結果を利用します。分析済み結果からの途中開始では、URL、project、実行日時、E2E実装参照等の実行事実へ辿れることを確認します。分析実施済みなら対応する分析成果物参照をtrace行ごとに保持します。fixtureまたは入力で分析未実施が明示される場合は分析結果参照を空欄にし、分析実施状態が未指定の既存経路では互換性のため一律に空欄を強制しません。
 3. logical primary対象数、resolved primary TestCase数、実際に開始したresolved primary TestCase数、logical / resolved単位の未実行数・理由を区別します。retry attempt数をresolved件数へ混ぜません。
 4. Playwright run全体status、process exit code、run-level error、`TestResult.status`、`TestCase.expectedStatus`、`TestCase.outcome()`を、確認元と単位を保ったまま別値域として報告します。`未実行`はworkflow状態として扱います。
 5. TC IDは存在する場合だけ記載し、TCなし経路のために作成しません。E2E実装参照・実行結果参照・分析結果参照を保持して追跡可能にします。reporting対象として開始した場合はlogical primaryを最低1件記録します。

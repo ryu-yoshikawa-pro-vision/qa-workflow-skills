@@ -8,7 +8,7 @@ config → project → file / describe / test → CLIの上書きを、今回対
 
 ## 準備とcleanup
 
-runnerが管理するsetup / teardownをrun外で二重実行しません。`webServer`は、なし、未確認 / 確認不能、確認済みの設定ありを分けます。確認済みの設定ありでは期待される全serverを`webServer process ownership`表へprocessごとに1行で対応付け、ownership・既存 / 再利用・cleanup対象・根拠を個別に記録します。既存 / 再利用processは今回runが所有せず終了対象にしません。webServer未確認 / 確認不能ではrunnerを開始せず、架空のserver識別子やownership行を作りません。run外処理はrepoで定義されinspection等で確認済みのseed / API / cleanupだけを使い、新しい方式を作りません。process interruptionや通信断でcleanup結果が確認できない場合は`未確認`です。
+runnerが管理するsetup / teardownをrun外で二重実行しません。`setup / dependency / webServer / teardown`欄はraw設定の記録に限定し、serverごとのownership・再利用・cleanupの正本は`webServer process ownership`表に置きます。`webServer`は、なし、未確認 / 確認不能、確認済みの設定ありを分けます。確認済みの設定ありでは期待される全serverをownership表へprocessごとに1行で対応付け、ownership・既存 / 再利用・cleanup対象・根拠を個別に記録します。既存 / 再利用processは今回runが所有せず終了対象にしません。webServer未確認 / 確認不能ではrunnerを開始せず、架空のserver識別子やownership行を作りません。run外処理はrepoで定義されinspection等で確認済みのseed / API / cleanupだけを使い、新しい方式を作りません。run外cleanupを成功と記録する場合は、実行条件の`run外準備`を`実施`または`実施（詳細）`として独立したraw factで記録します。setup自由記述の`run外`、`seed`、`API`等の部分一致や、`run外なし`等の否定表現だけでは準備実施とみなしません。process interruptionや通信断でcleanup結果が確認できない場合は`未確認`です。
 
 ## Playwright値域とworkflow状態
 
