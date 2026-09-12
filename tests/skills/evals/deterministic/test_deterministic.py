@@ -189,9 +189,9 @@ class DeterministicValidatorTests(unittest.TestCase):
 - ワークフロー全体状態: 実行中
 - 開始Skill: test-case-design
 - 最終Skill: test-case-design
-| Skill | 状態 | 成果物 / バージョン | ブロッカー / 備考 |
-| --- | --- | --- | --- |
-| test-case-design | 実行中 | TC | |
+| Skill | 対象 / 実行範囲 | 状態 | 成果物 / バージョン | ブロッカー / 備考 |
+| --- | --- | --- | --- | --- |
+| test-case-design |  | 実行中 | TC | |
 """
         exp={"expected_start_skill":"test-case-design","expected_final_skill":"test-case-design","expected_skills":["test-case-design"]}
         self.assert_pass("qa-workflow",valid,exp)

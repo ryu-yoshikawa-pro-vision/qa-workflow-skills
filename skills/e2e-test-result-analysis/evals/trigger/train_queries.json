@@ -1,0 +1,14 @@
+[
+  {"query":"検証済みのPlaywright実行結果から、FAIL・未実行・cleanup問題の原因を判定可能な範囲で分析してください。","should_trigger":true},
+  {"query":"logical primary、resolved primary、attempt、traceを突き合わせ、原因候補と修正routingを整理してください。","should_trigger":true},
+  {"query":"E2Eのraw factと導出した判断を分け、仕様・実装・環境・データ・証拠不足へ分類してください。","should_trigger":true},
+  {"query":"retry成功があっても初回FAILを消さず、追加実行が必要ならexecutionへ返す依頼を作ってください。","should_trigger":true},
+  {"query":"cleanup未確認のE2E結果を成功扱いせず、次に必要な証拠と最も早い責任Skillを示してください。","should_trigger":true},
+  {"query":"実行済みE2Eの結果を、コードを再実行せずに原因分析と修正先へ閉じてください。","should_trigger":true},
+  {"query":"Playwright E2Eを安全に実行し、runとcleanupのraw factを収集してください。","should_trigger":false},
+  {"query":"inspectionでE2E対象と認証条件を確定してください。","should_trigger":false},
+  {"query":"確認済みの対象にPlaywrightテストコードを実装してください。","should_trigger":false},
+  {"query":"検証済みE2E結果を原因の再解釈なしに報告書へ変換してください。","should_trigger":false},
+  {"query":"TC-501の期待結果と操作手順を設計してください。","should_trigger":false},
+  {"query":"E2E実装のlocatorとfixtureを反証レビューしてください。","should_trigger":false}
+]

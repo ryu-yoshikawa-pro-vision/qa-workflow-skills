@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -47,6 +48,11 @@ def main() -> int:
             candidate_output=candidate_output,
         )
 
+        judge_env = os.environ.copy()
+        # The judge protocol is UTF-8.  Python-based local judges otherwise
+        # inherit the Windows code page and emit bytes that cannot be decoded
+        # by the UTF-8 reader above.
+        judge_env["PYTHONIOENCODING"] = "utf-8"
         completed = subprocess.run(
             args.judge_command,
             input=prompt,
@@ -54,6 +60,7 @@ def main() -> int:
             encoding="utf-8",
             errors="strict",
             capture_output=True,
+            env=judge_env,
             check=False,
         )
         if completed.returncode != 0:
@@ -72,7 +79,10 @@ def main() -> int:
         print(f"semantic eval error: {exc}", file=sys.stderr)
         return 2
 
-    print(json.dumps(result, ensure_ascii=False, indent=2))
+    # CI / local Windows shells may expose a legacy stdout encoding.  The
+    # machine-readable CLI result stays JSON/UTF-8 semantically while using
+    # ASCII escapes on stdout so callers can decode it independent of locale.
+    print(json.dumps(result, ensure_ascii=True, indent=2))
     return 0 if result["verdict"] == "pass" else 1
 
 

@@ -112,6 +112,7 @@
 - ブロック中範囲
 - 回答後の正規化先
 - 再開先Skill
+- 再開先が複数用途Skillの場合の再開対象 / 実行範囲
 
 ## 停止・継続判断
 
@@ -138,13 +139,22 @@
 
 ## 再開先
 
-論点解消後は、意味が変わる最も早い担当Skillへ戻します。
+論点解消後は、意味が変わる最も早い担当Skillへ戻します。E2E工程も再開先になり得ます。
 
 - 仕様モデル / 現在有効な仕様根拠が変わる → `spec-analysis`
 - プロダクトリスク / テスト重点が変わる → `test-analysis`
 - テスト要求が変わる → `test-requirement-design`
 - テスト条件 / カバレッジ項目が変わる → `test-condition-design`
 - テストケース / 期待結果の根拠だけが変わる → `test-case-design`
+- E2E対象・repo / 実対象の事実が変わる → `e2e-test-inspection`
+- Playwright実装判断が変わる → `e2e-test-implementation`
+- E2E実行結果の期待解釈が変わる → `e2e-test-result-analysis`
+
+再開Skillが`test-analysis`、`coverage-analysis`、`adversarial-review`の場合は、次の正規値から再開対象 / 実行範囲を必ず併記します。
+
+- `test-analysis`: `テスト分析` / `E2E対象選定`
+- `coverage-analysis`: `テスト設計` / `TC → E2E実装` / `E2E実装 → 実行結果`
+- `adversarial-review`: `テスト設計成果物` / `E2E実装`
 
 ## 出力前自己検証
 

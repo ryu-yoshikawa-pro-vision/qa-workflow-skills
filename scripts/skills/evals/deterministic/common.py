@@ -18,6 +18,19 @@ CANONICAL_SKILLS = {
     "test-case-design",
     "coverage-analysis",
     "adversarial-review",
+    "e2e-test-inspection",
+    "e2e-test-implementation",
+    "e2e-test-execution",
+    "e2e-test-result-analysis",
+    "e2e-test-reporting",
+}
+
+# 同一Skillを異なる責務へ適用する場合にだけ対象値を必須にする。
+# 単一用途Skillの状態行では空欄を許容し、既存の状態表との互換性を保つ。
+MULTI_USE_SKILL_TARGETS = {
+    "test-analysis": {"テスト分析", "E2E対象選定"},
+    "coverage-analysis": {"テスト設計", "TC → E2E実装", "E2E実装 → 実行結果"},
+    "adversarial-review": {"テスト設計成果物", "E2E実装"},
 }
 
 PRIORITIES = {"高", "中", "低"}

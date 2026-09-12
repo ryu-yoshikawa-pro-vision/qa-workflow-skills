@@ -1,0 +1,3 @@
+# execution意味評価 cleanup未確認
+
+対象E2Eは実行途中で通信断になり、runner teardownの成否が確認できない。logical primaryは存在するがresolved primaryへ解決できなかった。

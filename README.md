@@ -1,6 +1,6 @@
-# QAテスト分析・設計 Agent Skills
+# QAテスト分析・設計・E2Eワークフロー Agent Skills
 
-新規機能・変更機能・指定対象機能を分析し、**テスト実施者が迷わず実行できる詳細テストケースまで落とし込む**ためのAgent Skills群です。
+新規機能・変更機能・指定対象機能を分析し、**テスト実施者が迷わず実行できる詳細テストケースまで落とし込む**ためのAgent Skills群です。要求された場合は、確認済みのPlaywright E2E対象を実装し、指定されたテスト環境へローカル実行し、結果分析・報告まで成果物ベースで扱います。
 
 ## Skill構成
 
@@ -14,7 +14,12 @@ skills/
 ├── test-condition-design/
 ├── test-case-design/
 ├── coverage-analysis/
-└── adversarial-review/
+├── adversarial-review/
+├── e2e-test-inspection/
+├── e2e-test-implementation/
+├── e2e-test-execution/
+├── e2e-test-result-analysis/
+└── e2e-test-reporting/
 ```
 
 各Skillは`skills/<skill-name>/SKILL.md`を持つ独立Skillです。`qa-workflow`も1 Skillとして扱います。
@@ -30,6 +35,11 @@ skills/
 | `test-case-design` | 詳細テストケース / 期待結果の根拠の具体化 |
 | `coverage-analysis` | カバレッジ / 閉鎖性 / ギャップ |
 | `adversarial-review` | 独立レビュー / 重大度 |
+| `e2e-test-inspection` | E2E対象、repo / 実対象の事実、実装可能性、安全条件 |
+| `e2e-test-implementation` | 確認済み対象のPlaywright E2E実装と静的 / 軽量検証 |
+| `e2e-test-execution` | 実行安全確認、準備、Playwright実行、構造化結果、cleanup |
+| `e2e-test-result-analysis` | 実行事実の原因分析、追加証拠、修正routing |
+| `e2e-test-reporting` | 検証済み実行・分析結果の人間向け報告 |
 
 ## テスト分析・設計フロー
 
@@ -86,6 +96,34 @@ flowchart TB
 ```
 
 修正が必要な場合は最も早い責任工程へ、ブロック解除後は回答に応じた再開先工程へルーティングします。上流変更時は影響する範囲だけを担当工程へ戻します。
+
+### E2E要求時の条件分岐
+
+全14 Skillを常に通すわけではありません。要求成果物と有効な既存成果物に応じ、必要な依存だけを実行します。
+
+```text
+詳細TC / 明示E2E対象 / 既存E2E参照
+  ↓（inspection相当情報がなければ）
+e2e-test-inspection
+  ↓
+e2e-test-implementation
+  ↓
+adversarial-review（対象: E2E実装）
+  ↓ 必要時
+coverage-analysis（対象: TC → E2E実装）
+  ↓
+e2e-test-execution
+  ├─ 正常かつ分析不要 → 必要なら e2e-test-reporting
+  └─ 異常 / 未実行 / cleanup問題 / 分析要求 → e2e-test-result-analysis
+                                      ↓ 必要ならexecutionへrouting
+                                      ↓ 必要ならe2e-test-reporting
+```
+
+既存E2Eの実行だけなら`e2e-test-execution`から開始できます。TCなしの明示E2E対象・既存E2E更新では、対象選定自体が要求されない限り`test-analysis`を必須にせず、TC作成のためだけに`test-case-design`へ戻しません。`qa-workflow`はオーケストレーションだけを担当し、Playwright固有の実装・実行・原因分析・報告再解釈は各E2E Skillへ閉じます。
+
+この拡張はSkillの責務・成果物・評価契約を対象とし、対象プロダクトのCIへE2E実行基盤を新設するものではありません。browser projectや実行方式は対象repoの既存入口を確認して扱い、特定のブラウザ操作方式を共通契約として固定しません。
+
+ワークフロー完了と全E2EテストPASSは別です。FAILでも、要求された実行・分析・報告、cleanup確認、必要な再検証が完了し、未処理のブロッカーがなければワークフローは完了できます。
 
 全体ワークフローは、要求成果物が必要な品質条件を満たし、必要なカバレッジ分析 / 反証レビューが完了し、対象スコープ内にブロック中・`要再検証`・利用停止が必要な未処置指摘が残っていないときに完了します。詳細な完了条件、修正ルーティング、再開先の判断は`qa-workflow`を正本とします。
 
@@ -212,11 +250,11 @@ Skillを利用するだけの場合は`skills/<skill-name>/`のみをコピー�
 
 ### 発火評価
 
-9 Skillの選択精度を評価します。正規モードは9 Skill同時利用、単独・限定Skillは診断モードです。
+14 Skillの選択精度を評価します。正規モードは14 Skill同時利用、単独・限定Skillは診断モードです。train / validationは各Skill12 / 8件、positive / negative比率を維持し、合計280 queryです。repo内データセット検証と実Agentクライアント上の実発火評価は別物です。
 
 ### 決定論的出力評価
 
-9 Skillの正規出力について、ID、参照整合、必須フィールド、リスクマトリクス、成果物閉鎖、Pairwise、レビュー / ワークフローの不変条件など、意味解釈なしで判定できる契約を評価します。
+14 Skillの正規出力について、ID、参照整合、必須フィールド、リスクマトリクス、成果物閉鎖、Pairwise、レビュー / ワークフロー、E2Eの対象・raw fact・primary / attempt・cleanup不変条件など、意味解釈なしで判定できる契約を評価します。
 
 - `known_*`: フィクスチャ側で既知の参照集合。Skill自身が出力内で生成するEntityの扱いは各Skill契約に従う。キー未指定なら対応する参照検査を行わない。
 - `required_*`: 出力に実際に存在しなければならないEntity / 値。
@@ -244,7 +282,7 @@ Agent実行と評価対象出力の生成は決定論的 / 意味評価ランタ
 
 ## qa-workflowのランタイム前提
 
-同一のAgentクライアント上で9 Skillすべてが利用可能で、Agentが必要なSkillを追加で読み込み / 利用できる環境を前提とします。Agent Skills Specificationが共通Skill-to-Skill APIを保証するとは扱いません。
+同一のAgentクライアント上で14 Skillすべてが利用可能で、Agentが必要なSkillを追加で読み込み / 利用できる環境を前提とします。Agent Skills Specificationが共通Skill-to-Skill APIを保証するとは扱いません。
 
 ## 検証
 

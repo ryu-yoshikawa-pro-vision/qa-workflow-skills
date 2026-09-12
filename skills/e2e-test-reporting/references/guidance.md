@@ -1,0 +1,15 @@
+# E2Eテスト結果報告 詳細判断基準
+
+## 集計単位
+
+論理的な要求primary対象、Playwrightが解決したresolved primary TestCase、各attemptを別の単位で保持します。project / repeatEach等でresolved件数が増え、retryでattemptが増えます。dependency / teardown testは要求primary集計へ混ぜません。
+
+logical primaryがresolved 0件の場合は、未実行 / 解決不能理由をlogical単位で示します。resolved primaryごとに結果または未実行理由がない場合も完全実行としません。
+
+## 結果と分析
+
+raw status、run-level結果、process exit code、導出したoutcome / 集計を区別します。分析を実施していない場合は「分析なし」と明記し、結果から原因を推測しません。分析済みの場合も入力の判定・原因・再現性を再解釈せず引用可能な範囲で伝えます。
+
+## 安全な共有
+
+trace / screenshot / video / HTML report / network / stdout / storageStateは機密情報を含み得ます。安全なローカル参照だけを示し、secret query、cookie、token、不要な個人データを転載しません。

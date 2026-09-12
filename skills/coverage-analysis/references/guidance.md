@@ -50,7 +50,12 @@
 5. カバレッジ項目 → テストケース または明示した扱い
 6. カバレッジ候補 → カバレッジ項目 または妥当な候補の扱い
 
-必要に応じて現在有効な仕様根拠 → テストケースのE2E追跡も確認します。
+必要に応じて次のE2E対応関係 / 実行結果追跡も確認します。
+
+- `TC → E2E実装`: TCありの自動化要求について、各TCを新規E2E実装、既存E2E再利用、既存E2E拡張、E2E対象外、ブロック中のいずれかへ閉じる
+- `E2E実装 → 実行結果`: 横断監査が要求された場合だけ、repo-relative path + title path等のE2E実装参照からresolved primary TestCaseまたは実行結果参照と結果 / 未実行理由へ辿る
+
+TCなしの明示E2E対象 / 既存E2Eから開始する経路へ、存在しないTC / TC IDを生成して要求しません。E2E実装参照は既存QA IDグラフへ新しいIDとして追加せず、対応表・実行結果参照との別契約で確認します。
 
 ## カバレッジの判断基準
 
@@ -183,6 +188,9 @@ IDがリンクされているだけで検証責務が意味を確認していな
 - テスト要求 / 上流の扱い → `test-requirement-design`
 - テスト条件 / カバレッジ基準 / カバレッジ項目 / 候補の扱い → `test-condition-design`
 - テストケース → `test-case-design`
+- E2E対象・実装参照 → `e2e-test-inspection` / `e2e-test-implementation`
+- TC → E2E実装の追跡関係 → `coverage-analysis`（対象: `TC → E2E実装`）
+- E2E実装 → 実行結果の追跡不足 → `e2e-test-execution`（実行事実）または`coverage-analysis`（追跡判定）
 
 ## 出力
 

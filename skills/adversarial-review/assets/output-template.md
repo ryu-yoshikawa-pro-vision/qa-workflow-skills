@@ -5,7 +5,14 @@
 - 対象成果物:
 - 現在有効な仕様根拠 / 正本一覧 / 情報源:
 - レビュー種別:
+- 対象 / 実行範囲: テスト設計成果物 / E2E実装
 - 制約:
+
+## E2E実装参照一覧（対象がE2E実装の場合）
+
+| E2E実装参照 | 対象 / 実行範囲 | 安定したtest identifierまたはrepo-relative path + title path | 一致根拠 |
+| --- | --- | --- | --- |
+| tests/example.spec.ts > example | E2E実装 | tests/example.spec.ts > example | inspection / 仕様根拠 |
 
 ## 指摘概要
 

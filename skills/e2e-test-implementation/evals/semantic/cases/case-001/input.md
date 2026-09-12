@@ -1,0 +1,3 @@
+# implementation意味評価
+
+inspection済みTC-101のログインE2Eを既存fixtureで実装する。対象repoのpackage scriptにlintとtest discoveryがあるが、本E2Eを環境へ実行する依頼ではない。

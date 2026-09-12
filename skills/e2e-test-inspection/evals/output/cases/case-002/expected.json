@@ -1,0 +1,1 @@
+{"required_e2e_refs":["tests/orders/order.spec.ts > order history"],"required_fact_labels":["Playwright構成 / 実行入口","実効設定・reporter・証跡"],"tc_absent":true}
