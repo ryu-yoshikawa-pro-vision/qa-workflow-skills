@@ -952,6 +952,15 @@ class E2EContractTests(unittest.TestCase):
             ),
             {},
         )
+        for no_cleanup in ("cleanup不要", "対象なし"):
+            self.assert_pass(
+                "e2e-test-execution",
+                execution.replace(
+                    "| cleanup方法 | runner teardown / run外なし | repo | raw fact |",
+                    f"| cleanup方法 | {no_cleanup} | repo | raw fact |",
+                ),
+                {},
+            )
         self.assert_pass(
             "e2e-test-execution",
             execution.replace("| テスト対象version / build ID | build-1 | 実対象 | raw fact |", "| テスト対象version / build ID | 未確認 | 実対象 | 確認不能 |"),

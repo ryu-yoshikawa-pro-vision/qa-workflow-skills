@@ -119,8 +119,10 @@ def _has_concrete_side_effect_limit(value: str) -> bool:
 def _has_concrete_cleanup_method(value: str) -> bool:
     value = clean(value)
     lowered = value.lower()
-    if not value or lowered in {"確認済み", "確認完了", "ok", "checked", "問題なし", "対象なし", "不要"}:
+    if not value or lowered in {"確認済み", "確認完了", "ok", "checked", "問題なし"}:
         return False
+    if value in {"cleanup不要", "対象なし", "不要"}:
+        return True
     return any(
         marker in lowered or marker in value
         for marker in (
