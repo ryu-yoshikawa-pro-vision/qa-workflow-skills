@@ -917,6 +917,18 @@ class E2EContractTests(unittest.TestCase):
             "playwright.config.tsでreuseExistingServer=falseを確認",
             "configでreuseExistingServer=trueを確認",
             "configでreuseExistingServer=falseを確認",
+            "reuseExistingServer: !process.env.CI",
+            "playwright.config.ts: reuseExistingServer: !process.env.CI",
+            "playwright.config.tsでreuseExistingServer: !process.env.CI",
+            "configでreuseExistingServer: !process.env.CI",
+            "reuseExistingServer=trueの設定を確認",
+            "playwright.config.tsでreuseExistingServer=trueの設定を確認",
+            "configでreuseExistingServer=falseの設定を確認",
+            "reuseExistingServer=trueを確認済み",
+            "playwright.config.tsでreuseExistingServer=trueを確認済み",
+            "configでreuseExistingServer=falseを確認済み",
+            "reuseExistingServer=trueを確認した",
+            "reuseExistingServer=falseを確認しました",
         ):
             config_only_reuse_evidence = reuse_existing.replace(
                 "| app | 実行前から存在 | 今回runは所有しない | 既存process再利用 | 対象外 | 実行前URL / port疎通確認 |",
@@ -933,6 +945,11 @@ class E2EContractTests(unittest.TestCase):
             "| app | 実行前から存在 | 今回runは所有しない | 既存process再利用 | 対象外 | playwright.config.tsでreuseExistingServer=trueを確認し、実行前URL / port疎通も確認 |",
         )
         self.assert_pass("e2e-test-execution", observed_config_reuse_evidence, {})
+        observed_config_expression_reuse_evidence = reuse_existing.replace(
+            "| app | 実行前から存在 | 今回runは所有しない | 既存process再利用 | 対象外 | 実行前URL / port疎通確認 |",
+            "| app | 実行前から存在 | 今回runは所有しない | 既存process再利用 | 対象外 | reuseExistingServer: !process.env.CI / 実行前URL / port疎通確認 |",
+        )
+        self.assert_pass("e2e-test-execution", observed_config_expression_reuse_evidence, {})
         raw_new_evidence = reuse_new.replace(
             "| app | 今回runが起動 | 今回runが所有 | 新規起動 | 対象 | Playwright起動時のprocess確認 |",
             "| app | 今回runが起動 | 今回runが所有 | 新規起動 | 対象 | reuseExistingServer=true |",
