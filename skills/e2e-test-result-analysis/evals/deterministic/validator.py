@@ -16,6 +16,17 @@ NEGATED_EXECUTION = re.compile(r"(?:しない|しません|せず|行わない|�
 ADDITIONAL_NEEDS = {"不要", "必要", "ブロック中"}
 
 
+def _reference_set(value: str) -> set[str]:
+    value = clean(value)
+    if not value:
+        return set()
+    return {
+        clean(part)
+        for part in re.split(r"\s*(?:,|、|;|；|\n|/\s+|／)\s*", value)
+        if clean(part)
+    }
+
+
 def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     result = EvalResult("e2e-test-result-analysis", eval_id)
     tables = parse_tables(text)
@@ -69,6 +80,27 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         evidence={"missing_rows": not judgements, "issues": judgement_issues}
         if not judgements or judgement_issues
         else None,
+    )
+    declared_execution_refs: set[str] = set()
+    for row in facts:
+        if clean(row.get("項目", "")) == "resolved primary TestCase / 実行結果参照":
+            declared_execution_refs.update(_reference_set(row.get("値", "")))
+    judgement_reference_issues = []
+    for row in judgements:
+        targets = _reference_set(row.get("対象参照", ""))
+        unknown_targets = sorted(targets - declared_execution_refs)
+        if unknown_targets:
+            judgement_reference_issues.append(
+                {
+                    "targets": unknown_targets,
+                    "declared_execution_refs": sorted(declared_execution_refs),
+                }
+            )
+    result.add(
+        "E2E-AN-D015",
+        not judgement_reference_issues,
+        "判定の対象参照が分析対象として宣言した実行結果参照集合に含まれること",
+        evidence=judgement_reference_issues or None,
     )
     invalid_states = sorted({clean(row.get("判定状態", "")) for row in judgements if clean(row.get("判定状態", "")) not in JUDGEMENT_STATES})
     invalid_repro = sorted({clean(row.get("再現性", "")) for row in judgements if clean(row.get("再現性", "")) not in REPRODUCIBILITY})

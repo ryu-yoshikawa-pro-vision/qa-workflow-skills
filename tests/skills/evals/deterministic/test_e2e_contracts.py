@@ -134,13 +134,13 @@ class E2EContractTests(unittest.TestCase):
 | --- | --- | ---: | --- |
 | login-flow | tests/auth/login.spec.ts > login succeeds{tc_suffix} | 1 |  |
 ## resolved primary TestCase結果
-| resolved primary TestCase参照 | 論理要求primary対象 | test file / title path | project | repeatEachIndex | 実行開始 | 結果 / 未実行理由 |
-| --- | --- | --- | --- | --- | --- | --- |
-| result-1 | login-flow | tests/auth/login.spec.ts > login succeeds | chromium | 0 | 開始 | passed |
+| resolved primary TestCase参照 | 論理要求primary対象 | test file / title path | project | repeatEachIndex | 実行開始 | 結果 / 未実行理由 | expectedStatus | outcome |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| result-1 | login-flow | tests/auth/login.spec.ts > login succeeds | chromium | 0 | 開始 | passed | passed | expected |
 ## attempt結果（retryをresolved件数へ加算しない）
-| resolved primary TestCase参照 | attempt番号 | 実行区分 | status | expectedStatus | outcome | retry番号 | duration | error / errors |
-| --- | ---: | --- | --- | --- | --- | ---: | --- | --- |
-| result-1 | 1 | 要求primary test | passed | passed | expected | 0 | 10ms |  |
+| resolved primary TestCase参照 | attempt番号 | 実行区分 | test file / title path | project | repeatEachIndex | status | retry番号 | duration | error / errors |
+| --- | ---: | --- | --- | --- | --- | ---: | --- | --- | --- |
+| result-1 | 1 | 要求primary test | tests/auth/login.spec.ts > login succeeds | chromium | 0 | passed | 0 | 10ms |  |
 ## working tree・証跡
 | 項目 | 実行前 | 実行後 | 今回runの変更 / 安全確認 |
 | --- | --- | --- | --- |
@@ -285,8 +285,11 @@ class E2EContractTests(unittest.TestCase):
             "E2E-EXEC-D008",
         )
         retry_execution = execution.replace(
-            "| result-1 | 1 | 要求primary test | passed | passed | expected | 0 | 10ms |  |",
-            "| result-1 | 1 | 要求primary test | failed | passed | unexpected | 0 | 10ms | first failure |\n| result-1 | 2 | 要求primary test | passed | passed | flaky | 1 | 8ms | retry success |",
+            "| result-1 | 1 | 要求primary test | tests/auth/login.spec.ts > login succeeds | chromium | 0 | passed | 0 | 10ms |  |",
+            "| result-1 | 1 | 要求primary test | tests/auth/login.spec.ts > login succeeds | chromium | 0 | failed | 0 | 10ms | first failure |\n| result-1 | 2 | 要求primary test | tests/auth/login.spec.ts > login succeeds | chromium | 0 | passed | 1 | 8ms | retry success |",
+        ).replace(
+            "| result-1 | login-flow | tests/auth/login.spec.ts > login succeeds | chromium | 0 | 開始 | passed | passed | expected |",
+            "| result-1 | login-flow | tests/auth/login.spec.ts > login succeeds | chromium | 0 | 開始 | passed | passed | flaky |",
         )
         retry_expected = {
             "expected_logical_primary_count": 1,
@@ -299,9 +302,38 @@ class E2EContractTests(unittest.TestCase):
         self.assert_pass("e2e-test-execution", retry_execution, retry_expected)
         self.assert_fails(
             "e2e-test-execution",
-            retry_execution.replace("| result-1 | 1 | 要求primary test | failed | passed | unexpected | 0 | 10ms | first failure |\n", ""),
+            retry_execution.replace("| result-1 | 1 | 要求primary test | tests/auth/login.spec.ts > login succeeds | chromium | 0 | failed | 0 | 10ms | first failure |\n", ""),
             retry_expected,
             "E2E-EXEC-D017",
+        )
+        self.assert_pass(
+            "e2e-test-execution",
+            execution.replace(
+                "| result-1 | login-flow | tests/auth/login.spec.ts > login succeeds | chromium | 0 | 開始 | passed | passed | expected |",
+                "| result-1 | login-flow | tests/auth/login.spec.ts > login succeeds | chromium | 0 | 開始 | failed | failed | expected |",
+            ).replace(
+                "| result-1 | 1 | 要求primary test | tests/auth/login.spec.ts > login succeeds | chromium | 0 | passed | 0 | 10ms |  |",
+                "| result-1 | 1 | 要求primary test | tests/auth/login.spec.ts > login succeeds | chromium | 0 | failed | 0 | 10ms | expected failure |",
+            ),
+            {"expected_logical_primary_count": 1, "expected_resolved_primary_count": 1},
+        )
+        self.assert_fails(
+            "e2e-test-execution",
+            retry_execution.replace(
+                "| result-1 | 2 | 要求primary test | tests/auth/login.spec.ts > login succeeds | chromium | 0 | passed | 1 | 8ms | retry success |",
+                "| result-1 | 1 | 要求primary test | tests/auth/login.spec.ts > login succeeds | chromium | 0 | passed | 0 | 8ms | duplicate |",
+            ),
+            retry_expected,
+            "E2E-EXEC-D033",
+        )
+        self.assert_fails(
+            "e2e-test-execution",
+            retry_execution.replace(
+                "| result-1 | 2 | 要求primary test | tests/auth/login.spec.ts > login succeeds | chromium | 0 | passed | 1 | 8ms | retry success |",
+                "| result-1 | 3 | 要求primary test | tests/auth/login.spec.ts > login succeeds | chromium | 0 | passed | 2 | 8ms | out of order |",
+            ),
+            retry_expected,
+            "E2E-EXEC-D033",
         )
 
         analysis = self.analysis_output()
@@ -337,6 +369,19 @@ class E2EContractTests(unittest.TestCase):
             {"required_e2e_ref": "tests/auth/login.spec.ts > login succeeds"},
             "E2E-AN-D007",
         )
+        analysis_target_mismatch = analysis.replace(
+            "| result-1 | 判定可能 | 異常なし | 未確認 | execution.md |",
+            "| result-999 | 判定可能 | 異常なし | 未確認 | execution.md |",
+        )
+        self.assert_fails("e2e-test-result-analysis", analysis_target_mismatch, {}, "E2E-AN-D015")
+        analysis_multiple_results = analysis.replace(
+            "| resolved primary TestCase / 実行結果参照 | result-1 | execution.md |",
+            "| resolved primary TestCase / 実行結果参照 | result-1 / result-2 | execution.md |",
+        ).replace(
+            "| result-1 | 判定可能 | 異常なし | 未確認 | execution.md |",
+            "| result-2 | 判定可能 | 異常なし | 未確認 | execution.md |",
+        )
+        self.assert_pass("e2e-test-result-analysis", analysis_multiple_results, {})
         self.assert_fails(
             "e2e-test-result-analysis",
             analysis.replace("| E2E対象 / logical primary | login-flow | execution.md |", "| E2E対象 / logical primary |  | execution.md |"),
@@ -645,10 +690,10 @@ class E2EContractTests(unittest.TestCase):
             "| login-flow | tests/auth/login.spec.ts > login succeeds / TC-101 | 0 | credential不足でrunner未開始 |",
         )
         preflight_block = preflight_block.replace(
-            "| result-1 | login-flow | tests/auth/login.spec.ts > login succeeds | chromium | 0 | 開始 | passed |\n", ""
+            "| result-1 | login-flow | tests/auth/login.spec.ts > login succeeds | chromium | 0 | 開始 | passed | passed | expected |\n", ""
         )
         preflight_block = preflight_block.replace(
-            "| result-1 | 1 | 要求primary test | passed | passed | expected | 0 | 10ms |  |\n", ""
+            "| result-1 | 1 | 要求primary test | tests/auth/login.spec.ts > login succeeds | chromium | 0 | passed | 0 | 10ms |  |\n", ""
         )
         preflight_block = preflight_block.replace("| runner開始 | はい | execution | raw fact |", "| runner開始 | いいえ | execution | raw fact |")
         preflight_block = preflight_block.replace(
@@ -734,6 +779,92 @@ class E2EContractTests(unittest.TestCase):
             "| run外準備 | 実施（seed） | repo | raw fact |",
         )
         self.assert_pass("e2e-test-execution", started_external_cleanup_with_preparation, {})
+        external_cleanup_missing = execution.replace(
+            "| run外準備 | 対象なし | repo | raw fact |",
+            "| run外準備 | 実施（seed） | repo | raw fact |",
+        ).replace("| run外処理 | 対象なし | run外準備なし | execution |\n", "")
+        self.assert_fails("e2e-test-execution", external_cleanup_missing, {}, "E2E-EXEC-D028")
+        external_cleanup_target_none = execution.replace(
+            "| run外準備 | 対象なし | repo | raw fact |",
+            "| run外準備 | 実施（seed） | repo | raw fact |",
+        ).replace(
+            "| run外処理 | 対象なし | run外準備なし | execution |",
+            "| run外処理 | 対象なし | cleanup不要（seedが副作用を作らない根拠を確認） | execution |",
+        )
+        self.assert_pass("e2e-test-execution", external_cleanup_target_none, {})
+        self.assert_fails(
+            "e2e-test-execution",
+            external_cleanup_target_none.replace("cleanup不要（seedが副作用を作らない根拠を確認）", "run外準備なし"),
+            {},
+            "E2E-EXEC-D028",
+        )
+        runner_cleanup_missing = execution.replace("| runner管理 | 成功 | 残存なし | reporter |\n", "")
+        self.assert_fails("e2e-test-execution", runner_cleanup_missing, {}, "E2E-EXEC-D029")
+        runner_cleanup_target_none = execution.replace(
+            "| runner管理 | 成功 | 残存なし | reporter |",
+            "| runner管理 | 対象なし | runner cleanup対象なし | reporter |",
+        )
+        self.assert_fails("e2e-test-execution", runner_cleanup_target_none, {}, "E2E-EXEC-D029")
+
+        unstarted_with_passed_attempt = execution.replace(
+            "| result-1 | login-flow | tests/auth/login.spec.ts > login succeeds | chromium | 0 | 開始 | passed | passed | expected |",
+            "| result-1 | login-flow | tests/auth/login.spec.ts > login succeeds | chromium | 0 | 未開始 | passed |  |  |",
+        )
+        self.assert_fails("e2e-test-execution", unstarted_with_passed_attempt, {}, "E2E-EXEC-D009")
+        self.assert_fails("e2e-test-execution", unstarted_with_passed_attempt, {}, "E2E-EXEC-D011")
+        ambiguous_start_state = execution.replace(
+            "| result-1 | login-flow | tests/auth/login.spec.ts > login succeeds | chromium | 0 | 開始 | passed | passed | expected |",
+            "| result-1 | login-flow | tests/auth/login.spec.ts > login succeeds | chromium | 0 | 確認済み | passed | passed | expected |",
+        )
+        self.assert_fails("e2e-test-execution", ambiguous_start_state, {}, "E2E-EXEC-D030")
+        unstarted_failed_without_attempt = execution.replace(
+            "| result-1 | login-flow | tests/auth/login.spec.ts > login succeeds | chromium | 0 | 開始 | passed | passed | expected |",
+            "| result-1 | login-flow | tests/auth/login.spec.ts > login succeeds | chromium | 0 | 未開始 | failed |  |  |",
+        ).replace(
+            "| result-1 | 1 | 要求primary test | tests/auth/login.spec.ts > login succeeds | chromium | 0 | passed | 0 | 10ms |  |\n",
+            "",
+        )
+        self.assert_fails("e2e-test-execution", unstarted_failed_without_attempt, {}, "E2E-EXEC-D009")
+        orphan_resolved = execution.replace(
+            "| login-flow | tests/auth/login.spec.ts > login succeeds / TC-101 | 1 |  |",
+            "| login-flow | tests/auth/login.spec.ts > login succeeds / TC-101 | 0 | credential不足で未実行 |",
+        ).replace(
+            "| result-1 | login-flow | tests/auth/login.spec.ts > login succeeds | chromium | 0 | 開始 | passed | passed | expected |",
+            "| result-1 | payment-flow | tests/auth/login.spec.ts > login succeeds | chromium | 0 | 開始 | passed | passed | expected |",
+        )
+        self.assert_fails("e2e-test-execution", orphan_resolved, {}, "E2E-EXEC-D032")
+        resolved_passed_attempt_failed = execution.replace(
+            "| result-1 | 1 | 要求primary test | tests/auth/login.spec.ts > login succeeds | chromium | 0 | passed | 0 | 10ms |  |",
+            "| result-1 | 1 | 要求primary test | tests/auth/login.spec.ts > login succeeds | chromium | 0 | failed | 0 | 10ms | first failure |",
+        )
+        self.assert_fails("e2e-test-execution", resolved_passed_attempt_failed, {}, "E2E-EXEC-D034")
+        attempt_testcase_fields = execution.replace(
+            "| resolved primary TestCase参照 | attempt番号 | 実行区分 | test file / title path | project | repeatEachIndex | status | retry番号 | duration | error / errors |",
+            "| resolved primary TestCase参照 | attempt番号 | 実行区分 | test file / title path | project | repeatEachIndex | status | expectedStatus | outcome | retry番号 | duration | error / errors |",
+        ).replace(
+            "| --- | ---: | --- | --- | --- | --- | ---: | --- | --- | --- |",
+            "| --- | ---: | --- | --- | --- | --- | ---: | --- | --- | ---: | --- | --- |",
+        ).replace(
+            "| result-1 | 1 | 要求primary test | tests/auth/login.spec.ts > login succeeds | chromium | 0 | passed | 0 | 10ms |  |",
+            "| result-1 | 1 | 要求primary test | tests/auth/login.spec.ts > login succeeds | chromium | 0 | passed | passed | expected | 0 | 10ms |  |",
+        )
+        self.assert_fails("e2e-test-execution", attempt_testcase_fields, {}, "E2E-EXEC-D035")
+
+        dependency_without_identity = execution.replace(
+            "| result-1 | 1 | 要求primary test | tests/auth/login.spec.ts > login succeeds | chromium | 0 | passed | 0 | 10ms |  |\n",
+            "| result-1 | 1 | 要求primary test | tests/auth/login.spec.ts > login succeeds | chromium | 0 | passed | 0 | 10ms |  |\n|  | 2 | project dependencyとして付随実行されたtest |  |  |  | passed | 0 | 5ms |  |\n",
+        )
+        self.assert_fails("e2e-test-execution", dependency_without_identity, {}, "E2E-EXEC-D010")
+        dependency_with_identity = dependency_without_identity.replace(
+            "|  | 2 | project dependencyとして付随実行されたtest |  |  |  | passed | 0 | 5ms |  |",
+            "|  | 2 | project dependencyとして付随実行されたtest | tests/global.setup.ts > create db | setup | 0 | passed | 0 | 5ms |  |",
+        )
+        teardown_with_identity = dependency_with_identity.replace(
+            "|  | 2 | project dependencyとして付随実行されたtest | tests/global.setup.ts > create db | setup | 0 | passed | 0 | 5ms |  |",
+            "|  | 2 | project teardownとして付随実行されたtest | tests/global.teardown.ts > delete db | teardown | 0 | passed | 0 | 5ms |  |",
+        )
+        self.assert_pass("e2e-test-execution", dependency_with_identity, {})
+        self.assert_pass("e2e-test-execution", teardown_with_identity, {})
         for mutated in (
             preflight_block.replace(
                 "| run-level / global error | 未実施 | reporter / process / 未実施 | 確認不能 |",
@@ -794,6 +925,17 @@ class E2EContractTests(unittest.TestCase):
             {},
             "E2E-EXEC-D026",
         )
+        for old, new in (
+            ("| 対象URL / origin | https://app.test | 実対象 | raw fact |", "| 対象URL / origin | 確認済み | 実対象 | raw fact |"),
+            ("| 副作用の許可範囲 / 最大回数 | test data only / max 1 | ユーザー提供情報 | raw fact |", "| 副作用の許可範囲 / 最大回数 | 確認済み | ユーザー提供情報 | raw fact |"),
+            ("| cleanup方法 | runner teardown / run外なし | repo | raw fact |", "| cleanup方法 | 確認済み | repo | raw fact |"),
+        ):
+            self.assert_fails(
+                "e2e-test-execution",
+                execution.replace(old, new),
+                {},
+                "E2E-EXEC-D026",
+            )
         self.assert_pass(
             "e2e-test-execution",
             execution.replace(
@@ -1018,10 +1160,10 @@ class E2EContractTests(unittest.TestCase):
         self.assert_pass("e2e-test-execution", configured_marker_text, {})
 
         for mutated, assertion_id in (
-            (execution.replace("| result-1 | 1 | 要求primary test | passed | passed | expected | 0 | 10ms |  |", "| result-1 | 1 | 要求primary test | timedout | passed | expected | 0 | 10ms |  |"), "E2E-EXEC-D010"),
-            (execution.replace("| result-1 | 1 | 要求primary test | passed | passed | expected | 0 | 10ms |  |", "| result-1 | 1 | 要求primary test | passed | passed | timedOut | 0 | 10ms |  |"), "E2E-EXEC-D010"),
-            (execution.replace("| result-1 | 1 | 要求primary test | passed | passed | expected | 0 | 10ms |  |", "| result-1 | 1 | 要求primary test | passed | passed | 未実行 | 0 | 10ms |  |"), "E2E-EXEC-D010"),
-            (execution.replace("| result-1 | 1 | 要求primary test | passed | passed | expected | 0 | 10ms |  |", "| result-1 | 1 | 要求primary test | passed | invalid | expected | 0 | 10ms |  |"), "E2E-EXEC-D010"),
+            (execution.replace("| result-1 | 1 | 要求primary test | tests/auth/login.spec.ts > login succeeds | chromium | 0 | passed | 0 | 10ms |  |", "| result-1 | 1 | 要求primary test | tests/auth/login.spec.ts > login succeeds | chromium | 0 | timedout | 0 | 10ms |  |"), "E2E-EXEC-D010"),
+            (execution.replace("| result-1 | 1 | 要求primary test | tests/auth/login.spec.ts > login succeeds | chromium | 0 | passed | 0 | 10ms |  |", "| result-1 | 1 | 要求primary test | tests/auth/login.spec.ts > login succeeds | chromium | 0 | 未実行 | 0 | 10ms |  |"), "E2E-EXEC-D010"),
+            (execution.replace("| result-1 | login-flow | tests/auth/login.spec.ts > login succeeds | chromium | 0 | 開始 | passed | passed | expected |", "| result-1 | login-flow | tests/auth/login.spec.ts > login succeeds | chromium | 0 | 開始 | passed | passed | timedOut |"), "E2E-EXEC-D009"),
+            (execution.replace("| result-1 | login-flow | tests/auth/login.spec.ts > login succeeds | chromium | 0 | 開始 | passed | passed | expected |", "| result-1 | login-flow | tests/auth/login.spec.ts > login succeeds | chromium | 0 | 開始 | passed | invalid | expected |"), "E2E-EXEC-D009"),
             (execution.replace("| Playwright run全体status | passed | reporter | raw fact |", "| Playwright run全体status | passed | process exit code | raw fact |"), "E2E-EXEC-D003"),
         ):
             self.assert_fails("e2e-test-execution", mutated, {}, assertion_id)
@@ -1069,12 +1211,22 @@ class E2EContractTests(unittest.TestCase):
             "| login-flow | result-1 | 未開始 |  | credential不足のため未実行 |  |  | 0 |  |  |",
         )
         self.assert_pass("e2e-test-reporting", not_started, {})
+        not_started_raw_status = not_started.replace("credential不足のため未実行", "failed")
+        self.assert_fails("e2e-test-reporting", not_started_raw_status, {}, "E2E-REPORT-D017")
         self.assert_fails(
             "e2e-test-reporting",
             report.replace("| TC-101 | tests/auth/login.spec.ts > login succeeds | result-1 | analysis.md | 実行済み |", "| TC-101 | tests/auth/login.spec.ts > login succeeds | result-999 | analysis.md | 実行済み |"),
             {},
             "E2E-REPORT-D009",
         )
+        reporting_orphan_resolved = report.replace(
+            "| login-flow | tests/auth/login.spec.ts > login succeeds | TC-101 | 1 | 1 |  |  |",
+            "| login-flow | tests/auth/login.spec.ts > login succeeds | TC-101 | 0 | 0 | credential不足で未実行 |  |",
+        ).replace(
+            "| login-flow | result-1 | 開始 | passed |  | passed | expected | 1 | passed (retry 0) | result-1 |",
+            "| payment-flow | result-1 | 開始 | passed |  | passed | expected | 1 | passed (retry 0) | result-1 |",
+        )
+        self.assert_fails("e2e-test-reporting", reporting_orphan_resolved, {}, "E2E-REPORT-D021")
         self.assert_fails(
             "e2e-test-reporting",
             report.replace("| TC-101 | tests/auth/login.spec.ts > login succeeds | result-1 | analysis.md | 実行済み |", "| TC-101 | tests/auth/admin.spec.ts > login succeeds | result-1 | analysis.md | 実行済み |"),

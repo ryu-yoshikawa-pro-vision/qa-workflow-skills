@@ -13,10 +13,11 @@ EXPECTED_STATUSES = {"passed", "failed", "timedOut", "skipped", "interrupted"}
 OUTCOMES = {"skipped", "expected", "unexpected", "flaky"}
 CLEANUP_STATES = {"成功", "失敗", "未確認", "対象なし", "意図的に残した状態", "一部失敗"}
 STARTED_MARKERS = {"開始", "開始済み", "実行済み", "はい"}
+NOT_STARTED_MARKERS = {"", "未開始", "未実行", "未実施", "いいえ", "対象なし"}
 
 
 def _has_unexecuted_reason(value: str) -> bool:
-    return has_value(value) and clean(value) not in {"なし", "対象なし", "不要"}
+    return has_value(value) and clean(value) not in {"なし", "対象なし", "不要"} and clean(value) not in TEST_STATUSES
 
 
 def _int(value: str) -> int | None:
@@ -128,6 +129,21 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             primary_issues.append({"logical": logical, "reason": "resolved logical target cannot carry an unexecuted logical reason"})
     result.add("E2E-REPORT-D005", not primary_issues, "logical primary・resolved primary・開始済み数と未実行理由が整合すること", evidence=primary_issues or None)
 
+    orphan_resolved = [
+        {
+            "resolved_ref": clean(row.get("resolved primary TestCase参照", "")),
+            "logical": clean(row.get("論理的な要求primary対象", "")),
+        }
+        for row in resolved_rows
+        if clean(row.get("論理的な要求primary対象", "")) not in set(primary_names)
+    ]
+    result.add(
+        "E2E-REPORT-D021",
+        not orphan_resolved,
+        "各resolved primary結果が既存logical primary対象へ逆参照できること",
+        evidence=orphan_resolved or None,
+    )
+
     result_refs = [clean(row.get("resolved primary TestCase参照", "")) for row in resolved_rows if clean(row.get("resolved primary TestCase参照", ""))]
     add_duplicate_assertion(result, "E2E-REPORT-D006", result_refs, "resolved primary TestCase参照")
     resolved_field_issues = []
@@ -139,7 +155,10 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         ]
         expected_status = clean(row.get("expectedStatus", ""))
         outcome = clean(row.get("outcome", ""))
-        started = clean(row.get("実行開始", "")) in STARTED_MARKERS
+        start_state = clean(row.get("実行開始", ""))
+        started = start_state in STARTED_MARKERS
+        if start_state not in STARTED_MARKERS and start_state not in NOT_STARTED_MARKERS:
+            missing_fields.append("実行開始(開始済み / 未開始marker)")
         if started:
             if not has_value(row.get("結果", "")):
                 missing_fields.append("結果")
@@ -158,6 +177,8 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                 missing_fields.append("結果(未開始では空欄)")
             if has_value(row.get("実行結果参照", "")):
                 missing_fields.append("実行結果参照(未開始では空欄)")
+            if expected_status or outcome:
+                missing_fields.append("expectedStatus / outcome(未開始では空欄)")
             if expected_status and expected_status not in EXPECTED_STATUSES:
                 missing_fields.append("expectedStatus(許可値)")
             if outcome and outcome not in OUTCOMES:

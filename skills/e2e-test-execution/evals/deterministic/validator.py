@@ -98,6 +98,53 @@ def _is_explicit_unavailable(value: str, allowed: set[str]) -> bool:
     )
 
 
+def _is_raw_test_status(value: str) -> bool:
+    return clean(value) in TEST_STATUSES
+
+
+def _has_concrete_url_or_origin(value: str) -> bool:
+    return re.search(r"https?://[^\s|]+", clean(value), re.IGNORECASE) is not None
+
+
+def _has_concrete_side_effect_limit(value: str) -> bool:
+    value = clean(value)
+    if not value or value.lower() in {"確認済み", "確認完了", "ok", "checked", "問題なし"}:
+        return False
+    if not re.search(r"(?:max(?:imum)?\s*\d+|最大\s*\d+|\d+\s*(?:回|times)(?:まで)?)", value, re.IGNORECASE):
+        return False
+    scope = re.split(r"[/／,、;；]", value, maxsplit=1)[0].strip()
+    return bool(scope) and scope.lower() not in {"確認済み", "確認完了", "ok", "checked", "問題なし"}
+
+
+def _has_concrete_cleanup_method(value: str) -> bool:
+    value = clean(value)
+    lowered = value.lower()
+    if not value or lowered in {"確認済み", "確認完了", "ok", "checked", "問題なし", "対象なし", "不要"}:
+        return False
+    return any(
+        marker in lowered or marker in value
+        for marker in (
+            "runner",
+            "teardown",
+            "fixture",
+            "global",
+            "cleanup",
+            "api",
+            "delete",
+            "削除",
+            "対象なし",
+            "不要",
+        )
+    )
+
+
+def _cleanup_target_none_has_evidence(row: dict[str, str]) -> bool:
+    value = clean(row.get("結果 / 残存副作用", ""))
+    if value in {"", "なし", "対象なし", "run外準備なし", "cleanup不要", "不要"}:
+        return False
+    return bool(re.search(r"(?:cleanup不要|対象なし|不要).*(?:根拠|理由|確認|準備|副作用)|(?:根拠|理由|確認|準備|副作用).*(?:cleanup不要|対象なし|不要)", value))
+
+
 def _is_raw_webserver_config_only(value: str) -> bool:
     normalized = re.sub(r"\s+", "", clean(value)).lower()
     return RAW_WEBSERVER_CONFIG_ONLY_RE.fullmatch(normalized) is not None
@@ -118,8 +165,27 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     run_table = find_table(tables, section_contains="Playwright run結果", required_headers=("項目", "値", "確認元", "raw fact / 導出値"))
     webserver_table = find_table(tables, section_contains="webServer process ownership", required_headers=("server識別子", "起動状態", "今回run所有か", "既存 / 再利用か", "cleanup対象か", "根拠"))
     logical_table = find_table(tables, section_contains="logical primary対象の解決", required_headers=("論理的な要求primary対象", "resolved primary TestCase数", "未実行 / 解決不能理由"))
-    resolved_table = find_table(tables, section_contains="resolved primary TestCase結果", required_headers=("resolved primary TestCase参照", "論理要求primary対象", "実行開始", "結果 / 未実行理由"))
-    attempt_table = find_table(tables, section_contains="attempt結果", required_headers=("resolved primary TestCase参照", "attempt番号", "実行区分", "status", "expectedStatus", "outcome", "retry番号"))
+    resolved_table = find_table(
+        tables,
+        section_contains="resolved primary TestCase結果",
+        required_headers=("resolved primary TestCase参照", "論理要求primary対象", "実行開始", "結果 / 未実行理由", "expectedStatus", "outcome"),
+    )
+    attempt_table = find_table(
+        tables,
+        section_contains="attempt結果",
+        required_headers=(
+            "resolved primary TestCase参照",
+            "attempt番号",
+            "実行区分",
+            "test file / title path",
+            "project",
+            "repeatEachIndex",
+            "status",
+            "retry番号",
+            "duration",
+            "error / errors",
+        ),
+    )
     worktree_table = find_table(tables, section_contains="working tree・証跡", required_headers=("項目", "実行前", "実行後", "今回runの変更 / 安全確認"))
     cleanup_table = find_table(tables, section_contains="cleanup・残存副作用", required_headers=("cleanup対象 / 実行主体", "状態", "結果 / 残存副作用"))
     missing = [name for name, table in (("実行条件", conditions), ("Playwright run結果", run_table), ("logical primary対象の解決", logical_table), ("resolved primary TestCase結果", resolved_table), ("attempt結果", attempt_table), ("working tree・証跡", worktree_table), ("cleanup・残存副作用", cleanup_table)) if table is None]
@@ -202,6 +268,13 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             value = clean(row.get("値", "")) if row else ""
             if _is_explicit_unavailable(value, set(UNKNOWN_SAFETY_MARKERS)):
                 started_safety_issues.append({"項目": label, "値": value})
+                continue
+            if label == "対象URL / origin" and not _has_concrete_url_or_origin(value):
+                started_safety_issues.append({"項目": label, "値": value, "reason": "対象URL / originの具体値がない"})
+            elif label == "副作用の許可範囲 / 最大回数" and not _has_concrete_side_effect_limit(value):
+                started_safety_issues.append({"項目": label, "値": value, "reason": "許可する副作用と最大回数の具体値がない"})
+            elif label == "cleanup方法" and not _has_concrete_cleanup_method(value):
+                started_safety_issues.append({"項目": label, "値": value, "reason": "cleanupの実行主体または方法の具体値がない"})
     result.add(
         "E2E-EXEC-D026",
         not started_safety_issues,
@@ -355,47 +428,175 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             logical_issues.append({"logical": logical, "reason": "resolved logical target cannot carry only an unexecuted reason"})
     result.add("E2E-EXEC-D008", not logical_issues, "各logical primaryがresolved primaryへ解決され、0件なら理由を持つこと", evidence=logical_issues or None)
 
+    orphan_resolved = [
+        {
+            "resolved_ref": clean(row.get("resolved primary TestCase参照", "")),
+            "logical": clean(row.get("論理要求primary対象", "")),
+        }
+        for row in resolved_rows
+        if clean(row.get("論理要求primary対象", "")) not in set(logical_names)
+    ]
+    result.add(
+        "E2E-EXEC-D032",
+        not orphan_resolved,
+        "各resolved primary TestCaseが既存logical primary対象へ逆参照できること",
+        evidence=orphan_resolved or None,
+    )
+
+    start_state_issues = []
     resolved_issues = []
     for row in resolved_rows:
         ref = clean(row.get("resolved primary TestCase参照", ""))
-        outcome = clean(row.get("結果 / 未実行理由", ""))
-        if not outcome:
-            resolved_issues.append({"ref": ref, "reason": "result or unexecuted reason missing"})
-    result.add("E2E-EXEC-D009", not resolved_issues, "各resolved primary TestCaseに結果または未実行理由があること", evidence=resolved_issues or None)
+        start_state = clean(row.get("実行開始", ""))
+        result_or_reason = clean(row.get("結果 / 未実行理由", ""))
+        expected_status = clean(row.get("expectedStatus", ""))
+        outcome = clean(row.get("outcome", ""))
+        started = start_state in STARTED_MARKERS
+        not_started = start_state in NOT_STARTED_MARKERS
+        if not started and not not_started:
+            start_state_issues.append({"ref": ref, "value": start_state, "reason": "開始済み / 未開始の既存markerで閉じていない"})
+        if started:
+            resolved_identity_fields = ("resolved primary TestCase参照", "論理要求primary対象", "test file / title path", "project", "repeatEachIndex")
+            missing_identity = [field for field in resolved_identity_fields if not has_value(row.get(field, ""))]
+            if _as_nonnegative_int(row.get("repeatEachIndex", "")) is None:
+                missing_identity.append("repeatEachIndex(非負整数)")
+            if missing_identity:
+                resolved_issues.append({"ref": ref, "field": "resolved primary identity", "fields": missing_identity})
+            if result_or_reason not in TEST_STATUSES:
+                resolved_issues.append({"ref": ref, "field": "結果", "value": result_or_reason})
+            if expected_status not in EXPECTED_STATUSES:
+                resolved_issues.append({"ref": ref, "field": "expectedStatus", "value": expected_status})
+            if outcome not in OUTCOMES:
+                resolved_issues.append({"ref": ref, "field": "outcome", "value": outcome})
+        elif not_started:
+            if not result_or_reason:
+                resolved_issues.append({"ref": ref, "reason": "未開始resolvedには未実行理由が必要"})
+            elif _is_raw_test_status(result_or_reason):
+                resolved_issues.append({"ref": ref, "field": "未実行理由", "value": result_or_reason, "reason": "Playwright TestResult.statusを未実行理由として使用している"})
+            if expected_status or outcome:
+                resolved_issues.append({"ref": ref, "reason": "未開始resolvedはPlaywrightのexpectedStatus / outcomeを持たない"})
+    result.add(
+        "E2E-EXEC-D030",
+        not start_state_issues,
+        "resolved primaryの実行開始を開始済み / 未開始の既存markerで分類すること",
+        evidence=start_state_issues or None,
+    )
+    result.add(
+        "E2E-EXEC-D009",
+        not resolved_issues,
+        "開始済みresolvedはTestResult.status・TestCase expectedStatus / outcomeを持ち、未開始resolvedは未実行理由だけを持つこと",
+        evidence=resolved_issues or None,
+    )
 
     attempts = nonempty_rows(attempt_table)
     attempt_issues = []
     for row in attempts:
         status = clean(row.get("status", ""))
-        outcome = clean(row.get("outcome", ""))
         execution_class = clean(row.get("実行区分", ""))
+        resolved_ref = clean(row.get("resolved primary TestCase参照", ""))
         attempt_no = _as_nonnegative_int(row.get("attempt番号", ""))
         retry_no = _as_nonnegative_int(row.get("retry番号", ""))
         if status not in TEST_STATUSES:
             attempt_issues.append({"field": "status", "value": status})
-        expected_status = clean(row.get("expectedStatus", ""))
-        if expected_status not in EXPECTED_STATUSES:
-            attempt_issues.append({"field": "expectedStatus", "value": expected_status})
-        if outcome not in OUTCOMES:
-            attempt_issues.append({"field": "outcome", "value": outcome})
         if execution_class not in EXECUTION_CLASSES:
             attempt_issues.append({"field": "実行区分", "value": execution_class})
-        if attempt_no is None or attempt_no < 1 or retry_no is None:
+        if attempt_no is None or attempt_no < 1 or retry_no is None or not has_value(row.get("duration", "")):
             attempt_issues.append({"field": "attempt / retry", "value": [row.get("attempt番号"), row.get("retry番号")]})
-    result.add("E2E-EXEC-D010", not attempt_issues, "attemptのstatus・outcome・実行区分・retry番号が構造化されていること", evidence=attempt_issues or None)
-    primary_attempt_refs = {clean(row.get("resolved primary TestCase参照", "")) for row in attempts if clean(row.get("実行区分", "")) == "要求primary test"}
+        identity_fields = ("test file / title path", "project", "repeatEachIndex")
+        dependency_or_teardown = execution_class in {"project dependencyとして付随実行されたtest", "project teardownとして付随実行されたtest", "dependency", "teardown"}
+        missing_identity = [field for field in identity_fields if not has_value(row.get(field, ""))]
+        if missing_identity:
+            attempt_issues.append({"field": "dependency / teardown identity" if dependency_or_teardown else "primary identity", "fields": missing_identity, "resolved_ref": resolved_ref})
+        if _as_nonnegative_int(row.get("repeatEachIndex", "")) is None:
+            attempt_issues.append({"field": "repeatEachIndex", "value": row.get("repeatEachIndex", ""), "resolved_ref": resolved_ref})
+        if dependency_or_teardown and resolved_ref:
+            attempt_issues.append({"field": "resolved primary TestCase参照", "value": resolved_ref, "reason": "dependency / teardownはresolved primary参照を持たない"})
+        if execution_class == "要求primary test" and not resolved_ref:
+            attempt_issues.append({"field": "resolved primary TestCase参照", "reason": "primary attemptのresolved参照が空欄"})
+    result.add(
+        "E2E-EXEC-D010",
+        not attempt_issues,
+        "attemptはTestResult.status・retry・duration・errorと実行区分別識別情報を保持し、TestCase outcomeを重複保持しないこと",
+        evidence=attempt_issues or None,
+    )
+    duplicate_testcase_fields = sorted({field for field in ("expectedStatus", "outcome") if attempt_table and field in attempt_table.headers})
+    result.add(
+        "E2E-EXEC-D035",
+        not duplicate_testcase_fields,
+        "attempt表へTestCase単位のexpectedStatus / outcomeを重複保持しないこと",
+        evidence=duplicate_testcase_fields or None,
+    )
+    primary_attempt_rows = [row for row in attempts if clean(row.get("実行区分", "")) == "要求primary test"]
+    primary_attempt_refs = {clean(row.get("resolved primary TestCase参照", "")) for row in primary_attempt_rows if clean(row.get("resolved primary TestCase参照", ""))}
     unresolved_attempt_refs = sorted(primary_attempt_refs - set(resolved_refs))
     started_refs = {
         clean(row.get("resolved primary TestCase参照", ""))
         for row in resolved_rows
         if clean(row.get("実行開始", "")) in STARTED_MARKERS
     }
+    unstarted_refs = {
+        clean(row.get("resolved primary TestCase参照", ""))
+        for row in resolved_rows
+        if clean(row.get("実行開始", "")) in NOT_STARTED_MARKERS
+    }
     missing_started_attempts = sorted(started_refs - primary_attempt_refs)
+    unstarted_attempt_refs = sorted(primary_attempt_refs & unstarted_refs)
     result.add(
         "E2E-EXEC-D011",
-        not unresolved_attempt_refs and not missing_started_attempts,
-        "要求primary attemptがresolved primary TestCaseへ対応し、開始済みresolved対象にattemptが存在すること",
-        evidence={"unknown_attempt_refs": unresolved_attempt_refs, "missing_started_attempts": missing_started_attempts} if unresolved_attempt_refs or missing_started_attempts else None,
+        not unresolved_attempt_refs and not missing_started_attempts and not unstarted_attempt_refs,
+        "要求primary attemptがstarted resolved primary TestCaseだけへ対応し、開始済みresolved対象にattemptが存在すること",
+        evidence={"unknown_attempt_refs": unresolved_attempt_refs, "missing_started_attempts": missing_started_attempts, "unstarted_attempt_refs": unstarted_attempt_refs}
+        if unresolved_attempt_refs or missing_started_attempts or unstarted_attempt_refs
+        else None,
+    )
+
+    primary_attempts_by_ref: dict[str, list[dict[str, str]]] = {}
+    duplicate_attempt_keys = []
+    seen_attempt_keys = set()
+    for row in primary_attempt_rows:
+        ref = clean(row.get("resolved primary TestCase参照", ""))
+        key = (ref, _as_nonnegative_int(row.get("attempt番号", "")), _as_nonnegative_int(row.get("retry番号", "")))
+        if key in seen_attempt_keys:
+            duplicate_attempt_keys.append(key)
+        seen_attempt_keys.add(key)
+        primary_attempts_by_ref.setdefault(ref, []).append(row)
+    attempt_order_issues = []
+    for ref, rows in primary_attempts_by_ref.items():
+        ordered = sorted(rows, key=lambda row: (_as_nonnegative_int(row.get("attempt番号", "")) or -1, _as_nonnegative_int(row.get("retry番号", "")) or -1))
+        attempt_numbers = [_as_nonnegative_int(row.get("attempt番号", "")) for row in ordered]
+        retry_numbers = [_as_nonnegative_int(row.get("retry番号", "")) for row in ordered]
+        expected_attempt_numbers = list(range(1, len(ordered) + 1))
+        expected_retry_numbers = list(range(0, len(ordered)))
+        if attempt_numbers != expected_attempt_numbers or retry_numbers != expected_retry_numbers:
+            attempt_order_issues.append({"resolved_ref": ref, "attempt_numbers": attempt_numbers, "retry_numbers": retry_numbers})
+    result.add(
+        "E2E-EXEC-D033",
+        not duplicate_attempt_keys and not attempt_order_issues,
+        "primary attemptの番号・retry番号が一意で初回から連番であること",
+        evidence={"duplicates": duplicate_attempt_keys, "order": attempt_order_issues} if duplicate_attempt_keys or attempt_order_issues else None,
+    )
+
+    result_attempt_issues = []
+    for row in resolved_rows:
+        ref = clean(row.get("resolved primary TestCase参照", ""))
+        if clean(row.get("実行開始", "")) not in STARTED_MARKERS:
+            continue
+        candidate_attempts = primary_attempts_by_ref.get(ref, [])
+        if not candidate_attempts:
+            continue
+        last_attempt = max(
+            candidate_attempts,
+            key=lambda attempt: (_as_nonnegative_int(attempt.get("attempt番号", "")) or -1, _as_nonnegative_int(attempt.get("retry番号", "")) or -1),
+        )
+        resolved_status = clean(row.get("結果 / 未実行理由", ""))
+        last_status = clean(last_attempt.get("status", ""))
+        if resolved_status != last_status:
+            result_attempt_issues.append({"resolved_ref": ref, "resolved_status": resolved_status, "last_attempt_status": last_status})
+    result.add(
+        "E2E-EXEC-D034",
+        not result_attempt_issues,
+        "resolved primaryの結果statusが最後に実行されたprimary attemptのstatusと一致すること",
+        evidence=result_attempt_issues or None,
     )
 
     cleanup_rows = nonempty_rows(cleanup_table)
@@ -427,6 +628,44 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         evidence={"cleanup": external_cleanup_success, "run外準備": condition_by_item.get("run外準備", {}).get("値", "")}
         if external_cleanup_without_preparation
         else None,
+    )
+
+    external_cleanup_issues = []
+    if _external_preparation_performed(condition_by_item):
+        external_cleanup_rows = [row for row in cleanup_rows if _cleanup_subject(row.get("cleanup対象 / 実行主体", "")) == "external"]
+        if not external_cleanup_rows:
+            external_cleanup_issues.append("run外準備に対応するrun外cleanup行がない")
+        elif any(
+            clean(row.get("状態", "")) == "対象なし" and not _cleanup_target_none_has_evidence(row)
+            for row in external_cleanup_rows
+        ):
+            external_cleanup_issues.append("run外cleanup対象なしの根拠がない")
+    result.add(
+        "E2E-EXEC-D028",
+        not external_cleanup_issues,
+        "run外準備を実施した場合、対応するrun外cleanup行を必須とし、対象なしなら不要の根拠を記録すること",
+        evidence=external_cleanup_issues or None,
+    )
+
+    runner_owned_cleanup_issues = []
+    runner_owned_servers = [
+        clean(row.get("server識別子", ""))
+        for row in webserver_rows
+        if clean(row.get("既存 / 再利用か", "")) == "新規起動"
+        and _is_run_owned(row.get("今回run所有か", ""))
+        and _is_cleanup_target(row.get("cleanup対象か", ""))
+    ]
+    runner_cleanup_rows = [row for row in cleanup_rows if _cleanup_subject(row.get("cleanup対象 / 実行主体", "")) == "runner"]
+    if runner_owned_servers:
+        if not runner_cleanup_rows:
+            runner_owned_cleanup_issues.append({"servers": runner_owned_servers, "reason": "runner管理cleanup行がない"})
+        elif any(clean(row.get("状態", "")) == "対象なし" for row in runner_cleanup_rows):
+            runner_owned_cleanup_issues.append({"servers": runner_owned_servers, "reason": "cleanup対象のrunner-owned processに対してrunner管理cleanupが対象なし"})
+    result.add(
+        "E2E-EXEC-D029",
+        not runner_owned_cleanup_issues,
+        "今回run所有かつcleanup対象のwebServerがある場合、runner管理cleanup行を対応付けること",
+        evidence=runner_owned_cleanup_issues or None,
     )
 
     runner_not_started_issues = []

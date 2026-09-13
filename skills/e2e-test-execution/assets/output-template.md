@@ -42,15 +42,19 @@
 
 ## resolved primary TestCase結果
 
-| resolved primary TestCase参照 | 論理要求primary対象 | test file / title path | project | repeatEachIndex | 実行開始 | 結果 / 未実行理由 |
-| --- | --- | --- | --- | --- | --- | --- |
-| session-test-1 | login-flow | tests/example.spec.ts > login | chromium | 0 | 開始 |  |
+| resolved primary TestCase参照 | 論理要求primary対象 | test file / title path | project | repeatEachIndex | 実行開始 | 結果 / 未実行理由 | expectedStatus | outcome |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| session-test-1 | login-flow | tests/example.spec.ts > login | chromium | 0 | 開始 | passed | passed | expected |
+
+開始済みresolved primaryでは、`結果 / 未実行理由`にPlaywright `TestResult.status`、`expectedStatus`と`outcome`にresolved `TestCase`の値を記録します。未開始resolved primaryでは、結果・expectedStatus・outcomeを空欄にし、workflow側の未実行理由だけを記録します。
 
 ## attempt結果（retryをresolved件数へ加算しない）
 
-| resolved primary TestCase参照 | attempt番号 | 実行区分 | status | expectedStatus | outcome | retry番号 | duration | error / errors |
-| --- | ---: | --- | --- | --- | --- | ---: | --- | --- |
-| session-test-1 | 1 | 要求primary test | passed / failed / timedOut / skipped / interrupted | passed / failed / timedOut / skipped / interrupted | skipped / expected / unexpected / flaky | 0 |  |  |
+| resolved primary TestCase参照 | attempt番号 | 実行区分 | test file / title path | project | repeatEachIndex | status | retry番号 | duration | error / errors |
+| --- | ---: | --- | --- | --- | ---: | --- | ---: | --- | --- |
+| session-test-1 | 1 | 要求primary test | tests/example.spec.ts > login | chromium | 0 | passed / failed / timedOut / skipped / interrupted | 0 | 10ms |  |
+
+attempt行はPlaywright `TestResult`単位の事実（status、retry、duration、error / errors）だけを保持します。dependency / teardown行はresolved primary参照を持たず、実行区分、test file / title path、project、repeatEachIndexで識別します。
 
 ## working tree・証跡
 
