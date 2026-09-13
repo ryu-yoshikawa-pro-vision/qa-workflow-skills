@@ -16,6 +16,11 @@ CANONICAL_SKILLS = (
     "test-case-design",
     "coverage-analysis",
     "adversarial-review",
+    "e2e-test-inspection",
+    "e2e-test-implementation",
+    "e2e-test-execution",
+    "e2e-test-result-analysis",
+    "e2e-test-reporting",
 )
 
 

@@ -15,6 +15,9 @@
 - `WF-D012` ワークフローSkill行の一意性
 - `WF-D013` フィクスチャに基づくワークフロー全体状態
 - `WF-D014` フィクスチャに基づくSkill状態
+- `WF-D015` ワークフロー状態表の対象 / 実行範囲列
+- `WF-D016` 複数用途Skillの対象 / 実行範囲値
+- `WF-D017` 開始 / 最終Skillの対象 / 実行範囲値
 
 ## spec-analysis
 - `SPEC-D001` 分析項目ID形式
@@ -53,6 +56,8 @@
 - `QUESTION-D014` 仮定候補必須フィールド
 - `QUESTION-D015` フィクスチャで必須の承認済みASM存在
 - `QUESTION-D016` フィクスチャに基づく回答後正規化先
+- `QUESTION-D017` 複数用途Skillの再開対象 / 実行範囲値
+- `QUESTION-D018` フィクスチャに基づく再開Skill / 対象整合
 
 ## test-analysis
 - `RISK-D001` RISK ID形式
@@ -70,6 +75,8 @@
 - `RISK-D013` テスト可能性行必須フィールド
 - `RISK-D014` フィクスチャで必須の技法存在
 - `RISK-D015` フィクスチャで必須のテスト可能性値
+- `RISK-D016` E2E対象選定テーブル必須
+- `RISK-D017` E2E対象選定の技術非依存フィールド
 
 ## test-requirement-design
 - `TR-D001` TR ID形式
@@ -145,6 +152,11 @@
 - `COV-D005` フィクスチャに基づく修正対象存在 / 修正Skill一致
 - `COV-D006` 修正Skillが正規Skill名
 - `COV-D007` 最低必須カバレッジマトリクスの存在
+- `COV-D008` TC → E2E実装対応表必須
+- `COV-D009` TCごとのE2E扱い / 実装参照整合
+- `COV-D010` 既存カバレッジマトリクスでE2E実装 → 実行結果を追跡可能
+- `COV-D011` E2E実装から実行結果への追跡整合
+- `COV-D012` TCなし経路のTC ID創作禁止
 
 ## adversarial-review
 - `REV-D001` REV ID形式
@@ -161,3 +173,83 @@
 - `REV-D012` 指摘必須フィールド
 - `REV-D013` 指摘概要の重大度許可値
 - `REV-D014` 指摘概要の重大度一意性
+- `REV-D015` E2E実装参照一覧必須
+- `REV-D016` E2E実装参照の安定性 / 期待値整合
+
+## e2e-test-inspection
+- `E2E-INSP-D001` 必須inspectionテーブル
+- `E2E-INSP-D002` TC扱いの許可値
+- `E2E-INSP-D003` TC ID形式
+- `E2E-INSP-D004` 安定参照の一意性
+- `E2E-INSP-D005` freshness fact必須フィールド
+- `E2E-INSP-D006` 安全条件の必須フィールド
+- `E2E-INSP-D007` 実行可能性 / 依存関係の必須フィールド
+- `E2E-INSP-D008` フィクスチャで期待するinspection事実
+- `E2E-INSP-D009` フィクスチャで期待する実装参照
+- `E2E-INSP-D010` フィクスチャで期待するTC ID
+- `E2E-INSP-D011` TCなし経路のTC ID創作禁止
+- `E2E-INSP-D012` 事実の確認元表示
+
+## e2e-test-implementation
+- `E2E-IMPL-D001` 必須実装テーブル
+- `E2E-IMPL-D002` TC扱いの許可値
+- `E2E-IMPL-D003` TC ID形式
+- `E2E-IMPL-D004` 実装参照の一意性
+- `E2E-IMPL-D005` 実装参照のrepo-relative性
+- `E2E-IMPL-D006` test file / title path必須
+- `E2E-IMPL-D007` 実装前の状態事実必須フィールド
+- `E2E-IMPL-D008` 静的 / 軽量検証結果の許可値
+- `E2E-IMPL-D009` 検証失敗理由
+- `E2E-IMPL-D010` フィクスチャで期待する実装参照
+- `E2E-IMPL-D011` フィクスチャで期待するTC ID
+- `E2E-IMPL-D012` TCなし経路のTC ID創作禁止
+- `E2E-IMPL-D013` 実行禁止 / 未実行の明示
+
+## e2e-test-execution
+- `E2E-EXEC-D001` 必須実行テーブル
+- `E2E-EXEC-D002` effective settingsの必須フィールド
+- `E2E-EXEC-D003` run statusのraw factと必須run項目
+- `E2E-EXEC-D004` run結果の確認元 / raw fact区分
+- `E2E-EXEC-D005` current run artifact参照
+- `E2E-EXEC-D006` logical primary参照の一意性
+- `E2E-EXEC-D007` resolved primary参照の一意性
+- `E2E-EXEC-D008` logical / resolved件数整合とresolved 0件の理由
+- `E2E-EXEC-D009` resolved primaryごとの結果 / 理由
+- `E2E-EXEC-D010` retry attemptの構造化
+- `E2E-EXEC-D011` primary attempt参照
+- `E2E-EXEC-D012` cleanup状態の許可値
+- `E2E-EXEC-D013` cleanup未成功を完了扱いしないこと
+- `E2E-EXEC-D014` TCなし経路のTC ID創作禁止
+- `E2E-EXEC-D015` フィクスチャで期待するlogical件数
+- `E2E-EXEC-D016` フィクスチャで期待するresolved件数
+- `E2E-EXEC-D017` フィクスチャで期待するretry attemptのstatus / 番号保持
+
+## e2e-test-result-analysis
+- `E2E-AN-D001` 必須分析テーブル
+- `E2E-AN-D002` 実行事実・参照・cleanupの保持
+- `E2E-AN-D003` 判定状態の許可値
+- `E2E-AN-D004` 再現性の許可値 / 原因との分離
+- `E2E-AN-D005` 追加実行の直接実行禁止とexecution routing
+- `E2E-AN-D006` 修正routing先の許可値
+- `E2E-AN-D007` フィクスチャで期待する実装参照
+- `E2E-AN-D008` TCなし経路のTC ID創作禁止
+- `E2E-AN-D009` cleanup未確認の明示
+- `E2E-AN-D010` 追加実行依頼の目的 / 仮説 / 範囲 / owner
+
+## e2e-test-reporting
+- `E2E-REPORT-D001` 必須報告テーブル
+- `E2E-REPORT-D002` environment必須フィールド
+- `E2E-REPORT-D003` run raw factの確認元 / 区分
+- `E2E-REPORT-D004` logical primary参照の一意性
+- `E2E-REPORT-D005` primary件数・開始数・未実行理由の整合
+- `E2E-REPORT-D006` resolved primary参照の一意性
+- `E2E-REPORT-D007` primary outcomeの許可値
+- `E2E-REPORT-D008` retry attemptの分離
+- `E2E-REPORT-D009` E2E実装から実行結果への追跡
+- `E2E-REPORT-D010` cleanup状態
+- `E2E-REPORT-D011` TCなし経路のTC ID創作禁止
+- `E2E-REPORT-D012` フィクスチャで期待するlogical件数
+- `E2E-REPORT-D013` フィクスチャで期待するresolved件数
+- `E2E-REPORT-D014` cleanupのフィクスチャ整合
+- `E2E-REPORT-D015` retry発生時の初回 / retry履歴保持
+- `E2E-REPORT-D016` フィクスチャで期待する初回 / retry履歴

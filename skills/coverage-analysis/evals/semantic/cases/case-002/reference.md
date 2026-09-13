@@ -1,9 +1,9 @@
 # 判定根拠
 ## Source of Truth
-- 空文字保存不可のCoverageが欠落している。
-- TC-003とTC-004は意味上同一で冗長。
-- 1文字/50文字/51文字はそれぞれ異なる境界意味を持つため単純重複ではない。
-- 空文字GapはCoverage Item/Test Caseの追加が必要。
+- TC-101 / TC-102とE2E path + title pathは、QA ID graphとは別の実装追跡参照として扱う。
+- 実装参照から`resolved primary TestCase`または`result-1`と結果へ辿れることを確認する。
+- 未実行の`order detail`は、実行済みと誤認せず未実行理由を保持する。
 
 ## 禁止される推測
-- 未記載の2文字や49文字を必須Gap扱いしない。
+- E2E path / title pathを既存QA IDの代替IDとして登録しない。
+- 未実行の結果、locator、原因を推測しない。

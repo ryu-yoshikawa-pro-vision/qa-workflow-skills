@@ -447,19 +447,20 @@ class FalsePassRegressionTests(unittest.TestCase):
     def test_workflow_state_invariants_and_duplicate_skill(self):
         def workflow(overall: str, rows: str) -> str:
             return f"""- ワークフロー全体状態: {overall}
-| Skill | 状態 | 成果物 / バージョン | ブロッカー / 備考 |
-| --- | --- | --- | --- |
+| Skill | 対象 / 実行範囲 | 状態 | 成果物 / バージョン | ブロッカー / 備考 |
+| --- | --- | --- | --- | --- |
 {rows}
 """
-        self.assert_fails("qa-workflow", workflow("完了", "| test-case-design | 実行中 | v1 | |"), {}, "WF-D004")
-        self.assert_fails("qa-workflow", workflow("部分完了（ブロック中あり）", "| test-case-design | 完了 | v1 | |"), {}, "WF-D010")
-        self.assert_fails("qa-workflow", workflow("ブロック中", "| test-case-design | 完了 | v1 | |"), {}, "WF-D011")
-        duplicate = workflow("実行中", "| test-case-design | 実行中 | v1 | |\n| test-case-design | 完了 | v1 | |")
+        self.assert_fails("qa-workflow", workflow("完了", "| test-case-design |  | 実行中 | v1 | |"), {}, "WF-D004")
+        self.assert_fails("qa-workflow", workflow("部分完了（ブロック中あり）", "| test-case-design |  | 完了 | v1 | |"), {}, "WF-D010")
+        self.assert_fails("qa-workflow", workflow("ブロック中", "| test-case-design |  | 完了 | v1 | |"), {}, "WF-D011")
+        duplicate = workflow("実行中", "| test-case-design |  | 実行中 | v1 | |\n| test-case-design |  | 完了 | v1 | |")
         self.assert_fails("qa-workflow", duplicate, {}, "WF-D012")
 
     def test_workflow_fixture_expected_states(self):
         expected = {
             "expected_start_skill": "test-analysis",
+            "expected_start_target": "テスト分析",
             "expected_final_skill": "test-case-design",
             "expected_skills": ["test-analysis", "test-requirement-design", "test-condition-design", "test-case-design"],
             "expected_overall_state": "部分完了（ブロック中あり）",
@@ -480,13 +481,15 @@ class FalsePassRegressionTests(unittest.TestCase):
         ) -> str:
             return f"""- ワークフロー全体状態: {overall}
 - 開始Skill: test-analysis
+- 開始対象 / 実行範囲: テスト分析
 - 最終Skill: test-case-design
-| Skill | 状態 | 成果物 / バージョン | ブロッカー / 備考 |
-| --- | --- | --- | --- |
-| test-analysis | {test_analysis_state} | Risk | |
-| test-requirement-design | {tr_state} | TR | |
-| test-condition-design | {tcn_state} | TCN | |
-| test-case-design | {tc_state} | TC | |
+- 最終対象 / 実行範囲:
+| Skill | 対象 / 実行範囲 | 状態 | 成果物 / バージョン | ブロッカー / 備考 |
+| --- | --- | --- | --- | --- |
+| test-analysis | テスト分析 | {test_analysis_state} | Risk | |
+| test-requirement-design |  | {tr_state} | TR | |
+| test-condition-design |  | {tcn_state} | TCN | |
+| test-case-design |  | {tc_state} | TC | |
 """
 
         self.assert_passes("qa-workflow", workflow("部分完了（ブロック中あり）", "ブロック中"), expected)

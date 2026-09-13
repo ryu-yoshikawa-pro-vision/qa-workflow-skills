@@ -1,0 +1,13 @@
+# Python bytecode and interpreter cache
+__pycache__/
+*.py[cod]
+*$py.class
+.agents
+.codex
+AGENTS.md
+CHANGELOG.md
+CODE_REVIEW.md
+CODE_REVIEW.md
+MIGRATION.md
+PLANS.md
+SECURITY.md

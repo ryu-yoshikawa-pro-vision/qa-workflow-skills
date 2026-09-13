@@ -1,0 +1,10 @@
+[
+  {"query":"対象画面の期待結果、実行条件、安全条件はinspection済みです。Playwright E2Eを追加してください。","should_trigger":true},
+  {"query":"TC-205をPlaywrightでE2E化してください。","should_trigger":false},
+  {"query":"inspectionで対象・期待挙動・実行入口・認証・副作用・cleanupまで確認済みの対象について、実装差分を作成し、lint・typecheck・test discoveryの結果を残してください。","should_trigger":true},
+  {"query":"inspectionで既存E2Eと変更対象を確認済みです。既存のPlaywright testを更新してください。","should_trigger":true},
+  {"query":"inspection結果で確認済みのTCなしE2E対象を、既存repoの入口に沿って実装してください。","should_trigger":true},
+  {"query":"既存のE2Eを指定環境で実行し、primaryとretryの結果を収集してください。","should_trigger":false},
+  {"query":"この画面をPlaywrightでE2E化して。","should_trigger":false},
+  {"query":"既存のPlaywright E2Eテストを直して。","should_trigger":false}
+]

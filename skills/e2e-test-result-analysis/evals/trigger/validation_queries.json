@@ -1,0 +1,10 @@
+[
+  {"query":"Playwright実行結果のraw factを再実行せずに分析し、FAILの原因候補と修正routingを示してください。","should_trigger":true},
+  {"query":"cleanup未確認、証跡不足、resolved primaryのFAILを分離して、追加実行の目的とownerを整理してください。","should_trigger":true},
+  {"query":"retry PASSで初回FAILを消さず、仕様・実装・環境・データ・証拠不足のどこへ戻すか判断してください。","should_trigger":true},
+  {"query":"E2E実行の検証済みartifactから、追加のPlaywright実行を自分で行わずexecutionへroutingしてください。","should_trigger":true},
+  {"query":"既存Playwrightテストを安全に実行して、primaryとattemptのraw結果を集めてください。","should_trigger":false},
+  {"query":"inspectionで対象URL、認証、fixture、cleanup条件を調べてください。","should_trigger":false},
+  {"query":"inspection済みのE2E対象をコードへ実装し、静的検証を行ってください。","should_trigger":false},
+  {"query":"検証済み結果を原因を追加せず、人間向けのE2E報告にまとめてください。","should_trigger":false}
+]

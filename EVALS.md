@@ -10,7 +10,7 @@
 2. **発火評価**: `description`によるSkill選択・誤発火・ルーティング
 3. **決定論的出力評価**: 機械判定可能な出力契約、ID・参照・閉鎖性・不変条件
 4. **意味評価**: 意味解釈が必要な成果物品質
-5. **ワークフローE2E評価**: `qa-workflow`から担当Skillへ遷移し要求成果物まで完了できるか（未実装）
+5. **ワークフロー統合評価**: `qa-workflow`から担当Skillへ遷移し、要求成果物・停止条件・再開・修正routingまで完了できるか
 
 どのレイヤーも単独ではQA成果物品質全体を保証しません。
 
@@ -28,9 +28,9 @@
 
 ## 正規 / 診断
 
-正規の発火評価は**9 Skillすべてを同一のAgentクライアント上で同時に利用可能**にし、クエリごとに独立したコンテキストで実行します。対象Skillの発火、想定外発火、ルーティングの正しさを確認します。
+正規の発火評価は**14 Skillすべてを同一のAgentクライアント上で同時に利用可能**にし、クエリごとに独立したコンテキストで実行します。対象Skillの発火、想定外発火、ルーティングの正しさを確認します。
 
-対象Skill: `qa-workflow`, `spec-analysis`, `question-analysis`, `test-analysis`, `test-requirement-design`, `test-condition-design`, `test-case-design`, `coverage-analysis`, `adversarial-review`。
+対象Skill: `qa-workflow`, `spec-analysis`, `question-analysis`, `test-analysis`, `test-requirement-design`, `test-condition-design`, `test-case-design`, `coverage-analysis`, `adversarial-review`, `e2e-test-inspection`, `e2e-test-implementation`, `e2e-test-execution`, `e2e-test-result-analysis`, `e2e-test-reporting`。
 
 対象Skill単独または限定Skillだけを利用可能にする実行は診断モードです。正規の発火スコアには使いません。
 
@@ -46,9 +46,9 @@ skills/<skill-name>/evals/trigger/
 
 - train: 12件 / Skill（positive 6 / negative 6）
 - validation: 8件 / Skill（positive 4 / negative 4）
-- 9 Skill合計: 180クエリ
+- 14 Skill合計: 280クエリ
 
-現`description`と180クエリは基準として固定します。`description`選定後、train / validationに未使用の新規クエリで最終ホールドアウトを行います。
+現`description`と280クエリは基準として固定します。`description`選定後、train / validationに未使用の新規クエリで最終ホールドアウトを行います。
 
 ---
 
@@ -92,7 +92,7 @@ skills/<skill-name>/evals/
     └── validator.py
 ```
 
-9 Skillすべてに最低2ケースあります。`expected.json`はGolden文章ではなく、評価プログラムが比較する既知事実だけを持ちます。
+14 Skillすべてに最低2ケースあります。`expected.json`はGolden文章ではなく、評価プログラムが比較する既知事実だけを持ちます。
 
 Skill固有の発火評価データセット、出力フィクスチャ、決定論的validatorは各Skillの`evals/`配下に置きます。`scripts/skills/evals/deterministic/`は実行処理、validatorの読み込み、Markdown parser、共通utility、result model、評価プログラムの自己テストを提供する共通評価ランタイムです。
 
@@ -223,7 +223,7 @@ python scripts/skills/evals/deterministic/run.py \
 
 リポジトリ決定論的契約テストは`tests/skills/evals/deterministic/`に置き、このリポジトリのvalidator assertion、false-pass regression、closure exclusivity、CLI契約、出力評価manifestとvalidatorの対応、1 Skill + 共通Skill評価ランタイムの移植可能性を検証します。
 
-9個の正規Skillの存在とAgent Skills仕様適合は`Validate Agent Skills`で検証します。
+14個の正規Skillの存在とAgent Skills仕様適合は`Validate Agent Skills`で検証します。
 
 CIでは次を実行します。
 
@@ -260,7 +260,7 @@ skills/<skill>/evals/semantic/
         └── reference.md
 ```
 
-9 Skill × 2ケース、合計18ケースです。`evals.json`の各caseは、そのフィクスチャで評価可能な評価基準だけを`criteria`へ列挙します。
+14 Skill × 2ケース、合計28ケースです。`evals.json`の各caseは、そのフィクスチャで評価可能な評価基準だけを`criteria`へ列挙します。
 
 `rubric.json`の評価基準は`id`, `title`, `description`, `critical`を持ちます。重み付きスコアは持ちません。
 
@@ -341,11 +341,11 @@ scripts/skills/evals/semantic/
 └── tests/
 ```
 
-`loader.py`はrubric / eval manifest / input / referenceを読み込み、汎用スキーマ検証を行います。`prompt_builder.py`はJudgeプロンプトを構築し、`result.py`はJudge JSON検証、評価基準のstatus、全体判定、正規化を担当します。`validate.py`は任意の`skills_root`を検証し、9 Skill必須や2 cases必須をハードコードしません。
+`loader.py`はrubric / eval manifest / input / referenceを読み込み、汎用スキーマ検証を行います。`prompt_builder.py`はJudgeプロンプトを構築し、`result.py`はJudge JSON検証、評価基準のstatus、全体判定、正規化を担当します。`validate.py`は任意の`skills_root`を検証し、14 Skill必須や2 cases必須をハードコードしません。
 
 共通ランタイム自己テストは`scripts/skills/evals/semantic/tests/`に置き、特定Skill名に依存しない一時フィクスチャでloader、prompt、result、CLI契約を検証します。
 
-リポジトリ固有テストは`tests/skills/evals/semantic/`に置き、9個の正規Skillの意味評価構造、2 cases / Skill、18 cases合計、評価データセット品質、1 Skill + 共通ランタイムの移植性を検証します。
+リポジトリ固有テストは`tests/skills/evals/semantic/`に置き、14個の正規Skillの意味評価構造、2 cases / Skill、28 cases合計、評価データセット品質、1 Skill + 共通ランタイムの移植性を検証します。
 
 ## CLI / Judge Adapterプロトコル
 
@@ -398,8 +398,10 @@ scripts/skills/evals/
 
 ---
 
-# ワークフローE2E評価
+# ワークフロー統合評価
 
-未実装です。決定論的な`qa-workflow` validatorは出力された状態 / ルーティング判断の整合だけを評価し、実Agentクライアント上のSkill遷移はE2Eで評価します。
+決定論的な`qa-workflow` validatorは、開始・省略・再利用・ブロック・再開・修正routing、対象 / 実行範囲付き状態、TCあり / TCなし経路の成果物整合を評価します。実Agentクライアント上のSkill読み込み・遷移・実runtime操作は、利用可能なクライアント環境がある場合に限って別途評価し、dataset検証を実Agent発火PASSとは扱いません。
+
+Planで定義した29件のrouting fixtureは、入力条件と独立した期待routingを`skills/qa-workflow/evals/deterministic/routing_cases.json`へ、検証対象のcandidate outputを`routing_candidate_outputs.json`へ分離して保持します。リポジトリ決定論的テストではcandidateを期待routingから生成せず、開始・省略・再利用・ブロック・再開・修正routingの代表経路と誤route回帰を検証します。
 
 Agent Skills Specificationは共通Skill-to-Skill APIを規定しません。特定クライアントとの互換性はE2Eで確認します。

@@ -50,6 +50,11 @@ jobs:
               "test-case-design",
               "coverage-analysis",
               "adversarial-review",
+              "e2e-test-inspection",
+              "e2e-test-implementation",
+              "e2e-test-execution",
+              "e2e-test-result-analysis",
+              "e2e-test-reporting",
           ]
 
           skill_root = Path("skills")
@@ -107,15 +112,32 @@ jobs:
                   assert negatives == expected_false, (path, negatives)
                   total_queries += len(data)
 
-          assert len(names) == len(set(names)) == 9, names
-          assert total_queries == 180, total_queries
+              train_queries = {
+                  item["query"]
+                  for item in json.loads(
+                      (skill_root / name / "evals" / "trigger" / "train_queries.json").read_text(encoding="utf-8")
+                  )
+              }
+              validation_queries = {
+                  item["query"]
+                  for item in json.loads(
+                      (skill_root / name / "evals" / "trigger" / "validation_queries.json").read_text(encoding="utf-8")
+                  )
+              }
+              assert train_queries.isdisjoint(validation_queries), (
+                  name,
+                  sorted(train_queries & validation_queries),
+              )
+
+          assert len(names) == len(set(names)) == 14, names
+          assert total_queries == 280, total_queries
 
           for doc in (Path("README.md"), Path("EVALS.md")):
               text = doc.read_text(encoding="utf-8")
               missing = [name for name in expected if f"`{name}`" not in text]
               assert not missing, (doc, missing)
 
-          print("Skill count: 9")
+          print("Skill count: 14")
           print("Each skill: train=12 (6/6), validation=8 (4/4)")
-          print("Total trigger queries: 180")
+          print("Total trigger queries: 280")
           PY

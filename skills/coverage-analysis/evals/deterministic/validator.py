@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 from collections import defaultdict
+import re
 
 from scripts.skills.evals.deterministic.common import CANONICAL_SKILLS, clean, compute_graph_gaps, ids_in, nonempty_rows
 from scripts.skills.evals.deterministic.markdown_parser import find_table, parse_tables
 from scripts.skills.evals.deterministic.result import EvalResult
+
+E2E_HANDLING = {"新規E2E実装", "既存E2E再利用", "既存E2E拡張", "E2E対象外", "ブロック中"}
 
 
 def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
@@ -80,4 +83,79 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         if clean(r.get("修正Skill / 層", "")) and clean(r.get("修正Skill / 層", "")).split()[0] not in CANONICAL_SKILLS
     })
     result.add("COV-D006", not invalid, "Skill名だけを指定する修正先は正規Skill名であること", evidence=invalid or None)
+
+    tc_e2e_table = find_table(
+        tables,
+        section_contains="TC → E2E実装対応表",
+        required_headers=("TC ID", "扱い", "E2E実装参照"),
+    )
+    expected_tc_e2e = expected.get("expected_tc_e2e", [])
+    if expected_tc_e2e:
+        result.add(
+            "COV-D008",
+            tc_e2e_table is not None,
+            "TC → E2E実装の対象別対応表が存在すること",
+            evidence="TC → E2E実装対応表" if tc_e2e_table is None else None,
+        )
+    tc_e2e_rows = nonempty_rows(tc_e2e_table)
+    tc_e2e_mismatches = []
+    for item in expected_tc_e2e:
+        tc_id = clean(str(item.get("tc_id", "")))
+        match = next((row for row in tc_e2e_rows if clean(row.get("TC ID", "")) == tc_id), None)
+        if match is None:
+            tc_e2e_mismatches.append({"tc_id": tc_id, "reason": "missing"})
+            continue
+        actual_handling = clean(match.get("扱い", ""))
+        actual_ref = clean(match.get("E2E実装参照", ""))
+        expected_handling = clean(str(item.get("handling", "")))
+        if actual_handling not in E2E_HANDLING or actual_handling != expected_handling:
+            tc_e2e_mismatches.append({"tc_id": tc_id, "expected_handling": expected_handling, "actual_handling": actual_handling})
+        if expected_handling in {"新規E2E実装", "既存E2E再利用", "既存E2E拡張"} and not actual_ref:
+            tc_e2e_mismatches.append({"tc_id": tc_id, "reason": "implementation reference missing"})
+        if "implementation_ref" in item and actual_ref != clean(str(item["implementation_ref"])):
+            tc_e2e_mismatches.append({"tc_id": tc_id, "expected_ref": item["implementation_ref"], "actual_ref": actual_ref})
+    if expected_tc_e2e:
+        result.add("COV-D009", not tc_e2e_mismatches, "TCごとのE2E扱いと実装参照がフィクスチャと一致すること", evidence=tc_e2e_mismatches or None)
+
+    expected_e2e_execution = expected.get("expected_e2e_execution", [])
+    if expected_e2e_execution:
+        result.add(
+            "COV-D010",
+            matrix_table is not None,
+            "既存カバレッジマトリクスでE2E実装 → 実行結果を追跡できること",
+            evidence="カバレッジマトリクス" if matrix_table is None else None,
+        )
+    e2e_result_rows = matrix_rows
+    execution_mismatches = []
+    for item in expected_e2e_execution:
+        ref = clean(str(item.get("implementation_ref", "")))
+        match = next((row for row in e2e_result_rows if ref and clean(row.get("上流ID / 挙動", "")) == ref), None)
+        if match is None:
+            execution_mismatches.append({"implementation_ref": ref, "reason": "missing"})
+            continue
+        result_ref = clean(match.get("下流ID / 扱い", ""))
+        result_context = " ".join(
+            clean(match.get(field, ""))
+            for field in ("根拠 / ギャップ", "推奨対応")
+            if clean(match.get(field, ""))
+        )
+        outcome = " ".join(
+            clean(match.get(field, ""))
+            for field in ("カバレッジ", "根拠 / ギャップ", "推奨対応")
+            if clean(match.get(field, ""))
+        )
+        if not result_ref:
+            execution_mismatches.append({"implementation_ref": ref, "reason": "result reference missing"})
+        if not outcome:
+            execution_mismatches.append({"implementation_ref": ref, "reason": "result or unexecuted reason missing"})
+        if "result_ref" in item and clean(str(item["result_ref"])) != result_ref:
+            execution_mismatches.append({"implementation_ref": ref, "reason": "expected result reference missing", "expected": item["result_ref"]})
+        if "result_contains" in item and str(item["result_contains"]) not in result_ref + " " + result_context + " " + outcome:
+            execution_mismatches.append({"implementation_ref": ref, "reason": "expected result text missing"})
+    if expected_e2e_execution:
+        result.add("COV-D011", not execution_mismatches, "E2E実装参照からresolved primary TestCase / 実行結果と結果または未実行理由へ追跡できること", evidence=execution_mismatches or None)
+
+    if expected.get("tc_absent"):
+        fabricated = sorted(set(re.findall(r"\bTC-\d{3}\b", text)))
+        result.add("COV-D012", not fabricated, "TCなし経路でTC IDを創作しないこと", evidence=fabricated or None)
     return result

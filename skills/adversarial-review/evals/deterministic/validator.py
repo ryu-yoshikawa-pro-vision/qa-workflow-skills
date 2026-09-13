@@ -97,4 +97,33 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         if not matched:
             missed.append(defect)
     result.add("REV-D010", not missed, "フィクスチャで指定した決定論的欠陥と属性が一致すること", evidence=missed or None)
+
+    e2e_table = find_table(
+        tables,
+        section_contains="E2E実装参照一覧",
+        required_headers=("E2E実装参照", "対象 / 実行範囲"),
+    )
+    expected_refs = expected.get(
+        "expected_e2e_implementation_refs",
+        expected.get("required_e2e_implementation_refs", expected.get("known_e2e_implementation_refs", [])),
+    )
+    if expected_refs:
+        result.add(
+            "REV-D015",
+            e2e_table is not None,
+            "E2E実装レビュー時にE2E実装参照一覧が存在すること",
+            evidence="E2E実装参照一覧" if e2e_table is None else None,
+        )
+    actual_refs = {clean(row.get("E2E実装参照", "")) for row in nonempty_rows(e2e_table) if clean(row.get("E2E実装参照", ""))}
+    ref_mismatches = []
+    for ref in expected_refs:
+        expected_ref = clean(str(ref))
+        if expected_ref not in actual_refs:
+            ref_mismatches.append(expected_ref)
+    result.add(
+        "REV-D016",
+        not ref_mismatches,
+        "フィクスチャで期待するE2E実装参照が対象repoの安定参照として一致すること",
+        evidence=ref_mismatches or None,
+    )
     return result
