@@ -833,11 +833,74 @@ class E2EContractTests(unittest.TestCase):
             "| result-1 | payment-flow | tests/auth/login.spec.ts > login succeeds | chromium | 0 | 開始 | passed | passed | expected |",
         )
         self.assert_fails("e2e-test-execution", orphan_resolved, {}, "E2E-EXEC-D032")
+        for mutated in (
+            execution.replace(
+                "| result-1 | login-flow | tests/auth/login.spec.ts > login succeeds | chromium | 0 | 開始 | passed | passed | expected |",
+                "| result-1 | login-flow | tests/auth/admin.spec.ts > login succeeds | chromium | 0 | 開始 | passed | passed | expected |",
+            ),
+            execution.replace(
+                "| result-1 | login-flow | tests/auth/login.spec.ts > login succeeds | chromium | 0 | 開始 | passed | passed | expected |",
+                "| result-1 | login-flow | tests/auth/login.spec.ts > login succeeds | firefox | 0 | 開始 | passed | passed | expected |",
+            ),
+            execution.replace(
+                "| result-1 | login-flow | tests/auth/login.spec.ts > login succeeds | chromium | 0 | 開始 | passed | passed | expected |",
+                "| result-1 | login-flow | tests/auth/login.spec.ts > login succeeds | chromium | 1 | 開始 | passed | passed | expected |",
+            ),
+        ):
+            self.assert_fails("e2e-test-execution", mutated, {}, "E2E-EXEC-D036")
+        unstarted_resolved = execution.replace(
+            "| result-1 | login-flow | tests/auth/login.spec.ts > login succeeds | chromium | 0 | 開始 | passed | passed | expected |",
+            "| result-1 | login-flow | tests/auth/login.spec.ts > login succeeds | chromium | 0 | 未開始 | credential不足 |  |  |",
+        ).replace(
+            "| result-1 | 1 | 要求primary test | tests/auth/login.spec.ts > login succeeds | chromium | 0 | passed | 0 | 10ms |  |\n",
+            "",
+        )
+        self.assert_pass("e2e-test-execution", unstarted_resolved, {})
+        for mutated in (
+            unstarted_resolved.replace("| result-1 | login-flow |", "|  | login-flow |"),
+            unstarted_resolved.replace("| tests/auth/login.spec.ts > login succeeds | chromium |", "|  | chromium |"),
+            unstarted_resolved.replace("| chromium | 0 | 未開始 |", "|  | 0 | 未開始 |"),
+            unstarted_resolved.replace("| chromium | 0 | 未開始 |", "| chromium |  | 未開始 |"),
+        ):
+            self.assert_fails("e2e-test-execution", mutated, {}, "E2E-EXEC-D009")
         resolved_passed_attempt_failed = execution.replace(
             "| result-1 | 1 | 要求primary test | tests/auth/login.spec.ts > login succeeds | chromium | 0 | passed | 0 | 10ms |  |",
             "| result-1 | 1 | 要求primary test | tests/auth/login.spec.ts > login succeeds | chromium | 0 | failed | 0 | 10ms | first failure |",
         )
         self.assert_fails("e2e-test-execution", resolved_passed_attempt_failed, {}, "E2E-EXEC-D034")
+        self.assert_fails(
+            "e2e-test-execution",
+            execution.replace(
+                "| result-1 | login-flow | tests/auth/login.spec.ts > login succeeds | chromium | 0 | 開始 | passed | passed | expected |",
+                "| result-1 | login-flow | tests/auth/login.spec.ts > login succeeds | chromium | 0 | 開始 | passed | passed | flaky |",
+            ),
+            {},
+            "E2E-EXEC-D034",
+        )
+        self.assert_fails(
+            "e2e-test-execution",
+            execution.replace(
+                "| result-1 | login-flow | tests/auth/login.spec.ts > login succeeds | chromium | 0 | 開始 | passed | passed | expected |",
+                "| result-1 | login-flow | tests/auth/login.spec.ts > login succeeds | chromium | 0 | 開始 | failed | failed | unexpected |",
+            ).replace(
+                "| result-1 | 1 | 要求primary test | tests/auth/login.spec.ts > login succeeds | chromium | 0 | passed | 0 | 10ms |  |",
+                "| result-1 | 1 | 要求primary test | tests/auth/login.spec.ts > login succeeds | chromium | 0 | failed | 0 | 10ms | unexpected failure |",
+            ),
+            {},
+            "E2E-EXEC-D034",
+        )
+        self.assert_fails(
+            "e2e-test-execution",
+            execution.replace(
+                "| result-1 | login-flow | tests/auth/login.spec.ts > login succeeds | chromium | 0 | 開始 | passed | passed | expected |",
+                "| result-1 | login-flow | tests/auth/login.spec.ts > login succeeds | chromium | 0 | 開始 | failed | passed | expected |",
+            ).replace(
+                "| result-1 | 1 | 要求primary test | tests/auth/login.spec.ts > login succeeds | chromium | 0 | passed | 0 | 10ms |  |",
+                "| result-1 | 1 | 要求primary test | tests/auth/login.spec.ts > login succeeds | chromium | 0 | failed | 0 | 10ms | unexpected failure |",
+            ),
+            {},
+            "E2E-EXEC-D034",
+        )
         attempt_testcase_fields = execution.replace(
             "| resolved primary TestCase参照 | attempt番号 | 実行区分 | test file / title path | project | repeatEachIndex | status | retry番号 | duration | error / errors |",
             "| resolved primary TestCase参照 | attempt番号 | 実行区分 | test file / title path | project | repeatEachIndex | status | expectedStatus | outcome | retry番号 | duration | error / errors |",
@@ -952,10 +1015,44 @@ class E2EContractTests(unittest.TestCase):
             ),
             {},
         )
-        for no_cleanup in ("cleanup不要", "対象なし"):
+        for cleanup_method in (
+            "作成した注文をテスト終了後に取り消す",
+            "DBを初期状態へ戻す",
+            "変更した共有設定を元の値へ戻す",
+            "作成したユーザーを後処理で破棄する",
+        ):
             self.assert_pass(
                 "e2e-test-execution",
                 execution.replace(
+                    "| cleanup方法 | runner teardown / run外なし | repo | raw fact |",
+                    f"| cleanup方法 | {cleanup_method} | repo | raw fact |",
+                ),
+                {},
+            )
+        for no_cleanup in ("cleanup不要", "対象なし", "不要"):
+            self.assert_fails(
+                "e2e-test-execution",
+                execution.replace(
+                    "| cleanup方法 | runner teardown / run外なし | repo | raw fact |",
+                    f"| cleanup方法 | {no_cleanup} | repo | raw fact |",
+                ),
+                {},
+                "E2E-EXEC-D026",
+            )
+        no_cleanup_target = execution.replace(
+            "| setup / dependency / webServer / teardown | runner / none / webServer設定あり / runner | repo | raw fact |",
+            "| setup / dependency / webServer / teardown | runner / none / webServerなし / runner | repo | raw fact |",
+        ).replace(
+            "| app | 今回runが起動 | 今回runが所有 | 新規起動 | 対象 | Playwright起動時のprocess確認 |\n",
+            "",
+        ).replace(
+            "| runner管理 | 成功 | 残存なし | reporter |",
+            "| runner管理 | 対象なし | cleanup対象なし | reporter |",
+        )
+        for no_cleanup in ("cleanup不要", "対象なし", "不要"):
+            self.assert_pass(
+                "e2e-test-execution",
+                no_cleanup_target.replace(
                     "| cleanup方法 | runner teardown / run外なし | repo | raw fact |",
                     f"| cleanup方法 | {no_cleanup} | repo | raw fact |",
                 ),
@@ -1220,6 +1317,42 @@ class E2EContractTests(unittest.TestCase):
             "| login-flow | result-1 | 未開始 |  | credential不足のため未実行 |  |  | 0 |  |  |",
         )
         self.assert_pass("e2e-test-reporting", not_started, {})
+        self.assert_fails(
+            "e2e-test-reporting",
+            report.replace(
+                resolved_row,
+                "| login-flow | result-1 | 開始 | passed | credential不足 | passed | expected | 1 | passed (retry 0) | result-1 |",
+            ),
+            {},
+            "E2E-REPORT-D017",
+        )
+        self.assert_fails(
+            "e2e-test-reporting",
+            report.replace(
+                resolved_row,
+                "| login-flow | result-1 | 開始 | passed |  | passed | expected | 0 |  | result-1 |",
+            ),
+            {},
+            "E2E-REPORT-D017",
+        )
+        self.assert_fails(
+            "e2e-test-reporting",
+            not_started.replace(
+                "| login-flow | result-1 | 未開始 |  | credential不足のため未実行 |  |  | 0 |  |  |",
+                "| login-flow | result-1 | 未開始 |  | credential不足のため未実行 |  |  | 2 | passed (retry 0) | result-1 |",
+            ),
+            {},
+            "E2E-REPORT-D017",
+        )
+        self.assert_fails(
+            "e2e-test-reporting",
+            not_started.replace(
+                "| login-flow | result-1 | 未開始 |  | credential不足のため未実行 |  |  | 0 |  |  |",
+                "| login-flow | result-1 | 未開始 |  | credential不足のため未実行 |  |  | 0 | passed (retry 0) |  |",
+            ),
+            {},
+            "E2E-REPORT-D017",
+        )
         not_started_raw_status = not_started.replace("credential不足のため未実行", "failed")
         self.assert_fails("e2e-test-reporting", not_started_raw_status, {}, "E2E-REPORT-D017")
         self.assert_fails(

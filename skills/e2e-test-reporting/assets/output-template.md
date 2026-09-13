@@ -30,7 +30,7 @@
 | --- | --- | --- | --- | --- | --- | --- | ---: | --- | --- |
 | login-flow | session-test-1 | 開始 | passed |  | passed | expected | 1 | passed (retry 0) | result-1 |
 
-開始していないresolved primaryは、`結果`と`実行結果参照`を空欄にし、`未実行理由`へworkflow側の理由を記録します。`expectedStatus` / `outcome`もPlaywrightが返していない限り空欄にします。resolved primary自体が0件のpreflight blockでは、traceの実行参照欄に架空のresultや未実行理由そのものを識別子として置かず、logical primary識別子を参照し、未実行理由は専用列へ記録します。
+開始済みresolved primaryは、`結果`へTestResult.status、`実行結果参照`、expectedStatus、outcome、1以上のretry attempt数を記録し、`未実行理由`を空欄にします。未開始resolved primaryは、`結果`・`実行結果参照`・expectedStatus・outcomeを空欄にし、`未実行理由`を記録し、retry attempt数を0、初回 / retry履歴を空欄にします。resolved primary自体が0件のpreflight blockでは、traceの実行参照欄に架空のresultや未実行理由そのものを識別子として置かず、logical primary識別子を参照し、未実行理由は専用列へ記録します。
 
 ## TC・E2E・実行・分析追跡
 

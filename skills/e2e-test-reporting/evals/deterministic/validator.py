@@ -156,10 +156,13 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         expected_status = clean(row.get("expectedStatus", ""))
         outcome = clean(row.get("outcome", ""))
         start_state = clean(row.get("実行開始", ""))
+        attempt_count = _int(row.get("retry attempt数（別集計）", ""))
         started = start_state in STARTED_MARKERS
         if start_state not in STARTED_MARKERS and start_state not in NOT_STARTED_MARKERS:
             missing_fields.append("実行開始(開始済み / 未開始marker)")
         if started:
+            if has_value(row.get("未実行理由", "")):
+                missing_fields.append("未実行理由(開始済みでは空欄)")
             if not has_value(row.get("結果", "")):
                 missing_fields.append("結果")
             if not has_value(row.get("実行結果参照", "")):
@@ -170,6 +173,8 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                 missing_fields.append("outcome(許可値)")
             if clean(row.get("結果", "")) not in TEST_STATUSES:
                 missing_fields.append("結果(TestResult.status許可値)")
+            if attempt_count is None or attempt_count < 1:
+                missing_fields.append("retry attempt数(開始済みでは1以上)")
         else:
             if not _has_unexecuted_reason(row.get("未実行理由", "")):
                 missing_fields.append("未実行理由")
@@ -183,6 +188,10 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                 missing_fields.append("expectedStatus(許可値)")
             if outcome and outcome not in OUTCOMES:
                 missing_fields.append("outcome(許可値)")
+            if attempt_count != 0:
+                missing_fields.append("retry attempt数(未開始では0)")
+            if has_value(row.get("初回 / retry履歴", "")):
+                missing_fields.append("初回 / retry履歴(未開始では空欄)")
         if missing_fields:
             resolved_field_issues.append({"ref": clean(row.get("resolved primary TestCase参照", "")) or "<unknown>", "fields": missing_fields})
     result.add(

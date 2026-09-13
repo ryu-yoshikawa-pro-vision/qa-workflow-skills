@@ -46,7 +46,7 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | session-test-1 | login-flow | tests/example.spec.ts > login | chromium | 0 | 開始 | passed | passed | expected |
 
-開始済みresolved primaryでは、`結果 / 未実行理由`にPlaywright `TestResult.status`、`expectedStatus`と`outcome`にresolved `TestCase`の値を記録します。未開始resolved primaryでは、結果・expectedStatus・outcomeを空欄にし、workflow側の未実行理由だけを記録します。
+開始済みresolved primaryでは、`結果 / 未実行理由`にPlaywright `TestResult.status`、`expectedStatus`と`outcome`にresolved `TestCase`の値を記録します。未開始resolved primaryでも、resolvedできたTestCaseの参照・論理対象・test file / title path・project・repeatEachIndexは空欄にしません。結果・expectedStatus・outcomeを空欄にし、workflow側の未実行理由だけを記録し、attempt行は作成しません。要求primaryのattempt行は、参照先resolved primaryのfile / title / project / repeatEachIndexと完全一致させます。`outcome = flaky`はretryを含む2件以上のprimary attemptと対応させ、単一attemptのexpected / unexpectedはそのattemptのstatusとexpectedStatusに整合させます。
 
 ## attempt結果（retryをresolved件数へ加算しない）
 
@@ -54,7 +54,7 @@
 | --- | ---: | --- | --- | --- | ---: | --- | ---: | --- | --- |
 | session-test-1 | 1 | 要求primary test | tests/example.spec.ts > login | chromium | 0 | passed / failed / timedOut / skipped / interrupted | 0 | 10ms |  |
 
-attempt行はPlaywright `TestResult`単位の事実（status、retry、duration、error / errors）だけを保持します。dependency / teardown行はresolved primary参照を持たず、実行区分、test file / title path、project、repeatEachIndexで識別します。
+attempt行はPlaywright `TestResult`単位の事実（status、retry、duration、error / errors）だけを保持します。dependency / teardown行はresolved primary参照を持たず、実行区分、test file / title path、project、repeatEachIndexで識別します。primary attemptだけは`resolved primary TestCase参照`を使ってresolved行のidentityと照合し、dependency / teardownにはこのcross-checkを適用しません。
 
 ## working tree・証跡
 
@@ -71,6 +71,8 @@ attempt行はPlaywright `TestResult`単位の事実（status、retry、duration�
 | --- | --- | --- | --- |
 | runner管理 | 成功 / 失敗 / 未確認 / 対象なし / 意図的に残した状態 |  |  |
 | run外処理 | 成功 / 失敗 / 未確認 / 対象なし / 意図的に残した状態 |  |  |
+
+`cleanup不要`、`対象なし`、`不要`は、既知のcleanup対象が存在しない場合に記録できます。今回run所有かつcleanup対象のwebServerがある場合は、実際のrunner管理cleanup方法を記録します。cleanup方法は`確認済み`等の確認状態だけでは足りず、特定語のallow-listに依存しない通常の具体的な説明を記録します。
 
 - 実行成果物状態: 完了 / ブロック中 / 要再確認
 - ブロック中: preflight blockの場合はrunner未開始・artifact未生成の理由
