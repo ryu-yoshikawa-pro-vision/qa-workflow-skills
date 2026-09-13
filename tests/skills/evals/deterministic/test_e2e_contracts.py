@@ -872,6 +872,16 @@ class E2EContractTests(unittest.TestCase):
             "| app | 実行前から存在 | 今回runは所有しない | 既存process再利用 | 対象外 | 実行前URL / port疎通確認 |",
         )
         self.assert_pass("e2e-test-execution", reuse_existing, {})
+        unknown_reuse_owner = reuse_existing.replace(
+            "| app | 実行前から存在 | 今回runは所有しない | 既存process再利用 | 対象外 | 実行前URL / port疎通確認 |",
+            "| app | 実行前から存在 | 未確認 | 既存process再利用 | 対象外 | 実行前URL / port疎通確認 |",
+        )
+        self.assert_fails("e2e-test-execution", unknown_reuse_owner, {}, "E2E-EXEC-D025")
+        unknown_reuse_cleanup = reuse_existing.replace(
+            "| app | 実行前から存在 | 今回runは所有しない | 既存process再利用 | 対象外 | 実行前URL / port疎通確認 |",
+            "| app | 実行前から存在 | 今回runは所有しない | 既存process再利用 | 未確認 | 実行前URL / port疎通確認 |",
+        )
+        self.assert_fails("e2e-test-execution", unknown_reuse_cleanup, {}, "E2E-EXEC-D025")
         reuse_new = execution.replace(
             "| setup / dependency / webServer / teardown | runner / none / webServer設定あり / runner | repo | raw fact |",
             "| setup / dependency / webServer / teardown | runner / none / reuseExistingServer=true / runner | repo | raw fact |",
@@ -894,6 +904,20 @@ class E2EContractTests(unittest.TestCase):
             "| app | 実行前から存在 | 今回runは所有しない | 既存process再利用 | 対象外 | reuseExistingServer=true |",
         )
         self.assert_fails("e2e-test-execution", raw_reuse_evidence, {}, "E2E-EXEC-D025")
+        for raw_config_evidence in (
+            "playwright.config.ts の reuseExistingServer=true",
+            "playwright.config.ts: reuseExistingServer=true",
+        ):
+            config_only_reuse_evidence = reuse_existing.replace(
+                "| app | 実行前から存在 | 今回runは所有しない | 既存process再利用 | 対象外 | 実行前URL / port疎通確認 |",
+                f"| app | 実行前から存在 | 今回runは所有しない | 既存process再利用 | 対象外 | {raw_config_evidence} |",
+            )
+            self.assert_fails("e2e-test-execution", config_only_reuse_evidence, {}, "E2E-EXEC-D025")
+        observed_reuse_evidence = reuse_existing.replace(
+            "| app | 実行前から存在 | 今回runは所有しない | 既存process再利用 | 対象外 | 実行前URL / port疎通確認 |",
+            "| app | 実行前から存在 | 今回runは所有しない | 既存process再利用 | 対象外 | reuseExistingServer=true / 実行前URL / port疎通確認 |",
+        )
+        self.assert_pass("e2e-test-execution", observed_reuse_evidence, {})
         raw_new_evidence = reuse_new.replace(
             "| app | 今回runが起動 | 今回runが所有 | 新規起動 | 対象 | Playwright起動時のprocess確認 |",
             "| app | 今回runが起動 | 今回runが所有 | 新規起動 | 対象 | reuseExistingServer=true |",

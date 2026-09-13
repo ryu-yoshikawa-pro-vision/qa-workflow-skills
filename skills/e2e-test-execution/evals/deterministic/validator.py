@@ -18,15 +18,15 @@ STARTED_MARKERS = {"開始", "開始済み", "実行済み", "はい"}
 NOT_STARTED_MARKERS = {"", "未開始", "未実行", "未実施", "いいえ", "対象なし"}
 NON_OWNER_MARKERS = {"今回runは所有しない", "今回runが所有しない", "所有しない", "非所有", "今回runの所有ではない"}
 NOT_CLEANUP_MARKERS = {"対象外", "対象なし", "cleanup対象外", "終了対象外", "終了しない", "しない"}
+ACTUAL_REUSE_NON_CLEANUP_MARKERS = {"対象外", "対象なし", "cleanup対象外", "終了対象外"}
 RUN_NOT_STARTED_ERROR_STATES = {"未実施", "未確認", "確認不能", "対象なし"}
 UNKNOWN_SAFETY_MARKERS = ("未確認", "確認不能", "不明", "未取得", "未指定", "確認待ち", "未実施")
 WEBSERVER_STARTED_BEFORE_RUN = "実行前から存在"
 WEBSERVER_STARTED_BY_RUN = "今回runが起動"
-RAW_WEBSERVER_CONFIG_ONLY = {
-    "reuseexistingserver=true",
-    "reuseexistingserver:true",
-    "playwright.config.tsのreuseexistingserver",
-}
+RAW_WEBSERVER_CONFIG_ONLY_RE = re.compile(
+    r"^(?:(?:playwright\.config\.ts(?:の|:)|config(?:上の|の|:))?reuseexistingserver)(?:[=:：]true)?$",
+    re.IGNORECASE,
+)
 RUN_START_REQUIRED_CONDITIONS = {
     "対象URL / origin",
     "実行入口 / command chain",
@@ -100,7 +100,7 @@ def _is_explicit_unavailable(value: str, allowed: set[str]) -> bool:
 
 def _is_raw_webserver_config_only(value: str) -> bool:
     normalized = re.sub(r"\s+", "", clean(value)).lower()
-    return normalized in RAW_WEBSERVER_CONFIG_ONLY
+    return RAW_WEBSERVER_CONFIG_ONLY_RE.fullmatch(normalized) is not None
 
 
 def _external_preparation_performed(condition_by_item: dict[str, dict[str, str]]) -> bool:
@@ -262,10 +262,10 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             webserver_issues.append({"server": row.get("server識別子"), "reason": "既存 / 再利用かが新規または既存 / 再利用として閉じていない"})
         if existing_process and startup != WEBSERVER_STARTED_BEFORE_RUN:
             webserver_issues.append({"server": row.get("server識別子"), "reason": "既存 / 再利用processは実行前から存在である必要がある"})
-        if existing_process and _is_run_owned(owner):
-            webserver_issues.append({"server": row.get("server識別子"), "reason": "既存 / 再利用processは今回run非所有である必要がある"})
-        if existing_process and _is_cleanup_target(cleanup):
-            webserver_issues.append({"server": row.get("server識別子"), "reason": "既存 / 再利用processはcleanup対象外である必要がある"})
+        if existing_process and owner not in NON_OWNER_MARKERS:
+            webserver_issues.append({"server": row.get("server識別子"), "reason": "既存 / 再利用processは明示的な今回run非所有である必要がある"})
+        if existing_process and cleanup not in ACTUAL_REUSE_NON_CLEANUP_MARKERS:
+            webserver_issues.append({"server": row.get("server識別子"), "reason": "既存 / 再利用processは明示的なcleanup対象外である必要がある"})
         if new_process:
             if startup != WEBSERVER_STARTED_BY_RUN:
                 webserver_issues.append({"server": row.get("server識別子"), "reason": "新規serverは今回run起動である必要がある"})
