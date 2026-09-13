@@ -907,6 +907,8 @@ class E2EContractTests(unittest.TestCase):
         for raw_config_evidence in (
             "playwright.config.ts の reuseExistingServer=true",
             "playwright.config.ts: reuseExistingServer=true",
+            "playwright.config.tsでreuseExistingServer=true",
+            "configでreuseExistingServer=true",
         ):
             config_only_reuse_evidence = reuse_existing.replace(
                 "| app | 実行前から存在 | 今回runは所有しない | 既存process再利用 | 対象外 | 実行前URL / port疎通確認 |",
