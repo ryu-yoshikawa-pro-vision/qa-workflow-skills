@@ -905,10 +905,18 @@ class E2EContractTests(unittest.TestCase):
         )
         self.assert_fails("e2e-test-execution", raw_reuse_evidence, {}, "E2E-EXEC-D025")
         for raw_config_evidence in (
+            "reuseExistingServer=true",
+            "reuseExistingServer=false",
             "playwright.config.ts の reuseExistingServer=true",
             "playwright.config.ts: reuseExistingServer=true",
             "playwright.config.tsでreuseExistingServer=true",
+            "playwright.config.tsでreuseExistingServer=false",
             "configでreuseExistingServer=true",
+            "configでreuseExistingServer=false",
+            "playwright.config.tsでreuseExistingServer=trueを確認",
+            "playwright.config.tsでreuseExistingServer=falseを確認",
+            "configでreuseExistingServer=trueを確認",
+            "configでreuseExistingServer=falseを確認",
         ):
             config_only_reuse_evidence = reuse_existing.replace(
                 "| app | 実行前から存在 | 今回runは所有しない | 既存process再利用 | 対象外 | 実行前URL / port疎通確認 |",
@@ -920,11 +928,24 @@ class E2EContractTests(unittest.TestCase):
             "| app | 実行前から存在 | 今回runは所有しない | 既存process再利用 | 対象外 | reuseExistingServer=true / 実行前URL / port疎通確認 |",
         )
         self.assert_pass("e2e-test-execution", observed_reuse_evidence, {})
+        observed_config_reuse_evidence = reuse_existing.replace(
+            "| app | 実行前から存在 | 今回runは所有しない | 既存process再利用 | 対象外 | 実行前URL / port疎通確認 |",
+            "| app | 実行前から存在 | 今回runは所有しない | 既存process再利用 | 対象外 | playwright.config.tsでreuseExistingServer=trueを確認し、実行前URL / port疎通も確認 |",
+        )
+        self.assert_pass("e2e-test-execution", observed_config_reuse_evidence, {})
         raw_new_evidence = reuse_new.replace(
             "| app | 今回runが起動 | 今回runが所有 | 新規起動 | 対象 | Playwright起動時のprocess確認 |",
             "| app | 今回runが起動 | 今回runが所有 | 新規起動 | 対象 | reuseExistingServer=true |",
         )
         self.assert_fails("e2e-test-execution", raw_new_evidence, {}, "E2E-EXEC-D025")
+        observed_config_new_evidence = execution.replace(
+            "| setup / dependency / webServer / teardown | runner / none / webServer設定あり / runner | repo | raw fact |",
+            "| setup / dependency / webServer / teardown | runner / none / reuseExistingServer=false / runner | repo | raw fact |",
+        ).replace(
+            "| app | 今回runが起動 | 今回runが所有 | 新規起動 | 対象 | Playwright起動時のprocess確認 |",
+            "| app | 今回runが起動 | 今回runが所有 | 新規起動 | 対象 | playwright.config.tsでreuseExistingServer=falseを確認し、今回runでprocess起動を確認 |",
+        )
+        self.assert_pass("e2e-test-execution", observed_config_new_evidence, {})
         ambiguous_reuse_startup = reuse_existing.replace(
             "| app | 実行前から存在 | 今回runは所有しない |",
             "| app | 確認済み | 今回runは所有しない |",

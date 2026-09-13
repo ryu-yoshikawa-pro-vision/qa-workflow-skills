@@ -24,7 +24,7 @@ UNKNOWN_SAFETY_MARKERS = ("未確認", "確認不能", "不明", "未取得", "�
 WEBSERVER_STARTED_BEFORE_RUN = "実行前から存在"
 WEBSERVER_STARTED_BY_RUN = "今回runが起動"
 RAW_WEBSERVER_CONFIG_ONLY_RE = re.compile(
-    r"^(?:(?:playwright\.config\.ts(?:の|で|:)|config(?:上の|の|で|:))?reuseexistingserver)(?:[=:：]true)?$",
+    r"^(?:(?:playwright\.config\.ts(?:の|で|:)|config(?:上の|の|で|:))?reuseexistingserver)(?:[=:：](?:true|false))?(?:を確認)?$",
     re.IGNORECASE,
 )
 RUN_START_REQUIRED_CONDITIONS = {
