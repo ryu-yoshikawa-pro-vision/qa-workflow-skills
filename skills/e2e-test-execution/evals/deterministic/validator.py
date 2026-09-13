@@ -20,6 +20,13 @@ NON_OWNER_MARKERS = {"今回runは所有しない", "今回runが所有しない
 NOT_CLEANUP_MARKERS = {"対象外", "対象なし", "cleanup対象外", "終了対象外", "終了しない", "しない"}
 RUN_NOT_STARTED_ERROR_STATES = {"未実施", "未確認", "確認不能", "対象なし"}
 UNKNOWN_SAFETY_MARKERS = ("未確認", "確認不能", "不明", "未取得", "未指定", "確認待ち", "未実施")
+WEBSERVER_STARTED_BEFORE_RUN = "実行前から存在"
+WEBSERVER_STARTED_BY_RUN = "今回runが起動"
+RAW_WEBSERVER_CONFIG_ONLY = {
+    "reuseexistingserver=true",
+    "reuseexistingserver:true",
+    "playwright.config.tsのreuseexistingserver",
+}
 RUN_START_REQUIRED_CONDITIONS = {
     "対象URL / origin",
     "実行入口 / command chain",
@@ -44,7 +51,10 @@ def _webserver_state(setup_value: str) -> str:
     lowered = candidate.lower()
     if not candidate or lowered in {"none", "n/a", "対象なし", "未使用", "なし", "-"}:
         return "none"
-    if any(marker in candidate for marker in UNKNOWN_SAFETY_MARKERS):
+    if _is_explicit_unavailable(candidate, set(UNKNOWN_SAFETY_MARKERS)):
+        return "unknown"
+    webserver_value = re.fullmatch(r"webserver\s*=\s*(.+)", candidate, re.IGNORECASE)
+    if webserver_value and _is_explicit_unavailable(webserver_value.group(1), set(UNKNOWN_SAFETY_MARKERS)):
         return "unknown"
     if "webserver" in lowered and any(token in lowered for token in ("none", "なし", "対象なし", "未使用")):
         return "none"
@@ -81,7 +91,16 @@ def _cleanup_subject(value: str) -> str | None:
 
 def _is_explicit_unavailable(value: str, allowed: set[str]) -> bool:
     value = clean(value)
-    return value in allowed or any(value.startswith(f"{state}（") for state in allowed)
+    return value in allowed or any(
+        value.startswith(f"{state}{delimiter}")
+        for state in allowed
+        for delimiter in ("（", "(", ":", "：")
+    )
+
+
+def _is_raw_webserver_config_only(value: str) -> bool:
+    normalized = re.sub(r"\s+", "", clean(value)).lower()
+    return normalized in RAW_WEBSERVER_CONFIG_ONLY
 
 
 def _external_preparation_performed(condition_by_item: dict[str, dict[str, str]]) -> bool:
@@ -237,23 +256,25 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         startup = clean(row.get("起動状態", ""))
         if runner_value in NOT_STARTED_MARKERS and any(marker in f"{startup} {existing}" for marker in ("起動なし", "未開始", "対象なし")):
             continue
-        existing_process = any(token in existing for token in ("既存", "再利用", "reuseExistingServer"))
-        new_process = "新規" in existing
+        existing_process = existing == "既存process再利用"
+        new_process = existing == "新規起動"
         if not existing_process and not new_process:
             webserver_issues.append({"server": row.get("server識別子"), "reason": "既存 / 再利用かが新規または既存 / 再利用として閉じていない"})
+        if existing_process and startup != WEBSERVER_STARTED_BEFORE_RUN:
+            webserver_issues.append({"server": row.get("server識別子"), "reason": "既存 / 再利用processは実行前から存在である必要がある"})
         if existing_process and _is_run_owned(owner):
             webserver_issues.append({"server": row.get("server識別子"), "reason": "既存 / 再利用processは今回run非所有である必要がある"})
         if existing_process and _is_cleanup_target(cleanup):
             webserver_issues.append({"server": row.get("server識別子"), "reason": "既存 / 再利用processはcleanup対象外である必要がある"})
-        if existing_process and any(token in startup for token in ("今回runが起動", "今回run起動")):
-            webserver_issues.append({"server": row.get("server識別子"), "reason": "既存 / 再利用processを今回run起動として記録している"})
         if new_process:
-            if "今回runが起動" not in startup and "今回run起動" not in startup:
+            if startup != WEBSERVER_STARTED_BY_RUN:
                 webserver_issues.append({"server": row.get("server識別子"), "reason": "新規serverは今回run起動である必要がある"})
             if not _is_run_owned(owner):
                 webserver_issues.append({"server": row.get("server識別子"), "reason": "今回runが起動したprocessは今回run所有である必要がある"})
             if not _is_cleanup_target(cleanup):
                 webserver_issues.append({"server": row.get("server識別子"), "reason": "今回runが起動したprocessはcleanup対象である必要がある"})
+        if (existing_process or new_process) and _is_raw_webserver_config_only(row.get("根拠", "")):
+            webserver_issues.append({"server": row.get("server識別子"), "reason": "actual process stateの根拠をraw configだけで記録している"})
         server_id = clean(row.get("server識別子", ""))
         if server_id in expected_reuse and expected_reuse[server_id] != existing_process:
             webserver_issues.append({"server": server_id, "reason": "setup / fixtureが示すreuse状態とownership表が一致しない"})

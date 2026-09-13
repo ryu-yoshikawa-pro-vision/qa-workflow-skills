@@ -128,7 +128,7 @@ class E2EContractTests(unittest.TestCase):
 ## webServer process ownership
 | server識別子 | 起動状態 | 今回run所有か | 既存 / 再利用か | cleanup対象か | 根拠 |
 | --- | --- | --- | --- | --- | --- |
-| app | 今回runが起動 | 今回runが所有 | 新規起動 | 対象 | Playwright webServer |
+| app | 今回runが起動 | 今回runが所有 | 新規起動 | 対象 | Playwright起動時のprocess確認 |
 ## logical primary対象の解決
 | 論理的な要求primary対象 | E2E実装参照 / TC ID（存在時のみ） | resolved primary TestCase数 | 未実行 / 解決不能理由 |
 | --- | --- | ---: | --- |
@@ -652,7 +652,7 @@ class E2EContractTests(unittest.TestCase):
         )
         preflight_block = preflight_block.replace("| runner開始 | はい | execution | raw fact |", "| runner開始 | いいえ | execution | raw fact |")
         preflight_block = preflight_block.replace(
-            "| app | 今回runが起動 | 今回runが所有 | 新規起動 | 対象 | Playwright webServer |",
+            "| app | 今回runが起動 | 今回runが所有 | 新規起動 | 対象 | Playwright起動時のprocess確認 |",
             "| app | 未開始 | 今回runは所有しない | 起動なし | 対象外 | runner未開始 |",
         )
         preflight_block = preflight_block.replace(
@@ -757,6 +757,13 @@ class E2EContractTests(unittest.TestCase):
             {},
             "E2E-EXEC-D026",
         )
+        for value in ("未確認: teardown方法を確認中", "未確認：teardown方法を確認中", "未確認(事前確認待ち)"):
+            self.assert_fails(
+                "e2e-test-execution",
+                execution.replace("| cleanup方法 | runner teardown / run外なし | repo | raw fact |", f"| cleanup方法 | {value} | repo | raw fact |"),
+                {},
+                "E2E-EXEC-D026",
+            )
         self.assert_fails(
             "e2e-test-execution",
             execution.replace("| cleanup方法 | runner teardown / run外なし | repo | raw fact |", "| cleanup方法 | 未実施 | repo | raw fact |"),
@@ -766,6 +773,24 @@ class E2EContractTests(unittest.TestCase):
         self.assert_fails(
             "e2e-test-execution",
             execution.replace("| 必要な認証 / テストデータ / 開始状態 | test user / clean account | repo | raw fact |", "| 必要な認証 / テストデータ / 開始状態 | 未実施 | repo | raw fact |"),
+            {},
+            "E2E-EXEC-D026",
+        )
+        self.assert_fails(
+            "e2e-test-execution",
+            execution.replace(
+                "| 必要な認証 / テストデータ / 開始状態 | test user / clean account | repo | raw fact |",
+                "| 必要な認証 / テストデータ / 開始状態 | 確認不能：テストアカウント未提供 | repo | raw fact |",
+            ),
+            {},
+            "E2E-EXEC-D026",
+        )
+        self.assert_fails(
+            "e2e-test-execution",
+            execution.replace(
+                "| 副作用の許可範囲 / 最大回数 | test data only / max 1 | ユーザー提供情報 | raw fact |",
+                "| 副作用の許可範囲 / 最大回数 | 未実施(事前確認待ち) | ユーザー提供情報 | raw fact |",
+            ),
             {},
             "E2E-EXEC-D026",
         )
@@ -798,31 +823,33 @@ class E2EContractTests(unittest.TestCase):
         )
 
         multi_server = execution.replace(
-            "| app | 今回runが起動 | 今回runが所有 | 新規起動 | 対象 | Playwright webServer |",
-            "| frontend | 今回runが起動 | 今回runが所有 | 新規起動 | 対象 | Playwright webServer |\n| backend | 既存process | 今回runは所有しない | 既存process再利用 | 対象外 | reuseExistingServer=true |",
+            "| app | 今回runが起動 | 今回runが所有 | 新規起動 | 対象 | Playwright起動時のprocess確認 |",
+            "| frontend | 今回runが起動 | 今回runが所有 | 新規起動 | 対象 | Playwright起動時のprocess確認 |\n| backend | 実行前から存在 | 今回runは所有しない | 既存process再利用 | 対象外 | 実行前URL / port疎通確認 |",
         )
         self.assert_pass("e2e-test-execution", multi_server, {"expected_webserver_ids": ["frontend", "backend"]})
+        duplicate_server_ids = multi_server.replace("| frontend |", "| app |", 1).replace("| backend |", "| app |", 1)
+        self.assert_fails("e2e-test-execution", duplicate_server_ids, {}, "E2E-EXEC-D025")
         self.assert_fails(
             "e2e-test-execution",
-            multi_server.replace("| backend | 既存process |", ""),
+            multi_server.replace("| backend | 実行前から存在 |", ""),
             {"expected_webserver_ids": ["frontend", "backend"]},
             "E2E-EXEC-D025",
         )
         self.assert_fails(
             "e2e-test-execution",
-            multi_server.replace("| backend | 既存process | 今回runは所有しない |", "| backend | 既存process |  |"),
+            multi_server.replace("| backend | 実行前から存在 | 今回runは所有しない |", "| backend | 実行前から存在 |  |"),
             {},
             "E2E-EXEC-D025",
         )
         self.assert_fails(
             "e2e-test-execution",
-            multi_server.replace("| frontend | 今回runが起動 | 今回runが所有 | 新規起動 | 対象 |", "| frontend | 今回runが起動 | 今回runは所有しない | 新規起動 | 対象外 |").replace("Playwright webServer |", "Playwright webServer |", 1),
+            multi_server.replace("| frontend | 今回runが起動 | 今回runが所有 | 新規起動 | 対象 |", "| frontend | 今回runが起動 | 今回runは所有しない | 新規起動 | 対象外 |"),
             {"expected_webserver_ids": ["frontend", "backend"]},
             "E2E-EXEC-D025",
         )
         self.assert_fails(
             "e2e-test-execution",
-            multi_server.replace("| backend | 既存process | 今回runは所有しない | 既存process再利用 | 対象外 |", "| backend | 既存process | 今回runは所有しない | 既存process再利用 | 対象 |"),
+            multi_server.replace("| backend | 実行前から存在 | 今回runは所有しない | 既存process再利用 | 対象外 |", "| backend | 実行前から存在 | 今回runは所有しない | 既存process再利用 | 対象 |"),
             {},
             "E2E-EXEC-D025",
         )
@@ -841,8 +868,8 @@ class E2EContractTests(unittest.TestCase):
             "| setup / dependency / webServer / teardown | runner / none / reuseExistingServer=true / runner | repo | raw fact |",
         )
         reuse_existing = reuse_existing.replace(
-            "| app | 今回runが起動 | 今回runが所有 | 新規起動 | 対象 | Playwright webServer |",
-            "| app | 実行前から存在 | 今回runは所有しない | 既存process再利用 | 対象外 | reuseExistingServer=true |",
+            "| app | 今回runが起動 | 今回runが所有 | 新規起動 | 対象 | Playwright起動時のprocess確認 |",
+            "| app | 実行前から存在 | 今回runは所有しない | 既存process再利用 | 対象外 | 実行前URL / port疎通確認 |",
         )
         self.assert_pass("e2e-test-execution", reuse_existing, {})
         reuse_new = execution.replace(
@@ -857,19 +884,44 @@ class E2EContractTests(unittest.TestCase):
             {"expected_webserver_reuse": {"app": True}},
             "E2E-EXEC-D025",
         )
-        contradictory_reuse_owner = reuse_existing.replace(
+        raw_state = reuse_existing.replace(
+            "| app | 実行前から存在 | 今回runは所有しない | 既存process再利用 | 対象外 | 実行前URL / port疎通確認 |",
+            "| app | 実行前から存在 | 今回runは所有しない | reuseExistingServer=true | 対象外 | 実行前URL / port疎通確認 |",
+        )
+        self.assert_fails("e2e-test-execution", raw_state, {}, "E2E-EXEC-D025")
+        raw_reuse_evidence = reuse_existing.replace(
+            "| app | 実行前から存在 | 今回runは所有しない | 既存process再利用 | 対象外 | 実行前URL / port疎通確認 |",
             "| app | 実行前から存在 | 今回runは所有しない | 既存process再利用 | 対象外 | reuseExistingServer=true |",
-            "| app | 実行前から存在 | 今回runが所有 | 既存process再利用 | 対象外 | reuseExistingServer=true |",
+        )
+        self.assert_fails("e2e-test-execution", raw_reuse_evidence, {}, "E2E-EXEC-D025")
+        raw_new_evidence = reuse_new.replace(
+            "| app | 今回runが起動 | 今回runが所有 | 新規起動 | 対象 | Playwright起動時のprocess確認 |",
+            "| app | 今回runが起動 | 今回runが所有 | 新規起動 | 対象 | reuseExistingServer=true |",
+        )
+        self.assert_fails("e2e-test-execution", raw_new_evidence, {}, "E2E-EXEC-D025")
+        ambiguous_reuse_startup = reuse_existing.replace(
+            "| app | 実行前から存在 | 今回runは所有しない |",
+            "| app | 確認済み | 今回runは所有しない |",
+        )
+        self.assert_fails("e2e-test-execution", ambiguous_reuse_startup, {}, "E2E-EXEC-D025")
+        ambiguous_new_startup = reuse_new.replace(
+            "| app | 今回runが起動 | 今回runが所有 |",
+            "| app | config確認済み | 今回runが所有 |",
+        )
+        self.assert_fails("e2e-test-execution", ambiguous_new_startup, {}, "E2E-EXEC-D025")
+        contradictory_reuse_owner = reuse_existing.replace(
+            "| app | 実行前から存在 | 今回runは所有しない | 既存process再利用 | 対象外 | 実行前URL / port疎通確認 |",
+            "| app | 実行前から存在 | 今回runが所有 | 既存process再利用 | 対象外 | 実行前URL / port疎通確認 |",
         )
         self.assert_fails("e2e-test-execution", contradictory_reuse_owner, {}, "E2E-EXEC-D025")
         contradictory_reuse_cleanup = reuse_existing.replace(
-            "| app | 実行前から存在 | 今回runは所有しない | 既存process再利用 | 対象外 | reuseExistingServer=true |",
-            "| app | 実行前から存在 | 今回runは所有しない | 既存process再利用 | 対象 | reuseExistingServer=true |",
+            "| app | 実行前から存在 | 今回runは所有しない | 既存process再利用 | 対象外 | 実行前URL / port疎通確認 |",
+            "| app | 実行前から存在 | 今回runは所有しない | 既存process再利用 | 対象 | 実行前URL / port疎通確認 |",
         )
         self.assert_fails("e2e-test-execution", contradictory_reuse_cleanup, {}, "E2E-EXEC-D025")
         contradictory_new = reuse_new.replace(
-            "| app | 今回runが起動 | 今回runが所有 | 新規起動 | 対象 | Playwright webServer |",
-            "| app | 今回runが起動 | 今回runは所有しない | 新規起動 | 対象外 | Playwright webServer |",
+            "| app | 今回runが起動 | 今回runが所有 | 新規起動 | 対象 | Playwright起動時のprocess確認 |",
+            "| app | 今回runが起動 | 今回runは所有しない | 新規起動 | 対象外 | Playwright起動時のprocess確認 |",
         )
         self.assert_fails("e2e-test-execution", contradictory_new, {}, "E2E-EXEC-D025")
         unknown_webserver = preflight_block.replace(
@@ -886,6 +938,20 @@ class E2EContractTests(unittest.TestCase):
             {},
             "E2E-EXEC-D025",
         )
+        for value in ("webServer=未確認（config調査中）", "webServer=未確認: config調査中"):
+            explicit_unknown_webserver = unknown_webserver.replace("webServer=未確認", value)
+            self.assert_pass("e2e-test-execution", explicit_unknown_webserver, {})
+            self.assert_fails(
+                "e2e-test-execution",
+                explicit_unknown_webserver.replace("| runner開始 | いいえ | execution | raw fact |", "| runner開始 | はい | execution | raw fact |").replace("- 実行成果物状態: ブロック中", "- 実行成果物状態: 完了"),
+                {},
+                "E2E-EXEC-D025",
+            )
+        configured_marker_text = execution.replace(
+            "| setup / dependency / webServer / teardown | runner / none / webServer設定あり / runner | repo | raw fact |",
+            "| setup / dependency / webServer / teardown | runner / none / 未実施状態一覧用mock server / runner | repo | raw fact |",
+        )
+        self.assert_pass("e2e-test-execution", configured_marker_text, {})
 
         for mutated, assertion_id in (
             (execution.replace("| result-1 | 1 | 要求primary test | passed | passed | expected | 0 | 10ms |  |", "| result-1 | 1 | 要求primary test | timedout | passed | expected | 0 | 10ms |  |"), "E2E-EXEC-D010"),

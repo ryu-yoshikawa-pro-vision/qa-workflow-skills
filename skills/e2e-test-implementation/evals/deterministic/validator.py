@@ -116,7 +116,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     result.add(
         "E2E-IMPL-D019",
         (not completed_targets) or (bool(refs) and not ref_contract_issues),
-        "実装・再利用・拡張が成立した場合はE2E実装参照を最低1件、repo-relative pathとtitle path付きで記録し、実装前blockでは0件を許容すること",
+        "実装・再利用・拡張が成立した場合はE2E実装参照を最低1件、repo-relative pathとtitle path付きで記録し、全対象が実装前blockの場合はE2E実装参照を0件とすること",
         evidence={"missing_rows": not refs, "issues": ref_contract_issues, "refs_required": bool(completed_targets)}
         if (completed_targets and (not refs or ref_contract_issues))
         else None,
