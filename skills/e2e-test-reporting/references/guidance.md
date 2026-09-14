@@ -12,7 +12,7 @@ logical primaryがresolved 0件の場合は、未実行 / 解決不能理由をl
 
 ## 結果と分析
 
-raw status、run-level結果、process exit code、Playwrightから取得したresolved TestCase単位のraw `outcome`、集計を区別します。`TestResult.status`は`passed` / `failed` / `timedOut` / `skipped` / `interrupted`、`TestCase.expectedStatus`も同じ値域、`TestCase.outcome()`は`skipped` / `expected` / `unexpected` / `flaky`、FullResultのrun全体statusは`passed` / `failed` / `timedout` / `interrupted`です。reportingはPlaywrightのoutcome計算全体を複製せず、`outcome = flaky`なのにretry attempt数が1未満という明白な矛盾だけを拒否します。`retry attempt数 = N`なら履歴の`retry N`番号は`0..N-1`と完全一致し、重複・欠落・範囲外を許容しません。`未実行`や`確認不能`をPlaywright raw値へ混ぜません。分析を実施していない場合は「分析なし」と明記し、結果から原因を推測しません。分析済みの場合も入力の判定・原因・再現性を再解釈せず引用可能な範囲で伝えます。
+raw status、run-level結果、process exit code、Playwrightから取得したresolved TestCase単位のraw `outcome`、集計を区別します。`TestResult.status`は`passed` / `failed` / `timedOut` / `skipped` / `interrupted`、`TestCase.expectedStatus`も同じ値域、`TestCase.outcome()`は`skipped` / `expected` / `unexpected` / `flaky`、FullResultのrun全体statusは`passed` / `failed` / `timedout` / `interrupted`です。reportingはPlaywrightのoutcome計算全体を複製せず、retry履歴のcanonical entry、entry数、retry番号の出現順、各status、末尾statusと`結果`の一致を保持します。`outcome = flaky`なのにretry attempt数が2件未満、またはexpected側 / unexpected側のattemptが混在しない履歴は拒否します。Playwrightの`interrupted`と、`expectedStatus != skipped`の`skipped`はexpected / unexpectedの混在判定へ数えません。`未実行`や`確認不能`をPlaywright raw値へ混ぜません。分析を実施していない場合は「分析なし」と明記し、結果から原因を推測しません。分析済みの場合も入力の判定・原因・再現性を再解釈せず引用可能な範囲で伝えます。
 
 ## 安全な共有
 

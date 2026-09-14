@@ -14,7 +14,7 @@ OUTCOMES = {"skipped", "expected", "unexpected", "flaky"}
 CLEANUP_STATES = {"成功", "失敗", "未確認", "対象なし", "意図的に残した状態", "一部失敗"}
 STARTED_MARKERS = {"開始", "開始済み", "実行済み", "はい"}
 NOT_STARTED_MARKERS = {"", "未開始", "未実行", "未実施", "いいえ", "対象なし"}
-RETRY_NUMBER_RE = re.compile(r"\bretry\s+(\d+)\b", re.IGNORECASE)
+RETRY_HISTORY_ENTRY_RE = re.compile(r"^(.+) \(retry (\d+)\)$")
 
 
 def _has_unexecuted_reason(value: str) -> bool:
@@ -24,6 +24,37 @@ def _has_unexecuted_reason(value: str) -> bool:
 def _int(value: str) -> int | None:
     value = clean(value)
     return int(value) if re.fullmatch(r"\d+", value) else None
+
+
+def _parse_retry_history(value: str) -> list[tuple[str, int]] | None:
+    history = clean(value)
+    if not history:
+        return []
+    entries = [clean(entry) for entry in history.split("->")]
+    parsed = []
+    for entry in entries:
+        match = RETRY_HISTORY_ENTRY_RE.fullmatch(entry)
+        if match is None or match.group(1) not in TEST_STATUSES:
+            return None
+        parsed.append((match.group(1), int(match.group(2))))
+    return parsed
+
+
+def _has_flaky_status_mix(expected_status: str, entries: list[tuple[str, int]]) -> bool:
+    expected_seen = False
+    unexpected_seen = False
+    for status, _ in entries:
+        if status == "interrupted":
+            continue
+        if status == "skipped":
+            if expected_status == "skipped":
+                expected_seen = True
+            continue
+        if status == expected_status:
+            expected_seen = True
+        else:
+            unexpected_seen = True
+    return expected_seen and unexpected_seen
 
 
 def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
@@ -212,25 +243,59 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         history = clean(row.get("初回 / retry履歴", ""))
         if attempt_count is None:
             continue
-        retry_numbers = [int(number) for number in RETRY_NUMBER_RE.findall(history)]
+        history_entries = _parse_retry_history(history)
         expected_retry_numbers = list(range(attempt_count))
         issues = []
         if attempt_count == 0:
-            if retry_numbers or history:
-                issues.append({"reason": "attempt数0ではretry履歴を持たない", "retry_numbers": retry_numbers})
-        elif sorted(retry_numbers) != expected_retry_numbers or len(retry_numbers) != len(set(retry_numbers)):
-            issues.append(
-                {
-                    "reason": "retry番号が0..N-1と完全一致しない、または重複している",
-                    "expected": expected_retry_numbers,
-                    "actual": retry_numbers,
-                }
-            )
-        if clean(row.get("outcome", "")) == "flaky" and attempt_count < 2:
-            issues.append({"reason": "flakyには2件以上のretry attemptが必要", "attempt_count": attempt_count})
+            if history_entries is None or history:
+                issues.append({"reason": "attempt数0ではretry履歴を持たない", "history": history})
+        elif history_entries is None:
+            issues.append({"reason": "retry履歴の各entryが<TestResult.status> (retry <number>)へ完全一致しない", "history": history})
+        else:
+            retry_numbers = [retry_number for _, retry_number in history_entries]
+            if len(history_entries) != attempt_count:
+                issues.append(
+                    {
+                        "reason": "retry履歴のentry数がattempt数と一致しない",
+                        "expected_count": attempt_count,
+                        "actual_count": len(history_entries),
+                    }
+                )
+            if retry_numbers != expected_retry_numbers:
+                issues.append(
+                    {
+                        "reason": "retry番号の出現順が0..N-1と一致しない",
+                        "expected": expected_retry_numbers,
+                        "actual": retry_numbers,
+                    }
+                )
+            if history_entries and history_entries[-1][0] != clean(row.get("結果", "")):
+                issues.append(
+                    {
+                        "reason": "retry履歴末尾のstatusがresolved結果と一致しない",
+                        "history_last_status": history_entries[-1][0],
+                        "result": clean(row.get("結果", "")),
+                    }
+                )
+            if clean(row.get("outcome", "")) == "flaky":
+                if attempt_count < 2:
+                    issues.append({"reason": "flakyには2件以上のretry attemptが必要", "attempt_count": attempt_count})
+                elif not _has_flaky_status_mix(clean(row.get("expectedStatus", "")), history_entries):
+                    issues.append(
+                        {
+                            "reason": "flakyのretry履歴にPlaywright上のexpected側とunexpected側のattemptが混在しない",
+                            "expectedStatus": clean(row.get("expectedStatus", "")),
+                            "statuses": [status for status, _ in history_entries],
+                        }
+                    )
         if issues:
             retry_history_issues.append({"ref": clean(row.get("resolved primary TestCase参照", "")) or "<unknown>", "issues": issues})
-    result.add("E2E-REPORT-D015", not retry_history_issues, "retry履歴の番号集合が0..N-1と完全一致し、flakyは2件以上のattemptを持つこと", evidence=retry_history_issues or None)
+    result.add(
+        "E2E-REPORT-D015",
+        not retry_history_issues,
+        "retry履歴をcanonical entryとして検証し、entry数・retry番号の出現順・status・末尾結果・flakyのexpected/unexpected混在を保持すること",
+        evidence=retry_history_issues or None,
+    )
 
     trace_rows = nonempty_rows(trace)
     primary_refs = {

@@ -22,6 +22,8 @@ NOT_CLEANUP_MARKERS = {"対象外", "対象なし", "cleanup対象外", "終了�
 ACTUAL_REUSE_NON_CLEANUP_MARKERS = {"対象外", "対象なし", "cleanup対象外", "終了対象外"}
 RUN_NOT_STARTED_ERROR_STATES = {"未実施", "未確認", "確認不能", "対象なし"}
 UNKNOWN_SAFETY_MARKERS = ("未確認", "確認不能", "不明", "未取得", "未指定", "確認待ち", "未実施")
+SETUP_CONTRACT_LABELS = ("setup", "dependency", "webServer", "teardown")
+EXTERNAL_PREPARATION_NOT_NEEDED = {"対象なし", "なし", "不要", "none", "n/a", "-"}
 WEBSERVER_STARTED_BEFORE_RUN = "実行前から存在"
 WEBSERVER_STARTED_BY_RUN = "今回runが起動"
 NO_CLEANUP_METHOD_RE = re.compile(r"^(?:cleanup不要|対象なし|不要)(?:\s*[（(].*[）)])?$")
@@ -37,16 +39,24 @@ RUN_START_REQUIRED_CONDITIONS = {
     "setup / dependency / webServer / teardown",
     "必要な認証 / テストデータ / 開始状態",
     "副作用の許可範囲 / 最大回数",
+    "run外準備",
     "runner管理cleanup対象 / 方法",
     "run外cleanup対象 / 方法",
 }
 REQUIRED_EXECUTION_CONDITIONS = RUN_START_REQUIRED_CONDITIONS | {"run外準備"}
 
 
-def _webserver_candidate(setup_value: str) -> str:
+def _setup_contract_parts(setup_value: str) -> tuple[str, ...] | None:
     value = clean(setup_value)
     parts = [clean(part) for part in value.split("/")]
-    return parts[2] if len(parts) >= 4 else value
+    if len(parts) != len(SETUP_CONTRACT_LABELS) or any(not part for part in parts):
+        return None
+    return tuple(parts)
+
+
+def _webserver_candidate(setup_value: str) -> str:
+    parts = _setup_contract_parts(setup_value)
+    return parts[2] if parts else ""
 
 
 def _webserver_state(setup_value: str) -> str:
@@ -65,8 +75,8 @@ def _webserver_state(setup_value: str) -> str:
 
 
 def _teardown_candidate(setup_value: str) -> str:
-    parts = [clean(part) for part in clean(setup_value).split("/")]
-    return parts[3] if len(parts) >= 4 else ""
+    parts = _setup_contract_parts(setup_value)
+    return parts[3] if parts else ""
 
 
 def _has_explicit_runner_cleanup_target(setup_value: str) -> bool:
@@ -163,11 +173,25 @@ def _is_raw_webserver_config_only(value: str) -> bool:
     return RAW_WEBSERVER_CONFIG_ONLY_RE.fullmatch(normalized) is not None
 
 
+def _external_preparation_value_performed(value: str) -> bool:
+    value = clean(value)
+    return value in {"実施", "実施済み"} or value.startswith(("実施（", "実施(", "実施:", "実施："))
+
+
+def _external_preparation_not_needed(value: str) -> bool:
+    return clean(value).lower() in EXTERNAL_PREPARATION_NOT_NEEDED
+
+
+def _external_preparation_confirmed(value: str) -> bool:
+    value = clean(value)
+    return bool(value) and not _is_explicit_unavailable(value, set(UNKNOWN_SAFETY_MARKERS)) and (
+        _external_preparation_value_performed(value) or _external_preparation_not_needed(value)
+    )
+
+
 def _external_preparation_performed(condition_by_item: dict[str, dict[str, str]]) -> bool:
     value = clean(condition_by_item.get("run外準備", {}).get("値", ""))
-    if value in {"実施", "実施済み"}:
-        return True
-    return value.startswith(("実施（", "実施(", "実施:", "実施："))
+    return _external_preparation_value_performed(value)
 
 
 def _compute_expected_testcase_outcome(expected_status: str, attempt_statuses: list[str]) -> str:
@@ -289,6 +313,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             field
             for field in ("値", "確認元", "raw fact / 導出値")
             if not has_value(row.get(field, ""))
+            and not (field == "値" and label == "run外準備" and _external_preparation_not_needed(row.get(field, "")))
         ]
         if missing_fields:
             condition_value_issues.append({"項目": label, "fields": missing_fields})
@@ -352,6 +377,41 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         for label in sorted(RUN_START_REQUIRED_CONDITIONS):
             row = condition_by_item.get(label)
             value = clean(row.get("値", "")) if row else ""
+            if label == "setup / dependency / webServer / teardown":
+                setup_parts = _setup_contract_parts(value)
+                if setup_parts is None:
+                    started_safety_issues.append(
+                        {
+                            "項目": label,
+                            "値": value,
+                            "reason": "setup / dependency / webServer / teardownは空欄なしの4要素が必要",
+                        }
+                    )
+                else:
+                    unresolved_parts = [
+                        {"要素": component, "値": component_value}
+                        for component, component_value in zip(SETUP_CONTRACT_LABELS, setup_parts)
+                        if _is_explicit_unavailable(component_value, set(UNKNOWN_SAFETY_MARKERS))
+                    ]
+                    if unresolved_parts:
+                        started_safety_issues.append(
+                            {
+                                "項目": label,
+                                "値": value,
+                                "reason": "4要素それぞれの状態が未確定",
+                                "未確定要素": unresolved_parts,
+                            }
+                        )
+                continue
+            if label == "run外準備" and not _external_preparation_confirmed(value):
+                started_safety_issues.append(
+                    {
+                        "項目": label,
+                        "値": value,
+                        "reason": "runner開始時はrun外準備を実施または実施不要として確定する必要がある",
+                    }
+                )
+                continue
             if _is_explicit_unavailable(value, set(UNKNOWN_SAFETY_MARKERS)):
                 started_safety_issues.append({"項目": label, "値": value})
                 continue

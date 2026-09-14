@@ -30,7 +30,7 @@
 | --- | --- | --- | --- | --- | --- | --- | ---: | --- | --- |
 | login-flow | session-test-1 | 開始 | passed |  | passed | expected | 1 | passed (retry 0) | result-1 |
 
-開始済みresolved primaryは、`結果`へTestResult.status、`実行結果参照`、expectedStatus、Playwrightから取得したresolved TestCase単位のraw `outcome`、1以上のretry attempt数を記録し、`未実行理由`を空欄にします。retry attempt数がNの場合、`初回 / retry履歴`には`retry 0`から`retry N-1`までを欠落・重複・範囲外なく保持します。`outcome = flaky`はこのreportだけで明白な矛盾となる1件未満のattempt数にしません。未開始resolved primaryは、`実行開始`を明示し、`結果`・`実行結果参照`・expectedStatus・outcomeを空欄にし、`未実行理由`を記録し、retry attempt数を0、初回 / retry履歴を空欄にします。resolved primary自体が0件のpreflight blockでは、traceの実行参照欄に架空のresultや未実行理由そのものを識別子として置かず、logical primary識別子を参照し、未実行理由は専用列へ記録します。
+開始済みresolved primaryは、`結果`へTestResult.status、`実行結果参照`、expectedStatus、Playwrightから取得したresolved TestCase単位のraw `outcome`、1以上のretry attempt数を記録し、`未実行理由`を空欄にします。retry attempt数がNの場合、`初回 / retry履歴`には`<TestResult.status> (retry <number>)`のcanonical entryをN件、`retry 0`から`retry N-1`の出現順で欠落・重複・範囲外なく保持し、末尾statusを`結果`と一致させます。`outcome = flaky`はこのreportだけで明白な矛盾となる2件未満のattempt数にせず、expected側 / unexpected側のattemptが混在しない履歴をflakyとして記録しません。未開始resolved primaryは、`実行開始`を明示し、`結果`・`実行結果参照`・expectedStatus・outcomeを空欄にし、`未実行理由`を記録し、retry attempt数を0、初回 / retry履歴を空欄にします。resolved primary自体が0件のpreflight blockでは、traceの実行参照欄に架空のresultや未実行理由そのものを識別子として置かず、logical primary識別子を参照し、未実行理由は専用列へ記録します。
 
 ## TC・E2E・実行・分析追跡
 

@@ -730,6 +730,11 @@ class E2EContractTests(unittest.TestCase):
             "| runner管理 | 対象なし | runner未開始 | execution |",
         )
         self.assert_pass("e2e-test-execution", preflight_block, {})
+        self.assert_pass(
+            "e2e-test-execution",
+            preflight_block.replace("| run外準備 | 対象なし | repo | raw fact |", "| run外準備 | 未確認 | repo | raw fact |"),
+            {},
+        )
         self.assert_fails(
             "e2e-test-execution",
             preflight_block.replace("| Playwright run全体status | 未確認 | reporter / API / 確認不能 | 確認不能 |", "| Playwright run全体status | passed | reporter | raw fact |"),
@@ -1433,6 +1438,45 @@ class E2EContractTests(unittest.TestCase):
     def test_e2e_execution_preflight_and_cleanup_contracts(self):
         execution = self.execution_output()
         side_effect_row = "| 副作用の許可範囲 / 最大回数 | test data only / max 1 | ユーザー提供情報 | raw fact |"
+        self.assert_fails(
+            "e2e-test-execution",
+            execution.replace("| run外準備 | 対象なし | repo | raw fact |", "| run外準備 | 未確認 | repo | raw fact |"),
+            {},
+            "E2E-EXEC-D026",
+        )
+        no_webserver = execution.replace(
+            "| setup / dependency / webServer / teardown | runner / none / webServer設定あり / runner | repo | raw fact |",
+            "| setup / dependency / webServer / teardown | runner / none / webServerなし / none | repo | raw fact |",
+        ).replace(
+            "| app | 今回runが起動 | 今回runが所有 | 新規起動 | 対象 | Playwright起動時のprocess確認 |\n",
+            "",
+        ).replace(
+            "| runner管理 | 成功 | 残存なし | reporter |",
+            "| runner管理 | 対象なし | cleanup対象なし | reporter |",
+        ).replace(
+            "| runner管理cleanup対象 / 方法 | webServer app / Playwright runner管理 | repo | raw fact |",
+            "| runner管理cleanup対象 / 方法 | 対象なし | repo | raw fact |",
+        )
+        for incomplete_setup in (
+            "未確認 / none / webServerなし / none",
+            "runner / 未確認 / webServerなし / none",
+            "runner / none / 未確認 / none",
+            "runner / none / webServerなし / 未確認",
+            "runner / none / webServerなし",
+        ):
+            self.assert_fails(
+                "e2e-test-execution",
+                no_webserver.replace("runner / none / webServerなし / none", incomplete_setup),
+                {},
+                "E2E-EXEC-D026",
+            )
+        self.assert_pass("e2e-test-execution", no_webserver, {})
+        for no_preparation in ("対象なし", "なし", "不要", "none", "n/a", "-"):
+            self.assert_pass(
+                "e2e-test-execution",
+                no_webserver.replace("| run外準備 | 対象なし | repo | raw fact |", f"| run外準備 | {no_preparation} | repo | raw fact |"),
+                {},
+            )
         blank_resolved_start = execution.replace(
             "| result-1 | login-flow | tests/auth/login.spec.ts > login succeeds | chromium | 0 | 開始 | passed | passed | expected |",
             "| result-1 | login-flow | tests/auth/login.spec.ts > login succeeds | chromium | 0 |  | passed | passed | expected |",
@@ -1593,12 +1637,34 @@ class E2EContractTests(unittest.TestCase):
         report = self.reporting_output()
         resolved_row = "| login-flow | result-1 | 開始 | passed |  | passed | expected | 1 | passed (retry 0) | result-1 |"
         self.assert_pass("e2e-test-reporting", report, {})
+
+        def flaky_report(result, expected_status, history):
+            return report.replace(
+                resolved_row,
+                f"| login-flow | result-1 | 開始 | {result} |  | {expected_status} | flaky | 2 | {history} | result-1 |",
+            )
+
+        for result, expected_status, history in (
+            ("passed", "passed", "failed (retry 0) -> passed (retry 1)"),
+            ("failed", "failed", "passed (retry 0) -> failed (retry 1)"),
+            ("failed", "skipped", "skipped (retry 0) -> failed (retry 1)"),
+        ):
+            self.assert_pass("e2e-test-reporting", flaky_report(result, expected_status, history), {})
         retry_report = report.replace(
             resolved_row,
             "| login-flow | result-1 | 開始 | passed |  | passed | flaky | 2 | failed (retry 0) -> passed (retry 1) | result-1 |",
         )
         self.assert_pass("e2e-test-reporting", retry_report, {})
-        for history in ("passed (retry 1)", "failed (retry 0) -> passed (retry 0)", "failed (retry 0) -> passed (retry 2)"):
+        for history in (
+            "passed (retry 1)",
+            "failed (retry 0) -> passed (retry 0)",
+            "failed (retry 0) -> passed (retry 2)",
+            "passed (retry 0) -> passed (retry 1)",
+            "passed (retry 0) -> failed (retry 1)",
+            "failed (retry 1) -> passed (retry 0)",
+            "error (retry 0) -> passed (retry 1)",
+            "skipped (retry 0) -> passed (retry 1)",
+        ):
             self.assert_fails(
                 "e2e-test-reporting",
                 retry_report.replace("failed (retry 0) -> passed (retry 1)", history),
