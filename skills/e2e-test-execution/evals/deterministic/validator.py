@@ -16,6 +16,7 @@ EXECUTION_CLASSES = {"要求primary test", "project dependencyとして付随実
 CLEANUP_STATES = {"成功", "失敗", "未確認", "対象なし", "意図的に残した状態", "一部失敗"}
 STARTED_MARKERS = {"開始", "開始済み", "実行済み", "はい"}
 NOT_STARTED_MARKERS = {"", "未開始", "未実行", "未実施", "いいえ", "対象なし"}
+RESOLVED_NOT_STARTED_MARKERS = NOT_STARTED_MARKERS - {""}
 NON_OWNER_MARKERS = {"今回runは所有しない", "今回runが所有しない", "所有しない", "非所有", "今回runの所有ではない"}
 NOT_CLEANUP_MARKERS = {"対象外", "対象なし", "cleanup対象外", "終了対象外", "終了しない", "しない"}
 ACTUAL_REUSE_NON_CLEANUP_MARKERS = {"対象外", "対象なし", "cleanup対象外", "終了対象外"}
@@ -36,7 +37,8 @@ RUN_START_REQUIRED_CONDITIONS = {
     "setup / dependency / webServer / teardown",
     "必要な認証 / テストデータ / 開始状態",
     "副作用の許可範囲 / 最大回数",
-    "cleanup方法",
+    "runner管理cleanup対象 / 方法",
+    "run外cleanup対象 / 方法",
 }
 REQUIRED_EXECUTION_CONDITIONS = RUN_START_REQUIRED_CONDITIONS | {"run外準備"}
 
@@ -60,6 +62,18 @@ def _webserver_state(setup_value: str) -> str:
     if "webserver" in lowered and any(token in lowered for token in ("none", "なし", "対象なし", "未使用")):
         return "none"
     return "configured"
+
+
+def _teardown_candidate(setup_value: str) -> str:
+    parts = [clean(part) for part in clean(setup_value).split("/")]
+    return parts[3] if len(parts) >= 4 else ""
+
+
+def _has_explicit_runner_cleanup_target(setup_value: str) -> bool:
+    candidate = _teardown_candidate(setup_value)
+    if not candidate or _is_explicit_unavailable(candidate, set(UNKNOWN_SAFETY_MARKERS)):
+        return False
+    return candidate.lower() not in {"none", "n/a", "なし", "対象なし", "未使用", "-"}
 
 
 def _as_nonnegative_int(value: str) -> int | None:
@@ -111,10 +125,13 @@ def _has_concrete_side_effect_limit(value: str) -> bool:
     value = clean(value)
     if not value or value.lower() in {"確認済み", "確認完了", "ok", "checked", "問題なし"}:
         return False
-    if not re.search(r"(?:max(?:imum)?\s*\d+|最大\s*\d+|\d+\s*(?:回|times)(?:まで)?)", value, re.IGNORECASE):
+    parts = re.split(r"[/／]", value, maxsplit=1)
+    if len(parts) != 2:
         return False
-    scope = re.split(r"[/／,、;；]", value, maxsplit=1)[0].strip()
-    return bool(scope) and scope.lower() not in {"確認済み", "確認完了", "ok", "checked", "問題なし"}
+    scope, count = (part.strip() for part in parts)
+    if not scope or scope.lower() in {"確認済み", "確認完了", "ok", "checked", "問題なし"}:
+        return False
+    return re.search(r"(?:max(?:imum)?\s*\d+|最大\s*\d+|\d+\s*(?:回|times)(?:まで)?)", count, re.IGNORECASE) is not None
 
 
 def _has_concrete_cleanup_method(value: str) -> bool:
@@ -151,6 +168,77 @@ def _external_preparation_performed(condition_by_item: dict[str, dict[str, str]]
     if value in {"実施", "実施済み"}:
         return True
     return value.startswith(("実施（", "実施(", "実施:", "実施："))
+
+
+def _compute_expected_testcase_outcome(expected_status: str, attempt_statuses: list[str]) -> str:
+    skipped = 0
+    did_not_run = 0
+    expected = 0
+    interrupted = 0
+    unexpected = 0
+    for status in attempt_statuses:
+        if status == "interrupted":
+            interrupted += 1
+        elif status == "skipped" and expected_status == "skipped":
+            skipped += 1
+        elif status == "skipped":
+            did_not_run += 1
+        elif status == expected_status:
+            expected += 1
+        else:
+            unexpected += 1
+
+    if expected == 0 and unexpected == 0:
+        return "skipped"
+    if unexpected == 0:
+        return "expected"
+    if expected == 0 and skipped == 0:
+        return "unexpected"
+    return "flaky"
+
+
+def _attempt_sequence_issues(
+    rows: list[dict[str, str]],
+    group_key,
+) -> tuple[list[dict], list[dict]]:
+    grouped: dict[object, list[dict[str, str]]] = {}
+    for row in rows:
+        grouped.setdefault(group_key(row), []).append(row)
+
+    duplicate_keys = []
+    order_issues = []
+    for group, group_rows in grouped.items():
+        seen = set()
+        for row in group_rows:
+            key = (
+                _as_nonnegative_int(row.get("attempt番号", "")),
+                _as_nonnegative_int(row.get("retry番号", "")),
+            )
+            if key in seen:
+                duplicate_keys.append({"group": group, "attempt": key})
+            seen.add(key)
+        ordered = sorted(
+            group_rows,
+            key=lambda row: (
+                _as_nonnegative_int(row.get("attempt番号", ""))
+                if _as_nonnegative_int(row.get("attempt番号", "")) is not None
+                else -1,
+                _as_nonnegative_int(row.get("retry番号", ""))
+                if _as_nonnegative_int(row.get("retry番号", "")) is not None
+                else -1,
+            ),
+        )
+        attempt_numbers = [_as_nonnegative_int(row.get("attempt番号", "")) for row in ordered]
+        retry_numbers = [_as_nonnegative_int(row.get("retry番号", "")) for row in ordered]
+        if attempt_numbers != list(range(1, len(ordered) + 1)) or retry_numbers != list(range(len(ordered))):
+            order_issues.append(
+                {
+                    "group": group,
+                    "attempt_numbers": attempt_numbers,
+                    "retry_numbers": retry_numbers,
+                }
+            )
+    return duplicate_keys, order_issues
 
 
 def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
@@ -258,6 +346,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         else None,
     )
     webserver_rows = nonempty_rows(webserver_table)
+    setup_value = clean(condition_by_item.get("setup / dependency / webServer / teardown", {}).get("値", ""))
     started_safety_issues = []
     if runner_started:
         for label in sorted(RUN_START_REQUIRED_CONDITIONS):
@@ -270,15 +359,17 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                 started_safety_issues.append({"項目": label, "値": value, "reason": "対象URL / originの具体値がない"})
             elif label == "副作用の許可範囲 / 最大回数" and not _has_concrete_side_effect_limit(value):
                 started_safety_issues.append({"項目": label, "値": value, "reason": "許可する副作用と最大回数の具体値がない"})
-            elif label == "cleanup方法" and not _has_concrete_cleanup_method(value):
-                started_safety_issues.append({"項目": label, "値": value, "reason": "cleanupの実行主体または方法の具体値がない"})
-            elif label == "cleanup方法" and NO_CLEANUP_METHOD_RE.fullmatch(value):
+            elif label in {"runner管理cleanup対象 / 方法", "run外cleanup対象 / 方法"} and not _has_concrete_cleanup_method(value):
+                started_safety_issues.append({"項目": label, "値": value, "reason": "cleanupの対象または方法の具体値がない"})
+            elif label == "runner管理cleanup対象 / 方法" and NO_CLEANUP_METHOD_RE.fullmatch(value):
                 runner_owned_cleanup_targets = [
                     clean(server.get("server識別子", ""))
                     for server in webserver_rows
                     if _is_run_owned(server.get("今回run所有か", ""))
                     and _is_cleanup_target(server.get("cleanup対象か", ""))
                 ]
+                if _has_explicit_runner_cleanup_target(setup_value):
+                    runner_owned_cleanup_targets.append(f"teardown:{_teardown_candidate(setup_value)}")
                 if runner_owned_cleanup_targets:
                     started_safety_issues.append(
                         {
@@ -294,7 +385,6 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         "runner開始済みなら実行開始前に確定が必要な安全情報を未確認のまま実行しないこと",
         evidence=started_safety_issues or None,
     )
-    setup_value = clean(condition_by_item.get("setup / dependency / webServer / teardown", {}).get("値", ""))
     webserver_state = _webserver_state(setup_value)
     webserver_issues = []
     actual_webserver_ids = [clean(row.get("server識別子", "")) for row in webserver_rows if clean(row.get("server識別子", ""))]
@@ -468,7 +558,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         expected_status = clean(row.get("expectedStatus", ""))
         outcome = clean(row.get("outcome", ""))
         started = start_state in STARTED_MARKERS
-        not_started = start_state in NOT_STARTED_MARKERS
+        not_started = start_state in RESOLVED_NOT_STARTED_MARKERS
         if not started and not not_started:
             start_state_issues.append({"ref": ref, "value": start_state, "reason": "開始済み / 未開始の既存markerで閉じていない"})
         resolved_identity_fields = ("resolved primary TestCase参照", "論理要求primary対象", "test file / title path", "project", "repeatEachIndex")
@@ -553,7 +643,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     unstarted_refs = {
         clean(row.get("resolved primary TestCase参照", ""))
         for row in resolved_rows
-        if clean(row.get("実行開始", "")) in NOT_STARTED_MARKERS
+        if clean(row.get("実行開始", "")) in RESOLVED_NOT_STARTED_MARKERS
     }
     missing_started_attempts = sorted(started_refs - primary_attempt_refs)
     unstarted_attempt_refs = sorted(primary_attempt_refs & unstarted_refs)
@@ -591,28 +681,36 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     )
 
     primary_attempts_by_ref: dict[str, list[dict[str, str]]] = {}
-    duplicate_attempt_keys = []
-    seen_attempt_keys = set()
     for row in primary_attempt_rows:
-        ref = clean(row.get("resolved primary TestCase参照", ""))
-        key = (ref, _as_nonnegative_int(row.get("attempt番号", "")), _as_nonnegative_int(row.get("retry番号", "")))
-        if key in seen_attempt_keys:
-            duplicate_attempt_keys.append(key)
-        seen_attempt_keys.add(key)
-        primary_attempts_by_ref.setdefault(ref, []).append(row)
-    attempt_order_issues = []
-    for ref, rows in primary_attempts_by_ref.items():
-        ordered = sorted(rows, key=lambda row: (_as_nonnegative_int(row.get("attempt番号", "")) or -1, _as_nonnegative_int(row.get("retry番号", "")) or -1))
-        attempt_numbers = [_as_nonnegative_int(row.get("attempt番号", "")) for row in ordered]
-        retry_numbers = [_as_nonnegative_int(row.get("retry番号", "")) for row in ordered]
-        expected_attempt_numbers = list(range(1, len(ordered) + 1))
-        expected_retry_numbers = list(range(0, len(ordered)))
-        if attempt_numbers != expected_attempt_numbers or retry_numbers != expected_retry_numbers:
-            attempt_order_issues.append({"resolved_ref": ref, "attempt_numbers": attempt_numbers, "retry_numbers": retry_numbers})
+        primary_attempts_by_ref.setdefault(clean(row.get("resolved primary TestCase参照", "")), []).append(row)
+    dependency_or_teardown_classes = {
+        "project dependencyとして付随実行されたtest",
+        "project teardownとして付随実行されたtest",
+        "dependency",
+        "teardown",
+    }
+    dependency_or_teardown_attempt_rows = [
+        row for row in attempts if clean(row.get("実行区分", "")) in dependency_or_teardown_classes
+    ]
+    sequence_rows = primary_attempt_rows + dependency_or_teardown_attempt_rows
+    duplicate_attempt_keys, attempt_order_issues = _attempt_sequence_issues(
+        sequence_rows,
+        lambda row: (
+            "要求primary test",
+            clean(row.get("resolved primary TestCase参照", "")),
+        )
+        if clean(row.get("実行区分", "")) == "要求primary test"
+        else (
+            clean(row.get("実行区分", "")),
+            clean(row.get("test file / title path", "")),
+            clean(row.get("project", "")),
+            _as_nonnegative_int(row.get("repeatEachIndex", "")),
+        ),
+    )
     result.add(
         "E2E-EXEC-D033",
         not duplicate_attempt_keys and not attempt_order_issues,
-        "primary attemptの番号・retry番号が一意で初回から連番であること",
+        "primary / dependency / teardown attemptの番号・retry番号がTestCase単位で一意かつ初回から連番であること",
         evidence={"duplicates": duplicate_attempt_keys, "order": attempt_order_issues} if duplicate_attempt_keys or attempt_order_issues else None,
     )
 
@@ -634,19 +732,14 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             result_attempt_issues.append({"resolved_ref": ref, "resolved_status": resolved_status, "last_attempt_status": last_status})
         expected_status = clean(row.get("expectedStatus", ""))
         outcome = clean(row.get("outcome", ""))
-        if outcome == "flaky" and len(candidate_attempts) < 2:
-            result_attempt_issues.append({"resolved_ref": ref, "outcome": outcome, "reason": "flakyには2件以上のprimary attemptが必要"})
-        if len(candidate_attempts) == 1 and expected_status in {"passed", "failed"}:
-            only_status = clean(candidate_attempts[0].get("status", ""))
-            if only_status in {"passed", "failed"}:
-                expected_outcome = "expected" if only_status == expected_status else "unexpected"
-            else:
-                expected_outcome = ""
-            if expected_outcome and outcome != expected_outcome:
+        if expected_status in EXPECTED_STATUSES and outcome in OUTCOMES:
+            attempt_statuses = [clean(attempt.get("status", "")) for attempt in candidate_attempts]
+            expected_outcome = _compute_expected_testcase_outcome(expected_status, attempt_statuses)
+            if outcome != expected_outcome:
                 result_attempt_issues.append(
                     {
                         "resolved_ref": ref,
-                        "attempt_status": only_status,
+                        "attempt_statuses": attempt_statuses,
                         "expectedStatus": expected_status,
                         "outcome": outcome,
                         "expected_outcome": expected_outcome,
@@ -655,7 +748,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     result.add(
         "E2E-EXEC-D034",
         not result_attempt_issues,
-        "resolved primaryの結果statusが最後に実行されたprimary attemptのstatusと一致すること",
+        "resolved primaryの結果statusが最後のprimary attemptと一致し、TestCase.outcome()がPlaywright公式集計と整合すること",
         evidence=result_attempt_issues or None,
     )
 
@@ -675,24 +768,33 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     result.add("E2E-EXEC-D012", bool(cleanup_rows) and not invalid_cleanup and not cleanup_contract_issues, "cleanup状態と実行主体を区別し、結果・確認元を記録すること", evidence={"missing_cleanup_rows": not cleanup_rows, "invalid": invalid_cleanup, "contract": cleanup_contract_issues} if not cleanup_rows or invalid_cleanup or cleanup_contract_issues else None)
     cleanup_unconfirmed = any(clean(row.get("状態", "")) in {"失敗", "未確認", "一部失敗"} for row in cleanup_rows)
     result.add("E2E-EXEC-D013", execution_state in {"完了", "ブロック中", "要再確認"} and not (cleanup_unconfirmed and execution_state == "完了"), "cleanup失敗 / 未確認を安全な完了扱いにせず、実行成果物状態を明示すること", evidence={"cleanup": [row.get("状態") for row in cleanup_rows], "execution_state": execution_state} if execution_state not in {"完了", "ブロック中", "要再確認"} or (cleanup_unconfirmed and execution_state == "完了") else None)
-    external_cleanup_success = [
-        row.get("cleanup対象 / 実行主体", "")
-        for row in cleanup_rows
-        if clean(row.get("状態", "")) == "成功" and _cleanup_subject(row.get("cleanup対象 / 実行主体", "")) == "external"
+    external_cleanup_rows = [
+        row for row in cleanup_rows if _cleanup_subject(row.get("cleanup対象 / 実行主体", "")) == "external"
     ]
-    external_cleanup_without_preparation = bool(external_cleanup_success) and not _external_preparation_performed(condition_by_item)
+    external_cleanup_with_contract_gap = [
+        {
+            "cleanup": row.get("cleanup対象 / 実行主体", ""),
+            "state": clean(row.get("状態", "")),
+            "contract": condition_by_item.get("run外cleanup対象 / 方法", {}).get("値", ""),
+        }
+        for row in external_cleanup_rows
+        if clean(row.get("状態", "")) in {"成功", "失敗", "未確認", "一部失敗", "意図的に残した状態"}
+        and (
+            not _has_concrete_cleanup_method(condition_by_item.get("run外cleanup対象 / 方法", {}).get("値", ""))
+            or NO_CLEANUP_METHOD_RE.fullmatch(clean(condition_by_item.get("run外cleanup対象 / 方法", {}).get("値", "")))
+        )
+    ]
     result.add(
         "E2E-EXEC-D027",
-        not external_cleanup_without_preparation,
-        "run外cleanupの成功は、独立した実行条件のrun外準備が実施済みの場合だけ許容すること",
-        evidence={"cleanup": external_cleanup_success, "run外準備": condition_by_item.get("run外準備", {}).get("値", "")}
-        if external_cleanup_without_preparation
+        not external_cleanup_with_contract_gap,
+        "run外cleanupの実績がある場合、run外準備の有無ではなく事前のrun外cleanup契約と対応すること",
+        evidence=external_cleanup_with_contract_gap
+        if external_cleanup_with_contract_gap
         else None,
     )
 
     external_cleanup_issues = []
     if _external_preparation_performed(condition_by_item):
-        external_cleanup_rows = [row for row in cleanup_rows if _cleanup_subject(row.get("cleanup対象 / 実行主体", "")) == "external"]
         if not external_cleanup_rows:
             external_cleanup_issues.append("run外準備に対応するrun外cleanup行がない")
         elif any(
@@ -715,16 +817,19 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         and _is_run_owned(row.get("今回run所有か", ""))
         and _is_cleanup_target(row.get("cleanup対象か", ""))
     ]
+    known_runner_cleanup_targets = list(runner_owned_servers)
+    if runner_started and _has_explicit_runner_cleanup_target(setup_value):
+        known_runner_cleanup_targets.append(f"teardown:{_teardown_candidate(setup_value)}")
     runner_cleanup_rows = [row for row in cleanup_rows if _cleanup_subject(row.get("cleanup対象 / 実行主体", "")) == "runner"]
-    if runner_owned_servers:
+    if known_runner_cleanup_targets:
         if not runner_cleanup_rows:
-            runner_owned_cleanup_issues.append({"servers": runner_owned_servers, "reason": "runner管理cleanup行がない"})
+            runner_owned_cleanup_issues.append({"targets": known_runner_cleanup_targets, "reason": "runner管理cleanup行がない"})
         elif any(clean(row.get("状態", "")) == "対象なし" for row in runner_cleanup_rows):
-            runner_owned_cleanup_issues.append({"servers": runner_owned_servers, "reason": "cleanup対象のrunner-owned processに対してrunner管理cleanupが対象なし"})
+            runner_owned_cleanup_issues.append({"targets": known_runner_cleanup_targets, "reason": "既知のrunner管理cleanup対象に対してcleanup結果が対象なし"})
     result.add(
         "E2E-EXEC-D029",
         not runner_owned_cleanup_issues,
-        "今回run所有かつcleanup対象のwebServerがある場合、runner管理cleanup行を対応付けること",
+        "既知のrunner管理cleanup対象（今回run所有webServerまたは明示teardown）がある場合、runner管理cleanup行を対応付け、対象なしにしないこと",
         evidence=runner_owned_cleanup_issues or None,
     )
 
@@ -745,7 +850,6 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         if attempts:
             runner_not_started_issues.append({"field": "attempt", "count": len(attempts)})
         successful_cleanup = []
-        external_cleanup = []
         ambiguous_cleanup = []
         for row in cleanup_rows:
             if clean(row.get("状態", "")) != "成功":
@@ -753,14 +857,10 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             subject = _cleanup_subject(row.get("cleanup対象 / 実行主体", ""))
             if subject == "runner":
                 successful_cleanup.append(row.get("cleanup対象 / 実行主体", ""))
-            elif subject == "external":
-                external_cleanup.append(row.get("cleanup対象 / 実行主体", ""))
             elif subject is None:
                 ambiguous_cleanup.append(row.get("cleanup対象 / 実行主体", ""))
         if successful_cleanup:
             runner_not_started_issues.append({"field": "runner管理cleanup", "value": successful_cleanup})
-        if external_cleanup and not _external_preparation_performed(condition_by_item):
-            runner_not_started_issues.append({"field": "run外cleanup", "value": external_cleanup, "reason": "runner開始前に対応するrun外準備が確認できない"})
         if ambiguous_cleanup:
             runner_not_started_issues.append({"field": "cleanup実行主体不明", "value": ambiguous_cleanup})
         for row in webserver_rows:

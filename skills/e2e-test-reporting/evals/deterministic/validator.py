@@ -14,6 +14,7 @@ OUTCOMES = {"skipped", "expected", "unexpected", "flaky"}
 CLEANUP_STATES = {"成功", "失敗", "未確認", "対象なし", "意図的に残した状態", "一部失敗"}
 STARTED_MARKERS = {"開始", "開始済み", "実行済み", "はい"}
 NOT_STARTED_MARKERS = {"", "未開始", "未実行", "未実施", "いいえ", "対象なし"}
+RETRY_NUMBER_RE = re.compile(r"\bretry\s+(\d+)\b", re.IGNORECASE)
 
 
 def _has_unexecuted_reason(value: str) -> bool:
@@ -209,9 +210,27 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     for row in resolved_rows:
         attempt_count = _int(row.get("retry attempt数（別集計）", ""))
         history = clean(row.get("初回 / retry履歴", ""))
-        if attempt_count is not None and attempt_count > 1 and not history:
-            retry_history_issues.append(clean(row.get("resolved primary TestCase参照", "")) or "<unknown>")
-    result.add("E2E-REPORT-D015", not retry_history_issues, "retry発生時に初回 / retry履歴を保持すること", evidence=retry_history_issues or None)
+        if attempt_count is None:
+            continue
+        retry_numbers = [int(number) for number in RETRY_NUMBER_RE.findall(history)]
+        expected_retry_numbers = list(range(attempt_count))
+        issues = []
+        if attempt_count == 0:
+            if retry_numbers or history:
+                issues.append({"reason": "attempt数0ではretry履歴を持たない", "retry_numbers": retry_numbers})
+        elif sorted(retry_numbers) != expected_retry_numbers or len(retry_numbers) != len(set(retry_numbers)):
+            issues.append(
+                {
+                    "reason": "retry番号が0..N-1と完全一致しない、または重複している",
+                    "expected": expected_retry_numbers,
+                    "actual": retry_numbers,
+                }
+            )
+        if clean(row.get("outcome", "")) == "flaky" and attempt_count < 2:
+            issues.append({"reason": "flakyには2件以上のretry attemptが必要", "attempt_count": attempt_count})
+        if issues:
+            retry_history_issues.append({"ref": clean(row.get("resolved primary TestCase参照", "")) or "<unknown>", "issues": issues})
+    result.add("E2E-REPORT-D015", not retry_history_issues, "retry履歴の番号集合が0..N-1と完全一致し、flakyは2件以上のattemptを持つこと", evidence=retry_history_issues or None)
 
     trace_rows = nonempty_rows(trace)
     primary_refs = {

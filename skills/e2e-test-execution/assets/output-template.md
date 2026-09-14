@@ -8,11 +8,12 @@
 | 実行入口 / command chain |  |  | raw fact |
 | Playwright project |  |  | raw fact |
 | retries / repeatEach / workers / parallel |  |  | raw fact |
-| setup / dependency / webServer / teardown |  |  | raw fact |
+| setup / dependency / webServer / teardown | `setup / dependency / webServer / teardown`の4要素 |  | raw fact |
 | run外準備 | 実施 / 対象なし / 未確認 / 確認不能 |  | raw fact |
 | 必要な認証 / テストデータ / 開始状態 |  |  | raw fact / 確認不能 |
-| 副作用の許可範囲 / 最大回数 |  |  | raw fact / 確認不能 |
-| cleanup方法 |  |  | raw fact / 確認不能 |
+| 副作用の許可範囲 / 最大回数 | `<許可範囲> / <最大回数>` |  | raw fact / 確認不能 |
+| runner管理cleanup対象 / 方法 | `<対象と確認済み方法>` / 対象なし |  | raw fact / 確認不能 |
+| run外cleanup対象 / 方法 | `<対象と確認済み方法>` / 対象なし |  | raw fact / 確認不能 |
 | branch / HEAD / working tree |  |  | raw fact |
 | テスト対象version / build ID |  |  | raw fact / 確認不能 |
 
@@ -46,7 +47,7 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | session-test-1 | login-flow | tests/example.spec.ts > login | chromium | 0 | 開始 | passed | passed | expected |
 
-開始済みresolved primaryでは、`結果 / 未実行理由`にPlaywright `TestResult.status`、`expectedStatus`と`outcome`にresolved `TestCase`の値を記録します。未開始resolved primaryでも、resolvedできたTestCaseの参照・論理対象・test file / title path・project・repeatEachIndexは空欄にしません。結果・expectedStatus・outcomeを空欄にし、workflow側の未実行理由だけを記録し、attempt行は作成しません。要求primaryのattempt行は、参照先resolved primaryのfile / title / project / repeatEachIndexと完全一致させます。`outcome = flaky`はretryを含む2件以上のprimary attemptと対応させ、単一attemptのexpected / unexpectedはそのattemptのstatusとexpectedStatusに整合させます。
+開始済みresolved primaryでは、`結果 / 未実行理由`にPlaywright `TestResult.status`、`expectedStatus`と`outcome`にPlaywrightから取得したresolved `TestCase`単位のraw値を記録します。未開始resolved primaryでも、`実行開始`は空欄にせず、resolvedできたTestCaseの参照・論理対象・test file / title path・project・repeatEachIndexは空欄にしません。結果・expectedStatus・outcomeを空欄にし、workflow側の未実行理由だけを記録し、attempt行は作成しません。要求primaryのattempt行は、参照先resolved primaryのfile / title / project / repeatEachIndexと完全一致させます。validatorはPlaywright公式の`computeTestCaseOutcome()`とattempt statusの整合だけを確認し、outcomeを生成して成果物へ書き込みません。
 
 ## attempt結果（retryをresolved件数へ加算しない）
 
@@ -54,7 +55,7 @@
 | --- | ---: | --- | --- | --- | ---: | --- | ---: | --- | --- |
 | session-test-1 | 1 | 要求primary test | tests/example.spec.ts > login | chromium | 0 | passed / failed / timedOut / skipped / interrupted | 0 | 10ms |  |
 
-attempt行はPlaywright `TestResult`単位の事実（status、retry、duration、error / errors）だけを保持します。dependency / teardown行はresolved primary参照を持たず、実行区分、test file / title path、project、repeatEachIndexで識別します。primary attemptだけは`resolved primary TestCase参照`を使ってresolved行のidentityと照合し、dependency / teardownにはこのcross-checkを適用しません。
+attempt行はPlaywright `TestResult`単位の事実（status、retry、duration、error / errors）だけを保持します。dependency / teardown行はresolved primary参照を持たず、`実行区分`、test file / title path、project、repeatEachIndexで識別し、そのTestCase単位でattempt番号`1..N`・retry番号`0..N-1`を重複なく記録します。primary attemptだけは`resolved primary TestCase参照`を使ってresolved行のidentityと照合します。
 
 ## working tree・証跡
 
@@ -72,8 +73,8 @@ attempt行はPlaywright `TestResult`単位の事実（status、retry、duration�
 | runner管理 | 成功 / 失敗 / 未確認 / 対象なし / 意図的に残した状態 |  |  |
 | run外処理 | 成功 / 失敗 / 未確認 / 対象なし / 意図的に残した状態 |  |  |
 
-`cleanup不要`、`対象なし`、`不要`は、既知のcleanup対象が存在しない場合に記録できます。今回run所有かつcleanup対象のwebServerがある場合は、実際のrunner管理cleanup方法を記録します。cleanup方法は`確認済み`等の確認状態だけでは足りず、特定語のallow-listに依存しない通常の具体的な説明を記録します。
+`setup / dependency / webServer / teardown`の4番目が`none` / `なし` / `対象なし` / `未使用`等でなければ、明示的なrunner管理cleanup対象として扱います。`cleanup不要`、`対象なし`、`不要`は、既知のcleanup対象が存在しない場合にrunner管理またはrun外の契約へ記録できます。今回run所有かつcleanup対象のwebServer、または明示teardownがある場合は、runner管理cleanup対象 / 方法とcleanup表のrunner管理行を対応付けます。run外cleanupの実績は、run外準備の有無ではなく、事前に確認したrun外cleanup対象 / 方法と対応付けます。各cleanup契約は`確認済み`等の確認状態だけでは足りず、特定語のallow-listに依存しない通常の具体的な説明を記録します。
 
 - 実行成果物状態: 完了 / ブロック中 / 要再確認
 - ブロック中: preflight blockの場合はrunner未開始・artifact未生成の理由
-- run外cleanupを成功と記録する場合は、実行条件の`run外準備`を`実施`または`実施（詳細）`として構造化して記録します。`run外なし`、`外部準備なし`、`seedなし`等の否定表現は準備実施の根拠になりません。
+- run外cleanupが成功 / 失敗 / 未確認 / 一部失敗 / 意図的に残した状態の場合は、実行条件のrun外cleanup対象 / 方法を`対象なし`以外の具体値として事前確認します。run外準備を実施した場合だけは、cleanup行を必ず対応付け、対象なしなら不要の根拠を記録します。`run外なし`、`外部準備なし`、`seedなし`等の否定表現は準備実施の根拠になりません。

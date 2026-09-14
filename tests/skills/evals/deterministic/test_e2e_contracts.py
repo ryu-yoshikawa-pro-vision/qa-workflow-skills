@@ -114,7 +114,8 @@ class E2EContractTests(unittest.TestCase):
 | run外準備 | 対象なし | repo | raw fact |
 | 必要な認証 / テストデータ / 開始状態 | test user / clean account | repo | raw fact |
 | 副作用の許可範囲 / 最大回数 | test data only / max 1 | ユーザー提供情報 | raw fact |
-| cleanup方法 | runner teardown / run外なし | repo | raw fact |
+| runner管理cleanup対象 / 方法 | webServer app / Playwright runner管理 | repo | raw fact |
+| run外cleanup対象 / 方法 | 対象なし | repo | raw fact |
 | branch / HEAD / working tree | feat/e2e / abc123 / clean | repo | raw fact |
 | テスト対象version / build ID | build-1 | 実対象 | raw fact |
 ## Playwright run結果
@@ -751,6 +752,9 @@ class E2EContractTests(unittest.TestCase):
             "| run外準備 | 対象なし | repo | raw fact |",
             "| run外準備 | 実施（seed） | repo | raw fact |",
         ).replace(
+            "| run外cleanup対象 / 方法 | 対象なし | repo | raw fact |",
+            "| run外cleanup対象 / 方法 | seed / cleanup API | repo | raw fact |",
+        ).replace(
             "| run外処理 | 対象なし | run外準備なし | execution |",
             "| run外処理 | 成功 | run外seedをcleanup済み | execution |",
         )
@@ -759,21 +763,27 @@ class E2EContractTests(unittest.TestCase):
             "e2e-test-execution",
             preflight_block.replace("| run外処理 | 対象なし | run外準備なし | execution |", "| run外処理 | 成功 | run外seedをcleanup済み | execution |"),
             {},
-            "E2E-EXEC-D024",
+            "E2E-EXEC-D027",
         )
         misleading_external_cleanup = preflight_block.replace(
             "| setup / dependency / webServer / teardown | runner / none / webServer設定あり / runner | repo | raw fact |",
             "| setup / dependency / webServer / teardown | runner / run外seed / webServer設定あり / runner | repo | raw fact |",
         ).replace(
+            "| run外cleanup対象 / 方法 | 対象なし | repo | raw fact |",
+            "| run外cleanup対象 / 方法 | 対象なし | repo | raw fact |",
+        ).replace(
             "| run外処理 | 対象なし | run外準備なし | execution |",
             "| run外処理 | 成功 | run外seedをcleanup済み | execution |",
         )
-        self.assert_fails("e2e-test-execution", misleading_external_cleanup, {}, "E2E-EXEC-D024")
+        self.assert_fails("e2e-test-execution", misleading_external_cleanup, {}, "E2E-EXEC-D027")
         started_external_cleanup_without_preparation = execution.replace(
+            "| run外cleanup対象 / 方法 | 対象なし | repo | raw fact |",
+            "| run外cleanup対象 / 方法 | test order / cleanup API | repo | raw fact |",
+        ).replace(
             "| run外処理 | 対象なし | run外準備なし | execution |",
             "| run外処理 | 成功 | run外seedをcleanup済み | execution |",
         )
-        self.assert_fails("e2e-test-execution", started_external_cleanup_without_preparation, {}, "E2E-EXEC-D027")
+        self.assert_pass("e2e-test-execution", started_external_cleanup_without_preparation, {})
         started_external_cleanup_with_preparation = started_external_cleanup_without_preparation.replace(
             "| run外準備 | 対象なし | repo | raw fact |",
             "| run外準備 | 実施（seed） | repo | raw fact |",
@@ -915,16 +925,16 @@ class E2EContractTests(unittest.TestCase):
 
         dependency_without_identity = execution.replace(
             "| result-1 | 1 | 要求primary test | tests/auth/login.spec.ts > login succeeds | chromium | 0 | passed | 0 | 10ms |  |\n",
-            "| result-1 | 1 | 要求primary test | tests/auth/login.spec.ts > login succeeds | chromium | 0 | passed | 0 | 10ms |  |\n|  | 2 | project dependencyとして付随実行されたtest |  |  |  | passed | 0 | 5ms |  |\n",
+            "| result-1 | 1 | 要求primary test | tests/auth/login.spec.ts > login succeeds | chromium | 0 | passed | 0 | 10ms |  |\n|  | 1 | project dependencyとして付随実行されたtest |  |  |  | passed | 0 | 5ms |  |\n",
         )
         self.assert_fails("e2e-test-execution", dependency_without_identity, {}, "E2E-EXEC-D010")
         dependency_with_identity = dependency_without_identity.replace(
-            "|  | 2 | project dependencyとして付随実行されたtest |  |  |  | passed | 0 | 5ms |  |",
-            "|  | 2 | project dependencyとして付随実行されたtest | tests/global.setup.ts > create db | setup | 0 | passed | 0 | 5ms |  |",
+            "|  | 1 | project dependencyとして付随実行されたtest |  |  |  | passed | 0 | 5ms |  |",
+            "|  | 1 | project dependencyとして付随実行されたtest | tests/global.setup.ts > create db | setup | 0 | passed | 0 | 5ms |  |",
         )
         teardown_with_identity = dependency_with_identity.replace(
-            "|  | 2 | project dependencyとして付随実行されたtest | tests/global.setup.ts > create db | setup | 0 | passed | 0 | 5ms |  |",
-            "|  | 2 | project teardownとして付随実行されたtest | tests/global.teardown.ts > delete db | teardown | 0 | passed | 0 | 5ms |  |",
+            "|  | 1 | project dependencyとして付随実行されたtest | tests/global.setup.ts > create db | setup | 0 | passed | 0 | 5ms |  |",
+            "|  | 1 | project teardownとして付随実行されたtest | tests/global.teardown.ts > delete db | teardown | 0 | passed | 0 | 5ms |  |",
         )
         self.assert_pass("e2e-test-execution", dependency_with_identity, {})
         self.assert_pass("e2e-test-execution", teardown_with_identity, {})
@@ -947,20 +957,20 @@ class E2EContractTests(unittest.TestCase):
         )
         self.assert_fails(
             "e2e-test-execution",
-            execution.replace("| cleanup方法 | runner teardown / run外なし | repo | raw fact |", "| cleanup方法 | 未確認 | repo | 確認不能 |"),
+            execution.replace("| runner管理cleanup対象 / 方法 | webServer app / Playwright runner管理 | repo | raw fact |", "| runner管理cleanup対象 / 方法 | 未確認 | repo | 確認不能 |"),
             {},
             "E2E-EXEC-D026",
         )
         for value in ("未確認: teardown方法を確認中", "未確認：teardown方法を確認中", "未確認(事前確認待ち)"):
             self.assert_fails(
                 "e2e-test-execution",
-                execution.replace("| cleanup方法 | runner teardown / run外なし | repo | raw fact |", f"| cleanup方法 | {value} | repo | raw fact |"),
+                execution.replace("| runner管理cleanup対象 / 方法 | webServer app / Playwright runner管理 | repo | raw fact |", f"| runner管理cleanup対象 / 方法 | {value} | repo | raw fact |"),
                 {},
                 "E2E-EXEC-D026",
             )
         self.assert_fails(
             "e2e-test-execution",
-            execution.replace("| cleanup方法 | runner teardown / run外なし | repo | raw fact |", "| cleanup方法 | 未実施 | repo | raw fact |"),
+            execution.replace("| runner管理cleanup対象 / 方法 | webServer app / Playwright runner管理 | repo | raw fact |", "| runner管理cleanup対象 / 方法 | 未実施 | repo | raw fact |"),
             {},
             "E2E-EXEC-D026",
         )
@@ -991,7 +1001,7 @@ class E2EContractTests(unittest.TestCase):
         for old, new in (
             ("| 対象URL / origin | https://app.test | 実対象 | raw fact |", "| 対象URL / origin | 確認済み | 実対象 | raw fact |"),
             ("| 副作用の許可範囲 / 最大回数 | test data only / max 1 | ユーザー提供情報 | raw fact |", "| 副作用の許可範囲 / 最大回数 | 確認済み | ユーザー提供情報 | raw fact |"),
-            ("| cleanup方法 | runner teardown / run外なし | repo | raw fact |", "| cleanup方法 | 確認済み | repo | raw fact |"),
+            ("| runner管理cleanup対象 / 方法 | webServer app / Playwright runner管理 | repo | raw fact |", "| runner管理cleanup対象 / 方法 | 確認済み | repo | raw fact |"),
         ):
             self.assert_fails(
                 "e2e-test-execution",
@@ -1010,8 +1020,8 @@ class E2EContractTests(unittest.TestCase):
         self.assert_pass(
             "e2e-test-execution",
             execution.replace(
-                "| cleanup方法 | runner teardown / run外なし | repo | raw fact |",
-                "| cleanup方法 | 「未実施」状態のテストレコードをAPIで削除する | repo | raw fact |",
+                "| runner管理cleanup対象 / 方法 | webServer app / Playwright runner管理 | repo | raw fact |",
+                "| runner管理cleanup対象 / 方法 | 「未実施」状態のテストレコードをAPIで削除する | repo | raw fact |",
             ),
             {},
         )
@@ -1024,8 +1034,8 @@ class E2EContractTests(unittest.TestCase):
             self.assert_pass(
                 "e2e-test-execution",
                 execution.replace(
-                    "| cleanup方法 | runner teardown / run外なし | repo | raw fact |",
-                    f"| cleanup方法 | {cleanup_method} | repo | raw fact |",
+                    "| runner管理cleanup対象 / 方法 | webServer app / Playwright runner管理 | repo | raw fact |",
+                    f"| runner管理cleanup対象 / 方法 | {cleanup_method} | repo | raw fact |",
                 ),
                 {},
             )
@@ -1033,15 +1043,15 @@ class E2EContractTests(unittest.TestCase):
             self.assert_fails(
                 "e2e-test-execution",
                 execution.replace(
-                    "| cleanup方法 | runner teardown / run外なし | repo | raw fact |",
-                    f"| cleanup方法 | {no_cleanup} | repo | raw fact |",
+                    "| runner管理cleanup対象 / 方法 | webServer app / Playwright runner管理 | repo | raw fact |",
+                    f"| runner管理cleanup対象 / 方法 | {no_cleanup} | repo | raw fact |",
                 ),
                 {},
                 "E2E-EXEC-D026",
             )
         no_cleanup_target = execution.replace(
             "| setup / dependency / webServer / teardown | runner / none / webServer設定あり / runner | repo | raw fact |",
-            "| setup / dependency / webServer / teardown | runner / none / webServerなし / runner | repo | raw fact |",
+            "| setup / dependency / webServer / teardown | runner / none / webServerなし / none | repo | raw fact |",
         ).replace(
             "| app | 今回runが起動 | 今回runが所有 | 新規起動 | 対象 | Playwright起動時のprocess確認 |\n",
             "",
@@ -1053,8 +1063,8 @@ class E2EContractTests(unittest.TestCase):
             self.assert_pass(
                 "e2e-test-execution",
                 no_cleanup_target.replace(
-                    "| cleanup方法 | runner teardown / run外なし | repo | raw fact |",
-                    f"| cleanup方法 | {no_cleanup} | repo | raw fact |",
+                    "| runner管理cleanup対象 / 方法 | webServer app / Playwright runner管理 | repo | raw fact |",
+                    f"| runner管理cleanup対象 / 方法 | {no_cleanup} | repo | raw fact |",
                 ),
                 {},
             )
@@ -1418,6 +1428,194 @@ class E2EContractTests(unittest.TestCase):
             report.replace("| login-flow | tests/auth/login.spec.ts > login succeeds | TC-101 | 1 | 1 |  |  |\n", ""),
             {},
             "E2E-REPORT-D019",
+        )
+
+    def test_e2e_execution_preflight_and_cleanup_contracts(self):
+        execution = self.execution_output()
+        side_effect_row = "| 副作用の許可範囲 / 最大回数 | test data only / max 1 | ユーザー提供情報 | raw fact |"
+        blank_resolved_start = execution.replace(
+            "| result-1 | login-flow | tests/auth/login.spec.ts > login succeeds | chromium | 0 | 開始 | passed | passed | expected |",
+            "| result-1 | login-flow | tests/auth/login.spec.ts > login succeeds | chromium | 0 |  | passed | passed | expected |",
+        )
+        self.assert_fails("e2e-test-execution", blank_resolved_start, {}, "E2E-EXEC-D030")
+        for count_only in ("max 1", "maximum 1", "最大1回", "1回まで", "確認済み / 最大1回"):
+            self.assert_fails(
+                "e2e-test-execution",
+                execution.replace(side_effect_row, f"| 副作用の許可範囲 / 最大回数 | {count_only} | ユーザー提供情報 | raw fact |"),
+                {},
+                "E2E-EXEC-D026",
+            )
+        for scoped_limit in ("test data only / max 1", "テスト用注文の作成のみ / 最大1回", "通知送信はテスト宛先のみ / 1回まで"):
+            self.assert_pass(
+                "e2e-test-execution",
+                execution.replace(side_effect_row, f"| 副作用の許可範囲 / 最大回数 | {scoped_limit} | ユーザー提供情報 | raw fact |"),
+                {},
+            )
+
+        external_contract = "| run外cleanup対象 / 方法 | 対象なし | repo | raw fact |"
+        external_result = "| run外処理 | 対象なし | run外準備なし | execution |"
+        declared_external_cleanup = execution.replace(
+            external_contract,
+            "| run外cleanup対象 / 方法 | test order / cleanup API | repo | raw fact |",
+        ).replace(
+            external_result,
+            "| run外処理 | 成功 | E2Eで作成したtest orderを削除済み | execution |",
+        )
+        self.assert_pass("e2e-test-execution", declared_external_cleanup, {})
+        for state, detail in (("成功", "seedを削除済み"), ("失敗", "seed削除に失敗")):
+            self.assert_fails(
+                "e2e-test-execution",
+                execution.replace(external_result, f"| run外処理 | {state} | {detail} | execution |").replace(
+                    external_contract,
+                    "| run外cleanup対象 / 方法 | 対象なし | repo | raw fact |",
+                ),
+                {},
+                "E2E-EXEC-D027",
+            )
+        prepared_without_cleanup = execution.replace(
+            "| run外準備 | 対象なし | repo | raw fact |",
+            "| run外準備 | 実施（seed） | repo | raw fact |",
+        ).replace(
+            external_result,
+            "| run外処理 | 対象なし | cleanup不要：seed処理が永続的副作用を残さない根拠を確認 | execution |",
+        )
+        self.assert_pass("e2e-test-execution", prepared_without_cleanup, {})
+
+        explicit_teardown = execution.replace(
+            "| setup / dependency / webServer / teardown | runner / none / webServer設定あり / runner | repo | raw fact |",
+            "| setup / dependency / webServer / teardown | runner / none / webServer設定あり / project teardown | repo | raw fact |",
+        ).replace(
+            "| runner管理cleanup対象 / 方法 | webServer app / Playwright runner管理 | repo | raw fact |",
+            "| runner管理cleanup対象 / 方法 | project teardown / Playwright runner管理 | repo | raw fact |",
+        )
+        self.assert_pass("e2e-test-execution", explicit_teardown, {})
+        self.assert_fails(
+            "e2e-test-execution",
+            explicit_teardown.replace(
+                "| runner管理cleanup対象 / 方法 | project teardown / Playwright runner管理 | repo | raw fact |",
+                "| runner管理cleanup対象 / 方法 | 対象なし | repo | raw fact |",
+            ),
+            {},
+            "E2E-EXEC-D026",
+        )
+        self.assert_fails(
+            "e2e-test-execution",
+            explicit_teardown.replace("| runner管理 | 成功 | 残存なし | reporter |", "| runner管理 | 対象なし | cleanup対象なし | reporter |"),
+            {},
+            "E2E-EXEC-D029",
+        )
+
+        no_known_cleanup_target = execution.replace(
+            "| setup / dependency / webServer / teardown | runner / none / webServer設定あり / runner | repo | raw fact |",
+            "| setup / dependency / webServer / teardown | runner / none / webServerなし / none | repo | raw fact |",
+        ).replace(
+            "| app | 今回runが起動 | 今回runが所有 | 新規起動 | 対象 | Playwright起動時のprocess確認 |\n",
+            "",
+        ).replace(
+            "| runner管理 | 成功 | 残存なし | reporter |",
+            "| runner管理 | 対象なし | cleanup対象なし | reporter |",
+        ).replace(
+            "| runner管理cleanup対象 / 方法 | webServer app / Playwright runner管理 | repo | raw fact |",
+            "| runner管理cleanup対象 / 方法 | 対象なし | repo | raw fact |",
+        )
+        for no_cleanup in ("cleanup不要", "対象なし", "不要"):
+            self.assert_pass(
+                "e2e-test-execution",
+                no_known_cleanup_target.replace(
+                    "| runner管理cleanup対象 / 方法 | 対象なし | repo | raw fact |",
+                    f"| runner管理cleanup対象 / 方法 | {no_cleanup} | repo | raw fact |",
+                ),
+                {},
+            )
+
+    def test_e2e_execution_outcome_and_retry_contracts(self):
+        execution = self.execution_output()
+        resolved_row = "| result-1 | login-flow | tests/auth/login.spec.ts > login succeeds | chromium | 0 | 開始 | passed | passed | expected |"
+        attempt_row = "| result-1 | 1 | 要求primary test | tests/auth/login.spec.ts > login succeeds | chromium | 0 | passed | 0 | 10ms |  |"
+
+        def one_attempt(status, expected_status, outcome):
+            resolved = resolved_row.replace("| 開始 | passed | passed | expected |", f"| 開始 | {status} | {expected_status} | {outcome} |")
+            attempt = attempt_row.replace("| passed | 0 |", f"| {status} | 0 |")
+            return execution.replace(resolved_row, resolved).replace(attempt_row, attempt)
+
+        self.assert_fails(
+            "e2e-test-execution",
+            execution.replace(resolved_row, resolved_row.replace("| expected |", "| flaky |"))
+            .replace(attempt_row, attempt_row.replace("| passed | 0 |", "| failed | 0 |") + "\n" + attempt_row.replace("| 1 | 要求primary test |", "| 2 | 要求primary test |").replace("| passed | 0 |", "| failed | 1 |")),
+            {},
+            "E2E-EXEC-D034",
+        )
+        flaky_pass = execution.replace(resolved_row, resolved_row.replace("| expected |", "| flaky |")).replace(
+            attempt_row,
+            attempt_row.replace("| passed | 0 |", "| failed | 0 |")
+            + "\n"
+            + attempt_row.replace("| 1 | 要求primary test |", "| 2 | 要求primary test |").replace("| 10ms |  |", "| 8ms | retry success |").replace("| passed | 0 |", "| passed | 1 |"),
+        )
+        self.assert_pass("e2e-test-execution", flaky_pass, {})
+        self.assert_pass("e2e-test-execution", one_attempt("failed", "failed", "expected"), {})
+        self.assert_fails("e2e-test-execution", one_attempt("timedOut", "passed", "expected"), {}, "E2E-EXEC-D034")
+        self.assert_pass("e2e-test-execution", one_attempt("skipped", "skipped", "skipped"), {})
+        self.assert_pass("e2e-test-execution", one_attempt("skipped", "passed", "skipped"), {})
+        self.assert_pass("e2e-test-execution", one_attempt("interrupted", "passed", "skipped"), {})
+
+        mixed_expected_failure = execution.replace(
+            resolved_row,
+            resolved_row.replace("| 開始 | passed | passed | expected |", "| 開始 | failed | failed | flaky |"),
+        ).replace(
+            attempt_row,
+            attempt_row.replace("| passed | 0 |", "| passed | 0 |")
+            + "\n"
+            + attempt_row.replace("| 1 | 要求primary test |", "| 2 | 要求primary test |").replace("| passed | 0 |", "| failed | 1 |"),
+        )
+        self.assert_pass("e2e-test-execution", mixed_expected_failure, {})
+        mixed_skipped = execution.replace(
+            resolved_row,
+            resolved_row.replace("| 開始 | passed | passed | expected |", "| 開始 | failed | skipped | flaky |"),
+        ).replace(
+            attempt_row,
+            attempt_row.replace("| passed | 0 |", "| skipped | 0 |")
+            + "\n"
+            + attempt_row.replace("| 1 | 要求primary test |", "| 2 | 要求primary test |").replace("| passed | 0 |", "| failed | 1 |"),
+        )
+        self.assert_pass("e2e-test-execution", mixed_skipped, {})
+
+        dependency_attempt = "|  | 1 | project dependencyとして付随実行されたtest | tests/global.setup.ts > create db | setup | 0 | passed | 0 | 5ms |  |"
+        dependency_attempt_2 = dependency_attempt.replace("| 1 | project dependencyとして", "| 2 | project dependencyとして").replace("| passed | 0 |", "| passed | 1 |")
+        self.assert_fails("e2e-test-execution", execution.replace(attempt_row, attempt_row + "\n" + dependency_attempt.replace("| passed | 0 |", "| passed | 4 |")), {}, "E2E-EXEC-D033")
+        self.assert_fails("e2e-test-execution", execution.replace(attempt_row, attempt_row + "\n" + dependency_attempt + "\n" + dependency_attempt_2.replace("| passed | 1 |", "| passed | 0 |")), {}, "E2E-EXEC-D033")
+        self.assert_pass("e2e-test-execution", execution.replace(attempt_row, attempt_row + "\n" + dependency_attempt + "\n" + dependency_attempt_2), {})
+        teardown_attempt = dependency_attempt.replace("dependencyとして付随実行された", "teardownとして付随実行された").replace("tests/global.setup.ts > create db", "tests/global.teardown.ts > delete db").replace("| setup |", "| teardown |")
+        teardown_attempt_2 = teardown_attempt.replace("| 1 | project teardownとして", "| 2 | project teardownとして").replace("| passed | 0 |", "| passed | 2 |")
+        self.assert_fails("e2e-test-execution", execution.replace(attempt_row, attempt_row + "\n" + teardown_attempt + "\n" + teardown_attempt_2), {}, "E2E-EXEC-D033")
+        self.assert_pass("e2e-test-execution", execution.replace(attempt_row, attempt_row + "\n" + teardown_attempt + "\n" + teardown_attempt_2.replace("| passed | 2 |", "| passed | 1 |")), {})
+
+    def test_e2e_reporting_retry_history_contracts(self):
+        report = self.reporting_output()
+        resolved_row = "| login-flow | result-1 | 開始 | passed |  | passed | expected | 1 | passed (retry 0) | result-1 |"
+        self.assert_pass("e2e-test-reporting", report, {})
+        retry_report = report.replace(
+            resolved_row,
+            "| login-flow | result-1 | 開始 | passed |  | passed | flaky | 2 | failed (retry 0) -> passed (retry 1) | result-1 |",
+        )
+        self.assert_pass("e2e-test-reporting", retry_report, {})
+        for history in ("passed (retry 1)", "failed (retry 0) -> passed (retry 0)", "failed (retry 0) -> passed (retry 2)"):
+            self.assert_fails(
+                "e2e-test-reporting",
+                retry_report.replace("failed (retry 0) -> passed (retry 1)", history),
+                {},
+                "E2E-REPORT-D015",
+            )
+        self.assert_fails(
+            "e2e-test-reporting",
+            report.replace(resolved_row, resolved_row.replace("| 1 | passed (retry 0) |", "| 1 | passed (retry 1) |")),
+            {},
+            "E2E-REPORT-D015",
+        )
+        self.assert_fails(
+            "e2e-test-reporting",
+            report.replace(resolved_row, resolved_row.replace("| expected | 1 | passed (retry 0) |", "| flaky | 1 | passed (retry 0) |")),
+            {},
+            "E2E-REPORT-D015",
         )
 
     def test_tc_free_paths_do_not_fabricate_tc_ids(self):
