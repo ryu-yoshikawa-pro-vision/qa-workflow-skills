@@ -182,10 +182,10 @@ def _has_concrete_cleanup_method(value: str) -> bool:
         return False
     if _is_explicit_unavailable(value, set(UNKNOWN_SAFETY_MARKERS)):
         return False
+    if _is_unresolved_component(value, CLEANUP_COMPONENT_LABELS):
+        return False
     components = STRUCTURED_SEPARATOR_RE.split(value)
-    if len(components) > 1 and any(
-        _is_unresolved_component(component, CLEANUP_COMPONENT_LABELS) for component in components
-    ):
+    if any(_is_unresolved_component(component, CLEANUP_COMPONENT_LABELS) for component in components):
         return False
     # no-cleanup is a valid state; its consistency with known targets is checked
     # separately from this safety-field concreteness check.

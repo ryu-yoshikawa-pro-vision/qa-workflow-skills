@@ -26,6 +26,8 @@ COMPLETED_EXECUTION_PATTERNS = (
 )
 NEGATED_EXECUTION = re.compile(r"(?:しない|しません|せず|行わない|行いません|ありません|禁止|してはいけ|不可)", re.IGNORECASE)
 EXTERNAL_EXECUTION_ACTOR = re.compile(r"e2e-test-execution", re.IGNORECASE)
+EXTERNAL_EXECUTION_SUBJECT = re.compile(r"e2e-test-execution\s*(?:が|は)\s*(?:直接\s*)?$", re.IGNORECASE)
+EXECUTION_CLAUSE_SEPARATOR = re.compile(r"[。！？!?；;、,，]")
 ADDITIONAL_NEEDS = {"不要", "必要", "ブロック中"}
 
 
@@ -40,16 +42,38 @@ def _reference_set(value: str) -> set[str]:
     }
 
 
+def _execution_clauses(line: str) -> list[str]:
+    clauses = []
+    start = 0
+    for separator in EXECUTION_CLAUSE_SEPARATOR.finditer(line):
+        clause = line[start : separator.start()].strip()
+        if clause:
+            clauses.append(clause)
+        start = separator.end()
+    tail = line[start:].strip()
+    if tail:
+        clauses.append(tail)
+    return clauses
+
+
+def _is_negated_execution_claim(clause: str, match: re.Match[str]) -> bool:
+    return NEGATED_EXECUTION.search(clause[match.end() :]) is not None
+
+
+def _is_external_execution_claim(clause: str, match: re.Match[str]) -> bool:
+    prefix = clause[: match.start()]
+    return EXTERNAL_EXECUTION_ACTOR.search(prefix) is not None and EXTERNAL_EXECUTION_SUBJECT.search(prefix) is not None
+
+
 def _direct_execution_evidence(text: str) -> list[str]:
     evidence = []
     for line in text.splitlines():
-        if NEGATED_EXECUTION.search(line) or EXTERNAL_EXECUTION_ACTOR.search(line):
-            continue
-        evidence.extend(
-            match.group(0)
-            for pattern in (*DIRECT_EXECUTION_PATTERNS, *COMPLETED_EXECUTION_PATTERNS)
-            if (match := pattern.search(line))
-        )
+        for clause in _execution_clauses(line):
+            for pattern in (*DIRECT_EXECUTION_PATTERNS, *COMPLETED_EXECUTION_PATTERNS):
+                for match in pattern.finditer(clause):
+                    if _is_negated_execution_claim(clause, match) or _is_external_execution_claim(clause, match):
+                        continue
+                    evidence.append(match.group(0))
     return sorted(set(evidence))
 
 

@@ -381,6 +381,23 @@ class E2EContractTests(unittest.TestCase):
             "e2e-test-executionがPlaywrightを再実行しました。",
         ):
             self.assert_pass("e2e-test-result-analysis", analysis + "\n" + non_execution_claim, {})
+        for execution_claim in (
+            "e2e-test-executionへ依頼した後、Playwrightを再実行しました。",
+            "e2e-test-executionへのrouting後、E2Eを再実行しました。",
+            "e2e-test-executionがPlaywrightを再実行しました。その後、E2Eを再実行しました。",
+            "Playwrightを再実行しませんでしたが、その後E2Eを再実行しました。",
+        ):
+            self.assert_fails(
+                "e2e-test-result-analysis",
+                analysis + "\n" + execution_claim,
+                {},
+                "E2E-AN-D005",
+            )
+        self.assert_pass(
+            "e2e-test-result-analysis",
+            analysis + "\ne2e-test-executionはE2Eを再実行しました。",
+            {},
+        )
         self.assert_fails(
             "e2e-test-result-analysis",
             analysis.replace("| 必要 | cleanup確認ログ | cleanupが成功しているか | cleanupのみ | e2e-test-execution |", "| 必要 | cleanup確認ログ | cleanupが成功しているか | cleanupのみ | e2e-test-result-analysis |"),
@@ -1553,6 +1570,16 @@ class E2EContractTests(unittest.TestCase):
                 {},
                 "E2E-EXEC-D026",
             )
+        for cleanup_value in ("方法=未確認", "対象=未確認", "cleanup対象=確認不能", "方法：未確認"):
+            self.assert_fails(
+                "e2e-test-execution",
+                execution.replace(
+                    "| runner管理cleanup対象 / 方法 | webServer app / Playwright runner管理 | repo | raw fact |",
+                    f"| runner管理cleanup対象 / 方法 | {cleanup_value} | repo | raw fact |",
+                ),
+                {},
+                "E2E-EXEC-D026",
+            )
         for cleanup_value in ("test order / 未確認", "対象=未確認 / cleanup API"):
             self.assert_fails(
                 "e2e-test-execution",
@@ -1563,6 +1590,15 @@ class E2EContractTests(unittest.TestCase):
                 {},
                 "E2E-EXEC-D026",
             )
+        self.assert_fails(
+            "e2e-test-execution",
+            execution.replace(
+                "| run外cleanup対象 / 方法 | 対象なし | repo | raw fact |",
+                "| run外cleanup対象 / 方法 | 方法=未確認 | repo | raw fact |",
+            ),
+            {},
+            "E2E-EXEC-D026",
+        )
         for cleanup_value in (
             "作成した注文をテスト終了後に取り消す",
             "DBを初期状態へ戻す",
