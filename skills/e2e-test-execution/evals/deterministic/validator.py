@@ -23,6 +23,18 @@ ACTUAL_REUSE_NON_CLEANUP_MARKERS = {"対象外", "対象なし", "cleanup対象�
 RUN_NOT_STARTED_ERROR_STATES = {"未実施", "未確認", "確認不能", "対象なし"}
 UNKNOWN_SAFETY_MARKERS = ("未確認", "確認不能", "不明", "未取得", "未指定", "確認待ち", "未実施")
 SETUP_CONTRACT_LABELS = ("setup", "dependency", "webServer", "teardown")
+SETUP_COMPONENT_LABELS = (
+    "setup",
+    "globalSetup",
+    "dependency",
+    "dependencies",
+    "webServer",
+    "teardown",
+    "globalTeardown",
+)
+SIDE_EFFECT_COMPONENT_LABELS = ("scope", "許可範囲")
+CLEANUP_COMPONENT_LABELS = ("対象", "cleanup対象", "方法")
+STRUCTURED_SEPARATOR_RE = re.compile(r"\s+[/／]\s+")
 EXTERNAL_PREPARATION_NOT_NEEDED = {"対象なし", "なし", "不要", "none", "n/a", "-"}
 WEBSERVER_STARTED_BEFORE_RUN = "実行前から存在"
 WEBSERVER_STARTED_BY_RUN = "今回runが起動"
@@ -48,7 +60,7 @@ REQUIRED_EXECUTION_CONDITIONS = RUN_START_REQUIRED_CONDITIONS | {"run外準備"}
 
 def _setup_contract_parts(setup_value: str) -> tuple[str, ...] | None:
     value = clean(setup_value)
-    parts = [clean(part) for part in value.split("/")]
+    parts = [clean(part) for part in STRUCTURED_SEPARATOR_RE.split(value)]
     if len(parts) != len(SETUP_CONTRACT_LABELS) or any(not part for part in parts):
         return None
     return tuple(parts)
@@ -81,7 +93,7 @@ def _teardown_candidate(setup_value: str) -> str:
 
 def _has_explicit_runner_cleanup_target(setup_value: str) -> bool:
     candidate = _teardown_candidate(setup_value)
-    if not candidate or _is_explicit_unavailable(candidate, set(UNKNOWN_SAFETY_MARKERS)):
+    if not candidate or _is_unresolved_component(candidate, set(SETUP_COMPONENT_LABELS)):
         return False
     return candidate.lower() not in {"none", "n/a", "なし", "対象なし", "未使用", "-"}
 
@@ -123,6 +135,20 @@ def _is_explicit_unavailable(value: str, allowed: set[str]) -> bool:
     )
 
 
+def _component_value_without_known_label(value: str, labels: tuple[str, ...] | set[str]) -> str:
+    value = clean(value)
+    for label in labels:
+        match = re.fullmatch(rf"{re.escape(label)}\s*[=＝:：]\s*(.*)", value, re.IGNORECASE)
+        if match:
+            return clean(match.group(1))
+    return value
+
+
+def _is_unresolved_component(value: str, labels: tuple[str, ...] | set[str]) -> bool:
+    component = _component_value_without_known_label(value, labels)
+    return _is_explicit_unavailable(component, set(UNKNOWN_SAFETY_MARKERS))
+
+
 def _is_raw_test_status(value: str) -> bool:
     return clean(value) in TEST_STATUSES
 
@@ -135,11 +161,16 @@ def _has_concrete_side_effect_limit(value: str) -> bool:
     value = clean(value)
     if not value or value.lower() in {"確認済み", "確認完了", "ok", "checked", "問題なし"}:
         return False
-    parts = re.split(r"[/／]", value, maxsplit=1)
+    parts = STRUCTURED_SEPARATOR_RE.split(value, maxsplit=1)
     if len(parts) != 2:
         return False
     scope, count = (part.strip() for part in parts)
-    if not scope or scope.lower() in {"確認済み", "確認完了", "ok", "checked", "問題なし"}:
+    if (
+        not scope
+        or scope.lower() in {"確認済み", "確認完了", "ok", "checked", "問題なし"}
+        or _is_unresolved_component(scope, SIDE_EFFECT_COMPONENT_LABELS)
+        or _is_unresolved_component(count, SIDE_EFFECT_COMPONENT_LABELS)
+    ):
         return False
     return re.search(r"(?:max(?:imum)?\s*\d+|最大\s*\d+|\d+\s*(?:回|times)(?:まで)?)", count, re.IGNORECASE) is not None
 
@@ -150,6 +181,11 @@ def _has_concrete_cleanup_method(value: str) -> bool:
     if not value or lowered in {"確認済み", "確認完了", "ok", "checked", "問題なし"}:
         return False
     if _is_explicit_unavailable(value, set(UNKNOWN_SAFETY_MARKERS)):
+        return False
+    components = STRUCTURED_SEPARATOR_RE.split(value)
+    if len(components) > 1 and any(
+        _is_unresolved_component(component, CLEANUP_COMPONENT_LABELS) for component in components
+    ):
         return False
     # no-cleanup is a valid state; its consistency with known targets is checked
     # separately from this safety-field concreteness check.
@@ -391,7 +427,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                     unresolved_parts = [
                         {"要素": component, "値": component_value}
                         for component, component_value in zip(SETUP_CONTRACT_LABELS, setup_parts)
-                        if _is_explicit_unavailable(component_value, set(UNKNOWN_SAFETY_MARKERS))
+                        if _is_unresolved_component(component_value, set(SETUP_COMPONENT_LABELS))
                     ]
                     if unresolved_parts:
                         started_safety_issues.append(

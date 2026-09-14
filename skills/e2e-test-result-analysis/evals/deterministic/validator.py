@@ -12,7 +12,20 @@ DIRECT_EXECUTION_PATTERNS = (
     re.compile(r"(?:Playwright|E2E)[^\n]{0,30}直接[^\n]{0,20}(?:実行|再実行|起動)", re.IGNORECASE),
     re.compile(r"直接[^\n]{0,20}(?:Playwright|E2E)[^\n]{0,20}(?:実行|再実行|起動)", re.IGNORECASE),
 )
+COMPLETED_EXECUTION_PATTERNS = (
+    re.compile(
+        r"(?:Playwright|E2E)\s*(?:を|が|は)?\s*(?:直接\s*)?(?:実行|再実行|起動|実施)"
+        r"(?:しました|した(?!い|ら|り|場合)|済み|完了(?:しました|した(?!い|ら|り|場合))?)",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"(?:Playwright|E2E)\s*(?:を|が|は)?\s*(?:直接\s*)?(?:実行|再実行|起動|実施)"
+        r"して(?:再現(?:を確認)?|確認)(?:しました|した(?!い|ら|り|場合))",
+        re.IGNORECASE,
+    ),
+)
 NEGATED_EXECUTION = re.compile(r"(?:しない|しません|せず|行わない|行いません|ありません|禁止|してはいけ|不可)", re.IGNORECASE)
+EXTERNAL_EXECUTION_ACTOR = re.compile(r"e2e-test-execution", re.IGNORECASE)
 ADDITIONAL_NEEDS = {"不要", "必要", "ブロック中"}
 
 
@@ -25,6 +38,19 @@ def _reference_set(value: str) -> set[str]:
         for part in re.split(r"\s*(?:,|、|;|；|\n|/\s+|／)\s*", value)
         if clean(part)
     }
+
+
+def _direct_execution_evidence(text: str) -> list[str]:
+    evidence = []
+    for line in text.splitlines():
+        if NEGATED_EXECUTION.search(line) or EXTERNAL_EXECUTION_ACTOR.search(line):
+            continue
+        evidence.extend(
+            match.group(0)
+            for pattern in (*DIRECT_EXECUTION_PATTERNS, *COMPLETED_EXECUTION_PATTERNS)
+            if (match := pattern.search(line))
+        )
+    return sorted(set(evidence))
 
 
 def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
@@ -108,12 +134,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     result.add("E2E-AN-D004", not invalid_repro, "再現性が原因と別軸の許可値であること", evidence=invalid_repro or None)
 
     additional = nonempty_rows(additional_table)
-    direct_execution = []
-    for line in text.splitlines():
-        if NEGATED_EXECUTION.search(line):
-            continue
-        direct_execution.extend(match.group(0) for pattern in DIRECT_EXECUTION_PATTERNS if (match := pattern.search(line)))
-    direct_execution = sorted(set(direct_execution))
+    direct_execution = _direct_execution_evidence(text)
     additional_issues = []
     for row in additional:
         need = clean(row.get("追加実行の必要性", ""))

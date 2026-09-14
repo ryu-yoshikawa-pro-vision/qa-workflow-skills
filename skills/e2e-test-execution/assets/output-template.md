@@ -8,10 +8,10 @@
 | 実行入口 / command chain |  |  | raw fact |
 | Playwright project |  |  | raw fact |
 | retries / repeatEach / workers / parallel |  |  | raw fact |
-| setup / dependency / webServer / teardown | `setup / dependency / webServer / teardown`の4要素 |  | raw fact |
+| setup / dependency / webServer / teardown | 空白付きの`/`または`／`で区切る4要素 |  | raw fact |
 | run外準備 | 実施 / 対象なし / 未確認 / 確認不能 |  | raw fact |
 | 必要な認証 / テストデータ / 開始状態 |  |  | raw fact / 確認不能 |
-| 副作用の許可範囲 / 最大回数 | `<許可範囲> / <最大回数>` |  | raw fact / 確認不能 |
+| 副作用の許可範囲 / 最大回数 | 空白付きの`/`または`／`で区切る`<許可範囲> / <最大回数>` |  | raw fact / 確認不能 |
 | runner管理cleanup対象 / 方法 | `<対象と確認済み方法>` / 対象なし |  | raw fact / 確認不能 |
 | run外cleanup対象 / 方法 | `<対象と確認済み方法>` / 対象なし |  | raw fact / 確認不能 |
 | branch / HEAD / working tree |  |  | raw fact |

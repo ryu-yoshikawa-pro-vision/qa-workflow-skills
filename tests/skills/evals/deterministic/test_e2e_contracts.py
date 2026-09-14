@@ -358,6 +358,29 @@ class E2EContractTests(unittest.TestCase):
             {},
             "E2E-AN-D005",
         )
+        for execution_claim in (
+            "Playwrightを再実行しました。",
+            "E2Eを再実行した。",
+            "Playwrightを起動しました。",
+            "E2Eを実行して再現を確認しました。",
+        ):
+            self.assert_fails(
+                "e2e-test-result-analysis",
+                analysis + "\n" + execution_claim,
+                {},
+                "E2E-AN-D005",
+            )
+        for non_execution_claim in (
+            "Playwrightを再実行しません。",
+            "Playwrightの再実行が必要です。",
+            "Playwrightを再実行する。",
+            "Playwrightを再実行したい。",
+            "e2e-test-executionへPlaywright再実行を依頼します。",
+            "追加実行はe2e-test-executionが担当します。",
+            "Playwright実行結果を分析しました。",
+            "e2e-test-executionがPlaywrightを再実行しました。",
+        ):
+            self.assert_pass("e2e-test-result-analysis", analysis + "\n" + non_execution_claim, {})
         self.assert_fails(
             "e2e-test-result-analysis",
             analysis.replace("| 必要 | cleanup確認ログ | cleanupが成功しているか | cleanupのみ | e2e-test-execution |", "| 必要 | cleanup確認ログ | cleanupが成功しているか | cleanupのみ | e2e-test-result-analysis |"),
@@ -1463,6 +1486,7 @@ class E2EContractTests(unittest.TestCase):
             "runner / none / 未確認 / none",
             "runner / none / webServerなし / 未確認",
             "runner / none / webServerなし",
+            "runner / none / webServerなし / none / extra",
         ):
             self.assert_fails(
                 "e2e-test-execution",
@@ -1494,6 +1518,92 @@ class E2EContractTests(unittest.TestCase):
                 "e2e-test-execution",
                 execution.replace(side_effect_row, f"| 副作用の許可範囲 / 最大回数 | {scoped_limit} | ユーザー提供情報 | raw fact |"),
                 {},
+            )
+        for unresolved_scope in (
+            "未確認 / 最大1回",
+            "scope=未確認 / 最大1回",
+            "許可範囲=確認不能 / max 1",
+        ):
+            self.assert_fails(
+                "e2e-test-execution",
+                execution.replace(side_effect_row, f"| 副作用の許可範囲 / 最大回数 | {unresolved_scope} | ユーザー提供情報 | raw fact |"),
+                {},
+                "E2E-EXEC-D026",
+            )
+        self.assert_pass(
+            "e2e-test-execution",
+            execution.replace(
+                side_effect_row,
+                "| 副作用の許可範囲 / 最大回数 | https://app.test/test-data 配下への作成のみ / 最大1回 | ユーザー提供情報 | raw fact |",
+            ),
+            {},
+        )
+
+        for cleanup_value in (
+            "webServer app / 未確認",
+            "未確認 / Playwright runner管理",
+            "webServer app / 方法=確認不能",
+        ):
+            self.assert_fails(
+                "e2e-test-execution",
+                no_webserver.replace(
+                    "| runner管理cleanup対象 / 方法 | 対象なし | repo | raw fact |",
+                    f"| runner管理cleanup対象 / 方法 | {cleanup_value} | repo | raw fact |",
+                ),
+                {},
+                "E2E-EXEC-D026",
+            )
+        for cleanup_value in ("test order / 未確認", "対象=未確認 / cleanup API"):
+            self.assert_fails(
+                "e2e-test-execution",
+                no_webserver.replace(
+                    "| run外cleanup対象 / 方法 | 対象なし | repo | raw fact |",
+                    f"| run外cleanup対象 / 方法 | {cleanup_value} | repo | raw fact |",
+                ),
+                {},
+                "E2E-EXEC-D026",
+            )
+        for cleanup_value in (
+            "作成した注文をテスト終了後に取り消す",
+            "DBを初期状態へ戻す",
+            "変更した共有設定を元の値へ戻す",
+            "作成したユーザーを後処理で破棄する",
+            "ステータス「未実施」の申請データをseed済み",
+        ):
+            self.assert_pass(
+                "e2e-test-execution",
+                execution.replace(
+                    "| runner管理cleanup対象 / 方法 | webServer app / Playwright runner管理 | repo | raw fact |",
+                    f"| runner管理cleanup対象 / 方法 | {cleanup_value} | repo | raw fact |",
+                ),
+                {},
+            )
+
+        for setup_value in (
+            "globalSetup=./global/setup.ts / none / webServer設定あり / globalTeardown=./global/teardown.ts",
+            "globalSetup=./global/setup.ts / none / webServer=http://127.0.0.1:3000 / globalTeardown=./global/teardown.ts",
+        ):
+            self.assert_pass(
+                "e2e-test-execution",
+                execution.replace(
+                    "| setup / dependency / webServer / teardown | runner / none / webServer設定あり / runner | repo | raw fact |",
+                    f"| setup / dependency / webServer / teardown | {setup_value} | repo | raw fact |",
+                ),
+                {},
+            )
+        for labeled_setup in (
+            "setup=未確認 / none / webServerなし / none",
+            "runner / dependency=未確認 / webServerなし / none",
+            "runner / none / webServer=未確認 / none",
+            "runner / none / webServerなし / teardown=未確認",
+            "globalSetup=未確認 / none / webServerなし / none",
+            "runner / none / webServerなし / globalTeardown=確認不能",
+        ):
+            self.assert_fails(
+                "e2e-test-execution",
+                no_webserver.replace("runner / none / webServerなし / none", labeled_setup),
+                {},
+                "E2E-EXEC-D026",
             )
 
         external_contract = "| run外cleanup対象 / 方法 | 対象なし | repo | raw fact |"
