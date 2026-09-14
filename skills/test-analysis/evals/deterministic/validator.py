@@ -148,4 +148,33 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                 ],
             }
     result.add("RISK-D015", testability_mismatch is None, "フィクスチャで必須のテスト可能性値がテスト可能性行に存在すること", evidence=testability_mismatch)
+
+    selection_table = find_table(
+        tables,
+        section_contains="E2E対象選定",
+        required_headers=("自動化目的", "候補範囲", "技術非依存の判断基準 / 根拠"),
+    )
+    selection_requested = bool(expected.get("require_e2e_selection") or "対象 / 実行範囲: E2E対象選定" in text)
+    result.add(
+        "RISK-D016",
+        not selection_requested or selection_table is not None,
+        "E2E対象選定時に自動化目的・候補範囲・技術非依存の判断基準 / 根拠が存在すること",
+        evidence={"missing_table": "E2E対象選定"} if selection_requested and selection_table is None else None,
+    )
+    if selection_requested:
+        selection_rows = nonempty_rows(selection_table)
+        missing_selection = []
+        for row in selection_rows:
+            fields = ["自動化目的", "候補範囲", "技術非依存の判断基準 / 根拠"]
+            absent = [field for field in fields if not clean(row.get(field, ""))]
+            if absent:
+                missing_selection.append({"fields": absent})
+        result.add(
+            "RISK-D017",
+            bool(selection_rows) and not missing_selection,
+            "E2E対象選定に自動化目的・候補範囲・技術非依存の判断基準 / 根拠を持つ有効行があること",
+            evidence={"missing_rows": not selection_rows, "invalid_rows": missing_selection}
+            if not selection_rows or missing_selection
+            else None,
+        )
     return result

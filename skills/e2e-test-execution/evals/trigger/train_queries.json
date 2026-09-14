@@ -1,0 +1,14 @@
+[
+  {"query":"既存のPlaywright E2Eを指定されたローカル環境で安全に実行し、run・primary・attempt・artifact・cleanupを記録してください。","should_trigger":true},
+  {"query":"実装済みのログインE2Eをrepo既存の実行入口から起動し、rawな結果とtraceを収集してください。","should_trigger":true},
+  {"query":"E2E実行前の環境・認証・データ・外部依存・cleanup条件を確認してからテストを走らせてください。","should_trigger":true},
+  {"query":"TCなしで指定された注文履歴E2Eを実行し、logical primaryとresolved primaryを分けて記録してください。","should_trigger":true},
+  {"query":"Playwrightのretry attemptを初回結果と混同せず、実行証跡とcleanup状態まで構造化してください。","should_trigger":true},
+  {"query":"既存E2Eのローカル実行を行い、プロセス終了コードとrun statusを別々に保存してください。","should_trigger":true},
+  {"query":"Playwrightテストの対象を調査し、実装可能性と安全条件を実行せずに確認してください。","should_trigger":false},
+  {"query":"inspection済みの対象をPlaywrightコードとして追加し、lintとtypecheckだけ実施してください。","should_trigger":false},
+  {"query":"E2EのFAIL結果から原因と最も早い修正Skillを分析してください。","should_trigger":false},
+  {"query":"E2Eの検証済み結果を人間向け報告にまとめてください。","should_trigger":false},
+  {"query":"TC-401の手順と期待結果をテストケースとして設計してください。","should_trigger":false},
+  {"query":"Playwright実装のassertionとfixtureを反証レビューしてください。","should_trigger":false}
+]

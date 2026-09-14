@@ -1,0 +1,1 @@
+{"skill":"e2e-test-reporting","canonical_output":true,"cases":[{"id":"E2E-REPORT-OUT-001","input":"cases/case-001/input.md","expected":"cases/case-001/expected.json"},{"id":"E2E-REPORT-OUT-002","input":"cases/case-002/input.md","expected":"cases/case-002/expected.json"}]}

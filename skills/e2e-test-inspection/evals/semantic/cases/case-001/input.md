@@ -1,0 +1,3 @@
+# inspection意味評価
+
+TC-101のログイン成功ケースをPlaywrightで実装したい。repoには既存の認証fixtureがある。対象環境URLは提供済みだが、storageStateの共有方法とcleanup制約を確認する必要がある。

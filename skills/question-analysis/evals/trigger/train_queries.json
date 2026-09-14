@@ -3,7 +3,7 @@
   {"query":"TRからTCまでの追跡に抜けがないかカバレッジ分析してください。","should_trigger":false},
   {"query":"Current Effective AuthorityからTest Requirementを設計してください。","should_trigger":false},
   {"query":"未回答の質問が12件あります。Blocker、要確認、仮定可能、任意に仕分けしてください。","should_trigger":true},
-  {"query":"この前提を仮定してケース作成まで進めてよいのか、それとも正式確認が必要か見て。","should_trigger":true},
+  {"query":"E2E実行結果の前提が崩れています。分析後にinspectionへ戻すのか、result-analysisへ再開するのか判断してください。","should_trigger":true},
   {"query":"この不明点は回答がないとテスト設計を止めるべきですか？Blockerか要確認か分類してください。","should_trigger":true},
   {"query":"この変更のProduct Riskとテスト重点を決めてください。","should_trigger":false},
   {"query":"仕様書とQ&Aで公開範囲の説明が矛盾しています。どこまで作業を続けられるか判断して。","should_trigger":true},

@@ -1,0 +1,14 @@
+[
+  {"query":"Playwright E2Eを追加する前に、対象repoの既存テスト、実行入口、対象画面、認証、データ準備、安全条件を調査してください。","should_trigger":true},
+  {"query":"この既存E2Eを更新できるか、workspaceの構成と実対象の事実を実行せずに確認してください。","should_trigger":true},
+  {"query":"E2E対象の候補と、現在のPlaywright設定・browser project・webServerの事実を棚卸ししてください。","should_trigger":true},
+  {"query":"TCなしで指定された注文履歴をE2E化できるか、仕様根拠と既存テストとの関係を先に調べてください。","should_trigger":true},
+  {"query":"ログインE2Eの実装前に、認証状態、テストユーザー、データ初期化、外部依存、cleanup可否をinspectionしてください。","should_trigger":true},
+  {"query":"E2E対象の実装可能性と安全性を確認し、まだコード変更やテスト実行はしないでください。","should_trigger":true},
+  {"query":"確認済みのE2E対象をPlaywrightコードとして実装してください。","should_trigger":false},
+  {"query":"既存のPlaywrightテストを指定環境で実行して、結果とtraceを収集してください。","should_trigger":false},
+  {"query":"Playwrightの失敗結果から原因を分析し、修正先を判断してください。","should_trigger":false},
+  {"query":"E2E実行結果をステークホルダー向けの報告書にまとめてください。","should_trigger":false},
+  {"query":"このテストコードをreviewして、locatorの問題を指摘してください。","should_trigger":false},
+  {"query":"E2Eの対象範囲を決めたので、coverageと実行結果の追跡表を作ってください。","should_trigger":false}
+]

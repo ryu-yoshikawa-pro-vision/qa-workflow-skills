@@ -1,0 +1,1 @@
+{"skill":"e2e-test-result-analysis","cases":[{"id":"E2E-AN-SEM-001","input":"cases/case-001/input.md","reference":"cases/case-001/reference.md","criteria":["SEM-AN-001","SEM-AN-002","SEM-AN-003","SEM-AN-004"]},{"id":"E2E-AN-SEM-002","input":"cases/case-002/input.md","reference":"cases/case-002/reference.md","criteria":["SEM-AN-001","SEM-AN-002","SEM-AN-003","SEM-AN-004"]}]}

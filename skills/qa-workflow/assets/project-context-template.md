@@ -42,6 +42,25 @@
 - 画面幅 / ビューポート:
 - OS:
 
+### 任意: E2E / Playwright実行条件
+
+必要な場合だけ記録します。password、token、cookie、secret値そのものは記録しません。
+
+- 対象repo / workspace:
+- テスト環境URL:
+- 主たる対象origin:
+- 許可された外部origin / 外部依存:
+- 対象ブラウザ / Playwright project:
+- 認証方法:
+- 認証情報の取得方法または環境変数名:
+- 利用可能なtest user / role:
+- テストデータ・状態準備方法:
+- 副作用の許可範囲と根拠:
+- cleanup制約:
+- 証跡の保存・共有制約:
+- テスト対象version / build ID等の確認方法:
+- ローカル実行上の既知制約:
+
 ## 5. 情報源の優先順位
 
 | 優先順位 | 情報源 | 役割 / 備考 |

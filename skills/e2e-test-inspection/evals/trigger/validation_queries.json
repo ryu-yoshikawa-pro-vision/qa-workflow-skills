@@ -1,0 +1,10 @@
+[
+  {"query":"未実行の状態で、対象repoのE2E構成・実行入口・安全条件・既存E2E再利用可否だけを調査してください。","should_trigger":true},
+  {"query":"TC-201をE2Eにする前提で、対応する画面と開始状態、認証、データ、cleanupの事実を確認してください。","should_trigger":true},
+  {"query":"Playwrightの対象projectとURL、外部依存、テストユーザーをコード変更なしで確定してください。","should_trigger":true},
+  {"query":"既存E2Eがあるか分からないため、workspaceを調べて実装前の判断材料を整理してください。","should_trigger":true},
+  {"query":"Playwrightのfixtureを追加実装して、静的検証を通してください。","should_trigger":false},
+  {"query":"E2Eを実行してcleanupが成功したことを確認してください。","should_trigger":false},
+  {"query":"失敗したE2Eのtraceから原因と修正routingを分析してください。","should_trigger":false},
+  {"query":"今回のE2E結果を初回FAILとretryを分けて報告してください。","should_trigger":false}
+]

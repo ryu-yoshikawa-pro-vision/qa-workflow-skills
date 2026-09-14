@@ -1,0 +1,14 @@
+[
+  {"query":"検証済みのPlaywright実行結果を、初回FAIL・retry・resolved primary・cleanupを分けて人間向けに報告してください。","should_trigger":true},
+  {"query":"E2Eの環境、effective settings、run status、primary結果、trace参照を判断可能な報告書へ変換してください。","should_trigger":true},
+  {"query":"result-analysis済みのE2E結果を再解釈せず、未実行理由と未確認cleanupを含めて報告してください。","should_trigger":true},
+  {"query":"TCなしの明示E2E対象について、TC IDを創作せず実行結果と証跡を報告してください。","should_trigger":true},
+  {"query":"Playwright実行のFAILを原因断定せず、検証済み事実と分析済み判断を分離して共有してください。","should_trigger":true},
+  {"query":"E2Eの検証済み途中結果から、利用者が次の判断をできる報告を作成してください。","should_trigger":true},
+  {"query":"Playwright E2Eを指定環境で実行し、rawなrunとcleanupを収集してください。","should_trigger":false},
+  {"query":"E2E実行結果から原因候補と最も早い修正Skillを分析してください。","should_trigger":false},
+  {"query":"inspectionでE2E対象、認証、外部依存、安全条件を確認してください。","should_trigger":false},
+  {"query":"確認済み対象のPlaywrightテストコードを実装してください。","should_trigger":false},
+  {"query":"テストケースの期待結果を仕様根拠へ追跡してください。","should_trigger":false},
+  {"query":"E2E実装のassertionとlocatorを反証レビューしてください。","should_trigger":false}
+]

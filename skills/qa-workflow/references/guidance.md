@@ -20,7 +20,7 @@
 
 ## ランタイム前提
 
-全体ワークフローでは次の9 Skillが同一のAgentクライアント上で利用可能であることを前提とします。
+全体ワークフローでは次の14 Skillが同一のAgentクライアント上で利用可能であることを前提とします。
 
 - `qa-workflow`
 - `spec-analysis`
@@ -31,6 +31,11 @@
 - `test-case-design`
 - `coverage-analysis`
 - `adversarial-review`
+- `e2e-test-inspection`
+- `e2e-test-implementation`
+- `e2e-test-execution`
+- `e2e-test-result-analysis`
+- `e2e-test-reporting`
 
 Agent Skills Specificationは共通Skill-to-Skill呼び出しAPIを規定しません。本ワークフローは、Agentクライアントが必要なSkillを追加で読み込み / 利用できる実装で動作することを前提とします。
 
@@ -48,6 +53,11 @@ Agent Skills Specificationは共通Skill-to-Skill呼び出しAPIを規定しま�
 | 詳細テストケース / 期待結果の根拠の具体化 | `test-case-design` |
 | カバレッジ / 閉鎖性 / ギャップ | `coverage-analysis` |
 | 独立レビュー / 重大度 | `adversarial-review` |
+| E2E対象、repo / 実対象の事実、実装可能性、安全条件 | `e2e-test-inspection` |
+| Playwright E2Eコード変更、静的 / 軽量検証 | `e2e-test-implementation` |
+| 実行安全確認、準備、Playwright実行、構造化結果、cleanup | `e2e-test-execution` |
+| 実行事実からの原因分析、追加証拠要求、修正routing | `e2e-test-result-analysis` |
+| 検証済み結果の人間向け報告 | `e2e-test-reporting` |
 | ルーティング / ブロック中 / 再開 / 変更伝播 / 完了 | `qa-workflow` |
 
 ### 現在有効な仕様根拠への依存
@@ -84,6 +94,34 @@ Agent Skills Specificationは共通Skill-to-Skill呼び出しAPIを規定しま�
 ```
 
 プロダクトリスクは深度・優先度の横断入力です。反証レビューは各成果物層に適用できます。
+
+## E2E要求時の分岐
+
+全14 Skillを固定順に実行しません。要求成果物と有効な成果物から必要な依存だけを選びます。
+
+- 詳細TCからE2E実装: `e2e-test-inspection` → `e2e-test-implementation` → `adversarial-review`（対象: `E2E実装`） → `coverage-analysis`（対象: `TC → E2E実装`）
+- TCなしの明示E2E対象 / 既存E2E更新: 確認済みinspection情報がなければ `e2e-test-inspection` → `e2e-test-implementation`。E2E対象選定が要求されない限り`test-analysis`を必須にせず、TC生成のためだけに`test-case-design`へ戻さない
+- 既存E2Eの実行だけ: `e2e-test-execution`から開始できる。実行安全条件を確認できない場合だけinspectionへ戻す
+- 設計からE2E実行: 既存の設計経路 → `e2e-test-inspection` → `e2e-test-implementation` → E2E実装のreview / coverage → `e2e-test-execution`
+- 実行異常、未実行、run-level error、cleanup失敗 / 未確認、明示分析要求がある場合: `e2e-test-result-analysis`。正常runかつ分析要求なしなら省略できる
+- 追加実行が必要な場合: result-analysisはPlaywrightを直接起動せず、仮説・取得証拠・範囲を示して`e2e-test-execution`へ戻す
+- 確定済み結果の報告だけ: `e2e-test-reporting`から開始できる。reportingは原因再判定や仕様再解釈をしない
+
+`e2e-test-inspection`、`e2e-test-implementation`、`e2e-test-execution`等のPlaywright固有契約は各Skillを正本とし、本Skillへ複製しません。
+
+## 状態と完了
+
+状態表の一意性はSkill名ではなく`(Skill, 対象 / 実行範囲)`で判定します。複数用途Skillの正規対象は次です。
+
+| Skill | 正規対象 / 実行範囲 |
+| --- | --- |
+| `test-analysis` | `テスト分析` / `E2E対象選定` |
+| `coverage-analysis` | `テスト設計` / `TC → E2E実装` / `E2E実装 → 実行結果` |
+| `adversarial-review` | `テスト設計成果物` / `E2E実装` |
+
+単一用途Skillの対象欄は空欄にできます。開始Skill、最終Skill、`question-analysis`回答後の再開Skillが複数用途Skillなら対象 / 実行範囲も必須です。
+
+ワークフロー完了は全E2E結果がPASSであることを意味しません。要求された実行・分析・報告が完了し、必要なcleanup確認、未処理ブロッカー、`要再検証`、未実施の必須実行が残っていないことを判定します。FAILでも、必要な分析・報告と安全なcleanupが完了し、追加修正が要求されていなければ完了できます。
 
 全体ワークフローでは、対象範囲内の上流項目を無言で消しません。各担当Skillが定義する下流成果物または妥当な扱いへ閉じていることを、ワークフロー全体状態として確認します。
 
@@ -190,6 +228,14 @@ adversarial-review
 - テスト条件 / カバレッジ基準 / カバレッジ項目 → `test-condition-design`
 - テストケース → `test-case-design`
 - カバレッジ判定自体 → `coverage-analysis`
+- E2E対象選定の価値判断 → `test-analysis`（対象: `E2E対象選定`）
+- E2E対象・repo / 実対象事実 → `e2e-test-inspection`
+- Playwright E2E実装 → `e2e-test-implementation`
+- E2E実装レビュー → `adversarial-review`（対象: `E2E実装`）
+- TC → E2E実装追跡 → `coverage-analysis`（対象: `TC → E2E実装`）
+- 実行条件、実行不足、状態準備、cleanup → `e2e-test-execution`
+- E2E実行結果の原因分析 / 証拠不足 → `e2e-test-result-analysis`
+- 確定済み結果の報告 → `e2e-test-reporting`
 
 レビューSkill自身や`qa-workflow`が担当層を直接再設計しません。
 
@@ -225,6 +271,8 @@ adversarial-review
 - `要再検証`が残っていない
 - 対象スコープ内にブロック中が残っていない
 - `adversarial-review`で利用停止が必要な未処置指摘が残っていない
+- E2E要求時は、必要なE2E工程の実行・分析・報告・cleanup確認が要求範囲に対して閉じている
+- logical primary / resolved primary TestCase / retry attemptが混同されていない
 
 重大度の詳細条件や残存リスク受容条件は`adversarial-review`を正本とします。
 
@@ -238,6 +286,7 @@ adversarial-review
 - 修正を最も早い責任Skillへ戻している
 - 上流修正後の影響下流だけを`要再検証`している
 - 完了判定が成果物の存在だけでなく状態・閉鎖性・各担当Skillの契約を見ている
+- E2E固有の判断を`qa-workflow`へ複製していない
 
 ## 出力前自己検証
 

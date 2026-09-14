@@ -29,7 +29,7 @@ class SemanticDatasetTests(unittest.TestCase):
                     self.assertTrue(set(case["criteria"]) <= set(dataset["criteria_by_id"]))
                 total_cases += len(dataset["cases"])
 
-        self.assertEqual(total_cases, 18)
+        self.assertEqual(total_cases, 28)
 
 
 if __name__ == "__main__":

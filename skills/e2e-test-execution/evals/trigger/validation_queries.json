@@ -1,0 +1,10 @@
+[
+  {"query":"既存のE2E実行入口を使い、実行前preflight、raw結果、resolved primary、retry attempt、cleanupを記録してください。","should_trigger":true},
+  {"query":"実装済みPlaywrightテストを指定browser projectで実行し、current run artifactを残してください。","should_trigger":true},
+  {"query":"E2Eを安全確認なしに起動せず、認証・データ準備・外部依存・cleanup確認後に実行してください。","should_trigger":true},
+  {"query":"テスト失敗でも初回FAILをretry成功で隠さず、実行結果とcleanup状態を構造化してください。","should_trigger":true},
+  {"query":"E2E対象のrepo構成と実装可否を、コード変更や実行なしでinspectionしてください。","should_trigger":false},
+  {"query":"Playwrightの実装を更新して、test discoveryとtypecheckを行ってください。","should_trigger":false},
+  {"query":"実行結果の原因を判断し、追加実行が必要ならexecutionへ依頼してください。","should_trigger":false},
+  {"query":"実行済みE2Eの結果を初回とretryに分けて報告してください。","should_trigger":false}
+]

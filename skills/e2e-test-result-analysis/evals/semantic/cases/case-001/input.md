@@ -1,0 +1,3 @@
+# result-analysis意味評価
+
+初回attemptはFAIL、retryはPASS、outcomeはflaky。実行結果とtraceはあるが、対象versionが取得できず、追加実行でdeployment差異を切り分けたい。

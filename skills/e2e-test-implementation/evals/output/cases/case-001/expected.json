@@ -1,0 +1,1 @@
+{"required_tc_ids":["TC-101"],"required_e2e_refs":["tests/auth/login.spec.ts > login succeeds"],"tc_absent":false,"require_no_e2e_execution":true}

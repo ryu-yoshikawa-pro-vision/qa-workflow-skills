@@ -1,0 +1,10 @@
+[
+  {"query":"実行済みPlaywright結果を、primaryとretryを混同せず、cleanup状態・trace・環境事実つきで報告してください。","should_trigger":true},
+  {"query":"result-analysisから受け取ったE2E判断を再判定せず、検証済み事実と未実行理由を報告してください。","should_trigger":true},
+  {"query":"TCなしのE2E実行結果を、架空のTC IDを追加せずに利用者向けレポートへしてください。","should_trigger":true},
+  {"query":"初回FAILとretry PASSの両方を残し、cleanup未確認を成功と書かないE2E報告を作成してください。","should_trigger":true},
+  {"query":"既存E2Eをローカルで実行し、rawなrun・attempt・artifactを収集してください。","should_trigger":false},
+  {"query":"Playwright実行のFAIL原因を、コードを再実行せずに分析してください。","should_trigger":false},
+  {"query":"E2E対象を実装して、lintとtypecheckを通してください。","should_trigger":false},
+  {"query":"対象repoのPlaywright構成と安全条件を実行せずにinspectionしてください。","should_trigger":false}
+]

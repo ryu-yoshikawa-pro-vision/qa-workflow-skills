@@ -28,7 +28,9 @@ jobs:
           skills = [
               "qa-workflow", "spec-analysis", "question-analysis", "test-analysis",
               "test-requirement-design", "test-condition-design", "test-case-design",
-              "coverage-analysis", "adversarial-review",
+              "coverage-analysis", "adversarial-review", "e2e-test-inspection",
+              "e2e-test-implementation", "e2e-test-execution",
+              "e2e-test-result-analysis", "e2e-test-reporting",
           ]
           total = 0
           for skill in skills:
@@ -47,7 +49,7 @@ jobs:
                   assert "output-template.md" in input_path.read_text(encoding="utf-8") or skill == "qa-workflow", input_path
                   assert isinstance(json.loads(expected_path.read_text(encoding="utf-8")), dict)
                   total += 1
-          assert total >= 18, total
+          assert total >= 28, total
           print(f"Deterministic output eval cases: {total}")
           PY
 

@@ -6,7 +6,7 @@
   {"query":"この未回答事項をBlockerか要確認か分類して。","should_trigger":false},
   {"query":"TR→TCN→Coverage Item→Test Caseの閉鎖性を確認して、未カバーを洗い出して。","should_trigger":true},
   {"query":"Product Riskが下流のTest Requirementやケースから消えていないか追跡して。","should_trigger":true},
-  {"query":"Coverage Itemのうちケース化されていないものと、そのDispositionが妥当か見て。","should_trigger":true},
+  {"query":"TC-101からE2E実装参照へ対応付け、実行結果まで追跡できるか確認してください。","should_trigger":true},
   {"query":"期待結果が仕様と逆になっていないか、ケース品質を徹底レビューして。","should_trigger":false},
   {"query":"このテスト項目書をCold Reviewして、致命的・重大・軽微に分けてください。","should_trigger":false},
   {"query":"このTRから不足しているTest Conditionを新しく設計してください。","should_trigger":false},

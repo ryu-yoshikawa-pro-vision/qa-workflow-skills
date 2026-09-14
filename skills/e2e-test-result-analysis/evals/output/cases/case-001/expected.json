@@ -1,0 +1,1 @@
+{"required_e2e_ref":"tests/auth/login.spec.ts > login succeeds","required_cleanup_text":"未確認","additional_execution_required":true,"tc_absent":false}
