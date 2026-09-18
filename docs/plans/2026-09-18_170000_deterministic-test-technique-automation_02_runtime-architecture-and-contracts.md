@@ -866,8 +866,9 @@ runtime単位状態の正本は各成果物に保存した`runtime_unit_key`、`
 - `Runtime Required`と`Deterministic Generated`は`Yes / No`
 - Skill状態表の`WF-D012`は既存Skill状態表だけへ適用し、runtime状態表へ流用しない
 - 1 runtime unitだけ`blocked / unresolved / stale`でも独立した他unitは継続可能
-- `Runtime Required=Yes`のunitで`Result Status != ready`、`Freshness=stale`、または`Deterministic Generated=No`が残る場合はworkflow全体を`完了`にしない
-- `Runtime Required=No`のfallback unitは、既存Skill契約を満たす成果物が得られ、未解決issueがなければworkflow完了を妨げない
+- すべてのruntime unitで`Result Status=ready / Freshness=current`を必須とする
+- `Runtime Required=Yes`のunitでは、さらに`Deterministic Generated=Yes`を必須とする
+- `Runtime Required=No`のfallback unitは、既存Skill契約を満たして`Result Status=ready`になった場合だけworkflow完了を妨げない
 - model issueを`question-analysis`へroutingする場合は`model_key / target_key`を質問一覧・ブロック中範囲・回答後の再開情報へ保持する
 - artifact全体scriptのissueは`runtime_unit_key`をBlocker / Issueへ保持し、model keyを捏造しない
 - `coverage-analysis`はstale / gapをTCN / CIだけでなく関連`model_key`まで追跡する
