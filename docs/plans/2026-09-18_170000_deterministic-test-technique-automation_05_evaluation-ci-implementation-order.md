@@ -225,6 +225,8 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 ### flow
 
 - node / edge / path
+- `max_path_length=1..1000`
+- max path length超過を列挙しない
 - simple loop
 - fork / join branch Coverage
 - `region_key`によるfork / join対応
@@ -269,6 +271,7 @@ raw machine-readable入力をfixtureにします。
 - JSON Schema 2020-12対応keyword
 - `properties / items` traversal
 - local JSON Pointer `$ref`
+- cyclic local `$ref` subtreeは`unsupported`
 - external `$ref`は事前dereference要求
 - OpenAPI 3.0 `nullable` / boolean exclusive boundary
 - HTML constraint validation
@@ -302,18 +305,20 @@ raw machine-readable入力をfixtureにします。
 - seed=42固定test vector
 - 同seedで同列
 - seed差
-- uniform finite
-- uniform integer
-- weighted categorical
+- `uniform_finite`: non-empty / duplicate拒否
+- `uniform_integer`: inclusive min/max
+- `categorical`: positive integer weightのみ、value重複拒否
 - case count limit
 - 一般Coverage 100%を作らない
 - `required_case_count / generated_case_count / complete`による終了条件
 
 ### Metamorphic Testing
 
-- 各input transform
-- 各expected relation
-- unsupported transform
+- `set / add_decimal / multiply_decimal / append / permute / sort`のrequired parameter
+- JSON pathはobject key / array indexだけ
+- `permute` indicesが完全bijection
+- `equal / not_equal`、numeric monotonic、unique scalar array subset / supersetの型制約
+- unsupported transform / path / relation
 - source → follow-up traceability
 - relationごとのrequired source数 / follow-up数
 - 一般Coverage 100%を作らない
@@ -340,11 +345,14 @@ raw machine-readable入力をfixtureにします。
 ## 5. stable identity・再実行の回帰
 
 - 同じmodel改訂で`model_key`維持
-- 新modelだけ新key
-- 削除keyを再利用しない
+- 新modelは同slug最大番号+1、新系列は001
+- 削除keyを同系列で再利用しない
+- qa-workflowの再利用元有無で成果物系列を一意に判定
 - TR / TCN / TCは意味上同一の既存Entityを再利用できる場合だけID維持し、runtimeがsemantic matchingしない
 - TR / TCN / TCの新規IDは最大番号+1、999到達後は`id_space_exhausted`
-- target key → CI ID mapping維持
+- 初回mappingはcanonical target順でCI01から採番
+- existing mappingは同一TCN内で維持し、新targetだけ最大番号+1
+- duplicate mapping / parent mismatchを拒否
 - 消滅targetで下流`要再検証`
 - 同じ実行を2回行ってmachine evidenceが重複しない
 - stale rowを完了扱いしない
