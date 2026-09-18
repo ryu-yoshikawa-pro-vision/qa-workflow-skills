@@ -129,7 +129,10 @@ LLMがpartition setとpartitionの意味を正規化した後を処理します�
 - 同一set内のenum / finite range重複
 - valid / invalidの同一値衝突
 - representative value所属検証
-- enum / integer range等で一意に作れる代表値候補
+- representativeが明示済みならpartition所属を検証してその値を使用
+- representative=nullの場合、enumは宣言順の先頭値を使用
+- integer rangeはfiniteなminimum / maximumを必須とし、minimum inclusiveならminimum、exclusiveならminimum+1を使用。maximumを超える場合は`invalid_input`
+- decimal / date / datetime rangeでrepresentative=nullの場合はstepを勝手に仮定せず`result_status=unresolved`
 - 成果物上の閉鎖
 - Each Choice Coverage
 
@@ -583,12 +586,16 @@ effectはcauseだけを参照します。循環参照は禁止します。
 
 production Coverage targetごとに、対象productionを1回以上含むderivationのうち**production適用回数が最小**のものを選びます。同じ適用回数なら、適用した`production_key`列のUnicode code point辞書順で最小のderivationを選びます。
 
+valid case集合は各production targetの上記shortest derivationのunionとし、生成文字列とproduction key列が同一のcaseを重複除去します。production Coverage達成に不要な追加grammar列挙は行いません。
+
 invalid syntaxは補集合から生成しません。明示mutationは`delete_terminal / replace_terminal / insert_terminal`だけを許可します。
 
 - `delete_terminal`: `symbol_index`が指すterminal itemを削除
 - `replace_terminal`: `symbol_index`が指すterminal itemを明示replacement文字列へ置換
 - `insert_terminal`: RHS配列の`symbol_index`位置へ明示terminal文字列を挿入。0..len(rhs)を許可
 - delete / replaceで対象itemがnonterminalなら`invalid_input`
+
+mutationは指定productionのRHSを1回だけ変換した一時grammarへ適用します。その一時grammarで、変換したproductionを1回以上使うproduction適用回数最小のderivationを探索し、同数ならproduction key列辞書順で選びます。`max_depth`内で導出不能なら`unreachable_mutation` issueを返します。
 
 mutation結果は`invalid_candidate`であり、scriptだけで製品上invalidと断定しません。製品上invalidであることをexpected resultへ昇格するにはAuthorityまたはLLMの意味判断を必須にします。
 ## 14. schema / HTML
@@ -752,7 +759,7 @@ seed=`42`の最初の6 outputは`2707161783, 2068313097, 3122475824, 2211639955,
 {"type":"uniform_integer","minimum":0,"maximum":10}
 ```
 
-- minimum / maximumはinclusive integer、`minimum <= maximum`
+- minimum / maximumはinclusive integer、`minimum <= maximum`、domain size `maximum - minimum + 1 <= 2^32`
 
 ```json
 {
@@ -766,8 +773,11 @@ seed=`42`の最初の6 outputは`2707161783, 2068313097, 3122475824, 2211639955,
 
 - valueはcanonical typed valueで重複不可
 - weightは1〜2,147,483,647のinteger。0 / 負値 / decimalは禁止
+- weight合計は1..`2^32`
 
 uniform finite / categoricalでは宣言順をsample indexへ使います。weighted categoricalではweight累積区間を宣言順で構築し、rejection sampling後の整数をその区間へ写像します。
+
+3 distributionはいずれも**復元抽出**とし、caseごとに独立して次の乱数を消費します。同じ値が複数caseに現れることを許可します。
 
 同じseed、generator contract version、distributionから同じ列を返します。
 
