@@ -36,11 +36,12 @@ skills/test-condition-design/
 各patternは最低限、次を持ちます。
 
 - 正規pattern名
+- alias
 - 対応するHTML要素 / ARIA role等の識別候補
 - 一般的な確認候補
 - keyboard / focus候補
 - state / value候補
-- 関連する外部資料
+- `reference_refs`として扱う外部資料URLと確認日 / revision
 - 製品仕様なしでは期待結果へ昇格させない項目
 
 ### `references/ui-patterns.md`
@@ -51,7 +52,7 @@ skills/test-condition-design/
 - 一般候補と製品固有期待結果の違い
 - 外部標準の位置付け
 - 対象要素を誤分類した場合の扱い
-- catalogにないpatternをLLMが勝手に追加しないこと
+- catalog自体を実行中に変更しないこと。catalogにないUIでも、現在有効な仕様根拠から通常のテスト設計は継続できること
 
 catalogとreferenceで同じ一覧を二重管理しません。
 
@@ -96,6 +97,8 @@ UIで一般的に出現し、確認項目の再利用価値が高いものを対
 
 catalogは「よくある挙動一覧」ではなく「確認候補一覧」とします。
 
+catalog validationでは、正規pattern名の一意性、aliasの一意性、aliasと別patternの正規名との衝突がないことを確認します。
+
 ## 4. UI属性からの機械展開
 
 LLMまたは対象調査で次が取得できる場合、技法へ接続します。
@@ -119,7 +122,9 @@ LLMまたは対象調査で次が取得できる場合、技法へ接続しま�
 - `minlength`、`maxlength` → BVA入力
 - pattern catalog → readonly / disabled / focus等の確認候補
 
-ただしDOM属性と仕様書が矛盾する場合、DOMを正として期待結果を決めません。既存の`spec-analysis` / `question-analysis`のルールへ戻します。
+HTML constraintをBVA / partitionへ渡す前に、そのcontrolがconstraint validation対象かを確認します。`disabled`、`readonly`、control type等によりvalidation対象外の場合、属性が存在するだけでinvalid候補を生成しません。
+
+DOM属性と仕様書が矛盾する場合、DOMを正として期待結果を決めません。既存の`spec-analysis` / `question-analysis`のルールへ戻します。
 
 ## 5. 外部標準
 
@@ -143,7 +148,7 @@ CTAL-TA v4.0で扱われるDomain Testing、Base Choice / Pairwise等のCombinat
 
 Button、Checkbox、Combobox、Dialog、Radio Group、Slider、Tabs、Menu等のpatternについて、keyboard interaction、role、state、focus等の確認候補に利用します。
 
-APGの例示や推奨を対象製品の仕様へ無条件に昇格しません。
+APGの例示や推奨を対象製品の仕様へ無条件に昇格しません。APG等のURLは`reference_refs`であり、Coverage Itemの製品固有expected resultに必要な`authority_refs`とは区別します。
 
 ### HTML Standard
 
@@ -151,7 +156,7 @@ APGの例示や推奨を対象製品の仕様へ無条件に昇格しません�
 
 - https://html.spec.whatwg.org/
 
-native HTML controlの属性、form control、button、select等について、platform semanticsを確認する一次資料として使用します。
+native HTML controlの属性、constraint validation、form control、button、select等について、platform semanticsを確認する一次資料として使用します。参照したLiving StandardのURLと確認日をcatalogの`reference_refs`へ残します。
 
 ### WCAG / WAI資料
 
@@ -240,7 +245,13 @@ native HTML controlの属性、form control、button、select等について、p
 
 外部Pairwise engineをSkillから呼ぶ実装例として参考にしますが、本リポジトリの必須依存にはしません。
 
-## 7. 外部依存を追加する条件
+## 7. UI候補の適用深度
+
+`ui_pattern_candidates.py`は、現在のテスト要求・選択技法・Coverage基準に関係するpatternの候補を返すために使います。
+
+現行`test-condition-design`のリスク深度契約を維持し、低リスクという理由で対象内の仕様候補を消さない一方、低リスク領域へcatalogの一般edge caseを無条件に全展開しません。候補の採否と深度は既存Skillが判断します。
+
+## 8. 外部依存を追加する条件
 
 次のすべてを満たす場合だけ新規依存を検討します。
 
@@ -252,3 +263,5 @@ native HTML controlの属性、form control、button、select等について、p
 - 依存を入れた方が自前実装より保守しやすい
 
 将来の可能性だけを理由にPICT adapter、GraphWalker adapter、Z3 adapterを先に作りません。
+
+外部資料の文章・表・コード等をcatalogへ転載・改変して同梱する場合は、その時点でlicenseと帰属条件を確認します。URLを参考資料として保持し、独自に記述した確認候補から参照するだけの場合は、転載と同一には扱いません。
