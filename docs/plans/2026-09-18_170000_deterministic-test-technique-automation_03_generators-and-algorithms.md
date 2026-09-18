@@ -8,6 +8,7 @@
 
 ```json
 {
+  "scheme": "repository-default",
   "impact": 4,
   "likelihood": 2
 }
@@ -17,17 +18,20 @@
 
 ```json
 {
+  "scheme": "repository-default",
   "impact": 4,
   "likelihood": 2,
   "level": "高"
 }
 ```
 
-実装は現在の`skills/test-analysis/evals/deterministic/validator.py`にある4×4マトリクスと同じ契約にします。ただしvalidatorのコードはimportしません。
+`scheme=repository-default`の場合だけ、現在の`test-analysis/references/guidance.md`にある4×4マトリクスを独立実装して使用します。validatorのコードはimportしません。
 
-scriptは影響度・発生可能性を決めません。1〜4以外は入力エラーです。
+案件固有のリスク評価方式が存在する場合、このscriptはその方式を解釈・代替しません。`test-analysis`は案件固有方式を維持し、`RISK-D005`側もリポジトリ標準方式を使用するケースだけ4×4再計算を要求するよう整合させます。
 
-## 2. テスト技法候補
+scriptは影響度・発生可能性を決めません。標準方式では1〜4以外を入力エラーにします。
+
+## 2. テスト技法候補## 2. テスト技法候補
 
 ### `technique_candidates.py`
 
@@ -114,7 +118,7 @@ Error Guessingは構造だけで自動選択しません。過去不具合等の
 - integer
 - decimal
 - date
-- datetime
+- timezoneを持たないlocal datetime
 - length / count
 
 必須入力:
@@ -129,8 +133,9 @@ Error Guessingは構造だけで自動選択しません。過去不具合等の
 重要事項:
 
 - step不明時に`±1`を仮定しない
-- decimalはbinary floatではなく`decimal.Decimal`を使う
-- date / datetimeは単位を明示する
+- decimalはJSON上では10進文字列として受け取り、binary floatではなく`decimal.Decimal`を使う
+- dateは`YYYY-MM-DD`、local datetimeはISO 8601形式で受け取り、最小単位を明示する
+- timezone / DSTを含むdatetimeは初回対応から外し、実行環境のlocal timezoneを暗黙に使用しない
 - exclusive境界では「境界そのもの」と「最初の有効値」の意味を区別する
 - lower / upper両方がある場合は重複値を重複Coverage Itemへしない
 - overflowやdomain外値を生成する場合、その値を表現可能か確認する
@@ -141,38 +146,34 @@ Error Guessingは構造だけで自動選択しません。過去不具合等の
 
 ### `decision_table.py`
 
+初回実装では、LLMが各ruleを完全assignmentへ正規化してから渡します。部分ruleやrule priorityは導入しません。
+
 入力:
 
 - conditions
 - condition values
-- constraints
-- known rules / outcomes
-- rule source references
+- `forbidden_constraints`
+- 完全assignmentのknown rules / outcomes
+- condition / outcome / rule source references
 
 処理:
 
 1. 条件値のCartesian productを作る
-2. constraintsで成立不能assignmentを除外する
+2. `forbidden_constraints`で成立不能assignmentを識別する
 3. 成立可能assignmentごとに既知ruleを照合する
 4. outcome未定義を`unspecified`として検出する
-5. 同一assignmentに複数outcomeが一致した場合は矛盾として検出する
+5. 同一assignmentに複数outcomeが定義されている場合は矛盾として検出する
 6. 完全に同一のrule重複を検出する
-7. coverage対象rule数を算出する
-8. 必要に応じて安全なrule統合候補を出す
+7. 成立可能rule、成立不能rule、unspecified ruleを分離して返す
+8. coverage対象rule数を算出する
+
+成立不能assignmentは捨てず、制約ID / source referenceとともに返し、`test-condition-design`の`カバレッジ候補の扱い`へ`成立不能`として閉じられるようにします。
 
 scriptは未定義assignmentへ製品挙動を補完しません。
 
-### rule最適化
+初回実装ではdon't care化やBoolean minimizationを行いません。完全rule setの生成、欠落・重複・矛盾の検出を先に正しく固定します。rule最適化は自動化可能な候補として一覧に残しますが、現在の要求を満たすための初回runtimeには含めません。
 
-最適化前の完全rule setを必ず保持します。
-
-don't care化は、差分となる条件値以外が同じで、outcomeとoracle根拠が同一である場合だけ候補にします。
-
-最適化後だけを保存して元ruleを失う実装にはしません。
-
-Boolean minimizationのためだけに外部依存を追加しません。初期実装は隣接ruleの安全な統合までとし、複雑な最小化が必要になった場合に別途評価します。
-
-## 6. 全組合せ・Pairwise・N-wise
+## 6. 全組合せ・Base Choice・Pairwise・N-wise
 
 ### `combinatorial.py`
 
@@ -180,46 +181,63 @@ Boolean minimizationのためだけに外部依存を追加しません。初期
 
 - factors
 - values
-- forbidden / required constraints
-- strength
-- optional seed
+- `forbidden_constraints`
+- mode
+- N-wiseの場合のstrength
+- Base Choiceの場合の各factorのbase value
+- source references
 
 対応mode:
 
 - exhaustive
+- base-choice
 - 2-wise
 - t-wise
 
+すべてのmodeで、候補順序とtie-breakを固定し、乱数を使用しません。
+
 ### exhaustive
 
-有限domainのCartesian productから禁止assignmentを除外します。
+有限domainのCartesian productから禁止assignmentを識別します。
 
-組合せ数が設定上限を超える場合は処理を拒否し、LLMへPairwise / N-wise等の縮約判断を返します。scriptが勝手にCoverage基準を下げません。
+成立不能assignmentは消去だけせず、制約根拠付きの除外候補として返します。
+
+### Base Choice
+
+LLMが各factorのbase valueを意味根拠付きで選択した後に使用します。
+
+1. 全base valueの組合せを1件作る
+2. 各factorについて、そのfactorだけを各non-base valueへ置き換える
+3. `forbidden_constraints`を適用する
+4. base組合せ自体または必須置換組合せが成立不能なら、scriptが別のbase valueを勝手に選ばず入力矛盾として返す
 
 ### Pairwise
 
-現行`common.py`の考え方と同じく、成立可能な全値ペアをまず計算します。
+現行`common.py`の考え方と同じく、成立可能な全値ペアを独立に計算します。
 
 generatorは成立可能assignmentから未Coverageペアを最も多く覆うassignmentを選ぶgreedy方式を初期候補とします。
 
 要件は「最小行数」ではなく「成立可能2-wiseの100% Coverage」です。
 
-同一入力・同一seedでは同一出力にします。tie-breakはfactor/valueの安定sort等で固定します。
+同一入力では同一出力にします。factor / value / assignmentのtie-break規則を安定させます。
 
-既存validatorの`TCN-D014`、`TCN-D015`、`TCN-D018`〜`TCN-D021`、`TCN-D026`〜`TCN-D028`で独立に検証できるようにします。
+現行validatorは部分assignment形式の禁止制約だけを独立再計算できるため、初回runtimeも同じ制約表現に限定します。
 
 ### N-wise
 
 strength = t として成立可能なt-tupleを計算し、同様にCoverage setを埋めます。
 
-ただし全assignment × 全t-tupleの計算量が急増するため、次を入力契約にします。
+高いinteraction strengthをscriptが自動選択しません。tはユーザー指定、案件コンテキスト、具体的なリスク、過去不具合等の根拠をLLMが確認して入力します。
 
-- 因子数
-- 各因子の値数
-- strength
-- 最大成立可能assignment数
+### 計算量と出力量の上限
 
-上限超過時に無制限計算しません。
+因子数・値数・strengthから事前に計算可能なraw Cartesian sizeを確認し、列挙中もassignment数、Coverage tuple数、生成行数、出力件数のhard limitを監視します。
+
+- 上限値は実装時に代表fixtureで検証し、script定数とtestで固定する
+- semantic inputとしてLLMに「最大成立可能assignment数」を推測させない
+- 上限超過時は`limit_exceeded`として終了する
+- exhaustiveをPairwiseへ、N-wiseを低いstrengthへ勝手に変更しない
+- 部分生成を100% Coverageとして返さない
 
 PICT / ACTS等の外部engine採用は後述の依存関係判断に従います。
 
@@ -231,7 +249,7 @@ PICT / ACTS等の外部engine採用は後述の依存関係判断に従います
 
 将来追加する場合も`combinatorial.py`の入力拡張で扱い、新Skillは増やしません。
 
-## 7. Classification Tree
+## 7. Classification Tree## 7. Classification Tree
 
 独立generatorを増やさず、LLMがClassification Treeを次へ正規化します。
 
@@ -249,8 +267,8 @@ PICT / ACTS等の外部engine採用は後述の依存関係判断に従います
 
 対応Coverage:
 
-- each-choice / minimum criterion
 - exhaustive
+- Base Choice
 - Pairwise / N-wise
 
 classification / classの意味的分解はLLMに残します。
@@ -263,29 +281,54 @@ classification / classの意味的分解はLLMに残します。
 
 - states
 - initial states
+- terminal states
 - transitions
 - event
 - guard
 - next state
 - source reference
 - optional reset information
+- 明示的に採用されたinvalid transition候補
+- 要求するCoverage mode
 
 機械処理:
 
 - 未知state参照
 - transition重複
-- 到達不能state
-- initial stateから到達不能なtransition
-- outgoing transitionのないdead end候補
+- initial stateからのgraph上の到達可能性
+- outgoing transitionのない状態の列挙
 - 全state Coverage
 - 全valid transition Coverage
-- transition-pair Coverage
-- n-switch Coverage
+- transition-pair / n-switch Coverage
+- Round-trip Coverage
 - 指定Coverage対象のpath候補生成
+- 根拠付きで明示されたinvalid transition候補の構造検査
 
-invalid transitionは「仕様で許可されたevent集合と有効遷移が十分明示されている」場合だけ補集合候補を出します。
+graph上の到達可能性と、guardを含む実行可能性を分けます。scriptがguard条件を評価できない場合は「graph上は到達可能 / 到達不能」までを返し、具体データを含む実行可能性を断定しません。
 
-「定義がないから拒否される」とは推論しません。
+outgoing transitionがない状態も、scriptは構造事実として返します。入力でterminal stateと明示されている場合は正常終端として区別し、それ以外を自動的に欠陥やdead endとは断定しません。
+
+### n-switch
+
+n-switchはN+1個の連続するvalid transitionとして扱います。
+
+- 0-switch = 1 transition
+- 1-switch = 2連続transition
+- 2-switch = 3連続transition
+
+2-switch以上を高リスクだけから機械選択せず、具体的なsequence failure risk等の根拠がある場合にLLMがCoverage基準として指定します。
+
+### Round-trip
+
+round tripは、start stateとend stateが同一で、途中のstateを重複しないloopとして構造的に列挙します。
+
+guardを満たすデータや、そのloopが業務上の対象範囲かはLLMに残します。cycle数が上限を超える場合は`limit_exceeded`とし、黙って一部loopだけを100% Coverageとして扱いません。
+
+### invalid transition
+
+現行`coverage-techniques.md`の契約を維持し、有効遷移集合の補集合から全invalid transitionを機械生成しません。
+
+仕様、プロダクトリスク、過去不具合等の根拠をLLMが確認して明示したinvalid transition候補だけを入力し、source referenceとCoverageを検査します。
 
 ### path生成
 
@@ -293,7 +336,7 @@ invalid transitionは「仕様で許可されたevent集合と有効遷移が十
 
 reset可能性が不明な場合、1つの巨大pathへ無理に連結せず複数pathを返します。
 
-既存状態へ到達するためのprefixはBFS等で生成できますが、guardを満たす具体データはLLM / 他generator側の責務です。
+既存状態へ到達するためのprefixはgraph上のBFS等で生成できますが、guardを満たす具体データはLLM / 他generator側の責務です。
 
 ## 9. 明示flowのpath列挙
 
@@ -309,21 +352,25 @@ Use Caseやシナリオに明示的な分岐graphがある場合だけ使用し�
 - terminal
 - guard / branch label
 - loop bound
+- source references
+- main / alternative等の分類が仕様で明示されている場合はその分類
 
 処理:
 
-- main / alternative path候補
+- bounded path候補
 - edge Coverage
 - node Coverage
-- 到達不能node
-- terminalへ到達しないpath
+- graph上の到達不能node
+- terminalへ到達しない構造path
 - loopを指定回数に制限したpath列挙
 
-自然言語の業務フローからgraphを作るのはLLMです。
+scriptはgraph構造だけからmain / alternativeを推測しません。入力で分類済みの場合だけその分類を保持します。
 
-無限loopを防ぐため、cycleがある場合は明示boundなしの全path列挙を拒否します。
+自然言語の業務フローからgraphを作るのはLLMです。guardを評価できない場合、scriptはgraph上のpathだけを扱います。
 
-## 10. Cause-Effect Graph
+cycleがある場合は明示boundなしの全path列挙を拒否します。acyclic graphでもpath数が出力上限を超える場合は`limit_exceeded`とします。
+
+## 10. Cause-Effect Graph## 10. Cause-Effect Graph
 
 ### `cause_effect.py`
 
@@ -339,9 +386,15 @@ scriptは可能なcause assignmentを列挙し、effectを評価してDecision T
 
 ### `schema_cases.py`
 
-初期対応対象は、一般的で一意に解釈できる制約に限定します。
+schema種別とdialectを混同しません。初回入力で`schema_kind`を必須にします。
 
-候補:
+初回対応候補:
+
+- `json-schema-2020-12`
+- `openapi-3.0-schema`
+- `html-form-control`
+
+JSON Schema / OpenAPIでは、対応dialectで意味が一意に決まるsubsetだけを処理します。
 
 - type
 - required / optional
@@ -349,17 +402,27 @@ scriptは可能なcause assignmentを列挙し、effectを評価してDecision T
 - minimum / maximum
 - exclusiveMinimum / exclusiveMaximum
 - minLength / maxLength
-- nullable
+- nullableまたはnull型の扱いはdialectごとに分離
 - arrayのminItems / maxItems
-- HTML相当のmin / max / minlength / maxlength / required
 
-これらを同値partition / BVA / enum Coverageへ変換します。
+HTML form constraintでは`input_type`またはcontrol種別を必須にし、そのtypeへ適用される属性だけを扱います。
 
-`pattern`や`format`は「制約あり」という候補は作れますが、任意regexやメールアドレス等の有効・無効具体値を標準ライブラリだけで完全生成しません。仕様またはLLMが具体値を与えた場合に所属検証へ使います。
+- `required`
+- `min` / `max`
+- `minlength` / `maxlength`
+- `step`
 
-OpenAPI / JSON Schema全仕様への完全準拠parserを新規実装しません。必要なsubsetだけを対象にします。
+HTMLの`minlength`は`required`を意味しないため、`required`がない空値を自動でinvalid partitionへ入れません。
 
-## 12. grammar-based testing
+HTMLの`step`はinput typeごとに単位・既定値・step baseが異なるため、type semanticsまたは正規化済みstep情報なしにBVA値を作りません。
+
+`pattern`は初回runtimeでPython `re`へ変換して評価しません。制約が存在する事実とsource referenceだけを保持し、具体的なvalid / invalid値生成や所属判定は行いません。
+
+これらの制約を同値partition / BVA / enum Coverageへ変換します。未対応dialectやkeywordは黙って別仕様として解釈せず`unsupported`として返します。
+
+OpenAPI / JSON Schema全仕様への完全準拠parserを新規実装しません。
+
+## 12. grammar-based testing## 12. grammar-based testing
 
 任意BNF / EBNF parserは初回実装しません。
 
@@ -386,11 +449,16 @@ invalid候補の期待結果は自動確定しません。
 
 ## 13. test data matrix
 
-BVA、partition、schema、enum、組合せの生成結果を、Coverage Itemへ利用しやすい共通の候補行へ整形できます。
+test data matrixは独立runtime scriptを追加しません。
 
-ただし「共通TestData framework」は作りません。各generatorは自分のJSON出力を返し、`test-condition-design`が成果物へ統合します。
+BVA、partition、schema、enum、組合せの生成結果を`test-condition-design`がCoverage Itemへ統合するときの整理方法として扱います。
 
-異なるgenerator結果の直積が必要な場合だけ`combinatorial.py`へ明示的に渡します。
+- 各generatorは安定した候補keyとsource referenceを返す
+- 同じ検証責務を複数generatorが生成した場合は、1つへ統合するか既存の`重複`扱いへ閉じる
+- 同じ入力値だからという理由だけで意味上異なるCoverage Itemを統合しない
+- 異なるgenerator結果の直積が必要な場合だけ`combinatorial.py`へ明示的に渡す
+
+「共通TestData framework」や新しいID体系は作りません。
 
 ## 14. 追跡性
 
@@ -415,15 +483,19 @@ BVA、partition、schema、enum、組合せの生成結果を、Coverage Itemへ
 
 出力:
 
-- missing closure
+- missing structural closure
 - orphan
 - unknown reference
-- covered / partial / missingの計数
-- Coverage率
+- 構造上のcovered / missing件数
+- 構造上の閉鎖率
 
-修正Skillの判断は、既存の責任分界で一意に決められる構造欠陥だけ機械化します。意味上の原因判断は`coverage-analysis`に残します。
+このscriptが算出するのはID graphの構造事実です。IDが接続されているだけで意味上のCoverageが成立したとは判定しません。
 
-## 15. scriptが生成してはいけないもの
+`充足 / 部分充足 / 未充足`、テストケースが上流意図を実際に検証しているか、扱いの意味的妥当性は既存`coverage-analysis`に残します。
+
+修正Skillの判断は、既存の責任分界で一意に決められる構造欠陥だけ機械化します。
+
+## 15. scriptが生成してはいけないもの## 15. scriptが生成してはいけないもの
 
 どのgeneratorでも次は生成しません。
 
