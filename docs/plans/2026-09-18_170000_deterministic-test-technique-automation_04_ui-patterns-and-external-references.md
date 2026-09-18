@@ -33,16 +33,36 @@ skills/test-condition-design/
 
 機械参照する正本です。generatorはcatalog file contentのSHA-256を`static_data_versions.ui_pattern_catalog`として出力し、成果物へ保持します。catalog変更後は旧versionで生成したUI候補をstaleとして再検証します。
 
-各patternは最低限、次を持ちます。
+各patternは次のschemaを持ちます。
 
-- 正規pattern名
-- alias
-- 対応するHTML要素 / ARIA role等の識別候補
-- 一般的な確認候補
-- keyboard / focus候補
-- state / value候補
-- `reference_refs`として扱う外部資料URLと確認日 / revision
-- 製品仕様なしでは期待結果へ昇格させない項目
+```json
+{
+  "pattern_key":"text-input",
+  "name":"Text Input",
+  "aliases":["input-text"],
+  "identifiers":["input[type=text]","role=textbox"],
+  "candidates":[
+    {
+      "candidate_key":"required-empty",
+      "category":"validation",
+      "check":"required時の空入力候補",
+      "reference_refs":["HTML"],
+      "requires_product_authority":true
+    }
+  ]
+}
+```
+
+- `pattern_key`はcatalog内一意で`^[a-z][a-z0-9-]*$`
+- `name`は正規pattern名
+- `aliases[]`はcatalog全体で一意で、別patternの`pattern_key / name / alias`と衝突不可
+- `identifiers[]`はHTML要素 / ARIA role等の識別候補
+- `candidates[].candidate_key`はpattern内一意で`^[a-z][a-z0-9-]*$`
+- `category`は`interaction / keyboard / focus / state / value / validation / navigation / lifecycle`
+- `check`は一般的な確認候補であり製品expected resultではない
+- `reference_refs`は外部資料URLまたはcatalog内reference key
+- `requires_product_authority=true`のcandidateは製品仕様なしで期待結果へ昇格させない
+- runtime target keyは`ui:<pattern_key>:<candidate_key>`
 
 ### `references/ui-patterns.md`
 
@@ -97,7 +117,7 @@ UIで一般的に出現し、確認項目の再利用価値が高いものを対
 
 catalogは「よくある挙動一覧」ではなく「確認候補一覧」とします。
 
-catalog validationでは、正規pattern名の一意性、aliasの一意性、aliasと別patternの正規名との衝突がないことを確認します。
+catalog validationでは、`pattern_key` / 正規pattern名 / aliasの一意性、相互衝突、各pattern内`candidate_key`の一意性、category許可値を確認します。
 
 ## 4. UI属性からの機械展開
 
