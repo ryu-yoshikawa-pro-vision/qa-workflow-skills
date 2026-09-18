@@ -702,21 +702,27 @@ Plan完了には次をすべて満たす必要があります。
 
 - `_01`で実装対象にした処理がruntimeまたは既存機械処理へ割り当てられている
 - 目的内の技法・構造処理が本Plan外へ先送りされていない
-- strict JSON / envelope / canonicalization / contract versionが実装済み
-- static data versionとmodel fingerprintが再現可能
-- stable model key / QA ID / CI mappingが維持される
+- strict JSON / envelope / canonicalization / envelope version / generator contract versionが実装済み
+- upstream semantic fingerprint、static data version、model / generation fingerprintが再現可能
+- 正規化modelのMarkdown fenced JSON round-tripが成立する
+- stable model key / 既存Entity ID再利用 / CI mappingが契約どおり
 - 再実行がupsertされ重複machine evidenceを作らない
 - stale派生成果物を完了扱いしない
 - 選択技法がmodelまたは明示的な扱いへ閉じる
 - machine-readable schema / HTMLをLLMが手変換せず対応scriptが処理する
 - script間の機械変換でLLMを再介在させない
 - 全技法generatorと構造scriptにunit testがある
-- hard limit / tie-breakが契約どおり
+- item数 / byte / depthを含むhard limitとtie-breakが契約どおり
 - runtime出力と保存machine evidenceの一致をvalidatorが確認する
+- supported subsetを`unsupported`でLLM fallbackしない
 - model内Coverageと仕様全体Coverageを混同しない
-- qa-workflowがupstream変更、model変更、stale、局所ブロック、legacyを処理できる
+- qa-workflowがupstream意味変更、generation変更、stale、局所ブロック、legacyを処理できる
+- question-analysis往復でmodel / targetが失われない
+- 途中工程開始と`Selection Source`が既存workflowを壊さない
 - runtime適用可能な代表fixtureでruntime使用が統合評価から確認できる
-- 5 Skillの単体移植性が成立
+- 5 Skillの単体移植性が成立し、共通runtime helperの内容一致を検証できる
+- test-analysis / test-condition-designのtrigger train / validation件数とpositive / negative比率を維持する
+- adversarial-reviewの新規技法代表semantic fixtureがPASSする
 - Python 3.11 compile / runtime unit / deterministic eval / semantic validation / workflow統合評価がPASS
 - `skills-ref validate`がPASS
 - README、Skill、reference、template、EVALS、ASSERTIONSが実装と一致
@@ -733,6 +739,7 @@ Plan完了には次をすべて満たす必要があります。
 - runtime `unsupported`をQA成果物の`対象外`と同一視する
 - `null` signalを`false`へ変換する
 - model内100%を仕様全体100%と表現する
+- Random Testing / Metamorphic Testingへ一般的な100% Coverageを作る
 - external referenceを製品Authorityへ昇格する
 - 意味判断なしにinvalid behavior / expected result / riskを創作する
 - machine evidenceをLLMに手計算させる
