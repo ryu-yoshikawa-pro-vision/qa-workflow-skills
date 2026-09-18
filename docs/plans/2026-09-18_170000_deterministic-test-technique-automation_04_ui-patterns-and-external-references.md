@@ -195,7 +195,7 @@ native HTML controlの属性、constraint validation、form control、button、s
 
 採用判断:
 
-本PlanのPairwise / N-wise / mixed-strength契約はPython実装で満たすため、PICTを必須依存にはしません。契約どおりの正確性を満たせない、または代表runtime fixtureがGitHub ActionsのUbuntu runnerで30秒timeoutを継続して超えることを確認した場合だけ、その場で別実装へ迂回せずPlanを更新して依存追加を判断します。
+本PlanではPICTをruntime dependencyへ追加しません。Pairwise / N-wise / mixed-strengthは、`_02` / `_03`で固定した有限domain、constraint、hard limitの範囲をPython 3.11標準ライブラリだけで実装します。PICTはアルゴリズム比較の参考資料に限定します。
 
 ### NIST ACTS
 
@@ -261,15 +261,15 @@ native HTML controlの属性、constraint validation、form control、button、s
 
 ## 8. 外部依存の方針
 
-本Planで定義した処理はPython 3.11標準ライブラリで実装する前提とします。ただし、標準ライブラリに固執して正確性・保守性を落とすことは目的ではありません。
+本Planのruntime dependencyは**Python 3.11標準ライブラリのみ**で固定します。PICT、ACTS、GraphWalker、Z3、その他PyPI packageや外部binaryを実装中に追加しません。
 
-実装中に、Planで固定した入力契約・Coverage要件を満たせない、または代表runtime fixtureがGitHub ActionsのUbuntu runnerで30秒timeoutを継続して超えることを確認した場合は、実装者が独自判断で簡略化や別アルゴリズムへ切り替えず、次を確認した上でPlanを更新します。
+理由:
 
-- 既存依存または成熟した外部依存で正しく満たせるか
-- Skill単体移植性への影響
-- Windows / macOS / Linuxでの利用方法
-- licenseと保守状況
-- 自前実装より保守しやすいか
+- Skill単体移植性を維持できる
+- 本Planは有限domain、明示constraint、明示hard limitへscopeを限定している
+- external solver / generatorごとの差を決定論性契約へ持ち込まない
+
+runtime unit / CLI integrationの各subprocess timeoutは30秒です。標準ライブラリ実装がPlanの正確性契約または30秒timeoutを満たせない場合は、Coverage基準やhard limitを暗黙に緩めたり外部dependencyへ切り替えたりせず、**その実装はPlan未達として停止**します。依存方針を変える場合は、このPlanとは別の明示的な要件変更として扱います。
 
 将来用のPICT / GraphWalker / Z3 adapter、plugin機構は作りません。
 
