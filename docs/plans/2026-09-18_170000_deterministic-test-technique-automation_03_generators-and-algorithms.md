@@ -1,5 +1,30 @@
 # テスト分析・テスト技法の決定論的自動化Plan
 
+## 共通payload契約
+
+generator系scriptの`payload`は次を基本形とします。
+
+```json
+{
+  "targets": [],
+  "coverage_summary": {
+    "criterion": "",
+    "required": 0,
+    "covered": 0,
+    "complete": false
+  },
+  "derived": {},
+  "metadata": {}
+}
+```
+
+- `targets`: 技法固有のstable target keyを持つ機械生成対象
+- `coverage_summary`: Coverage基準を持つ技法だけが使用する。Random Testing / Metamorphic Testingのように一般的なCoverage基準を持たない技法では、技法固有の終了条件を`completion_summary`として返す
+- `derived`: 次scriptへ直接渡す機械変換結果
+- `metadata`: target以外の再現可能な補助情報
+
+構造検査scriptは`violations`と`derived_values`をpayloadへ返します。各script固有のrequired keyとtarget key形式は以下の節で固定し、実装者が独自のtop-level payloadを作りません。
+
 ## 1. プロダクトリスク
 
 ### `test-analysis/scripts/risk_matrix.py`
@@ -22,15 +47,22 @@
     "likelihood": [1,2,3]
   },
   "matrix": {
-    "1,1": "低"
+    "1,1": "L1"
+  },
+  "priority_map": {
+    "L1": "低",
+    "L2": "中",
+    "L3": "高"
   }
 }
 ```
 
 - dimension値集合とmatrix keyの完全性を検証
-- 入力値がscheme外なら`invalid_input`
-- schemeに穴があれば`invalid_input`
+- matrixが返すすべてのlevelに`priority_map`を必須にする
+- `priority_map`の値は既存契約の`高 / 中 / 低`だけを許可する
+- 入力値がscheme外、matrixに穴がある、priority mappingがない場合は`invalid_input`
 - scheme採用理由はLLMへ残す
+- `test-requirement-design`以降の最低優先度判定にはmapped priorityを渡し、案件固有level文字列を既存`RISK_LEVEL_ORDER`へ直接渡さない
 
 ## 2. テスト技法候補
 
@@ -53,6 +85,25 @@ signal:
 
 各signalは`true / false / null`です。key欠落は`invalid_input`、`null`は未確認であり`false`ではありません。
 
+signalから候補技法へのmappingは次で固定します。
+
+| signal | `true`時の候補 |
+| --- | --- |
+| `ordered_domain` | `境界値分析` |
+| `explicit_boundaries` | `境界値分析` |
+| `equivalence_classes` | `同値分割` |
+| `multiple_discrete_conditions` | `デシジョンテーブル` |
+| `stateful` | `状態遷移` |
+| `multiple_factors` | `Pairwise / 組合せ` |
+| `explicit_flow` | `シナリオ / ユースケース` |
+| `multi_variable_domain` | `Domain Testing` |
+| `crud_model` | `CRUD Testing` |
+| `operational_profile` | `Random Testing` |
+| `metamorphic_relation` | `Metamorphic Testing` |
+| `grammar_model` | `grammar-based testing` |
+
+複数signalが`true`の場合は候補集合のunionを返し、上表の順で安定sortします。`false`は候補を追加せず、`null`は`undetermined_signals`へ入れます。
+
 出力payload:
 
 ```json
@@ -63,7 +114,7 @@ signal:
 }
 ```
 
-候補の最終採用は`test-analysis`が行います。Error Guessingは構造signalだけでは自動採用しません。
+`complete`は`undetermined_signals`が空かだけを表す診断値であり、`false`だけを理由にworkflowをブロックしません。候補の最終採用は`test-analysis`が行います。Error Guessingは構造signalだけでは自動採用しません。
 
 ## 3. 同値分割 / Each Choice
 
@@ -136,12 +187,16 @@ LLMがpartition setとpartitionの意味を正規化した後を処理します�
 
 1. key / type / coefficientを検証
 2. anchorを固定してpivot境界値を計算
-3. representableならON pointを生成
-4. relation方向と`pivot_step`からIN / OUT pointを生成
-5. 各pointがdomain / constraintを満たすか再検証
-6. ON / IN / OUT Coverageを計算
+3. border relationが`<= / >=`ならclosed、`< / >`ならopenと判定
+4. precision上borderへ置ける点をON pointとする
+5. ON pointの反対側でborderへ最も近いrepresentable pointをOFF pointとする
+6. borderから1 step以上離れたpartition内代表をIN point、partition外代表をOUT pointとする
+7. 各pointが意図したpartition / constraintを満たすか再検証
+8. 各borderについてON / OFF / IN / OUT Coverageを計算
 
-境界値が表現不能、pivot coefficientが0、必要step不明の場合は推測せずissueを返します。LLMが明示したoverride pointがある場合は、その所属だけscriptが検証します。
+closed borderではONはinside側、OFFはoutside側に属します。open borderではONはoutside側、OFFはinside側に属します。IN / OUTはborder上または最隣接点とは別の代表点として扱います。
+
+境界値または隣接点が表現不能、pivot coefficientが0、必要`pivot_step`不明の場合は推測せずissueを返します。LLMが明示したoverride pointがある場合は、その所属だけscriptが検証します。target keyは`<border_key>:ON|OFF|IN|OUT`で固定します。
 
 ## 6. Decision Table
 
@@ -230,9 +285,19 @@ Coverage targetはglobal strength targetとsubset追加targetの和集合です�
 
 ## 8. Classification Tree
 
-独立generatorは追加しません。
+### `classification_tree.py`
 
-LLMがclassification / classの意味を定義し、deterministic adapterがfactor / valueへ変換して`combinatorial.py`へ直接渡します。adapter出力をLLMが再生成しません。
+LLMがclassification / classの意味を定義した後、`classification_tree.py`がdeterministic adapterとしてfactor / valueへ変換し、`combinatorial.py`へ直接渡します。adapter出力をLLMが再生成しません。
+
+入力required key:
+
+- `classifications[]`
+- 各classificationの`classification_key`
+- `classes[]`
+- 各classの`class_key`
+- Authority / constraint refs
+
+出力`derived.factors`は`combinatorial.py`のfactor入力と直接互換にします。
 
 ## 9. 状態遷移
 
@@ -295,6 +360,8 @@ node kind:
 - `fork`
 - `join`
 - `terminal`
+
+fork / joinを使う場合は`region_key`を必須にし、同じ`region_key`を持つ1つのforkと1つのjoinだけを対応pairとします。regionのnestは許可しますが、同一region内の複数fork / join、crossing regionは`unsupported`です。
 
 処理:
 
@@ -389,6 +456,8 @@ machine-readableな入力はscriptが直接正規化します。
 ### JSON Schema 2020-12
 
 - `type`
+- `properties`
+- `items`
 - `enum`
 - `const`
 - `required`
@@ -398,6 +467,8 @@ machine-readableな入力はscriptが直接正規化します。
 - `minLength` / `maxLength`
 - `minItems` / `maxItems`
 - `minProperties` / `maxProperties`
+
+`$ref`はruntime内でnetwork解決しません。同一入力document内のlocal JSON Pointerだけ対応し、外部URI referenceは事前dereference済み入力を要求します。
 
 ### OpenAPI 3.0 Schema
 
@@ -418,7 +489,7 @@ machine-readableな入力はscriptが直接正規化します。
 
 `pattern`は存在を検出しreferenceへ残しますが、ECMAScript RegExpとPython `re`を同一視して具体値生成しません。
 
-`allOf / anyOf / oneOf / not / if / then / else`等、対応subset外でvalidation意味を変えるkeywordは`unsupported`です。annotation keywordだけではschema全体を拒否しません。
+`allOf / anyOf / oneOf / not / if / then / else`等、対応subset外でvalidation意味を変えるkeywordは`unsupported`です。unsupported keywordがvalidation意味へ影響するsubtreeだけを`unsupported`として切り離し、独立して評価できる別property / itemは継続できます。親schemaのvalidation意味をunsupported keywordが左右する場合は、その親subtree全体を`unsupported`にします。annotation keywordだけではschema全体を拒否しません。
 
 正規化後のconstraintはEP / BVA / combinatorial / test data requirementへ直接渡します。
 
@@ -451,11 +522,20 @@ machine-readableな入力はscriptが直接正規化します。
 - relation
 - required fixture property
 
+対応constraint operator:
+
+- scalar equality
+- finite enum set
+- integer / decimal / date / datetime range
+- version range（比較可能なdot-separated integer componentだけ）
+- boolean requirement
+
 処理:
 
 - canonical keyによる重複統合
-- compatible constraintのintersection
-- incompatible constraintの矛盾検出
+- equality一致、enum集合intersection、range intersection、version range intersection
+- 空intersectionまたは異なるscalar equalityを矛盾として検出
+- 対応operator外は推測せず`unsupported`
 - requirement → model / target traceability
 
 実際の個人情報・顧客データ・fixture値を自動取得しません。
@@ -466,10 +546,22 @@ machine-readableな入力はscriptが直接正規化します。
 
 再現可能性のためPRNGを`pcg32-v1`へ固定します。Python `random`の実装versionへ依存しません。
 
+`pcg32-v1`はPCG XSH RR 64/32として次を固定します。
+
+- multiplier: `6364136223846793005`
+- 64-bit unsigned state
+- init sequence: `54`
+- increment: `(54 << 1) | 1 = 109`
+- seeding: state=0 → 1回advance → seed加算 → 1回advance
+- output permutation: XSH RR 64/32
+- bounded integer: rejection samplingでmodulo biasを避ける
+
+seed=`42`の最初の6 outputは`2707161783, 2068313097, 3122475824, 2211639955, 3215226955, 3421331566`とし、固定test vectorに使用します。
+
 入力:
 
 - uint64 seed
-- case count
+- `case_count`
 - domain
 - distribution
 - Authority / Reference
@@ -481,6 +573,8 @@ machine-readableな入力はscriptが直接正規化します。
 - finite valuesの整数weight付きcategorical
 
 weighted categoricalではmodulo biasを避けるrejection samplingを使用します。同じseed、algorithm version、domain、distributionから同じ列を返します。
+
+Random Testingには一般的なCoverage 100%を定義しません。`completion_summary`は`required_case_count = case_count`、`generated_case_count`、`complete = generated_case_count == required_case_count`を返します。case count、時間等の終了条件をLLMが勝手に補いません。本Planのruntimeでは時間依存の終了条件を再現性保証へ含めず、件数で正規化された場合だけ機械生成します。
 
 Random Testingのoracleは生成しません。
 
@@ -508,7 +602,11 @@ LLMがmetamorphic relationを定義した後を処理します。
 - `subset`
 - `superset`
 
-scriptはsource inputからfollow-up inputを生成し、relationをmachine evidenceへ保持します。relationが製品に妥当か、出力のどのfieldへ適用するかはLLMがAuthorityとともに正規化します。
+各MR modelは`relation_key`、`source_inputs[]`、各sourceに対する`follow_up_count`、transform、expected relationを持ちます。
+
+scriptはsource inputから指定件数のfollow-up inputを生成し、relationをmachine evidenceへ保持します。Metamorphic Testingには一般的なCoverage 100%を定義しません。`completion_summary`は各`relation_key`について要求されたsource数とfollow-up数をすべて生成できたかだけを判定します。各MRを1回実行したことを「十分なCoverage」と表現しません。
+
+relationが製品に妥当か、必要なsource test数、出力のどのfieldへ適用するかはLLMがAuthorityとともに正規化します。
 
 ## 19. テスト環境要求
 
@@ -524,7 +622,7 @@ scriptはsource inputからfollow-up inputを生成し、relationをmachine evid
 - locale / timezone requirement
 - network / storage等の前提
 
-同じkeyの要求を統合し、互換しない値を矛盾として返します。環境を実際に準備・検出しません。
+対応constraint operatorは`test_data_requirements.py`と同じく、scalar equality、finite enum set、numeric / date / datetime range、version range、boolean requirementです。同じkeyの要求をoperatorごとのintersectionで統合し、互換しない値を矛盾として返します。未対応operatorは`unsupported`とし、環境を実際に準備・検出しません。
 
 ## 20. 変更影響分析
 
