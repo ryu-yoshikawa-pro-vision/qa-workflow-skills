@@ -488,8 +488,8 @@ CI番号は`CI\d{2,}`を許可します。
 
 既存成果物の再利用条件へ次を追加します。
 
-- 新契約成果物はcontract versionとupstream versionが現在有効
-- model fingerprintと派生成果物が一致
+- 新契約成果物はenvelope / generator contract versionとupstream semantic fingerprintが現在有効
+- model / generation fingerprintと派生成果物が一致
 - stale / `要再検証` / unresolvedなmodelが残っていない
 - runtime実行対象なのに決定論的generator未実行である場合、その事実を保持する
 
