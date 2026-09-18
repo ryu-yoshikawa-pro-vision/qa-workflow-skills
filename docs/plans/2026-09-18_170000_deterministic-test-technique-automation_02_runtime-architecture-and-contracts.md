@@ -278,9 +278,9 @@ Python unavailable時もSkillは既存LLM経路で成果物を作成できます
 
 ## 4. canonicalization・version・fingerprint
 
-### 4.1 canonical model
+### 4.1 canonical input・model・generation fingerprint
 
-model fingerprintはSHA-256で計算します。入力はUTF-8のcanonical JSONです。
+fingerprintはSHA-256で計算します。入力はUTF-8のcanonical JSONです。
 
 - object keyはUnicode code point順
 - `authority_refs` / `reference_refs`等の集合扱い配列は重複除去してsort
@@ -288,7 +288,6 @@ model fingerprintはSHA-256で計算します。入力はUTF-8のcanonical JSON�
 - assignment objectのkeyはsort
 - decimal / date / datetimeは共通表現へ正規化
 - JSON serializationはUTF-8、`ensure_ascii=false`相当、separatorは`,`と`:`、末尾改行なし
-- object keyは前記順序へ並べてからserializeする
 - string valueはUnicode normalizationを行わず入力code point列を保持する
 - decimalは指数表記を使わず、整数部の不要な先頭0と小数部の末尾0を除去し、`-0`は`0`へ正規化する
 - dateは`YYYY-MM-DD`、local datetimeは`YYYY-MM-DDTHH:MM:SS`、fixed-offset datetimeは`YYYY-MM-DDTHH:MM:SS±HH:MM`だけをcanonical表現とし、fractional secondを禁止する
@@ -296,17 +295,33 @@ model fingerprintはSHA-256で計算します。入力はUTF-8のcanonical JSON�
 - JSON whitespaceは除去
 - 非有限数は不可
 
-`model_fingerprint`は`metadata.model_key`とscript固有`input`の意味データから計算し、`upstream_entities`、`static_data_versions`、Markdown説明文、表示装飾、生成結果を含めません。artifact全体scriptでは`model_fingerprint`を出力せず`null`とします。
+`input_fingerprint`はすべてのruntime scriptで必須です。次をcanonical JSON化してSHA-256を計算します。
+
+- `runtime_unit_key`
+- script固有`input`
+- `authority_refs`
+- `reference_refs`
+- model scriptでは`selection_source`
+
+`upstream_entities`はstale判定用、`static_data_versions`はgeneration条件用なので`input_fingerprint`へ含めません。
+
+`model_fingerprint`はmodel scriptだけ使用し、次をcanonical JSON化してSHA-256を計算します。
+
+- `model_key`
+- `input_fingerprint`
+
+artifact全体scriptでは`model_fingerprint=null`です。ただし`input_fingerprint`が必ず存在するため、artifact input変更を検知できます。
 
 `generation_fingerprint`は次をcanonical JSON化してSHA-256を計算します。
 
 - `generator`
+- `input_fingerprint`
 - `model_fingerprint`
 - `runtime_contract_version`
 - `generator_contract_version`
 - `static_data_versions`
 
-artifact全体scriptでは`model_fingerprint=null`のまま上記を計算します。
+したがって、同じartifact scriptでも入力・Authority / Reference・runtime contract・generator contract・静的参照データのいずれかが変われば`generation_fingerprint`は変わります。
 
 generator実装のbug fix、探索順、tie-break等、machine outputへ影響する変更はschema互換でも必ず`generator_contract_version`を更新します。共通runtime処理のoutputへ影響する変更は`runtime_contract_version`を更新します。
 
