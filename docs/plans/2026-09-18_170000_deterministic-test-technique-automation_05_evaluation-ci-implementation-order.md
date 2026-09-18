@@ -66,7 +66,7 @@ CLI integration testは各代表fixtureをsubprocessで`python <script-path>`起
 
 ### runtime envelope
 
-- `envelope_version / runtime_contract_version / generator_contract_version / generator / runtime_unit_key / model_key / input_fingerprint / model_fingerprint / generation_fingerprint / static_data_versions / runtime_status / result_status / runtime_required / deterministic_generated / payload / issues`
+- `envelope_version / runtime_contract_version / generator_contract_version / generator / runtime_unit_key / model_key / input_fingerprint / model_fingerprint / generation_fingerprint / static_data_versions / runtime_status / result_status / runtime_required / deterministic_generated / fallback_reason / payload / issues`
 - model scriptは`runtime_unit_key=model:<model_key>`、artifact全体scriptは`runtime_unit_key=artifact:<generator>:<scope_key>`を要求し、artifact全体scriptの`model_key`はnull
 - `ok / invalid_input / unsupported / limit_exceeded`は構造化結果を返せた扱いで終了code 0
 - `internal_error`は可能ならenvelopeを返して終了code 1、envelope生成不能も1
@@ -74,7 +74,7 @@ CLI integration testは各代表fixtureをsubprocessで`python <script-path>`起
 - `runtime_required=false`の対応subset外は`not_run` fallbackとし、実行済みscriptの`unsupported`を正常fallback扱いしない
 - supported inputで`runtime_required=false`を拒否する
 - artifact scriptのscope keyがscript別固定値 / input由来値と一致する
-- Python unavailable / runtime未実行は成果物metadataで`runtime_status=not_run / deterministic_generated=false`
+- Python unavailable / runtime未実行は成果物metadataで`runtime_status=not_run / deterministic_generated=false`とし、fingerprintをnull、`fallback_reason`を許可値で保持する
 - status対応表どおりの`result_status / runtime_required / deterministic_generated`を要求
 - model scriptでは`model_status=result_status`、artifact全体scriptでは`artifact_status=result_status`
 - staleはruntime statusではなく`freshness_status`としてworkflowが付与
@@ -435,7 +435,7 @@ validatorはruntime traceabilityと独立にmissing / orphan / unknown / stale�
 
 `assets/workflow-state-template.md`へ別表`runtime状態`を追加します。
 
-`Skill | Runtime Unit Key | Model Key | Result Status | Freshness | Runtime Status | Runtime Required | Deterministic Generated | Blocker / Issue`
+`Skill | Runtime Unit Key | Model Key | Result Status | Freshness | Runtime Status | Runtime Required | Deterministic Generated | Fallback Reason | Blocker / Issue`
 
 - `Runtime Unit Key`は同一Skill内一意
 - model scriptではModel Key必須、artifact全体scriptでは空欄
@@ -443,6 +443,7 @@ validatorはruntime traceabilityと独立にmissing / orphan / unknown / stale�
 - `Freshness = current / stale`
 - `Runtime Status = ok / invalid_input / unsupported / limit_exceeded / internal_error / not_run`
 - `Runtime Required / Deterministic Generated = Yes / No`
+- `Fallback Reason`は空欄 / `outside_supported_subset` / `python_unavailable`
 - Skill状態表の`WF-D012`は従来どおりSkill + 対象にだけ適用し、runtime状態表へ流用しない
 - ワークフロー全体`完了`では全runtime unitが`Result Status=ready / Freshness=current`であることを追加検査する
 - `Runtime Required=Yes`のunitでは、さらに`Deterministic Generated=Yes`を要求する
@@ -473,6 +474,7 @@ runtime対応Skillの`evals/output/cases/*/expected.json`では、既存fieldに
     "expected_result_status": "ready",
     "expected_runtime_required": true,
     "expected_deterministic_generated": true,
+    "expected_fallback_reason": null,
     "expected_freshness_status": "current",
     "expected_target_id_map": {}
   }
