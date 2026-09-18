@@ -24,6 +24,8 @@
 
 自然言語の仕様、Figma、Q&A、実装等から「何が条件・境界・状態・因子・制約・期待結果の根拠になるか」を判断する処理はLLMに残します。
 
+あわせて、調査でテスト分析・設計に必要と判断したDomain Testing、CRUD Testing、Random Testing、Metamorphic Testing、grammar-based testing等を、既存の`test-analysis` / `test-condition-design`の責務を崩さず正式なSkill契約へ追加します。新しいSkillは作りません。
+
 一方、構造化済みの入力から一意または機械的に導出できる次の処理は、可能な限りSkill内のscriptへ移します。
 
 - 値・組合せ・ルール・遷移・経路の列挙
