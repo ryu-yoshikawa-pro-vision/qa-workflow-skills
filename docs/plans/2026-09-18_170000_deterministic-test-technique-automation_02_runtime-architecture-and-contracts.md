@@ -77,6 +77,7 @@ skills/test-condition-design/scripts/
 ├── domain_testing.py
 ├── decision_table.py
 ├── combinatorial.py
+├── classification_tree.py
 ├── state_transition.py
 ├── flow_paths.py
 ├── crud_matrix.py
@@ -132,33 +133,44 @@ Python実装では、duplicate key検出用`object_pairs_hook`、非有限数拒
 
 ```json
 {
-  "contract_version": "1",
+  "envelope_version": "1",
+  "generator_contract_version": "combinatorial-v1",
   "model_key": "pairwise-01",
   "upstream_artifacts": [
-    {"skill": "test-requirement-design", "version": "v3"}
+    {
+      "skill": "test-requirement-design",
+      "semantic_fingerprint": "sha256:..."
+    }
   ],
+  "static_data_versions": {},
   "authority_refs": ["SPEC-001"],
   "reference_refs": []
 }
 ```
 
-- `contract_version`: generator入出力契約。互換性を壊す変更で更新する
-- `model_key`: 同一成果物内のmodel識別
-- `upstream_artifacts`: 正規化に使用した上流成果物version
+- `envelope_version`: runtime共通envelopeの互換性version。全generator共通
+- `generator_contract_version`: 各generator固有の入出力・Coverage契約version。互換性を壊す変更でそのgeneratorだけ更新する
+- `model_key`: 同一成果物系列のmodel識別
+- `upstream_artifacts`: 正規化に使用した上流成果物の意味データfingerprint。Markdown全文hashや自由記述versionを使わない
+- `static_data_versions`: 出力へ影響するcatalog / scheme / assetのversionまたはfingerprint
 - `authority_refs`: 製品固有expected resultを確定できる現在有効な根拠
 - `reference_refs`: 外部標準、一般UI資料、DOM / 実装事実等の補助情報
 
 ### 3.3 runtime出力envelope
 
-成功・想定内の失敗を含め、stdoutは常に1つのJSON objectにします。
+成功・想定内の未処理状態を含め、stdoutは常に1つのJSON objectにします。
 
 ```json
 {
-  "contract_version": "1",
+  "envelope_version": "1",
+  "generator_contract_version": "combinatorial-v1",
   "generator": "combinatorial",
   "model_key": "pairwise-01",
   "model_fingerprint": "sha256:...",
+  "generation_fingerprint": "sha256:...",
+  "static_data_versions": {},
   "runtime_status": "ok",
+  "model_status": "ready",
   "payload": {},
   "issues": []
 }
@@ -172,9 +184,18 @@ Python実装では、duplicate key検出用`object_pairs_hook`、非有限数拒
 - `limit_exceeded`: 契約上限を超過
 - `internal_error`: 想定外障害
 
-`invalid_input`、`unsupported`、`limit_exceeded`、`internal_error`は非0終了にします。stderrは人間向け診断だけに使い、Skillはstdout JSONを機械処理します。入力全文、secret、tokenはstderrへ出しません。
+`model_status`:
 
-`unsupported`はruntimeの対応可否です。QA成果物自体の`対象外`、`ブロック中`、`残存リスク`等と同一視しません。runtime未対応でもLLM経路で意味上妥当な成果物を作れる場合は継続できますが、「決定論的生成済み」とは扱いません。
+- `ready`: 下流へ利用可能
+- `unresolved`: 追加情報が必要
+- `blocked`: 必須情報不足等で対象modelを継続できない
+- `stale`: 上流・model・generator contract・static dataの変更により再生成が必要
+
+`runtime_status=ok`でもblocking issueが存在する場合は`model_status=ready`にしません。
+
+`ok`、`invalid_input`、`unsupported`、`limit_exceeded`は「runtimeが構造化結果を返せた」という意味で終了code 0とします。`internal_error`またはenvelope自体を生成できない障害だけ終了code 1とします。Agent側は終了codeだけでroutingせず、stdout envelopeを必ずparseします。stderrは人間向け診断だけに使い、入力全文、secret、tokenを出しません。
+
+本Planで対応subsetとして定義した入力に対して`unsupported`を返した場合は、LLM fallbackで正常扱いせずruntime契約違反として修正対象にします。本Planの対応subset外の入力だけ、`unsupported`を明示した上で既存LLM経路へ戻せます。
 
 ### 3.4 構造化された未解決事項
 
@@ -183,14 +204,16 @@ Python実装では、duplicate key検出用`object_pairs_hook`、非有限数拒
 ```json
 {
   "issue_type": "unspecified_rule",
+  "model_key": "decision-01",
   "target_key": "R4",
   "authority_refs": ["SPEC-001"],
   "required_information": "条件組合せに対する期待action",
-  "route_to": "question-analysis"
+  "route_to": "question-analysis",
+  "resume_skill": "test-condition-design"
 }
 ```
 
-自由文stderrを再解釈してroutingしません。`route_to`は既存Skill名だけを許可します。
+自由文stderrを再解釈してroutingしません。`route_to` / `resume_skill`は既存Skill名だけを許可します。`question-analysis`へ送る場合は`model_key` / `target_key`を質問・ブロック・回答後の再開まで保持し、同じSkill内の無関係なmodelをブロックしません。
 
 ## 4. canonicalization・version・fingerprint
 
@@ -206,7 +229,15 @@ model fingerprintはSHA-256で計算します。入力はUTF-8のcanonical JSON�
 - JSON whitespaceは除去
 - 非有限数は不可
 
-`model_fingerprint`はcanonical modelだけから計算し、生成結果を含めません。
+`model_fingerprint`はcanonical modelの意味データだけから計算し、Markdownの説明文、表示順だけの装飾、生成結果を含めません。
+
+`generation_fingerprint`は次をcanonical JSON化してSHA-256を計算します。
+
+- `model_fingerprint`
+- `generator_contract_version`
+- `static_data_versions`
+
+同じmodelでもgenerator contractまたは静的参照データが変われば`generation_fingerprint`は変わり、旧派生成果物をstaleと判定します。
 
 ### 4.2 静的参照データ
 
@@ -273,6 +304,9 @@ named timezone / DST transition自体を一般BVAとして推測しません。�
 
 | 対象 | 上限 |
 | --- | ---: |
+| 入力JSON | 2 MiB |
+| JSON / schema / ASTのnesting depth | 64 |
+| 1文字列 | 64 KiB |
 | Decision Table / Cause-Effectのassignment | 65,536 |
 | Pairwise / N-wise / mixed-strengthのCoverage target | 100,000 |
 | feasibility search node | 1,000,000 |
@@ -280,9 +314,10 @@ named timezone / DST transition自体を一般BVAとして推測しません。�
 | state sequence / flow path | 10,000 |
 | grammar生成case | 10,000 |
 | Random Testing生成case | 10,000 |
-| 1 modelの機械出力item総数 | 20,000 |
+| 1 modelのtarget / row / candidate総数 | 100,000 |
+| stdout JSON | 16 MiB |
 
-上限を超えた場合は`limit_exceeded`とし、Coverage基準、strength、path深度等を自動で下げません。上限変更は実装者判断ではなく契約変更としてPlan / contract versionを更新します。
+上限を超えた場合は`limit_exceeded`とし、Coverage基準、strength、path深度等を自動で下げません。item数が上限内でもbyte / depth上限を超える入力・出力は処理しません。上限変更は実装者判断ではなくgenerator contract変更としてPlanを更新します。
 
 ## 6. 根拠・constraint
 
@@ -321,7 +356,9 @@ Coverage母集団から除外するconstraintは1件以上の`authority_refs`を
 - `TCN-xxx-CIyy`
 - `TC-`
 
-同じ意味の既存項目を更新する場合は既存IDを維持します。新規項目だけ現在の最大番号より後ろへ採番し、削除済みIDを同じ成果物系列で再利用しません。意味上同じ項目かどうかは担当SkillのLLM判断です。
+同じ意味の既存項目を再利用できる場合は既存IDを維持します。TR / TCN / TCの意味上の同一性判断は担当SkillのLLM責務であり、runtimeがsemantic matchingして再採番しません。新規項目だけ現在の最大番号より後ろへ採番し、削除済みIDを同じ成果物系列で再利用しません。
+
+TR / TCN / TCは既存の3桁形式をこのPlanで変更しません。最大番号が999に達した成果物系列で新規IDが必要な場合は削除済みIDを再利用せず、`id_space_exhausted` issueとしてブロックします。CIは`CI\d{2,}`のため同じ上限を持ちません。
 
 ### 7.2 Coverage targetとCI
 
@@ -349,23 +386,39 @@ CI番号は`CI\d{2,}`を許可します。
 
 `test-condition-design`を中心に、scriptへ再投入できる正規化済みJSONを成果物へ保持します。
 
-`モデルキー | 観点ID | 技法 | contract version | model fingerprint | upstream version | static data version | 正規化入力JSON | runtime status | 状態`
+一覧表には次だけを置きます。
+
+`モデルキー | 観点ID | 技法 | generator contract version | model fingerprint | generation fingerprint | upstream fingerprint | static data version | runtime status | model status`
+
+正規化入力JSONそのものはMarkdown table cellへ埋め込まず、`model_key`ごとのfenced `json` blockへ保存します。JSONはstrict JSONで、表示用のindentや改行が変わってもcanonical化後の意味が同じなら同じ`model_fingerprint`になります。
 
 人間向け説明文はLLMが生成して構いません。machine evidenceのJSON、key、ID対応、Coverage値をLLMが再計算・改変しません。
 
 ### 8.2 machine evidenceの描画
 
-各scriptのpayloadからmachine evidence行を決定論的に組み立てます。Markdownの`|`、backslash、改行のescape規則を共通化し、LLMが表の機械部分を手計算しません。
+各scriptのpayloadからmachine evidence行を決定論的に組み立てます。validatorはfenced JSON blockを抽出してstrict JSON decodeし、canonical化したmodel / fingerprint / machine evidenceが一致することを確認します。
 
-validatorはMarkdown parserで再読込し、保存された正規化model / fingerprint / machine evidenceが一致することを確認します。
+必須round-trip testは次です。
+
+1. canonical modelをMarkdownへ保存
+2. parserで同じ`model_key`のJSON blockを抽出
+3. strict JSON decode
+4. canonical化
+5. 元の`model_fingerprint`と一致
+
+これにより`|`、backslash、改行を含む値をMarkdown table escapeへ依存させません。
 
 ## 9. 技法選択とmodelの閉鎖
 
 `test-analysis`の技法選択用signalを機械証拠として保存します。
 
-`選択キー | 適用領域 | Signals JSON | Candidates JSON | Undetermined Signals JSON | 最終採用技法 | 状態`
+`選択キー | 適用領域 | Selection Source | Signals JSON | Candidates JSON | Undetermined Signals JSON | 最終採用技法 | 状態`
+
+`Selection Source`は`analysis / user / existing_artifact`のいずれかです。
 
 - `true / false / null`を区別
+- `technique_candidates.py`の`complete`は`undetermined_signals`が空かだけを表す診断値であり、`complete=false`だけを理由にworkflowをブロックしない
+- ユーザー明示または有効な既存成果物由来の技法をcandidate scriptが勝手に却下しない
 - 選択した技法は`test-condition-design`のmodel、対象外、未解決、runtime未対応のいずれかへ必ず閉じる
 - 選択技法だけ存在しmodel化されない状態を完了扱いしない
 - 新しい正規技法名を追加した場合はsignal / validator / semantic evalも同時に更新する
@@ -391,7 +444,7 @@ validatorはMarkdown parserで再読込し、保存された正規化model / fin
 次の変換でLLMによるJSON再生成を挟みません。
 
 - Cause-Effect → Decision Table
-- Classification Tree normalized factors → combinatorial
+- Classification Tree normalized classifications / classes → `classification_tree.py` → combinatorial
 - schema / HTML constraints → EP / BVA / test data requirement
 - Domain / CRUD / state / flow等のgenerator → machine evidence
 - Coverage target → CI mapping
@@ -433,11 +486,13 @@ contract versionを持たない既存成果物を一律破棄しません。
 
 ### 13.3 局所状態
 
-workflow stateはSkill単位に加え、必要な場合に`model_key`単位の状態を保持します。
+model単位状態の正本は各成果物に保存した`model_status`、fingerprint、構造化issueです。`qa-workflow`の状態表は必要時の集約表示であり、唯一の永続正本にしません。状態表がない場合も、成果物metadataから現在状態を再構築できることを必須とします。
 
 - 1 modelだけ`ブロック中` / `要再検証`でも、独立した他modelは継続可能
 - 対象scopeにstale / unresolvedな必須modelが残る場合はworkflow全体を完了にしない
 - runtime `unsupported`とQA成果物の意味上の`ブロック中`を分離する
+- `question-analysis`へroutingする場合は`model_key` / `target_key`を質問一覧・ブロック中範囲・回答後の再開情報へ保持する
+- `coverage-analysis`はstale / gapをTCN / CIだけでなく関連`model_key`まで追跡できるようにする
 
 ### 13.4 上流変更
 
@@ -454,6 +509,8 @@ workflow stateはSkill単位に加え、必要な場合に`model_key`単位の�
 ## 14. 移植性と依存関係
 
 各Skillは単体コピー可能な既存契約を維持します。
+
+strict JSON、canonicalization、fingerprint、envelope処理はruntime対象5 Skillそれぞれの`scripts/runtime_contract.py`へ同じ実装を同梱します。repo rootの共通helperへ依存させません。repository testで5ファイルのSHA-256一致を検証し、Skillごとの実装差を許可しません。技法固有ロジックはこの共通helperへ入れません。
 
 Python 3.11標準ライブラリで正しく実装できる処理は標準ライブラリを優先します。ただし、Domain Testing、mixed-strength、constraint solving等で自前実装より既存の成熟した依存関係を使う方が正確・保守可能な場合は、依存追加を禁止しません。
 
