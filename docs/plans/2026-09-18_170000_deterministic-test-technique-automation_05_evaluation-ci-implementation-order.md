@@ -111,8 +111,13 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 
 - 全signal key
 - `true / false / null`
+- `_03`のsignal → candidate mapping
+- 複数`true`時のunionと安定順
 - `undetermined_signals`
-- 新規正規技法のsignal
+- `complete=false`だけではworkflowをブロックしない
+- `Selection Source = analysis / user / existing_artifact`
+- ユーザー明示 / 既存成果物由来の技法をcandidate scriptが却下しない
+- 新規正規技法名
 - 選択技法のmodel / disposition閉鎖
 
 ### change impact
@@ -158,7 +163,11 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 
 - linear border
 - pivot / anchor
-- ON / IN / OUT
+- closed / open border
+- ON / OFF / IN / OUT
+- closed borderではON=inside / OFF=outside
+- open borderではON=outside / OFF=inside
+- `<border_key>:ON|OFF|IN|OUT` target key
 - representable / unrepresentable boundary
 - coefficient 0
 - constraintとの整合
@@ -203,7 +212,9 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - node / edge / path
 - simple loop
 - fork / join branch Coverage
-- matching join
+- `region_key`によるfork / join対応
+- nested region
+- 同一region複数fork / join、crossing regionは`unsupported`
 - scheduler interleavingを勝手に生成しない
 - edge証拠とpath証拠の分離
 
@@ -236,9 +247,14 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 raw machine-readable入力をfixtureにします。
 
 - JSON Schema 2020-12対応keyword
+- `properties / items` traversal
+- local JSON Pointer `$ref`
+- external `$ref`は事前dereference要求
 - OpenAPI 3.0 `nullable` / boolean exclusive boundary
 - HTML constraint validation
 - unsupported applicator
+- unsupported keywordが意味へ影響するsubtreeだけを局所`unsupported`
+- 親validation意味を左右する場合は親subtree全体を`unsupported`
 - annotationだけでは拒否しない
 - HTML `pattern`をPython `re`で評価しない
 - 正規化constraintをEP / BVA / test data requirementへ直接渡す
@@ -253,21 +269,25 @@ raw machine-readable入力をfixtureにします。
 
 ### test data requirement
 
-- 重複統合
-- compatible constraint intersection
+- scalar equality / enum set / numeric・date・datetime range / version range / boolean
+- operatorごとのintersection
 - incompatible constraint
+- unsupported operator
 - model / target traceability
 - 実データを自動取得しない
 
 ### Random Testing
 
-- `pcg32-v1`
+- `pcg32-v1`のstate / seeding / XSH RR / rejection sampling
+- seed=42固定test vector
 - 同seedで同列
 - seed差
 - uniform finite
 - uniform integer
 - weighted categorical
 - case count limit
+- 一般Coverage 100%を作らない
+- `required_case_count / generated_case_count / complete`による終了条件
 
 ### Metamorphic Testing
 
@@ -275,6 +295,9 @@ raw machine-readable入力をfixtureにします。
 - 各expected relation
 - unsupported transform
 - source → follow-up traceability
+- relationごとのrequired source数 / follow-up数
+- 一般Coverage 100%を作らない
+- 各MRを1回扱っただけで十分と判定しない
 - relation自体をscriptが創作しない
 
 ### test case structure
