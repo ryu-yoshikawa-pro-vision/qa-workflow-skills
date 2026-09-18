@@ -28,6 +28,7 @@ test_test_condition_bva.py
 test_test_condition_domain_testing.py
 test_test_condition_decision_table.py
 test_test_condition_combinatorial.py
+test_test_condition_classification_tree.py
 test_test_condition_state_transition.py
 test_test_condition_flow_paths.py
 test_test_condition_crud_matrix.py
@@ -41,6 +42,7 @@ test_test_condition_metamorphic.py
 test_test_case_structure.py
 test_coverage_analysis_traceability.py
 test_runtime_contract.py
+test_runtime_markdown_roundtrip.py
 test_runtime_determinism.py
 test_runtime_workflow_integration.py
 ```
@@ -59,10 +61,13 @@ test_runtime_workflow_integration.py
 
 ### runtime envelope
 
-- `contract_version / generator / model_key / model_fingerprint / runtime_status / payload / issues`
-- expected errorでもstdoutがvalid JSON
+- `envelope_version / generator_contract_version / generator / model_key / model_fingerprint / generation_fingerprint / static_data_versions / runtime_status / model_status / payload / issues`
+- `ok / invalid_input / unsupported / limit_exceeded`は構造化結果を返せた扱いで終了code 0
+- `internal_error`またはenvelope生成不能だけ終了code 1
+- Agent側は終了codeだけで判断せずstdout envelopeをparseする
+- supported subsetへの`unsupported`を正常fallback扱いしない
 - stderrへ入力全文・secretを出さない
-- unknown `route_to`を拒否
+- unknown `route_to` / `resume_skill`を拒否
 
 ### canonicalization / fingerprint
 
@@ -70,7 +75,10 @@ test_runtime_workflow_integration.py
 - `authority_refs` / `reference_refs`の順序差でfingerprintが変わらない
 - 順序に意味があるfactor / value / transition配列の順序変更はfingerprintへ反映
 - decimal / date / fixed-offset datetimeの正規化
-- static data versionが変わると再現条件が変わる
+- 人間向け説明文だけを変えてもsemantic / model fingerprintが変わらない
+- upstream意味データ変更でsemantic fingerprintが変わる
+- generator contractまたはstatic data version変更で`generation_fingerprint`が変わる
+- fenced JSONの保存→抽出→strict decode→canonical化でmodel fingerprintが一致する
 
 ### 決定論性
 
@@ -82,8 +90,8 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 
 `_02`の固定上限について境界値をテストします。
 
-- 上限ちょうどは処理可能
-- 1件超過で`limit_exceeded`
+- item数、入力byte、nesting depth、1文字列、stdout byteの各上限ちょうどは処理可能
+- 1件または1 byte超過で`limit_exceeded`
 - Coverage基準を自動で下げない
 - 部分結果を100%としない
 
@@ -93,8 +101,11 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 
 - repository-default 4×4
 - project-specific matrix完全性
+- matrix levelごとの`priority_map`完全性
+- mapped priorityが`高 / 中 / 低`のいずれか
 - scheme外値拒否
 - project-specificを標準方式で上書きしない
+- mapped priorityが`test-requirement-design`の最低優先度判定へ渡る
 
 ### technique candidates
 
