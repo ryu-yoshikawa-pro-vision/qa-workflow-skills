@@ -67,7 +67,7 @@ skills/test-analysis/
     └── technique_candidates.py
 ```
 
-`risk_matrix.py`は確定済みの影響度・発生可能性だけを受け取り、現在の4×4マトリクスからレベルを返します。
+`risk_matrix.py`は、案件固有のリスク評価方式が採用されていない場合だけ、確定済みの影響度・発生可能性を受け取り、リポジトリ標準の4×4マトリクスからレベルを返します。案件固有方式がある場合はこのscriptで上書きしません。
 
 `technique_candidates.py`は自然言語を読まず、正規化済みの問題構造を受け取ります。例えば`ordered_boundary=true`、`discrete_conditions=true`、`state_model=true`、`multiple_factors=true`等の明示signalから、既存の技法集合の候補を返します。候補を最終採用するかは`test-analysis`が判断します。
 
@@ -101,6 +101,12 @@ skills/coverage-analysis/
 
 既存validatorにある`compute_graph_gaps()`相当の考え方をSkill runtime側でも利用できるようにします。ただし評価runtimeからのimportは行わず、実行時の入出力契約に合わせて独立実装します。
 
+### 正規技法名の扱い
+
+runtime scriptを追加しても、`test-analysis`の正規技法名は現在のvalidatorが許可する集合を維持します。
+
+N-wise、Base Choice、Classification Tree、Round-trip等は既存技法の内部Coverage modeまたは入力形式として扱い、script追加だけを理由に正規技法名を増やしません。正規技法名自体を増やす場合は、`test-analysis`、`test-condition-design`、trigger / deterministic / semantic evalを別途整合させます。
+
 ## 3. 共通の入出力方針
 
 ### 3.1 JSONを機械入力とする
@@ -127,7 +133,21 @@ LLMが技法ごとのJSONへ正規化し、scriptはJSONを読み、JSONを返�
 
 JSON schema用の新規外部依存は入れず、Python標準ライブラリで必須key、型、許可値を検証します。
 
-### 3.2 CLI契約
+### 3.2 値の表現
+
+JSON上の値表現を技法ごとに曖昧にしません。
+
+- `integer`: JSON integer
+- `boolean`: JSON boolean
+- enum / 識別子: JSON string
+- `decimal`: `type: "decimal"`を明示し、値は10進文字列として渡して`decimal.Decimal`で解釈する
+- `date`: `YYYY-MM-DD`
+- 初回対応する日時: timezoneを持たないlocal datetimeだけとし、ISO 8601形式と最小単位を明示する
+- Pairwise等の同一factor内では値の型を混在させない
+
+値に`,`、`;`、`=`、`|`等が含まれてもJSON上では通常の値として保持します。Markdown成果物へ変換するときも、delimiter依存の文字列を機械契約にせず、validatorが曖昧なく復元できる表現へ更新します。
+
+### 3.3 CLI契約
 
 scriptは原則として次の形に揃えます。
 
@@ -136,17 +156,18 @@ python skills/test-condition-design/scripts/bva.py --input path/to/input.json
 ```
 
 - 成功時: JSONをstdoutへ出力
-- 入力契約違反: 非0終了し、原因をstderrへ出力
+- 失敗時: 非0終了し、`invalid_input`、`unsupported`、`limit_exceeded`、`internal_error`のいずれかを識別できる診断をstderrへ出力
+- 診断へ入力JSON全体や実データ全文をdumpしない。field名、index、制約ID等の特定に必要な情報だけを出す
 - 通常実行でリポジトリファイルを変更しない
 - networkへアクセスしない
-- 乱数を使う場合はseedを入力で明示し、同一seedで再現できること
+- 乱数を使う技法を将来追加する場合はseedを入力で明示し、同一seedで再現できること
 - Pythonの`eval()` / `exec()`で制約式を実行しない
 
 必要性が出るまで`--output`や複数出力formatは追加しません。
 
-### 3.3 仕様根拠をscriptで作らない
+### 3.4 仕様根拠をscriptで作らない
 
-generator入力に現在有効な仕様根拠IDを渡せる場合は、出力へそのまま引き継ぎます。
+LLMが仕様から抽出した境界、partition、rule、transition、constraint等には、現在有効な仕様根拠へ対応付けられる場合は`source_refs`を必須で保持します。scriptは`source_refs`を変更せず、生成した候補へ引き継ぎます。
 
 ただしscriptは次を行いません。
 
@@ -156,6 +177,15 @@ generator入力に現在有効な仕様根拠IDを渡せる場合は、出力へ
 - 実装コードの現状を仕様として昇格する
 
 期待結果根拠が不足する生成候補は、`test-condition-design`が完成済みCoverage Itemへ無条件に採用しません。
+
+### 3.5 決定論的な順序と候補識別
+
+同じ入力から同じ候補順序を返すことも決定論性に含めます。
+
+- 入力配列の意味を保つ必要がある場合は入力順を維持する
+- 集合計算から得た候補は、技法ごとに定義した安定sortで順序を固定する
+- generator出力には成果物IDではない安定した候補keyを持たせ、LLMがMarkdownへ統合するときの並び順と重複判定に使う
+- `TCN-xxx-CIxx`等の既存ID形式は変更せず、候補keyを新しい公開ID体系にはしない
 
 ## 4. 正規化入力
 
@@ -183,48 +213,33 @@ Decision Table、組合せ、Classification Tree等は、次の形へ正規化�
 
 ### 4.2 制約
 
-初期実装では任意のPython式や独自DSLを作りません。
+初回実装では、既存Pairwise validatorが独立に再計算できる部分assignment形式の禁止制約だけを共通契約にします。
 
-制約はJSON ASTまたは部分assignmentとして表現します。
-
-単純な禁止条件:
+例:
 
 ```json
 {
-  "forbidden": {
-    "role": "member",
-    "visibility": "private"
-  }
-}
-```
-
-複合条件が必要な場合:
-
-```json
-{
-  "op": "and",
-  "args": [
-    {"op": "eq", "factor": "role", "value": "member"},
-    {"op": "eq", "factor": "visibility", "value": "private"}
+  "forbidden_constraints": [
+    {
+      "role": "member",
+      "visibility": "private"
+    }
   ]
 }
 ```
 
-初期許可演算子は実際に必要な最小集合に限定します。
+この制約は「assignmentが指定されたすべての因子=値を満たす場合、そのassignmentは成立不能」を意味します。
 
-候補:
+初回実装では次を共通制約として追加しません。
 
-- `and`
-- `or`
-- `not`
-- `eq`
-- `neq`
-- `in`
-- 数値domainで必要なら`lt`、`lte`、`gt`、`gte`
+- `and` / `or` / `not`等の汎用JSON AST
+- `lt` / `lte` / `gt` / `gte`等の算術制約
+- required constraint
+- 独自文字列DSL
 
-文字列式を独自parserで解釈する実装は行いません。
+数値境界はBVA / schema等の責務で扱います。Decision TableやN-wiseで部分assignmentだけでは表せない具体的要求が確認された場合に、generatorと独立validatorの両方を同時に拡張します。
 
-## 5. LLMとscriptの責務境界
+## 5. LLMとscriptの責務境界## 5. LLMとscriptの責務境界
 
 ### LLMが担当するもの
 
@@ -243,7 +258,7 @@ Decision Table、組合せ、Classification Tree等は、次の形へ正規化�
 - 組合せ・境界値・rule・transition・pathを列挙する
 - 制約を適用する
 - カバレッジを計算する
-- 到達不能、重複、矛盾、欠落を検出する
+- graph上の到達不能、重複、構造矛盾、欠落を検出する。guardの意味を評価できない場合は実行可能性まで断定しない
 - 入力契約不足を明示的に失敗させる
 
 ## 6. Skill instructionの変更
@@ -252,10 +267,12 @@ Decision Table、組合せ、Classification Tree等は、次の形へ正規化�
 
 次を追加します。
 
-- 影響度・発生可能性が確定している場合は`scripts/risk_matrix.py`でレベルを算出する
+- 案件固有のリスク評価方式がなく、リポジトリ標準方式を使用すると確定している場合だけ`scripts/risk_matrix.py`でレベルを算出する
 - 問題構造が正規化できる場合は`scripts/technique_candidates.py`を補助的に使う
 - script結果を根拠なく上書きしない
-- scriptが必要入力不足で失敗した場合はLLMで数値や条件を捏造せず既存停止条件へ従う
+- script失敗時は`invalid_input`、`unsupported`、`limit_exceeded`、`internal_error`を区別する
+- 入力不足が仕様不足に由来する場合は既存停止条件 / ルーティングへ従い、計算量上限ではCoverage方式の判断を`test-condition-design`へ戻す
+- scriptを実行できないAgent環境では手計算結果を「scriptで決定論的に生成した結果」と扱わない
 
 ### `test-condition-design/SKILL.md`
 
@@ -277,7 +294,14 @@ Decision Table、組合せ、Classification Tree等は、次の形へ正規化�
 
 ## 7. 既存成果物との互換性
 
-既存Markdown成果物の主要な表形式、ID体系、Skill責務は維持します。
+既存のID体系とSkill責務は維持します。技法固有の機械証拠を曖昧なく保存するため、`test-condition-design/assets/output-template.md`の任意表は必要最小限拡張します。
+
+特に次を固定します。
+
+- Pairwise / N-wise / Base Choiceの因子=値組合せをdelimiter依存の自由文字列だけにしない
+- interaction strength、Coverage mode、候補key、成立不能候補とその根拠を追跡できる
+- n-switch / Round-trip等の状態Coverage証拠をvalidatorが安定して読める
+- generator候補が採用または`カバレッジ候補の扱い`のどちらかへ閉じる
 
 本変更はgeneratorの実行経路を追加するもので、次は変更しません。
 
@@ -288,3 +312,15 @@ Decision Table、組合せ、Classification Tree等は、次の形へ正規化�
 - Skill-only portability
 
 新しいSkillは追加しません。テスト技法は引き続き`test-condition-design`を正本とします。
+
+## 8. 実行環境
+
+初回runtime scriptはPython 3.11標準ライブラリを前提とします。
+
+Agent Skills仕様では`scripts/`は任意の実行可能リソースであり、対応言語はAgent実装に依存します。このためscriptを追加する3 Skillでは、frontmatterの`compatibility`にPython 3.11実行環境が必要であることを明記します。
+
+- Python 3.11を実行できる環境: 対応scriptを通常経路として使用する
+- Pythonを実行できない環境: 既存Skill自体の利用可否とは分けて扱い、script由来の決定論的生成・Coverage保証を行ったとは表現しない
+- 利用者が決定論的generatorの利用を必須としている場合、runtime unavailableをその計算範囲の制約として明示する
+
+Skill単体コピー後もrepo root、network、外部binaryへ依存しません。
