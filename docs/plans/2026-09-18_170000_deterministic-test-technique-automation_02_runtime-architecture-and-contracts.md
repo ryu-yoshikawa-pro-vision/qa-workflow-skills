@@ -455,18 +455,20 @@ Coverage母集団から除外するconstraintは1件以上の`authority_refs`を
 - `TCN-xxx-CIyy`
 - `TC-`
 
-同じ意味の既存項目を再利用できる場合は既存IDを維持します。TR / TCN / TCの意味上の同一性判断は担当SkillのLLM責務であり、runtimeがsemantic matchingして再採番しません。新規項目だけ現在の最大番号より後ろへ採番し、削除済みIDを同じ成果物系列で再利用しません。
+同じ意味の既存項目を再利用できる場合は既存IDを維持します。TR / TCN / TCの意味上の同一性判断は担当SkillのLLM責務であり、runtimeがsemantic matchingして再採番しません。qa-workflowが再利用元として選んだ同種成果物を同じ系列とし、新規項目だけその成果物内の最大番号+1で採番します。再利用元がない新規成果物では001から開始し、削除済みIDを同じ系列で再利用しません。
 
 TR / TCN / TCは既存の3桁形式をこのPlanで変更しません。最大番号が999に達した成果物系列で新規IDが必要な場合は削除済みIDを再利用せず、`id_space_exhausted` issueとしてブロックします。CIは`CI\d{2,}`のため同じ上限を持ちません。
 
 ### 7.2 Coverage targetとCI
 
-技法固有target keyとCI IDの対応を機械証拠へ保持します。
+技法固有target keyとCI IDの対応を機械証拠へ保持します。`materialize_coverage.py`のinputには`previous_target_id_map`を明示的に渡します。
 
-- 同じtarget keyが再生成された場合は既存CI IDを維持
-- 新しいtarget keyだけ新規CI IDを発行
+- 初回でmappingがない場合、同一TCN内のtarget keyをcanonical sortし、`CI01`から順に採番する
+- 既存mappingがある場合、同じtarget keyは既存CI IDを維持する
+- 新しいtarget keyは同一TCN内の既存CI最大番号+1から採番する
 - 消滅targetのCIはstaleとし、下流TCを`要再検証`へする
-- 既存CI番号の詰め直しは行わない
+- 削除済みCI番号を再利用せず、既存CI番号の詰め直しを行わない
+- previous mappingに同一target重複、同一CIの複数target、親TCN不一致があれば`invalid_input`
 
 CI番号は`CI\d{2,}`を許可します。
 
@@ -485,35 +487,46 @@ CI番号は`CI\d{2,}`を許可します。
 
 `test-condition-design`を中心に、scriptへ再投入できる正規化済みJSONを成果物へ保持します。
 
-一覧表には次だけを置きます。
+一覧表:
 
-`モデルキー | 観点ID | 技法 | generator contract version | model fingerprint | generation fingerprint | upstream fingerprint | static data version | runtime status | model status`
+`モデルキー | 観点ID | 技法 | runtime contract version | generator contract version | model fingerprint | generation fingerprint | upstream entity count | static data versions | runtime status | model status | freshness | deterministic generated`
 
-正規化入力JSONそのものはMarkdown table cellへ埋め込まず、`model_key`ごとのfenced `json` blockへ保存します。JSONはstrict JSONで、表示用のindentや改行が変わってもcanonical化後の意味が同じなら同じ`model_fingerprint`になります。
+正規化入力JSONはMarkdown table cellへ埋め込まず、次の形式で保存します。
+
+```markdown
+### Machine Model: pairwise-001
+
+```json
+{...}
+```
+```
+
+見出しの`model_key`とJSON内metadataの`model_key`が一致しない場合はvalidatorを失敗させます。
 
 人間向け説明文はLLMが生成して構いません。machine evidenceのJSON、key、ID対応、Coverage値をLLMが再計算・改変しません。
 
 ### 8.2 machine evidenceの描画
 
-各scriptのpayloadからmachine evidence行を決定論的に組み立てます。validatorはfenced JSON blockを抽出してstrict JSON decodeし、canonical化したmodel / fingerprint / machine evidenceが一致することを確認します。
+共通のJSON fence出力、Markdown escape、runtime metadata行の描画は各Skill同梱の`scripts/runtime_contract.py`が担当します。Coverage target → CI materialize、merge group統合、Coverage Item表のmachine row生成は`test-condition-design/scripts/materialize_coverage.py`が担当します。
 
-必須round-trip testは次です。
+validatorはfenced JSON blockを抽出してstrict JSON decodeし、canonical化したmodel / fingerprint / machine evidenceが一致することを確認します。
+
+必須round-trip test:
 
 1. canonical modelをMarkdownへ保存
-2. parserで同じ`model_key`のJSON blockを抽出
+2. `### Machine Model: <model_key>`直下のJSON fenceを抽出
 3. strict JSON decode
 4. canonical化
 5. 元の`model_fingerprint`と一致
 
 これにより`|`、backslash、改行を含む値をMarkdown table escapeへ依存させません。
-
 ## 9. 技法選択とmodelの閉鎖
 
 `test-analysis`の技法選択用signalを機械証拠として保存します。
 
 `選択キー | 適用領域 | Selection Source | Signals JSON | Candidates JSON | Undetermined Signals JSON | 最終採用技法 | 状態`
 
-`Selection Source`は`analysis / user / existing_artifact`のいずれかです。
+`Selection Source`は`analysis / user / existing_artifact`のいずれかです。技法modelのmetadataにも`selection_source`を必須で保存します。`test-analysis`を通った場合はその選択行からコピーし、途中工程開始でユーザーが技法を明示した場合は`user`、再利用した既存modelは`existing_artifact`とします。
 
 - `true / false / null`を区別
 - `technique_candidates.py`の`complete`は`undetermined_signals`が空かだけを表す診断値であり、`complete=false`だけを理由にworkflowをブロックしない
@@ -550,7 +563,9 @@ CI番号は`CI\d{2,}`を許可します。
 
 直接互換payloadまたは小さいdeterministic adapterを使用します。
 
-意味上の統合だけLLMに残します。複数技法の結果を同じCIへまとめる場合、LLMは`merge_group`を明示し、scriptがtarget key、Authority、優先度を決定論的にunionします。
+意味上の統合だけLLMに残します。複数技法の結果を同じCIへまとめる場合、LLMは`merge_group`を明示し、`materialize_coverage.py`がtarget key、Authority、Reference、優先度、test data requirementを決定論的にunionします。
+
+`merge_group` inputは`{"merge_group_key":"MG-001","target_keys":["...","..."],"authority_refs":["SPEC-001"]}`です。target keyは2件以上、重複不可、同一TCN配下だけを許可します。異なるexpected result rootを持つtargetは`invalid_input`とします。
 
 ## 12. runtime自己検査の処理順
 
