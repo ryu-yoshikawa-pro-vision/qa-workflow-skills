@@ -860,6 +860,9 @@ LLM draft後に次を計算します。
 - unknown upstream ID
 - linked + disposed重複
 - 関連Product Riskからの最低優先度
+- TRの指定優先度が最低優先度以上ならそのまま保持
+- 指定優先度が最低優先度より低く`priority_override_reason`が空ならviolation
+- 指定優先度が低くても`priority_override_reason`が非空ならoverrideとして保持し、runtimeが自動で優先度を書き換えない
 
 TR本文や粒度は変更しません。
 
@@ -872,7 +875,10 @@ LLM draft後に次を計算します。
 - TCN / CIがTCまたはDispositionへ閉じるか
 - unknown upstream ID
 - linked + disposed重複
-- Coverage Itemからの最高優先度
+- Coverage Itemから要求される最高優先度
+- TCの指定優先度が要求優先度以上ならそのまま保持
+- 指定優先度が要求より低く`priority_override_reason`が空ならviolation
+- 指定優先度が低くても`priority_override_reason`が非空ならoverrideとして保持し、runtimeが自動で優先度を書き換えない
 - 番号付きexpected resultとAuthority対応
 
 具体的な前提・操作・データ・expected resultは生成しません。
