@@ -39,6 +39,7 @@ test_test_condition_ui_pattern_candidates.py
 test_test_condition_test_data_requirements.py
 test_test_condition_random_testing.py
 test_test_condition_metamorphic.py
+test_test_condition_materialize_coverage.py
 test_test_case_structure.py
 test_coverage_analysis_traceability.py
 test_runtime_contract.py
@@ -48,6 +49,10 @@ test_runtime_workflow_integration.py
 ```
 
 実行test数が0件ならCIを失敗させます。
+
+各runtime scriptには`tests/skills/runtime/fixtures/<script-name>/valid_minimal.json`を1件必須とし、これをPlan `_03`のrequired input schemaの実行例とします。fixtureは手書きし、generator出力から生成しません。unknown field拒否、required field欠落、型不一致は各scriptのunit testで確認します。
+
+CLI integration testは各代表fixtureをsubprocessで`python <script-path>`起動し、stdinへJSONを渡してstdout envelopeを読む経路を使用します。1 subprocessのtimeoutは30秒です。
 
 ## 3. 共通契約の必須回帰
 
@@ -61,11 +66,15 @@ test_runtime_workflow_integration.py
 
 ### runtime envelope
 
-- `envelope_version / generator_contract_version / generator / model_key / model_fingerprint / generation_fingerprint / static_data_versions / runtime_status / model_status / payload / issues`
+- `envelope_version / runtime_contract_version / generator_contract_version / generator / model_key / model_fingerprint / generation_fingerprint / static_data_versions / runtime_status / model_status / deterministic_generated / payload / issues`
+- artifact全体scriptでは`model_key`を禁止し、技法model scriptだけ`<slug>-\d{3,}`を要求
 - `ok / invalid_input / unsupported / limit_exceeded`は構造化結果を返せた扱いで終了code 0
-- `internal_error`またはenvelope生成不能だけ終了code 1
+- `internal_error`は可能ならenvelopeを返して終了code 1、envelope生成不能も1
 - Agent側は終了codeだけで判断せずstdout envelopeをparseする
 - supported subsetへの`unsupported`を正常fallback扱いしない
+- Python unavailable / runtime未実行は成果物metadataで`runtime_status=not_run / deterministic_generated=false`
+- status対応表どおりの`model_status`とblocking issueを要求
+- staleはruntime statusではなく`freshness_status`としてworkflowが付与
 - stderrへ入力全文・secretを出さない
 - unknown `route_to` / `resume_skill`を拒否
 
@@ -75,9 +84,11 @@ test_runtime_workflow_integration.py
 - `authority_refs` / `reference_refs`の順序差でfingerprintが変わらない
 - 順序に意味があるfactor / value / transition配列の順序変更はfingerprintへ反映
 - decimal / date / fixed-offset datetimeの正規化
-- 人間向け説明文だけを変えてもsemantic / model fingerprintが変わらない
-- upstream意味データ変更でsemantic fingerprintが変わる
-- generator contractまたはstatic data version変更で`generation_fingerprint`が変わる
+- 人間向け説明文だけを変えてもmodel fingerprintが変わらない
+- upstream Entityの正規字段変更でその`content_fingerprint`だけが変わる
+- 無関係なupstream Entity変更では対象modelをstaleにしない
+- generator、runtime contract、generator contract、static data version変更で`generation_fingerprint`が変わる
+- machine outputへ影響するbug fix / tie-break変更でgenerator contract versionを更新する
 - fenced JSONの保存→抽出→strict decode→canonical化でmodel fingerprintが一致する
 
 ### 決定論性
@@ -91,6 +102,8 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 `_02`の固定上限について境界値をテストします。
 
 - item数、入力byte、nesting depth、1文字列、stdout byteの各上限ちょうどは処理可能
+- feasibility search nodeはroot=1、visited partial assignment単位で数える
+- target / row / candidateはstable key重複除去後に数える
 - 1件または1 byte超過で`limit_exceeded`
 - Coverage基準を自動で下げない
 - 部分結果を100%としない
