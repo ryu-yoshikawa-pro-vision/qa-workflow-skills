@@ -15,213 +15,221 @@ generatorを追加しても、LLMが正しいモデルを作れたことまで�
 
 ## 2. runtime scriptのunit test
 
-追加候補:
+Python 3.11の`unittest discover`で確実に検出できるよう、初回は`tests/skills/runtime/`直下へflatに配置します。
 
 ```text
 tests/skills/runtime/
-├── test_analysis/
-│   ├── test_risk_matrix.py
-│   └── test_technique_candidates.py
-├── test_condition_design/
-│   ├── test_equivalence_partitions.py
-│   ├── test_bva.py
-│   ├── test_decision_table.py
-│   ├── test_combinatorial.py
-│   ├── test_state_transition.py
-│   ├── test_flow_paths.py
-│   ├── test_cause_effect.py
-│   ├── test_schema_cases.py
-│   └── test_ui_pattern_candidates.py
-└── coverage_analysis/
-    └── test_traceability.py
+├── test_test_analysis_risk_matrix.py
+├── test_test_analysis_technique_candidates.py
+├── test_test_condition_equivalence_partitions.py
+├── test_test_condition_bva.py
+├── test_test_condition_decision_table.py
+├── test_test_condition_combinatorial.py
+├── test_test_condition_state_transition.py
+├── test_test_condition_flow_paths.py
+├── test_test_condition_cause_effect.py
+├── test_test_condition_schema_cases.py
+├── test_test_condition_ui_pattern_candidates.py
+└── test_coverage_analysis_traceability.py
 ```
 
-実装時に既存テスト構成と比較し、より自然な配置がある場合は既存側へ合わせます。
+CIでは実行test数が0件でないことも確認します。
 
 ### 必須回帰ケース
 
 #### risk matrix
 
-- repository-default方式の4×4全16組合せ
+- `repository-default`の4×4全16組合せ
 - 0 / 5 / 非数値の拒否
-- 案件固有方式を`risk_matrix.py`で上書きしない
-- validator側もrepository-defaultケースだけ4×4を要求する
+- `project-specific:*`を標準4×4で上書きしない
+
+#### technique candidates
+
+- 全signal keyが必須
+- `true / false / null`の区別
+- key欠落 / 不正値の拒否
+- `null`を`false`扱いして候補を落とさない
+
+#### 同値分割 / Each Choice
+
+- 複数partition set
+- 同じset内のenum / range重複
+- 異なるset間の値重複を誤検出しない
+- inclusive / exclusive端点
+- representative value所属
+- valid / invalid衝突
+- Each Choiceで各partitionがCoverageまたはDispositionへ閉じる
 
 #### BVA
 
-- integer lower / upper
-- inclusive / exclusive
+- lower / upper
+- `minimum_inclusive` / `maximum_inclusive`
 - 2-value / 3-value
 - decimal + step
 - date
 - step不明時に`±1`を作らない
-- lower / upperが近接する場合の重複排除
-
-#### 同値分割
-
-- enum partition
-- 有限range
-- 重複partition
-- representative valueの所属
-- valid / invalidの衝突
+- lower / upperが同じ具体値を生成しても境界位置を区別
+- model / boundary keyとtyped valueの対応
 
 #### Decision Table
 
-- 2条件booleanの全rule
-- 多値条件
+- 任意数condition
+- 複数actionのaction vector
+- all actions falseのknown ruleを`unspecified`にしない
 - forbidden constraint
-- 成立不能ruleを除外だけせず扱い候補として返す
-- unspecified outcome
-- 同一完全assignmentへの矛盾outcome
-- 重複rule
-- 部分ruleを初回入力として受け付けない
-- 自動don't care最適化を初回runtimeで行わない
+- known ruleとconstraintの矛盾
+- unspecified rule
+- 同一assignment + 同一action vectorの重複
+- 同一assignment + 異なるaction vectorの矛盾
+- 部分rule / don't-careを初回入力として拒否
+- 自動最適化を行わない
+- 同一成果物に2つのDecision Table model
 
 #### Pairwise / N-wise
 
-- 既存Pairwise fixture相当
-- forbidden constraint
-- 成立不能assignmentを根拠付きで返す
-- Base Choice
-- 100%成立可能pair Coverage
-- 3-wiseの小規模fixture
-- 同一入力で同一順序・同一結果
-- assignment / tuple / output件数上限
-- 上限超過時にCoverage基準を勝手に下げない
-- 未知factor / 未知value
-- factor / valueに`,`、`;`、`=`等を含んでも機械表現が壊れない
+- factor / valueの一意性と空集合拒否
+- 空constraint拒否
+- unknown factor / value in constraint
+- Pairwiseは2因子以上
+- N-wise strength範囲
+- 全assignment UNSATを100% Coverage扱いしない
+- constraintなしBase Choice
+- constraint付きBase Choiceは`unsupported`
+- 成立可能2-wise / 3-wise tupleの100% Coverage
+- 成立不能t-tupleの根拠
+- 全Cartesian productを事前materializeしない経路
+- deterministic ordering / tie-break
+- feasibility search / tuple / row / output hard limit
+- `limit_exceeded`時にCoverage基準を下げない
+- typed valueと`,` / `;` / `=`等を含む文字列値
+- 同一成果物に2つの独立Pairwise model
 
 #### 状態遷移
 
-- all states
-- all transitions
-- 0-switch = 1 transition
-- 1-switch = 2連続transition
-- 2-switch = 3連続transition
+- `transition_key`一意性
+- 同じfrom / event / toでguardだけ異なる遷移を区別
+- all states / all transitions
+- 0-switch / 1-switch / 2-switch
+- guard feasibility不明時は構造候補と正式Coverageを区別
 - Round-trip
-- graph上のunreachable state
-- terminal stateとoutgoing transitionなしの状態を区別
-- guard未評価時に実行可能性まで断定しない
-- 根拠付きで明示されたinvalid transition候補の検査
-- 有効遷移の補集合から全invalid transitionを生成しない
-- cycle
-- resetなしで無理に1path化しない
-- path / cycle件数上限
+- unreachable state
+- terminal state
+- 根拠付きinvalid transition候補
+- 全invalid transition補集合を生成しない
+- resetなしで巨大pathへ無理に連結しない
+- sequence / cycle hard limit
+- 同一成果物に2つの状態model
 
 #### flow path
 
-- bounded path
+- `edge_key`一意性
+- 同じfrom / toでguard / labelが異なるedgeを区別
+- 複数`terminal_nodes`
 - node / edge Coverage
-- main / alternative分類を入力なしに推測しない
-- unreachable node
-- bounded loop
-- boundなしcycleの拒否
-- acyclicでもpath数上限を超える場合の`limit_exceeded`
+- main / alternativeを入力なしに推測しない
+- loop boundのedge通過定義
+- boundなしcycle拒否
+- path hard limit
 
 #### Cause-Effect
 
-- and / or / not
+- `ref` / `not` / `and` / `or`
+- unknown cause参照
+- 重複key
+- 空`and / or`
+- 複数effectをaction vectorへ変換
 - Decision Tableへの変換
-- effect矛盾
 
-#### schema
+#### schema / HTML
 
-- `json-schema-2020-12`
-- `openapi-3.0-schema`
-- `html-form-control`
-- required
-- enum
-- min / max
-- exclusive boundary
-- minLength / maxLength
-- nullable / null型のdialect差
-- HTMLの`minlength`が`required`を暗黙に意味しない
-- HTMLのinput typeごとの`step`
+- 正規化済みfield constraint入力
+- JSON Schema 2020-12のnumeric exclusive boundary
+- OpenAPI 3.0のboolean exclusive boundary
+- OpenAPI 3.0 nullableの成立条件
+- annotation keywordをvalidation errorにしない
+- 未対応validation / applicator keyword
+- HTML required / min / max / minlength / maxlength / step
+- `constraint_validation_applicable=false`
+- disabled / readonly
 - HTML `pattern`をPython `re`で評価しない
-- 未対応dialect / keywordを黙って解釈しない
+- length semanticsをschema_kind間で混同しない
 
 #### UI pattern
 
-- 正規pattern
-- alias
-- 未知pattern
-- pattern候補が製品固有expected resultとして返らない
-- BVAへ渡せる属性抽出
+- 正規pattern名一意
+- alias一意
+- aliasと別pattern正規名の衝突禁止
+- 未知patternでもcatalogを実行中に変更しない
+- 一般候補を製品Authorityへ昇格しない
+- 低リスク領域へ一般edge caseを無条件全展開しない
 
 #### traceability
 
+- `対象 / 実行範囲 = テスト設計`
 - 正常な構造閉鎖
-- Authority未閉鎖
-- TR未閉鎖
-- TCN / CI未閉鎖
+- Authority / Risk / TR / TCN / CIのmissing edge
 - orphan
 - unknown reference
-- disposition済み項目
-- 構造上の閉鎖率と意味上のCoverage判定を混同しない
+- disposition済みnode
+- E2E部分分析をscript対象と誤認しない
 
 ## 3. 既存決定論的validatorの更新
 
+### 共通ID
+
+`ID_PATTERNS["CI"]`と`ALL_ID_RE`を`CI\d{2,}`へ後方互換で拡張し、`test-condition-design`、`test-case-design`、`coverage-analysis`等のCI参照検査を同時に更新します。
+
 ### `test-analysis`
 
-現在の`RISK-D005`は常にリポジトリ標準4×4マトリクスを再計算しますが、`test-analysis/references/guidance.md`は案件固有方式を許可しています。
+`リスク評価方式`をfixture / 成果物から判定できるようにします。
 
-runtime側`risk_matrix.py`追加前にこの不整合を解消します。
+- `repository-default`: `RISK-D004`で1〜4、`RISK-D005`で標準4×4を独立再計算
+- `project-specific:*`: `RISK-D004` / `RISK-D005`で標準方式を強制しない
+- 案件固有方式の決定論的契約をfixtureへ持てる場合だけその期待値を検査し、それ以外は意味評価へ残す
 
-- repository-default方式のfixtureでは、`RISK-D005`が4×4を独立再計算する
-- project-specific方式のfixtureでは、標準4×4へ強制しない
-- project-specific方式の正しさは、そのcaseで独立に定義できる期待値または意味評価で確認する
-- runtime generatorとvalidatorで同じhelperを共有しない
-
-script利用後も既存Assertionの意味を不要に弱めません。
+runtime generatorとvalidatorで同じhelperを共有しません。
 
 ### `test-condition-design`
 
-既存Assertionを維持します。
+既存Assertionを不要に弱めず、自由文検索や「最初の1表だけ」を前提とする箇所を技法固有の機械証拠へ置き換えます。
 
-特にPairwiseは現在の次の検査をgeneratorから独立して残します。
+- 同値分割: model / partition set / partition key / CIまたはDisposition
+- BVA: model / boundary key / position / typed value / CI。現行`TCN-D017`の全CI自由文検索だけには依存しない
+- Decision Table: model / rule key / complete assignment / action vector / CIまたはDisposition
+- Pairwise / N-wise: modelごとのfactor / tuple母集団 / generated rows / tuple Coverage
+- 状態遷移: `transition_key`、guardを含むidentity、modelごとのsequence Coverage
+- flow: `edge_key`とmodelごとのpath証拠
 
-- `TCN-D014`: 因子 / 値集合
-- `TCN-D015`: 成立可能pair 100% Coverage
-- `TCN-D018`〜`TCN-D021`: 未知factor / value、constraint、欠落factor
-- `TCN-D026`〜`TCN-D028`: Coverage Item参照、一意性、token構造
-- `TCN-D016`: 状態遷移
-- `TCN-D017`: BVA
+同一成果物に同種技法modelが複数存在するfixtureを追加し、2つ目以降を無視するfalse-passを防ぎます。
 
-追加する決定論的評価候補:
+Coverage母集団の閉鎖は技法ごとに検査します。全generatorへ「candidate 1件 = CI 1件」の共通Assertionは追加しません。
 
-- generatorが識別した候補母集団の各候補が、Coverage Itemまたは`カバレッジ候補の扱い`のどちらかへ閉じること
-- 同値partition Coverage
-- Decision Tableの成立可能rule Coverage、成立不能ruleの扱い、unspecified / contradictory ruleの表現
-- Base Choice / N-wise Coverage
-- state / transition / n-switch / Round-trip Coverage
-- schema由来boundary / enum候補
-- UI pattern候補が仕様根拠なしにexpected resultへ昇格していないこと
-- generator候補のsource referenceが成果物化の途中で失われていないこと
-
-Assertion IDは既存`ASSERTIONS.md`を確認し、未使用番号を割り当てます。Plan時点で番号を先に固定しません。
+`期待挙動の根拠`についてfixtureがknown Authorityを持つ場合、Coverage Itemに少なくとも1件の有効な`SPEC-` / `DEC-` / `ASM-`参照があることを検査します。外部URL等の`reference_refs`だけでは満たした扱いにしません。
 
 ### `coverage-analysis`
 
-runtime`traceability.py`と既存validatorが独立に同じgap / orphanを検出できるfixtureを追加します。
+`traceability.py`と既存validatorが、`対象 / 実行範囲 = テスト設計`の同じfixtureに対して独立にmissing edge / orphan / unknown referenceを検出できることを確認します。
 
-既存`COV-D001`〜`COV-D012`の意味を不要に変更しません。
+数値の構造閉鎖率は新設しません。既存`COV-D001`〜`COV-D012`の意味を不要に変更しません。
 
 ## 4. 意味評価
 
-決定論的scriptを追加すると、LLMの品質評価で重要になる箇所が変わります。
+generatorが正しくても入力モデルが誤っていれば結果も誤るため、意味評価は維持します。
 
-意味評価では主に次を確認します。
+主な確認対象:
 
-- 仕様から抽出したboundaryが正しいか
-- partitionの意味が妥当か
-- Decision Tableのcondition / outcome / constraintが仕様を正しく表しているか
-- state / event / guardを誤って作っていないか
-- Pairwise因子・値が問題構造を適切に表しているか
-- UI要素のpattern分類が妥当か
-- 一般候補を製品固有expected resultへ昇格していないか
-- scriptが出した組合せを、LLMが成果物化する過程で欠落・改変していないか
+- partition setと各partitionの意味
+- boundary / step / inclusivity
+- Decision Tableのcondition / action / constraint
+- Cause-Effectのcause / effect式
+- state / event / guardと実行可能性
+- Pairwise因子・値・strength
+- schema / HTML constraintの正規化
+- UI pattern分類
+- `authority_refs`と`reference_refs`の区別
+- script出力を成果物化する過程でCoverage対象や根拠が欠落・改変されていないこと
 
-generatorが正しくても入力モデルが誤っていればテスト設計は誤るため、この意味評価は削減しません。
+semantic fixtureのreferenceをruntime generator出力から自動生成しません。
 
 ## 5. 発火評価
 
@@ -235,257 +243,247 @@ generatorが正しくても入力モデルが誤っていればテスト設計�
 
 ## 6. CI
 
-新しいworkflowを増やす前に、既存`.github/workflows/deterministic-output-evals.yml`へ次を追加します。
-
-- `skills/test-analysis/scripts`のcompile
-- `skills/test-condition-design/scripts`のcompile
-- `skills/coverage-analysis/scripts`のcompile
-- `tests/skills/runtime`のunit test
-
-例:
+新しいworkflowを増やす前に、既存`.github/workflows/deterministic-output-evals.yml`へ追加します。
 
 ```bash
 python -m compileall -q skills/test-analysis/scripts
 python -m compileall -q skills/test-condition-design/scripts
 python -m compileall -q skills/coverage-analysis/scripts
-python -m unittest discover -s tests/skills/runtime -v
+python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 ```
 
-実際のtest package構成に合わせてdiscover pathは調整します。
+`tests/skills/runtime/`はflat構成とし、Python 3.11のdiscoverで子directory package要件に依存しません。
 
-`validate-skills.yml`はAgent Skills仕様・repository構造の検証責務を維持し、generatorの全unit testを重複実行させません。
+テスト実行結果から実行test数が0件でないことを確認します。
+
+`validate-skills.yml`はAgent Skills仕様・repository構造の検証責務を維持し、generator unit testを重複実行させません。
 
 ## 7. Skill単体移植性の検証
 
-既存READMEは、利用時に`skills/<skill-name>/`だけをコピーできることを契約にしています。
+既存READMEの「利用時は`skills/<skill-name>/`だけをコピーできる」契約を維持します。
 
-script追加後も次を満たします。
+次の3 Skillをそれぞれ別のtemporary directoryへ単体コピーし、最低1つの代表scriptをCLI実行します。
 
-- `test-condition-design`等、対象Skillを単体コピーしてgeneratorが動く
-- repo rootの`scripts/`へimportしない
-- `tests/`へimportしない
-- networkを必要としない
-- 外部binaryを必須にしない
-- Python 3.11標準ライブラリで動く
-- runtime scriptを持つSkillの`compatibility`にPython 3.11要件が記載されている
-- Pythonを実行できないAgent環境で、手計算結果をscript由来の決定論的結果として扱わない
+- `test-analysis`
+- `test-condition-design`
+- `coverage-analysis`
 
-テストではtemporary directoryへSkill packageをコピーし、代表scriptを実行する移植性回帰を追加します。
+検証項目:
+
+- repo rootの`scripts/` / `tests/`へimportしない
+- network不要
+- 外部binary不要
+- Python 3.11標準ライブラリで実行可能
+- Skill rootから`scripts/<name>.py`を解決できる
+- stdout JSONをlegacy code pageへ依存せず読める
+- `compatibility`に「deterministic generator scripts require Python 3.11」相当の要件が明示される
+- Python unavailable時にSkill全体を誤って利用不能扱いせず、決定論的generator利用済みとも表現しない
 
 ## 8. ドキュメント更新
 
 ### README
 
-次を最小限追加します。
-
-- テスト技法のうち機械的に生成できる部分はSkill内scriptを使用すること
+- 機械生成できる部分はSkill内scriptを使用する
 - LLMとscriptの責務境界
-- Skill packageに`scripts/`が実際に存在する例
+- Python 3.11要件はdeterministic generator scriptの要件であること
+- Skill package内`scripts/`の配置例
 
-READMEへ個々の技法アルゴリズムを複製しません。
+### `test-analysis/assets/output-template.md`
 
-### `coverage-techniques.md` / `output-template.md`
+- `リスク評価方式`を追加
+- repository-defaultとproject-specificのvalidator分岐を成果物から判断可能にする
 
-各技法について次を追記します。
+### `test-condition-design/references/coverage-techniques.md`
 
-- scriptを使える入力条件
-- scriptへ渡す前にLLMが確定すべき情報
-- scriptで自動化する範囲
-- 自動化しない意味判断
+- Each Choice
+- Base Choice / N-wiseを`Pairwise / 組合せ`内のCoverage modeとして説明
+- n-switch / Round-tripを`状態遷移`内のCoverage modeとして説明
+- scriptを使える入力条件と意味判断の境界
 
-具体的なPythonアルゴリズム説明はreferenceへ大量に書かず、scriptとtestを正本とします。
+### `test-condition-design/assets/output-template.md`
 
-`output-template.md`は、既存ID体系を変えずに次を機械的に保持できる最小拡張を行います。
+同じ技法modelを複数保持できる単一の機械表を技法ごとに用意し、各表へ`モデルキー` / `観点ID`を含めます。
 
-- Base Choice / Pairwise / N-wiseのCoverage modeとinteraction strength
-- delimiterに依存しない因子=値の表現
-- state sequence / Round-tripの対応Coverage Item
-- generator候補key
-- 成立不能候補と制約根拠
+- 同値partition表
+- BVA境界証拠表
+- 任意condition数・複数actionを表現できるDecision Table表
+- typed valueとCoverage tupleを曖昧なく保存できる組合せ表
+- `transition_key`を含む状態遷移表 / sequence表
+- `edge_key`を含むflow証拠表
 
-### `EVALS.md`
+既存QA ID prefixは維持し、CI番号だけ`CI\d{2,}`へ拡張します。
 
-Skill runtime scriptと評価runtimeの違いを明記します。
+### `coverage-analysis`
 
-特に「実行時自己検証はeval runtimeを呼ばない」という既存契約と、「Skill自身のruntime scriptを使う」ことが矛盾しないよう説明します。
+`traceability.py`の初回対象がテスト設計の構造追跡だけであることを`SKILL.md` / referenceへ明記します。
+
+### `EVALS.md` / `ASSERTIONS.md`
+
+- Skill runtime scriptと評価runtimeを分離する
+- 新しい技法固有機械証拠と独立Assertionを記録する
+- runtime generator outputをexpected fixtureの生成元にしない
 
 ## 9. 実装順序
 
 ### Step 0: 現状固定
 
-- main最新commitを再確認
-- 関連Skill、validator、fixture、CIを再検索
-- Plan作成後にmainへ入った変更があれば差分を確認
-- 新依存が追加されていないか確認
+- main最新commit、関連Skill、validator、fixture、CIを再確認
+- branch作成後にmainへ入った変更との差分を確認
 
-### Step 1: 共通境界
+### Step 1: 共通契約
 
-- JSON入力契約
-- 値の型・decimal / date / local datetime表現
-- 部分assignment形式の`forbidden_constraints`
-- 安定した出力順序と候補key
-- CLIエラー分類
-- 計算量 / 出力量のhard limit
-- source referenceの引き継ぎ
-- Skill frontmatterのPython 3.11 `compatibility`
-- Skill-only portability test
-- `EVALS.md`のruntime / eval境界更新
+- `model_key`、typed value、`authority_refs` / `reference_refs`
+- `forbidden_constraints`の`constraint_key / assignment / authority_refs`
+- factor / value / strength / UNSAT入力検証
+- 安定sort / candidate key scope
+- CLI error分類とstdout encoding
+- CI ID `\d{2,}`
+- Skill-only portability
 
-この段階では汎用constraint ASTやplugin frameworkを作らず、最初のscript実装に必要な契約だけ固定します。
+### Step 2: risk / 同値分割 / BVA
 
-### Step 2: 小さく完全に決められる処理
-
-- 案件固有リスク方式と`RISK-D005`の既存不整合を先に解消
+- `RISK-D004` / `RISK-D005`のscheme分岐
 - `risk_matrix.py`
-- `bva.py`
+- partition set / Each Choice
 - `equivalence_partitions.py`
+- structured BVA evidence / `bva.py`
 
-repository-default方式では既存validatorと独立unit testで一致を確認し、project-specific方式を標準4×4で上書きしないことも回帰確認します。
+成果物形式と独立validatorを同じStepで更新し、generatorだけ先に入れません。
 
-### Step 3: rule / 組合せ
+### Step 3: Decision Table / Cause-Effect
 
-- 完全assignment契約の`decision_table.py`
-- `combinatorial.py`のexhaustive / Base Choice / Pairwise / N-wise
-- Classification Treeから組合せ入力への正規化
-- `cause_effect.py`
+- action vector形式のDecision Table成果物
+- `decision_table.py`
+- constraintとknown ruleの矛盾
+- boolean subsetの`cause_effect.py`
+- Decision Table validator / semantic fixture
 
-ここでPairwise generatorと既存Pairwise validatorの独立性を重点確認します。
+### Step 4: 組合せ
 
-### Step 4: graph
+- constraintなしBase Choice
+- Pairwise / N-wiseのtuple feasibility
+- full Cartesian productをmaterializeしない生成
+- model別成果物 / validator
 
-- `state_transition.py`
-- `flow_paths.py`
+### Step 5: 状態 / flow
 
-state / transition / n-switch / Round-trip Coverage、graph上の到達可能性、terminal state、guardを含む意味判断との境界を固定します。有効遷移の補集合から全invalid transitionは生成しません。
+- `transition_key` / `edge_key`
+- guard feasibility境界
+- n-switch / Round-trip
+- `terminal_nodes` / loop bound
+- state / flow validator
 
-### Step 5: schema / UI候補
+### Step 6: schema / UI
 
-- dialect別の`schema_cases.py`
-- HTML control typeごとのconstraint handling
-- `ui-pattern-catalog.json`
-- `ui-patterns.md`
-- `ui_pattern_candidates.py`
+- 正規化済みfield constraint形式
+- dialect差
+- HTML constraint validation対象判定
+- UI catalog alias / reference / low-risk深度
 
-HTML `pattern`をPython `re`で代替せず、外部標準を製品仕様へ昇格しない回帰ケースを必須にします。
+### Step 7: traceability
 
-### Step 6: 追跡性
+- `対象 / 実行範囲 = テスト設計`に限定した`traceability.py`
+- missing edge / orphan / unknown reference
+- 既存coverage validatorとの独立照合
 
-- `coverage-analysis/scripts/traceability.py`
-- 構造上の閉鎖率
-- gap / orphan / unknown reference計算
-- 既存`coverage-analysis` validatorとの独立照合
+### Step 8: 全体統合
 
-意味上のCoverage充足はscriptへ移しません。
+- 3 Skillのinstruction / compatibility
+- deterministic / semantic fixtures
+- CI / portability
+- README / `EVALS.md` / `ASSERTIONS.md`
 
-### Step 7: Skill統合
-
-- `test-analysis/SKILL.md`
-- `test-condition-design/SKILL.md`
-- `coverage-analysis/SKILL.md`
-- Python 3.11 `compatibility`
-- references / output templateの必要最小限更新
-- generator候補をCoverage Itemまたは明示した扱いへ閉じる統合規則
-- 重複候補とCI ID割当の安定順序
-
-generatorを呼ぶ条件と、入力不足時にLLMが手計算・推測で埋めない条件を固定します。
-
-### Step 8: 評価・CI・README
-
-- runtime unit tests
-- deterministic fixtures
-- semantic fixtures
-- portability regression
-- CI
-- README
-- `ASSERTIONS.md` / `EVALS.md`
+grammar-based testingはこの実装順序に含めません。
 
 ## 10. 実装を分ける場合
 
-変更量が大きいため、1 PRへ無理に詰め込まない方が安全です。
+複数PRへ分ける場合、runtime scriptだけを先にmergeして未使用コードを残す横割りにはしません。
 
-実装時の分割候補:
+各PRは可能な限り次を一緒に含む縦の単位にします。
 
-1. runtime基盤 + risk / BVA / 同値分割
-2. Decision Table + Pairwise / N-wise + Cause-Effect
-3. State Transition + flow paths
-4. schema + UI pattern
-5. traceability + Skill統合 + 全体評価
+- runtime script
+- Skill instruction / reference
+- output template
+- deterministic validator / fixture
+- unit test
+- 必要なsemantic fixture
 
-ただしbranchやPR分割は実装開始時の差分量を見て決めます。Plan段階で複数branchを先に作りません。
+例:
+
+1. 共通契約 + risk / 同値分割 / BVA
+2. Decision Table + Cause-Effect
+3. Base Choice / Pairwise / N-wise
+4. 状態遷移 + flow
+5. schema / UI + traceability + 全体統合
+
+実際のPR分割は実装時の差分量で決め、Plan段階でbranchを増やしません。
 
 ## 11. リスク
 
 ### LLMが誤ったモデルを作る
 
-generatorは誤った入力を忠実に展開するため、結果が大量に誤る可能性があります。
-
-対策:
-
-- source referenceを構造入力に含める
-- 意味評価を維持する
-- generator前の必須入力検査
+- `authority_refs`を正規化入力へ保持する
+- semantic evalを維持する
 - 未確定値をscriptが補完しない
 
-### 計算量・出力量の増加
+### 組合せ・pathの計算量
 
-N-wise、Decision Table、state sequence、Round-trip、flow path、grammar generationで増加します。
-
-対策:
-
-- assignment / tuple / path / cycle / derivation / output件数のhard limit
-- bounded traversal
-- exhaustiveからPairwiseへ勝手に変更しない
-- 上限超過を`limit_exceeded`として明示し、部分結果を100% Coverage扱いしない
-- Coverage方式の判断を`test-condition-design`へ戻す
+- tuple / feasibility search / row / path / cycle / outputのhard limit
+- full Cartesian productをPairwise / N-wiseの前提にしない
+- `limit_exceeded`時にCoverage基準を勝手に下げない
+- 部分結果を100% Coverageと表現しない
 
 ### generatorとvalidatorの同時誤り
 
-同一helper共有で起きやすくなります。
+- helper実装を共有しない
+- expected fixtureをgeneratorから自動生成しない
+- small fixtureの期待値を人手で固定
+- false-pass regressionを追加
 
-対策:
+### 成果物形式の曖昧さ
 
-- eval runtimeをimportしない
-- fixtureの期待値をgeneratorから自動生成しない
-- 小規模ケースは期待結果を手で固定する
-- Pairwise等は数学的Coverageをvalidatorで独立再計算する
+- model keyで同種技法を区別
+- typed valueと自由文を分離
+- Coverage母集団と生成CIを1対1と仮定しない
 
-### UI一般論による仕様創作
+### UI / 外部標準からの仕様創作
 
-対策:
-
-- catalogは確認候補に限定
-- source種別を明示
-- 製品仕様がない候補からexpected resultを作らない
+- `authority_refs`と`reference_refs`を分離
+- catalogは候補に限定
 - semantic evalで回帰確認
+
+### runtime非対応環境
+
+- Python unavailableとSkill自体の利用可否を分離
+- deterministic generator未実行を明示
 
 ### 依存関係増加
 
-対策:
-
-- 初期実装はPython標準ライブラリ
-- PICT / ACTS / GraphWalker / Z3は具体的な不足が出るまで依存にしない
+初回はPython標準ライブラリを使用します。PICT / ACTS / GraphWalker / Z3は、標準ライブラリ実装で具体的な性能・正確性問題を再現した場合だけ再評価します。
 
 ## 12. 完了条件
 
-次をすべて満たしたとき完了とします。
-
-- 実装対象として列挙した決定論的処理が、対応Skillのscriptまたは既存の明示的な機械処理へ割り当てられている
-- LLMとscriptの責務境界が`SKILL.md` / referenceで説明されている
-- BVA、同値分割、Decision Table、Base Choice / Pairwise / N-wise、状態遷移 / n-switch / Round-trip、flow、schema、UI pattern、追跡性にruntime unit testがある
-- 現行Pairwise / BVA / 状態遷移 / risk / traceability validatorが独立評価として維持され、案件固有risk方式・新Coverage mode・候補閉鎖に必要な評価が追加されている
-- 新規機械処理に必要な決定論的fixtureが追加されている
-- 入力モデルの意味品質を確認するsemantic fixtureがある
-- Skill-only portability testがPASSする
-- runtime scriptを持つSkillの`compatibility`にPython 3.11要件が明示されている
+- 実装対象の各処理が対応Skillのscriptまたは既存機械処理へ割り当てられている
+- grammar-based testingが初回実装scopeから外れている
+- LLMとscriptの責務境界、`authority_refs` / `reference_refs`が文書化されている
+- risk schemeが成果物へ残り、`RISK-D004` / `RISK-D005`が正しく分岐する
+- 同値分割 / Each Choice、BVA、Decision Table、Base Choice / Pairwise / N-wise、状態遷移 / n-switch / Round-trip、flow、schema、UI、traceabilityにruntime unit testがある
+- Decision Tableが任意condition数と複数actionを表現できる
+- 同一成果物で同種技法modelを複数保持・独立評価できる
+- BVA / 同値分割 / Pairwise / 状態遷移を自由文検索だけに頼らず機械評価できる
+- CI IDが100件以上でも既存下流Skillを含め追跡できる
+- Pairwise / N-wiseが全Cartesian productの事前materializeを前提にしない
+- UNSAT / unsupported / limit_exceededを100% Coverageとして扱わない
+- state guard feasibility不明時に構造候補と正式Coverageを混同しない
+- raw schema full parserを追加せず、正規化済みconstraint契約でdialect差を保持する
+- `traceability.py`をテスト設計の構造追跡に限定する
+- 3 SkillそれぞれのSkill-only portability testがPASSする
 - Python 3.11でcompile / unit test / deterministic eval / semantic dataset validationがPASSする
+- runtime unit testが0件ではない
 - `skills-ref validate`が全SkillでPASSする
-- 外部依存を追加していない、または追加した場合は必要性・license・platform影響が別途確認済み
 - README、`EVALS.md`、`ASSERTIONS.md`、関連referenceが実装と一致する
-- 一般UI候補や外部標準から製品固有expected resultを創作する回帰がない
-- generatorが除外した成立不能候補を無言で捨てず、採用または明示した扱いへ閉じている
-- traceability scriptの構造上の閉鎖率を意味上のCoverage充足として扱っていない
-- 同じ入力から候補順序と機械表現が安定している
-- Error Guessing、Exploratory Testing、リスク発見等の意味判断を無理に決定論的generatorへ移していない
+- 外部referenceだけから製品固有expected resultを創作する回帰がない
+- Error Guessing、Exploratory Testing、リスク発見等の意味判断を決定論的generatorへ移していない
 
 ## 13. 実装時に避けること
 
@@ -494,12 +492,18 @@ N-wise、Decision Table、state sequence、Round-trip、flow path、grammar gene
 - 任意Python式を`eval()`で制約として実行する
 - 汎用plugin frameworkを先に作る
 - 全テスト技法を別Skillへ分割する
+- grammar runtimeを今回追加する
 - PICT / GraphWalker / Z3 adapterを将来用に先行実装する
-- 未定義挙動をUI標準から補完する
-- N-wiseの最小ケース数を保証すると宣言する
-- 組合せ上限超過時に無断でCoverage基準を下げる
+- Pairwise / N-wiseで全Cartesian productを必ずmaterializeする
+- 空Coverage母集団を100% CoverageとしてPASSさせる
+- Coverage対象と生成CIを全技法で1対1と仮定する
+- Decision Tableを単一outcomeモデルへ固定する
+- UI / HTML / APGのreferenceを製品Authorityとして扱う
 - 有効遷移集合の補集合から全invalid transitionを機械生成する
+- guard未評価のsequenceを実行可能Coverageと断定する
 - HTML `pattern`をPython `re`で同等とみなす
-- project-specific risk方式を標準4×4で上書きする
+- project-specific risk方式を標準1〜4 / 4×4へ強制する
 - 構造上のedge存在だけで意味上のCoverage充足と判定する
-- エラー推測・探索的テストを固定チェックリストだけで置き換える
+- `limit_exceeded`時にCoverage基準を無断で下げる
+- Python unavailableだけを理由に従来の意味判断まで禁止する
+
