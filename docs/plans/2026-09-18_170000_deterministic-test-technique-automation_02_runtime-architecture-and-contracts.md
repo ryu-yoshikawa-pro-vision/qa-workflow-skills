@@ -239,7 +239,7 @@ Decision Table、組合せ、Classification Tree等は、次の形へ正規化�
 
 数値境界はBVA / schema等の責務で扱います。Decision TableやN-wiseで部分assignmentだけでは表せない具体的要求が確認された場合に、generatorと独立validatorの両方を同時に拡張します。
 
-## 5. LLMとscriptの責務境界## 5. LLMとscriptの責務境界
+## 5. LLMとscriptの責務境界
 
 ### LLMが担当するもの
 
