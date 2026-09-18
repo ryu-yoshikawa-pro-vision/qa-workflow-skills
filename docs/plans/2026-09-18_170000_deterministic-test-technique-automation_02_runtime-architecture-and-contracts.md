@@ -183,19 +183,21 @@ runtime入力は`metadata`とscript固有`input`を分けます。
 - script固有入力は必ず`input`配下に置き、metadataと同じkeyを再定義しない
 ### 3.3 runtime出力envelope
 
-成功・想定内の未処理状態を含め、stdoutは常に1つのJSON objectにします。
+scriptが実行できた場合、stdoutは次のJSON object 1件だけです。
 
 ```json
 {
   "envelope_version": "1",
+  "runtime_contract_version": "runtime-v1",
   "generator_contract_version": "combinatorial-v1",
   "generator": "combinatorial",
-  "model_key": "pairwise-01",
+  "model_key": "pairwise-001",
   "model_fingerprint": "sha256:...",
   "generation_fingerprint": "sha256:...",
   "static_data_versions": {},
   "runtime_status": "ok",
   "model_status": "ready",
+  "deterministic_generated": true,
   "payload": {},
   "issues": []
 }
@@ -205,31 +207,44 @@ runtime入力は`metadata`とscript固有`input`を分けます。
 
 - `ok`: script責務を完了
 - `invalid_input`: 入力契約違反
-- `unsupported`: 入力は妥当だが本Planの対応契約外
+- `unsupported`: 入力は妥当だが本Planの対応subset外
 - `limit_exceeded`: 契約上限を超過
 - `internal_error`: 想定外障害
 
 `model_status`:
 
 - `ready`: 下流へ利用可能
-- `unresolved`: 追加情報が必要
-- `blocked`: 必須情報不足等で対象modelを継続できない
-- `stale`: 上流・model・generator contract・static dataの変更により再生成が必要
+- `unresolved`: 追加情報またはLLM fallbackが必要
+- `blocked`: 入力違反、上限超過、runtime障害等で継続不可
 
-`runtime_status=ok`でもblocking issueが存在する場合は`model_status=ready`にしません。
+status対応は次で固定します。
 
-`ok`、`invalid_input`、`unsupported`、`limit_exceeded`は「runtimeが構造化結果を返せた」という意味で終了code 0とします。`internal_error`またはenvelope自体を生成できない障害だけ終了code 1とします。Agent側は終了codeだけでroutingせず、stdout envelopeを必ずparseします。stderrは人間向け診断だけに使い、入力全文、secret、tokenを出しません。
+| runtime_status | model_status | blocking issue | 扱い |
+| --- | --- | --- | --- |
+| `ok` | `ready` | なし | runtime結果を利用可能 |
+| `ok` | `unresolved` | あり | 質問・意味判断後に再実行 |
+| `invalid_input` | `blocked` | あり | 入力契約を修正 |
+| `unsupported` | `unresolved` | あり | 本Planの対応subset外だけLLM fallback可 |
+| `limit_exceeded` | `blocked` | あり | model分割またはcontract変更が必要 |
+| `internal_error` | `blocked` | あり | runtime不具合として扱う |
 
-本Planで対応subsetとして定義した入力に対して`unsupported`を返した場合は、LLM fallbackで正常扱いせずruntime契約違反として修正対象にします。本Planの対応subset外の入力だけ、`unsupported`を明示した上で既存LLM経路へ戻せます。
+`stale`はscriptの`model_status`ではありません。成果物保存時の`freshness_status = current / stale`として`qa-workflow`がfingerprint比較から付与します。
+
+scriptが正常実行されたenvelopeでは`deterministic_generated=true`です。Python unavailable、runtime未実行、対応subset外のLLM fallbackでは、成果物metadataを`runtime_status=not_run`または直前の`unsupported`、`deterministic_generated=false`として保存します。LLM fallback後にQA成果物自体が利用可能なら`model_status=ready`にできますが、「決定論的生成済み」とは扱いません。
+
+`ok`、`invalid_input`、`unsupported`、`limit_exceeded`は終了code 0とします。`internal_error`は可能なら構造化envelopeを返して終了code 1、envelope自体を生成できない障害も終了code 1とします。Agent側は終了codeだけでroutingせずstdout envelopeをparseします。stderrは人間向け診断だけに使い、入力全文、secret、tokenを出しません。
+
+本Planで対応subsetとして定義した入力に対して`unsupported`を返した場合はruntime契約違反として修正対象にし、LLM fallbackで正常扱いしません。
 
 ### 3.4 構造化された未解決事項
 
-`issues`は少なくとも次を持てる共通形式にします。
+`issues`は次のfieldを持ちます。
 
 ```json
 {
   "issue_type": "unspecified_rule",
-  "model_key": "decision-01",
+  "blocking": true,
+  "model_key": "decision-001",
   "target_key": "R4",
   "authority_refs": ["SPEC-001"],
   "required_information": "条件組合せに対する期待action",
@@ -238,8 +253,12 @@ runtime入力は`metadata`とscript固有`input`を分けます。
 }
 ```
 
-自由文stderrを再解釈してroutingしません。`route_to` / `resume_skill`は既存Skill名だけを許可します。`question-analysis`へ送る場合は`model_key` / `target_key`を質問・ブロック・回答後の再開まで保持し、同じSkill内の無関係なmodelをブロックしません。
-
+- `issue_type`、`blocking`は必須
+- model scriptでは`model_key`必須、artifact scriptでは禁止
+- target固有issueだけ`target_key`必須
+- `route_to` / `resume_skill`は既存Skill名だけを許可
+- `question-analysis`へ送る場合はModel / Targetを質問・ブロック・回答後の再開まで保持する
+- 自由文stderrをrouting入力に使わない
 ## 4. canonicalization・version・fingerprint
 
 ### 4.1 canonical model
@@ -248,22 +267,27 @@ model fingerprintはSHA-256で計算します。入力はUTF-8のcanonical JSON�
 
 - object keyはUnicode code point順
 - `authority_refs` / `reference_refs`等の集合扱い配列は重複除去してsort
-- factor、condition、action、state、transition、edge、grammar production等、tie-breakや意味に入力順を使う配列は宣言順を保持
+- factor、condition、action、state、transition、edge、production等、tie-breakや意味に入力順を使う配列は宣言順を保持
 - assignment objectのkeyはsort
 - decimal / date / datetimeは共通表現へ正規化
 - JSON whitespaceは除去
 - 非有限数は不可
 
-`model_fingerprint`はcanonical modelの意味データだけから計算し、Markdownの説明文、表示順だけの装飾、生成結果を含めません。
+`model_fingerprint`は`metadata.model_key`とscript固有`input`の意味データから計算し、`upstream_entities`、`static_data_versions`、Markdown説明文、表示装飾、生成結果を含めません。artifact全体scriptでは`model_fingerprint`を出力せず`null`とします。
 
 `generation_fingerprint`は次をcanonical JSON化してSHA-256を計算します。
 
+- `generator`
 - `model_fingerprint`
+- `runtime_contract_version`
 - `generator_contract_version`
 - `static_data_versions`
 
-同じmodelでもgenerator contractまたは静的参照データが変われば`generation_fingerprint`は変わり、旧派生成果物をstaleと判定します。
+artifact全体scriptでは`model_fingerprint=null`のまま上記を計算します。
 
+generator実装のbug fix、探索順、tie-break等、machine outputへ影響する変更はschema互換でも必ず`generator_contract_version`を更新します。共通runtime処理のoutputへ影響する変更は`runtime_contract_version`を更新します。
+
+generatorが返すtarget集合とCoverage計算は純粋な決定論処理です。target → CI ID等のID維持はstateful materialize処理であり、同じgenerator結果と同じ`previous_target_id_map`から同じmappingを得ることを保証します。
 ### 4.2 静的参照データ
 
 generator結果に影響する静的データはversionを持ちます。
