@@ -54,15 +54,16 @@
 | --- | --- | --- | --- |
 | プロダクトリスク | 確定済み影響度・発生可能性からレベル算出、並び替え、範囲検証 | リスク発見、影響度・発生可能性の採点根拠 | 実装対象 |
 | テスト技法選択 | 正規化済み問題構造から技法候補を規則で絞る | 自然言語から問題構造を読み取る、複数技法の必要性判断 | 実装対象。ただし最終判断はLLM |
-| 同値分割 | 明示済みpartitionの重複・空白・境界整合、列挙可能なdomainから代表値候補生成、partition coverage計算 | 何を同値と扱えるかの意味判断 | 実装対象 |
+| 同値分割 | 明示済みpartition set内の重複・空白・境界整合、列挙可能なdomainから代表値候補生成、partition coverage計算 | 何を同値と扱えるか、どのpartition setへ属するかの意味判断 | 実装対象 |
+| Each Choice Coverage | 複数partition setについて各partitionが少なくとも1回Coverageされているかを計算 | partition setの意味、複数set間の組合せ方 | `同値分割`の内部Coverage基準として実装対象 |
 | 境界値分析 | 2-value / 3-value BVA、包含 / 排他、stepに基づく直前・境界・直後値生成 | 境界の意味、型、最小単位、採用するBVA深度 | 実装対象 |
 | Domain Testing | 構造化済みの多変数domainと境界式からON / OFF / IN / OUT候補とCoverageを計算 | domain式、精度、どのborderを対象にするか | 自動化可能として一覧化。現行Skillの正規技法を広げるため初回実装からは外す |
-| デシジョンテーブル | 条件値の組合せ列挙、制約除外、成立不能判定、未定義rule検出、重複rule、同条件で異なる結果の矛盾検出、rule coverage算出 | 条件・結果・制約・期待結果根拠の抽出 | 実装対象 |
+| デシジョンテーブル | 条件値の組合せ列挙、成立不能判定、未定義rule検出、重複rule、同一条件に対するaction vectorの矛盾検出、rule coverage算出 | 条件・action・制約・期待結果根拠の抽出 | 実装対象 |
 | デシジョンテーブル最適化 | 完全rule setからdon't care化できるrule候補を求めることは可能 | 統合で業務上の意味・根拠を失わないかの確認 | 自動化可能として一覧化するが、初回実装では行わない |
 | 全組合せ | 有限domainのCartesian product生成、禁止組合せ除外 | 因子・値・制約抽出 | 実装対象 |
-| Base Choice Coverage | 各因子のbase valueが確定している場合のbase組合せと1因子ずつの置換組合せ生成 | base valueの選択根拠、制約でbaseが成立しない場合の再選択 | `Pairwise / 組合せ`の内部Coverage modeとして実装対象 |
-| Pairwise | 成立可能な2-wise組合せ生成、全ペアCoverage計算 | 因子・値・制約抽出、Pairwise採用判断 | 実装対象 |
-| N-wise | t-wise組合せ生成、成立可能tupleのCoverage計算 | t値と対象因子の選択 | 実装対象。ただし入力規模上限を設ける |
+| Base Choice Coverage | 各因子のbase valueが確定している場合のbase組合せと1因子ずつの置換組合せ生成 | base valueの選択根拠 | `Pairwise / 組合せ`の内部Coverage modeとして実装対象。初回は`forbidden_constraints`なしに限定 |
+| Pairwise | 成立可能な2-wise tupleを求め、全Cartesian productを事前materializeせずCoverageする組合せを生成 | 因子・値・制約抽出、Pairwise採用判断 | 実装対象 |
+| N-wise | 成立可能なt-wise tupleを求め、全Cartesian productを事前materializeせずCoverageする組合せを生成 | t値と対象因子の選択 | 実装対象。ただし入力規模上限を設ける |
 | mixed-strength組合せ | 一部因子だけ高いinteraction strengthを適用 | 高強度対象の選択根拠 | 今回は一覧化・契約予約のみ。初回実装からは外す |
 | Classification Tree | classification / classが明示された後の全組合せ、Base Choice、Pairwise / N-wiseへの正規化 | classification / classの意味的分解 | 実装対象。新しい正規技法名にはしない |
 | 状態カバレッジ | 状態集合と遷移から対象状態のCoverage算出 | 状態モデル抽出 | 実装対象 |
@@ -73,15 +74,15 @@
 | 無効遷移 | 根拠付きで明示された無効遷移候補の構造検査・Coverage確認 | どの遷移を無効として確認するか、期待結果 | 実装対象。ただし有効遷移の補集合から全無効遷移を機械生成しない |
 | Use Case / シナリオ | 明示済みflow graphのbounded path列挙、node / edge Coverage | main / alternativeの分類、業務上意味のあるシナリオ、優先度 | 一部実装対象。main / alternativeはscriptが推測しない |
 | CRUD Testing | 構造化済みCRUD matrixのoperation Coverage、欠落operation、entity lifecycleの組合せ候補 | function / entity / operationの意味、欠落が仕様欠陥か対象外か | 自動化可能として一覧化。現行Skillの正規技法を広げるため初回実装からは外す |
-| Cause-Effect Graph | boolean条件 / effectが構造化済みならrule spaceへ展開しDecision Tableへ変換 | cause / effectと論理関係抽出 | 実装対象。Decision Table経路へ統合 |
+| Cause-Effect Graph | boolean causeとeffect式が構造化済みならrule spaceへ展開し、複数effectのaction vectorをDecision Tableへ変換 | cause / effectと論理関係抽出 | 実装対象。boolean subsetだけをDecision Table経路へ統合 |
 | 制約充足 | 有限domain制約のSAT / UNSAT判定、成立可能assignment列挙 | 制約式への正規化 | 実装対象。まず有限domainの明示制約のみ |
 | 矛盾検出 | 同一入力条件への複数期待結果、相互排他的rule、到達不能ruleの検出 | 仕様のどちらを正とするか | 実装対象 |
-| Syntax / grammar-based testing | grammarが明示されている場合の有効構文生成、規則単位Coverage、単一規則破壊によるinvalid候補生成 | grammarの作成、invalid時の期待結果 | 実装対象。ただし汎用fuzzer化しない |
-| JSON Schema等のschema-based testing | type、required、enum、minimum、maximum、length、format等から候補生成 | schemaが製品仕様として有効かの確認 | 実装対象。汎用schemaの最小subsetから開始 |
-| HTML form constraint | `required`、`min`、`max`、`minlength`、`maxlength`、`pattern`等から候補生成 | DOM値と製品仕様の優先関係判断 | UI候補生成として実装 |
+| Syntax / grammar-based testing | grammarが明示されている場合の有効構文生成や規則Coverageは自動化可能 | grammarの作成、terminal / nonterminal、depth、invalid判定 | 自動化可能として一覧化するが、初回実装からは外す |
+| JSON Schema等のschema-based testing | 正規化済みfield constraintのtype、required、enum、minimum、maximum、length等からCoverage候補生成 | schema dialectの意味解釈、schemaが製品仕様として有効かの確認 | 実装対象。raw schema parserは作らない |
+| HTML form constraint | constraint validation対象controlの`required`、`min`、`max`、`minlength`、`maxlength`、`step`からCoverage候補生成 | DOM値と製品仕様の優先関係、`disabled` / `readonly`等の適用可否判断 | UI候補生成として実装。`pattern`の具体値生成は初回対象外 |
 | UIコントロール別確認候補 | button、checkbox、radio、combobox、dialog等の種別から一般的な確認候補を参照 | その製品で期待される挙動の確定 | 実装対象 |
 | keyboard / focus候補 | UI patternと外部標準からキー操作・focus候補を引く | 製品がそのpattern / 標準を採用しているかの判断 | 候補生成のみ実装 |
-| test data matrix | 型、partition、boundary、enum、nullability、constraintから入力データ候補を組成 | 実データの業務意味 | 実装対象 |
+| test data matrix | 型、partition、boundary、enum、nullability、constraint由来の候補を整理・統合 | 実データの業務意味 | 独立generatorは作らず、成果物統合規則として実装 |
 | Random Testing | 指定済みdomain・確率分布・seedから再現可能な入力列を生成 | 確率分布、operational profile、oracle、停止条件 | 自動化可能として一覧化。現行Skillの正規技法を広げるため初回実装からは外す |
 | Property-Based Testing | property / generator domainが定義済みなら大量入力生成、shrinkingは既存ライブラリで自動化可能 | property / invariant定義 | 自動化可能として記録するが、現在のQA成果物workflow外のため実装対象外 |
 | Metamorphic Testing | metamorphic relationが定義済みなら派生入力・期待関係生成 | relation発見・妥当性 | 自動化可能として記録するが実装対象外 |
@@ -89,7 +90,7 @@
 | Differential Testing | 比較対象と同一入力を与え結果差分を抽出 | 参照実装が正しいという前提、差分解釈 | 自動化可能として記録するが実装対象外 |
 | Model-Based Testing | 状態モデルからCoverageを満たす経路生成 | モデル作成・oracle | 状態遷移実装の延長として一部実装 |
 | 要求追跡 | Authority → TR → TCN → CI → TCの閉鎖性、孤立、欠落、未知参照 | 意味上の対応edge作成 | 実装対象 |
-| Coverage集計 | partition、boundary、rule、pairwise / n-wise、state、transition等の技法別Coverageと、traceabilityの構造上の閉鎖率を計算 | どのCoverageを完了条件にするか、意味上のCoverage充足 | 実装対象 |
+| Coverage集計 | partition、boundary、rule、pairwise / n-wise、state、transition等の技法別Coverageを各技法scriptで計算し、traceabilityではmissing / orphan / unknown referenceを算出 | どのCoverageを完了条件にするか、意味上のCoverage充足 | 実装対象 |
 | 構造的重複 | 同一ID、同一入力組合せ、同一遷移、同一rule等の重複検出 | 意味上の重複・統合可否 | 実装対象 |
 | テスト優先順位 | 採用済み計算式がある場合のscore計算・sort | scoreモデル設計、リスク値採点 | 案件固有式がある場合だけ利用できる共通hookとして扱い、独自式は追加しない |
 | statement / branch / condition / MC/DC / Multiple Condition | instrumentationまたはCFGがあればCoverage計算、solverを使えば入力探索も可能 | コード解析環境、対象レベル選択 | 自動化可能だが現在のSkill責務外 |
@@ -109,7 +110,7 @@
 
 - Base Choice / Pairwise / N-wise / Classification Tree由来の組合せは、`Pairwise / 組合せ`の内部Coverage modeまたは入力形式として扱う
 - transition-pair / n-switch / Round-tripは、`状態遷移`の内部Coverage modeとして扱う
-- Cause-Effect GraphはDecision Table入力への変換、schema / grammar / UI属性は既存技法の候補生成元として扱う
+- Cause-Effect GraphはDecision Table入力への変換、schema / UI属性は既存技法の候補生成元として扱う
 - Domain Testing、CRUD Testing、Random Testingは一覧に残すが、正規技法名の追加と成果物契約拡張が必要なため初回実装からは外す
 
 ## 4. 今回の実装範囲
@@ -123,7 +124,7 @@
    - 正規化済み問題構造からの技法候補判定
 
 2. `test-condition-design`
-   - 同値分割の構造検査と代表値候補
+   - 同値分割の構造検査、代表値候補、Each Choice Coverage
    - BVA
    - Decision Table
    - 全組合せ / Base Choice / Pairwise / N-wise
@@ -132,13 +133,13 @@
    - 明示flowのpath列挙
    - Cause-Effect GraphからDecision Tableへの展開
    - 有限domain制約の成立可能性
-   - schema / grammar由来のテストデータ候補
+   - 正規化済みschema / HTML constraint由来のテストデータ候補
    - UIコントロール別の確認候補
 
 3. `coverage-analysis`
-   - 追跡グラフの閉鎖性
+   - `対象 / 実行範囲 = テスト設計`での追跡グラフの構造検査
    - 孤立 / 欠落 / 未知参照
-   - 技法別Coverage集計
+   - 技法別Coverage値は`test-condition-design`成果物を利用し、本Skillで再計算しない
 
 ## 5. 今回実装しないもの
 
@@ -148,6 +149,7 @@
 - CRUD Testing
 - Random Testing
 - mixed-strength組合せ
+- grammar-based testing runtime
 - Property-Based Testingのruntime
 - fuzzing engine
 - Differential Testing runner
