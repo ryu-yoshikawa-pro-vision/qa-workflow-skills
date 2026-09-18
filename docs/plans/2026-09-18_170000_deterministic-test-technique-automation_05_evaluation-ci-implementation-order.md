@@ -159,6 +159,8 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - linked + disposed重複
 - unknown upstream ID
 - 最低優先度
+- 低い指定優先度 + 空の`priority_override_reason`をviolation
+- 低い指定優先度 + 非空override reasonは値を保持し、自動補正しない
 - draft → runtime検査 → 再検査の処理順
 
 ### 同値分割 / Each Choice
@@ -351,6 +353,8 @@ raw machine-readable入力をfixtureにします。
 - linked + disposed重複
 - unknown upstream
 - highest priority
+- 低い指定優先度 + 空の`priority_override_reason`をviolation
+- 低い指定優先度 + 非空override reasonは値を保持し、自動補正しない
 - numbered expected result / Authority
 - runtime検査後の再検査
 
@@ -574,13 +578,16 @@ repository全体は328 queryです。
 
 4. 局所ブロック
    - 1 modelだけ未解決
-   - `question-analysis`往復で`model_key / target_key`維持
+   - `question-analysis`往復で`runtime_unit_key / model_key / target_key`維持
    - 独立modelは継続
    - 成果物metadataから状態を再構築し、qa-workflow出力時は既存Skill状態表と新しいruntime状態表へ反映
    - workflowは部分完了
 
-5. runtime unsupported
-   - QA成果物状態と分離
+5. runtime fallback / unavailable
+   - 対応subset外は`runtime_required=false / runtime_status=not_run / deterministic_generated=false`でLLM fallbackし、既存Skill契約を満たせば完了可能
+   - supported inputで`runtime_required=false`にした成果物はvalidator失敗
+   - supported inputでPython unavailableなら`runtime_required=true / runtime_status=not_run / deterministic_generated=false`を保持し、workflowを完了にしない
+   - QA成果物状態とruntime状態を分離
    - 「決定論的生成済み」と誤表示しない
 
 6. legacy成果物
