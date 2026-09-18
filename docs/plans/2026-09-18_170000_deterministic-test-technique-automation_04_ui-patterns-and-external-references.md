@@ -31,7 +31,7 @@ skills/test-condition-design/
 
 ### `ui-pattern-catalog.json`
 
-機械参照する正本です。generatorはcatalog file contentのSHA-256を`static_data_version`として出力し、成果物へ保持します。catalog変更後は旧versionで生成したUI候補をstaleとして再検証します。
+機械参照する正本です。generatorはcatalog file contentのSHA-256を`static_data_versions.ui_pattern_catalog`として出力し、成果物へ保持します。catalog変更後は旧versionで生成したUI候補をstaleとして再検証します。
 
 各patternは最低限、次を持ちます。
 
@@ -140,12 +140,20 @@ CTAL-TA v4.0で扱われるDomain Testing、Base Choice / Pairwise等のCombinat
 
 技法契約では、CTAL-TA v4.0の次の点を反映します。
 
-- Domain Testingは各borderのON / OFF / IN / OUTを区別する
+- Domain TestingはReliable Domain Coverageを採用する。`< / <= / > / >=`ではON / OFF / IN / OUT、`=`ではON + 両側OFF、`!=`ではOFF + 両側ONをCoverage Itemとする
+- CRUD Testingはcompleteness testingとconsistency testingの両方を扱う。completenessはmatrix operation、consistencyはentity lifecycleとAuthorityで明示されたnegative sequenceを対象にする
 - Random Testingには一般に認められたCoverage基準がなく、件数・時間等の終了条件で扱う。本Planの決定論的runtimeでは件数へ正規化された終了条件だけを機械判定する
 - Metamorphic Testingにも有用な一般Coverage measureを設定せず、MRを1回扱っただけで十分としない
 
-これらは網羅性確認と技法契約の確認に使います。既存技法のCoverage modeとして表現できるものは既存名を再利用し、Domain Testing、CRUD Testing、Random Testing、Metamorphic Testing、grammar-based testingのように独立したproblem model / selection reason / Coverageまたは終了条件の契約を持つものは、本Planで正規技法名・Skill契約・成果物契約・評価まで追加します。
+これらは網羅性確認と技法契約の確認に使います。既存技法のCoverage modeとして表現できるものは既存名を再利用し、Domain Testing、CRUD Testing、Random Testing、Metamorphic Testing、Syntax-Based Testingのように独立したproblem model / selection reason / Coverageまたは終了条件の契約を持つものは、本Planで正規技法名・Skill契約・成果物契約・評価まで追加します。
 
+### Syntax-Based Testingの参照
+
+参照先:
+
+- Paul Ammann / Jeff Offutt, *Introduction to Software Testing*, Chapter 5 "Syntax-Based Testing": https://www.cambridge.org/core/services/aop-cambridge-core/content/view/43BC474F5271ECA36F789D65F5243055/9780511809163c5_p170-212_CBO.pdf/syntaxbased_testing.pdf
+
+本Planの`Syntax-Based Testing`は、grammar / BNF等のsyntactic descriptionをmodelとしてvalid artifactを生成し、production Coverageを確認する考え方を根拠にします。mutationで作ったcandidateを製品上のinvalid expected resultへ自動昇格しません。
 ### WAI-ARIA Authoring Practices Guide
 
 参照先:
@@ -187,7 +195,7 @@ native HTML controlの属性、constraint validation、form control、button、s
 
 採用判断:
 
-本PlanのPairwise / N-wise / mixed-strength契約はPython実装で満たすため、PICTを必須依存にはしません。実装中に契約どおりの正確性またはhard limit内の性能を満たせないことがテストで確認された場合は、その場で別実装へ迂回せずPlanを更新して依存追加を判断します。
+本PlanのPairwise / N-wise / mixed-strength契約はPython実装で満たすため、PICTを必須依存にはしません。契約どおりの正確性を満たせない、または代表runtime fixtureがGitHub ActionsのUbuntu runnerで30秒timeoutを継続して超えることを確認した場合だけ、その場で別実装へ迂回せずPlanを更新して依存追加を判断します。
 
 ### NIST ACTS
 
@@ -255,7 +263,7 @@ native HTML controlの属性、constraint validation、form control、button、s
 
 本Planで定義した処理はPython 3.11標準ライブラリで実装する前提とします。ただし、標準ライブラリに固執して正確性・保守性を落とすことは目的ではありません。
 
-実装中に、Planで固定した入力契約・hard limit・Coverage要件を満たせないことを自動テストまたはbenchmarkで確認した場合は、実装者が独自判断で簡略化や別アルゴリズムへ切り替えず、次を確認した上でPlanを更新します。
+実装中に、Planで固定した入力契約・Coverage要件を満たせない、または代表runtime fixtureがGitHub ActionsのUbuntu runnerで30秒timeoutを継続して超えることを確認した場合は、実装者が独自判断で簡略化や別アルゴリズムへ切り替えず、次を確認した上でPlanを更新します。
 
 - 既存依存または成熟した外部依存で正しく満たせるか
 - Skill単体移植性への影響
