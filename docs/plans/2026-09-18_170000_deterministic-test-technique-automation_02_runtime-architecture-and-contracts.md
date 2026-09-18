@@ -362,7 +362,7 @@ runtime入力は`metadata`とscript固有`input`を分けます。
 - `generator_contract_version`: script固有の入出力・Coverage契約version。schema互換でも生成結果、tie-break、Coverage、target keyへ影響する変更では必ず更新する
 - `runtime_unit_key`: すべてのruntime invocationで必須。model scriptは`model:<model_key>`、artifact全体scriptは`artifact:<generator>:<scope_key>`
 - `model_key`: 技法modelを処理するscriptだけ必須。形式は`<technique-slug>-\d{3,}`。artifact全体scriptでは`null`
-。model scriptでは`null`
+- `scope_key`: artifact全体scriptだけ必須。`^[A-Za-z][A-Za-z0-9._:-]{0,63}$`。model scriptでは`null`
 - artifact全体scriptは`risk_matrix.py`、`technique_candidates.py`、`change_impact.py`、`environment_requirements.py`、`requirement_structure.py`、`case_structure.py`、`traceability.py`、`materialize_coverage.py`とし、同一成果物内で同じ`generator + scope_key`を重複させない
 
 artifact全体scriptの`scope_key`は次で固定します。
@@ -379,6 +379,7 @@ artifact全体scriptの`scope_key`は次で固定します。
 | `materialize_coverage.py` | inputの`tcn_id` |
 
 `generator`はscript basenameから`.py`を除いた文字列で固定します。
+
 - `runtime_required`: 自由入力ではなくPlanの対応subsetから導出する。対応scriptのinput schemaへ正規化できる場合は必ず`true`。対応script自体が存在しないsubset外だけ`false`
 - `runtime_required=false`のunitはscriptを呼ばず`runtime_status=not_run / deterministic_generated=false`としてfallback metadataを保存する
 - supported inputに対して`runtime_required=false`を設定した成果物はvalidatorで失敗させる
@@ -388,6 +389,7 @@ artifact全体scriptの`scope_key`は次で固定します。
 - `authority_refs`: runtime出力へ継承・利用する製品固有根拠
 - `reference_refs`: runtime出力へ継承・利用する外部標準、一般UI資料、DOM / 実装事実等の補助情報
 - script固有入力は必ず`input`配下に置き、metadataと同じkeyを再定義しない
+
 ### 3.3 runtime出力envelope
 
 scriptが実行できた場合、stdoutは次のJSON object 1件だけです。
