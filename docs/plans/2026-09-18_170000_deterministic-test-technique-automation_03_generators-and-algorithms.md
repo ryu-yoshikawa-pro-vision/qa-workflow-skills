@@ -727,7 +727,14 @@ seed=`42`の最初の6 outputは`2707161783, 2068313097, 3122475824, 2211639955,
 対応distribution schema:
 
 ```json
-{"type":"uniform_finite","values":[1,2,3]}
+{
+  "type":"uniform_finite",
+  "values":[
+    {"type":"integer","value":1},
+    {"type":"integer","value":2},
+    {"type":"integer","value":3}
+  ]
+}
 ```
 
 - `values`は1件以上、canonical typed valueとして重複不可
@@ -739,36 +746,53 @@ seed=`42`の最初の6 outputは`2707161783, 2068313097, 3122475824, 2211639955,
 - minimum / maximumはinclusive integer、`minimum <= maximum`
 
 ```json
-{"type":"categorical","entries":[{"value":"A","weight":3},{"value":"B","weight":1}]}
+{
+  "type":"categorical",
+  "entries":[
+    {"value":{"type":"string","value":"A"},"weight":3},
+    {"value":{"type":"string","value":"B"},"weight":1}
+  ]
+}
 ```
 
-- valueは重複不可
+- valueはcanonical typed valueで重複不可
 - weightは1〜2,147,483,647のinteger。0 / 負値 / decimalは禁止
 
-weighted categoricalではmodulo biasを避けるrejection samplingを使用します。同じseed、algorithm version、domain、distributionから同じ列を返します。
+uniform finite / categoricalでは宣言順をsample indexへ使います。weighted categoricalではweight累積区間を宣言順で構築し、rejection sampling後の整数をその区間へ写像します。
 
-Random Testingには一般的なCoverage 100%を定義しません。`completion_summary`は`required_case_count = case_count`、`generated_case_count`、`complete = generated_case_count == required_case_count`を返します。case count、時間等の終了条件をLLMが勝手に補いません。本Planのruntimeでは時間依存の終了条件を再現性保証へ含めず、件数で正規化された場合だけ機械生成します。
+同じseed、generator contract version、distributionから同じ列を返します。
+
+Random Testingには一般的なCoverage 100%を定義しません。`completion_summary`は`required_case_count = case_count`、`generated_case_count`、`complete = generated_case_count == required_case_count`を返します。本Planのruntimeでは時間依存の終了条件を使わず、件数で正規化された場合だけ機械生成します。
 
 Random Testingのoracleは生成しません。
-
 ## 18. Metamorphic Testing
 
 ### `metamorphic.py`
 
-LLMがmetamorphic relationを定義した後を処理します。
+LLMがmetamorphic relationを定義した後を処理します。複数follow-upは件数だけで暗黙生成せず、各follow-upとtransform列を明示します。
 
 各relation:
 
 ```json
 {
   "relation_key": "MR-001",
-  "source_inputs": [{"id":"SRC-001","value":{"amount":"10.0"}}],
-  "follow_up_count": 1,
-  "transform": {"op":"add_decimal","path":"$.amount","operand":"1.0"},
+  "source_inputs": [
+    {"source_id":"SRC-001","value":{"amount":{"type":"decimal","value":"10"}}}
+  ],
+  "follow_ups": [
+    {
+      "follow_up_key":"FU-001",
+      "transforms":[
+        {"op":"add_decimal","path":"$.amount","operand":"1"}
+      ]
+    }
+  ],
   "expected_relation": {"op":"monotonic_non_decreasing","output_path":"$.total"},
   "authority_refs": ["SPEC-001"]
 }
 ```
+
+`follow_ups[]`は1〜10,000件で`follow_up_key`をrelation内一意にします。各follow-upの`transforms[]`は1件以上で宣言順に逐次適用します。
 
 対応input transform:
 
@@ -783,18 +807,17 @@ JSON pathはroot `$`からobject key / array indexだけを辿る簡易pathと�
 
 対応expected relation:
 
-- `equal / not_equal`: canonical typed valueなら使用可
+- `equal / not_equal`: canonical typed scalarまたはarray/objectのcanonical JSON比較
 - `monotonic_non_decreasing / monotonic_non_increasing`: integer / decimalだけ
 - `subset / superset`: 重複を持たないcanonical scalar arrayだけ
 
 各expected relationは`output_path`を必須にし、型不一致は`invalid_input`です。
 
-scriptはsource inputから指定件数のfollow-up inputを生成し、relationをmachine evidenceへ保持します。target keyは`mr:<relation_key>:<source_id>:<followup_index>`です。
+scriptは各source inputへ各follow-upのtransform列を適用します。target keyは`mr:<relation_key>:<source_id>:<follow_up_key>`です。
 
-Metamorphic Testingには一般的なCoverage 100%を定義しません。`completion_summary`は各`relation_key`について要求されたsource数とfollow-up数をすべて生成できたかだけを判定します。各MRを1回実行したことを「十分なCoverage」と表現しません。
+Metamorphic Testingには一般的なCoverage 100%を定義しません。`completion_summary`は`required_pairs = source_inputs数 × follow_ups数`、`generated_pairs`、`complete = generated_pairs == required_pairs`を返します。各MRを1回実行したことを「十分なCoverage」と表現しません。
 
-relationが製品に妥当か、必要なsource test数、出力のどのfieldへ適用するかはLLMがAuthorityとともに正規化します。
-
+relationが製品に妥当か、source input集合、follow-up transform、出力のどのfieldへ期待関係を適用するかはLLMがAuthorityとともに正規化します。
 ## 19. テスト環境要求
 
 ### `test-analysis/scripts/environment_requirements.py`
