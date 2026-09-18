@@ -686,25 +686,30 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 
 ### Step 1: 共通runtime契約
 
+- stdin / stdout / cwd非依存のCLI契約
 - strict JSON
-- output envelope
+- output envelope / status対応表
 - canonicalization
-- envelope / generator contract version
-- static data version
+- envelope / runtime / generator contract version
+- static data versions
 - model / generation fingerprint
-- content fingerprint
-- hard limit
+- upstream Entity content fingerprint
+- item / byte / depth / search node hard limit
 - tie-break
-- structured issue
+- structured issue / blocking
+- 5 Skillの`runtime_contract.py`同一実装
 
 ### Step 2: identity / workflow基盤
 
-- stable model key
+- technique slugとstable model key採番
+- qa-workflow再利用元による成果物系列判定
 - 既存TR / TCN / TCのID再利用規則と999上限
-- target → CI mapping
-- upsert / stale
-- upstream content fingerprint
-- qa-workflow model単位状態
+- previous target mappingを入力にしたtarget → CI materialize
+- upsert / stale / freshness status
+- upstream Entity別content fingerprint
+- question-analysisのModel / Target保持
+- coverage-analysisのModel Key追跡
+- qa-workflowのSkill状態表 + モデル状態表
 - legacy昇格
 
 ### Step 3: test-analysis
@@ -724,9 +729,9 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 ### Step 5: condition design 基本技法
 
 - EP / Each Choice
-- BVA
-- Domain Testing ON / OFF / IN / OUT
-- schema / HTML parser
+- BVA 2-value / 3-value target
+- Domain Testing Reliable Domain Coverage（`< <= > >= = !=`）
+- schema / HTML parser / local `$ref`
 - test data requirement
 - 新規技法のSkill / reference / template / eval契約
 
@@ -760,10 +765,13 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 - Metamorphic relation / completion criterion
 - UI catalog / static version
 
-### Step 10: test-case / traceability
+### Step 10: materialize / test-case / traceability
 
+- `materialize_coverage.py`
+- target → CI mapping / upsert
+- merge group union
+- machine evidence描画
 - case structure
-- merge group
 - traceability
 - stale downstream
 
@@ -779,9 +787,12 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 
 ### Step 12: 全体検証・文書同期
 
-- unit / deterministic / semantic / workflow
+- runtime unit / CLI integration / deterministic / semantic / workflow
+- trigger dataset最低件数・正負バランス・境界scenario
+- semantic dataset最低件数と新技法criteria
 - CI
 - portability
+- 実Agent runtime smoke
 - README / references / templates / EVALS / ASSERTIONS
 
 ## 13. リスク
@@ -800,7 +811,7 @@ helperとexpected fixtureを共有しません。
 
 ### stale成果物
 
-model / upstream / static data versionを保持し、qa-workflowで`要再検証`へ戻します。
+model / upstream Entity content fingerprint / runtime・generator contract / static data versionsを保持し、qa-workflowで`要再検証`へ戻します。
 
 ### runtime非対応環境
 
@@ -816,10 +827,10 @@ Plan完了には次をすべて満たす必要があります。
 
 - `_01`で実装対象にした処理がruntimeまたは既存機械処理へ割り当てられている
 - 目的内の技法・構造処理が本Plan外へ先送りされていない
-- strict JSON / envelope / canonicalization / envelope version / generator contract versionが実装済み
-- upstream content fingerprint、static data version、model / generation fingerprintが再現可能
+- CLI / strict JSON / envelope / canonicalization / envelope・runtime・generator contract versionが実装済み
+- upstream Entity別content fingerprint、static data versions、model / generation fingerprintが再現可能
 - 正規化modelのMarkdown fenced JSON round-tripが成立する
-- stable model key / 既存Entity ID再利用 / CI mappingが契約どおり
+- stable model key / 成果物系列 / 既存Entity ID再利用 / previous mappingを含むCI materializeが契約どおり
 - 再実行がupsertされ重複machine evidenceを作らない
 - stale派生成果物を完了扱いしない
 - 選択技法がmodelまたは明示的な扱いへ閉じる
@@ -833,10 +844,10 @@ Plan完了には次をすべて満たす必要があります。
 - qa-workflowがupstream Entity内容変更、generation変更、stale、局所ブロック、legacyを処理できる
 - question-analysis往復でmodel / targetが失われない
 - 途中工程開始と`Selection Source`が既存workflowを壊さない
-- runtime適用可能な代表fixtureでruntime使用が統合評価から確認できる
+- CIではruntime metadata整合を確認し、実Agent smokeで代表promptが実際にscriptを起動したことを確認できる
 - 5 Skillの単体移植性が成立し、共通runtime helperの内容一致を検証できる
-- test-analysis / test-condition-designのtrigger train / validation件数とpositive / negative比率を維持する
-- adversarial-reviewの新規技法代表semantic fixtureがPASSする
+- trigger datasetがtrain 12件以上 / validation 8件以上、正負同数、repository合計280件以上を満たし、新規技法のselection / design境界をtrain・validation双方で検証する
+- semantic datasetが各Skill 2件以上 / 合計28件以上を満たし、test-analysis / test-condition-design / adversarial-reviewの新規技法criteriaがPASSする
 - Python 3.11 compile / runtime unit / deterministic eval / semantic validation / workflow統合評価がPASS
 - `skills-ref validate`がPASS
 - README、Skill、reference、template、EVALS、ASSERTIONSが実装と一致
