@@ -620,7 +620,7 @@ runtime状態とQA成果物状態を分離します。
 Plan完了には次をすべて満たす必要があります。
 
 - `_01`で実装対象にした処理がruntimeまたは既存機械処理へ割り当てられている
-- 「初回対象外」「後続候補」として残した目的内技法がない
+- 目的内の技法・構造処理が本Plan外へ先送りされていない
 - strict JSON / envelope / canonicalization / contract versionが実装済み
 - static data versionとmodel fingerprintが再現可能
 - stable model key / QA ID / CI mappingが維持される
