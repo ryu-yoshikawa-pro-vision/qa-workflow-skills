@@ -496,10 +496,10 @@ ISTQB CTAL-TA v4.0に合わせ、CRUD Testingは**completeness**と**consistency
 
 - `entities[]`
 - `functions[]`
-- 各cellの`C / R / U / D` operation集合
-- cellごとのAuthority
+- `cells[]`
 - `consistency_sequences[]`
-- 対象外cell
+- `excluded_cells[]`
+- `operation_dispositions[]`
 
 completeness:
 
@@ -507,7 +507,10 @@ completeness:
 - cell重複、unknown entity / function / operationを拒否
 - matrixに明示された各operationをCoverage targetとする
 - target keyは`crud:op:<entity_key>:<function_key>:<C|R|U|D>`
-- 仕様上必要なoperationが欠落しているかはLLMがAuthorityからmatrixへ正規化し、空cellだけを理由にscriptが欠陥扱いしない
+- entityごとにC/R/U/Dの各operationがmatrix全体で1回も存在しない場合、`crud:missing:<entity_key>:<C|R|U|D>` anomalyを生成する
+- missing operationは即欠陥とは断定せず、`operation_dispositions[]`にAuthority付きの`not_applicable`がなければ`model_status=unresolved`として`question-analysis`へ送る
+- `operation_dispositions[]`: `{entity_key, operation, handling, reason, authority_refs}`。`handling`は`not_applicable`だけを許可し、Authority 1件以上を必須とする
+- 個々の空cellだけを理由に欠陥扱いしない
 
 consistency:
 
@@ -529,12 +532,12 @@ consistency:
 
 - `kind`は`lifecycle / negative`
 - 各stepがCRUD matrixに存在するoperationを参照することを検証
-- lifecycle sequenceでは、そのentityのmatrix operationを全体として少なくとも1回Coverageすることを要求
+- lifecycle sequenceでは、そのentityの適用対象operationを全体として1回以上Coverageすることを要求
+- `not_applicable` disposition済みoperationはlifecycle Coverage母集団から除外する
 - negative sequenceはAuthorityで明示された「未作成のR/U/D」「削除後のR/U/D」等だけを入力し、scriptが業務上の禁止操作を創作しない
 - sequence target keyは`crud:seq:<sequence_key>`
 
-`coverage_summary`は`completeness`と`consistency`を別々に返し、両方completeでのみCRUD modelをcompleteとします。consistency sequenceが未正規化なら`model_status=unresolved`とし、completenessだけで「CRUD Testing完了」と表現しません。
-
+`coverage_summary`は`completeness`と`consistency`を別々に返し、両方completeでのみCRUD modelをcompleteとします。未処置missing operationまたはconsistency sequence未正規化があれば`model_status=unresolved`とし、completenessだけで「CRUD Testing完了」と表現しません。
 ## 12. Cause-Effect Graph
 
 ### `cause_effect.py`
@@ -1099,12 +1102,13 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 
 #### `crud_matrix.py`
 
-- required: `entities[]`, `functions[]`, `cells[]`, `consistency_sequences[]`, `excluded_cells[]`
+- required: `entities[]`, `functions[]`, `cells[]`, `consistency_sequences[]`, `excluded_cells[]`, `operation_dispositions[]`
 - entity: `{entity_key, authority_refs}`
 - function: `{function_key, authority_refs}`
 - cell: `{entity_key, function_key, operations[], authority_refs}`。operationsは`C/R/U/D`の重複なし集合
 - consistency sequenceは§11形式
 - excluded cell: `{entity_key, function_key, reason, authority_refs}`
+- operation disposition: `{entity_key, operation, handling, reason, authority_refs}`。`handling=not_applicable`、Authority 1件以上
 
 #### `cause_effect.py`
 
