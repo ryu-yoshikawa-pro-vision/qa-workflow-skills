@@ -296,16 +296,21 @@ Decision Table、組合せ、Classification Tree等ではfactor / conditionのke
 
 `test-condition-design/assets/output-template.md`は、同じ技法を複数回使っても独立validatorが区別できるよう、技法固有の機械証拠へ`モデルキー`または`観点ID`を持たせます。
 
-最低限、次を保持できる形式へ更新します。
+機械証拠のJSONセルはcompact JSONとして保存し、validatorはMarkdown parserでセルを取得した後に`json.loads()`相当で独立に解釈します。JSON objectはkey順を固定し、Markdownの`|`だけは既存parser契約に従ってescapeします。自由文のdelimiter splitを機械契約にしません。
 
-- 同値分割: モデルキー、partition set、partition key、valid / invalid、代表値、対応CI / Disposition
-- BVA: モデルキー、境界key、lower / upper、inclusive、位置、typed value、対応CI
-- Decision Table: モデルキー、rule key、完全condition assignment、action vector、対応CI / Disposition
-- Pairwise / N-wise / Base Choice: モデルキー、Coverage mode、strength、因子・typed value、生成組合せ、Coverage対象tupleとの対応
-- 状態遷移: モデルキー、transition key、from / event / guard / to、sequence / Round-trip、対応CI
-- flow: モデルキー、edge key、from / to / guard / label、path
+最低限、次の表を追加・更新します。
 
-delimiter依存の`Factor=Value; ...`だけを機械契約にしません。
+- 同値分割証拠: `モデルキー | 観点ID | Partition Set | Partition Key | 種別 | Domain JSON | Representative JSON | 対応CI / Disposition`
+- BVA証拠: `モデルキー | 観点ID | Boundary Key | 境界種別 | Inclusive | Position | Value JSON | 対応CI`
+- Decision Table証拠: `モデルキー | 観点ID | Rule Key | Condition Assignment JSON | Action Vector JSON | 状態 | 対応CI / Disposition`
+- 組合せモデル: `モデルキー | 観点ID | Coverage Mode | Strength | Factors JSON | Forbidden Constraints JSON`
+- 生成組合せ: `モデルキー | カバレッジ項目ID | Assignment JSON | Covered Target Keys JSON`
+- 組合せCoverage対象: `モデルキー | Target Key | Target JSON | 状態 | 根拠 / 対応CI`
+- 状態遷移証拠: `モデルキー | 観点ID | Transition Key | From | Event | Guard | To | 対応CI`
+- 状態sequence証拠: `モデルキー | Sequence Key | Coverage Mode | Transition Keys JSON | 状態 | 対応CI / Disposition`
+- flow edge証拠: `モデルキー | Edge Key | From | To | Guard / Label | Authority | Path Key`
+
+同じ技法を複数回使う場合も表自体を複製せず、`モデルキー`でgroup化します。
 
 技法ごとのCoverage母集団と生成CIの関係は1対1とは限りません。Pairwise / N-wiseではt-tuple、BVAでは境界位置、状態遷移ではtransition / sequenceをCoverage対象として独立に保持します。
 
