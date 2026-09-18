@@ -23,7 +23,7 @@ generator系scriptの`payload`は次を基本形とします。
 - `derived`: 次scriptへ直接渡す機械変換結果
 - `metadata`: target以外の再現可能な補助情報
 
-構造検査scriptは`violations`と`derived_values`をpayloadへ返します。各script固有のrequired keyとtarget key形式は以下の節で固定し、実装者が独自のtop-level payloadを作りません。
+構造検査scriptは`violations`と`derived_values`をpayloadへ返します。全scriptのrequired input、stable key、payloadは「## 25. script別入出力契約」で固定します。各技法節では技法固有アルゴリズムだけを定義し、実装者が別形式を追加しません。
 
 ## 1. プロダクトリスク
 
@@ -150,7 +150,7 @@ LLMがpartition setとpartitionの意味を正規化した後を処理します�
 - fixed-offset datetime
 - length / count
 
-入力は`boundary_key`、minimum / maximum、包含 / 排他、stepまたは最小単位、2-value / 3-value、Authorityを持ちます。
+入力は`boundary_key`、`side=lower|upper`、boundary value、包含 / 排他、正の`step`または最小単位、`mode=2-value|3-value`、Authorityを持ちます。
 
 規則:
 
@@ -158,13 +158,18 @@ LLMがpartition setとpartitionの意味を正規化した後を処理します�
 - decimalは`Decimal`
 - fixed-offset datetimeは同一instant比較用にUTC正規化できるが、named timezone / DST ruleを推測しない
 - exclusive境界は境界値と最初の有効値を区別
+- 2-valueは`AT`と隣接partition側の`OTHER`の2 targetを作る
+- 3-valueは`BELOW / AT / ABOVE`の3 targetを作る
 - lower / upperが同じ具体値になってもCoverage positionを別targetとして保持
+- target keyは`bva:<boundary_key>:AT|OTHER|BELOW|ABOVE`。modeで不要なpositionは生成しない
 
 ## 5. Domain Testing
 
 ### `domain_testing.py`
 
-多変数数値domainを扱います。一般solverを自然言語式へ適用しません。
+本PlanではISTQB CTAL-TA v4.0の**Reliable Domain Coverage**を実装します。Simplified Domain Coverageは別modeとして実装せず、Reliableのsubsetとして別名出力もしません。
+
+多変数の線形borderを扱います。一般solverを自然言語式へ適用しません。
 
 各borderは次を持ちます。
 
@@ -181,22 +186,36 @@ LLMがpartition setとpartitionの意味を正規化した後を処理します�
 }
 ```
 
-式は`sum(coeff_i * value_i) + constant relation 0`です。
+式は`sum(coeff_i * value_i) + constant relation 0`です。`relation`は`< / <= / > / >= / = / !=`だけを許可し、`pivot_step`は正のrepresentable単位を必須にします。
+
+`< / <= / > / >=`のReliable Domain Coverage:
+
+- closed border（`<= / >=`）: ON = border上、OFF = outside側の最隣接点、IN = inside側の最隣接点、OUT = OFFよりさらに1 step外側
+- open border（`< / >`）: OFF = border上、ON = inside側の最隣接点、IN = ONよりさらに1 step内側、OUT = outside側の最隣接点
+- target keyは`domain:<border_key>:ON|OFF|IN|OUT`
+
+`=`:
+
+- ON = border上
+- OFF_NEG / OFF_POS = borderの両側の最隣接点
+- target keyは`domain:<border_key>:ON|OFF_NEG|OFF_POS`
+
+`!=`:
+
+- OFF = border上
+- ON_NEG / ON_POS = borderの両側の最隣接点
+- target keyは`domain:<border_key>:OFF|ON_NEG|ON_POS`
 
 処理:
 
-1. key / type / coefficientを検証
-2. anchorを固定してpivot境界値を計算
-3. border relationが`<= / >=`ならclosed、`< / >`ならopenと判定
-4. precision上borderへ置ける点をON pointとする
-5. ON pointの反対側でborderへ最も近いrepresentable pointをOFF pointとする
-6. borderから1 step以上離れたpartition内代表をIN point、partition外代表をOUT pointとする
-7. 各pointが意図したpartition / constraintを満たすか再検証
-8. 各borderについてON / OFF / IN / OUT Coverageを計算
+1. key / type / coefficient / positive stepを検証
+2. anchorを固定してpivot border valueを求める
+3. 上記relation別規則でcoverage pointを生成
+4. 各pointを元のborder式へ再代入し、意図したinside / outside / border所属を検証
+5. Authority付きconstraintと矛盾しないことを検証
+6. relation別required targetがすべて生成できたときだけCoverage completeとする
 
-closed borderではONはinside側、OFFはoutside側に属します。open borderではONはoutside側、OFFはinside側に属します。IN / OUTはborder上または最隣接点とは別の代表点として扱います。
-
-境界値または隣接点が表現不能、pivot coefficientが0、必要`pivot_step`不明の場合は推測せずissueを返します。LLMが明示したoverride pointがある場合は、その所属だけscriptが検証します。target keyは`<border_key>:ON|OFF|IN|OUT`で固定します。
+border valueまたは必要な隣接点がrepresentableでない、pivot coefficientが0、anchor不足、step不明の場合は推測せずblocking issueを返します。LLMがoverride pointを明示する場合も、scriptが所属とstep距離を検証し、規則に一致しなければ`invalid_input`とします。
 
 ## 6. Decision Table
 
@@ -226,7 +245,7 @@ condition / action / ruleは任意数を許可します。known ruleのaction ve
 - 統合後に新しい未定義assignmentを包含しない
 - Authority集合を保持できる
 
-候補をdeterministicに列挙し、LLMが意味上統合してよいか判断します。採用されたmergeだけを再入力し、scriptがdon't-care ruleを生成します。Boolean minimizationで最小rule数を目的にしません。
+候補をdeterministicに列挙し、LLMが意味上統合してよいか判断します。採用されたmergeは`accepted_merges[]`として`{"merge_key":"DM-001","rule_keys":["R1","R2"]}`を再入力します。`rule_keys`は2件以上、重複不可、すべて同一action vectorであることをscriptが再検証し、don't-care ruleを生成します。Boolean minimizationで最小rule数を目的にしません。
 
 ## 7. 組合せ
 
@@ -307,14 +326,17 @@ LLMがclassification / classの意味を定義した後、`classification_tree.p
 
 入力:
 
-- states
-- initial states
-- terminal states
-- transitions
-- reset options
-- guard feasibility
-- 根拠付きinvalid transition候補
-- Coverage mode
+- `states[]`
+- `initial_states[]`
+- `terminal_states[]`
+- `transitions[]`
+- `reset_options[]`
+- `invalid_transition_candidates[]`
+- `coverage_mode`
+
+transitionの`guard`は説明用文字列ではなく`guard_status=true|false|null`と`guard_refs[]`を持ちます。`true`は成立可能、`false`はAuthorityにより成立不能、`null`は未解決です。`false`をCoverage母集団から外すには`guard_refs`にAuthorityを1件以上必須とします。
+
+invalid transition candidateは`{"candidate_key":"INV-001","from":"draft","event":"publish","authority_refs":["SPEC-010"]}`形式とし、target keyは`state:invalid:<candidate_key>`です。
 
 reset:
 
@@ -363,6 +385,8 @@ node kind:
 
 fork / joinを使う場合は`region_key`を必須にし、同じ`region_key`を持つ1つのforkと1つのjoinだけを対応pairとします。regionのnestは許可しますが、同一region内の複数fork / join、crossing regionは`unsupported`です。
 
+入力に`max_path_length`を必須とし、1〜1000 edgeの整数だけを許可します。すべてのpath列挙はこの長さ以下に制限します。cycleを含まないgraphでも同じ契約を使用します。
+
 処理:
 
 - bounded path
@@ -382,24 +406,50 @@ edge証拠とpath証拠は分離します。
 
 ### `crud_matrix.py`
 
+ISTQB CTAL-TA v4.0に合わせ、CRUD Testingは**completeness**と**consistency**を分けて扱います。
+
 入力:
 
-- entities
-- functions / operations
-- 各cellの`C / R / U / D`期待operation
-- Authority
+- `entities[]`
+- `functions[]`
+- 各cellの`C / R / U / D` operation集合
+- cellごとのAuthority
+- `consistency_sequences[]`
 - 対象外cell
 
-処理:
+completeness:
 
-- entity / function key一意性
-- cell重複
-- unknown entity / function
-- 各要求operationのCoverage
-- 欠落operation
-- 明示されたentity lifecycle sequence候補
+- entity / function / operation key一意性
+- cell重複、unknown entity / function / operationを拒否
+- matrixに明示された各operationをCoverage targetとする
+- target keyは`crud:op:<entity_key>:<function_key>:<C|R|U|D>`
+- 仕様上必要なoperationが欠落しているかはLLMがAuthorityからmatrixへ正規化し、空cellだけを理由にscriptが欠陥扱いしない
 
-空cellを自動で欠陥扱いしません。仕様上operationが必要かはLLMが正規化します。
+consistency:
+
+`consistency_sequences[]`はLLMが業務意味を正規化した後のsequenceです。
+
+```json
+{
+  "sequence_key": "SEQ-001",
+  "entity_key": "customer",
+  "kind": "lifecycle",
+  "steps": [
+    {"function_key":"create_customer","operation":"C"},
+    {"function_key":"read_customer","operation":"R"},
+    {"function_key":"delete_customer","operation":"D"}
+  ],
+  "authority_refs": ["SPEC-001"]
+}
+```
+
+- `kind`は`lifecycle / negative`
+- 各stepがCRUD matrixに存在するoperationを参照することを検証
+- lifecycle sequenceでは、そのentityのmatrix operationを全体として少なくとも1回Coverageすることを要求
+- negative sequenceはAuthorityで明示された「未作成のR/U/D」「削除後のR/U/D」等だけを入力し、scriptが業務上の禁止操作を創作しない
+- sequence target keyは`crud:seq:<sequence_key>`
+
+`coverage_summary`は`completeness`と`consistency`を別々に返し、両方completeでのみCRUD modelをcompleteとします。consistency sequenceが未正規化なら`model_status=unresolved`とし、completenessだけで「CRUD Testing完了」と表現しません。
 
 ## 12. Cause-Effect Graph
 
@@ -443,7 +493,13 @@ effectはcauseだけを参照します。循環参照は禁止します。
 - bounded valid case生成
 - production Coverage
 
-invalid syntaxは補集合から生成しません。明示済みmutation operatorがある場合だけ、そのoperatorを適用してinvalid候補を作ります。
+invalid syntaxは補集合から生成しません。明示mutationは`delete_terminal / replace_terminal / insert_terminal`だけを許可します。
+
+- `delete_terminal`: production内の指定terminal indexを削除
+- `replace_terminal`: 指定terminal indexを明示replacement文字列へ置換
+- `insert_terminal`: 指定位置へ明示terminal文字列を挿入
+
+mutation結果は`invalid_candidate`であり、scriptだけで「必ずinvalid」と断定しません。製品上invalidであることをexpected resultへ昇格するにはAuthorityまたはLLMの意味判断を必須にします。
 
 ## 14. schema / HTML
 
@@ -468,7 +524,7 @@ machine-readableな入力はscriptが直接正規化します。
 - `minItems` / `maxItems`
 - `minProperties` / `maxProperties`
 
-`$ref`はruntime内でnetwork解決しません。同一入力document内のlocal JSON Pointerだけ対応し、外部URI referenceは事前dereference済み入力を要求します。
+`$ref`はruntime内でnetwork解決しません。同一入力document内のlocal JSON Pointerだけ対応し、外部URI referenceは事前dereference済み入力を要求します。local `$ref`の循環参照はこのPlanでは展開せず、その循環subtreeを`unsupported`とします。
 
 ### OpenAPI 3.0 Schema
 
@@ -527,7 +583,7 @@ machine-readableな入力はscriptが直接正規化します。
 - scalar equality
 - finite enum set
 - integer / decimal / date / datetime range
-- version range（比較可能なdot-separated integer componentだけ）
+- version range（dot-separated non-negative integer componentだけ。各componentは`0`または先頭0なし。比較時は短い側へ0を補い、`1.2 == 1.2.0`とする）
 - boolean requirement
 
 処理:
@@ -560,17 +616,31 @@ seed=`42`の最初の6 outputは`2707161783, 2068313097, 3122475824, 2211639955,
 
 入力:
 
-- uint64 seed
-- `case_count`
-- domain
-- distribution
+- uint64 `seed`
+- `case_count`（1〜10,000）
+- `distribution`
 - Authority / Reference
 
-対応distribution:
+対応distribution schema:
 
-- finite valuesのuniform
-- integer rangeのuniform
-- finite valuesの整数weight付きcategorical
+```json
+{"type":"uniform_finite","values":[1,2,3]}
+```
+
+- `values`は1件以上、canonical typed valueとして重複不可
+
+```json
+{"type":"uniform_integer","minimum":0,"maximum":10}
+```
+
+- minimum / maximumはinclusive integer、`minimum <= maximum`
+
+```json
+{"type":"categorical","entries":[{"value":"A","weight":3},{"value":"B","weight":1}]}
+```
+
+- valueは重複不可
+- weightは1〜2,147,483,647のinteger。0 / 負値 / decimalは禁止
 
 weighted categoricalではmodulo biasを避けるrejection samplingを使用します。同じseed、algorithm version、domain、distributionから同じ列を返します。
 
@@ -584,27 +654,41 @@ Random Testingのoracleは生成しません。
 
 LLMがmetamorphic relationを定義した後を処理します。
 
+各relation:
+
+```json
+{
+  "relation_key": "MR-001",
+  "source_inputs": [{"id":"SRC-001","value":{"amount":"10.0"}}],
+  "follow_up_count": 1,
+  "transform": {"op":"add_decimal","path":"$.amount","operand":"1.0"},
+  "expected_relation": {"op":"monotonic_non_decreasing","output_path":"$.total"},
+  "authority_refs": ["SPEC-001"]
+}
+```
+
 対応input transform:
 
-- `set`
-- `add_decimal`
-- `multiply_decimal`
-- `append`
-- `permute`
-- `sort`
+- `set`: `path`とtyped `value`
+- `add_decimal`: decimal fieldの`path`とdecimal文字列`operand`
+- `multiply_decimal`: decimal fieldの`path`とdecimal文字列`operand`
+- `append`: arrayまたはstringの`path`と型互換な`value`
+- `permute`: arrayの`path`と0..n-1の完全なbijectionである`indices`
+- `sort`: homogeneous scalar arrayの`path`と`order=asc|desc`
+
+JSON pathはroot `$`からobject key / array indexだけを辿る簡易pathとし、wildcard、filter、recursive descentは`unsupported`です。
 
 対応expected relation:
 
-- `equal`
-- `not_equal`
-- `monotonic_non_decreasing`
-- `monotonic_non_increasing`
-- `subset`
-- `superset`
+- `equal / not_equal`: canonical typed valueなら使用可
+- `monotonic_non_decreasing / monotonic_non_increasing`: integer / decimalだけ
+- `subset / superset`: 重複を持たないcanonical scalar arrayだけ
 
-各MR modelは`relation_key`、`source_inputs[]`、各sourceに対する`follow_up_count`、transform、expected relationを持ちます。
+各expected relationは`output_path`を必須にし、型不一致は`invalid_input`です。
 
-scriptはsource inputから指定件数のfollow-up inputを生成し、relationをmachine evidenceへ保持します。Metamorphic Testingには一般的なCoverage 100%を定義しません。`completion_summary`は各`relation_key`について要求されたsource数とfollow-up数をすべて生成できたかだけを判定します。各MRを1回実行したことを「十分なCoverage」と表現しません。
+scriptはsource inputから指定件数のfollow-up inputを生成し、relationをmachine evidenceへ保持します。target keyは`mr:<relation_key>:<source_id>:<followup_index>`です。
+
+Metamorphic Testingには一般的なCoverage 100%を定義しません。`completion_summary`は各`relation_key`について要求されたsource数とfollow-up数をすべて生成できたかだけを判定します。各MRを1回実行したことを「十分なCoverage」と表現しません。
 
 relationが製品に妥当か、必要なsource test数、出力のどのfieldへ適用するかはLLMがAuthorityとともに正規化します。
 
@@ -695,7 +779,45 @@ LLMは`merge_group`だけを明示します。scriptは同じgroupについて�
 
 異なるexpected resultを持つ候補を同一groupへ統合しません。
 
-## 25. scriptが生成しないもの
+## 25. script別入出力契約
+
+次のkeyを全実装で固定します。hash targetは、指定したcanonical objectをSHA-256し`sha256:<64 lowercase hex>`で表します。
+
+| script | required input | stable result / target key | 主payload |
+| --- | --- | --- | --- |
+| `risk_matrix.py` | `scheme, risks[]` | `risk_id` | level、mapped priority |
+| `technique_candidates.py` | 全signal、selection key | `selection_key` | candidates、undetermined、complete |
+| `change_impact.py` | changed node、nodes、edges | `impact:<node_key>` | impacted nodes / paths |
+| `environment_requirements.py` | requirements[] | `env:<requirement_key>` | merged requirements / conflicts |
+| `requirement_structure.py` | authorities、risks、TR、Disposition | `violation:<type>:<entity_id>` | violations / derived priority |
+| `equivalence_partitions.py` | sets[] / partitions[] | `ep:<set_key>:<partition_key>` | representative / Coverage |
+| `bva.py` | boundaries[] | `bva:<boundary_key>:<position>` | typed value / Coverage |
+| `domain_testing.py` | borders[] | §5のrelation別key | point / Coverage |
+| `decision_table.py` | conditions、actions、known rules、constraints、accepted merges | `dt:sha256:<assignment_hash>` | rule assignment / action vector / Coverage |
+| `combinatorial.py` | mode、factors、constraints、strength | `comb:<mode>:sha256:<target_hash>` | target tuple / rows / Coverage |
+| `classification_tree.py` | classifications[] / classes[] | `class:<classification_key>:<class_key>` | `derived.factors` |
+| `state_transition.py` | states、transitions、reset、coverage mode | `state:<mode>:sha256:<sequence_hash>`、invalidは§9 key | setup / sequence / Coverage |
+| `flow_paths.py` | nodes、edges、region、max path length、coverage mode | `flow:<criterion>:sha256:<path_or_item_hash>` | paths / loops / branch Coverage |
+| `crud_matrix.py` | matrix、consistency sequences | §11のoperation / sequence key | completeness / consistency |
+| `cause_effect.py` | causes、effects、AST | `ce:sha256:<cause_assignment_hash>` | Decision Table互換rules |
+| `grammar_cases.py` | start、key付きproductions、max depth、mutations | `syntax:prod:<production_key>`、mutationは`syntax:mutation:<mutation_key>` | derivations / production Coverage |
+| `schema_cases.py` | `schema_kind, schema` | `schema:<json_pointer>:<keyword>` | normalized constraints / unsupported subtrees |
+| `ui_pattern_candidates.py` | pattern / alias、attributes | `ui:<pattern_key>:<candidate_key>` | candidate / references |
+| `test_data_requirements.py` | requirements[] | `data:<requirement_key>` | merged requirements / conflicts |
+| `random_testing.py` | seed、case count、distribution | `random:case:<1-based zero-padded 6 digits>` | generated input / completion |
+| `metamorphic.py` | relations[] | §18 key | follow-up input / completion |
+| `case_structure.py` | TCN / CI / TC / Disposition | `violation:<type>:<entity_id>` | violations / derived priority |
+| `traceability.py` | nodes / edges / stale metadata | `gap:<type>:<entity_id>` | gaps / orphan / stale |
+
+assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく、そのtargetを定義するcanonical key/value構造だけです。hash collisionを検出した場合は`internal_error`として停止し、別targetを同一keyへ統合しません。
+
+script固有inputの詳細schemaは同名unit fixtureの`valid_minimal.json`を正本例として1件ずつ置き、Planと異なるfieldを追加しません。optional fieldは各scriptのSkill referenceへ列挙し、未知fieldは`invalid_input`です。
+
+### grammar production key
+
+`grammar_cases.py`のproductionは配列indexへ依存せず、各productionを`{"production_key":"P-001","lhs":"expr","rhs":[...]}`形式で与えます。`production_key`はmodel内一意で、並べ替えではtarget keyを変えません。
+
+## 26. scriptが生成しないもの
 
 - 新しい仕様根拠
 - 未定義のexpected result
