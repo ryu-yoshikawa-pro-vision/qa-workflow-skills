@@ -794,7 +794,7 @@ LLMがmetamorphic relationを定義した後を処理します。複数follow-up
       ]
     }
   ],
-  "expected_relation": {"op":"monotonic_non_decreasing","output_path":"$.total"},
+  "expected_relation": {"op":"monotonic_non_decreasing","output_path":"$.total","output_kind":"decimal"},
   "authority_refs": ["SPEC-001"]
 }
 ```
@@ -814,11 +814,12 @@ JSON pathはroot `$`からobject key / array indexだけを辿る簡易pathと�
 
 対応expected relation:
 
-- `equal / not_equal`: canonical typed scalarまたはarray/objectのcanonical JSON比較
-- `monotonic_non_decreasing / monotonic_non_increasing`: integer / decimalだけ
-- `subset / superset`: 重複を持たないcanonical scalar arrayだけ
+- `output_kind`は`integer / decimal / scalar / unique_scalar_array / canonical_json`
+- `equal / not_equal`: すべての`output_kind`
+- `monotonic_non_decreasing / monotonic_non_increasing`: `integer / decimal`だけ
+- `subset / superset`: `unique_scalar_array`だけ
 
-各expected relationは`output_path`を必須にし、型不一致は`invalid_input`です。
+各expected relationは`output_path / output_kind`を必須にします。scriptは実際の製品出力をまだ持たないため、実値の型検証は行わず、`op`と正規化済み`output_kind`の互換性だけを検証します。実行時に観測した出力型が異なる場合はテスト実行側で失敗として扱います。
 
 scriptは各source inputへ各follow-upのtransform列を適用します。target keyは`mr:<relation_key>:<source_id>:<follow_up_key>`です。
 
@@ -1164,7 +1165,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 #### `metamorphic.py`
 
 - required: `relations[]`
-- relationは§18形式のみ
+- relationは§18形式のみ。`expected_relation.output_path / output_kind`を必須とする
 - `source_id`はrelation内一意
 - `follow_ups[]`は1..10,000件で`follow_up_key`をrelation内一意
 - 各follow-upの`transforms[]`は1件以上で宣言順に適用する
