@@ -272,6 +272,12 @@ model fingerprintはSHA-256で計算します。入力はUTF-8のcanonical JSON�
 - factor、condition、action、state、transition、edge、production等、tie-breakや意味に入力順を使う配列は宣言順を保持
 - assignment objectのkeyはsort
 - decimal / date / datetimeは共通表現へ正規化
+- JSON serializationはUTF-8、`ensure_ascii=false`相当、separatorは`,`と`:`、末尾改行なし
+- object keyは前記順序へ並べてからserializeする
+- string valueはUnicode normalizationを行わず入力code point列を保持する
+- decimalは指数表記を使わず、整数部の不要な先頭0と小数部の末尾0を除去し、`-0`は`0`へ正規化する
+- dateは`YYYY-MM-DD`、local datetimeは`YYYY-MM-DDTHH:MM:SS`、fixed-offset datetimeは`YYYY-MM-DDTHH:MM:SS±HH:MM`だけをcanonical表現とし、fractional secondを禁止する
+- fixed-offset datetimeのoffsetは意味データとして保持し、fingerprint用にUTCへ変換しない
 - JSON whitespaceは除去
 - 非有限数は不可
 
@@ -444,7 +450,7 @@ Coverage母集団から除外するconstraintは1件以上の`authority_refs`を
 }
 ```
 
-より強いsolver表現が必要なDomain Testing等は、その技法の明示ASTへ限定します。
+Domain Testingは`_03` §5で固定した線形border schemaだけを使用し、共通constraint以外の任意ASTや式言語を追加しません。
 
 ## 7. stable ID・upsert・stale
 
@@ -564,7 +570,12 @@ validatorはfenced JSON blockを抽出してstrict JSON decodeし、canonical化
 - Domain / CRUD / state / flow等のgenerator → machine evidence
 - Coverage target → CI mapping
 
-直接互換payloadまたは小さいdeterministic adapterを使用します。
+機械接続は次で固定し、未定義の汎用adapterは作りません。
+
+- `cause_effect.py`の`derived.decision_table`を`decision_table.py`の`input`へそのまま渡す
+- `classification_tree.py`の`derived.factors`を`combinatorial.py`の`factors`へそのまま渡す
+- `schema_cases.py`のnormalized constraintsを対応するEP / BVA / test data input builderが字段mappingだけで渡す。意味変換は行わない
+- 各generatorの`targets`を`materialize_coverage.py`へ渡す
 
 意味上の統合だけLLMに残します。複数技法の結果を同じCIへまとめる場合、LLMは`merge_group`を明示し、`materialize_coverage.py`がtarget key、Authority、Reference、優先度、test data requirementを決定論的にunionします。
 
