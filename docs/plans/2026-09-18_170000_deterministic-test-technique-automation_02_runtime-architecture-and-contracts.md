@@ -585,7 +585,7 @@ validatorはfenced JSON blockを抽出してstrict JSON decodeし、canonical化
 
 既存成果物の再利用条件へ次を追加します。
 
-- 新契約成果物はenvelope / generator contract versionとupstream semantic fingerprintが現在有効
+- 新契約成果物はenvelope / runtime / generator contract versionとupstream Entity content fingerprintが現在有効
 - model / generation fingerprintと派生成果物が一致
 - stale / `要再検証` / unresolvedなmodelが残っていない
 - runtime実行対象なのに決定論的generator未実行である場合、その事実を保持する
@@ -600,17 +600,26 @@ contract versionを持たない既存成果物を一律破棄しません。
 
 ### 13.3 局所状態
 
-model単位状態の正本は各成果物に保存した`model_status`、fingerprint、構造化issueです。`qa-workflow`の状態表は必要時の集約表示であり、唯一の永続正本にしません。状態表がない場合も、成果物metadataから現在状態を再構築できることを必須とします。
+model単位状態の正本は各成果物に保存した`model_status`、`freshness_status`、fingerprint、構造化issueです。
 
-- 1 modelだけ`ブロック中` / `要再検証`でも、独立した他modelは継続可能
-- 対象scopeにstale / unresolvedな必須modelが残る場合はworkflow全体を完了にしない
-- runtime `unsupported`とQA成果物の意味上の`ブロック中`を分離する
-- `question-analysis`へroutingする場合は`model_key` / `target_key`を質問一覧・ブロック中範囲・回答後の再開情報へ保持する
-- `coverage-analysis`はstale / gapをTCN / CIだけでなく関連`model_key`まで追跡できるようにする
+`qa-workflow`を出力する場合は既存のSkill状態表を必須で維持しますが、この表は集約表示であり唯一の永続正本ではありません。他Skill実行の前提としてworkflow状態表の存在は要求せず、必要時は成果物metadataから状態を再構築します。
 
+`qa-workflow`には既存Skill状態表とは別に次の`モデル状態`表を追加します。
+
+`Skill | Model Key | Model Status | Freshness | Runtime Status | Deterministic Generated | Blocker / Issue`
+
+- `Model Key`は同一Skill内一意
+- `Freshness`は`current / stale`
+- `Runtime Status`は`ok / invalid_input / unsupported / limit_exceeded / internal_error / not_run`
+- `Deterministic Generated`は`Yes / No`
+- Skill状態表の`WF-D012`は既存Skill状態表だけへ適用し、モデル状態表へ流用しない
+- 1 modelだけ`blocked / unresolved / stale`でも独立した他modelは継続可能
+- 対象scopeの必須modelに`blocked / unresolved / stale`が残る場合はworkflow全体を完了にしない
+- `question-analysis`へroutingする場合は`model_key / target_key`を質問一覧・ブロック中範囲・回答後の再開情報へ保持する
+- `coverage-analysis`はstale / gapをTCN / CIだけでなく関連`model_key`まで追跡する
 ### 13.4 上流変更
 
-上流成果物versionが変わった場合:
+上流Entityの`content_fingerprint`が変わった場合:
 
 1. 最も早い変更成果物を特定
 2. change impact / traceabilityで影響modelを特定
@@ -624,7 +633,7 @@ model単位状態の正本は各成果物に保存した`model_status`、fingerp
 
 各Skillは単体コピー可能な既存契約を維持します。
 
-strict JSON、canonicalization、fingerprint、envelope処理はruntime対象5 Skillそれぞれの`scripts/runtime_contract.py`へ同じ実装を同梱します。repo rootの共通helperへ依存させません。repository testで5ファイルのSHA-256一致を検証し、Skillごとの実装差を許可しません。技法固有ロジックはこの共通helperへ入れません。
+strict JSON、canonicalization、fingerprint、envelope処理はruntime対象5 Skillそれぞれの`scripts/runtime_contract.py`へ同じ実装を同梱します。repo rootの共通helperへ依存させません。`runtime_contract_version`をfile内定数として持ち、machine outputへ影響する内容変更では必ずversionを更新します。repository testで5ファイルのSHA-256一致を検証し、Skillごとの実装差を許可しません。技法固有ロジックはこの共通helperへ入れません。
 
 Python 3.11標準ライブラリで正しく実装できる処理は標準ライブラリを優先します。ただし、Domain Testing、mixed-strength、constraint solving等で自前実装より既存の成熟した依存関係を使う方が正確・保守可能な場合は、依存追加を禁止しません。
 
