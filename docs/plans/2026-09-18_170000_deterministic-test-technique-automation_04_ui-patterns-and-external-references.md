@@ -1,0 +1,234 @@
+# テスト分析・テスト技法の決定論的自動化Plan
+
+## 1. UIパターンをテスト条件へ利用する方針
+
+UI要素の種類から、一般的に確認すべき候補を機械的に引けるようにします。
+
+ただし、一般的なUIパターンや外部標準を、対象製品の仕様より強い根拠として扱いません。
+
+優先順は次です。
+
+1. 対象製品の現在有効な仕様根拠
+2. 対象platform / native controlが規定する挙動
+3. 製品が採用すると明示した外部標準・design system
+4. 一般的な確認候補
+
+4はテスト観点の候補を増やすために使い、製品固有の期待結果を確定する根拠にはしません。
+
+例えばDialogについて一般的なkeyboard / focus確認候補が存在しても、対象製品の仕様がESC操作を持たない場合に「ESCで閉じる」を期待結果として追加しません。
+
+## 2. 追加するファイル
+
+```text
+skills/test-condition-design/
+├── references/
+│   └── ui-patterns.md
+├── assets/
+│   └── ui-pattern-catalog.json
+└── scripts/
+    └── ui_pattern_candidates.py
+```
+
+### `ui-pattern-catalog.json`
+
+機械参照する正本です。
+
+各patternは最低限、次を持ちます。
+
+- 正規pattern名
+- 対応するHTML要素 / ARIA role等の識別候補
+- 一般的な確認候補
+- keyboard / focus候補
+- state / value候補
+- 関連する外部資料
+- 製品仕様なしでは期待結果へ昇格させない項目
+
+### `references/ui-patterns.md`
+
+次だけを説明します。
+
+- catalogの使い方
+- 一般候補と製品固有期待結果の違い
+- 外部標準の位置付け
+- 対象要素を誤分類した場合の扱い
+- catalogにないpatternをLLMが勝手に追加しないこと
+
+catalogとreferenceで同じ一覧を二重管理しません。
+
+## 3. 初期catalog対象
+
+UIで一般的に出現し、確認項目の再利用価値が高いものを対象にします。
+
+| UI要素 / pattern | 機械的に提示できる主な確認候補 |
+| --- | --- |
+| Button | enabled / disabled、pointer操作、keyboard activation、focus、二重操作、loading中の状態 |
+| Link | 遷移先、keyboard activation、focus、外部 / 内部遷移、disabled相当表現がある場合の扱い |
+| Text Input | required、空、文字数境界、入力可能文字、readonly / disabled、clear、paste、validation |
+| Textarea | Text Input共通、複数行、改行、max length、resize要件がある場合 |
+| Number Input / Spinbutton | min / max / step、直接入力、増減操作、非数値、decimal |
+| Password | required、長さ・形式、mask表示、表示切替が仕様にある場合、paste可否が仕様にある場合 |
+| Checkbox | checked / unchecked、keyboard、disabled、group制約、初期状態 |
+| Radio Group | 単一選択、初期選択、keyboard移動、disabled option、必須選択 |
+| Switch / Toggle | on / off、keyboard、disabled、labelとの対応 |
+| Select | option一覧、選択、初期値、disabled option、keyboard、未選択 |
+| Combobox / Autocomplete | 入力、候補表示、絞り込み、候補選択、keyboard、focus、no-result、clear |
+| Listbox | option移動、単一 / 複数選択、keyboard、selected state |
+| Slider | min / max / step、keyboard、pointer、表示値、disabled |
+| Date / Time Picker | min / max、禁止日、直接入力、picker選択、timezone要件がある場合 |
+| File Upload | 許可形式、サイズ境界、複数選択、取消、同一ファイル再選択、失敗時 |
+| Dialog / Modal | open / close経路、focus初期位置、focus移動、background操作、confirm / cancel、close control |
+| Alert / Toast / Notification | 表示条件、内容、表示回数、消滅条件、操作可能な場合のfocus |
+| Tabs | selected tab、panel対応、keyboard候補、disabled tab |
+| Accordion / Disclosure | open / close、複数開閉可否、keyboard、state |
+| Menu / Menu Button | open / close、項目選択、keyboard、focus return |
+| Tooltip | 表示trigger、非表示条件、内容、pointer / keyboardでの到達性 |
+| Table | column / row表示、empty state、overflow、headerとの対応 |
+| Grid / Data Grid | focus移動、selection、sort / editがある場合、virtualizationがある場合 |
+| Pagination | first / last、前後、current page、件数変動、境界page |
+| Search | 空検索、完全 / 部分一致等の仕様、clear、0件、特殊文字候補 |
+| Filter | 各値、複数条件、clear、初期値、結果件数、URL / state保持が仕様にある場合 |
+| Sort | 各列、昇順 / 降順、同値時、他sortとの独立性、初期順 |
+| Drag and Drop | drag可否、drop target、順序、取消、境界、keyboard代替が要件にある場合 |
+| Tree / Tree View | expand / collapse、selection、keyboard、階層、leaf |
+| Progress / Status | 初期 / 進行中 / 完了 / 失敗、値範囲、重複表示 |
+| Breadcrumb / Navigation | current、階層、遷移、keyboard、折返し |
+| Form | submit、validation順序、複数field相関、reset、二重submit、エラー後再送信 |
+
+catalogは「よくある挙動一覧」ではなく「確認候補一覧」とします。
+
+## 4. UI属性からの機械展開
+
+LLMまたは対象調査で次が取得できる場合、技法へ接続します。
+
+例:
+
+```json
+{
+  "pattern": "text-input",
+  "attributes": {
+    "required": true,
+    "minlength": 3,
+    "maxlength": 20
+  }
+}
+```
+
+この場合:
+
+- `required` → 空 / 非空partition候補
+- `minlength`、`maxlength` → BVA入力
+- pattern catalog → readonly / disabled / focus等の確認候補
+
+ただしDOM属性と仕様書が矛盾する場合、DOMを正として期待結果を決めません。既存の`spec-analysis` / `question-analysis`のルールへ戻します。
+
+## 5. 外部標準
+
+### WAI-ARIA Authoring Practices Guide
+
+参照先:
+
+- https://www.w3.org/WAI/ARIA/apg/patterns/
+
+Button、Checkbox、Combobox、Dialog、Radio Group、Slider、Tabs、Menu等のpatternについて、keyboard interaction、role、state、focus等の確認候補に利用します。
+
+APGの例示や推奨を対象製品の仕様へ無条件に昇格しません。
+
+### HTML Standard
+
+参照先:
+
+- https://html.spec.whatwg.org/
+
+native HTML controlの属性、form control、button、select等について、platform semanticsを確認する一次資料として使用します。
+
+### WCAG / WAI資料
+
+アクセシビリティ要件が対象scopeに含まれる場合だけ利用します。すべてのテスト条件へ自動で大量追加する使い方はしません。
+
+## 6. 既存プロジェクト・Agent Skillsの調査結果
+
+### Microsoft PICT
+
+- Repository: https://github.com/microsoft/pict
+- 有限parameter / valueとconstraintからPairwise等の組合せを生成する
+- CLI / APIを持つ
+- Pairwise / combinatorial testingの実装参考として有用
+
+採用判断:
+
+初期実装の必須依存にはしません。現在のSkill packageはPython標準ライブラリだけで移植でき、PICT binaryを必須にするとplatform / installation契約が増えるためです。
+
+自前generatorで現行要求の2-wise / 小規模N-wiseを満たせないことが実測で分かった場合に、依存候補として再評価します。
+
+### NIST ACTS
+
+- NIST Automated Combinatorial Testing for Software
+- t-way covering array、constraint、coverage measurementの考え方を持つ
+- 2-wayより高いinteraction strengthの参考になる
+
+参照先:
+
+- https://csrc.nist.gov/projects/automated-combinatorial-testing-for-software
+
+採用判断:
+
+アルゴリズム・評価観点の参考にします。初期runtime dependencyにはしません。
+
+### GraphWalker
+
+- Repository: https://github.com/GraphWalker/graphwalker-project
+- Model-Based Testingでgraphからpath / coverageを生成する既存プロジェクト
+
+採用判断:
+
+状態遷移Coverageとpath生成の参考にします。
+
+現行`test-condition-design`で必要なのはstate / transition / transition-pair等の設計成果物生成であり、GraphWalker runtimeを組み込むほどの要求は現時点でありません。初期実装はPython標準ライブラリのgraph処理で対応します。
+
+### Z3
+
+- Repository: https://github.com/Z3Prover/z3
+- SAT / SMTにより複雑な制約充足、矛盾、到達可能性等を扱える
+
+採用判断:
+
+有限domainの明示制約で足りる間は追加しません。
+
+算術、文字列、複雑な論理制約が増え、組合せ列挙では現実的に解けない具体的ケースが確認された場合にのみ再評価します。
+
+### `jovd83/test-design-orchestrator`
+
+- Repository: https://github.com/jovd83/test-design-orchestrator
+- BVA、Equivalence Partitioning、Decision Table、Classification Tree / N-Wise、State Transition等をtechnique別Skillへ分けている
+- technique selectionと成果物構造の参考になる
+
+確認した範囲では、技法の生成そのものは主にSkill instructionでLLMへ実行させており、BVA / Decision Table / N-wise等をすべて決定論的scriptへ移した構造ではありません。
+
+本リポジトリではSkill数を増やさず、現在の責務分界どおり`test-condition-design`配下のscriptへ置きます。
+
+### `jovd83/test-analysis-skill`
+
+- Repository: https://github.com/jovd83/test-analysis-skill
+- リスクscore計算を`scripts/calculate_risk.py`へ分離している
+
+「意味判断はLLM、数値計算はscript」という実装例として参考にします。
+
+### `omkamal/pypict-claude-skill`
+
+- Repository: https://github.com/omkamal/pypict-claude-skill
+- PICT / pypictをAgent Skillから利用する例
+
+外部Pairwise engineをSkillから呼ぶ実装例として参考にしますが、本リポジトリの必須依存にはしません。
+
+## 7. 外部依存を追加する条件
+
+次のすべてを満たす場合だけ新規依存を検討します。
+
+- 現在の具体的要求を標準ライブラリ実装で満たせない
+- 現実の入力規模で性能または正確性の問題を再現できる
+- Skill-only portabilityへの影響を説明できる
+- Windows / macOS / Linux等、想定環境で利用方法が成立する
+- licenseがリポジトリ利用条件と両立する
+- 依存を入れた方が自前実装より保守しやすい
+
+将来の可能性だけを理由にPICT adapter、GraphWalker adapter、Z3 adapterを先に作りません。
