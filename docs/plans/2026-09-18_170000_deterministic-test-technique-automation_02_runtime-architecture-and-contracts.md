@@ -390,6 +390,15 @@ named timezone / DST transition自体を一般BVAとして推測しません。�
 
 ### 5.3 共通hard limit
 
+上限の計測規則を先に固定します。
+
+- 入力JSON byte数: stdinで受け取ったUTF-8 bytesをdecode前に数える
+- nesting depth: object / array containerを1階層としてroot containerを1と数える
+- 1文字列: UTF-8 bytesで数える
+- feasibility search node: root assignmentを1とし、backtrackingで新しいpartial assignmentへ入るたびに1加算する。cache hitで再探索しない場合は加算しない
+- target / row / candidate総数: stable keyによる重複除去後、Markdown materialize前に数える
+- stdout JSON: UTF-8 serialization後のbytesを数える
+
 次を契約値として固定します。
 
 | 対象 | 上限 |
@@ -521,7 +530,7 @@ CI番号は`CI\d{2,}`を許可します。
 
 `Edge Key | From | To | Edge Type | Authority / Evidence`
 
-許可するedge typeは少なくとも次です。
+許可するedge typeは次の3種だけです。
 
 - `depends_on`
 - `traces_to`
