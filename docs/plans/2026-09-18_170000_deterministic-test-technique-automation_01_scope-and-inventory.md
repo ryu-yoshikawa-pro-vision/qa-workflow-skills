@@ -88,7 +88,7 @@ generatorが返す100%等のCoverageは、**明示された正規化済みモデ
 
 ## 4. 本Planの実装範囲
 
-本PlanはPR分割や「初回だけ」の部分実装を完了条件にしません。上記3.1で「実装」とした処理を、対応Skillのruntime、成果物契約、validator、semantic eval、workflow統合まで含めて実装します。
+本Planは部分実装を完了条件にしません。上記3.1で「実装」とした処理を、対応Skillのruntime、成果物契約、validator、semantic eval、workflow統合まで含めて実装します。
 
 主な責務は次のとおりです。
 
