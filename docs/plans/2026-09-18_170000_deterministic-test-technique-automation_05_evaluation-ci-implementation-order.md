@@ -93,7 +93,7 @@ CLI integration testは各代表fixtureをsubprocessで`python <script-path>`起
 
 ### 決定論性
 
-同一fixtureを少なくとも`PYTHONHASHSEED=1`と`PYTHONHASHSEED=999`で実行し、machine outputが一致することを確認します。
+同一fixtureを`PYTHONHASHSEED=1`と`PYTHONHASHSEED=999`の2条件で実行し、machine outputが一致することを確認します。
 
 locale依存sort、set iteration順、dict insertion偶然性に依存する出力を禁止します。
 
@@ -476,16 +476,23 @@ semantic referenceをgenerator outputから自動生成しません。
 
 ### semantic dataset件数
 
-現行`tests/skills/evals/semantic/test_semantic_datasets.py`の「各Skillちょうど2件 / 合計28件」は本変更で撤廃します。
+semantic dataset件数は次で固定します。
 
-- 各Skillは2件以上
+| Skill | case数 |
+| --- | ---: |
+| `test-analysis` | 7 |
+| `test-condition-design` | 7 |
+| `adversarial-review` | 8 |
+| その他11 Skill | 各2 |
+| repository合計 | 44 |
+
+- `test-analysis`: 既存2 caseを維持し、Domain / CRUD / Random / Metamorphic / Syntax-Basedを主対象とする5 caseを追加する
+- `test-condition-design`: 既存2 caseを維持し、同5技法を主対象とする5 caseを追加する
+- `adversarial-review`: 既存2 caseを維持し、下記6誤用を主対象とする6 caseを追加する
 - case IDはSkill内一意
-- repository全体は28件以上
-- `test-analysis` / `test-condition-design`は新規正規技法5種を少なくとも1件ずつsemantic評価できるcaseを持つ。1 caseで複数技法を評価してよいが、各技法のcriteriaが明示されること
-- `adversarial-review`は下記代表誤用をそれぞれcriteriaまたはcaseとして評価する
-- 既存Skillのcaseを減らして最低件数だけ満たす変更は行わない
+- `tests/skills/evals/semantic/test_semantic_datasets.py`はSkill別expected count mapと合計44を検証する
 
-`adversarial-review`には技法アルゴリズムを複製せず、次を評価します。
+`adversarial-review`には技法アルゴリズムを複製せず、次の6 caseを追加します。
 
 - Random Testingを一般的な「100% Coverage」と記載する
 - Metamorphic TestingでMRを1回だけ扱ったことを十分なCoverageと断定する
@@ -493,28 +500,32 @@ semantic referenceをgenerator outputから自動生成しません。
 - CRUD completenessだけでconsistencyも完了したと断定する
 - Syntax-Based Testingのmutation candidateをAuthorityなしで製品上invalidと断定する
 - 新規技法のexpected resultをAuthorityなしで創作する
-
 ### 発火評価
 
-新規技法追加により、現行`.github/workflows/validate-skills.yml`の固定件数契約を次へ変更します。
+既存queryは削除せず、新規技法5種の責務境界を追加します。件数は次で固定します。
 
-- 全Skill: train 12件以上、validation 8件以上
-- 各datasetはpositive / negative同数
-- train / validation queryはSkill内で重複しない
-- repository全体のtrigger query総数は280件以上
-- `test-analysis` / `test-condition-design`は既存queryを削らず、新規技法境界を追加する
+| Skill | train | validation |
+| --- | ---: | ---: |
+| `test-analysis` | 24（positive 12 / negative 12） | 20（positive 10 / negative 10） |
+| `test-condition-design` | 24（positive 12 / negative 12） | 20（positive 10 / negative 10） |
+| その他12 Skill | 各12（6 / 6） | 各8（4 / 4） |
+| repository合計 | 192 | 136 |
 
-`test-analysis` / `test-condition-design`では、Domain Testing、CRUD Testing、Random Testing、Metamorphic Testing、Syntax-Based Testingの各技法についてtrainとvalidationの双方で次を持ちます。
+repository全体は328 queryです。
 
-1. `test-analysis` positive: 技法を採用すべきか判断する依頼
-2. `test-analysis` negative: その技法で具体的なCoverage / 条件を設計する依頼
-3. `test-condition-design` positive: 技法を使って具体的なCoverage / 条件を設計する依頼
-4. `test-condition-design` negative: 技法の採用可否だけを判断する依頼
+`test-analysis` / `test-condition-design`では、Domain Testing、CRUD Testing、Random Testing、Metamorphic Testing、Syntax-Based Testingの各技法についてtrainとvalidationの双方に次の10 queryを追加します。
 
-さらに各Skillのtrainまたはvalidationに「技法とは何か説明して」という説明依頼negativeを少なくとも1件含めます。これらのscenarioとdataset case IDの対応表を`EVALS.md`へ記録し、train / validation未使用queryを最終holdoutとして残します。
+1. `test-analysis` positive: 技法を採用すべきか判断する依頼 × 5技法
+2. `test-analysis` negative: その技法で具体的なCoverage / 条件を設計する依頼 × 5技法
+3. `test-condition-design` positive: 技法を使って具体的なCoverage / 条件を設計する依頼 × 5技法
+4. `test-condition-design` negative: 技法の採用可否だけを判断する依頼 × 5技法
+
+さらに各datasetへ、各Skillについて「技法とは何か説明して」という説明依頼negativeを1件と、既存責務の一般positiveを1件追加してbalanceを維持します。train / validation間のquery重複は禁止します。
+
+`.github/workflows/validate-skills.yml`は上表のSkill別exact count、positive / negative exact count、repository合計328を検証します。`EVALS.md`へ新規query IDと責務境界の対応を記録します。
 ## 8. qa-workflow統合評価
 
-少なくとも次をE2E fixture化します。
+次の9シナリオをE2E fixture / smokeとして検証します。
 
 1. 新規設計
    - test-analysisで技法選択
@@ -585,10 +596,10 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 
 `.github/workflows/validate-skills.yml`のrepository eval structureは次へ変更します。
 
-- trigger dataset: train 12件以上、validation 8件以上、各datasetのpositive / negative同数
-- total trigger query: 280件以上。exact 280 assertionを削除
-- train / validation disjointは維持
-- semantic dataset test: 各Skill 2件以上、repository全体28件以上。exact 2 / exact 28 assertionを削除
+- trigger dataset: 上記Skill別exact countとpositive / negative exact countを検証
+- total trigger query: 328
+- train / validation disjointを維持
+- semantic dataset: `test-analysis=7 / test-condition-design=7 / adversarial-review=8 / その他=2`、repository合計44を検証
 
 `validate-skills.yml`へruntime unit testを重複追加しません。runtime testは`deterministic-output-evals.yml`だけで実行します。
 
@@ -846,8 +857,8 @@ Plan完了には次をすべて満たす必要があります。
 - 途中工程開始と`Selection Source`が既存workflowを壊さない
 - CIではruntime metadata整合を確認し、実Agent smokeで代表promptが実際にscriptを起動したことを確認できる
 - 5 Skillの単体移植性が成立し、共通runtime helperの内容一致を検証できる
-- trigger datasetがtrain 12件以上 / validation 8件以上、正負同数、repository合計280件以上を満たし、新規技法のselection / design境界をtrain・validation双方で検証する
-- semantic datasetが各Skill 2件以上 / 合計28件以上を満たし、test-analysis / test-condition-design / adversarial-reviewの新規技法criteriaがPASSする
+- trigger datasetがSkill別exact count（repository合計328）を満たし、新規技法5種のselection / design境界をtrain・validation双方で検証する
+- semantic datasetがSkill別exact count（repository合計44）を満たし、test-analysis / test-condition-design / adversarial-reviewの新規技法caseがPASSする
 - Python 3.11 compile / runtime unit / deterministic eval / semantic validation / workflow統合評価がPASS
 - `skills-ref validate`がPASS
 - README、Skill、reference、template、EVALS、ASSERTIONSが実装と一致
