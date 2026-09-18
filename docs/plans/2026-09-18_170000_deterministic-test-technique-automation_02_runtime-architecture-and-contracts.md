@@ -301,18 +301,42 @@ generator結果に影響する静的データはversionを持ちます。
 
 ### 4.3 model_keyの安定性
 
+技法slugは次で固定します。
+
+| 技法 / model | slug |
+| --- | --- |
+| 同値分割 | `ep` |
+| 境界値分析 | `bva` |
+| Domain Testing | `domain` |
+| Decision Table | `decision` |
+| Pairwise / 組合せ | `comb` |
+| Classification Tree | `classification` |
+| 状態遷移 | `state` |
+| シナリオ / Use Case | `flow` |
+| CRUD Testing | `crud` |
+| Cause-Effect Graph | `cause-effect` |
+| Syntax-Based Testing | `syntax` |
+| schema / HTML constraint | `schema` |
+| UI pattern | `ui` |
+| Random Testing | `random` |
+| Metamorphic Testing | `metamorphic` |
+
+`model_key`は`<slug>-\d{3,}`です。
+
+- qa-workflowが再利用元として選んだ直前の`test-condition-design`成果物を同じ成果物系列とする。再利用元がない場合は新しい系列
 - 同じ技法・同じ検証責務のmodelを改訂する場合は既存`model_key`を維持する
-- 意味上別modelと判断した場合だけ新しいkeyを発行する
-- 削除済みkeyは同じ成果物系列で再利用しない
+- 意味上別modelと判断した場合だけ、同じslugの既存最大番号+1で新しいkeyを発行する
+- 新しい系列では各slugを001から開始する
+- 削除済みkeyは同じ系列で再利用しない
 - 同じ`(技法, model_key)`に異なる同時定義を置かない
 
-意味上同じmodelかどうかの判断はLLMに残します。keyの維持・新規発行規則は機械契約として固定します。
+意味上同じmodelかどうかの判断はLLMに残し、番号割当てだけを機械規則として固定します。
 
 ### 4.4 上流変更
 
-同じIDでも上流成果物の意味は変わり得るため、自由記述のversionやMarkdown全文hashではなく、実際に消費した意味データから`semantic_fingerprint`を計算します。
+同じIDでも上流Entityの構造化内容は変わり得るため、自由記述versionやMarkdown全文hashではなく、実際に消費したEntityのcanonicalな構造化内容から`content_fingerprint`を計算します。これは意味同値性を推論するhashではなく、正規字段の変更検出用です。
 
-最初のAuthority入力では、`spec-analysis`成果物のうち実際に利用した「現在有効な仕様根拠」行について、少なくとも次をcanonical化します。
+`spec-analysis`のAuthority Entityでは次の字段をcanonical化します。
 
 - 仕様根拠ID
 - 種別
@@ -322,18 +346,18 @@ generator結果に影響する静的データはversionを持ちます。
 - 関係
 - 関連仕様根拠ID
 
-人間向け説明文、見出し、表記だけの変更はfingerprint対象にしません。`spec-analysis`へfingerprint字段を必須追加せず、最初に消費するruntime側で上記意味データから算出できます。
+以降のQA成果物は、下流が実際に利用するEntity単位でfingerprint対象字段を固定します。
 
-以降のQA成果物は、下流が実際に利用する正規テーブル / machine evidence / model metadataだけをsemantic fingerprint対象とします。
+- `test-analysis` Product Risk: リスクID、失敗、関連根拠、影響度、発生可能性、level、mapped priority
+- `test-analysis` 技法選択: selection key、適用領域、selection source、signals、候補、最終採用技法、状態
+- `test-analysis` change graph: node / edge key、type、from / to、Source / Authority
+- `test-analysis` 環境要求: requirement key、operator、value / range、Authority
+- `test-requirement-design`: TR ID、本文、Authority、Risk、優先度、テストレベル / 観測方法、およびDisposition行
+- `test-condition-design`: TCN ID、TR、条件、技法、Coverage基準、Authority / Risk、優先度、model metadata、target → CI mapping、およびDisposition行
+- `test-case-design`: TC ID、関連TR / TCN / CI、優先度、前提、データ、手順、期待結果、期待結果Authority、およびDisposition行
+- `coverage-analysis`: 対象上流 / 下流ID、Model Key、coverage / stale状態、修正Skill
 
-- `test-analysis`: Product Risk、技法選択machine evidence、change graph、環境要求
-- `test-requirement-design`: TRと上流Disposition
-- `test-condition-design`: TCN、正規化model、target → CI mapping、Disposition
-- `test-case-design`: TCとDisposition
-- `coverage-analysis`: coverage / stale判定のmachine evidence
-
-modelは利用した`semantic_fingerprint`を`upstream_artifacts`へ保持します。不一致時は`change_impact.py`またはtraceabilityで関連modelを特定し、影響modelだけを`要再検証`へ戻します。無関係なmodelを全再生成しません。
-
+modelは実際に消費したEntityを`upstream_entities`へ1件ずつ保持します。`skill + entity_ref`が同じEntityの`content_fingerprint`だけを比較し、不一致となったEntityを参照するmodelだけを`要再検証`へ戻します。無関係なEntity変更ではmodelをstaleにしません。
 ## 5. 値・順序・tie-break
 
 ### 5.1 typed value
