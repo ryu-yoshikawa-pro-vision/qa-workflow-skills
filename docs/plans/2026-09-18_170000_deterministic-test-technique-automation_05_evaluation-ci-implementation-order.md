@@ -167,6 +167,9 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 
 - partition重複 / 衝突
 - representative所属
+- enum representative=nullは宣言順先頭を選ぶ
+- integer range representative=nullはlower側の最初の有効整数を選ぶ
+- decimal / date / datetime rangeでrepresentative未指定ならunresolved
 - 成果物閉鎖とCoverageの分離
 - DispositionをCoverage済みと数えない
 - Authority付き成立不能だけを母集団から除外
@@ -279,9 +282,12 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - unreachable production
 - recursion / max depth
 - production適用回数最小 + production key列辞書順tie-breakのshortest derivation
+- valid case集合が各production shortest derivationのdedupe unionだけであること
 - production Coverage
 - `symbol_index`境界とterminal item検証
 - `delete_terminal / replace_terminal / insert_terminal`だけをmutationとして許可
+- mutation後grammarで対象productionを使うshortest derivationを生成
+- max_depth内で導出不能なら`unreachable_mutation`
 - mutation結果を自動で製品上invalidと断定しない
 
 ### schema / HTML
@@ -332,8 +338,9 @@ raw machine-readable入力をfixtureにします。
 - 同seedで同列
 - seed差
 - `uniform_finite`: typed value、non-empty / duplicate拒否、宣言順sample mapping
-- `uniform_integer`: inclusive min/max
-- `categorical`: typed value、positive integer weightのみ、value重複拒否、宣言順累積区間
+- `uniform_integer`: inclusive min/max、domain size `<= 2^32`
+- `categorical`: typed value、positive integer weightのみ、value重複拒否、weight合計 `<= 2^32`、宣言順累積区間
+- 全distributionが復元抽出で同値の再出現を許可
 - case count limit
 - 一般Coverage 100%を作らない
 - `required_case_count / generated_case_count / complete`による終了条件
