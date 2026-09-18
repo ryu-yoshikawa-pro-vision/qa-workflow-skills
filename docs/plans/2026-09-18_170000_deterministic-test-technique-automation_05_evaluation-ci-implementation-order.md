@@ -71,7 +71,7 @@ CLI integration testは各代表fixtureをsubprocessで`python <script-path>`起
 - `ok / invalid_input / unsupported / limit_exceeded`は構造化結果を返せた扱いで終了code 0
 - `internal_error`は可能ならenvelopeを返して終了code 1、envelope生成不能も1
 - Agent側は終了codeだけで判断せずstdout envelopeをparseする
-- supported subsetへの`unsupported`を正常fallback扱いしない
+- `runtime_required=false`の対応subset外は`not_run` fallbackとし、実行済みscriptの`unsupported`を正常fallback扱いしない
 - supported inputで`runtime_required=false`を拒否する
 - artifact scriptのscope keyがscript別固定値 / input由来値と一致する
 - Python unavailable / runtime未実行は成果物metadataで`runtime_status=not_run / deterministic_generated=false`
@@ -584,7 +584,7 @@ repository全体は328 queryです。
    - workflowは部分完了
 
 5. runtime fallback / unavailable
-   - 対応subset外は`runtime_required=false / runtime_status=not_run / deterministic_generated=false`でLLM fallbackし、既存Skill契約を満たせば完了可能
+   - 対応subset外は`runtime_required=false / runtime_status=not_run / result_status=ready / deterministic_generated=false / fallback_reason=outside_supported_subset`でLLM fallbackし、既存Skill契約を満たせば完了可能
    - supported inputで`runtime_required=false`にした成果物はvalidator失敗
    - supported inputでPython unavailableなら`runtime_required=true / runtime_status=not_run / deterministic_generated=false`を保持し、workflowを完了にしない
    - QA成果物状態とruntime状態を分離
@@ -704,7 +704,7 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 ### `question-analysis`
 
 - `不明点 / 質問一覧`と`ブロック中範囲`へ`Model Key / Target Key`列を追加
-- runtime issueの`model_key / target_key`を質問・ブロック・再開まで保持
+- runtime issueの`runtime_unit_key / model_key / target_key`を質問・ブロック・再開まで保持
 - `再開対象 / 実行範囲`へmodel keyを流用せず、既存`QUESTION-D017`契約を維持
 
 ### `qa-workflow`
@@ -752,7 +752,7 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 - upstream Entity別content fingerprint
 - question-analysisのModel / Target保持
 - coverage-analysisのModel Key追跡
-- qa-workflowのSkill状態表 + runtime状態表
+- qa-workflowのSkill状態表 + runtime状態表（model / artifact両runtime unit）
 - legacy昇格
 
 ### Step 3: test-analysis
