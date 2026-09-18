@@ -47,7 +47,7 @@ tests/skills/runtime/
 - 案件固有方式を`risk_matrix.py`で上書きしない
 - validator側もrepository-defaultケースだけ4×4を要求する
 
-#### BVA#### BVA
+#### BVA
 
 - integer lower / upper
 - inclusive / exclusive
@@ -118,7 +118,7 @@ tests/skills/runtime/
 - boundなしcycleの拒否
 - acyclicでもpath数上限を超える場合の`limit_exceeded`
 
-#### Cause-Effect#### Cause-Effect
+#### Cause-Effect
 
 - and / or / not
 - Decision Tableへの変換
@@ -140,7 +140,7 @@ tests/skills/runtime/
 - HTML `pattern`をPython `re`で評価しない
 - 未対応dialect / keywordを黙って解釈しない
 
-#### UI pattern#### UI pattern
+#### UI pattern
 
 - 正規pattern
 - alias
@@ -159,7 +159,7 @@ tests/skills/runtime/
 - disposition済み項目
 - 構造上の閉鎖率と意味上のCoverage判定を混同しない
 
-## 3. 既存決定論的validatorの更新## 3. 既存決定論的validatorの更新
+## 3. 既存決定論的validatorの更新
 
 ### `test-analysis`
 
@@ -333,7 +333,7 @@ Skill runtime scriptと評価runtimeの違いを明記します。
 
 この段階では汎用constraint ASTやplugin frameworkを作らず、最初のscript実装に必要な契約だけ固定します。
 
-### Step 2: 小さく完全に決められる処理### Step 2: 小さく完全に決められる処理
+### Step 2: 小さく完全に決められる処理
 
 - 案件固有リスク方式と`RISK-D005`の既存不整合を先に解消
 - `risk_matrix.py`
