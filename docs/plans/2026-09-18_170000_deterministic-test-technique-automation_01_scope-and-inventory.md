@@ -93,7 +93,7 @@ generatorが返す100%等のCoverageは、**明示された正規化済みモデ
 - Authority / Risk → TR → TCNの上流閉鎖は別途確認する
 - 選択した技法はmodel、対象外、未解決、または明示的なruntime非対応へ必ず閉じる
 - 正規化済みモデルが上流の意味を十分に表しているかはsemantic evalで確認する
-- `runtime_required=true`の必須runtime unitで`result_status != ready`、`freshness_status=stale`、または`deterministic_generated=false`である場合は完了扱いしない
+- 全runtime unitで`result_status=ready / freshness_status=current`を必須とし、さらに`runtime_required=true`のunitでは`deterministic_generated=true`を必須とする
 - Dispositionによる成果物上の閉鎖と技法Coverage達成を混同しない
 
 ## 4. 本Planの実装範囲
