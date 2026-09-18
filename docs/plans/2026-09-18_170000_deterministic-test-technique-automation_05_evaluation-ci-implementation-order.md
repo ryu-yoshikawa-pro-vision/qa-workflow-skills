@@ -559,8 +559,14 @@ semantic referenceをgenerator outputから自動生成しません。
 
 8. 途中工程開始
    - ユーザーが技法を明示したTRから`test-condition-design`を開始
-   - `Selection Source=user`を保持
+   - `Selection Source=user`をmodel metadataへ保持
    - `test-analysis`の技法選択行を作るためだけに上流へ戻らない
+
+9. 実Agent runtime smoke
+   - CIだけではLLMが実際にscriptを起動したことまでは証明しない
+   - 実装完了前にAgent環境で`test-analysis`と`test-condition-design`の代表promptを各1件実行する
+   - command / script path、return code、stdout envelopeが確認できる実行logをPRの検証記録へ残す
+   - runtime適用可能なpromptで`deterministic_generated=true`になることを確認する
 
 ## 9. CI
 
@@ -577,7 +583,14 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 
 既存のdeterministic eval、semantic dataset validation、Skill validationも維持します。
 
-`validate-skills.yml`へruntime unit testを重複追加しません。
+`.github/workflows/validate-skills.yml`のrepository eval structureは次へ変更します。
+
+- trigger dataset: train 12件以上、validation 8件以上、各datasetのpositive / negative同数
+- total trigger query: 280件以上。exact 280 assertionを削除
+- train / validation disjointは維持
+- semantic dataset test: 各Skill 2件以上、repository全体28件以上。exact 2 / exact 28 assertionを削除
+
+`validate-skills.yml`へruntime unit testを重複追加しません。runtime testは`deterministic-output-evals.yml`だけで実行します。
 
 ## 10. Skill単体移植性
 
@@ -640,18 +653,23 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 
 ### `coverage-analysis`
 
+- `assets/output-template.md`のカバレッジ基準確認・カバレッジ項目の扱い・陳腐化 / 孤立分析へ`Model Key`列を追加
 - stale / fingerprint / test-design traceability
 - model_key単位のgap / stale参照
+- deterministic validatorでModel Keyの既知model照合を追加
 
 ### `question-analysis`
 
+- `不明点 / 質問一覧`と`ブロック中範囲`へ`Model Key / Target Key`列を追加
 - runtime issueの`model_key / target_key`を質問・ブロック・再開まで保持
+- `再開対象 / 実行範囲`へmodel keyを流用せず、既存`QUESTION-D017`契約を維持
 
 ### `qa-workflow`
 
+- 既存Skill状態表を維持し、別表`モデル状態`を追加
 - model単位状態を成果物metadataから再構築
 - legacy昇格
-- upstream content fingerprint / stale伝播
+- upstream Entity別content fingerprint / stale伝播
 - 完了条件
 
 ### `EVALS.md` / `ASSERTIONS.md`
@@ -717,7 +735,7 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 - Decision Table / don't-care候補
 - Cause-Effect
 - CRUD
-- grammar
+- Syntax-Based Testing
 
 ### Step 7: 組合せ
 
