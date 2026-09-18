@@ -2,396 +2,459 @@
 
 ## 1. 実行時アーキテクチャ
 
-### 1.1 基本経路
+### 1.1 処理境界
 
-実行経路を次へ変更します。
+処理順は次で固定します。
 
 ```text
-仕様 / Figma / Q&A / 実装 / 既存成果物
+現在有効な仕様根拠・既存QA成果物
   ↓
-LLM
-  ├─ 条件
-  ├─ domain / partition
-  ├─ 境界
-  ├─ 状態 / event / guard
-  ├─ 因子 / 値
-  ├─ 制約
-  ├─ flow
-  └─ 現在有効な仕様根拠
+LLM: 意味判断と正規化
   ↓
-Skill内script
-  ├─ 列挙
-  ├─ 組合せ生成
-  ├─ 成立可能性
-  ├─ カバレッジ計算
-  └─ 構造矛盾検出
+canonicalな正規化済みモデル
   ↓
-LLM
-  ├─ テスト条件 / カバレッジ項目へ統合
-  ├─ 根拠を付与
-  └─ 人間が読める成果物へ整形
+Skill runtime script: 列挙・計算・構造検査
   ↓
-既存の実行時自己検証
+機械証拠 / 構造化された未解決事項
   ↓
-開発・回帰時の決定論的 / 意味評価
+LLM: 人間向け説明、意味上の統合、必要な質問
+  ↓
+runtime構造再検査
+  ↓
+QA成果物
+  ↓
+独立validator / semantic eval
+  ↓
+qa-workflow: 再利用・変更伝播・完了判定
 ```
 
-scriptは自然言語の仕様本文を直接解釈しません。LLMがscriptの入力契約まで正規化します。
+scriptは自然言語の仕様本文を直接解釈しません。machine-readableなJSON Schema / OpenAPI / HTML属性等、このPlanで対応subsetを明示する入力はscriptが直接正規化してよく、LLMへ機械変換を戻しません。
 
-決定論性の保証単位は正規化済みモデルです。同じ仕様資料をLLMへ渡したときの正規化結果そのものが常に同一であることは保証しません。
-
-scriptへ渡した正規化済みモデルは、一時入力として消費するだけにせず、成果物内の機械証拠から再構築できる形で保持します。これにより、同じモデルを再利用してgeneratorを再実行でき、自然言語資料から毎回再正規化することを必須にしません。
+正規化済みモデルを正本とします。Coverage表、生成組合せ、Coverage Itemの機械部分、traceability集計等は派生成果物です。正本が変わった場合は派生成果物を再生成・再検証します。
 
 ### 1.2 評価runtimeとの分離
 
-`EVALS.md`の現行契約を維持します。
-
-Skill実行時に次をimportまたは直接呼び出しません。
+Skill runtimeは次をimportまたは直接呼び出しません。
 
 - `scripts/skills/evals/deterministic/`
 - `scripts/skills/evals/semantic/`
 - `skills/*/evals/deterministic/validator.py`
 
-理由は次のとおりです。
-
-- 現行`EVALS.md`が実行時自己検証と開発・回帰評価を分離している
-- Skill単体利用では`skills/<skill-name>/`だけをコピーできることが既存の移植契約
-- generatorとvalidatorが同じ実装を共有すると、同じ不具合で生成と評価が同時に誤る可能性がある
-
-実行時scriptは各Skill package配下へ置き、評価側は独立実装で出力を再計算・照合します。
+generatorとvalidatorは独立実装とし、同じ不具合で生成と評価が同時に誤る構造を避けます。
 
 ## 2. 追加する実行時script
 
 ### `test-analysis`
 
 ```text
-skills/test-analysis/
-└── scripts/
-    ├── risk_matrix.py
-    ├── technique_candidates.py
-    └── change_impact.py
+skills/test-analysis/scripts/
+├── risk_matrix.py
+├── technique_candidates.py
+├── change_impact.py
+└── environment_requirements.py
 ```
 
-`risk_matrix.py`は、案件固有のリスク評価方式が採用されていない場合だけ、確定済みの影響度・発生可能性からリポジトリ標準4×4マトリクスのレベルを返します。案件固有方式を解釈・上書きしません。
-
-`technique_candidates.py`は自然言語を読まず、次のsignalをすべて明示したJSONを入力にします。
-
-- `ordered_domain`
-- `explicit_boundaries`
-- `equivalence_classes`
-- `multiple_discrete_conditions`
-- `stateful`
-- `multiple_factors`
-- `explicit_flow`
-
-各signalは`true / false / null`のいずれかとし、key欠落は入力エラーにします。`null`は未確認を意味し、`false`と同一視しません。
-
-出力は`candidates`、`undetermined_signals`、`complete`を持ちます。`undetermined_signals`が空でない場合、scriptは未確認signalを「非該当」と解釈して候補選択を確定しません。最終採用は`test-analysis`が行います。独立技法を正規技法名として追加した場合は、validatorと発火 / semantic evalの許可集合も同時に更新します。
-
-`change_impact.py`は、変更済みnodeと明示済みの依存 / 追跡edgeだけを入力にし、graph traversalで影響候補を返します。名称類似や一般的な依存関係から意味上の影響を推測しません。
+- `risk_matrix.py`: repository-defaultまたは明示済みproject-specific schemeからrisk levelを計算する
+- `technique_candidates.py`: 正規化済みproblem signalから技法候補を返す
+- `change_impact.py`: 明示済みnode / edgeから影響候補を抽出する
+- `environment_requirements.py`: 構造化済み環境要求を重複統合し矛盾を検出する
 
 ### `test-requirement-design`
 
 ```text
-skills/test-requirement-design/
-└── scripts/
-    └── requirement_structure.py
+skills/test-requirement-design/scripts/
+└── requirement_structure.py
 ```
 
-`requirement_structure.py`は、LLMが作成したTR本文の意味を生成・修正せず、Authority / Risk → TRの閉鎖、未知参照、linked + disposed重複、既存規則に基づく最低優先度を計算します。
+TR本文は生成せず、Authority / Risk → TRの閉鎖、未知参照、Disposition重複、優先度を計算します。
 
 ### `test-condition-design`
 
 ```text
-skills/test-condition-design/
-└── scripts/
-    ├── equivalence_partitions.py
-    ├── bva.py
-    ├── decision_table.py
-    ├── combinatorial.py
-    ├── state_transition.py
-    ├── flow_paths.py
-    ├── cause_effect.py
-    ├── schema_cases.py
-    └── ui_pattern_candidates.py
+skills/test-condition-design/scripts/
+├── equivalence_partitions.py
+├── bva.py
+├── domain_testing.py
+├── decision_table.py
+├── combinatorial.py
+├── state_transition.py
+├── flow_paths.py
+├── crud_matrix.py
+├── cause_effect.py
+├── grammar_cases.py
+├── schema_cases.py
+├── ui_pattern_candidates.py
+├── test_data_requirements.py
+├── random_testing.py
+└── metamorphic.py
 ```
-
-初回から汎用framework、plugin機構、generator registryは追加しません。複数scriptで同じ有限domain判定が重複した場合だけ、Skill内の小さいhelperへ切り出します。
-
-grammar-based testingは初回実装から外すため、grammar用scriptは追加しません。
 
 ### `test-case-design`
 
 ```text
-skills/test-case-design/
-└── scripts/
-    └── case_structure.py
+skills/test-case-design/scripts/
+└── case_structure.py
 ```
 
-`case_structure.py`は、具体的な前提・操作・データ・期待結果を生成しません。LLMが作成したケース構造に対して、TCN / CI → TCの閉鎖、未知参照、linked + disposed重複、最高優先度継承、番号付き期待結果とAuthority対応の構造だけを計算・検査します。
+具体的な前提、操作、実データ、expected resultは生成せず、TCN / CI → TCの閉鎖、未知参照、優先度、Authority対応を検査します。
 
 ### `coverage-analysis`
 
 ```text
-skills/coverage-analysis/
-└── scripts/
-    └── traceability.py
+skills/coverage-analysis/scripts/
+└── traceability.py
 ```
 
-`traceability.py`は初回は`対象 / 実行範囲 = テスト設計`だけを扱います。Authority / Risk → TR → TCN → CI → TC、またはCIを明示しない契約ではTCN → TCのmissing edge、orphan、unknown referenceを算出し、E2E実装参照や実行結果の意味判断は既存`coverage-analysis`に残します。
+対象はテスト設計のAuthority / Risk → TR → TCN → CI → TC、またはCIを持たない契約でのTCN → TCです。E2E実装・実行結果は既存責務のままです。
 
-### 正規技法名の扱い
+### `qa-workflow`
 
-runtime scriptを追加しても、既存技法のCoverage modeを不要に独立技法へ分割しません。ただし、独立した問題構造・選択理由・Coverage契約を持つ新技法を実装する場合は、正規技法名を追加して構いません。
+新しい工程固有scriptは追加しません。既存の成果物再利用、上流変更伝播、局所ブロック、完了判定を、以下のversion / fingerprint / runtime状態へ対応させます。
 
-- Each Choiceは`同値分割`のCoverage基準
-- Base Choice / Pairwise / N-wise / Classification Tree由来の組合せは`Pairwise / 組合せ`の内部Coverage modeまたは入力形式
-- transition-pair / n-switch / Round-tripは`状態遷移`の内部Coverage mode
-- Cause-Effect GraphはDecision Table入力への変換
-- schema / HTML / UI属性は既存技法の候補生成元
+## 3. 共通JSON契約
 
-## 3. 共通の入出力方針
+### 3.1 strict JSON
 
-### 3.1 JSONを機械入力とする
+すべてのruntime scriptはstrict JSONを使用します。
 
-scriptへMarkdown表を直接渡しません。LLMが技法ごとのJSONへ正規化し、scriptはJSONを読み、JSONを返します。Markdown化はSkill側の責務です。
+- duplicate object keyを拒否する
+- `NaN`、`Infinity`、`-Infinity`を拒否する
+- top-level typeをscriptごとに固定する
+- UTF-8で解釈する
+- decimalはJSON numberへ丸めず、`{"type":"decimal","value":"0.1"}`のような10進文字列で扱う
+- date / datetimeは契約で許可したISO 8601形式以外を拒否する
 
-各generator invocationは、少なくとも次を持ちます。
+Python実装では、duplicate key検出用`object_pairs_hook`、非有限数拒否、`allow_nan=False`相当の出力を共通方針とします。
 
-- `model_key`: 同一成果物内で技法インスタンスを区別する局所キー
-- 技法固有入力
-- `authority_refs`: 現在有効な製品仕様根拠。`SPEC-` / `DEC-` / `ASM-`等
-- `reference_refs`: HTML / APG等の外部資料、DOM・実装事実等。製品固有expected resultのAuthorityには使わない
+### 3.2 共通入力metadata
 
-`model_key`は既存QA IDではありません。`(技法, model_key)`は1成果物内で一意とし、1つの観点IDと1つの正規化済みmodel定義だけに対応させます。同じkeyに異なるmetadata / model定義が現れた場合は入力不整合として扱います。
+各modelは少なくとも次を持ちます。
 
-### 3.2 値の表現
-
-- `integer`: JSON integer
-- `boolean`: JSON boolean
-- enum / 識別子: JSON string
-- `decimal`: `type: "decimal"`を明示し、値は10進文字列として渡して`decimal.Decimal`で解釈する
-- `date`: `YYYY-MM-DD`
-- 初回対応する日時: timezoneを持たないlocal datetimeだけとし、ISO 8601形式と最小単位を明示する
-- Pairwise等の同一factor内では値の型を混在させない
-
-runtimeのtyped valueとMarkdown成果物の文字列表現を混同しません。技法固有の機械証拠では型を復元できる表現を使用します。
-
-### 3.3 CLI契約
-
-Skill instructionからはSkill rootを基準に`scripts/<name>.py`を参照します。repo root固定pathを契約にしません。
-
-```bash
-python scripts/bva.py --input path/to/input.json
+```json
+{
+  "contract_version": "1",
+  "model_key": "pairwise-01",
+  "upstream_artifacts": [
+    {"skill": "test-requirement-design", "version": "v3"}
+  ],
+  "authority_refs": ["SPEC-001"],
+  "reference_refs": []
+}
 ```
 
-- 成功時: JSONをstdoutへ出力
-- stdoutのmachine-readable JSONはWindowsのlegacy code pageに依存しないよう`ensure_ascii=True`相当で出力する
-- 失敗時: 非0終了し、`invalid_input`、`unsupported`、`limit_exceeded`、`internal_error`を識別できる診断をstderrへ出力
-- 診断へ入力JSON全体や実データ全文をdumpしない
-- 通常実行でリポジトリファイルを変更しない
-- networkへアクセスしない
-- Pythonの`eval()` / `exec()`で制約式を実行しない
+- `contract_version`: generator入出力契約。互換性を壊す変更で更新する
+- `model_key`: 同一成果物内のmodel識別
+- `upstream_artifacts`: 正規化に使用した上流成果物version
+- `authority_refs`: 製品固有expected resultを確定できる現在有効な根拠
+- `reference_refs`: 外部標準、一般UI資料、DOM / 実装事実等の補助情報
 
-### 3.4 根拠の扱い
+### 3.3 runtime出力envelope
 
-`authority_refs`と`reference_refs`を分けます。
+成功・想定内の失敗を含め、stdoutは常に1つのJSON objectにします。
 
-- `authority_refs`: 製品固有expected resultを確定できる現在有効な仕様根拠
-- `reference_refs`: 外部標準、一般UI資料、DOM・実装事実等の補助情報
+```json
+{
+  "contract_version": "1",
+  "generator": "combinatorial",
+  "model_key": "pairwise-01",
+  "model_fingerprint": "sha256:...",
+  "runtime_status": "ok",
+  "payload": {},
+  "issues": []
+}
+```
 
-scriptはこれらを作成・置換しません。
+`runtime_status`:
 
-根拠継承は次で固定します。
+- `ok`: script責務を完了
+- `invalid_input`: 入力契約違反
+- `unsupported`: 入力は妥当だが本Planの対応契約外
+- `limit_exceeded`: 契約上限を超過
+- `internal_error`: 想定外障害
+
+`invalid_input`、`unsupported`、`limit_exceeded`、`internal_error`は非0終了にします。stderrは人間向け診断だけに使い、Skillはstdout JSONを機械処理します。入力全文、secret、tokenはstderrへ出しません。
+
+`unsupported`はruntimeの対応可否です。QA成果物自体の`対象外`、`ブロック中`、`残存リスク`等と同一視しません。runtime未対応でもLLM経路で意味上妥当な成果物を作れる場合は継続できますが、「決定論的生成済み」とは扱いません。
+
+### 3.4 構造化された未解決事項
+
+`issues`は少なくとも次を持てる共通形式にします。
+
+```json
+{
+  "issue_type": "unspecified_rule",
+  "target_key": "R4",
+  "authority_refs": ["SPEC-001"],
+  "required_information": "条件組合せに対する期待action",
+  "route_to": "question-analysis"
+}
+```
+
+自由文stderrを再解釈してroutingしません。`route_to`は既存Skill名だけを許可します。
+
+## 4. canonicalization・version・fingerprint
+
+### 4.1 canonical model
+
+model fingerprintはSHA-256で計算します。入力はUTF-8のcanonical JSONです。
+
+- object keyはUnicode code point順
+- `authority_refs` / `reference_refs`等の集合扱い配列は重複除去してsort
+- factor、condition、action、state、transition、edge、grammar production等、tie-breakや意味に入力順を使う配列は宣言順を保持
+- assignment objectのkeyはsort
+- decimal / date / datetimeは共通表現へ正規化
+- JSON whitespaceは除去
+- 非有限数は不可
+
+`model_fingerprint`はcanonical modelだけから計算し、生成結果を含めません。
+
+### 4.2 静的参照データ
+
+generator結果に影響する静的データはversionを持ちます。
+
+- `ui-pattern-catalog.json`: file content SHA-256
+- repository-default risk scheme: `risk-scheme-v1`
+- project-specific scheme: 正規化schemeのfingerprint
+- grammar / distribution / metamorphic relation等が外部assetの場合: そのasset versionまたはfingerprint
+
+同じscriptでも静的データversionが異なる場合は同じ再現条件とは扱いません。
+
+### 4.3 model_keyの安定性
+
+- 同じ技法・同じ検証責務のmodelを改訂する場合は既存`model_key`を維持する
+- 意味上別modelと判断した場合だけ新しいkeyを発行する
+- 削除済みkeyは同じ成果物系列で再利用しない
+- 同じ`(技法, model_key)`に異なる同時定義を置かない
+
+意味上同じmodelかどうかの判断はLLMに残します。keyの維持・新規発行規則は機械契約として固定します。
+
+### 4.4 上流変更
+
+同じAuthority IDでも上流成果物versionが変わり得ます。
+
+- modelは利用した上流成果物versionを保持する
+- version不一致時は`change_impact.py`またはtraceabilityで関連modelを特定する
+- 影響modelだけを`要再検証`へ戻す
+- 無関係なmodelを全再生成しない
+
+## 5. 値・順序・tie-break
+
+### 5.1 typed value
+
+対応型:
+
+- integer
+- boolean
+- string / enum
+- decimal
+- null
+- date
+- local datetime
+- fixed-offset datetime
+
+nullable factorは「1つのnon-null base type + null」を許可します。Pythonの`True == 1`等に依存せず、型を含むcanonical表現で比較します。
+
+named timezone / DST transition自体を一般BVAとして推測しません。明示されたtimezone ruleを扱う技法modelがある場合だけ処理します。
+
+### 5.2 順序
+
+- 宣言順を意味に使う配列は入力順を維持
+- 集合扱いのrefs / key集合はcanonical sort
+- factor subsetは入力factor indexのtuple昇順
+- uncovered targetはcanonical target key昇順
+- greedy completionは「新たにCoverageするtarget数が多い候補」を優先
+- 同scoreならvalue indexの辞書順
+- 生成rowは生成順を保持
+- locale依存sortを使用しない
+
+### 5.3 共通hard limit
+
+次を契約値として固定します。
+
+| 対象 | 上限 |
+| --- | ---: |
+| Decision Table / Cause-Effectのassignment | 65,536 |
+| Pairwise / N-wise / mixed-strengthのCoverage target | 100,000 |
+| feasibility search node | 1,000,000 |
+| 生成row / test data candidate / Domain point | 10,000 |
+| state sequence / flow path | 10,000 |
+| grammar生成case | 10,000 |
+| Random Testing生成case | 10,000 |
+| 1 modelの機械出力item総数 | 20,000 |
+
+上限を超えた場合は`limit_exceeded`とし、Coverage基準、strength、path深度等を自動で下げません。上限変更は実装者判断ではなく契約変更としてPlan / contract versionを更新します。
+
+## 6. 根拠・constraint
+
+### 6.1 根拠継承
 
 - model-level refsはmodel全体の既定根拠
-- element-level refsはその要素に固有の根拠
-- 生成候補のrefsは、関連するmodel-level refsと、実際にその候補へ関与したelement / constraint refsの重複除去済み和集合
-- 無関係な要素のrefsは候補へ伝播させない
-- Coverage母集団から除外する`forbidden_constraint`は1件以上の`authority_refs`を必須とする。根拠なしconstraintで成立不能扱いしない
+- element-level refsはその要素固有の根拠
+- 生成候補は、関連model-level refsと実際に関与したelement / constraint refsだけを重複除去して継承
+- 無関係な要素のrefsを伝播しない
+- `reference_refs`だけで製品固有expected resultを確定しない
 
-UI catalogやHTML / APGのURLだけをCoverage Itemの`期待挙動の根拠`へ昇格しません。
+Coverage母集団から除外するconstraintは1件以上の`authority_refs`を必須にします。
 
-### 3.5 決定論的な順序と識別
+### 6.2 constraint表現
 
-- 入力順を意味として使う場合は入力順を維持する
-- 集合計算結果は技法ごとの安定sortで固定する
-- Coverage対象は`partition_key`、`boundary_key`、`rule_key`、tuple target key、`transition_key`、`edge_key`等の技法固有keyで識別する
-- 技法横断の汎用`candidate_key`は追加しない
-- Authorityはkeyへ埋め込まず、同じCoverage対象に複数Authorityがある場合はrefsを統合できるようにする
-- generatorがCoverage対象と生成行を別に持つ技法では両者を1対1と仮定しない
-
-特にPairwise / N-wiseではt-tupleがCoverage母集団であり、1つの生成組合せが複数tupleをCoverageできます。
-
-## 4. 正規化入力
-
-### 4.1 有限domain
-
-Decision Table、組合せ、Classification Tree等ではfactor / conditionのkeyを一意にし、値集合を空にしません。
+任意Python式は受け付けません。有限domainでは部分assignmentベースの禁止制約を共通形式とします。
 
 ```json
 {
-  "model_key": "pairwise-01",
-  "factors": [
-    {"key": "role", "values": ["admin", "member"]},
-    {"key": "visibility", "values": ["public", "private"]}
-  ],
-  "forbidden_constraints": []
+  "constraint_key": "C1",
+  "assignment": {"role": "guest", "visibility": "private"},
+  "authority_refs": ["SPEC-002"]
 }
 ```
 
-入力検証では次を必須にします。
+より強いsolver表現が必要なDomain Testing等は、その技法の明示ASTへ限定します。
 
-- factor / condition keyが一意
-- 各値集合が1件以上で重複なし
-- constraintが空assignmentでない
-- constraintが参照するfactor / valueが実在する
-- Pairwiseは2因子以上
-- N-wiseは`2 <= strength <= factor数`
+## 7. stable ID・upsert・stale
 
-### 4.2 禁止制約
+### 7.1 QA ID
 
-初回実装では、部分assignment形式の禁止制約だけを共通契約にします。
+既存prefixは維持します。
 
-```json
-{
-  "forbidden_constraints": [
-    {
-      "constraint_key": "FC-01",
-      "assignment": {"role": "member", "visibility": "private"},
-      "authority_refs": ["SPEC-001"]
-    }
-  ]
-}
-```
+- `TR-`
+- `TCN-`
+- `TCN-xxx-CIyy`
+- `TC-`
 
-`constraint_key`は局所キーで、既存QA ID体系へ追加しません。constraintの`assignment`が指定したすべてのfactor=valueを満たすfull assignmentは成立不能です。
+同じ意味の既存項目を更新する場合は既存IDを維持します。新規項目だけ現在の最大番号より後ろへ採番し、削除済みIDを同じ成果物系列で再利用しません。意味上同じ項目かどうかは担当SkillのLLM判断です。
 
-全assignmentが禁止される場合は正常な100% Coverageとはせず、UNSATとして明示的に返します。
+### 7.2 Coverage targetとCI
 
-初回実装では汎用constraint AST、算術constraint、required constraint、独自文字列DSLを追加しません。必要性が確認された場合にgeneratorと独立validatorを同時に拡張します。
+技法固有target keyとCI IDの対応を機械証拠へ保持します。
 
-## 5. LLMとscriptの責務境界
+- 同じtarget keyが再生成された場合は既存CI IDを維持
+- 新しいtarget keyだけ新規CI IDを発行
+- 消滅targetのCIはstaleとし、下流TCを`要再検証`へする
+- 既存CI番号の詰め直しは行わない
 
-### LLMが担当するもの
+CI番号は`CI\d{2,}`を許可します。
 
-- 仕様から条件・因子・状態・境界・制約を抽出する
-- 現在有効な仕様根拠へ対応付ける
-- 「同じ挙動になる値の集合」を同値partitionとして定義する
-- 境界の型、step、包含 / 排他を確定する
-- Decision Tableのaction / expected resultを仕様から確定する
-- 状態遷移の合法 / 非合法を仕様根拠に基づいて定義する
-- riskの影響度・発生可能性を根拠付きで決める
-- script出力をテスト条件 / Coverage Itemへ統合する
+### 7.3 upsert
 
-### scriptが担当するもの
+再実行はappendではなくstable keyでupsertします。
 
-- 同じ入力に対して同じ計算結果を返す
-- 組合せ・境界値・rule・transition・pathを列挙する
-- 制約を適用する
-- カバレッジを計算する
-- graph上の到達不能、重複、構造矛盾、欠落を検出する。guardの意味を評価できない場合は実行可能性まで断定しない
-- 入力契約不足を明示的に失敗させる
+- 同じ`model_key + target key`は置換
+- 生成されなくなった派生行はstaleとして除去候補にする
+- 同一再実行で重複machine evidenceを作らない
+- staleな派生成果物が残る状態を完了扱いしない
 
-## 6. Skill instructionの変更
+## 8. machine evidenceとMarkdown
 
-### `test-analysis/SKILL.md`
+### 8.1 正規化済みモデル
 
-- 案件固有方式がなく`repository-default`と確定した場合だけ`scripts/risk_matrix.py`を使う
-- `technique_candidates.py`は補助候補に使い、最終技法選択はLLMが行う
-- scriptで対応可能な入力はscriptを優先する
-- script対象外・`unsupported`・Python unavailableの場合は既存LLM経路を利用できるが、その結果を「scriptで決定論的に生成・検証した」と表現しない
+`test-condition-design`を中心に、scriptへ再投入できる正規化済みJSONを成果物へ保持します。
 
-### `test-requirement-design/SKILL.md`
+`モデルキー | 観点ID | 技法 | contract version | model fingerprint | upstream version | static data version | 正規化入力JSON | runtime status | 状態`
 
-- TR本文の作成、分割 / 統合、検証責務の意味判断はLLMに残す
-- 上流集合と作成済みTR / Dispositionを`requirement_structure.py`へ渡し、閉鎖・未知参照・優先度だけを計算する
-- script結果が意味判断と衝突する場合、scriptがTR本文を修正せず、成果物を未完了として上流判断へ戻す
+人間向け説明文はLLMが生成して構いません。machine evidenceのJSON、key、ID対応、Coverage値をLLMが再計算・改変しません。
 
-### `test-condition-design/SKILL.md`
+### 8.2 machine evidenceの描画
 
-- 対応技法にscriptがあり入力契約を満たす場合はscriptを使用する
-- Coverage母集団は技法ごとの`coverage-techniques.md`契約を正本とし、共通candidate規則へ無理に変換しない
-- `invalid_input`: 構造化入力を修正できるか確認し、仕様不足なら既存停止条件へ従う
-- `unsupported`: 対応範囲外として既存LLM経路で設計可能か判断する
-- `limit_exceeded`: Coverage基準を無断で下げず、方式・scopeを再判断する
-- `internal_error`: script異常として扱い、結果を完成済みCoverageとして使わない
-- Python unavailable時も従来の意味判断は可能だが、決定論的generator利用済みとは扱わない
-- 仕様根拠のある同一partition内の値へ代表値を変更する場合は、所属をscriptで再検証する
+各scriptのpayloadからmachine evidence行を決定論的に組み立てます。Markdownの`|`、backslash、改行のescape規則を共通化し、LLMが表の機械部分を手計算しません。
 
-### `test-case-design/SKILL.md`
+validatorはMarkdown parserで再読込し、保存された正規化model / fingerprint / machine evidenceが一致することを確認します。
 
-- 具体的な前提条件、操作、テストデータ、期待結果、Oracleの意味はLLMに残す
-- ケース作成後の閉鎖・優先度・上流参照・番号付きAuthority対応を`case_structure.py`で検査する
-- scriptは曖昧な期待結果を具体化したり、未定義のOracleを補完しない
+## 9. 技法選択とmodelの閉鎖
 
-### `coverage-analysis/SKILL.md`
+`test-analysis`の技法選択用signalを機械証拠として保存します。
 
-- 初回の`traceability.py`は`対象 / 実行範囲 = テスト設計`だけで使用する
-- scriptはmissing edge / orphan / unknown reference等の構造事実を返す
-- 技法別Coverage値は`test-condition-design`成果物を利用し、本Skillで再計算しない
-- 意味上のCoverage充足、Disposition妥当性、E2E実装・実行結果の分析は従来どおりLLMに残す
+`選択キー | 適用領域 | Signals JSON | Candidates JSON | Undetermined Signals JSON | 最終採用技法 | 状態`
 
-## 7. 既存成果物との互換性
+- `true / false / null`を区別
+- 選択した技法は`test-condition-design`のmodel、対象外、未解決、runtime未対応のいずれかへ必ず閉じる
+- 選択技法だけ存在しmodel化されない状態を完了扱いしない
+- 新しい正規技法名を追加した場合はsignal / validator / semantic evalも同時に更新する
 
-既存のQA ID prefixとSkill責務は維持します。ただし、自動生成で1 TCNあたり100件以上のCoverage Itemが発生し得るため、CI番号だけ後方互換で拡張します。
+## 10. change impact graph
 
-- 現行: `TCN-001-CI01`
-- 変更後: `TCN-001-CI01`、`TCN-001-CI100`等を許可する`CI\d{2,}`
+`test-analysis`成果物へ自由文とは別に機械graphを追加します。
 
-`ID_PATTERNS["CI"]`、`ALL_ID_RE`、`test-condition-design`、`test-case-design`、`coverage-analysis`等のCI ID consumerを同時に更新します。既存2桁IDはそのまま有効です。
+`Node Key | Node Type | Source Ref`
 
-`ALL_ID_RE`は単純に`-CI\d{2,}`を任意prefixへ許可せず、CI suffixを`TCN-\d{3}`へだけ付けられる形にします。`SPEC-001-CI01`等をCIとして認識しない回帰fixtureを追加します。
+`Edge Key | From | To | Edge Type | Authority / Evidence`
 
-`test-analysis/assets/output-template.md`には分析単位の`リスク評価方式`を追加します。
+許可するedge typeは少なくとも次です。
 
-- `repository-default`: 影響度・発生可能性は1〜4で、`RISK-D004` / `RISK-D005`が標準方式を検証する
-- `project-specific:<name>`: 標準1〜4と4×4を強制せず、fixtureで明示できる契約または意味評価で確認する
+- `depends_on`
+- `traces_to`
+- `derived_from`
 
-`test-condition-design/assets/output-template.md`は、同じ技法を複数回使っても独立validatorが区別できるよう、技法固有の機械証拠へ`モデルキー`または`観点ID`を持たせます。
+`change_impact.py`はchanged nodeからedge directionに従って下流候補を辿ります。`depends_on`は「FromがToへ依存する」と定義し、To変更時は逆向きに依存元を探索します。`traces_to` / `derived_from`は上流→下流として探索します。名称類似や同一画面だけでedgeを追加しません。
 
-機械証拠のJSONセルはcompact JSONとして保存し、validatorはMarkdown parserでセルを取得した後に`json.loads()`相当で独立に解釈します。JSON objectはkey順を固定し、Markdownの`|`だけは既存parser契約に従ってescapeします。自由文のdelimiter splitを機械契約にしません。
+## 11. Skill間の機械接続
 
-### 正規化済みモデルの保存
+次の変換でLLMによるJSON再生成を挟みません。
 
-`test-condition-design`成果物には、generatorへ渡した正規化済み入力を再構築できる正本を残します。別JSONファイルを必須にはせず、Markdown内のcompact JSONセルで保持します。
+- Cause-Effect → Decision Table
+- Classification Tree normalized factors → combinatorial
+- schema / HTML constraints → EP / BVA / test data requirement
+- Domain / CRUD / state / flow等のgenerator → machine evidence
+- Coverage target → CI mapping
 
-`モデルキー | 観点ID | 技法 | 正規化入力JSON | Authority | Reference | 状態`
+直接互換payloadまたは小さいdeterministic adapterを使用します。
 
-- `正規化入力JSON`はscriptへ再投入できる技法固有入力を保持する
-- JSON objectのkey順は固定する
-- secrets / token等を入力へ含めない
-- `状態`は`ready / unresolved / unsupported / limit_exceeded`を区別し、後3者を100% Coverage完了扱いしない
-- 同じ`(技法, model_key)`に異なる入力JSONを記録しない
+意味上の統合だけLLMに残します。複数技法の結果を同じCIへまとめる場合、LLMは`merge_group`を明示し、scriptがtarget key、Authority、優先度を決定論的にunionします。
 
-最低限、次の表を追加・更新します。
+## 12. runtime自己検査の処理順
 
-- 同値分割証拠: `モデルキー | 観点ID | Partition Set | Partition Key | 種別 | Domain JSON | Representative JSON | 対応CI / Disposition`
-- BVA証拠: `モデルキー | 観点ID | Boundary Key | 境界種別 | Inclusive | Position | Value JSON | 対応CI`
-- Decision Table証拠: `モデルキー | 観点ID | Rule Key | Condition Assignment JSON | Action Vector JSON | 状態 | 対応CI / Disposition`
-- 組合せモデル: `モデルキー | 観点ID | Coverage Mode | Strength | Factors JSON | Forbidden Constraints JSON`
-- 生成組合せ: `モデルキー | カバレッジ項目ID | Assignment JSON | Covered Target Keys JSON`
-- 組合せCoverage対象: `モデルキー | Target Key | Target JSON | 状態 | 根拠 / 対応CI`
-- 状態遷移証拠: `モデルキー | 観点ID | Transition Key | From | Event | Guard | To | 対応CI`
-- 状態sequence証拠: `モデルキー | Sequence Key | Coverage Mode | Transition Keys JSON | 状態 | 対応CI / Disposition`
-- flow edge証拠: `モデルキー | Edge Key | From | To | Guard / Label | Authority`
-- flow path証拠: `モデルキー | Path Key | Coverage Mode | Edge Keys JSON | Loop Count JSON | 状態 | 対応CI / Disposition`
+`test-requirement-design`と`test-case-design`では、既存evalのruntime複製で終わらせません。
 
-同じ技法を複数回使う場合も表自体を複製せず、`モデルキー`でgroup化します。
+1. LLMがdraftを作成
+2. runtime structure scriptを実行
+3. gap / unknown / priority結果を受け取る
+4. 意味判断が不要な局所修正は機械結果に合わせる
+5. 意味判断が必要なら担当Skillまたは`question-analysis`へ戻す
+6. runtime scriptを再実行
+7. unresolvedな構造違反がない状態で成果物を確定
 
-技法ごとのCoverage母集団と生成CIの関係は1対1とは限りません。Pairwise / N-wiseではt-tuple、BVAでは境界位置、状態遷移ではtransition / sequenceをCoverage対象として独立に保持します。
+## 13. qa-workflow統合
 
-新しいSkillは追加しません。
+### 13.1 再利用
 
-## 8. 実行環境
+既存成果物の再利用条件へ次を追加します。
 
-初回runtime scriptはPython 3.11標準ライブラリを前提とします。
+- 新契約成果物はcontract versionとupstream versionが現在有効
+- model fingerprintと派生成果物が一致
+- stale / `要再検証` / unresolvedなmodelが残っていない
+- runtime実行対象なのに決定論的generator未実行である場合、その事実を保持する
 
-Agent Skills仕様では`scripts/`は任意の実行可能リソースであり、対応言語はAgent実装に依存します。このためscriptを追加する5 Skillでは、frontmatterの`compatibility`を「Skill全体がPython必須」と読める表現にせず、`Deterministic generator scripts require Python 3.11`相当の要件として記載します。
+### 13.2 legacy成果物
 
-- Python 3.11を実行できる環境: 対応scriptを通常経路として使用する
-- Pythonを実行できない環境: 既存Skillの意味判断は利用できるが、script由来の決定論的生成・Coverage保証を行ったとは表現しない
-- 利用者が決定論的generatorの使用自体を必須としている場合: runtime unavailableをその範囲の制約として明示する
+contract versionを持たない既存成果物を一律破棄しません。
 
-Skill単体コピー後もrepo root、network、外部binaryへ依存しません。
+- 従来契約を満たす間はlegacy成果物として参照可能
+- その成果物を変更・再利用して本Plan対象の決定論的処理へ入る時点で、担当Skillが正規化modelを作成して新契約へ昇格
+- legacy成果物を「決定論的生成済み」と表現しない
 
+### 13.3 局所状態
+
+workflow stateはSkill単位に加え、必要な場合に`model_key`単位の状態を保持します。
+
+- 1 modelだけ`ブロック中` / `要再検証`でも、独立した他modelは継続可能
+- 対象scopeにstale / unresolvedな必須modelが残る場合はworkflow全体を完了にしない
+- runtime `unsupported`とQA成果物の意味上の`ブロック中`を分離する
+
+### 13.4 上流変更
+
+上流成果物versionが変わった場合:
+
+1. 最も早い変更成果物を特定
+2. change impact / traceabilityで影響modelを特定
+3. 影響modelとその派生成果物だけを`要再検証`
+4. 正規化modelを更新
+5. generator再実行
+6. 下流structure / Coverageを再検査
+7. staleが消えた範囲だけ再利用可能に戻す
+
+## 14. 移植性と依存関係
+
+各Skillは単体コピー可能な既存契約を維持します。
+
+Python 3.11標準ライブラリで正しく実装できる処理は標準ライブラリを優先します。ただし、Domain Testing、mixed-strength、constraint solving等で自前実装より既存の成熟した依存関係を使う方が正確・保守可能な場合は、依存追加を禁止しません。
+
+依存追加時はライセンス、保守状況、CI、Skill単体移植性を確認し、必要なpackageをSkill契約またはrepository依存へ明示します。将来用adapterは作りません。
