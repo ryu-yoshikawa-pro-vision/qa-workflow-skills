@@ -150,73 +150,107 @@ LLMがpartition setとpartitionの意味を正規化した後を処理します�
 - fixed-offset datetime
 - length / count
 
-入力は`boundary_key`、`side=lower|upper`、boundary value、包含 / 排他、正の`step`または最小単位、`mode=2-value|3-value`、Authorityを持ちます。
+入力の`threshold`は仕様に明示された境界値そのものです。`side`は対象partitionがthresholdより上側か下側か、`inclusive`はthresholdを対象partitionへ含むかを表します。
+
+`step`はdomainごとに次で固定します。
+
+- integer / length / count: `{"unit":"integer","amount":<positive integer>}`
+- decimal: `{"unit":"decimal","amount":"<positive decimal>"}`
+- date: `{"unit":"day","amount":<positive integer>}`
+- local / fixed-offset datetime: `{"unit":"second","amount":<positive integer>}`
 
 規則:
 
 - step不明時に`±1`を仮定しない
 - decimalは`Decimal`
-- fixed-offset datetimeは同一instant比較用にUTC正規化できるが、named timezone / DST ruleを推測しない
-- exclusive境界は境界値と最初の有効値を区別
-- 2-valueは`AT`と隣接partition側の`OTHER`の2 targetを作る
-- 3-valueは`BELOW / AT / ABOVE`の3 targetを作る
+- fixed-offset datetimeの加減算は入力thresholdのoffsetを保持して行い、named timezone / DST ruleを推測しない
+- `AT = threshold`
+- 2-valueの`OTHER`は、ATが対象partition内なら反対側の最隣接値、ATが対象partition外なら対象partition側の最隣接値
+- lower inclusive: `OTHER = threshold - step`
+- lower exclusive: `OTHER = threshold + step`
+- upper inclusive: `OTHER = threshold + step`
+- upper exclusive: `OTHER = threshold - step`
+- 3-valueは`BELOW = threshold - step / AT = threshold / ABOVE = threshold + step`
 - lower / upperが同じ具体値になってもCoverage positionを別targetとして保持
 - target keyは`bva:<boundary_key>:AT|OTHER|BELOW|ABOVE`。modeで不要なpositionは生成しない
 
+生成値がdomainで表現不能、date/datetime演算がoverflow、stepが0以下の場合は`invalid_input`とし、別のstepを推測しません。
 ## 5. Domain Testing
 
 ### `domain_testing.py`
 
-本PlanではISTQB CTAL-TA v4.0の**Reliable Domain Coverage**を実装します。Simplified Domain Coverageは別modeとして実装せず、Reliableのsubsetとして別名出力もしません。
+本PlanではISTQB CTAL-TA v4.0の**Reliable Domain Coverage**を実装します。Simplified Domain Coverageは別modeとして実装しません。
 
-多変数の線形borderを扱います。一般solverを自然言語式へ適用しません。
+多変数の線形borderと、そのborderで囲まれるpartition全体を扱います。各borderの`relation`は、そのborderについて対象partitionの内側で`true`になる向きで正規化します。
 
-各borderは次を持ちます。
+入力は`partitions[]`と`borders[]`です。
+
+partition:
+
+```json
+{
+  "partition_key": "P1",
+  "expression": {
+    "op": "and",
+    "args": [
+      {"op":"border_ref","border_key":"B1"},
+      {"op":"border_ref","border_key":"B2"}
+    ]
+  },
+  "authority_refs": ["SPEC-001"]
+}
+```
+
+partition expressionは`border_ref / and / or`だけを許可します。`not`は使用せず、補集合側を対象にする場合はrelationを反転した別borderとして正規化します。
+
+border:
 
 ```json
 {
   "border_key": "B1",
+  "partition_key": "P1",
   "relation": "<=",
   "coefficients": {"x": "1", "y": "2"},
   "constant": "-10",
   "pivot_key": "x",
-  "anchor": {"y": "3"},
+  "anchor": {"y": {"type":"decimal","value":"3"}},
   "pivot_step": "1",
   "authority_refs": ["SPEC-001"]
 }
 ```
 
-式は`sum(coeff_i * value_i) + constant relation 0`です。`relation`は`< / <= / > / >= / = / !=`だけを許可し、`pivot_step`は正のrepresentable単位を必須にします。
+式は`sum(coeff_i * value_i) + constant relation 0`です。`relation`は`< / <= / > / >= / = / !=`だけを許可し、`pivot_step`は正のdecimal文字列です。
 
 `< / <= / > / >=`のReliable Domain Coverage:
 
-- closed border（`<= / >=`）: ON = border上、OFF = outside側の最隣接点、IN = inside側の最隣接点、OUT = OFFよりさらに1 step外側
-- open border（`< / >`）: OFF = border上、ON = inside側の最隣接点、IN = ONよりさらに1 step内側、OUT = outside側の最隣接点
-- target keyは`domain:<border_key>:ON|OFF|IN|OUT`
+- closed border（`<= / >=`）: ON = border上、OFF = raw relationがfalseになる最隣接点、IN = raw relationがtrueになる最隣接点、OUT = OFFよりさらに1 step外側
+- open border（`< / >`）: OFF = border上、ON = raw relationがtrueになる最隣接点、IN = ONよりさらに1 step内側、OUT = raw relationがfalseになる最隣接点
+- target keyは`domain:<partition_key>:<border_key>:ON|OFF|IN|OUT`
 
 `=`:
 
 - ON = border上
 - OFF_NEG / OFF_POS = borderの両側の最隣接点
-- target keyは`domain:<border_key>:ON|OFF_NEG|OFF_POS`
+- target keyは`domain:<partition_key>:<border_key>:ON|OFF_NEG|OFF_POS`
 
-`!=`:
+`!=`: 
 
 - OFF = border上
 - ON_NEG / ON_POS = borderの両側の最隣接点
-- target keyは`domain:<border_key>:OFF|ON_NEG|ON_POS`
+- target keyは`domain:<partition_key>:<border_key>:OFF|ON_NEG|ON_POS`
 
 処理:
 
-1. key / type / coefficient / positive stepを検証
-2. anchorを固定してpivot border valueを求める
-3. 上記relation別規則でcoverage pointを生成
-4. 各pointを元のborder式へ再代入し、意図したinside / outside / border所属を検証
-5. Authority付きconstraintと矛盾しないことを検証
-6. relation別required targetがすべて生成できたときだけCoverage completeとする
+1. partition / border key、partition参照、型、coefficient、positive stepを検証
+2. partition expressionが同partitionの既知borderだけを参照することを検証
+3. anchorを固定してpivot border valueを求める
+4. relation別規則でcoverage pointを生成
+5. 各pointを**partition expression全体**へ再代入する
+6. ON / INはpartition expressionがtrue、OFF / OUTはfalseであることを検証する。`=` / `!=`も上記定義に従ってpartition所属を検証する
+7. 対象border以外のborderが意図せず跨がれ、required pointのpartition所属を満たせない場合はblocking issueを返す
+8. relation別required targetがすべて生成できたときだけCoverage completeとする
 
-border valueまたは必要な隣接点がrepresentableでない、pivot coefficientが0、anchor不足、step不明の場合は推測せずblocking issueを返します。LLMがoverride pointを明示する場合も、scriptが所属とstep距離を検証し、規則に一致しなければ`invalid_input`とします。
-
+border valueまたは必要な隣接点がrepresentableでない、pivot coefficientが0、anchor不足、step不明、partition全体の所属条件を満たせない場合は推測しません。LLMがoverride pointを明示する場合も、scriptがpartition全体の所属とstep距離を検証し、規則に一致しなければ`invalid_input`とします。
 ## 6. Decision Table
 
 ### `decision_table.py`
