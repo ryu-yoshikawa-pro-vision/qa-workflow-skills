@@ -706,22 +706,42 @@ TR / TCN / TCは既存の3桁形式をこのPlanで変更しません。最大�
 
 ### 7.2 Coverage targetとCI
 
-技法固有target keyとCI IDの対応を機械証拠へ保持します。`materialize_coverage.py`のinputには`previous_target_id_map`を明示的に渡します。
+generator内の`target_key`はmodel内で安定させます。異なるmodel間の衝突を避けるため、成果物横断のtarget identityとして`target_ref`を追加します。
 
-- 初回でmappingがない場合、同一TCN内のtarget keyをcanonical sortし、`CI01`から順に採番する
-- 既存mappingがある場合、同じtarget keyは既存CI IDを維持する
-- 新しいtarget keyは同一TCN内の既存CI最大番号+1から採番する
-- 消滅targetのCIはstaleとし、下流TCを`要再検証`へする
+`target_ref = sha256(canonical JSON({"model_key": <model_key>, "target_key": <target_key>}))`
+
+- `target_ref`は`sha256:<64 lowercase hex>`
+- model generatorの共通post-processで各targetへ`target_ref`を付与する
+- 同じ`model_key + target_key`から常に同じ`target_ref`を得る
+- hashが同じなのにmodel_key / target_keyが異なる場合は`internal_error`
+
+`materialize_coverage.py`のinputには`previous_target_id_map[]`を明示的に渡します。
+
+```json
+[
+  {
+    "target_ref":"sha256:...",
+    "model_key":"bva-001",
+    "target_key":"bva:age-lower:AT",
+    "ci_id":"TCN-001-CI01"
+  }
+]
+```
+
+- 初回mappingがない場合、同一TCN内のtargetを`model_key`、次に`target_key`のUnicode code point辞書順でsortし、`CI01`から順に採番する
+- 既存mappingがある場合、同じ`target_ref`は既存CI IDを維持する
+- 新しい`target_ref`は同一TCN内の既存CI最大番号+1から採番する
+- 消滅target_refのCIはstaleとし、下流TCを`要再検証`へする
 - 削除済みCI番号を再利用せず、既存CI番号の詰め直しを行わない
-- previous mappingに同一target重複、同一CIの複数target、親TCN不一致があれば`invalid_input`
+- previous mappingの`target_ref`をmodel_key / target_keyから再計算し、不一致を拒否する
+- 同一target_ref重複、同一CIの複数target_ref、親TCN不一致があれば`invalid_input`
 
 CI番号は`CI\d{2,}`を許可します。
-
 ### 7.3 upsert
 
 再実行はappendではなくstable keyでupsertします。
 
-- 同じ`model_key + target key`は置換
+- 同じ`target_ref`は置換
 - 生成されなくなった派生行はstaleとして除去候補にする
 - 同一再実行で重複machine evidenceを作らない
 - staleな派生成果物が残る状態を完了扱いしない
@@ -734,7 +754,7 @@ CI番号は`CI\d{2,}`を許可します。
 
 一覧表:
 
-`モデルキー | 観点ID | 技法 | runtime contract version | generator contract version | model fingerprint | generation fingerprint | upstream entity count | static data versions | runtime status | model status | freshness | deterministic generated`
+`Runtime Unit Key | モデルキー | 観点ID | 技法 | runtime contract version | generator contract version | input fingerprint | model fingerprint | generation fingerprint | upstream entity count | static data versions | runtime status | result status | runtime required | freshness | deterministic generated | fallback reason`
 
 正規化入力JSONはMarkdown table cellへ埋め込まず、次の形式で保存します。
 
@@ -816,7 +836,7 @@ validatorはfenced JSON blockを抽出してstrict JSON decodeし、canonical化
 
 意味上の統合だけLLMに残します。複数技法の結果を同じCIへまとめる場合、LLMは`merge_group`を明示し、`materialize_coverage.py`がtarget key、Authority、Reference、優先度、test data requirementを決定論的にunionします。
 
-`merge_group` inputは`{"merge_group_key":"MG-001","target_keys":["...","..."],"authority_refs":["SPEC-001"]}`です。target keyは2件以上、重複不可、同一TCN配下だけを許可します。異なるexpected result rootを持つtargetは`invalid_input`とします。
+`merge_group` inputは`{"merge_group_key":"MG-001","target_refs":["sha256:...","sha256:..."],"authority_refs":["SPEC-001"]}`です。target refは2件以上、重複不可、同一TCN配下だけを許可します。異なるexpected result rootを持つtargetは`invalid_input`とします。
 
 ## 12. runtime自己検査の処理順
 
