@@ -571,7 +571,7 @@ validatorはfenced JSON blockを抽出してstrict JSON decodeし、canonical化
 - `true / false / null`を区別
 - `technique_candidates.py`の`complete`は`undetermined_signals`が空かだけを表す診断値であり、`complete=false`だけを理由にworkflowをブロックしない
 - ユーザー明示または有効な既存成果物由来の技法をcandidate scriptが勝手に却下しない
-- 選択した技法は`test-condition-design`のmodel、対象外、未解決、runtime未対応のいずれかへ必ず閉じる
+- 選択した技法は`test-condition-design`のmodel、対象外、未解決、または`runtime_required=false`の対応subset外fallbackへ必ず閉じる
 - 選択技法だけ存在しmodel化されない状態を完了扱いしない
 - 新しい正規技法名を追加した場合はsignal / validator / semantic evalも同時に更新する
 
@@ -631,7 +631,7 @@ validatorはfenced JSON blockを抽出してstrict JSON decodeし、canonical化
 既存成果物の再利用条件へ次を追加します。
 
 - 新契約成果物はenvelope / runtime / generator contract versionとupstream Entity content fingerprintが現在有効
-- model / generation fingerprintと派生成果物が一致
+- input / model / generation fingerprintと派生成果物が一致
 - stale / `要再検証` / unresolvedなmodelが残っていない
 - runtime実行対象なのに決定論的generator未実行である場合、その事実を保持する
 
