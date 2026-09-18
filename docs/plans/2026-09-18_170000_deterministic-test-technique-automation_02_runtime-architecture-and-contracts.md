@@ -435,7 +435,7 @@ status対応は次で固定します。
 | `ok` | `ready` | `true` | `true` | runtime結果を利用可能 |
 | `ok` | `unresolved` | `true` | `true` | 質問・意味判断後に再実行 |
 | `invalid_input` | `blocked` | `true` | `false` | 入力契約を修正 |
-| `unsupported` | `unresolved` | `false` | `false` | 対応subset外だけLLM fallback可 |
+| `unsupported` | `blocked` | `true` | `false` | 事前の対応subset判定と不一致。runtime契約違反として修正 |
 | `limit_exceeded` | `blocked` | `true` | `false` | model分割またはcontract変更が必要 |
 | `internal_error` | `blocked` | `true` | `false` | runtime不具合として扱う |
 | `not_run` | `ready`または`blocked` | 入力に従う | `false` | Python unavailable等。成果物metadataだけで表現 |
@@ -444,13 +444,13 @@ status対応は次で固定します。
 
 技法modelでは成果物metadataの`model_status`を`result_status`と同じ値にします。artifact全体scriptでは`artifact_status`を同じ値にします。
 
-LLM fallback後にQA成果物自体が利用可能なら`result_status=ready`にできます。ただし`runtime_required=true`のunitで`deterministic_generated=false`なら決定論的処理未完了であり、ワークフロー全体を`完了`にしません。`runtime_required=false`の対応subset外fallbackは、fallback結果が既存Skill契約を満たせばワークフロー完了を妨げません。
+`runtime_required=false`の対応subset外fallbackはscriptを呼ばず、成果物metadataを`runtime_status=not_run / result_status=ready / deterministic_generated=false / fallback_reason=outside_supported_subset`として保存します。fallback結果が既存Skill契約を満たせばワークフロー完了を妨げません。`runtime_required=true`のunitで`deterministic_generated=false`なら決定論的処理未完了であり、ワークフロー全体を`完了`にしません。
 
-Python unavailable時もSkillは既存LLM経路で成果物を作成できますが、本来runtime対象なら`runtime_required=true / runtime_status=not_run / deterministic_generated=false`を保持し、ワークフローは`部分完了（ブロック中あり）`または`ブロック中`とします。
+Python unavailable時もSkillは既存LLM経路で成果物を作成できますが、本来runtime対象なら`runtime_required=true / runtime_status=not_run / result_status=readyまたはblocked / deterministic_generated=false / fallback_reason=python_unavailable`を保持し、ワークフローは`部分完了（ブロック中あり）`または`ブロック中`とします。
 
 `ok`、`invalid_input`、`unsupported`、`limit_exceeded`は終了code 0とします。`internal_error`は可能なら構造化envelopeを返して終了code 1、envelope自体を生成できない障害も終了code 1とします。Agent側は終了codeだけでroutingせずstdout envelopeをparseします。stderrは人間向け診断だけに使い、入力全文、secret、tokenを出しません。
 
-本Planで対応subsetとして定義した入力に対して`unsupported`を返した場合はruntime契約違反として修正対象にし、LLM fallbackで正常扱いしません。
+`unsupported`は正常なfallback経路に使いません。対応subset外は事前に`runtime_required=false`へ分類して`not_run` fallbackとし、実行したscriptが`unsupported`を返した場合はruntime契約または正規化の不一致として修正対象にします。
 ### 3.4 構造化された未解決事項
 
 `issues`は次のfieldを持ちます。
@@ -831,8 +831,9 @@ validatorはfenced JSON blockを抽出してstrict JSON decodeし、canonical化
 
 既存成果物の再利用条件へ次を追加します。
 
-- 新契約成果物はenvelope / runtime / generator contract versionとupstream Entity content fingerprintが現在有効
-- input / model / generation fingerprintと派生成果物が一致
+- `runtime_required=true`の新契約成果物はenvelope / runtime / generator contract versionとupstream Entity content fingerprintが現在有効
+- `runtime_required=true`ではinput / model / generation fingerprintと派生成果物が一致
+- `runtime_required=false`のfallback成果物はfingerprintを決定論的再利用条件に使わず、既存Skill契約と上流Authorityの有効性で再利用可否を判断する
 - stale / `要再検証` / unresolvedなmodelが残っていない
 - runtime実行対象なのに決定論的generator未実行である場合、その事実を保持する
 
