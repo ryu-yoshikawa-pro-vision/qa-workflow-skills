@@ -43,7 +43,7 @@ scriptは影響度・発生可能性を決めず、validator実装をimportし�
 - エラー推測
 - シナリオ / ユースケース
 
-scriptは`true`の構造signalから候補を返すだけで、`null`を`false`として候補除外しません。Error Guessingは過去不具合等の意味根拠が必要なため自動選択しません。
+scriptは`true`の構造signalから候補を返し、`candidates`、`undetermined_signals`、`complete`を返します。`null`を`false`として候補除外せず、未確認signalが残る場合は最終候補集合を確定済みとは扱いません。Error Guessingは過去不具合等の意味根拠が必要なため自動選択しません。
 
 ## 3. 同値分割
 
@@ -85,13 +85,16 @@ scriptは`true`の構造signalから候補を返すだけで、`null`を`false`�
 - representative valueが入力にある場合の所属検証
 - enum、整数範囲等で一意に候補を作れる場合の代表値候補生成
 - partition Coverage
-- Each Choice: 複数partition setの各partitionが少なくとも1つのCoverage Itemまたは妥当なDispositionへ閉じていることの確認
+- 成果物上の閉鎖: 各partitionがCoverage Itemまたは妥当なDispositionのどちらか一方へ位置づいていること
+- Each Choice Coverage: 対象内かつ成立可能な各partitionが、実際に1件以上のCoverage ItemでCoverageされていること
 
 異なるpartition set間のdomainは重複していてよく、相互排他検査をしません。
 
 整数rangeの代表値を機械生成しても「業務上代表的」とは扱いません。仕様根拠のある同一partition内の別値へ変更する場合は、変更後の所属をscriptで再検証します。
 
 複数partition set間の具体的な値組合せ最適化は同値分割scriptの責務にせず、必要な場合だけ明示的に`combinatorial.py`へ渡します。
+
+`対象外`、`別テストレベル`、`残存リスク`、`ブロック中`へ閉じたpartitionを「Coverage済み」とは数えません。`成立不能`としてCoverage母集団から外す場合は、成立不能を示すAuthority根拠を必須にします。`unresolved` / `unsupported`が残るmodelではEach Choice 100%を宣言しません。
 
 ## 4. 境界値分析
 
@@ -158,6 +161,13 @@ scriptは`true`の構造signalから候補を返すだけで、`null`を`false`�
 
 actionは複数同時に成立できます。`actions`がすべて`false`のknown ruleも有効なruleであり、rule未定義とは区別します。
 
+各known ruleのaction vectorは、宣言済みaction keyの集合と完全一致させます。
+
+- action key欠落を暗黙の`false`へ変換しない
+- 未知action keyを拒否する
+- 初回boolean subsetでは各action値をbooleanに限定する
+- key欠落、未知key、型不一致は`invalid_input`とする
+
 処理順:
 
 1. condition / action / rule keyと値集合を検証する
@@ -170,6 +180,8 @@ actionは複数同時に成立できます。`actions`がすべて`false`のknow
 8. 成立可能rule Coverageを算出する
 
 成立不能rule、unspecified ruleを無言で捨てません。未定義assignmentへscriptがactionを補完しません。
+
+`unspecified`が残る場合は、そのassignmentをCoverage済みruleへ数えず、期待挙動不足として既存`question-analysis` / ブロック中の経路へ戻します。同一assignmentへ異なるaction vectorが定義された矛盾も同様に未解決として返し、scriptがどちらかを採用しません。
 
 初回実装ではdon't-care化やBoolean minimizationを行いません。
 
@@ -224,10 +236,12 @@ constraint付きBase Choiceは、base再選択規則をこのbranchで新設せ�
 
 1. factor組合せと値からt-tuple候補を列挙する
 2. 各tupleについて、部分assignment禁止制約を使った決定論的backtrackingで少なくとも1つのfull assignmentへcompletion可能か確認する
-3. completion可能なtupleだけをCoverage母集団とする
-4. 未Coverage tupleを安定順で選び、そのtupleを含むfull assignmentを決定論的にcompletionする
-5. completion時は未Coverage tupleを多く含む値を優先し、tie-breakを固定する
-6. 生成したfull assignmentがCoverageするtupleを集合から除き、0件になるまで繰り返す
+3. feasibility結果を`SAT / UNSAT / limit_exceeded`へ分ける。探索空間を完全に調べ切った場合だけ`UNSAT`とする
+4. `SAT`のtupleだけをCoverage母集団とし、`UNSAT`はAuthority付き制約根拠とともに成立不能として保持する
+5. `limit_exceeded`が1件でも残る場合はCoverage母集団が確定していないため100% Coverageを宣言しない
+6. 未Coverage tupleを安定順で選び、そのtupleを含むfull assignmentを決定論的にcompletionする
+7. completion時は未Coverage tupleを多く含む値を優先し、tie-breakを固定する
+8. 生成したfull assignmentがCoverageするtupleを集合から除き、0件になるまで繰り返す
 
 最小行数は保証しません。要件は成立可能t-tupleの100% Coverageです。
 
@@ -341,10 +355,15 @@ start stateとend stateが同一で、途中stateを重複しないloopを構造
 - edge Coverage
 - graph上のunreachable node
 - terminalへ到達しない構造path
+- inputでloop対象・代表回数・最大回数が明示された場合のsimple loop Coverage
 
-scriptはgraph構造からmain / alternativeを推測しません。
+scriptはgraph構造からmain / alternative、typical loop回数、最大loop回数を推測しません。
 
-loop boundは「同じedgeを追加で通過できる最大回数」として固定し、boundなしcycleを拒否します。acyclic graphでもpath数がhard limitを超える場合は`limit_exceeded`とします。
+初回対応はsingle-threaded flow graphに限定します。fork / join、並行branch、interleaving semanticsを含むflowは`unsupported`とし、通常のpath列挙で直列化しません。
+
+loop boundは「同じedgeを追加で通過できる最大回数」として固定し、boundなしcycleを拒否します。simple loop Coverageを要求する場合は、0回、1回、仕様で明示された代表回数、仕様上の最大回数のうち入力で定義されたものをCoverage対象として保持します。acyclic graphでもpath数がhard limitを超える場合は`limit_exceeded`とします。
+
+edge証拠とpath証拠は分離し、1つのedgeが複数pathへ含まれることを許可します。
 
 ## 10. Cause-Effect Graph
 
@@ -379,7 +398,9 @@ effect式はcauseだけを参照し、effect同士の参照は初回非対応と
 }
 ```
 
-scriptはcause assignmentを列挙して各effectをboolean評価し、`effect_key -> boolean`のaction vectorとして`decision_table.py`へ渡します。
+scriptはcause assignmentを列挙して各effectをboolean評価し、`effect_key -> boolean`の完全なaction vectorとして`decision_table.py`へ渡します。
+
+cause数と最大assignment数にhard limitを設けます。全assignmentは最大`2^n`件になるため、上限を超えた場合は`limit_exceeded`とし、部分列挙を完全なDecision Tableへ渡しません。
 
 未知cause参照、重複key、空`and / or`を`invalid_input`とします。自然言語論理式をparseするDSLは追加しません。
 
@@ -415,7 +436,7 @@ scriptはcause assignmentを列挙して各effectをboolean評価し、`effect_k
 - `openapi-3.0-schema`
 - `html-form-control`
 
-normalization側でdialect差を保持します。
+normalization側でdialect差を保持します。raw JSON Schema / OpenAPI documentからこの正規化形式へ変換する意味判断はLLM / 対象調査の責務で、`schema_cases.py`の責務ではありません。
 
 - JSON Schema 2020-12の`exclusiveMinimum` / `exclusiveMaximum`は数値境界として正規化する
 - OpenAPI 3.0のboolean `exclusiveMinimum` / `exclusiveMaximum`は`minimum` / `maximum`と組み合わせて正規化する
@@ -487,7 +508,54 @@ BVA、partition、schema、enum、組合せの生成結果を`test-condition-des
 
 IDが接続されているだけで意味上のCoverageが成立したとは判定しません。`充足 / 部分充足 / 未充足`、Disposition妥当性、E2E実装・実行結果の分析は既存`coverage-analysis`に残します。
 
-## 15. scriptが生成してはいけないもの
+## 15. 変更影響分析
+
+### `test-analysis/scripts/change_impact.py`
+
+入力:
+
+- changed node IDs
+- node type
+- 明示済みdependency / traceability edges
+- 対象とする下流node type
+
+処理:
+
+- 変更nodeから明示edgeを辿った構造的な影響候補抽出
+- impacted Authority / TR / TCN / CI / TCの重複除去
+- unknown node / dangling edgeの検出
+- deterministic ordering
+
+scriptは名称類似、同一画面、一般的な実装知識等から新しいimpact edgeを作りません。「構造上接続されていないが意味上影響する可能性」は`test-analysis`のLLM判断に残します。
+
+## 16. テスト要求の構造処理
+
+### `test-requirement-design/scripts/requirement_structure.py`
+
+LLMが作成したTRとDispositionを入力にし、既存validatorと独立実装で次を計算します。
+
+- Authority / RiskがTRまたはDispositionのどちらか一方へ閉じているか
+- unknown upstream ID
+- linked + disposed重複
+- 関連する最高Product Riskからの最低優先度
+
+TR本文、TRの分割 / 統合、検証責務の意味は変更しません。
+
+## 17. テストケースの構造処理
+
+### `test-case-design/scripts/case_structure.py`
+
+LLMが作成したTCとDispositionを入力にし、既存validatorと独立実装で次を計算します。
+
+- TCN / CIがTCまたはDispositionのどちらか一方へ閉じているか
+- unknown upstream ID
+- linked + disposed重複
+- 関連Coverage Itemからの最高優先度
+- 番号付き期待結果とAuthority対応の構造
+
+具体的な前提条件、操作、テストデータ、期待結果、Oracleは生成・修正しません。
+
+## 18. scriptが生成してはいけないもの
 
 どのgeneratorでも次は生成しません。
 
