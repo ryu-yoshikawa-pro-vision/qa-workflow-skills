@@ -429,6 +429,30 @@ validatorはruntime traceabilityと独立にmissing / orphan / unknown / stale�
 - runtime未実行 / unsupportedとQA成果物状態の分離
 - legacy成果物の昇格
 
+### output eval fixture schema
+
+runtime対応Skillの`evals/output/cases/*/expected.json`では、既存fieldに加えて必要なcaseだけ次の`runtime_contract` objectを持てるようにします。
+
+```json
+{
+  "runtime_contract": {
+    "upstream_entities": [
+      {"skill":"spec-analysis","entity_ref":"SPEC-001","content_fingerprint":"sha256:..."}
+    ],
+    "expected_target_keys": [],
+    "expected_runtime_status": "ok",
+    "expected_model_status": "ready",
+    "expected_deterministic_generated": true,
+    "expected_freshness_status": "current",
+    "expected_target_id_map": {}
+  }
+}
+```
+
+- expected target / Coverageは手書きfixtureから独立計算または明示し、generator出力をexpectedへコピーしない
+- `expected_target_id_map`はstateful materialize caseだけ使用する
+- validatorは保存済みmodelからfingerprintを独立再計算し、fixtureに書いたhash文字列を盲信しない
+- upstream Entity差分caseでは無関係Entityの変更が対象modelをstaleにしないことを確認する
 ## 7. semantic eval
 
 維持・追加する主な確認:
@@ -516,7 +540,7 @@ semantic referenceをgenerator outputから自動生成しません。
    - 1 modelだけ未解決
    - `question-analysis`往復で`model_key / target_key`維持
    - 独立modelは継続
-   - workflow状態表がなくても成果物metadataから状態再構築
+   - 成果物metadataから状態を再構築し、qa-workflow出力時は既存Skill状態表と新しいモデル状態表へ反映
    - workflowは部分完了
 
 5. runtime unsupported
@@ -788,7 +812,7 @@ Plan完了には次をすべて満たす必要があります。
 - runtime出力と保存machine evidenceの一致をvalidatorが確認する
 - supported subsetを`unsupported`でLLM fallbackしない
 - model内Coverageと仕様全体Coverageを混同しない
-- qa-workflowがupstream意味変更、generation変更、stale、局所ブロック、legacyを処理できる
+- qa-workflowがupstream Entity内容変更、generation変更、stale、局所ブロック、legacyを処理できる
 - question-analysis往復でmodel / targetが失われない
 - 途中工程開始と`Selection Source`が既存workflowを壊さない
 - runtime適用可能な代表fixtureでruntime使用が統合評価から確認できる
