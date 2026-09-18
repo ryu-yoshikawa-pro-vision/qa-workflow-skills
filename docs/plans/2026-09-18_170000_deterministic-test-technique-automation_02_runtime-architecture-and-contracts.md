@@ -591,12 +591,36 @@ generator結果に影響する静的データはversionを持ちます。
 
 ### 4.3 model_keyの安定性
 
+技法slugは次で固定します。
+
+| 技法 / model | slug |
+| --- | --- |
+| 同値分割 | `ep` |
+| 境界値分析 | `bva` |
+| Domain Testing | `domain` |
+| Decision Table | `decision` |
+| Pairwise / 組合せ | `comb` |
+| Classification Tree | `classification` |
+| 状態遷移 | `state` |
+| シナリオ / Use Case | `flow` |
+| CRUD Testing | `crud` |
+| Cause-Effect Graph | `cause-effect` |
+| Syntax-Based Testing | `syntax` |
+| schema / HTML constraint | `schema` |
+| UI pattern | `ui` |
+| Random Testing | `random` |
+| Metamorphic Testing | `metamorphic` |
+
+`model_key`は`<slug>-\d{3,}`です。
+
+- qa-workflowが再利用元として選んだ直前の`test-condition-design`成果物を「同じ成果物系列」とする。再利用元がない場合は新しい系列
 - 同じ技法・同じ検証責務のmodelを改訂する場合は既存`model_key`を維持する
-- 意味上別modelと判断した場合だけ新しいkeyを発行する
-- 削除済みkeyは同じ成果物系列で再利用しない
+- 意味上別modelと判断した場合だけ、同じslugの既存最大番号+1で新しいkeyを発行する
+- 新しい系列では各slugを001から開始する
+- 削除済みkeyは同じ系列で再利用しない
 - 同じ`(技法, model_key)`に異なる同時定義を置かない
 
-意味上同じmodelかどうかの判断はLLMに残します。keyの維持・新規発行規則は機械契約として固定します。
+意味上同じmodelかどうかの判断はLLMに残します。番号の割当てだけを機械規則として固定します。
 
 ### 4.4 上流変更
 
@@ -723,7 +747,7 @@ Coverage母集団から除外するconstraintは1件以上の`authority_refs`を
 - `TCN-xxx-CIyy`
 - `TC-`
 
-同じ意味の既存項目を再利用できる場合は既存IDを維持します。TR / TCN / TCの意味上の同一性判断は担当SkillのLLM責務であり、runtimeがsemantic matchingして再採番しません。新規項目だけ現在の最大番号より後ろへ採番し、削除済みIDを同じ成果物系列で再利用しません。
+同じ意味の既存項目を再利用できる場合は既存IDを維持します。TR / TCN / TCの意味上の同一性判断は担当SkillのLLM責務であり、runtimeがsemantic matchingして再採番しません。qa-workflowが再利用元として選んだ同種成果物を同じ系列とし、新規項目だけその成果物内の最大番号+1で採番します。再利用元がない新規成果物では001から開始し、削除済みIDを同じ系列で再利用しません。
 
 TR / TCN / TCは既存の3桁形式をこのPlanで変更しません。最大番号が999に達した成果物系列で新規IDが必要な場合は削除済みIDを再利用せず、`id_space_exhausted` issueとしてブロックします。CIは`CI\d{2,}`のため同じ上限を持ちません。
 
@@ -797,7 +821,7 @@ validatorはfenced JSON blockを抽出してstrict JSON decodeし、canonical化
 
 `選択キー | 適用領域 | Selection Source | Signals JSON | Candidates JSON | Undetermined Signals JSON | 最終採用技法 | 状態`
 
-`Selection Source`は`analysis / user / existing_artifact`のいずれかです。
+`Selection Source`は`analysis / user / existing_artifact`のいずれかです。技法modelのmetadataにも`selection_source`を必須で保存します。`test-analysis`を通った場合はその選択行からコピーし、途中工程開始でユーザーが技法を明示した場合は`user`、再利用した既存modelは`existing_artifact`とします。したがって`test-analysis`成果物が存在しなくても選択元は失われません。
 
 - `true / false / null`を区別
 - `technique_candidates.py`の`complete`は`undetermined_signals`が空かだけを表す診断値であり、`complete=false`だけを理由にworkflowをブロックしない
