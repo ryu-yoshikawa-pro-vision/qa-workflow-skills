@@ -261,12 +261,29 @@ generator結果に影響する静的データはversionを持ちます。
 
 ### 4.4 上流変更
 
-同じAuthority IDでも上流成果物versionが変わり得ます。
+同じIDでも上流成果物の意味は変わり得るため、自由記述のversionやMarkdown全文hashではなく、実際に消費した意味データから`semantic_fingerprint`を計算します。
 
-- modelは利用した上流成果物versionを保持する
-- version不一致時は`change_impact.py`またはtraceabilityで関連modelを特定する
-- 影響modelだけを`要再検証`へ戻す
-- 無関係なmodelを全再生成しない
+最初のAuthority入力では、`spec-analysis`成果物のうち実際に利用した「現在有効な仕様根拠」行について、少なくとも次をcanonical化します。
+
+- 仕様根拠ID
+- 種別
+- 現在有効な内容
+- 適用範囲
+- 情報源 / 正本一覧
+- 関係
+- 関連仕様根拠ID
+
+人間向け説明文、見出し、表記だけの変更はfingerprint対象にしません。`spec-analysis`へfingerprint字段を必須追加せず、最初に消費するruntime側で上記意味データから算出できます。
+
+以降のQA成果物は、下流が実際に利用する正規テーブル / machine evidence / model metadataだけをsemantic fingerprint対象とします。
+
+- `test-analysis`: Product Risk、技法選択machine evidence、change graph、環境要求
+- `test-requirement-design`: TRと上流Disposition
+- `test-condition-design`: TCN、正規化model、target → CI mapping、Disposition
+- `test-case-design`: TCとDisposition
+- `coverage-analysis`: coverage / stale判定のmachine evidence
+
+modelは利用した`semantic_fingerprint`を`upstream_artifacts`へ保持します。不一致時は`change_impact.py`またはtraceabilityで関連modelを特定し、影響modelだけを`要再検証`へ戻します。無関係なmodelを全再生成しません。
 
 ## 5. 値・順序・tie-break
 
