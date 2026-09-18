@@ -133,7 +133,7 @@ generatorが返す100%等のCoverageは、**明示された正規化済みモデ
 
 8. 評価契約
    - 新規技法に伴う`test-analysis` / `test-condition-design`の発火評価を更新する
-   - trigger evalは全Skillでtrain 12件以上 / validation 8件以上、各datasetのpositive / negative同数を維持し、新規技法のselection / design境界を追加する
+   - trigger evalは`test-analysis` / `test-condition-design`をtrain 24件（12 / 12）・validation 20件（10 / 10）、その他12 Skillをtrain 12件（6 / 6）・validation 8件（4 / 4）とし、repository全体328件へ固定する
    - `adversarial-review`には技法ロジックを複製せず、新規技法の代表的な誤用を検出するsemantic fixtureだけを追加する
 
 ## 5. 本Planの対象外
