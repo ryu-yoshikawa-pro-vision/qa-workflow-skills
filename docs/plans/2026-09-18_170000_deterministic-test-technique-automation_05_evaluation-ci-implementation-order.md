@@ -374,9 +374,11 @@ raw machine-readable入力をfixtureにします。
 - qa-workflowの再利用元有無で成果物系列を一意に判定
 - TR / TCN / TCは意味上同一の既存Entityを再利用できる場合だけID維持し、runtimeがsemantic matchingしない
 - TR / TCN / TCの新規IDは最大番号+1、999到達後は`id_space_exhausted`
-- 初回mappingはcanonical target順でCI01から採番
-- existing mappingは同一TCN内で維持し、新targetだけ最大番号+1
-- duplicate mapping / parent mismatchを拒否
+- `target_ref = sha256({model_key,target_key})`を独立再計算
+- 同じTCN内に同名target keyを持つ複数modelがあってもtarget_refが衝突しない
+- 初回mappingは`model_key → target_key`順でCI01から採番
+- existing mappingは同一target_refで維持し、新target_refだけ最大番号+1
+- target_ref内容不一致、duplicate mapping、parent mismatchを拒否
 - 消滅targetで下流`要再検証`
 - 同じ実行を2回行ってmachine evidenceが重複しない
 - stale rowを完了扱いしない
@@ -476,13 +478,13 @@ runtime対応Skillの`evals/output/cases/*/expected.json`では、既存fieldに
     "expected_deterministic_generated": true,
     "expected_fallback_reason": null,
     "expected_freshness_status": "current",
-    "expected_target_id_map": {}
+    "expected_target_id_map": []
   }
 }
 ```
 
 - expected target / Coverageは手書きfixtureから独立計算または明示し、generator出力をexpectedへコピーしない
-- `expected_target_id_map`はstateful materialize caseだけ使用する
+- `expected_target_id_map`はstateful materialize caseだけ使用し、`{target_ref, model_key, target_key, ci_id}`配列で保持する
 - validatorは保存済みruntime inputから`input_fingerprint`、model scriptでは`model_fingerprint`、全scriptで`generation_fingerprint`を独立再計算し、fixtureに書いたhash文字列を盲信しない
 - upstream Entity差分caseでは無関係Entityの変更が対象modelをstaleにしないことを確認する
 ## 7. semantic eval
@@ -500,7 +502,7 @@ runtime対応Skillの`evals/output/cases/*/expected.json`では、既存fieldに
 - metamorphic relation
 - UI pattern分類
 - test data / environment requirement
-- merge groupの意味上の妥当性
+- merge groupの意味上の妥当性と`target_refs[]`の同一TCN制約
 - model内100%を対象仕様全体100%と誤認しない
 - scriptがexpected resultを創作していない
 
@@ -750,7 +752,7 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 - technique slugとstable model key採番
 - qa-workflow再利用元による成果物系列判定
 - 既存TR / TCN / TCのID再利用規則と999上限
-- previous target mappingを入力にしたtarget → CI materialize
+- previous target_ref mappingを入力にしたtarget_ref → CI materialize
 - upsert / stale / freshness status
 - upstream Entity別content fingerprint
 - question-analysisのModel / Target保持
@@ -814,7 +816,7 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 ### Step 10: materialize / test-case / traceability
 
 - `materialize_coverage.py`
-- target → CI mapping / upsert
+- target_ref → CI mapping / upsert
 - merge group union
 - machine evidence描画
 - case structure
@@ -876,7 +878,7 @@ Plan完了には次をすべて満たす必要があります。
 - CLI / strict JSON / envelope / canonicalization / envelope・runtime・generator contract versionが実装済み
 - upstream Entity別content fingerprint、static data versions、input / model / generation fingerprintが再現可能
 - 正規化modelのMarkdown fenced JSON round-tripが成立する
-- stable model key / 成果物系列 / 既存Entity ID再利用 / previous mappingを含むCI materializeが契約どおり
+- stable model key / target_ref / 成果物系列 / 既存Entity ID再利用 / previous mappingを含むCI materializeが契約どおり
 - 再実行がupsertされ重複machine evidenceを作らない
 - stale派生成果物を完了扱いしない
 - 選択技法がmodelまたは明示的な扱いへ閉じる
