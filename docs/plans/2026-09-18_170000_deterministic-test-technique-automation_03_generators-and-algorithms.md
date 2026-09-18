@@ -600,6 +600,7 @@ machine-readableな入力はscriptが直接正規化します。
 ### JSON Schema 2020-12
 
 - `type`
+- `$defs`（local JSON Pointer `$ref`の参照先containerとしてのみ使用）
 - `properties`
 - `items`
 - `enum`
@@ -614,13 +615,16 @@ machine-readableな入力はscriptが直接正規化します。
 
 `$ref`はruntime内でnetwork解決しません。同一入力document内のlocal JSON Pointerだけ対応し、外部URI referenceは事前dereference済み入力を要求します。local `$ref`の循環参照はその循環subtreeを`unsupported`とします。
 
-validationへ影響しないannotationとして無視してよいkeywordは`title / description / $comment / default / examples`だけです。その他の未知keywordは黙って無視せず`unsupported`とします。
+`type`は単一type文字列、または`[<non-null type>, "null"]` / `["null", <non-null type>]`の2要素だけを対応します。2要素形式は`allows_null=true`へ正規化し、それ以外のunion typeは`unsupported`です。
+
+`$schema / $id`はdocument metadataとして保持しますがvalidation Coverageへ使用しません。validationへ影響しないannotationとして無視してよいkeywordは`title / description / $comment / default / examples`だけです。その他の未知keywordは黙って無視せず`unsupported`とします。
 
 ### OpenAPI 3.0 Schema
 
 - 上記相当keyword
 - boolean `exclusiveMinimum` / `exclusiveMaximum`
 - `nullable`
+- `nullable=true`はsingle base type + nullの`allows_null=true`へ正規化する
 - annotationとして`title / description / default / example / deprecated / readOnly / writeOnly`は保持してもvalidation Coverageへ使用しない
 
 ### HTML form control
