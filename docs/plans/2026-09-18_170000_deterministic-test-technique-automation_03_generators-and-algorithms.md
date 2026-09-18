@@ -559,32 +559,33 @@ effectはcauseだけを参照します。循環参照は禁止します。
 ```json
 {
   "start": "expr",
-  "productions": {
-    "expr": [
-      [{"terminal":"a"}],
-      [{"nonterminal":"expr"},{"terminal":"+"},{"terminal":"a"}]
-    ]
-  },
-  "max_depth": 4
+  "productions": [
+    {"production_key":"P-001","lhs":"expr","rhs":[{"terminal":"a"}]},
+    {"production_key":"P-002","lhs":"expr","rhs":[{"nonterminal":"expr"},{"terminal":"+"},{"terminal":"a"}]}
+  ],
+  "max_depth": 4,
+  "mutations": []
 }
 ```
 
 処理:
 
 - undefined nonterminal / unreachable production
-- left recursion等によるdepth超過
-- 各productionを少なくとも1回使うshortest valid derivation
+- recursionによるdepth超過
+- 各productionを少なくとも1回使うvalid derivation
 - bounded valid case生成
 - production Coverage
 
+production Coverage targetごとに、対象productionを1回以上含むderivationのうち**production適用回数が最小**のものを選びます。同じ適用回数なら、適用した`production_key`列のUnicode code point辞書順で最小のderivationを選びます。
+
 invalid syntaxは補集合から生成しません。明示mutationは`delete_terminal / replace_terminal / insert_terminal`だけを許可します。
 
-- `delete_terminal`: production内の指定terminal indexを削除
-- `replace_terminal`: 指定terminal indexを明示replacement文字列へ置換
-- `insert_terminal`: 指定位置へ明示terminal文字列を挿入
+- `delete_terminal`: `symbol_index`が指すterminal itemを削除
+- `replace_terminal`: `symbol_index`が指すterminal itemを明示replacement文字列へ置換
+- `insert_terminal`: RHS配列の`symbol_index`位置へ明示terminal文字列を挿入。0..len(rhs)を許可
+- delete / replaceで対象itemがnonterminalなら`invalid_input`
 
-mutation結果は`invalid_candidate`であり、scriptだけで「必ずinvalid」と断定しません。製品上invalidであることをexpected resultへ昇格するにはAuthorityまたはLLMの意味判断を必須にします。
-
+mutation結果は`invalid_candidate`であり、scriptだけで製品上invalidと断定しません。製品上invalidであることをexpected resultへ昇格するにはAuthorityまたはLLMの意味判断を必須にします。
 ## 14. schema / HTML
 
 ### `schema_cases.py`
@@ -608,13 +609,16 @@ machine-readableな入力はscriptが直接正規化します。
 - `minItems` / `maxItems`
 - `minProperties` / `maxProperties`
 
-`$ref`はruntime内でnetwork解決しません。同一入力document内のlocal JSON Pointerだけ対応し、外部URI referenceは事前dereference済み入力を要求します。local `$ref`の循環参照はこのPlanでは展開せず、その循環subtreeを`unsupported`とします。
+`$ref`はruntime内でnetwork解決しません。同一入力document内のlocal JSON Pointerだけ対応し、外部URI referenceは事前dereference済み入力を要求します。local `$ref`の循環参照はその循環subtreeを`unsupported`とします。
+
+validationへ影響しないannotationとして無視してよいkeywordは`title / description / $comment / default / examples`だけです。その他の未知keywordは黙って無視せず`unsupported`とします。
 
 ### OpenAPI 3.0 Schema
 
 - 上記相当keyword
 - boolean `exclusiveMinimum` / `exclusiveMaximum`
 - `nullable`
+- annotationとして`title / description / default / example / deprecated / readOnly / writeOnly`は保持してもvalidation Coverageへ使用しない
 
 ### HTML form control
 
@@ -623,16 +627,31 @@ machine-readableな入力はscriptが直接正規化します。
 - min / max
 - minlength / maxlength
 - step
+- pattern
 - disabled
 - readonly
 - multiple
 
-`pattern`は存在を検出しreferenceへ残しますが、ECMAScript RegExpとPython `re`を同一視して具体値生成しません。
+`pattern`は文字列としてreference / metadataへ保持しますが、ECMAScript RegExpとPython `re`を同一視して具体値生成しません。
 
-`allOf / anyOf / oneOf / not / if / then / else`等、対応subset外でvalidation意味を変えるkeywordは`unsupported`です。unsupported keywordがvalidation意味へ影響するsubtreeだけを`unsupported`として切り離し、独立して評価できる別property / itemは継続できます。親schemaのvalidation意味をunsupported keywordが左右する場合は、その親subtree全体を`unsupported`にします。annotation keywordだけではschema全体を拒否しません。
+`multipleOf`と数値系HTML `step`は`grid` constraintへ正規化します。
 
-正規化後のconstraintはEP / BVA / combinatorial / test data requirementへ直接渡します。
+```json
+{
+  "operator":"grid",
+  "base":{"type":"decimal","value":"0"},
+  "step":{"type":"decimal","value":"0.5"}
+}
+```
 
+- JSON Schema `multipleOf=m`: `base=0 / step=m`
+- HTML `step=s`: `min`が存在する数値controlだけ`base=min / step=s`として対応
+- HTML `step`が存在して`min`がない場合、またはdate/time系stepは本Planの対応subset外としてそのcontrol subtreeを`unsupported`
+- `grid`はschema Coverage候補とBVA / combinatorial入力へ渡すが、`test_data_requirements.py`のintersection対象にはしない
+
+`allOf / anyOf / oneOf / not / if / then / else`等、対応subset外でvalidation意味を変えるkeywordは`unsupported`です。unsupported keywordがvalidation意味へ影響するsubtreeだけを切り離し、独立して評価できる別property / itemは継続できます。親schemaのvalidation意味をunsupported keywordが左右する場合は、その親subtree全体を`unsupported`にします。
+
+正規化後のrange / enum / required等はEP / BVA / combinatorial / test data requirementへ直接渡し、`grid`は上記限定経路で扱います。
 ## 15. UI pattern
 
 ### `ui_pattern_candidates.py`
