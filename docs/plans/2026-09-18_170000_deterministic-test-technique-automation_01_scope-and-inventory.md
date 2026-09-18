@@ -4,7 +4,7 @@
 
 現在の`qa-workflow-skills`は、テスト分析・テスト要求・テスト条件・詳細テストケース・カバレッジ分析をSkill instructionとLLM判断で実行し、開発・回帰時に決定論的validatorで出力契約を評価しています。
 
-本変更では、テスト分析・テスト設計のうち、入力が構造化された後は機械的に処理できる部分をSkill実行時のscriptへ移します。
+本変更では、テスト分析・テスト設計のうち、入力が構造化された後は機械的に処理できる部分をSkill実行時のscriptへ移します。加えて、調査で必要と判断したテスト分析・設計技法を既存の`test-analysis` / `test-condition-design`へ正式追加し、技法選択、Coverage / 終了条件、成果物形式、validator、semantic eval、発火評価まで既存Skill契約へ組み込みます。
 
 LLMには、仕様の意味理解、要素抽出、仕様根拠の対応付け、リスク判断、技法採用判断、成立条件の意味解釈、具体的な期待結果等の意味判断を残します。値・組合せ・遷移・経路・Coverage・追跡・優先度継承・重複検出・変更伝播等の機械処理はscriptへ移します。
 
@@ -24,7 +24,7 @@ LLMには、仕様の意味理解、要素抽出、仕様根拠の対応付け�
 - `test-case-design`
 - `coverage-analysis`
 
-加えて、成果物の再利用、上流変更の伝播、局所ブロック、完了判定を新契約へ合わせるため、`qa-workflow`も統合対象とします。
+加えて、成果物の再利用、上流変更の伝播、局所ブロック、完了判定を新契約へ合わせるため、`qa-workflow`も統合対象とします。runtime由来の未解決事項をmodel単位で質問・再開できるようにするため、`question-analysis`のルーティング契約も必要な範囲で更新します。技法固有ロジックは`test-analysis` / `test-condition-design`を正本とし、`question-analysis`や`qa-workflow`へ複製しません。
 
 現状はLLMが成果物を作り、評価側でPairwise、BVA、状態遷移、Authority / Risk → TR、TCN / CI → TC、追跡グラフ等の一部を後から機械検査しています。本変更では、評価側で既に機械判定できる領域を中心に、実行時も「LLMが意味を正規化する → Skill runtime scriptが生成・計算・構造検査する → LLMが意味を統合する → 独立validator / semantic evalが検証する」構造へ変更します。
 
@@ -74,7 +74,17 @@ LLMには、仕様の意味理解、要素抽出、仕様根拠の対応付け�
 - transition-pair / n-switch / Round-trip → `状態遷移`
 - Cause-Effect Graph → Decision Tableへの機械変換
 
-Domain Testing、CRUD Testing、Random Testing、Metamorphic Testing、grammar-based testingのように独立したproblem model / selection reason / Coverage contractを持つものは、既存技法へ無理に押し込めず正規技法名を追加します。
+Domain Testing、CRUD Testing、Random Testing、Metamorphic Testing、grammar-based testingのように独立したproblem model / selection reason / Coverageまたは終了条件の契約を持つものは、既存技法へ無理に押し込めず正規技法名を追加します。
+
+追加する正規技法名は次で固定します。
+
+- `Domain Testing`
+- `CRUD Testing`
+- `Random Testing`
+- `Metamorphic Testing`
+- `grammar-based testing`
+
+`test-analysis`の許可技法、`references/guidance.md`、`assets/output-template.md`、deterministic / semantic evalをこの表記へ揃えます。`test-condition-design`では`SKILL.md`、`references/coverage-techniques.md`、出力template、validator、semantic evalへ同じ表記と適用条件を反映します。
 
 ### 3.3 Coverageの意味
 
@@ -116,6 +126,15 @@ generatorが返す100%等のCoverageは、**明示された正規化済みモデ
 
 6. `qa-workflow`
    - contract / model version、上流変更、stale派生成果物、局所ブロック、`要再検証`、legacy成果物再利用、完了判定
+
+7. `question-analysis`
+   - runtimeの構造化issueに含まれる`model_key` / `target_key`を質問・ブロック・回答後の再開まで保持する
+   - 技法固有の判定は行わず、既存の不明点分類と回答正規化だけを担当する
+
+8. 評価契約
+   - 新規技法に伴う`test-analysis` / `test-condition-design`の発火評価を更新する
+   - 現行のtrain 12件（positive 6 / negative 6）、validation 8件（positive 4 / negative 4）は増やさず、既存queryの一部を置換して維持する
+   - `adversarial-review`には技法ロジックを複製せず、新規技法の代表的な誤用を検出するsemantic fixtureだけを追加する
 
 ## 5. 本Planの対象外
 
