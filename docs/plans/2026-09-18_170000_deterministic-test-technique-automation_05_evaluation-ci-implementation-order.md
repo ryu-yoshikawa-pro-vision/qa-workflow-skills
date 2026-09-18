@@ -444,8 +444,9 @@ validatorはruntime traceabilityと独立にmissing / orphan / unknown / stale�
 - `Runtime Status = ok / invalid_input / unsupported / limit_exceeded / internal_error / not_run`
 - `Runtime Required / Deterministic Generated = Yes / No`
 - Skill状態表の`WF-D012`は従来どおりSkill + 対象にだけ適用し、runtime状態表へ流用しない
-- ワークフロー全体`完了`では`Runtime Required=Yes`のunitに`Result Status != ready`、`Freshness=stale`、`Deterministic Generated=No`のいずれも残らないことを追加検査する
-- `Runtime Required=No`のfallback unitは、既存Skill契約を満たし未解決issueがなければ完了を妨げない
+- ワークフロー全体`完了`では全runtime unitが`Result Status=ready / Freshness=current`であることを追加検査する
+- `Runtime Required=Yes`のunitでは、さらに`Deterministic Generated=Yes`を要求する
+- `Runtime Required=No`のfallback unitも`Result Status != ready`なら完了を妨げる
 
 完了条件・再利用条件へ次を追加します。
 
