@@ -8,7 +8,7 @@
 
 LLMには、仕様の意味理解、要素抽出、仕様根拠の対応付け、リスク判断、技法採用判断、成立条件の意味解釈、具体的な期待結果等の意味判断を残します。値・組合せ・遷移・経路・Coverage・追跡・優先度継承・重複検出・変更伝播等の機械処理はscriptへ移します。
 
-決定論性の保証対象は自然言語入力そのものではありません。**同じcanonicalな正規化済みモデル、同じgenerator contract version、同じ静的参照データversionから、同じ機械処理結果を再現できる状態**を作ります。
+決定論性の保証対象は自然言語入力そのものではありません。**同じcanonicalな正規化済みモデル、同じruntime contract version、同じgenerator contract version、同じ静的参照データversionから同じgenerator結果を再現でき、statefulなID materializeではさらに同じprevious mappingから同じID対応を再現できる状態**を作ります。
 
 正規化済みモデルが元のAuthority / Risk / TR等を意味的に漏れなく表しているかは、既存の上流閉鎖、semantic eval、レビューで確認します。
 
@@ -24,7 +24,7 @@ LLMには、仕様の意味理解、要素抽出、仕様根拠の対応付け�
 - `test-case-design`
 - `coverage-analysis`
 
-加えて、成果物の再利用、上流変更の伝播、局所ブロック、完了判定を新契約へ合わせるため、`qa-workflow`も統合対象とします。runtime由来の未解決事項をmodel単位で質問・再開できるようにするため、`question-analysis`のルーティング契約も必要な範囲で更新します。技法固有ロジックは`test-analysis` / `test-condition-design`を正本とし、`question-analysis`や`qa-workflow`へ複製しません。
+加えて、成果物の再利用、上流変更の伝播、局所ブロック、完了判定を新契約へ合わせるため、`qa-workflow`も統合対象とします。runtime由来の未解決事項をmodel単位で質問・再開できるようにするため、`question-analysis`の質問一覧・ブロック中範囲へ`Model Key / Target Key`列を追加し、deterministic validatorも更新します。技法固有ロジックは`test-analysis` / `test-condition-design`を正本とし、`question-analysis`や`qa-workflow`へ複製しません。
 
 現状はLLMが成果物を作り、評価側でPairwise、BVA、状態遷移、Authority / Risk → TR、TCN / CI → TC、追跡グラフ等の一部を後から機械検査しています。本変更では、評価側で既に機械判定できる領域を中心に、実行時も「LLMが意味を正規化する → Skill runtime scriptが生成・計算・構造検査する → LLMが意味を統合する → 独立validator / semantic evalが検証する」構造へ変更します。
 
@@ -91,9 +91,9 @@ Domain Testing、CRUD Testing、Random Testing、Metamorphic Testing、Syntax-Ba
 generatorが返す100%等のCoverageは、**明示された正規化済みモデル内のCoverage**です。対象仕様全体の100%とは扱いません。
 
 - Authority / Risk → TR → TCNの上流閉鎖は別途確認する
-- 選択した技法はmodel、対象外、未解決、runtime未対応のいずれかへ必ず閉じる
+- 選択した技法はmodel、対象外、未解決、または明示的なruntime非対応へ必ず閉じる
 - 正規化済みモデルが上流の意味を十分に表しているかはsemantic evalで確認する
-- `unresolved`、`limit_exceeded`、staleな派生成果物が残るmodelを完了扱いしない
+- 必須modelが`model_status != ready`、`freshness_status=stale`、または未処置の`deterministic_generated=false`である場合は完了扱いしない
 - Dispositionによる成果物上の閉鎖と技法Coverage達成を混同しない
 
 ## 4. 本Planの実装範囲
@@ -133,7 +133,7 @@ generatorが返す100%等のCoverageは、**明示された正規化済みモデ
 
 8. 評価契約
    - 新規技法に伴う`test-analysis` / `test-condition-design`の発火評価を更新する
-   - 現行のtrain 12件（positive 6 / negative 6）、validation 8件（positive 4 / negative 4）は増やさず、既存queryの一部を置換して維持する
+   - trigger evalは全Skillでtrain 12件以上 / validation 8件以上、各datasetのpositive / negative同数を維持し、新規技法のselection / design境界を追加する
    - `adversarial-review`には技法ロジックを複製せず、新規技法の代表的な誤用を検出するsemantic fixtureだけを追加する
 
 ## 5. 本Planの対象外
