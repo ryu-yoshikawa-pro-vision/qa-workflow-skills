@@ -339,7 +339,8 @@ raw machine-readable入力をfixtureにします。
 - `set / add_decimal / multiply_decimal / append / permute / sort`のrequired parameter
 - JSON pathはobject key / array indexだけ
 - `permute` indicesが完全bijection
-- `equal / not_equal`、numeric monotonic、unique scalar array subset / supersetの型制約
+- `expected_relation.output_kind`必須
+- `equal / not_equal`、numeric monotonic、unique scalar array subset / supersetの`op × output_kind`互換性
 - unsupported transform / path / relation
 - source → follow-up traceability
 - `required_pairs = source数 × follow_up数`
