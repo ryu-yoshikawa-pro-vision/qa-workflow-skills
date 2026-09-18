@@ -39,25 +39,40 @@
 
 以下は、一般的なテスト分析・テスト設計のうち、構造化入力があれば決定論的処理または機械的生成へ移せるものを整理したものです。
 
+### 3.1 一覧化の基準
+
+「自動化できるものをすべて列挙する」の範囲を無制限に広げず、次を基準集合として確認します。
+
+- 現在の`qa-workflow-skills`が正本としているテスト分析・テスト設計の技法とCoverage契約
+- ISTQB CTFL v4.0.1のテスト技法
+- ISTQB CTAL-TA v4.0のデータベース、振る舞いベース、ルールベース、経験ベースのテスト技法とCoverage基準
+- ISTQB CTAL-TTA v4.0のwhite-box Coverage技法
+
+この基準集合に含まれることと、このbranchで実装することは分けて扱います。現在のSkill責務・正規技法名・成果物契約を広げるものは一覧へ残し、初回実装からは外します。外部資料にある技法名を、そのまま`test-analysis`の正規技法名へ追加しません。
+
 | 対象 | 自動化できる処理 | 人間 / LLMに残す処理 | このbranchでの扱い |
 | --- | --- | --- | --- |
 | プロダクトリスク | 確定済み影響度・発生可能性からレベル算出、並び替え、範囲検証 | リスク発見、影響度・発生可能性の採点根拠 | 実装対象 |
 | テスト技法選択 | 正規化済み問題構造から技法候補を規則で絞る | 自然言語から問題構造を読み取る、複数技法の必要性判断 | 実装対象。ただし最終判断はLLM |
 | 同値分割 | 明示済みpartitionの重複・空白・境界整合、列挙可能なdomainから代表値候補生成、partition coverage計算 | 何を同値と扱えるかの意味判断 | 実装対象 |
 | 境界値分析 | 2-value / 3-value BVA、包含 / 排他、stepに基づく直前・境界・直後値生成 | 境界の意味、型、最小単位、採用するBVA深度 | 実装対象 |
+| Domain Testing | 構造化済みの多変数domainと境界式からON / OFF / IN / OUT候補とCoverageを計算 | domain式、精度、どのborderを対象にするか | 自動化可能として一覧化。現行Skillの正規技法を広げるため初回実装からは外す |
 | デシジョンテーブル | 条件値の組合せ列挙、制約除外、成立不能判定、未定義rule検出、重複rule、同条件で異なる結果の矛盾検出、rule coverage算出 | 条件・結果・制約・期待結果根拠の抽出 | 実装対象 |
-| デシジョンテーブル最適化 | 同一結果かつ安全にdon't care化できるruleの機械統合 | 統合しても業務上の意味を失わないかの確認 | 実装対象。最適化前tableを必ず保持 |
+| デシジョンテーブル最適化 | 完全rule setからdon't care化できるrule候補を求めることは可能 | 統合で業務上の意味・根拠を失わないかの確認 | 自動化可能として一覧化するが、初回実装では行わない |
 | 全組合せ | 有限domainのCartesian product生成、禁止組合せ除外 | 因子・値・制約抽出 | 実装対象 |
+| Base Choice Coverage | 各因子のbase valueが確定している場合のbase組合せと1因子ずつの置換組合せ生成 | base valueの選択根拠、制約でbaseが成立しない場合の再選択 | `Pairwise / 組合せ`の内部Coverage modeとして実装対象 |
 | Pairwise | 成立可能な2-wise組合せ生成、全ペアCoverage計算 | 因子・値・制約抽出、Pairwise採用判断 | 実装対象 |
 | N-wise | t-wise組合せ生成、成立可能tupleのCoverage計算 | t値と対象因子の選択 | 実装対象。ただし入力規模上限を設ける |
 | mixed-strength組合せ | 一部因子だけ高いinteraction strengthを適用 | 高強度対象の選択根拠 | 今回は一覧化・契約予約のみ。初回実装からは外す |
-| Classification Tree | classification / classが明示された後の最小基準、全組合せ、Pairwise / N-wise展開 | classification / classの意味的分解 | 実装対象 |
+| Classification Tree | classification / classが明示された後の全組合せ、Base Choice、Pairwise / N-wiseへの正規化 | classification / classの意味的分解 | 実装対象。新しい正規技法名にはしない |
 | 状態カバレッジ | 状態集合と遷移から対象状態のCoverage算出 | 状態モデル抽出 | 実装対象 |
 | 遷移カバレッジ | 有効遷移列挙、全遷移Coverage、欠落遷移検出 | 遷移の有効性と期待結果根拠 | 実装対象 |
-| transition-pair / switch coverage | 連続遷移の組合せ列挙、n-switch Coverage | どの深度を要求するか | 実装対象 |
-| 状態経路 | 開始状態からの到達可能性、到達不能状態、dead end、指定Coverageを満たす経路候補生成 | reset可能性、業務上意味のある経路選択 | 実装対象 |
-| 無効遷移 | 明示された許可遷移の補集合から候補生成 | 未定義操作が本当に拒否される仕様か | 候補生成のみ実装。期待結果は自動確定しない |
-| Use Case / シナリオ | 明示済みflow graphのmain / alternative path列挙、分岐Coverage | 業務上意味のあるシナリオ、優先度 | 一部実装対象 |
+| transition-pair / switch coverage | 連続遷移の組合せ列挙、n-switch Coverage | どの深度を要求するか | `状態遷移`のCoverage modeとして実装対象 |
+| Round-trip Coverage | state graph上のround trip候補列挙とCoverage計算 | どのloopが対象範囲か、guardを含む実行可能性 | `状態遷移`のCoverage modeとして実装対象 |
+| 状態経路 | graph上の到達可能性、outgoing transitionのない状態、指定Coverageを満たす経路候補生成 | guardを含む実行可能性、terminalか欠陥候補か、reset可能性、業務上意味のある経路選択 | 実装対象。構造事実と意味判断を分離 |
+| 無効遷移 | 根拠付きで明示された無効遷移候補の構造検査・Coverage確認 | どの遷移を無効として確認するか、期待結果 | 実装対象。ただし有効遷移の補集合から全無効遷移を機械生成しない |
+| Use Case / シナリオ | 明示済みflow graphのbounded path列挙、node / edge Coverage | main / alternativeの分類、業務上意味のあるシナリオ、優先度 | 一部実装対象。main / alternativeはscriptが推測しない |
+| CRUD Testing | 構造化済みCRUD matrixのoperation Coverage、欠落operation、entity lifecycleの組合せ候補 | function / entity / operationの意味、欠落が仕様欠陥か対象外か | 自動化可能として一覧化。現行Skillの正規技法を広げるため初回実装からは外す |
 | Cause-Effect Graph | boolean条件 / effectが構造化済みならrule spaceへ展開しDecision Tableへ変換 | cause / effectと論理関係抽出 | 実装対象。Decision Table経路へ統合 |
 | 制約充足 | 有限domain制約のSAT / UNSAT判定、成立可能assignment列挙 | 制約式への正規化 | 実装対象。まず有限domainの明示制約のみ |
 | 矛盾検出 | 同一入力条件への複数期待結果、相互排他的rule、到達不能ruleの検出 | 仕様のどちらを正とするか | 実装対象 |
@@ -67,17 +82,17 @@
 | UIコントロール別確認候補 | button、checkbox、radio、combobox、dialog等の種別から一般的な確認候補を参照 | その製品で期待される挙動の確定 | 実装対象 |
 | keyboard / focus候補 | UI patternと外部標準からキー操作・focus候補を引く | 製品がそのpattern / 標準を採用しているかの判断 | 候補生成のみ実装 |
 | test data matrix | 型、partition、boundary、enum、nullability、constraintから入力データ候補を組成 | 実データの業務意味 | 実装対象 |
-| seed付きランダム生成 | 同一seedで再現可能なサンプル生成 | 何をランダム化するか | 補助機能として実装可能。主技法にはしない |
+| Random Testing | 指定済みdomain・確率分布・seedから再現可能な入力列を生成 | 確率分布、operational profile、oracle、停止条件 | 自動化可能として一覧化。現行Skillの正規技法を広げるため初回実装からは外す |
 | Property-Based Testing | property / generator domainが定義済みなら大量入力生成、shrinkingは既存ライブラリで自動化可能 | property / invariant定義 | 自動化可能として記録するが、現在のQA成果物workflow外のため実装対象外 |
 | Metamorphic Testing | metamorphic relationが定義済みなら派生入力・期待関係生成 | relation発見・妥当性 | 自動化可能として記録するが実装対象外 |
 | Fuzzing | grammar / schema / corpusがあれば入力変異・生成 | oracle、重要領域、停止条件 | 自動化可能として記録するが実装対象外 |
 | Differential Testing | 比較対象と同一入力を与え結果差分を抽出 | 参照実装が正しいという前提、差分解釈 | 自動化可能として記録するが実装対象外 |
 | Model-Based Testing | 状態モデルからCoverageを満たす経路生成 | モデル作成・oracle | 状態遷移実装の延長として一部実装 |
 | 要求追跡 | Authority → TR → TCN → CI → TCの閉鎖性、孤立、欠落、未知参照 | 意味上の対応edge作成 | 実装対象 |
-| Coverage集計 | partition、boundary、rule、pairwise / n-wise、state、transition、traceability等の割合計算 | どのCoverageを完了条件にするか | 実装対象 |
+| Coverage集計 | partition、boundary、rule、pairwise / n-wise、state、transition等の技法別Coverageと、traceabilityの構造上の閉鎖率を計算 | どのCoverageを完了条件にするか、意味上のCoverage充足 | 実装対象 |
 | 構造的重複 | 同一ID、同一入力組合せ、同一遷移、同一rule等の重複検出 | 意味上の重複・統合可否 | 実装対象 |
 | テスト優先順位 | 採用済み計算式がある場合のscore計算・sort | scoreモデル設計、リスク値採点 | 案件固有式がある場合だけ利用できる共通hookとして扱い、独自式は追加しない |
-| statement / branch / condition / MC/DC | instrumentationまたはCFGがあればCoverage計算、solverを使えば入力探索も可能 | コード解析環境、対象レベル選択 | 自動化可能だが現在のSkill責務外 |
+| statement / branch / condition / MC/DC / Multiple Condition | instrumentationまたはCFGがあればCoverage計算、solverを使えば入力探索も可能 | コード解析環境、対象レベル選択 | 自動化可能だが現在のSkill責務外 |
 | symbolic / concolic execution | path constraint生成とsolverによる入力生成 | 実行環境・モデル化・oracle | 自動化可能だが現在のSkill責務外 |
 | mutation testing | mutation生成、実行、mutation score | surviving mutantの意味判断 | 自動化可能だが現在のSkill責務外 |
 | visual regression | screenshot差分・閾値判定 | 意図した見た目変更かの判断 | 自動化可能だがテスト技法生成ではなく実行領域のため対象外 |
@@ -87,6 +102,15 @@
 | Checklist-Based Testing | catalogから候補を引く | 対象への関連性・期待結果 | UI pattern等の候補検索に限定 |
 | リスク発見 | 既知カテゴリとの照合 | 何が製品上の失敗になるか | LLM / 人間 |
 | 期待結果の補完 | なし | 現在有効な仕様根拠から確定 | 自動化しない |
+
+### 3.2 正規技法名との関係
+
+このbranchでは、`test-analysis`の正規技法名を増やしません。
+
+- Base Choice / Pairwise / N-wise / Classification Tree由来の組合せは、`Pairwise / 組合せ`の内部Coverage modeまたは入力形式として扱う
+- transition-pair / n-switch / Round-tripは、`状態遷移`の内部Coverage modeとして扱う
+- Cause-Effect GraphはDecision Table入力への変換、schema / grammar / UI属性は既存技法の候補生成元として扱う
+- Domain Testing、CRUD Testing、Random Testingは一覧に残すが、正規技法名の追加と成果物契約拡張が必要なため初回実装からは外す
 
 ## 4. 今回の実装範囲
 
@@ -102,9 +126,9 @@
    - 同値分割の構造検査と代表値候補
    - BVA
    - Decision Table
-   - 全組合せ / Pairwise / N-wise
-   - Classification Tree展開
-   - 状態 / 遷移 / transition-pair
+   - 全組合せ / Base Choice / Pairwise / N-wise
+   - Classification Treeから組合せ入力への正規化
+   - 状態 / 遷移 / transition-pair / n-switch / Round-trip
    - 明示flowのpath列挙
    - Cause-Effect GraphからDecision Tableへの展開
    - 有限domain制約の成立可能性
@@ -118,8 +142,12 @@
 
 ## 5. 今回実装しないもの
 
-次は自動化可能ですが、現在のリポジトリ責務を広げるためこのbranchでは実装しません。
+次は自動化可能ですが、現在のリポジトリ責務または正規技法契約を広げるためこのbranchでは実装しません。
 
+- Domain Testingの多変数domain generator
+- CRUD Testing
+- Random Testing
+- mixed-strength組合せ
 - Property-Based Testingのruntime
 - fuzzing engine
 - Differential Testing runner
