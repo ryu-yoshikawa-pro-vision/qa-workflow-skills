@@ -639,6 +639,6 @@ model単位状態の正本は各成果物に保存した`model_status`、`freshn
 
 strict JSON、canonicalization、fingerprint、envelope処理はruntime対象5 Skillそれぞれの`scripts/runtime_contract.py`へ同じ実装を同梱します。repo rootの共通helperへ依存させません。`runtime_contract_version`をfile内定数として持ち、machine outputへ影響する内容変更では必ずversionを更新します。repository testで5ファイルのSHA-256一致を検証し、Skillごとの実装差を許可しません。技法固有ロジックはこの共通helperへ入れません。
 
-Python 3.11標準ライブラリで正しく実装できる処理は標準ライブラリを優先します。ただし、Domain Testing、mixed-strength、constraint solving等で自前実装より既存の成熟した依存関係を使う方が正確・保守可能な場合は、依存追加を禁止しません。
+本Planのruntime dependencyはPython 3.11標準ライブラリだけに固定します。外部PyPI package、外部binary、network serviceをruntime依存へ追加しません。
 
-依存追加時はライセンス、保守状況、CI、Skill単体移植性を確認し、必要なpackageをSkill契約またはrepository依存へ明示します。将来用adapterは作りません。
+Planで定義した正確性、hard limit、30秒のCLI test timeoutを標準ライブラリ実装で満たせない場合は、その実装をPlan未達として停止し、暗黙にCoverage基準を下げたり依存関係を変更したりしません。将来用adapterも作りません。
