@@ -260,6 +260,7 @@ Python unavailable時もSkillは既存LLM経路で成果物を作成できます
 {
   "issue_type": "unspecified_rule",
   "blocking": true,
+  "runtime_unit_key": "model:decision-001",
   "model_key": "decision-001",
   "target_key": "R4",
   "authority_refs": ["SPEC-001"],
@@ -269,11 +270,11 @@ Python unavailable時もSkillは既存LLM経路で成果物を作成できます
 }
 ```
 
-- `issue_type`、`blocking`は必須
-- model scriptでは`model_key`必須、artifact scriptでは禁止
+- `issue_type`、`blocking`、`runtime_unit_key`は必須
+- model scriptでは`model_key`必須、artifact scriptでは`model_key=null`
 - target固有issueだけ`target_key`必須
 - `route_to` / `resume_skill`は既存Skill名だけを許可
-- `question-analysis`へ送る場合はModel / Targetを質問・ブロック・回答後の再開まで保持する
+- `question-analysis`へ送る場合はRuntime Unit / Model / Targetを質問・ブロック・回答後の再開まで保持する
 - 自由文stderrをrouting入力に使わない
 
 ## 4. canonicalization・version・fingerprint
