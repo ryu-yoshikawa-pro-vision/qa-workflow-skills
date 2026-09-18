@@ -1033,16 +1033,19 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 #### `bva.py`
 
 - required: `boundaries[]`
-- boundary: `{boundary_key, side, value, inclusive, step, mode, authority_refs}`
+- boundary: `{boundary_key, side, threshold, inclusive, step, mode, authority_refs}`
 - `side=lower|upper`, `mode=2-value|3-value`
-- `value / step`は同一互換型。stepは正値
+- `threshold`はtyped integer / decimal / date / local_datetime / fixed_offset_datetime
+- `step`は§4のdomain別object形式だけを許可し、threshold型と互換であることを必須にする
 
 #### `domain_testing.py`
 
-- required: `borders[]`
-- borderは§5の`border_key / relation / coefficients / constant / pivot_key / anchor / pivot_step / authority_refs`だけ
+- required: `partitions[]`, `borders[]`
+- partition: `{partition_key, expression, authority_refs}`。expressionは§5の`border_ref / and / or` ASTだけ
+- borderは§5の`border_key / partition_key / relation / coefficients / constant / pivot_key / anchor / pivot_step / authority_refs`だけ
 - coefficient / constant / pivot_stepはdecimal文字列
 - anchor valueはtyped integer / decimalだけ
+- 各borderは同じ`partition_key`のpartition expressionから1回以上参照されること
 
 #### `decision_table.py`
 
@@ -1072,21 +1075,27 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 #### `state_transition.py`
 
 - required: `states[]`, `initial_states[]`, `terminal_states[]`, `transitions[]`, `reset_options[]`, `invalid_transition_candidates[]`, `coverage_mode`
+- optional: `switch_count`。`coverage_mode=n-switch`だけ必須
 - state: `{state_key, authority_refs}`
 - transition: `{transition_key, from, event, guard_status, guard_refs, to, authority_refs}`
 - `guard_status=true|false|null`
 - resetは§9形式
 - coverage mode: `all-states | all-transitions | n-switch | round-trip | invalid-transitions`
-- `n-switch`だけ`switch_count` integer 0..10必須。他modeでは禁止
+- `switch_count`はinteger 0..10
+- n-switch / round-tripのtarget定義とcanonicalizationは§9を正本とする
 - invalid candidateは§9形式
 
 #### `flow_paths.py`
 
-- required: `nodes[]`, `edges[]`, `coverage_mode`, `max_path_length`
-- node: `{node_key, kind, region_key, authority_refs}`。kindは`normal / fork / join / terminal`、region_keyはfork/joinだけ必須
+- required: `nodes[]`, `edges[]`, `initial_node_keys[]`, `regions[]`, `loop_specs[]`, `coverage_mode`, `max_path_length`
+- node: `{node_key, kind, authority_refs}`。kindは`normal / fork / join / terminal`
 - edge: `{edge_key, from, to, guard_status, guard_refs, label, authority_refs}`
+- region: `{region_key, fork_node_key, join_node_key, branches[]}`。branchは`{branch_key, edge_keys[]}`
+- loop spec: `{loop_key, entry_node_key, edge_keys[], typical_iterations, maximum_iterations, authority_refs}`
+- `initial_node_keys[]`は1件以上
 - `coverage_mode = node | edge | bounded-path | simple-loop | fork-join`
 - `max_path_length`は1..1000
+- region / loopの連続性・nest・iteration規則は§10を正本とする
 
 #### `crud_matrix.py`
 
@@ -1112,15 +1121,19 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - productionは§25 grammar production key形式
 - RHS itemは`{"terminal":"..."}`または`{"nonterminal":"..."}`のどちらか一方
 - `max_depth`は1..64
-- mutation: `{mutation_key, op, production_key, index, value}`。opは§13の3種。deleteではvalue禁止、replace/insertではvalue string必須
+- mutation: `{mutation_key, op, production_key, symbol_index, value}`。opは§13の3種
+- deleteではvalue禁止、replace/insertではvalue string必須
+- delete / replaceは`symbol_index`がterminal itemを指すこと、insertは0..len(rhs)を許可
 
 #### `schema_cases.py`
 
 - required: `schema_kind`, `schema`
 - `schema_kind = json-schema-2020-12 | openapi-3.0 | html-control`
 - json/openapiでは`schema`はobject
-- html-controlでは`schema`は`{type, required, min, max, minlength, maxlength, step, disabled, readonly, multiple}`の対応属性だけを持つobject。存在しない属性は省略可能
-- unknown schema keywordはannotationかvalidation keywordかを判定できないため、対応subset外のkeyは`unsupported` subtreeとして報告し、黙って無視しない
+- html-controlでは`schema`は`{type, required, min, max, minlength, maxlength, step, pattern, disabled, readonly, multiple}`の対応属性だけを持つobject。存在しない属性は省略可能
+- `pattern`は保持のみで具体値生成に使わない
+- `multipleOf`と対応可能な数値HTML `step`は§14の`grid` constraintへ正規化
+- annotation allowlistとunsupported subtree規則は§14を正本とする
 
 #### `ui_pattern_candidates.py`
 
@@ -1137,7 +1150,10 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 #### `metamorphic.py`
 
 - required: `relations[]`
-- relationは§18形式のみ。source IDはrelation内一意、follow_up_countは1..10,000
+- relationは§18形式のみ
+- `source_id`はrelation内一意
+- `follow_ups[]`は1..10,000件で`follow_up_key`をrelation内一意
+- 各follow-upの`transforms[]`は1件以上で宣言順に適用する
 
 #### `case_structure.py`
 
