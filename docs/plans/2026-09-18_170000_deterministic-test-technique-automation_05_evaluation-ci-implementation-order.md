@@ -66,14 +66,15 @@ CLI integration testは各代表fixtureをsubprocessで`python <script-path>`起
 
 ### runtime envelope
 
-- `envelope_version / runtime_contract_version / generator_contract_version / generator / model_key / model_fingerprint / generation_fingerprint / static_data_versions / runtime_status / model_status / deterministic_generated / payload / issues`
-- artifact全体scriptでは`model_key`を禁止し、技法model scriptだけ`<slug>-\d{3,}`を要求
+- `envelope_version / runtime_contract_version / generator_contract_version / generator / runtime_unit_key / model_key / input_fingerprint / model_fingerprint / generation_fingerprint / static_data_versions / runtime_status / result_status / runtime_required / deterministic_generated / payload / issues`
+- model scriptは`runtime_unit_key=model:<model_key>`、artifact全体scriptは`runtime_unit_key=artifact:<generator>:<scope_key>`を要求し、artifact全体scriptの`model_key`はnull
 - `ok / invalid_input / unsupported / limit_exceeded`は構造化結果を返せた扱いで終了code 0
 - `internal_error`は可能ならenvelopeを返して終了code 1、envelope生成不能も1
 - Agent側は終了codeだけで判断せずstdout envelopeをparseする
 - supported subsetへの`unsupported`を正常fallback扱いしない
 - Python unavailable / runtime未実行は成果物metadataで`runtime_status=not_run / deterministic_generated=false`
-- status対応表どおりの`model_status`とblocking issueを要求
+- status対応表どおりの`result_status / runtime_required / deterministic_generated`を要求
+- model scriptでは`model_status=result_status`、artifact全体scriptでは`artifact_status=result_status`
 - staleはruntime statusではなく`freshness_status`としてworkflowが付与
 - stderrへ入力全文・secretを出さない
 - unknown `route_to` / `resume_skill`を拒否
@@ -84,9 +85,11 @@ CLI integration testは各代表fixtureをsubprocessで`python <script-path>`起
 - `authority_refs` / `reference_refs`の順序差でfingerprintが変わらない
 - 順序に意味があるfactor / value / transition配列の順序変更はfingerprintへ反映
 - decimal / date / fixed-offset datetimeの正規化
-- 人間向け説明文だけを変えてもmodel fingerprintが変わらない
+- 人間向け説明文だけを変えてもinput / model fingerprintが変わらない
+- script固有input、`authority_refs`、`reference_refs`、modelの`selection_source`変更で`input_fingerprint`が変わる
+- artifact全体scriptでもinput変更で`input_fingerprint / generation_fingerprint`が変わる
 - upstream Entityの正規字段変更でその`content_fingerprint`だけが変わる
-- 無関係なupstream Entity変更では対象modelをstaleにしない
+- 無関係なupstream Entity変更では対象runtime unitをstaleにしない
 - generator、runtime contract、generator contract、static data version変更で`generation_fingerprint`が変わる
 - machine outputへ影響するbug fix / tie-break変更でgenerator contract versionを更新する
 - fenced JSONの保存→抽出→strict decode→canonical化でmodel fingerprintが一致する
@@ -397,38 +400,41 @@ validatorはruntime traceabilityと独立にmissing / orphan / unknown / stale�
 
 ### `question-analysis`
 
-`assets/output-template.md`の`不明点 / 質問一覧`と`ブロック中範囲`へ、既存の`再開対象 / 実行範囲`とは別に`Model Key`と`Target Key`列を追加します。
+`assets/output-template.md`の`不明点 / 質問一覧`と`ブロック中範囲`へ、既存の`再開対象 / 実行範囲`とは別に`Runtime Unit Key`、`Model Key`、`Target Key`列を追加します。
 
 - `再開対象 / 実行範囲`は既存`QUESTION-D017`のSkill用途判定だけに使用する
-- `Model Key` / `Target Key`はruntime issueの局所識別専用とし、単一用途Skillでも値を許可する
-- 同じブロッカーIDについて質問一覧とブロック中範囲のModel / Targetが一致することをvalidatorで確認する
-- runtime issue由来でない質問では両列を空欄にできる
-
+- `Runtime Unit Key`はruntime issue由来の質問で必須
+- model issueでは`Model Key`を必須、artifact全体script issueでは空欄
+- target固有issueだけ`Target Key`を必須
+- 同じブロッカーIDについて質問一覧とブロック中範囲のRuntime Unit / Model / Targetが一致することをvalidatorで確認する
+- runtime issue由来でない質問では3列を空欄にできる
 ### `qa-workflow`
 
 既存Skill状態表は`qa-workflow`出力時に引き続き必須とし、`WF-D009`は維持します。ただし永続正本にはせず、成果物metadataから再構築可能にします。
 
-`assets/workflow-state-template.md`へ別表`モデル状態`を追加します。
+`assets/workflow-state-template.md`へ別表`runtime状態`を追加します。
 
-`Skill | Model Key | Model Status | Freshness | Runtime Status | Deterministic Generated | Blocker / Issue`
+`Skill | Runtime Unit Key | Model Key | Result Status | Freshness | Runtime Status | Runtime Required | Deterministic Generated | Blocker / Issue`
 
-- `Model Key`は同一Skill内一意
-- `Freshness`は`current / stale`
-- `Runtime Status`は`ok / invalid_input / unsupported / limit_exceeded / internal_error / not_run`
-- `Deterministic Generated`は`Yes / No`
-- Skill状態表の`WF-D012`は従来どおりSkill + 対象にだけ適用し、モデル状態表へ流用しない
-- ワークフロー全体`完了`では必須modelに`stale / unresolved / blocked`または`Deterministic Generated=No`の未処置が残らないことを追加検査する
+- `Runtime Unit Key`は同一Skill内一意
+- model scriptではModel Key必須、artifact全体scriptでは空欄
+- `Result Status = ready / unresolved / blocked`
+- `Freshness = current / stale`
+- `Runtime Status = ok / invalid_input / unsupported / limit_exceeded / internal_error / not_run`
+- `Runtime Required / Deterministic Generated = Yes / No`
+- Skill状態表の`WF-D012`は従来どおりSkill + 対象にだけ適用し、runtime状態表へ流用しない
+- ワークフロー全体`完了`では`Runtime Required=Yes`のunitに`Result Status != ready`、`Freshness=stale`、`Deterministic Generated=No`のいずれも残らないことを追加検査する
+- `Runtime Required=No`のfallback unitは、既存Skill契約を満たし未解決issueがなければ完了を妨げない
 
 完了条件・再利用条件へ次を追加します。
 
 - envelope / runtime / generator contract version
 - upstream Entity別content fingerprint
-- model / generation fingerprint
+- input / model / generation fingerprint
 - stale派生成果物
-- model単位の`要再検証` / ブロック中
+- runtime unit単位の`要再検証` / ブロック中
 - runtime未実行 / unsupportedとQA成果物状態の分離
 - legacy成果物の昇格
-
 ### output eval fixture schema
 
 runtime対応Skillの`evals/output/cases/*/expected.json`では、既存fieldに加えて必要なcaseだけ次の`runtime_contract` objectを持てるようにします。
@@ -436,12 +442,14 @@ runtime対応Skillの`evals/output/cases/*/expected.json`では、既存fieldに
 ```json
 {
   "runtime_contract": {
+    "expected_runtime_unit_key": "model:pairwise-001",
     "upstream_entities": [
       {"skill":"spec-analysis","entity_ref":"SPEC-001","content_fingerprint":"sha256:..."}
     ],
     "expected_target_keys": [],
     "expected_runtime_status": "ok",
-    "expected_model_status": "ready",
+    "expected_result_status": "ready",
+    "expected_runtime_required": true,
     "expected_deterministic_generated": true,
     "expected_freshness_status": "current",
     "expected_target_id_map": {}
@@ -451,7 +459,7 @@ runtime対応Skillの`evals/output/cases/*/expected.json`では、既存fieldに
 
 - expected target / Coverageは手書きfixtureから独立計算または明示し、generator出力をexpectedへコピーしない
 - `expected_target_id_map`はstateful materialize caseだけ使用する
-- validatorは保存済みmodelからfingerprintを独立再計算し、fixtureに書いたhash文字列を盲信しない
+- validatorは保存済みruntime inputから`input_fingerprint`、model scriptでは`model_fingerprint`、全scriptで`generation_fingerprint`を独立再計算し、fixtureに書いたhash文字列を盲信しない
 - upstream Entity差分caseでは無関係Entityの変更が対象modelをstaleにしないことを確認する
 ## 7. semantic eval
 
@@ -618,7 +626,7 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 - repo rootのeval helperをimportしない
 - 5 Skillの`scripts/runtime_contract.py`がSHA-256一致
 - network不要
-- 必要依存が`compatibility`またはSkillと一緒に移植可能なmanifestへ明示
+- runtime dependencyがPython 3.11標準ライブラリだけで、外部package manifestを必要としない
 - Skill rootからscriptを解決
 - stdout envelopeを読める
 - Python unavailable時にSkill全体を利用不能と誤判定しない
@@ -799,8 +807,8 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 ### Step 12: 全体検証・文書同期
 
 - runtime unit / CLI integration / deterministic / semantic / workflow
-- trigger dataset最低件数・正負バランス・境界scenario
-- semantic dataset最低件数と新技法criteria
+- trigger datasetのSkill別exact count（repository合計328）・正負件数・境界scenario
+- semantic datasetのSkill別exact count（repository合計44）と新技法case
 - CI
 - portability
 - 実Agent runtime smoke
@@ -839,7 +847,7 @@ Plan完了には次をすべて満たす必要があります。
 - `_01`で実装対象にした処理がruntimeまたは既存機械処理へ割り当てられている
 - 目的内の技法・構造処理が本Plan外へ先送りされていない
 - CLI / strict JSON / envelope / canonicalization / envelope・runtime・generator contract versionが実装済み
-- upstream Entity別content fingerprint、static data versions、model / generation fingerprintが再現可能
+- upstream Entity別content fingerprint、static data versions、input / model / generation fingerprintが再現可能
 - 正規化modelのMarkdown fenced JSON round-tripが成立する
 - stable model key / 成果物系列 / 既存Entity ID再利用 / previous mappingを含むCI materializeが契約どおり
 - 再実行がupsertされ重複machine evidenceを作らない
@@ -852,7 +860,7 @@ Plan完了には次をすべて満たす必要があります。
 - runtime出力と保存machine evidenceの一致をvalidatorが確認する
 - supported subsetを`unsupported`でLLM fallbackしない
 - model内Coverageと仕様全体Coverageを混同しない
-- qa-workflowがupstream Entity内容変更、generation変更、stale、局所ブロック、legacyを処理できる
+- qa-workflowがmodel / artifact両方のruntime unit、upstream Entity内容変更、generation変更、stale、局所ブロック、runtime fallback、legacyを処理できる
 - question-analysis往復でmodel / targetが失われない
 - 途中工程開始と`Selection Source`が既存workflowを壊さない
 - CIではruntime metadata整合を確認し、実Agent smokeで代表promptが実際にscriptを起動したことを確認できる
