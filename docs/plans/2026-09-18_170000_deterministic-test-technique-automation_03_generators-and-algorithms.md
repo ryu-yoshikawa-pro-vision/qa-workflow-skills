@@ -808,10 +808,237 @@ LLMは`merge_group`だけを明示します。scriptは同じgroupについて�
 | `metamorphic.py` | relations[] | §18 key | follow-up input / completion |
 | `case_structure.py` | TCN / CI / TC / Disposition | `violation:<type>:<entity_id>` | violations / derived priority |
 | `traceability.py` | nodes / edges / stale metadata | `gap:<type>:<entity_id>` | gaps / orphan / stale |
+| `materialize_coverage.py` | TCN、generator targets、previous mapping、merge groups | target key → CI ID | CI mapping / stale / machine rows |
 
 assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく、そのtargetを定義するcanonical key/value構造だけです。hash collisionを検出した場合は`internal_error`として停止し、別targetを同一keyへ統合しません。
 
-script固有inputの詳細schemaは同名unit fixtureの`valid_minimal.json`を正本例として1件ずつ置き、Planと異なるfieldを追加しません。optional fieldは各scriptのSkill referenceへ列挙し、未知fieldは`invalid_input`です。
+### 25.1 共通値schema
+
+技法model内の業務値は、Pythonの型同一視へ依存しないよう次のtyped valueを使用します。
+
+```json
+{"type":"integer","value":1}
+{"type":"boolean","value":true}
+{"type":"string","value":"A"}
+{"type":"enum","value":"admin"}
+{"type":"decimal","value":"0.10"}
+{"type":"null","value":null}
+{"type":"date","value":"2026-09-19"}
+{"type":"local_datetime","value":"2026-09-19T12:30:00"}
+{"type":"fixed_offset_datetime","value":"2026-09-19T12:30:00+09:00"}
+```
+
+- integerはJSON integer
+- decimalは符号付き10進文字列で指数表記を禁止し、`Decimal`でcanonical化する
+- date / datetimeは`_02`のISO 8601契約へ従う
+- enumとstringは同じ文字列でも別型として扱う
+- nullは`value:null`だけを許可する
+- assignmentのvalueはすべてtyped value
+
+共通constraint:
+
+```json
+{
+  "constraint_key":"C1",
+  "assignment":{"role":{"type":"enum","value":"guest"}},
+  "authority_refs":["SPEC-001"]
+}
+```
+
+`assignment`は1件以上のfactor / condition keyを持つpartial assignmentです。
+
+### 25.2 script固有input schema
+
+以下で`required`に記載したfieldは必須、`optional`に記載したfieldだけ省略可能です。未知fieldは`invalid_input`です。配列内の`*_key` / IDは各配列内一意です。
+
+#### `risk_matrix.py`
+
+- required: `scheme`, `risks[]`
+- `scheme.kind = repository-default | project-specific`
+- repository-default: `scheme_key="risk-scheme-v1"`
+- project-specific: `_03` §1の`scheme_key / dimensions / matrix / priority_map`を必須
+- `risks[]`: `{risk_id, impact, likelihood}`。impact / likelihoodはschemeで宣言したinteger value
+
+#### `technique_candidates.py`
+
+- required: `selection_key`, `signals`
+- `signals`は§2で列挙した12 keyをすべて持ち、値は`true / false / null`
+- signal以外の技法選択、`selection_source`、最終採用技法はこのscript入力に含めない
+
+#### `change_impact.py`
+
+- required: `changed_node_keys[]`, `nodes[]`, `edges[]`
+- node: `{node_key, node_type, source_ref}`
+- `node_type = Authority | Risk | TR | TCN | CI | TC`
+- edge: `{edge_key, from, to, edge_type, evidence_refs[]}`
+- `edge_type = depends_on | traces_to | derived_from`
+- changed nodeはnodesに存在必須
+
+#### `environment_requirements.py` / `test_data_requirements.py`
+
+- required: `requirements[]`
+- requirement: `{requirement_key, dimension_key, operator, authority_refs, source_target_keys}`
+- `operator=eq`: `value` typed value必須
+- `operator=enum`: `values[]` typed valueを1件以上、重複不可
+- `operator=range`: `minimum / maximum` typed value、`minimum_inclusive / maximum_inclusive` boolean必須
+- `operator=version_range`: `minimum / maximum` version文字列、inclusive boolean必須
+- `operator=boolean`: `value` boolean必須
+- `source_target_keys`はtest dataでは1件以上、environmentでは空配列を許可
+
+#### `requirement_structure.py`
+
+- required: `authorities[]`, `risks[]`, `test_requirements[]`, `dispositions[]`
+- `authorities[]`: Authority ID文字列
+- risk: `{risk_id, priority}`、priorityは`高 / 中 / 低`
+- TR: `{tr_id, authority_refs[], risk_refs[], priority, priority_override_reason}`
+- `priority_override_reason`は空文字を許可。関連risk最高優先度より低い場合だけ非空必須
+- disposition: `{upstream_id, handling, reason}`。handlingは既存TR Disposition集合
+
+#### `equivalence_partitions.py`
+
+- required: `sets[]`
+- set: `{set_key, partitions[]}`
+- partition: `{partition_key, validity, definition, representative, authority_refs}`
+- `validity = valid | invalid`
+- `definition.type=enum`: `values[]` typed valueを1件以上
+- `definition.type=range`: `minimum / maximum / minimum_inclusive / maximum_inclusive`
+- `representative`はtyped valueまたはnull。nullならscriptが一意に選べるenum / numeric rangeだけ自動生成
+
+#### `bva.py`
+
+- required: `boundaries[]`
+- boundary: `{boundary_key, side, value, inclusive, step, mode, authority_refs}`
+- `side=lower|upper`, `mode=2-value|3-value`
+- `value / step`は同一互換型。stepは正値
+
+#### `domain_testing.py`
+
+- required: `borders[]`
+- borderは§5の`border_key / relation / coefficients / constant / pivot_key / anchor / pivot_step / authority_refs`だけ
+- coefficient / constant / pivot_stepはdecimal文字列
+- anchor valueはtyped integer / decimalだけ
+
+#### `decision_table.py`
+
+- required: `conditions[]`, `actions[]`, `known_rules[]`, `constraints[]`, `accepted_merges[]`
+- condition: `{condition_key, values[], authority_refs}`。valuesはtyped valueを1件以上
+- action: `{action_key, values[], authority_refs}`。valuesはtyped valueを1件以上
+- known rule: `{rule_key, when, then, authority_refs}`。`when`は全condition keyを1回ずつ、`then`は全action keyを1回ずつ持つ
+- constraintsは共通partial assignment
+- accepted mergeは§6.1形式
+
+#### `combinatorial.py`
+
+- required: `mode`, `factors[]`, `constraints[]`
+- factor: `{factor_key, values[], authority_refs}`。valuesはtyped valueを1件以上
+- `mode=exhaustive`: 追加fieldなし
+- `mode=base-choice`: `base_assignment`を全factorについて必須
+- `mode=t-wise`: `strength` integerを2..factor数で必須
+- `mode=mixed-strength`: `global_strength` integerを2..factor数、`subsets[]`を1件以上必須。subsetは`factor_keys[]`と`strength`を持ち、strengthは2..subset factor数
+
+#### `classification_tree.py`
+
+- required: `classifications[]`, `constraints[]`
+- classification: `{classification_key, classes[], authority_refs}`
+- class: `{class_key, value, authority_refs}`。valueはtyped value
+- 同一classificationのclass valueは重複不可
+
+#### `state_transition.py`
+
+- required: `states[]`, `initial_states[]`, `terminal_states[]`, `transitions[]`, `reset_options[]`, `invalid_transition_candidates[]`, `coverage_mode`
+- state: `{state_key, authority_refs}`
+- transition: `{transition_key, from, event, guard_status, guard_refs, to, authority_refs}`
+- `guard_status=true|false|null`
+- resetは§9形式
+- coverage mode: `all-states | all-transitions | n-switch | round-trip | invalid-transitions`
+- `n-switch`だけ`switch_count` integer 0..10必須。他modeでは禁止
+- invalid candidateは§9形式
+
+#### `flow_paths.py`
+
+- required: `nodes[]`, `edges[]`, `coverage_mode`, `max_path_length`
+- node: `{node_key, kind, region_key, authority_refs}`。kindは`normal / fork / join / terminal`、region_keyはfork/joinだけ必須
+- edge: `{edge_key, from, to, guard_status, guard_refs, label, authority_refs}`
+- `coverage_mode = node | edge | bounded-path | simple-loop | fork-join`
+- `max_path_length`は1..1000
+
+#### `crud_matrix.py`
+
+- required: `entities[]`, `functions[]`, `cells[]`, `consistency_sequences[]`, `excluded_cells[]`
+- entity: `{entity_key, authority_refs}`
+- function: `{function_key, authority_refs}`
+- cell: `{entity_key, function_key, operations[], authority_refs}`。operationsは`C/R/U/D`の重複なし集合
+- consistency sequenceは§11形式
+- excluded cell: `{entity_key, function_key, reason, authority_refs}`
+
+#### `cause_effect.py`
+
+- required: `causes[]`, `effects[]`
+- cause: `{cause_key, authority_refs}`
+- effect: `{effect_key, expression, true_value, false_value, authority_refs}`
+- expression ASTは`{"op":"ref","key":"C1"}`、`{"op":"not","arg":...}`、`{"op":"and|or","args":[...,...]}`だけ
+- refはcause keyだけを許可し、effect参照は禁止
+- true / false valueはtyped value
+
+#### `grammar_cases.py`
+
+- required: `start`, `productions[]`, `max_depth`, `mutations[]`
+- productionは§25 grammar production key形式
+- RHS itemは`{"terminal":"..."}`または`{"nonterminal":"..."}`のどちらか一方
+- `max_depth`は1..64
+- mutation: `{mutation_key, op, production_key, index, value}`。opは§13の3種。deleteではvalue禁止、replace/insertではvalue string必須
+
+#### `schema_cases.py`
+
+- required: `schema_kind`, `schema`
+- `schema_kind = json-schema-2020-12 | openapi-3.0 | html-control`
+- json/openapiでは`schema`はobject
+- html-controlでは`schema`は`{type, required, min, max, minlength, maxlength, step, disabled, readonly, multiple}`の対応属性だけを持つobject。存在しない属性は省略可能
+- unknown schema keywordはannotationかvalidation keywordかを判定できないため、対応subset外のkeyは`unsupported` subtreeとして報告し、黙って無視しない
+
+#### `ui_pattern_candidates.py`
+
+- required: `pattern`, `attributes`
+- `pattern`はcatalog正規名またはalias
+- `attributes`は`type / role / required / min / max / minlength / maxlength / step / disabled / readonly / multiple`だけを許可
+- catalogにないpatternは`unsupported`
+
+#### `random_testing.py`
+
+- required: `seed`, `case_count`, `distribution`
+- distributionは§17の3 schemaのいずれか一つ
+
+#### `metamorphic.py`
+
+- required: `relations[]`
+- relationは§18形式のみ。source IDはrelation内一意、follow_up_countは1..10,000
+
+#### `case_structure.py`
+
+- required: `test_conditions[]`, `coverage_items[]`, `test_cases[]`, `dispositions[]`
+- TCN: `{tcn_id, priority}`
+- CI: `{ci_id, tcn_id, priority, authority_refs}`
+- TC: `{tc_id, tcn_refs[], ci_refs[], priority, priority_override_reason, expected_results[]}`
+- expected result: `{number, text, authority_refs[]}`。numberは1から連番
+- priority_override_reasonは低い優先度へoverrideする場合だけ非空必須
+- disposition: `{upstream_id, handling, reason}`
+
+#### `traceability.py`
+
+- required: `nodes[]`, `edges[]`, `freshness[]`
+- node: `{node_key, node_type}`。node_typeは`Authority / Risk / TR / TCN / CI / TC`
+- edge: `{from, to}`。from / toは既知node
+- freshness: `{entity_ref, model_key, freshness_status}`。freshnessは`current / stale`、model_keyがないEntityはnull
+
+#### `materialize_coverage.py`
+
+- required: `tcn_id`, `models[]`, `previous_target_id_map`, `merge_groups[]`
+- model: `{model_key, generator_contract_version, targets[]}`。targetは`{target_key, authority_refs, reference_refs, priority, expected_result_root, test_data_requirements}`
+- `previous_target_id_map`はobject `{target_key: ci_id}`
+- merge groupは`_02` §11形式
+- outputは`target_id_map`、`coverage_item_rows`、`stale_ci_ids`、`issues`
+
+`valid_minimal.json`は上記schemaの実行例であり正本ではありません。optional fieldは上記で明記したものだけとし、Skill referenceはこのPlanのschemaをそのまま説明します。
 
 ### grammar production key
 
