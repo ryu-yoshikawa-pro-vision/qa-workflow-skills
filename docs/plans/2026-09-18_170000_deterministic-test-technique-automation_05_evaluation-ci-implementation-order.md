@@ -322,8 +322,8 @@ raw machine-readable入力をfixtureにします。
 - 同じmodel改訂で`model_key`維持
 - 新modelだけ新key
 - 削除keyを再利用しない
-- 既存TR / TCN / CI / TC IDを意味変更なしで維持
-- 新規項目だけ新番号
+- TR / TCN / TCは意味上同一の既存Entityを再利用できる場合だけID維持し、runtimeがsemantic matchingしない
+- TR / TCN / TCの新規IDは最大番号+1、999到達後は`id_space_exhausted`
 - target key → CI ID mapping維持
 - 消滅targetで下流`要再検証`
 - 同じ実行を2回行ってmachine evidenceが重複しない
@@ -358,15 +358,19 @@ raw machine-readable入力をfixtureにします。
 
 ### `coverage-analysis`
 
-runtime traceabilityと既存validatorが同じfixtureに対して独立にmissing / orphan / unknown / staleを検出できることを確認します。
+runtime traceabilityと既存validatorが同じfixtureに対して独立にmissing / orphan / unknown / staleを検出できることを確認します。stale / gapはTCN / CIだけでなく関連`model_key`まで追跡します。
+
+### `question-analysis`
+
+runtime issue由来の`model_key` / `target_key`が質問一覧、ブロック中範囲、回答後の再開情報で失われないことを確認します。技法固有判定は追加しません。
 
 ### `qa-workflow`
 
 次を完了条件・再利用条件へ追加します。
 
-- contract version
-- upstream artifact version
-- model fingerprint
+- envelope / generator contract version
+- upstream semantic fingerprint
+- model / generation fingerprint
 - stale派生成果物
 - model単位の`要再検証` / ブロック中
 - runtime未実行 / unsupportedとQA成果物状態の分離
@@ -393,6 +397,25 @@ runtime traceabilityと既存validatorが同じfixtureに対して独立にmissi
 
 semantic referenceをgenerator outputから自動生成しません。
 
+`adversarial-review`には技法アルゴリズムを複製せず、少なくとも次の代表誤用をsemantic fixtureへ追加します。
+
+- Random Testingを一般的な「100% Coverage」と記載する
+- Metamorphic TestingでMRを1回だけ扱ったことを十分なCoverageと断定する
+- Domain TestingでOFF pointを欠落させる
+- 新規技法の期待結果をAuthorityなしで創作する
+
+### 発火評価
+
+`test-analysis` / `test-condition-design`の新規技法対応は現行件数を増やさず更新します。
+
+- train: 12件 / Skill（positive 6 / negative 6）
+- validation: 8件 / Skill（positive 4 / negative 4）
+- 新規技法queryは既存queryの一部を置換する
+- 「技法を使うべきか判断して」→ `test-analysis`
+- 「技法を使ってCoverage / 条件を設計して」→ `test-condition-design`
+- 「技法とは何か説明して」→ 両Skillともnegative
+- train / validation未使用queryで最終holdoutを維持する
+
 ## 8. qa-workflow統合評価
 
 少なくとも次をE2E fixture化します。
@@ -406,18 +429,22 @@ semantic referenceをgenerator outputから自動生成しません。
    - workflow完了
 
 2. 上流Authority変更
-   - upstream version変更
+   - upstream semantic fingerprint変更
+   - 人間向け説明文だけの変更ではfingerprint不変
    - 影響modelだけ`要再検証`
    - stale派生物を拒否
    - 再生成後に再利用可能
 
-3. modelだけ変更
-   - fingerprint変更
+3. model / generator変更
+   - model意味変更で`model_fingerprint`変更
+   - generator contract / static data変更で`generation_fingerprint`変更
    - 旧machine evidence拒否
 
 4. 局所ブロック
    - 1 modelだけ未解決
+   - `question-analysis`往復で`model_key / target_key`維持
    - 独立modelは継続
+   - workflow状態表がなくても成果物metadataから状態再構築
    - workflowは部分完了
 
 5. runtime unsupported
@@ -431,7 +458,13 @@ semantic referenceをgenerator outputから自動生成しません。
 
 7. runtime利用確認
    - script適用可能fixtureでruntime result metadataが存在
+   - supported subsetが`unsupported`になった場合は失敗
    - LLM手計算だけの成果物を決定論的生成済みと判定しない
+
+8. 途中工程開始
+   - ユーザーが技法を明示したTRから`test-condition-design`を開始
+   - `Selection Source=user`を保持
+   - `test-analysis`の技法選択行を作るためだけに上流へ戻らない
 
 ## 9. CI
 
