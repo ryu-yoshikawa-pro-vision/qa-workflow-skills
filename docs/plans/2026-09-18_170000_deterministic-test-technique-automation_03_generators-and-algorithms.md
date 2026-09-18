@@ -31,7 +31,7 @@
 
 scriptは影響度・発生可能性を決めません。標準方式では1〜4以外を入力エラーにします。
 
-## 2. テスト技法候補## 2. テスト技法候補
+## 2. テスト技法候補
 
 ### `technique_candidates.py`
 
@@ -249,7 +249,7 @@ PICT / ACTS等の外部engine採用は後述の依存関係判断に従います
 
 将来追加する場合も`combinatorial.py`の入力拡張で扱い、新Skillは増やしません。
 
-## 7. Classification Tree## 7. Classification Tree
+## 7. Classification Tree
 
 独立generatorを増やさず、LLMがClassification Treeを次へ正規化します。
 
@@ -370,7 +370,7 @@ scriptはgraph構造だけからmain / alternativeを推測しません。入力
 
 cycleがある場合は明示boundなしの全path列挙を拒否します。acyclic graphでもpath数が出力上限を超える場合は`limit_exceeded`とします。
 
-## 10. Cause-Effect Graph## 10. Cause-Effect Graph
+## 10. Cause-Effect Graph
 
 ### `cause_effect.py`
 
@@ -422,7 +422,7 @@ HTMLの`step`はinput typeごとに単位・既定値・step baseが異なるた
 
 OpenAPI / JSON Schema全仕様への完全準拠parserを新規実装しません。
 
-## 12. grammar-based testing## 12. grammar-based testing
+## 12. grammar-based testing
 
 任意BNF / EBNF parserは初回実装しません。
 
@@ -495,7 +495,7 @@ BVA、partition、schema、enum、組合せの生成結果を`test-condition-des
 
 修正Skillの判断は、既存の責任分界で一意に決められる構造欠陥だけ機械化します。
 
-## 15. scriptが生成してはいけないもの## 15. scriptが生成してはいけないもの
+## 15. scriptが生成してはいけないもの
 
 どのgeneratorでも次は生成しません。
 
