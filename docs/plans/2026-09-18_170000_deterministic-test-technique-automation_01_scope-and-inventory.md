@@ -8,7 +8,7 @@
 
 LLMには、仕様の意味理解、要素抽出、仕様根拠の対応付け、リスク判断、技法採用判断、成立条件の意味解釈、具体的な期待結果等の意味判断を残します。値・組合せ・遷移・経路・Coverage・追跡・優先度継承・重複検出・変更伝播等の機械処理はscriptへ移します。
 
-決定論性の保証対象は自然言語入力そのものではありません。**同じcanonicalな正規化済みモデル、同じruntime contract version、同じgenerator contract version、同じ静的参照データversionから同じgenerator結果を再現でき、statefulなID materializeではさらに同じprevious mappingから同じID対応を再現できる状態**を作ります。
+決定論性の保証対象は自然言語入力そのものではありません。**同じcanonicalなruntime入力、同じruntime contract version、同じgenerator contract version、同じ静的参照データversionから同じgenerator結果を再現でき、statefulなID materializeではさらに同じprevious mappingから同じID対応を再現できる状態**を作ります。
 
 正規化済みモデルが元のAuthority / Risk / TR等を意味的に漏れなく表しているかは、既存の上流閉鎖、semantic eval、レビューで確認します。
 
@@ -93,7 +93,7 @@ generatorが返す100%等のCoverageは、**明示された正規化済みモデ
 - Authority / Risk → TR → TCNの上流閉鎖は別途確認する
 - 選択した技法はmodel、対象外、未解決、または明示的なruntime非対応へ必ず閉じる
 - 正規化済みモデルが上流の意味を十分に表しているかはsemantic evalで確認する
-- 必須modelが`model_status != ready`、`freshness_status=stale`、または未処置の`deterministic_generated=false`である場合は完了扱いしない
+- `runtime_required=true`の必須runtime unitで`result_status != ready`、`freshness_status=stale`、または`deterministic_generated=false`である場合は完了扱いしない
 - Dispositionによる成果物上の閉鎖と技法Coverage達成を混同しない
 
 ## 4. 本Planの実装範囲
