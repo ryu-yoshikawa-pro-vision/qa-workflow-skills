@@ -438,8 +438,8 @@ validatorはruntime traceabilityと独立にmissing / orphan / unknown / stale�
 - Decision Table condition / action / constraint
 - factor / strength / mixed-strength選択
 - state / guard / reset / flow / fork-joinの意味
-- CRUD model
-- grammar
+- CRUD completeness / consistency model
+- Syntax-Based Testingのgrammar / production / mutation意味
 - operational profile / Random Testing採用
 - metamorphic relation
 - UI pattern分類
@@ -450,25 +450,44 @@ validatorはruntime traceabilityと独立にmissing / orphan / unknown / stale�
 
 semantic referenceをgenerator outputから自動生成しません。
 
-`adversarial-review`には技法アルゴリズムを複製せず、少なくとも次の代表誤用をsemantic fixtureへ追加します。
+### semantic dataset件数
+
+現行`tests/skills/evals/semantic/test_semantic_datasets.py`の「各Skillちょうど2件 / 合計28件」は本変更で撤廃します。
+
+- 各Skillは2件以上
+- case IDはSkill内一意
+- repository全体は28件以上
+- `test-analysis` / `test-condition-design`は新規正規技法5種を少なくとも1件ずつsemantic評価できるcaseを持つ。1 caseで複数技法を評価してよいが、各技法のcriteriaが明示されること
+- `adversarial-review`は下記代表誤用をそれぞれcriteriaまたはcaseとして評価する
+- 既存Skillのcaseを減らして最低件数だけ満たす変更は行わない
+
+`adversarial-review`には技法アルゴリズムを複製せず、次を評価します。
 
 - Random Testingを一般的な「100% Coverage」と記載する
 - Metamorphic TestingでMRを1回だけ扱ったことを十分なCoverageと断定する
-- Domain TestingでOFF pointを欠落させる
-- 新規技法の期待結果をAuthorityなしで創作する
+- Domain Testingでrelation別required pointを欠落させる
+- CRUD completenessだけでconsistencyも完了したと断定する
+- Syntax-Based Testingのmutation candidateをAuthorityなしで製品上invalidと断定する
+- 新規技法のexpected resultをAuthorityなしで創作する
 
 ### 発火評価
 
-`test-analysis` / `test-condition-design`の新規技法対応は現行件数を増やさず更新します。
+新規技法追加により、現行`.github/workflows/validate-skills.yml`の固定件数契約を次へ変更します。
 
-- train: 12件 / Skill（positive 6 / negative 6）
-- validation: 8件 / Skill（positive 4 / negative 4）
-- 新規技法queryは既存queryの一部を置換する
-- 「技法を使うべきか判断して」→ `test-analysis`
-- 「技法を使ってCoverage / 条件を設計して」→ `test-condition-design`
-- 「技法とは何か説明して」→ 両Skillともnegative
-- train / validation未使用queryで最終holdoutを維持する
+- 全Skill: train 12件以上、validation 8件以上
+- 各datasetはpositive / negative同数
+- train / validation queryはSkill内で重複しない
+- repository全体のtrigger query総数は280件以上
+- `test-analysis` / `test-condition-design`は既存queryを削らず、新規技法境界を追加する
 
+`test-analysis` / `test-condition-design`では、Domain Testing、CRUD Testing、Random Testing、Metamorphic Testing、Syntax-Based Testingの各技法についてtrainとvalidationの双方で次を持ちます。
+
+1. `test-analysis` positive: 技法を採用すべきか判断する依頼
+2. `test-analysis` negative: その技法で具体的なCoverage / 条件を設計する依頼
+3. `test-condition-design` positive: 技法を使って具体的なCoverage / 条件を設計する依頼
+4. `test-condition-design` negative: 技法の採用可否だけを判断する依頼
+
+さらに各Skillのtrainまたはvalidationに「技法とは何か説明して」という説明依頼negativeを少なくとも1件含めます。これらのscenarioとdataset case IDの対応表を`EVALS.md`へ記録し、train / validation未使用queryを最終holdoutとして残します。
 ## 8. qa-workflow統合評価
 
 少なくとも次をE2E fixture化します。
