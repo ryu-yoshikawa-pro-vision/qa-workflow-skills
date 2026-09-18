@@ -644,24 +644,28 @@ contract versionを持たない既存成果物を一律破棄しません。
 
 ### 13.3 局所状態
 
-model単位状態の正本は各成果物に保存した`model_status`、`freshness_status`、fingerprint、構造化issueです。
+runtime単位状態の正本は各成果物に保存した`runtime_unit_key`、`result_status`、`runtime_required`、`deterministic_generated`、`freshness_status`、fingerprint、構造化issueです。
 
 `qa-workflow`を出力する場合は既存のSkill状態表を必須で維持しますが、この表は集約表示であり唯一の永続正本ではありません。他Skill実行の前提としてworkflow状態表の存在は要求せず、必要時は成果物metadataから状態を再構築します。
 
-`qa-workflow`には既存Skill状態表とは別に次の`モデル状態`表を追加します。
+`qa-workflow`には既存Skill状態表とは別に次の`runtime状態`表を追加します。
 
-`Skill | Model Key | Model Status | Freshness | Runtime Status | Deterministic Generated | Blocker / Issue`
+`Skill | Runtime Unit Key | Model Key | Result Status | Freshness | Runtime Status | Runtime Required | Deterministic Generated | Blocker / Issue`
 
-- `Model Key`は同一Skill内一意
+- `Runtime Unit Key`は同一Skill内一意
+- model scriptは`Runtime Unit Key = model:<model_key>`とし、`Model Key`を必須
+- artifact全体scriptは`Runtime Unit Key = artifact:<generator>:<scope_key>`とし、`Model Key`は空欄
+- `Result Status`は`ready / unresolved / blocked`
 - `Freshness`は`current / stale`
 - `Runtime Status`は`ok / invalid_input / unsupported / limit_exceeded / internal_error / not_run`
-- `Deterministic Generated`は`Yes / No`
-- Skill状態表の`WF-D012`は既存Skill状態表だけへ適用し、モデル状態表へ流用しない
-- 1 modelだけ`blocked / unresolved / stale`でも独立した他modelは継続可能
-- 対象scopeの必須modelに`blocked / unresolved / stale`が残る場合はworkflow全体を完了にしない
-- `question-analysis`へroutingする場合は`model_key / target_key`を質問一覧・ブロック中範囲・回答後の再開情報へ保持する
+- `Runtime Required`と`Deterministic Generated`は`Yes / No`
+- Skill状態表の`WF-D012`は既存Skill状態表だけへ適用し、runtime状態表へ流用しない
+- 1 runtime unitだけ`blocked / unresolved / stale`でも独立した他unitは継続可能
+- `Runtime Required=Yes`のunitで`Result Status != ready`、`Freshness=stale`、または`Deterministic Generated=No`が残る場合はworkflow全体を`完了`にしない
+- `Runtime Required=No`のfallback unitは、既存Skill契約を満たす成果物が得られ、未解決issueがなければworkflow完了を妨げない
+- model issueを`question-analysis`へroutingする場合は`model_key / target_key`を質問一覧・ブロック中範囲・回答後の再開情報へ保持する
+- artifact全体scriptのissueは`runtime_unit_key`をBlocker / Issueへ保持し、model keyを捏造しない
 - `coverage-analysis`はstale / gapをTCN / CIだけでなく関連`model_key`まで追跡する
-
 ### 13.4 上流変更
 
 上流Entityの`content_fingerprint`が変わった場合:
