@@ -136,9 +136,15 @@ DOM属性と仕様書が矛盾する場合、DOMを正として期待結果を�
 - CTAL-TA v4.0: https://istqb.org/wp-content/uploads/sdm-uploads/ISTQB-CTAL-TA-Syllabus-v4.0-EN-4.pdf
 - CTAL-TTA v4.0: https://www.istqb.org/wp-content/uploads/2024/11/ISTQB-CTAL-TTA_Syllabus_v4.0.pdf
 
-CTAL-TA v4.0で扱われるDomain Testing、Base Choice / Pairwise等のCombinatorial Testing、Random Testing、CRUD Testing、N-switch、Round-trip Coverage等を一覧化の確認に使います。
+CTAL-TA v4.0で扱われるDomain Testing、Base Choice / Pairwise等のCombinatorial Testing、Random Testing、CRUD Testing、N-switch、Round-trip Coverage、Metamorphic Testing等を一覧化の確認に使います。
 
-これらは網羅性確認と技法契約の確認に使います。既存技法のCoverage modeとして表現できるものは既存名を再利用し、Domain Testing、CRUD Testing、Random Testing、Metamorphic Testing、grammar-based testingのように独立したproblem model / selection reason / Coverage contractを持つものは、本Planで正規技法名・成果物契約・評価まで追加します。
+技法契約では、CTAL-TA v4.0の次の点を反映します。
+
+- Domain Testingは各borderのON / OFF / IN / OUTを区別する
+- Random Testingには一般に認められたCoverage基準がなく、件数・時間等の終了条件で扱う。本Planの決定論的runtimeでは件数へ正規化された終了条件だけを機械判定する
+- Metamorphic Testingにも有用な一般Coverage measureを設定せず、MRを1回扱っただけで十分としない
+
+これらは網羅性確認と技法契約の確認に使います。既存技法のCoverage modeとして表現できるものは既存名を再利用し、Domain Testing、CRUD Testing、Random Testing、Metamorphic Testing、grammar-based testingのように独立したproblem model / selection reason / Coverageまたは終了条件の契約を持つものは、本Planで正規技法名・Skill契約・成果物契約・評価まで追加します。
 
 ### WAI-ARIA Authoring Practices Guide
 
