@@ -31,7 +31,7 @@ skills/test-condition-design/
 
 ### `ui-pattern-catalog.json`
 
-機械参照する正本です。
+機械参照する正本です。generatorはcatalog file contentのSHA-256を`static_data_version`として出力し、成果物へ保持します。catalog変更後は旧versionで生成したUI候補をstaleとして再検証します。
 
 各patternは最低限、次を持ちます。
 
@@ -56,7 +56,7 @@ skills/test-condition-design/
 
 catalogとreferenceで同じ一覧を二重管理しません。
 
-## 3. 初期catalog対象
+## 3. catalog対象
 
 UIで一般的に出現し、確認項目の再利用価値が高いものを対象にします。
 
@@ -138,7 +138,7 @@ DOM属性と仕様書が矛盾する場合、DOMを正として期待結果を�
 
 CTAL-TA v4.0で扱われるDomain Testing、Base Choice / Pairwise等のCombinatorial Testing、Random Testing、CRUD Testing、N-switch、Round-trip Coverage等を一覧化の確認に使います。
 
-これらは網羅性確認の基準であり、外部資料にある技法をそのまま現行`test-analysis`の正規技法名へ追加する根拠にはしません。現在のSkill責務・出力契約へ自然に収まるものだけ、既存技法の内部Coverage modeまたは候補生成元として実装します。
+これらは網羅性確認と技法契約の確認に使います。既存技法のCoverage modeとして表現できるものは既存名を再利用し、Domain Testing、CRUD Testing、Random Testing、Metamorphic Testing、grammar-based testingのように独立したproblem model / selection reason / Coverage contractを持つものは、本Planで正規技法名・成果物契約・評価まで追加します。
 
 ### WAI-ARIA Authoring Practices Guide
 
@@ -181,9 +181,7 @@ native HTML controlの属性、constraint validation、form control、button、s
 
 採用判断:
 
-初期実装の必須依存にはしません。現在のSkill packageはPython標準ライブラリだけで移植でき、PICT binaryを必須にするとplatform / installation契約が増えるためです。
-
-自前generatorで現行要求の2-wise / 小規模N-wiseを満たせないことが実測で分かった場合に、依存候補として再評価します。
+本PlanのPairwise / N-wise / mixed-strength契約はPython実装で満たすため、PICTを必須依存にはしません。実装中に契約どおりの正確性またはhard limit内の性能を満たせないことがテストで確認された場合は、その場で別実装へ迂回せずPlanを更新して依存追加を判断します。
 
 ### NIST ACTS
 
@@ -197,7 +195,7 @@ native HTML controlの属性、constraint validation、form control、button、s
 
 採用判断:
 
-アルゴリズム・評価観点の参考にします。初期runtime dependencyにはしません。
+アルゴリズム・評価観点の参考にします。本Planではruntime dependencyにしません。
 
 ### GraphWalker
 
@@ -206,9 +204,7 @@ native HTML controlの属性、constraint validation、form control、button、s
 
 採用判断:
 
-状態遷移Coverageとpath生成の参考にします。
-
-現行`test-condition-design`で必要なのはstate / transition / transition-pair等の設計成果物生成であり、GraphWalker runtimeを組み込むほどの要求は現時点でありません。初期実装はPython標準ライブラリのgraph処理で対応します。
+状態遷移Coverageとpath生成の参考にします。本Planのstate / transition / n-switch / Round-trip / fork-join CoverageはSkill内scriptで実装し、GraphWalker runtimeは依存に追加しません。
 
 ### Z3
 
@@ -217,9 +213,7 @@ native HTML controlの属性、constraint validation、form control、button、s
 
 採用判断:
 
-有限domainの明示制約で足りる間は追加しません。
-
-算術、文字列、複雑な論理制約が増え、組合せ列挙では現実的に解けない具体的ケースが確認された場合にのみ再評価します。
+本Planのconstraintは`_02` / `_03`で定義した有限domainとDomain Testingの明示式へ限定するため、Z3は依存に追加しません。対応契約を将来用に広げるadapterも作りません。
 
 ### `jovd83/test-design-orchestrator`
 
@@ -251,17 +245,18 @@ native HTML controlの属性、constraint validation、form control、button、s
 
 現行`test-condition-design`のリスク深度契約を維持し、低リスクという理由で対象内の仕様候補を消さない一方、低リスク領域へcatalogの一般edge caseを無条件に全展開しません。候補の採否と深度は既存Skillが判断します。
 
-## 8. 外部依存を追加する条件
+## 8. 外部依存の方針
 
-次のすべてを満たす場合だけ新規依存を検討します。
+本Planで定義した処理はPython 3.11標準ライブラリで実装する前提とします。ただし、標準ライブラリに固執して正確性・保守性を落とすことは目的ではありません。
 
-- 現在の具体的要求を標準ライブラリ実装で満たせない
-- 現実の入力規模で性能または正確性の問題を再現できる
-- Skill-only portabilityへの影響を説明できる
-- Windows / macOS / Linux等、想定環境で利用方法が成立する
-- licenseがリポジトリ利用条件と両立する
-- 依存を入れた方が自前実装より保守しやすい
+実装中に、Planで固定した入力契約・hard limit・Coverage要件を満たせないことを自動テストまたはbenchmarkで確認した場合は、実装者が独自判断で簡略化や別アルゴリズムへ切り替えず、次を確認した上でPlanを更新します。
 
-将来の可能性だけを理由にPICT adapter、GraphWalker adapter、Z3 adapterを先に作りません。
+- 既存依存または成熟した外部依存で正しく満たせるか
+- Skill単体移植性への影響
+- Windows / macOS / Linuxでの利用方法
+- licenseと保守状況
+- 自前実装より保守しやすいか
 
-外部資料の文章・表・コード等をcatalogへ転載・改変して同梱する場合は、その時点でlicenseと帰属条件を確認します。URLを参考資料として保持し、独自に記述した確認候補から参照するだけの場合は、転載と同一には扱いません。
+将来用のPICT / GraphWalker / Z3 adapter、plugin機構は作りません。
+
+外部資料の文章・表・コード等をcatalogへ転載・改変して同梱する場合はlicenseと帰属条件を確認します。URLと独自記述の確認候補だけを保持する場合は転載と同一には扱いません。
