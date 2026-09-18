@@ -126,7 +126,7 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - `depends_on / traces_to / derived_from`の探索方向
 - unknown node / dangling edge
 - 名称類似だけでedge追加しない
-- upstream version変更時の影響model限定
+- upstream semantic fingerprint変更時の影響model限定
 
 ### test environment requirement
 
