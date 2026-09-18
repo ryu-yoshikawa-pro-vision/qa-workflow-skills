@@ -356,7 +356,7 @@ LLMがclassification / classの意味を定義した後、`classification_tree.p
 
 ### `state_transition.py`
 
-各transitionは`transition_key / from / event / guard / to / authority_refs`を持ちます。
+各transitionは`transition_key / from / event / guard_status / guard_refs / to / authority_refs`を持ちます。
 
 入力:
 
@@ -367,10 +367,29 @@ LLMがclassification / classの意味を定義した後、`classification_tree.p
 - `reset_options[]`
 - `invalid_transition_candidates[]`
 - `coverage_mode`
+- `switch_count`（`coverage_mode=n-switch`だけ必須）
 
-transitionの`guard`は説明用文字列ではなく`guard_status=true|false|null`と`guard_refs[]`を持ちます。`true`は成立可能、`false`はAuthorityにより成立不能、`null`は未解決です。`false`をCoverage母集団から外すには`guard_refs`にAuthorityを1件以上必須とします。
+`guard_status=true|false|null`と`guard_refs[]`を使います。`false`をCoverage母集団から外すには`guard_refs`にAuthorityを1件以上必須とします。`null`を含むsequenceは正式Coverage targetにしません。
 
-invalid transition candidateは`{"candidate_key":"INV-001","from":"draft","event":"publish","authority_refs":["SPEC-010"]}`形式とし、target keyは`state:invalid:<candidate_key>`です。
+Coverage定義:
+
+- `all-states`: initial stateからfeasible transitionだけで到達可能な全state
+- `all-transitions`: initial stateから到達可能で`guard_status=true`の全transition
+- `n-switch`: `switch_count=N`として、到達可能な**N+1個の連続するvalid transition**の全sequence。Nは0..10
+- `round-trip`: 到達可能なsimple cycle。開始stateと終了stateは同一で、それ以外のstateをsequence内で重複させない。self-loopも1 transitionのround-tripとして含める
+- `invalid-transitions`: 明示されたinvalid transition candidateだけ
+
+stable target:
+
+- state: `state:node:<state_key>`
+- transition: `state:transition:<transition_key>`
+- n-switch: `state:n-switch:<N>:sha256:<transition_key_sequence_hash>`
+- round-trip: `state:round-trip:sha256:<canonical_cycle_hash>`
+- invalid: `state:invalid:<candidate_key>`
+
+round-tripの同一cycle重複を避けるため、transition key列を全rotationし、Unicode code point辞書順で最小の列をcanonical cycleとします。逆方向はtransition列が異なるため別cycleです。
+
+invalid transition candidateは`{"candidate_key":"INV-001","from":"draft","event":"publish","authority_refs":["SPEC-010"]}`形式です。
 
 reset:
 
@@ -383,32 +402,21 @@ reset:
 }
 ```
 
-機械処理:
-
-- state / transition key整合
-- 到達可能性
-- all states / all transitions
-- 0-switch / 1-switch / 2-switch /任意n-switch
-- Round-trip
-- invalid transition候補検証
-- 各Coverage sequenceの実行開始条件
-
 ### 9.1 setup prefix
 
-sequence開始stateへ直接開始できない場合:
+Coverage sequence開始stateへ直接開始できない場合:
 
-1. initial stateからのfeasible shortest pathを探す
+1. initial stateから`guard_status=true`だけを使うshortest pathを探す
 2. なければ適用可能reset後のshortest pathを探す
-3. 同長ならtransition key列の辞書順
-4. guard feasibility不明を含むpathは「構造候補」とし正式実行sequenceにしない
+3. path長が同じ場合はtransition key列のUnicode code point辞書順
+4. `guard_status=null`を含むpathは構造候補に留め、正式実行sequenceにしない
 
-出力は`setup_prefix`と`coverage_sequence`を分離します。実行可能setupがないsequenceを正式Coverage済みにしません。
-
+出力は`setup_prefix`と`coverage_sequence`を分離します。実行可能setupがないtargetをCoverage済みにしません。
 ## 10. Use Case / シナリオ
 
 ### `flow_paths.py`
 
-edgeは`edge_key / from / to / guard / label / authority_refs`を持ちます。
+入力は`nodes[] / edges[] / initial_node_keys[] / regions[] / loop_specs[] / coverage_mode / max_path_length`です。
 
 node kind:
 
@@ -417,25 +425,67 @@ node kind:
 - `join`
 - `terminal`
 
-fork / joinを使う場合は`region_key`を必須にし、同じ`region_key`を持つ1つのforkと1つのjoinだけを対応pairとします。regionのnestは許可しますが、同一region内の複数fork / join、crossing regionは`unsupported`です。
+`initial_node_keys[]`は1件以上必須で、すべて既知nodeを参照します。terminal到達を要求するpath criterionでは`kind=terminal`のnodeを終点にします。
 
-入力に`max_path_length`を必須とし、1〜1000 edgeの整数だけを許可します。すべてのpath列挙はこの長さ以下に制限します。cycleを含まないgraphでも同じ契約を使用します。
+edgeは`edge_key / from / to / guard_status / guard_refs / label / authority_refs`を持ち、`guard_status=true`だけを正式Coverage対象へ使います。
 
-処理:
+fork / join regionは曖昧に導出せず、次を正規化入力として明示します。
 
-- bounded path
-- node / edge Coverage
-- unreachable node
-- terminalへ到達しないpath
-- simple loop Coverage
-- fork / join branch Coverage
+```json
+{
+  "region_key":"RG-001",
+  "fork_node_key":"F1",
+  "join_node_key":"J1",
+  "branches":[
+    {"branch_key":"BR-001","edge_keys":["E1","E2"]},
+    {"branch_key":"BR-002","edge_keys":["E3"]}
+  ]
+}
+```
 
-fork / joinでは、matching forkからjoinまでの各branchを少なくとも1回Coverageする組合せを生成します。scheduler interleavingを仕様なしに列挙しません。順序依存を検証する場合は、順序を明示したstate / event modelを別modelとして入力します。
+- branchの`edge_keys`はforkからmatching joinまで連続するpathであることをscriptが検証
+- 同一regionのbranch keyは一意
+- nested regionはbranch path内に含めてよい
+- region同士がcrossingする場合は`unsupported`
+- scheduler interleavingは仕様なしに生成しない
 
-loop回数は0、1、仕様で明示した代表回数、仕様上の最大回数をCoverage targetにします。typical / maxをscriptが推測しません。
+simple loopは次を明示します。
 
-edge証拠とpath証拠は分離します。
+```json
+{
+  "loop_key":"LP-001",
+  "entry_node_key":"N1",
+  "edge_keys":["E10","E11"],
+  "typical_iterations":3,
+  "maximum_iterations":10,
+  "authority_refs":["SPEC-020"]
+}
+```
 
+- `edge_keys`はentryへ戻るsimple cycleで、途中node重複を禁止
+- `typical_iterations`は2以上のinteger必須
+- `maximum_iterations`はnullまたは`typical_iterations`以上のinteger
+- Coverage targetは0回、1回、typical回、maximum回。maximumがnullまたはtypicalと同値なら重複targetを作らない
+
+`max_path_length`は1〜1000 edgeのintegerです。
+
+Coverage mode:
+
+- `node`: initialから到達可能な全node
+- `edge`: initialから到達可能な全feasible edge
+- `bounded-path`: initialからterminalへ到達する、長さ`<= max_path_length`の全feasible path
+- `simple-loop`: `loop_specs[]`で明示したloop iteration target
+- `fork-join`: `regions[]`の各branchを少なくとも1回含むtarget
+
+stable target:
+
+- node: `flow:node:<node_key>`
+- edge: `flow:edge:<edge_key>`
+- bounded path: `flow:path:sha256:<edge_key_sequence_hash>`
+- simple loop: `flow:loop:<loop_key>:<iterations>`
+- fork / join: `flow:branch:<region_key>:<branch_key>`
+
+terminalへ到達しないbounded path候補は正式Coverage targetにせず、診断metadataへ保持します。
 ## 11. CRUD Testing
 
 ### `crud_matrix.py`
