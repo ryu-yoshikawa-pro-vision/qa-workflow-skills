@@ -43,16 +43,16 @@ LLMには、仕様の意味理解、要素抽出、仕様根拠の対応付け�
 | テスト技法選択 | 正規化済みproblem signalから技法候補を算出 | problem signal抽出、最終採用 | 実装 |
 | 同値分割 / Each Choice | partition構造検査、代表値候補、Coverage計算 | partitionの意味的定義 | 実装 |
 | 境界値分析 | 2-value / 3-value、包含 / 排他、step / 最小単位に基づく候補生成 | 境界の意味、採用深度 | 実装 |
-| Domain Testing | 構造化済み多変数domainからON / OFF / IN / OUT候補とCoverageを計算 | domain式、対象border、精度の意味 | 実装 |
+| Domain Testing | Reliable Domain Coverageとしてrelation別のON / OFF / IN / OUT等を生成・計算 | domain式、対象border、precisionの意味 | 実装 |
 | Decision Table | rule space、成立不能、未定義、重複、矛盾、Coverage | condition / action / constraint抽出 | 実装 |
 | Decision Table最適化 | action-equivalentなruleのdon't-care統合候補 | 統合で業務意味・Authorityを失わないか | 実装 |
 | 全組合せ / Base Choice / Pairwise / N-wise / mixed-strength | 成立可能tuple、Coverage row、constraint処理 | factor / value / constraint、strength選択 | 実装 |
 | Classification Tree | classification / classから組合せmodelへの機械変換 | classification / classの意味的分解 | 実装 |
 | 状態遷移 / n-switch / Round-trip | 状態・遷移Coverage、sequence、到達可能性、setup prefix | state / event / guard / resetの意味 | 実装 |
 | Use Case / シナリオ | path / node / edge / simple loop / fork-join Coverage | main / alternative分類、業務上の意味 | 実装 |
-| CRUD Testing | CRUD matrix、operation Coverage、欠落operation | function / entity / operationの意味 | 実装 |
+| CRUD Testing | CRUD completenessのoperation Coverageと、正規化済みlifecycle / negative sequenceのconsistency Coverage | function / entity / operation / lifecycleの業務意味 | 実装 |
 | Cause-Effect Graph | 構造化済みcause / effectからDecision Table入力へ展開 | cause / effect / 論理関係抽出 | 実装 |
-| grammar-based testing | 明示grammarからvalid syntax、規則Coverage、bounded invalid候補 | grammar作成、invalid意味判断 | 実装 |
+| Syntax-Based Testing | 明示grammar / BNF相当modelからvalid syntax、production Coverage、明示mutation候補 | grammar作成、mutation結果のinvalid意味判断 | 実装 |
 | JSON Schema / OpenAPI / HTML constraint | 対応subsetのmachine-readable schema / DOM属性を正規化しCoverage候補生成 | そのschema / DOMが製品Authorityとして有効か | 実装 |
 | UI pattern | catalogから一般的な確認候補を生成 | 製品固有expected result、pattern採用判断 | 実装 |
 | テストデータ要求 | role / state / partition / boundary / entity等から要求を統合し矛盾検出 | 実データ選定、準備方法、利用可否 | `test-condition-design`で実装 |
@@ -74,7 +74,7 @@ LLMには、仕様の意味理解、要素抽出、仕様根拠の対応付け�
 - transition-pair / n-switch / Round-trip → `状態遷移`
 - Cause-Effect Graph → Decision Tableへの機械変換
 
-Domain Testing、CRUD Testing、Random Testing、Metamorphic Testing、grammar-based testingのように独立したproblem model / selection reason / Coverageまたは終了条件の契約を持つものは、既存技法へ無理に押し込めず正規技法名を追加します。
+Domain Testing、CRUD Testing、Random Testing、Metamorphic Testing、Syntax-Based Testingのように独立したproblem model / selection reason / Coverageまたは終了条件の契約を持つものは、既存技法へ無理に押し込めず正規技法名を追加します。
 
 追加する正規技法名は次で固定します。
 
@@ -82,7 +82,7 @@ Domain Testing、CRUD Testing、Random Testing、Metamorphic Testing、grammar-b
 - `CRUD Testing`
 - `Random Testing`
 - `Metamorphic Testing`
-- `grammar-based testing`
+- `Syntax-Based Testing`
 
 `test-analysis`の許可技法、`references/guidance.md`、`assets/output-template.md`、deterministic / semantic evalをこの表記へ揃えます。`test-condition-design`では`SKILL.md`、`references/coverage-techniques.md`、出力template、validator、semantic evalへ同じ表記と適用条件を反映します。
 
