@@ -927,13 +927,13 @@ LLMは`merge_group`だけを明示します。scriptは同じgroupについて�
 | `requirement_structure.py` | authorities、risks、TR、Disposition | `violation:<type>:<entity_id>` | violations / derived priority |
 | `equivalence_partitions.py` | sets[] / partitions[] | `ep:<set_key>:<partition_key>` | representative / Coverage |
 | `bva.py` | boundaries[] | `bva:<boundary_key>:<position>` | typed value / Coverage |
-| `domain_testing.py` | borders[] | §5のrelation別key | point / Coverage |
+| `domain_testing.py` | partitions[] / borders[] | §5のpartition + border + relation別key | point / Coverage |
 | `decision_table.py` | conditions、actions、known rules、constraints、accepted merges | `dt:sha256:<assignment_hash>` | rule assignment / action vector / Coverage |
 | `combinatorial.py` | mode、factors、constraints、strength | `comb:<mode>:sha256:<target_hash>` | target tuple / rows / Coverage |
 | `classification_tree.py` | classifications[] / classes[] | `class:<classification_key>:<class_key>` | `derived.factors` |
-| `state_transition.py` | states、transitions、reset、coverage mode | `state:<mode>:sha256:<sequence_hash>`、invalidは§9 key | setup / sequence / Coverage |
-| `flow_paths.py` | nodes、edges、region、max path length、coverage mode | `flow:<criterion>:sha256:<path_or_item_hash>` | paths / loops / branch Coverage |
-| `crud_matrix.py` | matrix、consistency sequences | §11のoperation / sequence key | completeness / consistency |
+| `state_transition.py` | states、transitions、reset、coverage mode、n-switch時switch_count | §9のstate / transition / n-switch / round-trip / invalid key | setup / sequence / Coverage |
+| `flow_paths.py` | nodes、edges、initial nodes、regions、loop specs、max path length、coverage mode | §10のnode / edge / path / loop / branch key | paths / loops / branch Coverage |
+| `crud_matrix.py` | matrix、consistency sequences、operation dispositions | §11のoperation / missing / sequence key | completeness / consistency / anomalies |
 | `cause_effect.py` | causes、effects、AST | `ce:sha256:<cause_assignment_hash>` | Decision Table互換rules |
 | `grammar_cases.py` | start、key付きproductions、max depth、mutations | `syntax:prod:<production_key>`、mutationは`syntax:mutation:<mutation_key>` | derivations / production Coverage |
 | `schema_cases.py` | `schema_kind, schema` | `schema:<json_pointer>:<keyword>` | normalized constraints / unsupported subtrees |
