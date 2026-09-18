@@ -180,8 +180,190 @@ runtime入力は`metadata`とscript固有`input`を分けます。
 - `generator_contract_version`: script固有の入出力・Coverage契約version。schema互換でも生成結果、tie-break、Coverage、target keyへ影響する変更では必ず更新する
 - `runtime_unit_key`: すべてのruntime invocationで必須。model scriptは`model:<model_key>`、artifact全体scriptは`artifact:<generator>:<scope_key>`
 - `model_key`: 技法modelを処理するscriptだけ必須。形式は`<technique-slug>-\d{3,}`。artifact全体scriptでは`null`
-- `scope_key`: artifact全体scriptだけ必須。`^[a-z][a-z0-9._-]{0,63}$`。model scriptでは`null`
-- artifact全体scriptは`risk_matrix.py`、`technique_candidates.py`、`change_impact.py`、`environment_requirements.py`、`requirement_structure.py`、`case_structure.py`、`traceability.py`とし、同一成果物内で同じ`generator + scope_key`を重複させない
+- `scope_key`: artifact全体scriptだけ必須。`^[A-Za-z][A-Za-z0-9._:-]{0,63}# テスト分析・テスト技法の決定論的自動化Plan
+
+## 1. 実行時アーキテクチャ
+
+### 1.1 処理境界
+
+処理順は次で固定します。
+
+```text
+現在有効な仕様根拠・既存QA成果物
+  ↓
+LLM: 意味判断と正規化
+  ↓
+canonicalな正規化済みモデル
+  ↓
+Skill runtime script: 列挙・計算・構造検査
+  ↓
+機械証拠 / 構造化された未解決事項
+  ↓
+LLM: 人間向け説明、意味上の統合、必要な質問
+  ↓
+runtime構造再検査
+  ↓
+QA成果物
+  ↓
+独立validator / semantic eval
+  ↓
+qa-workflow: 再利用・変更伝播・完了判定
+```
+
+scriptは自然言語の仕様本文を直接解釈しません。machine-readableなJSON Schema / OpenAPI / HTML属性等、このPlanで対応subsetを明示する入力はscriptが直接正規化してよく、LLMへ機械変換を戻しません。
+
+正規化済みモデルを正本とします。Coverage表、生成組合せ、Coverage Itemの機械部分、traceability集計等は派生成果物です。正本が変わった場合は派生成果物を再生成・再検証します。
+
+### 1.2 評価runtimeとの分離
+
+Skill runtimeは次をimportまたは直接呼び出しません。
+
+- `scripts/skills/evals/deterministic/`
+- `scripts/skills/evals/semantic/`
+- `skills/*/evals/deterministic/validator.py`
+
+generatorとvalidatorは独立実装とし、同じ不具合で生成と評価が同時に誤る構造を避けます。
+
+## 2. 追加する実行時script
+
+### `test-analysis`
+
+```text
+skills/test-analysis/scripts/
+├── runtime_contract.py
+├── risk_matrix.py
+├── technique_candidates.py
+├── change_impact.py
+└── environment_requirements.py
+```
+
+- `risk_matrix.py`: repository-defaultまたは明示済みproject-specific schemeからrisk levelを計算する
+- `technique_candidates.py`: 正規化済みproblem signalから技法候補を返す
+- `change_impact.py`: 明示済みnode / edgeから影響候補を抽出する
+- `environment_requirements.py`: 構造化済み環境要求を重複統合し矛盾を検出する
+
+### `test-requirement-design`
+
+```text
+skills/test-requirement-design/scripts/
+├── runtime_contract.py
+└── requirement_structure.py
+```
+
+TR本文は生成せず、Authority / Risk → TRの閉鎖、未知参照、Disposition重複、優先度を計算します。
+
+### `test-condition-design`
+
+```text
+skills/test-condition-design/scripts/
+├── runtime_contract.py
+├── equivalence_partitions.py
+├── bva.py
+├── domain_testing.py
+├── decision_table.py
+├── combinatorial.py
+├── classification_tree.py
+├── state_transition.py
+├── flow_paths.py
+├── crud_matrix.py
+├── cause_effect.py
+├── grammar_cases.py
+├── schema_cases.py
+├── ui_pattern_candidates.py
+├── test_data_requirements.py
+├── random_testing.py
+└── metamorphic.py
+```
+
+### `test-case-design`
+
+```text
+skills/test-case-design/scripts/
+├── runtime_contract.py
+└── case_structure.py
+```
+
+具体的な前提、操作、実データ、expected resultは生成せず、TCN / CI → TCの閉鎖、未知参照、優先度、Authority対応を検査します。
+
+### `coverage-analysis`
+
+```text
+skills/coverage-analysis/scripts/
+├── runtime_contract.py
+└── traceability.py
+```
+
+対象はテスト設計のAuthority / Risk → TR → TCN → CI → TC、またはCIを持たない契約でのTCN → TCです。E2E実装・実行結果は既存責務のままです。
+
+### `qa-workflow`
+
+新しい工程固有scriptは追加しません。既存の成果物再利用、上流変更伝播、局所ブロック、完了判定を、以下のversion / fingerprint / runtime状態へ対応させます。
+
+## 3. 共通JSON契約
+
+### 3.0 CLI契約
+
+すべてのruntime scriptは同じCLI契約を使用します。
+
+- 起動は`python <script-path>`
+- stdinからUTF-8のstrict JSON objectを1件だけ読む
+- positional argument、入力file path、環境変数から業務入力を受け取らない
+- cwdへ依存せず、Skill root相対のassetは`__file__`から解決する
+- stdoutはruntime envelopeのJSON object 1件だけ。logや説明文を混在させない
+- stderrは人間向け診断だけに使う
+- stdinが空、JSONが複数、末尾に非空白データが残る場合は`invalid_input`
+- subprocess呼び出し側はstdout / stderr / return codeをすべて取得し、return codeだけでroutingしない
+
+### 3.1 strict JSON
+
+すべてのruntime scriptはstrict JSONを使用します。
+
+- duplicate object keyを拒否する
+- `NaN`、`Infinity`、`-Infinity`を拒否する
+- top-level typeをscriptごとに固定する
+- UTF-8で解釈する
+- decimalはJSON numberへ丸めず、`{"type":"decimal","value":"0.1"}`のような10進文字列で扱う
+- date / datetimeは契約で許可したISO 8601形式以外を拒否する
+
+Python実装では、duplicate key検出用`object_pairs_hook`、非有限数拒否、`allow_nan=False`相当の出力を共通方針とします。
+
+### 3.2 共通入力metadata
+
+runtime入力は`metadata`とscript固有`input`を分けます。
+
+```json
+{
+  "metadata": {
+    "envelope_version": "1",
+    "runtime_contract_version": "runtime-v1",
+    "generator_contract_version": "combinatorial-v1",
+    "runtime_unit_key": "model:pairwise-001",
+    "model_key": "pairwise-001",
+    "scope_key": null,
+    "runtime_required": true,
+    "selection_source": "analysis",
+    "upstream_entities": [
+      {
+        "skill": "test-requirement-design",
+        "entity_ref": "TR-001",
+        "content_fingerprint": "sha256:..."
+      }
+    ],
+    "static_data_versions": {},
+    "authority_refs": ["SPEC-001"],
+    "reference_refs": []
+  },
+  "input": {}
+}
+```
+
+- `envelope_version`: runtime envelope形式のversion
+- `runtime_contract_version`: strict JSON、canonicalization、共通status、fingerprint等の共通処理version
+- `generator_contract_version`: script固有の入出力・Coverage契約version。schema互換でも生成結果、tie-break、Coverage、target keyへ影響する変更では必ず更新する
+- `runtime_unit_key`: すべてのruntime invocationで必須。model scriptは`model:<model_key>`、artifact全体scriptは`artifact:<generator>:<scope_key>`
+- `model_key`: 技法modelを処理するscriptだけ必須。形式は`<technique-slug>-\d{3,}`。artifact全体scriptでは`null`
+。model scriptでは`null`
+- artifact全体scriptは`risk_matrix.py`、`technique_candidates.py`、`change_impact.py`、`environment_requirements.py`、`requirement_structure.py`、`case_structure.py`、`traceability.py`、`materialize_coverage.py`とし、同一成果物内で同じ`generator + scope_key`を重複させない
 - `runtime_required`: 入力が本Planの対応subsetに該当しruntimeで機械処理すべき場合は`true`。対応subset外でLLM fallbackを許可する場合だけ`false`
 - `selection_source`: 技法modelだけ必須で`analysis / user / existing_artifact`。artifact全体scriptでは`null`
 - `upstream_entities`: 実際に消費した上流Entity単位で保持する。`skill + entity_ref`を一意keyとし、そのEntityのcanonicalな構造化内容から`content_fingerprint`を計算する
@@ -302,6 +484,7 @@ fingerprintはSHA-256で計算します。入力はUTF-8のcanonical JSONです�
 - script固有`input`
 - `authority_refs`
 - `reference_refs`
+- `runtime_required`
 - model scriptでは`selection_source`
 
 `upstream_entities`はstale判定用、`static_data_versions`はgeneration条件用なので`input_fingerprint`へ含めません。
@@ -316,6 +499,7 @@ artifact全体scriptでは`model_fingerprint=null`です。ただし`input_finge
 `generation_fingerprint`は次をcanonical JSON化してSHA-256を計算します。
 
 - `generator`
+- `envelope_version`
 - `input_fingerprint`
 - `model_fingerprint`
 - `runtime_contract_version`
