@@ -174,17 +174,19 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 
 ### Domain Testing
 
+- Reliable Domain Coverageだけを実装
 - linear border
-- pivot / anchor
-- closed / open border
-- ON / OFF / IN / OUT
-- closed borderではON=inside / OFF=outside
-- open borderではON=outside / OFF=inside
-- `<border_key>:ON|OFF|IN|OUT` target key
+- pivot / anchor / positive step
+- `< / <= / > / >= / = / !=`
+- closed `<= / >=`: ON=border、OFF=outside最隣接、IN=inside最隣接、OUT=さらにoutside
+- open `< / >`: OFF=border、ON=inside最隣接、IN=さらにinside、OUT=outside最隣接
+- `=`: ON + OFF_NEG + OFF_POS
+- `!=`: OFF + ON_NEG + ON_POS
+- `_03`で定義したrelation別target key
 - representable / unrepresentable boundary
-- coefficient 0
+- coefficient 0 / anchor不足
 - constraintとの整合
-- override point所属検証
+- override point所属・距離検証
 
 ### Decision Table
 
@@ -233,9 +235,12 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 
 ### CRUD
 
-- matrix key
-- operation Coverage
-- 欠落operation
+- completeness / consistencyを別Coverage summaryで返す
+- matrix operation target
+- lifecycle sequence
+- Authority付きnegative sequence
+- matrixに存在しないsequence stepを拒否
+- consistency未正規化ではCRUD全体をcompleteにしない
 - 空cellを自動欠陥化しない
 
 ### Cause-Effect
@@ -246,14 +251,16 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - assignment hard limit
 - Decision Tableとの直接互換payload
 
-### grammar
+### Syntax-Based Testing
 
+- production_key一意性
 - undefined nonterminal
 - unreachable production
 - recursion / max depth
 - shortest derivation
 - production Coverage
-- 明示mutationだけinvalid候補へ使う
+- `delete_terminal / replace_terminal / insert_terminal`だけをmutationとして許可
+- mutation結果を自動で製品上invalidと断定しない
 
 ### schema / HTML
 
