@@ -155,7 +155,11 @@ runtime入力は`metadata`とscript固有`input`を分けます。
     "envelope_version": "1",
     "runtime_contract_version": "runtime-v1",
     "generator_contract_version": "combinatorial-v1",
+    "runtime_unit_key": "model:pairwise-001",
     "model_key": "pairwise-001",
+    "scope_key": null,
+    "runtime_required": true,
+    "selection_source": "analysis",
     "upstream_entities": [
       {
         "skill": "test-requirement-design",
@@ -174,14 +178,17 @@ runtime入力は`metadata`とscript固有`input`を分けます。
 - `envelope_version`: runtime envelope形式のversion
 - `runtime_contract_version`: strict JSON、canonicalization、共通status、fingerprint等の共通処理version
 - `generator_contract_version`: script固有の入出力・Coverage契約version。schema互換でも生成結果、tie-break、Coverage、target keyへ影響する変更では必ず更新する
-- `model_key`: 技法modelを処理するscriptだけ必須。形式は`<technique-slug>-\d{3,}`
-- artifact全体を処理する`risk_matrix.py`、`technique_candidates.py`、`change_impact.py`、`environment_requirements.py`、`requirement_structure.py`、`case_structure.py`、`traceability.py`では`model_key`を禁止し、対象Entityはscript固有inputのIDで識別する
+- `runtime_unit_key`: すべてのruntime invocationで必須。model scriptは`model:<model_key>`、artifact全体scriptは`artifact:<generator>:<scope_key>`
+- `model_key`: 技法modelを処理するscriptだけ必須。形式は`<technique-slug>-\d{3,}`。artifact全体scriptでは`null`
+- `scope_key`: artifact全体scriptだけ必須。`^[a-z][a-z0-9._-]{0,63}$`。model scriptでは`null`
+- artifact全体scriptは`risk_matrix.py`、`technique_candidates.py`、`change_impact.py`、`environment_requirements.py`、`requirement_structure.py`、`case_structure.py`、`traceability.py`とし、同一成果物内で同じ`generator + scope_key`を重複させない
+- `runtime_required`: 入力が本Planの対応subsetに該当しruntimeで機械処理すべき場合は`true`。対応subset外でLLM fallbackを許可する場合だけ`false`
+- `selection_source`: 技法modelだけ必須で`analysis / user / existing_artifact`。artifact全体scriptでは`null`
 - `upstream_entities`: 実際に消費した上流Entity単位で保持する。`skill + entity_ref`を一意keyとし、そのEntityのcanonicalな構造化内容から`content_fingerprint`を計算する
 - `static_data_versions`: keyは`^[a-z][a-z0-9_]*$`、valueは`sha256:<64 lowercase hex>`または明示的なcontract version文字列`^[A-Za-z0-9][A-Za-z0-9._-]*$`
-- `authority_refs`: 製品固有expected resultを確定できる現在有効な根拠
-- `reference_refs`: 外部標準、一般UI資料、DOM / 実装事実等の補助情報
+- `authority_refs`: runtime出力へ継承・利用する製品固有根拠
+- `reference_refs`: runtime出力へ継承・利用する外部標準、一般UI資料、DOM / 実装事実等の補助情報
 - script固有入力は必ず`input`配下に置き、metadataと同じkeyを再定義しない
-
 ### 3.3 runtime出力envelope
 
 scriptが実行できた場合、stdoutは次のJSON object 1件だけです。
@@ -192,12 +199,15 @@ scriptが実行できた場合、stdoutは次のJSON object 1件だけです。
   "runtime_contract_version": "runtime-v1",
   "generator_contract_version": "combinatorial-v1",
   "generator": "combinatorial",
+  "runtime_unit_key": "model:pairwise-001",
   "model_key": "pairwise-001",
+  "input_fingerprint": "sha256:...",
   "model_fingerprint": "sha256:...",
   "generation_fingerprint": "sha256:...",
   "static_data_versions": {},
   "runtime_status": "ok",
-  "model_status": "ready",
+  "result_status": "ready",
+  "runtime_required": true,
   "deterministic_generated": true,
   "payload": {},
   "issues": []
@@ -211,8 +221,9 @@ scriptが実行できた場合、stdoutは次のJSON object 1件だけです。
 - `unsupported`: 入力は妥当だが本Planの対応subset外
 - `limit_exceeded`: 契約上限を超過
 - `internal_error`: 想定外障害
+- `not_run`: script未実行。成果物metadataだけで使用し、script自身は返さない
 
-`model_status`:
+`result_status`:
 
 - `ready`: 下流へ利用可能
 - `unresolved`: 追加情報またはLLM fallbackが必要
@@ -220,23 +231,27 @@ scriptが実行できた場合、stdoutは次のJSON object 1件だけです。
 
 status対応は次で固定します。
 
-| runtime_status | model_status | blocking issue | 扱い |
-| --- | --- | --- | --- |
-| `ok` | `ready` | なし | runtime結果を利用可能 |
-| `ok` | `unresolved` | あり | 質問・意味判断後に再実行 |
-| `invalid_input` | `blocked` | あり | 入力契約を修正 |
-| `unsupported` | `unresolved` | あり | 本Planの対応subset外だけLLM fallback可 |
-| `limit_exceeded` | `blocked` | あり | model分割またはcontract変更が必要 |
-| `internal_error` | `blocked` | あり | runtime不具合として扱う |
+| runtime_status | result_status | runtime_required | deterministic_generated | 扱い |
+| --- | --- | --- | --- | --- |
+| `ok` | `ready` | `true` | `true` | runtime結果を利用可能 |
+| `ok` | `unresolved` | `true` | `true` | 質問・意味判断後に再実行 |
+| `invalid_input` | `blocked` | `true` | `false` | 入力契約を修正 |
+| `unsupported` | `unresolved` | `false` | `false` | 対応subset外だけLLM fallback可 |
+| `limit_exceeded` | `blocked` | `true` | `false` | model分割またはcontract変更が必要 |
+| `internal_error` | `blocked` | `true` | `false` | runtime不具合として扱う |
+| `not_run` | `ready`または`blocked` | 入力に従う | `false` | Python unavailable等。成果物metadataだけで表現 |
 
-`stale`はscriptの`model_status`ではありません。成果物保存時の`freshness_status = current / stale`として`qa-workflow`がfingerprint比較から付与します。
+`stale`は`result_status`ではありません。成果物保存時の`freshness_status = current / stale`として`qa-workflow`がfingerprint比較から付与します。
 
-scriptが正常実行されたenvelopeでは`deterministic_generated=true`です。Python unavailable、runtime未実行、対応subset外のLLM fallbackでは、成果物metadataを`runtime_status=not_run`または直前の`unsupported`、`deterministic_generated=false`として保存します。LLM fallback後にQA成果物自体が利用可能なら`model_status=ready`にできますが、「決定論的生成済み」とは扱いません。
+技法modelでは成果物metadataの`model_status`を`result_status`と同じ値にします。artifact全体scriptでは`artifact_status`を同じ値にします。
+
+LLM fallback後にQA成果物自体が利用可能なら`result_status=ready`にできます。ただし`runtime_required=true`のunitで`deterministic_generated=false`なら決定論的処理未完了であり、ワークフロー全体を`完了`にしません。`runtime_required=false`の対応subset外fallbackは、fallback結果が既存Skill契約を満たせばワークフロー完了を妨げません。
+
+Python unavailable時もSkillは既存LLM経路で成果物を作成できますが、本来runtime対象なら`runtime_required=true / runtime_status=not_run / deterministic_generated=false`を保持し、ワークフローは`部分完了（ブロック中あり）`または`ブロック中`とします。
 
 `ok`、`invalid_input`、`unsupported`、`limit_exceeded`は終了code 0とします。`internal_error`は可能なら構造化envelopeを返して終了code 1、envelope自体を生成できない障害も終了code 1とします。Agent側は終了codeだけでroutingせずstdout envelopeをparseします。stderrは人間向け診断だけに使い、入力全文、secret、tokenを出しません。
 
 本Planで対応subsetとして定義した入力に対して`unsupported`を返した場合はruntime契約違反として修正対象にし、LLM fallbackで正常扱いしません。
-
 ### 3.4 構造化された未解決事項
 
 `issues`は次のfieldを持ちます。
