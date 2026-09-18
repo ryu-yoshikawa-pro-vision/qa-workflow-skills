@@ -230,6 +230,8 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - Round-tripは開始終了stateのみ重複するsimple cycle、self-loop含む
 - cycle rotationのcanonicalizationとstable target
 - guard feasibility
+- reachable sourceの`guard_status=null`でCoverage completeにしない
+- `guard_status=false`除外にはAuthorityを必須
 - initial / reset
 - setup prefix
 - shortest path tie-break
@@ -245,6 +247,8 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - explicit `regions[] / branches[]`の連続path検証
 - nested region
 - crossing regionは`unsupported`
+- reachable sourceの`guard_status=null`でCoverage completeにしない
+- `guard_status=false`除外にはAuthorityを必須
 - scheduler interleavingを勝手に生成しない
 - edge証拠とpath証拠の分離
 
