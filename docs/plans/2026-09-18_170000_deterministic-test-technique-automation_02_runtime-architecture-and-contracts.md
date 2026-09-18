@@ -181,6 +181,7 @@ runtime入力は`metadata`とscript固有`input`を分けます。
 - `authority_refs`: 製品固有expected resultを確定できる現在有効な根拠
 - `reference_refs`: 外部標準、一般UI資料、DOM / 実装事実等の補助情報
 - script固有入力は必ず`input`配下に置き、metadataと同じkeyを再定義しない
+
 ### 3.3 runtime出力envelope
 
 scriptが実行できた場合、stdoutは次のJSON object 1件だけです。
@@ -259,6 +260,7 @@ scriptが正常実行されたenvelopeでは`deterministic_generated=true`です
 - `route_to` / `resume_skill`は既存Skill名だけを許可
 - `question-analysis`へ送る場合はModel / Targetを質問・ブロック・回答後の再開まで保持する
 - 自由文stderrをrouting入力に使わない
+
 ## 4. canonicalization・version・fingerprint
 
 ### 4.1 canonical model
@@ -493,13 +495,13 @@ CI番号は`CI\d{2,}`を許可します。
 
 正規化入力JSONはMarkdown table cellへ埋め込まず、次の形式で保存します。
 
-```markdown
+````markdown
 ### Machine Model: pairwise-001
 
 ```json
 {...}
 ```
-```
+````
 
 見出しの`model_key`とJSON内metadataの`model_key`が一致しない場合はvalidatorを失敗させます。
 
@@ -520,6 +522,7 @@ validatorはfenced JSON blockを抽出してstrict JSON decodeし、canonical化
 5. 元の`model_fingerprint`と一致
 
 これにより`|`、backslash、改行を含む値をMarkdown table escapeへ依存させません。
+
 ## 9. 技法選択とmodelの閉鎖
 
 `test-analysis`の技法選択用signalを機械証拠として保存します。
@@ -617,6 +620,7 @@ model単位状態の正本は各成果物に保存した`model_status`、`freshn
 - 対象scopeの必須modelに`blocked / unresolved / stale`が残る場合はworkflow全体を完了にしない
 - `question-analysis`へroutingする場合は`model_key / target_key`を質問一覧・ブロック中範囲・回答後の再開情報へ保持する
 - `coverage-analysis`はstale / gapをTCN / CIだけでなく関連`model_key`まで追跡する
+
 ### 13.4 上流変更
 
 上流Entityの`content_fingerprint`が変わった場合:
