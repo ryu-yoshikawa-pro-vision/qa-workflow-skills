@@ -100,7 +100,7 @@ signalから候補技法へのmappingは次で固定します。
 | `crud_model` | `CRUD Testing` |
 | `operational_profile` | `Random Testing` |
 | `metamorphic_relation` | `Metamorphic Testing` |
-| `grammar_model` | `grammar-based testing` |
+| `grammar_model` | `Syntax-Based Testing` |
 
 複数signalが`true`の場合は候補集合のunionを返し、上表の順で安定sortします。`false`は候補を追加せず、`null`は`undetermined_signals`へ入れます。
 
@@ -466,7 +466,7 @@ effectはcauseだけを参照します。循環参照は禁止します。
 
 全cause assignmentをhard limit内で列挙し、effect action vectorへ変換します。出力payloadは`decision_table.py`の入力payloadと直接互換にします。
 
-## 13. grammar-based testing
+## 13. Syntax-Based Testing
 
 ### `grammar_cases.py`
 
