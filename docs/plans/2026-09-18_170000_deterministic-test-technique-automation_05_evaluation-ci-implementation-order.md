@@ -169,9 +169,11 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 
 ### BVA
 
-- inclusive / exclusive
-- 2-value / 3-value
+- `threshold / side / inclusive`から2-valueの`OTHER`を一意に決定
+- 3-valueの`BELOW / AT / ABOVE`
 - integer / Decimal / date / local datetime / fixed-offset datetime
+- domain別step objectの型・正値検証
+- fixed-offset datetime算術でoffsetを保持
 - step不明時に隣接値を創作しない
 - 同一具体値でもCoverage positionを区別
 
@@ -185,10 +187,12 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - open `< / >`: OFF=border、ON=inside最隣接、IN=さらにinside、OUT=outside最隣接
 - `=`: ON + OFF_NEG + OFF_POS
 - `!=`: OFF + ON_NEG + ON_POS
-- `_03`で定義したrelation別target key
+- `_03`で定義したpartition + border + relation別target key
+- partition expressionの`and / or / border_ref`検証
+- ON / INがpartition全体true、OFF / OUTがfalseになること
+- 対象border以外の条件によりrequired pointを作れない場合のblocking
 - representable / unrepresentable boundary
 - coefficient 0 / anchor不足
-- constraintとの整合
 - override point所属・距離検証
 
 ### Decision Table
@@ -217,8 +221,10 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 
 - transition identity
 - all state / all transition
-- n-switch
-- Round-trip
+- n-switchは`N+1`個の連続valid transition全sequence
+- `switch_count=0..10`
+- Round-tripは開始終了stateのみ重複するsimple cycle、self-loop含む
+- cycle rotationのcanonicalizationとstable target
 - guard feasibility
 - initial / reset
 - setup prefix
@@ -227,14 +233,14 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 
 ### flow
 
-- node / edge / path
+- `initial_node_keys[]`必須
+- node / edge / initial→terminal bounded path
 - `max_path_length=1..1000`
-- max path length超過を列挙しない
-- simple loop
-- fork / join branch Coverage
-- `region_key`によるfork / join対応
+- explicit `loop_specs[]`の0 / 1 / typical / max iteration target
+- `maximum_iterations=null` / typical重複時のtarget dedupe
+- explicit `regions[] / branches[]`の連続path検証
 - nested region
-- 同一region複数fork / join、crossing regionは`unsupported`
+- crossing regionは`unsupported`
 - scheduler interleavingを勝手に生成しない
 - edge証拠とpath証拠の分離
 
@@ -242,11 +248,13 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 
 - completeness / consistencyを別Coverage summaryで返す
 - matrix operation target
+- entity単位でC/R/U/D欠落を`crud:missing:*` anomalyとして列挙
+- Authority付き`not_applicable` dispositionでのみmissing operationを閉じる
 - lifecycle sequence
 - Authority付きnegative sequence
 - matrixに存在しないsequence stepを拒否
-- consistency未正規化ではCRUD全体をcompleteにしない
-- 空cellを自動欠陥化しない
+- consistency未正規化または未処置missing operationではCRUD全体をcompleteにしない
+- 個々の空cellを自動欠陥化しない
 
 ### Cause-Effect
 
@@ -262,8 +270,9 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - undefined nonterminal
 - unreachable production
 - recursion / max depth
-- shortest derivation
+- production適用回数最小 + production key列辞書順tie-breakのshortest derivation
 - production Coverage
+- `symbol_index`境界とterminal item検証
 - `delete_terminal / replace_terminal / insert_terminal`だけをmutationとして許可
 - mutation結果を自動で製品上invalidと断定しない
 
@@ -279,15 +288,19 @@ raw machine-readable入力をfixtureにします。
 - OpenAPI 3.0 `nullable` / boolean exclusive boundary
 - HTML constraint validation
 - unsupported applicator
+- annotation allowlistだけをvalidation非影響として許可
 - unsupported keywordが意味へ影響するsubtreeだけを局所`unsupported`
 - 親validation意味を左右する場合は親subtree全体を`unsupported`
-- annotationだけでは拒否しない
-- HTML `pattern`をPython `re`で評価しない
-- 正規化constraintをEP / BVA / test data requirementへ直接渡す
+- HTML `pattern`を保持するがPython `re`で評価しない
+- JSON Schema `multipleOf` → `grid(base=0, step=m)`
+- HTML数値`step`は`min`ありの場合だけgrid化し、minなし / date-time系は`unsupported`
+- range / enum / requiredはEP / BVA / combinatorial / test dataへ、gridはschema Coverage / BVA / combinatorialだけへ渡す
 
 ### UI pattern
 
-- pattern / alias一意性
+- `pattern_key / name / alias`のcatalog全体一意性と相互衝突
+- pattern内`candidate_key`一意性とcategory許可値
+- `ui:<pattern_key>:<candidate_key>` stable target
 - catalog SHA-256
 - catalog変更で旧結果stale
 - external referenceをAuthorityへ昇格しない
@@ -308,22 +321,24 @@ raw machine-readable入力をfixtureにします。
 - seed=42固定test vector
 - 同seedで同列
 - seed差
-- `uniform_finite`: non-empty / duplicate拒否
+- `uniform_finite`: typed value、non-empty / duplicate拒否、宣言順sample mapping
 - `uniform_integer`: inclusive min/max
-- `categorical`: positive integer weightのみ、value重複拒否
+- `categorical`: typed value、positive integer weightのみ、value重複拒否、宣言順累積区間
 - case count limit
 - 一般Coverage 100%を作らない
 - `required_case_count / generated_case_count / complete`による終了条件
 
 ### Metamorphic Testing
 
+- `follow_ups[]`の`follow_up_key`一意性と1..10,000件
+- 各follow-upの`transforms[]`を宣言順に逐次適用
 - `set / add_decimal / multiply_decimal / append / permute / sort`のrequired parameter
 - JSON pathはobject key / array indexだけ
 - `permute` indicesが完全bijection
 - `equal / not_equal`、numeric monotonic、unique scalar array subset / supersetの型制約
 - unsupported transform / path / relation
 - source → follow-up traceability
-- relationごとのrequired source数 / follow-up数
+- `required_pairs = source数 × follow_up数`
 - 一般Coverage 100%を作らない
 - 各MRを1回扱っただけで十分と判定しない
 - relation自体をscriptが創作しない
