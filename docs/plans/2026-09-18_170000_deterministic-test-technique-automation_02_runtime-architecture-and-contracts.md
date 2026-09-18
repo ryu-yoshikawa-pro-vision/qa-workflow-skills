@@ -364,7 +364,24 @@ runtime入力は`metadata`とscript固有`input`を分けます。
 - `model_key`: 技法modelを処理するscriptだけ必須。形式は`<technique-slug>-\d{3,}`。artifact全体scriptでは`null`
 。model scriptでは`null`
 - artifact全体scriptは`risk_matrix.py`、`technique_candidates.py`、`change_impact.py`、`environment_requirements.py`、`requirement_structure.py`、`case_structure.py`、`traceability.py`、`materialize_coverage.py`とし、同一成果物内で同じ`generator + scope_key`を重複させない
-- `runtime_required`: 入力が本Planの対応subsetに該当しruntimeで機械処理すべき場合は`true`。対応subset外でLLM fallbackを許可する場合だけ`false`
+
+artifact全体scriptの`scope_key`は次で固定します。
+
+| script | scope_key |
+| --- | --- |
+| `risk_matrix.py` | `risks` |
+| `technique_candidates.py` | inputの`selection_key` |
+| `change_impact.py` | `impact` |
+| `environment_requirements.py` | `environment` |
+| `requirement_structure.py` | `requirements` |
+| `case_structure.py` | `cases` |
+| `traceability.py` | `traceability` |
+| `materialize_coverage.py` | inputの`tcn_id` |
+
+`generator`はscript basenameから`.py`を除いた文字列で固定します。
+- `runtime_required`: 自由入力ではなくPlanの対応subsetから導出する。対応scriptのinput schemaへ正規化できる場合は必ず`true`。対応script自体が存在しないsubset外だけ`false`
+- `runtime_required=false`のunitはscriptを呼ばず`runtime_status=not_run / deterministic_generated=false`としてfallback metadataを保存する
+- supported inputに対して`runtime_required=false`を設定した成果物はvalidatorで失敗させる
 - `selection_source`: 技法modelだけ必須で`analysis / user / existing_artifact`。artifact全体scriptでは`null`
 - `upstream_entities`: 実際に消費した上流Entity単位で保持する。`skill + entity_ref`を一意keyとし、そのEntityのcanonicalな構造化内容から`content_fingerprint`を計算する
 - `static_data_versions`: keyは`^[a-z][a-z0-9_]*$`、valueは`sha256:<64 lowercase hex>`または明示的なcontract version文字列`^[A-Za-z0-9][A-Za-z0-9._-]*$`
