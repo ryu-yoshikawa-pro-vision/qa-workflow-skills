@@ -142,7 +142,7 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - `depends_on / traces_to / derived_from`の探索方向
 - unknown node / dangling edge
 - 名称類似だけでedge追加しない
-- upstream content fingerprint変更時の影響model限定
+- upstream Entity content fingerprint変更時の影響model限定
 
 ### test environment requirement
 
@@ -559,7 +559,7 @@ repository全体は328 queryです。
    - workflow完了
 
 2. 上流Authority変更
-   - upstream content fingerprint変更
+   - upstream Entity content fingerprint変更
    - 人間向け説明文だけの変更ではfingerprint不変
    - 影響modelだけ`要再検証`
    - stale派生物を拒否
@@ -574,7 +574,7 @@ repository全体は328 queryです。
    - 1 modelだけ未解決
    - `question-analysis`往復で`model_key / target_key`維持
    - 独立modelは継続
-   - 成果物metadataから状態を再構築し、qa-workflow出力時は既存Skill状態表と新しいモデル状態表へ反映
+   - 成果物metadataから状態を再構築し、qa-workflow出力時は既存Skill状態表と新しいruntime状態表へ反映
    - workflowは部分完了
 
 5. runtime unsupported
@@ -700,7 +700,7 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 
 ### `qa-workflow`
 
-- 既存Skill状態表を維持し、別表`モデル状態`を追加
+- 既存Skill状態表を維持し、別表`runtime状態`を追加
 - model単位状態を成果物metadataから再構築
 - legacy昇格
 - upstream Entity別content fingerprint / stale伝播
@@ -726,7 +726,7 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 - canonicalization
 - envelope / runtime / generator contract version
 - static data versions
-- model / generation fingerprint
+- input / model / generation fingerprint
 - upstream Entity content fingerprint
 - item / byte / depth / search node hard limit
 - tie-break
@@ -743,7 +743,7 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 - upstream Entity別content fingerprint
 - question-analysisのModel / Target保持
 - coverage-analysisのModel Key追跡
-- qa-workflowのSkill状態表 + モデル状態表
+- qa-workflowのSkill状態表 + runtime状態表
 - legacy昇格
 
 ### Step 3: test-analysis
