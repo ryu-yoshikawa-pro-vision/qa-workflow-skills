@@ -496,8 +496,9 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 確認:
 
 - repo rootのeval helperをimportしない
+- 5 Skillの`scripts/runtime_contract.py`がSHA-256一致
 - network不要
-- 必要依存が`compatibility`またはrepository依存へ明示
+- 必要依存が`compatibility`またはSkillと一緒に移植可能なmanifestへ明示
 - Skill rootからscriptを解決
 - stdout envelopeを読める
 - Python unavailable時にSkill全体を利用不能と誤判定しない
@@ -515,10 +516,12 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 
 ### `test-analysis`
 
-- risk scheme
-- technique signal machine evidence
+- `SKILL.md` / `references/guidance.md`へ新規正規技法と選択条件を追加
+- `assets/output-template.md`へ`Selection Source`と技法選択machine evidenceを追加
+- risk scheme / priority mapping
 - change graph
 - environment requirement
+- deterministic / semantic / trigger evalを更新
 
 ### `test-requirement-design`
 
@@ -526,12 +529,13 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 
 ### `test-condition-design`
 
-- 全実装技法のCoverage契約
-- 正規化model表
-- stable target / CI mapping
+- `SKILL.md`の対象技法を更新
+- `references/coverage-techniques.md`へ全実装技法の適用条件、Coverageまたは終了条件を追加
+- `assets/output-template.md`へ正規化model metadata、fenced JSON machine model、stable target / CI mappingを追加
+- Random / Metamorphicは一般Coverage 100%を定義しない
 - runtime metadata
 - test data requirement
-- machine evidence
+- deterministic / semantic / trigger evalを更新
 
 ### `test-case-design`
 
@@ -541,12 +545,17 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 ### `coverage-analysis`
 
 - stale / fingerprint / test-design traceability
+- model_key単位のgap / stale参照
+
+### `question-analysis`
+
+- runtime issueの`model_key / target_key`を質問・ブロック・再開まで保持
 
 ### `qa-workflow`
 
-- model単位状態
+- model単位状態を成果物metadataから再構築
 - legacy昇格
-- upstream version / stale伝播
+- upstream semantic fingerprint / stale伝播
 - 完了条件
 
 ### `EVALS.md` / `ASSERTIONS.md`
@@ -566,9 +575,10 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 - strict JSON
 - output envelope
 - canonicalization
-- contract version
+- envelope / generator contract version
 - static data version
-- model fingerprint
+- model / generation fingerprint
+- semantic fingerprint
 - hard limit
 - tie-break
 - structured issue
@@ -576,17 +586,19 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 ### Step 2: identity / workflow基盤
 
 - stable model key
-- stable QA ID
+- 既存TR / TCN / TCのID再利用規則と999上限
 - target → CI mapping
 - upsert / stale
-- upstream artifact version
+- upstream semantic fingerprint
 - qa-workflow model単位状態
 - legacy昇格
 
 ### Step 3: test-analysis
 
-- risk scheme
-- technique candidates
+- risk scheme / priority mapping
+- technique candidates / Selection Source
+- 新規正規技法のSkill契約
+- trigger eval更新
 - change graph / impact
 - environment requirement
 
@@ -599,9 +611,10 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 
 - EP / Each Choice
 - BVA
-- Domain Testing
+- Domain Testing ON / OFF / IN / OUT
 - schema / HTML parser
 - test data requirement
+- 新規技法のSkill / reference / template / eval契約
 
 ### Step 6: rule / model技法
 
@@ -616,7 +629,7 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 - constraint付きBase Choice
 - Pairwise / N-wise
 - mixed-strength
-- Classification Tree adapter
+- `classification_tree.py` adapter
 
 ### Step 8: state / scenario
 
@@ -628,8 +641,9 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 
 ### Step 9: Random / Metamorphic / UI
 
-- `pcg32-v1`
-- metamorphic relation
+- `pcg32-v1`固定test vector
+- Random completion criterion
+- Metamorphic relation / completion criterion
 - UI catalog / static version
 
 ### Step 10: test-case / traceability
