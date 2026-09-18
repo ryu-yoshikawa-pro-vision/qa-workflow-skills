@@ -18,7 +18,7 @@ generator系scriptの`payload`は次を基本形とします。
 }
 ```
 
-- `targets`: 技法固有のstable target keyを持つ機械生成対象
+- `targets`: 技法固有のstable `target_key`を持つ機械生成対象。model generatorは共通post-processで`model_key + target_key`から`target_ref`も付与する
 - `coverage_summary`: Coverage基準を持つ技法だけが使用する。Random Testing / Metamorphic Testingのように一般的なCoverage基準を持たない技法では、技法固有の終了条件を`completion_summary`として返す
 - `derived`: 次scriptへ直接渡す機械変換結果
 - `metadata`: target以外の再現可能な補助情報
@@ -906,7 +906,7 @@ LLM draft後に次を計算します。
 
 LLMは`merge_group`だけを明示します。scriptは同じgroupについて次を機械統合します。
 
-- Covered Target Keys
+- Covered Target Refs
 - Authority refs
 - Reference refs
 - 優先度は既存規則の最高値
@@ -1184,11 +1184,14 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 
 #### `materialize_coverage.py`
 
-- required: `tcn_id`, `models[]`, `previous_target_id_map`, `merge_groups[]`
-- model: `{model_key, generator_contract_version, targets[]}`。targetは`{target_key, authority_refs, reference_refs, priority, expected_result_root, test_data_requirements}`
-- `previous_target_id_map`はobject `{target_key: ci_id}`
-- merge groupは`_02` §11形式
-- outputは`target_id_map`、`coverage_item_rows`、`stale_ci_ids`、`issues`
+- required: `tcn_id`, `models[]`, `previous_target_id_map[]`, `merge_groups[]`
+- model: `{model_key, runtime_unit_key, input_fingerprint, model_fingerprint, generation_fingerprint, generator_contract_version, targets[]}`
+- target: `{target_ref, target_key, authority_refs, reference_refs, priority, expected_result_root, test_data_requirements}`
+- `target_ref`は`_02` §7.2の式を再計算して一致必須
+- `previous_target_id_map[]`: `{target_ref, model_key, target_key, ci_id}`
+- merge groupは`_02` §11形式の`target_refs[]`
+- outputは`target_id_map[]`、`coverage_item_rows`、`stale_ci_ids`、`issues`
+- `target_id_map[]`: `{target_ref, model_key, target_key, ci_id}`
 
 `valid_minimal.json`は上記schemaの実行例であり正本ではありません。optional fieldは上記で明記したものだけとし、Skill referenceはこのPlanのschemaをそのまま説明します。
 
