@@ -410,6 +410,7 @@ scriptが実行できた場合、stdoutは次のJSON object 1件だけです。
   "result_status": "ready",
   "runtime_required": true,
   "deterministic_generated": true,
+  "fallback_reason": null,
   "payload": {},
   "issues": []
 }
@@ -444,9 +445,11 @@ status対応は次で固定します。
 
 `stale`は`result_status`ではありません。成果物保存時の`freshness_status = current / stale`として`qa-workflow`がfingerprint比較から付与します。
 
+`fallback_reason`は`null / outside_supported_subset / python_unavailable`だけを許可します。script実行済みenvelopeでは`null`です。`runtime_status=not_run`では`input_fingerprint / model_fingerprint / generation_fingerprint`を`null`とし、決定論的再利用の証拠に使いません。
+
 技法modelでは成果物metadataの`model_status`を`result_status`と同じ値にします。artifact全体scriptでは`artifact_status`を同じ値にします。
 
-`runtime_required=false`の対応subset外fallbackはscriptを呼ばず、成果物metadataを`runtime_status=not_run / result_status=ready / deterministic_generated=false / fallback_reason=outside_supported_subset`として保存します。fallback結果が既存Skill契約を満たせばワークフロー完了を妨げません。`runtime_required=true`のunitで`deterministic_generated=false`なら決定論的処理未完了であり、ワークフロー全体を`完了`にしません。
+`runtime_required=false`の対応subset外fallbackはscriptを呼ばず、成果物metadataを`runtime_status=not_run / deterministic_generated=false / fallback_reason=outside_supported_subset`として保存します。LLM fallbackが既存Skill契約を満たせば`result_status=ready`、満たせなければ`blocked`です。`runtime_required=true`のunitで`deterministic_generated=false`なら決定論的処理未完了であり、ワークフロー全体を`完了`にしません。
 
 Python unavailable時もSkillは既存LLM経路で成果物を作成できますが、本来runtime対象なら`runtime_required=true / runtime_status=not_run / result_status=readyまたはblocked / deterministic_generated=false / fallback_reason=python_unavailable`を保持し、ワークフローは`部分完了（ブロック中あり）`または`ブロック中`とします。
 
@@ -855,7 +858,7 @@ runtime単位状態の正本は各成果物に保存した`runtime_unit_key`、`
 
 `qa-workflow`には既存Skill状態表とは別に次の`runtime状態`表を追加します。
 
-`Skill | Runtime Unit Key | Model Key | Result Status | Freshness | Runtime Status | Runtime Required | Deterministic Generated | Blocker / Issue`
+`Skill | Runtime Unit Key | Model Key | Result Status | Freshness | Runtime Status | Runtime Required | Deterministic Generated | Fallback Reason | Blocker / Issue`
 
 - `Runtime Unit Key`は同一Skill内一意
 - model scriptは`Runtime Unit Key = model:<model_key>`とし、`Model Key`を必須
@@ -864,6 +867,7 @@ runtime単位状態の正本は各成果物に保存した`runtime_unit_key`、`
 - `Freshness`は`current / stale`
 - `Runtime Status`は`ok / invalid_input / unsupported / limit_exceeded / internal_error / not_run`
 - `Runtime Required`と`Deterministic Generated`は`Yes / No`
+- `Fallback Reason`は空欄 / `outside_supported_subset` / `python_unavailable`
 - Skill状態表の`WF-D012`は既存Skill状態表だけへ適用し、runtime状態表へ流用しない
 - 1 runtime unitだけ`blocked / unresolved / stale`でも独立した他unitは継続可能
 - すべてのruntime unitで`Result Status=ready / Freshness=current`を必須とする
