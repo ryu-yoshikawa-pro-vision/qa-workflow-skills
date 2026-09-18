@@ -123,6 +123,18 @@ LLMまたは対象調査で次が取得できる場合、技法へ接続しま�
 
 ## 5. 外部標準
 
+### ISTQBのテスト技法
+
+自動化対象の一覧化に使う基準集合として、次を参照します。
+
+- CTFL v4.0.1: https://www.istqb.org/wp-content/uploads/2024/11/ISTQB_CTFL_Syllabus_v4.0.1.pdf
+- CTAL-TA v4.0: https://istqb.org/wp-content/uploads/sdm-uploads/ISTQB-CTAL-TA-Syllabus-v4.0-EN-4.pdf
+- CTAL-TTA v4.0: https://www.istqb.org/wp-content/uploads/2024/11/ISTQB-CTAL-TTA_Syllabus_v4.0.pdf
+
+CTAL-TA v4.0で扱われるDomain Testing、Base Choice / Pairwise等のCombinatorial Testing、Random Testing、CRUD Testing、N-switch、Round-trip Coverage等を一覧化の確認に使います。
+
+これらは網羅性確認の基準であり、外部資料にある技法をそのまま現行`test-analysis`の正規技法名へ追加する根拠にはしません。現在のSkill責務・出力契約へ自然に収まるものだけ、既存技法の内部Coverage modeまたは候補生成元として実装します。
+
 ### WAI-ARIA Authoring Practices Guide
 
 参照先:
@@ -146,6 +158,14 @@ native HTML controlの属性、form control、button、select等について、p
 アクセシビリティ要件が対象scopeに含まれる場合だけ利用します。すべてのテスト条件へ自動で大量追加する使い方はしません。
 
 ## 6. 既存プロジェクト・Agent Skillsの調査結果
+
+### Agent Skills Specification
+
+このリポジトリが`validate-skills.yml`でpinしているAgent Skills仕様を正本として確認します。
+
+仕様上、Skill packageの`scripts/`は任意の実行可能リソースで、実際に対応するscript言語はAgent実装に依存します。また環境要件はfrontmatterの`compatibility`へ記載できます。
+
+このためPython runtime scriptを追加するSkillにはPython 3.11要件を`compatibility`へ明記し、Skill単体移植性を「ファイルをコピーできること」だけでなく「必要runtimeが明示されていること」まで含めて検証します。
 
 ### Microsoft PICT
 
