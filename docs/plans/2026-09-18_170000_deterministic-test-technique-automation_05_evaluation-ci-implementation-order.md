@@ -289,6 +289,8 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 raw machine-readable入力をfixtureにします。
 
 - JSON Schema 2020-12対応keyword
+- `$defs`をlocal `$ref`参照先containerとして扱う
+- single typeと`[base, null]`だけを対応し、nullableを`allows_null`へ正規化
 - `properties / items` traversal
 - local JSON Pointer `$ref`
 - cyclic local `$ref` subtreeは`unsupported`
@@ -296,7 +298,7 @@ raw machine-readable入力をfixtureにします。
 - OpenAPI 3.0 `nullable` / boolean exclusive boundary
 - HTML constraint validation
 - unsupported applicator
-- annotation allowlistだけをvalidation非影響として許可
+- `$schema / $id`をmetadataとして許可し、annotation allowlistだけをvalidation非影響として許可
 - unsupported keywordが意味へ影響するsubtreeだけを局所`unsupported`
 - 親validation意味を左右する場合は親subtree全体を`unsupported`
 - HTML `pattern`を保持するがPython `re`で評価しない
