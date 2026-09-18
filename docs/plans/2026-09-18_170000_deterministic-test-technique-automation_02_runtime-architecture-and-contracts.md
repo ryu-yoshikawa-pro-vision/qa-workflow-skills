@@ -48,6 +48,7 @@ generatorとvalidatorは独立実装とし、同じ不具合で生成と評価�
 
 ```text
 skills/test-analysis/scripts/
+├── runtime_contract.py
 ├── risk_matrix.py
 ├── technique_candidates.py
 ├── change_impact.py
@@ -63,6 +64,7 @@ skills/test-analysis/scripts/
 
 ```text
 skills/test-requirement-design/scripts/
+├── runtime_contract.py
 └── requirement_structure.py
 ```
 
@@ -72,6 +74,7 @@ TR本文は生成せず、Authority / Risk → TRの閉鎖、未知参照、Disp
 
 ```text
 skills/test-condition-design/scripts/
+├── runtime_contract.py
 ├── equivalence_partitions.py
 ├── bva.py
 ├── domain_testing.py
@@ -94,6 +97,7 @@ skills/test-condition-design/scripts/
 
 ```text
 skills/test-case-design/scripts/
+├── runtime_contract.py
 └── case_structure.py
 ```
 
@@ -103,6 +107,7 @@ skills/test-case-design/scripts/
 
 ```text
 skills/coverage-analysis/scripts/
+├── runtime_contract.py
 └── traceability.py
 ```
 
@@ -113,6 +118,19 @@ skills/coverage-analysis/scripts/
 新しい工程固有scriptは追加しません。既存の成果物再利用、上流変更伝播、局所ブロック、完了判定を、以下のversion / fingerprint / runtime状態へ対応させます。
 
 ## 3. 共通JSON契約
+
+### 3.0 CLI契約
+
+すべてのruntime scriptは同じCLI契約を使用します。
+
+- 起動は`python <script-path>`
+- stdinからUTF-8のstrict JSON objectを1件だけ読む
+- positional argument、入力file path、環境変数から業務入力を受け取らない
+- cwdへ依存せず、Skill root相対のassetは`__file__`から解決する
+- stdoutはruntime envelopeのJSON object 1件だけ。logや説明文を混在させない
+- stderrは人間向け診断だけに使う
+- stdinが空、JSONが複数、末尾に非空白データが残る場合は`invalid_input`
+- subprocess呼び出し側はstdout / stderr / return codeをすべて取得し、return codeだけでroutingしない
 
 ### 3.1 strict JSON
 
@@ -129,33 +147,40 @@ Python実装では、duplicate key検出用`object_pairs_hook`、非有限数拒
 
 ### 3.2 共通入力metadata
 
-各modelは少なくとも次を持ちます。
+runtime入力は`metadata`とscript固有`input`を分けます。
 
 ```json
 {
-  "envelope_version": "1",
-  "generator_contract_version": "combinatorial-v1",
-  "model_key": "pairwise-01",
-  "upstream_artifacts": [
-    {
-      "skill": "test-requirement-design",
-      "semantic_fingerprint": "sha256:..."
-    }
-  ],
-  "static_data_versions": {},
-  "authority_refs": ["SPEC-001"],
-  "reference_refs": []
+  "metadata": {
+    "envelope_version": "1",
+    "runtime_contract_version": "runtime-v1",
+    "generator_contract_version": "combinatorial-v1",
+    "model_key": "pairwise-001",
+    "upstream_entities": [
+      {
+        "skill": "test-requirement-design",
+        "entity_ref": "TR-001",
+        "content_fingerprint": "sha256:..."
+      }
+    ],
+    "static_data_versions": {},
+    "authority_refs": ["SPEC-001"],
+    "reference_refs": []
+  },
+  "input": {}
 }
 ```
 
-- `envelope_version`: runtime共通envelopeの互換性version。全generator共通
-- `generator_contract_version`: 各generator固有の入出力・Coverage契約version。互換性を壊す変更でそのgeneratorだけ更新する
-- `model_key`: 同一成果物系列のmodel識別
-- `upstream_artifacts`: 正規化に使用した上流成果物の意味データfingerprint。Markdown全文hashや自由記述versionを使わない
-- `static_data_versions`: 出力へ影響するcatalog / scheme / assetのversionまたはfingerprint
+- `envelope_version`: runtime envelope形式のversion
+- `runtime_contract_version`: strict JSON、canonicalization、共通status、fingerprint等の共通処理version
+- `generator_contract_version`: script固有の入出力・Coverage契約version。schema互換でも生成結果、tie-break、Coverage、target keyへ影響する変更では必ず更新する
+- `model_key`: 技法modelを処理するscriptだけ必須。形式は`<technique-slug>-\d{3,}`
+- artifact全体を処理する`risk_matrix.py`、`technique_candidates.py`、`change_impact.py`、`environment_requirements.py`、`requirement_structure.py`、`case_structure.py`、`traceability.py`では`model_key`を禁止し、対象Entityはscript固有inputのIDで識別する
+- `upstream_entities`: 実際に消費した上流Entity単位で保持する。`skill + entity_ref`を一意keyとし、そのEntityのcanonicalな構造化内容から`content_fingerprint`を計算する
+- `static_data_versions`: keyは`^[a-z][a-z0-9_]*$`、valueは`sha256:<64 lowercase hex>`または明示的なcontract version文字列`^[A-Za-z0-9][A-Za-z0-9._-]*$`
 - `authority_refs`: 製品固有expected resultを確定できる現在有効な根拠
 - `reference_refs`: 外部標準、一般UI資料、DOM / 実装事実等の補助情報
-
+- script固有入力は必ず`input`配下に置き、metadataと同じkeyを再定義しない
 ### 3.3 runtime出力envelope
 
 成功・想定内の未処理状態を含め、stdoutは常に1つのJSON objectにします。
