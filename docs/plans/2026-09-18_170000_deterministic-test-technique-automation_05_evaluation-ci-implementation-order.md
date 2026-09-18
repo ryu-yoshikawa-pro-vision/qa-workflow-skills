@@ -72,6 +72,8 @@ CLI integration testは各代表fixtureをsubprocessで`python <script-path>`起
 - `internal_error`は可能ならenvelopeを返して終了code 1、envelope生成不能も1
 - Agent側は終了codeだけで判断せずstdout envelopeをparseする
 - supported subsetへの`unsupported`を正常fallback扱いしない
+- supported inputで`runtime_required=false`を拒否する
+- artifact scriptのscope keyがscript別固定値 / input由来値と一致する
 - Python unavailable / runtime未実行は成果物metadataで`runtime_status=not_run / deterministic_generated=false`
 - status対応表どおりの`result_status / runtime_required / deterministic_generated`を要求
 - model scriptでは`model_status=result_status`、artifact全体scriptでは`artifact_status=result_status`
@@ -90,7 +92,7 @@ CLI integration testは各代表fixtureをsubprocessで`python <script-path>`起
 - artifact全体scriptでもinput変更で`input_fingerprint / generation_fingerprint`が変わる
 - upstream Entityの正規字段変更でその`content_fingerprint`だけが変わる
 - 無関係なupstream Entity変更では対象runtime unitをstaleにしない
-- generator、runtime contract、generator contract、static data version変更で`generation_fingerprint`が変わる
+- envelope version、generator、runtime contract、generator contract、static data version変更で`generation_fingerprint`が変わる
 - machine outputへ影響するbug fix / tie-break変更でgenerator contract versionを更新する
 - fenced JSONの保存→抽出→strict decode→canonical化でmodel fingerprintが一致する
 
