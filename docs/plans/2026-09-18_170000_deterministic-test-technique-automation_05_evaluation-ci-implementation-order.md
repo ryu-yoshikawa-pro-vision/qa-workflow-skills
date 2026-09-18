@@ -139,7 +139,7 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - `depends_on / traces_to / derived_from`の探索方向
 - unknown node / dangling edge
 - 名称類似だけでedge追加しない
-- upstream semantic fingerprint変更時の影響model限定
+- upstream content fingerprint変更時の影響model限定
 
 ### test environment requirement
 
@@ -386,18 +386,43 @@ raw machine-readable入力をfixtureにします。
 
 ### `coverage-analysis`
 
-runtime traceabilityと既存validatorが同じfixtureに対して独立にmissing / orphan / unknown / staleを検出できることを確認します。stale / gapはTCN / CIだけでなく関連`model_key`まで追跡します。
+`assets/output-template.md`を次のように更新します。
+
+- `カバレッジ基準確認`へ`Model Key`列を追加
+- `カバレッジ項目の扱い`へ`Model Key`列を追加
+- `陳腐化 / 孤立分析`へ`Model Key`列を追加
+- modelを持たないlegacy / E2E経路では空欄を許可
+
+validatorはruntime traceabilityと独立にmissing / orphan / unknown / staleを検出し、stale / gapをTCN / CIだけでなく関連`model_key`まで追跡します。
 
 ### `question-analysis`
 
-runtime issue由来の`model_key` / `target_key`が質問一覧、ブロック中範囲、回答後の再開情報で失われないことを確認します。技法固有判定は追加しません。
+`assets/output-template.md`の`不明点 / 質問一覧`と`ブロック中範囲`へ、既存の`再開対象 / 実行範囲`とは別に`Model Key`と`Target Key`列を追加します。
+
+- `再開対象 / 実行範囲`は既存`QUESTION-D017`のSkill用途判定だけに使用する
+- `Model Key` / `Target Key`はruntime issueの局所識別専用とし、単一用途Skillでも値を許可する
+- 同じブロッカーIDについて質問一覧とブロック中範囲のModel / Targetが一致することをvalidatorで確認する
+- runtime issue由来でない質問では両列を空欄にできる
 
 ### `qa-workflow`
 
-次を完了条件・再利用条件へ追加します。
+既存Skill状態表は`qa-workflow`出力時に引き続き必須とし、`WF-D009`は維持します。ただし永続正本にはせず、成果物metadataから再構築可能にします。
 
-- envelope / generator contract version
-- upstream semantic fingerprint
+`assets/workflow-state-template.md`へ別表`モデル状態`を追加します。
+
+`Skill | Model Key | Model Status | Freshness | Runtime Status | Deterministic Generated | Blocker / Issue`
+
+- `Model Key`は同一Skill内一意
+- `Freshness`は`current / stale`
+- `Runtime Status`は`ok / invalid_input / unsupported / limit_exceeded / internal_error / not_run`
+- `Deterministic Generated`は`Yes / No`
+- Skill状態表の`WF-D012`は従来どおりSkill + 対象にだけ適用し、モデル状態表へ流用しない
+- ワークフロー全体`完了`では必須modelに`stale / unresolved / blocked`または`Deterministic Generated=No`の未処置が残らないことを追加検査する
+
+完了条件・再利用条件へ次を追加します。
+
+- envelope / runtime / generator contract version
+- upstream Entity別content fingerprint
 - model / generation fingerprint
 - stale派生成果物
 - model単位の`要再検証` / ブロック中
@@ -457,7 +482,7 @@ semantic referenceをgenerator outputから自動生成しません。
    - workflow完了
 
 2. 上流Authority変更
-   - upstream semantic fingerprint変更
+   - upstream content fingerprint変更
    - 人間向け説明文だけの変更ではfingerprint不変
    - 影響modelだけ`要再検証`
    - stale派生物を拒否
@@ -583,7 +608,7 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 
 - model単位状態を成果物metadataから再構築
 - legacy昇格
-- upstream semantic fingerprint / stale伝播
+- upstream content fingerprint / stale伝播
 - 完了条件
 
 ### `EVALS.md` / `ASSERTIONS.md`
@@ -606,7 +631,7 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 - envelope / generator contract version
 - static data version
 - model / generation fingerprint
-- semantic fingerprint
+- content fingerprint
 - hard limit
 - tie-break
 - structured issue
@@ -617,7 +642,7 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 - 既存TR / TCN / TCのID再利用規則と999上限
 - target → CI mapping
 - upsert / stale
-- upstream semantic fingerprint
+- upstream content fingerprint
 - qa-workflow model単位状態
 - legacy昇格
 
@@ -731,7 +756,7 @@ Plan完了には次をすべて満たす必要があります。
 - `_01`で実装対象にした処理がruntimeまたは既存機械処理へ割り当てられている
 - 目的内の技法・構造処理が本Plan外へ先送りされていない
 - strict JSON / envelope / canonicalization / envelope version / generator contract versionが実装済み
-- upstream semantic fingerprint、static data version、model / generation fingerprintが再現可能
+- upstream content fingerprint、static data version、model / generation fingerprintが再現可能
 - 正規化modelのMarkdown fenced JSON round-tripが成立する
 - stable model key / 既存Entity ID再利用 / CI mappingが契約どおり
 - 再実行がupsertされ重複machine evidenceを作らない
