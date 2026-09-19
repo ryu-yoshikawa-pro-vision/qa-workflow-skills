@@ -513,7 +513,7 @@ completeness:
 - matrixに明示された各operationをCoverage targetとする
 - target keyは`crud:op:<entity_key>:<function_key>:<C|R|U|D>`
 - entityごとにC/R/U/Dの各operationがmatrix全体で1回も存在しない場合、`crud:missing:<entity_key>:<C|R|U|D>` anomalyを生成する
-- missing operationは即欠陥とは断定せず、`operation_dispositions[]`にAuthority付きの`not_applicable`がなければ`model_status=unresolved`として`question-analysis`へ送る
+- missing operationは即欠陥とは断定せず、`operation_dispositions[]`にAuthority付きの`not_applicable`がなければ`result_status=unresolved`として`question-analysis`へ送る
 - `operation_dispositions[]`: `{entity_key, operation, handling, reason, authority_refs}`。`handling`は`not_applicable`だけを許可し、Authority 1件以上を必須とする
 - 個々の空cellだけを理由に欠陥扱いしない
 
@@ -542,7 +542,7 @@ consistency:
 - negative sequenceはAuthorityで明示された「未作成のR/U/D」「削除後のR/U/D」等だけを入力し、scriptが業務上の禁止操作を創作しない
 - sequence target keyは`crud:seq:<sequence_key>`
 
-`coverage_summary`は`completeness`と`consistency`を別々に返し、両方completeでのみCRUD modelをcompleteとします。未処置missing operationまたはconsistency sequence未正規化があれば`model_status=unresolved`とし、completenessだけで「CRUD Testing完了」と表現しません。
+`coverage_summary`は`completeness`と`consistency`を別々に返し、両方completeでのみCRUD modelをcompleteとします。未処置missing operationまたはconsistency sequence未正規化があれば`result_status=unresolved`とし、completenessだけで「CRUD Testing完了」と表現しません。
 ## 12. Cause-Effect Graph
 
 ### `cause_effect.py`
@@ -1013,7 +1013,8 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 
 #### `technique_candidates.py`
 
-
+- required: `selection_key`, `signals`
+- `selection_key`は`^[A-Za-z][A-Za-z0-9._:-]{0,63}$`
 - `signals`は§2で列挙した12 keyをすべて持ち、値は`true / false / null`
 - signal以外の技法選択、`selection_source`、最終採用技法はこのscript入力に含めない
 
