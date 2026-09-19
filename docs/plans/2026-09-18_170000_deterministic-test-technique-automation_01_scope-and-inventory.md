@@ -91,7 +91,7 @@ Domain Testing、CRUD Testing、Random Testing、Metamorphic Testing、Syntax-Ba
 generatorが返す100%等のCoverageは、**明示された正規化済みモデル内のCoverage**です。対象仕様全体の100%とは扱いません。
 
 - Authority / Risk → TR → TCNの上流閉鎖は別途確認する
-- 選択した技法はmodel、対象外、未解決、または明示的なruntime非対応へ必ず閉じる
+- 選択した技法は`selection_key + technique_slug`でmodel、対象外、未解決、またはmodel実行後の明示的なruntime非対応へ必ず閉じ、TCNの`technique_slugs[]`と所属active modelのslug集合を一致させる
 - 正規化済みモデルが上流の意味を十分に表しているかはsemantic evalで確認する
 - 全runtime unitで`result_status=ready / freshness_status=current`を必須とし、さらに`runtime_required=true`のunitでは`deterministic_generated=true`を必須とする
 - Dispositionによる成果物上の閉鎖と技法Coverage達成を混同しない
@@ -116,7 +116,9 @@ generatorが返す100%等のCoverageは、**明示された正規化済みモデ
    - Authority / Risk → TRの構造処理
 
 4. `test-condition-design`
+   - 技法選択 → TCN → model → generatorの対応検査
    - 各テスト技法generator
+   - generator別`materializable` / canonical `execution`の生成
    - schema / HTML / UI候補
    - テストデータ要求
    - Coverage Itemの機械証拠
@@ -130,7 +132,8 @@ generatorが返す100%等のCoverageは、**明示された正規化済みモデ
 
 7. `qa-workflow`
    - contract / model version、上流変更、runtime unit間依存、stale派生成果物、局所ブロック、`要再検証`、legacy成果物再利用、完了判定
-   - fingerprint比較、runtime状態集約、機械的なstale / 完了判定をLLMに手計算させずruntime scriptで実行する
+   - dispatch表から導出した期待runtime unit集合と各Skill validatorが導出した期待Machine Entity集合を実際集合と比較し、完全欠落をblockerにする
+   - fingerprint比較、runtime / Entity状態集約、機械的なstale / 完了判定をLLMに手計算させずruntime scriptで実行する
 
 8. `question-analysis`
    - runtimeの構造化issueに含まれる`skill / runtime_unit_key / model_key / target_key / generation_fingerprint`を質問・ブロック・回答後の再開まで保持する
