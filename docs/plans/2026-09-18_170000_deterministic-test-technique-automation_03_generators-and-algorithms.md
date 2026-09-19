@@ -18,7 +18,7 @@ generator系scriptの`payload`は次を基本形とします。
 }
 ```
 
-- `targets`: 技法固有のstable `target_key`を持つ機械生成対象。model generatorは共通post-processで`model_key + target_key`から`target_ref`も付与する
+- `targets`: 技法固有のstable `target_key`を持つ機械生成対象。model generatorは共通post-processで`model_key + target_key`から`target_ref`も付与する。CIへmaterialize可能なtargetは、具体的な値・assignment・setup + sequence・path・生成input等、そのCoverageを1回実行するmachine表現を`execution`へ必須で持たせ、共通post-processで`execution_fingerprint`を計算する。診断・adapter専用targetは`execution`を持たず直接CI化しない
 - `coverage_summary`: Coverage基準を持つ技法だけが使用する。Random Testing / Metamorphic Testingのように一般的なCoverage基準を持たない技法では、技法固有の終了条件を`completion_summary`として返す
 - `derived`: 次scriptへ直接渡す機械変換結果
 - `metadata`: target以外の再現可能な補助情報
@@ -561,7 +561,15 @@ boolean AST:
 
 effectはcauseだけを参照します。循環参照は禁止します。
 
-全cause assignmentをhard limit内で列挙し、effect action vectorへ変換します。`derived.decision_table`は`conditions / actions / known_rules / constraints / accepted_merges=[]`を必ず持ち、`decision_table.py`のscript固有inputと直接互換にします。Cause-Effect側で意味上のmergeを作りません。
+入力は`causes[] / effects[] / constraints[]`です。`constraints[]`は§25.1の共通partial assignmentをcause keyへ適用し、Authority付きのcause間成立不能条件を表します。constraintをLLMが派生先で作り直しません。
+
+1. cause / effect key、AST参照、constraintのcause key / valueを検証する
+2. hard limit内で全cause assignmentを列挙する
+3. constraintに一致するassignmentを成立不能として識別し、正式known rule / Coverage母集団へ入れない
+4. 成立可能assignmentだけeffect action vectorへ変換する
+5. `derived.decision_table.conditions / actions / known_rules / constraints / accepted_merges=[]`を生成する。入力`constraints[]`は同じ意味のままDecision Table互換schemaへ渡す
+
+`derived.decision_table`は`decision_table.py`のscript固有inputと直接互換にし、Cause-Effect側で意味上のmergeを作りません。
 
 ## 13. Syntax-Based Testing
 
@@ -649,6 +657,10 @@ JSON Schema / OpenAPI document内のJSON numberは`_02` §3.1に従ってinteger
 
 ### HTML form control
 
+runtime-v1でconstraint生成対象とする`type`は`text / number / date / datetime-local`だけです。それ以外のnative control typeはUI pattern候補として扱えても、`schema_cases.py`ではcontrol subtreeを`unsupported`にします。
+
+受け取る属性:
+
 - type
 - required
 - min / max
@@ -659,7 +671,15 @@ JSON Schema / OpenAPI document内のJSON numberは`_02` §3.1に従ってinteger
 - readonly
 - multiple
 
-`pattern`は文字列としてreference / metadataへ保持しますが、ECMAScript RegExpとPython `re`を同一視して具体値生成しません。
+type別の扱い:
+
+- `text`: `required / minlength / maxlength`
+- `number`: `required / min / max / step`
+- `date / datetime-local`: `required / min / max`。本Planではdate/time系`step`を対応しない
+- 対応typeでHTML Standard上そのattributeが適用されない場合はvalidation constraintへ変換せずmetadataとして保持する
+- `disabled=true`、または対応typeで`readonly=true`の場合はconstraint validation対象外としてvalidation targetを生成しない。readonly / disabled自体のUI挙動はUI pattern側で扱う
+- `pattern`がvalidationへ適用されるcontrolはECMAScript RegExpをPython `re`で代用せず、そのcontrol validationを`unsupported`にする。pattern制約を無視したまま他constraintだけでcompleteにしない
+- `multiple`がvalidation意味を持つtypeはruntime-v1の対応type外なので`unsupported`とする。対応type上で意味を持たない場合はmetadataだけ保持する
 
 `multipleOf`と数値系HTML `step`は`grid` constraintへ正規化します。
 
@@ -672,8 +692,8 @@ JSON Schema / OpenAPI document内のJSON numberは`_02` §3.1に従ってinteger
 ```
 
 - JSON Schema `multipleOf=m`: `base=0 / step=m`
-- HTML `step=s`: `min`が存在する数値controlだけ`base=min / step=s`として対応
-- HTML `step`が存在して`min`がない場合、またはdate/time系stepは本Planの対応subset外としてそのcontrol subtreeを`unsupported`
+- HTML `step=s`: `type=number`かつ`min`が存在するcontrolだけ`base=min / step=s`として対応
+- `type=number`で`step`が存在して`min`がない場合、またはdate / datetime-local系stepは本Planの対応subset外としてそのcontrol subtreeを`unsupported`
 - `grid`はschema Coverage候補とBVA / combinatorial入力へ渡すが、`test_data_requirements.py`のintersection対象にはしない
 
 `allOf / anyOf / oneOf / not / if / then / else`等、対応subset外でvalidation意味を変えるkeywordは`unsupported`です。unsupported keywordがvalidation意味へ影響するsubtreeだけを切り離し、独立して評価できる別property / itemは継続できます。親schemaのvalidation意味をunsupported keywordが左右する場合は、その親subtree全体を`unsupported`にします。
@@ -1181,12 +1201,13 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 
 #### `cause_effect.py`
 
-- required: `causes[]`, `effects[]`
+- required: `causes[]`, `effects[]`, `constraints[]`
 - cause: `{cause_key, authority_refs}`
 - effect: `{effect_key, expression, true_value, false_value, authority_refs}`
 - expression ASTは`{"op":"ref","key":"C1"}`、`{"op":"not","arg":...}`、`{"op":"and|or","args":[...,...]}`だけ
 - refはcause keyだけを許可し、effect参照は禁止
 - true / false valueはtyped value
+- constraintは§25.1の共通partial assignmentで、assignment keyはcause keyだけを許可し、`derived.decision_table.constraints`へそのまま渡す
 
 #### `grammar_cases.py`
 
