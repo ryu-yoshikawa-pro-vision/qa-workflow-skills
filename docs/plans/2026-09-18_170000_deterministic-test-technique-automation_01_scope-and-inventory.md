@@ -8,7 +8,7 @@
 
 LLMには、仕様の意味理解、要素抽出、仕様根拠の対応付け、リスク判断、技法採用判断、成立条件の意味解釈、具体的な期待結果等の意味判断を残します。値・組合せ・遷移・経路・Coverage・追跡・優先度継承・重複検出・変更伝播等の機械処理はscriptへ移します。
 
-決定論性の保証対象は自然言語入力そのものではありません。**同じcanonicalなruntime入力、同じruntime / generator contract version、同じruntime / generator implementation fingerprint、同じ静的参照データversionから同じgenerator結果を再現でき、statefulなID materializeではさらに同じprevious mappingとmerge指定から同じID対応を再現できる状態**を作ります。
+決定論性の保証対象は自然言語入力そのものではありません。**同じcanonicalなruntime入力、同じruntime / generator contract version、同じruntime / generator implementation fingerprint、同じ静的参照データversionから同じgenerator結果を再現でき、statefulなID materializeではさらに同じtarget annotation / Disposition / merge指定とprevious target / CI / expected result root / ID stateから同じID対応を再現できる状態**を作ります。
 
 正規化済みモデルが元のAuthority / Risk / TR等を意味的に漏れなく表しているかは、既存の上流閉鎖、semantic eval、レビューで確認します。
 
@@ -173,8 +173,8 @@ scriptが正規化済みモデル内で100% Coverageを返しても、LLMの正�
 本Planの実装では、次を全Skillで共通の前提とします。
 
 - LLMは自然言語から意味を正規化し、Authority対応、risk判断、技法採用、意味上の同一性、expected result等を決める。scriptへ渡した後の列挙、計算、fingerprint、ID採番、Coverage集計、構造検査、stale判定をLLMが再計算しない
-- Skillがruntime対象modelを扱う場合は、Skill instructionに定義したdispatch表からscriptを選び、保存済みMachine Modelは決定論的に抽出・strict decodeして再投入する。MarkdownをLLMが読み直してJSONを再生成しない
-- runtime間で機械変換した結果は、上流runtime unitとgeneration fingerprintを保持して下流へ渡す。上流runtime結果が変わった場合は依存する下流runtime unitだけをstaleへ戻す
+- Skillがruntime対象を扱う場合は、Skill instructionに定義したdispatch表からscriptを選び、保存済み`Machine Runtime Input / Result`を決定論的に抽出・strict decodeして再投入する。MarkdownをLLMが読み直してJSONを再生成しない
+- runtime間で機械変換した結果は、上流の`skill + runtime_unit_key + generation_fingerprint`を保持して下流へ渡す。上流runtime結果が変わった場合は依存する下流runtime unitだけをstaleへ戻す
 - generator targetは、Coverage Item、明示的なmerge、または既存Skill契約上のDispositionへ閉じる。Dispositionによる成果物上の閉鎖と技法Coverage達成は別に判定する
 - 本Planで追加する全scriptは、deterministicなdispatch / integration testで実際の呼出経路を検証する。実Agentでは代表経路でPython実行、stdout envelope parse、machine結果採用まで確認する
 
