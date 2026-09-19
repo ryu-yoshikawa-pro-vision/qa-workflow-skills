@@ -839,7 +839,7 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 
 ### `question-analysis`
 
-- `不明点 / 質問一覧`と`ブロック中範囲`へ`Runtime Skill / Runtime Unit Key / Model Key / Target Key`列を追加
+- `不明点 / 質問一覧`と`ブロック中範囲`へ`Runtime Skill / Runtime Unit Key / Model Key / Target Key / Generation Fingerprint`列を追加
 - runtime issueの`skill / runtime_unit_key / model_key / target_key`を質問・ブロック・再開まで保持
 - `再開対象 / 実行範囲`へmodel keyを流用せず、既存`QUESTION-D017`契約を維持
 
