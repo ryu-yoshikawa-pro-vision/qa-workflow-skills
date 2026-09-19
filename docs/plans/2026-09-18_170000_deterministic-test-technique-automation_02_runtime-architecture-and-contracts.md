@@ -139,6 +139,38 @@ runtime対象Skillは、Skill instructionへscript選択表を持ち、次の順
 
 各scriptは入力検証の一部として対応subset判定を行い、`runtime_required`を出力として決定します。`runtime_required`はruntime入力へ渡さず、Agentが自然言語だけから`runtime_required=false`を確定してscriptを省略しません。
 
+dispatchは次で固定します。
+
+| Skill | 条件 | script | 実行 |
+| --- | --- | --- | --- |
+| `test-analysis` | Product Riskがある | `risk_matrix.py` | 条件付き |
+| `test-analysis` | 技法選択を行う | `technique_candidates.py` | 必須 |
+| `test-analysis` | 変更影響graphがある | `change_impact.py` | 条件付き |
+| `test-analysis` | 環境要求がある | `environment_requirements.py` | 条件付き |
+| `test-requirement-design` | 成果物確定前 | `requirement_structure.py` | 必須 |
+| `test-condition-design` | TCN / model draft作成後 | `condition_structure.py` | 必須 |
+| `test-condition-design` | modelのtechnique slugが対応する | 各技法generator | modelごとに必須 |
+| `test-condition-design` | test data要求が1件以上ある | `test_data_requirements.py` | 条件付き |
+| `test-condition-design` | generator targetの閉鎖前 | `materialize_coverage.py` | TCNごとに必須 |
+| `test-case-design` | 成果物確定前 | `case_structure.py` | 必須 |
+| `coverage-analysis` | テスト設計traceabilityを検査する | `traceability.py` | 必須 |
+| `qa-workflow` | runtime状態を集約する | `workflow_runtime.py` | 必須 |
+
+`test-condition-design`のmodel slug → generatorは`_02` §4.3と`_03`のscript一覧を1対1対応の正本とします。artifact全体scriptを「常に全部実行する」とは扱わず、上表の条件を満たす場合だけ実行します。
+
+### 2.2 派生modelの生成
+
+Cause-Effect → Decision Table、Classification Tree → combinatorial、schema → EP / BVA等の機械接続で別generatorを起動する場合は、親runtimeの出力を直接「別modelのinput」として匿名利用しません。
+
+1. 親runtimeが`derived.*`を生成する
+2. LLMは派生先で必要な意味パラメータだけを補う。親runtimeが生成したmachine fieldを再生成しない
+3. `condition_structure.py`へ派生model draftを渡し、`model_key`と親TCNを確定する
+4. 派生modelは`selection_source=derived`とする
+5. 派生modelの`upstream_runtime_units[]`へ親の`skill + runtime_unit_key + generation_fingerprint`を必須で保存する
+6. 派生generatorを実行する
+
+同じ親runtime・同じ派生技法・同じ検証責務を再利用するとLLMが判断した場合は既存model keyを維持します。派生modelを作るためだけの汎用model factoryやplugin機構は追加しません。
+
 ## 3. 共通JSON契約
 
 ### 3.0 CLI契約
@@ -153,6 +185,7 @@ runtime対象Skillは、Skill instructionへscript選択表を持ち、次の順
 - stderrは人間向け診断だけに使う
 - stdinが空、JSONが複数、末尾に非空白データが残る場合は`invalid_input`
 - subprocess呼び出し側はstdout / stderr / return codeをすべて取得し、return codeだけでroutingしない
+- Skill実行時のsubprocessにも30秒の安全timeoutを設定する。通常の探索停止は§5.3の決定論的hard limitで行い、timeoutをCoverageや探索アルゴリズムの正常終了条件にしない。timeout時はmachine resultを採用せず`runtime_execution_timeout`としてblockedにする
 
 ### 3.1 strict JSON
 
@@ -162,10 +195,12 @@ runtime対象Skillは、Skill instructionへscript選択表を持ち、次の順
 - `NaN`、`Infinity`、`-Infinity`を拒否する
 - top-level typeをscriptごとに固定する
 - UTF-8で解釈する
-- decimalはJSON numberへ丸めず、`{"type":"decimal","value":"0.1"}`のような10進文字列で扱う
+- model内のdecimalはJSON numberへ丸めず、`{"type":"decimal","value":"0.1"}`のような10進文字列で扱う
+- raw JSON Schema / OpenAPI document等に含まれるJSON integerはPython `int`、非整数JSON numberは`Decimal`としてexactにparseし、binary `float`を経由しない
+- canonical JSONへ再serializeする`Decimal`は指数表記を使わない正規化済みJSON numberとして出力する
 - date / datetimeは契約で許可したISO 8601形式以外を拒否する
 
-Python実装では、duplicate key検出用`object_pairs_hook`、非有限数拒否、`allow_nan=False`相当の出力を共通方針とします。
+Python実装では、duplicate key検出用`object_pairs_hook`、`parse_float=Decimal`相当、非有限数拒否、`allow_nan=False`相当の出力を共通方針とします。
 
 ### 3.2 共通入力metadata
 
@@ -190,6 +225,7 @@ runtime入力は`metadata`とscript固有`input`を分けます。
     ],
     "upstream_runtime_units": [
       {
+        "skill": "test-requirement-design",
         "runtime_unit_key": "artifact:requirement_structure:all",
         "generation_fingerprint": "sha256:..."
       }
@@ -214,14 +250,15 @@ runtime入力は`metadata`とscript固有`input`を分けます。
   - `materialize_coverage.py`: 入力`tcn_id`
   - その他のartifact全体script: literal `all`
 - 同一Skill内で同じ`artifact:<generator>:<scope_key>`を同時に複数定義しない
-- `selection_source`: model scriptだけ`analysis / user / existing_artifact`のいずれかを必須。artifact全体scriptでは`null`
+- `selection_source`: model scriptだけ`analysis / user / existing_artifact / derived`のいずれかを必須。artifact全体scriptでは`null`。`derived`では親runtimeを`upstream_runtime_units[]`へ1件以上必須にする
 - `upstream_entities`: 実際に消費した上流Entity単位で保持する。`skill + entity_ref`を一意keyとし、呼び出し側はPlanで固定した項目のcanonicalな`content`を渡す。`content_fingerprint`はruntimeが`content`から計算してenvelopeと成果物へ保存し、LLMからhash値だけを受け取らない
-- `upstream_runtime_units`: 他runtime結果を直接利用した場合に必須。直接利用した`runtime_unit_key + generation_fingerprint`を保持し、上流runtime結果が変わったときに依存unitだけをstaleへ戻せるようにする
+- `upstream_runtime_units`: 他runtime結果を直接利用した場合に必須。`skill + runtime_unit_key + generation_fingerprint`を一意参照として保持する。`runtime_unit_key`単独をSkill横断identityに使わない
 - `runtime_contract_version`、`generator_contract_version`、runtime実装hash、generator実装hash、fileから導出できる`static_data_versions`はruntime側を正本とする。入力metadataに同じ値を持たせる場合はruntime実値と一致しなければ`invalid_input`
 - `static_data_versions`: keyは`^[a-z][a-z0-9_]*$`、valueは`sha256:<64 lowercase hex>`または明示的なcontract version文字列`^[A-Za-z0-9][A-Za-z0-9._-]*$`
 - `authority_refs`: 製品固有expected resultを確定できる現在有効な根拠
 - `reference_refs`: 外部標準、一般UI資料、DOM / 実装事実等の補助情報
 - script固有入力は必ず`input`配下に置き、metadataと同じkeyを再定義しない
+- target / result keyへ文字列として直接埋め込むcomponent keyは`^[A-Za-z][A-Za-z0-9._-]{0,63}$`を共通形式とし、delimiterの`:`を禁止する。任意文字列を含むidentityはcanonical JSONをhashしてkey化する
 ### 3.3 runtime出力envelope
 
 scriptが実行できた場合、stdoutは次のJSON object 1件だけです。
@@ -327,7 +364,8 @@ fingerprintはSHA-256で計算します。入力はUTF-8のcanonical JSONです�
 
 - object keyはUnicode code point順
 - `authority_refs` / `reference_refs`等の集合扱い配列は重複除去してsort
-- factor、condition、action、state、transition、edge、production等、tie-breakや意味に入力順を使う配列は宣言順を保持
+- 順序が意味として明示された配列だけ宣言順を保持する。factor、condition、action、state、transition、edge、production、Random distribution values等が該当する
+- 順序に意味がないkey付きrecord配列は指定primary keyでcanonical sortする。`upstream_entities`は`(skill, entity_ref)`、`upstream_runtime_units`は`(skill, runtime_unit_key)`、`previous_*`は各ID、`target_annotations / target_dispositions`は`target_ref`、`merge_groups`は`merge_group_key`でsortする
 - assignment objectのkeyはsort
 - decimal / date / datetimeは共通表現へ正規化
 - JSON serializationはUTF-8、`ensure_ascii=false`相当、separatorは`,`と`:`、末尾改行なし
@@ -367,7 +405,7 @@ artifact全体scriptでは`model_fingerprint=null`です。ただし`input_finge
 - `generator_implementation_fingerprint`
 - `static_data_versions`
 
-`runtime_implementation_fingerprint`は実行した`runtime_contract.py`のUTF-8 file bytes、`generator_implementation_fingerprint`は実行scriptのUTF-8 file bytesをSHA-256した値です。runtime自身が計算し、呼び出し側の申告値を正本にしません。
+`runtime_implementation_fingerprint`は実行した`runtime_contract.py`、`generator_implementation_fingerprint`は実行scriptについて、UTF-8 textの`CRLF / CR`を`LF`へ正規化したbytesをSHA-256した値です。runtime自身が計算し、呼び出し側の申告値を正本にしません。generator scriptはPython標準ライブラリ、同一Skillの`runtime_contract.py`、同一Skill内でPlanに明記したprivate helper以外のPython moduleをimportしません。
 
 したがって、同じartifact scriptでも入力・Authority / Reference・runtime contract・generator contract・実装内容・静的参照データのいずれかが変われば`generation_fingerprint`は変わります。
 
@@ -378,7 +416,7 @@ generatorが返すtarget集合とCoverage計算は純粋な決定論処理です
 
 generator結果に影響する静的データはversionを持ちます。
 
-- `ui-pattern-catalog.json`: file content SHA-256
+- `ui-pattern-catalog.json`: strict JSON decode → canonical JSON → SHA-256。改行や整形差だけではversionを変えない
 - repository-default risk scheme: `risk-scheme-v1`
 - project-specific scheme: 正規化schemeのfingerprint
 - grammar / distribution / metamorphic relation等が外部assetの場合: そのasset versionまたはfingerprint
@@ -443,9 +481,25 @@ generator結果に影響する静的データはversionを持ちます。
 - `test-case-design`: TC ID、関連TR / TCN / CI、優先度、前提、データ、手順、期待結果、期待結果Authority、およびDisposition行
 - `coverage-analysis`: 対象上流 / 下流ID、Model Key、coverage / stale状態、修正Skill
 
+fingerprint対象の`content`はLLMが自由に再構成しません。各担当Skillが保存するmachine dataから次のcanonical schemaで機械的に組み立てます。
+
+- Authority: `{authority_id, authority_type, active_content, scope, source_refs[], relations[], related_authority_refs[]}`
+- Product Risk: `{risk_id, failure, authority_refs[], impact, likelihood, level, mapped_priority}`
+- 技法選択: `{selection_key, applicability_scope, selection_source, signals, candidates[], selected_techniques[], status}`
+- change graph node / edge: `{node_key, node_type, source_ref}` / `{edge_key, from, to, edge_type, evidence_refs[]}`
+- 環境 / test data要求: `{requirement_key, dimension_key, operator, normalized_value, authority_refs[], source_target_refs[]}`
+- TR: `{tr_id, text, authority_refs[], risk_refs[], priority, test_level, observation_method}`
+- TCN: `{tcn_id, tr_refs[], condition, technique, coverage_criterion, authority_refs[], risk_refs[], priority}`
+- model metadata: `{model_key, technique_slug, parent_tcn_id, selection_source}`
+- CI mapping: `{target_ref, model_key, target_key, ci_id, status}`
+- TC: `{tc_id, tr_refs[], tcn_refs[], ci_refs[], priority, preconditions, test_data, steps, expected_results[]}`
+- Disposition: `{upstream_id, handling, reason, authority_refs[], covered_by_ref}`
+
+machine dataに存在しない表示専用の備考やMarkdown整形は`content`へ入れません。schema変更はruntime contract変更として扱います。
+
 modelは実際に消費したEntityを`upstream_entities`へ1件ずつ保持し、runtimeがcanonical `content`から`content_fingerprint`を計算します。`skill + entity_ref`が同じEntityの`content_fingerprint`だけを比較し、不一致となったEntityを参照するmodelだけを`要再検証`へ戻します。無関係なEntity変更ではmodelをstaleにしません。
 
-他runtime結果を直接利用したunitは`upstream_runtime_units`も比較します。保存した`generation_fingerprint`と現在の上流runtime unitが一致しなければ下流unitをstaleとし、その下流へも依存関係に従って伝播します。LLMはこのfingerprint比較を手計算しません。
+他runtime結果を直接利用したunitは`upstream_runtime_units`も`(skill, runtime_unit_key)`で比較します。保存した`generation_fingerprint`と現在の上流runtime unitが一致しなければ下流unitをstaleとし、その下流へも依存関係に従って伝播します。参照先が存在しない場合はstale + blocker、同じ`(skill, runtime_unit_key)`が重複する場合またはruntime dependency graphにcycleがある場合は`invalid_input`です。LLMはこのfingerprint比較を手計算しません。
 ## 5. 値・順序・tie-break
 
 ### 5.1 typed value
@@ -483,7 +537,7 @@ named timezone / DST transition自体を一般BVAとして推測しません。�
 - 入力JSON byte数: stdinで受け取ったUTF-8 bytesをdecode前に数える
 - nesting depth: object / array containerを1階層としてroot containerを1と数える
 - 1文字列: UTF-8 bytesで数える
-- feasibility search node: root assignmentを1とし、backtrackingで新しいpartial assignmentへ入るたびに1加算する。cache hitで再探索しない場合は加算しない
+- 探索node: rootを1とし、combinatorial / Decision Tableでは新しいpartial assignment、state / flowでは新しいpath / cycle prefix、grammarでは新しいpartial derivationを展開するたびに1加算する。cache hitで再探索しない場合は加算しない
 - target / row / candidate総数: stable keyによる重複除去後、Markdown materialize前に数える
 - stdout JSON: UTF-8 serialization後のbytesを数える
 
@@ -491,12 +545,13 @@ named timezone / DST transition自体を一般BVAとして推測しません。�
 
 | 対象 | 上限 |
 | --- | ---: |
-| 入力JSON | 2 MiB |
+| 通常runtime入力JSON | 2 MiB |
+| 集約runtime入力JSON（`materialize_coverage.py` / `traceability.py` / `workflow_runtime.py`） | 16 MiB |
 | JSON / schema / ASTのnesting depth | 64 |
 | 1文字列 | 64 KiB |
 | Decision Table / Cause-Effectのassignment | 65,536 |
 | Pairwise / N-wise / mixed-strengthのCoverage target | 100,000 |
-| feasibility search node | 1,000,000 |
+| 探索node | 1,000,000 |
 | 生成row / test data candidate / Domain point | 10,000 |
 | state sequence / flow path | 10,000 |
 | grammar生成case | 10,000 |
@@ -504,7 +559,7 @@ named timezone / DST transition自体を一般BVAとして推測しません。�
 | 1 modelのtarget / row / candidate総数 | 100,000 |
 | stdout JSON | 16 MiB |
 
-上限を超えた場合は`limit_exceeded`とし、Coverage基準、strength、path深度等を自動で下げません。item数が上限内でもbyte / depth上限を超える入力・出力は処理しません。上限変更は実装者判断ではなくgenerator contract変更としてPlanを更新します。16 MiBはruntime engineのstdout上限であり、Agentが同量を安全に成果物へ統合できることを意味しません。Step 1の代表smokeで実Agentのstdout取得・strict decode・成果物保存を境界付近まで確認し、16 MiB未満の実用上限が必要ならgenerator実装へ進む前に`runtime-v1`のartifact transport上限としてPlanへ固定します。上限超過時にtruncateや要約でmachine evidenceを欠落させず`limit_exceeded`とします。
+上限を超えた場合は`limit_exceeded`とし、Coverage基準、strength、path深度等を自動で下げません。item数が上限内でもbyte / depth上限を超える入力・出力は処理しません。集約scriptは複数上流結果をまとめた**最終stdin全体**へ16 MiB上限を適用し、個々の上流unitが成功していても集約入力が上限を超えればworkflowを完了にしません。これによりstage間transport上限を明示し、暗黙のtruncateや分割で意味を変えません。上限変更は実装者判断ではなくcontract変更としてPlanを更新します。16 MiBはruntime engineのstdout / 集約stdin上限であり、Agentが同量を安全に成果物へ統合できることを意味しません。代表generator実装後の共通経路smokeで実Agentのstdout取得・strict decode・成果物保存を境界付近まで確認し、16 MiB未満の実用上限が必要なら後続generatorを量産する前に`runtime-v1`へ固定します。上限超過時にmachine evidenceをtruncate / 要約しません。
 
 ## 6. 根拠・constraint
 
@@ -590,6 +645,34 @@ generator内の`target_key`はmodel内で安定させます。異なるmodel間�
 - merge targetがすべて消滅した場合だけ旧CIをstaleにする
 
 CI番号は`CI\d{2,}`を許可します。
+
+### 7.2.1 ID状態の永続化
+
+削除済みIDを将来再利用しないため、各成果物へactive / deleted状態をmachine dataとして保存します。
+
+- TR: `{tr_id, status}`
+- TCN: `{tcn_id, status}`
+- model: `{model_key, technique_slug, parent_tcn_id, status}`
+- TC: `{tc_id, status}`
+- CI: `{ci_id, status}`
+
+`status=active|deleted`です。structure / materialize scriptの`previous_*`入力はこのmachine stateからだけ構築し、人間向け表から削除済みIDを推測しません。削除されたID rowも同じ成果物系列のmachine stateには残します。
+
+### 7.2.2 CI mappingの状態遷移
+
+再実行時は次を固定します。
+
+- unmerged → merged: group内に既存active CIが複数ある場合、数値部分が最小のCIを存続CIとし、他CIをdeletedへ移す。存続CIを含む関連TCも意味変更として`要再検証`
+- merged groupへtarget追加: 既存groupの存続CIへ追加し、関連TCを`要再検証`
+- merged groupからtarget削除 / Disposition: 残存targetが1件以上なら存続CIを維持し、関連TCを`要再検証`。0件ならCIをdeleted
+- merged → unmerged: 辞書順で最初の存続targetへ既存CIを維持し、他targetへ同一TCNの過去使用済み最大CI番号+1から新規採番
+- CI → Disposition: targetのactive mappingを外す。CIを共有する他targetがなければCIをdeleted、共有targetが残ればCIは維持する。どちらも関連TCを`要再検証`
+- Disposition → CI: targetの直近CIがdeletedで、現在ほかのactive targetへ割り当てられていなければ同じCIを復帰してよい。そうでなければ過去使用済み最大CI番号+1から新規採番
+- deleted CI番号を別targetへ再利用しない
+
+`previous_target_id_map[]`はactive mappingだけでなく`mapping_status=active|inactive`と直近`ci_id`を保持し、Disposition中のtargetも過去mappingを失わない。
+
+CI番号は`CI\d{2,}`を許可します。
 ### 7.3 upsert
 
 再実行はappendではなくstable keyでupsertします。
@@ -626,17 +709,23 @@ Dispositionはgeneratorの`coverage_summary`を書き換えません。技法内
 
 `Runtime Unit Key | モデルキー | 観点ID | 技法 | runtime contract version | generator contract version | input fingerprint | model fingerprint | generation fingerprint | upstream entity count | static data versions | runtime status | result status | runtime required | freshness | deterministic generated | fallback reason`
 
-正規化入力JSONはMarkdown table cellへ埋め込まず、次の形式で保存します。
+全runtime unitについてcanonicalな実行入力と実行結果を成果物へ保存します。
 
 ````markdown
-### Machine Model: pairwise-001
+### Machine Runtime Input: test-condition-design::model:pairwise-001
 
 ```json
-{...}
+{"metadata":{...},"input":{...}}
+```
+
+### Machine Runtime Result: test-condition-design::model:pairwise-001
+
+```json
+{"runtime_unit_key":"model:pairwise-001",...}
 ```
 ````
 
-見出しの`model_key`とJSON内metadataの`model_key`が一致しない場合はvalidatorを失敗させます。
+見出しidentityは`<skill>::<runtime_unit_key>`で、JSON内metadataのSkill所属と`runtime_unit_key`が一致しなければvalidatorを失敗させます。model scriptでは`Machine Runtime Input.input`が正規化modelの正本です。必要なら`Machine Model: <model_key>`表示をruntimeから派生描画できますが、LLMが別JSONを作らず、canonical `input` subtreeと一致を必須にします。artifact全体scriptも同じ形式で入力を保存するため、validatorは全scriptの`input_fingerprint`を保存済み入力から再計算できます。
 
 人間向け説明文はLLMが生成して構いません。machine evidenceのJSON、key、ID対応、Coverage値をLLMが再計算・改変しません。再利用時のJSON抽出もLLMへ委ねず、`runtime_contract.py`の抽出処理を使用します。
 
@@ -648,12 +737,12 @@ validatorはfenced JSON blockを抽出してstrict JSON decodeし、canonical化
 
 必須round-trip test:
 
-1. canonical modelをMarkdownへ保存
-2. `### Machine Model: <model_key>`直下のJSON fenceを抽出
+1. canonical runtime input / resultをMarkdownへ保存
+2. `<skill>::<runtime_unit_key>`に対応するJSON fenceを一意に抽出
 3. strict JSON decode
 4. canonical化
-5. 元の`model_fingerprint`と一致
-6. 抽出したJSONを同じruntime scriptへ再投入し、同一contract / implementation / static data条件なら同じmachine resultを得る
+5. 元の`input_fingerprint`、model scriptでは`model_fingerprint`も一致
+6. 抽出したruntime inputを同じscriptへ再投入し、同一contract / implementation / static data条件なら同じmachine resultを得る
 
 これにより`|`、backslash、改行を含む値をMarkdown table escapeへ依存させません。
 
@@ -663,10 +752,10 @@ validatorはfenced JSON blockを抽出してstrict JSON decodeし、canonical化
 
 `選択キー | 適用領域 | Selection Source | Signals JSON | Candidates JSON | Undetermined Signals JSON | 最終採用技法 | 状態`
 
-`Selection Source`は`analysis / user / existing_artifact`のいずれかです。技法modelのmetadataにも`selection_source`を必須で保存します。`test-analysis`を通った場合はその選択行からコピーし、途中工程開始でユーザーが技法を明示した場合は`user`、再利用した既存modelは`existing_artifact`とします。
+`Selection Source`は`analysis / user / existing_artifact / derived`のいずれかです。技法modelのmetadataにも`selection_source`を必須で保存します。`test-analysis`を通った場合はその選択行からコピーし、途中工程開始でユーザーが技法を明示した場合は`user`、再利用した既存modelは`existing_artifact`、親runtimeのmachine outputから派生したmodelは`derived`とします。
 
 - `true / false / null`を区別
-- `technique_candidates.py`の`complete`は`undetermined_signals`が空かだけを表す診断値であり、`complete=false`だけを理由にworkflowをブロックしない
+- `technique_candidates.py`の`complete`は`undetermined_signals`が空かだけを表す診断値であり、`complete=false`だけを理由にworkflowをブロックしない。ただし各undetermined signalは`test-analysis`成果物で`resolved / selection_not_affected / question`のいずれかへ閉じ、未閉鎖signalが残る状態をworkflow完了にしない
 - ユーザー明示または有効な既存成果物由来の技法をcandidate scriptが勝手に却下しない
 - 選択した技法は`test-condition-design`のmodel、対象外、未解決、または`runtime_required=false`の対応subset外fallbackへ必ず閉じる
 - 選択技法だけ存在しmodel化されない状態を完了扱いしない
@@ -702,16 +791,16 @@ validatorはfenced JSON blockを抽出してstrict JSON decodeし、canonical化
 
 - `cause_effect.py`の`derived.decision_table`は`conditions / actions / known_rules / constraints / accepted_merges=[]`を必ず持ち、`decision_table.py`のscript固有`input`と完全互換にする
 - `classification_tree.py`は`derived.combinatorial_input`へ`factors / constraints`を出力する。LLMは`mode / strength / mixed-strength subsets`だけを意味判断として追加し、factor / class / constraintを再生成しない。最終inputは固定builderが機械的にjoinする
-- `schema_cases.py`は`derived.ep_inputs / derived.bva_inputs / derived.combinatorial_constraints / derived.test_data_requirements`を固定schemaで返し、同script内のbuilder処理で各下流script入力へ変換する。別の汎用adapterは作らない
+- `schema_cases.py`は`derived.ep_inputs / derived.bva_boundary_skeletons / derived.combinatorial_constraints / derived.test_data_requirements`を固定schemaで返す。BVAはschemaから`boundary / threshold / side / inclusive / step`までを機械生成し、`mode / coverage_selection_reason`はLLMが意味判断として追加して固定builderが`bva.py`入力を作る。EP / combinatorial / test dataも固定builder以外でmachine fieldを再生成しない
 - 各generatorのmachine targetと、LLMがtarget_ref単位で付与した`target_annotations[]`を`materialize_coverage.py`がjoinする。generator target JSONをLLMが再生成しない
 
 意味上の統合だけLLMに残します。CIへmaterializeするtargetの意味情報は`target_annotations[]`へ`{target_ref, priority, expected_result_root, test_data_requirement_refs[]}`として保持します。Disposition済みtargetにはannotationを要求せず、同一targetへannotationとDispositionを同時指定しません。`expected_result_root`は期待結果本文ではなく、同じ期待挙動へまとめてよいかをLLMが判定したstable keyです。複数技法の結果を同じCIへまとめる場合、LLMは`merge_group`を明示し、`materialize_coverage.py`がtarget key、Authority、Reference、優先度、test data requirement参照を決定論的にunionします。
 
-`merge_group` inputは`{"merge_group_key":"MG-001","target_refs":["sha256:...","sha256:..."],"authority_refs":["SPEC-001"]}`です。target refは2件以上、重複不可、同一TCN配下だけを許可します。各targetの`target_annotations.expected_result_root`が一致しない場合は`invalid_input`とします。
+`merge_group` inputは`{"merge_group_key":"MG-001","target_refs":["sha256:...","sha256:..."],"authority_refs":["SPEC-001"]}`です。target refは2件以上、重複不可、同一TCN配下だけを許可します。各targetの`target_annotations.expected_result_root`が一致しない場合は`invalid_input`とします。各targetが参照するtest data requirementは`_03` §16と同じintersection規則で機械統合し、矛盾またはunsupportedな組合せならmergeを拒否します。`test_data_requirement_refs[]`は`data:<requirement_key>`形式で、同一materialize入力の正規化済みtest data requirementに存在することを必須にします。
 
 ## 12. runtime自己検査の処理順
 
-`test-requirement-design`と`test-case-design`では、既存evalのruntime複製で終わらせません。
+`test-requirement-design`、`test-condition-design`、`test-case-design`では、既存evalのruntime複製で終わらせません。
 
 1. LLMがdraftを作成
 2. runtime structure scriptを実行
@@ -785,7 +874,7 @@ runtime単位状態の正本は各成果物に保存した`runtime_unit_key`、`
 
 各Skillは単体コピー可能な既存契約を維持します。
 
-strict JSON、canonicalization、fingerprint、envelope処理はruntime対象6 Skillそれぞれの`scripts/runtime_contract.py`へ同じ実装を同梱します。repo rootの共通helperへ依存させません。`runtime_contract_version`をfile内定数として持ち、意味契約を変更した場合にversionを更新します。repository testで6ファイルのSHA-256一致を検証し、Skillごとの実装差を許可しません。実装内容の変更はfile SHA-256を`runtime_implementation_fingerprint`へ反映します。技法固有ロジックはこの共通helperへ入れません。
+strict JSON、canonicalization、fingerprint、envelope処理はruntime対象6 Skillそれぞれの`scripts/runtime_contract.py`へ同じ実装を同梱します。repo rootの共通helperへ依存させません。`runtime_contract_version`をfile内定数として持ち、意味契約を変更した場合にversionを更新します。repository testでは改行をLFへ正規化した内容のSHA-256一致を検証し、Skillごとの実装差を許可しません。実装内容の変更は同じLF正規化規則で`runtime_implementation_fingerprint`へ反映します。技法固有ロジックはこの共通helperへ入れません。
 
 本Planのruntime dependencyはPython 3.11標準ライブラリだけに固定します。外部PyPI package、外部binary、network serviceをruntime依存へ追加しません。
 
