@@ -828,10 +828,17 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 - Python要件
 - Skill package内script
 
+### `spec-analysis`
+
+- runtimeは追加しない
+- `assets/output-template.md`へAuthorityの`Machine Entities` canonical JSON blockを追加する
+- Authority表とMachine EntityのID / 種別 / 現在有効な内容 / 適用範囲 / 情報源 / 関係 / 関連Authorityの一致をvalidatorで確認する
+
 ### `test-analysis`
 
 - `SKILL.md` / `references/guidance.md`へ新規正規技法と選択条件を追加
-- `assets/output-template.md`へ`Machine Runtime Input / Result`、`Selection Source`、技法選択machine evidence、undetermined signalの`resolved / selection_not_affected / question`閉鎖状態を追加
+- `assets/output-template.md`へ`Machine Entities`、`Machine Runtime Input / Result`、`Selection Source`、技法選択machine evidence、undetermined signalの`resolved / selection_not_affected / question`閉鎖状態を追加
+- Product Risk Machine EntityはLLM意味fieldと`risk_matrix.py`の`level / mapped_priority`を固定builderでjoinする
 - risk scheme / priority mapping
 - change graph
 - environment requirement
@@ -840,13 +847,13 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 ### `test-requirement-design`
 
 - runtime structure検査の処理順
-- `assets/output-template.md`へ`Machine Runtime Input / Result`とTR active / deleted ID stateを追加
+- `assets/output-template.md`へTRの`Machine Entities`、`Machine Runtime Input / Result`、TR active / deleted ID stateを追加
 
 ### `test-condition-design`
 
 - `SKILL.md`の対象技法を更新
 - `references/coverage-techniques.md`へ全実装技法の適用条件、Coverageまたは終了条件を追加
-- `assets/output-template.md`へ`Machine Runtime Input / Result`、正規化model metadata、active / deleted ID state、stable target / CI mappingを追加
+- `assets/output-template.md`へTCN / model metadata / CI mappingの`Machine Entities`、`Machine Runtime Input / Result`、active / deleted ID state、stable target / CI mappingを追加
 - Random / Metamorphicは一般Coverage 100%を定義しない
 - runtime metadata
 - test data requirement
@@ -855,7 +862,7 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 ### `test-case-design`
 
 - runtime structure検査の処理順
-- `assets/output-template.md`へ`Machine Runtime Input / Result`とTC active / deleted ID stateを追加
+- `assets/output-template.md`へTCの`Machine Entities`、`Machine Runtime Input / Result`、TC active / deleted ID stateを追加
 - stable ID / active・deleted ID state / stale
 
 ### `coverage-analysis`
@@ -875,14 +882,15 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 ### `qa-workflow`
 
 - `assets/workflow-state-template.md`へ`workflow_runtime.py`の`Machine Runtime Input / Result`を追加
-- `scripts/workflow_runtime.py`を追加し、runtime metadata集約、upstream Entity / runtime unit fingerprint比較、stale伝播、機械的完了判定をLLMから分離
+- `scripts/workflow_runtime.py`を追加し、runtime metadata集約、Machine Entityのupstream / runtime dependency、runtime unit fingerprint比較、runtime / Entity freshness、stale伝播、機械的完了判定をLLMから分離
 - runtime dependency identityは`(skill, runtime_unit_key)`で固定する
 - `workflow_runtime.py`自身を評価対象`runtime_units[]`から除外し、self dependencyを禁止する
 - missing dependencyはstale + blocker、duplicate / cycleは`invalid_input`
 - 既存Skill状態表を維持し、別表`runtime状態`を追加
 - model単位状態を成果物metadataから再構築
 - legacy昇格
-- upstream Entity別content fingerprint / upstream runtime dependency / stale伝播
+- upstream Entity別content fingerprint / Machine Entityの`upstream_entity_dependencies[] / runtime_dependencies[]` / upstream runtime dependency / stale伝播
+- `traceability.py`と同じ`runtime_contract.py` freshness関数を使用し、workflow_runtime resultをtraceabilityの依存入力にしない
 - 完了条件
 
 ### `EVALS.md` / `ASSERTIONS.md`
