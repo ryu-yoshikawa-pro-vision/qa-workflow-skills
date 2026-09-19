@@ -753,7 +753,7 @@ generatorが返した各`target_ref`は、最終的に次のどちらか一方�
 - `materialize_coverage.py`でCIへ割り当てる。複数targetを同じCIへ割り当てる場合は§11の`merge_group`を必須にする
 - `target_dispositions[]`で既存`test-condition-design`契約上の扱いへ明示する
 
-`target_dispositions[]`は`{target_ref, target_content_fingerprint, handling, reason, authority_refs, covered_by_target_ref}`です。`target_content_fingerprint`は現在machine targetと一致必須で、過去targetに対するDispositionを新しい内容へ流用しません。
+`target_dispositions[]`は`{target_ref, target_content_fingerprint, generation_fingerprint, handling, reason, authority_refs, covered_by_target_ref}`です。`target_content_fingerprint`と`generation_fingerprint`は現在machine target / modelと一致必須で、過去targetまたは過去generationに対するDispositionを現在世代へ流用しません。
 
 - `handling=対象外 / 別テストレベル / 残存リスク / ブロック中 / 重複`だけを許可する
 - `重複`では`covered_by_target_ref`を必須にし、同一TCN内のcurrentかつCIへmaterializeされるtargetを参照する。他handlingでは`covered_by_target_ref=null`
@@ -791,7 +791,9 @@ Dispositionはgeneratorの`coverage_summary`を書き換えません。技法内
 
 見出しidentityは`<skill>::<runtime_unit_key>`で、JSON内metadataのSkill所属と`runtime_unit_key`が一致しなければvalidatorを失敗させます。model scriptでは`Machine Runtime Input.input`が正規化modelの正本です。必要なら`Machine Model: <model_key>`表示をruntimeから派生描画できますが、LLMが別JSONを作らず、canonical `input` subtreeと一致を必須にします。artifact全体scriptも同じ形式で入力を保存するため、validatorは全scriptの`input_fingerprint`を保存済み入力から再計算できます。
 
-人間向け説明文はLLMが生成して構いません。machine evidenceのJSON、key、ID対応、Coverage値をLLMが再計算・改変しません。再利用時のJSON抽出もLLMへ委ねず、`runtime_contract.py`の抽出処理を使用します。
+人間向け説明文はLLMが生成して構いません。machine evidenceのJSON、key、ID対応、Coverage値をLLMが再計算・改変しません。runtime blockのJSON抽出もLLMへ委ねず、`runtime_contract.py`の抽出処理を使用します。
+
+§4.4の`Machine Entities` blockはruntime evidenceとは別の意味上の正本です。`spec-analysis`を含む各担当Skillのvalidatorはstrict JSON decode、schema、entity_ref一意性、人間向け表との主要field一致を確認します。既存成果物を再利用するときはこのblockから現在のcanonical Entityを取得し、runtime対象unitの入力を組み立て直します。保存済み`Machine Runtime Result`を現在世代のresultとしてそのまま採用しません。
 
 ### 8.2 machine evidenceの描画
 
@@ -880,13 +882,15 @@ validatorはfenced JSON blockを抽出してstrict JSON decodeし、canonical化
 
 ### 13.1 再利用
 
-既存成果物の再利用条件へ次を追加します。
+既存成果物の再利用では次を固定します。
 
-- `runtime_required=true`の新契約成果物はenvelope / runtime / generator contract versionとupstream Entity content fingerprintが現在有効
-- `runtime_required=true`ではinput / model / generation fingerprintと派生成果物が一致
-- `runtime_required=false`のfallback成果物はfingerprintを決定論的再利用条件に使わず、既存Skill契約と上流Authorityの有効性で再利用可否を判断する
-- stale / `要再検証` / unresolvedなmodelが残っていない
-- runtime実行対象なのに決定論的generator未実行である場合、その事実を保持する
+- canonical `Machine Entities`とstable ID / previous stateは、現在の対象範囲と担当Skill契約を満たす場合に再利用できる
+- 本Planのdispatch対象runtime unitは、既存成果物を再利用する場合も現在のMachine Entity、保存済み意味parameter、previous ID stateからcanonical inputを組み立て直し、現在のscriptを必ず再実行する
+- 保存済み`Machine Runtime Input / Result`はprevious state、差分確認、round-trip検証に使うが、現在のcontract / implementation / static data / support判定を省略するcacheにはしない
+- 再実行した`generation_fingerprint`が以前と同じ場合はstable IDと現在も一致する意味判断を維持できる。generationが変わった場合はannotation / Disposition / merge / question回答 / unsupported closureの世代一致を再確認する
+- 以前`runtime_required=false`だったwhole-model fallbackも現在runtimeでsupport判定を再実行し、現在supportedになったunitをfallbackのまま固定しない
+- stale / `要再検証` / unresolvedなmodelが残っていないことを最終完了条件とする
+- runtime対象unitをPython unavailable等で再実行できない場合は既存resultへfallbackせず`not_run / blocked`として保持する
 
 ### 13.2 legacy成果物
 
@@ -924,6 +928,24 @@ runtime単位状態の正本は各成果物に保存した`runtime_unit_key`、`
 - model issueを`question-analysis`へroutingする場合は`skill / runtime_unit_key / model_key / target_key / generation_fingerprint`を質問一覧・ブロック中範囲・回答後の再開情報へ保持する
 - artifact全体scriptのissueも`skill / runtime_unit_key / generation_fingerprint`をBlocker / Issueへ保持し、model keyを捏造しない
 - `coverage-analysis`はstale / gapをTCN / CIだけでなく関連`model_key`まで追跡する
+
+Machine Entityのfreshnessは`runtime_contract.py`の共通関数で計算します。各Machine Entityの`runtime_dependencies[]`と現在runtime unitのgenerationを比較し、次のschemaへ正規化します。
+
+```json
+{
+  "skill":"test-case-design",
+  "entity_ref":"TC-001",
+  "model_key":null,
+  "freshness_status":"current",
+  "stale_reasons":[]
+}
+```
+
+- runtime dependencyを持たないAuthority等のsource Entityは、その担当Skill成果物が現在有効なら`current`
+- dependencyがmissing / stale、または保存generationと現在generationが不一致ならそのEntityを`stale`
+- `workflow_runtime.py`と`traceability.py`は同じ共通関数・同じ入力schemaを使用し、runtime unit freshnessからEntity freshnessへの別々の変換規則を持たない
+- `traceability.py`は`workflow_runtime.py`のresultをruntime dependencyとして参照せず、同じcurrent runtime / Machine Entity stateから共通関数を呼ぶ。これによりworkflow_runtimeとのcycleを作らない
+
 ### 13.4 上流変更
 
 上流Entityの`content_fingerprint`または直接依存する上流runtime unitの`generation_fingerprint`が変わった場合:
@@ -933,7 +955,7 @@ runtime単位状態の正本は各成果物に保存した`runtime_unit_key`、`
 3. 影響modelとその派生成果物だけを`要再検証`
 4. 正規化modelを更新
 5. generator再実行
-6. target内容が変わった場合は、同じ`target_ref`でも`target_content_fingerprint`差分によりannotation / Disposition / merge判断と関連CI / TCを`要再検証`へ戻す
+6. target内容が変わった場合は、同じ`target_ref`でも`target_content_fingerprint`差分によりannotation / Disposition / merge判断と関連CI / TCを`要再検証`へ戻す。target内容が同じでも`generation_fingerprint`が変わった場合はannotation / Disposition / merge判断の世代一致を再確認する
 7. question回答、unsupported closure等の意味判断は対象`generation_fingerprint`が現在世代と一致するものだけ再利用する
 8. 下流structure / Coverageを再検査
 9. staleが消えた範囲だけ再利用可能に戻す
