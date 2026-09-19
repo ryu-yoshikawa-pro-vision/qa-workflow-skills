@@ -302,7 +302,7 @@ local `$ref`は対象Schema Objectだけでなくroot OpenAPI documentを基準�
 - 本Planは有限domain、明示constraint、明示hard limitへscopeを限定している
 - external solver / generatorごとの差を決定論性契約へ持ち込まない
 
-runtime unit / CLI integrationの各subprocess timeoutは30秒です。標準ライブラリ実装がPlanの正確性契約または30秒timeoutを満たせない場合は、Coverage基準やhard limitを暗黙に緩めたり外部dependencyへ切り替えたりせず、**その実装はPlan未達として停止**します。依存方針を変える場合は、このPlanとは別の明示的な要件変更として扱います。
+CLI integrationとSkill実行時subprocessには30秒の安全timeoutを設定します。通常の探索停止は`_02`の決定論的hard limitで行い、timeout時刻をCoverageや探索結果の正常終了条件にしません。標準ライブラリ実装がPlanの正確性契約・hard limit・安全timeoutを満たせない場合は、Coverage基準を暗黙に緩めたり外部dependencyへ切り替えたりせず、**その実装はPlan未達として停止**します。依存方針を変える場合は、このPlanとは別の明示的な要件変更として扱います。
 
 将来用のPICT / GraphWalker / Z3 adapter、plugin機構は作りません。
 
