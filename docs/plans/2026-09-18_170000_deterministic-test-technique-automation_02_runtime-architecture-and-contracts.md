@@ -406,7 +406,7 @@ fingerprintはSHA-256で計算します。入力はUTF-8のcanonical JSONです�
 - `reference_refs`
 - model scriptでは`selection_source`
 
-`upstream_entities`はstale判定用、`static_data_versions`はgeneration条件用なので`input_fingerprint`へ含めません。
+`upstream_entities`はscript固有inputとは分離するため`input_fingerprint`へ含めません。ただし各`content_fingerprint`は`generation_fingerprint`へ含め、同じIDのAuthority / Risk / TR等の内容変更を別generationとして扱います。`static_data_versions`もgeneration条件として扱います。
 
 `model_fingerprint`はmodel scriptだけ使用し、次をcanonical JSON化してSHA-256を計算します。
 
@@ -425,11 +425,12 @@ artifact全体scriptでは`model_fingerprint=null`です。ただし`input_finge
 - `generator_contract_version`
 - `runtime_implementation_fingerprint`
 - `generator_implementation_fingerprint`
+- `upstream_entity_fingerprints`: 実際に消費した`upstream_entities[]`を`(skill, entity_ref)`でsortした`{skill, entity_ref, content_fingerprint}`配列
 - `static_data_versions`
 
 `runtime_implementation_fingerprint`は実行した`runtime_contract.py`、`generator_implementation_fingerprint`は実行scriptについて、UTF-8 textの`CRLF / CR`を`LF`へ正規化したbytesをSHA-256した値です。runtime自身が計算し、呼び出し側の申告値を正本にしません。generator scriptはPython標準ライブラリと同一Skillの`runtime_contract.py`以外のSkill-local Python moduleをimportしません。これによりgenerator実装fingerprintの対象外で実行ロジックが変わる経路を作りません。
 
-したがって、同じartifact scriptでも入力・Authority / Reference・runtime contract・generator contract・実装内容・静的参照データのいずれかが変われば`generation_fingerprint`は変わります。
+したがって、同じartifact scriptでも入力、実際に消費した上流Entityのcanonical content、runtime contract、generator contract、実装内容、静的参照データのいずれかが変われば`generation_fingerprint`は変わります。`authority_refs`等のID文字列が同じでも、対応するEntity contentが変われば同じgenerationにはなりません。
 
 `runtime_contract_version` / `generator_contract_version`は意味契約変更時に更新します。bug fixや内部refactorで意味契約を変えない場合も実装fingerprintが変わるため旧machine evidenceを同一生成条件として再利用しません。探索順、tie-break、Coverage、target key等の契約自体を変える場合は実装fingerprintだけで済ませず対応contract versionも更新します。
 
@@ -482,6 +483,45 @@ generator結果に影響する静的データはversionを持ちます。
 
 同じIDでも上流Entityの構造化内容は変わり得るため、自由記述versionやMarkdown全文hashではなく、実際に消費したEntityのcanonicalな構造化内容から`content_fingerprint`を計算します。これは意味同値性を推論するhashではなく、正規項目の変更検出用です。
 
+#### canonical machine Entityの保存
+
+下流fingerprint対象となるEntityは、runtimeの有無にかかわらず各担当Skillの成果物へcanonical JSONとして保存します。Markdown表を再読解してEntity JSONを再生成しません。
+
+````markdown
+### Machine Entities: test-requirement-design
+
+```json
+{
+  "schema_version":"entity-state-v1",
+  "skill":"test-requirement-design",
+  "entities":[
+    {
+      "entity_ref":"TR-001",
+      "model_key":null,
+      "content":{...},
+      "runtime_dependencies":[
+        {
+          "skill":"test-requirement-design",
+          "runtime_unit_key":"artifact:requirement_structure:all",
+          "generation_fingerprint":"sha256:..."
+        }
+      ]
+    }
+  ]
+}
+```
+````
+
+- `spec-analysis`はruntimeを追加せず、解決済みAuthorityをこのblockの`content`へ直接保存する
+- `test-analysis`はLLMが作るProduct Risk等の意味fieldとruntime resultを固定builderでjoinして保存する。例えばProduct Riskは`failure / authority_refs / impact / likelihood`と`risk_matrix.py`の`level / mapped_priority`をjoinする
+- `test-requirement-design` / `test-condition-design` / `test-case-design`はstructure scriptへ渡した意味fieldとruntimeが確定したID・優先度等を固定builderでjoinして保存する
+- Markdownの人間向け表はMachine Entityと同じ意味fieldを表示し、validatorでID・参照・優先度・期待結果等の一致を確認する。Machine Entityにない意味fieldをMarkdownだけへ追加して下流正本にしない
+- `content`は意味上のEntity本体、`runtime_dependencies[]`はfreshness用の機械metadataであり`content_fingerprint`へ含めない
+- `runtime_dependencies[]`はそのEntityの現在状態を成立させるruntime unitだけを列挙する。Authority等、runtimeに依存しないsource Entityでは空配列を許可する
+- 複数用途SkillでMachine Entityを保存する場合は既存`対象 / 実行範囲`をblock metadataへ保持し、本Planでruntime対象となる`test-analysis: テスト分析`と他用途を混在させない
+
+`spec-analysis`のAuthority Entityでは次の項目をcanonical化します。
+
 `spec-analysis`のAuthority Entityでは次の項目をcanonical化します。
 
 - 仕様根拠ID
@@ -511,13 +551,13 @@ fingerprint対象の`content`はLLMが自由に再構成しません。各担当
 - change graph node / edge: `{node_key, node_type, source_ref}` / `{edge_key, from, to, edge_type, evidence_refs[]}`
 - 環境 / test data要求: `{requirement_key, dimension_key, operator, normalized_value, authority_refs[], source_target_refs[]}`
 - TR: `{tr_id, text, authority_refs[], risk_refs[], priority, test_level, observation_method}`
-- TCN: `{tcn_id, tr_refs[], condition, technique, coverage_criterion, authority_refs[], risk_refs[], priority}`
+- TCN: `{tcn_id, tr_refs[], condition, category, technique, coverage_criterion, authority_refs[], risk_refs[], priority}`
 - model metadata: `{model_key, technique_slug, parent_tcn_id, selection_source}`
 - CI mapping: `{target_ref, model_key, target_key, ci_id, status}`
-- TC: `{tc_id, tr_refs[], tcn_refs[], ci_refs[], priority, preconditions, test_data, steps, expected_results[]}`
+- TC: `{tc_id, title_or_purpose, tr_refs[], tcn_refs[], ci_refs[], priority, preconditions, test_data, steps, expected_results[], postconditions_or_cleanup}`
 - Disposition: `{upstream_id, handling, reason, authority_refs[], covered_by_ref}`
 
-machine dataに存在しない表示専用の備考やMarkdown整形は`content`へ入れません。schema変更はruntime contract変更として扱います。
+machine dataに存在しない表示専用の備考やMarkdown整形は`content`へ入れません。Machine Entity schemaの意味変更は`entity-state-v1`のversion変更として扱い、そのschemaを消費するruntime contractも更新します。
 
 modelは実際に消費したEntityを`upstream_entities`へ1件ずつ保持し、runtimeがcanonical `content`から`content_fingerprint`を計算します。`skill + entity_ref`が同じEntityの`content_fingerprint`だけを比較し、不一致となったEntityを参照するmodelだけを`要再検証`へ戻します。無関係なEntity変更ではmodelをstaleにしません。
 
