@@ -875,6 +875,8 @@ relationが製品に妥当か、source input集合、follow-up transform、出�
 
 ### `requirement_structure.py`
 
+LLMはTRの意味内容と、既存TRを再利用するか新規TRにするかだけを判断します。既存ID再利用時は`reuse_id`、新規時は`new`を指定し、runtimeが最終TR IDを割り当てます。
+
 LLM draft後に次を計算します。
 
 - Authority / RiskがTRまたはDispositionのどちらか一方へ閉じるか
@@ -884,12 +886,16 @@ LLM draft後に次を計算します。
 - TRの指定優先度が最低優先度以上ならそのまま保持
 - 指定優先度が最低優先度より低く`priority_override_reason`が空ならviolation
 - 指定優先度が低くても`priority_override_reason`が非空ならoverrideとして保持し、runtimeが自動で優先度を書き換えない
+- reuse指定のTR IDが直前成果物系列に存在し、同じIDを複数draftへ割り当てていないことを検証する
+- new指定だけ既存最大TR番号+1から採番し、削除済みTR番号を再利用しない
 
-TR本文や粒度は変更しません。
+TR本文や粒度、既存TRとの意味上の同一性は変更・推論しません。
 
 ## 22. テストケースの構造処理
 
 ### `case_structure.py`
+
+LLMはTCの前提・手順・データ・expected resultと、既存TCを再利用するか新規TCにするかを判断します。既存ID再利用時は`reuse_id`、新規時は`new`を指定し、runtimeが最終TC IDを割り当てます。
 
 LLM draft後に次を計算します。
 
@@ -901,8 +907,10 @@ LLM draft後に次を計算します。
 - 指定優先度が要求より低く`priority_override_reason`が空ならviolation
 - 指定優先度が低くても`priority_override_reason`が非空ならoverrideとして保持し、runtimeが自動で優先度を書き換えない
 - 番号付きexpected resultとAuthority対応
+- reuse指定のTC IDが直前成果物系列に存在し、同じIDを複数draftへ割り当てていないことを検証する
+- new指定だけ既存最大TC番号+1から採番し、削除済みTC番号を再利用しない
 
-具体的な前提・操作・データ・expected resultは生成しません。
+具体的な前提・操作・データ・expected result、既存TCとの意味上の同一性は生成・推論しません。
 
 ## 23. traceability
 
@@ -968,6 +976,7 @@ LLMは`merge_group`だけを明示します。scriptは同じgroupについて�
 | `case_structure.py` | TCN / CI / TC / Disposition | `violation:<type>:<entity_id>` | violations / derived priority |
 | `traceability.py` | nodes / edges / dispositions / stale metadata | `gap:<type>:<entity_id>` | gaps / orphan / stale / closed dispositions |
 | `materialize_coverage.py` | TCN、generator targets、target annotations、previous mapping、merge groups | target ref → CI ID | CI mapping / stale / machine rows |
+| `workflow_runtime.py` | runtime units、current upstream entities / runtime units、unsupported item closure | `runtime_unit_key` | freshness / stale propagation / completion blockers |
 
 assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく、そのtargetを定義するcanonical key/value構造だけです。hash collisionを検出した場合は`internal_error`として停止し、別targetを同一keyへ統合しません。
 
@@ -1047,12 +1056,15 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 
 #### `requirement_structure.py`
 
-- required: `authorities[]`, `risks[]`, `test_requirements[]`, `dispositions[]`
+- required: `authorities[]`, `risks[]`, `test_requirements[]`, `dispositions[]`, `previous_tr_ids[]`
 - `authorities[]`: Authority ID文字列
 - risk: `{risk_id, priority}`、priorityは`高 / 中 / 低`
-- TR: `{tr_id, authority_refs[], risk_refs[], priority, priority_override_reason}`
+- TR draft: `{identity_action, reuse_id, authority_refs[], risk_refs[], priority, priority_override_reason}`。`identity_action=reuse|new`。reuse時だけ既存`TR-\d{3}`を`reuse_id`へ指定し、new時は`reuse_id=null`
+- `previous_tr_ids[]`は同じ成果物系列で既に使用済みのTR IDを保持し、削除済みIDも含めて再利用禁止番号を維持する
+- runtimeはreuse対象の存在・重複を検証し、newだけ最大番号+1で採番する。999到達後のnewは`id_space_exhausted`
 - `priority_override_reason`は空文字を許可。関連risk最高優先度より低い場合だけ非空必須
 - disposition: `{upstream_id, handling, reason}`。handlingは既存TR Disposition集合
+- outputに`tr_id_map[]: {draft_index, tr_id, identity_action}`を返す
 
 #### `condition_structure.py`
 
@@ -1203,13 +1215,16 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 
 #### `case_structure.py`
 
-- required: `test_conditions[]`, `coverage_items[]`, `test_cases[]`, `dispositions[]`
+- required: `test_conditions[]`, `coverage_items[]`, `test_cases[]`, `dispositions[]`, `previous_tc_ids[]`
 - TCN: `{tcn_id, priority}`
 - CI: `{ci_id, tcn_id, priority, authority_refs}`
-- TC: `{tc_id, tcn_refs[], ci_refs[], priority, priority_override_reason, expected_results[]}`
+- TC draft: `{identity_action, reuse_id, tcn_refs[], ci_refs[], priority, priority_override_reason, expected_results[]}`。`identity_action=reuse|new`。reuse時だけ既存`TC-\d{3}`を`reuse_id`へ指定し、new時は`reuse_id=null`
+- `previous_tc_ids[]`は同じ成果物系列で既に使用済みのTC IDを保持し、削除済みIDも含めて再利用禁止番号を維持する
+- runtimeはreuse対象の存在・重複を検証し、newだけ最大番号+1で採番する。999到達後のnewは`id_space_exhausted`
 - expected result: `{number, text, authority_refs[]}`。numberは1から連番
 - priority_override_reasonは低い優先度へoverrideする場合だけ非空必須
 - disposition: `{upstream_id, handling, reason}`
+- outputに`tc_id_map[]: {draft_index, tc_id, identity_action}`を返す
 
 #### `traceability.py`
 
@@ -1231,6 +1246,17 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - merge groupは`_02` §11形式の`target_refs[]`で、同一TCN内かつ同じ`expected_result_root`だけを許可する
 - outputは`target_id_map[]`、`coverage_item_rows`、`stale_ci_ids`、`issues`
 - `target_id_map[]`: `{target_ref, model_key, target_key, ci_id}`。1 target_refから複数CIへのmappingは禁止する
+
+#### `workflow_runtime.py`
+
+- required: `runtime_units[]`, `current_upstream_entities[]`, `current_runtime_units[]`, `unsupported_item_closures[]`
+- runtime unit: `{skill, runtime_unit_key, model_key, support_status, result_status, runtime_status, runtime_required, deterministic_generated, generation_fingerprint, upstream_entities[], upstream_runtime_units[], unsupported_items[]}`
+- `current_upstream_entities[]`: `{skill, entity_ref, content}`。`workflow_runtime.py`は`runtime_contract.py`のcanonicalizationで現在の`content_fingerprint`を計算し、保存済みruntime unitのfingerprintと比較する
+- `current_runtime_units[]`: `{runtime_unit_key, generation_fingerprint}`。保存済み`upstream_runtime_units[]`と比較し、直接依存unitから下流へstaleを伝播する
+- `unsupported_item_closures[]`: `{runtime_unit_key, item_key, handling, reason, authority_refs}`。`support_status=partial`のunsupported item、またはwhole-model fallbackについて既存Skill契約上のfallback / Dispositionへ閉じた結果だけを渡す
+- runtimeは意味上の再利用可否、開始Skill、仕様Authorityの優先関係を再判断しない
+- outputは`freshness[]: {runtime_unit_key, freshness_status, stale_reasons[]}`、`completion: {can_complete, blockers[]}`、runtime状態表用の正規化rowを返す
+- `can_complete=true`には、全unitがcurrent、`result_status=ready`、runtime required unitが`deterministic_generated=true`、partial / unsupportedの未閉鎖itemが0件であることを必須にする
 
 `valid_minimal.json`は上記schemaの実行例であり正本ではありません。optional fieldは上記で明記したものだけとし、Skill referenceはこのPlanのschemaをそのまま説明します。
 
