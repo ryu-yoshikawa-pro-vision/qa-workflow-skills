@@ -54,7 +54,7 @@ test_runtime_workflow_integration.py
 
 各runtime scriptには`tests/skills/runtime/fixtures/<script-name>/valid_minimal.json`を1件必須とし、これをPlan `_03`のrequired input schemaの実行例とします。fixtureは手書きし、generator出力から生成しません。unknown field拒否、required field欠落、型不一致は各scriptのunit testで確認します。
 
-CLI integration testは各runtime scriptの`valid_minimal.json`をsubprocessで`python <script-path>`起動し、stdinへJSONを渡してstdout envelopeを読む経路を使用します。加えてSkill別dispatch表について、各scriptへ到達するprompt分類済みfixtureから期待script pathを一意に決められることを機械テストします。全scriptのdispatchはCIで検証し、実Agent smokeだけへ依存しません。1 subprocessのtimeoutは30秒です。
+CLI integration testは各runtime scriptの`valid_minimal.json`をsubprocessで`python <script-path>`起動し、stdinへJSONを渡してstdout envelopeを読む経路を使用します。加えて`_02` §2.1のSkill別dispatch表について、各scriptへ到達するprompt分類済みfixtureから期待script path・必須/条件付き・実行順を一意に決められることを機械テストします。派生modelでは親runtime → `condition_structure.py` → 派生generatorまで検証します。全scriptのdispatchはCIで検証し、実Agent smokeだけへ依存しません。CI subprocessとSkill実行時subprocessの安全timeoutは30秒です。
 
 ## 3. 共通契約の必須回帰
 
@@ -63,13 +63,16 @@ CLI integration testは各runtime scriptの`valid_minimal.json`をsubprocessで`
 - duplicate key拒否
 - `NaN` / `Infinity`拒否
 - 不正top-level type拒否
-- decimalの型保持
+- model decimalの型保持
+- raw JSON documentの非integer numberを`Decimal`でexact parseし、binary floatを経由しない
+- canonical serializerが`Decimal`を指数表記なしのexact JSON numberへ戻す
 - nullと欠落の区別
 
 ### runtime envelope
 
 - `envelope_version / runtime_contract_version / generator_contract_version / generator / runtime_unit_key / model_key / input_fingerprint / model_fingerprint / generation_fingerprint / runtime_implementation_fingerprint / generator_implementation_fingerprint / support_status / static_data_versions / runtime_status / result_status / runtime_required / deterministic_generated / fallback_reason / payload / issues`
 - model scriptは`runtime_unit_key=model:<model_key>`、artifact全体scriptは`runtime_unit_key=artifact:<generator>:<scope_key>`を要求し、artifact全体scriptの`model_key`はnull
+- runtime dependency参照は`(skill, runtime_unit_key)`を一意keyとし、Skillを跨いで`runtime_unit_key`単独をidentityにしない
 - `ok / invalid_input / unsupported / limit_exceeded`は構造化結果を返せた扱いで終了code 0
 - `internal_error`は可能ならenvelopeを返して終了code 1、envelope生成不能も1
 - Agent側は終了codeだけで判断せずstdout envelopeをparseする
@@ -101,7 +104,9 @@ CLI integration testは各runtime scriptの`valid_minimal.json`をsubprocessで`
 - envelope version、generator、runtime contract、generator contract、実装fingerprint、static data version変更で`generation_fingerprint`が変わる
 - runtime / generator source変更で実装fingerprintが変わり、意味契約を変えないbug fixでも旧machine evidenceを同一生成条件として再利用しない
 - tie-break / Coverage / target key等の意味契約変更では実装fingerprintだけでなく対応contract versionも更新する
-- fenced JSONの保存→決定論的抽出→strict decode→canonical化でmodel fingerprintが一致し、同条件でruntimeへ再投入すると同じmachine resultになる
+- model / artifact全runtime unitについて`Machine Runtime Input / Result`を保存→決定論的抽出→strict decode→canonical化し、input fingerprint、model scriptではmodel fingerprintも一致する。同条件でruntimeへ再投入すると同じmachine resultになる
+- LF / CRLF差だけでimplementation fingerprintが変わらない
+- canonical JSON static dataは整形・改行差だけでversion hashが変わらない
 
 ### 決定論性
 
@@ -113,13 +118,17 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 
 `_02`の固定上限について境界値をテストします。
 
-- item数、入力byte、nesting depth、1文字列、stdout byteの各上限ちょうどは処理可能
-- feasibility search nodeはroot=1、visited partial assignment単位で数える
+- 通常runtime stdin 2 MiB、集約runtime stdin 16 MiB、stdout 16 MiBの各上限ちょうどは処理可能
+- 複数modelを集約した`materialize_coverage.py`等は最終stdin全体へ16 MiB上限を適用し、個々の上流unit成功だけでは完了扱いしない
+- nesting depth、1文字列、target / row / candidate上限を検証
+- 探索nodeはroot=1。combinatorial / Decision Tableのpartial assignment、state / flowのpath / cycle prefix、grammarのpartial derivationを展開するたびに加算する
+- output件数0でも探索node超過なら`limit_exceeded`
 - target / row / candidateはstable key重複除去後に数える
 - 1件または1 byte超過で`limit_exceeded`
 - Coverage基準を自動で下げない
 - 部分結果を100%としない
-- stdout 16 MiB境界付近の代表fixtureを実Agent smokeで取得・strict decode・成果物保存できることを確認する。実Agent側の安全上限が低い場合はgenerator実装前に`runtime-v1`のartifact transport上限を固定し、超過時はtruncateせず`limit_exceeded`とする
+- 30秒timeoutは異常時の安全網であり、通常の探索結果をtimeout時刻で確定しない
+- 代表generator実装後の実Agent smokeでstdout 16 MiB境界付近の取得・strict decode・成果物保存を確認し、実Agent側の安全上限が低い場合は後続generator量産前に`runtime-v1`へ固定する
 
 ## 4. 技法・構造処理の必須回帰
 
@@ -141,8 +150,9 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - 複数`true`時のunionと安定順
 - `undetermined_signals`
 - `complete=false`だけではworkflowをブロックしない
-- `Selection Source = analysis / user / existing_artifact`
+- `Selection Source = analysis / user / existing_artifact / derived`
 - ユーザー明示 / 既存成果物由来の技法をcandidate scriptが却下しない
+- `undetermined_signals`の各signalを`resolved / selection_not_affected / question`へ閉じ、未閉鎖signalをworkflow完了にしない
 - 新規正規技法名
 - 選択技法のmodel / disposition閉鎖
 
@@ -174,16 +184,21 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - `draft_key`を使ってLLM draftと最終TR ID mappingを安定追跡する
 - `reuse_id / new`の意味判断とTR番号割当てを分離し、`previous_tr_ids[].status=active|deleted`を検証する
 - reuseはactiveだけ許可し、新規はactive / deletedを含む最大番号+1で採番して削除済み番号を再利用しない
+- outputの`tr_id_state[]`にdeleted IDも残し、次回入力の正本にする
 - draft → runtime検査 → 再検査の処理順
 
 ### test condition structure
 
+- TR入力、TCNの`tr_refs[]`、requirement Dispositionから各TRをTCNまたは扱いへちょうど1回閉じる
+- unknown TR、linked + disposed重複、未閉鎖TRを検出する
+- TCN priorityは関連TR最高優先度を既定とし、低いoverrideには理由を必須にする
 - TCN / modelの`draft_key`、`reuse / new`意味判断と番号割当てを分離する
 - `previous_tcn_ids[] / previous_model_keys[]`の`active|deleted`を検証し、reuseはactiveだけ許可する
 - 新規TCNはactive / deletedを含む既存最大+1、999超過は`id_space_exhausted`
 - model keyは同slugのactive / deleted最大+1、削除済みkeyを同系列で再利用しない
 - reuse時のslug / parent TCN / existing key一致
 - 1 model key = 1 TCN所属を検査し、同じmodel keyを複数TCNへ割り当てない
+- outputの`tcn_id_state[] / model_key_state[]`にdeleted IDも残し、次回入力の正本にする
 
 ### 同値分割 / Each Choice
 
@@ -203,6 +218,7 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - integer / Decimal / date / local datetime / fixed-offset datetime
 - domain別step objectの型・正値検証
 - 3-valueでは境界リスク、過去不具合、ユーザー明示等の具体的な`coverage_selection_reason`を必須にする
+- schema由来BVAはboundary skeletonとLLMの`mode / coverage_selection_reason`を固定builderでjoinし、schema scriptだけで3-valueを自動選択しない
 - fixed-offset datetime算術でoffsetを保持
 - step不明時に隣接値を創作しない
 - 同一具体値でもCoverage positionを区別
@@ -223,6 +239,8 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - 対象borderのON / IN pointが他border上に乗らず、他borderについてpartition内部であること
 - OFF / OUTが対象borderを跨いだ結果としてpartition外であり、別borderだけを跨いだpointを誤採用しないこと
 - 対象border以外の条件によりrequired pointを作れない場合のblocking
+- coefficient / constant / anchorをexact rationalへ変換し、pivot計算でbinary float / Decimal roundingを使わない
+- finite decimalへexact変換できるboundaryだけ生成し、`1/3`等は`unrepresentable_point` unsupported itemへする
 - representable / unrepresentable boundary
 - coefficient 0 / anchor不足
 - override point所属・距離検証
@@ -324,6 +342,8 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 raw machine-readable入力をfixtureにします。
 
 - JSON Schema 2020-12対応keyword
+- raw JSON numberを`int / Decimal`でexact parse
+- scalar / nullの`enum / const`を処理し、object / array値はsubtree単位`unsupported`
 - `$defs`をlocal `$ref`参照先containerとして扱う
 - single typeと`[base, null]`だけを対応し、nullableを`allows_null`へ正規化
 - `properties / items` traversal
@@ -342,7 +362,8 @@ raw machine-readable入力をfixtureにします。
 - HTML `pattern`を保持するがPython `re`で評価しない
 - JSON Schema `multipleOf` → `grid(base=0, step=m)`
 - HTML数値`step`は`min`ありの場合だけgrid化し、minなし / date-time系は`unsupported`
-- `derived.ep_inputs / derived.bva_inputs / derived.combinatorial_constraints / derived.test_data_requirements`が下流inputと直接互換で、LLM再生成を挟まない
+- `derived.ep_inputs / derived.bva_boundary_skeletons / derived.combinatorial_constraints / derived.test_data_requirements`を固定schemaで出す
+- BVAはboundary skeletonへLLMが`mode / coverage_selection_reason`だけを追加し、固定builderで`bva.py` inputへする
 - range / enum / requiredはEP / BVA / combinatorial / test dataへ、gridはschema Coverage / BVA / combinatorialだけへ渡す
 
 ### UI pattern
@@ -396,6 +417,8 @@ raw machine-readable入力をfixtureにします。
 
 ### Coverage target materialize / Disposition
 
+- materialize入力modelは`runtime_status=ok / result_status=ready / deterministic_generated=true / freshness=current`を必須にし、supportedまたは分離済みpartialだけ許可する
+- unresolved / blocked / stale modelからCIを作らない
 - generator targetは、CIへmaterializeするtargetと`target_dispositions[]`へ閉じるtargetのどちらか一方へ必ず分類する
 - 同一target_refへ`target_annotations[]`と`target_dispositions[]`を同時指定しない
 - CI化するtargetだけ`target_annotations[]`を1対1で要求し、unknown / duplicate target_refを拒否する
@@ -404,13 +427,18 @@ raw machine-readable入力をfixtureにします。
 - generator生成後に`成立不能`Dispositionへ変更しない。成立不能根拠が得られた場合はmodel / constraintを更新してgeneratorを再実行する
 - Disposition済みtargetへCIを採番せず、同時にgeneratorの`coverage_summary.required / covered / complete`を変更しない
 - `ブロック中`Dispositionはworkflow完了を妨げる
+- `test_data_requirement_refs[]`は同じmaterialize inputの`data:<requirement_key>`へ解決できることを必須にする
 - merge groupはDispositionされていない同一TCN内targetだけを含み、同じ`expected_result_root`を要求する
+- merge targetのtest data requirementsを§16と同じintersection規則で統合し、矛盾 / unsupportedならmerge拒否
+- 同じ期待挙動groupを再利用すると判断した場合は既存`expected_result_root`を維持し、意味不変のkey churnをsemantic evalで検出する
 
 ### test case structure
 
+- Dispositionはstructure / traceability共通schema`{upstream_id, handling, reason, authority_refs[], covered_by_ref}`を使う
 - `draft_key`を使ってLLM draftと最終TC ID mappingを安定追跡する
 - `previous_tc_ids[].status=active|deleted`を検証し、reuseはactiveだけ、新規はactive / deletedを含む最大番号+1とする
 - 削除済みTC IDを再利用せず、999超過は`id_space_exhausted`
+- outputの`tc_id_state[]`にdeleted IDも残し、次回入力の正本にする
 - TCN / CI → TC closure
 - linked + disposed重複
 - unknown upstream
@@ -422,6 +450,7 @@ raw machine-readable入力をfixtureにします。
 
 ### traceability
 
+- Dispositionはstructure scriptと同じ共通schemaをそのまま受け取り、Markdownから再解釈しない
 - Authority / Risk → TRまたはDisposition
 - TR → TCNまたはDisposition
 - TCN → CI → TC、CIなしTCN → TC、または既存Skill契約で許可されたDisposition
@@ -449,7 +478,10 @@ raw machine-readable入力をfixtureにします。
 - `target_annotations[]`が全targetへ1対1対応し、unknown / duplicate target_refを拒否する
 - `expected_result_root`は同一TCN内の内部用local keyで、同じ期待挙動と意味判断したtargetだけ同値になる
 - 同一CIへの複数target_refは、同じ`expected_result_root`を持つ同一merge groupだけ許可する
-- merge解除時は辞書順先頭targetへ既存CIを維持し、残りを最大番号+1で再採番して関連TCを`要再検証`へする
+- unmerged→mergedでは既存CIの最小番号を存続CIとし、他CIをdeletedへする
+- merge groupへのtarget追加 / 削除、CI→Disposition、Disposition→CIの各状態遷移で`_02` §7.2.2どおりID維持・deleted・再採番を行う
+- merge解除時は辞書順先頭targetへ既存CIを維持し、残りを過去使用済み最大番号+1で再採番して関連TCを`要再検証`へする
+- `target_mapping_state[] / ci_id_state[]`にinactive / deleted履歴を残す
 - 消滅targetで下流`要再検証`
 - 同じ実行を2回行ってmachine evidenceが重複しない
 - stale rowを完了扱いしない
@@ -561,7 +593,7 @@ runtime対応Skillの`evals/output/cases/*/expected.json`では、既存fieldに
 
 - expected target / Coverageは手書きfixtureから独立計算または明示し、generator出力をexpectedへコピーしない
 - `expected_target_id_map`はstateful materialize caseだけ使用し、`{target_ref, model_key, target_key, ci_id}`配列で保持する
-- validatorは保存済みruntime inputから`input_fingerprint`、model scriptでは`model_fingerprint`、全scriptで`generation_fingerprint`を独立再計算し、fixtureに書いたhash文字列を盲信しない
+- validatorは全runtime unitの保存済み`Machine Runtime Input / Result`から`input_fingerprint`、model scriptでは`model_fingerprint`、全scriptで`generation_fingerprint`を独立再計算し、fixtureに書いたhash文字列を盲信しない
 - upstream Entity差分caseでは無関係Entityの変更が対象modelをstaleにしないことを確認する
 - upstream runtime差分caseでは直接依存unitだけがstaleになり、依存していないmodelへ伝播しないことを確認する
 - implementation fingerprintはruntime / generator sourceから独立再計算し、fixtureの文字列を盲信しない
@@ -801,6 +833,9 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 ### `qa-workflow`
 
 - `scripts/workflow_runtime.py`を追加し、runtime metadata集約、upstream Entity / runtime unit fingerprint比較、stale伝播、機械的完了判定をLLMから分離
+- runtime dependency identityは`(skill, runtime_unit_key)`で固定する
+- `workflow_runtime.py`自身を評価対象`runtime_units[]`から除外し、self dependencyを禁止する
+- missing dependencyはstale + blocker、duplicate / cycleは`invalid_input`
 - 既存Skill状態表を維持し、別表`runtime状態`を追加
 - model単位状態を成果物metadataから再構築
 - legacy昇格
@@ -822,6 +857,7 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 ### Step 1: 共通runtime契約
 
 - stdin / stdout / cwd非依存のCLI契約
+- Skill実行時subprocessの30秒安全timeout
 - strict JSON
 - output envelope / status対応表
 - canonicalization
@@ -829,43 +865,44 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 - static data versions
 - input / model / generation fingerprint
 - runtime / generator implementation fingerprint
-- upstream Entity content fingerprint / upstream runtime dependency
+- upstream Entity canonical content schema / content fingerprint / `(skill, runtime_unit_key)` upstream runtime dependency
 - support_statusと対応subset判定。`runtime_required`は入力fieldにせずruntime出力として導出
-- deterministic Markdown抽出 / 再投入
-- item / byte / depth / search node hard limit
+- 全runtime unitの`Machine Runtime Input / Result`保存、決定論的抽出 / 再投入
+- 通常stdin 2 MiB / 集約stdin 16 MiB / stdout 16 MiB / depth / 探索node hard limit
 - tie-break
 - structured issue / blocking
-- 6 Skillの`runtime_contract.py`同一実装
-- 実Agentのartifact transport境界を代表fixtureで確認し、16 MiB未満の上限が必要ならこのStepで`runtime-v1`へ固定
+- 6 Skillの`runtime_contract.py`同一実装とLF正規化implementation fingerprint
 
 ### Step 2: identity / workflow基盤
 
-- technique slugと`condition_structure.py`によるstable model key / TCN採番
+- technique slugと`condition_structure.py`によるstable model key / TCN採番、TR closure / priority検査
 - `requirement_structure.py` / `case_structure.py`によるTR / TC採番
 - qa-workflow再利用元による成果物系列判定
-- 既存TR / TCN / TC / modelのID再利用規則と999上限
+- 既存TR / TCN / TC / modelのID再利用規則、active / deleted machine state、999上限
 - 1 model key = 1 TCN所属
 - previous target_ref mappingとmerge groupを入力にしたtarget_ref → CI materialize
-- merge解除時のID維持 / 再採番 / downstream stale
+- merge / unmerge / target追加削除 / CI↔DispositionのID状態遷移とdownstream stale
 - upsert / stale / freshness status
 - upstream Entity別content fingerprint / upstream runtime dependency
 - question-analysisのModel / Target保持
 - coverage-analysisのModel Key / Disposition追跡
-- `workflow_runtime.py`によるSkill状態表 + runtime状態表（model / artifact両runtime unit）の機械集約
+- `workflow_runtime.py`によるSkill状態表 + runtime状態表（model / artifact両runtime unit）の機械集約。自身は評価対象から除外
 - legacy昇格
 
-### Step 2.5: 共通経路の成立確認
+### Step 2.5: 代表generatorと共通経路の成立確認
 
-後続generatorを量産する前に、既存技法1つを使って次を同一PR内で通します。
+後続generatorを量産する前に、代表generatorとして`equivalence_partitions.py`を先行実装し、次を同一PR内で通します。Step 5ではEPを再実装せず、この実装へBVA等を追加します。
 
-`LLM正規化 → dispatch → runtime → Machine Model保存 → target annotation → CI materialize → validator → workflow_runtime → Markdown再読込 → runtime再実行`
+`LLM正規化 → dispatch → runtime → Machine Runtime Input / Result保存 → target annotation → CI materialize → validator → workflow_runtime → Markdown再読込 → runtime再実行`
+
+この時点で実Agentのartifact transport境界も確認し、16 MiB未満の上限が必要なら後続generator実装前に`runtime-v1`へ固定します。
 
 ここで見つかった共通契約不整合はStep 1 / 2へ戻して修正します。この確認を完了扱いの区切りにはせず、修正後は同じPRでStep 3以降の全対象を実装します。
 
 ### Step 3: test-analysis
 
 - risk scheme / priority mapping
-- technique candidates / Selection Source
+- technique candidates / Selection Source / undetermined signal閉鎖
 - 新規正規技法のSkill契約
 - trigger eval更新
 - change graph / impact
@@ -878,11 +915,11 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 
 ### Step 5: condition design 基本技法
 
-- EP / Each Choice
+- Step 2.5で先行実装したEP / Each Choiceの回帰を維持
 - BVA 2-value / 3-value target
-- Domain Testing Reliable Domain Coverage（`< <= > >= = !=`）
-- schema / HTML parser / root document + local `$ref` / OpenAPI request-response context
-- schemaからEP / BVA / combinatorial / test dataへの固定derived input
+- Domain Testing Reliable Domain Coverage（`< <= > >= = !=`）とexact rational border arithmetic
+- schema / HTML parser / exact JSON number / scalar-null enum・const / root document + local `$ref` / OpenAPI request-response context
+- schemaからEP / BVA boundary skeleton / combinatorial / test dataへの固定derived inputとBVA意味parameter join
 - test data / environment cross-operator intersection
 - 新規技法のSkill / reference / template / eval契約
 
@@ -918,10 +955,11 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 
 ### Step 10: materialize / test-case / traceability
 
-- `materialize_coverage.py`
+- `materialize_coverage.py`のmodel status / freshness gate
+- test data requirement参照解決とmerge compatibility intersection
 - target_ref → CI mapping / upsert
 - target machine data + `target_annotations[]` join
-- merge group union / merge解除時のstable ID
+- merge group union / merge・unmerge・CI↔Disposition状態遷移時のstable IDとID state永続化
 - machine evidence描画
 - case structure
 - traceability
@@ -930,6 +968,7 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 ### Step 11: workflow統合
 
 - end-to-end path
+- `(skill, runtime_unit_key)` dependency identity / missing / duplicate / cycle / self除外
 - upstream Entity / upstream runtime変更
 - model / implementation変更
 - local block / partial unsupported
@@ -955,7 +994,7 @@ semantic evalとAuthority traceで検出し、scriptが意味を補完しませ�
 
 ### 計算量
 
-固定hard limitを使用し、超過時にCoverage基準を下げません。
+固定hard limitを使用し、超過時にCoverage基準を下げません。output件数だけでなくstate / flow / grammarを含む探索nodeを計測し、timeoutを正常終了条件にしません。
 
 ### generator / validator同時誤り
 
@@ -979,29 +1018,29 @@ Plan完了には次をすべて満たす必要があります。
 
 - `_01`で実装対象にした処理がruntimeまたは既存機械処理へ割り当てられている
 - 目的内の技法・構造処理が本Plan外へ先送りされていない
-- CLI / strict JSON / envelope / canonicalization / envelope・runtime・generator contract versionが実装済み
-- upstream Entityのcanonical contentからcontent fingerprintをruntime計算でき、upstream runtime dependency、static data versions、input / model / generation / implementation fingerprintが再現可能
-- 正規化modelのMarkdown fenced JSONをruntimeが決定論的に抽出し、strict decode、fingerprint一致、同条件での再実行までround-tripが成立する
-- stable model key / TR / TCN / TCのruntime採番、1 model = 1 TCN、target_ref、成果物系列、previous mapping、merge / merge解除を含むCI materializeが契約どおり
+- CLI / strict JSON / exact JSON number / envelope / canonicalization / envelope・runtime・generator contract versionが実装済み
+- upstream Entityのmachine dataからcanonical contentを機械構築してcontent fingerprintをruntime計算でき、`(skill, runtime_unit_key)` upstream dependency、static data versions、input / model / generation / LF正規化implementation fingerprintが再現可能
+- model / artifact全runtime unitの`Machine Runtime Input / Result`を決定論的に抽出し、strict decode、fingerprint一致、同条件での再実行までround-tripが成立する
+- stable model key / TR / TCN / TCのruntime採番、active / deleted ID state、1 model = 1 TCN、target_ref、成果物系列、previous mapping、merge / unmerge / CI↔Disposition状態遷移を含むCI materializeが契約どおり
 - 再実行がupsertされ重複machine evidenceを作らない
 - stale派生成果物を完了扱いしない
 - 選択技法がmodelまたは明示的な扱いへ閉じる
 - machine-readable schema / HTMLをLLMが手変換せず対応scriptが処理する
-- script間の機械変換では固定derived schema / builderを使い、LLMは意味パラメータやtarget annotationだけを追加してmachine dataを再生成しない
+- script間の機械変換では固定derived schema / builderを使い、派生modelを`condition_structure.py`で採番し、LLMは意味パラメータやtarget annotationだけを追加してmachine dataを再生成しない
 - 全技法generatorと構造scriptにunit testがある
-- item数 / byte / depthを含むhard limitとtie-breakが契約どおり
+- 通常/集約stdin、stdout、item数、byte、depth、state / flow / grammarを含む探索node hard limitとtie-breakが契約どおり
 - runtime出力と保存machine evidenceの一致をvalidatorが確認する
 - support判定をruntimeが行い、whole-model `unsupported`、`partial`、Python unavailableを契約どおり区別する。supported inputをAgent判断だけでruntime省略しない
 - model内Coverageと仕様全体Coverageを混同しない
-- `workflow_runtime.py`がmodel / artifact両runtime unit、upstream Entity内容変更、upstream runtime dependency、generation / implementation変更、stale、局所ブロック、partial / whole-model fallback、legacyを処理できる
+- `workflow_runtime.py`がmodel / artifact両runtime unit、upstream Entity内容変更、`(skill, runtime_unit_key)` dependency、missing / duplicate / cycle、generation / implementation変更、stale、局所ブロック、partial / whole-model fallback、legacyを処理でき、自身を評価対象へ含めない
 - question-analysis往復でmodel / targetが失われない
-- 途中工程開始と`Selection Source`が既存workflowを壊さない
+- 途中工程開始と`Selection Source=analysis / user / existing_artifact / derived`が既存workflowを壊さず、undetermined signalが未閉鎖のまま完了しない
 - CIでは全runtime scriptのdispatch / metadata整合、Coverage targetのCI / Disposition閉鎖、Decision Table don't-care merge非破壊性を確認し、実Agent smokeでは代表promptでPython起動、envelope parse、machine結果採用、Markdown再読込まで確認できる
 - 6 Skillの単体移植性が成立し、共通runtime helperの内容一致を検証できる
 - trigger datasetがSkill別exact count（repository合計328）を満たし、新規技法5種のselection / design境界をtrain・validation双方で検証する
 - semantic datasetがSkill別exact count（repository合計51）を満たし、LLMへ残す意味判断責務が少なくとも1 caseへ対応したうえでtest-analysis / test-condition-design / adversarial-reviewのcaseがPASSする
-- Round-tripが開始state違いを別targetとして扱い、Domain Testingが対象border以外のIN条件を検証し、Decision Table mergeが未定義assignmentを包含しない
-- traceabilityがDispositionを正常な閉鎖として扱い、OpenAPI `readOnly / writeOnly`をrequest / response contextに従って処理する
+- Round-tripが開始state違いを別targetとして扱い、Domain Testingがexact rationalで対象border以外のIN条件を検証し、Decision Table mergeが未定義assignmentを包含しない
+- structure / traceabilityが共通Disposition schemaを扱い、OpenAPI `readOnly / writeOnly`をrequest / response contextに従い、raw schema数値をfloatへ丸めず処理する
 - Python 3.11 compile / runtime unit / deterministic eval / semantic validation / workflow統合評価がPASS
 - `skills-ref validate`がPASS
 - README、Skill、reference、template、EVALS、ASSERTIONSが実装と一致
@@ -1023,3 +1062,7 @@ Plan完了には次をすべて満たす必要があります。
 - 意味判断なしにinvalid behavior / expected result / riskを創作する
 - machine evidenceをLLMに手計算させる
 - machine-readable入力を対応scriptがあるのにLLMへ再変換させる
+- runtime dependencyを`runtime_unit_key`単独でSkill横断参照する
+- target key componentへdelimiter `:`を許可する
+- Domain borderやschema numeric keywordをbinary float / context roundingで近似する
+- `workflow_runtime.py`自身を完了判定の入力unitへ含める
