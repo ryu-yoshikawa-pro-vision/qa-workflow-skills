@@ -255,7 +255,9 @@ border:
 9. OFF / OUT pointは対象borderを跨いだ結果としてpartition外になることを確認し、別borderだけを跨いでpartition外になったpointを対象borderのrequired pointとして採用しない
 10. relation別required targetがすべて生成できたときだけCoverage completeとする
 
-border valueまたは必要な隣接点がrepresentableでない、pivot coefficientが0、anchor不足、step不明、partition全体の所属条件を満たせない場合は推測しません。LLMがoverride pointを明示する場合も、scriptがpartition全体の所属とstep距離を検証し、規則に一致しなければ`invalid_input`とします。
+coefficient、constant、anchor、pivot stepは有限decimalをexact rationalへ変換し、border座標計算はPython `fractions.Fraction`相当の有理数演算で行います。pivot border valueを求める途中でbinary floatや`Decimal` context roundingを使用しません。最終値がintegerまたは有限decimalとしてexactに表現できる場合だけtyped valueへ変換します。既約分母が2と5以外の素因数を持つ等、対応typed valueへexact変換できないrequired pointは`unrepresentable_point`としてunsupported itemへ出し、丸めたON / OFF pointを生成しません。
+
+border valueまたは必要な隣接点がrepresentableでない、pivot coefficientが0、anchor不足、step不明、partition全体の所属条件を満たせない場合は推測しません。LLMがoverride pointを明示する場合も、scriptがpartition全体の所属とstep距離をexact arithmeticで検証し、規則に一致しなければ`invalid_input`とします。
 ## 6. Decision Table
 
 ### `decision_table.py`
@@ -284,7 +286,7 @@ condition / action / ruleは任意数を許可します。known ruleのaction ve
 - 統合後に新しい未定義assignmentを包含しない
 - Authority集合を保持できる
 
-候補をdeterministicに列挙し、各候補へstable `merge_key`を付与します。LLMは意味上統合してよい候補の`merge_key`だけを`accepted_merges[]`へ返し、任意の`rule_keys[]`を新規構成しません。scriptはaccepted `merge_key`が同一実行で生成した候補に存在すること、候補内ruleが同一action vectorであること、統合後のCartesian productが成立可能な既知ruleだけを含み未定義assignmentを追加しないことを再検証してdon't-care ruleを生成します。Boolean minimizationで最小rule数を目的にしません。
+候補をdeterministicに列挙し、各候補へ`merge_key = dm:sha256:<canonical sorted rule_keys hash>`を付与します。`rule_keys`はUnicode code point順でsortした配列をcanonical JSON化してSHA-256します。LLMは意味上統合してよい候補の`merge_key`だけを`accepted_merges[]`へ返し、任意の`rule_keys[]`を新規構成しません。scriptはaccepted `merge_key`が同一実行で生成した候補に存在すること、候補内ruleが同一action vectorであること、統合後のCartesian productが成立可能な既知ruleだけを含み未定義assignmentを追加しないことを再検証してdon't-care ruleを生成します。Boolean minimizationで最小rule数を目的にしません。
 
 `accepted_merges[]`はDecision Tableの派生表示・レビュー用のdon't-care ruleを作るためだけに使用します。元の成立可能assignment targetは削除せず、`coverage_summary.required / covered`も変更しません。Decision Tableのaccepted mergeを`materialize_coverage.py`の`merge_group`へ自動変換しません。複数assignmentを1つのCI / TCへまとめる場合は、各targetのtest data requirementを同時に満たせることを含め、別途§24と`_02` §11のmerge契約を満たす必要があります。
 
@@ -631,6 +633,10 @@ machine-readableな入力はscriptが直接正規化します。
 
 `$schema / $id`はdocument metadataとして保持しますがvalidation Coverageへ使用しません。validationへ影響しないannotationとして無視してよいkeywordは`title / description / $comment / default / examples`だけです。その他の未知keywordは黙って無視せず`unsupported`とします。
 
+JSON Schema / OpenAPI document内のJSON numberは`_02` §3.1に従ってintegerを`int`、非integerを`Decimal`としてparseし、`minimum / maximum / exclusiveMinimum / exclusiveMaximum / multipleOf / enum / const`をbinary floatへ変換しません。
+
+`enum / const`のruntime-v1対応範囲はscalar / nullだけです。string、boolean、integer、finite decimal、nullは対応し、object / arrayを値として持つ`enum / const`はそのsubtreeを`unsupported`とします。JSON Schema自体をinvalidとは扱いません。
+
 ### OpenAPI 3.0 Schema
 
 - 上記相当keyword
@@ -672,7 +678,7 @@ machine-readableな入力はscriptが直接正規化します。
 
 `allOf / anyOf / oneOf / not / if / then / else`等、対応subset外でvalidation意味を変えるkeywordは`unsupported`です。unsupported keywordがvalidation意味へ影響するsubtreeだけを切り離し、独立して評価できる別property / itemは継続できます。親schemaのvalidation意味をunsupported keywordが左右する場合は、その親subtree全体を`unsupported`にします。
 
-正規化後のrange / enum / required等は`derived.ep_inputs / derived.bva_inputs / derived.combinatorial_constraints / derived.test_data_requirements`へ固定schemaで出力します。各配列は対応下流scriptのinput fieldと直接互換で、`schema_cases.py`内の固定builderが項目mappingだけを行います。`grid`は上記限定経路で扱います。
+正規化後のrange / enum / required等は`derived.ep_inputs / derived.bva_boundary_skeletons / derived.combinatorial_constraints / derived.test_data_requirements`へ固定schemaで出力します。`derived.bva_boundary_skeletons`は`boundary_key / side / threshold / inclusive / step / authority_refs`までを持ち、`mode / coverage_selection_reason`は含めません。LLMがその2 fieldだけを追加し、固定builderが`bva.py` inputへ変換します。EP / combinatorial / test dataは対応下流scriptのinput fieldと直接互換です。`grid`は上記限定経路で扱います。
 ## 15. UI pattern
 
 ### `ui_pattern_candidates.py`
@@ -877,7 +883,7 @@ relationが製品に妥当か、source input集合、follow-up transform、出�
 
 ### `requirement_structure.py`
 
-LLMはTRの意味内容と、既存TRを再利用するか新規TRにするかだけを判断します。既存ID再利用時は`reuse_id`、新規時は`new`を指定し、runtimeが最終TR IDを割り当てます。
+LLMはTRの意味内容と、既存TRを再利用するか新規TRにするかだけを判断します。Dispositionのmachine schemaはstructure / traceabilityで共通して`{upstream_id, handling, reason, authority_refs[], covered_by_ref}`とし、不要な`covered_by_ref`はnullです。既存ID再利用時は`reuse_id`、新規時は`new`を指定し、runtimeが最終TR IDを割り当てます。
 
 LLM draft後に次を計算します。
 
@@ -890,6 +896,7 @@ LLM draft後に次を計算します。
 - 指定優先度が低くても`priority_override_reason`が非空ならoverrideとして保持し、runtimeが自動で優先度を書き換えない
 - reuse指定のTR IDが直前成果物系列に存在し、同じIDを複数draftへ割り当てていないことを検証する
 - new指定だけ既存最大TR番号+1から採番し、削除済みTR番号を再利用しない
+- outputへactive / deletedを含む`tr_id_state[]`を返し、次回の`previous_tr_ids[]`の正本にする
 
 TR本文や粒度、既存TRとの意味上の同一性は変更・推論しません。
 
@@ -897,7 +904,7 @@ TR本文や粒度、既存TRとの意味上の同一性は変更・推論しま�
 
 ### `case_structure.py`
 
-LLMはTCの前提・手順・データ・expected resultと、既存TCを再利用するか新規TCにするかを判断します。既存ID再利用時は`reuse_id`、新規時は`new`を指定し、runtimeが最終TC IDを割り当てます。
+LLMはTCの前提・手順・データ・expected resultと、既存TCを再利用するか新規TCにするかを判断します。Dispositionは`requirement_structure.py`と同じ共通schemaを使用します。既存ID再利用時は`reuse_id`、新規時は`new`を指定し、runtimeが最終TC IDを割り当てます。
 
 LLM draft後に次を計算します。
 
@@ -911,6 +918,7 @@ LLM draft後に次を計算します。
 - 番号付きexpected resultとAuthority対応
 - reuse指定のTC IDが直前成果物系列に存在し、同じIDを複数draftへ割り当てていないことを検証する
 - new指定だけ既存最大TC番号+1から採番し、削除済みTC番号を再利用しない
+- outputへactive / deletedを含む`tc_id_state[]`を返し、次回の`previous_tc_ids[]`の正本にする
 
 具体的な前提・操作・データ・expected result、既存TCとの意味上の同一性は生成・推論しません。
 
@@ -1065,18 +1073,22 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - `previous_tr_ids[]`: `{tr_id, status}`。`status=active|deleted`。reuseは`active`だけ許可し、new採番の最大番号計算にはactive / deletedの両方を含めて削除済み番号を再利用しない
 - runtimeはreuse対象の存在・status・重複を検証し、newだけ最大番号+1で採番する。999到達後のnewは`id_space_exhausted`
 - `priority_override_reason`は空文字を許可。関連risk最高優先度より低い場合だけ非空必須
-- disposition: `{upstream_id, handling, reason}`。handlingは既存TR Disposition集合
-- outputに`tr_id_map[]: {draft_key, tr_id, identity_action}`を返す
+- disposition: `{upstream_id, handling, reason, authority_refs[], covered_by_ref}`。handlingは既存TR Disposition集合、`covered_by_ref`は必要なhandlingだけ使用しその他はnull
+- outputに`tr_id_map[]: {draft_key, tr_id, identity_action}`と`tr_id_state[]: {tr_id, status}`を返す
 
 #### `condition_structure.py`
 
-- required: `test_conditions[]`, `models[]`, `previous_tcn_ids[]`, `previous_model_keys[]`
-- TCN draft: `{draft_key, identity_action, reuse_id, priority}`。`draft_key`は入力内一意。意味上の同一性はLLMが`identity_action=reuse|new`として決め、reuse時だけ既存`TCN-\d{3}`を指定する
+- required: `test_requirements[]`, `test_conditions[]`, `requirement_dispositions[]`, `models[]`, `previous_tcn_ids[]`, `previous_model_keys[]`
+- TR: `{tr_id, priority, authority_refs[], risk_refs[]}`
+- TCN draft: `{draft_key, identity_action, reuse_id, tr_refs[], priority, priority_override_reason}`。`draft_key`は入力内一意。意味上の同一性はLLMが`identity_action=reuse|new`として決め、reuse時だけ既存`TCN-\d{3}`を指定する
+- requirement dispositionは共通Disposition schemaを使用する
+- 各TRはTCNの`tr_refs[]`またはrequirement dispositionのどちらか一方へ閉じ、unknown TR、linked + disposed重複、未閉鎖TRをviolationにする
+- TCNの既定priorityは関連TRの最高優先度。より低いpriorityを指定する場合だけ非空`priority_override_reason`を必須にし、runtimeが自動補正しない
 - model draft: `{draft_key, technique_slug, identity_action, reuse_model_key, parent_tcn_draft_key}`。`draft_key`はmodel内一意、`parent_tcn_draft_key`は同じ入力のTCN draftを参照する。reuse時だけ既存`<slug>-\d{3,}`を指定する
 - `previous_tcn_ids[]`: `{tcn_id, status}`、`previous_model_keys[]`: `{model_key, technique_slug, parent_tcn_id, status}`。`status=active|deleted`。reuseはactiveだけ許可し、新規採番の最大番号にはdeletedも含める
 - runtimeはreuse対象の存在、status、重複、slug一致、最終親TCN一致を検証し、新規TCN / modelだけ既存最大番号+1で採番する
 - 1つのmodel keyは同時に1つのTCNだけへ所属する。別TCNへ同じmodel keyを割り当てない
-- outputに`tcn_id_map[]: {draft_key, tcn_id, identity_action}`と`model_key_map[]: {draft_key, model_key, parent_tcn_id, identity_action}`を返す
+- outputに`tcn_id_map[]: {draft_key, tcn_id, identity_action}`、`model_key_map[]: {draft_key, model_key, parent_tcn_id, identity_action}`、`tcn_id_state[]`、`model_key_state[]`を返す
 - 999到達後の新規TCNは`id_space_exhausted`。model keyは3桁以上を許可し999上限を設けない
 
 #### `equivalence_partitions.py`
@@ -1188,6 +1200,8 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 #### `schema_cases.py`
 
 - required: `schema_kind`, `document`, `schema_pointer`, `context`
+- JSON / OpenAPI documentの非integer JSON numberは`Decimal`としてexactにparseし、binary floatを使用しない
+- `enum / const`はscalar / nullだけruntime-v1対応。object / array値を含むsubtreeはunsupported itemへ出す
 - `schema_kind = json-schema-2020-12 | openapi-3.0 | html-control`
 - json/openapiでは`document`はroot document object、`schema_pointer`はそのdocument内のCoverage対象Schema Objectを指すlocal JSON Pointer。local `$ref`は常に同じ`document`をrootとして解決する
 - `context`はJSON Schemaでは`validation`、OpenAPIでは`request|response`、HTMLでは`form-control`
@@ -1227,45 +1241,64 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - runtimeはreuse対象の存在・status・重複を検証し、newだけ最大番号+1で採番する。999到達後のnewは`id_space_exhausted`
 - expected result: `{number, text, authority_refs[]}`。numberは1から連番
 - priority_override_reasonは低い優先度へoverrideする場合だけ非空必須
-- disposition: `{upstream_id, handling, reason}`
-- outputに`tc_id_map[]: {draft_key, tc_id, identity_action}`を返す
+- disposition: `{upstream_id, handling, reason, authority_refs[], covered_by_ref}`
+- outputに`tc_id_map[]: {draft_key, tc_id, identity_action}`と`tc_id_state[]: {tc_id, status}`を返す
 
 #### `traceability.py`
 
 - required: `nodes[]`, `edges[]`, `dispositions[]`, `freshness[]`
 - node: `{node_key, node_type}`。node_typeは`Authority / Risk / TR / TCN / CI / TC`
 - edge: `{from, to}`。from / toは既知nodeで、§23の許可直接edgeだけを認める
-- disposition: `{upstream_id, handling, reason, authority_refs}`。handlingは対象上流型に対して既存担当Skillが許可するDisposition集合だけを認め、必要なreason / Authorityを検証する
+- disposition: `{upstream_id, handling, reason, authority_refs[], covered_by_ref}`。handlingは対象上流型に対して既存担当Skillが許可するDisposition集合だけを認め、必要なreason / Authority / covered_by_refを検証する
 - freshness: `{entity_ref, model_key, freshness_status}`。freshnessは`current / stale`、model_keyがないEntityはnull
 
 #### `materialize_coverage.py`
 
-- required: `tcn_id`, `models[]`, `target_annotations[]`, `target_dispositions[]`, `previous_target_id_map[]`, `merge_groups[]`
+- required: `tcn_id`, `models[]`, `target_annotations[]`, `target_dispositions[]`, `test_data_requirements[]`, `previous_target_id_map[]`, `previous_ci_ids[]`, `previous_expected_result_roots[]`, `merge_groups[]`
 - `tcn_id`は`TCN-\d{3}`
-- model: `{model_key, runtime_unit_key, input_fingerprint, model_fingerprint, generation_fingerprint, generator_contract_version, targets[]}`。全modelは`condition_structure.py`で同じ`tcn_id`への1対1所属を検証済みであること
+- model: `{model_key, skill, runtime_unit_key, input_fingerprint, model_fingerprint, generation_fingerprint, generator_contract_version, support_status, runtime_status, result_status, deterministic_generated, freshness_status, targets[]}`。全modelは`condition_structure.py`で同じ`tcn_id`への1対1所属を検証済みであること
+- materialize対象modelは`runtime_status=ok / result_status=ready / deterministic_generated=true / freshness_status=current`を必須にする。`support_status=supported`または、unsupported itemとtarget集合が分離済みの`partial`だけ許可する
 - machine target: `{target_ref, target_key, authority_refs, reference_refs, ...技法固有machine fields}`。priority、expected result、test data要求をLLMに埋め戻させない
-- target annotation: `{target_ref, priority, expected_result_root, test_data_requirement_refs[]}`。Dispositionされないmachine targetにちょうど1件対応し、unknown / duplicate target_refを拒否する。`expected_result_root`は同一TCN内の内部用local keyで`^[A-Za-z][A-Za-z0-9._:-]{0,63}$`、同じkeyはLLMがAuthorityに基づき同じ期待挙動へ統合可能と判断したtargetだけへ付与する。製品Authorityそのものとして扱わない
+- target annotation: `{target_ref, priority, expected_result_root, test_data_requirement_refs[]}`。Dispositionされないmachine targetにちょうど1件対応し、unknown / duplicate target_refを拒否する。`expected_result_root`は同一TCN内の内部用local keyで`^[A-Za-z][A-Za-z0-9._:-]{0,63}$`、同じkeyはLLMがAuthorityに基づき同じ期待挙動へ統合可能と判断したtargetだけへ付与する。前回同じ期待挙動groupを再利用すると意味判断した場合は`previous_expected_result_roots[]`の既存keyを維持し、新規groupだけ未使用keyを追加する。製品Authorityそのものとして扱わない
 - target disposition: `{target_ref, handling, reason, authority_refs, covered_by_target_ref}`。`_02` §7.4のhandlingだけを許可し、同一target_refへannotationとDispositionを同時指定しない。`重複`では`covered_by_target_ref`必須
 - `target_ref`は`_02` §7.2の式を再計算して一致必須
-- `previous_target_id_map[]`: `{target_ref, model_key, target_key, ci_id}`。同一merge group内だけ同じ`ci_id`を共有可
-- merge groupは`_02` §11形式の`target_refs[]`で、Dispositionされていない同一TCN内targetかつ同じ`expected_result_root`だけを許可する
+- `test_data_requirements[]`は`{data_ref, requirement_key, dimension_key, operator, ...}`で、`data_ref=data:<requirement_key>`を一意にする。annotationの全`test_data_requirement_refs[]`はこの集合に存在必須
+- `previous_target_id_map[]`: `{target_ref, model_key, target_key, ci_id, mapping_status}`。`mapping_status=active|inactive`で、Disposition中targetの直近CIもinactiveとして保持する
+- `previous_ci_ids[]`: `{ci_id, status}`。`status=active|deleted`で削除済み番号も保持する
+- `previous_expected_result_roots[]`: `{expected_result_root, status}`。`status=active|deleted`。同じ意味groupのkey再利用可否はLLMが判断し、runtimeはduplicate / deleted keyの不正reuseを検査する
+- merge groupは`_02` §11形式の`target_refs[]`で、Dispositionされていない同一TCN内targetかつ同じ`expected_result_root`だけを許可する。group内test data requirementは§16と同じintersection規則で統合し、conflict / unsupportedならmergeを拒否する
 - `target_dispositions[]`にあるtargetはCI採番対象から除外し、generatorの`coverage_summary`自体は変更しない
-- outputは`target_id_map[]`、`disposed_target_refs[]`、`coverage_item_rows`、`stale_ci_ids`、`issues`
-- `target_id_map[]`: `{target_ref, model_key, target_key, ci_id}`。1 target_refから複数CIへのmappingは禁止する
+- outputは`target_id_map[]`、`target_mapping_state[]`、`ci_id_state[]`、`expected_result_root_state[]`、`disposed_target_refs[]`、`coverage_item_rows`、`stale_ci_ids`、`issues`
+- `target_id_map[]`: `{target_ref, model_key, target_key, ci_id}`。active mappingだけを返し、1 target_refから複数CIへのmappingは禁止する
+- `target_mapping_state[]`はactive / inactiveを含む直近mappingを保持し、`ci_id_state[]`はactive / deletedを保持する。次回のprevious stateはこれらを正本にする
 - `disposed_target_refs[]`: `{target_ref, handling, covered_by_target_ref}`。Coverage済みtarget数の計算には使用しない
 
 #### `workflow_runtime.py`
 
 - required: `runtime_units[]`, `current_upstream_entities[]`, `current_runtime_units[]`, `unsupported_item_closures[]`
+- `runtime_units[]`は評価対象unitだけを含み、`qa-workflow::artifact:workflow_runtime:all`自身を含めない。self dependencyも禁止する
 - runtime unit: `{skill, runtime_unit_key, model_key, support_status, result_status, runtime_status, runtime_required, deterministic_generated, generation_fingerprint, upstream_entities[], upstream_runtime_units[], unsupported_items[]}`
 - `current_upstream_entities[]`: `{skill, entity_ref, content}`。`workflow_runtime.py`は`runtime_contract.py`のcanonicalizationで現在の`content_fingerprint`を計算し、保存済みruntime unitのfingerprintと比較する
-- `current_runtime_units[]`: `{runtime_unit_key, generation_fingerprint}`。保存済み`upstream_runtime_units[]`と比較し、直接依存unitから下流へstaleを伝播する
-- `unsupported_item_closures[]`: `{runtime_unit_key, item_key, handling, reason, authority_refs}`。`support_status=partial`では`item_key`をunsupported itemのstable keyで必須、whole-model `unsupported`では`item_key=null`とし、既存Skill契約上のfallback / Dispositionへ閉じた結果だけを渡す
+- `current_runtime_units[]`: `{skill, runtime_unit_key, generation_fingerprint}`。`(skill, runtime_unit_key)`を一意keyとして保存済み`upstream_runtime_units[]`と比較し、直接依存unitから下流へstaleを伝播する。missing dependencyはstale + blocker、duplicateまたはcycleは`invalid_input`
+- `unsupported_item_closures[]`: `{skill, runtime_unit_key, item_key, handling, reason, authority_refs}`。`support_status=partial`では`item_key`をunsupported itemのstable keyで必須、whole-model `unsupported`では`item_key=null`とし、既存Skill契約上のfallback / Dispositionへ閉じた結果だけを渡す
 - runtimeは意味上の再利用可否、開始Skill、仕様Authorityの優先関係を再判断しない
-- outputは`freshness[]: {runtime_unit_key, freshness_status, stale_reasons[]}`、`completion: {can_complete, blockers[]}`、runtime状態表用の正規化rowを返す
+- outputは`freshness[]: {skill, runtime_unit_key, freshness_status, stale_reasons[]}`、`completion: {can_complete, blockers[]}`、runtime状態表用の正規化rowを返す
 - `can_complete=true`には、全unitがcurrent、`result_status=ready`、runtime required unitが`deterministic_generated=true`、partial / unsupportedの未閉鎖itemが0件であることを必須にする
 
+### unsupported item共通schema
+
+`support_status=partial`で返す`payload.unsupported_items[]`は`{item_key, item_type, source_key, reason_code, authority_refs[]}`で固定します。
+
+- `item_key`は`unsupported:<generator>:sha256:<canonical identity hash>`で、generator、`item_type`、`source_key`をcanonical JSON化して作る
+- `source_key`は対応できないsubtree / region / operator等のstable component keyまたはJSON Pointer
+- `reason_code`はscriptごとにPlan / Skill referenceで列挙した固定値だけを使用し、自由文をidentityに含めない
+- 再実行で同じunsupported箇所は同じ`item_key`を維持し、`workflow_runtime.py`のclosure再利用に使う
+
 `valid_minimal.json`は上記schemaの実行例であり正本ではありません。optional fieldは上記で明記したものだけとし、Skill referenceはこのPlanのschemaをそのまま説明します。
+
+### stable component key
+
+target / result keyへ文字列連結する`set_key / partition_key / boundary_key / border_key / condition_key / action_key / rule_key / factor_key / classification_key / class_key / state_key / transition_key / candidate_key / region_key / branch_key / loop_key / entity_key / function_key / sequence_key / cause_key / effect_key / production_key / mutation_key / relation_key / source_id / follow_up_key / requirement_key / dimension_key`は`_02` §3.2のstable component key形式に従い、`:`を含めません。
 
 ### grammar production key
 
