@@ -292,6 +292,20 @@ scriptが実行できた場合、stdoutは次のJSON object 1件だけです。
   "generation_fingerprint": "sha256:...",
   "runtime_implementation_fingerprint": "sha256:...",
   "generator_implementation_fingerprint": "sha256:...",
+  "upstream_entity_fingerprints": [
+    {
+      "skill":"test-requirement-design",
+      "entity_ref":"TR-001",
+      "content_fingerprint":"sha256:..."
+    }
+  ],
+  "upstream_runtime_units": [
+    {
+      "skill":"test-requirement-design",
+      "runtime_unit_key":"artifact:requirement_structure:all",
+      "generation_fingerprint":"sha256:..."
+    }
+  ],
   "support_status": "supported",
   "static_data_versions": {},
   "runtime_status": "ok",
@@ -304,7 +318,7 @@ scriptが実行できた場合、stdoutは次のJSON object 1件だけです。
 }
 ```
 
-output envelopeの`skill`はinput metadataおよびscript所属Skillと一致必須です。
+output envelopeの`skill`はinput metadataおよびscript所属Skillと一致必須です。`upstream_entity_fingerprints[]`はinput metadataの`upstream_entities[]`からruntimeが計算し、`upstream_runtime_units[]`は入力参照をcanonical順で正規化して保存します。callerがfingerprint結果だけを出力へ注入しません。
 
 `support_status`は`supported / partial / unsupported / unknown`です。`partial`は同一input内に、独立して機械処理できる範囲と対応subset外の範囲が共存する場合だけ使用します。対応subset外部分は`payload.unsupported_items[]`へstable key、理由、Authorityを保持し、黙って削除しません。`unknown`はsupport判定を完了できなかった場合だけ使用し、`invalid_input / internal_error / not_run`以外では返しません。
 
