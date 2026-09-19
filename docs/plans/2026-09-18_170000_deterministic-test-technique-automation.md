@@ -40,6 +40,8 @@
 
 このPlanでいう決定論性は、**同じcanonicalなruntime入力、同じ上流Entity content fingerprint、同じruntime / generator contract version、同じruntime / generator implementation fingerprint、同じ静的参照データversionから同じgenerator結果を得ること**です。runtime入力には正規化済みモデルと技法選択元を含め、実際に消費したAuthority / Risk / TR等はcanonical machine Entityのcontent fingerprintとしてgeneration条件へ含めます。既存CI ID等を維持するstateful処理は、これらに加えて同じtarget annotation / Disposition / merge指定と、同じprevious target / CI / expected result root / ID stateを入力した場合に同じ結果を得ることを保証します。自然言語資料から正規化済みモデルを作るLLM判断まで「同じ入力なら常に同じ結果」と保証するものではありません。正規化の意味妥当性・漏れはsemantic evalと既存の上流閉鎖で確認します。
 
-正規化済みモデルと各担当Skillが保存するcanonical machine Entityを意味上の正本とし、Coverage表、生成組合せ、Coverage Item等の機械生成部分は派生成果物として扱います。既存成果物を再利用する場合も、runtime対象unitは現在のcanonical machine Entityと正規化済み入力からscriptを再実行し、保存済みruntime resultを現在世代の実行cacheとして扱いません。上流Authority、直接依存する上流runtime結果、正規化済みモデル、runtime / generator contract、runtime / generator実装、静的参照データのいずれかが変わった場合は、fingerprint比較で影響する派生成果物だけをstaleとして`要再検証`へ戻し、再生成・再検証が完了するまで完了扱いしません。
+正規化済みモデルと各担当Skillが保存するcanonical machine Entityを意味上の正本とし、Machine Entityは`(skill, entity_type, entity_ref)`で識別します。Coverage表、生成組合せ、Coverage Item等の機械生成部分は派生成果物として扱います。既存成果物を再利用する場合も、runtime対象unitは現在のcanonical machine Entityと正規化済み入力からscriptを再実行し、保存済みruntime resultを現在世代の実行cacheとして扱いません。上流Authority、直接依存する上流runtime結果、正規化済みモデル、runtime / generator contract、runtime / generator実装、静的参照データのいずれかが変わった場合は、fingerprint比較で影響する派生成果物だけをstaleとして`要再検証`へ戻し、再生成・再検証が完了するまで完了扱いしません。
 
-scriptは仕様根拠や業務ルールを創作しません。期待結果が現在有効な仕様根拠へ追跡できない場合は、生成結果を完成済みテストとして扱わず、既存の停止条件・ブロック中・質問ルーティングへ戻します。
+scriptは仕様根拠や業務ルールを創作しません。技法選択は`selection_key + technique_slug`からTCN / modelへ機械的に追跡できる状態を保ち、CI化するCoverage targetはgenerator別に固定した実行可能`execution`を持たせます。最終完了判定ではdispatch表から導出した期待runtime unit集合と、各Skill validatorが導出した期待Machine Entity集合を実際の集合と比較し、丸ごと欠落したunit / Entityを見逃しません。
+
+期待結果が現在有効な仕様根拠へ追跡できない場合は、生成結果を完成済みテストとして扱わず、既存の停止条件・ブロック中・質問ルーティングへ戻します。
