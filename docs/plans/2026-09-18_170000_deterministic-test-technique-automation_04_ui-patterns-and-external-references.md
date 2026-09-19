@@ -142,7 +142,7 @@ LLMまたは対象調査で次が取得できる場合、技法へ接続しま�
 - `minlength`、`maxlength` → BVA入力
 - pattern catalog → readonly / disabled / focus等の確認候補
 
-HTML constraintをBVA / partitionへ渡す前に、そのcontrolがconstraint validation対象かを確認します。`disabled`、`readonly`、control type等によりvalidation対象外の場合、属性が存在するだけでinvalid候補を生成しません。
+HTML constraintをBVA / partitionへ渡す前に、そのcontrolがconstraint validation対象かを確認します。`schema_cases.py`のruntime-v1でconstraint生成対象にするtypeは`text / number / date / datetime-local`へ限定します。`disabled`、対応typeの`readonly`等によりconstraint validation対象外の場合、属性が存在するだけでinvalid候補を生成しません。`type=text`でvalidationへ適用される`pattern`はECMAScript RegExpをPython `re`で代用せず、そのcontrol validationを`unsupported`にします。`multiple`がvalidation意味を持つtypeはruntime-v1の対応type外として扱います。
 
 DOM属性と仕様書が矛盾する場合、DOMを正として期待結果を決めません。既存の`spec-analysis` / `question-analysis`のルールへ戻します。
 
