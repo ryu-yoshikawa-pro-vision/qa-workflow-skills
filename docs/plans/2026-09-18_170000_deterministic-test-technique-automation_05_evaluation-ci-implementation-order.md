@@ -527,14 +527,14 @@ validatorはruntime traceabilityと独立にmissing / orphan / unknown / stale�
 
 ### `question-analysis`
 
-`assets/output-template.md`の`不明点 / 質問一覧`と`ブロック中範囲`へ、既存の`再開対象 / 実行範囲`とは別に`Runtime Unit Key`、`Model Key`、`Target Key`列を追加します。
+`assets/output-template.md`の`不明点 / 質問一覧`と`ブロック中範囲`へ、既存の`再開対象 / 実行範囲`とは別に`Runtime Skill`、`Runtime Unit Key`、`Model Key`、`Target Key`列を追加します。
 
 - `再開対象 / 実行範囲`は既存`QUESTION-D017`のSkill用途判定だけに使用する
 - `Runtime Skill`と`Runtime Unit Key`はruntime issue由来の質問で必須で、組を一意identityとして扱う
 - model issueでは`Model Key`を必須、artifact全体script issueでは空欄
 - target固有issueだけ`Target Key`を必須
-- 同じブロッカーIDについて質問一覧とブロック中範囲のRuntime Unit / Model / Targetが一致することをvalidatorで確認する
-- runtime issue由来でない質問では3列を空欄にできる
+- 同じブロッカーIDについて質問一覧とブロック中範囲のRuntime Skill / Runtime Unit / Model / Targetが一致することをvalidatorで確認する
+- runtime issue由来でない質問では4列を空欄にできる
 ### `qa-workflow`
 
 既存Skill状態表は`qa-workflow`出力時に引き続き必須とし、`WF-D009`は維持します。ただし永続正本にはせず、成果物metadataから再構築可能にします。
@@ -575,6 +575,7 @@ runtime対応Skillの`evals/output/cases/*/expected.json`では、既存fieldに
 ```json
 {
   "runtime_contract": {
+    "expected_skill": "test-condition-design",
     "expected_runtime_unit_key": "model:pairwise-001",
     "upstream_entities": [
       {"skill":"spec-analysis","entity_ref":"SPEC-001","content_fingerprint":"sha256:..."}
@@ -818,7 +819,7 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 ### `test-case-design`
 
 - runtime structure検査の処理順
-- `assets/output-template.md`へ`Machine Runtime Input / Result`とTR active / deleted ID stateを追加
+- `assets/output-template.md`へ`Machine Runtime Input / Result`とTC active / deleted ID stateを追加
 - stable ID / active・deleted ID state / stale
 
 ### `coverage-analysis`
