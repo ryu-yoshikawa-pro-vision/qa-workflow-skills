@@ -1296,6 +1296,8 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - outputは`target_id_map[]`、`target_mapping_state[]`、`ci_id_state[]`、`expected_result_root_state[]`、`disposed_target_refs[]`、`coverage_item_rows`、`stale_ci_ids`、`issues`
 - `target_id_map[]`: `{target_ref, target_content_fingerprint, execution_fingerprint, model_key, target_key, ci_id}`。active mappingだけを返し、1 target_refから複数CIへのmappingは禁止する
 - `target_mapping_state[]`はactive / inactiveと直近`target_content_fingerprint`を保持し、`ci_id_state[]`はactive / deletedを保持する。次回のprevious stateはこれらを正本にする
+- 固定builderはactive CIごとに`_02` §4.4のCI Machine Entityを生成する。`covered_targets[]`は同じ`ci_id`へactive mappingされたtargetを`target_ref`順で集約し、各`target_ref / target_key / target_content_fingerprint / execution_fingerprint`を保持する。priority / expected_result_root / Authority / Reference / test data requirementは現在annotation / targetから機械joinし、LLMがCI Entity JSONを再生成しない
+- CI Machine Entityの`runtime_dependencies[]`には現在の`materialize_coverage.py` generationを、`upstream_entity_dependencies[]`には親TCNとmodel metadataを保存する。stable target_refのままtarget内容が変わればCI content fingerprintも変わる
 - `disposed_target_refs[]`: `{target_ref, handling, covered_by_target_ref}`。Coverage済みtarget数の計算には使用しない
 
 #### `workflow_runtime.py`
