@@ -615,15 +615,17 @@ runtime対応Skillの`evals/output/cases/*/expected.json`では、既存fieldに
 ```json
 {
   "machine_entities": {
-    "expected_skill": "test-condition-design",
-    "expected_entity_refs": ["TCN-001", "TCN-001-CI01"],
-    "expected_stale_entity_refs": []
+    "expected_entities": [
+      {"skill":"test-condition-design","entity_type":"tcn","entity_ref":"TCN-001"},
+      {"skill":"test-condition-design","entity_type":"ci","entity_ref":"TCN-001-CI01"}
+    ],
+    "expected_stale_entities": []
   },
   "runtime_contract": {
     "expected_skill": "test-condition-design",
     "expected_runtime_unit_key": "model:pairwise-001",
     "upstream_entities": [
-      {"skill":"spec-analysis","entity_ref":"SPEC-001","content_fingerprint":"sha256:..."}
+      {"skill":"spec-analysis","entity_type":"authority","entity_ref":"SPEC-001","content_fingerprint":"sha256:..."}
     ],
     "expected_target_keys": [],
     "expected_support_status": "supported",
@@ -638,7 +640,7 @@ runtime対応Skillの`evals/output/cases/*/expected.json`では、既存fieldに
 }
 ```
 
-- `machine_entities.expected_entity_refs[]`は成果物から抽出したMachine Entity ID集合と一致させ、各contentはSkill別canonical schemaと人間向け表の主要fieldへ独立照合する
+- `machine_entities.expected_entities[]`は成果物から抽出した`(skill, entity_type, entity_ref)`集合と一致させ、各contentはentity type別canonical schemaと人間向け表の主要fieldへ独立照合する
 - `spec-analysis`ではruntime_contractなしでMachine Entity fixtureを使用し、Authority表とcanonical Authority contentの一致を検証する
 - expected target / Coverageは手書きfixtureから独立計算または明示し、generator出力をexpectedへコピーしない
 - `expected_target_id_map`はstateful materialize caseだけ使用し、`{target_ref, target_content_fingerprint, execution_fingerprint, model_key, target_key, ci_id}`配列で保持する
