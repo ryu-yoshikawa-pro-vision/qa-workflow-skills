@@ -266,7 +266,7 @@ runtime入力は`metadata`とscript固有`input`を分けます。
   - その他のartifact全体script: literal `all`
 - 同一Skill内で同じ`artifact:<generator>:<scope_key>`を同時に複数定義しない
 - `selection_source`: model scriptだけ`analysis / user / existing_artifact / derived`のいずれかを必須。artifact全体scriptでは`null`。`derived`では親runtimeを`upstream_runtime_units[]`へ1件以上必須にする
-- `upstream_entities`: 実際に消費した上流Entity単位で保持する。`skill + entity_ref`を一意keyとし、呼び出し側はPlanで固定した項目のcanonicalな`content`を渡す。`content_fingerprint`はruntimeが`content`から計算してenvelopeと成果物へ保存し、LLMからhash値だけを受け取らない
+- `upstream_entities`: 実際に消費した上流Entity単位で保持する。`skill + entity_type + entity_ref`を一意keyとし、呼び出し側はPlanで固定した項目のcanonicalな`content`を渡す。`content_fingerprint`はruntimeが`content`から計算してenvelopeと成果物へ保存し、LLMからhash値だけを受け取らない
 - `upstream_runtime_units`: 他runtime結果を直接利用した場合に必須。`skill + runtime_unit_key + generation_fingerprint`を一意参照として保持する。`runtime_unit_key`単独をSkill横断identityに使わない
 - `runtime_contract_version`、`generator_contract_version`、runtime実装hash、generator実装hash、fileから導出できる`static_data_versions`はruntime側を正本とする。入力metadataに同じ値を持たせる場合はruntime実値と一致しなければ`invalid_input`
 - `static_data_versions`: keyは`^[a-z][a-z0-9_]*$`、valueは`sha256:<64 lowercase hex>`または明示的なcontract version文字列`^[A-Za-z0-9][A-Za-z0-9._-]*$`
@@ -350,7 +350,7 @@ status対応は次で固定します。
 | `internal_error` | `unknown` | `blocked` | `true` | `false` | support判定完了前後を問わず安全側でruntime requiredとして扱い、runtime不具合を修正 |
 | `not_run` | `unknown` | `blocked` | `true` | `false` | Python unavailable。成果物metadataだけで表現 |
 
-`stale`は`result_status`ではありません。成果物保存時の`freshness_status = current / stale`として`qa-workflow`がfingerprint比較から付与します。
+`stale`は`result_status`ではありません。semantic dependency preflightに成功した現在inputを現在scriptで正常実行したruntime resultは、保存時に`freshness_status=current`とします。`workflow_runtime.py`は保存済みdependencyと現在generationを共通freshness関数で再検証し、差分があれば`stale`へ変更して下流へ伝播します。`qa-workflow`だけをfreshnessの唯一の付与主体にせず、実行直後のcurrent判定と最終集約を分離します。
 
 `fallback_reason`は`null / outside_supported_subset / python_unavailable`だけを許可します。`runtime_status=unsupported`では`outside_supported_subset`、`runtime_status=not_run`では`python_unavailable`です。`runtime_status=not_run`では`input_fingerprint / model_fingerprint / generation_fingerprint`を`null`とし、決定論的再利用の証拠に使いません。`support_status=partial`のunsupported itemはitem単位でfallbackまたはDispositionへ閉じ、その閉鎖情報を成果物へ保存します。
 
@@ -510,12 +510,15 @@ generator結果に影響する静的データはversionを持ちます。
   "skill":"test-requirement-design",
   "entities":[
     {
+      "entity_type":"tr",
       "entity_ref":"TR-001",
       "model_key":null,
       "content":{...},
+      "content_fingerprint":"sha256:...",
       "upstream_entity_dependencies":[
         {
           "skill":"spec-analysis",
+          "entity_type":"authority",
           "entity_ref":"SPEC-001",
           "content_fingerprint":"sha256:..."
         }
@@ -537,12 +540,13 @@ generator結果に影響する静的データはversionを持ちます。
 - `test-analysis`はLLMが作るProduct Risk等の意味fieldとruntime resultを固定builderでjoinして保存する。例えばProduct Riskは`failure / authority_refs / impact / likelihood`と`risk_matrix.py`の`level / mapped_priority`をjoinする
 - `test-requirement-design` / `test-condition-design` / `test-case-design`はstructure scriptへ渡した意味fieldとruntimeが確定したID・優先度等を固定builderでjoinして保存する
 - Markdownの人間向け表はMachine Entityと同じ意味fieldを表示し、validatorでID・参照・優先度・期待結果等の一致を確認する。Machine Entityにない意味fieldをMarkdownだけへ追加して下流正本にしない
+- `entity_type`は`authority / product_risk / technique_selection / change_node / change_edge / environment_requirement / test_data_requirement / tr / tcn / model / ci / tc / disposition`の固定値だけを許可する。Machine Entity identityは`(skill, entity_type, entity_ref)`で一意とし、異なるtypeの同名keyを衝突扱いしない
+- `entity_ref`は各typeの既存stable ID / keyを使用する。Authority=`authority_id`、Product Risk=`risk_id`、技法選択=`selection_key`、change node=`node_key`、change edge=`edge_key`、環境 / test data要求=`requirement_key`、TR / TCN / model / CI / TCは各ID / key、Dispositionは対象`upstream_id`を使用する。同一`(skill, disposition, upstream_id)`にcurrentなDispositionを複数保存しない
+- `content_fingerprint`は`content`からruntime / validatorが再計算し、保存値と一致必須にする
 - `content`は意味上のEntity本体、`upstream_entity_dependencies[] / runtime_dependencies[]`はfreshness用の機械metadataであり`content_fingerprint`へ含めない
-- `upstream_entity_dependencies[]`はその意味判断を行った時点で実際に参照した上流Entityの`skill / entity_ref / content_fingerprint`を保存する。上流内容が変わった場合は、同じEntity IDでも意味判断を再確認するまでこのEntityを`stale`とする
+- `upstream_entity_dependencies[]`はその意味判断を行った時点で実際に参照した上流Entityの`skill / entity_type / entity_ref / content_fingerprint`を保存する。上流内容が変わった場合は、同じEntity IDでも意味判断を再確認するまでこのEntityを`stale`とする
 - `runtime_dependencies[]`はそのEntityの現在状態を成立させるruntime unitだけを列挙する。Authority等、上流もruntimeも持たないsource Entityでは両配列を空にできる
 - 複数用途SkillでMachine Entityを保存する場合は既存`対象 / 実行範囲`をblock metadataへ保持し、本Planでruntime対象となる`test-analysis: テスト分析`と他用途を混在させない
-
-`spec-analysis`のAuthority Entityでは次の項目をcanonical化します。
 
 `spec-analysis`のAuthority Entityでは次の項目をcanonical化します。
 
@@ -573,8 +577,8 @@ fingerprint対象の`content`はLLMが自由に再構成しません。各担当
 - change graph node / edge: `{node_key, node_type, source_ref}` / `{edge_key, from, to, edge_type, evidence_refs[]}`
 - 環境 / test data要求: `{requirement_key, dimension_key, operator, normalized_value, authority_refs[], source_target_refs[]}`
 - TR: `{tr_id, text, authority_refs[], risk_refs[], priority, test_level, observation_method}`
-- TCN: `{tcn_id, tr_refs[], condition, category, technique, coverage_criterion, authority_refs[], risk_refs[], priority}`
-- model metadata: `{model_key, technique_slug, parent_tcn_id, selection_source}`
+- TCN: `{tcn_id, tr_refs[], condition, category, technique_slugs[], coverage_criterion, authority_refs[], risk_refs[], priority}`
+- model metadata: `{model_key, technique_slug, parent_tcn_id, selection_source, selection_key}`。`selection_source=analysis`だけ`selection_key`を必須とし、`user / existing_artifact / derived`では`null`
 - CI: `{ci_id, tcn_id, model_key, covered_targets[], priority, expected_result_root, authority_refs[], reference_refs[], test_data_requirement_refs[], status}`。`covered_targets[]`は`{target_ref, target_key, target_content_fingerprint, execution_fingerprint}`を`target_ref`順で保持し、stable target_refのままtarget内容が変わった場合もCI content fingerprintが変わる
 - TC: `{tc_id, title_or_purpose, tr_refs[], tcn_refs[], ci_refs[], priority, preconditions, test_data, steps, expected_results[], postconditions_or_cleanup}`
 - Disposition: `{upstream_id, handling, reason, authority_refs[], covered_by_ref}`
@@ -588,14 +592,14 @@ Machine Entityの`upstream_entity_dependencies[]`は次を最低限含めます�
 - 技法選択: selection判断で実際に参照したAuthority / Risk / TR等
 - TR: `authority_refs[]`のAuthorityと`risk_refs[]`のProduct Risk
 - TCN: `tr_refs[]`のTR、直接`authority_refs[] / risk_refs[]`を持つ場合はそのAuthority / Risk
-- model metadata: 親TCN。`selection_source=analysis`では対応する技法選択Entity、`derived`では親runtimeをruntime dependencyへ持つ
+- model metadata: 親TCN。`selection_source=analysis`では`selection_key`が指す技法選択Entity、`derived`では親runtimeをruntime dependencyへ持つ
 - CI: 親TCNとmodel metadata。CI contentの`covered_targets[]`でtarget内容変更もcontent fingerprintへ反映する
 - TC: `tr_refs[] / tcn_refs[] / ci_refs[]`の各Entityと、expected resultが直接参照するAuthority
 - Disposition: 対象upstream Entity、`authority_refs[]`、`covered_by_ref`がある場合はその参照先Entity
 
 structure / materialize / generator等がEntity状態を機械的に成立させる場合は、そのruntime unitを`runtime_dependencies[]`へ追加します。semantic dependencyとruntime dependencyを相互代用しません。
 
-modelは実際に消費したEntityを`upstream_entities`へ1件ずつ保持し、runtimeがcanonical `content`から`content_fingerprint`を計算します。`skill + entity_ref`が同じEntityの`content_fingerprint`だけを比較し、不一致となったEntityを参照するmodelだけを`要再検証`へ戻します。無関係なEntity変更ではmodelをstaleにしません。
+modelは実際に消費したEntityを`upstream_entities`へ1件ずつ保持し、runtimeがcanonical `content`から`content_fingerprint`を計算します。`skill + entity_type + entity_ref`が同じEntityの`content_fingerprint`だけを比較し、不一致となったEntityを参照するmodelだけを`要再検証`へ戻します。無関係なEntity変更ではmodelをstaleにしません。
 
 他runtime結果を直接利用したunitは`upstream_runtime_units`も`(skill, runtime_unit_key)`で比較します。保存した`generation_fingerprint`と現在の上流runtime unitが一致しなければ下流unitをstaleとし、その下流へも依存関係に従って伝播します。参照先が存在しない場合はstale + blocker、同じ`(skill, runtime_unit_key)`が重複する場合またはruntime dependency graphにcycleがある場合は`invalid_input`です。LLMはこのfingerprint比較を手計算しません。
 ## 5. 値・順序・tie-break
@@ -854,13 +858,14 @@ validatorはfenced JSON blockを抽出してstrict JSON decodeし、canonical化
 
 `選択キー | 適用領域 | Selection Source | Signals JSON | Candidates JSON | Undetermined Signals JSON | 最終採用技法 | 状態`
 
-`Selection Source`は`analysis / user / existing_artifact / derived`のいずれかです。技法modelのmetadataにも`selection_source`を必須で保存します。`test-analysis`を通った場合はその選択行からコピーし、途中工程開始でユーザーが技法を明示した場合は`user`、再利用した既存modelは`existing_artifact`、親runtimeのmachine outputから派生したmodelは`derived`とします。
+`Selection Source`は`analysis / user / existing_artifact / derived`のいずれかです。技法modelのmetadataにも`selection_source`を必須で保存します。`analysis`では元の技法選択行の`selection_key`も必須で保存し、その行の`selected_techniques[]`にmodelの`technique_slug`が含まれることを`condition_structure.py`で検証します。`user / existing_artifact / derived`では`selection_key=null`とします。`test-analysis`を通った場合はその選択行からsourceとkeyをコピーし、途中工程開始でユーザーが技法を明示した場合は`user`、再利用した既存modelは`existing_artifact`、親runtimeのmachine outputから派生したmodelは`derived`とします。
 
 - `true / false / null`を区別
 - `technique_candidates.py`の`complete`は`undetermined_signals`が空かだけを表す診断値であり、`complete=false`だけを理由にworkflowをブロックしない。ただし各undetermined signalは`test-analysis`成果物で`resolved / selection_not_affected / question`のいずれかへ閉じ、未閉鎖signalが残る状態をworkflow完了にしない
 - ユーザー明示または有効な既存成果物由来の技法をcandidate scriptが勝手に却下しない
-- 選択した技法は`test-condition-design`のmodel、対象外、未解決、または`runtime_required=false`の対応subset外fallbackへ必ず閉じる
-- 選択技法だけ存在しmodel化されない状態を完了扱いしない
+- `condition_structure.py`は現在の技法選択Entityを入力として受け、`status`が確定した各`selected_techniques[]`について、同じ`selection_key + technique_slug`を持つmodel、対象外、未解決のいずれかへちょうど1回閉じる。model化後にruntimeが`runtime_required=false`となる場合だけ対応subset外fallbackへ閉じる
+- TCN Machine Entityの`technique_slugs[]`は、そのTCNへ所属するactive modelの`technique_slug`集合と完全一致させる。unknown / duplicate slug、TCNにないmodel slug、modelのないTCN slugを許可しない
+- 選択技法だけ存在しmodelまたは明示的な扱いへ閉じない状態を完了扱いしない
 - 新しい正規技法名を追加した場合はsignal / validator / semantic evalも同時に更新する
 
 ## 10. change impact graph
