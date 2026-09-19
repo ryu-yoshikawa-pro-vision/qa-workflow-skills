@@ -250,8 +250,10 @@ border:
 4. relation別規則でcoverage pointを生成
 5. 各pointを**partition expression全体**へ再代入する
 6. ON / INはpartition expressionがtrue、OFF / OUTはfalseであることを検証する。`=` / `!=`も上記定義に従ってpartition所属を検証する
-7. 対象border以外のborderが意図せず跨がれ、required pointのpartition所属を満たせない場合はblocking issueを返す
-8. relation別required targetがすべて生成できたときだけCoverage completeとする
+7. 対象borderのON pointは、同じpartitionを構成する他borderについてborder上ではなくpartition内部にあることを必須にする。対象border以外でON/OFF相当になるpointはReliable Domain Coverageの対象pointとして採用しない
+8. IN pointは対象borderだけでなく同じpartitionの他borderについてもpartition内部にあることを検証する。対象border以外を意図せず跨ぐ、または他border上に乗る場合はblocking issueを返す
+9. OFF / OUT pointは対象borderを跨いだ結果としてpartition外になることを確認し、別borderだけを跨いでpartition外になったpointを対象borderのrequired pointとして採用しない
+10. relation別required targetがすべて生成できたときだけCoverage completeとする
 
 border valueまたは必要な隣接点がrepresentableでない、pivot coefficientが0、anchor不足、step不明、partition全体の所属条件を満たせない場合は推測しません。LLMがoverride pointを明示する場合も、scriptがpartition全体の所属とstep距離を検証し、規則に一致しなければ`invalid_input`とします。
 ## 6. Decision Table
@@ -282,7 +284,7 @@ condition / action / ruleは任意数を許可します。known ruleのaction ve
 - 統合後に新しい未定義assignmentを包含しない
 - Authority集合を保持できる
 
-候補をdeterministicに列挙し、LLMが意味上統合してよいか判断します。採用されたmergeは`accepted_merges[]`として`{"merge_key":"DM-001","rule_keys":["R1","R2"]}`を再入力します。`rule_keys`は2件以上、重複不可、すべて同一action vectorであることをscriptが再検証し、don't-care ruleを生成します。Boolean minimizationで最小rule数を目的にしません。
+候補をdeterministicに列挙し、各候補へstable `merge_key`を付与します。LLMは意味上統合してよい候補の`merge_key`だけを`accepted_merges[]`へ返し、任意の`rule_keys[]`を新規構成しません。scriptはaccepted `merge_key`が同一実行で生成した候補に存在すること、候補内ruleが同一action vectorであること、統合後のCartesian productが成立可能な既知ruleだけを含み未定義assignmentを追加しないことを再検証してdon't-care ruleを生成します。Boolean minimizationで最小rule数を目的にしません。
 
 ## 7. 組合せ
 
@@ -353,7 +355,7 @@ LLMがclassification / classの意味を定義した後、`classification_tree.p
 - 各classの`class_key`
 - Authority / constraint refs
 
-出力`derived.factors`は`combinatorial.py`のfactor入力と直接互換にします。
+出力`derived.combinatorial_input`は`factors[] / constraints[]`を持ち、`combinatorial.py`の同名fieldと直接互換にします。`mode / strength / mixed-strength subsets / base_assignment`は組合せ戦略の意味判断なのでLLMが別fieldとして決め、固定builderが`derived.combinatorial_input`へjoinします。LLMがfactor / class / constraintを再生成しません。
 
 ## 9. 状態遷移
 
@@ -378,8 +380,8 @@ Coverage定義:
 
 - `all-states`: initial stateからfeasible transitionだけで到達可能な全state
 - `all-transitions`: initial stateから到達可能で`guard_status=true`の全transition
-- `n-switch`: `switch_count=N`として、到達可能な**N+1個の連続するvalid transition**の全sequence。Nは0..10
-- `round-trip`: 到達可能なsimple cycle。開始stateと終了stateは同一で、それ以外のstateをsequence内で重複させない。self-loopも1 transitionのround-tripとして含める
+- `n-switch`: `switch_count=N`として、到達可能な**N+1個の連続するvalid transition**の全sequence。Nは0..10。`N>=2`は高いfailure risk、ユーザー明示、案件固有基準等の具体的理由を`coverage_selection_reason`へ必須で残す
+- `round-trip`: 到達可能なsimple cycle。開始stateと終了stateは同一で、それ以外のstateをsequence内で重複させない。self-loopも1 transitionのround-tripとして含める。開始stateが異なるround tripは別Coverage targetとして扱う
 - `invalid-transitions`: 明示されたinvalid transition candidateだけ
 
 stable target:
@@ -387,10 +389,10 @@ stable target:
 - state: `state:node:<state_key>`
 - transition: `state:transition:<transition_key>`
 - n-switch: `state:n-switch:<N>:sha256:<transition_key_sequence_hash>`
-- round-trip: `state:round-trip:sha256:<canonical_cycle_hash>`
+- round-trip: `state:round-trip:<start_state_key>:sha256:<transition_key_sequence_hash>`
 - invalid: `state:invalid:<candidate_key>`
 
-round-tripの同一cycle重複を避けるため、transition key列を全rotationし、Unicode code point辞書順で最小の列をcanonical cycleとします。逆方向はtransition列が異なるため別cycleです。
+round-tripは開始stateをCoverage identityの一部とし、transition key列をrotationして同一化しません。同じ閉路でも開始stateが異なる場合は別targetです。同じ開始stateかつ同じtransition key列だけを重複として除去し、逆方向はtransition列が異なるため別cycleです。
 
 invalid transition candidateは`{"candidate_key":"INV-001","from":"draft","event":"publish","authority_refs":["SPEC-010"]}`形式です。
 
@@ -503,7 +505,6 @@ ISTQB CTAL-TA v4.0に合わせ、CRUD Testingは**completeness**と**consistency
 - `functions[]`
 - `cells[]`
 - `consistency_sequences[]`
-- `excluded_cells[]`
 - `operation_dispositions[]`
 
 completeness:
@@ -556,7 +557,7 @@ boolean AST:
 
 effectはcauseだけを参照します。循環参照は禁止します。
 
-全cause assignmentをhard limit内で列挙し、effect action vectorへ変換します。出力payloadは`decision_table.py`の入力payloadと直接互換にします。
+全cause assignmentをhard limit内で列挙し、effect action vectorへ変換します。`derived.decision_table`は`conditions / actions / known_rules / constraints / accepted_merges=[]`を必ず持ち、`decision_table.py`のscript固有inputと直接互換にします。Cause-Effect側で意味上のmergeを作りません。
 
 ## 13. Syntax-Based Testing
 
@@ -622,7 +623,7 @@ machine-readableな入力はscriptが直接正規化します。
 - `minItems` / `maxItems`
 - `minProperties` / `maxProperties`
 
-`$ref`はruntime内でnetwork解決しません。同一入力document内のlocal JSON Pointerだけ対応し、外部URI referenceは事前dereference済み入力を要求します。local `$ref`の循環参照はその循環subtreeを`unsupported`とします。
+`$ref`はruntime内でnetwork解決しません。JSON Schema / OpenAPIでは`document`をrootとして同一document内のlocal JSON Pointerだけ解決し、`schema_pointer`でCoverage対象subtreeを指定します。外部URI referenceは事前dereference済み入力を要求します。local `$ref`の循環参照はその循環subtreeを`unsupported`とします。
 
 `type`は単一type文字列、または`[<non-null type>, "null"]` / `["null", <non-null type>]`の2要素だけを対応します。2要素形式は`allows_null=true`へ正規化し、それ以外のunion typeは`unsupported`です。
 
@@ -634,7 +635,9 @@ machine-readableな入力はscriptが直接正規化します。
 - boolean `exclusiveMinimum` / `exclusiveMaximum`
 - `nullable`
 - `nullable=true`はsingle base type + nullの`allows_null=true`へ正規化する
-- annotationとして`title / description / default / example / deprecated / readOnly / writeOnly`は保持してもvalidation Coverageへ使用しない
+- `context=request|response`を必須にし、`readOnly=true` propertyはrequest側required / test data母集団から除外し、`writeOnly=true` propertyはresponse側required / expected response母集団から除外する
+- 同一propertyで`readOnly=true`かつ`writeOnly=true`は`invalid_input`
+- `title / description / default / example / deprecated`はannotationとして保持してもvalidation Coverageへ使用しない
 
 ### HTML form control
 
@@ -667,7 +670,7 @@ machine-readableな入力はscriptが直接正規化します。
 
 `allOf / anyOf / oneOf / not / if / then / else`等、対応subset外でvalidation意味を変えるkeywordは`unsupported`です。unsupported keywordがvalidation意味へ影響するsubtreeだけを切り離し、独立して評価できる別property / itemは継続できます。親schemaのvalidation意味をunsupported keywordが左右する場合は、その親subtree全体を`unsupported`にします。
 
-正規化後のrange / enum / required等はEP / BVA / combinatorial / test data requirementへ直接渡し、`grid`は上記限定経路で扱います。
+正規化後のrange / enum / required等は`derived.ep_inputs / derived.bva_inputs / derived.combinatorial_constraints / derived.test_data_requirements`へ固定schemaで出力します。各配列は対応下流scriptのinput fieldと直接互換で、`schema_cases.py`内の固定builderが字段mappingだけを行います。`grid`は上記限定経路で扱います。
 ## 15. UI pattern
 
 ### `ui_pattern_candidates.py`
@@ -708,10 +711,11 @@ machine-readableな入力はscriptが直接正規化します。
 処理:
 
 - canonical keyによる重複統合
-- equality一致、enum集合intersection、range intersection、version range intersection
-- 空intersectionまたは異なるscalar equalityを矛盾として検出
-- 対応operator外は推測せず`unsupported`
-- requirement → model / target traceability
+- 同一dimensionで型互換な`eq × eq`、`eq × enum`、`eq × range`、`enum × enum`、`enum × range`、`range × range`、`version_range × version_range`をintersectionする
+- `boolean`は同一dimensionのboolean同士、または型互換な`eq`との一致を検証する
+- 空intersection、異なるscalar equality、range外eq等を矛盾として検出する
+- 型またはoperator組合せを安全にintersectionできない場合は別要求として黙って残さず`unsupported`
+- requirement → model / `source_target_refs[]` traceability
 
 実際の個人情報・顧客データ・fixture値を自動取得しません。
 
@@ -852,7 +856,7 @@ relationが製品に妥当か、source input集合、follow-up transform、出�
 - locale / timezone requirement
 - network / storage等の前提
 
-対応constraint operatorは`test_data_requirements.py`と同じく、scalar equality、finite enum set、numeric / date / datetime range、version range、boolean requirementです。同じkeyの要求をoperatorごとのintersectionで統合し、互換しない値を矛盾として返します。未対応operatorは`unsupported`とし、環境を実際に準備・検出しません。
+対応constraint operatorは`test_data_requirements.py`と同じく、scalar equality、finite enum set、numeric / date / datetime range、version range、boolean requirementです。同じdimensionの要求は`test_data_requirements.py`と同じcross-operator intersection規則で統合し、互換しない値を矛盾として返します。未対応operatorまたは安全にintersectionできない型組合せは`unsupported`とし、環境を実際に準備・検出しません。
 
 ## 20. 変更影響分析
 
@@ -906,14 +910,16 @@ LLM draft後に次を計算します。
 
 対象はテスト設計です。
 
-- Authority / Risk → TR
-- TR → TCN
-- TCN → CI → TC
-- CIなし契約ではTCN → TC
+- Authority / Risk → TRまたはDisposition
+- TR → TCNまたはDisposition
+- TCN → CI → TC、または各層の既存Skill契約で許可されたDisposition
+- CIなし契約ではTCN → TCまたはDisposition
 - missing edge
 - orphan
 - unknown reference
 - stale downstream
+
+許可する直接edgeは`Authority→TR`、`Risk→TR`、`TR→TCN`、`TCN→CI`、`CI→TC`、CIなし契約の`TCN→TC`だけです。別層を飛び越えるedgeや逆向きedgeをclosure根拠として数えません。Dispositionは既存各Skillのhandling集合と必要なreason / Authority条件を検証し、正常なDispositionをmissing扱いしません。
 
 技法別Coverage数値は各技法scriptを正本とし、traceabilityで再計算しません。
 
@@ -941,26 +947,27 @@ LLMは`merge_group`だけを明示します。scriptは同じgroupについて�
 | `technique_candidates.py` | 全signal、selection key | `selection_key` | candidates、undetermined、complete |
 | `change_impact.py` | changed node、nodes、edges | `impact:<node_key>` | impacted nodes / paths |
 | `environment_requirements.py` | requirements[] | `env:<requirement_key>` | merged requirements / conflicts |
-| `requirement_structure.py` | authorities、risks、TR、Disposition | `violation:<type>:<entity_id>` | violations / derived priority |
+| `requirement_structure.py` | authorities、risks、TR、Disposition、previous ID state | `violation:<type>:<entity_id>` | violations / derived priority / TR ID mapping |
+| `condition_structure.py` | TCN、models、previous ID state | `violation:<type>:<entity_id>` | violations / TCN・model key mapping |
 | `equivalence_partitions.py` | sets[] / partitions[] | `ep:<set_key>:<partition_key>` | representative / Coverage |
 | `bva.py` | boundaries[] | `bva:<boundary_key>:<position>` | typed value / Coverage |
 | `domain_testing.py` | partitions[] / borders[] | §5のpartition + border + relation別key | point / Coverage |
 | `decision_table.py` | conditions、actions、known rules、constraints、accepted merges | `dt:sha256:<assignment_hash>` | rule assignment / action vector / Coverage |
 | `combinatorial.py` | mode、factors、constraints、strength | `comb:<mode>:sha256:<target_hash>` | target tuple / rows / Coverage |
-| `classification_tree.py` | classifications[] / classes[] | `class:<classification_key>:<class_key>` | `derived.factors` |
+| `classification_tree.py` | classifications[] / classes[] / constraints[] | `class:<classification_key>:<class_key>` | `derived.combinatorial_input` |
 | `state_transition.py` | states、transitions、reset、coverage mode、n-switch時switch_count | §9のstate / transition / n-switch / round-trip / invalid key | setup / sequence / Coverage |
 | `flow_paths.py` | nodes、edges、initial nodes、regions、loop specs、max path length、coverage mode | §10のnode / edge / path / loop / branch key | paths / loops / branch Coverage |
 | `crud_matrix.py` | matrix、consistency sequences、operation dispositions | §11のoperation / missing / sequence key | completeness / consistency / anomalies |
 | `cause_effect.py` | causes、effects、AST | `ce:sha256:<cause_assignment_hash>` | Decision Table互換rules |
 | `grammar_cases.py` | start、key付きproductions、max depth、mutations | `syntax:prod:<production_key>`、mutationは`syntax:mutation:<mutation_key>` | derivations / production Coverage |
-| `schema_cases.py` | `schema_kind, schema` | `schema:<json_pointer>:<keyword>` | normalized constraints / unsupported subtrees |
+| `schema_cases.py` | `schema_kind, document, schema_pointer, context` | `schema:<json_pointer>:<keyword>` | normalized constraints / downstream inputs / unsupported subtrees |
 | `ui_pattern_candidates.py` | pattern / alias、attributes | `ui:<pattern_key>:<candidate_key>` | candidate / references |
 | `test_data_requirements.py` | requirements[] | `data:<requirement_key>` | merged requirements / conflicts |
 | `random_testing.py` | seed、case count、distribution | `random:case:<1-based zero-padded 6 digits>` | generated input / completion |
 | `metamorphic.py` | relations[] | §18 key | follow-up input / completion |
 | `case_structure.py` | TCN / CI / TC / Disposition | `violation:<type>:<entity_id>` | violations / derived priority |
-| `traceability.py` | nodes / edges / stale metadata | `gap:<type>:<entity_id>` | gaps / orphan / stale |
-| `materialize_coverage.py` | TCN、generator targets、previous mapping、merge groups | target key → CI ID | CI mapping / stale / machine rows |
+| `traceability.py` | nodes / edges / dispositions / stale metadata | `gap:<type>:<entity_id>` | gaps / orphan / stale / closed dispositions |
+| `materialize_coverage.py` | TCN、generator targets、target annotations、previous mapping、merge groups | target ref → CI ID | CI mapping / stale / machine rows |
 
 assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく、そのtargetを定義するcanonical key/value構造だけです。hash collisionを検出した場合は`internal_error`として停止し、別targetを同一keyへ統合しません。
 
@@ -1030,13 +1037,13 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 #### `environment_requirements.py` / `test_data_requirements.py`
 
 - required: `requirements[]`
-- requirement: `{requirement_key, dimension_key, operator, authority_refs, source_target_keys}`
+- requirement: `{requirement_key, dimension_key, operator, authority_refs, source_target_refs}`
 - `operator=eq`: `value` typed value必須
 - `operator=enum`: `values[]` typed valueを1件以上、重複不可
 - `operator=range`: `minimum / maximum` typed value、`minimum_inclusive / maximum_inclusive` boolean必須
 - `operator=version_range`: `minimum / maximum` version文字列、inclusive boolean必須
 - `operator=boolean`: `value` boolean必須
-- `source_target_keys`はtest dataでは1件以上、environmentでは空配列を許可
+- `source_target_refs`は`sha256:<64 lowercase hex>`の`target_ref`だけを許可し、test dataでは1件以上、environmentでは空配列を許可する。modelを跨ぐtraceabilityへ`target_key`単独を使用しない
 
 #### `requirement_structure.py`
 
@@ -1046,6 +1053,15 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - TR: `{tr_id, authority_refs[], risk_refs[], priority, priority_override_reason}`
 - `priority_override_reason`は空文字を許可。関連risk最高優先度より低い場合だけ非空必須
 - disposition: `{upstream_id, handling, reason}`。handlingは既存TR Disposition集合
+
+#### `condition_structure.py`
+
+- required: `test_conditions[]`, `models[]`, `previous_tcn_ids[]`, `previous_model_keys[]`
+- TCN draft: `{identity_action, reuse_id, priority, ...}`。meaning上の同一性はLLMが`identity_action=reuse|new`として決め、reuse時だけ既存`TCN-\d{3}`を指定する
+- model draft: `{technique_slug, identity_action, reuse_model_key, parent_tcn_ref, ...}`。reuse時だけ既存`<slug>-\d{3,}`を指定する
+- runtimeはreuse対象の存在、重複、slug一致、親TCN一致を検証し、新規TCN / modelだけ既存最大番号+1で採番する
+- 1つのmodel keyは同時に1つのTCNだけへ所属する。別TCNへ同じmodel keyを割り当てない
+- 999到達後の新規TCNは`id_space_exhausted`。model keyは3桁以上を許可し999上限を設けない
 
 #### `equivalence_partitions.py`
 
@@ -1102,7 +1118,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 #### `state_transition.py`
 
 - required: `states[]`, `initial_states[]`, `terminal_states[]`, `transitions[]`, `reset_options[]`, `invalid_transition_candidates[]`, `coverage_mode`
-- optional: `switch_count`。`coverage_mode=n-switch`だけ必須
+- optional: `switch_count`, `coverage_selection_reason`。`coverage_mode=n-switch`だけ`switch_count`必須、`switch_count>=2`では`coverage_selection_reason`を非空必須
 - state: `{state_key, authority_refs}`
 - transition: `{transition_key, from, event, guard_status, guard_refs, to, authority_refs}`
 - `guard_status=true|false|null`
@@ -1126,12 +1142,12 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 
 #### `crud_matrix.py`
 
-- required: `entities[]`, `functions[]`, `cells[]`, `consistency_sequences[]`, `excluded_cells[]`, `operation_dispositions[]`
+- required: `entities[]`, `functions[]`, `cells[]`, `consistency_sequences[]`, `operation_dispositions[]`
 - entity: `{entity_key, authority_refs}`
 - function: `{function_key, authority_refs}`
 - cell: `{entity_key, function_key, operations[], authority_refs}`。operationsは`C/R/U/D`の重複なし集合
 - consistency sequenceは§11形式
-- excluded cell: `{entity_key, function_key, reason, authority_refs}`
+- 個々の空cellは欠陥・N/Aを意味しないため専用`excluded_cells[]`を持たない。entity全体でoperationが存在しない場合だけ`operation_dispositions[]`で扱う
 - operation disposition: `{entity_key, operation, handling, reason, authority_refs}`。`handling=not_applicable`、Authority 1件以上
 
 #### `cause_effect.py`
@@ -1155,10 +1171,12 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 
 #### `schema_cases.py`
 
-- required: `schema_kind`, `schema`
+- required: `schema_kind`, `document`, `schema_pointer`, `context`
 - `schema_kind = json-schema-2020-12 | openapi-3.0 | html-control`
-- json/openapiでは`schema`はobject
-- html-controlでは`schema`は`{type, required, min, max, minlength, maxlength, step, pattern, disabled, readonly, multiple}`の対応属性だけを持つobject。存在しない属性は省略可能
+- json/openapiでは`document`はroot document object、`schema_pointer`はそのdocument内のCoverage対象Schema Objectを指すlocal JSON Pointer。local `$ref`は常に同じ`document`をrootとして解決する
+- `context`はJSON Schemaでは`validation`、OpenAPIでは`request|response`、HTMLでは`form-control`
+- html-controlでは`document`は`{type, required, min, max, minlength, maxlength, step, pattern, disabled, readonly, multiple}`の対応属性だけを持つobject、`schema_pointer`は空文字列を固定。存在しない属性は省略可能
+- OpenAPIでは`readOnly / writeOnly`を§14のrequest / response規則でrequired母集団へ反映する
 - `pattern`は保持のみで具体値生成に使わない
 - `multipleOf`と対応可能な数値HTML `step`は§14の`grid` constraintへ正規化
 - annotation allowlistとunsupported subtree規則は§14を正本とする
@@ -1195,22 +1213,24 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 
 #### `traceability.py`
 
-- required: `nodes[]`, `edges[]`, `freshness[]`
+- required: `nodes[]`, `edges[]`, `dispositions[]`, `freshness[]`
 - node: `{node_key, node_type}`。node_typeは`Authority / Risk / TR / TCN / CI / TC`
-- edge: `{from, to}`。from / toは既知node
+- edge: `{from, to}`。from / toは既知nodeで、§23の許可直接edgeだけを認める
+- disposition: `{upstream_id, handling, reason, authority_refs}`。handlingは対象上流型に対して既存担当Skillが許可するDisposition集合だけを認め、必要なreason / Authorityを検証する
 - freshness: `{entity_ref, model_key, freshness_status}`。freshnessは`current / stale`、model_keyがないEntityはnull
 
 #### `materialize_coverage.py`
 
-- required: `tcn_id`, `models[]`, `previous_target_id_map[]`, `merge_groups[]`
+- required: `tcn_id`, `models[]`, `target_annotations[]`, `previous_target_id_map[]`, `merge_groups[]`
 - `tcn_id`は`TCN-\d{3}`
-- model: `{model_key, runtime_unit_key, input_fingerprint, model_fingerprint, generation_fingerprint, generator_contract_version, targets[]}`
-- target: `{target_ref, target_key, authority_refs, reference_refs, priority, expected_result_root, test_data_requirements}`
+- model: `{model_key, runtime_unit_key, input_fingerprint, model_fingerprint, generation_fingerprint, generator_contract_version, targets[]}`。全modelは`condition_structure.py`で同じ`tcn_id`への1対1所属を検証済みであること
+- machine target: `{target_ref, target_key, authority_refs, reference_refs, ...技法固有machine fields}`。priority、expected result、test data要求をLLMに埋め戻させない
+- target annotation: `{target_ref, priority, expected_result_root, test_data_requirement_refs[]}`。全machine targetにちょうど1件対応し、unknown / duplicate target_refを拒否する
 - `target_ref`は`_02` §7.2の式を再計算して一致必須
-- `previous_target_id_map[]`: `{target_ref, model_key, target_key, ci_id}`
-- merge groupは`_02` §11形式の`target_refs[]`
+- `previous_target_id_map[]`: `{target_ref, model_key, target_key, ci_id}`。同一merge group内だけ同じ`ci_id`を共有可
+- merge groupは`_02` §11形式の`target_refs[]`で、同一TCN内かつ同じ`expected_result_root`だけを許可する
 - outputは`target_id_map[]`、`coverage_item_rows`、`stale_ci_ids`、`issues`
-- `target_id_map[]`: `{target_ref, model_key, target_key, ci_id}`
+- `target_id_map[]`: `{target_ref, model_key, target_key, ci_id}`。1 target_refから複数CIへのmappingは禁止する
 
 `valid_minimal.json`は上記schemaの実行例であり正本ではありません。optional fieldは上記で明記したものだけとし、Skill referenceはこのPlanのschemaをそのまま説明します。
 
