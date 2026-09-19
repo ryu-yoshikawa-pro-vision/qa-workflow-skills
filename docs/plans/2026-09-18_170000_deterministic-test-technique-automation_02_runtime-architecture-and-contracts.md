@@ -575,11 +575,25 @@ fingerprint対象の`content`はLLMが自由に再構成しません。各担当
 - TR: `{tr_id, text, authority_refs[], risk_refs[], priority, test_level, observation_method}`
 - TCN: `{tcn_id, tr_refs[], condition, category, technique, coverage_criterion, authority_refs[], risk_refs[], priority}`
 - model metadata: `{model_key, technique_slug, parent_tcn_id, selection_source}`
-- CI mapping: `{target_ref, model_key, target_key, ci_id, status}`
+- CI: `{ci_id, tcn_id, model_key, covered_targets[], priority, expected_result_root, authority_refs[], reference_refs[], test_data_requirement_refs[], status}`。`covered_targets[]`は`{target_ref, target_key, target_content_fingerprint, execution_fingerprint}`を`target_ref`順で保持し、stable target_refのままtarget内容が変わった場合もCI content fingerprintが変わる
 - TC: `{tc_id, title_or_purpose, tr_refs[], tcn_refs[], ci_refs[], priority, preconditions, test_data, steps, expected_results[], postconditions_or_cleanup}`
 - Disposition: `{upstream_id, handling, reason, authority_refs[], covered_by_ref}`
 
 machine dataに存在しない表示専用の備考やMarkdown整形は`content`へ入れません。Machine Entity schemaの意味変更は`entity-state-v1`のversion変更として扱い、そのschemaを消費するruntime contractも更新します。
+
+Machine Entityの`upstream_entity_dependencies[]`は次を最低限含めます。直接参照していない無関係Entityを追加しません。
+
+- Authority: なし。関連Authority IDはcontent内の関係として保持するが、別Authorityの内容変更で自動staleにするかは既存`spec-analysis`の関係解決結果に従う
+- Product Risk: `authority_refs[]`のAuthority
+- 技法選択: selection判断で実際に参照したAuthority / Risk / TR等
+- TR: `authority_refs[]`のAuthorityと`risk_refs[]`のProduct Risk
+- TCN: `tr_refs[]`のTR、直接`authority_refs[] / risk_refs[]`を持つ場合はそのAuthority / Risk
+- model metadata: 親TCN。`selection_source=analysis`では対応する技法選択Entity、`derived`では親runtimeをruntime dependencyへ持つ
+- CI: 親TCNとmodel metadata。CI contentの`covered_targets[]`でtarget内容変更もcontent fingerprintへ反映する
+- TC: `tr_refs[] / tcn_refs[] / ci_refs[]`の各Entityと、expected resultが直接参照するAuthority
+- Disposition: 対象upstream Entity、`authority_refs[]`、`covered_by_ref`がある場合はその参照先Entity
+
+structure / materialize / generator等がEntity状態を機械的に成立させる場合は、そのruntime unitを`runtime_dependencies[]`へ追加します。semantic dependencyとruntime dependencyを相互代用しません。
 
 modelは実際に消費したEntityを`upstream_entities`へ1件ずつ保持し、runtimeがcanonical `content`から`content_fingerprint`を計算します。`skill + entity_ref`が同じEntityの`content_fingerprint`だけを比較し、不一致となったEntityを参照するmodelだけを`要再検証`へ戻します。無関係なEntity変更ではmodelをstaleにしません。
 
