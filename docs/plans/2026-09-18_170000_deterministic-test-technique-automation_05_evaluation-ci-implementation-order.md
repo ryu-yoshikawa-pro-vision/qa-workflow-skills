@@ -70,7 +70,7 @@ CLI integration testは各runtime scriptの`valid_minimal.json`をsubprocessで`
 
 ### runtime envelope
 
-- `envelope_version / skill / runtime_contract_version / generator_contract_version / generator / runtime_unit_key / model_key / input_fingerprint / model_fingerprint / generation_fingerprint / runtime_implementation_fingerprint / generator_implementation_fingerprint / support_status / static_data_versions / runtime_status / result_status / runtime_required / deterministic_generated / fallback_reason / payload / issues`
+- `envelope_version / skill / runtime_contract_version / generator_contract_version / generator / runtime_unit_key / model_key / input_fingerprint / model_fingerprint / generation_fingerprint / runtime_implementation_fingerprint / generator_implementation_fingerprint / upstream_entity_fingerprints / upstream_runtime_units / support_status / static_data_versions / runtime_status / result_status / runtime_required / deterministic_generated / fallback_reason / payload / issues`
 - `skill`はscript所属Skillと一致必須で、runtime issueも`skill + runtime_unit_key`を保持する
 - runtime生成issueはenvelopeの`generation_fingerprint`を保持し、質問・再開時に現在世代と一致しない回答を拒否する。timeout等のcaller生成issueだけ`generation_fingerprint=null`を許可する
 - model scriptは`runtime_unit_key=model:<model_key>`、artifact全体scriptは`runtime_unit_key=artifact:<generator>:<scope_key>`を要求し、artifact全体scriptの`model_key`はnull
@@ -102,7 +102,7 @@ CLI integration testは各runtime scriptの`valid_minimal.json`をsubprocessで`
 - script固有input、`authority_refs`、`reference_refs`、modelの`selection_source`変更で`input_fingerprint`が変わる
 - artifact全体scriptでもinput変更で`input_fingerprint / generation_fingerprint`が変わる
 - `spec-analysis / test-analysis / test-requirement-design / test-condition-design / test-case-design`の`Machine Entities`をstrict decodeし、canonical Entity schema、entity_ref一意性、人間向け表との主要field一致を検証する
-- upstream Entityのcanonical `content`からruntimeが`content_fingerprint`を計算し、呼び出し側が渡したhashだけを信用しない
+- upstream Entityのcanonical `content`からruntimeが`content_fingerprint`を計算し、output envelopeの`upstream_entity_fingerprints[]`へcanonical順で保存する。呼び出し側が渡したhashだけを信用しない
 - upstream Entityの正規項目変更でその`content_fingerprint`だけが変わる
 - `upstream_entity_fingerprints`の変更で`generation_fingerprint`が変わり、Authority IDが同じでも内容変更を同一generation扱いしない
 - Machine Entityの`upstream_entity_dependencies[]`差分を再実行前に検出し、古いsemantic model / draftをそのまま現在runtimeへ投入しない
