@@ -86,12 +86,14 @@ Domain Testing、CRUD Testing、Random Testing、Metamorphic Testing、Syntax-Ba
 
 `test-analysis`の許可技法、`references/guidance.md`、`assets/output-template.md`、deterministic / semantic evalをこの表記へ揃えます。`test-condition-design`では`SKILL.md`、`references/coverage-techniques.md`、出力template、validator、semantic evalへ同じ表記と適用条件を反映します。
 
+正規テスト技法とruntime内部model / adapterのidentityは分離します。`同値分割`、`境界値分析`、`デシジョンテーブル`、`状態遷移`、`Pairwise / 組合せ`、`エラー推測`、`シナリオ / ユースケース`と上記5技法を`technique_slug`で表し、Classification Tree、Cause-Effect Graph、schema / HTML、UI pattern等の内部表現は`model_type`で識別します。内部model / adapter名をTCNの「適用技法」へ混ぜません。
+
 ### 3.3 Coverageの意味
 
 generatorが返す100%等のCoverageは、**明示された正規化済みモデル内のCoverage**です。対象仕様全体の100%とは扱いません。
 
 - Authority / Risk → TR → TCNの上流閉鎖は別途確認する
-- 選択した技法は`selection_key + technique_slug`でmodel、対象外、未解決、またはmodel実行後の明示的なruntime非対応へ必ず閉じ、TCNの`technique_slugs[]`と所属active modelのslug集合を一致させる
+- 選択した正規技法は`selection_source / selection_key / technique_slug`で、同じ正規技法を表すmodel、対象外、未解決、またはmodel実行後の明示的なruntime非対応へ必ず閉じる。TCNの`technique_slugs[]`は所属active modelの**非nullな正規`technique_slug`集合**と一致させ、`model_type`は含めない。エラー推測のようにruntime generatorへ移さない既存技法はsemantic Coverage ItemをCI Machine Entityへ載せて閉鎖する
 - 正規化済みモデルが上流の意味を十分に表しているかはsemantic evalで確認する
 - 全runtime unitで`result_status=ready / freshness_status=current`を必須とし、さらに`runtime_required=true`のunitでは`deterministic_generated=true`を必須とする
 - Dispositionによる成果物上の閉鎖と技法Coverage達成を混同しない
