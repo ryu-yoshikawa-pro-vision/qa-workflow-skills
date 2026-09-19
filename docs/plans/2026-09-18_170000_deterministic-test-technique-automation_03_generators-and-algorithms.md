@@ -996,7 +996,7 @@ LLMは`merge_group`だけを明示します。scriptは同じgroupについて�
 | `state_transition.py` | states、transitions、reset、coverage mode、n-switch時switch_count | §9のstate / transition / n-switch / round-trip / invalid key | setup / sequence / Coverage |
 | `flow_paths.py` | nodes、edges、initial nodes、regions、loop specs、max path length、coverage mode | §10のnode / edge / path / loop / branch key | paths / loops / branch Coverage |
 | `crud_matrix.py` | matrix、consistency sequences、operation dispositions | §11のoperation / missing / sequence key | completeness / consistency / anomalies |
-| `cause_effect.py` | causes、effects、AST | `ce:sha256:<cause_assignment_hash>` | Decision Table互換rules |
+| `cause_effect.py` | causes、effects、constraints、AST | `ce:sha256:<cause_assignment_hash>` | Decision Table互換rules |
 | `grammar_cases.py` | start、key付きproductions、max depth、mutations | `syntax:prod:<production_key>`、mutationは`syntax:mutation:<mutation_key>` | derivations / production Coverage |
 | `schema_cases.py` | `schema_kind, document, schema_pointer, context` | `schema:<json_pointer>:<keyword>` | normalized constraints / downstream inputs / unsupported subtrees |
 | `ui_pattern_candidates.py` | pattern / alias、attributes | `ui:<pattern_key>:<candidate_key>` | candidate / references |
@@ -1004,9 +1004,9 @@ LLMは`merge_group`だけを明示します。scriptは同じgroupについて�
 | `random_testing.py` | seed、case count、distribution | `random:case:<1-based zero-padded 6 digits>` | generated input / completion |
 | `metamorphic.py` | relations[] | §18 key | follow-up input / completion |
 | `case_structure.py` | TCN / CI / TC / Disposition | `violation:<type>:<entity_id>` | violations / derived priority |
-| `traceability.py` | nodes / edges / dispositions / stale metadata | `gap:<type>:<entity_id>` | gaps / orphan / stale / closed dispositions |
+| `traceability.py` | nodes / edges / dispositions / runtime units / Machine Entity state | `gap:<type>:<entity_id>` | gaps / orphan / stale / closed dispositions |
 | `materialize_coverage.py` | TCN、generator targets、target annotations、previous mapping、merge groups | target ref → CI ID | CI mapping / stale / machine rows |
-| `workflow_runtime.py` | runtime units、current upstream entities / runtime units、unsupported item closure | `runtime_unit_key` | freshness / stale propagation / completion blockers |
+| `workflow_runtime.py` | runtime units、current Machine Entities / runtime units、unsupported item closure | `runtime_unit_key` | runtime / Entity freshness、stale propagation、completion blockers |
 
 assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく、そのtargetを定義するcanonical key/value構造だけです。hash collisionを検出した場合は`internal_error`として停止し、別targetを同一keyへ統合しません。
 
@@ -1095,7 +1095,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - runtimeはreuse対象の存在・status・重複を検証し、newだけ最大番号+1で採番する。999到達後のnewは`id_space_exhausted`
 - `priority_override_reason`は空文字を許可。関連risk最高優先度より低い場合だけ非空必須
 - disposition: `{upstream_id, handling, reason, authority_refs[], covered_by_ref}`。handlingは既存TR Disposition集合、`covered_by_ref`は必要なhandlingだけ使用しその他はnull
-- outputに`tr_id_map[]: {draft_key, tr_id, identity_action}`と`tr_id_state[]: {tr_id, status}`を返す
+- outputに`tr_id_map[]: {draft_key, tr_id, identity_action}`と`tr_id_state[]: {tr_id, status}`を返す。固定builderは最終TR IDと入力`text / authority_refs / risk_refs / priority / test_level / observation_method`をjoinし、TR Machine Entityを生成する
 
 #### `condition_structure.py`
 
@@ -1109,7 +1109,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - `previous_tcn_ids[]`: `{tcn_id, status}`、`previous_model_keys[]`: `{model_key, technique_slug, parent_tcn_id, status}`。`status=active|deleted`。reuseはactiveだけ許可し、新規採番の最大番号にはdeletedも含める
 - runtimeはreuse対象の存在、status、重複、slug一致、最終親TCN一致を検証し、新規TCN / modelだけ既存最大番号+1で採番する
 - 1つのmodel keyは同時に1つのTCNだけへ所属する。別TCNへ同じmodel keyを割り当てない
-- outputに`tcn_id_map[]: {draft_key, tcn_id, identity_action}`、`model_key_map[]: {draft_key, model_key, parent_tcn_id, identity_action}`、`tcn_id_state[]`、`model_key_state[]`を返す
+- outputに`tcn_id_map[]: {draft_key, tcn_id, identity_action}`、`model_key_map[]: {draft_key, model_key, parent_tcn_id, identity_action}`、`tcn_id_state[]`、`model_key_state[]`を返す。固定builderはTCN draftの意味fieldと最終TCN IDをjoinしてTCN Machine Entityを、model draftの`technique_slug / selection_source`と最終model key / parent TCNをjoinしてmodel metadata Entityを生成する
 - 999到達後の新規TCNは`id_space_exhausted`。model keyは3桁以上を許可し999上限を設けない
 
 #### `equivalence_partitions.py`
@@ -1229,7 +1229,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - `context`はJSON Schemaでは`validation`、OpenAPIでは`request|response`、HTMLでは`form-control`
 - html-controlでは`document`は`{type, required, min, max, minlength, maxlength, step, pattern, disabled, readonly, multiple}`の対応属性だけを持つobject、`schema_pointer`は空文字列を固定。存在しない属性は省略可能
 - OpenAPIでは`readOnly / writeOnly`を§14のrequest / response規則でrequired母集団へ反映する
-- `pattern`は保持のみで具体値生成に使わない
+- html-controlは§14のruntime-v1 type / attribute matrixを正本とする。`type=text`でvalidationへ適用される`pattern`は無視せずcontrol validationを`unsupported`にし、`disabled / readonly`でconstraint validation対象外となるcontrolからinvalid候補を生成しない
 - `multipleOf`と対応可能な数値HTML `step`は§14の`grid` constraintへ正規化
 - annotation allowlistとunsupported subtree規則は§14を正本とする
 
@@ -1264,7 +1264,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - expected result: `{number, text, authority_refs[]}`。numberは1から連番
 - priority_override_reasonは低い優先度へoverrideする場合だけ非空必須
 - disposition: `{upstream_id, handling, reason, authority_refs[], covered_by_ref}`
-- outputに`tc_id_map[]: {draft_key, tc_id, identity_action}`と`tc_id_state[]: {tc_id, status}`を返す
+- outputに`tc_id_map[]: {draft_key, tc_id, identity_action}`と`tc_id_state[]: {tc_id, status}`を返す。固定builderは最終TC IDと入力`title_or_purpose / tr_refs / tcn_refs / ci_refs / priority / preconditions / test_data / steps / expected_results / postconditions_or_cleanup`をjoinしてTC Machine Entityを生成する
 
 #### `traceability.py`
 
