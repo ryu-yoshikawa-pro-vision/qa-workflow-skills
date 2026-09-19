@@ -672,7 +672,7 @@ machine-readableな入力はscriptが直接正規化します。
 
 `allOf / anyOf / oneOf / not / if / then / else`等、対応subset外でvalidation意味を変えるkeywordは`unsupported`です。unsupported keywordがvalidation意味へ影響するsubtreeだけを切り離し、独立して評価できる別property / itemは継続できます。親schemaのvalidation意味をunsupported keywordが左右する場合は、その親subtree全体を`unsupported`にします。
 
-正規化後のrange / enum / required等は`derived.ep_inputs / derived.bva_inputs / derived.combinatorial_constraints / derived.test_data_requirements`へ固定schemaで出力します。各配列は対応下流scriptのinput fieldと直接互換で、`schema_cases.py`内の固定builderが字段mappingだけを行います。`grid`は上記限定経路で扱います。
+正規化後のrange / enum / required等は`derived.ep_inputs / derived.bva_inputs / derived.combinatorial_constraints / derived.test_data_requirements`へ固定schemaで出力します。各配列は対応下流scriptのinput fieldと直接互換で、`schema_cases.py`内の固定builderが項目mappingだけを行います。`grid`は上記限定経路で扱います。
 ## 15. UI pattern
 
 ### `ui_pattern_candidates.py`
@@ -1244,7 +1244,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - `tcn_id`は`TCN-\d{3}`
 - model: `{model_key, runtime_unit_key, input_fingerprint, model_fingerprint, generation_fingerprint, generator_contract_version, targets[]}`。全modelは`condition_structure.py`で同じ`tcn_id`への1対1所属を検証済みであること
 - machine target: `{target_ref, target_key, authority_refs, reference_refs, ...技法固有machine fields}`。priority、expected result、test data要求をLLMに埋め戻させない
-- target annotation: `{target_ref, priority, expected_result_root, test_data_requirement_refs[]}`。Dispositionされないmachine targetにちょうど1件対応し、unknown / duplicate target_refを拒否する。`expected_result_root`は同一TCN内のopaque local keyで`^[A-Za-z][A-Za-z0-9._:-]{0,63}$`、同じkeyはLLMがAuthorityに基づき同じ期待挙動へ統合可能と判断したtargetだけへ付与する。製品Authorityそのものとして扱わない
+- target annotation: `{target_ref, priority, expected_result_root, test_data_requirement_refs[]}`。Dispositionされないmachine targetにちょうど1件対応し、unknown / duplicate target_refを拒否する。`expected_result_root`は同一TCN内の内部用local keyで`^[A-Za-z][A-Za-z0-9._:-]{0,63}$`、同じkeyはLLMがAuthorityに基づき同じ期待挙動へ統合可能と判断したtargetだけへ付与する。製品Authorityそのものとして扱わない
 - target disposition: `{target_ref, handling, reason, authority_refs, covered_by_target_ref}`。`_02` §7.4のhandlingだけを許可し、同一target_refへannotationとDispositionを同時指定しない。`重複`では`covered_by_target_ref`必須
 - `target_ref`は`_02` §7.2の式を再計算して一致必須
 - `previous_target_id_map[]`: `{target_ref, model_key, target_key, ci_id}`。同一merge group内だけ同じ`ci_id`を共有可
