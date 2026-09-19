@@ -795,7 +795,7 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 ### `test-analysis`
 
 - `SKILL.md` / `references/guidance.md`へ新規正規技法と選択条件を追加
-- `assets/output-template.md`へ`Selection Source`と技法選択machine evidenceを追加
+- `assets/output-template.md`へ`Machine Runtime Input / Result`、`Selection Source`、技法選択machine evidence、undetermined signalの`resolved / selection_not_affected / question`閉鎖状態を追加
 - risk scheme / priority mapping
 - change graph
 - environment requirement
@@ -824,6 +824,7 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 
 ### `coverage-analysis`
 
+- `assets/output-template.md`へ`Machine Runtime Input / Result`を追加
 - `assets/output-template.md`のカバレッジ基準確認・カバレッジ項目の扱い・陳腐化 / 孤立分析へ`Model Key`列を追加
 - stale / fingerprint / test-design traceability
 - model_key単位のgap / stale参照
@@ -837,6 +838,7 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 
 ### `qa-workflow`
 
+- `assets/workflow-state-template.md`へ`workflow_runtime.py`の`Machine Runtime Input / Result`を追加
 - `scripts/workflow_runtime.py`を追加し、runtime metadata集約、upstream Entity / runtime unit fingerprint比較、stale伝播、機械的完了判定をLLMから分離
 - runtime dependency identityは`(skill, runtime_unit_key)`で固定する
 - `workflow_runtime.py`自身を評価対象`runtime_units[]`から除外し、self dependencyを禁止する
