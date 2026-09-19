@@ -210,6 +210,7 @@ runtime入力は`metadata`とscript固有`input`を分けます。
 {
   "metadata": {
     "envelope_version": "1",
+    "skill": "test-condition-design",
     "runtime_contract_version": "runtime-v1",
     "generator_contract_version": "combinatorial-v1",
     "runtime_unit_key": "model:pairwise-001",
@@ -239,6 +240,7 @@ runtime入力は`metadata`とscript固有`input`を分けます。
 ```
 
 - `envelope_version`: runtime envelope形式のversion
+- `skill`: runtime scriptが所属する既存Skill名。script pathから決まる値をruntime側の正本とし、入力値が不一致なら`invalid_input`
 - `runtime_contract_version`: strict JSON、canonicalization、共通status、fingerprint等の共通処理version
 - `generator_contract_version`: script固有の入出力・Coverage契約version。schema互換でも生成結果、tie-break、Coverage、target keyへ影響する変更では必ず更新する
 - `runtime_unit_key`: すべてのruntime invocationで必須。model scriptは`model:<model_key>`、artifact全体scriptは`artifact:<generator>:<scope_key>`
@@ -266,6 +268,7 @@ scriptが実行できた場合、stdoutは次のJSON object 1件だけです。
 ```json
 {
   "envelope_version": "1",
+  "skill": "test-condition-design",
   "runtime_contract_version": "runtime-v1",
   "generator_contract_version": "combinatorial-v1",
   "generator": "combinatorial",
@@ -339,6 +342,7 @@ Python unavailable時はsupport判定自体を実行できないため、runtime
 {
   "issue_type": "unspecified_rule",
   "blocking": true,
+  "skill": "test-condition-design",
   "runtime_unit_key": "model:decision-001",
   "model_key": "decision-001",
   "target_key": "R4",
@@ -349,11 +353,11 @@ Python unavailable時はsupport判定自体を実行できないため、runtime
 }
 ```
 
-- `issue_type`、`blocking`、`runtime_unit_key`は必須
+- `issue_type`、`blocking`、`skill`、`runtime_unit_key`は必須。runtime issue identityは`(skill, runtime_unit_key)`で扱う
 - model scriptでは`model_key`必須、artifact scriptでは`model_key=null`
 - target固有issueだけ`target_key`必須
 - `route_to` / `resume_skill`は既存Skill名だけを許可
-- `question-analysis`へ送る場合はRuntime Unit / Model / Targetを質問・ブロック・回答後の再開まで保持する
+- `question-analysis`へ送る場合はRuntime Skill / Runtime Unit / Model / Targetを質問・ブロック・回答後の再開まで保持する
 - 自由文stderrをrouting入力に使わない
 
 ## 4. canonicalization・version・fingerprint
@@ -405,7 +409,7 @@ artifact全体scriptでは`model_fingerprint=null`です。ただし`input_finge
 - `generator_implementation_fingerprint`
 - `static_data_versions`
 
-`runtime_implementation_fingerprint`は実行した`runtime_contract.py`、`generator_implementation_fingerprint`は実行scriptについて、UTF-8 textの`CRLF / CR`を`LF`へ正規化したbytesをSHA-256した値です。runtime自身が計算し、呼び出し側の申告値を正本にしません。generator scriptはPython標準ライブラリ、同一Skillの`runtime_contract.py`、同一Skill内でPlanに明記したprivate helper以外のPython moduleをimportしません。
+`runtime_implementation_fingerprint`は実行した`runtime_contract.py`、`generator_implementation_fingerprint`は実行scriptについて、UTF-8 textの`CRLF / CR`を`LF`へ正規化したbytesをSHA-256した値です。runtime自身が計算し、呼び出し側の申告値を正本にしません。generator scriptはPython標準ライブラリと同一Skillの`runtime_contract.py`以外のSkill-local Python moduleをimportしません。これによりgenerator実装fingerprintの対象外で実行ロジックが変わる経路を作りません。
 
 したがって、同じartifact scriptでも入力・Authority / Reference・runtime contract・generator contract・実装内容・静的参照データのいずれかが変われば`generation_fingerprint`は変わります。
 
