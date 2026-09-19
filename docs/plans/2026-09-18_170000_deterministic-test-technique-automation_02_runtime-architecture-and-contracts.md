@@ -75,6 +75,7 @@ TR本文は生成せず、Authority / Risk → TRの閉鎖、未知参照、Disp
 ```text
 skills/test-condition-design/scripts/
 ├── runtime_contract.py
+├── condition_structure.py
 ├── equivalence_partitions.py
 ├── bva.py
 ├── domain_testing.py
@@ -116,7 +117,27 @@ skills/coverage-analysis/scripts/
 
 ### `qa-workflow`
 
-新しい工程固有scriptは追加しません。既存の成果物再利用、上流変更伝播、局所ブロック、完了判定を、以下のversion / fingerprint / runtime状態へ対応させます。
+```text
+skills/qa-workflow/scripts/
+├── runtime_contract.py
+└── workflow_runtime.py
+```
+
+`workflow_runtime.py`は工程固有の意味判断を行いません。各成果物へ保存されたruntime metadata、上流Entity、runtime unit依存、fingerprintを入力として、runtime状態集約、freshness、stale伝播、機械的な完了可否を計算します。開始Skill、意味上の変更影響、既存成果物を意味的に再利用できるかの判断は既存`qa-workflow`責務に残します。
+
+### 2.1 Skill実行時のdispatch契約
+
+runtime対象Skillは、Skill instructionへscript選択表を持ち、次の順序で実行します。
+
+1. LLMがAuthority、Risk、TR等を意味的に解釈し、Planで固定したcanonical inputへ正規化する
+2. script選択表から1つのruntime scriptを選ぶ。script pathを自由文から推測しない
+3. 保存済みMachine Modelを再利用する場合は`runtime_contract.py`が対象見出し直下のJSON fenceを抽出し、strict decode、model key一致、fingerprint一致を確認する。LLMがMarkdownからJSONを再生成しない
+4. stdinへ共通metadataとscript固有inputを渡してscriptを起動する
+5. stdout envelopeをstrict decodeし、return code、runtime status、issuesを合わせてroutingする
+6. 意味判断が必要なissueは既存Skillまたは`question-analysis`へ戻し、機械結果をLLMが再計算しない
+7. 意味入力を更新した場合はruntimeを再実行し、保存machine evidenceを置換する
+
+各scriptは入力検証の一部として対応subset判定を行います。Agentが自然言語だけから`runtime_required=false`を確定してscriptを省略しません。
 
 ## 3. 共通JSON契約
 
@@ -165,7 +186,13 @@ runtime入力は`metadata`とscript固有`input`を分けます。
       {
         "skill": "test-requirement-design",
         "entity_ref": "TR-001",
-        "content_fingerprint": "sha256:..."
+        "content": {}
+      }
+    ],
+    "upstream_runtime_units": [
+      {
+        "runtime_unit_key": "artifact:requirement_structure:all",
+        "generation_fingerprint": "sha256:..."
       }
     ],
     "static_data_versions": {},
@@ -181,16 +208,18 @@ runtime入力は`metadata`とscript固有`input`を分けます。
 - `generator_contract_version`: script固有の入出力・Coverage契約version。schema互換でも生成結果、tie-break、Coverage、target keyへ影響する変更では必ず更新する
 - `runtime_unit_key`: すべてのruntime invocationで必須。model scriptは`model:<model_key>`、artifact全体scriptは`artifact:<generator>:<scope_key>`
 - `model_key`: 技法modelを処理するscriptだけ必須。形式は`<technique-slug>-\d{3,}`。artifact全体scriptでは`null`
-- artifact全体scriptは`risk_matrix.py`、`technique_candidates.py`、`change_impact.py`、`environment_requirements.py`、`test_data_requirements.py`、`requirement_structure.py`、`materialize_coverage.py`、`case_structure.py`、`traceability.py`で固定する
+- artifact全体scriptは`risk_matrix.py`、`technique_candidates.py`、`change_impact.py`、`environment_requirements.py`、`test_data_requirements.py`、`requirement_structure.py`、`condition_structure.py`、`materialize_coverage.py`、`case_structure.py`、`traceability.py`、`workflow_runtime.py`で固定する
 - `scope_key`: artifact全体scriptだけ必須。`^[A-Za-z][A-Za-z0-9._:-]{0,63}$`。model scriptでは`null`
 - artifact全体scriptの`scope_key`はscriptごとに固定する
   - `technique_candidates.py`: 入力`selection_key`
   - `materialize_coverage.py`: 入力`tcn_id`
   - その他のartifact全体script: literal `all`
 - 同一Skill内で同じ`artifact:<generator>:<scope_key>`を同時に複数定義しない
-- `runtime_required`: 入力が本Planの対応subsetに入る場合は`true`、対応subset外なら`false`。Python unavailable等の実行環境都合では`false`へ変更しない
+- `runtime_required`: 呼び出し側が想定する値を入力するが、信頼しない。各scriptのsupport判定で再計算し、不一致は`invalid_input`とする。対応subsetなら`true`、model全体が対応subset外なら`false`。Python unavailable等の実行環境都合では`false`へ変更しない
 - `selection_source`: model scriptだけ`analysis / user / existing_artifact`のいずれかを必須。artifact全体scriptでは`null`
-- `upstream_entities`: 実際に消費した上流Entity単位で保持する。`skill + entity_ref`を一意keyとし、そのEntityのcanonicalな構造化内容から`content_fingerprint`を計算する
+- `upstream_entities`: 実際に消費した上流Entity単位で保持する。`skill + entity_ref`を一意keyとし、呼び出し側はPlanで固定した字段のcanonicalな`content`を渡す。`content_fingerprint`はruntimeが`content`から計算してenvelopeと成果物へ保存し、LLMからhash値だけを受け取らない
+- `upstream_runtime_units`: 他runtime結果を直接利用した場合に必須。直接利用した`runtime_unit_key + generation_fingerprint`を保持し、上流runtime結果が変わったときに依存unitだけをstaleへ戻せるようにする
+- `runtime_contract_version`、`generator_contract_version`、runtime実装hash、generator実装hash、fileから導出できる`static_data_versions`はruntime側を正本とする。入力metadataに同じ値を持たせる場合はruntime実値と一致しなければ`invalid_input`
 - `static_data_versions`: keyは`^[a-z][a-z0-9_]*$`、valueは`sha256:<64 lowercase hex>`または明示的なcontract version文字列`^[A-Za-z0-9][A-Za-z0-9._-]*$`
 - `authority_refs`: 製品固有expected resultを確定できる現在有効な根拠
 - `reference_refs`: 外部標準、一般UI資料、DOM / 実装事実等の補助情報
@@ -210,6 +239,9 @@ scriptが実行できた場合、stdoutは次のJSON object 1件だけです。
   "input_fingerprint": "sha256:...",
   "model_fingerprint": "sha256:...",
   "generation_fingerprint": "sha256:...",
+  "runtime_implementation_fingerprint": "sha256:...",
+  "generator_implementation_fingerprint": "sha256:...",
+  "support_status": "supported",
   "static_data_versions": {},
   "runtime_status": "ok",
   "result_status": "ready",
@@ -221,14 +253,16 @@ scriptが実行できた場合、stdoutは次のJSON object 1件だけです。
 }
 ```
 
+`support_status`は`supported / partial / unsupported`です。`partial`は同一input内に、独立して機械処理できる範囲と対応subset外の範囲が共存する場合だけ使用します。対応subset外部分は`payload.unsupported_items[]`へstable key、理由、Authorityを保持し、黙って削除しません。
+
 `runtime_status`:
 
-- `ok`: script責務を完了
+- `ok`: script責務を完了。`support_status=partial`でも機械処理できる範囲を正しく生成できた場合は`ok`
 - `invalid_input`: 入力契約違反
-- `unsupported`: 入力は妥当だが本Planの対応subset外
+- `unsupported`: 入力は妥当だがmodel全体が本Planの対応subset外
 - `limit_exceeded`: 契約上限を超過
 - `internal_error`: 想定外障害
-- `not_run`: script未実行。成果物metadataだけで使用し、script自身は返さない
+- `not_run`: script未実行。Python unavailable時だけ成果物metadataで使用し、script自身は返さない
 
 `result_status`:
 
@@ -238,29 +272,30 @@ scriptが実行できた場合、stdoutは次のJSON object 1件だけです。
 
 status対応は次で固定します。
 
-| runtime_status | result_status | runtime_required | deterministic_generated | 扱い |
-| --- | --- | --- | --- | --- |
-| `ok` | `ready` | `true` | `true` | runtime結果を利用可能 |
-| `ok` | `unresolved` | `true` | `true` | 質問・意味判断後に再実行 |
-| `invalid_input` | `blocked` | `true` | `false` | 入力契約を修正 |
-| `unsupported` | `blocked` | `true` | `false` | 事前の対応subset判定と不一致。runtime契約違反として修正 |
-| `limit_exceeded` | `blocked` | `true` | `false` | model分割またはcontract変更が必要 |
-| `internal_error` | `blocked` | `true` | `false` | runtime不具合として扱う |
-| `not_run` | `ready`または`blocked` | 入力に従う | `false` | Python unavailable等。成果物metadataだけで表現 |
+| runtime_status | support_status | result_status | runtime_required | deterministic_generated | 扱い |
+| --- | --- | --- | --- | --- | --- |
+| `ok` | `supported` | `ready` | `true` | `true` | runtime結果を利用可能 |
+| `ok` | `supported` | `unresolved` | `true` | `true` | 質問・意味判断後に再実行 |
+| `ok` | `partial` | `ready`または`unresolved` | `true` | `true` | supported部分を利用し、unsupported itemはfallbackまたはDispositionへ閉じる |
+| `invalid_input` | 任意 | `blocked` | support判定結果 | `false` | 入力契約を修正 |
+| `unsupported` | `unsupported` | `ready`または`blocked` | `false` | `false` | 既存Skill契約によるLLM fallback。fallback後も未解決ならblocked |
+| `limit_exceeded` | `supported`または`partial` | `blocked` | `true` | `false` | model分割またはcontract変更が必要 |
+| `internal_error` | 任意 | `blocked` | support判定結果 | `false` | runtime不具合として扱う |
+| `not_run` | `unknown` | `blocked` | `true` | `false` | Python unavailable。成果物metadataだけで表現 |
 
 `stale`は`result_status`ではありません。成果物保存時の`freshness_status = current / stale`として`qa-workflow`がfingerprint比較から付与します。
 
-`fallback_reason`は`null / outside_supported_subset / python_unavailable`だけを許可します。script実行済みenvelopeでは`null`です。`runtime_status=not_run`では`input_fingerprint / model_fingerprint / generation_fingerprint`を`null`とし、決定論的再利用の証拠に使いません。
+`fallback_reason`は`null / outside_supported_subset / python_unavailable`だけを許可します。`runtime_status=unsupported`では`outside_supported_subset`、`runtime_status=not_run`では`python_unavailable`です。`runtime_status=not_run`では`input_fingerprint / model_fingerprint / generation_fingerprint`を`null`とし、決定論的再利用の証拠に使いません。`support_status=partial`のunsupported itemはitem単位でfallbackまたはDispositionへ閉じ、その閉鎖情報を成果物へ保存します。
 
 技法modelでは成果物metadataの`model_status`を`result_status`と同じ値にします。artifact全体scriptでは`artifact_status`を同じ値にします。
 
-`runtime_required=false`の対応subset外fallbackはscriptを呼ばず、成果物metadataを`runtime_status=not_run / deterministic_generated=false / fallback_reason=outside_supported_subset`として保存します。LLM fallbackが既存Skill契約を満たせば`result_status=ready`、満たせなければ`blocked`です。`runtime_required=true`のunitで`deterministic_generated=false`なら決定論的処理未完了であり、ワークフロー全体を`完了`にしません。
+対応subset外かどうかはruntimeのsupport判定を正本とします。model全体がsubset外なら`runtime_status=unsupported / support_status=unsupported / runtime_required=false / deterministic_generated=false / fallback_reason=outside_supported_subset`を保存し、LLM fallbackが既存Skill契約を満たせば`result_status=ready`、満たせなければ`blocked`です。`runtime_required=true`のunitで`deterministic_generated=false`なら決定論的処理未完了であり、ワークフロー全体を`完了`にしません。
 
-Python unavailable時もSkillは既存LLM経路で成果物を作成できますが、本来runtime対象なら`runtime_required=true / runtime_status=not_run / result_status=readyまたはblocked / deterministic_generated=false / fallback_reason=python_unavailable`を保持し、ワークフローは`部分完了（ブロック中あり）`または`ブロック中`とします。
+Python unavailable時はsupport判定自体を実行できないため、runtime対象として選択済みのunitを`runtime_required=true / runtime_status=not_run / support_status=unknown / result_status=blocked / deterministic_generated=false / fallback_reason=python_unavailable`として保持し、ワークフローを`完了`にしません。LLMが成果物本文を作成しても決定論的処理済みとは扱いません。
 
 `ok`、`invalid_input`、`unsupported`、`limit_exceeded`は終了code 0とします。`internal_error`は可能なら構造化envelopeを返して終了code 1、envelope自体を生成できない障害も終了code 1とします。Agent側は終了codeだけでroutingせずstdout envelopeをparseします。stderrは人間向け診断だけに使い、入力全文、secret、tokenを出しません。
 
-`unsupported`は正常なfallback経路に使いません。対応subset外は事前に`runtime_required=false`へ分類して`not_run` fallbackとし、実行したscriptが`unsupported`を返した場合はruntime契約または正規化の不一致として修正対象にします。
+`unsupported`はmodel全体が対応subset外であることをruntimeが確認した正常なfallback経路です。`partial`は独立して処理できるsupported部分を生成し、unsupported部分を`unsupported_items[]`として残します。Agent側でsupport判定を再実装せず、supported inputを`runtime_required=false`としてruntime省略することを禁止します。
 ### 3.4 構造化された未解決事項
 
 `issues`は次のfieldを持ちます。
@@ -331,11 +366,15 @@ artifact全体scriptでは`model_fingerprint=null`です。ただし`input_finge
 - `model_fingerprint`
 - `runtime_contract_version`
 - `generator_contract_version`
+- `runtime_implementation_fingerprint`
+- `generator_implementation_fingerprint`
 - `static_data_versions`
 
-したがって、同じartifact scriptでも入力・Authority / Reference・runtime contract・generator contract・静的参照データのいずれかが変われば`generation_fingerprint`は変わります。
+`runtime_implementation_fingerprint`は実行した`runtime_contract.py`のUTF-8 file bytes、`generator_implementation_fingerprint`は実行scriptのUTF-8 file bytesをSHA-256した値です。runtime自身が計算し、呼び出し側の申告値を正本にしません。
 
-generator実装のbug fix、探索順、tie-break等、machine outputへ影響する変更はschema互換でも必ず`generator_contract_version`を更新します。共通runtime処理のoutputへ影響する変更は`runtime_contract_version`を更新します。
+したがって、同じartifact scriptでも入力・Authority / Reference・runtime contract・generator contract・実装内容・静的参照データのいずれかが変われば`generation_fingerprint`は変わります。
+
+`runtime_contract_version` / `generator_contract_version`は意味契約変更時に更新します。bug fixや内部refactorで意味契約を変えない場合も実装fingerprintが変わるため旧machine evidenceを同一生成条件として再利用しません。探索順、tie-break、Coverage、target key等の契約自体を変える場合は実装fingerprintだけで済ませず対応contract versionも更新します。
 
 generatorが返すtarget集合とCoverage計算は純粋な決定論処理です。target → CI ID等のID維持はstateful materialize処理であり、同じgenerator結果と同じ`previous_target_id_map`から同じmappingを得ることを保証します。
 ### 4.2 静的参照データ
@@ -407,7 +446,9 @@ generator結果に影響する静的データはversionを持ちます。
 - `test-case-design`: TC ID、関連TR / TCN / CI、優先度、前提、データ、手順、期待結果、期待結果Authority、およびDisposition行
 - `coverage-analysis`: 対象上流 / 下流ID、Model Key、coverage / stale状態、修正Skill
 
-modelは実際に消費したEntityを`upstream_entities`へ1件ずつ保持します。`skill + entity_ref`が同じEntityの`content_fingerprint`だけを比較し、不一致となったEntityを参照するmodelだけを`要再検証`へ戻します。無関係なEntity変更ではmodelをstaleにしません。
+modelは実際に消費したEntityを`upstream_entities`へ1件ずつ保持し、runtimeがcanonical `content`から`content_fingerprint`を計算します。`skill + entity_ref`が同じEntityの`content_fingerprint`だけを比較し、不一致となったEntityを参照するmodelだけを`要再検証`へ戻します。無関係なEntity変更ではmodelをstaleにしません。
+
+他runtime結果を直接利用したunitは`upstream_runtime_units`も比較します。保存した`generation_fingerprint`と現在の上流runtime unitが一致しなければ下流unitをstaleとし、その下流へも依存関係に従って伝播します。LLMはこのfingerprint比較を手計算しません。
 ## 5. 値・順序・tie-break
 
 ### 5.1 typed value
@@ -466,7 +507,7 @@ named timezone / DST transition自体を一般BVAとして推測しません。�
 | 1 modelのtarget / row / candidate総数 | 100,000 |
 | stdout JSON | 16 MiB |
 
-上限を超えた場合は`limit_exceeded`とし、Coverage基準、strength、path深度等を自動で下げません。item数が上限内でもbyte / depth上限を超える入力・出力は処理しません。上限変更は実装者判断ではなくgenerator contract変更としてPlanを更新します。
+上限を超えた場合は`limit_exceeded`とし、Coverage基準、strength、path深度等を自動で下げません。item数が上限内でもbyte / depth上限を超える入力・出力は処理しません。上限変更は実装者判断ではなくgenerator contract変更としてPlanを更新します。16 MiBはruntime engineのstdout上限であり、Agentが同量を安全に成果物へ統合できることを意味しません。Step 1の代表smokeで実Agentのstdout取得・strict decode・成果物保存を境界付近まで確認し、16 MiB未満の実用上限が必要ならgenerator実装へ進む前に`runtime-v1`のartifact transport上限としてPlanへ固定します。上限超過時にtruncateや要約でmachine evidenceを欠落させず`limit_exceeded`とします。
 
 ## 6. 根拠・constraint
 
@@ -505,7 +546,14 @@ Domain Testingは`_03` §5で固定した線形border schemaだけを使用し�
 - `TCN-xxx-CIyy`
 - `TC-`
 
-同じ意味の既存項目を再利用できる場合は既存IDを維持します。TR / TCN / TCの意味上の同一性判断は担当SkillのLLM責務であり、runtimeがsemantic matchingして再採番しません。qa-workflowが再利用元として選んだ同種成果物を同じ系列とし、新規項目だけその成果物内の最大番号+1で採番します。再利用元がない新規成果物では001から開始し、削除済みIDを同じ系列で再利用しません。
+同じ意味の既存項目を再利用できる場合は既存IDを維持します。TR / TCN / TCおよび技法modelの意味上の同一性判断は担当SkillのLLM責務であり、runtimeがsemantic matchingしません。LLMは各draft entityへ`reuse_id`または`new`を明示し、実際の番号割当てはruntimeが行います。
+
+- `requirement_structure.py`: TRの既存ID維持 / 新規採番
+- `condition_structure.py`: TCNと`model_key`の既存ID維持 / 新規採番、modelと親TCNの1対1所属検証
+- `materialize_coverage.py`: CI採番
+- `case_structure.py`: TCの既存ID維持 / 新規採番
+
+qa-workflowが再利用元として選んだ同種成果物を同じ系列とし、新規項目だけその成果物内の最大番号+1で採番します。再利用元がない新規成果物では001から開始し、削除済みIDを同じ系列で再利用しません。1つの`model_key`は同時に1つのTCNだけへ所属し、別TCNで同じmodelを再利用する場合は意味上別modelとして別`model_key`を発行します。
 
 TR / TCN / TCは既存の3桁形式をこのPlanで変更しません。最大番号が999に達した成果物系列で新規IDが必要な場合は削除済みIDを再利用せず、`id_space_exhausted` issueとしてブロックします。CIは`CI\d{2,}`のため同じ上限を持ちません。
 
@@ -539,7 +587,10 @@ generator内の`target_key`はmodel内で安定させます。異なるmodel間�
 - 消滅target_refのCIはstaleとし、下流TCを`要再検証`へする
 - 削除済みCI番号を再利用せず、既存CI番号の詰め直しを行わない
 - previous mappingの`target_ref`をmodel_key / target_keyから再計算し、不一致を拒否する
-- 同一target_ref重複、同一CIの複数target_ref、親TCN不一致があれば`invalid_input`
+- 同一`target_ref`が複数CIへ割り当てられる場合、親TCN不一致、merge group外で同一CIへ複数target_refが割り当てられる場合は`invalid_input`
+- 同一CIへ複数target_refを割り当てるのは、同一`merge_group`で明示されたtargetだけ許可する。mappingはtarget_refごとに1行保持し、同じ`ci_id`を共有できる
+- mergeを解除した場合は、既存CIを辞書順で最初の存続targetへ維持し、残りtargetへ既存CI最大番号+1から新規採番する。旧merge CIの意味が変わるため関連下流TCを`要再検証`へする
+- merge targetがすべて消滅した場合だけ旧CIをstaleにする
 
 CI番号は`CI\d{2,}`を許可します。
 ### 7.3 upsert
@@ -573,7 +624,7 @@ CI番号は`CI\d{2,}`を許可します。
 
 見出しの`model_key`とJSON内metadataの`model_key`が一致しない場合はvalidatorを失敗させます。
 
-人間向け説明文はLLMが生成して構いません。machine evidenceのJSON、key、ID対応、Coverage値をLLMが再計算・改変しません。
+人間向け説明文はLLMが生成して構いません。machine evidenceのJSON、key、ID対応、Coverage値をLLMが再計算・改変しません。再利用時のJSON抽出もLLMへ委ねず、`runtime_contract.py`の抽出処理を使用します。
 
 ### 8.2 machine evidenceの描画
 
@@ -588,6 +639,7 @@ validatorはfenced JSON blockを抽出してstrict JSON decodeし、canonical化
 3. strict JSON decode
 4. canonical化
 5. 元の`model_fingerprint`と一致
+6. 抽出したJSONを同じruntime scriptへ再投入し、同一contract / implementation / static data条件なら同じmachine resultを得る
 
 これにより`|`、backslash、改行を含む値をMarkdown table escapeへ依存させません。
 
@@ -634,14 +686,14 @@ validatorはfenced JSON blockを抽出してstrict JSON decodeし、canonical化
 
 機械接続は次で固定し、未定義の汎用adapterは作りません。
 
-- `cause_effect.py`の`derived.decision_table`を`decision_table.py`の`input`へそのまま渡す
-- `classification_tree.py`の`derived.factors`を`combinatorial.py`の`factors`へそのまま渡す
-- `schema_cases.py`のnormalized constraintsを対応するEP / BVA / test data input builderが字段mappingだけで渡す。意味変換は行わない
-- 各generatorの`targets`を`materialize_coverage.py`へ渡す
+- `cause_effect.py`の`derived.decision_table`は`conditions / actions / known_rules / constraints / accepted_merges=[]`を必ず持ち、`decision_table.py`のscript固有`input`と完全互換にする
+- `classification_tree.py`は`derived.combinatorial_input`へ`factors / constraints`を出力する。LLMは`mode / strength / mixed-strength subsets`だけを意味判断として追加し、factor / class / constraintを再生成しない。最終inputは固定builderが機械的にjoinする
+- `schema_cases.py`は`derived.ep_inputs / derived.bva_inputs / derived.combinatorial_constraints / derived.test_data_requirements`を固定schemaで返し、同script内のbuilder処理で各下流script入力へ変換する。別の汎用adapterは作らない
+- 各generatorのmachine targetと、LLMがtarget_ref単位で付与した`target_annotations[]`を`materialize_coverage.py`がjoinする。generator target JSONをLLMが再生成しない
 
-意味上の統合だけLLMに残します。複数技法の結果を同じCIへまとめる場合、LLMは`merge_group`を明示し、`materialize_coverage.py`がtarget key、Authority、Reference、優先度、test data requirementを決定論的にunionします。
+意味上の統合だけLLMに残します。各targetの意味情報は`target_annotations[]`へ`{target_ref, priority, expected_result_root, test_data_requirement_refs[]}`として保持します。`expected_result_root`は期待結果本文ではなく、同じ期待挙動へまとめてよいかをLLMが判定したstable keyです。複数技法の結果を同じCIへまとめる場合、LLMは`merge_group`を明示し、`materialize_coverage.py`がtarget key、Authority、Reference、優先度、test data requirement参照を決定論的にunionします。
 
-`merge_group` inputは`{"merge_group_key":"MG-001","target_refs":["sha256:...","sha256:..."],"authority_refs":["SPEC-001"]}`です。target refは2件以上、重複不可、同一TCN配下だけを許可します。異なるexpected result rootを持つtargetは`invalid_input`とします。
+`merge_group` inputは`{"merge_group_key":"MG-001","target_refs":["sha256:...","sha256:..."],"authority_refs":["SPEC-001"]}`です。target refは2件以上、重複不可、同一TCN配下だけを許可します。各targetの`target_annotations.expected_result_root`が一致しない場合は`invalid_input`とします。
 
 ## 12. runtime自己検査の処理順
 
@@ -683,11 +735,12 @@ runtime単位状態の正本は各成果物に保存した`runtime_unit_key`、`
 
 `qa-workflow`には既存Skill状態表とは別に次の`runtime状態`表を追加します。
 
-`Skill | Runtime Unit Key | Model Key | Result Status | Freshness | Runtime Status | Runtime Required | Deterministic Generated | Fallback Reason | Blocker / Issue`
+`Skill | Runtime Unit Key | Model Key | Support Status | Result Status | Freshness | Runtime Status | Runtime Required | Deterministic Generated | Fallback Reason | Blocker / Issue`
 
 - `Runtime Unit Key`は同一Skill内一意
 - model scriptは`Runtime Unit Key = model:<model_key>`とし、`Model Key`を必須
 - artifact全体scriptは`Runtime Unit Key = artifact:<generator>:<scope_key>`とし、`Model Key`は空欄
+- `Support Status`は`supported / partial / unsupported / unknown`
 - `Result Status`は`ready / unresolved / blocked`
 - `Freshness`は`current / stale`
 - `Runtime Status`は`ok / invalid_input / unsupported / limit_exceeded / internal_error / not_run`
@@ -698,12 +751,13 @@ runtime単位状態の正本は各成果物に保存した`runtime_unit_key`、`
 - すべてのruntime unitで`Result Status=ready / Freshness=current`を必須とする
 - `Runtime Required=Yes`のunitでは、さらに`Deterministic Generated=Yes`を必須とする
 - `Runtime Required=No`のfallback unitは、既存Skill契約を満たして`Result Status=ready`になった場合だけworkflow完了を妨げない
+- `Support Status=partial`のunitは`unsupported_items[]`がすべてfallbackまたはDispositionへ閉じていることを完了条件にする
 - model issueを`question-analysis`へroutingする場合は`model_key / target_key`を質問一覧・ブロック中範囲・回答後の再開情報へ保持する
 - artifact全体scriptのissueは`runtime_unit_key`をBlocker / Issueへ保持し、model keyを捏造しない
 - `coverage-analysis`はstale / gapをTCN / CIだけでなく関連`model_key`まで追跡する
 ### 13.4 上流変更
 
-上流Entityの`content_fingerprint`が変わった場合:
+上流Entityの`content_fingerprint`または直接依存する上流runtime unitの`generation_fingerprint`が変わった場合:
 
 1. 最も早い変更成果物を特定
 2. change impact / traceabilityで影響modelを特定
@@ -717,7 +771,7 @@ runtime単位状態の正本は各成果物に保存した`runtime_unit_key`、`
 
 各Skillは単体コピー可能な既存契約を維持します。
 
-strict JSON、canonicalization、fingerprint、envelope処理はruntime対象5 Skillそれぞれの`scripts/runtime_contract.py`へ同じ実装を同梱します。repo rootの共通helperへ依存させません。`runtime_contract_version`をfile内定数として持ち、machine outputへ影響する内容変更では必ずversionを更新します。repository testで5ファイルのSHA-256一致を検証し、Skillごとの実装差を許可しません。技法固有ロジックはこの共通helperへ入れません。
+strict JSON、canonicalization、fingerprint、envelope処理はruntime対象6 Skillそれぞれの`scripts/runtime_contract.py`へ同じ実装を同梱します。repo rootの共通helperへ依存させません。`runtime_contract_version`をfile内定数として持ち、意味契約を変更した場合にversionを更新します。repository testで6ファイルのSHA-256一致を検証し、Skillごとの実装差を許可しません。実装内容の変更はfile SHA-256を`runtime_implementation_fingerprint`へ反映します。技法固有ロジックはこの共通helperへ入れません。
 
 本Planのruntime dependencyはPython 3.11標準ライブラリだけに固定します。外部PyPI package、外部binary、network serviceをruntime依存へ追加しません。
 
