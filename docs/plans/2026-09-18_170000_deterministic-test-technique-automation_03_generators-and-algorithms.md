@@ -1268,11 +1268,13 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 
 #### `traceability.py`
 
-- required: `nodes[]`, `edges[]`, `dispositions[]`, `freshness[]`
+- required: `nodes[]`, `edges[]`, `dispositions[]`, `runtime_units[]`, `current_entities[]`, `current_runtime_units[]`
 - node: `{node_key, node_type}`。node_typeは`Authority / Risk / TR / TCN / CI / TC`
 - edge: `{from, to}`。from / toは既知nodeで、§23の許可直接edgeだけを認める
 - disposition: `{upstream_id, handling, reason, authority_refs[], covered_by_ref}`。handlingは対象上流型に対して既存担当Skillが許可するDisposition集合だけを認め、必要なreason / Authority / covered_by_refを検証する
-- freshness: `{entity_ref, model_key, freshness_status}`。freshnessは`current / stale`、model_keyがないEntityはnull
+- `runtime_units / current_entities / current_runtime_units`は`workflow_runtime.py`と同じschemaを使用する
+- `traceability.py`は各Skillの同一内容`runtime_contract.py`にある共通freshness評価関数を呼び、`runtime_freshness[] / entity_freshness[]`を決定論的に算出する。workflow_runtime resultを入力へ渡さず、self/cycle dependencyを作らない
+- stale分析では`entity_freshness[]: {skill, entity_ref, model_key, freshness_status, stale_reasons[]}`を正本にし、stale Entityがcurrentな下流で閉鎖済みと誤判定しない
 
 #### `materialize_coverage.py`
 
@@ -1280,33 +1282,34 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - `tcn_id`は`TCN-\d{3}`
 - model: `{model_key, skill, runtime_unit_key, input_fingerprint, model_fingerprint, generation_fingerprint, generator_contract_version, support_status, runtime_status, result_status, deterministic_generated, freshness_status, targets[]}`。全modelは`condition_structure.py`で同じ`tcn_id`への1対1所属を検証済みであること
 - materialize対象modelは`runtime_status=ok / result_status=ready / deterministic_generated=true / freshness_status=current`を必須にする。`support_status=supported`または、unsupported itemとtarget集合が分離済みの`partial`だけ許可する
-- `freshness_status=current`は、同一Skill実行で現在のcanonical inputから直前に正常生成したresultではその実行内で成立する。保存済みresultの再利用では、materialize前に`workflow_runtime.py`でcurrentを確認済みであることを必須にする。`materialize_coverage.py`自身はfreshnessを再計算しない
-- machine target: `{target_ref, target_content_fingerprint, target_key, authority_refs, reference_refs, ...技法固有machine fields}`。`target_content_fingerprint`は`_02` §7.2の式をruntimeが計算する。priority、expected result、test data要求をLLMに埋め戻させない
-- target annotation: `{target_ref, target_content_fingerprint, priority, expected_result_root, test_data_requirement_refs[]}`。Dispositionされないmachine targetにちょうど1件対応し、unknown / duplicate target_refを拒否する。`target_content_fingerprint`は現在machine targetと一致必須で、以前のtarget内容に対するannotationを再利用しない。`expected_result_root`は同一TCN内の内部用local keyで`^[A-Za-z][A-Za-z0-9._:-]{0,63}$`、同じkeyはLLMがAuthorityに基づき同じ期待挙動へ統合可能と判断したtargetだけへ付与する。前回同じ期待挙動groupを再利用すると意味判断した場合は`previous_expected_result_roots[]`の既存keyを維持し、新規groupだけ未使用keyを追加する。製品Authorityそのものとして扱わない
-- target disposition: `{target_ref, target_content_fingerprint, handling, reason, authority_refs, covered_by_target_ref}`。`target_content_fingerprint`は現在machine targetと一致必須。`_02` §7.4のhandlingだけを許可し、同一target_refへannotationとDispositionを同時指定しない。`重複`では`covered_by_target_ref`必須
+- `freshness_status=current`は、現在のMachine Entity / 正規化済み意味入力をpreflight確認した後、現在scriptを再実行して正常生成したresultだけに付与する。保存済みresultをmaterialize入力として直接再利用しない。`materialize_coverage.py`自身はupstream semantic freshnessを再判定しない
+- machine target: `{target_ref, target_content_fingerprint, execution_fingerprint, target_key, execution, authority_refs, reference_refs, ...技法固有machine fields}`。`target_content_fingerprint / execution_fingerprint`は`_02` §7.2の式をruntimeが計算する。CI化するtargetでは`execution`必須。priority、expected result、test data要求をLLMに埋め戻させない
+- target annotation: `{target_ref, target_content_fingerprint, generation_fingerprint, priority, expected_result_root, test_data_requirement_refs[]}`。Dispositionされないmachine targetにちょうど1件対応し、unknown / duplicate target_refを拒否する。`target_content_fingerprint`と`generation_fingerprint`は現在machine target / modelと一致必須で、以前のtarget内容・上流Entity内容・runtime世代に対するannotationを再利用しない。`expected_result_root`は同一TCN内の内部用local keyで`^[A-Za-z][A-Za-z0-9._:-]{0,63}$`、同じkeyはLLMがAuthorityに基づき同じ期待挙動へ統合可能と判断したtargetだけへ付与する。前回同じ期待挙動groupを再利用すると意味判断した場合は`previous_expected_result_roots[]`の既存keyを維持し、新規groupだけ未使用keyを追加する。製品Authorityそのものとして扱わない
+- target disposition: `{target_ref, target_content_fingerprint, generation_fingerprint, handling, reason, authority_refs, covered_by_target_ref}`。`target_content_fingerprint`と`generation_fingerprint`は現在machine target / modelと一致必須。`_02` §7.4のhandlingだけを許可し、同一target_refへannotationとDispositionを同時指定しない。`重複`では`covered_by_target_ref`必須
 - `target_ref`は`_02` §7.2の式を再計算して一致必須
 - `test_data_requirements[]`は`{data_ref, requirement_key, dimension_key, operator, ...}`で、`data_ref=data:<requirement_key>`を一意にする。annotationの全`test_data_requirement_refs[]`はこの集合に存在必須
 - `previous_target_id_map[]`: `{target_ref, model_key, target_key, target_content_fingerprint, ci_id, mapping_status}`。`mapping_status=active|inactive`で、Disposition中targetの直近CIもinactiveとして保持する。同じ`target_ref`でcontent fingerprintが変わった場合はCI IDを維持しても`stale_ci_ids`へ追加する
 - `previous_ci_ids[]`: `{ci_id, status}`。`status=active|deleted`で削除済み番号も保持する
 - `previous_expected_result_roots[]`: `{expected_result_root, status}`。`status=active|deleted`。同じ意味groupのkey再利用可否はLLMが判断し、runtimeはduplicate / deleted keyの不正reuseを検査する
-- merge groupは`_02` §11形式の`target_refs[] / target_content_fingerprints[]`で、Dispositionされていない同一TCN内targetかつ同じ`expected_result_root`だけを許可する。全fingerprintは現在machine targetと一致必須で、以前のtarget内容に対するmerge判断を流用しない。group内test data requirementは§16と同じintersection規則で統合し、conflict / unsupportedならmergeを拒否する
+- merge groupは`_02` §11形式の`model_key / target_refs[] / target_versions[]`で、Dispositionされていない同一TCN・同一model内targetだけを許可する。全target versionは現在machine target / modelと一致必須で、`execution_fingerprint`と`expected_result_root`が全件一致する場合だけ同一CIへ統合する。異なるmodel / 技法はCIを分け、必要なら`case_structure.py`の1 TC draftで複数`ci_refs[]`を参照する。group内の追加test data requirementは§16と同じintersection規則で統合し、conflict / unsupportedならmergeを拒否する
 - `target_dispositions[]`にあるtargetはCI採番対象から除外し、generatorの`coverage_summary`自体は変更しない
 - outputは`target_id_map[]`、`target_mapping_state[]`、`ci_id_state[]`、`expected_result_root_state[]`、`disposed_target_refs[]`、`coverage_item_rows`、`stale_ci_ids`、`issues`
-- `target_id_map[]`: `{target_ref, target_content_fingerprint, model_key, target_key, ci_id}`。active mappingだけを返し、1 target_refから複数CIへのmappingは禁止する
+- `target_id_map[]`: `{target_ref, target_content_fingerprint, execution_fingerprint, model_key, target_key, ci_id}`。active mappingだけを返し、1 target_refから複数CIへのmappingは禁止する
 - `target_mapping_state[]`はactive / inactiveと直近`target_content_fingerprint`を保持し、`ci_id_state[]`はactive / deletedを保持する。次回のprevious stateはこれらを正本にする
 - `disposed_target_refs[]`: `{target_ref, handling, covered_by_target_ref}`。Coverage済みtarget数の計算には使用しない
 
 #### `workflow_runtime.py`
 
-- required: `runtime_units[]`, `current_upstream_entities[]`, `current_runtime_units[]`, `unsupported_item_closures[]`
+- required: `runtime_units[]`, `current_entities[]`, `current_runtime_units[]`, `unsupported_item_closures[]`
 - `runtime_units[]`は評価対象unitだけを含み、`qa-workflow::artifact:workflow_runtime:all`自身を含めない。self dependencyも禁止する
 - runtime unit: `{skill, runtime_unit_key, model_key, support_status, result_status, runtime_status, runtime_required, deterministic_generated, generation_fingerprint, upstream_entities[], upstream_runtime_units[], unsupported_items[]}`
-- `current_upstream_entities[]`: `{skill, entity_ref, content}`。`workflow_runtime.py`は`runtime_contract.py`のcanonicalizationで現在の`content_fingerprint`を計算し、保存済みruntime unitのfingerprintと比較する
-- `current_runtime_units[]`: `{skill, runtime_unit_key, generation_fingerprint}`。`(skill, runtime_unit_key)`を一意keyとして保存済み`upstream_runtime_units[]`と比較し、直接依存unitから下流へstaleを伝播する。missing dependencyはstale + blocker、duplicateまたはcycleは`invalid_input`
+- `current_entities[]`: `{skill, entity_ref, model_key, content, upstream_entity_dependencies[], runtime_dependencies[]}`。`content`は§4.4のMachine Entityと同一で、共通関数が現在`content_fingerprint`を計算する
+- `current_runtime_units[]`: `{skill, runtime_unit_key, generation_fingerprint}`。`(skill, runtime_unit_key)`を一意keyとして保存済み`upstream_runtime_units[]`と比較する
+- 各Skillの同一内容`runtime_contract.py`にruntime dependency graphとMachine Entity dependency graphを評価する共通関数を置く。missing dependencyはstale + blocker、duplicateまたはcycleは`invalid_input`
 - `unsupported_item_closures[]`: `{skill, runtime_unit_key, generation_fingerprint, item_key, reason_code, handling, reason, authority_refs}`。closureの`generation_fingerprint`は対象runtime unitの現在値と一致必須。`support_status=partial`では`item_key`をunsupported itemのstable keyで必須とし、`reason_code`も現在unsupported itemと一致必須。whole-model `unsupported`では`item_key=null / reason_code=null`を許可するが`generation_fingerprint`一致は必須とする。世代またはreasonが変わった以前のclosureを自動再利用しない
 - runtimeは意味上の再利用可否、開始Skill、仕様Authorityの優先関係を再判断しない
-- outputは`freshness[]: {skill, runtime_unit_key, generation_fingerprint, freshness_status, stale_reasons[]}`、`completion: {can_complete, blockers[]}`、runtime状態表用の正規化rowを返す
-- `can_complete=true`には、全unitがcurrent、`result_status=ready`、runtime required unitが`deterministic_generated=true`、partial / unsupportedの未閉鎖itemが0件であることを必須にする
+- outputは`freshness[]: {skill, runtime_unit_key, generation_fingerprint, freshness_status, stale_reasons[]}`、`entity_freshness[]: {skill, entity_ref, model_key, freshness_status, stale_reasons[]}`、`completion: {can_complete, blockers[]}`、runtime状態表用の正規化rowを返す
+- `can_complete=true`には、全runtime unitと対象Machine Entityがcurrent、全unitの`result_status=ready`、runtime required unitが`deterministic_generated=true`、partial / unsupportedの未閉鎖itemが0件であることを必須にする
 
 ### unsupported item共通schema
 
