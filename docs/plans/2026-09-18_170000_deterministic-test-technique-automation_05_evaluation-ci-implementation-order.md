@@ -195,6 +195,8 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - `reuse_id / new`の意味判断とTR番号割当てを分離し、`previous_tr_ids[].status=active|deleted`を検証する
 - reuseはactiveだけ許可し、新規はactive / deletedを含む最大番号+1で採番して削除済み番号を再利用しない
 - outputの`tr_id_state[]`にdeleted IDも残し、次回入力の正本にする
+- TR draftの`text / test_level / observation_method`をruntime inputへ保持し、structure scriptが内容を生成・欠落させない
+- runtime output + draft意味fieldからTR Machine Entityを固定builderで生成する
 - draft → runtime検査 → 再検査の処理順
 
 ### test condition structure
@@ -209,6 +211,7 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - reuse時のslug / parent TCN / existing key一致
 - 1 model key = 1 TCN所属を検査し、同じmodel keyを複数TCNへ割り当てない
 - outputの`tcn_id_state[] / model_key_state[]`にdeleted IDも残し、次回入力の正本にする
+- TCN draftの`condition / category / technique / coverage_criterion / authority_refs / risk_refs`とmodel draftの`selection_source`をruntime inputへ保持し、最終IDとjoinしてTCN / model metadata Machine Entityを固定生成する
 
 ### 同値分割 / Each Choice
 
@@ -329,8 +332,10 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - boolean AST
 - unknown cause
 - cycle禁止
+- Authority付き`constraints[]`でcause間の成立不能partial assignmentを表現する
+- constraintに一致するcause assignmentを正式known rule / Coverage母集団へ入れない
 - assignment hard limit
-- `derived.decision_table`が`conditions / actions / known_rules / constraints / accepted_merges=[]`を持ちDecision Table inputと直接互換
+- `derived.decision_table`が`conditions / actions / known_rules / constraints / accepted_merges=[]`を持ち、入力constraintを失わずDecision Table inputと直接互換
 
 ### Syntax-Based Testing
 
@@ -462,7 +467,9 @@ raw machine-readable入力をfixtureにします。
 - highest priority
 - 低い指定優先度 + 空の`priority_override_reason`をviolation
 - 低い指定優先度 + 非空override reasonは値を保持し、自動補正しない
+- `title_or_purpose / tr_refs / preconditions / test_data / steps / postconditions_or_cleanup`をruntime inputへ保持し、structure scriptが意味内容を生成・欠落させない
 - numbered expected result / Authority
+- runtime output + draft意味fieldからTC Machine Entityを固定builderで生成する
 - runtime検査後の再検査
 
 ### traceability
@@ -706,6 +713,9 @@ repository全体は328 queryです。
 
 2. 上流Authority / runtime変更
    - upstream Entity content fingerprint変更
+   - runtime `generation_fingerprint`へupstream Entity fingerprintが含まれ、同じAuthority IDでも内容変更で別generationになる
+   - 保存済みsemantic model / draftの`upstream_entity_dependencies[]`不一致をruntime再実行前に検出し、担当Skillで意味再確認するまで古い入力を再投入しない
+   - Machine Entityのupstream / runtime dependencyからEntity freshnessがstaleになり、`traceability.py`と`workflow_runtime.py`で同じ結果になる
    - 人間向け説明文だけの変更ではfingerprint不変
    - 直接依存する上流runtime unitのgeneration fingerprint変更
    - 影響modelと依存下流unitだけ`要再検証`
@@ -729,6 +739,7 @@ repository全体は328 queryです。
 
 5. runtime support / fallback / unavailable
    - model全体が対応subset外ならscript自身が`support_status=unsupported / runtime_status=unsupported / runtime_required=false / deterministic_generated=false / fallback_reason=outside_supported_subset`を返し、既存Skill契約を満たすLLM fallbackで完了可能
+   - 既存fallback成果物を再利用するときも現在runtimeでsupport判定を再実行し、runtime更新でsupportedになったfixtureを古いfallbackへ固定しない
    - 一部subset外なら`support_status=partial`でsupported部分を生成し、unsupported itemをfallback / Dispositionへ閉じるまで完了不可
    - `runtime_required`をcaller inputから与えず、runtimeのsupport判定出力として検証する
    - Python unavailableなら`support_status=unknown / runtime_required=true / runtime_status=not_run / result_status=blocked / deterministic_generated=false`を保持し、workflowを完了にしない
@@ -742,8 +753,9 @@ repository全体は328 queryです。
 
 7. runtime利用確認
    - 全runtime scriptについてdispatch fixtureから期待script pathへ到達し、CLI実行結果metadataが存在する
+   - `test-analysis: E2E対象選定`と`coverage-analysis: TC → E2E実装 / E2E実装 → 実行結果`では本Planruntimeをdispatchしない
    - supported inputが`unsupported`になる、またはsupport判定前にAgentがscriptを省略する場合は失敗
-   - 保存済み`Machine Runtime Input / Result`を決定論的に抽出して同じruntimeへ再投入できる
+   - 保存済み`Machine Runtime Input / Result`を決定論的に抽出してround-trip検証できるが、workflow再利用では保存済みresultをcurrent cacheにせず現在scriptを再実行する
    - LLM手計算だけの成果物を決定論的生成済みと判定しない
 
 8. 途中工程開始
