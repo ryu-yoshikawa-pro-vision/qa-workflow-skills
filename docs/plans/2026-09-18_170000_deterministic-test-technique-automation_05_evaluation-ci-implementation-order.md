@@ -88,7 +88,7 @@ CLI integration testは各runtime scriptの`valid_minimal.json`をsubprocessで`
 - Python unavailable / runtime未実行は`runtime_status=not_run / support_status=unknown / runtime_required=true / result_status=blocked / deterministic_generated=false / fallback_reason=python_unavailable`とし、fingerprintをnullで保持する
 - status対応表どおりの`support_status / result_status / runtime_required / deterministic_generated`を要求
 - model scriptでは`model_status=result_status`、artifact全体scriptでは`artifact_status=result_status`
-- staleはruntime statusではなく`freshness_status`としてworkflowが付与
+- staleはruntime statusではなく`freshness_status`で表現する。semantic dependency preflight成功後に現在scriptを正常実行したresultは保存時に`current`、`workflow_runtime.py`は共通freshness関数で再検証して必要なresult / Entityを`stale`へ変更する
 - stderrへ入力全文・secretを出さない
 - unknown `route_to` / `resume_skill`を拒否
 
@@ -101,7 +101,9 @@ CLI integration testは各runtime scriptの`valid_minimal.json`をsubprocessで`
 - 人間向け説明文だけを変えてもinput / model fingerprintが変わらない
 - script固有input、`authority_refs`、`reference_refs`、modelの`selection_source`変更で`input_fingerprint`が変わる
 - artifact全体scriptでもinput変更で`input_fingerprint / generation_fingerprint`が変わる
-- `spec-analysis / test-analysis / test-requirement-design / test-condition-design / test-case-design`の`Machine Entities`をstrict decodeし、canonical Entity schema、entity_ref一意性、人間向け表との主要field一致を検証する
+- `spec-analysis / test-analysis / test-requirement-design / test-condition-design / test-case-design`の`Machine Entities`をstrict decodeし、canonical Entity schema、`(skill, entity_type, entity_ref)`一意性、`content_fingerprint`再計算一致、人間向け表との主要field一致を検証する
+- 異なる`entity_type`で同じ`entity_ref`を使うfixtureは許可し、同じ`(skill, entity_type, entity_ref)`重複だけを拒否する
+- `upstream_entity_dependencies[]`と`current_entities[] / entity_freshness[]`で`entity_type`欠落またはtype不一致を拒否する
 - upstream Entityのcanonical `content`からruntimeが`content_fingerprint`を計算し、output envelopeの`upstream_entity_fingerprints[]`へcanonical順で保存する。呼び出し側が渡したhashだけを信用しない
 - upstream Entityの正規項目変更でその`content_fingerprint`だけが変わる
 - `upstream_entity_fingerprints`の変更で`generation_fingerprint`が変わり、Authority IDが同じでも内容変更を同一generation扱いしない
@@ -211,7 +213,10 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - reuse時のslug / parent TCN / existing key一致
 - 1 model key = 1 TCN所属を検査し、同じmodel keyを複数TCNへ割り当てない
 - outputの`tcn_id_state[] / model_key_state[]`にdeleted IDも残し、次回入力の正本にする
-- TCN draftの`condition / category / technique / coverage_criterion / authority_refs / risk_refs`とmodel draftの`selection_source`をruntime inputへ保持し、最終IDとjoinしてTCN / model metadata Machine Entityを固定生成する
+- TCN draftの`condition / category / technique_slugs[] / coverage_criterion / authority_refs / risk_refs`とmodel draftの`selection_source / selection_key`をruntime inputへ保持し、最終IDとjoinしてTCN / model metadata Machine Entityを固定生成する
+- `selection_source=analysis`では`selection_key`必須、参照selectionの`selected_techniques[]`にmodelの`technique_slug`が存在することを検証する。その他sourceでは`selection_key=null`
+- 各TCNの`technique_slugs[]`と所属active modelの`technique_slug`集合を完全一致で検証し、modelのないslug / TCNにないmodel slugを拒否する
+- 確定済みselectionの各`selection_key + technique_slug`がmodelまたは上流で明示した対象外 / 未解決へちょうど1回閉じることを検証する
 
 ### 同値分割 / Each Choice
 
@@ -438,10 +443,13 @@ raw machine-readable入力をfixtureにします。
 
 - materialize入力modelは`runtime_status=ok / result_status=ready / deterministic_generated=true / freshness=current`を必須にし、supportedまたは分離済みpartialだけ許可する
 - unresolved / blocked / stale modelからCIを作らない
-- generator targetは、CIへmaterializeするtargetと`target_dispositions[]`へ閉じるtargetのどちらか一方へ必ず分類する
+- generator targetは`materializable=true|false`を必須にし、`true`だけCI materialize / target Dispositionの対象とする。adapter / diagnostic用`false` targetはmachine evidenceとして保持し、annotation / Disposition / CIを要求しない
 - 同一target_refへ`target_annotations[]`と`target_dispositions[]`を同時指定しない
 - CI化するtargetだけ`target_annotations[]`を1対1で要求し、unknown / duplicate target_refを拒否する
-- CI化targetはcanonical `execution`とruntime計算済み`execution_fingerprint`を必須とする
+- CI化targetはgenerator別にPlanで固定したcanonical `execution`とruntime計算済み`execution_fingerprint`を必須とする
+- combinatorialはfull rowへ`row_ref=sha256(canonical assignment)`を付与し、各SAT targetをそのtargetをcoverする生成済みrowのうち生成順で最初のrowへ対応付ける。同じrowを使うtargetは同じ`execution_fingerprint`になる
+- `classification_tree.py / cause_effect.py / schema_cases.py / ui_pattern_candidates.py`は直接CI化せず、Planで定義したderived model / 意味判断先だけをmaterialize対象にする
+- state / flowのnode / edge targetはPlanのtie-breakで一意なfeasible witness sequence / pathを選び、witnessを作れないtargetをCoverage済みにしない
 - annotation / Dispositionの`target_content_fingerprint / generation_fingerprint`が現在target / modelと一致しない場合は拒否する
 - `target_dispositions[].handling`は`対象外 / 別テストレベル / 残存リスク / ブロック中 / 重複`だけを許可する
 - `重複`では同一TCN内でcurrentかつCIへmaterializeされる`covered_by_target_ref`を必須にする
@@ -477,9 +485,9 @@ raw machine-readable入力をfixtureにします。
 ### traceability
 
 - Dispositionはstructure scriptと同じ共通schemaをそのまま受け取り、Markdownから再解釈しない
-- `traceability.py`と`workflow_runtime.py`が同じ`runtime_contract.py` freshness関数・同じ`runtime_units / current_entities / current_runtime_units` schemaを使う
+- `traceability.py`と`workflow_runtime.py`が同じ`runtime_contract.py` freshness関数・同じ`runtime_units / current_entities / current_runtime_units / expected_runtime_units / expected_entities` schemaを使う
 - Machine Entityの`upstream_entity_dependencies[] / runtime_dependencies[]`から`entity_freshness[]`を同じ結果として算出し、missing / generation mismatch / dependency cycleを検出する
-- `traceability.py`は`workflow_runtime.py` resultを依存入力にせず、self/cycle dependencyを作らない
+- `traceability.py`は`workflow_runtime.py` resultを依存入力にせず、`coverage-analysis::artifact:traceability:all`自身を`runtime_units[] / current_runtime_units[] / expected_runtime_units[]`へ含めない。self inclusionを`invalid_input`として回帰検出する
 - Authority / Risk → TRまたはDisposition
 - TR → TCNまたはDisposition
 - TCN → CI → TC、CIなしTCN → TC、または既存Skill契約で許可されたDisposition
@@ -925,7 +933,7 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 - static data versions
 - input / model / generation fingerprint。generationにはsort済み`upstream_entity_fingerprints`を含める
 - runtime / generator implementation fingerprint
-- `entity-state-v1` Machine Entity schema、`content_fingerprint`、`upstream_entity_dependencies[] / runtime_dependencies[]`
+- `entity-state-v1` Machine Entity schema、`entity_type`、`content_fingerprint`、`upstream_entity_dependencies[] / runtime_dependencies[]`、identity=`(skill, entity_type, entity_ref)`
 - `spec-analysis` Authority Machine Entity blockとvalidator。`spec-analysis`へruntimeは追加しない
 - `(skill, runtime_unit_key)` upstream runtime dependency
 - support_statusと対応subset判定。`runtime_required`は入力fieldにせずruntime出力として導出
@@ -940,12 +948,14 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 ### Step 2: identity / workflow基盤
 
 - technique slugと`condition_structure.py`によるstable model key / TCN採番、TR closure / priority検査
+- technique selectionの`selection_key + technique_slug` → model対応、TCN`technique_slugs[]` ↔ active model slug集合の完全一致
 - `requirement_structure.py` / `case_structure.py`によるTR / TC採番
 - qa-workflow再利用元による成果物系列判定
 - 既存成果物のsemantic model / draftを再利用する前に保存`upstream_entities[]`とMachine Entityの`upstream_entity_dependencies[]`を現在Entityと比較し、不一致なら担当Skillへ`要再検証`として戻すpreflight
 - 既存TR / TCN / TC / modelのID再利用規則、active / deleted machine state、999上限
 - 1 model key = 1 TCN所属
 - `materialize_coverage.py`本体を実装し、previous target mapping、annotation / Disposition / merge、target content / generation / execution fingerprintを入力にtarget_ref → CI materializeする
+- generator別`materializable` / canonical `execution`契約を共通post-processへ接続し、adapter専用generatorを直接CI化しない
 - CI化targetのcanonical `execution` / `execution_fingerprint`を共通post-processで生成し、mergeは同一TCN・同一model・同一execution・同一expected resultだけ許可する。異なるmodelはCIを分ける
 - merge / unmerge / target追加削除 / CI↔DispositionのID状態遷移とdownstream stale
 - 同じtarget_refの内容変更時にCI IDを維持しつつannotation / Disposition / mergeと関連TCを`要再検証`へ戻す
@@ -954,6 +964,7 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 - Machine Entityのruntime dependencyとsemantic dependencyからEntity freshnessを計算し、traceabilityとworkflowで同じ共通関数を使用する
 - question-analysisのRuntime Skill / Runtime Unit / Model / Target / Generation Fingerprint保持
 - coverage-analysisのModel Key / Disposition追跡
+- 各Skillがdispatch表・current input / model metadata・structure / materialize resultから`expected_runtime_units[] / expected_entities[]`を固定生成し、`workflow_runtime.py`が実際集合との完全一致を検査する
 - `workflow_runtime.py`によるSkill状態表 + runtime状態表（model / artifact両runtime unit）の機械集約。自身は評価対象から除外
 - legacy昇格
 
@@ -1028,7 +1039,7 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 ### Step 10: 全generator統合 / test-case / traceability
 
 - Step 2で実装済みの`materialize_coverage.py`を全generator出力へ接続し、model status / freshness gateを回帰確認する
-- 全materializable targetでcanonical `execution / execution_fingerprint`を確認する
+- 全generatorについて`materializable`の固定値とcanonical `execution / execution_fingerprint` schemaを確認する。combinatorialはpartial target → deterministic full row mapping、state / flowはwitness sequence / path、adapter専用generatorは非materializeを回帰確認する
 - mergeは同一model・同一executionに限定し、追加test data requirement参照のintersectionを確認する。異なるmodelの同一TC実行はcase structureの複数`ci_refs[]`で検証する
 - target content / generation fingerprintと`target_annotations / target_dispositions / merge_group`の一致検証を全generatorで確認する
 - target_ref → CI mapping / upsert、merge / unmerge / CI↔Dispositionの状態遷移を全generatorで回帰確認する
@@ -1036,7 +1047,7 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 - CI content変更後、既存TC Machine Entityがsemantic再確認前はstaleになることを確認する
 - machine evidence描画
 - title / purpose、前提、データ、手順、expected result、事後状態を保持するcase structureとTC Machine Entity
-- `runtime_units / current_entities / current_runtime_units`から共通freshness関数でEntity freshnessを算出するtraceability
+- `runtime_units / current_entities / current_runtime_units / expected_runtime_units / expected_entities`から共通freshness関数でEntity freshnessを算出するtraceability。自身のtraceability unitを3つのruntime集合へ含めない
 - stale downstream
 
 ### Step 11: workflow統合
@@ -1045,6 +1056,7 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 - 既存成果物再利用でもruntime対象unitを現在scriptで再実行し、保存済みresultをcacheにしない
 - whole-model fallbackを再利用する場合もsupport判定を再実行する
 - runtime対象を既存`対象 / 実行範囲`へ限定したうえでの`(skill, runtime_unit_key)` dependency identity / missing / duplicate / cycle / self除外
+- expected runtime / Entity集合と実際集合の完全一致。必須unit / Entity丸ごと欠落はblocker、未知の余分なcurrent itemは`invalid_input`
 - upstream Entity / semantic dependency / upstream runtime変更とEntity freshness
 - model / implementation変更
 - local block / partial unsupported
@@ -1095,14 +1107,15 @@ Plan完了には次をすべて満たす必要があります。
 - `_01`で実装対象にした処理がruntimeまたは既存機械処理へ割り当てられている
 - 目的内の技法・構造処理が本Plan外へ先送りされていない
 - CLI / strict JSON / exact JSON number / envelope / canonicalization / envelope・runtime・generator contract versionが実装済み
-- `spec-analysis / test-analysis / test-requirement-design / test-condition-design / test-case-design`がcanonical `Machine Entities`を保存し、Markdown再解釈なしでcontent fingerprint、`upstream_entity_dependencies[] / runtime_dependencies[]`を再構築できる
+- `spec-analysis / test-analysis / test-requirement-design / test-condition-design / test-case-design`がcanonical `Machine Entities`を保存し、`entity_type`を含む`(skill, entity_type, entity_ref)` identity、content fingerprint、`upstream_entity_dependencies[] / runtime_dependencies[]`をMarkdown再解釈なしで再構築できる
 - upstream Entityのmachine dataからcanonical contentを機械構築してcontent fingerprintをruntime計算でき、sort済み`upstream_entity_fingerprints`を含むgeneration fingerprint、`(skill, runtime_unit_key)` upstream dependency、static data versions、input / model / LF正規化implementation fingerprintが再現可能
 - model / artifact全runtime unitの`Machine Runtime Input / Result`を決定論的に抽出し、strict decode、fingerprint一致、同条件でのround-trip再実行が成立する。workflow再利用では保存済みresultをcurrent cacheとして採用せず現在scriptを再実行する
 - stable model key / TR / TCN / TCのruntime採番、active / deleted ID state、1 model = 1 TCN、target_ref、成果物系列、previous mapping、merge / unmerge / CI↔Disposition状態遷移を含むCI materializeが契約どおり
-- CI化する全targetがcanonical `execution / execution_fingerprint`を持ち、同一CI mergeは同一TCN・同一model・同一execution・同一expected resultに限定される。異なるmodelの同一実行はTCの複数`ci_refs[]`で表現する
+- 各generatorのtargetがPlan固定の`materializable`を持ち、CI化する全targetがgenerator別canonical `execution / execution_fingerprint`を持つ。combinatorial targetはdeterministic full rowへ対応し、adapter専用generatorを直接CI化しない。同一CI mergeは同一TCN・同一model・同一execution・同一expected resultに限定される。異なるmodelの同一実行はTCの複数`ci_refs[]`で表現する
 - 再実行がupsertされ重複machine evidenceを作らない
+- semantic dependency preflight済みの現在script正常実行結果だけを保存時`freshness_status=current`とし、`workflow_runtime.py`が再検証してstale伝播する。freshnessの付与主体をworkflowだけに限定せずmaterialize前の循環を作らない
 - stale派生成果物を完了扱いしない
-- 選択技法がmodelまたは明示的な扱いへ閉じる
+- 技法選択の`selection_key + technique_slug`がmodelまたは明示的な扱いへちょうど1回閉じ、TCN`technique_slugs[]`が所属active modelのslug集合と完全一致する
 - machine-readable schema / HTMLをLLMが手変換せず対応scriptが処理する。HTML runtime-v1は`text / number / date / datetime-local`のtype / attribute matrix、disabled / readonlyのvalidation除外、pattern等のunsupportedを契約どおり扱う
 - script間の機械変換では固定derived schema / builderを使い、派生modelを`condition_structure.py`で採番し、LLMは意味パラメータやtarget annotationだけを追加してmachine dataを再生成しない
 - 全技法generatorと構造scriptにunit testがある
@@ -1110,8 +1123,8 @@ Plan完了には次をすべて満たす必要があります。
 - runtime出力と保存machine evidenceの一致をvalidatorが確認する
 - support判定をruntimeが行い、whole-model `unsupported`、`partial`、Python unavailableを契約どおり区別する。supported inputをAgent判断だけでruntime省略しない
 - model内Coverageと仕様全体Coverageを混同しない
-- `workflow_runtime.py`がmodel / artifact両runtime unit、Machine Entityのsemantic / runtime dependency、upstream Entity内容変更、`(skill, runtime_unit_key)` dependency、missing / duplicate / cycle、generation / implementation変更、stale、局所ブロック、partial / whole-model fallback、legacyを処理でき、自身を評価対象へ含めない
-- `traceability.py`と`workflow_runtime.py`が同じ`runtime_contract.py` freshness関数から同じruntime / Entity freshnessを得て、workflow_runtime resultをtraceabilityの依存入力にしない
+- `workflow_runtime.py`がmodel / artifact両runtime unit、Machine Entityのsemantic / runtime dependency、upstream Entity内容変更、`(skill, runtime_unit_key)` dependency、expected runtime / Entity集合のmissing / extra、dependency missing / duplicate / cycle、generation / implementation変更、stale、局所ブロック、partial / whole-model fallback、legacyを処理でき、自身を評価対象へ含めない
+- `traceability.py`と`workflow_runtime.py`が同じ`runtime_contract.py` freshness関数から同じruntime / Entity freshnessを得て、workflow_runtime resultをtraceabilityの依存入力にしない。traceability自身もfreshness入力runtime集合へ含めない
 - 既存成果物を再利用する場合、保存済みsemantic model / draftの上流Entity dependencyをruntime再実行前に確認し、不一致なら担当Skillで意味再確認する。freshな意味入力だけを現在scriptへ再投入し、materialize / traceability / workflow freshnessに循環を作らない
 - 以前whole-model `unsupported`だった成果物も再利用時に現在runtimeでsupport判定を再実行し、現在supportedなら古いfallbackを維持しない
 - question-analysis往復でRuntime Skill / Runtime Unit / model / target / generation fingerprintが失われず、別generationへ古い回答を自動適用しない
