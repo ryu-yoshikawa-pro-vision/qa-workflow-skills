@@ -160,7 +160,9 @@ CTAL-TA v4.0で扱われるDomain Testing、Base Choice / Pairwise等のCombinat
 
 技法契約では、CTAL-TA v4.0の次の点を反映します。
 
-- Domain TestingはReliable Domain Coverageを採用する。`< / <= / > / >=`ではON / OFF / IN / OUT、`=`ではON + 両側OFF、`!=`ではOFF + 両側ONをCoverage Itemとする
+- Domain TestingはReliable Domain Coverageを採用する。`< / <= / > / >=`ではON / OFF / IN / OUT、`=`ではON + 両側OFF、`!=`ではOFF + 両側ONをCoverage Itemとする。多border partitionでは対象borderのON / IN pointが他border上に乗らず、他borderについてpartition内部にあることも確認する
+- Round-trip Coverageは開始stateをCoverage Itemのidentityへ含める。同じ閉路でも開始stateが異なるround tripをrotationで同一化しない
+- N-switchで2-switch以上を採用する場合は、高いfailure risk、ユーザー明示、案件固有基準等の具体的な選択理由を成果物へ残す
 - CRUD Testingはcompleteness testingとconsistency testingの両方を扱う。completenessはmatrix operation、consistencyはentity lifecycleとAuthorityで明示されたnegative sequenceを対象にする
 - Random Testingには一般に認められたCoverage基準がなく、件数・時間等の終了条件で扱う。本Planの決定論的runtimeでは件数へ正規化された終了条件だけを機械判定する
 - Metamorphic Testingにも有用な一般Coverage measureを設定せず、MRを1回扱っただけで十分としない
@@ -191,6 +193,16 @@ APGの例示や推奨を対象製品の仕様へ無条件に昇格しません�
 - https://html.spec.whatwg.org/
 
 native HTML controlの属性、constraint validation、form control、button、select等について、platform semanticsを確認する一次資料として使用します。参照したLiving StandardのURLと確認日をcatalogの`reference_refs`へ残します。
+
+### OpenAPI Specification 3.0.3
+
+参照先:
+
+- https://spec.openapis.org/oas/v3.0.3
+
+OpenAPI 3.0のSchema Objectを直接入力する場合、`readOnly` / `writeOnly`は単なる表示annotationとして無視しません。`required`と併用された`readOnly` propertyはresponse側、`writeOnly` propertyはrequest側の必須条件として扱うため、`schema_cases.py`へ`request / response` contextを渡します。同一propertyの`readOnly=true`かつ`writeOnly=true`は不正入力として扱います。
+
+local `$ref`は対象Schema Objectだけでなくroot OpenAPI documentを基準に解決します。runtime入力はroot `document`と対象`schema_pointer`を分け、外部URI referenceは事前dereference済みを要求します。
 
 ### WCAG / WAI資料
 
