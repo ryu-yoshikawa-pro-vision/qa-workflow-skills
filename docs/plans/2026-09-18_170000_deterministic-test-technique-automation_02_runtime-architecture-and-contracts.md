@@ -295,6 +295,7 @@ scriptが実行できた場合、stdoutは次のJSON object 1件だけです。
   "upstream_entity_fingerprints": [
     {
       "skill":"test-requirement-design",
+      "entity_type":"tr",
       "entity_ref":"TR-001",
       "content_fingerprint":"sha256:..."
     }
@@ -400,7 +401,7 @@ fingerprintはSHA-256で計算します。入力はUTF-8のcanonical JSONです�
 - object keyはUnicode code point順
 - `authority_refs` / `reference_refs`等の集合扱い配列は重複除去してsort
 - 順序が意味として明示された配列だけ宣言順を保持する。factor、condition、action、state、transition、edge、production、Random distribution values等が該当する
-- 順序に意味がないkey付きrecord配列は指定primary keyでcanonical sortする。`upstream_entities`は`(skill, entity_ref)`、`upstream_runtime_units`は`(skill, runtime_unit_key)`、`previous_*`は各ID、`target_annotations / target_dispositions`は`target_ref`、`merge_groups`は`merge_group_key`でsortする
+- 順序に意味がないkey付きrecord配列は指定primary keyでcanonical sortする。`upstream_entities`は`(skill, entity_type, entity_ref)`、`upstream_runtime_units`は`(skill, runtime_unit_key)`、`previous_*`は各ID、`target_annotations / target_dispositions`は`target_ref`、`merge_groups`は`merge_group_key`でsortする
 - assignment objectのkeyはsort
 - decimal / date / datetimeは共通表現へ正規化
 - JSON serializationはUTF-8、`ensure_ascii=false`相当、separatorは`,`と`:`、末尾改行なし
@@ -439,7 +440,7 @@ artifact全体scriptでは`model_fingerprint=null`です。ただし`input_finge
 - `generator_contract_version`
 - `runtime_implementation_fingerprint`
 - `generator_implementation_fingerprint`
-- `upstream_entity_fingerprints`: 実際に消費した`upstream_entities[]`を`(skill, entity_ref)`でsortした`{skill, entity_ref, content_fingerprint}`配列
+- `upstream_entity_fingerprints`: 実際に消費した`upstream_entities[]`を`(skill, entity_type, entity_ref)`でsortした`{skill, entity_type, entity_ref, content_fingerprint}`配列
 - `static_data_versions`
 
 `runtime_implementation_fingerprint`は実行した`runtime_contract.py`、`generator_implementation_fingerprint`は実行scriptについて、UTF-8 textの`CRLF / CR`を`LF`へ正規化したbytesをSHA-256した値です。runtime自身が計算し、呼び出し側の申告値を正本にしません。generator scriptはPython標準ライブラリと同一Skillの`runtime_contract.py`以外のSkill-local Python moduleをimportしません。これによりgenerator実装fingerprintの対象外で実行ロジックが変わる経路を作りません。
@@ -833,7 +834,7 @@ Dispositionはgeneratorの`coverage_summary`を書き換えません。技法内
 
 人間向け説明文はLLMが生成して構いません。machine evidenceのJSON、key、ID対応、Coverage値をLLMが再計算・改変しません。runtime blockのJSON抽出もLLMへ委ねず、`runtime_contract.py`の抽出処理を使用します。
 
-§4.4の`Machine Entities` blockはruntime evidenceとは別の意味上の正本です。`spec-analysis`を含む各担当Skillのvalidatorはstrict JSON decode、schema、entity_ref一意性、人間向け表との主要field一致を確認します。既存成果物を再利用するときはこのblockから現在のcanonical Entityを取得し、runtime対象unitの入力を組み立て直します。保存済み`Machine Runtime Result`を現在世代のresultとしてそのまま採用しません。
+§4.4の`Machine Entities` blockはruntime evidenceとは別の意味上の正本です。`spec-analysis`を含む各担当Skillのvalidatorはstrict JSON decode、schema、`(skill, entity_type, entity_ref)`一意性、`content_fingerprint`再計算一致、人間向け表との主要field一致を確認します。既存成果物を再利用するときはこのblockから現在のcanonical Entityを取得し、runtime対象unitの入力を組み立て直します。保存済み`Machine Runtime Result`を現在世代のresultとしてそのまま採用しません。
 
 ### 8.2 machine evidenceの描画
 
