@@ -181,7 +181,9 @@ runtime入力は`metadata`とscript固有`input`を分けます。
 - `generator_contract_version`: script固有の入出力・Coverage契約version。schema互換でも生成結果、tie-break、Coverage、target keyへ影響する変更では必ず更新する
 - `runtime_unit_key`: すべてのruntime invocationで必須。model scriptは`model:<model_key>`、artifact全体scriptは`artifact:<generator>:<scope_key>`
 - `model_key`: 技法modelを処理するscriptだけ必須。形式は`<technique-slug>-\d{3,}`。artifact全体scriptでは`null`
+- artifact全体scriptは`risk_matrix.py`、`technique_candidates.py`、`change_impact.py`、`environment_requirements.py`、`test_data_requirements.py`、`requirement_structure.py`、`materialize_coverage.py`、`case_structure.py`、`traceability.py`で固定する
 - `scope_key`: artifact全体scriptだけ必須。`^[A-Za-z][A-Za-z0-9._:-]{0,63}$`。model scriptでは`null`
+- artifact全体scriptの`scope_key`は、対象成果物全体なら成果物ID、TCN単位処理なら`TCN-\d{3}`を使用する。`materialize_coverage.py`は必ず入力`tcn_id`と同じTCN IDを`scope_key`に使う。`test_data_requirements.py`を複数model横断で実行する場合は対象`test-condition-design`成果物IDを使う
 - `runtime_required`: 入力が本Planの対応subsetに入る場合は`true`、対応subset外なら`false`。Python unavailable等の実行環境都合では`false`へ変更しない
 - `selection_source`: model scriptだけ`analysis / user / existing_artifact`のいずれかを必須。artifact全体scriptでは`null`
 - `upstream_entities`: 実際に消費した上流Entity単位で保持する。`skill + entity_ref`を一意keyとし、そのEntityのcanonicalな構造化内容から`content_fingerprint`を計算する
