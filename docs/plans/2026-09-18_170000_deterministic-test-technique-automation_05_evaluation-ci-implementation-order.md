@@ -600,10 +600,15 @@ validatorはruntime traceabilityと独立にmissing / orphan / unknown / stale�
 - legacy成果物の昇格
 ### output eval fixture schema
 
-runtime対応Skillの`evals/output/cases/*/expected.json`では、既存fieldに加えて必要なcaseだけ次の`runtime_contract` objectを持てるようにします。
+runtime対応Skillの`evals/output/cases/*/expected.json`では、既存fieldに加えて必要なcaseだけ次の`runtime_contract` objectを持てるようにします。Machine Entityを持つSkillではruntime有無にかかわらず`machine_entities` objectも使用できます。
 
 ```json
 {
+  "machine_entities": {
+    "expected_skill": "test-condition-design",
+    "expected_entity_refs": ["TCN-001", "TCN-001-CI01"],
+    "expected_stale_entity_refs": []
+  },
   "runtime_contract": {
     "expected_skill": "test-condition-design",
     "expected_runtime_unit_key": "model:pairwise-001",
@@ -623,8 +628,10 @@ runtime対応Skillの`evals/output/cases/*/expected.json`では、既存fieldに
 }
 ```
 
+- `machine_entities.expected_entity_refs[]`は成果物から抽出したMachine Entity ID集合と一致させ、各contentはSkill別canonical schemaと人間向け表の主要fieldへ独立照合する
+- `spec-analysis`ではruntime_contractなしでMachine Entity fixtureを使用し、Authority表とcanonical Authority contentの一致を検証する
 - expected target / Coverageは手書きfixtureから独立計算または明示し、generator出力をexpectedへコピーしない
-- `expected_target_id_map`はstateful materialize caseだけ使用し、`{target_ref, model_key, target_key, ci_id}`配列で保持する
+- `expected_target_id_map`はstateful materialize caseだけ使用し、`{target_ref, target_content_fingerprint, execution_fingerprint, model_key, target_key, ci_id}`配列で保持する
 - validatorは全runtime unitの保存済み`Machine Runtime Input / Result`から`input_fingerprint`、model scriptでは`model_fingerprint`、全scriptで`generation_fingerprint`を独立再計算し、fixtureに書いたhash文字列を盲信しない
 - upstream Entity差分caseでは無関係Entityの変更が対象modelをstaleにしないことを確認する
 - upstream runtime差分caseでは直接依存unitだけがstaleになり、依存していないmodelへ伝播しないことを確認する
