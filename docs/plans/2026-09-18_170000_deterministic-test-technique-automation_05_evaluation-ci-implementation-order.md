@@ -72,6 +72,7 @@ CLI integration testは各runtime scriptの`valid_minimal.json`をsubprocessで`
 
 - `envelope_version / skill / runtime_contract_version / generator_contract_version / generator / runtime_unit_key / model_key / input_fingerprint / model_fingerprint / generation_fingerprint / runtime_implementation_fingerprint / generator_implementation_fingerprint / support_status / static_data_versions / runtime_status / result_status / runtime_required / deterministic_generated / fallback_reason / payload / issues`
 - `skill`はscript所属Skillと一致必須で、runtime issueも`skill + runtime_unit_key`を保持する
+- runtime生成issueはenvelopeの`generation_fingerprint`を保持し、質問・再開時に現在世代と一致しない回答を拒否する。timeout等のcaller生成issueだけ`generation_fingerprint=null`を許可する
 - model scriptは`runtime_unit_key=model:<model_key>`、artifact全体scriptは`runtime_unit_key=artifact:<generator>:<scope_key>`を要求し、artifact全体scriptの`model_key`はnull
 - runtime dependency参照は`(skill, runtime_unit_key)`を一意keyとし、Skillを跨いで`runtime_unit_key`単独をidentityにしない
 - `ok / invalid_input / unsupported / limit_exceeded`は構造化結果を返せた扱いで終了code 0
@@ -840,7 +841,7 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 ### `question-analysis`
 
 - `不明点 / 質問一覧`と`ブロック中範囲`へ`Runtime Skill / Runtime Unit Key / Model Key / Target Key / Generation Fingerprint`列を追加
-- runtime issueの`skill / runtime_unit_key / model_key / target_key`を質問・ブロック・再開まで保持
+- runtime issueの`skill / runtime_unit_key / model_key / target_key / generation_fingerprint`を質問・ブロック・再開まで保持
 - `再開対象 / 実行範囲`へmodel keyを流用せず、既存`QUESTION-D017`契約を維持
 
 ### `qa-workflow`
