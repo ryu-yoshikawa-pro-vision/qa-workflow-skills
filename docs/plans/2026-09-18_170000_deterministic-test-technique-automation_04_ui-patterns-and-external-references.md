@@ -163,6 +163,7 @@ CTAL-TA v4.0で扱われるDomain Testing、Base Choice / Pairwise等のCombinat
 - Domain TestingはReliable Domain Coverageを採用する。`< / <= / > / >=`ではON / OFF / IN / OUT、`=`ではON + 両側OFF、`!=`ではOFF + 両側ONをCoverage Itemとする。多border partitionでは対象borderのON / IN pointが他border上に乗らず、他borderについてpartition内部にあることも確認する
 - Round-trip Coverageは開始stateをCoverage Itemのidentityへ含める。同じ閉路でも開始stateが異なるround tripをrotationで同一化しない
 - N-switchで2-switch以上を採用する場合は、高いfailure risk、ユーザー明示、案件固有基準等の具体的な選択理由を成果物へ残す
+- Decision Tableのdon't-care統合は同一actionのruleを読みやすく表現する派生結果として扱い、元の成立可能rule Coverage母集団やCoverage値を削減しない。複数ruleを同一CIへまとめる場合は別途materializeのmerge契約を満たす
 - CRUD Testingはcompleteness testingとconsistency testingの両方を扱う。completenessはmatrix operation、consistencyはentity lifecycleとAuthorityで明示されたnegative sequenceを対象にする
 - Random Testingには一般に認められたCoverage基準がなく、件数・時間等の終了条件で扱う。本Planの決定論的runtimeでは件数へ正規化された終了条件だけを機械判定する
 - Metamorphic Testingにも有用な一般Coverage measureを設定せず、MRを1回扱っただけで十分としない
