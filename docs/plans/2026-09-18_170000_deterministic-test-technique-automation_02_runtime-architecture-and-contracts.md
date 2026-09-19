@@ -680,8 +680,10 @@ generator内の`target_key`はmodel内で安定させます。異なるmodel間�
 - `target_ref`は`sha256:<64 lowercase hex>`
 - model generatorの共通post-processで各targetへ`target_ref`を付与する
 - 同じ`model_key + target_key`から常に同じ`target_ref`を得る
-- 各targetへ`target_content_fingerprint = sha256(canonical JSON(targetのうちtarget_ref / target_content_fingerprintを除く全machine field))`を付与する。Authority / Referenceと技法固有fieldを含める
-- `target_ref`はstable ID、`target_content_fingerprint`はその時点のtarget内容の有効性確認に使う。target内容が変わってもstable ID維持のため`target_ref`は変えない
+- CIへmaterialize可能な各targetは、具体的にそのCoverageを実行する値・assignment・sequence・path等をgenerator固有のcanonical object `execution`として持つ。診断metadataだけではCI化しない
+- 共通post-processで`execution_fingerprint = sha256(canonical JSON(execution))`を付与する。LLMが`execution`やhashを再生成しない
+- 各targetへ`target_content_fingerprint = sha256(canonical JSON(targetのうちtarget_ref / target_content_fingerprint / execution_fingerprintを除く全machine field))`を付与する。`execution`、Authority / Reference、技法固有fieldを含める
+- `target_ref`はstable ID、`target_content_fingerprint`はその時点のtarget内容、`execution_fingerprint`は具体実行の同一性確認に使う。target内容が変わってもstable ID維持のため`target_ref`は変えない
 - hashが同じなのにmodel_key / target_keyが異なる場合は`internal_error`
 
 `materialize_coverage.py`のinputには`previous_target_id_map[]`を明示的に渡します。
@@ -701,7 +703,7 @@ generator内の`target_key`はmodel内で安定させます。異なるmodel間�
 
 - 初回mappingがない場合、同一TCN内のtargetを`model_key`、次に`target_key`のUnicode code point辞書順でsortし、`CI01`から順に採番する
 - 既存active mappingがある場合、同じ`target_ref`は既存CI IDを維持する。inactive mappingは§7.2.2の復帰規則でだけ再利用する
-- 同じ`target_ref`でも`target_content_fingerprint`が前回mappingから変わった場合はCI IDを維持したままそのCIと下流TCを`要再検証`へし、旧`target_annotations / target_dispositions / merge_group`を現在targetへ自動再利用しない
+- 同じ`target_ref`でも`target_content_fingerprint`が前回mappingから変わった場合はCI IDを維持したままそのCIと下流TCを`要再検証`へし、旧`target_annotations / target_dispositions / merge_group`を現在targetへ自動再利用しない。generationだけが変わった場合も意味判断は再確認するが、stable ID自体は維持できる
 - 新しい`target_ref`は同一TCN内の既存CI最大番号+1から採番する
 - 消滅target_refのCIはstaleとし、下流TCを`要再検証`へする
 - 削除済みCI番号を再利用せず、既存CI番号の詰め直しを行わない
@@ -856,9 +858,11 @@ validatorはfenced JSON blockを抽出してstrict JSON decodeし、canonical化
 - `schema_cases.py`は`derived.ep_inputs / derived.bva_boundary_skeletons / derived.combinatorial_constraints / derived.test_data_requirements`を固定schemaで返す。BVAはschemaから`boundary / threshold / side / inclusive / step`までを機械生成し、`mode / coverage_selection_reason`はLLMが意味判断として追加して固定builderが`bva.py`入力を作る。EP / combinatorial / test dataも固定builder以外でmachine fieldを再生成しない
 - 各generatorのmachine targetと、LLMがtarget_ref単位で付与した`target_annotations[]`を`materialize_coverage.py`がjoinする。generator target JSONをLLMが再生成しない
 
-意味上の統合だけLLMに残します。CIへmaterializeするtargetの意味情報は`target_annotations[]`へ`{target_ref, target_content_fingerprint, priority, expected_result_root, test_data_requirement_refs[]}`として保持します。`target_content_fingerprint`は現在machine targetと一致必須で、target内容が変わった場合はLLMが意味判断を再確認して新しいfingerprintでannotationを更新するまでmaterializeしません。Disposition済みtargetにはannotationを要求せず、同一targetへannotationとDispositionを同時指定しません。`expected_result_root`は期待結果本文ではなく、同じ期待挙動へまとめてよいかをLLMが判定したstable keyです。複数技法の結果を同じCIへまとめる場合、LLMは`merge_group`を明示し、`materialize_coverage.py`がtarget key、Authority、Reference、優先度、test data requirement参照を決定論的にunionします。
+意味上の判断だけLLMに残します。CIへmaterializeするtargetの意味情報は`target_annotations[]`へ`{target_ref, target_content_fingerprint, generation_fingerprint, priority, expected_result_root, test_data_requirement_refs[]}`として保持します。`target_content_fingerprint`と`generation_fingerprint`は現在machine target / modelと一致必須で、target内容または上流Entity内容・runtime generationが変わった場合はLLMが意味判断を再確認して現在値でannotationを更新するまでmaterializeしません。Disposition済みtargetにはannotationを要求せず、同一targetへannotationとDispositionを同時指定しません。`expected_result_root`は期待結果本文ではなく、同じ期待挙動へまとめてよいかをLLMが判定したstable keyです。
 
-`merge_group` inputは`{"merge_group_key":"MG-001","target_refs":["sha256:...","sha256:..."],"target_content_fingerprints":[{"target_ref":"sha256:...","target_content_fingerprint":"sha256:..."}],"authority_refs":["SPEC-001"]}`です。`target_content_fingerprints[]`は全`target_refs[]`へ1対1対応し、現在machine targetと一致必須です。target refは2件以上、重複不可、同一TCN配下だけを許可します。各targetの`target_annotations.expected_result_root`が一致しない場合は`invalid_input`とします。各targetが参照するtest data requirementは`_03` §16と同じintersection規則で機械統合し、矛盾またはunsupportedな組合せならmergeを拒否します。`test_data_requirement_refs[]`は`data:<requirement_key>`形式で、同一materialize入力の正規化済みtest data requirementに存在することを必須にします。
+同じ実行で複数Coverage targetを満たせる場合だけLLMは`merge_group`を明示できます。runtime-v1ではmerge対象を**同じ`model_key`かつ同じ`execution_fingerprint`**へ限定します。異なる技法 / modelのCoverage ItemはCIを分けたまま保持し、同じ詳細TCで実行できる場合は`test-case-design`で1つのTC draftから複数`ci_refs[]`を参照します。これによりCI統合のためだけに技法間の汎用互換adapterを追加しません。
+
+`merge_group` inputは`{"merge_group_key":"MG-001","model_key":"pairwise-001","target_refs":["sha256:...","sha256:..."],"target_versions":[{"target_ref":"sha256:...","target_content_fingerprint":"sha256:...","generation_fingerprint":"sha256:...","execution_fingerprint":"sha256:..."}],"authority_refs":["SPEC-001"]}`です。`target_versions[]`は全`target_refs[]`へ1対1対応し、現在machine target / modelと一致必須です。target refは2件以上、重複不可、同一TCN・同一`model_key`だけを許可し、全targetの`execution_fingerprint`が一致しなければ`invalid_input`とします。各targetの`target_annotations.expected_result_root`も一致必須です。各targetが参照する追加test data requirementは`_03` §16と同じintersection規則で機械統合し、矛盾またはunsupportedな組合せならmergeを拒否します。`test_data_requirement_refs[]`は`data:<requirement_key>`形式で、同一materialize入力の正規化済みtest data requirementに存在することを必須にします。
 
 ## 12. runtime自己検査の処理順
 
