@@ -38,7 +38,7 @@
 - 追跡グラフの閉鎖性・孤立確認
 - UI要素種別から一般的な確認候補を引く処理
 
-このPlanでいう決定論性は、**同じcanonicalなruntime入力、同じruntime / generator contract version、同じruntime / generator implementation fingerprint、同じ静的参照データversionから同じgenerator結果を得ること**です。runtime入力には正規化済みモデル、出力へ影響するAuthority / Reference、技法選択元を含めます。既存CI IDを維持するmaterialize処理は、これらに加えて同じ`previous_target_id_map`と同じmerge指定を入力した場合に同じ結果を得ることを保証します。自然言語資料から正規化済みモデルを作るLLM判断まで「同じ入力なら常に同じ結果」と保証するものではありません。正規化の意味妥当性・漏れはsemantic evalと既存の上流閉鎖で確認します。
+このPlanでいう決定論性は、**同じcanonicalなruntime入力、同じruntime / generator contract version、同じruntime / generator implementation fingerprint、同じ静的参照データversionから同じgenerator結果を得ること**です。runtime入力には正規化済みモデル、出力へ影響するAuthority / Reference、技法選択元を含めます。既存CI ID等を維持するstateful処理は、これらに加えて同じtarget annotation / Disposition / merge指定と、同じprevious target / CI / expected result root / ID stateを入力した場合に同じ結果を得ることを保証します。自然言語資料から正規化済みモデルを作るLLM判断まで「同じ入力なら常に同じ結果」と保証するものではありません。正規化の意味妥当性・漏れはsemantic evalと既存の上流閉鎖で確認します。
 
 正規化済みモデルを正本とし、Coverage表、生成組合せ、Coverage Item等の機械生成部分は派生成果物として扱います。上流Authority、直接依存する上流runtime結果、正規化済みモデル、runtime / generator contract、runtime / generator実装、静的参照データのいずれかが変わった場合は、fingerprint比較で影響する派生成果物だけをstaleとして`要再検証`へ戻し、再生成・再検証が完了するまで完了扱いしません。
 
