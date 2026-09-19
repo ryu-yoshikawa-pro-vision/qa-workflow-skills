@@ -903,7 +903,7 @@ relationが製品に妥当か、source input集合、follow-up transform、出�
 
 ### `requirement_structure.py`
 
-LLMはTRの意味内容と、既存TRを再利用するか新規TRにするかだけを判断します。Dispositionのmachine schemaはstructure / traceabilityで共通して`{upstream_id, handling, reason, authority_refs[], covered_by_ref}`とし、不要な`covered_by_ref`はnullです。既存ID再利用時は`reuse_id`、新規時は`new`を指定し、runtimeが最終TR IDを割り当てます。
+LLMはTRの本文、テストレベル / 観測方法と、既存TRを再利用するか新規TRにするかを判断します。これらの意味fieldもruntime inputへそのまま渡し、structure scriptは内容を生成・要約せずschemaと構造だけを検査します。Dispositionのmachine schemaはstructure / traceabilityで共通して`{upstream_id, handling, reason, authority_refs[], covered_by_ref}`とし、不要な`covered_by_ref`はnullです。既存ID再利用時は`reuse_id`、新規時は`new`を指定し、runtimeが最終TR IDを割り当てます。
 
 LLM draft後に次を計算します。
 
@@ -918,13 +918,13 @@ LLM draft後に次を計算します。
 - new指定だけ既存最大TR番号+1から採番し、削除済みTR番号を再利用しない
 - outputへactive / deletedを含む`tr_id_state[]`を返し、次回の`previous_tr_ids[]`の正本にする
 
-TR本文や粒度、既存TRとの意味上の同一性は変更・推論しません。
+TR本文、テストレベル / 観測方法、粒度、既存TRとの意味上の同一性は変更・推論しません。runtime outputと入力meaning fieldを固定builderでjoinし、`_02` §4.4のTR Machine Entityを作ります。
 
 ## 22. テストケースの構造処理
 
 ### `case_structure.py`
 
-LLMはTCの前提・手順・データ・expected resultと、既存TCを再利用するか新規TCにするかを判断します。Dispositionは`requirement_structure.py`と同じ共通schemaを使用します。既存ID再利用時は`reuse_id`、新規時は`new`を指定し、runtimeが最終TC IDを割り当てます。
+LLMはTCのタイトル / 目的、前提・手順・データ・expected result・事後状態 / 後処理と、既存TCを再利用するか新規TCにするかを判断します。これらの意味fieldもruntime inputへそのまま渡し、structure scriptは内容を生成せず構造・参照・優先度・expected result番号とAuthority対応を検査します。Dispositionは`requirement_structure.py`と同じ共通schemaを使用します。既存ID再利用時は`reuse_id`、新規時は`new`を指定し、runtimeが最終TC IDを割り当てます。
 
 LLM draft後に次を計算します。
 
@@ -940,7 +940,7 @@ LLM draft後に次を計算します。
 - new指定だけ既存最大TC番号+1から採番し、削除済みTC番号を再利用しない
 - outputへactive / deletedを含む`tc_id_state[]`を返し、次回の`previous_tc_ids[]`の正本にする
 
-具体的な前提・操作・データ・expected result、既存TCとの意味上の同一性は生成・推論しません。
+具体的なタイトル / 目的、前提・操作・データ・expected result・事後状態 / 後処理、既存TCとの意味上の同一性は生成・推論しません。runtime outputと入力meaning fieldを固定builderでjoinし、`_02` §4.4のTC Machine Entityを作ります。
 
 ## 23. traceability
 
@@ -1090,7 +1090,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - required: `authorities[]`, `risks[]`, `test_requirements[]`, `dispositions[]`, `previous_tr_ids[]`
 - `authorities[]`: Authority ID文字列
 - risk: `{risk_id, priority}`、priorityは`高 / 中 / 低`
-- TR draft: `{draft_key, identity_action, reuse_id, authority_refs[], risk_refs[], priority, priority_override_reason}`。`draft_key`は入力内一意、`identity_action=reuse|new`。reuse時だけ既存`TR-\d{3}`を`reuse_id`へ指定し、new時は`reuse_id=null`
+- TR draft: `{draft_key, identity_action, reuse_id, text, authority_refs[], risk_refs[], priority, priority_override_reason, test_level, observation_method}`。`draft_key`は入力内一意、`identity_action=reuse|new`。`text`は非空文字列、`test_level / observation_method`は文字列またはnull。reuse時だけ既存`TR-\d{3}`を`reuse_id`へ指定し、new時は`reuse_id=null`
 - `previous_tr_ids[]`: `{tr_id, status}`。`status=active|deleted`。reuseは`active`だけ許可し、new採番の最大番号計算にはactive / deletedの両方を含めて削除済み番号を再利用しない
 - runtimeはreuse対象の存在・status・重複を検証し、newだけ最大番号+1で採番する。999到達後のnewは`id_space_exhausted`
 - `priority_override_reason`は空文字を許可。関連risk最高優先度より低い場合だけ非空必須
@@ -1101,11 +1101,11 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 
 - required: `test_requirements[]`, `test_conditions[]`, `requirement_dispositions[]`, `models[]`, `previous_tcn_ids[]`, `previous_model_keys[]`
 - TR: `{tr_id, priority, authority_refs[], risk_refs[]}`
-- TCN draft: `{draft_key, identity_action, reuse_id, tr_refs[], priority, priority_override_reason}`。`draft_key`は入力内一意。意味上の同一性はLLMが`identity_action=reuse|new`として決め、reuse時だけ既存`TCN-\d{3}`を指定する
+- TCN draft: `{draft_key, identity_action, reuse_id, tr_refs[], condition, category, technique, coverage_criterion, authority_refs[], risk_refs[], priority, priority_override_reason}`。`draft_key`は入力内一意。condition / technique / coverage_criterionは非空文字列、categoryは文字列またはnull。意味上の同一性はLLMが`identity_action=reuse|new`として決め、reuse時だけ既存`TCN-\d{3}`を指定する
 - requirement dispositionは共通Disposition schemaを使用する
 - 各TRはTCNの`tr_refs[]`またはrequirement dispositionのどちらか一方へ閉じ、unknown TR、linked + disposed重複、未閉鎖TRをviolationにする
 - TCNの既定priorityは関連TRの最高優先度。より低いpriorityを指定する場合だけ非空`priority_override_reason`を必須にし、runtimeが自動補正しない
-- model draft: `{draft_key, technique_slug, identity_action, reuse_model_key, parent_tcn_draft_key}`。`draft_key`はmodel内一意、`parent_tcn_draft_key`は同じ入力のTCN draftを参照する。reuse時だけ既存`<slug>-\d{3,}`を指定する
+- model draft: `{draft_key, technique_slug, selection_source, identity_action, reuse_model_key, parent_tcn_draft_key}`。`draft_key`はmodel内一意、`selection_source=analysis|user|existing_artifact|derived`、`parent_tcn_draft_key`は同じ入力のTCN draftを参照する。reuse時だけ既存`<slug>-\d{3,}`を指定する
 - `previous_tcn_ids[]`: `{tcn_id, status}`、`previous_model_keys[]`: `{model_key, technique_slug, parent_tcn_id, status}`。`status=active|deleted`。reuseはactiveだけ許可し、新規採番の最大番号にはdeletedも含める
 - runtimeはreuse対象の存在、status、重複、slug一致、最終親TCN一致を検証し、新規TCN / modelだけ既存最大番号+1で採番する
 - 1つのmodel keyは同時に1つのTCNだけへ所属する。別TCNへ同じmodel keyを割り当てない
@@ -1258,7 +1258,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - required: `test_conditions[]`, `coverage_items[]`, `test_cases[]`, `dispositions[]`, `previous_tc_ids[]`
 - TCN: `{tcn_id, priority}`
 - CI: `{ci_id, tcn_id, priority, authority_refs}`
-- TC draft: `{draft_key, identity_action, reuse_id, tcn_refs[], ci_refs[], priority, priority_override_reason, expected_results[]}`。`draft_key`は入力内一意、`identity_action=reuse|new`。reuse時だけ既存`TC-\d{3}`を`reuse_id`へ指定し、new時は`reuse_id=null`
+- TC draft: `{draft_key, identity_action, reuse_id, title_or_purpose, tr_refs[], tcn_refs[], ci_refs[], priority, priority_override_reason, preconditions[], test_data[], steps[], expected_results[], postconditions_or_cleanup[]}`。`draft_key`は入力内一意、`identity_action=reuse|new`。`title_or_purpose`は非空文字列、preconditions / test_data / postconditions_or_cleanupは文字列配列、stepは`{number, text}`で1から連番。reuse時だけ既存`TC-\d{3}`を`reuse_id`へ指定し、new時は`reuse_id=null`
 - `previous_tc_ids[]`: `{tc_id, status}`。`status=active|deleted`。reuseはactiveだけ許可し、new採番の最大番号にはdeletedも含めて削除済み番号を再利用しない
 - runtimeはreuse対象の存在・status・重複を検証し、newだけ最大番号+1で採番する。999到達後のnewは`id_space_exhausted`
 - expected result: `{number, text, authority_refs[]}`。numberは1から連番
