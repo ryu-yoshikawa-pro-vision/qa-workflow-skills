@@ -499,6 +499,13 @@ generator結果に影響する静的データはversionを持ちます。
       "entity_ref":"TR-001",
       "model_key":null,
       "content":{...},
+      "upstream_entity_dependencies":[
+        {
+          "skill":"spec-analysis",
+          "entity_ref":"SPEC-001",
+          "content_fingerprint":"sha256:..."
+        }
+      ],
       "runtime_dependencies":[
         {
           "skill":"test-requirement-design",
@@ -516,8 +523,9 @@ generator結果に影響する静的データはversionを持ちます。
 - `test-analysis`はLLMが作るProduct Risk等の意味fieldとruntime resultを固定builderでjoinして保存する。例えばProduct Riskは`failure / authority_refs / impact / likelihood`と`risk_matrix.py`の`level / mapped_priority`をjoinする
 - `test-requirement-design` / `test-condition-design` / `test-case-design`はstructure scriptへ渡した意味fieldとruntimeが確定したID・優先度等を固定builderでjoinして保存する
 - Markdownの人間向け表はMachine Entityと同じ意味fieldを表示し、validatorでID・参照・優先度・期待結果等の一致を確認する。Machine Entityにない意味fieldをMarkdownだけへ追加して下流正本にしない
-- `content`は意味上のEntity本体、`runtime_dependencies[]`はfreshness用の機械metadataであり`content_fingerprint`へ含めない
-- `runtime_dependencies[]`はそのEntityの現在状態を成立させるruntime unitだけを列挙する。Authority等、runtimeに依存しないsource Entityでは空配列を許可する
+- `content`は意味上のEntity本体、`upstream_entity_dependencies[] / runtime_dependencies[]`はfreshness用の機械metadataであり`content_fingerprint`へ含めない
+- `upstream_entity_dependencies[]`はその意味判断を行った時点で実際に参照した上流Entityの`skill / entity_ref / content_fingerprint`を保存する。上流内容が変わった場合は、同じEntity IDでも意味判断を再確認するまでこのEntityを`stale`とする
+- `runtime_dependencies[]`はそのEntityの現在状態を成立させるruntime unitだけを列挙する。Authority等、上流もruntimeも持たないsource Entityでは両配列を空にできる
 - 複数用途SkillでMachine Entityを保存する場合は既存`対象 / 実行範囲`をblock metadataへ保持し、本Planでruntime対象となる`test-analysis: テスト分析`と他用途を混在させない
 
 `spec-analysis`のAuthority Entityでは次の項目をcanonical化します。
@@ -886,6 +894,7 @@ validatorはfenced JSON blockを抽出してstrict JSON decodeし、canonical化
 
 - canonical `Machine Entities`とstable ID / previous stateは、現在の対象範囲と担当Skill契約を満たす場合に再利用できる
 - 本Planのdispatch対象runtime unitは、既存成果物を再利用する場合も現在のMachine Entity、保存済み意味parameter、previous ID stateからcanonical inputを組み立て直し、現在のscriptを必ず再実行する
+- 保存済み正規化model / semantic draftを入力へ再利用する前に、そのruntime inputへ保存した`upstream_entities[]`および対応Machine Entityの`upstream_entity_dependencies[]`を現在のcanonical Entityと比較する。不一致があれば古い意味入力のままscriptを再実行せず、担当Skillへ`要再検証`として戻す。LLMが意味を再確認して現在のdependency fingerprintを保存した後にruntimeを実行する
 - 保存済み`Machine Runtime Input / Result`はprevious state、差分確認、round-trip検証に使うが、現在のcontract / implementation / static data / support判定を省略するcacheにはしない
 - 再実行した`generation_fingerprint`が以前と同じ場合はstable IDと現在も一致する意味判断を維持できる。generationが変わった場合はannotation / Disposition / merge / question回答 / unsupported closureの世代一致を再確認する
 - 以前`runtime_required=false`だったwhole-model fallbackも現在runtimeでsupport判定を再実行し、現在supportedになったunitをfallbackのまま固定しない
@@ -941,8 +950,9 @@ Machine Entityのfreshnessは`runtime_contract.py`の共通関数で計算しま
 }
 ```
 
-- runtime dependencyを持たないAuthority等のsource Entityは、その担当Skill成果物が現在有効なら`current`
-- dependencyがmissing / stale、または保存generationと現在generationが不一致ならそのEntityを`stale`
+- upstream / runtime dependencyを持たないAuthority等のsource Entityは、その担当Skill成果物が現在有効なら`current`
+- `upstream_entity_dependencies[]`のcontent fingerprint不一致、参照先missing、または参照先Entity自体がstaleならそのEntityを`stale`
+- `runtime_dependencies[]`の参照先がmissing / stale、または保存generationと現在generationが不一致ならそのEntityを`stale`
 - `workflow_runtime.py`と`traceability.py`は同じ共通関数・同じ入力schemaを使用し、runtime unit freshnessからEntity freshnessへの別々の変換規則を持たない
 - `traceability.py`は`workflow_runtime.py`のresultをruntime dependencyとして参照せず、同じcurrent runtime / Machine Entity stateから共通関数を呼ぶ。これによりworkflow_runtimeとのcycleを作らない
 
