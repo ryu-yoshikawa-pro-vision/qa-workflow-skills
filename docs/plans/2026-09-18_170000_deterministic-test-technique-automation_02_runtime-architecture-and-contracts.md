@@ -90,7 +90,8 @@ skills/test-condition-design/scripts/
 ├── ui_pattern_candidates.py
 ├── test_data_requirements.py
 ├── random_testing.py
-└── metamorphic.py
+├── metamorphic.py
+└── materialize_coverage.py
 ```
 
 ### `test-case-design`
