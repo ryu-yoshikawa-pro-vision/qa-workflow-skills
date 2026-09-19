@@ -98,41 +98,45 @@ generatorが返す100%等のCoverageは、**明示された正規化済みモデ
 
 ## 4. 本Planの実装範囲
 
-本Planは部分実装を完了条件にしません。上記3.1で「実装」とした処理を、対応Skillのruntime、成果物契約、validator、semantic eval、workflow統合まで含めて実装します。
+本Planは部分実装を完了条件にしません。上記3.1で「実装」とした処理を、対応Skillのruntime、成果物契約、validator、semantic eval、workflow統合まで含めて実装します。加えて、runtimeの上流fingerprintをMarkdown再解釈に依存させないため、`spec-analysis` / `test-analysis` / `test-requirement-design` / `test-condition-design` / `test-case-design`へcanonical machine Entityを保存します。
 
 主な責務は次のとおりです。
 
-1. `test-analysis`
+1. `spec-analysis`
+   - 現在有効なAuthorityをcanonical machine JSONとして成果物へ保存する
+   - runtimeは追加せず、既存の仕様解決責務を維持する
+
+2. `test-analysis`
    - risk scheme計算
    - technique candidate
    - change impact
    - テスト環境要求
 
-2. `test-requirement-design`
+3. `test-requirement-design`
    - Authority / Risk → TRの構造処理
 
-3. `test-condition-design`
+4. `test-condition-design`
    - 各テスト技法generator
    - schema / HTML / UI候補
    - テストデータ要求
    - Coverage Itemの機械証拠
 
-4. `test-case-design`
+5. `test-case-design`
    - TCN / CI → TCの構造処理
    - 具体的なテストデータ・手順・expected resultはLLMの意味判断に残す
 
-5. `coverage-analysis`
+6. `coverage-analysis`
    - テスト設計範囲のtraceabilityと構造ギャップ
 
-6. `qa-workflow`
+7. `qa-workflow`
    - contract / model version、上流変更、runtime unit間依存、stale派生成果物、局所ブロック、`要再検証`、legacy成果物再利用、完了判定
    - fingerprint比較、runtime状態集約、機械的なstale / 完了判定をLLMに手計算させずruntime scriptで実行する
 
-7. `question-analysis`
-   - runtimeの構造化issueに含まれる`model_key` / `target_key`を質問・ブロック・回答後の再開まで保持する
+8. `question-analysis`
+   - runtimeの構造化issueに含まれる`skill / runtime_unit_key / model_key / target_key / generation_fingerprint`を質問・ブロック・回答後の再開まで保持する
    - 技法固有の判定は行わず、既存の不明点分類と回答正規化だけを担当する
 
-8. 評価契約
+9. 評価契約
    - 新規技法に伴う`test-analysis` / `test-condition-design`の発火評価を更新する
    - trigger evalは`test-analysis` / `test-condition-design`をtrain 24件（12 / 12）・validation 20件（10 / 10）、その他12 Skillをtrain 12件（6 / 6）・validation 8件（4 / 4）とし、repository全体328件へ固定する
    - `adversarial-review`には技法ロジックを複製せず、新規技法の代表的な誤用を検出するsemantic fixtureだけを追加する
