@@ -130,7 +130,7 @@ skills/qa-workflow/scripts/
 runtime対象Skillは、Skill instructionへscript選択表を持ち、次の順序で実行します。
 
 1. LLMがAuthority、Risk、TR等を意味的に解釈し、Planで固定したcanonical inputへ正規化する
-2. script選択表から1つのruntime scriptを選ぶ。script pathを自由文から推測しない
+2. script選択表から、その時点で条件を満たすruntime scriptを必須/条件付きと実行順に従って選ぶ。1回のSkill実行で複数scriptを順に呼べるが、script pathを自由文から推測しない
 3. 保存済みMachine Modelを再利用する場合は`runtime_contract.py`が対象見出し直下のJSON fenceを抽出し、strict decode、model key一致、fingerprint一致を確認する。LLMがMarkdownからJSONを再生成しない
 4. stdinへ共通metadataとscript固有inputを渡してscriptを起動する
 5. stdout envelopeをstrict decodeし、return code、runtime status、issuesを合わせてroutingする
