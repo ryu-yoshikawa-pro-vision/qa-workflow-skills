@@ -8,7 +8,7 @@
 
 LLMには、仕様の意味理解、要素抽出、仕様根拠の対応付け、リスク判断、技法採用判断、成立条件の意味解釈、具体的な期待結果等の意味判断を残します。値・組合せ・遷移・経路・Coverage・追跡・優先度継承・重複検出・変更伝播等の機械処理はscriptへ移します。
 
-決定論性の保証対象は自然言語入力そのものではありません。**同じcanonicalなruntime入力、同じruntime contract version、同じgenerator contract version、同じ静的参照データversionから同じgenerator結果を再現でき、statefulなID materializeではさらに同じprevious mappingから同じID対応を再現できる状態**を作ります。
+決定論性の保証対象は自然言語入力そのものではありません。**同じcanonicalなruntime入力、同じruntime / generator contract version、同じruntime / generator implementation fingerprint、同じ静的参照データversionから同じgenerator結果を再現でき、statefulなID materializeではさらに同じprevious mappingとmerge指定から同じID対応を再現できる状態**を作ります。
 
 正規化済みモデルが元のAuthority / Risk / TR等を意味的に漏れなく表しているかは、既存の上流閉鎖、semantic eval、レビューで確認します。
 
