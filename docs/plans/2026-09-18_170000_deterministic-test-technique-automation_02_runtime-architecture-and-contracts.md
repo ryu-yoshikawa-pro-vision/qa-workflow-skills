@@ -233,6 +233,7 @@ runtime入力は`metadata`とscript固有`input`を分けます。
     "upstream_entities": [
       {
         "skill": "test-requirement-design",
+        "entity_type": "tr",
         "entity_ref": "TR-001",
         "content": {}
       }
@@ -977,6 +978,7 @@ Machine Entityのfreshnessは`runtime_contract.py`の共通関数で計算しま
 ```json
 {
   "skill":"test-case-design",
+  "entity_type":"tc",
   "entity_ref":"TC-001",
   "model_key":null,
   "freshness_status":"current",
