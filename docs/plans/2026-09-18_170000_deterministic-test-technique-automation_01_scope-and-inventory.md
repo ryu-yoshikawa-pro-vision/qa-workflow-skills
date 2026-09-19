@@ -24,7 +24,7 @@ LLMには、仕様の意味理解、要素抽出、仕様根拠の対応付け�
 - `test-case-design`
 - `coverage-analysis`
 
-加えて、成果物の再利用、上流変更の伝播、局所ブロック、完了判定を新契約へ合わせるため、`qa-workflow`も統合対象とします。runtime由来の未解決事項をmodel単位で質問・再開できるようにするため、`question-analysis`の質問一覧・ブロック中範囲へ`Model Key / Target Key`列を追加し、deterministic validatorも更新します。技法固有ロジックは`test-analysis` / `test-condition-design`を正本とし、`question-analysis`や`qa-workflow`へ複製しません。
+加えて、成果物の再利用、上流変更の伝播、局所ブロック、完了判定を新契約へ合わせるため、`qa-workflow`も統合対象とします。runtime由来の未解決事項をmodel単位で質問・再開できるようにするため、`question-analysis`の質問一覧・ブロック中範囲へ`Runtime Unit Key / Model Key / Target Key`列を追加し、deterministic validatorも更新します。技法固有ロジックは`test-analysis` / `test-condition-design`を正本とし、`question-analysis`や`qa-workflow`へ複製しません。
 
 現状はLLMが成果物を作り、評価側でPairwise、BVA、状態遷移、Authority / Risk → TR、TCN / CI → TC、追跡グラフ等の一部を後から機械検査しています。本変更では、評価側で既に機械判定できる領域を中心に、実行時も「LLMが意味を正規化する → Skill runtime scriptが生成・計算・構造検査する → LLMが意味を統合する → 独立validator / semantic evalが検証する」構造へ変更します。
 
