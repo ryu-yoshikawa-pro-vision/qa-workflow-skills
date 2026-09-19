@@ -75,7 +75,7 @@ CLI integration testは各runtime scriptの`valid_minimal.json`をsubprocessで`
 - Agent側は終了codeだけで判断せずstdout envelopeをparseする
 - 対応subset判定は各runtime scriptが行い、model全体がsubset外なら`runtime_status=unsupported / support_status=unsupported / runtime_required=false / fallback_reason=outside_supported_subset`を返す
 - 一部だけsubset外なら`support_status=partial`としてsupported部分を生成し、`unsupported_items[]`をfallback / Dispositionへ閉じるまで完了扱いしない
-- supported inputで`runtime_required=false`を拒否し、Agent側だけでsupport判定してruntimeを省略しない
+- `runtime_required`はruntime入力に存在せず、support判定結果からscriptが出力する。Agent側だけでsupport判定してruntimeを省略しない
 - artifact scriptのscope keyがscript別固定値 / input由来値と一致する
 - Python unavailable / runtime未実行は`runtime_status=not_run / support_status=unknown / runtime_required=true / result_status=blocked / deterministic_generated=false / fallback_reason=python_unavailable`とし、fingerprintをnullで保持する
 - status対応表どおりの`result_status / runtime_required / deterministic_generated`を要求
@@ -170,14 +170,17 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - 最低優先度
 - 低い指定優先度 + 空の`priority_override_reason`をviolation
 - 低い指定優先度 + 非空override reasonは値を保持し、自動補正しない
-- `reuse_id / new`の意味判断とTR番号割当てを分離し、新規だけ最大番号+1で採番する
+- `draft_key`を使ってLLM draftと最終TR ID mappingを安定追跡する
+- `reuse_id / new`の意味判断とTR番号割当てを分離し、`previous_tr_ids[].status=active|deleted`を検証する
+- reuseはactiveだけ許可し、新規はactive / deletedを含む最大番号+1で採番して削除済み番号を再利用しない
 - draft → runtime検査 → 再検査の処理順
 
 ### test condition structure
 
-- TCN / modelの`reuse / new`意味判断と番号割当てを分離する
-- 新規TCNは既存最大+1、999超過は`id_space_exhausted`
-- model keyは同slug最大+1、削除済みkeyを同系列で再利用しない
+- TCN / modelの`draft_key`、`reuse / new`意味判断と番号割当てを分離する
+- `previous_tcn_ids[] / previous_model_keys[]`の`active|deleted`を検証し、reuseはactiveだけ許可する
+- 新規TCNはactive / deletedを含む既存最大+1、999超過は`id_space_exhausted`
+- model keyは同slugのactive / deleted最大+1、削除済みkeyを同系列で再利用しない
 - reuse時のslug / parent TCN / existing key一致
 - 1 model key = 1 TCN所属を検査し、同じmodel keyを複数TCNへ割り当てない
 
@@ -388,6 +391,9 @@ raw machine-readable入力をfixtureにします。
 
 ### test case structure
 
+- `draft_key`を使ってLLM draftと最終TC ID mappingを安定追跡する
+- `previous_tc_ids[].status=active|deleted`を検証し、reuseはactiveだけ、新規はactive / deletedを含む最大番号+1とする
+- 削除済みTC IDを再利用せず、999超過は`id_space_exhausted`
 - TCN / CI → TC closure
 - linked + disposed重複
 - unknown upstream
@@ -422,7 +428,9 @@ raw machine-readable入力をfixtureにします。
 - 初回mappingは`model_key → target_key`順でCI01から採番
 - existing mappingは同一target_refで維持し、新target_refだけ最大番号+1
 - target_ref内容不一致、1 target_ref→複数CI、parent mismatchを拒否
-- 同一CIへの複数target_refは同一merge groupだけ許可する
+- `target_annotations[]`が全targetへ1対1対応し、unknown / duplicate target_refを拒否する
+- `expected_result_root`は同一TCN内のopaque local keyで、同じ期待挙動と意味判断したtargetだけ同値になる
+- 同一CIへの複数target_refは、同じ`expected_result_root`を持つ同一merge groupだけ許可する
 - merge解除時は辞書順先頭targetへ既存CIを維持し、残りを最大番号+1で再採番して関連TCを`要再検証`へする
 - 消滅targetで下流`要再検証`
 - 同じ実行を2回行ってmachine evidenceが重複しない
@@ -497,7 +505,8 @@ validatorはruntime traceabilityと独立にmissing / orphan / unknown / stale�
 - `Runtime Required=Yes`のunitでは、さらに`Deterministic Generated=Yes`を要求する
 - `Runtime Required=No`のfallback unitも`Result Status != ready`なら完了を妨げる
 - `Support Status=partial`では`unsupported_items[]`がfallbackまたはDispositionへすべて閉じていることを要求する
-- `workflow_runtime.py`が上流Entity fingerprint、`upstream_runtime_units`、runtime metadataからstale / 完了可否を計算し、LLMが表を手計算しない
+- `workflow_runtime.py`が上流Entity fingerprint、`upstream_runtime_units`、runtime metadata、`unsupported_item_closures[]`からstale / 完了可否を計算し、LLMが表を手計算しない
+- partial supportは全unsupported item keyにclosureがあること、whole-model unsupportedは`item_key=null`のfallback closureがあることを完了条件として検証する
 
 完了条件・再利用条件へ次を追加します。
 
@@ -645,7 +654,7 @@ repository全体は328 queryです。
 5. runtime support / fallback / unavailable
    - model全体が対応subset外ならscript自身が`support_status=unsupported / runtime_status=unsupported / runtime_required=false / deterministic_generated=false / fallback_reason=outside_supported_subset`を返し、既存Skill契約を満たすLLM fallbackで完了可能
    - 一部subset外なら`support_status=partial`でsupported部分を生成し、unsupported itemをfallback / Dispositionへ閉じるまで完了不可
-   - supported inputで`runtime_required=false`にした成果物はvalidator失敗
+   - `runtime_required`をcaller inputから与えず、runtimeのsupport判定出力として検証する
    - Python unavailableなら`support_status=unknown / runtime_required=true / runtime_status=not_run / result_status=blocked / deterministic_generated=false`を保持し、workflowを完了にしない
    - QA成果物状態とruntime状態を分離
    - 「決定論的生成済み」と誤表示しない
@@ -803,7 +812,7 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 - input / model / generation fingerprint
 - runtime / generator implementation fingerprint
 - upstream Entity content fingerprint / upstream runtime dependency
-- support_statusと対応subset判定
+- support_statusと対応subset判定。`runtime_required`は入力fieldにせずruntime出力として導出
 - deterministic Markdown抽出 / 再投入
 - item / byte / depth / search node hard limit
 - tie-break
