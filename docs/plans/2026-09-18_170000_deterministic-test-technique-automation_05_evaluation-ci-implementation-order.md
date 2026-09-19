@@ -76,6 +76,7 @@ CLI integration testは各runtime scriptの`valid_minimal.json`をsubprocessで`
 - runtime dependency参照は`(skill, runtime_unit_key)`を一意keyとし、Skillを跨いで`runtime_unit_key`単独をidentityにしない
 - `ok / invalid_input / unsupported / limit_exceeded`は構造化結果を返せた扱いで終了code 0
 - `internal_error`は可能ならenvelopeを返して終了code 1、envelope生成不能も1
+- subprocess timeoutは新しいruntime statusを増やさず、`runtime_status=internal_error / support_status=unknown / result_status=blocked / runtime_required=true / deterministic_generated=false`へmappingし、`issue_type=runtime_execution_timeout`で原因を区別する
 - Agent側は終了codeだけで判断せずstdout envelopeをparseする
 - 対応subset判定は各runtime scriptが行い、model全体がsubset外なら`runtime_status=unsupported / support_status=unsupported / runtime_required=false / fallback_reason=outside_supported_subset`を返す
 - 一部だけsubset外なら`support_status=partial`としてsupported部分を生成し、`unsupported_items[]`をfallback / Dispositionへ閉じるまで完了扱いしない
@@ -104,6 +105,7 @@ CLI integration testは各runtime scriptの`valid_minimal.json`をsubprocessで`
 - 直接依存する上流runtime unitの`generation_fingerprint`変更で下流unitだけがstaleになる
 - envelope version、generator、runtime contract、generator contract、実装fingerprint、static data version変更で`generation_fingerprint`が変わる
 - runtime / generator source変更で実装fingerprintが変わり、意味契約を変えないbug fixでも旧machine evidenceを同一生成条件として再利用しない
+- `condition_structure.py`を派生model追加のため再実行しても、既存model generatorがID割当てしか利用していない場合は同scriptをruntime dependencyへ登録せず、親generatorを自己stale化しない
 - tie-break / Coverage / target key等の意味契約変更では実装fingerprintだけでなく対応contract versionも更新する
 - model / artifact全runtime unitについて`Machine Runtime Input / Result`を保存→決定論的抽出→strict decode→canonical化し、input fingerprint、model scriptではmodel fingerprintも一致する。同条件でruntimeへ再投入すると同じmachine resultになる
 - LF / CRLF差だけでimplementation fingerprintが変わらない
@@ -474,9 +476,12 @@ raw machine-readable入力をfixtureにします。
 - 同じTCN内に同名target keyを持つ複数modelがあってもtarget_refが衝突しない
 - 初回mappingは`model_key → target_key`順でCI01から採番
 - existing mappingは同一target_refで維持し、新target_refだけ最大番号+1
+- 同じtarget_refで`target_content_fingerprint`だけが変わった場合はCI IDを維持するが、関連CI / TCを`要再検証`へし、以前のannotation / Disposition / merge判断を現在targetへ自動適用しない
 - Disposition targetはCI mapping対象から除外し、generator Coverage値は変更しない
 - target_ref内容不一致、1 target_ref→複数CI、parent mismatchを拒否
 - `target_annotations[]`が全targetへ1対1対応し、unknown / duplicate target_refを拒否する
+- annotation / Dispositionの`target_content_fingerprint`が現在machine targetと一致しない場合は拒否する
+- merge groupの全targetについて保存fingerprintが現在machine targetと一致しない場合は拒否する
 - `expected_result_root`は同一TCN内の内部用local keyで、同じ期待挙動と意味判断したtargetだけ同値になる
 - 同一CIへの複数target_refは、同じ`expected_result_root`を持つ同一merge groupだけ許可する
 - unmerged→mergedでは既存CIの最小番号を存続CIとし、他CIをdeletedへする
@@ -527,14 +532,15 @@ validatorはruntime traceabilityと独立にmissing / orphan / unknown / stale�
 
 ### `question-analysis`
 
-`assets/output-template.md`の`不明点 / 質問一覧`と`ブロック中範囲`へ、既存の`再開対象 / 実行範囲`とは別に`Runtime Skill`、`Runtime Unit Key`、`Model Key`、`Target Key`列を追加します。
+`assets/output-template.md`の`不明点 / 質問一覧`と`ブロック中範囲`へ、既存の`再開対象 / 実行範囲`とは別に`Runtime Skill`、`Runtime Unit Key`、`Model Key`、`Target Key`、`Generation Fingerprint`列を追加します。
 
 - `再開対象 / 実行範囲`は既存`QUESTION-D017`のSkill用途判定だけに使用する
 - `Runtime Skill`と`Runtime Unit Key`はruntime issue由来の質問で必須で、組を一意identityとして扱う
 - model issueでは`Model Key`を必須、artifact全体script issueでは空欄
 - target固有issueだけ`Target Key`を必須
-- 同じブロッカーIDについて質問一覧とブロック中範囲のRuntime Skill / Runtime Unit / Model / Targetが一致することをvalidatorで確認する
-- runtime issue由来でない質問では4列を空欄にできる
+- runtime生成issueでは`Generation Fingerprint`を必須にし、回答適用時に現在runtime unitのgenerationと一致することを確認する。timeout等のcaller生成issueだけ空欄を許可する
+- 同じブロッカーIDについて質問一覧とブロック中範囲のRuntime Skill / Runtime Unit / Model / Target / Generation Fingerprintが一致することをvalidatorで確認する
+- runtime issue由来でない質問では5列を空欄にできる
 ### `qa-workflow`
 
 既存Skill状態表は`qa-workflow`出力時に引き続き必須とし、`WF-D009`は維持します。ただし永続正本にはせず、成果物metadataから再構築可能にします。
@@ -557,7 +563,7 @@ validatorはruntime traceabilityと独立にmissing / orphan / unknown / stale�
 - `Runtime Required=No`のfallback unitも`Result Status != ready`なら完了を妨げる
 - `Support Status=partial`では`unsupported_items[]`がfallbackまたはDispositionへすべて閉じていることを要求する
 - `workflow_runtime.py`が上流Entity fingerprint、`upstream_runtime_units`、runtime metadata、`unsupported_item_closures[]`からstale / 完了可否を計算し、LLMが表を手計算しない
-- partial supportは全unsupported item keyにclosureがあること、whole-model unsupportedは`item_key=null`のfallback closureがあることを完了条件として検証する
+- partial supportは全unsupported item keyにclosureがあり、closureの`generation_fingerprint / reason_code`が現在unsupported itemと一致することを要求する。whole-model unsupportedは`item_key=null`でもclosureの`generation_fingerprint`一致を必須にする
 
 完了条件・再利用条件へ次を追加します。
 
@@ -698,7 +704,8 @@ repository全体は328 queryです。
 
 4. 局所ブロック
    - 1 modelだけ未解決
-   - `question-analysis`往復で`runtime_unit_key / model_key / target_key`維持
+   - `question-analysis`往復で`skill / runtime_unit_key / model_key / target_key / generation_fingerprint`維持
+   - 質問後にgenerationが変わった場合は以前の回答を自動適用せず、現在世代でissueが残るか再評価する
    - 独立modelは継続
    - 成果物metadataから状態を再構築し、qa-workflow出力時は既存Skill状態表と新しいruntime状態表へ反映
    - workflowは部分完了
@@ -719,7 +726,7 @@ repository全体は328 queryです。
 7. runtime利用確認
    - 全runtime scriptについてdispatch fixtureから期待script pathへ到達し、CLI実行結果metadataが存在する
    - supported inputが`unsupported`になる、またはsupport判定前にAgentがscriptを省略する場合は失敗
-   - Markdown保存済みMachine Modelを決定論的に抽出して同じruntimeへ再投入できる
+   - 保存済み`Machine Runtime Input / Result`を決定論的に抽出して同じruntimeへ再投入できる
    - LLM手計算だけの成果物を決定論的生成済みと判定しない
 
 8. 途中工程開始
@@ -887,11 +894,12 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 - qa-workflow再利用元による成果物系列判定
 - 既存TR / TCN / TC / modelのID再利用規則、active / deleted machine state、999上限
 - 1 model key = 1 TCN所属
-- previous target_ref mappingとmerge groupを入力にしたtarget_ref → CI materialize
+- `materialize_coverage.py`本体を実装し、previous target mapping、annotation / Disposition / merge、target content fingerprintを入力にtarget_ref → CI materializeする
 - merge / unmerge / target追加削除 / CI↔DispositionのID状態遷移とdownstream stale
+- 同じtarget_refの内容変更時にCI IDを維持しつつannotation / Disposition / mergeと関連TCを`要再検証`へ戻す
 - upsert / stale / freshness status
 - upstream Entity別content fingerprint / upstream runtime dependency
-- question-analysisのModel / Target保持
+- question-analysisのRuntime Skill / Runtime Unit / Model / Target / Generation Fingerprint保持
 - coverage-analysisのModel Key / Disposition追跡
 - `workflow_runtime.py`によるSkill状態表 + runtime状態表（model / artifact両runtime unit）の機械集約。自身は評価対象から除外
 - legacy昇格
@@ -960,13 +968,12 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 - Metamorphic relation / completion criterion
 - UI catalog / static version
 
-### Step 10: materialize / test-case / traceability
+### Step 10: 全generator統合 / test-case / traceability
 
-- `materialize_coverage.py`のmodel status / freshness gate
-- test data requirement参照解決とmerge compatibility intersection
-- target_ref → CI mapping / upsert
-- target machine data + `target_annotations[]` join
-- merge group union / merge・unmerge・CI↔Disposition状態遷移時のstable IDとID state永続化
+- Step 2で実装済みの`materialize_coverage.py`を全generator出力へ接続し、model status / freshness gateを回帰確認する
+- test data requirement参照解決とmerge compatibility intersectionを全対象技法で確認する
+- target content fingerprintと`target_annotations / target_dispositions / merge_group`の一致検証を全generatorで確認する
+- target_ref → CI mapping / upsert、merge / unmerge / CI↔Dispositionの状態遷移を全generatorで回帰確認する
 - machine evidence描画
 - case structure
 - traceability
@@ -1040,7 +1047,10 @@ Plan完了には次をすべて満たす必要があります。
 - support判定をruntimeが行い、whole-model `unsupported`、`partial`、Python unavailableを契約どおり区別する。supported inputをAgent判断だけでruntime省略しない
 - model内Coverageと仕様全体Coverageを混同しない
 - `workflow_runtime.py`がmodel / artifact両runtime unit、upstream Entity内容変更、`(skill, runtime_unit_key)` dependency、missing / duplicate / cycle、generation / implementation変更、stale、局所ブロック、partial / whole-model fallback、legacyを処理でき、自身を評価対象へ含めない
-- question-analysis往復でmodel / targetが失われない
+- 同一実行で現在inputから生成したruntime resultは直後の下流処理へ`current`として渡せ、保存済みresultを再利用する場合だけ下流実行前に`workflow_runtime.py`でcurrent確認するため、freshness判定がmaterialize / traceabilityと循環しない
+- question-analysis往復でRuntime Skill / Runtime Unit / model / target / generation fingerprintが失われず、別generationへ古い回答を自動適用しない
+- target内容変更時にstable `target_ref` / CI IDを維持しても、古いannotation / Disposition / merge判断と下流TCをcurrent扱いしない
+- unsupported closureは対象generationとreasonが現在値に一致する場合だけ再利用する
 - 途中工程開始と`Selection Source=analysis / user / existing_artifact / derived`が既存workflowを壊さず、undetermined signalが未閉鎖のまま完了しない
 - CIでは全runtime scriptのdispatch / metadata整合、Coverage targetのCI / Disposition閉鎖、Decision Table don't-care merge非破壊性を確認し、実Agent smokeでは代表promptでPython起動、envelope parse、machine結果採用、Markdown再読込まで確認できる
 - 6 Skillの単体移植性が成立し、共通runtime helperの内容一致を検証できる
