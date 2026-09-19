@@ -484,7 +484,7 @@ generator結果に影響する静的データはversionを持ちます。
 | Random Testing | `random` |
 | Metamorphic Testing | `metamorphic` |
 
-`model_key`は`<slug>-\d{3,}`です。
+`model_key`は`<slug>-\d{3,}`です。`test-analysis`の人間向け「最終採用技法」は上表の技法名を表示し、Technique Selection Machine Entityの`selected_techniques[]`は対応するslug列を保存します。名前→slug変換はこの表だけを正本に固定builderで行い、LLMが別表記からslugを推測しません。
 
 - qa-workflowが再利用元として選んだ直前の`test-condition-design`成果物を同じ成果物系列とする。再利用元がない場合は新しい系列
 - 同じ技法・同じ検証責務のmodelを改訂する場合は既存`model_key`を維持する
