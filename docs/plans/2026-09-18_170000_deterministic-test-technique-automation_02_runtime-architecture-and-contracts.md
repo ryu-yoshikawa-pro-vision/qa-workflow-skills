@@ -599,6 +599,23 @@ CI番号は`CI\d{2,}`を許可します。
 - 同一再実行で重複machine evidenceを作らない
 - staleな派生成果物が残る状態を完了扱いしない
 
+### 7.4 Coverage targetの成果物上の閉鎖
+
+generatorが返した各`target_ref`は、最終的に次のどちらか一方へ閉じます。
+
+- `materialize_coverage.py`でCIへ割り当てる。複数targetを同じCIへ割り当てる場合は§11の`merge_group`を必須にする
+- `target_dispositions[]`で既存`test-condition-design`契約上の扱いへ明示する
+
+`target_dispositions[]`は`{target_ref, handling, reason, authority_refs, covered_by_target_ref}`です。
+
+- `handling=対象外 / 別テストレベル / 残存リスク / ブロック中 / 重複`だけを許可する
+- `重複`では`covered_by_target_ref`を必須にし、同一TCN内のcurrentかつCIへmaterializeされるtargetを参照する。他handlingでは`covered_by_target_ref=null`
+- generatorが成立可能targetとして生成した後に`成立不能`へ変更しない。新しいAuthorityで成立不能と判明した場合は正規化model / constraintを更新してgeneratorを再実行し、Coverage母集団から機械的に除外する
+- 同一target_refへCI mappingとDispositionを同時に持たせない
+- `ブロック中`はworkflow完了を妨げる。`対象外 / 別テストレベル / 残存リスク / 重複`は既存Skill契約上の根拠条件を満たせば成果物上は閉鎖できる
+
+Dispositionはgeneratorの`coverage_summary`を書き換えません。技法内Coverageは正規化modelとgenerator結果を正本とし、成果物上の未実施・別レベル・残存リスク等は`coverage-analysis`で別に追跡します。これにより、DispositionしたtargetをCoverage済みと誤計上しません。
+
 ## 8. machine evidenceとMarkdown
 
 ### 8.1 正規化済みモデル
@@ -688,7 +705,7 @@ validatorはfenced JSON blockを抽出してstrict JSON decodeし、canonical化
 - `schema_cases.py`は`derived.ep_inputs / derived.bva_inputs / derived.combinatorial_constraints / derived.test_data_requirements`を固定schemaで返し、同script内のbuilder処理で各下流script入力へ変換する。別の汎用adapterは作らない
 - 各generatorのmachine targetと、LLMがtarget_ref単位で付与した`target_annotations[]`を`materialize_coverage.py`がjoinする。generator target JSONをLLMが再生成しない
 
-意味上の統合だけLLMに残します。各targetの意味情報は`target_annotations[]`へ`{target_ref, priority, expected_result_root, test_data_requirement_refs[]}`として保持します。`expected_result_root`は期待結果本文ではなく、同じ期待挙動へまとめてよいかをLLMが判定したstable keyです。複数技法の結果を同じCIへまとめる場合、LLMは`merge_group`を明示し、`materialize_coverage.py`がtarget key、Authority、Reference、優先度、test data requirement参照を決定論的にunionします。
+意味上の統合だけLLMに残します。CIへmaterializeするtargetの意味情報は`target_annotations[]`へ`{target_ref, priority, expected_result_root, test_data_requirement_refs[]}`として保持します。Disposition済みtargetにはannotationを要求せず、同一targetへannotationとDispositionを同時指定しません。`expected_result_root`は期待結果本文ではなく、同じ期待挙動へまとめてよいかをLLMが判定したstable keyです。複数技法の結果を同じCIへまとめる場合、LLMは`merge_group`を明示し、`materialize_coverage.py`がtarget key、Authority、Reference、優先度、test data requirement参照を決定論的にunionします。
 
 `merge_group` inputは`{"merge_group_key":"MG-001","target_refs":["sha256:...","sha256:..."],"authority_refs":["SPEC-001"]}`です。target refは2件以上、重複不可、同一TCN配下だけを許可します。各targetの`target_annotations.expected_result_root`が一致しない場合は`invalid_input`とします。
 
