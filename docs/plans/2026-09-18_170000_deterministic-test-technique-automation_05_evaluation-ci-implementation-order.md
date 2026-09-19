@@ -448,6 +448,8 @@ raw machine-readable入力をfixtureにします。
 - generator生成後に`成立不能`Dispositionへ変更しない。成立不能根拠が得られた場合はmodel / constraintを更新してgeneratorを再実行する
 - Disposition済みtargetへCIを採番せず、同時にgeneratorの`coverage_summary.required / covered / complete`を変更しない
 - `ブロック中`Dispositionはworkflow完了を妨げる
+- materialize outputから生成したCI Machine Entityは、同一CIの`covered_targets[]`とpriority / expected_result_root / Authority / Reference / test data requirementを現在target / annotationから固定joinする
+- stable target_refのままtarget content / executionが変わった場合、CI Machine Entityのcontent fingerprintが変わり、参照TCへstaleが伝播する
 - `test_data_requirement_refs[]`は同じmaterialize inputの`data:<requirement_key>`へ解決できることを必須にする
 - merge groupはDispositionされていない同一TCN・同一`model_key`のtargetだけを含み、全targetの`execution_fingerprint`と`expected_result_root`の一致を要求する
 - 異なるmodel / 技法のtargetを同一CIへmergeせず、同一TCで実行できる場合は`case_structure.py`の複数`ci_refs[]`で表現する
@@ -1030,6 +1032,8 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 - mergeは同一model・同一executionに限定し、追加test data requirement参照のintersectionを確認する。異なるmodelの同一TC実行はcase structureの複数`ci_refs[]`で検証する
 - target content / generation fingerprintと`target_annotations / target_dispositions / merge_group`の一致検証を全generatorで確認する
 - target_ref → CI mapping / upsert、merge / unmerge / CI↔Dispositionの状態遷移を全generatorで回帰確認する
+- CI Machine Entityの`covered_targets[]`へtarget content / execution fingerprintを保存し、stable target_refのままtarget内容が変わるcaseでもCI content fingerprintが変わることを確認する
+- CI content変更後、既存TC Machine Entityがsemantic再確認前はstaleになることを確認する
 - machine evidence描画
 - title / purpose、前提、データ、手順、expected result、事後状態を保持するcase structureとTC Machine Entity
 - `runtime_units / current_entities / current_runtime_units`から共通freshness関数でEntity freshnessを算出するtraceability
