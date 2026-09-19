@@ -286,6 +286,8 @@ condition / action / ruleは任意数を許可します。known ruleのaction ve
 
 候補をdeterministicに列挙し、各候補へstable `merge_key`を付与します。LLMは意味上統合してよい候補の`merge_key`だけを`accepted_merges[]`へ返し、任意の`rule_keys[]`を新規構成しません。scriptはaccepted `merge_key`が同一実行で生成した候補に存在すること、候補内ruleが同一action vectorであること、統合後のCartesian productが成立可能な既知ruleだけを含み未定義assignmentを追加しないことを再検証してdon't-care ruleを生成します。Boolean minimizationで最小rule数を目的にしません。
 
+`accepted_merges[]`はDecision Tableの派生表示・レビュー用のdon't-care ruleを作るためだけに使用します。元の成立可能assignment targetは削除せず、`coverage_summary.required / covered`も変更しません。Decision Tableのaccepted mergeを`materialize_coverage.py`の`merge_group`へ自動変換しません。複数assignmentを1つのCI / TCへまとめる場合は、各targetのtest data requirementを同時に満たせることを含め、別途§24と`_02` §11のmerge契約を満たす必要があります。
+
 ## 7. 組合せ
 
 ### `combinatorial.py`
@@ -1090,8 +1092,8 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 #### `bva.py`
 
 - required: `boundaries[]`
-- boundary: `{boundary_key, side, threshold, inclusive, step, mode, authority_refs}`
-- `side=lower|upper`, `mode=2-value|3-value`
+- boundary: `{boundary_key, side, threshold, inclusive, step, mode, coverage_selection_reason, authority_refs}`
+- `side=lower|upper`, `mode=2-value|3-value`。`mode=3-value`では境界リスク、過去不具合、ユーザー明示等の具体的な`coverage_selection_reason`を非空必須とし、2-valueでは空文字を許可する
 - `threshold`はtyped integer / decimal / date / local_datetime / fixed_offset_datetime
 - `step`は§4のdomain別object形式だけを許可し、threshold型と互換であることを必須にする
 
@@ -1119,8 +1121,8 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - factor: `{factor_key, values[], authority_refs}`。valuesはtyped valueを1件以上
 - `mode=exhaustive`: 追加fieldなし
 - `mode=base-choice`: `base_assignment`を全factorについて必須
-- `mode=t-wise`: `strength` integerを2..factor数で必須
-- `mode=mixed-strength`: `global_strength` integerを2..factor数、`subsets[]`を1件以上必須。subsetは`factor_keys[]`と`strength`を持ち、strengthは2..subset factor数
+- `mode=t-wise`: `strength` integerを2..factor数で必須。`strength>2`では`coverage_selection_reason`を非空必須
+- `mode=mixed-strength`: `global_strength` integerを2..factor数、`subsets[]`を1件以上必須。subsetは`factor_keys[]`と`strength`を持ち、strengthは2..subset factor数。globalまたはsubsetのいずれかがstrength>2なら`coverage_selection_reason`を非空必須
 
 #### `classification_tree.py`
 
@@ -1238,16 +1240,19 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 
 #### `materialize_coverage.py`
 
-- required: `tcn_id`, `models[]`, `target_annotations[]`, `previous_target_id_map[]`, `merge_groups[]`
+- required: `tcn_id`, `models[]`, `target_annotations[]`, `target_dispositions[]`, `previous_target_id_map[]`, `merge_groups[]`
 - `tcn_id`は`TCN-\d{3}`
 - model: `{model_key, runtime_unit_key, input_fingerprint, model_fingerprint, generation_fingerprint, generator_contract_version, targets[]}`。全modelは`condition_structure.py`で同じ`tcn_id`への1対1所属を検証済みであること
 - machine target: `{target_ref, target_key, authority_refs, reference_refs, ...技法固有machine fields}`。priority、expected result、test data要求をLLMに埋め戻させない
-- target annotation: `{target_ref, priority, expected_result_root, test_data_requirement_refs[]}`。全machine targetにちょうど1件対応し、unknown / duplicate target_refを拒否する。`expected_result_root`は同一TCN内のopaque local keyで`^[A-Za-z][A-Za-z0-9._:-]{0,63}$`、同じkeyはLLMがAuthorityに基づき同じ期待挙動へ統合可能と判断したtargetだけへ付与する。製品Authorityそのものとして扱わない
+- target annotation: `{target_ref, priority, expected_result_root, test_data_requirement_refs[]}`。Dispositionされないmachine targetにちょうど1件対応し、unknown / duplicate target_refを拒否する。`expected_result_root`は同一TCN内のopaque local keyで`^[A-Za-z][A-Za-z0-9._:-]{0,63}$`、同じkeyはLLMがAuthorityに基づき同じ期待挙動へ統合可能と判断したtargetだけへ付与する。製品Authorityそのものとして扱わない
+- target disposition: `{target_ref, handling, reason, authority_refs, covered_by_target_ref}`。`_02` §7.4のhandlingだけを許可し、同一target_refへannotationとDispositionを同時指定しない。`重複`では`covered_by_target_ref`必須
 - `target_ref`は`_02` §7.2の式を再計算して一致必須
 - `previous_target_id_map[]`: `{target_ref, model_key, target_key, ci_id}`。同一merge group内だけ同じ`ci_id`を共有可
-- merge groupは`_02` §11形式の`target_refs[]`で、同一TCN内かつ同じ`expected_result_root`だけを許可する
-- outputは`target_id_map[]`、`coverage_item_rows`、`stale_ci_ids`、`issues`
+- merge groupは`_02` §11形式の`target_refs[]`で、Dispositionされていない同一TCN内targetかつ同じ`expected_result_root`だけを許可する
+- `target_dispositions[]`にあるtargetはCI採番対象から除外し、generatorの`coverage_summary`自体は変更しない
+- outputは`target_id_map[]`、`disposed_target_refs[]`、`coverage_item_rows`、`stale_ci_ids`、`issues`
 - `target_id_map[]`: `{target_ref, model_key, target_key, ci_id}`。1 target_refから複数CIへのmappingは禁止する
+- `disposed_target_refs[]`: `{target_ref, handling, covered_by_target_ref}`。Coverage済みtarget数の計算には使用しない
 
 #### `workflow_runtime.py`
 
