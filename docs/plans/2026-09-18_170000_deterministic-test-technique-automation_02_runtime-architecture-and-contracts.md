@@ -137,7 +137,7 @@ runtime対象Skillは、Skill instructionへscript選択表を持ち、次の順
 6. 意味判断が必要なissueは既存Skillまたは`question-analysis`へ戻し、機械結果をLLMが再計算しない
 7. 意味入力を更新した場合はruntimeを再実行し、保存machine evidenceを置換する
 
-各scriptは入力検証の一部として対応subset判定を行います。Agentが自然言語だけから`runtime_required=false`を確定してscriptを省略しません。
+各scriptは入力検証の一部として対応subset判定を行い、`runtime_required`を出力として決定します。`runtime_required`はruntime入力へ渡さず、Agentが自然言語だけから`runtime_required=false`を確定してscriptを省略しません。
 
 ## 3. 共通JSON契約
 
@@ -180,7 +180,6 @@ runtime入力は`metadata`とscript固有`input`を分けます。
     "runtime_unit_key": "model:pairwise-001",
     "model_key": "pairwise-001",
     "scope_key": null,
-    "runtime_required": true,
     "selection_source": "analysis",
     "upstream_entities": [
       {
@@ -215,7 +214,6 @@ runtime入力は`metadata`とscript固有`input`を分けます。
   - `materialize_coverage.py`: 入力`tcn_id`
   - その他のartifact全体script: literal `all`
 - 同一Skill内で同じ`artifact:<generator>:<scope_key>`を同時に複数定義しない
-- `runtime_required`: 呼び出し側が想定する値を入力するが、信頼しない。各scriptのsupport判定で再計算し、不一致は`invalid_input`とする。対応subsetなら`true`、model全体が対応subset外なら`false`。Python unavailable等の実行環境都合では`false`へ変更しない
 - `selection_source`: model scriptだけ`analysis / user / existing_artifact`のいずれかを必須。artifact全体scriptでは`null`
 - `upstream_entities`: 実際に消費した上流Entity単位で保持する。`skill + entity_ref`を一意keyとし、呼び出し側はPlanで固定した字段のcanonicalな`content`を渡す。`content_fingerprint`はruntimeが`content`から計算してenvelopeと成果物へ保存し、LLMからhash値だけを受け取らない
 - `upstream_runtime_units`: 他runtime結果を直接利用した場合に必須。直接利用した`runtime_unit_key + generation_fingerprint`を保持し、上流runtime結果が変わったときに依存unitだけをstaleへ戻せるようにする
@@ -266,8 +264,8 @@ scriptが実行できた場合、stdoutは次のJSON object 1件だけです。
 
 `result_status`:
 
-- `ready`: 下流へ利用可能
-- `unresolved`: 追加情報またはLLM fallbackが必要
+- `ready`: runtime unitとして下流へ利用可能。`support_status=partial / unsupported`ではQA成果物全体の完了を意味せず、unsupported itemまたはfallbackが既存Skill契約へ閉じていることを別途要求する
+- `unresolved`: 追加情報または意味判断後の再実行が必要
 - `blocked`: 入力違反、上限超過、runtime障害等で継続不可
 
 status対応は次で固定します。
@@ -278,7 +276,7 @@ status対応は次で固定します。
 | `ok` | `supported` | `unresolved` | `true` | `true` | 質問・意味判断後に再実行 |
 | `ok` | `partial` | `ready`または`unresolved` | `true` | `true` | supported部分を利用し、unsupported itemはfallbackまたはDispositionへ閉じる |
 | `invalid_input` | 任意 | `blocked` | support判定結果 | `false` | 入力契約を修正 |
-| `unsupported` | `unsupported` | `ready`または`blocked` | `false` | `false` | 既存Skill契約によるLLM fallback。fallback後も未解決ならblocked |
+| `unsupported` | `unsupported` | `ready` | `false` | `false` | runtime unitとしてfallback可能。QA成果物全体はfallbackが既存Skill契約へ閉じた場合だけ完了可能 |
 | `limit_exceeded` | `supported`または`partial` | `blocked` | `true` | `false` | model分割またはcontract変更が必要 |
 | `internal_error` | 任意 | `blocked` | support判定結果 | `false` | runtime不具合として扱う |
 | `not_run` | `unknown` | `blocked` | `true` | `false` | Python unavailable。成果物metadataだけで表現 |
@@ -289,13 +287,13 @@ status対応は次で固定します。
 
 技法modelでは成果物metadataの`model_status`を`result_status`と同じ値にします。artifact全体scriptでは`artifact_status`を同じ値にします。
 
-対応subset外かどうかはruntimeのsupport判定を正本とします。model全体がsubset外なら`runtime_status=unsupported / support_status=unsupported / runtime_required=false / deterministic_generated=false / fallback_reason=outside_supported_subset`を保存し、LLM fallbackが既存Skill契約を満たせば`result_status=ready`、満たせなければ`blocked`です。`runtime_required=true`のunitで`deterministic_generated=false`なら決定論的処理未完了であり、ワークフロー全体を`完了`にしません。
+対応subset外かどうかはruntimeのsupport判定を正本とします。model全体がsubset外なら`runtime_status=unsupported / support_status=unsupported / runtime_required=false / result_status=ready / deterministic_generated=false / fallback_reason=outside_supported_subset`を保存します。これはruntime unitとしてfallback可能という意味であり、QA成果物全体はLLM fallbackが既存Skill契約を満たした場合だけ完了できます。`runtime_required=true`のunitで`deterministic_generated=false`なら決定論的処理未完了であり、ワークフロー全体を`完了`にしません。
 
 Python unavailable時はsupport判定自体を実行できないため、runtime対象として選択済みのunitを`runtime_required=true / runtime_status=not_run / support_status=unknown / result_status=blocked / deterministic_generated=false / fallback_reason=python_unavailable`として保持し、ワークフローを`完了`にしません。LLMが成果物本文を作成しても決定論的処理済みとは扱いません。
 
 `ok`、`invalid_input`、`unsupported`、`limit_exceeded`は終了code 0とします。`internal_error`は可能なら構造化envelopeを返して終了code 1、envelope自体を生成できない障害も終了code 1とします。Agent側は終了codeだけでroutingせずstdout envelopeをparseします。stderrは人間向け診断だけに使い、入力全文、secret、tokenを出しません。
 
-`unsupported`はmodel全体が対応subset外であることをruntimeが確認した正常なfallback経路です。`partial`は独立して処理できるsupported部分を生成し、unsupported部分を`unsupported_items[]`として残します。Agent側でsupport判定を再実装せず、supported inputを`runtime_required=false`としてruntime省略することを禁止します。
+`unsupported`はmodel全体が対応subset外であることをruntimeが確認した正常なfallback経路です。`partial`は独立して処理できるsupported部分を生成し、unsupported部分を`unsupported_items[]`として残します。Agent側でsupport判定を再実装せず、runtime対象modelをsupport判定前に省略することを禁止します。
 ### 3.4 構造化された未解決事項
 
 `issues`は次のfieldを持ちます。
@@ -346,7 +344,6 @@ fingerprintはSHA-256で計算します。入力はUTF-8のcanonical JSONです�
 - script固有`input`
 - `authority_refs`
 - `reference_refs`
-- `runtime_required`
 - model scriptでは`selection_source`
 
 `upstream_entities`はstale判定用、`static_data_versions`はgeneration条件用なので`input_fingerprint`へ含めません。
