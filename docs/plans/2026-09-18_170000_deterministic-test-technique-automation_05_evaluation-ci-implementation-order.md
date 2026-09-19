@@ -70,7 +70,8 @@ CLI integration testは各runtime scriptの`valid_minimal.json`をsubprocessで`
 
 ### runtime envelope
 
-- `envelope_version / runtime_contract_version / generator_contract_version / generator / runtime_unit_key / model_key / input_fingerprint / model_fingerprint / generation_fingerprint / runtime_implementation_fingerprint / generator_implementation_fingerprint / support_status / static_data_versions / runtime_status / result_status / runtime_required / deterministic_generated / fallback_reason / payload / issues`
+- `envelope_version / skill / runtime_contract_version / generator_contract_version / generator / runtime_unit_key / model_key / input_fingerprint / model_fingerprint / generation_fingerprint / runtime_implementation_fingerprint / generator_implementation_fingerprint / support_status / static_data_versions / runtime_status / result_status / runtime_required / deterministic_generated / fallback_reason / payload / issues`
+- `skill`はscript所属Skillと一致必須で、runtime issueも`skill + runtime_unit_key`を保持する
 - model scriptは`runtime_unit_key=model:<model_key>`、artifact全体scriptは`runtime_unit_key=artifact:<generator>:<scope_key>`を要求し、artifact全体scriptの`model_key`はnull
 - runtime dependency参照は`(skill, runtime_unit_key)`を一意keyとし、Skillを跨いで`runtime_unit_key`単独をidentityにしない
 - `ok / invalid_input / unsupported / limit_exceeded`は構造化結果を返せた扱いで終了code 0
@@ -529,7 +530,7 @@ validatorはruntime traceabilityと独立にmissing / orphan / unknown / stale�
 `assets/output-template.md`の`不明点 / 質問一覧`と`ブロック中範囲`へ、既存の`再開対象 / 実行範囲`とは別に`Runtime Unit Key`、`Model Key`、`Target Key`列を追加します。
 
 - `再開対象 / 実行範囲`は既存`QUESTION-D017`のSkill用途判定だけに使用する
-- `Runtime Unit Key`はruntime issue由来の質問で必須
+- `Runtime Skill`と`Runtime Unit Key`はruntime issue由来の質問で必須で、組を一意identityとして扱う
 - model issueでは`Model Key`を必須、artifact全体script issueでは空欄
 - target固有issueだけ`Target Key`を必須
 - 同じブロッカーIDについて質問一覧とブロック中範囲のRuntime Unit / Model / Targetが一致することをvalidatorで確認する
@@ -771,9 +772,10 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 確認:
 
 - repo rootのeval helperをimportしない
-- 6 Skillの`scripts/runtime_contract.py`がSHA-256一致
+- 6 Skillの`scripts/runtime_contract.py`がLF正規化後のSHA-256で一致
 - network不要
 - runtime dependencyがPython 3.11標準ライブラリだけで、外部package manifestを必要としない
+- generator scriptがSkill-local Python moduleとしてimportできるのは`runtime_contract.py`だけで、fingerprint対象外helperへ実行ロジックを逃がさない
 - Skill rootからscriptを解決
 - stdout envelopeを読める
 - Python unavailable時にSkill全体を利用不能と誤判定しない
@@ -801,12 +803,13 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 ### `test-requirement-design`
 
 - runtime structure検査の処理順
+- `assets/output-template.md`へ`Machine Runtime Input / Result`とTR active / deleted ID stateを追加
 
 ### `test-condition-design`
 
 - `SKILL.md`の対象技法を更新
 - `references/coverage-techniques.md`へ全実装技法の適用条件、Coverageまたは終了条件を追加
-- `assets/output-template.md`へ正規化model metadata、fenced JSON machine model、stable target / CI mappingを追加
+- `assets/output-template.md`へ`Machine Runtime Input / Result`、正規化model metadata、active / deleted ID state、stable target / CI mappingを追加
 - Random / Metamorphicは一般Coverage 100%を定義しない
 - runtime metadata
 - test data requirement
@@ -815,7 +818,8 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 ### `test-case-design`
 
 - runtime structure検査の処理順
-- stable ID / stale
+- `assets/output-template.md`へ`Machine Runtime Input / Result`とTR active / deleted ID stateを追加
+- stable ID / active・deleted ID state / stale
 
 ### `coverage-analysis`
 
@@ -826,8 +830,8 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 
 ### `question-analysis`
 
-- `不明点 / 質問一覧`と`ブロック中範囲`へ`Model Key / Target Key`列を追加
-- runtime issueの`runtime_unit_key / model_key / target_key`を質問・ブロック・再開まで保持
+- `不明点 / 質問一覧`と`ブロック中範囲`へ`Runtime Skill / Runtime Unit Key / Model Key / Target Key`列を追加
+- runtime issueの`skill / runtime_unit_key / model_key / target_key`を質問・ブロック・再開まで保持
 - `再開対象 / 実行範囲`へmodel keyを流用せず、既存`QUESTION-D017`契約を維持
 
 ### `qa-workflow`
