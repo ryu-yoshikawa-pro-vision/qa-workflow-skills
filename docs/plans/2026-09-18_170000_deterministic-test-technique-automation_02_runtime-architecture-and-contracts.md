@@ -411,7 +411,7 @@ artifact全体scriptでは`model_fingerprint=null`です。ただし`input_finge
 
 `runtime_contract_version` / `generator_contract_version`は意味契約変更時に更新します。bug fixや内部refactorで意味契約を変えない場合も実装fingerprintが変わるため旧machine evidenceを同一生成条件として再利用しません。探索順、tie-break、Coverage、target key等の契約自体を変える場合は実装fingerprintだけで済ませず対応contract versionも更新します。
 
-generatorが返すtarget集合とCoverage計算は純粋な決定論処理です。target → CI ID等のID維持はstateful materialize処理であり、同じgenerator結果と同じ`previous_target_id_map`から同じmappingを得ることを保証します。
+generatorが返すtarget集合とCoverage計算は純粋な決定論処理です。target → CI ID等のID維持はstateful materialize処理であり、同じgenerator結果、`target_annotations / target_dispositions / merge_groups`、`previous_target_id_map / previous_ci_ids / previous_expected_result_roots`から同じmappingとID状態を得ることを保証します。
 ### 4.2 静的参照データ
 
 generator結果に影響する静的データはversionを持ちます。
@@ -628,23 +628,21 @@ generator内の`target_key`はmodel内で安定させます。異なるmodel間�
     "target_ref":"sha256:...",
     "model_key":"bva-001",
     "target_key":"bva:age-lower:AT",
-    "ci_id":"TCN-001-CI01"
+    "ci_id":"TCN-001-CI01",
+    "mapping_status":"active"
   }
 ]
 ```
 
 - 初回mappingがない場合、同一TCN内のtargetを`model_key`、次に`target_key`のUnicode code point辞書順でsortし、`CI01`から順に採番する
-- 既存mappingがある場合、同じ`target_ref`は既存CI IDを維持する
+- 既存active mappingがある場合、同じ`target_ref`は既存CI IDを維持する。inactive mappingは§7.2.2の復帰規則でだけ再利用する
 - 新しい`target_ref`は同一TCN内の既存CI最大番号+1から採番する
 - 消滅target_refのCIはstaleとし、下流TCを`要再検証`へする
 - 削除済みCI番号を再利用せず、既存CI番号の詰め直しを行わない
 - previous mappingの`target_ref`をmodel_key / target_keyから再計算し、不一致を拒否する
 - 同一`target_ref`が複数CIへ割り当てられる場合、親TCN不一致、merge group外で同一CIへ複数target_refが割り当てられる場合は`invalid_input`
 - 同一CIへ複数target_refを割り当てるのは、同一`merge_group`で明示されたtargetだけ許可する。mappingはtarget_refごとに1行保持し、同じ`ci_id`を共有できる
-- mergeを解除した場合は、既存CIを辞書順で最初の存続targetへ維持し、残りtargetへ既存CI最大番号+1から新規採番する。旧merge CIの意味が変わるため関連下流TCを`要再検証`へする
-- merge targetがすべて消滅した場合だけ旧CIをstaleにする
-
-CI番号は`CI\d{2,}`を許可します。
+merge / unmerge / target追加削除 / CI↔Dispositionの詳細な状態遷移は§7.2.2を正本とします。
 
 ### 7.2.1 ID状態の永続化
 
@@ -670,9 +668,7 @@ CI番号は`CI\d{2,}`を許可します。
 - Disposition → CI: targetの直近CIがdeletedで、現在ほかのactive targetへ割り当てられていなければ同じCIを復帰してよい。そうでなければ過去使用済み最大CI番号+1から新規採番
 - deleted CI番号を別targetへ再利用しない
 
-`previous_target_id_map[]`はactive mappingだけでなく`mapping_status=active|inactive`と直近`ci_id`を保持し、Disposition中のtargetも過去mappingを失わない。
-
-CI番号は`CI\d{2,}`を許可します。
+`previous_target_id_map[]`はactive mappingだけでなく`mapping_status=active|inactive`と直近`ci_id`を保持し、Disposition中のtargetも過去mappingを失いません。CI番号は`CI\d{2,}`を許可します。
 ### 7.3 upsert
 
 再実行はappendではなくstable keyでupsertします。
