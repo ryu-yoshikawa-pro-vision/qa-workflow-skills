@@ -16,7 +16,7 @@ LLMには、仕様の意味理解、要素抽出、仕様根拠の対応付け�
 
 基準commit `3510e6ffce87ba8c025ebde22f9947dbb6074f9c`では14 Skillが存在します。
 
-本Planでテスト分析・設計の機械処理を追加する主対象は次の5 Skillです。
+本Planでテスト分析・設計のgenerator・構造検査を追加する主対象は次の5 Skillです。`qa-workflow`にもruntime状態の集約、stale判定、完了判定を機械処理するruntimeを追加するため、Skill実行時にPython scriptを持つ対象は6 Skillです。
 
 - `test-analysis`
 - `test-requirement-design`
@@ -125,7 +125,8 @@ generatorが返す100%等のCoverageは、**明示された正規化済みモデ
    - テスト設計範囲のtraceabilityと構造ギャップ
 
 6. `qa-workflow`
-   - contract / model version、上流変更、stale派生成果物、局所ブロック、`要再検証`、legacy成果物再利用、完了判定
+   - contract / model version、上流変更、runtime unit間依存、stale派生成果物、局所ブロック、`要再検証`、legacy成果物再利用、完了判定
+   - fingerprint比較、runtime状態集約、機械的なstale / 完了判定をLLMに手計算させずruntime scriptで実行する
 
 7. `question-analysis`
    - runtimeの構造化issueに含まれる`model_key` / `target_key`を質問・ブロック・回答後の再開まで保持する
@@ -166,3 +167,15 @@ generatorが返す100%等のCoverageは、**明示された正規化済みモデ
 - Error GuessingやExploratory Testingで新しい故障仮説を発見すること
 
 scriptが正規化済みモデル内で100% Coverageを返しても、LLMの正規化に意味上の漏れがないことまでは保証しません。
+
+## 7. 実装時に維持する責務境界
+
+本Planの実装では、次を全Skillで共通の前提とします。
+
+- LLMは自然言語から意味を正規化し、Authority対応、risk判断、技法採用、意味上の同一性、expected result等を決める。scriptへ渡した後の列挙、計算、fingerprint、ID採番、Coverage集計、構造検査、stale判定をLLMが再計算しない
+- Skillがruntime対象modelを扱う場合は、Skill instructionに定義したdispatch表からscriptを選び、保存済みMachine Modelは決定論的に抽出・strict decodeして再投入する。MarkdownをLLMが読み直してJSONを再生成しない
+- runtime間で機械変換した結果は、上流runtime unitとgeneration fingerprintを保持して下流へ渡す。上流runtime結果が変わった場合は依存する下流runtime unitだけをstaleへ戻す
+- generator targetは、Coverage Item、明示的なmerge、または既存Skill契約上のDispositionへ閉じる。Dispositionによる成果物上の閉鎖と技法Coverage達成は別に判定する
+- 本Planで追加する全scriptは、deterministicなdispatch / integration testで実際の呼出経路を検証する。実Agentでは代表経路でPython実行、stdout envelope parse、machine結果採用まで確認する
+
+本Planは1 PR内で全対象を完了させる前提です。実装途中の契約確認は後続実装の手戻りを減らすための検証点であり、そこで対象を打ち切ったり別PRへ先送りしたりしません。
