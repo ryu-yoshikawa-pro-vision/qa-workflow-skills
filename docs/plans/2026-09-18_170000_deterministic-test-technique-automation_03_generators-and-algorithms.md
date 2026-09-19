@@ -1063,6 +1063,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - `operator=version_range`: `minimum / maximum` version文字列、inclusive boolean必須
 - `operator=boolean`: `value` boolean必須
 - `source_target_refs`は`sha256:<64 lowercase hex>`の`target_ref`だけを許可し、test dataでは1件以上、environmentでは空配列を許可する。modelを跨ぐtraceabilityへ`target_key`単独を使用しない
+- `test_data_requirements.py`の各正規化済み要求は`data_ref=data:<requirement_key>`を返し、`materialize_coverage.py`の`test_data_requirement_refs[]`はこの`data_ref`だけを参照する
 
 #### `requirement_structure.py`
 
