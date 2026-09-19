@@ -226,8 +226,8 @@ runtime入力は`metadata`とscript固有`input`を分けます。
     "skill": "test-condition-design",
     "runtime_contract_version": "runtime-v1",
     "generator_contract_version": "combinatorial-v1",
-    "runtime_unit_key": "model:pairwise-001",
-    "model_key": "pairwise-001",
+    "runtime_unit_key": "model:comb-001",
+    "model_key": "comb-001",
     "scope_key": null,
     "selection_source": "analysis",
     "upstream_entities": [
@@ -258,7 +258,7 @@ runtime入力は`metadata`とscript固有`input`を分けます。
 - `runtime_contract_version`: strict JSON、canonicalization、共通status、fingerprint等の共通処理version
 - `generator_contract_version`: script固有の入出力・Coverage契約version。schema互換でも生成結果、tie-break、Coverage、target keyへ影響する変更では必ず更新する
 - `runtime_unit_key`: すべてのruntime invocationで必須。model scriptは`model:<model_key>`、artifact全体scriptは`artifact:<generator>:<scope_key>`
-- `model_key`: 技法modelを処理するscriptだけ必須。形式は`<technique-slug>-\d{3,}`。artifact全体scriptでは`null`
+- `model_key`: modelを処理するscriptだけ必須。形式は`<model_type>-\d{3,}`。artifact全体scriptでは`null`
 - artifact全体scriptは`risk_matrix.py`、`technique_candidates.py`、`change_impact.py`、`environment_requirements.py`、`test_data_requirements.py`、`requirement_structure.py`、`condition_structure.py`、`materialize_coverage.py`、`case_structure.py`、`traceability.py`、`workflow_runtime.py`で固定する
 - `scope_key`: artifact全体scriptだけ必須。`^[A-Za-z][A-Za-z0-9._:-]{0,63}$`。model scriptでは`null`
 - artifact全体scriptの`scope_key`はscriptごとに固定する
@@ -266,7 +266,7 @@ runtime入力は`metadata`とscript固有`input`を分けます。
   - `materialize_coverage.py`: 入力`tcn_id`
   - その他のartifact全体script: literal `all`
 - 同一Skill内で同じ`artifact:<generator>:<scope_key>`を同時に複数定義しない
-- `selection_source`: model scriptだけ`analysis / user / existing_artifact / derived`のいずれかを必須。artifact全体scriptでは`null`。`derived`では親runtimeを`upstream_runtime_units[]`へ1件以上必須にする
+- `selection_source`: model scriptでは`analysis / condition_design / user / derived / null`。正規技法を表す`technique_slug!=null`のmodelだけ非nullを必須とし、`analysis`だけ`selection_key`必須、`derived`では親runtimeを`upstream_runtime_units[]`へ1件以上必須にする。`technique_slug=null`の内部model / adapterとartifact全体scriptでは`null`
 - `upstream_entities`: 実際に消費した上流Entity単位で保持する。`skill + entity_type + entity_ref`を一意keyとし、呼び出し側はPlanで固定した項目のcanonicalな`content`を渡す。`content_fingerprint`はruntimeが`content`から計算してenvelopeと成果物へ保存し、LLMからhash値だけを受け取らない
 - `upstream_runtime_units`: 他runtime結果を直接利用した場合に必須。`skill + runtime_unit_key + generation_fingerprint`を一意参照として保持する。`runtime_unit_key`単独をSkill横断identityに使わない
 - `runtime_contract_version`、`generator_contract_version`、runtime実装hash、generator実装hash、fileから導出できる`static_data_versions`はruntime側を正本とする。入力metadataに同じ値を持たせる場合はruntime実値と一致しなければ`invalid_input`
@@ -286,8 +286,8 @@ scriptが実行できた場合、stdoutは次のJSON object 1件だけです。
   "runtime_contract_version": "runtime-v1",
   "generator_contract_version": "combinatorial-v1",
   "generator": "combinatorial",
-  "runtime_unit_key": "model:pairwise-001",
-  "model_key": "pairwise-001",
+  "runtime_unit_key": "model:comb-001",
+  "model_key": "comb-001",
   "input_fingerprint": "sha256:...",
   "model_fingerprint": "sha256:...",
   "generation_fingerprint": "sha256:...",
@@ -345,7 +345,7 @@ status対応は次で固定します。
 | --- | --- | --- | --- | --- | --- |
 | `ok` | `supported` | `ready` | `true` | `true` | runtime結果を利用可能 |
 | `ok` | `supported` | `unresolved` | `true` | `true` | 質問・意味判断後に再実行 |
-| `ok` | `partial` | `ready`または`unresolved` | `true` | `true` | supported部分を利用し、unsupported itemはfallbackまたはDispositionへ閉じる |
+| `ok` | `partial` | `ready`または`unresolved` | `true` | `true` | supported部分を利用し、unsupported itemは後述のclosure契約へ閉じる |
 | `invalid_input` | `unknown` | `blocked` | `true` | `false` | 入力契約違反でsupport判定を完了できない。入力契約を修正 |
 | `unsupported` | `unsupported` | `ready` | `false` | `false` | runtime unitとしてfallback可能。QA成果物全体はfallbackが既存Skill契約へ閉じた場合だけ完了可能 |
 | `limit_exceeded` | `supported`または`partial` | `blocked` | `true` | `false` | model分割またはcontract変更が必要 |
@@ -354,7 +354,7 @@ status対応は次で固定します。
 
 `stale`は`result_status`ではありません。semantic dependency preflightに成功した現在inputを現在scriptで正常実行したruntime resultは、保存時に`freshness_status=current`とします。`workflow_runtime.py`は保存済みdependencyと現在generationを共通freshness関数で再検証し、差分があれば`stale`へ変更して下流へ伝播します。`qa-workflow`だけをfreshnessの唯一の付与主体にせず、実行直後のcurrent判定と最終集約を分離します。
 
-`fallback_reason`は`null / outside_supported_subset / python_unavailable`だけを許可します。`runtime_status=unsupported`では`outside_supported_subset`、`runtime_status=not_run`では`python_unavailable`です。`runtime_status=not_run`では`input_fingerprint / model_fingerprint / generation_fingerprint`を`null`とし、決定論的再利用の証拠に使いません。`support_status=partial`のunsupported itemはitem単位でfallbackまたはDispositionへ閉じ、その閉鎖情報を成果物へ保存します。
+`fallback_reason`は`null / outside_supported_subset / python_unavailable`だけを許可します。`runtime_status=unsupported`では`outside_supported_subset`、`runtime_status=not_run`では`python_unavailable`です。`runtime_status=not_run`では`input_fingerprint / model_fingerprint / generation_fingerprint`を`null`とし、決定論的再利用の証拠に使いません。`support_status=partial`のunsupported itemはitem単位で後述の`unsupported_item_closures[]`へ閉じ、その閉鎖情報を成果物へ保存します。
 
 技法modelでは成果物metadataの`model_status`を`result_status`と同じ値にします。artifact全体scriptでは`artifact_status`を同じ値にします。
 
@@ -603,7 +603,7 @@ fingerprint対象の`content`はLLMが自由に再構成しません。各担当
 - TR: `{tr_id, text, authority_refs[], risk_refs[], priority, test_level, observation_method}`
 - TCN: `{tcn_id, tr_refs[], condition, category, technique_slugs[], coverage_criterion, authority_refs[], risk_refs[], priority}`
 - model metadata: `{model_key, model_type, technique_slug, parent_tcn_id, selection_source, selection_key}`。`technique_slug`は正規技法だけを表し、内部modelでは`null`を許可する。`technique_slug!=null`では`selection_source`を必須とし、`selection_source=analysis`だけ`selection_key`必須、`condition_design / user / derived`では`selection_key=null`。`technique_slug=null`では`selection_source / selection_key`も`null`
-- CI: `{ci_id, tcn_id, model_key, source_kind, covered_targets[], semantic_item_key, priority, expected_result_root, authority_refs[], reference_refs[], test_data_requirement_refs[], status}`。`source_kind=runtime_target`では`covered_targets[]`を1件以上持ち`semantic_item_key=null`、`source_kind=semantic_item`では`covered_targets=[]`かつ`semantic_item_key`必須とする。`covered_targets[]`は`{target_ref, target_key, target_content_fingerprint, execution_fingerprint}`を`target_ref`順で保持し、stable target_refのままtarget内容が変わった場合もCI content fingerprintが変わる
+- CI: `{ci_id, tcn_id, model_key, source_kind, covered_targets[], semantic_item_key, semantic_source_targets[], priority, expected_result_root, authority_refs[], reference_refs[], test_data_requirement_refs[], status}`。`source_kind=runtime_target`では`covered_targets[]`を1件以上持ち`semantic_item_key=null / semantic_source_targets=[]`、`source_kind=semantic_item`では`covered_targets=[]`かつ`semantic_item_key`必須とする。fork-join等のmachine targetからsemantic itemへ閉じる場合は`semantic_source_targets[]`へ`{target_ref, target_content_fingerprint, generation_fingerprint}`を保存し、エラー推測のように元machine targetがない場合は空配列とする。`covered_targets[]`は`{target_ref, target_key, target_content_fingerprint, execution_fingerprint}`を`target_ref`順で保持し、stable target_refのままtarget内容が変わった場合もCI content fingerprintが変わる
 - TC: `{tc_id, title_or_purpose, tr_refs[], tcn_refs[], ci_refs[], priority, preconditions, test_data, steps, expected_results[], postconditions_or_cleanup}`
 - Disposition: `{upstream_id, handling, reason, authority_refs[], covered_by_ref}`
 
@@ -617,7 +617,7 @@ Machine Entityの`upstream_entity_dependencies[]`は次を最低限含めます�
 - TR: `authority_refs[]`のAuthorityと`risk_refs[]`のProduct Risk
 - TCN: `tr_refs[]`のTR、直接`authority_refs[] / risk_refs[]`を持つ場合はそのAuthority / Risk
 - model metadata: 親TCN。`selection_source=analysis`では`selection_key`が指す技法選択Entityをsemantic dependencyとして持つ。`selection_source=derived`では親runtimeをruntime dependencyへ持つ。`technique_slug=null`の内部modelは選択元Entityを要求しない
-- CI: 親TCNとmodel metadata。`source_kind=runtime_target`では`covered_targets[]`でtarget内容変更をcontent fingerprintへ反映し、`source_kind=semantic_item`ではsemantic item本文・根拠・優先度等の変更をCI content fingerprintへ反映する
+- CI: 親TCNとmodel metadata。`source_kind=runtime_target`では`covered_targets[]`でtarget内容変更をcontent fingerprintへ反映する。`source_kind=semantic_item`ではsemantic item本文・根拠・優先度に加え`semantic_source_targets[]`もcontentへ含め、元machine targetの内容・世代変更をCI staleへ伝播する
 - TC: `tr_refs[] / tcn_refs[] / ci_refs[]`の各Entityと、expected resultが直接参照するAuthority
 - Disposition: 対象upstream Entity、`authority_refs[]`、`covered_by_ref`がある場合はその参照先Entity
 
@@ -840,16 +840,16 @@ Dispositionはgeneratorの`coverage_summary`を書き換えません。技法内
 全runtime unitについてcanonicalな実行入力と実行結果を成果物へ保存します。
 
 ````markdown
-### Machine Runtime Input: test-condition-design::model:pairwise-001
+### Machine Runtime Input: test-condition-design::model:comb-001
 
 ```json
 {"metadata":{...},"input":{...}}
 ```
 
-### Machine Runtime Result: test-condition-design::model:pairwise-001
+### Machine Runtime Result: test-condition-design::model:comb-001
 
 ```json
-{"runtime_unit_key":"model:pairwise-001",...}
+{"runtime_unit_key":"model:comb-001",...}
 ```
 ````
 
@@ -940,7 +940,7 @@ validatorはfenced JSON blockを抽出してstrict JSON decodeし、canonical化
 
 同じ実行で複数Coverage targetを満たせる場合だけLLMは`merge_group`を明示できます。runtime-v1ではmerge対象を**同じ`model_key`かつ同じ`execution_fingerprint`**へ限定します。異なる技法 / modelのCoverage ItemはCIを分けたまま保持し、同じ詳細TCで実行できる場合は`test-case-design`で1つのTC draftから複数`ci_refs[]`を参照します。これによりCI統合のためだけに技法間の汎用互換adapterを追加しません。
 
-`merge_group` inputは`{"merge_group_key":"MG-001","model_key":"pairwise-001","target_refs":["sha256:...","sha256:..."],"target_versions":[{"target_ref":"sha256:...","target_content_fingerprint":"sha256:...","generation_fingerprint":"sha256:...","execution_fingerprint":"sha256:..."}],"authority_refs":["SPEC-001"]}`です。`target_versions[]`は全`target_refs[]`へ1対1対応し、現在machine target / modelと一致必須です。target refは2件以上、重複不可、同一TCN・同一`model_key`だけを許可し、全targetの`execution_fingerprint`が一致しなければ`invalid_input`とします。各targetの`target_annotations.expected_result_root`も一致必須です。各targetが参照する追加test data requirementは`_03` §16と同じintersection規則で機械統合し、矛盾またはunsupportedな組合せならmergeを拒否します。`test_data_requirement_refs[]`は`data:<requirement_key>`形式で、同一materialize入力の正規化済みtest data requirementに存在することを必須にします。
+`merge_group` inputは`{"merge_group_key":"MG-001","model_key":"comb-001","target_refs":["sha256:...","sha256:..."],"target_versions":[{"target_ref":"sha256:...","target_content_fingerprint":"sha256:...","generation_fingerprint":"sha256:...","execution_fingerprint":"sha256:..."}],"authority_refs":["SPEC-001"]}`です。`target_versions[]`は全`target_refs[]`へ1対1対応し、現在machine target / modelと一致必須です。target refは2件以上、重複不可、同一TCN・同一`model_key`だけを許可し、全targetの`execution_fingerprint`が一致しなければ`invalid_input`とします。各targetの`target_annotations.expected_result_root`も一致必須です。各targetが参照する追加test data requirementは`_03` §16と同じintersection規則で機械統合し、矛盾またはunsupportedな組合せならmergeを拒否します。`test_data_requirement_refs[]`は`data:<requirement_key>`形式で、同一materialize入力の正規化済みtest data requirementに存在することを必須にします。
 
 ## 12. runtime自己検査の処理順
 
