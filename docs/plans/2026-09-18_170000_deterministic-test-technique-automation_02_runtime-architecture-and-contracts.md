@@ -215,7 +215,7 @@ runtime入力は`metadata`とscript固有`input`を分けます。
   - その他のartifact全体script: literal `all`
 - 同一Skill内で同じ`artifact:<generator>:<scope_key>`を同時に複数定義しない
 - `selection_source`: model scriptだけ`analysis / user / existing_artifact`のいずれかを必須。artifact全体scriptでは`null`
-- `upstream_entities`: 実際に消費した上流Entity単位で保持する。`skill + entity_ref`を一意keyとし、呼び出し側はPlanで固定した字段のcanonicalな`content`を渡す。`content_fingerprint`はruntimeが`content`から計算してenvelopeと成果物へ保存し、LLMからhash値だけを受け取らない
+- `upstream_entities`: 実際に消費した上流Entity単位で保持する。`skill + entity_ref`を一意keyとし、呼び出し側はPlanで固定した項目のcanonicalな`content`を渡す。`content_fingerprint`はruntimeが`content`から計算してenvelopeと成果物へ保存し、LLMからhash値だけを受け取らない
 - `upstream_runtime_units`: 他runtime結果を直接利用した場合に必須。直接利用した`runtime_unit_key + generation_fingerprint`を保持し、上流runtime結果が変わったときに依存unitだけをstaleへ戻せるようにする
 - `runtime_contract_version`、`generator_contract_version`、runtime実装hash、generator実装hash、fileから導出できる`static_data_versions`はruntime側を正本とする。入力metadataに同じ値を持たせる場合はruntime実値と一致しなければ`invalid_input`
 - `static_data_versions`: keyは`^[a-z][a-z0-9_]*$`、valueは`sha256:<64 lowercase hex>`または明示的なcontract version文字列`^[A-Za-z0-9][A-Za-z0-9._-]*$`
@@ -420,9 +420,9 @@ generator結果に影響する静的データはversionを持ちます。
 
 ### 4.4 上流変更
 
-同じIDでも上流Entityの構造化内容は変わり得るため、自由記述versionやMarkdown全文hashではなく、実際に消費したEntityのcanonicalな構造化内容から`content_fingerprint`を計算します。これは意味同値性を推論するhashではなく、正規字段の変更検出用です。
+同じIDでも上流Entityの構造化内容は変わり得るため、自由記述versionやMarkdown全文hashではなく、実際に消費したEntityのcanonicalな構造化内容から`content_fingerprint`を計算します。これは意味同値性を推論するhashではなく、正規項目の変更検出用です。
 
-`spec-analysis`のAuthority Entityでは次の字段をcanonical化します。
+`spec-analysis`のAuthority Entityでは次の項目をcanonical化します。
 
 - 仕様根拠ID
 - 種別
@@ -432,7 +432,7 @@ generator結果に影響する静的データはversionを持ちます。
 - 関係
 - 関連仕様根拠ID
 
-以降のQA成果物は、下流が実際に利用するEntity単位でfingerprint対象字段を固定します。
+以降のQA成果物は、下流が実際に利用するEntity単位でfingerprint対象項目を固定します。
 
 - `test-analysis` Product Risk: リスクID、失敗、関連根拠、影響度、発生可能性、level、mapped priority
 - `test-analysis` 技法選択: selection key、適用領域、selection source、signals、候補、最終採用技法、状態
