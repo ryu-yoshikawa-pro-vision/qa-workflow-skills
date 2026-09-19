@@ -23,6 +23,7 @@ test_test_analysis_technique_candidates.py
 test_test_analysis_change_impact.py
 test_test_analysis_environment_requirements.py
 test_test_requirement_structure.py
+test_test_condition_structure.py
 test_test_condition_equivalence_partitions.py
 test_test_condition_bva.py
 test_test_condition_domain_testing.py
@@ -42,6 +43,7 @@ test_test_condition_metamorphic.py
 test_test_condition_materialize_coverage.py
 test_test_case_structure.py
 test_coverage_analysis_traceability.py
+test_qa_workflow_runtime.py
 test_runtime_contract.py
 test_runtime_markdown_roundtrip.py
 test_runtime_determinism.py
@@ -52,7 +54,7 @@ test_runtime_workflow_integration.py
 
 各runtime scriptには`tests/skills/runtime/fixtures/<script-name>/valid_minimal.json`を1件必須とし、これをPlan `_03`のrequired input schemaの実行例とします。fixtureは手書きし、generator出力から生成しません。unknown field拒否、required field欠落、型不一致は各scriptのunit testで確認します。
 
-CLI integration testは各代表fixtureをsubprocessで`python <script-path>`起動し、stdinへJSONを渡してstdout envelopeを読む経路を使用します。1 subprocessのtimeoutは30秒です。
+CLI integration testは各runtime scriptの`valid_minimal.json`をsubprocessで`python <script-path>`起動し、stdinへJSONを渡してstdout envelopeを読む経路を使用します。加えてSkill別dispatch表について、各scriptへ到達するprompt分類済みfixtureから期待script pathを一意に決められることを機械テストします。全scriptのdispatchはCIで検証し、実Agent smokeだけへ依存しません。1 subprocessのtimeoutは30秒です。
 
 ## 3. 共通契約の必須回帰
 
@@ -66,15 +68,16 @@ CLI integration testは各代表fixtureをsubprocessで`python <script-path>`起
 
 ### runtime envelope
 
-- `envelope_version / runtime_contract_version / generator_contract_version / generator / runtime_unit_key / model_key / input_fingerprint / model_fingerprint / generation_fingerprint / static_data_versions / runtime_status / result_status / runtime_required / deterministic_generated / fallback_reason / payload / issues`
+- `envelope_version / runtime_contract_version / generator_contract_version / generator / runtime_unit_key / model_key / input_fingerprint / model_fingerprint / generation_fingerprint / runtime_implementation_fingerprint / generator_implementation_fingerprint / support_status / static_data_versions / runtime_status / result_status / runtime_required / deterministic_generated / fallback_reason / payload / issues`
 - model scriptは`runtime_unit_key=model:<model_key>`、artifact全体scriptは`runtime_unit_key=artifact:<generator>:<scope_key>`を要求し、artifact全体scriptの`model_key`はnull
 - `ok / invalid_input / unsupported / limit_exceeded`は構造化結果を返せた扱いで終了code 0
 - `internal_error`は可能ならenvelopeを返して終了code 1、envelope生成不能も1
 - Agent側は終了codeだけで判断せずstdout envelopeをparseする
-- `runtime_required=false`の対応subset外は`not_run` fallbackとし、実行済みscriptの`unsupported`を正常fallback扱いしない
-- supported inputで`runtime_required=false`を拒否する
+- 対応subset判定は各runtime scriptが行い、model全体がsubset外なら`runtime_status=unsupported / support_status=unsupported / runtime_required=false / fallback_reason=outside_supported_subset`を返す
+- 一部だけsubset外なら`support_status=partial`としてsupported部分を生成し、`unsupported_items[]`をfallback / Dispositionへ閉じるまで完了扱いしない
+- supported inputで`runtime_required=false`を拒否し、Agent側だけでsupport判定してruntimeを省略しない
 - artifact scriptのscope keyがscript別固定値 / input由来値と一致する
-- Python unavailable / runtime未実行は成果物metadataで`runtime_status=not_run / deterministic_generated=false`とし、fingerprintをnull、`fallback_reason`を許可値で保持する
+- Python unavailable / runtime未実行は`runtime_status=not_run / support_status=unknown / runtime_required=true / result_status=blocked / deterministic_generated=false / fallback_reason=python_unavailable`とし、fingerprintをnullで保持する
 - status対応表どおりの`result_status / runtime_required / deterministic_generated`を要求
 - model scriptでは`model_status=result_status`、artifact全体scriptでは`artifact_status=result_status`
 - staleはruntime statusではなく`freshness_status`としてworkflowが付与
@@ -90,11 +93,14 @@ CLI integration testは各代表fixtureをsubprocessで`python <script-path>`起
 - 人間向け説明文だけを変えてもinput / model fingerprintが変わらない
 - script固有input、`authority_refs`、`reference_refs`、modelの`selection_source`変更で`input_fingerprint`が変わる
 - artifact全体scriptでもinput変更で`input_fingerprint / generation_fingerprint`が変わる
+- upstream Entityのcanonical `content`からruntimeが`content_fingerprint`を計算し、caller supplied hashだけを信用しない
 - upstream Entityの正規字段変更でその`content_fingerprint`だけが変わる
 - 無関係なupstream Entity変更では対象runtime unitをstaleにしない
-- envelope version、generator、runtime contract、generator contract、static data version変更で`generation_fingerprint`が変わる
-- machine outputへ影響するbug fix / tie-break変更でgenerator contract versionを更新する
-- fenced JSONの保存→抽出→strict decode→canonical化でmodel fingerprintが一致する
+- 直接依存する上流runtime unitの`generation_fingerprint`変更で下流unitだけがstaleになる
+- envelope version、generator、runtime contract、generator contract、実装fingerprint、static data version変更で`generation_fingerprint`が変わる
+- runtime / generator source変更で実装fingerprintが変わり、意味契約を変えないbug fixでも旧machine evidenceを同一生成条件として再利用しない
+- tie-break / Coverage / target key等の意味契約変更では実装fingerprintだけでなく対応contract versionも更新する
+- fenced JSONの保存→決定論的抽出→strict decode→canonical化でmodel fingerprintが一致し、同条件でruntimeへ再投入すると同じmachine resultになる
 
 ### 決定論性
 
@@ -112,6 +118,7 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - 1件または1 byte超過で`limit_exceeded`
 - Coverage基準を自動で下げない
 - 部分結果を100%としない
+- stdout 16 MiB境界付近の代表fixtureを実Agent smokeで取得・strict decode・成果物保存できることを確認する。実Agent側の安全上限が低い場合はgenerator実装前に`runtime-v1`のartifact transport上限を固定し、超過時はtruncateせず`limit_exceeded`とする
 
 ## 4. 技法・構造処理の必須回帰
 
@@ -148,9 +155,11 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 
 ### test environment requirement
 
-- 同一requirement統合
-- compatible value統合
-- incompatible value矛盾
+- 同一dimension統合
+- `eq × eq / eq × enum / eq × range / enum × enum / enum × range / range × range / version_range × version_range`の型互換intersection
+- booleanと型互換`eq`の一致
+- incompatible value / empty intersection矛盾
+- 安全にintersectionできない型・operator組合せを`unsupported`として残す
 - 実環境を勝手に推測しない
 
 ### test requirement structure
@@ -161,7 +170,16 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - 最低優先度
 - 低い指定優先度 + 空の`priority_override_reason`をviolation
 - 低い指定優先度 + 非空override reasonは値を保持し、自動補正しない
+- `reuse_id / new`の意味判断とTR番号割当てを分離し、新規だけ最大番号+1で採番する
 - draft → runtime検査 → 再検査の処理順
+
+### test condition structure
+
+- TCN / modelの`reuse / new`意味判断と番号割当てを分離する
+- 新規TCNは既存最大+1、999超過は`id_space_exhausted`
+- model keyは同slug最大+1、削除済みkeyを同系列で再利用しない
+- reuse時のslug / parent TCN / existing key一致
+- 1 model key = 1 TCN所属を検査し、同じmodel keyを複数TCNへ割り当てない
 
 ### 同値分割 / Each Choice
 
@@ -197,6 +215,8 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - `_03`で定義したpartition + border + relation別target key
 - partition expressionの`and / or / border_ref`検証
 - ON / INがpartition全体true、OFF / OUTがfalseになること
+- 対象borderのON / IN pointが他border上に乗らず、他borderについてpartition内部であること
+- OFF / OUTが対象borderを跨いだ結果としてpartition外であり、別borderだけを跨いだpointを誤採用しないこと
 - 対象border以外の条件によりrequired pointを作れない場合のblocking
 - representable / unrepresentable boundary
 - coefficient 0 / anchor不足
@@ -209,8 +229,9 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - forbidden constraint
 - unspecified
 - duplicate / conflict
-- don't-care merge candidate
-- merge後に未定義assignmentを増やさない
+- don't-care merge candidateへstable `merge_key`を付ける
+- accepted mergeは生成済み`merge_key`だけを受け付け、LLMが任意rule集合を構成できない
+- merge後のCartesian productが成立可能な既知ruleだけを含み、未定義assignmentを増やさない
 - Authority保持
 
 ### 組合せ
@@ -229,9 +250,9 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - transition identity
 - all state / all transition
 - n-switchは`N+1`個の連続valid transition全sequence
-- `switch_count=0..10`
+- `switch_count=0..10`、`N>=2`では具体的な`coverage_selection_reason`必須
 - Round-tripは開始終了stateのみ重複するsimple cycle、self-loop含む
-- cycle rotationのcanonicalizationとstable target
+- 開始stateをtarget identityに含め、同じ閉路でも開始state違いを別targetとして保持する。rotationで同一化しない
 - guard feasibility
 - reachable sourceの`guard_status=null`でCoverage completeにしない
 - `guard_status=false`除外にはAuthorityを必須
@@ -265,7 +286,7 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - Authority付きnegative sequence
 - matrixに存在しないsequence stepを拒否
 - consistency未正規化または未処置missing operationではCRUD全体をcompleteにしない
-- 個々の空cellを自動欠陥化しない
+- 個々の空cellを自動欠陥化せず、専用`excluded_cells[]`も持たない。entity全体のmissing operationだけ`operation_dispositions[]`で閉じる
 
 ### Cause-Effect
 
@@ -273,7 +294,7 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - unknown cause
 - cycle禁止
 - assignment hard limit
-- Decision Tableとの直接互換payload
+- `derived.decision_table`が`conditions / actions / known_rules / constraints / accepted_merges=[]`を持ちDecision Table inputと直接互換
 
 ### Syntax-Based Testing
 
@@ -298,10 +319,13 @@ raw machine-readable入力をfixtureにします。
 - `$defs`をlocal `$ref`参照先containerとして扱う
 - single typeと`[base, null]`だけを対応し、nullableを`allows_null`へ正規化
 - `properties / items` traversal
-- local JSON Pointer `$ref`
+- root `document + schema_pointer`を使ったlocal JSON Pointer `$ref`解決
+- OpenAPI `#/components/...`を同一root documentから解決
 - cyclic local `$ref` subtreeは`unsupported`
 - external `$ref`は事前dereference要求
 - OpenAPI 3.0 `nullable` / boolean exclusive boundary
+- OpenAPI `context=request|response`と`readOnly / writeOnly + required`の方向別意味
+- 同一propertyの`readOnly=true && writeOnly=true`を拒否
 - HTML constraint validation
 - unsupported applicator
 - `$schema / $id`をmetadataとして許可し、annotation allowlistだけをvalidation非影響として許可
@@ -310,6 +334,7 @@ raw machine-readable入力をfixtureにします。
 - HTML `pattern`を保持するがPython `re`で評価しない
 - JSON Schema `multipleOf` → `grid(base=0, step=m)`
 - HTML数値`step`は`min`ありの場合だけgrid化し、minなし / date-time系は`unsupported`
+- `derived.ep_inputs / derived.bva_inputs / derived.combinatorial_constraints / derived.test_data_requirements`が下流inputと直接互換で、LLM再生成を挟まない
 - range / enum / requiredはEP / BVA / combinatorial / test dataへ、gridはschema Coverage / BVA / combinatorialだけへ渡す
 
 ### UI pattern
@@ -325,10 +350,10 @@ raw machine-readable入力をfixtureにします。
 ### test data requirement
 
 - scalar equality / enum set / numeric・date・datetime range / version range / boolean
-- operatorごとのintersection
-- incompatible constraint
-- unsupported operator
-- model / target traceability
+- test environmentと同じcross-operator intersection
+- incompatible constraint / empty intersection
+- unsupported operatorまたは安全にintersectionできない型組合せ
+- `source_target_refs[]`でmodel横断targetを一意に追跡し、`target_key`単独をidentityに使わない
 - 実データを自動取得しない
 
 ### Random Testing
@@ -374,8 +399,11 @@ raw machine-readable入力をfixtureにします。
 
 ### traceability
 
-- Authority / Risk → TR → TCN → CI → TC
-- CIなしTCN → TC
+- Authority / Risk → TRまたはDisposition
+- TR → TCNまたはDisposition
+- TCN → CI → TC、CIなしTCN → TC、または既存Skill契約で許可されたDisposition
+- 許可直接edge以外をclosure根拠にしない
+- Dispositionのhandling / reason / Authority条件
 - missing / orphan / unknown
 - stale downstream
 - 技法Coverageを再計算しない
@@ -386,13 +414,16 @@ raw machine-readable入力をfixtureにします。
 - 新modelは同slug最大番号+1、新系列は001
 - 削除keyを同系列で再利用しない
 - qa-workflowの再利用元有無で成果物系列を一意に判定
-- TR / TCN / TCは意味上同一の既存Entityを再利用できる場合だけID維持し、runtimeがsemantic matchingしない
-- TR / TCN / TCの新規IDは最大番号+1、999到達後は`id_space_exhausted`
+- TR / TCN / TC / modelは意味上同一の既存Entityを再利用できる場合だけID維持し、runtimeがsemantic matchingしない。LLMはreuse/newだけを決め、番号はruntimeが割り当てる
+- TR / TCN / TCの新規IDは最大番号+1、999到達後は`id_space_exhausted`。model keyは同slug最大番号+1で3桁以上を許可する
+- 同じmodel keyを複数TCNへ所属させない
 - `target_ref = sha256({model_key,target_key})`を独立再計算
 - 同じTCN内に同名target keyを持つ複数modelがあってもtarget_refが衝突しない
 - 初回mappingは`model_key → target_key`順でCI01から採番
 - existing mappingは同一target_refで維持し、新target_refだけ最大番号+1
-- target_ref内容不一致、duplicate mapping、parent mismatchを拒否
+- target_ref内容不一致、1 target_ref→複数CI、parent mismatchを拒否
+- 同一CIへの複数target_refは同一merge groupだけ許可する
+- merge解除時は辞書順先頭targetへ既存CIを維持し、残りを最大番号+1で再採番して関連TCを`要再検証`へする
 - 消滅targetで下流`要再検証`
 - 同じ実行を2回行ってmachine evidenceが重複しない
 - stale rowを完了扱いしない
@@ -451,10 +482,11 @@ validatorはruntime traceabilityと独立にmissing / orphan / unknown / stale�
 
 `assets/workflow-state-template.md`へ別表`runtime状態`を追加します。
 
-`Skill | Runtime Unit Key | Model Key | Result Status | Freshness | Runtime Status | Runtime Required | Deterministic Generated | Fallback Reason | Blocker / Issue`
+`Skill | Runtime Unit Key | Model Key | Support Status | Result Status | Freshness | Runtime Status | Runtime Required | Deterministic Generated | Fallback Reason | Blocker / Issue`
 
 - `Runtime Unit Key`は同一Skill内一意
 - model scriptではModel Key必須、artifact全体scriptでは空欄
+- `Support Status = supported / partial / unsupported / unknown`
 - `Result Status = ready / unresolved / blocked`
 - `Freshness = current / stale`
 - `Runtime Status = ok / invalid_input / unsupported / limit_exceeded / internal_error / not_run`
@@ -464,6 +496,8 @@ validatorはruntime traceabilityと独立にmissing / orphan / unknown / stale�
 - ワークフロー全体`完了`では全runtime unitが`Result Status=ready / Freshness=current`であることを追加検査する
 - `Runtime Required=Yes`のunitでは、さらに`Deterministic Generated=Yes`を要求する
 - `Runtime Required=No`のfallback unitも`Result Status != ready`なら完了を妨げる
+- `Support Status=partial`では`unsupported_items[]`がfallbackまたはDispositionへすべて閉じていることを要求する
+- `workflow_runtime.py`が上流Entity fingerprint、`upstream_runtime_units`、runtime metadataからstale / 完了可否を計算し、LLMが表を手計算しない
 
 完了条件・再利用条件へ次を追加します。
 
@@ -486,6 +520,7 @@ runtime対応Skillの`evals/output/cases/*/expected.json`では、既存fieldに
       {"skill":"spec-analysis","entity_ref":"SPEC-001","content_fingerprint":"sha256:..."}
     ],
     "expected_target_keys": [],
+    "expected_support_status": "supported",
     "expected_runtime_status": "ok",
     "expected_result_status": "ready",
     "expected_runtime_required": true,
@@ -501,6 +536,8 @@ runtime対応Skillの`evals/output/cases/*/expected.json`では、既存fieldに
 - `expected_target_id_map`はstateful materialize caseだけ使用し、`{target_ref, model_key, target_key, ci_id}`配列で保持する
 - validatorは保存済みruntime inputから`input_fingerprint`、model scriptでは`model_fingerprint`、全scriptで`generation_fingerprint`を独立再計算し、fixtureに書いたhash文字列を盲信しない
 - upstream Entity差分caseでは無関係Entityの変更が対象modelをstaleにしないことを確認する
+- upstream runtime差分caseでは直接依存unitだけがstaleになり、依存していないmodelへ伝播しないことを確認する
+- implementation fingerprintはruntime / generator sourceから独立再計算し、fixtureの文字列を盲信しない
 ## 7. semantic eval
 
 維持・追加する主な確認:
@@ -529,16 +566,16 @@ semantic dataset件数は次で固定します。
 | Skill | case数 |
 | --- | ---: |
 | `test-analysis` | 7 |
-| `test-condition-design` | 7 |
+| `test-condition-design` | 14 |
 | `adversarial-review` | 8 |
 | その他11 Skill | 各2 |
-| repository合計 | 44 |
+| repository合計 | 51 |
 
-- `test-analysis`: 既存2 caseを維持し、Domain / CRUD / Random / Metamorphic / Syntax-Basedを主対象とする5 caseを追加する
-- `test-condition-design`: 既存2 caseを維持し、同5技法を主対象とする5 caseを追加する
+- `test-analysis`: 既存2 caseを維持し、Domain / CRUD / Random / Metamorphic / Syntax-Basedの採用判断を主対象とする5 caseを追加する
+- `test-condition-design`: 既存2 caseを維持し、Domain / CRUD / Random / Metamorphic / Syntax-Basedに加え、Decision Table / Cause-Effect、Classification Tree / combinatorial strength、Round-trip / n-switch、flow、schema / OpenAPI、UI pattern、test data / environment、merge / Coverage範囲の意味判断を各caseで最低1回検証できるよう合計14 caseへする。1 caseで複数責務を検証してよいが、各責務とcase IDの対応表を`EVALS.md`へ記録する
 - `adversarial-review`: 既存2 caseを維持し、下記6誤用を主対象とする6 caseを追加する
 - case IDはSkill内一意
-- `tests/skills/evals/semantic/test_semantic_datasets.py`はSkill別expected count mapと合計44を検証する
+- `tests/skills/evals/semantic/test_semantic_datasets.py`はSkill別expected count mapと合計51を検証し、`EVALS.md`の意味判断責務→case対応が空になっていないこともrepository testで確認する
 
 `adversarial-review`には技法アルゴリズムを複製せず、次の6 caseを追加します。
 
@@ -583,16 +620,19 @@ repository全体は328 queryです。
    - coverage-analysis
    - workflow完了
 
-2. 上流Authority変更
+2. 上流Authority / runtime変更
    - upstream Entity content fingerprint変更
    - 人間向け説明文だけの変更ではfingerprint不変
-   - 影響modelだけ`要再検証`
+   - 直接依存する上流runtime unitのgeneration fingerprint変更
+   - 影響modelと依存下流unitだけ`要再検証`
+   - 無関係modelへstaleを伝播しない
    - stale派生物を拒否
    - 再生成後に再利用可能
 
 3. model / generator変更
    - model意味変更で`model_fingerprint`変更
-   - generator contract / static data変更で`generation_fingerprint`変更
+   - generator contract / static data / generator implementation変更で`generation_fingerprint`変更
+   - contractを変えないbug fixでもimplementation fingerprint差で旧machine evidenceを再利用しない
    - 旧machine evidence拒否
 
 4. 局所ブロック
@@ -602,10 +642,11 @@ repository全体は328 queryです。
    - 成果物metadataから状態を再構築し、qa-workflow出力時は既存Skill状態表と新しいruntime状態表へ反映
    - workflowは部分完了
 
-5. runtime fallback / unavailable
-   - 対応subset外は`runtime_required=false / runtime_status=not_run / result_status=ready / deterministic_generated=false / fallback_reason=outside_supported_subset`でLLM fallbackし、既存Skill契約を満たせば完了可能
+5. runtime support / fallback / unavailable
+   - model全体が対応subset外ならscript自身が`support_status=unsupported / runtime_status=unsupported / runtime_required=false / deterministic_generated=false / fallback_reason=outside_supported_subset`を返し、既存Skill契約を満たすLLM fallbackで完了可能
+   - 一部subset外なら`support_status=partial`でsupported部分を生成し、unsupported itemをfallback / Dispositionへ閉じるまで完了不可
    - supported inputで`runtime_required=false`にした成果物はvalidator失敗
-   - supported inputでPython unavailableなら`runtime_required=true / runtime_status=not_run / deterministic_generated=false`を保持し、workflowを完了にしない
+   - Python unavailableなら`support_status=unknown / runtime_required=true / runtime_status=not_run / result_status=blocked / deterministic_generated=false`を保持し、workflowを完了にしない
    - QA成果物状態とruntime状態を分離
    - 「決定論的生成済み」と誤表示しない
 
@@ -615,8 +656,9 @@ repository全体は328 queryです。
    - 以後version / fingerprint契約で再利用
 
 7. runtime利用確認
-   - script適用可能fixtureでruntime result metadataが存在
-   - supported subsetが`unsupported`になった場合は失敗
+   - 全runtime scriptについてdispatch fixtureから期待script pathへ到達し、CLI実行結果metadataが存在する
+   - supported inputが`unsupported`になる、またはsupport判定前にAgentがscriptを省略する場合は失敗
+   - Markdown保存済みMachine Modelを決定論的に抽出して同じruntimeへ再投入できる
    - LLM手計算だけの成果物を決定論的生成済みと判定しない
 
 8. 途中工程開始
@@ -625,8 +667,9 @@ repository全体は328 queryです。
    - `test-analysis`の技法選択行を作るためだけに上流へ戻らない
 
 9. 実Agent runtime smoke
-   - CIだけではLLMが実際にscriptを起動したことまでは証明しない
-   - 実装完了前にAgent環境で`test-analysis`と`test-condition-design`の代表promptを各1件実行する
+   - 全scriptのdispatch網羅はCIで保証し、実Agent smokeを全script分へ重複させない
+   - 実装完了前にAgent環境で`test-analysis`と`test-condition-design`の代表promptを各1件実行し、Python runtime起動、stdout envelope parse、machine result採用、Markdown保存・再読込まで確認する
+   - 1件は可能な範囲で大きいmachine outputも扱い、artifact transport上限がruntime 16 MiBより低くないか確認する
    - command / script path、return code、stdout envelopeが確認できる実行logをPRの検証記録へ残す
    - runtime適用可能なpromptで`deterministic_generated=true`になることを確認する
 
@@ -640,6 +683,7 @@ python -m compileall -q skills/test-requirement-design/scripts
 python -m compileall -q skills/test-condition-design/scripts
 python -m compileall -q skills/test-case-design/scripts
 python -m compileall -q skills/coverage-analysis/scripts
+python -m compileall -q skills/qa-workflow/scripts
 python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 ```
 
@@ -650,24 +694,25 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 - trigger dataset: 上記Skill別exact countとpositive / negative exact countを検証
 - total trigger query: 328
 - train / validation disjointを維持
-- semantic dataset: `test-analysis=7 / test-condition-design=7 / adversarial-review=8 / その他=2`、repository合計44を検証
+- semantic dataset: `test-analysis=7 / test-condition-design=14 / adversarial-review=8 / その他=2`、repository合計51を検証
 
 `validate-skills.yml`へruntime unit testを重複追加しません。runtime testは`deterministic-output-evals.yml`だけで実行します。
 
 ## 10. Skill単体移植性
 
-次の5 Skillを単体コピーして代表scriptをCLI実行します。
+次の6 Skillを単体コピーして代表scriptをCLI実行します。
 
 - `test-analysis`
 - `test-requirement-design`
 - `test-condition-design`
 - `test-case-design`
 - `coverage-analysis`
+- `qa-workflow`
 
 確認:
 
 - repo rootのeval helperをimportしない
-- 5 Skillの`scripts/runtime_contract.py`がSHA-256一致
+- 6 Skillの`scripts/runtime_contract.py`がSHA-256一致
 - network不要
 - runtime dependencyがPython 3.11標準ライブラリだけで、外部package manifestを必要としない
 - Skill rootからscriptを解決
@@ -728,10 +773,11 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 
 ### `qa-workflow`
 
+- `scripts/workflow_runtime.py`を追加し、runtime metadata集約、upstream Entity / runtime unit fingerprint比較、stale伝播、機械的完了判定をLLMから分離
 - 既存Skill状態表を維持し、別表`runtime状態`を追加
 - model単位状態を成果物metadataから再構築
 - legacy昇格
-- upstream Entity別content fingerprint / stale伝播
+- upstream Entity別content fingerprint / upstream runtime dependency / stale伝播
 - 完了条件
 
 ### `EVALS.md` / `ASSERTIONS.md`
@@ -755,24 +801,39 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 - envelope / runtime / generator contract version
 - static data versions
 - input / model / generation fingerprint
-- upstream Entity content fingerprint
+- runtime / generator implementation fingerprint
+- upstream Entity content fingerprint / upstream runtime dependency
+- support_statusと対応subset判定
+- deterministic Markdown抽出 / 再投入
 - item / byte / depth / search node hard limit
 - tie-break
 - structured issue / blocking
-- 5 Skillの`runtime_contract.py`同一実装
+- 6 Skillの`runtime_contract.py`同一実装
+- 実Agentのartifact transport境界を代表fixtureで確認し、16 MiB未満の上限が必要ならこのStepで`runtime-v1`へ固定
 
 ### Step 2: identity / workflow基盤
 
-- technique slugとstable model key採番
+- technique slugと`condition_structure.py`によるstable model key / TCN採番
+- `requirement_structure.py` / `case_structure.py`によるTR / TC採番
 - qa-workflow再利用元による成果物系列判定
-- 既存TR / TCN / TCのID再利用規則と999上限
-- previous target_ref mappingを入力にしたtarget_ref → CI materialize
+- 既存TR / TCN / TC / modelのID再利用規則と999上限
+- 1 model key = 1 TCN所属
+- previous target_ref mappingとmerge groupを入力にしたtarget_ref → CI materialize
+- merge解除時のID維持 / 再採番 / downstream stale
 - upsert / stale / freshness status
-- upstream Entity別content fingerprint
+- upstream Entity別content fingerprint / upstream runtime dependency
 - question-analysisのModel / Target保持
-- coverage-analysisのModel Key追跡
-- qa-workflowのSkill状態表 + runtime状態表（model / artifact両runtime unit）
+- coverage-analysisのModel Key / Disposition追跡
+- `workflow_runtime.py`によるSkill状態表 + runtime状態表（model / artifact両runtime unit）の機械集約
 - legacy昇格
+
+### Step 2.5: 共通経路の成立確認
+
+後続generatorを量産する前に、既存技法1つを使って次を同一PR内で通します。
+
+`LLM正規化 → dispatch → runtime → Machine Model保存 → target annotation → CI materialize → validator → workflow_runtime → Markdown再読込 → runtime再実行`
+
+ここで見つかった共通契約不整合はStep 1 / 2へ戻して修正します。この確認を完了扱いの区切りにはせず、修正後は同じPRでStep 3以降の全対象を実装します。
 
 ### Step 3: test-analysis
 
@@ -793,8 +854,9 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 - EP / Each Choice
 - BVA 2-value / 3-value target
 - Domain Testing Reliable Domain Coverage（`< <= > >= = !=`）
-- schema / HTML parser / local `$ref`
-- test data requirement
+- schema / HTML parser / root document + local `$ref` / OpenAPI request-response context
+- schemaからEP / BVA / combinatorial / test dataへの固定derived input
+- test data / environment cross-operator intersection
 - 新規技法のSkill / reference / template / eval契約
 
 ### Step 6: rule / model技法
@@ -816,7 +878,7 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 
 - state / transition
 - setup prefix / reset
-- n-switch / Round-trip
+- n-switch / Round-trip（開始stateを保持しrotation同一化しない）
 - simple loop
 - fork / join
 
@@ -831,7 +893,8 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 
 - `materialize_coverage.py`
 - target_ref → CI mapping / upsert
-- merge group union
+- target machine data + `target_annotations[]` join
+- merge group union / merge解除時のstable ID
 - machine evidence描画
 - case structure
 - traceability
@@ -840,18 +903,18 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 ### Step 11: workflow統合
 
 - end-to-end path
-- upstream変更
-- model変更
-- local block
-- unsupported
+- upstream Entity / upstream runtime変更
+- model / implementation変更
+- local block / partial unsupported
+- whole-model unsupported fallback
 - legacy
-- runtime利用確認
+- runtime利用確認 / Markdown再読込
 
 ### Step 12: 全体検証・文書同期
 
 - runtime unit / CLI integration / deterministic / semantic / workflow
 - trigger datasetのSkill別exact count（repository合計328）・正負件数・境界scenario
-- semantic datasetのSkill別exact count（repository合計44）と新技法case
+- semantic datasetのSkill別exact count（repository合計51）と意味判断責務→case対応
 - CI
 - portability
 - 実Agent runtime smoke
@@ -873,7 +936,7 @@ helperとexpected fixtureを共有しません。
 
 ### stale成果物
 
-model / upstream Entity content fingerprint / runtime・generator contract / static data versionsを保持し、qa-workflowで`要再検証`へ戻します。
+model / upstream Entity content fingerprint / upstream runtime generation fingerprint / runtime・generator contract / implementation fingerprint / static data versionsを保持し、`workflow_runtime.py`で依存範囲だけを`要再検証`へ戻します。
 
 ### runtime非対応環境
 
@@ -890,26 +953,28 @@ Plan完了には次をすべて満たす必要があります。
 - `_01`で実装対象にした処理がruntimeまたは既存機械処理へ割り当てられている
 - 目的内の技法・構造処理が本Plan外へ先送りされていない
 - CLI / strict JSON / envelope / canonicalization / envelope・runtime・generator contract versionが実装済み
-- upstream Entity別content fingerprint、static data versions、input / model / generation fingerprintが再現可能
-- 正規化modelのMarkdown fenced JSON round-tripが成立する
-- stable model key / target_ref / 成果物系列 / 既存Entity ID再利用 / previous mappingを含むCI materializeが契約どおり
+- upstream Entityのcanonical contentからcontent fingerprintをruntime計算でき、upstream runtime dependency、static data versions、input / model / generation / implementation fingerprintが再現可能
+- 正規化modelのMarkdown fenced JSONをruntimeが決定論的に抽出し、strict decode、fingerprint一致、同条件での再実行までround-tripが成立する
+- stable model key / TR / TCN / TCのruntime採番、1 model = 1 TCN、target_ref、成果物系列、previous mapping、merge / merge解除を含むCI materializeが契約どおり
 - 再実行がupsertされ重複machine evidenceを作らない
 - stale派生成果物を完了扱いしない
 - 選択技法がmodelまたは明示的な扱いへ閉じる
 - machine-readable schema / HTMLをLLMが手変換せず対応scriptが処理する
-- script間の機械変換でLLMを再介在させない
+- script間の機械変換では固定derived schema / builderを使い、LLMは意味パラメータやtarget annotationだけを追加してmachine dataを再生成しない
 - 全技法generatorと構造scriptにunit testがある
 - item数 / byte / depthを含むhard limitとtie-breakが契約どおり
 - runtime出力と保存machine evidenceの一致をvalidatorが確認する
-- supported subsetを`unsupported`でLLM fallbackしない
+- support判定をruntimeが行い、whole-model `unsupported`、`partial`、Python unavailableを契約どおり区別する。supported inputをAgent判断だけでruntime省略しない
 - model内Coverageと仕様全体Coverageを混同しない
-- qa-workflowがmodel / artifact両方のruntime unit、upstream Entity内容変更、generation変更、stale、局所ブロック、runtime fallback、legacyを処理できる
+- `workflow_runtime.py`がmodel / artifact両runtime unit、upstream Entity内容変更、upstream runtime dependency、generation / implementation変更、stale、局所ブロック、partial / whole-model fallback、legacyを処理できる
 - question-analysis往復でmodel / targetが失われない
 - 途中工程開始と`Selection Source`が既存workflowを壊さない
-- CIではruntime metadata整合を確認し、実Agent smokeで代表promptが実際にscriptを起動したことを確認できる
-- 5 Skillの単体移植性が成立し、共通runtime helperの内容一致を検証できる
+- CIでは全runtime scriptのdispatch / metadata整合を確認し、実Agent smokeでは代表promptでPython起動、envelope parse、machine結果採用、Markdown再読込まで確認できる
+- 6 Skillの単体移植性が成立し、共通runtime helperの内容一致を検証できる
 - trigger datasetがSkill別exact count（repository合計328）を満たし、新規技法5種のselection / design境界をtrain・validation双方で検証する
-- semantic datasetがSkill別exact count（repository合計44）を満たし、test-analysis / test-condition-design / adversarial-reviewの新規技法caseがPASSする
+- semantic datasetがSkill別exact count（repository合計51）を満たし、LLMへ残す意味判断責務が少なくとも1 caseへ対応したうえでtest-analysis / test-condition-design / adversarial-reviewのcaseがPASSする
+- Round-tripが開始state違いを別targetとして扱い、Domain Testingが対象border以外のIN条件を検証し、Decision Table mergeが未定義assignmentを包含しない
+- traceabilityがDispositionを正常な閉鎖として扱い、OpenAPI `readOnly / writeOnly`をrequest / response contextに従って処理する
 - Python 3.11 compile / runtime unit / deterministic eval / semantic validation / workflow統合評価がPASS
 - `skills-ref validate`がPASS
 - README、Skill、reference、template、EVALS、ASSERTIONSが実装と一致
