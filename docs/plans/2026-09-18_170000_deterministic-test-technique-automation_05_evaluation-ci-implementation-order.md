@@ -77,8 +77,9 @@ CLI integration testは各runtime scriptの`valid_minimal.json`をsubprocessで`
 - 一部だけsubset外なら`support_status=partial`としてsupported部分を生成し、`unsupported_items[]`をfallback / Dispositionへ閉じるまで完了扱いしない
 - `runtime_required`はruntime入力に存在せず、support判定結果からscriptが出力する。Agent側だけでsupport判定してruntimeを省略しない
 - artifact scriptのscope keyがscript別固定値 / input由来値と一致する
+- `support_status=unknown`は`invalid_input / internal_error / not_run`だけで許可し、いずれも`runtime_required=true / result_status=blocked / deterministic_generated=false`を要求する
 - Python unavailable / runtime未実行は`runtime_status=not_run / support_status=unknown / runtime_required=true / result_status=blocked / deterministic_generated=false / fallback_reason=python_unavailable`とし、fingerprintをnullで保持する
-- status対応表どおりの`result_status / runtime_required / deterministic_generated`を要求
+- status対応表どおりの`support_status / result_status / runtime_required / deterministic_generated`を要求
 - model scriptでは`model_status=result_status`、artifact全体scriptでは`artifact_status=result_status`
 - staleはruntime statusではなく`freshness_status`としてworkflowが付与
 - stderrへ入力全文・secretを出さない
@@ -201,6 +202,7 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - 3-valueの`BELOW / AT / ABOVE`
 - integer / Decimal / date / local datetime / fixed-offset datetime
 - domain別step objectの型・正値検証
+- 3-valueでは境界リスク、過去不具合、ユーザー明示等の具体的な`coverage_selection_reason`を必須にする
 - fixed-offset datetime算術でoffsetを保持
 - step不明時に隣接値を創作しない
 - 同一具体値でもCoverage positionを区別
@@ -236,6 +238,8 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - accepted mergeは生成済み`merge_key`だけを受け付け、LLMが任意rule集合を構成できない
 - merge後のCartesian productが成立可能な既知ruleだけを含み、未定義assignmentを増やさない
 - Authority保持
+- accepted don't-care merge前後で元の成立可能assignment target集合と`coverage_summary.required / covered`が変わらない
+- accepted don't-care mergeを`materialize_coverage.py`の`merge_group`へ自動変換しない
 
 ### 組合せ
 
@@ -244,6 +248,7 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - Pairwise / N-wise
 - mixed-strength
 - `SAT / UNSAT / limit_exceeded`
+- `t-wise strength>2`またはmixed-strengthのいずれかのstrength>2では具体的な`coverage_selection_reason`を必須にする
 - target union
 - tie-break
 - full Cartesian productの事前materializeを前提にしない
@@ -389,6 +394,18 @@ raw machine-readable入力をfixtureにします。
 - 各MRを1回扱っただけで十分と判定しない
 - relation自体をscriptが創作しない
 
+### Coverage target materialize / Disposition
+
+- generator targetは、CIへmaterializeするtargetと`target_dispositions[]`へ閉じるtargetのどちらか一方へ必ず分類する
+- 同一target_refへ`target_annotations[]`と`target_dispositions[]`を同時指定しない
+- CI化するtargetだけ`target_annotations[]`を1対1で要求し、unknown / duplicate target_refを拒否する
+- `target_dispositions[].handling`は`対象外 / 別テストレベル / 残存リスク / ブロック中 / 重複`だけを許可する
+- `重複`では同一TCN内でcurrentかつCIへmaterializeされる`covered_by_target_ref`を必須にする
+- generator生成後に`成立不能`Dispositionへ変更しない。成立不能根拠が得られた場合はmodel / constraintを更新してgeneratorを再実行する
+- Disposition済みtargetへCIを採番せず、同時にgeneratorの`coverage_summary.required / covered / complete`を変更しない
+- `ブロック中`Dispositionはworkflow完了を妨げる
+- merge groupはDispositionされていない同一TCN内targetだけを含み、同じ`expected_result_root`を要求する
+
 ### test case structure
 
 - `draft_key`を使ってLLM draftと最終TC ID mappingを安定追跡する
@@ -427,6 +444,7 @@ raw machine-readable入力をfixtureにします。
 - 同じTCN内に同名target keyを持つ複数modelがあってもtarget_refが衝突しない
 - 初回mappingは`model_key → target_key`順でCI01から採番
 - existing mappingは同一target_refで維持し、新target_refだけ最大番号+1
+- Disposition targetはCI mapping対象から除外し、generator Coverage値は変更しない
 - target_ref内容不一致、1 target_ref→複数CI、parent mismatchを拒否
 - `target_annotations[]`が全targetへ1対1対応し、unknown / duplicate target_refを拒否する
 - `expected_result_root`は同一TCN内のopaque local keyで、同じ期待挙動と意味判断したtargetだけ同値になる
@@ -978,7 +996,7 @@ Plan完了には次をすべて満たす必要があります。
 - `workflow_runtime.py`がmodel / artifact両runtime unit、upstream Entity内容変更、upstream runtime dependency、generation / implementation変更、stale、局所ブロック、partial / whole-model fallback、legacyを処理できる
 - question-analysis往復でmodel / targetが失われない
 - 途中工程開始と`Selection Source`が既存workflowを壊さない
-- CIでは全runtime scriptのdispatch / metadata整合を確認し、実Agent smokeでは代表promptでPython起動、envelope parse、machine結果採用、Markdown再読込まで確認できる
+- CIでは全runtime scriptのdispatch / metadata整合、Coverage targetのCI / Disposition閉鎖、Decision Table don't-care merge非破壊性を確認し、実Agent smokeでは代表promptでPython起動、envelope parse、machine結果採用、Markdown再読込まで確認できる
 - 6 Skillの単体移植性が成立し、共通runtime helperの内容一致を検証できる
 - trigger datasetがSkill別exact count（repository合計328）を満たし、新規技法5種のselection / design境界をtrain・validation双方で検証する
 - semantic datasetがSkill別exact count（repository合計51）を満たし、LLMへ残す意味判断責務が少なくとも1 caseへ対応したうえでtest-analysis / test-condition-design / adversarial-reviewのcaseがPASSする
