@@ -141,29 +141,33 @@ runtime対象Skillは、Skill instructionへscript選択表を持ち、次の順
 
 dispatchは次で固定します。
 
-| Skill | 条件 | script | 実行 |
-| --- | --- | --- | --- |
-| `test-analysis` | Product Riskがある | `risk_matrix.py` | 条件付き |
-| `test-analysis` | 技法選択を行う | `technique_candidates.py` | 必須 |
-| `test-analysis` | 変更影響graphがある | `change_impact.py` | 条件付き |
-| `test-analysis` | 環境要求がある | `environment_requirements.py` | 条件付き |
-| `test-requirement-design` | 成果物確定前 | `requirement_structure.py` | 必須 |
-| `test-condition-design` | TCN / model draft作成後 | `condition_structure.py` | 必須 |
-| `test-condition-design` | modelのtechnique slugが対応する | 各技法generator | modelごとに必須 |
-| `test-condition-design` | test data要求が1件以上ある | `test_data_requirements.py` | 条件付き |
-| `test-condition-design` | generator targetの閉鎖前 | `materialize_coverage.py` | TCNごとに必須 |
-| `test-case-design` | 成果物確定前 | `case_structure.py` | 必須 |
-| `coverage-analysis` | テスト設計traceabilityを検査する | `traceability.py` | 必須 |
-| `qa-workflow` | runtime状態を集約する | `workflow_runtime.py` | 必須 |
+| Skill | 対象 / 実行範囲 | 条件 | script | 実行 |
+| --- | --- | --- | --- | --- |
+| `test-analysis` | `テスト分析` | Product Riskがある | `risk_matrix.py` | 条件付き |
+| `test-analysis` | `テスト分析` | 技法選択を行う | `technique_candidates.py` | 必須 |
+| `test-analysis` | `テスト分析` | 変更影響graphがある | `change_impact.py` | 条件付き |
+| `test-analysis` | `テスト分析` | 環境要求がある | `environment_requirements.py` | 条件付き |
+| `test-requirement-design` | 単一用途 | 成果物確定前 | `requirement_structure.py` | 必須 |
+| `test-condition-design` | 単一用途 | TCN / model draft作成後 | `condition_structure.py` | 必須 |
+| `test-condition-design` | 単一用途 | modelのtechnique slugが対応する | 各技法generator | modelごとに必須 |
+| `test-condition-design` | 単一用途 | test data要求が1件以上ある | `test_data_requirements.py` | 条件付き |
+| `test-condition-design` | 単一用途 | generator targetの閉鎖前 | `materialize_coverage.py` | TCNごとに必須 |
+| `test-case-design` | 単一用途 | 成果物確定前 | `case_structure.py` | 必須 |
+| `coverage-analysis` | `テスト設計` | テスト設計traceabilityを検査する | `traceability.py` | 必須 |
+| `qa-workflow` | 単一用途 | runtime状態を集約する | `workflow_runtime.py` | 必須 |
+
+複数用途Skillでは上表の正規`対象 / 実行範囲`にだけ本Planのruntimeをdispatchします。`test-analysis: E2E対象選定`や`coverage-analysis: TC → E2E実装 / E2E実装 → 実行結果`では本Planのruntime unitを作りません。これにより既存`qa-workflow`の複数用途状態を維持したまま、`(skill, runtime_unit_key)`を本Plan対象runtime内で一意にします。
 
 `test-condition-design`のmodel slug → generatorは`_02` §4.3と`_03`のscript一覧を1対1対応の正本とします。artifact全体scriptを「常に全部実行する」とは扱わず、上表の条件を満たす場合だけ実行します。
 
 freshnessは次の順序で扱います。
 
-- 同じSkill実行内で現在のcanonical inputから正常に生成したruntime resultは、その実行内の直後の下流処理では`current`として扱う。`workflow_runtime.py`の最終集約前に同じ結果をstale判定するための循環を作らない
-- 保存済みruntime resultを再利用する場合は、下流scriptへ渡す前に`qa-workflow`が`workflow_runtime.py`で現在のupstream Entity / runtime dependencyと比較し、`current`を確認する。`stale`なら再生成してから下流へ渡す
-- `materialize_coverage.py`と`traceability.py`はfreshnessを計算せず、今回生成したresultまたは再利用前検証済みの`current` resultだけを受け取る
-- ワークフロー完了前に`workflow_runtime.py`を再実行し、全runtime unitのfreshnessと完了可否を最終確認する
+- 既存成果物を再利用する場合も、dispatch対象のruntime unitは保存済みresultを現在世代のcacheとして採用せず、現在のcanonical machine Entityと正規化済み入力からscriptを再実行する。保存済みMachine Runtime Input / Resultはprevious state、stable ID、round-trip検証の証拠として使用する
+- whole-model `unsupported`やpartial fallbackも再利用時に現在runtimeでsupport判定を再実行する。以前unsupportedだったことだけを理由にscriptを省略しない
+- 同じSkill実行内で現在のcanonical inputから正常に生成したruntime resultは、その実行内の直後の下流処理では`current`として扱う
+- `materialize_coverage.py`は今回再実行して得た`current` model resultだけを受け取る
+- `traceability.py`と`workflow_runtime.py`は同じ`runtime_contract.py`のfreshness評価関数を使い、保存済みruntime dependencyと現在runtime generationを比較する。AgentやLLMがfreshnessを手計算しない
+- ワークフロー完了前に`workflow_runtime.py`を実行し、全runtime unitとMachine Entityのfreshness、完了可否を最終確認する
 
 ### 2.2 派生modelの生成
 
