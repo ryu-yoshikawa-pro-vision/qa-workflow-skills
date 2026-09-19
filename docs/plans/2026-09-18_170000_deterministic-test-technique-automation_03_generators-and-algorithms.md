@@ -288,7 +288,7 @@ condition / action / ruleは任意数を許可します。known ruleのaction ve
 
 候補をdeterministicに列挙し、各候補へ`merge_key = dm:sha256:<canonical sorted rule_keys hash>`を付与します。`rule_keys`はUnicode code point順でsortした配列をcanonical JSON化してSHA-256します。LLMは意味上統合してよい候補の`merge_key`だけを`accepted_merges[]`へ返し、任意の`rule_keys[]`を新規構成しません。scriptはaccepted `merge_key`が同一実行で生成した候補に存在すること、候補内ruleが同一action vectorであること、統合後のCartesian productが成立可能な既知ruleだけを含み未定義assignmentを追加しないことを再検証してdon't-care ruleを生成します。Boolean minimizationで最小rule数を目的にしません。
 
-`accepted_merges[]`はDecision Tableの派生表示・レビュー用のdon't-care ruleを作るためだけに使用します。元の成立可能assignment targetは削除せず、`coverage_summary.required / covered`も変更しません。Decision Tableのaccepted mergeを`materialize_coverage.py`の`merge_group`へ自動変換しません。複数assignmentを1つのCI / TCへまとめる場合は、各targetのtest data requirementを同時に満たせることを含め、別途§24と`_02` §11のmerge契約を満たす必要があります。
+`accepted_merges[]`はDecision Tableの派生表示・レビュー用のdon't-care ruleを作るためだけに使用します。元の成立可能assignment targetは削除せず、`coverage_summary.required / covered`も変更しません。異なるassignmentは`execution_fingerprint`が異なるため、accepted don't-care mergeを`materialize_coverage.py`の`merge_group`へ変換せず、元assignmentごとに別CIを維持します。TCへ複数CIを対応付ける必要がある場合は、don't-care表示を根拠に自動統合せず、`test-case-design`が具体的な前提・データ・手順・期待結果を意味判断したうえで既存の`ci_refs[]`契約を使用します。
 
 ## 7. 組合せ
 
@@ -961,19 +961,19 @@ LLM draft後に次を計算します。
 
 技法別Coverage数値は各技法scriptを正本とし、traceabilityで再計算しません。
 
-## 24. 複数技法の統合
+## 24. 複数Coverage targetの扱い
 
-同じ具体的テストへ複数Coverage targetをまとめる意味判断はLLMに残します。
+CI単位の`merge_group`と、TCが複数CIを参照する意味判断を分離します。
 
-LLMは`merge_group`だけを明示します。scriptは同じgroupについて次を機械統合します。
+`materialize_coverage.py`の`merge_group`は、同一TCN・同一`model_key`・同一`execution_fingerprint`・同一`expected_result_root`のtargetだけを対象にします。LLMはその範囲で`merge_group`を明示し、scriptは次を機械統合します。
 
 - Covered Target Refs
 - Authority refs
 - Reference refs
 - 優先度は既存規則の最高値
-- test data requirements
+- 追加test data requirements
 
-異なるexpected resultを持つ候補を同一groupへ統合しません。
+異なるmodel / 技法、異なるexecution、異なるexpected resultを同一CIへ統合しません。異なるCIを1つの詳細TCで検証できるかは`test-case-design`の意味判断に残し、成立する場合だけ1つのTC draftの`ci_refs[]`へ複数CIを明示します。runtimeはこのTC判断を`merge_group`へ逆変換しません。
 
 ## 25. script別入出力契約
 
