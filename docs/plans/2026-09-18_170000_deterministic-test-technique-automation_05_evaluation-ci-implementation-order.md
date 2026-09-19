@@ -445,20 +445,20 @@ raw machine-readable入力をfixtureにします。
 
 - materialize入力modelは`runtime_status=ok / result_status=ready / deterministic_generated=true / freshness=current`を必須にし、supportedまたは分離済みpartialだけ許可する
 - unresolved / blocked / stale modelからCIを作らない
-- generator targetは`materializable=true|false`を必須にし、`true`だけCI materialize / target Dispositionの対象とする。adapter / diagnostic用`false` targetはmachine evidenceとして保持し、annotation / Disposition / CIを要求しない
+- generator targetは`materializable=true|false`を必須にし、`true`だけmachine targetとしてCI materialize / target Dispositionの対象とする。adapter / diagnostic専用`false` targetはmachine evidenceとして保持してCIを要求しない。一方、fork-join branch等の正規Coverage基準上必要な`false` targetは、現在target versionを参照するsemantic Coverage Itemまたは既存Skillで許可されたDispositionへ閉じるまで完了させない
 - 同一target_refへ`target_annotations[]`と`target_dispositions[]`を同時指定しない
 - CI化するtargetだけ`target_annotations[]`を1対1で要求し、unknown / duplicate target_refを拒否する
 - CI化targetはgenerator別にPlanで固定したcanonical `execution`とruntime計算済み`execution_fingerprint`を必須とする
 - combinatorialはfull rowへ`row_ref=sha256(canonical assignment)`を付与し、各SAT targetをそのtargetをcoverする生成済みrowのうち生成順で最初のrowへ対応付ける。同じrowを使うtargetは同じ`execution_fingerprint`になる
 - `classification_tree.py / cause_effect.py / schema_cases.py / ui_pattern_candidates.py`は直接CI化せず、Planで定義したderived model / 意味判断先だけをmaterialize対象にする
-- stateのinvalid transitionは`attempted_transition`をcanonical executionへ保持し、valid transition列へ混ぜない。flowのnode / edgeはinitialから対象までの最短witness、bounded-pathはinitial→terminal pathを使用する。fork-join branchは単一`edge_sequence`へ順序化せずsemantic Coverage Itemへ閉じるまで完了させない
+- stateのinvalid transitionは`attempted_transition`をcanonical executionへ保持し、valid transition列へ混ぜない。flowのnode / edgeはinitialから対象までの最短witness、bounded-pathはinitial→terminal pathを使用する。fork-join branchは単一`edge_sequence`へ順序化せず、semantic Coverage Itemの`source_target_versions[]`が現在branch targetと一致するまで完了させない
 - annotation / Dispositionの`target_content_fingerprint / generation_fingerprint`が現在target / modelと一致しない場合は拒否する
 - `target_dispositions[].handling`は`対象外 / 別テストレベル / 残存リスク / ブロック中 / 重複`だけを許可する
 - `重複`では同一TCN内でcurrentかつCIへmaterializeされる`covered_by_target_ref`を必須にする
 - generator生成後に`成立不能`Dispositionへ変更しない。成立不能根拠が得られた場合はmodel / constraintを更新してgeneratorを再実行する
 - Disposition済みtargetへCIを採番せず、同時にgeneratorの`coverage_summary.required / covered / complete`を変更しない
 - `ブロック中`Dispositionはworkflow完了を妨げる
-- materialize outputから生成したCI Machine Entityは、同一CIの`covered_targets[]`とpriority / expected_result_root / Authority / Reference / test data requirementを現在target / annotationから固定joinする
+- materialize outputから生成したCI Machine Entityは、machine target由来では同一CIの`covered_targets[]`とpriority / expected_result_root / Authority / Reference / test data requirementを現在target / annotationから固定joinする。semantic item由来では`source_kind=semantic_item / semantic_item_key=semantic:<ci_id>`と現在`source_target_versions[]`を保存し、item本文・根拠を固定joinする
 - stable target_refのままtarget content / executionが変わった場合、CI Machine Entityのcontent fingerprintが変わり、参照TCへstaleが伝播する
 - `test_data_requirement_refs[]`は同じmaterialize inputの`data:<requirement_key>`へ解決できることを必須にする
 - merge groupはDispositionされていない同一TCN・同一`model_key`のtargetだけを含み、全targetの`execution_fingerprint`と`expected_result_root`の一致を要求する
@@ -502,11 +502,11 @@ raw machine-readable入力をfixtureにします。
 ## 5. stable identity・再実行の回帰
 
 - 同じmodel改訂で`model_key`維持
-- 新modelは同slug最大番号+1、新系列は001
+- 新modelは同じ`model_type`の最大番号+1、新系列は001
 - 削除keyを同系列で再利用しない
 - qa-workflowの再利用元有無で成果物系列を一意に判定
 - TR / TCN / TC / modelは意味上同一の既存Entityを再利用できる場合だけID維持し、runtimeがsemantic matchingしない。LLMはreuse/newだけを決め、番号はruntimeが割り当てる
-- TR / TCN / TCの新規IDは最大番号+1、999到達後は`id_space_exhausted`。model keyは同slug最大番号+1で3桁以上を許可する
+- TR / TCN / TCの新規IDは最大番号+1、999到達後は`id_space_exhausted`。model keyは同じ`model_type`の最大番号+1で3桁以上を許可する
 - 同じmodel keyを複数TCNへ所属させない
 - `target_ref = sha256({model_key,target_key})`を独立再計算
 - 同じTCN内に同名target keyを持つ複数modelがあってもtarget_refが衝突しない
@@ -597,7 +597,7 @@ validatorはruntime traceabilityと独立にmissing / orphan / unknown / stale�
 - ワークフロー全体`完了`では全runtime unitが`Result Status=ready / Freshness=current`であることを追加検査する
 - `Runtime Required=Yes`のunitでは、さらに`Deterministic Generated=Yes`を要求する
 - `Runtime Required=No`のfallback unitも`Result Status != ready`なら完了を妨げる
-- `Support Status=partial`では`unsupported_items[]`がfallbackまたはDispositionへすべて閉じていることを要求する
+- `Support Status=partial`では`unsupported_items[]`が許可されたhandling、必要なcurrent`covered_by_ref`、既存Disposition条件を満たすclosureへすべて閉じていることを要求する。closure行の存在だけでは完了条件を満たさない
 - `workflow_runtime.py`が上流Entity fingerprint、`upstream_runtime_units`、runtime metadata、`unsupported_item_closures[]`からstale / 完了可否を計算し、LLMが表を手計算しない
 - partial supportは全unsupported item keyにclosureがあり、closureの`generation_fingerprint / reason_code`が現在unsupported itemと一致することに加え、`handling`が許可集合内であることを要求する。`llm_fallback / 重複`はcurrentな`covered_by_ref`必須、`ブロック中`は完了不可、その他Dispositionは既存Skill条件を満たすことを検証する。whole-model unsupportedも同じclosure規則と`generation_fingerprint`一致を必須にする
 
@@ -625,7 +625,7 @@ runtime対応Skillの`evals/output/cases/*/expected.json`では、既存fieldに
   },
   "runtime_contract": {
     "expected_skill": "test-condition-design",
-    "expected_runtime_unit_key": "model:pairwise-001",
+    "expected_runtime_unit_key": "model:comb-001",
     "upstream_entities": [
       {"skill":"spec-analysis","entity_type":"authority","entity_ref":"SPEC-001","content_fingerprint":"sha256:..."}
     ],
@@ -1046,7 +1046,7 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 - Step 2で実装済みの`materialize_coverage.py`を全generator出力へ接続し、model status / freshness gateを回帰確認する
 - 全generatorについて`materializable`の固定値とcanonical `execution / execution_fingerprint` schemaを確認する。combinatorialはpartial target → deterministic full row mapping、state / flowはwitness sequence / path、adapter専用generatorは非materializeを回帰確認する
 - mergeは同一model・同一executionに限定し、追加test data requirement参照のintersectionを確認する。異なるmodelの同一TC実行はcase structureの複数`ci_refs[]`で検証する
-- target content / generation fingerprintと`target_annotations / target_dispositions / merge_group`の一致検証を全generatorで確認する。semantic Coverage Itemはmachine target用fingerprintを捏造せず、semantic item内容のCI content fingerprintとstable CI ID再利用を確認する
+- target content / generation fingerprintと`target_annotations / target_dispositions / merge_group`の一致検証を全generatorで確認する。semantic Coverage Itemはmachine target用fingerprintを捏造せず、`source_target_versions[]`の現在target一致、semantic item内容のCI content fingerprint、stable CI ID再利用を確認する
 - target_ref → CI mapping / upsert、merge / unmerge / CI↔Dispositionの状態遷移を全generatorで回帰確認する
 - CI Machine Entityの`covered_targets[]`へtarget content / execution fingerprintを保存し、stable target_refのままtarget内容が変わるcaseでもCI content fingerprintが変わることを確認する
 - CI content変更後、既存TC Machine Entityがsemantic再確認前はstaleになることを確認する
