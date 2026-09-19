@@ -462,36 +462,58 @@ generator結果に影響する静的データはversionを持ちます。
 
 同じscriptでも静的データversionが異なる場合は同じ再現条件とは扱いません。
 
-### 4.3 model_keyの安定性
+### 4.3 正規技法slugとmodel_keyの安定性
 
-技法slugは次で固定します。
+`technique_slug`はユーザー向け・Skill契約上の正規テスト技法だけを表します。正規技法名とslugは次で固定します。
 
-| 技法 / model | slug |
+| 正規テスト技法 | technique slug |
 | --- | --- |
 | 同値分割 | `ep` |
 | 境界値分析 | `bva` |
 | Domain Testing | `domain` |
-| Decision Table | `decision` |
+| デシジョンテーブル | `decision` |
 | Pairwise / 組合せ | `comb` |
-| Classification Tree | `classification` |
 | 状態遷移 | `state` |
-| シナリオ / Use Case | `flow` |
+| エラー推測 | `error-guessing` |
+| シナリオ / ユースケース | `scenario` |
 | CRUD Testing | `crud` |
-| Cause-Effect Graph | `cause-effect` |
 | Syntax-Based Testing | `syntax` |
-| schema / HTML constraint | `schema` |
-| UI pattern | `ui` |
 | Random Testing | `random` |
 | Metamorphic Testing | `metamorphic` |
 
-`model_key`は`<slug>-\d{3,}`です。`test-analysis`の人間向け「最終採用技法」は上表の技法名を表示し、Technique Selection Machine Entityの`selected_techniques[]`は対応するslug列を保存します。名前→slug変換はこの表だけを正本に固定builderで行い、LLMが別表記からslugを推測しません。
+`test-analysis`の人間向け「最終採用技法」は上表の技法名を表示し、Technique Selection Machine Entityの`selected_techniques[]`は対応するslugを保存します。名前→slug変換はこの表だけを正本に固定builderで行い、LLMが別表記からslugを推測しません。
+
+runtime内部model / adapterのidentityは`model_type`で分けます。
+
+| model / adapter | model_type |
+| --- | --- |
+| Equivalence Partitioning model | `ep` |
+| BVA model | `bva` |
+| Domain model | `domain` |
+| Decision Table model | `decision` |
+| combinatorial model | `comb` |
+| Classification Tree adapter | `classification` |
+| state model | `state` |
+| flow model | `flow` |
+| CRUD model | `crud` |
+| Cause-Effect adapter | `cause-effect` |
+| Syntax model | `syntax` |
+| schema / HTML adapter | `schema` |
+| UI pattern adapter | `ui` |
+| Random model | `random` |
+| Metamorphic model | `metamorphic` |
+| エラー推測 semantic model | `error-guessing` |
+
+`model_key`は`<model_type>-\d{3,}`です。`model_type`と`technique_slug`は同一概念として扱いません。正規技法を直接表すmodelは`technique_slug`を持ち、内部変換だけのmodelは`technique_slug=null`を許可します。Classification TreeをPairwise / 組合せへ使う場合はClassification Tree modelを`model_type=classification / technique_slug=comb`とし、そこから機械派生するcombinatorial子modelは`model_type=comb / technique_slug=null`とします。Cause-Effect Graphからデシジョンテーブルへ変換する場合も親を`model_type=cause-effect / technique_slug=decision`、派生Decision Table modelを`model_type=decision / technique_slug=null`とします。schema / HTML、UI pattern等のadapterは、それ自体を正規技法として選択していないため`technique_slug=null`です。schema等から派生したEP / BVA / 組合せmodelを正規技法として採用する場合は、派生子modelへ該当`technique_slug`を持たせ、`selection_source=derived`とします。
+
+エラー推測は既存`test-condition-design`の正規技法として維持し、`model_type=error-guessing / technique_slug=error-guessing`のsemantic modelを持てます。ただし専用runtime generatorは追加しません。LLMが既存Skill契約に従って作るCoverage Itemは§11のsemantic Coverage Item経路でCI Machine Entityへ載せます。
 
 - qa-workflowが再利用元として選んだ直前の`test-condition-design`成果物を同じ成果物系列とする。再利用元がない場合は新しい系列
-- 同じ技法・同じ検証責務のmodelを改訂する場合は既存`model_key`を維持する
-- 意味上別modelと判断した場合だけ、同じslugの既存最大番号+1で新しいkeyを発行する
-- 新しい系列では各slugを001から開始する
+- 同じmodel type・同じ検証責務のmodelを改訂する場合は既存`model_key`を維持する
+- 意味上別modelと判断した場合だけ、同じ`model_type`の既存最大番号+1で新しいkeyを発行する
+- 新しい系列では各`model_type`を001から開始する
 - 削除済みkeyは同じ系列で再利用しない
-- 同じ`(技法, model_key)`に異なる同時定義を置かない
+- 同じ`model_key`に異なる同時定義を置かない
 
 意味上同じmodelかどうかの判断はLLMに残し、番号割当てだけを機械規則として固定します。
 
@@ -580,8 +602,8 @@ fingerprint対象の`content`はLLMが自由に再構成しません。各担当
 - 環境 / test data要求: `{requirement_key, dimension_key, operator, normalized_value, authority_refs[], source_target_refs[]}`
 - TR: `{tr_id, text, authority_refs[], risk_refs[], priority, test_level, observation_method}`
 - TCN: `{tcn_id, tr_refs[], condition, category, technique_slugs[], coverage_criterion, authority_refs[], risk_refs[], priority}`
-- model metadata: `{model_key, technique_slug, parent_tcn_id, selection_source, selection_key}`。`selection_source=analysis`だけ`selection_key`を必須とし、`user / existing_artifact / derived`では`null`
-- CI: `{ci_id, tcn_id, model_key, covered_targets[], priority, expected_result_root, authority_refs[], reference_refs[], test_data_requirement_refs[], status}`。`covered_targets[]`は`{target_ref, target_key, target_content_fingerprint, execution_fingerprint}`を`target_ref`順で保持し、stable target_refのままtarget内容が変わった場合もCI content fingerprintが変わる
+- model metadata: `{model_key, model_type, technique_slug, parent_tcn_id, selection_source, selection_key}`。`technique_slug`は正規技法だけを表し、内部modelでは`null`を許可する。`technique_slug!=null`では`selection_source`を必須とし、`selection_source=analysis`だけ`selection_key`必須、`condition_design / user / derived`では`selection_key=null`。`technique_slug=null`では`selection_source / selection_key`も`null`
+- CI: `{ci_id, tcn_id, model_key, source_kind, covered_targets[], semantic_item_key, priority, expected_result_root, authority_refs[], reference_refs[], test_data_requirement_refs[], status}`。`source_kind=runtime_target`では`covered_targets[]`を1件以上持ち`semantic_item_key=null`、`source_kind=semantic_item`では`covered_targets=[]`かつ`semantic_item_key`必須とする。`covered_targets[]`は`{target_ref, target_key, target_content_fingerprint, execution_fingerprint}`を`target_ref`順で保持し、stable target_refのままtarget内容が変わった場合もCI content fingerprintが変わる
 - TC: `{tc_id, title_or_purpose, tr_refs[], tcn_refs[], ci_refs[], priority, preconditions, test_data, steps, expected_results[], postconditions_or_cleanup}`
 - Disposition: `{upstream_id, handling, reason, authority_refs[], covered_by_ref}`
 
@@ -594,8 +616,8 @@ Machine Entityの`upstream_entity_dependencies[]`は次を最低限含めます�
 - 技法選択: selection判断で実際に参照したAuthority / Risk / TR等
 - TR: `authority_refs[]`のAuthorityと`risk_refs[]`のProduct Risk
 - TCN: `tr_refs[]`のTR、直接`authority_refs[] / risk_refs[]`を持つ場合はそのAuthority / Risk
-- model metadata: 親TCN。`selection_source=analysis`では`selection_key`が指す技法選択Entity、`derived`では親runtimeをruntime dependencyへ持つ
-- CI: 親TCNとmodel metadata。CI contentの`covered_targets[]`でtarget内容変更もcontent fingerprintへ反映する
+- model metadata: 親TCN。`selection_source=analysis`では`selection_key`が指す技法選択Entityをsemantic dependencyとして持つ。`selection_source=derived`では親runtimeをruntime dependencyへ持つ。`technique_slug=null`の内部modelは選択元Entityを要求しない
+- CI: 親TCNとmodel metadata。`source_kind=runtime_target`では`covered_targets[]`でtarget内容変更をcontent fingerprintへ反映し、`source_kind=semantic_item`ではsemantic item本文・根拠・優先度等の変更をCI content fingerprintへ反映する
 - TC: `tr_refs[] / tcn_refs[] / ci_refs[]`の各Entityと、expected resultが直接参照するAuthority
 - Disposition: 対象upstream Entity、`authority_refs[]`、`covered_by_ref`がある場合はその参照先Entity
 
@@ -860,13 +882,23 @@ validatorはfenced JSON blockを抽出してstrict JSON decodeし、canonical化
 
 `選択キー | 適用領域 | Selection Source | Signals JSON | Candidates JSON | Undetermined Signals JSON | 最終採用技法 | 状態`
 
-`Selection Source`は`analysis / user / existing_artifact / derived`のいずれかです。技法modelのmetadataにも`selection_source`を必須で保存します。`analysis`では元の技法選択行の`selection_key`も必須で保存し、その行の`selected_techniques[]`にmodelの`technique_slug`が含まれることを`condition_structure.py`で検証します。`user / existing_artifact / derived`では`selection_key=null`とします。`test-analysis`を通った場合はその選択行からsourceとkeyをコピーし、途中工程開始でユーザーが技法を明示した場合は`user`、再利用した既存modelは`existing_artifact`、親runtimeのmachine outputから派生したmodelは`derived`とします。
+`Selection Source`は正規技法を表すmodel（`technique_slug != null`）だけに保存し、値は`analysis / condition_design / user / derived`のいずれかです。
 
-- `true / false / null`を区別
+- `analysis`: `test-analysis`で技法を選択した場合。元の`selection_key`を必須で保存し、そのTechnique Selection Machine Entityの`selected_techniques[]`にmodelの`technique_slug`が含まれることを検証する
+- `condition_design`: `test-analysis`を通らず、既存`test-condition-design`の責務として問題構造から技法を選択した場合。`selection_key=null`
+- `user`: ユーザーが技法を明示した場合。`selection_key=null`
+- `derived`: 親runtimeのmachine outputからEP / BVA等の正規技法modelを派生した場合。`selection_key=null`
+- `technique_slug=null`の内部model / adapter: `selection_source=null / selection_key=null`
+
+既存modelの再利用はSelection Sourceではありません。`identity_action=reuse|new`で別に管理し、reuse時は元の`selection_source / selection_key / technique_slug`を保持します。legacy成果物に元の選択元がない場合は、昇格時に現在の根拠で意味を再確認し、現在実際に成立するsourceを保存します。`existing_artifact`というSelection Sourceは使用しません。
+
+- `true / false / null`を区別する
 - `technique_candidates.py`の`complete`は`undetermined_signals`が空かだけを表す診断値であり、`complete=false`だけを理由にworkflowをブロックしない。ただし各undetermined signalは`test-analysis`成果物で`resolved / selection_not_affected / question`のいずれかへ閉じ、未閉鎖signalが残る状態をworkflow完了にしない
-- ユーザー明示または有効な既存成果物由来の技法をcandidate scriptが勝手に却下しない
-- `condition_structure.py`は現在の技法選択Entityを入力として受け、`status`が確定した各`selected_techniques[]`について、同じ`selection_key + technique_slug`を持つmodel、対象外、未解決のいずれかへちょうど1回閉じる。model化後にruntimeが`runtime_required=false`となる場合だけ対応subset外fallbackへ閉じる
-- TCN Machine Entityの`technique_slugs[]`は、そのTCNへ所属するactive modelの`technique_slug`集合と完全一致させる。unknown / duplicate slug、TCNにないmodel slug、modelのないTCN slugを許可しない
+- ユーザー明示または有効な既存成果物由来の正規技法をcandidate scriptが勝手に却下しない
+- `condition_structure.py`は現在の技法選択Entityを入力として受け、`status`が確定した各`selected_techniques[]`について、同じ`selection_key + technique_slug`を持つ正規技法model、対象外、未解決のいずれかへちょうど1回閉じる。model化後にruntimeが`runtime_required=false`となる場合だけ対応subset外fallbackへ閉じる
+- TCN Machine Entityの`technique_slugs[]`は、そのTCNへ所属するactive modelの**非nullな`technique_slug`集合**と完全一致させる。`model_type`、Classification Tree、Cause-Effect Graph、schema / HTML、UI pattern等の内部identityをTCNの適用技法へ混ぜない
+- `model_type=classification / technique_slug=comb`や`model_type=cause-effect / technique_slug=decision`のように、内部modelと正規技法の対応は§4.3で固定する。派生した内部子modelで同じ正規技法を二重計上しない
+- `model_type=error-guessing / technique_slug=error-guessing`はruntime dispatch対象にしない。既存`test-condition-design`が意味判断で作るCoverage Itemをsemantic Coverage Itemとして`materialize_coverage.py`へ渡し、CI Machine Entity・traceability・stale伝播へ含める
 - 選択技法だけ存在しmodelまたは明示的な扱いへ閉じない状態を完了扱いしない
 - 新しい正規技法名を追加した場合はsignal / validator / semantic evalも同時に更新する
 
@@ -902,6 +934,7 @@ validatorはfenced JSON blockを抽出してstrict JSON decodeし、canonical化
 - `classification_tree.py`は`derived.combinatorial_input`へ`factors / constraints`を出力する。LLMは`mode / strength / mixed-strength subsets`だけを意味判断として追加し、factor / class / constraintを再生成しない。最終inputは固定builderが機械的にjoinする
 - `schema_cases.py`は`derived.ep_inputs / derived.bva_boundary_skeletons / derived.combinatorial_constraints / derived.test_data_requirements`を固定schemaで返す。BVAはschemaから`boundary / threshold / side / inclusive / step`までを機械生成し、`mode / coverage_selection_reason`はLLMが意味判断として追加して固定builderが`bva.py`入力を作る。EP / combinatorial / test dataも固定builder以外でmachine fieldを再生成しない
 - 各generatorのmachine targetと、LLMがtarget_ref単位で付与した`target_annotations[]`を`materialize_coverage.py`がjoinする。generator target JSONをLLMが再生成しない
+- runtime generatorへ移さないエラー推測は`semantic_coverage_items[]`として`materialize_coverage.py`へ渡す。semantic itemはgenerator targetを装わず、LLMが既存Skill契約に従って定義したCoverage Item本文・根拠・優先度・test data要求と`identity_action / reuse_ci_id`を保持し、同じCI ID allocatorとMachine Entity builderを使う
 
 意味上の判断だけLLMに残します。CIへmaterializeするtargetの意味情報は`target_annotations[]`へ`{target_ref, target_content_fingerprint, generation_fingerprint, priority, expected_result_root, test_data_requirement_refs[]}`として保持します。`target_content_fingerprint`と`generation_fingerprint`は現在machine target / modelと一致必須で、target内容または上流Entity内容・runtime generationが変わった場合はLLMが意味判断を再確認して現在値でannotationを更新するまでmaterializeしません。Disposition済みtargetにはannotationを要求せず、同一targetへannotationとDispositionを同時指定しません。`expected_result_root`は期待結果本文ではなく、同じ期待挙動へまとめてよいかをLLMが判定したstable keyです。
 
@@ -968,9 +1001,11 @@ runtime単位状態の正本は各成果物に保存した`runtime_unit_key`、`
 - すべてのruntime unitで`Result Status=ready / Freshness=current`を必須とする
 - `Runtime Required=Yes`のunitでは、さらに`Deterministic Generated=Yes`を必須とする
 - `Runtime Required=No`のfallback unitは、既存Skill契約を満たして`Result Status=ready`になった場合だけworkflow完了を妨げない
-- `Support Status=partial`のunitは`unsupported_items[]`がすべてfallbackまたはDispositionへ閉じていることを完了条件にする
+- `Support Status=partial`のunitは`unsupported_items[]`がすべて§13.3のclosure契約へ妥当に閉じていることを完了条件にする。closure行が存在するだけでは閉鎖済みとみなさない
 - model issueを`question-analysis`へroutingする場合は`skill / runtime_unit_key / model_key / target_key / generation_fingerprint`を質問一覧・ブロック中範囲・回答後の再開情報へ保持する
 - artifact全体scriptのissueも`skill / runtime_unit_key / generation_fingerprint`をBlocker / Issueへ保持し、model keyを捏造しない
+- unsupported item closureの`handling`は`llm_fallback / 対象外 / 別テストレベル / 残存リスク / 成立不能 / 重複 / ブロック中`だけを許可する。`llm_fallback`と`重複`はcurrentな`covered_by_ref`を必須にし、`ブロック中`はclosure行があってもworkflow完了不可とする。その他のDispositionは既存`test-condition-design`のreason / Authority条件をそのまま適用する
+- `llm_fallback`の`covered_by_ref`は同じunsupported itemを意味上カバーするcurrentなTCN / CI等のMachine Entityを参照し、参照先missing / stale / 対象modelと無関係なら未閉鎖として扱う。whole-model unsupportedも同じ規則でfallback先のcurrent性を確認する
 - `coverage-analysis`はstale / gapをTCN / CIだけでなく関連`model_key`まで追跡する
 
 Machine Entityのfreshnessは`runtime_contract.py`の共通関数で計算します。各Machine Entityの`runtime_dependencies[]`と現在runtime unitのgenerationを比較し、次のschemaへ正規化します。
