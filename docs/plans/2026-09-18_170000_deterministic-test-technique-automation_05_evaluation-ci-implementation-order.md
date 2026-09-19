@@ -83,6 +83,7 @@ CLI integration testは各runtime scriptの`valid_minimal.json`をsubprocessで`
 - 一部だけsubset外なら`support_status=partial`としてsupported部分を生成し、`unsupported_items[]`をfallback / Dispositionへ閉じるまで完了扱いしない
 - `runtime_required`はruntime入力に存在せず、support判定結果からscriptが出力する。Agent側だけでsupport判定してruntimeを省略しない
 - artifact scriptのscope keyがscript別固定値 / input由来値と一致する
+- `test-analysis` runtimeは`対象 / 実行範囲=テスト分析`だけ、`coverage-analysis` runtimeは`対象 / 実行範囲=テスト設計`だけでdispatchし、同じSkillの他用途では本Planruntimeを起動しない
 - `support_status=unknown`は`invalid_input / internal_error / not_run`だけで許可し、いずれも`runtime_required=true / result_status=blocked / deterministic_generated=false`を要求する
 - Python unavailable / runtime未実行は`runtime_status=not_run / support_status=unknown / runtime_required=true / result_status=blocked / deterministic_generated=false / fallback_reason=python_unavailable`とし、fingerprintをnullで保持する
 - status対応表どおりの`support_status / result_status / runtime_required / deterministic_generated`を要求
@@ -100,12 +101,17 @@ CLI integration testは各runtime scriptの`valid_minimal.json`をsubprocessで`
 - 人間向け説明文だけを変えてもinput / model fingerprintが変わらない
 - script固有input、`authority_refs`、`reference_refs`、modelの`selection_source`変更で`input_fingerprint`が変わる
 - artifact全体scriptでもinput変更で`input_fingerprint / generation_fingerprint`が変わる
+- `spec-analysis / test-analysis / test-requirement-design / test-condition-design / test-case-design`の`Machine Entities`をstrict decodeし、canonical Entity schema、entity_ref一意性、人間向け表との主要field一致を検証する
 - upstream Entityのcanonical `content`からruntimeが`content_fingerprint`を計算し、呼び出し側が渡したhashだけを信用しない
 - upstream Entityの正規項目変更でその`content_fingerprint`だけが変わる
+- `upstream_entity_fingerprints`の変更で`generation_fingerprint`が変わり、Authority IDが同じでも内容変更を同一generation扱いしない
+- Machine Entityの`upstream_entity_dependencies[]`差分を再実行前に検出し、古いsemantic model / draftをそのまま現在runtimeへ投入しない
 - 無関係なupstream Entity変更では対象runtime unitをstaleにしない
 - 直接依存する上流runtime unitの`generation_fingerprint`変更で下流unitだけがstaleになる
 - envelope version、generator、runtime contract、generator contract、実装fingerprint、static data version変更で`generation_fingerprint`が変わる
 - runtime / generator source変更で実装fingerprintが変わり、意味契約を変えないbug fixでも旧machine evidenceを同一生成条件として再利用しない
+- 既存成果物再利用時もdispatch対象runtimeを現在scriptで再実行し、保存済みruntime resultだけでcurrent判定しない
+- 以前whole-model `unsupported`だったfixtureをruntime対応後に再実行するとsupported経路へ移り、古いfallbackを固定しない
 - `condition_structure.py`を派生model追加のため再実行しても、既存model generatorがID割当てしか利用していない場合は同scriptをruntime dependencyへ登録せず、親generatorを自己stale化しない
 - tie-break / Coverage / target key等の意味契約変更では実装fingerprintだけでなく対応contract versionも更新する
 - model / artifact全runtime unitについて`Machine Runtime Input / Result`を保存→決定論的抽出→strict decode→canonical化し、input fingerprint、model scriptではmodel fingerprintも一致する。同条件でruntimeへ再投入すると同じmachine resultになる
@@ -359,11 +365,15 @@ raw machine-readable入力をfixtureにします。
 - OpenAPI `context=request|response`と`readOnly / writeOnly + required`の方向別意味
 - 同一propertyの`readOnly=true && writeOnly=true`を拒否
 - HTML constraint validation
+- html-control runtime-v1は`text / number / date / datetime-local`だけをconstraint生成対象にする
+- `disabled=true`または対応typeの`readonly=true`ではconstraint validation targetを生成しない
+- `type=text`でvalidationへ適用される`pattern`を無視せず`unsupported`とし、Python `re`で代用しない
+- `multiple`がvalidation意味を持つtypeはruntime-v1対応外として`unsupported`にする
 - unsupported applicator
 - `$schema / $id`をmetadataとして許可し、annotation allowlistだけをvalidation非影響として許可
 - unsupported keywordが意味へ影響するsubtreeだけを局所`unsupported`
 - 親validation意味を左右する場合は親subtree全体を`unsupported`
-- HTML `pattern`を保持するがPython `re`で評価しない
+- HTML `pattern`を対応済みconstraintとして扱わず、適用されるcontrolでは`unsupported`を返す
 - JSON Schema `multipleOf` → `grid(base=0, step=m)`
 - HTML数値`step`は`min`ありの場合だけgrid化し、minなし / date-time系は`unsupported`
 - `derived.ep_inputs / derived.bva_boundary_skeletons / derived.combinatorial_constraints / derived.test_data_requirements`を固定schemaで出す
@@ -426,14 +436,17 @@ raw machine-readable入力をfixtureにします。
 - generator targetは、CIへmaterializeするtargetと`target_dispositions[]`へ閉じるtargetのどちらか一方へ必ず分類する
 - 同一target_refへ`target_annotations[]`と`target_dispositions[]`を同時指定しない
 - CI化するtargetだけ`target_annotations[]`を1対1で要求し、unknown / duplicate target_refを拒否する
+- CI化targetはcanonical `execution`とruntime計算済み`execution_fingerprint`を必須とする
+- annotation / Dispositionの`target_content_fingerprint / generation_fingerprint`が現在target / modelと一致しない場合は拒否する
 - `target_dispositions[].handling`は`対象外 / 別テストレベル / 残存リスク / ブロック中 / 重複`だけを許可する
 - `重複`では同一TCN内でcurrentかつCIへmaterializeされる`covered_by_target_ref`を必須にする
 - generator生成後に`成立不能`Dispositionへ変更しない。成立不能根拠が得られた場合はmodel / constraintを更新してgeneratorを再実行する
 - Disposition済みtargetへCIを採番せず、同時にgeneratorの`coverage_summary.required / covered / complete`を変更しない
 - `ブロック中`Dispositionはworkflow完了を妨げる
 - `test_data_requirement_refs[]`は同じmaterialize inputの`data:<requirement_key>`へ解決できることを必須にする
-- merge groupはDispositionされていない同一TCN内targetだけを含み、同じ`expected_result_root`を要求する
-- merge targetのtest data requirementsを§16と同じintersection規則で統合し、矛盾 / unsupportedならmerge拒否
+- merge groupはDispositionされていない同一TCN・同一`model_key`のtargetだけを含み、全targetの`execution_fingerprint`と`expected_result_root`の一致を要求する
+- 異なるmodel / 技法のtargetを同一CIへmergeせず、同一TCで実行できる場合は`case_structure.py`の複数`ci_refs[]`で表現する
+- merge targetの追加test data requirementsを§16と同じintersection規則で統合し、矛盾 / unsupportedならmerge拒否
 - 同じ期待挙動groupを再利用すると判断した場合は既存`expected_result_root`を維持し、意味不変のkey churnをsemantic evalで検出する
 
 ### test case structure
@@ -455,6 +468,9 @@ raw machine-readable入力をfixtureにします。
 ### traceability
 
 - Dispositionはstructure scriptと同じ共通schemaをそのまま受け取り、Markdownから再解釈しない
+- `traceability.py`と`workflow_runtime.py`が同じ`runtime_contract.py` freshness関数・同じ`runtime_units / current_entities / current_runtime_units` schemaを使う
+- Machine Entityの`upstream_entity_dependencies[] / runtime_dependencies[]`から`entity_freshness[]`を同じ結果として算出し、missing / generation mismatch / dependency cycleを検出する
+- `traceability.py`は`workflow_runtime.py` resultを依存入力にせず、self/cycle dependencyを作らない
 - Authority / Risk → TRまたはDisposition
 - TR → TCNまたはDisposition
 - TCN → CI → TC、CIなしTCN → TC、または既存Skill契約で許可されたDisposition
