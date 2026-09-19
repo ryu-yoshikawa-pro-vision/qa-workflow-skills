@@ -131,7 +131,7 @@ runtime対象Skillは、Skill instructionへscript選択表を持ち、次の順
 
 1. LLMがAuthority、Risk、TR等を意味的に解釈し、Planで固定したcanonical inputへ正規化する
 2. script選択表から、その時点で条件を満たすruntime scriptを必須/条件付きと実行順に従って選ぶ。1回のSkill実行で複数scriptを順に呼べるが、script pathを自由文から推測しない
-3. 保存済みMachine Modelを再利用する場合は`runtime_contract.py`が対象見出し直下のJSON fenceを抽出し、strict decode、model key一致、fingerprint一致を確認する。LLMがMarkdownからJSONを再生成しない
+3. 保存済み`Machine Runtime Input / Result`を再利用する場合は`runtime_contract.py`が対象見出し直下のJSON fenceを抽出し、strict decode、runtime identity、model key、fingerprint一致を確認する。LLMがMarkdownからJSONを再生成しない
 4. stdinへ共通metadataとscript固有inputを渡してscriptを起動する
 5. stdout envelopeをstrict decodeし、return code、runtime status、issuesを合わせてroutingする
 6. 意味判断が必要なissueは既存Skillまたは`question-analysis`へ戻し、機械結果をLLMが再計算しない
@@ -158,6 +158,13 @@ dispatchは次で固定します。
 
 `test-condition-design`のmodel slug → generatorは`_02` §4.3と`_03`のscript一覧を1対1対応の正本とします。artifact全体scriptを「常に全部実行する」とは扱わず、上表の条件を満たす場合だけ実行します。
 
+freshnessは次の順序で扱います。
+
+- 同じSkill実行内で現在のcanonical inputから正常に生成したruntime resultは、その実行内の直後の下流処理では`current`として扱う。`workflow_runtime.py`の最終集約前に同じ結果をstale判定するための循環を作らない
+- 保存済みruntime resultを再利用する場合は、下流scriptへ渡す前に`qa-workflow`が`workflow_runtime.py`で現在のupstream Entity / runtime dependencyと比較し、`current`を確認する。`stale`なら再生成してから下流へ渡す
+- `materialize_coverage.py`と`traceability.py`はfreshnessを計算せず、今回生成したresultまたは再利用前検証済みの`current` resultだけを受け取る
+- ワークフロー完了前に`workflow_runtime.py`を再実行し、全runtime unitのfreshnessと完了可否を最終確認する
+
 ### 2.2 派生modelの生成
 
 Cause-Effect → Decision Table、Classification Tree → combinatorial、schema → EP / BVA等の機械接続で別generatorを起動する場合は、親runtimeの出力を直接「別modelのinput」として匿名利用しません。
@@ -166,8 +173,10 @@ Cause-Effect → Decision Table、Classification Tree → combinatorial、schema
 2. LLMは派生先で必要な意味パラメータだけを補う。親runtimeが生成したmachine fieldを再生成しない
 3. `condition_structure.py`へ派生model draftを渡し、`model_key`と親TCNを確定する
 4. 派生modelは`selection_source=derived`とする
-5. 派生modelの`upstream_runtime_units[]`へ親の`skill + runtime_unit_key + generation_fingerprint`を必須で保存する
+5. 派生modelの`upstream_runtime_units[]`へ親generatorの`skill + runtime_unit_key + generation_fingerprint`を必須で保存する
 6. 派生generatorを実行する
+
+`condition_structure.py`はTCN / model keyの採番・所属検査を担当しますが、**そのID割当て結果だけを利用する既存model generatorの`upstream_runtime_units[]`へ`condition_structure.py`自身を登録しません**。派生model追加のために`condition_structure.py`を再実行してgeneration fingerprintが変わっても、既存model key・親TCNが維持されている限り親generatorをstaleにしません。generatorが`condition_structure.py`の別のmachine resultを実際に消費する場合だけ通常のruntime dependencyとして扱います。
 
 同じ親runtime・同じ派生技法・同じ検証責務を再利用するとLLMが判断した場合は既存model keyを維持します。派生modelを作るためだけの汎用model factoryやplugin機構は追加しません。
 
@@ -185,7 +194,7 @@ Cause-Effect → Decision Table、Classification Tree → combinatorial、schema
 - stderrは人間向け診断だけに使う
 - stdinが空、JSONが複数、末尾に非空白データが残る場合は`invalid_input`
 - subprocess呼び出し側はstdout / stderr / return codeをすべて取得し、return codeだけでroutingしない
-- Skill実行時のsubprocessにも30秒の安全timeoutを設定する。通常の探索停止は§5.3の決定論的hard limitで行い、timeoutをCoverageや探索アルゴリズムの正常終了条件にしない。timeout時はmachine resultを採用せず`runtime_execution_timeout`としてblockedにする
+- Skill実行時のsubprocessにも30秒の安全timeoutを設定する。通常の探索停止は§5.3の決定論的hard limitで行い、timeoutをCoverageや探索アルゴリズムの正常終了条件にしない。timeout時はmachine resultを採用せず、成果物metadataでは`runtime_status=internal_error / support_status=unknown / result_status=blocked / runtime_required=true / deterministic_generated=false`として扱い、構造化issueの`issue_type=runtime_execution_timeout`で原因を区別する。`runtime_execution_timeout`を新しい`runtime_status`にはしない
 
 ### 3.1 strict JSON
 
@@ -348,6 +357,7 @@ Python unavailable時はsupport判定自体を実行できないため、runtime
   "runtime_unit_key": "model:decision-001",
   "model_key": "decision-001",
   "target_key": "R4",
+  "generation_fingerprint": "sha256:...",
   "authority_refs": ["SPEC-001"],
   "required_information": "条件組合せに対する期待action",
   "route_to": "question-analysis",
@@ -356,10 +366,11 @@ Python unavailable時はsupport判定自体を実行できないため、runtime
 ```
 
 - `issue_type`、`blocking`、`skill`、`runtime_unit_key`は必須。runtime issue identityは`(skill, runtime_unit_key)`で扱う
+- runtimeが生成したissueでは`generation_fingerprint`を必須にし、そのissueがどのruntime世代に対するものかを固定する。subprocess timeout等でgenerationを確定できないcaller生成issueだけ`generation_fingerprint=null`を許可する
 - model scriptでは`model_key`必須、artifact scriptでは`model_key=null`
 - target固有issueだけ`target_key`必須
 - `route_to` / `resume_skill`は既存Skill名だけを許可
-- `question-analysis`へ送る場合はRuntime Skill / Runtime Unit / Model / Targetを質問・ブロック・回答後の再開まで保持する
+- `question-analysis`へ送る場合はRuntime Skill / Runtime Unit / Model / Target / Generation Fingerprintを質問・ブロック・回答後の再開まで保持し、現在のruntime unitの`generation_fingerprint`と一致しない過去回答を自動適用しない
 - 自由文stderrをrouting入力に使わない
 
 ## 4. canonicalization・version・fingerprint
@@ -625,6 +636,8 @@ generator内の`target_key`はmodel内で安定させます。異なるmodel間�
 - `target_ref`は`sha256:<64 lowercase hex>`
 - model generatorの共通post-processで各targetへ`target_ref`を付与する
 - 同じ`model_key + target_key`から常に同じ`target_ref`を得る
+- 各targetへ`target_content_fingerprint = sha256(canonical JSON(targetのうちtarget_ref / target_content_fingerprintを除く全machine field))`を付与する。Authority / Referenceと技法固有fieldを含める
+- `target_ref`はstable ID、`target_content_fingerprint`はその時点のtarget内容の有効性確認に使う。target内容が変わってもstable ID維持のため`target_ref`は変えない
 - hashが同じなのにmodel_key / target_keyが異なる場合は`internal_error`
 
 `materialize_coverage.py`のinputには`previous_target_id_map[]`を明示的に渡します。
@@ -635,6 +648,7 @@ generator内の`target_key`はmodel内で安定させます。異なるmodel間�
     "target_ref":"sha256:...",
     "model_key":"bva-001",
     "target_key":"bva:age-lower:AT",
+    "target_content_fingerprint":"sha256:...",
     "ci_id":"TCN-001-CI01",
     "mapping_status":"active"
   }
@@ -643,6 +657,7 @@ generator内の`target_key`はmodel内で安定させます。異なるmodel間�
 
 - 初回mappingがない場合、同一TCN内のtargetを`model_key`、次に`target_key`のUnicode code point辞書順でsortし、`CI01`から順に採番する
 - 既存active mappingがある場合、同じ`target_ref`は既存CI IDを維持する。inactive mappingは§7.2.2の復帰規則でだけ再利用する
+- 同じ`target_ref`でも`target_content_fingerprint`が前回mappingから変わった場合はCI IDを維持したままそのCIと下流TCを`要再検証`へし、旧`target_annotations / target_dispositions / merge_group`を現在targetへ自動再利用しない
 - 新しい`target_ref`は同一TCN内の既存CI最大番号+1から採番する
 - 消滅target_refのCIはstaleとし、下流TCを`要再検証`へする
 - 削除済みCI番号を再利用せず、既存CI番号の詰め直しを行わない
@@ -675,12 +690,12 @@ merge / unmerge / target追加削除 / CI↔Dispositionの詳細な状態遷移�
 - Disposition → CI: targetの直近CIがdeletedで、現在ほかのactive targetへ割り当てられていなければ同じCIを復帰してよい。そうでなければ過去使用済み最大CI番号+1から新規採番
 - deleted CI番号を別targetへ再利用しない
 
-`previous_target_id_map[]`はactive mappingだけでなく`mapping_status=active|inactive`と直近`ci_id`を保持し、Disposition中のtargetも過去mappingを失いません。CI番号は`CI\d{2,}`を許可します。
+`previous_target_id_map[]`はactive mappingだけでなく`mapping_status=active|inactive`、直近`ci_id`、その判断時点の`target_content_fingerprint`を保持し、Disposition中のtargetも過去mappingを失いません。CI番号は`CI\d{2,}`を許可します。
 ### 7.3 upsert
 
 再実行はappendではなくstable keyでupsertします。
 
-- 同じ`target_ref`は置換
+- 同じ`target_ref`は置換する。`target_content_fingerprint`が変わった場合はstable IDを維持しても意味変更として扱い、関連CI / TCと意味判断を`要再検証`へ戻す
 - 生成されなくなった派生行はstaleとして除去候補にする
 - 同一再実行で重複machine evidenceを作らない
 - staleな派生成果物が残る状態を完了扱いしない
@@ -692,7 +707,7 @@ generatorが返した各`target_ref`は、最終的に次のどちらか一方�
 - `materialize_coverage.py`でCIへ割り当てる。複数targetを同じCIへ割り当てる場合は§11の`merge_group`を必須にする
 - `target_dispositions[]`で既存`test-condition-design`契約上の扱いへ明示する
 
-`target_dispositions[]`は`{target_ref, handling, reason, authority_refs, covered_by_target_ref}`です。
+`target_dispositions[]`は`{target_ref, target_content_fingerprint, handling, reason, authority_refs, covered_by_target_ref}`です。`target_content_fingerprint`は現在machine targetと一致必須で、過去targetに対するDispositionを新しい内容へ流用しません。
 
 - `handling=対象外 / 別テストレベル / 残存リスク / ブロック中 / 重複`だけを許可する
 - `重複`では`covered_by_target_ref`を必須にし、同一TCN内のcurrentかつCIへmaterializeされるtargetを参照する。他handlingでは`covered_by_target_ref=null`
@@ -797,9 +812,9 @@ validatorはfenced JSON blockを抽出してstrict JSON decodeし、canonical化
 - `schema_cases.py`は`derived.ep_inputs / derived.bva_boundary_skeletons / derived.combinatorial_constraints / derived.test_data_requirements`を固定schemaで返す。BVAはschemaから`boundary / threshold / side / inclusive / step`までを機械生成し、`mode / coverage_selection_reason`はLLMが意味判断として追加して固定builderが`bva.py`入力を作る。EP / combinatorial / test dataも固定builder以外でmachine fieldを再生成しない
 - 各generatorのmachine targetと、LLMがtarget_ref単位で付与した`target_annotations[]`を`materialize_coverage.py`がjoinする。generator target JSONをLLMが再生成しない
 
-意味上の統合だけLLMに残します。CIへmaterializeするtargetの意味情報は`target_annotations[]`へ`{target_ref, priority, expected_result_root, test_data_requirement_refs[]}`として保持します。Disposition済みtargetにはannotationを要求せず、同一targetへannotationとDispositionを同時指定しません。`expected_result_root`は期待結果本文ではなく、同じ期待挙動へまとめてよいかをLLMが判定したstable keyです。複数技法の結果を同じCIへまとめる場合、LLMは`merge_group`を明示し、`materialize_coverage.py`がtarget key、Authority、Reference、優先度、test data requirement参照を決定論的にunionします。
+意味上の統合だけLLMに残します。CIへmaterializeするtargetの意味情報は`target_annotations[]`へ`{target_ref, target_content_fingerprint, priority, expected_result_root, test_data_requirement_refs[]}`として保持します。`target_content_fingerprint`は現在machine targetと一致必須で、target内容が変わった場合はLLMが意味判断を再確認して新しいfingerprintでannotationを更新するまでmaterializeしません。Disposition済みtargetにはannotationを要求せず、同一targetへannotationとDispositionを同時指定しません。`expected_result_root`は期待結果本文ではなく、同じ期待挙動へまとめてよいかをLLMが判定したstable keyです。複数技法の結果を同じCIへまとめる場合、LLMは`merge_group`を明示し、`materialize_coverage.py`がtarget key、Authority、Reference、優先度、test data requirement参照を決定論的にunionします。
 
-`merge_group` inputは`{"merge_group_key":"MG-001","target_refs":["sha256:...","sha256:..."],"authority_refs":["SPEC-001"]}`です。target refは2件以上、重複不可、同一TCN配下だけを許可します。各targetの`target_annotations.expected_result_root`が一致しない場合は`invalid_input`とします。各targetが参照するtest data requirementは`_03` §16と同じintersection規則で機械統合し、矛盾またはunsupportedな組合せならmergeを拒否します。`test_data_requirement_refs[]`は`data:<requirement_key>`形式で、同一materialize入力の正規化済みtest data requirementに存在することを必須にします。
+`merge_group` inputは`{"merge_group_key":"MG-001","target_refs":["sha256:...","sha256:..."],"target_content_fingerprints":[{"target_ref":"sha256:...","target_content_fingerprint":"sha256:..."}],"authority_refs":["SPEC-001"]}`です。`target_content_fingerprints[]`は全`target_refs[]`へ1対1対応し、現在machine targetと一致必須です。target refは2件以上、重複不可、同一TCN配下だけを許可します。各targetの`target_annotations.expected_result_root`が一致しない場合は`invalid_input`とします。各targetが参照するtest data requirementは`_03` §16と同じintersection規則で機械統合し、矛盾またはunsupportedな組合せならmergeを拒否します。`test_data_requirement_refs[]`は`data:<requirement_key>`形式で、同一materialize入力の正規化済みtest data requirementに存在することを必須にします。
 
 ## 12. runtime自己検査の処理順
 
@@ -858,8 +873,8 @@ runtime単位状態の正本は各成果物に保存した`runtime_unit_key`、`
 - `Runtime Required=Yes`のunitでは、さらに`Deterministic Generated=Yes`を必須とする
 - `Runtime Required=No`のfallback unitは、既存Skill契約を満たして`Result Status=ready`になった場合だけworkflow完了を妨げない
 - `Support Status=partial`のunitは`unsupported_items[]`がすべてfallbackまたはDispositionへ閉じていることを完了条件にする
-- model issueを`question-analysis`へroutingする場合は`model_key / target_key`を質問一覧・ブロック中範囲・回答後の再開情報へ保持する
-- artifact全体scriptのissueは`runtime_unit_key`をBlocker / Issueへ保持し、model keyを捏造しない
+- model issueを`question-analysis`へroutingする場合は`skill / runtime_unit_key / model_key / target_key / generation_fingerprint`を質問一覧・ブロック中範囲・回答後の再開情報へ保持する
+- artifact全体scriptのissueも`skill / runtime_unit_key / generation_fingerprint`をBlocker / Issueへ保持し、model keyを捏造しない
 - `coverage-analysis`はstale / gapをTCN / CIだけでなく関連`model_key`まで追跡する
 ### 13.4 上流変更
 
@@ -870,8 +885,10 @@ runtime単位状態の正本は各成果物に保存した`runtime_unit_key`、`
 3. 影響modelとその派生成果物だけを`要再検証`
 4. 正規化modelを更新
 5. generator再実行
-6. 下流structure / Coverageを再検査
-7. staleが消えた範囲だけ再利用可能に戻す
+6. target内容が変わった場合は、同じ`target_ref`でも`target_content_fingerprint`差分によりannotation / Disposition / merge判断と関連CI / TCを`要再検証`へ戻す
+7. question回答、unsupported closure等の意味判断は対象`generation_fingerprint`が現在世代と一致するものだけ再利用する
+8. 下流structure / Coverageを再検査
+9. staleが消えた範囲だけ再利用可能に戻す
 
 ## 14. 移植性と依存関係
 
