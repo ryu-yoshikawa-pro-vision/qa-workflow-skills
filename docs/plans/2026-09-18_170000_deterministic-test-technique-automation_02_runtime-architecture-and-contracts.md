@@ -291,6 +291,8 @@ scriptが実行できた場合、stdoutは次のJSON object 1件だけです。
 }
 ```
 
+output envelopeの`skill`はinput metadataおよびscript所属Skillと一致必須です。
+
 `support_status`は`supported / partial / unsupported / unknown`です。`partial`は同一input内に、独立して機械処理できる範囲と対応subset外の範囲が共存する場合だけ使用します。対応subset外部分は`payload.unsupported_items[]`へstable key、理由、Authorityを保持し、黙って削除しません。`unknown`はsupport判定を完了できなかった場合だけ使用し、`invalid_input / internal_error / not_run`以外では返しません。
 
 `runtime_status`:
@@ -382,6 +384,7 @@ fingerprintはSHA-256で計算します。入力はUTF-8のcanonical JSONです�
 
 `input_fingerprint`はすべてのruntime scriptで必須です。次をcanonical JSON化してSHA-256を計算します。
 
+- `skill`
 - `runtime_unit_key`
 - script固有`input`
 - `authority_refs`
