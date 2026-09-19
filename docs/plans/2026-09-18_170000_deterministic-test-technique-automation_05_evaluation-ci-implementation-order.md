@@ -94,8 +94,8 @@ CLI integration testは各runtime scriptの`valid_minimal.json`をsubprocessで`
 - 人間向け説明文だけを変えてもinput / model fingerprintが変わらない
 - script固有input、`authority_refs`、`reference_refs`、modelの`selection_source`変更で`input_fingerprint`が変わる
 - artifact全体scriptでもinput変更で`input_fingerprint / generation_fingerprint`が変わる
-- upstream Entityのcanonical `content`からruntimeが`content_fingerprint`を計算し、caller supplied hashだけを信用しない
-- upstream Entityの正規字段変更でその`content_fingerprint`だけが変わる
+- upstream Entityのcanonical `content`からruntimeが`content_fingerprint`を計算し、呼び出し側が渡したhashだけを信用しない
+- upstream Entityの正規項目変更でその`content_fingerprint`だけが変わる
 - 無関係なupstream Entity変更では対象runtime unitをstaleにしない
 - 直接依存する上流runtime unitの`generation_fingerprint`変更で下流unitだけがstaleになる
 - envelope version、generator、runtime contract、generator contract、実装fingerprint、static data version変更で`generation_fingerprint`が変わる
@@ -447,7 +447,7 @@ raw machine-readable入力をfixtureにします。
 - Disposition targetはCI mapping対象から除外し、generator Coverage値は変更しない
 - target_ref内容不一致、1 target_ref→複数CI、parent mismatchを拒否
 - `target_annotations[]`が全targetへ1対1対応し、unknown / duplicate target_refを拒否する
-- `expected_result_root`は同一TCN内のopaque local keyで、同じ期待挙動と意味判断したtargetだけ同値になる
+- `expected_result_root`は同一TCN内の内部用local keyで、同じ期待挙動と意味判断したtargetだけ同値になる
 - 同一CIへの複数target_refは、同じ`expected_result_root`を持つ同一merge groupだけ許可する
 - merge解除時は辞書順先頭targetへ既存CIを維持し、残りを最大番号+1で再採番して関連TCを`要再検証`へする
 - 消滅targetで下流`要再検証`
