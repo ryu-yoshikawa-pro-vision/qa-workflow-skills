@@ -251,7 +251,7 @@ scriptが実行できた場合、stdoutは次のJSON object 1件だけです。
 }
 ```
 
-`support_status`は`supported / partial / unsupported`です。`partial`は同一input内に、独立して機械処理できる範囲と対応subset外の範囲が共存する場合だけ使用します。対応subset外部分は`payload.unsupported_items[]`へstable key、理由、Authorityを保持し、黙って削除しません。
+`support_status`は`supported / partial / unsupported / unknown`です。`partial`は同一input内に、独立して機械処理できる範囲と対応subset外の範囲が共存する場合だけ使用します。対応subset外部分は`payload.unsupported_items[]`へstable key、理由、Authorityを保持し、黙って削除しません。`unknown`はsupport判定を完了できなかった場合だけ使用し、`invalid_input / internal_error / not_run`以外では返しません。
 
 `runtime_status`:
 
@@ -275,10 +275,10 @@ status対応は次で固定します。
 | `ok` | `supported` | `ready` | `true` | `true` | runtime結果を利用可能 |
 | `ok` | `supported` | `unresolved` | `true` | `true` | 質問・意味判断後に再実行 |
 | `ok` | `partial` | `ready`または`unresolved` | `true` | `true` | supported部分を利用し、unsupported itemはfallbackまたはDispositionへ閉じる |
-| `invalid_input` | 任意 | `blocked` | support判定結果 | `false` | 入力契約を修正 |
+| `invalid_input` | `unknown` | `blocked` | `true` | `false` | 入力契約違反でsupport判定を完了できない。入力契約を修正 |
 | `unsupported` | `unsupported` | `ready` | `false` | `false` | runtime unitとしてfallback可能。QA成果物全体はfallbackが既存Skill契約へ閉じた場合だけ完了可能 |
 | `limit_exceeded` | `supported`または`partial` | `blocked` | `true` | `false` | model分割またはcontract変更が必要 |
-| `internal_error` | 任意 | `blocked` | support判定結果 | `false` | runtime不具合として扱う |
+| `internal_error` | `unknown` | `blocked` | `true` | `false` | support判定完了前後を問わず安全側でruntime requiredとして扱い、runtime不具合を修正 |
 | `not_run` | `unknown` | `blocked` | `true` | `false` | Python unavailable。成果物metadataだけで表現 |
 
 `stale`は`result_status`ではありません。成果物保存時の`freshness_status = current / stale`として`qa-workflow`がfingerprint比較から付与します。
