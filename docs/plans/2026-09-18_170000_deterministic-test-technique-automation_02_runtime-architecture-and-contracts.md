@@ -758,7 +758,7 @@ Coverage母集団から除外するconstraintは1件以上の`authority_refs`を
 }
 ```
 
-Domain Testingは`_03` §5で固定した線形border schemaだけを使用し、共通constraint以外の任意ASTや式言語を追加しません。
+Domain Testingは[基本generator契約](./2026-09-18_170000_deterministic-test-technique-automation_03_generators-and-algorithms.md) §5で固定した線形border schemaだけを使用し、共通constraint以外の任意ASTや式言語を追加しません。
 
 ## 続き
 
