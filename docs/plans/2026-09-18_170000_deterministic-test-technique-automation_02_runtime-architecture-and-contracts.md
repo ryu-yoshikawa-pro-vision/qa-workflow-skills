@@ -230,27 +230,82 @@ Cause-Effect → Decision Table、Classification Tree → combinatorial、schema
 - canonical JSONへ再serializeする`Decimal`は指数表記を使わない正規化済みJSON numberとして出力する
 - date / datetimeは契約で許可したISO 8601形式以外を拒否する
 
-Python実装では、duplicate key検出用`object_pairs_hook`、`parse_int / parse_float`でnumber tokenを字句列のまま受けるhook、非有限数拒否、`allow_nan=False`相当の出力を共通方針とします。
+Python実装では、duplicate key検出用`object_pairs_hook`、`parse_int / parse_float`でJSON numberだけを表す専用の内部token型を返すhook、非有限数拒否、`allow_nan=False`相当の出力を共通方針とします。number tokenを通常のPython `str`として返してJSON stringと同一視しません。strict decode後、すべてのstring valueを走査してunpaired surrogate code pointを拒否し、number tokenはJSON number grammar・raw token長を検証してからcanonical integerまたは`coefficient + scale`へ変換します。
+
+入力byte上限はUTF-8 decode前に検査し、decode後は§5.3のnesting depth上限64をparser入力全体へ適用します。depth超過やsurrogate不正はparser例外の偶然に依存させず`invalid_input`または契約上の`limit_exceeded`へ正規化します。少なくとも`1 != "1"`、`1.0 != "1.0"`、`1e3 != "1e3"`を回帰fixtureで固定します。
 
 ### 3.2 共通入力metadata
 
 runtime入力は`metadata`とscript固有`input`を分けます。
 
-model scriptのmetadataは少なくとも`model_key / model_type / technique_slug / selection_source / selection_key`をmodel metadata Machine Entityと一致させます。
+```json
+{
+  "metadata": {
+    "envelope_version": "1",
+    "skill": "test-condition-design",
+    "runtime_contract_version": "runtime-v1",
+    "generator_contract_version": "combinatorial-v1",
+    "runtime_unit_key": "model:comb-001",
+    "model_key": "comb-001",
+    "model_type": "comb",
+    "technique_slug": "comb",
+    "selection_source": "analysis",
+    "selection_key": "SEL-001",
+    "scope_key": null,
+    "upstream_entities": [
+      {
+        "skill": "test-requirement-design",
+        "entity_type": "tr",
+        "entity_ref": "TR-001",
+        "content": {}
+      }
+    ],
+    "upstream_runtime_units": [
+      {
+        "skill": "test-requirement-design",
+        "runtime_unit_key": "artifact:requirement_structure:all",
+        "generation_fingerprint": "sha256:..."
+      }
+    ],
+    "static_data_versions": {},
+    "authority_refs": ["SPEC-001"],
+    "reference_refs": []
+  },
+  "input": {}
+}
+```
 
-- `runtime_unit_key`: model scriptは`model:<model_key>`、artifact scriptは`artifact:<generator>:<scope_key>`
-- `model_key`: model scriptだけ必須。`<model_type>-\d{3,}`
-- `model_type`: model scriptだけ必須で§4.3の固定値
-- `technique_slug`: Coverage所有modelではcanonical technique slug、内部adapterでは`null`
-- `selection_source`: `technique_slug!=null`では`analysis / condition_design / user`のいずれか。内部adapterでは`null`
+共通metadataは少なくとも次を持ちます。
+
+- `envelope_version`: runtime envelope形式のversion
+- `skill`: runtime scriptが所属する既存Skill名。script pathから決まる値をruntime側の正本とし、入力値が不一致なら`invalid_input`
+- `runtime_contract_version`: strict JSON、canonicalization、共通status、fingerprint等の共通処理version
+- `generator_contract_version`: script固有の入出力・Coverage契約version。生成結果、tie-break、Coverage、target keyへ影響する変更では必ず更新する
+- `runtime_unit_key`: すべてのruntime invocationで必須。model scriptは`model:<model_key>`、artifact scriptは`artifact:<generator>:<scope_key>`
+- `model_key`: model scriptだけ必須。形式は`<model_type>-\d{3,}`。artifact scriptでは`null`
+- `model_type`: model scriptだけ必須で§4.3の固定値。artifact scriptでは`null`
+- `technique_slug`: Coverage所有modelでは§4.3のcanonical technique slug、内部adapterとartifact scriptでは`null`
+- `selection_source`: Coverage所有modelでは`analysis / condition_design / user`のいずれか。内部adapterとartifact scriptでは`null`
 - `selection_key`: `selection_source=analysis`だけ必須。その他は`null`
-- `scope_key`: artifact scriptだけ必須。`technique_candidates.py`は`selection_key`、`materialize_coverage.py`は`tcn_id`、その他は`all`
-- `upstream_entities`: 実際に消費したMachine Entityを`skill + entity_type + entity_ref`で一意に保持し、runtimeが`content_fingerprint`を計算する
-- `upstream_runtime_units`: 他runtime結果を直接利用した場合に`skill + runtime_unit_key + generation_fingerprint`を保持する
-- `static_data_versions`: runtime側が計算した静的参照データversion
-- `authority_refs / reference_refs`: 現在有効な根拠と補助情報
+- `scope_key`: artifact scriptだけ必須。model scriptでは`null`
+- `upstream_entities`: 実際に消費したMachine Entityを`skill + entity_type + entity_ref`で一意に保持し、runtimeがcanonical `content`から`content_fingerprint`を計算する
+- `upstream_runtime_units`: 他runtime結果を直接利用した場合に`skill + runtime_unit_key + generation_fingerprint`を一意参照として保持する。runtime派生child modelの派生元もここで表し、Selection Sourceへ混ぜない
+- `static_data_versions`: generator結果に影響する静的参照データversion
+- `authority_refs / reference_refs`: 現在有効な製品根拠と補助情報
 
-artifact scriptではmodel固有fieldを`null`とし、script固有入力は`input`配下にだけ置きます。
+artifact scriptは`risk_matrix.py`、`technique_candidates.py`、`change_impact.py`、`environment_requirements.py`、`test_data_requirements.py`、`requirement_structure.py`、`condition_structure.py`、`materialize_coverage.py`、`case_structure.py`、`traceability.py`、`workflow_runtime.py`で固定します。`scope_key`はscriptごとに次へ固定します。
+
+- `technique_candidates.py`: 入力`selection_key`
+- `materialize_coverage.py`: 入力`tcn_id`
+- その他のartifact script: literal `all`
+
+同一Skill内で同じ`artifact:<generator>:<scope_key>`を同時に複数定義しません。
+
+`runtime_contract_version`、`generator_contract_version`、runtime実装hash、generator実装hash、fileから導出できる`static_data_versions`はruntime側を正本にします。呼び出し側metadataへ同じ値を持たせる場合はruntime実値と一致しなければ`invalid_input`です。
+
+`static_data_versions`はkeyを`^[a-z][a-z0-9_]*$`、valueを`sha256:<64 lowercase hex>`または明示的なcontract version文字列`^[A-Za-z0-9][A-Za-z0-9._-]*$`とします。
+
+script固有入力は必ず`input`配下に置き、metadataと同じkeyを再定義しません。target / result keyへ文字列として直接埋め込むstable component keyは`^[A-Za-z][A-Za-z0-9._-]{0,63}$`で固定し、delimiterの`:`を禁止します。任意文字列を含むidentityはcanonical JSONをhashしてkey化します。
 
 ### 3.3 runtime出力envelope
 
@@ -588,13 +643,17 @@ machine dataに存在しない表示専用の備考やMarkdown整形は`content`
 Machine Entityの`upstream_entity_dependencies[]`は次を最低限含めます。直接参照していない無関係Entityを追加しません。
 
 - Authority: なし。関連Authority IDはcontent内の関係として保持するが、別Authorityの内容変更で自動staleにするかは既存`spec-analysis`の関係解決結果に従う
-- Product Risk: `authority_refs[]`のAuthority
-- 技法選択: selection判断で実際に参照したAuthority / Risk / TR等
+- test-analysis context: scope / objective / test level / environment constraint / exclusion / blocker / test focus / testability判断で実際に参照したAuthority / Product Risk
+- Product Risk: `authority_refs[]`のAuthorityに加え、`source_refs[]`のうちMachine Entityとして解決でき、risk判断へ実際に使用したsource Entity
+- 技法選択: selection判断で実際に参照したAuthority / Product Risk / TR等
+- change graph node / edge: `source_ref / evidence_refs[]`のうちMachine Entityとして解決でき、node / edge判断へ実際に使用したsource Entity
+- environment requirement: `authority_refs[]`のAuthority
+- test data requirement: `authority_refs[]`のAuthority、要求を導出したCoverage所有model metadata。machine target由来では`source_target_versions[]`の現在target version一致を別途必須にし、target versionが変わればcurrent扱いしない
 - TR: `authority_refs[]`のAuthorityと`risk_refs[]`のProduct Risk
-- TCN: `tr_refs[]`のTR、直接`authority_refs[] / risk_refs[]`を持つ場合はそのAuthority / Risk
+- TCN: `tr_refs[]`のTR、直接`authority_refs[] / risk_refs[]`を持つ場合はそのAuthority / Product Risk
 - model metadata: 親TCN。`selection_source=analysis`では技法選択Entity、runtime派生childでは派生元runtimeをdependencyへ持つ
-- CI: 親TCN、model metadata、参照するtest data requirement Entity。runtime targetではtarget version、semantic itemでは本文とsource target versionをcontentへ含める
-- TC: `tr_refs[] / tcn_refs[] / ci_refs[] / environment_requirement_refs[] / test_data_requirement_refs[]`の各Entityとexpected result Authority
+- CI: 親TCN、Coverage所有model metadata、参照するtest data requirement Entity。runtime targetでは現在target version、semantic itemでは本文と`source_target_versions[]`をcontentへ含める
+- TC: `tr_refs[] / tcn_refs[] / ci_refs[] / environment_requirement_refs[] / test_data_requirement_refs[]`の各Entityと各expected resultで実際に参照したAuthority
 - Disposition: `upstream_entity`、Authority、`covered_by_entity`がある場合はその参照先Entity。保存fingerprint不一致はstale
 
 structure / materialize / generator等がEntity状態を機械的に成立させる場合は、そのruntime unitを`runtime_dependencies[]`へ追加します。semantic dependencyとruntime dependencyを相互代用しません。
@@ -862,7 +921,9 @@ validatorはfenced JSON blockを抽出してstrict JSON decodeし、canonical化
 - `user`: ユーザー明示。`selection_key=null`
 - model再利用は`identity_action=reuse|new`で管理し、Selection Sourceへ混ぜない
 - `selection_source=analysis`の各Coverage所有modelは参照selectionの`selected_techniques[]`に同じ`technique_slug`が存在必須
-- 1つの`selection_key + technique_slug`は複数TCN / modelへ展開してよい。selected techniqueごとに少なくとも1件のcurrent Coverage所有modelまたは明示closureを必須とし、ちょうど1 modelへ限定しない
+- 1つの`selection_key + technique_slug`は複数TCN / modelへ展開してよい。ただしactiveなTechnique Selectionの`selected_techniques[]`に残っている各技法は、少なくとも1件のcurrent Coverage所有modelへ到達必須とし、ちょうど1 modelへ限定しない
+- 選択後に不適用または未解決と判明した技法を「selection closure」という別schemaで閉じない。意味判断が変わった場合はTechnique Selection Entityを更新して`selected_techniques[]`から外すか、既存のblock / unresolved / question経路へ戻す
+- runtime非対応はCoverage所有model生成後に既存の`unsupported_item_closures[]`またはwhole-model unsupported処理で閉じる。adapterだけ、Disposition行だけ、または未定義のselection closureだけでselected techniqueを完了扱いしない
 - TCNの`technique_slugs[]`は所属Coverage所有modelの非null`technique_slug`集合と一致させる
 - Classification Tree / Cause-Effect / schema / UI adapterは正規技法を所有しない。child Coverage modelがcanonical techniqueとselection provenanceを持つ
 - エラー推測はsemantic CIを作るまで完了扱いしない
@@ -896,9 +957,23 @@ LLMによるmachine JSON再生成を挟まず、固定builderで接続します�
 
 `materialize_coverage.py`はcurrent generator result用`models[]`とは別に、TCN配下の全current `active_model_metadata[]`を受けます。runtime generatorを持たないエラー推測やunsupported fallbackもmodel所属を検証できます。
 
-semantic Coverage Itemは`{semantic_item_key, model_key, identity_action, reuse_ci_id, source_target_versions[], item_text, authority_refs[], reference_refs[], priority, expected_result_root, test_data_requirement_refs[]}`です。`semantic_item_key`は成果物系列内stable keyとし、reuseはprevious semantic mappingの同じkey / model / CIだけ許可します。
+semantic Coverage Itemのinput draftは`{draft_key, model_key, identity_action, reuse_semantic_item_key, reuse_ci_id, source_target_versions[], item_text, authority_refs[], reference_refs[], priority, expected_result_root, test_data_requirement_refs[]}`です。新規itemではreuse fieldをnull、再利用では`reuse_semantic_item_key`と`reuse_ci_id`をprevious semantic mappingの同じrowへ一致させます。
 
-machine target由来CIはcanonical `execution`を、semantic item由来CIは`semantic_item_text`をMachine Entityへ保存します。test data requirementはcurrent Machine Entityのcontent fingerprintをCI dependencyへ保存します。
+semantic item lifecycleは次で固定します。
+
+- new候補はcanonical `(model_key, draft_key)`順でCIを採番し、確定CI IDから`semantic_item_key=semantic:<ci_id>`をruntimeが発行する。LLMが新規stable keyを任意生成しない
+- `previous_semantic_ci_map[]`は`{semantic_item_key, model_key, ci_id, mapping_status, semantic_content_fingerprint}`をfull snapshotで保持し、`mapping_status=active|inactive`
+- previous active itemがcurrentでreuseされなければmappingをinactiveへ遷移し、そのsemantic CIをdeletedへ移す。row自体は削除しない
+- inactive itemが意味上同一として復帰する場合、`identity_action=reuse`で同じsemantic item key / model / CIを指定し、そのCIが別itemへ再利用されていなければ同じkey / CIを復帰できる
+- deleted CIやinactive semantic item keyを別itemへ再利用しない。modelが変わる場合は意味上別itemとしてnewにする
+- 同じsemantic item keyをreuseしても`item_text / source_target_versions[] / Authority / Reference / priority / expected_result_root / test data requirement`が変わればCI content fingerprintを変え、下流TCをstaleにする
+- `source_target_versions[]`を持つitemは現在targetの`target_ref / target_content_fingerprint / generation_fingerprint`と完全一致しなければcurrentにしない
+
+machine target由来CIはcanonical `execution`を、semantic item由来CIは`semantic_item_key / semantic_item_text / semantic_source_targets[]`をMachine Entityへ保存します。test data requirementはcurrent Machine Entityのcontent fingerprintをCI dependencyへ保存します。
+
+各active Coverage所有modelは、少なくとも1件のcurrent CIを持つか、非空のcurrent Coverage母集団が既存のtarget Disposition / unsupported closure契約で全件閉じている必要があります。空の入力・空のCoverage母集団をvacuous completeにしません。特にエラー推測semantic modelは1件以上のcurrent semantic CIを必須とし、semantic item 0件では完了不可です。
+
+`test-case-design`はCI Machine Entityの`execution`を下流で再解釈不要な自己完結表現として扱います。state / flow / CRUD等のexecutionはstable key列だけでなく、具体的な実行手順を組み立てるために必要なevent / operation / input / from / to等のmachine meaningをgenerator側で含めます。下流が人間向けCoverage表やgenerator内部modelを再読解して意味を補完しません。
 
 `test-case-design`はこれらのMachine Entityから具体手順・データを作り、人間向けCoverage Item表からmachine値を再抽出しません。
 
