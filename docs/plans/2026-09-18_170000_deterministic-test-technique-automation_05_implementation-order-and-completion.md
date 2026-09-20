@@ -217,7 +217,7 @@ runtime状態とQA成果物状態を分離します。
 
 ### 依存関係
 
-runtime dependencyはPython 3.11標準ライブラリだけとし、実装中の外部dependency追加を認めません。正確性・hard limit・30秒timeoutを満たせない場合はPlan未達として停止します。
+runtime dependencyはPython 3.11標準ライブラリだけとし、実装中の外部dependency追加を認めません。正確性とhard limitを満たせない場合はPlan未達として停止します。interpreter command名とtimeout機構はAgent / host依存とし、30秒timeoutはCIの安全策に限定します。
 
 ## 14. 完了条件
 
@@ -233,13 +233,13 @@ Plan完了には次をすべて満たす必要があります。
 - `spec-analysis / test-analysis / test-requirement-design / test-condition-design / test-case-design`がPython固定builderでcanonical `Machine Entities`とexpected Entity identityを生成・保存し、`entity_type`を含む`(skill, entity_type, entity_ref)` identity、content fingerprint、`upstream_entity_dependencies[] / runtime_dependencies[]`をMarkdown再解釈なしで再構築できる。actual Machine Entity集合からexpected集合を逆算しない
 - script固有inputのsemantic reference集合から必要な`upstream_entities[]`を固定builderで完全導出し、そのmachine dataからcanonical contentを機械構築してcontent fingerprintをruntime計算できる。省略・余分な参照Entityを拒否し、sort済み`upstream_entity_fingerprints`を含むgeneration fingerprint、`(skill, runtime_unit_key)` upstream dependency、static data versions、input / model / LF正規化implementation fingerprintが再現可能
 - model / artifact全runtime unitの`Machine Runtime Input / Result`を決定論的に抽出し、strict decode、fingerprint一致、同条件でのround-trip再実行が成立する。workflow再利用では保存済みresultをcurrent cacheとして採用せず現在scriptを再実行する
-- stable model key / TR / TCN / TCのruntime採番、active / deleted ID state、1 model = 1 TCN、target_ref、成果物系列、previous mapping、merge / unmerge / CI↔Disposition状態遷移を含むCI materializeが契約どおり
+- stable model key / TR / TCN / TCのruntime採番、active / deleted ID state、1 model = 1 TCN、target_ref、成果物系列、previous mapping、merge / unmerge / CI↔Disposition状態遷移を含むCI materializeが契約どおり。TR / TCN / model / TCのpartial rerunではprevious full snapshotを維持し、`update_scope_*`内だけdeleted遷移させてscope外activeを保持する
 - 各generatorのtargetがPlan固定の`materializable`を持ち、CI化する全targetがgenerator別canonical `execution / execution_fingerprint`を持つ。EP / BVA / Domain / Decision / combinatorial / grammar / Random / Metamorphicを含め、executionだけで下流が対象・値・条件・期待関係を理解できる。combinatorial targetはdeterministic full rowへ対応し、adapter専用generatorを直接CI化しない。同一CI mergeは同一TCN・同一model・同一execution・同一expected resultに限定される。異なるmodelの同一実行はTCの複数`ci_refs[]`で表現する
 - 再実行がupsertされ重複machine evidenceを作らない
 - semantic dependency preflight済みの現在script正常実行結果だけを保存時`freshness_status=current`とし、`workflow_runtime.py`が再検証してstale伝播する。freshnessの付与主体をworkflowだけに限定せずmaterialize前の循環を作らない
 - stale派生成果物を完了扱いしない
 - `technique_slug`が正規技法だけを表し、内部adapterは正規技法を所有しない。adapter / Coverage childを同じ`condition_structure.py`実行で先に採番し、childが`selection_source / selection_key / derived_from_model_key`を保持する。adapterは意味parameter不足時に`semantic_parameter_requests[]`で`unresolved`、ready時に全child分の直接互換`derived_child_inputs[]`を返す。active Technique Selectionの各selected techniqueが1件以上のcurrent Coverage modelへ到達する。不適用 / 未解決はTechnique Selection更新または既存block / unresolvedで扱い、未定義のselection closureを作らない。エラー推測は1件以上のsemantic CIへ入る
-- machine-readable schema / HTMLをLLMが手変換せず対応scriptが処理する。HTML runtime-v1は`text / number / date / datetime-local`のtype / attribute matrix、disabled / readonlyのvalidation除外、pattern等のunsupportedを契約どおり扱う
+- machine-readable schema / HTMLをLLMが手変換せず対応scriptが処理する。HTML runtime-v1は`text / number / date / datetime-local`のtype / attribute matrix、disabled / readonlyのvalidation除外、pattern等のunsupportedを契約どおり扱う。OpenAPI runtime-v1は解析済みstrict JSON objectを入力とし、YAML parserや追加dependencyをruntimeへ導入しない
 - script間の機械変換ではadapter / child modelを親runtime実行前に`condition_structure.py`で採番し、adapter script自身が固定derived schemaと意味parameterからchild generator互換`derived_child_inputs[]`を生成する。LLMは`semantic_parameter_requests[]`で要求された意味parameterやtarget annotationだけを追加し、machine dataやruntime dependencyを再生成しない
 - 全技法generatorと構造scriptにunit testがある
 - 通常/集約stdin、stdout、item数、byte、depth、state / flow / grammarを含む探索node hard limitとtie-breakが契約どおり
@@ -252,8 +252,9 @@ Plan完了には次をすべて満たす必要があります。
 - 以前whole-model `unsupported`だった成果物も再利用時に現在runtimeでsupport判定を再実行し、現在supportedなら古いfallbackを維持しない
 - question-analysis往復でRuntime Skill / Runtime Unit / model / target / generation fingerprintが失われず、`qa-workflow`の回答適用前preflightで未解決inputを現在runtimeへ再実行して世代一致を確認する。別generationまたはfingerprint未確定issueへ古い回答を自動適用しない
 - target内容またはruntime generation変更時にstable `target_ref` / CI IDを維持しても、古いannotation / Disposition / merge判断と下流TCをcurrent扱いしない
+- environment requirementは同一`environment_key`内だけ同時成立を検査し、異なるkeyを代替環境としてcross-intersectionしない。test data requirementはmodel-wide / target-specificの適用範囲を維持し、target・merge group・TCで実際に同時成立する要求集合だけintersectionする。どちらも元の`requirement_key` identityを維持する
 - unsupported closureは対象generationとreasonが現在値に一致し、許可されたhandling・必要なcurrent`covered_by_entity`の完全identity / fingerprint・既存Disposition条件を満たす場合だけ閉鎖済みとして再利用する。`llm_fallback`は同じmodelのcurrent CIへ解決し、`ブロック中`closureは完了不可。target Dispositionの`重複`はself / cycleがなくcurrent CI / semantic CIへ終端する場合だけ閉鎖済みにする
-- 途中工程開始と`Selection Source=analysis / condition_design / user`が既存workflowを壊さず、runtime派生元をSelection Sourceへ混ぜず、model reuseが選択元を失わず、undetermined signalが未閉鎖のまま完了しない
+- `input_mode=direct|artifact`が途中工程開始と成果物再利用を分離し、directでは前工程Machine Entity / Skill directoryを強制せず、artifactでは必要Machine Entityのmissing / extraを拒否する。途中工程開始と`Selection Source=analysis / condition_design / user`が既存workflowを壊さず、runtime派生元をSelection Sourceへ混ぜず、model reuseが選択元を失わず、undetermined signalが未閉鎖のまま完了しない
 - CIでは全runtime scriptのdispatch / metadata整合、複数用途Skillの対象限定、Coverage targetのCI / Disposition閉鎖、Cause-Effect constraint伝播、Decision Table don't-care merge非破壊性を確認し、実Agent smokeでは代表promptでPython起動、envelope parse、Machine Entity / runtime result採用、Markdown再読込、現在script再実行まで確認できる
 - runtime対象6 Skillの単体移植性が成立し、`spec-analysis`を含む7 Skillのcanonical / Machine Entity helper内容一致を検証できる
 - trigger datasetがSkill別exact count（repository合計328）を満たし、新規技法5種のselection / design境界をtrain・validation双方で検証する
