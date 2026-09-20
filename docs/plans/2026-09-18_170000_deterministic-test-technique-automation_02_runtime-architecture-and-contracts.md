@@ -575,7 +575,7 @@ fingerprint対象の`content`はLLMが自由に再構成しません。各担当
 - Product Risk: `{risk_id, failure, source_refs[], authority_refs[], impact, likelihood, level, mapped_priority}`
 - 技法選択: `{selection_key, applicability_scope, selection_source, signals, candidates[], selected_techniques[], selection_reason, risk_refs[], authority_refs[], condition_design_focus[], status}`
 - change graph node / edge: `{node_key, node_type, source_ref}` / `{edge_key, from, to, edge_type, evidence_refs[]}`
-- 環境 / test data要求: `{requirement_key, dimension_key, operator, normalized_value, authority_refs[], source_target_refs[]}`
+- 環境 / test data要求: `{requirement_key, dimension_key, operator, normalized_value, authority_refs[], source_target_versions[]}`。test dataでは各source targetの`target_ref / target_content_fingerprint / generation_fingerprint`を保持する
 - TR: `{tr_id, text, authority_refs[], risk_refs[], priority, test_level, observation_method}`
 - TCN: `{tcn_id, tr_refs[], condition, category, technique_slugs[], coverage_criterion, authority_refs[], risk_refs[], priority}`
 - model metadata: `{model_key, model_type, technique_slug, parent_tcn_id, selection_source, selection_key}`。内部adapterでは`technique_slug / selection_source / selection_key=null`。Coverage所有modelでは`selection_source=analysis / condition_design / user`を必須とし、`analysis`だけ`selection_key`必須
