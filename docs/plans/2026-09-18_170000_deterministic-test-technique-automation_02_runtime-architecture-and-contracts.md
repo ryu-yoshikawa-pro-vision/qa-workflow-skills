@@ -44,6 +44,10 @@ generatorとvalidatorは独立実装とし、同じ不具合で生成と評価�
 
 ## 2. 追加する実行時script
 
+### `spec-analysis`
+
+`spec-analysis`にはruntime unitを追加しません。ただしAuthority Machine EntityをLLMの手計算で組み立てないため、`scripts/runtime_contract.py`のcanonical JSON / Machine Entity helperと、`scripts/authority_entities.py`を追加します。`authority_entities.py`はAuthority表の正規化済みfieldを受け取り、canonical `content`、`content_fingerprint`、Machine Entity wrapper、期待Authority identityを決定論的に生成します。これはgenerator dispatch、`Machine Runtime Input / Result`、`expected_runtime_units[]`の対象には含めません。
+
 ### `test-analysis`
 
 ```text
@@ -182,15 +186,16 @@ freshnessは既存契約どおり、現在のcanonical machine Entityと正規�
 
 ### 2.2 派生modelの生成
 
-Cause-Effect → Decision Table、Classification Tree → combinatorial、schema → EP / BVA等で別generatorを起動する場合、親runtime結果を匿名の別model inputとして扱いません。
+Cause-Effect → Decision Table、Classification Tree → combinatorial、schema → EP / BVA等で別generatorを起動する場合、親runtime結果を匿名の別model inputとして扱いません。また、active Technique Selectionの閉鎖確認より後にchild modelを作る循環を作りません。
 
-1. adapter modelは`technique_slug=null / selection_source=null / selection_key=null`とする
-2. 親runtimeが`derived.*`を生成し、LLMは派生先で必要な意味パラメータだけを補う
-3. `condition_structure.py`へCoverage所有child model draftを渡し、`model_key`と親TCNを確定する
-4. child modelが正規技法を表す場合は`technique_slug`をchildへ持たせる
-5. 技法の選択元は`analysis / condition_design / user`のいずれかとし、runtimeから派生したこと自体をSelection Sourceにしない
-6. `analysis`由来childは元の`selection_key`を保持し、機械派生元は`upstream_runtime_units[]`へ保存する
-7. adapter出力を正規技法として採用した場合は対応するCoverage所有child modelを必須にする。採用しない候補はTechnique Selectionの`selected_techniques[]`へ残さない。adapter親や別のclosure行でchild欠落を隠さない
+1. LLMがadapterを採用する時点で、adapter model draftと、それから派生させるCoverage所有child model draftを同じ`condition_structure.py`入力へ含める
+2. child model draftは`derived_from_model_draft_key`で同じ入力内のadapter draftを1件だけ参照する。adapterでない親、unknown draft、自己参照、複数親は`invalid_input`
+3. `condition_structure.py`がadapter / child双方の`model_key`と親TCNを先に確定し、active Technique Selectionの`selected_techniques[]`がCoverage所有child modelへ到達することをこの時点で検証する
+4. adapter modelは`technique_slug=null / selection_source=null / selection_key=null`、child modelはcanonical `technique_slug`と`selection_source=analysis / condition_design / user`を持つ。`analysis`由来childだけ元の`selection_key`を保持する
+5. 確定したadapter `model_key`で親runtimeを実行し、`derived.*`を生成する
+6. 固定builderはchildの`derived_from_model_key`から親adapter runtime unitを一意に解決し、child generatorの`upstream_runtime_units[]`へそのcurrent generationを保存する。LLMはruntime dependencyを手入力しない
+7. LLMは派生先で必要な意味パラメータだけを補い、固定builderが親runtimeのmachine outputとjoinして既に採番済みのchild model inputを作る
+8. adapter出力を正規技法として採用した場合は対応childを必須にし、採用しない候補はTechnique Selectionの`selected_techniques[]`へ残さない。adapter親や別のclosure行でchild欠落を隠さない
 
 固定対応:
 
@@ -214,6 +219,7 @@ Cause-Effect → Decision Table、Classification Tree → combinatorial、schema
 - stdoutはruntime envelopeのJSON object 1件だけ。logや説明文を混在させない
 - stderrは人間向け診断だけに使う
 - stdinが空、JSONが複数、末尾に非空白データが残る場合は`invalid_input`
+- strict decode前に失敗し、`runtime_unit_key / input_fingerprint / model_fingerprint / generation_fingerprint`を確定できない場合も、可能なら§3.3のpre-parse error envelopeをstdoutへ返す。callerが推測したfingerprintを補わない
 - subprocess呼び出し側はstdout / stderr / return codeをすべて取得し、return codeだけでroutingしない
 - Skill実行時のsubprocessにも30秒の安全timeoutを設定する。通常の探索停止は§5.3の決定論的hard limitで行い、timeoutをCoverageや探索アルゴリズムの正常終了条件にしない。timeout時はmachine resultを採用せず、成果物metadataでは`runtime_status=internal_error / support_status=unknown / result_status=blocked / runtime_required=true / deterministic_generated=false`として扱い、構造化issueの`issue_type=runtime_execution_timeout`で原因を区別する。`runtime_execution_timeout`を新しい`runtime_status`にはしない
 
@@ -288,7 +294,7 @@ runtime入力は`metadata`とscript固有`input`を分けます。
 - `selection_source`: Coverage所有modelでは`analysis / condition_design / user`のいずれか。内部adapterとartifact scriptでは`null`
 - `selection_key`: `selection_source=analysis`だけ必須。その他は`null`
 - `scope_key`: artifact scriptだけ必須。model scriptでは`null`
-- `upstream_entities`: 実際に消費したMachine Entityを`skill + entity_type + entity_ref`で一意に保持し、runtimeがcanonical `content`から`content_fingerprint`を計算する
+- `upstream_entities`: script固有input内のAuthority / Risk / TR / TCN等の参照のうち、そのscript契約でsemantic dependencyと定義したMachine Entityから固定builderが導出する。callerが参照Entityを任意に省略・追加しない。runtimeはcanonical `content`から`content_fingerprint`を再計算し、参照集合との不足・余分・重複を`invalid_input`にする
 - `upstream_runtime_units`: 他runtime結果を直接利用した場合に`skill + runtime_unit_key + generation_fingerprint`を一意参照として保持する。runtime派生child modelの派生元もここで表し、Selection Sourceへ混ぜない
 - `static_data_versions`: generator結果に影響する静的参照データversion
 - `authority_refs / reference_refs`: 現在有効な製品根拠と補助情報
@@ -354,6 +360,8 @@ scriptが実行できた場合、stdoutは次のJSON object 1件だけです。
 
 output envelopeの`skill`はinput metadataおよびscript所属Skillと一致必須です。`upstream_entity_fingerprints[]`はinput metadataの`upstream_entities[]`からruntimeが計算し、`upstream_runtime_units[]`は入力参照をcanonical順で正規化して保存します。callerがfingerprint結果だけを出力へ注入しません。
 
+strict JSON objectと共通metadataを確定する前に失敗した場合はpre-parse error envelopeを使用します。`skill / generator / runtime_contract_version / generator_contract_version / runtime_implementation_fingerprint / generator_implementation_fingerprint / runtime_status / support_status / result_status / runtime_required / deterministic_generated / payload / issues`は返し、未確定の`runtime_unit_key / model_key / input_fingerprint / model_fingerprint / generation_fingerprint`は`null`、`upstream_entity_fingerprints / upstream_runtime_units`は空配列にします。byte上限やdepth上限をstrict decode前に検出した場合も同じ形で返し、入力内容からidentityを推測しません。
+
 `support_status`は`supported / partial / unsupported / unknown`です。`partial`は同一input内に、独立して機械処理できる範囲と対応subset外の範囲が共存する場合だけ使用します。対応subset外部分は`payload.unsupported_items[]`へstable key、理由、Authorityを保持し、黙って削除しません。`unknown`はsupport判定を完了できなかった場合だけ使用し、`invalid_input / internal_error / not_run`以外では返しません。
 
 `runtime_status`:
@@ -380,7 +388,8 @@ status対応は次で固定します。
 | `ok` | `partial` | `ready`または`unresolved` | `true` | `true` | supported部分を利用し、unsupported itemは後述のclosure契約へ閉じる |
 | `invalid_input` | `unknown` | `blocked` | `true` | `false` | 入力契約違反でsupport判定を完了できない。入力契約を修正 |
 | `unsupported` | `unsupported` | `ready` | `false` | `false` | runtime unitとしてfallback可能。QA成果物全体はfallbackが既存Skill契約へ閉じた場合だけ完了可能 |
-| `limit_exceeded` | `supported`または`partial` | `blocked` | `true` | `false` | model分割またはcontract変更が必要 |
+| `limit_exceeded` | `supported`または`partial` | `blocked` | `true` | `false` | decode済みinputの契約上限超過。model分割またはcontract変更が必要 |
+| `limit_exceeded` | `unknown` | `blocked` | `true` | `false` | decode前のbyte / depth上限超過。pre-parse error envelopeを返す |
 | `internal_error` | `unknown` | `blocked` | `true` | `false` | support判定完了前後を問わず安全側でruntime requiredとして扱い、runtime不具合を修正 |
 | `not_run` | `unknown` | `blocked` | `true` | `false` | Python unavailable。成果物metadataだけで表現 |
 
@@ -418,7 +427,7 @@ Python unavailable時はsupport判定自体を実行できないため、runtime
 ```
 
 - `issue_type`、`blocking`、`skill`、`runtime_unit_key`は必須。runtime issue identityは`(skill, runtime_unit_key)`で扱う
-- runtimeが生成したissueでは`generation_fingerprint`を必須にし、そのissueがどのruntime世代に対するものかを固定する。subprocess timeout等でgenerationを確定できないcaller生成issueだけ`generation_fingerprint=null`を許可する
+- runtimeがcanonical inputを確定した後に生成したissueでは`generation_fingerprint`を必須にし、そのissueがどのruntime世代に対するものかを固定する。pre-parse errorまたはsubprocess timeout等でgenerationを確定できないissueだけ`generation_fingerprint=null`を許可する
 - model scriptでは`model_key`必須、artifact scriptでは`model_key=null`
 - target固有issueだけ`target_key`必須
 - `route_to` / `resume_skill`は既存Skill名だけを許可
