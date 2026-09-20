@@ -504,9 +504,9 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - `expected_runtime_units[]`: `{skill, runtime_unit_key}`。各Skillは`_02` §2.1のdispatch表、現在の対象 / 実行範囲、active TCN / model metadata、条件付き入力の有無から固定builderで期待集合を作り、`qa-workflow`はそれを連結して`workflow_runtime.py`自身を除外する
 - `expected_entities[]`: `{skill, entity_type, entity_ref}`。actual `current_entities[]`や保存済みMachine Entity blockから逆算せず、actual集合と独立したsourceから固定導出する
   - `spec-analysis`: Authority表 / canonical source inventory
-  - `test-analysis`: 人間向け正本とnormalized inputからcontext / Product Risk / Technique Selection / change graph / environment requirement
+  - `test-analysis`: `analysis_entities.py`の正規化inputとcurrent risk / technique / environment runtime resultからcontext / Product Risk / Technique Selection / change graph / environment requirement
   - `test-requirement-design`: `requirement_structure.py`のinput draft + ID mapping / full stateからTR / Disposition
-  - `test-condition-design`: `condition_structure.py`のinput draft + ID mapping / full state、current generator dispatch、`materialize_coverage.py` mappingからTCN / model / CI / test data requirement / Disposition
+  - `test-condition-design`: `condition_structure.py`のinput draft + ID mapping / full state、current generator dispatch、`test_data_requirements.py`の正規化input / result、`materialize_coverage.py` mappingからTCN / model / CI / test data requirement / Disposition
   - `test-case-design`: `case_structure.py`のinput draft + ID mapping / full stateからTC / Disposition
 - 禁止: `current_entities[]`を読んでexpectedを作る、保存済みMachine Entity blockを期待集合の正本にする、missing actual Entityの存在を前提にexpected identityを作る
 - `expected_runtime_units[]`もactual `runtime_units[] / current_runtime_units[]`から逆算せず、固定dispatch条件、対象 / 実行範囲、active structure state、normalized inputから導出する
