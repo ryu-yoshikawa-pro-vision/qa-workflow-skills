@@ -93,7 +93,7 @@ e2e-test-implementation
 
 案件固有のテスト対象資料は、ユーザーまたは案件が指定した保存先へだけ永続化します。`qa-workflow`の案件コンテキストを利用している場合は、既存の`skills/qa-workflow/assets/project-context-template.md`にある`既存QA成果物`欄へ、成果物参照、対象範囲、鮮度 / バージョンを記録します。新しいartifact registry / DBは追加しません。
 
-再利用時は成果物全体の更新日時だけでcurrentと判断せず、今回利用する対象・要素・状態・遷移等がどの確認元と確認日時 / revisionに基づくか確認します。version / build変更時は関連範囲への影響を確認し、影響不明な範囲だけ`test-target-inspection`へ戻します。
+再利用時は成果物全体の更新日時だけでcurrentと判断せず、今回利用する対象・要素・状態・遷移等がどの確認元と確認日時 / revisionに基づくか確認します。version / build変更時は関連範囲への影響を確認し、影響不明な範囲だけ`test-target-inspection`へ戻します。同一buildでも、今回利用する事実へ影響するrole / 権限、viewport、locale、feature flag、テストデータ等の確認条件が異なる場合は、差異が該当事実へ影響しないことを確認できる範囲だけ再利用します。
 
 テスト設計で利用する場合、現在有効なテスト対象資料を`test-case-design`の補助入力として利用できます。UI名称、到達方法、具体手順、観測可能性には利用できますが、期待結果や合格条件の仕様根拠にはしません。
 ## 4. `e2e-test-inspection`との統合
@@ -107,6 +107,7 @@ e2e-test-implementation
 - 同一version / build、または対象変更がないことを別根拠で確認できる。version / build不明時は確認日時だけでcurrentと判断しない
 - `未確認`の値を確認済みとして扱っていない
 - repo参照が現在branch / commitと矛盾していない、または差分が判断へ影響しない
+- role / 権限、viewport、locale、feature flag、テストデータ等、今回再利用する事実へ影響する確認条件が一致するか、差異が該当事実へ影響しない
 
 資料が古い場合は、E2E inspection全体を停止せず、必要な実対象事実だけ`test-target-inspection`へ更新依頼できます。
 
@@ -116,10 +117,11 @@ e2e-test-implementation
 
 既存のPlaywright固有契約を維持します。
 
-`e2e-test-execution`から`test-execution`へ渡すのは、既存出力で確認済みの次の情報です。
+`e2e-test-execution`から`test-execution`へ渡すのは、既存出力で確認済みの次の情報です。`test-execution`はこれらを今回要求されたTC・対象環境と照合してからTC判定へ使用します。
 
 - currentな`TC → E2E実装`対応
-- logical primary対象
+- 今回固定したTC ID集合から解決したlogical primary対象
+- 対象URL / origin、Playwright project、必要な認証 / 開始状態 / テストデータ、version / build ID等の実行条件
 - TC ID（存在時）
 - resolved primary TestCase
 - 実行開始 / 未実行理由
@@ -134,7 +136,7 @@ e2e-test-implementation
 
 異常、未実行、run-level error、cleanup失敗 / 未確認は現行契約どおり`e2e-test-result-analysis`へ渡し、その分析結果を必要なTC判定へ利用します。正常runでは原因分析要求がなければ`test-execution`へ直接接続できます。原因分析をTC期待結果そのものへ変更しません。
 
-自動実行の対応は`TC ID → E2E実装参照 → logical primary → resolved primary TestCase → 実行結果 / 観測証拠`を辿れるようにします。run全体PASS、`outcome=expected`、最終retry PASSだけではTCの`PASS`にしません。TCを`PASS`にする場合は、currentなE2E実装がPASS判定に必要な期待結果を検証していることを、現在有効なE2E実装成果物、`adversarial-review`（対象: `E2E実装`）の結果、または同等の確認済み事実から確認できることを要求します。確認できない場合は`判定不能`として必要な担当Skillへ戻します。
+自動実行の対応は`TC ID → E2E実装参照 → logical primary → resolved primary TestCase → 実行結果 / 観測証拠`を辿れるようにします。今回固定したTC ID集合から必要なlogical primary集合を実行前に解決し、要求外primaryを暗黙追加しません。runner上必要なdependency / teardown等は既存`e2e-test-execution`契約へ委ねます。run全体PASS、`outcome=expected`、最終retry PASSだけではTCの`PASS`にしません。TCを`PASS`にする場合は、currentなE2E実装がPASS判定に必要な期待結果を検証していることを、現在有効なE2E実装成果物、`adversarial-review`（対象: `E2E実装`）の結果、または同等の確認済み事実から確認できることを要求します。`adversarial-review`を根拠にする場合はE2E実装変更後の`要再検証`が残っていない等、reviewがcurrentな実装へ適用できることを確認します。確認できない場合は`判定不能`として必要な担当Skillへ戻します。
 
 ## 6. `e2e-test-reporting`との統合
 
@@ -210,4 +212,4 @@ README / `qa-workflow`では、次を区別して説明します。
 
 実行を要求したTCが理由なく欠落している場合も完了にしません。
 
-`test-target-inspection`についても、ユーザーが実対象確認を要求した範囲に必要な`確認不能`が残り、要求資料を完成できない場合はworkflowを完了にしません。repo由来情報だけで実対象確認済みとして閉じません。
+`test-target-inspection`についても、今回確認すべき範囲に必要な`未確認`または`確認不能`が残り、要求資料を完成できない場合はworkflowを完了にしません。要求範囲外を`未確認`へ混ぜず、repo由来情報だけで実対象確認済みとして閉じません。
