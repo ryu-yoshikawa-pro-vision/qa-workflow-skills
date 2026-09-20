@@ -30,10 +30,11 @@
 3. 実対象で観測した現在の挙動は実装事実として扱い、製品の期待結果や現在有効な仕様根拠へ昇格させません。期待結果の正本は既存の`spec-analysis` / `test-case-design`契約を維持します。
 4. `test-target-inspection` の`assets/`は成果物テンプレートだけを保持します。案件固有のテスト対象資料を`qa-workflow-skills`リポジトリへ自動保存しません。永続化先はユーザーまたは対象案件が指定したパス / リポジトリを使用し、指定・書込能力がない場合は永続更新を実施済みと扱いません。`qa-workflow`の案件コンテキストを利用している場合は、既存の`既存QA成果物`欄へ成果物参照・範囲・鮮度を記録し、新しいartifact registryは追加しません。
 5. `test-execution` を新規Skillとして追加し、詳細テストケースを実行して期待結果と実測結果を比較し、TC単位の結果を確定する責務を持たせます。自動化対象かどうかを入力条件にしません。
-6. 現スコープの実行方式は`AI直接操作`と`自動実行`です。実行方式はTC単位で決め、同一成果物内で混在可能とします。`AI直接操作`では利用可能なbrowser / computer操作能力で実対象を操作します。`自動実行`では既存の`e2e-test-execution`等が取得した検証済みrunner事実を利用します。新しい汎用browser frameworkやrunnerは追加しません。
+6. 現スコープの実行方式は`AI直接操作`と`自動実行`です。実行方式はTC単位で決め、同一成果物内で混在可能とします。`AI直接操作`では利用可能なbrowser / computer操作能力で実対象を操作します。`自動実行`では既存の`e2e-test-execution`等が取得した検証済みrunner事実を利用します。今回新しい実行を要求されている場合は過去結果だけで代替せず、currentな今回runがなければ既存`e2e-test-execution`へ実行を委譲します。新しい汎用browser frameworkやrunnerは追加しません。
 7. 既存`e2e-test-execution`は削除・汎用化しません。Playwright固有のproject、retry、repeat、reporter、raw result、artifact、process ownership、cleanup等の契約を維持し、`test-execution`へ移しません。
-8. `test-execution` のTC結果状態は`PASS / FAIL / 未実行 / 判定不能`を基本とします。`ブロック中`はTC結果ではなくSkill / workflow状態として扱います。実行基盤・認証・環境・準備の失敗を製品の`FAIL`へ変換せず、実測できない期待結果を推測でPASSにしません。TC結果とcleanup状態も別軸で保持します。
-9. 既存E2Eをraw runner結果だけ取得する要求は、従来どおり`e2e-test-execution`から直接開始可能とします。TCの実行結果判定を要求された場合だけ`test-execution`へ接続します。
-10. 今回要求されたTC集合と`test-execution`結果集合の完全性は`test-execution`自身のvalidatorで確認します。`coverage-analysis`へ新しい`TC → テスト実行結果`用途は追加しません。
-11. 現`main`基準では14 Skillを16 Skillへ増やします。既存の「train 12 / validation 8 query、semantic 2 case / Skill」契約を維持する場合、この変更単独ではtrigger queryは280→320、semantic caseは28→32になります。実装開始時に基準branch側の契約が変わっていれば、当時の正本に合わせて再計算します。
-12. このPlanではPlanファイル以外を変更しません。Skill本体、Asset、validator、CI、README、EVALSの実装は後続作業で行います。
+8. `test-execution` のTC結果状態は`PASS / FAIL / 未実行 / 判定不能`を基本とします。`ブロック中`はTC結果ではなくSkill / workflow状態として扱います。実行基盤・認証・環境・準備の失敗を製品の`FAIL`へ変換せず、実測できない期待結果を推測でPASSにしません。TC結果、TCに定義された事後状態 / 後処理、実行時cleanup、Playwright runner管理cleanupを混同しません。
+9. 既存E2Eをraw runner結果だけ取得する要求は、従来どおり`e2e-test-execution`から直接開始可能とします。TCの実行結果判定を要求された場合だけ`test-execution`へ接続します。異常、未実行、run-level error、cleanup失敗 / 未確認は現行E2E契約どおり`e2e-test-result-analysis`を経由し、その分析後に必要なTC判定を`test-execution`で行います。
+10. 今回要求されたTC集合と`test-execution`結果集合の完全性は`test-execution`自身のvalidatorで確認します。範囲指定で依頼された場合も、実行開始前に今回の具体的なTC ID集合へ解決して母集団を固定します。`coverage-analysis`へ新しい`TC → テスト実行結果`用途は追加しません。
+11. `test-target-inspection`でユーザーが実対象確認を要求した範囲に必要な`確認不能`が残る場合は、repo情報だけで実対象確認済みとせず、要求成果物を完成できない範囲をworkflow上`ブロック中`として扱います。成果物の観測事実とSkill完了状態を分離します。
+12. 現`main`基準では14 Skillを16 Skillへ増やします。既存の「train 12 / validation 8 query、semantic 2 case / Skill」契約を維持する場合、この変更単独ではtrigger queryは280→320、semantic caseは28→32になります。実装開始時に基準branch側の契約が変わっていれば、当時の正本に合わせて再計算します。
+13. このPlanではPlanファイル以外を変更しません。Skill本体、Asset、validator、CI、README、EVALSの実装は後続作業で行います。
