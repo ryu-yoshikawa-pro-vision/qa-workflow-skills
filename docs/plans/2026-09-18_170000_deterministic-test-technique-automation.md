@@ -1,6 +1,6 @@
 # テスト分析・テスト技法の決定論的自動化Plan
 
-このPlanは長文化するため、内容を見出し境界で分割しています。レビュー・実装時は以下5ファイルを順に読み、全体を1つのPlanとして扱ってください。
+このPlanは長文化するため、責務ごとに分割しています。レビュー・実装時は以下10ファイルを順に読み、全体を1つのPlanとして扱ってください。
 
 ## 対象ブランチ
 
@@ -15,10 +15,15 @@
 ## 構成
 
 1. [目的・現状・自動化対象の全体一覧](./2026-09-18_170000_deterministic-test-technique-automation_01_scope-and-inventory.md)
-2. [実行時アーキテクチャ・入力出力契約](./2026-09-18_170000_deterministic-test-technique-automation_02_runtime-architecture-and-contracts.md)
-3. [各テスト技法のgenerator・検査ロジック](./2026-09-18_170000_deterministic-test-technique-automation_03_generators-and-algorithms.md)
-4. [UIパターン・外部標準・既存プロジェクトの扱い](./2026-09-18_170000_deterministic-test-technique-automation_04_ui-patterns-and-external-references.md)
-5. [評価・CI・実装順序・完了条件](./2026-09-18_170000_deterministic-test-technique-automation_05_evaluation-ci-implementation-order.md)
+2. [共通runtime・Machine Entity・fingerprint契約](./2026-09-18_170000_deterministic-test-technique-automation_02_runtime-architecture-and-contracts.md)
+3. [stable ID・materialize・workflow契約](./2026-09-18_170000_deterministic-test-technique-automation_02_identity-materialize-and-workflow-contracts.md)
+4. [基本generator・状態遷移](./2026-09-18_170000_deterministic-test-technique-automation_03_generators-and-algorithms.md)
+5. [シナリオ・CRUD・schema・Random・Metamorphic等のgenerator](./2026-09-18_170000_deterministic-test-technique-automation_03_additional-generators.md)
+6. [artifact処理・script別入出力契約](./2026-09-18_170000_deterministic-test-technique-automation_03_artifact-processing-and-script-contracts.md)
+7. [UIパターン・外部標準・既存プロジェクトの扱い](./2026-09-18_170000_deterministic-test-technique-automation_04_ui-patterns-and-external-references.md)
+8. [unit test・共通契約・技法回帰](./2026-09-18_170000_deterministic-test-technique-automation_05_evaluation-ci-implementation-order.md)
+9. [validator・semantic eval・CI・文書更新](./2026-09-18_170000_deterministic-test-technique-automation_05_validation-ci-and-docs.md)
+10. [実装順序・リスク・完了条件](./2026-09-18_170000_deterministic-test-technique-automation_05_implementation-order-and-completion.md)
 
 ## このPlanの基本方針
 
