@@ -668,6 +668,8 @@ machine dataに存在しない表示専用の備考やMarkdown整形は`content`
 
 Machine Entityの`upstream_entity_dependencies[]`は次を最低限含めます。直接参照していない無関係Entityを追加しません。
 
+`input_mode=artifact`では以下に列挙した外部semantic dependencyをcurrent Machine Entityへ完全解決します。`input_mode=direct`では、既存Skill契約が許す直接入力のうち実際にcurrent Machine Entityとして渡された参照だけを`upstream_entity_dependencies[]`へ保存し、存在しない前工程Entityを合成しません。direct inputの構造化内容自体はstructure / artifact runtimeの`input_fingerprint / generation_fingerprint`へ入り、そのruntimeを生成Entityの`runtime_dependencies[]`へ保存するため、直接入力の内容変更もstale判定できます。
+
 - Authority: なし。関連Authority IDはcontent内の関係として保持するが、別Authorityの内容変更で自動staleにするかは既存`spec-analysis`の関係解決結果に従う
 - test-analysis context: scope / objective / test level / environment constraint / exclusion / blocker / test focus / testability判断で実際に参照したAuthority / Product Risk
 - Product Risk: `authority_refs[]`のAuthorityに加え、`source_refs[]`のうちrisk判断より上流のAuthority / change graph等としてMachine Entityへ解決でき、実際に使用したsource Entity。既存TR / TCN / CI / TC等の下流QA成果物をrisk evidenceとして参照しても`upstream_entity_dependencies[]`へ逆向きedgeを作らず、content上のsource referenceとして保持する。これにより`Risk → … → TC → Risk`のdependency cycleを作らない
