@@ -863,6 +863,7 @@ repository全体は328 queryです。
 既存`.github/workflows/deterministic-output-evals.yml`へ追加します。
 
 ```bash
+python -m compileall -q skills/spec-analysis/scripts
 python -m compileall -q skills/test-analysis/scripts
 python -m compileall -q skills/test-requirement-design/scripts
 python -m compileall -q skills/test-condition-design/scripts
@@ -885,7 +886,7 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 
 ## 10. Skill単体移植性
 
-次の6 Skillを単体コピーして代表scriptをCLI実行します。
+runtime対象の次の6 Skillを単体コピーして代表scriptをCLI実行します。加えて`spec-analysis`も単体コピーし、`authority_entities.py`によるAuthority Machine Entity生成と`runtime_contract.py`のcanonical / Machine Entity helperが外部repository helperなしで動作することを検証します。
 
 - `test-analysis`
 - `test-requirement-design`
@@ -897,7 +898,7 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 確認:
 
 - repo rootのeval helperをimportしない
-- 6 Skillの`scripts/runtime_contract.py`がLF正規化後のSHA-256で一致
+- `spec-analysis`を含む7 Skillの`scripts/runtime_contract.py`がLF正規化後のSHA-256で一致
 - network不要
 - runtime dependencyがPython 3.11標準ライブラリだけで、外部package manifestを必要としない
 - generator scriptがSkill-local Python moduleとしてimportできるのは`runtime_contract.py`だけで、fingerprint対象外helperへ実行ロジックを逃がさない
@@ -918,7 +919,8 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 
 ### `spec-analysis`
 
-- runtimeは追加しない
+- runtime unitは追加しない
+- `scripts/runtime_contract.py`と`scripts/authority_entities.py`を追加し、Authority Machine Entity / expected identityを決定論的に生成する
 - `assets/output-template.md`へAuthorityの`Machine Entities` canonical JSON blockを追加する
 - Authority表とMachine EntityのID / 種別 / 現在有効な内容 / 適用範囲 / 情報源 / 関係 / 関連Authorityの一致をvalidatorで確認する
 
