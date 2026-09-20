@@ -137,7 +137,7 @@ CI単位の`merge_group`と、TCが複数CIを参照する意味判断を分離�
 | `ui_pattern_candidates.py` | pattern / alias、attributes | `ui:<pattern_key>:<candidate_key>` | candidate / references |
 | `test_data_requirements.py` | requirements[] | `data:<requirement_key>` | merged requirements / conflicts |
 | `random_testing.py` | seed、case count、distribution | `random:case:<1-based zero-padded 6 digits>` | generated input / completion |
-| `metamorphic.py` | relations[] | §18 key | follow-up input / completion |
+| `metamorphic.py` | relations[] | [追加generator契約](./2026-09-18_170000_deterministic-test-technique-automation_03_additional-generators.md) §18 key | follow-up input / completion |
 | `case_structure.py` | TCN / CI / TC / Disposition | `violation:<type>:<entity_id>` | violations / derived priority |
 | `traceability.py` | nodes / edges / dispositions / runtime units / Machine Entity state | `gap:<type>:<entity_id>` | gaps / orphan / stale / closed dispositions |
 | `materialize_coverage.py` | TCN、generator targets、target annotations、previous mapping、merge groups | target ref → CI ID | CI mapping / stale / machine rows |
@@ -414,12 +414,12 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 
 - required: `input_label`, `seed`, `case_count`, `distribution`
 - `input_label`は生成値を適用する入力対象を第三者が識別できる非空文字列
-- distributionは§17の3 schemaのいずれか一つ
+- distributionは[追加generator契約](./2026-09-18_170000_deterministic-test-technique-automation_03_additional-generators.md) §17の3 schemaのいずれか一つ
 
 #### `metamorphic.py`
 
 - required: `relations[]`
-- relationは§18形式に`relation_label`を加え、`relation_label`を非空必須とする。`expected_relation.output_path / output_kind`も必須
+- relationは[追加generator契約](./2026-09-18_170000_deterministic-test-technique-automation_03_additional-generators.md) §18形式に`relation_label`を加え、`relation_label`を非空必須とする。`expected_relation.output_path / output_kind`も必須
 - `source_id`はrelation内一意
 - `follow_ups[]`は1..10,000件で`follow_up_key`をrelation内一意
 - 各follow-upの`transforms[]`は1件以上で宣言順に適用する
@@ -478,7 +478,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - inactive target / semantic itemの復帰は同じidentityへの明示reuseかつ過去CIが別identityへ再利用されていない場合だけ同じCIを復帰できる。deleted CI / semantic item keyを別identityへ再利用しない
 - semantic itemのmodel変更はreuse不可。同じsemantic item keyをreuseしてもcontent fingerprintが変わればCI content fingerprintを変え、既存TCをstaleにする
 - merge groupは[identity・materialize契約](./2026-09-18_170000_deterministic-test-technique-automation_02_identity-materialize-and-workflow-contracts.md) §7.4の`{merge_group_key, model_key, target_refs[], target_versions[]}`を使う。Dispositionされていない同一TCN・同一model内targetだけを許可し、全target versionを現在model resultへ一致させる。`execution_fingerprint`と`expected_result_root`が全件一致する場合だけ同一CIへ統合し、異なるmodel / 技法 / execution / expected resultを統合しない
-- merge group内の追加test data requirementは§16と同じintersection規則で統合し、conflict / unsupportedならmergeを拒否する。異なるCIを1つのTCへまとめる意味判断は`case_structure.py`の`ci_refs[]`で行い、merge groupへ逆変換しない
+- merge group内の追加test data requirementは[追加generator契約](./2026-09-18_170000_deterministic-test-technique-automation_03_additional-generators.md) §16と同じintersection規則で統合し、conflict / unsupportedならmergeを拒否する。異なるCIを1つのTCへまとめる意味判断は`case_structure.py`の`ci_refs[]`で行い、merge groupへ逆変換しない
 - `materializable=false`のadapter / diagnostic専用targetはCI採番、annotation、Dispositionの対象外。正規Coverage基準上必要だがlinear executionへ落とせないtargetはcurrent target versionを持つsemantic Coverage Itemまたは既存Skillで許可されたtarget Dispositionへ1回だけ閉じる
 - `target_dispositions[]`にあるmaterializable targetはCI採番対象から除外するが、generator固有の`coverage_summary`または`completion_summary`自体は変更しない
 - new CI候補はcanonical `(model_key, source_kind, source_key)`順で採番する。`runtime_target < semantic_item`、runtime targetのsource keyは`target_ref`、semantic itemはnewなら`draft_key`、reuseなら`reuse_semantic_item_key`。raw入力順で採番しない
