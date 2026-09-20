@@ -13,6 +13,8 @@
 
 新規Skillについて、repo内評価だけで実Agent上の発火をPASS扱いしません。現行`EVALS.md`と同様、repo内ではデータセット構造と出力契約を検証し、実Agent上の発火評価は別に扱います。
 
+新規Skillの`evals/deterministic/validator.py`は出力評価インフラとして使用し、Skill実行時のruntime validatorにはしません。runtimeの最終出力確認は各`SKILL.md` / guidanceに既存Skillと同じ自己検証契約として定義します。
+
 ## 2. Skill数と固定値
 
 基準branchでは正規Skillは14です。本変更で次を追加します。
@@ -60,14 +62,15 @@ negativeには最低限、次を含めます。
 最低限、次を検査します。
 
 - 正規セクション / テーブルが存在する
-- 対象キーが一意
-- 要素キーが一意
+- 対象キーが一意で、新規成果物では文書ローカルの`target-001`形式を使用し、削除確認済みキーを再利用しない
+- 要素キーが一意で、新規成果物では文書ローカルの`element-001`形式を使用する
 - 要素の対象キーが存在する
-- 状態キーが一意
+- 状態キーが一意で、新規成果物では文書ローカルの`state-001`形式を使用する
 - 状態の対象キーが存在する
 - 操作・遷移、データ・権限依存、既存テスト実装との対応、未確認事項が参照する`対象キー / 要素キー / 状態キー`は現在成果物に存在する、または`未使用`等の明示状態である。`今回の更新`の`追加 / 更新 / 変更なし`も現在成果物のキーを参照するが、`削除確認`だけは更新前成果物に存在したキーへの参照を許可する
 - 確認元が空でない
-- 画面 / 要素 / 状態 / 操作・遷移 / データ・権限依存等の各記録が確認元、確認version / build、確認日時 / revisionへ追跡できる
+- 画面 / 要素 / 状態 / 操作・遷移 / データ・権限依存等の各記録が確認元、確認version / build、確認日時 / revision、該当事実へ影響する確認条件へ追跡できる
+- repo由来事実でbranch / commitだけでなくworking tree状態を保持し、未commit変更に依存した事実をHEADだけでcurrentとみなさない
 - `今回確認`と`既存資料から継承・未再確認`を区別し、部分更新で未再確認行の確認version / build・確認日時 / revisionを今回値へ上げない
 - 確認version / buildと確認日時 / revisionが値または明示的未確認状態を持つ
 - version / buildが値または明示的未確認状態を持つ
@@ -80,6 +83,7 @@ negativeには最低限、次を含めます。
 - 削除確認fixtureでは、実対象UI / 状態 / 遷移は同一対象条件の実対象で不存在を確認するか、repoだけで不存在を証明できる明確な根拠がある場合だけ除外し、Page Object / fixture / helper等のrepo事実は対象revisionで不存在を確認した場合だけ除外する。`削除確認`のキーは更新前成果物に存在することを確認し、単に見つからない対象や存在しなかったキーを削除扱いしない
 - inspection副作用fixtureでは対象origin、許可範囲、最大回数、実施回数、実施結果、cleanup方法 / 結果、残存状態が記録され、実施回数が最大回数を超えない
 - 永続保存fixtureでは保存結果が存在し、保存・更新自体が要求成果物なのに`未保存 / 保存後不整合`のまま完成扱いしない
+- 既存成果物更新fixtureでは候補作成時の更新元revision / content identityと保存直前の対象状態が一致し、途中変更がある場合に古い候補で上書きしない
 
 意味判断が必要な次はdeterministic validatorへ入れません。
 
@@ -96,10 +100,10 @@ negativeには最低限、次を含めます。
 2. 現在観測した実装を仕様Authorityへ昇格しない
 3. テスト設計・AI直接操作・E2E inspectionから利用可能な粒度で整理する
 4. 更新時に既存の有効情報を不必要に消さず、変更範囲だけを更新する
-5. 古い確認日時 / version / revisionの資料を現在値として扱わず、version / build変更時は関連範囲だけ再確認する。部分更新で未再確認行の確認version / buildを今回値へ上書きしない
+5. 古い確認日時 / version / revisionの資料を現在値として扱わず、version / build変更時は関連範囲だけ再確認する。部分更新で未再確認行の確認version / build・revision・確認条件を今回値へ上書きせず、repo由来事実ではworking tree差もcurrent判定へ含める
 6. 存在しないUI要素、locator、Page Object、routeを創作しない
 7. live target確認要求をrepo確認だけで満たした扱いにしない
-8. 永続更新では候補成果物を検証してから保存し、保存できない場合に更新済みと表現しない。永続保存・更新自体が要求成果物なら、保存先不明、書込不能、安全な差分更新不能、保存後不整合を残したまま完了扱いしない
+8. 永続更新では候補成果物を検証してから保存し、保存直前に更新元成果物が候補作成時から変わっていないことを確認する。途中変更があれば古い候補で上書きせず、保存できない場合も更新済みと表現しない。永続保存・更新自体が要求成果物なら、保存先不明、書込不能、安全な差分更新不能、保存後不整合を残したまま完了扱いしない
 9. `未確認`を今回確認対象だが未確認、`確認不能`を今回確認対象だが確認できない状態として区別し、要求範囲外を`未確認`へ混ぜない。必要な`未確認 / 確認不能`が残る場合にrepo情報だけで完了扱いしない
 10. 通常の`test-target-inspection`では実対象事実を正本とし、repo / workspaceだけの確認を実対象確認済みへ昇格しない。ユーザーがrepo限定調査を明示した場合だけその限定成果物として扱う
 11. inspectionで永続的副作用を伴う操作が必要な場合は対象origin、許可範囲、最大回数、cleanup方法を確認し、確認できなければ操作しない。再試行を含む実施回数を記録して最大回数を超えず、実施した副作用とcleanup結果を成果物へ残す
@@ -109,6 +113,8 @@ semantic evalは最低2 case作成します。
 
 - 新規作成
 - 既存資料の部分更新
+
+現行契約がsemantic 2 case / Skillのexact countを要求する場合もcase数を機械的に増やしません。ただし`rubric.json`でcriticalにした各criterion IDが最低1件のsemantic caseから参照されることを必須にし、2 caseの組み合わせでcritical基準を取りこぼさないことをdataset testで確認します。
 
 ## 4. `test-execution` の評価
 
@@ -128,6 +134,7 @@ negativeには最低限、次を含めます。
 - Playwright runの人間向け報告 → `e2e-test-reporting`
 - TC設計 → `test-case-design`
 - テスト対象資料作成 → `test-target-inspection`
+- API / DB専用runnerでのTC実行や新しい実行基盤の追加 → 本変更の`test-execution`対象外
 
 新規2 Skill側のnegativeだけで境界検証を完了扱いにしません。全Skill同時利用の正規発火評価で双方向の誤発火を検出できるよう、`e2e-test-inspection`、`e2e-test-execution`、`test-case-design`等の隣接Skillについて、既存train / validation件数を維持したまま必要なnegative queryを置換・再配分します。置換は意味的に重複しているnegativeを優先し、既存の固有境界をrepository全体から消しません。削るqueryが担っていた境界はtrain / validationの別caseまたは同等caseで引き続き検証されていることを確認します。既存Skillのquery総数は増やしません。
 
@@ -155,11 +162,15 @@ negativeには最低限、次を含めます。
 - cleanup必須fixtureでは実行時cleanup状態が存在し、後処理 / cleanup失敗で確定済みTC結果を書き換えない
 - runner異常fixtureで対象TCを製品FAILとして誤分類しない
 - 観測不能fixtureでPASSにせず、実行開始済みなら`判定不能`にする
-- 自動実行fixtureではTC識別子 → E2E実装 → logical primary → resolved primary TestCase → 実行結果の対応が追跡できる。既存`TC → E2E実装`対応を使う場合は既存TC IDと今回TC識別子が同一TCを指す
-- 固定した今回TC識別子集合の自動実行subsetから今回必要なlogical primary集合を実行前に解決し、要求外primaryを暗黙追加しない。runner上必要なdependency / teardownは別扱いとする
+- 自動実行fixtureでは今回TC識別子 → 既存TC ID（存在時のみ） → E2E実装 → E2E実装revision / working tree → logical primary → E2E実行成果物 → resolved primary TestCase → 実行結果の対応が追跡できる。既存`TC → E2E実装`対応を使う場合は既存TC IDと今回TC識別子が同一TCを指し、外部IDを既存TC IDへ変換しない
+- 固定した今回TC識別子集合の自動実行subsetから今回必要なlogical primaryを実行前に解決し、同一`e2e-test-execution`へ渡すlogical primary集合を一意化して要求外primaryを暗黙追加しない。複数TCが同じlogical primaryへ対応してもTCとの追跡関係は保持する。runner上必要なdependency / teardownは別扱いとする
+- URL / project / 認証 / 開始状態 / テストデータ / 副作用・cleanup等のpreflight条件を1 runで両立できない自動実行subsetは、条件が両立する集合へ分けて複数のE2E実行成果物を追跡する
 - TC要求の対象条件と`e2e-test-execution`が記録したURL / origin、Playwright project、必要なrole / 認証条件、開始状態 / テストデータ、version / build等のうち判定へ影響する条件が整合する
 - 自動実行対応表に独自の`対応状態`を追加せず、既存E2E実装参照・resolved primary・実行結果とTC結果を使用する
 - run全体PASS、`outcome=expected`、最終retry PASSだけをTC PASS根拠にしない
+- 自動実行対応の各行がE2E実行成果物参照と`TC判定 / 診断のみ`の利用区分を持ち、診断runだけを正式TC PASS根拠にしない
+- E2E期待結果検証の根拠に`adversarial-review`を使う場合、review成果物から対象E2E実装revision / working treeへ追跡できる
+- 実行開始後のTC追加・除外または方式変更fixtureでは開始時の固定TC集合を同じ成果物内で書き換えず、変更後要求を別実行として扱う
 
 ### 4.3 意味評価
 
@@ -177,14 +188,21 @@ critical候補:
 10. 今回の新規実行要求を過去の`test-execution`成果物だけで代替しない
 11. AI直接操作で副作用操作の結果が不明な場合は状態確認なしに盲目的再試行せず、重複副作用を回避できなければ`判定不能`または`ブロック中`として停止する
 12. 自動実行でcurrentな今回runがなければ`e2e-test-execution`へ戻し、異常・未実行・run-level error・cleanup問題は既存契約どおり`e2e-test-result-analysis`を経由する
-13. 自動実行でTCをPASSにする前に、currentなE2E実装がPASS判定に必要な期待結果を検証していると確認できる。`adversarial-review`を根拠にする場合はE2E実装変更後の`要再検証`が残っていない等reviewの鮮度も確認し、確認できなければ`判定不能`とする
-14. 自動実行では固定TC識別子集合の自動実行subsetから必要logical primary集合を解決し、要求外primaryを暗黙実行しない。TC要求とrunの対象環境差も判定前に確認する
+13. 自動実行でTCをPASSにする前に、currentなE2E実装がPASS判定に必要な期待結果を検証していると確認できる。`adversarial-review`を根拠にする場合は対象E2E実装revision / working treeへ追跡し、E2E実装変更後の`要再検証`が残っていない等reviewの鮮度も確認し、確認できなければ`判定不能`とする
+14. 自動実行では固定TC識別子集合の自動実行subsetから必要logical primaryを解決し、同一runへ渡す集合を一意化して要求外primaryを暗黙実行しない。TC要求とrunの対象環境差も判定前に確認する
 15. AI直接操作 / 自動実行が混在する場合は`test-execution`が固定TC識別子集合と方式を保持し、自動実行subsetだけをE2E Skillへ委譲して同じ`test-execution`へ再開し、同一TCを二重実行せず結果を統合する
+16. currentな`TC → E2E実装`対応が欠落・陳腐化している場合は対応を推測せず`coverage-analysis`（対象: `TC → E2E実装`）へ戻す
+17. E2Eコード変更が必要でも、実装・更新がユーザー要求またはworkflow範囲に含まれない実行依頼から`e2e-test-implementation`へ暗黙に進まない
+18. 自動実行subsetのpreflight条件が1 runで両立しない場合は安全に両立する集合へ分け、複数E2E実行成果物を同じ`test-execution`へ統合する
+19. `e2e-test-result-analysis`からの診断runを正式TC実行と区別し、診断runだけで正式結果をPASSへ置き換えない
+20. 実行開始後のTC追加・除外または方式変更で開始時の固定TC集合を同一成果物内で書き換えず、別の`test-execution`として扱う
 
 semantic evalは最低2 case作成します。
 
 - AI直接操作でPASS / FAIL / 判定不能が混在し、TC間の開始状態、TC後処理、安全cleanupを分離する複数TC
 - 自動実行結果利用で未実行またはrunner異常を含み、既存`e2e-test-result-analysis` routingと期待結果検証の十分性を守り、raw statusだけではTC PASSにしないTC
+
+現行契約がsemantic 2 case / Skillのexact countを要求する場合もcase数を機械的に増やしません。ただし`rubric.json`でcriticalにした各criterion IDが最低1件のsemantic caseから参照されることを必須にします。自動実行側caseには、TC ID境界、複数TCから同一logical primaryへの対応、複数run分割、review鮮度、診断run分離、既存Skillへの修正routingを組み合わせて検証します。
 
 ## 5. `qa-workflow` 評価
 
@@ -230,6 +248,12 @@ routing caseへ最低限、次を追加します。
 - 分析後にTC判定が要求されている場合だけ`test-execution`へ接続し、Playwright raw fact自体をTC結果へ置き換えない
 
 ### `e2e-test-reporting`
+### `coverage-analysis` / `adversarial-review`
+
+- `coverage-analysis`の既存`TC → E2E実装`追跡責務を、対応欠落・陳腐化時の修正先として再利用する。`TC → テスト実行結果`という新用途は追加しない
+- `adversarial-review`（対象: `E2E実装`）は既存の期待結果 / assertionレビュー責務を維持し、TC実行を所有しない
+- E2E実装reviewを`test-execution`のPASS根拠へ再利用するため、review対象のE2E実装revision / working treeを成果物から追跡できる最小契約を追加し、関連deterministic / semantic evalを同期する
+
 
 - Playwright run報告の責務を維持する
 - 汎用TC結果報告へ拡張しない
@@ -263,6 +287,7 @@ routing caseへ最低限、次を追加します。
 - `tests/skills/evals/semantic/test_repository_structure.py`の正規Skill一覧へ2 Skillを追加する
 - 現行契約が維持されている場合は`tests/skills/evals/semantic/test_semantic_datasets.py`のrepository合計28を32へ更新する
 - PR #11等でSkill別expected count mapへ移行済みなら、その時点の正規一覧・Skill別exact count・repository合計へ2 Skill分を追加し、旧32固定値へ戻さない
+- 新規2 Skillでは`rubric.json`のcritical criterion IDが最低1件のsemantic caseから参照されることをdataset testで確認する。既存Skillへ同じ制約を一括適用して無関係な回帰を起こさない
 
 ### 共通validator
 
@@ -322,6 +347,7 @@ routing caseへ最低限、次を追加します。
 - deterministic output eval / validator
 - semantic eval
 - `e2e-test-inspection`再利用契約
+- 文書ローカルキーの新規採番 / 安定維持、確認条件、repo working tree、更新元revision / content identity、保存直前の競合確認、最終出力自己検証
 
 ### Step 4: `test-execution`
 
@@ -331,9 +357,10 @@ routing caseへ最低限、次を追加します。
 - trigger eval
 - deterministic output eval / validator
 - semantic eval
-- テストケース入力元、入力側の既存一意TC識別子、実行対象TC識別子集合、TC revision未提供、外部 / 直接入力TCの期待結果境界、既存結果再利用、AI直接操作preflight、副作用実施回数、TC後処理 / cleanup、結果不明な副作用操作の再試行禁止
-- 自動実行のTC識別子 → E2E実装 → logical primary固定 → resolved primary → 結果追跡、対象環境整合、期待結果検証とreview鮮度の十分性確認
-- AI直接操作 / 自動実行混在時のsubset委譲・同一`test-execution`再開・重複実行防止
+- テストケース入力元、入力側の既存一意TC識別子、今回TC識別子と既存E2E `TC ID`の分離、実行開始後に不変なTC識別子集合、TC revision未提供、外部 / 直接入力TCの期待結果境界、既存結果再利用、AI直接操作preflight、副作用実施回数、TC後処理 / cleanup、結果不明な副作用操作の再試行禁止
+- 自動実行の今回TC識別子 → 既存TC ID（存在時のみ） → E2E実装 / revision / working tree → logical primary → E2E実行成果物 → resolved primary → 結果追跡、対象環境整合、期待結果検証とreview鮮度の十分性確認
+- 同一logical primaryの委譲集合一意化、preflight条件ごとの複数E2E run分割、診断runと正式TC実行の分離
+- AI直接操作 / 自動実行混在時のsubset委譲・同一`test-execution`再開・重複実行防止、最終出力自己検証
 - `e2e-test-execution` / `e2e-test-result-analysis`の既存異常routingを維持
 
 ### Step 5: 既存Skillとの接続
@@ -342,7 +369,9 @@ routing caseへ最低限、次を追加します。
 - `question-analysis`へ`test-target-inspection` / `test-execution`の再開routingを追加
 - `e2e-test-inspection`へテスト対象資料の任意再利用境界を追加
 - `e2e-test-execution` / `e2e-test-result-analysis`の既存routingを変更せず、`test-execution`への接続だけを必要最小限で追加
-- `adversarial-review`（対象: `E2E実装`）の既存期待結果 / assertionレビューを自動実行PASS判定の確認元として再利用
+- `coverage-analysis`（対象: `TC → E2E実装`）を対応欠落・陳腐化時の既存修正先として再利用し、新用途は追加しない
+- `adversarial-review`（対象: `E2E実装`）の既存期待結果 / assertionレビューを自動実行PASS判定の確認元として再利用し、対象E2E実装revision / working treeを追跡できる最小契約を同期する
+- E2Eコード変更は実装・更新がユーザー要求 / workflow範囲に含まれる場合だけ`e2e-test-implementation`へroutingする
 - `test-case-design` / `question-analysis`自身の回帰評価を更新
 - 隣接Skillのtrigger negativeを件数維持のまま置換・再配分し、既存の固有境界が別caseで残ることを確認
 - `coverage-analysis`へ新用途は追加しない
@@ -405,6 +434,12 @@ routing caseへ最低限、次を追加します。
 - `test-execution`結果の完全性確認だけのために`coverage-analysis`へ新しい比較対象を追加する
 - 操作・遷移や期待結果のためだけに新しい共通ID体系を追加する
 - test execution履歴管理のためだけに新しいrun registry / DBを追加する
+- `evals/deterministic/validator.py`をSkill runtimeのvalidatorとして呼び出す
+- 任意形式の既存テスト対象資料を更新するためだけに汎用document parser / mergerを追加する
+- 複数TCが同じlogical primaryへ対応するとき、TC数だけ同じlogical primaryをrunnerへ重複指定する
+- preflight条件が両立しない自動実行TCを1回の`e2e-test-execution`へ無理にまとめる
+- 診断runだけを正式TC結果のPASS根拠へ昇格する
+- 実行だけの要求からE2Eコード変更を暗黙許可する
 
 ## 11. 完了条件
 
@@ -413,27 +448,34 @@ routing caseへ最低限、次を追加します。
 - 正規Skillが16件になっている
 - `test-target-inspection`が独立Skillとして作成・部分更新でき、`未確認`を今回確認対象だが未確認、`確認不能`を今回確認対象だが確認できない状態として区別し、要求範囲外を`未確認`へ混ぜず、必要な`未確認 / 確認不能`をrepo情報だけで完了扱いしない
 - テスト対象資料の操作・遷移、データ・権限依存、更新履歴が既存の`対象キー / 要素キー / 状態キー`へ追跡できる
+- 新規テスト対象資料で`target-001` / `element-001` / `state-001`の文書ローカルキーを安定して採番し、既存資料の別キー規則は不要に置換せず、削除確認済みキーを再利用しない
+- 各観測事実が該当時のrole / 権限、viewport、locale、feature flag、テストデータ等の確認条件へ追跡でき、repo事実はworking tree状態も含めて鮮度判定できる
 - inspection副作用を実施した場合は許可範囲・最大回数・実施回数・cleanup結果・残存状態が記録され、実施回数が最大回数を超えない
 - 実対象UI / 状態 / 遷移とrepo事実で削除判定の根拠を分け、単に見つからない情報を削除しない
 - `test-target-inspection`成果物を`e2e-test-inspection`等が任意入力として再利用でき、各継承行の確認version / build・revisionを保持したうえで、該当事実へ影響するrole / viewport / locale / feature flag / データ条件等の差異を確認する
 - 永続保存・更新が要求成果物の場合は保存成功まで完了にせず、`qa-workflow`利用時の案件コンテキスト`既存QA成果物`更新を`qa-workflow`が担当する
+- 既存資料の永続更新では候補作成時の更新元revision / content identityを保存直前に再確認し、途中変更を古い候補で上書きしない
 - テスト対象資料が仕様Authorityとして扱われない
 - `test-execution`が`qa-workflow`成果物、外部成果物、ユーザー直接入力のTCを受け、入力側の既存一意TC識別子を使い、外部 / 直接入力の期待結果を今回実行契約として扱いながら仕様Authorityへ昇格せず、AI直接操作と検証済み自動実行結果利用の両方を扱える
 - PASS / FAIL / 未実行 / 判定不能のTC結果契約が成立し、workflow上の`ブロック中`と分離される
-- 実行開始前に今回要求された具体的TC識別子集合が固定され、識別不能TCへ正式TC IDを創作せず、その集合と結果集合の完全性を`test-execution`自身が検査できる
+- 実行開始前に今回要求された具体的TC識別子集合が固定され、識別不能TCへ正式TC IDを創作せず、開始後のTC追加・除外または方式変更で同じ成果物の集合を書き換えず、その集合と結果集合の完全性を`SKILL.md` / guidanceの最終出力自己検証で確認できる
 - TC revision / content identityが未提供でも今回実行は可能で、未提供状態を明示し、過去結果のcurrent再利用では鮮度を確認する
 - AI直接操作の実行前条件がTC単位で記録され、再試行を含む副作用実施回数が最大回数以下であることを記録・検証し、結果不明な副作用操作を盲目的再試行せず、TC事後状態 / 後処理、実行時cleanup、Playwright runner管理cleanupが区別される
 - TC結果と後処理 / cleanup状態が別軸で保持される
-- 自動実行で固定TC識別子集合の自動実行subset → E2E実装 → 今回logical primary集合 → resolved primary TestCase → 実行結果を追跡でき、要求外primaryを暗黙追加しない
+- 自動実行で固定TC識別子集合の自動実行subset → 既存TC ID（存在時のみ） → E2E実装 / revision / working tree → 今回logical primary → E2E実行成果物 → resolved primary TestCase → 実行結果を追跡でき、同一runへ渡すlogical primary集合を一意化して要求外primaryを暗黙追加しない
 - AI直接操作 / 自動実行の混在時に、自動実行subsetだけをE2E Skillへ委譲して同じ`test-execution`へ再開し、同一TCを重複実行せず全結果を統合できる
+- 自動実行subsetのpreflight条件が両立しない場合は複数の`e2e-test-execution`へ分割し、各成果物参照を同じ`test-execution`へ統合できる
+- `e2e-test-result-analysis`からの診断runを正式TC実行と区別し、診断runだけをPASS根拠にしない
+- currentな`TC → E2E実装`対応が欠落・陳腐化した場合は`coverage-analysis`へ戻り、実行だけの要求からE2Eコード変更へ暗黙routingしない
 - 自動実行結果が今回要求したURL / origin、project、role / 認証、開始状態 / データ、version / build等のうちTC判定へ影響する条件へ適用可能であることを確認できる
-- 自動実行でTCをPASSにする際、E2E実装が必要な期待結果を検証し、根拠に使うE2E実装reviewもcurrentであることを確認でき、確認不能なら`判定不能`になる
+- 自動実行でTCをPASSにする際、E2E実装が必要な期待結果を検証し、根拠に使うE2E実装reviewから対象E2E実装revision / working treeへ追跡してcurrentであることを確認でき、確認不能なら`判定不能`になる
 - 今回の新規実行要求を過去結果だけで完了扱いせず、currentな自動runがない場合は`e2e-test-execution`へroutingする
 - runner異常と製品FAILが分離され、既存`e2e-test-result-analysis` routingが維持される
 - `e2e-test-execution`のPlaywright固有契約が維持される
 - `qa-workflow`が必要時だけ2 Skillへroutingできる
 - trigger query合計が基準契約どおり（本Plan基準では320）
 - semantic case合計が基準契約どおり（本Plan基準では32）
+- 新規2 Skillのsemantic evalで、各critical criterion IDが最低1件のcaseから参照される
 - deterministic output evalのrepository最低case数が基準契約どおり（本Plan基準では32）
 - 既存14 Skillの回帰がPASSする
 - `e2e-test-inspection`、`e2e-test-execution`、`test-case-design`等の隣接Skillと新規2 Skillの双方向発火境界が、既存query件数を維持したデータセットと実Agent評価可能時のsmokeで確認される
