@@ -350,7 +350,7 @@ runtime対象の次の6 Skillを単体コピーして代表scriptをCLI実行し
 ### `test-analysis`
 
 - `SKILL.md` / `references/guidance.md`へ新規正規技法と選択条件を追加
-- `assets/output-template.md`へ`Machine Entities`、`Machine Runtime Input / Result`、`Selection Source`、技法選択machine evidence、undetermined signalの`resolved / selection_not_affected / question`閉鎖状態を追加
+- `assets/output-template.md`へ`Machine Entities`、`Machine Runtime Input / Result`、`Selection Source`、技法選択machine evidence、current undetermined signalの`selection_not_affected / question`閉鎖状態を追加する。signal解決時は`signals`更新・candidate runtime再実行でundetermined集合から外す
 - `analysis_entities.py`がtest-analysis context / Product Risk / Technique Selection / change graph / environment requirementのLLM意味fieldとcurrent runtime resultをjoinし、Machine Entity / dependency / expected Entity identityを固定生成する。Product Riskは`assessment_reason / confidence_note`も保持する
 - `analysis_entities.py`はchange graph / environment → Product Risk → Technique Selection / contextの順で同一invocation内dependencyを解決し、change graph上のRisk / TR / TCN / CI / TC参照を逆向きdependencyにしてcycleを作らない
 - risk scheme / priority mapping
