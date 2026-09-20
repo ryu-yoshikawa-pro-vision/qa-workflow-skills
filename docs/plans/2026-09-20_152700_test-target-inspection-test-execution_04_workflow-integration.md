@@ -52,17 +52,18 @@ test-execution
 ```text
 詳細TC + currentなTC → E2E実装対応
   ↓
-e2e-test-execution
+今回の新規実行要求でcurrentなrunがない
   ↓
-test-execution
-  └─ raw factだけではTC判定不能 / 原因分析要求 / 追加実行判断が必要
-       ↓
+e2e-test-execution
+  ├─ 正常run ─────────────────→ test-execution
+  └─ 異常 / 未実行 / run-level error / cleanup失敗・未確認
+        ↓
      e2e-test-result-analysis
-       ↓ 必要時
-     e2e-test-execution / test-execution
+        ├─ 追加実行不要 ───────→ test-execution
+        └─ 追加実行必要 → e2e-test-execution → 既存E2E異常routingを再適用
 ```
 
-`test-execution`はPlaywright raw statusを作り直さず、検証済み入力をTCの期待結果と対応付けます。異常runであることだけを理由に`e2e-test-result-analysis`を必須にしません。
+`test-execution`はPlaywright raw statusを作り直さず、検証済み入力をTCの期待結果と対応付けます。現行`e2e-test-execution` / `qa-workflow`の異常routingを維持し、本変更だけを理由に`e2e-test-result-analysis`を省略しません。過去結果の確認だけを要求されている場合は新しいrunner実行を強制しません。
 
 ### 既存E2Eのraw実行だけ
 
@@ -103,7 +104,7 @@ e2e-test-implementation
 
 - 対象範囲が今回E2E対象を含む
 - 確認元が追跡できる
-- version / buildまたは確認日時が今回の判断に使える
+- 同一version / build、または対象変更がないことを別根拠で確認できる。version / build不明時は確認日時だけでcurrentと判断しない
 - `未確認`の値を確認済みとして扱っていない
 - repo参照が現在branch / commitと矛盾していない、または差分が判断へ影響しない
 
@@ -131,9 +132,9 @@ e2e-test-implementation
 
 既存出力でTC判定に必要な対応情報が不足することが実装時に確認された場合だけ、`e2e-test-execution`の出力へ最小のtrace情報を追加します。一般化のために既存raw result表を作り直しません。
 
-`test-execution`がraw factだけではTCの`FAIL / 判定不能`を区別できない場合、原因分析が要求された場合、または追加実行判断に分析が必要な場合だけ`e2e-test-result-analysis`を利用します。原因分析をTC期待結果そのものへ変更しません。
+異常、未実行、run-level error、cleanup失敗 / 未確認は現行契約どおり`e2e-test-result-analysis`へ渡し、その分析結果を必要なTC判定へ利用します。正常runでは原因分析要求がなければ`test-execution`へ直接接続できます。原因分析をTC期待結果そのものへ変更しません。
 
-自動実行の対応は`TC ID → E2E実装参照 → logical primary → resolved primary TestCase → 実行結果 / 観測証拠`を辿れるようにします。run全体PASS、`outcome=expected`、最終retry PASSだけではTCの`PASS`にしません。
+自動実行の対応は`TC ID → E2E実装参照 → logical primary → resolved primary TestCase → 実行結果 / 観測証拠`を辿れるようにします。run全体PASS、`outcome=expected`、最終retry PASSだけではTCの`PASS`にしません。TCを`PASS`にする場合は、currentなE2E実装がPASS判定に必要な期待結果を検証していることを、現在有効なE2E実装成果物、`adversarial-review`（対象: `E2E実装`）の結果、または同等の確認済み事実から確認できることを要求します。確認できない場合は`判定不能`として必要な担当Skillへ戻します。
 
 ## 6. `e2e-test-reporting`との統合
 
@@ -157,7 +158,7 @@ README / `qa-workflow`では、次を区別して説明します。
 
 現時点では両Skillを単一用途Skillとして扱い、`MULTI_USE_SKILL_TARGETS`へ追加しません。
 
-実行方式は`test-execution`成果物内の属性であり、workflow状態の対象 / 実行範囲へ重複して持たせません。
+実行方式は`test-execution`成果物内の属性であり、workflow状態の対象 / 実行範囲へ重複して持たせません。`test-execution = 再利用`は過去結果の確認・分析・報告等で既存成果物をそのまま利用できる場合だけ使用します。ユーザーが今回の新規実行を要求している場合は、過去結果だけを再利用して実行完了にしません。
 
 
 ## 8. 修正routing
@@ -195,6 +196,10 @@ README / `qa-workflow`では、次を区別して説明します。
 
 自動実行経路では既存E2E実装 / executionの再検証規則を維持し、必要なrunが更新された後に`test-execution`結果を再評価します。
 
+### 対象version / build・実施環境が変更された場合
+
+既存の`test-execution`結果は履歴として保持しますが、対象version / build、実施環境、role、locale等のTC判定に影響する条件が変わった場合は、その結果を現在のPASS証拠として自動再利用しません。影響がないことを確認できない範囲を`要再検証`として扱います。確認日時だけで現在の対象と同一とみなしません。
+
 ## 10. 完了判定
 
 テスト実行を要求したworkflowでは、今回要求されたTC集合が`test-execution`成果物上で`PASS / FAIL / 未実行 / 判定不能`のいずれかへ漏れなく対応していることを確認します。
@@ -204,3 +209,5 @@ README / `qa-workflow`では、次を区別して説明します。
 必須TCが安全条件・権限・環境不足で`未実行`のまま再開待ちであれば`test-execution`をworkflow上`ブロック中`とし、全体を完了にしません。実行開始済みだが必要観測を完了できず`判定不能`になったTCも、要求範囲を閉じる追加対応が残る場合は完了にしません。ユーザーが明示的に実行対象外へ変更したTCは今回要求TC集合から外した根拠を保持します。
 
 実行を要求したTCが理由なく欠落している場合も完了にしません。
+
+`test-target-inspection`についても、ユーザーが実対象確認を要求した範囲に必要な`確認不能`が残り、要求資料を完成できない場合はworkflowを完了にしません。repo由来情報だけで実対象確認済みとして閉じません。
