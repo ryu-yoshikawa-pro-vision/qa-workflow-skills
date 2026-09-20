@@ -2,185 +2,189 @@
 
 ## 1. 現状
 
-`main@3510e6ffce87ba8c025ebde22f9947dbb6074f9c`では、次の14 Skillがあります。
+`main@3510e6ffce87ba8c025ebde22f9947dbb6074f9c`では14 Skillがあります。既存の`e2e-test-inspection`はPlaywright E2E実装前の調査、`e2e-test-execution`は既存 / 実装済みPlaywright E2Eの安全なrunner実行とraw fact収集を担当します。
 
-```text
-qa-workflow
-spec-analysis
-question-analysis
-test-analysis
-test-requirement-design
-test-condition-design
-test-case-design
-coverage-analysis
-adversarial-review
-e2e-test-inspection
-e2e-test-implementation
-e2e-test-execution
-e2e-test-result-analysis
-e2e-test-reporting
-```
+今回不足しているのは次の2責務です。
 
-通常のテスト分析・設計は`spec-analysis`から`adversarial-review`までで完了できます。Playwright E2Eが要求された場合は`e2e-test-inspection`以降のE2E Skillへ分岐します。
+- **生きたテスト対象の現在情報を継続的に収集・確認・管理する責務**
+- **人間の手動テスト相当の操作をAIが実施し、TC結果を報告する責務**
 
-現在の`e2e-test-inspection`は、E2E実装前にrepo / workspaceと必要時の実対象を確認し、画面、経路、実在locator、非同期状態、Page Object、fixture、認証・データ等を調査します。ただし入力契約が詳細TC、明示E2E対象、既存E2E実装参照のいずれかであり、成果物の目的もPlaywright実装可否の確定です。
-
-現在の`e2e-test-execution`はPlaywright runnerの安全な実行とraw fact収集を担当し、原因分析や一般的なTC実行判定は担当しません。
-
-そのため次の2責務が不足しています。
-
-- 自動化対象に依存せず、実対象を調査してテスト設計・実装・実行時に再利用する資料を作成・更新する責務
-- テストケースを実行方式に依存せず実施し、期待結果と実測結果を比較してTC単位の結果を確定する責務
+この2責務を`test-target-inspection`と`test-execution`として追加します。
 
 ## 2. 追加するSkill
 
 ### `test-target-inspection`
 
-実際のテスト対象を観測し、後続作業で参照するテスト対象資料を作成・更新します。
+目的は、生きた実対象から現在のUI情報とふるまいを収集し、後続のテスト設計・実装・実行で再利用できる資料として管理することです。
 
 主責務:
 
-- 対象画面 / 領域 / 経路の確認
-- UI要素と操作可能性の確認
-- role / accessible name / test id等の識別情報の確認
-- 表示状態、loading / empty / error、modal等の状態確認
-- 画面遷移、非同期状態、データ / 権限依存の確認
-- 必要時のrepo参照確認。既存Page Object / fixture / helper等との対応は、後続作業に有用で実在確認できた場合だけ任意で記録する
-- 既存のテスト対象資料との差分確認と必要範囲の更新
-- 確認元、確認日時、version / build、repo revision、未確認範囲の保持
+- 対象画面 / 領域 / 到達経路の確認
+- UI要素、操作可能性、role / accessible name / test id等の確認
+- 表示状態、loading / empty / error / modal等の状態確認
+- 操作に対する反応、画面遷移、非同期状態、データ / 権限依存の確認
+- DOM / accessibility tree等では確認できない視覚状態の画像確認
+- レイアウト崩れ、重なり、欠け、表示位置、画像、canvas等の視覚情報の記録
+- 既存資料がある場合、今回対象範囲を実対象と照合してcurrentか確認する
+- 変更がある箇所だけ更新し、変更がない箇所も今回確認済みとして鮮度を更新する
+- 確認元、確認日時、version / build、確認条件、未確認 / 確認不能範囲の保持
+- POM / Page Object / fixture / helper等は、対象プロジェクトで利用されており後続作業に有用な場合だけ任意参照として記録する
 
 担当しないこと:
 
-- 現在有効な仕様根拠の決定
-- 実装挙動から期待結果を確定すること
+- 実対象の現在挙動を仕様Authorityへ昇格すること
 - テスト要求 / 条件 / ケースの設計
 - 自動化対象選定
-- Playwrightコード実装
-- テスト実行結果のPASS / FAIL判定
+- POM / Page Object / fixture / helperの作成・更新
+- Playwright E2Eコードの永続実装
+- TCのPASS / FAIL判定
+
+`test-target-inspection`は実対象への到達を基本とします。repo / workspaceだけを確認した結果は補助情報として利用できますが、実対象を確認していない範囲をcurrentなテスト対象情報として扱いません。
 
 ### `test-execution`
 
-詳細テストケースを実行し、期待結果と実測結果を比較してTC単位の結果を確定します。現スコープでは、利用可能なbrowser / computer操作能力で実対象UIを操作・観測できるTCと、既存Playwright E2Eで実行できるTCを扱います。API / DB等の専用実行基盤は本変更の対象にしません。
+目的は、人間が手動テストで行うのと同様にAIが実対象を操作し、詳細TCを実施して、その結果をユーザーへ報告することです。
 
 主責務:
 
-- 実行要求を、入力側で既に存在する一意識別子を使って具体的なTC集合へ解決し、今回の実行母集団を開始前に確定。TCは`qa-workflow`成果物、外部成果物、ユーザー直接入力のいずれでもよい。既存TC IDや外部システムの一意識別子を再利用し、`test-execution`自身が正式TC IDを創作しない。1成果物では1つのTC入力元 / snapshotだけを扱う
-- 前提条件、テストデータ、事後状態 / 後処理、環境、安全条件の確認
-- `AI直接操作`による手順実施と観測
-- `自動実行`で取得済みの検証済みrunner事実の利用
-- 期待結果と実測結果の対応付け
-- `PASS / FAIL / 未実行 / 判定不能`判定
-- 証跡参照、未実行理由、TCに定義された事後状態 / 後処理、実行時cleanup / 残存状態の記録
+- 入力側の既存一意識別子から今回実行するTC集合を固定する
+- 前提条件、テストデータ、role / アカウント、環境、安全条件を確認する
+- Playwright MCP等の対話的なbrowser操作でTC手順を実施する
+- 必要に応じてPlaywright CLIまたはPlaywrightコードを使って現在TCを実行する
+- 今回の実行だけに必要な一時的Playwrightコードを最小限生成・実行する
+- DOM / accessibility tree等による構造・意味情報の観測
+- screenshot等の画像による視覚情報の観測
+- 期待結果と実測結果を比較し、`PASS / FAIL / 未実行 / 判定不能`を確定する
+- TCごとの手順・観測、判定根拠、証跡、後処理 / cleanup、残存状態を整理する
+- **テスト実行結果を人間が判断できる形で報告する**
 
 担当しないこと:
 
-- テストケースの期待結果を作り直すこと
-- Playwright runner固有設定 / retry / reporter / raw result解釈の再実装
+- TCの期待結果を実測へ合わせて変更すること
+- 実対象の現在挙動を仕様Authorityへ昇格すること
 - 原因未確認のFAILを製品不具合と断定すること
-- E2Eコードの修正
-- テスト結果に合わせた仕様の再解釈
+- 将来も維持するrepo内Playwright E2Eコードを、実行だけの要求から暗黙に追加・更新すること
+- 既存Playwright runnerのretry / reporter / process ownership等の契約を再設計すること
 
-## 3. 責務境界
+## 3. Playwrightコードとの境界
 
-| 項目 | 担当Skill | 備考 |
-| --- | --- | --- |
-| 現在有効な仕様根拠 | `spec-analysis` | 実対象観測で上書きしない |
-| 詳細テストケース / 期待結果 | `test-case-design` | workflow内で設計・変更する責任Skill。外部成果物 / ユーザー直接入力の既存期待結果は今回実行の契約として利用可だが仕様Authorityへ昇格しない |
-| テスト対象資料 | `test-target-inspection` | 必要時に作成・更新する補助成果物 |
-| Playwright E2E実装前事実 | `e2e-test-inspection` | テスト対象資料を再利用可能 |
-| Playwrightコード | `e2e-test-implementation` | 既存責務維持 |
-| TC → E2E実装の追跡関係 | `coverage-analysis`（対象: `TC → E2E実装`） | 対応の欠落・陳腐化を`test-execution`で推測補完しない |
-| E2E実装の期待結果 / assertionレビュー | `adversarial-review`（対象: `E2E実装`） | currentなTCとE2E実装に対するreviewとして利用できる場合だけTC PASS判断の確認元にする。鮮度を証明できなければ現在対象を再reviewする |
-| Playwright対象解決・preflight・runner事実 | `e2e-test-execution` | logical primary、project、実効設定、run分割、retry、artifact、cleanup等の既存責務を維持 |
-| TC実行と期待結果比較 | `test-execution` | AI直接操作 / 自動実行に共通 |
-| Playwright異常原因分析 | `e2e-test-result-analysis` | 既存責務維持 |
-| Playwright固有結果報告 | `e2e-test-reporting` | 既存責務維持 |
-| Skill間ルーティング / 再開 / 完了 | `qa-workflow` | `test-execution`自身に子Skill実行や再開制御を持たせない |
+`test-execution`で許可するPlaywrightコード生成は、**今回のテスト実行を成立させるための一時的なコード**です。
 
-## 4. `test-target-inspection` を既定フローへ固定しない理由
+例えば次を含みます。
 
-対象UIの構造情報がなくても、仕様と既存成果物だけで有効なテスト分析・設計を実施できる案件があります。常に実対象調査を要求すると、不要なbrowserアクセス、認証、環境準備、資料更新を増やします。
+- 対話操作だけでは安定して実施できない複数手順を、今回TC用の一時スクリプトとして実行する
+- 同じ観測を複数データで繰り返すため、今回runだけで使用する最小コードを生成する
+- screenshotや必要な観測値を取得するための一時コードを実行する
 
-そのため`qa-workflow`では次の場合だけ利用します。
+一方、次は既存E2E Skillの責務を維持します。
 
-- ユーザーがテスト対象資料の作成・更新を要求した
-- 後続Skillが実対象の構造情報を必要としている
-- 既存資料の鮮度が不足し、実対象確認が必要
-- UI変更等により既存資料の該当範囲が陳腐化した
+| 目的 | 担当 |
+| --- | --- |
+| 将来も維持するPlaywright E2Eをrepoへ実装 / 更新 | `e2e-test-inspection` → `e2e-test-implementation` |
+| 既存 / 実装済みrepo E2Eを正式なrunner契約で実行 | `e2e-test-execution` |
+| 既存E2E実行異常の原因分析 | `e2e-test-result-analysis` |
+| Playwright runner固有のrun / attempt等の詳細報告 | `e2e-test-reporting` |
+| 人間の手動テスト相当のAI操作とTC結果報告 | `test-execution` |
 
-既存資料が現在の対象範囲に対して十分であれば再利用し、更新のためだけに全対象を再調査しません。
+これにより、`test-execution`で一時コードを使えるようにしつつ、既存のE2E資産管理責務を重複させません。
 
-## 5. 案件固有成果物の管理方針
+## 4. 画像判断
 
-`skills/test-target-inspection/assets/`はテンプレートを保持する場所であり、案件固有の生成物の保存先にはしません。
+両Skillで、必要な場合は画像を正式な観測元として使用します。
 
-永続的な更新を要求された場合は次を入力として扱います。
+画像を使用する代表例:
 
-- 保存先リポジトリ / workspace
-- repo-relative pathまたはユーザーが指定した文書参照
-- 更新対象の既存成果物（存在時）
+- UI要素の重なり
+- 文字やコンテンツの欠け / はみ出し
+- レスポンシブ崩れ
+- modal / popupの視覚的な表示状態
+- 画像・アイコン・canvasの描画
+- DOM / accessibility treeでは判断できない位置・サイズ・視覚状態
+- TC期待結果が視覚的表示を要求している場合
 
-保存先が指定されない、またはAgentに書込能力がない場合は、完成した資料を成果物として返すことはできますが、「管理済み」「更新済み」とは扱いません。保存先を推測して対象repoへ新規文書を作成しません。ユーザー要求が資料案の作成だけならこの返却で完了できますが、永続的な作成・更新自体が要求成果物なら、保存先不明、書込不能、安全な差分更新不能、保存後不整合が残る範囲を完了扱いにしません。
+構造情報と画像は役割を分けます。
 
-`test-target-inspection`は保存したテスト対象資料の場所・範囲・鮮度 / バージョンを返します。`qa-workflow`を利用している場合だけ、`qa-workflow`が既存の`skills/qa-workflow/assets/project-context-template.md`にある`既存QA成果物`欄へその情報を反映します。`test-target-inspection`単体利用では案件コンテキストを変更しません。新しいregistry / DBは追加しません。
+- role、accessible name、DOM状態等はDOM / accessibility tree等を優先
+- 見た目・配置・描画は画像を使用
+- 必要なら両方を併用する
+- 画像だけから仕様、role、accessible name等を推測しない
 
-既存文書を更新する場合は、正規テンプレートまたは構造的に互換性を確認できる資料だけを自動差分更新の対象とし、既存の対象キーと未変更情報を可能な限り維持します。既定テンプレート外の人間記載セクションを無関係に削除しません。任意形式の文書を汎用的に解析・mergeする仕組みは追加しません。既存構造が曖昧で安全に差分更新できない場合は上書きせず、更新不能範囲を明示します。
+UI崩れ等をTC外で発見した場合は追加観測として報告できますが、元TCの期待結果に含まれない事象を理由なくTC FAILへ変換しません。
 
-永続更新では、保存先が提供するSHA / revision / ETag等の条件付き更新を優先して古い候補の上書きを防ぎます。利用できない場合だけ、更新候補を作成した元成果物のrevision / content identityを保持し、保存直前の再読込・比較で同じ元状態か確認します。変更済みなら古い候補で上書きせず、最新内容から候補を作り直します。新しいlockやartifact registryは追加しません。
+## 5. `test-target-inspection`の鮮度管理
 
-成果物の単位は、既存成果物があればその単位を維持します。新規作成では今回要求された調査範囲を1成果物の範囲とし、明示要求なしに製品全体へ拡張したり画面単位へ細分化したりしません。
+既存資料がある場合でも、そのままcurrentとはみなしません。Skill実行時に今回対象範囲の実対象を確認し、既存情報と照合します。
 
-## 6. テスト対象資料と仕様根拠の分離
+今回対象範囲の各情報は最低限、次のいずれかへ閉じます。
 
-テスト対象資料に記録する内容は、原則として次のいずれかです。
+- `今回確認・変更なし`
+- `今回確認・更新`
+- `今回確認・削除確認`
+- `未確認`
+- `確認不能`
 
-- 実対象で観測した事実
-- repoで確認した実装事実
-- ユーザー提供情報
-- 未確認 / 確認不能状態
+要求範囲外の情報を無理に再確認しません。製品全体のfull scanを毎回要求するのではなく、**今回利用・更新する範囲についてcurrentか確認する**ことを必須にします。
 
-実対象で現在表示されている文言・状態・遷移を、それだけを根拠に`SPEC` / `DECISION`へ昇格させません。
+既存情報を今回確認していない場合は、古い確認日時 / version / buildを保持し、currentとして更新しません。
 
-期待結果との不一致を発見した場合は、テスト対象資料を仕様へ合わせて改変するのではなく、観測事実を保持します。現在有効な仕様根拠が明確なら、その不一致だけを理由に`spec-analysis`へ戻さず、実装観測と仕様根拠の差として後続へ渡します。どの仕様が有効か不明、仕様根拠同士が競合、期待結果の意味を確定できない場合だけ`question-analysis` / `spec-analysis`へ戻します。
+## 6. 案件固有成果物の管理
 
-現在有効なテスト対象資料は、`test-case-design`でUI名称、到達方法、実施手順、観測可能性等の補助情報として利用できます。ただしテスト対象資料を期待結果の仕様根拠にはしません。
+`skills/test-target-inspection/assets/`はテンプレートだけを保持します。案件固有のテスト対象資料はユーザーまたは案件が指定した保存先で管理します。
 
-## 7. 安全境界
+永続更新では以下を守ります。
 
-両Skillで共通して、以下を暗黙許可しません。
+- 保存先が提供するSHA / revision / ETag等の条件付き更新を優先
+- 利用できない場合は保存直前に再読込・比較
+- 途中変更を古い候補で上書きしない
+- 保存後に確認できる場合は保存内容を再読込して確認
+- 新しいlock / artifact registry / 独自DBは追加しない
+
+POM等の実装資産はテスト対象資料の保存対象とは別です。`test-target-inspection`からPOM等を書き換えません。
+
+## 7. TC入力と結果
+
+`test-execution`は`qa-workflow`成果物、外部成果物、ユーザー直接入力の詳細TCを受け付けます。
+
+- 1つの成果物では1つのTC入力元 / snapshotを扱う
+- 既存TC IDまたは外部システムの一意識別子を使用する
+- 正式TC IDを新規創作しない
+- 外部TCを内部QA成果物へ自動変換しない
+- 実行開始後にTC集合を書き換えない
+- TC追加 / 除外 / 実行手段変更があれば旧成果物を理由付きで閉じ、新しい成果物 / versionを開始する
+
+TC結果は以下です。
+
+- `PASS`: 必要な期待結果をすべて観測し、一致した
+- `FAIL`: 有効な期待結果との不一致を実測した
+- `未実行`: TC自体を開始していない
+- `判定不能`: 開始したが必要な観測を完了できず判定できない
+
+`ブロック中`はTC結果ではなくworkflow状態です。
+
+## 8. 安全境界
+
+両Skillで次を暗黙許可しません。
 
 - productionや対象外originへの切替
 - 削除、決済、メール / 通知送信、権限変更、共有データ更新等の高リスク副作用
-- secret、cookie、token、storageState等の成果物への転載
-- TC判定に不要な個人データ・機密情報の成果物や証跡への転載
 - 指定外アカウントへのログイン
 - cleanup方法未確認の破壊的操作
+- secret、cookie、token、storageState等の記録・転載
 
-`test-target-inspection`は観測・非永続操作を既定とします。永続的な副作用を伴う操作が必要な場合は、対象origin、許可範囲、最大回数、cleanup方法を確認してから実施します。実施した場合は操作内容、許可範囲、最大回数、実施回数、cleanup結果、残存状態を成果物へ記録します。再試行も実施回数へ含め、実施回数が最大回数を超えないことを確認します。これらを確認できない場合は操作せず、その範囲を`未確認`または`確認不能`として残します。inspectionであることを理由に副作用確認を省略しません。
+副作用の最大回数は許可された操作scope全体で累計し、TCごとにリセットしません。
 
-`test-execution`はTCが要求する操作でも、環境・副作用・cleanup条件を確認できなければ該当TCを開始せず`未実行`とし、必要な条件が解消するまで`test-execution`の該当範囲をworkflow上`ブロック中`として扱います。副作用の最大回数はユーザーが許可した操作scope全体で累計し、同じscopeを複数TCが共有してもTCごとに上限をリセットしません。実行開始後に必要な観測を完了できずPASS / FAILを確定できない場合はTCを`判定不能`とします。他の安全なTCまで一律停止しません。
+trace / screenshot / page snapshot / video / network等は必要最小限だけ取得し、機密情報を含む可能性がある証跡を自動共有・commit・転載しません。
 
-`test-target-inspection`で`未確認`は今回確認対象だがまだ確認していない情報、`確認不能`は今回確認する必要があるがアクセス・権限・環境等により確認できなかった情報として区別します。要求範囲外の情報を`未確認`へ混ぜず、既存情報を保持するだけなら`既存資料から継承・未再確認`として扱います。今回確認すべき範囲に必要な`未確認`または`確認不能`が残り、要求資料を完成できない場合は、repo由来情報だけで`完了`にせず該当範囲をworkflow上`ブロック中`として扱います。
-
-`test-target-inspection`は対象製品コード、Page Object、fixture、helper、既存テストコードを変更しません。永続的な書込は、ユーザーまたは案件が指定したテスト対象資料の作成・更新に限定します。実装修正が必要と判明した場合は観測事実として残し、責任Skillへroutingします。
-
-外部成果物 / ユーザー直接入力TCで期待結果やE2E対応が不足している場合は、内部QA成果物へ自動変換しません。入力元・ユーザーから解消できない範囲はブロックし、内部QA workflowへの取込が明示された場合だけ`test-case-design`や`coverage-analysis`等の既存Skillへroutingします。
-
-`test-target-inspection` / `test-execution`で取得するscreenshot、page snapshot等の証跡は必要最小限とし、secret・個人データ・機密情報を含む可能性がある証跡を自動共有・commit・転載しません。
-
-## 8. 対象外
+## 9. 対象外
 
 今回追加しません。
 
 - 新しいbrowser automation framework
 - Playwright以外のrunner adapter framework
-- テスト管理SaaSへの自動登録
-- 不具合管理システムへの自動起票
+- POM生成専用Skill
 - 画像差分専用Skill
 - API / DB専用の新規実行Skill
 - テスト対象資料の独自DB / registry
 - 自動的な案件横断knowledge base
 - E2E既存5 Skillの統廃合
-- 人間が手動実施した外部結果の取込専用workflow
 
-現在の要求を満たすために必要になった場合だけ、既存Skillの入力として扱える範囲を実装します。
