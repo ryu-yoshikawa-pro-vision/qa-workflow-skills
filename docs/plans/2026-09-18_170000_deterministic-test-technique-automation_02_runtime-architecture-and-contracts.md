@@ -636,15 +636,15 @@ fingerprint対象の`content`はLLMが自由に再構成しません。各担当
 
 - Authority: `{authority_id, authority_type, active_content, scope, source_refs[], relations[], related_authority_refs[]}`
 - test-analysis context: `{scope, objectives[], test_levels[], environment_constraints[], exclusions[], blockers[], test_focus_items[], testability_decisions[], residual_risks[]}`
-- Product Risk: `{risk_id, failure, source_refs[], authority_refs[], impact, likelihood, level, mapped_priority}`
-- 技法選択: `{selection_key, applicability_scope, selection_source, signals, candidates[], selected_techniques[], selection_reason, risk_refs[], authority_refs[], condition_design_focus[], status}`
-- change graph node / edge: `{node_key, node_type, source_ref}` / `{edge_key, from, to, edge_type, evidence_refs[]}`
-- 環境 / test data要求: `{requirement_key, dimension_key, operator, normalized_value, authority_refs[], source_target_versions[]}`。test dataでは各source targetの`target_ref / target_content_fingerprint / generation_fingerprint`を保持する
-- TR: `{tr_id, text, authority_refs[], risk_refs[], priority, test_level, observation_method}`
-- TCN: `{tcn_id, tr_refs[], condition, category, technique_slugs[], coverage_criterion, authority_refs[], risk_refs[], priority}`
-- model metadata: `{model_key, model_type, technique_slug, parent_tcn_id, selection_source, selection_key}`。内部adapterでは`technique_slug / selection_source / selection_key=null`。Coverage所有modelでは`selection_source=analysis / condition_design / user`を必須とし、`analysis`だけ`selection_key`必須
-- CI: `{ci_id, tcn_id, model_key, source_kind, covered_targets[], execution, semantic_item_key, semantic_item_text, semantic_source_targets[], priority, expected_result_root, authority_refs[], reference_refs[], test_data_requirement_refs[], status}`。`source_kind=runtime_target`では`covered_targets[]`を1件以上持ち、同一`execution_fingerprint`のcanonical `execution`を保存する。`source_kind=semantic_item`では`covered_targets=[] / execution=null`、`semantic_item_key / semantic_item_text`を必須とする。fork-join等のmachine targetからsemantic itemへ閉じる場合は`semantic_source_targets[]`へ`{target_ref, target_content_fingerprint, generation_fingerprint}`を保存し、エラー推測のように元machine targetがない場合は空配列とする。`covered_targets[]`は`{target_ref, target_key, target_content_fingerprint, execution_fingerprint}`を`target_ref`順で保持し、stable target_refのままtarget内容が変わった場合もCI content fingerprintが変わる
-- TC: `{tc_id, title_or_purpose, tr_refs[], tcn_refs[], ci_refs[], environment_requirement_refs[], test_data_requirement_refs[], priority, preconditions, test_data, steps, expected_results[], postconditions_or_cleanup}`
+- Product Risk: `{risk_id, failure, source_refs[], authority_refs[], impact, likelihood, assessment_reason, confidence_note, level, mapped_priority}`
+- 技法選択: `{selection_key, applicability_scope, selection_source, signals, candidates[], undetermined_signal_closures[], selected_techniques[], selection_reason, risk_refs[], authority_refs[], condition_design_focus[], status}`。`status=active|blocked|unresolved`、`undetermined_signal_closures[]`は各null signalを`resolved / selection_not_affected / question`のいずれかへ1回だけ閉じ、未閉鎖signalがある状態で`active`にしない
+- change graph node / edge: `{node_key, node_type, source_ref, change_kind, expected_impact}` / `{edge_key, from, to, edge_type, evidence_refs[]}`。人間向け変更表にある変更種別・想定影響をMachine Entityから落とさない
+- 環境 / test data要求: `{requirement_key, dimension_key, operator, normalized_value, authority_refs[], source_model_key, source_target_versions[]}`。environmentでは`source_model_key=null / source_target_versions=[]`、test dataではcurrent Coverage所有modelの`source_model_key`を必須とし、machine target由来なら各source targetの`target_ref / target_content_fingerprint / generation_fingerprint`も保持する
+- TR: `{tr_id, text, authority_refs[], risk_refs[], priority, priority_override_reason, test_level, observation_method}`
+- TCN: `{tcn_id, tr_refs[], condition, category, technique_slugs[], coverage_criterion, authority_refs[], risk_refs[], priority, priority_override_reason}`
+- model metadata: `{model_key, model_type, technique_slug, parent_tcn_id, selection_source, selection_key, derived_from_model_key}`。内部adapterでは`technique_slug / selection_source / selection_key / derived_from_model_key=null`。直接定義したCoverage所有modelでは`selection_source=analysis / condition_design / user`を必須とし、`analysis`だけ`selection_key`必須。adapter派生childでは`derived_from_model_key`へ同一TCNのcurrent adapter modelを必須で保持する
+- CI: `{ci_id, tcn_id, model_key, source_kind, covered_targets[], execution, semantic_item_key, semantic_item_text, semantic_source_targets[], priority, priority_override_reason, expected_result_root, authority_refs[], reference_refs[], test_data_requirement_refs[], status}`。`source_kind=runtime_target`では`covered_targets[]`を1件以上持ち、同一`execution_fingerprint`のcanonical `execution`を保存する。`source_kind=semantic_item`では`covered_targets=[] / execution=null`、`semantic_item_key / semantic_item_text`を必須とする。fork-join等のmachine targetからsemantic itemへ閉じる場合は`semantic_source_targets[]`へ`{target_ref, target_content_fingerprint, generation_fingerprint}`を保存し、エラー推測のように元machine targetがない場合は空配列とする。`covered_targets[]`は`{target_ref, target_key, target_content_fingerprint, execution_fingerprint}`を`target_ref`順で保持し、stable target_refのままtarget内容が変わった場合もCI content fingerprintが変わる
+- TC: `{tc_id, title_or_purpose, tr_refs[], tcn_refs[], ci_refs[], environment_requirement_refs[], test_data_requirement_refs[], priority, priority_override_reason, preconditions, test_data, steps, expected_results[], postconditions_or_cleanup}`
 - Disposition: `{upstream_entity:{skill, entity_type, entity_ref, content_fingerprint}, handling, reason, authority_refs[], covered_by_entity}`。`covered_by_entity`は`null`または同じ4 fieldを持つ完全Machine Entity参照
 
 machine dataに存在しない表示専用の備考やMarkdown整形は`content`へ入れません。Machine Entity schemaの意味変更は`entity-state-v1`のversion変更として扱い、そのschemaを消費するruntime contractも更新します。
@@ -653,14 +653,14 @@ Machine Entityの`upstream_entity_dependencies[]`は次を最低限含めます�
 
 - Authority: なし。関連Authority IDはcontent内の関係として保持するが、別Authorityの内容変更で自動staleにするかは既存`spec-analysis`の関係解決結果に従う
 - test-analysis context: scope / objective / test level / environment constraint / exclusion / blocker / test focus / testability判断で実際に参照したAuthority / Product Risk
-- Product Risk: `authority_refs[]`のAuthorityに加え、`source_refs[]`のうちMachine Entityとして解決でき、risk判断へ実際に使用したsource Entity
+- Product Risk: `authority_refs[]`のAuthorityに加え、`source_refs[]`のうちrisk判断より上流のAuthority / change graph等としてMachine Entityへ解決でき、実際に使用したsource Entity。既存TR / TCN / CI / TC等の下流QA成果物をrisk evidenceとして参照しても`upstream_entity_dependencies[]`へ逆向きedgeを作らず、content上のsource referenceとして保持する。これにより`Risk → … → TC → Risk`のdependency cycleを作らない
 - 技法選択: selection判断で実際に参照したAuthority / Product Risk。後続のTR / TCN / CI / TCをsemantic dependencyへ逆参照しない
 - change graph node / edge: `source_ref / evidence_refs[]`のうちMachine Entityとして解決でき、node / edge判断へ実際に使用したsource Entity
 - environment requirement: `authority_refs[]`のAuthority
-- test data requirement: `authority_refs[]`のAuthority、要求を導出したCoverage所有model metadata。machine target由来では`source_target_versions[]`の現在target version一致を別途必須にし、target versionが変わればcurrent扱いしない
+- test data requirement: `authority_refs[]`のAuthorityと`source_model_key`のcurrent Coverage所有model metadata。adapterだけをsource modelとしてcurrent保存しない。machine target由来では`source_target_versions[]`が同じ`source_model_key`のcurrent target versionと一致することも必須にし、target versionが変わればcurrent扱いしない
 - TR: `authority_refs[]`のAuthorityと`risk_refs[]`のProduct Risk
 - TCN: `tr_refs[]`のTR、直接`authority_refs[] / risk_refs[]`を持つ場合はそのAuthority / Product Risk
-- model metadata: 親TCN。`selection_source=analysis`では技法選択Entity、runtime派生childでは派生元runtimeをdependencyへ持つ
+- model metadata: 親TCN。`selection_source=analysis`では技法選択Entity。`derived_from_model_key`が非nullのchildでは参照adapter model Entityと、そのadapterのcurrent runtime unitをdependencyへ持つ
 - CI: 親TCN、Coverage所有model metadata、参照するtest data requirement Entity。runtime targetでは現在target version、semantic itemでは本文と`source_target_versions[]`をcontentへ含める
 - TC: `tr_refs[] / tcn_refs[] / ci_refs[] / environment_requirement_refs[] / test_data_requirement_refs[]`の各Entityと各expected resultで実際に参照したAuthority
 - Disposition: `upstream_entity`、Authority、`covered_by_entity`がある場合はその参照先Entity。保存fingerprint不一致はstale
@@ -861,16 +861,18 @@ CIは§7.2.2のtarget mapping状態遷移を優先し、同sectionで明示し�
 
 各`target_ref`はCI mappingまたは`target_dispositions[]`のどちらか一方へ閉じます。
 
-`target_dispositions[]`は`{target_ref, target_content_fingerprint, generation_fingerprint, handling, reason, authority_refs, covered_by_target_version}`です。
+`target_dispositions[]`は`{target_ref, target_content_fingerprint, generation_fingerprint, handling, reason, authority_refs[], covered_by_target_version}`です。
 
 - source targetのcontent / generation fingerprintは現在値と一致必須
 - `handling=対象外 / 別テストレベル / 残存リスク / ブロック中 / 重複`だけを許可
-- `重複`では`covered_by_target_version={target_ref, target_content_fingerprint, generation_fingerprint, execution_fingerprint}`を必須とし、参照先current targetと完全一致させる
+- `重複`では`covered_by_target_version={target_ref, target_content_fingerprint, generation_fingerprint, execution_fingerprint}`を必須とし、参照先current targetと完全一致させる。source target自身の参照を禁止する。全`materialize_coverage.py`結果を集約したtarget mapping / disposition graphでcycleを拒否し、`重複`chainの終端がcurrent CI mappingまたはcurrent semantic Coverage Itemへ到達しない場合は閉鎖済みに数えない
 - 他handlingでは`covered_by_target_version=null`
 - 同一targetへCI mappingとDispositionを同時指定しない
 - `ブロック中`はworkflow完了不可
 
 Dispositionはgeneratorの`coverage_summary`を書き換えません。
+
+`merge_groups[]`は`{merge_group_key, model_key, target_refs[], target_versions[]}`で固定します。`merge_group_key`はstable component key、`target_refs[]`は2件以上で重複不可、`target_versions[]`は各targetについて`{target_ref, target_content_fingerprint, generation_fingerprint, execution_fingerprint}`を1件ずつ持ちます。全targetは同一TCN・同一`model_key`・Dispositionなし・current versionで、`execution_fingerprint`と`expected_result_root`が一致する場合だけmergeできます。入力は`merge_group_key`順、各group内は`target_ref`順にcanonicalizeします。
 
 ## 8. machine evidenceとMarkdown
 
@@ -956,7 +958,9 @@ validatorはfenced JSON blockを抽出してstrict JSON decodeし、canonical化
 
 ## 11. Skill間の機械接続
 
-LLMによるmachine JSON再生成を挟まず、固定builderで接続します。
+LLMによるmachine JSON再生成を挟まず、固定builderで接続します。ここでいう固定builderは文書上の手順ではなくPythonの決定論的処理です。runtimeを持つSkillでは各`runtime_contract.py`の共通Machine Entity builderを既存artifact / model scriptから呼び、structure / materialize scriptが所有するEntityはそのscriptが最終`content`とdependencyを返します。`spec-analysis`だけは§2の`authority_entities.py`が同じcanonicalization規則でAuthority Entityを生成します。AgentがMachine Entity wrapper、content fingerprint、期待identityを手で組み立てる経路を許可しません。
+
+各Skillは同じ正規化済みsourceから`expected_entity_identities[]`を固定builderで生成し、Machine Entity actual rowの存在を入力にして期待identityを逆算しません。`workflow_runtime.py`へ渡す際はbuilder出力をそのまま連結し、callerがidentityを追加・削除しません。期待runtime unitもdispatch表とactive model stateから固定builderで生成し、actual runtime集合から逆算しません。
 
 - Cause-Effect → child Decision Table
 - Classification Tree → child combinatorial
@@ -966,7 +970,7 @@ LLMによるmachine JSON再生成を挟まず、固定builderで接続します�
 
 `materialize_coverage.py`はcurrent generator result用`models[]`とは別に、TCN配下の全current `active_model_metadata[]`を受けます。runtime generatorを持たないエラー推測やunsupported fallbackもmodel所属を検証できます。
 
-semantic Coverage Itemのinput draftは`{draft_key, model_key, identity_action, reuse_semantic_item_key, reuse_ci_id, source_target_versions[], item_text, authority_refs[], reference_refs[], priority, expected_result_root, test_data_requirement_refs[]}`です。新規itemではreuse fieldをnull、再利用では`reuse_semantic_item_key`と`reuse_ci_id`をprevious semantic mappingの同じrowへ一致させます。
+semantic Coverage Itemのinput draftは`{draft_key, model_key, identity_action, reuse_semantic_item_key, reuse_ci_id, source_target_versions[], item_text, authority_refs[], reference_refs[], priority, priority_override_reason, expected_result_root, test_data_requirement_refs[]}`です。runtime generatorを持たないsemantic model、fork-join等の非linear target、partial / whole-model unsupportedの`llm_fallback`だけに使用します。新規itemではreuse fieldをnull、再利用では`reuse_semantic_item_key`と`reuse_ci_id`をprevious semantic mappingの同じrowへ一致させます。
 
 semantic item lifecycleは次で固定します。
 
@@ -976,7 +980,7 @@ semantic item lifecycleは次で固定します。
 - inactive itemが意味上同一として復帰する場合、`identity_action=reuse`で同じsemantic item key / model / CIを指定し、そのCIが別itemへ再利用されていなければ同じkey / CIを復帰できる
 - deleted CIやinactive semantic item keyを別itemへ再利用しない。modelが変わる場合は意味上別itemとしてnewにする
 - 同じsemantic item keyをreuseしても`item_text / source_target_versions[] / Authority / Reference / priority / expected_result_root / test data requirement`が変わればCI content fingerprintを変え、下流TCをstaleにする
-- `source_target_versions[]`を持つitemは現在targetの`target_ref / target_content_fingerprint / generation_fingerprint`と完全一致しなければcurrentにしない
+- `source_target_versions[]`を持つitemは現在targetの`target_ref / target_content_fingerprint / generation_fingerprint`と完全一致し、全source targetがsemantic item自身の`model_key`に所属しなければcurrentにしない。別modelのtargetで当該modelのclosureを代替しない
 
 machine target由来CIはcanonical `execution`を、semantic item由来CIは`semantic_item_key / semantic_item_text / semantic_source_targets[]`をMachine Entityへ保存します。test data requirementはcurrent Machine Entityのcontent fingerprintをCI dependencyへ保存します。
 
@@ -1037,7 +1041,7 @@ runtime単位状態の正本は各成果物に保存した`runtime_unit_key`、`
 - model scriptは`Runtime Unit Key = model:<model_key>`とし、`Model Key`を必須
 - artifact全体scriptは`Runtime Unit Key = artifact:<generator>:<scope_key>`とし、`Model Key`は空欄
 - `Support Status`は`supported / partial / unsupported / unknown`
-- runtime集約inputの各runtime unitは共通`model_completion[]` fieldを持ち、`artifact:materialize_coverage:<tcn_id>`だけ非空を許可する。他unitでは空配列固定。rowはcurrent materialize resultから固定builderで転記し、LLMが生成しない
+- runtime集約inputの各runtime unitは共通`model_completion[] / target_mappings[] / target_dispositions[]` fieldを持ち、`artifact:materialize_coverage:<tcn_id>`だけ非空を許可する。他unitでは3配列を空固定とする。各rowはcurrent materialize resultから固定builderで転記し、LLMが生成しない。`traceability.py`と`workflow_runtime.py`は全materialize unitのtarget mapping / dispositionを集約し、`重複`参照のmissing / stale / cycle / terminal coverageを同じ規則で検査する
 - `Result Status`は`ready / unresolved / blocked`
 - `Freshness`は`current / stale`
 - `Runtime Status`は`ok / invalid_input / unsupported / limit_exceeded / internal_error / not_run`
@@ -1092,7 +1096,7 @@ Machine Entityのfreshnessは`runtime_contract.py`の共通関数で計算しま
 
 各Skillは単体コピー可能な既存契約を維持します。
 
-strict JSON、canonicalization、fingerprint、envelope処理はruntime対象6 Skillそれぞれの`scripts/runtime_contract.py`へ同じ実装を同梱します。repo rootの共通helperへ依存させません。`runtime_contract_version`をfile内定数として持ち、意味契約を変更した場合にversionを更新します。repository testでは改行をLFへ正規化した内容のSHA-256一致を検証し、Skillごとの実装差を許可しません。実装内容の変更は同じLF正規化規則で`runtime_implementation_fingerprint`へ反映します。技法固有ロジックはこの共通helperへ入れません。
+`spec-analysis`を含む7 Skillへ`scripts/runtime_contract.py`を同梱し、canonical JSON / Machine Entity helperは同一実装にします。runtime dispatchを持つのは従来どおり6 Skillだけで、`spec-analysis`のhelperはruntime unitとして数えません。repo rootの共通helperへ依存させません。`runtime_contract_version`をfile内定数として持ち、意味契約を変更した場合にversionを更新します。repository testでは改行をLFへ正規化した内容のSHA-256一致を検証し、Skillごとの実装差を許可しません。実装内容の変更は同じLF正規化規則で`runtime_implementation_fingerprint`へ反映します。技法固有ロジックはこの共通helperへ入れません。
 
 本Planのruntime dependencyはPython 3.11標準ライブラリだけに固定します。外部PyPI package、外部binary、network serviceをruntime依存へ追加しません。
 
