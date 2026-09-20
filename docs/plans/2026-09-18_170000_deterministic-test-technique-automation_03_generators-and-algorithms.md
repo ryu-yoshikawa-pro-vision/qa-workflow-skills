@@ -1350,7 +1350,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - node: `{node_key, node_type}`。node_typeは`Authority / Risk / TR / TCN / CI / TC`
 - edge: `{from, to}`。from / toは既知nodeで、§23の許可直接edgeだけを認める
 - disposition: `{upstream_entity:{skill, entity_type, entity_ref, content_fingerprint}, handling, reason, authority_refs[], covered_by_entity}`。handlingは対象上流型に対して既存担当Skillが許可するDisposition集合だけを認め、必要なreason / Authority / covered_by_entityを検証する
-- `runtime_units / current_entities / current_runtime_units / expected_runtime_units / expected_entities`は`workflow_runtime.py`と同じschemaを使用する
+- `runtime_units / current_entities / current_runtime_units / expected_runtime_units / expected_entities`は`workflow_runtime.py`と同じschemaを使用し、materialize runtime unitの`model_completion[]`も同じcurrent resultから受け取る
 - `coverage-analysis::artifact:traceability:all`自身は`runtime_units[] / current_runtime_units[] / expected_runtime_units[]`のすべてから除外する。いずれかに自身が含まれていた場合は`invalid_input`とし、自己generationをfreshness入力にしない
 - `traceability.py`は各Skillの同一内容`runtime_contract.py`にある共通freshness評価関数を呼び、`runtime_freshness[] / entity_freshness[]`を決定論的に算出する。workflow_runtime resultを入力へ渡さず、self/cycle dependencyを作らない
 - stale分析では`entity_freshness[]: {skill, entity_type, entity_ref, model_key, freshness_status, stale_reasons[]}`を正本にし、stale Entityがcurrentな下流で閉鎖済みと誤判定しない
@@ -1379,14 +1379,16 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - `materializable=false`の正規Coverage targetはsemantic itemまたはDispositionへ1回だけ閉じる
 - 各active Coverage所有modelは1件以上のcurrent CIを持つか、非空のrequired Coverage母集団がcurrent target Disposition / unsupported closureで全件閉じている必要がある。エラー推測semantic modelは1件以上のcurrent semantic CI必須
 - `conditions=[] / actions=[] / factors=[] / relations=[] / source_inputs=[] / states=[]`等、Coverage所有modelの意味母集団が空でrequired target / pair / caseが0件になる入力をvacuous completeにしない。model契約に応じて`invalid_input`または`unresolved`へ落とす
-- outputは`target_id_map[]`, `target_mapping_state[]`, `semantic_ci_mapping_state[]`, `ci_id_state[]`, `expected_result_root_state[]`, `disposed_target_refs[]`, `stale_ci_ids[]`, `coverage_item_rows[]`, `issues[]`
+- outputは`target_id_map[]`, `target_mapping_state[]`, `semantic_ci_mapping_state[]`, `ci_id_state[]`, `expected_result_root_state[]`, `disposed_target_refs[]`, `stale_ci_ids[]`, `coverage_item_rows[]`, `model_completion[]`, `issues[]`
+- `model_completion[]`: `{model_key, required_target_refs[], closed_target_refs[], active_ci_ids[], semantic_item_keys[], materialize_complete}`。supported / partialのruntime modelとruntimeなしsemantic modelを対象にする。`required_target_refs[]`はadapter / diagnosticを除くcurrentなrequired Coverage target、`closed_target_refs[]`はcurrent CI mapping・target Disposition・target version一致済みsemantic itemで閉じたtargetだけ。`active_ci_ids[] / semantic_item_keys[]`はcurrent mappingだけを載せる
+- runtime targetを持つmodelは`required_target_refs[]`が非空かつ全件`closed_target_refs[]`に含まれる場合だけ`materialize_complete=true`。エラー推測等のtargetなしsemantic modelは1件以上のactive semantic CIがある場合だけtrue。partial modelのunsupported item closureはここで完了扱いせず`workflow_runtime.py`が別途検査する。whole-model unsupportedは`model_completion[]`へ成功rowを捏造しない
 - `target_mapping_state[] / semantic_ci_mapping_state[] / ci_id_state[] / expected_result_root_state[]`はactive / inactive / deletedを含む必要なfull snapshotを返し、次回previous stateの正本にする
 
 #### `workflow_runtime.py`
 
 - required: `runtime_units[]`, `current_entities[]`, `current_runtime_units[]`, `expected_runtime_units[]`, `expected_entities[]`, `unsupported_item_closures[]`
 - `qa-workflow::artifact:workflow_runtime:all`自身は`runtime_units[] / current_runtime_units[] / expected_runtime_units[]`の3集合すべてから除外する。いずれかに自身が含まれていた場合は`invalid_input`とし、self dependencyも禁止する
-- runtime unit: `{skill, runtime_unit_key, model_key, support_status, result_status, runtime_status, runtime_required, deterministic_generated, generation_fingerprint, upstream_entities[], upstream_runtime_units[], unsupported_items[]}`
+- runtime unit: `{skill, runtime_unit_key, model_key, support_status, result_status, runtime_status, runtime_required, deterministic_generated, generation_fingerprint, upstream_entities[], upstream_runtime_units[], unsupported_items[], model_completion[]}`。`model_completion[]`は`artifact:materialize_coverage:<tcn_id>`だけ非空を許可し、current materialize resultから固定builderで転記する。他unitは空配列
 - `current_entities[]`: `{skill, entity_type, entity_ref, model_key, content, content_fingerprint, upstream_entity_dependencies[], runtime_dependencies[]}`。`content`は`_02` §4.4のMachine Entityと同一で、共通関数が`content_fingerprint`を再計算して保存値と一致確認する
 - `current_runtime_units[]`: `{skill, runtime_unit_key, generation_fingerprint}`。`(skill, runtime_unit_key)`を一意keyとして保存済み`upstream_runtime_units[]`と比較する
 - `expected_runtime_units[]`: `{skill, runtime_unit_key}`。各Skillは`_02` §2.1のdispatch表、現在の対象 / 実行範囲、active TCN / model metadata、条件付き入力の有無から固定builderで期待集合を作り、`qa-workflow`はそれを連結して`workflow_runtime.py`自身を除外する
@@ -1399,7 +1401,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - 禁止: `current_entities[]`を読んでexpectedを作る、保存済みMachine Entity blockを期待集合の正本にする、missing actual Entityの存在を前提にexpected identityを作る
 - `expected_runtime_units[]`もactual `runtime_units[] / current_runtime_units[]`から逆算せず、固定dispatch条件、対象 / 実行範囲、active structure state、normalized inputから導出する
 - `runtime_units[]`のidentity集合は`expected_runtime_units[]`と完全一致、`current_entities[]`のidentity集合は`expected_entities[]`と完全一致を必須にする。期待item欠落はblocker、未知の余分なcurrent itemは`invalid_input`とする
-- completionでは各active Coverage所有modelについてcurrent CIまたは許可されたcurrent target / unsupported closureを検査し、親TCNに別modelのCIがあるだけで当該modelを完了扱いしない
+- completionでは各active Coverage所有modelをmodel単位で検査する。supported / partial / runtimeなしsemantic modelはcurrent materialize runtime unitの対応`model_completion[]` rowを必須とし、`materialize_complete=true`かつrow内`active_ci_ids[]`がcurrent CI Machine Entityと一致することを検証する。partialではさらにcurrent unsupported item closureを全件必須とする。whole-model unsupportedは対応generationのwhole-model `unsupported_item_closures[]`を必須とする。親TCNに別modelのCIがあるだけで当該modelを完了扱いしない
 - 各Skillの同一内容`runtime_contract.py`にruntime dependency graphとMachine Entity dependency graphを評価する共通関数を置く。missing dependencyはstale + blocker、duplicateまたはcycleは`invalid_input`
 - `unsupported_item_closures[]`: `{skill, runtime_unit_key, generation_fingerprint, item_key, reason_code, handling, reason, authority_refs, covered_by_entity}`。`covered_by_entity`は`null`または`{skill, entity_type, entity_ref, content_fingerprint}`の完全Machine Entity参照。`handling`は`llm_fallback / 対象外 / 別テストレベル / 残存リスク / 成立不能 / 重複 / ブロック中`だけを許可する。closureの`generation_fingerprint`は対象runtime unitの現在値と一致必須。`support_status=partial`では`item_key`をunsupported itemのstable keyで必須とし、`reason_code`も現在unsupported itemと一致必須。whole-model `unsupported`では`item_key=null / reason_code=null`を許可するが`generation_fingerprint`一致は必須とする。世代またはreasonが変わった以前のclosureを自動再利用しない
 - `llm_fallback`と`重複`は`covered_by_entity`必須で、currentなMachine Entityへ解決できることを検証する。`対象外 / 別テストレベル / 残存リスク / 成立不能`は既存`test-condition-design`のDisposition条件をそのまま適用し、不要な`covered_by_entity`はnullとする。`ブロック中`はclosure rowとして保持しても閉鎖済みには数えず`can_complete=false`とする
