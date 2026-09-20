@@ -193,7 +193,15 @@ APGの例示や推奨を対象製品の仕様へ無条件に昇格しません�
 
 - https://html.spec.whatwg.org/
 
-native HTML controlの属性、constraint validation、form control、button、select等について、platform semanticsを確認する一次資料として使用します。参照したLiving StandardのURLと確認日をcatalogの`reference_refs`へ残します。
+native HTML controlの属性、constraint validation、form control、button、select等について、platform semanticsを確認する一次資料として使用します。`input type=number`ではdefault step=1、`step="any"`、step baseの`min → value → 0`を`schema_cases.py`のruntime-v1契約へ反映し、属性欠落を制約なしとして扱いません。参照したLiving StandardのURLと確認日をcatalogの`reference_refs`へ残します。
+
+### JSON Schema 2020-12 Core
+
+参照先:
+
+- https://json-schema.org/draft/2020-12/json-schema-core
+
+JSON Schema 2020-12では`$id`がschema resourceのbase URIを定め、subschemaの`$id`で別resourceが形成され得ます。また`$ref`とsibling keywordは併存できます。本Planのruntime-v1は誤解決を避けるため、root resource内の`#/...`だけを対応し、nested `$id`、anchor / dynamic reference、外部URI referenceは`unsupported`とします。対応subsetの`$ref` siblingは通常どおり評価します。
 
 ### OpenAPI Specification 3.0.3
 
@@ -203,7 +211,7 @@ native HTML controlの属性、constraint validation、form control、button、s
 
 OpenAPI 3.0のSchema Objectを直接入力する場合、`readOnly` / `writeOnly`は単なる表示annotationとして無視しません。`required`と併用された`readOnly` propertyはresponse側、`writeOnly` propertyはrequest側の必須条件として扱うため、`schema_cases.py`へ`request / response` contextを渡します。同一propertyの`readOnly=true`かつ`writeOnly=true`は不正入力として扱います。
 
-local `$ref`は対象Schema Objectだけでなくroot OpenAPI documentを基準に解決します。runtime入力はroot `document`と対象`schema_pointer`を分け、外部URI referenceは事前dereference済みを要求します。
+local `$ref`は対象Schema Objectだけでなくroot OpenAPI documentを基準に解決します。OpenAPI 3.0のReference ObjectはJSON Schema 2020-12の`$ref` siblingと同じ意味にせず、runtime-v1では`$ref`以外の追加propertyを持つReference Objectを`unsupported`として安全側へ閉じます。runtime入力はroot `document`と対象`schema_pointer`を分け、外部URI referenceは事前dereference済みを要求します。
 
 ### WCAG / WAI資料
 
