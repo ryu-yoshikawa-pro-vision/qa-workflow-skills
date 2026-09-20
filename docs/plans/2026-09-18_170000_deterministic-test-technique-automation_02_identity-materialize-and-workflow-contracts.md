@@ -91,7 +91,7 @@ merge / unmerge / target追加削除 / CI↔Dispositionの詳細な状態遷移�
 - TC: `{tc_id, status}`
 - CI: `{ci_id, status}`
 
-TR / TCN / model / TCはpreviousでactiveだったIDがcurrentでactive reuseされなければ同じrowを`deleted`へ遷移させます。previous deleted rowは保持し、別項目へ再利用・復活させません。
+TR / TCN / model / TCは§7.1.1の`update_scope_*`規則に従い、今回の更新scope内にあるprevious active IDだけをcurrentでreuseされなければ`deleted`へ遷移させます。scope外activeは維持し、previous deleted rowも保持して別項目へ再利用・復活させません。
 
 CIは§7.2.2のtarget mapping状態遷移を優先し、同sectionで明示した同一targetへの復帰以外でdeleted番号を再利用しません。
 
