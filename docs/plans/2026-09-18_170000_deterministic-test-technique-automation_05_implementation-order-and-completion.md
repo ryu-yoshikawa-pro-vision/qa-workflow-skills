@@ -91,7 +91,7 @@
 - Domain Testing Reliable Domain Coverage（`< <= > >= = !=`）とexact rational border arithmetic
 - schema / HTML parser / exact JSON number / scalar-null enum・const / root document + local `$ref` / OpenAPI request-response context
 - HTML runtime-v1 typeを`text / number / date / datetime-local`へ限定し、disabled / readonlyのconstraint validation除外、pattern / unsupported typeを安全側へ閉じる
-- schemaからEP / BVA boundary skeleton / combinatorial / test dataへの固定derived inputとBVA意味parameter join
+- schemaから、既に選択・採番済みのEP / BVA / combinatorial childへ固定derived inputを供給し、test data requirementを生成する。schema runtime結果から新しい技法 / child modelを自動追加しない。選択済みchildへderived inputを作れない場合は`unresolved`へ戻す。BVAは意味parameterをjoinする
 - test data / environment cross-operator intersection
 - 新規技法のSkill / reference / template / eval契約
 
