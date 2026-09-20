@@ -44,6 +44,10 @@ test-target-inspection
   ↓
 test-execution
   ↓
+各TCをGiven / When / Then構造のYAMLへ整理
+  ↓ unresolvedあり
+該当TCは未実行として解消条件を報告
+  ↓ unresolvedなし
 Playwright MCP等の対話操作
 または
 Playwright CLI / 今回run用の一時Playwrightコード
@@ -57,7 +61,7 @@ PASS / FAIL / 未実行 / 判定不能
 テスト実行結果を報告
 ```
 
-`test-execution`は、AI自身が現在の実対象を操作・観測することを基本とします。既存の過去結果を読み替えるだけで新規実行要求を完了にしません。
+`test-execution`は、AI自身が現在の実対象を操作・観測することを基本とします。操作開始前に各TCをGiven / When / Then構造のYAMLへ整理し、実行または合否判定に影響する曖昧さが残るTCは推測で補完せず`未実行`とします。既存の過去結果を読み替えるだけで新規実行要求を完了にしません。
 
 ### repoへ残すPlaywright E2Eが必要
 
@@ -198,7 +202,8 @@ Playwright runner固有のrun / logical primary / resolved TestCase / attempt / 
 
 - 実対象UI情報・ふるまい・鮮度 → `test-target-inspection`
 - TC手順 / 期待結果自体の問題 → `test-case-design`
-- AIによるTC実行・実測・判定・結果報告 → `test-execution`
+- TCの実行前整理、AIによる実行・実測・判定・結果報告 → `test-execution`
+- 実行前YAMLで判明した元TCの期待結果・手順自体の曖昧さ → 元TCを推測修正せず、必要に応じて`test-case-design`または入力元 / ユーザーへ戻す
 - currentな仕様根拠が不明 / 競合 → `question-analysis` / `spec-analysis`
 - repoへ残すE2E実装が必要 → `e2e-test-inspection` / `e2e-test-implementation`
 - 既存repo E2Eのrunner実行 → `e2e-test-execution`
@@ -250,7 +255,7 @@ Playwright runner固有のrun / logical primary / resolved TestCase / attempt / 
 
 ### `test-execution`
 
-今回要求されたTC集合が`PASS / FAIL / 未実行 / 判定不能`のいずれかへ漏れなく対応し、必要な実行結果報告が作成されていることを確認します。
+今回要求されたTC集合について、各TCの実行前YAMLが元TCへ追跡でき、操作開始前の`unresolved`判定が完了していることを確認します。その上で、TC集合が`PASS / FAIL / 未実行 / 判定不能`のいずれかへ漏れなく対応し、必要な実行結果報告が作成されていることを確認します。
 
 全TC PASSはworkflow完了条件ではありません。`FAIL`があっても、要求された実行と報告が終わり、未処理のcleanup / ブロック / 要再検証がなければworkflowは完了できます。
 
