@@ -226,11 +226,11 @@ Cause-Effect → Decision Table、Classification Tree → combinatorial、schema
 - top-level typeをscriptごとに固定する
 - UTF-8で解釈する
 - model内のdecimalはJSON numberへ丸めず、`{"type":"decimal","value":"0.1"}`のような10進文字列で扱う
-- raw JSON Schema / OpenAPI document等に含まれるJSON integerはPython `int`、非整数JSON numberは`Decimal`としてexactにparseし、binary `float`を経由しない
+- JSON numberはまず元token文字列として取得し、§5.1の長さ・形式検証後にcanonical integerまたは`coefficient + scale`へexact正規化する。binary `float`や未検証の巨大`int / Decimal`へ直接変換しない
 - canonical JSONへ再serializeする`Decimal`は指数表記を使わない正規化済みJSON numberとして出力する
 - date / datetimeは契約で許可したISO 8601形式以外を拒否する
 
-Python実装では、duplicate key検出用`object_pairs_hook`、`parse_float=Decimal`相当、非有限数拒否、`allow_nan=False`相当の出力を共通方針とします。
+Python実装では、duplicate key検出用`object_pairs_hook`、`parse_int / parse_float`でnumber tokenを字句列のまま受けるhook、非有限数拒否、`allow_nan=False`相当の出力を共通方針とします。
 
 ### 3.2 共通入力metadata
 
