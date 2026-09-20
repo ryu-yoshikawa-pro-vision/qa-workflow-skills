@@ -45,7 +45,7 @@ e2e-test-reporting
 - role / accessible name / test id等の識別情報の確認
 - 表示状態、loading / empty / error、modal等の状態確認
 - 画面遷移、非同期状態、データ / 権限依存の確認
-- 既存Page Object / fixture / helperとの対応確認
+- 必要時のrepo参照確認。既存Page Object / fixture / helper等との対応は、後続作業に有用で実在確認できた場合だけ任意で記録する
 - 既存のテスト対象資料との差分確認と必要範囲の更新
 - 確認元、確認日時、version / build、repo revision、未確認範囲の保持
 
@@ -64,7 +64,7 @@ e2e-test-reporting
 
 主責務:
 
-- 実行要求を、入力側で既に存在する一意識別子を使って具体的なTC集合へ解決し、今回の実行母集団を開始前に確定。TCは`qa-workflow`成果物、外部成果物、ユーザー直接入力のいずれでもよい。既存TC IDや外部システムの一意識別子を再利用し、`test-execution`自身が正式TC IDを創作しない
+- 実行要求を、入力側で既に存在する一意識別子を使って具体的なTC集合へ解決し、今回の実行母集団を開始前に確定。TCは`qa-workflow`成果物、外部成果物、ユーザー直接入力のいずれでもよい。既存TC IDや外部システムの一意識別子を再利用し、`test-execution`自身が正式TC IDを創作しない。1成果物では1つのTC入力元 / snapshotだけを扱う
 - 前提条件、テストデータ、事後状態 / 後処理、環境、安全条件の確認
 - `AI直接操作`による手順実施と観測
 - `自動実行`で取得済みの検証済みrunner事実の利用
@@ -90,12 +90,12 @@ e2e-test-reporting
 | Playwright E2E実装前事実 | `e2e-test-inspection` | テスト対象資料を再利用可能 |
 | Playwrightコード | `e2e-test-implementation` | 既存責務維持 |
 | TC → E2E実装の追跡関係 | `coverage-analysis`（対象: `TC → E2E実装`） | 対応の欠落・陳腐化を`test-execution`で推測補完しない |
-| E2E実装の期待結果 / assertionレビュー | `adversarial-review`（対象: `E2E実装`） | TC PASS根拠に使う場合は対象E2E実装revision / working treeとの対応を追跡する |
-| Playwright runner事実 | `e2e-test-execution` | 既存責務維持 |
+| E2E実装の期待結果 / assertionレビュー | `adversarial-review`（対象: `E2E実装`） | currentなTCとE2E実装に対するreviewとして利用できる場合だけTC PASS判断の確認元にする。鮮度を証明できなければ現在対象を再reviewする |
+| Playwright対象解決・preflight・runner事実 | `e2e-test-execution` | logical primary、project、実効設定、run分割、retry、artifact、cleanup等の既存責務を維持 |
 | TC実行と期待結果比較 | `test-execution` | AI直接操作 / 自動実行に共通 |
 | Playwright異常原因分析 | `e2e-test-result-analysis` | 既存責務維持 |
 | Playwright固有結果報告 | `e2e-test-reporting` | 既存責務維持 |
-| ルーティング / 完了 | `qa-workflow` | 2 Skillを正規Skillへ追加 |
+| Skill間ルーティング / 再開 / 完了 | `qa-workflow` | `test-execution`自身に子Skill実行や再開制御を持たせない |
 
 ## 4. `test-target-inspection` を既定フローへ固定しない理由
 
@@ -126,7 +126,7 @@ e2e-test-reporting
 
 既存文書を更新する場合は、正規テンプレートまたは構造的に互換性を確認できる資料だけを自動差分更新の対象とし、既存の対象キーと未変更情報を可能な限り維持します。既定テンプレート外の人間記載セクションを無関係に削除しません。任意形式の文書を汎用的に解析・mergeする仕組みは追加しません。既存構造が曖昧で安全に差分更新できない場合は上書きせず、更新不能範囲を明示します。
 
-永続更新では、更新候補を作成した元成果物のrevision / content identityを保持し、保存直前に対象成果物が同じ元状態のままか再確認します。変更済みなら古い候補で上書きせず、最新内容を再読込して候補を作り直します。新しいlockやartifact registryは追加しません。
+永続更新では、保存先が提供するSHA / revision / ETag等の条件付き更新を優先して古い候補の上書きを防ぎます。利用できない場合だけ、更新候補を作成した元成果物のrevision / content identityを保持し、保存直前の再読込・比較で同じ元状態か確認します。変更済みなら古い候補で上書きせず、最新内容から候補を作り直します。新しいlockやartifact registryは追加しません。
 
 成果物の単位は、既存成果物があればその単位を維持します。新規作成では今回要求された調査範囲を1成果物の範囲とし、明示要求なしに製品全体へ拡張したり画面単位へ細分化したりしません。
 
@@ -158,11 +158,15 @@ e2e-test-reporting
 
 `test-target-inspection`は観測・非永続操作を既定とします。永続的な副作用を伴う操作が必要な場合は、対象origin、許可範囲、最大回数、cleanup方法を確認してから実施します。実施した場合は操作内容、許可範囲、最大回数、実施回数、cleanup結果、残存状態を成果物へ記録します。再試行も実施回数へ含め、実施回数が最大回数を超えないことを確認します。これらを確認できない場合は操作せず、その範囲を`未確認`または`確認不能`として残します。inspectionであることを理由に副作用確認を省略しません。
 
-`test-execution`はTCが要求する操作でも、環境・副作用・cleanup条件を確認できなければ該当TCを開始せず`未実行`とし、必要な条件が解消するまで`test-execution`の該当範囲をworkflow上`ブロック中`として扱います。実行開始後に必要な観測を完了できずPASS / FAILを確定できない場合はTCを`判定不能`とします。他の安全なTCまで一律停止しません。
+`test-execution`はTCが要求する操作でも、環境・副作用・cleanup条件を確認できなければ該当TCを開始せず`未実行`とし、必要な条件が解消するまで`test-execution`の該当範囲をworkflow上`ブロック中`として扱います。副作用の最大回数はユーザーが許可した操作scope全体で累計し、同じscopeを複数TCが共有してもTCごとに上限をリセットしません。実行開始後に必要な観測を完了できずPASS / FAILを確定できない場合はTCを`判定不能`とします。他の安全なTCまで一律停止しません。
 
 `test-target-inspection`で`未確認`は今回確認対象だがまだ確認していない情報、`確認不能`は今回確認する必要があるがアクセス・権限・環境等により確認できなかった情報として区別します。要求範囲外の情報を`未確認`へ混ぜず、既存情報を保持するだけなら`既存資料から継承・未再確認`として扱います。今回確認すべき範囲に必要な`未確認`または`確認不能`が残り、要求資料を完成できない場合は、repo由来情報だけで`完了`にせず該当範囲をworkflow上`ブロック中`として扱います。
 
 `test-target-inspection`は対象製品コード、Page Object、fixture、helper、既存テストコードを変更しません。永続的な書込は、ユーザーまたは案件が指定したテスト対象資料の作成・更新に限定します。実装修正が必要と判明した場合は観測事実として残し、責任Skillへroutingします。
+
+外部成果物 / ユーザー直接入力TCで期待結果やE2E対応が不足している場合は、内部QA成果物へ自動変換しません。入力元・ユーザーから解消できない範囲はブロックし、内部QA workflowへの取込が明示された場合だけ`test-case-design`や`coverage-analysis`等の既存Skillへroutingします。
+
+`test-target-inspection` / `test-execution`で取得するscreenshot、page snapshot等の証跡は必要最小限とし、secret・個人データ・機密情報を含む可能性がある証跡を自動共有・commit・転載しません。
 
 ## 8. 対象外
 
