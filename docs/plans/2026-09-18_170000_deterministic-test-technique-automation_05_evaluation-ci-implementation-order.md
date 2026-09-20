@@ -323,6 +323,7 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - target union
 - tie-break
 - full Cartesian productの事前materializeを前提にしない
+- Classification Tree adapterは事前採番済み`comb` child 1件だけを受け、strategy未指定ではfactor key付き`semantic_parameter_requests[]`で`unresolved`、strategy指定後は`combinatorial.py`と完全互換な`derived_child_inputs[]`を返す
 
 ### 状態遷移
 
@@ -386,7 +387,7 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - Authority付き`constraints[]`でcause間の成立不能partial assignmentを表現する
 - constraintに一致するcause assignmentを正式known rule / Coverage母集団へ入れない
 - assignment hard limit
-- `derived.decision_table`が`conditions / actions / known_rules / constraints / accepted_merges=[]`を持ち、入力constraintを失わずDecision Table inputと直接互換
+- 事前採番済み`decision` child 1件だけを受け、`semantic_parameter_requests=[]`で`derived_child_inputs[].input`へ`conditions / actions / known_rules / constraints / accepted_merges=[]`を返す。入力constraintを失わずDecision Table inputと直接互換
 
 ### Syntax-Based Testing
 
@@ -408,8 +409,9 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 
 ### schema / HTML
 
-- schema adapterはcurrent Technique Selectionまたはcondition-design / userで採用済みの`ep / bva / comb` child typeだけへderived inputを供給し、runtime出力から新しい技法やchild modelを自動追加しない
-- 選択済みchildに対応するderived inputが0件なら`selected_technique_not_derivable`で`unresolved`とし、空modelをmaterializeしない
+- schema adapterはcurrent Technique Selectionまたはcondition-design / userで採用済みの`ep / bva / comb` child identityだけを`child_models[]`で受け、runtime出力から新しい技法やchild modelを自動追加しない
+- BVA boundary / combinatorial strategyの意味parameterが不足する初回実行ではstable machine key付き`semantic_parameter_requests[]`で`unresolved`とし、parameter追加後の再実行でchild generatorと完全互換な`derived_child_inputs[]`を返す
+- 選択済みchildに適用可能skeletonが0件なら`selected_technique_not_derivable`とし、`analysis → test-analysis / condition_design → test-condition-design / user → question-analysis`のroutingを検証して空modelをmaterializeしない
 
 raw machine-readable入力をfixtureにします。
 
