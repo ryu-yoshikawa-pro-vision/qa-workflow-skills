@@ -131,6 +131,8 @@ CLI integration testは各runtime scriptの`valid_minimal.json`をsubprocessで`
 - LF / CRLF差だけでimplementation fingerprintが変わらない
 - canonical JSON static dataは整形・改行差だけでversion hashが変わらない
 
+- hash由来stable component keyは`h` + full SHA-256 digest先頭63 hexで64文字に固定し、異なるfull digestが同じcomponentへ衝突する場合は`internal_error`にする
+
 ### 決定論性
 
 同一fixtureを`PYTHONHASHSEED=1`と`PYTHONHASHSEED=999`の2条件で実行し、machine outputが一致することを確認します。
