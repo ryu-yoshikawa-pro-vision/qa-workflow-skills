@@ -128,9 +128,9 @@ CI単位の`merge_group`と、TCが複数CIを参照する意味判断を分離�
 | `decision_table.py` | conditions、actions、known rules、constraints、accepted merges | `dt:sha256:<assignment_hash>` | rule assignment / action vector / Coverage |
 | `combinatorial.py` | mode、factors、constraints、strength | `comb:<mode>:sha256:<target_hash>` | target tuple / rows / Coverage |
 | `classification_tree.py` | classifications[] / classes[] / constraints[] | `class:<classification_key>:<class_key>` | `derived.combinatorial_input` |
-| `state_transition.py` | states、transitions、reset、coverage mode、n-switch時switch_count | §9のstate / transition / n-switch / round-trip / invalid key | setup / sequence / Coverage |
-| `flow_paths.py` | nodes、edges、initial nodes、regions、loop specs、max path length、coverage mode | §10のnode / edge / path / loop / branch key | paths / loops / branch Coverage |
-| `crud_matrix.py` | matrix、consistency sequences、operation dispositions | §11のoperation / missing / sequence key | completeness / consistency / anomalies |
+| `state_transition.py` | states、transitions、reset、coverage mode、n-switch時switch_count | [基本generator契約](./2026-09-18_170000_deterministic-test-technique-automation_03_generators-and-algorithms.md) §9のstate / transition / n-switch / round-trip / invalid key | setup / sequence / Coverage |
+| `flow_paths.py` | nodes、edges、initial nodes、regions、loop specs、max path length、coverage mode | [追加generator契約](./2026-09-18_170000_deterministic-test-technique-automation_03_additional-generators.md) §10のnode / edge / path / loop / branch key | paths / loops / branch Coverage |
+| `crud_matrix.py` | matrix、consistency sequences、operation dispositions | [追加generator契約](./2026-09-18_170000_deterministic-test-technique-automation_03_additional-generators.md) §11のoperation / missing / sequence key | completeness / consistency / anomalies |
 | `cause_effect.py` | causes、effects、constraints、AST | `ce:sha256:<cause_assignment_hash>` | Decision Table互換rules |
 | `grammar_cases.py` | start、key付きproductions、max depth、mutations | `syntax:prod:<production_key>`、mutationは`syntax:mutation:<mutation_key>` | derivations / production Coverage |
 | `schema_cases.py` | `schema_kind, document, schema_pointer, context` | `schema:sha256:<source_hash>` | normalized constraints / downstream inputs / unsupported subtrees |
@@ -334,11 +334,11 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - state: `{state_key, label, authority_refs}`。`label`は非空文字列
 - transition: `{transition_key, from, event, guard_status, guard_refs, to, authority_refs}`
 - `guard_status=true|false|null`
-- resetは§9形式で`action`を非空文字列必須とする
+- resetは[基本generator契約](./2026-09-18_170000_deterministic-test-technique-automation_03_generators-and-algorithms.md) §9形式で`action`を非空文字列必須とする
 - coverage mode: `all-states | valid-transitions | n-switch | round-trip | invalid-transitions`
 - `switch_count`はinteger 0..10
-- n-switch / round-tripのtarget定義とcanonicalizationは§9を正本とする
-- invalid candidateは§9形式
+- n-switch / round-tripのtarget定義とcanonicalizationは[基本generator契約](./2026-09-18_170000_deterministic-test-technique-automation_03_generators-and-algorithms.md) §9を正本とする
+- invalid candidateは[基本generator契約](./2026-09-18_170000_deterministic-test-technique-automation_03_generators-and-algorithms.md) §9形式
 
 #### `flow_paths.py`
 
@@ -350,7 +350,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - `initial_node_keys[]`は1件以上
 - `coverage_mode = node | edge | bounded-path | simple-loop | fork-join`
 - `max_path_length`は1..1000
-- region / loopの連続性・nest・iteration規則は§10を正本とする
+- region / loopの連続性・nest・iteration規則は[追加generator契約](./2026-09-18_170000_deterministic-test-technique-automation_03_additional-generators.md) §10を正本とする
 
 #### `crud_matrix.py`
 
@@ -358,7 +358,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - entity: `{entity_key, label, authority_refs}`。`label`は非空文字列
 - function: `{function_key, label, authority_refs}`。`label`は非空文字列
 - cell: `{entity_key, function_key, operations[], authority_refs}`。operationsは`C/R/U/D`の重複なし集合
-- consistency sequenceは§11形式
+- consistency sequenceは[追加generator契約](./2026-09-18_170000_deterministic-test-technique-automation_03_additional-generators.md) §11形式
 - 個々の空cellは欠陥・N/Aを意味しないため専用`excluded_cells[]`を持たない。entity全体でoperationが存在しない場合だけ`operation_dispositions[]`で扱う
 - operation disposition: `{entity_key, operation, handling, reason, authority_refs}`。`handling=not_applicable`、Authority 1件以上
 
@@ -394,14 +394,14 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - numberは共通strict JSONの専用number tokenからcanonical integer / exact `coefficient + scale`へ正規化し、binary float / `Decimal` contextへ依存しない
 - JSON Schema 2020-12ではroot `$id`だけmetadataとして許可し、nested `$id`、`$anchor / $dynamicAnchor / $dynamicRef`、外部URI referenceはruntime-v1 `unsupported`。対応`$ref`は同一schema resource内の`#/...`だけ
 - JSON Schema 2020-12の`$ref` siblingは対応keywordなら通常どおり評価し、`$ref`だけを見てsiblingsを捨てない
-- OpenAPI 3.0はJSON Schema 2020-12と別semanticsで、`nullable`、boolean exclusive boundary、`readOnly / writeOnly`、Reference Objectを§14どおり処理する
+- OpenAPI 3.0はJSON Schema 2020-12と別semanticsで、`nullable`、boolean exclusive boundary、`readOnly / writeOnly`、Reference Objectを[追加generator契約](./2026-09-18_170000_deterministic-test-technique-automation_03_additional-generators.md) §14どおり処理する
 - OpenAPI Reference Objectは`$ref`以外の追加propertyを仕様どおり無視し、sibling Schema assertionとして解釈しない
 - `enum / const`はscalar / nullだけruntime-v1対応。object / array値を含むsubtreeはunsupported itemへ出す
 - `context`はJSON Schemaでは`validation`、OpenAPIでは`request|response`、HTMLでは`form-control`
-- html-control `document`は`{type, required, min, max, minlength, maxlength, step, value, pattern, disabled, readonly, multiple}`。numberのdefault step=1、`step=any`、step base=min→value→0を§14どおり扱う
+- html-control `document`は`{type, required, min, max, minlength, maxlength, step, value, pattern, disabled, readonly, multiple}`。numberのdefault step=1、`step=any`、step base=min→value→0を[追加generator契約](./2026-09-18_170000_deterministic-test-technique-automation_03_additional-generators.md) §14どおり扱う
 - `pattern`等の未対応constraintを無視してcompleteにせず、validation意味へ影響するsubtreeを`unsupported`
-- `multipleOf`と対応可能なnumber `step`は§14の`grid` constraintへ正規化する
-- annotation allowlistとunsupported subtree規則は§14を正本とする
+- `multipleOf`と対応可能なnumber `step`は[追加generator契約](./2026-09-18_170000_deterministic-test-technique-automation_03_additional-generators.md) §14の`grid` constraintへ正規化する
+- annotation allowlistとunsupported subtree規則は[追加generator契約](./2026-09-18_170000_deterministic-test-technique-automation_03_additional-generators.md) §14を正本とする
 
 #### `ui_pattern_candidates.py`
 
