@@ -8,6 +8,7 @@ skills/test-execution/
 ├── references/
 │   └── guidance.md
 ├── assets/
+│   ├── execution-plan-template.yaml
 │   └── output-template.md
 └── evals/
     ├── trigger/
@@ -47,7 +48,71 @@ TCは`qa-workflow`成果物、外部成果物、ユーザー直接入力のい�
 
 外部 / 直接入力TCの期待結果が不足・曖昧な場合は、実測に合わせて補完しません。入力元・ユーザーから解消できなければ該当TCを開始しません。
 
-## 3. 実行手段
+## 3. 実行前のGherkin構造YAML
+
+実対象への操作を開始する前に、固定した各TCをGherkinの`Given / When / Then`構造へ整理し、YAMLとして保持します。
+
+これはGherkin / Cucumberの新しい標準形式を定義するものではありません。元TCをAIが実行可能な形へ整理し、曖昧な前提・操作・期待結果・観測方法を操作開始前に表面化させるための中間成果物です。元TCを正本とし、YAMLは元TCの意味を追加・削除・変更しません。
+
+`skills/test-execution/assets/execution-plan-template.yaml`は次の最小構造を持たせます。
+
+```yaml
+test_case_id: TC-001
+title: 正しい認証情報でログインできる
+scenario:
+  given:
+    - 未ログイン状態でログイン画面を表示している
+    - 有効なテストユーザーが存在する
+  when:
+    - メールアドレスとパスワードを入力してログインする
+  then:
+    - expected: ダッシュボードが表示される
+      observation:
+        - accessibility_tree
+        - image
+unresolved: []
+cleanup: []
+```
+
+契約は次のとおりです。
+
+- `test_case_id`: 入力側ですでに存在するTC識別子をそのまま使う
+- `title`: 元TCに存在する名称または意味を変えない短い表現
+- `scenario.given`: 実行開始状態、前提条件、role、必要なテストデータ等を元TCから整理する
+- `scenario.when`: AIが実施する操作を元TCの順序・意味を維持して整理する
+- `scenario.then`: 期待結果と、その確認に必要な観測方法を整理する
+- `unresolved`: 実行または合否判定に影響する未解決事項だけを列挙する。ない場合は空配列にする
+- `cleanup`: 元TCまたは安全条件で必要な後処理だけを記録する。対象なしなら空配列にする
+
+`observation`は今回の期待結果を確認する方法を示します。DOM / accessibility tree / image / Playwright assertion等、実際に利用可能な観測方法を記録し、元TCが視覚状態を要求する場合は必要に応じて`image`を含めます。観測方法を選べないこと自体が合否判定へ影響する場合は`unresolved`へ残します。
+
+### 曖昧さの扱い
+
+次のいずれかが実行または判定に必要なのに元TC・既存成果物・ユーザー提供情報から確定できない場合は、推測で埋めず`unresolved`へ記録します。
+
+- 開始状態 / 前提条件
+- 操作対象または操作内容
+- 操作順序
+- 期待結果
+- PASS / FAILに必要な観測方法
+- 安全に実行するための副作用条件 / cleanup
+
+`unresolved`が空でないTCは実対象への操作を開始せず`未実行`とし、何を解消すれば開始できるかを報告します。他のTCを安全に実行できる場合は継続します。
+
+曖昧さが実行や合否判定へ影響しない補足情報であれば、実行を止めるためだけに`unresolved`へ追加しません。
+
+### 変換時に禁止すること
+
+- 元TCにない期待結果を追加する
+- 「正常に」「適切に」等の曖昧な期待結果を独自判断で具体化する
+- 元TCにないテストデータ、role、アカウント、URLを推測する
+- PASSを得やすくするために操作順序やUI経路を変更する
+- YAMLを仕様Authorityまたは新しいTC正本として扱う
+- YAML化を理由に正式TC ID、step ID、expectation ID等の新しい共通ID体系を追加する
+
+今回の目的に不要な`Feature`、`Background`、`Scenario Outline`、`Examples`、tag等のGherkin / Cucumber全構文は実装しません。
+
+## 4. 実行手段
 
 実行手段はTCの属性ではなく、AIが今回の実対象を操作・観測するための手段です。
 
@@ -86,30 +151,31 @@ AIはTCの手順に沿って、画面を確認しながら1操作ずつ進めま
 
 既存 / 実装済みrepo E2Eを正式なrunner契約で実行する場合は、既存`e2e-test-execution`を使用できます。その場合も、最終的なTC単位の結果報告が要求されているなら`test-execution`へ結果を戻して報告します。
 
-## 4. 人間の手動テスト相当の実行契約
+## 5. 人間の手動テスト相当の実行契約
 
 `references/guidance.md`では次の流れを基本とします。
 
 1. 今回実行するTC集合を固定する
-2. TCの前提条件、手順、期待結果、事後状態 / 後処理を確認する
-3. 対象環境、URL / origin、role / アカウント、認証、テストデータ、開始状態を確認する
-4. 副作用scope、最大回数、cleanup対象 / 方法を確認する
-5. TCごとに開始状態を確認する
-6. 人間がTCを実施するのと同じUI経路で手順を実施する
-7. 各観測点でDOM / accessibility tree等から取得できる構造・意味情報を確認する
-8. 視覚確認が必要な観測点ではscreenshot等を取得し、画像として確認する
-9. 期待結果と実測結果を比較する
-10. 後続手順の前提が崩れた場合は、PASSを得るために別経路へ勝手に迂回しない
-11. TC結果を確定する
-12. TCに定義された事後状態 / 後処理を実施・確認する
-13. 実行時cleanupと残存状態を確認する
-14. TC結果、観測、証跡、未実行 / 判定不能理由、cleanupを報告する
+2. 各TCの前提条件、手順、期待結果、事後状態 / 後処理をGherkin構造YAMLへ整理する
+3. YAMLの`unresolved`を確認し、実行または合否判定に影響する未解決事項があるTCは操作を開始せず`未実行`とする
+4. 対象環境、URL / origin、role / アカウント、認証、テストデータ、開始状態を確認する
+5. 副作用scope、最大回数、cleanup対象 / 方法を確認する
+6. TCごとに開始状態を確認する
+7. 人間がTCを実施するのと同じUI経路でYAMLの`scenario.when`を実施する
+8. 各`scenario.then`の観測方法に従い、DOM / accessibility tree等から取得できる構造・意味情報を確認する
+9. 視覚確認が必要な観測点ではscreenshot等を取得し、画像として確認する
+10. 期待結果と実測結果を比較する
+11. 後続手順の前提が崩れた場合は、PASSを得るために別経路へ勝手に迂回しない
+12. TC結果を確定する
+13. TCに定義された事後状態 / 後処理を実施・確認する
+14. 実行時cleanupと残存状態を確認する
+15. TC結果、実行前YAML、観測、証跡、未実行 / 判定不能理由、cleanupを報告する
 
 TC手順にない探索操作を、PASSを得るために追加しません。診断目的で追加操作する場合は正式TC手順と区別します。
 
 UI操作を避けるためにbackend API / DB等へ直接書き込んでTCを成立させません。TCまたはユーザー要求がAPI / DB操作自体を明示している場合は本Skillの現スコープ外として扱います。
 
-## 5. 画像による判断
+## 6. 画像による判断
 
 画像確認を補助的な証跡だけではなく、必要時の正式な観測手段として扱います。
 
@@ -135,7 +201,7 @@ UI操作を避けるためにbackend API / DB等へ直接書き込んでTCを成
 
 pixel diff専用frameworkや画像差分専用Skillは追加しません。
 
-## 6. TC結果状態
+## 7. TC結果状態
 
 正規状態は次です。
 
@@ -150,7 +216,7 @@ pixel diff専用frameworkや画像差分専用Skillは追加しません。
 
 不一致はないがPASSに必要な観測を完了できない場合は`判定不能`です。
 
-## 7. 副作用・cleanup
+## 8. 副作用・cleanup
 
 副作用の最大回数は、ユーザーが許可した操作scope全体で管理します。同じscopeを複数TCが共有してもTCごとに上限をリセットしません。
 
@@ -164,7 +230,7 @@ pixel diff専用frameworkや画像差分専用Skillは追加しません。
 
 cleanup失敗は確定済みTC結果を自動でFAILへ変更しません。ただし残存状態がある場合は実行報告とworkflow完了状態へ反映します。
 
-## 8. 実行開始後の変更
+## 9. 実行開始後の変更
 
 実行開始後は今回のTC集合を変更しません。
 
@@ -176,7 +242,7 @@ cleanup失敗は確定済みTC結果を自動でFAILへ変更しません。た�
 - 旧成果物を履歴として閉じる
 - 変更後要求は別の`test-execution`成果物 / versionとして開始する
 
-## 9. 出力Asset
+## 10. 出力Asset
 
 `skills/test-execution/assets/output-template.md`を正規出力として追加します。
 
@@ -194,6 +260,14 @@ cleanup失敗は確定済みTC結果を自動でFAILへ変更しません。た�
 | 実行日時 |  |  |
 | 使用した実行手段 | Playwright MCP等 / browser操作 / Playwright CLI / 一時Playwrightコード / 既存E2E runner |  |
 | テスト対象資料参照 |  |  |
+
+### 実行前Gherkin構造YAML
+
+固定した全TCについて、実対象への操作開始前に`execution-plan-template.yaml`と同じ構造で整理します。
+
+元TCの正本参照とTC識別子から追跡できることを必須とします。`unresolved`が空でないTCは、その内容と再開条件を`未実行・判定不能`表にも反映します。
+
+YAMLは最終報告にも含めるか、安全な成果物参照を示し、実行された内容が事前に整理した内容と対応することを確認できるようにします。実行後の観測結果をYAMLの期待結果へ上書きしません。
 
 ### 実行前条件
 
@@ -270,7 +344,7 @@ TC期待結果とは別に発見したUI崩れや異常がある場合だけ記�
 - cleanup / 残存状態
 - 残るブロックや再実行条件
 
-## 10. Playwrightコードと既存E2E Skillの境界
+## 11. Playwrightコードと既存E2E Skillの境界
 
 ### 今回runだけの一時コード
 
@@ -299,7 +373,7 @@ e2e-test-execution
 
 `test-execution`がTC結果報告まで要求されている場合だけ、その実行結果をTCの期待結果と対応付けて報告します。
 
-## 11. `test-target-inspection`の利用
+## 12. `test-target-inspection`の利用
 
 currentな`test-target-inspection`成果物は任意入力として使用できます。
 
@@ -313,7 +387,7 @@ currentな`test-target-inspection`成果物は任意入力として使用でき�
 
 資料と実対象が不一致の場合は資料を正として実対象を無視しません。今回の実測を保持し、資料管理が要求範囲に含まれる場合は`qa-workflow`経由で`test-target-inspection`へ更新を戻します。
 
-## 12. `e2e-test-reporting`との境界
+## 13. `e2e-test-reporting`との境界
 
 `test-execution`は一般的なTC実行結果の報告まで担当します。
 
@@ -321,12 +395,14 @@ currentな`test-target-inspection`成果物は任意入力として使用でき�
 
 一般的なTC実行報告のために`e2e-test-reporting`を必須化しません。
 
-## 13. 実装時の主な変更先
+## 14. 実装時の主な変更先
 
 - `skills/test-execution/SKILL.md`
 - `skills/test-execution/references/guidance.md`
 - `skills/test-execution/assets/output-template.md`
+- `assets/execution-plan-template.yaml`
 - trigger / deterministic / semantic eval
+- 実行前YAMLの必須項目、Given / When / Then構造、`unresolved`と未実行判定の整合検証
 - `qa-workflow`のrouting / state
 - 必要な範囲の`test-target-inspection`連携
 - 既存E2E Skillとの境界説明
