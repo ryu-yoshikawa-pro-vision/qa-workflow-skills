@@ -46,17 +46,21 @@ test-execution
   ↓ TC識別子集合を固定し、TCごとに実行方式を確定
   ├─ AI直接操作subset ───────────────┐
   └─ 自動実行subset                  │
-       ↓ 実行条件が両立する集合へ分割 │
-     1件以上のe2e-test-execution      │
+       ↓ 必要TC / E2E実装参照を返す   │
+     qa-workflow                     │
+       ↓                              │
+     e2e-test-execution              │
        ↓ 異常時                       │
      e2e-test-result-analysis         │
+       ↓                              │
+     qa-workflow                     │
        ↓                              │
      test-executionへ再開 ←───────────┘
        ↓
      全TC結果を統合
 ```
 
-テスト対象資料は利用可能なら再利用しますが必須依存にしません。AI直接操作だけ、自動実行だけの場合も同じ`test-execution`契約の部分集合として扱います。混在時は`test-execution`を未完了のまま保持し、workflow状態表の`成果物 / バージョン`に進行中の`test-execution`成果物参照を保持します。自動実行subsetを複数の`e2e-test-execution`へ分割した場合も、それぞれを補助成果物として同じ`test-execution`へ戻して統合します。同じTC識別子を複数方式で暗黙に実行しません。新しいexecution IDやrun registryは追加しません。
+テスト対象資料は利用可能なら再利用しますが必須依存にしません。AI直接操作だけ、自動実行だけの場合も同じ`test-execution`契約の部分集合として扱います。混在時は`test-execution`を未完了のまま保持し、workflow状態表の`成果物 / バージョン`に進行中の`test-execution`成果物参照を保持します。自動実行に新しいrunが必要な場合、`test-execution`は必要TCと既存E2E実装参照を返し、`qa-workflow`が`e2e-test-execution`へroutingします。Playwright側で追加runが必要になっても、`test-execution`自身はrun分割や再routingを管理しません。返却されたE2E成果物は`qa-workflow`が同じ`test-execution`へ戻して統合します。同じTC識別子を複数方式で暗黙に実行せず、新しいexecution IDやrun registryも追加しません。
 
 ### 自動化済みTCだけを実行してTC結果を確認
 
@@ -80,7 +84,7 @@ e2e-test-execution
 
 `test-execution`はPlaywright raw statusを作り直さず、検証済み入力をTCの期待結果と対応付けます。現行`e2e-test-execution` / `qa-workflow`の異常routingを維持し、本変更だけを理由に`e2e-test-result-analysis`を省略しません。過去結果の確認だけを要求されている場合は新しいrunner実行を強制しません。
 
-自動実行開始前にcurrentな`TC → E2E実装`対応が欠落・陳腐化している場合は`coverage-analysis`（対象: `TC → E2E実装`）へ戻します。対応E2Eの期待結果検証が不足・不明な場合は`adversarial-review`（対象: `E2E実装`）へ戻します。E2Eコード変更が必要でも、ユーザー要求またはworkflow範囲に実装・更新が含まれない場合は`e2e-test-implementation`へ暗黙routingせず、`test-execution`の該当範囲を`ブロック中`とします。
+`qa-workflow`管理下のTCで自動実行開始前にcurrentな`TC → E2E実装`対応が欠落・陳腐化している場合は`qa-workflow`が`coverage-analysis`（対象: `TC → E2E実装`）へroutingします。外部 / ユーザー直接入力TCでは内部QA成果物へ自動変換せず、入力元・ユーザーからE2E実装参照との対応を確認できなければ自動実行対象をブロックします。対応E2Eの期待結果検証が不足・不明な場合は`qa-workflow`が必要に応じて`adversarial-review`（対象: `E2E実装`）へroutingします。E2Eコード変更が必要でも、ユーザー要求またはworkflow範囲に実装・更新が含まれない場合は`e2e-test-implementation`へ暗黙routingせず、`test-execution`の該当範囲を`ブロック中`とします。
 
 ### 既存E2Eのraw実行だけ
 
@@ -153,9 +157,9 @@ e2e-test-implementation
 
 異常、未実行、run-level error、cleanup失敗 / 未確認は現行契約どおり`e2e-test-result-analysis`へ渡し、その分析結果を必要なTC判定へ利用します。正常runでは原因分析要求がなければ`test-execution`へ直接接続できます。原因分析をTC期待結果そのものへ変更しません。
 
-自動実行の対応は`今回TC識別子 → 既存TC ID（存在時のみ） → E2E実装参照 → logical primary → E2E実行成果物参照 → resolved primary TestCase → 実行結果 / 観測証拠`を辿れるようにします。既存`TC → E2E実装`対応を使う場合は、その既存TC IDと今回TC識別子が同一TCを指すことを確認し、外部IDを既存TC IDへ書き換えません。今回固定したTC識別子集合の自動実行subsetから必要なlogical primaryを実行前に解決し、同一`e2e-test-execution`へ渡すlogical primary集合は一意化します。複数TCが同じlogical primaryへ対応してもTC側の対応は失わず、runnerだけを重複起動しません。URL / project / 認証 / 開始状態 / データ / 副作用・cleanup等のpreflight条件が同時に成立しない場合は、自動実行subsetを複数の`e2e-test-execution`へ分けます。要求外primaryを暗黙追加せず、runner上必要なdependency / teardown等は既存契約へ委ねます。
+自動実行の対応は`今回TC識別子 → 既存TC ID（存在時のみ） → E2E実装参照 → E2E実行成果物参照 → logical primary → resolved primary TestCase → 実行結果 / 観測証拠`を辿れるようにします。既存`TC → E2E実装`対応を使う場合は、その既存TC IDと今回TC識別子が同一TCを指すことを確認し、外部IDを既存TC IDへ書き換えません。`test-execution`は今回TCとE2E実装参照の対応までを正本として保持し、logical / resolved primary、project、preflight、要求外primary、dependency / teardown、run分割は`e2e-test-execution`が返す既存成果物を正本とします。`qa-workflow`はその成果物を同じ`test-execution`へ戻します。
 
-run全体PASS、`outcome=expected`、最終retry PASSだけではTCの`PASS`にしません。TCを`PASS`にする場合は、currentなE2E実装がPASS判定に必要な期待結果を検証していることを、現在有効なE2E実装成果物、`adversarial-review`（対象: `E2E実装`）の結果、または同等の確認済み事実から確認できることを要求します。`adversarial-review`を根拠にする場合は、review成果物から対象E2E実装revision / working treeへ追跡でき、E2E実装変更後の`要再検証`が残っていない等、reviewがcurrentな実装へ適用できることを確認します。確認できない場合は`判定不能`として必要な担当Skillへ戻します。
+run全体PASS、`outcome=expected`、最終retry PASSだけではTCの`PASS`にしません。新しいrunner実行を開始する場合は、currentなE2E実装がPASS判定に必要な期待結果を検証していることを実行前に確認し、確認できなければrunnerを起動せず`未実行`として必要なroutingへ戻します。既存runを後からTC判定へ利用する場合に十分性を確認できなければ`判定不能`とします。`adversarial-review`を根拠にする場合は`qa-workflow`上の`要再検証`が残っていない等、現在TC / E2Eへ適用できることを確認し、鮮度を証明できなければ現在対象を再reviewします。`adversarial-review`へ`test-execution`専用のrevision / working tree schemaは追加しません。
 
 `e2e-test-result-analysis`から追加runへ進む場合は、正式TC条件を維持する再実行と診断runを区別します。診断runは原因分析の証拠として利用できますが、それだけで正式TC結果をPASSへ変更しません。
 
@@ -183,7 +187,7 @@ README / `qa-workflow`では、次を区別して説明します。
 
 実行方式は`test-execution`成果物内の属性であり、workflow状態の対象 / 実行範囲へ重複して持たせません。`test-execution = 再利用`は過去結果の確認・分析・報告等で既存成果物をそのまま利用できる場合だけ使用します。ユーザーが今回の新規実行を要求している場合は、過去結果だけを再利用して実行完了にしません。
 
-`test-execution`から他Skillへ委譲している間もworkflow状態は`実行中`のままにし、`成果物 / バージョン`には開始時に固定したTC集合を持つ進行中成果物を保持します。委譲先から戻った結果はその成果物へ統合します。開始後のTC追加・除外または方式変更は同じ成果物を書き換えず、別の`test-execution`成果物 / versionとして開始します。
+`qa-workflow`が`test-execution`から他Skillへroutingしている間もworkflow状態は`実行中`のままにし、`成果物 / バージョン`には開始時に固定したTC集合を持つ進行中成果物を保持します。委譲先から戻った結果は`qa-workflow`がその成果物へ統合するため再開します。開始後のTC追加・除外または方式変更は同じ成果物を書き換えず、旧成果物の未開始 / 未完了TCを理由付きで閉じて必要なcleanupを終えた後、別の`test-execution`成果物 / versionとして開始します。
 
 
 ## 8. 修正routing
@@ -193,7 +197,7 @@ README / `qa-workflow`では、次を区別して説明します。
 - テスト対象資料の事実・鮮度・更新 → `test-target-inspection`
 - TC手順 / 期待結果自体の問題 → `test-case-design`
 - TC実行・実測・判定・cleanup → `test-execution`
-- TC → E2E実装の追跡関係の欠落・陳腐化 → `coverage-analysis`（対象: `TC → E2E実装`）
+- `qa-workflow`管理下のTC → E2E実装追跡の欠落・陳腐化 → `coverage-analysis`（対象: `TC → E2E実装`）。外部 / 直接入力TCは内部成果物へ自動取込せず、明示要求がある場合だけ既存設計workflowへrouting
 - E2E実装がTCの必要な期待結果を検証しているかのreview → `adversarial-review`（対象: `E2E実装`）
 - E2Eコード変更 → ユーザー要求 / workflow範囲に実装・更新が含まれる場合だけ`e2e-test-implementation`
 - Playwright runner条件 / raw結果 → `e2e-test-execution`
@@ -218,7 +222,7 @@ README / `qa-workflow`では、次を区別して説明します。
 
 ### TCが変更された場合
 
-既存の`test-execution`結果は、期待結果または手順へ影響するTC変更があれば`要再検証`として扱います。古いTC結果を新しいTCのPASS証拠として再利用しません。進行中の`test-execution`に対してTC追加・除外または方式変更が発生しても開始時の固定TC集合を書き換えず、変更後の要求は別の`test-execution`成果物 / versionとして扱います。TC Machine Entityの`content_fingerprint`等、既存の内容同一性契約が利用可能ならそれを再利用し、今回独自のhashを追加しません。
+既存の`test-execution`結果は、期待結果または手順へ影響するTC変更があれば`要再検証`として扱います。古いTC結果を新しいTCのPASS証拠として再利用しません。進行中の`test-execution`に対してTC追加・除外または方式変更が発生した場合も開始時の固定TC集合を書き換えません。旧成果物は変更要求時点の状態を保持し、未開始TCは`未実行`、開始済みだが判定前なら必要に応じて`判定不能`として理由を残し、必要なcleanup後に履歴として閉じます。その後、変更後の要求を別の`test-execution`成果物 / versionとして開始します。TC Machine Entityの`content_fingerprint`等、既存の内容同一性契約が利用可能ならそれを再利用し、今回独自のhashを追加しません。
 
 ### E2E実装が変更された場合
 
