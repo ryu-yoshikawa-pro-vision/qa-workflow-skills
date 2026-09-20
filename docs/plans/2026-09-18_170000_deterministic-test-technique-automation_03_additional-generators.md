@@ -284,7 +284,7 @@ HTML `number`のstepはHTML Standardのstep semanticsへ合わせます。
 
 `allOf / anyOf / oneOf / not / if / then / else`等、対応subset外でvalidation意味を変えるkeywordは`unsupported`です。unsupported keywordがvalidation意味へ影響するsubtreeだけを切り離し、独立して評価できる別property / itemは継続できます。親schemaのvalidation意味をunsupported keywordが左右する場合は、その親subtree全体を`unsupported`にします。
 
-正規化後のrange / enum / required等は`derived.ep_inputs / derived.bva_boundary_skeletons / derived.combinatorial_constraints / derived.test_data_requirements`へ固定schemaで出力します。EPのset / partition、BVA boundary、combinatorial factorにはsource JSON Pointer / property名から決定論的に作る非空`label`を含めます。`derived.bva_boundary_skeletons`は`boundary_key / label / side / threshold / inclusive / step / authority_refs`までを持ち、`mode / coverage_selection_reason`は含めません。LLMがその2 fieldだけを追加し、固定builderが`bva.py` inputへ変換します。
+正規化後のrange / enum / required等は`derived.ep_inputs / derived.bva_boundary_skeletons / derived.combinatorial_constraints / derived.test_data_requirements`へ固定schemaで出力します。これらは既に採番済みの`ep / bva / comb` child modelへ渡すmachine input候補であり、`schema_cases.py`自身がTechnique Selectionへ新しい技法を追加したりchild modelを発行したりしません。選択済みchildに対応するderived inputが0件の場合は固定builderが`selected_technique_not_derivable` issueを返し、空Coverage modelとして完了させません。EPのset / partition、BVA boundary、combinatorial factorにはsource JSON Pointer / property名から決定論的に作る非空`label`を含めます。`derived.bva_boundary_skeletons`は`boundary_key / label / side / threshold / inclusive / step / authority_refs`までを持ち、`mode / coverage_selection_reason`は含めません。LLMがその2 fieldだけを追加し、固定builderが`bva.py` inputへ変換します。
 
 ## 15. UI pattern
 
