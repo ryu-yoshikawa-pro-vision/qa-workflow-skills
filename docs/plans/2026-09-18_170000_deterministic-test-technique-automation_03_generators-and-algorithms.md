@@ -221,6 +221,11 @@ partition:
 ```json
 {
   "partition_key": "P1",
+  "label": "購入金額と保有ポイントの有効領域",
+  "dimensions": [
+    {"dimension_key":"x","label":"購入金額"},
+    {"dimension_key":"y","label":"保有ポイント"}
+  ],
   "expression": {
     "op": "and",
     "args": [
@@ -239,6 +244,7 @@ border:
 ```json
 {
   "border_key": "B1",
+  "label": "購入金額 + 2×保有ポイント <= 10",
   "partition_key": "P1",
   "relation": "<=",
   "coefficients": {"x": "1", "y": "2"},
@@ -640,7 +646,7 @@ effectはcauseだけを参照します。循環参照は禁止します。
 
 ### `grammar_cases.py`
 
-自然言語grammarをparseせず、正規化済みproductionを受けます。
+自然言語grammarをparseせず、正規化済みproductionを受けます。`input_label`には生成文字列を適用する入力対象を非空文字列で渡し、全materializable targetの`execution`へそのまま保持します。
 
 derivationは**leftmost derivation**で固定します。sentential formに複数nonterminalがある場合、常に最左のnonterminal occurrenceだけへ次productionを適用します。
 
@@ -831,6 +837,7 @@ seed=`42`の最初の6 outputは`2707161783, 2068313097, 3122475824, 2211639955,
 
 入力:
 
+- 非空`input_label`
 - uint64 `seed`
 - `case_count`（1〜10,000）
 - `distribution`
