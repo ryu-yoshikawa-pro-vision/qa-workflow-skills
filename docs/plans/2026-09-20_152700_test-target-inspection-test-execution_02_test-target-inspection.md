@@ -223,6 +223,7 @@ skills/test-target-inspection/
 - 必要なら`skills/e2e-test-inspection/assets/output-template.md`
 - `skills/qa-workflow/SKILL.md`
 - `skills/qa-workflow/references/guidance.md`
+- `skills/test-case-design/SKILL.md`
 - `skills/test-case-design/references/guidance.md`
 
 既存`e2e-test-inspection`の正規output contractを不必要に壊さず、テスト対象資料参照は任意入力 / 利用時参照として追加します。
