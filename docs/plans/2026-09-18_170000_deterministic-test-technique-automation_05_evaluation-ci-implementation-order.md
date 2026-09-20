@@ -685,7 +685,8 @@ runtime対応Skillの`evals/output/cases/*/expected.json`では、既存fieldに
     "expected_deterministic_generated": true,
     "expected_fallback_reason": null,
     "expected_freshness_status": "current",
-    "expected_target_id_map": []
+    "expected_target_id_map": [],
+    "expected_model_completion": []
   }
 }
 ```
@@ -694,6 +695,7 @@ runtime対応Skillの`evals/output/cases/*/expected.json`では、既存fieldに
 - `spec-analysis`ではruntime_contractなしでMachine Entity fixtureを使用し、Authority表とcanonical Authority contentの一致を検証する
 - expected target / Coverageは手書きfixtureから独立計算または明示し、generator出力をexpectedへコピーしない
 - `expected_target_id_map`はstateful materialize caseだけ使用し、`{target_ref, target_content_fingerprint, execution_fingerprint, model_key, target_key, ci_id}`配列で保持する
+- `expected_model_completion`はmaterialize / workflow integration caseで使用し、modelごとの`required_target_refs / closed_target_refs / active_ci_ids / semantic_item_keys / materialize_complete`を手書きfixtureから明示する。runtime出力をexpectedへコピーしない
 - validatorは全runtime unitの保存済み`Machine Runtime Input / Result`から`input_fingerprint`、model scriptでは`model_fingerprint`、全scriptで`generation_fingerprint`を独立再計算し、fixtureに書いたhash文字列を盲信しない
 - upstream Entity差分caseでは無関係Entityの変更が対象modelをstaleにしないことを確認する
 - upstream runtime差分caseでは直接依存unitだけがstaleになり、依存していないmodelへ伝播しないことを確認する
