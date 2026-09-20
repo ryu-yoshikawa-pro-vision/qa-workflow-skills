@@ -204,7 +204,7 @@ Cause-Effect → Decision Table、Classification Tree → combinatorial、schema
 
 - `classification` adapter → child `comb`
 - `cause-effect` adapter → child `decision`
-- `schema` adapter → 採用済み正規技法`equivalence-partition / boundary-value-analysis / pairwise-combinatorial`に対応してchild `ep / bva / comb`。schema runtimeはchild typeを新規決定せず、そのchild用derived inputだけを生成する
+- `schema` adapter → 採用済み正規技法slug `ep / bva / comb`に対応してchild `ep / bva / comb`。schema runtimeはchild typeを新規決定せず、そのchild用derived inputだけを生成する
 - `ui` adapter → 正規技法modelを自動生成せず、既存`test-condition-design`の意味判断へ候補を渡す
 
 同じ親runtime generationから同じchild inputを作る場合は固定builderを使います。
