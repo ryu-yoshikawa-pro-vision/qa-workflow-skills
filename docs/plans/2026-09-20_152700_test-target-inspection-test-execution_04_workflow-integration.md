@@ -42,18 +42,6 @@ test-target-inspection
 ```text
 詳細TC
   ↓
-test-target-inspection
-  ↓
-既存の設計Skillへ再開
-```
-
-資料作成後に必ず`spec-analysis`からやり直しません。開始 / 再開先は要求成果物と影響範囲から決めます。
-
-### AI直接操作でTCを実行
-
-```text
-詳細TC
-  ↓
 test-execution
   ↓ 必要時
 coverage-analysis（対象: TC → テスト実行結果）
