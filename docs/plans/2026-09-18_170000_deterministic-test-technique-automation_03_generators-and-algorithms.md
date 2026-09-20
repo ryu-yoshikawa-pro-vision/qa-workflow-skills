@@ -91,6 +91,7 @@ model generatorはtargetごとに`materializable=true|false`を返します。`m
 - 入力値がscheme外、matrixに穴がある、priority mappingがない場合は`invalid_input`
 - scheme採用理由はLLMへ残す
 - `test-requirement-design`以降の最低優先度判定にはmapped priorityを渡し、案件固有level文字列を既存`RISK_LEVEL_ORDER`へ直接渡さない
+- output payloadは`risks[]: {risk_id, level, mapped_priority}`を`risk_id`順で返す。入力にないrisk、欠落risk、重複risk rowを作らない
 
 ## 2. テスト技法候補
 
@@ -136,13 +137,14 @@ signalから候補技法へのmappingは次で固定します。
 
 ```json
 {
+  "selection_key": "selection-001",
   "candidates": ["境界値分析"],
   "undetermined_signals": ["stateful"],
   "complete": false
 }
 ```
 
-`complete`は`undetermined_signals`が空かだけを表す診断値であり、`false`だけを理由にworkflowをブロックしません。候補の最終採用は`test-analysis`が行います。Error Guessingは構造signalだけでは自動採用しません。
+outputの`selection_key`はinput値をそのまま返します。`complete`は`undetermined_signals`が空かだけを表す診断値であり、`false`だけを理由にworkflowをブロックしません。候補の最終採用は`test-analysis`が行います。Error Guessingは構造signalだけでは自動採用しません。
 
 ## 3. 同値分割 / Each Choice
 
@@ -1136,7 +1138,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 #### `technique_candidates.py`
 
 - required: `selection_key`, `signals`
-- `selection_key`はstable result keyとして`_02` §3.2と同じ`^[A-Za-z][A-Za-z0-9._-]{0,63}$`を使用し、`:`を許可しない
+- `selection_key`はstable result keyとして`_02` §3.2と同じ`^[A-Za-z][A-Za-z0-9._-]{0,64}$`を使用し、`:`を許可しない
 - `signals`は§2で列挙した12 keyをすべて持ち、値は`true / false / null`
 - signal以外の技法選択、`selection_source`、最終採用技法はこのscript入力に含めない
 
@@ -1167,8 +1169,8 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 
 - required: `test_analysis_context`, `product_risks[]`, `technique_selections[]`, `change_nodes[]`, `change_edges[]`, `environment_requirements[]`, `risk_matrix_results[]`, `technique_candidate_results[]`
 - `test_analysis_context`は`_02` §4.4のcontext contentと同じ意味fieldを持つ
-- Product Risk draft: `{risk_id, failure, source_refs[], authority_refs[], impact, likelihood, assessment_reason, confidence_note}`。各`risk_id`は入力内一意で、対応する`risk_matrix_results[]`の`risk_id / level / mapped_priority`と1対1でjoinする。missing / duplicate / unknown resultを`invalid_input`にする
-- Technique Selection draft: `{selection_key, applicability_scope, selection_source, signals, selected_techniques[], selection_reason, risk_refs[], authority_refs[], condition_design_focus[], undetermined_signal_closures[], status}`。対応する`technique_candidate_results[]`の`selection_key / candidates[] / undetermined_signals[]`と1対1でjoinし、closure対象signal集合を一致させる
+- `risk_matrix_results[]`はcurrent `risk_matrix.py` payloadの`risks[]`を固定抽出した`{risk_id, level, mapped_priority}`だけを受ける。Product Risk draftは`{risk_id, failure, source_refs[], authority_refs[], impact, likelihood, assessment_reason, confidence_note}`。各`risk_id`は入力内一意で、result rowと1対1でjoinする。missing / duplicate / unknown resultを`invalid_input`にする
+- `technique_candidate_results[]`はcurrent `technique_candidates.py` payloadから固定抽出した`{selection_key, candidates[], undetermined_signals[]}`だけを受ける。Technique Selection draftは`{selection_key, applicability_scope, selection_source, signals, selected_techniques[], selection_reason, risk_refs[], authority_refs[], condition_design_focus[], undetermined_signal_closures[], status}`。result rowと1対1でjoinし、closure対象signal集合を一致させる
 - `status=active`では全`undetermined_signals[]`が`resolved / selection_not_affected / question`のいずれかへ1回だけ閉じ、`selected_techniques[]`はcanonical technique slugだけを許可する
 - change node / edgeは`_02` §4.4の`change_kind / expected_impact / evidence_refs[]`を含むcontent schemaをそのまま使う
 - `environment_requirements[]`はcurrent `environment_requirements.py` resultから固定builderが渡す正規化済み要求で、同runtime unitを`upstream_runtime_units[]`へ保持する
