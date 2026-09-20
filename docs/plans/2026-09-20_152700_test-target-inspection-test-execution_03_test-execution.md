@@ -48,7 +48,7 @@ TCは`qa-workflow`成果物、外部成果物、ユーザー直接入力のい�
 
 外部 / 直接入力TCの期待結果が不足・曖昧な場合は、実測に合わせて補完しません。入力元・ユーザーから解消できなければ該当TCを開始しません。
 
-## 3. 実行前のGherkin構造YAML
+## 3. Given / When / Then構造の実行前YAML
 
 実対象への操作を開始する前に、固定した各TCをGherkinの`Given / When / Then`構造へ整理し、YAMLとして保持します。
 
@@ -156,7 +156,7 @@ AIはTCの手順に沿って、画面を確認しながら1操作ずつ進めま
 `references/guidance.md`では次の流れを基本とします。
 
 1. 今回実行するTC集合を固定する
-2. 各TCの前提条件、手順、期待結果、事後状態 / 後処理をGherkin構造YAMLへ整理する
+2. 各TCの前提条件、手順、期待結果、事後状態 / 後処理をGiven / When / Then構造のYAMLへ整理する
 3. YAMLの`unresolved`を確認し、実行または合否判定に影響する未解決事項があるTCは操作を開始せず`未実行`とする
 4. 対象環境、URL / origin、role / アカウント、認証、テストデータ、開始状態を確認する
 5. 副作用scope、最大回数、cleanup対象 / 方法を確認する
@@ -261,7 +261,7 @@ cleanup失敗は確定済みTC結果を自動でFAILへ変更しません。た�
 | 使用した実行手段 | Playwright MCP等 / browser操作 / Playwright CLI / 一時Playwrightコード / 既存E2E runner |  |
 | テスト対象資料参照 |  |  |
 
-### 実行前Gherkin構造YAML
+### Given / When / Then構造の実行前YAML
 
 固定した全TCについて、実対象への操作開始前に`execution-plan-template.yaml`と同じ構造で整理します。
 
@@ -399,8 +399,8 @@ currentな`test-target-inspection`成果物は任意入力として使用でき�
 
 - `skills/test-execution/SKILL.md`
 - `skills/test-execution/references/guidance.md`
+- `skills/test-execution/assets/execution-plan-template.yaml`
 - `skills/test-execution/assets/output-template.md`
-- `assets/execution-plan-template.yaml`
 - trigger / deterministic / semantic eval
 - 実行前YAMLの必須項目、Given / When / Then構造、`unresolved`と未実行判定の整合検証
 - `qa-workflow`のrouting / state
