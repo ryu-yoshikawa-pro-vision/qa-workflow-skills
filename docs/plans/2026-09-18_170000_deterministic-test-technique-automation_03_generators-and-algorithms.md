@@ -37,9 +37,9 @@ model generatorはtargetごとに`materializable=true|false`を返します。`m
 | `decision_table.py` | yes | `{condition_assignment, action_vector}` |
 | `combinatorial.py` | yes | `{row_ref, assignment}` |
 | `classification_tree.py` | no | adapter専用。child `comb` modelだけをCI化 |
-| `state_transition.py` | yes | `{initial_state_key, reset_key, setup_prefix, coverage_sequence, attempted_transition}` |
-| `flow_paths.py` | mode依存 | node / edge / bounded-path / simple-loopは`{initial_node_key, edge_sequence}`。fork-join branchはsemantic Coverage Itemへ閉じる |
-| `crud_matrix.py` | yes | operation=`{entity_key, function_key, operation}`、sequence=`{entity_key, sequence_key, steps}` |
+| `state_transition.py` | yes | `{initial_state_key, initial_state_label, reset_key, reset_execution, setup_prefix, coverage_sequence, attempted_transition}`。state / transition / resetの実行意味を内包する |
+| `flow_paths.py` | mode依存 | node / edge / bounded-path / simple-loopは`{initial_node_key, initial_node_label, target_node, edge_sequence}`。node / edgeの実行意味を内包する。fork-join branchはsemantic Coverage Itemへ閉じる |
+| `crud_matrix.py` | yes | operation=`{entity_key, entity_label, function_key, function_label, operation}`、sequence=`{entity_key, entity_label, sequence_key, steps}`。stepsへfunction labelを含める |
 | `cause_effect.py` | no | adapter専用。child `decision` modelだけをCI化 |
 | `grammar_cases.py` | yes | `{input_text, production_key_sequence, mutation_key}` |
 | `schema_cases.py` | no | adapter専用 |
@@ -391,7 +391,7 @@ LLMがclassification / classの意味を定義した後、`classification_tree.p
 
 ### `state_transition.py`
 
-各transitionは`transition_key / from / event / guard_status / guard_refs / to / authority_refs`を持ちます。
+各stateは`state_key / label / authority_refs`、各transitionは`transition_key / from / event / guard_status / guard_refs / to / authority_refs`を持ちます。`label`は下流でstable keyを再解釈せず状態の意味を扱うための非空文字列です。
 
 入力:
 
@@ -433,6 +433,7 @@ reset:
   "reset_key": "RESET-1",
   "from_states": ["*"],
   "to_state": "draft",
+  "action": "下書き状態へ戻す",
   "authority_refs": ["SPEC-010"]
 }
 ```
@@ -453,14 +454,16 @@ canonical execution:
 ```json
 {
   "initial_state_key": "draft",
+  "initial_state_label": "下書き",
   "reset_key": null,
+  "reset_execution": null,
   "setup_prefix": [],
   "coverage_sequence": [
     {
       "transition_key":"T-001",
-      "from":"draft",
+      "from":{"state_key":"draft","label":"下書き"},
       "event":"publish",
-      "to":"published"
+      "to":{"state_key":"published","label":"公開済み"}
     }
   ],
   "attempted_transition": null
@@ -468,8 +471,8 @@ canonical execution:
 ```
 
 - resetなしでは選択した`initial_state_key`を保存する
-- resetありではresetを実行する起点の`initial_state_key`と`reset_key`を保存し、reset後のtransitionだけを`setup_prefix`へ入れる
-- `setup_prefix / coverage_sequence`はstable keyだけでなく`transition_key / from / event / to`を含む自己完結machine meaningを持つ
+- resetありではresetを実行する起点の`initial_state_key`と`reset_key`を保存し、`reset_execution={reset_key, action, from_state_key, to_state:{state_key,label}}`を持たせる。reset後のtransitionだけを`setup_prefix`へ入れる
+- `initial_state_label`、`reset_execution`、`setup_prefix / coverage_sequence`のstate labelと`event`を含め、stable keyだけでなく下流が実行手順を作るための自己完結machine meaningを持つ
 - valid targetでは`coverage_sequence`を使用する
 - invalid transitionでは`coverage_sequence=[]`、`attempted_transition={candidate_key, from, event}`
 - initial stateそのものをCoverageする場合も`initial_state_key`をexecution identityへ含める
@@ -487,7 +490,7 @@ node kind:
 - `join`
 - `terminal`
 
-`initial_node_keys[]`は1件以上必須で、すべて既知nodeを参照します。terminal到達を要求するpath criterionでは`kind=terminal`のnodeを終点にします。
+`nodes[]`の各nodeは`node_key / label / kind / authority_refs`を持ち、`label`は非空文字列です。`initial_node_keys[]`は1件以上必須で、すべて既知nodeを参照します。terminal到達を要求するpath criterionでは`kind=terminal`のnodeを終点にします。
 
 edgeは`edge_key / from / to / guard_status / guard_refs / label / authority_refs`を持ち、`guard_status=true`だけを正式Coverage対象へ使います。`guard_status=false`をCoverage母集団から外すには`guard_refs`にAuthorityを1件以上必須とします。initial nodeから`true` edgeだけで到達可能なnodeをsourceに持つ`guard_status=null` edgeがある場合は`result_status=unresolved`とし、node / edge / path / loop / fork-joinの100% Coverageを返しません。
 
@@ -555,7 +558,7 @@ stable target:
 
 node / edge / bounded-path / simple-loopのmaterializable targetは各initial nodeからCoverage開始点まで`guard_status=true`だけのshortest prefixを求め、同長は`(initial_node_key, edge key列)`で辞書順に固定します。bounded-pathはterminal到達を必須とし、terminalへ到達しない候補は正式targetにせず診断metadataへ保持します。
 
-canonical executionは選択した`initial_node_key`と、各edgeについて`edge_key / from / label / to`を持つ`edge_sequence`を保存します。stable key列だけを渡して下流にmodel再解決させません。
+canonical executionは選択した`initial_node_key / initial_node_label`、Coverage対象の`target_node={node_key,label}`、各edgeについて`edge_key / from:{node_key,label} / label / to:{node_key,label}`を持つ`edge_sequence`を保存します。node targetがinitial node自身で`edge_sequence=[]`でも`target_node`から意味を解決でき、stable key列だけを渡して下流にmodel再解決させません。
 
 ## 11. CRUD Testing
 
@@ -565,8 +568,8 @@ ISTQB CTAL-TA v4.0に合わせ、CRUD Testingは**completeness**と**consistency
 
 入力:
 
-- `entities[]`
-- `functions[]`
+- `entities[]`（`entity_key / label / authority_refs`）
+- `functions[]`（`function_key / label / authority_refs`）
 - `cells[]`
 - `consistency_sequences[]`
 - `operation_dispositions[]`
@@ -584,7 +587,7 @@ completeness:
 
 consistency:
 
-`consistency_sequences[]`はLLMが業務意味を正規化した後のsequenceです。
+`consistency_sequences[]`はLLMが業務意味を正規化した後のsequenceです。generatorはentity / function keyを現在inputへ解決し、materializable executionには対応する`entity_label / function_label`も複製します。下流はCRUD keyだけを見て意味を推測しません。
 
 ```json
 {
@@ -1234,10 +1237,10 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 
 - required: `states[]`, `initial_states[]`, `terminal_states[]`, `transitions[]`, `reset_options[]`, `invalid_transition_candidates[]`, `coverage_mode`
 - optional: `switch_count`, `coverage_selection_reason`。`coverage_mode=n-switch`だけ`switch_count`必須、`switch_count>=2`では`coverage_selection_reason`を非空必須
-- state: `{state_key, authority_refs}`
+- state: `{state_key, label, authority_refs}`。`label`は非空文字列
 - transition: `{transition_key, from, event, guard_status, guard_refs, to, authority_refs}`
 - `guard_status=true|false|null`
-- resetは§9形式
+- resetは§9形式で`action`を非空文字列必須とする
 - coverage mode: `all-states | all-transitions | n-switch | round-trip | invalid-transitions`
 - `switch_count`はinteger 0..10
 - n-switch / round-tripのtarget定義とcanonicalizationは§9を正本とする
@@ -1246,7 +1249,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 #### `flow_paths.py`
 
 - required: `nodes[]`, `edges[]`, `initial_node_keys[]`, `regions[]`, `loop_specs[]`, `coverage_mode`, `max_path_length`
-- node: `{node_key, kind, authority_refs}`。kindは`normal / fork / join / terminal`
+- node: `{node_key, label, kind, authority_refs}`。`label`は非空文字列、kindは`normal / fork / join / terminal`
 - edge: `{edge_key, from, to, guard_status, guard_refs, label, authority_refs}`
 - region: `{region_key, fork_node_key, join_node_key, branches[]}`。branchは`{branch_key, edge_keys[]}`
 - loop spec: `{loop_key, entry_node_key, edge_keys[], exit_edge_keys[], typical_iterations, maximum_iterations, authority_refs}`
@@ -1258,8 +1261,8 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 #### `crud_matrix.py`
 
 - required: `entities[]`, `functions[]`, `cells[]`, `consistency_sequences[]`, `operation_dispositions[]`
-- entity: `{entity_key, authority_refs}`
-- function: `{function_key, authority_refs}`
+- entity: `{entity_key, label, authority_refs}`。`label`は非空文字列
+- function: `{function_key, label, authority_refs}`。`label`は非空文字列
 - cell: `{entity_key, function_key, operations[], authority_refs}`。operationsは`C/R/U/D`の重複なし集合
 - consistency sequenceは§11形式
 - 個々の空cellは欠陥・N/Aを意味しないため専用`excluded_cells[]`を持たない。entity全体でoperationが存在しない場合だけ`operation_dispositions[]`で扱う
@@ -1279,7 +1282,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 
 - required: `start`, `productions[]`, `max_depth`, `mutations[]`
 - productionは`{production_key,lhs,rhs[]}`。RHS itemは`{"terminal":"..."}`または`{"nonterminal":"..."}`のどちらか一方で、`rhs=[]`をepsilonとして許可する
-- `max_depth`は0..64のparse tree depth上限でroot start symbolをdepth 0とする
+- `max_depth`は1..64のparse tree depth上限でroot start symbolをdepth 0とする
 - derivationはleftmost固定。各production targetは対象productionを1回以上含むproduction適用回数最小のderivation、同数ならproduction key列辞書順
 - valid case集合は各production shortest derivationのunionで、生成文字列 + production key列が同一なら重複除去
 - mutation: `{mutation_key, op, production_key, symbol_index, value}`。opは`delete_terminal / replace_terminal / insert_terminal`
