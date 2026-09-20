@@ -297,7 +297,7 @@ runtime入力は`metadata`とscript固有`input`を分けます。
 - `selection_source`: Coverage所有modelでは`analysis / condition_design / user`のいずれか。内部adapterとartifact scriptでは`null`
 - `selection_key`: `selection_source=analysis`だけ必須。その他は`null`
 - `scope_key`: artifact scriptだけ必須。model scriptでは`null`
-- `upstream_entities`: script固有input内のAuthority / Risk / TR / TCN等の参照のうち、そのscript契約でsemantic dependencyと定義したMachine Entityから固定builderが導出する。callerが参照Entityを任意に省略・追加しない。runtimeはcanonical `content`から`content_fingerprint`を再計算し、参照集合との不足・余分・重複を`invalid_input`にする
+- `upstream_entities`: script固有input内のAuthority / Risk / TR / TCN等の参照のうち、そのscript契約で**実行前から存在する外部semantic dependency**と定義したMachine Entityから固定builderが導出する。callerが参照Entityを任意に省略・追加しない。同一runtime invocationで新規生成するEntity同士の依存はここへ事前投入せず、script内の固定builderが生成済みcanonical contentからfingerprintを計算して`upstream_entity_dependencies[]`へ接続する。runtimeは外部Entityのcanonical `content`から`content_fingerprint`を再計算し、期待外部参照集合との不足・余分・重複を`invalid_input`にする
 - `upstream_runtime_units`: 他runtime結果を直接利用した場合に`skill + runtime_unit_key + generation_fingerprint`を一意参照として保持する。runtime派生child modelの派生元もここで表し、Selection Sourceへ混ぜない
 - `static_data_versions`: generator結果に影響する静的参照データversion
 - `authority_refs / reference_refs`: 現在有効な製品根拠と補助情報
@@ -659,7 +659,7 @@ Machine Entityの`upstream_entity_dependencies[]`は次を最低限含めます�
 - test-analysis context: scope / objective / test level / environment constraint / exclusion / blocker / test focus / testability判断で実際に参照したAuthority / Product Risk
 - Product Risk: `authority_refs[]`のAuthorityに加え、`source_refs[]`のうちrisk判断より上流のAuthority / change graph等としてMachine Entityへ解決でき、実際に使用したsource Entity。既存TR / TCN / CI / TC等の下流QA成果物をrisk evidenceとして参照しても`upstream_entity_dependencies[]`へ逆向きedgeを作らず、content上のsource referenceとして保持する。これにより`Risk → … → TC → Risk`のdependency cycleを作らない
 - 技法選択: selection判断で実際に参照したAuthority / Product Risk。後続のTR / TCN / CI / TCをsemantic dependencyへ逆参照しない
-- change graph node / edge: `source_ref / evidence_refs[]`のうちMachine Entityとして解決でき、node / edge判断へ実際に使用したsource Entity
+- change graph node / edge: `source_ref / evidence_refs[]`のうちAuthority等の上流Entityとして解決でき、node / edge判断へ実際に使用したsource Entity。Risk / TR / TCN / CI / TC等の下流QA成果物をgraph nodeとして表す場合はcontent上の参照に留め、`upstream_entity_dependencies[]`へ逆向きedgeを作らない
 - environment requirement: `authority_refs[]`のAuthority
 - test data requirement: `authority_refs[]`のAuthorityと`source_model_key`のcurrent model metadata。`source_target_versions=[]`のmodel-wide requirementではcurrent adapter modelも許可する。target-specific requirementではsource modelをCoverage所有modelに限定し、`source_target_versions[]`が同じ`source_model_key`のcurrent target versionと一致することを必須にする。source modelまたはtarget versionが変わればcurrent扱いしない
 - TR: `authority_refs[]`のAuthorityと`risk_refs[]`のProduct Risk
