@@ -24,146 +24,159 @@ skills/test-execution/
         └── cases/
 ```
 
-新しいrunner / browser libraryは追加しません。
+新しいbrowser automation frameworkは追加しません。
 
-## 2. `SKILL.md` 契約
+## 2. `SKILL.md`契約
 
-`test-execution`は「TCを実際に実行し、期待結果と実測結果を比較する」責務を持ちます。
+`test-execution`の目的は、**人間が手動テストで操作するのと同じようにAIが実対象を操作し、詳細TCを実施して、その結果を報告すること**です。
+
+単に既存の自動実行結果を集約するSkillにはしません。今回の実行要求では、AI自身が現在の実対象に対して操作・観測を行うことを基本とします。
 
 ### 必須入力
 
 - 実行対象の詳細テストケース
-- テストケース入力元を識別できる情報。`qa-workflow`成果物、外部成果物、ユーザー直接入力のいずれでもよく、永続参照がない場合は`ユーザー提供 / 永続参照なし`等の明示状態を使用する。1つの`test-execution`成果物では1つの入力元 / snapshotだけを扱う
-- 今回実行を要求されたTC識別子集合または識別可能な実行範囲。各TCは既存TC ID、外部システムの一意識別子等、入力側で既に存在する一意識別子を持つこと
+- テストケース入力元を識別できる情報
+- 今回実行するTC識別子集合または識別可能な実行範囲
 - 実行対象環境を識別できる情報
-- 実行方式、または要求と既存実装からTC単位で一意に決められる情報
+- 実対象へ到達するためのURL / 入口または同等情報
+- 利用可能な実行手段
 
-識別可能な実行範囲で要求された場合は、実行開始前に現在の詳細テストケース入力から具体的なTC識別子集合へ解決し、今回の実行母集団として固定します。`test-execution`自身は正式TC IDを新規採番しません。単一TCでも入力側の一意識別子が必要です。今回の`TC識別子`は実行入力上の識別子であり、既存E2E成果物の`TC ID`とは別契約です。外部IDを既存E2Eの`TC ID`欄へ変換して書き込まず、既存`TC → E2E実装`対応が`TC ID`を持つ場合は、今回識別子と既存TC IDが同一TCを指すことを確認します。複数TCを一意に識別できない場合は該当範囲を実行開始前にブロックします。
+TCは`qa-workflow`成果物、外部成果物、ユーザー直接入力のいずれでもよいものとします。
 
-実行開始後は今回のTC識別子集合を不変とし、母集団を暗黙にも明示要求への追随でも書き換えません。ユーザーが開始後にTC追加・除外または実行方式変更を求めた場合は、元成果物へ上書きせず別の`test-execution`成果物 / versionとして開始します。元成果物は、変更要求時点で未開始のTCを`未実行`、開始済みだが必要観測を終えていないTCを必要に応じて`判定不能`として理由を残し、必要な後処理 / cleanupを実施して履歴として閉じます。変更後の要求から外れたTCを理由に旧成果物をworkflow上`ブロック中`のまま残しません。
+1つの`test-execution`成果物では1つのTC入力元 / snapshotを扱います。今回のTC識別子は入力側ですでに存在する一意識別子を使用し、正式TC IDを新規採番しません。
 
-詳細テストケースには少なくとも、実行に必要な前提条件・手順・期待結果が存在することを確認します。TCに`事後状態 / 後処理`が定義されている場合も実行契約として扱います。`qa-workflow`管理下のTCで期待結果を設計・変更する責任は`test-case-design`に残します。一方、外部成果物やユーザー直接入力で既に明示された期待結果は今回のTC実行契約としてそのまま利用できますが、`SPEC`や製品期待挙動の正本へ自動昇格しません。外部 / 直接入力TCで期待結果が欠落・曖昧・矛盾している場合は内部QA成果物へ自動変換せず、入力元・ユーザーから解消できない範囲をブロックします。内部QA workflowへの取込が明示された場合だけ`question-analysis`や`test-case-design`へroutingします。
+外部 / 直接入力TCの期待結果が不足・曖昧な場合は、実測に合わせて補完しません。入力元・ユーザーから解消できなければ該当TCを開始しません。
 
-テストケース入力元のrevisionまたは内容同一性情報は、利用可能な場合に記録します。PR #11等によりTC Machine Entityの`content_fingerprint`が既存契約として利用可能なら再利用し、`test-execution`専用のhash機構を追加しません。外部成果物やユーザー直接入力で内容同一性情報が存在しなくても今回の実行自体は可能ですが、`未提供 / 未確認`として記録し、後からcurrentな実行証拠として再利用する際はTC内容の鮮度を別途確認します。永続参照のない入力を履歴再利用の根拠として自動昇格させません。
+## 3. 実行手段
 
-### 現スコープの実行方式
+実行手段はTCの属性ではなく、AIが今回の実対象を操作・観測するための手段です。
 
-正規値は次の2つにします。
+### Playwright MCP等の対話操作
 
-- `AI直接操作`
-- `自動実行`
+利用可能でTCを実施できる場合は、Playwright MCP等の対話的なbrowser操作を基本にします。
 
-`AI直接操作`は、利用可能なbrowser / computer操作能力を使ってAIが実対象UI上でTC手順を実施・観測できる場合の方式です。
+AIはTCの手順に沿って、画面を確認しながら1操作ずつ進めます。
 
-`自動実行`は、既存Playwright E2Eを`e2e-test-execution`で実行して得た検証済み実行結果を利用し、TCの期待結果と実測結果を対応付ける方式です。本変更ではAPI / DB等の専用runnerや新しい実行方式を追加しません。
+- navigation
+- click
+- input
+- selection
+- keyboard操作
+- modal / popup等の操作
+- 状態変化待機
+- DOM / accessibility tree等の確認
+- screenshot取得と画像確認
 
-「自動実行」を理由に`test-execution`自身がPlaywright commandを直接組み立てません。
+特定のtool名へSkill契約を固定せず、利用可能なbrowser / computer操作能力のうち、人間の操作に相当するUI操作を実施できる手段を使用します。Playwright MCPが利用可能な環境では優先的な実行手段として扱います。
 
-実行方式はTC単位で決めます。ユーザーが方式を指定した場合はその指定を優先します。指定がなく、currentな`TC → E2E実装`対応があり、そのE2EがTC判定に必要な期待結果を十分検証していることをcurrentなE2E実装成果物・有効なreview結果等から確認でき、今回の対象環境で安全に実行できる場合にだけ`自動実行`を使用します。それ以外でAI直接操作が安全に成立する場合は`AI直接操作`を使用します。
+### Playwright CLI / Playwrightコード
 
-`qa-workflow`管理下のTCで`自動実行`を選ぶための`TC → E2E実装`対応が欠落・陳腐化している場合は、repoから対応を推測せず`qa-workflow`が既存`coverage-analysis`（対象: `TC → E2E実装`）へroutingします。外部 / 直接入力TCでは内部`TC → E2E実装`対応を新規作成せず、入力元・ユーザーからE2E実装参照との対応を確認できない場合は自動実行対象をブロックします。対応先E2EがTCの期待結果を十分検証しているか確認できない場合も、`test-execution`自身がreviewを実行せず、`qa-workflow`が必要に応じて`adversarial-review`（対象: `E2E実装`）へroutingします。十分な検証のためにE2Eコード変更が必要でも、ユーザー要求または現在のworkflow範囲にコード実装・更新が含まれる場合だけ`qa-workflow`から`e2e-test-implementation`へ進みます。実行だけが要求されている場合はコード変更を暗黙許可せず、該当範囲を`ブロック中`とします。ユーザーが`自動実行`を明示した場合も勝手にAI直接操作へ切り替えません。どちらの方式も成立しないTCは開始しません。同一成果物内で両方式を混在できます。
+対話操作だけでは安定して実施できない場合、または現在TCの実行にコードが適する場合はPlaywright CLI / Playwrightコードを使用できます。
 
-混在時は`test-execution`が固定TC識別子集合と各TCの実行方式を正本として保持します。AI直接操作subsetは`test-execution`自身が実施し、自動実行subsetに新しいrunner実行が必要な場合は、`test-execution`が必要なTCと既存E2E実装参照を返し、`qa-workflow`が`e2e-test-execution`へroutingします。委譲中は進行中の`test-execution`成果物を保持し、runner結果または必要な`e2e-test-result-analysis`が揃った後に`qa-workflow`が同じ成果物へ再開して全TC結果を統合します。`test-execution`自身は子Skillの実行・再開制御を持ちません。TCごとの開始状態・cleanupを満たせる限りsubset間の固定実行順序は設けませんが、同じTC識別子を複数方式で暗黙に実行しません。
+今回の実行だけに必要な一時的コードは`test-execution`内で生成・実行できます。
 
-`自動実行`を実施した後に、失敗回避やPASS取得を目的として同じTCを自動的に`AI直接操作`で再実行しません。方式変更による再実行は、ユーザー要求または明示した診断目的がある場合だけ別実行として扱います。
+例:
 
-ユーザーが今回の新規実行を要求している場合、過去の`test-execution`成果物だけで実行済み扱いにしません。過去結果の確認・分析・報告だけが要求されている場合は、既存成果物を再利用できます。
+- 複数データで同じ操作を繰り返す
+- 一定の待機・観測を安定させる
+- screenshotや必要なUI状態を取得する
+- 対話操作では再現しにくい手順を今回TC用に実行する
 
-## 3. AI直接操作の実行契約
+一時コードは今回runの実行手段であり、将来の回帰テスト資産へ自動昇格させません。repoの保守対象E2Eとして残す場合は`qa-workflow`経由で`e2e-test-inspection` / `e2e-test-implementation`へroutingします。
 
-`references/guidance.md`で次の順序を固定します。
+既存 / 実装済みrepo E2Eを正式なrunner契約で実行する場合は、既存`e2e-test-execution`を使用できます。その場合も、最終的なTC単位の結果報告が要求されているなら`test-execution`へ結果を戻して報告します。
 
-1. 対象TC、対象環境、URL / originを確認する
-2. 使用するアカウント / role、認証方法、開始状態、テストデータ、TCに定義された事後状態 / 後処理を確認する
-3. TC自身の後処理とは別に、実行時に発生させる副作用について許可範囲と最大回数を確認し、必要な安全cleanup対象 / 方法を確認する。副作用なしの場合も明示する。最大回数は許可された操作scope全体で管理し、同じscopeを複数TCが共有してもTCごとにリセットしない。再試行も同じ上限へ含め、実際の累計実施回数を記録する
-4. browser / computer操作能力が対象操作を実施できるか確認する
-5. 必須の安全条件を確認できないTCは実行を開始せず`未実行`とし、必要な条件が解消するまで該当範囲をworkflow上`ブロック中`とする
-6. TCごとに開始状態を再確認し、前TCが残した状態を暗黙前提にしない
-7. TCの手順順序を維持して操作する。副作用操作の結果が不明な場合は、対象状態を確認してから再試行可否を判断し、結果を確認できないまま同じ操作を盲目的に繰り返さない。安全に状態確認できず重複副作用の可能性が残る場合は`判定不能`または必要範囲をworkflow上`ブロック中`として停止する
-8. TCが要求する観測点で実測結果を取得する
-9. 期待結果と実測結果を比較する。期待結果との不一致が確定し、その後の手順前提が成立しない場合は無理に後続操作を続けない
-10. TC単位の状態を確定する
-11. TCに定義された事後状態 / 後処理を実施・確認する。実行時cleanupと重なる処理を二重実行しない
-12. 必要な実行時cleanupと残存状態をTC判定とは別に確認する
-13. 実在する場合だけ証跡参照を記録し、未確認事項を記録する
+## 4. 人間の手動テスト相当の実行契約
 
-TC手順にない探索的な操作を、PASSを得るために追加しません。診断目的の追加操作が必要な場合は正式TC実行と区別します。
+`references/guidance.md`では次の流れを基本とします。
 
-## 4. 自動実行の実行契約
+1. 今回実行するTC集合を固定する
+2. TCの前提条件、手順、期待結果、事後状態 / 後処理を確認する
+3. 対象環境、URL / origin、role / アカウント、認証、テストデータ、開始状態を確認する
+4. 副作用scope、最大回数、cleanup対象 / 方法を確認する
+5. TCごとに開始状態を確認する
+6. 人間がTCを実施するのと同じUI経路で手順を実施する
+7. 各観測点でDOM / accessibility tree等から取得できる構造・意味情報を確認する
+8. 視覚確認が必要な観測点ではscreenshot等を取得し、画像として確認する
+9. 期待結果と実測結果を比較する
+10. 後続手順の前提が崩れた場合は、PASSを得るために別経路へ勝手に迂回しない
+11. TC結果を確定する
+12. TCに定義された事後状態 / 後処理を実施・確認する
+13. 実行時cleanupと残存状態を確認する
+14. TC結果、観測、証跡、未実行 / 判定不能理由、cleanupを報告する
 
-Playwright経路では既存Skillを利用します。
+TC手順にない探索操作を、PASSを得るために追加しません。診断目的で追加操作する場合は正式TC手順と区別します。
 
-```text
-新しいTC実行要求
-  ↓
-test-execution
-  ↓ TC識別子集合・実行方式を固定
-自動実行subset
-  ↓ currentな今回runがない
-e2e-test-execution
-  ├─ 正常run ─────────────────→ test-executionへ再開
-  └─ 異常 / 未実行 / run-level error / cleanup問題
-        ↓
-     e2e-test-result-analysis
-        ├─ 追加実行不要 ───────→ test-executionへ再開
-        └─ 追加実行必要
-             ↓
-          e2e-test-execution
-             ↓
-          既存E2E異常routingを再適用
-```
+UI操作を避けるためにbackend API / DB等へ直接書き込んでTCを成立させません。TCまたはユーザー要求がAPI / DB操作自体を明示している場合は本Skillの現スコープ外として扱います。
 
-既存`e2e-test-execution` / `qa-workflow`のrouting契約を維持します。異常、未実行、run-level error、cleanup失敗 / 未確認を、本変更だけを理由に`e2e-test-result-analysis`から迂回させません。
+## 5. 画像による判断
 
-`test-execution`が利用するのは、`e2e-test-execution`が検証済みとして記録したrunner事実と、異常経路では`e2e-test-result-analysis`の分析結果です。自動実行結果をTC判定へ使用する前に、TC実行要求の対象条件と`e2e-test-execution`が記録した対象URL / origin、Playwright project、必要なrole / 認証条件、テストデータ / 開始状態、version / build等のうちTC判定へ影響する項目が一致するか、差異が結果へ影響しないことを確認します。取得不能な値は推測せず制約として残します。
+画像確認を補助的な証跡だけではなく、必要時の正式な観測手段として扱います。
 
-`test-execution`は自動実行対象TCと既存E2E実装参照までを確定し、Playwrightのlogical primary解決、重複排除、project / 認証 / setup / 副作用 / cleanupのpreflight、同一runで実行できる範囲の判断は`e2e-test-execution`の既存責務へ委ねます。1回のrunで成立しない場合も`test-execution`で独自partitionを実装せず、`qa-workflow`が`e2e-test-execution`の結果・ブロック範囲に従って必要範囲だけ再routingします。run数の最小化を要件にせず、新しいbatch runnerやrun registryは追加しません。
+使用する代表例:
 
-`e2e-test-result-analysis`が不足証拠の取得を目的に追加runを要求した場合は、そのrunが正式TC実行条件を維持した再実行か、診断目的で条件を変えたrunかを区別します。診断runは原因分析の証拠として参照できますが、診断runだけで正式TC結果をPASSへ置き換えません。TC判定へ使うrunは今回TCの正式実行条件へ適用可能であることを確認します。
+- UI崩れ
+- 要素の重なり
+- 文字・コンテンツの欠け / はみ出し
+- レスポンシブ表示
+- 画像・アイコン
+- canvas描画
+- modal / popupの視覚的状態
+- DOM / accessibility treeでは確認できない位置・サイズ・見た目
 
-次を再解釈しません。
+判定規則:
 
-- Playwright run全体status
-- process exit code
-- `TestResult.status`
-- `expectedStatus`
-- `TestCase.outcome()`
-- retry attempt履歴
-- webServer ownership
-- artifact鮮度
-- runner管理cleanup
+- TC期待結果が視覚状態を要求する場合は画像観測を判定根拠にできる
+- 画像だけでrole、accessible name、ARIA状態等を推測しない
+- accessibility固有の期待結果はaccessibility tree / role等の情報を使用する
+- 画像と構造情報の両方が必要なら併用する
+- 「なんとなくおかしい」だけでTCをFAILにしない
+- TC期待結果外で見つけたUI崩れ等は`追加観測`として報告し、元TCの期待結果に関係しない限りTC結果を変更しない
 
-runner異常、認証失敗、setup failure等により対象TC自体が開始されていない場合はTCを`未実行`とし、再開に必要な条件が未解決ならSkill / workflowを`ブロック中`として扱います。対象TCは開始されたが必要な期待結果を観測できずPASS / FAILを確定できない場合は`判定不能`とします。cleanup問題は確定済みTC結果を書き換えず、cleanup状態とSkill / workflow完了条件へ反映します。
+pixel diff専用frameworkや画像差分専用Skillは追加しません。
 
-assertion結果等から期待結果と実測結果の差を確認できる場合だけ、TCの`FAIL`判定へ利用します。Playwrightの`failed`というstatusだけを根拠に製品期待結果の不一致と断定しません。run全体PASS、`TestCase.outcome() = expected`、最終retry PASSも単独ではTCの`PASS`根拠にしません。
-
-自動実行では、最低限`今回TC識別子 → 既存TC ID（存在時のみ） → E2E実装参照 → E2E実行成果物参照 → logical primary → resolved primary TestCase → 実行結果 / 観測証拠`を辿れることを要求します。既存`TC → E2E実装`対応を利用する場合は、その対応が参照する既存TC IDと今回TC識別子が同一TCを指すことを確認し、外部IDを既存TC IDとして書き換えません。`test-execution`は今回TCとE2E実装参照の対応を保持し、logical / resolved primaryは`e2e-test-execution`が返した事実を利用します。1 TCが複数のE2E実装 / resolved primaryへ対応する場合も、TCの期待結果を判定するために必要な対応先をすべて確認します。dependency / teardown、要求外primaryを避けられるか等のrunner判断は既存`e2e-test-execution`契約を正本とし、retry attemptは別TCとして数えません。既存`TC → E2E実装`対応がある場合はそれを正本として再利用し、raw結果側の任意TC IDだけに依存しません。
-
-TCを`PASS`にするには、currentなE2E実装がそのTCのPASS判定に必要な期待結果を検証していることを、現在有効なE2E実装成果物、currentな`adversarial-review`（対象: `E2E実装`）の結果、または同等の確認済み事実から確認できることを要求します。新しいrunner実行を開始する前にこの十分性を確認できなければrunnerを起動せず、そのTCは`未実行`として必要なroutingへ戻します。既存runを後からTC判定へ利用する依頼で、run自体は存在するがE2Eが必要な期待結果を検証しているか確認できない場合は`判定不能`とします。`qa-workflow`利用時はE2E実装変更後の`要再検証`が残っていないことを利用し、単体利用で過去reviewの対象・鮮度を証明できない場合は古いreviewを再利用せず現在対象を再reviewします。`adversarial-review`成果物へ新しいrevision / working tree追跡schemaを追加しません。期待結果専用の新しいID体系やcoverage用途も追加しません。
-
-## 5. TC結果状態
+## 6. TC結果状態
 
 正規状態は次です。
 
-- `PASS`: PASS判定に必要なすべての期待結果を観測し、すべて一致した
-- `FAIL`: 有効な期待結果との不一致を1つ以上実測で確認した
-- `未実行`: 対象TCの実行自体を開始していない
-- `判定不能`: 実行は開始したが、必要な観測が成立せずPASS / FAILを確定できない
+- `PASS`: PASS判定に必要な期待結果をすべて観測し、すべて一致した
+- `FAIL`: 有効な期待結果との不一致を1つ以上実測した
+- `未実行`: TCの実行自体を開始していない
+- `判定不能`: 実行は開始したが、必要な観測を完了できずPASS / FAILを確定できない
 
-`ブロック中`はTC結果状態に含めず、必須情報・権限・環境・安全条件等の未解決で現在の実行を進められないSkill / workflow状態として扱います。
+`ブロック中`はTC結果ではなくworkflow状態です。
 
-`PASS` / `FAIL`には期待結果・実測結果・判定根拠を必須にします。`未実行` / `判定不能`には理由を必須にし、実測していない結果を埋めません。
+1つ以上の期待結果で不一致を確認した場合は`FAIL`とします。後続操作が不能になって未観測項目が残っても、確認済みの不一致を`判定不能`へ弱めません。
 
-複数期待結果を持つTCでは次の規則で判定します。
+不一致はないがPASSに必要な観測を完了できない場合は`判定不能`です。
 
-- 1つ以上の期待結果で不一致を確認した場合は`FAIL`。後続手順の前提が崩れて未観測項目が残っても、確認済み不一致を`判定不能`へ弱めない
-- 不一致はないが、PASSに必要な期待結果を1つでも観測できなければ`判定不能`
-- 実行開始前に停止した場合だけ`未実行`
-- 必要な期待結果をすべて観測し、すべて一致した場合だけ`PASS`
+## 7. 副作用・cleanup
 
-TCに定義された`事後状態 / 後処理`と、実行時の安全cleanupはTC結果と別軸です。TCの期待結果をすべて満たした後で後処理またはcleanupに失敗した場合、TC結果は`PASS`のまま保持し、残存状態により`test-execution` / workflowを完了させません。元TCの後処理と実行時cleanupが同じ処理を要求する場合は一度だけ実施し、どちらの契約を満たしたか追跡します。Playwright runner管理cleanupは`e2e-test-execution`の既存責務を維持します。
+副作用の最大回数は、ユーザーが許可した操作scope全体で管理します。同じscopeを複数TCが共有してもTCごとに上限をリセットしません。
 
-## 6. 出力Asset
+結果不明な副作用操作は、状態確認なしに盲目的再試行しません。
+
+次を分離します。
+
+- TCに定義された事後状態 / 後処理
+- 今回のAI操作に伴う実行時cleanup
+- 既存repo E2Eを`e2e-test-execution`で動かした場合のrunner管理cleanup
+
+cleanup失敗は確定済みTC結果を自動でFAILへ変更しません。ただし残存状態がある場合は実行報告とworkflow完了状態へ反映します。
+
+## 8. 実行開始後の変更
+
+実行開始後は今回のTC集合を変更しません。
+
+ユーザーが途中でTC追加・除外または実行手段変更を求めた場合:
+
+- 未開始TCは`未実行`として理由を残す
+- 開始済みで判定未完了なら必要に応じて`判定不能`として理由を残す
+- 必要なcleanupを実施する
+- 旧成果物を履歴として閉じる
+- 変更後要求は別の`test-execution`成果物 / versionとして開始する
+
+## 9. 出力Asset
 
 `skills/test-execution/assets/output-template.md`を正規出力として追加します。
 
@@ -176,74 +189,61 @@ TCに定義された`事後状態 / 後処理`と、実行時の安全cleanupは
 | TC revision / content identity |  |  |
 | 今回の実行対象TC識別子集合 |  |  |
 | 環境 / URL / origin |  |  |
-| 実施環境 / 対象条件 |  |  |
 | version / build ID |  |  |
+| role / アカウント |  |  |
 | 実行日時 |  |  |
-| 実行方式概要 | AI直接操作 / 自動実行 / 混在 |  |
-| repo revision / E2E code revision |  |  |
+| 使用した実行手段 | Playwright MCP等 / browser操作 / Playwright CLI / 一時Playwrightコード / 既存E2E runner |  |
 | テスト対象資料参照 |  |  |
 
-テスト対象資料を利用していない場合は`未使用`等の明示状態を使用します。`TC revision / content identity`を取得できない場合は空欄にせず`未提供 / 未確認`等を記録します。
+### 実行前条件
 
-### AI直接操作の実行前条件
-
-AI直接操作を使用するTCだけ記録します。
-
-| TC識別子 | origin | アカウント / role | 開始状態 / テストデータ | 副作用の許可範囲 | 最大回数 | 安全cleanup対象 / 方法 | 確認結果 |
-| --- | --- | --- | --- | --- | ---: | --- | --- |
-
-必須条件を確認できないTCは操作を開始せず`未実行`とします。この表はPlaywright runnerのpreflightを複製するものではありません。
-
-### AI直接操作の副作用実績
-
-副作用操作を実施したAI直接操作TCだけ記録します。再試行も`実施回数`へ含めます。同じ許可scopeを複数TCが共有する場合は、TC行の値とは別に累計が上限を超えないことを確認し、TCごとに最大回数をリセットしません。
-
-| TC識別子 | 操作 | 最大回数 | 実施回数 | 実施結果 | 残存状態 / 備考 |
-| --- | --- | ---: | ---: | --- | --- |
-
-`実施回数`が`最大回数`を超えた成果物は契約違反として完成扱いしません。
-
-### TC実行結果
-
-| TC識別子 | 実行方式 | 状態 | 期待結果 | 実測結果 | 判定根拠 | 実行結果参照 / 証跡 |
-| --- | --- | --- | --- | --- | --- | --- |
-
-実行方式の正本はTC実行結果表の`実行方式`列とし、複数方式が混在してもrun全体に1方式を強制しません。`TC revision / content identity`は既存のrevision / fingerprint契約を優先し、独自hashを新設しません。
-
-自動実行を利用する場合は次の対応表も出力します。`test-execution`が確定した今回TCとE2E実装参照に対し、`e2e-test-execution`が返したlogical / resolved primaryと実行結果を比較・追跡できるようにします。
-
-### 自動実行対応
-
-| TC識別子 | 既存TC ID（存在時のみ） | E2E実装参照 | E2E実行成果物参照 | logical primary | resolved primary TestCase | 利用区分 | 期待結果検証根拠 | 実行結果 / 観測証拠 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| TC識別子 | 開始状態 / テストデータ | 副作用scope | 最大回数 | cleanup対象 / 方法 | 確認結果 |
+| --- | --- | --- | ---: | --- | --- |
 
 ### 手順・観測結果
 
-| TC識別子 | 手順 / 観測点 | 操作 | 期待結果 | 実測結果 | 状態 / 備考 |
+| TC識別子 | 手順 / 観測点 | 操作 | 観測方法 | 期待結果 | 実測結果 | 状態 / 備考 |
+| --- | --- | --- | --- | --- | --- | --- |
+
+`観測方法`には必要に応じてDOM / accessibility tree / 画像 / Playwright assertion等を記録します。
+
+全手順を冗長に複製する必要はありませんが、判定・再現に必要な操作と観測は追跡できるようにします。
+
+### 視覚確認
+
+画像を使用したTCだけ記録します。
+
+| TC識別子 | 手順 / 観測点 | 確認観点 | 画像で観測した事実 | 画像参照 | 判定への利用 |
 | --- | --- | --- | --- | --- | --- |
 
-全TCで全手順を冗長に複製することを目的にしません。ただしPASS / FAIL判定や再現に必要な観測点は追跡できるようにします。
+安全な画像参照を保持できない場合は、画像そのものを保存せず、確認した観測事実だけを記録できます。
+
+### TC実行結果
+
+| TC識別子 | 状態 | 期待結果 | 実測結果 | 判定根拠 | 証跡参照 |
+| --- | --- | --- | --- | --- | --- |
 
 ### 未実行・判定不能
 
-| TC識別子 | 状態 | 理由 | 必要な情報 / 対応 | 再開先 |
+| TC識別子 | 状態 | 理由 | 必要な情報 / 対応 | 再開条件 |
 | --- | --- | --- | --- | --- |
 
-`状態`は`未実行 / 判定不能`だけを使用します。Skill / workflow上の`ブロック中`はこの表へTC結果として混ぜません。
+### 追加観測
+
+TC期待結果とは別に発見したUI崩れや異常がある場合だけ記録します。
+
+| TC識別子 | 観測内容 | 確認方法 | TC結果への影響 | 証跡 |
+| --- | --- | --- | --- | --- |
 
 ### TC事後状態・後処理
 
 | TC識別子 | 事後状態 / 後処理 | 実施結果 | 残存状態 | 根拠 |
 | --- | --- | --- | --- | --- |
 
-元TCに定義がない場合は`対象なし`とします。実行時cleanupと同じ処理を二重実行しません。
-
 ### 実行時cleanup・残存状態
 
 | 対象 | 状態 | 内容 | 根拠 |
 | --- | --- | --- | --- |
-
-実行時cleanupの成功 / 失敗 / 未確認はTCのPASS / FAILと独立して記録します。Playwright runner管理cleanupは`e2e-test-execution`成果物を正本とします。
 
 ### 集計
 
@@ -254,56 +254,82 @@ AI直接操作を使用するTCだけ記録します。
 | 未実行 |  |
 | 判定不能 |  |
 
-集計は実行開始前に固定した今回のTC識別子集合を母集団としてTC単位で行い、自動実行のretry attempt数をTC件数へ加算しません。結果表から要求TCが欠落している、要求外TCが混入している、または同じTC識別子が複数方式で暗黙に重複実行されている場合は成果物を完成扱いしません。
+### 実行結果報告
 
-永続的な証跡参照が存在しないAI直接操作では架空のURL / artifact参照を作りません。`実測結果`と`判定根拠`は必須とし、`実行結果参照 / 証跡`は実在する安全な参照がある場合だけ記録します。TC判定に不要な個人データ・機密情報を成果物や証跡へ転載せず、screenshot、page snapshot等の機密情報を含む可能性がある証跡を自動共有・commit・転載しません。
+最終出力は単なる内部成果物ではなく、ユーザーが判断できるテスト実行報告とします。
 
-`自動実行対応`の`利用区分`は`TC判定`または`診断のみ`とし、診断runを正式TC判定の唯一の根拠にしません。各TCがどのE2E実行成果物へ対応したかを追跡し、runner側の実行単位や分割方法は`e2e-test-execution`成果物を正本とします。
+最低限、次を含みます。
 
-### 最終出力の自己検証
+- 実行対象と環境
+- 実行したTC
+- PASS / FAIL / 未実行 / 判定不能の集計
+- FAILの実測内容と再現に必要な情報
+- 未実行 / 判定不能理由
+- 画像判断を使用した場合の観測内容
+- TC外の追加観測
+- cleanup / 残存状態
+- 残るブロックや再実行条件
 
-最終出力前に`SKILL.md` / guidanceの出力契約を成果物自身へ再適用します。少なくとも、開始前に固定したTC識別子集合とTC実行結果表の集合が一致し、欠落・要求外・不正重複がないこと、実行方式と結果状態が正規値であること、自動実行TCが既存TC ID（存在時のみ）・E2E実装・E2E実行成果物・logical / resolved primary・期待結果検証根拠へ追跡できること、診断runだけを正式結果へ昇格していないこと、後処理 / cleanup状態をTC結果へ混ぜていないことを確認します。明白かつ局所的で新しい領域判断を必要としない契約違反だけを最大1回修正し、TC、期待結果、対応E2E、実測結果を推測で補完しません。`evals/deterministic/validator.py`はruntimeで呼び出さず評価専用とします。
+## 10. Playwrightコードと既存E2E Skillの境界
 
-### 既存実行結果の再利用
+### 今回runだけの一時コード
 
-過去の`test-execution`成果物は履歴事実として保持します。今回の新規実行要求を過去結果で代替しません。過去結果の確認・分析・報告、または現在の判断材料として再利用する場合は、元TC内容、対象version / build、実施環境 / 対象条件、自動実行ではE2E実装と対応runが今回の判断へ適用可能か確認します。変更や不明点があれば古い結果をcurrentなPASS証拠にせず`要再検証`として扱います。履歴成果物自体を書き換えません。
+`test-execution`で作成・実行できます。
 
-## 7. テスト対象資料の利用
+- 今回TCだけを実施する
+- repoの保守対象E2Eへ無断で追加しない
+- 将来再利用できる品質へ仕上げることを完了条件にしない
+- 実行後に不要な一時ファイルを残さない
 
-`test-target-inspection`成果物は任意入力です。
+### repoへ残すE2Eコード
 
-次の情報が現在有効なら、AI直接操作時の探索コスト削減や操作の安定化に利用できます。
+ユーザー要求またはworkflow範囲に永続的なE2E実装が含まれる場合だけ、`qa-workflow`経由で既存Skillを使用します。
+
+```text
+e2e-test-inspection
+  ↓
+e2e-test-implementation
+  ↓
+e2e-test-execution
+```
+
+### 既存repo E2Eの実行
+
+既存E2Eを正式なrunner契約で実行する場合は`e2e-test-execution`を正本とします。
+
+`test-execution`がTC結果報告まで要求されている場合だけ、その実行結果をTCの期待結果と対応付けて報告します。
+
+## 11. `test-target-inspection`の利用
+
+currentな`test-target-inspection`成果物は任意入力として使用できます。
 
 - 到達経路
 - UI要素
-- role / accessible name等
-- 状態・非同期条件
+- role / accessible name
+- 現在の状態・ふるまい
+- 非同期条件
+- 視覚情報
 - データ / 権限依存
-- 既存Page Object等の参照
 
-資料が存在しない場合でもTCと実対象だけで安全に実行できるなら開始できます。資料を作るためだけに必ず`test-target-inspection`へ戻しません。
+資料と実対象が不一致の場合は資料を正として実対象を無視しません。今回の実測を保持し、資料管理が要求範囲に含まれる場合は`qa-workflow`経由で`test-target-inspection`へ更新を戻します。
 
-資料と実対象が明らかに不一致の場合は、資料を正として実対象を無視せず、今回観測した事実を保持します。更新要求がある場合だけ`test-target-inspection`へルーティングします。
+## 12. `e2e-test-reporting`との境界
 
-## 8. `e2e-test-reporting`との境界
+`test-execution`は一般的なTC実行結果の報告まで担当します。
 
-`test-execution`の成果物はTC結果です。`e2e-test-reporting`はPlaywright固有のrun / resolved primary / attempt / raw status / cleanup等を人間向けに報告する既存Skillです。
+`e2e-test-reporting`は、既存repo E2Eのrun / logical primary / resolved TestCase / attempt / raw status / cleanup等をPlaywright固有の形式で報告する必要がある場合だけ使用します。
 
-以下を維持します。
+一般的なTC実行報告のために`e2e-test-reporting`を必須化しません。
 
-- TC実行結果が必要 → `test-execution`
-- Playwright runnerの詳細報告が必要 → `e2e-test-reporting`
-- 両方必要 → 両成果物を作るが、一方を他方の代替として解釈しない
+## 13. 実装時の主な変更先
 
-`e2e-test-reporting`を一般テスト報告Skillへ拡張しません。
+- `skills/test-execution/SKILL.md`
+- `skills/test-execution/references/guidance.md`
+- `skills/test-execution/assets/output-template.md`
+- trigger / deterministic / semantic eval
+- `qa-workflow`のrouting / state
+- 必要な範囲の`test-target-inspection`連携
+- 既存E2E Skillとの境界説明
 
-## 9. 実装時の主な変更先
+既存`e2e-test-execution` / `e2e-test-result-analysis`のraw result契約は、本変更だけを理由に汎用化しません。
 
-新規Skill以外では、ルーティング上必要な範囲だけ変更します。
-
-- `skills/qa-workflow/SKILL.md`
-- `skills/qa-workflow/references/guidance.md`
-- `skills/qa-workflow/assets/workflow-state-template.md`
-- `skills/adversarial-review/**`は既存契約を原則維持し、`test-execution`専用のrevision / working tree追跡schemaは追加しない。必要なrouting / 再検証連携だけ`qa-workflow`側で扱う
-
-`e2e-test-execution` / `e2e-test-result-analysis`の既存異常routingは変更しません。TC判定に必要なtrace情報が既存成果物で不足することを実装時に確認した場合だけ、既存raw result contractを壊さない最小の参照情報を追加します。
