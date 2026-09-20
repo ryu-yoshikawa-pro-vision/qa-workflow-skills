@@ -1089,7 +1089,7 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 - 既存成果物再利用でもruntime対象unitを現在scriptで再実行し、保存済みresultをcacheにしない
 - whole-model fallbackを再利用する場合もsupport判定を再実行する
 - runtime対象を既存`対象 / 実行範囲`へ限定したうえでの`(skill, runtime_unit_key)` dependency identity / missing / duplicate / cycle / self除外。workflow runtime自身は3つのruntime集合すべてでself inclusionを拒否する
-- expected runtime / Entity集合と実際集合の完全一致。必須unit / Entity丸ごと欠落はblocker、未知の余分なcurrent itemは`invalid_input`
+- expected runtime / Entity集合と実際集合の完全一致。必須unit / Entity丸ごと欠落はblocker、未知の余分なcurrent itemは`invalid_input`。`test_analysis_context / product_risk / technique_selection / change_node / change_edge / environment_requirement / test_data_requirement / disposition`も期待集合から省略しない
 - upstream Entity / semantic dependency / upstream runtime変更とEntity freshness
 - model / implementation変更
 - local block / partial unsupported。closureのhandling / currentな完全Machine Entity参照`covered_by_entity` / 既存Disposition条件まで検査し、closure行の存在だけで完了させない
