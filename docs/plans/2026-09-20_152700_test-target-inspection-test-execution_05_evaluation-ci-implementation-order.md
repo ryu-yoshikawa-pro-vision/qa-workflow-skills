@@ -195,9 +195,9 @@ routing caseへ最低限、次を追加します。
 
 `qa-workflow`自身が2 Skillの内部処理を再定義しないこともsemantic evalで確認します。
 
-## 6. 既存E2E Skill回帰
+## 6. 既存Skill回帰
 
-新規Skill追加により次の境界が崩れていないことを確認します。
+新規Skill追加により、直接境界が変わる既存Skillの責務・routing・発火境界が崩れていないことを確認します。
 
 ### `e2e-test-inspection`
 
@@ -410,6 +410,7 @@ routing caseへ最低限、次を追加します。
 - semantic case合計が基準契約どおり（本Plan基準では32）
 - deterministic output evalのrepository最低case数が基準契約どおり（本Plan基準では32）
 - 既存14 Skillの回帰がPASSする
+- `e2e-test-inspection`、`e2e-test-execution`、`test-case-design`等の隣接Skillと新規2 Skillの双方向発火境界が、既存query件数を維持したデータセットと実Agent評価可能時のsmokeで確認される
 - `skills-ref validate`が全SkillでPASSする
 - README、EVALS、ASSERTIONS、CIの記述と実装が一致する
 - 実Agent発火評価を実施できない場合、repo内dataset PASSだけを発火PASSと表現していない
