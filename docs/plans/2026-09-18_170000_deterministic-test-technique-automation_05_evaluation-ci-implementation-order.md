@@ -424,7 +424,7 @@ raw machine-readable入力をfixtureにします。
 - test environmentと同じcross-operator intersection
 - incompatible constraint / empty intersection
 - unsupported operatorまたは安全にintersectionできない型組合せ
-- `source_target_refs[]`でmodel横断targetを一意に追跡し、`target_key`単独をidentityに使わない
+- `source_target_versions[]`で`target_ref / target_content_fingerprint / generation_fingerprint`を保持し、`target_key`単独やstable IDだけをidentityに使わない
 - 実データを自動取得しない
 
 ### Random Testing
@@ -625,7 +625,7 @@ validatorはruntime traceabilityと独立にmissing / orphan / unknown / stale�
 - ワークフロー全体`完了`では全runtime unitが`Result Status=ready / Freshness=current`であることを追加検査する
 - `Runtime Required=Yes`のunitでは、さらに`Deterministic Generated=Yes`を要求する
 - `Runtime Required=No`のfallback unitも`Result Status != ready`なら完了を妨げる
-- `Support Status=partial`では`unsupported_items[]`が許可されたhandling、必要なcurrent`covered_by_ref`、既存Disposition条件を満たすclosureへすべて閉じていることを要求する。closure行の存在だけでは完了条件を満たさない
+- `Support Status=partial`では`unsupported_items[]`が許可されたhandling、必要なcurrent`covered_by_entity`、既存Disposition条件を満たすclosureへすべて閉じていることを要求する。closure行の存在だけでは完了条件を満たさない
 - `workflow_runtime.py`が上流Entity fingerprint、`upstream_runtime_units`、runtime metadata、`unsupported_item_closures[]`からstale / 完了可否を計算し、LLMが表を手計算しない
 - partial supportは全unsupported item keyにclosureがあり、closureの`generation_fingerprint / reason_code`が現在unsupported itemと一致することに加え、`handling`が許可集合内であることを要求する。`llm_fallback / 重複`はcurrentな`covered_by_ref`必須、`ブロック中`は完了不可、その他Dispositionは既存Skill条件を満たすことを検証する。whole-model unsupportedも同じclosure規則と`generation_fingerprint`一致を必須にする
 
