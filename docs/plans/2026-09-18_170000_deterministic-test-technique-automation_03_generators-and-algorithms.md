@@ -395,7 +395,7 @@ LLMがclassification / classの意味を定義した後、`classification_tree.p
 - 各classの`class_key`
 - Authority / constraint refs
 
-出力`derived.combinatorial_input`は`factors[] / constraints[]`を持ち、`combinatorial.py`の同名fieldと直接互換にします。`mode / strength / mixed-strength subsets / base_assignment`は組合せ戦略の意味判断なのでLLMが別fieldとして決め、固定builderが`derived.combinatorial_input`へjoinします。LLMがfactor / class / constraintを再生成しません。
+`classification_tree.py`は先に`factors[] / constraints[]` skeletonを決定論的に生成します。child `comb`の`mode / strength / subsets / base_assignment`が未指定なら、そのskeletonとfactor keyを保持したまま`result_status=unresolved`と`semantic_parameter_requests[]`を返します。LLMは要求された組合せ戦略parameterだけを補います。再実行後は`derived_child_inputs[]`へ`{child_model_key, model_type:"comb", input:{factors, constraints, mode, strength, subsets, base_assignment}}`を返し、その`input`を`combinatorial.py`へ直接渡します。LLMや別builderがfactor / class / constraintを再生成しません。
 
 ## 9. 状態遷移
 
