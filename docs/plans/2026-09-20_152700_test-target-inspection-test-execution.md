@@ -11,7 +11,7 @@
 - 基準branch: `main`
 - 基準commit: `3510e6ffce87ba8c025ebde22f9947dbb6074f9c`
 - 対象リポジトリ: `ryu-yoshikawa-pro-vision/qa-workflow-skills`
-- Plan作成時炻の正規Skill数: 14
+- Plan作成時点の正規Skill数: 14
 
 実装開始前に最新`main`との差分を確認します。特にDraft PR #11 `feat/deterministic-test-technique-automation` が先にmergeされた場合は、同PRが変更したSkill・評価・CI契約をこのPlanの基準より優先し、本Planで固定した14 Skill / 280 trigger query / semantic 28 case等の基準値をそのまま上書きしません。
 
