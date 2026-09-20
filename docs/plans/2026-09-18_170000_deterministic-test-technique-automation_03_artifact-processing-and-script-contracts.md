@@ -16,7 +16,13 @@
 - locale / timezone requirement
 - network / storage等の前提
 
-対応constraint operatorは`test_data_requirements.py`と同じく、scalar equality、finite enum set、numeric / date / datetime range、version range、boolean requirementです。同じdimensionの要求は`test_data_requirements.py`と同じcross-operator intersection規則で統合し、互換しない値を矛盾として返します。未対応operatorまたは安全にintersectionできない型組合せは`unsupported`とし、環境を実際に準備・検出しません。
+対応constraint operatorは`test_data_requirements.py`と同じく、scalar equality、finite enum set、numeric / date / datetime range、version range、boolean requirementです。
+
+各要求は`environment_key`を持ちます。同じ`environment_key`は1つの実行環境として同時成立が必要な要求集合、異なる`environment_key`は別の実行環境候補です。同じdimensionでも異なる`environment_key`間ではintersectionせず、Chrome用環境とSafari用環境等を矛盾扱いしません。同一`environment_key`内だけcross-operator intersectionで互換性を検査し、互換しない値を矛盾として返します。`requirement_key`は入力identityのまま維持し、複数requirementを別の新しいrequirement identityへ統合しません。
+
+`test-case-design`は意味判断としてTCへ適用する`environment_key`を選び、そのkeyを選ぶ場合はcurrentな同keyのrequirement refsを一式渡します。複数`environment_key`を指定した場合は代替実行環境として扱い、相互にintersectionしません。`case_structure.py`は選択された各keyのrequirement集合がcurrentで完全か、各key内が互換かを検査します。どの環境をTCへ適用するか自体はruntimeが推測しません。
+
+未対応operatorまたは安全にintersectionできない型組合せは`unsupported`とし、環境を実際に準備・検出しません。
 
 ## 20. 変更影響分析
 
@@ -118,7 +124,7 @@ CI単位の`merge_group`と、TCが複数CIを参照する意味判断を分離�
 | `risk_matrix.py` | `scheme, risks[]` | `risk_id` | level、mapped priority |
 | `technique_candidates.py` | 全signal、selection key | `selection_key` | candidates、undetermined、complete |
 | `change_impact.py` | changed node、nodes、edges | `impact:<node_key>` | impacted nodes / paths |
-| `environment_requirements.py` | requirements[] | `env:<requirement_key>` | merged requirements / conflicts |
+| `environment_requirements.py` | requirements[] | `env:<requirement_key>` | normalized requirements / per-environment conflicts |
 | `analysis_entities.py` | test-analysis意味field + current runtime result | `(entity_type, entity_ref)` | Machine Entity / expected identity |
 | `requirement_structure.py` | authorities、risks、TR、Disposition、previous ID state | `violation:<type>:<entity_id>` | violations / derived priority / TR ID mapping |
 | `condition_structure.py` | TCN、models、previous ID state | `violation:<type>:<entity_id>` | violations / TCN・model key mapping |
@@ -135,7 +141,7 @@ CI単位の`merge_group`と、TCが複数CIを参照する意味判断を分離�
 | `grammar_cases.py` | start、key付きproductions、max depth、mutations | `syntax:prod:<production_key>`、mutationは`syntax:mutation:<mutation_key>` | derivations / production Coverage |
 | `schema_cases.py` | `schema_kind, document, schema_pointer, context` | `schema:sha256:<source_hash>` | normalized constraints / downstream inputs / unsupported subtrees |
 | `ui_pattern_candidates.py` | pattern / alias、attributes | `ui:<pattern_key>:<candidate_key>` | candidate / references |
-| `test_data_requirements.py` | requirements[] | `data:<requirement_key>` | merged requirements / conflicts |
+| `test_data_requirements.py` | requirements[] | `data:<requirement_key>` | normalized requirements / applicable-scope conflicts |
 | `random_testing.py` | seed、case count、distribution | `random:case:<1-based zero-padded 6 digits>` | generated input / completion |
 | `metamorphic.py` | relations[] | [追加generator契約](./2026-09-18_170000_deterministic-test-technique-automation_03_additional-generators.md) §18 key | follow-up input / completion |
 | `case_structure.py` | TCN / CI / TC / Disposition | `violation:<type>:<entity_id>` | violations / derived priority |
@@ -214,14 +220,15 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - environment required: `requirements[]`
 - test data required: `requirements[]`, `current_source_targets[]`
 - `current_source_targets[]`: `{source_model_key, target_ref, target_content_fingerprint, generation_fingerprint}`。同一target identityの重複を拒否し、current generator resultから固定builderが作る
-- requirement: `{requirement_key, dimension_key, operator, authority_refs, source_model_key, source_target_versions}`。environmentでは`source_model_key=null`。test dataではcurrent model keyを必須とし、model-wide requirementではcurrent adapter modelを許可、target-specific requirementではCoverage所有modelを必須にする
+- requirement: `{requirement_key, environment_key, dimension_key, operator, authority_refs, source_model_key, source_target_versions}`。environmentでは`environment_key`をstable component keyとして必須、`source_model_key=null / source_target_versions=[]`。同じ`environment_key`の要求だけを同時成立対象とし、異なるkeyは代替環境としてcross-intersectionしない。test dataでは`environment_key=null`、current model keyを必須とし、model-wide requirementではcurrent adapter modelを許可、target-specific requirementではCoverage所有modelを必須にする
 - `operator=eq`: `value` typed value必須
 - `operator=enum`: `values[]` typed valueを1件以上、重複不可
 - `operator=range`: `minimum / maximum` typed value、`minimum_inclusive / maximum_inclusive` boolean必須
 - `operator=version_range`: `minimum / maximum` version文字列、inclusive boolean必須
 - `operator=boolean`: `value` boolean必須
 - `source_target_versions[]`は`{target_ref, target_content_fingerprint, generation_fingerprint}`。environmentとmodel-wide test dataでは空配列を許可する。target-specific test dataでは1件以上必須とし、全rowが`current_source_targets[]`の同じ`source_model_key`へ完全一致しなければ`invalid_input`とする。model-wide test dataでは`current_source_targets[]`照合を要求せず、`source_model_key`のcurrent model metadata一致だけを必須にする。test dataの`source_model_key`がruntime generatorを持つmodelの場合、固定builderはそのcurrent model runtime unitを`upstream_runtime_units[]`へ必須で追加し、保存generation不一致をstaleとして扱う。別modelのtargetや古いversionを受理せず、modelを跨ぐtraceabilityへ`target_key`単独を使用しない
-- `test_data_requirements.py`の各正規化済み要求は`data_ref=data:<requirement_key>`を返し、`materialize_coverage.py`の`test_data_requirement_refs[]`はこの`data_ref`だけを参照する
+- `test_data_requirements.py`は異なる`requirement_key`を新しいidentityへmergeしない。model-wide要求は同じ`source_model_key`の各targetへ適用し、target-specific要求は`source_target_versions[]`で参照したtargetだけへ適用する。各current targetについて「同modelのmodel-wide要求 + そのtargetを参照するtarget-specific要求」の同一dimensionだけをintersectionし、互換性を検査する。互いに参照targetが重ならないtarget-specific要求同士はこの段階でintersectionしない
+- `test_data_requirements.py`の各正規化済み要求は元の`requirement_key`を維持して`data_ref=data:<requirement_key>`を返し、`materialize_coverage.py`の`test_data_requirement_refs[]`はこの`data_ref`だけを参照する。複数targetを同一CIへmergeする場合はmerge対象targetの要求unionを、複数CIを同一TCへ入れる場合はそのTCが参照する要求unionを同じintersection関数で再検査する
 
 #### `analysis_entities.py`
 
@@ -240,20 +247,21 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 
 #### `requirement_structure.py`
 
-- required: `authorities[]`, `risks[]`, `test_requirements[]`, `dispositions[]`, `previous_tr_ids[]`
+- required: `authorities[]`, `risks[]`, `test_requirements[]`, `dispositions[]`, `previous_tr_ids[]`, `update_scope_tr_ids[]`
 - TR draft: `{draft_key, identity_action, reuse_id, text, authority_refs[], risk_refs[], priority, priority_override_reason, test_level, observation_method}`
 - `draft_key`は入力内一意、`identity_action=reuse|new`。reuse時だけactiveな既存`TR-\d{3}`を`reuse_id`へ指定し、new時は`reuse_id=null`
-- `previous_tr_ids[]`: `{tr_id, status}`、`status=active|deleted`
+- `previous_tr_ids[]`: `{tr_id, status}`、`status=active|deleted`の成果物系列full snapshot
+- `update_scope_tr_ids[]`は今回の実行でlifecycleを確定するprevious active TRだけを重複なしで列挙する。unknown / deleted IDを拒否する
 - canonicalized `test_requirements[]`を`draft_key`順で処理し、複数new TRへその順で採番する
-- reuse対象の不存在 / deleted / 同一IDのduplicate reuseを`invalid_input`にする。new採番はdeletedを含む過去最大番号+1。999超過は`id_space_exhausted`
-- previous active TRのうちcurrentでreuseされないIDは`deleted`へ遷移し、deleted rowを保持する
+- reuse対象は`update_scope_tr_ids[]`内のactive IDに限定し、不存在 / deleted / scope外 / 同一IDのduplicate reuseを`invalid_input`にする。new採番はscope外も含むprevious full snapshotの過去最大番号+1。999超過は`id_space_exhausted`
+- `update_scope_tr_ids[]`内のprevious active TRだけ、currentでreuseされなければ`deleted`へ遷移する。scope外のactive / deleted rowは状態を変更せず保持する
 - `priority_override_reason`は関連Riskから導出した最低優先度より低くする場合だけ非空必須で、runtimeが意味判断として優先度を自動補正しない
 - dispositionは`{upstream_entity:{skill, entity_type, entity_ref, content_fingerprint}, handling, reason, authority_refs[], covered_by_entity}`を使う
 - outputは`tr_id_map[]: {draft_key, tr_id, identity_action}`とactive / deleted全行を含むfull snapshotの`tr_id_state[]`
 
 #### `condition_structure.py`
 
-- required: `test_requirements[]`, `technique_selections[]`, `test_conditions[]`, `requirement_dispositions[]`, `models[]`, `previous_tcn_ids[]`, `previous_model_keys[]`
+- required: `test_requirements[]`, `technique_selections[]`, `test_conditions[]`, `requirement_dispositions[]`, `models[]`, `previous_tcn_ids[]`, `previous_model_keys[]`, `update_scope_tcn_ids[]`, `update_scope_model_keys[]`
 - TR: `{tr_id, priority, authority_refs[], risk_refs[]}`。各`tr_id`は入力内一意
 - Technique Selection: `{selection_key, selected_techniques[], undetermined_signal_closures[], status}`。`selection_key`は入力内一意、`selected_techniques[]`はcanonical technique slugで重複不可。`status=active`だけmodel閉鎖の対象にし、activeではcurrent undetermined signalがすべて`selection_not_affected`で閉じ、`question` closureが0件であることを必須にする
 - TCN draft: `{draft_key, identity_action, reuse_id, tr_refs[], condition, category, technique_slugs[], coverage_criterion, authority_refs[], risk_refs[], priority, priority_override_reason}`。`draft_key`は入力内一意、`condition / coverage_criterion`は非空文字列、`category`は文字列またはnull、`technique_slugs[]`は`_02` §4.3のcanonical technique slugだけを許可し重複不可。意味上の同一性はLLMが`identity_action=reuse|new`で決め、reuse時だけactiveな既存`TCN-\d{3}`を`reuse_id`へ指定する
@@ -261,10 +269,11 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - 各current TRはTCNの`tr_refs[]`またはrequirement dispositionのどちらか一方へ閉じる。unknown TR、linked + disposed重複、未閉鎖TRをviolationにする
 - TCNの既定priorityは関連TRの最高優先度。より低いpriorityを指定する場合だけ非空`priority_override_reason`を必須にし、runtimeが自動補正しない
 - model draft: `{draft_key, model_type, technique_slug, selection_source, selection_key, derived_from_model_draft_key, identity_action, reuse_model_key, parent_tcn_draft_key}`。`model_type`は`_02` §4.3の内部model type。adapterでは`technique_slug / selection_source / selection_key=null`、Coverage所有modelではcanonical `technique_slug`と`selection_source=analysis|condition_design|user`を必須とする。`selection_source=analysis`だけ`selection_key`必須、その他はnull
-- `previous_tcn_ids[]`: `{tcn_id, status}`、`previous_model_keys[]`: `{model_key, model_type, technique_slug, parent_tcn_id, selection_source, selection_key, derived_from_model_key, status}`。`status=active|deleted`。reuseはactiveだけ許可し、新規採番の最大番号にはdeletedも含める
+- `previous_tcn_ids[]`: `{tcn_id, status}`、`previous_model_keys[]`: `{model_key, model_type, technique_slug, parent_tcn_id, selection_source, selection_key, derived_from_model_key, status}`。`status=active|deleted`の成果物系列full snapshot
+- `update_scope_tcn_ids[] / update_scope_model_keys[]`は今回lifecycleを確定するprevious active TCN / modelだけを列挙する。unknown / deletedを拒否し、reuse対象は対応scope内のactive ID / keyに限定する。full rebuildでは全previous active TCN / modelをscopeへ含める
 - runtimeはreuse対象の存在、status、duplicate reuse、`model_type / technique_slug / selection_source / selection_key / derived_from_model_key`、最終親TCN一致を検証する。reuse modelを別TCNへ移さない。`derived_from_model_draft_key`は同じTCN draft配下のadapter draftだけを許可し、確定後の`derived_from_model_key`へ一意変換する
 - TCN draftはcanonical `draft_key`順、model draftは`(parent_tcn_draft_key, model_type, draft_key)`順でnew IDを割り当てる。raw入力順を採番へ使わない
-- 1つのmodel keyは同時に1つのTCNだけへ所属する。previous active TCN / modelでcurrentにreuseされないものはdeletedへ遷移し、deleted rowをfull snapshotから消さない
+- 1つのmodel keyは同時に1つのTCNだけへ所属する。`update_scope_tcn_ids[] / update_scope_model_keys[]`内のprevious active TCN / modelだけ、currentにreuseされなければdeletedへ遷移する。scope外のactive / deleted rowは状態を変更せずfull snapshotへ保持する
 - 各TCN draftの`technique_slugs[]`は、そのTCNを`parent_tcn_draft_key`に持つcurrent Coverage所有model draftの非null `technique_slug`集合と完全一致させる。`model_type`を集合へ入れずadapterはTCNの適用技法を増やさない
 - Classification Tree / Cause-Effect / schema / UI等のadapterはcanonical techniqueを所有しない。Coverageを実際に所有するchild modelが`technique_slug / selection_source / selection_key`を持つ
 - `selection_source=analysis`のCoverage所有modelは参照Technique Selectionに同じ`technique_slug`が存在必須。1つの`selection_key + technique_slug`から複数TCN / modelへ展開してよい
@@ -446,18 +455,19 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 
 #### `case_structure.py`
 
-- required: `test_conditions[]`, `coverage_items[]`, `environment_requirements[]`, `test_data_requirements[]`, `test_cases[]`, `dispositions[]`, `previous_tc_ids[]`
+- required: `test_conditions[]`, `coverage_items[]`, `environment_requirements[]`, `test_data_requirements[]`, `test_cases[]`, `dispositions[]`, `previous_tc_ids[]`, `update_scope_tc_ids[]`
 - TCN: `{tcn_id, tr_refs[], priority}`
 - CI: `{ci_id, tcn_id, model_key, priority, authority_refs[], source_kind, execution, semantic_item_key, semantic_item_text, semantic_source_targets[], test_data_requirement_refs[]}`
 - environment / test data requirementはcurrent Machine Entityのcanonical contentとcontent fingerprintを渡す
 - TC draft: `{draft_key, identity_action, reuse_id, title_or_purpose, tr_refs[], tcn_refs[], ci_refs[], environment_requirement_refs[], test_data_requirement_refs[], priority, priority_override_reason, preconditions[], test_data[], steps[], expected_results[], postconditions_or_cleanup[]}`
 - stepは`{number,text}`で1から連番。expected resultは`{number,text,authority_refs[]}`で1から連番
-- `previous_tc_ids[]`は`{tc_id,status}`のfull snapshot。reuseはactiveだけ、duplicate reuse禁止、newはdeletedを含む過去最大番号+1、999超過は`id_space_exhausted`
+- `previous_tc_ids[]`は`{tc_id,status}`の成果物系列full snapshot。`update_scope_tc_ids[]`は今回lifecycleを確定するprevious active TCだけを列挙し、reuseはscope内activeだけ、duplicate reuse禁止。newはscope外 / deletedも含む過去最大番号+1、999超過は`id_space_exhausted`
 - 各`ci_ref`の親TCNは`tcn_refs[]`に必須。TCの`tr_refs[]`は参照TCNのTR unionと一致させる
-- CIのtest data requirement refsはTCのrefsへ含め、environment / test data requirementの存在とcontent fingerprintを検証する
+- CIのtest data requirement refsはTCのrefsへ含め、environment / test data requirementの存在とcontent fingerprintを検証する。TCが参照するtest data requirement unionは同一dimensionのintersectionを再検査し、複数CI統合で初めて生じるconflict / unsupportedをviolationにする
+- environment requirementは`environment_key`ごとにcurrent要求集合を構成する。TCがある`environment_key`を選んだ場合、そのkeyのcurrent requirement refsを一式含むことを必須にし、key内だけintersectionを検査する。複数keyは代替実行環境としてcross-intersectionしない。どのkeyを選ぶかはLLMの意味判断に残す
 - `priority_override_reason`はCoverage Itemから要求される優先度より低くする場合だけ非空必須
 - LLMはCIの自己完結canonical `execution`または`semantic_item_text`とcurrent requirementsを使い、Markdown Coverage Item表やgenerator内部modelからmachine meaningを再抽出しない
-- canonicalized TC draftを`draft_key`順で採番し、previous activeでreuseされないTCはdeletedへ遷移する
+- canonicalized TC draftを`draft_key`順で採番し、`update_scope_tc_ids[]`内のprevious active TCだけcurrentでreuseされなければdeletedへ遷移する。scope外のactive / deleted rowは状態を維持する
 - dispositionは完全Machine Entity参照schemaを使う
 - outputは`tc_id_map[]: {draft_key,tc_id,identity_action}`とactive / deleted全行を含む`tc_id_state[]`
 
@@ -489,7 +499,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - `expected_result_root`は同一TCN内の内部用local keyでstable component key形式を使う。同じkeyはLLMがAuthorityに基づき同じ期待挙動へ統合可能と判断したtargetだけへ付与し、製品Authorityそのものとして扱わない。意味上同じgroupをreuseする場合だけactiveなprevious keyを維持し、新規groupは未使用keyを追加する
 - target disposition: `{target_ref, target_content_fingerprint, generation_fingerprint, handling, reason, authority_refs[], covered_by_target_version}`。`covered_by_target_version`はnullまたは`{target_ref, target_content_fingerprint, generation_fingerprint, execution_fingerprint}`。source targetの現在target / generationは完全一致必須で、同一targetへannotationとDispositionを同時指定しない。`handling=重複`では完全`covered_by_target_version`必須かつself参照禁止。参照先`materializable=true`ではcurrent `execution_fingerprint`を必須、semantic Coverage Itemへ閉じる`materializable=false` targetでは`execution_fingerprint=null`を必須にする。同一input内の参照先targetは即時にcurrent version照合し、local input外の参照先は最終`traceability.py / workflow_runtime.py`で全materialize unit横断照合する
 - `target_ref`は[identity・materialize契約](./2026-09-18_170000_deterministic-test-technique-automation_02_identity-materialize-and-workflow-contracts.md) §7.2の式を再計算して一致必須
-- `test_data_requirements[]`: `{data_ref, requirement_key, dimension_key, operator, ...}`。`data_ref=data:<requirement_key>`を一意にし、annotation / semantic itemの全`test_data_requirement_refs[]`はcurrent集合に存在必須
+- `test_data_requirements[]`: `{data_ref, requirement_key, environment_key:null, dimension_key, operator, source_model_key, source_target_versions, ...}`。`data_ref=data:<requirement_key>`を一意にし、annotation / semantic itemの全`test_data_requirement_refs[]`はcurrent集合に存在必須
 - `previous_target_id_map[]`: `{target_ref, model_key, target_key, target_content_fingerprint, ci_id, mapping_status}`。`mapping_status=active|inactive`。Disposition中targetの直近CIもinactiveとして保持し、同じtarget_refでcontent fingerprintが変わればCI IDを維持しても`stale_ci_ids[]`へ追加する
 - `previous_semantic_ci_map[]`: `{semantic_item_key, model_key, ci_id, mapping_status, semantic_content_fingerprint}`。`mapping_status=active|inactive`
 - `previous_ci_ids[]`: `{ci_id, status}`。`status=active|deleted`で削除済み番号も保持する
