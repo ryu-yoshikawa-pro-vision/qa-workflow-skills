@@ -625,9 +625,18 @@ validatorはruntime traceabilityと独立にmissing / orphan / unknown / stale�
 - `Runtime Skill`と`Runtime Unit Key`はruntime issue由来の質問で必須で、組を一意identityとして扱う
 - model issueでは`Model Key`を必須、artifact全体script issueでは空欄
 - target固有issueだけ`Target Key`を必須
-- runtime生成issueでは`Generation Fingerprint`を必須にし、回答適用時に現在runtime unitのgenerationと一致することを確認する。timeout等のcaller生成issueだけ空欄を許可する
+- canonical input確定後のruntime issueでは`Generation Fingerprint`を必須にする。pre-parse error / timeout等でgenerationを確定できないissueだけ空欄を許可する。`question-analysis`自身はgenerationを計算せず、回答を再開先へ渡す前に`qa-workflow`の再開preflightで現在generationとの一致を確認する
 - 同じブロッカーIDについて質問一覧とブロック中範囲のRuntime Skill / Runtime Unit / Model / Target / Generation Fingerprintが一致することをvalidatorで確認する
 - runtime issue由来でない質問では5列を空欄にできる
+
+runtime issueへの回答を再開する場合は、回答を正規化modelへ適用する前に次の順序を固定します。
+
+1. 保存済み回答をまだ適用せず、現在のMachine Entity / semantic dependencyと、質問発生時点の未解決inputから対象runtime unitを再実行する
+2. 再実行したcurrent `generation_fingerprint`と質問行の`Generation Fingerprint`を比較する
+3. 一致する場合だけ保存済み回答を担当Skillの意味入力へ適用し、その回答を含む正規化inputでruntimeを再実行する
+4. 不一致なら旧回答を自動適用せず、現在世代でissueが残るかを再評価して質問 / block状態を更新する
+5. pre-parse error / timeout由来でfingerprintが空欄の場合は世代一致による回答再利用をせず、現在inputからissueを再評価する
+
 ### `qa-workflow`
 
 既存Skill状態表は`qa-workflow`出力時に引き続き必須とし、`WF-D009`は維持します。ただし永続正本にはせず、成果物metadataから再構築可能にします。
@@ -649,8 +658,8 @@ validatorはruntime traceabilityと独立にmissing / orphan / unknown / stale�
 - `Runtime Required=Yes`のunitでは、さらに`Deterministic Generated=Yes`を要求する
 - `Runtime Required=No`のfallback unitも`Result Status != ready`なら完了を妨げる
 - `Support Status=partial`では`unsupported_items[]`が許可されたhandling、必要なcurrent`covered_by_entity`、既存Disposition条件を満たすclosureへすべて閉じていることを要求する。closure行の存在だけでは完了条件を満たさない
-- `workflow_runtime.py`が上流Entity fingerprint、`upstream_runtime_units`、runtime metadata、`unsupported_item_closures[]`からstale / 完了可否を計算し、LLMが表を手計算しない
-- partial supportは全unsupported item keyにclosureがあり、closureの`generation_fingerprint / reason_code`が現在unsupported itemと一致することに加え、`handling`が許可集合内であることを要求する。`llm_fallback / 重複`はcurrentな`covered_by_entity`の完全identity / fingerprint必須、`ブロック中`は完了不可、その他Dispositionは既存Skill条件を満たすことを検証する。whole-model unsupportedも同じclosure規則と`generation_fingerprint`一致を必須にする
+- `workflow_runtime.py`が上流Entity fingerprint、`upstream_runtime_units`、runtime metadata、materialize runtime unitの`model_completion[] / target_mappings[] / target_dispositions[]`、`unsupported_item_closures[]`からstale / 完了可否を計算し、LLMが表を手計算しない
+- partial supportは全unsupported item keyにclosureがあり、closureの`generation_fingerprint / reason_code`が現在unsupported itemと一致することに加え、`handling`が許可集合内であることを要求する。`llm_fallback`は同じ`model_key`に属するcurrent CI Machine Entity、`重複`はcurrentな`covered_by_entity`を必須にし、`ブロック中`は完了不可、その他Dispositionは既存Skill条件を満たすことを検証する。whole-model unsupportedも同じclosure規則と`generation_fingerprint`一致を必須にする。target Dispositionの`重複`は全materialize unitを跨いでcycleがなく、current CI / semantic CIへ到達する場合だけ閉鎖済みに数える
 
 完了条件・再利用条件へ次を追加します。
 
