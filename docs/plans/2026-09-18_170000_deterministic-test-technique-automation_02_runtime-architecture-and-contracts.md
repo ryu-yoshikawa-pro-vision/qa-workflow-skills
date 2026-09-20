@@ -232,7 +232,7 @@ Cause-Effect → Decision Table、Classification Tree → combinatorial、schema
 
 Python実装では、duplicate key検出用`object_pairs_hook`、`parse_int / parse_float`でJSON numberだけを表す専用の内部token型を返すhook、非有限数拒否、`allow_nan=False`相当の出力を共通方針とします。number tokenを通常のPython `str`として返してJSON stringと同一視しません。strict decode後、すべてのstring valueを走査してunpaired surrogate code pointを拒否し、number tokenはJSON number grammar・raw token長を検証してからcanonical integerまたは`coefficient + scale`へ変換します。
 
-入力byte上限はUTF-8 decode前に検査します。UTF-8 decode後、`json.loads()`より前にstring / escapeを認識する軽量な構造scanで`{[` / `]}`のnesting depthを数え、§5.3の上限64を超えた時点で`limit_exceeded`にします。これにより深いJSONがPython parserの再帰上限や例外形へ先に到達することを避けます。strict parse後はすべてのstring valueのsurrogate妥当性を検証し、不正は`invalid_input`へ正規化します。少なくとも`1 != "1"`、`1.0 != "1.0"`、`1e3 != "1e3"`を回帰fixtureで固定します。
+入力byte上限はUTF-8 decode前に検査します。UTF-8 decode後、`json.loads()`より前にstring / escapeを認識する軽量な構造scanで`{[` / `]}`のnesting depthを数え、§5.3の上限64を超えた時点で`limit_exceeded`にします。これにより深いJSONがPython parserの再帰上限や例外形へ先に到達することを避けます。strict parse後はobject keyを含むすべてのstringのsurrogate妥当性を検証し、不正は`invalid_input`へ正規化します。少なくとも`1 != "1"`、`1.0 != "1.0"`、`1e3 != "1e3"`を回帰fixtureで固定します。
 
 ### 3.2 共通入力metadata
 
