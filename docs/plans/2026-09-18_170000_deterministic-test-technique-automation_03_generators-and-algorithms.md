@@ -191,7 +191,7 @@ LLMがpartition setとpartitionの意味を正規化した後を処理します�
 規則:
 
 - step不明時に`±1`を仮定しない
-- decimalは`Decimal`
+- decimalは共通exact helperの`integer coefficient + base-10 scale`表現で加減算し、Python `Decimal` context precisionへ依存しない
 - fixed-offset datetimeの加減算は入力thresholdのoffsetを保持して行い、named timezone / DST ruleを推測しない
 - `AT = threshold`
 - 2-valueの`OTHER`は、ATが対象partition内なら反対側の最隣接値、ATが対象partition外なら対象partition側の最隣接値
@@ -702,7 +702,7 @@ OpenAPI 3.0はJSON Schema 2020-12として解釈しません。runtime-v1ではP
 - `context=request|response`を必須にし、`readOnly=true` propertyはrequest側required / test data母集団から除外し、`writeOnly=true` propertyはresponse側required / expected response母集団から除外する
 - 同一propertyで`readOnly=true`かつ`writeOnly=true`は`invalid_input`
 - `title / description / default / example / deprecated`はannotationとして保持してもvalidation Coverageへ使用しない
-- Reference Objectは`{"$ref":"..."}`だけをReference Objectとして扱う。OpenAPI 3.0ではReference Objectの追加propertyは参照先schemaのsibling assertionとして解釈しない。runtime-v1では追加property付きReference Objectを黙って評価せず`unsupported`へ落とす
+- Reference Objectは`$ref`だけを意味fieldとして扱う。OpenAPI 3.0のReference Objectへ追加されたpropertyは仕様どおり無視し、参照先schemaのsibling assertionとして解釈しない
 - runtime-v1で対応するreferenceは同一OpenAPI document内のlocal JSON Pointerだけ。外部document referenceは事前dereference済み入力を要求する
 - JSON Schema 2020-12だけのkeywordをOpenAPI 3.0へ暗黙適用しない
 
@@ -739,7 +739,7 @@ HTML `number`のstepはHTML Standardのstep semanticsへ合わせます。
 - `step="any"`ではallowed value stepなしとし、grid constraintを生成しない
 - positive finite `step=s`ではallowed step = s
 - step baseは有効な`min`、次に有効な`value`、それもなければ0の順で決める
-- invalid / zero / negative step tokenはdefault stepへfallbackするHTML semanticsを実装するか、入力normalizerで`invalid_input`へ狭める。どちらを採るかはruntime-v1で1つに固定し、制約なしとして扱わない
+- invalid / zero / negative step tokenはHTML semanticsどおりdefault step=1へfallbackする。制約なしとして扱わない
 - numberのdefault stepもstep mismatchへ影響するため、`step`属性がないことを「gridなし」と解釈しない
 
 `multipleOf`と対応可能なnumber stepは`grid` constraintへ正規化します。
@@ -1296,7 +1296,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - JSON Schema 2020-12ではroot `$id`だけmetadataとして許可し、nested `$id`、`$anchor / $dynamicAnchor / $dynamicRef`、外部URI referenceはruntime-v1 `unsupported`。対応`$ref`は同一schema resource内の`#/...`だけ
 - JSON Schema 2020-12の`$ref` siblingは対応keywordなら通常どおり評価し、`$ref`だけを見てsiblingsを捨てない
 - OpenAPI 3.0はJSON Schema 2020-12と別semanticsで、`nullable`、boolean exclusive boundary、`readOnly / writeOnly`、Reference Objectを§14どおり処理する
-- OpenAPI Reference Objectは`$ref`以外の追加propertyをsibling Schema assertionとして解釈しない。runtime-v1では追加property付きReference Objectを`unsupported`
+- OpenAPI Reference Objectは`$ref`以外の追加propertyを仕様どおり無視し、sibling Schema assertionとして解釈しない
 - `enum / const`はscalar / nullだけruntime-v1対応。object / array値を含むsubtreeはunsupported itemへ出す
 - `context`はJSON Schemaでは`validation`、OpenAPIでは`request|response`、HTMLでは`form-control`
 - html-control `document`は`{type, required, min, max, minlength, maxlength, step, value, pattern, disabled, readonly, multiple}`。numberのdefault step=1、`step=any`、step base=min→value→0を§14どおり扱う
