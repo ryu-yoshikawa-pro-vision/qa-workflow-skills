@@ -869,7 +869,7 @@ CIは§7.2.2のtarget mapping状態遷移を優先し、同sectionで明示し�
 
 - source targetのcontent / generation fingerprintは現在値と一致必須
 - `handling=対象外 / 別テストレベル / 残存リスク / ブロック中 / 重複`だけを許可
-- `重複`では`covered_by_target_version={target_ref, target_content_fingerprint, generation_fingerprint, execution_fingerprint}`を必須とする。source target自身の参照を禁止する。同一`materialize_coverage.py`入力内に参照先targetが存在する場合はそのcurrent versionと即時照合し、別TCN等でlocal inputに存在しない参照先は完全versionを保持したまま最終集約へ渡す。`traceability.py / workflow_runtime.py`が全materialize結果を集約して参照先current target versionとの完全一致、missing / stale、cycleを検査し、`重複`chainの終端がcurrent CI mappingまたはcurrent semantic Coverage Itemへ到達しない場合は閉鎖済みに数えない
+- `重複`では`covered_by_target_version={target_ref, target_content_fingerprint, generation_fingerprint, execution_fingerprint}`を必須とする。`execution_fingerprint`は参照先が`materializable=true`なら非null current値、semantic Coverage Itemへ閉じる`materializable=false` targetなら`null`とする。source target自身の参照を禁止する。同一`materialize_coverage.py`入力内に参照先targetが存在する場合はそのcurrent versionと即時照合し、別TCN等でlocal inputに存在しない参照先は完全versionを保持したまま最終集約へ渡す。`traceability.py / workflow_runtime.py`が全materialize結果を集約して参照先current target versionとの完全一致、missing / stale、cycleを検査し、`重複`chainの終端がcurrent CI mappingまたはcurrent semantic Coverage Itemへ到達しない場合は閉鎖済みに数えない
 - 他handlingでは`covered_by_target_version=null`
 - 同一targetへCI mappingとDispositionを同時指定しない
 - `ブロック中`はworkflow完了不可
