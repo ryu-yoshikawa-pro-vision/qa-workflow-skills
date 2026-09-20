@@ -43,8 +43,6 @@ test-target-inspection
 詳細TC
   ↓
 test-execution
-  ↓ 必要時
-coverage-analysis（対象: TC → テスト実行結果）
 ```
 
 テスト対象資料は利用可能なら再利用しますが必須依存にしません。
@@ -52,18 +50,19 @@ coverage-analysis（対象: TC → テスト実行結果）
 ### 自動化済みTCを実行してTC結果を確認
 
 ```text
-詳細TC + E2E実装参照
+詳細TC + currentなTC → E2E実装対応
   ↓
 e2e-test-execution
-  ├─ 正常かつ原因分析不要 ─────────┐
-  └─ 異常 / 未実行 / cleanup問題 ─→ e2e-test-result-analysis
-                                      ↓
-                                  test-execution
-                                      ↓ 必要時
-                         coverage-analysis（TC → テスト実行結果）
+  ↓
+test-execution
+  └─ raw factだけではTC判定不能 / 原因分析要求 / 追加実行判断が必要
+       ↓
+     e2e-test-result-analysis
+       ↓ 必要時
+     e2e-test-execution / test-execution
 ```
 
-`test-execution`はPlaywright raw statusを作り直さず、検証済み入力をTCの期待結果と対応付けます。
+`test-execution`はPlaywright raw statusを作り直さず、検証済み入力をTCの期待結果と対応付けます。異常runであることだけを理由に`e2e-test-result-analysis`を必須にしません。
 
 ### 既存E2Eのraw実行だけ
 
@@ -89,55 +88,13 @@ e2e-test-implementation
 
 `e2e-test-inspection`は資料の鮮度と対象範囲を確認して再利用し、Playwright固有事実だけ追加確認します。
 
-## 3. `coverage-analysis`の変更
+## 3. テスト対象資料の保存・再利用
 
-複数用途Skillの正規対象へ次を追加します。
+案件固有のテスト対象資料は、ユーザーまたは案件が指定した保存先へだけ永続化します。`qa-workflow`の案件コンテキストを利用している場合は、既存の`skills/qa-workflow/assets/project-context-template.md`にある`既存QA成果物`欄へ、成果物参照、対象範囲、鮮度 / バージョンを記録します。新しいartifact registry / DBは追加しません。
 
-`TC → テスト実行結果`
+再利用時は成果物全体の更新日時だけでcurrentと判断せず、今回利用する対象・要素・状態・遷移等がどの確認元と確認日時 / revisionに基づくか確認します。version / build変更時は関連範囲への影響を確認し、影響不明な範囲だけ`test-target-inspection`へ戻します。
 
-現在の正規対象は次です。
-
-```text
-テスト設計
-TC → E2E実装
-E2E実装 → 実行結果
-```
-
-追加後:
-
-```text
-テスト設計
-TC → E2E実装
-E2E実装 → 実行結果
-TC → テスト実行結果
-```
-
-### 比較内容
-
-`TC → テスト実行結果`では、対象TCが次のいずれかへ閉じていることを確認します。
-
-- `PASS`
-- `FAIL`
-- `未実行` + 理由
-- `ブロック中` + 理由
-
-自動化対象外を未実行理由として自動採用しません。自動化対象かどうかと、今回テストを実行するかどうかは別です。
-
-retry attemptやresolved Playwright TestCaseをTC件数として扱いません。TC IDと`test-execution`成果物のTC結果を比較します。
-
-### 変更対象
-
-最低限:
-
-- `skills/coverage-analysis/SKILL.md`
-- `skills/coverage-analysis/references/guidance.md`
-- `skills/coverage-analysis/assets/output-template.md`
-- `skills/coverage-analysis/evals/deterministic/validator.py`
-- `skills/coverage-analysis/evals/trigger/*`
-- 必要なoutput / semantic eval fixture
-
-既存3用途の意味を変えず、新規用途だけ追加します。
-
+テスト設計で利用する場合、現在有効なテスト対象資料を`test-case-design`の補助入力として利用できます。UI名称、到達方法、具体手順、観測可能性には利用できますが、期待結果や合格条件の仕様根拠にはしません。
 ## 4. `e2e-test-inspection`との統合
 
 現在有効なテスト対象資料がある場合だけ、確認済み実対象事実として再利用します。
@@ -160,6 +117,7 @@ retry attemptやresolved Playwright TestCaseをTC件数として扱いません�
 
 `e2e-test-execution`から`test-execution`へ渡すのは、既存出力で確認済みの次の情報です。
 
+- currentな`TC → E2E実装`対応
 - logical primary対象
 - TC ID（存在時）
 - resolved primary TestCase
@@ -173,7 +131,9 @@ retry attemptやresolved Playwright TestCaseをTC件数として扱いません�
 
 既存出力でTC判定に必要な対応情報が不足することが実装時に確認された場合だけ、`e2e-test-execution`の出力へ最小のtrace情報を追加します。一般化のために既存raw result表を作り直しません。
 
-異常runでは、必要に応じて`e2e-test-result-analysis`を先に実施し、環境 / データ / 実装 / runner等の原因情報を`test-execution`が未実行 / ブロック判断へ利用できます。ただし原因分析をTC期待結果そのものへ変更しません。
+`test-execution`がraw factだけではTCの`FAIL / 判定不能`を区別できない場合、原因分析が要求された場合、または追加実行判断に分析が必要な場合だけ`e2e-test-result-analysis`を利用します。原因分析をTC期待結果そのものへ変更しません。
+
+自動実行の対応は`TC ID → E2E実装参照 → logical primary → resolved primary TestCase → 実行結果 / 観測証拠`を辿れるようにします。run全体PASS、`outcome=expected`、最終retry PASSだけではTCの`PASS`にしません。
 
 ## 6. `e2e-test-reporting`との統合
 
@@ -199,7 +159,6 @@ README / `qa-workflow`では、次を区別して説明します。
 
 実行方式は`test-execution`成果物内の属性であり、workflow状態の対象 / 実行範囲へ重複して持たせません。
 
-一方、`coverage-analysis`には新しい複数用途の正規対象`TC → テスト実行結果`を追加します。
 
 ## 8. 修正routing
 
@@ -210,9 +169,10 @@ README / `qa-workflow`では、次を区別して説明します。
 - TC実行・実測・判定・cleanup → `test-execution`
 - Playwright runner条件 / raw結果 → `e2e-test-execution`
 - Playwright異常の原因分析 → `e2e-test-result-analysis`
-- TC → テスト実行結果の追跡 → `coverage-analysis`（対象: `TC → テスト実行結果`）
 
-実装観測と仕様根拠が矛盾する場合、`test-target-inspection`で仕様を変更せず、必要に応じて`question-analysis`または`spec-analysis`へ戻します。
+実装観測と仕様根拠が矛盾しても、現在有効な仕様根拠が明確なら`test-target-inspection`で仕様を変更せず、不一致事実として後続へ渡します。どの仕様が有効か不明、仕様根拠同士が競合、期待結果の意味を確定できない場合だけ`question-analysis`または`spec-analysis`へ戻します。
+
+`question-analysis`の再開先へ、一般的なテスト対象資料・実対象事実の変更では`test-target-inspection`、汎用TC実行の再開では`test-execution`を追加します。Playwright固有の事実・実行・原因分析は既存E2E Skillへ戻します。
 
 ## 9. 変更伝播
 
@@ -229,7 +189,7 @@ README / `qa-workflow`では、次を区別して説明します。
 
 ### TCが変更された場合
 
-既存の`test-execution`結果は、期待結果または手順へ影響するTC変更があれば`要再検証`として扱います。古いTC結果を新しいTCのPASS証拠として再利用しません。
+既存の`test-execution`結果は、期待結果または手順へ影響するTC変更があれば`要再検証`として扱います。古いTC結果を新しいTCのPASS証拠として再利用しません。TC Machine Entityの`content_fingerprint`等、既存の内容同一性契約が利用可能ならそれを再利用し、今回独自のhashを追加しません。
 
 ### E2E実装が変更された場合
 
@@ -237,8 +197,10 @@ README / `qa-workflow`では、次を区別して説明します。
 
 ## 10. 完了判定
 
-テスト実行を要求したworkflowでは、対象TCが`test-execution`成果物上で結果または妥当な未実行 / ブロック状態へ閉じていることを確認します。
+テスト実行を要求したworkflowでは、今回要求されたTC集合が`test-execution`成果物上で`PASS / FAIL / 未実行 / 判定不能`のいずれかへ漏れなく対応していることを確認します。
 
-全TCのPASSをworkflow完了条件にはしません。FAILでも、要求された実行、必要な原因分析 / 報告、cleanup、未処理ブロッカー、`要再検証`が適切に閉じていればworkflowは完了できます。
+全TCのPASSをworkflow完了条件にはしません。`FAIL`があっても、要求された実行と必要な報告が完了し、cleanup失敗・未確認、未処理のworkflow上`ブロック中`、`要再検証`が残っていなければworkflowは完了できます。
 
-一方、実行を要求したTCが理由なく欠落している場合は完了にしません。
+必須TCが安全条件・権限・環境不足で`未実行`のまま再開待ちであれば`test-execution`をworkflow上`ブロック中`とし、全体を完了にしません。実行開始済みだが必要観測を完了できず`判定不能`になったTCも、要求範囲を閉じる追加対応が残る場合は完了にしません。ユーザーが明示的に実行対象外へ変更したTCは今回要求TC集合から外した根拠を保持します。
+
+実行を要求したTCが理由なく欠落している場合も完了にしません。
