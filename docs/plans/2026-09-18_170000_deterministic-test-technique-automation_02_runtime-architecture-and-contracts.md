@@ -113,7 +113,7 @@ skills/coverage-analysis/scripts/
 └── traceability.py
 ```
 
-対象はテスト設計のAuthority / Risk → TR → TCN → CI → TC、またはCIを持たない契約でのTCN → TCです。E2E実装・実行結果は既存責務のままです。
+対象はテスト設計のAuthority / Risk → TR → TCN → CI → TCです。既存SkillがCIなしTCN → TCを許可する場合も、当該TCNにactiveなCoverage所有modelがない契約に限ります。Coverage所有modelがあるTCNは、各modelのcurrent CIまたは許可されたcurrent closureを先に満たさなければならず、直接TCN → TCでCoverage closureを迂回できません。E2E実装・実行結果は既存責務のままです。
 
 ### `qa-workflow`
 
