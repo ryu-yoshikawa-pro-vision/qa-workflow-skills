@@ -603,7 +603,7 @@ runtime内部identityは`model_type`で分けます。
 ```
 ````
 
-- `spec-analysis`はruntimeを追加せず、解決済みAuthorityをこのblockの`content`へ直接保存する
+- `spec-analysis`はruntime unitを追加せず、解決済みAuthorityの正規化済みfieldを`authority_entities.py`へ渡し、同scriptがcanonical `content`、`content_fingerprint`、Machine Entity wrapper、expected identityを生成してblockへ保存する。LLMがAuthority Machine Entity JSONやfingerprintを手計算しない
 - `test-analysis`は`analysis_entities.py`がLLMの意味fieldとcurrent runtime resultを固定schemaでjoinして保存する。例えばProduct Riskは`failure / authority_refs / impact / likelihood / assessment_reason / confidence_note`と`risk_matrix.py`の`level / mapped_priority`をjoinする。Technique Selectionでは候補runtime結果と最終選択・undetermined signal closureをjoinし、change graph / environment requirementも同じbuilderでMachine Entity化する
 - `test-requirement-design` / `test-condition-design` / `test-case-design`はstructure scriptへ渡した意味fieldとruntimeが確定したID・優先度等を固定builderでjoinして保存する
 - Markdownの人間向け表はMachine Entityと同じ意味fieldを表示し、validatorでID・参照・優先度・期待結果等の一致を確認する。Machine Entityにない意味fieldをMarkdownだけへ追加して下流正本にしない
