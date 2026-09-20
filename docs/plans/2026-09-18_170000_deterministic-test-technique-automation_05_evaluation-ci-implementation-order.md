@@ -63,9 +63,13 @@ CLI integration testは各runtime scriptの`valid_minimal.json`をsubprocessで`
 - duplicate key拒否
 - `NaN` / `Infinity`拒否
 - 不正top-level type拒否
+- UTF-8 decode前byte上限とdecode後nesting depth 64
+- unpaired surrogate code point拒否
 - model decimalの型保持
-- raw JSON documentのnumberをtoken文字列で受け、長さ検証後にcanonical integer / exact decimalへ正規化し、binary floatを経由しない
-- canonical serializerが`Decimal`を指数表記なしのexact JSON numberへ戻す
+- raw JSON documentのnumberを通常のstringと異なる専用token型で受け、raw token長 / JSON number grammar検証後にcanonical integer / `coefficient + scale`へexact正規化し、binary float / `Decimal` contextへ依存しない
+- canonical serializerがexact numeric表現を指数表記なしのJSON numberへ戻す
+- `1 != "1"`、`1.0 != "1.0"`、`1e3 != "1e3"`を固定回帰にする
+- raw numeric token / canonical numeric representationの4096 chars上限超過を`limit_exceeded`にし、丸めない
 - nullと欠落の区別
 
 ### runtime envelope
@@ -223,9 +227,13 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - Coverage所有modelだけ`selection_source=analysis / condition_design / user`を持ち、内部adapterは`technique_slug / selection_source / selection_key=null`
 - 各TCNの`technique_slugs[]`と所属Coverage所有modelのcanonical `technique_slug`集合を完全一致で検証する
 - Classification Tree / Cause-Effect / schema adapterは正規技法を所有せず、child Coverage modelがcanonical techniqueと元のselection provenanceを持つ
-- 1つのselectionは複数TCN / modelへ展開でき、各selected techniqueが少なくとも1件のcurrent Coverage所有modelまたは明示closureへ到達することを検証する
+- 1つのselectionは複数TCN / modelへ展開できるが、active Technique Selectionの`selected_techniques[]`に残る各技法は少なくとも1件のcurrent Coverage所有modelへ到達することを検証する
+- 選択後に不適用 / 未解決となった技法はTechnique Selection Entity自体を更新してselected listから外すか既存block / unresolvedへ戻し、未定義のselection closureでは閉じない
+- runtime非対応はCoverage所有model生成後のunsupported closureで扱う
 - child Coverage model欠落をadapter親だけで閉鎖済みにしない
-- `model_type=error-guessing / technique_slug=error-guessing`はruntime unitを要求せず、semantic Coverage ItemをCI Machine Entityへmaterializeできることを検証する
+- `model_type=error-guessing / technique_slug=error-guessing`はruntime unitを要求せず、semantic Coverage ItemをCI Machine Entityへmaterializeできることを検証する。semantic item 0件では完了不可
+- 各active Coverage所有modelは、1件以上のcurrent CI、または非空のrequired Coverage母集団がcurrent target Disposition / unsupported closureで全件閉じていることをmodel単位で検証する。別modelのCIが親TCNに存在するだけでは完了にしない
+- `conditions=[] / actions=[] / factors=[] / relations=[] / source_inputs=[] / states=[]`等の空modelがvacuous completeにならず`invalid_input / unresolved`へ落ちることを検証する
 
 ### 同値分割 / Each Choice
 
@@ -385,9 +393,12 @@ raw machine-readable入力をfixtureにします。
 - `$defs`をlocal `$ref`参照先containerとして扱う
 - single typeと`[base, null]`だけを対応し、nullableを`allows_null`へ正規化
 - `properties / items` traversal
-- root `document + schema_pointer`を使ったlocal JSON Pointer `$ref`解決
-- OpenAPI `#/components/...`を同一root documentから解決
+- JSON Schema 2020-12は同一schema resource内の`#/...`だけをlocal `$ref`として解決する
+- root `$id`はmetadataとして許可し、nested `$id`、`$anchor / $dynamicAnchor / $dynamicRef`、外部URI referenceをruntime-v1 `unsupported`にする
+- JSON Schema 2020-12で`$ref` siblingの対応keywordも評価し、`$ref`だけを見てsiblingsを捨てない
 - cyclic local `$ref` subtreeは`unsupported`
+- OpenAPI 3.0はJSON Schema 2020-12と別semanticsで解釈し、`#/components/...`のlocal referenceをOpenAPI Reference Object規則で解決する
+- OpenAPI Reference Objectの追加propertyをsibling Schema assertionとして扱わず、runtime-v1では追加property付きReference Objectを`unsupported`
 - external `$ref`は事前dereference要求
 - OpenAPI 3.0 `nullable` / boolean exclusive boundary
 - OpenAPI `context=request|response`と`readOnly / writeOnly + required`の方向別意味
@@ -398,12 +409,14 @@ raw machine-readable入力をfixtureにします。
 - `type=text`でvalidationへ適用される`pattern`を無視せず`unsupported`とし、Python `re`で代用しない
 - `multiple`がvalidation意味を持つtypeはruntime-v1対応外として`unsupported`にする
 - unsupported applicator
-- `$schema / $id`をmetadataとして許可し、annotation allowlistだけをvalidation非影響として許可
+- `$schema`とroot `$id`だけをmetadataとして許可し、annotation allowlistだけをvalidation非影響として許可
 - unsupported keywordが意味へ影響するsubtreeだけを局所`unsupported`
 - 親validation意味を左右する場合は親subtree全体を`unsupported`
 - HTML `pattern`を対応済みconstraintとして扱わず、適用されるcontrolでは`unsupported`を返す
 - JSON Schema `multipleOf` → `grid(base=0, step=m)`
-- HTML数値`step`は`min`ありの場合だけgrid化し、minなし / date-time系は`unsupported`
+- HTML `number`はstep省略時default step=1、`step=any`はgridなし、step baseは`min → value → 0`の順で固定し、minなしを即unsupportedにしない
+- invalid / zero / negative HTML stepの扱いをruntime-v1で固定し、制約なしとしてcompleteにしない
+- date / datetime-local系stepはruntime-v1 `unsupported`
 - `derived.ep_inputs / derived.bva_boundary_skeletons / derived.combinatorial_constraints / derived.test_data_requirements`を固定schemaで出す
 - BVAはboundary skeletonへLLMが`mode / coverage_selection_reason`だけを追加し、固定builderで`bva.py` inputへする
 - range / enum / requiredはEP / BVA / combinatorial / test dataへ、gridはschema Coverage / BVA / combinatorialだけへ渡す
@@ -430,7 +443,8 @@ raw machine-readable入力をfixtureにします。
 ### Random Testing
 
 - `pcg32-v1`のstate / seeding / XSH RR / rejection sampling
-- seed=42固定test vector
+- seed=42固定raw output vector
+- non-power-of-two bound（少なくともbound=10）のbounded integer固定vectorでrejection発生を含め、単純modulo実装を検出する
 - 同seedで同列
 - seed差
 - `uniform_finite`: typed value、non-empty / duplicate拒否、宣言順sample mapping
@@ -446,6 +460,7 @@ raw machine-readable入力をfixtureにします。
 - `follow_ups[]`の`follow_up_key`一意性と1..10,000件
 - 各follow-upの`transforms[]`を宣言順に逐次適用
 - `set / add_decimal / multiply_decimal / append / permute / sort`のrequired parameter
+- `sort`はnumber homogeneous arrayをexact numeric order、string homogeneous arrayをUnicode code point順で処理し、異種型 / boolean / null / enumを`unsupported`にする
 - JSON pathはobject key / array indexだけ
 - `permute` indicesが完全bijection
 - `expected_relation.output_kind`必須
@@ -997,7 +1012,8 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 - Machine Entityのruntime dependencyとsemantic dependencyからEntity freshnessを計算し、traceabilityとworkflowで同じ共通関数を使用する
 - question-analysisのRuntime Skill / Runtime Unit / Model / Target / Generation Fingerprint保持
 - coverage-analysisのModel Key / Disposition追跡
-- 各Skillがdispatch表・current input / model metadata・structure / materialize resultから`expected_runtime_units[] / expected_entities[]`を固定生成し、`workflow_runtime.py`が実際集合との完全一致を検査する
+- 各Skillがactual集合から独立した固定sourceから`expected_runtime_units[] / expected_entities[]`を生成し、`workflow_runtime.py`が実際集合との完全一致を検査する。expected生成で`current_entities[] / runtime_units[] / current_runtime_units[]`や保存済みMachine Entity blockを参照しない
+- 正常fixtureからMachine Entity 1件を削除しても`expected_entities[]`が変わらずmissing blockerになる回帰と、runtime unit 1件を削除しても`expected_runtime_units[]`が変わらずmissing blockerになる回帰を必須にする
 - `workflow_runtime.py`によるSkill状態表 + runtime状態表（model / artifact両runtime unit）の機械集約。`qa-workflow::artifact:workflow_runtime:all`自身を`runtime_units[] / current_runtime_units[] / expected_runtime_units[]`の3集合すべてから除外し、self inclusionを`invalid_input`にする
 - legacy昇格
 
@@ -1019,7 +1035,7 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 - technique candidates / Selection Source / undetermined signal閉鎖
 - 新規正規技法のSkill契約
 - trigger eval更新
-- change graph / impact
+- change graph / impact。cycleを含むgraphでshortest path 1本だけを返し、同距離はedge key列→node key列でtie-breakする。visitedの実装差でpathが欠落しないことを検証する
 - environment requirement
 
 ### Step 4: test-requirement-design
@@ -1074,7 +1090,7 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 - Step 2で実装済みの`materialize_coverage.py`を全generator出力へ接続し、model status / freshness gateを回帰確認する
 - 全generatorについて`materializable`の固定値とcanonical `execution / execution_fingerprint` schemaを確認する。combinatorialはpartial target → deterministic full row mapping、state / flowはwitness sequence / path、adapter専用generatorは非materializeを回帰確認する
 - mergeは同一model・同一executionに限定し、追加test data requirement参照のintersectionを確認する。異なるmodelの同一TC実行はcase structureの複数`ci_refs[]`で検証する
-- target content / generation fingerprintとannotation / target disposition / mergeのversion一致を確認する。semantic Coverage Itemはstable key、previous mapping、本文content fingerprint、source target version一致を確認する
+- target content / generation fingerprintとannotation / target disposition / mergeのversion一致を確認する。semantic Coverage Itemはnew key発行、active→inactive、CI deleted、同一item復帰、deleted CIの別item再利用拒否、本文変更、model変更、source target version変更を含むlifecycleを確認する
 - target_ref → CI mapping / upsert、merge / unmerge / CI↔Dispositionの状態遷移を全generatorで回帰確認する
 - CI Machine Entityの`covered_targets[]`へtarget content / execution fingerprintを保存し、stable target_refのままtarget内容が変わるcaseでもCI content fingerprintが変わることを確認する
 - CI content変更後、既存TC Machine Entityがsemantic再確認前はstaleになることを確認する
@@ -1152,7 +1168,7 @@ Plan完了には次をすべて満たす必要があります。
 - 再実行がupsertされ重複machine evidenceを作らない
 - semantic dependency preflight済みの現在script正常実行結果だけを保存時`freshness_status=current`とし、`workflow_runtime.py`が再検証してstale伝播する。freshnessの付与主体をworkflowだけに限定せずmaterialize前の循環を作らない
 - stale派生成果物を完了扱いしない
-- `technique_slug`が正規技法だけを表し、内部adapterは正規技法を所有しない。Coverage child modelがselection provenanceを持ち、各selected techniqueが1件以上のCoverage modelまたは明示closureへ到達する。エラー推測もsemantic CIへ入る
+- `technique_slug`が正規技法だけを表し、内部adapterは正規技法を所有しない。Coverage child modelがselection provenanceを持ち、active Technique Selectionの各selected techniqueが1件以上のcurrent Coverage modelへ到達する。不適用 / 未解決はTechnique Selection更新または既存block / unresolvedで扱い、未定義のselection closureを作らない。エラー推測は1件以上のsemantic CIへ入る
 - machine-readable schema / HTMLをLLMが手変換せず対応scriptが処理する。HTML runtime-v1は`text / number / date / datetime-local`のtype / attribute matrix、disabled / readonlyのvalidation除外、pattern等のunsupportedを契約どおり扱う
 - script間の機械変換では固定derived schema / builderを使い、派生modelを`condition_structure.py`で採番し、LLMは意味パラメータやtarget annotationだけを追加してmachine dataを再生成しない
 - 全技法generatorと構造scriptにunit testがある
@@ -1160,7 +1176,7 @@ Plan完了には次をすべて満たす必要があります。
 - runtime出力と保存machine evidenceの一致をvalidatorが確認する
 - support判定をruntimeが行い、whole-model `unsupported`、`partial`、Python unavailableを契約どおり区別する。supported inputをAgent判断だけでruntime省略しない
 - model内Coverageと仕様全体Coverageを混同しない
-- `workflow_runtime.py`がmodel / artifact両runtime unit、Machine Entityのsemantic / runtime dependency、upstream Entity内容変更、`(skill, runtime_unit_key)` dependency、expected runtime / Entity集合のmissing / extra、dependency missing / duplicate / cycle、generation / implementation変更、stale、局所ブロック、partial / whole-model fallback、legacyを処理でき、自身を`runtime_units[] / current_runtime_units[] / expected_runtime_units[]`へ含めず、self inclusionを`invalid_input`にする
+- `workflow_runtime.py`がmodel / artifact両runtime unit、Machine Entityのsemantic / runtime dependency、upstream Entity内容変更、`(skill, runtime_unit_key)` dependency、actualから独立導出したexpected runtime / Entity集合のmissing / extra、dependency missing / duplicate / cycle、generation / implementation変更、stale、Coverage所有model単位のCI / closure完了、局所ブロック、partial / whole-model fallback、legacyを処理でき、自身を`runtime_units[] / current_runtime_units[] / expected_runtime_units[]`へ含めず、self inclusionを`invalid_input`にする
 - `traceability.py`と`workflow_runtime.py`が同じ`runtime_contract.py` freshness関数から同じruntime / Entity freshnessを得て、workflow_runtime resultをtraceabilityの依存入力にしない。traceability自身もfreshness入力runtime集合へ含めない
 - 既存成果物を再利用する場合、保存済みsemantic model / draftの上流Entity dependencyをruntime再実行前に確認し、不一致なら担当Skillで意味再確認する。freshな意味入力だけを現在scriptへ再投入し、materialize / traceability / workflow freshnessに循環を作らない
 - 以前whole-model `unsupported`だった成果物も再利用時に現在runtimeでsupport判定を再実行し、現在supportedなら古いfallbackを維持しない
@@ -1173,7 +1189,7 @@ Plan完了には次をすべて満たす必要があります。
 - trigger datasetがSkill別exact count（repository合計328）を満たし、新規技法5種のselection / design境界をtrain・validation双方で検証する
 - semantic datasetがSkill別exact count（repository合計51）を満たし、LLMへ残す意味判断責務が少なくとも1 caseへ対応したうえでtest-analysis / test-condition-design / adversarial-reviewのcaseがPASSする
 - Round-tripが開始state違いを別targetとして扱い、Domain Testingがexact rationalで対象border以外のIN条件を検証し、Decision Table mergeが未定義assignmentを包含しない
-- structure / traceabilityが共通Disposition schemaを扱い、OpenAPI `readOnly / writeOnly`をrequest / response contextに従い、raw schema数値をfloatへ丸めず処理する
+- structure / traceabilityが共通Disposition schemaを扱い、JSON Schema 2020-12の`$id / $ref` resource境界と`$ref` sibling、OpenAPI 3.0 Reference Object / `nullable / readOnly / writeOnly`、HTML numberのdefault step / `step=any` / step baseをPlanの対応subsetどおり処理し、raw schema数値をstringと混同せずbinary float / context roundingなしで処理する
 - Python 3.11 compile / runtime unit / deterministic eval / semantic validation / workflow統合評価がPASS
 - `skills-ref validate`がPASS
 - README、Skill、reference、template、EVALS、ASSERTIONSが実装と一致
