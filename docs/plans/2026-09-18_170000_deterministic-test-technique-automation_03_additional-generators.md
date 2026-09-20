@@ -330,12 +330,16 @@ selected childに完成inputを作るための意味parameterが不足する場�
 
 処理:
 
-- canonical keyによる重複統合
-- 同一dimensionで型互換な`eq × eq`、`eq × enum`、`eq × range`、`enum × enum`、`enum × range`、`range × range`、`version_range × version_range`をintersectionする
+- 各`requirement_key`をstable identityとして維持し、異なるkeyを別の新しいrequirement identityへmergeしない
+- model-wide requirementは同じ`source_model_key`の各current targetへ適用する
+- target-specific requirementは`source_target_versions[]`で参照したcurrent targetだけへ適用する
+- 各current targetごとに「同modelのmodel-wide requirement + そのtargetを参照するtarget-specific requirement」を有効要求集合とし、その集合内の同一dimensionだけを互換性検査する。互いに参照targetが重ならない要求同士はこの段階ではintersectionしない
+- 有効要求集合内で型互換な`eq × eq`、`eq × enum`、`eq × range`、`enum × enum`、`enum × range`、`range × range`、`version_range × version_range`をintersectionして互換性を検査する
 - `boolean`は同一dimensionのboolean同士、または型互換な`eq`との一致を検証する
 - 空intersection、異なるscalar equality、range外eq等を矛盾として検出する
-- 型またはoperator組合せを安全にintersectionできない場合は別要求として黙って残さず`unsupported`
-- requirement → model / source target traceability。test data要求では各source targetを`{target_ref, target_content_fingerprint, generation_fingerprint}`として保持し、stable IDだけへ結び付けない
+- 型またはoperator組合せを安全にintersectionできない場合は、別要求として黙って通さずその有効要求集合を`unsupported`にする
+- requirement → model / source target traceability。各source targetを`{target_ref, target_content_fingerprint, generation_fingerprint}`として保持し、stable IDだけへ結び付けない
+- 複数targetを同一CIへmergeする場合、および複数CIを同一TCへまとめる場合は、その時点で同時成立が必要になるtest data requirement unionへ同じintersection規則を再適用する
 
 実際の個人情報・顧客データ・fixture値を自動取得しません。
 
