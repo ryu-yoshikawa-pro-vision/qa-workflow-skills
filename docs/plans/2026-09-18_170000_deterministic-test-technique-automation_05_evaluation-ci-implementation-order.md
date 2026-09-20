@@ -190,7 +190,7 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 
 - `analysis_entities.py`はcurrent `risk_matrix.py` payloadの`risks[]`とcurrent `technique_candidates.py` payloadを固定抽出したresult rowだけを受け、runtime envelope全文やMarkdownを再解釈しない
 - Product Risk draftと`risk_matrix_results[]`、Technique Selection draftと`technique_candidate_results[]`をidentityで1対1joinし、missing / duplicate / unknown rowを`invalid_input`にする
-- change graph / environment → Product Risk → Technique Selection / test-analysis contextの固定順で同一invocation内Entity dependencyを生成する
+- change graph / environment → Product Risk → Technique Selection / test-analysis contextの固定順で同一invocation内Entity dependencyを生成する。同じtest-analysis実行でdispatchされたrisk / technique / change impact / environment runtime unitをcurrent upstream runtime dependencyとして保持し、未dispatchの条件付きunitを追加しない
 - output `expected_entity_identities[]`はdraft / normalized resultから独立導出し、生成済み`machine_entities[]`から逆算しない
 - Product Riskの`assessment_reason / confidence_note`、Technique Selectionの`undetermined_signal_closures[]`、change graphの`change_kind / expected_impact`をMachine Entityへ保持する
 
