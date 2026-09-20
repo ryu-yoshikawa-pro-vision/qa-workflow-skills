@@ -54,9 +54,11 @@ test_runtime_workflow_integration.py
 
 実行test数が0件ならCIを失敗させます。
 
-各runtime scriptには`tests/skills/runtime/fixtures/<script-name>/valid_minimal.json`を1件必須とし、これをPlan `_03`のrequired input schemaの実行例とします。`spec-analysis/authority_entities.py`にもbuilder用`valid_minimal.json`を1件置き、runtime envelopeではなくMachine Entity / expected identity出力を検証します。fixtureは手書きし、generator出力から生成しません。unknown field拒否、required field欠落、型不一致は各scriptのunit testで確認します。
+各runtime scriptには`tests/skills/runtime/fixtures/<script-name>/valid_minimal.json`を1件必須とし、これをPlan `_03`のrequired input schemaの実行例とします。`spec-analysis/authority_entities.py`にもbuilder用`valid_minimal.json`を1件置き、runtime envelopeではなくMachine Entity / expected identity出力を検証します。`authority_entities.py`の不正入力・実行失敗ではMachine Entity / fingerprintを返さず、callerが代替生成しないことも回帰対象にします。fixtureは手書きし、generator出力から生成しません。unknown field拒否、required field欠落、型不一致は各scriptのunit testで確認します。
 
-CLI integration testは各runtime scriptの`valid_minimal.json`をsubprocessで`python <script-path>`起動し、stdinへJSONを渡してstdout envelopeを読む経路を使用します。`authority_entities.py`もsubprocessでbuilder入出力を検証します。加えて`_02` §2.1のSkill別dispatch表について、各scriptへ到達するprompt分類済みfixtureから期待script path・必須/条件付き・実行順を一意に決められることを機械テストします。派生modelでは`condition_structure.py`でadapter / child identity確定 → 親adapter runtime → child generatorまで検証します。全scriptのdispatchはCIで検証し、実Agent smokeだけへ依存しません。CI subprocessとSkill実行時subprocessの安全timeoutは30秒です。
+CLI integration testは各runtime scriptの`valid_minimal.json`をCIのPython 3.11 interpreterで起動し、stdinへJSONを渡してstdout envelopeを読む経路を使用します。CI実装は`sys.executable`またはsetup済みinterpreterを使用し、Skill契約として`python`というcommand名を要求しません。`authority_entities.py`も同じinterpreterでbuilder入出力を検証します。
+
+`_02` §2.1のSkill別dispatch表は、自然言語promptをPythonで再分類せず、正規化済み`input / model_type / 対象 / 実行範囲`fixtureから期待script path・必須/条件付き・実行順を一意に決められることを機械テストします。自然言語promptからSkill責務・意味入力へ到達できることは既存trigger eval / semantic evalと代表Agent smokeで検証します。dispatch検証専用のprompt parserや重複manifestを追加しません。派生modelでは`condition_structure.py`でadapter / child identity確定 → 親adapter runtime → child generatorまで検証します。全scriptの正規化後dispatchはCIで網羅し、実Agent smokeだけへ依存しません。CIの安全timeoutは30秒としますが、Agent / host runtimeの必須timeout値にはしません。
 
 ## 3. 共通契約の必須回帰
 
@@ -88,6 +90,8 @@ CLI integration testは各runtime scriptの`valid_minimal.json`をsubprocessで`
 - 対応subset判定は各runtime scriptが行い、model全体がsubset外なら`runtime_status=unsupported / support_status=unsupported / runtime_required=false / fallback_reason=outside_supported_subset`を返す
 - 一部だけsubset外なら`support_status=partial`としてsupported部分を生成し、`unsupported_items[]`をfallback / Dispositionへ閉じるまで完了扱いしない
 - `runtime_required`はruntime入力に存在せず、support判定結果からscriptが出力する。Agent側だけでsupport判定してruntimeを省略しない
+- `metadata.input_mode=artifact|direct`を必須にし、`input_fingerprint`へ含める。`artifact`では必要なexternal Machine Entityのmissing / extra / duplicateを拒否し、`direct`では既存Skill契約が許す直接入力をscript固有inputへ正規化して、存在しない前工程Machine Entityを期待集合へ捏造しない。明示的に渡したMachine Entityだけはdirectでも通常どおり検証する
+- 同一の直接入力を前工程Skill directoryなしで実行でき、入力変更でstructure runtime generationと生成Entity freshnessが変わることを検証する
 - artifact scriptのscope keyがscript別固定値 / input由来値と一致する
 - `test-analysis` runtimeは`対象 / 実行範囲=テスト分析`だけ、`coverage-analysis` runtimeは`対象 / 実行範囲=テスト設計`だけでdispatchし、同じSkillの他用途では本Planruntimeを起動しない
 - `support_status=unknown`は`invalid_input / internal_error / not_run`に加え、strict decode前の`limit_exceeded`だけで許可する。いずれも`runtime_required=true / result_status=blocked / deterministic_generated=false`を要求する
@@ -205,12 +209,15 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 
 ### test environment requirement
 
-- 同一dimension統合
-- `eq × eq / eq × enum / eq × range / enum × enum / enum × range / range × range / version_range × version_range`の型互換intersection
+- `environment_key`を必須stable keyとして検証する
+- 同一`environment_key`内の同一dimensionだけ`eq × eq / eq × enum / eq × range / enum × enum / enum × range / range × range / version_range × version_range`の型互換intersectionを検査する
 - booleanと型互換`eq`の一致
 - incompatible value / empty intersection矛盾
+- Chrome用 / Safari用等、異なる`environment_key`の同一dimensionをcross-intersectionせず代替環境として保持する
+- requirement identityは元の`requirement_key`を維持し、intersection結果のために新しいrequirement keyを発行しない
+- TCが`environment_key`を選択した場合、そのkeyのcurrent requirement refsが一式含まれること、key内が互換であることを`case_structure.py`で検査する。複数keyは相互にintersectionしない
 - 安全にintersectionできない型・operator組合せを`unsupported`として残す
-- 実環境を勝手に推測しない
+- 実環境やTCへの適用keyをruntimeが勝手に推測しない
 
 ### test requirement structure
 
@@ -221,9 +228,10 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - 低い指定優先度 + 空の`priority_override_reason`をviolation
 - 低い指定優先度 + 非空override reasonは値を保持し、自動補正しない
 - `draft_key`を使ってLLM draftと最終TR ID mappingを安定追跡する
-- `reuse_id / new`の意味判断とTR番号割当てを分離し、`previous_tr_ids[].status=active|deleted`を検証する
-- reuseはactiveだけ許可し、新規はactive / deletedを含む最大番号+1で採番して削除済み番号を再利用しない
-- outputの`tr_id_state[]`にdeleted IDも残し、次回入力の正本にする
+- `reuse_id / new`の意味判断とTR番号割当てを分離し、`previous_tr_ids[].status=active|deleted`と`update_scope_tr_ids[]`を検証する
+- reuseは`update_scope_tr_ids[]`内のactiveだけ許可し、新規はscope外も含むactive / deleted full snapshotの最大番号+1で採番して削除済み番号を再利用しない
+- scope内activeでcurrent reuseされないTRだけdeletedへ遷移し、scope外activeは維持する。意図した削除はIDをscopeへ含めてdraftから外すfixtureで検証する
+- outputの`tr_id_state[]`にscope外activeとdeleted IDも残し、次回入力の正本にする
 - TR draftの`text / test_level / observation_method`をruntime inputへ保持し、structure scriptが内容を生成・欠落させない
 - runtime output + draft意味fieldからTR Machine Entityを固定builderで生成する
 - draft → runtime検査 → 再検査の処理順
@@ -234,9 +242,10 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - unknown TR、linked + disposed重複、未閉鎖TRを検出する
 - TCN priorityは関連TR最高優先度を既定とし、低いoverrideには理由を必須にする
 - TCN / modelの`draft_key`、`reuse / new`意味判断と番号割当てを分離する
-- `previous_tcn_ids[] / previous_model_keys[]`の`active|deleted`を検証し、reuseはactiveだけ許可する
-- 新規TCNはactive / deletedを含む既存最大+1、999超過は`id_space_exhausted`
-- model keyは同じ`model_type`のactive / deleted最大+1、削除済みkeyを同系列で再利用しない
+- `previous_tcn_ids[] / previous_model_keys[]`の`active|deleted`と`update_scope_tcn_ids[] / update_scope_model_keys[]`を検証し、reuseは対応scope内activeだけ許可する
+- scope内activeでcurrent reuseされないTCN / modelだけdeletedへ遷移し、scope外activeは維持する
+- 新規TCNはscope外も含むactive / deleted full snapshotの既存最大+1、999超過は`id_space_exhausted`
+- model keyは同じ`model_type`のactive / deleted full snapshot最大+1、削除済みkeyを同系列で再利用しない
 - reuse時の`model_type / technique_slug / selection_source / selection_key / derived_from_model_key / parent TCN / existing key`一致
 - 1 model key = 1 TCN所属を検査し、同じmodel keyを複数TCNへ割り当てない
 - outputの`tcn_id_state[] / model_key_state[]`にdeleted IDも残し、次回入力の正本にする
@@ -431,6 +440,7 @@ raw machine-readable入力をfixtureにします。
 - OpenAPI 3.0 `nullable` / boolean exclusive boundary
 - OpenAPI `context=request|response`と`readOnly / writeOnly + required`の方向別意味
 - 同一propertyの`readOnly=true && writeOnly=true`を拒否
+- runtime-v1のOpenAPI `document`は解析済みstrict JSON objectだけを受け、YAML parserをruntimeへ実装しない。YAML textを直接入力したfixtureは`invalid_input`とし、PyYAML等のdependencyを追加しない
 - HTML constraint validation
 - html-control runtime-v1は`text / number / date / datetime-local`だけをconstraint生成対象にする
 - `disabled=true`または対応typeの`readonly=true`ではconstraint validation targetを生成しない
@@ -462,10 +472,13 @@ raw machine-readable入力をfixtureにします。
 ### test data requirement
 
 - scalar equality / enum set / numeric・date・datetime range / version range / boolean
-- test environmentと同じcross-operator intersection
+- 異なる`requirement_key`を別identityへmergeせず、各`data_ref=data:<requirement_key>`を維持する
+- model-wide requirementは同modelの各current targetへ、target-specific requirementは参照したcurrent targetだけへ適用する
+- 各targetについてmodel-wide + そのtarget-specific要求の同一dimensionだけcross-operator intersectionを検査し、参照targetが重ならないtarget-specific要求同士はこの段階で比較しない
 - incompatible constraint / empty intersection
 - unsupported operatorまたは安全にintersectionできない型組合せ
 - test dataは`source_model_key`を必須にし、model-wide requirementでは`source_target_versions=[]`とcurrent adapter / Coverage model metadataの一致、target-specific requirementでは1件以上の`source_target_versions[]`と`current_source_targets[]`の同一Coverage model / current version一致を検証する。source modelがruntime generatorを持つ場合はcurrent `(skill, runtime_unit_key, generation_fingerprint)`を`upstream_runtime_units[]`へ必須にし、generation変更でtest data runtime / Entityをstaleにする。`target_key`単独やstable IDだけをidentityに使わない
+- merge groupではmerge対象targetの要求union、case structureでは1 TCが参照するCIの要求unionへ同じintersection規則を再適用し、その段階で初めて生じるconflict / unsupportedを検出する
 - 実データを自動取得しない
 
 ### Random Testing
@@ -527,20 +540,23 @@ raw machine-readable入力をfixtureにします。
 - `test_data_requirement_refs[]`は同じmaterialize inputの`data:<requirement_key>`へ解決できることを必須にする
 - merge groupは`{merge_group_key, model_key, target_refs[], target_versions[]}`を使い、Dispositionされていない同一TCN・同一`model_key`のtargetだけを含む。各`target_versions[]`は`target_ref / target_content_fingerprint / generation_fingerprint / execution_fingerprint`を保持し、全targetの`execution_fingerprint`と`expected_result_root`の一致を要求する
 - 異なるmodel / 技法のtargetを同一CIへmergeせず、同一TCで実行できる場合は`case_structure.py`の複数`ci_refs[]`で表現する
-- merge targetの追加test data requirementsを[追加generator契約](./2026-09-18_170000_deterministic-test-technique-automation_03_additional-generators.md) §16と同じintersection規則で統合し、矛盾 / unsupportedならmerge拒否
+- merge targetの追加test data requirementsのunionへ[追加generator契約](./2026-09-18_170000_deterministic-test-technique-automation_03_additional-generators.md) §16と同じintersection規則を再適用し、矛盾 / unsupportedならmerge拒否する。requirement identity自体はmergeしない
 - 同じ期待挙動groupを再利用すると判断した場合は既存`expected_result_root`を維持し、意味不変のkey churnをsemantic evalで検出する
 
 ### test case structure
 
 - CIの親TCNとTCの`tcn_refs[]`、TCNの`tr_refs[]` unionとTCの`tr_refs[]`を整合検証する
 - CI canonical `execution` / semantic item本文、environment / test data requirementをMachine Entityから入力し、Markdown再解釈なしでTCを検証する
+- CIが要求する全test data requirement refをTCへ継承し、複数CIの要求unionを再intersectionしてconflict / unsupportedを検出する
+- environmentは選択した各`environment_key`についてcurrent requirement refs一式を要求し、同一key内だけintersectionする。複数keyは代替環境として扱う
 - requirement content変更で関連TCをstaleにする
 
 - Dispositionは完全Machine Entity参照を持つ共通schema`{upstream_entity, handling, reason, authority_refs[], covered_by_entity}`を使う
 - `draft_key`を使ってLLM draftと最終TC ID mappingを安定追跡する
-- `previous_tc_ids[].status=active|deleted`を検証し、reuseはactiveだけ、新規はactive / deletedを含む最大番号+1とする
+- `previous_tc_ids[].status=active|deleted`と`update_scope_tc_ids[]`を検証し、reuseはscope内activeだけ、新規はscope外も含むactive / deleted full snapshot最大番号+1とする
+- scope内activeでcurrent reuseされないTCだけdeletedへ遷移し、scope外activeは維持する
 - 削除済みTC IDを再利用せず、999超過は`id_space_exhausted`
-- outputの`tc_id_state[]`にdeleted IDも残し、次回入力の正本にする
+- outputの`tc_id_state[]`にscope外activeとdeleted IDも残し、次回入力の正本にする
 - TCN / CI → TC closure
 - linked + disposed重複
 - unknown upstream
@@ -570,7 +586,7 @@ raw machine-readable入力をfixtureにします。
 
 ## 5. stable identity・再実行の回帰
 
-- TR / TCN / model / TCはprevious activeでcurrent reuseされないIDをdeletedへ遷移し、deleted rowをfull snapshotに保持する
+- TR / TCN / model / TCは`update_scope_*`内のprevious activeでcurrent reuseされないIDだけをdeletedへ遷移し、scope外activeを維持する。previous state自体は成果物系列のfull snapshotを保持し、部分更新でも過去最大番号とdeleted履歴を失わない
 - 複数new draftはcanonical `draft_key`順、semantic CIはcanonical candidate順で採番し、raw入力配列順へ依存しない
 
 - 同じmodel改訂で`model_key`維持
