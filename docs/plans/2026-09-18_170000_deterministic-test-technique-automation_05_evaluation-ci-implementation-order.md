@@ -500,7 +500,7 @@ raw machine-readable入力をfixtureにします。
 - stateのinvalid transitionは`attempted_transition`をcanonical executionへ保持し、valid transition列へ混ぜない。flowのnode / edgeはinitialから対象までの最短witness、bounded-pathはinitial→terminal pathを使用する。fork-join branchは単一`edge_sequence`へ順序化せず、semantic Coverage Itemの`source_target_versions[]`が現在branch targetと一致するまで完了させない
 - annotation / Dispositionの`target_content_fingerprint / generation_fingerprint`が現在target / modelと一致しない場合は拒否する
 - `target_dispositions[].handling`は`対象外 / 別テストレベル / 残存リスク / ブロック中 / 重複`だけを許可する
-- `重複`ではcurrentな`covered_by_target_version={target_ref,target_content_fingerprint,generation_fingerprint,execution_fingerprint}`を必須にし、self参照を拒否する。全materialize結果を集約したduplicate graphでcycleを拒否し、chain終端がcurrent CI mappingまたはcurrent semantic CIへ到達することを要求する
+- `重複`では完全`covered_by_target_version={target_ref,target_content_fingerprint,generation_fingerprint,execution_fingerprint}`を必須にし、self参照を拒否する。同一materialize input内の参照先は即時照合し、別TCNの参照先は`target_mappings[]`またはsemantic CIの`semantic_source_targets[]`を使って最終集約時にcurrent version一致を確認する。missing / generation mismatch / content mismatch / execution mismatch / cycleを拒否し、chain終端がcurrent CI mappingまたはcurrent semantic CIへ到達することを要求する
 - generator生成後に`成立不能`Dispositionへ変更しない。成立不能根拠が得られた場合はmodel / constraintを更新してgeneratorを再実行する
 - Disposition済みtargetへCIを採番せず、同時にgenerator固有の`coverage_summary`または`completion_summary`を変更しない
 - `ブロック中`Dispositionはworkflow完了を妨げる
