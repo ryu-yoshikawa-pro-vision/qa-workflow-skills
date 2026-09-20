@@ -232,7 +232,7 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - runtime非対応はCoverage所有model生成後のunsupported closureで扱う
 - child Coverage model欠落をadapter親だけで閉鎖済みにしない
 - `model_type=error-guessing / technique_slug=error-guessing`はruntime unitを要求せず、semantic Coverage ItemをCI Machine Entityへmaterializeできることを検証する。semantic item 0件では完了不可
-- 各active Coverage所有modelは、1件以上のcurrent CI、または非空のrequired Coverage母集団がcurrent target Disposition / unsupported closureで全件閉じていることをmodel単位で検証する。別modelのCIが親TCNに存在するだけでは完了にしない
+- 各active Coverage所有modelはmodel単位で検証する。supported / partial / runtimeなしsemantic modelではcurrent materialize runtime unitの`model_completion[]` rowが必須で、current CI / target Disposition / semantic source targetから決まる`materialize_complete`を確認する。partialはunsupported item closureも別途全件必要、whole-model unsupportedはcurrent whole-model closureが必要。別modelのCIが親TCNに存在するだけでは完了にしない
 - `conditions=[] / actions=[] / factors=[] / relations=[] / source_inputs=[] / states=[]`等の空modelがvacuous completeにならず`invalid_input / unresolved`へ落ちることを検証する
 
 ### 同値分割 / Each Choice
@@ -1096,6 +1096,7 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 - 全generatorについて`materializable`の固定値とcanonical `execution / execution_fingerprint` schemaを確認する。combinatorialはpartial target → deterministic full row mapping、state / flow / CRUDはstable keyだけでなく下流の手順化に必要なmachine meaningをexecutionへ内包し、adapter専用generatorは非materializeを回帰確認する
 - mergeは同一model・同一executionに限定し、追加test data requirement参照のintersectionを確認する。異なるmodelの同一TC実行はcase structureの複数`ci_refs[]`で検証する
 - target content / generation fingerprintとannotation / target disposition / mergeのversion一致を確認する。semantic Coverage Itemはnew key発行、active→inactive、CI deleted、同一item復帰、deleted CIの別item再利用拒否、本文変更、model変更、source target version変更を含むlifecycleを確認する
+- `model_completion[]`がmodelごとのrequired target / closed target / active CI / semantic itemをcurrent mappingから構築し、別modelのCI混入、stale CI、未閉鎖targetでfalseになることを確認する。whole-model unsupportedで成功rowを捏造しない
 - target_ref → CI mapping / upsert、merge / unmerge / CI↔Dispositionの状態遷移を全generatorで回帰確認する
 - CI Machine Entityの`covered_targets[]`へtarget content / execution fingerprintを保存し、stable target_refのままtarget内容が変わるcaseでもCI content fingerprintが変わることを確認する
 - CI content変更後、既存TC Machine Entityがsemantic再確認前はstaleになることを確認する
@@ -1181,7 +1182,7 @@ Plan完了には次をすべて満たす必要があります。
 - runtime出力と保存machine evidenceの一致をvalidatorが確認する
 - support判定をruntimeが行い、whole-model `unsupported`、`partial`、Python unavailableを契約どおり区別する。supported inputをAgent判断だけでruntime省略しない
 - model内Coverageと仕様全体Coverageを混同しない
-- `workflow_runtime.py`がmodel / artifact両runtime unit、Machine Entityのsemantic / runtime dependency、upstream Entity内容変更、`(skill, runtime_unit_key)` dependency、actualから独立導出したexpected runtime / Entity集合のmissing / extra、dependency missing / duplicate / cycle、generation / implementation変更、stale、Coverage所有model単位のCI / closure完了、局所ブロック、partial / whole-model fallback、legacyを処理でき、自身を`runtime_units[] / current_runtime_units[] / expected_runtime_units[]`へ含めず、self inclusionを`invalid_input`にする
+- `workflow_runtime.py`がmodel / artifact両runtime unit、Machine Entityのsemantic / runtime dependency、upstream Entity内容変更、`(skill, runtime_unit_key)` dependency、actualから独立導出したexpected runtime / Entity集合のmissing / extra、dependency missing / duplicate / cycle、generation / implementation変更、stale、current materialize `model_completion[]`によるCoverage所有model単位の完了、partial / whole-model unsupported closure、局所ブロック、legacyを処理でき、自身を`runtime_units[] / current_runtime_units[] / expected_runtime_units[]`へ含めず、self inclusionを`invalid_input`にする
 - `traceability.py`と`workflow_runtime.py`が同じ`runtime_contract.py` freshness関数から同じruntime / Entity freshnessを得て、workflow_runtime resultをtraceabilityの依存入力にしない。traceability自身もfreshness入力runtime集合へ含めない
 - 既存成果物を再利用する場合、保存済みsemantic model / draftの上流Entity dependencyをruntime再実行前に確認し、不一致なら担当Skillで意味再確認する。freshな意味入力だけを現在scriptへ再投入し、materialize / traceability / workflow freshnessに循環を作らない
 - 以前whole-model `unsupported`だった成果物も再利用時に現在runtimeでsupport判定を再実行し、現在supportedなら古いfallbackを維持しない
