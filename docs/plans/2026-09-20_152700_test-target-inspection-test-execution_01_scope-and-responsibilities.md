@@ -60,7 +60,7 @@ e2e-test-reporting
 
 ### `test-execution`
 
-詳細テストケースを実行し、期待結果と実測結果を比較してTC単位の結果を確定します。
+詳細テストケースを実行し、期待結果と実測結果を比較してTC単位の結果を確定します。現スコープでは、利用可能なbrowser / computer操作能力で実対象UIを操作・観測できるTCと、既存Playwright E2Eで実行できるTCを扱います。API / DB等の専用実行基盤は本変更の対象にしません。
 
 主責務:
 
@@ -89,6 +89,8 @@ e2e-test-reporting
 | テスト対象資料 | `test-target-inspection` | 必要時に作成・更新する補助成果物 |
 | Playwright E2E実装前事実 | `e2e-test-inspection` | テスト対象資料を再利用可能 |
 | Playwrightコード | `e2e-test-implementation` | 既存責務維持 |
+| TC → E2E実装の追跡関係 | `coverage-analysis`（対象: `TC → E2E実装`） | 対応の欠落・陳腐化を`test-execution`で推測補完しない |
+| E2E実装の期待結果 / assertionレビュー | `adversarial-review`（対象: `E2E実装`） | TC PASS根拠に使う場合は対象E2E実装revision / working treeとの対応を追跡する |
 | Playwright runner事実 | `e2e-test-execution` | 既存責務維持 |
 | TC実行と期待結果比較 | `test-execution` | AI直接操作 / 自動実行に共通 |
 | Playwright異常原因分析 | `e2e-test-result-analysis` | 既存責務維持 |
@@ -122,7 +124,9 @@ e2e-test-reporting
 
 `test-target-inspection`は保存したテスト対象資料の場所・範囲・鮮度 / バージョンを返します。`qa-workflow`を利用している場合だけ、`qa-workflow`が既存の`skills/qa-workflow/assets/project-context-template.md`にある`既存QA成果物`欄へその情報を反映します。`test-target-inspection`単体利用では案件コンテキストを変更しません。新しいregistry / DBは追加しません。
 
-既存文書を更新する場合は、既存の対象キーと未変更情報を可能な限り維持します。既定テンプレート外の人間記載セクションを無関係に削除しません。既存構造が曖昧で安全に差分更新できない場合は上書きせず、更新不能範囲を明示します。
+既存文書を更新する場合は、正規テンプレートまたは構造的に互換性を確認できる資料だけを自動差分更新の対象とし、既存の対象キーと未変更情報を可能な限り維持します。既定テンプレート外の人間記載セクションを無関係に削除しません。任意形式の文書を汎用的に解析・mergeする仕組みは追加しません。既存構造が曖昧で安全に差分更新できない場合は上書きせず、更新不能範囲を明示します。
+
+永続更新では、更新候補を作成した元成果物のrevision / content identityを保持し、保存直前に対象成果物が同じ元状態のままか再確認します。変更済みなら古い候補で上書きせず、最新内容を再読込して候補を作り直します。新しいlockやartifact registryは追加しません。
 
 成果物の単位は、既存成果物があればその単位を維持します。新規作成では今回要求された調査範囲を1成果物の範囲とし、明示要求なしに製品全体へ拡張したり画面単位へ細分化したりしません。
 
