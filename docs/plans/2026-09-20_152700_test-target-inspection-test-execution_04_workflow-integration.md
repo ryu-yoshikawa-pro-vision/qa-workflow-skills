@@ -141,7 +141,7 @@ e2e-test-implementation
 `e2e-test-execution`から`test-execution`へ渡すのは、既存出力で確認済みの次の情報です。`test-execution`はこれらを今回要求されたTC・対象環境と照合してからTC判定へ使用します。
 
 - currentな`TC → E2E実装`対応
-- 今回固定したTC識別子集合の自動実行subsetから解決したlogical primary対象
+- `e2e-test-execution`が今回のE2E実行要求から解決したlogical primary対象
 - 対象URL / origin、Playwright project、必要な認証 / 開始状態 / テストデータ、version / build ID等の実行条件
 - TC ID（存在時）
 - resolved primary TestCase
