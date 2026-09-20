@@ -314,7 +314,7 @@ runtime-v1のOpenAPI `document`はstrict JSONで表現できる解析済みobjec
 - 本Planは有限domain、明示constraint、明示hard limitへscopeを限定している
 - external solver / generatorごとの差を決定論性契約へ持ち込まない
 
-CLI integrationとSkill実行時subprocessには30秒の安全timeoutを設定します。通常の探索停止は`_02`の決定論的hard limitで行い、timeout時刻をCoverageや探索結果の正常終了条件にしません。標準ライブラリ実装がPlanの正確性契約・hard limit・安全timeoutを満たせない場合は、Coverage基準を暗黙に緩めたり外部dependencyへ切り替えたりせず、**その実装はPlan未達として停止**します。依存方針を変える場合は、このPlanとは別の明示的な要件変更として扱います。
+CI integrationでは30秒の安全timeoutを設定します。Agent / host側のtimeout値やtimeout APIはAgent Skills共通契約には含めません。通常の探索停止は`_02`の決定論的hard limitで行い、timeout時刻をCoverageや探索結果の正常終了条件にしません。Python 3.11標準ライブラリ実装がPlanの正確性契約・hard limitを満たせない場合は、Coverage基準を暗黙に緩めたり外部dependencyへ切り替えたりせず、**その実装はPlan未達として停止**します。依存方針を変える場合は、このPlanとは別の明示的な要件変更として扱います。
 
 将来用のPICT / GraphWalker / Z3 adapter、plugin機構は作りません。
 
