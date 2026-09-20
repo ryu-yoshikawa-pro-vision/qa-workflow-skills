@@ -161,6 +161,8 @@ CTAL-TA v4.0で扱われるDomain Testing、Base Choice / Pairwise等のCombinat
 技法契約では、CTAL-TA v4.0の次の点を反映します。
 
 - Domain TestingはReliable Domain Coverageを採用する。`< / <= / > / >=`ではON / OFF / IN / OUT、`=`ではON + 両側OFF、`!=`ではOFF + 両側ONをCoverage Itemとする。多border partitionでは対象borderのON / IN pointが他border上に乗らず、他borderについてpartition内部にあることも確認する
+- CTFL v4.0.1の用語へ合わせ、単一のvalid transitionを対象にするmodeは`valid-transitions`と呼ぶ。`all-transitions`はvalid + invalid transitionを含む別基準なので、本Planのvalid-only mode名には使用しない
+- `all-states`のCoverage母集団はmodelに定義された全state、`valid-transitions`はvalidと確定した全transitionとする。initial stateからsetup不能なrequired state / transitionを母集団から黙って除外せず、model / setup未解決として扱う
 - Round-trip Coverageは開始stateをCoverage Itemのidentityへ含める。同じ閉路でも開始stateが異なるround tripをrotationで同一化しない
 - N-switchで2-switch以上を採用する場合は、高いfailure risk、ユーザー明示、案件固有基準等の具体的な選択理由を成果物へ残す
 - Decision Tableのdon't-care統合は同一actionのruleを読みやすく表現する派生結果として扱い、元の成立可能rule Coverage母集団やCoverage値を削減しない。複数ruleを同一CIへまとめる場合は別途materializeのmerge契約を満たす
