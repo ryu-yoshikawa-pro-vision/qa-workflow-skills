@@ -182,7 +182,7 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - `complete=false`だけではworkflowをブロックしない
 - `Selection Source = analysis / condition_design / user`。runtime派生元は`upstream_runtime_units[]`で表し、既存model再利用は`identity_action=reuse`で表す
 - ユーザー明示 / 既存成果物由来の技法をcandidate scriptが却下しない
-- `undetermined_signals`の各signalを`resolved / selection_not_affected / question`へ閉じ、未閉鎖signalをworkflow完了にしない
+- current `undetermined_signals[]`の各signalを`selection_not_affected / question`のどちらかへ1回だけ閉じる。`selection_not_affected`はreason必須、`question`は`Q-\d{3}`必須でactive不可。signalを解決するcaseは`signals`をbooleanへ更新してcandidate runtimeを再実行し、undetermined集合から外れることを確認する
 - 新規正規技法名
 - 選択技法のmodel / disposition閉鎖
 
