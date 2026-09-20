@@ -114,6 +114,7 @@ generatorが返す100%等のCoverageは、**明示された正規化済みモデ
    - technique candidate
    - change impact
    - テスト環境要求
+   - `analysis_entities.py`によるtest-analysis context / Product Risk / Technique Selection / change graph / environment requirementのMachine Entity・expected identity固定生成
 
 3. `test-requirement-design`
    - Authority / Risk → TRの構造処理
