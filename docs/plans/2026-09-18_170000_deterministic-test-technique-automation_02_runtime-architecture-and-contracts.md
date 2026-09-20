@@ -627,13 +627,13 @@ runtime内部identityは`model_type`で分けます。
 以降のQA成果物は、下流が実際に利用するEntity単位でfingerprint対象項目を固定します。
 
 - `test-analysis` context: テスト分析範囲、案件固有のテスト目的 / 重点、テストレベル、環境制約、対象外、ブロッカー、テスト重点、テスト可能性 / テストレベル判断、残存リスク
-- `test-analysis` Product Risk: リスクID、失敗、関連する現在有効な仕様根拠 / 変更 / 依存、影響度、発生可能性、level、mapped priority
-- `test-analysis` 技法選択: selection key、適用領域、selection source、signals、候補、最終採用技法、選択理由、関連Risk / Authority、`test-condition-design`への着眼点、状態
-- `test-analysis` change graph: node / edge key、type、from / to、Source / Authority
-- `test-analysis` 環境要求: requirement key、operator、value / range、Authority
-- `test-requirement-design`: TR ID、本文、Authority、Risk、優先度、テストレベル / 観測方法、およびDisposition行
-- `test-condition-design`: TCN ID、TR、条件、技法、Coverage基準、Authority / Risk、優先度、model metadata、target → CI mapping、およびDisposition行
-- `test-case-design`: TC ID、関連TR / TCN / CI、優先度、前提、データ、手順、期待結果、期待結果Authority、およびDisposition行
+- `test-analysis` Product Risk: リスクID、失敗、関連する現在有効な仕様根拠 / 変更 / 依存、影響度、発生可能性、評価根拠、信頼度補足、level、mapped priority
+- `test-analysis` 技法選択: selection key、適用領域、selection source、signals、候補、undetermined signal closure、最終採用技法、選択理由、関連Risk / Authority、`test-condition-design`への着眼点、状態
+- `test-analysis` change graph: node / edge key、type、from / to、source ref、変更種別、想定影響、evidence
+- `test-analysis` 環境要求: requirement key、dimension、operator、正規化値、Authority
+- `test-requirement-design`: TR ID、本文、Authority、Risk、優先度、`priority_override_reason`、テストレベル / 観測方法、およびDisposition行
+- `test-condition-design`: TCN ID、TR、条件、技法、Coverage基準、Authority / Risk、優先度、`priority_override_reason`、`derived_from_model_key`を含むmodel metadata、target → CI mapping、およびDisposition行
+- `test-case-design`: TC ID、関連TR / TCN / CI、優先度、`priority_override_reason`、前提、データ、手順、期待結果、期待結果Authority、およびDisposition行
 - `coverage-analysis`: 対象上流 / 下流ID、Model Key、coverage / stale状態、修正Skill
 
 fingerprint対象の`content`はLLMが自由に再構成しません。各担当Skillが保存するmachine dataから次のcanonical schemaで機械的に組み立てます。
