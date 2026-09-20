@@ -114,7 +114,7 @@ CLI integration testは各runtime scriptの`valid_minimal.json`をsubprocessで`
 - `spec-analysis / test-analysis / test-requirement-design / test-condition-design / test-case-design`の`Machine Entities`をstrict decodeし、canonical Entity schema、`(skill, entity_type, entity_ref)`一意性、`content_fingerprint`再計算一致、人間向け表との主要field一致を検証する
 - 異なる`entity_type`で同じ`entity_ref`を使うfixtureは許可し、同じ`(skill, entity_type, entity_ref)`重複だけを拒否する
 - `upstream_entity_dependencies[]`と`current_entities[] / entity_freshness[]`で`entity_type`欠落またはtype不一致を拒否する
-- upstream Entityのcanonical `content`からruntimeが`content_fingerprint`を計算し、output envelopeの`upstream_entity_fingerprints[]`へcanonical順で保存する。script固有inputのsemantic reference集合から固定builderが期待する`upstream_entities[]`と完全一致することも検査し、参照Entityの省略・余分・重複を許可しない
+- 実行前から存在する外部upstream Entityはcanonical `content`からruntimeが`content_fingerprint`を計算し、output envelopeの`upstream_entity_fingerprints[]`へcanonical順で保存する。script固有inputのsemantic reference集合から固定builderが期待する外部`upstream_entities[]`と完全一致することを検査し、省略・余分・重複を許可しない。同一runtime invocationで生成するEntity間依存は入力`upstream_entities[]`へ要求せず、固定生成順で確定したcontent fingerprintをdependencyへ使う
 - upstream Entityの正規項目変更でその`content_fingerprint`だけが変わる
 - `upstream_entity_fingerprints`の変更で`generation_fingerprint`が変わり、Authority IDが同じでも内容変更を同一generation扱いしない
 - Machine Entityの`upstream_entity_dependencies[]`差分を再実行前に検出し、古いsemantic model / draftをそのまま現在runtimeへ投入しない
@@ -932,6 +932,7 @@ runtime対象の次の6 Skillを単体コピーして代表scriptをCLI実行し
 - `SKILL.md` / `references/guidance.md`へ新規正規技法と選択条件を追加
 - `assets/output-template.md`へ`Machine Entities`、`Machine Runtime Input / Result`、`Selection Source`、技法選択machine evidence、undetermined signalの`resolved / selection_not_affected / question`閉鎖状態を追加
 - `analysis_entities.py`がtest-analysis context / Product Risk / Technique Selection / change graph / environment requirementのLLM意味fieldとcurrent runtime resultをjoinし、Machine Entity / dependency / expected Entity identityを固定生成する。Product Riskは`assessment_reason / confidence_note`も保持する
+- `analysis_entities.py`はchange graph / environment → Product Risk → Technique Selection / contextの順で同一invocation内dependencyを解決し、change graph上のRisk / TR / TCN / CI / TC参照を逆向きdependencyにしてcycleを作らない
 - risk scheme / priority mapping
 - change graph
 - environment requirement
