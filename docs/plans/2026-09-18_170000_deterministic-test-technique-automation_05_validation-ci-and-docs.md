@@ -1,0 +1,416 @@
+# テスト分析・テスト技法の決定論的自動化Plan
+
+このファイルはvalidator、semantic eval、CI、文書更新をまとめます。[unit test・必須回帰](./2026-09-18_170000_deterministic-test-technique-automation_05_evaluation-ci-implementation-order.md)から続けて参照します。
+
+## 6. 既存validatorの更新
+
+### 共通ID
+
+`CI\d{2,}`を許可します。ただし`TCN-\d{3}-CI\d{2,}`だけをCIとして認識し、`SPEC-001-CI01`等を誤認しません。
+
+### `test-analysis`
+
+- risk scheme分岐
+- technique selection machine evidence
+- change graph
+- environment requirement
+
+### `test-requirement-design`
+
+既存`TR-D001`〜を維持し、runtimeと同じfixtureで独立照合します。
+
+### `test-condition-design`
+
+自由文検索依存を減らし、技法固有key、model、target、Coverage、runtime metadataを検査します。
+
+正規化model fingerprintと保存済みmachine evidenceの不一致を検出します。
+
+### `test-case-design`
+
+既存構造契約を維持し、runtimeと独立にclosure / priority / Authority mappingを検証します。
+
+### `coverage-analysis`
+
+`assets/output-template.md`を次のように更新します。
+
+- `カバレッジ基準確認`へ`Model Key`列を追加
+- `カバレッジ項目の扱い`へ`Model Key`列を追加
+- `陳腐化 / 孤立分析`へ`Model Key`列を追加
+- modelを持たないlegacy / E2E経路では空欄を許可
+
+validatorはruntime traceabilityと独立にmissing / orphan / unknown / staleを検出し、stale / gapをTCN / CIだけでなく関連`model_key`まで追跡します。
+
+### `question-analysis`
+
+`assets/output-template.md`の`不明点 / 質問一覧`と`ブロック中範囲`へ、既存の`再開対象 / 実行範囲`とは別に`Runtime Skill`、`Runtime Unit Key`、`Model Key`、`Target Key`、`Generation Fingerprint`列を追加します。
+
+- `再開対象 / 実行範囲`は既存`QUESTION-D017`のSkill用途判定だけに使用する
+- `Runtime Skill`と`Runtime Unit Key`はruntime issue由来の質問で必須で、組を一意identityとして扱う
+- model issueでは`Model Key`を必須、artifact全体script issueでは空欄
+- target固有issueだけ`Target Key`を必須
+- canonical input確定後のruntime issueでは`Generation Fingerprint`を必須にする。pre-parse error / timeout等でgenerationを確定できないissueだけ空欄を許可する。`question-analysis`自身はgenerationを計算せず、回答を再開先へ渡す前に`qa-workflow`の再開preflightで現在generationとの一致を確認する
+- 同じブロッカーIDについて質問一覧とブロック中範囲のRuntime Skill / Runtime Unit / Model / Target / Generation Fingerprintが一致することをvalidatorで確認する
+- runtime issue由来でない質問では5列を空欄にできる
+
+runtime issueへの回答を再開する場合は、回答を正規化modelへ適用する前に次の順序を固定します。
+
+1. 保存済み回答をまだ適用せず、現在のMachine Entity / semantic dependencyと、質問発生時点の未解決inputから対象runtime unitを再実行する
+2. 再実行したcurrent `generation_fingerprint`と質問行の`Generation Fingerprint`を比較する
+3. 一致する場合だけ保存済み回答を担当Skillの意味入力へ適用し、その回答を含む正規化inputでruntimeを再実行する
+4. 不一致なら旧回答を自動適用せず、現在世代でissueが残るかを再評価して質問 / block状態を更新する
+5. pre-parse error / timeout由来でfingerprintが空欄の場合は世代一致による回答再利用をせず、現在inputからissueを再評価する
+
+### `qa-workflow`
+
+既存Skill状態表は`qa-workflow`出力時に引き続き必須とし、`WF-D009`は維持します。ただし永続正本にはせず、成果物metadataから再構築可能にします。
+
+`assets/workflow-state-template.md`へ別表`runtime状態`を追加します。
+
+`Skill | Runtime Unit Key | Model Key | Support Status | Result Status | Freshness | Runtime Status | Runtime Required | Deterministic Generated | Fallback Reason | Blocker / Issue`
+
+- `Runtime Unit Key`は同一Skill内一意
+- model scriptではModel Key必須、artifact全体scriptでは空欄
+- `Support Status = supported / partial / unsupported / unknown`
+- `Result Status = ready / unresolved / blocked`
+- `Freshness = current / stale`
+- `Runtime Status = ok / invalid_input / unsupported / limit_exceeded / internal_error / not_run`
+- `Runtime Required / Deterministic Generated = Yes / No`
+- `Fallback Reason`は空欄 / `outside_supported_subset` / `python_unavailable`
+- Skill状態表の`WF-D012`は従来どおりSkill + 対象にだけ適用し、runtime状態表へ流用しない
+- ワークフロー全体`完了`では全runtime unitが`Result Status=ready / Freshness=current`であることを追加検査する
+- `Runtime Required=Yes`のunitでは、さらに`Deterministic Generated=Yes`を要求する
+- `Runtime Required=No`のfallback unitも`Result Status != ready`なら完了を妨げる
+- `Support Status=partial`では`unsupported_items[]`が許可されたhandling、必要なcurrent`covered_by_entity`、既存Disposition条件を満たすclosureへすべて閉じていることを要求する。closure行の存在だけでは完了条件を満たさない
+- `workflow_runtime.py`が上流Entity fingerprint、`upstream_runtime_units`、runtime metadata、materialize runtime unitの`model_completion[] / target_mappings[] / target_dispositions[]`、`unsupported_item_closures[]`からstale / 完了可否を計算し、LLMが表を手計算しない
+- partial supportは全unsupported item keyにclosureがあり、closureの`generation_fingerprint / reason_code`が現在unsupported itemと一致することに加え、`handling`が許可集合内であることを要求する。`llm_fallback`は同じ`model_key`に属するcurrent CI Machine Entity、`重複`はcurrentな`covered_by_entity`を必須にし、`ブロック中`は完了不可、その他Dispositionは既存Skill条件を満たすことを検証する。whole-model unsupportedも同じclosure規則と`generation_fingerprint`一致を必須にする。target Dispositionの`重複`は全materialize unitを跨いでcycleがなく、current CI / semantic CIへ到達する場合だけ閉鎖済みに数える
+
+完了条件・再利用条件へ次を追加します。
+
+- envelope / runtime / generator contract version
+- upstream Entity別content fingerprint
+- input / model / generation fingerprint
+- stale派生成果物
+- runtime unit単位の`要再検証` / ブロック中
+- runtime未実行 / unsupportedとQA成果物状態の分離
+- legacy成果物の昇格
+### output eval fixture schema
+
+runtime対応Skillの`evals/output/cases/*/expected.json`では、既存fieldに加えて必要なcaseだけ次の`runtime_contract` objectを持てるようにします。Machine Entityを持つSkillではruntime有無にかかわらず`machine_entities` objectも使用できます。
+
+```json
+{
+  "machine_entities": {
+    "expected_entities": [
+      {"skill":"test-condition-design","entity_type":"tcn","entity_ref":"TCN-001"},
+      {"skill":"test-condition-design","entity_type":"ci","entity_ref":"TCN-001-CI01"}
+    ],
+    "expected_stale_entities": []
+  },
+  "runtime_contract": {
+    "expected_skill": "test-condition-design",
+    "expected_runtime_unit_key": "model:comb-001",
+    "upstream_entities": [
+      {"skill":"spec-analysis","entity_type":"authority","entity_ref":"SPEC-001","content_fingerprint":"sha256:..."}
+    ],
+    "expected_target_keys": [],
+    "expected_support_status": "supported",
+    "expected_runtime_status": "ok",
+    "expected_result_status": "ready",
+    "expected_runtime_required": true,
+    "expected_deterministic_generated": true,
+    "expected_fallback_reason": null,
+    "expected_freshness_status": "current",
+    "expected_target_id_map": [],
+    "expected_model_completion": []
+  }
+}
+```
+
+- `machine_entities.expected_entities[]`は成果物から抽出した`(skill, entity_type, entity_ref)`集合と一致させ、各contentはentity type別canonical schemaと人間向け表の主要fieldへ独立照合する
+- `spec-analysis`ではruntime_contractなしでMachine Entity fixtureを使用し、Authority表とcanonical Authority contentの一致を検証する
+- expected target / Coverageは手書きfixtureから独立計算または明示し、generator出力をexpectedへコピーしない
+- `expected_target_id_map`はstateful materialize caseだけ使用し、`{target_ref, target_content_fingerprint, generation_fingerprint, execution_fingerprint, model_key, target_key, ci_id}`配列で保持する
+- `expected_model_completion`はmaterialize / workflow integration caseで使用し、modelごとの`required_target_refs / closed_target_refs / active_ci_ids / semantic_item_keys / materialize_complete`を手書きfixtureから明示する。runtime出力をexpectedへコピーしない
+- validatorは全runtime unitの保存済み`Machine Runtime Input / Result`から`input_fingerprint`、model scriptでは`model_fingerprint`、全scriptで`generation_fingerprint`を独立再計算し、fixtureに書いたhash文字列を盲信しない
+- upstream Entity差分caseでは無関係Entityの変更が対象modelをstaleにしないことを確認する
+- upstream runtime差分caseでは直接依存unitだけがstaleになり、依存していないmodelへ伝播しないことを確認する
+- implementation fingerprintはruntime / generator sourceから独立再計算し、fixtureの文字列を盲信しない
+## 7. semantic eval
+
+維持・追加する主な確認:
+
+- 正規化modelがAuthority / Risk / TRの意味を必要十分に表している
+- partition / boundary / Domain borderの意味
+- Decision Table condition / action / constraint
+- factor / strength / mixed-strength選択
+- state / guard / reset / flow / fork-joinの意味
+- CRUD completeness / consistency model
+- Syntax-Based Testingのgrammar / production / mutation意味
+- operational profile / Random Testing採用
+- metamorphic relation
+- UI pattern分類
+- test data / environment requirement
+- merge groupの意味上の妥当性と`target_refs[]`の同一TCN制約
+- model内100%を対象仕様全体100%と誤認しない
+- scriptがexpected resultを創作していない
+
+semantic referenceをgenerator outputから自動生成しません。
+
+CIの`Validate Semantic Output Evals`は既存契約どおり外部LLM APIを呼ばず、dataset / rubric / semantic runtime / fake judge contractを検証します。このCI成功だけをsemantic case PASSとは扱いません。
+
+Plan完了時は、`test-analysis / test-condition-design / adversarial-review`の本Planで追加・更新したsemantic caseについて、保存済みcandidate outputを用意し、既存`scripts/skills/evals/semantic/run.py`とLLM Judge adapterで実評価します。candidate output生成、Judge実行command、Judge結果をPRの検証記録へ残します。Judgeを利用できない場合はsemantic dataset validationまでは実施できますが、semantic case PASSの完了条件は未達としてPRをDraftのままにします。CIへ外部LLM secretやJudge実行を追加しません。
+
+### semantic dataset件数
+
+semantic dataset件数は次で固定します。
+
+| Skill | case数 |
+| --- | ---: |
+| `test-analysis` | 7 |
+| `test-condition-design` | 14 |
+| `adversarial-review` | 8 |
+| その他11 Skill | 各2 |
+| repository合計 | 51 |
+
+- `test-analysis`: 既存2 caseを維持し、Domain / CRUD / Random / Metamorphic / Syntax-Basedの採用判断を主対象とする5 caseを追加する
+- `test-condition-design`: 既存2 caseを維持し、Domain / CRUD / Random / Metamorphic / Syntax-Basedに加え、Decision Table / Cause-Effect、Classification Tree / combinatorial strength、Round-trip / n-switch、flow、schema / OpenAPI、UI pattern、test data / environment、merge / Coverage範囲の意味判断を各caseで最低1回検証できるよう合計14 caseへする。1 caseで複数責務を検証してよいが、各責務とcase IDの対応表を`EVALS.md`へ記録する
+- `adversarial-review`: 既存2 caseを維持し、下記6誤用を主対象とする6 caseを追加する
+- case IDはSkill内一意
+- `tests/skills/evals/semantic/test_semantic_datasets.py`はSkill別expected count mapと合計51を検証し、`EVALS.md`の意味判断責務→case対応が空になっていないこともrepository testで確認する
+
+`adversarial-review`には技法アルゴリズムを複製せず、次の6 caseを追加します。
+
+- Random Testingを一般的な「100% Coverage」と記載する
+- Metamorphic TestingでMRを1回だけ扱ったことを十分なCoverageと断定する
+- Domain Testingでrelation別required pointを欠落させる
+- CRUD completenessだけでconsistencyも完了したと断定する
+- Syntax-Based Testingのmutation candidateをAuthorityなしで製品上invalidと断定する
+- 新規技法のexpected resultをAuthorityなしで創作する
+### 発火評価
+
+既存queryは削除せず、新規技法5種の責務境界を追加します。件数は次で固定します。
+
+| Skill | train | validation |
+| --- | ---: | ---: |
+| `test-analysis` | 24（positive 12 / negative 12） | 20（positive 10 / negative 10） |
+| `test-condition-design` | 24（positive 12 / negative 12） | 20（positive 10 / negative 10） |
+| その他12 Skill | 各12（6 / 6） | 各8（4 / 4） |
+| repository合計 | 192 | 136 |
+
+repository全体は328 queryです。
+
+`test-analysis` / `test-condition-design`では、Domain Testing、CRUD Testing、Random Testing、Metamorphic Testing、Syntax-Based Testingの各技法についてtrainとvalidationの双方に次の10 queryを追加します。
+
+1. `test-analysis` positive: 技法を採用すべきか判断する依頼 × 5技法
+2. `test-analysis` negative: その技法で具体的なCoverage / 条件を設計する依頼 × 5技法
+3. `test-condition-design` positive: 技法を使って具体的なCoverage / 条件を設計する依頼 × 5技法
+4. `test-condition-design` negative: 技法の採用可否だけを判断する依頼 × 5技法
+
+さらに`test-analysis` / `test-condition-design`の各datasetへ、それぞれ「技法とは何か説明して」という説明依頼negativeを1件と、既存責務の一般positiveを1件追加してbalanceを維持します。その他12 Skillの件数は変更しません。train / validation間のquery重複は禁止します。
+
+`.github/workflows/validate-skills.yml`は上表のSkill別exact count、positive / negative exact count、repository合計328を検証します。`EVALS.md`へ新規query IDと責務境界の対応を記録します。
+## 8. qa-workflow統合評価
+
+次の9シナリオをE2E fixture / smokeとして検証します。
+
+1. 新規設計
+   - test-analysisで技法選択
+   - model作成
+   - runtime生成
+   - CI / TC
+   - coverage-analysis
+   - workflow完了
+
+2. 上流Authority / runtime変更
+   - upstream Entity content fingerprint変更
+   - runtime `generation_fingerprint`へupstream Entity fingerprintが含まれ、同じAuthority IDでも内容変更で別generationになる
+   - 保存済みsemantic model / draftの`upstream_entity_dependencies[]`不一致をruntime再実行前に検出し、担当Skillで意味再確認するまで古い入力を再投入しない
+   - Machine Entityのupstream / runtime dependencyからEntity freshnessがstaleになり、`traceability.py`と`workflow_runtime.py`で同じ結果になる
+   - 人間向け説明文だけの変更ではfingerprint不変
+   - 直接依存する上流runtime unitのgeneration fingerprint変更
+   - 影響modelと依存下流unitだけ`要再検証`
+   - 無関係modelへstaleを伝播しない
+   - stale派生物を拒否
+   - 再生成後に再利用可能
+
+3. model / generator変更
+   - model意味変更で`model_fingerprint`変更
+   - generator contract / static data / generator implementation変更で`generation_fingerprint`変更
+   - contractを変えないbug fixでもimplementation fingerprint差で旧machine evidenceを再利用しない
+   - 旧machine evidence拒否
+
+4. 局所ブロック
+   - 1 modelだけ未解決
+   - `question-analysis`往復で`skill / runtime_unit_key / model_key / target_key / generation_fingerprint`維持
+   - 質問後にgenerationが変わった場合は以前の回答を自動適用せず、現在世代でissueが残るか再評価する
+   - 独立modelは継続
+   - 成果物metadataから状態を再構築し、qa-workflow出力時は既存Skill状態表と新しいruntime状態表へ反映
+   - workflowは部分完了
+
+5. runtime support / fallback / unavailable
+   - model全体が対応subset外ならscript自身が`support_status=unsupported / runtime_status=unsupported / runtime_required=false / deterministic_generated=false / fallback_reason=outside_supported_subset`を返し、既存Skill契約を満たすLLM fallbackで完了可能
+   - 既存fallback成果物を再利用するときも現在runtimeでsupport判定を再実行し、runtime更新でsupportedになったfixtureを古いfallbackへ固定しない
+   - 一部subset外なら`support_status=partial`でsupported部分を生成し、unsupported itemをfallback / Dispositionへ閉じるまで完了不可
+   - `runtime_required`をcaller inputから与えず、runtimeのsupport判定出力として検証する
+   - Python unavailableなら`support_status=unknown / runtime_required=true / runtime_status=not_run / result_status=blocked / deterministic_generated=false`を保持し、workflowを完了にしない
+   - QA成果物状態とruntime状態を分離
+   - 「決定論的生成済み」と誤表示しない
+
+6. legacy成果物
+   - 旧成果物を参照
+   - 変更時に新modelへ昇格
+   - 以後version / fingerprint契約で再利用
+
+7. runtime利用確認
+   - 全runtime scriptについてdispatch fixtureから期待script pathへ到達し、CLI実行結果metadataが存在する
+   - `test-analysis: E2E対象選定`と`coverage-analysis: TC → E2E実装 / E2E実装 → 実行結果`では本Planruntimeをdispatchしない
+   - supported inputが`unsupported`になる、またはsupport判定前にAgentがscriptを省略する場合は失敗
+   - 保存済み`Machine Runtime Input / Result`を決定論的に抽出してround-trip検証できるが、workflow再利用では保存済みresultをcurrent cacheにせず現在scriptを再実行する
+   - LLM手計算だけの成果物を決定論的生成済みと判定しない
+
+8. 途中工程開始
+   - ユーザーが技法を明示したTRから`test-condition-design`を開始し、`Selection Source=user`をmodel metadataへ保持する
+   - ユーザー明示がなくても`test-condition-design`自身が問題構造から技法を選べる正常経路を`Selection Source=condition_design`で検証する
+   - 既存modelをreuseした場合は元のSelection Source / selection keyを維持し、reuseを`existing_artifact` sourceへ置き換えない
+   - `test-analysis`の技法選択行を作るためだけに上流へ戻らない
+
+9. 実Agent runtime smoke
+   - 全scriptのdispatch網羅はCIで保証し、実Agent smokeを全script分へ重複させない
+   - 実装完了前にAgent環境で`test-analysis`と`test-condition-design`の代表promptを各1件実行し、Python runtime起動、stdout envelope parse、machine result採用、Markdown保存・再読込まで確認する
+   - 1件は可能な範囲で大きいmachine outputも扱い、artifact transport上限がruntime 16 MiBより低くないか確認する
+   - command / script path、return code、stdout envelopeが確認できる実行logをPRの検証記録へ残す
+   - runtime適用可能なpromptで`deterministic_generated=true`になることを確認する
+
+## 9. CI
+
+既存`.github/workflows/deterministic-output-evals.yml`へ追加します。
+
+```bash
+python -m compileall -q skills/spec-analysis/scripts
+python -m compileall -q skills/test-analysis/scripts
+python -m compileall -q skills/test-requirement-design/scripts
+python -m compileall -q skills/test-condition-design/scripts
+python -m compileall -q skills/test-case-design/scripts
+python -m compileall -q skills/coverage-analysis/scripts
+python -m compileall -q skills/qa-workflow/scripts
+python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
+```
+
+既存のdeterministic eval、semantic dataset validation、Skill validationも維持します。
+
+`.github/workflows/validate-skills.yml`のrepository eval structureは次へ変更します。
+
+- trigger dataset: 上記Skill別exact countとpositive / negative exact countを検証
+- total trigger query: 328
+- train / validation disjointを維持
+- semantic dataset: `test-analysis=7 / test-condition-design=14 / adversarial-review=8 / その他=2`、repository合計51を検証
+
+`validate-skills.yml`へruntime unit testを重複追加しません。runtime testは`deterministic-output-evals.yml`だけで実行します。
+
+## 10. Skill単体移植性
+
+runtime対象の次の6 Skillを単体コピーして代表scriptをCLI実行します。加えて`spec-analysis`も単体コピーし、`authority_entities.py`によるAuthority Machine Entity生成と`runtime_contract.py`のcanonical / Machine Entity helperが外部repository helperなしで動作することを検証します。
+
+- `test-analysis`
+- `test-requirement-design`
+- `test-condition-design`
+- `test-case-design`
+- `coverage-analysis`
+- `qa-workflow`
+
+確認:
+
+- repo rootのeval helperをimportしない
+- `spec-analysis`を含む7 Skillの`scripts/runtime_contract.py`がLF正規化後のSHA-256で一致
+- network不要
+- runtime dependencyがPython 3.11標準ライブラリだけで、外部package manifestを必要としない
+- generator scriptがSkill-local Python moduleとしてimportできるのは`runtime_contract.py`だけで、fingerprint対象外helperへ実行ロジックを逃がさない
+- Skill rootからscriptを解決
+- stdout envelopeを読める
+- Python unavailable時にSkill全体を利用不能と誤判定しない
+- runtime未実行を決定論的生成済みと表現しない
+
+## 11. ドキュメント更新
+
+### README
+
+- LLM / runtime責務境界
+- contract / static data version
+- stale / legacy / 再利用
+- Python要件
+- Skill package内script
+
+### `spec-analysis`
+
+- runtime unitは追加しない
+- `scripts/runtime_contract.py`と`scripts/authority_entities.py`を追加し、Authority Machine Entity / expected identityを決定論的に生成する
+- `assets/output-template.md`へAuthorityの`Machine Entities` canonical JSON blockを追加する
+- Authority表とMachine EntityのID / 種別 / 現在有効な内容 / 適用範囲 / 情報源 / 関係 / 関連Authorityの一致をvalidatorで確認する
+
+### `test-analysis`
+
+- `SKILL.md` / `references/guidance.md`へ新規正規技法と選択条件を追加
+- `assets/output-template.md`へ`Machine Entities`、`Machine Runtime Input / Result`、`Selection Source`、技法選択machine evidence、undetermined signalの`resolved / selection_not_affected / question`閉鎖状態を追加
+- `analysis_entities.py`がtest-analysis context / Product Risk / Technique Selection / change graph / environment requirementのLLM意味fieldとcurrent runtime resultをjoinし、Machine Entity / dependency / expected Entity identityを固定生成する。Product Riskは`assessment_reason / confidence_note`も保持する
+- `analysis_entities.py`はchange graph / environment → Product Risk → Technique Selection / contextの順で同一invocation内dependencyを解決し、change graph上のRisk / TR / TCN / CI / TC参照を逆向きdependencyにしてcycleを作らない
+- risk scheme / priority mapping
+- change graph
+- environment requirement
+- deterministic / semantic / trigger evalを更新
+
+### `test-requirement-design`
+
+- runtime structure検査の処理順
+- `assets/output-template.md`へTRの`Machine Entities`、`Machine Runtime Input / Result`、TR active / deleted ID stateを追加
+
+### `test-condition-design`
+
+- `SKILL.md`の対象技法を更新
+- `references/coverage-techniques.md`へ全実装技法の適用条件、Coverageまたは終了条件を追加
+- `assets/output-template.md`へTCN / model metadata / CI mappingの`Machine Entities`、`Machine Runtime Input / Result`、active / deleted ID state、stable target / CI mappingを追加
+- Random / Metamorphicは一般Coverage 100%を定義しない
+- runtime metadata
+- test data requirement
+- deterministic / semantic / trigger evalを更新
+
+### `test-case-design`
+
+- runtime structure検査の処理順
+- `assets/output-template.md`へTCの`Machine Entities`、`Machine Runtime Input / Result`、TC active / deleted ID stateを追加
+- stable ID / active・deleted ID state / stale
+
+### `coverage-analysis`
+
+- `assets/output-template.md`へ`Machine Runtime Input / Result`を追加
+- `assets/output-template.md`のカバレッジ基準確認・カバレッジ項目の扱い・陳腐化 / 孤立分析へ`Model Key`列を追加
+- stale / fingerprint / test-design traceability
+- model_key単位のgap / stale参照
+- deterministic validatorでModel Keyの既知model照合を追加
+
+### `question-analysis`
+
+- `不明点 / 質問一覧`と`ブロック中範囲`へ`Runtime Skill / Runtime Unit Key / Model Key / Target Key / Generation Fingerprint`列を追加
+- runtime issueの`skill / runtime_unit_key / model_key / target_key / generation_fingerprint`を質問・ブロック・再開まで保持
+- `再開対象 / 実行範囲`へmodel keyを流用せず、既存`QUESTION-D017`契約を維持
+
+### `qa-workflow`
+
+- `assets/workflow-state-template.md`へ`workflow_runtime.py`の`Machine Runtime Input / Result`を追加
+- `scripts/workflow_runtime.py`を追加し、runtime metadata集約、Machine Entityのupstream / runtime dependency、runtime unit fingerprint比較、runtime / Entity freshness、stale伝播、機械的完了判定をLLMから分離
+- runtime dependency identityは`(skill, runtime_unit_key)`で固定する
+- `workflow_runtime.py`自身を評価対象`runtime_units[]`から除外し、self dependencyを禁止する
+- missing dependencyはstale + blocker、duplicate / cycleは`invalid_input`
+- 既存Skill状態表を維持し、別表`runtime状態`を追加
+- model単位状態を成果物metadataから再構築
+- legacy昇格
+- upstream Entity別content fingerprint / Machine Entityの`upstream_entity_dependencies[] / runtime_dependencies[]` / upstream runtime dependency / stale伝播
+- `traceability.py`と同じ`runtime_contract.py` freshness関数を使用し、workflow_runtime resultをtraceabilityの依存入力にしない
+- 完了条件
+
+### `EVALS.md` / `ASSERTIONS.md`
+
+新契約と独立評価を記録します。
+
+## 続き
+
+[実装順序・リスク・完了条件](./2026-09-18_170000_deterministic-test-technique-automation_05_implementation-order-and-completion.md) に続きます。
