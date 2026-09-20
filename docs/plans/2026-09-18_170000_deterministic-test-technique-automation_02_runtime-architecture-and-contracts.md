@@ -191,20 +191,20 @@ freshnessは既存契約どおり、現在のcanonical machine Entityと正規�
 
 Cause-Effect → Decision Table、Classification Tree → combinatorial、schema → EP / BVA等で別generatorを起動する場合、親runtime結果を匿名の別model inputとして扱いません。また、active Technique Selectionの閉鎖確認より後にchild modelを作る循環を作りません。
 
-1. LLMがadapterを採用する時点で、adapter model draftと、それから派生させるCoverage所有child model draftを同じ`condition_structure.py`入力へ含める
+1. adapterを採用する時点で、adapter model draftとCoverage所有child model draftを同じ`condition_structure.py`入力へ含める。childの`model_type / technique_slug`はcurrent Technique Selectionまたは`selection_source=condition_design|user`で既に採用した正規技法から決め、adapter runtime出力を見て新しい技法を自動選択しない
 2. child model draftは`derived_from_model_draft_key`で同じ入力内のadapter draftを1件だけ参照する。adapterでない親、unknown draft、自己参照、複数親は`invalid_input`
 3. `condition_structure.py`がadapter / child双方の`model_key`と親TCNを先に確定し、active Technique Selectionの`selected_techniques[]`がCoverage所有child modelへ到達することをこの時点で検証する
 4. adapter modelは`technique_slug=null / selection_source=null / selection_key=null`、child modelはcanonical `technique_slug`と`selection_source=analysis / condition_design / user`を持つ。`analysis`由来childだけ元の`selection_key`を保持する
 5. 確定したadapter `model_key`で親runtimeを実行し、`derived.*`を生成する
 6. 固定builderはchildの`derived_from_model_key`から親adapter runtime unitを一意に解決し、child generatorの`upstream_runtime_units[]`へそのcurrent generationを保存する。LLMはruntime dependencyを手入力しない
-7. LLMは派生先で必要な意味パラメータだけを補い、固定builderが親runtimeのmachine outputとjoinして既に採番済みのchild model inputを作る
+7. LLMは派生先で必要な意味パラメータだけを補い、固定builderが親runtimeのmachine outputとjoinして既に採番済みのchild model inputを作る。selected childへ対応するderived inputを親runtimeが生成できない場合は、そのchild generatorを空入力で実行せず`unresolved`へ戻し、Technique Selectionまたはcondition-design判断を更新する
 8. adapter出力を正規技法として採用した場合は対応childを必須にし、採用しない候補はTechnique Selectionの`selected_techniques[]`へ残さない。adapter親や別のclosure行でchild欠落を隠さない
 
 固定対応:
 
 - `classification` adapter → child `comb`
 - `cause-effect` adapter → child `decision`
-- `schema` adapter → 採用したCoverageに応じてchild `ep / bva / comb`
+- `schema` adapter → 採用済み正規技法`equivalence-partition / boundary-value-analysis / pairwise-combinatorial`に対応してchild `ep / bva / comb`。schema runtimeはchild typeを新規決定せず、そのchild用derived inputだけを生成する
 - `ui` adapter → 正規技法modelを自動生成せず、既存`test-condition-design`の意味判断へ候補を渡す
 
 同じ親runtime generationから同じchild inputを作る場合は固定builderを使います。
