@@ -169,6 +169,7 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - scheme外値拒否
 - project-specificを標準方式で上書きしない
 - mapped priorityが`test-requirement-design`の最低優先度判定へ渡る
+- output `risks[]`が全input riskを`risk_id`順で1回ずつ返し、`{risk_id, level, mapped_priority}`以外の意味fieldをruntimeが創作しない
 
 ### technique candidates
 
@@ -176,6 +177,7 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - `true / false / null`
 - `_03`のsignal → candidate mapping
 - 複数`true`時のunionと安定順
+- outputがinput `selection_key`を保持する
 - `undetermined_signals`
 - `complete=false`だけではworkflowをブロックしない
 - `Selection Source = analysis / condition_design / user`。runtime派生元は`upstream_runtime_units[]`で表し、既存model再利用は`identity_action=reuse`で表す
@@ -183,6 +185,14 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - `undetermined_signals`の各signalを`resolved / selection_not_affected / question`へ閉じ、未閉鎖signalをworkflow完了にしない
 - 新規正規技法名
 - 選択技法のmodel / disposition閉鎖
+
+### test-analysis Machine Entity builder
+
+- `analysis_entities.py`はcurrent `risk_matrix.py` payloadの`risks[]`とcurrent `technique_candidates.py` payloadを固定抽出したresult rowだけを受け、runtime envelope全文やMarkdownを再解釈しない
+- Product Risk draftと`risk_matrix_results[]`、Technique Selection draftと`technique_candidate_results[]`をidentityで1対1joinし、missing / duplicate / unknown rowを`invalid_input`にする
+- change graph / environment → Product Risk → Technique Selection / test-analysis contextの固定順で同一invocation内Entity dependencyを生成する
+- output `expected_entity_identities[]`はdraft / normalized resultから独立導出し、生成済み`machine_entities[]`から逆算しない
+- Product Riskの`assessment_reason / confidence_note`、Technique Selectionの`undetermined_signal_closures[]`、change graphの`change_kind / expected_impact`をMachine Entityへ保持する
 
 ### change impact
 
