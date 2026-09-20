@@ -90,14 +90,18 @@ TC手順にない探索的な操作を、PASSを得るために追加しませ�
 Playwright経路では既存Skillを利用します。
 
 ```text
-新しい自動実行要求
+新しいTC実行要求
+  ↓
+test-execution
+  ↓ TC識別子集合・実行方式を固定
+自動実行subset
   ↓ currentな今回runがない
 e2e-test-execution
-  ├─ 正常run ─────────────────→ test-execution
+  ├─ 正常run ─────────────────→ test-executionへ再開
   └─ 異常 / 未実行 / run-level error / cleanup問題
         ↓
      e2e-test-result-analysis
-        ├─ 追加実行不要 ───────→ test-execution
+        ├─ 追加実行不要 ───────→ test-executionへ再開
         └─ 追加実行必要
              ↓
           e2e-test-execution
