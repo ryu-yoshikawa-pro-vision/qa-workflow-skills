@@ -1329,7 +1329,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 #### `schema_cases.py`
 
 - required: `schema_kind`, `document`, `schema_pointer`, `context`
-- arbitrary JSON Pointerやproperty名をstable component keyへ直接埋め込まない。`source_digest`は`canonical JSON({schema_kind,schema_pointer,keyword,role})`のSHA-256 64桁lowercase hexとし、schema targetは`schema:sha256:<source_digest>`を使う。下流へ渡す`set_key / partition_key / boundary_key / factor_key / requirement_key`は同じsource objectへ用途`role`を加えたfull digestから`_02` §3.2の`h` + 63 hex component keyを固定生成する。元pointer / keyword / full digestもpayloadへ保持し、truncated componentのcollisionを検出した場合は`internal_error`にする
+- arbitrary JSON Pointerやproperty名をstable component keyへ直接埋め込まない。`source_digest`は`canonical JSON({schema_kind,schema_pointer,keyword,role})`のSHA-256 64桁lowercase hexとし、schema targetは`schema:sha256:<source_digest>`を使う。下流へ渡す`set_key / partition_key / boundary_key / factor_key / requirement_key`は同じsource objectへ用途`role`を加えたfull digestから`_02` §3.2の`h` + 64 hex component keyを固定生成する。元pointer / keyword / full digestもpayloadへ保持する
 - `schema_kind = json-schema-2020-12 | openapi-3.0 | html-control`
 - numberは共通strict JSONの専用number tokenからcanonical integer / exact `coefficient + scale`へ正規化し、binary float / `Decimal` contextへ依存しない
 - JSON Schema 2020-12ではroot `$id`だけmetadataとして許可し、nested `$id`、`$anchor / $dynamicAnchor / $dynamicRef`、外部URI referenceはruntime-v1 `unsupported`。対応`$ref`は同一schema resource内の`#/...`だけ
