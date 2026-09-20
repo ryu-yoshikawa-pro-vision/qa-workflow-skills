@@ -382,7 +382,7 @@ LLMがclassification / classの意味を定義した後、`classification_tree.p
 入力required key:
 
 - `classifications[]`
-- 各classificationの`classification_key`
+- 各classificationの`classification_key / label`
 - `classes[]`
 - 各classの`class_key`
 - Authority / constraint refs
@@ -632,9 +632,9 @@ effectはcauseだけを参照します。循環参照は禁止します。
 2. hard limit内で全cause assignmentを列挙する
 3. constraintに一致するassignmentを成立不能として識別し、正式known rule / Coverage母集団へ入れない
 4. 成立可能assignmentだけeffect action vectorへ変換する
-5. `derived.decision_table.conditions / actions / known_rules / constraints / accepted_merges=[]`を生成する。入力`constraints[]`は同じ意味のままDecision Table互換schemaへ渡す
+5. `derived.decision_table.conditions / actions / known_rules / constraints / accepted_merges=[]`を生成する。conditionはcauseの`cause_key / label`、actionはeffectの`effect_key / label`を失わずDecision Table互換schemaへ渡し、入力`constraints[]`も同じ意味のまま渡す
 
-`derived.decision_table`は`decision_table.py`のscript固有inputと直接互換にし、Cause-Effect側で意味上のmergeを作りません。
+`derived.decision_table`は`decision_table.py`のscript固有inputと直接互換にし、Cause-Effect側で意味上のmergeを作りません。cause / effectのlabelを派生先でLLMが再生成しません。
 
 ## 13. Syntax-Based Testing
 
@@ -761,7 +761,7 @@ HTML `number`のstepはHTML Standardのstep semanticsへ合わせます。
 
 `allOf / anyOf / oneOf / not / if / then / else`等、対応subset外でvalidation意味を変えるkeywordは`unsupported`です。unsupported keywordがvalidation意味へ影響するsubtreeだけを切り離し、独立して評価できる別property / itemは継続できます。親schemaのvalidation意味をunsupported keywordが左右する場合は、その親subtree全体を`unsupported`にします。
 
-正規化後のrange / enum / required等は`derived.ep_inputs / derived.bva_boundary_skeletons / derived.combinatorial_constraints / derived.test_data_requirements`へ固定schemaで出力します。`derived.bva_boundary_skeletons`は`boundary_key / side / threshold / inclusive / step / authority_refs`までを持ち、`mode / coverage_selection_reason`は含めません。LLMがその2 fieldだけを追加し、固定builderが`bva.py` inputへ変換します。
+正規化後のrange / enum / required等は`derived.ep_inputs / derived.bva_boundary_skeletons / derived.combinatorial_constraints / derived.test_data_requirements`へ固定schemaで出力します。EPのset / partition、BVA boundary、combinatorial factorにはsource JSON Pointer / property名から決定論的に作る非空`label`を含めます。`derived.bva_boundary_skeletons`は`boundary_key / label / side / threshold / inclusive / step / authority_refs`までを持ち、`mode / coverage_selection_reason`は含めません。LLMがその2 fieldだけを追加し、固定builderが`bva.py` inputへ変換します。
 
 ## 15. UI pattern
 
@@ -891,6 +891,7 @@ LLMがmetamorphic relationを定義した後を処理します。複数follow-up
 ```json
 {
   "relation_key": "MR-001",
+  "relation_label": "金額を増やしても合計は減少しない",
   "source_inputs": [
     {"source_id":"SRC-001","value":{"amount":{"type":"decimal","value":"10"}}}
   ],
@@ -1252,7 +1253,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 #### `classification_tree.py`
 
 - required: `classifications[]`, `constraints[]`
-- classification: `{classification_key, classes[], authority_refs}`
+- classification: `{classification_key, label, classes[], authority_refs}`。`label`は非空文字列
 - class: `{class_key, value, authority_refs}`。valueはtyped value
 - 同一classificationのclass valueは重複不可
 
@@ -1294,8 +1295,8 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 #### `cause_effect.py`
 
 - required: `causes[]`, `effects[]`, `constraints[]`
-- cause: `{cause_key, authority_refs}`
-- effect: `{effect_key, expression, true_value, false_value, authority_refs}`
+- cause: `{cause_key, label, authority_refs}`。`label`は非空文字列
+- effect: `{effect_key, label, expression, true_value, false_value, authority_refs}`。`label`は非空文字列
 - expression ASTは`{"op":"ref","key":"C1"}`、`{"op":"not","arg":...}`、`{"op":"and|or","args":[...,...]}`だけ
 - refはcause keyだけを許可し、effect参照は禁止
 - true / false valueはtyped value
