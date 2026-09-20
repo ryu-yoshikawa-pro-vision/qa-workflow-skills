@@ -94,6 +94,7 @@ semantic evalは最低2 case作成します。
 
 positiveには最低限、次を含めます。
 
+- TCを実行前にGiven / When / Then構造のYAMLへ整理し、曖昧さを確認してからAIが画面操作・結果報告する
 - AIがPlaywright MCP等で人間と同じようにTCを画面操作して結果を報告する
 - AIがブラウザを操作して指定TCを手動テスト相当で実施する
 - Playwright CLIを使ってTCを実行し、期待結果と実測結果を報告する
@@ -119,6 +120,10 @@ negativeには最低限、次を含めます。
 - TC結果が`PASS / FAIL / 未実行 / 判定不能`の正規値である
 - PASS / FAILには期待結果・実測結果・判定根拠が存在する
 - 未実行 / 判定不能には理由が存在する
+- 固定した全TCに実行前YAMLまたはその成果物参照が存在する
+- 実行前YAMLが入力TC識別子へ追跡できる
+- `scenario.given / when / then`、`unresolved`、`cleanup`の必須構造を満たす
+- `unresolved`が空でないTCを操作済み / PASS / FAILとして扱っていない
 - 使用した実行手段が記録される
 - 手順・観測結果が判定根拠へ追跡できる
 - 画像を使用した場合は視覚確認行がTC / 観測点へ追跡できる
@@ -137,18 +142,19 @@ negativeには最低限、次を含めます。
 
 semantic rubricは次の観点を中心にします。
 
-1. 人間の手動テスト相当としてTC手順に沿って実対象を操作し、PASSを得るために勝手な別経路へ迂回しない
-2. 実測していない結果を推測してPASS / FAILにしない
-3. DOM / accessibility tree等の構造情報と画像による視覚情報を確認対象に応じて使い分ける
-4. UI崩れ等のTC外発見を追加観測として扱い、期待結果に関係しない事象で元TCをFAILにしない
-5. 今回run用の一時Playwrightコードと、repoへ残すE2E資産を区別する
-6. 副作用、開始状態、事後状態、cleanup、証跡の安全境界を守る
-7. TC結果だけでなく、人間が判断できる実行結果報告まで完成させる
+1. 元TCをGiven / When / Then構造のYAMLへ意味を変えず整理し、曖昧な前提・操作・期待結果・観測方法を推測で補完しない
+2. 人間の手動テスト相当としてTC手順に沿って実対象を操作し、PASSを得るために勝手な別経路へ迂回しない
+3. 実測していない結果を推測してPASS / FAILにしない
+4. DOM / accessibility tree等の構造情報と画像による視覚情報を確認対象に応じて使い分ける
+5. UI崩れ等のTC外発見を追加観測として扱い、期待結果に関係しない事象で元TCをFAILにしない
+6. 今回run用の一時Playwrightコードと、repoへ残すE2E資産を区別する
+7. 副作用、開始状態、事後状態、cleanup、証跡の安全境界を守る
+8. TC結果だけでなく、人間が判断できる実行結果報告まで完成させる
 
 semantic evalは最低2 case作成します。
 
-- Playwright MCP等の対話操作で複数TCを実施し、画像確認を含むPASS / FAIL / 判定不能を報告するcase
-- Playwright CLI / 今回run用の一時コードを使用し、repoへ残すE2E実装との境界を守るcase
+- 元TCの曖昧さを実行前YAMLの`unresolved`へ残して該当TCを`未実行`にし、明確なTCだけPlaywright MCP等で操作して画像確認を含むPASS / FAIL / 判定不能を報告するcase
+- Playwright CLI / 今回run用の一時コードを使用し、実行前YAML・画像確認・repoへ残すE2E実装との境界をまとめて確認するcase
 
 ## 5. `qa-workflow`評価
 
@@ -156,7 +162,7 @@ routing caseへ最低限、次を追加します。
 
 1. 生きたテスト対象の情報収集 / 更新 → `test-target-inspection`
 2. 既存資料がcurrentか実対象で確認 → `test-target-inspection`
-3. AIがPlaywright MCP等でTCを実行して結果報告 → `test-execution`
+3. 詳細TCを実行前YAMLへ整理し、曖昧さを確認してからAIがPlaywright MCP等で実行・結果報告 → `test-execution`
 4. AIがPlaywright CLI / 今回run用コードでTCを実行して結果報告 → `test-execution`
 5. TC実行中にrepoへ残すE2E実装が必要 → `qa-workflow` → `e2e-test-inspection` → `e2e-test-implementation`
 6. 既存repo E2Eをraw runner契約で実行 → `e2e-test-execution`
@@ -240,6 +246,7 @@ routing caseへ最低限、次を追加します。
 - 16 Skill構成
 - `test-target-inspection`: 生きた実対象のUI情報・ふるまい収集 / 管理
 - `test-execution`: AIによる手動テスト相当のTC実行・結果報告
+- Given / When / Then構造の実行前YAML生成と`unresolved`判定
 - Playwright MCP等の対話操作、CLI / 一時コード利用
 - 画像判断
 - repoへ残すE2Eと今回run用一時コードの境界
@@ -275,6 +282,7 @@ routing caseへ最低限、次を追加します。
 
 - `SKILL.md`
 - `references/guidance.md`
+- `assets/execution-plan-template.yaml`
 - `assets/output-template.md`
 - trigger / deterministic / semantic eval
 - 実対象currentness確認
@@ -350,6 +358,9 @@ routing caseへ最低限、次を追加します。
 - 実対象の現在挙動を仕様Authorityへ昇格する
 - 画像だけでrole / accessibility情報 / 仕様を推測する
 - すべての観測へ不要なscreenshotを要求する
+- 実行前YAMLを元TCの正本や仕様Authorityとして扱う
+- YAML化の過程で曖昧な期待結果・前提・操作をAIが独自補完する
+- Gherkin / Cucumber全構文を今回要件のためだけに実装する
 - `test-execution`を既存E2E結果の集約・判定だけのSkillにする
 - `test-execution`で人間のUI経路を避けるためにbackend API / DBを直接操作する
 - TCのPASSを得るために手順外の別経路へ勝手に迂回する
@@ -373,6 +384,8 @@ routing caseへ最低限、次を追加します。
 - POM等を必須化せず、任意参照として扱える
 - テスト対象資料を仕様Authorityとして扱わない
 - 永続更新の競合上書きを避け、安全に保存できる
+- `test-execution`が固定TC集合を実行前にGiven / When / Then構造のYAMLへ整理し、元TCの意味を変えず曖昧さを顕在化できる
+- 実行または合否判定に影響する`unresolved`が残るTCを推測で実行せず`未実行`として報告できる
 - `test-execution`がAI自身による実対象操作を基本とする
 - Playwright MCP等の対話操作でTCを手順どおり実行できる
 - 必要時にPlaywright CLI / 今回run用の一時コードを使用できる
