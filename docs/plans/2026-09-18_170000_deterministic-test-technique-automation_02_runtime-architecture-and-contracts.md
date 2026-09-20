@@ -227,7 +227,7 @@ Cause-Effect → Decision Table、Classification Tree → combinatorial、schema
 - UTF-8で解釈する
 - model内のdecimalはJSON numberへ丸めず、`{"type":"decimal","value":"0.1"}`のような10進文字列で扱う
 - JSON numberはまず元token文字列として取得し、§5.1の長さ・形式検証後にcanonical integerまたは`coefficient + scale`へexact正規化する。binary `float`や未検証の巨大`int / Decimal`へ直接変換しない
-- canonical JSONへ再serializeする`Decimal`は指数表記を使わない正規化済みJSON numberとして出力する
+- canonical JSONへ再serializeするexact numeric内部表現は指数表記を使わない正規化済みJSON numberとして出力する
 - date / datetimeは契約で許可したISO 8601形式以外を拒否する
 
 Python実装では、duplicate key検出用`object_pairs_hook`、`parse_int / parse_float`でJSON numberだけを表す専用の内部token型を返すhook、非有限数拒否、`allow_nan=False`相当の出力を共通方針とします。number tokenを通常のPython `str`として返してJSON stringと同一視しません。strict decode後、すべてのstring valueを走査してunpaired surrogate code pointを拒否し、number tokenはJSON number grammar・raw token長を検証してからcanonical integerまたは`coefficient + scale`へ変換します。
