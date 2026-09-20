@@ -155,9 +155,10 @@ effectはcauseだけを参照します。循環参照は禁止します。
 2. hard limit内で全cause assignmentを列挙する
 3. constraintに一致するassignmentを成立不能として識別し、正式known rule / Coverage母集団へ入れない
 4. 成立可能assignmentだけeffect action vectorへ変換する
-5. `derived.decision_table.conditions / actions / known_rules / constraints / accepted_merges=[]`を生成する。conditionはcauseの`cause_key / label`、actionはeffectの`effect_key / label`を失わずDecision Table互換schemaへ渡し、入力`constraints[]`も同じ意味のまま渡す
+5. `conditions / actions / known_rules / constraints / accepted_merges=[]`を生成する。conditionはcauseの`cause_key / label`、actionはeffectの`effect_key / label`を失わず、入力`constraints[]`も同じ意味のまま渡す
+6. child `decision`のidentityを検証し、`derived_child_inputs[]`へ`{child_model_key, model_type:"decision", input:{conditions, actions, known_rules, constraints, accepted_merges:[]}}`を返す
 
-`derived.decision_table`は`decision_table.py`のscript固有inputと直接互換にし、Cause-Effect側で意味上のmergeを作りません。cause / effectのlabelを派生先でLLMが再生成しません。
+`derived_child_inputs[].input`は`decision_table.py`のscript固有inputと直接互換にし、Cause-Effect側で意味上のmergeを作りません。cause / effectのlabelを派生先でLLMが再生成しません。
 
 ## 13. Syntax-Based Testing
 
@@ -284,7 +285,11 @@ HTML `number`のstepはHTML Standardのstep semanticsへ合わせます。
 
 `allOf / anyOf / oneOf / not / if / then / else`等、対応subset外でvalidation意味を変えるkeywordは`unsupported`です。unsupported keywordがvalidation意味へ影響するsubtreeだけを切り離し、独立して評価できる別property / itemは継続できます。親schemaのvalidation意味をunsupported keywordが左右する場合は、その親subtree全体を`unsupported`にします。
 
-正規化後のrange / enum / required等は`derived.ep_inputs / derived.bva_boundary_skeletons / derived.combinatorial_constraints / derived.test_data_requirements`へ固定schemaで出力します。これらは既に採番済みの`ep / bva / comb` child modelへ渡すmachine input候補であり、`schema_cases.py`自身がTechnique Selectionへ新しい技法を追加したりchild modelを発行したりしません。選択済みchildに対応するderived inputが0件の場合は固定builderが`selected_technique_not_derivable` issueを返し、空Coverage modelとして完了させません。EPのset / partition、BVA boundary、combinatorial factorにはsource JSON Pointer / property名から決定論的に作る非空`label`を含めます。`derived.bva_boundary_skeletons`は`boundary_key / label / side / threshold / inclusive / step / authority_refs`までを持ち、`mode / coverage_selection_reason`は含めません。LLMがその2 fieldだけを追加し、固定builderが`bva.py` inputへ変換します。
+正規化後のrange / enum / required等から、選択済みchildごとのmachine skeletonを生成します。`schema_cases.py`自身がTechnique Selectionへ新しい技法を追加したりchild modelを発行したりしません。EPのset / partition、BVA boundary、combinatorial factorにはsource JSON Pointer / property名から決定論的に作る非空`label`を含めます。BVA skeletonは`boundary_key / label / side / threshold / inclusive / step / authority_refs`までを持ち、`mode / coverage_selection_reason`は含めません。combinatorial skeletonはfactor / constraintを持ちます。
+
+selected childに完成inputを作るための意味parameterが不足する場合、`schema_cases.py`はchild model keyとstable machine keyを含む`semantic_parameter_requests[]`を返して`result_status=unresolved`にします。例としてBVAはboundaryごとの`mode / coverage_selection_reason`、combinatorialは`mode / strength / subsets / base_assignment`を要求できます。LLMは要求されたparameterだけを補い、schema由来のset / partition / boundary / factor / constraintを再生成しません。
+
+意味parameter込みで同じ`schema_cases.py`を再実行した後、`derived_child_inputs[]`へ`{child_model_key, model_type, input}`を返します。`input`は`ep / bva / comb`の各child generator script固有inputと直接互換にします。選択済みchildに適用可能なmachine skeletonが0件なら`selected_technique_not_derivable` issueを返し、空Coverage modelとして完了させません。`derived.test_data_requirements`も同じ再実行結果から生成し、別builderでschema outputを再構成しません。
 
 ## 15. UI pattern
 
