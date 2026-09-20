@@ -36,7 +36,7 @@
 ### Step 2: identity / workflow基盤
 
 - canonical technique slugと内部`model_type`を分離し、dispatchは`model_type → generator`固定表だけを使う
-- 内部adapterは正規技法を所有せず、Coverage child modelが`selection_source / selection_key / technique_slug / derived_from_model_key`を保持する。adapter draftとchild draftを同じ`condition_structure.py`実行へ入れて先にidentityを確定し、親adapter runtime実行後にchildを追加する循環を作らない。1 selection → 複数modelを許可する
+- 内部adapterは正規技法を所有せず、Coverage child modelが`selection_source / selection_key / technique_slug / derived_from_model_key`を保持する。adapter draftとchild draftを同じ`condition_structure.py`実行へ入れて先にidentityを確定する。adapter scriptは不足する意味parameterを`semantic_parameter_requests[]`で返し、再実行後にchild generatorと直接互換な`derived_child_inputs[]`を生成する。親runtime後に新しいchild identityを追加する循環や匿名builderでmachine inputをjoinする経路を作らない。1 selection → 複数modelを許可する
 - `requirement_structure.py` / `condition_structure.py` / `case_structure.py`によるTR / TCN・model / TC採番
 - qa-workflow再利用元による成果物系列判定
 - 既存成果物のsemantic model / draftを再利用する前に保存`upstream_entities[]`とMachine Entityの`upstream_entity_dependencies[]`を現在Entityと比較し、不一致なら担当Skillへ`要再検証`として戻すpreflight
@@ -91,7 +91,7 @@
 - Domain Testing Reliable Domain Coverage（`< <= > >= = !=`）とexact rational border arithmetic
 - schema / HTML parser / exact JSON number / scalar-null enum・const / root document + local `$ref` / OpenAPI request-response context
 - HTML runtime-v1 typeを`text / number / date / datetime-local`へ限定し、disabled / readonlyのconstraint validation除外、pattern / unsupported typeを安全側へ閉じる
-- schemaから、既に選択・採番済みのEP / BVA / combinatorial childへ固定derived inputを供給し、test data requirementを生成する。schema runtime結果から新しい技法 / child modelを自動追加しない。選択済みchildへderived inputを作れない場合は`unresolved`へ戻す。BVAは意味parameterをjoinする
+- schemaから、既に選択・採番済みのEP / BVA / combinatorial childへmachine skeletonを生成する。BVA / combinatorialで意味parameterが必要なら`schema_cases.py`自身が`unresolved` + `semantic_parameter_requests[]`を返し、同script再実行で完成`derived_child_inputs[]`とtest data requirementを生成する。schema runtime結果から新しい技法 / child modelを自動追加せず、選択済みchildへskeletonを作れない場合はselection source別に戻す
 - test data / environment cross-operator intersection
 - 新規技法のSkill / reference / template / eval契約
 
@@ -213,9 +213,9 @@ Plan完了には次をすべて満たす必要があります。
 - 再実行がupsertされ重複machine evidenceを作らない
 - semantic dependency preflight済みの現在script正常実行結果だけを保存時`freshness_status=current`とし、`workflow_runtime.py`が再検証してstale伝播する。freshnessの付与主体をworkflowだけに限定せずmaterialize前の循環を作らない
 - stale派生成果物を完了扱いしない
-- `technique_slug`が正規技法だけを表し、内部adapterは正規技法を所有しない。adapter / Coverage childを同じ`condition_structure.py`実行で先に採番し、childが`selection_source / selection_key / derived_from_model_key`を保持する。active Technique Selectionの各selected techniqueが1件以上のcurrent Coverage modelへ到達する。不適用 / 未解決はTechnique Selection更新または既存block / unresolvedで扱い、未定義のselection closureを作らない。エラー推測は1件以上のsemantic CIへ入る
+- `technique_slug`が正規技法だけを表し、内部adapterは正規技法を所有しない。adapter / Coverage childを同じ`condition_structure.py`実行で先に採番し、childが`selection_source / selection_key / derived_from_model_key`を保持する。adapterは意味parameter不足時に`semantic_parameter_requests[]`で`unresolved`、ready時に全child分の直接互換`derived_child_inputs[]`を返す。active Technique Selectionの各selected techniqueが1件以上のcurrent Coverage modelへ到達する。不適用 / 未解決はTechnique Selection更新または既存block / unresolvedで扱い、未定義のselection closureを作らない。エラー推測は1件以上のsemantic CIへ入る
 - machine-readable schema / HTMLをLLMが手変換せず対応scriptが処理する。HTML runtime-v1は`text / number / date / datetime-local`のtype / attribute matrix、disabled / readonlyのvalidation除外、pattern等のunsupportedを契約どおり扱う
-- script間の機械変換では固定derived schema / Python builderを使い、adapter / child modelを親runtime実行前に`condition_structure.py`で採番する。LLMは意味パラメータやtarget annotationだけを追加し、machine dataやruntime dependencyを再生成しない
+- script間の機械変換ではadapter / child modelを親runtime実行前に`condition_structure.py`で採番し、adapter script自身が固定derived schemaと意味parameterからchild generator互換`derived_child_inputs[]`を生成する。LLMは`semantic_parameter_requests[]`で要求された意味parameterやtarget annotationだけを追加し、machine dataやruntime dependencyを再生成しない
 - 全技法generatorと構造scriptにunit testがある
 - 通常/集約stdin、stdout、item数、byte、depth、state / flow / grammarを含む探索node hard limitとtie-breakが契約どおり
 - runtime出力と保存machine evidenceの一致をvalidatorが確認する
