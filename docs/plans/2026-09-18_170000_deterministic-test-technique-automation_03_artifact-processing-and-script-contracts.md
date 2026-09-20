@@ -220,7 +220,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - `operator=range`: `minimum / maximum` typed value、`minimum_inclusive / maximum_inclusive` boolean必須
 - `operator=version_range`: `minimum / maximum` version文字列、inclusive boolean必須
 - `operator=boolean`: `value` boolean必須
-- `source_target_versions[]`は`{target_ref, target_content_fingerprint, generation_fingerprint}`。environmentとmodel-wide test dataでは空配列を許可する。target-specific test dataでは1件以上必須とし、全rowが`current_source_targets[]`の同じ`source_model_key`へ完全一致しなければ`invalid_input`とする。model-wide test dataでは`current_source_targets[]`照合を要求せず、`source_model_key`のcurrent model metadata一致だけを必須にする。別modelのtargetや古いversionを受理せず、modelを跨ぐtraceabilityへ`target_key`単独を使用しない
+- `source_target_versions[]`は`{target_ref, target_content_fingerprint, generation_fingerprint}`。environmentとmodel-wide test dataでは空配列を許可する。target-specific test dataでは1件以上必須とし、全rowが`current_source_targets[]`の同じ`source_model_key`へ完全一致しなければ`invalid_input`とする。model-wide test dataでは`current_source_targets[]`照合を要求せず、`source_model_key`のcurrent model metadata一致だけを必須にする。test dataの`source_model_key`がruntime generatorを持つmodelの場合、固定builderはそのcurrent model runtime unitを`upstream_runtime_units[]`へ必須で追加し、保存generation不一致をstaleとして扱う。別modelのtargetや古いversionを受理せず、modelを跨ぐtraceabilityへ`target_key`単独を使用しない
 - `test_data_requirements.py`の各正規化済み要求は`data_ref=data:<requirement_key>`を返し、`materialize_coverage.py`の`test_data_requirement_refs[]`はこの`data_ref`だけを参照する
 
 #### `analysis_entities.py`
