@@ -127,7 +127,7 @@ CI単位の`merge_group`と、TCが複数CIを参照する意味判断を分離�
 | `domain_testing.py` | partitions[] / borders[] | §5のpartition + border + relation別key | point / Coverage |
 | `decision_table.py` | conditions、actions、known rules、constraints、accepted merges | `dt:sha256:<assignment_hash>` | rule assignment / action vector / Coverage |
 | `combinatorial.py` | mode、factors、constraints、strength | `comb:<mode>:sha256:<target_hash>` | target tuple / rows / Coverage |
-| `classification_tree.py` | classifications[] / classes[] / constraints[] | `class:<classification_key>:<class_key>` | `derived.combinatorial_input` |
+| `classification_tree.py` | classifications[] / classes[] / constraints[] / child_models[] | `class:<classification_key>:<class_key>` | factor skeleton / semantic_parameter_requests / derived_child_inputs |
 | `state_transition.py` | states、transitions、reset、coverage mode、n-switch時switch_count | [基本generator契約](./2026-09-18_170000_deterministic-test-technique-automation_03_generators-and-algorithms.md) §9のstate / transition / n-switch / round-trip / invalid key | setup / sequence / Coverage |
 | `flow_paths.py` | nodes、edges、initial nodes、regions、loop specs、max path length、coverage mode | [追加generator契約](./2026-09-18_170000_deterministic-test-technique-automation_03_additional-generators.md) §10のnode / edge / path / loop / branch key | paths / loops / branch Coverage |
 | `crud_matrix.py` | matrix、consistency sequences、operation dispositions | [追加generator契約](./2026-09-18_170000_deterministic-test-technique-automation_03_additional-generators.md) §11のoperation / missing / sequence key | completeness / consistency / anomalies |
