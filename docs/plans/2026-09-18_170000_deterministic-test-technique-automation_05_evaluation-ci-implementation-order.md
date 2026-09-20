@@ -64,7 +64,7 @@ CLI integration testは各runtime scriptの`valid_minimal.json`をsubprocessで`
 - `NaN` / `Infinity`拒否
 - 不正top-level type拒否
 - UTF-8 decode前byte上限と、`json.loads()`前のstring / escape aware構造scanによるnesting depth 64。depth 65以上をparser依存エラーではなく`limit_exceeded`にする
-- unpaired surrogate code point拒否
+- object key / string valueのunpaired surrogate code point拒否
 - model decimalの型保持
 - raw JSON documentのnumberを通常のstringと異なる専用token型で受け、raw token長 / JSON number grammar検証後にcanonical integer / `coefficient + scale`へexact正規化し、binary float / `Decimal` contextへ依存しない
 - canonical serializerが専用number型をstring化せず、exact numeric表現を指数表記なしのJSON numberへ戻す
