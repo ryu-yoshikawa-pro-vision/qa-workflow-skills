@@ -1163,28 +1163,28 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - dispositionは`{upstream_entity:{skill, entity_type, entity_ref, content_fingerprint}, handling, reason, authority_refs[], covered_by_entity}`を使う
 - outputは`tr_id_map[]: {draft_key, tr_id, identity_action}`とactive / deleted全行を含むfull snapshotの`tr_id_state[]`
 
-#### \`condition_structure.py\`
+#### `condition_structure.py`
 
-- required: \`test_requirements[]\`, \`technique_selections[]\`, \`test_conditions[]\`, \`requirement_dispositions[]\`, \`models[]\`, \`previous_tcn_ids[]\`, \`previous_model_keys[]\`
-- TR: \`{tr_id, priority, authority_refs[], risk_refs[]}\`。各\`tr_id\`は入力内一意
-- Technique Selection: \`{selection_key, selected_techniques[], status}\`。\`selection_key\`は入力内一意、\`selected_techniques[]\`はcanonical technique slugで重複不可
-- TCN draft: \`{draft_key, identity_action, reuse_id, tr_refs[], condition, category, technique_slugs[], coverage_criterion, authority_refs[], risk_refs[], priority, priority_override_reason}\`。\`draft_key\`は入力内一意、\`condition / coverage_criterion\`は非空文字列、\`category\`は文字列またはnull、\`technique_slugs[]\`は\`_02\` §4.3のcanonical technique slugだけを許可し重複不可。意味上の同一性はLLMが\`identity_action=reuse|new\`で決め、reuse時だけactiveな既存\`TCN-\d{3}\`を\`reuse_id\`へ指定する
-- requirement dispositionは\`_02\`の共通Disposition schemaを使用する
-- 各current TRはTCNの\`tr_refs[]\`またはrequirement dispositionのどちらか一方へ閉じる。unknown TR、linked + disposed重複、未閉鎖TRをviolationにする
-- TCNの既定priorityは関連TRの最高優先度。より低いpriorityを指定する場合だけ非空\`priority_override_reason\`を必須にし、runtimeが自動補正しない
-- model draft: \`{draft_key, model_type, technique_slug, selection_source, selection_key, identity_action, reuse_model_key, parent_tcn_draft_key}\`。\`model_type\`は\`_02\` §4.3の内部model type。adapterでは\`technique_slug / selection_source / selection_key=null\`、Coverage所有modelではcanonical \`technique_slug\`と\`selection_source=analysis|condition_design|user\`を必須とする。\`selection_source=analysis\`だけ\`selection_key\`必須、その他はnull
-- \`previous_tcn_ids[]\`: \`{tcn_id, status}\`、\`previous_model_keys[]\`: \`{model_key, model_type, technique_slug, parent_tcn_id, selection_source, selection_key, status}\`。\`status=active|deleted\`。reuseはactiveだけ許可し、新規採番の最大番号にはdeletedも含める
-- runtimeはreuse対象の存在、status、duplicate reuse、\`model_type / technique_slug / selection_source / selection_key\`、最終親TCN一致を検証する。reuse modelを別TCNへ移さない
-- TCN draftはcanonical \`draft_key\`順、model draftは\`(parent_tcn_draft_key, model_type, draft_key)\`順でnew IDを割り当てる。raw入力順を採番へ使わない
+- required: `test_requirements[]`, `technique_selections[]`, `test_conditions[]`, `requirement_dispositions[]`, `models[]`, `previous_tcn_ids[]`, `previous_model_keys[]`
+- TR: `{tr_id, priority, authority_refs[], risk_refs[]}`。各`tr_id`は入力内一意
+- Technique Selection: `{selection_key, selected_techniques[], status}`。`selection_key`は入力内一意、`selected_techniques[]`はcanonical technique slugで重複不可
+- TCN draft: `{draft_key, identity_action, reuse_id, tr_refs[], condition, category, technique_slugs[], coverage_criterion, authority_refs[], risk_refs[], priority, priority_override_reason}`。`draft_key`は入力内一意、`condition / coverage_criterion`は非空文字列、`category`は文字列またはnull、`technique_slugs[]`は`_02` §4.3のcanonical technique slugだけを許可し重複不可。意味上の同一性はLLMが`identity_action=reuse|new`で決め、reuse時だけactiveな既存`TCN-\d{3}`を`reuse_id`へ指定する
+- requirement dispositionは`_02`の共通Disposition schemaを使用する
+- 各current TRはTCNの`tr_refs[]`またはrequirement dispositionのどちらか一方へ閉じる。unknown TR、linked + disposed重複、未閉鎖TRをviolationにする
+- TCNの既定priorityは関連TRの最高優先度。より低いpriorityを指定する場合だけ非空`priority_override_reason`を必須にし、runtimeが自動補正しない
+- model draft: `{draft_key, model_type, technique_slug, selection_source, selection_key, identity_action, reuse_model_key, parent_tcn_draft_key}`。`model_type`は`_02` §4.3の内部model type。adapterでは`technique_slug / selection_source / selection_key=null`、Coverage所有modelではcanonical `technique_slug`と`selection_source=analysis|condition_design|user`を必須とする。`selection_source=analysis`だけ`selection_key`必須、その他はnull
+- `previous_tcn_ids[]`: `{tcn_id, status}`、`previous_model_keys[]`: `{model_key, model_type, technique_slug, parent_tcn_id, selection_source, selection_key, status}`。`status=active|deleted`。reuseはactiveだけ許可し、新規採番の最大番号にはdeletedも含める
+- runtimeはreuse対象の存在、status、duplicate reuse、`model_type / technique_slug / selection_source / selection_key`、最終親TCN一致を検証する。reuse modelを別TCNへ移さない
+- TCN draftはcanonical `draft_key`順、model draftは`(parent_tcn_draft_key, model_type, draft_key)`順でnew IDを割り当てる。raw入力順を採番へ使わない
 - 1つのmodel keyは同時に1つのTCNだけへ所属する。previous active TCN / modelでcurrentにreuseされないものはdeletedへ遷移し、deleted rowをfull snapshotから消さない
-- 各TCN draftの\`technique_slugs[]\`は、そのTCNを\`parent_tcn_draft_key\`に持つcurrent Coverage所有model draftの非null \`technique_slug\`集合と完全一致させる。\`model_type\`を集合へ入れずadapterはTCNの適用技法を増やさない
-- Classification Tree / Cause-Effect / schema / UI等のadapterはcanonical techniqueを所有しない。Coverageを実際に所有するchild modelが\`technique_slug / selection_source / selection_key\`を持つ
-- \`selection_source=analysis\`のCoverage所有modelは参照Technique Selectionに同じ\`technique_slug\`が存在必須。1つの\`selection_key + technique_slug\`から複数TCN / modelへ展開してよい
-- active Technique Selectionの\`selected_techniques[]\`に残る各技法は、少なくとも1件のcurrent Coverage所有modelへ到達必須。後から不適用 / 未解決と判断した場合はTechnique Selection Entity自体を更新してselected listから外すか既存block / unresolvedへ戻し、未定義のselection closureで閉じない
-- \`model_type=error-guessing / technique_slug=error-guessing\`はmodel metadataを作るがgenerator runtime unitを期待集合へ追加しない。semantic Coverage Itemを1件以上のcurrent CIへmaterializeするまで完了不可
-- outputは\`tcn_id_map[]: {draft_key, tcn_id, identity_action}\`、\`model_key_map[]: {draft_key, model_key, model_type, technique_slug, parent_tcn_id, identity_action}\`、full snapshotの\`tcn_id_state[]\`、\`model_key_state[]\`を返す
-- 固定builderはTCN draftの意味fieldと最終TCN IDをjoinしてTCN Machine Entityを、model draftの\`model_type / technique_slug / selection_source / selection_key\`と最終model key / parent TCNをjoinしてmodel metadata Entityを生成する。LLMがMachine Entity JSONを再生成しない
-- 999到達後の新規TCNは\`id_space_exhausted\`。model keyは3桁以上を許可し999上限を設けない
+- 各TCN draftの`technique_slugs[]`は、そのTCNを`parent_tcn_draft_key`に持つcurrent Coverage所有model draftの非null `technique_slug`集合と完全一致させる。`model_type`を集合へ入れずadapterはTCNの適用技法を増やさない
+- Classification Tree / Cause-Effect / schema / UI等のadapterはcanonical techniqueを所有しない。Coverageを実際に所有するchild modelが`technique_slug / selection_source / selection_key`を持つ
+- `selection_source=analysis`のCoverage所有modelは参照Technique Selectionに同じ`technique_slug`が存在必須。1つの`selection_key + technique_slug`から複数TCN / modelへ展開してよい
+- active Technique Selectionの`selected_techniques[]`に残る各技法は、少なくとも1件のcurrent Coverage所有modelへ到達必須。後から不適用 / 未解決と判断した場合はTechnique Selection Entity自体を更新してselected listから外すか既存block / unresolvedへ戻し、未定義のselection closureで閉じない
+- `model_type=error-guessing / technique_slug=error-guessing`はmodel metadataを作るがgenerator runtime unitを期待集合へ追加しない。semantic Coverage Itemを1件以上のcurrent CIへmaterializeするまで完了不可
+- outputは`tcn_id_map[]: {draft_key, tcn_id, identity_action}`、`model_key_map[]: {draft_key, model_key, model_type, technique_slug, parent_tcn_id, identity_action}`、full snapshotの`tcn_id_state[]`、`model_key_state[]`を返す
+- 固定builderはTCN draftの意味fieldと最終TCN IDをjoinしてTCN Machine Entityを、model draftの`model_type / technique_slug / selection_source / selection_key`と最終model key / parent TCNをjoinしてmodel metadata Entityを生成する。LLMがMachine Entity JSONを再生成しない
+- 999到達後の新規TCNは`id_space_exhausted`。model keyは3桁以上を許可し999上限を設けない
 
 #### `equivalence_partitions.py`
 
@@ -1360,47 +1360,47 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - `traceability.py`は各Skillの同一内容`runtime_contract.py`にある共通freshness評価関数を呼び、`runtime_freshness[] / entity_freshness[]`を決定論的に算出する。workflow_runtime resultを入力へ渡さず、self/cycle dependencyを作らない
 - stale分析では`entity_freshness[]: {skill, entity_type, entity_ref, model_key, freshness_status, stale_reasons[]}`を正本にし、stale Entityがcurrentな下流で閉鎖済みと誤判定しない
 
-#### \`materialize_coverage.py\`
+#### `materialize_coverage.py`
 
-- required: \`tcn_id\`, \`active_model_metadata[]\`, \`models[]\`, \`semantic_coverage_items[]\`, \`target_annotations[]\`, \`target_dispositions[]\`, \`test_data_requirements[]\`, \`previous_target_id_map[]\`, \`previous_semantic_ci_map[]\`, \`previous_ci_ids[]\`, \`previous_expected_result_roots[]\`, \`merge_groups[]\`
-- \`tcn_id\`は\`TCN-\d{3}\`
-- \`active_model_metadata[]\`: \`{model_key, model_type, technique_slug, parent_tcn_id, content_fingerprint}\`。TCN配下の全current modelを渡し、\`parent_tcn_id\`はinputの\`tcn_id\`と一致必須
-- \`models[]\`の各model result: \`{model_key, model_type, technique_slug, skill, runtime_unit_key, input_fingerprint, model_fingerprint, generation_fingerprint, generator_contract_version, support_status, runtime_status, result_status, deterministic_generated, freshness_status, targets[], coverage_summary, unsupported_items[]}\`。runtime generatorを持ち、今回正常実行したcurrent resultだけを含める
-- materialize対象model resultは\`runtime_status=ok / result_status=ready / deterministic_generated=true / freshness_status=current\`を必須にする。\`support_status=supported\`または、unsupported itemと対応可能targetが分離済みの\`partial\`だけ許可する。runtimeなしsemantic modelやwhole-model unsupportedを成功resultとして\`models[]\`へ偽装しない
-- \`freshness_status=current\`は現在のMachine Entity / normalized inputをpreflight確認した後、現在scriptを再実行して正常生成したresultだけに付与する。保存済みgenerator resultをmaterialize入力のcurrent cacheとして直接再利用しない
-- semantic item draft: \`{draft_key, model_key, identity_action, reuse_semantic_item_key, reuse_ci_id, source_target_versions[], item_text, authority_refs[], reference_refs[], priority, expected_result_root, test_data_requirement_refs[]}\`。\`draft_key\`は入力内一意、\`item_text\`は非空。runtime generatorへ移さないsemantic model、またはfork-join等の直接linear executionへ落とさないCoverage Itemだけに使用する
-- new semantic itemは\`reuse_semantic_item_key / reuse_ci_id=null\`とし、canonical \`(model_key, draft_key)\`順でCIを採番した後にruntimeが\`semantic_item_key=semantic:<ci_id>\`を発行する。reuseではactive / inactiveのprevious rowにある同じsemantic item key / model / CIをすべて指定し、別item・別model・runtime target CIへの横取りを拒否する
-- \`semantic_content_fingerprint\`は\`model_key / source_target_versions[] / item_text / authority_refs[] / reference_refs[] / priority / expected_result_root / test_data_requirement_refs[]\`をcanonical JSON化してSHA-256する。identity_action / reuse fieldはfingerprintへ含めない
-- \`source_target_versions[]\`は\`{target_ref, target_content_fingerprint, generation_fingerprint}\`。machine targetを意味判断へ渡す場合は現在targetと完全一致必須、エラー推測等の元machine targetがないsemantic itemでは空配列を許可する。machine target / execution / generation fingerprintを捏造しない
-- machine target: \`{target_ref, target_content_fingerprint, materializable, execution_fingerprint, target_key, execution, authority_refs, reference_refs, ...技法固有machine fields}\`。\`materializable=true\`では自己完結\`execution\`と\`execution_fingerprint\`必須、falseでは両方null。fingerprintは\`_02\` §7.2の式をruntimeが再計算する
-- target annotation: \`{target_ref, target_content_fingerprint, generation_fingerprint, priority, expected_result_root, test_data_requirement_refs[]}\`。Dispositionされないmaterializable targetにちょうど1件対応し、unknown / duplicate target_refを拒否する。target / generation versionは現在model resultと一致必須
-- \`expected_result_root\`は同一TCN内の内部用local keyでstable component key形式を使う。同じkeyはLLMがAuthorityに基づき同じ期待挙動へ統合可能と判断したtargetだけへ付与し、製品Authorityそのものとして扱わない。意味上同じgroupをreuseする場合だけactiveなprevious keyを維持し、新規groupは未使用keyを追加する
-- target disposition: \`{target_ref, target_content_fingerprint, generation_fingerprint, handling, reason, authority_refs[], covered_by_target_version}\`。\`covered_by_target_version\`はnullまたは\`{target_ref, target_content_fingerprint, generation_fingerprint}\`。現在target / generationと完全一致必須で、同一targetへannotationとDispositionを同時指定しない。\`handling=重複\`ではcurrentな\`covered_by_target_version\`必須
-- \`target_ref\`は\`_02\` §7.2の式を再計算して一致必須
-- \`test_data_requirements[]\`: \`{data_ref, requirement_key, dimension_key, operator, ...}\`。\`data_ref=data:<requirement_key>\`を一意にし、annotation / semantic itemの全\`test_data_requirement_refs[]\`はcurrent集合に存在必須
-- \`previous_target_id_map[]\`: \`{target_ref, model_key, target_key, target_content_fingerprint, ci_id, mapping_status}\`。\`mapping_status=active|inactive\`。Disposition中targetの直近CIもinactiveとして保持し、同じtarget_refでcontent fingerprintが変わればCI IDを維持しても\`stale_ci_ids[]\`へ追加する
-- \`previous_semantic_ci_map[]\`: \`{semantic_item_key, model_key, ci_id, mapping_status, semantic_content_fingerprint}\`。\`mapping_status=active|inactive\`
-- \`previous_ci_ids[]\`: \`{ci_id, status}\`。\`status=active|deleted\`で削除済み番号も保持する
-- \`previous_expected_result_roots[]\`: \`{expected_result_root, status}\`。\`status=active|deleted\`。same-meaning groupのreuse可否はLLMが判断し、runtimeはunknown / duplicate / deleted keyの不正reuseを検査する
+- required: `tcn_id`, `active_model_metadata[]`, `models[]`, `semantic_coverage_items[]`, `target_annotations[]`, `target_dispositions[]`, `test_data_requirements[]`, `previous_target_id_map[]`, `previous_semantic_ci_map[]`, `previous_ci_ids[]`, `previous_expected_result_roots[]`, `merge_groups[]`
+- `tcn_id`は`TCN-\d{3}`
+- `active_model_metadata[]`: `{model_key, model_type, technique_slug, parent_tcn_id, content_fingerprint}`。TCN配下の全current modelを渡し、`parent_tcn_id`はinputの`tcn_id`と一致必須
+- `models[]`の各model result: `{model_key, model_type, technique_slug, skill, runtime_unit_key, input_fingerprint, model_fingerprint, generation_fingerprint, generator_contract_version, support_status, runtime_status, result_status, deterministic_generated, freshness_status, targets[], coverage_summary, unsupported_items[]}`。runtime generatorを持ち、今回正常実行したcurrent resultだけを含める
+- materialize対象model resultは`runtime_status=ok / result_status=ready / deterministic_generated=true / freshness_status=current`を必須にする。`support_status=supported`または、unsupported itemと対応可能targetが分離済みの`partial`だけ許可する。runtimeなしsemantic modelやwhole-model unsupportedを成功resultとして`models[]`へ偽装しない
+- `freshness_status=current`は現在のMachine Entity / normalized inputをpreflight確認した後、現在scriptを再実行して正常生成したresultだけに付与する。保存済みgenerator resultをmaterialize入力のcurrent cacheとして直接再利用しない
+- semantic item draft: `{draft_key, model_key, identity_action, reuse_semantic_item_key, reuse_ci_id, source_target_versions[], item_text, authority_refs[], reference_refs[], priority, expected_result_root, test_data_requirement_refs[]}`。`draft_key`は入力内一意、`item_text`は非空。runtime generatorへ移さないsemantic model、またはfork-join等の直接linear executionへ落とさないCoverage Itemだけに使用する
+- new semantic itemは`reuse_semantic_item_key / reuse_ci_id=null`とし、canonical `(model_key, draft_key)`順でCIを採番した後にruntimeが`semantic_item_key=semantic:<ci_id>`を発行する。reuseではactive / inactiveのprevious rowにある同じsemantic item key / model / CIをすべて指定し、別item・別model・runtime target CIへの横取りを拒否する
+- `semantic_content_fingerprint`は`model_key / source_target_versions[] / item_text / authority_refs[] / reference_refs[] / priority / expected_result_root / test_data_requirement_refs[]`をcanonical JSON化してSHA-256する。identity_action / reuse fieldはfingerprintへ含めない
+- `source_target_versions[]`は`{target_ref, target_content_fingerprint, generation_fingerprint}`。machine targetを意味判断へ渡す場合は現在targetと完全一致必須、エラー推測等の元machine targetがないsemantic itemでは空配列を許可する。machine target / execution / generation fingerprintを捏造しない
+- machine target: `{target_ref, target_content_fingerprint, materializable, execution_fingerprint, target_key, execution, authority_refs, reference_refs, ...技法固有machine fields}`。`materializable=true`では自己完結`execution`と`execution_fingerprint`必須、falseでは両方null。fingerprintは`_02` §7.2の式をruntimeが再計算する
+- target annotation: `{target_ref, target_content_fingerprint, generation_fingerprint, priority, expected_result_root, test_data_requirement_refs[]}`。Dispositionされないmaterializable targetにちょうど1件対応し、unknown / duplicate target_refを拒否する。target / generation versionは現在model resultと一致必須
+- `expected_result_root`は同一TCN内の内部用local keyでstable component key形式を使う。同じkeyはLLMがAuthorityに基づき同じ期待挙動へ統合可能と判断したtargetだけへ付与し、製品Authorityそのものとして扱わない。意味上同じgroupをreuseする場合だけactiveなprevious keyを維持し、新規groupは未使用keyを追加する
+- target disposition: `{target_ref, target_content_fingerprint, generation_fingerprint, handling, reason, authority_refs[], covered_by_target_version}`。`covered_by_target_version`はnullまたは`{target_ref, target_content_fingerprint, generation_fingerprint}`。現在target / generationと完全一致必須で、同一targetへannotationとDispositionを同時指定しない。`handling=重複`ではcurrentな`covered_by_target_version`必須
+- `target_ref`は`_02` §7.2の式を再計算して一致必須
+- `test_data_requirements[]`: `{data_ref, requirement_key, dimension_key, operator, ...}`。`data_ref=data:<requirement_key>`を一意にし、annotation / semantic itemの全`test_data_requirement_refs[]`はcurrent集合に存在必須
+- `previous_target_id_map[]`: `{target_ref, model_key, target_key, target_content_fingerprint, ci_id, mapping_status}`。`mapping_status=active|inactive`。Disposition中targetの直近CIもinactiveとして保持し、同じtarget_refでcontent fingerprintが変わればCI IDを維持しても`stale_ci_ids[]`へ追加する
+- `previous_semantic_ci_map[]`: `{semantic_item_key, model_key, ci_id, mapping_status, semantic_content_fingerprint}`。`mapping_status=active|inactive`
+- `previous_ci_ids[]`: `{ci_id, status}`。`status=active|deleted`で削除済み番号も保持する
+- `previous_expected_result_roots[]`: `{expected_result_root, status}`。`status=active|deleted`。same-meaning groupのreuse可否はLLMが判断し、runtimeはunknown / duplicate / deleted keyの不正reuseを検査する
 - previous active target / semantic mappingがcurrentでreuseされなければinactiveへ遷移する。共有targetのないruntime CIまたは消滅したsemantic CIはdeletedへ移し、inactive / deleted rowをfull snapshotから消さない
 - inactive target / semantic itemの復帰は同じidentityへの明示reuseかつ過去CIが別identityへ再利用されていない場合だけ同じCIを復帰できる。deleted CI / semantic item keyを別identityへ再利用しない
 - semantic itemのmodel変更はreuse不可。同じsemantic item keyをreuseしてもcontent fingerprintが変わればCI content fingerprintを変え、既存TCをstaleにする
-- merge groupは\`_02\` §11形式の\`model_key / target_refs[] / target_versions[]\`を使う。Dispositionされていない同一TCN・同一model内targetだけを許可し、全target versionを現在model resultへ一致させる。\`execution_fingerprint\`と\`expected_result_root\`が全件一致する場合だけ同一CIへ統合し、異なるmodel / 技法 / execution / expected resultを統合しない
-- merge group内の追加test data requirementは§16と同じintersection規則で統合し、conflict / unsupportedならmergeを拒否する。異なるCIを1つのTCへまとめる意味判断は\`case_structure.py\`の\`ci_refs[]\`で行い、merge groupへ逆変換しない
-- \`materializable=false\`のadapter / diagnostic専用targetはCI採番、annotation、Dispositionの対象外。正規Coverage基準上必要だがlinear executionへ落とせないtargetはcurrent target versionを持つsemantic Coverage Itemまたは既存Skillで許可されたtarget Dispositionへ1回だけ閉じる
-- \`target_dispositions[]\`にあるmaterializable targetはCI採番対象から除外するがgeneratorの\`coverage_summary\`自体は変更しない
-- new CI候補はcanonical \`(model_key, source_kind, source_key)\`順で採番する。\`runtime_target < semantic_item\`、runtime targetのsource keyは\`target_ref\`、semantic itemはnewなら\`draft_key\`、reuseなら\`reuse_semantic_item_key\`。raw入力順で採番しない
-- runtime target mapping、semantic reuse、mergeの全経路で同一CIを別identityへ不正reuseするduplicateを拒否する。new CIはdeletedを含む過去最大番号+1で割り当て、ID空間上限到達時は\`id_space_exhausted\`
-- outputは\`target_id_map[]\`、\`target_mapping_state[]\`、\`semantic_ci_mapping_state[]\`、\`ci_id_state[]\`、\`expected_result_root_state[]\`、\`disposed_target_refs[]\`、\`coverage_item_rows[]\`、\`stale_ci_ids[]\`、\`model_completion[]\`、\`issues[]\`
-- \`target_id_map[]\`: \`{target_ref, target_content_fingerprint, execution_fingerprint, model_key, target_key, ci_id}\`。active mappingだけを返し、1 target_refから複数CIへのmappingを禁止する
-- \`target_mapping_state[] / semantic_ci_mapping_state[] / ci_id_state[] / expected_result_root_state[]\`はactive / inactive / deletedを含む必要なfull snapshotを返し、次回previous stateの正本にする
-- 固定builderはactive CIごとに\`_02\`のCI Machine Entityを生成する。machine target由来は\`source_kind=runtime_target\`として\`covered_targets[]\`をtarget_ref順で集約しcanonical \`execution\`を保存する。semantic item由来は\`source_kind=semantic_item / covered_targets=[] / execution=null / semantic_item_key / semantic_item_text / semantic_source_targets[]\`を保存する
-- CI Machine Entityの\`runtime_dependencies[]\`にはcurrent \`materialize_coverage.py\` generationを、\`upstream_entity_dependencies[]\`には親TCN、model metadata、current test data requirement Entityを保存する。priority / expected result root / Authority / Reference / test data requirementは現在annotation / target / semantic itemから固定joinし、LLMがCI Entity JSONを再生成しない
-- \`disposed_target_refs[]\`: \`{target_ref, target_content_fingerprint, generation_fingerprint, handling, covered_by_target_version}\`。Coverage済みtarget数の計算には使用しない
-- \`model_completion[]\`: \`{model_key, required_target_refs[], closed_target_refs[], active_ci_ids[], semantic_item_keys[], materialize_complete}\`。supported / partial runtime modelとruntimeなしsemantic modelを対象にする。adapter / diagnosticをrequired targetへ数えない
-- runtime targetを持つmodelは\`required_target_refs[]\`が非空かつ全件\`closed_target_refs[]\`に含まれる場合だけ\`materialize_complete=true\`。target disposition、current CI mapping、target version一致済みsemantic itemだけをclosureへ数える
-- エラー推測等のtargetなしsemantic modelは1件以上のactive semantic CIがある場合だけtrue。partial modelのunsupported item closureはここで完了扱いせず\`workflow_runtime.py\`が別途検査する。whole-model unsupportedはLLM fallback CIのmaterialize自体は許可するが\`model_completion[]\`へ成功rowを捏造せず、workflow側のcurrent whole-model closureを最終条件にする
-- \`conditions=[] / actions=[] / factors=[] / relations=[] / source_inputs=[] / states=[]\`等、Coverage所有modelの意味母集団が空でrequired target / pair / caseが0件になる入力をvacuous completeにしない。model契約に応じて\`invalid_input\`または\`unresolved\`へ落とす
+- merge groupは`_02` §11形式の`model_key / target_refs[] / target_versions[]`を使う。Dispositionされていない同一TCN・同一model内targetだけを許可し、全target versionを現在model resultへ一致させる。`execution_fingerprint`と`expected_result_root`が全件一致する場合だけ同一CIへ統合し、異なるmodel / 技法 / execution / expected resultを統合しない
+- merge group内の追加test data requirementは§16と同じintersection規則で統合し、conflict / unsupportedならmergeを拒否する。異なるCIを1つのTCへまとめる意味判断は`case_structure.py`の`ci_refs[]`で行い、merge groupへ逆変換しない
+- `materializable=false`のadapter / diagnostic専用targetはCI採番、annotation、Dispositionの対象外。正規Coverage基準上必要だがlinear executionへ落とせないtargetはcurrent target versionを持つsemantic Coverage Itemまたは既存Skillで許可されたtarget Dispositionへ1回だけ閉じる
+- `target_dispositions[]`にあるmaterializable targetはCI採番対象から除外するがgeneratorの`coverage_summary`自体は変更しない
+- new CI候補はcanonical `(model_key, source_kind, source_key)`順で採番する。`runtime_target < semantic_item`、runtime targetのsource keyは`target_ref`、semantic itemはnewなら`draft_key`、reuseなら`reuse_semantic_item_key`。raw入力順で採番しない
+- runtime target mapping、semantic reuse、mergeの全経路で同一CIを別identityへ不正reuseするduplicateを拒否する。new CIはdeletedを含む過去最大番号+1で割り当て、ID空間上限到達時は`id_space_exhausted`
+- outputは`target_id_map[]`、`target_mapping_state[]`、`semantic_ci_mapping_state[]`、`ci_id_state[]`、`expected_result_root_state[]`、`disposed_target_refs[]`、`coverage_item_rows[]`、`stale_ci_ids[]`、`model_completion[]`、`issues[]`
+- `target_id_map[]`: `{target_ref, target_content_fingerprint, execution_fingerprint, model_key, target_key, ci_id}`。active mappingだけを返し、1 target_refから複数CIへのmappingを禁止する
+- `target_mapping_state[] / semantic_ci_mapping_state[] / ci_id_state[] / expected_result_root_state[]`はactive / inactive / deletedを含む必要なfull snapshotを返し、次回previous stateの正本にする
+- 固定builderはactive CIごとに`_02`のCI Machine Entityを生成する。machine target由来は`source_kind=runtime_target`として`covered_targets[]`をtarget_ref順で集約しcanonical `execution`を保存する。semantic item由来は`source_kind=semantic_item / covered_targets=[] / execution=null / semantic_item_key / semantic_item_text / semantic_source_targets[]`を保存する
+- CI Machine Entityの`runtime_dependencies[]`にはcurrent `materialize_coverage.py` generationを、`upstream_entity_dependencies[]`には親TCN、model metadata、current test data requirement Entityを保存する。priority / expected result root / Authority / Reference / test data requirementは現在annotation / target / semantic itemから固定joinし、LLMがCI Entity JSONを再生成しない
+- `disposed_target_refs[]`: `{target_ref, target_content_fingerprint, generation_fingerprint, handling, covered_by_target_version}`。Coverage済みtarget数の計算には使用しない
+- `model_completion[]`: `{model_key, required_target_refs[], closed_target_refs[], active_ci_ids[], semantic_item_keys[], materialize_complete}`。supported / partial runtime modelとruntimeなしsemantic modelを対象にする。adapter / diagnosticをrequired targetへ数えない
+- runtime targetを持つmodelは`required_target_refs[]`が非空かつ全件`closed_target_refs[]`に含まれる場合だけ`materialize_complete=true`。target disposition、current CI mapping、target version一致済みsemantic itemだけをclosureへ数える
+- エラー推測等のtargetなしsemantic modelは1件以上のactive semantic CIがある場合だけtrue。partial modelのunsupported item closureはここで完了扱いせず`workflow_runtime.py`が別途検査する。whole-model unsupportedはLLM fallback CIのmaterialize自体は許可するが`model_completion[]`へ成功rowを捏造せず、workflow側のcurrent whole-model closureを最終条件にする
+- `conditions=[] / actions=[] / factors=[] / relations=[] / source_inputs=[] / states=[]`等、Coverage所有modelの意味母集団が空でrequired target / pair / caseが0件になる入力をvacuous completeにしない。model契約に応じて`invalid_input`または`unresolved`へ落とす
 
 #### `workflow_runtime.py`
 
