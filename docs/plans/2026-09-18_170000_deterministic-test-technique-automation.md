@@ -24,7 +24,7 @@
 
 自然言語の仕様、Figma、Q&A、実装等から「何が条件・境界・状態・因子・制約・期待結果の根拠になるか」を判断する処理はLLMに残します。
 
-あわせて、調査でテスト分析・設計に必要と判断したDomain Testing、CRUD Testing、Random Testing、Metamorphic Testing、Syntax-Based Testing等を、既存の`test-analysis` / `test-condition-design`の責務を崩さず正式なSkill契約へ追加します。新しいSkillは作りません。runtime scriptは既存6 Skillへ追加し、`qa-workflow`ではstale・完了判定等の機械処理だけをscriptへ分離します。`spec-analysis`にはruntimeを追加せず、下流fingerprintの正本となるAuthorityのcanonical machine JSONを成果物へ追加します。
+あわせて、調査でテスト分析・設計に必要と判断したDomain Testing、CRUD Testing、Random Testing、Metamorphic Testing、Syntax-Based Testing等を、既存の`test-analysis` / `test-condition-design`の責務を崩さず正式なSkill契約へ追加します。新しいSkillは作りません。runtime scriptは既存6 Skillへ追加し、`qa-workflow`ではstale・完了判定等の機械処理だけをscriptへ分離します。`spec-analysis`にはruntime unitを追加しませんが、下流fingerprintの正本となるAuthority Machine EntityをLLMの手計算にしないため、Skill-localのcanonical / Machine Entity helperとAuthority Entity builderを追加します。
 
 一方、構造化済みの入力から一意または機械的に導出できる次の処理は、可能な限りSkill内のscriptへ移します。
 
@@ -42,6 +42,6 @@
 
 正規化済みモデルと各担当Skillが保存するcanonical machine Entityを意味上の正本とし、Machine Entityは`(skill, entity_type, entity_ref)`で識別します。Coverage表、生成組合せ、Coverage Item等の機械生成部分は派生成果物として扱います。既存成果物を再利用する場合も、runtime対象unitは現在のcanonical machine Entityと正規化済み入力からscriptを再実行し、保存済みruntime resultを現在世代の実行cacheとして扱いません。上流Authority、直接依存する上流runtime結果、正規化済みモデル、runtime / generator contract、runtime / generator実装、静的参照データのいずれかが変わった場合は、fingerprint比較で影響する派生成果物だけをstaleとして`要再検証`へ戻し、再生成・再検証が完了するまで完了扱いしません。
 
-scriptは仕様根拠や業務ルールを創作しません。`technique_slug`は正規テスト技法だけを表し、内部adapterは`model_type`だけを持ちます。実際にCoverageを生成するchild modelが`selection_source / selection_key / technique_slug`を保持し、dispatchは`model_type → generator`固定表だけを使います。Machine Entityは既存Skillが後続へ渡す意味fieldを落とさず、CIにはcanonical `execution`またはsemantic Coverage Item本文を保存します。canonicalizationはfingerprint計算だけでなくscriptが実際に処理する入力へ適用し、stable ID採番順も固定します。数値は対応範囲内でexactに処理し、state / flow / grammarの実行・導出順も一意にします。partial / unsupportedはclosure行の存在だけで完了扱いせず、currentな完全Machine Entity参照または既存Skillで許可された扱いへ閉じていることを検査します。最終完了判定では期待runtime unit / Machine Entity集合をactual集合から独立したsourceから導出して実際集合と比較し、丸ごと欠落したunit / Entityを見逃しません。
+scriptは仕様根拠や業務ルールを創作しません。`technique_slug`は正規テスト技法だけを表し、内部adapterは`model_type`だけを持ちます。adapterとCoverage childは同じ`condition_structure.py`実行で先にidentityを確定し、実際にCoverageを生成するchild modelが`selection_source / selection_key / technique_slug / derived_from_model_key`を保持します。dispatchは`model_type → generator`固定表だけを使います。Machine Entityは既存Skillが後続判断・再利用・stale判定に使う意味fieldを落とさず、CIには下流がgenerator内部modelを再読解しなくても具体手順へ展開できるcanonical `execution`またはsemantic Coverage Item本文を保存します。canonicalizationはfingerprint計算だけでなくscriptが実際に処理する入力へ適用し、stable ID採番順も固定します。数値は対応範囲内でexactに処理し、state / flow / grammarの実行・導出順も一意にします。partial / unsupportedはclosure行の存在だけで完了扱いせず、currentな実Coverageまたは既存Skillで許可された扱いへ閉じていることを検査します。target Dispositionの`重複`はcycleを許さずcurrent CI / semantic CIへ終端させ、`llm_fallback`も同じmodelのcurrent CIを根拠にします。最終完了判定ではPython固定builderが期待runtime unit / Machine Entity集合をactual集合から独立したsourceから導出して実際集合と比較し、丸ごと欠落したunit / Entityを見逃しません。
 
 期待結果が現在有効な仕様根拠へ追跡できない場合は、生成結果を完成済みテストとして扱わず、既存の停止条件・ブロック中・質問ルーティングへ戻します。
