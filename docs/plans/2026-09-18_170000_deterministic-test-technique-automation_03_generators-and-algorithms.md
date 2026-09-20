@@ -1142,14 +1142,16 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 
 #### `environment_requirements.py` / `test_data_requirements.py`
 
-- required: `requirements[]`
-- requirement: `{requirement_key, dimension_key, operator, authority_refs, source_target_versions}`
+- environment required: `requirements[]`
+- test data required: `requirements[]`, `current_source_targets[]`
+- `current_source_targets[]`: `{source_model_key, target_ref, target_content_fingerprint, generation_fingerprint}`。同一target identityの重複を拒否し、current generator resultから固定builderが作る
+- requirement: `{requirement_key, dimension_key, operator, authority_refs, source_model_key, source_target_versions}`。environmentでは`source_model_key=null`、test dataではcurrent Coverage所有model keyを必須にする
 - `operator=eq`: `value` typed value必須
 - `operator=enum`: `values[]` typed valueを1件以上、重複不可
 - `operator=range`: `minimum / maximum` typed value、`minimum_inclusive / maximum_inclusive` boolean必須
 - `operator=version_range`: `minimum / maximum` version文字列、inclusive boolean必須
 - `operator=boolean`: `value` boolean必須
-- `source_target_versions[]`は`{target_ref, target_content_fingerprint, generation_fingerprint}`。test dataでは1件以上、environmentでは空配列を許可し、現在target / modelと一致必須。modelを跨ぐtraceabilityへ`target_key`単独を使用しない
+- `source_target_versions[]`は`{target_ref, target_content_fingerprint, generation_fingerprint}`。test dataでは1件以上、environmentでは空配列を許可する。test dataでは全rowが`current_source_targets[]`の同じ`source_model_key`へ完全一致しなければ`invalid_input`とし、別modelのtargetや古いversionを受理しない。modelを跨ぐtraceabilityへ`target_key`単独を使用しない
 - `test_data_requirements.py`の各正規化済み要求は`data_ref=data:<requirement_key>`を返し、`materialize_coverage.py`の`test_data_requirement_refs[]`はこの`data_ref`だけを参照する
 
 #### `requirement_structure.py`
@@ -1169,14 +1171,14 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 
 - required: `test_requirements[]`, `technique_selections[]`, `test_conditions[]`, `requirement_dispositions[]`, `models[]`, `previous_tcn_ids[]`, `previous_model_keys[]`
 - TR: `{tr_id, priority, authority_refs[], risk_refs[]}`。各`tr_id`は入力内一意
-- Technique Selection: `{selection_key, selected_techniques[], status}`。`selection_key`は入力内一意、`selected_techniques[]`はcanonical technique slugで重複不可
+- Technique Selection: `{selection_key, selected_techniques[], undetermined_signal_closures[], status}`。`selection_key`は入力内一意、`selected_techniques[]`はcanonical technique slugで重複不可。`status=active`だけmodel閉鎖の対象にし、activeではundetermined signalが全件閉じていることを必須にする
 - TCN draft: `{draft_key, identity_action, reuse_id, tr_refs[], condition, category, technique_slugs[], coverage_criterion, authority_refs[], risk_refs[], priority, priority_override_reason}`。`draft_key`は入力内一意、`condition / coverage_criterion`は非空文字列、`category`は文字列またはnull、`technique_slugs[]`は`_02` §4.3のcanonical technique slugだけを許可し重複不可。意味上の同一性はLLMが`identity_action=reuse|new`で決め、reuse時だけactiveな既存`TCN-\d{3}`を`reuse_id`へ指定する
 - requirement dispositionは`_02`の共通Disposition schemaを使用する
 - 各current TRはTCNの`tr_refs[]`またはrequirement dispositionのどちらか一方へ閉じる。unknown TR、linked + disposed重複、未閉鎖TRをviolationにする
 - TCNの既定priorityは関連TRの最高優先度。より低いpriorityを指定する場合だけ非空`priority_override_reason`を必須にし、runtimeが自動補正しない
-- model draft: `{draft_key, model_type, technique_slug, selection_source, selection_key, identity_action, reuse_model_key, parent_tcn_draft_key}`。`model_type`は`_02` §4.3の内部model type。adapterでは`technique_slug / selection_source / selection_key=null`、Coverage所有modelではcanonical `technique_slug`と`selection_source=analysis|condition_design|user`を必須とする。`selection_source=analysis`だけ`selection_key`必須、その他はnull
-- `previous_tcn_ids[]`: `{tcn_id, status}`、`previous_model_keys[]`: `{model_key, model_type, technique_slug, parent_tcn_id, selection_source, selection_key, status}`。`status=active|deleted`。reuseはactiveだけ許可し、新規採番の最大番号にはdeletedも含める
-- runtimeはreuse対象の存在、status、duplicate reuse、`model_type / technique_slug / selection_source / selection_key`、最終親TCN一致を検証する。reuse modelを別TCNへ移さない
+- model draft: `{draft_key, model_type, technique_slug, selection_source, selection_key, derived_from_model_draft_key, identity_action, reuse_model_key, parent_tcn_draft_key}`。`model_type`は`_02` §4.3の内部model type。adapterでは`technique_slug / selection_source / selection_key=null`、Coverage所有modelではcanonical `technique_slug`と`selection_source=analysis|condition_design|user`を必須とする。`selection_source=analysis`だけ`selection_key`必須、その他はnull
+- `previous_tcn_ids[]`: `{tcn_id, status}`、`previous_model_keys[]`: `{model_key, model_type, technique_slug, parent_tcn_id, selection_source, selection_key, derived_from_model_key, status}`。`status=active|deleted`。reuseはactiveだけ許可し、新規採番の最大番号にはdeletedも含める
+- runtimeはreuse対象の存在、status、duplicate reuse、`model_type / technique_slug / selection_source / selection_key / derived_from_model_key`、最終親TCN一致を検証する。reuse modelを別TCNへ移さない。`derived_from_model_draft_key`は同じTCN draft配下のadapter draftだけを許可し、確定後の`derived_from_model_key`へ一意変換する
 - TCN draftはcanonical `draft_key`順、model draftは`(parent_tcn_draft_key, model_type, draft_key)`順でnew IDを割り当てる。raw入力順を採番へ使わない
 - 1つのmodel keyは同時に1つのTCNだけへ所属する。previous active TCN / modelでcurrentにreuseされないものはdeletedへ遷移し、deleted rowをfull snapshotから消さない
 - 各TCN draftの`technique_slugs[]`は、そのTCNを`parent_tcn_draft_key`に持つcurrent Coverage所有model draftの非null `technique_slug`集合と完全一致させる。`model_type`を集合へ入れずadapterはTCNの適用技法を増やさない
@@ -1184,7 +1186,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - `selection_source=analysis`のCoverage所有modelは参照Technique Selectionに同じ`technique_slug`が存在必須。1つの`selection_key + technique_slug`から複数TCN / modelへ展開してよい
 - active Technique Selectionの`selected_techniques[]`に残る各技法は、少なくとも1件のcurrent Coverage所有modelへ到達必須。後から不適用 / 未解決と判断した場合はTechnique Selection Entity自体を更新してselected listから外すか既存block / unresolvedへ戻し、未定義のselection closureで閉じない
 - `model_type=error-guessing / technique_slug=error-guessing`はmodel metadataを作るがgenerator runtime unitを期待集合へ追加しない。semantic Coverage Itemを1件以上のcurrent CIへmaterializeするまで完了不可
-- outputは`tcn_id_map[]: {draft_key, tcn_id, identity_action}`、`model_key_map[]: {draft_key, model_key, model_type, technique_slug, parent_tcn_id, identity_action}`、full snapshotの`tcn_id_state[]`、`model_key_state[]`を返す
+- outputは`tcn_id_map[]: {draft_key, tcn_id, identity_action}`、`model_key_map[]: {draft_key, model_key, model_type, technique_slug, parent_tcn_id, derived_from_model_key, identity_action}`、full snapshotの`tcn_id_state[]`、`model_key_state[]`を返す
 - 固定builderはTCN draftの意味fieldと最終TCN IDをjoinしてTCN Machine Entityを、model draftの`model_type / technique_slug / selection_source / selection_key`と最終model key / parent TCNをjoinしてmodel metadata Entityを生成する。LLMがMachine Entity JSONを再生成しない
 - 999到達後の新規TCNは`id_space_exhausted`。model keyは3桁以上を許可し999上限を設けない
 
@@ -1287,7 +1289,8 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 
 #### `grammar_cases.py`
 
-- required: `start`, `productions[]`, `max_depth`, `mutations[]`
+- required: `input_label`, `start`, `productions[]`, `max_depth`, `mutations[]`
+- `input_label`は生成文字列を適用する入力対象を第三者が識別できる非空文字列
 - productionは`{production_key,lhs,rhs[]}`。RHS itemは`{"terminal":"..."}`または`{"nonterminal":"..."}`のどちらか一方で、`rhs=[]`をepsilonとして許可する
 - `max_depth`は1..64のparse tree depth上限でroot start symbolをdepth 0とする
 - derivationはleftmost固定。各production targetは対象productionを1回以上含むproduction適用回数最小のderivation、同数ならproduction key列辞書順
@@ -1301,6 +1304,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 #### `schema_cases.py`
 
 - required: `schema_kind`, `document`, `schema_pointer`, `context`
+- arbitrary JSON Pointerやproperty名をstable component keyへ直接埋め込まない。`source_hash = sha256(canonical JSON({schema_kind,schema_pointer,keyword,role}))`を計算し、schema targetは`schema:sha256:<source_hash>`を使う。下流へ渡す`set_key / partition_key / boundary_key / factor_key / requirement_key`は同じsource objectへ用途`role`を加えたhashから固定生成し、元pointer / keywordもpayloadへ保持してcollision / traceabilityを検証する
 - `schema_kind = json-schema-2020-12 | openapi-3.0 | html-control`
 - numberは共通strict JSONの専用number tokenからcanonical integer / exact `coefficient + scale`へ正規化し、binary float / `Decimal` contextへ依存しない
 - JSON Schema 2020-12ではroot `$id`だけmetadataとして許可し、nested `$id`、`$anchor / $dynamicAnchor / $dynamicRef`、外部URI referenceはruntime-v1 `unsupported`。対応`$ref`は同一schema resource内の`#/...`だけ
@@ -1323,13 +1327,14 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 
 #### `random_testing.py`
 
-- required: `seed`, `case_count`, `distribution`
+- required: `input_label`, `seed`, `case_count`, `distribution`
+- `input_label`は生成値を適用する入力対象を第三者が識別できる非空文字列
 - distributionは§17の3 schemaのいずれか一つ
 
 #### `metamorphic.py`
 
 - required: `relations[]`
-- relationは§18形式のみ。`expected_relation.output_path / output_kind`を必須とする
+- relationは§18形式に`relation_label`を加え、`relation_label`を非空必須とする。`expected_relation.output_path / output_kind`も必須
 - `source_id`はrelation内一意
 - `follow_ups[]`は1..10,000件で`follow_up_key`をrelation内一意
 - 各follow-upの`transforms[]`は1件以上で宣言順に適用する
