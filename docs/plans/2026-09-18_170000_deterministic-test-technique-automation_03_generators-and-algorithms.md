@@ -27,7 +27,7 @@ generator系scriptの`payload`は次を基本形とします。
 
 ### materialize対象と`execution`
 
-model generatorはtargetごとに`materializable=true|false`を返します。`materializable=true`では`execution`を必須、`false`では`execution=null / execution_fingerprint=null`とし、`materialize_coverage.py`が直接CI化しません。
+model generatorはtargetごとに`materializable=true|false`を返します。`materializable=true`では`execution`必須、`false`では`execution=null / execution_fingerprint=null`です。
 
 | generator | materialize | canonical `execution` |
 | --- | --- | --- |
@@ -35,23 +35,21 @@ model generatorはtargetごとに`materializable=true|false`を返します。`m
 | `bva.py` | yes | `{boundary_key, position, value}` |
 | `domain_testing.py` | yes | `{partition_key, border_key, point_kind, coordinates}` |
 | `decision_table.py` | yes | `{condition_assignment, action_vector}` |
-| `combinatorial.py` | yes | targetをcoverする決定済みfull rowの`{row_ref, assignment}` |
-| `classification_tree.py` | no | adapter専用。derived combinatorial modelだけをCI化 |
-| `state_transition.py` | yes | valid state / transition / n-switch / round-tripは`{setup_prefix, coverage_sequence}`。`invalid-transitions`は`{setup_prefix, attempted_transition:{candidate_key, from, event}}`とし、invalid eventをvalid transition列へ偽装しない |
-| `flow_paths.py` | mode依存 | node / edgeは対象へ到達する最短feasible`{edge_sequence}`、bounded-pathはinitial→terminalの`{edge_sequence}`。simple-loopはPlanで固定したiterationを実行できるwitness pathを返す。fork-join branch targetは並行branchを単一順序へ偽装せず`materializable=false`としてsemantic Coverage Itemへ閉じる |
-| `crud_matrix.py` | yes | operation targetは`{entity_key, function_key, operation}`、sequence targetは`{entity_key, sequence_key, steps}` |
-| `cause_effect.py` | no | adapter専用。derived Decision Table modelだけをCI化 |
-| `grammar_cases.py` | yes | `{input_text, production_key_sequence, mutation_key}`。validでは`mutation_key=null` |
-| `schema_cases.py` | no | adapter専用。derived EP / BVA / combinatorial / test data modelだけをCI化 |
+| `combinatorial.py` | yes | `{row_ref, assignment}` |
+| `classification_tree.py` | no | adapter専用。child `comb` modelだけをCI化 |
+| `state_transition.py` | yes | `{initial_state_key, reset_key, setup_prefix, coverage_sequence, attempted_transition}` |
+| `flow_paths.py` | mode依存 | node / edge / bounded-path / simple-loopは`{initial_node_key, edge_sequence}`。fork-join branchはsemantic Coverage Itemへ閉じる |
+| `crud_matrix.py` | yes | operation=`{entity_key, function_key, operation}`、sequence=`{entity_key, sequence_key, steps}` |
+| `cause_effect.py` | no | adapter専用。child `decision` modelだけをCI化 |
+| `grammar_cases.py` | yes | `{input_text, production_key_sequence, mutation_key}` |
+| `schema_cases.py` | no | adapter専用 |
 | `ui_pattern_candidates.py` | no | 一般確認候補であり直接CI化しない |
 | `random_testing.py` | yes | `{case_index, generated_value}` |
 | `metamorphic.py` | yes | `{relation_key, source_id, source_input, follow_up_key, follow_up_input}` |
 
-`combinatorial.py`はfull Coverage rowごとに`row_ref=sha256(canonical assignment)`を返し、各SAT targetへそのtargetをcoverする生成済みrowのうち**生成順で最初**の`row_ref`を割り当てます。rowの生成順は§7のgreedy / tie-break規則で決定済みなので追加のLLM判断を入れません。同じrowへ割り当てられたtargetは同じ`execution_fingerprint`になります。
+`materializable=false`でも正規Coverage基準上必要なtargetは、current target versionを保持したsemantic Coverage Itemまたは既存Skillで許可されたDispositionへ閉じるまで完了させません。adapter / diagnostic専用targetはこのclosure対象外です。
 
-state / flowでmaterializable targetのwitness sequence / pathを作れない場合は、そのtargetをCoverage済みとして返さず`unresolved`または既存のblocking issueへ閉じます。flowのnode / edge witnessはterminal到達を必須にせず、initialから対象node / edgeまでの最短feasible pathを使います。bounded-pathだけは定義どおりterminal到達を必須にします。fork-join branch targetはscheduler interleavingを創作しないため直接materializeせず、branch集合を保持したmachine evidenceから`test-condition-design`がsemantic Coverage Itemを作るまで完了させません。adapter専用generatorのtarget / diagnostic itemは親modelの証拠として保持しても`materialize_coverage.py`へ渡しません。
-
-runtime generatorへ移さないエラー推測も同じsemantic Coverage Item経路を使います。これはmachine targetではないため`execution / execution_fingerprint / generation_fingerprint`を捏造せず、既存Skillが作るCoverage Item本文・根拠とmodel metadataを`materialize_coverage.py`の`semantic_coverage_items[]`へ渡してCI IDを割り当てます。
+エラー推測も同じsemantic Coverage Item経路を使い、偽のmachine target / executionを作りません。
 
 ## 1. プロダクトリスク
 
@@ -393,138 +391,67 @@ LLMがclassification / classの意味を定義した後、`classification_tree.p
 
 ### `state_transition.py`
 
-各transitionは`transition_key / from / event / guard_status / guard_refs / to / authority_refs`を持ちます。
+既存のstate / transition / n-switch / round-trip / invalid-transition Coverage定義、guard契約、stable targetは維持します。
 
-入力:
+resetは`{reset_key, from_states[], to_state, authority_refs[]}`です。
 
-- `states[]`
-- `initial_states[]`
-- `terminal_states[]`
-- `transitions[]`
-- `reset_options[]`
-- `invalid_transition_candidates[]`
-- `coverage_mode`
-- `switch_count`（`coverage_mode=n-switch`だけ必須）
+### 9.1 setup prefixとcanonical execution
 
-`guard_status=true|false|null`と`guard_refs[]`を使います。`false`をCoverage母集団から外すには`guard_refs`にAuthorityを1件以上必須とします。initial stateから`true` edgeだけで到達可能なstateをsourceに持つ`guard_status=null` transitionがある場合は、Coverage母集団が確定しないため`result_status=unresolved`とし、100% Coverageを返しません。`null`を含むsequenceは正式Coverage targetにしません。
+各materializable targetについて、Coverage開始stateへの実行contextを次で一意に決めます。
 
-Coverage定義:
+1. 各`initial_states[]`から`guard_status=true`だけのshortest pathを探索する
+2. 候補は`(path長, initial_state_key, transition key列)`で昇順
+3. initialから到達不能なら適用可能resetごとにreset後stateからshortest pathを探索する
+4. reset候補は`(path長, reset_key, transition key列)`で昇順
+5. unknown guardを含むpathは正式executionにしない
 
-- `all-states`: initial stateからfeasible transitionだけで到達可能な全state
-- `all-transitions`: initial stateから到達可能で`guard_status=true`の全transition
-- `n-switch`: `switch_count=N`として、到達可能な**N+1個の連続するvalid transition**の全sequence。Nは0..10。`N>=2`は高いfailure risk、ユーザー明示、案件固有基準等の具体的理由を`coverage_selection_reason`へ必須で残す
-- `round-trip`: 到達可能なsimple cycle。開始stateと終了stateは同一で、それ以外のstateをsequence内で重複させない。self-loopも1 transitionのround-tripとして含める。開始stateが異なるround tripは別Coverage targetとして扱う
-- `invalid-transitions`: 明示されたinvalid transition candidateだけ
-
-stable target:
-
-- state: `state:node:<state_key>`
-- transition: `state:transition:<transition_key>`
-- n-switch: `state:n-switch:<N>:sha256:<transition_key_sequence_hash>`
-- round-trip: `state:round-trip:<start_state_key>:sha256:<transition_key_sequence_hash>`
-- invalid: `state:invalid:<candidate_key>`
-
-round-tripは開始stateをCoverage identityの一部とし、transition key列をrotationして同一化しません。同じ閉路でも開始stateが異なる場合は別targetです。同じ開始stateかつ同じtransition key列だけを重複として除去し、逆方向はtransition列が異なるため別cycleです。
-
-invalid transition candidateは`{"candidate_key":"INV-001","from":"draft","event":"publish","authority_refs":["SPEC-010"]}`形式です。
-
-reset:
+canonical execution:
 
 ```json
 {
-  "reset_key": "RESET-1",
-  "from_states": ["*"],
-  "to_state": "draft",
-  "authority_refs": ["SPEC-010"]
+  "initial_state_key": "draft",
+  "reset_key": null,
+  "setup_prefix": [],
+  "coverage_sequence": ["T-001"],
+  "attempted_transition": null
 }
 ```
 
-### 9.1 setup prefix
+- resetなしでは選択した`initial_state_key`を保存する
+- resetありでは実行する`reset_key`を保存し、reset後のtransitionだけを`setup_prefix`へ入れる
+- valid targetでは`coverage_sequence`を使用する
+- invalid transitionでは`coverage_sequence=[]`、`attempted_transition={candidate_key, from, event}`
+- initial stateそのものをCoverageする場合も`initial_state_key`をexecution identityへ含める
 
-Coverage sequence開始stateへ直接開始できない場合:
-
-1. initial stateから`guard_status=true`だけを使うshortest pathを探す
-2. なければ適用可能reset後のshortest pathを探す
-3. path長が同じ場合はtransition key列のUnicode code point辞書順
-4. `guard_status=null`を含むpathは構造候補に留め、正式実行sequenceにしない
-
-出力は`setup_prefix`と`coverage_sequence`を分離します。実行可能setupがないtargetをCoverage済みにしません。
 ## 10. Use Case / シナリオ
 
 ### `flow_paths.py`
 
-入力は`nodes[] / edges[] / initial_node_keys[] / regions[] / loop_specs[] / coverage_mode / max_path_length`です。
+node / edge、guard、fork / join regionの既存契約は維持します。
 
-node kind:
-
-- `normal`
-- `fork`
-- `join`
-- `terminal`
-
-`initial_node_keys[]`は1件以上必須で、すべて既知nodeを参照します。terminal到達を要求するpath criterionでは`kind=terminal`のnodeを終点にします。
-
-edgeは`edge_key / from / to / guard_status / guard_refs / label / authority_refs`を持ち、`guard_status=true`だけを正式Coverage対象へ使います。
-
-`guard_status=false`をCoverage母集団から外すには`guard_refs`にAuthorityを1件以上必須とします。initial nodeから`true` edgeだけで到達可能なnodeをsourceに持つ`guard_status=null` edgeがある場合は`result_status=unresolved`とし、node / edge / path / loop / fork-joinの100% Coverageを返しません。
-
-fork / join regionは曖昧に導出せず、次を正規化入力として明示します。
-
-```json
-{
-  "region_key":"RG-001",
-  "fork_node_key":"F1",
-  "join_node_key":"J1",
-  "branches":[
-    {"branch_key":"BR-001","edge_keys":["E1","E2"]},
-    {"branch_key":"BR-002","edge_keys":["E3"]}
-  ]
-}
-```
-
-- branchの`edge_keys`はforkからmatching joinまで連続するpathであることをscriptが検証
-- 同一regionのbranch keyは一意
-- nested regionはbranch path内に含めてよい
-- region同士がcrossingする場合は`unsupported`
-- scheduler interleavingは仕様なしに生成しない
-
-simple loopは次を明示します。
+simple loop inputへ`exit_edge_keys[]`を追加します。
 
 ```json
 {
   "loop_key":"LP-001",
   "entry_node_key":"N1",
   "edge_keys":["E10","E11"],
+  "exit_edge_keys":["E12"],
   "typical_iterations":3,
   "maximum_iterations":10,
   "authority_refs":["SPEC-020"]
 }
 ```
 
-- `edge_keys`はentryへ戻るsimple cycleで、途中node重複を禁止
-- `typical_iterations`は2以上のinteger必須
-- `maximum_iterations`はnullまたは`typical_iterations`以上のinteger
-- Coverage targetは0回、1回、typical回、maximum回。maximumがnullまたはtypicalと同値なら重複targetを作らない
+- `edge_keys`はentryへ戻るsimple cycle
+- `exit_edge_keys[]`は1件以上で、すべてentryから出るfeasible edge、cycleの最初のedgeとは別key
+- 0 / 1 / typical / maximum回targetを生成する
+- 各initial nodeからentryまでのshortest prefixを求め、同長は`(initial_node_key, edge key列)`で辞書順
+- executionは`prefix + cycle×N + exit`。exitは`exit_edge_keys[]`辞書順先頭を使う
+- 0回targetを空sequenceで代用しない。exitを実行できないloop specは`invalid_input`
 
-`max_path_length`は1〜1000 edgeのintegerです。
+node / edge / bounded-path / simple-loopのcanonical executionには選択した`initial_node_key`を保存します。fork-joinはscheduler interleavingを生成せずsemantic Coverage Itemへ閉じます。
 
-Coverage mode:
-
-- `node`: initialから到達可能な全node
-- `edge`: initialから到達可能な全feasible edge
-- `bounded-path`: initialからterminalへ到達する、長さ`<= max_path_length`の全feasible path
-- `simple-loop`: `loop_specs[]`で明示したloop iteration target
-- `fork-join`: `regions[]`の各branchを少なくとも1回含むtarget
-
-stable target:
-
-- node: `flow:node:<node_key>`
-- edge: `flow:edge:<edge_key>`
-- bounded path: `flow:path:sha256:<edge_key_sequence_hash>`
-- simple loop: `flow:loop:<loop_key>:<iterations>`
-- fork / join: `flow:branch:<region_key>:<branch_key>`
-
-terminalへ到達しないbounded path候補は正式Coverage targetにせず、診断metadataへ保持します。
 ## 11. CRUD Testing
 
 ### `crud_matrix.py`
@@ -603,42 +530,16 @@ effectはcauseだけを参照します。循環参照は禁止します。
 
 ### `grammar_cases.py`
 
-自然言語grammarをparseしません。正規化済みproductionを受けます。
+自然言語grammarをparseせず、正規化済みproductionを受けます。
 
-```json
-{
-  "start": "expr",
-  "productions": [
-    {"production_key":"P-001","lhs":"expr","rhs":[{"terminal":"a"}]},
-    {"production_key":"P-002","lhs":"expr","rhs":[{"nonterminal":"expr"},{"terminal":"+"},{"terminal":"a"}]}
-  ],
-  "max_depth": 4,
-  "mutations": []
-}
-```
+derivationは**leftmost derivation**で固定します。sentential formに複数nonterminalがある場合、常に最左のnonterminal occurrenceだけへ次productionを適用します。
 
-処理:
+`max_depth`はparse tree depthで、start symbolを0、productionで生成したchildをparent + 1と数えます。生成childが`max_depth`を超えるproduction適用は探索しません。`rhs=[]`はepsilon productionとして許可します。
 
-- undefined nonterminal / unreachable production
-- recursionによるdepth超過
-- 各productionを少なくとも1回使うvalid derivation
-- bounded valid case生成
-- production Coverage
+production Coverage targetごとに、対象productionを1回以上含むleftmost derivationのうちproduction適用回数最小を選び、同数ならproduction key列のUnicode code point辞書順で決めます。leftmost規則により同じproduction key列から異なる文字列を生成しません。
 
-production Coverage targetごとに、対象productionを1回以上含むderivationのうち**production適用回数が最小**のものを選びます。同じ適用回数なら、適用した`production_key`列のUnicode code point辞書順で最小のderivationを選びます。
+valid case集合、明示mutation、`unreachable_mutation`、`invalid_candidate`の既存契約は維持し、mutation後grammarにも同じleftmost / depth規則を適用します。
 
-valid case集合は各production targetの上記shortest derivationのunionとし、生成文字列とproduction key列が同一のcaseを重複除去します。production Coverage達成に不要な追加grammar列挙は行いません。
-
-invalid syntaxは補集合から生成しません。明示mutationは`delete_terminal / replace_terminal / insert_terminal`だけを許可します。
-
-- `delete_terminal`: `symbol_index`が指すterminal itemを削除
-- `replace_terminal`: `symbol_index`が指すterminal itemを明示replacement文字列へ置換
-- `insert_terminal`: RHS配列の`symbol_index`位置へ明示terminal文字列を挿入。0..len(rhs)を許可
-- delete / replaceで対象itemがnonterminalなら`invalid_input`
-
-mutationは指定productionのRHSを1回だけ変換した一時grammarへ適用します。その一時grammarで、変換したproductionを1回以上使うproduction適用回数最小のderivationを探索し、同数ならproduction key列辞書順で選びます。`max_depth`内で導出不能なら`unreachable_mutation` issueを返します。
-
-mutation結果は`invalid_candidate`であり、scriptだけで製品上invalidと断定しません。製品上invalidであることをexpected resultへ昇格するにはAuthorityまたはLLMの意味判断を必須にします。
 ## 14. schema / HTML
 
 ### `schema_cases.py`
@@ -771,7 +672,7 @@ type別の扱い:
 - `boolean`は同一dimensionのboolean同士、または型互換な`eq`との一致を検証する
 - 空intersection、異なるscalar equality、range外eq等を矛盾として検出する
 - 型またはoperator組合せを安全にintersectionできない場合は別要求として黙って残さず`unsupported`
-- requirement → model / `source_target_refs[]` traceability
+- requirement → model / source target traceability。test data要求では各source targetを`{target_ref, target_content_fingerprint, generation_fingerprint}`として保持し、stable IDだけへ結び付けない
 
 実際の個人情報・顧客データ・fixture値を自動取得しません。
 
@@ -931,7 +832,7 @@ relationが製品に妥当か、source input集合、follow-up transform、出�
 
 ### `requirement_structure.py`
 
-LLMはTRの本文、テストレベル / 観測方法と、既存TRを再利用するか新規TRにするかを判断します。これらの意味fieldもruntime inputへそのまま渡し、structure scriptは内容を生成・要約せずschemaと構造だけを検査します。Dispositionのmachine schemaはstructure / traceabilityで共通して`{upstream_id, handling, reason, authority_refs[], covered_by_ref}`とし、不要な`covered_by_ref`はnullです。既存ID再利用時は`reuse_id`、新規時は`new`を指定し、runtimeが最終TR IDを割り当てます。
+LLMはTRの本文、テストレベル / 観測方法と、既存TRを再利用するか新規TRにするかを判断します。これらの意味fieldもruntime inputへそのまま渡し、structure scriptは内容を生成・要約せずschemaと構造だけを検査します。Dispositionのmachine schemaはstructure / traceabilityで共通して`{upstream_id, handling, reason, authority_refs[], covered_by_ref}`とし、不要な`covered_by_entity`はnullです。既存ID再利用時は`reuse_id`、新規時は`new`を指定し、runtimeが最終TR IDを割り当てます。
 
 LLM draft後に次を計算します。
 
@@ -1104,46 +1005,37 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 #### `environment_requirements.py` / `test_data_requirements.py`
 
 - required: `requirements[]`
-- requirement: `{requirement_key, dimension_key, operator, authority_refs, source_target_refs}`
+- requirement: `{requirement_key, dimension_key, operator, authority_refs, source_target_versions}`
 - `operator=eq`: `value` typed value必須
 - `operator=enum`: `values[]` typed valueを1件以上、重複不可
 - `operator=range`: `minimum / maximum` typed value、`minimum_inclusive / maximum_inclusive` boolean必須
 - `operator=version_range`: `minimum / maximum` version文字列、inclusive boolean必須
 - `operator=boolean`: `value` boolean必須
-- `source_target_refs`は`sha256:<64 lowercase hex>`の`target_ref`だけを許可し、test dataでは1件以上、environmentでは空配列を許可する。modelを跨ぐtraceabilityへ`target_key`単独を使用しない
+- `source_target_versions[]`は`{target_ref, target_content_fingerprint, generation_fingerprint}`。test dataでは1件以上、environmentでは空配列を許可し、現在target / modelと一致必須。modelを跨ぐtraceabilityへ`target_key`単独を使用しない
 - `test_data_requirements.py`の各正規化済み要求は`data_ref=data:<requirement_key>`を返し、`materialize_coverage.py`の`test_data_requirement_refs[]`はこの`data_ref`だけを参照する
 
 #### `requirement_structure.py`
 
-- required: `authorities[]`, `risks[]`, `test_requirements[]`, `dispositions[]`, `previous_tr_ids[]`
-- `authorities[]`: Authority ID文字列
-- risk: `{risk_id, priority}`、priorityは`高 / 中 / 低`
-- TR draft: `{draft_key, identity_action, reuse_id, text, authority_refs[], risk_refs[], priority, priority_override_reason, test_level, observation_method}`。`draft_key`は入力内一意、`identity_action=reuse|new`。`text`は非空文字列、`test_level / observation_method`は文字列またはnull。reuse時だけ既存`TR-\d{3}`を`reuse_id`へ指定し、new時は`reuse_id=null`
-- `previous_tr_ids[]`: `{tr_id, status}`。`status=active|deleted`。reuseは`active`だけ許可し、new採番の最大番号計算にはactive / deletedの両方を含めて削除済み番号を再利用しない
-- runtimeはreuse対象の存在・status・重複を検証し、newだけ最大番号+1で採番する。999到達後のnewは`id_space_exhausted`
-- `priority_override_reason`は空文字を許可。関連risk最高優先度より低い場合だけ非空必須
-- disposition: `{upstream_id, handling, reason, authority_refs[], covered_by_ref}`。handlingは既存TR Disposition集合、`covered_by_ref`は必要なhandlingだけ使用しその他はnull
-- outputに`tr_id_map[]: {draft_key, tr_id, identity_action}`と`tr_id_state[]: {tr_id, status}`を返す。固定builderは最終TR IDと入力`text / authority_refs / risk_refs / priority / test_level / observation_method`をjoinし、TR Machine Entityを生成する
+- 既存TR draft意味fieldを維持し、`draft_key`を入力内一意にする
+- canonicalized `test_requirements[]`を`draft_key`順で処理し、複数new TRへその順で採番する
+- previous active TRのうちcurrentでreuseされないIDは`deleted`へ遷移し、deleted rowを保持する
+- dispositionは`{upstream_entity:{skill, entity_type, entity_ref, content_fingerprint}, handling, reason, authority_refs[], covered_by_entity}`を使う
+- outputは`tr_id_map[]`とfull snapshotの`tr_id_state[]`
 
 #### `condition_structure.py`
 
-- required: `test_requirements[]`, `technique_selections[]`, `test_conditions[]`, `requirement_dispositions[]`, `models[]`, `previous_tcn_ids[]`, `previous_model_keys[]`
-- TR: `{tr_id, priority, authority_refs[], risk_refs[]}`
-- technique selection: `{selection_key, selected_techniques[], status}`。`selection_key`は入力内一意、`selected_techniques[]`はcanonical technique slugで重複不可
-- TCN draft: `{draft_key, identity_action, reuse_id, tr_refs[], condition, category, technique_slugs[], coverage_criterion, authority_refs[], risk_refs[], priority, priority_override_reason}`。`draft_key`は入力内一意。condition / coverage_criterionは非空文字列、categoryは文字列またはnull、`technique_slugs[]`は`_02` §4.3のcanonical technique slugだけを許可し重複不可。意味上の同一性はLLMが`identity_action=reuse|new`として決め、reuse時だけ既存`TCN-\d{3}`を指定する
-- requirement dispositionは共通Disposition schemaを使用する
-- 各TRはTCNの`tr_refs[]`またはrequirement dispositionのどちらか一方へ閉じ、unknown TR、linked + disposed重複、未閉鎖TRをviolationにする
-- TCNの既定priorityは関連TRの最高優先度。より低いpriorityを指定する場合だけ非空`priority_override_reason`を必須にし、runtimeが自動補正しない
-- model draft: `{draft_key, model_type, technique_slug, selection_source, selection_key, identity_action, reuse_model_key, parent_tcn_draft_key}`。`model_type`は`_02` §4.3の内部model type、`technique_slug`はcanonical technique slugまたはnull。`technique_slug!=null`では`selection_source=analysis|condition_design|user|derived`を必須とし、`analysis`では`selection_key`必須、その他では`selection_key=null`。`technique_slug=null`では`selection_source / selection_key`もnull。reuse時は既存modelの`model_type / technique_slug / selection_source / selection_key`を維持し、`identity_action`だけをreuseにする
-- `previous_tcn_ids[]`: `{tcn_id, status}`、`previous_model_keys[]`: `{model_key, model_type, technique_slug, parent_tcn_id, selection_source, selection_key, status}`。`status=active|deleted`。reuseはactiveだけ許可し、新規採番の最大番号にはdeletedも含める
-- runtimeはreuse対象の存在、status、重複、`model_type`、`technique_slug`、選択元、最終親TCN一致を検証し、新規TCN / modelだけ同じ`model_type`の既存最大番号+1で採番する
-- 1つのmodel keyは同時に1つのTCNだけへ所属する。別TCNへ同じmodel keyを割り当てない
-- 各TCN draftの`technique_slugs[]`は、そのTCNを`parent_tcn_draft_key`に持つactive model draftの**非nullな`technique_slug`集合**と完全一致させる。`model_type`を集合へ入れず、internal adapter / derived child modelの`technique_slug=null`はTCNの適用技法を増やさない
-- Classification TreeをPairwise / 組合せとして採用する親modelは`model_type=classification / technique_slug=comb`、そのderived combinatorial子modelは`model_type=comb / technique_slug=null`。Cause-Effectも親を`model_type=cause-effect / technique_slug=decision`、derived Decision Table子modelを`model_type=decision / technique_slug=null`とする
-- `selection_source=analysis`の確定selectionについて、各`selection_key + technique_slug`は非null`technique_slug`を持つmodel draftへちょうど1回対応するか、上流`test-analysis`ですでに対象外 / 未解決として明示閉鎖されていることを必須にする。`test-condition-design`自身が選んだ場合は`selection_source=condition_design`を使用する
-- `model_type=error-guessing / technique_slug=error-guessing`はmodel metadataを作るがruntime generator unitを期待集合へ追加しない
-- outputに`tcn_id_map[]: {draft_key, tcn_id, identity_action}`、`model_key_map[]: {draft_key, model_key, model_type, technique_slug, parent_tcn_id, identity_action}`、`tcn_id_state[]`、`model_key_state[]`を返す。固定builderはTCN draftの`technique_slugs[]`を含む意味fieldと最終TCN IDをjoinしてTCN Machine Entityを、model draftの`model_type / technique_slug / selection_source / selection_key`と最終model key / parent TCNをjoinしてmodel metadata Entityを生成する
-- 999到達後の新規TCNは`id_space_exhausted`。model keyは3桁以上を許可し999上限を設けない
+- requiredは既存のTR / selection / TCN / disposition / model / previous stateを維持する
+- model draftは`{draft_key, model_type, technique_slug, selection_source, selection_key, identity_action, reuse_model_key, parent_tcn_draft_key}`
+- 内部adapterは`technique_slug / selection_source / selection_key=null`。Coverage所有modelはcanonical `technique_slug`と`selection_source=analysis|condition_design|user`を持つ
+- `previous_model_keys[]`は`{model_key, model_type, technique_slug, parent_tcn_id, selection_source, selection_key, status}`で、成果物stateから損失なく復元する
+- TCN draftは`draft_key`順、model draftは`(parent_tcn_draft_key, model_type, draft_key)`順でnew IDを割り当てる
+- previous active TCN / modelでcurrent reuseされないものはdeletedへ遷移し、full snapshot stateを返す
+- TCNの`technique_slugs[]`は所属Coverage所有modelの非null technique slug集合と一致させる
+- Classification Tree / Cause-Effect / schema / UI adapterはcanonical techniqueを所有しない。Coverage child側へ正規技法とselection provenanceを置く
+- `selection_source=analysis`の各Coverage modelは参照selectionに同じtechnique slugが必要。1 selection → 複数TCN / modelを許可する
+- active selectionの各selected techniqueは1件以上のcurrent Coverage所有modelまたは明示closureへ到達必須。adapter親だけで閉鎖済みにしない
+- エラー推測modelはruntime generatorなしでもstateへ保持し、semantic Coverage Item対象にする
+- outputはID mappingとfull snapshotのTCN / model state
 
 #### `equivalence_partitions.py`
 
@@ -1288,16 +1180,17 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 
 #### `case_structure.py`
 
-- required: `test_conditions[]`, `coverage_items[]`, `test_cases[]`, `dispositions[]`, `previous_tc_ids[]`
-- TCN: `{tcn_id, priority}`
-- CI: `{ci_id, tcn_id, priority, authority_refs}`
-- TC draft: `{draft_key, identity_action, reuse_id, title_or_purpose, tr_refs[], tcn_refs[], ci_refs[], priority, priority_override_reason, preconditions[], test_data[], steps[], expected_results[], postconditions_or_cleanup[]}`。`draft_key`は入力内一意、`identity_action=reuse|new`。`title_or_purpose`は非空文字列、preconditions / test_data / postconditions_or_cleanupは文字列配列、stepは`{number, text}`で1から連番。reuse時だけ既存`TC-\d{3}`を`reuse_id`へ指定し、new時は`reuse_id=null`
-- `previous_tc_ids[]`: `{tc_id, status}`。`status=active|deleted`。reuseはactiveだけ許可し、new採番の最大番号にはdeletedも含めて削除済み番号を再利用しない
-- runtimeはreuse対象の存在・status・重複を検証し、newだけ最大番号+1で採番する。999到達後のnewは`id_space_exhausted`
-- expected result: `{number, text, authority_refs[]}`。numberは1から連番
-- priority_override_reasonは低い優先度へoverrideする場合だけ非空必須
-- disposition: `{upstream_id, handling, reason, authority_refs[], covered_by_ref}`
-- outputに`tc_id_map[]: {draft_key, tc_id, identity_action}`と`tc_id_state[]: {tc_id, status}`を返す。固定builderは最終TC IDと入力`title_or_purpose / tr_refs / tcn_refs / ci_refs / priority / preconditions / test_data / steps / expected_results / postconditions_or_cleanup`をjoinしてTC Machine Entityを生成する
+- required: `test_conditions[]`, `coverage_items[]`, `environment_requirements[]`, `test_data_requirements[]`, `test_cases[]`, `dispositions[]`, `previous_tc_ids[]`
+- TCN: `{tcn_id, tr_refs[], priority}`
+- CI: `{ci_id, tcn_id, model_key, priority, authority_refs[], source_kind, execution, semantic_item_text, test_data_requirement_refs[]}`
+- environment / test data requirementはcurrent Machine Entityのcanonical contentとcontent fingerprintを渡す
+- TC draftは既存fieldに`environment_requirement_refs[] / test_data_requirement_refs[]`を追加する
+- 各`ci_ref`の親TCNは`tcn_refs[]`に必須。TCの`tr_refs[]`は参照TCNのTR unionと一致させる
+- CIのtest data requirement refsはTCのrefsへ含め、参照requirementの存在とfingerprintを検証する
+- LLMはCIのcanonical `execution`または`semantic_item_text`とcurrent requirementsを使い、Markdown Coverage Item表からmachine値を再抽出しない
+- canonicalized TC draftを`draft_key`順で採番し、previous activeでreuseされないTCはdeletedへ遷移する
+- dispositionは完全Machine Entity参照schemaを使う
+- outputはTC mappingとfull snapshot state
 
 #### `traceability.py`
 
@@ -1312,29 +1205,17 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 
 #### `materialize_coverage.py`
 
-- required: `tcn_id`, `models[]`, `semantic_coverage_items[]`, `target_annotations[]`, `target_dispositions[]`, `test_data_requirements[]`, `previous_target_id_map[]`, `previous_ci_ids[]`, `previous_expected_result_roots[]`, `merge_groups[]`
-- `tcn_id`は`TCN-\d{3}`
-- model: `{model_key, model_type, technique_slug, skill, runtime_unit_key, input_fingerprint, model_fingerprint, generation_fingerprint, generator_contract_version, support_status, runtime_status, result_status, deterministic_generated, freshness_status, targets[]}`。runtime generatorを持つmodelだけをここへ入れ、全modelは`condition_structure.py`で同じ`tcn_id`への1対1所属を検証済みであること
-- materialize対象modelは`runtime_status=ok / result_status=ready / deterministic_generated=true / freshness_status=current`を必須にする。`support_status=supported`または、unsupported itemとtarget集合が分離済みの`partial`だけ許可する
-- semantic coverage item: `{draft_key, model_key, identity_action, reuse_ci_id, source_target_versions[], item_text, authority_refs[], reference_refs[], priority, expected_result_root, test_data_requirement_refs[]}`。runtime generatorへ移さない正規技法、またはfork-join等の直接linear executionへ落とさないCoverage Itemだけに使用する。`model_key`は同じTCNのactive modelを参照し、`identity_action=reuse|new`、reuse時だけactiveな既存CI IDを指定する。`source_target_versions[]`は`{target_ref, target_content_fingerprint, generation_fingerprint}`で、fork-join等のmachine targetを意味判断へ渡す場合は現在targetと完全一致を必須にし、エラー推測のように元machine targetがない場合は空配列とする。machine target / execution / generation fingerprintを捏造しない
-- `freshness_status=current`は、現在のMachine Entity / 正規化済み意味入力をpreflight確認した後、現在scriptを再実行して正常生成したresultだけに付与する。保存済みresultをmaterialize入力として直接再利用しない。`materialize_coverage.py`自身はupstream semantic freshnessを再判定しない
-- machine target: `{target_ref, target_content_fingerprint, materializable, execution_fingerprint, target_key, execution, authority_refs, reference_refs, ...技法固有machine fields}`。`materializable=true`では`execution`と`execution_fingerprint`必須、`false`では両方null。`target_content_fingerprint / execution_fingerprint`は`_02` §7.2の式をruntimeが計算する。priority、expected result、test data要求をLLMに埋め戻させない
-- target annotation: `{target_ref, target_content_fingerprint, generation_fingerprint, priority, expected_result_root, test_data_requirement_refs[]}`。Dispositionされないmachine targetにちょうど1件対応し、unknown / duplicate target_refを拒否する。`target_content_fingerprint`と`generation_fingerprint`は現在machine target / modelと一致必須で、以前のtarget内容・上流Entity内容・runtime世代に対するannotationを再利用しない。`expected_result_root`は同一TCN内の内部用local keyで`^[A-Za-z][A-Za-z0-9._:-]{0,63}$`、同じkeyはLLMがAuthorityに基づき同じ期待挙動へ統合可能と判断したtargetだけへ付与する。前回同じ期待挙動groupを再利用すると意味判断した場合は`previous_expected_result_roots[]`の既存keyを維持し、新規groupだけ未使用keyを追加する。製品Authorityそのものとして扱わない
-- target disposition: `{target_ref, target_content_fingerprint, generation_fingerprint, handling, reason, authority_refs, covered_by_target_ref}`。`target_content_fingerprint`と`generation_fingerprint`は現在machine target / modelと一致必須。`_02` §7.4のhandlingだけを許可し、同一target_refへannotationとDispositionを同時指定しない。`重複`では`covered_by_target_ref`必須
-- `target_ref`は`_02` §7.2の式を再計算して一致必須
-- `test_data_requirements[]`は`{data_ref, requirement_key, dimension_key, operator, ...}`で、`data_ref=data:<requirement_key>`を一意にする。annotationの全`test_data_requirement_refs[]`はこの集合に存在必須
-- `previous_target_id_map[]`: `{target_ref, model_key, target_key, target_content_fingerprint, ci_id, mapping_status}`。`mapping_status=active|inactive`で、Disposition中targetの直近CIもinactiveとして保持する。同じ`target_ref`でcontent fingerprintが変わった場合はCI IDを維持しても`stale_ci_ids`へ追加する
-- `previous_ci_ids[]`: `{ci_id, status}`。`status=active|deleted`で削除済み番号も保持する
-- `previous_expected_result_roots[]`: `{expected_result_root, status}`。`status=active|deleted`。同じ意味groupのkey再利用可否はLLMが判断し、runtimeはduplicate / deleted keyの不正reuseを検査する
-- merge groupは`_02` §11形式の`model_key / target_refs[] / target_versions[]`で、Dispositionされていない同一TCN・同一model内targetだけを許可する。全target versionは現在machine target / modelと一致必須で、`execution_fingerprint`と`expected_result_root`が全件一致する場合だけ同一CIへ統合する。異なるmodel / 技法はCIを分け、必要なら`case_structure.py`の1 TC draftで複数`ci_refs[]`を参照する。group内の追加test data requirementは§16と同じintersection規則で統合し、conflict / unsupportedならmergeを拒否する
-- `materializable=false`のうちadapter / diagnostic専用targetはCI採番対象へ入れず、target annotation / target dispositionも要求しない。正規Coverage基準を満たすために必要だが線形executionへ直接落とさないtarget（fork-join branch等）は、現在の`target_ref / target_content_fingerprint / generation_fingerprint`を`semantic_coverage_items[].source_target_versions[]`へ保持したsemantic Coverage Item、または既存Skillで許可されたDispositionへ閉じるまでmodelを完了扱いしない
-- `target_dispositions[]`にあるmaterializable targetはCI採番対象から除外し、generatorの`coverage_summary`自体は変更しない
-- outputは`target_id_map[]`、`target_mapping_state[]`、`ci_id_state[]`、`expected_result_root_state[]`、`disposed_target_refs[]`、`coverage_item_rows`、`stale_ci_ids`、`issues`
-- `target_id_map[]`: `{target_ref, target_content_fingerprint, execution_fingerprint, model_key, target_key, ci_id}`。active mappingだけを返し、1 target_refから複数CIへのmappingは禁止する
-- `target_mapping_state[]`はactive / inactiveと直近`target_content_fingerprint`を保持し、`ci_id_state[]`はactive / deletedを保持する。次回のprevious stateはこれらを正本にする
-- 固定builderはactive CIごとに`_02` §4.4のCI Machine Entityを生成する。machine target由来は`source_kind=runtime_target`として`covered_targets[]`を`target_ref`順で集約し、semantic Coverage Item由来は`source_kind=semantic_item / covered_targets=[] / semantic_item_key=semantic:<ci_id> / semantic_source_targets=<source_target_versions[]>`とする。priority / expected_result_root / Authority / Reference / test data requirementは現在annotation / targetまたはsemantic itemから機械joinし、LLMがCI Entity JSONを再生成しない
-- CI Machine Entityの`runtime_dependencies[]`には現在の`materialize_coverage.py` generationを、`upstream_entity_dependencies[]`には親TCNとmodel metadataを保存する。stable target_refのままtarget内容が変わる場合も、semantic item本文・根拠等が変わる場合もCI content fingerprintを変え、既存TCをstaleにする
-- `disposed_target_refs[]`: `{target_ref, handling, covered_by_target_ref}`。Coverage済みtarget数の計算には使用しない
+- required: `tcn_id`, `active_model_metadata[]`, `models[]`, `semantic_coverage_items[]`, `target_annotations[]`, `target_dispositions[]`, `test_data_requirements[]`, `previous_target_id_map[]`, `previous_semantic_ci_map[]`, `previous_ci_ids[]`, `previous_expected_result_roots[]`, `merge_groups[]`
+- `active_model_metadata[]`はTCN配下の全current modelを`{model_key, model_type, technique_slug, parent_tcn_id, content_fingerprint}`で渡す
+- `models[]`は今回正常生成したcurrent generator resultだけを含む。runtimeなしmodelやunsupported modelを成功resultとして偽装しない
+- semantic itemは`{semantic_item_key, model_key, identity_action, reuse_ci_id, source_target_versions[], item_text, authority_refs[], reference_refs[], priority, expected_result_root, test_data_requirement_refs[]}`
+- `semantic_item_key`は成果物系列内stable key。`previous_semantic_ci_map[]`は`{semantic_item_key, model_key, ci_id, mapping_status}`で過去mappingを保持する
+- semantic reuseは同じkey / model / active previous mappingのCIだけ許可し、別item・別model・runtime target CIへの横取りを拒否する
+- new CI候補は`(model_key, source_kind, source_key)`でsortし、`runtime_target < semantic_item`、source keyは`target_ref`または`semantic_item_key`。raw入力順で採番しない
+- runtime target CIはcanonical `execution`を、semantic CIは`semantic_item_key / semantic_item_text / semantic_source_targets[]`をMachine Entity contentへ保存する
+- test data requirementはcurrent Entity fingerprintをCI dependencyへ保存する
+- `materializable=false`の正規Coverage targetはsemantic itemまたはDispositionへ1回だけ閉じる
+- outputは既存stateに加えて`semantic_ci_mapping_state[]`を返す
 
 #### `workflow_runtime.py`
 
@@ -1348,10 +1229,10 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - `runtime_units[]`のidentity集合は`expected_runtime_units[]`と完全一致、`current_entities[]`のidentity集合は`expected_entities[]`と完全一致を必須にする。期待item欠落はblocker、未知の余分なcurrent itemは`invalid_input`とする
 - 各Skillの同一内容`runtime_contract.py`にruntime dependency graphとMachine Entity dependency graphを評価する共通関数を置く。missing dependencyはstale + blocker、duplicateまたはcycleは`invalid_input`
 - `unsupported_item_closures[]`: `{skill, runtime_unit_key, generation_fingerprint, item_key, reason_code, handling, reason, authority_refs, covered_by_ref}`。`handling`は`llm_fallback / 対象外 / 別テストレベル / 残存リスク / 成立不能 / 重複 / ブロック中`だけを許可する。closureの`generation_fingerprint`は対象runtime unitの現在値と一致必須。`support_status=partial`では`item_key`をunsupported itemのstable keyで必須とし、`reason_code`も現在unsupported itemと一致必須。whole-model `unsupported`では`item_key=null / reason_code=null`を許可するが`generation_fingerprint`一致は必須とする。世代またはreasonが変わった以前のclosureを自動再利用しない
-- `llm_fallback`と`重複`は`covered_by_ref`必須で、currentなMachine Entityへ解決できることを検証する。`対象外 / 別テストレベル / 残存リスク / 成立不能`は既存`test-condition-design`のDisposition条件をそのまま適用し、不要な`covered_by_ref`はnullとする。`ブロック中`はclosure rowとして保持しても閉鎖済みには数えず`can_complete=false`とする
+- `llm_fallback`と`重複`は`covered_by_entity`必須で、currentなMachine Entityへ解決できることを検証する。`対象外 / 別テストレベル / 残存リスク / 成立不能`は既存`test-condition-design`のDisposition条件をそのまま適用し、不要な`covered_by_entity`はnullとする。`ブロック中`はclosure rowとして保持しても閉鎖済みには数えず`can_complete=false`とする
 - runtimeは意味上の再利用可否、開始Skill、仕様Authorityの優先関係を再判断しない
 - outputは`freshness[]: {skill, runtime_unit_key, generation_fingerprint, freshness_status, stale_reasons[]}`、`entity_freshness[]: {skill, entity_type, entity_ref, model_key, freshness_status, stale_reasons[]}`、`completion: {can_complete, blockers[]}`、runtime状態表用の正規化rowを返す
-- `can_complete=true`には、expected runtime / Entity集合が完全一致し、全runtime unitと対象Machine Entityがcurrent、全unitの`result_status=ready`、runtime required unitが`deterministic_generated=true`であることに加え、partial / unsupportedの各itemが上記closure契約を満たし、`ブロック中`closure、missing / staleな`covered_by_ref`、既存Disposition条件違反が0件であることを必須にする
+- `can_complete=true`には、expected runtime / Entity集合が完全一致し、全runtime unitと対象Machine Entityがcurrent、全unitの`result_status=ready`、runtime required unitが`deterministic_generated=true`であることに加え、partial / unsupportedの各itemが上記closure契約を満たし、`ブロック中`closure、missing / stale / fingerprint不一致な`covered_by_entity`、既存Disposition条件違反が0件であることを必須にする
 
 ### unsupported item共通schema
 
