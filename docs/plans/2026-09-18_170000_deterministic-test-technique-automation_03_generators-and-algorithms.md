@@ -1051,6 +1051,7 @@ CI単位の`merge_group`と、TCが複数CIを参照する意味判断を分離�
 | `technique_candidates.py` | 全signal、selection key | `selection_key` | candidates、undetermined、complete |
 | `change_impact.py` | changed node、nodes、edges | `impact:<node_key>` | impacted nodes / paths |
 | `environment_requirements.py` | requirements[] | `env:<requirement_key>` | merged requirements / conflicts |
+| `analysis_entities.py` | test-analysis意味field + current runtime result | `(entity_type, entity_ref)` | Machine Entity / expected identity |
 | `requirement_structure.py` | authorities、risks、TR、Disposition、previous ID state | `violation:<type>:<entity_id>` | violations / derived priority / TR ID mapping |
 | `condition_structure.py` | TCN、models、previous ID state | `violation:<type>:<entity_id>` | violations / TCN・model key mapping |
 | `equivalence_partitions.py` | sets[] / partitions[] | `ep:<set_key>:<partition_key>` | representative / Coverage |
@@ -1153,6 +1154,19 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - `operator=boolean`: `value` boolean必須
 - `source_target_versions[]`は`{target_ref, target_content_fingerprint, generation_fingerprint}`。test dataでは1件以上、environmentでは空配列を許可する。test dataでは全rowが`current_source_targets[]`の同じ`source_model_key`へ完全一致しなければ`invalid_input`とし、別modelのtargetや古いversionを受理しない。modelを跨ぐtraceabilityへ`target_key`単独を使用しない
 - `test_data_requirements.py`の各正規化済み要求は`data_ref=data:<requirement_key>`を返し、`materialize_coverage.py`の`test_data_requirement_refs[]`はこの`data_ref`だけを参照する
+
+#### `analysis_entities.py`
+
+- required: `test_analysis_context`, `product_risks[]`, `technique_selections[]`, `change_nodes[]`, `change_edges[]`, `environment_requirements[]`, `risk_matrix_results[]`, `technique_candidate_results[]`
+- `test_analysis_context`は`_02` §4.4のcontext contentと同じ意味fieldを持つ
+- Product Risk draft: `{risk_id, failure, source_refs[], authority_refs[], impact, likelihood, assessment_reason, confidence_note}`。各`risk_id`は入力内一意で、対応する`risk_matrix_results[]`の`risk_id / level / mapped_priority`と1対1でjoinする。missing / duplicate / unknown resultを`invalid_input`にする
+- Technique Selection draft: `{selection_key, applicability_scope, selection_source, signals, selected_techniques[], selection_reason, risk_refs[], authority_refs[], condition_design_focus[], undetermined_signal_closures[], status}`。対応する`technique_candidate_results[]`の`selection_key / candidates[] / undetermined_signals[]`と1対1でjoinし、closure対象signal集合を一致させる
+- `status=active`では全`undetermined_signals[]`が`resolved / selection_not_affected / question`のいずれかへ1回だけ閉じ、`selected_techniques[]`はcanonical technique slugだけを許可する
+- change node / edgeは`_02` §4.4の`change_kind / expected_impact / evidence_refs[]`を含むcontent schemaをそのまま使う
+- `environment_requirements[]`はcurrent `environment_requirements.py` resultから固定builderが渡す正規化済み要求で、同runtime unitを`upstream_runtime_units[]`へ保持する
+- Product Riskはcurrent `risk_matrix.py`、Technique Selectionはcurrent `technique_candidates.py`の対応resultを必要な場合だけ`upstream_runtime_units[]`へ保持する。change impact resultはchange graph contentの正本にはせず、別runtime resultとして保存する
+- outputはcanonical sort済み`machine_entities[]`と`expected_entity_identities[]`。expected identityはdraft / normalized resultのidentity sourceから導出し、生成済み`machine_entities[]`の存在から逆算しない
+- Machine Entity wrapper / content fingerprint / dependencyは`runtime_contract.py`の共通builderで生成し、LLMがJSONを再構築しない
 
 #### `requirement_structure.py`
 
