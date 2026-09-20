@@ -1173,6 +1173,8 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - change node / edgeは`_02` §4.4の`change_kind / expected_impact / evidence_refs[]`を含むcontent schemaをそのまま使う
 - `environment_requirements[]`はcurrent `environment_requirements.py` resultから固定builderが渡す正規化済み要求で、同runtime unitを`upstream_runtime_units[]`へ保持する
 - Product Riskはcurrent `risk_matrix.py`、Technique Selectionはcurrent `technique_candidates.py`の対応resultを必要な場合だけ`upstream_runtime_units[]`へ保持する。change impact resultはchange graph contentの正本にはせず、別runtime resultとして保存する
+- 同一invocation内のEntity生成順は、(1) change graph / environment requirement、(2) Product Risk、(3) Technique Selection / test-analysis contextで固定する。後段Entityが前段Entityをsemantic dependencyとして参照する場合は、同じ実行で確定した前段Entityのcanonical content fingerprintを使用する
+- change graph内のRisk / TR / TCN / CI / TC nodeは構造参照であり、それら下流QA Entityへのdependencyを自動追加しない。これによりProduct Riskがchange graphを参照してもdependency cycleを作らない
 - outputはcanonical sort済み`machine_entities[]`と`expected_entity_identities[]`。expected identityはdraft / normalized resultのidentity sourceから導出し、生成済み`machine_entities[]`の存在から逆算しない
 - Machine Entity wrapper / content fingerprint / dependencyは`runtime_contract.py`の共通builderで生成し、LLMがJSONを再構築しない
 
