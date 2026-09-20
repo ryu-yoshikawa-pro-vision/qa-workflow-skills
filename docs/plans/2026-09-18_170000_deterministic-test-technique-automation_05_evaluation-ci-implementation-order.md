@@ -522,7 +522,7 @@ raw machine-readable入力をfixtureにします。
 - `test_data_requirement_refs[]`は同じmaterialize inputの`data:<requirement_key>`へ解決できることを必須にする
 - merge groupは`{merge_group_key, model_key, target_refs[], target_versions[]}`を使い、Dispositionされていない同一TCN・同一`model_key`のtargetだけを含む。各`target_versions[]`は`target_ref / target_content_fingerprint / generation_fingerprint / execution_fingerprint`を保持し、全targetの`execution_fingerprint`と`expected_result_root`の一致を要求する
 - 異なるmodel / 技法のtargetを同一CIへmergeせず、同一TCで実行できる場合は`case_structure.py`の複数`ci_refs[]`で表現する
-- merge targetの追加test data requirementsを§16と同じintersection規則で統合し、矛盾 / unsupportedならmerge拒否
+- merge targetの追加test data requirementsを[追加generator契約](./2026-09-18_170000_deterministic-test-technique-automation_03_additional-generators.md) §16と同じintersection規則で統合し、矛盾 / unsupportedならmerge拒否
 - 同じ期待挙動groupを再利用すると判断した場合は既存`expected_result_root`を維持し、意味不変のkey churnをsemantic evalで検出する
 
 ### test case structure
