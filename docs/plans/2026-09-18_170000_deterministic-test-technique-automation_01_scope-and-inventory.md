@@ -93,7 +93,7 @@ Domain Testing、CRUD Testing、Random Testing、Metamorphic Testing、Syntax-Ba
 generatorが返す100%等のCoverageは、**明示された正規化済みモデル内のCoverage**です。対象仕様全体の100%とは扱いません。
 
 - Authority / Risk → TR → TCNの上流閉鎖は別途確認する
-- 選択した正規技法は`selection_source / selection_key / technique_slug`で1件以上のCoverage所有model、対象外、未解決、またはruntime非対応closureへ閉じる。1つの技法選択から複数TCN / modelへ展開してよい。TCNの`technique_slugs[]`は所属Coverage所有modelのcanonical technique集合と一致させる。エラー推測はsemantic Coverage ItemをCI Machine Entityへ載せて閉鎖する
+- active Technique Selectionの`selected_techniques[]`に残る正規技法は、`selection_source / selection_key / technique_slug`で1件以上のcurrent Coverage所有modelへ到達させる。選択後に対象外 / 未解決と判断した場合はTechnique Selection Entityを更新してselected listから外すか既存block / unresolvedへ戻す。runtime非対応はCoverage所有model生成後のunsupported closureで扱う。1つの技法選択から複数TCN / modelへ展開してよい。TCNの`technique_slugs[]`は所属Coverage所有modelのcanonical technique集合と一致させる。エラー推測は1件以上のsemantic Coverage ItemをCI Machine Entityへ載せて閉鎖する
 - 正規化済みモデルが上流の意味を十分に表しているかはsemantic evalで確認する
 - 全runtime unitで`result_status=ready / freshness_status=current`を必須とし、さらに`runtime_required=true`のunitでは`deterministic_generated=true`を必須とする
 - Dispositionによる成果物上の閉鎖と技法Coverage達成を混同しない
