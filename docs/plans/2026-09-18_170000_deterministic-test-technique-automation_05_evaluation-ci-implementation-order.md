@@ -499,7 +499,7 @@ raw machine-readable入力をfixtureにします。
 - `target_dispositions[].handling`は`対象外 / 別テストレベル / 残存リスク / ブロック中 / 重複`だけを許可する
 - `重複`ではcurrentな`covered_by_target_version={target_ref,target_content_fingerprint,generation_fingerprint,execution_fingerprint}`を必須にし、self参照を拒否する。全materialize結果を集約したduplicate graphでcycleを拒否し、chain終端がcurrent CI mappingまたはcurrent semantic CIへ到達することを要求する
 - generator生成後に`成立不能`Dispositionへ変更しない。成立不能根拠が得られた場合はmodel / constraintを更新してgeneratorを再実行する
-- Disposition済みtargetへCIを採番せず、同時にgeneratorの`coverage_summary.required / covered / complete`を変更しない
+- Disposition済みtargetへCIを採番せず、同時にgenerator固有の`coverage_summary`または`completion_summary`を変更しない
 - `ブロック中`Dispositionはworkflow完了を妨げる
 - materialize outputから生成したCI Machine Entityは、machine target由来ではcanonical `execution`まで保存する。semantic item由来ではstable `semantic_item_key`と`semantic_item_text / source_target_versions[]`を保存し、`priority_override_reason`を含む意味field変更でCI content fingerprintを変える
 - stable target_refのままtarget content / executionが変わった場合、CI Machine Entityのcontent fingerprintが変わり、参照TCへstaleが伝播する
@@ -534,7 +534,7 @@ raw machine-readable入力をfixtureにします。
 ### traceability
 
 - Dispositionはstructure scriptと同じ共通schemaをそのまま受け取り、Markdownから再解釈しない
-- `traceability.py`と`workflow_runtime.py`が同じ`runtime_contract.py` freshness関数・同じ`runtime_units / current_entities / current_runtime_units / expected_runtime_units / expected_entities` schemaを使う
+- `traceability.py`と`workflow_runtime.py`が同じ`runtime_contract.py` freshness / closure関数と、`runtime_units / current_entities / current_runtime_units / expected_runtime_units / expected_entities / unsupported_item_closures` schemaを使う
 - Machine Entityの`upstream_entity_dependencies[] / runtime_dependencies[]`から`entity_freshness[]`を同じ結果として算出し、missing / generation mismatch / dependency cycleを検出する
 - `traceability.py`は`workflow_runtime.py` resultを依存入力にせず、`coverage-analysis::artifact:traceability:all`自身と`qa-workflow::artifact:workflow_runtime:all`を`runtime_units[] / current_runtime_units[] / expected_runtime_units[]`へ含めない。いずれかのinclusionを`invalid_input`として回帰検出する
 - Authority / Risk → TRまたはDisposition
@@ -928,7 +928,7 @@ runtime対象の次の6 Skillを単体コピーして代表scriptをCLI実行し
 
 - `SKILL.md` / `references/guidance.md`へ新規正規技法と選択条件を追加
 - `assets/output-template.md`へ`Machine Entities`、`Machine Runtime Input / Result`、`Selection Source`、技法選択machine evidence、undetermined signalの`resolved / selection_not_affected / question`閉鎖状態を追加
-- Product Risk Machine EntityはLLM意味fieldと`risk_matrix.py`の`level / mapped_priority`を固定builderでjoinする
+- `analysis_entities.py`がtest-analysis context / Product Risk / Technique Selection / change graph / environment requirementのLLM意味fieldとcurrent runtime resultをjoinし、Machine Entity / dependency / expected Entity identityを固定生成する。Product Riskは`assessment_reason / confidence_note`も保持する
 - risk scheme / priority mapping
 - change graph
 - environment requirement
@@ -1055,7 +1055,7 @@ runtime対象の次の6 Skillを単体コピーして代表scriptをCLI実行し
 ### Step 3: test-analysis
 
 - runtimeは`対象 / 実行範囲=テスト分析`だけでdispatchする
-- Product Risk / 技法選択 / change graph / environment requirementのMachine Entityを固定builderで保存する
+- `analysis_entities.py`でProduct Risk / 技法選択 / change graph / environment requirement / test-analysis contextのMachine Entityとexpected identityを保存する
 - risk scheme / priority mapping
 - technique candidates / Selection Source / undetermined signal閉鎖
 - 新規正規技法のSkill契約
