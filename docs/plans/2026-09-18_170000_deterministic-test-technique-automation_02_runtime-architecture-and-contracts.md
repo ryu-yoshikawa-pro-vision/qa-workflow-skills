@@ -190,7 +190,7 @@ Cause-Effect → Decision Table、Classification Tree → combinatorial、schema
 4. child modelが正規技法を表す場合は`technique_slug`をchildへ持たせる
 5. 技法の選択元は`analysis / condition_design / user`のいずれかとし、runtimeから派生したこと自体をSelection Sourceにしない
 6. `analysis`由来childは元の`selection_key`を保持し、機械派生元は`upstream_runtime_units[]`へ保存する
-7. adapter出力を正規技法として採用した場合は、対応child modelまたは既存Skill契約上の明示的な扱いへ閉じる。adapter親へ正規`technique_slug`を置いてchild欠落を隠さない
+7. adapter出力を正規技法として採用した場合は対応するCoverage所有child modelを必須にする。採用しない候補はTechnique Selectionの`selected_techniques[]`へ残さない。adapter親や別のclosure行でchild欠落を隠さない
 
 固定対応:
 
