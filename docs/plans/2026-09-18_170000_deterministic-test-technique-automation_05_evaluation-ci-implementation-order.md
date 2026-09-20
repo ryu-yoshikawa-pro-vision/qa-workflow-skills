@@ -229,6 +229,7 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - 1 model key = 1 TCN所属を検査し、同じmodel keyを複数TCNへ割り当てない
 - outputの`tcn_id_state[] / model_key_state[]`にdeleted IDも残し、次回入力の正本にする
 - TCN draftの`condition / category / technique_slugs[] / coverage_criterion / authority_refs / risk_refs / priority_override_reason`とmodel draftの`model_type / technique_slug / selection_source / selection_key / derived_from_model_draft_key`をruntime inputへ保持し、最終IDとjoinしてTCN / model metadata Machine Entityを固定生成する
+- 同一`condition_structure.py` invocationで生成するparent TCN / adapter modelを事前`upstream_entities[]`へ要求せず、TCN → adapter model → child modelの固定生成順でEntity dependencyを接続する
 - Coverage所有modelだけ`selection_source=analysis / condition_design / user`を持ち、内部adapterは`technique_slug / selection_source / selection_key=null`
 - 各TCNの`technique_slugs[]`と所属Coverage所有modelのcanonical `technique_slug`集合を完全一致で検証する
 - Classification Tree / Cause-Effect / schema adapterは正規技法を所有せず、child Coverage modelがcanonical techniqueと元のselection provenance、`derived_from_model_key`を持つ
