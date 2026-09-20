@@ -32,7 +32,7 @@ skills/test-target-inspection/
 
 - 今回確認する対象範囲
 - 実対象へ到達するためのURL / 入口または同等の識別情報
-- 実対象を観測できるbrowser / computer操作能力
+- 実対象を観測できるPlaywright MCP等のbrowser / computer操作能力
 - 既存テスト対象資料または保存先（存在する場合）
 
 既存資料がある場合は、今回対象範囲のcurrentness確認を必須とします。既存資料がない場合は、今回対象範囲を新規収集します。
