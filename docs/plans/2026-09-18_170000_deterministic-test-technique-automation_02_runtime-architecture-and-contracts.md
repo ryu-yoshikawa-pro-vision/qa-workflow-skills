@@ -872,7 +872,7 @@ CIは§7.2.2のtarget mapping状態遷移を優先し、同sectionで明示し�
 - 同一targetへCI mappingとDispositionを同時指定しない
 - `ブロック中`はworkflow完了不可
 
-Dispositionはgeneratorの`coverage_summary`を書き換えません。
+Dispositionはgeneratorの`coverage_summary`または`completion_summary`を書き換えません。
 
 `merge_groups[]`は`{merge_group_key, model_key, target_refs[], target_versions[]}`で固定します。`merge_group_key`はstable component key、`target_refs[]`は2件以上で重複不可、`target_versions[]`は各targetについて`{target_ref, target_content_fingerprint, generation_fingerprint, execution_fingerprint}`を1件ずつ持ちます。全targetは同一TCN・同一`model_key`・Dispositionなし・current versionで、`execution_fingerprint`と`expected_result_root`が一致する場合だけmergeできます。入力は`merge_group_key`順、各group内は`target_ref`順にcanonicalizeします。
 
