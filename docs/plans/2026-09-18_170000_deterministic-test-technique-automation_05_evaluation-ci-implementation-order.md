@@ -489,7 +489,7 @@ raw machine-readable入力をfixtureにします。
 - semantic itemのstable key / previous mapping / reuse CIを検証し、別item・別model・runtime target CIへの横取りを拒否する。`source_target_versions[]`はsemantic item自身の`model_key`に属するcurrent targetだけを許可する
 - test data requirement Entity fingerprint変更をCI / TC staleへ反映する
 
-- materialize入力modelは`runtime_status=ok / result_status=ready / deterministic_generated=true / freshness=current`を必須にし、supportedまたは分離済みpartialだけ許可する
+- materialize入力modelは`runtime_status=ok / result_status=ready / deterministic_generated=true / freshness=current`に加え、model type別の`coverage_summary.complete`または`completion_summary.complete`を必須にする。CRUDはcompleteness / consistency双方のcompleteを要求し、Random / Metamorphicの件数未達をCI化しない。supportedまたは分離済みpartialだけ許可する
 - unresolved / blocked / stale modelからCIを作らない
 - generator targetは`materializable=true|false`を必須にし、`true`だけmachine targetとしてCI materialize / target Dispositionの対象とする。adapter / diagnostic専用`false` targetはmachine evidenceとして保持してCIを要求しない。一方、fork-join branch等の正規Coverage基準上必要な`false` targetは、現在target versionを参照するsemantic Coverage Itemまたは既存Skillで許可されたDispositionへ閉じるまで完了させない
 - 同一target_refへ`target_annotations[]`と`target_dispositions[]`を同時指定しない
