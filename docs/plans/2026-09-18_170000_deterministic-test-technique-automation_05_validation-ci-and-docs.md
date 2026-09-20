@@ -126,8 +126,8 @@ runtime対応Skillの`evals/output/cases/*/expected.json`では、既存fieldに
 }
 ```
 
-- `machine_entities.expected_entities[]`は成果物から抽出した`(skill, entity_type, entity_ref)`集合と一致させ、各contentはentity type別canonical schemaと人間向け表の主要fieldへ独立照合する
-- `spec-analysis`ではruntime_contractなしでMachine Entity fixtureを使用し、Authority表とcanonical Authority contentの一致を検証する
+- `machine_entities.expected_entities[]`は各Skillの固定builderがnormalized source / structure stateから導出した`(skill, entity_type, entity_ref)`をfixtureへ明示し、actual成果物のMachine Entity集合から逆算しない。validatorはactual identity集合とのmissing / extraと、各contentのentity type別canonical schema・人間向け表主要fieldを独立照合する
+- `spec-analysis`では`runtime_contract.py`のcanonical / Machine Entity helperと`authority_entities.py`を使うfixtureを用意し、runtime unitを作らずAuthority表とcanonical Authority content / expected identityの一致を検証する
 - expected target / Coverageは手書きfixtureから独立計算または明示し、generator出力をexpectedへコピーしない
 - `expected_target_id_map`はstateful materialize caseだけ使用し、`{target_ref, target_content_fingerprint, generation_fingerprint, execution_fingerprint, model_key, target_key, ci_id}`配列で保持する
 - `expected_model_completion`はmaterialize / workflow integration caseで使用し、modelごとの`required_target_refs / closed_target_refs / active_ci_ids / semantic_item_keys / materialize_complete`を手書きfixtureから明示する。runtime出力をexpectedへコピーしない
