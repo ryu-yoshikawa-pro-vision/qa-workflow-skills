@@ -195,10 +195,11 @@ Cause-Effect → Decision Table、Classification Tree → combinatorial、schema
 2. child model draftは`derived_from_model_draft_key`で同じ入力内のadapter draftを1件だけ参照する。adapterでない親、unknown draft、自己参照、複数親は`invalid_input`
 3. `condition_structure.py`がadapter / child双方の`model_key`と親TCNを先に確定し、active Technique Selectionの`selected_techniques[]`がCoverage所有child modelへ到達することをこの時点で検証する
 4. adapter modelは`technique_slug=null / selection_source=null / selection_key=null`、child modelはcanonical `technique_slug`と`selection_source=analysis / condition_design / user`を持つ。`analysis`由来childだけ元の`selection_key`を保持する
-5. 確定したadapter `model_key`で親runtimeを実行し、`derived.*`を生成する
-6. 固定builderはchildの`derived_from_model_key`から親adapter runtime unitを一意に解決し、child generatorの`upstream_runtime_units[]`へそのcurrent generationを保存する。LLMはruntime dependencyを手入力しない
-7. LLMは派生先で必要な意味パラメータだけを補い、固定builderが親runtimeのmachine outputとjoinして既に採番済みのchild model inputを作る。selected childへ対応するderived inputを親runtimeが生成できない場合は、そのchild generatorを空入力で実行せず`unresolved`へ戻し、Technique Selectionまたはcondition-design判断を更新する
-8. adapter出力を正規技法として採用した場合は対応childを必須にし、採用しない候補はTechnique Selectionの`selected_techniques[]`へ残さない。adapter親や別のclosure行でchild欠落を隠さない
+5. 確定したadapter `model_key`とchild model identityをadapter runtimeへ渡す。adapterはmachine-readable sourceを解析してchild用skeletonと、完成inputに必要だがまだ未確定な意味parameterを`semantic_parameter_requests[]`として返せる
+6. 意味parameter不足時はadapter自身が`result_status=unresolved`と構造化issueを返す。LLMはissueで要求された意味parameterだけを補い、machine skeletonやkeyを再生成しない
+7. 同じadapter scriptを意味parameter込みで再実行し、`derived_child_inputs[]: {child_model_key, model_type, input}`を返す。各`input`は対応child generatorのscript固有inputと直接互換にし、別の匿名builderでjoinしない
+8. child generatorはadapterの最終`generation_fingerprint`を`upstream_runtime_units[]`へ固定転記し、対応する`derived_child_inputs[]` rowをそのままscript固有inputへ使う。unknown / duplicate child、model type不一致、ready adapterなのにselected childのrowが欠落する場合は`invalid_input`または`unresolved`とし、空modelを実行しない
+9. adapter出力を正規技法として採用した場合は対応childを必須にし、採用しない候補はTechnique Selectionの`selected_techniques[]`へ残さない。adapter親や別のclosure行でchild欠落を隠さない
 
 固定対応:
 
@@ -207,7 +208,7 @@ Cause-Effect → Decision Table、Classification Tree → combinatorial、schema
 - `schema` adapter → 採用済み正規技法slug `ep / bva / comb`に対応してchild `ep / bva / comb`。schema runtimeはchild typeを新規決定せず、そのchild用derived inputだけを生成する
 - `ui` adapter → 正規技法modelを自動生成せず、既存`test-condition-design`の意味判断へ候補を渡す
 
-同じ親runtime generationから同じchild inputを作る場合は固定builderを使います。
+同じcanonical adapter inputと同じ意味parameterから同じ`derived_child_inputs[]`をadapter runtime自身が生成します。child inputの生成をAgent側helperやLLMへ分散しません。
 
 ## 3. 共通JSON契約
 
