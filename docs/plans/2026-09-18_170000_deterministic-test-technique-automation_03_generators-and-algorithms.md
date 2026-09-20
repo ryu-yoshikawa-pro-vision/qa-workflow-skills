@@ -1012,13 +1012,13 @@ LLM draft後に次を計算します。
 - Authority / Risk → TRまたはDisposition
 - TR → TCNまたはDisposition
 - TCN → CI → TC、または各層の既存Skill契約で許可されたDisposition
-- CIなし契約ではTCN → TCまたはDisposition
+- CIなし契約のTCN → TCまたはDispositionは、そのTCNにactiveなCoverage所有modelが存在せず、既存Skill契約が明示的にCIなしを許可する場合だけ認める
 - missing edge
 - orphan
 - unknown reference
 - stale downstream
 
-許可する直接edgeは`Authority→TR`、`Risk→TR`、`TR→TCN`、`TCN→CI`、`CI→TC`、CIなし契約の`TCN→TC`だけです。別層を飛び越えるedgeや逆向きedgeをclosure根拠として数えません。Dispositionは既存各Skillのhandling集合と必要なreason / Authority条件を検証し、正常なDispositionをmissing扱いしません。
+許可する直接edgeは`Authority→TR`、`Risk→TR`、`TR→TCN`、`TCN→CI`、`CI→TC`、条件付きのCIなし`TCN→TC`だけです。CIなし`TCN→TC`は当該TCNにactiveなCoverage所有modelが0件で、既存Skill契約が明示的に許可する場合だけ有効です。Coverage所有modelが1件でもあるTCNでは各modelのcurrent CIまたは許可されたcurrent closureを先に検査し、直接edgeをCoverage closureの代替にしません。別層を飛び越えるedgeや逆向きedgeをclosure根拠として数えません。Dispositionは既存各Skillのhandling集合と必要なreason / Authority条件を検証し、正常なDispositionをmissing扱いしません。
 
 技法別Coverage数値は各技法scriptを正本とし、traceabilityで再計算しません。
 
