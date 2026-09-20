@@ -1136,7 +1136,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 #### `change_impact.py`
 
 - required: `changed_node_keys[]`, `nodes[]`, `edges[]`
-- node: `{node_key, node_type, source_ref}`
+- node: `{node_key, node_type, source_ref, change_kind, expected_impact}`。`change_kind / expected_impact`は非空文字列またはnullで、探索順・到達判定には使わずMachine Entityへそのまま保持する
 - `node_type = Authority | Risk | TR | TCN | CI | TC`
 - edge: `{edge_key, from, to, edge_type, evidence_refs[]}`
 - `edge_type = depends_on | traces_to | derived_from`
@@ -1147,13 +1147,13 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - environment required: `requirements[]`
 - test data required: `requirements[]`, `current_source_targets[]`
 - `current_source_targets[]`: `{source_model_key, target_ref, target_content_fingerprint, generation_fingerprint}`。同一target identityの重複を拒否し、current generator resultから固定builderが作る
-- requirement: `{requirement_key, dimension_key, operator, authority_refs, source_model_key, source_target_versions}`。environmentでは`source_model_key=null`、test dataではcurrent Coverage所有model keyを必須にする
+- requirement: `{requirement_key, dimension_key, operator, authority_refs, source_model_key, source_target_versions}`。environmentでは`source_model_key=null`。test dataではcurrent model keyを必須とし、model-wide requirementではcurrent adapter modelを許可、target-specific requirementではCoverage所有modelを必須にする
 - `operator=eq`: `value` typed value必須
 - `operator=enum`: `values[]` typed valueを1件以上、重複不可
 - `operator=range`: `minimum / maximum` typed value、`minimum_inclusive / maximum_inclusive` boolean必須
 - `operator=version_range`: `minimum / maximum` version文字列、inclusive boolean必須
 - `operator=boolean`: `value` boolean必須
-- `source_target_versions[]`は`{target_ref, target_content_fingerprint, generation_fingerprint}`。test dataでは1件以上、environmentでは空配列を許可する。test dataでは全rowが`current_source_targets[]`の同じ`source_model_key`へ完全一致しなければ`invalid_input`とし、別modelのtargetや古いversionを受理しない。modelを跨ぐtraceabilityへ`target_key`単独を使用しない
+- `source_target_versions[]`は`{target_ref, target_content_fingerprint, generation_fingerprint}`。environmentとmodel-wide test dataでは空配列を許可する。target-specific test dataでは1件以上必須とし、全rowが`current_source_targets[]`の同じ`source_model_key`へ完全一致しなければ`invalid_input`とする。model-wide test dataでは`current_source_targets[]`照合を要求せず、`source_model_key`のcurrent model metadata一致だけを必須にする。別modelのtargetや古いversionを受理せず、modelを跨ぐtraceabilityへ`target_key`単独を使用しない
 - `test_data_requirements.py`の各正規化済み要求は`data_ref=data:<requirement_key>`を返し、`materialize_coverage.py`の`test_data_requirement_refs[]`はこの`data_ref`だけを参照する
 
 #### `analysis_entities.py`
