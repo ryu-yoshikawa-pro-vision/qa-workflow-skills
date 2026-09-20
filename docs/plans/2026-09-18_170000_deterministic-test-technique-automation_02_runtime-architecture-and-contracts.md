@@ -645,7 +645,7 @@ Machine Entityの`upstream_entity_dependencies[]`は次を最低限含めます�
 - Authority: なし。関連Authority IDはcontent内の関係として保持するが、別Authorityの内容変更で自動staleにするかは既存`spec-analysis`の関係解決結果に従う
 - test-analysis context: scope / objective / test level / environment constraint / exclusion / blocker / test focus / testability判断で実際に参照したAuthority / Product Risk
 - Product Risk: `authority_refs[]`のAuthorityに加え、`source_refs[]`のうちMachine Entityとして解決でき、risk判断へ実際に使用したsource Entity
-- 技法選択: selection判断で実際に参照したAuthority / Product Risk / TR等
+- 技法選択: selection判断で実際に参照したAuthority / Product Risk。後続のTR / TCN / CI / TCをsemantic dependencyへ逆参照しない
 - change graph node / edge: `source_ref / evidence_refs[]`のうちMachine Entityとして解決でき、node / edge判断へ実際に使用したsource Entity
 - environment requirement: `authority_refs[]`のAuthority
 - test data requirement: `authority_refs[]`のAuthority、要求を導出したCoverage所有model metadata。machine target由来では`source_target_versions[]`の現在target version一致を別途必須にし、target versionが変わればcurrent扱いしない
