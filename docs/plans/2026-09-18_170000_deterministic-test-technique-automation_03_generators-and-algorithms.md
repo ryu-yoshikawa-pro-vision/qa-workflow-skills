@@ -1147,7 +1147,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 #### `schema_cases.py`
 
 - required: `schema_kind`, `document`, `schema_pointer`, `context`
-- JSON / OpenAPI documentの非integer JSON numberは`Decimal`としてexactにparseし、binary floatを使用しない
+- JSON / OpenAPI documentのnumberは共通strict JSON契約でtoken長を検証してからcanonical integer / exact decimalへ正規化し、binary floatを使用しない
 - `enum / const`はscalar / nullだけruntime-v1対応。object / array値を含むsubtreeはunsupported itemへ出す
 - `schema_kind = json-schema-2020-12 | openapi-3.0 | html-control`
 - json/openapiでは`document`はroot document object、`schema_pointer`はそのdocument内のCoverage対象Schema Objectを指すlocal JSON Pointer。local `$ref`は常に同じ`document`をrootとして解決する
