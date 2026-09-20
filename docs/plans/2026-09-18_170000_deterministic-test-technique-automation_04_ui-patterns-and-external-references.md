@@ -215,6 +215,8 @@ OpenAPI 3.0のSchema Objectを直接入力する場合、`readOnly` / `writeOnly
 
 local `$ref`は対象Schema Objectだけでなくroot OpenAPI documentを基準に解決します。OpenAPI 3.0のReference ObjectはJSON Schema 2020-12の`$ref` siblingと同じ意味にしません。`$ref`以外の追加propertyはOpenAPI 3.0仕様どおり無視し、参照先Schema Objectのsibling assertionとして評価しません。runtime入力はroot `document`と対象`schema_pointer`を分け、外部URI referenceは事前dereference済みを要求します。
 
+runtime-v1のOpenAPI `document`はstrict JSONで表現できる解析済みobjectを入力とします。JSON sourceはそのまま構造化入力へ渡せますが、runtime自身へYAML parserを追加しません。YAML sourceを使う場合はAgent / host側で信頼できる構造化objectへ変換済みであることを前提とし、LLMによる自由なYAML→JSON書き換えを決定論的変換として扱いません。YAML対応のためにPyYAML等の追加dependencyや独自YAML parserを導入しません。
+
 ### WCAG / WAI資料
 
 アクセシビリティ要件が対象scopeに含まれる場合だけ利用します。すべてのテスト条件へ自動で大量追加する使い方はしません。
@@ -227,7 +229,7 @@ local `$ref`は対象Schema Objectだけでなくroot OpenAPI documentを基準�
 
 仕様上、Skill packageの`scripts/`は任意の実行可能リソースで、実際に対応するscript言語はAgent実装に依存します。また環境要件はfrontmatterの`compatibility`へ記載できます。
 
-このためPython runtime scriptを追加するSkillにはPython 3.11要件を`compatibility`へ明記し、Skill単体移植性を「ファイルをコピーできること」だけでなく「必要runtimeが明示されていること」まで含めて検証します。
+このためPython runtime scriptを追加するSkillにはPython 3.11要件を`compatibility`へ明記し、Skill単体移植性を「ファイルをコピーできること」だけでなく「必要runtimeが明示されていること」まで含めて検証します。Agent Skills仕様はPython interpreterのcommand名やsubprocess timeoutを共通契約として定めないため、本Planも`python`というcommand名や30秒timeoutをSkillの移植性条件にはしません。CIでは既知のPython 3.11環境上で`python`と30秒timeoutを使用します。
 
 ### Microsoft PICT
 
