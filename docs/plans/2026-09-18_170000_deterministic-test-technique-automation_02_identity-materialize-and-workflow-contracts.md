@@ -302,7 +302,7 @@ runtime単位状態の正本は各成果物に保存した`runtime_unit_key`、`
 - model issueを`question-analysis`へroutingする場合は`skill / runtime_unit_key / model_key / target_key / generation_fingerprint`を質問一覧・ブロック中範囲・回答後の再開情報へ保持する
 - artifact全体scriptのissueも`skill / runtime_unit_key / generation_fingerprint`をBlocker / Issueへ保持し、model keyを捏造しない
 - unsupported item closureの`handling`は`llm_fallback / 対象外 / 別テストレベル / 残存リスク / 成立不能 / 重複 / ブロック中`だけを許可する。`llm_fallback`と`重複`はcurrentな`covered_by_entity`を必須にし、`ブロック中`はclosure行があってもworkflow完了不可とする。その他のDispositionは既存`test-condition-design`のreason / Authority条件をそのまま適用する
-- `llm_fallback`の`covered_by_entity`は同じunsupported itemを意味上カバーするcurrentなTCN / CI等のMachine Entityを参照し、参照先missing / stale / 対象modelと無関係なら未閉鎖として扱う。whole-model unsupportedも同じ規則でfallback先のcurrent性を確認する
+- `llm_fallback`の`covered_by_entity`は対象unsupported item / whole-modelと同じ`model_key`に属するcurrent CI Machine Entityだけを参照する。TCNやmodel metadataだけをfallback Coverage evidenceにせず、参照先missing / stale / 別modelなら未閉鎖として扱う
 - `coverage-analysis`はstale / gapをTCN / CIだけでなく関連`model_key`まで追跡する
 
 Machine Entityのfreshnessは`runtime_contract.py`の共通関数で計算します。各Machine Entityの`runtime_dependencies[]`と現在runtime unitのgenerationを比較し、次のschemaへ正規化します。
