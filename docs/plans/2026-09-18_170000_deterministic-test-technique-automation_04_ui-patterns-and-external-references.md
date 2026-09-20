@@ -31,7 +31,7 @@ skills/test-condition-design/
 
 ### `ui-pattern-catalog.json`
 
-機械参照する正本です。generatorはcatalog file contentのSHA-256を`static_data_versions.ui_pattern_catalog`として出力し、成果物へ保持します。catalog変更後は旧versionで生成したUI候補をstaleとして再検証します。
+機械参照する正本です。generatorはstrict JSON decode後のcanonical JSON bytesのSHA-256を`static_data_versions.ui_pattern_catalog`として出力し、成果物へ保持します。改行・indent等の表示差だけではversionを変えず、意味内容が変わったcatalogだけ旧versionのUI候補をstaleとして再検証します。
 
 各patternは次のschemaを持ちます。
 
