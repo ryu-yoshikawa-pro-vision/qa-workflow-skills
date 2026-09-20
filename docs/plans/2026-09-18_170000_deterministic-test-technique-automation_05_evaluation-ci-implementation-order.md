@@ -271,7 +271,7 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - integer / exact decimal（coefficient + scale） / date / local datetime / fixed-offset datetime
 - domain別step objectの型・正値検証
 - 3-valueでは境界リスク、過去不具合、ユーザー明示等の具体的な`coverage_selection_reason`を必須にする
-- schema由来BVAはboundary skeletonとLLMの`mode / coverage_selection_reason`を固定builderでjoinし、schema scriptだけで3-valueを自動選択しない
+- schema由来BVAはboundary skeletonに対して不足する`mode / coverage_selection_reason`を`schema_cases.py`の`semantic_parameter_requests[]`で要求し、同script再実行後の`derived_child_inputs[]`でBVA inputを完成させる。schema scriptだけで3-valueを自動選択しない
 - fixed-offset datetime算術でoffsetを保持
 - step不明時に隣接値を創作しない
 - 同一具体値でもCoverage positionを区別
@@ -445,7 +445,7 @@ raw machine-readable入力をfixtureにします。
 - HTML `number`はstep省略時default step=1、`step=any`はgridなし、step baseは`min → value → 0`の順で固定し、minなしを即unsupportedにしない
 - invalid / zero / negative HTML stepはdefault step=1へfallbackし、制約なしとしてcompleteにしない
 - date / datetime-local系stepはruntime-v1 `unsupported`
-- `derived.ep_inputs / derived.bva_boundary_skeletons / derived.combinatorial_constraints / derived.test_data_requirements`を固定schemaで出す
+- schema解析でEP / BVA / combinatorial / test dataのmachine skeletonを固定schemaで生成し、selected childの最終入力は`derived_child_inputs[]`、test data requirementは同じadapter再実行結果から出す
 - BVAはboundary skeletonへLLMが`mode / coverage_selection_reason`だけを追加し、固定builderで`bva.py` inputへする
 - range / enum / requiredはEP / BVA / combinatorial / test dataへ、gridはschema Coverage / BVA / combinatorialだけへ渡す
 
