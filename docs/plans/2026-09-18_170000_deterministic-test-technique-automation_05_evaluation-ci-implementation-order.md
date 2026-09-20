@@ -588,7 +588,7 @@ raw machine-readable入力をfixtureにします。
 - `expected_result_root`は同一TCN内の内部用local keyで、同じ期待挙動と意味判断したtargetだけ同値になる
 - 同一CIへの複数target_refは、同じ`expected_result_root`を持つ同一merge groupだけ許可する
 - unmerged→mergedでは既存CIの最小番号を存続CIとし、他CIをdeletedへする
-- merge groupへのtarget追加 / 削除、CI→Disposition、Disposition→CIの各状態遷移で`_02` §7.2.2どおりID維持・deleted・再採番を行う
+- merge groupへのtarget追加 / 削除、CI→Disposition、Disposition→CIの各状態遷移で[identity・materialize契約](./2026-09-18_170000_deterministic-test-technique-automation_02_identity-materialize-and-workflow-contracts.md) §7.2.2どおりID維持・deleted・再採番を行う
 - merge解除時は辞書順先頭targetへ既存CIを維持し、残りを過去使用済み最大番号+1で再採番して関連TCを`要再検証`へする
 - `target_mapping_state[] / ci_id_state[]`にinactive / deleted履歴を残す
 - 消滅targetで下流`要再検証`
