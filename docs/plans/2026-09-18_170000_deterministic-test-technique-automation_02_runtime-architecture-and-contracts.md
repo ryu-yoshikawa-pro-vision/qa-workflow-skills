@@ -60,7 +60,7 @@ skills/test-analysis/scripts/
 └── environment_requirements.py
 ```
 
-- `analysis_entities.py`: test-analysis context / Product Risk / Technique Selection / change graph / environment requirementのLLM意味fieldとcurrent runtime resultを固定schemaでjoinし、Machine Entity、dependency、expected Entity identityを決定論的に生成する。runtime unitではなく、保存前builderとして呼ぶ
+- `analysis_entities.py`: test-analysis context / Product Risk / Technique Selection / change graph / environment requirementのLLM意味fieldとcurrent runtime resultを固定schemaでjoinし、Machine Entity、dependency、expected Entity identityを決定論的に生成するartifact runtime。意味判断は行わず、保存前に必ず実行する
 - `risk_matrix.py`: repository-defaultまたは明示済みproject-specific schemeからrisk levelを計算する
 - `technique_candidates.py`: 正規化済みproblem signalから技法候補を返す
 - `change_impact.py`: 明示済みnode / edgeから影響候補を抽出する
@@ -152,6 +152,7 @@ runtime対象Skillは、Skill instructionへscript選択表を持ち、次の順
 | `test-analysis` | `テスト分析` | 技法選択を行う | `technique_candidates.py` | 必須 |
 | `test-analysis` | `テスト分析` | 変更影響graphがある | `change_impact.py` | 条件付き |
 | `test-analysis` | `テスト分析` | 環境要求がある | `environment_requirements.py` | 条件付き |
+| `test-analysis` | `テスト分析` | test-analysis成果物を保存する | `analysis_entities.py` | 必須 |
 | `test-requirement-design` | 単一用途 | 成果物確定前 | `requirement_structure.py` | 必須 |
 | `test-condition-design` | 単一用途 | TCN / model draft作成後 | `condition_structure.py` | 必須 |
 | `test-condition-design` | 単一用途 | active modelの`model_type`が下表のgeneratorを持つ | model type対応generator | modelごとに必須 |
@@ -301,10 +302,11 @@ runtime入力は`metadata`とscript固有`input`を分けます。
 - `static_data_versions`: generator結果に影響する静的参照データversion
 - `authority_refs / reference_refs`: 現在有効な製品根拠と補助情報
 
-artifact scriptは`risk_matrix.py`、`technique_candidates.py`、`change_impact.py`、`environment_requirements.py`、`test_data_requirements.py`、`requirement_structure.py`、`condition_structure.py`、`materialize_coverage.py`、`case_structure.py`、`traceability.py`、`workflow_runtime.py`で固定します。`scope_key`はscriptごとに次へ固定します。
+artifact scriptは`risk_matrix.py`、`technique_candidates.py`、`change_impact.py`、`environment_requirements.py`、`analysis_entities.py`、`test_data_requirements.py`、`requirement_structure.py`、`condition_structure.py`、`materialize_coverage.py`、`case_structure.py`、`traceability.py`、`workflow_runtime.py`で固定します。`scope_key`はscriptごとに次へ固定します。
 
 - `technique_candidates.py`: 入力`selection_key`
 - `materialize_coverage.py`: 入力`tcn_id`
+- `analysis_entities.py`: literal `all`
 - その他のartifact script: literal `all`
 
 同一Skill内で同じ`artifact:<generator>:<scope_key>`を同時に複数定義しません。
