@@ -315,7 +315,324 @@ artifact scriptは`risk_matrix.py`、`technique_candidates.py`、`change_impact.
 
 `static_data_versions`はkeyを`^[a-z][a-z0-9_]*$`、valueを`sha256:<64 lowercase hex>`または明示的なcontract version文字列`^[A-Za-z0-9][A-Za-z0-9._-]*$`とします。
 
-script固有入力は必ず`input`配下に置き、metadataと同じkeyを再定義しません。target / result keyへ文字列として直接埋め込むstable component keyは`^[A-Za-z][A-Za-z0-9._-]{0,63}$`で固定し、delimiterの`:`を禁止します。任意文字列を含むidentityはcanonical JSONをhashしてkey化します。
+script固有入力は必ず`input`配下に置き、metadataと同じkeyを再定義しません。target / result keyへ文字列として直接埋め込むstable component keyは`^[A-Za-z][A-Za-z0-9._-]{0,63}# テスト分析・テスト技法の決定論的自動化Plan
+
+## 1. 実行時アーキテクチャ
+
+### 1.1 処理境界
+
+処理順は次で固定します。
+
+```text
+現在有効な仕様根拠・既存QA成果物
+  ↓
+LLM: 意味判断と正規化
+  ↓
+canonicalな正規化済みモデル
+  ↓
+Skill runtime script: 列挙・計算・構造検査
+  ↓
+機械証拠 / 構造化された未解決事項
+  ↓
+LLM: 人間向け説明、意味上の統合、必要な質問
+  ↓
+runtime構造再検査
+  ↓
+QA成果物
+  ↓
+独立validator / semantic eval
+  ↓
+qa-workflow: 再利用・変更伝播・完了判定
+```
+
+scriptは自然言語の仕様本文を直接解釈しません。machine-readableなJSON Schema / OpenAPI / HTML属性等、このPlanで対応subsetを明示する入力はscriptが直接正規化してよく、LLMへ機械変換を戻しません。
+
+正規化済みモデルを正本とします。Coverage表、生成組合せ、Coverage Itemの機械部分、traceability集計等は派生成果物です。正本が変わった場合は派生成果物を再生成・再検証します。
+
+### 1.2 評価runtimeとの分離
+
+Skill runtimeは次をimportまたは直接呼び出しません。
+
+- `scripts/skills/evals/deterministic/`
+- `scripts/skills/evals/semantic/`
+- `skills/*/evals/deterministic/validator.py`
+
+generatorとvalidatorは独立実装とし、同じ不具合で生成と評価が同時に誤る構造を避けます。
+
+## 2. 追加する実行時script
+
+### `spec-analysis`
+
+`spec-analysis`にはruntime unitを追加しません。ただしAuthority Machine EntityをLLMの手計算で組み立てないため、`scripts/runtime_contract.py`のcanonical JSON / Machine Entity helperと、`scripts/authority_entities.py`を追加します。`authority_entities.py`はAuthority表の正規化済みfieldを受け取り、canonical `content`、`content_fingerprint`、Machine Entity wrapper、期待Authority identityを決定論的に生成します。これはgenerator dispatch、`Machine Runtime Input / Result`、`expected_runtime_units[]`の対象には含めません。
+
+### `test-analysis`
+
+```text
+skills/test-analysis/scripts/
+├── runtime_contract.py
+├── analysis_entities.py
+├── risk_matrix.py
+├── technique_candidates.py
+├── change_impact.py
+└── environment_requirements.py
+```
+
+- `analysis_entities.py`: test-analysis context / Product Risk / Technique Selection / change graph / environment requirementのLLM意味fieldとcurrent runtime resultを固定schemaでjoinし、Machine Entity、dependency、expected Entity identityを決定論的に生成するartifact runtime。意味判断は行わず、保存前に必ず実行する
+- `risk_matrix.py`: repository-defaultまたは明示済みproject-specific schemeからrisk levelを計算する
+- `technique_candidates.py`: 正規化済みproblem signalから技法候補を返す
+- `change_impact.py`: 明示済みnode / edgeから影響候補を抽出する
+- `environment_requirements.py`: 構造化済み環境要求を重複統合し矛盾を検出する
+
+### `test-requirement-design`
+
+```text
+skills/test-requirement-design/scripts/
+├── runtime_contract.py
+└── requirement_structure.py
+```
+
+TR本文は生成せず、Authority / Risk → TRの閉鎖、未知参照、Disposition重複、優先度を計算します。
+
+### `test-condition-design`
+
+```text
+skills/test-condition-design/scripts/
+├── runtime_contract.py
+├── condition_structure.py
+├── equivalence_partitions.py
+├── bva.py
+├── domain_testing.py
+├── decision_table.py
+├── combinatorial.py
+├── classification_tree.py
+├── state_transition.py
+├── flow_paths.py
+├── crud_matrix.py
+├── cause_effect.py
+├── grammar_cases.py
+├── schema_cases.py
+├── ui_pattern_candidates.py
+├── test_data_requirements.py
+├── random_testing.py
+├── metamorphic.py
+└── materialize_coverage.py
+```
+
+### `test-case-design`
+
+```text
+skills/test-case-design/scripts/
+├── runtime_contract.py
+└── case_structure.py
+```
+
+具体的な前提、操作、実データ、expected resultは生成せず、TCN / CI → TCの閉鎖、未知参照、優先度、Authority対応を検査します。
+
+### `coverage-analysis`
+
+```text
+skills/coverage-analysis/scripts/
+├── runtime_contract.py
+└── traceability.py
+```
+
+対象はテスト設計のAuthority / Risk → TR → TCN → CI → TCです。既存SkillがCIなしTCN → TCを許可する場合も、当該TCNにactiveなCoverage所有modelがない契約に限ります。Coverage所有modelがあるTCNは、各modelのcurrent CIまたは許可されたcurrent closureを先に満たさなければならず、直接TCN → TCでCoverage closureを迂回できません。E2E実装・実行結果は既存責務のままです。
+
+### `qa-workflow`
+
+```text
+skills/qa-workflow/scripts/
+├── runtime_contract.py
+└── workflow_runtime.py
+```
+
+`workflow_runtime.py`は工程固有の意味判断を行いません。各成果物へ保存されたruntime metadata、上流Entity、runtime unit依存、fingerprintを入力として、runtime状態集約、freshness、stale伝播、機械的な完了可否を計算します。開始Skill、意味上の変更影響、既存成果物を意味的に再利用できるかの判断は既存`qa-workflow`責務に残します。
+
+### 2.1 Skill実行時のdispatch契約
+
+runtime対象Skillは、Skill instructionへscript選択表を持ち、次の順序で実行します。
+
+1. LLMがAuthority、Risk、TR等を意味的に解釈し、Planで固定したcanonical inputへ正規化する
+2. `runtime_contract.py`がcanonicalizationを適用した正規化済み入力を返し、fingerprint計算とgenerator本体の両方が同じ正規化済み値を使う
+3. script選択表からruntime scriptを選ぶ。script pathを自由文や`technique_slug`から推測しない
+4. 保存済み`Machine Runtime Input / Result`を再利用する場合はstrict decode、runtime identity、model key、fingerprint一致を検証する
+5. stdinへ共通metadataとscript固有inputを渡してscriptを起動する
+6. stdout envelopeをstrict decodeし、return code、runtime status、issuesを合わせてroutingする
+7. 意味判断が必要なissueは既存Skillまたは`question-analysis`へ戻し、機械結果をLLMが再計算しない
+8. 意味入力を更新した場合はruntimeを再実行し、保存machine evidenceを置換する
+
+`runtime_required`はscriptの入力検証結果として決定し、Agentが自然言語だけから`false`を確定してscriptを省略しません。
+
+| Skill | 対象 / 実行範囲 | 条件 | script | 実行 |
+| --- | --- | --- | --- | --- |
+| `test-analysis` | `テスト分析` | Product Riskがある | `risk_matrix.py` | 条件付き |
+| `test-analysis` | `テスト分析` | 技法選択を行う | `technique_candidates.py` | 必須 |
+| `test-analysis` | `テスト分析` | 変更影響graphがある | `change_impact.py` | 条件付き |
+| `test-analysis` | `テスト分析` | 環境要求がある | `environment_requirements.py` | 条件付き |
+| `test-analysis` | `テスト分析` | test-analysis成果物を保存する | `analysis_entities.py` | 必須 |
+| `test-requirement-design` | 単一用途 | 成果物確定前 | `requirement_structure.py` | 必須 |
+| `test-condition-design` | 単一用途 | TCN / model draft作成後 | `condition_structure.py` | 必須 |
+| `test-condition-design` | 単一用途 | active modelの`model_type`が下表のgeneratorを持つ | model type対応generator | modelごとに必須 |
+| `test-condition-design` | 単一用途 | test data要求が1件以上ある | `test_data_requirements.py` | 条件付き |
+| `test-condition-design` | 単一用途 | current machine targetまたは`semantic_coverage_items[]`が1件以上ある | `materialize_coverage.py` | TCNごとに必須 |
+| `test-case-design` | 単一用途 | 成果物確定前 | `case_structure.py` | 必須 |
+| `coverage-analysis` | `テスト設計` | traceabilityを検査する | `traceability.py` | 必須 |
+| `qa-workflow` | 単一用途 | runtime状態を集約する | `workflow_runtime.py` | 必須 |
+
+model typeからgeneratorへの対応は次だけを許可します。model runtimeの`expected_runtime_units[]`はこの表から、artifact runtimeの`expected_runtime_units[]`は直前のSkill dispatch表から導出し、両集合を連結します。
+
+| model_type | generator |
+| --- | --- |
+| `ep` | `equivalence_partitions.py` |
+| `bva` | `bva.py` |
+| `domain` | `domain_testing.py` |
+| `decision` | `decision_table.py` |
+| `comb` | `combinatorial.py` |
+| `classification` | `classification_tree.py` |
+| `state` | `state_transition.py` |
+| `flow` | `flow_paths.py` |
+| `crud` | `crud_matrix.py` |
+| `cause-effect` | `cause_effect.py` |
+| `syntax` | `grammar_cases.py` |
+| `schema` | `schema_cases.py` |
+| `ui` | `ui_pattern_candidates.py` |
+| `random` | `random_testing.py` |
+| `metamorphic` | `metamorphic.py` |
+| `error-guessing` | runtime generatorなし |
+
+`materialize_coverage.py`はruntime generatorを持たないエラー推測やunsupported fallbackのsemantic Coverage Itemだけでもdispatch対象にします。
+
+freshnessは既存契約どおり、現在のcanonical machine Entityと正規化済み入力からruntimeを再実行して判定します。保存済みruntime resultを現在世代のcacheとして使いません。
+
+### 2.2 派生modelの生成
+
+Cause-Effect → Decision Table、Classification Tree → combinatorial、schema → EP / BVA等で別generatorを起動する場合、親runtime結果を匿名の別model inputとして扱いません。また、active Technique Selectionの閉鎖確認より後にchild modelを作る循環を作りません。
+
+1. LLMがadapterを採用する時点で、adapter model draftと、それから派生させるCoverage所有child model draftを同じ`condition_structure.py`入力へ含める
+2. child model draftは`derived_from_model_draft_key`で同じ入力内のadapter draftを1件だけ参照する。adapterでない親、unknown draft、自己参照、複数親は`invalid_input`
+3. `condition_structure.py`がadapter / child双方の`model_key`と親TCNを先に確定し、active Technique Selectionの`selected_techniques[]`がCoverage所有child modelへ到達することをこの時点で検証する
+4. adapter modelは`technique_slug=null / selection_source=null / selection_key=null`、child modelはcanonical `technique_slug`と`selection_source=analysis / condition_design / user`を持つ。`analysis`由来childだけ元の`selection_key`を保持する
+5. 確定したadapter `model_key`で親runtimeを実行し、`derived.*`を生成する
+6. 固定builderはchildの`derived_from_model_key`から親adapter runtime unitを一意に解決し、child generatorの`upstream_runtime_units[]`へそのcurrent generationを保存する。LLMはruntime dependencyを手入力しない
+7. LLMは派生先で必要な意味パラメータだけを補い、固定builderが親runtimeのmachine outputとjoinして既に採番済みのchild model inputを作る
+8. adapter出力を正規技法として採用した場合は対応childを必須にし、採用しない候補はTechnique Selectionの`selected_techniques[]`へ残さない。adapter親や別のclosure行でchild欠落を隠さない
+
+固定対応:
+
+- `classification` adapter → child `comb`
+- `cause-effect` adapter → child `decision`
+- `schema` adapter → 採用したCoverageに応じてchild `ep / bva / comb`
+- `ui` adapter → 正規技法modelを自動生成せず、既存`test-condition-design`の意味判断へ候補を渡す
+
+同じ親runtime generationから同じchild inputを作る場合は固定builderを使います。
+
+## 3. 共通JSON契約
+
+### 3.0 CLI契約
+
+すべてのruntime scriptは同じCLI契約を使用します。
+
+- 起動は`python <script-path>`
+- stdinからUTF-8のstrict JSON objectを1件だけ読む
+- positional argument、入力file path、環境変数から業務入力を受け取らない
+- cwdへ依存せず、Skill root相対のassetは`__file__`から解決する
+- stdoutはruntime envelopeのJSON object 1件だけ。logや説明文を混在させない
+- stderrは人間向け診断だけに使う
+- stdinが空、JSONが複数、末尾に非空白データが残る場合は`invalid_input`
+- strict decode前に失敗し、`runtime_unit_key / input_fingerprint / model_fingerprint / generation_fingerprint`を確定できない場合も、可能なら§3.3のpre-parse error envelopeをstdoutへ返す。callerが推測したfingerprintを補わない
+- subprocess呼び出し側はstdout / stderr / return codeをすべて取得し、return codeだけでroutingしない
+- Skill実行時のsubprocessにも30秒の安全timeoutを設定する。通常の探索停止は§5.3の決定論的hard limitで行い、timeoutをCoverageや探索アルゴリズムの正常終了条件にしない。timeout時はmachine resultを採用せず、成果物metadataでは`runtime_status=internal_error / support_status=unknown / result_status=blocked / runtime_required=true / deterministic_generated=false`として扱い、構造化issueの`issue_type=runtime_execution_timeout`で原因を区別する。`runtime_execution_timeout`を新しい`runtime_status`にはしない
+
+### 3.1 strict JSON
+
+すべてのruntime scriptはstrict JSONを使用します。
+
+- duplicate object keyを拒否する
+- `NaN`、`Infinity`、`-Infinity`を拒否する
+- top-level typeをscriptごとに固定する
+- UTF-8で解釈する
+- model内のdecimalはJSON numberへ丸めず、`{"type":"decimal","value":"0.1"}`のような10進文字列で扱う
+- JSON numberはまず元token文字列として取得し、§5.1の長さ・形式検証後にcanonical integerまたは`coefficient + scale`へexact正規化する。binary `float`や未検証の巨大`int / Decimal`へ直接変換しない
+- canonical JSONへ再serializeするexact numeric内部表現は、共通canonical serializerが検証済みnumber tokenとして指数表記なしの正規化済みJSON numberへ出力する。専用number型を通常の`json.dumps()`へ渡してstring化する実装は禁止する
+- date / datetimeは契約で許可したISO 8601形式以外を拒否する
+
+Python実装では、duplicate key検出用`object_pairs_hook`、`parse_int / parse_float`でJSON numberだけを表す専用の内部token型を返すhook、非有限数拒否、`allow_nan=False`相当の出力を共通方針とします。number tokenを通常のPython `str`として返してJSON stringと同一視しません。strict decode後、すべてのstring valueを走査してunpaired surrogate code pointを拒否し、number tokenはJSON number grammar・raw token長を検証してからcanonical integerまたは`coefficient + scale`へ変換します。
+
+入力byte上限はUTF-8 decode前に検査します。UTF-8 decode後、`json.loads()`より前にstring / escapeを認識する軽量な構造scanで`{[` / `]}`のnesting depthを数え、§5.3の上限64を超えた時点で`limit_exceeded`にします。これにより深いJSONがPython parserの再帰上限や例外形へ先に到達することを避けます。strict parse後はobject keyを含むすべてのstringのsurrogate妥当性を検証し、不正は`invalid_input`へ正規化します。少なくとも`1 != "1"`、`1.0 != "1.0"`、`1e3 != "1e3"`を回帰fixtureで固定します。
+
+### 3.2 共通入力metadata
+
+runtime入力は`metadata`とscript固有`input`を分けます。
+
+```json
+{
+  "metadata": {
+    "envelope_version": "1",
+    "skill": "test-condition-design",
+    "runtime_contract_version": "runtime-v1",
+    "generator_contract_version": "combinatorial-v1",
+    "runtime_unit_key": "model:comb-001",
+    "model_key": "comb-001",
+    "model_type": "comb",
+    "technique_slug": "comb",
+    "selection_source": "analysis",
+    "selection_key": "SEL-001",
+    "scope_key": null,
+    "upstream_entities": [
+      {
+        "skill": "test-requirement-design",
+        "entity_type": "tr",
+        "entity_ref": "TR-001",
+        "content": {}
+      }
+    ],
+    "upstream_runtime_units": [
+      {
+        "skill": "test-requirement-design",
+        "runtime_unit_key": "artifact:requirement_structure:all",
+        "generation_fingerprint": "sha256:..."
+      }
+    ],
+    "static_data_versions": {},
+    "authority_refs": ["SPEC-001"],
+    "reference_refs": []
+  },
+  "input": {}
+}
+```
+
+共通metadataは少なくとも次を持ちます。
+
+- `envelope_version`: runtime envelope形式のversion
+- `skill`: runtime scriptが所属する既存Skill名。script pathから決まる値をruntime側の正本とし、入力値が不一致なら`invalid_input`
+- `runtime_contract_version`: strict JSON、canonicalization、共通status、fingerprint等の共通処理version
+- `generator_contract_version`: script固有の入出力・Coverage契約version。生成結果、tie-break、Coverage、target keyへ影響する変更では必ず更新する
+- `runtime_unit_key`: すべてのruntime invocationで必須。model scriptは`model:<model_key>`、artifact scriptは`artifact:<generator>:<scope_key>`
+- `model_key`: model scriptだけ必須。形式は`<model_type>-\d{3,}`。artifact scriptでは`null`
+- `model_type`: model scriptだけ必須で§4.3の固定値。artifact scriptでは`null`
+- `technique_slug`: Coverage所有modelでは§4.3のcanonical technique slug、内部adapterとartifact scriptでは`null`
+- `selection_source`: Coverage所有modelでは`analysis / condition_design / user`のいずれか。内部adapterとartifact scriptでは`null`
+- `selection_key`: `selection_source=analysis`だけ必須。その他は`null`
+- `scope_key`: artifact scriptだけ必須。model scriptでは`null`
+- `upstream_entities`: script固有input内のAuthority / Risk / TR / TCN等の参照のうち、そのscript契約で**実行前から存在する外部semantic dependency**と定義したMachine Entityから固定builderが導出する。callerが参照Entityを任意に省略・追加しない。同一runtime invocationで新規生成するEntity同士の依存はここへ事前投入せず、script内の固定builderが生成済みcanonical contentからfingerprintを計算して`upstream_entity_dependencies[]`へ接続する。runtimeは外部Entityのcanonical `content`から`content_fingerprint`を再計算し、期待外部参照集合との不足・余分・重複を`invalid_input`にする
+- `upstream_runtime_units`: 他runtime結果を直接利用した場合に`skill + runtime_unit_key + generation_fingerprint`を一意参照として保持する。runtime派生child modelの派生元もここで表し、Selection Sourceへ混ぜない
+- `static_data_versions`: generator結果に影響する静的参照データversion
+- `authority_refs / reference_refs`: 現在有効な製品根拠と補助情報
+
+artifact scriptは`risk_matrix.py`、`technique_candidates.py`、`change_impact.py`、`environment_requirements.py`、`analysis_entities.py`、`test_data_requirements.py`、`requirement_structure.py`、`condition_structure.py`、`materialize_coverage.py`、`case_structure.py`、`traceability.py`、`workflow_runtime.py`で固定します。`scope_key`はscriptごとに次へ固定します。
+
+- `technique_candidates.py`: 入力`selection_key`
+- `materialize_coverage.py`: 入力`tcn_id`
+- `analysis_entities.py`: literal `all`
+- その他のartifact script: literal `all`
+
+同一Skill内で同じ`artifact:<generator>:<scope_key>`を同時に複数定義しません。
+
+`runtime_contract_version`、`generator_contract_version`、runtime実装hash、generator実装hash、fileから導出できる`static_data_versions`はruntime側を正本にします。呼び出し側metadataへ同じ値を持たせる場合はruntime実値と一致しなければ`invalid_input`です。
+
+`static_data_versions`はkeyを`^[a-z][a-z0-9_]*$`、valueを`sha256:<64 lowercase hex>`または明示的なcontract version文字列`^[A-Za-z0-9][A-Za-z0-9._-]*$`とします。
+
+で固定し、delimiterの`:`を禁止します。任意文字列を含むidentityはcanonical JSONをSHA-256化します。digestをstable component keyへ変換する場合は`h` + digest先頭63桁のlowercase hex（計64文字）で固定し、同じcomponent keyへ異なるfull digestが衝突した場合は`internal_error`として停止します。full digest自体を保存するfieldでは`sha256:<64 lowercase hex>`を使い、切り詰めません。
 
 ### 3.3 runtime出力envelope
 
