@@ -19,7 +19,9 @@ generator系scriptの`payload`は次を基本形とします。
 ```
 
 - `targets`: 技法固有のstable `target_key`を持つ機械生成対象。model generatorは共通post-processで`model_key + target_key`から`target_ref`も付与する。CIへmaterialize可能なtargetは、具体的な値・assignment・setup + sequence・path・生成input等、そのCoverageを1回実行するmachine表現を`execution`へ必須で持たせ、共通post-processで`execution_fingerprint`を計算する。診断・adapter専用targetは`execution`を持たず直接CI化しない
-- `coverage_summary`: Coverage基準を持つ技法だけが使用する。Random Testing / Metamorphic Testingのように一般的なCoverage基準を持たない技法では、技法固有の終了条件を`completion_summary`として返す
+- `coverage_summary`: EP / BVA / Domain / Decision Table / combinatorial / state / flow / grammar等の通常Coverage modelでは`{criterion, required, covered, complete}`を返す。CRUDでは`coverage_summary={completeness:{criterion,required,covered,complete}, consistency:{criterion,required,covered,complete}, complete}`を返し、2要素ともcompleteのときだけ全体をcompleteにする
+- `completion_summary`: Random Testing / Metamorphic Testingだけが使用する。Randomは`required_case_count / generated_case_count / complete`、Metamorphicは`required_pairs / generated_pairs / complete`を返す
+- model typeごとに上記の許可fieldを固定し、Random / Metamorphicへ`coverage_summary`を捏造したり、通常Coverage modelへ`completion_summary`を追加したりしない
 - `derived`: 次scriptへ直接渡す機械変換結果
 - `metadata`: target以外の再現可能な補助情報
 
@@ -31,23 +33,23 @@ model generatorはtargetごとに`materializable=true|false`を返します。`m
 
 | generator | materialize | canonical `execution` |
 | --- | --- | --- |
-| `equivalence_partitions.py` | yes | `{set_key, partition_key, representative}` |
-| `bva.py` | yes | `{boundary_key, position, value}` |
-| `domain_testing.py` | yes | `{partition_key, border_key, point_kind, coordinates}` |
-| `decision_table.py` | yes | `{condition_assignment, action_vector}` |
-| `combinatorial.py` | yes | `{row_ref, assignment}` |
+| `equivalence_partitions.py` | yes | `{set:{key,label}, partition:{key,label}, representative}` |
+| `bva.py` | yes | `{boundary:{key,label}, position, value}` |
+| `domain_testing.py` | yes | `{partition:{key,label}, border:{key,label}, point_kind, coordinates:[{dimension_key,label,value}]}` |
+| `decision_table.py` | yes | `{conditions:[{condition_key,label,value}], actions:[{action_key,label,value}]}` |
+| `combinatorial.py` | yes | `{row_ref, assignments:[{factor_key,label,value}]}` |
 | `classification_tree.py` | no | adapter専用。child `comb` modelだけをCI化 |
 | `state_transition.py` | yes | `{initial_state_key, initial_state_label, reset_key, reset_execution, setup_prefix, coverage_sequence, attempted_transition}`。state / transition / resetの実行意味を内包する |
 | `flow_paths.py` | mode依存 | node / edge / bounded-path / simple-loopは`{initial_node_key, initial_node_label, target_node, edge_sequence}`。node / edgeの実行意味を内包する。fork-join branchはsemantic Coverage Itemへ閉じる |
 | `crud_matrix.py` | yes | operation=`{entity_key, entity_label, function_key, function_label, operation}`、sequence=`{entity_key, entity_label, sequence_key, steps}`。stepsへfunction labelを含める |
 | `cause_effect.py` | no | adapter専用。child `decision` modelだけをCI化 |
-| `grammar_cases.py` | yes | `{input_text, production_key_sequence, mutation_key}` |
+| `grammar_cases.py` | yes | `{input_label, input_text, production_key_sequence, mutation_key}` |
 | `schema_cases.py` | no | adapter専用 |
 | `ui_pattern_candidates.py` | no | 一般確認候補であり直接CI化しない |
-| `random_testing.py` | yes | `{case_index, generated_value}` |
-| `metamorphic.py` | yes | `{relation_key, source_id, source_input, follow_up_key, follow_up_input}` |
+| `random_testing.py` | yes | `{input_label, case_index, generated_value}` |
+| `metamorphic.py` | yes | `{relation_key, relation_label, source_id, source_input, follow_up_key, follow_up_input, expected_relation}` |
 
-`materializable=false`でも正規Coverage基準上必要なtargetは、current target versionを保持したsemantic Coverage Itemまたは既存Skillで許可されたDispositionへ閉じるまで完了させません。adapter / diagnostic専用targetはこのclosure対象外です。
+`materializable=false`でも正規Coverage基準上必要なtargetは、current target versionを保持したsemantic Coverage Itemまたは既存Skillで許可されたDispositionへ閉じるまで完了させません。adapter / diagnostic専用targetはこのclosure対象外です。`execution`はstable keyの解決を下流へ要求せず、`test-case-design`がgenerator内部modelを読み直さなくても入力対象・条件・操作・期待関係を理解できるmachine meaningを持たせます。
 
 エラー推測も同じsemantic Coverage Item経路を使い、偽のmachine target / executionを作りません。
 
@@ -408,8 +410,8 @@ LLMがclassification / classの意味を定義した後、`classification_tree.p
 
 Coverage定義:
 
-- `all-states`: initial stateからfeasible transitionだけで到達可能な全state
-- `all-transitions`: initial stateから到達可能で`guard_status=true`の全transition
+- `all-states`: model内の全state。initial stateから`guard_status=true` transitionだけでsetupできないstateが1件でもあればrequired集合から黙って除外せず`result_status=unresolved`とする
+- `valid-transitions`: model内で`guard_status=true`と確定した全valid transition。source stateへsetupできないtransitionが1件でもあればrequired集合から黙って除外せず`result_status=unresolved`とする
 - `n-switch`: `switch_count=N`として、到達可能なN+1個の連続するvalid transitionの全sequence。Nは0..10。N>=2は高いfailure risk、ユーザー明示、案件固有基準等の具体的理由を`coverage_selection_reason`へ必須で残す
 - `round-trip`: 到達可能なsimple cycle。開始stateと終了stateは同一で、それ以外のstateをsequence内で重複させない。self-loopも1 transitionのround-tripとして含める。開始stateが異なるround tripは別Coverage targetとして扱う
 - `invalid-transitions`: 明示されたinvalid transition candidateだけ
@@ -1062,7 +1064,7 @@ CI単位の`merge_group`と、TCが複数CIを参照する意味判断を分離�
 | `crud_matrix.py` | matrix、consistency sequences、operation dispositions | §11のoperation / missing / sequence key | completeness / consistency / anomalies |
 | `cause_effect.py` | causes、effects、constraints、AST | `ce:sha256:<cause_assignment_hash>` | Decision Table互換rules |
 | `grammar_cases.py` | start、key付きproductions、max depth、mutations | `syntax:prod:<production_key>`、mutationは`syntax:mutation:<mutation_key>` | derivations / production Coverage |
-| `schema_cases.py` | `schema_kind, document, schema_pointer, context` | `schema:<json_pointer>:<keyword>` | normalized constraints / downstream inputs / unsupported subtrees |
+| `schema_cases.py` | `schema_kind, document, schema_pointer, context` | `schema:sha256:<source_hash>` | normalized constraints / downstream inputs / unsupported subtrees |
 | `ui_pattern_candidates.py` | pattern / alias、attributes | `ui:<pattern_key>:<candidate_key>` | candidate / references |
 | `test_data_requirements.py` | requirements[] | `data:<requirement_key>` | merged requirements / conflicts |
 | `random_testing.py` | seed、case count、distribution | `random:case:<1-based zero-padded 6 digits>` | generated input / completion |
@@ -1189,8 +1191,8 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 #### `equivalence_partitions.py`
 
 - required: `sets[]`
-- set: `{set_key, partitions[]}`
-- partition: `{partition_key, validity, definition, representative, authority_refs}`
+- set: `{set_key, label, partitions[]}`。`label`は非空文字列
+- partition: `{partition_key, label, validity, definition, representative, authority_refs}`。`label`は非空文字列
 - `validity = valid | invalid`
 - `definition.type=enum`: `values[]` typed valueを1件以上
 - `definition.type=range`: `minimum / maximum / minimum_inclusive / maximum_inclusive`
@@ -1199,7 +1201,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 #### `bva.py`
 
 - required: `boundaries[]`
-- boundary: `{boundary_key, side, threshold, inclusive, step, mode, coverage_selection_reason, authority_refs}`
+- boundary: `{boundary_key, label, side, threshold, inclusive, step, mode, coverage_selection_reason, authority_refs}`。`label`は非空文字列
 - `side=lower|upper`, `mode=2-value|3-value`。`mode=3-value`では境界リスク、過去不具合、ユーザー明示等の具体的な`coverage_selection_reason`を非空必須とし、2-valueでは空文字を許可する
 - `threshold`はtyped integer / decimal / date / local_datetime / fixed_offset_datetime
 - `step`は§4のdomain別object形式だけを許可し、threshold型と互換であることを必須にする
@@ -1207,8 +1209,8 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 #### `domain_testing.py`
 
 - required: `partitions[]`, `borders[]`
-- partition: `{partition_key, expression, authority_refs}`。expressionは§5の`border_ref / and / or` ASTだけ
-- borderは§5の`border_key / partition_key / relation / coefficients / constant / pivot_key / anchor / pivot_step / authority_refs`だけ
+- partition: `{partition_key, label, dimensions[], expression, authority_refs}`。`label`は非空文字列、`dimensions[]`は`{dimension_key,label}`を1件以上持ち、expressionは§5の`border_ref / and / or` ASTだけ
+- borderは§5の`border_key / label / partition_key / relation / coefficients / constant / pivot_key / anchor / pivot_step / authority_refs`だけ。`label`は非空文字列、coefficient / anchorのdimension keyは同partitionの`dimensions[]`へ解決必須
 - coefficient / constant / pivot_stepはdecimal文字列
 - anchor valueはtyped integer / decimalだけ
 - 各borderは同じ`partition_key`のpartition expressionから1回以上参照されること
@@ -1216,8 +1218,8 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 #### `decision_table.py`
 
 - required: `conditions[]`, `actions[]`, `known_rules[]`, `constraints[]`, `accepted_merges[]`
-- condition: `{condition_key, values[], authority_refs}`。valuesはtyped valueを1件以上
-- action: `{action_key, values[], authority_refs}`。valuesはtyped valueを1件以上
+- condition: `{condition_key, label, values[], authority_refs}`。`label`は非空文字列、valuesはtyped valueを1件以上
+- action: `{action_key, label, values[], authority_refs}`。`label`は非空文字列、valuesはtyped valueを1件以上
 - known rule: `{rule_key, when, then, authority_refs}`。`when`は全condition keyを1回ずつ、`then`は全action keyを1回ずつ持つ
 - constraintsは共通partial assignment
 - accepted mergeは§6.1形式
@@ -1225,7 +1227,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 #### `combinatorial.py`
 
 - required: `mode`, `factors[]`, `constraints[]`
-- factor: `{factor_key, values[], authority_refs}`。valuesはtyped valueを1件以上
+- factor: `{factor_key, label, values[], authority_refs}`。`label`は非空文字列、valuesはtyped valueを1件以上
 - `mode=exhaustive`: 追加fieldなし
 - `mode=base-choice`: `base_assignment`を全factorについて必須
 - `mode=t-wise`: `strength` integerを2..factor数で必須。`strength>2`では`coverage_selection_reason`を非空必須
@@ -1246,7 +1248,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - transition: `{transition_key, from, event, guard_status, guard_refs, to, authority_refs}`
 - `guard_status=true|false|null`
 - resetは§9形式で`action`を非空文字列必須とする
-- coverage mode: `all-states | all-transitions | n-switch | round-trip | invalid-transitions`
+- coverage mode: `all-states | valid-transitions | n-switch | round-trip | invalid-transitions`
 - `switch_count`はinteger 0..10
 - n-switch / round-tripのtarget定義とcanonicalizationは§9を正本とする
 - invalid candidateは§9形式
