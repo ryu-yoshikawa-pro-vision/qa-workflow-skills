@@ -197,7 +197,7 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 ### change impact
 
 - node / edge type
-- `change_kind / expected_impact`を探索ロジックで創作・欠落させずMachine Entityへ保持する
+- `change_kind`を既存`新規 / 変更 / 削除 / 回帰影響 / 参考`またはnullに限定し、`expected_impact`とともに探索ロジックで創作・欠落させずMachine Entityへ保持する
 - `depends_on / traces_to / derived_from`の探索方向
 - unknown node / dangling edge
 - 名称類似だけでedge追加しない
