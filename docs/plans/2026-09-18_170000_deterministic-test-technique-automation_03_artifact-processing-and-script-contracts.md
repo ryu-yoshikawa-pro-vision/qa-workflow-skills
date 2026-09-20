@@ -320,12 +320,25 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - `mode=t-wise`: `strength` integerを2..factor数で必須。`strength>2`では`coverage_selection_reason`を非空必須
 - `mode=mixed-strength`: `global_strength` integerを2..factor数、`subsets[]`を1件以上必須。subsetは`factor_keys[]`と`strength`を持ち、strengthは2..subset factor数。globalまたはsubsetのいずれかがstrength>2なら`coverage_selection_reason`を非空必須
 
+#### adapter共通child契約
+
+`classification_tree.py / cause_effect.py / schema_cases.py`は、`condition_structure.py`で先に確定したchild identityだけを受けます。
+
+- `child_models[]`: `{child_model_key, model_type, derived_from_model_key, semantic_parameters}`。`child_model_key`は入力内一意、`derived_from_model_key`はadapter runtimeの共通metadata `model_key`と完全一致必須
+- adapterごとに許可した`model_type`以外は`invalid_input`。unknown child、duplicate child、自己parent不一致を拒否する
+- 意味parameterが不足する場合は`semantic_parameter_requests[]: {child_model_key, model_type, source_key, required_fields[]}`をstable sortして返し、`result_status=unresolved`にする。`source_key`はboundary / factor group等のstable machine keyで、自由文をidentityにしない
+- `result_status=ready`では`semantic_parameter_requests=[]`かつ各`child_models[]`にちょうど1件の`derived_child_inputs[]: {child_model_key, model_type, input}`を返す。`input`は対応child generatorのscript固有inputと直接互換にする
+- child generatorは`derived_child_inputs[].input`を変更せず使用し、adapterのcurrent generationを`upstream_runtime_units[]`へ保持する
+
 #### `classification_tree.py`
 
-- required: `classifications[]`, `constraints[]`
+- required: `classifications[]`, `constraints[]`, `child_models[]`
+- `child_models[]`は1件だけで`model_type=comb`必須
 - classification: `{classification_key, label, classes[], authority_refs}`。`label`は非空文字列
 - class: `{class_key, value, authority_refs}`。valueはtyped value
 - 同一classificationのclass valueは重複不可
+- `semantic_parameters`はnullまたは`combinatorial.py`の戦略field `{mode, strength, global_strength, subsets, base_assignment, coverage_selection_reason}`。mode別に不要なfieldは拒否する
+- strategy未確定ならfactor key集合を`source_key`として`semantic_parameter_requests[]`を返す。確定後は`derived_child_inputs[].input`を`combinatorial.py` inputと完全互換にする
 
 #### `state_transition.py`
 
@@ -364,13 +377,14 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 
 #### `cause_effect.py`
 
-- required: `causes[]`, `effects[]`, `constraints[]`
+- required: `causes[]`, `effects[]`, `constraints[]`, `child_models[]`
+- `child_models[]`は1件だけで`model_type=decision / semantic_parameters=null`必須
 - cause: `{cause_key, label, authority_refs}`。`label`は非空文字列
 - effect: `{effect_key, label, expression, true_value, false_value, authority_refs}`。`label`は非空文字列
 - expression ASTは`{"op":"ref","key":"C1"}`、`{"op":"not","arg":...}`、`{"op":"and|or","args":[...,...]}`だけ
 - refはcause keyだけを許可し、effect参照は禁止
 - true / false valueはtyped value
-- constraintは§25.1の共通partial assignmentで、assignment keyはcause keyだけを許可し、`derived.decision_table.constraints`へそのまま渡す
+- constraintは§25.1の共通partial assignmentで、assignment keyはcause keyだけを許可する。valid inputでは`semantic_parameter_requests=[]`とし、`derived_child_inputs[].input`へDecision Table互換の`conditions / actions / known_rules / constraints / accepted_merges=[]`を返す
 
 #### `grammar_cases.py`
 
@@ -388,7 +402,13 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 
 #### `schema_cases.py`
 
-- required: `schema_kind`, `document`, `schema_pointer`, `context`
+- required: `schema_kind`, `document`, `schema_pointer`, `context`, `child_models[]`
+- `child_models[]`の`model_type`は`ep / bva / comb`だけを許可する。同じmodel typeを複数childへ使う場合も`child_model_key`ごとに別rowとして扱う
+- `ep`の`semantic_parameters`はnull固定
+- `bva`の`semantic_parameters`はnullまたは`boundaries[]: {boundary_key, mode, coverage_selection_reason}`。生成skeletonの全boundary keyを1回ずつ指定し、unknown / missing / duplicate boundaryを拒否する
+- `comb`の`semantic_parameters`はnullまたは`combinatorial.py`の戦略field `{mode, strength, global_strength, subsets, base_assignment, coverage_selection_reason}`。factor keyはschema解析結果へ解決必須
+- selected childに適用可能なskeletonが0件なら`issue_type=selected_technique_not_derivable / blocking=true`を返す。`selection_source=analysis`なら`route_to=test-analysis`、`condition_design`なら`route_to=test-condition-design`、`user`なら`route_to=question-analysis / resume_skill=test-condition-design`とする
+- BVA / combinatorialの意味parameter不足時はstable boundary / factor keyを`semantic_parameter_requests[]`へ返す。要求が0件になったready実行だけ`derived_child_inputs[]`を返す
 - arbitrary JSON Pointerやproperty名をstable component keyへ直接埋め込まない。`source_digest`は`canonical JSON({schema_kind,schema_pointer,keyword,role})`のSHA-256 64桁lowercase hexとし、schema targetは`schema:sha256:<source_digest>`を使う。下流へ渡す`set_key / partition_key / boundary_key / factor_key / requirement_key`は同じsource objectへ用途`role`を加えたfull digestから`_02` §3.2の`h` + 64 hex component keyを固定生成する。元pointer / keyword / full digestもpayloadへ保持する
 - `schema_kind = json-schema-2020-12 | openapi-3.0 | html-control`
 - numberは共通strict JSONの専用number tokenからcanonical integer / exact `coefficient + scale`へ正規化し、binary float / `Decimal` contextへ依存しない
