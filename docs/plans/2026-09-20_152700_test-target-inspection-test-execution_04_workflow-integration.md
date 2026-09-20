@@ -37,17 +37,28 @@ test-target-inspection
 
 資料作成後に必ず`spec-analysis`からやり直しません。開始 / 再開先は要求成果物と影響範囲から決めます。
 
-### AI直接操作でTCを実行
+### TCを実行
 
 ```text
 詳細TC
   ↓
 test-execution
+  ↓ TC識別子集合を固定し、TCごとに実行方式を確定
+  ├─ AI直接操作subset ───────────────┐
+  └─ 自動実行subset                  │
+       ↓                              │
+     e2e-test-execution              │
+       ↓ 異常時                       │
+     e2e-test-result-analysis         │
+       ↓                              │
+     test-executionへ再開 ←───────────┘
+       ↓
+     全TC結果を統合
 ```
 
-テスト対象資料は利用可能なら再利用しますが必須依存にしません。
+テスト対象資料は利用可能なら再利用しますが必須依存にしません。AI直接操作だけ、自動実行だけの場合も同じ`test-execution`契約の部分集合として扱います。混在時は`test-execution`を未完了のまま保持し、自動実行subsetの結果が戻った後に同じ成果物へ統合します。同じTC識別子を複数方式で暗黙に実行しません。
 
-### 自動化済みTCを実行してTC結果を確認
+### 自動化済みTCだけを実行してTC結果を確認
 
 ```text
 詳細TC + currentなTC → E2E実装対応
@@ -91,9 +102,9 @@ e2e-test-implementation
 
 ## 3. テスト対象資料の保存・再利用
 
-案件固有のテスト対象資料は、ユーザーまたは案件が指定した保存先へだけ永続化します。`qa-workflow`の案件コンテキストを利用している場合は、既存の`skills/qa-workflow/assets/project-context-template.md`にある`既存QA成果物`欄へ、成果物参照、対象範囲、鮮度 / バージョンを記録します。新しいartifact registry / DBは追加しません。
+案件固有のテスト対象資料は、ユーザーまたは案件が指定した保存先へだけ永続化します。`test-target-inspection`は保存済み成果物参照・対象範囲・鮮度 / バージョンを返し、`qa-workflow`利用時だけ`qa-workflow`が既存の`skills/qa-workflow/assets/project-context-template.md`にある`既存QA成果物`欄へ反映します。`test-target-inspection`単体利用では案件コンテキストを変更しません。永続保存・更新自体が要求成果物なのに保存できない場合は、候補資料を返してもworkflowを完了にしません。新しいartifact registry / DBは追加しません。
 
-再利用時は成果物全体の更新日時だけでcurrentと判断せず、今回利用する対象・要素・状態・遷移等がどの確認元と確認日時 / revisionに基づくか確認します。version / build変更時は関連範囲への影響を確認し、影響不明な範囲だけ`test-target-inspection`へ戻します。同一buildでも、今回利用する事実へ影響するrole / 権限、viewport、locale、feature flag、テストデータ等の確認条件が異なる場合は、差異が該当事実へ影響しないことを確認できる範囲だけ再利用します。
+再利用時は成果物全体の更新日時や成果物上部の今回version / buildだけでcurrentと判断せず、今回利用する対象・要素・状態・遷移等の各行がどの確認元・確認version / build・確認日時 / revisionに基づくか確認します。部分更新で`既存資料から継承・未再確認`となった行は、その行を実際に確認したversion / buildを正本とします。version / build変更時は関連範囲への影響を確認し、影響不明な範囲だけ`test-target-inspection`へ戻します。同一buildでも、今回利用する事実へ影響するrole / 権限、viewport、locale、feature flag、テストデータ等の確認条件が異なる場合は、差異が該当事実へ影響しないことを確認できる範囲だけ再利用します。
 
 テスト設計で利用する場合、現在有効なテスト対象資料を`test-case-design`の補助入力として利用できます。UI名称、到達方法、具体手順、観測可能性には利用できますが、期待結果や合格条件の仕様根拠にはしません。
 ## 4. `e2e-test-inspection`との統合
@@ -120,7 +131,7 @@ e2e-test-implementation
 `e2e-test-execution`から`test-execution`へ渡すのは、既存出力で確認済みの次の情報です。`test-execution`はこれらを今回要求されたTC・対象環境と照合してからTC判定へ使用します。
 
 - currentな`TC → E2E実装`対応
-- 今回固定したTC ID集合から解決したlogical primary対象
+- 今回固定したTC識別子集合の自動実行subsetから解決したlogical primary対象
 - 対象URL / origin、Playwright project、必要な認証 / 開始状態 / テストデータ、version / build ID等の実行条件
 - TC ID（存在時）
 - resolved primary TestCase
@@ -136,7 +147,7 @@ e2e-test-implementation
 
 異常、未実行、run-level error、cleanup失敗 / 未確認は現行契約どおり`e2e-test-result-analysis`へ渡し、その分析結果を必要なTC判定へ利用します。正常runでは原因分析要求がなければ`test-execution`へ直接接続できます。原因分析をTC期待結果そのものへ変更しません。
 
-自動実行の対応は`TC ID → E2E実装参照 → logical primary → resolved primary TestCase → 実行結果 / 観測証拠`を辿れるようにします。今回固定したTC ID集合から必要なlogical primary集合を実行前に解決し、要求外primaryを暗黙追加しません。runner上必要なdependency / teardown等は既存`e2e-test-execution`契約へ委ねます。run全体PASS、`outcome=expected`、最終retry PASSだけではTCの`PASS`にしません。TCを`PASS`にする場合は、currentなE2E実装がPASS判定に必要な期待結果を検証していることを、現在有効なE2E実装成果物、`adversarial-review`（対象: `E2E実装`）の結果、または同等の確認済み事実から確認できることを要求します。`adversarial-review`を根拠にする場合はE2E実装変更後の`要再検証`が残っていない等、reviewがcurrentな実装へ適用できることを確認します。確認できない場合は`判定不能`として必要な担当Skillへ戻します。
+自動実行の対応は`TC識別子 → E2E実装参照 → logical primary → resolved primary TestCase → 実行結果 / 観測証拠`を辿れるようにします。既存`TC → E2E実装`対応を使う場合は、その既存TC IDと今回TC識別子が同一TCを指すことを確認します。今回固定したTC識別子集合の自動実行subsetから必要なlogical primary集合を実行前に解決し、要求外primaryを暗黙追加しません。runner上必要なdependency / teardown等は既存`e2e-test-execution`契約へ委ねます。run全体PASS、`outcome=expected`、最終retry PASSだけではTCの`PASS`にしません。TCを`PASS`にする場合は、currentなE2E実装がPASS判定に必要な期待結果を検証していることを、現在有効なE2E実装成果物、`adversarial-review`（対象: `E2E実装`）の結果、または同等の確認済み事実から確認できることを要求します。`adversarial-review`を根拠にする場合はE2E実装変更後の`要再検証`が残っていない等、reviewがcurrentな実装へ適用できることを確認します。確認できない場合は`判定不能`として必要な担当Skillへ戻します。
 
 ## 6. `e2e-test-reporting`との統合
 
@@ -212,4 +223,4 @@ README / `qa-workflow`では、次を区別して説明します。
 
 実行を要求したTCが理由なく欠落している場合も完了にしません。
 
-`test-target-inspection`についても、今回確認すべき範囲に必要な`未確認`または`確認不能`が残り、要求資料を完成できない場合はworkflowを完了にしません。要求範囲外を`未確認`へ混ぜず、repo由来情報だけで実対象確認済みとして閉じません。
+`test-target-inspection`についても、今回確認すべき範囲に必要な`未確認`または`確認不能`が残り、要求資料を完成できない場合はworkflowを完了にしません。要求範囲外を`未確認`へ混ぜず、repo由来情報だけで実対象確認済みとして閉じません。永続保存・更新自体がユーザー要求に含まれる場合は、保存先不明、書込不能、安全な差分更新不能、保存後不整合が残る範囲も完了にしません。
