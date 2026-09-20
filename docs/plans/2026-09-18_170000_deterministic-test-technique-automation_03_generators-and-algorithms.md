@@ -832,7 +832,7 @@ relationが製品に妥当か、source input集合、follow-up transform、出�
 
 ### `requirement_structure.py`
 
-LLMはTRの本文、テストレベル / 観測方法と、既存TRを再利用するか新規TRにするかを判断します。これらの意味fieldもruntime inputへそのまま渡し、structure scriptは内容を生成・要約せずschemaと構造だけを検査します。Dispositionのmachine schemaはstructure / traceabilityで共通して`{upstream_id, handling, reason, authority_refs[], covered_by_ref}`とし、不要な`covered_by_entity`はnullです。既存ID再利用時は`reuse_id`、新規時は`new`を指定し、runtimeが最終TR IDを割り当てます。
+LLMはTRの本文、テストレベル / 観測方法と、既存TRを再利用するか新規TRにするかを判断します。これらの意味fieldもruntime inputへそのまま渡し、structure scriptは内容を生成・要約せずschemaと構造だけを検査します。Dispositionのmachine schemaはstructure / traceabilityで共通して`{upstream_entity:{skill, entity_type, entity_ref, content_fingerprint}, handling, reason, authority_refs[], covered_by_entity}`とし、`covered_by_entity`は不要なhandlingではnullです。既存ID再利用時は`reuse_id`、新規時は`new`を指定し、runtimeが最終TR IDを割り当てます。
 
 LLM draft後に次を計算します。
 
@@ -1108,7 +1108,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - node: `{node_key, kind, authority_refs}`。kindは`normal / fork / join / terminal`
 - edge: `{edge_key, from, to, guard_status, guard_refs, label, authority_refs}`
 - region: `{region_key, fork_node_key, join_node_key, branches[]}`。branchは`{branch_key, edge_keys[]}`
-- loop spec: `{loop_key, entry_node_key, edge_keys[], typical_iterations, maximum_iterations, authority_refs}`
+- loop spec: `{loop_key, entry_node_key, edge_keys[], exit_edge_keys[], typical_iterations, maximum_iterations, authority_refs}`
 - `initial_node_keys[]`は1件以上
 - `coverage_mode = node | edge | bounded-path | simple-loop | fork-join`
 - `max_path_length`は1..1000
@@ -1197,7 +1197,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - required: `nodes[]`, `edges[]`, `dispositions[]`, `runtime_units[]`, `current_entities[]`, `current_runtime_units[]`, `expected_runtime_units[]`, `expected_entities[]`
 - node: `{node_key, node_type}`。node_typeは`Authority / Risk / TR / TCN / CI / TC`
 - edge: `{from, to}`。from / toは既知nodeで、§23の許可直接edgeだけを認める
-- disposition: `{upstream_id, handling, reason, authority_refs[], covered_by_ref}`。handlingは対象上流型に対して既存担当Skillが許可するDisposition集合だけを認め、必要なreason / Authority / covered_by_refを検証する
+- disposition: `{upstream_entity:{skill, entity_type, entity_ref, content_fingerprint}, handling, reason, authority_refs[], covered_by_entity}`。handlingは対象上流型に対して既存担当Skillが許可するDisposition集合だけを認め、必要なreason / Authority / covered_by_entityを検証する
 - `runtime_units / current_entities / current_runtime_units / expected_runtime_units / expected_entities`は`workflow_runtime.py`と同じschemaを使用する
 - `coverage-analysis::artifact:traceability:all`自身は`runtime_units[] / current_runtime_units[] / expected_runtime_units[]`のすべてから除外する。いずれかに自身が含まれていた場合は`invalid_input`とし、自己generationをfreshness入力にしない
 - `traceability.py`は各Skillの同一内容`runtime_contract.py`にある共通freshness評価関数を呼び、`runtime_freshness[] / entity_freshness[]`を決定論的に算出する。workflow_runtime resultを入力へ渡さず、self/cycle dependencyを作らない
@@ -1228,7 +1228,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - `expected_entities[]`: `{skill, entity_type, entity_ref}`。各Skill validatorが現在のsource表、structure / generator / materialize resultから固定導出したcurrent Entity集合を渡す。spec-analysis AuthorityはAuthority表、TR / TCN / model / CI / TCは各structure / materialize resultを正本に導出する
 - `runtime_units[]`のidentity集合は`expected_runtime_units[]`と完全一致、`current_entities[]`のidentity集合は`expected_entities[]`と完全一致を必須にする。期待item欠落はblocker、未知の余分なcurrent itemは`invalid_input`とする
 - 各Skillの同一内容`runtime_contract.py`にruntime dependency graphとMachine Entity dependency graphを評価する共通関数を置く。missing dependencyはstale + blocker、duplicateまたはcycleは`invalid_input`
-- `unsupported_item_closures[]`: `{skill, runtime_unit_key, generation_fingerprint, item_key, reason_code, handling, reason, authority_refs, covered_by_ref}`。`handling`は`llm_fallback / 対象外 / 別テストレベル / 残存リスク / 成立不能 / 重複 / ブロック中`だけを許可する。closureの`generation_fingerprint`は対象runtime unitの現在値と一致必須。`support_status=partial`では`item_key`をunsupported itemのstable keyで必須とし、`reason_code`も現在unsupported itemと一致必須。whole-model `unsupported`では`item_key=null / reason_code=null`を許可するが`generation_fingerprint`一致は必須とする。世代またはreasonが変わった以前のclosureを自動再利用しない
+- `unsupported_item_closures[]`: `{skill, runtime_unit_key, generation_fingerprint, item_key, reason_code, handling, reason, authority_refs, covered_by_entity}`。`handling`は`llm_fallback / 対象外 / 別テストレベル / 残存リスク / 成立不能 / 重複 / ブロック中`だけを許可する。closureの`generation_fingerprint`は対象runtime unitの現在値と一致必須。`support_status=partial`では`item_key`をunsupported itemのstable keyで必須とし、`reason_code`も現在unsupported itemと一致必須。whole-model `unsupported`では`item_key=null / reason_code=null`を許可するが`generation_fingerprint`一致は必須とする。世代またはreasonが変わった以前のclosureを自動再利用しない
 - `llm_fallback`と`重複`は`covered_by_entity`必須で、currentなMachine Entityへ解決できることを検証する。`対象外 / 別テストレベル / 残存リスク / 成立不能`は既存`test-condition-design`のDisposition条件をそのまま適用し、不要な`covered_by_entity`はnullとする。`ブロック中`はclosure rowとして保持しても閉鎖済みには数えず`can_complete=false`とする
 - runtimeは意味上の再利用可否、開始Skill、仕様Authorityの優先関係を再判断しない
 - outputは`freshness[]: {skill, runtime_unit_key, generation_fingerprint, freshness_status, stale_reasons[]}`、`entity_freshness[]: {skill, entity_type, entity_ref, model_key, freshness_status, stale_reasons[]}`、`completion: {can_complete, blockers[]}`、runtime状態表用の正規化rowを返す
@@ -1236,7 +1236,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 
 ### unsupported item共通schema
 
-`support_status=partial`で返す`payload.unsupported_items[]`は`{item_key, item_type, source_key, reason_code, authority_refs[]}`で固定します。`reason_code`は機械的な非対応理由であり、workflow完了可否は`unsupported_item_closures[]`の`handling / covered_by_ref`を別途検査して決めます。
+`support_status=partial`で返す`payload.unsupported_items[]`は`{item_key, item_type, source_key, reason_code, authority_refs[]}`で固定します。`reason_code`は機械的な非対応理由であり、workflow完了可否は`unsupported_item_closures[]`の`handling / covered_by_entity`を別途検査して決めます。
 
 - `item_key`は`unsupported:<generator>:sha256:<canonical identity hash>`で、generator、`item_type`、`source_key`をcanonical JSON化して作る
 - `source_key`は対応できないsubtree / region / operator等のstable component keyまたはJSON Pointer
