@@ -366,7 +366,7 @@ output envelopeの`skill`はinput metadataおよびscript所属Skillと一致必
 
 strict JSON objectと共通metadataを確定する前に失敗した場合はpre-parse error envelopeを使用します。`skill / generator / runtime_contract_version / generator_contract_version / runtime_implementation_fingerprint / generator_implementation_fingerprint / runtime_status / support_status / result_status / runtime_required / deterministic_generated / payload / issues`は返し、未確定の`runtime_unit_key / model_key / input_fingerprint / model_fingerprint / generation_fingerprint`は`null`、`upstream_entity_fingerprints / upstream_runtime_units`は空配列にします。byte上限やdepth上限をstrict decode前に検出した場合も同じ形で返し、入力内容からidentityを推測しません。
 
-`support_status`は`supported / partial / unsupported / unknown`です。`partial`は同一input内に、独立して機械処理できる範囲と対応subset外の範囲が共存する場合だけ使用します。対応subset外部分は`payload.unsupported_items[]`へstable key、理由、Authorityを保持し、黙って削除しません。`unknown`はsupport判定を完了できなかった場合だけ使用し、`invalid_input / internal_error / not_run`以外では返しません。
+`support_status`は`supported / partial / unsupported / unknown`です。`partial`は同一input内に、独立して機械処理できる範囲と対応subset外の範囲が共存する場合だけ使用します。対応subset外部分は`payload.unsupported_items[]`へstable key、理由、Authorityを保持し、黙って削除しません。`unknown`はsupport判定を完了できなかった場合だけ使用し、`invalid_input / internal_error / not_run`とstrict decode前の`limit_exceeded`以外では返しません。
 
 `runtime_status`:
 
