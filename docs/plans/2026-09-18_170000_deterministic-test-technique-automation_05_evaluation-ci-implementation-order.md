@@ -18,6 +18,8 @@ generatorとvalidatorは実装helperを共有しません。expected fixtureをg
 対象:
 
 ```text
+test_spec_analysis_authority_entities.py
+test_test_analysis_entities.py
 test_test_analysis_risk_matrix.py
 test_test_analysis_technique_candidates.py
 test_test_analysis_change_impact.py
@@ -52,9 +54,9 @@ test_runtime_workflow_integration.py
 
 実行test数が0件ならCIを失敗させます。
 
-各runtime scriptには`tests/skills/runtime/fixtures/<script-name>/valid_minimal.json`を1件必須とし、これをPlan `_03`のrequired input schemaの実行例とします。fixtureは手書きし、generator出力から生成しません。unknown field拒否、required field欠落、型不一致は各scriptのunit testで確認します。
+各runtime scriptには`tests/skills/runtime/fixtures/<script-name>/valid_minimal.json`を1件必須とし、これをPlan `_03`のrequired input schemaの実行例とします。`spec-analysis/authority_entities.py`にもbuilder用`valid_minimal.json`を1件置き、runtime envelopeではなくMachine Entity / expected identity出力を検証します。fixtureは手書きし、generator出力から生成しません。unknown field拒否、required field欠落、型不一致は各scriptのunit testで確認します。
 
-CLI integration testは各runtime scriptの`valid_minimal.json`をsubprocessで`python <script-path>`起動し、stdinへJSONを渡してstdout envelopeを読む経路を使用します。加えて`_02` §2.1のSkill別dispatch表について、各scriptへ到達するprompt分類済みfixtureから期待script path・必須/条件付き・実行順を一意に決められることを機械テストします。派生modelでは親runtime → `condition_structure.py` → 派生generatorまで検証します。全scriptのdispatchはCIで検証し、実Agent smokeだけへ依存しません。CI subprocessとSkill実行時subprocessの安全timeoutは30秒です。
+CLI integration testは各runtime scriptの`valid_minimal.json`をsubprocessで`python <script-path>`起動し、stdinへJSONを渡してstdout envelopeを読む経路を使用します。`authority_entities.py`もsubprocessでbuilder入出力を検証します。加えて`_02` §2.1のSkill別dispatch表について、各scriptへ到達するprompt分類済みfixtureから期待script path・必須/条件付き・実行順を一意に決められることを機械テストします。派生modelでは`condition_structure.py`でadapter / child identity確定 → 親adapter runtime → child generatorまで検証します。全scriptのdispatchはCIで検証し、実Agent smokeだけへ依存しません。CI subprocessとSkill実行時subprocessの安全timeoutは30秒です。
 
 ## 3. 共通契約の必須回帰
 
