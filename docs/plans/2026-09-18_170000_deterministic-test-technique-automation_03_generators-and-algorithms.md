@@ -1212,6 +1212,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - `model_type=error-guessing / technique_slug=error-guessing`はmodel metadataを作るがgenerator runtime unitを期待集合へ追加しない。semantic Coverage Itemを1件以上のcurrent CIへmaterializeするまで完了不可
 - outputは`tcn_id_map[]: {draft_key, tcn_id, identity_action}`、`model_key_map[]: {draft_key, model_key, model_type, technique_slug, parent_tcn_id, derived_from_model_key, identity_action}`、full snapshotの`tcn_id_state[]`、`model_key_state[]`を返す
 - 固定builderはTCN draftの意味field（`priority_override_reason`を含む）と最終TCN IDをjoinしてTCN Machine Entityを、model draftの`model_type / technique_slug / selection_source / selection_key / derived_from_model_draft_key`と最終model key / parent TCN / `derived_from_model_key`をjoinしてmodel metadata Entityを生成する。LLMがMachine Entity JSONを再生成しない
+- TCN / modelは同一`condition_structure.py` invocationで生成するため、model metadataの親TCNと`derived_from_model_key`のadapter modelは入力`upstream_entities[]`へ事前要求しない。TCN Entityを先に、adapter modelをchild modelより先に固定生成し、そのcurrent content fingerprintをmodel Entityの`upstream_entity_dependencies[]`へ設定する
 - 999到達後の新規TCNは`id_space_exhausted`。model keyは3桁以上を許可し999上限を設けない
 
 #### `equivalence_partitions.py`
