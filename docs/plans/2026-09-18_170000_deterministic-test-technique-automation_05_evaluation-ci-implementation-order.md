@@ -724,6 +724,10 @@ runtime対応Skillの`evals/output/cases/*/expected.json`では、既存fieldに
 
 semantic referenceをgenerator outputから自動生成しません。
 
+CIの`Validate Semantic Output Evals`は既存契約どおり外部LLM APIを呼ばず、dataset / rubric / semantic runtime / fake judge contractを検証します。このCI成功だけをsemantic case PASSとは扱いません。
+
+Plan完了時は、`test-analysis / test-condition-design / adversarial-review`の本Planで追加・更新したsemantic caseについて、保存済みcandidate outputを用意し、既存`scripts/skills/evals/semantic/run.py`とLLM Judge adapterで実評価します。candidate output生成、Judge実行command、Judge結果をPRの検証記録へ残します。Judgeを利用できない場合はsemantic dataset validationまでは実施できますが、semantic case PASSの完了条件は未達としてPRをDraftのままにします。CIへ外部LLM secretやJudge実行を追加しません。
+
 ### semantic dataset件数
 
 semantic dataset件数は次で固定します。
@@ -770,7 +774,7 @@ repository全体は328 queryです。
 3. `test-condition-design` positive: 技法を使って具体的なCoverage / 条件を設計する依頼 × 5技法
 4. `test-condition-design` negative: 技法の採用可否だけを判断する依頼 × 5技法
 
-さらに各datasetへ、各Skillについて「技法とは何か説明して」という説明依頼negativeを1件と、既存責務の一般positiveを1件追加してbalanceを維持します。train / validation間のquery重複は禁止します。
+さらに`test-analysis` / `test-condition-design`の各datasetへ、それぞれ「技法とは何か説明して」という説明依頼negativeを1件と、既存責務の一般positiveを1件追加してbalanceを維持します。その他12 Skillの件数は変更しません。train / validation間のquery重複は禁止します。
 
 `.github/workflows/validate-skills.yml`は上表のSkill別exact count、positive / negative exact count、repository合計328を検証します。`EVALS.md`へ新規query IDと責務境界の対応を記録します。
 ## 8. qa-workflow統合評価
