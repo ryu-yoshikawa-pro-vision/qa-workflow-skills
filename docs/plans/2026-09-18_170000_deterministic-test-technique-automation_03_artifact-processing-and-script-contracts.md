@@ -203,7 +203,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 #### `change_impact.py`
 
 - required: `changed_node_keys[]`, `nodes[]`, `edges[]`
-- node: `{node_key, node_type, source_ref, change_kind, expected_impact}`。`change_kind / expected_impact`は非空文字列またはnullで、探索順・到達判定には使わずMachine Entityへそのまま保持する
+- node: `{node_key, node_type, source_ref, change_kind, expected_impact}`。`change_kind`は既存`test-analysis`契約の`新規 / 変更 / 削除 / 回帰影響 / 参考`またはnull、`expected_impact`は非空文字列またはnullとする。探索順・到達判定には使わずMachine Entityへそのまま保持する
 - `node_type = Authority | Risk | TR | TCN | CI | TC`
 - edge: `{edge_key, from, to, edge_type, evidence_refs[]}`
 - `edge_type = depends_on | traces_to | derived_from`
