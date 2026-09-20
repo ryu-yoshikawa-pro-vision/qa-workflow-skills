@@ -1395,7 +1395,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - merge groupは`_02` §7.4の`{merge_group_key, model_key, target_refs[], target_versions[]}`を使う。Dispositionされていない同一TCN・同一model内targetだけを許可し、全target versionを現在model resultへ一致させる。`execution_fingerprint`と`expected_result_root`が全件一致する場合だけ同一CIへ統合し、異なるmodel / 技法 / execution / expected resultを統合しない
 - merge group内の追加test data requirementは§16と同じintersection規則で統合し、conflict / unsupportedならmergeを拒否する。異なるCIを1つのTCへまとめる意味判断は`case_structure.py`の`ci_refs[]`で行い、merge groupへ逆変換しない
 - `materializable=false`のadapter / diagnostic専用targetはCI採番、annotation、Dispositionの対象外。正規Coverage基準上必要だがlinear executionへ落とせないtargetはcurrent target versionを持つsemantic Coverage Itemまたは既存Skillで許可されたtarget Dispositionへ1回だけ閉じる
-- `target_dispositions[]`にあるmaterializable targetはCI採番対象から除外するがgeneratorの`coverage_summary`自体は変更しない
+- `target_dispositions[]`にあるmaterializable targetはCI採番対象から除外するが、generator固有の`coverage_summary`または`completion_summary`自体は変更しない
 - new CI候補はcanonical `(model_key, source_kind, source_key)`順で採番する。`runtime_target < semantic_item`、runtime targetのsource keyは`target_ref`、semantic itemはnewなら`draft_key`、reuseなら`reuse_semantic_item_key`。raw入力順で採番しない
 - runtime target mapping、semantic reuse、mergeの全経路で同一CIを別identityへ不正reuseするduplicateを拒否する。new CIはdeletedを含む同一TCNの過去最大番号+1で割り当てる。CIは`CI\d{2,}`で上限を設けない
 - outputは`target_id_map[]`、`target_mapping_state[]`、`semantic_ci_mapping_state[]`、`ci_id_state[]`、`expected_result_root_state[]`、`disposed_target_refs[]`、`coverage_item_rows[]`、`stale_ci_ids[]`、`model_completion[]`、`issues[]`
