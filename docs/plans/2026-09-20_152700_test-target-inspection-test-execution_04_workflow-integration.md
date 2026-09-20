@@ -60,17 +60,21 @@ test-execution
 
 ### 自動化済みTCだけを実行してTC結果を確認
 
+自動実行だけの場合も、TC単位の結果判定を要求しているなら`test-execution`から開始して固定TC識別子集合と方式を確定します。
+
 ```text
-詳細TC + currentなTC → E2E実装対応
+詳細TC
   ↓
-今回の新規実行要求でcurrentなrunがない
+test-execution
+  ↓ currentなTC → E2E実装対応と自動実行subsetを確定
+currentな今回runがない
   ↓
 e2e-test-execution
-  ├─ 正常run ─────────────────→ test-execution
+  ├─ 正常run ─────────────────→ test-executionへ再開
   └─ 異常 / 未実行 / run-level error / cleanup失敗・未確認
         ↓
      e2e-test-result-analysis
-        ├─ 追加実行不要 ───────→ test-execution
+        ├─ 追加実行不要 ───────→ test-executionへ再開
         └─ 追加実行必要 → e2e-test-execution → 既存E2E異常routingを再適用
 ```
 
