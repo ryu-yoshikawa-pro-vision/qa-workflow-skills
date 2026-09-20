@@ -408,6 +408,9 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 
 ### schema / HTML
 
+- schema adapterはcurrent Technique Selectionまたはcondition-design / userで採用済みの`ep / bva / comb` child typeだけへderived inputを供給し、runtime出力から新しい技法やchild modelを自動追加しない
+- 選択済みchildに対応するderived inputが0件なら`selected_technique_not_derivable`で`unresolved`とし、空modelをmaterializeしない
+
 raw machine-readable入力をfixtureにします。
 
 - JSON Schema 2020-12対応keyword
