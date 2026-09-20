@@ -463,7 +463,7 @@ raw machine-readable入力をfixtureにします。
 - test environmentと同じcross-operator intersection
 - incompatible constraint / empty intersection
 - unsupported operatorまたは安全にintersectionできない型組合せ
-- test dataは`source_model_key`を必須にし、model-wide requirementでは`source_target_versions=[]`とcurrent adapter / Coverage model metadataの一致、target-specific requirementでは1件以上の`source_target_versions[]`と`current_source_targets[]`の同一Coverage model / current version一致を検証する。`target_key`単独やstable IDだけをidentityに使わない
+- test dataは`source_model_key`を必須にし、model-wide requirementでは`source_target_versions=[]`とcurrent adapter / Coverage model metadataの一致、target-specific requirementでは1件以上の`source_target_versions[]`と`current_source_targets[]`の同一Coverage model / current version一致を検証する。source modelがruntime generatorを持つ場合はcurrent `(skill, runtime_unit_key, generation_fingerprint)`を`upstream_runtime_units[]`へ必須にし、generation変更でtest data runtime / Entityをstaleにする。`target_key`単独やstable IDだけをidentityに使わない
 - 実データを自動取得しない
 
 ### Random Testing
