@@ -149,7 +149,7 @@ boolean AST:
 
 effectはcauseだけを参照します。循環参照は禁止します。
 
-入力は`causes[] / effects[] / constraints[]`です。`constraints[]`は§25.1の共通partial assignmentをcause keyへ適用し、Authority付きのcause間成立不能条件を表します。constraintをLLMが派生先で作り直しません。
+入力は`causes[] / effects[] / constraints[]`です。`constraints[]`は[artifact処理・script別入出力契約](./2026-09-18_170000_deterministic-test-technique-automation_03_artifact-processing-and-script-contracts.md) §25.1の共通partial assignmentをcause keyへ適用し、Authority付きのcause間成立不能条件を表します。constraintをLLMが派生先で作り直しません。
 
 1. cause / effect key、AST参照、constraintのcause key / valueを検証する
 2. hard limit内で全cause assignmentを列挙する
