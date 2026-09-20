@@ -76,7 +76,7 @@ CLI integration testは各runtime scriptの`valid_minimal.json`をsubprocessで`
 
 - `envelope_version / skill / runtime_contract_version / generator_contract_version / generator / runtime_unit_key / model_key / input_fingerprint / model_fingerprint / generation_fingerprint / runtime_implementation_fingerprint / generator_implementation_fingerprint / upstream_entity_fingerprints / upstream_runtime_units / support_status / static_data_versions / runtime_status / result_status / runtime_required / deterministic_generated / fallback_reason / payload / issues`
 - `skill`はscript所属Skillと一致必須で、runtime issueも`skill + runtime_unit_key`を保持する
-- runtime生成issueはenvelopeの`generation_fingerprint`を保持し、質問・再開時に現在世代と一致しない回答を拒否する。timeout等のcaller生成issueだけ`generation_fingerprint=null`を許可する
+- canonical input確定後のruntime issueはenvelopeの`generation_fingerprint`を保持し、質問・再開時に現在世代と一致しない回答を拒否する。pre-parse error / timeout等でgenerationを確定できないissueだけ`generation_fingerprint=null`を許可する
 - model scriptは`runtime_unit_key=model:<model_key>`、artifact全体scriptは`runtime_unit_key=artifact:<generator>:<scope_key>`を要求し、artifact全体scriptの`model_key`はnull
 - runtime dependency参照は`(skill, runtime_unit_key)`を一意keyとし、Skillを跨いで`runtime_unit_key`単独をidentityにしない
 - `ok / invalid_input / unsupported / limit_exceeded`は構造化結果を返せた扱いで終了code 0
@@ -88,11 +88,12 @@ CLI integration testは各runtime scriptの`valid_minimal.json`をsubprocessで`
 - `runtime_required`はruntime入力に存在せず、support判定結果からscriptが出力する。Agent側だけでsupport判定してruntimeを省略しない
 - artifact scriptのscope keyがscript別固定値 / input由来値と一致する
 - `test-analysis` runtimeは`対象 / 実行範囲=テスト分析`だけ、`coverage-analysis` runtimeは`対象 / 実行範囲=テスト設計`だけでdispatchし、同じSkillの他用途では本Planruntimeを起動しない
-- `support_status=unknown`は`invalid_input / internal_error / not_run`だけで許可し、いずれも`runtime_required=true / result_status=blocked / deterministic_generated=false`を要求する
+- `support_status=unknown`は`invalid_input / internal_error / not_run`に加え、strict decode前の`limit_exceeded`だけで許可する。いずれも`runtime_required=true / result_status=blocked / deterministic_generated=false`を要求する
 - Python unavailable / runtime未実行は`runtime_status=not_run / support_status=unknown / runtime_required=true / result_status=blocked / deterministic_generated=false / fallback_reason=python_unavailable`とし、fingerprintをnullで保持する
 - status対応表どおりの`support_status / result_status / runtime_required / deterministic_generated`を要求
 - model scriptでは`model_status=result_status`、artifact全体scriptでは`artifact_status=result_status`
 - staleはruntime statusではなく`freshness_status`で表現する。semantic dependency preflight成功後に現在scriptを正常実行したresultは保存時に`current`、`workflow_runtime.py`は共通freshness関数で再検証して必要なresult / Entityを`stale`へ変更する
+- strict decode前の空stdin / 不正UTF-8 / duplicate JSON / byte・depth上限ではpre-parse error envelopeを返し、未確定の`runtime_unit_key / model_key / input_fingerprint / model_fingerprint / generation_fingerprint=null`を検証する。callerが推測値を補わない
 - stderrへ入力全文・secretを出さない
 - unknown `route_to` / `resume_skill`を拒否
 
@@ -111,7 +112,7 @@ CLI integration testは各runtime scriptの`valid_minimal.json`をsubprocessで`
 - `spec-analysis / test-analysis / test-requirement-design / test-condition-design / test-case-design`の`Machine Entities`をstrict decodeし、canonical Entity schema、`(skill, entity_type, entity_ref)`一意性、`content_fingerprint`再計算一致、人間向け表との主要field一致を検証する
 - 異なる`entity_type`で同じ`entity_ref`を使うfixtureは許可し、同じ`(skill, entity_type, entity_ref)`重複だけを拒否する
 - `upstream_entity_dependencies[]`と`current_entities[] / entity_freshness[]`で`entity_type`欠落またはtype不一致を拒否する
-- upstream Entityのcanonical `content`からruntimeが`content_fingerprint`を計算し、output envelopeの`upstream_entity_fingerprints[]`へcanonical順で保存する。呼び出し側が渡したhashだけを信用しない
+- upstream Entityのcanonical `content`からruntimeが`content_fingerprint`を計算し、output envelopeの`upstream_entity_fingerprints[]`へcanonical順で保存する。script固有inputのsemantic reference集合から固定builderが期待する`upstream_entities[]`と完全一致することも検査し、参照Entityの省略・余分・重複を許可しない
 - upstream Entityの正規項目変更でその`content_fingerprint`だけが変わる
 - `upstream_entity_fingerprints`の変更で`generation_fingerprint`が変わり、Authority IDが同じでも内容変更を同一generation扱いしない
 - Machine Entityの`upstream_entity_dependencies[]`差分を再実行前に検出し、古いsemantic model / draftをそのまま現在runtimeへ投入しない
@@ -121,7 +122,8 @@ CLI integration testは各runtime scriptの`valid_minimal.json`をsubprocessで`
 - runtime / generator source変更で実装fingerprintが変わり、意味契約を変えないbug fixでも旧machine evidenceを同一生成条件として再利用しない
 - 既存成果物再利用時もdispatch対象runtimeを現在scriptで再実行し、保存済みruntime resultだけでcurrent判定しない
 - 以前whole-model `unsupported`だったfixtureをruntime対応後に再実行するとsupported経路へ移り、古いfallbackを固定しない
-- `condition_structure.py`を派生model追加のため再実行しても、既存model generatorがID割当てしか利用していない場合は同scriptをruntime dependencyへ登録せず、親generatorを自己stale化しない
+- adapter / child modelを同じ`condition_structure.py`実行で先に採番し、childの`derived_from_model_draft_key → derived_from_model_key`を固定する。adapter実行後にchildを追加してTechnique Selection閉鎖を一時的に破る経路を作らない
+- `condition_structure.py`を派生modelのidentity確定に再利用しても、既存model generatorがID割当てしか利用していない場合は同scriptをruntime dependencyへ登録せず、親generatorを自己stale化しない
 - tie-break / Coverage / target key等の意味契約変更では実装fingerprintだけでなく対応contract versionも更新する
 - model / artifact全runtime unitについて`Machine Runtime Input / Result`を保存→決定論的抽出→strict decode→canonical化し、input fingerprint、model scriptではmodel fingerprintも一致する。同条件でruntimeへ再投入すると同じmachine resultになる
 - LF / CRLF差だけでimplementation fingerprintが変わらない
@@ -220,13 +222,13 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - `previous_tcn_ids[] / previous_model_keys[]`の`active|deleted`を検証し、reuseはactiveだけ許可する
 - 新規TCNはactive / deletedを含む既存最大+1、999超過は`id_space_exhausted`
 - model keyは同じ`model_type`のactive / deleted最大+1、削除済みkeyを同系列で再利用しない
-- reuse時の`model_type / technique_slug / selection_source / selection_key / parent TCN / existing key`一致
+- reuse時の`model_type / technique_slug / selection_source / selection_key / derived_from_model_key / parent TCN / existing key`一致
 - 1 model key = 1 TCN所属を検査し、同じmodel keyを複数TCNへ割り当てない
 - outputの`tcn_id_state[] / model_key_state[]`にdeleted IDも残し、次回入力の正本にする
-- TCN draftの`condition / category / technique_slugs[] / coverage_criterion / authority_refs / risk_refs`とmodel draftの`model_type / technique_slug / selection_source / selection_key`をruntime inputへ保持し、最終IDとjoinしてTCN / model metadata Machine Entityを固定生成する
+- TCN draftの`condition / category / technique_slugs[] / coverage_criterion / authority_refs / risk_refs / priority_override_reason`とmodel draftの`model_type / technique_slug / selection_source / selection_key / derived_from_model_draft_key`をruntime inputへ保持し、最終IDとjoinしてTCN / model metadata Machine Entityを固定生成する
 - Coverage所有modelだけ`selection_source=analysis / condition_design / user`を持ち、内部adapterは`technique_slug / selection_source / selection_key=null`
 - 各TCNの`technique_slugs[]`と所属Coverage所有modelのcanonical `technique_slug`集合を完全一致で検証する
-- Classification Tree / Cause-Effect / schema adapterは正規技法を所有せず、child Coverage modelがcanonical techniqueと元のselection provenanceを持つ
+- Classification Tree / Cause-Effect / schema adapterは正規技法を所有せず、child Coverage modelがcanonical techniqueと元のselection provenance、`derived_from_model_key`を持つ
 - 1つのselectionは複数TCN / modelへ展開できるが、active Technique Selectionの`selected_techniques[]`に残る各技法は少なくとも1件のcurrent Coverage所有modelへ到達することを検証する
 - 選択後に不適用 / 未解決となった技法はTechnique Selection Entity自体を更新してselected listから外すか既存block / unresolvedへ戻し、未定義のselection closureでは閉じない
 - runtime非対応はCoverage所有model生成後のunsupported closureで扱う
@@ -442,7 +444,7 @@ raw machine-readable入力をfixtureにします。
 - test environmentと同じcross-operator intersection
 - incompatible constraint / empty intersection
 - unsupported operatorまたは安全にintersectionできない型組合せ
-- `source_target_versions[]`で`target_ref / target_content_fingerprint / generation_fingerprint`を保持し、`target_key`単独やstable IDだけをidentityに使わない
+- `source_model_key`と`source_target_versions[]`で`target_ref / target_content_fingerprint / generation_fingerprint`を保持し、`current_source_targets[]`の同じmodel / current versionと完全一致を検証する。`target_key`単独やstable IDだけをidentityに使わない
 - 実データを自動取得しない
 
 ### Random Testing
@@ -479,9 +481,9 @@ raw machine-readable入力をfixtureにします。
 
 ### Coverage target materialize / Disposition
 
-- semantic-only Error Guessing、fork-join、whole-model unsupported fallbackでも`materialize_coverage.py`をdispatchする
+- semantic-only Error Guessing、fork-join、partial / whole-model unsupportedの`llm_fallback`でも`materialize_coverage.py`をdispatchする
 - `active_model_metadata[]`でruntimeなしmodelのTCN所属を検証する
-- semantic itemのstable key / previous mapping / reuse CIを検証し、別item・別model・runtime target CIへの横取りを拒否する
+- semantic itemのstable key / previous mapping / reuse CIを検証し、別item・別model・runtime target CIへの横取りを拒否する。`source_target_versions[]`はsemantic item自身の`model_key`に属するcurrent targetだけを許可する
 - test data requirement Entity fingerprint変更をCI / TC staleへ反映する
 
 - materialize入力modelは`runtime_status=ok / result_status=ready / deterministic_generated=true / freshness=current`を必須にし、supportedまたは分離済みpartialだけ許可する
@@ -489,20 +491,20 @@ raw machine-readable入力をfixtureにします。
 - generator targetは`materializable=true|false`を必須にし、`true`だけmachine targetとしてCI materialize / target Dispositionの対象とする。adapter / diagnostic専用`false` targetはmachine evidenceとして保持してCIを要求しない。一方、fork-join branch等の正規Coverage基準上必要な`false` targetは、現在target versionを参照するsemantic Coverage Itemまたは既存Skillで許可されたDispositionへ閉じるまで完了させない
 - 同一target_refへ`target_annotations[]`と`target_dispositions[]`を同時指定しない
 - CI化するtargetだけ`target_annotations[]`を1対1で要求し、unknown / duplicate target_refを拒否する
-- CI化targetはgenerator別にPlanで固定したcanonical `execution`とruntime計算済み`execution_fingerprint`を必須とする
+- CI化targetはgenerator別にPlanで固定したcanonical `execution`とruntime計算済み`execution_fingerprint`を必須とし、opaqueなstable keyだけではなく`test-case-design`が入力対象・条件・操作を再構築できるlabel / concrete value / expected relationを保持する
 - combinatorialはfull rowへ`row_ref=sha256(canonical assignment)`を付与し、各SAT targetをそのtargetをcoverする生成済みrowのうち生成順で最初のrowへ対応付ける。同じrowを使うtargetは同じ`execution_fingerprint`になる
 - `classification_tree.py / cause_effect.py / schema_cases.py / ui_pattern_candidates.py`は直接CI化せず、Planで定義したderived model / 意味判断先だけをmaterialize対象にする
 - stateのinvalid transitionは`attempted_transition`をcanonical executionへ保持し、valid transition列へ混ぜない。flowのnode / edgeはinitialから対象までの最短witness、bounded-pathはinitial→terminal pathを使用する。fork-join branchは単一`edge_sequence`へ順序化せず、semantic Coverage Itemの`source_target_versions[]`が現在branch targetと一致するまで完了させない
 - annotation / Dispositionの`target_content_fingerprint / generation_fingerprint`が現在target / modelと一致しない場合は拒否する
 - `target_dispositions[].handling`は`対象外 / 別テストレベル / 残存リスク / ブロック中 / 重複`だけを許可する
-- `重複`ではcurrentな`covered_by_target_version={target_ref,target_content_fingerprint,generation_fingerprint,execution_fingerprint}`を必須にする
+- `重複`ではcurrentな`covered_by_target_version={target_ref,target_content_fingerprint,generation_fingerprint,execution_fingerprint}`を必須にし、self参照を拒否する。全materialize結果を集約したduplicate graphでcycleを拒否し、chain終端がcurrent CI mappingまたはcurrent semantic CIへ到達することを要求する
 - generator生成後に`成立不能`Dispositionへ変更しない。成立不能根拠が得られた場合はmodel / constraintを更新してgeneratorを再実行する
 - Disposition済みtargetへCIを採番せず、同時にgeneratorの`coverage_summary.required / covered / complete`を変更しない
 - `ブロック中`Dispositionはworkflow完了を妨げる
-- materialize outputから生成したCI Machine Entityは、machine target由来ではcanonical `execution`まで保存する。semantic item由来ではstable `semantic_item_key`と`semantic_item_text / source_target_versions[]`を保存し、本文変更でCI content fingerprintを変える
+- materialize outputから生成したCI Machine Entityは、machine target由来ではcanonical `execution`まで保存する。semantic item由来ではstable `semantic_item_key`と`semantic_item_text / source_target_versions[]`を保存し、`priority_override_reason`を含む意味field変更でCI content fingerprintを変える
 - stable target_refのままtarget content / executionが変わった場合、CI Machine Entityのcontent fingerprintが変わり、参照TCへstaleが伝播する
 - `test_data_requirement_refs[]`は同じmaterialize inputの`data:<requirement_key>`へ解決できることを必須にする
-- merge groupはDispositionされていない同一TCN・同一`model_key`のtargetだけを含み、全targetの`execution_fingerprint`と`expected_result_root`の一致を要求する
+- merge groupは`{merge_group_key, model_key, target_refs[], target_versions[]}`を使い、Dispositionされていない同一TCN・同一`model_key`のtargetだけを含む。各`target_versions[]`は`target_ref / target_content_fingerprint / generation_fingerprint / execution_fingerprint`を保持し、全targetの`execution_fingerprint`と`expected_result_root`の一致を要求する
 - 異なるmodel / 技法のtargetを同一CIへmergeせず、同一TCで実行できる場合は`case_structure.py`の複数`ci_refs[]`で表現する
 - merge targetの追加test data requirementsを§16と同じintersection規則で統合し、矛盾 / unsupportedならmerge拒否
 - 同じ期待挙動groupを再利用すると判断した場合は既存`expected_result_root`を維持し、意味不変のkey churnをsemantic evalで検出する
@@ -534,12 +536,13 @@ raw machine-readable入力をfixtureにします。
 - Dispositionはstructure scriptと同じ共通schemaをそのまま受け取り、Markdownから再解釈しない
 - `traceability.py`と`workflow_runtime.py`が同じ`runtime_contract.py` freshness関数・同じ`runtime_units / current_entities / current_runtime_units / expected_runtime_units / expected_entities` schemaを使う
 - Machine Entityの`upstream_entity_dependencies[] / runtime_dependencies[]`から`entity_freshness[]`を同じ結果として算出し、missing / generation mismatch / dependency cycleを検出する
-- `traceability.py`は`workflow_runtime.py` resultを依存入力にせず、`coverage-analysis::artifact:traceability:all`自身を`runtime_units[] / current_runtime_units[] / expected_runtime_units[]`へ含めない。self inclusionを`invalid_input`として回帰検出する
+- `traceability.py`は`workflow_runtime.py` resultを依存入力にせず、`coverage-analysis::artifact:traceability:all`自身と`qa-workflow::artifact:workflow_runtime:all`を`runtime_units[] / current_runtime_units[] / expected_runtime_units[]`へ含めない。いずれかのinclusionを`invalid_input`として回帰検出する
 - Authority / Risk → TRまたはDisposition
 - TR → TCNまたはDisposition
 - TCN → CI → TC、条件付きCIなしTCN → TC、または既存Skill契約で許可されたDisposition。CIなし経路はactive Coverage所有modelが0件のTCNだけ許可し、Coverage所有modelがあるTCNではmodel単位のcurrent CI / closureを先に必須とする
 - 許可直接edge以外をclosure根拠にしない
 - Dispositionのhandling / reason / Authority条件
+- materialize runtime unitの`target_mappings[] / target_dispositions[]`と`unsupported_item_closures[]`を使い、target重複chainのmissing / stale / cycle / terminal coverage、partial / whole-model unsupported closureをmodel単位で検査する
 - missing / orphan / unknown
 - stale downstream
 - 技法Coverageを再計算しない
