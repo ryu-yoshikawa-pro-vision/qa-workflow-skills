@@ -869,7 +869,7 @@ CIは§7.2.2のtarget mapping状態遷移を優先し、同sectionで明示し�
 
 - source targetのcontent / generation fingerprintは現在値と一致必須
 - `handling=対象外 / 別テストレベル / 残存リスク / ブロック中 / 重複`だけを許可
-- `重複`では`covered_by_target_version={target_ref, target_content_fingerprint, generation_fingerprint, execution_fingerprint}`を必須とし、参照先current targetと完全一致させる。source target自身の参照を禁止する。全`materialize_coverage.py`結果を集約したtarget mapping / disposition graphでcycleを拒否し、`重複`chainの終端がcurrent CI mappingまたはcurrent semantic Coverage Itemへ到達しない場合は閉鎖済みに数えない
+- `重複`では`covered_by_target_version={target_ref, target_content_fingerprint, generation_fingerprint, execution_fingerprint}`を必須とする。source target自身の参照を禁止する。同一`materialize_coverage.py`入力内に参照先targetが存在する場合はそのcurrent versionと即時照合し、別TCN等でlocal inputに存在しない参照先は完全versionを保持したまま最終集約へ渡す。`traceability.py / workflow_runtime.py`が全materialize結果を集約して参照先current target versionとの完全一致、missing / stale、cycleを検査し、`重複`chainの終端がcurrent CI mappingまたはcurrent semantic Coverage Itemへ到達しない場合は閉鎖済みに数えない
 - 他handlingでは`covered_by_target_version=null`
 - 同一targetへCI mappingとDispositionを同時指定しない
 - `ブロック中`はworkflow完了不可
@@ -1045,7 +1045,7 @@ runtime単位状態の正本は各成果物に保存した`runtime_unit_key`、`
 - model scriptは`Runtime Unit Key = model:<model_key>`とし、`Model Key`を必須
 - artifact全体scriptは`Runtime Unit Key = artifact:<generator>:<scope_key>`とし、`Model Key`は空欄
 - `Support Status`は`supported / partial / unsupported / unknown`
-- runtime集約inputの各runtime unitは共通`model_completion[] / target_mappings[] / target_dispositions[]` fieldを持ち、`artifact:materialize_coverage:<tcn_id>`だけ非空を許可する。他unitでは3配列を空固定とする。`target_mappings[]`はmaterialize outputの`target_id_map[]`を同名row schema `{target_ref, target_content_fingerprint, execution_fingerprint, model_key, target_key, ci_id}`で固定転記し、`target_dispositions[]`は`disposed_target_refs[]`へ`reason / authority_refs[]`を含むcurrent input dispositionをjoinして`_02` §7.4の完全schemaで転記する。LLMが生成しない。`traceability.py`と`workflow_runtime.py`は全materialize unitのtarget mapping / dispositionを集約し、`重複`参照のmissing / stale / cycle / terminal coverageを同じ規則で検査する
+- runtime集約inputの各runtime unitは共通`model_completion[] / target_mappings[] / target_dispositions[]` fieldを持ち、`artifact:materialize_coverage:<tcn_id>`だけ非空を許可する。他unitでは3配列を空固定とする。`target_mappings[]`はmaterialize outputの`target_id_map[]`を同名row schema `{target_ref, target_content_fingerprint, generation_fingerprint, execution_fingerprint, model_key, target_key, ci_id}`で固定転記し、`target_dispositions[]`は`disposed_target_refs[]`へ`reason / authority_refs[]`を含むcurrent input dispositionをjoinして`_02` §7.4の完全schemaで転記する。LLMが生成しない。`traceability.py`と`workflow_runtime.py`は全materialize unitのtarget mapping / dispositionを集約し、`重複`参照のmissing / stale / cycle / terminal coverageを同じ規則で検査する
 - `Result Status`は`ready / unresolved / blocked`
 - `Freshness`は`current / stale`
 - `Runtime Status`は`ok / invalid_input / unsupported / limit_exceeded / internal_error / not_run`
