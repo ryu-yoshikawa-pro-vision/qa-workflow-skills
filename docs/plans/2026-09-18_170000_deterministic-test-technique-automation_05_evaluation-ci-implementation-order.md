@@ -500,7 +500,7 @@ raw machine-readable入力をfixtureにします。
 - stateのinvalid transitionは`attempted_transition`をcanonical executionへ保持し、valid transition列へ混ぜない。flowのnode / edgeはinitialから対象までの最短witness、bounded-pathはinitial→terminal pathを使用する。fork-join branchは単一`edge_sequence`へ順序化せず、semantic Coverage Itemの`source_target_versions[]`が現在branch targetと一致するまで完了させない
 - annotation / Dispositionの`target_content_fingerprint / generation_fingerprint`が現在target / modelと一致しない場合は拒否する
 - `target_dispositions[].handling`は`対象外 / 別テストレベル / 残存リスク / ブロック中 / 重複`だけを許可する
-- `重複`では完全`covered_by_target_version={target_ref,target_content_fingerprint,generation_fingerprint,execution_fingerprint}`を必須にし、self参照を拒否する。同一materialize input内の参照先は即時照合し、別TCNの参照先は`target_mappings[]`またはsemantic CIの`semantic_source_targets[]`を使って最終集約時にcurrent version一致を確認する。missing / generation mismatch / content mismatch / execution mismatch / cycleを拒否し、chain終端がcurrent CI mappingまたはcurrent semantic CIへ到達することを要求する
+- `重複`では完全`covered_by_target_version={target_ref,target_content_fingerprint,generation_fingerprint,execution_fingerprint}`を必須にし、参照先runtime targetではexecution fingerprint非null一致、semantic targetではnullを要求してself参照を拒否する。同一materialize input内の参照先は即時照合し、別TCNの参照先は`target_mappings[]`またはsemantic CIの`semantic_source_targets[]`を使って最終集約時にcurrent version一致を確認する。missing / generation mismatch / content mismatch / execution mismatch / cycleを拒否し、chain終端がcurrent CI mappingまたはcurrent semantic CIへ到達することを要求する
 - generator生成後に`成立不能`Dispositionへ変更しない。成立不能根拠が得られた場合はmodel / constraintを更新してgeneratorを再実行する
 - Disposition済みtargetへCIを採番せず、同時にgenerator固有の`coverage_summary`または`completion_summary`を変更しない
 - `ブロック中`Dispositionはworkflow完了を妨げる
@@ -709,7 +709,7 @@ runtime対応Skillの`evals/output/cases/*/expected.json`では、既存fieldに
 - `machine_entities.expected_entities[]`は成果物から抽出した`(skill, entity_type, entity_ref)`集合と一致させ、各contentはentity type別canonical schemaと人間向け表の主要fieldへ独立照合する
 - `spec-analysis`ではruntime_contractなしでMachine Entity fixtureを使用し、Authority表とcanonical Authority contentの一致を検証する
 - expected target / Coverageは手書きfixtureから独立計算または明示し、generator出力をexpectedへコピーしない
-- `expected_target_id_map`はstateful materialize caseだけ使用し、`{target_ref, target_content_fingerprint, execution_fingerprint, model_key, target_key, ci_id}`配列で保持する
+- `expected_target_id_map`はstateful materialize caseだけ使用し、`{target_ref, target_content_fingerprint, generation_fingerprint, execution_fingerprint, model_key, target_key, ci_id}`配列で保持する
 - `expected_model_completion`はmaterialize / workflow integration caseで使用し、modelごとの`required_target_refs / closed_target_refs / active_ci_ids / semantic_item_keys / materialize_complete`を手書きfixtureから明示する。runtime出力をexpectedへコピーしない
 - validatorは全runtime unitの保存済み`Machine Runtime Input / Result`から`input_fingerprint`、model scriptでは`model_fingerprint`、全scriptで`generation_fingerprint`を独立再計算し、fixtureに書いたhash文字列を盲信しない
 - upstream Entity差分caseでは無関係Entityの変更が対象modelをstaleにしないことを確認する
