@@ -184,7 +184,7 @@ validatorはfenced JSON blockを抽出してstrict JSON decodeし、canonical化
 - TCNの`technique_slugs[]`は所属Coverage所有modelの非null`technique_slug`集合と一致させる
 - Classification Tree / Cause-Effect / schema / UI adapterは正規技法を所有しない。child Coverage modelがcanonical techniqueとselection provenanceを持つ
 - エラー推測はsemantic CIを作るまで完了扱いしない
-- undetermined signalは既存契約どおり`resolved / selection_not_affected / question`へ閉じる
+- current undetermined signalは`selection_not_affected`または`question`へ閉じる。解決できたsignalは`signals`を`true / false`へ更新して`technique_candidates.py`を再実行し、current undetermined集合から外す。`question`が残るTechnique Selectionをactiveにしない
 
 ## 10. change impact graph
 
