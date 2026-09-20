@@ -146,6 +146,15 @@ runtime対象Skillは、Skill instructionへscript選択表を持ち、次の順
 
 `runtime_required`はscriptの入力検証結果として決定し、Agentが自然言語だけから`false`を確定してscriptを省略しません。
 
+既存Skillの途中工程開始・単体利用を維持するため、runtime invocationは`metadata.input_mode=artifact|direct`を必須にします。
+
+- `artifact`: 前工程または再利用成果物のcanonical Machine Entityを使う経路です。script固有inputが参照する外部semantic dependencyは、PlanでMachine Entity化すると定義したものを`upstream_entities[]`へ完全に解決します。missing / extra / duplicateを拒否します
+- `direct`: 既存Skillの入力契約が許すユーザー入力または同等の成果物から、そのSkillを途中工程として直接開始する経路です。存在しない前工程Machine Entityを捏造せず、欠落とも扱いません。実際に消費する意味fieldはscript固有inputへ正規化し、`input_fingerprint`へ含めます。現在invocationが生成するEntityはstructure / builder runtime dependencyを持つため、direct input変更もgeneration差分として検出します
+- `direct`でもcurrent Machine Entityが明示的に渡された参照は通常どおり検証してsemantic dependencyへ保存します。Machine Entityを渡した参照だけを無視してdirect inputへ黙って置き換えません
+- `qa-workflow`がcurrentなMachine Entity付き成果物を再利用する場合は`artifact`、既存Skill契約に従って途中工程から直接開始する場合とlegacy成果物を新契約へ初回昇格する場合は`direct`を使用します。昇格後の再利用は`artifact`へ移ります
+
+これによりSkill単体コピー時に前工程Skillの成果物生成を強制せず、workflow内で利用できるMachine Entity dependencyも失いません。
+
 | Skill | 対象 / 実行範囲 | 条件 | script | 実行 |
 | --- | --- | --- | --- | --- |
 | `test-analysis` | `テスト分析` | Product Riskがある | `risk_matrix.py` | 条件付き |
@@ -216,7 +225,7 @@ Cause-Effect → Decision Table、Classification Tree → combinatorial、schema
 
 すべてのruntime scriptは同じCLI契約を使用します。
 
-- 起動は`python <script-path>`
+- Skill側の実行契約は「Python 3.11 interpreterで同梱scriptを実行できること」とし、interpreterのcommand名は固定しない。`python` / `python3` / `py -3.11`等の選択はAgent / host実装に委ねる。CIの標準実行例は`python <script-path>`とする
 - stdinからUTF-8のstrict JSON objectを1件だけ読む
 - positional argument、入力file path、環境変数から業務入力を受け取らない
 - cwdへ依存せず、Skill root相対のassetは`__file__`から解決する
@@ -224,8 +233,8 @@ Cause-Effect → Decision Table、Classification Tree → combinatorial、schema
 - stderrは人間向け診断だけに使う
 - stdinが空、JSONが複数、末尾に非空白データが残る場合は`invalid_input`
 - strict decode前に失敗し、`runtime_unit_key / input_fingerprint / model_fingerprint / generation_fingerprint`を確定できない場合も、可能なら§3.3のpre-parse error envelopeをstdoutへ返す。callerが推測したfingerprintを補わない
-- subprocess呼び出し側はstdout / stderr / return codeをすべて取得し、return codeだけでroutingしない
-- Skill実行時のsubprocessにも30秒の安全timeoutを設定する。通常の探索停止は§5.3の決定論的hard limitで行い、timeoutをCoverageや探索アルゴリズムの正常終了条件にしない。timeout時はmachine resultを採用せず、成果物metadataでは`runtime_status=internal_error / support_status=unknown / result_status=blocked / runtime_required=true / deterministic_generated=false`として扱い、構造化issueの`issue_type=runtime_execution_timeout`で原因を区別する。`runtime_execution_timeout`を新しい`runtime_status`にはしない
+- Agent / host側のscript runnerはstdout / stderr / return code相当を取得し、return codeだけでroutingしない。CIではsubprocessを使用する
+- timeoutはAgent Skillsの共通runtime要件にせず、Agent / host / CI側の安全策とする。CIでは30秒を使用する。通常の探索停止は§5.3の決定論的hard limitで行い、timeoutをCoverageや探索アルゴリズムの正常終了条件にしない。hostがtimeoutを検出した場合はmachine resultを採用せず、成果物metadataでは`runtime_status=internal_error / support_status=unknown / result_status=blocked / runtime_required=true / deterministic_generated=false`として扱い、構造化issueの`issue_type=runtime_execution_timeout`で原因を区別する。`runtime_execution_timeout`を新しい`runtime_status`にはしない
 
 ### 3.1 strict JSON
 
@@ -262,6 +271,7 @@ runtime入力は`metadata`とscript固有`input`を分けます。
     "selection_source": "analysis",
     "selection_key": "SEL-001",
     "scope_key": null,
+    "input_mode": "artifact",
     "upstream_entities": [
       {
         "skill": "test-requirement-design",
@@ -298,7 +308,8 @@ runtime入力は`metadata`とscript固有`input`を分けます。
 - `selection_source`: Coverage所有modelでは`analysis / condition_design / user`のいずれか。内部adapterとartifact scriptでは`null`
 - `selection_key`: `selection_source=analysis`だけ必須。その他は`null`
 - `scope_key`: artifact scriptだけ必須。model scriptでは`null`
-- `upstream_entities`: script固有input内のAuthority / Risk / TR / TCN等の参照のうち、そのscript契約で**実行前から存在する外部semantic dependency**と定義したMachine Entityから固定builderが導出する。callerが参照Entityを任意に省略・追加しない。同一runtime invocationで新規生成するEntity同士の依存はここへ事前投入せず、script内の固定builderが生成済みcanonical contentからfingerprintを計算して`upstream_entity_dependencies[]`へ接続する。runtimeは外部Entityのcanonical `content`から`content_fingerprint`を再計算し、期待外部参照集合との不足・余分・重複を`invalid_input`にする
+- `input_mode`: `artifact / direct`。§2.1の途中工程開始・単体利用契約に従う
+- `upstream_entities`: `input_mode=artifact`ではscript固有input内のAuthority / Risk / TR / TCN等の参照のうち、そのscript契約で**実行前から存在する外部semantic dependency**と定義したMachine Entityから固定builderが完全導出する。callerが参照Entityを任意に省略・追加しない。`input_mode=direct`では、存在するcurrent Machine Entityとして明示された参照だけを同じ規則で検証し、存在しない前工程Entityを期待集合へ追加しない。同一runtime invocationで新規生成するEntity同士の依存はどちらのmodeでも事前投入せず、script内の固定builderが生成済みcanonical contentからfingerprintを計算して`upstream_entity_dependencies[]`へ接続する。runtimeは受け取った外部Entityのcanonical `content`から`content_fingerprint`を再計算する
 - `upstream_runtime_units`: 他runtime結果を直接利用した場合に`skill + runtime_unit_key + generation_fingerprint`を一意参照として保持する。runtime派生child modelの派生元もここで表し、Selection Sourceへ混ぜない
 - `static_data_versions`: generator結果に影響する静的参照データversion
 - `authority_refs / reference_refs`: 現在有効な製品根拠と補助情報
@@ -465,6 +476,7 @@ fingerprintはSHA-256で計算します。入力はUTF-8のcanonical JSONです�
 
 - `skill`
 - `runtime_unit_key`
+- `input_mode`
 - script固有`input`
 - `authority_refs`
 - `reference_refs`
@@ -603,7 +615,7 @@ runtime内部identityは`model_type`で分けます。
 ```
 ````
 
-- `spec-analysis`はruntime unitを追加せず、解決済みAuthorityの正規化済みfieldを`authority_entities.py`へ渡し、同scriptがcanonical `content`、`content_fingerprint`、Machine Entity wrapper、expected identityを生成してblockへ保存する。LLMがAuthority Machine Entity JSONやfingerprintを手計算しない
+- `spec-analysis`はruntime unitを追加せず、解決済みAuthorityの正規化済みfieldを`authority_entities.py`へ渡し、同scriptがcanonical `content`、`content_fingerprint`、Machine Entity wrapper、expected identityを生成してblockへ保存する。LLMがAuthority Machine Entity JSONやfingerprintを手計算しない。`authority_entities.py`の実行・strict decode・schema検証に失敗した場合はAuthority Machine Entityを未生成のまま対象範囲を`blocked`とし、LLMや別builderがfingerprint / Machine Entityを代替生成しない。Python unavailable時も同様に決定論的Entity生成済みとは扱わない
 - `test-analysis`は`analysis_entities.py`がLLMの意味fieldとcurrent runtime resultを固定schemaでjoinして保存する。例えばProduct Riskは`failure / authority_refs / impact / likelihood / assessment_reason / confidence_note`と`risk_matrix.py`の`level / mapped_priority`をjoinする。Technique Selectionでは候補runtime結果と最終選択・undetermined signal closureをjoinし、change graph / environment requirementも同じbuilderでMachine Entity化する
 - `test-requirement-design` / `test-condition-design` / `test-case-design`はstructure scriptへ渡した意味fieldとruntimeが確定したID・優先度等を固定builderでjoinして保存する
 - Markdownの人間向け表はMachine Entityと同じ意味fieldを表示し、validatorでID・参照・優先度・期待結果等の一致を確認する。Machine Entityにない意味fieldをMarkdownだけへ追加して下流正本にしない
