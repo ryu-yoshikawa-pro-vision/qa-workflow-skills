@@ -250,7 +250,7 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 
 - `threshold / side / inclusive`から2-valueの`OTHER`を一意に決定
 - 3-valueの`BELOW / AT / ABOVE`
-- integer / Decimal / date / local datetime / fixed-offset datetime
+- integer / exact decimal（coefficient + scale） / date / local datetime / fixed-offset datetime
 - domain別step objectの型・正値検証
 - 3-valueでは境界リスク、過去不具合、ユーザー明示等の具体的な`coverage_selection_reason`を必須にする
 - schema由来BVAはboundary skeletonとLLMの`mode / coverage_selection_reason`を固定builderでjoinし、schema scriptだけで3-valueを自動選択しない
@@ -398,7 +398,7 @@ raw machine-readable入力をfixtureにします。
 - JSON Schema 2020-12で`$ref` siblingの対応keywordも評価し、`$ref`だけを見てsiblingsを捨てない
 - cyclic local `$ref` subtreeは`unsupported`
 - OpenAPI 3.0はJSON Schema 2020-12と別semanticsで解釈し、`#/components/...`のlocal referenceをOpenAPI Reference Object規則で解決する
-- OpenAPI Reference Objectの追加propertyをsibling Schema assertionとして扱わず、runtime-v1では追加property付きReference Objectを`unsupported`
+- OpenAPI Reference Objectの追加propertyを仕様どおり無視し、sibling Schema assertionとして扱わない
 - external `$ref`は事前dereference要求
 - OpenAPI 3.0 `nullable` / boolean exclusive boundary
 - OpenAPI `context=request|response`と`readOnly / writeOnly + required`の方向別意味
@@ -415,7 +415,7 @@ raw machine-readable入力をfixtureにします。
 - HTML `pattern`を対応済みconstraintとして扱わず、適用されるcontrolでは`unsupported`を返す
 - JSON Schema `multipleOf` → `grid(base=0, step=m)`
 - HTML `number`はstep省略時default step=1、`step=any`はgridなし、step baseは`min → value → 0`の順で固定し、minなしを即unsupportedにしない
-- invalid / zero / negative HTML stepの扱いをruntime-v1で固定し、制約なしとしてcompleteにしない
+- invalid / zero / negative HTML stepはdefault step=1へfallbackし、制約なしとしてcompleteにしない
 - date / datetime-local系stepはruntime-v1 `unsupported`
 - `derived.ep_inputs / derived.bva_boundary_skeletons / derived.combinatorial_constraints / derived.test_data_requirements`を固定schemaで出す
 - BVAはboundary skeletonへLLMが`mode / coverage_selection_reason`だけを追加し、固定builderで`bva.py` inputへする
