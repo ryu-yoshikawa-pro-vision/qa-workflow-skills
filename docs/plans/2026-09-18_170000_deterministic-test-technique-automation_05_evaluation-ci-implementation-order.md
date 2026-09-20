@@ -308,7 +308,7 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 
 ### 状態遷移
 
-- 複数initial stateのtie-breakと`initial_state_key`をexecutionへ保持する
+- 複数initial stateのtie-breakと`initial_state_key / initial_state_label`をexecutionへ保持する。reset使用時は`reset_execution.action / to_state`まで保存し、setup / coverage transitionはfrom / event / toの状態意味を内包する
 - resetが必要なtargetは`reset_key`をexecutionへ保持し、reset操作を空`setup_prefix`へ落とさない
 
 - transition identity
@@ -327,6 +327,9 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 
 ### flow
 
+- nodeの`label`をnormalized inputへ保持し、node targetがinitial node自身でedge sequenceが空でも`target_node`から意味を解決できる
+- canonical edge sequenceへfrom / label / toのnode意味を保存し、stable keyだけをtest-case-designへ渡さない
+
 - simple-loop 0 / 1 / typical / maximumはprefix + cycle×N + canonical exit edgeでexecutionを作る
 - `exit_edge_keys[]`、複数exit tie-break、exitなしspecの`invalid_input`、複数initial nodeの`initial_node_key`保持を検証する
 
@@ -344,6 +347,8 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - edge証拠とpath証拠の分離
 
 ### CRUD
+
+- entity / functionの非空`label`をnormalized inputへ保持し、operation / consistency sequenceのcanonical executionへlabelを複製する。`entity_key / function_key`だけを下流の実行意味にしない
 
 - completeness / consistencyを別Coverage summaryで返す
 - matrix operation target
@@ -368,7 +373,7 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 ### Syntax-Based Testing
 
 - 同じnonterminalが複数出現するgrammarでもleftmost derivationで展開位置を一意にする
-- `max_depth`をroot=0のparse tree depthとして検証し、epsilon production境界を確認する
+- `max_depth`を1..64、root=0のparse tree depthとして検証し、epsilon production境界を確認する
 
 - production_key一意性
 - undefined nonterminal
@@ -1072,8 +1077,8 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 
 ### Step 8: state / scenario
 
-- state / transition
-- `initial_state_key / reset_key / setup_prefix / coverage_sequence`を持つcanonical state execution
+- state / transition / reset action
+- `initial_state_key / initial_state_label / reset_key / reset_execution / setup_prefix / coverage_sequence`を持ち、transitionのfrom / event / toまで自己完結したcanonical state execution
 - n-switch / Round-trip（開始stateを保持しrotation同一化しない）
 - simple loopのprefix + cycle×N + exit execution
 - fork / join
@@ -1088,7 +1093,7 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 ### Step 10: 全generator統合 / test-case / traceability
 
 - Step 2で実装済みの`materialize_coverage.py`を全generator出力へ接続し、model status / freshness gateを回帰確認する
-- 全generatorについて`materializable`の固定値とcanonical `execution / execution_fingerprint` schemaを確認する。combinatorialはpartial target → deterministic full row mapping、state / flowはwitness sequence / path、adapter専用generatorは非materializeを回帰確認する
+- 全generatorについて`materializable`の固定値とcanonical `execution / execution_fingerprint` schemaを確認する。combinatorialはpartial target → deterministic full row mapping、state / flow / CRUDはstable keyだけでなく下流の手順化に必要なmachine meaningをexecutionへ内包し、adapter専用generatorは非materializeを回帰確認する
 - mergeは同一model・同一executionに限定し、追加test data requirement参照のintersectionを確認する。異なるmodelの同一TC実行はcase structureの複数`ci_refs[]`で検証する
 - target content / generation fingerprintとannotation / target disposition / mergeのversion一致を確認する。semantic Coverage Itemはnew key発行、active→inactive、CI deleted、同一item復帰、deleted CIの別item再利用拒否、本文変更、model変更、source target version変更を含むlifecycleを確認する
 - target_ref → CI mapping / upsert、merge / unmerge / CI↔Dispositionの状態遷移を全generatorで回帰確認する
