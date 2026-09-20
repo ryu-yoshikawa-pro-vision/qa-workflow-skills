@@ -26,6 +26,20 @@ qa-workflowが再利用元として選んだ同種成果物を同じ系列とし
 
 TR / TCN / TCは既存の3桁形式をこのPlanで変更しません。最大番号が999に達した成果物系列で新規IDが必要な場合は削除済みIDを再利用せず、`id_space_exhausted` issueとしてブロックします。CIは`CI\d{2,}`のため同じ上限を持ちません。
 
+### 7.1.1 部分更新時のID状態
+
+`qa-workflow`は既存契約どおり影響範囲だけを担当Skillへ戻せるため、structure scriptは「current draftに出なかったprevious active IDをすべてdeletedにする」と解釈しません。
+
+- previous ID stateは成果物系列全体のfull snapshotを渡し、過去最大番号とdeleted履歴を失わない
+- 各structure scriptへ、今回そのscriptがlifecycleを確定する既存IDの集合を`update_scope_*`として明示する
+- `update_scope_*`内のprevious active IDだけ、currentでreuseされなければ`deleted`へ遷移する
+- `update_scope_*`外のprevious active / deleted rowは状態を変更せずそのまま次のfull snapshotへ引き継ぐ
+- reuse対象は対応する`update_scope_*`内のactive IDに限定する。意図した削除はIDをscopeへ含めたうえでcurrent draftから外すことで表現する
+- full rebuildではprevious active IDをすべて`update_scope_*`へ含める
+- new draftはscope指定を必要とせず、過去のactive / deleted全行から算出した最大番号の次を採番する
+
+対象は`requirement_structure.py`のTR、`condition_structure.py`のTCN / model、`case_structure.py`のTCです。`materialize_coverage.py`は既存どおりTCN単位を更新境界とし、TCN配下の全current active model metadataとmapping stateを受けるため、modelの一部だけを渡して他modelのCIを暗黙削除する経路を作りません。
+
 ### 7.2 Coverage targetとCI
 
 generator内の`target_key`はmodel内で安定させます。異なるmodel間の衝突を避けるため、成果物横断のtarget identityとして`target_ref`を追加します。
@@ -257,7 +271,7 @@ mergeは既存契約どおり同一model・同一execution fingerprintだけを�
 既存成果物の再利用では次を固定します。
 
 - canonical `Machine Entities`とstable ID / previous stateは、現在の対象範囲と担当Skill契約を満たす場合に再利用できる
-- 本Planのdispatch対象runtime unitは、既存成果物を再利用する場合も現在のMachine Entity、保存済み意味parameter、previous ID stateからcanonical inputを組み立て直し、現在のscriptを必ず再実行する
+- 本Planのdispatch対象runtime unitは、既存成果物を再利用する場合も現在のMachine Entity、保存済み意味parameter、previous ID stateから`input_mode=artifact`のcanonical inputを組み立て直し、現在のscriptを必ず再実行する
 - 保存済み正規化model / semantic draftを入力へ再利用する前に、そのruntime inputへ保存した`upstream_entities[]`および対応Machine Entityの`upstream_entity_dependencies[]`を現在のcanonical Entityと比較する。不一致があれば古い意味入力のままscriptを再実行せず、担当Skillへ`要再検証`として戻す。LLMが意味を再確認して現在のdependency fingerprintを保存した後にruntimeを実行する
 - 保存済み`Machine Runtime Input / Result`はprevious state、差分確認、round-trip検証に使うが、現在のcontract / implementation / static data / support判定を省略するcacheにはしない
 - 再実行した`generation_fingerprint`が以前と同じ場合はstable IDと現在も一致する意味判断を維持できる。generationが変わった場合はannotation / Disposition / merge / question回答 / unsupported closureの世代一致を再確認する
@@ -270,16 +284,16 @@ mergeは既存契約どおり同一model・同一execution fingerprintだけを�
 contract versionを持たない既存成果物を一律破棄しません。
 
 - 従来契約を満たす間はlegacy成果物として参照可能
-- その成果物を変更・再利用して本Plan対象の決定論的処理へ入る時点で、担当Skillが正規化modelを作成して新契約へ昇格
+- その成果物を変更・再利用して本Plan対象の決定論的処理へ入る時点で、担当Skillが`input_mode=direct`として正規化model / 構造入力を作成して新契約へ昇格する。新契約のMachine Entityを保存した後の再利用は`artifact`へ移る
 - legacy成果物を「決定論的生成済み」と表現しない
 
 ### 13.3 局所状態
 
 runtime単位状態の正本は各成果物に保存した`runtime_unit_key`、`result_status`、`runtime_required`、`deterministic_generated`、`freshness_status`、fingerprint、構造化issueです。
 
-`qa-workflow`を出力する場合は既存のSkill状態表を必須で維持しますが、この表は集約表示であり唯一の永続正本ではありません。他Skill実行の前提としてworkflow状態表の存在は要求せず、必要時は成果物metadataから状態を再構築します。
+既存`qa-workflow`契約どおり、Skill状態表はワークフロー状態を明示する必要がある場合だけ使用します。表を表示する場合も集約表示であり唯一の永続正本ではありません。他Skill実行、freshness判定、workflow完了判定は状態表の存在に依存せず、成果物metadataから状態を再構築します。
 
-`qa-workflow`には既存Skill状態表とは別に次の`runtime状態`表を追加します。
+ワークフロー状態を表示する場合は、既存Skill状態表に加えて次の`runtime状態`表を追加します。通常出力で状態表示が不要な場合は両表を省略でき、runtime metadata自体は各成果物へ保存します。
 
 `Skill | Runtime Unit Key | Model Key | Support Status | Result Status | Freshness | Runtime Status | Runtime Required | Deterministic Generated | Fallback Reason | Blocker / Issue`
 
@@ -293,7 +307,7 @@ runtime単位状態の正本は各成果物に保存した`runtime_unit_key`、`
 - `Runtime Status`は`ok / invalid_input / unsupported / limit_exceeded / internal_error / not_run`
 - `Runtime Required`と`Deterministic Generated`は`Yes / No`
 - `Fallback Reason`は空欄 / `outside_supported_subset` / `python_unavailable`
-- Skill状態表の`WF-D012`は既存Skill状態表だけへ適用し、runtime状態表へ流用しない
+- Skill状態表を表示する場合、`WF-D012`は既存Skill状態表だけへ適用し、runtime状態表へ流用しない。canonical deterministic evalで状態表を要求するfixtureは別途`WF-D009`を維持する
 - 1 runtime unitだけ`blocked / unresolved / stale`でも独立した他unitは継続可能
 - すべてのruntime unitで`Result Status=ready / Freshness=current`を必須とする
 - `Runtime Required=Yes`のunitでは、さらに`Deterministic Generated=Yes`を必須とする
@@ -346,4 +360,4 @@ Machine Entityのfreshnessは`runtime_contract.py`の共通関数で計算しま
 
 本Planのruntime dependencyはPython 3.11標準ライブラリだけに固定します。外部PyPI package、外部binary、network serviceをruntime依存へ追加しません。
 
-Planで定義した正確性、hard limit、30秒のCLI test timeoutを標準ライブラリ実装で満たせない場合は、その実装をPlan未達として停止し、暗黙にCoverage基準を下げたり依存関係を変更したりしません。将来用adapterも作りません。
+Planで定義した正確性とhard limitをPython 3.11標準ライブラリ実装で満たせない場合は、その実装をPlan未達として停止し、暗黙にCoverage基準を下げたり依存関係を変更したりしません。interpreterのcommand名とtimeout機構はAgent / host実装に依存させ、CIでは`python`と30秒timeoutを安全策として使用します。将来用adapterも作りません。
