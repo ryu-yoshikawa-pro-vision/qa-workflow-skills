@@ -391,19 +391,62 @@ LLMがclassification / classの意味を定義した後、`classification_tree.p
 
 ### `state_transition.py`
 
-既存のstate / transition / n-switch / round-trip / invalid-transition Coverage定義、guard契約、stable targetは維持します。
+各transitionは`transition_key / from / event / guard_status / guard_refs / to / authority_refs`を持ちます。
 
-resetは`{reset_key, from_states[], to_state, authority_refs[]}`です。
+入力:
+
+- `states[]`
+- `initial_states[]`
+- `terminal_states[]`
+- `transitions[]`
+- `reset_options[]`
+- `invalid_transition_candidates[]`
+- `coverage_mode`
+- `switch_count`（`coverage_mode=n-switch`だけ必須）
+
+`guard_status=true|false|null`と`guard_refs[]`を使います。`false`をCoverage母集団から外すには`guard_refs`にAuthorityを1件以上必須とします。initial stateから`true` edgeだけで到達可能なstateをsourceに持つ`guard_status=null` transitionがある場合はCoverage母集団が確定しないため`result_status=unresolved`とし、100% Coverageを返しません。`null`を含むsequenceは正式Coverage targetにしません。
+
+Coverage定義:
+
+- `all-states`: initial stateからfeasible transitionだけで到達可能な全state
+- `all-transitions`: initial stateから到達可能で`guard_status=true`の全transition
+- `n-switch`: `switch_count=N`として、到達可能なN+1個の連続するvalid transitionの全sequence。Nは0..10。N>=2は高いfailure risk、ユーザー明示、案件固有基準等の具体的理由を`coverage_selection_reason`へ必須で残す
+- `round-trip`: 到達可能なsimple cycle。開始stateと終了stateは同一で、それ以外のstateをsequence内で重複させない。self-loopも1 transitionのround-tripとして含める。開始stateが異なるround tripは別Coverage targetとして扱う
+- `invalid-transitions`: 明示されたinvalid transition candidateだけ
+
+stable target:
+
+- state: `state:node:<state_key>`
+- transition: `state:transition:<transition_key>`
+- n-switch: `state:n-switch:<N>:sha256:<transition_key_sequence_hash>`
+- round-trip: `state:round-trip:<start_state_key>:sha256:<transition_key_sequence_hash>`
+- invalid: `state:invalid:<candidate_key>`
+
+round-tripは開始stateをCoverage identityの一部とし、transition key列をrotationして同一化しません。同じ閉路でも開始stateが異なる場合は別targetです。同じ開始stateかつ同じtransition key列だけを重複として除去し、逆方向はtransition列が異なるため別cycleです。
+
+invalid transition candidateは`{"candidate_key":"INV-001","from":"draft","event":"publish","authority_refs":["SPEC-010"]}`形式です。
+
+reset:
+
+```json
+{
+  "reset_key": "RESET-1",
+  "from_states": ["*"],
+  "to_state": "draft",
+  "authority_refs": ["SPEC-010"]
+}
+```
 
 ### 9.1 setup prefixとcanonical execution
 
-各materializable targetについて、Coverage開始stateへの実行contextを次で一意に決めます。
+各materializable targetについてCoverage開始stateへの実行contextを次で一意に決めます。
 
-1. 各`initial_states[]`から`guard_status=true`だけのshortest pathを探索する
-2. 候補は`(path長, initial_state_key, transition key列)`で昇順
-3. initialから到達不能なら適用可能resetごとにreset後stateからshortest pathを探索する
-4. reset候補は`(path長, reset_key, transition key列)`で昇順
-5. unknown guardを含むpathは正式executionにしない
+1. 各`initial_states[]`から`guard_status=true`だけを使うshortest pathを探索する
+2. direct候補は`(path長, initial_state_key, transition key列)`で昇順
+3. direct候補がなければ、各initial stateで適用可能なresetごとにreset後stateから`guard_status=true`だけのshortest pathを探索する
+4. reset候補は`(path長, initial_state_key, reset_key, transition key列)`で昇順
+5. `guard_status=null`を含むpathは構造候補に留め、正式executionにしない
+6. setupが得られないtargetをCoverage済みにしない
 
 canonical execution:
 
@@ -412,13 +455,21 @@ canonical execution:
   "initial_state_key": "draft",
   "reset_key": null,
   "setup_prefix": [],
-  "coverage_sequence": ["T-001"],
+  "coverage_sequence": [
+    {
+      "transition_key":"T-001",
+      "from":"draft",
+      "event":"publish",
+      "to":"published"
+    }
+  ],
   "attempted_transition": null
 }
 ```
 
 - resetなしでは選択した`initial_state_key`を保存する
-- resetありでは実行する`reset_key`を保存し、reset後のtransitionだけを`setup_prefix`へ入れる
+- resetありではresetを実行する起点の`initial_state_key`と`reset_key`を保存し、reset後のtransitionだけを`setup_prefix`へ入れる
+- `setup_prefix / coverage_sequence`はstable keyだけでなく`transition_key / from / event / to`を含む自己完結machine meaningを持つ
 - valid targetでは`coverage_sequence`を使用する
 - invalid transitionでは`coverage_sequence=[]`、`attempted_transition={candidate_key, from, event}`
 - initial stateそのものをCoverageする場合も`initial_state_key`をexecution identityへ含める
@@ -427,9 +478,41 @@ canonical execution:
 
 ### `flow_paths.py`
 
-node / edge、guard、fork / join regionの既存契約は維持します。
+入力は`nodes[] / edges[] / initial_node_keys[] / regions[] / loop_specs[] / coverage_mode / max_path_length`です。
 
-simple loop inputへ`exit_edge_keys[]`を追加します。
+node kind:
+
+- `normal`
+- `fork`
+- `join`
+- `terminal`
+
+`initial_node_keys[]`は1件以上必須で、すべて既知nodeを参照します。terminal到達を要求するpath criterionでは`kind=terminal`のnodeを終点にします。
+
+edgeは`edge_key / from / to / guard_status / guard_refs / label / authority_refs`を持ち、`guard_status=true`だけを正式Coverage対象へ使います。`guard_status=false`をCoverage母集団から外すには`guard_refs`にAuthorityを1件以上必須とします。initial nodeから`true` edgeだけで到達可能なnodeをsourceに持つ`guard_status=null` edgeがある場合は`result_status=unresolved`とし、node / edge / path / loop / fork-joinの100% Coverageを返しません。
+
+fork / join regionは曖昧に導出せず、次を正規化入力として明示します。
+
+```json
+{
+  "region_key":"RG-001",
+  "fork_node_key":"F1",
+  "join_node_key":"J1",
+  "branches":[
+    {"branch_key":"BR-001","edge_keys":["E1","E2"]},
+    {"branch_key":"BR-002","edge_keys":["E3"]}
+  ]
+}
+```
+
+- branchの`edge_keys`はforkからmatching joinまで連続するpathであることをscriptが検証する
+- 同一regionのbranch keyは一意
+- nested regionはbranch path内に含めてよい
+- region同士がcrossingする場合は`unsupported`
+- scheduler interleavingは仕様なしに生成しない
+- fork-join targetは直接linear executionへ落とさずsemantic Coverage Itemへ閉じる
+
+simple loopは次を明示します。
 
 ```json
 {
@@ -443,14 +526,36 @@ simple loop inputへ`exit_edge_keys[]`を追加します。
 }
 ```
 
-- `edge_keys`はentryへ戻るsimple cycle
-- `exit_edge_keys[]`は1件以上で、すべてentryから出るfeasible edge、cycleの最初のedgeとは別key
-- 0 / 1 / typical / maximum回targetを生成する
-- 各initial nodeからentryまでのshortest prefixを求め、同長は`(initial_node_key, edge key列)`で辞書順
-- executionは`prefix + cycle×N + exit`。exitは`exit_edge_keys[]`辞書順先頭を使う
-- 0回targetを空sequenceで代用しない。exitを実行できないloop specは`invalid_input`
+- `edge_keys`はentryへ戻るsimple cycleで、途中node重複を禁止する
+- `exit_edge_keys[]`は1件以上で、すべてentryから出る`guard_status=true` edge、cycleの最初のedgeとは別key
+- `typical_iterations`は2以上のinteger必須
+- `maximum_iterations`はnullまたは`typical_iterations`以上のinteger
+- Coverage targetは0回、1回、typical回、maximum回。maximumがnullまたはtypicalと同値なら重複targetを作らない
+- executionは`prefix + cycle×N + canonical exit`とし、exitは`exit_edge_keys[]`のUnicode code point辞書順先頭を使う
+- 0回targetでもexitを実行し、空sequenceで代用しない
+- canonical exitを実行できないloop specは`invalid_input`
 
-node / edge / bounded-path / simple-loopのcanonical executionには選択した`initial_node_key`を保存します。fork-joinはscheduler interleavingを生成せずsemantic Coverage Itemへ閉じます。
+`max_path_length`は1〜1000 edgeのintegerです。
+
+Coverage mode:
+
+- `node`: initialから到達可能な全node
+- `edge`: initialから到達可能な全feasible edge
+- `bounded-path`: initialからterminalへ到達する、長さ`<= max_path_length`の全feasible path
+- `simple-loop`: `loop_specs[]`で明示したloop iteration target
+- `fork-join`: `regions[]`の各branchを少なくとも1回含むtarget
+
+stable target:
+
+- node: `flow:node:<node_key>`
+- edge: `flow:edge:<edge_key>`
+- bounded path: `flow:path:sha256:<edge_key_sequence_hash>`
+- simple loop: `flow:loop:<loop_key>:<iterations>`
+- fork / join: `flow:branch:<region_key>:<branch_key>`
+
+node / edge / bounded-path / simple-loopのmaterializable targetは各initial nodeからCoverage開始点まで`guard_status=true`だけのshortest prefixを求め、同長は`(initial_node_key, edge key列)`で辞書順に固定します。bounded-pathはterminal到達を必須とし、terminalへ到達しない候補は正式targetにせず診断metadataへ保持します。
+
+canonical executionは選択した`initial_node_key`と、各edgeについて`edge_key / from / label / to`を持つ`edge_sequence`を保存します。stable key列だけを渡して下流にmodel再解決させません。
 
 ## 11. CRUD Testing
 
@@ -538,79 +643,106 @@ derivationは**leftmost derivation**で固定します。sentential formに複�
 
 production Coverage targetごとに、対象productionを1回以上含むleftmost derivationのうちproduction適用回数最小を選び、同数ならproduction key列のUnicode code point辞書順で決めます。leftmost規則により同じproduction key列から異なる文字列を生成しません。
 
-valid case集合、明示mutation、`unreachable_mutation`、`invalid_candidate`の既存契約は維持し、mutation後grammarにも同じleftmost / depth規則を適用します。
+valid case集合は各production Coverage targetのshortest derivationのunionとし、生成文字列とproduction key列が同一のcaseを重複除去します。production Coverage達成に不要な追加grammar列挙は行いません。
+
+invalid syntaxは補集合から生成しません。明示mutationは`delete_terminal / replace_terminal / insert_terminal`だけを許可します。
+
+- `delete_terminal`: `symbol_index`が指すterminal itemを削除する
+- `replace_terminal`: `symbol_index`が指すterminal itemを明示replacement文字列へ置換する
+- `insert_terminal`: RHS配列の`symbol_index`位置へ明示terminal文字列を挿入し、0..len(rhs)を許可する
+- delete / replaceで対象itemがnonterminalなら`invalid_input`
+
+mutationは指定productionのRHSを1回だけ変換した一時grammarへ適用します。その一時grammarで変換したproductionを1回以上使うleftmost derivationのうちproduction適用回数最小を探索し、同数ならproduction key列のUnicode code point辞書順で決めます。`max_depth`内で導出不能なら`unreachable_mutation` issueを返します。
+
+stable targetはproduction Coverageを`syntax:prod:<production_key>`、mutation候補を`syntax:mutation:<mutation_key>`とします。mutation結果は`invalid_candidate`であり、scriptだけで製品上invalidと断定しません。製品上invalidであることをexpected resultへ昇格するにはAuthorityまたはLLMの意味判断を必須にします。
 
 ## 14. schema / HTML
 
 ### `schema_cases.py`
 
-machine-readableな入力はscriptが直接正規化します。
-
-対応subset:
+machine-readableな入力はscriptが直接正規化します。JSON Schema 2020-12、OpenAPI 3.0、HTML form constraintは別semanticsとして扱い、同じkeyword名だけを理由に意味を共通化しません。
 
 ### JSON Schema 2020-12
 
+runtime-v1の対応subset:
+
 - `type`
-- `$defs`（local JSON Pointer `$ref`の参照先containerとしてのみ使用）
+- `$defs`（対応可能なlocal referenceの参照先container）
+- `$ref`
 - `properties`
 - `items`
 - `enum`
 - `const`
 - `required`
-- `minimum` / `maximum`
-- `exclusiveMinimum` / `exclusiveMaximum`
+- `minimum / maximum`
+- `exclusiveMinimum / exclusiveMaximum`
 - `multipleOf`
-- `minLength` / `maxLength`
-- `minItems` / `maxItems`
-- `minProperties` / `maxProperties`
+- `minLength / maxLength`
+- `minItems / maxItems`
+- `minProperties / maxProperties`
 
-`$ref`はruntime内でnetwork解決しません。JSON Schema / OpenAPIでは`document`をrootとして同一document内のlocal JSON Pointerだけ解決し、`schema_pointer`でCoverage対象subtreeを指定します。外部URI referenceは事前dereference済み入力を要求します。local `$ref`の循環参照はその循環subtreeを`unsupported`とします。
+`$ref`はruntime内でnetwork解決しません。runtime-v1で対応するreferenceは同一schema resource内の`#/...` JSON Pointerだけです。root schemaの`$id`はmetadataとして保持できますが、subschemaに`$id`があり別schema resource / base URIを形成するdocument、plain-name fragment、`$anchor / $dynamicAnchor / $dynamicRef`、外部URI referenceは`unsupported`です。これによりnested `$id`を無視してdocument rootへ誤解決しません。
 
-`type`は単一type文字列、または`[<non-null type>, "null"]` / `["null", <non-null type>]`の2要素だけを対応します。2要素形式は`allows_null=true`へ正規化し、それ以外のunion typeは`unsupported`です。
+JSON Schema 2020-12では`$ref`のsibling keywordも評価対象です。したがって`$ref`と並ぶ対応subset keywordは通常どおり評価し、未知またはruntime-v1非対応keywordがvalidation意味へ影響する場合はそのsubtreeを`unsupported`にします。`$ref`があるという理由でsiblingを捨てません。
 
-`$schema / $id`はdocument metadataとして保持しますがvalidation Coverageへ使用しません。validationへ影響しないannotationとして無視してよいkeywordは`title / description / $comment / default / examples`だけです。その他の未知keywordは黙って無視せず`unsupported`とします。
+`type`は単一type文字列、または`[<non-null type>, "null"] / ["null", <non-null type>]`の2要素だけを対応し、2要素形式は`allows_null=true`へ正規化します。それ以外のunion typeは`unsupported`です。
 
-JSON Schema / OpenAPI document内のJSON numberは`_02` §3.1に従ってintegerを`int`、非integerを`Decimal`としてparseし、`minimum / maximum / exclusiveMinimum / exclusiveMaximum / multipleOf / enum / const`をbinary floatへ変換しません。
+`$schema`とroot `$id`はdocument metadataとして保持します。validationへ影響しないannotationとして無視してよいkeywordは`title / description / $comment / default / examples`だけです。その他の未知keywordを「制約なし」として扱いません。
 
-`enum / const`のruntime-v1対応範囲はscalar / nullだけです。string、boolean、integer、finite decimal、nullは対応し、object / arrayを値として持つ`enum / const`はそのsubtreeを`unsupported`とします。JSON Schema自体をinvalidとは扱いません。
+JSON numberは`_02` §3.1の専用number tokenとしてstring値と区別してdecodeし、token長・grammar検証後にcanonical integerまたは`integer coefficient + base-10 scale`へexact正規化します。binary floatやPython `Decimal` context precisionへ意味を依存させません。
+
+`enum / const`のruntime-v1対応範囲はscalar / nullだけです。string、boolean、integer、finite decimal、nullは対応し、object / arrayを値として持つsubtreeは`unsupported`です。
 
 ### OpenAPI 3.0 Schema
 
-- 上記相当keyword
-- boolean `exclusiveMinimum` / `exclusiveMaximum`
-- `nullable`
-- `nullable=true`はsingle base type + nullの`allows_null=true`へ正規化する
+OpenAPI 3.0はJSON Schema 2020-12として解釈しません。runtime-v1ではPlanで列挙したSchema Object subsetだけをOpenAPI 3.0 semanticsで処理します。
+
+- `nullable`はOpenAPI 3.0固有semanticsとしてsingle base typeにnull許容を加える
+- `exclusiveMinimum / exclusiveMaximum`はOpenAPI 3.0のboolean形式として扱う
 - `context=request|response`を必須にし、`readOnly=true` propertyはrequest側required / test data母集団から除外し、`writeOnly=true` propertyはresponse側required / expected response母集団から除外する
 - 同一propertyで`readOnly=true`かつ`writeOnly=true`は`invalid_input`
 - `title / description / default / example / deprecated`はannotationとして保持してもvalidation Coverageへ使用しない
+- Reference Objectは`{"$ref":"..."}`だけをReference Objectとして扱う。OpenAPI 3.0ではReference Objectの追加propertyは参照先schemaのsibling assertionとして解釈しない。runtime-v1では追加property付きReference Objectを黙って評価せず`unsupported`へ落とす
+- runtime-v1で対応するreferenceは同一OpenAPI document内のlocal JSON Pointerだけ。外部document referenceは事前dereference済み入力を要求する
+- JSON Schema 2020-12だけのkeywordをOpenAPI 3.0へ暗黙適用しない
 
 ### HTML form control
 
-runtime-v1でconstraint生成対象とする`type`は`text / number / date / datetime-local`だけです。それ以外のnative control typeはUI pattern候補として扱えても、`schema_cases.py`ではcontrol subtreeを`unsupported`にします。
+runtime-v1でconstraint生成対象とする`type`は`text / number / date / datetime-local`だけです。それ以外のnative control typeはUI pattern候補として扱えても`schema_cases.py`ではcontrol subtreeを`unsupported`にします。
 
 受け取る属性:
 
-- type
-- required
-- min / max
-- minlength / maxlength
-- step
-- pattern
-- disabled
-- readonly
-- multiple
+- `type`
+- `required`
+- `min / max`
+- `minlength / maxlength`
+- `step`
+- `value`
+- `pattern`
+- `disabled`
+- `readonly`
+- `multiple`
 
 type別の扱い:
 
 - `text`: `required / minlength / maxlength`
-- `number`: `required / min / max / step`
-- `date / datetime-local`: `required / min / max`。本Planではdate/time系`step`を対応しない
+- `number`: `required / min / max / step / value`
+- `date / datetime-local`: `required / min / max`。runtime-v1ではdate/time系`step`を対応しない
 - 対応typeでHTML Standard上そのattributeが適用されない場合はvalidation constraintへ変換せずmetadataとして保持する
-- `disabled=true`、または対応typeで`readonly=true`の場合はconstraint validation対象外としてvalidation targetを生成しない。readonly / disabled自体のUI挙動はUI pattern側で扱う
-- `pattern`がvalidationへ適用されるcontrolはECMAScript RegExpをPython `re`で代用せず、そのcontrol validationを`unsupported`にする。pattern制約を無視したまま他constraintだけでcompleteにしない
-- `multiple`がvalidation意味を持つtypeはruntime-v1の対応type外なので`unsupported`とする。対応type上で意味を持たない場合はmetadataだけ保持する
+- `disabled=true`、または対応typeで`readonly=true`の場合はconstraint validation対象外としてvalidation targetを生成しない
+- `pattern`がvalidationへ適用されるcontrolはECMAScript RegExpをPython `re`で代用せず、そのcontrol validationを`unsupported`にする
+- `multiple`がvalidation意味を持つtypeはruntime-v1の対応type外なので`unsupported`とする
 
-`multipleOf`と数値系HTML `step`は`grid` constraintへ正規化します。
+HTML `number`のstepはHTML Standardのstep semanticsへ合わせます。
+
+- `step`省略時はdefault step = 1
+- `step="any"`ではallowed value stepなしとし、grid constraintを生成しない
+- positive finite `step=s`ではallowed step = s
+- step baseは有効な`min`、次に有効な`value`、それもなければ0の順で決める
+- invalid / zero / negative step tokenはdefault stepへfallbackするHTML semanticsを実装するか、入力normalizerで`invalid_input`へ狭める。どちらを採るかはruntime-v1で1つに固定し、制約なしとして扱わない
+- numberのdefault stepもstep mismatchへ影響するため、`step`属性がないことを「gridなし」と解釈しない
+
+`multipleOf`と対応可能なnumber stepは`grid` constraintへ正規化します。
 
 ```json
 {
@@ -620,14 +752,12 @@ type別の扱い:
 }
 ```
 
-- JSON Schema `multipleOf=m`: `base=0 / step=m`
-- HTML `step=s`: `type=number`かつ`min`が存在するcontrolだけ`base=min / step=s`として対応
-- `type=number`で`step`が存在して`min`がない場合、またはdate / datetime-local系stepは本Planの対応subset外としてそのcontrol subtreeを`unsupported`
-- `grid`はschema Coverage候補とBVA / combinatorial入力へ渡すが、`test_data_requirements.py`のintersection対象にはしない
+`grid`はschema Coverage候補とBVA / combinatorial入力へ渡しますが、`test_data_requirements.py`のintersection対象にはしません。
 
 `allOf / anyOf / oneOf / not / if / then / else`等、対応subset外でvalidation意味を変えるkeywordは`unsupported`です。unsupported keywordがvalidation意味へ影響するsubtreeだけを切り離し、独立して評価できる別property / itemは継続できます。親schemaのvalidation意味をunsupported keywordが左右する場合は、その親subtree全体を`unsupported`にします。
 
-正規化後のrange / enum / required等は`derived.ep_inputs / derived.bva_boundary_skeletons / derived.combinatorial_constraints / derived.test_data_requirements`へ固定schemaで出力します。`derived.bva_boundary_skeletons`は`boundary_key / side / threshold / inclusive / step / authority_refs`までを持ち、`mode / coverage_selection_reason`は含めません。LLMがその2 fieldだけを追加し、固定builderが`bva.py` inputへ変換します。EP / combinatorial / test dataは対応下流scriptのinput fieldと直接互換です。`grid`は上記限定経路で扱います。
+正規化後のrange / enum / required等は`derived.ep_inputs / derived.bva_boundary_skeletons / derived.combinatorial_constraints / derived.test_data_requirements`へ固定schemaで出力します。`derived.bva_boundary_skeletons`は`boundary_key / side / threshold / inclusive / step / authority_refs`までを持ち、`mode / coverage_selection_reason`は含めません。LLMがその2 fieldだけを追加し、固定builderが`bva.py` inputへ変換します。
+
 ## 15. UI pattern
 
 ### `ui_pattern_candidates.py`
@@ -692,7 +822,7 @@ type別の扱い:
 - output permutation: XSH RR 64/32
 - bounded integer: rejection samplingでmodulo biasを避ける
 
-seed=`42`の最初の6 outputは`2707161783, 2068313097, 3122475824, 2211639955, 3215226955, 3421331566`とし、固定test vectorに使用します。
+seed=`42`の最初の6 outputは`2707161783, 2068313097, 3122475824, 2211639955, 3215226955, 3421331566`とし、固定test vectorに使用します。bounded integerはraw output vectorだけでなく、少なくとも1つのnon-power-of-two bound（例: bound=10）についてrejection発生を含む固定vectorを契約testへ持ち、単純modulo実装への回帰を検出します。
 
 入力:
 
@@ -781,7 +911,7 @@ LLMがmetamorphic relationを定義した後を処理します。複数follow-up
 - `multiply_decimal`: decimal fieldの`path`とdecimal文字列`operand`
 - `append`: arrayまたはstringの`path`と型互換な`value`
 - `permute`: arrayの`path`と0..n-1の完全なbijectionである`indices`
-- `sort`: homogeneous scalar arrayの`path`と`order=asc|desc`
+- `sort`: homogeneous scalar arrayの`path`と`order=asc|desc`。runtime-v1で許可する要素型はnumber同士またはstring同士に限定し、numberはexact numeric order、stringはUnicode code point順で比較する。boolean / null / enumを含むsort、異種型混在は`unsupported`
 
 JSON pathはroot `$`からobject key / array indexだけを辿る簡易pathとし、wildcard、filter、recursive descentは`unsupported`です。
 
@@ -821,12 +951,14 @@ relationが製品に妥当か、source input集合、follow-up transform、出�
 
 `_02`で定義したnode / edge契約だけを使用します。
 
-- changed nodeから許可edgeを探索
-- Authority / TR / TCN / CI / TC候補を重複除去
-- dangling edge / unknown nodeを検出
-- canonical順で出力
+- changed nodeから許可edgeを探索する
+- Authority / TR / TCN / CI / TC候補を重複除去する
+- dangling edge / unknown nodeを検出する
+- 意味上のedgeを新規推測しない
 
-意味上のedgeを新規推測しません。
+payloadの`paths[]`は各impacted nodeに対する**shortest impact pathを1本**だけ返します。探索中のvisitedはgraph全体で「一度見たnodeを永久に捨てる」集合にせず、shortest distanceとcanonical predecessorを管理します。同じ最短距離の候補が複数ある場合はedge key列、次にnode key列のUnicode code point辞書順で1本へ固定します。cycleはshortest distanceを改善しない再訪として打ち切ります。
+
+出力はimpacted nodeをnode key順、pathを終点node key順でcanonical sortします。all simple pathsの列挙は行いません。
 
 ## 21. テスト要求の構造処理
 
@@ -955,8 +1087,9 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 {"type":"fixed_offset_datetime","value":"2026-09-19T12:30:00+09:00"}
 ```
 
-- integerはJSON integer
-- decimalは符号付き10進文字列で指数表記を禁止し、`Decimal`でcanonical化する
+- integerはstrict JSON decodeで取得した専用number tokenをgrammar / raw length検証してからcanonical integerへ変換する。JSON stringの`"1"`と混同しない
+- decimalはtyped valueでは符号付き10進文字列で指数表記を禁止し、共通exact helperで`integer coefficient + base-10 scale`へ正規化する。Python `Decimal` context precisionやbinary floatへ結果を依存させない
+- raw numeric tokenとcanonical numeric representationはいずれも4096 chars上限。超過時は`limit_exceeded`とし、丸めない
 - date / datetimeは`_02`のISO 8601契約へ従う
 - enumとstringは同じ文字列でも別型として扱う
 - nullは`value:null`だけを許可する
@@ -1016,26 +1149,34 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 
 #### `requirement_structure.py`
 
-- 既存TR draft意味fieldを維持し、`draft_key`を入力内一意にする
+- required: `authorities[]`, `risks[]`, `test_requirements[]`, `dispositions[]`, `previous_tr_ids[]`
+- TR draft: `{draft_key, identity_action, reuse_id, text, authority_refs[], risk_refs[], priority, priority_override_reason, test_level, observation_method}`
+- `draft_key`は入力内一意、`identity_action=reuse|new`。reuse時だけactiveな既存`TR-\d{3}`を`reuse_id`へ指定し、new時は`reuse_id=null`
+- `previous_tr_ids[]`: `{tr_id, status}`、`status=active|deleted`
 - canonicalized `test_requirements[]`を`draft_key`順で処理し、複数new TRへその順で採番する
+- reuse対象の不存在 / deleted / 同一IDのduplicate reuseを`invalid_input`にする。new採番はdeletedを含む過去最大番号+1。999超過は`id_space_exhausted`
 - previous active TRのうちcurrentでreuseされないIDは`deleted`へ遷移し、deleted rowを保持する
+- `priority_override_reason`は関連Riskから導出した最低優先度より低くする場合だけ非空必須で、runtimeが意味判断として優先度を自動補正しない
 - dispositionは`{upstream_entity:{skill, entity_type, entity_ref, content_fingerprint}, handling, reason, authority_refs[], covered_by_entity}`を使う
-- outputは`tr_id_map[]`とfull snapshotの`tr_id_state[]`
+- outputは`tr_id_map[]: {draft_key, tr_id, identity_action}`とactive / deleted全行を含むfull snapshotの`tr_id_state[]`
 
 #### `condition_structure.py`
 
-- requiredは既存のTR / selection / TCN / disposition / model / previous stateを維持する
-- model draftは`{draft_key, model_type, technique_slug, selection_source, selection_key, identity_action, reuse_model_key, parent_tcn_draft_key}`
+- required: current TR / Technique Selection、`test_conditions[]`, `models[]`, `dispositions[]`, `previous_tcn_ids[]`, `previous_model_keys[]`
+- TCN draft: `{draft_key, identity_action, reuse_id, tr_refs[], condition, category, technique_slugs[], coverage_criterion, authority_refs[], risk_refs[], priority, priority_override_reason}`
+- model draft: `{draft_key, model_type, technique_slug, selection_source, selection_key, identity_action, reuse_model_key, parent_tcn_draft_key}`
+- TCN reuseはactiveな既存`TCN-\d{3}`だけ、model reuseはactiveな既存modelだけ許可する。同一ID / model keyのduplicate reuseは`invalid_input`
 - 内部adapterは`technique_slug / selection_source / selection_key=null`。Coverage所有modelはcanonical `technique_slug`と`selection_source=analysis|condition_design|user`を持つ
-- `previous_model_keys[]`は`{model_key, model_type, technique_slug, parent_tcn_id, selection_source, selection_key, status}`で、成果物stateから損失なく復元する
-- TCN draftは`draft_key`順、model draftは`(parent_tcn_draft_key, model_type, draft_key)`順でnew IDを割り当てる
+- `previous_tcn_ids[]`は`{tcn_id,status}`、`previous_model_keys[]`は`{model_key, model_type, technique_slug, parent_tcn_id, selection_source, selection_key, status}`のfull snapshot
+- TCN draftは`draft_key`順、model draftは`(parent_tcn_draft_key, model_type, draft_key)`順でnew IDを割り当てる。deleted ID / model keyを別Entityへ再利用せず、TCN 999超過は`id_space_exhausted`
 - previous active TCN / modelでcurrent reuseされないものはdeletedへ遷移し、full snapshot stateを返す
+- `priority_override_reason`は要求優先度より低くする場合だけ非空必須
 - TCNの`technique_slugs[]`は所属Coverage所有modelの非null technique slug集合と一致させる
 - Classification Tree / Cause-Effect / schema / UI adapterはcanonical techniqueを所有しない。Coverage child側へ正規技法とselection provenanceを置く
 - `selection_source=analysis`の各Coverage modelは参照selectionに同じtechnique slugが必要。1 selection → 複数TCN / modelを許可する
-- active selectionの各selected techniqueは1件以上のcurrent Coverage所有modelまたは明示closureへ到達必須。adapter親だけで閉鎖済みにしない
+- active Technique Selectionの`selected_techniques[]`に残る各技法は1件以上のcurrent Coverage所有modelへ到達必須。不適用 / 未解決へ変わった場合はTechnique Selection Entity自体を更新し、未定義のselection closureで閉じない
 - エラー推測modelはruntime generatorなしでもstateへ保持し、semantic Coverage Item対象にする
-- outputはID mappingとfull snapshotのTCN / model state
+- outputは`tcn_id_map[] / model_key_map[]`とactive / deleted全行を含むTCN / model full snapshot state
 
 #### `equivalence_partitions.py`
 
@@ -1137,25 +1278,30 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 #### `grammar_cases.py`
 
 - required: `start`, `productions[]`, `max_depth`, `mutations[]`
-- productionは§25 grammar production key形式
-- RHS itemは`{"terminal":"..."}`または`{"nonterminal":"..."}`のどちらか一方
-- `max_depth`は1..64
-- mutation: `{mutation_key, op, production_key, symbol_index, value}`。opは§13の3種
-- deleteではvalue禁止、replace/insertではvalue string必須
+- productionは`{production_key,lhs,rhs[]}`。RHS itemは`{"terminal":"..."}`または`{"nonterminal":"..."}`のどちらか一方で、`rhs=[]`をepsilonとして許可する
+- `max_depth`は0..64のparse tree depth上限でroot start symbolをdepth 0とする
+- derivationはleftmost固定。各production targetは対象productionを1回以上含むproduction適用回数最小のderivation、同数ならproduction key列辞書順
+- valid case集合は各production shortest derivationのunionで、生成文字列 + production key列が同一なら重複除去
+- mutation: `{mutation_key, op, production_key, symbol_index, value}`。opは`delete_terminal / replace_terminal / insert_terminal`
+- deleteではvalue禁止、replace / insertではvalue string必須
 - delete / replaceは`symbol_index`がterminal itemを指すこと、insertは0..len(rhs)を許可
+- mutation後もleftmost / depth / shortest tie-breakを適用し、対象productionを含む導出がなければ`unreachable_mutation`
+- stable targetはproduction `syntax:prod:<production_key>`、mutation `syntax:mutation:<mutation_key>`
 
 #### `schema_cases.py`
 
 - required: `schema_kind`, `document`, `schema_pointer`, `context`
-- JSON / OpenAPI documentのnumberは共通strict JSON契約でtoken長を検証してからcanonical integer / exact decimalへ正規化し、binary floatを使用しない
-- `enum / const`はscalar / nullだけruntime-v1対応。object / array値を含むsubtreeはunsupported itemへ出す
 - `schema_kind = json-schema-2020-12 | openapi-3.0 | html-control`
-- json/openapiでは`document`はroot document object、`schema_pointer`はそのdocument内のCoverage対象Schema Objectを指すlocal JSON Pointer。local `$ref`は常に同じ`document`をrootとして解決する
+- numberは共通strict JSONの専用number tokenからcanonical integer / exact `coefficient + scale`へ正規化し、binary float / `Decimal` contextへ依存しない
+- JSON Schema 2020-12ではroot `$id`だけmetadataとして許可し、nested `$id`、`$anchor / $dynamicAnchor / $dynamicRef`、外部URI referenceはruntime-v1 `unsupported`。対応`$ref`は同一schema resource内の`#/...`だけ
+- JSON Schema 2020-12の`$ref` siblingは対応keywordなら通常どおり評価し、`$ref`だけを見てsiblingsを捨てない
+- OpenAPI 3.0はJSON Schema 2020-12と別semanticsで、`nullable`、boolean exclusive boundary、`readOnly / writeOnly`、Reference Objectを§14どおり処理する
+- OpenAPI Reference Objectは`$ref`以外の追加propertyをsibling Schema assertionとして解釈しない。runtime-v1では追加property付きReference Objectを`unsupported`
+- `enum / const`はscalar / nullだけruntime-v1対応。object / array値を含むsubtreeはunsupported itemへ出す
 - `context`はJSON Schemaでは`validation`、OpenAPIでは`request|response`、HTMLでは`form-control`
-- html-controlでは`document`は`{type, required, min, max, minlength, maxlength, step, pattern, disabled, readonly, multiple}`の対応属性だけを持つobject、`schema_pointer`は空文字列を固定。存在しない属性は省略可能
-- OpenAPIでは`readOnly / writeOnly`を§14のrequest / response規則でrequired母集団へ反映する
-- html-controlは§14のruntime-v1 type / attribute matrixを正本とする。`type=text`でvalidationへ適用される`pattern`は無視せずcontrol validationを`unsupported`にし、`disabled / readonly`でconstraint validation対象外となるcontrolからinvalid候補を生成しない
-- `multipleOf`と対応可能な数値HTML `step`は§14の`grid` constraintへ正規化
+- html-control `document`は`{type, required, min, max, minlength, maxlength, step, value, pattern, disabled, readonly, multiple}`。numberのdefault step=1、`step=any`、step base=min→value→0を§14どおり扱う
+- `pattern`等の未対応constraintを無視してcompleteにせず、validation意味へ影響するsubtreeを`unsupported`
+- `multipleOf`と対応可能なnumber `step`は§14の`grid` constraintへ正規化する
 - annotation allowlistとunsupported subtree規則は§14を正本とする
 
 #### `ui_pattern_candidates.py`
@@ -1182,15 +1328,18 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 
 - required: `test_conditions[]`, `coverage_items[]`, `environment_requirements[]`, `test_data_requirements[]`, `test_cases[]`, `dispositions[]`, `previous_tc_ids[]`
 - TCN: `{tcn_id, tr_refs[], priority}`
-- CI: `{ci_id, tcn_id, model_key, priority, authority_refs[], source_kind, execution, semantic_item_text, test_data_requirement_refs[]}`
+- CI: `{ci_id, tcn_id, model_key, priority, authority_refs[], source_kind, execution, semantic_item_key, semantic_item_text, semantic_source_targets[], test_data_requirement_refs[]}`
 - environment / test data requirementはcurrent Machine Entityのcanonical contentとcontent fingerprintを渡す
-- TC draftは既存fieldに`environment_requirement_refs[] / test_data_requirement_refs[]`を追加する
+- TC draft: `{draft_key, identity_action, reuse_id, title_or_purpose, tr_refs[], tcn_refs[], ci_refs[], environment_requirement_refs[], test_data_requirement_refs[], priority, priority_override_reason, preconditions[], test_data[], steps[], expected_results[], postconditions_or_cleanup[]}`
+- stepは`{number,text}`で1から連番。expected resultは`{number,text,authority_refs[]}`で1から連番
+- `previous_tc_ids[]`は`{tc_id,status}`のfull snapshot。reuseはactiveだけ、duplicate reuse禁止、newはdeletedを含む過去最大番号+1、999超過は`id_space_exhausted`
 - 各`ci_ref`の親TCNは`tcn_refs[]`に必須。TCの`tr_refs[]`は参照TCNのTR unionと一致させる
-- CIのtest data requirement refsはTCのrefsへ含め、参照requirementの存在とfingerprintを検証する
-- LLMはCIのcanonical `execution`または`semantic_item_text`とcurrent requirementsを使い、Markdown Coverage Item表からmachine値を再抽出しない
+- CIのtest data requirement refsはTCのrefsへ含め、environment / test data requirementの存在とcontent fingerprintを検証する
+- `priority_override_reason`はCoverage Itemから要求される優先度より低くする場合だけ非空必須
+- LLMはCIの自己完結canonical `execution`または`semantic_item_text`とcurrent requirementsを使い、Markdown Coverage Item表やgenerator内部modelからmachine meaningを再抽出しない
 - canonicalized TC draftを`draft_key`順で採番し、previous activeでreuseされないTCはdeletedへ遷移する
 - dispositionは完全Machine Entity参照schemaを使う
-- outputはTC mappingとfull snapshot state
+- outputは`tc_id_map[]: {draft_key,tc_id,identity_action}`とactive / deleted全行を含む`tc_id_state[]`
 
 #### `traceability.py`
 
@@ -1208,14 +1357,27 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - required: `tcn_id`, `active_model_metadata[]`, `models[]`, `semantic_coverage_items[]`, `target_annotations[]`, `target_dispositions[]`, `test_data_requirements[]`, `previous_target_id_map[]`, `previous_semantic_ci_map[]`, `previous_ci_ids[]`, `previous_expected_result_roots[]`, `merge_groups[]`
 - `active_model_metadata[]`はTCN配下の全current modelを`{model_key, model_type, technique_slug, parent_tcn_id, content_fingerprint}`で渡す
 - `models[]`は今回正常生成したcurrent generator resultだけを含む。runtimeなしmodelやunsupported modelを成功resultとして偽装しない
-- semantic itemは`{semantic_item_key, model_key, identity_action, reuse_ci_id, source_target_versions[], item_text, authority_refs[], reference_refs[], priority, expected_result_root, test_data_requirement_refs[]}`
-- `semantic_item_key`は成果物系列内stable key。`previous_semantic_ci_map[]`は`{semantic_item_key, model_key, ci_id, mapping_status}`で過去mappingを保持する
-- semantic reuseは同じkey / model / active previous mappingのCIだけ許可し、別item・別model・runtime target CIへの横取りを拒否する
-- new CI候補は`(model_key, source_kind, source_key)`でsortし、`runtime_target < semantic_item`、source keyは`target_ref`または`semantic_item_key`。raw入力順で採番しない
+- semantic item draft: `{draft_key, model_key, identity_action, reuse_semantic_item_key, reuse_ci_id, source_target_versions[], item_text, authority_refs[], reference_refs[], priority, expected_result_root, test_data_requirement_refs[]}`
+- new semantic itemはreuse fieldをnullにし、canonical `(model_key,draft_key)`順でCIを割り当てた後、runtimeが`semantic_item_key=semantic:<ci_id>`を発行する。reuseではprevious rowのsemantic item key / model / CIをすべて一致させる
+- `previous_target_id_map[]`: `{target_ref, model_key, target_key, target_content_fingerprint, ci_id, mapping_status}`、`mapping_status=active|inactive`
+- `previous_semantic_ci_map[]`: `{semantic_item_key, model_key, ci_id, mapping_status, semantic_content_fingerprint}`、`mapping_status=active|inactive`
+- `previous_ci_ids[]`: `{ci_id,status}`、`status=active|deleted`
+- `previous_expected_result_roots[]`: `{expected_result_root,status}`、`status=active|deleted`
+- previous active target / semantic mappingがcurrentで再利用されなければinactiveへ遷移し、共有targetのないCIまたはsemantic CIをdeletedへ移す。deleted / inactive rowはfull snapshotから消さない
+- inactive target / semantic itemの復帰は、同じidentityへの明示reuseかつ過去CIが別itemへ再利用されていない場合だけ同じCIを復帰できる。deleted CIを別identityへ再利用しない
+- semantic itemのmodel変更はreuse不可。本文・source target version・根拠・priority・expected result root・test data requirement変更は同じkeyを維持できてもcontent fingerprintを変え、`stale_ci_ids[]`へ追加する
+- target annotation: `{target_ref,target_content_fingerprint,generation_fingerprint,priority,expected_result_root,test_data_requirement_refs[]}`
+- target disposition: `{target_ref,target_content_fingerprint,generation_fingerprint,handling,reason,authority_refs[],covered_by_target_version}`
+- `source_target_versions[] / target_annotations[] / target_dispositions[] / merge_groups[]`のtarget versionは現在targetと完全一致必須
+- semantic reuse、runtime target mapping、mergeの各経路で同一CIを複数identityへ不正reuseするduplicateを拒否する
+- new CI候補は`(model_key, source_kind, source_key)`でsortし、`runtime_target < semantic_item`、runtime targetのsource keyは`target_ref`、semantic itemはnewなら`draft_key`、reuseなら`reuse_semantic_item_key`を使う。raw入力順で採番しない
 - runtime target CIはcanonical `execution`を、semantic CIは`semantic_item_key / semantic_item_text / semantic_source_targets[]`をMachine Entity contentへ保存する
 - test data requirementはcurrent Entity fingerprintをCI dependencyへ保存する
 - `materializable=false`の正規Coverage targetはsemantic itemまたはDispositionへ1回だけ閉じる
-- outputは既存stateに加えて`semantic_ci_mapping_state[]`を返す
+- 各active Coverage所有modelは1件以上のcurrent CIを持つか、非空のrequired Coverage母集団がcurrent target Disposition / unsupported closureで全件閉じている必要がある。エラー推測semantic modelは1件以上のcurrent semantic CI必須
+- `conditions=[] / actions=[] / factors=[] / relations=[] / source_inputs=[] / states=[]`等、Coverage所有modelの意味母集団が空でrequired target / pair / caseが0件になる入力をvacuous completeにしない。model契約に応じて`invalid_input`または`unresolved`へ落とす
+- outputは`target_id_map[]`, `target_mapping_state[]`, `semantic_ci_mapping_state[]`, `ci_id_state[]`, `expected_result_root_state[]`, `disposed_target_refs[]`, `stale_ci_ids[]`, `coverage_item_rows[]`, `issues[]`
+- `target_mapping_state[] / semantic_ci_mapping_state[] / ci_id_state[] / expected_result_root_state[]`はactive / inactive / deletedを含む必要なfull snapshotを返し、次回previous stateの正本にする
 
 #### `workflow_runtime.py`
 
@@ -1225,8 +1387,16 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - `current_entities[]`: `{skill, entity_type, entity_ref, model_key, content, content_fingerprint, upstream_entity_dependencies[], runtime_dependencies[]}`。`content`は`_02` §4.4のMachine Entityと同一で、共通関数が`content_fingerprint`を再計算して保存値と一致確認する
 - `current_runtime_units[]`: `{skill, runtime_unit_key, generation_fingerprint}`。`(skill, runtime_unit_key)`を一意keyとして保存済み`upstream_runtime_units[]`と比較する
 - `expected_runtime_units[]`: `{skill, runtime_unit_key}`。各Skillは`_02` §2.1のdispatch表、現在の対象 / 実行範囲、active TCN / model metadata、条件付き入力の有無から固定builderで期待集合を作り、`qa-workflow`はそれを連結して`workflow_runtime.py`自身を除外する
-- `expected_entities[]`: `{skill, entity_type, entity_ref}`。各Skill validatorが現在成果物の正本から全current Entityを固定導出する。`spec-analysis`はAuthority、`test-analysis`はcontext / Product Risk / Technique Selection / change graph / environment requirement、`test-requirement-design`はTR / Disposition、`test-condition-design`はTCN / model / CI / test data requirement / Disposition、`test-case-design`はTC / Dispositionを対象にし、Entity typeを暗黙に省略しない
+- `expected_entities[]`: `{skill, entity_type, entity_ref}`。actual `current_entities[]`や保存済みMachine Entity blockから逆算せず、actual集合と独立したsourceから固定導出する
+  - `spec-analysis`: Authority表 / canonical source inventory
+  - `test-analysis`: 人間向け正本とnormalized inputからcontext / Product Risk / Technique Selection / change graph / environment requirement
+  - `test-requirement-design`: `requirement_structure.py`のinput draft + ID mapping / full stateからTR / Disposition
+  - `test-condition-design`: `condition_structure.py`のinput draft + ID mapping / full state、current generator dispatch、`materialize_coverage.py` mappingからTCN / model / CI / test data requirement / Disposition
+  - `test-case-design`: `case_structure.py`のinput draft + ID mapping / full stateからTC / Disposition
+- 禁止: `current_entities[]`を読んでexpectedを作る、保存済みMachine Entity blockを期待集合の正本にする、missing actual Entityの存在を前提にexpected identityを作る
+- `expected_runtime_units[]`もactual `runtime_units[] / current_runtime_units[]`から逆算せず、固定dispatch条件、対象 / 実行範囲、active structure state、normalized inputから導出する
 - `runtime_units[]`のidentity集合は`expected_runtime_units[]`と完全一致、`current_entities[]`のidentity集合は`expected_entities[]`と完全一致を必須にする。期待item欠落はblocker、未知の余分なcurrent itemは`invalid_input`とする
+- completionでは各active Coverage所有modelについてcurrent CIまたは許可されたcurrent target / unsupported closureを検査し、親TCNに別modelのCIがあるだけで当該modelを完了扱いしない
 - 各Skillの同一内容`runtime_contract.py`にruntime dependency graphとMachine Entity dependency graphを評価する共通関数を置く。missing dependencyはstale + blocker、duplicateまたはcycleは`invalid_input`
 - `unsupported_item_closures[]`: `{skill, runtime_unit_key, generation_fingerprint, item_key, reason_code, handling, reason, authority_refs, covered_by_entity}`。`covered_by_entity`は`null`または`{skill, entity_type, entity_ref, content_fingerprint}`の完全Machine Entity参照。`handling`は`llm_fallback / 対象外 / 別テストレベル / 残存リスク / 成立不能 / 重複 / ブロック中`だけを許可する。closureの`generation_fingerprint`は対象runtime unitの現在値と一致必須。`support_status=partial`では`item_key`をunsupported itemのstable keyで必須とし、`reason_code`も現在unsupported itemと一致必須。whole-model `unsupported`では`item_key=null / reason_code=null`を許可するが`generation_fingerprint`一致は必須とする。世代またはreasonが変わった以前のclosureを自動再利用しない
 - `llm_fallback`と`重複`は`covered_by_entity`必須で、currentなMachine Entityへ解決できることを検証する。`対象外 / 別テストレベル / 残存リスク / 成立不能`は既存`test-condition-design`のDisposition条件をそのまま適用し、不要な`covered_by_entity`はnullとする。`ブロック中`はclosure rowとして保持しても閉鎖済みには数えず`can_complete=false`とする
