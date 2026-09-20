@@ -100,13 +100,14 @@ generatorが返す100%等のCoverageは、**明示された正規化済みモデ
 
 ## 4. 本Planの実装範囲
 
-本Planは部分実装を完了条件にしません。上記3.1で「実装」とした処理を、対応Skillのruntime、成果物契約、validator、semantic eval、workflow統合まで含めて実装します。加えて、runtimeの上流fingerprintをMarkdown再解釈に依存させないため、`spec-analysis` / `test-analysis` / `test-requirement-design` / `test-condition-design` / `test-case-design`へcanonical machine Entityを保存します。
+本Planは部分実装を完了条件にしません。上記3.1で「実装」とした処理を、対応Skillのruntime、成果物契約、validator、semantic eval、workflow統合まで含めて実装します。加えて、runtimeの上流fingerprintをMarkdown再解釈に依存させないため、`spec-analysis` / `test-analysis` / `test-requirement-design` / `test-condition-design` / `test-case-design`へcanonical Machine Entityを保存します。Machine Entityと期待identityはPython固定builderで生成し、actual Machine Entity集合から期待集合を逆算しません。
 
 主な責務は次のとおりです。
 
 1. `spec-analysis`
    - 現在有効なAuthorityをcanonical machine JSONとして成果物へ保存する
-   - runtimeは追加せず、既存の仕様解決責務を維持する
+   - `runtime_contract.py`のcanonical / Machine Entity helperと`authority_entities.py`でAuthority Entity / expected identityを決定論的に生成する
+   - runtime unitは追加せず、既存の仕様解決責務を維持する
 
 2. `test-analysis`
    - risk scheme計算
@@ -118,7 +119,7 @@ generatorが返す100%等のCoverageは、**明示された正規化済みモデ
    - Authority / Risk → TRの構造処理
 
 4. `test-condition-design`
-   - 技法選択 → TCN → model → generatorの対応検査
+   - 技法選択 → TCN → model → generatorの対応検査。adapterとCoverage childは同じ`condition_structure.py`実行で先にidentityを確定し、childが派生元adapterを`derived_from_model_key`で保持する
    - 各テスト技法generator
    - generator別`materializable` / canonical `execution`の生成
    - schema / HTML / UI候補
@@ -134,7 +135,8 @@ generatorが返す100%等のCoverageは、**明示された正規化済みモデ
 
 7. `qa-workflow`
    - contract / model version、上流変更、runtime unit間依存、stale派生成果物、局所ブロック、`要再検証`、legacy成果物再利用、完了判定
-   - dispatch表から導出した期待runtime unit集合と各Skill validatorが導出した期待Machine Entity集合を実際集合と比較し、完全欠落をblockerにする
+   - Python固定builderがdispatch表・normalized input・structure / materialize stateから導出した期待runtime unit / Machine Entity集合を実際集合と比較し、完全欠落をblockerにする
+   - target Dispositionの`重複`chain、partial / whole-model unsupported closure、質問回答のgeneration一致を機械的に検査し、実Coverageへ到達しないclosureや古い回答で完了させない
    - fingerprint比較、runtime / Entity状態集約、機械的なstale / 完了判定をLLMに手計算させずruntime scriptで実行する
 
 8. `question-analysis`
@@ -183,10 +185,10 @@ scriptが正規化済みモデル内で100% Coverageを返しても、LLMの正�
 
 - LLMは自然言語から意味を正規化し、Authority対応、risk判断、技法採用、意味上の同一性、expected result等を決める。scriptへ渡した後の列挙、計算、fingerprint、ID採番、Coverage集計、構造検査、stale判定をLLMが再計算しない
 - Skillがruntime対象を扱う場合は、Skill instructionに定義したdispatch表からscriptを選び、保存済み`Machine Runtime Input / Result`を決定論的に抽出・strict decodeして再投入する。MarkdownをLLMが読み直してJSONを再生成しない
-- runtime間で機械変換した結果は、上流の`skill + runtime_unit_key + generation_fingerprint`を保持して下流へ渡す。上流runtime結果が変わった場合は依存する下流runtime unitだけをstaleへ戻す
+- runtime間で機械変換した結果は、上流の`skill + runtime_unit_key + generation_fingerprint`を保持して下流へ渡す。adapter派生childは親adapter modelを`derived_from_model_key`で保持し、上流runtime結果が変わった場合は依存する下流runtime unitだけをstaleへ戻す
 - canonicalizationはfingerprint計算専用にせず、scriptが処理する正規化済み入力そのものへ適用する。順序に意味がない配列のraw入力順でmachine resultやstable IDを変えない
 - generator targetは、Coverage Item、明示的なmerge、または既存Skill契約上のDispositionへ閉じる。Dispositionによる成果物上の閉鎖と技法Coverage達成は別に判定する
-- Machine Entityは既存Skillが後続へ渡す意味fieldを保持する。CIはmachine target由来ならcanonical `execution`、semantic item由来ならCoverage Item本文を保持し、`test-case-design`がMarkdownを再解釈しない
+- Machine Entityは既存Skillが後続判断・再利用・stale判定に使う意味fieldを保持する。CIはmachine target由来ならopaque keyだけでなく具体対象・値・条件を含む自己完結canonical `execution`、semantic item由来ならCoverage Item本文を保持し、`test-case-design`がMarkdownやgenerator内部modelを再解釈しない
 - 本Planで追加する全scriptは、deterministicなdispatch / integration testで実際の呼出経路を検証する。実Agentでは代表経路でPython実行、stdout envelope parse、machine結果採用まで確認する
 
 本Planは1 PR内で全対象を完了させる前提です。実装途中の契約確認は後続実装の手戻りを減らすための検証点であり、そこで対象を打ち切ったり別PRへ先送りしたりしません。
