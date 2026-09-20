@@ -162,7 +162,7 @@ runtime対象Skillは、Skill instructionへscript選択表を持ち、次の順
 | `coverage-analysis` | `テスト設計` | traceabilityを検査する | `traceability.py` | 必須 |
 | `qa-workflow` | 単一用途 | runtime状態を集約する | `workflow_runtime.py` | 必須 |
 
-model typeからgeneratorへの対応は次だけを許可し、`expected_runtime_units[]`もこの表から導出します。
+model typeからgeneratorへの対応は次だけを許可します。model runtimeの`expected_runtime_units[]`はこの表から、artifact runtimeの`expected_runtime_units[]`は直前のSkill dispatch表から導出し、両集合を連結します。
 
 | model_type | generator |
 | --- | --- |
