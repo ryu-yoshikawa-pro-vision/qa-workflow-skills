@@ -282,7 +282,6 @@ routing caseへ最低限、次を追加します。
 
 - `SKILL.md`
 - `references/guidance.md`
-- `assets/execution-plan-template.yaml`
 - `assets/output-template.md`
 - trigger / deterministic / semantic eval
 - 実対象currentness確認
@@ -298,6 +297,7 @@ routing caseへ最低限、次を追加します。
 
 - `SKILL.md`
 - `references/guidance.md`
+- `assets/execution-plan-template.yaml`
 - `assets/output-template.md`
 - trigger / deterministic / semantic eval
 - Playwright MCP等の対話操作
