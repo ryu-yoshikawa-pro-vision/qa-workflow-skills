@@ -62,9 +62,9 @@ runtime issueへの回答を再開する場合は、回答を正規化modelへ�
 
 ### `qa-workflow`
 
-既存Skill状態表は`qa-workflow`出力時に引き続き必須とし、`WF-D009`は維持します。ただし永続正本にはせず、成果物metadataから再構築可能にします。
+既存Skill契約どおり、Skill状態表はワークフロー状態を明示する必要がある場合だけ表示します。通常出力の必須要件には変更しません。既存canonical deterministic evalでは状態表を検証するfixtureに対する`WF-D009`を維持しますが、一般のSkill出力へ拡張しません。状態表は永続正本にせず、成果物metadataから再構築可能にします。
 
-`assets/workflow-state-template.md`へ別表`runtime状態`を追加します。
+`assets/workflow-state-template.md`へ、状態表示を行う場合に既存Skill状態表と併記する別表`runtime状態`を追加します。
 
 `Skill | Runtime Unit Key | Model Key | Support Status | Result Status | Freshness | Runtime Status | Runtime Required | Deterministic Generated | Fallback Reason | Blocker / Issue`
 
@@ -76,7 +76,7 @@ runtime issueへの回答を再開する場合は、回答を正規化modelへ�
 - `Runtime Status = ok / invalid_input / unsupported / limit_exceeded / internal_error / not_run`
 - `Runtime Required / Deterministic Generated = Yes / No`
 - `Fallback Reason`は空欄 / `outside_supported_subset` / `python_unavailable`
-- Skill状態表の`WF-D012`は従来どおりSkill + 対象にだけ適用し、runtime状態表へ流用しない
+- Skill状態表を表示するfixtureでは`WF-D012`を従来どおりSkill + 対象にだけ適用し、runtime状態表へ流用しない
 - ワークフロー全体`完了`では全runtime unitが`Result Status=ready / Freshness=current`であることを追加検査する
 - `Runtime Required=Yes`のunitでは、さらに`Deterministic Generated=Yes`を要求する
 - `Runtime Required=No`のfallback unitも`Result Status != ready`なら完了を妨げる
@@ -244,7 +244,7 @@ repository全体は328 queryです。
    - `question-analysis`往復で`skill / runtime_unit_key / model_key / target_key / generation_fingerprint`維持
    - 質問後にgenerationが変わった場合は以前の回答を自動適用せず、現在世代でissueが残るか再評価する
    - 独立modelは継続
-   - 成果物metadataから状態を再構築し、qa-workflow出力時は既存Skill状態表と新しいruntime状態表へ反映
+   - 成果物metadataから状態を再構築し、qa-workflowが状態表示を行う場合だけ既存Skill状態表と新しいruntime状態表へ反映する。表を省略しても完了判定は変わらない
    - workflowは部分完了
 
 5. runtime support / fallback / unavailable
@@ -262,16 +262,19 @@ repository全体は328 queryです。
    - 以後version / fingerprint契約で再利用
 
 7. runtime利用確認
-   - 全runtime scriptについてdispatch fixtureから期待script pathへ到達し、CLI実行結果metadataが存在する
+   - 正規化済み`input / model_type / 対象 / 実行範囲`からscript選択表へ入った後のdispatchはunit fixtureで全runtime scriptを網羅し、期待script path・必須/条件付き・実行順とCLI実行結果metadataを検証する
+   - 自然言語promptからSkill責務・意味入力を決める部分はPython dispatch testへ実装せず、既存trigger eval / semantic evalと代表Agent smokeで検証する。dispatch検証専用のprompt parserや重複manifestを新設しない
    - `test-analysis: E2E対象選定`と`coverage-analysis: TC → E2E実装 / E2E実装 → 実行結果`では本Planruntimeをdispatchしない
    - supported inputが`unsupported`になる、またはsupport判定前にAgentがscriptを省略する場合は失敗
    - 保存済み`Machine Runtime Input / Result`を決定論的に抽出してround-trip検証できるが、workflow再利用では保存済みresultをcurrent cacheにせず現在scriptを再実行する
    - LLM手計算だけの成果物を決定論的生成済みと判定しない
 
 8. 途中工程開始
-   - ユーザーが技法を明示したTRから`test-condition-design`を開始し、`Selection Source=user`をmodel metadataへ保持する
+   - 前工程のMachine Entityがない直接入力では`input_mode=direct`を使用し、ユーザーが技法を明示したTRから`test-condition-design`を開始して`Selection Source=user`をmodel metadataへ保持する。存在しない`test-analysis / test-requirement-design` Machine Entityを捏造しない
+   - 同じfixtureを`test-condition-design` Skill directory単体でも実行し、repo root helperや前工程Skill directoryなしで正規化input → runtime → Machine Entity保存まで成立することを確認する
    - ユーザー明示がなくても`test-condition-design`自身が問題構造から技法を選べる正常経路を`Selection Source=condition_design`で検証する
-   - 既存modelをreuseした場合は元のSelection Source / selection keyを維持し、reuseを`existing_artifact` sourceへ置き換えない
+   - 既存Machine Entity付き成果物を再利用する経路では`input_mode=artifact`を使用し、元のSelection Source / selection keyを維持する。reuseを別のSelection Sourceへ置き換えない
+   - legacy昇格は初回だけ`input_mode=direct`とし、新契約のMachine Entity保存後の再利用は`artifact`へ移る
    - `test-analysis`の技法選択行を作るためだけに上流へ戻らない
 
 9. 実Agent runtime smoke
@@ -309,7 +312,7 @@ python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
 
 ## 10. Skill単体移植性
 
-runtime対象の次の6 Skillを単体コピーして代表scriptをCLI実行します。加えて`spec-analysis`も単体コピーし、`authority_entities.py`によるAuthority Machine Entity生成と`runtime_contract.py`のcanonical / Machine Entity helperが外部repository helperなしで動作することを検証します。
+runtime対象の次の6 Skillを単体コピーして代表scriptを実行します。CIではsetup済みPython 3.11 interpreterを使用し、Skill側が`python`というcommand名へ依存しないことを確認します。加えて`spec-analysis`も単体コピーし、`authority_entities.py`によるAuthority Machine Entity生成と`runtime_contract.py`のcanonical / Machine Entity helperが外部repository helperなしで動作することを検証します。
 
 - `test-analysis`
 - `test-requirement-design`
@@ -326,7 +329,10 @@ runtime対象の次の6 Skillを単体コピーして代表scriptをCLI実行し
 - runtime dependencyがPython 3.11標準ライブラリだけで、外部package manifestを必要としない
 - generator scriptがSkill-local Python moduleとしてimportできるのは`runtime_contract.py`だけで、fingerprint対象外helperへ実行ロジックを逃がさない
 - Skill rootからscriptを解決
-- stdout envelopeを読める
+- stdinへUTF-8 JSONを渡しstdout envelopeを読める。interpreterのcommand名やtimeout APIをSkill code / Skill契約へ埋め込まない
+- `test-condition-design`と`test-case-design`は`input_mode=direct`の代表fixtureを前工程Skill directory / Machine Entityなしで実行できる
+- `input_mode=artifact`では必要なMachine Entity missing / extraを拒否し、`direct`と`artifact`を黙って相互fallbackしない
+- `authority_entities.py`が失敗またはPython unavailableの場合、Authority Machine Entity / fingerprintをLLMや別builderで代替生成せず対象範囲をblockedにする
 - Python unavailable時にSkill全体を利用不能と誤判定しない
 - runtime未実行を決定論的生成済みと表現しない
 
@@ -400,7 +406,7 @@ runtime対象の次の6 Skillを単体コピーして代表scriptをCLI実行し
 - runtime dependency identityは`(skill, runtime_unit_key)`で固定する
 - `workflow_runtime.py`自身を評価対象`runtime_units[]`から除外し、self dependencyを禁止する
 - missing dependencyはstale + blocker、duplicate / cycleは`invalid_input`
-- 既存Skill状態表を維持し、別表`runtime状態`を追加
+- 既存Skill状態表の「必要な場合だけ使用」を維持し、状態表示時だけ別表`runtime状態`を追加
 - model単位状態を成果物metadataから再構築
 - legacy昇格
 - upstream Entity別content fingerprint / Machine Entityの`upstream_entity_dependencies[] / runtime_dependencies[]` / upstream runtime dependency / stale伝播
