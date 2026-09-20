@@ -38,7 +38,9 @@ skills/test-execution/
 - 実行対象環境を識別できる情報
 - 実行方式、または要求と既存実装からTC単位で一意に決められる情報
 
-識別可能な実行範囲で要求された場合は、実行開始前に現在の詳細テストケース入力から具体的なTC識別子集合へ解決し、今回の実行母集団として固定します。`test-execution`自身は正式TC IDを新規採番しません。単一TCでも入力側の一意識別子が必要です。複数TCを一意に識別できない場合は該当範囲を実行開始前にブロックします。実行中に母集団を暗黙拡張・縮小しません。
+識別可能な実行範囲で要求された場合は、実行開始前に現在の詳細テストケース入力から具体的なTC識別子集合へ解決し、今回の実行母集団として固定します。`test-execution`自身は正式TC IDを新規採番しません。単一TCでも入力側の一意識別子が必要です。今回の`TC識別子`は実行入力上の識別子であり、既存E2E成果物の`TC ID`とは別契約です。外部IDを既存E2Eの`TC ID`欄へ変換して書き込まず、既存`TC → E2E実装`対応が`TC ID`を持つ場合は、今回識別子と既存TC IDが同一TCを指すことを確認します。複数TCを一意に識別できない場合は該当範囲を実行開始前にブロックします。
+
+実行開始後は今回のTC識別子集合を不変とし、母集団を暗黙にも明示要求への追随でも書き換えません。ユーザーが開始後にTC追加・除外または実行方式変更を求めた場合は、元成果物へ上書きせず別の`test-execution`成果物 / versionとして開始します。元成果物は開始時に固定した集合と途中までの結果を履歴として保持します。
 
 詳細テストケースには少なくとも、実行に必要な前提条件・手順・期待結果が存在することを確認します。TCに`事後状態 / 後処理`が定義されている場合も実行契約として扱います。`qa-workflow`内で期待結果を設計・変更する責任は`test-case-design`に残します。一方、外部成果物やユーザー直接入力で既に明示された期待結果は今回のTC実行契約としてそのまま利用できますが、`SPEC`や製品期待挙動の正本へ自動昇格しません。期待結果が欠落・曖昧・矛盾している場合は自力で補完せず、`test-case-design`または`question-analysis`へ戻します。
 
@@ -51,13 +53,15 @@ skills/test-execution/
 - `AI直接操作`
 - `自動実行`
 
-`AI直接操作`は、利用可能なbrowser / computer操作能力を使ってAIがTC手順を対象環境で実施する方式です。
+`AI直接操作`は、利用可能なbrowser / computer操作能力を使ってAIが実対象UI上でTC手順を実施・観測できる場合の方式です。
 
-`自動実行`は、Playwright等の既存自動テストrunnerで取得された検証済み実行結果を利用してTCの期待結果と実測結果を対応付ける方式です。本変更ではPlaywright経路として`e2e-test-execution`を既存の実行担当とします。
+`自動実行`は、既存Playwright E2Eを`e2e-test-execution`で実行して得た検証済み実行結果を利用し、TCの期待結果と実測結果を対応付ける方式です。本変更ではAPI / DB等の専用runnerや新しい実行方式を追加しません。
 
 「自動実行」を理由に`test-execution`自身がPlaywright commandを直接組み立てません。
 
-実行方式はTC単位で決めます。ユーザーが方式を指定した場合はその指定を優先します。指定がなく、現在有効なE2E実装との対応があり、そのE2EがTC判定に必要な期待結果を十分検証していることをcurrentなE2E実装成果物・有効なreview結果等から確認でき、今回の対象環境で安全に実行できる場合にだけ`自動実行`を使用します。それ以外でAI直接操作が安全に成立する場合は`AI直接操作`を使用します。ユーザーが`自動実行`を明示したのにE2Eの期待結果検証が不足する場合は、勝手にAI直接操作へ切り替えず、必要なら`adversarial-review`（対象: `E2E実装`）または`e2e-test-implementation`へ戻します。どちらも成立しないTCは開始しません。同一成果物内で両方式を混在できます。
+実行方式はTC単位で決めます。ユーザーが方式を指定した場合はその指定を優先します。指定がなく、currentな`TC → E2E実装`対応があり、そのE2EがTC判定に必要な期待結果を十分検証していることをcurrentなE2E実装成果物・有効なreview結果等から確認でき、今回の対象環境で安全に実行できる場合にだけ`自動実行`を使用します。それ以外でAI直接操作が安全に成立する場合は`AI直接操作`を使用します。
+
+`自動実行`を選ぶための`TC → E2E実装`対応が欠落・陳腐化している場合は、repoから対応を推測せず既存`coverage-analysis`（対象: `TC → E2E実装`）へ戻します。対応先E2EがTCの期待結果を十分検証しているか確認できない場合は`adversarial-review`（対象: `E2E実装`）へ戻します。十分な検証のためにE2Eコード変更が必要でも、ユーザー要求または現在のworkflow範囲にコード実装・更新が含まれる場合だけ`e2e-test-implementation`へ進みます。実行だけが要求されている場合はコード変更を暗黙許可せず、必要なE2E実装変更を理由に該当範囲を`ブロック中`とします。ユーザーが`自動実行`を明示した場合も勝手にAI直接操作へ切り替えません。どちらの方式も成立しないTCは開始しません。同一成果物内で両方式を混在できます。
 
 混在時は`test-execution`が固定TC識別子集合と各TCの実行方式を正本として保持します。AI直接操作subsetは`test-execution`自身が実施し、自動実行subsetだけを`e2e-test-execution`へ委譲します。委譲中は`test-execution`を未完了のまま保持し、runner結果または必要な`e2e-test-result-analysis`が揃った後に同じ`test-execution`へ再開して未処理subsetと全TC結果を統合します。TCごとの開始状態・cleanupを満たせる限りsubset間の固定実行順序は設けませんが、同じTC識別子を複数方式で暗黙に実行しません。
 
@@ -113,6 +117,10 @@ e2e-test-execution
 
 `test-execution`が利用するのは、`e2e-test-execution`が検証済みとして記録したrunner事実と、異常経路では`e2e-test-result-analysis`の分析結果です。自動実行結果をTC判定へ使用する前に、TC実行要求の対象条件と`e2e-test-execution`が記録した対象URL / origin、Playwright project、必要なrole / 認証条件、テストデータ / 開始状態、version / build等のうちTC判定へ影響する項目が一致するか、差異が結果へ影響しないことを確認します。取得不能な値は推測せず制約として残します。
 
+自動実行subsetを委譲する前に、TCごとの対応から必要なlogical primaryを解決します。複数TCが同じlogical primaryへ対応する場合、`test-execution`の追跡表では各TCとの対応を保持しますが、1つの`e2e-test-execution`へ渡すlogical primary集合は一意化し、同じlogical primaryをTC数だけ重複実行しません。また、対象URL / origin、Playwright project、role / 認証、開始状態 / テストデータ、setup、許可する副作用、cleanup等を同一runで両立できないTCは、安全に同一preflight契約を共有できる最小限の集合へ分け、複数の`e2e-test-execution`成果物として実行します。新しいbatch runnerやrun registryは追加しません。
+
+`e2e-test-result-analysis`が不足証拠の取得を目的に追加runを要求した場合は、そのrunが正式TC実行条件を維持した再実行か、診断目的で条件を変えたrunかを区別します。診断runは原因分析の証拠として参照できますが、診断runだけで正式TC結果をPASSへ置き換えません。TC判定へ使うrunは今回TCの正式実行条件へ適用可能であることを確認します。
+
 次を再解釈しません。
 
 - Playwright run全体status
@@ -129,9 +137,9 @@ runner異常、認証失敗、setup failure等により対象TC自体が開始�
 
 assertion結果等から期待結果と実測結果の差を確認できる場合だけ、TCの`FAIL`判定へ利用します。Playwrightの`failed`というstatusだけを根拠に製品期待結果の不一致と断定しません。run全体PASS、`TestCase.outcome() = expected`、最終retry PASSも単独ではTCの`PASS`根拠にしません。
 
-自動実行では、最低限`TC識別子 → E2E実装参照 → logical primary → resolved primary TestCase → 実行結果 / 観測証拠`を辿れることを要求します。既存`TC → E2E実装`対応を利用する場合は、その対応が参照する既存TC IDと今回TC識別子が同一TCを指すことを確認します。実行開始前に、固定した今回TC識別子集合の自動実行subsetから今回必要なE2E実装参照とlogical primary集合を解決し、`e2e-test-execution`へ渡します。1 TCが複数のE2E実装 / resolved primaryへ対応する場合も、TCの期待結果を判定するために必要な対応先をすべて確認します。dependency / teardown等のrunner上必要な実行は既存契約へ委ねますが、要求外のprimary testを「ついでに」追加しません。runner入口の制約で追加primaryが避けられない場合は、その実行範囲と副作用を開始前に確認します。retry attemptは別TCとして数えません。既存`TC → E2E実装`対応がある場合はそれを正本として再利用し、raw結果側の任意TC IDだけに依存しません。
+自動実行では、最低限`今回TC識別子 → 既存TC ID（存在時のみ） → E2E実装参照 → logical primary → E2E実行成果物参照 → resolved primary TestCase → 実行結果 / 観測証拠`を辿れることを要求します。既存`TC → E2E実装`対応を利用する場合は、その対応が参照する既存TC IDと今回TC識別子が同一TCを指すことを確認し、外部IDを既存TC IDとして書き換えません。実行開始前に、固定した今回TC識別子集合の自動実行subsetから今回必要なE2E実装参照とlogical primaryを解決し、各`e2e-test-execution`へ渡すlogical primary集合を一意化します。1 TCが複数のE2E実装 / resolved primaryへ対応する場合も、TCの期待結果を判定するために必要な対応先をすべて確認します。dependency / teardown等のrunner上必要な実行は既存契約へ委ねますが、要求外のprimary testを「ついでに」追加しません。runner入口の制約で追加primaryが避けられない場合は、その実行範囲と副作用を開始前に確認します。retry attemptは別TCとして数えません。既存`TC → E2E実装`対応がある場合はそれを正本として再利用し、raw結果側の任意TC IDだけに依存しません。
 
-TCを`PASS`にするには、currentなE2E実装がそのTCのPASS判定に必要な期待結果を検証していることを、現在有効なE2E実装成果物、`adversarial-review`（対象: `E2E実装`）の結果、または同等の確認済み事実から確認できることを要求します。`adversarial-review`を根拠に使う場合は、現在のE2E実装変更後に`要再検証`が残っていない等、そのreviewがcurrentなE2E実装へ適用できることを確認します。単体`test-execution`でreview鮮度を確認できない場合は、古いreviewだけをPASS根拠にせず現在のE2E実装を再reviewします。runがPASSでも必要な期待結果の検証またはreview鮮度を確認できない場合はTCを`判定不能`とします。期待結果専用の新しいID体系やcoverage用途は追加しません。
+TCを`PASS`にするには、currentなE2E実装がそのTCのPASS判定に必要な期待結果を検証していることを、現在有効なE2E実装成果物、`adversarial-review`（対象: `E2E実装`）の結果、または同等の確認済み事実から確認できることを要求します。根拠は対象E2E実装参照だけでなく、その判断対象となったE2E実装revision / working treeへ追跡できるようにします。`adversarial-review`を根拠に使う場合は、review成果物がどのE2E実装revision / working treeを対象にしたか追跡でき、現在の実装変更後に`要再検証`が残っていない等、そのreviewがcurrentなE2E実装へ適用できることを確認します。現行`adversarial-review`成果物だけでこの対応を再現できない場合は、E2E実装review時の対象revision / working treeを記録する最小の出力契約を追加します。単体`test-execution`でreview鮮度を確認できない場合は、古いreviewだけをPASS根拠にせず現在のE2E実装を再reviewします。runがPASSでも必要な期待結果の検証またはreview鮮度を確認できない場合はTCを`判定不能`とします。期待結果専用の新しいID体系やcoverage用途は追加しません。
 
 ## 5. TC結果状態
 
@@ -206,8 +214,8 @@ AI直接操作を使用するTCだけ記録します。
 
 ### 自動実行対応
 
-| TC識別子 | E2E実装参照 | logical primary | resolved primary TestCase | 実行結果 / 観測証拠 |
-| --- | --- | --- | --- | --- |
+| TC識別子 | 既存TC ID（存在時のみ） | E2E実装参照 | E2E実装revision / working tree | logical primary | E2E実行成果物参照 | resolved primary TestCase | 利用区分 | 期待結果検証根拠 | 実行結果 / 観測証拠 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
 ### 手順・観測結果
 
@@ -250,6 +258,12 @@ AI直接操作を使用するTCだけ記録します。
 
 永続的な証跡参照が存在しないAI直接操作では架空のURL / artifact参照を作りません。`実測結果`と`判定根拠`は必須とし、`実行結果参照 / 証跡`は実在する参照がある場合だけ記録します。TC判定に不要な個人データ・機密情報を成果物や証跡へ転載しません。
 
+`自動実行対応`の`利用区分`は`TC判定`または`診断のみ`とし、診断runを正式TC判定の唯一の根拠にしません。複数の`e2e-test-execution`へ分割した場合も、各TCがどのE2E実行成果物へ対応したか追跡できるようにします。
+
+### 最終出力の自己検証
+
+最終出力前に`SKILL.md` / guidanceの出力契約を成果物自身へ再適用します。少なくとも、開始前に固定したTC識別子集合とTC実行結果表の集合が一致し、欠落・要求外・不正重複がないこと、実行方式と結果状態が正規値であること、自動実行TCが既存TC ID（存在時のみ）・E2E実装・E2E実行成果物・logical / resolved primary・期待結果検証根拠へ追跡できること、診断runだけを正式結果へ昇格していないこと、後処理 / cleanup状態をTC結果へ混ぜていないことを確認します。明白かつ局所的で新しい領域判断を必要としない契約違反だけを最大1回修正し、TC、期待結果、対応E2E、実測結果を推測で補完しません。`evals/deterministic/validator.py`はruntimeで呼び出さず評価専用とします。
+
 ### 既存実行結果の再利用
 
 過去の`test-execution`成果物は履歴事実として保持します。今回の新規実行要求を過去結果で代替しません。過去結果の確認・分析・報告、または現在の判断材料として再利用する場合は、元TC内容、対象version / build、実施環境 / 対象条件、自動実行ではE2E実装と対応runが今回の判断へ適用可能か確認します。変更や不明点があれば古い結果をcurrentなPASS証拠にせず`要再検証`として扱います。履歴成果物自体を書き換えません。
@@ -290,6 +304,6 @@ AI直接操作を使用するTCだけ記録します。
 - `skills/qa-workflow/SKILL.md`
 - `skills/qa-workflow/references/guidance.md`
 - `skills/qa-workflow/assets/workflow-state-template.md`
-- `skills/adversarial-review/references/`（既存E2E実装レビュー契約の参照方法を同期する必要がある場合だけ）
+- `skills/adversarial-review/SKILL.md` / `references/guidance.md` / `assets/output-template.md` / 関連eval（E2E実装review時に対象E2E実装revision / working treeを追跡できる最小変更）
 
 `e2e-test-execution` / `e2e-test-result-analysis`の既存異常routingは変更しません。TC判定に必要なtrace情報が既存成果物で不足することを実装時に確認した場合だけ、既存raw result contractを壊さない最小の参照情報を追加します。
