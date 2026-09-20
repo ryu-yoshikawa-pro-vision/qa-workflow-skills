@@ -661,7 +661,7 @@ Machine Entityの`upstream_entity_dependencies[]`は次を最低限含めます�
 - 技法選択: selection判断で実際に参照したAuthority / Product Risk。後続のTR / TCN / CI / TCをsemantic dependencyへ逆参照しない
 - change graph node / edge: `source_ref / evidence_refs[]`のうちAuthority等の上流Entityとして解決でき、node / edge判断へ実際に使用したsource Entity。Risk / TR / TCN / CI / TC等の下流QA成果物をgraph nodeとして表す場合はcontent上の参照に留め、`upstream_entity_dependencies[]`へ逆向きedgeを作らない
 - environment requirement: `authority_refs[]`のAuthority
-- test data requirement: `authority_refs[]`のAuthorityと`source_model_key`のcurrent model metadata。`source_target_versions=[]`のmodel-wide requirementではcurrent adapter modelも許可する。target-specific requirementではsource modelをCoverage所有modelに限定し、`source_target_versions[]`が同じ`source_model_key`のcurrent target versionと一致することを必須にする。source modelまたはtarget versionが変わればcurrent扱いしない
+- test data requirement: `authority_refs[]`のAuthorityと`source_model_key`のcurrent model metadata。`source_target_versions=[]`のmodel-wide requirementではcurrent adapter modelも許可する。target-specific requirementではsource modelをCoverage所有modelに限定し、`source_target_versions[]`が同じ`source_model_key`のcurrent target versionと一致することを必須にする。source modelがruntime generatorを持つ場合は、そのcurrent model runtime unitも`runtime_dependencies[]`へ間接的に反映できるよう`test_data_requirements.py`の`upstream_runtime_units[]`へ保持する。source modelまたはtarget versionが変わればcurrent扱いしない
 - TR: `authority_refs[]`のAuthorityと`risk_refs[]`のProduct Risk
 - TCN: `tr_refs[]`のTR、直接`authority_refs[] / risk_refs[]`を持つ場合はそのAuthority / Product Risk
 - model metadata: 親TCN。`selection_source=analysis`では技法選択Entity。`derived_from_model_key`が非nullのchildでは参照adapter model Entityと、そのadapterのcurrent runtime unitをdependencyへ持つ
