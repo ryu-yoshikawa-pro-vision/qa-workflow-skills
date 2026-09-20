@@ -86,14 +86,14 @@ Domain Testing、CRUD Testing、Random Testing、Metamorphic Testing、Syntax-Ba
 
 `test-analysis`の許可技法、`references/guidance.md`、`assets/output-template.md`、deterministic / semantic evalをこの表記へ揃えます。`test-condition-design`では`SKILL.md`、`references/coverage-techniques.md`、出力template、validator、semantic evalへ同じ表記と適用条件を反映します。
 
-正規テスト技法とruntime内部model / adapterのidentityは分離します。`同値分割`、`境界値分析`、`デシジョンテーブル`、`状態遷移`、`Pairwise / 組合せ`、`エラー推測`、`シナリオ / ユースケース`と上記5技法を`technique_slug`で表し、Classification Tree、Cause-Effect Graph、schema / HTML、UI pattern等の内部表現は`model_type`で識別します。内部model / adapter名をTCNの「適用技法」へ混ぜません。
+正規テスト技法とruntime内部model / adapterのidentityは分離します。`同値分割`、`境界値分析`、`デシジョンテーブル`、`状態遷移`、`Pairwise / 組合せ`、`エラー推測`、`シナリオ / ユースケース`と上記5技法を`technique_slug`で表し、Classification Tree、Cause-Effect Graph、schema / HTML、UI pattern等の内部表現は`model_type`で識別します。内部adapterは正規技法を所有せず、Coverageを生成するchild modelがcanonical `technique_slug`と技法選択元を保持します。
 
 ### 3.3 Coverageの意味
 
 generatorが返す100%等のCoverageは、**明示された正規化済みモデル内のCoverage**です。対象仕様全体の100%とは扱いません。
 
 - Authority / Risk → TR → TCNの上流閉鎖は別途確認する
-- 選択した正規技法は`selection_source / selection_key / technique_slug`で、同じ正規技法を表すmodel、対象外、未解決、またはmodel実行後の明示的なruntime非対応へ必ず閉じる。TCNの`technique_slugs[]`は所属active modelの**非nullな正規`technique_slug`集合**と一致させ、`model_type`は含めない。エラー推測のようにruntime generatorへ移さない既存技法はsemantic Coverage ItemをCI Machine Entityへ載せて閉鎖する
+- 選択した正規技法は`selection_source / selection_key / technique_slug`で1件以上のCoverage所有model、対象外、未解決、またはruntime非対応closureへ閉じる。1つの技法選択から複数TCN / modelへ展開してよい。TCNの`technique_slugs[]`は所属Coverage所有modelのcanonical technique集合と一致させる。エラー推測はsemantic Coverage ItemをCI Machine Entityへ載せて閉鎖する
 - 正規化済みモデルが上流の意味を十分に表しているかはsemantic evalで確認する
 - 全runtime unitで`result_status=ready / freshness_status=current`を必須とし、さらに`runtime_required=true`のunitでは`deterministic_generated=true`を必須とする
 - Dispositionによる成果物上の閉鎖と技法Coverage達成を混同しない
@@ -184,7 +184,9 @@ scriptが正規化済みモデル内で100% Coverageを返しても、LLMの正�
 - LLMは自然言語から意味を正規化し、Authority対応、risk判断、技法採用、意味上の同一性、expected result等を決める。scriptへ渡した後の列挙、計算、fingerprint、ID採番、Coverage集計、構造検査、stale判定をLLMが再計算しない
 - Skillがruntime対象を扱う場合は、Skill instructionに定義したdispatch表からscriptを選び、保存済み`Machine Runtime Input / Result`を決定論的に抽出・strict decodeして再投入する。MarkdownをLLMが読み直してJSONを再生成しない
 - runtime間で機械変換した結果は、上流の`skill + runtime_unit_key + generation_fingerprint`を保持して下流へ渡す。上流runtime結果が変わった場合は依存する下流runtime unitだけをstaleへ戻す
+- canonicalizationはfingerprint計算専用にせず、scriptが処理する正規化済み入力そのものへ適用する。順序に意味がない配列のraw入力順でmachine resultやstable IDを変えない
 - generator targetは、Coverage Item、明示的なmerge、または既存Skill契約上のDispositionへ閉じる。Dispositionによる成果物上の閉鎖と技法Coverage達成は別に判定する
+- Machine Entityは既存Skillが後続へ渡す意味fieldを保持する。CIはmachine target由来ならcanonical `execution`、semantic item由来ならCoverage Item本文を保持し、`test-case-design`がMarkdownを再解釈しない
 - 本Planで追加する全scriptは、deterministicなdispatch / integration testで実際の呼出経路を検証する。実Agentでは代表経路でPython実行、stdout envelope parse、machine結果採用まで確認する
 
 本Planは1 PR内で全対象を完了させる前提です。実装途中の契約確認は後続実装の手戻りを減らすための検証点であり、そこで対象を打ち切ったり別PRへ先送りしたりしません。
