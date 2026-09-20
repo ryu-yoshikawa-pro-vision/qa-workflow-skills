@@ -53,12 +53,14 @@ generatorとvalidatorは独立実装とし、同じ不具合で生成と評価�
 ```text
 skills/test-analysis/scripts/
 ├── runtime_contract.py
+├── analysis_entities.py
 ├── risk_matrix.py
 ├── technique_candidates.py
 ├── change_impact.py
 └── environment_requirements.py
 ```
 
+- `analysis_entities.py`: test-analysis context / Product Risk / Technique Selection / change graph / environment requirementのLLM意味fieldとcurrent runtime resultを固定schemaでjoinし、Machine Entity、dependency、expected Entity identityを決定論的に生成する。runtime unitではなく、保存前builderとして呼ぶ
 - `risk_matrix.py`: repository-defaultまたは明示済みproject-specific schemeからrisk levelを計算する
 - `technique_candidates.py`: 正規化済みproblem signalから技法候補を返す
 - `change_impact.py`: 明示済みnode / edgeから影響候補を抽出する
@@ -599,7 +601,7 @@ runtime内部identityは`model_type`で分けます。
 ````
 
 - `spec-analysis`はruntimeを追加せず、解決済みAuthorityをこのblockの`content`へ直接保存する
-- `test-analysis`はLLMが作るProduct Risk等の意味fieldとruntime resultを固定builderでjoinして保存する。例えばProduct Riskは`failure / authority_refs / impact / likelihood`と`risk_matrix.py`の`level / mapped_priority`をjoinする
+- `test-analysis`は`analysis_entities.py`がLLMの意味fieldとcurrent runtime resultを固定schemaでjoinして保存する。例えばProduct Riskは`failure / authority_refs / impact / likelihood / assessment_reason / confidence_note`と`risk_matrix.py`の`level / mapped_priority`をjoinする。Technique Selectionでは候補runtime結果と最終選択・undetermined signal closureをjoinし、change graph / environment requirementも同じbuilderでMachine Entity化する
 - `test-requirement-design` / `test-condition-design` / `test-case-design`はstructure scriptへ渡した意味fieldとruntimeが確定したID・優先度等を固定builderでjoinして保存する
 - Markdownの人間向け表はMachine Entityと同じ意味fieldを表示し、validatorでID・参照・優先度・期待結果等の一致を確認する。Machine Entityにない意味fieldをMarkdownだけへ追加して下流正本にしない
 - `entity_type`は`authority / test_analysis_context / product_risk / technique_selection / change_node / change_edge / environment_requirement / test_data_requirement / tr / tcn / model / ci / tc / disposition`の固定値だけを許可する。Machine Entity identityは`(skill, entity_type, entity_ref)`で一意とし、異なるtypeの同名keyを衝突扱いしない
