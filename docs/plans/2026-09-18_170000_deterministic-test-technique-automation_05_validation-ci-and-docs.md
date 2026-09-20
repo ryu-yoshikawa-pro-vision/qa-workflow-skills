@@ -343,7 +343,8 @@ runtime対象の次の6 Skillを単体コピーして代表scriptを実行しま
 - LLM / runtime責務境界
 - contract / static data version
 - stale / legacy / 再利用
-- Python要件
+- Python 3.11要件と、interpreter command名 / timeout APIをSkill共通契約へ固定しない実行境界
+- `input_mode=artifact|direct`による成果物再利用 / 途中工程開始
 - Skill package内script
 
 ### `spec-analysis`
@@ -361,28 +362,28 @@ runtime対象の次の6 Skillを単体コピーして代表scriptを実行しま
 - `analysis_entities.py`はchange graph / environment → Product Risk → Technique Selection / contextの順で同一invocation内dependencyを解決し、change graph上のRisk / TR / TCN / CI / TC参照を逆向きdependencyにしてcycleを作らない
 - risk scheme / priority mapping
 - change graph
-- environment requirement
+- environment requirement。`environment_key`ごとの代替実行環境とrequirementを人間向け出力でも追跡できるよう、key / dimension / constraint / Authorityを表示する
 - deterministic / semantic / trigger evalを更新
 
 ### `test-requirement-design`
 
 - runtime structure検査の処理順
-- `assets/output-template.md`へTRの`Machine Entities`、`Machine Runtime Input / Result`、TR active / deleted ID stateを追加
+- `assets/output-template.md`へTRの`Machine Entities`、`Machine Runtime Input / Result`、TR active / deleted ID stateとpartial rerunの`update_scope_tr_ids[]` evidenceを追加
 
 ### `test-condition-design`
 
 - `SKILL.md`の対象技法を更新
 - `references/coverage-techniques.md`へ全実装技法の適用条件、Coverageまたは終了条件を追加
-- `assets/output-template.md`へTCN / model metadata / CI mappingの`Machine Entities`、`Machine Runtime Input / Result`、active / deleted ID state、stable target / CI mappingを追加
+- `assets/output-template.md`へTCN / model metadata / CI mappingの`Machine Entities`、`Machine Runtime Input / Result`、active / deleted ID state、`update_scope_tcn_ids[] / update_scope_model_keys[]`、stable target / CI mappingを追加
 - Random / Metamorphicは一般Coverage 100%を定義しない
 - runtime metadata
-- test data requirement
+- test data requirement。model-wide / target-specificの適用範囲と元`requirement_key` identityを保持し、別target間の要求を早期に誤intersectionしない
 - deterministic / semantic / trigger evalを更新
 
 ### `test-case-design`
 
 - runtime structure検査の処理順
-- `assets/output-template.md`へTCの`Machine Entities`、`Machine Runtime Input / Result`、TC active / deleted ID stateを追加
+- `assets/output-template.md`へTCの`Machine Entities`、`Machine Runtime Input / Result`、TC active / deleted ID stateと`update_scope_tc_ids[]` evidenceを追加
 - stable ID / active・deleted ID state / stale
 
 ### `coverage-analysis`
