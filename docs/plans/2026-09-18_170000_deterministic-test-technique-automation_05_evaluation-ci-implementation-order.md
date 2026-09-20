@@ -64,7 +64,7 @@ CLI integration testは各runtime scriptの`valid_minimal.json`をsubprocessで`
 - `NaN` / `Infinity`拒否
 - 不正top-level type拒否
 - model decimalの型保持
-- raw JSON documentの非integer numberを`Decimal`でexact parseし、binary floatを経由しない
+- raw JSON documentのnumberをtoken文字列で受け、長さ検証後にcanonical integer / exact decimalへ正規化し、binary floatを経由しない
 - canonical serializerが`Decimal`を指数表記なしのexact JSON numberへ戻す
 - nullと欠落の区別
 
@@ -380,7 +380,7 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 raw machine-readable入力をfixtureにします。
 
 - JSON Schema 2020-12対応keyword
-- raw JSON numberを`int / Decimal`でexact parse
+- raw JSON numberをtoken文字列で受け、共通numeric validator後にcanonical integer / exact decimalへ正規化する
 - scalar / nullの`enum / const`を処理し、object / array値はsubtree単位`unsupported`
 - `$defs`をlocal `$ref`参照先containerとして扱う
 - single typeと`[base, null]`だけを対応し、nullableを`allows_null`へ正規化
