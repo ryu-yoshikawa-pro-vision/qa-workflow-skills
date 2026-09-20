@@ -532,7 +532,7 @@ raw machine-readable入力をfixtureにします。
 - `traceability.py`は`workflow_runtime.py` resultを依存入力にせず、`coverage-analysis::artifact:traceability:all`自身を`runtime_units[] / current_runtime_units[] / expected_runtime_units[]`へ含めない。self inclusionを`invalid_input`として回帰検出する
 - Authority / Risk → TRまたはDisposition
 - TR → TCNまたはDisposition
-- TCN → CI → TC、CIなしTCN → TC、または既存Skill契約で許可されたDisposition
+- TCN → CI → TC、条件付きCIなしTCN → TC、または既存Skill契約で許可されたDisposition。CIなし経路はactive Coverage所有modelが0件のTCNだけ許可し、Coverage所有modelがあるTCNではmodel単位のcurrent CI / closureを先に必須とする
 - 許可直接edge以外をclosure根拠にしない
 - Dispositionのhandling / reason / Authority条件
 - missing / orphan / unknown
