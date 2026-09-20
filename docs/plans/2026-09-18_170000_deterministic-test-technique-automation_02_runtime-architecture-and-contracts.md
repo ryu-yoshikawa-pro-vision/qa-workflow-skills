@@ -971,7 +971,7 @@ semantic item lifecycleは次で固定します。
 
 machine target由来CIはcanonical `execution`を、semantic item由来CIは`semantic_item_key / semantic_item_text / semantic_source_targets[]`をMachine Entityへ保存します。test data requirementはcurrent Machine Entityのcontent fingerprintをCI dependencyへ保存します。
 
-各active Coverage所有modelは、少なくとも1件のcurrent CIを持つか、非空のcurrent Coverage母集団が既存のtarget Disposition / unsupported closure契約で全件閉じている必要があります。空の入力・空のCoverage母集団をvacuous completeにしません。特にエラー推測semantic modelは1件以上のcurrent semantic CIを必須とし、semantic item 0件では完了不可です。
+各active Coverage所有modelは、少なくとも1件のcurrent CIを持つか、非空のcurrent Coverage母集団が既存のtarget Disposition / unsupported closure契約で全件閉じている必要があります。`materialize_coverage.py`はsupported / partial / runtimeなしsemantic modelについてmodel単位の`model_completion[]`を決定論的に返し、固定builderがそのrowをcurrent materialize runtime unitへ載せます。`traceability.py`と`workflow_runtime.py`はcurrent materialize generationの同じrowを使用し、TCN全体のCI有無からmodel完了を推測しません。whole-model unsupportedだけはcurrent `unsupported_item_closures[]`を最終closureとして使用します。空の入力・空のCoverage母集団をvacuous completeにしません。特にエラー推測semantic modelは1件以上のcurrent semantic CIを必須とし、semantic item 0件では完了不可です。
 
 `test-case-design`はCI Machine Entityの`execution`を下流で再解釈不要な自己完結表現として扱います。state / flow / CRUD等のexecutionはstable key列だけでなく、具体的な実行手順を組み立てるために必要なevent / operation / input / from / to等のmachine meaningをgenerator側で含めます。下流が人間向けCoverage表やgenerator内部modelを再読解して意味を補完しません。
 
@@ -1028,6 +1028,7 @@ runtime単位状態の正本は各成果物に保存した`runtime_unit_key`、`
 - model scriptは`Runtime Unit Key = model:<model_key>`とし、`Model Key`を必須
 - artifact全体scriptは`Runtime Unit Key = artifact:<generator>:<scope_key>`とし、`Model Key`は空欄
 - `Support Status`は`supported / partial / unsupported / unknown`
+- runtime集約inputの各runtime unitは共通`model_completion[]` fieldを持ち、`artifact:materialize_coverage:<tcn_id>`だけ非空を許可する。他unitでは空配列固定。rowはcurrent materialize resultから固定builderで転記し、LLMが生成しない
 - `Result Status`は`ready / unresolved / blocked`
 - `Freshness`は`current / stale`
 - `Runtime Status`は`ok / invalid_input / unsupported / limit_exceeded / internal_error / not_run`
