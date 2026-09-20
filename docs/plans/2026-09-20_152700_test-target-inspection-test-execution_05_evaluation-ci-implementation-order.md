@@ -34,7 +34,7 @@
 
 現行のdeterministic output evalも各Skill2 cases以上を維持し、repository合計の最低値を28から32へ更新します。
 
-実装開始時に基準branch側でこれらの契約値が変更済みなら、その時点の正本から再計算し、本Planの14 / 280 / 28を機械的に上書きしません。
+実装開始時に基準branch側でこれらの契約値が変更済みなら、その時点の正本から再計算し、本Planの14 / 280 / 28を機械的に上書きしません。特にPR #11が先にmergeされてSkill別trigger / semantic exact countやMachine Entity契約が変わっている場合は、その実装済み契約を正本とします。TCの`content_fingerprint`等は利用可能なら再利用しますが、本変更だけを理由に新規2 SkillをPR #11のruntime / Machine Entity対象へ追加しません。
 
 ## 3. `test-target-inspection` の評価
 
@@ -66,6 +66,8 @@ negativeには最低限、次を含めます。
 - 状態キーが一意
 - 状態の対象キーが存在する
 - 確認元が空でない
+- 画面 / 要素 / 状態 / 操作・遷移 / データ・権限依存等の各記録が確認元と確認日時 / revisionへ追跡できる
+- `今回確認`と`既存資料から継承・未再確認`を区別し、部分更新で未再確認行の鮮度を上げない
 - 確認日時 / revisionが値または明示的未確認状態を持つ
 - version / buildが値または明示的未確認状態を持つ
 - 既存成果物更新時は今回の更新区分を持つ
@@ -73,6 +75,8 @@ negativeには最低限、次を含めます。
 - fixtureで要求された対象 / 要素 / 状態を欠落させない
 - fixtureに存在しない対象キーを創作しない
 - secret / cookie / token値を平文成果物へ要求しない契約になっている
+- TC判定や後続利用に不要な個人データ・機密情報をfixture上の必須出力にしない
+- 削除確認fixtureでは、存在しないことを確認できた対象だけが現在一覧から除外され、単に未確認の対象を削除しない
 
 意味判断が必要な次はdeterministic validatorへ入れません。
 
@@ -89,8 +93,10 @@ negativeには最低限、次を含めます。
 2. 現在観測した実装を仕様Authorityへ昇格しない
 3. テスト設計・AI直接操作・E2E inspectionから利用可能な粒度で整理する
 4. 更新時に既存の有効情報を不必要に消さず、変更範囲だけを更新する
-5. 古い確認日時 / version / revisionの資料を現在値として扱わない
+5. 古い確認日時 / version / revisionの資料を現在値として扱わず、version / build変更時は関連範囲だけ再確認する
 6. 存在しないUI要素、locator、Page Object、routeを創作しない
+7. live target確認要求をrepo確認だけで満たした扱いにしない
+8. 永続更新では候補成果物を検証してから保存し、保存できない場合に更新済みと表現しない
 
 semantic evalは最低2 case作成します。
 
@@ -106,7 +112,7 @@ positiveには最低限、次を含めます。
 - 詳細TCを実画面でAIが操作してPASS / FAILを確認する
 - 自動化対象外も含む指定TCを実行する
 - 検証済み自動実行結果をTC期待結果と照合する
-- 未実行 / ブロック理由を含めTC実行結果を整理する
+- 未実行 / 判定不能理由を含めTC実行結果を整理する
 
 negativeには最低限、次を含めます。
 
@@ -121,19 +127,23 @@ negativeには最低限、次を含めます。
 最低限、次を検査します。
 
 - 正規セクション / テーブルが存在する
-- fixture指定の全TC IDが結果表に存在する
+- 元テストケース成果物参照とTC revision / content identityが存在する
+- fixture指定の今回実行対象TC ID集合と結果表のTC ID集合が一致する
 - fixtureに存在しないTC IDを創作しない
 - 同じTC IDを不正重複させない
-- 実行方式が`AI直接操作`または`自動実行`
-- 状態が`PASS / FAIL / 未実行 / ブロック中`
+- 実行方式がTC単位で`AI直接操作`または`自動実行`
+- 状態が`PASS / FAIL / 未実行 / 判定不能`
 - PASS / FAILには期待結果・実測結果・判定根拠が存在する
-- 未実行 / ブロック中には理由が存在する
-- 実行済みTCには実行結果参照または証跡参照が存在する
+- 未実行 / 判定不能には理由が存在する
+- 実行済みTCには実測結果・判定根拠が存在し、実在しない証跡参照を要求しない
 - 集計値がTC結果表の状態別件数と一致する
 - retry / attempt数をTC件数へ混ぜない
-- cleanup必須fixtureではcleanup状態が存在する
+- AI直接操作fixtureでは対象origin、アカウント / role、副作用の許可範囲・最大回数、cleanup対象 / 方法が実行前条件として確認される
+- cleanup必須fixtureではcleanup状態が存在し、cleanup失敗で確定済みTC結果を書き換えない
 - runner異常fixtureで対象TCを製品FAILとして誤分類しない
-- 観測不能fixtureでPASSにしない
+- 観測不能fixtureでPASSにせず、実行開始済みなら`判定不能`にする
+- 自動実行fixtureではTC → E2E実装 → logical primary → resolved primary TestCase → 実行結果の対応が追跡できる
+- run全体PASS、`outcome=expected`、最終retry PASSだけをTC PASS根拠にしない
 
 ### 4.3 意味評価
 
@@ -143,13 +153,16 @@ critical候補:
 2. 実測していない結果を推測してPASS / FAILにしない
 3. 期待結果を書き換えて実測へ合わせない
 4. runner / 認証 / setup / cleanup等の実行失敗と製品FAILを区別する
-5. 副作用・権限・cleanupの安全条件を満たさない場合に実行を継続しない
+5. 副作用・権限・cleanupの安全条件を満たさない場合に実行を開始しない
 6. 自動実行経路では既存E2E Skillのraw factを再解釈・創作しない
+7. TCごとに開始状態を再確認し、前TCの残存状態を暗黙前提にしない
+8. cleanup状態とTCの製品期待結果判定を別軸で扱う
+9. 指定なしの実行方式を既存実装と安全条件からTC単位で決め、自動実行後にPASS取得目的でAI直接操作へ自動fallbackしない
 
 semantic evalは最低2 case作成します。
 
-- AI直接操作でPASS / FAILが混在する複数TC
-- 自動実行結果利用で未実行またはrunner異常を含むTC
+- AI直接操作でPASS / FAIL / 判定不能が混在し、TC間の開始状態とcleanupを分離する複数TC
+- 自動実行結果利用で未実行またはrunner異常を含み、raw statusだけではTC PASSにしないTC
 
 ## 5. `qa-workflow` 評価
 
@@ -159,30 +172,16 @@ routing caseへ最低限、次を追加します。
 2. 既存テスト対象資料更新だけ → `test-target-inspection`
 3. 詳細TCのAI直接操作 → `test-execution`
 4. Playwright raw実行のみ → `e2e-test-execution`
-5. Playwright実行後にTC判定 → `e2e-test-execution` → 必要なら`e2e-test-result-analysis` → `test-execution`
+5. Playwright実行後にTC判定 → `e2e-test-execution` → `test-execution`。raw factだけでは判定できない場合だけ`e2e-test-result-analysis`
 6. テスト対象資料が古くE2E inspection前に更新が必要 → `test-target-inspection` → `e2e-test-inspection`
-7. TC結果の追跡性確認 → `coverage-analysis`、対象`TC → テスト実行結果`
-8. `test-execution`で期待結果不足 → `test-case-design`または`question-analysis`へ修正routing
-9. `test-execution`で対象構造未確認 → 必要時だけ`test-target-inspection`
+7. `test-execution`で期待結果不足 → `test-case-design`または`question-analysis`へ修正routing
+8. `test-execution`で対象構造未確認 → 必要時だけ`test-target-inspection`
+9. `question-analysis`で一般的な実対象事実が解消 → `test-target-inspection`、汎用TC実行の再開 → `test-execution`
 10. TC実行途中で局所ブロックがあっても他TCを安全に継続できるcase
 
 `qa-workflow`自身が2 Skillの内部処理を再定義しないこともsemantic evalで確認します。
 
-## 6. `coverage-analysis` 評価
-
-新規対象`TC → テスト実行結果`について最低限、次を確認します。
-
-- 詳細TC集合を母集団として取得する
-- 各TCがPASS / FAIL / 未実行 / ブロック中のいずれかへ対応する
-- 未実行 / ブロック中をcoverage済みとして閉じない
-- retry attemptを別TCとして数えない
-- E2E自動化対象外TCも実行対象なら追跡対象になる
-- `TC → E2E実装`と混同しない
-- テスト実行結果側だけに存在する未知TC IDを検出する
-
-既存3用途の回帰fixtureは維持します。
-
-## 7. 既存E2E Skill回帰
+## 6. 既存E2E Skill回帰
 
 新規Skill追加により次の境界が崩れていないことを確認します。
 
@@ -208,7 +207,7 @@ routing caseへ最低限、次を追加します。
 - Playwright run報告の責務を維持する
 - 汎用TC結果報告へ拡張しない
 
-## 8. CI変更
+## 7. CI変更
 
 最低限、次を更新します。
 
@@ -228,7 +227,9 @@ routing caseへ最低限、次を追加します。
 
 ### semantic dataset test
 
-現行の`tests/skills/evals/semantic/test_semantic_datasets.py`でrepository合計28を固定している箇所を32へ更新します。
+- `tests/skills/evals/semantic/test_repository_structure.py`の正規Skill一覧へ2 Skillを追加する
+- 現行契約が維持されている場合は`tests/skills/evals/semantic/test_semantic_datasets.py`のrepository合計28を32へ更新する
+- PR #11等でSkill別expected count mapへ移行済みなら、その時点の正規一覧・Skill別exact count・repository合計へ2 Skill分を追加し、旧32固定値へ戻さない
 
 ### 共通validator
 
@@ -238,7 +239,7 @@ routing caseへ最低限、次を追加します。
 - `MULTI_USE_SKILL_TARGETS`は今回変更しない
 - 新規共通ID体系は追加しない
 
-## 9. README / EVALS / ASSERTIONS
+## 8. README / EVALS / ASSERTIONS
 
 実装後、実際の契約に合わせて更新します。
 
@@ -261,9 +262,9 @@ routing caseへ最低限、次を追加します。
 
 ### ASSERTIONS
 
-存在する場合は、新規validator assertion ID、`coverage-analysis`追加対象、workflow routing assertionを同期します。実装開始時に現行構成を確認して対象ファイルを確定します。
+現行の`scripts/skills/evals/deterministic/ASSERTIONS.md`へ、新規2 Skillのvalidator assertion IDとworkflow routing assertionを同期します。存在確認を条件にせず、現在の正本へ実装と同時に反映します。
 
-## 10. 実装順序
+## 9. 実装順序
 
 ### Step 1: 基準再確認
 
@@ -298,17 +299,20 @@ routing caseへ最低限、次を追加します。
 - semantic eval
 - `e2e-test-execution` / `e2e-test-result-analysis`境界
 
-### Step 5: `coverage-analysis`
+### Step 5: 既存Skillとの接続
 
-- `TC → テスト実行結果`対象追加
-- template / guidance / validator / fixture / semantic eval更新
-- 既存3用途回帰
+- `test-case-design`へテスト対象資料の任意補助入力境界を追加
+- `question-analysis`へ`test-target-inspection` / `test-execution`の再開routingを追加
+- `e2e-test-inspection`へテスト対象資料の任意再利用境界を追加
+- `e2e-test-execution` / `e2e-test-result-analysis`との自動実行境界を必要最小限で同期
+- `coverage-analysis`へ新用途は追加しない
 
 ### Step 6: `qa-workflow`
 
 - 16 Skill化
 - routing
 - workflow state template
+- 案件コンテキストの既存`既存QA成果物`欄を使ったテスト対象資料参照
 - 途中開始 / 再利用 / ブロック / 再開
 - routing fixture / deterministic validator / semantic eval
 
@@ -318,7 +322,7 @@ routing caseへ最低限、次を追加します。
 - EVALS
 - ASSERTIONS
 - GitHub Actions固定値
-- repository eval tests
+- semantic repository structure / dataset testsを含むrepository eval tests
 
 ### Step 8: 全体検証
 
@@ -329,9 +333,10 @@ routing caseへ最低限、次を追加します。
 - repository deterministic tests
 - workflow routing tests
 - 既存14 Skill回帰
-- 可能なら実Agent上で新規2 Skillのpositive / negative発火smoke
+- 実Agentを利用できる環境では、新規2 Skillのpositive / negative発火smokeに加え、安全な実対象で`test-target-inspection`の観測と`test-execution`の非破壊TC実行を最低1経路ずつ確認する
+- 実Agentまたはbrowser / computer操作能力を利用できない場合は、その経路を未検証として記録し、repo内dataset PASSだけでAI直接操作まで検証済みと表現しない
 
-## 11. 実装時に避けること
+## 10. 実装時に避けること
 
 - `test-target-inspection`を通常workflowへ無条件挿入する
 - 案件固有テスト対象資料を`qa-workflow-skills`へ永続保存する
@@ -345,8 +350,10 @@ routing caseへ最低限、次を追加します。
 - `test-target-inspection`成果物がないだけで実行可能なTCを止める
 - 将来のAPI / mobile / DB等のためだけにrunner adapter frameworkを作る
 - 今回使わない共通artifact registryや外部knowledge baseを追加する
+- 新規2 Skillを現在要件だけを理由にPR #11のruntime / Machine Entity対象へ追加する
+- `test-execution`結果の完全性確認だけのために`coverage-analysis`へ新しい比較対象を追加する
 
-## 12. 完了条件
+## 11. 完了条件
 
 以下をすべて満たしたら実装完了とします。
 
@@ -355,10 +362,12 @@ routing caseへ最低限、次を追加します。
 - `test-target-inspection`成果物を`e2e-test-inspection`等が任意入力として再利用できる
 - テスト対象資料が仕様Authorityとして扱われない
 - `test-execution`がAI直接操作と検証済み自動実行結果利用の両方を扱える
-- PASS / FAIL / 未実行 / ブロック中の契約が成立する
+- PASS / FAIL / 未実行 / 判定不能のTC結果契約が成立し、workflow上の`ブロック中`と分離される
+- 今回要求されたTC集合と結果集合の完全性を`test-execution`自身が検査できる
+- TC結果とcleanup状態が別軸で保持される
+- 自動実行でTC → E2E実装 → logical primary → resolved primary TestCase → 実行結果を追跡できる
 - runner異常と製品FAILが分離される
 - `e2e-test-execution`のPlaywright固有契約が維持される
-- `coverage-analysis`が`TC → テスト実行結果`を検査できる
 - `qa-workflow`が必要時だけ2 Skillへroutingできる
 - trigger query合計が基準契約どおり（本Plan基準では320）
 - semantic case合計が基準契約どおり（本Plan基準では32）
@@ -367,3 +376,4 @@ routing caseへ最低限、次を追加します。
 - `skills-ref validate`が全SkillでPASSする
 - README、EVALS、ASSERTIONS、CIの記述と実装が一致する
 - 実Agent発火評価を実施できない場合、repo内dataset PASSだけを発火PASSと表現していない
+- AI直接操作の実対象smokeを実施できない場合、その経路を未検証として明示している
