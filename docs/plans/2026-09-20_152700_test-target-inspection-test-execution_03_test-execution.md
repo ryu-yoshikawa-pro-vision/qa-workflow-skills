@@ -157,7 +157,7 @@ AIはTCの手順に沿って、画面を確認しながら1操作ずつ進めま
 - 既に利用可能なPlaywright Libraryを直接利用し、repoのPlaywright test runnerを起動しない
 - 新規package installを行わず、`package.json`、lockfile、source code等のrepo working treeを変更しない
 - `playwright.config.*`、fixture、hook、project dependency、webServer等のrepo runner契約を読み込んで実行しない
-- TC状態を成立させるためにDOM、localStorage / sessionStorage、cookie、network response、アプリ内部状態を直接書き換えない。読み取り目的の観測は実対象状態を変更しない範囲で利用できる
+- 元TC、案件コンテキスト、またはユーザーが明示した認証方法・開始状態・テストデータ準備を除き、TCで検証するUI操作を代替してPASS条件を成立させるためにDOM、localStorage / sessionStorage、cookie、network response、backend API / DB、アプリ内部状態を操作しない。読み取り目的の観測は実対象状態を変更しない範囲で利用できる
 - 今回TCの操作・待機・観測だけに必要な最小コードとする
 - 一時コード / 一時データはrepo外の一時領域を基本とし、実行後に不要な一時ファイルを残さない
 
@@ -174,12 +174,12 @@ AIはTCの手順に沿って、画面を確認しながら1操作ずつ進めま
 
 `references/guidance.md`では次の流れを基本とします。
 
-1. 今回実行するTC入力snapshotを固定し、各TCの一意な`test_case_ref`と入力元の`source_test_case_id`を確定する。正式ID重複は値を変更せず`unresolved`へ記録する
+1. 今回実行するTC入力snapshotを固定し、入力順に基づく成果物ローカル`test_case_ref`と入力元の`source_test_case_id`を確定する。正式ID重複は値を変更せず保持し、元IDによる実行対象指定や追跡が曖昧で今回対象TCを一意に特定できない場合だけ`unresolved`へ記録する
 2. 各TCの前提条件、手順、期待結果、事後状態 / 後処理をGiven / When / Then構造のYAMLへ整理する
 3. YAMLの`unresolved`を確認し、実行または合否判定に影響する未解決事項があるTCは操作を開始せず`未実行`とする
 4. 今回成果物で固定するrun条件と、各TCが明示的に要求するTC実行条件を分けて確認する。run固定条件には対象環境、許可origin、対象version / build等を含め、role / アカウント、viewport、locale、feature flag、テストデータ、開始状態等は元TCが変化を要求する場合はTC実行条件として扱う
-5. 副作用scopeごとの最大回数、現在の累計実施回数、今回の準備・TC操作・TC事後処理・実行時cleanupで予定する状態変更とcleanup対象 / 方法を確認する。cleanupが同じscopeを消費する場合は、TC本体開始前に必要なcleanupまで実施できる残数を確認する
-6. TCごとにGiven、開始状態、テストデータをpreflightとして確認する。preflightやテストデータ準備で実対象のデータ・設定・権限・外部送信等を変更する場合も対応する副作用scopeへ計上する。前TCの後処理 / cleanup失敗や残存状態の影響もここで確認する
+5. 副作用scopeごとの1回の定義、最大回数、現在の累計実施回数、今回の準備・TC操作・TC事後処理・実行時cleanupで予定する状態変更とcleanup対象 / 方法を確認する。cleanupが同じscopeを消費する場合は、TC本体開始前に必要なcleanupまで実施できる残数を確認する
+6. TCごとにGiven、開始状態、テストデータをpreflightとして確認する。元TC、案件コンテキスト、またはユーザーが明示した準備方法だけを使用し、未確認のseed / API / DB等を新規に作らない。preflightやテストデータ準備で実対象のデータ・設定・権限・外部送信等を変更する場合も対応する副作用scopeへ計上する。前TCの後処理 / cleanup失敗や残存状態の影響もここで確認する
 7. 開始状態または必要な副作用許可を安全に成立させられないTCは`未実行`とし、影響しないTCは継続する
 8. 人間がTCを実施するのと同じUI経路で最初の`scenario.when`操作を開始した時点で、そのTCを開始済みとする
 9. 各`scenario.then`の観測方法に従い、DOM / accessibility tree等から取得できる構造・意味情報を確認する
