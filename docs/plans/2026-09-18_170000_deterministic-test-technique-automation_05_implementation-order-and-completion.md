@@ -183,7 +183,7 @@ Step 2.5で成立した経路を、現在Planで必要な全Skill / lifecycleへ
 - upstream Entity / semantic dependency / upstream runtime変更とEntity freshness
 - model / implementation変更
 - local block / partial unsupported。closureのhandling / currentな完全Machine Entity参照`covered_by_entity` / 既存Disposition条件まで検査し、closure行の存在だけで完了させない
-- whole-model unsupported fallback。通常Coverage modelの`llm_fallback`は同じmodelのcurrent semantic CIへ解決する。internal adapterは同一TCNへ直接定義Coverage modelをnew作成して通常generatorを通し、そのcurrent CIへclosureを閉じる。妥当なDispositionを含めcurrent closureがない場合は完了させない
+- whole-model unsupported fallback。通常Coverage modelの`llm_fallback`は同じmodelのcurrent semantic CIへ解決する。internal adapterはactiveのまま残すselected child techniqueごとに同一TCNへ直接定義Coverage modelをnew作成して通常generatorを通し、そのcurrent CIまたは既存Disposition closureへ到達させる。不適用 / 未解決とした技法はTechnique Selectionを更新してselected listから外すか既存block / unresolvedへ戻す。妥当なcurrent closureがない場合は完了させない
 - target Dispositionの`重複`graphがcycleせずcurrent CI / semantic CIへ終端することを全materialize unit横断で検証する
 - runtime issue回答の再開preflightで、現在generation不一致時に旧回答を自動適用しない
 - legacy
