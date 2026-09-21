@@ -6,7 +6,7 @@
 
 ### 共通ID
 
-`CI\d{2,}`を許可します。ただし`TCN-\d{3}-CI\d{2,}`だけをCIとして認識し、`SPEC-001-CI01`等を誤認しません。
+CIの完全IDは`TCN-\d{3}-CI\d{2,}`だけを認識します。suffix `CI\d{2,}`は同一TCN内の採番比較にだけ使用し、state / mapping / Machine Entity / legacy inputへsuffix単独を保存しません。`SPEC-001-CI01`等を誤認しません。
 
 ### `test-analysis`
 
@@ -82,7 +82,7 @@ runtime issueへの回答を再開する場合は、回答を正規化modelへ�
 - `Runtime Required=No`のfallback unitも`Result Status != ready`なら完了を妨げる
 - `Support Status=partial`では`unsupported_items[]`が許可されたhandling、必要なcurrent`covered_by_entity`、既存Disposition条件を満たすclosureへすべて閉じていることを要求する。closure行の存在だけでは完了条件を満たさない
 - `workflow_runtime.py`が上流Entity fingerprint、`upstream_runtime_units`、runtime metadata、materialize runtime unitの`model_completion[] / target_mappings[] / target_dispositions[]`、`unsupported_item_closures[]`からstale / 完了可否を計算し、LLMが表を手計算しない
-- partial supportは全unsupported item keyにclosureがあり、closureの`generation_fingerprint / reason_code`が現在unsupported itemと一致することに加え、`handling`が許可集合内であることを要求する。通常Coverage modelの`llm_fallback`は同じ`model_key`に属するcurrent CI Machine Entityを必須にする。internal adapterだけは明示fallback手順で同一TCNへ追加した直接定義Coverage modelのcurrent CIを許可し、adapter自身・無関係TCN / technique・stale CIを拒否する。`重複`はcurrentな`covered_by_entity`を必須にし、`ブロック中`は完了不可、その他Dispositionは既存Skill条件を満たすことを検証する。whole-model unsupportedも同じclosure規則と`generation_fingerprint`一致を必須にする。target Dispositionの`重複`は全materialize unitを跨いでcycleがなく、current CI / semantic CIへ到達する場合だけ閉鎖済みに数える
+- partial supportは全unsupported item keyにclosureがあり、closureの`generation_fingerprint / reason_code`が現在unsupported itemと一致することに加え、`handling`が許可集合内であることを要求する。同じ`(skill,runtime_unit_key,generation_fingerprint,item_key)`のclosureはちょうど1件とし、duplicateを拒否する。通常Coverage modelの`llm_fallback`は同じ`model_key`に属するcurrent CI Machine Entityを必須にする。internal adapterのpartialではunsupported itemの`affected_technique_slug`と同じtechniqueの直接定義Coverage model / current CIだけを許可し、同じsourceが複数techniqueへ影響する場合はitemがtechnique単位に分かれていることを要求する。adapter自身・無関係TCN / technique・stale CIを拒否する。`重複`はcurrentな`covered_by_entity`を必須にし、`ブロック中`は完了不可、その他Dispositionは既存Skill条件を満たすことを検証する。whole-model unsupportedは同じ`(skill,runtime_unit_key,generation_fingerprint)`でclosureをちょうど1件とし、activeのまま残る各selected child techniqueがcurrent direct Coverage model / CIまたは既存Disposition closureへ到達することを必須にする。target Dispositionの`重複`は全materialize unitを跨いでcycleがなく、current CI / semantic CIへ到達する場合だけ閉鎖済みに数える
 
 完了条件・再利用条件へ次を追加します。
 
@@ -134,7 +134,7 @@ runtime対応Skillの`evals/output/cases/*/expected.json`では、既存fieldに
 - `machine_entities.expected_entities[]`は各Skillの固定builderがnormalized source / structure stateから導出した`(skill, entity_type, entity_ref)`をfixtureへ明示し、actual成果物のMachine Entity集合から逆算しない。validatorはactual identity集合とのmissing / extraと、各contentのentity type別canonical schema・人間向け表主要fieldを独立照合する
 - `runtime_contract.expected_runtime_units[]`はstandalone Skillの正規化input / structure stateから固定builderが導出した`(skill, runtime_unit_key)`をfixtureへ明示する。validatorは成果物中の`Machine Runtime Input / Result` block identity集合と完全一致を要求し、必須runtime blockの丸ごと欠落と未知の余分なblockを検出する。actual runtime block集合からexpectedを逆算しない
 - standalone direct fixtureで必須runtime blockを1件削除したnegative caseを各代表Skillに置き、`qa-workflow`を通さなくても成果物を完成扱いしないことを確認する
-- 同じcandidate artifactへproduction側`runtime_contract.py`の`verify_runtime_evidence` operationを実行し、validatorとは独立にmissing / extra / incomplete pair / duplicateを検出できることを確認する。deterministic validatorがPASS判定の唯一のruntime省略検出経路にならない
+- 同じcandidate artifactへproduction側`runtime_contract.py`の`verify_runtime_evidence` operationを実行し、validatorとは独立にmissing / extra / incomplete pair / duplicateを検出できることを確認する。deterministic validatorがPASS判定の唯一のruntime省略検出経路にならない。operationは集約stdin 16 MiB上限を使い、JSON escape後の実UTF-8 bytesで境界値と1 byte超過を検証する
 - `spec-analysis`では`runtime_contract.py`のcanonical / Machine Entity helperと`authority_entities.py`を使うfixtureを用意し、runtime unitを作らずAuthority表とcanonical Authority content / expected identityの一致を検証する
 - expected target / Coverageは手書きfixtureから独立計算または明示し、generator出力をexpectedへコピーしない
 - `expected_target_id_map`はstateful materialize caseだけ使用し、`{target_ref, target_content_fingerprint, generation_fingerprint, execution_fingerprint, model_key, target_key, ci_id}`配列で保持する
@@ -283,7 +283,7 @@ repository全体は328 queryです。
    - supported inputが`unsupported`になる、またはsupport判定前にAgentがscriptを省略する場合は失敗
    - 保存済み`Machine Runtime Input / Result`を決定論的に抽出してround-trip検証できるが、workflow再利用では保存済みresultをcurrent cacheにせず現在scriptを再実行する
    - LLM手計算だけの成果物を決定論的生成済みと判定しない
-   - internal adapterがpartial / whole-model unsupportedになり`llm_fallback`を選ぶfixtureでは、test-condition-designへ戻って同じTCNへ直接定義Coverage modelをnew作成し、通常generatorを通したcurrent CIだけをadapter closureのfallback evidenceとして受理する。adapter自身のCI、無関係TCN / technique、stale CIを拒否する
+   - internal adapterがpartialになり`llm_fallback`を選ぶfixtureでは、同じsourceがEP / BVA等の複数child techniqueへ影響するcaseを含め、`affected_technique_slug`ごとにunsupported itemを分割し、各itemを同techniqueの直接定義Coverage model / current CIへ閉じる。whole-model unsupportedではactiveのまま残すselected child techniqueすべてにdirect Coverage model / CIまたは既存Disposition closureがあることを要求する。adapter自身のCI、無関係TCN / technique、stale CI、selected technique欠落を拒否する
 
 8. 途中工程開始
    - 前工程のMachine Entityがない直接入力では`input_mode=direct`を使用し、ユーザーが技法を明示したTRから`test-condition-design`を開始して`Selection Source=user`をmodel metadataへ保持する。存在しない`test-analysis / test-requirement-design` Machine Entityを捏造しない
@@ -427,7 +427,7 @@ runtime対象の次の6 Skillを単体コピーして代表scriptを実行しま
 - 既存Skill状態表の「必要な場合だけ使用」を維持し、状態表示時だけ別表`runtime状態`を追加
 - model単位状態を成果物metadataから再構築
 - legacy昇格。structure / materialize scriptの初回legacy seed入力とnormal previous stateへの移行まで含む
-- standalone最終出力では`runtime_contract.py verify_runtime_evidence`で必須runtime block pairをproduction側から検査する
+- standalone最終出力では`runtime_contract.py verify_runtime_evidence`で必須runtime block pairをproduction側から検査する。Skill / 対象 / 条件 / `model_type → generator`のdispatch metadataは同一`runtime_contract.py`内の固定dataを正本にし、別manifest / registryを追加しない
 - upstream Entity別content fingerprint / Machine Entityの`upstream_entity_dependencies[] / runtime_dependencies[]` / upstream runtime dependency / stale伝播
 - `traceability.py`と同じ`runtime_contract.py` freshness関数を使用し、workflow_runtime resultをtraceabilityの依存入力にしない
 - `workflow_runtime.py`の`can_complete`は本Planruntime範囲の必要条件として扱い、既存`qa-workflow`全体の完了条件を置換しない
