@@ -276,6 +276,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - 1つのmodel keyは同時に1つのTCNだけへ所属する。`update_scope_tcn_ids[] / update_scope_model_keys[]`内のprevious active TCN / modelだけ、currentにreuseされなければdeletedへ遷移する。scope外のactive / deleted rowは状態を変更せずfull snapshotへ保持する
 - 各TCN draftの`technique_slugs[]`は、そのTCNを`parent_tcn_draft_key`に持つcurrent Coverage所有model draftの非null `technique_slug`集合と完全一致させる。`model_type`を集合へ入れずadapterはTCNの適用技法を増やさない
 - Classification Tree / Cause-Effect / schema / UI等のadapterはcanonical techniqueを所有しない。Coverageを実際に所有するchild modelが`technique_slug / selection_source / selection_key`を持つ
+- adapter派生childのmodel metadataは親adapter実行前に確定するが、child generatorのdispatch / `expected_runtime_units[]`追加は親adapter runtimeがcurrent `result_status=ready`となり、当該child向け`derived_child_inputs[]`がちょうど1件得られた後だけ行う。親adapterがunresolved / blocked / staleの間はchild runtime missingを別blockerとして重複計上しない
 - `selection_source=analysis`のCoverage所有modelは参照Technique Selectionに同じ`technique_slug`が存在必須。1つの`selection_key + technique_slug`から複数TCN / modelへ展開してよい
 - active Technique Selectionの`selected_techniques[]`に残る各技法は、少なくとも1件のcurrent Coverage所有modelへ到達必須。後から不適用 / 未解決と判断した場合はTechnique Selection Entity自体を更新してselected listから外すか既存block / unresolvedへ戻し、未定義のselection closureで閉じない
 - `model_type=error-guessing / technique_slug=error-guessing`はmodel metadataを作るがgenerator runtime unitを期待集合へ追加しない。semantic Coverage Itemを1件以上のcurrent CIへmaterializeするまで完了不可
@@ -485,10 +486,11 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 #### `materialize_coverage.py`
 
 - required: `tcn_id`, `active_model_metadata[]`, `models[]`, `semantic_coverage_items[]`, `target_annotations[]`, `target_dispositions[]`, `test_data_requirements[]`, `previous_target_id_map[]`, `previous_semantic_ci_map[]`, `previous_ci_ids[]`, `previous_expected_result_roots[]`, `merge_groups[]`
+- optional: `legacy_ci_seed[]`。normal target / semantic mapping stateがまだ存在しないlegacy初回昇格だけ許可し、通常再実行ではfield自体を渡さない
 - `tcn_id`は`TCN-\d{3}`
 - `active_model_metadata[]`: `{model_key, model_type, technique_slug, parent_tcn_id, content_fingerprint}`。TCN配下の全current modelを渡し、`parent_tcn_id`はinputの`tcn_id`と一致必須
 - TCN配下にactiveなCoverage所有modelが1件以上あれば、current machine target / semantic itemが0件でも`materialize_coverage.py`をdispatchする。runtimeなしsemantic modelでは0件を成功扱いせず対応`model_completion[]`を`materialize_complete=false`とする。whole-model `unsupported`は成功rowを作らずunsupported closureを最終条件にする
-- `models[]`の各model resultは共通metadata `{model_key, model_type, technique_slug, skill, runtime_unit_key, input_fingerprint, model_fingerprint, generation_fingerprint, generator_contract_version, support_status, runtime_status, result_status, deterministic_generated, freshness_status, targets[], unsupported_items[]}`に、model type別summaryを加える。通常Coverage modelは`coverage_summary={criterion,required,covered,complete}`、CRUDは`coverage_summary={completeness:{criterion,required,covered,complete},consistency:{criterion,required,covered,complete},complete}`、Random / Metamorphicは各節の`completion_summary`を必須とし、他形式を拒否する
+- `models[]`の各model resultは`runtime_contract.py`の`current_model_result_row`固定projectionだけから受け取る。共通metadataは`{model_key, model_type, technique_slug, skill, runtime_unit_key, input_fingerprint, model_fingerprint, generation_fingerprint, generator_contract_version, support_status, runtime_status, result_status, deterministic_generated, freshness_status, targets[], unsupported_items[]}`で、model type別summaryを加える。通常Coverage modelは`coverage_summary={criterion,required,covered,complete}`、CRUDは`coverage_summary={completeness:{criterion,required,covered,complete},consistency:{criterion,required,covered,complete},complete}`、Random / Metamorphicは各節の`completion_summary`を必須とし、他形式を拒否する
 - materialize対象model resultは`runtime_status=ok / result_status=ready / deterministic_generated=true / freshness_status=current`を必須にする。加えて通常Coverage modelは`coverage_summary.complete=true`、CRUDは`coverage_summary.completeness.complete=true / consistency.complete=true / complete=true`、Random / Metamorphicは`completion_summary.complete=true`を必須にする。`support_status=supported`または、unsupported itemと対応可能targetが分離済みの`partial`だけ許可し、partialではsupported範囲のsummaryだけをcompleteにできる。runtimeなしsemantic modelやwhole-model unsupportedを成功resultとして`models[]`へ偽装しない
 - `freshness_status=current`は現在のMachine Entity / normalized inputをpreflight確認した後、現在scriptを再実行して正常生成したresultだけに付与する。保存済みgenerator resultをmaterialize入力のcurrent cacheとして直接再利用しない
 - semantic item draft: `{draft_key, model_key, identity_action, reuse_semantic_item_key, reuse_ci_id, source_target_versions[], item_text, authority_refs[], reference_refs[], priority, priority_override_reason, expected_result_root, test_data_requirement_refs[]}`。`draft_key`は入力内一意、`item_text`は非空。runtime generatorへ移さないsemantic model、fork-join等の直接linear executionへ落とさないCoverage Item、またはpartial / whole-model unsupportedの`llm_fallback`だけに使用する
@@ -505,6 +507,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - `previous_semantic_ci_map[]`: `{semantic_item_key, model_key, ci_id, mapping_status, semantic_content_fingerprint}`。`mapping_status=active|inactive`
 - `previous_ci_ids[]`: `{ci_id, status}`。`status=active|deleted`で削除済み番号も保持する
 - `previous_expected_result_roots[]`: `{expected_result_root, status}`。`status=active|deleted`。same-meaning groupのreuse可否はLLMが判断し、runtimeはunknown / duplicate / deleted keyの不正reuseを検査する
+- `legacy_ci_seed[]`: `{ci_id, model_key, source_kind, target_ref, semantic_item_draft_key}`。`source_kind=runtime_target|semantic_item`。runtime targetではcurrent targetに一致する`target_ref`必須 / semantic draft keyはnull、semantic itemではcurrent draftに一致する`semantic_item_draft_key`必須 / target refはnull。既存CI IDはinputの`tcn_id`配下であること、modelがcurrent active modelであること、1 CI / 1 target / 1 semantic draftを複数seedへ重複利用しないことを検証する。seedされたidentityは通常のtarget / semantic mappingへ変換し、以後legacy専用stateとして保持しない
 - previous active target / semantic mappingがcurrentでreuseされなければinactiveへ遷移する。共有targetのないruntime CIまたは消滅したsemantic CIはdeletedへ移し、inactive / deleted rowをfull snapshotから消さない
 - inactive target / semantic itemの復帰は同じidentityへの明示reuseかつ過去CIが別identityへ再利用されていない場合だけ同じCIを復帰できる。deleted CI / semantic item keyを別identityへ再利用しない
 - semantic itemのmodel変更はreuse不可。同じsemantic item keyをreuseしてもcontent fingerprintが変わればCI content fingerprintを変え、既存TCをstaleにする
@@ -530,7 +533,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - `workflow_runtime.py`自身を除く本Plan対象runtime unitの期待集合が1件以上ある場合だけdispatchする。本Plan対象runtimeが0件のE2E-only経路ではこのartifact runtime unit自体を作らず、既存`qa-workflow`の完了契約を使用する
 - required: `runtime_units[]`, `current_entities[]`, `current_runtime_units[]`, `expected_runtime_units[]`, `expected_entities[]`, `unsupported_item_closures[]`
 - `qa-workflow::artifact:workflow_runtime:all`自身は`runtime_units[] / current_runtime_units[] / expected_runtime_units[]`の3集合すべてから除外する。いずれかに自身が含まれていた場合は`invalid_input`とし、self dependencyも禁止する
-- runtime unit: `{skill, runtime_unit_key, model_key, support_status, result_status, runtime_status, runtime_required, deterministic_generated, generation_fingerprint, upstream_entities[], upstream_runtime_units[], unsupported_items[], model_completion[], target_mappings[], target_dispositions[]}`。`model_completion[] / target_mappings[] / target_dispositions[]`は`artifact:materialize_coverage:<tcn_id>`だけ非空を許可し、current materialize resultから固定builderで転記する。他unitは3配列とも空固定
+- runtime unit: `{skill, runtime_unit_key, model_key, support_status, result_status, runtime_status, runtime_required, deterministic_generated, generation_fingerprint, upstream_entity_fingerprints[], upstream_runtime_units[], unsupported_items[], model_completion[], target_mappings[], target_dispositions[]}`。`runtime_contract.py`の`runtime_unit_row`固定projectionだけから作り、raw envelope / payloadをcallerが再構成しない。`model_completion[] / target_mappings[] / target_dispositions[]`は`artifact:materialize_coverage:<tcn_id>`だけ非空を許可し、current materialize resultから固定builderで転記する。他unitは3配列とも空固定
 - `current_entities[]`: `{skill, entity_type, entity_ref, model_key, content, content_fingerprint, upstream_entity_dependencies[], runtime_dependencies[]}`。`content`は`_02` §4.4のMachine Entityと同一で、共通関数が`content_fingerprint`を再計算して保存値と一致確認する
 - `current_runtime_units[]`: `{skill, runtime_unit_key, generation_fingerprint}`。`(skill, runtime_unit_key)`を一意keyとして保存済み`upstream_runtime_units[]`と比較する
 - `expected_runtime_units[]`: `{skill, runtime_unit_key}`。各Skillは`_02` §2.1のdispatch表、現在の対象 / 実行範囲、active TCN / model metadata、条件付き入力の有無から固定builderで期待集合を作り、`qa-workflow`はそれを連結して`workflow_runtime.py`自身を除外する
@@ -549,7 +552,8 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - `llm_fallback`と`重複`は`covered_by_entity`必須で、currentなMachine Entityへ解決できることを検証する。`llm_fallback`は同じ`model_key`に属するcurrent CI Machine Entityを必須とし、親TCNやmodel metadataだけをfallback Coverage evidenceにしない。`対象外 / 別テストレベル / 残存リスク / 成立不能`は既存`test-condition-design`のDisposition条件をそのまま適用し、不要な`covered_by_entity`はnullとする。`ブロック中`はclosure rowとして保持しても閉鎖済みには数えず`can_complete=false`とする
 - runtimeは意味上の再利用可否、開始Skill、仕様Authorityの優先関係を再判断しない
 - outputは`freshness[]: {skill, runtime_unit_key, generation_fingerprint, freshness_status, stale_reasons[]}`、`entity_freshness[]: {skill, entity_type, entity_ref, model_key, freshness_status, stale_reasons[]}`、`completion: {can_complete, blockers[]}`、runtime状態表用の正規化rowを返す
-- `can_complete=true`には、expected runtime / Entity集合が完全一致し、全runtime unitと対象Machine Entityがcurrent、全unitの`result_status=ready`、runtime required unitが`deterministic_generated=true`であることに加え、partial / unsupportedの各itemが上記closure契約を満たし、`ブロック中`closure、missing / stale / fingerprint不一致な`covered_by_entity`、既存Disposition条件違反が0件であることを必須にする
+- `can_complete`は本Planが追加するruntime / Machine Entity / Coverage closure範囲だけの機械的完了可否であり、既存`qa-workflow`全体の完了を表さない
+- `can_complete=true`には、expected runtime / Entity集合が完全一致し、全runtime unitと対象Machine Entityがcurrent、全unitの`result_status=ready`、runtime required unitが`deterministic_generated=true`であることに加え、partial / unsupportedの各itemが上記closure契約を満たし、`ブロック中`closure、missing / stale / fingerprint不一致な`covered_by_entity`、既存Disposition条件違反が0件であることを必須にする。E2E実装・実行・分析・報告等を要求するworkflowでは、既存`qa-workflow`完了条件が別途すべて成立し、かつ本scriptをdispatchした場合に`can_complete=true`であることを追加の必要条件とする
 
 ### unsupported item共通schema
 
@@ -558,6 +562,12 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - `item_key`は`unsupported:<generator>:sha256:<canonical identity hash>`で、generator、`item_type`、`source_key`をcanonical JSON化して作る
 - `source_key`は対応できないsubtree / region / operator等のstable component keyまたはJSON Pointer
 - `reason_code`はscriptごとにPlan / Skill referenceで列挙した固定値だけを使用し、自由文をidentityに含めない
+- runtime-v1でpartial unsupported itemを返すscriptの最低限の固定値は次とする。より細かい理由へ分割する場合はcontract変更としてPlan / Skill referenceと回帰fixtureを同時更新し、実装者判断で自由なcodeを追加しない
+  - `domain_testing.py`: `unrepresentable_point`
+  - `flow_paths.py`: `concurrent_flow_requires_semantic_execution / crossing_regions`
+  - `schema_cases.py`: `cyclic_local_ref / unsupported_reference / unsupported_schema_keyword / unsupported_value_shape / unsupported_html_control / unsupported_html_constraint`
+  - `test_data_requirements.py`: `unsupported_intersection`
+  - `metamorphic.py`: `unsupported_transform / unsupported_path / unsupported_relation`
 - 再実行で同じunsupported箇所は同じ`item_key`を維持し、`workflow_runtime.py`のclosure再利用に使う
 
 `valid_minimal.json`は上記schemaの実行例であり正本ではありません。optional fieldは上記で明記したものだけとし、Skill referenceはこのPlanのschemaをそのまま説明します。
