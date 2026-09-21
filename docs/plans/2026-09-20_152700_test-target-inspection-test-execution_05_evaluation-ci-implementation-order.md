@@ -194,7 +194,7 @@ routing caseへ最低限、次を追加します。
 11. 元TCが明示するrole / viewport / locale / feature flag / テストデータ等の切替 → 同じ`test-execution`成果物を継続
 12. 確定済みTCの再実行 → 前回成果物参照を持つ新しい`test-execution`成果物 / versionを開始し、再実行対象TCごとに前回TC参照も保持
 13. 未開始TCで対話操作と独立一時コードを切替し、run固定条件と開始状態を再確認できる → 同じ`test-execution`成果物を継続
-14. 開始済みTCで実行手段を切替し、同じbrowser / sessionまたは判定に必要な状態継続を確認できない → 当該TCを`判定不能`として閉じ、同じTCの再実行は前回成果物参照を持つ新しい`test-execution`成果物 / version
+14. 開始済みTCで実行手段を切替し、同じbrowser / sessionまたは判定に必要な状態継続を確認できない → 当該TCを`判定不能`として閉じ、同じTCの再実行は前回成果物参照を持つ新しい`test-execution`成果物 / versionとし、前回TC参照も保持
 15. 明示されたseed / API / DB等で開始状態・テストデータをpreflight準備 → `test-execution`で許可。ただしTCで検証するUI操作の代替には使わない
 
 `qa-workflow`自身は各Skillの観測・実行ロジックを再定義しません。
@@ -433,8 +433,9 @@ routing caseへ最低限、次を追加します。
 
 - 正規Skillが16件になっている
 - `test-target-inspection`が生きた実対象へ到達し、今回範囲のUI情報・ふるまいを収集できる
-- 既存資料がある場合、今回対象範囲を実対象と照合し、変更なしを含めcurrentnessを更新できる
+- 既存資料がある場合、今回対象範囲を実対象と照合し、role / 権限、viewport、locale、feature flag、テストデータ、到達条件等の比較可能性で`変更なし / 更新 / 追加 / 削除確認`を判断できる。version / buildの変更自体を比較不能扱いせず、取得不能だけで一律`確認不能`にしない
 - 実対象を確認していない行をcurrentとして更新しない
+- `削除確認`対象キーがcurrent本体テーブルに存在しないことを正当な削除後状態として扱い、通常のcurrent実在キー参照チェックで誤って失敗させない
 - DOM / accessibility tree等では不足する視覚情報を画像で確認・記録できる
 - POM等を必須化せず、任意参照として扱える
 - テスト対象資料を仕様Authorityとして扱わない
