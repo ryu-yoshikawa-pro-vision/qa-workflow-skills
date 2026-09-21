@@ -61,7 +61,7 @@ PASS / FAIL / 未実行 / 判定不能
 テスト実行結果を報告
 ```
 
-`test-execution`は、AI自身が現在の実対象を操作・観測することを基本とします。操作開始前に各TCをGiven / When / Then構造のYAMLへ整理し、実行または合否判定に影響する曖昧さが残るTCは推測で補完せず`未実行`とします。既存の過去結果を読み替えるだけで新規実行要求を完了にしません。
+`test-execution`は、AI自身が現在の実対象を操作・観測することを基本とします。操作開始前に各TCをGiven / When / Then構造のYAMLへ整理し、多段TCでは中間期待結果を対応する操作へ結び付けます。実行または合否判定に影響する曖昧さが残るTCは推測で補完せず`未実行`とします。browser / computer操作能力が利用できない場合は入力整理・preflightまでを可能な範囲で行い、実操作が必要なTCは`未実行`、対応範囲は`ブロック中`とします。既存の過去結果を読み替えるだけで新規実行要求を完了にしません。
 
 ### repoへ残すPlaywright E2Eが必要
 
@@ -224,15 +224,15 @@ Playwright runner固有のrun / logical primary / resolved TestCase / attempt / 
 
 既存`test-execution`結果は、TC追加 / 除外、手順・期待結果等のTC内容変更、入力元のrevision / content identity変更があればcurrentな結果として再利用しません。
 
-進行中の実行では固定した入力snapshotを書き換えず、旧成果物を理由付きで閉じ、必要なcleanup後に新しい成果物 / versionを開始します。開始時に許可済みの対話操作と独立一時コードの間で実行手段を切り替えるだけでは新versionにしません。
+進行中の実行では固定した入力snapshotを書き換えず、旧成果物を理由付きで閉じ、必要なcleanup後に新しい成果物 / versionを開始します。一度確定したTC結果も同じ成果物内で上書きせず、同じTCを再実行する場合は前回成果物参照を持つ新しい成果物 / versionを開始します。開始時に許可済みの対話操作と独立一時コードの間で実行手段を切り替えるだけでは新versionにしません。
 
 ### 対象version / build・実施条件が変わった場合
 
 過去の`test-target-inspection` / `test-execution`成果物は履歴として保持します。
 
-対象version / build、role、viewport、locale、feature flag、テストデータ等の差異が観測事実やTC判定へ影響しないことを確認できない場合はcurrentな証拠として自動再利用しません。
+`test-execution`では、今回成果物で固定するrun条件と、元TCが明示的に要求するTC実行条件を分けます。対象環境、許可origin、対象version / build等のrun固定条件が変わった場合、または元TCが要求していないrole / viewport / locale / feature flag / テストデータ等の変化が起きて判定への影響を否定できない場合はcurrentな証拠として自動再利用しません。元TCが明示的に要求する条件切替は正常なTC実行として同じ成果物内で扱えます。
 
-進行中に条件が変わり影響を否定できない場合、`test-target-inspection`は変更前後を同じ今回確認として扱わず、`test-execution`は変更後の未開始TCを同じ実行条件の成果物へ追加しません。version / buildを取得できないことだけで一律に失敗させず、取得不能と代替の実施条件を記録します。
+進行中にrun固定条件または予期しないTC実行条件が変わり影響を否定できない場合、`test-target-inspection`は変更前後を同じ今回確認として扱わず、`test-execution`は変更後の未開始TCを同じ実行条件の成果物へ追加しません。version / buildを取得できないことだけで一律に失敗させず、取得不能と代替の実施条件を記録します。
 
 ## 10. 完了判定
 
@@ -246,7 +246,7 @@ Playwright runner固有のrun / logical primary / resolved TestCase / attempt / 
 
 ### `test-execution`
 
-今回要求されたTC集合について、各TCの実行前YAMLが元TCへ追跡でき、操作開始前の`unresolved`判定が完了していることを確認します。その上で、TC集合が`PASS / FAIL / 未実行 / 判定不能`のいずれかへ漏れなく対応し、必要な実行結果報告が作成されていることを確認します。
+今回要求されたTC集合について、TC参照がsnapshot内で一意であり、各TCの実行前YAMLが元TCへ追跡でき、操作開始前の`unresolved`判定が完了していることを確認します。その上で、TC集合が`PASS / FAIL / 未実行 / 判定不能`のいずれかへ漏れなく対応し、必要な実行結果報告が作成されていることを確認します。
 
 実行または合否判定に必要な未解決事項により要求TCを開始できない場合、TC結果は`未実行`、対応する`test-execution`の対象範囲は`ブロック中`とします。影響しないTCは継続できます。開始後に必要な観測を完了できず`判定不能`になっただけでは、自動的にworkflow全体を`ブロック中`へしません。
 
