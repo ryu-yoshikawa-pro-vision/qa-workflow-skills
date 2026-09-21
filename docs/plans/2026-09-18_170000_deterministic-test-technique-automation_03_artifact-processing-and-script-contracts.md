@@ -490,7 +490,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 
 - required: `tcn_id`, `active_model_metadata[]`, `models[]`, `semantic_coverage_items[]`, `target_annotations[]`, `target_dispositions[]`, `test_data_requirements[]`, `previous_target_id_map[]`, `previous_semantic_ci_map[]`, `previous_ci_ids[]`, `previous_expected_result_roots[]`, `merge_groups[]`
 - optional: `legacy_ci_ids[]`, `legacy_ci_seed[]`。normal target / semantic mapping stateと`previous_ci_ids[]`がまだ存在しないlegacy初回昇格だけ許可し、通常再実行ではfield自体を渡さない
-- `legacy_ci_ids[]`は現在legacy成果物に存在する全CI IDを一意な`CI-\d{3}`で列挙する。`runtime_contract.py`のlegacy ID seed helperが全件`status=active`の`previous_ci_ids[]`へ変換し、未対応CIも過去最大番号と再利用禁止stateへ含める
+- `legacy_ci_ids[]`はinputの`tcn_id`配下に存在する全legacy CI IDを一意な`CI\d{2,}`で列挙する。`runtime_contract.py`のlegacy ID seed helperが全件`status=active`の同TCN `previous_ci_ids[]`へ変換し、未対応CIもそのTCNの過去最大番号と再利用禁止stateへ含める
 - `legacy_ci_seed[]`は`legacy_ci_ids[]`のsubsetで、意味上current target / semantic itemへ対応付けて既存CI IDを維持するrowだけを持つ。`legacy_ci_seed[]`だけから全previous CI stateを逆算しない
 - `tcn_id`は`TCN-\d{3}`
 - `active_model_metadata[]`: `{model_key, model_type, technique_slug, parent_tcn_id, content_fingerprint}`。TCN配下の全current modelを渡し、`parent_tcn_id`はinputの`tcn_id`と一致必須
