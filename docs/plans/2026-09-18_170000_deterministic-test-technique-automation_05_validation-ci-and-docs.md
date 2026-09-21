@@ -269,7 +269,7 @@ repository全体は328 queryです。
    - 初回昇格時は`input_mode=direct`かつnormal previous stateが空の場合だけ、`legacy_tr_ids[] / legacy_tcn_ids[] / legacy_tc_ids[]`を各structure script自身がactive previous stateへseedする。Agent / LLMがprevious stateを手組みしない
    - 現在観測できるTR / TCN / CI / TCだけをactive seedとして取り込み、未知の過去deleted履歴を捏造しない
    - TR / TCN / TCは意味上同一なら既存IDをreuseし、model keyがlegacyに存在しなければ新規採番する
-   - CIは全既存IDを`legacy_ci_ids[]`でprevious stateへseedし、そのsubsetの`legacy_ci_seed[]`だけをcurrent target / semantic itemへ対応付ける。対応不能CIも番号rowをfull snapshotへ残して別CIへ再利用せず、参照TCは`要再検証`へする
+   - CIは各TCNの全既存IDをそのTCNの`legacy_ci_ids[]`でprevious stateへseedし、そのsubsetの`legacy_ci_seed[]`だけをcurrent target / semantic itemへ対応付ける。対応不能CIも同TCNの番号rowをfull snapshotへ残して別CIへ再利用せず、参照TCは`要再検証`へする
    - normal previous state生成後のlegacy入力再投入、legacy / normal state併用、unknown / duplicate / 別TCN / 別model seedを拒否する
    - 前工程Machine Entityが存在しないdirect由来境界は新契約保存後もdirectで再利用でき、必要な外部Machine Entityがすべて揃った時点だけartifactへ切り替える
    - 以後version / fingerprint / normal previous state契約で再利用
