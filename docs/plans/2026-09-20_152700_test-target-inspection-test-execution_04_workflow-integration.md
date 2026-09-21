@@ -61,7 +61,7 @@ PASS / FAIL / 未実行 / 判定不能
 テスト実行結果を報告
 ```
 
-`test-execution`は、AI自身が現在の実対象を操作・観測することを基本とします。操作開始前に各TCをGiven / When / Then構造のYAMLへ整理し、多段TCでは中間期待結果を対応する操作へ結び付けます。実行または合否判定に影響する曖昧さが残るTCは推測で補完せず`未実行`とします。browser / computer操作能力が利用できない場合は入力整理・preflightまでを可能な範囲で行い、実操作が必要なTCは`未実行`、対応範囲は`ブロック中`とします。既存の過去結果を読み替えるだけで新規実行要求を完了にしません。
+`test-execution`は、AI自身が現在の実対象を操作・観測することを基本とします。操作開始前に各TCをGiven / When / Then構造のYAMLへ整理し、多段TCでは中間期待結果を対応する操作へ結び付けます。1成果物内のTC実操作は直列とし、ユーザーまたは入力元が順序を明示していない場合はsnapshot入力順で、状態変更preflightからTC操作・後処理・cleanup・副作用回数更新までを1TCずつ完了してから次TCへ進みます。実行または合否判定に影響する曖昧さが残るTCは推測で補完せず`未実行`とします。browser / computer操作能力が利用できない場合は入力整理・preflightまでを可能な範囲で行い、実操作が必要なTCは`未実行`、対応範囲は`ブロック中`とします。既存の過去結果を読み替えるだけで新規実行要求を完了にしません。
 
 ### repoへ残すPlaywright E2Eが必要
 
@@ -109,7 +109,7 @@ e2e-test-execution
 - 変更有無
 - 未確認 / 確認不能範囲
 
-`qa-workflow`利用時だけ、`qa-workflow`が案件コンテキストの既存`既存QA成果物`欄へ反映します。
+`qa-workflow`利用時だけ、`qa-workflow`が案件コンテキストの既存`既存QA成果物`欄へ反映します。password、token、cookie、storageState等のsecret実値は案件コンテキストや実行成果物へ転記せず、既存の認証情報取得方法、環境変数名、secret参照名等だけを保持します。
 
 成果物全体の更新日時だけでcurrentと判断しません。今回利用する行が実対象でいつ・どの条件で確認されたかを確認します。
 
@@ -226,7 +226,7 @@ Playwright runner固有のrun / logical primary / resolved TestCase / attempt / 
 
 既存`test-execution`結果は、TC追加 / 除外、手順・期待結果等のTC内容変更、入力元identity変更、または固定snapshot内容変更があればcurrentな結果として再利用しません。
 
-進行中の実行では固定した入力snapshotを書き換えず、旧成果物を理由付きで閉じ、必要なcleanup後に新しい成果物 / versionを開始します。一度確定したTC結果も同じ成果物内で上書きせず、同じTCを再実行する場合は前回成果物参照を持つ新しい成果物 / versionを開始します。実行手段の切替だけでは新versionにしません。未開始TCは切替後にrun固定条件と開始状態を再確認して同じ成果物内で実行できます。開始済みTCは同じbrowser / session、または判定に必要な状態の継続を確認できる場合だけ継続し、確認できなければ`判定不能`として閉じます。同じTCを再実行する場合は別成果物 / versionを開始します。
+進行中の実行では固定した入力snapshotを書き換えず、旧成果物を理由付きで閉じ、必要なcleanup後に新しい成果物 / versionを開始します。一度確定したTC結果も同じ成果物内で上書きせず、同じTCを再実行する場合は前回成果物参照を持つ新しい成果物 / versionを開始します。再実行対象TCごとに`前回TC参照`も保持し、`前回実行成果物参照 + 前回TC参照`で前回成果物内の元TCへ一意に追跡します。実行手段の切替だけでは新versionにしません。未開始TCは切替後にrun固定条件と開始状態を再確認して同じ成果物内で実行できます。開始済みTCは同じbrowser / session、または判定に必要な状態の継続を確認できる場合だけ継続し、確認できなければ`判定不能`として閉じます。同じTCを再実行する場合は別成果物 / versionを開始します。
 
 ### 対象version / build・実施条件が変わった場合
 
@@ -234,7 +234,7 @@ Playwright runner固有のrun / logical primary / resolved TestCase / attempt / 
 
 `test-execution`では、今回成果物で固定するrun条件と、元TCが明示的に要求するTC実行条件を分けます。対象環境、許可origin、対象version / build等のrun固定条件が変わった場合、または元TCが要求していないrole / viewport / locale / feature flag / テストデータ等の変化が起きて判定への影響を否定できない場合はcurrentな証拠として自動再利用しません。元TCが明示的に要求する条件切替は正常なTC実行として同じ成果物内で扱えます。
 
-進行中にrun固定条件または予期しないTC実行条件が変わり影響を否定できない場合、`test-target-inspection`は変更前後を同じ今回確認として扱わず、`test-execution`は変更後の未開始TCを同じ実行条件の成果物へ追加しません。version / buildを取得できないことだけで一律に失敗させず、取得不能と代替の実施条件を記録します。
+進行中にrun固定条件または予期しないTC実行条件が変わり影響を否定できない場合、`test-target-inspection`は変更前後を同じ今回確認として扱わず、`test-execution`は変更後の未開始TCを同じ実行条件の成果物へ追加しません。`test-target-inspection`ではversion / buildの変更自体を`変更なし / 削除確認`の禁止条件にせず、role / 権限、viewport、locale、feature flag、テストデータ、到達条件等の比較可能性で判断します。version / buildを取得できないことだけで一律に失敗させず、取得不能と代替の実施条件を記録します。
 
 ## 10. 完了判定
 
@@ -250,7 +250,7 @@ Playwright runner固有のrun / logical primary / resolved TestCase / attempt / 
 
 ### `test-execution`
 
-今回要求されたTC集合について、入力順に基づく成果物ローカル`test_case_ref`がsnapshot内で一意であり、入力側の正式識別子が`source_test_case_id`として値を変えず保持され、各TCの実行前YAMLが元TCへ追跡できることを確認します。重複した`source_test_case_id`だけを理由に一律`未実行`へせず、元IDによる実行対象指定や追跡が曖昧で今回対象TCを一意に特定できない場合だけ`unresolved`として該当TCを開始しません。入力元identityがない場合は独自hashを要求せず、成果物 / version内に固定したTC集合と全TCの実行前YAMLがsnapshotの正本になっていることを確認します。その上で、TC集合が`PASS / FAIL / 未実行 / 判定不能`のいずれかへ漏れなく対応し、必要な実行結果報告が作成されていることを確認します。
+今回要求されたTC集合について、入力順に基づく成果物ローカル`test_case_ref`がsnapshot内で一意であり、入力側の正式識別子が`source_test_case_id`として値を変えず保持され、各TCの実行前YAMLが元TCへ追跡できることを確認します。再実行成果物では各再実行TCに`前回TC参照`があり、`前回実行成果物参照 + 前回TC参照`で前回成果物内の元TCを一意に参照できることも確認します。重複した`source_test_case_id`だけを理由に一律`未実行`へせず、元IDによる実行対象指定や追跡が曖昧で今回対象TCを一意に特定できない場合だけ`unresolved`として該当TCを開始しません。入力元identityがない場合は独自hashを要求せず、成果物 / version内に固定したTC集合と全TCの実行前YAMLがsnapshotの正本になっていることを確認します。その上で、TC集合が`PASS / FAIL / 未実行 / 判定不能`のいずれかへ漏れなく対応し、必要な実行結果報告が作成されていることを確認します。
 
 実行または合否判定に必要な未解決事項により要求TCを開始できない場合、TC結果は`未実行`、対応する`test-execution`の対象範囲は`ブロック中`とします。影響しないTCは継続できます。開始後に必要な観測を完了できず`判定不能`になっただけでは、自動的にworkflow全体を`ブロック中`へしません。
 
