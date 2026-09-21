@@ -36,7 +36,7 @@ fork / join regionは曖昧に導出せず、次を正規化入力として明�
 - branchの`edge_keys`はforkからmatching joinまで連続するpathであることをscriptが検証する
 - 同一regionのbranch keyは一意
 - nested regionはbranch path内に含めてよい
-- region同士がcrossingする場合はwhole-model `unsupported`とし、runtime-v1では`reason_code=crossing_regions`を使用する。crossing regionを部分的に線形化して処理しない
+- region同士がcrossingする場合はwhole-model `unsupported`とし、crossing regionを部分的に線形化して処理しない。whole-model unsupportedはitem単位`unsupported_items[]`を作らず、既存のwhole-model closure契約で扱う
 - scheduler interleavingは仕様なしに生成しない
 - fork-join targetは直接linear executionへ落とさずsemantic Coverage Itemへ閉じる
 - `node / edge / bounded-path / simple-loop`でcanonical witnessまたはsetup prefixがforkからmatching joinまでのregionを横断する、またはtarget自体がそのregion内部にある場合、runtime-v1はそのtargetを単一`edge_sequence`へmaterializeしない。該当targetは`materializable=false`とし、stableな`unsupported_items[]`へ`reason_code=concurrent_flow_requires_semantic_execution`で残す
