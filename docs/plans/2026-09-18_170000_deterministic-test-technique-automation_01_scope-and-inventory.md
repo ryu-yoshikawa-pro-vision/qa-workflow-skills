@@ -185,7 +185,7 @@ scriptが正規化済みモデル内で100% Coverageを返しても、LLMの正�
 本Planの実装では、次を全Skillで共通の前提とします。
 
 - LLMは自然言語から意味を正規化し、Authority対応、risk判断、技法採用、意味上の同一性、expected result等を決める。scriptへ渡した後の列挙、計算、fingerprint、ID採番、Coverage集計、構造検査、stale判定をLLMが再計算しない
-- Skillがruntime対象を扱う場合は、Skill instructionに定義したdispatch表からscriptを選び、保存済み`Machine Runtime Input / Result`を決定論的に抽出・strict decodeして再投入する。MarkdownをLLMが読み直してJSONを再生成しない
+- Skillがruntime対象を扱う場合は、Skill instructionに定義したdispatch表からscriptを選ぶ。保存済み`Machine Runtime Input / Result`は決定論的に抽出・strict decodeできる状態を維持し、round-trip、差分、previous state確認に使用する。workflow再利用時は保存済みresultをcurrent cacheにせず、current Machine Entity、保存済み意味parameter、previous stateから現在inputを組み立て直し、semantic dependency preflight後に現在scriptを再実行する。MarkdownをLLMが読み直してJSONを再生成しない
 - runtime間で機械変換した結果は、上流の`skill + runtime_unit_key + generation_fingerprint`を保持して下流へ渡す。adapter派生childは親adapter modelを`derived_from_model_key`で保持し、上流runtime結果が変わった場合は依存する下流runtime unitだけをstaleへ戻す
 - canonicalizationはfingerprint計算専用にせず、scriptが処理する正規化済み入力そのものへ適用する。順序に意味がない配列のraw入力順でmachine resultやstable IDを変えない
 - generator targetは、Coverage Item、明示的なmerge、または既存Skill契約上のDispositionへ閉じる。Dispositionによる成果物上の閉鎖と技法Coverage達成は別に判定する
