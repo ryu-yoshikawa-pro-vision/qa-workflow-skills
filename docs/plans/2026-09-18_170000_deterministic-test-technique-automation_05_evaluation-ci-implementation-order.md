@@ -260,7 +260,7 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - child Coverage model欠落をadapter親だけで閉鎖済みにしない
 - `model_type=error-guessing / technique_slug=error-guessing`はruntime unitを要求せず、semantic Coverage ItemをCI Machine Entityへmaterializeできることを検証する。semantic item 0件では完了不可
 - 各active Coverage所有modelはmodel単位で検証する。supported / partial / runtimeなしsemantic modelではcurrent materialize runtime unitの`model_completion[]` rowが必須で、current CI / target Disposition / semantic source targetから決まる`materialize_complete`を確認する。partialはunsupported item closureも別途全件必要、whole-model unsupportedはcurrent whole-model closureが必要。別modelのCIが親TCNに存在するだけでは完了にしない
-- `conditions=[] / actions=[] / factors=[] / relations=[] / source_inputs=[] / states=[]`等の空modelがvacuous completeにならず`invalid_input / unresolved`へ落ちることを検証する
+- 空modelをvacuous completeにしない。script schemaで1件以上必須のfieldが空なら`invalid_input`、schemaは成立するが意味parameter / 母集団未確定なら`unresolved`、対応subset外なら`unsupported / partial`となる代表fixtureを固定する
 
 ### 同値分割 / Each Choice
 
@@ -317,6 +317,9 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - don't-care merge candidateへstable `merge_key`を付ける
 - accepted mergeは生成済み`merge_key`だけを受け付け、LLMが任意rule集合を構成できない
 - merge後のCartesian productが成立可能な既知ruleだけを含み、未定義assignmentを増やさない
+- 3値conditionで全3値が同一action vectorなら1 conditionのdon't-care統合候補を生成できる
+- 3値conditionで2値だけ同一action、残り1値が異なるactionならdon't-care統合候補を生成しない
+- 1 conditionをdon't-care化した派生ruleを別conditionの自動統合候補へ再利用せず、連鎖最小化しない
 - Authority保持
 - accepted don't-care merge前後で元の成立可能assignment target集合と`coverage_summary.required / covered`が変わらない
 - accepted don't-care mergeを`materialize_coverage.py`の`merge_group`へ自動変換しない
@@ -372,6 +375,7 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - reachable sourceの`guard_status=null`でCoverage completeにしない
 - `guard_status=false`除外にはAuthorityを必須
 - scheduler interleavingを勝手に生成しない
+- `node / edge / bounded-path / simple-loop`のcanonical witnessがfork/join regionを横断する場合、単一`edge_sequence`をmaterializeせず`concurrent_flow_requires_semantic_execution`へ落とす。独立targetと混在する場合は`partial`、全required targetが該当する場合はwhole-model `unsupported`を検証する
 - edge証拠とpath証拠の分離
 
 ### CRUD
@@ -449,6 +453,8 @@ raw machine-readable入力をfixtureにします。
 - unsupported applicator
 - `$schema`とroot `$id`だけをmetadataとして許可し、annotation allowlistだけをvalidation非影響として許可
 - unsupported keywordが意味へ影響するsubtreeだけを局所`unsupported`
+- local JSON Pointerの`~1` / `~0` decode順、不正`~` escape拒否を検証する
+- JSON Schema / OpenAPI local `$ref`のself-cycleとmutual cycleを`cyclic_local_ref`として有限時間で局所`unsupported`にし、独立siblingを処理できる
 - 親validation意味を左右する場合は親subtree全体を`unsupported`
 - HTML `pattern`を対応済みconstraintとして扱わず、適用されるcontrolでは`unsupported`を返す
 - JSON Schema `multipleOf` → `grid(base=0, step=m)`
@@ -515,7 +521,7 @@ raw machine-readable入力をfixtureにします。
 
 ### Coverage target materialize / Disposition
 
-- semantic-only Error Guessing、fork-join、partial / whole-model unsupportedの`llm_fallback`でも`materialize_coverage.py`をdispatchする
+- TCN配下にactiveなCoverage所有modelが1件以上あれば、machine target / semantic itemが0件でも`materialize_coverage.py`をdispatchする。semantic-only Error Guessing、fork-join、partial / whole-model unsupportedの`llm_fallback`を含み、targetなしsemantic model 0件は`materialize_complete=false`とする
 - `active_model_metadata[]`でruntimeなしmodelのTCN所属を検証する
 - semantic itemのstable key / previous mapping / reuse CIを検証し、別item・別model・runtime target CIへの横取りを拒否する。`source_target_versions[]`はsemantic item自身の`model_key`に属するcurrent targetだけを許可する
 - test data requirement Entity fingerprint変更をCI / TC staleへ反映する
