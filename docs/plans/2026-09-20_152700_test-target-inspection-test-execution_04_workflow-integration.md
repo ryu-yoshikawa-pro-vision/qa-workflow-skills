@@ -23,7 +23,7 @@
 test-target-inspection
 ```
 
-既存資料がある場合も今回対象範囲を実対象で確認し、`変更なし / 更新 / 削除確認 / 未確認 / 確認不能`へ閉じます。
+既存資料がある場合も今回対象範囲を実対象で確認します。確認状態は`確認済み / 未確認 / 確認不能`、既存成果物の更新区分は`変更なし / 更新 / 追加 / 削除確認`とし、詳細契約は`02_test-target-inspection.md`を正本とします。
 
 ### テスト設計でcurrentな実対象情報が必要
 
@@ -50,7 +50,7 @@ test-execution
   ↓ unresolvedなし
 Playwright MCP等の対話操作
 または
-Playwright CLI / 今回run用の一時Playwrightコード
+repo runnerから独立した今回run用の一時Playwrightコード
   ↓
 必要時に画像確認
   ↓
@@ -77,8 +77,6 @@ e2e-test-inspection
 e2e-test-implementation
   ↓
 e2e-test-execution
-  ↓
-必要なら test-execution へ戻してTC結果を報告
 ```
 
 ### 既存repo E2Eを正式なrunner契約で実行
@@ -88,18 +86,15 @@ e2e-test-execution
 ```text
 e2e-test-execution
   ├─ 正常
-  │    ├─ Playwright固有報告だけ必要 → e2e-test-reporting
-  │    └─ TC結果報告も必要 → test-execution
+  │    └─ Playwright固有報告が必要 → e2e-test-reporting
   └─ 異常 / 未実行 / cleanup問題
        ↓
      e2e-test-result-analysis
        ↓
      必要な再実行はqa-workflow経由でe2e-test-execution
-       ↓
-     TC結果報告が必要ならtest-execution
 ```
 
-`test-execution`は、既存repo E2Eのrunner内部契約を再実装しません。
+`test-execution`は、既存repo E2Eのrunner内部契約を再実装せず、既存repo E2E結果を一般TC結果へ再集約しません。
 
 ## 3. テスト対象資料の保存・再利用
 
@@ -163,7 +158,7 @@ currentなテスト対象資料がある場合、`e2e-test-inspection`は実対�
 
 将来も維持するrepo内E2Eコードを作成・更新する場合に使用します。
 
-今回runだけの一時Playwrightコード生成は`test-execution`内で完結できます。
+repo runnerから独立し、`playwright.config.*`、fixture、hook、project dependency、webServer等を読み込まない今回runだけの一時Playwrightコード生成は`test-execution`内で完結できます。
 
 ### `e2e-test-execution`
 
@@ -227,9 +222,9 @@ Playwright runner固有のrun / logical primary / resolved TestCase / attempt / 
 
 ### TCが変更された場合
 
-既存`test-execution`結果は、手順または期待結果へ影響する変更があればcurrentな結果として再利用しません。
+既存`test-execution`結果は、TC追加 / 除外、手順・期待結果等のTC内容変更、入力元のrevision / content identity変更があればcurrentな結果として再利用しません。
 
-進行中の実行では固定TC集合を書き換えず、旧成果物を理由付きで閉じ、必要なcleanup後に新しい成果物 / versionを開始します。
+進行中の実行では固定した入力snapshotを書き換えず、旧成果物を理由付きで閉じ、必要なcleanup後に新しい成果物 / versionを開始します。開始時に許可済みの対話操作と独立一時コードの間で実行手段を切り替えるだけでは新versionにしません。
 
 ### 対象version / build・実施条件が変わった場合
 
@@ -237,17 +232,13 @@ Playwright runner固有のrun / logical primary / resolved TestCase / attempt / 
 
 対象version / build、role、viewport、locale、feature flag、テストデータ等の差異が観測事実やTC判定へ影響しないことを確認できない場合はcurrentな証拠として自動再利用しません。
 
+進行中に条件が変わり影響を否定できない場合、`test-target-inspection`は変更前後を同じ今回確認として扱わず、`test-execution`は変更後の未開始TCを同じ実行条件の成果物へ追加しません。version / buildを取得できないことだけで一律に失敗させず、取得不能と代替の実施条件を記録します。
+
 ## 10. 完了判定
 
 ### `test-target-inspection`
 
-今回対象範囲が次のいずれかへ閉じていることを確認します。
-
-- 今回確認・変更なし
-- 今回確認・更新
-- 今回確認・削除確認
-- 未確認
-- 確認不能
+今回対象範囲の各情報が`確認済み / 未確認 / 確認不能`のいずれかへ閉じていることを確認します。既存成果物を更新した場合は、確認済みの変更対象について`変更なし / 更新 / 追加 / 削除確認`の更新区分も記録します。
 
 要求上必要な範囲に未解決の`未確認 / 確認不能`が残る場合は完了にしません。
 
@@ -256,6 +247,8 @@ Playwright runner固有のrun / logical primary / resolved TestCase / attempt / 
 ### `test-execution`
 
 今回要求されたTC集合について、各TCの実行前YAMLが元TCへ追跡でき、操作開始前の`unresolved`判定が完了していることを確認します。その上で、TC集合が`PASS / FAIL / 未実行 / 判定不能`のいずれかへ漏れなく対応し、必要な実行結果報告が作成されていることを確認します。
+
+実行または合否判定に必要な未解決事項により要求TCを開始できない場合、TC結果は`未実行`、対応する`test-execution`の対象範囲は`ブロック中`とします。影響しないTCは継続できます。開始後に必要な観測を完了できず`判定不能`になっただけでは、自動的にworkflow全体を`ブロック中`へしません。
 
 全TC PASSはworkflow完了条件ではありません。`FAIL`があっても、要求された実行と報告が終わり、未処理のcleanup / ブロック / 要再検証がなければworkflowは完了できます。
 
