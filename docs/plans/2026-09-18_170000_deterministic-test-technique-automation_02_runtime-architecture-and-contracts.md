@@ -136,7 +136,7 @@ skills/qa-workflow/scripts/
 `qa-workflow`を経由しないSkillでも必須runtime unitの丸ごと省略をproduction経路で検出するため、各Skill-local `runtime_contract.py`へ同一実装の`verify_runtime_evidence` operationを持たせます。これはdispatch対象runtime unitではなく、最終出力前の固定検査です。
 
 - inputはstrict JSON `{operation:"verify_runtime_evidence", skill, normalized_skill_input, artifact_markdown}`。このoperationは最終成果物全体を扱う集約処理として扱い、stdin hard limitは16 MiBとする。上限はJSON escape後の実際のUTF-8 stdin bytesへ適用し、超過時はtruncateせず`limit_exceeded`として成果物を完成扱いしない。runtime-v1では16 MiBを超えるstandalone成果物の最終evidence確認をサポートしない
-- `normalized_skill_input`は当該Skillを実行したときのcanonical normalized inputそのものとし、複数用途Skillでは既存の対象 / 実行範囲を含む。Agent / LLMが完成済み`expected_runtime_units[]`、`dispatch_source_state`、active model一覧を別入力として手組みする経路を作らない
+- `normalized_skill_input`は当該Skillを実行したときのcanonical normalized inputそのものとし、複数用途Skillでは既存の対象 / 実行範囲を含む。Agent / LLMが完成済み`expected_runtime_units[]`、完成済みdispatch state、active model一覧を別入力として手組みする経路を作らない
 - `runtime_contract.py`の共通expected-runtime builderは、まず`skill + normalized_skill_input`と§2.1の固定dispatch metadataだけからstructure / artifact等のroot期待runtime unitを導出する。root期待unitの有無をcandidate artifactのactual集合から逆算しない
 - 同じ`runtime_contract.py`のMarkdown抽出処理で`artifact_markdown`から`Machine Runtime Input / Result`の`(skill, runtime_unit_key)`を抽出し、InputとResultが1対1で揃うactual集合を作る。root期待unitにmissing / incomplete / duplicateがあれば、その時点で`valid=false`とし、欠落したrootを理由にdownstream期待集合を空へ縮退させない
 - model runtimeやadapter派生child等の条件付きdownstream期待unitは、存在確認・strict decode・identity / fingerprint整合を通過したcurrent structure / adapter parent runtime resultから同helperが固定projectionして段階的に導出する。Agent / LLMがcurrent structure stateやadapter parent stateを別JSONとして再生成しない。親runtimeが`unresolved / blocked / stale`なら§2.1の規則どおりchildを期待集合へ追加せず、親側状態をblockerとして扱う
