@@ -271,7 +271,7 @@ mergeは既存契約どおり同一model・同一execution fingerprintだけを�
 既存成果物の再利用では次を固定します。
 
 - canonical `Machine Entities`とstable ID / previous stateは、現在の対象範囲と担当Skill契約を満たす場合に再利用できる
-- 本Planのdispatch対象runtime unitは、既存成果物を再利用する場合も現在のMachine Entity、保存済み意味parameter、previous ID stateから`input_mode=artifact`のcanonical inputを組み立て直し、現在のscriptを必ず再実行する
+- 本Planのdispatch対象runtime unitは、既存成果物を再利用する場合も現在のMachine Entity、保存済み意味parameter、previous ID stateから`_02_runtime-architecture-and-contracts.md` §2.1の`direct / artifact`条件に従ってcanonical inputを組み立て直し、現在のscriptを必ず再実行する。前工程Machine Entityが存在しないdirect由来成果物を、自SkillのMachine Entityがあるという理由だけでartifactへ強制昇格しない
 - 保存済み正規化model / semantic draftを入力へ再利用する前に、そのruntime inputへ保存した`upstream_entities[]`および対応Machine Entityの`upstream_entity_dependencies[]`を現在のcanonical Entityと比較する。不一致があれば古い意味入力のままscriptを再実行せず、担当Skillへ`要再検証`として戻す。LLMが意味を再確認して現在のdependency fingerprintを保存した後にruntimeを実行する
 - 保存済み`Machine Runtime Input / Result`はprevious state、差分確認、round-trip検証に使うが、現在のcontract / implementation / static data / support判定を省略するcacheにはしない
 - 再実行した`generation_fingerprint`が以前と同じ場合はstable IDと現在も一致する意味判断を維持できる。generationが変わった場合はannotation / Disposition / merge / question回答 / unsupported closureの世代一致を再確認する
@@ -284,7 +284,13 @@ mergeは既存契約どおり同一model・同一execution fingerprintだけを�
 contract versionを持たない既存成果物を一律破棄しません。
 
 - 従来契約を満たす間はlegacy成果物として参照可能
-- その成果物を変更・再利用して本Plan対象の決定論的処理へ入る時点で、担当Skillが`input_mode=direct`として正規化model / 構造入力を作成して新契約へ昇格する。新契約のMachine Entityを保存した後の再利用は`artifact`へ移る
+- その成果物を変更・再利用して本Plan対象の決定論的処理へ入る時点で、担当Skillが`input_mode=direct`として正規化model / 構造入力を作成して新契約へ昇格する
+- legacy初回昇格では、現在のlegacy成果物に存在するTR / TCN / CI / TC IDを「現在確認できるactive ID」として固定migration builderがprevious stateへseedする。過去に削除済みだったが現成果物から消えているID履歴は復元できないため、昇格前のdeleted履歴を捏造しない。新規採番は現在観測できる同系列IDの最大番号+1から開始し、互換保証は昇格時点以降のfull snapshotへ限定する
+- TR / TCN / TCは、担当Skillが意味上同一と判断した既存rowについて既存`reuse_id`経路を使ってlegacy IDを維持する。legacy成果物にmodel keyが存在しない場合はmodel keyを新規採番し、存在しない過去model identityを復元しない
+- legacy CIを現在generator target / semantic Coverage Itemへ対応付けてIDを維持する場合だけ、初回昇格用`legacy_ci_seed[]`を`materialize_coverage.py`へ渡す。schemaは`{ci_id, model_key, source_kind, target_ref, semantic_item_draft_key}`とし、`source_kind=runtime_target`ではcurrent `target_ref`だけ、`source_kind=semantic_item`ではcurrent `semantic_item_draft_key`だけを必須にする。LLMは意味上の同一性だけを判断し、固定builderがcurrent TCN / model / target / draftの存在、一意対応、CI親TCN、duplicate reuseを検証する
+- `legacy_ci_seed[]`により対応できたCIはその既存CI IDを初回normal mappingへ移し、`materialize_coverage.py`が通常の`target_mapping_state[] / semantic_ci_mapping_state[] / ci_id_state[]`を出力する。対応できないlegacy CIは新targetへ推測割当てせず、当該CIとそれを参照する既存TCを`要再検証`にする
+- `legacy_ci_seed[]`はnormal mapping stateがまだ存在しない初回昇格だけ許可する。通常state生成後は受理せず、以降は既存のprevious mapping / full snapshot契約だけを正本にする
+- 新契約Machine Entity保存後も、必要な前工程Machine Entityが存在しない境界は`direct`を維持できる。必要な外部semantic dependencyがすべてcurrent Machine Entityとして揃った場合だけ`artifact`へ切り替える
 - legacy成果物を「決定論的生成済み」と表現しない
 
 ### 13.3 局所状態
@@ -309,7 +315,7 @@ runtime単位状態の正本は各成果物に保存した`runtime_unit_key`、`
 - `Fallback Reason`は空欄 / `outside_supported_subset` / `python_unavailable`
 - Skill状態表を表示する場合、`WF-D012`は既存Skill状態表だけへ適用し、runtime状態表へ流用しない。canonical deterministic evalで状態表を要求するfixtureは別途`WF-D009`を維持する
 - 1 runtime unitだけ`blocked / unresolved / stale`でも独立した他unitは継続可能
-- すべてのruntime unitで`Result Status=ready / Freshness=current`を必須とする
+- 本Plan対象runtime範囲の機械的完了には、すべてのruntime unitで`Result Status=ready / Freshness=current`を必須とする。この条件や`workflow_runtime.py`の`can_complete`を、E2E実装・実行・分析・報告等を含む既存`qa-workflow`全体の完了条件へ置き換えない。workflow全体`完了`は既存`qa-workflow`完了条件を満たしたうえで、`workflow_runtime.py`をdispatchした場合だけさらに`can_complete=true`を必要条件として加える
 - `Runtime Required=Yes`のunitでは、さらに`Deterministic Generated=Yes`を必須とする
 - `Runtime Required=No`のfallback unitは、既存Skill契約を満たして`Result Status=ready`になった場合だけworkflow完了を妨げない
 - `Support Status=partial`のunitは`unsupported_items[]`がすべて§13.3のclosure契約へ妥当に閉じていることを完了条件にする。closure行が存在するだけでは閉鎖済みとみなさない
