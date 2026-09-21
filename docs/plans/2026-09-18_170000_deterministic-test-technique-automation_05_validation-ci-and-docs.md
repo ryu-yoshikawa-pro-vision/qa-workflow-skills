@@ -265,6 +265,7 @@ repository全体は328 queryです。
    - 正規化済み`input / model_type / 対象 / 実行範囲`からscript選択表へ入った後のdispatchはunit fixtureで全runtime scriptを網羅し、期待script path・必須/条件付き・実行順とCLI実行結果metadataを検証する
    - 自然言語promptからSkill責務・意味入力を決める部分はPython dispatch testへ実装せず、既存trigger eval / semantic evalと代表Agent smokeで検証する。dispatch検証専用のprompt parserや重複manifestを新設しない
    - `test-analysis: E2E対象選定`と`coverage-analysis: TC → E2E実装 / E2E実装 → 実行結果`では本Planruntimeをdispatchしない
+   - 本Plan対象runtime unitの期待集合が0件のE2E-only `qa-workflow`では`workflow_runtime.py`をdispatchせず、Python unavailableでも本Plan追加を理由に`blocked`へ変更しない。既存`qa-workflow`の開始・完了条件だけで判定する回帰fixtureを追加する
    - supported inputが`unsupported`になる、またはsupport判定前にAgentがscriptを省略する場合は失敗
    - 保存済み`Machine Runtime Input / Result`を決定論的に抽出してround-trip検証できるが、workflow再利用では保存済みresultをcurrent cacheにせず現在scriptを再実行する
    - LLM手計算だけの成果物を決定論的生成済みと判定しない
