@@ -13,7 +13,7 @@
 - 対象リポジトリ: `ryu-yoshikawa-pro-vision/qa-workflow-skills`
 - Plan作成時点の正規Skill数: 14
 
-実装開始前に最新`main`との差分を確認します。特にDraft PR #11 `feat/deterministic-test-technique-automation` が先にmergeされた場合は、同PRが変更したSkill・評価・CI契約をこのPlanの基準より優先し、本Planで固定した14 Skill / 280 trigger query / semantic 28 case等の基準値をそのまま上書きしません。PR #11でTCの`content_fingerprint`等、今回の追跡性に利用できる既存契約が導入済みなら再利用します。一方、本変更だけを理由に`test-target-inspection` / `test-execution`をPR #11のMachine Entity / runtime対象へ追加しません。
+実装開始前に最新`main`との差分を確認します。特にDraft PR #11 `feat/deterministic-test-technique-automation` が先にmergeされた場合は、同PRが変更したSkill・評価・CI契約をこのPlanの基準より優先し、本Planで固定した14 Skill / 280 trigger query / semantic 28 case等の基準値をそのまま上書きしません。入力元がrevision / SHA / content identity等を既に提供している場合は、その既存identityを記録できます。一方、入力元identityがないTCのためにPR #11の`content_fingerprint` runtimeを流用・拡張せず、独自fingerprint runtimeも追加しません。本変更だけを理由に`test-target-inspection` / `test-execution`をPR #11のMachine Entity / runtime対象へ追加しません。
 
 ## 構成
 
