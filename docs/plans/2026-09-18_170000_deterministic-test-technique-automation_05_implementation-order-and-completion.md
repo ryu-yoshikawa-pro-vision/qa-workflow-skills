@@ -34,6 +34,7 @@
 - structured issue / blocking
 - 複数用途Skillのruntime dispatchを`test-analysis: テスト分析`、`coverage-analysis: テスト設計`へ限定する
 - `runtime_contract.py`をSkill-localに同梱し、repo root helperへ依存させない。canonical / Machine Entity helperの同一実装とLF正規化implementation fingerprintを検証する
+- 同じ`runtime_contract.py`へ`verify_runtime_evidence` operationとexpected-runtime builderを実装し、normalized dispatch stateから期待runtime identityを独立導出してcandidate artifactのMachine Runtime Input / Result pairと比較できるようにする。このoperation自身はruntime unitにしない
 
 このStepでは、全Skillのfreshness graph、全expected Entity集合、merge / unmerge、question再開等を完成させません。Step 2.5で実経路を確認してからStep 2.6で一般化します。
 
@@ -89,9 +90,10 @@ Step 2.5で成立した経路を、現在Planで必要な全Skill / lifecycleへ
 - question-analysisのRuntime Skill / Runtime Unit / Model / Target / Generation Fingerprint保持と回答適用前preflight
 - coverage-analysisのModel Key / Disposition追跡
 - 各Skillの固定builderがactual集合から独立したnormalized source / structure stateから`expected_runtime_units[] / expected_entities[]`を生成し、`workflow_runtime.py`が実際集合との完全一致を検査する
-- `qa-workflow`を経由しないstandalone Skillでも、最終自己検証時に同じ固定builderでexpected runtime identity集合を導出し、保存した`Machine Runtime Input / Result` block identity集合と完全一致を確認する。必須runtime blockのmissing / unknown extraがあれば成果物を完成扱いしない
+- `qa-workflow`を経由しないstandalone Skillでは、最終成果物を返す直前に`runtime_contract.py verify_runtime_evidence`を実行する。normalized dispatch stateからexpected runtime identityを導出し、candidate artifactから抽出したInput / Result pairとのmissing / extra / incomplete / duplicateを検査する。`valid=false`なら成果物を完成扱いしない
 - `workflow_runtime.py`によるruntime metadataの機械集約。既存Skill状態表 / runtime状態表はqa-workflowが状態表示を行う場合だけ描画し、完了判定は表の存在に依存させない
-- legacy昇格。初回は`input_mode=direct`で現在観測できるTR / TCN / CI / TCをactive seedへ取り込み、未知の過去deleted履歴を捏造しない。既存CI IDを維持する場合は初回だけ`legacy_ci_seed[]`でcurrent target / semantic itemへ一意に対応付ける。新契約保存後も必要な前工程Machine Entityが存在しない境界はdirectを維持し、必要な外部Entityがすべて揃った時点だけartifactへ切り替える
+- legacy昇格。初回は`input_mode=direct`かつnormal previous stateが空の場合だけ`legacy_tr_ids[] / legacy_tcn_ids[] / legacy_tc_ids[]`を各structure script自身がactive previous stateへseedする。CIは全既存IDを`legacy_ci_ids[]`へseedし、そのsubsetの`legacy_ci_seed[]`だけcurrent target / semantic itemへ一意に対応付ける。未対応CIもfull snapshotへ番号rowを残して再利用せず、参照TCを`要再検証`へする。新契約保存後も必要な前工程Machine Entityが存在しない境界はdirectを維持し、必要な外部Entityがすべて揃った時点だけartifactへ切り替える
+- internal adapterのpartial / whole-model unsupportedで`llm_fallback`が必要な場合は`test-condition-design`へ戻し、同じTCNへ直接定義Coverage modelをnew作成して通常generatorを通す。adapter自身へCIを作らず、fallback closureはそのdirect modelのcurrent CIへ閉じる
 - `qa-workflow::artifact:workflow_runtime:all`自身を評価runtime集合から除外し、self inclusionを`invalid_input`にする
 
 ### Step 3: test-analysis
@@ -148,9 +150,10 @@ Step 2.5で成立した経路を、現在Planで必要な全Skill / lifecycleへ
 
 ### Step 9: Random / Metamorphic / UI
 
-- `pcg32-v1`固定test vector
+- `pcg32-v1` raw固定test vectorに加え、`threshold = (2^32 - bound) mod bound`のbounded integerを実装する。seed=42 / bound=10と、実際にrejectionが発生するbound=2147483649の固定vectorをそのまま回帰testへ使う
 - Random completion criterion
 - Metamorphic relation / completion criterion
+- Metamorphic pathはruntime-v1の`$ (.<identifier>|[<index>])*`だけを実装し、identifier / index規則外は`unsupported_path`とする。full JSONPath parserを追加しない
 - UI catalog / static version
 
 ### Step 10: 全generator統合 / test-case / traceability
@@ -235,16 +238,17 @@ Plan完了には次をすべて満たす必要があります。
 - `spec-analysis / test-analysis / test-requirement-design / test-condition-design / test-case-design`がPython固定builderでcanonical `Machine Entities`とexpected Entity identityを生成・保存し、`entity_type`を含む`(skill, entity_type, entity_ref)` identity、content fingerprint、`upstream_entity_dependencies[] / runtime_dependencies[]`をMarkdown再解釈なしで再構築できる。actual Machine Entity集合からexpected集合を逆算しない
 - script固有inputのsemantic reference集合から必要な`upstream_entities[]`を固定builderで完全導出し、そのmachine dataからcanonical contentを機械構築してcontent fingerprintをruntime計算できる。省略・余分な参照Entityを拒否し、sort済み`upstream_entity_fingerprints`を含むgeneration fingerprint、`(skill, runtime_unit_key)` upstream dependency、static data versions、input / model / LF正規化implementation fingerprintが再現可能
 - model / artifact全runtime unitの`Machine Runtime Input / Result`を決定論的に抽出し、strict decode、fingerprint一致、同条件でのround-trip再実行が成立する。workflow再利用では保存済みresultをcurrent cacheとして採用せず現在scriptを再実行する。model resultと集約runtime rowは`runtime_contract.py`固定projectionから作り、`upstream_entity_fingerprints[]`や`freshness_status`をcaller / LLMが補完しない
-- stable model key / TR / TCN / TCのruntime採番、active / deleted ID state、1 model = 1 TCN、target_ref、成果物系列、previous mapping、merge / unmerge / CI↔Disposition状態遷移を含むCI materializeが契約どおり。TR / TCN / model / TCのpartial rerunではprevious full snapshotを維持し、`update_scope_*`内だけdeleted遷移させてscope外activeを保持する。legacy初回昇格は現在観測できるactive IDだけをseedし、`legacy_ci_seed[]`で一意対応できる既存CIだけ通常mappingへ移す
+- runtime対象Skillのstandalone最終出力で`runtime_contract.py verify_runtime_evidence`がnormalized dispatch stateから期待runtime unitを独立導出し、candidate artifactのInput / Result pairとのmissing / extra / incomplete / duplicateをproduction経路で検出できる。helper operation自身をruntime unitへ数えない
+- stable model key / TR / TCN / TCのruntime採番、active / deleted ID state、1 model = 1 TCN、target_ref、成果物系列、previous mapping、merge / unmerge / CI↔Disposition状態遷移を含むCI materializeが契約どおり。TR / TCN / model / TCのpartial rerunではprevious full snapshotを維持し、`update_scope_*`内だけdeleted遷移させてscope外activeを保持する。legacy初回昇格はstructure scriptが`legacy_tr_ids[] / legacy_tcn_ids[] / legacy_tc_ids[]`をnormal previous stateへseedし、materializeは`legacy_ci_ids[]`全件をCI stateへseedしたうえで`legacy_ci_seed[]`のsubsetだけ通常mappingへ移す。未対応legacy CIの番号を再利用しない
 - 各generatorのtargetがPlan固定の`materializable`を持ち、CI化する全targetがgenerator別canonical `execution / execution_fingerprint`を持つ。EP / BVA / Domain / Decision / combinatorial / grammar / Random / Metamorphicを含め、executionだけで下流が対象・値・条件・期待関係を理解できる。combinatorial targetはdeterministic full rowへ対応し、adapter専用generatorを直接CI化しない。同一CI mergeは同一TCN・同一model・同一execution・同一expected resultに限定される。異なるmodelの同一実行はTCの複数`ci_refs[]`で表現する
 - 再実行がupsertされ重複machine evidenceを作らない
 - semantic dependency preflight済みの現在script正常実行結果だけを保存時`freshness_status=current`とし、`workflow_runtime.py`が再検証してstale伝播する。freshnessの付与主体をworkflowだけに限定せずmaterialize前の循環を作らない
 - stale派生成果物を完了扱いしない
-- `technique_slug`が正規技法だけを表し、内部adapterは正規技法を所有しない。adapter / Coverage childを同じ`condition_structure.py`実行で先に採番し、childが`selection_source / selection_key / derived_from_model_key`を保持する。child model Entityはadapter model Entityへ依存するが未実行adapter runtimeへ依存せず、親adapter runtimeがcurrent readyかつ当該childの`derived_child_inputs[]`が1件になるまでchild generatorをdispatch / expected集合へ追加しない。adapterは意味parameter不足時に`semantic_parameter_requests[]`で`unresolved`、ready時に全child分の直接互換`derived_child_inputs[]`を返す。active Technique Selectionの各selected techniqueが1件以上のcurrent Coverage modelへ到達する。不適用 / 未解決はTechnique Selection更新または既存block / unresolvedで扱い、未定義のselection closureを作らない。エラー推測は1件以上のsemantic CIへ入る
+- `technique_slug`が正規技法だけを表し、内部adapterは正規技法を所有しない。adapter / Coverage childを同じ`condition_structure.py`実行で先に採番し、childが`selection_source / selection_key / derived_from_model_key`を保持する。child model Entityはadapter model Entityへ依存するが未実行adapter runtimeへ依存せず、親adapter runtimeがcurrent readyかつ当該childの`derived_child_inputs[]`が1件になるまでchild generatorをdispatch / expected集合へ追加しない。adapterは意味parameter不足時に`semantic_parameter_requests[]`で`unresolved`、ready時に全child分の直接互換`derived_child_inputs[]`を返す。adapter runtimeのpartial / whole-model unsupportedで意味fallbackが必要な場合は、adapter自身のCIを作らず同一TCNへ直接定義Coverage modelをnew作成して通常generatorへ戻し、そのcurrent CIへadapter closureを閉じる。active Technique Selectionの各selected techniqueが1件以上のcurrent Coverage modelへ到達する。不適用 / 未解決はTechnique Selection更新または既存block / unresolvedで扱い、未定義のselection closureを作らない。エラー推測は1件以上のsemantic CIへ入る
 - machine-readable schema / HTMLをLLMが手変換せず対応scriptが処理する。HTML runtime-v1は`text / number / date / datetime-local`のtype / attribute matrix、disabled / readonlyのvalidation除外、pattern等のunsupportedを契約どおり扱う。OpenAPI runtime-v1は解析済みstrict JSON objectを入力とし、YAML parserや追加dependencyをruntimeへ導入しない
 - script間の機械変換ではadapter / child modelを親runtime実行前に`condition_structure.py`で採番し、adapter script自身が固定derived schemaと意味parameterからchild generator互換`derived_child_inputs[]`を生成する。LLMは`semantic_parameter_requests[]`で要求された意味parameterやtarget annotationだけを追加し、machine dataやruntime dependencyを再生成しない
 - 全技法generatorと構造scriptにunit testがあり、Syntax-Based Testingのunreachable productionは`unresolved` issue、partial unsupported itemはscript別固定`reason_code`で検証される
-- 通常/集約stdin、stdout、item数、byte、depth、state / flow / grammarを含む探索node hard limitとtie-breakが契約どおり。巨大exponentはcanonical文字列展開前に桁数上限を判定し、fixed-offset datetimeのrange比較はabsolute instantを使用する
+- 通常/集約stdin、stdout、item数、byte、depth、state / flow / grammarを含む探索node hard limitとtie-breakが契約どおり。巨大exponentはcanonical文字列展開前に桁数上限を判定し、fixed-offset datetimeのrange比較はabsolute instantを使用する。Random bounded integerはPlan固定threshold式と固定vectorに一致し、Metamorphic pathはruntime-v1最小文法だけを受理する
 - runtime出力と保存machine evidenceの一致をvalidatorが確認する
 - support判定をruntimeが行い、whole-model `unsupported`、`partial`、Python unavailableを契約どおり区別する。script schemaで1件以上必須のfieldが空なら`invalid_input`、schemaは成立するが意味parameter / 母集団未確定なら`unresolved`とし、対応subset外の`unsupported / partial`と混同しない。supported inputをAgent判断だけでruntime省略しない
 - model内Coverageと仕様全体Coverageを混同しない
@@ -255,7 +259,7 @@ Plan完了には次をすべて満たす必要があります。
 - question-analysis往復でRuntime Skill / Runtime Unit / model / target / generation fingerprintが失われず、`qa-workflow`の回答適用前preflightで未解決inputを現在runtimeへ再実行して世代一致を確認する。別generationまたはfingerprint未確定issueへ古い回答を自動適用しない
 - target内容またはruntime generation変更時にstable `target_ref` / CI IDを維持しても、古いannotation / Disposition / merge判断と下流TCをcurrent扱いしない
 - environment requirementは同一`environment_key`内だけ同時成立を検査し、異なるkeyを代替環境としてcross-intersectionしない。test data requirementはmodel-wide / target-specificの適用範囲を維持し、target・merge group・TCで実際に同時成立する要求集合だけintersectionする。どちらも元の`requirement_key` identityを維持する
-- unsupported closureは対象generationとreasonが現在値に一致し、許可されたhandling・必要なcurrent`covered_by_entity`の完全identity / fingerprint・既存Disposition条件を満たす場合だけ閉鎖済みとして再利用する。`llm_fallback`は同じmodelのcurrent CIへ解決し、`ブロック中`closureは完了不可。target Dispositionの`重複`はself / cycleがなくcurrent CI / semantic CIへ終端する場合だけ閉鎖済みにする
+- unsupported closureは対象generationとreasonが現在値に一致し、許可されたhandling・必要なcurrent`covered_by_entity`の完全identity / fingerprint・既存Disposition条件を満たす場合だけ閉鎖済みとして再利用する。通常Coverage modelの`llm_fallback`は同じmodelのcurrent CIへ解決する。internal adapterだけは明示fallback手順で同一TCNへ追加した、事前採用child techniqueと同じ直接定義Coverage modelのcurrent CIを許可する。`ブロック中`closureは完了不可。target Dispositionの`重複`はself / cycleがなくcurrent CI / semantic CIへ終端する場合だけ閉鎖済みにする
 - `input_mode=direct|artifact`が途中工程開始と成果物再利用を分離し、directでは前工程Machine Entity / Skill directoryを強制せず、artifactでは必要Machine Entityのmissing / extraを拒否する。direct由来成果物は自Skill Machine Entityを保存済みという理由だけでartifactへ強制移行せず、必要な外部Entityがすべて揃った時点だけ切り替える。途中工程開始と`Selection Source=analysis / condition_design / user`が既存workflowを壊さず、runtime派生元をSelection Sourceへ混ぜず、model reuseが選択元を失わず、undetermined signalが未閉鎖のまま完了しない
 - CIでは全runtime scriptのdispatch / metadata整合、複数用途Skillの対象限定、active Coverage所有modelがあるTCNの`materialize_coverage.py`必須dispatch、E2E-onlyでの`workflow_runtime.py`非dispatch、Coverage targetのCI / Disposition閉鎖、Cause-Effect constraint伝播、Decision Table don't-care merge非破壊性、fork/join concurrencyのlinear execution禁止を確認し、実Agent smokeでは代表promptでPython起動、envelope parse、Machine Entity / runtime result採用、Markdown再読込、現在script再実行まで確認できる
 - runtime対象6 Skillの単体移植性が成立し、`spec-analysis`を含む7 Skillのcanonical / Machine Entity helper内容一致を検証できる
