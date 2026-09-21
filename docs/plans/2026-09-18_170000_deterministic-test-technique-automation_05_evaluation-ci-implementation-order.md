@@ -137,7 +137,7 @@ CLI integration testは各runtime scriptの`valid_minimal.json`をCIのPython 3.
 - `condition_structure.py`を派生modelのidentity確定に再利用しても、既存model generatorがID割当てしか利用していない場合は同scriptをruntime dependencyへ登録せず、親generatorを自己stale化しない
 - tie-break / Coverage / target key等の意味契約変更では実装fingerprintだけでなく対応contract versionも更新する
 - model / artifact全runtime unitについて`Machine Runtime Input / Result`を保存→決定論的抽出→strict decode→canonical化し、input fingerprint、model scriptではmodel fingerprintも一致する。同条件でruntimeへ再投入すると同じmachine resultになる
-- `runtime_contract.py`の`verify_runtime_evidence` operationはnormalized dispatch stateからexpected runtime identityを独立導出し、artifact MarkdownからInput / Result pairを抽出して完全一致を検査する。valid caseに加え、必須unit missing、unknown extra、Inputのみ、Resultのみ、duplicate heading / blockを各1件以上negative fixtureで検出する。operation自身をexpected / actual runtime unitへ追加しない
+- `runtime_contract.py`の`verify_runtime_evidence` operationはnormalized dispatch stateからexpected runtime identityを独立導出し、artifact MarkdownからInput / Result pairを抽出して完全一致を検査する。valid caseに加え、必須unit missing、unknown extra、Inputのみ、Resultのみ、duplicate heading / blockを各1件以上negative fixtureで検出する。operation自身をexpected / actual runtime unitへ追加しない。Skill / 対象 / 条件 / `model_type → generator`等の固定dispatch metadataは同一`runtime_contract.py`内の共通dataを使い、別manifest / registryを作らない
 - standalone Skillの代表fixtureでは、Agentが必須runtime blockを1件省略した候補artifactへ`verify_runtime_evidence`を実行して`valid=false`となり、deterministic validatorを実行しなくてもproduction最終確認で停止する
 - LF / CRLF差だけでimplementation fingerprintが変わらない
 - canonical JSON static dataは整形・改行差だけでversion hashが変わらない
@@ -158,6 +158,7 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 `_02`の固定上限について境界値をテストします。
 
 - 通常runtime stdin 2 MiB、集約runtime stdin 16 MiB、stdout 16 MiBの各上限ちょうどは処理可能
+- `verify_runtime_evidence`は集約処理として16 MiB stdin上限を使い、JSON escape後の実UTF-8 stdin bytesが上限ちょうどなら処理可能、1 byte超過ならtruncateせず`limit_exceeded`になる。runtime-v1で16 MiBを超えるstandalone成果物を完成扱いしない
 - 複数modelを集約した`materialize_coverage.py`等は最終stdin全体へ16 MiB上限を適用し、個々の上流unit成功だけでは完了扱いしない
 - nesting depth、1文字列、target / row / candidate上限を検証
 - 探索nodeはroot=1。combinatorial / Decision Tableのpartial assignment、state / flowのpath / cycle prefix、grammarのpartial derivationを展開するたびに加算する
@@ -268,8 +269,9 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - runtime非対応はCoverage所有model生成後のunsupported closureで扱う
 - child Coverage model欠落をadapter親だけで閉鎖済みにしない
 - internal adapterのunsupported itemを`llm_fallback`で閉じる場合、adapter自身のCIを要求しない。test-condition-designへ戻して同じTCNに直接定義Coverage modelをnew作成し、通常generatorを通したcurrent CIだけをadapter closureの`covered_by_entity`へ許可する
-- adapter `partial`ではsupported部分のadapter派生childを維持しつつunsupported部分だけdirect fallback modelへ閉じられる。whole-model `unsupported`では実行不能なadapter派生childをscope内deletedへ遷移してdirect modelへ置き換える
-- adapterと無関係なTCN、事前採用child techniqueと異なるdirect model、stale CI、model metadataだけをadapter fallback evidenceとして拒否する
+- adapter `partial`ではsupported部分のadapter派生childを維持する。1つのunsupported箇所が複数child techniqueへ影響するfixtureでは`affected_technique_slug`ごとにunsupported itemを分け、同じsource / reasonでもitem keyが異なることを確認する。各closureのdirect fallback model / CIはその`affected_technique_slug`と一致必須
+- whole-model `unsupported`では実行不能なadapter派生childをscope内deletedへ遷移し、activeのまま残すselected child techniqueごとに少なくとも1件の直接定義Coverage model / current CIまたは既存Disposition closureへ到達する。不適用 / 未解決とした技法はTechnique Selectionを更新してselected listから外すか既存block / unresolvedへ戻す
+- adapterと無関係なTCN、`affected_technique_slug`と異なるdirect model、active selected techniqueを欠落させるwhole-model fallback、stale CI、model metadataだけをadapter fallback evidenceとして拒否する
 - `model_type=error-guessing / technique_slug=error-guessing`はruntime unitを要求せず、semantic Coverage ItemをCI Machine Entityへmaterializeできることを検証する。semantic item 0件では完了不可
 - 各active Coverage所有modelはmodel単位で検証する。supported / partial / runtimeなしsemantic modelではcurrent materialize runtime unitの`model_completion[]` rowが必須で、current CI / target Disposition / semantic source targetから決まる`materialize_complete`を確認する。partialはunsupported item closureも別途全件必要、whole-model unsupportedはcurrent whole-model closureが必要。別modelのCIが親TCNに存在するだけでは完了にしない
 - 空modelをvacuous completeにしない。script schemaで1件以上必須のfieldが空なら`invalid_input`、schemaは成立するが意味parameter / 母集団未確定なら`unresolved`、対応subset外なら`unsupported / partial`となる代表fixtureを固定する
@@ -542,6 +544,7 @@ raw machine-readable入力をfixtureにします。
 - `active_model_metadata[]`でruntimeなしmodelのTCN所属を検証する
 - legacy初回昇格では各TCNの`legacy_ci_ids[]`からそのTCNの全既存CIをactive previous stateへseedし、そのsubsetの`legacy_ci_seed[]`だけをcurrent runtime target / semantic item draftへ一意に対応付けて通常mapping stateへ移す。seedされないlegacy CIも同TCNの過去最大番号へ残し、新規CIへ番号を再利用しない
 - unknown / duplicate / `legacy_ci_ids[]`外 / 別TCN / 別model seedを拒否し、normal state生成後の`legacy_ci_ids[] / legacy_ci_seed[]`再投入を拒否する
+- CI IDは完全形式`TCN-\d{3}-CI\d{2,}`だけをstate / mapping / Machine Entity / legacy入力で受理し、suffixだけの`CI01`をfull `ci_id`として拒否する。採番比較は同一TCN prefix確認後の末尾番号だけを使用する
 - semantic itemのstable key / previous mapping / reuse CIを検証し、別item・別model・runtime target CIへの横取りを拒否する。`source_target_versions[]`はsemantic item自身の`model_key`に属するcurrent targetだけを許可する
 - test data requirement Entity fingerprint変更をCI / TC staleへ反映する
 
