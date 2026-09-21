@@ -135,9 +135,9 @@ skills/qa-workflow/scripts/
 
 `qa-workflow`を経由しないSkillでも必須runtime unitの丸ごと省略をproduction経路で検出するため、各Skill-local `runtime_contract.py`へ同一実装の`verify_runtime_evidence` operationを持たせます。これはdispatch対象runtime unitではなく、最終出力前の固定検査です。
 
-- inputはstrict JSON `{operation:"verify_runtime_evidence", skill, normalized_dispatch_state, artifact_markdown}`
+- inputはstrict JSON `{operation:"verify_runtime_evidence", skill, normalized_dispatch_state, artifact_markdown}`。このoperationは最終成果物全体を扱う集約処理として扱い、stdin hard limitは16 MiBとする。上限はJSON escape後の実際のUTF-8 stdin bytesへ適用し、超過時はtruncateせず`limit_exceeded`として成果物を完成扱いしない。runtime-v1では16 MiBを超えるstandalone成果物の最終evidence確認をサポートしない
 - `normalized_dispatch_state`は当該Skillの対象 / 実行範囲、active structure state、adapter parent runtime state等、§2.1の固定dispatch条件に必要なmachine dataを必須fieldで受ける。actual runtime block集合をexpected算出入力にしない
-- `runtime_contract.py`の共通expected-runtime builderが`normalized_dispatch_state`から`expected_runtime_units[]`を導出する
+- `runtime_contract.py`の共通expected-runtime builderが`normalized_dispatch_state`から`expected_runtime_units[]`を導出する。§2.1のSkill / 対象 / 条件 / `model_type → generator`等の固定dispatch metadataは共通runtime契約として同一`runtime_contract.py`内にdataとして保持してよい。generatorアルゴリズム、技法の意味判断、Coverage計算は入れない。別dispatch manifest / registryは追加しない
 - 同じ`runtime_contract.py`の既存Markdown抽出処理で`artifact_markdown`から`Machine Runtime Input / Result`の`(skill, runtime_unit_key)`を抽出し、InputとResultが1対1で揃うactual集合を作る
 - expected / actualのmissing、extra、Inputだけ、Resultだけ、duplicateを検出し、1件でもあれば`valid=false`とする。actual集合からexpectedを逆算しない
 - outputは`{valid, expected_runtime_units[], actual_runtime_units[], missing[], extra[], incomplete_pairs[], duplicates[]}`の固定JSONとする
@@ -242,10 +242,10 @@ Cause-Effect → Decision Table、Classification Tree → combinatorial、schema
 
 internal adapterはCoverageを所有せずCIを持たないため、adapter runtimeの`partial / unsupported`を通常Coverage modelの「同じmodelのCI」規則で`llm_fallback`へ閉じません。adapterのunsupported箇所を意味判断でテスト対象へ残す場合は、次で固定します。
 
-1. `test-condition-design`へ戻し、unsupported箇所を対象にする**直接定義のCoverage所有model**を同じTCNへ追加する。新modelは`derived_from_model_draft_key=null`とし、adapter派生childのmodel keyをlineage変更してreuseしない
+1. `test-condition-design`へ戻し、unsupported箇所を対象にする**直接定義のCoverage所有model**を同じTCNへ追加する。new modelは`derived_from_model_draft_key=null`とし、adapter派生childのmodel keyをlineage変更してreuseしない。whole-model `unsupported`ではactiveのまま残すselected child techniqueごとに少なくとも1件の直接定義Coverage modelを用意する。意味判断の結果その技法自体が不適用 / 未解決なら、fallback modelを作る代わりにTechnique Selection Entityを更新してselected listから外すか既存block / unresolvedへ戻す
 2. 直接定義modelの`technique_slug / selection_source / selection_key`は、当該adapterで事前採用済みだったchild techniqueとselection provenanceを維持する。adapter runtimeが新しい技法を選択しない
 3. LLMはunsupported箇所の意味をその直接定義modelの既存generator inputへ正規化し、generator以降は通常の決定論的経路を通す。これはruntimeが対応subset外と判定した箇所の明示fallbackに限り、supportedなmachine-readable入力をLLMへ戻さない
-4. adapterが`partial`ならsupported部分のadapter派生childは維持でき、unsupported itemだけを追加した直接定義modelのcurrent CIへ閉じる。whole-model `unsupported`なら、実行不能なadapter派生childを`update_scope_model_keys[]`へ含めてdeletedへ遷移し、直接定義modelをcurrent Coverage所有modelとする
+4. adapterが`partial`ならsupported部分のadapter派生childは維持できる。adapterは1つのunsupported箇所が複数child techniqueへ影響する場合、`affected_technique_slug`ごとにunsupported itemを分けて返し、1 itemを1 techniqueの直接定義model / CIで閉じる。同じ`source_key / reason_code`でも`affected_technique_slug`が異なれば別itemとする。whole-model `unsupported`なら、実行不能なadapter派生childを`update_scope_model_keys[]`へ含めてdeletedへ遷移し、activeのまま残す各selected child techniqueの直接定義modelをcurrent Coverage所有modelとする
 5. adapter runtimeの`unsupported_item_closures[]`で`handling=llm_fallback`を使う場合に限り、`covered_by_entity`は同じTCNの上記直接定義modelに属するcurrent CIを参照できる。通常Coverage modelのunsupported closureは従来どおり同じ`model_key`のCIだけを許可する
 6. `対象外 / 別テストレベル / 残存リスク / 成立不能 / ブロック中`等で閉じる場合は既存Disposition条件をそのまま使用し、fallback modelを作るためだけの追加schemaを導入しない
 
