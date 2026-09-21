@@ -44,7 +44,7 @@ skills/test-execution/
 
 TCは`qa-workflow`成果物、外部成果物、ユーザー直接入力のいずれでもよいものとします。
 
-1つの`test-execution`成果物では1つのTC入力元 / snapshotを扱います。TC参照はsnapshot内で一意であることをpreflightで確認します。入力側に既存TC IDまたは外部システムの一意識別子がある場合はその値をTC参照として使います。同じ正式識別子がsnapshot内で重複している場合はAIが改名して解消せず、重複したTCを開始しません。一意識別子がない外部 / ユーザー直接入力TCだけ、今回snapshot内で一意な成果物ローカル参照を使って追跡し、正式TC IDを新規採番しません。
+1つの`test-execution`成果物では1つのTC入力元 / snapshotを扱います。`test_case_ref`は今回snapshot内で必ず一意な成果物内参照です。入力側に正式TC IDまたは外部システム識別子がある場合は、その値を`source_test_case_id`として保持します。`source_test_case_id`がない場合は`null`とします。`source_test_case_id`がsnapshot内で一意なら同じ値を`test_case_ref`へ再利用できます。`source_test_case_id`がない場合、または重複している場合だけ、snapshotの入力順に基づく`input-001`等の成果物ローカル参照を`test_case_ref`へ使用します。成果物ローカル参照は同一snapshot内で安定させ、正式TC IDとして扱わず入力元へ書き戻しません。重複した`source_test_case_id`はAIが改名して解消せず、該当TCの`unresolved`へ記録して開始しません。
 
 入力元にrevision / SHA / content identityがある場合はその値を再利用します。ない場合は、今回受け取ったTC内容を固定し、SHA-256等のcontent identityを計算してsnapshotを識別します。PR #11等で同等の`content_fingerprint`契約が先に導入済みならそれを再利用し、別方式を重複追加しません。
 
@@ -62,6 +62,7 @@ browser / computer操作能力を利用できない場合も、TC snapshot固定
 
 ```yaml
 test_case_ref: TC-001
+source_test_case_id: TC-001
 title: 正しい認証情報でログインできる
 scenario:
   given:
@@ -82,7 +83,8 @@ cleanup: []
 
 契約は次のとおりです。
 
-- `test_case_ref`: 入力側に一意識別子があればその値を使う。存在しない場合は今回snapshot内だけの成果物ローカル参照を使い、正式TC IDとして扱わない
+- `test_case_ref`: 今回snapshot内で必ず一意な成果物内参照。`source_test_case_id`が一意なら同じ値を再利用できる。元IDなしまたは重複時は入力順に基づく`input-001`等の成果物ローカル参照を使う
+- `source_test_case_id`: 入力側の正式TC IDまたは外部システム識別子。存在しない場合は`null`。重複していても値を改名せず保持する
 - `title`: 元TCに存在する名称または意味を変えない短い表現
 - `scenario.given`: 実行開始状態、前提条件、role、必要なテストデータ等を元TCから整理する
 - `scenario.when[].step_ref`: 今回snapshot内だけの手順参照。元TCの順序を保持するために使用し、正式step IDや共通ID体系にはしない
@@ -119,6 +121,7 @@ cleanup: []
 - PASSを得やすくするために操作順序やUI経路を変更する
 - YAMLを仕様Authorityまたは新しいTC正本として扱う
 - YAML化を理由に正式TC ID、step ID、expectation ID等の新しい共通ID体系を追加する
+- 重複した`source_test_case_id`をAIが改名して一意化する
 
 今回の目的に不要な`Feature`、`Background`、`Scenario Outline`、`Examples`、tag等のGherkin / Cucumber全構文は実装しません。
 
@@ -170,22 +173,22 @@ AIはTCの手順に沿って、画面を確認しながら1操作ずつ進めま
 
 `references/guidance.md`では次の流れを基本とします。
 
-1. 今回実行するTC入力snapshotとTC参照集合を固定する
+1. 今回実行するTC入力snapshotを固定し、各TCの一意な`test_case_ref`と入力元の`source_test_case_id`を確定する。正式ID重複は値を変更せず`unresolved`へ記録する
 2. 各TCの前提条件、手順、期待結果、事後状態 / 後処理をGiven / When / Then構造のYAMLへ整理する
 3. YAMLの`unresolved`を確認し、実行または合否判定に影響する未解決事項があるTCは操作を開始せず`未実行`とする
 4. 今回成果物で固定するrun条件と、各TCが明示的に要求するTC実行条件を分けて確認する。run固定条件には対象環境、許可origin、対象version / build等を含め、role / アカウント、viewport、locale、feature flag、テストデータ、開始状態等は元TCが変化を要求する場合はTC実行条件として扱う
-5. 副作用scopeごとの最大回数、現在の累計実施回数、実行時cleanup対象 / 方法を確認する
-6. TCごとにGiven、開始状態、テストデータをpreflightとして確認する。前TCの後処理 / cleanup失敗や残存状態の影響もここで確認する
-7. 開始状態を安全に成立させられないTCは`未実行`とし、影響しないTCは継続する
+5. 副作用scopeごとの最大回数、現在の累計実施回数、今回の準備・TC操作・TC事後処理・実行時cleanupで予定する状態変更とcleanup対象 / 方法を確認する。cleanupが同じscopeを消費する場合は、TC本体開始前に必要なcleanupまで実施できる残数を確認する
+6. TCごとにGiven、開始状態、テストデータをpreflightとして確認する。preflightやテストデータ準備で実対象のデータ・設定・権限・外部送信等を変更する場合も対応する副作用scopeへ計上する。前TCの後処理 / cleanup失敗や残存状態の影響もここで確認する
+7. 開始状態または必要な副作用許可を安全に成立させられないTCは`未実行`とし、影響しないTCは継続する
 8. 人間がTCを実施するのと同じUI経路で最初の`scenario.when`操作を開始した時点で、そのTCを開始済みとする
 9. 各`scenario.then`の観測方法に従い、DOM / accessibility tree等から取得できる構造・意味情報を確認する
 10. 視覚確認が必要な観測点ではscreenshot等を取得し、画像として確認する
 11. 期待結果と実測結果を比較する
 12. 後続手順の前提が崩れた場合は、PASSを得るために別経路へ勝手に迂回しない
 13. TC結果を確定する
-14. TCに定義された事後状態 / 後処理を実施・確認する
-15. 実行時cleanupと残存状態を確認する
-16. 副作用scopeの累計実施回数を更新し、上限をTCごとにリセットしない
+14. TCに定義された事後状態 / 後処理を実施・確認し、状態変更を伴う場合は対応する副作用scopeへ計上する
+15. 実行時cleanupを実施・確認し、状態変更を伴う場合は対応する副作用scopeへ計上する。cleanup結果と残存状態を確定する
+16. 副作用scopeごとの準備・TC操作・TC事後処理・実行時cleanupの実施回数と累計実施回数を更新し、上限をTCごとにリセットしない
 17. run固定条件が途中で変わった場合、または元TCが要求していないTC実行条件の変化が起きて判定への影響を否定できない場合は、残りTCを同じ実行条件として続行しない。元TCが明示的に要求するrole / viewport / locale / feature flag / テストデータ等の切替は正常なTC実行条件として扱い、それだけを理由に成果物を分割しない
 18. TC結果、実行前YAML、観測、証跡、未実行 / 判定不能理由、cleanupを報告する
 
@@ -238,7 +241,7 @@ pixel diff専用frameworkや画像差分専用Skillは追加しません。
 
 ## 8. 副作用・cleanup
 
-副作用の最大回数は、ユーザーが許可した操作scope全体で管理します。同じscopeを複数TCが共有してもTCごとに上限をリセットしません。scopeごとに最大回数と累計実施回数を1つの正本で管理し、各TCは使用するscopeを参照します。
+実対象のデータ・設定・権限・外部送信等を変更する、またはcleanupを要する操作は、準備、TC操作、TC事後処理、実行時cleanupを含め、必ず許可済みの副作用scopeへ所属させます。副作用の最大回数はscope全体で管理し、同じscopeを複数TCが共有してもTCごとに上限をリセットしません。scopeごとに工程別実施回数と累計実施回数を1つの正本で管理し、各TCは使用するscopeを参照します。cleanupが同じscopeを消費する場合は、TC本体開始前に必要なcleanupまで実施できる残数を確認します。
 
 結果不明な副作用操作は、状態確認なしに盲目的再試行しません。
 
@@ -247,7 +250,7 @@ pixel diff専用frameworkや画像差分専用Skillは追加しません。
 - TCに定義された事後状態 / 後処理。実行前YAMLの`cleanup`はこちらだけを扱う
 - 今回のAI操作に伴う実行時cleanup。run側の安全条件と実行結果で管理する
 
-cleanup失敗は確定済みTC結果を自動でFAILへ変更しません。ただし残存状態がある場合は実行報告とworkflow完了状態へ反映します。次TCの開始状態へ影響する可能性がある場合は次TC開始前に再確認し、安全に開始状態を成立させられないTCだけ`未実行`とします。一度確定したTC結果は同じ成果物内で変更せず、確定後に同じTCを再実行する場合は前回成果物参照を持つ別成果物 / versionを開始します。
+`cleanup結果`は`成功 / 失敗 / 未確認 / 対象なし / 意図的に残した状態 / 一部失敗`のいずれかとします。`意図的に残した状態`は案件コンテキストまたはユーザーが明示的に許可した場合だけ使用します。cleanup失敗は確定済みTC結果を自動でFAILへ変更しません。ただし必要なcleanupが`失敗 / 未確認 / 一部失敗`、または許可されていない残存状態がある場合は実行報告とworkflow完了状態へ反映し、対応する実行範囲を完了扱いにしません。次TCの開始状態へ影響する可能性がある場合は次TC開始前に再確認し、安全に開始状態を成立させられないTCだけ`未実行`とします。一度確定したTC結果は同じ成果物内で変更せず、確定後に同じTCを再実行する場合は前回成果物参照を持つ別成果物 / versionを開始します。
 
 ## 9. 実行開始後の変更
 
@@ -276,10 +279,8 @@ run固定条件が途中で変わった場合、または元TCが要求してい
 | 対象 |  |  |
 | テストケース入力元 / 成果物参照 |  |  |
 | TC revision / content identity |  |  |
-| 今回の実行対象TC参照集合 |  |  |
+| 今回の実行対象`test_case_ref`集合 |  |  |
 | 前回実行成果物参照 |  |  |
-| 環境 / URL / origin |  |  |
-| version / build ID |  |  |
 | 実行日時 |  |  |
 | 使用した実行手段 | Playwright MCP等 / browser操作 / 独立一時Playwrightコード |  |
 | テスト対象資料参照 |  |  |
@@ -294,6 +295,15 @@ run固定条件が途中で変わった場合、または元TCが要求してい
 | 許可origin |  |  |
 | version / build |  |  |
 | その他今回固定する条件 |  |  |
+
+### TC参照対応
+
+結果表・条件表では一意な`test_case_ref`をキーにします。入力側の正式識別子はこの対応表と実行前YAMLの`source_test_case_id`で保持します。
+
+| TC参照 | 元TC ID | 入力順 |
+| --- | --- | ---: |
+
+元TC IDがない場合は`元TC ID`を`なし`とします。重複元IDでも値は変更せず、各行は一意な`TC参照`で区別します。
 
 ### TC実行条件
 
@@ -319,8 +329,8 @@ run固定条件が途中で変わった場合、または元TCが要求してい
 
 ### 副作用上限・実行時cleanup
 
-| 副作用scope | 最大回数 | 累計実施回数 | 実行時cleanup対象 / 方法 | cleanup結果 | 残存状態 | 残数 / 状態 | 根拠 |
-| --- | ---: | ---: | --- | --- | --- | --- | --- |
+| 副作用scope | 最大回数 | 準備回数 | TC操作回数 | TC事後処理回数 | 実行時cleanup回数 | 累計実施回数 | 実行時cleanup対象 / 方法 | cleanup結果 | 残存状態 | 残数 / 状態 | 根拠 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- | --- | --- |
 
 ### 手順・観測結果
 
