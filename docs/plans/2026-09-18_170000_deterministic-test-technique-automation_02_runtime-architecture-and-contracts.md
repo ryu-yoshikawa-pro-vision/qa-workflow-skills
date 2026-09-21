@@ -166,10 +166,14 @@ runtime対象Skillは、Skill instructionへscript選択表を持ち、次の順
 | `test-condition-design` | 単一用途 | TCN / model draft作成後 | `condition_structure.py` | 必須 |
 | `test-condition-design` | 単一用途 | active modelの`model_type`が下表のgeneratorを持つ | model type対応generator | modelごとに必須 |
 | `test-condition-design` | 単一用途 | test data要求が1件以上ある | `test_data_requirements.py` | 条件付き |
-| `test-condition-design` | 単一用途 | current machine targetまたは`semantic_coverage_items[]`が1件以上ある | `materialize_coverage.py` | TCNごとに必須 |
+| `test-condition-design` | 単一用途 | TCN配下にactiveなCoverage所有modelが1件以上ある | `materialize_coverage.py` | TCNごとに必須 |
 | `test-case-design` | 単一用途 | 成果物確定前 | `case_structure.py` | 必須 |
 | `coverage-analysis` | `テスト設計` | traceabilityを検査する | `traceability.py` | 必須 |
-| `qa-workflow` | 単一用途 | runtime状態を集約する | `workflow_runtime.py` | 必須 |
+| `qa-workflow` | 単一用途 | `workflow_runtime.py`自身を除く本Plan対象runtime unitの期待集合が1件以上ある | `workflow_runtime.py` | 条件付き |
+
+`materialize_coverage.py`はcurrent machine targetやsemantic itemが0件でも、TCN配下にactiveなCoverage所有modelが1件以上あれば実行します。runtimeなしsemantic modelやtarget 0件のmodelも`model_completion[]`を明示し、空入力をvacuous completeにしません。whole-model `unsupported`は既存のunsupported closure契約で閉じ、成功`model_completion[]`を捏造しません。
+
+`workflow_runtime.py`は、`workflow_runtime.py`自身を除く本Plan対象runtime unitの期待集合が1件以上ある場合だけdispatchします。`test-analysis: E2E対象選定`、`coverage-analysis: TC → E2E実装 / E2E実装 → 実行結果`等、本Plan対象runtime unitが0件のE2E-only経路ではdispatchせず、既存`qa-workflow`の完了契約を維持します。Python unavailableだけを理由に本Plan対象runtimeがない経路を`blocked`へ変更しません。
 
 model typeからgeneratorへの対応は次だけを許可します。model runtimeの`expected_runtime_units[]`はこの表から、artifact runtimeの`expected_runtime_units[]`は直前のSkill dispatch表から導出し、両集合を連結します。
 
