@@ -74,6 +74,7 @@ CLI integration testは各runtime scriptの`valid_minimal.json`をCIのPython 3.
 - canonical serializerが専用number型をstring化せず、exact numeric表現を指数表記なしのJSON numberへ戻す
 - `1 != "1"`、`1.0 != "1.0"`、`1e3 != "1e3"`を固定回帰にする
 - raw numeric token / canonical numeric representationの4096 chars上限超過を`limit_exceeded`にし、丸めない
+- `1e1000000000`等、raw token自体は短いが展開後canonical桁数が上限を超えるexponentを、巨大な文字列 / integerを生成する前の桁数計算で`limit_exceeded`にする
 - nullと欠落の区別
 
 ### runtime envelope
@@ -99,6 +100,8 @@ CLI integration testは各runtime scriptの`valid_minimal.json`をCIのPython 3.
 - status対応表どおりの`support_status / result_status / runtime_required / deterministic_generated`を要求
 - model scriptでは`model_status=result_status`、artifact全体scriptでは`artifact_status=result_status`
 - staleはruntime statusではなく`freshness_status`で表現する。semantic dependency preflight成功後に現在scriptを正常実行したresultは保存時に`current`、`workflow_runtime.py`は共通freshness関数で再検証して必要なresult / Entityを`stale`へ変更する
+- model generator envelope → `materialize_coverage.py`の`current_model_result_row`と、全runtime envelope → traceability / workflowの`runtime_unit_row`を`runtime_contract.py`固定projectionで生成する。callerによるpayload flattenを禁止し、`freshness_status=current`はcurrent再実行・envelope検証成功後だけ付与する
+- `runtime_unit_row`は`upstream_entity_fingerprints[]`をenvelopeからそのまま使用し、別名`upstream_entities[]`へ置換しない
 - strict decode前の空stdin / 不正UTF-8 / duplicate JSON / byte・depth上限ではpre-parse error envelopeを返し、未確定の`runtime_unit_key / model_key / input_fingerprint / model_fingerprint / generation_fingerprint=null`を検証する。callerが推測値を補わない
 - stderrへ入力全文・secretを出さない
 - unknown `route_to` / `resume_skill`を拒否
@@ -112,6 +115,7 @@ CLI integration testは各runtime scriptの`valid_minimal.json`をCIのPython 3.
 - `authority_refs` / `reference_refs`の順序差でfingerprintが変わらない
 - 順序に意味があるfactor / value / transition配列の順序変更はfingerprintへ反映
 - decimal / date / fixed-offset datetimeの正規化
+- fixed-offset datetimeはcanonical value / fingerprintで元offsetを保持しつつ、range比較・intersectionではoffset適用後のabsolute instantで大小比較する
 - 人間向け説明文だけを変えてもinput / model fingerprintが変わらない
 - script固有input、`authority_refs`、`reference_refs`、modelの`selection_source`変更で`input_fingerprint`が変わる
 - artifact全体scriptでもinput変更で`input_fingerprint / generation_fingerprint`が変わる
@@ -126,6 +130,7 @@ CLI integration testは各runtime scriptの`valid_minimal.json`をCIのPython 3.
 - 直接依存する上流runtime unitの`generation_fingerprint`変更で下流unitだけがstaleになる
 - envelope version、generator、runtime contract、generator contract、実装fingerprint、static data version変更で`generation_fingerprint`が変わる
 - runtime / generator source変更で実装fingerprintが変わり、意味契約を変えないbug fixでも旧machine evidenceを同一生成条件として再利用しない
+- model generatorとartifact runtimeの全scriptについて、Skill-local importは`runtime_contract.py`だけを許可し、別helperへ実行ロジックを逃がす実装をCIで拒否する
 - 既存成果物再利用時もdispatch対象runtimeを現在scriptで再実行し、保存済みruntime resultだけでcurrent判定しない
 - 以前whole-model `unsupported`だったfixtureをruntime対応後に再実行するとsupported経路へ移り、古いfallbackを固定しない
 - adapter / child modelを同じ`condition_structure.py`実行で先に採番し、childの`derived_from_model_draft_key → derived_from_model_key`を固定する。adapter実行後にchildを追加してTechnique Selection閉鎖を一時的に破る経路を作らない
@@ -254,6 +259,8 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 - Coverage所有modelだけ`selection_source=analysis / condition_design / user`を持ち、内部adapterは`technique_slug / selection_source / selection_key=null`
 - 各TCNの`technique_slugs[]`と所属Coverage所有modelのcanonical `technique_slug`集合を完全一致で検証する
 - Classification Tree / Cause-Effect / schema adapterは正規技法を所有せず、child Coverage modelがcanonical techniqueと元のselection provenance、`derived_from_model_key`を持つ
+- child model Entityはadapter model Entityをsemantic dependencyへ持つが、`condition_structure.py`時点では未実行のadapter runtime generationを`runtime_dependencies[]`へ要求しない。adapter runtime依存はchild generatorの`upstream_runtime_units[]`で検証する
+- adapter派生childは親adapterがcurrent `result_status=ready`かつ対応`derived_child_inputs[]`がちょうど1件になるまでgeneratorをdispatchせず`expected_runtime_units[]`へも追加しない。親adapter unresolved / blocked / stale時にchild missing runtime blockerを重複生成しない
 - 1つのselectionは複数TCN / modelへ展開できるが、active Technique Selectionの`selected_techniques[]`に残る各技法は少なくとも1件のcurrent Coverage所有modelへ到達することを検証する
 - 選択後に不適用 / 未解決となった技法はTechnique Selection Entity自体を更新してselected listから外すか既存block / unresolvedへ戻し、未定義のselection closureでは閉じない
 - runtime非対応はCoverage所有model生成後のunsupported closureで扱う
@@ -409,7 +416,7 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 
 - production_key一意性
 - undefined nonterminal
-- unreachable production
+- unreachable productionはCoverage母集団から除外せず`issue_type=unreachable_production / result_status=unresolved`となり、対象production keyを保持して`test-condition-design`へ戻る
 - recursion / max depth
 - production適用回数最小 + production key列辞書順tie-breakのshortest derivation
 - valid case集合が各production shortest derivationのdedupe unionだけであること
@@ -453,7 +460,9 @@ raw machine-readable入力をfixtureにします。
 - unsupported applicator
 - `$schema`とroot `$id`だけをmetadataとして許可し、annotation allowlistだけをvalidation非影響として許可
 - unsupported keywordが意味へ影響するsubtreeだけを局所`unsupported`
+- local `$ref`はURI fragmentのpercent-decode → UTF-8検証 → JSON Pointer token decodeの順で処理し、malformed percent escape / invalid UTF-8を拒否する
 - local JSON Pointerの`~1` / `~0` decode順、不正`~` escape拒否を検証する
+- array pointerは`0|[1-9][0-9]*`だけを許可し、leading zero / `-` / out-of-range index / nonexistent object memberを拒否する
 - JSON Schema / OpenAPI local `$ref`のself-cycleとmutual cycleを`cyclic_local_ref`として有限時間で局所`unsupported`にし、独立siblingを処理できる
 - 親validation意味を左右する場合は親subtree全体を`unsupported`
 - HTML `pattern`を対応済みconstraintとして扱わず、適用されるcontrolでは`unsupported`を返す
@@ -523,6 +532,7 @@ raw machine-readable入力をfixtureにします。
 
 - TCN配下にactiveなCoverage所有modelが1件以上あれば、machine target / semantic itemが0件でも`materialize_coverage.py`をdispatchする。semantic-only Error Guessing、fork-join、partial / whole-model unsupportedの`llm_fallback`を含み、targetなしsemantic model 0件は`materialize_complete=false`とする
 - `active_model_metadata[]`でruntimeなしmodelのTCN所属を検証する
+- legacy初回昇格ではnormal mapping stateが空のときだけ`legacy_ci_seed[]`を許可し、既存CIをcurrent runtime target / semantic item draftへ一意に対応付けて通常mapping stateへ移す。unknown / duplicate / 別TCN / 別model seedを拒否し、normal state生成後のlegacy seed再投入を拒否する
 - semantic itemのstable key / previous mapping / reuse CIを検証し、別item・別model・runtime target CIへの横取りを拒否する。`source_target_versions[]`はsemantic item自身の`model_key`に属するcurrent targetだけを許可する
 - test data requirement Entity fingerprint変更をCI / TC staleへ反映する
 
@@ -592,6 +602,8 @@ raw machine-readable入力をfixtureにします。
 
 ## 5. stable identity・再実行の回帰
 
+- legacy初回昇格では現在観測できるTR / TCN / CI / TCをactive seedとして取り込み、未知の過去deleted履歴を捏造しない。TR / TCN / TCは意味上同一なら既存IDをreuseし、legacyにmodel keyがなければ新規採番する。未対応legacy CIと参照TCは`要再検証`へする
+- directで前工程Machine Entityなしに生成した成果物は2回目の再利用でもdirectで成立し、自SkillMachine Entityの存在だけでartifactへ強制変更しない。必要な外部Machine Entityがすべて揃ったfixtureではdirect → artifactへ切り替え、`input_mode`変更によりruntimeを再実行する
 - TR / TCN / model / TCは`update_scope_*`内のprevious activeでcurrent reuseされないIDだけをdeletedへ遷移し、scope外activeを維持する。previous state自体は成果物系列のfull snapshotを保持し、部分更新でも過去最大番号とdeleted履歴を失わない
 - 複数new draftはcanonical `draft_key`順、semantic CIはcanonical candidate順で採番し、raw入力配列順へ依存しない
 
