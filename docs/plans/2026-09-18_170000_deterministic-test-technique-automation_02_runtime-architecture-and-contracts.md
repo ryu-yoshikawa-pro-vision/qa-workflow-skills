@@ -148,12 +148,14 @@ runtime対象Skillは、Skill instructionへscript選択表を持ち、次の順
 
 既存Skillの途中工程開始・単体利用を維持するため、runtime invocationは`metadata.input_mode=artifact|direct`を必須にします。
 
-- `artifact`: 前工程または再利用成果物のcanonical Machine Entityを使う経路です。script固有inputが参照する外部semantic dependencyは、PlanでMachine Entity化すると定義したものを`upstream_entities[]`へ完全に解決します。missing / extra / duplicateを拒否します
+- `artifact`: 前工程または再利用成果物のcanonical Machine Entityを使う経路です。script固有inputが参照する外部semantic dependencyのうち、PlanでMachine Entity化すると定義したものがすべてcurrent Machine Entityとして実在する場合だけ使用します。`upstream_entities[]`へ完全に解決し、missing / extra / duplicateを拒否します
 - `direct`: 既存Skillの入力契約が許すユーザー入力または同等の成果物から、そのSkillを途中工程として直接開始する経路です。存在しない前工程Machine Entityを捏造せず、欠落とも扱いません。実際に消費する意味fieldはscript固有inputへ正規化し、`input_fingerprint`へ含めます。現在invocationが生成するEntityはstructure / builder runtime dependencyを持つため、direct input変更もgeneration差分として検出します
 - `direct`でもcurrent Machine Entityが明示的に渡された参照は通常どおり検証してsemantic dependencyへ保存します。Machine Entityを渡した参照だけを無視してdirect inputへ黙って置き換えません
-- `qa-workflow`がcurrentなMachine Entity付き成果物を再利用する場合は`artifact`、既存Skill契約に従って途中工程から直接開始する場合とlegacy成果物を新契約へ初回昇格する場合は`direct`を使用します。昇格後の再利用は`artifact`へ移ります
+- direct開始で外部semantic dependencyの一部がMachine Entity化されていない成果物は、自SkillのMachine Entityを保存済みという理由だけで次回`artifact`へ切り替えません。再利用時も不足する前工程Entityを合成せず`direct`を維持します
+- `direct → artifact`へ切り替えるのは、そのscriptが必要とする外部semantic dependencyがすべてcurrent Machine Entityとして実在し、固定builderで完全解決できる時点だけです。切替時は`input_mode`変更を`input_fingerprint`へ反映してruntimeを再実行し、旧generationをcurrent扱いしません
+- `qa-workflow`が必要な外部Machine Entityをすべて持つ成果物を再利用する場合は`artifact`、既存Skill契約に従って途中工程から直接開始する場合とlegacy成果物を新契約へ初回昇格する場合は`direct`を使用します。legacy昇格後も前工程Machine Entityが存在しない境界は上記規則に従って`direct`を維持できます
 
-これによりSkill単体コピー時に前工程Skillの成果物生成を強制せず、workflow内で利用できるMachine Entity dependencyも失いません。
+これによりSkill単体コピー時に前工程Skillの成果物生成を強制せず、workflow内で実在するMachine Entity dependencyも失いません。
 
 | Skill | 対象 / 実行範囲 | 条件 | script | 実行 |
 | --- | --- | --- | --- | --- |
@@ -164,7 +166,7 @@ runtime対象Skillは、Skill instructionへscript選択表を持ち、次の順
 | `test-analysis` | `テスト分析` | test-analysis成果物を保存する | `analysis_entities.py` | 必須 |
 | `test-requirement-design` | 単一用途 | 成果物確定前 | `requirement_structure.py` | 必須 |
 | `test-condition-design` | 単一用途 | TCN / model draft作成後 | `condition_structure.py` | 必須 |
-| `test-condition-design` | 単一用途 | active modelの`model_type`が下表のgeneratorを持つ | model type対応generator | modelごとに必須 |
+| `test-condition-design` | 単一用途 | active modelの`model_type`が下表のgeneratorを持つ。adapter派生childは親adapterがcurrent `result_status=ready`で対応`derived_child_inputs[]`がちょうど1件ある | model type対応generator | modelごとに必須 |
 | `test-condition-design` | 単一用途 | test data要求が1件以上ある | `test_data_requirements.py` | 条件付き |
 | `test-condition-design` | 単一用途 | TCN配下にactiveなCoverage所有modelが1件以上ある | `materialize_coverage.py` | TCNごとに必須 |
 | `test-case-design` | 単一用途 | 成果物確定前 | `case_structure.py` | 必須 |
@@ -175,7 +177,7 @@ runtime対象Skillは、Skill instructionへscript選択表を持ち、次の順
 
 `workflow_runtime.py`は、`workflow_runtime.py`自身を除く本Plan対象runtime unitの期待集合が1件以上ある場合だけdispatchします。`test-analysis: E2E対象選定`、`coverage-analysis: TC → E2E実装 / E2E実装 → 実行結果`等、本Plan対象runtime unitが0件のE2E-only経路ではdispatchせず、既存`qa-workflow`の完了契約を維持します。Python unavailableだけを理由に本Plan対象runtimeがない経路を`blocked`へ変更しません。
 
-model typeからgeneratorへの対応は次だけを許可します。model runtimeの`expected_runtime_units[]`はこの表から、artifact runtimeの`expected_runtime_units[]`は直前のSkill dispatch表から導出し、両集合を連結します。
+model typeからgeneratorへの対応は次だけを許可します。model runtimeの`expected_runtime_units[]`はこの表から、artifact runtimeの`expected_runtime_units[]`は直前のSkill dispatch表から導出し、両集合を連結します。adapter派生child（`derived_from_model_key != null`）は、親adapter runtimeがcurrent `result_status=ready`で、そのchildに対応する`derived_child_inputs[]` rowがちょうど1件存在する場合だけdispatch対象かつ期待runtime集合へ追加します。親adapterが`unresolved / blocked / stale`、未実行、または対応row欠落の間はchild runtime unitを期待集合へ入れず、親adapter側のissue / freshnessをblockerとして扱います。
 
 | model_type | generator |
 | --- | --- |
@@ -380,6 +382,13 @@ scriptが実行できた場合、stdoutは次のJSON object 1件だけです。
 
 output envelopeの`skill`はinput metadataおよびscript所属Skillと一致必須です。`upstream_entity_fingerprints[]`はinput metadataの`upstream_entities[]`からruntimeが計算し、`upstream_runtime_units[]`は入力参照をcanonical順で正規化して保存します。callerがfingerprint結果だけを出力へ注入しません。
 
+現在実行結果を下流runtimeへ渡すときは、各Skillの`runtime_contract.py`に置く固定projectionだけを使用します。LLM / Agentがenvelopeの`payload`をflattenしたりmetadataを補完したりしません。
+
+- model generator → `materialize_coverage.py`では、current envelopeとcurrent model metadataから`current_model_result_row`を作る。`model_key / model_type / technique_slug / skill / runtime_unit_key / input_fingerprint / model_fingerprint / generation_fingerprint / generator_contract_version / support_status / runtime_status / result_status / deterministic_generated`はenvelopeまたはcurrent model metadataから固定転記し、`targets[] / unsupported_items[] / coverage_summary / completion_summary`等はenvelopeの`payload`からmodel type別schemaどおり投影する
+- `freshness_status=current`はsemantic dependency preflightに成功したcurrent inputをcurrent scriptで再実行し、envelope検証まで成功したrowに固定projectionが付与する。保存済みresultやcaller申告値から付与しない
+- `traceability.py / workflow_runtime.py`へ渡す`runtime_unit_row`はcurrent envelopeから`skill / runtime_unit_key / model_key / support_status / result_status / runtime_status / runtime_required / deterministic_generated / generation_fingerprint / upstream_entity_fingerprints[] / upstream_runtime_units[] / unsupported_items[]`を固定転記する。`model_completion[] / target_mappings[] / target_dispositions[]`は`materialize_coverage.py` unitだけcurrent materialize resultから追加し、他unitでは空配列固定とする
+- これらのprojectionは保存用`Machine Runtime Result`と同じsource envelopeから作り、field名の別解釈や匿名の中間schemaを作らない
+
 strict JSON objectと共通metadataを確定する前に失敗した場合はpre-parse error envelopeを使用します。`skill / generator / runtime_contract_version / generator_contract_version / runtime_implementation_fingerprint / generator_implementation_fingerprint / runtime_status / support_status / result_status / runtime_required / deterministic_generated / payload / issues`は返し、未確定の`runtime_unit_key / model_key / input_fingerprint / model_fingerprint / generation_fingerprint`は`null`、`upstream_entity_fingerprints / upstream_runtime_units`は空配列にします。byte上限やdepth上限をstrict decode前に検出した場合も同じ形で返し、入力内容からidentityを推測しません。
 
 `support_status`は`supported / partial / unsupported / unknown`です。`partial`は同一input内に、独立して機械処理できる範囲と対応subset外の範囲が共存する場合だけ使用します。対応subset外部分は`payload.unsupported_items[]`へstable key、理由、Authorityを保持し、黙って削除しません。`unknown`はsupport判定を完了できなかった場合だけ使用し、`invalid_input / internal_error / not_run`とstrict decode前の`limit_exceeded`以外では返しません。
@@ -473,6 +482,7 @@ fingerprintはSHA-256で計算します。入力はUTF-8のcanonical JSONです�
 - decimalは指数表記を使わず、整数部の不要な先頭0と小数部の末尾0を除去し、`-0`は`0`へ正規化する
 - dateは`YYYY-MM-DD`、local datetimeは`YYYY-MM-DDTHH:MM:SS`、fixed-offset datetimeは`YYYY-MM-DDTHH:MM:SS±HH:MM`だけをcanonical表現とし、fractional secondを禁止する
 - fixed-offset datetimeのoffsetは意味データとして保持し、fingerprint用にUTCへ変換しない
+- fixed-offset datetimeの大小比較・range intersectionはoffsetを適用したabsolute instantで行う。canonical value / fingerprintでは入力のoffset表現を保持し、named timezone / DST ruleを導入しない
 - JSON whitespaceは除去
 - 非有限数は不可
 
@@ -512,7 +522,7 @@ artifact全体scriptでは`model_fingerprint=null`です。ただし`input_finge
 - `upstream_entity_fingerprints`: 実際に消費した`upstream_entities[]`を`(skill, entity_type, entity_ref)`でsortした`{skill, entity_type, entity_ref, content_fingerprint}`配列
 - `static_data_versions`
 
-`runtime_implementation_fingerprint`は実行した`runtime_contract.py`、`generator_implementation_fingerprint`は実行scriptについて、UTF-8 textの`CRLF / CR`を`LF`へ正規化したbytesをSHA-256した値です。runtime自身が計算し、呼び出し側の申告値を正本にしません。generator scriptはPython標準ライブラリと同一Skillの`runtime_contract.py`以外のSkill-local Python moduleをimportしません。これによりgenerator実装fingerprintの対象外で実行ロジックが変わる経路を作りません。
+`runtime_implementation_fingerprint`は実行した`runtime_contract.py`、`generator_implementation_fingerprint`は実行scriptについて、UTF-8 textの`CRLF / CR`を`LF`へ正規化したbytesをSHA-256した値です。runtime自身が計算し、呼び出し側の申告値を正本にしません。本Planで追加する全runtime scriptはPython標準ライブラリと同一Skillの`runtime_contract.py`以外のSkill-local Python moduleをimportしません。model generatorだけでなくartifact scriptも同じ制約です。共通exact numeric、intersection、canonicalization、freshness等の現在必要な共有処理は`runtime_contract.py`へ置き、implementation fingerprint対象外helperへ実行ロジックを逃がしません。
 
 したがって、同じartifact scriptでも入力、実際に消費した上流Entityのcanonical content、runtime contract、generator contract、実装内容、静的参照データのいずれかが変われば`generation_fingerprint`は変わります。`authority_refs`等のID文字列が同じでも、対応するEntity contentが変われば同じgenerationにはなりません。
 
@@ -651,7 +661,6 @@ runtime内部identityは`model_type`で分けます。
 - `test-requirement-design`: TR ID、本文、Authority、Risk、優先度、`priority_override_reason`、テストレベル / 観測方法、およびDisposition行
 - `test-condition-design`: TCN ID、TR、条件、技法、Coverage基準、Authority / Risk、優先度、`priority_override_reason`、`derived_from_model_key`を含むmodel metadata、target → CI mapping、およびDisposition行
 - `test-case-design`: TC ID、関連TR / TCN / CI、優先度、`priority_override_reason`、前提、データ、手順、期待結果、期待結果Authority、およびDisposition行
-- `coverage-analysis`: 対象上流 / 下流ID、Model Key、coverage / stale状態、修正Skill
 
 fingerprint対象の`content`はLLMが自由に再構成しません。各担当Skillが保存するmachine dataから次のcanonical schemaで機械的に組み立てます。
 
@@ -683,7 +692,7 @@ Machine Entityの`upstream_entity_dependencies[]`は次を最低限含めます�
 - test data requirement: `authority_refs[]`のAuthorityと`source_model_key`のcurrent model metadata。`source_target_versions=[]`のmodel-wide requirementではcurrent adapter modelも許可する。target-specific requirementではsource modelをCoverage所有modelに限定し、`source_target_versions[]`が同じ`source_model_key`のcurrent target versionと一致することを必須にする。source modelがruntime generatorを持つ場合は、そのcurrent model runtime unitも`runtime_dependencies[]`へ間接的に反映できるよう`test_data_requirements.py`の`upstream_runtime_units[]`へ保持する。source modelまたはtarget versionが変わればcurrent扱いしない
 - TR: `authority_refs[]`のAuthorityと`risk_refs[]`のProduct Risk
 - TCN: `tr_refs[]`のTR、直接`authority_refs[] / risk_refs[]`を持つ場合はそのAuthority / Product Risk
-- model metadata: 親TCN。`selection_source=analysis`では技法選択Entity。`derived_from_model_key`が非nullのchildでは参照adapter model Entityと、そのadapterのcurrent runtime unitをdependencyへ持つ
+- model metadata: 親TCN。`selection_source=analysis`では技法選択Entity。`derived_from_model_key`が非nullのchildでは参照adapter model Entityをsemantic dependencyとして持つ。child model Entityは`condition_structure.py`でadapter runtime実行前に生成されるため、まだ存在しないadapter runtime generationを`runtime_dependencies[]`へ要求しない。adapter runtime generationへの依存はchild generatorの`upstream_runtime_units[]`で保持し、そのchild runtimeへ依存する下流Entityへfreshnessを伝播する
 - CI: 親TCN、Coverage所有model metadata、参照するtest data requirement Entity。runtime targetでは現在target version、semantic itemでは本文と`source_target_versions[]`をcontentへ含める
 - TC: `tr_refs[] / tcn_refs[] / ci_refs[] / environment_requirement_refs[] / test_data_requirement_refs[]`の各Entityと各expected resultで実際に参照したAuthority
 - Disposition: `upstream_entity`、Authority、`covered_by_entity`がある場合はその参照先Entity。保存fingerprint不一致はstale
@@ -703,7 +712,7 @@ integer / decimalはstrict JSON decode時にPythonの`int` / `float` / `Decimal`
 
 - raw numeric tokenは4,096文字以下
 - canonical整数 / decimal表現は符号と小数点を含め4,096文字以下
-- exponent入力は許可するが、展開後canonical表現が4,096文字を超える場合は`limit_exceeded`
+- exponent入力は許可するが、coefficient桁数・scale・exponentから展開後canonical表現の桁数を文字列展開前に計算し、4,096文字を超える場合は巨大なゼロ埋めや整数生成を行わず`limit_exceeded`
 - 非有限数とJSON規格外number tokenは`invalid_input`
 - decimalは`integer coefficient + base-10 scale`へ正規化し、比較・加減算・乗算をexactに行う。Python `Decimal` context precisionやbinary floatへ結果を依存させない
 - BVA、range intersection、Metamorphic `add_decimal / multiply_decimal`は同じhelperを使う
