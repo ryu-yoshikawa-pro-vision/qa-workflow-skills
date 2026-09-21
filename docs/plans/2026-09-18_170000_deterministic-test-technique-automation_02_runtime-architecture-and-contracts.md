@@ -131,6 +131,21 @@ skills/qa-workflow/scripts/
 
 `workflow_runtime.py`は工程固有の意味判断を行いません。各成果物へ保存されたruntime metadata、上流Entity、runtime unit依存、fingerprintを入力として、runtime状態集約、freshness、stale伝播、機械的な完了可否を計算します。開始Skill、意味上の変更影響、既存成果物を意味的に再利用できるかの判断は既存`qa-workflow`責務に残します。
 
+### standalone最終runtime evidence確認
+
+`qa-workflow`を経由しないSkillでも必須runtime unitの丸ごと省略をproduction経路で検出するため、各Skill-local `runtime_contract.py`へ同一実装の`verify_runtime_evidence` operationを持たせます。これはdispatch対象runtime unitではなく、最終出力前の固定検査です。
+
+- inputはstrict JSON `{operation:"verify_runtime_evidence", skill, normalized_dispatch_state, artifact_markdown}`
+- `normalized_dispatch_state`は当該Skillの対象 / 実行範囲、active structure state、adapter parent runtime state等、§2.1の固定dispatch条件に必要なmachine dataを必須fieldで受ける。actual runtime block集合をexpected算出入力にしない
+- `runtime_contract.py`の共通expected-runtime builderが`normalized_dispatch_state`から`expected_runtime_units[]`を導出する
+- 同じ`runtime_contract.py`の既存Markdown抽出処理で`artifact_markdown`から`Machine Runtime Input / Result`の`(skill, runtime_unit_key)`を抽出し、InputとResultが1対1で揃うactual集合を作る
+- expected / actualのmissing、extra、Inputだけ、Resultだけ、duplicateを検出し、1件でもあれば`valid=false`とする。actual集合からexpectedを逆算しない
+- outputは`{valid, expected_runtime_units[], actual_runtime_units[], missing[], extra[], incomplete_pairs[], duplicates[]}`の固定JSONとする
+- このoperation自体はruntime unitではないため、Machine Runtime Input / Resultを保存せず、`expected_runtime_units[]`へ自身を追加しない。generation fingerprintやCoverage evidenceにも使用しない
+- runtime対象Skillは最終成果物を返す直前に必ずこのoperationを実行し、`valid=false`なら契約適合済み・完成済みとして返さない。これをdeterministic eval専用validatorへ委ねない
+
+`spec-analysis`はruntime unitを持たないためこの確認の対象外で、Authority Machine Entityの既存自己検証だけを行います。`qa-workflow`では`workflow_runtime.py`が全体expected集合を検査しますが、同じhelperを使って最終artifact内のruntime block pair欠落も確認します。
+
 ### 2.1 Skill実行時のdispatch契約
 
 runtime対象Skillは、Skill instructionへscript選択表を持ち、次の順序で実行します。
@@ -224,6 +239,17 @@ Cause-Effect → Decision Table、Classification Tree → combinatorial、schema
 - `ui` adapter → 正規技法modelを自動生成せず、既存`test-condition-design`の意味判断へ候補を渡す
 
 同じcanonical adapter inputと同じ意味parameterから同じ`derived_child_inputs[]`をadapter runtime自身が生成します。child inputの生成をAgent側helperやLLMへ分散しません。
+
+internal adapterはCoverageを所有せずCIを持たないため、adapter runtimeの`partial / unsupported`を通常Coverage modelの「同じmodelのCI」規則で`llm_fallback`へ閉じません。adapterのunsupported箇所を意味判断でテスト対象へ残す場合は、次で固定します。
+
+1. `test-condition-design`へ戻し、unsupported箇所を対象にする**直接定義のCoverage所有model**を同じTCNへ追加する。新modelは`derived_from_model_draft_key=null`とし、adapter派生childのmodel keyをlineage変更してreuseしない
+2. 直接定義modelの`technique_slug / selection_source / selection_key`は、当該adapterで事前採用済みだったchild techniqueとselection provenanceを維持する。adapter runtimeが新しい技法を選択しない
+3. LLMはunsupported箇所の意味をその直接定義modelの既存generator inputへ正規化し、generator以降は通常の決定論的経路を通す。これはruntimeが対応subset外と判定した箇所の明示fallbackに限り、supportedなmachine-readable入力をLLMへ戻さない
+4. adapterが`partial`ならsupported部分のadapter派生childは維持でき、unsupported itemだけを追加した直接定義modelのcurrent CIへ閉じる。whole-model `unsupported`なら、実行不能なadapter派生childを`update_scope_model_keys[]`へ含めてdeletedへ遷移し、直接定義modelをcurrent Coverage所有modelとする
+5. adapter runtimeの`unsupported_item_closures[]`で`handling=llm_fallback`を使う場合に限り、`covered_by_entity`は同じTCNの上記直接定義modelに属するcurrent CIを参照できる。通常Coverage modelのunsupported closureは従来どおり同じ`model_key`のCIだけを許可する
+6. `対象外 / 別テストレベル / 残存リスク / 成立不能 / ブロック中`等で閉じる場合は既存Disposition条件をそのまま使用し、fallback modelを作るためだけの追加schemaを導入しない
+
+adapter generation / unsupported item identityとclosureの世代一致は既存契約どおり維持します。fallback用plugin、別adapter、別migration層は追加しません。
 
 ## 3. 共通JSON契約
 
