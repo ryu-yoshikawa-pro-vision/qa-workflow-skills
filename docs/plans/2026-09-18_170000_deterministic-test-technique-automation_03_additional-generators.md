@@ -39,6 +39,8 @@ fork / join regionは曖昧に導出せず、次を正規化入力として明�
 - region同士がcrossingする場合は`unsupported`
 - scheduler interleavingは仕様なしに生成しない
 - fork-join targetは直接linear executionへ落とさずsemantic Coverage Itemへ閉じる
+- `node / edge / bounded-path / simple-loop`でcanonical witnessまたはsetup prefixがforkからmatching joinまでのregionを横断する、またはtarget自体がそのregion内部にある場合、runtime-v1はそのtargetを単一`edge_sequence`へmaterializeしない。該当targetは`materializable=false`とし、stableな`unsupported_items[]`へ`reason_code=concurrent_flow_requires_semantic_execution`で残す
+- concurrencyの影響を受けないrequired targetと混在する場合は`support_status=partial`として独立targetだけ生成する。選択Coverage criterionのrequired targetがすべてconcurrency依存ならwhole-model `unsupported`とし、既存のsemantic fallback / unsupported closureで閉じる。scheduler、interleaving列挙、並行実行engineは追加しない
 
 simple loopは次を明示します。
 
@@ -212,6 +214,8 @@ runtime-v1の対応subset:
 
 `$ref`はruntime内でnetwork解決しません。runtime-v1で対応するreferenceは同一schema resource内の`#/...` JSON Pointerだけです。root schemaの`$id`はmetadataとして保持できますが、subschemaに`$id`があり別schema resource / base URIを形成するdocument、plain-name fragment、`$anchor / $dynamicAnchor / $dynamicRef`、外部URI referenceは`unsupported`です。これによりnested `$id`を無視してdocument rootへ誤解決しません。
 
+local JSON PointerはRFC 6901のtoken escapeを使用し、各tokenで`~1`を`/`、次に`~0`を`~`へdecodeします。`~`の後が`0 / 1`以外の不正escapeは受理しません。`$ref`解決中は現在解決中のJSON Pointerをactive stack / setで追跡し、activeなpointerへ再入した場合はその影響subtreeを`unsupported`、`reason_code=cyclic_local_ref`として打ち切ります。self-cycleとmutual cycleのrecursive schema semanticsはruntime-v1で実装せず、独立して評価できるsibling property / itemは既存の局所`unsupported`規則に従って継続します。
+
 JSON Schema 2020-12では`$ref`のsibling keywordも評価対象です。したがって`$ref`と並ぶ対応subset keywordは通常どおり評価し、未知またはruntime-v1非対応keywordがvalidation意味へ影響する場合はそのsubtreeを`unsupported`にします。`$ref`があるという理由でsiblingを捨てません。
 
 `type`は単一type文字列、または`[<non-null type>, "null"] / ["null", <non-null type>]`の2要素だけを対応し、2要素形式は`allows_null=true`へ正規化します。それ以外のunion typeは`unsupported`です。
@@ -232,7 +236,7 @@ OpenAPI 3.0はJSON Schema 2020-12として解釈しません。runtime-v1ではP
 - 同一propertyで`readOnly=true`かつ`writeOnly=true`は`invalid_input`
 - `title / description / default / example / deprecated`はannotationとして保持してもvalidation Coverageへ使用しない
 - Reference Objectは`$ref`だけを意味fieldとして扱う。OpenAPI 3.0のReference Objectへ追加されたpropertyは仕様どおり無視し、参照先schemaのsibling assertionとして解釈しない
-- runtime-v1で対応するreferenceは同一OpenAPI document内のlocal JSON Pointerだけ。外部document referenceは事前dereference済み入力を要求する
+- runtime-v1で対応するreferenceは同一OpenAPI document内のlocal JSON Pointerだけ。外部document referenceは事前dereference済み入力を要求する。local reference解決はJSON Schema側と同じRFC 6901 token decode、不正escape拒否、active pointer cycle検出を使用し、cycleへ再入した影響subtreeを`unsupported / reason_code=cyclic_local_ref`とする
 - JSON Schema 2020-12だけのkeywordをOpenAPI 3.0へ暗黙適用しない
 
 ### HTML form control
