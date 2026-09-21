@@ -248,6 +248,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 #### `requirement_structure.py`
 
 - required: `authorities[]`, `risks[]`, `test_requirements[]`, `dispositions[]`, `previous_tr_ids[]`, `update_scope_tr_ids[]`
+- optional: `legacy_tr_ids[]`。初回legacy昇格時だけ使用し、`input_mode=direct / previous_tr_ids=[]`を必須にする。各値は一意な`TR-\d{3}`で、`runtime_contract.py`のlegacy ID seed helperが`{tr_id,status:"active"}`へ変換してから通常処理へ入る。normal previous stateと併用した場合は`invalid_input`
 - TR draft: `{draft_key, identity_action, reuse_id, text, authority_refs[], risk_refs[], priority, priority_override_reason, test_level, observation_method}`
 - `draft_key`は入力内一意、`identity_action=reuse|new`。reuse時だけactiveな既存`TR-\d{3}`を`reuse_id`へ指定し、new時は`reuse_id=null`
 - `previous_tr_ids[]`: `{tr_id, status}`、`status=active|deleted`の成果物系列full snapshot
@@ -262,6 +263,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 #### `condition_structure.py`
 
 - required: `test_requirements[]`, `technique_selections[]`, `test_conditions[]`, `requirement_dispositions[]`, `models[]`, `previous_tcn_ids[]`, `previous_model_keys[]`, `update_scope_tcn_ids[]`, `update_scope_model_keys[]`
+- optional: `legacy_tcn_ids[]`。初回legacy昇格時だけ使用し、`input_mode=direct / previous_tcn_ids=[] / previous_model_keys=[]`を必須にする。各値は一意な`TCN-\d{3}`で、helperがactive previous TCN stateへseedする。legacyにmodel keyがない場合はmodel stateを捏造せずcurrent model draftをnew採番する。normal previous stateと併用した場合は`invalid_input`
 - TR: `{tr_id, priority, authority_refs[], risk_refs[]}`。各`tr_id`は入力内一意
 - Technique Selection: `{selection_key, selected_techniques[], undetermined_signal_closures[], status}`。`selection_key`は入力内一意、`selected_techniques[]`はcanonical technique slugで重複不可。`status=active`だけmodel閉鎖の対象にし、activeではcurrent undetermined signalがすべて`selection_not_affected`で閉じ、`question` closureが0件であることを必須にする
 - TCN draft: `{draft_key, identity_action, reuse_id, tr_refs[], condition, category, technique_slugs[], coverage_criterion, authority_refs[], risk_refs[], priority, priority_override_reason}`。`draft_key`は入力内一意、`condition / coverage_criterion`は非空文字列、`category`は文字列またはnull、`technique_slugs[]`は`_02` §4.3のcanonical technique slugだけを許可し重複不可。意味上の同一性はLLMが`identity_action=reuse|new`で決め、reuse時だけactiveな既存`TCN-\d{3}`を`reuse_id`へ指定する
@@ -457,6 +459,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 #### `case_structure.py`
 
 - required: `test_conditions[]`, `coverage_items[]`, `environment_requirements[]`, `test_data_requirements[]`, `test_cases[]`, `dispositions[]`, `previous_tc_ids[]`, `update_scope_tc_ids[]`
+- optional: `legacy_tc_ids[]`。初回legacy昇格時だけ使用し、`input_mode=direct / previous_tc_ids=[]`を必須にする。各値は一意な`TC-\d{3}`で、helperがactive previous TC stateへseedする。normal previous stateと併用した場合は`invalid_input`
 - TCN: `{tcn_id, tr_refs[], priority}`
 - CI: `{ci_id, tcn_id, model_key, priority, authority_refs[], source_kind, execution, semantic_item_key, semantic_item_text, semantic_source_targets[], test_data_requirement_refs[]}`
 - environment / test data requirementはcurrent Machine Entityのcanonical contentとcontent fingerprintを渡す
@@ -486,7 +489,9 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 #### `materialize_coverage.py`
 
 - required: `tcn_id`, `active_model_metadata[]`, `models[]`, `semantic_coverage_items[]`, `target_annotations[]`, `target_dispositions[]`, `test_data_requirements[]`, `previous_target_id_map[]`, `previous_semantic_ci_map[]`, `previous_ci_ids[]`, `previous_expected_result_roots[]`, `merge_groups[]`
-- optional: `legacy_ci_seed[]`。normal target / semantic mapping stateがまだ存在しないlegacy初回昇格だけ許可し、通常再実行ではfield自体を渡さない
+- optional: `legacy_ci_ids[]`, `legacy_ci_seed[]`。normal target / semantic mapping stateと`previous_ci_ids[]`がまだ存在しないlegacy初回昇格だけ許可し、通常再実行ではfield自体を渡さない
+- `legacy_ci_ids[]`は現在legacy成果物に存在する全CI IDを一意な`CI-\d{3}`で列挙する。`runtime_contract.py`のlegacy ID seed helperが全件`status=active`の`previous_ci_ids[]`へ変換し、未対応CIも過去最大番号と再利用禁止stateへ含める
+- `legacy_ci_seed[]`は`legacy_ci_ids[]`のsubsetで、意味上current target / semantic itemへ対応付けて既存CI IDを維持するrowだけを持つ。`legacy_ci_seed[]`だけから全previous CI stateを逆算しない
 - `tcn_id`は`TCN-\d{3}`
 - `active_model_metadata[]`: `{model_key, model_type, technique_slug, parent_tcn_id, content_fingerprint}`。TCN配下の全current modelを渡し、`parent_tcn_id`はinputの`tcn_id`と一致必須
 - TCN配下にactiveなCoverage所有modelが1件以上あれば、current machine target / semantic itemが0件でも`materialize_coverage.py`をdispatchする。runtimeなしsemantic modelでは0件を成功扱いせず対応`model_completion[]`を`materialize_complete=false`とする。whole-model `unsupported`は成功rowを作らずunsupported closureを最終条件にする
@@ -507,7 +512,8 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - `previous_semantic_ci_map[]`: `{semantic_item_key, model_key, ci_id, mapping_status, semantic_content_fingerprint}`。`mapping_status=active|inactive`
 - `previous_ci_ids[]`: `{ci_id, status}`。`status=active|deleted`で削除済み番号も保持する
 - `previous_expected_result_roots[]`: `{expected_result_root, status}`。`status=active|deleted`。same-meaning groupのreuse可否はLLMが判断し、runtimeはunknown / duplicate / deleted keyの不正reuseを検査する
-- `legacy_ci_seed[]`: `{ci_id, model_key, source_kind, target_ref, semantic_item_draft_key}`。`source_kind=runtime_target|semantic_item`。runtime targetではcurrent targetに一致する`target_ref`必須 / semantic draft keyはnull、semantic itemではcurrent draftに一致する`semantic_item_draft_key`必須 / target refはnull。既存CI IDはinputの`tcn_id`配下であること、modelがcurrent active modelであること、1 CI / 1 target / 1 semantic draftを複数seedへ重複利用しないことを検証する。seedされたidentityは通常のtarget / semantic mappingへ変換し、以後legacy専用stateとして保持しない
+- `legacy_ci_seed[]`: `{ci_id, model_key, source_kind, target_ref, semantic_item_draft_key}`。`source_kind=runtime_target|semantic_item`。runtime targetではcurrent targetに一致する`target_ref`必須 / semantic draft keyはnull、semantic itemではcurrent draftに一致する`semantic_item_draft_key`必須 / target refはnull。`ci_id`は`legacy_ci_ids[]`に存在必須。既存CI IDはinputの`tcn_id`配下であること、modelがcurrent active modelであること、1 CI / 1 target / 1 semantic draftを複数seedへ重複利用しないことを検証する。seedされたidentityは通常のtarget / semantic mappingへ変換し、以後legacy専用stateとして保持しない
+- `legacy_ci_ids[]`に存在して`legacy_ci_seed[]`へ対応しなかったCIは新targetへ推測割当てせず、current TCNの通常lifecycleでdeletedへ遷移させる。番号rowは`ci_id_state[]` full snapshotへ残し、そのCIを参照するlegacy TCは`要再検証`対象とする
 - previous active target / semantic mappingがcurrentでreuseされなければinactiveへ遷移する。共有targetのないruntime CIまたは消滅したsemantic CIはdeletedへ移し、inactive / deleted rowをfull snapshotから消さない
 - inactive target / semantic itemの復帰は同じidentityへの明示reuseかつ過去CIが別identityへ再利用されていない場合だけ同じCIを復帰できる。deleted CI / semantic item keyを別identityへ再利用しない
 - semantic itemのmodel変更はreuse不可。同じsemantic item keyをreuseしてもcontent fingerprintが変わればCI content fingerprintを変え、既存TCをstaleにする
@@ -549,7 +555,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - completionでは各active Coverage所有modelをmodel単位で検査する。supported / partial / runtimeなしsemantic modelはcurrent materialize runtime unitの対応`model_completion[]` rowを必須とし、`materialize_complete=true`かつrow内`active_ci_ids[]`がcurrent CI Machine Entityと一致することを検証する。partialではさらにcurrent unsupported item closureを全件必須とする。whole-model unsupportedは対応generationのwhole-model `unsupported_item_closures[]`を必須とする。親TCNに別modelのCIがあるだけで当該modelを完了扱いしない
 - 各Skillの同一内容`runtime_contract.py`にruntime dependency graphとMachine Entity dependency graphを評価する共通関数を置く。missing dependencyはstale + blocker、duplicateまたはcycleは`invalid_input`
 - `unsupported_item_closures[]`: `{skill, runtime_unit_key, generation_fingerprint, item_key, reason_code, handling, reason, authority_refs, covered_by_entity}`。`covered_by_entity`は`null`または`{skill, entity_type, entity_ref, content_fingerprint}`の完全Machine Entity参照。`handling`は`llm_fallback / 対象外 / 別テストレベル / 残存リスク / 成立不能 / 重複 / ブロック中`だけを許可する。closureの`generation_fingerprint`は対象runtime unitの現在値と一致必須。`support_status=partial`では`item_key`をunsupported itemのstable keyで必須とし、`reason_code`も現在unsupported itemと一致必須。whole-model `unsupported`では`item_key=null / reason_code=null`を許可するが`generation_fingerprint`一致は必須とする。世代またはreasonが変わった以前のclosureを自動再利用しない
-- `llm_fallback`と`重複`は`covered_by_entity`必須で、currentなMachine Entityへ解決できることを検証する。`llm_fallback`は同じ`model_key`に属するcurrent CI Machine Entityを必須とし、親TCNやmodel metadataだけをfallback Coverage evidenceにしない。`対象外 / 別テストレベル / 残存リスク / 成立不能`は既存`test-condition-design`のDisposition条件をそのまま適用し、不要な`covered_by_entity`はnullとする。`ブロック中`はclosure rowとして保持しても閉鎖済みには数えず`can_complete=false`とする
+- `llm_fallback`と`重複`は`covered_by_entity`必須で、currentなMachine Entityへ解決できることを検証する。通常Coverage modelの`llm_fallback`は同じ`model_key`に属するcurrent CI Machine Entityを必須とする。internal adapterのunsupported closureだけは、`_02_runtime-architecture-and-contracts.md` §2.2の手順で同じTCNへ追加した直接定義Coverage modelのcurrent CIを許可する。この場合、CIのmodelはadapterで事前採用済みchild techniqueと同じcanonical `technique_slug`を持ち、adapterと同じTCNへ所属することを検証する。親TCNやmodel metadataだけをfallback Coverage evidenceにしない。`対象外 / 別テストレベル / 残存リスク / 成立不能`は既存`test-condition-design`のDisposition条件をそのまま適用し、不要な`covered_by_entity`はnullとする。`ブロック中`はclosure rowとして保持しても閉鎖済みには数えず`can_complete=false`とする
 - runtimeは意味上の再利用可否、開始Skill、仕様Authorityの優先関係を再判断しない
 - outputは`freshness[]: {skill, runtime_unit_key, generation_fingerprint, freshness_status, stale_reasons[]}`、`entity_freshness[]: {skill, entity_type, entity_ref, model_key, freshness_status, stale_reasons[]}`、`completion: {can_complete, blockers[]}`、runtime状態表用の正規化rowを返す
 - `can_complete`は本Planが追加するruntime / Machine Entity / Coverage closure範囲だけの機械的完了可否であり、既存`qa-workflow`全体の完了を表さない
