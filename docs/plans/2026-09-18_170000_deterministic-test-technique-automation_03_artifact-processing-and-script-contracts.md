@@ -564,7 +564,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - `reason_code`はscriptごとにPlan / Skill referenceで列挙した固定値だけを使用し、自由文をidentityに含めない
 - runtime-v1でpartial unsupported itemを返すscriptの最低限の固定値は次とする。より細かい理由へ分割する場合はcontract変更としてPlan / Skill referenceと回帰fixtureを同時更新し、実装者判断で自由なcodeを追加しない
   - `domain_testing.py`: `unrepresentable_point`
-  - `flow_paths.py`: `concurrent_flow_requires_semantic_execution / crossing_regions`
+  - `flow_paths.py`: `concurrent_flow_requires_semantic_execution`
   - `schema_cases.py`: `cyclic_local_ref / unsupported_reference / unsupported_schema_keyword / unsupported_value_shape / unsupported_html_control / unsupported_html_constraint`
   - `test_data_requirements.py`: `unsupported_intersection`
   - `metamorphic.py`: `unsupported_transform / unsupported_path / unsupported_relation`
