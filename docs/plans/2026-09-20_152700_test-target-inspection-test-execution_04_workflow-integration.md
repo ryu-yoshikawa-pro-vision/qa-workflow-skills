@@ -191,6 +191,8 @@ Playwright runner固有のrun / logical primary / resolved TestCase / attempt / 
 
 `test-execution = 再利用`は過去結果の確認だけが要求された場合等に限ります。新規実行要求では、過去結果だけで実行完了にしません。
 
+案件コンテキストの既存`認証方法`、`認証情報の取得方法または環境変数名`、`テストデータ・状態準備方法`、`cleanup制約`は`test-execution`のpreflightでも再利用します。`副作用の許可範囲と根拠`は、実装時に`副作用の許可範囲 / 1回の定義 / 最大回数 / 根拠`を保持できる形へ更新します。password、token、cookie、storageState等のsecret値そのものは記録しません。新しい案件コンテキスト形式や副作用registryは追加しません。
+
 ## 8. 修正routing
 
 `qa-workflow` guidanceへ次を追加します。
@@ -222,9 +224,9 @@ Playwright runner固有のrun / logical primary / resolved TestCase / attempt / 
 
 ### TCが変更された場合
 
-既存`test-execution`結果は、TC追加 / 除外、手順・期待結果等のTC内容変更、入力元のrevision / content identity変更があればcurrentな結果として再利用しません。
+既存`test-execution`結果は、TC追加 / 除外、手順・期待結果等のTC内容変更、入力元identity変更、または固定snapshot内容変更があればcurrentな結果として再利用しません。
 
-進行中の実行では固定した入力snapshotを書き換えず、旧成果物を理由付きで閉じ、必要なcleanup後に新しい成果物 / versionを開始します。一度確定したTC結果も同じ成果物内で上書きせず、同じTCを再実行する場合は前回成果物参照を持つ新しい成果物 / versionを開始します。開始時に許可済みの対話操作と独立一時コードの間で実行手段を切り替えるだけでは新versionにしません。
+進行中の実行では固定した入力snapshotを書き換えず、旧成果物を理由付きで閉じ、必要なcleanup後に新しい成果物 / versionを開始します。一度確定したTC結果も同じ成果物内で上書きせず、同じTCを再実行する場合は前回成果物参照を持つ新しい成果物 / versionを開始します。実行手段の切替だけでは新versionにしません。未開始TCは切替後にrun固定条件と開始状態を再確認して同じ成果物内で実行できます。開始済みTCは同じbrowser / session、または判定に必要な状態の継続を確認できる場合だけ継続し、確認できなければ`判定不能`として閉じます。同じTCを再実行する場合は別成果物 / versionを開始します。
 
 ### 対象version / build・実施条件が変わった場合
 
@@ -248,7 +250,7 @@ Playwright runner固有のrun / logical primary / resolved TestCase / attempt / 
 
 ### `test-execution`
 
-今回要求されたTC集合について、`test_case_ref`がsnapshot内で一意であり、入力側の正式識別子が`source_test_case_id`として値を変えず保持され、各TCの実行前YAMLが元TCへ追跡できることを確認します。重複した`source_test_case_id`は一意な成果物ローカル`test_case_ref`で区別し、`unresolved`として該当TCを開始しません。その上で、TC集合が`PASS / FAIL / 未実行 / 判定不能`のいずれかへ漏れなく対応し、必要な実行結果報告が作成されていることを確認します。
+今回要求されたTC集合について、入力順に基づく成果物ローカル`test_case_ref`がsnapshot内で一意であり、入力側の正式識別子が`source_test_case_id`として値を変えず保持され、各TCの実行前YAMLが元TCへ追跡できることを確認します。重複した`source_test_case_id`だけを理由に一律`未実行`へせず、元IDによる実行対象指定や追跡が曖昧で今回対象TCを一意に特定できない場合だけ`unresolved`として該当TCを開始しません。入力元identityがない場合は独自hashを要求せず、成果物 / version内に固定したTC集合と全TCの実行前YAMLがsnapshotの正本になっていることを確認します。その上で、TC集合が`PASS / FAIL / 未実行 / 判定不能`のいずれかへ漏れなく対応し、必要な実行結果報告が作成されていることを確認します。
 
 実行または合否判定に必要な未解決事項により要求TCを開始できない場合、TC結果は`未実行`、対応する`test-execution`の対象範囲は`ブロック中`とします。影響しないTCは継続できます。開始後に必要な観測を完了できず`判定不能`になっただけでは、自動的にworkflow全体を`ブロック中`へしません。
 
