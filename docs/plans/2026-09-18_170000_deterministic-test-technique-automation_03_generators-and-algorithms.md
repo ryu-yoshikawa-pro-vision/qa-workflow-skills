@@ -315,14 +315,17 @@ condition / action / ruleは任意数を許可します。known ruleのaction ve
 
 ### 6.1 don't-care統合候補
 
-完全rule setに対して、次を満たす2 ruleだけを統合候補にします。
+完全rule setに対して、1 conditionだけをdon't-care化する候補を次の規則で作ります。
 
-- action vectorが完全一致
-- assignmentが1 conditionだけ異なる
-- 統合後に新しい未定義assignmentを包含しない
-- Authority集合を保持できる
+1. 対象conditionを1つ選び、それ以外のcondition assignmentが同一な成立可能known ruleをgroup化する
+2. constraint適用後に成立可能な対象conditionの関連value集合を求め、その全valueについてknown ruleが1件ずつ存在することを必須にする
+3. group内の全ruleでaction vectorが完全一致する場合だけ候補にする
+4. group内のAuthority集合を失わず保持する
+5. 生成したdon't-care派生ruleをさらに候補化せず、1回の候補生成で別conditionへ連鎖統合しない
 
-候補をdeterministicに列挙し、各候補へ`merge_key = dm:sha256:<canonical sorted rule_keys hash>`を付与します。`rule_keys`はUnicode code point順でsortした配列をcanonical JSON化してSHA-256します。LLMは意味上統合してよい候補の`merge_key`だけを`accepted_merges[]`へ返し、任意の`rule_keys[]`を新規構成しません。scriptはaccepted `merge_key`が同一実行で生成した候補に存在すること、候補内ruleが同一action vectorであること、統合後のCartesian productが成立可能な既知ruleだけを含み未定義assignmentを追加しないことを再検証してdon't-care ruleを生成します。Boolean minimizationで最小rule数を目的にしません。
+対象conditionが3値以上でも、一部valueだけactionが一致するgroupをdon't-careへ変換しません。例えば`A / B / C`のうち`A / B`だけ同じactionで`C`が異なる場合は統合不可です。3値すべてが同じactionで、他condition assignmentも同一かつ全valueが成立可能known ruleとして揃う場合だけ統合候補にします。
+
+候補をdeterministicに列挙し、各候補へ`merge_key = dm:sha256:<canonical sorted rule_keys hash>`を付与します。`rule_keys`はUnicode code point順でsortした配列をcanonical JSON化してSHA-256します。LLMは意味上統合してよい候補の`merge_key`だけを`accepted_merges[]`へ返し、任意の`rule_keys[]`を新規構成しません。scriptはaccepted `merge_key`が同一実行で生成した候補に存在すること、対象conditionの成立可能な関連valueがすべて候補ruleに含まれること、候補内ruleが同一action vectorであること、統合後のCartesian productが成立可能な既知ruleだけを含み未定義assignmentを追加しないことを再検証してdon't-care ruleを生成します。Boolean minimizationで最小rule数を目的にしません。
 
 `accepted_merges[]`はDecision Tableの派生表示・レビュー用のdon't-care ruleを作るためだけに使用します。元の成立可能assignment targetは削除せず、`coverage_summary.required / covered`も変更しません。異なるassignmentは`execution_fingerprint`が異なるため、accepted don't-care mergeを`materialize_coverage.py`の`merge_group`へ変換せず、元assignmentごとに別CIを維持します。TCへ複数CIを対応付ける必要がある場合は、don't-care表示を根拠に自動統合せず、`test-case-design`が具体的な前提・データ・手順・期待結果を意味判断したうえで既存の`ci_refs[]`契約を使用します。
 
