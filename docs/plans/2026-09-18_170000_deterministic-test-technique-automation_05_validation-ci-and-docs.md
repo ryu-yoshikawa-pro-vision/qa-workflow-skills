@@ -107,6 +107,11 @@ runtime対応Skillの`evals/output/cases/*/expected.json`では、既存fieldに
     "expected_stale_entities": []
   },
   "runtime_contract": {
+    "expected_runtime_units": [
+      {"skill":"test-condition-design","runtime_unit_key":"artifact:condition_structure:all"},
+      {"skill":"test-condition-design","runtime_unit_key":"model:comb-001"},
+      {"skill":"test-condition-design","runtime_unit_key":"artifact:materialize_coverage:TCN-001"}
+    ],
     "expected_skill": "test-condition-design",
     "expected_runtime_unit_key": "model:comb-001",
     "upstream_entities": [
@@ -127,6 +132,8 @@ runtime対応Skillの`evals/output/cases/*/expected.json`では、既存fieldに
 ```
 
 - `machine_entities.expected_entities[]`は各Skillの固定builderがnormalized source / structure stateから導出した`(skill, entity_type, entity_ref)`をfixtureへ明示し、actual成果物のMachine Entity集合から逆算しない。validatorはactual identity集合とのmissing / extraと、各contentのentity type別canonical schema・人間向け表主要fieldを独立照合する
+- `runtime_contract.expected_runtime_units[]`はstandalone Skillの正規化input / structure stateから固定builderが導出した`(skill, runtime_unit_key)`をfixtureへ明示する。validatorは成果物中の`Machine Runtime Input / Result` block identity集合と完全一致を要求し、必須runtime blockの丸ごと欠落と未知の余分なblockを検出する。actual runtime block集合からexpectedを逆算しない
+- standalone direct fixtureで必須runtime blockを1件削除したnegative caseを各代表Skillに置き、`qa-workflow`を通さなくても成果物を完成扱いしないことを確認する
 - `spec-analysis`では`runtime_contract.py`のcanonical / Machine Entity helperと`authority_entities.py`を使うfixtureを用意し、runtime unitを作らずAuthority表とcanonical Authority content / expected identityの一致を検証する
 - expected target / Coverageは手書きfixtureから独立計算または明示し、generator出力をexpectedへコピーしない
 - `expected_target_id_map`はstateful materialize caseだけ使用し、`{target_ref, target_content_fingerprint, generation_fingerprint, execution_fingerprint, model_key, target_key, ci_id}`配列で保持する
@@ -158,7 +165,7 @@ semantic referenceをgenerator outputから自動生成しません。
 
 CIの`Validate Semantic Output Evals`は既存契約どおり外部LLM APIを呼ばず、dataset / rubric / semantic runtime / fake judge contractを検証します。このCI成功だけをsemantic case PASSとは扱いません。
 
-Plan完了時は、`test-analysis / test-condition-design / adversarial-review`の本Planで追加・更新したsemantic caseについて、保存済みcandidate outputを用意し、既存`scripts/skills/evals/semantic/run.py`とLLM Judge adapterで実評価します。candidate output生成、Judge実行command、Judge結果をPRの検証記録へ残します。Judgeを利用できない場合はsemantic dataset validationまでは実施できますが、semantic case PASSの完了条件は未達としてPRをDraftのままにします。CIへ外部LLM secretやJudge実行を追加しません。
+Plan完了時は、`test-analysis / test-condition-design / adversarial-review`の本Planで追加・更新したsemantic caseについて、保存済みcandidate outputを用意し、既存`scripts/skills/evals/semantic/run.py`へそのprotocolに適合する外部Judge commandを接続して実評価します。特定provider用の新しいJudge adapterは本Planの実装対象にしません。candidate output生成、Judge実行command、Judge結果をPRの検証記録へ残します。Judgeを利用できない場合はsemantic dataset validationまでは実施できますが、semantic case PASSの完了条件は未達としてPRをDraftのままにします。CIへ外部LLM secretやJudge実行を追加しません。
 
 ### semantic dataset件数
 
@@ -258,14 +265,18 @@ repository全体は328 queryです。
 
 6. legacy成果物
    - 旧成果物を参照
-   - 変更時に新modelへ昇格
-   - 以後version / fingerprint契約で再利用
+   - 初回昇格時に現在観測できるTR / TCN / CI / TCをactive seedとして取り込み、未知の過去deleted履歴を捏造しない
+   - TR / TCN / TCは意味上同一なら既存IDをreuseし、model keyがlegacyに存在しなければ新規採番する
+   - 既存CIをcurrent target / semantic itemへ維持する場合は初回だけ`legacy_ci_seed[]`を使用し、unknown / duplicate / 別TCN / 別model対応を拒否する。対応不能CIと参照TCは`要再検証`へする
+   - 前工程Machine Entityが存在しないdirect由来境界は新契約保存後もdirectで再利用でき、必要な外部Machine Entityがすべて揃った時点だけartifactへ切り替える
+   - 以後version / fingerprint / normal previous state契約で再利用
 
 7. runtime利用確認
    - 正規化済み`input / model_type / 対象 / 実行範囲`からscript選択表へ入った後のdispatchはunit fixtureで全runtime scriptを網羅し、期待script path・必須/条件付き・実行順とCLI実行結果metadataを検証する
    - 自然言語promptからSkill責務・意味入力を決める部分はPython dispatch testへ実装せず、既存trigger eval / semantic evalと代表Agent smokeで検証する。dispatch検証専用のprompt parserや重複manifestを新設しない
    - `test-analysis: E2E対象選定`と`coverage-analysis: TC → E2E実装 / E2E実装 → 実行結果`では本Planruntimeをdispatchしない
    - 本Plan対象runtime unitの期待集合が0件のE2E-only `qa-workflow`では`workflow_runtime.py`をdispatchせず、Python unavailableでも本Plan追加を理由に`blocked`へ変更しない。既存`qa-workflow`の開始・完了条件だけで判定する回帰fixtureを追加する
+   - テスト設計runtimeとE2E実装・実行を同時に要求する混在workflowでは、`workflow_runtime.py`の`can_complete=true`でもE2E側の既存完了条件が未達ならworkflow全体を`完了`にしない。逆に既存workflow条件を満たしても`workflow_runtime.py`がdispatch済みで`can_complete=false`なら完了にしない
    - supported inputが`unsupported`になる、またはsupport判定前にAgentがscriptを省略する場合は失敗
    - 保存済み`Machine Runtime Input / Result`を決定論的に抽出してround-trip検証できるが、workflow再利用では保存済みresultをcurrent cacheにせず現在scriptを再実行する
    - LLM手計算だけの成果物を決定論的生成済みと判定しない
@@ -275,7 +286,7 @@ repository全体は328 queryです。
    - 同じfixtureを`test-condition-design` Skill directory単体でも実行し、repo root helperや前工程Skill directoryなしで正規化input → runtime → Machine Entity保存まで成立することを確認する
    - ユーザー明示がなくても`test-condition-design`自身が問題構造から技法を選べる正常経路を`Selection Source=condition_design`で検証する
    - 既存Machine Entity付き成果物を再利用する経路では`input_mode=artifact`を使用し、元のSelection Source / selection keyを維持する。reuseを別のSelection Sourceへ置き換えない
-   - legacy昇格は初回だけ`input_mode=direct`とし、新契約のMachine Entity保存後の再利用は`artifact`へ移る
+   - legacy昇格は初回`input_mode=direct`とし、新契約のMachine Entity保存後も必要な前工程Machine Entityが存在しない境界はdirectで再利用する。必要な外部Machine Entityがすべてcurrentになった場合だけartifactへ切り替える
    - `test-analysis`の技法選択行を作るためだけに上流へ戻らない
 
 9. 実Agent runtime smoke
@@ -328,7 +339,7 @@ runtime対象の次の6 Skillを単体コピーして代表scriptを実行しま
 - `spec-analysis`を含む7 Skillの`scripts/runtime_contract.py`がLF正規化後のSHA-256で一致
 - network不要
 - runtime dependencyがPython 3.11標準ライブラリだけで、外部package manifestを必要としない
-- generator scriptがSkill-local Python moduleとしてimportできるのは`runtime_contract.py`だけで、fingerprint対象外helperへ実行ロジックを逃がさない
+- 本Planで追加するmodel generator / artifact runtimeの全scriptがSkill-local Python moduleとしてimportできるのは`runtime_contract.py`だけで、fingerprint対象外helperへ実行ロジックを逃がさない
 - Skill rootからscriptを解決
 - stdinへUTF-8 JSONを渡しstdout envelopeを読める。interpreterのcommand名やtimeout APIをSkill code / Skill契約へ埋め込まない
 - `test-condition-design`と`test-case-design`は`input_mode=direct`の代表fixtureを前工程Skill directory / Machine Entityなしで実行できる
@@ -413,6 +424,7 @@ runtime対象の次の6 Skillを単体コピーして代表scriptを実行しま
 - legacy昇格
 - upstream Entity別content fingerprint / Machine Entityの`upstream_entity_dependencies[] / runtime_dependencies[]` / upstream runtime dependency / stale伝播
 - `traceability.py`と同じ`runtime_contract.py` freshness関数を使用し、workflow_runtime resultをtraceabilityの依存入力にしない
+- `workflow_runtime.py`の`can_complete`は本Planruntime範囲の必要条件として扱い、既存`qa-workflow`全体の完了条件を置換しない
 - 完了条件
 
 ### `EVALS.md` / `ASSERTIONS.md`
