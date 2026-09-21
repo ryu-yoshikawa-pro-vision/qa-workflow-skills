@@ -36,7 +36,7 @@ fork / join regionは曖昧に導出せず、次を正規化入力として明�
 - branchの`edge_keys`はforkからmatching joinまで連続するpathであることをscriptが検証する
 - 同一regionのbranch keyは一意
 - nested regionはbranch path内に含めてよい
-- region同士がcrossingする場合は`unsupported`
+- region同士がcrossingする場合はwhole-model `unsupported`とし、runtime-v1では`reason_code=crossing_regions`を使用する。crossing regionを部分的に線形化して処理しない
 - scheduler interleavingは仕様なしに生成しない
 - fork-join targetは直接linear executionへ落とさずsemantic Coverage Itemへ閉じる
 - `node / edge / bounded-path / simple-loop`でcanonical witnessまたはsetup prefixがforkからmatching joinまでのregionを横断する、またはtarget自体がそのregion内部にある場合、runtime-v1はそのtargetを単一`edge_sequence`へmaterializeしない。該当targetは`materializable=false`とし、stableな`unsupported_items[]`へ`reason_code=concurrent_flow_requires_semantic_execution`で残す
@@ -172,7 +172,7 @@ derivationは**leftmost derivation**で固定します。sentential formに複�
 
 `max_depth`はparse tree depthで、start symbolを0、productionで生成したchildをparent + 1と数えます。生成childが`max_depth`を超えるproduction適用は探索しません。`rhs=[]`はepsilon productionとして許可します。
 
-production Coverage targetごとに、対象productionを1回以上含むleftmost derivationのうちproduction適用回数最小を選び、同数ならproduction key列のUnicode code point辞書順で決めます。leftmost規則により同じproduction key列から異なる文字列を生成しません。
+production Coverage targetごとに、対象productionを1回以上含むleftmost derivationのうちproduction適用回数最小を選び、同数ならproduction key列のUnicode code point辞書順で決めます。leftmost規則により同じproduction key列から異なる文字列を生成しません。start symbolから`max_depth`内で対象productionを1回以上使うterminal derivationを生成できない場合はCoverage母集団から黙って除外せず、`issue_type=unreachable_production / blocking=true / result_status=unresolved`を返します。issueは対象`production_key`をtarget keyとして保持し、`route_to=test-condition-design / resume_skill=test-condition-design`でgrammarまたはCoverage条件の意味判断へ戻します。
 
 valid case集合は各production Coverage targetのshortest derivationのunionとし、生成文字列とproduction key列が同一のcaseを重複除去します。production Coverage達成に不要な追加grammar列挙は行いません。
 
@@ -214,7 +214,7 @@ runtime-v1の対応subset:
 
 `$ref`はruntime内でnetwork解決しません。runtime-v1で対応するreferenceは同一schema resource内の`#/...` JSON Pointerだけです。root schemaの`$id`はmetadataとして保持できますが、subschemaに`$id`があり別schema resource / base URIを形成するdocument、plain-name fragment、`$anchor / $dynamicAnchor / $dynamicRef`、外部URI referenceは`unsupported`です。これによりnested `$id`を無視してdocument rootへ誤解決しません。
 
-local JSON PointerはRFC 6901のtoken escapeを使用し、各tokenで`~1`を`/`、次に`~0`を`~`へdecodeします。`~`の後が`0 / 1`以外の不正escapeは受理しません。`$ref`解決中は現在解決中のJSON Pointerをactive stack / setで追跡し、activeなpointerへ再入した場合はその影響subtreeを`unsupported`、`reason_code=cyclic_local_ref`として打ち切ります。self-cycleとmutual cycleのrecursive schema semanticsはruntime-v1で実装せず、独立して評価できるsibling property / itemは既存の局所`unsupported`規則に従って継続します。
+local `$ref`はURI fragmentとして先頭`#`を除いた部分をpercent-decodeし、decode結果をUTF-8として検証した後にRFC 6901 JSON Pointerとして評価します。malformed `%xx`、不正UTF-8、不正なJSON Pointer tokenは`invalid_input`です。JSON Pointer tokenは各tokenで`~1`を`/`、次に`~0`を`~`へdecodeし、`~`の後が`0 / 1`以外の不正escapeを拒否します。array参照ではindexを`0|[1-9][0-9]*`だけ許可し、leading zero、`-`、範囲外index、存在しないobject memberは`invalid_input`とします。`$ref`解決中は現在解決中のdecode済みJSON Pointerをactive stack / setで追跡し、activeなpointerへ再入した場合はその影響subtreeを`unsupported`、`reason_code=cyclic_local_ref`として打ち切ります。self-cycleとmutual cycleのrecursive schema semanticsはruntime-v1で実装せず、独立して評価できるsibling property / itemは既存の局所`unsupported`規則に従って継続します。
 
 JSON Schema 2020-12では`$ref`のsibling keywordも評価対象です。したがって`$ref`と並ぶ対応subset keywordは通常どおり評価し、未知またはruntime-v1非対応keywordがvalidation意味へ影響する場合はそのsubtreeを`unsupported`にします。`$ref`があるという理由でsiblingを捨てません。
 
@@ -236,7 +236,7 @@ OpenAPI 3.0はJSON Schema 2020-12として解釈しません。runtime-v1ではP
 - 同一propertyで`readOnly=true`かつ`writeOnly=true`は`invalid_input`
 - `title / description / default / example / deprecated`はannotationとして保持してもvalidation Coverageへ使用しない
 - Reference Objectは`$ref`だけを意味fieldとして扱う。OpenAPI 3.0のReference Objectへ追加されたpropertyは仕様どおり無視し、参照先schemaのsibling assertionとして解釈しない
-- runtime-v1で対応するreferenceは同一OpenAPI document内のlocal JSON Pointerだけ。外部document referenceは事前dereference済み入力を要求する。local reference解決はJSON Schema側と同じRFC 6901 token decode、不正escape拒否、active pointer cycle検出を使用し、cycleへ再入した影響subtreeを`unsupported / reason_code=cyclic_local_ref`とする
+- runtime-v1で対応するreferenceは同一OpenAPI document内のlocal JSON Pointerだけ。外部document referenceは事前dereference済み入力を要求する。local reference解決はJSON Schema側と同じURI fragment percent-decode → UTF-8検証 → RFC 6901 token decode → array / object参照検証 → active pointer cycle検出を使用し、cycleへ再入した影響subtreeを`unsupported / reason_code=cyclic_local_ref`とする
 - JSON Schema 2020-12だけのkeywordをOpenAPI 3.0へ暗黙適用しない
 
 ### HTML form control
