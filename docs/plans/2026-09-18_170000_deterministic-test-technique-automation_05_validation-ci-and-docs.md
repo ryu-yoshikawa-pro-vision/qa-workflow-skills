@@ -82,7 +82,7 @@ runtime issueへの回答を再開する場合は、回答を正規化modelへ�
 - `Runtime Required=No`のfallback unitも`Result Status != ready`なら完了を妨げる
 - `Support Status=partial`では`unsupported_items[]`が許可されたhandling、必要なcurrent`covered_by_entity`、既存Disposition条件を満たすclosureへすべて閉じていることを要求する。closure行の存在だけでは完了条件を満たさない
 - `workflow_runtime.py`が上流Entity fingerprint、`upstream_runtime_units`、runtime metadata、materialize runtime unitの`model_completion[] / target_mappings[] / target_dispositions[]`、`unsupported_item_closures[]`からstale / 完了可否を計算し、LLMが表を手計算しない
-- partial supportは全unsupported item keyにclosureがあり、closureの`generation_fingerprint / reason_code`が現在unsupported itemと一致することに加え、`handling`が許可集合内であることを要求する。`llm_fallback`は同じ`model_key`に属するcurrent CI Machine Entity、`重複`はcurrentな`covered_by_entity`を必須にし、`ブロック中`は完了不可、その他Dispositionは既存Skill条件を満たすことを検証する。whole-model unsupportedも同じclosure規則と`generation_fingerprint`一致を必須にする。target Dispositionの`重複`は全materialize unitを跨いでcycleがなく、current CI / semantic CIへ到達する場合だけ閉鎖済みに数える
+- partial supportは全unsupported item keyにclosureがあり、closureの`generation_fingerprint / reason_code`が現在unsupported itemと一致することに加え、`handling`が許可集合内であることを要求する。通常Coverage modelの`llm_fallback`は同じ`model_key`に属するcurrent CI Machine Entityを必須にする。internal adapterだけは明示fallback手順で同一TCNへ追加した直接定義Coverage modelのcurrent CIを許可し、adapter自身・無関係TCN / technique・stale CIを拒否する。`重複`はcurrentな`covered_by_entity`を必須にし、`ブロック中`は完了不可、その他Dispositionは既存Skill条件を満たすことを検証する。whole-model unsupportedも同じclosure規則と`generation_fingerprint`一致を必須にする。target Dispositionの`重複`は全materialize unitを跨いでcycleがなく、current CI / semantic CIへ到達する場合だけ閉鎖済みに数える
 
 完了条件・再利用条件へ次を追加します。
 
