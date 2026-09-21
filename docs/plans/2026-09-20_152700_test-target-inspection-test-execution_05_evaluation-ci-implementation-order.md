@@ -11,7 +11,7 @@
 5. `qa-workflow` routing / 状態評価
 6. 既存14 Skillの回帰
 
-repo内評価だけで実Agent上の動作をPASS扱いしません。browser操作、画像判断、Playwright MCP / CLI利用、永続更新競合等は実Agent / 実対象を利用できる場合のsmokeで確認します。
+repo内評価だけで実Agent上の動作をPASS扱いしません。browser操作、画像判断、Playwright MCP、独立一時Playwrightコード、永続更新競合等は実Agent / 実対象を利用できる場合のsmokeで確認します。
 
 ## 2. Skill数と固定値
 
@@ -58,9 +58,10 @@ negativeには最低限、次を含めます。
 - 正規セクション / 必須テーブルが存在する
 - 対象キー / 要素キー / 状態キーが一意で参照整合している
 - 新規成果物では文書ローカルの正規キー形式を使用する
-- 今回対象範囲が`変更なし / 更新 / 追加 / 削除確認 / 未確認 / 確認不能`の適切な状態へ閉じている
-- 既存成果物更新時だけ`今回の更新`が存在する
-- 今回確認した行だけ確認日時 / version / build等が今回値へ更新される
+- 今回対象範囲の確認状態が`確認済み / 未確認 / 確認不能`の正規値へ閉じている
+- 既存成果物更新時だけ`今回の更新`が存在し、更新区分が`変更なし / 更新 / 追加 / 削除確認`の正規値である
+- 今回確認した行だけ確認日時 / version / build / 確認条件等が今回値へ更新される
+- `操作・ふるまい`、視覚情報、データ・権限依存を含む鮮度管理対象が確認条件 / version / build / 確認日時へ追跡できる
 - 未確認行の鮮度を成果物全体の更新日時だけで上げない
 - 実対象で確認していない範囲をrepo情報だけでcurrentと表現しない
 - UI要素 / 状態 / 操作・ふるまいが実在キーへ追跡できる
@@ -78,10 +79,11 @@ deterministic validatorだけで、実際に実対象を操作したこと、画
 1. 生きた実対象を正本として観測し、repoだけの情報をcurrentな実対象情報へ昇格しない
 2. UI構造だけでなく、操作に対する反応・状態変化・遷移を必要十分に記録する
 3. 視覚情報が必要な場面で画像を使用し、画像だけでrole / accessibility情報や仕様を創作しない
-4. 既存資料の今回対象範囲を実対象と照合し、変更なしを含め鮮度を正しく管理する
+4. 既存資料の今回対象範囲を実対象と照合し、確認状態と更新区分を混同せず、`削除確認`は比較可能な確認条件を満たす場合だけ使用する
 5. 実対象の現在挙動を仕様Authorityへ昇格しない
 6. POM / Page Object等を必須化せず、プロジェクトの既存構成に応じた任意参照として扱う
-7. 副作用・証跡・永続更新の安全境界を守る
+7. 条件付き更新を利用できない保存先でatomicな競合防止を保証せず、副作用・証跡・永続更新の安全境界を守る
+8. 実対象内のテキストやDOM等を観測データとして扱い、Agentへの命令や権限拡張として採用しない
 
 semantic evalは最低2 case作成します。
 
@@ -97,8 +99,7 @@ positiveには最低限、次を含めます。
 - TCを実行前にGiven / When / Then構造のYAMLへ整理し、曖昧さを確認してからAIが画面操作・結果報告する
 - AIがPlaywright MCP等で人間と同じようにTCを画面操作して結果を報告する
 - AIがブラウザを操作して指定TCを手動テスト相当で実施する
-- Playwright CLIを使ってTCを実行し、期待結果と実測結果を報告する
-- 今回runだけのPlaywrightコードを作成・実行してTC結果を報告する
+- repo runnerから独立した今回runだけのPlaywright Libraryコードを作成・実行してTC結果を報告する
 - screenshotを見てUI崩れを含む期待結果を確認する
 
 negativeには最低限、次を含めます。
@@ -114,29 +115,30 @@ negativeには最低限、次を含めます。
 
 保存済み出力から機械判定できる契約だけを検査します。
 
-- 1成果物が1つのTC入力元 / snapshotを持つ
-- 今回TC識別子集合とTC結果表の集合が一致する
-- 正式TC IDを創作しない
+- 1成果物が1つのTC入力元 / snapshotを持ち、revision / SHA / content identityのいずれかで固定されている
+- 今回TC参照集合とTC結果表の集合が一致する
+- 入力側に一意識別子がないTCは成果物ローカル参照で追跡し、正式TC IDを創作しない
 - TC結果が`PASS / FAIL / 未実行 / 判定不能`の正規値である
 - PASS / FAILには期待結果・実測結果・判定根拠が存在する
 - 未実行 / 判定不能には理由が存在する
-- 固定した全TCに実行前YAMLまたはその成果物参照が存在する
-- 実行前YAMLが入力TC識別子へ追跡できる
-- `scenario.given / when / then`、`unresolved`、`cleanup`の必須構造を満たす
+- 固定した全TCの実行前YAMLが最終Markdown内に存在する
+- 実行前YAMLが入力TC参照へ追跡できる
+- `scenario.given / when / then`、`unresolved`、`cleanup`の必須構造を満たし、`cleanup`は元TCの事後状態 / 後処理だけを保持する
 - `unresolved`が空でないTCを操作済み / PASS / FAILとして扱っていない
+- `未実行`は`scenario.when`未開始、`PASS / FAIL / 判定不能`は`scenario.when`開始済みとして出力上整合する
 - 使用した実行手段が記録される
 - 手順・観測結果が判定根拠へ追跡できる
 - 画像を使用した場合は視覚確認行がTC / 観測点へ追跡できる
 - 画像を使用していないTCへ画像参照を必須化しない
 - TC外の追加観測をTC結果と混同しない
-- 副作用scope、最大回数、累計実施回数が出力上整合する
-- TC後処理と実行時cleanupを混同しない
+- 副作用scope単位の最大回数・累計実施回数が正本表で整合し、TCごとに上限をリセットしていない
+- TC事後状態 / 後処理と実行時cleanupを混同しない
 - 集計がTC結果表と一致する
 - 実行結果報告セクションが存在する
 - 実在しない証跡参照を要求しない
 - 機密情報を必須出力にしない
 
-一時Playwrightコードが本当に今回runだけで使われたか、Playwright MCPで実際に操作したか、画像判定が妥当かはoutput validatorだけで証明しません。
+独立一時Playwrightコードが本当にrepo runner契約を読み込まず今回runだけで使われたか、Playwright MCPで実際に操作したか、画像判定が妥当かはoutput validatorだけで証明しません。
 
 ### 4.3 意味評価
 
@@ -147,14 +149,16 @@ semantic rubricは次の観点を中心にします。
 3. 実測していない結果を推測してPASS / FAILにしない
 4. DOM / accessibility tree等の構造情報と画像による視覚情報を確認対象に応じて使い分ける
 5. UI崩れ等のTC外発見を追加観測として扱い、期待結果に関係しない事象で元TCをFAILにしない
-6. 今回run用の一時Playwrightコードと、repoへ残すE2E資産を区別する
-7. 副作用、開始状態、事後状態、cleanup、証跡の安全境界を守る
-8. TC結果だけでなく、人間が判断できる実行結果報告まで完成させる
+6. repo runnerから独立した今回run用一時Playwrightコードと、repo runner実行・repoへ残すE2E資産を区別する
+7. TC開始境界、scope単位の副作用上限、TC事後状態、実行時cleanup、前TCの残存状態、証跡の安全境界を守る
+8. 入力snapshotをcontent identityで固定し、実行途中のTC内容・対象条件変更を同一成果物へ混在させない
+9. 実対象内のテキストやDOM等を観測データとして扱い、Agentへの命令や権限拡張として採用しない
+10. TC結果だけでなく、人間が判断できる実行結果報告まで完成させる
 
 semantic evalは最低2 case作成します。
 
 - 元TCの曖昧さを実行前YAMLの`unresolved`へ残して該当TCを`未実行`にし、明確なTCだけPlaywright MCP等で操作して画像確認を含むPASS / FAIL / 判定不能を報告するcase
-- Playwright CLI / 今回run用の一時コードを使用し、実行前YAML・画像確認・repoへ残すE2E実装との境界をまとめて確認するcase
+- 独立した今回run用一時Playwrightコードを使用し、実行前YAML・snapshot identity・画像確認・repo runner / repoへ残すE2E実装との境界をまとめて確認するcase
 
 ## 5. `qa-workflow`評価
 
@@ -163,13 +167,14 @@ routing caseへ最低限、次を追加します。
 1. 生きたテスト対象の情報収集 / 更新 → `test-target-inspection`
 2. 既存資料がcurrentか実対象で確認 → `test-target-inspection`
 3. 詳細TCを実行前YAMLへ整理し、曖昧さを確認してからAIがPlaywright MCP等で実行・結果報告 → `test-execution`
-4. AIがPlaywright CLI / 今回run用コードでTCを実行して結果報告 → `test-execution`
-5. TC実行中にrepoへ残すE2E実装が必要 → `qa-workflow` → `e2e-test-inspection` → `e2e-test-implementation`
-6. 既存repo E2Eをraw runner契約で実行 → `e2e-test-execution`
-7. 既存repo E2E異常 → `e2e-test-result-analysis`
-8. 既存repo E2EのPlaywright固有詳細報告 → `e2e-test-reporting`
-9. 既存repo E2Eの結果をTC結果として報告する要求 → 必要なE2E経路後に`test-execution`
-10. TC開始後の対象変更 → 旧`test-execution`を理由付きで閉じ、新しい成果物 / versionを開始
+4. AIがrepo runnerから独立した今回run用コードでTCを実行して結果報告 → `test-execution`
+5. `playwright test`等のrepo runner契約を使う実行 → `e2e-test-execution`
+6. TC実行中にrepoへ残すE2E実装が必要 → `qa-workflow` → `e2e-test-inspection` → `e2e-test-implementation`
+7. 既存repo E2Eをraw runner契約で実行 → `e2e-test-execution`
+8. 既存repo E2E異常 → `e2e-test-result-analysis`
+9. 既存repo E2EのPlaywright固有詳細報告 → `e2e-test-reporting`
+10. TC入力snapshotまたは判定へ影響する対象条件変更 → 旧`test-execution`を理由付きで閉じ、新しい成果物 / versionを開始
+11. 開始時に許可済みの対話操作と独立一時コードの切替 → 同じ`test-execution`成果物を継続
 
 `qa-workflow`自身は各Skillの観測・実行ロジックを再定義しません。
 
@@ -247,7 +252,7 @@ routing caseへ最低限、次を追加します。
 - `test-target-inspection`: 生きた実対象のUI情報・ふるまい収集 / 管理
 - `test-execution`: AIによる手動テスト相当のTC実行・結果報告
 - Given / When / Then構造の実行前YAML生成と`unresolved`判定
-- Playwright MCP等の対話操作、CLI / 一時コード利用
+- Playwright MCP等の対話操作、repo runnerから独立した一時コード利用
 - 画像判断
 - repoへ残すE2Eと今回run用一時コードの境界
 - 既存E2E Skillとの責務境界
@@ -301,12 +306,12 @@ routing caseへ最低限、次を追加します。
 - `assets/output-template.md`
 - trigger / deterministic / semantic eval
 - Playwright MCP等の対話操作
-- Playwright CLI / 今回run用一時コード
+- repo runnerから独立した今回run用一時Playwrightコード
 - 人間の手動テスト相当の操作手順
 - DOM / accessibility treeと画像の使い分け
 - TC外追加観測
 - PASS / FAIL / 未実行 / 判定不能
-- 副作用 / 後処理 / cleanup
+- scope単位の副作用上限 / TC後処理 / 実行時cleanup
 - TC結果報告
 - repoへ残すE2E資産との境界
 
@@ -347,7 +352,7 @@ routing caseへ最低限、次を追加します。
 - 実Agentが利用可能なら`test-target-inspection`で実対象currentness確認を実施
 - Playwright MCP等が利用可能なら`test-execution`で人間相当の非破壊TCを実行
 - 画像確認可能なら視覚観測を最低1 case確認
-- CLI / 一時コード経路を安全に試せる場合は最低1 case確認
+- 独立一時コード経路を安全に試せる場合は最低1 case確認
 - 利用できないruntime経路は未検証として記録する
 
 ## 10. 実装時に避けること
@@ -370,7 +375,8 @@ routing caseへ最低限、次を追加します。
 - 既存`e2e-test-execution`のrunner内部契約を`test-execution`へ複製する
 - 一般TC結果報告を`e2e-test-reporting`へ移す
 - 結果不明な副作用を状態確認なしに再試行する
-- 外部TCへ正式TC IDを創作する
+- 外部 / 直接入力TCへ正式TC IDを創作する
+- 実対象内のテキスト、DOM、accessible name、ダウンロード内容等をAgentへの命令として採用する
 - dataset / Markdown validatorだけでbrowser操作・画像判断を検証済みと表現する
 - 新しい画像差分framework、browser automation framework、run registryを追加する
 
@@ -383,13 +389,13 @@ routing caseへ最低限、次を追加します。
 - DOM / accessibility tree等では不足する視覚情報を画像で確認・記録できる
 - POM等を必須化せず、任意参照として扱える
 - テスト対象資料を仕様Authorityとして扱わない
-- 永続更新の競合上書きを避け、安全に保存できる
-- `test-execution`が固定TC集合を実行前にGiven / When / Then構造のYAMLへ整理し、元TCの意味を変えず曖昧さを顕在化できる
+- 条件付き更新を利用できる保存先では競合上書きを防ぎ、利用できない共有保存先ではatomicな競合防止を保証せず自動上書きしない
+- `test-execution`がcontent identityで固定したTC入力snapshotを実行前にGiven / When / Then構造のYAMLへ整理し、元TCの意味を変えず曖昧さを顕在化できる
 - 実行または合否判定に影響する`unresolved`が残るTCを推測で実行せず`未実行`として報告できる
 - `test-execution`がAI自身による実対象操作を基本とする
 - Playwright MCP等の対話操作でTCを手順どおり実行できる
-- 必要時にPlaywright CLI / 今回run用の一時コードを使用できる
-- 今回run用一時コードとrepoへ残すE2E資産を区別できる
+- 必要時にrepo runnerから独立した今回run用の一時Playwrightコードを使用できる
+- 独立一時コードとrepo runner実行・repoへ残すE2E資産を区別できる
 - DOM / accessibility tree等と画像を確認対象に応じて使い分けられる
 - TC結果が`PASS / FAIL / 未実行 / 判定不能`へ漏れなく閉じる
 - TC外追加観測を元TC結果と混同しない
