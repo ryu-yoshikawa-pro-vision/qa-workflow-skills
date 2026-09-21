@@ -287,11 +287,13 @@ contract versionを持たない既存成果物を一律破棄しません。
 
 - 従来契約を満たす間はlegacy成果物として参照可能
 - その成果物を変更・再利用して本Plan対象の決定論的処理へ入る時点で、担当Skillが`input_mode=direct`として正規化model / 構造入力を作成して新契約へ昇格する
-- legacy初回昇格では、現在のlegacy成果物に存在するTR / TCN / CI / TC IDを「現在確認できるactive ID」として固定migration builderがprevious stateへseedする。過去に削除済みだったが現成果物から消えているID履歴は復元できないため、昇格前のdeleted履歴を捏造しない。新規採番は現在観測できる同系列IDの最大番号+1から開始し、互換保証は昇格時点以降のfull snapshotへ限定する
-- TR / TCN / TCは、担当Skillが意味上同一と判断した既存rowについて既存`reuse_id`経路を使ってlegacy IDを維持する。legacy成果物にmodel keyが存在しない場合はmodel keyを新規採番し、存在しない過去model identityを復元しない
-- legacy CIを現在generator target / semantic Coverage Itemへ対応付けてIDを維持する場合だけ、初回昇格用`legacy_ci_seed[]`を`materialize_coverage.py`へ渡す。schemaは`{ci_id, model_key, source_kind, target_ref, semantic_item_draft_key}`とし、`source_kind=runtime_target`ではcurrent `target_ref`だけ、`source_kind=semantic_item`ではcurrent `semantic_item_draft_key`だけを必須にする。LLMは意味上の同一性だけを判断し、固定builderがcurrent TCN / model / target / draftの存在、一意対応、CI親TCN、duplicate reuseを検証する
-- `legacy_ci_seed[]`により対応できたCIはその既存CI IDを初回normal mappingへ移し、`materialize_coverage.py`が通常の`target_mapping_state[] / semantic_ci_mapping_state[] / ci_id_state[]`を出力する。対応できないlegacy CIは新targetへ推測割当てせず、当該CIとそれを参照する既存TCを`要再検証`にする
-- `legacy_ci_seed[]`はnormal mapping stateがまだ存在しない初回昇格だけ許可する。通常state生成後は受理せず、以降は既存のprevious mapping / full snapshot契約だけを正本にする
+- legacy初回昇格では、現在のlegacy成果物に存在するTR / TCN / CI / TC IDを「現在確認できるactive ID」としてstructure / materialize script自身がprevious stateへseedする。AgentやLLMが`previous_*[]`を手組みしない。過去に削除済みだったが現成果物から消えているID履歴は復元できないため、昇格前のdeleted履歴を捏造しない。新規採番は現在観測できる同系列IDの最大番号+1から開始し、互換保証は昇格時点以降のfull snapshotへ限定する
+- 初回昇格入力は`input_mode=direct`かつnormal previous stateが空の場合だけ許可する。`requirement_structure.py`は`legacy_tr_ids[]`、`condition_structure.py`は`legacy_tcn_ids[]`、`case_structure.py`は`legacy_tc_ids[]`をoptionalで受け、各scriptが`runtime_contract.py`の同一legacy ID seed helperで`status=active`のprevious stateへ変換してから通常のscope / reuse / new採番処理へ入る。normal previous stateとlegacy ID入力の併用は`invalid_input`
+- TR / TCN / TCは、担当Skillが意味上同一と判断した既存rowについて既存`reuse_id`経路を使ってlegacy IDを維持する。legacy成果物にmodel keyが存在しない場合は`previous_model_keys=[]`からmodel keyを新規採番し、存在しない過去model identityを復元しない
+- CIは全legacy CI IDを`legacy_ci_ids[]`として`materialize_coverage.py`へ渡し、normal `previous_ci_ids[]`が空の初回昇格だけ全件`status=active`へseedする。これにより意味対応できないlegacy CIも採番上限・過去最大番号へ含め、別の新規CIへ番号を再利用しない
+- legacy CIを現在generator target / semantic Coverage Itemへ対応付けてIDを維持する場合だけ、`legacy_ci_ids[]`のsubsetとして初回昇格用`legacy_ci_seed[]`を渡す。schemaは`{ci_id, model_key, source_kind, target_ref, semantic_item_draft_key}`とし、`source_kind=runtime_target`ではcurrent `target_ref`だけ、`source_kind=semantic_item`ではcurrent `semantic_item_draft_key`だけを必須にする。LLMは意味上の同一性だけを判断し、固定builderがcurrent TCN / model / target / draftの存在、一意対応、CI親TCN、duplicate reuseを検証する
+- `legacy_ci_seed[]`により対応できたCIはその既存CI IDを初回normal mappingへ移し、`materialize_coverage.py`が通常の`target_mapping_state[] / semantic_ci_mapping_state[] / ci_id_state[]`を出力する。対応できないlegacy CIはcurrent mappingへ推測割当てせず通常lifecycleでdeletedへ遷移し、当該CIを参照していた既存TCを`要再検証`にする。ID row自体はfull snapshotへ残す
+- `legacy_tr_ids[] / legacy_tcn_ids[] / legacy_tc_ids[] / legacy_ci_ids[] / legacy_ci_seed[]`は初回昇格だけ許可し、normal state生成後は受理しない。以降は既存のprevious mapping / full snapshot契約だけを正本にする
 - 新契約Machine Entity保存後も、必要な前工程Machine Entityが存在しない境界は`direct`を維持できる。必要な外部semantic dependencyがすべてcurrent Machine Entityとして揃った場合だけ`artifact`へ切り替える
 - legacy成果物を「決定論的生成済み」と表現しない
 
@@ -324,7 +326,7 @@ runtime単位状態の正本は各成果物に保存した`runtime_unit_key`、`
 - model issueを`question-analysis`へroutingする場合は`skill / runtime_unit_key / model_key / target_key / generation_fingerprint`を質問一覧・ブロック中範囲・回答後の再開情報へ保持する
 - artifact全体scriptのissueも`skill / runtime_unit_key / generation_fingerprint`をBlocker / Issueへ保持し、model keyを捏造しない
 - unsupported item closureの`handling`は`llm_fallback / 対象外 / 別テストレベル / 残存リスク / 成立不能 / 重複 / ブロック中`だけを許可する。`llm_fallback`と`重複`はcurrentな`covered_by_entity`を必須にし、`ブロック中`はclosure行があってもworkflow完了不可とする。その他のDispositionは既存`test-condition-design`のreason / Authority条件をそのまま適用する
-- `llm_fallback`の`covered_by_entity`は対象unsupported item / whole-modelと同じ`model_key`に属するcurrent CI Machine Entityだけを参照する。TCNやmodel metadataだけをfallback Coverage evidenceにせず、参照先missing / stale / 別modelなら未閉鎖として扱う
+- 通常Coverage modelの`llm_fallback`は対象unsupported item / whole-modelと同じ`model_key`に属するcurrent CI Machine Entityだけを参照する。internal adapterはCoverageを所有しないため例外とし、`_02_runtime-architecture-and-contracts.md` §2.2のfallback手順で追加した同一TCNの直接定義Coverage modelに属するcurrent CIだけを`covered_by_entity`へ指定できる。adapterと無関係なTCN / modelのCI、TCNやmodel metadataだけをfallback Coverage evidenceにせず、参照先missing / staleなら未閉鎖として扱う
 - `coverage-analysis`はstale / gapをTCN / CIだけでなく関連`model_key`まで追跡する
 
 Machine Entityのfreshnessは`runtime_contract.py`の共通関数で計算します。各Machine Entityの`runtime_dependencies[]`と現在runtime unitのgenerationを比較し、次のschemaへ正規化します。
