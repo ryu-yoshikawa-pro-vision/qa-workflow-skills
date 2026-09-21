@@ -24,7 +24,7 @@ qa-workflowが再利用元として選んだ同種成果物を同じ系列とし
 
 同一実行で複数の`new` draftへ採番する場合はcanonicalization後の`draft_key`順で割り当て、raw JSON配列順を使いません。CIは`materialize_coverage.py`のcanonical candidate順を使います。1つの`model_key`は同時に1つのTCNだけへ所属し、別TCNで同じmodelを再利用する場合は意味上別modelとして別`model_key`を発行します。
 
-TR / TCN / TCは既存の3桁形式をこのPlanで変更しません。最大番号が999に達した成果物系列で新規IDが必要な場合は削除済みIDを再利用せず、`id_space_exhausted` issueとしてブロックします。CIは`CI\d{2,}`のため同じ上限を持ちません。
+TR / TCN / TCは既存の3桁形式をこのPlanで変更しません。最大番号が999に達した成果物系列で新規IDが必要な場合は削除済みIDを再利用せず、`id_space_exhausted` issueとしてブロックします。CIは完全IDを`TCN-\d{3}-CI\d{2,}`、TCN配下の採番suffixを`CI\d{2,}`とします。`previous_ci_ids[] / legacy_ci_ids[] / mapping / Machine Entity`は常に完全`ci_id`を保持し、採番・最大番号比較時だけ同一TCN prefixを検証したうえで末尾のCI番号を取り出します。CI suffixは2桁以上を許可するため999上限を持ちません。
 
 ### 7.1.1 部分更新時のID状態
 
@@ -107,7 +107,7 @@ CIは§7.2.2のtarget mapping状態遷移を優先し、同sectionで明示し�
 - Disposition → CI: targetの直近CIがdeletedで、現在ほかのactive targetへ割り当てられていなければ同じCIを復帰してよい。そうでなければ過去使用済み最大CI番号+1から新規採番
 - deleted CI番号を別targetへ再利用しない
 
-`previous_target_id_map[]`はactive mappingだけでなく`mapping_status=active|inactive`、直近`ci_id`、その判断時点の`target_content_fingerprint`を保持し、Disposition中のtargetも過去mappingを失いません。CI番号は`CI\d{2,}`を許可します。
+`previous_target_id_map[]`はactive mappingだけでなく`mapping_status=active|inactive`、直近`ci_id`、その判断時点の`target_content_fingerprint`を保持し、Disposition中のtargetも過去mappingを失いません。`ci_id`は完全形式`TCN-\d{3}-CI\d{2,}`を保持し、同一TCN内の採番比較ではsuffix `CI\d{2,}`の数値部分だけを使用します。
 ### 7.3 upsert
 
 再実行はappendではなくstable keyでupsertします。
@@ -326,7 +326,7 @@ runtime単位状態の正本は各成果物に保存した`runtime_unit_key`、`
 - model issueを`question-analysis`へroutingする場合は`skill / runtime_unit_key / model_key / target_key / generation_fingerprint`を質問一覧・ブロック中範囲・回答後の再開情報へ保持する
 - artifact全体scriptのissueも`skill / runtime_unit_key / generation_fingerprint`をBlocker / Issueへ保持し、model keyを捏造しない
 - unsupported item closureの`handling`は`llm_fallback / 対象外 / 別テストレベル / 残存リスク / 成立不能 / 重複 / ブロック中`だけを許可する。`llm_fallback`と`重複`はcurrentな`covered_by_entity`を必須にし、`ブロック中`はclosure行があってもworkflow完了不可とする。その他のDispositionは既存`test-condition-design`のreason / Authority条件をそのまま適用する
-- 通常Coverage modelの`llm_fallback`は対象unsupported item / whole-modelと同じ`model_key`に属するcurrent CI Machine Entityだけを参照する。internal adapterはCoverageを所有しないため例外とし、`_02_runtime-architecture-and-contracts.md` §2.2のfallback手順で追加した同一TCNの直接定義Coverage modelに属するcurrent CIだけを`covered_by_entity`へ指定できる。adapterと無関係なTCN / modelのCI、TCNやmodel metadataだけをfallback Coverage evidenceにせず、参照先missing / staleなら未閉鎖として扱う
+- 通常Coverage modelの`llm_fallback`は対象unsupported item / whole-modelと同じ`model_key`に属するcurrent CI Machine Entityだけを参照する。internal adapterはCoverageを所有しないため例外とし、`_02_runtime-architecture-and-contracts.md` §2.2のfallback手順で追加した同一TCNの直接定義Coverage modelに属するcurrent CIだけを`covered_by_entity`へ指定できる。partial adapterではunsupported itemの`affected_technique_slug`と直接定義modelの`technique_slug`を一致必須とする。whole-model adapterではactiveのまま残す各selected child techniqueについて少なくとも1件のcurrent直接定義Coverage model / CIまたは既存Disposition closureへ到達することを必須とする。adapterと無関係なTCN / model / techniqueのCI、TCNやmodel metadataだけをfallback Coverage evidenceにせず、参照先missing / staleなら未閉鎖として扱う
 - `coverage-analysis`はstale / gapをTCN / CIだけでなく関連`model_key`まで追跡する
 
 Machine Entityのfreshnessは`runtime_contract.py`の共通関数で計算します。各Machine Entityの`runtime_dependencies[]`と現在runtime unitのgenerationを比較し、次のschemaへ正規化します。
