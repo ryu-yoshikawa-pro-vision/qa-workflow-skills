@@ -325,7 +325,7 @@ condition / action / ruleは任意数を許可します。known ruleのaction ve
 
 対象conditionが3値以上でも、一部valueだけactionが一致するgroupをdon't-careへ変換しません。例えば`A / B / C`のうち`A / B`だけ同じactionで`C`が異なる場合は統合不可です。3値すべてが同じactionで、他condition assignmentも同一かつ全valueが成立可能known ruleとして揃う場合だけ統合候補にします。
 
-候補をdeterministicに列挙し、各候補へ`merge_key = dm:sha256:<canonical sorted rule_keys hash>`を付与します。`rule_keys`はUnicode code point順でsortした配列をcanonical JSON化してSHA-256します。LLMは意味上統合してよい候補の`merge_key`だけを`accepted_merges[]`へ返し、任意の`rule_keys[]`を新規構成しません。scriptはaccepted `merge_key`が同一実行で生成した候補に存在すること、対象conditionの成立可能な関連valueがすべて候補ruleに含まれること、候補内ruleが同一action vectorであること、統合後のCartesian productが成立可能な既知ruleだけを含み未定義assignmentを追加しないことを再検証してdon't-care ruleを生成します。Boolean minimizationで最小rule数を目的にしません。
+候補をdeterministicに列挙し、各候補へ`merge_key = dm:h<canonical sorted rule_keys SHA-256 64 lowercase hex>`を付与します。`rule_keys`はUnicode code point順でsortした配列をcanonical JSON化してSHA-256します。LLMは意味上統合してよい候補の`merge_key`だけを`accepted_merges[]`へ返し、任意の`rule_keys[]`を新規構成しません。scriptはaccepted `merge_key`が同一実行で生成した候補に存在すること、対象conditionの成立可能な関連valueがすべて候補ruleに含まれること、候補内ruleが同一action vectorであること、統合後のCartesian productが成立可能な既知ruleだけを含み未定義assignmentを追加しないことを再検証してdon't-care ruleを生成します。Boolean minimizationで最小rule数を目的にしません。
 
 `accepted_merges[]`はDecision Tableの派生表示・レビュー用のdon't-care ruleを作るためだけに使用します。元の成立可能assignment targetは削除せず、`coverage_summary.required / covered`も変更しません。異なるassignmentは`execution_fingerprint`が異なるため、accepted don't-care mergeを`materialize_coverage.py`の`merge_group`へ変換せず、元assignmentごとに別CIを維持します。TCへ複数CIを対応付ける必要がある場合は、don't-care表示を根拠に自動統合せず、`test-case-design`が具体的な前提・データ・手順・期待結果を意味判断したうえで既存の`ci_refs[]`契約を使用します。
 
@@ -431,8 +431,8 @@ stable target:
 
 - state: `state:node:<state_key>`
 - transition: `state:transition:<transition_key>`
-- n-switch: `state:n-switch:<N>:sha256:<transition_key_sequence_hash>`
-- round-trip: `state:round-trip:<start_state_key>:sha256:<transition_key_sequence_hash>`
+- n-switch: `state:n-switch:<N>:h<transition_key_sequence_hash>`
+- round-trip: `state:round-trip:<start_state_key>:h<transition_key_sequence_hash>`
 - invalid: `state:invalid:<candidate_key>`
 
 round-tripは開始stateをCoverage identityの一部とし、transition key列をrotationして同一化しません。同じ閉路でも開始stateが異なる場合は別targetです。同じ開始stateかつ同じtransition key列だけを重複として除去し、逆方向はtransition列が異なるため別cycleです。

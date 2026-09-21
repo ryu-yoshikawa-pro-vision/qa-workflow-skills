@@ -129,18 +129,19 @@ skills/qa-workflow/scripts/
 └── workflow_runtime.py
 ```
 
-`workflow_runtime.py`は工程固有の意味判断を行いません。各成果物へ保存されたruntime metadata、上流Entity、runtime unit依存、fingerprintを入力として、runtime状態集約、freshness、stale伝播、機械的な完了可否を計算します。開始Skill、意味上の変更影響、既存成果物を意味的に再利用できるかの判断は既存`qa-workflow`責務に残します。
+`workflow_runtime.py`は工程固有の意味判断を行いません。各成果物へ保存されたruntime metadata、上流Entity、runtime unit依存、fingerprintを入力として、runtime状態集約、freshness、stale伝播、機械的な完了可否を計算します。開始Skill、必要Skill、対象 / 実行範囲、意味上の変更影響、既存成果物を意味的に再利用できるかの判断は既存`qa-workflow`責務に残し、その決定をcanonical workflow scopeとして`workflow_runtime.py`へ渡します。runtimeの完全性保証はこのscope内を対象とし、scope自体の意味的な正しさは既存routing契約、trigger eval、semantic evalで検証します。
 
 ### standalone最終runtime evidence確認
 
 `qa-workflow`を経由しないSkillでも必須runtime unitの丸ごと省略をproduction経路で検出するため、各Skill-local `runtime_contract.py`へ同一実装の`verify_runtime_evidence` operationを持たせます。これはdispatch対象runtime unitではなく、最終出力前の固定検査です。
 
-- inputはstrict JSON `{operation:"verify_runtime_evidence", skill, dispatch_source_state, artifact_markdown}`。このoperationは最終成果物全体を扱う集約処理として扱い、stdin hard limitは16 MiBとする。上限はJSON escape後の実際のUTF-8 stdin bytesへ適用し、超過時はtruncateせず`limit_exceeded`として成果物を完成扱いしない。runtime-v1では16 MiBを超えるstandalone成果物の最終evidence確認をサポートしない
-- `dispatch_source_state`はAgent / LLMが手組みする自由入力にしない。各Skill-local `runtime_contract.py`の固定builderが、当該Skillのcanonical normalized input、対象 / 実行範囲、current structure / identity state、active model metadata、adapter parentのcurrent runtime state、条件付きruntime判定に必要な入力有無から固定projectionで生成する。actual runtime block集合をsourceへ含めず、builder出力へAgent / LLMがitemを追加・削除してから渡す経路を許可しない
-- `verify_runtime_evidence`は`dispatch_source_state`をstrict検証し、内部で`normalized_dispatch_state`へ正規化してから共通expected-runtime builderへ渡す。Skill / 対象 / 実行範囲だけで必須になるstructure / artifact runtimeはcurrent actual blockの有無に依存せず期待集合へ入れ、model runtime等はcurrent structure stateとadapter parent stateから導出する。期待集合導出に必要なsource stateが欠落・矛盾している場合は空の期待集合へ縮退させず、`issues[]`へ`issue_type=invalid_dispatch_state`を返して`valid=false`とする
-- `runtime_contract.py`の共通expected-runtime builderが内部で得た`normalized_dispatch_state`から`expected_runtime_units[]`を導出する。§2.1のSkill / 対象 / 条件 / `model_type → generator`等の固定dispatch metadataは共通runtime契約として同一`runtime_contract.py`内にdataとして保持してよい。generatorアルゴリズム、技法の意味判断、Coverage計算は入れない。別dispatch manifest / registryは追加しない
-- 同じ`runtime_contract.py`の既存Markdown抽出処理で`artifact_markdown`から`Machine Runtime Input / Result`の`(skill, runtime_unit_key)`を抽出し、InputとResultが1対1で揃うactual集合を作る
-- expected / actualのmissing、extra、Inputだけ、Resultだけ、duplicateを検出し、1件でもあれば`valid=false`とする。actual集合からexpectedを逆算しない
+- inputはstrict JSON `{operation:"verify_runtime_evidence", skill, normalized_skill_input, artifact_markdown}`。このoperationは最終成果物全体を扱う集約処理として扱い、stdin hard limitは16 MiBとする。上限はJSON escape後の実際のUTF-8 stdin bytesへ適用し、超過時はtruncateせず`limit_exceeded`として成果物を完成扱いしない。runtime-v1では16 MiBを超えるstandalone成果物の最終evidence確認をサポートしない
+- `normalized_skill_input`は当該Skillを実行したときのcanonical normalized inputそのものとし、複数用途Skillでは既存の対象 / 実行範囲を含む。Agent / LLMが完成済み`expected_runtime_units[]`、`dispatch_source_state`、active model一覧を別入力として手組みする経路を作らない
+- `runtime_contract.py`の共通expected-runtime builderは、まず`skill + normalized_skill_input`と§2.1の固定dispatch metadataだけからstructure / artifact等のroot期待runtime unitを導出する。root期待unitの有無をcandidate artifactのactual集合から逆算しない
+- 同じ`runtime_contract.py`のMarkdown抽出処理で`artifact_markdown`から`Machine Runtime Input / Result`の`(skill, runtime_unit_key)`を抽出し、InputとResultが1対1で揃うactual集合を作る。root期待unitにmissing / incomplete / duplicateがあれば、その時点で`valid=false`とし、欠落したrootを理由にdownstream期待集合を空へ縮退させない
+- model runtimeやadapter派生child等の条件付きdownstream期待unitは、存在確認・strict decode・identity / fingerprint整合を通過したcurrent structure / adapter parent runtime resultから同helperが固定projectionして段階的に導出する。Agent / LLMがcurrent structure stateやadapter parent stateを別JSONとして再生成しない。親runtimeが`unresolved / blocked / stale`なら§2.1の規則どおりchildを期待集合へ追加せず、親側状態をblockerとして扱う
+- `normalized_skill_input`自体がdispatch契約に必要なfieldを欠く、またはcandidate artifactのcurrent root resultと矛盾する場合は`issues[]`へ`issue_type=invalid_dispatch_input`を返して`valid=false`とする
+- expected / actualのmissing、extra、Inputだけ、Resultだけ、duplicateを検出し、1件でもあれば`valid=false`とする。actual identity集合からexpectedを逆算しない
 - outputは`{valid, issues[], expected_runtime_units[], actual_runtime_units[], missing[], extra[], incomplete_pairs[], duplicates[]}`の固定JSONとする。正常時の`issues[]`は空配列とする
 - このoperation自体はruntime unitではないため、Machine Runtime Input / Resultを保存せず、`expected_runtime_units[]`へ自身を追加しない。generation fingerprintやCoverage evidenceにも使用しない
 - runtime対象Skillは最終成果物を返す直前に必ずこのoperationを実行し、`valid=false`なら契約適合済み・完成済みとして返さない。これをdeterministic eval専用validatorへ委ねない
@@ -187,11 +188,11 @@ runtime対象Skillは、Skill instructionへscript選択表を持ち、次の順
 | `test-condition-design` | 単一用途 | TCN配下にactiveなCoverage所有modelが1件以上ある | `materialize_coverage.py` | TCNごとに必須 |
 | `test-case-design` | 単一用途 | 成果物確定前 | `case_structure.py` | 必須 |
 | `coverage-analysis` | `テスト設計` | traceabilityを検査する | `traceability.py` | 必須 |
-| `qa-workflow` | 単一用途 | `workflow_runtime.py`自身を除く本Plan対象runtime unitの期待集合が1件以上ある | `workflow_runtime.py` | 条件付き |
+| `qa-workflow` | 単一用途 | canonical workflow scopeに本Planruntime対象のSkill / 対象 / 実行範囲が1件以上ある | `workflow_runtime.py` | 条件付き |
 
 `materialize_coverage.py`はcurrent machine targetやsemantic itemが0件でも、TCN配下にactiveなCoverage所有modelが1件以上あれば実行します。runtimeなしsemantic modelやtarget 0件のmodelも`model_completion[]`を明示し、空入力をvacuous completeにしません。whole-model `unsupported`は既存のunsupported closure契約で閉じ、成功`model_completion[]`を捏造しません。
 
-`workflow_runtime.py`は、`workflow_runtime.py`自身を除く本Plan対象runtime unitの期待集合が1件以上ある場合だけdispatchします。`test-analysis: E2E対象選定`、`coverage-analysis: TC → E2E実装 / E2E実装 → 実行結果`等、本Plan対象runtime unitが0件のE2E-only経路ではdispatchせず、既存`qa-workflow`の完了契約を維持します。Python unavailableだけを理由に本Plan対象runtimeがない経路を`blocked`へ変更しません。
+`workflow_runtime.py`は、既存`qa-workflow`が確定したcanonical workflow scopeに本Planruntime対象のSkill / 対象 / 実行範囲が1件以上ある場合だけdispatchします。`test-analysis: E2E対象選定`、`coverage-analysis: TC → E2E実装 / E2E実装 → 実行結果`等、本Planruntime対象scopeが0件のE2E-only経路ではdispatchせず、既存`qa-workflow`の完了契約を維持します。Python unavailableだけを理由に本Planruntime対象scopeがない経路を`blocked`へ変更しません。
 
 model typeからgeneratorへの対応は次だけを許可します。model runtimeの`expected_runtime_units[]`はこの表から、artifact runtimeの`expected_runtime_units[]`は直前のSkill dispatch表から導出し、両集合を連結します。adapter派生child（`derived_from_model_key != null`）は、親adapter runtimeがcurrent `result_status=ready`で、そのchildに対応する`derived_child_inputs[]` rowがちょうど1件存在する場合だけdispatch対象かつ期待runtime集合へ追加します。親adapterが`unresolved / blocked / stale`、未実行、または対応row欠落の間はchild runtime unitを期待集合へ入れず、親adapter側のissue / freshnessをblockerとして扱います。
 

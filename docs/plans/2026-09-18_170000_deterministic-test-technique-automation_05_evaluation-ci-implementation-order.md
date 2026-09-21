@@ -139,12 +139,12 @@ CLI integration testは各runtime scriptの`valid_minimal.json`をCIのPython 3.
 - `condition_structure.py`を派生modelのidentity確定に再利用しても、既存model generatorがID割当てしか利用していない場合は同scriptをruntime dependencyへ登録せず、親generatorを自己stale化しない
 - tie-break / Coverage / target key等の意味契約変更では実装fingerprintだけでなく対応contract versionも更新する
 - model / artifact全runtime unitについて`Machine Runtime Input / Result`を保存→決定論的抽出→strict decode→canonical化し、input fingerprint、model scriptではmodel fingerprintも一致する。同条件でruntimeへ再投入すると同じmachine resultになる
-- `runtime_contract.py`の`verify_runtime_evidence` operationは固定builderが生成した`dispatch_source_state`をstrict検証し、内部でnormalized dispatch stateとexpected runtime identityを導出して、artifact Markdownから抽出したInput / Result pairと完全一致を検査する。valid caseに加え、必須unit missing、unknown extra、Inputのみ、Resultのみ、duplicate heading / blockを各1件以上negative fixtureで検出する。さらに、active modelまたは条件付き入力をsource stateから削った改ざんfixture、current structure stateと矛盾するsource stateを`invalid_dispatch_state`として`valid=false`にし、空のexpected集合へ縮退しないことを確認する。operation自身をexpected / actual runtime unitへ追加しない。Skill / 対象 / 条件 / `model_type → generator`等の固定dispatch metadataは同一`runtime_contract.py`内の共通dataを使い、別manifest / registryを作らない
+- `runtime_contract.py`の`verify_runtime_evidence` operationは`normalized_skill_input`とcandidate artifactを受け、Skill / 対象 / 条件の固定dispatch metadataからroot expected runtime identityを先に導出する。artifact MarkdownからInput / Result pairを抽出し、root pairを確認した後だけcurrent structure / adapter parent resultから条件付きdownstream expected identityを段階的に導出する。valid caseに加え、必須root unit missing、条件付きmodel unit missing、unknown extra、Inputのみ、Resultのみ、duplicate heading / blockを各1件以上negative fixtureで検出する。root runtimeを削除してもexpected root集合が縮まないこと、親adapter ready resultがあるのにchild runtimeを削除するとmissingになること、親adapter unresolvedならchildを期待しないことを固定fixtureで確認する。Agent / LLMが完成済みexpected集合やdispatch stateを入力しない。operation自身をexpected / actual runtime unitへ追加せず、Skill / 対象 / 条件 / `model_type → generator`等の固定dispatch metadataは同一`runtime_contract.py`内の共通dataを使い、別manifest / registryを作らない
 - standalone Skillの代表fixtureでは、Agentが必須runtime blockを1件省略した候補artifactへ`verify_runtime_evidence`を実行して`valid=false`となり、deterministic validatorを実行しなくてもproduction最終確認で停止する
 - LF / CRLF差だけでimplementation fingerprintが変わらない
 - canonical JSON static dataは整形・改行差だけでversion hashが変わらない
 
-- hash由来stable component keyは`h` + full SHA-256 64 hexの65文字に固定し、digestを切り詰めない
+- hash由来stable component keyは`h` + full SHA-256 64 hexの65文字に固定し、digestを切り詰めない。Decision Table / combinatorial / Cause-Effect / schema / flow / state / unsupported item / don't-care mergeのhash componentも同じ形式を使用し、stable key内のcomponentとして`sha256:<hex>`を使用しない。`target_ref / content_fingerprint / execution_fingerprint`等のdigest専用fieldだけ`sha256:<64 lowercase hex>`を使用する
 
 ### 決定論性
 
@@ -601,9 +601,9 @@ raw machine-readable入力をfixtureにします。
 ### traceability
 
 - Dispositionはstructure scriptと同じ共通schemaをそのまま受け取り、Markdownから再解釈しない
-- `traceability.py`と`workflow_runtime.py`が同じ`runtime_contract.py` freshness / closure関数と、`runtime_units / current_entities / current_runtime_units / expected_runtime_units / expected_entities / unsupported_item_closures` schemaを使う
+- `traceability.py`と`workflow_runtime.py`が同じ`runtime_contract.py` freshness / closure関数と、`runtime_units / current_entities / current_runtime_units / unsupported_item_closures`のrow schemaを使う。traceabilityへ渡すexpected集合は同fixed builder出力、workflow_runtimeはcanonical `workflow_scopes[]`からexpected runtime / Entity集合を内部再導出し、traceability側のexpected配列を信頼しない
 - Machine Entityの`upstream_entity_dependencies[] / runtime_dependencies[]`から`entity_freshness[]`を同じ結果として算出し、missing / generation mismatch / dependency cycleを検出する
-- `traceability.py`は`workflow_runtime.py` resultを依存入力にせず、`coverage-analysis::artifact:traceability:all`自身と`qa-workflow::artifact:workflow_runtime:all`を`runtime_units[] / current_runtime_units[] / expected_runtime_units[]`へ含めない。いずれかのinclusionを`invalid_input`として回帰検出する
+- `traceability.py`は`workflow_runtime.py` resultを依存入力にせず、`coverage-analysis::artifact:traceability:all`自身と`qa-workflow::artifact:workflow_runtime:all`を`runtime_units[] / current_runtime_units[] / expected_runtime_units[]`へ含めない。`workflow_runtime.py`ではcanonical `workflow_scopes[]`に選択済みの本Planruntime scopeがある場合にroot期待unitを内部導出し、root unit欠落、current structure stateから導出されるmodel / child runtime欠落、Machine Entity欠落を検出する。E2E-only scopeではdispatchしない。いずれかのself inclusionを`invalid_input`として回帰検出する
 - Authority / Risk → TRまたはDisposition
 - TR → TCNまたはDisposition
 - TCN → CI → TC、条件付きCIなしTCN → TC、または既存Skill契約で許可されたDisposition。CIなし経路はactive Coverage所有modelが0件のTCNだけ許可し、Coverage所有modelがあるTCNではmodel単位のcurrent CI / closureを先に必須とする

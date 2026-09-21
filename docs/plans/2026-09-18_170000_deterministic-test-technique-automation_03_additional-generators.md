@@ -79,7 +79,7 @@ stable target:
 
 - node: `flow:node:<node_key>`
 - edge: `flow:edge:<edge_key>`
-- bounded path: `flow:path:sha256:<edge_key_sequence_hash>`
+- bounded path: `flow:path:h<edge_key_sequence_hash>`
 - simple loop: `flow:loop:<loop_key>:<iterations>`
 - fork / join: `flow:branch:<region_key>:<branch_key>`
 

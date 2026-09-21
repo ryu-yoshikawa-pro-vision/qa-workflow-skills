@@ -131,15 +131,15 @@ CI単位の`merge_group`と、TCが複数CIを参照する意味判断を分離�
 | `equivalence_partitions.py` | sets[] / partitions[] | `ep:<set_key>:<partition_key>` | representative / Coverage |
 | `bva.py` | boundaries[] | `bva:<boundary_key>:<position>` | typed value / Coverage |
 | `domain_testing.py` | partitions[] / borders[] | §5のpartition + border + relation別key | point / Coverage |
-| `decision_table.py` | conditions、actions、known rules、constraints、accepted merges | `dt:sha256:<assignment_hash>` | rule assignment / action vector / Coverage |
-| `combinatorial.py` | mode、factors、constraints、strength | `comb:<mode>:sha256:<target_hash>` | target tuple / rows / Coverage |
+| `decision_table.py` | conditions、actions、known rules、constraints、accepted merges | `dt:h<assignment_hash>` | rule assignment / action vector / Coverage |
+| `combinatorial.py` | mode、factors、constraints、strength | `comb:<mode>:h<target_hash>` | target tuple / rows / Coverage |
 | `classification_tree.py` | classifications[] / classes[] / constraints[] / child_models[] | `class:<classification_key>:<class_key>` | factor skeleton / semantic_parameter_requests / derived_child_inputs |
 | `state_transition.py` | states、transitions、reset、coverage mode、n-switch時switch_count | [基本generator契約](./2026-09-18_170000_deterministic-test-technique-automation_03_generators-and-algorithms.md) §9のstate / transition / n-switch / round-trip / invalid key | setup / sequence / Coverage |
 | `flow_paths.py` | nodes、edges、initial nodes、regions、loop specs、max path length、coverage mode | [追加generator契約](./2026-09-18_170000_deterministic-test-technique-automation_03_additional-generators.md) §10のnode / edge / path / loop / branch key | paths / loops / branch Coverage |
 | `crud_matrix.py` | matrix、consistency sequences、operation dispositions | [追加generator契約](./2026-09-18_170000_deterministic-test-technique-automation_03_additional-generators.md) §11のoperation / missing / sequence key | completeness / consistency / anomalies |
-| `cause_effect.py` | causes、effects、constraints、AST | `ce:sha256:<cause_assignment_hash>` | Decision Table互換rules |
+| `cause_effect.py` | causes、effects、constraints、AST | `ce:h<cause_assignment_hash>` | Decision Table互換rules |
 | `grammar_cases.py` | start、key付きproductions、max depth、mutations | `syntax:prod:<production_key>`、mutationは`syntax:mutation:<mutation_key>` | derivations / production Coverage |
-| `schema_cases.py` | `schema_kind, document, schema_pointer, context` | `schema:sha256:<source_hash>` | normalized constraints / downstream inputs / unsupported subtrees |
+| `schema_cases.py` | `schema_kind, document, schema_pointer, context` | `schema:h<source_hash>` | normalized constraints / downstream inputs / unsupported subtrees |
 | `ui_pattern_candidates.py` | pattern / alias、attributes | `ui:<pattern_key>:<candidate_key>` | candidate / references |
 | `test_data_requirements.py` | requirements[] | `data:<requirement_key>` | normalized requirements / applicable-scope conflicts |
 | `random_testing.py` | seed、case count、distribution | `random:case:<1-based zero-padded 6 digits>` | generated input / completion |
@@ -421,7 +421,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - `comb`の`semantic_parameters`はnullまたは`combinatorial.py`の戦略field `{mode, strength, global_strength, subsets, base_assignment, coverage_selection_reason}`。factor keyはschema解析結果へ解決必須
 - selected childに適用可能なskeletonが0件なら`issue_type=selected_technique_not_derivable / blocking=true`を返す。`selection_source=analysis`なら`route_to=test-analysis`、`condition_design`なら`route_to=test-condition-design`、`user`なら`route_to=question-analysis / resume_skill=test-condition-design`とする
 - BVA / combinatorialの意味parameter不足時はstable boundary / factor keyを`semantic_parameter_requests[]`へ返す。要求が0件になったready実行だけ`derived_child_inputs[]`を返す
-- arbitrary JSON Pointerやproperty名をstable component keyへ直接埋め込まない。`source_digest`は`canonical JSON({schema_kind,schema_pointer,keyword,role})`のSHA-256 64桁lowercase hexとし、schema targetは`schema:sha256:<source_digest>`を使う。下流へ渡す`set_key / partition_key / boundary_key / factor_key / requirement_key`は同じsource objectへ用途`role`を加えたfull digestから`_02` §3.2の`h` + 64 hex component keyを固定生成する。元pointer / keyword / full digestもpayloadへ保持する
+- arbitrary JSON Pointerやproperty名をstable component keyへ直接埋め込まない。`source_digest`は`canonical JSON({schema_kind,schema_pointer,keyword,role})`のSHA-256 64桁lowercase hexとし、schema targetは`schema:h<source_digest>`を使う。下流へ渡す`set_key / partition_key / boundary_key / factor_key / requirement_key`は同じsource objectへ用途`role`を加えたfull digestから`_02` §3.2の`h` + 64 hex component keyを固定生成する。元pointer / keyword / full digestもpayloadへ保持する
 - `schema_kind = json-schema-2020-12 | openapi-3.0 | html-control`
 - numberは共通strict JSONの専用number tokenからcanonical integer / exact `coefficient + scale`へ正規化し、binary float / `Decimal` contextへ依存しない
 - JSON Schema 2020-12ではroot `$id`だけmetadataとして許可し、nested `$id`、`$anchor / $dynamicAnchor / $dynamicRef`、外部URI referenceはruntime-v1 `unsupported`。対応`$ref`は同一schema resource内の`#/...`だけ
@@ -482,7 +482,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - node: `{node_key, node_type}`。node_typeは`Authority / Risk / TR / TCN / CI / TC`
 - edge: `{from, to}`。from / toは既知nodeで、§23の許可直接edgeだけを認める
 - disposition: `{upstream_entity:{skill, entity_type, entity_ref, content_fingerprint}, handling, reason, authority_refs[], covered_by_entity}`。handlingは対象上流型に対して既存担当Skillが許可するDisposition集合だけを認め、必要なreason / Authority / covered_by_entityを検証する
-- `runtime_units / current_entities / current_runtime_units / expected_runtime_units / expected_entities / unsupported_item_closures`は`workflow_runtime.py`と同じschemaを使用し、materialize runtime unitの`model_completion[] / target_mappings[] / target_dispositions[]`も同じcurrent resultから受け取る
+- `runtime_units / current_entities / current_runtime_units / unsupported_item_closures`のrow schemaとfreshness / closure規則は`workflow_runtime.py`と共通化する。`traceability.py`の`expected_runtime_units[] / expected_entities[]`はcoverage-analysis呼出し前に同じ`runtime_contract.py`固定builderから生成して渡すが、`workflow_runtime.py`はこれらの配列を入力として信頼せずcanonical workflow scopeから独立に再導出する。materialize runtime unitの`model_completion[] / target_mappings[] / target_dispositions[]`は同じcurrent resultから受け取る
 - `coverage-analysis::artifact:traceability:all`自身と`qa-workflow::artifact:workflow_runtime:all`は`runtime_units[] / current_runtime_units[] / expected_runtime_units[]`のすべてから除外する。いずれかが含まれていた場合は`invalid_input`とし、traceability → workflow_runtime → traceabilityのcycleを作らない
 - `traceability.py`は各Skillの同一内容`runtime_contract.py`にある共通freshness評価関数を呼び、`runtime_freshness[] / entity_freshness[]`を決定論的に算出する。workflow_runtime resultを入力へ渡さず、self/cycle dependencyを作らない
 - stale分析では`entity_freshness[]: {skill, entity_type, entity_ref, model_key, freshness_status, stale_reasons[]}`を正本にし、stale Entityがcurrentな下流で閉鎖済みと誤判定しない
@@ -537,22 +537,23 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 
 #### `workflow_runtime.py`
 
-- `workflow_runtime.py`自身を除く本Plan対象runtime unitの期待集合が1件以上ある場合だけdispatchする。本Plan対象runtimeが0件のE2E-only経路ではこのartifact runtime unit自体を作らず、既存`qa-workflow`の完了契約を使用する
-- required: `runtime_units[]`, `current_entities[]`, `current_runtime_units[]`, `expected_runtime_units[]`, `expected_entities[]`, `unsupported_item_closures[]`
-- `qa-workflow::artifact:workflow_runtime:all`自身は`runtime_units[] / current_runtime_units[] / expected_runtime_units[]`の3集合すべてから除外する。いずれかに自身が含まれていた場合は`invalid_input`とし、self dependencyも禁止する
+- 既存`qa-workflow`が意味判断で確定したcanonical `workflow_scopes[]`に本Planruntime対象scopeが1件以上ある場合だけdispatchする。本Planruntime対象scopeが0件のE2E-only経路ではこのartifact runtime unit自体を作らず、既存`qa-workflow`の完了契約を使用する
+- required: `workflow_scopes[]`, `runtime_units[]`, `current_entities[]`, `current_runtime_units[]`, `unsupported_item_closures[]`
+- `workflow_scopes[]`はqa-workflowが選択したSkill実行単位を`{skill, target, execution_range, input_mode, normalized_input, current_structure_state}`で保持する。`target / execution_range`は既存qa-workflowの正規値で、単一用途Skillではnullを許可する。`normalized_input`はそのSkill実行で使用したcanonical normalized input、`current_structure_state`は必要な場合だけcurrent structure / adapter parent runtime resultから同一`runtime_contract.py`が固定projectionしたmachine stateとする。Agent / LLMがexpected identity一覧をここへ埋め込まない
+- `workflow_scopes[]`のSkill / 対象 / 実行範囲の選択自体は既存`qa-workflow`の意味判断を正本とし、`workflow_runtime.py`は自然言語要求から必要Skillを再推論しない。scope routingの妥当性はtrigger / semantic evalで検証する。一方、選択済みscope内のruntime / Entity完全性は以下の固定builderで機械検査する
+- `qa-workflow::artifact:workflow_runtime:all`自身は`runtime_units[] / current_runtime_units[]`と、内部導出する`expected_runtime_units[]`のすべてから除外する。いずれかに自身が含まれていた場合は`invalid_input`とし、self dependencyも禁止する
 - runtime unit: `{skill, runtime_unit_key, model_key, support_status, result_status, runtime_status, runtime_required, deterministic_generated, generation_fingerprint, upstream_entity_fingerprints[], upstream_runtime_units[], unsupported_items[], model_completion[], target_mappings[], target_dispositions[]}`。`runtime_contract.py`の`runtime_unit_row`固定projectionだけから作り、raw envelope / payloadをcallerが再構成しない。`model_completion[] / target_mappings[] / target_dispositions[]`は`artifact:materialize_coverage:<tcn_id>`だけ非空を許可し、current materialize resultから固定builderで転記する。他unitは3配列とも空固定
 - `current_entities[]`: `{skill, entity_type, entity_ref, model_key, content, content_fingerprint, upstream_entity_dependencies[], runtime_dependencies[]}`。`content`は`_02` §4.4のMachine Entityと同一で、共通関数が`content_fingerprint`を再計算して保存値と一致確認する
 - `current_runtime_units[]`: `{skill, runtime_unit_key, generation_fingerprint}`。`(skill, runtime_unit_key)`を一意keyとして保存済み`upstream_runtime_units[]`と比較する
-- `expected_runtime_units[]`: `{skill, runtime_unit_key}`。各Skillは`_02` §2.1のdispatch表、現在の対象 / 実行範囲、active TCN / model metadata、条件付き入力の有無から固定builderで期待集合を作り、`qa-workflow`はそれを連結して`workflow_runtime.py`自身を除外する
-- `expected_entities[]`: `{skill, entity_type, entity_ref}`。actual `current_entities[]`や保存済みMachine Entity blockから逆算せず、actual集合と独立したsourceから固定導出する
+- `workflow_runtime.py`は各`workflow_scopes[]` rowについて、まず`skill + target / execution_range + normalized_input`と`_02` §2.1の固定dispatch表からroot `expected_runtime_units[]`を内部導出する。条件付きmodel / child runtimeは、source generationが`current_runtime_units[]`と一致する`current_structure_state`から同helperが段階的に導出する。root期待unitがmissing / staleなら、その欠落をblockerにしたうえでdownstream期待集合を空へ縮退させない
+- `expected_entities[]`も入力fieldにせず、各scopeのnormalized sourceとcurrentなstructure / materialize machine stateから同じ固定builderで内部導出する
   - `spec-analysis`: Authority表 / canonical source inventory
   - `test-analysis`: `analysis_entities.py`の正規化inputとcurrent risk / technique / environment runtime resultからcontext / Product Risk / Technique Selection / change graph / environment requirement
   - `test-requirement-design`: `requirement_structure.py`のinput draft + ID mapping / full stateからTR / Disposition
   - `test-condition-design`: `condition_structure.py`のinput draft + ID mapping / full state、current generator dispatch、`test_data_requirements.py`の正規化input / result、`materialize_coverage.py` mappingからTCN / model / CI / test data requirement / Disposition
   - `test-case-design`: `case_structure.py`のinput draft + ID mapping / full stateからTC / Disposition
-- 禁止: `current_entities[]`を読んでexpectedを作る、保存済みMachine Entity blockを期待集合の正本にする、missing actual Entityの存在を前提にexpected identityを作る
-- `expected_runtime_units[]`もactual `runtime_units[] / current_runtime_units[]`から逆算せず、固定dispatch条件、対象 / 実行範囲、active structure state、normalized inputから導出する
-- `runtime_units[]`のidentity集合は`expected_runtime_units[]`と完全一致、`current_entities[]`のidentity集合は`expected_entities[]`と完全一致を必須にする。期待item欠落はblocker、未知の余分なcurrent itemは`invalid_input`とする
+- 禁止: Agent / LLMが完成済み`expected_runtime_units[] / expected_entities[]`を`workflow_runtime.py`へ渡す、`current_entities[]`を読んでexpectedを作る、保存済みMachine Entity blockを期待集合の正本にする、missing actual Entityの存在を前提にexpected identityを作る
+- `runtime_units[]`のidentity集合は内部導出した`expected_runtime_units[]`と完全一致、`current_entities[]`のidentity集合は内部導出した`expected_entities[]`と完全一致を必須にする。期待item欠落はblocker、未知の余分なcurrent itemは`invalid_input`とする
 - completionでは各active Coverage所有modelをmodel単位で検査する。supported / partial / runtimeなしsemantic modelはcurrent materialize runtime unitの対応`model_completion[]` rowを必須とし、`materialize_complete=true`かつrow内`active_ci_ids[]`がcurrent CI Machine Entityと一致することを検証する。partialではさらにcurrent unsupported item closureを全件必須とする。whole-model unsupportedは対応generationのwhole-model `unsupported_item_closures[]`を必須とする。親TCNに別modelのCIがあるだけで当該modelを完了扱いしない
 - 各Skillの同一内容`runtime_contract.py`にruntime dependency graphとMachine Entity dependency graphを評価する共通関数を置く。missing dependencyはstale + blocker、duplicateまたはcycleは`invalid_input`
 - `unsupported_item_closures[]`: `{skill, runtime_unit_key, generation_fingerprint, item_key, reason_code, handling, reason, authority_refs, covered_by_entity}`。`covered_by_entity`は`null`または`{skill, entity_type, entity_ref, content_fingerprint}`の完全Machine Entity参照。`handling`は`llm_fallback / 対象外 / 別テストレベル / 残存リスク / 成立不能 / 重複 / ブロック中`だけを許可する。closureの`generation_fingerprint`は対象runtime unitの現在値と一致必須。`support_status=partial`では`item_key`をunsupported itemのstable keyで必須とし、`reason_code`も現在unsupported itemと一致必須。同じ`(skill, runtime_unit_key, generation_fingerprint, item_key)`のclosureはちょうど1件とし、duplicateを`invalid_input`にする。whole-model `unsupported`では`item_key=null / reason_code=null`を許可するが、同じ`(skill, runtime_unit_key, generation_fingerprint)`のwhole-model closureはちょうど1件だけ許可する。世代またはreasonが変わった以前のclosureを自動再利用しない
@@ -566,7 +567,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 
 `support_status=partial`で返す`payload.unsupported_items[]`は`{item_key, item_type, source_key, reason_code, affected_technique_slug, authority_refs[]}`で固定します。通常Coverage generatorでは`affected_technique_slug=null`固定です。Coverageを所有しないinternal adapterだけ、partial unsupported itemごとに事前採用済みchild techniqueのcanonical `technique_slug`を必須にします。1つのunsupported箇所が複数child techniqueへ影響する場合はtechniqueごとにitemを分けます。`reason_code`は機械的な非対応理由であり、workflow完了可否は`unsupported_item_closures[]`の`handling / covered_by_entity`を別途検査して決めます。
 
-- `item_key`は`unsupported:<generator>:sha256:<canonical identity hash>`で、generator、`item_type`、`source_key`、`affected_technique_slug`をcanonical JSON化して作る。通常generatorはnullを含め、adapterで同じsource/reasonが複数techniqueへ影響してもitem keyを衝突させない
+- `item_key`は`unsupported:<generator>:h<canonical identity SHA-256 64 lowercase hex>`で、generator、`item_type`、`source_key`、`affected_technique_slug`をcanonical JSON化して作る。通常generatorはnullを含め、adapterで同じsource/reasonが複数techniqueへ影響してもitem keyを衝突させない
 - `source_key`は対応できないsubtree / region / operator等のstable component keyまたはJSON Pointer
 - `reason_code`はscriptごとにPlan / Skill referenceで列挙した固定値だけを使用し、自由文をidentityに含めない
 - runtime-v1でpartial unsupported itemを返すscriptの最低限の固定値は次とする。より細かい理由へ分割する場合はcontract変更としてPlan / Skill referenceと回帰fixtureを同時更新し、実装者判断で自由なcodeを追加しない

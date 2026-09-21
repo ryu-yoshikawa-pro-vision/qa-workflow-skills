@@ -136,7 +136,8 @@ generatorが返す100%等のCoverageは、**明示された正規化済みモデ
 
 7. `qa-workflow`
    - contract / model version、上流変更、runtime unit間依存、stale派生成果物、局所ブロック、`要再検証`、legacy成果物再利用、完了判定
-   - Python固定builderがdispatch表・normalized input・structure / materialize stateから導出した期待runtime unit / Machine Entity集合を実際集合と比較し、完全欠落をblockerにする
+   - ユーザー要求と要求成果物から開始Skill・必要Skill・対象 / 実行範囲を決め、canonical workflow scopeとして保持する。このscope選択は既存`qa-workflow`の意味判断であり、runtimeが自然言語要求から再推論しない
+   - canonical workflow scope内ではPython固定builderがdispatch表・normalized input・current structure / materialize stateから期待runtime unit / Machine Entity集合を導出して実際集合と比較し、選択済みscope内の完全欠落をblockerにする。scope自体のrouting妥当性はtrigger / semantic evalで検証する
    - target Dispositionの`重複`chain、partial / whole-model unsupported closure、質問回答のgeneration一致を機械的に検査し、実Coverageへ到達しないclosureや古い回答で完了させない
    - fingerprint比較、runtime / Entity状態集約、機械的なstale / 完了判定をLLMに手計算させずruntime scriptで実行する
 

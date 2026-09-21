@@ -132,7 +132,7 @@ runtime対応Skillの`evals/output/cases/*/expected.json`では、既存fieldに
 ```
 
 - `machine_entities.expected_entities[]`は各Skillの固定builderがnormalized source / structure stateから導出した`(skill, entity_type, entity_ref)`をfixtureへ明示し、actual成果物のMachine Entity集合から逆算しない。validatorはactual identity集合とのmissing / extraと、各contentのentity type別canonical schema・人間向け表主要fieldを独立照合する
-- `runtime_contract.expected_runtime_units[]`はstandalone Skillの正規化input / structure stateから固定builderが導出した`(skill, runtime_unit_key)`をfixtureへ明示する。validatorは成果物中の`Machine Runtime Input / Result` block identity集合と完全一致を要求し、必須runtime blockの丸ごと欠落と未知の余分なblockを検出する。actual runtime block集合からexpectedを逆算しない
+- `runtime_contract.expected_runtime_units[]`はvalidator fixtureではstandalone Skillのcanonical normalized inputと検証済みstructure / adapter parent resultから固定builderが段階的に導出した`(skill, runtime_unit_key)`を明示する。productionの`verify_runtime_evidence`も完成済みexpected集合を入力せず同じ導出順を使用する。validatorは成果物中の`Machine Runtime Input / Result` block identity集合と完全一致を要求し、必須runtime blockの丸ごと欠落と未知の余分なblockを検出する。actual runtime block集合からexpectedを逆算しない
 - standalone direct fixtureで必須runtime blockを1件削除したnegative caseを各代表Skillに置き、`qa-workflow`を通さなくても成果物を完成扱いしないことを確認する
 - 同じcandidate artifactへproduction側`runtime_contract.py`の`verify_runtime_evidence` operationを実行し、validatorとは独立にmissing / extra / incomplete pair / duplicateを検出できることを確認する。deterministic validatorがPASS判定の唯一のruntime省略検出経路にならない。operationは集約stdin 16 MiB上限を使い、JSON escape後の実UTF-8 bytesで境界値と1 byte超過を検証する
 - `spec-analysis`では`runtime_contract.py`のcanonical / Machine Entity helperと`authority_entities.py`を使うfixtureを用意し、runtime unitを作らずAuthority表とcanonical Authority content / expected identityの一致を検証する
@@ -280,7 +280,7 @@ repository全体は328 queryです。
    - 正規化済み`input / model_type / 対象 / 実行範囲`からscript選択表へ入った後のdispatchはunit fixtureで全runtime scriptを網羅し、期待script path・必須/条件付き・実行順とCLI実行結果metadataを検証する
    - 自然言語promptからSkill責務・意味入力を決める部分はPython dispatch testへ実装せず、既存trigger eval / semantic evalと代表Agent smokeで検証する。dispatch検証専用のprompt parserや重複manifestを新設しない
    - `test-analysis: E2E対象選定`と`coverage-analysis: TC → E2E実装 / E2E実装 → 実行結果`では本Planruntimeをdispatchしない
-   - 本Plan対象runtime unitの期待集合が0件のE2E-only `qa-workflow`では`workflow_runtime.py`をdispatchせず、Python unavailableでも本Plan追加を理由に`blocked`へ変更しない。既存`qa-workflow`の開始・完了条件だけで判定する回帰fixtureを追加する
+   - canonical workflow scopeに本Planruntime対象scopeが0件のE2E-only `qa-workflow`では`workflow_runtime.py`をdispatchせず、Python unavailableでも本Plan追加を理由に`blocked`へ変更しない。既存`qa-workflow`の開始・完了条件だけで判定する回帰fixtureを追加する
    - テスト設計runtimeとE2E実装・実行を同時に要求する混在workflowでは、`workflow_runtime.py`の`can_complete=true`でもE2E側の既存完了条件が未達ならworkflow全体を`完了`にしない。逆に既存workflow条件を満たしても`workflow_runtime.py`がdispatch済みで`can_complete=false`なら完了にしない
    - supported inputが`unsupported`になる、またはsupport判定前にAgentがscriptを省略する場合は失敗
    - 保存済み`Machine Runtime Input / Result`を決定論的に抽出してround-trip検証できるが、workflow再利用では保存済みresultをcurrent cacheにせず現在scriptを再実行する
@@ -431,7 +431,7 @@ runtime対象の次の6 Skillを単体コピーして代表scriptを実行しま
 - 既存Skill状態表の「必要な場合だけ使用」を維持し、状態表示時だけ別表`runtime状態`を追加
 - model単位状態を成果物metadataから再構築
 - legacy昇格。structure / materialize scriptの初回legacy seed入力とnormal previous stateへの移行まで含む
-- standalone最終出力では`runtime_contract.py verify_runtime_evidence`で必須runtime block pairをproduction側から検査する。Skill / 対象 / 条件 / `model_type → generator`のdispatch metadataは同一`runtime_contract.py`内の固定dataを正本にし、別manifest / registryを追加しない
+- standalone最終出力では`runtime_contract.py verify_runtime_evidence`へcurrent Skillのcanonical normalized inputとcandidate artifactだけを渡し、必須root runtimeを先に、current parent resultから条件付きdownstream runtimeを後に導出して必須runtime block pairをproduction側から検査する。完成済みexpected集合やdispatch stateをAgent / LLMから受けない。Skill / 対象 / 条件 / `model_type → generator`のdispatch metadataは同一`runtime_contract.py`内の固定dataを正本にし、別manifest / registryを追加しない
 - upstream Entity別content fingerprint / Machine Entityの`upstream_entity_dependencies[] / runtime_dependencies[]` / upstream runtime dependency / stale伝播
 - `traceability.py`と同じ`runtime_contract.py` freshness関数を使用し、workflow_runtime resultをtraceabilityの依存入力にしない
 - `workflow_runtime.py`の`can_complete`は本Planruntime範囲の必要条件として扱い、既存`qa-workflow`全体の完了条件を置換しない

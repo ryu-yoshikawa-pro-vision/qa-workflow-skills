@@ -48,7 +48,7 @@ generator内の`target_key`はmodel内で安定させます。異なるmodel間�
 
 - `target_ref`は`sha256:<64 lowercase hex>`
 - model generatorの共通post-processで各targetへ`target_ref`を付与する
-- この共通post-processは`test-condition-design/scripts/runtime_contract.py`の固定helperとして実装し、`target_ref / execution_fingerprint / target_content_fingerprint`を同じcanonicalization規則から生成する。各generatorへ同じhash処理を複製せず、generatorは技法固有のmachine fieldとcanonical `execution`だけを返す
+- この共通post-processは7 Skillへ同一内容で同梱する`scripts/runtime_contract.py`のgeneric固定helperとして実装し、`target_ref / execution_fingerprint / target_content_fingerprint`を同じcanonicalization規則から生成する。実際にtargetへ適用するのは`test-condition-design`のgeneratorだけとし、他Skill用の分岐や技法固有ロジックをhelperへ追加しない。各generatorへ同じhash処理を複製せず、generatorは技法固有のmachine fieldとcanonical `execution`だけを返す
 - 同じ`model_key + target_key`から常に同じ`target_ref`を得る
 - CIへmaterialize可能な各targetは、具体的にそのCoverageを実行する値・assignment・sequence・path等をgenerator固有のcanonical object `execution`として持つ。診断metadataだけではCI化しない
 - 共通post-processで`execution_fingerprint = sha256(canonical JSON(execution))`を付与する。LLMが`execution`やhashを再生成しない
@@ -369,7 +369,7 @@ Machine Entityのfreshnessは`runtime_contract.py`の共通関数で計算しま
 
 各Skillは単体コピー可能な既存契約を維持します。
 
-`spec-analysis`を含む7 Skillへ`scripts/runtime_contract.py`を同梱し、canonical JSON / Machine Entity helperは同一実装にします。runtime dispatchを持つのは従来どおり6 Skillだけで、`spec-analysis`のhelperはruntime unitとして数えません。repo rootの共通helperへ依存させません。`runtime_contract_version`をfile内定数として持ち、意味契約を変更した場合にversionを更新します。repository testでは改行をLFへ正規化した内容のSHA-256一致を検証し、Skillごとの実装差を許可しません。実装内容の変更は同じLF正規化規則で`runtime_implementation_fingerprint`へ反映します。技法固有ロジックはこの共通helperへ入れません。
+`spec-analysis`を含む7 Skillへ`scripts/runtime_contract.py`を同梱し、canonical JSON / Machine Entity helper、expected-runtime builder、generic target post-process helperを同一実装にします。runtime dispatchを持つのは従来どおり6 Skillだけで、`spec-analysis`のhelperはruntime unitとして数えません。generic target post-processは同一fileへ存在しても`test-condition-design`のgeneratorだけが使用します。repo rootの共通helperへ依存させません。`runtime_contract_version`をfile内定数として持ち、意味契約を変更した場合にversionを更新します。repository testでは改行をLFへ正規化した内容のSHA-256一致を検証し、Skillごとの実装差を許可しません。実装内容の変更は同じLF正規化規則で`runtime_implementation_fingerprint`へ反映します。技法固有ロジックはこの共通helperへ入れません。
 
 本Planのruntime dependencyはPython 3.11標準ライブラリだけに固定します。外部PyPI package、外部binary、network serviceをruntime依存へ追加しません。
 
