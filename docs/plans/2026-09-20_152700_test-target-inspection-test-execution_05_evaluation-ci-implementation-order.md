@@ -147,7 +147,7 @@ negativeには最低限、次を含めます。
 - 実在しない証跡参照を要求しない
 - 機密情報を必須出力にしない
 
-独立一時Playwrightコードが本当にrepo runner契約を読み込まず今回runだけで使われたか、新規package installやrepo working tree変更をしていないか、非UI状態改変をしていないか、Playwright MCPで実際に操作したか、画像判定が妥当かはoutput validatorだけで証明しません。これらはsemantic evalと利用可能な場合のruntime smokeで確認します。
+独立一時Playwrightコードが本当にrepo runner契約を読み込まず今回runだけで使われたか、新規package installやrepo working tree変更をしていないか、明示されたpreflight準備を超えてTCのUI経路を迂回する非UI状態改変をしていないか、Playwright MCPで実際に操作したか、画像判定が妥当かはoutput validatorだけで証明しません。これらはsemantic evalと利用可能な場合のruntime smokeで確認します。
 
 ### 4.3 意味評価
 
@@ -158,7 +158,7 @@ semantic rubricは次の観点を中心にします。
 3. 実測していない結果を推測してPASS / FAILにしない
 4. DOM / accessibility tree等の構造情報と画像による視覚情報を確認対象に応じて使い分ける
 5. UI崩れ等のTC外発見を追加観測として扱い、期待結果に関係しない事象で元TCをFAILにしない
-6. repo runnerから独立した今回run用一時Playwrightコードと、repo runner実行・repoへ残すE2E資産を区別し、一時コードのためにpackage install・repo変更・非UI状態改変を行わない
+6. repo runnerから独立した今回run用一時Playwrightコードと、repo runner実行・repoへ残すE2E資産を区別し、一時コードのためにpackage install・repo変更を行わず、明示されたpreflight準備を超える非UI状態改変でTCのUI経路を迂回しない
 7. TC開始境界を守り、準備・TC操作・TC事後処理・実行時cleanupの状態変更を対応する副作用scopeへ計上し、必要なcleanup分を含めて上限を超えない
 8. 入力元identityがあれば記録し、なければ独自hashを作らず成果物内のTC集合・実行前YAMLをsnapshotとして固定する。`test_case_ref`は常に成果物ローカル参照とし、元TCの正式識別子を`source_test_case_id`として改名せず保持し、確定済みTC結果を同一成果物で上書きしない
 9. run固定条件とTCが意図した実行条件を区別し、予期しない条件変更だけを成果物分割対象にする
@@ -331,7 +331,7 @@ routing caseへ最低限、次を追加します。
 - `assets/output-template.md`
 - trigger / deterministic / semantic eval
 - Playwright MCP等の対話操作
-- repo runnerから独立し、package install・repo変更・非UI状態改変を行わない今回run用一時Playwrightコード
+- repo runnerから独立し、package install・repo変更を行わず、明示されたpreflight準備を超える非UI状態改変でTCのUI経路を迂回しない今回run用一時Playwrightコード
 - 人間の手動テスト相当の操作手順
 - 多段手順の操作と中間期待結果の対応
 - 常に成果物ローカルな`test_case_ref`と元IDの`source_test_case_id`分離、入力元identityまたは成果物内snapshot固定、確定結果の再実行version
@@ -357,6 +357,8 @@ routing caseへ最低限、次を追加します。
 - 16 Skill化
 - routing
 - workflow state
+- 案件コンテキストの認証方法・テストデータ準備方法を新Skillのpreflightから再利用
+- `副作用の許可範囲と根拠`を`副作用の許可範囲 / 1回の定義 / 最大回数 / 根拠`を保持できる形へ更新
 - テスト対象資料成果物参照の案件コンテキスト反映
 - ブロック / 再開 / 変更伝播
 - routing fixture / deterministic / semantic eval
@@ -433,7 +435,7 @@ routing caseへ最低限、次を追加します。
 - 実行または合否判定に影響する`unresolved`が残るTCを推測で実行せず`未実行`として報告できる
 - `test-execution`がAI自身による実対象操作を基本とする
 - Playwright MCP等の対話操作でTCを手順どおり実行できる
-- 必要時にrepo runnerから独立した今回run用の一時Playwrightコードを使用でき、package install・repo変更・非UI状態改変を行わない
+- 必要時にrepo runnerから独立した今回run用の一時Playwrightコードを使用でき、package install・repo変更を行わず、明示されたpreflight準備を超える非UI状態改変でTCのUI経路を迂回しない
 - 独立一時コードとrepo runner実行・repoへ残すE2E資産を区別できる
 - DOM / accessibility tree等と画像を確認対象に応じて使い分けられる
 - `test_case_ref`が常に`input-001`等の成果物ローカル参照としてsnapshot内で一意で、入力側の正式識別子を`source_test_case_id`として値を変えず保持できる。元ID重複だけでは一律`未実行`にせず、元IDによる対象指定・追跡が曖昧で一意に特定できない場合だけ`unresolved / 未実行`として閉じられる
