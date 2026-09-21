@@ -220,7 +220,9 @@ validatorはfenced JSON blockを抽出してstrict JSON decodeし、canonical化
 
 LLMによるmachine JSON再生成を挟まず、固定builderで接続します。ここでいう固定builderは文書上の手順ではなくPythonの決定論的処理です。runtimeを持つSkillでは各`runtime_contract.py`の共通Machine Entity builderを既存artifact / model scriptから呼び、structure / materialize scriptが所有するEntityはそのscriptが最終`content`とdependencyを返します。`spec-analysis`だけは§2の`authority_entities.py`が同じcanonicalization規則でAuthority Entityを生成します。AgentがMachine Entity wrapper、content fingerprint、期待identityを手で組み立てる経路を許可しません。
 
-各Skillは同じ正規化済みsourceから`expected_entity_identities[]`を固定builderで生成し、Machine Entity actual rowの存在を入力にして期待identityを逆算しません。`workflow_runtime.py`へ渡す際はbuilder出力をそのまま連結し、callerがidentityを追加・削除しません。期待runtime unitもdispatch表とactive model stateから固定builderで生成し、actual runtime集合から逆算しません。
+各Skillは同じ正規化済みsourceから`expected_entity_identities[]`を固定builderで生成し、Machine Entity actual rowの存在を入力にして期待identityを逆算しません。`workflow_runtime.py`へ渡す際はbuilder出力をそのまま連結し、callerがidentityを追加・削除しません。期待runtime unitもdispatch表、active model state、adapter派生childの親runtime ready条件から固定builderで生成し、actual runtime集合から逆算しません。
+
+`qa-workflow`を経由しないSkill単体利用でも、このexpected runtime builderを最終自己検証に使用します。担当Skillは保存予定の`Machine Runtime Input / Result` block identity集合を`expected_runtime_units[]`と完全一致で検査し、必須unitのmissingまたは未知のextraがある場合は成果物を契約適合済み・完成済みとして扱いません。`workflow_runtime.py`だけをruntime省略検出の唯一の経路にしません。
 
 - Cause-Effect → child Decision Table
 - Classification Tree → child combinatorial
