@@ -134,6 +134,7 @@ runtime対応Skillの`evals/output/cases/*/expected.json`では、既存fieldに
 - `machine_entities.expected_entities[]`は各Skillの固定builderがnormalized source / structure stateから導出した`(skill, entity_type, entity_ref)`をfixtureへ明示し、actual成果物のMachine Entity集合から逆算しない。validatorはactual identity集合とのmissing / extraと、各contentのentity type別canonical schema・人間向け表主要fieldを独立照合する
 - `runtime_contract.expected_runtime_units[]`はstandalone Skillの正規化input / structure stateから固定builderが導出した`(skill, runtime_unit_key)`をfixtureへ明示する。validatorは成果物中の`Machine Runtime Input / Result` block identity集合と完全一致を要求し、必須runtime blockの丸ごと欠落と未知の余分なblockを検出する。actual runtime block集合からexpectedを逆算しない
 - standalone direct fixtureで必須runtime blockを1件削除したnegative caseを各代表Skillに置き、`qa-workflow`を通さなくても成果物を完成扱いしないことを確認する
+- 同じcandidate artifactへproduction側`runtime_contract.py`の`verify_runtime_evidence` operationを実行し、validatorとは独立にmissing / extra / incomplete pair / duplicateを検出できることを確認する。deterministic validatorがPASS判定の唯一のruntime省略検出経路にならない
 - `spec-analysis`では`runtime_contract.py`のcanonical / Machine Entity helperと`authority_entities.py`を使うfixtureを用意し、runtime unitを作らずAuthority表とcanonical Authority content / expected identityの一致を検証する
 - expected target / Coverageは手書きfixtureから独立計算または明示し、generator出力をexpectedへコピーしない
 - `expected_target_id_map`はstateful materialize caseだけ使用し、`{target_ref, target_content_fingerprint, generation_fingerprint, execution_fingerprint, model_key, target_key, ci_id}`配列で保持する
@@ -265,9 +266,11 @@ repository全体は328 queryです。
 
 6. legacy成果物
    - 旧成果物を参照
-   - 初回昇格時に現在観測できるTR / TCN / CI / TCをactive seedとして取り込み、未知の過去deleted履歴を捏造しない
+   - 初回昇格時は`input_mode=direct`かつnormal previous stateが空の場合だけ、`legacy_tr_ids[] / legacy_tcn_ids[] / legacy_tc_ids[]`を各structure script自身がactive previous stateへseedする。Agent / LLMがprevious stateを手組みしない
+   - 現在観測できるTR / TCN / CI / TCだけをactive seedとして取り込み、未知の過去deleted履歴を捏造しない
    - TR / TCN / TCは意味上同一なら既存IDをreuseし、model keyがlegacyに存在しなければ新規採番する
-   - 既存CIをcurrent target / semantic itemへ維持する場合は初回だけ`legacy_ci_seed[]`を使用し、unknown / duplicate / 別TCN / 別model対応を拒否する。対応不能CIと参照TCは`要再検証`へする
+   - CIは全既存IDを`legacy_ci_ids[]`でprevious stateへseedし、そのsubsetの`legacy_ci_seed[]`だけをcurrent target / semantic itemへ対応付ける。対応不能CIも番号rowをfull snapshotへ残して別CIへ再利用せず、参照TCは`要再検証`へする
+   - normal previous state生成後のlegacy入力再投入、legacy / normal state併用、unknown / duplicate / 別TCN / 別model seedを拒否する
    - 前工程Machine Entityが存在しないdirect由来境界は新契約保存後もdirectで再利用でき、必要な外部Machine Entityがすべて揃った時点だけartifactへ切り替える
    - 以後version / fingerprint / normal previous state契約で再利用
 
@@ -280,6 +283,7 @@ repository全体は328 queryです。
    - supported inputが`unsupported`になる、またはsupport判定前にAgentがscriptを省略する場合は失敗
    - 保存済み`Machine Runtime Input / Result`を決定論的に抽出してround-trip検証できるが、workflow再利用では保存済みresultをcurrent cacheにせず現在scriptを再実行する
    - LLM手計算だけの成果物を決定論的生成済みと判定しない
+   - internal adapterがpartial / whole-model unsupportedになり`llm_fallback`を選ぶfixtureでは、test-condition-designへ戻って同じTCNへ直接定義Coverage modelをnew作成し、通常generatorを通したcurrent CIだけをadapter closureのfallback evidenceとして受理する。adapter自身のCI、無関係TCN / technique、stale CIを拒否する
 
 8. 途中工程開始
    - 前工程のMachine Entityがない直接入力では`input_mode=direct`を使用し、ユーザーが技法を明示したTRから`test-condition-design`を開始して`Selection Source=user`をmodel metadataへ保持する。存在しない`test-analysis / test-requirement-design` Machine Entityを捏造しない
@@ -343,6 +347,7 @@ runtime対象の次の6 Skillを単体コピーして代表scriptを実行しま
 - Skill rootからscriptを解決
 - stdinへUTF-8 JSONを渡しstdout envelopeを読める。interpreterのcommand名やtimeout APIをSkill code / Skill契約へ埋め込まない
 - `test-condition-design`と`test-case-design`は`input_mode=direct`の代表fixtureを前工程Skill directory / Machine Entityなしで実行できる
+- runtime対象6 Skillの単体コピーで`runtime_contract.py`の`verify_runtime_evidence` operationを実行でき、repo root validator / helperなしでcandidate artifactのruntime block pairを検査できる
 - `input_mode=artifact`では必要なMachine Entity missing / extraを拒否し、`direct`と`artifact`を黙って相互fallbackしない
 - `authority_entities.py`が失敗またはPython unavailableの場合、Authority Machine Entity / fingerprintをLLMや別builderで代替生成せず対象範囲をblockedにする
 - Python unavailable時にSkill全体を利用不能と誤判定しない
@@ -421,7 +426,8 @@ runtime対象の次の6 Skillを単体コピーして代表scriptを実行しま
 - missing dependencyはstale + blocker、duplicate / cycleは`invalid_input`
 - 既存Skill状態表の「必要な場合だけ使用」を維持し、状態表示時だけ別表`runtime状態`を追加
 - model単位状態を成果物metadataから再構築
-- legacy昇格
+- legacy昇格。structure / materialize scriptの初回legacy seed入力とnormal previous stateへの移行まで含む
+- standalone最終出力では`runtime_contract.py verify_runtime_evidence`で必須runtime block pairをproduction側から検査する
 - upstream Entity別content fingerprint / Machine Entityの`upstream_entity_dependencies[] / runtime_dependencies[]` / upstream runtime dependency / stale伝播
 - `traceability.py`と同じ`runtime_contract.py` freshness関数を使用し、workflow_runtime resultをtraceabilityの依存入力にしない
 - `workflow_runtime.py`の`can_complete`は本Planruntime範囲の必要条件として扱い、既存`qa-workflow`全体の完了条件を置換しない
