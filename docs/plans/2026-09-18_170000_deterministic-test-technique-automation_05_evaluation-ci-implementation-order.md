@@ -540,7 +540,7 @@ raw machine-readable入力をfixtureにします。
 
 - TCN配下にactiveなCoverage所有modelが1件以上あれば、machine target / semantic itemが0件でも`materialize_coverage.py`をdispatchする。semantic-only Error Guessing、fork-join、partial / whole-model unsupportedの`llm_fallback`を含み、targetなしsemantic model 0件は`materialize_complete=false`とする
 - `active_model_metadata[]`でruntimeなしmodelのTCN所属を検証する
-- legacy初回昇格では`legacy_ci_ids[]`から全既存CIをactive previous stateへseedし、そのsubsetの`legacy_ci_seed[]`だけをcurrent runtime target / semantic item draftへ一意に対応付けて通常mapping stateへ移す。seedされないlegacy CIも過去最大番号へ残し、新規CIへ番号を再利用しない
+- legacy初回昇格では各TCNの`legacy_ci_ids[]`からそのTCNの全既存CIをactive previous stateへseedし、そのsubsetの`legacy_ci_seed[]`だけをcurrent runtime target / semantic item draftへ一意に対応付けて通常mapping stateへ移す。seedされないlegacy CIも同TCNの過去最大番号へ残し、新規CIへ番号を再利用しない
 - unknown / duplicate / `legacy_ci_ids[]`外 / 別TCN / 別model seedを拒否し、normal state生成後の`legacy_ci_ids[] / legacy_ci_seed[]`再投入を拒否する
 - semantic itemのstable key / previous mapping / reuse CIを検証し、別item・別model・runtime target CIへの横取りを拒否する。`source_target_versions[]`はsemantic item自身の`model_key`に属するcurrent targetだけを許可する
 - test data requirement Entity fingerprint変更をCI / TC staleへ反映する
