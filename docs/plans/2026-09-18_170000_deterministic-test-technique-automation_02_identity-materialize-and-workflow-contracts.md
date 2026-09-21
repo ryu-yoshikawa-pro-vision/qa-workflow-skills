@@ -48,6 +48,7 @@ generator内の`target_key`はmodel内で安定させます。異なるmodel間�
 
 - `target_ref`は`sha256:<64 lowercase hex>`
 - model generatorの共通post-processで各targetへ`target_ref`を付与する
+- この共通post-processは`test-condition-design/scripts/runtime_contract.py`の固定helperとして実装し、`target_ref / execution_fingerprint / target_content_fingerprint`を同じcanonicalization規則から生成する。各generatorへ同じhash処理を複製せず、generatorは技法固有のmachine fieldとcanonical `execution`だけを返す
 - 同じ`model_key + target_key`から常に同じ`target_ref`を得る
 - CIへmaterialize可能な各targetは、具体的にそのCoverageを実行する値・assignment・sequence・path等をgenerator固有のcanonical object `execution`として持つ。診断metadataだけではCI化しない
 - 共通post-processで`execution_fingerprint = sha256(canonical JSON(execution))`を付与する。LLMが`execution`やhashを再生成しない
@@ -162,6 +163,8 @@ Dispositionはgeneratorの`coverage_summary`または`completion_summary`を書�
 
 見出しidentityは`<skill>::<runtime_unit_key>`で、JSON内metadataのSkill所属と`runtime_unit_key`が一致しなければvalidatorを失敗させます。model scriptでは`Machine Runtime Input.input`が正規化modelの正本です。必要なら`Machine Model: <model_key>`表示をruntimeから派生描画できますが、LLMが別JSONを作らず、canonical `input` subtreeと一致を必須にします。artifact全体scriptも同じ形式で入力を保存するため、validatorは全scriptの`input_fingerprint`を保存済み入力から再計算できます。
 
+ここへ保存するruntime inputとMachine Entityは[実行時アーキテクチャ・契約](./2026-09-18_170000_deterministic-test-technique-automation_02_runtime-architecture-and-contracts.md)の機密情報規則を適用済みのcanonical dataだけを使用します。password、token、cookie、secret値そのものをround-trip可能なmachine evidenceへ保存しません。
+
 人間向け説明文はLLMが生成して構いません。machine evidenceのJSON、key、ID対応、Coverage値をLLMが再計算・改変しません。runtime blockのJSON抽出もLLMへ委ねず、`runtime_contract.py`の抽出処理を使用します。
 
 §4.4の`Machine Entities` blockはruntime evidenceとは別の意味上の正本です。`spec-analysis`を含む各担当Skillのvalidatorはstrict JSON decode、schema、`(skill, entity_type, entity_ref)`一意性、`content_fingerprint`再計算一致、人間向け表との主要field一致を確認します。既存成果物を再利用するときはこのblockから現在のcanonical Entityを取得し、runtime対象unitの入力を組み立て直します。保存済み`Machine Runtime Result`を現在世代のresultとしてそのまま採用しません。
@@ -220,7 +223,7 @@ validatorはfenced JSON blockを抽出してstrict JSON decodeし、canonical化
 
 LLMによるmachine JSON再生成を挟まず、固定builderで接続します。ここでいう固定builderは文書上の手順ではなくPythonの決定論的処理です。runtimeを持つSkillでは各`runtime_contract.py`の共通Machine Entity builderを既存artifact / model scriptから呼び、structure / materialize scriptが所有するEntityはそのscriptが最終`content`とdependencyを返します。`spec-analysis`だけは§2の`authority_entities.py`が同じcanonicalization規則でAuthority Entityを生成します。AgentがMachine Entity wrapper、content fingerprint、期待identityを手で組み立てる経路を許可しません。
 
-各Skillは同じ正規化済みsourceから`expected_entity_identities[]`を固定builderで生成し、Machine Entity actual rowの存在を入力にして期待identityを逆算しません。`workflow_runtime.py`へ渡す際はbuilder出力をそのまま連結し、callerがidentityを追加・削除しません。期待runtime unitもdispatch表、active model state、adapter派生childの親runtime ready条件から固定builderで生成し、actual runtime集合から逆算しません。
+各Skillは同じ正規化済みsourceから`expected_entity_identities[]`を固定builderで生成し、Machine Entity actual rowの存在を入力にして期待identityを逆算しません。`workflow_runtime.py`へ渡す際はbuilder出力をそのまま連結し、callerがidentityを追加・削除しません。期待runtime unitについては、各Skill-local `runtime_contract.py`がcanonical normalized input、対象 / 実行範囲、current structure / identity state、active model metadata、adapter parentのcurrent runtime state、条件付き入力の有無から`dispatch_source_state`を固定生成し、そのsourceからexpected-runtime builderが期待集合を作ります。Agent / LLMが`dispatch_source_state`や`expected_runtime_units[]`を手組み・削減せず、actual runtime集合からも逆算しません。
 
 `qa-workflow`を経由しないSkill単体利用でも、このexpected runtime builderを最終自己検証に使用します。担当Skillは保存予定の`Machine Runtime Input / Result` block identity集合を`expected_runtime_units[]`と完全一致で検査し、必須unitのmissingまたは未知のextraがある場合は成果物を契約適合済み・完成済みとして扱いません。`workflow_runtime.py`だけをruntime省略検出の唯一の経路にしません。
 

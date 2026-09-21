@@ -161,12 +161,13 @@ runtime対応Skillの`evals/output/cases/*/expected.json`では、既存fieldに
 - merge groupの意味上の妥当性と`target_refs[]`の同一TCN制約
 - model内100%を対象仕様全体100%と誤認しない
 - scriptがexpected resultを創作していない
+- `test-case-design`がCI Machine Entityのcanonical `execution`または`semantic_item_text`を入力として具体TCへ展開し、generator内部modelやMarkdown Coverage Item表を再解釈せず、Authorityにないexpected resultを追加していない
 
 semantic referenceをgenerator outputから自動生成しません。
 
 CIの`Validate Semantic Output Evals`は既存契約どおり外部LLM APIを呼ばず、dataset / rubric / semantic runtime / fake judge contractを検証します。このCI成功だけをsemantic case PASSとは扱いません。
 
-Plan完了時は、`test-analysis / test-condition-design / adversarial-review`の本Planで追加・更新したsemantic caseについて、保存済みcandidate outputを用意し、既存`scripts/skills/evals/semantic/run.py`へそのprotocolに適合する外部Judge commandを接続して実評価します。特定provider用の新しいJudge adapterは本Planの実装対象にしません。candidate output生成、Judge実行command、Judge結果をPRの検証記録へ残します。Judgeを利用できない場合はsemantic dataset validationまでは実施できますが、semantic case PASSの完了条件は未達としてPRをDraftのままにします。CIへ外部LLM secretやJudge実行を追加しません。
+Plan完了時は、`test-analysis / test-condition-design / test-case-design / adversarial-review`の本Planで追加・更新したsemantic caseについて、保存済みcandidate outputを用意し、既存`scripts/skills/evals/semantic/run.py`へそのprotocolに適合する外部Judge commandを接続して実評価します。特定provider用の新しいJudge adapterは本Planの実装対象にしません。candidate output生成、Judge実行command、Judge結果をPRの検証記録へ残します。Judgeを利用できない場合はsemantic dataset validationまでは実施できますが、semantic case PASSの完了条件は未達としてPRをDraftのままにします。CIへ外部LLM secretやJudge実行を追加しません。
 
 ### semantic dataset件数
 
@@ -177,11 +178,12 @@ semantic dataset件数は次で固定します。
 | `test-analysis` | 7 |
 | `test-condition-design` | 14 |
 | `adversarial-review` | 8 |
-| その他11 Skill | 各2 |
+| その他11 Skill（`test-case-design`を含む） | 各2 |
 | repository合計 | 51 |
 
 - `test-analysis`: 既存2 caseを維持し、Domain / CRUD / Random / Metamorphic / Syntax-Basedの採用判断を主対象とする5 caseを追加する
 - `test-condition-design`: 既存2 caseを維持し、Domain / CRUD / Random / Metamorphic / Syntax-Basedに加え、Decision Table / Cause-Effect、Classification Tree / combinatorial strength、Round-trip / n-switch、flow、schema / OpenAPI、UI pattern、test data / environment、merge / Coverage範囲の意味判断を各caseで最低1回検証できるよう合計14 caseへする。1 caseで複数責務を検証してよいが、各責務とcase IDの対応表を`EVALS.md`へ記録する
+- `test-case-design`: case数は既存2件のまま維持し、そのうち1件を本PlanのCI Machine Entity入力へ更新する。入力にはcanonical `execution`または`semantic_item_text`、Authority、current environment / test data requirementを含め、具体的な前提・データ・手順・期待結果へ正しく展開できること、generator内部modelを再解釈しないこと、Authorityにないexpected resultを追加しないことを評価する
 - `adversarial-review`: 既存2 caseを維持し、下記6誤用を主対象とする6 caseを追加する
 - case IDはSkill内一意
 - `tests/skills/evals/semantic/test_semantic_datasets.py`はSkill別expected count mapと合計51を検証し、`EVALS.md`の意味判断責務→case対応が空になっていないこともrepository testで確認する
@@ -402,6 +404,8 @@ runtime対象の次の6 Skillを単体コピーして代表scriptを実行しま
 - runtime structure検査の処理順
 - `assets/output-template.md`へTCの`Machine Entities`、`Machine Runtime Input / Result`、TC active / deleted ID stateと`update_scope_tc_ids[]` evidenceを追加
 - stable ID / active・deleted ID state / stale
+- 既存semantic case 2件のうち1件をCI Machine Entityのcanonical `execution` / `semantic_item_text`入力へ更新し、generator内部modelを再読解せず具体TCへ展開する経路を評価する
+- TCのmachine evidenceへpassword、token、cookie、secret値そのものを保存せず、認証方式・取得方法・環境変数名等の非secret参照だけを残す
 
 ### `coverage-analysis`
 

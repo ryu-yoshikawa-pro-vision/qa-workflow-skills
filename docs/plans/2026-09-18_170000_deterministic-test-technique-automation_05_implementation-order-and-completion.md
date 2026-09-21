@@ -36,6 +36,9 @@
 - `runtime_contract.py`をSkill-localに同梱し、repo root helperへ依存させない。canonical / Machine Entity helperの同一実装とLF正規化implementation fingerprintを検証する
 - 同じ`runtime_contract.py`へ`verify_runtime_evidence` operationとexpected-runtime builderを実装し、normalized dispatch stateから期待runtime identityを独立導出してcandidate artifactのMachine Runtime Input / Result pairと比較できるようにする。このoperation自身はruntime unitにしない。Skill / 対象 / 条件 / `model_type → generator`等の固定dispatch metadataは共通runtime契約として同一helper内のdataに置き、generatorアルゴリズムは入れない。別manifest / registryを追加しない
 - `verify_runtime_evidence`は集約処理として16 MiB stdin上限を適用し、JSON escape後の実UTF-8 stdin bytesで判定する。超過時はtruncateせず`limit_exceeded`とし、runtime-v1ではそのstandalone成果物を完成扱いしない
+- standalone最終検査用の`dispatch_source_state`はAgent / LLMが手組みせず、`runtime_contract.py`の固定builderがcanonical normalized input、対象 / 実行範囲、current structure / identity state、active model metadata、adapter parent current state、条件付き入力の有無から生成する。`verify_runtime_evidence`はsource stateをstrict検証して内部でnormalized dispatch stateを構築し、source欠落・矛盾を空のexpected集合へ縮退させず`invalid_dispatch_state`で失敗させる
+- canonical runtime input、Machine Runtime Input、Machine Entity、TC machine evidenceへpassword、token、cookie、secret値そのものを保存しない。認証条件は方式、取得方法、環境変数名、secret manager key等の非secret参照へ正規化し、汎用secret scannerやcredential取得処理をruntimeへ追加しない
+- `runtime_contract.py`変更は当該Skillの全runtime unitのimplementation / generation fingerprintを変える安全側の無効化として扱う。共通helper変更をruntime対象6 Skillへ同期した場合は6 Skillのruntime evidenceを再実行対象とし、runtime-v1では関数単位fingerprintによる局所最適化を追加しない
 
 このStepでは、全Skillのfreshness graph、全expected Entity集合、merge / unmerge、question再開等を完成させません。Step 2.5で実経路を確認してからStep 2.6で一般化します。
 
@@ -44,7 +47,7 @@
 - canonical technique slugと内部`model_type`を分離し、まず`model_type=ep → equivalence_partitions.py`の固定dispatchを実装する
 - `condition_structure.py`のTCN / EP model identity確定、`draft_key`、reuse / new、previous full snapshot、`update_scope_tcn_ids[] / update_scope_model_keys[]`を実装する
 - `equivalence_partitions.py`を代表generatorとして実装する
-- EP targetの`target_ref / target_content_fingerprint / canonical execution / execution_fingerprint`を共通post-processで生成する
+- EP targetの`target_ref / target_content_fingerprint / canonical execution / execution_fingerprint`を`test-condition-design/scripts/runtime_contract.py`の共通post-processで生成し、各generatorへhash処理を複製しない
 - `materialize_coverage.py`はEP縦断経路に必要なtarget annotation、stable CI採番、previous mapping、current TCN単位のstate、CI Machine Entityまでを先に実装する
 - TCN / model / CIのMachine Entityと、representative fixtureからactual集合と独立導出するexpected identityを実装する
 - `input_mode=direct`で前工程Machine Entityなしのtest-condition-design単体経路、`input_mode=artifact`でcurrent Machine Entityを使う再利用経路を両方用意する
@@ -194,7 +197,7 @@ Step 2.5で成立した経路を、現在Planで必要な全Skill / lifecycleへ
 - runtime unit / CLI integration / deterministic / semantic / workflow
 - trigger datasetのSkill別exact count（repository合計328）・正負件数・境界scenario
 - semantic datasetのSkill別exact count（repository合計51）と意味判断責務→case対応
-- `test-analysis / test-condition-design / adversarial-review`の本Plan追加・更新semantic caseについて保存candidate outputを既存semantic runner + runner protocolに適合する外部Judge commandで実評価し、command / Judge結果をPR検証記録へ残す。特定provider用Judge adapterは本Planへ追加せず、Judge未実施ならsemantic case PASSを完了扱いしない
+- `test-analysis / test-condition-design / test-case-design / adversarial-review`の本Plan追加・更新semantic caseについて保存candidate outputを既存semantic runner + runner protocolに適合する外部Judge commandで実評価し、command / Judge結果をPR検証記録へ残す。`test-case-design`は既存2 caseのうち1件をcanonical CI Machine Entity入力へ更新し、case総数は増やさない。特定provider用Judge adapterは本Planへ追加せず、Judge未実施ならsemantic case PASSを完了扱いしない
 - CI
 - portability
 - 実Agent runtime smoke
@@ -240,7 +243,7 @@ Plan完了には次をすべて満たす必要があります。
 - `spec-analysis / test-analysis / test-requirement-design / test-condition-design / test-case-design`がPython固定builderでcanonical `Machine Entities`とexpected Entity identityを生成・保存し、`entity_type`を含む`(skill, entity_type, entity_ref)` identity、content fingerprint、`upstream_entity_dependencies[] / runtime_dependencies[]`をMarkdown再解釈なしで再構築できる。actual Machine Entity集合からexpected集合を逆算しない
 - script固有inputのsemantic reference集合から必要な`upstream_entities[]`を固定builderで完全導出し、そのmachine dataからcanonical contentを機械構築してcontent fingerprintをruntime計算できる。省略・余分な参照Entityを拒否し、sort済み`upstream_entity_fingerprints`を含むgeneration fingerprint、`(skill, runtime_unit_key)` upstream dependency、static data versions、input / model / LF正規化implementation fingerprintが再現可能
 - model / artifact全runtime unitの`Machine Runtime Input / Result`を決定論的に抽出し、strict decode、fingerprint一致、同条件でのround-trip再実行が成立する。workflow再利用では保存済みresultをcurrent cacheとして採用せず現在scriptを再実行する。model resultと集約runtime rowは`runtime_contract.py`固定projectionから作り、`upstream_entity_fingerprints[]`や`freshness_status`をcaller / LLMが補完しない
-- runtime対象Skillのstandalone最終出力で`runtime_contract.py verify_runtime_evidence`がnormalized dispatch stateから期待runtime unitを独立導出し、candidate artifactのInput / Result pairとのmissing / extra / incomplete / duplicateをproduction経路で検出できる。helper operation自身をruntime unitへ数えない
+- runtime対象Skillのstandalone最終出力で`runtime_contract.py verify_runtime_evidence`が固定builder生成の`dispatch_source_state`をstrict検証し、内部でnormalized dispatch stateと期待runtime unitを独立導出してcandidate artifactのInput / Result pairとのmissing / extra / incomplete / duplicateをproduction経路で検出できる。source state欠落・矛盾は`invalid_dispatch_state`で失敗し、空の期待集合へ縮退しない。helper operation自身をruntime unitへ数えない
 - stable model key / TR / TCN / TCのruntime採番、active / deleted ID state、1 model = 1 TCN、target_ref、成果物系列、previous mapping、merge / unmerge / CI↔Disposition状態遷移を含むCI materializeが契約どおり。CI state / mapping / Machine Entity / legacy inputは完全形式`TCN-\d{3}-CI\d{2,}`を使用し、suffix`CI\d{2,}`は同一TCN内の採番比較にだけ使う。TR / TCN / model / TCのpartial rerunではprevious full snapshotを維持し、`update_scope_*`内だけdeleted遷移させてscope外activeを保持する。legacy初回昇格はstructure scriptが`legacy_tr_ids[] / legacy_tcn_ids[] / legacy_tc_ids[]`をnormal previous stateへseedし、materializeは各TCNの`legacy_ci_ids[]`全件を同TCNのCI stateへseedしたうえで`legacy_ci_seed[]`のsubsetだけ通常mappingへ移す。未対応legacy CIの番号を再利用しない
 - 各generatorのtargetがPlan固定の`materializable`を持ち、CI化する全targetがgenerator別canonical `execution / execution_fingerprint`を持つ。EP / BVA / Domain / Decision / combinatorial / grammar / Random / Metamorphicを含め、executionだけで下流が対象・値・条件・期待関係を理解できる。combinatorial targetはdeterministic full rowへ対応し、adapter専用generatorを直接CI化しない。同一CI mergeは同一TCN・同一model・同一execution・同一expected resultに限定される。異なるmodelの同一実行はTCの複数`ci_refs[]`で表現する
 - 再実行がupsertされ重複machine evidenceを作らない
@@ -266,9 +269,10 @@ Plan完了には次をすべて満たす必要があります。
 - CIでは全runtime scriptのdispatch / metadata整合、複数用途Skillの対象限定、active Coverage所有modelがあるTCNの`materialize_coverage.py`必須dispatch、E2E-onlyでの`workflow_runtime.py`非dispatch、Coverage targetのCI / Disposition閉鎖、Cause-Effect constraint伝播、Decision Table don't-care merge非破壊性、fork/join concurrencyのlinear execution禁止を確認し、実Agent smokeでは代表promptでPython起動、envelope parse、Machine Entity / runtime result採用、Markdown再読込、現在script再実行まで確認できる
 - runtime対象6 Skillの単体移植性が成立し、`spec-analysis`を含む7 Skillのcanonical / Machine Entity helper内容一致を検証できる
 - trigger datasetがSkill別exact count（repository合計328）を満たし、新規技法5種のselection / design境界をtrain・validation双方で検証する
-- semantic datasetがSkill別exact count（repository合計51）を満たし、LLMへ残す意味判断責務が少なくとも1 caseへ対応する。加えて`test-analysis / test-condition-design / adversarial-review`の本Plan追加・更新caseは保存candidate outputを既存semantic runner + runner protocolに適合する外部Judge commandで実評価してPASSし、実行commandとJudge結果がPR検証記録に残る。dataset validation / fake judge CIだけをsemantic PASSとしない
+- semantic datasetがSkill別exact count（repository合計51）を満たし、LLMへ残す意味判断責務が少なくとも1 caseへ対応する。`test-case-design`は既存2 caseのうち1件でcanonical CI Machine Entityの`execution`または`semantic_item_text`から具体TCへ展開する経路を評価する。加えて`test-analysis / test-condition-design / test-case-design / adversarial-review`の本Plan追加・更新caseは保存candidate outputを既存semantic runner + runner protocolに適合する外部Judge commandで実評価してPASSし、実行commandとJudge結果がPR検証記録に残る。dataset validation / fake judge CIだけをsemantic PASSとしない
 - stateの`all-states`がmodel内全state、`valid-transitions`がvalidと確定した全transitionをrequired母集団とし、setup不能required itemを無言で除外しない。Round-tripは開始state違いを別targetとして扱い、Domain Testingがexact rationalで対象border以外のIN条件を検証し、Decision Tableのdon't-care mergeは対象conditionの成立可能な全関連valueが同一action vectorの場合だけ許可して多値conditionの一部一致を統合しない
 - structure / traceabilityが共通Disposition schemaを扱い、JSON Schema 2020-12の`$id / $ref` resource境界と`$ref` sibling、local URI fragmentのpercent-decode / UTF-8 / RFC 6901 escape / array index、不正escape、self / mutual cycleの局所`unsupported`、OpenAPI 3.0 Reference Object / `nullable / readOnly / writeOnly`、HTML numberのdefault step / `step=any` / step baseをPlanの対応subsetどおり処理し、raw schema数値をstringと混同せずbinary float / context roundingなしで処理する
+- canonical runtime input / Machine Runtime Input / Machine Entity / TC machine evidenceへpassword、token、cookie、secret値そのものが保存されず、ダミーsecretを含む代表Agent smokeでも値そのものが成果物へ残らない
 - Python 3.11 compile / runtime unit / deterministic eval / semantic validation / workflow統合評価がPASS
 - `skills-ref validate`がPASS
 - README、Skill、reference、template、EVALS、ASSERTIONSが実装と一致

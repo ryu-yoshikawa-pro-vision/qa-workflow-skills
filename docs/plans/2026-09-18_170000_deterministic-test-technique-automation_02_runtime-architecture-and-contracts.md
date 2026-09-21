@@ -135,12 +135,13 @@ skills/qa-workflow/scripts/
 
 `qa-workflow`を経由しないSkillでも必須runtime unitの丸ごと省略をproduction経路で検出するため、各Skill-local `runtime_contract.py`へ同一実装の`verify_runtime_evidence` operationを持たせます。これはdispatch対象runtime unitではなく、最終出力前の固定検査です。
 
-- inputはstrict JSON `{operation:"verify_runtime_evidence", skill, normalized_dispatch_state, artifact_markdown}`。このoperationは最終成果物全体を扱う集約処理として扱い、stdin hard limitは16 MiBとする。上限はJSON escape後の実際のUTF-8 stdin bytesへ適用し、超過時はtruncateせず`limit_exceeded`として成果物を完成扱いしない。runtime-v1では16 MiBを超えるstandalone成果物の最終evidence確認をサポートしない
-- `normalized_dispatch_state`は当該Skillの対象 / 実行範囲、active structure state、adapter parent runtime state等、§2.1の固定dispatch条件に必要なmachine dataを必須fieldで受ける。actual runtime block集合をexpected算出入力にしない
-- `runtime_contract.py`の共通expected-runtime builderが`normalized_dispatch_state`から`expected_runtime_units[]`を導出する。§2.1のSkill / 対象 / 条件 / `model_type → generator`等の固定dispatch metadataは共通runtime契約として同一`runtime_contract.py`内にdataとして保持してよい。generatorアルゴリズム、技法の意味判断、Coverage計算は入れない。別dispatch manifest / registryは追加しない
+- inputはstrict JSON `{operation:"verify_runtime_evidence", skill, dispatch_source_state, artifact_markdown}`。このoperationは最終成果物全体を扱う集約処理として扱い、stdin hard limitは16 MiBとする。上限はJSON escape後の実際のUTF-8 stdin bytesへ適用し、超過時はtruncateせず`limit_exceeded`として成果物を完成扱いしない。runtime-v1では16 MiBを超えるstandalone成果物の最終evidence確認をサポートしない
+- `dispatch_source_state`はAgent / LLMが手組みする自由入力にしない。各Skill-local `runtime_contract.py`の固定builderが、当該Skillのcanonical normalized input、対象 / 実行範囲、current structure / identity state、active model metadata、adapter parentのcurrent runtime state、条件付きruntime判定に必要な入力有無から固定projectionで生成する。actual runtime block集合をsourceへ含めず、builder出力へAgent / LLMがitemを追加・削除してから渡す経路を許可しない
+- `verify_runtime_evidence`は`dispatch_source_state`をstrict検証し、内部で`normalized_dispatch_state`へ正規化してから共通expected-runtime builderへ渡す。Skill / 対象 / 実行範囲だけで必須になるstructure / artifact runtimeはcurrent actual blockの有無に依存せず期待集合へ入れ、model runtime等はcurrent structure stateとadapter parent stateから導出する。期待集合導出に必要なsource stateが欠落・矛盾している場合は空の期待集合へ縮退させず、`issues[]`へ`issue_type=invalid_dispatch_state`を返して`valid=false`とする
+- `runtime_contract.py`の共通expected-runtime builderが内部で得た`normalized_dispatch_state`から`expected_runtime_units[]`を導出する。§2.1のSkill / 対象 / 条件 / `model_type → generator`等の固定dispatch metadataは共通runtime契約として同一`runtime_contract.py`内にdataとして保持してよい。generatorアルゴリズム、技法の意味判断、Coverage計算は入れない。別dispatch manifest / registryは追加しない
 - 同じ`runtime_contract.py`の既存Markdown抽出処理で`artifact_markdown`から`Machine Runtime Input / Result`の`(skill, runtime_unit_key)`を抽出し、InputとResultが1対1で揃うactual集合を作る
 - expected / actualのmissing、extra、Inputだけ、Resultだけ、duplicateを検出し、1件でもあれば`valid=false`とする。actual集合からexpectedを逆算しない
-- outputは`{valid, expected_runtime_units[], actual_runtime_units[], missing[], extra[], incomplete_pairs[], duplicates[]}`の固定JSONとする
+- outputは`{valid, issues[], expected_runtime_units[], actual_runtime_units[], missing[], extra[], incomplete_pairs[], duplicates[]}`の固定JSONとする。正常時の`issues[]`は空配列とする
 - このoperation自体はruntime unitではないため、Machine Runtime Input / Resultを保存せず、`expected_runtime_units[]`へ自身を追加しない。generation fingerprintやCoverage evidenceにも使用しない
 - runtime対象Skillは最終成果物を返す直前に必ずこのoperationを実行し、`valid=false`なら契約適合済み・完成済みとして返さない。これをdeterministic eval専用validatorへ委ねない
 
@@ -512,6 +513,8 @@ fingerprintはSHA-256で計算します。入力はUTF-8のcanonical JSONです�
 - JSON whitespaceは除去
 - 非有限数は不可
 
+canonical runtime input、保存対象の`Machine Runtime Input`、Machine Entityの`content`には、password、token、cookie、secret値そのもの、Authorization header、storageState等の認証情報を含めません。認証が必要な条件は、認証方式、取得方法、環境変数名、secret manager上のkey等の**値を含まない参照**として正規化します。仕様書やログ等のraw全文をfingerprint目的だけでruntime inputへ入れません。Agent / LLMはruntime呼び出し前の意味正規化でsecret値を除外し、runtime側はsecret値を補完・取得しません。runtime-v1では汎用secret scannerを新設せず、script固有schemaでraw credential fieldを定義しないこと、unknown fieldを拒否すること、実Agent smokeでダミーsecret値が保存成果物へ残らないことを検証します。実行時にcredential値が必要な後続工程では既存Skillの認証契約に従って実行時に取得し、このmachine evidenceへ永続化しません。
+
 `input_fingerprint`はすべてのruntime scriptで必須です。次をcanonical JSON化してSHA-256を計算します。
 
 - `skill`
@@ -549,6 +552,8 @@ artifact全体scriptでは`model_fingerprint=null`です。ただし`input_finge
 - `static_data_versions`
 
 `runtime_implementation_fingerprint`は実行した`runtime_contract.py`、`generator_implementation_fingerprint`は実行scriptについて、UTF-8 textの`CRLF / CR`を`LF`へ正規化したbytesをSHA-256した値です。runtime自身が計算し、呼び出し側の申告値を正本にしません。本Planで追加する全runtime scriptはPython標準ライブラリと同一Skillの`runtime_contract.py`以外のSkill-local Python moduleをimportしません。model generatorだけでなくartifact scriptも同じ制約です。共通exact numeric、intersection、canonicalization、freshness等の現在必要な共有処理は`runtime_contract.py`へ置き、implementation fingerprint対象外helperへ実行ロジックを逃がしません。
+
+`runtime_contract.py`全体が`runtime_implementation_fingerprint`の対象です。このため、同一Skillの`runtime_contract.py`を変更すると、そのhelperを使う当該Skillの全runtime unitはgeneration変更としてstaleになります。本Planではcanonical / Machine Entity helperをruntime対象6 Skillと`spec-analysis`へ同一内容で同期するため、共通helper変更を6 Skillへ同期した場合は6 Skillのruntime evidenceが広く再検証対象になり得ます。これは安全側の意図した無効化とし、runtime-v1では関数単位fingerprintや「変更部分を使ったunitだけcurrent維持」といった局所最適化を追加しません。意味field自体が変わっていない上流EntityをLLMが再解釈する必要はありませんが、変更後helperを使うruntime resultは現在scriptで再実行します。
 
 したがって、同じartifact scriptでも入力、実際に消費した上流Entityのcanonical content、runtime contract、generator contract、実装内容、静的参照データのいずれかが変われば`generation_fingerprint`は変わります。`authority_refs`等のID文字列が同じでも、対応するEntity contentが変われば同じgenerationにはなりません。
 

@@ -345,7 +345,7 @@ selected childに完成inputを作るための意味parameterが不足する場�
 - requirement → model / source target traceability。各source targetを`{target_ref, target_content_fingerprint, generation_fingerprint}`として保持し、stable IDだけへ結び付けない
 - 複数targetを同一CIへmergeする場合、および複数CIを同一TCへまとめる場合は、その時点で同時成立が必要になるtest data requirement unionへ同じintersection規則を再適用する
 
-実際の個人情報・顧客データ・fixture値を自動取得しません。
+実際の個人情報・顧客データ・fixture値を自動取得しません。password、token、cookie、secret値そのものをtest data / environment requirementの`value / values[]`へ入れず、認証条件は認証方式、取得方法、環境変数名、secret manager上のkey等の値を含まない参照として表現します。runtimeはcredential値を取得・生成しません。
 
 ## 17. Random Testing
 

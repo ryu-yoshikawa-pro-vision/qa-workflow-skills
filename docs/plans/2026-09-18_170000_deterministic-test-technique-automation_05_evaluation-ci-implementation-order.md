@@ -104,6 +104,7 @@ CLI integration testは各runtime scriptの`valid_minimal.json`をCIのPython 3.
 - `runtime_unit_row`は`upstream_entity_fingerprints[]`をenvelopeからそのまま使用し、別名`upstream_entities[]`へ置換しない
 - strict decode前の空stdin / 不正UTF-8 / duplicate JSON / byte・depth上限ではpre-parse error envelopeを返し、未確定の`runtime_unit_key / model_key / input_fingerprint / model_fingerprint / generation_fingerprint=null`を検証する。callerが推測値を補わない
 - stderrへ入力全文・secretを出さない
+- canonical runtime input / `Machine Runtime Input` / Machine Entity / TC machine evidenceへダミーのpassword、token、cookie、secret値そのものを残さず、認証方式・環境変数名等の非secret参照だけを保存する。script固有schemaへraw credential fieldを追加せず、unknown credential fieldを拒否する。汎用secret scannerの実装をテスト要件にしない
 - unknown `route_to` / `resume_skill`を拒否
 
 ### canonicalization / fingerprint
@@ -130,6 +131,7 @@ CLI integration testは各runtime scriptの`valid_minimal.json`をCIのPython 3.
 - 直接依存する上流runtime unitの`generation_fingerprint`変更で下流unitだけがstaleになる
 - envelope version、generator、runtime contract、generator contract、実装fingerprint、static data version変更で`generation_fingerprint`が変わる
 - runtime / generator source変更で実装fingerprintが変わり、意味契約を変えないbug fixでも旧machine evidenceを同一生成条件として再利用しない
+- `runtime_contract.py`変更では、そのhelperを使う当該Skillの全runtime unitの`runtime_implementation_fingerprint / generation_fingerprint`が変わる。共通helper変更をruntime対象6 Skillへ同期したfixtureでは6 Skillの旧runtime evidenceをcurrentのまま維持せず、関数単位fingerprint等の局所最適化を前提にしない
 - model generatorとartifact runtimeの全scriptについて、Skill-local importは`runtime_contract.py`だけを許可し、別helperへ実行ロジックを逃がす実装をCIで拒否する
 - 既存成果物再利用時もdispatch対象runtimeを現在scriptで再実行し、保存済みruntime resultだけでcurrent判定しない
 - 以前whole-model `unsupported`だったfixtureをruntime対応後に再実行するとsupported経路へ移り、古いfallbackを固定しない
@@ -137,7 +139,7 @@ CLI integration testは各runtime scriptの`valid_minimal.json`をCIのPython 3.
 - `condition_structure.py`を派生modelのidentity確定に再利用しても、既存model generatorがID割当てしか利用していない場合は同scriptをruntime dependencyへ登録せず、親generatorを自己stale化しない
 - tie-break / Coverage / target key等の意味契約変更では実装fingerprintだけでなく対応contract versionも更新する
 - model / artifact全runtime unitについて`Machine Runtime Input / Result`を保存→決定論的抽出→strict decode→canonical化し、input fingerprint、model scriptではmodel fingerprintも一致する。同条件でruntimeへ再投入すると同じmachine resultになる
-- `runtime_contract.py`の`verify_runtime_evidence` operationはnormalized dispatch stateからexpected runtime identityを独立導出し、artifact MarkdownからInput / Result pairを抽出して完全一致を検査する。valid caseに加え、必須unit missing、unknown extra、Inputのみ、Resultのみ、duplicate heading / blockを各1件以上negative fixtureで検出する。operation自身をexpected / actual runtime unitへ追加しない。Skill / 対象 / 条件 / `model_type → generator`等の固定dispatch metadataは同一`runtime_contract.py`内の共通dataを使い、別manifest / registryを作らない
+- `runtime_contract.py`の`verify_runtime_evidence` operationは固定builderが生成した`dispatch_source_state`をstrict検証し、内部でnormalized dispatch stateとexpected runtime identityを導出して、artifact Markdownから抽出したInput / Result pairと完全一致を検査する。valid caseに加え、必須unit missing、unknown extra、Inputのみ、Resultのみ、duplicate heading / blockを各1件以上negative fixtureで検出する。さらに、active modelまたは条件付き入力をsource stateから削った改ざんfixture、current structure stateと矛盾するsource stateを`invalid_dispatch_state`として`valid=false`にし、空のexpected集合へ縮退しないことを確認する。operation自身をexpected / actual runtime unitへ追加しない。Skill / 対象 / 条件 / `model_type → generator`等の固定dispatch metadataは同一`runtime_contract.py`内の共通dataを使い、別manifest / registryを作らない
 - standalone Skillの代表fixtureでは、Agentが必須runtime blockを1件省略した候補artifactへ`verify_runtime_evidence`を実行して`valid=false`となり、deterministic validatorを実行しなくてもproduction最終確認で停止する
 - LF / CRLF差だけでimplementation fingerprintが変わらない
 - canonical JSON static dataは整形・改行差だけでversion hashが変わらない

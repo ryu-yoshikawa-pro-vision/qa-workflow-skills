@@ -464,6 +464,7 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 - CI: `{ci_id, tcn_id, model_key, priority, authority_refs[], source_kind, execution, semantic_item_key, semantic_item_text, semantic_source_targets[], test_data_requirement_refs[]}`
 - environment / test data requirementはcurrent Machine Entityのcanonical contentとcontent fingerprintを渡す
 - TC draft: `{draft_key, identity_action, reuse_id, title_or_purpose, tr_refs[], tcn_refs[], ci_refs[], environment_requirement_refs[], test_data_requirement_refs[], priority, priority_override_reason, preconditions[], test_data[], steps[], expected_results[], postconditions_or_cleanup[]}`
+- TC draftの`preconditions[] / test_data[] / steps[] / expected_results[] / postconditions_or_cleanup[]`へpassword、token、cookie、secret値そのものを保存しない。認証が必要な場合は取得方法、環境変数名等の値を含まない参照だけを記述する。`case_structure.py`へ汎用secret scannerは追加せず、Agent / LLMの意味正規化とscript固有schemaでsecret値をmachine evidenceへ持ち込まない境界を維持する
 - stepは`{number,text}`で1から連番。expected resultは`{number,text,authority_refs[]}`で1から連番
 - `previous_tc_ids[]`は`{tc_id,status}`の成果物系列full snapshot。`update_scope_tc_ids[]`は今回lifecycleを確定するprevious active TCだけを列挙し、reuseはscope内activeだけ、duplicate reuse禁止。newはscope外 / deletedも含む過去最大番号+1、999超過は`id_space_exhausted`
 - 各`ci_ref`の親TCNは`tcn_refs[]`に必須。TCの`tr_refs[]`は参照TCNのTR unionと一致させる
