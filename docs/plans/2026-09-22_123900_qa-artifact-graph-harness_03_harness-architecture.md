@@ -204,12 +204,15 @@ relation indexを実装しない限りGraph schema versionやrelation schema ver
 確認対象:
 
 - workflow_refが存在し、同一workflow内で不変
-- workflow stateがworkflowごとに独立している
+- workflow stateがworkflowごとに独立したartifactである
+- state revision / content identityを保持している
+- state更新がCASを使用し、競合時に古いstateを上書きしていない
 - started source refs / revisionsを保持している
+- used knowledge refs / revisions、project context revision、resource条件を保持している
 - persisted updateが読み込み時revisionを保持している
-- 保存時revision conflictを検出している
 - conflict後に古い内容を上書きしていない
-- scopeがdisjointと決定論的に確認できないsemantic updateを自動mergeしていない
+- owner Skillがpartial update boundaryを定義していないartifactを自動rebaseしていない
+- owner contractがある場合もscope disjoint + upstream dependency不変を確認している
 - latest current state向けの完了判定前に依存revision / fingerprintを再確認している
 
 workflow_refの採番規則はruntimeが生成し、LLMが一意性を手計算しません。具体形式は実装時に既存runtime / portability制約を確認して決定します。
@@ -219,13 +222,16 @@ workflow_refの採番規則はruntimeが生成し、LLMが一意性を手計算�
 継続利用するQA知識成果物を実装する場合、最低限次を検査します。
 
 - stable entry ref一意性
+- entry revision / content identity
 - 種別の許可値
-- source refs / revisions
+- provenance source refs / revisions
+- currentness dependency refs / revisions
 - 適用scope
 - environment / version条件
 - 状態: 有効 / 要再検証 / 置換済み
 - 置換済みentryの置換先
-- 有効entryに未解決sourceがない
+- 有効entryのcurrentness dependencyがcurrentである
+- 未検証candidateをcurrent knowledge entryとして保存していない
 - secret実値を保存していない
 - 既存正本へ属する内容を第二のAuthority / Risk / TCとして再定義していない
 
@@ -235,26 +241,44 @@ relation indexは不要です。
 
 ## 14. cross-workflow currentness
 
-workflow Aが参照したMachine Entity / artifactをworkflow Bが更新した場合、PR #11のdependency / content fingerprintを優先して影響を判定します。
+workflow Aが参照したMachine Entity / artifact / knowledge / project context / environment conditionをworkflow Bが更新しても、event busで即時通知する仕組みは追加しません。
+
+次のcheckpointでcurrentnessをdeterministically確認します。
+
+- workflow / Run開始時
+- resume時
+- 未開始のexecution / side-effect等のmutable operation開始直前
+- latest current state向け完了判定直前
+- 過去成果物のcurrent再利用直前
+
+PR #11対象のEntityはdependency / content fingerprintを優先し、PR #11対象外はworkflowが保持したref / revision / resource conditionをcurrent値と比較します。
 
 - historical Activity / execution / Sessionは変更しない
-- Aが進行中なら、Aがlatest current stateに対して完了を主張する前に影響scopeを再確認する
-- dependency変更がAの判断へ影響する場合、該当scopeを要再検証へ戻す
-- dependencyが無関係ならA全体を再実行しない
+- 影響scopeだけ要再検証へ戻す
+- dependencyが無関係ならworkflow全体を再実行しない
 - dependencyを解決できない場合はcurrent完了を安全側にblockする
 
-この検査を成立させるためだけの中央workflow databaseは追加しません。
+この検査を成立させるためだけの中央workflow database / coordinatorは追加しません。
 
 ## 15. shared environment / resource coordination
 
 test user / tenant / test data / external account等の共有mutable resourceは、Activity / Session / executionから参照できる形にします。
 
+優先順位:
+
+1. workflowごとにresourceを分離する。
+2. 分離できず既存の外部reservation / exclusive ownership機構がある場合は利用する。
+3. 外部機構がなく、保存先がatomic CASを提供する場合だけproject-local reservation recordを利用する。
+4. 排他を保証できず相互影響も否定できない場合はblockする。
+
 最低限の検査:
 
 - shared mutable resourceを利用する場合、resource refまたは再現可能な識別条件がある
-- isolationが確認済みか、project policy上の直列化 / block条件がある
+- read-only / parallel-safeか、isolation済みか、exclusive ownershipがあるかを区別できる
+- project-local reservationのacquire / releaseがCASで競合検出される
 - policy不明で他workflowへの影響を否定できない場合に並行実行していない
-- cleanup対象が当該workflow / Activityの所有範囲へ限定されている
+- cleanup対象が当該workflow / Activityの所有または予約範囲へ限定されている
 - 別workflowのresourceをcleanupしていない
 
-reservation / lease / lockの具体方式は実装前リサーチで決定します。必要性未確認のlock serviceは追加しません。
+自動expiry付きlease、distributed lock service、environment managerは追加しません。
+
