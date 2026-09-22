@@ -4,7 +4,7 @@
 
 PR #13では新規`regression-testing`と`exploratory-testing`を追加します。
 
-「新規・改修」「Regression」「Exploration / Investigation」はQA活動全体を排他的に分類するものではありません。PR #13で責任Skillを持つ主要workflow入口として扱い、同一workflowで複数活動を組み合わせられるようにします。特に不具合修正ではConfirmation TestingとRegression Testingを別目的として扱います。
+「新規・改修」「Regression」「Exploration / Investigation」はQA活動全体を排他的に分類するものではありません。PR #13で責任Skillを持つ主要workflow入口として扱い、同一workflowで複数活動を組み合わせられるようにします。不具合修正では、元の不具合が直ったかを確認する修正確認と、周辺影響を確認するRegression Testingを別目的として扱います。修正確認は独立Skillや独立QA活動として追加せず、既存Skillを使うworkflow intentとして扱います。
 
 Graphの構築自体は目的にしません。主要workflowはrelation indexなしで成立させ、direct refとdeterministic scanで実需を満たせないことを実測した場合だけ、必要なquery向けの最小indexをその時点で設計します。
 
@@ -62,26 +62,27 @@ spec-analysis
 - Follow-up
 - 既存責任Skillがない仮説駆動Investigation
 
-### Confirmation Testing
+### 修正確認のworkflow intent
 
-新Skillは追加しません。
+修正確認専用Skill、専用artifact、専用stateは追加しません。
 
-不具合修正後に既知のFAIL / 再現TCを再実行して元のdefectが解消したか確認する経路として、`test-execution` / `e2e-test-execution`を再利用します。
+既存の有効なFAIL / 再現TCがある場合はanalysis / designをやり直さず、`test-execution` / `e2e-test-execution`でそのTCを再実行します。期待結果や再現条件を既存成果物から確定できない場合だけ、`qa-workflow`が必要な最も早い既存analysis / design Skillへ戻してcurrent TCを確定してから実行します。
 
 ```text
 defect fix
-→ Confirmation Testing
-→ 必要なRegression Testing
+├→ 既存TCで修正確認できる → executionへ直接
+├→ 設計不足がある → 必要な既存analysis / design → execution
+└→ 周辺影響も確認する → regression-testing
 ```
 
-ConfirmationとRegressionは同一workflowで両方実施できます。
+修正確認とRegressionは同一workflowで組み合わせられますが、修正確認自体に新しいSkill体系は作りません。
 
 ## 構成
 
 1. [目的・現状・責務境界](./2026-09-22_123900_qa-artifact-graph-harness_01_scope-and-baseline.md)
 2. [Cross-artifact query / relation index導入判定](./2026-09-22_123900_qa-artifact-graph-harness_02_graph-contract.md)
 3. [決定論的補助runtime・履歴発見](./2026-09-22_123900_qa-artifact-graph-harness_03_harness-architecture.md)
-4. [QA活動の接続・Confirmation・feedback](./2026-09-22_123900_qa-artifact-graph-harness_04_activity-models.md)
+4. [QA活動の接続・修正確認・feedback](./2026-09-22_123900_qa-artifact-graph-harness_04_activity-models.md)
 5. [Regression Suite・Run・実行契約](./2026-09-22_123900_qa-artifact-graph-harness_04a_regression-suite.md)
 6. [regression-testing Skill契約](./2026-09-22_123900_qa-artifact-graph-harness_04b_regression-testing-skill.md)
 7. [exploratory-testing Skill契約](./2026-09-22_123900_qa-artifact-graph-harness_04c_exploratory-testing-skill.md)
@@ -96,7 +97,7 @@ ConfirmationとRegressionは同一workflowで両方実施できます。
 4. `test-analysis`は変更影響候補とProduct Risk等を分析する。既存Suiteから今回実行するTCを確定するRegression Run selectionは`regression-testing`が担当する。
 5. `qa-workflow`は活動間のrouting、共通workflow state、blocked / resume、複合workflowのオーケストレーションを担当し、Regression固有の意味判断を再実装しない。
 6. baseline更新・Run selection・history参照等の単独要求は`regression-testing`から開始できる。manual / E2E実行まで含むend-to-end Regressionは`qa-workflow`が`regression-testing`とexecution Skillを接続する。
-7. Confirmation Testingは独立Skillにせず、既知のFAIL / 再現TCの再実行としてexecution Skillを使う。必要なRegressionとは別に扱う。
+7. 修正確認は独立Skill / 独立artifactにせずworkflow intentとして扱う。既存の有効なTCがあればexecution Skillへ直接routingし、設計不足がある場合だけ必要な既存analysis / design Skillへ戻る。周辺影響の確認は別に`regression-testing`が担当する。
 8. Regression運用中のprojectでmembership入力が変わった場合、古いbaselineをcurrent扱いしない。変更時handoffに加え、各Run開始前にsource ref / revisionとcurrent stateを照合して必要なreconciliationを行う。
 9. initial baselineはauthoritative TC discovery snapshotを固定してからmembershipを処理する。TC数が多い場合はdeterministicに分割・再開でき、全件が閉じるまで`complete=false`とする。
 10. TC discoveryの完全性、PR #11 lifecycleへ解決できるか、test basisからのcoverageが閉じるかは別々に判定する。legacy TCを発見しただけでinventory欠落扱いにせず、currentnessを判定できない場合はbaseline completeを成立させない。
@@ -106,7 +107,7 @@ ConfirmationとRegressionは同一workflowで両方実施できます。
 14. execution artifactの存在だけでexecutedと判断しない。PR #12 / E2Eのsource execution契約上、実際に開始されたことを確認してexecutedを集計する。
 15. Suite completeness、Run scope、executed / unexecuted、source resultのPASS / FAIL / 判定不能等を分離する。Regression Activityはsource resultを再判定せずrefと確認済み状態を投影する。
 16. `regression-testing`のresidual riskはcurrent Product Risk等を再採点せず、excluded / blocked / unexecuted / coverage gapによって残る既存Riskへの影響を示す。新しいRisk identification / scoringは`test-analysis`へ戻す。
-17. Regression中のFAIL / Findingでworkflowを終了しない。証拠に応じて既存責任Skillまたは`exploratory-testing(mode=investigation)`へroutingし、修正後のConfirmation、必要なRegression再評価 / rerunへつなぐ。
+17. Regression中のFAIL / Findingでworkflowを終了しない。証拠に応じて既存責任Skillまたは`exploratory-testing(mode=investigation)`へroutingし、修正後の既知TC再実行による修正確認と、必要なRegression再評価 / rerunへつなぐ。
 18. `exploratory-testing`はCharter / Session / Observation / Finding / Follow-up、block / resume / completion、安全・cleanupを明示的な契約として持つ。`investigation`は別Skill / 別runtimeにせず、symptom / hypothesisを起点にする同じSession契約として扱う。
 19. Activity stateの正規値は既存`qa-workflow`語彙を再利用する。Regression Activityのdomain stateは`regression-testing`が判断し、`qa-workflow`は独立計算せずworkflow状態へ反映する。
 20. relation indexは実装対象ではなく将来gateとする。direct ref + deterministic scanで不足を実測するまでrelation schemaも確定しない。
@@ -116,7 +117,7 @@ ConfirmationとRegressionは同一workflowで両方実施できます。
 ## 対象外
 
 - 既存の新規・改修SkillをRegression専用Skillへ拡張すること
-- Confirmation専用Skill
+- 修正確認専用Skill / 専用artifact / 専用state
 - Investigation専用Skill
 - Suite maintenance専用Skill
 - 汎用reporting Skill / defect-reporting Skill
