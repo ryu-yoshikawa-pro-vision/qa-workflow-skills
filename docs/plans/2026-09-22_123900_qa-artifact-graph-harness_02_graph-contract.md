@@ -125,6 +125,7 @@ PR #13で第二のcurrentness stateを作りません。
 - workflow state → `qa-workflow`
 - Regression membership / Activity domain state → `regression-testing`
 - Exploration Session state → `exploratory-testing`
+- QA knowledge entry lifecycle → `qa-knowledge`
 - execution start / result / cleanup / rerun → PR #12 / E2E
 
 ## 8. 保存しないもの
@@ -154,6 +155,8 @@ workflow state / Activity / Sessionから最低限次を辿れるようにしま
 
 ### knowledge entry
 
+knowledge entryはproject-local fixed root配下の1 entry = 1 independently versioned artifactです。`qa-knowledge`がlifecycleを所有します。
+
 knowledge entryではprovenanceとcurrentness dependencyを分けます。
 
 provenance:
@@ -166,7 +169,8 @@ currentness:
 - currentness dependency refs / revisions
 - 適用target / environment scope refs
 - 適用version / environment条件
-- entry revision / content identity
+- entry artifact自身のstorage revision token
+- content identity（storage revisionだけで意味変更を判定できない場合）
 - state
 - 置換先ref
 
@@ -183,6 +187,7 @@ current knowledgeやcurrent QA artifactが更新されても、過去workflowの
 次のqueryもdirect ref + deterministic scanを優先します。
 
 - knowledge entry → 由来となったFinding / Activity / inspection
+- knowledge entry → currentness dependency revisions
 - target / environment → 関連する有効knowledge entry
 - workflow → 利用したknowledge / artifact / environment
 - artifact revision → そのrevisionを利用した進行中 / 過去workflow
@@ -210,6 +215,10 @@ direct refには、current artifactを更新するときの競合検出に利用
 workflow state自身も1 workflow = 1 persisted state artifactとしてstate revision / content identityを持ち、CASで更新します。
 
 古いrevisionでの後勝ち上書きを許可しません。
+
+knowledge entryの更新はtarget entry artifact自身のrevisionでCASします。knowledge root / repository HEADの変更だけをsame-entry conflictやstale判定に使いません。
+
+新規entryはcreate-if-absentとし、global mutable counterやcentral manifestを要求しません。
 
 この契約のために汎用transaction managerやGraph DBは追加しません。
 
