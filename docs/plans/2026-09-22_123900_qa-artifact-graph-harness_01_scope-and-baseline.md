@@ -1,171 +1,157 @@
-# QA Artifact Graph / Harness 導入Plan
+# Regression Suite / QA Activity 統合Plan
 
 ## 1. 目的
 
-PR #11 / #12後に残る課題だけを本Planの対象とします。
+PR #11 / #12後に残る課題だけを扱います。
 
-- 新規・改修ごとに設計したTest Caseを、次回以降も再利用できる全機能Regression Suiteへ統合する
-- Regression Suiteを機能タグで整理し、全件実行と部分実行の意味を明確に分ける
-- 今回のRegressionで選択 / 除外したTCと理由、実行結果を活動単位で後から辿れるようにする
-- 過去Result / Findingをrelease / sessionを跨いで発見できるようにする
-- Exploration / InvestigationのCharter / Session / Finding / Follow-upを第一級成果物として管理する
-- PR #11の設計traceabilityとPR #12 / E2Eのexecution lineageを跨ぐ、不足relationだけを決定論的に検索できるようにする
+- 新規・改修で作成したTCを、そのセッションだけで終わらせず、継続Regressionへ再利用できるようにする
+- 現在のRegression対象範囲を網羅する基準集合と、各回のRunを分離する
+- Regressionごとのcandidate / selected / excluded / rationale / residual risk / executionを履歴として残す
+- Exploration / InvestigationのCharter / Session / Finding / Follow-upを第一級成果物として扱う
+- release / sessionを跨いで過去activityを発見できるようにする
+- direct refでは不足する横断queryだけ、必要性確認後に決定論的に支援する
 
-次はPR #13固有の課題として再実装しません。
+次はPR #13で再実装しません。
 
 - SPEC → TR → TCN → CI → TCのdesign traceability
-- 設計成果物のchange impact / freshness / stale伝播
-- TC snapshot、execution、result、rerunの正本
+- design change impact
+- freshness / stale / `要再検証`
+- TC snapshot
+- execution / result / rerun lineage
 
-これらはPR #11 / #12のmerge後実装を正本として利用します。QA Artifact Graphはその上に新しいQA状態を作るものではなく、必要なcross-artifact queryを支える派生relation indexです。
+## 2. 実装開始時の確認
 
-## 2. 実装開始時の基準
+PR #11 / #12 merge後に次を確認します。
 
-実装開始前に以下を必ず確認します。
-
-1. PR #11 / #12がmerge済みである
-2. 最新`main`のMachine Entity、traceability、change impact、freshness、execution、rerunの実契約を取得する
-3. 実成果物で次のqueryを試し、PR #11 / #12だけで回答できるものをPR #13から除外する
-   - current TC → 仕様根拠 / Risk / TCN / CI
-   - changed specification / Risk → affected current TC
+1. latest `main`のMachine Entity、traceability、change impact、freshness、execution、rerunの実契約を取得する。
+2. PR #11からproject全体のcurrent TC集合を決定論的に列挙できるか確認する。
+3. current TCのlifecycleをPR #11だけでcurrent / deleted / superseded相当に判断できるか確認する。
+4. 実成果物で次を確認する。
+   - current TC → design root
+   - changed design node → affected TC
+   - TC → current E2E testware
    - execution → TC snapshot / target version / previous execution
-4. 次の残課題だけが未解決であることを確認する
-   - Regression Suiteと機能タグ
-   - Regression activityの選択 / 除外理由
-   - cross-run Result / Finding discovery
-   - Exploration / Investigation
-   - PR #11とexecution/historyを跨ぐ不足relation
-5. 4の残課題を、Regression Suite成果物 + activity成果物 + 最小relation indexで解けるかを先に検証する
+5. activity成果物を既存の固定保存場所から列挙できるか確認する。
+6. direct refだけで次を回答できるか試す。
+   - Regression activity → selected TC → execution → result
+   - Finding → follow-up
+   - TC →過去activity / execution
+7. 2〜6で不足するものだけをPR #13の追加実装対象にする。
 
-5までで目的を満たせる場合、現在Planに記載されたより広いGraph node / edgeを実装しません。Graph拡張は未解決queryが具体的に確認できた場合だけ行います。
+### Regression Suiteのmaterialization gate
 
-## 3. 現状のQA活動別能力
+project全体のcurrent TCと加入判断を既存成果物から再構成できる場合、Regression Suiteは派生viewとして扱い、TC本文やlifecycleを別artifactへ複製しません。
 
-### 3.1 新規・改修
+直接再構成できない場合だけ、project-localなRegression Suite artifactへ次の最小情報を保持します。
 
-既存SkillとPR #11により、次が成立している前提です。
+- Regression対象範囲ref
+- member TC ref
+- source artifact ref / revision
+- membershipの判断結果と理由
+- 明示的な一時検証 / 対象外の理由
+
+どちらの場合も、Regression SuiteをPR #11と競合する第二のTC正本にしません。
+
+## 3. Regression対象範囲
+
+「全機能」はSuiteに登録されたfeature tag一覧から定義しません。
+
+Regression対象範囲は次を入力として定めます。
+
+- 案件コンテキストの対象機能 / 対象業務フロー / 対象role
+- test level
+- 現在有効な仕様根拠
+- Product Risk
+- 明示された非機能テスト範囲
+- ユーザーが指定した対象外
+
+本Planの既定対象は、案件でRegression対象としたcurrentな機能テスト範囲です。性能、アクセシビリティ、セキュリティ等は案件コンテキストでRegression対象に含めた場合だけ同じ基準集合へ含めます。
+
+Suite自身のmember / tag集合を「全機能」の母集団に使いません。
+
+## 4. QA活動別の位置づけ
+
+### 4.1 新規・改修
+
+既存flowを維持します。
 
 ```text
 仕様根拠
-  ↓
-Question / Decision / Assumption
-  ↓
-Product Risk / Change Impact
-  ↓
-Test Requirement
-  ↓
-Test Condition / Coverage model / Coverage Item
-  ↓
-Test Case
-  ↓
-Coverage / Adversarial Review
-  ↓
-必要時 E2E implementation / execution
+→ test-analysis
+→ test-requirement-design
+→ test-condition-design
+→ test-case-design
+→ coverage-analysis
+→ 必要時 adversarial-review / E2E
 ```
 
-この経路はGraph化の入力が最も揃っています。
+各セッションの完了時に、current TCごとに継続Regression対象か一時的な検証かを確認し、Regression Suiteへ反映します。
 
-### 3.2 Regression
-
-Regressionは、各セッションで設計した機能別TCを継続的に統合した**全機能Regression Suite**を基準にします。
-
-- Suite自体は現在有効な全機能を網羅する
-- 各TCは1件以上の機能タグを持つ
-- 新規・改修セッションで確定したTCはSuiteへ追加 / 更新する
-- 削除・置換されたTCはcurrent Suiteから外し、過去runのsnapshotは変更しない
-- E2E化されたTCも論理TCとして1件だけSuiteへ保持する
-
-実行は2種類に分けます。
-
-- **全件実行**: current Suiteの全memberを対象にする。ユーザーが単にRegression実施を要求し、絞り込みを指定しない場合はこれを既定とする
-- **部分実行**: 機能タグ、明示TC、変更影響、Risk / history等でmemberを抽出する。選択理由と除外理由をactivity成果物へ保存し、全機能Regression完了とは扱わない
-
-機能タグは抽出単位です。全機能網羅の判定は件数ではなく、`coverage-analysis`が各機能の現在有効な仕様根拠 / Risk / TR / TCN / CIがSuite member TCへ意味上閉じていることを確認します。
-
-Regression専用Skillは追加しません。Suite管理と実行routingは`qa-workflow`、意味上の部分選定は`test-analysis`、全機能 / 選択範囲のカバレッジ確認は`coverage-analysis`、実行は`test-execution / e2e-test-execution`を利用します。詳細契約は`_04a_regression-suite.md`を正本とします。
-
-### 3.3 Exploration / Investigation
-
-既存Skillには探索的思考はありますが、Charter / Session / Observation / Finding / Evidence / Follow-upを第一級成果物として扱う責任Skillがありません。
-
-本Planでは`exploratory-testing`を1 Skillだけ追加し、探索テストと仮説駆動の調査を同じSkillの明示modeで扱います。
-
-- `mode=exploration`: charterに基づく探索
-- `mode=investigation`: 問題 / Finding / Question / Hypothesisを起点にした調査
-
-両modeとも実測を仕様Authorityへ昇格しません。
-
-## 4. Relation index / Graphの位置づけ
-
-Graphは既存成果物を置き換える共通domain modelではありません。
+### 4.2 Regression
 
 ```text
-PR #11 Machine Entities / traceability
-PR #12 execution artifacts / E2E artifacts
-Regression Suite / QA activity / Exploration artifacts
-                         │
-                         ▼
-                 deterministic adapters
-                         │
-                         ▼
-                thin relation index
-                         │
-              ┌──────────┼──────────┐
-              ▼          ▼          ▼
-          validation   query     activity view
+Regression対象範囲
+        ↓
+Regression Suite
+        ↓ snapshot
+full / selected Run
+        ↓
+execution route
+        ↓
+PR #12 / E2E execution
+        ↓
+Result / Evidence
 ```
 
-設計側のimpact / freshnessはPR #11、execution stateはPR #12 / E2Eを正本とします。Relation indexはそれらを再判定せず、明示relationの逆探索・複数hop query・履歴参照を支えます。
+SuiteのcoverageとRunのscopeを分離します。
+
+### 4.3 Exploration / Investigation
+
+既存SkillにはCharter / Session / Observation / Finding / Evidence / Follow-upを第一級成果物として扱う責任Skillがありません。
+
+`exploratory-testing`を1 Skillだけ追加します。
+
+- `mode=exploration`: charterに基づく探索
+- `mode=investigation`: 既存責任Skillがない実対象の仮説駆動調査
+
+E2E failureは引き続き`e2e-test-result-analysis`を優先します。
 
 ## 5. 責務境界
 
-### Skill
+### 既存Skill
 
 意味判断を担当します。
 
-- 仕様の意味
-- Risk
+- current仕様根拠
+- Product Risk
 - Test Requirement / Condition / Case
-- Regression最終scope
-- Exploration charter
-- Findingの意味
-- 変更が本当に下流へ影響するか
+- 継続Regression対象か一時的な検証か
+- selected Regressionの意味上のscope
+- TC → E2E実装のcoverage
+- Exploration / Findingの意味
 - 修正routing
-
-### Harness
-
-- relation schema validation
-- identity / artifact-local scope解決
-- duplicate / dangling参照
-- relation source/target type検証
-- 明示relationのquery / reachability
-- Regression Suite構造検査
-- activity index / history参照
-- query完全性の判定
-- canonical JSON生成 / 再build一致
-
-設計成果物のsemantic impact、freshness、Regression最終scope、PASS / FAILは判断しません。
 
 ### qa-workflow
 
-Graph Harnessの候補を入力として、既存契約どおり最も早い責任Skillへroutingします。
+オーケストレーションと記録を担当します。
 
-GraphがSkill固有ロジックを再定義しません。
+- Suite更新の起動
+- full / selected routing
+- activity artifact作成
+- execution route受け渡し
+- activity discovery
+- query不完全時の安全側routing
 
-## 6. 過剰設計を避ける制約
+意味上のcoverageやRiskを再判定しません。
 
-このPRでは次を追加しません。
+### 決定論的補助runtime
 
-- Graph DB
-- event sourcing
-- message bus
-- background daemon
-- generic plugin architecture
-- dynamic graph schema registry
-- universal artifact fingerprint
-- universal QA entity ID
-- graph migration framework
-- graph visualization UI
-- graph専用LLM agent
+必要な場合だけ追加します。
 
-v1は既知Skill / 既知成果物だけを固定adapterで扱います。
+- Suite / activity artifactのschema検証
+- duplicate / dangling ref検出
+- activity発見
+- direct refで不足するrelation query
+- query completeness判定
+
+PR #11のdesign impact / freshnessを再計算しません。
