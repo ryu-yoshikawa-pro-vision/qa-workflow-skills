@@ -2,11 +2,11 @@
 
 このPlanは、PR #11「決定論的テスト技法自動化」とPR #12「テスト対象資料管理・テスト実行Skill追加」が`main`へmerge済みであることを実装開始時の前提とし、両PRで解決済みのdesign traceability、change impact、execution / result / rerun lineageを再実装せず、継続RegressionとExploratory Testingに残る責務を追加する実装計画です。
 
-PR #13では新規`regression-testing`と`exploratory-testing`を追加します。
+PR #13では新規`regression-testing`と`exploratory-testing`を追加します。加えて、特定Skillの責務ではなくproject全体にまたがる要件として、継続利用するQA知識の管理と複数workflowの並行実行契約を追加します。
 
 「新規・改修」「Regression」「Exploration / Investigation」はQA活動全体を排他的に分類するものではありません。PR #13で責任Skillを持つ主要workflow入口として扱い、同一workflowで複数活動を組み合わせられるようにします。不具合修正では、元の不具合が直ったかを確認する修正確認と、周辺影響を確認するRegression Testingを別目的として扱います。修正確認は独立Skillや独立QA活動として追加せず、既存Skillを使うworkflow intentとして扱います。
 
-Graphの構築自体は目的にしません。主要workflowはrelation indexなしで成立させ、direct refとdeterministic scanで実需を満たせないことを実測した場合だけ、必要なquery向けの最小indexをその時点で設計します。
+Graphの構築自体は目的にしません。成果物・Activity・知識・workflowのprovenanceをdirect ref / revisionで追跡できることを目的とし、主要workflowはrelation indexなしで成立させます。deterministic scanで実需を満たせないことを実測した場合だけ、必要なquery向けの最小indexをその時点で設計します。
 
 ## 対象ブランチ
 
@@ -86,8 +86,9 @@ defect fix
 5. [Regression Suite・Run・実行契約](./2026-09-22_123900_qa-artifact-graph-harness_04a_regression-suite.md)
 6. [regression-testing Skill契約](./2026-09-22_123900_qa-artifact-graph-harness_04b_regression-testing-skill.md)
 7. [exploratory-testing Skill契約](./2026-09-22_123900_qa-artifact-graph-harness_04c_exploratory-testing-skill.md)
-8. [既存Skill・PR #11/#12統合](./2026-09-22_123900_qa-artifact-graph-harness_05_skill-integration.md)
-9. [評価・CI・実装順序・完了条件](./2026-09-22_123900_qa-artifact-graph-harness_06_evaluation-ci-implementation-order.md)
+8. [継続QA知識・複数workflow・共有環境](./2026-09-22_123900_qa-artifact-graph-harness_04d_continuous-qa-knowledge-and-concurrency.md)
+9. [既存Skill・PR #11/#12統合](./2026-09-22_123900_qa-artifact-graph-harness_05_skill-integration.md)
+10. [評価・CI・実装順序・完了条件](./2026-09-22_123900_qa-artifact-graph-harness_06_evaluation-ci-implementation-order.md)
 
 ## 固定方針
 
@@ -113,6 +114,12 @@ defect fix
 20. relation indexは実装対象ではなく将来gateとする。direct ref + deterministic scanで不足を実測するまでrelation schemaも確定しない。
 21. query結果の完全性を保証できない場合は`complete=false`相当を明示し、空集合を「影響なし」「Regression不要」と解釈しない。
 22. 新2 Skillの意味品質はdataset構造検証だけで完了扱いにしない。既存semantic runnerと実Judgeを用いた代表caseの評価を実装完了時に別途記録する。
+23. QAを続けるほど、テスト対象・関連する仕組み・テスト観点・テスト環境について再利用可能な知見が蓄積され、次のworkflowがscopeに応じて取り出せることを要件にする。既存の仕様・Risk・TC・test-target-inspection等の正本へ入る情報はそちらを更新し、第二の正本を作らない。
+24. Activity / Session / executionは履歴の正本とし、そこから得た知見を自動的にcurrent事実へ昇格しない。source ref / revision、適用scope、environment / version条件を確認した有効知識だけを後続判断へ利用する。
+25. `qa-workflow`で管理する各workflowは一意な`workflow_ref`と開始時のsource refs / revisionsを持ち、workflow stateを他workflowと共有上書きしない。
+26. 共有current成果物はrevision / SHA / ETag等を使った競合検出を必須にし、同一scope競合を後勝ち上書きしない。scopeがdisjointであることを決定論的に確認できない場合はcurrent成果物を再読込し責任Skillで再評価する。
+27. 進行中workflowが参照したEntityを別workflowが更新しても過去snapshotは書き換えない。ただしlatest current stateに対する完了・再利用を主張する前にdependency / revisionを再確認し、影響scopeを`要再検証`へ戻す。
+28. test user / test data / tenant / external account等のshared mutable resourceは、workflow間の観測へ影響しないことを確認できる場合だけ並行利用する。安全性を確認できない場合はproject policyに従って直列化またはblockし、同時利用可能と推測しない。
 
 ## 対象外
 
@@ -124,6 +131,9 @@ defect fix
 - Finding / FAILの自動Defect化
 - `qa-workflow`へRegression固有の意味判断を追加すること
 - QA全体を新しいGraphへ移すこと
+- Graph DBを前提としたknowledge management
+- workflowを1件だけ実行できる中央queue / schedulerの新設
+- shared resource向けlock / lease方式の先行固定
 - Graph DB / query server / web UI
 - 汎用artifact registry
 - 新しい共通Feature ID体系 / feature hierarchy
