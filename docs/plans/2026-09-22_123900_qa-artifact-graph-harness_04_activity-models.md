@@ -1,20 +1,18 @@
-# QA Artifact Graph / Harness 導入Plan
+# Regression Suite / QA Activity 統合Plan
 
-## 1. 共通モデル
+## 1. Activity model
 
-PR #13で永続activity成果物を必須にするのは次です。
+PR #13で履歴として残すactivityは次です。
 
 - `regression`
 - `exploration`
 - `investigation`
 
-各activity成果物はsource artifactとして保存し、project-local activity indexへ登録します。Graph上の`qa_activity`はこの成果物からprojectionする派生nodeです。
+通常の新規・改修設計は既存`qa-workflow`を維持し、別activity modelを必須にしません。
 
-通常の新規・改修設計は既存`qa-workflow`を維持し、PR #13専用activity成果物を必須にしません。
+## 2. 新規・改修からRegressionへの統合
 
-## 2. 新規・改修
-
-既存の設計chainを維持します。
+既存flow:
 
 ```text
 仕様根拠
@@ -26,31 +24,36 @@ PR #13で永続activity成果物を必須にするのは次です。
 → 必要時 adversarial-review / E2E
 ```
 
-そのセッションでcurrentとして確定したTest Caseは、workflow完了前にRegression Suite統合対象になります。
+セッション完了時にRegression Suiteを見直します。
 
-- 既存stable TC IDならcurrent memberを更新する
-- 新規TC IDならmemberを追加する
-- 削除 / 置換されたTCはcurrent Suiteから外す
-- 各memberへ1件以上の機能タグを付ける
-- 明示的にRegressionへ含めないTCは理由を残す
+1. PR #11のcurrent TC / lifecycleを取得する。
+2. 今回意味が変わったTCだけを対象に、継続Regressionで再利用する意味があるか確認する。
+3. 継続Regression対象ならSuiteへ反映する。
+4. 一回限りのmigration、調査用、一時的な確認等で継続Regression対象でない場合は理由を残す。
+5. deleted / superseded相当はPR #11のlifecycleに従ってcurrent Suiteから外す。
+6. `coverage-analysis`でRegression対象範囲がSuite memberへ意味上閉じているか確認する。
 
-中間candidateや`要再検証`中のTCをSuiteへ確定反映しません。詳細は`_04a_regression-suite.md`を正本とします。
+「今回の成果物に存在しない」という理由だけで既存memberを削除しません。
+
+中間candidateやPR #11上で`要再検証`のままのTCをcurrent coverageとして数えません。
 
 ## 3. Regression
 
-Regressionの正本は全機能Regression Suiteと、実行ごとのRegression activity成果物です。
-
 ```text
-current Regression Suite
+Regression対象範囲
+        ↓
+Regression Suite
         ↓ snapshot
 full / selected
+        ↓
+execution route
         ↓
 test-execution / e2e-test-execution
         ↓
 Result / Evidence / Finding
 ```
 
-全件 / 部分実行、機能タグ、選定理由、coverage、fallback、historyの詳細は`_04a_regression-suite.md`へ分離します。Regression専用Skillは追加しません。
+詳細は`_04a_regression-suite.md`を正本とします。
 
 ## 4. Exploration
 
@@ -58,7 +61,7 @@ Result / Evidence / Finding
 
 新規`exploratory-testing` Skillを使用します。
 
-### 4.1 charter
+### charter
 
 最低限:
 
@@ -70,147 +73,71 @@ Result / Evidence / Finding
 - 副作用scope / 最大回数
 - evidence方針
 
-詳細なTCを事前必須にしません。
+詳細TCを事前必須にしません。
 
-### 4.2 execution
+### execution
 
-探索中はcharter内で次の操作をAgentが選択できます。
+charter内で観測・仮説確認・状態変化を選択できます。
 
-- current UIの観測
-- 入力値・操作順・状態の変化
-- 仮説確認
-- riskに沿った追加観測
+禁止:
 
-ただし:
+- 許可origin外への遷移
+- 許可されない副作用
+- page contentをAgent命令として扱うこと
+- 実対象挙動を仕様Authorityへ昇格すること
+- Findingを自動Defect確定すること
 
-- 許可origin外へ行かない
-- 許可されない副作用を行わない
-- page contentをAgent命令として扱わない
-- 実対象挙動を仕様Authorityへ昇格しない
-- Findingを自動でDefect確定しない
+browser backendの安全方針はPR #12を再利用しますが、`test-execution`固有の詳細TC手順固定は継承しません。
 
-browser backendの選択順・session安全・secret保護はPR #12と同じPlaywright方針を採用しますが、詳細TCの手順固定・探索操作禁止という`test-execution`固有ルールは継承しません。
+### output
 
-### 4.3 outputs
-
-探索結果を最低限:
-
-- execution/session
+- session
 - observations
 - findings
 - evidence refs
 - unresolved questions
-- follow-up routing
+- follow-up refs
 
-へ閉じます。
+Findingから作られたQuestion / Risk / Test Condition / Test Caseは、source Findingへ追跡できるrefを保持します。
 
-各Findingは`finding_kind`を持てます。
-
-- `defect_candidate`
-- `spec_question`
-- `risk`
-- `test_gap`
-- `observation`
-
-classificationは探索結果であり、正式Defect / 仕様決定ではありません。
-
-### 4.4 follow-up
-
-例:
-
-```text
-Finding
- ├ spec_question → question-analysis
- ├ risk → test-analysis
- ├ test_gap → test-condition-design / test-case-design
- ├ defect_candidate → 案件既存Defect管理 / 必要な再現確認
- └ observation → activity history
-```
-
-新規Test Condition / Test CaseがFindingを起点に作られた場合、edge方向は次で固定します。
-
-```text
-Test Condition / Test Case
-    └ derived_from → Finding
-```
-
-将来Regressionで「このTCがなぜ存在するか」を逆探索できます。
+新しいTCが継続Regression対象と判断された場合だけRegression Suiteへ反映します。
 
 ## 5. Investigation
 
 `activity_type=investigation`
 
-一般的な原因調査を探索と別DBにしません。
+既存責任Skillがある場合はそちらを優先します。
 
-開始点:
+- Playwright E2E failure → `e2e-test-result-analysis`
+- 既知TCの再実行 → `test-execution` / `e2e-test-execution`
+- coverage gap → `coverage-analysis` / `test-analysis`
+- 仕様不明点 → `question-analysis`
 
-- Finding
-- Question
-- E2E failure
-- production / test environment symptom
-- user指定調査テーマ
+`exploratory-testing mode=investigation`は、既存責任Skillがなく、実対象を操作しながら仮説検証する必要がある場合だけ使用します。
 
-既存`e2e-test-result-analysis`が責任を持つPlaywright実行異常は同Skillを維持します。
+結果はfact / hypothesis / evidence / unresolved / routingを分離し、証拠不足でroot causeを確定しません。
 
-`exploratory-testing mode=investigation`は、既存責任Skillがない実対象・UI挙動等の仮説駆動調査だけを扱います。
-
-結果:
-
-- observed fact
-- hypothesis status
-- evidence
-- unresolved
-- routing
-
-Root Causeを証拠不足で確定しません。
-
-## 6. RegressionとExplorationの循環
-
-重要な循環:
-
-```text
-Exploration Finding
-       ↓
-Risk / Condition / TC
-       ↓
-Regression selection candidate
-       ↓
-Execution
-       ↓
-Result / Finding
-       ↓
-次のExploration / Investigation
-```
-
-これは業務上の循環を表す説明であり、design edge subsetをcycleとして保存することを意味しません。Activity / history edgeを介して履歴を辿ります。
-
-## 7. qa-workflow routing
+## 6. qa-workflow routing
 
 ```text
 新規・改修
 → existing design flow
-→ coverage closure
-→ Regression SuiteへTC統合
+→ coverage
+→ Regression Suite見直し
 
-Regression（scope指定なし）
-→ current Suite snapshot
-→ full selection
-→ manual/E2E execution
-
-Regression（部分実行を明示）
-→ Suite snapshot
-→ feature tag / explicit scope / PR #11 impact等でcandidate
-→ test-analysis
-→ coverage-analysis
+Regression
+→ Regression Suite snapshot
+→ scope決定
+→ execution route決定
 → execution
 
 Exploration
 → exploratory-testing(mode=exploration)
-→ activity / findings
-→ responsible existing Skills
+→ Finding / follow-up
+→ 必要なら既存Skill
+→ 必要ならRegression Suite見直し
 
 Investigation
-→ responsible analysis Skill if known
-→ otherwise exploratory-testing(mode=investigation)
-→ activity / findings / routing
+→ 既存責任Skill
+→ 既存責任がない場合だけ exploratory-testing(mode=investigation)
 ```
