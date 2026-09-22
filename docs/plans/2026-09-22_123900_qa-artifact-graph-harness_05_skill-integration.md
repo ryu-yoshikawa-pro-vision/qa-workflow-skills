@@ -1,50 +1,41 @@
 # QA Artifact Graph / Harness 導入Plan
 
-## 1. 既存SkillをGraph Producerとして扱う
+## 1. 既存Skillとの関係
 
-Graphのために既存Skillの意味責務を変更しません。
+PR #13は既存Skillの意味責務を変更せず、残課題だけを統合します。
 
-| Skill | 主なGraph projection |
+| Skill / runtime | PR #13で利用する内容 |
 | --- | --- |
-| `spec-analysis` | specification / decision / assumption |
-| `question-analysis` | question / resolution relation |
-| `test-analysis` | product_risk / change relation / local change-impact graph |
-| `test-requirement-design` | test_requirement |
-| `test-condition-design` | test_condition / coverage_item |
-| `test-case-design` | test_case |
-| `coverage-analysis` | graph gap候補を入力として意味的coverageを判定 |
-| `adversarial-review` | finding相当のreview issueを必要範囲でprojection |
-| `test-target-inspection` | test_target_snapshot |
-| `test-execution` | execution / result / evidence refs |
-| `e2e-test-inspection` | testware対象・実装可能性参照 |
-| `e2e-test-implementation` | testware |
-| `e2e-test-execution` | execution / result / evidence refs |
-| `e2e-test-result-analysis` | finding / investigation relation |
-| `e2e-test-reporting` | Graph正本ではなくreport projection |
-| `qa-workflow` | qa_activity / routing / graph manifest / Harness invocation |
+| PR #11 Machine Entity / traceability | design identity / relation / impact / freshnessの正本 |
+| `test-case-design` | current logical TC |
+| `coverage-analysis` | 全機能Regression Suiteと選択範囲の意味上coverage |
+| `test-analysis` | 部分Regressionの意味上scope選定 |
+| `test-target-inspection` | target snapshot |
+| `test-execution` | manual相当execution / result / evidence |
+| `e2e-test-implementation` | TCのtestware実装先 |
+| `e2e-test-execution` | E2E execution / result / evidence |
+| `e2e-test-result-analysis` | E2E failure analysis |
+| `qa-workflow` | Regression Suite更新、activity成果物 / index、routing、Harness invocation |
+| `exploratory-testing` | Exploration / Investigation session / finding / evidence / follow-up |
 
 ## 2. PR #11統合
 
-### 維持するもの
+PR #11を次の正本として扱います。
 
-- stable QA ID
-- Machine Entity
-- runtime identity / freshness
-- `target_ref`
-- change impact graph
-- traceability runtime
-- workflow runtime
+- stable QA ID / Machine Entity
+- design dependency / traceability
+- change impact
+- freshness / stale / 要再検証
 - deterministic generator結果
 
-### 禁止
+PR #13で禁止すること:
 
-- Graph HarnessがMachine Entityを再生成する
-- Graph Harnessがsemantic matchingして`reuse_id`を決める
-- Graph目的でPR #11のfingerprint対象を無断拡張する
-- PR #11 local change impact graphを削除してglobal graphだけにする
-- Graph JSONをMachine Entity正本として次Skillへ渡す
+- design impactを別Harnessで再計算する
+- Graph独自currentnessとPR #11 freshnessを二重管理する
+- Graph目的でMachine Entity identity / fingerprintを変更する
+- Skillごとのdesign adapterを再実装する
 
-GraphはMachine Entityを**参照・projectionする消費者**です。
+Regression Suite更新ではPR #11のcurrent TC identity / lifecycleを利用します。
 
 ## 3. PR #12統合
 
@@ -168,60 +159,69 @@ Graphでは`artifact_ref + finding-local-ref`でscopeします。
 
 ## 5. Regressionに新Skillを追加しない理由
 
-Regressionの固有処理を分解すると:
+Regressionは新しいテスト設計方式ではなく、各機能のcurrent Test CaseをRegression Suiteとして統合し、全件または明示的な部分scopeで再実行する活動です。
 
-- impact candidate → Graph Harness
-- risk / scope判断 → `test-analysis`
-- coverage妥当性 → `coverage-analysis`
+- Suite bookkeeping / full run routing → `qa-workflow`
+- change impact → PR #11 runtime
+- 部分scopeの意味判断 → `test-analysis`
+- Suite / selected scopeの意味上coverage → `coverage-analysis`
 - manual execution → `test-execution`
-- automated execution → `e2e-test-execution`
-- failure analysis → `e2e-test-result-analysis`等
-- reporting →各execution / reporting
+- E2E execution → `e2e-test-execution`
+- failure analysis → 既存analysis Skill
 
-既存責務で閉じるため、新しい`regression-testing` Skillを追加すると重複します。
-
-Regressionは`qa_activity.activity_type=regression`としてqa-workflowが束ねます。
+既存責務で閉じるため`regression-testing` Skillは追加しません。詳細は`_04a_regression-suite.md`を正本とします。
 
 ## 6. coverage-analysis拡張
 
-Graph Harnessのdeterministic findingsを任意入力として受けられるようにします。
+新しい正規対象 / 実行範囲としてRegression Suiteの確認を追加します。
 
-例:
+確認内容:
 
-- orphan candidate
-- uncovered changed node
-- selected-but-not-executed
-- evidence missing
-- currentness candidate
-- history-only coverage
+- feature tagがcurrent機能scopeへ対応している
+- 各機能のcurrent仕様根拠 / Risk / TR / TCN / CIがSuite member TCへ意味上閉じている
+- untagged / missing current TCをcoverage済み扱いしていない
+- stale / 要再検証TCをcurrent Suite coverageとして数えていない
+- selected Regressionでは選択範囲が指定scope / Riskへ妥当に閉じている
 
-`coverage-analysis`はGraph findingを無条件で欠陥扱いせず、意味上の妥当性を確認します。
+selected-but-not-executed等の実行完了判定は`qa-workflow` / activity validatorへ委ねます。
 
 ## 7. test-analysis拡張
 
-Regression scope選定時だけGraph impact projectionを入力にできます。
+`test-analysis`は**部分Regression**でのみscope selectionを担当します。
 
-Graph候補全件を必ずRegressionへ入れません。
+入力:
 
-既存のProduct Risk、変更影響、重点、残存リスクの責務を維持します。
+- Suite snapshot
+- user指定scope / feature tags
+- PR #11 impact result
+- Product Risk
+- explicit relationで接続された過去FAIL / Finding
+
+出力:
+
+- candidate
+- selected
+- excluded
+- selection / exclusion rationale
+- residual risk
+
+全件Regressionではscope selectionを行わず、Suite snapshotの全memberを選択します。
 
 ## 8. qa-workflow拡張
 
-追加:
+追加責務:
 
-- QA Activity type
-- source manifest作成
-- Graph Harness呼び出し
-- impact candidate受領
-- activity view更新
-- responsible Skill routing
-- Graph validation failureのblock
+- current Regression Suite成果物の管理
+- 新規・改修セッション完了時のTC統合
+- feature tagの明示値利用と未解決tagのblock
+- full / selected Regression routing
+- Regression activity成果物の作成
+- Exploration / Investigation activity成果物の登録
+- project-local activity indexの更新
+- relation Harness呼び出し
+- query `complete=false`時の安全側routing
 
-`qa_activity`は既存workflow state / project contextからprojectionし、別activity registryを新設しません。既存assetに保持できない最小fieldだけ追加します。
-
-Graph構築に失敗しても各Skill成果物を破損扱いにはしません。
-
-Graph管理が要求範囲の場合はworkflowを完了にせず、Graph issueを明示します。
+`qa-workflow`は機能coverageやRiskを自分で再判定しません。意味判断は担当Skillへ委ねます。
 
 ## 9. Portability
 
