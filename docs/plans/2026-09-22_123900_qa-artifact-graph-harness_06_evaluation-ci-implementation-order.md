@@ -1,13 +1,20 @@
-# Regression Suite / QA Activity 統合Plan
+# Regression / Exploratory Testing 統合Plan
 
 ## 1. 評価方針
+
+### routing / responsibility
+
+- 新規・改修要求は既存Skillへroutingされる
+- Regression要求は`regression-testing`へroutingされる
+- Exploration要求は`exploratory-testing`へroutingされる
+- `test-analysis`がRegression membership / selection責務を持たない
+- `qa-workflow`がRegression固有判断を再実装しない
 
 ### deterministic
 
 - project-wide TC discovery completeness
 - initial baseline reconciliation
 - Suite / Activity schema
-- stable ref / artifact-local ref保持
 - membership source ref / revision
 - full / selected snapshot整合
 - required execution route closure
@@ -19,295 +26,267 @@
 
 ### semantic
 
-- 継続Regression対象の判断
-- Regression対象範囲変更時のmembership再評価対象
+- `regression-testing`によるmembership判断
+- Regression対象範囲変更時のmembership再評価
+- full / selected selectionの妥当性
+- residual risk
 - Suiteとは独立したRegression対象範囲のcoverage
-- selected scopeの妥当性
-- TC → E2E実装のcoverage
+- TC→E2E実装coverage
 - `test-target-inspection`とInvestigationの責務境界
-- Finding classification / follow-up
+- Finding / follow-up
 
 ### runtime smoke
 
-- 既存TCを持つprojectでの初回baseline
-- 新規・改修 → membership見直し
+- existing design flow → regression-testing handoff
+- 既存TCを持つprojectでinitial baseline
 - scope変更のみ → membership再評価
-- Suite → full Run → manual / E2E
+- regression-testing → full Run → manual / E2E
 - selected Run
 - Activity block / resume / complete
-- activity history
 - exploratory-testing
-- Finding → follow-up
+- Finding → design flow → regression-testing handoff
 
 ## 2. 必須評価
 
+### Skill routing
+
+- 「新機能のテスト分析」→ `test-analysis`
+- 「この変更のテストケースを設計」→ `test-case-design`
+- 「Regressionを実施」→ `regression-testing`
+- 「変更影響からRegression対象を選んで」→ `regression-testing`
+- 「探索的テストをして」→ `exploratory-testing`
+- 「現在のUI構造を確認」→ `test-target-inspection`
+- Regression要求を`test-analysis`へ誤routingしない
+- 新規・改修要求を`regression-testing`へ誤routingしない
+
 ### TC discovery / initial baseline
 
-- project context等のauthoritative discovery rootから全current TC sourceを列挙できる
+- authoritative discovery rootから全current TC sourceを列挙
 - sourceを1件欠落させたfixtureでbaseline completenessがPASSしない
-- 既存TC A/B/Cがあり今回Cしか変更していなくても、初回baselineではA/B/Cの必要memberを判断する
-- project-wide discoveryを保証できない場合、派生Suiteをfull / completeとして扱わない
+- 既存TC A/B/Cがあり今回Cしか変更していなくてもinitial baselineではA/B/Cを判断
+- discoveryを保証できない場合、baselineをcompleteとして扱わない
 
-### Regression対象範囲 / membership
+### Regression membership
 
-- Suiteに存在しないcurrent対象責務をcoverage gapとして検出する
-- Suite自身からRegression対象範囲を定義しない
-- one-off migration TCをcurrentでも恒常memberにしない判断を許容する
+- one-off migration TCを恒常memberにしない
 - one-off責務自体がcurrent Regression対象範囲に残る場合はcoverage gapを黙らせない
-- 調査専用TCを自動加入させない
-- stable TC更新でidentityを維持する
+- stable TC update
 - split / mergeはPR #11 lifecycleに従う
-- deleted / superseded相当をcurrent memberとして数えない
-- 今回の成果物にないだけで既存memberを削除しない
-- feature tagがなくてもmembership / coverageを失敗させない
-- feature renameでTC identityを変更しない
-- TC無変更でもrole / test level / Regression scope / relevant Risk等が変われば影響membershipを再評価する
-- membership影響範囲を限定できない場合はcurrent TC全体を再確認する
+- deleted / supersededをcurrent memberにしない
+- feature tagなしでも成立
+- TC無変更でもrole / test level / Regression scope / relevant Risk変更で再評価
+- 影響範囲不明ならcurrent TC全体を再確認
 
 ### Full / Selected
 
-- user明示scopeを最優先する
-- project policyがあれば利用する
-- scope未定義時だけfull fallbackする
-- fullはsnapshot全TC memberをselectedにする
-- selectedはsnapshotのsubsetである
-- selectedをSuite全体のRegression完了として扱わない
-- 100 selected / 98 executed / 2 unexecutedを「100件実行済み」と表現しない
+- user scope優先
+- project policy利用
+- 未定義時full fallback
+- fullはsnapshot全TC member
+- selectedはsubset
+- selectedをSuite全体完了と扱わない
+- selection rationale / residual riskを保持
 
 ### manual / E2E route closure
 
-- E2E存在だけでmanual不要と判断しない
-- E2EがTCの一部だけをcoverする場合、required routeにmanualまたは追加E2Eを残す
-- 1 TC → 2 E2Eで片方未実行ならlogical TCをexecuted countへ入れない
-- manual + E2Eで片方未実行ならlogical TCをexecuted countへ入れない
-- FAIL / 判定不能をPASSと扱わない一方、実行attempt自体は追跡できる
-- 2 TC → 1 E2Eでは同じtestware executionを重複起動せず、両TCから同じexecution refを参照できる
-- required routeすべてがexecutionへ閉じた場合だけlogical TCをexecutedとして数える
+- E2E存在だけでmanual不要としない
+- partial E2Eで必要routeを残す
+- 1 TC → 2 E2Eで片方未実行ならexecutedにしない
+- manual + E2Eで片方未実行ならexecutedにしない
+- FAIL / 判定不能とexecutedを分離
+- 2 TC → 1 E2Eでexecutionを重複起動しない
+- required routeすべてがexecutionへ閉じた場合だけexecuted
 
 ### TCなしE2E
 
-- TCなしE2EへTC IDを創作しない
-- user明示またはproject policyに補助testware refがある場合だけRegressionへ含める
-- full Runでも案件方針にないTCなしE2Eを暗黙加入させない
-- auxiliary selected / executed countをTC countと分離する
+- TC IDを創作しない
+- user明示またはproject policyだけで参加
+- fullでも暗黙加入しない
+- auxiliary countをTC countと分離
 - TC-based coverageへ算入しない
 
-### Activity provenance / lifecycle
+### Activity
 
-- project context ref / revisionを保持する
-- selected scope判断に使用したimpact / Risk / Finding等のinput refs / revisionsを保持する
-- scope / baseline snapshot不変のblock → resumeは同じactivity refを使える
-- scope / snapshot変更時は別activity / versionになる
-- 完了後Activityを変更できない
+- project context ref / revision
+- selection input refs / revisions
+- block → resume
+- scope / snapshot変更時は別Activity
+- 完了後immutable
 - workflow完了と全TC PASSを混同しない
-- past Activity snapshotをcurrent Suite更新で書き換えない
+- current Suite更新でpast Activityを書き換えない
 
 ### Activity discovery
 
-- fixed rootから発見可能ならindexなしで全Activityを列挙できる
-- index方式の場合、project contextからindexを一意に発見できる
-- index方式でActivity保存成功 / index登録失敗を保存完了扱いしない
-- indexが存在しないartifact refを指せば失敗
-- indexへTC / Result / Finding本文を複製しない
+- fixed rootならindexなしで全Activity列挙
+- index方式ならproject contextからindexを一意に発見
+- Activity保存成功 / index登録失敗を保存完了扱いしない
+- dangling index refを拒否
 
 ### PR #11 / #12境界
 
-- PR #11のfreshness / `要再検証`を参照し、PR #13独自stateを生成しない
-- past PASSをupstream変更だけでFAILへ書き換えない
-- PR #12のTC snapshot / execution schemaをActivityへ複製しない
+- PR #11 freshnessを参照し独自stateを生成しない
+- PR #12 TC snapshot / execution schemaをActivityへ複製しない
 - `source_test_case_id`をglobal identityへしない
 
 ### candidate completeness
 
-- discovery source不足 / unsupported / dangling / unmapped等があれば`complete=false`
-- `complete=false`の空集合をRegression不要へ変換しない
-- candidate不完全時は明示scope維持、current test basisへの拡大、full fallback / blockの順で安全側に扱う
+- discovery source不足 / unsupported / dangling / unmapped等で`complete=false`
+- `complete=false`空集合をRegression不要へ変換しない
+- safety fallbackを維持
 
-### Exploration / Investigation routing
+### Exploration / Investigation
 
-- current UI情報 / 既知範囲のふるまい収集 → `test-target-inspection`
-- 既知TC実行 → `test-execution` / `e2e-test-execution`
-- E2E failure → `e2e-test-result-analysis`
-- 仕様不明 → `question-analysis`
-- 仮説駆動で実対象を探索する必要があり既存責任Skillがない → `exploratory-testing(mode=investigation)`
+- current UI確認 → `test-target-inspection`
+- 既知TC実行 → execution Skill
+- E2E failure → result analysis
+- 仕様不明 → question-analysis
+- ownerなしの仮説駆動調査 → `exploratory-testing(mode=investigation)`
 - Findingを自動Defect化しない
-- observationを仕様Authorityへ自動昇格しない
 
 ### relation index不要ケース
 
-- TC → past Activityを固定rootのActivity scanだけで回答できるfixtureではrelation indexを要求しない
-- deterministic scanで要件を満たす限りrelation indexを実装対象にしない
+- TC → past Activityをdeterministic scanで回答できる場合はindex不要
+- scanで要件を満たす限りrelation indexを実装しない
 
 ## 3. CI
 
-実装開始時のPR #11 / #12 merge後CIを正本として追加先を決めます。
+実装開始時のPR #11 / #12 merge後CIへ次を追加・更新します。
 
-予定:
-
-- Skill一覧へ`exploratory-testing`
-- project context schema / docs同期
+- Skill一覧へ`regression-testing` / `exploratory-testing`
 - trigger dataset
-- deterministic output eval
-- semantic dataset validation
+- semantic dataset
+- deterministic validator / output eval
 - qa-workflow routing
 - Regression Suite / Activity validator
 - current TC discovery / initial baseline test
-- Activity discovery test
 - execution route closure test
+- Activity discovery test
 - runtime smoke
+- project context schema / docs
+- README / EVALS / ASSERTIONS
 - `skills-ref validate`
-- README / EVALS / ASSERTIONS同期
 
-relation indexを実装した場合だけ追加:
-
-- relation build / query unit test
-- canonical reproducibility
-- completeness test
-
-Graph Harness専用CIを先に固定しません。
+relation indexを実装した場合だけrelation build / query testを追加します。
 
 ## 4. 実装順序
 
 ### Step 0: PR #11 / #12 merge後の再判定
 
-- merge済み実装を確認する
-- PR #11にcanonical project-wide TC inventoryが追加されたか確認する
-- なければproject contextの既存QA成果物をTC discovery rootとして使えるか確認する
-- TC discovery completenessを検証できるか確認する
-- current lifecycleをPR #11だけで判断できるか確認する
-- TC → E2E、execution historyを確認する
-- Activity保存規約を確認する
-- PR #11 / #12だけで解けるものをPR #13から除外する
+- merge済み実装を確認
+- project-wide TC inventory有無
+- current lifecycle / impact契約
+- TC→E2E / execution history
+- Activity保存規約
+- PR #11 / #12だけで解けるものを除外
 
-### Step 1: initial baseline
+### Step 1: regression-testing最小Skill
 
-既存current TCを持つfixtureで実証します。
+まず新しい責務境界を成立させます。
+
+- `skills/regression-testing/SKILL.md`
+- guidance
+- trigger / negative routing
+- initial baselineの最小artifact
+- existing design SkillへRegression固有責務を追加しないことを確認
+
+### Step 2: initial baseline / membership
 
 ```text
 Regression対象範囲
 → authoritative TC discovery
-→ 全current TC
-→ membership判断
+→ current TC
+→ regression-testing membership
 → baseline
-→ coverage-analysis
+→ coverage validation
 ```
 
-この段階ではGraph / relation indexを実装しません。
+### Step 3: membership更新
 
-### Step 2: membership更新
-
-- TC content / lifecycle変更
-- role / function / test level等のRegression scope変更
-- relevant Risk / test objective変更
+- TC変更
+- scope / policy / Risk変更
 - one-off終了
 - impact範囲不明時の全current TC再確認
 
-を検証します。
-
-### Step 3: Suite → Regression Activity
+### Step 4: Regression Run / Activity
 
 ```text
-baseline
-→ immutable member snapshot
-→ full / selected
-→ required execution routes
-→ manual / E2E execution
-→ Activity result
+baseline snapshot
+→ regression-testing full / selected
+→ required routes
+→ execution Skills
+→ regression-testing Activity update
 ```
 
-Suite、Run scope、actual execution、Resultを分離します。
-
-### Step 4: E2E route / auxiliary testware
+### Step 5: execution route / auxiliary testware
 
 - partial automation
 - manual + E2E
-- 1 TC → 複数testware
-- 複数TC → 1 testware
+- many-to-many
 - TCなしE2E
-- required route closure
+- route closure
 
-### Step 5: Activity lifecycle / history
+### Step 6: Activity lifecycle / history
 
-- selection provenance
+- provenance
 - block / resume
 - complete → immutable
-- fixed root discovery
-- 必要な場合だけactivity index
+- discovery
 
-### Step 6: selected Regression / safety fallback
+### Step 7: exploratory-testing
 
-- user / project policy scope
-- PR #11 impact
-- Product Risk
-- past FAIL / Finding
-- query completeness
-- safe broadening / block
-
-### Step 7: exploratory-testing / Investigation
-
-- `test-target-inspection`とのrouting境界
-- Skill / validator
+- Skill / guidance
+- routing
 - browser safety
 - Finding follow-up
 
-### Step 8: relation index必要性gate
+### Step 8: end-to-end QA cycle
 
 ```text
-direct ref
-→ discovered artifact deterministic scan
-→ 要件を満たすなら終了
-→ 実測上不足するqueryだけrelation index
+新規・改修
+→ current QA成果物
+→ regression-testing
+→ Regression
+→ Finding /変更
+→ 新規・改修flowまたはExploration
+→ regression-testing再評価
 ```
 
-relation indexを実装しないことを正常な完了結果として許容します。
+### Step 9: relation index gate
 
-### Step 9: 全体回帰
+direct ref → deterministic scanで不足した場合だけ実装します。
 
-- 既存Skill
-- PR #11 runtime
-- PR #12 execution
-- E2E
-- Suite / Activity
-- exploratory-testing
-- project context
-- relation indexを実装した場合だけそのruntime
-- CI / runtime smoke
+### Step 10: 全体回帰
+
+既存Skill、PR #11 / #12、新規2 Skill、routing、CI、runtime smokeを確認します。
 
 ## 5. 実装時に避けること
 
-- TC discoveryの完全性を確認せず「見つかったTC = 全current TC」と扱う
-- 初回baselineを増分更新だけで作る
-- TC変更時だけmembershipを再評価する
-- SuiteをTC lifecycleの第二の正本にする
-- feature tagをcoverage / membershipの必須条件にする
-- Suite自身からRegression対象範囲を作る
+- `test-analysis`へRegression membership / selection責務を追加する
+- `qa-workflow`へRegression固有意味判断を追加する
+- `coverage-analysis`へRegression selection責務を追加する
+- 新規・改修SkillがSuiteを直接更新する
+- TC discovery completenessを確認せずbaselineをcomplete扱いする
+- TC変更時だけmembership再評価する
+- SuiteをTC lifecycleの第二正本にする
+- feature tagをcoverage / membership必須にする
 - full scopeと全件実行済みを混同する
-- required routeの一部だけでlogical TCをexecuted扱いする
-- E2E存在だけでmanual不要と判断する
-- TCなしE2EへTCを創作する
-- TCなしE2Eを暗黙にfull Regressionへ加入させる
+- required routeの一部だけでexecuted扱いする
+- TCなしE2Eを暗黙加入する
 - completed Activityを書き換える
-- index登録に失敗したActivityを保存完了扱いする
-- `test-target-inspection`の責務をgeneric investigationへ移す
-- PR #11 design graphをPR #13へ複製する
-- relation indexをreverse lookupがあるだけで導入する
+- relation indexをreverse lookupだけで導入する
 
 ## 6. 完了条件
 
-- project-wide TC discoveryの入口とcomplete判定が決まっている
-- 既存projectでinitial baselineを構築できる
-- current Regression対象範囲がSuiteとは独立して定義される
-- TC変更だけでなくscope / policy / Risk等の変更でもmembershipを適切に再評価できる
-- 継続Regression対象のTCだけを基準集合へ反映できる
-- feature tagなしでもSuite / coverageが成立する
-- Suite completeness、Run scope、actual execution、PASS / FAILが分離されている
-- logical TCのrequired execution route closureが一意に判定できる
-- TCなしE2Eを明示方針だけで補助testwareとして扱える
-- selection input refs / revisionsから当時のscope判断を再現できる
-- Activityのblock / resume / complete / immutable境界が一意である
-- past Activityを欠落なく決定論的に発見できる
-- `test-target-inspection`とInvestigationのroutingが競合しない
-- candidate query不完全時に安全側へ処理できる
-- relation indexなしでも主workflowが成立する
-- relation indexを追加する場合はdirect ref + deterministic scanでは不足した実証済みqueryだけを対象にする
+- `regression-testing`と`exploratory-testing`の責務が独立している
+- 既存新規・改修SkillにRegression固有責務が追加されていない
+- `qa-workflow`はroutingに留まる
+- initial baselineを構築できる
+- membershipをscope / policy / Risk変更でも再評価できる
+- full / selected / execution / resultを分離できる
+- required execution route closureを一意に判定できる
+- TCなしE2Eを明示方針だけで扱える
+- Regression Activityからselection判断を再現できる
+- Activity lifecycle / discoveryが一意
+- Exploration / Investigation routingが一意
+- relation indexなしで主workflowが成立する
 - deterministic / semantic / runtime smokeと既存CIがPASSする
