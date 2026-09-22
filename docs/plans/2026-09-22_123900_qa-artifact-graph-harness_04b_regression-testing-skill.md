@@ -60,6 +60,7 @@ workflow state、開始Skill / 最終Skill、resume先ではこの値を使用�
 - authoritative TC discovery root
 - PR #11 current TC identity / lifecycle / change impact / freshness
 - current Product Risk / test objective
+- currentness確認済みの関連QA knowledge refs / revisions
 - current TC→E2E mapping
 - previous baseline / membership metadata
 - previous Regression Activity
@@ -190,7 +191,7 @@ currentness確認済みbaseline snapshotの全memberをselectedにします。
 
 ### selected
 
-PR #11 impact、current Risk、past FAIL / Finding、明示TC / filter等を入力にcandidate / selected / excludedを決めます。
+PR #11 impact、current Risk、past FAIL / Finding、currentness確認済みの関連QA knowledge、明示TC / filter等を入力にcandidate / selected / excludedを決めます。
 
 判断根拠をActivityへ保存します。
 
