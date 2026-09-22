@@ -17,9 +17,9 @@ PR #13ではuser-facing Skillを2件追加します。
 | `coverage-analysis` | 指定された成果物の意味上coverage検証 |
 | `regression-testing` | Regression baseline / membership / Run計画 / Activity / history |
 | `test-target-inspection` | currentな実対象情報 / UI / 既知範囲のふるまい収集 |
-| `test-execution` | manual相当execution / Confirmation / result / evidence |
+| `test-execution` | manual相当execution / result / evidence。既存TCの修正確認にも再利用 |
 | `e2e-test-implementation` | E2E testware |
-| `e2e-test-execution` | E2E execution / Confirmation / result / evidence |
+| `e2e-test-execution` | E2E execution / result / evidence。既存E2Eの修正確認にも再利用 |
 | `e2e-test-result-analysis` | E2E failure分析 |
 | `exploratory-testing` | Exploration / 仮説駆動Investigation |
 | `qa-workflow` | 複合workflowのrouting / common workflow state / blocked / resume |
@@ -67,18 +67,15 @@ PR #13ではuser-facing Skillを2件追加します。
 
 Investigation専用Skill / 別runtimeは追加しません。
 
-## 5. Confirmation Testing
+## 5. 修正確認のrouting
 
-Confirmation専用Skillは追加しません。
+修正確認は独立Skill、独立artifact、独立stateとして追加しません。`qa-workflow`が要求を修正確認として解釈し、必要な既存Skillへroutingします。
 
-既知のFAIL / reproductionに対して、
+- currentな既存FAIL / 再現TCがある → analysis / designを省略し、manual相当は`test-execution`、repo E2Eは`e2e-test-execution`
+- 期待結果、再現条件、current TCが不足する → 必要な最も早い既存analysis / design Skillで不足分だけ更新し、その後execution
+- 周辺影響も確認する → `regression-testing`を別目的として追加
 
-- manual相当 → `test-execution`
-- repo E2E → `e2e-test-execution`
-
-を再利用します。
-
-ConfirmationとRegressionは目的を分離し、同じ`qa-workflow`内で順に実施できます。
+修正確認専用のテスト設計体系は作りません。既存のanalysis / design成果物を再利用できる場合は再利用します。
 
 ## 6. project context
 
@@ -135,8 +132,9 @@ currentな実対象情報 / UI / 既知範囲のふるまい確認を担当し�
 
 - TC snapshot
 - manual相当execution
-- Confirmation execution
 - source execution start / result / evidence / cleanup
+
+修正確認でも同じexecution契約をそのまま再利用します。
 
 を正本とします。
 
@@ -155,9 +153,9 @@ TCなしE2EへTCを創作しません。
 代表例:
 
 - 新規・改修 + Regression asset reconciliation
-- Confirmation + Regression
+- 修正確認 + Regression
 - Regression Run planning + manual / E2E execution + Activity update
-- Regression FAIL → analysis / investigation → fix → Confirmation → rerun
+- Regression FAIL → analysis / investigation → fix → 既存TCの修正確認 → rerun
 - Regression + Exploration
 
 `qa-workflow`自身は次を独立再判定しません。
@@ -212,7 +210,7 @@ Regression中のFAIL / 判定不能は`regression-testing`が原因確定しま�
 
 へroutingします。
 
-修正後はConfirmationを実施し、必要ならbaseline / Run scopeを再評価します。
+修正後はcurrentな既存TCが使えるなら直接再実行して修正確認し、設計不足がある場合だけ既存analysis / designへ戻します。必要ならbaseline / Run scopeを再評価します。
 
 ## 13. reporting / Defect Management
 
