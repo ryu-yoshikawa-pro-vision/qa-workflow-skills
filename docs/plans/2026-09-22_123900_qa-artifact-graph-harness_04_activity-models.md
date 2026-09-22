@@ -2,125 +2,55 @@
 
 ## 1. 共通モデル
 
-4種類のQA活動を別Graphにしません。
+PR #13で永続activity成果物を必須にするのは次です。
 
-```text
-qa_activity
-    │
-    ├ triggered_by → change / finding / question
-    ├ selected_for ← test_case / testware
-    ├ produced → execution
-    │                 │
-    │                 └ produced → result / finding
-    └                 result / finding → evidenced_by → evidence
-```
+- `regression`
+- `exploration`
+- `investigation`
 
-`activity_type`だけを変えます。
+各activity成果物はsource artifactとして保存し、project-local activity indexへ登録します。Graph上の`qa_activity`はこの成果物からprojectionする派生nodeです。
+
+通常の新規・改修設計は既存`qa-workflow`を維持し、PR #13専用activity成果物を必須にしません。
 
 ## 2. 新規・改修
 
-`activity_type=new_change`
-
-代表経路:
+既存の設計chainを維持します。
 
 ```text
-Change
- ↑ derived_from
-Specification
- ↑ derived_from
-Product Risk / Test Requirement
- ↑ covers
-Test Condition
- ↑ covers
-Coverage Item
- ↑ verifies
-Test Case
- └ implemented_by → E2E Testware
-
-Test Case / Testware
- └ executed_in → Execution
-                    └ produced → Result
-                                  └ evidenced_by → Evidence
+仕様根拠
+→ test-analysis
+→ test-requirement-design
+→ test-condition-design
+→ test-case-design
+→ coverage-analysis
+→ 必要時 adversarial-review / E2E
 ```
 
-Decision / Question / Assumptionは、それぞれ既存成果物の明示関係に従ってSpecification等へ接続し、Graph Harnessが意味関係を推測しません。
+そのセッションでcurrentとして確定したTest Caseは、workflow完了前にRegression Suite統合対象になります。
 
-既存Skillが各Entityの意味を所有します。
+- 既存stable TC IDならcurrent memberを更新する
+- 新規TC IDならmemberを追加する
+- 削除 / 置換されたTCはcurrent Suiteから外す
+- 各memberへ1件以上の機能タグを付ける
+- 明示的にRegressionへ含めないTCは理由を残す
 
-Graph Harnessは既存chainをprojectionし、変更時のimpact candidateを返します。
+中間candidateや`要再検証`中のTCをSuiteへ確定反映しません。詳細は`_04a_regression-suite.md`を正本とします。
 
 ## 3. Regression
 
-`activity_type=regression`
+Regressionの正本は全機能Regression Suiteと、実行ごとのRegression activity成果物です。
 
-### 3.1 trigger
+```text
+current Regression Suite
+        ↓ snapshot
+full / selected
+        ↓
+test-execution / e2e-test-execution
+        ↓
+Result / Evidence / Finding
+```
 
-例:
-
-- release / version
-- change set
-- hotfix
-- 定期回帰
-- incident後の再確認
-
-Graph上は`qa_activity triggered_by change / finding / question`として接続します。定期回帰のようにchangeがないActivityも正当です。
-
-### 3.2 candidate生成
-
-決定論的Harnessは次を候補として列挙できます。
-
-- changed nodeから`design-impact`で到達可能なcurrent TC / testware
-- current high-risk nodeへ到達するTC
-- 同領域の過去FAIL / Findingへ接続するTC
-- explicit dependencyを持つTC
-- user指定TC / 既存Regression set
-
-ただし候補を自動で「今回必須」と確定しません。
-
-### 3.3 scope selection
-
-`test-analysis`を既存責務の範囲で利用します。
-
-入力:
-
-- change / release情報
-- Graph impact candidate
-- Product Risk
-- previous execution history
-- user指定scope
-
-出力:
-
-- 選定したTC / testware
-- 選定根拠
-- 除外 / 残存リスク
-
-選定後だけ`test_case / testware selected_for qa_activity`をGraphへprojectionします。
-
-### 3.4 coverage確認
-
-`coverage-analysis`で、
-
-- changed / high-risk領域が選定対象または明示handlingへ閉じているか
-- manual / E2Eの重複や欠落
-- Regression scopeの根拠不足
-
-を確認します。
-
-### 3.5 execution
-
-- manual / AI手動相当TC → PR #12 `test-execution`
-- repo E2E → `e2e-test-execution`
-
-実行後に`test_case / testware executed_in execution`をprojectionし、結果を同じActivity viewへ束ねます。
-
-既存execution結果をコピーして今回実行扱いにしません。
-
-### 3.6 history
-
-過去Resultは削除しません。
-
-今回changeの影響を受ける過去PASSは`revalidation_required`候補になりますが、過去の事実として`historical`で保持します。
+全件 / 部分実行、機能タグ、選定理由、coverage、fallback、historyの詳細は`_04a_regression-suite.md`へ分離します。Regression専用Skillは追加しません。
 
 ## 4. Exploration
 
@@ -255,6 +185,37 @@ Result / Finding
 これは業務上の循環を表す説明であり、design edge subsetをcycleとして保存することを意味しません。Activity / history edgeを介して履歴を辿ります。
 
 ## 7. qa-workflow routing
+
+```text
+新規・改修
+→ existing design flow
+→ coverage closure
+→ Regression SuiteへTC統合
+
+Regression（scope指定なし）
+→ current Suite snapshot
+→ full selection
+→ manual/E2E execution
+
+Regression（部分実行を明示）
+→ Suite snapshot
+→ feature tag / explicit scope / PR #11 impact等でcandidate
+→ test-analysis
+→ coverage-analysis
+→ execution
+
+Exploration
+→ exploratory-testing(mode=exploration)
+→ activity / findings
+→ responsible existing Skills
+
+Investigation
+→ responsible analysis Skill if known
+→ otherwise exploratory-testing(mode=investigation)
+→ activity / findings / routing
+```
+
+
 
 代表routing:
 
