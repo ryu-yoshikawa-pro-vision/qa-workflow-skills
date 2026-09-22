@@ -132,19 +132,21 @@ LLMはbuild pathへ入りません。
 - PR #12 `artifact_ref + test_case_ref` scope整合
 - supersedes self-loop禁止
 - derived_from self-loop禁止
-- 明示的にacyclicとするedge集合のcycle検出
+- 明示的にacyclicとするdesign edge集合のcycle検出
 - current nodeがsuperseded-only sourceへ依存していないか
 - secret-like field名をgraph schemaに含めていないか
 
-Graph全体をDAGとは仮定しません。`executed_in / produced / resolved_by`等で履歴ループを表現し得るため、cycle禁止は意味上DAGであるedge subsetだけへ限定します。
+Graph全体をDAGとは仮定しません。`selected_for / executed_in / produced / evidenced_by / resolves`等は活動・履歴を表すため、cycle禁止は仕様→設計→TCの意味上DAGであるedge subsetだけへ限定します。
 
 ## 7. impact
 
 入力:
 
 - changed node refs
-- traversal policy
+- traversal policy（v1は`design-impact`を正規値とし、自由定義しない）
 - max depth（省略時はschema定義）
+
+`design-impact`のedge方向はGraph contractの固定表だけを使用します。Agentがedge typeごとの順方向 / 逆方向を選択しません。
 
 出力:
 
