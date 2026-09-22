@@ -10,5 +10,17 @@
   {"query":"権限×公開範囲×状態の組合せをPairwiseで設計できるか確認し、必要なCoverage Itemを出して。","should_trigger":true},
   {"query":"Authorityから何を保証すべきかTest Requirementだけ作って。","should_trigger":false},
   {"query":"このテスト観点一覧をCold Reviewして重大度付きで問題を出して。","should_trigger":false},
-  {"query":"この変更のProduct Riskを4×4で評価して。","should_trigger":false}
+  {"query":"この変更のProduct Riskを4×4で評価して。","should_trigger":false},
+  {"query":"Domain Testingを使って複数変数のborderとrequired pointを生成してください。","should_trigger":true},
+  {"query":"CRUD Testingのcompleteness行列とconsistency sequenceを作成してください。","should_trigger":true},
+  {"query":"Random Testingの固定seed、分布、完了件数をもとに入力ケースを生成してください。","should_trigger":true},
+  {"query":"Metamorphic relationに沿ったsource / follow-up pairと期待関係を作成してください。","should_trigger":true},
+  {"query":"Syntax-Based Testingのgrammarからproduction sequenceとmutation caseを生成してください。","should_trigger":true},
+  {"query":"Domain Testingをこの変更へ採用するべきかだけ判断してください。","should_trigger":false},
+  {"query":"CRUD Testingを使うべきか、リスク分析として結論だけ出してください。","should_trigger":false},
+  {"query":"Random Testingの採用可否と運用プロファイルの説明をしてください。","should_trigger":false},
+  {"query":"Metamorphic Testingが適切かどうかを根拠付きで評価してください。","should_trigger":false},
+  {"query":"Syntax-Based Testingを選択するかどうかだけ決めてください。","should_trigger":false},
+  {"query":"Domain、CRUD、Random、Metamorphic、Syntax-Based Testingとは何か説明してください。","should_trigger":false},
+  {"query":"選択済みの技法から、具体的なtest conditionとCoverage Itemを作成してください。","should_trigger":true}
 ]

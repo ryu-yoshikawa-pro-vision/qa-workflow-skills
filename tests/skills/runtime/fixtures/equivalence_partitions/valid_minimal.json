@@ -1,0 +1,1 @@
+{"sets":[{"set_key":"role","label":"Role","partitions":[{"partition_key":"admin","label":"Admin","validity":"valid","definition":{"type":"enum","values":[{"type":"enum","value":"admin"}]},"representative":null,"authority_refs":[]}]}]}

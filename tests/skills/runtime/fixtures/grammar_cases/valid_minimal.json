@@ -1,0 +1,1 @@
+{"input_label":"command","start":"S","productions":[{"production_key":"P-001","lhs":"S","rhs":[{"terminal":"a"}]}],"max_depth":1,"mutations":[]}

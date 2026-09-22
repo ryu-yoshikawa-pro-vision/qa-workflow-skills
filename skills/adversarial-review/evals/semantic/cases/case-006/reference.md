@@ -1,0 +1,2 @@
+# 判定根拠
+completenessとconsistencyを分離し、後者の欠落を重要な指摘として扱う。存在しない障害やSeverityを作らず、設計不足の修正先を示す。

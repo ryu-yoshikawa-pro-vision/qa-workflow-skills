@@ -2,6 +2,18 @@
   "skill": "test-condition-design",
   "cases": [
     {"id":"TCN-SEM-001","input":"cases/case-001/input.md","reference":"cases/case-001/reference.md","criteria":["SEM-TCN-001","SEM-TCN-002","SEM-TCN-003","SEM-TCN-004"]},
-    {"id":"TCN-SEM-002","input":"cases/case-002/input.md","reference":"cases/case-002/reference.md","criteria":["SEM-TCN-001","SEM-TCN-002","SEM-TCN-003","SEM-TCN-005","SEM-TCN-006"]}
+    {"id":"TCN-SEM-002","input":"cases/case-002/input.md","reference":"cases/case-002/reference.md","criteria":["SEM-TCN-001","SEM-TCN-002","SEM-TCN-003","SEM-TCN-005","SEM-TCN-006"]},
+    {"id":"TCN-SEM-003","input":"cases/case-003/input.md","reference":"cases/case-003/reference.md","criteria":["SEM-TCN-001","SEM-TCN-002","SEM-TCN-003","SEM-TCN-004"]},
+    {"id":"TCN-SEM-004","input":"cases/case-004/input.md","reference":"cases/case-004/reference.md","criteria":["SEM-TCN-001","SEM-TCN-002","SEM-TCN-003","SEM-TCN-004"]},
+    {"id":"TCN-SEM-005","input":"cases/case-005/input.md","reference":"cases/case-005/reference.md","criteria":["SEM-TCN-001","SEM-TCN-002","SEM-TCN-003","SEM-TCN-004"]},
+    {"id":"TCN-SEM-006","input":"cases/case-006/input.md","reference":"cases/case-006/reference.md","criteria":["SEM-TCN-001","SEM-TCN-002","SEM-TCN-003","SEM-TCN-004"]},
+    {"id":"TCN-SEM-007","input":"cases/case-007/input.md","reference":"cases/case-007/reference.md","criteria":["SEM-TCN-001","SEM-TCN-002","SEM-TCN-003","SEM-TCN-006"]},
+    {"id":"TCN-SEM-008","input":"cases/case-008/input.md","reference":"cases/case-008/reference.md","criteria":["SEM-TCN-001","SEM-TCN-002","SEM-TCN-003","SEM-TCN-004","SEM-TCN-005"]},
+    {"id":"TCN-SEM-009","input":"cases/case-009/input.md","reference":"cases/case-009/reference.md","criteria":["SEM-TCN-001","SEM-TCN-002","SEM-TCN-003","SEM-TCN-004"]},
+    {"id":"TCN-SEM-010","input":"cases/case-010/input.md","reference":"cases/case-010/reference.md","criteria":["SEM-TCN-001","SEM-TCN-002","SEM-TCN-003","SEM-TCN-004","SEM-TCN-006"]},
+    {"id":"TCN-SEM-011","input":"cases/case-011/input.md","reference":"cases/case-011/reference.md","criteria":["SEM-TCN-001","SEM-TCN-002","SEM-TCN-003","SEM-TCN-004"]},
+    {"id":"TCN-SEM-012","input":"cases/case-012/input.md","reference":"cases/case-012/reference.md","criteria":["SEM-TCN-001","SEM-TCN-002","SEM-TCN-003","SEM-TCN-004"]},
+    {"id":"TCN-SEM-013","input":"cases/case-013/input.md","reference":"cases/case-013/reference.md","criteria":["SEM-TCN-001","SEM-TCN-002","SEM-TCN-003","SEM-TCN-004","SEM-TCN-006"]},
+    {"id":"TCN-SEM-014","input":"cases/case-014/input.md","reference":"cases/case-014/reference.md","criteria":["SEM-TCN-001","SEM-TCN-003","SEM-TCN-004","SEM-TCN-005"]}
   ]
 }

@@ -223,6 +223,7 @@ scripts/skills/evals/
 │   ├── loader.py
 │   ├── markdown_parser.py
 │   ├── common.py
+│   ├── runtime_validator.py
 │   ├── result.py
 │   └── tests/
 └── semantic/
@@ -246,11 +247,19 @@ Skillを利用するだけの場合は`skills/<skill-name>/`のみをコピー�
 
 `evals/`や評価プログラムはAgent Skills Specificationの必須標準機能ではありません。
 
+## 決定論的runtime
+
+runtime対応Skillは、LLMによる意味判断と、再現可能な機械処理を分離します。Skill-localの`runtime_contract.py`とgeneratorはPython 3.11標準ライブラリだけで動作し、stdinの厳格なJSON objectを受け、stdoutへ1つのruntime envelopeを返します。CLI引数・入力ファイル・環境変数による業務入力・外部ネットワーク・タイムアウト制御には依存しません。
+
+Machine Runtime Input / ResultとMachine Entityは、Skill、runtime unit、Model Key、stable ID、input / model / generation / implementation fingerprint、upstream dependency、support / runtime / result / freshness statusを保持します。保存済み結果の再利用は`current`かつfingerprint一致の場合だけ許可し、`stale` / `legacy` / `deleted` / `unsupported`を完全結果へ昇格しません。独立validatorは保存済み入力・Entity・Skill-local sourceから期待値を再計算し、actual出力から期待値を推測しません。
+
+runtimeのためにLLMの意味判断をPythonへ複製せず、unsupported subset、undetermined、semantic coverage不足は理由付き状態として保持します。Skill単体の移植では`skills/<skill-name>/`と、そのSkillに同梱された`scripts/runtime_contract.py`だけでruntimeが成立することを検証します。
+
 ## 評価
 
 ### 発火評価
 
-14 Skillの選択精度を評価します。正規モードは14 Skill同時利用、単独・限定Skillは診断モードです。train / validationは各Skill12 / 8件、positive / negative比率を維持し、合計280 queryです。repo内データセット検証と実Agentクライアント上の実発火評価は別物です。
+14 Skillの選択精度を評価します。正規モードは14 Skill同時利用、単独・限定Skillは診断モードです。`test-analysis` / `test-condition-design`はtrain 24件・validation 20件、その他12 Skillはtrain 12件・validation 8件で、合計328 queryです。repo内データセット検証と実Agentクライアント上の実発火評価は別物です。
 
 ### 決定論的出力評価
 

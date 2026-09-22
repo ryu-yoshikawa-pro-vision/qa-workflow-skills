@@ -1,0 +1,1 @@
+{"mode":"exhaustive","factors":[{"factor_key":"role","label":"Role","values":[{"type":"enum","value":"admin"},{"type":"enum","value":"user"}],"authority_refs":[]},{"factor_key":"region","label":"Region","values":[{"type":"enum","value":"jp"},{"type":"enum","value":"us"}],"authority_refs":[]}],"constraints":[]}

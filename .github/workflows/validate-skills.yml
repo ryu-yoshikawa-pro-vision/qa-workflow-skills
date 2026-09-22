@@ -88,9 +88,11 @@ jobs:
               assert description, f"empty description: {skill_file}"
               names.append(declared_name)
 
+              train_expected = (24, 12, 12) if name in {"test-analysis", "test-condition-design"} else (12, 6, 6)
+              validation_expected = (20, 10, 10) if name in {"test-analysis", "test-condition-design"} else (8, 4, 4)
               datasets = [
-                  ("train_queries.json", 12, 6, 6),
-                  ("validation_queries.json", 8, 4, 4),
+                  ("train_queries.json", *train_expected),
+                  ("validation_queries.json", *validation_expected),
               ]
               for filename, expected_count, expected_true, expected_false in datasets:
                   path = skill_root / name / "evals" / "trigger" / filename
@@ -130,7 +132,7 @@ jobs:
               )
 
           assert len(names) == len(set(names)) == 14, names
-          assert total_queries == 280, total_queries
+          assert total_queries == 328, total_queries
 
           for doc in (Path("README.md"), Path("EVALS.md")):
               text = doc.read_text(encoding="utf-8")
@@ -138,6 +140,12 @@ jobs:
               assert not missing, (doc, missing)
 
           print("Skill count: 14")
-          print("Each skill: train=12 (6/6), validation=8 (4/4)")
-          print("Total trigger queries: 280")
+          print("通常Skill: train=12 (6/6), validation=8 (4/4)")
+          print("test-analysis / test-condition-design: train=24 (12/12), validation=20 (10/10)")
+          print("Total trigger queries: 328")
           PY
+
+      - name: Validate semantic dataset counts
+        run: |
+          python scripts/skills/evals/semantic/validate.py
+          python -m unittest discover -s tests/skills/evals/semantic -v

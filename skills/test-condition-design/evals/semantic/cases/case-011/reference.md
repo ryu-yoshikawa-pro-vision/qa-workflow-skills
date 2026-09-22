@@ -1,0 +1,2 @@
+# 判定根拠
+catalogのstatic versionとaliasを固定し、runtime-v1で許可されたcontrol typeだけを扱う。disabled / readonlyの意味を有効な入力制約へ誤変換せず、未知patternはunsupportedとして残す。

@@ -1,0 +1,2 @@
+# 判定根拠
+各borderについてReliable Domain Coverageのrequired pointを、変数のcoordinatesと境界のrelation付きで作る。入力順や値のラベルだけでなく実値をexecutionへ含め、model内Coverageを仕様全体Coverageと混同しない。

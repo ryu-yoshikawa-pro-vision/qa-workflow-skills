@@ -1,0 +1,2 @@
+# 判定根拠
+解析済みstrict JSONを機械処理し、OpenAPI reference objectのsiblings規則とrequired/nullabilityを区別する。schema adapterは新しいchild identityを自動追加せず、childが意味parameter不足ならunresolvedとする。

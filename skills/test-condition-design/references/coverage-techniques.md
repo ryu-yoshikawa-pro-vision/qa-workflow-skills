@@ -81,3 +81,7 @@
 - 候補母集団を識別せず「重要なものだけ」を恣意的に採用しない
 - 低プロダクトリスクだけを理由に対象候補を無言削除しない
 - テストケースの実行手順へ先回りしない
+
+## runtime generatorとの対応
+
+runtime generatorは、この文書の技法規則を機械的に適用できる範囲だけをsupported subsetとして扱います。入力が範囲外、制約が矛盾、期待挙動の根拠がない場合は、適当な代表値・ルール・遷移を創作せず、`unsupported`または`unresolved`とその理由を返します。生成したstable ID、選択条件、coverage item、semantic itemは、同じModel Keyとgeneration fingerprintで追跡し、`test-case-design`が実行手順を追加するまでケース完了とはみなしません。

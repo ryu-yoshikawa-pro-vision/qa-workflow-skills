@@ -51,3 +51,16 @@
 | 自動化目的 | 候補範囲 | 技術非依存の判断基準 / 根拠 | 対象外 / 保留 |
 | --- | --- | --- | --- |
 |  |  |  |  |
+
+## Machine Runtime / Entity（機械証拠）
+
+runtime dispatchを行った場合は、入力・結果・Entityを次の固定ブロックで保存します。expected unitやfingerprintを実行者が追記してはいけません。
+
+```text
+<!-- Machine Runtime Input: test-analysis -->
+{ "skill": "test-analysis", "runtime_contract_version": "runtime-contract-v1", "input": {} }
+<!-- Machine Runtime Result: test-analysis / analysis_entities -->
+{ "envelope_version": "runtime-envelope-v1", "runtime_unit_key": "analysis_entities", "input_fingerprint": "sha256:<64 hex>", "generation_fingerprint": "sha256:<64 hex>", "runtime_status": "ok", "result_status": "ready", "freshness_status": "current", "payload": {} }
+<!-- Machine Entities: test-analysis -->
+[{ "entity_schema_version": "entity-state-v1", "skill": "test-analysis", "entity_type": "risk", "entity_ref": "risk:<stable-ref>", "content": {}, "content_fingerprint": "sha256:<64 hex>", "dependencies": [] }]
+```

@@ -84,6 +84,12 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     })
     result.add("COV-D006", not invalid, "Skill名だけを指定する修正先は正規Skill名であること", evidence=invalid or None)
 
+    model_key_issues = []
+    for row in matrix_rows + item_rows + orphan_rows:
+        if "Model Key" in row and clean(row.get("Model Key", "")) and not re.fullmatch(r"[a-z][a-z0-9-]*-\d{3,}", clean(row.get("Model Key", ""))):
+            model_key_issues.append(clean(row.get("Model Key", "")))
+    result.add("COV-D013", not model_key_issues, "Model Keyが指定される場合はstable model key形式であること", evidence=sorted(set(model_key_issues)) or None)
+
     tc_e2e_table = find_table(
         tables,
         section_contains="TC → E2E実装対応表",

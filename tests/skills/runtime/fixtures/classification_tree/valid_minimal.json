@@ -1,0 +1,1 @@
+{"classifications":[{"classification_key":"role","label":"Role","classes":[{"class_key":"admin","value":{"type":"enum","value":"admin"},"authority_refs":[]}],"authority_refs":[]}],"constraints":[],"child_models":[{"child_model_key":"comb-child","model_type":"comb","derived_from_model_key":"classification-001","semantic_parameters":null}]}

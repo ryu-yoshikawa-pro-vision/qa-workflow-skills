@@ -65,3 +65,19 @@
 | 項目 | 関連項目ID | 後続Skillへの関連 / 備考 |
 | --- | --- | --- |
 |  |  |  |
+
+## Machine Entity（機械証拠）
+
+```json
+{
+  "entity_schema_version": "entity-state-v1",
+  "skill": "spec-analysis",
+  "entity_type": "authority",
+  "entity_ref": "authority:<stable-ref>",
+  "content": {},
+  "content_fingerprint": "sha256:<64 hex>",
+  "dependencies": []
+}
+```
+
+仕様本文の表とMachine Entityは同じstable IDを参照し、Entityのfingerprintを手入力で差し替えません。本SkillにはMachine Runtime Resultはありません。

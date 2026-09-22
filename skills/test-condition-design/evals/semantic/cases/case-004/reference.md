@@ -1,0 +1,2 @@
+# 判定根拠
+completenessは各操作と対象の組合せを、consistencyは操作sequence後の在庫・請求の整合性を別々に表す。missing operationを黙って除外せず、具体的なentity・function・operationをexecutionへ持つ。

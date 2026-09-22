@@ -38,3 +38,7 @@
 | 上流ID | 種別 | 扱い | 理由 / 根拠 |
 | --- | --- | --- | --- |
 |  | カバレッジ項目 / テスト条件 | 別テストレベル / 残存リスク / 対象外 / ブロック中 |  |
+
+## Machine Runtime / Entity（機械証拠）
+
+`case_structure`を実行した場合は、Machine Runtime Input / ResultとMachine Entityを成果物へ添付します。ケースID・観点・CI・test-data requirement・根拠のstable IDと、input/model/generation/implementation/upstream fingerprintを保持します。秘密値やcredentialは添付しません。
