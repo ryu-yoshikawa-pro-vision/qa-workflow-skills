@@ -115,11 +115,13 @@ defect fix
 21. query結果の完全性を保証できない場合は`complete=false`相当を明示し、空集合を「影響なし」「Regression不要」と解釈しない。
 22. 新2 Skillの意味品質はdataset構造検証だけで完了扱いにしない。既存semantic runnerと実Judgeを用いた代表caseの評価を実装完了時に別途記録する。
 23. QAを続けるほど、テスト対象・関連する仕組み・テスト観点・テスト環境について再利用可能な知見が蓄積され、次のworkflowがscopeに応じて取り出せることを要件にする。既存の仕様・Risk・TC・test-target-inspection等の正本へ入る情報はそちらを更新し、第二の正本を作らない。
-24. Activity / Session / executionは履歴の正本とし、そこから得た知見を自動的にcurrent事実へ昇格しない。source ref / revision、適用scope、environment / version条件を確認した有効知識だけを後続判断へ利用する。
-25. `qa-workflow`で管理する各workflowは一意な`workflow_ref`と開始時のsource refs / revisionsを持ち、workflow stateを他workflowと共有上書きしない。
-26. 共有current成果物はrevision / SHA / ETag等を使った競合検出を必須にし、同一scope競合を後勝ち上書きしない。scopeがdisjointであることを決定論的に確認できない場合はcurrent成果物を再読込し責任Skillで再評価する。
-27. 進行中workflowが参照したEntityを別workflowが更新しても過去snapshotは書き換えない。ただしlatest current stateに対する完了・再利用を主張する前にdependency / revisionを再確認し、影響scopeを`要再検証`へ戻す。
-28. test user / test data / tenant / external account等のshared mutable resourceは、workflow間の観測へ影響しないことを確認できる場合だけ並行利用する。安全性を確認できない場合はproject policyに従って直列化またはblockし、同時利用可能と推測しない。
+24. Activity / Session / executionは履歴の正本とし、Finding / Observationを自動的にcurrent知識へ昇格しない。未検証candidateは元Activity / Finding / Follow-upに残し、検証済みentryだけを知識成果物へ追加する。
+25. knowledge entryではprovenance source refs / revisionsとcurrentness dependency refs / revisionsを分離し、entry単位のrevision / content identityを持つ。dependency変更時は一度有効だったentryを`要再検証`へ戻す。
+26. `qa-workflow`で継続管理するworkflowは一意な`workflow_ref`を持ち、1 workflow = 1 persisted state artifactとする。state自身もrevision / content identityを持ち、CASでlost updateを防ぐ。standalone Skillには強制しない。
+27. cross-workflow currentnessはevent busで即時伝播せず、workflow / Run開始、resume、未開始mutable operation開始直前、current完了直前、current再利用直前のcheckpointでdependency / revisionを確認する。
+28. 共有current成果物の自動rebase / partial updateは、owner Skillがdeterministic partial update boundaryを明示するartifactに限定する。scope disjoint、upstream dependency不変、cross-scope invariant維持を確認できない場合はcurrent成果物を再読込し責任Skillで再評価する。
+29. shared mutable resourceはisolationを第一選択とし、分離できない場合は既存外部reservation、atomic CAS付きproject-local reservation、blockの順で扱う。単なるpolicyやreservation fileの存在確認を排他保証にしない。
+30. knowledge lifecycleの意味上の責任主体と、entry revision / CAS要件を満たすknowledgeの物理保存形式だけは追加リサーチで確定する。`qa-workflow`へknowledgeのdomain判断を持たせない。
 
 ## 対象外
 
