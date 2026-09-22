@@ -2,7 +2,7 @@
 
 このPlanは、PR #11「決定論的テスト技法自動化」とPR #12「テスト対象資料管理・テスト実行Skill追加」が`main`へmerge済みであることを実装開始時の前提とし、両PRで解決済みのdesign traceability、change impact、execution / result / rerun lineageを再実装せず、継続RegressionとExploratory Testingに残る責務を追加する実装計画です。
 
-PR #13では新規`regression-testing`と`exploratory-testing`を追加します。加えて、特定Skillの責務ではなくproject全体にまたがる要件として、継続利用するQA知識の管理と複数workflowの並行実行契約を追加します。
+PR #13では新規`regression-testing`、`exploratory-testing`、`qa-knowledge`を追加します。加えて、複数workflowの並行実行、共有成果物の競合防止、shared environment / resourceの安全な利用契約を追加します。
 
 「新規・改修」「Regression」「Exploration / Investigation」はQA活動全体を排他的に分類するものではありません。PR #13で責任Skillを持つ主要workflow入口として扱い、同一workflowで複数活動を組み合わせられるようにします。不具合修正では、元の不具合が直ったかを確認する修正確認と、周辺影響を確認するRegression Testingを別目的として扱います。修正確認は独立Skillや独立QA活動として追加せず、既存Skillを使うworkflow intentとして扱います。
 
@@ -62,6 +62,17 @@ spec-analysis
 - Follow-up
 - 既存責任Skillがない仮説駆動Investigation
 
+### QA Knowledge
+
+新規`qa-knowledge`が、Activity / Finding / Observation等から得た情報について、既存正本へroutingするか、継続利用するQA knowledgeとして有効化・更新・再検証・置換するかを担当します。
+
+- existing owner routing
+- residual knowledge validation
+- entry create / update / revalidation / replacement
+- knowledge lookup / history
+
+仕様Authority、Product Risk、TR / TCN / CI / TC、current実対象情報そのものは既存ownerが正本化します。
+
 ### 修正確認のworkflow intent
 
 修正確認専用Skill、専用artifact、専用stateは追加しません。
@@ -87,8 +98,9 @@ defect fix
 6. [regression-testing Skill契約](./2026-09-22_123900_qa-artifact-graph-harness_04b_regression-testing-skill.md)
 7. [exploratory-testing Skill契約](./2026-09-22_123900_qa-artifact-graph-harness_04c_exploratory-testing-skill.md)
 8. [継続QA知識・複数workflow・共有環境](./2026-09-22_123900_qa-artifact-graph-harness_04d_continuous-qa-knowledge-and-concurrency.md)
-9. [既存Skill・PR #11/#12統合](./2026-09-22_123900_qa-artifact-graph-harness_05_skill-integration.md)
-10. [評価・CI・実装順序・完了条件](./2026-09-22_123900_qa-artifact-graph-harness_06_evaluation-ci-implementation-order.md)
+9. [qa-knowledge Skill契約](./2026-09-22_123900_qa-artifact-graph-harness_04e_qa-knowledge-skill.md)
+10. [既存Skill・PR #11/#12統合](./2026-09-22_123900_qa-artifact-graph-harness_05_skill-integration.md)
+11. [評価・CI・実装順序・完了条件](./2026-09-22_123900_qa-artifact-graph-harness_06_evaluation-ci-implementation-order.md)
 
 ## 固定方針
 
@@ -113,7 +125,7 @@ defect fix
 19. Activity stateの正規値は既存`qa-workflow`語彙を再利用する。Regression Activityのdomain stateは`regression-testing`が判断し、`qa-workflow`は独立計算せずworkflow状態へ反映する。
 20. relation indexは実装対象ではなく将来gateとする。direct ref + deterministic scanで不足を実測するまでrelation schemaも確定しない。
 21. query結果の完全性を保証できない場合は`complete=false`相当を明示し、空集合を「影響なし」「Regression不要」と解釈しない。
-22. 新2 Skillの意味品質はdataset構造検証だけで完了扱いにしない。既存semantic runnerと実Judgeを用いた代表caseの評価を実装完了時に別途記録する。
+22. 新3 Skillの意味品質はdataset構造検証だけで完了扱いにしない。既存semantic runnerと実Judgeを用いた代表caseの評価を実装完了時に別途記録する。
 23. QAを続けるほど、テスト対象・関連する仕組み・テスト観点・テスト環境について再利用可能な知見が蓄積され、次のworkflowがscopeに応じて取り出せることを要件にする。既存の仕様・Risk・TC・test-target-inspection等の正本へ入る情報はそちらを更新し、第二の正本を作らない。
 24. Activity / Session / executionは履歴の正本とし、Finding / Observationを自動的にcurrent知識へ昇格しない。未検証candidateは元Activity / Finding / Follow-upに残し、検証済みentryだけを知識成果物へ追加する。
 25. knowledge entryではprovenance source refs / revisionsとcurrentness dependency refs / revisionsを分離し、entry単位のrevision / content identityを持つ。dependency変更時は一度有効だったentryを`要再検証`へ戻す。
@@ -121,7 +133,9 @@ defect fix
 27. cross-workflow currentnessはevent busで即時伝播せず、workflow / Run開始、resume、未開始mutable operation開始直前、current完了直前、current再利用直前のcheckpointでdependency / revisionを確認する。
 28. 共有current成果物の自動rebase / partial updateは、owner Skillがdeterministic partial update boundaryを明示するartifactに限定する。scope disjoint、upstream dependency不変、cross-scope invariant維持を確認できない場合はcurrent成果物を再読込し責任Skillで再評価する。
 29. shared mutable resourceはisolationを第一選択とし、分離できない場合は既存外部reservation、atomic CAS付きproject-local reservation、blockの順で扱う。単なるpolicyやreservation fileの存在確認を排他保証にしない。
-30. knowledge lifecycleの意味上の責任主体と、entry revision / CAS要件を満たすknowledgeの物理保存形式だけは追加リサーチで確定する。`qa-workflow`へknowledgeのdomain判断を持たせない。
+30. knowledge lifecycleは`qa-knowledge`が担当する。`qa-workflow`はknowledgeのdomain判断を持たず、複数Skillが必要な要求のrouting / workflow stateだけを担当する。
+31. knowledge persistenceはproject contextから発見できるfixed root配下の1 entry = 1 independently versioned artifactとする。単一project knowledge artifact、central manifest、global mutable ID counterは採用しない。
+32. knowledge entryはartifact自身のrevision tokenでCASし、same-entry conflictをsemantic auto-mergeしない。通常の再検証 / 更新はsame entryのnew revision、semantic identity変更時だけreplacementとする。
 
 ## 対象外
 
@@ -134,6 +148,9 @@ defect fix
 - `qa-workflow`へRegression固有の意味判断を追加すること
 - QA全体を新しいGraphへ移すこと
 - Graph DBを前提としたknowledge management
+- 単一の巨大なproject knowledge artifact
+- knowledge central manifest / global mutable ID counter
+- 汎用knowledge storage adapter
 - workflowを1件だけ実行できる中央queue / schedulerの新設
 - shared resource向けlock / lease方式の先行固定
 - Graph DB / query server / web UI
