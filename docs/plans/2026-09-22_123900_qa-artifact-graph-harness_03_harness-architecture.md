@@ -196,3 +196,65 @@ state値は既存`qa-workflow`語彙を再利用します。
 persistするSuite metadata / Activity machine blockには必要なschema versionを持たせます。
 
 relation indexを実装しない限りGraph schema versionやrelation schema versionを追加しません。
+
+## 12. workflow identity / concurrency validator
+
+複数workflowを同時進行できる前提で、workflow state / persisted artifactの機械検査を追加します。
+
+確認対象:
+
+- workflow_refが存在し、同一workflow内で不変
+- workflow stateがworkflowごとに独立している
+- started source refs / revisionsを保持している
+- persisted updateが読み込み時revisionを保持している
+- 保存時revision conflictを検出している
+- conflict後に古い内容を上書きしていない
+- scopeがdisjointと決定論的に確認できないsemantic updateを自動mergeしていない
+- latest current state向けの完了判定前に依存revision / fingerprintを再確認している
+
+workflow_refの採番規則はruntimeが生成し、LLMが一意性を手計算しません。具体形式は実装時に既存runtime / portability制約を確認して決定します。
+
+## 13. knowledge artifact validator
+
+継続利用するQA知識成果物を実装する場合、最低限次を検査します。
+
+- stable entry ref一意性
+- 種別の許可値
+- source refs / revisions
+- 適用scope
+- environment / version条件
+- 状態: 有効 / 要再検証 / 置換済み
+- 置換済みentryの置換先
+- 有効entryに未解決sourceがない
+- secret実値を保存していない
+- 既存正本へ属する内容を第二のAuthority / Risk / TCとして再定義していない
+
+knowledge rootからcurrent entryをdeterministicに列挙できることを必須にします。
+
+relation indexは不要です。
+
+## 14. cross-workflow currentness
+
+workflow Aが参照したMachine Entity / artifactをworkflow Bが更新した場合、PR #11のdependency / content fingerprintを優先して影響を判定します。
+
+- historical Activity / execution / Sessionは変更しない
+- Aが進行中なら、Aがlatest current stateに対して完了を主張する前に影響scopeを再確認する
+- dependency変更がAの判断へ影響する場合、該当scopeを要再検証へ戻す
+- dependencyが無関係ならA全体を再実行しない
+- dependencyを解決できない場合はcurrent完了を安全側にblockする
+
+この検査を成立させるためだけの中央workflow databaseは追加しません。
+
+## 15. shared environment / resource coordination
+
+test user / tenant / test data / external account等の共有mutable resourceは、Activity / Session / executionから参照できる形にします。
+
+最低限の検査:
+
+- shared mutable resourceを利用する場合、resource refまたは再現可能な識別条件がある
+- isolationが確認済みか、project policy上の直列化 / block条件がある
+- policy不明で他workflowへの影響を否定できない場合に並行実行していない
+- cleanup対象が当該workflow / Activityの所有範囲へ限定されている
+- 別workflowのresourceをcleanupしていない
+
+reservation / lease / lockの具体方式は実装前リサーチで決定します。必要性未確認のlock serviceは追加しません。
