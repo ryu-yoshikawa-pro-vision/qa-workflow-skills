@@ -8,13 +8,13 @@
 | `test-analysis` | 継続Regression対象判断、selected scope判断 |
 | `test-case-design` | current logical TC |
 | `coverage-analysis` | Regression対象範囲coverage、TC → E2E実装coverage |
-| `test-target-inspection` | target snapshot |
+| `test-target-inspection` | currentな実対象情報 / UI / 既知範囲のふるまい収集 |
 | `test-execution` | manual相当execution / result / evidence |
 | `e2e-test-implementation` | testware |
 | `e2e-test-execution` | E2E execution / result / evidence |
 | `e2e-test-result-analysis` | E2E failure分析 |
-| `qa-workflow` | Suite見直し、activity、routing、history discovery |
-| `exploratory-testing` | Exploration / Investigation |
+| `qa-workflow` | initial baseline、Suite見直し、Activity lifecycle、routing、history discovery |
+| `exploratory-testing` | Exploration / 仮説駆動Investigation |
 
 ## 2. PR #11
 
@@ -30,18 +30,40 @@ PR #11を次の正本とします。
 PR #13で行いません。
 
 - design impact再計算
-- Graph独自currentness
+- 独自currentness / membership freshness state
 - Machine Entity再生成
 - Graph目的のfingerprint拡張
 - current / deleted / superseded相当の独自判定
 
-Regression SuiteはPR #11のcurrent TC / lifecycleを参照します。
+PR #11がproject-wide artifact discoveryを保証するとは仮定しません。merge後の実装でcanonical inventoryが提供されていれば利用し、なければproject contextの既存QA成果物をdiscovery rootとして利用します。
 
-## 3. PR #12 / E2E
+## 3. project context
+
+既存`skills/qa-workflow/assets/project-context-template.md`を拡張します。
+
+既存欄を正本として再利用:
+
+- §3 テスト範囲
+- §8 非機能テスト範囲
+- §11 対象外
+- §14 既存QA成果物
+
+新規に追加するのは、既存欄で表現できない案件固有Regression方針だけです。
+
+- 既定Run scope / selection方針（必要な案件だけ）
+- TCなしE2E等の補助Regression testware refs（必要な案件だけ）
+
+対象機能、role、業務フロー等をRegression専用欄へ複製しません。
+
+project context artifact ref / revisionをActivityへ保存し、後日のproject context更新後も当時の判断入力を特定できるようにします。
+
+## 4. PR #12 / E2E
 
 ### test-target-inspection
 
-target snapshotの正本として利用します。実測挙動をspecificationへ自動昇格しません。
+currentな実対象情報、UI構造、既知範囲のふるまい確認を担当します。
+
+「現在どうなっているか」を収集・更新する依頼を`exploratory-testing(mode=investigation)`へ送らないようにします。
 
 ### test-execution
 
@@ -51,7 +73,7 @@ target snapshotの正本として利用します。実測挙動をspecification�
 - 再実行は別execution
 - secret実値を別成果物へ複製しない
 
-Regression activityにはexecution refだけを保持し、PR #12のsnapshot内容を複製しません。
+Regression Activityにはexecution refだけを保持し、TC snapshot内容を複製しません。
 
 ### E2E
 
@@ -59,7 +81,9 @@ TCあり / TCなしの既存経路を維持します。
 
 TCなしE2EへSuite都合でTCを創作しません。
 
-## 4. exploratory-testing
+Regression参加はuser明示またはproject contextの補助testware方針に限定します。
+
+## 5. exploratory-testing
 
 ### 目的
 
@@ -70,19 +94,17 @@ TCなしE2EへSuite都合でTCを創作しません。
 - `exploration`
 - `investigation`
 
-### 必須入力
+### routing
 
-exploration:
+`investigation`は、既存責任Skillがなく、未確定問題について実対象を操作しながら仮説検証する場合だけ使用します。
 
-- 対象 / 入口
-- charter objective
-- scope / non-scope
-- 許可origin
-- 副作用scope
-- 終了条件またはtimebox
-- evidence制約
+優先:
 
-investigationでは加えて、対象Finding / Question / symptomと確認したい仮説を扱います。
+- currentなUI / ふるまい情報収集 → `test-target-inspection`
+- 既知TC実行 → `test-execution` / `e2e-test-execution`
+- E2E failure → `e2e-test-result-analysis`
+- 仕様不明 → `question-analysis`
+- coverage gap → `coverage-analysis` / `test-analysis`
 
 ### browser safety
 
@@ -100,23 +122,21 @@ PR #12のPlaywright実行基盤、安全境界、secret保護、side-effect / cl
 
 Findingを自動Defect化せず、実測を仕様Authorityへ昇格しません。
 
-## 5. Regression専用Skillを追加しない理由
+## 6. Regression専用Skillを追加しない理由
 
 Regression固有処理は既存責務で分割できます。
 
-- 継続Regression対象判断 → `test-analysis`
+- membership意味判断 → `test-analysis`
 - design impact → PR #11
 - coverage → `coverage-analysis`
-- Suite bookkeeping / Run routing → `qa-workflow`
+- initial baseline / Suite bookkeeping / Run routing / Activity lifecycle → `qa-workflow`
 - manual execution → `test-execution`
 - E2E execution → `e2e-test-execution`
 - failure analysis → 既存analysis Skill
 
 新しい`regression-testing` Skillは追加しません。
 
-## 6. coverage-analysis拡張
-
-新しい確認対象としてRegression Suiteを扱います。
+## 7. coverage-analysis拡張
 
 確認すること:
 
@@ -125,14 +145,13 @@ Regression固有処理は既存責務で分割できます。
 - stale / `要再検証`のTCをcurrent coverageとして数えない
 - selected Runでは指定scope / Riskへ意味上閉じている
 - TC → E2E実装について、E2E存在だけで十分と判定しない
+- one-off TCをSuiteから外す場合、その検証責務自体がcurrent Regression対象範囲外であることを確認する
 
 feature tag不存在をcoverage gapにしません。
 
-## 7. test-analysis拡張
+## 8. test-analysis拡張
 
-既存責務の範囲で次を扱います。
-
-### 新規・改修時
+### membership
 
 current TCが継続Regression対象か、一時的な検証かを判断します。
 
@@ -140,19 +159,21 @@ current TCが継続Regression対象か、一時的な検証かを判断します
 
 - current test objective
 - Product Risk
-- current scope
+- current Regression対象範囲
 - 将来の変更後にも同じ検証責務を繰り返す意味があるか
-- 一回限りのmigration / 調査等か
+- one-off migration / 調査等か
+
+membership sourceの変更時は影響TCを再評価します。
 
 ### selected Regression
 
 入力:
 
-- Suite snapshot
+- baseline snapshot
 - user / project policy scope
 - PR #11 impact result
 - Product Risk
-- 明示relationで接続された過去FAIL / Finding
+- explicit relationで接続された過去FAIL / Finding
 
 出力:
 
@@ -162,27 +183,26 @@ current TCが継続Regression対象か、一時的な検証かを判断します
 - rationale
 - residual risk
 
-full Runではscope selectionを行いません。
+selectionに実際に使ったinput artifact refs / revisionsをActivityへ渡します。
 
-## 8. qa-workflow拡張
+## 9. qa-workflow拡張
 
 追加責務:
 
-- 各新規・改修完了時のSuite見直しを起動する
+- 初回baseline reconciliationを起動する
+- TC / scope / membership source変更時に必要範囲の再評価を起動する
 - membership判断結果を反映する
-- user指定 → project policy → full fallbackの順でRun scopeをroutingする
-- Regression activity artifactを作成する
-- execution routeの担当Skillへ接続する
-- Exploration / Investigation activityを記録する
-- 固定保存場所または必要時の最小indexからpast activityを発見する
+- user指定 → project policy → full fallbackでRun scopeをroutingする
+- required execution routesを担当Skillへ接続する
+- Activity stateを既存workflow state語彙で管理する
+- scope / snapshot不変の再開と、変更時の別activity / versionを分ける
+- project context / fixed root / 必要時indexからpast activityを発見する
 - candidate query不完全時に安全側へroutingする
 
 `qa-workflow`自身はmembershipの意味判断、Risk、coverage、E2E sufficiencyを再判定しません。
 
-## 9. Portability
+## 10. Portability
 
-各既存Skillは単体利用時にRegression Suite / relation indexを必須にしません。
-
-統合workflowでのみSuite / Activityを利用します。
+各既存Skillは単体利用時にRegression Suite / Activity / relation indexを必須にしません。
 
 relation indexが実装されない場合でも、Regression / Exploration / Investigation workflowが成立することを必須条件にします。
