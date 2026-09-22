@@ -9,7 +9,7 @@
 - baseline / Run selection / historyの単独要求は`regression-testing`へroutingされる
 - executionまで含むRegression要求は`qa-workflow`がオーケストレーションする
 - Exploration / Investigationは`exploratory-testing`へ正しくroutingされる
-- ConfirmationとRegressionを別目的として組み合わせられる
+- 修正確認を独立Skill化せず既存analysis / design / executionで実施し、必要なRegressionを別目的として組み合わせられる
 - `qa-workflow`がRegression固有判断を再実装しない
 
 ### deterministic
@@ -49,9 +49,9 @@
 - initial baselineの中断 / resume
 - stale baseline → Run前reconciliation
 - full / selected Regression
-- Confirmation + Regression
+- 修正確認 + Regression
 - manual / E2E / partial automation
-- FAIL → analysis / investigation → fix → Confirmation → rerun
+- FAIL → analysis / investigation → fix → 既存TC再実行による修正確認 → rerun
 - Exploration → Finding → design flow → baseline reconciliation
 - Activity block / resume / complete / history
 
@@ -79,7 +79,7 @@ negative:
 
 ### 複合workflow
 
-- 「不具合修正が直ったか確認して、周辺Regressionもして」→ Confirmation execution + `regression-testing`
+- 「不具合修正が直ったか確認して、周辺Regressionもして」→ currentな既存TCがあればexecutionへ直接。設計不足があれば必要な既存analysis / designを経由し、その後`regression-testing`
 - 「今回の変更をRegressionして、追加で探索的にも確認して」→ Regression + Exploration
 - baseline / Run planningだけなら`regression-testing`単体利用を許可
 - actual executionを含む場合は`qa-workflow`が全体を追跡
@@ -164,12 +164,13 @@ negative:
 - auxiliary countをTC countと分離
 - TC-based coverageへ算入しない
 
-### Confirmation
+### 修正確認 intent
 
-- known failing manual TC → `test-execution`
-- known failing E2E → `e2e-test-execution`
-- Confirmation PASSだけでRegression不要としない
-- 既知TCがない場合は必要なdesign Skillで期待結果 / TCを確定してから実行
+- currentなknown failing manual TCがある → analysis / designを再実行せず`test-execution`
+- currentなknown failing E2Eがある → analysis / designを再実行せず`e2e-test-execution`
+- 期待結果 / 再現条件 / current TCが不足する → 必要な最も早い既存analysis / design Skillで不足分だけ更新してからexecution
+- 修正確認専用Skill / artifact / stateを生成しない
+- 修正確認PASSだけでRegression不要としない
 
 ### Regression FAIL feedback
 
@@ -178,7 +179,7 @@ negative:
 - current実対象情報不足 → `test-target-inspection`
 - TC問題 → `test-case-design`
 - owner不明の仮説調査 → `exploratory-testing | investigation`
-- fix後 → Confirmation
+- fix後 → currentな既存TC再実行による修正確認
 - QA成果物 / baseline入力変更 → membership / Run scope再評価
 - FAIL / Findingを自動Defect化しない
 
@@ -298,12 +299,12 @@ CIへ外部APIを追加しません。
 - source result投影
 - Activity lifecycle / history
 
-### Step 5: Confirmation / FAIL feedback
+### Step 5: 修正確認routing / FAIL feedback
 
-- Confirmation routing
+- 既存TC再利用とanalysis / design省略条件
 - E2E failure analysis
 - manual FAIL owner routing
-- fix → Confirmation → rerun / baseline再評価
+- fix → 修正確認 → rerun / baseline再評価
 
 ### Step 6: exploratory-testing
 
@@ -324,7 +325,7 @@ CIへ外部APIを追加しません。
 → FAIL / Finding
 → analysis / investigation
 → fix
-→ Confirmation
+→ 既存TC再実行による修正確認
 → 必要なRegression
 ```
 
@@ -347,7 +348,8 @@ direct ref + deterministic scanで不足を実測した場合だけ、必要quer
 ## 6. 実装時に避けること
 
 - 主要workflow入口を排他的なQA taxonomyとして扱う
-- ConfirmationをRegressionと同一視する
+- 修正確認を独立Skill / 独立artifactとして実装する
+- 修正確認をRegressionと同一視する
 - `test-analysis`の既存回帰影響候補triggerを`regression-testing`へ移す
 - `qa-workflow`へRegression固有意味判断を追加する
 - standalone設計依頼でRegression baseline構築を強制する
@@ -367,7 +369,7 @@ direct ref + deterministic scanで不足を実測した場合だけ、必要quer
 ## 7. 完了条件
 
 - 主要workflow入口を組み合わせてQAを実施できる
-- ConfirmationとRegressionが区別されている
+- 修正確認がworkflow intentとして既存Skillで実施され、専用Skill / artifact / stateを作らずRegressionと区別されている
 - `test-analysis` impact分析と`regression-testing` Run selectionが競合しない
 - `regression-testing`単体要求とend-to-end Regressionが区別される
 - 新規・改修後のhandoffとRun前currentnessの両方で古いbaseline利用を防げる
@@ -378,7 +380,7 @@ direct ref + deterministic scanで不足を実測した場合だけ、必要quer
 - actual startに基づきexecutedを判定できる
 - source resultをActivity historyから確認できる
 - residual riskがexisting Riskを再採点しない
-- Regression FAIL → analysis / investigation → fix → Confirmation → rerunが閉じる
+- Regression FAIL → analysis / investigation → fix → 既存TC再実行による修正確認 → rerunが閉じる
 - `exploratory-testing`の入力 / lifecycle / output / safety契約が実装可能な粒度で固定されている
 - workflow state validatorが新2 Skill / multi-use targetを扱える
 - relation indexなしで主workflowが成立する
