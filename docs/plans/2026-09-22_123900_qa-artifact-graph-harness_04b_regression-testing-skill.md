@@ -36,7 +36,7 @@ manual / E2E実行まで含むend-to-end要求:
 - current UIの事実収集
 - 既知TCの実操作そのもの
 - E2E failure原因分析
-- Confirmation executionそのもの
+- 修正確認のためのexecutionそのもの
 - Exploratory Testing
 
 ## 3. qa-workflowの対象 / 実行範囲
@@ -282,17 +282,19 @@ execution結果に追加対応が必要なら`qa-workflow`へ戻します。
 - coverage gap → `coverage-analysis`
 - owner不明の実対象仮説調査 → `exploratory-testing(mode=investigation)`
 
-修正後はConfirmation executionを行い、QA成果物やbaseline入力が変わった場合はmembership / Run scopeを再評価します。
+修正後は、currentな既存TCが使えるならそのTCをexecution Skillで直接再実行して修正確認します。期待結果やTCの更新が必要な場合だけ`qa-workflow`が既存analysis / design Skillへ戻します。QA成果物やbaseline入力が変わった場合はmembership / Run scopeを再評価します。
 
 Finding / FAILを自動Defect化しません。
 
-## 17. Confirmation Testingとの関係
+## 17. 修正確認との関係
 
-Confirmationは`regression-testing`の内部modeにしません。
+修正確認は`regression-testing`の内部modeでも独立Skillでもありません。`qa-workflow`が扱うテスト目的として、既存Skillを再利用します。
 
-既知のFAIL / 再現TCを`test-execution` / `e2e-test-execution`で再実行します。
+- currentな既存FAIL / 再現TCがある → analysis / designを再実行せず`test-execution` / `e2e-test-execution`へrouting
+- 期待結果、再現条件、current TCが不足する → 必要な最も早い既存analysis / design Skillへroutingし、current TCを確定してからexecution
+- 周辺影響も確認する → 別途`regression-testing`でRegression Runを計画
 
-Confirmation後に周辺影響を確認する必要があれば、別途`regression-testing`でRegression Runを計画します。
+修正確認専用のartifact、state、selection、history管理は追加しません。
 
 ## 18. TCなしE2E
 
@@ -346,7 +348,7 @@ Regression運用中のprojectまたはユーザーがRegression資産更新を�
 - PR #11 impact / freshness再計算
 - browser操作
 - E2E failure原因分析
-- Confirmation executionそのもの
+- 修正確認のためのexecutionそのもの
 - generic Exploration / Investigation
 - Defect reportの生成・登録
 - Graphを前提にした履歴管理
