@@ -478,12 +478,13 @@ assignment / tuple / sequence / pathのhash対象はIDや表示文ではなく�
 
 #### `traceability.py`
 
-- required: `nodes[]`, `edges[]`, `dispositions[]`, `runtime_units[]`, `current_entities[]`, `current_runtime_units[]`, `expected_runtime_units[]`, `expected_entities[]`, `unsupported_item_closures[]`
+- required: `analysis_scopes[]`, `nodes[]`, `edges[]`, `dispositions[]`, `runtime_units[]`, `current_entities[]`, `current_runtime_units[]`, `unsupported_item_closures[]`
 - node: `{node_key, node_type}`。node_typeは`Authority / Risk / TR / TCN / CI / TC`
 - edge: `{from, to}`。from / toは既知nodeで、§23の許可直接edgeだけを認める
 - disposition: `{upstream_entity:{skill, entity_type, entity_ref, content_fingerprint}, handling, reason, authority_refs[], covered_by_entity}`。handlingは対象上流型に対して既存担当Skillが許可するDisposition集合だけを認め、必要なreason / Authority / covered_by_entityを検証する
-- `runtime_units / current_entities / current_runtime_units / unsupported_item_closures`のrow schemaとfreshness / closure規則は`workflow_runtime.py`と共通化する。`traceability.py`の`expected_runtime_units[] / expected_entities[]`はcoverage-analysis呼出し前に同じ`runtime_contract.py`固定builderから生成して渡すが、`workflow_runtime.py`はこれらの配列を入力として信頼せずcanonical workflow scopeから独立に再導出する。materialize runtime unitの`model_completion[] / target_mappings[] / target_dispositions[]`は同じcurrent resultから受け取る
-- `coverage-analysis::artifact:traceability:all`自身と`qa-workflow::artifact:workflow_runtime:all`は`runtime_units[] / current_runtime_units[] / expected_runtime_units[]`のすべてから除外する。いずれかが含まれていた場合は`invalid_input`とし、traceability → workflow_runtime → traceabilityのcycleを作らない
+- `analysis_scopes[]`は`coverage-analysis`が既存契約の「分析モードと対象範囲」を意味判断して正規化したSkill実行単位で、row schemaは`{skill, target, execution_range, input_mode, normalized_input, current_structure_state}`とする。`target / execution_range`は既存Skillの正規値、単一用途Skillではnullを許可する。`normalized_input`はそのscopeで使うcanonical normalized input、`current_structure_state`は必要な場合だけcurrent structure / materialize resultから`runtime_contract.py`固定projectionしたmachine stateとする。Agent / LLMはexpected identity一覧をここへ埋め込まない
+- `runtime_units / current_entities / current_runtime_units / unsupported_item_closures`のrow schemaとfreshness / closure規則は`workflow_runtime.py`と共通化する。`traceability.py`は各`analysis_scopes[]` rowから同じ`runtime_contract.py` fixed builderを呼んで`expected_runtime_units[] / expected_entities[]`を内部導出し、inputとして完成済みexpected配列を受け取らない。actual runtime / Entity集合からexpectedを逆算しない。materialize runtime unitの`model_completion[] / target_mappings[] / target_dispositions[]`は同じcurrent resultから受け取る
+- `coverage-analysis::artifact:traceability:all`自身と`qa-workflow::artifact:workflow_runtime:all`は`runtime_units[] / current_runtime_units[]`と内部導出する`expected_runtime_units[]`のすべてから除外する。いずれかに含まれていた場合は`invalid_input`とし、traceability → workflow_runtime → traceabilityのcycleを作らない
 - `traceability.py`は各Skillの同一内容`runtime_contract.py`にある共通freshness評価関数を呼び、`runtime_freshness[] / entity_freshness[]`を決定論的に算出する。workflow_runtime resultを入力へ渡さず、self/cycle dependencyを作らない
 - stale分析では`entity_freshness[]: {skill, entity_type, entity_ref, model_key, freshness_status, stale_reasons[]}`を正本にし、stale Entityがcurrentな下流で閉鎖済みと誤判定しない
 

@@ -410,6 +410,7 @@ runtime対象の次の6 Skillを単体コピーして代表scriptを実行しま
 
 ### `coverage-analysis`
 
+- 既存の分析モードと対象範囲をcanonical `analysis_scopes[]`へ正規化し、`traceability.py`が同じ`runtime_contract.py` fixed builderでexpected runtime / Entity集合を内部導出する。完成済みexpected配列をAgent / LLMから渡さない
 - `assets/output-template.md`へ`Machine Runtime Input / Result`を追加
 - `assets/output-template.md`のカバレッジ基準確認・カバレッジ項目の扱い・陳腐化 / 孤立分析へ`Model Key`列を追加
 - stale / fingerprint / test-design traceability
@@ -432,7 +433,7 @@ runtime対象の次の6 Skillを単体コピーして代表scriptを実行しま
 - 既存Skill状態表の「必要な場合だけ使用」を維持し、状態表示時だけ別表`runtime状態`を追加
 - model単位状態を成果物metadataから再構築
 - legacy昇格。structure / materialize scriptの初回legacy seed入力とnormal previous stateへの移行まで含む
-- standalone最終出力では`runtime_contract.py verify_runtime_evidence`へcurrent Skillのcanonical normalized inputとcandidate artifactだけを渡し、必須root runtimeを先に、current parent resultから条件付きdownstream runtimeを後に導出して必須runtime block pairをproduction側から検査する。完成済みexpected集合やdispatch stateをAgent / LLMから受けない。Skill / 対象 / 条件 / `model_type → generator`のdispatch metadataは同一`runtime_contract.py`内の固定dataを正本にし、別manifest / registryを追加しない
+- standalone最終出力では`runtime_contract.py verify_runtime_evidence`へcurrent Skillのcanonical normalized inputとcandidate artifactを渡し、partial rerunの場合だけ同一成果物系列の直前artifact全文を`previous_artifact_markdown`として渡す。必須root runtimeを先に、current parent resultから条件付きdownstream runtimeを後に導出し、Machine Entityはcurrent scopeと前回artifactから固定抽出したscope外carry-forward集合からexpectedを導出してproduction側から完全性を検査する。完成済みexpected集合、dispatch state、手組みのprevious Entity配列をAgent / LLMから受けない。Skill / 対象 / 条件 / `model_type → generator`のdispatch metadataは同一`runtime_contract.py`内の固定dataを正本にし、別manifest / registryを追加しない
 - upstream Entity別content fingerprint / Machine Entityの`upstream_entity_dependencies[] / runtime_dependencies[]` / upstream runtime dependency / stale伝播
 - `traceability.py`と同じ`runtime_contract.py` freshness関数を使用し、workflow_runtime resultをtraceabilityの依存入力にしない
 - `workflow_runtime.py`の`can_complete`は本Planruntime範囲の必要条件として扱い、既存`qa-workflow`全体の完了条件を置換しない

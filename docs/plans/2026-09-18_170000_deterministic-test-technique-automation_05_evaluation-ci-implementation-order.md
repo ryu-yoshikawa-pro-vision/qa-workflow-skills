@@ -603,9 +603,9 @@ raw machine-readable入力をfixtureにします。
 ### traceability
 
 - Dispositionはstructure scriptと同じ共通schemaをそのまま受け取り、Markdownから再解釈しない
-- `traceability.py`と`workflow_runtime.py`が同じ`runtime_contract.py` freshness / closure関数と、`runtime_units / current_entities / current_runtime_units / unsupported_item_closures`のrow schemaを使う。traceabilityへ渡すexpected集合は同fixed builder出力、workflow_runtimeはcanonical `workflow_scopes[]`からexpected runtime / Entity集合を内部再導出し、traceability側のexpected配列を信頼しない
+- `traceability.py`と`workflow_runtime.py`が同じ`runtime_contract.py` freshness / closure関数と、`runtime_units / current_entities / current_runtime_units / unsupported_item_closures`のrow schemaを使う。coverage-analysisが意味判断で確定したcanonical `analysis_scopes[]`からtraceability自身がexpected runtime / Entity集合を内部導出し、完成済みexpected配列をinputとして受け取らない。workflow_runtimeもcanonical `workflow_scopes[]`から同様に内部導出する
 - Machine Entityの`upstream_entity_dependencies[] / runtime_dependencies[]`から`entity_freshness[]`を同じ結果として算出し、missing / generation mismatch / dependency cycleを検出する
-- `traceability.py`は`workflow_runtime.py` resultを依存入力にせず、`coverage-analysis::artifact:traceability:all`自身と`qa-workflow::artifact:workflow_runtime:all`を`runtime_units[] / current_runtime_units[] / expected_runtime_units[]`へ含めない。`workflow_runtime.py`ではcanonical `workflow_scopes[]`に選択済みの本Planruntime scopeがある場合にroot期待unitを内部導出し、root unit欠落、current structure stateから導出されるmodel / child runtime欠落、Machine Entity欠落を検出する。E2E-only scopeではdispatchしない。いずれかのself inclusionを`invalid_input`として回帰検出する
+- `traceability.py`は`workflow_runtime.py` resultを依存入力にせず、`coverage-analysis::artifact:traceability:all`自身と`qa-workflow::artifact:workflow_runtime:all`を`runtime_units[] / current_runtime_units[]`と内部expected runtime集合へ含めない。正常`analysis_scopes[]`のactual runtime unitまたはMachine Entityを1件削除してもscopeを変えずmissingを検出し、unknown extraも拒否する。`analysis_scopes[]`自体の意味的な対象選択は既存coverage-analysisのsemantic evalで検証する。`workflow_runtime.py`ではcanonical `workflow_scopes[]`から同様にroot / 条件付きruntimeとMachine Entity欠落を検出し、E2E-only scopeではdispatchしない。いずれかのself inclusionを`invalid_input`として回帰検出する
 - Authority / Risk → TRまたはDisposition
 - TR → TCNまたはDisposition
 - TCN → CI → TC、条件付きCIなしTCN → TC、または既存Skill契約で許可されたDisposition。CIなし経路はactive Coverage所有modelが0件のTCNだけ許可し、Coverage所有modelがあるTCNではmodel単位のcurrent CI / closureを先に必須とする
