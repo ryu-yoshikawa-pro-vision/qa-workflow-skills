@@ -2,17 +2,16 @@
 
 ## 1. 実装場所
 
-Graph Harnessは新しいuser-facing Skillにせず、`qa-workflow`の決定論的補助runtimeとして実装します。
+Harnessは新しいuser-facing Skillにせず、`qa-workflow`の決定論的補助runtimeとして実装します。
 
 予定:
 
 ```text
 skills/qa-workflow/
-├── SKILL.md
-├── references/
-│   └── ...
 ├── assets/
-│   ├── ...
+│   ├── regression-suite-template.md
+│   ├── qa-activity-template.md
+│   ├── qa-activity-index-template.md
 │   └── qa-graph-source-manifest-template.json
 └── scripts/
     └── qa_graph/
@@ -25,10 +24,12 @@ skills/qa-workflow/
             ├── machine_entities.py
             ├── test_execution.py
             ├── e2e_execution.py
+            ├── regression_suite.py
+            ├── qa_activity.py
             └── exploratory_testing.py
 ```
 
-ファイル数は実装時に責務が小さい場合は統合してよく、上記構成を増やすこと自体を目的にしません。
+PR #11側の各SkillごとにGraph adapterを重複実装せず、Machine Entity / canonical traceabilityを設計側の共通入力境界にします。
 
 ## 2. CLI
 
@@ -42,59 +43,48 @@ operation:
 
 - `build`
 - `validate`
-- `impact`
+- `query`
 - `activity-view`
-- `coverage-view`
+- `regression-suite-view`
 
-別CLIを増やしません。
+`coverage-view`は追加しません。設計coverageは`coverage-analysis` / PR #11 traceabilityを正本とし、Regression実行のselected-but-not-executed等はactivity / suite validatorで検査します。
 
-## 3. source manifest
+## 3. source manifest / activity index
 
-Graph Harnessはrepoや外部保存先を無制限crawlしません。
+source manifestは**今回のbuild input一覧**に限定します。正本や汎用artifact registryにしません。
 
-qa-workflowが今回利用する正本成果物をsource manifestへ列挙します。
+qa-workflowは次からmanifestを作ります。
 
-例:
+- project contextのcurrent QA成果物
+- current Regression Suite
+- project-local activity indexが指すRegression / Exploration / Investigation成果物
+- 必要なPR #11 / PR #12 / E2E成果物
 
-```json
-{
-  "schema_version": "qa-artifact-graph-source-v1",
-  "artifacts": [
-    {
-      "artifact_ref": "project://qa/spec-analysis/v3",
-      "skill": "spec-analysis",
-      "path": "/safe/path/spec-analysis.md",
-      "revision": "provided-or-null",
-      "lifecycle": "current"
-    }
-  ]
-}
+過去activityを発見するため、別にproject-localなactivity indexを持ちます。最小項目は次です。
+
+```text
+activity_ref
+activity_type
+artifact_ref / path
+release / version（利用可能な場合）
+completed_at（利用可能な場合）
 ```
 
-規則:
-
-- `artifact_ref`は入力元が既に持つ参照を優先する
-- repo pathを利用する場合はそのpath + refを明示する
-- identityがない外部成果物へhashを新設しない
-- 同一manifest内でartifact_ref重複を拒否
-- secret path / secret valueをmanifestへ入れない
-- lifecycleは`current / historical / superseded`
+activity indexは活動成果物の所在を列挙するだけで、TC、Result、Finding本文や独自lifecycleを複製しません。
 
 ## 4. adapter方針
 
 自由文を汎用LLM parserでGraph化しません。
 
-固定adapterで既知machine-readable情報を読みます。
-
 優先順位:
 
-1. PR #11 merge後のMachine Entity / canonical machine evidence
-2. PR #12 merge後のstructured YAML / fixed result tables / explicit refs
-3. E2E Skillの既存structured result / ID contract
-4. `exploratory-testing`の本Planで追加するmachine-readable activity output
-5. machine-readable情報がない成果物は、既存deterministic parserで安全に一意抽出できる項目だけ
+1. PR #11のMachine Entity / canonical traceability
+2. Regression Suite machine block
+3. PR #12のstructured execution / result
+4. E2E Skillの既存structured result / testware ref
+5. `exploratory-testing` / `qa_activity`のmachine block
 
-一意抽出できない関係はGraph edgeへ推測追加しません。`unresolved_graph_relation`としてissue化できます。
+一意に抽出できないrelationは推測せずissue化し、query結果を`complete=false`にできます。
 
 ## 5. build
 
@@ -138,25 +128,20 @@ LLMはbuild pathへ入りません。
 
 Graph全体をDAGとは仮定しません。`selected_for / executed_in / produced / evidenced_by / resolves`等は活動・履歴を表すため、cycle禁止は仕様→設計→TCの意味上DAGであるedge subsetだけへ限定します。
 
-## 7. impact
+## 7. query
 
-入力:
+`query`は保存済みの明示relationを順方向 / 逆方向へ検索します。
 
-- changed node refs
-- traversal policy（v1は`design-impact`を正規値とし、自由定義しない）
-- max depth（省略時はschema定義）
+主な用途:
 
-`design-impact`のedge方向はGraph contractの固定表だけを使用します。Agentがedge typeごとの順方向 / 逆方向を選択しません。
+- TC → testware → execution history
+- Regression activity → selected TC / testware → execution / result
+- Finding → follow-up artifact
+- PR #11 impact candidate → testware / past activity
 
-出力:
+design impactそのものはPR #11の結果を入力として利用し、Harnessが独自に再計算しません。
 
-- reachable candidates
-- path
-- distance
-- edge chain
-- source activity / artifact refs
-
-Graph Harnessは候補をrisk score順等へ勝手に並べ替えません。riskは既存Product Riskを属性として返せますが、selectionは`test-analysis`の責務です。
+出力には、候補、path、distance、relation chain、source artifact refs、`complete`を含めます。
 
 ## 8. activity-view
 
@@ -174,21 +159,26 @@ Graph Harnessは候補をrisk score順等へ勝手に並べ替えません。ris
 
 Regression、Exploration等の専用DBを作りません。
 
-## 9. coverage-view
+## 9. regression-suite-view
 
-既存`coverage-analysis`を置換しません。
+current Regression Suiteについて次を機械的に表示 / 検査します。
 
-Harnessは機械的な候補だけ返します。
+- feature tag一覧
+- feature tag別member TC
+- untagged member
+- duplicate member
+- current TCへ解決できないmember
+- explicit exclusionと理由
+- suite snapshot revision / source ref
 
-- orphan Test Case
-- Test Requirementから到達不能なTC
-- selected_forされたのにexecutionがない対象
-- Resultにevidence refが必要な契約なのに欠落
-- historical executionしかないTC
-- current Test Caseがdeleted / superseded upstreamだけへ閉じている
-- Findingからfollow-up edgeがない候補
+「各機能が意味上十分にテストされているか」はここで判定せず、`coverage-analysis`を正本とします。
 
-意味上十分なcoverageかは`coverage-analysis`が判定します。
+Regression activityについては別validatorで次を検査します。
+
+- full runがcurrent Suite snapshotの全memberを選択している
+- selected runがsnapshotのsubsetである
+- selected runをfull扱いしていない
+- selected memberにexecutionまたは明示未実行理由がある
 
 ## 10. 再生成性
 
@@ -199,6 +189,12 @@ Graph cacheを正本にしません。
 source変更後は再buildします。
 
 ## 11. Harness version
+
+Graph schema versionとHarness contract versionを持たせます。
+
+repo内実装revisionを識別できる既存commit / source revisionが利用できる場合はそれを使用し、独自の意味Entity fingerprint体系は作りません。
+
+
 
 Graph出力へ次を持たせます。
 
