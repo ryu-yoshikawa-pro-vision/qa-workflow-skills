@@ -214,30 +214,3 @@ Investigation
 → otherwise exploratory-testing(mode=investigation)
 → activity / findings / routing
 ```
-
-
-
-代表routing:
-
-```text
-新規・改修
-→ existing design flow
-→ Graph build/update
-→ execution as requested
-
-Regression
-→ graph impact
-→ test-analysis
-→ coverage-analysis
-→ test-execution / e2e-test-execution
-
-Exploration
-→ exploratory-testing(mode=exploration)
-→ findings
-→ responsible existing Skills
-
-Investigation
-→ responsible analysis Skill if known
-→ otherwise exploratory-testing(mode=investigation)
-→ findings / evidence / routing
-```
