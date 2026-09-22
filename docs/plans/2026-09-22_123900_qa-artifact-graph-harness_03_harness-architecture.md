@@ -4,7 +4,7 @@
 
 補助runtimeは機械判定可能な整合性だけを担当します。
 
-user-facingな意味判断は`regression-testing` / `exploratory-testing`へ残します。
+user-facingな意味判断は`regression-testing` / `exploratory-testing` / `qa-knowledge`へ残します。
 
 必要な処理:
 
@@ -15,6 +15,8 @@ user-facingな意味判断は`regression-testing` / `exploratory-testing`へ残�
 - required execution routeとsource execution stateの整合
 - Activity discovery
 - direct ref + deterministic scan
+- fixed knowledge root discovery / completeness
+- knowledge entry schema / CAS整合
 
 relation index runtimeはgateを通るまで追加しません。
 
@@ -41,6 +43,8 @@ skills/regression-testing/
 既存Skill評価runtimeで表現できるvalidatorは既存の`evals/deterministic/validator.py`を優先し、user-facing runtime用scriptを重複させません。
 
 Exploratory Testing固有契約は`skills/exploratory-testing/`に置き、Regression runtimeへ混在させません。
+
+QA knowledge固有contract / template / validator / discovery helperは`skills/qa-knowledge/`配下を第一候補とし、project-local knowledge本文はSkill package内へ保存しません。project contextから案件側fixed rootを参照します。
 
 ## 3. current TC discovery snapshot
 
@@ -219,10 +223,15 @@ workflow_refの採番規則はruntimeが生成し、LLMが一意性を手計算�
 
 ## 13. knowledge artifact validator
 
-継続利用するQA知識成果物を実装する場合、最低限次を検査します。
+継続利用するQA knowledgeはproject contextから発見するfixed root配下で1 entry = 1 artifactとします。
 
+最低限次を検査します。
+
+- fixed rootを完全列挙できる
+- 1 entry = 1 artifact
 - stable entry ref一意性
-- entry revision / content identity
+- entry artifact自身のstorage revision tokenを取得できる
+- content identityが必要なbackendでは決定論的に計算できる
 - 種別の許可値
 - provenance source refs / revisions
 - currentness dependency refs / revisions
@@ -232,10 +241,12 @@ workflow_refの採番規則はruntimeが生成し、LLMが一意性を手計算�
 - 置換済みentryの置換先
 - 有効entryのcurrentness dependencyがcurrentである
 - 未検証candidateをcurrent knowledge entryとして保存していない
+- same-entry updateがexpected revision付きCASである
+- new entryがcreate-if-absentである
+- knowledge root / repository HEAD変更だけで無関係entryをstaleにしていない
+- central manifest / global mutable ID counterを要求していない
 - secret実値を保存していない
 - 既存正本へ属する内容を第二のAuthority / Risk / TCとして再定義していない
-
-knowledge rootからcurrent entryをdeterministicに列挙できることを必須にします。
 
 relation indexは不要です。
 
