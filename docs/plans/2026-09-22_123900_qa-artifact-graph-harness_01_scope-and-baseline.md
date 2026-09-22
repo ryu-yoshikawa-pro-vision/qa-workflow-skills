@@ -2,19 +2,20 @@
 
 ## 1. 目的
 
-PR #11 / #12後に残る課題を、既存の新規・改修Skillへ責務追加せず解決します。
+PR #11 / #12後に残る課題を、既存の新規・改修SkillへRegression責務を追加せず解決します。
 
-- 新規・改修で作成したcurrent QA成果物を継続Regressionへ接続する
+- current QA成果物を継続Regressionへ接続する
 - Regression固有のbaseline / membership / Runを`regression-testing`へ集約する
-- 現在のRegression対象範囲をSuite自身とは独立したtest basisから確定する
-- project内のcurrent TCを漏れなく発見し、initial baselineとmembership更新を成立させる
-- Regressionごとのselection / execution / residual riskをActivityとして残す
+- Suite自身とは独立したtest basisからRegression対象範囲を扱う
+- project内のcurrent TCを発見し、initial baselineと以後のmembership更新を成立させる
+- 古いbaselineを後日のRunで黙って再利用しない
+- Regressionごとのselection / execution / source result / residual riskを履歴化する
+- Confirmation TestingをRegressionと区別して既存execution Skillへroutingする
 - Exploration / Investigationを`exploratory-testing`として独立させる
-- release / sessionを跨いで過去Activityを欠落なく発見する
 
-次はPR #13で再実装しません。
+PR #13で再実装しないもの:
 
-- 新規・改修の仕様分析 / Risk分析 / TC設計
+- 新規・改修の仕様分析 / Product Risk分析 / TC設計
 - SPEC → TR → TCN → CI → TCのdesign traceability
 - design change impact
 - freshness / stale / `要再検証`
@@ -23,7 +24,7 @@ PR #11 / #12後に残る課題を、既存の新規・改修Skillへ責務追加
 
 ## 2. 新規・改修とRegressionの境界
 
-既存の新規・改修flowは変更しません。
+既存flowはcurrentなQA設計を作ります。
 
 ```text
 current仕様
@@ -34,49 +35,100 @@ current仕様
 → coverage-analysis
 ```
 
-このflowが生成するcurrent成果物を`regression-testing`が参照します。
+`test-analysis`が扱う「回帰影響候補」は変更・Risk分析の一部です。
 
-既存Skillへ次を追加しません。
+```text
+変更影響候補 / Product Risk
+→ test-analysis
 
-- Regression membership判断
-- Regression baseline管理
-- full / selected Regression選定
-- Regression Activity管理
-- Regression Run完了判定
+既存Regression baselineから今回実行するTCを確定
+→ regression-testing
+```
 
-新規・改修でTC / Risk / scope等が変わった場合、`qa-workflow`は変更済み成果物を`regression-testing`の再評価入力としてroutingします。
+この境界をtrigger / semantic evalでも維持します。
 
-## 3. 実装開始時の確認
+## 3. 新規・改修からRegressionへのhandoff
 
-PR #11 / #12 merge後に次を確認します。
+既存設計Skill自身はSuiteを更新しません。
 
-1. latest `main`のMachine Entity、traceability、change impact、freshness、execution、rerun契約を取得する。
-2. PR #11のcurrent TC identity / lifecycleとproject-wide artifact discoveryを分けて確認する。
-3. project contextの「既存QA成果物」またはPR #11側のcanonical inventoryからauthoritative TC sourceを決定論的に列挙できるか確認する。
-4. discovery sourceからcurrent TCを抽出し、PR #11 lifecycleでcurrent / deleted / superseded相当を解決できるか確認する。
-5. source登録漏れを検出できない場合、project-wide current TC集合をcompleteとみなさない。
-6. TC → current E2E testware、execution → TC snapshot / target version / previous executionを確認する。
-7. Activityを固定project-relative rootから列挙できるか確認する。
-8. relation index前にdirect ref + deterministic scanで必要queryを回答できるか確認する。
+次のいずれかを満たすworkflowでは、`qa-workflow`が変更成果物を`regression-testing`へhandoffします。
 
-## 4. initial baseline
+- projectでcurrent Regression baseline / policyを運用している
+- ユーザーがRegression資産の更新まで要求している
+- end-to-end QA workflowとしてRegressionまで要求されている
 
-初回利用時は増分更新から始めません。
+membership判断入力に影響する変更:
+
+- TC lifecycle / content
+- Regression対象範囲
+- project contextのRegression方針
+- relevant Product Risk / test objective
+- one-off / 対象外判断の根拠
+
+これらが変わった場合、`qa-workflow`上の`regression-testing | baseline / membership`を`要再検証`として扱い、次回Run開始前までにreconciliationを必須とします。
+
+設計成果物の完成とRegression reconciliationの完成は分離できます。単体Skill利用でRegression更新を強制しません。ただしbaseline運用中のprojectで古いbaselineをcurrent扱いしません。
+
+E2E mappingの変更は通常membership変更ではなくrequired execution route再評価要因です。TCの意味やRegression対象範囲自体が変わらない限り、mapping変更だけでmembershipを変えません。
+
+## 4. Run開始時のbaseline currentness確認
+
+handoff漏れや別sessionの変更があっても古いbaselineでRunを開始しないよう、各Runのsnapshot確定前に次を現在値と照合します。
+
+- baselineが参照するauthoritative TC discovery snapshot / source revisions
+- project context ref / revision
+- current Regression対象範囲
+- membership判断に使用したRisk / test objective等のsource refs / revisions
+- PR #11のcurrent TC lifecycle / change impact / `要再検証`状態
+
+差分があれば、PR #11 impact / traceabilityで安全に限定できる範囲をreconcileします。限定できない場合はcurrent TC全体を再確認します。
+
+baseline currentnessを確認できない場合、Run scopeをfullと呼んで開始しません。
+
+## 5. initial baseline
+
+初回利用時は増分更新から開始しません。
+
+最初にauthoritative discovery snapshotを固定します。
 
 ```text
 current Regression対象範囲
-→ authoritative TC discovery
-→ 全current TC
-→ regression-testingによるmembership判断
-→ Regression baseline
-→ coverage-analysisによる閉鎖確認
+→ authoritative TC discovery roots
+→ source revisionを含むdiscovery snapshot
+→ current TC candidate集合
+→ membership判断
+→ baseline
+→ coverage-analysis
 ```
 
-このreconciliationが完了するまでbaselineをcompleteとして扱いません。
+### 中断・再開
 
-専用migration Skillは追加しません。
+TC数が1回の処理量を超える場合、同じdiscovery snapshotをdeterministicな順序で複数batchへ分割できます。
 
-## 5. Regression対象範囲
+最低契約:
+
+- discovery snapshot自体を途中で差し替えない
+- 判定済み / 未判定TC refを区別する
+- 未判定TCが1件でも残る間は`complete=false`
+- resumeは同じdiscovery snapshotから続行する
+- snapshot sourceが変更された場合は旧baseline作業を履歴として閉じ、新しいsnapshotで再評価する
+
+専用migration Skillやqueue frameworkは追加しません。
+
+### legacy / 不完全TC
+
+次を別々に判定します。
+
+1. authoritative sourceからTCを発見できたか
+2. PR #11上でcurrent / deleted / superseded相当を解決できるか
+3. membershipを判断できるか
+4. current Regression test basisからcoverageが閉じるか
+
+TCを発見済みでもPR #11 lifecycleへ解決できない場合、discovery欠落とは扱いませんがcomplete baselineは成立させません。`regression-testing`がTCを独自修復せず、PR #11側のlegacy昇格または該当design Skillへroutingし、正規化後に再評価します。
+
+traceability不足でcoverageが閉じない場合はcoverage gapとして扱い、inventory欠落と混同しません。
+
+## 6. Regression対象範囲
 
 既存`project-context-template.md`を再利用します。
 
@@ -92,15 +144,15 @@ current Regression対象範囲
 
 対象機能、role、業務フロー等をRegression専用欄へ複製しません。
 
-`regression-testing`はproject context、current仕様、Risk等を入力として利用しますが、それらを再分析しません。
+`regression-testing`はproject context、current仕様、Risk等を入力として利用しますが、それらを再分析・再採点しません。
 
-## 6. Suite materialization gate
+## 7. Suite materialization gate
 
-project-wide current TCとRegression membershipを決定論的に再構成できる場合、Suiteは派生viewにします。
+project-wide current TCとpersistしたmembership判断からcurrent Suiteを決定論的に再構成できる場合、Suiteは派生viewにします。
 
-必要な追加情報だけ保持します。
+保持するRegression固有情報:
 
-- Regression対象範囲ref / source revision
+- Regression対象範囲ref / revision
 - TC refごとのmembership判断
 - membership source refs / revisions
 - one-off / 対象外理由
@@ -110,56 +162,53 @@ project-wide current TCとRegression membershipを決定論的に再構成でき
 
 TC本文、stable ID lifecycle、freshnessを複製しません。
 
-## 7. membership再評価
+## 8. membership再評価
 
-`regression-testing`は次の変更を再評価triggerとして扱います。
+再評価trigger:
 
 - TC lifecycle / content
 - current Regression対象範囲
 - project contextのRegression方針
 - relevant Product Risk / test objective
-- one-off / 対象外判断の根拠
+- one-off / 対象外判断根拠
 
-PR #11 change impact / existing traceabilityで影響範囲を安全に限定できる場合はその範囲だけ再評価します。
+PR #11 change impact / traceabilityで安全に限定できる場合はその範囲だけ再評価します。
 
-限定できない場合は古いmembershipを維持せずcurrent TC全体を再確認します。
+限定できない場合はcurrent TC全体を再確認します。
 
-## 8. 責務境界
+## 9. 責務境界
 
 ### 新規・改修Skill
 
-current QA成果物を作ります。
-
-Regression固有判断は行いません。
+current QA成果物を作ります。Regression固有判断は行いません。
 
 ### regression-testing
 
-- initial baseline
-- membership / membership再評価
-- full / selected
-- selection rationale / residual risk
+- baseline / membership
+- Run計画
 - required execution route
-- TCなし補助testware
-- Regression Activity
-- Run完了判定
+- Run結果更新
+- history
 
 ### qa-workflow
 
-- 新規・改修 / Regression / Explorationのrouting
+- 活動間routing
+- Confirmation + Regression等の複合workflow
 - 共通workflow state
-- blocked / resumeの共通制御
-- 成果物間のhandoff
+- blocked / resume
+- 成果物間handoff
 
-Regression membershipやselectionを再判定しません。
+Regression membershipやRun selectionを独立再計算しません。
 
 ### coverage-analysis
 
-`regression-testing`の判断を置換せず、指定されたRegression対象範囲やTC→E2Eの意味上coverageを検証します。
+指定されたRegression対象範囲やTC→E2Eの意味上coverageを検証します。membership / selectionの判断主体にはしません。
 
 ### 決定論的補助runtime
 
-- discovery / schema / ref整合
-- baseline completeness
+- discovery snapshot / completeness
+- schema / ref整合
+- batch progress整合
 - Activity discovery
 - execution route closureの構造検査
 - query completeness
