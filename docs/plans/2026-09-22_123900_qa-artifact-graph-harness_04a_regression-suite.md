@@ -317,6 +317,6 @@ candidate queryが`complete=false`の場合、candidateだけでscopeを狭め�
 | Regression対象範囲のcoverage検証 | `coverage-analysis` |
 | TC → E2E実装coverage検証 | `coverage-analysis` |
 | workflow orchestration | `qa-workflow` |
-| Confirmation / manual相当実行 | `test-execution` |
+| manual相当実行・既存TCの修正確認 | `test-execution` |
 | E2E実行 | `e2e-test-execution` |
 | E2E failure分析 | `e2e-test-result-analysis` |
