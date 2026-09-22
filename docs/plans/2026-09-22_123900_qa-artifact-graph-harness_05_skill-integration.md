@@ -199,6 +199,7 @@ TCなしE2EへTCを創作しません。
 - required execution route
 - source result
 - Regression Activity domain state
+- knowledge candidate分類 / entry有効化 / update / replacement判断
 
 ## 12. workflow state / canonical Skill更新
 
@@ -289,7 +290,7 @@ project contextへ知識本文やworkflow state本文を直接埋め込みませ
 
 既存の「既存QA成果物」または最小追加欄から、少なくとも次の入口を発見できるようにします。
 
-- 継続利用するQA知識成果物
+- fixed knowledge root
 - workflow history root
 - Activity / Session history root
 - shared environment / resource policy
