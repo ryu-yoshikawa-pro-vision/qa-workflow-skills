@@ -193,13 +193,3 @@ source変更後は再buildします。
 Graph schema versionとHarness contract versionを持たせます。
 
 repo内実装revisionを識別できる既存commit / source revisionが利用できる場合はそれを使用し、独自の意味Entity fingerprint体系は作りません。
-
-
-
-Graph出力へ次を持たせます。
-
-- graph schema version
-- harness contract version
-- implementation fingerprintまたは既存repoで採用済みの同等identity方式
-
-PR #11のruntime fingerprint helperを無条件に流用しません。実装時に同helperがGraph Harnessへ意味的に適用可能な契約になっている場合だけ、重複実装回避として利用可否を確認します。利用できない場合はGraph Harness自身のversion文字列を固定し、新たな意味Entity fingerprint体系を作りません。
