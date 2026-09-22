@@ -1,26 +1,28 @@
-# Regression Suite / QA Activity 統合Plan
+# Regression / Exploratory Testing 統合Plan
 
 ## 1. Regression Suiteの位置づけ
 
-Regression Suiteは、**現在のRegression対象範囲を継続的に検証するための、currentかつ再利用可能な論理Test Caseの基準集合**です。
+Regression Suiteは、現在のRegression対象範囲を継続的に検証するためのcurrentかつ再利用可能なlogical TCの基準集合です。
 
 Suiteを全TCの履歴保管庫にしません。
 
-各新規・改修セッションではSuiteを見直しますが、current TCを機械的に全件加入させません。
+Suiteの意味判断とRun利用は`regression-testing`が担当します。
 
 ## 2. Regression対象範囲
 
-Suiteの完全性を判定する母集団はSuite自身から作りません。
+母集団はSuite自身から作りません。
 
 入力:
 
 - project context §3のtest level / 対象機能 / role / 業務フロー
 - current仕様根拠
 - Product Risk
-- project context §8の明示された非機能テスト範囲
+- project context §8の非機能テスト範囲
 - project context §11の対象外
 
-`coverage-analysis`はこの独立したtest basisから、既存traceabilityを使ってSuite memberへ閉じているか確認します。
+`regression-testing`はこれらのcurrent成果物を参照してRegression対象範囲を扱いますが、新規・改修のRisk分析や仕様分析を再実行しません。
+
+必要に応じて`coverage-analysis`へ、
 
 ```text
 current Regression test basis
@@ -31,157 +33,149 @@ current Regression test basis
 → Regression Suite
 ```
 
-Activityは当時利用したproject context ref / revisionと必要なbasis source refs / revisionsを固定します。
+の閉鎖確認を依頼します。
 
-独立したRegression scope state machineは作りません。
-
-## 3. Suite membership
+## 3. membership
 
 member条件:
 
-- PR #11上でcurrentな論理TCである
-- 現在のRegression対象範囲に属する
-- 今後の変更後にも繰り返し検証する意味がある
+- PR #11上でcurrentなlogical TC
+- current Regression対象範囲内
+- 将来も繰り返し検証する意味がある
 
-one-off migration、調査専用、一時確認等はcurrent TCでも恒常memberにしないことがあります。
+one-off migration、調査専用、一時確認等はcurrent TCでも恒常memberにしない場合があります。
 
-実行コストが高い、特殊環境が必要、manualであることだけをmembership除外理由にしません。
+高コスト、特殊環境、manualであることだけを除外理由にしません。
 
-membershipの意味判断は`test-analysis`が担当し、`qa-workflow`は判断結果とsource ref / revisionを記録します。
+membership判断は`regression-testing`が所有します。
 
-## 4. 初回baseline
+判断時は既存のcurrent仕様、Risk、test objective、project contextを入力として参照し、それらの意味を再分析しません。
 
-PR #13初回導入時は、current Regression対象範囲に関係するauthoritative TC sourceをproject-wideに列挙し、全current TCを一度membership判定します。
+## 4. initial baseline
+
+`regression-testing`は初回利用時にauthoritative TC sourceをproject-wideに列挙し、全current TCをmembership判定します。
 
 成立条件:
 
 - discovery rootが明示されている
-- current対象scopeに属するauthoritative TC sourceを完全に列挙できる
+- current scopeに属するTC sourceを完全列挙できる
 - PR #11 lifecycleでcurrent TCを確定できる
-- membership判断が全current TCについて閉じる
-- `coverage-analysis`でcurrent Regression対象範囲がmember TCへ閉じる
+- membership判断が全current TCで閉じる
+- 必要なcoverage確認が完了する
 
-いずれかを満たせない場合、baselineをfull / completeとして扱いません。
+満たせない場合、baselineをcompleteとして扱いません。
 
 ## 5. Suiteの保持方法
 
 ### current TC + membershipを再構成できる場合
 
-Suiteは派生viewとします。
+Suiteは派生viewにします。
 
-必要な追加情報だけ保持します。
+保持するRegression固有情報:
 
-- Regression対象範囲ref / source revision
+- Regression対象範囲ref / revision
 - TC refごとのmembership判断
 - membership source refs / revisions
-- 一時検証 / 対象外理由
+- one-off / 対象外理由
 - optional filter
 
 ### 再構成できない場合
 
-project-localなSuite artifactへmember refを保持します。
+project-local Suite artifactへmember refを保持します。
 
-それでもTC本文、freshness、deleted / superseded判定はPR #11を正本とします。
+TC本文、freshness、deleted / superseded判定はPR #11を正本とします。
 
 ## 6. membership再評価
 
-次の変更をtriggerにします。
+`regression-testing`は次をtriggerに再評価します。
 
 - TC lifecycle / content
-- current Regression対象範囲
+- Regression対象範囲
 - project contextのRegression方針
-- membership判断に利用したProduct Risk / test objective
-- one-off / 対象外判断の根拠
+- relevant Product Risk / test objective
+- one-off / 対象外判断根拠
 
-PR #11 change impact / existing traceabilityで影響TCを安全に限定できる場合はその範囲だけ再評価します。
+PR #11 change impact / traceabilityで安全に限定できる場合は影響範囲だけ再評価します。
 
-限定できない場合は古いmembershipを維持せずcurrent TC全体を再確認します。
-
-専用freshness stateは追加しません。
+限定できなければcurrent TC全体を再確認します。
 
 ## 7. feature tag / filter
 
 feature tagは任意のhuman-friendly filterです。
 
-- projectに既存の機能分類がある場合だけ再利用できる
-- 1 TCに複数tagを付けてもよい
-- cross-feature TCを許容する
+- 既存の機能分類がある場合だけ再利用
+- cross-feature TCを許容
 - renameでTC identityを変更しない
-- tagがないことだけでmembership / coverageをblockしない
-- hierarchyはv1で追加しない
+- tagなしをmembership / coverage failureにしない
+- hierarchyを追加しない
 
-feature指定Regressionを要求されたのにfilterとcurrent scopeのmappingを確定できない場合だけ、そのselected scopeをblockまたは安全側へ拡張します。
-
-coverageはtagではなく既存traceabilityを正本とします。
+coverageの正本にはしません。
 
 ## 8. add / update / remove
 
-- stable TC IDが維持された変更 → 同じmember refとしてcurrent sourceを更新
-- 新規TC → membership判断後に追加
-- split / merge → PR #11のidentity / lifecycle判断に従う
-- deleted / superseded相当 → current Suiteから外す
-- 今回の成果物に存在しないだけ → 削除しない
-- Regression対象範囲の変更 → 影響TCのmembershipを再評価
-- membership sourceを安全に特定できない → current TC全体を再確認
+- stable TC ID更新 → 同じmember ref
+- 新規TC → `regression-testing`がmembership判断
+- split / merge → PR #11 lifecycleに従う
+- deleted / superseded → current Suiteから外す
+- 今回の成果物にないだけ → 削除しない
+- Regression scope変更 → 影響TCを再評価
+- 影響範囲不明 → current TC全体を再確認
 
-過去Regression Activity snapshotはcurrent Suite更新で書き換えません。
+過去Regression Activity snapshotは書き換えません。
 
 ## 9. Full / Selected Run
 
-### scope決定
+`regression-testing`がRun scopeを決めます。
 
-1. ユーザーが明示したscope
+優先順位:
+
+1. user明示scope
 2. project contextのRegression方針
-3. 未定義なら安全側fallbackとしてfull
+3. 未定義なら安全側のfull fallback
 
 ### full
 
 snapshot時点の全TC memberをselectedにします。
 
-project contextでfull対象と明示されたTCなし補助testwareがある場合は、TC memberとは別枠で対象に加えます。
-
-`full`はscopeの意味であり、全対象を実際に実行済みという意味ではありません。
+project contextでfull対象と明示されたTCなし補助testwareは別枠で追加できます。
 
 ### selected
 
-feature filter、明示TC、PR #11 impact、Product Risk、過去FAIL / Finding等からTC subsetを選べます。
+PR #11 impact、Product Risk、過去FAIL / Finding、明示TC / filter等を入力に`regression-testing`がcandidate / selected / excluded / rationale / residual riskを決定します。
 
-TCなし補助testwareはユーザーまたはproject contextで今回scopeへ明示された場合だけ加えます。
+`test-analysis`へRegression selection責務を追加しません。
 
-`test-analysis`が意味上のselectionを行い、candidate / selected / excluded / rationale / residual riskをActivityへ残します。
-
-selected RunをSuite全体のRegression完了として扱いません。
+selected RunをSuite全体のRegression完了と扱いません。
 
 ## 10. execution route
 
-selected logical TCごとに今回requiredなexecution routeを固定します。
+`regression-testing`がselected TCごとのrequired routeを決定します。
 
 - manual
 - 1件以上のE2E testware
 - manual + E2E
 - 未実行 / blocked
 
-E2E存在だけでmanual不要と判断しません。
+TC→E2E実装の十分性が必要な場合、`coverage-analysis`の結果を参照します。
 
-`coverage-analysis`（`TC → E2E実装`）で今回の検証責務を満たすrouteを判断します。
+E2E存在だけでmanual不要としません。
 
 ### completion
 
-- required routeがすべて実executionへ閉じた場合だけlogical TCをexecutedとして数える
-- required routeの一部が未実行 / 開始不能ならlogical TCをexecuted countへ入れない
-- FAIL / 判定不能は「実行した」事実として扱えるがPASSとは別
-- blocked / unresolvedは別集計する
-- 同一E2E executionが複数TCをcoverする場合は1回だけ実行し、複数TCから同じexecution refを参照する
-- 1 TCに複数required testwareがある場合は全required routeを追跡する
+- required routeがすべてexecutionへ閉じた場合だけlogical TCをexecutedとして数える
+- 一部未実行 / 開始不能ならexecuted countへ入れない
+- FAIL / 判定不能と「実行したか」を分離
+- 1 executionが複数TCをcoverする場合は同一refを共有
+- 複数required testwareは全routeを追跡
 
-PR #13でsource execution resultを再判定しません。
+source execution resultを再判定しません。
 
 ## 11. TCなしE2E
 
-TCなしE2EをRegressionへ参加させる正本は次だけです。
+参加条件:
 
 - user明示
-- project contextのRegression方針に明示された補助testware ref
+- project contextのRegression方針に補助testware refがある
 
 heuristicで既存E2Eを全件加入させません。
 
@@ -191,11 +185,13 @@ ActivityではTCとは別に、
 - auxiliary execution refs
 - auxiliary executed / unexecuted / blocked count
 
-を保持できます。
+を保持します。
 
-TC member count、TC-based coverageには算入しません。
+TC count / TC-based coverageへ算入しません。
 
-## 12. Regression Activity成果物
+## 12. Regression Activity
+
+`regression-testing`が生成・更新します。
 
 最低限:
 
@@ -205,25 +201,23 @@ TC member count、TC-based coverageには算入しません。
 - baseline / scope source refs / revisions
 - selection input refs / revisions
 - member snapshot refs
-- run scope: `full` / `selected`
-- candidate TC refs（selected時）
-- selected TC refs
-- excluded TC refsと理由
-- auxiliary selected testware refs（利用時）
+- run scope
+- candidate / selected / excluded TC refs
+- auxiliary selected testware refs
 - selection rationale
-- query completeness（利用時）
+- query completeness
 - residual risk
 - required execution route refs
 - execution refs
-- TC executed / unexecuted / blocked集計
-- auxiliary testware executed / unexecuted / blocked集計
+- TC executed / unexecuted / blocked
+- auxiliary executed / unexecuted / blocked
 - unresolved
 
-TC本文のsnapshotをActivityへ複製しません。実行時TC snapshotはPR #12を正本とします。
+TC本文やPR #12 snapshot本文を複製しません。
 
 ## 13. Activity lifecycle
 
-既存`qa-workflow`状態語彙を再利用します。
+状態値は既存`qa-workflow`の語彙を再利用しますが、Regression Activityの状態判断は`regression-testing`が担当します。
 
 - 未開始
 - 実行中
@@ -231,32 +225,33 @@ TC本文のsnapshotをActivityへ複製しません。実行時TC snapshotはPR 
 - ブロック中
 - 完了
 
-scope / baseline snapshotが不変なら同じactivityを再開できます。
+scope / baseline snapshot不変なら同じactivityを再開できます。
 
-scope / baseline snapshotを変更する場合は別activity / versionとして扱います。
+scope / snapshot変更時は別Activity / versionです。
 
 完了後はimmutableです。
 
 ## 14. candidate不完全時
 
-candidate queryが`complete=false`の場合、そのcandidateだけでscopeを狭めません。
+candidate queryが`complete=false`の場合、`regression-testing`はcandidateだけでscopeを狭めません。
 
-1. ユーザー明示scopeがあれば維持する
-2. current test basisから対象範囲を確定できるなら、その範囲のSuite memberまで広げる
-3. 対象範囲も確定できなければfullへ広げる、または必要範囲をblockする
+1. user明示scopeを維持
+2. current test basisから対象範囲を確定できればその範囲へ拡張
+3. 対象範囲も確定できなければfullへ拡張、またはblock
 
-候補0件だけを根拠にRegression不要と判断しません。
+候補0件をRegression不要と解釈しません。
 
 ## 15. 責務
 
 | 処理 | 担当 |
 | --- | --- |
+| 新規・改修のRisk / test objective | `test-analysis` |
 | TC設計 | `test-case-design` |
 | design traceability / impact / freshness | PR #11 runtime |
-| 継続Regression対象かの意味判断 | `test-analysis` |
-| Regression対象範囲の意味上coverage | `coverage-analysis` |
-| initial baseline / Suite反映 / snapshot / routing | `qa-workflow` |
-| TC → E2E実装coverage | `coverage-analysis` |
+| Regression baseline / membership / selection / Activity | `regression-testing` |
+| Regression対象範囲のcoverage検証 | `coverage-analysis` |
+| TC → E2E実装coverage検証 | `coverage-analysis` |
+| workflow routing | `qa-workflow` |
 | manual相当実行 | `test-execution` |
 | E2E実行 | `e2e-test-execution` |
 | E2E failure分析 | `e2e-test-result-analysis` |
