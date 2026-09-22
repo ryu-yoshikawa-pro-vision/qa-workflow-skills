@@ -2,23 +2,25 @@
 
 ## 1. 決定論的補助runtimeの位置づけ
 
-補助runtimeはRegression固有の機械処理を支援しますが、user-facingな判断主体は`regression-testing`です。
+補助runtimeは機械判定可能な整合性だけを担当します。
 
-補助runtimeへ意味判断を移しません。
+user-facingな意味判断は`regression-testing` / `exploratory-testing`へ残します。
 
 必要な処理:
 
-- current TC discovery / baseline completeness
+- current TC discovery snapshot
+- initial baseline progress / completeness
 - Suite / Regression Activity validation
 - membership / source ref整合
-- execution route closureの構造検査
+- required execution routeとsource execution stateの整合
 - Activity discovery
 - direct ref + deterministic scan
-- 必要性を実証した場合だけrelation index build / query
+
+relation index runtimeはgateを通るまで追加しません。
 
 ## 2. 配置方針
 
-Regression固有runtime / templateは`qa-workflow`配下へ置かず、`skills/regression-testing/`配下を第一候補とします。
+Regression固有runtime / templateは`skills/regression-testing/`配下を第一候補とします。
 
 予定:
 
@@ -30,33 +32,60 @@ skills/regression-testing/
 ├── assets/
 │   ├── regression-suite-template.md
 │   └── regression-activity-template.md
+├── evals/
 └── scripts/
     ├── validate_regression_artifact.py
     └── discover_regression_artifacts.py
 ```
 
-relation indexが不要ならindex builder / query scriptは追加しません。
+既存Skill評価runtimeで表現できるvalidatorは既存の`evals/deterministic/validator.py`を優先し、user-facing runtime用scriptを重複させません。
 
-## 3. current TC discovery
+Exploratory Testing固有契約は`skills/exploratory-testing/`に置き、Regression runtimeへ混在させません。
+
+## 3. current TC discovery snapshot
 
 PR #11 merge後、identity / lifecycleとartifact discoveryを分けて確認します。
 
 discovery root:
 
-1. PR #11 merge後にproject-wide current TCを完全列挙できるcanonical inventoryがあれば再利用
-2. なければproject contextの「既存QA成果物」にauthoritative TC成果物を列挙
+1. PR #11 merge後にproject-wide current TCを列挙できるcanonical inventoryがあれば再利用する
+2. なければproject contextの「既存QA成果物」をauthoritative sourceの入口にする
 
-current Regression対象範囲に関係するTC sourceを完全列挙できない場合、baseline completenessをtrueにしません。
+initial baseline開始時に、次を含むdiscovery snapshotを固定します。
 
-汎用artifact registryは作りません。
+- discovery roots
+- source refs / revisions
+- 発見したTC refs
+- deterministic ordering
+- 判定済み / 未判定refs
+- completeness
 
-## 4. Suiteの保持方法
+TC数が多い場合、同じsnapshotを複数batchへ分けて処理できます。
 
-### current TCとmembershipを再構成できる場合
+全TCのmembershipが閉じるまで`complete=false`です。
 
-Suiteは派生viewにします。
+source revisionが途中で変わった場合、旧snapshotへ新しいTCを継ぎ足さず、新しいsnapshotでreconciliationを開始します。
 
-保持する必要があるのはRegression固有情報だけです。
+## 4. completenessを分解する
+
+少なくとも次を別判定にします。
+
+- discovery completeness: authoritative sourceを列挙できたか
+- lifecycle resolvability: 発見TCをPR #11 current stateへ解決できたか
+- membership completeness: 全current TCのmembershipが閉じたか
+- coverage adequacy: current Regression test basisがmember TCへ意味上閉じるか
+
+legacy TCを発見したがPR #11 lifecycleへ解決できない場合はdiscovery失敗にはしません。一方、current baselineを確定できないためoverall baseline completenessはfalseです。
+
+coverage gapはinventory欠落とは別に保持します。
+
+## 5. Suiteの保持方法
+
+### 再構成できる場合
+
+current TCとpersistしたmembership判断からSuiteを再構成し、派生viewを優先します。
+
+保持するRegression固有情報:
 
 - Regression対象範囲ref / revision
 - TC refごとのmembership判断
@@ -70,82 +99,83 @@ project-local Suite artifactへmember refを保持します。
 
 TC本文、stable ID lifecycle、freshnessはPR #11を正本とします。
 
-## 5. Activity discovery
+## 6. Regression Activity validator
+
+確認すること:
+
+- baseline / project context / selection inputのsource ref / revisionがある
+- selected TCがmember snapshot内にある
+- fullの場合、complete baseline snapshotの全memberがselectedである
+- incomplete baselineをfullとして確定していない
+- TCなし補助testwareをTC countへ混ぜていない
+- selected TCごとにrequired execution routeがある
+- required routeとsource execution ref / state / resultを辿れる
+- execution artifactの存在だけでexecutedへ数えていない
+- executed / unexecuted / blockedとsource resultを混同していない
+- completed Activityを上書きしていない
+
+## 7. required execution routeと実行状態
+
+required routeは「今回何を実行する必要があるか」だけを表します。
+
+許可する構成:
+
+- manual
+- 1件以上の具体的E2E testware ref
+- manual + E2E testware ref(s)
+
+`未実行` / `blocked` / `判定不能`はrequired routeの種類にしません。
+
+### source execution state
+
+routeごとにPR #12 / E2Eのsource execution契約を参照します。
+
+manual相当`test-execution`では、PR #12の契約上、最初の`scenario.when`操作を開始した時点が開始済み境界です。preflightだけで成果物が生成されてもexecutedには数えません。
+
+E2Eもmerge後の実契約で実際のattempt開始条件を確認し、preflight block等でartifactだけ存在する状態をexecuted扱いしません。
+
+### logical TCのexecuted
+
+logical TCをexecutedとして数えるのは、今回requiredとした全routeについてsource execution契約上の開始事実が確認できる場合だけです。
+
+- 1 routeでも未開始ならTC全体をexecutedへ入れない
+- blockedは未開始routeの状態として別に保持する
+- source resultがFAIL / 判定不能でも、開始済みであれば「実行した」事実とは両立する
+- 1 executionが複数TCをcoverする場合、同じexecution refを再利用できる
+- 1 TCに複数E2E testwareがrequiredなら全routeを追跡する
+
+## 8. source resultの投影
+
+Regression Activityはsource execution resultを再判定しません。
+
+routeごとに少なくとも次へ辿れるようにします。
+
+- execution ref
+- source上の開始状態
+- source result / outcome
+- evidence ref
+- cleanup / unresolved（Run完了へ影響する場合）
+
+Activity summaryでPASS / FAIL / 判定不能等を表示する場合、PR #12 / E2E merge後の正規状態から決定論的に投影できる範囲だけ集計します。
+
+独自の別result taxonomyは作りません。
+
+## 9. Activity discovery
 
 固定project-relative rootを優先します。
 
 固定rootを使える場合:
 
 - indexを追加しない
-- deterministic scanでActivityを発見する
+- deterministic scanで全Activityを発見する
 
-固定rootを使えない場合だけproject-local activity indexを追加します。
+固定rootを使えない場合だけproject-local activity indexを検討します。
 
-indexの入口はproject contextの「既存QA成果物」から一意に参照できる1件に固定します。
+indexが必要になった場合もproject contextから一意に発見できる入口にし、Activity artifact保存とindex登録の両方が成功するまで保存完了にしません。
 
-Activity artifact保存とindex登録の両方が成功するまで保存完了にしません。
+## 10. Activity lifecycle
 
-## 6. validator
-
-### Regression Activity
-
-- baseline / scope source ref / revision
-- selection input ref / revision
-- selected refsがsnapshot内にある
-- fullの場合はsnapshot全memberをselectedにしている
-- auxiliary TC-free testwareをTC countへ混ぜない
-- selected TCごとのrequired route
-- required routeとexecution refの対応
-- executed / unexecuted / blockedとPASS / FAILを混同していない
-- 完了後Activityを変更していない
-
-### Suite / baseline
-
-- duplicate member ref
-- deleted / superseded相当をcurrent memberとして利用していない
-- memberがPR #11 current TCへ解決できる
-- membership source ref / revisionを辿れる
-- feature tag不存在だけでは失敗にしない
-
-### Exploration / Investigation
-
-Exploration固有validatorは`exploratory-testing`側へ置きます。Regression runtimeへ混在させません。
-
-## 7. execution route closure
-
-`regression-testing`がselected logical TCごとにrequired routeを固定します。
-
-route:
-
-- manual
-- 1件以上のE2E testware
-- manual + E2E
-- 未実行 / blocked
-
-required routeの決定時、既存`coverage-analysis`によるTC→E2E実装coverage結果を参照できます。
-
-executed判定:
-
-- required routeが1件でも未実行 / 開始不能ならlogical TCをexecuted countへ入れない
-- required routeがすべてexecution artifactへ閉じた場合にexecutedと数える
-- FAIL / 判定不能と「実行したか」を分離する
-- 1 executionが複数TCをcoverする場合は同一execution refを共有する
-- 1 TCに複数required testwareがある場合は全routeを追跡する
-
-source execution resultを再判定しません。
-
-## 8. TCなしE2E
-
-Regression参加条件:
-
-- user明示
-- project contextのRegression方針で補助testwareとして明示
-
-TC memberとは別にselected / executed / blockedを集計し、TC-based coverageへ算入しません。
-
-## 9. Activity lifecycle
-
-Regression Activityの生成・更新・完了判定は`regression-testing`が担当します。
+Regression Activityのdomain stateは`regression-testing`が判断します。
 
 state値は既存`qa-workflow`語彙を再利用します。
 
@@ -155,20 +185,14 @@ state値は既存`qa-workflow`語彙を再利用します。
 - ブロック中
 - 完了
 
-scope / baseline snapshot不変なら同じactivity_refで再開できます。
+`qa-workflow`は同じstateを独立計算せず、Regression Activity stateをworkflow stateへ反映します。
 
-scope / snapshot変更時は別Activity / versionとします。
-
-完了後はimmutableです。
-
-## 10. relation index gate
-
-direct ref + deterministic scanで回答不能、またはscan costが実測要件を満たさない場合だけrelation indexを実装します。
-
-design lifecycle / currentnessをPR #13へ持ち込みません。
+- scope / baseline snapshot不変 → 同じActivityを再開可能
+- scope / snapshot変更 → 別Activity / version
+- 完了後 → immutable
 
 ## 11. versioning
 
-persistするSuite metadata / Regression Activity machine blockにはschema versionを持たせます。
+persistするSuite metadata / Activity machine blockには必要なschema versionを持たせます。
 
-relation indexを実装しない場合、Graph schema versionやHarness contract versionは追加しません。
+relation indexを実装しない限りGraph schema versionやrelation schema versionを追加しません。
