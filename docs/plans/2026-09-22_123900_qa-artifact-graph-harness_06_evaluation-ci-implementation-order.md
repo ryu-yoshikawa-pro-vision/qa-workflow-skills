@@ -196,6 +196,44 @@ negative:
 - ownerなし仮説駆動だけInvestigation
 - Investigationで別runtime / schemaを作らない
 
+
+### 継続QA知識
+
+- Activity / Session / executionで得た情報を無条件にcurrent知識へ昇格しない
+- 既存正本へ属する内容は担当Skillへ戻す
+- 既存正本へ自然に置けない再利用知識だけproject-level知識成果物へ残す
+- knowledge entryはsource ref / revision、適用scope、environment / version条件を持つ
+- `要再検証` / `置換済み`entryをcurrentな判断へ使わない
+- workflow / Activityから実際に利用したknowledge ref / revisionを追える
+- knowledge更新後も過去Activity / Sessionのinput revisionを書き換えない
+- scopeに無関係なknowledgeを全件LLMへ投入しない
+- secret実値をknowledge artifactへ保存しない
+
+### 複数workflow
+
+- 同一projectで2つ以上のworkflowが異なる`workflow_ref`を持って同時進行できる
+- workflow stateをglobal 1件として上書きしない
+- 各workflowがstarted source refs / revisionsを保持する
+- workflow Aの進行中にBがAの依存Entityを更新した場合、Aのhistorical resultは保持する
+- Aがlatest current state向け完了を主張する前に依存revision / fingerprintを再確認する
+- Bの変更がAへ影響する場合だけ該当scopeを`要再検証`へ戻す
+- Bの変更がAへ無関係ならA全体を再実行しない
+
+### 共有成果物の競合
+
+- 2 workflowが同じbase revisionから別scopeを更新し、disjointを決定論的に証明できる場合はscope外current内容を失わず更新できる
+- 同じscopeを同じbase revisionから更新した場合、後勝ち上書きをしない
+- scope overlapを判定できない場合にLLMが自動mergeしない
+- revision / SHA / ETag等の競合検出に失敗した更新を保存済み扱いしない
+
+### shared environment / resource
+
+- workflow別に分離されたtest user / dataでは並行実行できる
+- 同じmutable test user / dataを2 workflowが変更し相互影響するfixtureでは並行実行しない
+- shared resource policyが不明なら同時利用可能と推測しない
+- cleanupが別workflowのresourceを削除しない
+- environment / resource条件が途中で変わった場合、結果のcurrentnessを再確認する
+
 ### relation index不要
 
 - TC → past Activityをfixed root scanで回答できる場合はindex不要
@@ -274,7 +312,18 @@ CIへ外部APIを追加しません。
 - trigger境界
 - qa-workflow routing
 
-### Step 2: initial baseline / currentness
+### Step 2: 継続QA知識 / workflow identity / concurrency
+
+- knowledge root / workflow history root discovery
+- knowledge entryのprovenance / scope / freshness
+- workflow_ref
+- started source refs / revisions
+- shared artifact revision conflict
+- cross-workflow stale伝播
+- shared environment / resource policy入口
+- resource reservation方式はリサーチ結果に従う
+
+### Step 3: initial baseline / currentness
 
 - discovery snapshot
 - batch / resume
@@ -283,14 +332,14 @@ CIへ外部APIを追加しません。
 - coverage gap分離
 - Run前currentness
 
-### Step 3: Regression Run計画
+### Step 4: Regression Run計画
 
 - full / selected
 - `test-analysis`とのimpact境界
 - residual risk
 - required execution route
 
-### Step 4: execution / Activity
+### Step 5: execution / Activity
 
 - manual / E2E
 - route vs state分離
@@ -299,14 +348,14 @@ CIへ外部APIを追加しません。
 - source result投影
 - Activity lifecycle / history
 
-### Step 5: 修正確認routing / FAIL feedback
+### Step 6: 修正確認routing / FAIL feedback
 
 - 既存TC再利用とanalysis / design省略条件
 - E2E failure analysis
 - manual FAIL owner routing
 - fix → 修正確認 → rerun / baseline再評価
 
-### Step 6: exploratory-testing
+### Step 7: exploratory-testing
 
 - dedicated Skill contract
 - Charter / Session
@@ -315,7 +364,7 @@ CIへ外部APIを追加しません。
 - block / resume / completion
 - Follow-up routing
 
-### Step 7: end-to-end QA cycle
+### Step 8: end-to-end QA cycle
 
 ```text
 新規・改修
@@ -331,17 +380,17 @@ CIへ外部APIを追加しません。
 
 Regression + Exploration等の複合workflowも確認します。
 
-### Step 8: semantic実評価
+### Step 9: semantic実評価
 
 保存candidate outputを既存semantic runner + 実Judgeで評価します。
 
-### Step 9: relation index gate
+### Step 10: relation index gate
 
 direct ref + deterministic scanで不足を実測した場合だけ、必要queryに対するindexをその時点で設計します。
 
 不足がなければ何も実装せず完了します。
 
-### Step 10: 全体回帰
+### Step 11: 全体回帰
 
 既存Skill、PR #11 / #12、新規2 Skill、routing、runtime smoke、CI、実Judge記録を確認します。
 
@@ -365,6 +414,13 @@ direct ref + deterministic scanで不足を実測した場合だけ、必要quer
 - Findingを自動Defect化する
 - generic reporting frameworkを追加する
 - relation index schemaを必要性実証前に固定する
+- workflow stateをproject全体で1件だけ持つ
+- shared current artifactをrevision確認なしで上書きする
+- concurrent workflowのsemantic conflictを後勝ちまたは無条件自動mergeで解決する
+- Activity / Findingを自動でcurrent知識へ昇格する
+- project contextへ知識本文を無制限に詰め込む
+- shared mutable resourceを安全性確認なしで並行利用する
+- reservation / lock方式を必要性検証前に固定する
 
 ## 7. 完了条件
 
@@ -386,3 +442,9 @@ direct ref + deterministic scanで不足を実測した場合だけ、必要quer
 - relation indexなしで主workflowが成立する
 - deterministic / semantic dataset / runtime smoke / 既存CIがPASSする
 - 代表semantic caseを実Judgeで評価し、実装完了記録に残せる
+- 継続利用するQA知識をsource / scope / revision付きで保存・検索・再利用できる
+- 既存正本へ属する知識を第二の正本として複製しない
+- 複数workflowが独立したworkflow_ref / state / input snapshotで同時進行できる
+- shared current artifactの競合で後勝ち上書きが起きない
+- cross-workflow変更をdependency / revisionから必要scopeだけ要再検証へ戻せる
+- shared environment / resourceの安全な並行利用可否を判断でき、不明時にblockできる
