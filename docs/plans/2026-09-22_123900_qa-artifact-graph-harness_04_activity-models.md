@@ -13,9 +13,9 @@ PR #13では、次を主要workflow入口 / 責任Skillとして扱います。
 同一workflowで、
 
 - 新規・改修 + Exploration
-- Confirmation + Regression
+- 修正確認 + Regression
 - Regression + Exploration
-- Regression FAIL後のInvestigation + Confirmation
+- Regression FAIL後のInvestigation + 修正確認
 
 等を組み合わせられます。
 
@@ -40,38 +40,38 @@ Regression運用中のprojectまたはユーザーがRegression資産更新を�
 
 設計成果物の完了とRegression reconciliationの完了は分離できます。
 
-## 3. Confirmation Testing
+## 3. 修正確認のworkflow intent
 
-Confirmation Testingは元のdefectが修正されたことを確認する横断経路です。
+Confirmation Testingに相当する修正確認は、元のdefectが修正されたことを確認するテスト目的です。PR #13では独立したSkill、Activity、artifact、stateを追加せず、`qa-workflow`が既存Skillを選ぶためのworkflow intentとして扱います。
 
-新Skillは追加しません。
-
-### 既知TC / 再現経路がある場合
+### 既存の有効なTC / 再現経路がある場合
 
 ```text
 defect fix
-→ known failing TC / reproductionを特定
-→ test-execution または e2e-test-execution
+→ currentなknown failing TC / reproductionを特定
+→ analysis / designを再実行せずtest-execution または e2e-test-execution
 → source result確認
 ```
 
 前回execution refを利用できる場合はPR #12 / E2Eのrerun lineageを使用します。
 
-### 既知TCがない場合
+### 既存成果物だけでは修正確認できない場合
 
-元defectを確認するための期待結果や再現条件が既存成果物として不足する場合は、必要な最も早いdesign Skillへroutingしてcurrent TCを確定してからexecutionします。
+期待結果、再現条件、current TCのいずれかが不足・陳腐化している場合だけ、`qa-workflow`が必要な最も早い既存analysis / design Skillへroutingします。必要な範囲を更新してcurrent TCを確定した後、通常のexecution Skillで実行します。
+
+修正確認のためだけの専用analysis / design flowは作りません。
 
 ### Regressionとの関係
 
-ConfirmationがPASSしても周辺Regression不要とは判断しません。
+修正確認がPASSしても周辺Regression不要とは判断しません。
 
 ```text
 defect fix
-├→ Confirmation Testing
-└→ 必要なRegression Testing
+├→ 修正確認: 既存TCまたは必要最小限に更新したTCをexecution
+└→ 周辺影響確認: 必要ならregression-testing
 ```
 
-impact / Riskに基づくRegressionは別経路として`regression-testing`が扱います。
+impact / Riskに基づくRegressionは別目的として`regression-testing`が扱います。
 
 ## 4. initial baseline
 
@@ -141,8 +141,8 @@ e2e-test-execution
 
 ```text
 product / QA artifact修正
-→ Confirmation Testing
-→ membership / baseline入力変更があればreconciliation
+→ 既知TCの再実行による修正確認
+→ QA成果物 / membership入力変更があればreconciliation
 → 必要なRegression rerun
 ```
 
@@ -195,7 +195,7 @@ Regression実施
 → regression-testing | Run結果更新
 
 不具合修正
-→ Confirmation execution
+→ 修正確認として既存TCをexecution
 → 必要なRegression
 
 Exploration
@@ -205,7 +205,7 @@ Regression manual FAIL
 → owner判定
 → existing owner または exploratory-testing | investigation
 → 修正
-→ Confirmation
+→ 既存TC再実行による修正確認
 → 必要なRegression
 ```
 
