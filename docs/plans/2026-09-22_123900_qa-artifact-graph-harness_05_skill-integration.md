@@ -225,3 +225,78 @@ Finding / FAILを自動Defect化しません。
 既存Skillは単体利用時にRegression Suite / Activityを必須にしません。
 
 `regression-testing`と`exploratory-testing`もGraph / relation indexなしで主要機能を利用できることを必須にします。
+
+## 15. 継続QA知識
+
+継続利用する知識の詳細契約は`_04d_continuous-qa-knowledge-and-concurrency.md`を正本とします。
+
+新しいuser-facing Skillは追加しません。
+
+既存正本へ属する知識は、その責任Skillへ戻します。
+
+- 仕様・期待挙動 → `spec-analysis`
+- Product Risk / test focus → `test-analysis`
+- currentな実対象情報 → `test-target-inspection`
+- TR / TCN / CI / TC → 各design Skill
+- execution / result → PR #12 / E2E
+
+それでも残る、複数workflowで再利用するテスト対象・仕組み・観点・環境の知識だけをproject-level知識成果物として扱います。
+
+`qa-workflow`は知識の意味内容を独自に確定せず、project contextからrootを発見し、scopeに関係する有効entryを担当Skillへ入力として渡し、実際に利用したentry ref / revisionをworkflow stateへ残します。
+
+## 16. project contextの追加入口
+
+project contextへ知識本文やworkflow state本文を直接埋め込みません。
+
+既存の「既存QA成果物」または最小追加欄から、少なくとも次の入口を発見できるようにします。
+
+- 継続利用するQA知識成果物
+- workflow history root
+- Activity / Session history root
+- shared environment / resource policy
+
+既存の実施環境、test user、test data、cleanup等の案件固有値は引き続きproject contextへ保持します。
+
+project context自体を汎用artifact registryにしません。
+
+## 17. workflow state
+
+`skills/qa-workflow/assets/workflow-state-template.md`は「1 project = 1 workflow」の形にしません。
+
+各workflow stateへ最低限次を追加します。
+
+- workflow_ref
+- workflow objective / requested outcome
+- workflow scope
+- started source refs / revisions
+- 利用したknowledge refs / revisions
+- 利用したenvironment / shared resource refs
+- produced artifact / Activity / Session refs
+- optional related workflow refs
+
+Skill状態表はそのworkflow内だけを表します。
+
+同時進行する別workflowの状態を同じ行へmergeしません。
+
+## 18. 共有成果物の並行更新
+
+PR #12の`test-target-inspection`にあるrevision / SHA / ETagベースの競合防止を、共有current QA成果物更新時の共通原則として再利用します。
+
+- 読み込み時revisionを保持
+- 保存時にcurrent revisionを確認
+- 条件付き更新が使える保存先では利用する
+- 競合検出時に古いbaseで上書きしない
+- stable ID / update scopeでdisjointを決定論的に証明できる場合だけcurrentを再読込してscope外を保持
+- overlapping / unknown scopeでは責任Skillへ戻して再評価
+
+汎用merge engineは追加しません。
+
+## 19. shared environment / resource
+
+`test-execution` / `exploratory-testing` / E2E等の実操作では、同時に利用するtest user、tenant、test data、external account等が他workflowへ影響し得ます。
+
+実装時はproject context / Activity / Session / executionからshared mutable resourceと利用条件を追跡できるようにします。
+
+安全な並行利用を確認できない場合は、project policyに従って直列化またはblockします。
+
+resource reservation / lease / lockの具体方式は、PR #11 / #12 merge後の実装と外部リサーチを確認してから決定します。
