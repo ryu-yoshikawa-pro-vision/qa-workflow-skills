@@ -1,66 +1,49 @@
-# QA Artifact Graph / Harness 導入Plan
+# Regression Suite / QA Activity 統合Plan
 
-## 1. 実装場所
+## 1. 決定論的補助runtimeの位置づけ
 
-Harnessは新しいuser-facing Skillにせず、`qa-workflow`の決定論的補助runtimeとして実装します。
+補助runtimeは新しいuser-facing Skillにしません。
 
-予定:
+最初からGraph Harnessを実装せず、次の順に必要な処理だけ追加します。
 
-```text
-skills/qa-workflow/
-├── assets/
-│   ├── regression-suite-template.md
-│   ├── qa-activity-template.md
-│   ├── qa-activity-index-template.md
-│   └── qa-graph-source-manifest-template.json
-└── scripts/
-    └── qa_graph/
-        ├── run.py
-        ├── model.py
-        ├── extract.py
-        ├── validate.py
-        ├── query.py
-        └── adapters/
-            ├── machine_entities.py
-            ├── test_execution.py
-            ├── e2e_execution.py
-            ├── regression_suite.py
-            ├── qa_activity.py
-            └── exploratory_testing.py
-```
+1. Regression Suite / Activity artifactのvalidation
+2. activity artifactの発見
+3. direct refで不足するqueryの確認
+4. 必要な場合だけrelation index build / query
 
-PR #11側の各SkillごとにGraph adapterを重複実装せず、Machine Entity / canonical traceabilityを設計側の共通入力境界にします。
+## 2. Regression Suiteの保持方法
 
-## 2. CLI
+PR #11 merge後に次を確認します。
 
-入口は1つに固定します。
+### current TC集合を直接列挙できる場合
 
-```bash
-python skills/qa-workflow/scripts/qa_graph/run.py <operation>
-```
+Regression Suiteは派生viewとして扱います。
 
-operation:
+必要な追加情報だけ別artifactへ保持します。
 
-- `build`
-- `validate`
-- `query`
-- `activity-view`
-- `regression-suite-view`
+- Regression対象範囲ref
+- membership判断
+- 一時検証 / 対象外の理由
+- optionalなhuman-friendly filter
 
-`coverage-view`は追加しません。設計coverageは`coverage-analysis` / PR #11 traceabilityを正本とし、Regression実行のselected-but-not-executed等はactivity / suite validatorで検査します。
+TC本文、stable ID lifecycle、freshnessを複製しません。
 
-## 3. source manifest / activity index
+### 直接列挙できない場合
 
-source manifestは**今回のbuild input一覧**に限定します。正本や汎用artifact registryにしません。
+project-local artifactへmember refを保持します。
 
-qa-workflowは次からmanifestを作ります。
+それでも保持するのは参照だけで、TC本文やdesign stateはPR #11を正本とします。
 
-- project contextのcurrent QA成果物
-- current Regression Suite
-- project-local activity indexが指すRegression / Exploration / Investigation成果物
-- 必要なPR #11 / PR #12 / E2E成果物
+## 3. activity発見
 
-過去activityを発見するため、別にproject-localなactivity indexを持ちます。最小項目は次です。
+Regression / Exploration / Investigation artifactを後から発見する必要があります。
+
+実装開始時に既存のartifact保存規約を確認し、次の順で選びます。
+
+1. 固定directory / path規則から決定論的に列挙できるならindexを作らない
+2. 案件ごとに保存場所が異なる場合だけproject-local activity indexを持つ
+
+indexが必要な場合の最小項目:
 
 ```text
 activity_ref
@@ -70,126 +53,91 @@ release / version（利用可能な場合）
 completed_at（利用可能な場合）
 ```
 
-activity indexは活動成果物の所在を列挙するだけで、TC、Result、Finding本文や独自lifecycleを複製しません。
+TC、Result、Finding本文やlifecycleを複製しません。
 
-## 4. adapter方針
+## 4. validator
 
-自由文を汎用LLM parserでGraph化しません。
+Graph schema validatorではなく、source artifactごとの必要最小限のvalidatorから始めます。
 
-優先順位:
+### Regression Suite / baseline
 
-1. PR #11のMachine Entity / canonical traceability
-2. Regression Suite machine block
-3. PR #12のstructured execution / result
-4. E2E Skillの既存structured result / testware ref
-5. `exploratory-testing` / `qa_activity`のmachine block
+- duplicate member ref
+- deleted / superseded相当をcurrent memberとして利用していない
+- memberがPR #11 current TCへ解決できる
+- membership判断 / 理由の形式
+- optional feature filterが既知scope refへ解決できる場合は参照整合
 
-一意に抽出できないrelationは推測せずissue化し、query結果を`complete=false`にできます。
+feature tagの不存在だけでは失敗にしません。
 
-## 5. build
+### Regression activity
 
-`build`は次の順序を固定します。
+- Suite / baseline snapshot ref
+- selected refsがsnapshot内にある
+- fullの場合はsnapshot全memberをselectedにしている
+- selectedをfullとして表現していない
+- selected TCごとにexecution routeまたは未解決理由がある
+- executed / unexecuted / blockedを区別できる
+- past activityを書き換えていない
 
-1. manifest schema検証
-2. artifactをmanifest順ではなく`artifact_ref` canonical sortで処理
-3. skill / artifact typeに対応する固定adapter選択
-4. nodes抽出
-5. edges抽出
-6. node identity canonicalization
-7. edge canonicalization
-8. duplicate検出
-9. lifecycle / currentness projection
-10. graph全体validate
-11. canonical sort
-12. JSON出力
+### Exploration / Investigation
 
-LLMはbuild pathへ入りません。
+- local Finding ref一意
+- evidence ref整合
+- follow-up ref整合
+- secret実値を含めない
 
-## 6. validate
+## 5. execution route
 
-最低限:
+Regression Activityでは、selected logical TCごとに今回の実行方法を確定します。
 
-- schema version
-- node type
-- edge type
-- node_key一意
-- edge key一意
-- dangling source / target
-- source/target type compatibility
-- artifact-local ref scope
-- canonical ID format
-- PR #11 Machine Entity identity整合
-- PR #12 `artifact_ref + test_case_ref` scope整合
-- supersedes self-loop禁止
-- derived_from self-loop禁止
-- 明示的にacyclicとするdesign edge集合のcycle検出
-- current nodeがsuperseded-only sourceへ依存していないか
-- secret-like field名をgraph schemaに含めていないか
+候補:
 
-Graph全体をDAGとは仮定しません。`selected_for / executed_in / produced / evidenced_by / resolves`等は活動・履歴を表すため、cycle禁止は仕様→設計→TCの意味上DAGであるedge subsetだけへ限定します。
+- manual
+- 1件以上のE2E testware
+- manual + E2E
+- 未実行 / blocked
 
-## 7. query
+E2E testwareが存在するだけではmanualを省略しません。
 
-`query`は保存済みの明示relationを順方向 / 逆方向へ検索します。
+`coverage-analysis`（対象: `TC → E2E実装`）が十分な検証責務を確認した結果を入力にします。
 
-主な用途:
+1 TC → 複数testware、複数TC → 1 testwareを許容し、1対1前提を置きません。
 
-- TC → testware → execution history
-- Regression activity → selected TC / testware → execution / result
-- Finding → follow-up artifact
-- PR #11 impact candidate → testware / past activity
+TCなしE2Eは架空TCを作らず、Regression方針上必要なら補助的なtestware実行対象として扱います。TC-basedな全機能coverageの証拠には自動で数えません。
 
-design impactそのものはPR #11の結果を入力として利用し、Harnessが独自に再計算しません。
+## 6. relation index gate
 
-出力には、候補、path、distance、relation chain、source artifact refs、`complete`を含めます。
+direct refで回答不能なqueryが確認された場合だけrelation indexを実装します。
 
-## 8. activity-view
+その場合も、
 
-`qa_activity`を中心に、次をprojectionします。
+- relation recordのcanonical sort
+- duplicate / dangling ref
+- artifact-local scope
+- query completeness
+- reproducible build
 
-- trigger
-- selected requirements / conditions / test cases / testware
-- target snapshot
-- executions
-- results
-- evidence refs
-- findings
-- unresolved / blocked
-- historical reruns
+だけを決定論的に処理します。
 
-Regression、Exploration等の専用DBを作りません。
+design lifecycle / currentness / cycle判定をPR #13へ持ち込みません。
 
-## 9. regression-suite-view
+## 7. source manifest
 
-current Regression Suiteについて次を機械的に表示 / 検査します。
+relation index buildが必要になった場合だけ、今回のbuild input一覧としてmanifestを導入できます。
 
-- feature tag一覧
-- feature tag別member TC
-- untagged member
-- duplicate member
-- current TCへ解決できないmember
-- explicit exclusionと理由
-- suite snapshot revision / source ref
+manifestはartifact registryではありません。
 
-「各機能が意味上十分にテストされているか」はここで判定せず、`coverage-analysis`を正本とします。
+- current QA成果物
+- relevant activity artifact
+- relevant execution artifact
+- relevant exploratory artifact
 
-Regression activityについては別validatorで次を検査します。
+を列挙するだけにします。
 
-- full runがcurrent Suite snapshotの全memberを選択している
-- selected runがsnapshotのsubsetである
-- selected runをfull扱いしていない
-- selected memberにexecutionまたは明示未実行理由がある
+## 8. versioning
 
-## 10. 再生成性
+Regression Suite / Activity等のpersisted machine blockには必要なschema versionを持たせます。
 
-同一source manifest、同一source artifact bytes、同一Harness versionから同一canonical graph JSONを得ることをcontract testにします。
+relation indexを実装しない場合、Graph schema versionやHarness contract versionは追加しません。
 
-Graph cacheを正本にしません。
-
-source変更後は再buildします。
-
-## 11. Harness version
-
-Graph schema versionとHarness contract versionを持たせます。
-
-repo内実装revisionを識別できる既存commit / source revisionが利用できる場合はそれを使用し、独自の意味Entity fingerprint体系は作りません。
+relation indexをpersistする場合も、repo revisionで実装versionを識別できるなら独自fingerprint体系を追加しません。
