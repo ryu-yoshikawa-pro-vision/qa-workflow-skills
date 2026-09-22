@@ -10,7 +10,7 @@ PR #11 / #12後に残る課題を、既存の新規・改修SkillへRegression�
 - project内のcurrent TCを発見し、initial baselineと以後のmembership更新を成立させる
 - 古いbaselineを後日のRunで黙って再利用しない
 - Regressionごとのselection / execution / source result / residual riskを履歴化する
-- Confirmation TestingをRegressionと区別して既存execution Skillへroutingする
+- 修正確認を独立Skillにせず、既存TCが有効ならexecutionへ直接、設計不足がある場合だけ既存analysis / designを経由して実行する
 - Exploration / Investigationを`exploratory-testing`として独立させる
 
 PR #13で再実装しないもの:
@@ -193,7 +193,7 @@ current QA成果物を作ります。Regression固有判断は行いません。
 ### qa-workflow
 
 - 活動間routing
-- Confirmation + Regression等の複合workflow
+- 修正確認 + Regression等の複合workflow
 - 共通workflow state
 - blocked / resume
 - 成果物間handoff
