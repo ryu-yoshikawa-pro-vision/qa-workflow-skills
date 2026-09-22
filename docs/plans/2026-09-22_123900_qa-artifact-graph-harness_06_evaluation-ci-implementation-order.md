@@ -9,6 +9,8 @@
 - baseline / Run selection / historyの単独要求は`regression-testing`へroutingされる
 - executionまで含むRegression要求は`qa-workflow`がオーケストレーションする
 - Exploration / Investigationは`exploratory-testing`へ正しくroutingされる
+- knowledge lifecycle要求は`qa-knowledge`へroutingされ、既存正本へ属する候補はowner Skillへ戻される
+- 既存knowledgeを入力として使うだけのdomain requestは`qa-knowledge`を必須gatewayにしない
 - 修正確認を独立Skill化せず既存analysis / design / executionで実施し、必要なRegressionを別目的として組み合わせられる
 - `qa-workflow`がRegression固有判断を再実装しない
 
@@ -29,6 +31,11 @@
 - Activity lifecycle / immutable条件
 - Activity discovery completeness
 - direct ref / deterministic scan
+- fixed knowledge root discovery completeness
+- 1 entry = 1 artifact
+- entry ref / storage revision / CAS
+- same-entry conflict / create-if-absent
+- superseded ref / currentness dependency
 
 ### semantic
 
@@ -41,6 +48,11 @@
 - Finding / Observation / follow-up
 - Exploration / Investigationの判断境界
 - FAIL後routingの妥当性
+- knowledge candidate triage
+- residual knowledgeの有効化判断
+- existing owner routing
+- same-entry update / replacement判断
+- environment / version applicability
 
 ### runtime smoke
 
@@ -54,6 +66,9 @@
 - FAIL → analysis / investigation → fix → 既存TC再実行による修正確認 → rerun
 - Exploration → Finding → design flow → baseline reconciliation
 - Activity block / resume / complete / history
+- Finding → qa-knowledge → existing owner / residual knowledge
+- knowledge revalidation → current evidence取得 → same entry update
+- 5 workflowによるentry-level CAS / stale isolation
 
 ## 2. 必須評価
 
@@ -69,6 +84,10 @@
 - 「探索的テストをして」→ `exploratory-testing | exploration`
 - 「この未知症状を仮説検証して」→ 既存ownerがなければ`exploratory-testing | investigation`
 - 「現在のUI構造を確認」→ `test-target-inspection`
+- 「このFindingを今後のQA知識として残して」→ `qa-knowledge | triage`
+- 「この環境知識がまだ有効か確認して」→ `qa-knowledge | revalidation`
+- 「過去のQA知識を確認して」→ `qa-knowledge | lookup / history`
+- 「このknowledgeを更新して」→ `qa-knowledge | create / update`
 
 negative:
 
@@ -76,6 +95,8 @@ negative:
 - change impact / Product Risk分析を`regression-testing`へ送らない
 - current UI情報収集を`exploratory-testing`へ送らない
 - 既知TC実行を`exploratory-testing`へ送らない
+- specification / Product Risk / current UI factの直接要求を`qa-knowledge`へ送らない
+- 既存knowledgeを使ったテスト分析要求をknowledge lifecycleだけの要求と誤判定しない
 
 ### 複合workflow
 
@@ -199,16 +220,27 @@ negative:
 
 ### 継続QA知識
 
-- Activity / Session / executionで得た情報を無条件にcurrent知識へ昇格しない
-- 未検証candidateをknowledge成果物へcurrent entryとして保存しない
-- 既存正本へ属する内容は担当Skillへ戻す
-- 既存正本へ自然に置けない再利用知識だけknowledge候補にする
-- knowledge entryはstable refとentry revision / content identityを持つ
+- Finding / Observationを無条件にcurrent knowledgeへ昇格しない
+- 未検証candidateをknowledge artifactへ保存せず元Activity / Finding / Follow-upに残す
+- specification候補 → `spec-analysis`
+- Product Risk / test focus候補 → `test-analysis`
+- current UI fact → `test-target-inspection`
+- formal Test Condition等へ昇格すべき候補 → design Skill
+- 既存正本へ自然に置けない再利用knowledgeだけ`qa-knowledge`がentry化する
+- knowledge entryはstable refを持つ
+- fixed root配下で1 entry = 1 independently versioned artifact
+- updateはentry artifact自身のexpected revisionによるCAS
+- new entryはcreate-if-absent
+- global mutable counter / central manifestを要求しない
 - provenance source refs / revisionsとcurrentness dependency refs / revisionsを分離する
 - 適用scope、environment / version条件を持つ
-- currentness dependency変更で一度有効だったentryを`要再検証`にできる
+- currentness dependency変更時はcurrent利用しない
+- same identityの再検証 / 更新はsame entryのnew revision
+- semantic identity変更時だけreplacementを使う
+- same-entry CAS conflictをsemantic auto-mergeしない
+- 別entry更新だけで無関係entry利用workflowをstaleにしない
 - `要再検証` / `置換済み`entryをcurrentな判断へ使わない
-- workflow / Activityから実際に利用したknowledge ref / entry revisionを追える
+- workflow / Activityから実際に利用したentry ref / revisionを追える
 - knowledge更新後も過去Activity / Sessionのinput revisionを書き換えない
 - scopeに無関係なknowledgeを全件LLMへ投入しない
 - secret実値をknowledge artifactへ保存しない
@@ -257,7 +289,7 @@ negative:
 
 実装開始時のPR #11 / #12 merge後CIを正本として、少なくとも次を更新します。
 
-- Skill一覧へ`regression-testing` / `exploratory-testing`
+- Skill一覧へ`regression-testing` / `exploratory-testing` / `qa-knowledge`
 - `skills/qa-workflow/assets/workflow-state-template.md`
 - `scripts/skills/evals/deterministic/common.py`
   - `CANONICAL_SKILLS`
@@ -269,6 +301,8 @@ negative:
 - deterministic output eval
 - semantic dataset / rubric
 - Regression Suite / Activity validator
+- qa-knowledge entry validator / discovery / CAS contract test
+- knowledge routing / lifecycle fixtures
 - current TC discovery / baseline progress test
 - Activity discovery
 - execution route closure
@@ -291,6 +325,8 @@ repository CIでは既存方針どおり外部LLM APIを呼びません。
 - Observation / Finding分類
 - Follow-up
 - 複合workflow routing
+- knowledge candidate triage / owner routing
+- knowledge applicability / revalidation / replacement
 
 実装完了前に代表caseの実Agent candidate outputを保存し、
 
@@ -319,21 +355,25 @@ CIへ外部APIを追加しません。
 
 ### Step 1: Skill / workflow vocabulary
 
-- `regression-testing` / `exploratory-testing` skeleton
+- `regression-testing` / `exploratory-testing` / `qa-knowledge` skeleton
 - `CANONICAL_SKILLS`
 - `MULTI_USE_SKILL_TARGETS`
 - workflow state template
 - trigger境界
 - qa-workflow routing
 
-### Step 2: 継続QA知識 / workflow identity / concurrency
+### Step 2: qa-knowledge / 継続QA知識 / workflow concurrency
 
-- knowledge root / workflow history root discovery
-- knowledge entryのstable ref / entry revision
+- `qa-knowledge` trigger / non-trigger / input / output
+- candidate triage / existing owner routing
+- fixed knowledge root discovery
+- 1 entry = 1 independently versioned artifact
+- stable entry ref / create-if-absent
+- entry storage revision / CAS
 - provenance sourceとcurrentness dependencyの分離
+- same-entry update / revalidation / replacement
+- root / repository HEAD変更だけで無関係entryをstaleにしない
 - knowledge candidateをActivity / Finding / Follow-upに留める契約
-- knowledge lifecycle ownerの追加リサーチ結果を反映
-- knowledge entryの物理保存形式を追加リサーチ結果で確定
 - workflow_ref
 - 1 workflow = 1 persisted state artifact
 - workflow state revision / CAS
@@ -344,8 +384,6 @@ CIへ外部APIを追加しません。
 - cross-workflow staleのcheckpoint検出
 - shared environment / resource policy入口
 - isolation → existing reservation → CAS付きproject-local reservation → block
-
-knowledge lifecycle ownerとknowledge entryの物理保存形式が未確定の間は、当該部分の実装へ進みません。
 
 ### Step 3: initial baseline / currentness
 
@@ -416,7 +454,7 @@ direct ref + deterministic scanで不足を実測した場合だけ、必要quer
 
 ### Step 11: 全体回帰
 
-既存Skill、PR #11 / #12、新規2 Skill、routing、runtime smoke、CI、実Judge記録を確認します。
+既存Skill、PR #11 / #12、新規3 Skill、routing、runtime smoke、CI、実Judge記録を確認します。
 
 ## 6. 実装時に避けること
 
@@ -448,6 +486,10 @@ direct ref + deterministic scanで不足を実測した場合だけ、必要quer
 - provenance sourceだけでknowledgeのcurrentnessを判断する
 - 未検証Finding / Observationをknowledge成果物へ蓄積する
 - knowledge artifact全体のrevisionだけを全entryのrevisionとして扱う
+- 全knowledge entryを単一artifactへ集約する
+- knowledge central manifest / global mutable ID counterを追加する
+- `qa-knowledge`へ仕様 / Risk / TC / current実対象情報のdomain判断を移す
+- 既存knowledgeを利用するだけの全domain requestを`qa-knowledge`経由にする
 - workflow stateをCASなしで更新する
 - currentnessをworkflow完了時だけ確認する
 - owner Skillがpartial updateを保証していないartifactをscope推測でauto-rebaseする
@@ -470,11 +512,14 @@ direct ref + deterministic scanで不足を実測した場合だけ、必要quer
 - residual riskがexisting Riskを再採点しない
 - Regression FAIL → analysis / investigation → fix → 既存TC再実行による修正確認 → rerunが閉じる
 - `exploratory-testing`の入力 / lifecycle / output / safety契約が実装可能な粒度で固定されている
-- workflow state validatorが新2 Skill / multi-use targetを扱える
+- workflow state validatorが新3 Skill / multi-use targetを扱える
 - relation indexなしで主workflowが成立する
 - deterministic / semantic dataset / runtime smoke / 既存CIがPASSする
 - 代表semantic caseを実Judgeで評価し、実装完了記録に残せる
-- 継続利用するQA知識をsource / scope / revision付きで保存・検索・再利用できる
+- 継続利用するQA知識を`qa-knowledge`でtriage / 有効化 / 再検証 / 更新 / 置換 / lookupできる
+- fixed knowledge root + 1 entry = 1 artifactで保存・検索・再利用できる
+- same-entry updateをentry-level CASで保護できる
+- unrelated entry更新で無関係workflowをstaleにしない
 - 既存正本へ属する知識を第二の正本として複製しない
 - 複数workflowが独立したworkflow_ref / state / input snapshotで同時進行できる
 - shared current artifactの競合で後勝ち上書きが起きない
