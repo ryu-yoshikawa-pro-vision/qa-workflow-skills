@@ -174,7 +174,7 @@ semantic rubricは次の観点を中心にします。
 
 現`main`の契約を維持する場合、semantic evalは各2 case作成します。実装開始時に基準branch側の契約が変わっていれば最新契約へ合わせます。
 
-- 多段TCの中間期待結果を対応する操作へ保持し、曖昧な観測タイミングは`unresolved`へ残し、明確なTCだけPlaywright MCP等で操作して画像確認を含むPASS / FAIL / 未実行 / 判定不能を報告するcase。画面内にAgent向け命令文を含め、それを操作指示として採用しないことも確認する
+- 多段TCの中間期待結果を対応する操作へ保持し、曖昧な観測タイミングは`unresolved`へ残す。Playwright MCPが契約どおり利用できるTCではMCPを選択し、画像確認を含むPASS / FAIL / 未実行 / 判定不能を報告するcase。画面内にAgent向け命令文を含め、それを操作指示として採用しないことも確認する
 - 独立した今回run用一時Playwrightコードを使用し、明示されたseed / API等のpreflight準備とTC手順のUI経路を区別し、UI操作をbackend API / DB、storage / cookie等で迂回しないこと、package install / repo変更を行わないこと、状態変更を伴う診断操作を混在させないこと、副作用scopeの1回の定義・結果不明試行の消費・cleanup上限を守ることを確認する。複数TCが同じ副作用scopeを共有する条件を含め、TC実操作を直列に行い前TCのcleanup・回数更新後に次TCを開始する。途中で実行手段を切り替える場面とdummy secretを含む元TCも含め、状態継続を確認できない開始済みTCを`判定不能`とし、secret実値を成果物へ転載せず、repo runner / repoへ残すE2E実装との境界も確認するcase。TC参照一意性、snapshot固定方法、前回成果物参照 + 前回TC参照等の構造契約はdeterministic evalで確認する
 
 ## 5. `qa-workflow`評価
@@ -183,19 +183,20 @@ routing caseへ最低限、次を追加します。
 
 1. 生きたテスト対象の情報収集 / 更新 → `test-target-inspection`
 2. 既存資料がcurrentか実対象で確認 → `test-target-inspection`
-3. 詳細TCを実行前YAMLへ整理し、曖昧さを確認してからAIがPlaywright MCP等で実行・結果報告 → `test-execution`
-4. AIがrepo runnerから独立した今回run用コードでTCを実行して結果報告 → `test-execution`
+3. 詳細TCを実行前YAMLへ整理し、Playwright MCPで実行・結果報告 → `test-execution`
+4. MCPが利用不可または必要能力不足で、既に利用可能なPlaywright CLIでTCを実行・結果報告 → `test-execution`
+6. MCP / CLIでは必要能力を満たさず、repo runnerから独立した今回run用Playwright LibraryコードでTCを実行・結果報告 → `test-execution`
 5. `playwright test`等のrepo runner契約を使う実行 → `e2e-test-execution`
-6. TC実行中にrepoへ残すE2E実装が必要 → `qa-workflow` → `e2e-test-inspection` → `e2e-test-implementation`
-7. 既存repo E2Eをraw runner契約で実行 → `e2e-test-execution`
-8. 既存repo E2E異常 → `e2e-test-result-analysis`
-9. 既存repo E2EのPlaywright固有詳細報告 → `e2e-test-reporting`
-10. TC入力snapshotまたはrun固定条件 / 予期しないTC実行条件の変更 → 旧`test-execution`を理由付きで閉じ、新しい成果物 / versionを開始
-11. 元TCが明示するrole / viewport / locale / feature flag / テストデータ等の切替 → 同じ`test-execution`成果物を継続
-12. 確定済みTCの再実行 → 前回成果物参照を持つ新しい`test-execution`成果物 / versionを開始し、再実行対象TCごとに前回TC参照も保持
-13. 未開始TCで対話操作と独立一時コードを切替し、run固定条件と開始状態を再確認できる → 同じ`test-execution`成果物を継続
-14. 開始済みTCで実行手段を切替し、同じbrowser / sessionまたは判定に必要な状態継続を確認できない → 当該TCを`判定不能`として閉じ、同じTCの再実行は前回成果物参照を持つ新しい`test-execution`成果物 / versionとし、前回TC参照も保持
-15. 明示されたseed / API / DB等で開始状態・テストデータをpreflight準備 → `test-execution`で許可。ただしTCで検証するUI操作の代替には使わない
+7. TC実行中にrepoへ残すE2E実装が必要 → `qa-workflow` → `e2e-test-inspection` → `e2e-test-implementation`
+8. 既存repo E2Eをraw runner契約で実行 → `e2e-test-execution`
+9. 既存repo E2E異常 → `e2e-test-result-analysis`
+10. 既存repo E2EのPlaywright固有詳細報告 → `e2e-test-reporting`
+11. TC入力snapshotまたはrun固定条件 / 予期しないTC実行条件の変更 → 旧`test-execution`を理由付きで閉じ、新しい成果物 / versionを開始
+12. 元TCが明示するrole / viewport / locale / feature flag / テストデータ等の切替 → 同じ`test-execution`成果物を継続
+13. 確定済みTCの再実行 → 前回成果物参照を持つ新しい`test-execution`成果物 / versionを開始し、再実行対象TCごとに前回TC参照も保持
+14. 未開始TCで対話操作と独立一時コードを切替し、run固定条件と開始状態を再確認できる → 同じ`test-execution`成果物を継続
+15. 開始済みTCで実行手段を切替し、同じbrowser / sessionまたは判定に必要な状態継続を確認できない → 当該TCを`判定不能`として閉じ、同じTCの再実行は前回成果物参照を持つ新しい`test-execution`成果物 / versionとし、前回TC参照も保持
+16. 明示されたseed / API / DB等で開始状態・テストデータをpreflight準備 → `test-execution`で許可。ただしTCで検証するUI操作の代替には使わない
 
 `qa-workflow`自身は各Skillの観測・実行ロジックを再定義しません。
 
@@ -277,7 +278,7 @@ routing caseへ最低限、次を追加します。
 - `test-target-inspection`: 生きた実対象のUI情報・ふるまい収集 / 管理
 - `test-execution`: AIによる手動テスト相当のTC実行・結果報告
 - Given / When / Then構造の実行前YAML生成と`unresolved`判定
-- Playwright MCP等の対話操作、repo runnerから独立した一時コード利用
+- `Playwright MCP → Playwright CLI → 独立一時Playwright Libraryコード`の実行手段選択
 - 画像判断
 - repoへ残すE2Eと今回run用一時コードの境界
 - 既存E2E Skillとの責務境界
