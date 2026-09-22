@@ -138,7 +138,7 @@ PR #13で第二のcurrentness stateを作りません。
 
 ## 9. 知識 / workflow provenance
 
-PR #13では、活動履歴だけでなく継続利用するQA知識とworkflowの由来もdirect refで追跡します。
+PR #13では、活動履歴だけでなく継続利用するQA知識とworkflowの由来・currentnessをdirect refで追跡します。
 
 ### workflow
 
@@ -147,18 +147,27 @@ workflow state / Activity / Sessionから最低限次を辿れるようにしま
 - workflow_ref
 - 利用したQA artifact refs / revisions
 - 利用したknowledge entry refs / revisions
+- 利用したproject context ref / revision
 - 利用したenvironment / resource条件
 - 生成したActivity / Session / artifact refs
 - related workflow refs（因果関係が明示できる場合だけ）
 
 ### knowledge entry
 
-継続利用する知識entryから最低限次を辿れるようにします。
+knowledge entryではprovenanceとcurrentness dependencyを分けます。
+
+provenance:
 
 - source artifact / inspection / Activity / Session / Finding refs
 - source revisions
+
+currentness:
+
+- currentness dependency refs / revisions
 - 適用target / environment scope refs
-- related current QA artifact refs
+- 適用version / environment条件
+- entry revision / content identity
+- state
 - 置換先ref
 
 Activity / Finding本文をknowledgeへ複製するのではなく、由来をrefで保持します。
@@ -187,11 +196,20 @@ query completenessはknowledge root / workflow history root / artifact discovery
 
 direct refには、current artifactを更新するときの競合検出に利用できるrevision / SHA / ETag / content identityを含めます。
 
-同じbase revisionから複数workflowが共有成果物を更新した場合:
+同じbase revisionから複数workflowが共有成果物を更新した場合、自動rebase / partial updateを許可するのはowner Skillがdeterministic partial update boundaryを明示しているartifactだけです。
 
-- scopeがdisjointと決定論的に確認できる場合だけcurrent成果物を再読込してscope外current内容を保持できる
-- scopeが重なる、またはdisjointか判定できない場合は自動mergeしない
-- 最も早い責任Skillへ戻してcurrent内容を入力に再評価する
-- 古いrevisionでの後勝ち上書きを許可しない
+さらに次をすべて満たす必要があります。
+
+- update scopeがdisjoint
+- 対象scopeのupstream revision / fingerprintが不変
+- cross-scope invariantを壊さないことをowner contractで確認できる
+- current成果物を再読込してからscope外current内容を保持する
+
+それ以外は自動mergeせず、最も早い責任Skillへ戻してcurrent内容を入力に再評価します。
+
+workflow state自身も1 workflow = 1 persisted state artifactとしてstate revision / content identityを持ち、CASで更新します。
+
+古いrevisionでの後勝ち上書きを許可しません。
 
 この契約のために汎用transaction managerやGraph DBは追加しません。
+
