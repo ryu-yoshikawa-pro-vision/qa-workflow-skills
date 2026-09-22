@@ -230,8 +230,6 @@ Finding / FAILを自動Defect化しません。
 
 継続利用する知識の詳細契約は`_04d_continuous-qa-knowledge-and-concurrency.md`を正本とします。
 
-新しいuser-facing Skillは追加しません。
-
 既存正本へ属する知識は、その責任Skillへ戻します。
 
 - 仕様・期待挙動 → `spec-analysis`
@@ -242,7 +240,9 @@ Finding / FAILを自動Defect化しません。
 
 それでも残る、複数workflowで再利用するテスト対象・仕組み・観点・環境の知識だけをproject-level知識成果物として扱います。
 
-`qa-workflow`は知識の意味内容を独自に確定せず、project contextからrootを発見し、scopeに関係する有効entryを担当Skillへ入力として渡し、実際に利用したentry ref / revisionをworkflow stateへ残します。
+`qa-workflow`は知識の意味内容を独自に確定しません。project contextからknowledge rootを発見し、scopeに関係する`有効`entryを担当Skillへ入力として渡し、実際に利用したentry ref / revisionをworkflow stateへ残します。
+
+knowledge entryの意味上のlifecycleを既存Skillへ分散するか、専用Skillを1件追加するかは未確定です。この判断は実装前に追加リサーチで確定します。`qa-workflow`へdomain判断を持たせる案は採用しません。
 
 ## 16. project contextの追加入口
 
@@ -263,6 +263,8 @@ project context自体を汎用artifact registryにしません。
 
 `skills/qa-workflow/assets/workflow-state-template.md`は「1 project = 1 workflow」の形にしません。
 
+`qa-workflow`が複数sessionへ跨いで継続管理するworkflowは、1 workflow = 1 persisted state artifactとします。
+
 各workflow stateへ最低限次を追加します。
 
 - workflow_ref
@@ -270,13 +272,17 @@ project context自体を汎用artifact registryにしません。
 - workflow scope
 - started source refs / revisions
 - 利用したknowledge refs / revisions
+- project context ref / revision
 - 利用したenvironment / shared resource refs
 - produced artifact / Activity / Session refs
 - optional related workflow refs
+- state revision / content identity
+
+state更新は保存先のSHA / revision / ETag等によるCASを使用し、同じworkflowを複数session / Agentが同時resumeしても古いstateで後勝ち上書きしません。
 
 Skill状態表はそのworkflow内だけを表します。
 
-同時進行する別workflowの状態を同じ行へmergeしません。
+単発のstandalone Skill利用にまでpersisted workflow stateを強制しません。
 
 ## 18. 共有成果物の並行更新
 
@@ -286,8 +292,13 @@ PR #12の`test-target-inspection`にあるrevision / SHA / ETagベースの競�
 - 保存時にcurrent revisionを確認
 - 条件付き更新が使える保存先では利用する
 - 競合検出時に古いbaseで上書きしない
-- stable ID / update scopeでdisjointを決定論的に証明できる場合だけcurrentを再読込してscope外を保持
 - overlapping / unknown scopeでは責任Skillへ戻して再評価
+
+自動rebase / partial updateを許可するのは、owner Skillがdeterministic partial update boundaryを明示的に定義しているartifactだけです。
+
+その場合も、update scopeがdisjoint、upstream dependency revision / fingerprintが不変、cross-scope invariantを壊さないことを確認し、current成果物を再読込してからscope外current内容を保持します。
+
+stable IDが異なることだけを理由に安全mergeと判断しません。
 
 汎用merge engineは追加しません。
 
@@ -295,8 +306,18 @@ PR #12の`test-target-inspection`にあるrevision / SHA / ETagベースの競�
 
 `test-execution` / `exploratory-testing` / E2E等の実操作では、同時に利用するtest user、tenant、test data、external account等が他workflowへ影響し得ます。
 
-実装時はproject context / Activity / Session / executionからshared mutable resourceと利用条件を追跡できるようにします。
+優先順位を固定します。
 
-安全な並行利用を確認できない場合は、project policyに従って直列化またはblockします。
+1. workflowごとにresourceを分離する。
+2. 分離できず既存の外部reservation / exclusive ownership機構がある場合は利用する。
+3. 外部機構がなく、保存先がatomic CASを保証できる場合だけproject-local reservation recordを利用する。
+4. 排他を保証できず相互影響も否定できない場合は自動並行実行をblockする。
 
-resource reservation / lease / lockの具体方式は、PR #11 / #12 merge後の実装と外部リサーチを確認してから決定します。
+project-local reservationは必要なprojectだけで使用し、resource ref、workflow ref、関連Activity / Session ref、予約状態、reservation revisionを持たせます。acquire / releaseともCASで競合を検出します。
+
+read-only / parallel-safe用途にはreservationを要求しません。
+
+cleanupは自workflowが所有または予約したresource範囲だけを対象にします。
+
+自動expiry付きlease、distributed lock service、environment managerは追加しません。
+
