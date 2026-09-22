@@ -1,167 +1,199 @@
-# QA Artifact Graph / Harness 導入Plan
+# Regression Suite / QA Activity 統合Plan
 
 ## 1. Regression Suiteの位置づけ
 
-Regression Suiteは、各新規・改修セッションで設計された機能別Test Caseを継続的に統合した、**現在有効な全機能テストの基準集合**です。
+Regression Suiteは、**現在のRegression対象範囲を継続的に検証するための、currentかつ再利用可能な論理Test Caseの基準集合**です。
 
-Regressionのたびに変更影響からTCをゼロから集める方式を正本にしません。変更影響・Risk・過去FAIL等は部分実行時の抽出材料として利用します。
+Suiteを全TCの履歴保管庫にしません。
 
-Suite memberは論理的なTest Caseです。E2E testwareはTCの実装先であり、同じTCをmanual memberとE2E memberへ二重登録しません。
+各新規・改修セッションでは必ずSuiteを見直しますが、current TCを機械的に全件加入させません。
 
-## 2. Regression Suite成果物
+## 2. Regression対象範囲
 
-`qa-workflow`配下にproject-localなRegression Suite成果物を持ちます。新しいuser-facing Skillは追加しません。
+Suiteの完全性を判定する母集団はSuite自身から作りません。
 
-最小machine block:
+入力:
 
-```json
-{
-  "schema_version": "regression-suite-v1",
-  "feature_tags": [
-    {"tag": "...", "scope_refs": ["SPEC-..."]}
-  ],
-  "members": [
-    {
-      "test_case_ref": "TC-...",
-      "feature_tags": ["..."],
-      "source_artifact_ref": "..."
-    }
-  ],
-  "exclusions": [
-    {"test_case_ref": "TC-...", "reason": "..."}
-  ]
-}
+- 案件コンテキストの対象機能 / 業務フロー / role
+- test level
+- 現在有効な仕様根拠
+- Product Risk
+- 明示された非機能テスト範囲
+- 対象外
+
+`coverage-analysis`はこの独立したtest basisから、既存traceabilityを使ってSuite memberへ閉じているか確認します。
+
+```text
+current Regression test basis
+→ specification / Risk
+→ TR
+→ TCN / CI
+→ current TC
+→ Regression Suite
 ```
 
-current Suite成果物はcurrent membershipの正本です。過去runはactivity成果物内のSuite snapshotを正本とし、current Suite更新で書き換えません。
+feature tag一覧を「全機能」の正本にしません。
 
-## 3. 機能タグ
+## 3. Suite membership
 
-機能タグはRegression Suiteを機能単位で整理・抽出するためのproject-localな分類です。
+member条件:
 
-- 各current member TCは1件以上の機能タグを持つ
-- 1 TCへ複数タグを付けてもよい
-- tagは既存Suite、案件コンテキスト、現在有効な仕様根拠等で明示された機能区分を再利用する
-- 文字列類似、画面名類似、LLM推測だけで新しい機能区分を作らない
-- 新機能の明示的な機能区分が存在しない場合はSuite統合を確定せず、必要な区分を明示する
-- 機能タグはcoverage証拠ではない
+- PR #11上でcurrentな論理TCである
+- 現在のRegression対象範囲に属する
+- 今後の変更後にも繰り返し検証する意味がある
 
-`scope_refs`はその機能タグがどのcurrent仕様範囲を表すかを明示するために使用します。新しい汎用Feature ID体系は作りません。
+一回限りのmigration確認、調査専用、一時的な確認等はcurrent TCでも恒常memberにしないことがあります。
 
-## 4. 各セッションからの統合
+一方、実行コストが高い、特殊環境が必要、manualであることだけをmembership除外理由にしません。それらはRun側のscope / execution routeで扱います。
 
-新規・改修セッションでは、`test-case-design`でTCを作成し、必要な`coverage-analysis` / reviewを終えた後にSuite統合を行います。
+membershipの意味判断は、既存のProduct Risk・scope・test objectiveを扱う`test-analysis`へ寄せます。`qa-workflow`は判断結果を記録・反映します。
 
-既定:
+新しいRegression専用Skillは追加しません。
 
-1. currentとして確定したTC集合を取得する
-2. PR #11 stable IDで既存Suite memberと照合する
-3. 同一TC IDがあればcurrent source ref / tagを更新する
-4. 新規TC IDはmemberへ追加する
-5. current設計から削除 / 置換されたTCはcurrent member集合から外す
-6. 各memberの機能タグを確認する
-7. current TCをRegressionへ含めない場合だけ`exclusions`へ理由を残す
-8. `coverage-analysis`で全機能Suiteの意味上の閉鎖性を確認する
+## 4. Suiteの保持方法
 
-中間candidate、未解決、`要再検証`中のTCはcurrent Suiteの確定memberにしません。
+PR #11 merge後にcurrent TCをproject全体で列挙できるか確認します。
 
-各セッションでSuite更新を行うため、新しい機能・変更機能のテスト設計は次回以降のRegressionへ蓄積されます。
+### 直接列挙できる場合
 
-## 5. 全機能網羅の判定
+Suiteは派生viewとし、TC本文やlifecycleを複製しません。
 
-「全機能を網羅」は、feature tagごとにTCが1件存在することでは判定しません。
+必要な追加情報だけ保持します。
 
-`coverage-analysis`が現在有効な各機能について次を確認します。
+- Regression対象範囲ref
+- membership判断
+- 明示的な一時検証 / 対象外理由
+- optional filter
 
-- feature tagがcurrent機能scopeへ対応している
-- 機能scope内のcurrent仕様根拠 / Product Risk / TR / TCN / CIが既存契約どおり下流へ閉じている
-- その閉鎖先TCがcurrent Regression Suite memberに含まれている
-- `要再検証` / stale / unresolvedなTCをcurrent coverageとして数えていない
-- current機能scopeにSuite memberへ到達しない未カバーがない
+### 直接列挙できない場合
 
-未カバー、ブロック中、未解決feature tagがある場合は「全機能を網羅したRegression Suite」と扱いません。
+project-localなSuite artifactへmember refを保持します。
 
-## 6. 全件実行と部分実行
+それでもTC本文、freshness、deleted / superseded判定はPR #11を正本とします。
 
-Regression activityはSuite snapshotを固定してから実行scopeを決めます。
+## 5. feature tag / filter
 
-### 全件実行
+feature tagは任意のhuman-friendly filterです。
 
-- ユーザーが単にRegression実施を要求し、絞り込みを指定しない場合の既定
-- snapshot時点の全current memberを選択する
-- change impact / Riskだけを理由にmemberを落とさない
-- memberが実行不能 / ブロック中の場合も選択対象から消さず、未実行理由を残す
-- 全memberについてexecutionまたは明示未実行理由が閉じるまで全件実行完了にしない
+- projectに既存の機能分類がある場合は再利用できる
+- 1 TCに複数tagを付けてもよい
+- cross-feature TCを許容する
+- renameでTC identityを変更しない
+- tagがないことだけでmembership / coverageをblockしない
+- hierarchyはv1で追加しない
 
-### 部分実行
+feature指定Regressionを要求されたのにfilterとcurrent scopeのmappingを確定できない場合だけ、そのselected scopeをblockまたは安全側へ拡張します。
 
-次のいずれかが明示された場合だけ行います。
+coverageはtagではなく既存traceabilityを正本とします。
 
-- 機能タグによる対象指定
-- ユーザー指定TC / testware
-- PR #11のchange impact candidate
-- Product Risk
-- 明示relationで接続された過去FAIL / Finding
+## 6. add / update / remove
 
-`test-analysis`が意味上のselectionを行い、activity成果物へcandidate / selected / excluded / reason / residual riskを保存します。
+各セッションでは今回意味が変わった範囲だけ更新します。
 
-部分実行は選択範囲内のRegressionであり、全機能Regression完了とは表現しません。
+- stable TC IDが維持された変更 → 同じmember refとしてcurrent sourceを更新
+- 新規TC → membership判断後に追加
+- split / merge → PR #11のidentity / lifecycle判断に従う
+- deleted / superseded相当 → current Suiteから外す
+- 今回の成果物に存在しないだけ → 削除しない
 
-## 7. Regression activity成果物
+過去Regression activityのsnapshotはcurrent Suite更新で書き換えません。
 
-各runはcurrent Suiteとは別に活動成果物を持ちます。
+## 7. Full / Selected Run
 
-最小項目:
+SuiteとRunを分離します。
 
-- activity artifact ref
-- Suite source ref / revision（利用可能な場合）
-- Suite member snapshot
-- execution mode: `full` / `selected`
-- feature tag filter（利用時）
+### scope決定の優先順位
+
+1. ユーザーが明示したscope
+2. 案件コンテキストのRegression方針
+3. どちらも未定義なら安全側fallbackとしてfull
+
+### full
+
+snapshot時点の全memberをselectedにします。
+
+`full`は「全memberをscopeへ含めた」という意味であり、「全memberを実際に実行済み」という意味ではありません。
+
+### selected
+
+feature filter、明示TC、PR #11 impact、Product Risk、過去FAIL / Finding等からsubsetを選べます。
+
+`test-analysis`が意味上のselectionを行い、candidate / selected / excluded / rationale / residual riskをactivityへ残します。
+
+selected RunをSuite全体のRegression完了として扱いません。
+
+## 8. 実行状況
+
+Regression activityは最低限次を区別します。
+
+- snapshot member count
+- selected count
+- executed count
+- unexecuted count
+- blocked / unresolved count
+
+未実行理由が残っていてもactivityを報告可能にできますが、「全件実行済み」とは表現しません。
+
+## 9. Regression activity成果物
+
+最低限:
+
+- activity ref
+- Suite / baseline source ref / revision
+- member snapshot refs
+- run scope: `full` / `selected`
+- optional filter / explicit scope
 - candidate refs（selected時）
 - selected refs
 - excluded refsと理由（selected時）
 - selection根拠
-- relation queryの`complete`
+- query completeness（利用時）
 - residual risk
+- execution route refs
 - execution refs
-- unresolved / blocked
+- executed / unexecuted / blocked集計
+- unresolved
 
-過去activityは完了後にcurrent Suite変更で書き換えません。
+TC本文のsnapshotをここへ複製しません。実行時TC snapshotはPR #12を正本とします。
 
-## 8. manual / E2Eの扱い
+## 10. manual / E2E
 
 Suite membershipは論理TC単位です。
 
-- currentなE2E testwareがTCを実装している場合は`implemented_by`等の既存relationを利用する
-- testwareがないTCは`test-execution`で実行できる
-- 1つのTCをmanualとE2Eの2件としてSuite memberへ重複登録しない
-- E2E implementationがTCの検証責務を十分に満たすかは既存`coverage-analysis`（対象: `TC → E2E実装`）を正本とする
-- 実行手段が異なっても、Regression activityでは同じlogical TCのexecution historyとして追跡する
+E2E testwareは実装先です。
 
-## 9. relation不完全時の安全条件
+- E2E存在だけでmanual不要と判断しない
+- `coverage-analysis`（対象: `TC → E2E実装`）で検証責務を確認する
+- 十分なE2Eで閉じられるTC → E2E routeを選択可能
+- 部分的なE2E → manual + E2E、適切なTC分割、または未解決として扱う
+- 1 TC → 複数testwareを許容する
+- 複数TC → 1 testwareを許容する
+- TCなしE2EへTCを創作しない
 
-部分実行で候補抽出に使ったrelation queryが`complete=false`の場合、その候補だけでscopeを狭めません。
+TCなしE2EをRegressionで実行する必要がある場合は補助testware対象として扱えますが、TC-basedなRegression対象範囲のcoverage証拠へ自動算入しません。
 
-安全側の選択順:
+## 11. candidate不完全時
 
-1. ユーザーが明示したscopeがあればそのscopeを維持する
-2. 対応する機能タグが確定していれば対象機能のSuite member全件へ広げる
-3. 対象機能も確定できなければ全件Regressionへ広げる、または必要範囲をブロック中として明示する
+部分scopeを決めるcandidate queryが`complete=false`の場合、そのcandidateだけでscopeを狭めません。
+
+安全側の処理:
+
+1. ユーザー明示scopeがあれば維持する
+2. current test basisから対象範囲を確定できるなら、その範囲のSuite memberまで広げる
+3. 対象範囲も確定できなければfullへ広げる、または必要範囲をblockする
 
 候補0件だけを根拠にRegression不要と判断しません。
 
-## 10. 責務
+## 12. 責務
 
 | 処理 | 担当 |
 | --- | --- |
 | TC設計 | `test-case-design` |
-| 設計traceability / change impact / freshness | PR #11 runtime |
-| Suite bookkeeping / feature tag参照 / activity snapshot | `qa-workflow` |
-| 全機能 / 選択範囲の意味上coverage確認 | `coverage-analysis` |
-| 部分Regressionの意味上scope選定 | `test-analysis` |
+| design traceability / impact / freshness | PR #11 runtime |
+| 継続Regression対象かの意味判断 | `test-analysis` |
+| Regression対象範囲の意味上coverage | `coverage-analysis` |
+| Suite反映 / snapshot / routing | `qa-workflow` |
+| TC → E2E実装coverage | `coverage-analysis` |
 | manual相当実行 | `test-execution` |
 | E2E実行 | `e2e-test-execution` |
-| E2E失敗分析 | `e2e-test-result-analysis` |
-
-Regression専用Skillは追加しません。
+| E2E failure分析 | `e2e-test-result-analysis` |
