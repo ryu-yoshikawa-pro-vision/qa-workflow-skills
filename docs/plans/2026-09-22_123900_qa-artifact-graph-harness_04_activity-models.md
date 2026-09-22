@@ -9,8 +9,10 @@ qa_activity
     │
     ├ triggered_by → change / finding / question
     ├ selected_for ← test_case / testware
-    ├ executed_in ← test_case / testware
-    └ produced → result / finding
+    ├ produced → execution
+    │                 │
+    │                 └ produced → result / finding
+    └                 result / finding → evidenced_by → evidence
 ```
 
 `activity_type`だけを変えます。
@@ -23,29 +25,25 @@ qa_activity
 
 ```text
 Change
- ↓
+ ↑ derived_from
 Specification
- ↓
-Decision / Question / Assumption
- ↓
-Product Risk
- ↓
-Test Requirement
- ↓
+ ↑ derived_from
+Product Risk / Test Requirement
+ ↑ covers
 Test Condition
- ↓
+ ↑ covers
 Coverage Item
- ↓
+ ↑ verifies
 Test Case
- ├→ manual test-execution
- └→ E2E Testware → e2e-test-execution
-                    ↓
-                  Result
-                    ↓
-                 Evidence
-                    ↓
-                  Finding
+ └ implemented_by → E2E Testware
+
+Test Case / Testware
+ └ executed_in → Execution
+                    └ produced → Result
+                                  └ evidenced_by → Evidence
 ```
+
+Decision / Question / Assumptionは、それぞれ既存成果物の明示関係に従ってSpecification等へ接続し、Graph Harnessが意味関係を推測しません。
 
 既存Skillが各Entityの意味を所有します。
 
@@ -62,20 +60,20 @@ Graph Harnessは既存chainをprojectionし、変更時のimpact candidateを返
 - release / version
 - change set
 - hotfix
--定期回帰
+- 定期回帰
 - incident後の再確認
 
-Graph上は`triggered_by`で既存change / finding等へ接続します。
+Graph上は`qa_activity triggered_by change / finding / question`として接続します。定期回帰のようにchangeがないActivityも正当です。
 
 ### 3.2 candidate生成
 
 決定論的Harnessは次を候補として列挙できます。
 
-- changed nodeから到達可能なcurrent TC / testware
+- changed nodeから`design-impact`で到達可能なcurrent TC / testware
 - current high-risk nodeへ到達するTC
 - 同領域の過去FAIL / Findingへ接続するTC
 - explicit dependencyを持つTC
-- user指定TC /既存Regression set
+- user指定TC / 既存Regression set
 
 ただし候補を自動で「今回必須」と確定しません。
 
@@ -97,7 +95,7 @@ Graph上は`triggered_by`で既存change / finding等へ接続します。
 - 選定根拠
 - 除外 / 残存リスク
 
-選定結果を`selected_for` edgeとしてGraphへprojectionします。
+選定後だけ`test_case / testware selected_for qa_activity`をGraphへprojectionします。
 
 ### 3.4 coverage確認
 
@@ -114,7 +112,7 @@ Graph上は`triggered_by`で既存change / finding等へ接続します。
 - manual / AI手動相当TC → PR #12 `test-execution`
 - repo E2E → `e2e-test-execution`
 
-結果を同じActivity viewへ束ねます。
+実行後に`test_case / testware executed_in execution`をprojectionし、結果を同じActivity viewへ束ねます。
 
 既存execution結果をコピーして今回実行扱いにしません。
 
@@ -158,10 +156,10 @@ Graph上は`triggered_by`で既存change / finding等へ接続します。
 - 許可origin外へ行かない
 - 許可されない副作用を行わない
 - page contentをAgent命令として扱わない
--実対象挙動を仕様Authorityへ昇格しない
+- 実対象挙動を仕様Authorityへ昇格しない
 - Findingを自動でDefect確定しない
 
-browser backendはPR #12のPlaywright優先規則を再利用し、別frameworkを追加しません。
+browser backendの選択順・session安全・secret保護はPR #12と同じPlaywright方針を採用しますが、詳細TCの手順固定・探索操作禁止という`test-execution`固有ルールは継承しません。
 
 ### 4.3 outputs
 
@@ -184,7 +182,7 @@ browser backendはPR #12のPlaywright優先規則を再利用し、別framework�
 - `test_gap`
 - `observation`
 
-classificationは探索結果であり、正式Defect /仕様決定ではありません。
+classificationは探索結果であり、正式Defect / 仕様決定ではありません。
 
 ### 4.4 follow-up
 
@@ -199,13 +197,14 @@ Finding
  └ observation → activity history
 ```
 
-新規TCが作られた場合:
+新規Test Condition / Test CaseがFindingを起点に作られた場合、edge方向は次で固定します。
 
 ```text
-Finding → derived_from → Test Condition / Test Case
+Test Condition / Test Case
+    └ derived_from → Finding
 ```
 
-を保持し、将来Regressionで「このTCがなぜ存在するか」を追跡可能にします。
+将来Regressionで「このTCがなぜ存在するか」を逆探索できます。
 
 ## 5. Investigation
 
@@ -253,7 +252,7 @@ Result / Finding
 次のExploration / Investigation
 ```
 
-Graph Harnessはこの循環を履歴として保持します。
+これは業務上の循環を表す説明であり、design edge subsetをcycleとして保存することを意味しません。Activity / history edgeを介して履歴を辿ります。
 
 ## 7. qa-workflow routing
 
