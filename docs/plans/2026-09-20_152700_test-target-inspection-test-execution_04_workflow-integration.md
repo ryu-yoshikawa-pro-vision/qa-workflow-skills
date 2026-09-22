@@ -48,10 +48,14 @@ test-execution
   ↓ unresolvedあり
 該当TCは未実行として解消条件を報告
   ↓ unresolvedなし
-Playwright MCP等の対話操作
-または
-repo runnerから独立した今回run用の一時Playwrightコード
-  ↓
+Playwright MCP
+  ↓ 利用不可 / 必要能力不足
+Playwright CLI
+  ↓ 利用不可 / 必要能力不足
+独立した今回run用Playwright Libraryコード
+  ↓ 利用不可 / 安全に実施不能
+未実行 / ブロック中
+  ↓ 実行可能
 必要時に画像確認
   ↓
 期待結果と実測結果を比較
@@ -61,7 +65,7 @@ PASS / FAIL / 未実行 / 判定不能
 テスト実行結果を報告
 ```
 
-`test-execution`は、AI自身が現在の実対象を操作・観測することを基本とします。操作開始前に各TCをGiven / When / Then構造のYAMLへ整理し、多段TCでは中間期待結果を対応する操作へ結び付けます。1成果物内のTC実操作は直列とし、ユーザーまたは入力元が順序を明示していない場合はsnapshot入力順で、状態変更preflightからTC操作・後処理・cleanup・副作用回数更新までを1TCずつ完了してから次TCへ進みます。実行または合否判定に影響する曖昧さが残るTCは推測で補完せず`未実行`とします。browser / computer操作能力が利用できない場合は入力整理・preflightまでを可能な範囲で行い、実操作が必要なTCは`未実行`、対応範囲は`ブロック中`とします。既存の過去結果を読み替えるだけで新規実行要求を完了にしません。
+`test-execution`は、AI自身が現在の実対象を操作・観測することを基本とします。browser実行手段は`Playwright MCP → Playwright CLI → 独立した今回run用Playwright Libraryコード`の順で判定し、前段で契約どおり実施できる場合は下位手段を比較しません。いずれも利用できない、または安全条件を満たせない場合は実操作が必要なTCを`未実行`、対応範囲を`ブロック中`とします。操作開始前に各TCをGiven / When / Then構造のYAMLへ整理し、多段TCでは中間期待結果を対応する操作へ結び付けます。1成果物内のTC実操作は直列とし、ユーザーまたは入力元が順序を明示していない場合はsnapshot入力順で、状態変更preflightからTC操作・後処理・cleanup・副作用回数更新までを1TCずつ完了してから次TCへ進みます。実行または合否判定に影響する曖昧さが残るTCは推測で補完せず`未実行`とします。既存の過去結果を読み替えるだけで新規実行要求を完了にしません。
 
 ### repoへ残すPlaywright E2Eが必要
 
