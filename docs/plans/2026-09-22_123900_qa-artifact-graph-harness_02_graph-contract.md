@@ -53,33 +53,21 @@ v1は次だけを正規node typeとします。
 
 新しいnode typeをruntime入力から自由生成しません。追加はschema version変更を伴う明示実装とします。
 
-## 3. QA Activity
+## 3. QA Activity / Regression Suite
 
-`qa_activity`はQA業務を束ねる共通nodeです。
+`qa_activity`はRegression / Exploration / Investigationを後から参照するための活動成果物からprojectionします。optionalなworkflow stateだけを正本にしません。
 
 `activity_type`の正規値:
 
-- `new_change`
 - `regression`
 - `exploration`
 - `investigation`
 
-活動種別ごとに別Graphを作りません。
+新規・改修の通常設計は既存`qa-workflow`を正本とし、PR #13のactivity成果物を必須にしません。新規・改修セッションで確定したTCはRegression Suite更新時にsource artifact refを保持します。
 
-最小machine field:
+Regression SuiteはGraph nodeを正本にせず、project-localなsuite成果物を正本とします。Suiteは機能タグ一覧、current member TC、明示的な除外理由を持ちます。Graph / Harnessはその内容を読み取る消費者です。
 
-```json
-{
-  "node_type": "qa_activity",
-  "activity_type": "regression",
-  "source_artifact_ref": "...",
-  "status": "active"
-}
-```
-
-案件が既存Activity IDを持つ場合は保持できます。存在しない場合に正式IDを創作しません。
-
-`qa_activity`の正本を新規registryにせず、`qa-workflow`の既存workflow state / project context等の成果物からprojectionします。既存assetでactivity_type等を保持できない場合だけ、そのassetへ最小fieldを追加します。独立したactivity DBは追加しません。
+Regression / Exploration / Investigation成果物はproject-localなactivity indexへ登録し、過去成果物の発見経路を固定します。汎用artifact registryは追加しません。
 
 ## 4. identity contract
 
@@ -159,116 +147,63 @@ edgeごとに許可source/target node typeをschemaへ固定します。
 
 名称類似、同一画面、同一単語だけを理由にedgeを自動生成しません。
 
-## 6. impact traversal規則
+## 6. query / impact規則
 
-edgeの保存方向と変更影響の伝播方向を分離します。
+設計成果物のimpact traversalはPR #11の`change_impact.py` / traceability runtimeを正本とします。PR #13のHarnessがSPEC → TR → TCN → CI → TCを独自計算しません。
 
-`design-impact` queryでは次を固定します。
+PR #13が行うのは、PR #11が返したcurrent TC / relationを起点に、必要な場合だけ次へ接続することです。
 
-| Edge | 変更起点からの伝播 |
-| --- | --- |
-| `derived_from` | To変更 → 逆向きにFromへ |
-| `depends_on` | To変更 → 逆向きにFromへ |
-| `covers` | To変更 → 逆向きにFromへ |
-| `verifies` | To変更 → 逆向きにtest_caseへ |
-| `implemented_by` | test_case変更 / 要再検証 → 順方向にtestwareへ |
-| `supersedes` | 旧nodeをcurrent候補として使わないためのlifecycle判断に使用し、通常の下流impact traversalへ直接混ぜない |
-| activity / execution / evidence系edge | design-impactでは自動伝播しない |
+- TC → current E2E testware
+- TC / testware → Regression activity selection
+- execution → result / evidence
+- Finding → follow-up Question / Risk / Test Condition / Test Case
 
-Regression historyや過去FAILを調べる場合は別`activity-history` / `coverage-view` queryでactivity / execution / evidence系edgeを辿ります。
+過去FAIL / Findingを部分Regressionの参考にする場合も、文字列類似や「同じ画面」等をHarnessが推測しません。明示relationだけを機械的候補として返し、意味上の関連判断は`test-analysis`へ残します。
 
-これにより、履歴edgeを通じて過去Resultから設計成果物へ無制限にimpactが逆流することを防ぎます。
+query結果は`complete`を持ちます。unsupported artifact、unmapped relation、dangling ref等により候補集合の完全性を保証できない場合は`complete=false`とし、空集合を「影響なし」と解釈しません。
 
-## 7. PR #11 change impact graphとの関係
+## 7. PR #11 / #12との関係
 
-PR #11の`test-analysis` change impact graphは局所graphとして維持します。
+### PR #11
 
-PR #11で許可された:
+- Machine Entity identityをそのまま使用する
+- design dependency / traceability / change impact / freshnessを再計算しない
+- `depends_on / traces_to / derived_from`等の既存明示relationは、cross-artifact queryに必要な範囲だけprojectionする
+- PR #11 runtimeと異なるstateをGraph側で生成しない
 
-- `depends_on`
-- `traces_to`
-- `derived_from`
+### PR #12 / E2E
 
-を本Graphへprojectionするとき:
+- `test_case_ref`はartifact-localのまま保持する
+- `source_test_case_id`をglobal keyへ昇格しない
+- execution / result / evidence / rerunの事実を再判定しない
+- current executionかhistorical executionかはsource artifactのrevision / previous ref / lifecycleから読み取る
 
-- `depends_on` → `depends_on`
-- `derived_from` → `derived_from`
-- `traces_to` → source/targetの意味がv1 edgeへ一意に対応できる場合だけ固定mapping。対応不能ならlocal graph参照として保持し、global edgeを推測生成しない
+## 8. source state / history
 
-PR #11の`change_impact.py`をglobal Graph Harnessへ移植・削除しません。
+Graph独自の`graph_state`は追加しません。
 
-## 8. currentness / history
+- design freshness / stale / 要再検証 → PR #11
+- workflow block / completion → `qa-workflow`
+- execution result / rerun / cleanup → PR #12 / E2E
+- Regression Suite current membership → Regression Suite成果物
+- activity history → immutableなactivity成果物 + activity index
 
-Graph上の派生状態`graph_state`:
+Harnessはこれらのsource stateをviewへ表示できますが、別state machineとして上書きしません。
 
-- `current`
-- `revalidation_required`
-- `blocked`
-- `historical`
-- `superseded`
-- `unknown`
+過去Result / Findingは履歴として保持し、current runへコピーして今回実行扱いにしません。
 
-これは元成果物のstatusを上書きしません。
+## 9. Regression selectionの安全条件
 
-### current
+部分Regressionでrelation / impact候補を利用する場合、次のいずれかがあれば候補集合を完全と扱いません。
 
-current source artifactから抽出され、既知の再検証要求がない。
+- PR #11 impact resultが未検証 / unavailable
+- unsupported artifactがある
+- current Suite memberに機能タグがない
+- changed scopeとSuite feature scopeの対応が未解決
+- dangling / unmapped relationがある
+- current TC / testwareのfreshnessが不明
 
-### revalidation_required
-
-次のいずれかの候補:
-
-- current upstreamのidentity / content version変更により到達可能な下流
-- PR #11 runtimeが要再検証としたEntity
-- explicit rerun / revalidation requirementを持つ
-- Regression activityが再確認対象として選定した
-
-Graph traversalだけで「内容が誤っている」と断定しません。
-
-### historical
-
-過去run / 過去version / 確定済み旧execution等。
-
-履歴nodeを削除しません。
-
-### superseded
-
-明示`supersedes`関係または正本契約が置換済みとしたものだけ。
-
-### blocked
-
-正本側でblock中、または必須参照が未解決。
-
-## 9. 変更伝播
-
-変更伝播は2段階とします。
-
-```text
-deterministic reachability
-        ↓
-impact candidates
-        ↓
-responsible Skill semantic review
-        ↓
-current / revalidation / updated
-```
-
-Harnessは候補集合を返します。
-
-例:
-
-```json
-{
-  "changed": ["specification:SPEC-023"],
-  "candidates": [
-    {"node_key":"test_requirement:TR-014","distance":1},
-    {"node_key":"test_condition:TCN-052","distance":2},
-    {"node_key":"test_case:TC-087","distance":3}
-  ]
-}
-```
-
-意味上の影響がないと責任Skillが確認したnodeを、Harnessだけの判断で更新対象へ戻し続けません。確認結果を次回入力のexplicit closureとして参照できる契約を設けます。
+`complete=false`の候補集合だけを根拠にscopeを狭めません。`test-analysis`は明示ユーザーscope、機能タグによる広い範囲、または全件Regressionへ安全側に閉じます。
 
 ## 10. Graphに保存しないもの
 
