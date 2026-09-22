@@ -135,3 +135,63 @@ PR #13で第二のcurrentness stateを作りません。
 - 生の個人情報
 - chain-of-thought
 - source artifact本文全文
+
+## 9. 知識 / workflow provenance
+
+PR #13では、活動履歴だけでなく継続利用するQA知識とworkflowの由来もdirect refで追跡します。
+
+### workflow
+
+workflow state / Activity / Sessionから最低限次を辿れるようにします。
+
+- workflow_ref
+- 利用したQA artifact refs / revisions
+- 利用したknowledge entry refs / revisions
+- 利用したenvironment / resource条件
+- 生成したActivity / Session / artifact refs
+- related workflow refs（因果関係が明示できる場合だけ）
+
+### knowledge entry
+
+継続利用する知識entryから最低限次を辿れるようにします。
+
+- source artifact / inspection / Activity / Session / Finding refs
+- source revisions
+- 適用target / environment scope refs
+- related current QA artifact refs
+- 置換先ref
+
+Activity / Finding本文をknowledgeへ複製するのではなく、由来をrefで保持します。
+
+### historical snapshot
+
+workflow / Activity / Sessionが当時利用したrevisionは履歴として保持します。
+
+current knowledgeやcurrent QA artifactが更新されても、過去workflowの入力refを最新revisionへ書き換えません。
+
+## 10. cross-workflow query
+
+次のqueryもdirect ref + deterministic scanを優先します。
+
+- knowledge entry → 由来となったFinding / Activity / inspection
+- target / environment → 関連する有効knowledge entry
+- workflow → 利用したknowledge / artifact / environment
+- artifact revision → そのrevisionを利用した進行中 / 過去workflow
+- workflow Aの更新 → 影響を受けるworkflow Bのdependency
+
+query completenessはknowledge root / workflow history root / artifact discovery rootの完全性に依存します。
+
+完全性を保証できない場合は結果を完全な影響集合として扱いません。
+
+## 11. 並行更新とrevision
+
+direct refには、current artifactを更新するときの競合検出に利用できるrevision / SHA / ETag / content identityを含めます。
+
+同じbase revisionから複数workflowが共有成果物を更新した場合:
+
+- scopeがdisjointと決定論的に確認できる場合だけcurrent成果物を再読込してscope外current内容を保持できる
+- scopeが重なる、またはdisjointか判定できない場合は自動mergeしない
+- 最も早い責任Skillへ戻してcurrent内容を入力に再評価する
+- 古いrevisionでの後勝ち上書きを許可しない
+
+この契約のために汎用transaction managerやGraph DBは追加しません。
