@@ -17,6 +17,7 @@ Suiteのmembership判断とRun利用は`regression-testing`が担当します。
 - project context §3のtest level / 対象機能 / role / 業務フロー
 - current仕様根拠
 - current Product Risk / test objective
+- currentness確認済みの関連QA knowledge refs / revisions
 - project context §8の非機能テスト範囲
 - project context §11の対象外
 
@@ -168,7 +169,7 @@ project contextでfull対象と明示されたTCなし補助testwareは別枠で
 
 ### selected
 
-PR #11 impact、current Product Risk、past FAIL / Finding、明示TC / filter等を入力にcandidate / selected / excluded / rationaleを決定します。
+PR #11 impact、current Product Risk、past FAIL / Finding、currentness確認済みの関連QA knowledge、明示TC / filter等を入力にcandidate / selected / excluded / rationaleを決定します。
 
 `test-analysis`へRun selection責務を追加しません。
 
