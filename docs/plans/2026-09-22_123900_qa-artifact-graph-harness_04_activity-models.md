@@ -210,3 +210,75 @@ Regression manual FAIL
 ```
 
 workflow stateでは同一Skillの複数用途を`Skill + 対象 / 実行範囲`で識別します。
+
+## 10. 継続利用する知識への反映
+
+Activity / Session / executionで得たFindingやObservationを、そのままcurrentな知識へ昇格しません。
+
+後続で再利用する価値がある場合:
+
+1. 仕様 / Product Risk / TC / currentな実対象資料等の既存正本へ属するか判定する。
+2. 属する場合は最も早い責任Skillへroutingして正本を更新する。
+3. 既存正本へ自然に置けない継続知識だけ、project-levelの知識成果物候補にする。
+4. source ref / revision、適用scope、environment / version条件を確認できない候補は`要再検証`のままにする。
+5. 有効化したentryだけ、次回workflowの入力候補として利用する。
+
+Regression historyやExploration Sessionは知識の由来として保持しますが、知識本文の第二の正本にはしません。
+
+## 11. 複数workflowの同時進行
+
+`qa-workflow`で管理する各workflowは独立した`workflow_ref`を持ちます。
+
+例:
+
+```text
+workflow A: 新機能Aのdesign
+workflow B: release Regression
+workflow C: production issue investigation
+workflow D: exploratory session
+```
+
+各workflowは自分が開始・利用したartifact / knowledge / project context / environment条件のref / revisionを保持します。
+
+同時進行してもworkflow stateを1件のglobal current stateとして上書きしません。
+
+### 進行中に別workflowが上流を更新した場合
+
+workflow Aがsnapshot v1を使って実行中にworkflow Bがcurrentをv2へ更新しても、Aのhistorical execution / Activity / Sessionをv2へ差し替えません。
+
+ただしAがlatest current stateに対する完了・再利用を主張する前に、参照revision / fingerprintを再確認します。
+
+- 影響あり → 該当scopeを`要再検証`
+- 影響なしをdependencyで確認できる → 継続
+- 影響範囲を安全に限定できない → 必要scopeを再評価
+
+これにより「当時の結果」と「現在も有効な結果」を分離します。
+
+## 12. 共有current artifactの更新競合
+
+複数workflowが同じcurrent artifactを更新する場合:
+
+- 読み込み時revision / SHA / ETag / content identityを保持
+- 保存直前にcurrent revisionを確認
+- 変わっていれば古いbaseから上書きしない
+
+stable ID / update scope等により変更範囲がdisjointと決定論的に確認できる場合だけ、current内容を再読込してscope外を維持した上で対象scopeを再適用できます。
+
+scopeが重なる、または判定不能なら、責任Skillでcurrent内容を入力に再評価します。
+
+LLMが競合したsemantic contentを無条件に自動mergeしません。
+
+## 13. 共有環境の同時利用
+
+Regression、Exploration、修正確認等が同時に実対象を操作する場合、環境・test user・test data・tenant・external account等が共有される可能性があります。
+
+実操作を伴うworkflowは、必要なshared mutable resourceをActivity / Session / executionの入力として明示します。
+
+- workflowごとに分離されたresource → 並行実行可能
+- 同じresourceでも相互影響がないことを明示できる → project policyに従い並行可能
+- 相互影響を否定できない → 直列化またはblock
+- policy不明 → 同時利用可能と推測しない
+
+cleanupは自workflowが所有するresource範囲だけを対象にします。
+
+具体的なreservation / lease方式は実装前リサーチで決めます。
