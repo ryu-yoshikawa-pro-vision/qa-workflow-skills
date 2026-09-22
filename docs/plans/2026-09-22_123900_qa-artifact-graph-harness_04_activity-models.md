@@ -290,11 +290,13 @@ Regression、Exploration、修正確認等が同時に実対象を操作する�
 
 実操作を伴うworkflowは、必要なshared mutable resourceをActivity / Session / executionの入力として明示します。
 
-- workflowごとに分離されたresource → 並行実行可能
-- 同じresourceでも相互影響がないことを明示できる → project policyに従い並行可能
-- 相互影響を否定できない → 直列化またはblock
-- policy不明 → 同時利用可能と推測しない
+shared mutable resourceは次の優先順位で扱います。
 
-cleanupは自workflowが所有するresource範囲だけを対象にします。
+1. workflowごとにresourceを分離する。
+2. 既存の外部reservation / exclusive ownership機構があれば利用する。
+3. 外部機構がなく、保存先がatomic CASを保証できる場合だけproject-local reservationを利用する。
+4. 排他を保証できず相互影響も否定できない場合はblockする。
 
-具体的なreservation / lease方式は実装前リサーチで決めます。
+read-only / parallel-safeで相互影響がないことを確認できるresourceはreservation不要です。
+
+cleanupは自workflowが所有または予約したresource範囲だけを対象にします。
