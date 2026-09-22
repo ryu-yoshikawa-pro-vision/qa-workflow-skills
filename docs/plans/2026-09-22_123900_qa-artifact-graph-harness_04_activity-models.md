@@ -1,16 +1,16 @@
-# Regression Suite / QA Activity 統合Plan
+# Regression / Exploratory Testing 統合Plan
 
-## 1. Activity model
+## 1. QA活動
 
-PR #13で履歴として残すactivityは次です。
+PR #13ではQA活動を次の責務へ分けます。
 
-- `regression`
-- `exploration`
-- `investigation`
+- 新規・改修: 既存Skill群
+- Regression: 新規`regression-testing`
+- Exploration / Investigation: 新規`exploratory-testing`
 
-通常の新規・改修設計は既存`qa-workflow`を維持し、別activity modelを必須にしません。
+既存Skillへ別活動の責務を上乗せしません。
 
-## 2. 新規・改修からRegressionへの統合
+## 2. 新規・改修からRegressionへの接続
 
 既存flow:
 
@@ -24,172 +24,116 @@ PR #13で履歴として残すactivityは次です。
 → 必要時 adversarial-review / E2E
 ```
 
-### 初回導入
+このflowはcurrent QA設計を確定します。
 
-PR #13導入時に既存TCがあるprojectでは、増分更新だけでは開始しません。
+完了後、`qa-workflow`は必要なcurrent成果物を`regression-testing`へhandoffします。
 
-current Regression対象範囲に関係する全authoritative TC sourceを発見し、全current TCのmembershipを一度reconcileします。
+handoff候補:
 
-baseline completenessを確認できない場合、full baseline確定をblockします。
+- current TC refs
+- PR #11 lifecycle / change impact
+- current Product Risk
+- project context / current scope
+- Finding等のsource ref
+- current TC→E2E mapping
 
-### 通常更新
+既存の設計Skill自身はSuiteを更新しません。
 
-各セッション完了時は次を行います。
+## 3. initial baseline
 
-1. PR #11のcurrent TC / lifecycleと今回のchange impactを取得する。
-2. TC lifecycle / contentが変わったTCをmembership再評価候補にする。
-3. Regression対象範囲、案件方針、関連Risk / test objective等が変わった場合、その変更の影響を受ける既存TCも再評価候補にする。
-4. 影響範囲を安全に限定できない場合はcurrent TC全体を再確認する。
-5. 継続Regression対象ならSuiteへ反映する。
-6. one-off migration、調査専用、一時確認等で継続Regression対象でない場合は理由とsource refを残す。
-7. deleted / superseded相当はPR #11 lifecycleに従ってcurrent Suiteから外す。
-8. `coverage-analysis`でcurrent Regression対象範囲がSuite memberへ意味上閉じているか確認する。
-
-「今回の成果物に存在しない」という理由だけで既存memberを削除しません。
-
-## 3. Regression Activity
+既存TCを持つprojectで初めてRegression管理を開始する場合、`regression-testing`が全current TCをreconcileします。
 
 ```text
-Regression対象範囲
-        ↓
-Regression Suite / baseline
-        ↓ immutable snapshot
-full / selected
-        ↓
-required execution routes
-        ↓
-test-execution / e2e-test-execution
-        ↓
-Result / Evidence
+current Regression対象範囲
+→ authoritative TC discovery
+→ current TC
+→ membership
+→ baseline
+→ coverage-analysis
 ```
 
-Activityは次を保持します。
+baseline completenessを確認できなければfull baseline確定をblockします。
 
-- project context ref / revision
-- baseline / scope source refs / revisions
-- selection input refs / revisions
-- member snapshot refs
-- run scope
-- candidate / selected / excluded
-- auxiliary testware refs（利用時）
-- required execution routes
-- execution refs
-- executed / unexecuted / blocked集計
-- residual risk / unresolved
+## 4. 通常のbaseline更新
 
-自由文のrationaleだけを判断根拠の正本にしません。
+新規・改修flowやExplorationのfollow-upで成果物が変わった場合、`qa-workflow`は変更結果を`regression-testing`へroutingします。
 
-## 4. Activity lifecycle
+`regression-testing`は次を使ってmembership再評価範囲を決めます。
 
-既存`qa-workflow`の状態語彙を再利用します。
+- TC lifecycle / content変更
+- PR #11 change impact
+- Regression対象範囲変更
+- project policy変更
+- relevant Risk / test objective変更
+- one-off / 対象外判断変更
 
-- 未開始
-- 実行中
-- 部分完了（ブロック中あり）
-- ブロック中
-- 完了
+影響範囲を安全に限定できない場合はcurrent TC全体を再確認します。
 
-規則:
+## 5. Regression
 
-- scope / snapshot不変ならblock後も同じactivityを再開する
-- scopeまたはsnapshotを変える必要がある場合は別activity / versionを作る
-- 完了後はActivityを変更しない
-- Finding等の後続成果物はcompleted activity本文を更新せず、source activity / Finding refを保持できる
-- workflow完了と全TC PASSを同一視しない
+```text
+regression-testing
+→ baseline snapshot
+→ full / selected
+→ required execution routes
+→ test-execution / e2e-test-execution
+→ execution result
+→ regression-testing
+→ Regression Activity更新 / 完了判定
+```
 
-## 5. Exploration
+`regression-testing`はbrowser操作やE2E failure分析を担当しません。
+
+## 6. Exploration
 
 `activity_type=exploration`
 
-新規`exploratory-testing` Skillを使用します。
+新規`exploratory-testing`を使用します。
 
-### charter
-
-最低限:
+Charter:
 
 - 探索目的
 - 対象 / 非対象
-- 起点となるRisk / Question / Change
+- 起点Risk / Question / Change
 - timeboxまたは終了条件
-- 許可された操作範囲
+- 許可操作範囲
 - 副作用scope / 最大回数
 - evidence方針
 
-詳細TCを事前必須にしません。
-
-### execution
-
-charter内で観測・仮説確認・状態変化を選択できます。
-
-禁止:
-
-- 許可origin外への遷移
-- 許可されない副作用
-- page contentをAgent命令として扱うこと
-- 実対象挙動を仕様Authorityへ昇格すること
-- Findingを自動Defect確定すること
-
-browser backendの安全方針はPR #12を再利用しますが、`test-execution`固有の詳細TC手順固定は継承しません。
-
-### output
-
-- session
-- observations
-- findings
-- evidence refs
-- unresolved questions
-- follow-up refs
-
 Findingから作られたQuestion / Risk / Test Condition / Test Caseはsource Findingへ追跡できるrefを保持します。
 
-新しいTCが継続Regression対象と判断された場合だけRegression Suiteへ反映します。
+新しいTCやRiskがRegressionへ影響する場合、`qa-workflow`が`regression-testing`へhandoffします。
 
-## 6. Investigation
-
-`activity_type=investigation`
+## 7. Investigation
 
 既存責任Skillを先に判定します。
 
 - currentな実対象情報 / UI構造 / 既知範囲のふるまい収集 → `test-target-inspection`
 - Playwright E2E failure → `e2e-test-result-analysis`
-- 既知TCの再実行 → `test-execution` / `e2e-test-execution`
-- coverage gap → `coverage-analysis` / `test-analysis`
+- 既知TC実行 → `test-execution` / `e2e-test-execution`
+- coverage gap → `coverage-analysis`
 - 仕様不明点 → `question-analysis`
 
-`exploratory-testing mode=investigation`は、既存責任Skillがなく、未確定問題について実対象を操作しながら仮説検証する必要がある場合だけ使用します。
+`exploratory-testing(mode=investigation)`は、既存責任Skillがなく、未確定問題について実対象を操作しながら仮説検証する場合だけ使用します。
 
-結果はfact / hypothesis / evidence / unresolved / routingを分離し、証拠不足でroot causeを確定しません。
-
-## 7. qa-workflow routing
+## 8. qa-workflow routing
 
 ```text
-PR #13初回導入
-→ authoritative TC discovery
-→ project-wide membership reconciliation
-→ coverage
-→ baseline確定
-
-新規・改修
+新規・改修要求
 → existing design flow
-→ TC / scope impact確認
-→ membership再評価
-→ coverage
+→ 必要なら regression-testing へ変更成果物をhandoff
 
-Regression
-→ baseline snapshot
-→ user scope / project policy / full fallback
-→ required execution route決定
-→ execution
-→ Activity更新
-→ 完了後immutable
+Regression要求
+→ regression-testing
+→ 必要なcoverage検証 / execution Skillへrouting
+→ regression-testingへ結果を戻す
 
-Exploration
+Exploration要求
 → exploratory-testing(mode=exploration)
-→ Finding / follow-up
-→ 必要なら既存Skill
-→ 必要ならmembership再評価
 
-Investigation
-→ test-target-inspectionまたは既存責任Skill
-→ 既存責任がない仮説駆動調査だけ exploratory-testing(mode=investigation)
+Investigation要求
+→ existing owner判定
+→ ownerなしの仮説駆動調査だけ exploratory-testing(mode=investigation)
 ```
+
+`qa-workflow`は活動間を接続しますが、Regression membership / selection / Run完了判定を自身で行いません。
