@@ -12,17 +12,17 @@ PR #13ではuser-facing Skillを2件追加します。
 | Skill / runtime | PR #13での位置づけ |
 | --- | --- |
 | PR #11 Machine Entity / traceability | identity / lifecycle / impact / freshnessの正本 |
-| `test-analysis` | 新規・改修のRisk / test objective / test scope |
+| `test-analysis` | 新規・改修の変更影響候補 / Product Risk / test objective / test scope |
 | `test-case-design` | current logical TC |
-| `coverage-analysis` | 指定された成果物のcoverage検証 |
-| `regression-testing` | Regression baseline / membership / selection / Activity |
+| `coverage-analysis` | 指定された成果物の意味上coverage検証 |
+| `regression-testing` | Regression baseline / membership / Run計画 / Activity / history |
 | `test-target-inspection` | currentな実対象情報 / UI / 既知範囲のふるまい収集 |
-| `test-execution` | manual相当execution / result / evidence |
+| `test-execution` | manual相当execution / Confirmation / result / evidence |
 | `e2e-test-implementation` | E2E testware |
-| `e2e-test-execution` | E2E execution / result / evidence |
+| `e2e-test-execution` | E2E execution / Confirmation / result / evidence |
 | `e2e-test-result-analysis` | E2E failure分析 |
 | `exploratory-testing` | Exploration / 仮説駆動Investigation |
-| `qa-workflow` | QA活動間のrouting / common workflow state |
+| `qa-workflow` | 複合workflowのrouting / common workflow state / blocked / resume |
 
 ## 2. 既存の新規・改修Skill
 
@@ -37,37 +37,50 @@ PR #13ではuser-facing Skillを2件追加します。
 - current TC→E2E mapping
 - PR #11によるchange impact / freshness
 
-これらは`regression-testing`の入力です。
+「変更による回帰影響候補とProduct Riskを整理する」は`test-analysis`の既存責務として維持します。
 
-「新しいTCを作ったらSuiteへ追加する」のは`test-case-design`の責務ではありません。
+「その影響候補等を使って、既存baselineから今回実行するRegression TCを確定する」は`regression-testing`です。
+
+この境界をtrigger / semantic evalで固定します。
 
 ## 3. regression-testing
 
 詳細契約は`_04b_regression-testing-skill.md`を正本とします。
 
-責務:
+正規の`対象 / 実行範囲`:
 
-- initial baseline
-- membership / membership再評価
-- full / selected
-- candidate / selected / excluded
-- residual risk
-- required execution route
-- TCなし補助testware
-- Regression Activity
-- Run完了判定
-- history参照
+- `baseline / membership`
+- `Run計画`
+- `Run結果更新`
+- `履歴参照`
 
-担当しないもの:
+`regression-testing`単体で完結できる要求と、`qa-workflow`がexecutionまでオーケストレーションする要求を分離します。
 
-- 仕様分析
-- Product Riskの新規評価
-- TR / TCN / CI / TC設計
-- browser操作
-- E2E failure原因分析
-- PR #11 freshness再実装
+## 4. exploratory-testing
 
-## 4. project context
+詳細契約は`_04c_exploratory-testing-skill.md`を正本とします。
+
+正規の`対象 / 実行範囲`:
+
+- `exploration`
+- `investigation`
+
+Investigation専用Skill / 別runtimeは追加しません。
+
+## 5. Confirmation Testing
+
+Confirmation専用Skillは追加しません。
+
+既知のFAIL / reproductionに対して、
+
+- manual相当 → `test-execution`
+- repo E2E → `e2e-test-execution`
+
+を再利用します。
+
+ConfirmationとRegressionは目的を分離し、同じ`qa-workflow`内で順に実施できます。
+
+## 6. project context
 
 既存`skills/qa-workflow/assets/project-context-template.md`を拡張します。
 
@@ -85,22 +98,19 @@ PR #13ではuser-facing Skillを2件追加します。
 
 対象機能、role、業務フローをRegression専用欄へ複製しません。
 
-## 5. coverage-analysis
+## 7. coverage-analysis
 
 Regression専用Skillにはしません。
 
 `regression-testing`または`qa-workflow`から指定された対象に対し、既存責務の範囲で確認します。
 
-- current Regression対象範囲→TCの意味上coverage
-- stale / `要再検証`TCをcurrent coverageへ数えていないか
-- selected scopeのcoverage
-- TC→E2E実装の十分性
+- current Regression対象範囲 → TC
+- selected scope → selected TC
+- TC → E2E実装
 
-coverage gapを見つけた場合は既存routingに従って責任Skillへ戻します。
+Regression membership / Run selectionを`coverage-analysis`自身で決定しません。
 
-Regression membership / selectionを`coverage-analysis`自身で決定しません。
-
-## 6. PR #11
+## 8. PR #11
 
 正本:
 
@@ -111,11 +121,11 @@ Regression membership / selectionを`coverage-analysis`自身で決定しませ�
 - freshness / stale / `要再検証`
 - partial update lifecycle
 
-`regression-testing`はこれを入力として利用します。
+`regression-testing`は入力として利用し、独自freshnessを作りません。
 
 PR #11がproject-wide artifact discoveryを保証するとは仮定しません。
 
-## 7. PR #12 / E2E
+## 9. PR #12 / E2E
 
 ### test-target-inspection
 
@@ -123,60 +133,97 @@ currentな実対象情報 / UI / 既知範囲のふるまい確認を担当し�
 
 ### test-execution
 
-実行時TC snapshot、manual相当execution / result / evidenceを正本として扱います。
+- TC snapshot
+- manual相当execution
+- Confirmation execution
+- source execution start / result / evidence / cleanup
 
-Regression Activityにはexecution refだけを保持します。
+を正本とします。
+
+PR #12 Planでは最初の`scenario.when`操作開始がTCの開始済み境界です。`regression-testing`はこのsource contractを参照します。
 
 ### E2E
 
-TCあり / TCなしの既存経路を維持します。
+既存repo E2Eのexecution / rerun / raw result契約を正本とします。
 
 TCなしE2EへTCを創作しません。
 
-## 8. exploratory-testing
+## 10. qa-workflow
 
-### 目的
+`qa-workflow`は活動間routingだけでなく、複数Skillが必要なend-to-end QA要求をオーケストレーションします。
 
-既知TC実行と分離し、charterに基づく探索・仮説検証を担当します。
+代表例:
 
-### mode
+- 新規・改修 + Regression asset reconciliation
+- Confirmation + Regression
+- Regression Run planning + manual / E2E execution + Activity update
+- Regression FAIL → analysis / investigation → fix → Confirmation → rerun
+- Regression + Exploration
 
-- `exploration`
-- `investigation`
-
-### routing
-
-- current UI / ふるまい情報収集 → `test-target-inspection`
-- 既知TC実行 → `test-execution` / `e2e-test-execution`
-- E2E failure → `e2e-test-result-analysis`
-- 仕様不明 → `question-analysis`
-- coverage gap → `coverage-analysis`
-- ownerなしの仮説駆動調査 → `exploratory-testing(mode=investigation)`
-
-## 9. qa-workflow
-
-`qa-workflow`は活動間routingへ集中します。
-
-追加するrouting:
-
-- 新規・改修完了 → 必要なら`regression-testing`へ変更成果物をhandoff
-- Regression要求 → `regression-testing`
-- Regression中のcoverage確認 → `coverage-analysis`
-- Regression中のmanual実行 → `test-execution`
-- Regression中のE2E実行 → `e2e-test-execution`
-- execution結果 → `regression-testing`
-- Exploration → `exploratory-testing`
-
-`qa-workflow`自身は次を決めません。
+`qa-workflow`自身は次を独立再判定しません。
 
 - Regression membership
-- full / selectedの意味判断
+- full / selected
 - candidate / selected / excluded
 - required execution route
-- Regression Activity完了条件
+- source result
+- Regression Activity domain state
 
-## 10. Portability
+## 11. workflow state / canonical Skill更新
+
+PR #11 / #12 merge後の最新実装を確認し、少なくとも次をPR #13実装対象へ含めます。
+
+- `skills/qa-workflow/assets/workflow-state-template.md`
+- `scripts/skills/evals/deterministic/common.py`の`CANONICAL_SKILLS`
+- 同ファイルの`MULTI_USE_SKILL_TARGETS`
+- `skills/qa-workflow/evals/deterministic/validator.py`への影響確認
+- qa-workflow routing fixtures / candidate outputs
+- `.github/workflows/validate-skills.yml`のSkill一覧 / 件数
+- README / EVALS / ASSERTIONS等のSkill一覧と件数
+
+`MULTI_USE_SKILL_TARGETS`へ少なくとも次を追加します。
+
+```text
+regression-testing:
+- baseline / membership
+- Run計画
+- Run結果更新
+- 履歴参照
+
+exploratory-testing:
+- exploration
+- investigation
+```
+
+最新mainのSkill数を実装時に再取得し、古い14 Skill前提をハードコードしません。
+
+## 12. FAIL / Finding feedback
+
+Regression中のFAIL / 判定不能は`regression-testing`が原因確定しません。
+
+`qa-workflow`が証拠に応じて、
+
+- E2E異常 → `e2e-test-result-analysis`
+- 仕様不明 → `question-analysis`
+- current実対象情報不足 → `test-target-inspection`
+- TC問題 → `test-case-design`
+- coverage gap → `coverage-analysis`
+- ownerなしの仮説駆動調査 → `exploratory-testing | investigation`
+
+へroutingします。
+
+修正後はConfirmationを実施し、必要ならbaseline / Run scopeを再評価します。
+
+## 13. reporting / Defect Management
+
+PR #13では汎用reporting Skillや`defect-reporting`を追加しません。
+
+Finding / FAILを自動Defect化しません。
+
+実装後に報告形式の重複や運用上の必要性が確認された場合は別課題として検討します。
+
+## 14. Portability
 
 既存Skillは単体利用時にRegression Suite / Activityを必須にしません。
 
-`regression-testing`と`exploratory-testing`も、汎用Graph / relation indexなしで主要機能を利用できることを必須にします。
+`regression-testing`と`exploratory-testing`もGraph / relation indexなしで主要機能を利用できることを必須にします。
