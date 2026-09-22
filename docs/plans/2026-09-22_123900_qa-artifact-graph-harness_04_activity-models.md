@@ -213,17 +213,33 @@ workflow stateでは同一Skillの複数用途を`Skill + 対象 / 実行範囲`
 
 ## 10. 継続利用する知識への反映
 
-Activity / Session / executionで得たFindingやObservationを、そのままcurrentな知識へ昇格しません。
+Activity / Session / executionで得たFindingやObservationを、そのままcurrentなknowledgeへ昇格しません。
 
 後続で再利用する価値がある場合:
 
-1. 仕様 / Product Risk / TC / currentな実対象資料等の既存正本へ属するか判定する。
-2. 属する場合は最も早い責任Skillへroutingして正本を更新する。
-3. 既存正本へ自然に置けない継続知識だけ、project-levelの知識成果物候補にする。
-4. source ref / revision、適用scope、environment / version条件を確認できない候補は`要再検証`のままにする。
-5. 有効化したentryだけ、次回workflowの入力候補として利用する。
+1. candidateを元Activity / Finding / Follow-upへ残す。
+2. `qa-knowledge`が既存正本へ属するか分類する。
+3. specification / Product Risk / current実対象情報 / design artifactへ属する場合は既存ownerへroutingする。
+4. 既存正本へ自然に置けない場合だけ継続再利用価値、scope、applicability、provenance、currentness dependencyを確認する。
+5. 条件を満たす場合だけfixed knowledge rootへentryを作成 / 更新する。
+6. currentness dependencyが変わったentryはcurrent判断へ使用せず、`qa-knowledge | revalidation`へ送る。
 
-Regression historyやExploration Sessionは知識の由来として保持しますが、知識本文の第二の正本にはしません。
+Regression historyやExploration Sessionはknowledgeのprovenanceとして保持しますが、knowledge本文の第二の正本にはしません。
+
+### 代表routing
+
+```text
+Finding / Observation
+→ qa-knowledge | triage
+├→ spec-analysis
+├→ test-analysis
+├→ test-target-inspection
+├→ design Skill
+└→ residual knowledge
+     → qa-knowledge | create / update
+```
+
+既存の有効knowledgeをdomain Skillが入力として利用するだけなら、`qa-knowledge`を中央gatewayとして必須化しません。
 
 ## 11. 複数workflowの同時進行
 
