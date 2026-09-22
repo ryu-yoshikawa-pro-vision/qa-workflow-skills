@@ -12,7 +12,7 @@ PR #11 / #12後に残る課題を、既存の新規・改修SkillへRegression�
 - Regressionごとのselection / execution / source result / residual riskを履歴化する
 - 修正確認を独立Skillにせず、既存TCが有効ならexecutionへ直接、設計不足がある場合だけ既存analysis / designを経由して実行する
 - Exploration / Investigationを`exploratory-testing`として独立させる
-- QA活動で得た対象・仕組み・テスト観点・環境の知識を、既存正本を壊さず継続再利用できるようにする
+- QA活動で得た対象・仕組み・テスト観点・環境の知識を、`qa-knowledge`で既存正本と分離しながら継続再利用できるようにする
 - 複数workflowが同時進行しても、workflow state・共有QA成果物・test environment / dataが混線しないようにする
 
 PR #13で再実装しないもの:
@@ -191,6 +191,16 @@ current QA成果物を作ります。Regression固有判断は行いません。
 - required execution route
 - Run結果更新
 - history
+
+### qa-knowledge
+
+- knowledge candidate triage
+- 既存正本ownerへのrouting
+- residual knowledge validation
+- entry create / update / revalidation / replacement
+- knowledge lookup / history
+
+仕様Authority、Product Risk、TC、current実対象情報そのものは確定しません。
 
 ### qa-workflow
 
