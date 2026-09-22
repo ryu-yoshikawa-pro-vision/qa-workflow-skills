@@ -1,91 +1,76 @@
-# QA Artifact Graph / Harness 導入Plan
+# Regression Suite / QA Activity 統合Plan
 
 ## 1. 既存Skillとの関係
 
-PR #13は既存Skillの意味責務を変更せず、残課題だけを統合します。
-
 | Skill / runtime | PR #13で利用する内容 |
 | --- | --- |
-| PR #11 Machine Entity / traceability | design identity / relation / impact / freshnessの正本 |
+| PR #11 Machine Entity / traceability | design identity / lifecycle / impact / freshnessの正本 |
+| `test-analysis` | 継続Regression対象判断、selected scope判断 |
 | `test-case-design` | current logical TC |
-| `coverage-analysis` | 全機能Regression Suiteと選択範囲の意味上coverage |
-| `test-analysis` | 部分Regressionの意味上scope選定 |
+| `coverage-analysis` | Regression対象範囲coverage、TC → E2E実装coverage |
 | `test-target-inspection` | target snapshot |
 | `test-execution` | manual相当execution / result / evidence |
-| `e2e-test-implementation` | TCのtestware実装先 |
+| `e2e-test-implementation` | testware |
 | `e2e-test-execution` | E2E execution / result / evidence |
-| `e2e-test-result-analysis` | E2E failure analysis |
-| `qa-workflow` | Regression Suite更新、activity成果物 / index、routing、Harness invocation |
-| `exploratory-testing` | Exploration / Investigation session / finding / evidence / follow-up |
+| `e2e-test-result-analysis` | E2E failure分析 |
+| `qa-workflow` | Suite見直し、activity、routing、history discovery |
+| `exploratory-testing` | Exploration / Investigation |
 
-## 2. PR #11統合
+## 2. PR #11
 
-PR #11を次の正本として扱います。
+PR #11を次の正本とします。
 
-- stable QA ID / Machine Entity
+- stable QA ID
+- Machine Entity
 - design dependency / traceability
 - change impact
-- freshness / stale / 要再検証
-- deterministic generator結果
+- freshness / stale / `要再検証`
+- partial update lifecycle
 
-PR #13で禁止すること:
+PR #13で行いません。
 
-- design impactを別Harnessで再計算する
-- Graph独自currentnessとPR #11 freshnessを二重管理する
-- Graph目的でMachine Entity identity / fingerprintを変更する
-- Skillごとのdesign adapterを再実装する
+- design impact再計算
+- Graph独自currentness
+- Machine Entity再生成
+- Graph目的のfingerprint拡張
+- current / deleted / superseded相当の独自判定
 
-Regression Suite更新ではPR #11のcurrent TC identity / lifecycleを利用します。
+Regression SuiteはPR #11のcurrent TC / lifecycleを参照します。
 
-## 3. PR #12統合
+## 3. PR #12 / E2E
 
 ### test-target-inspection
 
-`test_target_snapshot` nodeとしてprojectionします。
-
-保持:
-
-- 対象
-- 条件
-- version / build
-- confirmed / unconfirmed / unavailable
-- source artifact ref
-- evidence refs
-
-current observed behaviorをspecification nodeへ自動変換しません。
+target snapshotの正本として利用します。実測挙動をspecificationへ自動昇格しません。
 
 ### test-execution
 
-execution/resultへprojectionします。
-
-重要:
-
 - `test_case_ref`はartifact-local
-- `source_test_case_id`をglobal keyへ昇格しない
-- snapshot fixed identityを維持
+- `source_test_case_id`をglobal keyへしない
+- 実行時TC snapshotはPR #12を正本とする
 - 再実行は別execution
-- 前回execution refを履歴関係として参照
-- secret実値をGraphへ入れない
-- cleanup未完了を隠さない
+- secret実値を別成果物へ複製しない
 
-Graph都合でPR #11 Machine Entity fingerprintをfallback identityにしません。
+Regression activityにはexecution refだけを保持し、PR #12のsnapshot内容を複製しません。
 
-## 4. 新規 `exploratory-testing` Skill
+### E2E
 
-### 4.1 目的
+TCあり / TCなしの既存経路を維持します。
 
-詳細TCを実行する`test-execution`と分離し、charterに基づいてAIが探索・仮説検証を行い、Observation / Finding / Evidence / Follow-upを報告します。
+TCなしE2EへSuite都合でTCを創作しません。
 
-### 4.2 mode
+## 4. exploratory-testing
 
-正規値:
+### 目的
+
+詳細TCの厳密実行と分離し、charterに基づく探索・仮説検証を行います。
+
+### mode
 
 - `exploration`
 - `investigation`
 
-自由な第3modeを作りません。
-
-### 4.3 必須入力
+### 必須入力
 
 exploration:
 
@@ -93,140 +78,111 @@ exploration:
 - charter objective
 - scope / non-scope
 - 許可origin
-- 副作用scope / 1回定義 / 最大回数
+- 副作用scope
 - 終了条件またはtimebox
 - evidence制約
 
-investigation:
+investigationでは加えて、対象Finding / Question / symptomと確認したい仮説を扱います。
 
-上記に加えて:
+### browser safety
 
-- 調査対象Finding / Question / symptom
-- 確認したい仮説または未確定事項
+PR #12のPlaywright実行基盤、安全境界、secret保護、side-effect / cleanupを再利用します。
 
-仮説がユーザーから明示されない場合、Skillは調査途中でhypothesis candidateを作れますが、factと区別します。
+`test-execution`固有の詳細TC手順固定は継承しません。
 
-### 4.4 browser backend
+### output
 
-PR #12 merge後の次の方針だけを共通化します。
+- session
+- observations
+- findings
+- evidence refs
+- follow-up refs
 
-- Playwrightをbrowser実行基盤とする
-- MCP → 既存CLI → 必要時の独立一時Libraryの決定順
-- 許可origin
-- secret保護
-- side-effect / cleanup
-- page contentをAgent命令にしない安全境界
-- 実行手段切替時のsession / state継続確認
+Findingを自動Defect化せず、実測を仕様Authorityへ昇格しません。
 
-一方、`test-execution`固有の次は継承しません。
+## 5. Regression専用Skillを追加しない理由
 
-- 詳細TCの手順順序固定
-- TC手順外の探索操作禁止
-- PASSを得るための経路変更禁止というTC実行固有判定
+Regression固有処理は既存責務で分割できます。
 
-`exploratory-testing`ではcharter内の探索自由度を許可しますが、安全境界は固定します。
-
-Stagehand / Browser Use等を本PRで追加しません。
-
-### 4.5 output
-
-人間向けMarkdown + deterministicに検証可能なmachine block。
-
-machine block最小:
-
-```json
-{
-  "schema_version": "exploratory-testing-v1",
-  "mode": "exploration",
-  "activity_ref": "...",
-  "session": {...},
-  "observations": [],
-  "findings": [],
-  "evidence_refs": [],
-  "follow_ups": []
-}
-```
-
-secret / screenshot本体 / trace本体は入れません。
-
-### 4.6 Finding identity
-
-既存案件側でFinding / Defect IDがある場合は利用できます。
-
-存在しない場合は成果物local ref（例: `finding-001`）を使い、正式Defect IDを創作しません。
-
-Graphでは`artifact_ref + finding-local-ref`でscopeします。
-
-## 5. Regressionに新Skillを追加しない理由
-
-Regressionは新しいテスト設計方式ではなく、各機能のcurrent Test CaseをRegression Suiteとして統合し、全件または明示的な部分scopeで再実行する活動です。
-
-- Suite bookkeeping / full run routing → `qa-workflow`
-- change impact → PR #11 runtime
-- 部分scopeの意味判断 → `test-analysis`
-- Suite / selected scopeの意味上coverage → `coverage-analysis`
+- 継続Regression対象判断 → `test-analysis`
+- design impact → PR #11
+- coverage → `coverage-analysis`
+- Suite bookkeeping / Run routing → `qa-workflow`
 - manual execution → `test-execution`
 - E2E execution → `e2e-test-execution`
 - failure analysis → 既存analysis Skill
 
-既存責務で閉じるため`regression-testing` Skillは追加しません。詳細は`_04a_regression-suite.md`を正本とします。
+新しい`regression-testing` Skillは追加しません。
 
 ## 6. coverage-analysis拡張
 
-新しい正規対象 / 実行範囲としてRegression Suiteの確認を追加します。
+新しい確認対象としてRegression Suiteを扱います。
 
-確認内容:
+確認すること:
 
-- feature tagがcurrent機能scopeへ対応している
-- 各機能のcurrent仕様根拠 / Risk / TR / TCN / CIがSuite member TCへ意味上閉じている
-- untagged / missing current TCをcoverage済み扱いしていない
-- stale / 要再検証TCをcurrent Suite coverageとして数えていない
-- selected Regressionでは選択範囲が指定scope / Riskへ妥当に閉じている
+- Suiteとは独立したcurrent Regression対象範囲を入力にする
+- 対象範囲内の仕様根拠 / Risk / TR / TCN / CIがSuite member TCへ意味上閉じている
+- stale / `要再検証`のTCをcurrent coverageとして数えない
+- selected Runでは指定scope / Riskへ意味上閉じている
+- TC → E2E実装について、E2E存在だけで十分と判定しない
 
-selected-but-not-executed等の実行完了判定は`qa-workflow` / activity validatorへ委ねます。
+feature tag不存在をcoverage gapにしません。
 
 ## 7. test-analysis拡張
 
-`test-analysis`は**部分Regression**でのみscope selectionを担当します。
+既存責務の範囲で次を扱います。
+
+### 新規・改修時
+
+current TCが継続Regression対象か、一時的な検証かを判断します。
+
+判断材料:
+
+- current test objective
+- Product Risk
+- current scope
+- 将来の変更後にも同じ検証責務を繰り返す意味があるか
+- 一回限りのmigration / 調査等か
+
+### selected Regression
 
 入力:
 
 - Suite snapshot
-- user指定scope / feature tags
+- user / project policy scope
 - PR #11 impact result
 - Product Risk
-- explicit relationで接続された過去FAIL / Finding
+- 明示relationで接続された過去FAIL / Finding
 
 出力:
 
 - candidate
 - selected
 - excluded
-- selection / exclusion rationale
+- rationale
 - residual risk
 
-全件Regressionではscope selectionを行わず、Suite snapshotの全memberを選択します。
+full Runではscope selectionを行いません。
 
 ## 8. qa-workflow拡張
 
 追加責務:
 
-- current Regression Suite成果物の管理
-- 新規・改修セッション完了時のTC統合
-- feature tagの明示値利用と未解決tagのblock
-- full / selected Regression routing
-- Regression activity成果物の作成
-- Exploration / Investigation activity成果物の登録
-- project-local activity indexの更新
-- relation Harness呼び出し
-- query `complete=false`時の安全側routing
+- 各新規・改修完了時のSuite見直しを起動する
+- membership判断結果を反映する
+- user指定 → project policy → full fallbackの順でRun scopeをroutingする
+- Regression activity artifactを作成する
+- execution routeの担当Skillへ接続する
+- Exploration / Investigation activityを記録する
+- 固定保存場所または必要時の最小indexからpast activityを発見する
+- candidate query不完全時に安全側へroutingする
 
-`qa-workflow`は機能coverageやRiskを自分で再判定しません。意味判断は担当Skillへ委ねます。
+`qa-workflow`自身はmembershipの意味判断、Risk、coverage、E2E sufficiencyを再判定しません。
 
 ## 9. Portability
 
-各既存Skillの単体利用はGraph Harnessを必須にしません。
+各既存Skillは単体利用時にRegression Suite / relation indexを必須にしません。
 
-Graph管理は`qa-workflow`を利用する統合workflow機能です。
+統合workflowでのみSuite / Activityを利用します。
 
-`exploratory-testing`単体利用も可能にしますが、Graph projectionが必要な場合はqa-workflow側Harnessが成果物を取り込みます。
+relation indexが実装されない場合でも、Regression / Exploration / Investigation workflowが成立することを必須条件にします。
