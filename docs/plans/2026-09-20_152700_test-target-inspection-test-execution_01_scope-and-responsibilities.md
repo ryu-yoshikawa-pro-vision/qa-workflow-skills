@@ -52,9 +52,9 @@
 - 多段TCではsnapshot内だけの手順参照を使い、各中間期待結果をどの操作直後に観測するかを保持する
 - 実行または合否判定に影響する未解決事項が残るTCは開始せず、解消条件を報告する
 - 前提条件、テストデータ、role / アカウント、環境、安全条件を確認する
-- Playwright MCP等の対話的なbrowser操作でTC手順を実施する
-- 必要に応じて、repoのPlaywright test runnerや`playwright.config.*`等を起動しない独立した一時Playwright Libraryコードで現在TCを実行する
-- 今回の実行だけに必要な一時コードを最小限生成・実行する
+- browser実行基盤はPlaywrightに固定し、TC開始前に`Playwright MCP → Playwright CLI → 独立した今回run用Playwright Libraryコード`の順で利用可能性と必要能力を判定する
+- 前段の手段でTCを契約どおり実施できる場合はその手段を使用し、速度・便利さ等を理由に下位手段へ切り替えない
+- MCP / CLIでは必要な操作・観測を契約どおり表現できず、既存Playwright Libraryで実施可能な場合だけ、今回run用の一時コードを最小限生成・実行する
 - DOM / accessibility tree等による構造・意味情報の観測
 - screenshot等の画像による視覚情報の観測
 - 期待結果と実測結果を比較し、`PASS / FAIL / 未実行 / 判定不能`を確定する
@@ -73,13 +73,11 @@
 
 ## 3. Playwrightコードとの境界
 
-`test-execution`で許可するPlaywrightコード生成は、**今回のテスト実行を成立させるための独立した一時コード**です。repoのPlaywright test runner、`playwright.config.*`、fixture、hook、project dependency、webServer等を読み込む実行は既存`e2e-test-execution`へroutingします。一時コードは既に利用可能なPlaywright Libraryだけを使い、新規package install、`package.json` / lockfile / source変更を行いません。
+`test-execution`ではPlaywright MCP、Playwright CLI、独立した一時Playwright Libraryコードの順で実行手段を判定します。MCPまたはCLIで今回TCに必要な操作・観測を本Skillの契約どおり実施できる場合は、一時コードへ切り替えません。
 
-例えば次を含みます。
+Playwrightコード生成を許可するのは、**MCP / CLIでは今回TCに必要な操作・観測を契約どおり表現できず、既存Playwright Libraryで実施可能な場合の独立した一時コード**だけです。repoのPlaywright test runner、`playwright.config.*`、fixture、hook、project dependency、webServer等を読み込む実行は既存`e2e-test-execution`へroutingします。一時コードは既に利用可能なPlaywright Libraryだけを使い、新規package install、`package.json` / lockfile / source変更を行いません。
 
-- 対話操作だけでは安定して実施できない複数手順を、今回TC用の一時スクリプトとして実行する
-- 同じ観測を複数データで繰り返すため、今回runだけで使用する最小コードを生成する
-- screenshotや必要な観測値を取得するための一時コードを実行する
+例えば、同じUI操作を複数データで繰り返す、または待機・観測処理をコードで固定しないと元TCを忠実に実施できない場合に限って使用します。
 
 元TC、案件コンテキスト、またはユーザーが明示した開始状態・テストデータ準備方法はpreflightとして利用できます。seed / API / DB等を使う場合も副作用scope、1回の定義、最大回数、cleanup契約へ従い、未確認の準備方法を新規に作りません。案件コンテキストまたはユーザーが認証方法として明示した既存の認証済みsession / storageState等もpreflightで利用できますが、ログイン操作自体がTCの検証対象ならその代替には使いません。一時コードを含む実行手段では、TCで検証するUI操作を置き換えてPASS条件を成立させるためにDOM、localStorage / sessionStorage、cookie、network response、backend API / DB、アプリ内部状態を操作してUI経路を迂回しません。読み取り目的の観測は、実対象状態を変更しない範囲で利用できます。
 
