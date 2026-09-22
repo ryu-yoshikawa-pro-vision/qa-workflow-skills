@@ -70,21 +70,26 @@ secret実値は保存しません。
 
 project-localな知識成果物を、project contextの「既存QA成果物」から一意に発見できるようにします。
 
-保存形式やファイル分割は実装前リサーチで決定します。Graph DBや汎用registryは前提にしません。
+Graph DBや汎用registryは前提にしません。knowledge entryの論理契約はこのPlanで固定し、物理保存形式だけを実装前の未確定事項として残します。
 
 各entryは最低限次を持ちます。
 
 - stable entry ref
+- entry revision / content identity
 - 種別: テスト対象・仕組み / テスト観点 / テスト環境
 - 内容
 - 適用対象 / scope refs
 - 適用environment / version条件
-- source artifact / Activity / Session / Finding / inspection refs
-- source revisions
+- provenance source refs / revisions
+- currentness dependency refs / revisions
 - 最終確認条件 / 最終確認時点
 - 状態: 有効 / 要再検証 / 置換済み
 - 置換先ref（置換済みの場合）
 - 関連するcurrent QA成果物ref
+
+`provenance source`は「どこからその知識を得たか」を表します。`currentness dependency`は「何が変わったら、その知識をcurrentとして再利用する前に再確認が必要か」を表します。同じrefである必要はありません。
+
+knowledge artifact全体のrevisionだけを全entryのrevisionとして扱いません。無関係なentry更新だけで全knowledge利用workflowをstaleにしないため、論理上はentry単位でrevision / content identityを持ちます。
 
 本文をActivityやFindingから無条件にコピーしません。
 
@@ -95,37 +100,45 @@ Activity / Session / executionで得た情報は、次の順に扱います。
 1. 既存の正本へ属するか判定する。
 2. 属する場合は最も早い責任Skillへroutingする。
 3. 正本更新後は知識成果物へ本文を複製せずrefで接続する。
-4. 既存正本へ自然に置けないが継続再利用価値がある場合だけ知識entry候補にする。
-5. sourceと適用範囲を確認できない候補は`要再検証`とし、currentな事実として後続判断へ使用しない。
-6. 有効化されたentryだけを後続workflowの入力として利用する。
+4. 既存正本へ自然に置けないが継続再利用価値がある場合だけ、Activity / Session / Finding上でknowledge候補としてfollow-upする。
+5. source、適用scope、environment / version条件、currentness dependency、再利用価値を確認できるまでknowledge成果物へcurrent entryとして追加しない。
+6. 検証済みのentryだけを`有効`として追加する。
+7. 一度`有効`だったentryがcurrentness dependency変更により再確認を必要とする場合だけ`要再検証`へ遷移する。
+8. `有効`entryだけを後続workflowの入力として利用する。
+
+未検証candidateをknowledge成果物へ蓄積するための追加stateは作りません。candidateは元のActivity / Finding / Follow-upに残します。
 
 Finding / Observationを自動的に知識へ昇格しません。
 
 仕様Authority、Product Risk、TC等への昇格も既存責任Skillを経由します。
 
+knowledge候補を意味上`有効`にする責任主体は未確定です。`qa-workflow`へdomain判断を持たせる案は採用しません。既存Skillへ分散するか、専用Skillを1件追加するかは追加リサーチで決定します。
+
 ## 6. 知識の利用
 
-`qa-workflow`はworkflow開始時または途中で新しい対象を扱うとき、project contextから知識成果物のrootを発見し、今回scopeに関係する有効entryだけを候補にします。
+`qa-workflow`はworkflow開始時または途中で新しい対象を扱うとき、project contextからknowledge rootを発見し、今回scopeに関係するentryだけを候補にします。
 
 全知識を毎回LLMへ投入しません。
+
+候補をscope / 種別 / environment / version / stateでdeterministicに絞り、各候補のcurrentness dependencyがcurrentか確認してからAgentへ渡します。dependency revisionが一致しない、またはcurrentnessを確認できないentryは`要再検証`としてcurrent判断へ使用しません。
 
 利用したentryはworkflow / Activity / Sessionへ次を残します。
 
 - knowledge entry ref
-- revision / content identity
+- entry revision / content identity
 - 今回どの判断で利用したか
 
-知識成果物が後から更新されても、過去Activity / Sessionを書き換えません。
+knowledge成果物が後から更新されても、過去Activity / Sessionを書き換えません。
 
-過去結果は当時利用したrevisionに対する履歴として残します。
+過去結果は当時利用したentry revisionに対する履歴として残します。
 
-現在のQA判断として再利用する場合はcurrent revisionと状態を確認します。
+現在のQA判断として再利用する場合はcurrent entry revision、state、currentness dependencyを確認します。
 
 ## 7. workflow identity
 
 同時進行するworkflowを1つの共有状態表へ混在させません。
 
-`qa-workflow`で管理する各workflowは一意な`workflow_ref`を持ちます。
+`qa-workflow`で継続管理する各workflowは一意な`workflow_ref`を持ちます。
 
 workflow stateには少なくとも次を追加します。
 
@@ -135,27 +148,46 @@ workflow stateには少なくとも次を追加します。
 - started source refs / revisions
 - current state
 - current Skill / 対象・実行範囲
+- used knowledge refs / revisions
+- used environment / shared resource refs
 - produced artifact refs
 - related Activity / Session refs
 - blocked / 要再検証
 - optional related workflow refs
 
-workflow stateはworkflowごとに独立して保存します。
+`qa-workflow`が複数sessionへ跨いで継続管理するworkflowは、1 workflow = 1 persisted state artifactとします。
+
+各state artifactはstate revision / content identityを持ち、更新時は保存先が提供するSHA / revision / ETag等によるCASを使用します。読み込み時revisionとcurrent revisionが一致しない場合は古いstateで上書きせず、current stateを再読込して再評価します。
+
+単発のstandalone Skill利用にまでpersisted workflow stateを強制しません。
 
 プロジェクト全体に「現在実行中のworkflowは1件だけ」という前提を置きません。
 
 ## 8. workflow snapshotとcurrent state
 
-各workflowは利用した上流成果物・project context・知識・environment条件のref / revisionを固定して記録します。
+各workflowは利用した上流成果物・project context・knowledge・environment条件のref / revisionを固定して記録します。
 
-進行中に別workflowがcurrent成果物を更新した場合:
+進行中に別workflowがcurrent成果物を更新しても、進行中Activity / execution / Sessionの過去snapshotを途中で差し替えません。
 
-- 進行中Activity / execution / Sessionの過去snapshotを途中で差し替えない
-- そのworkflowの結果は固定snapshotに対する履歴として残せる
-- latest current stateに対する完了・再利用を主張する前に依存revisionを再確認する
-- 影響するscopeが変わっていれば`要再検証`へ戻す
-- PR #11のdependency / fingerprintで影響範囲を安全に限定できる場合はその範囲だけ再検証する
-- 限定できない場合は安全側に対象scopeを再評価する
+currentnessはイベント駆動の即時通知ではなく、次のcheckpointでdeterministically再確認します。
+
+- workflow / Run開始時
+- resume時
+- まだ開始していない新しいexecution / side-effect等のmutable operationを開始する直前
+- latest current stateに対する完了を主張する直前
+- 過去成果物をcurrentとして再利用する直前
+
+確認対象:
+
+- PR #11 Machine Entity / fingerprint / dependency
+- project context ref / revision
+- knowledge entry ref / revision / currentness dependency
+- test-target-inspection等のcurrent artifact ref / revision
+- environment / shared resource condition
+
+影響するscopeが変わっていれば`要再検証`へ戻します。PR #11のdependency / fingerprintで影響範囲を安全に限定できる場合はその範囲だけ再検証し、限定できない場合は安全側に対象scopeを再評価します。
+
+既に開始済みの操作を一律に中断しません。安全に完了できる場合は固定snapshotに対するhistorical resultとして閉じます。ただし変更後のcurrent stateに対する結果とは扱いません。
 
 これにより「実行中に別作業が入ったため過去結果自体が消える」ことと、「古い結果をcurrentと誤認する」ことを分離します。
 
@@ -171,7 +203,16 @@ workflow stateはworkflowごとに独立して保存します。
 
 ### scopeが重ならない場合
 
-stable ID / update scope等から変更範囲がdisjointであることを決定論的に確認できる場合だけ、current成果物を再読込したうえでscope外current内容を保持し、対象scopeを再適用できます。
+自動rebase / partial updateを許可するのは、owner Skillがdeterministic partial update boundaryを明示的に定義しているartifactだけです。
+
+さらに次をすべて満たす場合に限定します。
+
+- update scopeがdisjoint
+- 対象scopeが依存するupstream revision / fingerprintが変わっていない
+- cross-scope invariantを壊さないことをowner contractで確認できる
+- current成果物を再読込してからscope外current内容を保持し、対象scopeを再適用する
+
+stable IDが異なる、または見た目上別featureであることだけでは自動merge可能と判断しません。
 
 ### scopeが重なる、または判定できない場合
 
@@ -205,16 +246,22 @@ workflow同士を直接依存させるのではなく、共有したEntity / art
 - external account
 - side-effect対象
 
-基本方針:
+基本方針は次の優先順位で固定します。
 
-- workflowごとに独立resourceを使える場合は分離する
-- 同じresourceを同時変更しても互いの観測へ影響しないことを明示できる場合だけ並行実行する
-- shared mutable resourceで影響を否定できない場合、明示済みproject policyに従って直列化またはblockする
-- policyがなく安全性を判定できない場合、同時利用可能と推測しない
-- cleanupは他workflowが作った状態を削除しない
-- resource / environment変更を検出した場合、実行結果の有効性を再確認する
+1. workflowごとに独立resourceを使える場合は分離する。
+2. 分離できず既存の外部reservation / exclusive ownership機構がある場合はそれを利用する。
+3. 外部機構がなく、保存先がatomicなCASを保証できる場合だけproject-local reservation recordを利用する。
+4. いずれも利用できずshared mutable resourceへの相互影響を否定できない場合は、自動並行実行を開始せずblockする。
 
-resource reservation / lease / lockの具体実装は、実装前リサーチで決定します。
+同じresourceでもread-only / parallel-safeで相互影響がないことを明示できる用途はreservation不要です。
+
+project-local reservationを使う場合は最低限、resource ref、workflow ref、関連Activity / Session ref、予約状態、reservation revisionを持ち、acquire / releaseともCASで競合を検出します。単なるMarkdownの存在確認をlockとして扱いません。
+
+自動expiry付きlease、distributed lock service、environment managerはv1では追加しません。workflow異常終了時は安全側に予約を残し、明示的なrecoveryで解放します。
+
+cleanupは自workflowが所有または予約したresource範囲だけを対象にし、他workflowが作った状態を削除しません。
+
+resource / environment変更を検出した場合、実行結果の有効性を再確認します。
 
 ## 12. Graph / provenanceとして保持する関係
 
@@ -291,12 +338,16 @@ project contextは知識本文の保管庫にしません。
 
 ## 15. 実装前に追加調査が必要な点
 
-次は必要性は明確ですが、現時点では最小実装を一意に決め切れません。
+確定していない設計判断は次の2点だけとします。
 
-1. 継続QA知識を、単一project artifact、対象別artifact、既存project context拡張のどれで管理するのが最小か。
-2. テスト対象の内部仕組み・運用知識・テスト観点について、どの既存Skillを有効化の責任主体にするか。既存Skillで不自然になる場合だけ新Skillを検討する。
-3. shared mutable resourceを直列化する仕組みを、単なるproject policy、repository内lease artifact、外部environment管理機構のどこまで実装するか。
-4. PR #11の`workflow_runtime.py` / Machine Entity stale伝播だけでcross-workflow currentnessを十分に検出できるか。追加のrepo-level coordinatorが本当に必要か。
-5. workflow / knowledge historyをfixed root scanで十分扱える規模と運用条件。relation indexはこの検証後も必要な場合だけ検討する。
+1. 継続QA知識の意味上のlifecycleを誰が所有するか。既存Skillへ分散するか、継続QA知識専用Skillを1件追加するかを決定する。`qa-workflow`へdomain判断を持たせる案は採用しない。
+2. knowledge entryの論理的なentry revision / CAS要件を満たす物理保存形式。単一project artifact内のentry管理にするか、fixed root配下のentry別artifactにするかは、保存先のCAS粒度・portability・競合頻度を踏まえて決定する。
 
-この5点は、実装前の外部リサーチと最新PR #11 / #12実装確認を完了してから決定します。
+次は方針を確定済みです。
+
+- cross-workflow currentnessは中央coordinator / event busではなくcheckpointで検出する
+- shared mutable resourceはisolation → 既存reservation → CAS付きproject-local reservation → blockの順で扱う
+- relation indexはfixed root scanの実測不足が確認された場合だけ検討する
+
+PR #11 / #12はまだPlan段階のため、実装開始時にはmerge後の実契約を再確認し、上記契約を満たさない差分があればPR #13側を調整します。
+
