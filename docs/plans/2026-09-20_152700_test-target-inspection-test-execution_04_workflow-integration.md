@@ -48,14 +48,12 @@ test-execution
   ↓ unresolvedあり
 該当TCは未実行として解消条件を報告
   ↓ unresolvedなし
-Playwright MCP
-  ↓ 利用不可 / 必要能力不足
-Playwright CLI
-  ↓ 利用不可 / 必要能力不足
-独立した今回run用Playwright Libraryコード
-  ↓ 利用不可 / 安全に実施不能
-未実行 / ブロック中
-  ↓ 実行可能
+実行手段を上から判定
+  ├─ Playwright MCP
+  ├─ MCPが利用不可 / 必要能力不足 → Playwright CLI
+  ├─ MCP / CLIが必要能力不足 → 独立した今回run用Playwright Libraryコード
+  └─ いずれも利用不可 / 安全に実施不能 → 未実行 / ブロック中
+  ↓ 実行手段を確定できたTC
 必要時に画像確認
   ↓
 期待結果と実測結果を比較
@@ -168,7 +166,7 @@ repo runnerから独立し、`playwright.config.*`、fixture、hook、project de
 
 既存 / 実装済みrepo E2Eを正式なrunner契約で実行する責務を維持します。
 
-`test-execution`が直接Playwright MCP等で人間相当の操作を行う経路とは別です。
+`test-execution`がPlaywright MCP / CLI / 独立一時Playwright Libraryコードで人間相当のUI操作を行う経路とは別です。
 
 ### `e2e-test-result-analysis`
 
