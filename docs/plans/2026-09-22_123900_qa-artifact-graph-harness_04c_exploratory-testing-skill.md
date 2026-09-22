@@ -56,6 +56,7 @@ workflow state、開始Skill / 最終Skill、resume先ではこの値を使用�
 - 許可origin / 操作範囲
 - side-effect制約
 - 利用可能な既存QA成果物
+- currentness確認済みの関連QA knowledge refs / revisions
 - evidenceを安全に保持する方法
 
 ### exploration
@@ -232,6 +233,7 @@ Findingの内容に応じ、`qa-workflow`経由で最も早い責任Skillへ戻�
 - TC追加 / 更新が必要 → 適切なdesign Skill
 - current UI情報の整理が必要 → `test-target-inspection`
 - E2E failure分析 → `e2e-test-result-analysis`
+- 複数workflowで再利用する価値があるknowledge候補 → `qa-knowledge | triage`
 
 QA成果物やRegression membership入力が変わった場合、Regression運用中projectでは`regression-testing | baseline / membership`へhandoffします。
 
