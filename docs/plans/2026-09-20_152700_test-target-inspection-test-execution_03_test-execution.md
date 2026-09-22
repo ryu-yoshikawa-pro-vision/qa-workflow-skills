@@ -130,29 +130,32 @@ cleanup: []
 
 ## 4. 実行手段
 
-実行手段はTCの属性ではなく、AIが今回の実対象を操作・観測するための手段です。
+browser実行基盤はPlaywrightに固定します。TC開始前に次の表を上から評価し、最初に成立した行の手段を使用します。候補を自由比較せず、速度・便利さ・成功しやすさを理由に下位手段へ切り替えません。
 
-### Playwright MCP等の対話操作
+| 条件 | 使用手段 |
+| --- | --- |
+| Playwright MCPが既に利用可能で、今回TCに必要な操作・観測を本Skillの契約どおり実施できる | Playwright MCP |
+| MCPが利用不可、または必要な操作・観測能力が不足し、Playwright CLIと必要なbrowserが既に利用可能 | Playwright CLI |
+| MCP / CLIでは今回TCに必要な操作・観測を契約どおり表現できず、既存Playwright Libraryで実施可能 | 独立した今回run用Playwright Libraryコード |
+| 上記を利用できない、または安全条件を満たせない | `未実行`とし、対応する実行範囲を`ブロック中`として再開条件を報告 |
 
-利用可能でTCを実施できる場合は、Playwright MCP等の対話的なbrowser操作を基本にします。
+Playwright MCP、Playwright CLI、Playwright Library、必要なbrowser等が未導入の場合、本Skillのために新規installしません。実行手段を選ぶための新しいadapter / frameworkも追加しません。
 
-AIはTCの手順に沿って、画面を確認しながら1操作ずつ進めます。
+### Playwright MCP
 
-- navigation
-- click
-- input
-- selection
-- keyboard操作
-- modal / popup等の操作
-- 状態変化待機
-- DOM / accessibility tree等の確認
-- screenshot取得と画像確認
+Playwright MCPを第1経路とします。既存のMCP設定で今回TCに必要な操作・観測を実施できる場合はMCPを使用します。本Skill自身がMCP server設定や利用可能な機能を変更して実行能力を拡張しません。既存設定で必要能力を利用できない場合は、その手段では能力不足として次の行を判定します。
 
-特定のtool名へSkill契約を固定せず、利用可能なbrowser / computer操作能力のうち、人間の操作に相当するUI操作を実施できる手段を使用します。Playwright MCPが利用可能な環境では優先的な実行手段として扱います。
+AIは元TCの手順に沿って、navigation、click、input、selection、keyboard操作、modal / popup等の操作、状態変化待機、DOM / accessibility情報の確認、screenshot取得等を行います。
+
+### Playwright CLI
+
+Playwright MCPが前表の条件を満たさず、Playwright CLIと必要なbrowserが既に利用可能な場合はCLIを使用します。本SkillのためにCLI、追加Skill、browser等をinstallしません。
+
+CLIでも人間の手動テスト相当のUI経路を維持し、navigation、click、input、selection、keyboard操作、screenshot、console / network等の状態を変更しない観測に使用します。元TCまたは明示されたpreflight契約がない限り、cookie、storage、network response、DOM、アプリ内部状態等を直接変更してTCのUI経路を代替しません。
 
 ### 独立した一時Playwrightコード
 
-対話操作だけでは安定して実施できない場合、または現在TCの実行にコードが適する場合は、今回runだけの独立した一時Playwright Libraryコードを使用できます。
+独立した今回run用Playwright Libraryコードは第3経路です。MCP / CLIでは今回TCに必要な操作・観測を本Skillの契約どおり表現できず、既存Playwright Libraryで実施可能な場合だけ使用します。
 
 一時コードは次を満たします。
 
@@ -160,17 +163,17 @@ AIはTCの手順に沿って、画面を確認しながら1操作ずつ進めま
 - 新規package installを行わず、`package.json`、lockfile、source code等のrepo working treeを変更しない
 - `playwright.config.*`、fixture、hook、project dependency、webServer等のrepo runner契約を読み込んで実行しない
 - 元TC、案件コンテキスト、またはユーザーが明示した認証方法・開始状態・テストデータ準備を除き、TCで検証するUI操作を代替してPASS条件を成立させるためにDOM、localStorage / sessionStorage、cookie、network response、backend API / DB、アプリ内部状態を操作しない。読み取り目的の観測は実対象状態を変更しない範囲で利用できる
+- TCの意味、操作順、UI経路、期待結果を変更しない
 - 今回TCの操作・待機・観測だけに必要な最小コードとする
 - 一時コード / 一時データはrepo外の一時領域を基本とし、実行後に不要な一時ファイルを残さない
 
-例:
-
-- 複数データで同じUI操作を繰り返す
-- 一定の待機・観測を安定させる
-- screenshotや必要なUI状態を取得する
-- 対話操作では再現しにくい手順を今回TC用に実行する
+同じUI操作を複数データで繰り返す、または待機・観測処理をコードで固定しないと元TCを忠実に実施できない場合は、この経路を利用できます。「コードの方が便利」「速い」といった理由だけでは使用しません。
 
 `playwright test`等のrepo runner、`playwright.config.*`、fixture、hook、project dependency、webServer等を必要とする場合は`e2e-test-execution`へroutingします。一時コードは将来の回帰テスト資産へ自動昇格させません。repoの保守対象E2Eとして残す場合は`qa-workflow`経由で`e2e-test-inspection` / `e2e-test-implementation`へroutingします。
+
+### 観測方法
+
+実行手段の選択と観測方法を分離します。構造・意味情報で判定できる期待結果はDOM / accessibility情報 / Playwright assertion等を使用し、レイアウト、重なり、欠け、画像、canvas等の視覚的期待結果は現在選択しているPlaywright実行手段からscreenshot等を取得して確認します。視覚確認が必要であることだけを理由に実行手段を切り替えません。
 
 ## 5. 人間の手動テスト相当の実行契約
 
