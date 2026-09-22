@@ -49,5 +49,6 @@ Plan作成ブランチ自体は2026-09-22時点の`main`から作成していま
 - PR #11 runtimeの再設計
 - PR #12 execution runtimeの再設計
 - Regressionを自動で最終選定して無人release判定する仕組み
+- 部分Regressionを全機能Regression完了として扱うこと
 - Explorationで発見した内容を自動的に仕様Authorityへ昇格する仕組み
 - 全Findingを自動でDefect化する仕組み
