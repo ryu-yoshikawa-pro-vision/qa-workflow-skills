@@ -2,10 +2,11 @@
 
 ## 1. Skill構成
 
-PR #13ではuser-facing Skillを2件追加します。
+PR #13ではuser-facing Skillを3件追加します。
 
 - `regression-testing`
 - `exploratory-testing`
+- `qa-knowledge`
 
 既存の新規・改修Skillは責務を維持します。
 
@@ -22,6 +23,7 @@ PR #13ではuser-facing Skillを2件追加します。
 | `e2e-test-execution` | E2E execution / result / evidence。既存E2Eの修正確認にも再利用 |
 | `e2e-test-result-analysis` | E2E failure分析 |
 | `exploratory-testing` | Exploration / 仮説駆動Investigation |
+| `qa-knowledge` | 継続QA knowledgeのtriage / lifecycle / lookup |
 | `qa-workflow` | 複合workflowのrouting / common workflow state / blocked / resume |
 
 ## 2. 既存の新規・改修Skill
@@ -67,7 +69,38 @@ PR #13ではuser-facing Skillを2件追加します。
 
 Investigation専用Skill / 別runtimeは追加しません。
 
-## 5. 修正確認のrouting
+## 5. qa-knowledge
+
+詳細契約は`_04e_qa-knowledge-skill.md`を正本とします。
+
+正規の`対象 / 実行範囲`:
+
+- `triage`
+- `create / update`
+- `revalidation`
+- `lookup / history`
+
+担当:
+
+- knowledge candidateの分類
+- 既存正本ownerへのrouting
+- residual knowledgeの有効化
+- entry create / update / revalidation / replacement
+- explicit knowledge lookup / history
+
+担当しない:
+
+- specification Authority確定
+- Product Risk / test focusの採点
+- TR / TCN / CI / TC設計
+- current実対象情報の観測そのもの
+- test execution
+- Regression / Explorationのdomain判断
+- workflow orchestration
+
+既存の有効knowledgeを入力として使うだけのdomain requestでは、`qa-knowledge`を中央gatewayとして必須化しません。
+
+## 6. 修正確認のrouting
 
 修正確認は独立Skill、独立artifact、独立stateとして追加しません。`qa-workflow`が要求を修正確認として解釈し、必要な既存Skillへroutingします。
 
@@ -77,7 +110,7 @@ Investigation専用Skill / 別runtimeは追加しません。
 
 修正確認専用のテスト設計体系は作りません。既存のanalysis / design成果物を再利用できる場合は再利用します。
 
-## 6. project context
+## 7. project context
 
 既存`skills/qa-workflow/assets/project-context-template.md`を拡張します。
 
@@ -95,7 +128,7 @@ Investigation専用Skill / 別runtimeは追加しません。
 
 対象機能、role、業務フローをRegression専用欄へ複製しません。
 
-## 7. coverage-analysis
+## 8. coverage-analysis
 
 Regression専用Skillにはしません。
 
@@ -107,7 +140,7 @@ Regression専用Skillにはしません。
 
 Regression membership / Run selectionを`coverage-analysis`自身で決定しません。
 
-## 8. PR #11
+## 9. PR #11
 
 正本:
 
@@ -122,7 +155,7 @@ Regression membership / Run selectionを`coverage-analysis`自身で決定しま
 
 PR #11がproject-wide artifact discoveryを保証するとは仮定しません。
 
-## 9. PR #12 / E2E
+## 10. PR #12 / E2E
 
 ### test-target-inspection
 
@@ -146,7 +179,7 @@ PR #12 Planでは最初の`scenario.when`操作開始がTCの開始済み境界�
 
 TCなしE2EへTCを創作しません。
 
-## 10. qa-workflow
+## 11. qa-workflow
 
 `qa-workflow`は活動間routingだけでなく、複数Skillが必要なend-to-end QA要求をオーケストレーションします。
 
@@ -167,7 +200,7 @@ TCなしE2EへTCを創作しません。
 - source result
 - Regression Activity domain state
 
-## 11. workflow state / canonical Skill更新
+## 12. workflow state / canonical Skill更新
 
 PR #11 / #12 merge後の最新実装を確認し、少なくとも次をPR #13実装対象へ含めます。
 
@@ -191,11 +224,17 @@ regression-testing:
 exploratory-testing:
 - exploration
 - investigation
+
+qa-knowledge:
+- triage
+- create / update
+- revalidation
+- lookup / history
 ```
 
 最新mainのSkill数を実装時に再取得し、古い14 Skill前提をハードコードしません。
 
-## 12. FAIL / Finding feedback
+## 13. FAIL / Finding feedback
 
 Regression中のFAIL / 判定不能は`regression-testing`が原因確定しません。
 
@@ -212,7 +251,7 @@ Regression中のFAIL / 判定不能は`regression-testing`が原因確定しま�
 
 修正後はcurrentな既存TCが使えるなら直接再実行して修正確認し、設計不足がある場合だけ既存analysis / designへ戻します。必要ならbaseline / Run scopeを再評価します。
 
-## 13. reporting / Defect Management
+## 14. reporting / Defect Management
 
 PR #13では汎用reporting Skillや`defect-reporting`を追加しません。
 
@@ -220,17 +259,17 @@ Finding / FAILを自動Defect化しません。
 
 実装後に報告形式の重複や運用上の必要性が確認された場合は別課題として検討します。
 
-## 14. Portability
+## 15. Portability
 
 既存Skillは単体利用時にRegression Suite / Activityを必須にしません。
 
-`regression-testing`と`exploratory-testing`もGraph / relation indexなしで主要機能を利用できることを必須にします。
+`regression-testing`、`exploratory-testing`、`qa-knowledge`もGraph / relation indexなしで主要機能を利用できることを必須にします。
 
-## 15. 継続QA知識
+## 16. 継続QA知識
 
-継続利用する知識の詳細契約は`_04d_continuous-qa-knowledge-and-concurrency.md`を正本とします。
+継続利用する知識の共通契約は`_04d_continuous-qa-knowledge-and-concurrency.md`、Skill固有契約は`_04e_qa-knowledge-skill.md`を正本とします。
 
-既存正本へ属する知識は、その責任Skillへ戻します。
+既存正本へ属する知識は`qa-knowledge`がそのownerへroutingします。
 
 - 仕様・期待挙動 → `spec-analysis`
 - Product Risk / test focus → `test-analysis`
@@ -238,13 +277,13 @@ Finding / FAILを自動Defect化しません。
 - TR / TCN / CI / TC → 各design Skill
 - execution / result → PR #12 / E2E
 
-それでも残る、複数workflowで再利用するテスト対象・仕組み・観点・環境の知識だけをproject-level知識成果物として扱います。
+既存正本へ自然に置けず、複数workflowで継続再利用する価値があるテスト対象・仕組み・観点・環境の知識だけを`qa-knowledge`がproject-local knowledge entryとして管理します。
 
-`qa-workflow`は知識の意味内容を独自に確定しません。project contextからknowledge rootを発見し、scopeに関係する`有効`entryを担当Skillへ入力として渡し、実際に利用したentry ref / revisionをworkflow stateへ残します。
+保存形式はproject contextから発見するfixed root + 1 entry = 1 independently versioned artifactです。
 
-knowledge entryの意味上のlifecycleを既存Skillへ分散するか、専用Skillを1件追加するかは未確定です。この判断は実装前に追加リサーチで確定します。`qa-workflow`へdomain判断を持たせる案は採用しません。
+`qa-workflow`はknowledgeの意味内容やentry lifecycleを独自に確定しません。複数Skillが必要な要求のrouting / workflow state / handoffだけを担当します。
 
-## 16. project contextの追加入口
+## 17. project contextの追加入口
 
 project contextへ知識本文やworkflow state本文を直接埋め込みません。
 
@@ -259,7 +298,7 @@ project contextへ知識本文やworkflow state本文を直接埋め込みませ
 
 project context自体を汎用artifact registryにしません。
 
-## 17. workflow state
+## 18. workflow state
 
 `skills/qa-workflow/assets/workflow-state-template.md`は「1 project = 1 workflow」の形にしません。
 
@@ -284,7 +323,7 @@ Skill状態表はそのworkflow内だけを表します。
 
 単発のstandalone Skill利用にまでpersisted workflow stateを強制しません。
 
-## 18. 共有成果物の並行更新
+## 19. 共有成果物の並行更新
 
 PR #12の`test-target-inspection`にあるrevision / SHA / ETagベースの競合防止を、共有current QA成果物更新時の共通原則として再利用します。
 
@@ -302,7 +341,7 @@ stable IDが異なることだけを理由に安全mergeと判断しません。
 
 汎用merge engineは追加しません。
 
-## 19. shared environment / resource
+## 20. shared environment / resource
 
 `test-execution` / `exploratory-testing` / E2E等の実操作では、同時に利用するtest user、tenant、test data、external account等が他workflowへ影響し得ます。
 
