@@ -185,8 +185,8 @@ routing caseへ最低限、次を追加します。
 2. 既存資料がcurrentか実対象で確認 → `test-target-inspection`
 3. 詳細TCを実行前YAMLへ整理し、Playwright MCPで実行・結果報告 → `test-execution`
 4. MCPが利用不可または必要能力不足で、既に利用可能なPlaywright CLIでTCを実行・結果報告 → `test-execution`
-6. MCP / CLIでは必要能力を満たさず、repo runnerから独立した今回run用Playwright LibraryコードでTCを実行・結果報告 → `test-execution`
-5. `playwright test`等のrepo runner契約を使う実行 → `e2e-test-execution`
+5. MCP / CLIでは必要能力を満たさず、repo runnerから独立した今回run用Playwright LibraryコードでTCを実行・結果報告 → `test-execution`
+6. `playwright test`等のrepo runner契約を使う実行 → `e2e-test-execution`
 7. TC実行中にrepoへ残すE2E実装が必要 → `qa-workflow` → `e2e-test-inspection` → `e2e-test-implementation`
 8. 既存repo E2Eをraw runner契約で実行 → `e2e-test-execution`
 9. 既存repo E2E異常 → `e2e-test-result-analysis`
@@ -194,8 +194,8 @@ routing caseへ最低限、次を追加します。
 11. TC入力snapshotまたはrun固定条件 / 予期しないTC実行条件の変更 → 旧`test-execution`を理由付きで閉じ、新しい成果物 / versionを開始
 12. 元TCが明示するrole / viewport / locale / feature flag / テストデータ等の切替 → 同じ`test-execution`成果物を継続
 13. 確定済みTCの再実行 → 前回成果物参照を持つ新しい`test-execution`成果物 / versionを開始し、再実行対象TCごとに前回TC参照も保持
-14. 未開始TCで対話操作と独立一時コードを切替し、run固定条件と開始状態を再確認できる → 同じ`test-execution`成果物を継続
-15. 開始済みTCで実行手段を切替し、同じbrowser / sessionまたは判定に必要な状態継続を確認できない → 当該TCを`判定不能`として閉じ、同じTCの再実行は前回成果物参照を持つ新しい`test-execution`成果物 / versionとし、前回TC参照も保持
+14. 未開始TCで実行手段を切り替え、run固定条件と開始状態を再確認できる → 同じ`test-execution`成果物を継続
+15. 開始済みTCで実行手段を切り替え、同じbrowser / sessionまたは判定に必要な状態継続を確認できない → 当該TCを`判定不能`として閉じ、同じTCの再実行は前回成果物参照を持つ新しい`test-execution`成果物 / versionとし、前回TC参照も保持
 16. 明示されたseed / API / DB等で開始状態・テストデータをpreflight準備 → `test-execution`で許可。ただしTCで検証するUI操作の代替には使わない
 
 `qa-workflow`自身は各Skillの観測・実行ロジックを再定義しません。
