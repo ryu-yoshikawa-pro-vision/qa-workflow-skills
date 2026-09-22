@@ -421,11 +421,13 @@ LLMがclassification / classの意味を定義した後、`classification_tree.p
 
 Coverage定義:
 
-- `all-states`: model内の全state。initial stateから`guard_status=true` transitionだけでsetupできないstateが1件でもあればrequired集合から黙って除外せず`result_status=unresolved`とする
-- `valid-transitions`: model内で`guard_status=true`と確定した全valid transition。source stateへsetupできないtransitionが1件でもあればrequired集合から黙って除外せず`result_status=unresolved`とする
-- `n-switch`: `switch_count=N`として、到達可能なN+1個の連続するvalid transitionの全sequence。Nは0..10。N>=2は高いfailure risk、ユーザー明示、案件固有基準等の具体的理由を`coverage_selection_reason`へ必須で残す
-- `round-trip`: 到達可能なsimple cycle。開始stateと終了stateは同一で、それ以外のstateをsequence内で重複させない。self-loopも1 transitionのround-tripとして含める。開始stateが異なるround tripは別Coverage targetとして扱う
-- `invalid-transitions`: 明示されたinvalid transition candidateだけ
+required母集団と実行開始可能性を分離します。required itemをinitial stateからのdirect pathだけで事前除外せず、各materializable targetのsetup可否は§9.1だけを正本として判定します。
+
+- `all-states`: model内の全stateをrequired母集団とする。各stateへのsetupを§9.1で解決し、direct pathでもreset + pathでもsetupできないstateが1件でもあればrequired集合から除外せず`result_status=unresolved`とする
+- `valid-transitions`: model内で`guard_status=true`と確定した全valid transitionをrequired母集団とする。各transitionのsource stateへのsetupを§9.1で解決し、setup不能なrequired transitionがあれば除外せず`result_status=unresolved`とする
+- `n-switch`: `switch_count=N`として、構造上成立するN+1個の連続するvalid transitionの全sequenceを候補にする。各sequence開始stateへのsetupを§9.1で解決し、setup不能なrequired sequenceを黙って除外しない。Nは0..10。N>=2は高いfailure risk、ユーザー明示、案件固有基準等の具体的理由を`coverage_selection_reason`へ必須で残す
+- `round-trip`: model内のsimple cycleを候補にし、開始stateへのsetupを§9.1で解決する。開始stateと終了stateは同一で、それ以外のstateをsequence内で重複させない。self-loopも1 transitionのround-tripとして含める。開始stateが異なるround tripは別Coverage targetとして扱い、setup不能なrequired cycleを黙って除外しない
+- `invalid-transitions`: 明示されたinvalid transition candidateだけをrequired母集団とし、attempt元stateへのsetupを§9.1で解決する。setup不能なcandidateを黙って除外しない
 
 stable target:
 

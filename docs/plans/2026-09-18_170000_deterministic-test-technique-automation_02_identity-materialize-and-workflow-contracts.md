@@ -40,6 +40,20 @@ TR / TCN / TCは既存の3桁形式をこのPlanで変更しません。最大�
 
 対象は`requirement_structure.py`のTR、`condition_structure.py`のTCN / model、`case_structure.py`のTCです。`materialize_coverage.py`は既存どおりTCN単位を更新境界とし、TCN配下の全current active model metadataとmapping stateを受けるため、modelの一部だけを渡して他modelのCIを暗黙削除する経路を作りません。
 
+### 7.1.2 部分更新時のMachine Entity
+
+partial rerunではID stateだけでなく、scope外のactive Machine Entityも次の成果物へ維持します。Machine Entity blockのmergeをAgent / LLMへ任せず、`runtime_contract.py`の固定helperで行います。
+
+- 前回成果物の`Machine Entities` blockをstrict decodeし、identity一意性、entity type別schema、`content_fingerprint`再計算、dependency形式を検証する。検証できないprevious rowをcurrentとしてcarry forwardしない
+- TR / TCN / model / TCは対応する`update_scope_*`内をcurrent structure resultで置換し、deletedへ遷移したidentityをcurrent集合から外す。`update_scope_*`外のprevious active rowはcanonical `content`とfingerprintを変更せずcarry forwardする
+- test-condition-designのCI、test data requirement、Coverageに関するDispositionはTCN / modelの所有関係を更新境界に使う。更新対象TCN / modelに属するrowはcurrent generator / materialize resultから再生成し、scope外TCN / modelに属するprevious current rowだけをcarry forwardする
+- 共通Dispositionは`upstream_entity`が属する更新境界に従う。upstream Entityがscope内なら再評価し、scope外ならprevious rowを維持できる。参照先Entity / runtime generationが変わっている場合はcarry forward rowをfreshness上currentとせず、`要再検証` / blockerとして扱う
+- `test-analysis`はruntime-v1でSkill内の部分Entity更新境界を新設せず、`対象 / 実行範囲=テスト分析`の再実行ではtest-analysis所有Entityをcurrent inputから再生成する。`spec-analysis`も既存Authority成果物単位の再生成契約を維持する
+- fixed helperは「current scopeで再生成したEntity + 検証済みscope外carry-forward Entity」からfull current Entity集合を作り、同じ集合のidentity projectionをstandalone `verify_runtime_evidence`と`workflow_runtime.py`のexpected Entity導出へ渡す。candidate artifactのactual Entity集合を見てcarry-forward対象を決めない
+- full rebuildではprevious Machine Entityをcarry forwardせず、current normalized input / runtime resultだけから全Entityを再生成する
+
+この規則により、partial rerunでscope外IDだけactiveのまま残り、対応Machine Entityが消える状態を作りません。
+
 ### 7.2 Coverage targetとCI
 
 generator内の`target_key`はmodel内で安定させます。異なるmodel間の衝突を避けるため、成果物横断のtarget identityとして`target_ref`を追加します。
@@ -292,6 +306,8 @@ contract versionを持たない既存成果物を一律破棄しません。
 - その成果物を変更・再利用して本Plan対象の決定論的処理へ入る時点で、担当Skillが`input_mode=direct`として正規化model / 構造入力を作成して新契約へ昇格する
 - legacy初回昇格では、現在のlegacy成果物に存在するTR / TCN / CI / TC IDを「現在確認できるactive ID」としてstructure / materialize script自身がprevious stateへseedする。AgentやLLMが`previous_*[]`を手組みしない。過去に削除済みだったが現成果物から消えているID履歴は復元できないため、昇格前のdeleted履歴を捏造しない。新規採番は現在観測できる同系列IDの最大番号+1から開始し、互換保証は昇格時点以降のfull snapshotへ限定する
 - 初回昇格入力は`input_mode=direct`かつnormal previous stateが空の場合だけ許可する。`requirement_structure.py`は`legacy_tr_ids[]`、`condition_structure.py`は`legacy_tcn_ids[]`、`case_structure.py`は`legacy_tc_ids[]`をoptionalで受け、各scriptが`runtime_contract.py`の同一legacy ID seed helperで`status=active`のprevious stateへ変換してから通常のscope / reuse / new採番処理へ入る。normal previous stateとlegacy ID入力の併用は`invalid_input`
+- legacy初回昇格だけはpartial rerunを許可しない。担当Skillの現在legacy成果物で観測できるactive TR / TCN / TCをすべて対応`update_scope_*`へ含め、意味上維持するrowもcurrent draftへ含めてreuseする。`test-condition-design`では全legacy TCNを昇格対象にし、各TCNの全legacy CIを`legacy_ci_ids[]`へ渡してcurrent model / CI / Machine Entityまでnormal契約へ移す。初回昇格とユーザー要求の変更を同じ実行で行う場合も、変更対象外rowを含む全active legacy rowを同時にnormal stateへ昇格する
+- legacy active rowの一部だけをseedして残りをlegacyのまま残す、またはseed済みactive IDを`update_scope_*`外へ置いてMachine Entity未昇格のまま残す入力は`invalid_input`とする。normal state / Machine Entityのfull snapshotが1回成立した後だけ§7.1.1 / §7.1.2のpartial rerunを許可する
 - TR / TCN / TCは、担当Skillが意味上同一と判断した既存rowについて既存`reuse_id`経路を使ってlegacy IDを維持する。legacy成果物にmodel keyが存在しない場合は`previous_model_keys=[]`からmodel keyを新規採番し、存在しない過去model identityを復元しない
 - `materialize_coverage.py`の各TCN単位実行では、対象TCNに存在する全legacy CI IDを`legacy_ci_ids[]`として渡し、同TCNのnormal `previous_ci_ids[]`が空の初回昇格だけ全件`status=active`へseedする。これにより意味対応できないlegacy CIもそのTCNの過去最大番号へ含め、別の新規CIへ番号を再利用しない
 - 対象TCNのlegacy CIを現在generator target / semantic Coverage Itemへ対応付けてIDを維持する場合だけ、`legacy_ci_ids[]`のsubsetとして初回昇格用`legacy_ci_seed[]`を渡す。schemaは`{ci_id, model_key, source_kind, target_ref, semantic_item_draft_key}`とし、`source_kind=runtime_target`ではcurrent `target_ref`だけ、`source_kind=semantic_item`ではcurrent `semantic_item_draft_key`だけを必須にする。LLMは意味上の同一性だけを判断し、固定builderがcurrent TCN / model / target / draftの存在、一意対応、CI親TCN、duplicate reuseを検証する
@@ -306,7 +322,7 @@ runtime単位状態の正本は各成果物に保存した`runtime_unit_key`、`
 
 既存`qa-workflow`契約どおり、Skill状態表はワークフロー状態を明示する必要がある場合だけ使用します。表を表示する場合も集約表示であり唯一の永続正本ではありません。他Skill実行、freshness判定、workflow完了判定は状態表の存在に依存せず、成果物metadataから状態を再構築します。
 
-ワークフロー状態を表示する場合は、既存Skill状態表に加えて次の`runtime状態`表を追加します。通常出力で状態表示が不要な場合は両表を省略でき、runtime metadata自体は各成果物へ保存します。
+ワークフロー状態を表示する場合は、既存Skill状態表に加えて次の`runtime状態`表を追加します。通常出力で状態表示が不要な場合は両表を省略できます。ただし`workflow_runtime.py`がdispatchされた場合、その`Machine Runtime Input / Result` blockは状態表示の有無にかかわらずqa-workflow成果物へ必須保存します。人間向け状態表を省略してもmachine evidenceとruntime metadataは省略しません。
 
 `Skill | Runtime Unit Key | Model Key | Support Status | Result Status | Freshness | Runtime Status | Runtime Required | Deterministic Generated | Fallback Reason | Blocker / Issue`
 

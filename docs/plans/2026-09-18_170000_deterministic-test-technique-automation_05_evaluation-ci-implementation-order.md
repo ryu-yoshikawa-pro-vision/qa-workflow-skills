@@ -141,6 +141,7 @@ CLI integration testは各runtime scriptの`valid_minimal.json`をCIのPython 3.
 - model / artifact全runtime unitについて`Machine Runtime Input / Result`を保存→決定論的抽出→strict decode→canonical化し、input fingerprint、model scriptではmodel fingerprintも一致する。同条件でruntimeへ再投入すると同じmachine resultになる
 - `runtime_contract.py`の`verify_runtime_evidence` operationは`normalized_skill_input`とcandidate artifactを受け、Skill / 対象 / 条件の固定dispatch metadataからroot expected runtime identityを先に導出する。artifact MarkdownからInput / Result pairを抽出し、root pairを確認した後だけcurrent structure / adapter parent resultから条件付きdownstream expected identityを段階的に導出する。valid caseに加え、必須root unit missing、条件付きmodel unit missing、unknown extra、Inputのみ、Resultのみ、duplicate heading / blockを各1件以上negative fixtureで検出する。root runtimeを削除してもexpected root集合が縮まないこと、親adapter ready resultがあるのにchild runtimeを削除するとmissingになること、親adapter unresolvedならchildを期待しないことを固定fixtureで確認する。Agent / LLMが完成済みexpected集合やdispatch stateを入力しない。operation自身をexpected / actual runtime unitへ追加せず、Skill / 対象 / 条件 / `model_type → generator`等の固定dispatch metadataは同一`runtime_contract.py`内の共通dataを使い、別manifest / registryを作らない
 - standalone Skillの代表fixtureでは、Agentが必須runtime blockを1件省略した候補artifactへ`verify_runtime_evidence`を実行して`valid=false`となり、deterministic validatorを実行しなくてもproduction最終確認で停止する
+- 同じfixtureでMachine Entityを1件削除、未知Entityを1件追加、同一identityを重複させた各caseを`verify_runtime_evidence`が`missing_entities / extra_entities / duplicate_entities`として拒否する。partial rerun fixtureではfixed helperがprevious成果物から抽出したscope外Entityだけをcarry forward候補として使用し、candidate artifactのactual集合からexpected Entityを逆算しない
 - LF / CRLF差だけでimplementation fingerprintが変わらない
 - canonical JSON static dataは整形・改行差だけでversion hashが変わらない
 
@@ -357,6 +358,7 @@ locale依存sort、set iteration順、dict insertion偶然性に依存する出�
 
 - 複数initial stateのtie-breakと`initial_state_key / initial_state_label`をexecutionへ保持する。reset使用時は`reset_execution.action / to_state`まで保存し、setup / coverage transitionはfrom / event / toの状態意味を内包する
 - resetが必要なtargetは`reset_key`をexecutionへ保持し、reset操作を空`setup_prefix`へ落とさない
+- required母集団とsetup可否を分離し、`all-states / valid-transitions / n-switch / round-trip / invalid-transitions`のsetup判定は§9.1だけを正本にする。direct pathがなくてもreset + pathで開始できるtargetは正常生成し、direct / resetの両方でsetup不能なrequired itemだけ`unresolved`とする
 
 - transition identity
 - all state / all transition
@@ -616,10 +618,10 @@ raw machine-readable入力をfixtureにします。
 
 ## 5. stable identity・再実行の回帰
 
-- legacy初回昇格では`requirement_structure.py / condition_structure.py / case_structure.py`へ`legacy_tr_ids[] / legacy_tcn_ids[] / legacy_tc_ids[]`を与え、normal previous stateが空かつ`input_mode=direct`の場合だけactive previous stateへseedする。normal stateとの併用・duplicate・不正IDを拒否する
+- legacy初回昇格では`requirement_structure.py / condition_structure.py / case_structure.py`へ`legacy_tr_ids[] / legacy_tcn_ids[] / legacy_tc_ids[]`を与え、normal previous stateが空かつ`input_mode=direct`の場合だけactive previous stateへseedする。normal stateとの併用・duplicate・不正IDを拒否する。初回昇格は対象Skillの全active legacy IDを`update_scope_*`へ含むfull migrationだけ許可し、一部IDだけscopeへ入れるpartial migrationを`invalid_input`にする
 - 現在観測できるTR / TCN / CI / TCだけをactive seedとして取り込み、未知の過去deleted履歴を捏造しない。TR / TCN / TCは意味上同一なら既存IDをreuseし、legacyにmodel keyがなければ新規採番する。未対応legacy CIはdeleted full snapshotへ残し、参照TCは`要再検証`へする
 - directで前工程Machine Entityなしに生成した成果物は2回目の再利用でもdirectで成立し、自SkillMachine Entityの存在だけでartifactへ強制変更しない。必要な外部Machine Entityがすべて揃ったfixtureではdirect → artifactへ切り替え、`input_mode`変更によりruntimeを再実行する
-- TR / TCN / model / TCは`update_scope_*`内のprevious activeでcurrent reuseされないIDだけをdeletedへ遷移し、scope外activeを維持する。previous state自体は成果物系列のfull snapshotを保持し、部分更新でも過去最大番号とdeleted履歴を失わない
+- TR / TCN / model / TCは`update_scope_*`内のprevious activeでcurrent reuseされないIDだけをdeletedへ遷移し、scope外activeを維持する。previous state自体は成果物系列のfull snapshotを保持し、部分更新でも過去最大番号とdeleted履歴を失わない。partial rerunではscope外active Machine Entityもprevious成果物からcanonical content / fingerprint不変でcarry forwardされ、scope内Entityだけcurrent resultへ置換される。scope外Entityのdependencyが変わったfixtureではcarry forward rowをcurrent完了条件へ使わず`要再検証`にする
 - 複数new draftはcanonical `draft_key`順、semantic CIはcanonical candidate順で採番し、raw入力配列順へ依存しない
 
 - 同じmodel改訂で`model_key`維持

@@ -117,7 +117,7 @@ CI単位の`merge_group`と、TCが複数CIを参照する意味判断を分離�
 
 ## 25. script別入出力契約
 
-次のkeyを全実装で固定します。hash targetは、指定したcanonical objectをSHA-256し`sha256:<64 lowercase hex>`で表します。
+次のkeyを全実装で固定します。hash由来のstable key componentは、指定したcanonical objectのSHA-256 full digestを`h<64 lowercase hex>`で表します。`target_ref`、各種`*_fingerprint`、static data version等のdigest専用fieldは`sha256:<64 lowercase hex>`で表します。stable key componentへ`sha256:<hex>`を埋め込みません。
 
 | script | required input | stable result / target key | 主payload |
 | --- | --- | --- | --- |

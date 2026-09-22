@@ -64,7 +64,7 @@ runtime issueへの回答を再開する場合は、回答を正規化modelへ�
 
 既存Skill契約どおり、Skill状態表はワークフロー状態を明示する必要がある場合だけ表示します。通常出力の必須要件には変更しません。既存canonical deterministic evalでは状態表を検証するfixtureに対する`WF-D009`を維持しますが、一般のSkill出力へ拡張しません。状態表は永続正本にせず、成果物metadataから再構築可能にします。
 
-`assets/workflow-state-template.md`へ、状態表示を行う場合に既存Skill状態表と併記する別表`runtime状態`を追加します。
+`assets/workflow-state-template.md`へ、状態表示を行う場合に既存Skill状態表と併記する別表`runtime状態`を追加します。これは人間向け表示だけです。`workflow_runtime.py`がdispatchされた場合の`Machine Runtime Input / Result`は`qa-workflow`の最終出力契約として状態表と独立に必須保存し、状態表を省略した正常出力でもmachine evidenceを残します。
 
 `Skill | Runtime Unit Key | Model Key | Support Status | Result Status | Freshness | Runtime Status | Runtime Required | Deterministic Generated | Fallback Reason | Blocker / Issue`
 
@@ -77,6 +77,7 @@ runtime issueへの回答を再開する場合は、回答を正規化modelへ�
 - `Runtime Required / Deterministic Generated = Yes / No`
 - `Fallback Reason`は空欄 / `outside_supported_subset` / `python_unavailable`
 - Skill状態表を表示するfixtureでは`WF-D012`を従来どおりSkill + 対象にだけ適用し、runtime状態表へ流用しない
+- `workflow_runtime.py`をdispatchするfixtureでは、Skill状態表 / runtime状態表を省略しても`Machine Runtime Input / Result`が存在すればvalidとし、同じfixtureからworkflow runtime evidenceだけを削除した場合はinvalidとする
 - ワークフロー全体`完了`では全runtime unitが`Result Status=ready / Freshness=current`であることを追加検査する
 - `Runtime Required=Yes`のunitでは、さらに`Deterministic Generated=Yes`を要求する
 - `Runtime Required=No`のfallback unitも`Result Status != ready`なら完了を妨げる
@@ -134,7 +135,7 @@ runtime対応Skillの`evals/output/cases/*/expected.json`では、既存fieldに
 - `machine_entities.expected_entities[]`は各Skillの固定builderがnormalized source / structure stateから導出した`(skill, entity_type, entity_ref)`をfixtureへ明示し、actual成果物のMachine Entity集合から逆算しない。validatorはactual identity集合とのmissing / extraと、各contentのentity type別canonical schema・人間向け表主要fieldを独立照合する
 - `runtime_contract.expected_runtime_units[]`はvalidator fixtureではstandalone Skillのcanonical normalized inputと検証済みstructure / adapter parent resultから固定builderが段階的に導出した`(skill, runtime_unit_key)`を明示する。productionの`verify_runtime_evidence`も完成済みexpected集合を入力せず同じ導出順を使用する。validatorは成果物中の`Machine Runtime Input / Result` block identity集合と完全一致を要求し、必須runtime blockの丸ごと欠落と未知の余分なblockを検出する。actual runtime block集合からexpectedを逆算しない
 - standalone direct fixtureで必須runtime blockを1件削除したnegative caseを各代表Skillに置き、`qa-workflow`を通さなくても成果物を完成扱いしないことを確認する
-- 同じcandidate artifactへproduction側`runtime_contract.py`の`verify_runtime_evidence` operationを実行し、validatorとは独立にmissing / extra / incomplete pair / duplicateを検出できることを確認する。deterministic validatorがPASS判定の唯一のruntime省略検出経路にならない。operationは集約stdin 16 MiB上限を使い、JSON escape後の実UTF-8 bytesで境界値と1 byte超過を検証する
+- 同じcandidate artifactへproduction側`runtime_contract.py`の`verify_runtime_evidence` operationを実行し、validatorとは独立にruntime blockのmissing / extra / incomplete pair / duplicateとMachine Entityのmissing / extra / duplicateを検出できることを確認する。partial rerunでは検証済みprevious Machine Entityからscope外expected identityを導出し、actual candidate集合からexpectedを逆算しない。deterministic validatorがPASS判定の唯一の省略検出経路にならない。operationは集約stdin 16 MiB上限を使い、JSON escape後の実UTF-8 bytesで境界値と1 byte超過を検証する
 - `spec-analysis`では`runtime_contract.py`のcanonical / Machine Entity helperと`authority_entities.py`を使うfixtureを用意し、runtime unitを作らずAuthority表とcanonical Authority content / expected identityの一致を検証する
 - expected target / Coverageは手書きfixtureから独立計算または明示し、generator出力をexpectedへコピーしない
 - `expected_target_id_map`はstateful materialize caseだけ使用し、`{target_ref, target_content_fingerprint, generation_fingerprint, execution_fingerprint, model_key, target_key, ci_id}`配列で保持する
@@ -423,7 +424,7 @@ runtime対象の次の6 Skillを単体コピーして代表scriptを実行しま
 
 ### `qa-workflow`
 
-- `assets/workflow-state-template.md`へ`workflow_runtime.py`の`Machine Runtime Input / Result`を追加
+- `qa-workflow/SKILL.md`へ、`workflow_runtime.py`をdispatchした場合は状態表示の有無にかかわらず`Machine Runtime Input / Result`を最終成果物へ保存する契約を追加する。`assets/workflow-state-template.md`は既存どおり任意の人間向け状態表示と`runtime状態`表だけを扱い、machine evidenceの唯一の保存先にしない
 - `scripts/workflow_runtime.py`を追加し、runtime metadata集約、Machine Entityのupstream / runtime dependency、runtime unit fingerprint比較、runtime / Entity freshness、stale伝播、機械的完了判定をLLMから分離
 - runtime dependency identityは`(skill, runtime_unit_key)`で固定する
 - `workflow_runtime.py`自身を評価対象`runtime_units[]`から除外し、self dependencyを禁止する
