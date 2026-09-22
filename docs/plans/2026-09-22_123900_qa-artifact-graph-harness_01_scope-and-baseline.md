@@ -2,31 +2,42 @@
 
 ## 1. 目的
 
-現在のQA workflowは、仕様分析、質問整理、リスク分析、テスト要求、テスト条件、テストケース、カバレッジ、E2E実装・実行・分析・報告までを独立Skillへ分離できています。PR #11 merge後は主要設計成果物にMachine Entity / deterministic runtimeが加わり、PR #12 merge後は実対象のcurrent情報収集と、AIによる詳細TCの手動相当実行が加わります。
+PR #11 / #12後に残る課題だけを本Planの対象とします。
 
-不足しているのは、これらを案件・リリース・探索セッションを跨いで次の問いへ機械的に答える共通層です。
+- 新規・改修ごとに設計したTest Caseを、次回以降も再利用できる全機能Regression Suiteへ統合する
+- Regression Suiteを機能タグで整理し、全件実行と部分実行の意味を明確に分ける
+- 今回のRegressionで選択 / 除外したTCと理由、実行結果を活動単位で後から辿れるようにする
+- 過去Result / Findingをrelease / sessionを跨いで発見できるようにする
+- Exploration / InvestigationのCharter / Session / Finding / Follow-upを第一級成果物として管理する
+- PR #11の設計traceabilityとPR #12 / E2Eのexecution lineageを跨ぐ、不足relationだけを決定論的に検索できるようにする
 
-- このTCはどの仕様・Risk・Conditionから来たか
-- この変更でどのTR / TCN / CI / TC / E2E / 過去Resultが再確認候補になるか
-- 今回のRegressionでなぜこのTC / E2Eを選んだか
-- 過去に同じ領域で何がFAIL / Findingになったか
-- 探索で得たFindingがどのQuestion / Risk / Condition / TCへ反映されたか
-- このPASS証拠はどの対象version / TC snapshot / executionに基づくか
-- 上流変更後も過去結果をcurrent evidenceとして扱ってよいか
+次はPR #13固有の課題として再実装しません。
 
-本Planでは、これらを**QA Artifact Graphの派生projectionと決定論的Harness**で管理します。
+- SPEC → TR → TCN → CI → TCのdesign traceability
+- 設計成果物のchange impact / freshness / stale伝播
+- TC snapshot、execution、result、rerunの正本
+
+これらはPR #11 / #12のmerge後実装を正本として利用します。QA Artifact Graphはその上に新しいQA状態を作るものではなく、必要なcross-artifact queryを支える派生relation indexです。
 
 ## 2. 実装開始時の基準
 
 実装開始前に以下を必ず確認します。
 
-1. PR #11がmerge済みである
-2. PR #12がmerge済みである
-3. 最新`main`のSkill一覧、Machine Entity schema、runtime contract、workflow state、評価件数を取得する
-4. PR #11 / #12 merge時の追加修正がPlan記載より優先される場合は実契約を正本とする
-5. 本PlanのGraph adapter / schemaを最新成果物契約へ合わせる
+1. PR #11 / #12がmerge済みである
+2. 最新`main`のMachine Entity、traceability、change impact、freshness、execution、rerunの実契約を取得する
+3. 実成果物で次のqueryを試し、PR #11 / #12だけで回答できるものをPR #13から除外する
+   - current TC → 仕様根拠 / Risk / TCN / CI
+   - changed specification / Risk → affected current TC
+   - execution → TC snapshot / target version / previous execution
+4. 次の残課題だけが未解決であることを確認する
+   - Regression Suiteと機能タグ
+   - Regression activityの選択 / 除外理由
+   - cross-run Result / Finding discovery
+   - Exploration / Investigation
+   - PR #11とexecution/historyを跨ぐ不足relation
+5. 4の残課題を、Regression Suite成果物 + activity成果物 + 最小relation indexで解けるかを先に検証する
 
-PR #11 / #12のPlan文書記載を実装時のruntime正本にはしません。merge済みコード・Skill・validator・assetを正本とします。
+5までで目的を満たせる場合、現在Planに記載されたより広いGraph node / edgeを実装しません。Graph拡張は未解決queryが具体的に確認できた場合だけ行います。
 
 ## 3. 現状のQA活動別能力
 
@@ -56,11 +67,22 @@ Coverage / Adversarial Review
 
 ### 3.2 Regression
 
-既存`e2e-test-execution`はPlaywright E2E runを構造化できます。PR #12の`test-execution`で詳細TCの手動相当実行も可能になる前提です。
+Regressionは、各セッションで設計した機能別TCを継続的に統合した**全機能Regression Suite**を基準にします。
 
-ただし「変更 / release → 影響候補 → Regression対象選定 → manual/E2E再利用 → execution history」の共通activity viewはありません。
+- Suite自体は現在有効な全機能を網羅する
+- 各TCは1件以上の機能タグを持つ
+- 新規・改修セッションで確定したTCはSuiteへ追加 / 更新する
+- 削除・置換されたTCはcurrent Suiteから外し、過去runのsnapshotは変更しない
+- E2E化されたTCも論理TCとして1件だけSuiteへ保持する
 
-本Planでは新しいRegression Skillを追加せず、Graph候補 + `test-analysis` + `coverage-analysis` + 既存execution Skillで成立させます。
+実行は2種類に分けます。
+
+- **全件実行**: current Suiteの全memberを対象にする。ユーザーが単にRegression実施を要求し、絞り込みを指定しない場合はこれを既定とする
+- **部分実行**: 機能タグ、明示TC、変更影響、Risk / history等でmemberを抽出する。選択理由と除外理由をactivity成果物へ保存し、全機能Regression完了とは扱わない
+
+機能タグは抽出単位です。全機能網羅の判定は件数ではなく、`coverage-analysis`が各機能の現在有効な仕様根拠 / Risk / TR / TCN / CIがSuite member TCへ意味上閉じていることを確認します。
+
+Regression専用Skillは追加しません。Suite管理と実行routingは`qa-workflow`、意味上の部分選定は`test-analysis`、全機能 / 選択範囲のカバレッジ確認は`coverage-analysis`、実行は`test-execution / e2e-test-execution`を利用します。詳細契約は`_04a_regression-suite.md`を正本とします。
 
 ### 3.3 Exploration / Investigation
 
@@ -73,30 +95,27 @@ Coverage / Adversarial Review
 
 両modeとも実測を仕様Authorityへ昇格しません。
 
-## 4. Graphの位置づけ
+## 4. Relation index / Graphの位置づけ
 
-Graphは「各成果物を置き換える巨大共通schema」ではありません。
+Graphは既存成果物を置き換える共通domain modelではありません。
 
 ```text
-Existing QA artifacts / Machine Entities / Run artifacts
+PR #11 Machine Entities / traceability
+PR #12 execution artifacts / E2E artifacts
+Regression Suite / QA activity / Exploration artifacts
                          │
                          ▼
-                deterministic adapters
+                 deterministic adapters
                          │
                          ▼
-                  QA Artifact Graph
+                thin relation index
                          │
               ┌──────────┼──────────┐
               ▼          ▼          ▼
-          validation   impact     projections
-                         │
-                         ▼
-                    qa-workflow
+          validation   query     activity view
 ```
 
-正本は引き続き担当Skillの成果物です。
-
-Graphを削除しても、正本から再buildできることをv1の必須条件にします。
+設計側のimpact / freshnessはPR #11、execution stateはPR #12 / E2Eを正本とします。Relation indexはそれらを再判定せず、明示relationの逆探索・複数hop query・履歴参照を支えます。
 
 ## 5. 責務境界
 
@@ -113,23 +132,19 @@ Graphを削除しても、正本から再buildできることをv1の必須条�
 - 変更が本当に下流へ影響するか
 - 修正routing
 
-### Graph Harness
+### Harness
 
-意味判断をしません。
-
-- node / edge schema validation
-- identity解決
+- relation schema validation
+- identity / artifact-local scope解決
 - duplicate / dangling参照
-- edge source/target type検証
-- explicit supersedes / deleted状態
-- graph traversal
-- reachability
-- cycle禁止対象のcycle検出
-- impact candidate列挙
-- coverage / orphan候補列挙
-- activity projection生成
-- currentness候補伝播
-- Graph JSON生成 / 再build一致
+- relation source/target type検証
+- 明示relationのquery / reachability
+- Regression Suite構造検査
+- activity index / history参照
+- query完全性の判定
+- canonical JSON生成 / 再build一致
+
+設計成果物のsemantic impact、freshness、Regression最終scope、PASS / FAILは判断しません。
 
 ### qa-workflow
 
