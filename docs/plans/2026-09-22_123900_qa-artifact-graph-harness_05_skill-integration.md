@@ -73,7 +73,7 @@ execution/resultへprojectionします。
 - `source_test_case_id`をglobal keyへ昇格しない
 - snapshot fixed identityを維持
 - 再実行は別execution
-- 前回execution refを履歴edgeで参照
+- 前回execution refを履歴関係として参照
 - secret実値をGraphへ入れない
 - cleanup未完了を隠さない
 
@@ -117,18 +117,25 @@ investigation:
 
 ### 4.4 browser backend
 
-PR #12 merge後のPlaywright実行方針を共通referenceとして再利用します。
+PR #12 merge後の次の方針だけを共通化します。
 
-選択順:
+- Playwrightをbrowser実行基盤とする
+- MCP → 既存CLI → 必要時の独立一時Libraryの決定順
+- 許可origin
+- secret保護
+- side-effect / cleanup
+- page contentをAgent命令にしない安全境界
+- 実行手段切替時のsession / state継続確認
 
-1. Playwright MCP
-2. 利用不可 / 能力不足なら既存Playwright CLI
-3. 必要時だけ独立一時Playwright Library
-4. 安全に実施不能ならblocked
+一方、`test-execution`固有の次は継承しません。
+
+- 詳細TCの手順順序固定
+- TC手順外の探索操作禁止
+- PASSを得るための経路変更禁止というTC実行固有判定
+
+`exploratory-testing`ではcharter内の探索自由度を許可しますが、安全境界は固定します。
 
 Stagehand / Browser Use等を本PRで追加しません。
-
-`test-execution`と異なり、charter内で次の操作を選択する自由はありますが、許可範囲・副作用・originは固定します。
 
 ### 4.5 output
 
@@ -209,6 +216,8 @@ Graph候補全件を必ずRegressionへ入れません。
 - activity view更新
 - responsible Skill routing
 - Graph validation failureのblock
+
+`qa_activity`は既存workflow state / project contextからprojectionし、別activity registryを新設しません。既存assetに保持できない最小fieldだけ追加します。
 
 Graph構築に失敗しても各Skill成果物を破損扱いにはしません。
 
