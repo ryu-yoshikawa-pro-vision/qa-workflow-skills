@@ -4,36 +4,52 @@
 
 旧PlanではQA Artifact Graphのschemaを先に固定していましたが、本PlanではGraphを必須基盤にしません。
 
-実装順序は次です。
+queryの解決順序を固定します。
 
-1. Regression Suite / Activityをdirect refだけで成立させる。
-2. 過去activityの発見経路を成立させる。
-3. direct refとPR #11 / #12の既存runtimeで回答できないqueryを列挙する。
-4. reverse / multi-hop / cross-run queryが必要な場合だけ、最小relation indexを追加する。
+1. source artifactが持つdirect refを使う
+2. project context / canonical rootから発見済みのActivity・execution成果物をdeterministicにscanする
+3. それでも実需を満たせないqueryだけ、最小relation indexを検討する
 
-このgateを通る前に広いnode taxonomy、edge taxonomy、Graph schemaを実装しません。
+reverse lookupであることだけをrelation index導入理由にしません。
 
-## 2. direct refで先に成立させる関係
-
-最低限、各source artifact自身が次を保持できるか確認します。
+## 2. direct refで成立させる関係
 
 ### Regression activity
 
-- Suite / baseline revision ref
+最低限、次を保持します。
+
+- baseline / Suite source ref / revision
+- project context ref / revision
+- selection input refs / revisions
 - member snapshot refs
 - selected TC refs
-- excluded TC refsと理由
+- auxiliary testware refs（利用時）
+- excluded refsと理由
 - execution route refs
 - execution refs
 - unresolved / blocked
 - residual risk
 
+selection input refsには、今回のselectionに実際に使ったものだけを保持します。
+
+例:
+
+- PR #11 impact result
+- Product Risk
+- Finding
+- explicit user scope
+- project contextのRegression方針
+
+本文をActivityへ複製しません。
+
 ### Exploration / Investigation
 
 - activity ref
-- source Finding / Question ref
+- source Finding / Question / symptom ref
 - evidence refs
 - follow-up refs
+
+completed activityの本文を後続成果物作成のたびに書き換える必要はありません。後続成果物側がsource Finding等へback-referenceできる場合はそれを利用します。
 
 ### execution
 
@@ -44,22 +60,35 @@ PR #12 / E2Eの既存契約を正本とします。
 - result / evidence ref
 - previous execution ref
 
-これらでforward queryを回答できる場合、同じ関係を別indexへ重複保存しません。
+## 3. deterministic scan
 
-## 3. relation indexを追加する条件
+Activity rootから全activityを発見できる場合、reverse queryはまずscanで解決します。
 
-次のようなqueryがdirect refだけでは実用的に回答できないことを確認した場合だけ追加します。
+例:
 
-- `TC-xxx`が使われた過去Regression activityを逆引きする
-- testwareから複数releaseのexecution / resultを横断する
-- Findingから後続TCを辿り、そのTCを使用した後続Regressionまで横断する
-- PR #11 impact candidateから関連する過去FAIL / Findingを逆引きする
+- TC → 過去Regression activity
+- testware → 過去execution / activity
+- Finding → follow-up TC → 後続Regression
 
-単に「将来便利そう」という理由で追加しません。
+scan結果の完全性は、Activity discovery root自体の完全性に依存します。
 
-## 4. 最小relation record
+root / indexの完全性が保証できない場合、結果を完全な履歴として扱いません。
 
-relation indexが必要と確認された場合、最初は次の最小形から開始します。
+## 4. relation indexを追加する条件
+
+次のいずれかを実測で確認した場合だけ追加します。
+
+- artifact数により毎回scanするコストが実運用上問題になる
+- 保存場所が分散し、canonical discovery rootからscanできない
+- 頻繁に使うmulti-hop queryをdirect ref + scanで安定して回答できない
+
+追加する場合も、問題になったqueryに必要なrelationだけを持ちます。
+
+単に「将来便利」「Graphなら拡張しやすい」という理由で追加しません。
+
+## 5. 最小relation record
+
+必要性を実証した場合だけ、次のような最小recordから開始します。
 
 ```json
 {
@@ -70,32 +99,15 @@ relation indexが必要と確認された場合、最初は次の最小形から
 }
 ```
 
-必要な場合だけ、artifact-local refのscope情報を追加します。
+必要な場合だけartifact-local refのscope情報を追加します。
 
 初期段階では以下を作りません。
 
 - specification / risk / requirement / condition等のPR #11 design nodeの再定義
 - 独自`graph_state`
-- 独自currentness
-- 独自lifecycle
+- 独自currentness / lifecycle
 - 汎用`node_key`
 - 全QA成果物共通のnode schema
-
-PR #11側のentityはcanonical refとして参照し、design graph自体をPR #13へコピーしません。
-
-## 5. relation type
-
-relation typeもquery需要から必要なものだけ追加します。
-
-初期候補:
-
-- logical TC → testware
-- activity → selected TC / testware
-- activity → execution
-- execution → result / evidence
-- Finding → follow-up artifact
-
-PR #11が所有する`depends_on`、`derived_from`、design traceability等をPR #13のschemaとして再定義しません。
 
 ## 6. identity
 
@@ -106,14 +118,13 @@ PR #11が所有する`depends_on`、`derived_from`、design traceability等をPR
 - semantic matchingでIDを補完しない
 - TCなしE2EへTC IDを創作しない
 
-relation index用の内部keyが実装上必要になった場合も、正式QA IDとして成果物へ書き戻しません。
-
 ## 7. query completeness
 
-部分Regressionのscopeを狭めるcandidate queryは、完全性を判断できる情報を返します。
+部分Regressionのcandidate queryは、完全性を判断できる情報を返します。
 
-`complete=false`相当とする例:
+`complete=false`相当:
 
+- authoritative discovery sourceを完全に列挙できない
 - unsupported artifactがある
 - required relationを抽出できない
 - dangling refがある
@@ -130,12 +141,11 @@ relation index用の内部keyが実装上必要になった場合も、正式QA 
 PR #13で独自stateを生成しません。
 
 - design freshness / stale / `要再検証` → PR #11
-- workflow block / completion → `qa-workflow`
+- workflow / activity state → `qa-workflow`
 - execution result / cleanup / rerun → PR #12 / E2E
-- Regression membership → Regression Suiteの論理契約
-- activity履歴 → activity artifact
+- Regression membership → Regression Suite契約
 
-補助runtimeはsource stateを表示・検証できますが、別のcurrentness判定を作りません。
+補助runtimeはsource stateを参照・検証できますが、別のcurrentness判定を作りません。
 
 ## 9. 保存しないもの
 
@@ -145,5 +155,3 @@ PR #13で独自stateを生成しません。
 - 生の個人情報
 - chain-of-thought
 - source artifact本文全文
-
-必要なrefと最小metadataだけを扱います。
