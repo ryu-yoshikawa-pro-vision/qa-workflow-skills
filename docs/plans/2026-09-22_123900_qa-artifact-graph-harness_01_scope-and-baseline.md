@@ -12,6 +12,8 @@ PR #11 / #12後に残る課題を、既存の新規・改修SkillへRegression�
 - Regressionごとのselection / execution / source result / residual riskを履歴化する
 - 修正確認を独立Skillにせず、既存TCが有効ならexecutionへ直接、設計不足がある場合だけ既存analysis / designを経由して実行する
 - Exploration / Investigationを`exploratory-testing`として独立させる
+- QA活動で得た対象・仕組み・テスト観点・環境の知識を、既存正本を壊さず継続再利用できるようにする
+- 複数workflowが同時進行しても、workflow state・共有QA成果物・test environment / dataが混線しないようにする
 
 PR #13で再実装しないもの:
 
