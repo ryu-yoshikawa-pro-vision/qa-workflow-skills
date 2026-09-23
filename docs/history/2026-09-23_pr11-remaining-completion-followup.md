@@ -142,9 +142,19 @@ The existing skip behavior and production code were not changed.
 - Ubuntu symlink check: run 35852216454, job `semantic-output-evals`, step `Run Semantic Eval shared runtime tests`. Both `test_cases_directory_symlink_escape_raises` and `test_symlink_escape_raises` were discovered and reported `... ok`; the shared suite ran 27 tests and finished `OK` with no skips.
 - Saved external Semantic Judge set: current latest candidate set 24/24 cases, 91/91 criteria PASS; needs_review=0, fail=0, not_evaluable=0. The historical 12 Reference / Eval causes are resolved; current unresolved mismatch count is 0. Criterion evidence and the corrected cause record are in `docs/history/2026-09-23_pr11-semantic-judge-criteria-starting-state.md`.
 - Windows semantic shared suite still skips the same two symlink tests because of WinError 1314; Ubuntu execution above confirms both tests pass when symlink creation is available.
-- This report records CI run IDs for the implementation/test commit. The report-only follow-up head must also pass all three workflows before the PR description is updated.
+- Report-only follow-up commit: `4c9d1f35d3b71e28c47b4e883d19dd24c0307bbf`. Local HEAD, remote branch head, and PR head matched when its workflows completed:
 
-## GitHub PR body proposal (not yet applied; update after latest-head CI)
+| Workflow | Run ID | Result |
+| --- | ---: | --- |
+| Validate Agent Skills | 35852880189 | success |
+| Validate Semantic Output Evals | 35852880443 | success |
+| Validate Deterministic Output Evals | 35852880423 | success |
+
+- On Ubuntu, run 35852880443, job `semantic-output-evals`, step `Run Semantic Eval shared runtime tests`, reported both `test_cases_directory_symlink_escape_raises` and `test_symlink_escape_raises` as `ok`; 27 shared tests finished `OK` with no skips.
+- PR #11 body was updated after these runs. The PR remained open and Ready for review (`isDraft=false`).
+- This report correction changes the report-only head again. Recheck the three workflows on that new head, then refresh the PR body run links to the final head.
+
+## PR body text snapshot (applied after CI on 4c9d1f3; refresh links after this report commit)
 
 > ## 実装状況
 >
@@ -161,6 +171,6 @@ The existing skip behavior and production code were not changed.
 ## Git operations
 
 - Commit `18098995376190b14778dc04c55c1d0aae7f3636`: performed (normal commit).
-- Push: performed; local HEAD = PR head at the time of the first GitHub Actions check.
-- GitHub PR body update: not yet performed; wait for CI on the documentation-only report commit's latest head.
+- Report commit `4c9d1f35d3b71e28c47b4e883d19dd24c0307bbf`: performed (normal commit); its push and all three Actions succeeded.
+- GitHub PR body: updated after successful Actions on `4c9d1f3`; update again after CI for the current report correction commit.
 - Merge / branch deletion / issue or PR close: not performed.
