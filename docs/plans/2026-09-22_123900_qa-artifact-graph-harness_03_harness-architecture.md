@@ -212,7 +212,10 @@ relation indexを実装しない限りGraph schema versionやrelation schema ver
 - state revision / content identityを保持している
 - state更新がCASを使用し、競合時に古いstateを上書きしていない
 - started source refs / revisionsを保持している
-- used knowledge refs / revisions、project context revision、resource条件を保持している
+- used knowledge refs / revisionsを保持している
+- project context全体のref / revisionをprovenance snapshotとして保持している
+- currentness判定に利用したproject context項目のstable locator + content identityまたは正規化値を保持している
+- resource条件を保持している
 - persisted updateが読み込み時revisionを保持している
 - conflict後に古い内容を上書きしていない
 - owner Skillがpartial update boundaryを定義していないartifactを自動rebaseしていない
@@ -220,6 +223,8 @@ relation indexを実装しない限りGraph schema versionやrelation schema ver
 - latest current state向けの完了判定前に依存revision / fingerprintを再確認している
 
 workflow_refの採番規則はruntimeが生成し、LLMが一意性を手計算しません。具体形式は実装時に既存runtime / portability制約を確認して決定します。
+
+persisted workflow stateはproject-local fixed workflow state rootから発見し、同じ`workflow_ref`は必ず同じstate artifactへ決定論的に解決します。初回保存はatomic create-if-absent、更新はそのstate artifact自身のexpected revisionを使うatomic conditional writeとします。read → revision比較 → 無条件writeはCASとして扱いません。
 
 ## 13. knowledge artifact validator
 
@@ -241,8 +246,10 @@ workflow_refの採番規則はruntimeが生成し、LLMが一意性を手計算�
 - 置換済みentryの置換先
 - 有効entryのcurrentness dependencyがcurrentである
 - 未検証candidateをcurrent knowledge entryとして保存していない
-- same-entry updateがexpected revision付きCASである
-- new entryがcreate-if-absentである
+- same-entry updateがtarget entry自身のexpected revisionを使うatomic conditional writeである
+- new entry作成がidentity判定時のcompleteなknowledge snapshotとpublishを競合検出可能な形で結び付けている
+- 同一semantic identityの並行createでcurrent entryが複数残らない
+- snapshot変更時にcurrent rootを再読込してidentity判定からやり直す
 - knowledge root / repository HEAD変更だけで無関係entryをstaleにしていない
 - central manifest / global mutable ID counterを要求していない
 - secret実値を保存していない
@@ -262,12 +269,13 @@ workflow Aが参照したMachine Entity / artifact / knowledge / project context
 - latest current state向け完了判定直前
 - 過去成果物のcurrent再利用直前
 
-PR #11対象のEntityはdependency / content fingerprintを優先し、PR #11対象外はworkflowが保持したref / revision / resource conditionをcurrent値と比較します。
+PR #11対象のEntityはdependency / content fingerprintを優先し、PR #11対象外はworkflowが保持したref / revision / resource conditionをcurrent値と比較します。project context全体のrevisionはprovenance snapshotとして扱い、revisionが変わった場合はworkflowが実際に利用した項目のstable locator + content identityまたは正規化値だけをcurrent値と比較します。
 
 - historical Activity / execution / Sessionは変更しない
-- 影響scopeだけ要再検証へ戻す
+- 利用したproject context項目が変わった場合だけ関係scopeを要再検証へ戻す
+- 未使用project context項目だけの変更ではworkflowをstaleにしない
 - dependencyが無関係ならworkflow全体を再実行しない
-- dependencyを解決できない場合はcurrent完了を安全側にblockする
+- dependencyを安全に再解決できない場合はcurrent完了をblockする
 
 この検査を成立させるためだけの中央workflow database / coordinatorは追加しません。
 
@@ -286,7 +294,11 @@ test user / tenant / test data / external account等の共有mutable resourceは
 
 - shared mutable resourceを利用する場合、resource refまたは再現可能な識別条件がある
 - read-only / parallel-safeか、isolation済みか、exclusive ownershipがあるかを区別できる
-- project-local reservationのacquire / releaseがCASで競合検出される
+- 同じ`resource_ref`が全workflowから同じcanonical reservation targetへ解決される
+- 未予約をabsenceで表す場合はacquireがatomic create-if-absent、persistent recordを使う場合はexpected revision付き`available → reserved` CASである
+- releaseはcurrent owner / workflowとexpected reservation revisionが一致する場合だけ成功する
+- recoveryは時間経過だけでreleaseせず、current reservation、owner workflow / Activity / Session、必要cleanupの状態を再確認する
+- ownerがactiveか不明、cleanupが失敗 / 未確認 / 一部失敗、または安全な解放を機械判定できない場合は明示的確認へblockする
 - policy不明で他workflowへの影響を否定できない場合に並行実行していない
 - cleanup対象が当該workflow / Activityの所有または予約範囲へ限定されている
 - 別workflowのresourceをcleanupしていない

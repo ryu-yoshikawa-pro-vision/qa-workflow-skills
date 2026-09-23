@@ -179,7 +179,7 @@ formalなTest Requirement / Condition / Caseへ昇格すべき場合は該当des
 - currentness dependencyを特定できる
 - 既存正本へ入れるべき内容ではない
 - 継続して再利用する具体的な価値がある
-- 既存entryとのidentity関係を判断できる
+- completeなknowledge root snapshotに対して既存entryとのidentity関係を判断できる
 
 確認できない場合はknowledge artifactへ未検証entryを作りません。
 
@@ -189,14 +189,23 @@ candidateは元Finding / Activity / Follow-upに残し、必要な追加確認�
 
 new knowledge identityの場合だけ新entryを作成します。
 
+基本契約:
+
 - fixed knowledge root配下
 - 1 entry = 1 artifact
-- create-if-absent
+- identity判定はcompleteなknowledge root snapshotに対して行う
+- identity判定とpublishを競合検出可能な形で結び付ける
 - global mutable counterなし
-- collision-resistantなstable ref
 - central manifest更新なし
+- 同一semantic identityのcurrent entryを複数作らない
 
-stable refの文字列表現は実装時に既存ID規約とportabilityを確認して決定します。
+保存先でsemantic identityからstableなcanonical create targetを決定できる場合は、同じidentityを同じtargetへ収束させてatomic create-if-absentします。
+
+canonical targetへ収束させられない場合は、identity判定に利用したknowledge namespace / branch snapshotのexpected revision付きでpublishします。snapshot変更を検出した場合は新entryを保存せず、current rootを再読込して既存entryとのidentity関係から再評価します。
+
+stable refの文字列表現は実装時に既存ID規約とportabilityを確認して決定します。同じtargetが既に存在する場合、「別refを作って再試行」する前にcurrent entryを読み、same identityならupdate / revalidationへ移ります。真のidentity collisionと確認できた場合だけ別targetを使います。
+
+この競合制御のためにglobal semantic lock、vector DB、central manifestは追加しません。
 
 ## 10. update / revalidation
 

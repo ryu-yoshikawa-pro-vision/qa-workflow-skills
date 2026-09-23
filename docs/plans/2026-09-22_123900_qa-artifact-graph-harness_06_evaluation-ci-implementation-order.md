@@ -229,8 +229,11 @@ negative:
 - 既存正本へ自然に置けない再利用knowledgeだけ`qa-knowledge`がentry化する
 - knowledge entryはstable refを持つ
 - fixed root配下で1 entry = 1 independently versioned artifact
-- updateはentry artifact自身のexpected revisionによるCAS
-- new entryはcreate-if-absent
+- existing entry updateはentry artifact自身のexpected revisionを使うatomic conditional write
+- new entryのidentity判定とpublishを同じcompleteなknowledge snapshotへ結び付ける
+- 同じsemantic identityを2 workflowが同時createしてもcurrent entryは1件に収束する
+- identity判定後にsnapshotが変わった場合はcurrent rootを再読込してidentity判定からやり直す
+- 異なるsemantic identityの並行createは再評価後に両方保存できる
 - global mutable counter / central manifestを要求しない
 - provenance source refs / revisionsとcurrentness dependency refs / revisionsを分離する
 - 適用scope、environment / version条件を持つ
@@ -248,13 +251,15 @@ negative:
 ### 複数workflow
 
 - 同一projectで2つ以上のworkflowが異なる`workflow_ref`を持って同時進行できる
-- qa-workflowが継続管理するworkflowは1 workflow = 1 persisted state artifact
-- workflow state自身がrevision / content identityを持ちCASで更新される
+- qa-workflowが継続管理するworkflowはfixed workflow state root配下で1 workflow = 1 persisted state artifact
+- 同じ`workflow_ref`の同時初回保存が1つのcanonical state artifactへ収束する
+- workflow state自身がrevision / content identityを持ちatomic conditional writeで更新される
 - 同じworkflowを2 sessionが同時resumeしてもstateの後勝ち上書きが起きない
-- 各workflowがstarted source refs / revisions、knowledge refs / revisions、project context revision、resource条件を保持する
+- 各workflowがstarted source refs / revisions、knowledge refs / revisions、project context全体revision、利用したproject context項目のstable locator + content identityまたは正規化値、resource条件を保持する
 - workflow Aの進行中にBがAの依存Entityを更新してもAのhistorical resultは保持する
 - currentnessをworkflow / Run開始、resume、未開始mutable operation開始直前、current完了直前、current再利用直前で確認する
-- Bの変更がAへ影響する場合だけ該当scopeを`要再検証`へ戻す
+- BがAの利用中project context項目を変更した場合だけ該当scopeを`要再検証`へ戻す
+- BがAの未使用project context項目だけを変更した場合はAをstaleにしない
 - Bの変更がAへ無関係ならA全体を再実行しない
 - event bus / repo-wide coordinatorなしでcheckpoint検出できる
 
@@ -263,6 +268,7 @@ negative:
 - 同じscopeを同じbase revisionから更新した場合、後勝ち上書きをしない
 - scope overlapを判定できない場合にLLMが自動mergeしない
 - revision / SHA / ETag等の競合検出に失敗した更新を保存済み扱いしない
+- read → revision比較 → 無条件writeをCASとして扱わず、保存先のatomic conditional writeを検証する
 - owner Skillがdeterministic partial update boundaryを定義していないartifactは自動rebaseしない
 - owner contractがあるartifactでもupdate scope disjoint + upstream dependency不変を確認する
 - stable IDが異なるだけではdisjoint updateとみなさない
@@ -273,12 +279,16 @@ negative:
 - workflow別に分離されたtest user / dataでは並行実行できる
 - 既存の外部reservation / exclusive ownershipがある場合は再利用する
 - 外部機構がない場合、atomic CASを提供できる保存先だけproject-local reservationを許可する
+- 同じresource refが同じcanonical reservation targetへ解決される
 - project-local reservationの同時acquireで1 workflowだけが成功する
 - CASで排他を保証できないshared mutable resourceは並行実行をblockする
 - read-only / parallel-safe resourceはreservation不要
 - cleanupが別workflowのresourceを削除しない
 - environment / resource条件が途中で変わった場合、結果のcurrentnessを再確認する
 - workflow異常終了時にreservationを自動expiryで別workflowへ譲渡しない
+- stale reservation revisionからのrelease / recoveryを拒否する
+- owner active状態またはcleanup状態を確認できないrecoveryをblockする
+- 安全なrecoveryだけがexpected revision付きCASでreleaseできる
 
 ### relation index不要
 
@@ -351,6 +361,10 @@ CIへ外部APIを追加しません。
 - PR #12 execution start / result / rerun契約
 - E2E execution start / result契約
 - Activity保存規約
+- workflow state / knowledge entry / reservationをpersistする実際の保存経路
+- 保存経路ごとのatomic conditional write primitiveと、historical revisionから当時artifactを再取得できること
+- fixed rootを使用するAPI / filesystemで完全列挙でき、truncation時に`complete=true`を返さないこと
+- same-workflow concurrent resume時、state保存より先に同じmutable operationを二重開始しないsource contractが存在するか
 - PR #11 / #12だけで解けるものを除外
 
 ### Step 1: Skill / workflow vocabulary
@@ -369,21 +383,24 @@ CIへ外部APIを追加しません。
 - fixed knowledge root discovery
 - 1 entry = 1 independently versioned artifact
 - stable entry ref / create-if-absent
-- entry storage revision / CAS
+- new knowledge identityのsnapshot-bound create / concurrent duplicate防止
+- entry storage revision / backend atomic conditional write
 - provenance sourceとcurrentness dependencyの分離
 - same-entry update / revalidation / replacement
 - root / repository HEAD変更だけで無関係entryをstaleにしない
 - knowledge candidateをActivity / Finding / Follow-upに留める契約
 - workflow_ref
-- 1 workflow = 1 persisted state artifact
-- workflow state revision / CAS
+- fixed workflow state root / 1 workflow_ref = 1 persisted state artifact
+- workflow state初回create-if-absent / revision / backend atomic conditional write
 - started source refs / revisions
+- project context whole revision + used item dependency identity
 - currentness checkpoint
 - owner Skillが保証するpartial update boundary
 - shared artifact revision conflict
 - cross-workflow staleのcheckpoint検出
 - shared environment / resource policy入口
-- isolation → existing reservation → CAS付きproject-local reservation → block
+- isolation → existing reservation → canonical target + CAS付きproject-local reservation → block
+- reservation recoveryのowner / cleanup確認とCAS release
 
 ### Step 3: initial baseline / currentness
 
@@ -495,6 +512,10 @@ direct ref + deterministic scanで不足を実測した場合だけ、必要quer
 - owner Skillがpartial updateを保証していないartifactをscope推測でauto-rebaseする
 - project policyの記述だけをshared mutable resourceの排他保証として扱う
 - CASできないreservation fileの存在だけをlockとして扱う
+- blob / revisionを事前比較しただけの無条件writeをCASと呼ぶ
+- 同一semantic knowledgeを別refで複数current entryとして残す
+- project context全体revision差だけで無関係workflowまでstaleにする
+- abandoned reservationを時間経過や未確認cleanupのままreleaseする
 
 ## 7. 完了条件
 
@@ -518,11 +539,14 @@ direct ref + deterministic scanで不足を実測した場合だけ、必要quer
 - 代表semantic caseを実Judgeで評価し、実装完了記録に残せる
 - 継続利用するQA知識を`qa-knowledge`でtriage / 有効化 / 再検証 / 更新 / 置換 / lookupできる
 - fixed knowledge root + 1 entry = 1 artifactで保存・検索・再利用できる
-- same-entry updateをentry-level CASで保護できる
+- same-entry updateをentry-level atomic conditional writeで保護できる
+- 同一semantic identityの並行createを1 current entryへ収束できる
 - unrelated entry更新で無関係workflowをstaleにしない
 - 既存正本へ属する知識を第二の正本として複製しない
 - 複数workflowが独立したworkflow_ref / state / input snapshotで同時進行できる
+- 同じworkflow_refの初回state作成と更新が1つのcanonical state artifactへ収束する
 - shared current artifactの競合で後勝ち上書きが起きない
+- project contextの未使用項目変更で誤staleにせず、利用項目変更だけ必要scopeを要再検証へ戻せる
 - cross-workflow変更をdependency / revisionから必要scopeだけ要再検証へ戻せる
 - shared environment / resourceの安全な並行利用可否を判断でき、不明時にblockできる
 - knowledge entryのprovenanceとcurrentness dependencyを分離できる
@@ -530,4 +554,5 @@ direct ref + deterministic scanで不足を実測した場合だけ、必要quer
 - workflow state自身のCASで同一workflowのlost updateを防げる
 - currentness checkpointで別workflowの変更をmutable operation開始前にも検出できる
 - partial auto-rebaseをowner Skillが保証するartifactへ限定できる
-- shared mutable resourceをisolation → existing reservation → CAS付きlocal reservation → blockの順で安全に扱える
+- shared mutable resourceをisolation → existing reservation → canonical target + CAS付きlocal reservation → blockの順で安全に扱える
+- abandoned reservationをowner / cleanup状態確認なしに再利用せず、安全なrecoveryだけをCASで解放できる

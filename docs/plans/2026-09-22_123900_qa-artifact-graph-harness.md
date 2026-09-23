@@ -129,13 +129,14 @@ defect fix
 23. QAを続けるほど、テスト対象・関連する仕組み・テスト観点・テスト環境について再利用可能な知見が蓄積され、次のworkflowがscopeに応じて取り出せることを要件にする。既存の仕様・Risk・TC・test-target-inspection等の正本へ入る情報はそちらを更新し、第二の正本を作らない。
 24. Activity / Session / executionは履歴の正本とし、Finding / Observationを自動的にcurrent知識へ昇格しない。未検証candidateは元Activity / Finding / Follow-upに残し、検証済みentryだけを知識成果物へ追加する。
 25. knowledge entryではprovenance source refs / revisionsとcurrentness dependency refs / revisionsを分離し、entry単位のrevision / content identityを持つ。dependency変更時は一度有効だったentryを`要再検証`へ戻す。
-26. `qa-workflow`で継続管理するworkflowは一意な`workflow_ref`を持ち、1 workflow = 1 persisted state artifactとする。state自身もrevision / content identityを持ち、CASでlost updateを防ぐ。standalone Skillには強制しない。
-27. cross-workflow currentnessはevent busで即時伝播せず、workflow / Run開始、resume、未開始mutable operation開始直前、current完了直前、current再利用直前のcheckpointでdependency / revisionを確認する。
+26. `qa-workflow`で継続管理するworkflowは一意な`workflow_ref`を持ち、project-local fixed workflow state root配下で1 workflow = 1 persisted state artifactとする。同じ`workflow_ref`は常に同じstate artifactへ決定論的に解決し、初回保存はcreate-if-absent、更新はそのartifactのexpected revisionを使うatomic conditional writeで行う。standalone Skillにはpersisted stateを強制しない。
+27. workflowはproject context全体のref / revisionをprovenance snapshotとして保持し、currentness判定には実際に利用したproject context項目のstable locatorとcontent identityまたは正規化値を別に保持する。cross-workflow currentnessはevent busで即時伝播せず、workflow / Run開始、resume、未開始mutable operation開始直前、current完了直前、current再利用直前のcheckpointで利用済みdependencyだけを再確認する。project context全体のrevisionが変わっても未使用項目だけの変更ではworkflowをstaleにしない。
 28. 共有current成果物の自動rebase / partial updateは、owner Skillがdeterministic partial update boundaryを明示するartifactに限定する。scope disjoint、upstream dependency不変、cross-scope invariant維持を確認できない場合はcurrent成果物を再読込し責任Skillで再評価する。
-29. shared mutable resourceはisolationを第一選択とし、分離できない場合は既存外部reservation、atomic CAS付きproject-local reservation、blockの順で扱う。単なるpolicyやreservation fileの存在確認を排他保証にしない。
+29. shared mutable resourceはisolationを第一選択とし、分離できない場合は既存外部reservation、atomic CAS付きproject-local reservation、blockの順で扱う。project-local reservationでは同じ`resource_ref`が必ず同じreservation targetへ解決され、初回acquireをatomic create-if-absentまたはexpected revision付きstate transitionで競合させる。release / recoveryもcurrent ownerとexpected revisionを確認してCASし、時間経過だけ、owner状態不明、cleanup未確認の状態では自動解放しない。
 30. knowledge lifecycleは`qa-knowledge`が担当する。`qa-workflow`はknowledgeのdomain判断を持たず、複数Skillが必要な要求のrouting / workflow stateだけを担当する。
 31. knowledge persistenceはproject contextから発見できるfixed root配下の1 entry = 1 independently versioned artifactとする。単一project knowledge artifact、central manifest、global mutable ID counterは採用しない。
-32. knowledge entryはartifact自身のrevision tokenでCASし、same-entry conflictをsemantic auto-mergeしない。通常の再検証 / 更新はsame entryのnew revision、semantic identity変更時だけreplacementとする。
+32. existing knowledge entryはartifact自身のexpected revisionを使うatomic conditional writeで更新し、same-entry conflictをsemantic auto-mergeしない。new knowledge identityの作成は、identity判定に使用したcompleteなknowledge snapshotとpublishを競合検出可能な形で結び付け、同一semantic identityから複数のcurrent entryを作らない。保存先に応じて、同一identityが同じcreate targetへ収束する方式またはnamespace / branch snapshotへのconditional publishを使用し、snapshot変更時はcurrent rootを再読込してidentity判定からやり直す。
+33. このPlanでいうCASは、実際に共有されるmutable storage targetに対するatomic conditional writeを意味する。read → revision比較 → 無条件writeをCASとして扱わない。GitHub Contents API、native Git等でatomic primitiveが異なるため、Step 0で採用する保存経路ごとの条件付き更新方法を既存実装と照合して固定する。
 
 ## 対象外
 

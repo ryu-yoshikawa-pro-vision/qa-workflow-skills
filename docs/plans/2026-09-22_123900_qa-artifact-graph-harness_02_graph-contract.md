@@ -148,7 +148,8 @@ workflow state / Activity / Sessionから最低限次を辿れるようにしま
 - workflow_ref
 - 利用したQA artifact refs / revisions
 - 利用したknowledge entry refs / revisions
-- 利用したproject context ref / revision
+- 利用したproject context ref / revision（provenance snapshot）
+- currentness判定へ実際に利用したproject context項目のstable locator + content identityまたは正規化値
 - 利用したenvironment / resource条件
 - 生成したActivity / Session / artifact refs
 - related workflow refs（因果関係が明示できる場合だけ）
@@ -201,6 +202,8 @@ query completenessはknowledge root / workflow history root / artifact discovery
 
 direct refには、current artifactを更新するときの競合検出に利用できるrevision / SHA / ETag / content identityを含めます。
 
+このPlanでいうCASは、実際に共有されるmutable storage targetに対するatomic conditional writeです。read時のrevisionを比較した後に無条件writeする処理はCASとして扱いません。保存先ごとに実際のatomic primitiveを使い、競合時は保存済み扱いにせずcurrent stateを再取得します。
+
 同じbase revisionから複数workflowが共有成果物を更新した場合、自動rebase / partial updateを許可するのはowner Skillがdeterministic partial update boundaryを明示しているartifactだけです。
 
 さらに次をすべて満たす必要があります。
@@ -212,13 +215,11 @@ direct refには、current artifactを更新するときの競合検出に利用
 
 それ以外は自動mergeせず、最も早い責任Skillへ戻してcurrent内容を入力に再評価します。
 
-workflow state自身も1 workflow = 1 persisted state artifactとしてstate revision / content identityを持ち、CASで更新します。
+workflow stateはproject-local fixed workflow state root配下で、1 `workflow_ref` = 1 state artifactとして決定論的に解決します。初回保存はcreate-if-absent、更新はstate artifact自身のexpected revisionを使うatomic conditional writeとし、同じworkflowを別session / Agentが別artifactへ分岐させません。
 
-古いrevisionでの後勝ち上書きを許可しません。
+knowledge entryのexisting updateはtarget entry artifact自身のexpected revisionを使うatomic conditional writeで保護します。knowledge root / repository HEADの変更だけをsame-entry conflictやstale判定には使いません。
 
-knowledge entryの更新はtarget entry artifact自身のrevisionでCASします。knowledge root / repository HEADの変更だけをsame-entry conflictやstale判定に使いません。
+new knowledge identityの作成では、identity判定に使用したcompleteなknowledge snapshotとpublishを結び付けます。同一semantic identityが同じcreate targetへ収束する保存方式を使える場合はatomic create-if-absentを使用し、それがない場合はnamespace / branch snapshotのexpected revision付きpublishを使用します。snapshot変更を検出した場合はcurrent rootを再読込し、identity判定からやり直します。同一semantic identityのcurrent entryを複数残すことを許可しません。
 
-新規entryはcreate-if-absentとし、global mutable counterやcentral manifestを要求しません。
-
-この契約のために汎用transaction managerやGraph DBは追加しません。
+global mutable counter、central manifest、汎用transaction manager、Graph DBはこの競合制御のために追加しません。
 

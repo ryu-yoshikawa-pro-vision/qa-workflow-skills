@@ -122,9 +122,11 @@ Markdown本文のmachine-readable block等、entry artifact内部のserializatio
 
 `entry_revision`はentry artifact自身のstorage revision tokenです。
 
-Git / GitHubを使う場合は対象fileのblob SHA等、保存先が提供するCAS tokenを利用します。entry本文へ自分自身のstorage SHAを書き込むことは要求しません。
+`entry_revision`は読み込んだartifact versionを識別するtokenであり、それ単体をatomic writeの実装とはみなしません。existing entryを保存するときは、保存先が提供する実際のatomic conditional writeへexpected revisionとして渡せるtokenまたはそれと対応するstorage conditionを使います。
 
-workflow / Activity / Sessionは利用した`entry_ref + entry_revision`を保持します。
+GitHub Contents API等で対象pathのblob SHAをconditionとして更新できる場合はその機構を使います。native Gitで共有branchへpublishする場合は、blob SHAの事前比較だけで済ませず、共有mutable pointであるbranch / refをexpected old commitで条件付き更新し、競合後にtarget entryを再確認します。採用する保存経路ごとのatomic primitiveはStep 0でPR #11 / #12 merge後の実装と照合して固定します。
+
+entry本文へ自分自身のstorage SHAを書き込むことは要求しません。workflow / Activity / Sessionは利用した`entry_ref + entry_revision`を保持し、historical provenanceへ使うrevision tokenは実装時に当時のartifact内容を再取得できることも確認します。
 
 ### content identity
 
@@ -206,18 +208,25 @@ knowledge entryが後から更新されても、過去Activity / Sessionを書�
 
 ### 新規entry
 
-新規entryはcreate-if-absentで作成します。
+new knowledge identityの場合だけ新規entryを作成します。
 
-`entry_ref`は中央のmutable counterへ依存せず、複数workflowが同時createできる衝突耐性のある方法で生成します。具体文字列形式は実装時に決定します。
+新規作成は、`qa-knowledge`がidentity関係を判断した**completeなknowledge root snapshot**とpublishを競合検出可能な形で結び付けます。同じcandidateを並行処理する2 workflowが、それぞれ別`entry_ref`へcurrent entryを作れる状態を許可しません。
 
-同じrefが既に存在する場合は別refを生成して再試行します。
+保存先では次のどちらかを使用します。
+
+1. semantic identityからowner contractでstableなcanonical identity materialを確定でき、同一identityを同じcreate targetへ決定論的に解決できる場合、そのtargetへatomic create-if-absentする。
+2. 同一targetへ収束させられない場合、identity判定に使用したknowledge namespace / branch snapshotのexpected revision付きでpublishする。publish前にsnapshotが変わっていれば新entryを保存せずcurrent rootを再読込し、既存entryとのidentity関係を最初から再評価する。
+
+`entry_ref`の具体文字列表現は実装時に既存ID規約とportabilityを確認して決定します。global mutable counter、central manifest、global semantic lock、vector DBは追加しません。
+
+同じcreate targetに別identityのartifactが存在することを確認した場合だけ真のidentity collisionとして扱い、別targetを使用します。「同じrefが存在した」という理由だけで別refを生成してsemantic identity判定を迂回しません。
 
 ### 既存entry更新
 
 ```text
 read entry @ revision R1
 → qa-knowledgeが新内容を確定
-→ expected revision = R1 でconditional write
+→ expected revision = R1 を保存先のatomic conditional writeへ渡す
 ```
 
 currentがR1のままなら成功します。
@@ -273,15 +282,24 @@ workflow stateには少なくとも次を追加します。
 - blocked / 要再検証
 - optional related workflow refs
 
-`qa-workflow`が複数sessionへ跨いで継続管理するworkflowは、1 workflow = 1 persisted state artifactとします。
+`qa-workflow`が複数sessionへ跨いで継続管理するworkflowは、project-local fixed workflow state root配下で1 workflow = 1 persisted state artifactとします。
 
-各state artifactはstate revision / content identityを持ち、更新時は保存先が提供するSHA / revision / ETag等によるCASを使用します。
+同じ`workflow_ref`は必ず同じstate artifactへ決定論的に解決します。初回保存はatomic create-if-absentとし、同じ`workflow_ref`で別state artifactを並行作成しません。
+
+各state artifactはstate revision / content identityを持ち、更新時はそのartifactのexpected revisionを保存先のatomic conditional writeへ渡します。競合時はcurrent stateを再読込し、stale stateを保存しません。
 
 単発のstandalone Skill利用にまでpersisted workflow stateを強制しません。
 
 ## 12. workflow snapshotとcurrent state
 
-各workflowは利用した上流成果物・project context・knowledge・environment条件のref / revisionを固定して記録します。
+各workflowは利用した上流成果物・knowledge・environment条件のref / revisionを固定して記録します。
+
+project contextは次を分けて保持します。
+
+- project context全体のref / revision: workflow開始時のprovenance snapshot
+- currentness判定へ実際に利用した項目: stable locator + content identityまたは正規化値
+
+project context全体のrevision差だけでworkflow全体を`要再検証`へ戻しません。whole revisionが変わった場合はcurrent contextを再読込し、保存済みの利用項目だけを比較します。未使用項目だけの変更ならcurrentのまま継続し、利用項目を安全に再解決できない場合はcurrent完了をblockします。
 
 進行中に別workflowがcurrent成果物を更新しても、進行中Activity / execution / Sessionの過去snapshotを途中で差し替えません。
 
@@ -296,7 +314,7 @@ currentnessはイベント駆動の即時通知ではなく、次のcheckpoint�
 確認対象:
 
 - PR #11 Machine Entity / fingerprint / dependency
-- project context ref / revision
+- project context全体のref / revisionと、利用したproject context項目のstable locator + content identityまたは正規化値
 - knowledge entry ref / revision / currentness dependency
 - test-target-inspection等のcurrent artifact ref / revision
 - environment / shared resource condition
@@ -334,9 +352,10 @@ workflow Aが利用しているcurrent Entity / knowledge / project context / en
 - 進行中workflowがlatest current stateとして完了する前に影響scopeを再確認する
 - PR #11対象Entityはdependency / fingerprintを利用する
 - knowledgeは利用したentry revision / content identityとcurrentness dependencyを確認する
-- project context / environment等は保存したrevision / conditionとcurrent値を比較する
+- project contextはwhole revision差を検出した後、workflowが利用した項目だけのcontent identityまたは正規化値をcurrent値と比較する
+- 未使用project context項目だけの変更ではworkflowをstaleにしない
 - 無関係なworkflowまで一律に再実行しない
-- 影響範囲を安全に限定できない場合はcurrent完了をblockする
+- 利用dependencyを安全に再解決できず影響範囲を限定できない場合はcurrent完了をblockする
 
 中央coordinator / event busは追加しません。
 
@@ -355,11 +374,18 @@ workflow Aが利用しているcurrent Entity / knowledge / project context / en
 
 同じresourceでもread-only / parallel-safeで相互影響がないことを明示できる用途はreservation不要です。
 
-project-local reservationを使う場合は最低限、resource ref、workflow ref、関連Activity / Session ref、予約状態、reservation revisionを持ち、acquire / releaseともCASで競合を検出します。
+project-local reservationを使う場合、同じshared mutable `resource_ref`を扱う全workflowが必ず同じcanonical reservation targetへ競合するようにします。resourceごとに別writer用recordを作る方式は許可しません。
 
-単なるfile存在確認をlockとして扱いません。
+reservationは最低限、resource ref、workflow ref、関連Activity / Session ref、予約状態、reservation revisionを持ちます。
 
-自動expiry付きlease、distributed lock service、environment managerはv1では追加しません。workflow異常終了時は安全側に予約を残し、明示的なrecoveryで解放します。
+- 未予約をrecord absenceで表す場合、初回acquireはcanonical targetへのatomic create-if-absentとする
+- persistent recordを使う場合、acquireはexpected revision付き`available → reserved` CASとする
+- releaseはcurrent owner / workflowとexpected reservation revisionが一致する場合だけ成功する
+- read → file存在確認 → 通常writeを排他保証として扱わない
+
+workflow異常終了時は安全側にreservationを残します。recoveryでは時間経過だけを根拠に解放せず、current reservation revisionを再読込し、owner workflow / Activity / Sessionの状態と必要cleanupを確認します。ownerがactiveか不明、cleanupが失敗 / 未確認 / 一部失敗、または安全な解放を機械判定できない場合は自動releaseせず明示的な確認へblockします。recoveryによるrelease自体もexpected revision付きCASで行います。
+
+自動expiry付きlease、distributed lock service、environment managerはv1では追加しません。
 
 cleanupは自workflowが所有または予約したresource範囲だけを対象にします。
 
@@ -429,17 +455,23 @@ project context自体を汎用artifact registryにしません。
 - 1 entry = 1 artifact
 - 別entry更新で無関係entryのrevisionが変わらない
 - root / repository HEAD変更だけで全knowledge利用workflowをstaleにしない
-- same-entry concurrent updateでは1 writerだけCAS成功する
+- same-entry concurrent updateでは1 writerだけatomic conditional writeが成功する
 - CAS conflict後にsame entryをsemantic auto-mergeしない
-- new entry create時にglobal counterを要求しない
+- 同じsemantic identityを2 workflowが同時createしてもcurrent entryは1件に収束する
+- identity判定後にknowledge snapshotが変わった場合、新entryをそのままpublishせずcurrent rootでidentity判定からやり直す
+- 異なるsemantic identityの並行createは、一時競合しても再評価後に両方を保存できる
+- new entry create時にglobal counter / central manifestを要求しない
 - replacementをatomicに閉じられない場合は安全にblockする
 
 ### 複数workflow
 
 - 2 workflowが独立した`workflow_ref`を持つ
 - 同時進行してもstateを上書きしない
-- workflow state自身をCASで更新する
+- 同じ`workflow_ref`の初回state作成が1つのcanonical state artifactへ収束する
+- workflow state自身をatomic conditional writeで更新する
 - workflow A開始後にBがAのdependencyを更新するとcheckpointでAの影響scopeを検出する
+- workflowが利用したproject context項目を変更すると関係scopeを`要再検証`へ戻す
+- workflowが利用していないproject context項目だけを変更してもstaleにしない
 - Bの変更がAへ無関係ならA全体を再実行しない
 - historical resultをcurrent resultとして扱わない
 
@@ -447,7 +479,10 @@ project context自体を汎用artifact registryにしません。
 
 - 同じtest user / dataを2 workflowが変更し観測へ影響するfixtureで、並行実行を許可しない
 - workflow別に分離されたresourceなら並行実行できる
+- 同じresource refが同じcanonical reservation targetへ解決される
 - reservation acquire競合で1 workflowだけ成功する
+- stale revisionからのrelease / recoveryを拒否する
+- owner active状態またはcleanup状態を確認できないrecoveryをblockする
 - cleanupが別workflowのresourceを削除しない
 - shared resource policy / CASが不足する場合はblockする
 

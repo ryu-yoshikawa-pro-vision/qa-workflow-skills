@@ -282,6 +282,8 @@ Finding / FAILを自動Defect化しません。
 
 保存形式はproject contextから発見するfixed root + 1 entry = 1 independently versioned artifactです。
 
+new knowledge identityの作成では、identity判定に使ったcompleteなknowledge snapshotとpublishを競合検出可能な形で結び付け、同一semantic identityのcurrent entryを複数作りません。同一identityが同じcreate targetへ収束する場合はatomic create-if-absent、そうでない場合はnamespace / branch snapshotのexpected revision付きpublishを使い、snapshot変更時はidentity判定からやり直します。
+
 `qa-workflow`はknowledgeの意味内容やentry lifecycleを独自に確定しません。複数Skillが必要な要求のrouting / workflow state / handoffだけを担当します。
 
 ## 17. project contextの追加入口
@@ -297,13 +299,17 @@ project contextへ知識本文やworkflow state本文を直接埋め込みませ
 
 既存の実施環境、test user、test data、cleanup等の案件固有値は引き続きproject contextへ保持します。
 
+workflowはproject context全体のref / revisionをprovenance snapshotとして保持します。一方、currentness判定では実際に利用した項目のstable locator + content identityまたは正規化値を保存し、whole revisionが変わった場合も利用項目だけを比較します。未使用項目だけの変更ではworkflowをstaleにしません。
+
 project context自体を汎用artifact registryにしません。
 
 ## 18. workflow state
 
 `skills/qa-workflow/assets/workflow-state-template.md`は「1 project = 1 workflow」の形にしません。
 
-`qa-workflow`が複数sessionへ跨いで継続管理するworkflowは、1 workflow = 1 persisted state artifactとします。
+`qa-workflow`が複数sessionへ跨いで継続管理するworkflowは、project-local fixed workflow state root配下で1 workflow = 1 persisted state artifactとします。
+
+同じ`workflow_ref`は常に同じstate artifactへ決定論的に解決します。初回保存はatomic create-if-absentとし、同じworkflowを別session / Agentが別state artifactへ分岐させません。
 
 各workflow stateへ最低限次を追加します。
 
@@ -312,13 +318,14 @@ project context自体を汎用artifact registryにしません。
 - workflow scope
 - started source refs / revisions
 - 利用したknowledge refs / revisions
-- project context ref / revision
+- project context ref / revision（provenance snapshot）
+- currentness判定に利用したproject context項目のstable locator + content identityまたは正規化値
 - 利用したenvironment / shared resource refs
 - produced artifact / Activity / Session refs
 - optional related workflow refs
 - state revision / content identity
 
-state更新は保存先のSHA / revision / ETag等によるCASを使用し、同じworkflowを複数session / Agentが同時resumeしても古いstateで後勝ち上書きしません。
+state更新はそのartifactのexpected revisionを保存先のatomic conditional writeへ渡し、同じworkflowを複数session / Agentが同時resumeしても古いstateで後勝ち上書きしません。
 
 Skill状態表はそのworkflow内だけを表します。
 
@@ -329,8 +336,9 @@ Skill状態表はそのworkflow内だけを表します。
 PR #12の`test-target-inspection`にあるrevision / SHA / ETagベースの競合防止を、共有current QA成果物更新時の共通原則として再利用します。
 
 - 読み込み時revisionを保持
-- 保存時にcurrent revisionを確認
-- 条件付き更新が使える保存先では利用する
+- 保存時は実際のshared mutable storage targetへatomic conditional writeする
+- read → revision比較 → 無条件writeをCASとして扱わない
+- 保存先ごとの条件付き更新primitiveを使用する
 - 競合検出時に古いbaseで上書きしない
 - overlapping / unknown scopeでは責任Skillへ戻して再評価
 
@@ -353,11 +361,15 @@ stable IDが異なることだけを理由に安全mergeと判断しません。
 3. 外部機構がなく、保存先がatomic CASを保証できる場合だけproject-local reservation recordを利用する。
 4. 排他を保証できず相互影響も否定できない場合は自動並行実行をblockする。
 
-project-local reservationは必要なprojectだけで使用し、resource ref、workflow ref、関連Activity / Session ref、予約状態、reservation revisionを持たせます。acquire / releaseともCASで競合を検出します。
+project-local reservationは必要なprojectだけで使用し、同じ`resource_ref`が全workflowから同じcanonical reservation targetへ解決されるようにします。resource ref、workflow ref、関連Activity / Session ref、予約状態、reservation revisionを持たせます。
+
+未予約をabsenceで表す場合はacquireをatomic create-if-absent、persistent recordを使う場合はexpected revision付き`available → reserved` CASとします。releaseはcurrent owner / workflowとexpected reservation revisionが一致する場合だけ成功します。
 
 read-only / parallel-safe用途にはreservationを要求しません。
 
 cleanupは自workflowが所有または予約したresource範囲だけを対象にします。
+
+異常終了時はreservationを自動expiryしません。recoveryではcurrent reservation revision、owner workflow / Activity / Session、必要cleanupを再確認し、owner状態不明またはcleanup未確認では自動releaseせず明示的確認へblockします。recoveryのstate更新もCASします。
 
 自動expiry付きlease、distributed lock service、environment managerは追加しません。
 
