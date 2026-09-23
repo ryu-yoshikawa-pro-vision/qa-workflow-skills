@@ -16,6 +16,9 @@
 
 ### deterministic
 
+- production helperとdeterministic validatorの責務分離
+- requiredなproduction helper失敗時にLLMで同一処理を代替しない
+- same inputに対するproduction helperのexact / stable output
 - project-wide TC discovery completeness
 - fixed discovery snapshot / batch resume
 - lifecycle resolvabilityとcoverage gapの分離
@@ -36,6 +39,11 @@
 - entry ref / storage revision / CAS
 - same-entry conflict / create-if-absent
 - superseded ref / currentness dependency
+- Project Context stable key解決 / normalized value / used-item currentness
+- missing / duplicate / ambiguous Project Context keyのunresolved
+- same-workflow mutable operationのpre-start claim / idempotent start
+- incomplete / truncated listingをcomplete扱いしない
+- partial / failed I/Oを保存済み扱いしない
 
 ### semantic
 
@@ -256,7 +264,12 @@ negative:
 - 同じ`workflow_ref`の同時初回保存が1つのcanonical state artifactへ収束する
 - workflow state自身がrevision / content identityを持ちatomic conditional writeで更新される
 - 同じworkflowを2 sessionが同時resumeしてもstateの後勝ち上書きが起きない
-- 各workflowがstarted source refs / revisions、knowledge refs / revisions、project context全体revision、利用したproject context項目のstable locator + content identityまたは正規化値、resource条件を保持する
+- 同じworkflowを2 sessionが同じstate revisionからresumeしても、mutable operationのpre-start claimは1 sessionだけ成功し、loserは実操作を開始しない
+- claim成功後にwinnerが停止した場合、source execution / resource状態を確認せず同じoperationを再実行しない
+- source側claimもproject-localな安全なclaimも利用できない場合、same-workflow concurrent mutable executionをblockする
+- 各workflowがstarted source refs / revisions、knowledge refs / revisions、project context全体revision、利用したproject context項目のstable key + content identityまたは正規化値 + 影響scope / operation、resource条件を保持する
+- Project Contextのused stable key変更だけ該当scopeをstaleにし、field順序や未使用field変更ではstaleにしない
+- missing / duplicate / ambiguous Project Context keyを推測補完せず`unresolved`にする
 - workflow Aの進行中にBがAの依存Entityを更新してもAのhistorical resultは保持する
 - currentnessをworkflow / Run開始、resume、未開始mutable operation開始直前、current完了直前、current再利用直前で確認する
 - BがAの利用中project context項目を変更した場合だけ該当scopeを`要再検証`へ戻す
@@ -365,7 +378,11 @@ CIへ外部APIを追加しません。
 - workflow state / knowledge entry / reservationをpersistする実際の保存経路
 - 保存経路ごとのatomic conditional write primitiveと、historical revisionから当時artifactを再取得できること
 - fixed rootを使用するAPI / filesystemで完全列挙でき、truncation時に`complete=true`を返さないこと
-- same-workflow concurrent resume時、state保存より先に同じmutable operationを二重開始しないsource contractが存在するか
+- same-workflow concurrent resume時、state保存より先に同じmutable operationを二重開始しないatomic pre-start claim / idempotent start契約がowner executionに存在するか
+- owner executionに同等契約がある場合は再利用する
+- 同等契約がない場合は、workflow stateまたはowner artifactへStep 0で確認したatomic primitiveを使う最小pre-start claimを追加できるか確認する
+- pre-start claimを安全に実装できない場合はsame-workflow concurrent mutable executionをblockする方針で固定する
+- Project Context parser / templateでcurrentness対象fieldへ表示文言・行番号と独立したstable keyを付与できるか確認し、具体serializationを固定する
 - PR #11 / #12だけで解けるものを除外
 
 ### Step 1: Skill / workflow vocabulary
@@ -395,8 +412,10 @@ CIへ外部APIを追加しません。
 - fixed workflow state root / 1 workflow_ref = 1 persisted state artifact
 - workflow state初回create-if-absent / revision / backend atomic conditional write
 - started source refs / revisions
-- project context whole revision + used item dependency identity
+- project context whole revision + used item stable key / normalized value or content identity / affected scope or operation
+- Project Context stable key resolver / field typeごとの最小normalization / missing・duplicate・ambiguous keyのunresolved
 - currentness checkpoint
+- same-workflow mutable operation開始前のowner claim / idempotent start契約の接続
 - owner Skillが保証するpartial update boundary
 - shared artifact revision conflict
 - cross-workflow staleのcheckpoint検出
@@ -518,6 +537,12 @@ direct ref + deterministic scanで不足を実測した場合だけ、必要quer
 - 同一semantic knowledgeを別refで複数current entryとして残す
 - project context全体revision差だけで無関係workflowまでstaleにする
 - abandoned reservationを時間経過や未確認cleanupのままreleaseする
+- production helperが失敗した決定論的処理をLLMで手計算して続行する
+- production生成処理の代わりにeval validatorだけを置く
+- Project Contextの表示label、heading text、行番号をstable keyとして扱う
+- Project Contextのmissing / duplicate / ambiguous keyをLLMの意味検索で別項目へ置換する
+- same-workflowのstate CASだけでmutable operation二重開始も防止済みと扱う
+- Git / GitHub / filesystemのatomicity差を隠すためだけにgeneric storage adapter / transaction managerを追加する
 
 ## 7. 完了条件
 
@@ -554,6 +579,9 @@ direct ref + deterministic scanで不足を実測した場合だけ、必要quer
 - knowledge entryのprovenanceとcurrentness dependencyを分離できる
 - 未検証candidateをcurrent knowledgeとして利用しない
 - workflow state自身のCASで同一workflowのlost updateを防げる
+- same-workflow concurrent resumeでは、owner側claim / idempotent startまたはStep 0で選んだ最小pre-start claimによりmutable operationを1回だけ開始できる。保証できない場合は並行mutable実行をblockできる
+- requiredなproduction helper失敗時にLLMが同じ決定論的処理を代替せず、影響scopeをincomplete / unresolved / blockedにできる
+- Project Contextのcurrentness対象fieldをstable keyで再解決し、field順序・未使用field変更では誤staleにせず、missing / duplicate / ambiguous keyをunresolvedにできる
 - currentness checkpointで別workflowの変更をmutable operation開始前にも検出できる
 - partial auto-rebaseをowner Skillが保証するartifactへ限定できる
 - shared mutable resourceをisolation → existing reservation → canonical target + CAS付きlocal reservation → blockの順で安全に扱える

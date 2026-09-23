@@ -1,22 +1,33 @@
 # Regression / Exploratory Testing 統合Plan
 
-## 1. 決定論的補助runtimeの位置づけ
+## 1. 決定論的処理の位置づけ
 
-補助runtimeは機械判定可能な整合性だけを担当します。
+PR #13では、QA上の意味判断と、同じ確定入力から機械的に一意に導出できる処理を分離します。
 
-user-facingな意味判断は`regression-testing` / `exploratory-testing` / `qa-knowledge`へ残します。
+user-facingな意味判断は`regression-testing` / `exploratory-testing` / `qa-knowledge` / 既存owner Skillへ残します。一方、workflow分岐、currentness、completeness、安全性、保存可否へ使う機械的な導出値はLLMへ手計算させずproduction codeで生成します。
 
-必要な処理:
+`script化`とPR #11型のpersisted runtime unit化は同義にしません。
 
-- current TC discovery snapshot
-- initial baseline progress / completeness
-- Suite / Regression Activity validation
-- membership / source ref整合
-- required execution routeとsource execution stateの整合
-- Activity discovery
-- direct ref + deterministic scan
-- fixed knowledge root discovery / completeness
-- knowledge entry schema / CAS整合
+| 処理 | 配置 |
+| --- | --- |
+| PR #11のMachine Entity / fingerprint / dependency / freshnessで解ける処理 | PR #11 runtimeを再利用し、PR #13で再実装しない |
+| sort / filter / deduplicate、snapshot、batch / resume、completeness、ref / path解決、projection、currentness比較等、実行時に必要な機械処理 | owner Skillまたは`qa-workflow`のproduction script / helper |
+| 保存済みartifactのschema / invariant / ref整合 | deterministic validator |
+| create-if-absent、atomic conditional write、reservation acquire / release等のatomicity | Step 0で確定した保存先のnative primitive |
+| membership、selected Regression、residual risk、Charter妥当性、Finding分類、knowledge semantic identity等 | owner Skillの意味判断 |
+| source / backend実装がPR #11 / #12 merge後でないと確定しない処理 | Step 0で既存実装を確認して配置を確定 |
+
+PR #11型のpersisted runtime unitを新設するのは、少なくとも次をすべて満たす場合に限定します。
+
+1. structured inputから後続処理が参照するMachine Evidenceを生成する。
+2. 下流のidentity / freshness / completenessがそのgeneration結果へ依存する。
+3. generator implementation変更時に保存済みresultをstaleとして扱う必要がある。
+
+それ以外の決定論的処理は、必要ならproduction helperとしてコード化しますが、Machine Runtime Input / Resultやgeneration fingerprintを増やす理由にはしません。
+
+production helperが必須と定義された処理では、helper失敗、入力不正、不完全な列挙、current dependency解決不能をLLMが同じ計算で代替しません。影響scopeを`incomplete` / `unresolved` / `blocked`として扱います。保存先が必要なatomic primitiveを提供しない場合も、自動write / reservationをLLMやread-compare-writeで代替しません。
+
+明示的なsemantic fallbackを許すのは、処理が事前に定義したmachine対応subset外であることを確認し、owner Skillへ意味判断として戻す場合だけです。
 
 relation index runtimeはgateを通るまで追加しません。
 
@@ -40,11 +51,17 @@ skills/regression-testing/
     └── discover_regression_artifacts.py
 ```
 
-既存Skill評価runtimeで表現できるvalidatorは既存の`evals/deterministic/validator.py`を優先し、user-facing runtime用scriptを重複させません。
+user-facing artifactの値、workflow分岐、currentness、completion、安全性へ使う決定論的な導出値はproduction script / helperで生成します。`evals/deterministic/validator.py`はその代替にせず、保存済み成果物を独立して再検証します。schema presence、enum、ref整合等、値生成を必要としないinvariantだけはvalidatorのみで構いません。
+
+production生成処理とdeterministic validatorは独立させ、validatorをproduction処理から呼んで正しさの根拠にしません。PR #11の既存runtime / helperで解ける処理は再利用し、同じ処理を新3 Skillへ複製しません。
 
 Exploratory Testing固有契約は`skills/exploratory-testing/`に置き、Regression runtimeへ混在させません。
 
 QA knowledge固有contract / template / validator / discovery helperは`skills/qa-knowledge/`配下を第一候補とし、project-local knowledge本文はSkill package内へ保存しません。project contextから案件側fixed rootを参照します。
+
+Project Contextのstable key解決、値の正規化、利用項目だけのcurrentness比較は`skills/qa-workflow/scripts/`配下の専用production helperへ置くことを第一候補とします。Project Context parsing自体をPR #11の共通`runtime_contract.py`へ追加しません。具体的なserializationはStep 0でmerge後のparser / template実装と照合して固定します。
+
+Git / GitHub / filesystem等の保存処理を統一するgeneric storage adapterは追加しません。atomicityは採用backendのnative primitiveが担います。
 
 ## 3. current TC discovery snapshot
 
@@ -222,7 +239,7 @@ relation indexを実装しない限りGraph schema versionやrelation schema ver
 - owner contractがある場合もscope disjoint + upstream dependency不変を確認している
 - latest current state向けの完了判定前に依存revision / fingerprintを再確認している
 
-workflow_refの採番規則はruntimeが生成し、LLMが一意性を手計算しません。具体形式は実装時に既存runtime / portability制約を確認して決定します。
+`workflow_ref`はLLMではなくcodeがcollision-resistantなopaque identityとして生成し、作成後はstableに保持します。同じobjective / scope等のsemantic inputから常に同じ`workflow_ref`を導出することは要求しません。この生成をPR #11型のpersisted runtime unitにする必要もありません。具体形式は実装時に既存ID規約 / portability制約を確認して決定します。
 
 persisted workflow stateはproject contextから一意に発見できるproject-local fixed workflow state rootから発見し、同じ`workflow_ref`は必ず同じstate artifactへ決定論的に解決します。初回保存はatomic create-if-absent、更新はそのstate artifact自身のexpected revisionを使うatomic conditional writeとします。read → revision比較 → 無条件writeはCASとして扱いません。
 
@@ -269,7 +286,18 @@ workflow Aが参照したMachine Entity / artifact / knowledge / project context
 - latest current state向け完了判定直前
 - 過去成果物のcurrent再利用直前
 
-PR #11対象のEntityはdependency / content fingerprintを優先し、PR #11対象外はworkflowが保持したref / revision / resource conditionをcurrent値と比較します。project context全体のrevisionはprovenance snapshotとして扱い、revisionが変わった場合はworkflowが実際に利用した項目のstable locator + content identityまたは正規化値だけをcurrent値と比較します。
+PR #11対象のEntityはdependency / content fingerprintを優先し、PR #11対象外はworkflowが保持したref / revision / resource conditionをcurrent値と比較します。project context全体のrevisionはprovenance snapshotとして扱い、revisionが変わった場合はworkflowが実際に利用した項目だけをcurrent値と比較します。
+
+Project Contextのcurrentness対象には、表示文言や行番号と独立したtemplate-defined stable keyを使います。
+
+- scalar fieldはstable keyから決定論的に解決し、前後空白と改行形式等、field typeごとにPlan / schemaで許可した最小限の正規化だけを行う
+- 順序に意味があるfree text / listを勝手にsortしない
+- table rowをdependencyにする場合は既存のstable ID / keyを持つrowだけを対象にする
+- missing / duplicate / ambiguous keyは別項目を推測せず`unresolved`とする
+- workflow stateには利用したstable key、normalized valueまたはcontent identity、影響するworkflow scope / operationを保持する
+- exact serializationはStep 0でmerge後のProject Context parser / template実装と照合して固定する
+
+whole MarkdownをLLMへ再投入してcurrentness差分を意味推定させません。
 
 - historical Activity / execution / Sessionは変更しない
 - 利用したproject context項目が変わった場合だけ関係scopeを要再検証へ戻す

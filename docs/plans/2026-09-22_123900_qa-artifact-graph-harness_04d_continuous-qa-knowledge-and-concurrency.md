@@ -265,7 +265,7 @@ CAS conflict
 
 同時進行するworkflowを1つの共有状態表へ混在させません。
 
-`qa-workflow`で継続管理する各workflowは一意な`workflow_ref`を持ちます。
+`qa-workflow`で継続管理する各workflowは一意な`workflow_ref`を持ちます。`workflow_ref`はLLMではなくcodeがcollision-resistantなopaque identityとして生成し、作成後はstableに保持します。同じobjective / scope等のsemantic inputから常に同じIDを導出することは要求しません。
 
 workflow stateには少なくとも次を追加します。
 
@@ -288,6 +288,16 @@ workflow stateには少なくとも次を追加します。
 
 各state artifactはstate revision / content identityを持ち、更新時はそのartifactのexpected revisionを保存先のatomic conditional writeへ渡します。競合時はcurrent stateを再読込し、stale stateを保存しません。
 
+state CASはlost update防止であり、mutable operationの二重開始防止とは別に扱います。同一workflowを複数session / Agentがresumeし得る場合、mutable operation開始前に1 sessionだけが開始権を得る契約を必要とします。
+
+1. PR #12 / E2E等のowner execution contractが同じoperation identityに対するatomic pre-start claimまたはidempotent startを既に保証する場合は、その契約を再利用する。
+2. owner側に同等契約がない場合は、Step 0で確認したatomic conditional writeを使い、既存workflow stateまたはowner側artifactの最小claimを実操作前に確定する。
+3. claim競合に負けたsessionはmutable operationを開始せず、current state / source operationを再読込する。
+4. claim成功後にprocessが停止した場合は、source execution / resource / cleanup状態を確認せず盲目的に同じoperationを再実行しない。
+5. pre-start claimまたはidempotent startを安全に実装できない場合、同一workflowの同時mutable実行をblockする。
+
+どのartifactをclaimの正本にするかはPR #12 / E2E merge後のsource contractをStep 0で確認して決定し、このためだけに中央scheduler、distributed lock、lease serviceを追加しません。
+
 単発のstandalone Skill利用にまでpersisted workflow stateを強制しません。
 
 ## 12. workflow snapshotとcurrent state
@@ -297,9 +307,15 @@ workflow stateには少なくとも次を追加します。
 project contextは次を分けて保持します。
 
 - project context全体のref / revision: workflow開始時のprovenance snapshot
-- currentness判定へ実際に利用した項目: stable locator + content identityまたは正規化値
+- currentness判定へ実際に利用した項目: template-defined stable key + content identityまたは正規化値 + 影響するworkflow scope / operation
 
-project context全体のrevision差だけでworkflow全体を`要再検証`へ戻しません。whole revisionが変わった場合はcurrent contextを再読込し、保存済みの利用項目だけを比較します。未使用項目だけの変更ならcurrentのまま継続し、利用項目を安全に再解決できない場合はcurrent完了をblockします。
+stable keyは表示label、heading text、行番号から導出しません。currentness対象のscalar fieldにはtemplate / schema側で固定keyを与えます。table rowをdependencyとして扱う場合は既存のstable ID / keyを持つrowだけを対象にします。
+
+値の正規化はfield typeごとに固定し、前後空白や改行形式等の意味を変えない最小限に留めます。順序に意味があるfree text / listを勝手にsortしません。missing / duplicate / ambiguous keyは近い項目をLLMで補完せず`unresolved`としてcurrent完了をblockします。
+
+project context全体のrevision差だけでworkflow全体を`要再検証`へ戻しません。whole revisionが変わった場合はcurrent contextを再読込し、保存済みの利用項目だけをproduction helperで比較します。未使用項目だけの変更ならcurrentのまま継続し、利用項目を安全に再解決できない場合はcurrent完了をblockします。
+
+stable keyの具体的なmachine-readable serializationは、Step 0でPR #11 / #12 merge後のProject Context parser / template実装を確認して固定します。汎用Markdown AST frameworkは追加しません。
 
 進行中に別workflowがcurrent成果物を更新しても、進行中Activity / execution / Sessionの過去snapshotを途中で差し替えません。
 

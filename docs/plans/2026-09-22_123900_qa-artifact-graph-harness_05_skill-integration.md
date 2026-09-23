@@ -201,6 +201,8 @@ TCなしE2EへTCを創作しません。
 - Regression Activity domain state
 - knowledge candidate分類 / entry有効化 / update / replacement判断
 
+一方、同一workflowを複数session / Agentがresumeできる場合、`qa-workflow`はmutable operation開始前にowner側のatomic pre-start claim / idempotent start契約を確認します。owner contractが同等保証を持たない場合は、Step 0で決めた最小claimを実操作前に取得し、claimできないsessionはoperationを開始しません。claim後の停止ではsource stateを確認せず盲目的にretryしません。
+
 ## 12. workflow state / canonical Skill更新
 
 PR #11 / #12 merge後の最新実装を確認し、少なくとも次をPR #13実装対象へ含めます。
@@ -300,7 +302,9 @@ project contextへ知識本文やworkflow state本文を直接埋め込みませ
 
 既存の実施環境、test user、test data、cleanup等の案件固有値は引き続きproject contextへ保持します。
 
-workflowはproject context全体のref / revisionをprovenance snapshotとして保持します。一方、currentness判定では実際に利用した項目のstable locator + content identityまたは正規化値を保存し、whole revisionが変わった場合も利用項目だけを比較します。未使用項目だけの変更ではworkflowをstaleにしません。
+workflowはproject context全体のref / revisionをprovenance snapshotとして保持します。一方、currentness判定では実際に利用した項目について、表示label / heading / 行番号と独立したtemplate-defined stable key、content identityまたは正規化値、影響するworkflow scope / operationを保存し、whole revisionが変わった場合も利用項目だけをproduction helperで比較します。未使用項目だけの変更ではworkflowをstaleにしません。
+
+currentness対象のscalar fieldには固定keyを与え、table rowはstable ID / keyを持つrowだけをdependency対象にします。field typeごとの正規化は意味を変えない最小限に固定し、順序に意味があるfree text / listを勝手にsortしません。missing / duplicate / ambiguous keyは`unresolved`として扱い、LLMによる意味検索で別項目へ置換しません。具体serializationはStep 0で既存parser / templateと照合して固定します。
 
 project context自体を汎用artifact registryにしません。
 
@@ -327,6 +331,8 @@ project context自体を汎用artifact registryにしません。
 - state revision / content identity
 
 state更新はそのartifactのexpected revisionを保存先のatomic conditional writeへ渡し、同じworkflowを複数session / Agentが同時resumeしても古いstateで後勝ち上書きしません。
+
+ただしstate CASだけで、state保存より前に始まるbrowser操作等のmutable operationの二重開始を防げるとは扱いません。owner executionにatomic pre-start claim / idempotent startがあれば再利用し、なければStep 0で選んだowner境界の最小claimを実操作前に取得します。安全なclaimを作れない場合は同一workflowの同時mutable実行をblockします。
 
 Skill状態表はそのworkflow内だけを表します。
 

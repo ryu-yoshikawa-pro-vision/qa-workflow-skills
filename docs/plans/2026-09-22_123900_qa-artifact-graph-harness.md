@@ -92,7 +92,7 @@ defect fix
 
 1. [目的・現状・責務境界](./2026-09-22_123900_qa-artifact-graph-harness_01_scope-and-baseline.md)
 2. [Cross-artifact query / relation index導入判定](./2026-09-22_123900_qa-artifact-graph-harness_02_graph-contract.md)
-3. [決定論的補助runtime・履歴発見](./2026-09-22_123900_qa-artifact-graph-harness_03_harness-architecture.md)
+3. [決定論的処理・履歴発見](./2026-09-22_123900_qa-artifact-graph-harness_03_harness-architecture.md)
 4. [QA活動の接続・修正確認・feedback](./2026-09-22_123900_qa-artifact-graph-harness_04_activity-models.md)
 5. [Regression Suite・Run・実行契約](./2026-09-22_123900_qa-artifact-graph-harness_04a_regression-suite.md)
 6. [regression-testing Skill契約](./2026-09-22_123900_qa-artifact-graph-harness_04b_regression-testing-skill.md)
@@ -137,6 +137,9 @@ defect fix
 31. knowledge persistenceはproject contextから発見できるfixed root配下の1 entry = 1 independently versioned artifactとする。単一project knowledge artifact、central manifest、global mutable ID counterは採用しない。
 32. existing knowledge entryはartifact自身のexpected revisionを使うatomic conditional writeで更新し、same-entry conflictをsemantic auto-mergeしない。new knowledge identityの作成は、identity判定に使用したcompleteなknowledge snapshotとpublishを競合検出可能な形で結び付け、同一semantic identityから複数のcurrent entryを作らない。保存先に応じて、同一identityが同じcreate targetへ収束する方式またはnamespace / branch snapshotへのconditional publishを使用し、snapshot変更時はcurrent rootを再読込してidentity判定からやり直す。
 33. このPlanでいうCASは、実際に共有されるmutable storage targetに対するatomic conditional writeを意味する。read → revision比較 → 無条件writeをCASとして扱わない。GitHub Contents API、native Git等でatomic primitiveが異なるため、Step 0で採用する保存経路ごとの条件付き更新方法を既存実装と照合して固定する。
+34. workflow分岐、currentness、completeness、安全性、保存可否に使う決定論的な導出値はproduction codeで生成し、LLMに同じ計算を代替させない。PR #11型persisted runtime unitはMachine Evidenceとして下流identity / freshness / completenessがgeneration結果へ依存し、implementation変更時にstale判定が必要な処理だけに限定する。保存済みartifactの独立再検証はdeterministic validator、atomicityは保存先primitive、QA上の意味判断はowner Skillが担当する。
+35. project contextのcurrentnessでは、表示label / heading / 行番号と独立したtemplate-defined stable keyをcurrentness対象fieldへ持たせる。workflowは利用したkeyとnormalized valueまたはcontent identity、影響scope / operationだけを保持し、missing / duplicate / ambiguous keyをLLMで推測補完しない。
+36. workflow stateのCASだけで同一workflowのmutable operation二重開始を防止済みとは扱わない。PR #12 / E2E等のowner executionにatomic pre-start claim / idempotent startがあれば再利用し、なければStep 0で最小claimを実操作前に確定する。安全にclaimできない場合はsame-workflow concurrent mutable executionをblockする。
 
 ## 対象外
 
