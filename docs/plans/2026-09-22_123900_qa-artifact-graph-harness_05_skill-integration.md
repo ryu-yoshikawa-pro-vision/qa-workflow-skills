@@ -293,6 +293,7 @@ project contextへ知識本文やworkflow state本文を直接埋め込みませ
 既存の「既存QA成果物」または最小追加欄から、少なくとも次の入口を発見できるようにします。
 
 - fixed knowledge root
+- fixed workflow state root
 - workflow history root
 - Activity / Session history root
 - shared environment / resource policy
@@ -307,7 +308,7 @@ project context自体を汎用artifact registryにしません。
 
 `skills/qa-workflow/assets/workflow-state-template.md`は「1 project = 1 workflow」の形にしません。
 
-`qa-workflow`が複数sessionへ跨いで継続管理するworkflowは、project-local fixed workflow state root配下で1 workflow = 1 persisted state artifactとします。
+`qa-workflow`が複数sessionへ跨いで継続管理するworkflowは、project contextから一意に発見できるproject-local fixed workflow state root配下で1 workflow = 1 persisted state artifactとします。
 
 同じ`workflow_ref`は常に同じstate artifactへ決定論的に解決します。初回保存はatomic create-if-absentとし、同じworkflowを別session / Agentが別state artifactへ分岐させません。
 

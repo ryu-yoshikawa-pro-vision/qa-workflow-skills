@@ -282,7 +282,7 @@ workflow stateには少なくとも次を追加します。
 - blocked / 要再検証
 - optional related workflow refs
 
-`qa-workflow`が複数sessionへ跨いで継続管理するworkflowは、project-local fixed workflow state root配下で1 workflow = 1 persisted state artifactとします。
+`qa-workflow`が複数sessionへ跨いで継続管理するworkflowは、project contextから一意に発見できるproject-local fixed workflow state root配下で1 workflow = 1 persisted state artifactとします。
 
 同じ`workflow_ref`は必ず同じstate artifactへ決定論的に解決します。初回保存はatomic create-if-absentとし、同じ`workflow_ref`で別state artifactを並行作成しません。
 
@@ -425,6 +425,7 @@ project contextはknowledge本文の保管庫にしません。
 入口として次を追加します。
 
 - fixed knowledge root
+- fixed workflow state root
 - workflow history root
 - Activity / Session history root
 - shared environment / resource policy
@@ -467,6 +468,7 @@ project context自体を汎用artifact registryにしません。
 
 - 2 workflowが独立した`workflow_ref`を持つ
 - 同時進行してもstateを上書きしない
+- project contextからfixed workflow state rootを一意に発見できる
 - 同じ`workflow_ref`の初回state作成が1つのcanonical state artifactへ収束する
 - workflow state自身をatomic conditional writeで更新する
 - workflow A開始後にBがAのdependencyを更新するとcheckpointでAの影響scopeを検出する

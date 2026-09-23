@@ -251,6 +251,7 @@ negative:
 ### 複数workflow
 
 - 同一projectで2つ以上のworkflowが異なる`workflow_ref`を持って同時進行できる
+- project contextからfixed workflow state rootを一意に発見できる
 - qa-workflowが継続管理するworkflowはfixed workflow state root配下で1 workflow = 1 persisted state artifact
 - 同じ`workflow_ref`の同時初回保存が1つのcanonical state artifactへ収束する
 - workflow state自身がrevision / content identityを持ちatomic conditional writeで更新される
@@ -390,6 +391,7 @@ CIへ外部APIを追加しません。
 - root / repository HEAD変更だけで無関係entryをstaleにしない
 - knowledge candidateをActivity / Finding / Follow-upに留める契約
 - workflow_ref
+- project context schemaへfixed workflow state rootの入口
 - fixed workflow state root / 1 workflow_ref = 1 persisted state artifact
 - workflow state初回create-if-absent / revision / backend atomic conditional write
 - started source refs / revisions

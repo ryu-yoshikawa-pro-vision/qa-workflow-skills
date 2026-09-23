@@ -224,7 +224,7 @@ relation indexを実装しない限りGraph schema versionやrelation schema ver
 
 workflow_refの採番規則はruntimeが生成し、LLMが一意性を手計算しません。具体形式は実装時に既存runtime / portability制約を確認して決定します。
 
-persisted workflow stateはproject-local fixed workflow state rootから発見し、同じ`workflow_ref`は必ず同じstate artifactへ決定論的に解決します。初回保存はatomic create-if-absent、更新はそのstate artifact自身のexpected revisionを使うatomic conditional writeとします。read → revision比較 → 無条件writeはCASとして扱いません。
+persisted workflow stateはproject contextから一意に発見できるproject-local fixed workflow state rootから発見し、同じ`workflow_ref`は必ず同じstate artifactへ決定論的に解決します。初回保存はatomic create-if-absent、更新はそのstate artifact自身のexpected revisionを使うatomic conditional writeとします。read → revision比較 → 無条件writeはCASとして扱いません。
 
 ## 13. knowledge artifact validator
 

@@ -194,7 +194,7 @@ current knowledgeやcurrent QA artifactが更新されても、過去workflowの
 - artifact revision → そのrevisionを利用した進行中 / 過去workflow
 - workflow Aの更新 → 影響を受けるworkflow Bのdependency
 
-query completenessはknowledge root / workflow history root / artifact discovery rootの完全性に依存します。
+query completenessはknowledge root / workflow state root / workflow history root / artifact discovery rootの完全性に依存します。
 
 完全性を保証できない場合は結果を完全な影響集合として扱いません。
 
