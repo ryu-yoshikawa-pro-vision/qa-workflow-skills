@@ -268,6 +268,17 @@ Finding / FAILを自動Defect化しません。
 
 `regression-testing`、`exploratory-testing`、`qa-knowledge`もGraph / relation indexなしで主要機能を利用できることを必須にします。
 
+standaloneで起動可能なSkillがproductionで必須とするscript / helperは、そのSkill package単独で実行可能にします。
+
+- sibling Skillの`scripts/`を実行時の必須依存にしない
+- repository rootのproduction runtime / helperを実行時の必須依存にしない
+- raw inputから決定論的な値を生成する必要がある場合は、必要な最小helperをSkill package内へ置く
+- callerから正規化済みmachine inputを受ける場合は、そのinputをSkillの明示的な契約とし、repository-local helperを暗黙依存にしない
+- script言語やruntime等の実行要件はSkill package側で明示する
+- required helperを利用できない、入力を解決できない、または実行に失敗した場合は`incomplete` / `unresolved` / `blocked`として扱い、LLMで同じ機械処理を代替しない
+
+`qa-workflow`専用のcross-workflow currentness / workflow state処理は`qa-workflow`内に置きます。standalone Skillのportabilityのためだけにgeneric shared runtime module、plugin、adapterを追加しません。
+
 ## 16. 継続QA知識
 
 継続利用する知識の共通契約は`_04d_continuous-qa-knowledge-and-concurrency.md`、Skill固有契約は`_04e_qa-knowledge-skill.md`を正本とします。
@@ -324,7 +335,7 @@ project context自体を汎用artifact registryにしません。
 - started source refs / revisions
 - 利用したknowledge refs / revisions
 - project context ref / revision（provenance snapshot）
-- currentness判定に利用したproject context項目のstable locator + content identityまたは正規化値
+- currentness判定に利用したproject context項目のstable key + content identityまたは正規化値 + 影響scope / operation
 - 利用したenvironment / shared resource refs
 - produced artifact / Activity / Session refs
 - optional related workflow refs

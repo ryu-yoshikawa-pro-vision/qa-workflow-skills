@@ -53,13 +53,26 @@ skills/regression-testing/
 
 user-facing artifactの値、workflow分岐、currentness、completion、安全性へ使う決定論的な導出値はproduction script / helperで生成します。`evals/deterministic/validator.py`はその代替にせず、保存済み成果物を独立して再検証します。schema presence、enum、ref整合等、値生成を必要としないinvariantだけはvalidatorのみで構いません。
 
-production生成処理とdeterministic validatorは独立させ、validatorをproduction処理から呼んで正しさの根拠にしません。PR #11の既存runtime / helperで解ける処理は再利用し、同じ処理を新3 Skillへ複製しません。
+production生成処理とdeterministic validatorは独立させ、validatorをproduction処理から呼んで正しさの根拠にしません。PR #11の既存runtime / helperで解ける処理は再利用し、同じ意味上の処理を新3 Skillへそれぞれ独自実装しません。
+
+ただし、standaloneで起動可能なSkillがproductionで必須とする決定論的処理は、そのSkill package単独で実行可能にします。別Skillの`scripts/`やrepository rootのproduction helperを実行時の必須依存にしません。
+
+複数のstandalone Skillで同じ機械処理が必要な場合は、次のいずれかでpackage境界を保ちます。
+
+- PR #11のSkill-local helper方針と同様に、同じ契約を満たす最小helperを各Skill packageへ同梱する
+- callerから既に正規化済みのmachine inputを受け取ることをSkillの入力契約として明示し、standalone Skill側でrepository-local codeを要求しない
+
+rawなProject Contextをstandalone Skillが直接受け取り、その値をcurrentness判定へ使う場合は、stable key解決・正規化・比較に必要なproduction helperをそのSkill package内で実行可能にします。helperを利用できない場合にLLMへ同じ計算を戻しません。
+
+このportabilityのためだけにgeneric shared runtime module、plugin framework、repository-wide helper packageを追加しません。
 
 Exploratory Testing固有契約は`skills/exploratory-testing/`に置き、Regression runtimeへ混在させません。
 
 QA knowledge固有contract / template / validator / discovery helperは`skills/qa-knowledge/`配下を第一候補とし、project-local knowledge本文はSkill package内へ保存しません。project contextから案件側fixed rootを参照します。
 
-Project Contextのstable key解決、値の正規化、利用項目だけのcurrentness比較は`skills/qa-workflow/scripts/`配下の専用production helperへ置くことを第一候補とします。Project Context parsing自体をPR #11の共通`runtime_contract.py`へ追加しません。具体的なserializationはStep 0でmerge後のparser / template実装と照合して固定します。
+`qa-workflow`自身が行うProject Contextのstable key解決、値の正規化、利用項目だけのcurrentness比較は`skills/qa-workflow/scripts/`配下の専用production helperへ置くことを第一候補とします。このhelperを`regression-testing` / `qa-knowledge`等のstandalone Skillから必須参照させません。
+
+standalone経路でも同じProject Context機械処理が必要な場合は、前項のpackage境界に従い、Skill-localな最小helperまたは明示された正規化済みmachine input境界を使用します。Project Context parsing自体をPR #11の共通`runtime_contract.py`へ追加しません。具体的なserializationはStep 0でmerge後のparser / template実装と照合して固定します。
 
 Git / GitHub / filesystem等の保存処理を統一するgeneric storage adapterは追加しません。atomicityは採用backendのnative primitiveが担います。
 
@@ -231,7 +244,7 @@ relation indexを実装しない限りGraph schema versionやrelation schema ver
 - started source refs / revisionsを保持している
 - used knowledge refs / revisionsを保持している
 - project context全体のref / revisionをprovenance snapshotとして保持している
-- currentness判定に利用したproject context項目のstable locator + content identityまたは正規化値を保持している
+- currentness判定に利用したproject context項目のstable key + content identityまたは正規化値 + 影響scope / operationを保持している
 - resource条件を保持している
 - persisted updateが読み込み時revisionを保持している
 - conflict後に古い内容を上書きしていない

@@ -331,6 +331,12 @@ negative:
 - Activity discovery
 - execution route closure
 - project context schema / docs
+- standaloneで起動可能な新Skillのproduction helper portability smoke
+  - 対象Skill directoryだけでrequired helper / representative production pathを実行できる
+  - sibling Skillの`scripts/`へimport / script呼び出ししない
+  - repository rootのproduction runtime / helperを必須依存にしない
+  - caller提供machine inputを使う場合は明示されたinput contractだけで成立する
+  - required helper欠落 / 実行不能時にLLM fallbackせず`incomplete` / `unresolved` / `blocked`へ閉じる
 - README / EVALS / ASSERTIONS
 - `skills-ref validate`
 
@@ -383,6 +389,7 @@ CIへ外部APIを追加しません。
 - 同等契約がない場合は、workflow stateまたはowner artifactへStep 0で確認したatomic primitiveを使う最小pre-start claimを追加できるか確認する
 - pre-start claimを安全に実装できない場合はsame-workflow concurrent mutable executionをblockする方針で固定する
 - Project Context parser / templateでcurrentness対象fieldへ表示文言・行番号と独立したstable keyを付与できるか確認し、具体serializationを固定する
+- PR #11のSkill-local runtime contract / portability実装を再確認し、新3 Skillのrequired production helperも同じpackage境界を壊さないことを固定する
 - PR #11 / #12だけで解けるものを除外
 
 ### Step 1: Skill / workflow vocabulary
@@ -494,6 +501,8 @@ direct ref + deterministic scanで不足を実測した場合だけ、必要quer
 
 既存Skill、PR #11 / #12、新規3 Skill、routing、runtime smoke、CI、実Judge記録を確認します。
 
+新3 Skillのうちstandaloneでproduction helperを必要とする代表経路は、対象Skill directoryだけを取り出したportability smokeでも確認します。sibling Skill / repository rootのproduction helperがなくても契約どおり実行または安全にblockできることを確認します。
+
 ## 6. 実装時に避けること
 
 - 主要workflow入口を排他的なQA taxonomyとして扱う
@@ -543,6 +552,8 @@ direct ref + deterministic scanで不足を実測した場合だけ、必要quer
 - Project Contextのmissing / duplicate / ambiguous keyをLLMの意味検索で別項目へ置換する
 - same-workflowのstate CASだけでmutable operation二重開始も防止済みと扱う
 - Git / GitHub / filesystemのatomicity差を隠すためだけにgeneric storage adapter / transaction managerを追加する
+- standalone Skillのrequired production helperをsibling Skillの`scripts/`やrepository rootのproduction runtimeへ必須依存させる
+- standalone Skillでrequired helperを利用できない場合にLLMへ同じ決定論的処理を戻す
 
 ## 7. 完了条件
 
@@ -581,6 +592,7 @@ direct ref + deterministic scanで不足を実測した場合だけ、必要quer
 - workflow state自身のCASで同一workflowのlost updateを防げる
 - same-workflow concurrent resumeでは、owner側claim / idempotent startまたはStep 0で選んだ最小pre-start claimによりmutable operationを1回だけ開始できる。保証できない場合は並行mutable実行をblockできる
 - requiredなproduction helper失敗時にLLMが同じ決定論的処理を代替せず、影響scopeをincomplete / unresolved / blockedにできる
+- standaloneでproduction helperを必要とする新Skillが、対象Skill package単独で代表production pathを実行でき、sibling Skill / repository root runtimeを必須依存にしない
 - Project Contextのcurrentness対象fieldをstable keyで再解決し、field順序・未使用field変更では誤staleにせず、missing / duplicate / ambiguous keyをunresolvedにできる
 - currentness checkpointで別workflowの変更をmutable operation開始前にも検出できる
 - partial auto-rebaseをowner Skillが保証するartifactへ限定できる
