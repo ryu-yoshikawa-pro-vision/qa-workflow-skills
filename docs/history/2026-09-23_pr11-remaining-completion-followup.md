@@ -152,7 +152,17 @@ The existing skip behavior and production code were not changed.
 
 - On Ubuntu, run 35852880443, job `semantic-output-evals`, step `Run Semantic Eval shared runtime tests`, reported both `test_cases_directory_symlink_escape_raises` and `test_symlink_escape_raises` as `ok`; 27 shared tests finished `OK` with no skips.
 - PR #11 body was updated after these runs. The PR remained open and Ready for review (`isDraft=false`).
-- This report correction changes the report-only head again. Recheck the three workflows on that new head, then refresh the PR body run links to the final head.
+- Report correction commit `7994ccdebf22b933a655698718bc3ada560e1a62` was pushed; local, remote, and PR heads matched when its workflows completed:
+
+| Workflow | Run ID | Result |
+| --- | ---: | --- |
+| Validate Agent Skills | 35854061285 | success |
+| Validate Semantic Output Evals | 35854061214 | success |
+| Validate Deterministic Output Evals | 35854061253 | success |
+
+- On Ubuntu, run 35854061214's shared semantic runtime step discovered `test_cases_directory_symlink_escape_raises` and `test_symlink_escape_raises`; each reported `ok`, and the 27-test shared suite finished `OK` with no skips.
+- The PR body was refreshed after these checks and linked these latest runs. PR #11 remained open and Ready for review.
+- This is a chronological verification record. A later report-only commit will itself be checked by Actions; the PR body will link to the most recent successful head.
 
 ## PR body text snapshot (applied after CI on 4c9d1f3; refresh links after this report commit)
 
@@ -172,5 +182,6 @@ The existing skip behavior and production code were not changed.
 
 - Commit `18098995376190b14778dc04c55c1d0aae7f3636`: performed (normal commit).
 - Report commit `4c9d1f35d3b71e28c47b4e883d19dd24c0307bbf`: performed (normal commit); its push and all three Actions succeeded.
-- GitHub PR body: updated after successful Actions on `4c9d1f3`; update again after CI for the current report correction commit.
+- Report commit `7994ccdebf22b933a655698718bc3ada560e1a62`: performed (normal commit); its push and all three Actions succeeded.
+- GitHub PR body: refreshed after successful Actions on `7994ccde`; latest links are updated after the current final report correction is checked.
 - Merge / branch deletion / issue or PR close: not performed.
