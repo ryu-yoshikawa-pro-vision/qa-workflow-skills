@@ -186,9 +186,6 @@ def generate(input_value: dict, metadata: dict) -> dict:
                 # unsupported result; do not linearize only one side.
                 raise UnsupportedInput(
                     "crossing regionはruntime-v1でunsupportedです",
-                    item_key="unsupported:flow:crossing-region",
-                    reason_code="crossing_concurrency_region",
-                    affected_technique_slug="scenario",
                 )
 
     loops_raw = ensure_list(input_value["loop_specs"], "loop_specs")

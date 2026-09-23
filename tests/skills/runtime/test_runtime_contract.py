@@ -235,6 +235,83 @@ class EntityAndEvidenceTests(unittest.TestCase):
         with self.assertRaises(runtime.InvalidInput):
             runtime.validate_machine_entity(invalid)
 
+    def test_shared_dependency_resolver_uses_full_identity_and_current_content(self) -> None:
+        authority = runtime.make_machine_entity("spec-analysis", "authority", "SHARED", {"authority_id": "SHARED"})
+        risk = runtime.make_machine_entity("test-analysis", "product_risk", "SHARED", {"risk_id": "SHARED"})
+        current = [authority, risk]
+        dependencies = runtime.resolve_entity_dependencies(
+            [("spec-analysis", "authority", "SHARED"), ("test-analysis", "product_risk", "SHARED")],
+            current,
+        )
+        self.assertEqual(
+            {(row["skill"], row["entity_type"], row["entity_ref"]): row["content_fingerprint"] for row in dependencies},
+            {
+                ("spec-analysis", "authority", "SHARED"): authority["content_fingerprint"],
+                ("test-analysis", "product_risk", "SHARED"): risk["content_fingerprint"],
+            },
+        )
+        with self.assertRaises(runtime.InvalidInput):
+            runtime.resolve_entity_dependencies([("spec-analysis", "product_risk", "SHARED")], current)
+        with self.assertRaises(runtime.InvalidInput):
+            runtime.resolve_entity_dependencies([("spec-analysis", "authority", "SHARED")], [risk])
+
+    def test_common_disposition_currentness_covered_rules_and_dependencies(self) -> None:
+        upstream = runtime.make_machine_entity("spec-analysis", "authority", "AUTH-001", {"authority_id": "AUTH-001"})
+        covered = runtime.make_machine_entity("test-analysis", "product_risk", "R-001", {"risk_id": "R-001"})
+        authority = runtime.make_machine_entity("spec-analysis", "authority", "AUTH-002", {"authority_id": "AUTH-002"})
+        current = [upstream, covered, authority]
+        row = {
+            "upstream_entity": {key: upstream[key] for key in ("skill", "entity_type", "entity_ref", "content_fingerprint")},
+            "handling": "重複", "reason": "already covered", "authority_refs": ["AUTH-001", "AUTH-002"],
+            "covered_by_entity": {key: covered[key] for key in ("skill", "entity_type", "entity_ref", "content_fingerprint")},
+        }
+        normalized, dependencies = runtime.normalize_machine_entity_disposition(
+            row, current, allowed_handlings={"対象外", "重複"}, allowed_upstream_entity_types={"authority"}, input_mode="artifact",
+        )
+        self.assertEqual(normalized["authority_refs"], ["AUTH-001", "AUTH-002"])
+        self.assertEqual(
+            {(item["skill"], item["entity_type"], item["entity_ref"]) for item in dependencies},
+            {("spec-analysis", "authority", "AUTH-001"), ("spec-analysis", "authority", "AUTH-002"), ("test-analysis", "product_risk", "R-001")},
+        )
+        regular = {**row, "handling": "対象外", "covered_by_entity": None}
+        runtime.normalize_machine_entity_disposition(
+            regular, current, allowed_handlings={"対象外", "重複"}, allowed_upstream_entity_types={"authority"}, input_mode="artifact",
+        )
+
+        disposition = runtime.make_machine_entity("test-requirement-design", "disposition", "authority:AUTH-001", normalized, upstream_entity_dependencies=dependencies)
+        changed_upstream = runtime.make_machine_entity("spec-analysis", "authority", "AUTH-001", {"authority_id": "AUTH-001", "text": "changed"})
+        changed_covered = runtime.make_machine_entity("test-analysis", "product_risk", "R-001", {"risk_id": "R-001", "text": "changed"})
+        unrelated = runtime.make_machine_entity("test-analysis", "product_risk", "R-002", {"risk_id": "R-002", "text": "unrelated"})
+        for replacement, expected in ((changed_upstream, "stale"), (changed_covered, "stale"), (unrelated, "current")):
+            current_rows = [entity for entity in current if (entity["skill"], entity["entity_type"], entity["entity_ref"]) != (replacement["skill"], replacement["entity_type"], replacement["entity_ref"])]
+            current_rows.append(replacement)
+            current_rows.append(disposition)
+            freshness = runtime.evaluate_entity_freshness(current_rows, {})
+            status = next(item["freshness_status"] for item in freshness if item["entity_type"] == "disposition")
+            self.assertEqual(status, expected)
+
+        for invalid in (
+            {**row, "upstream_entity": {**row["upstream_entity"], "content_fingerprint": "sha256:" + "f" * 64}},
+            {**row, "upstream_entity": {"skill": "spec-analysis", "entity_type": "authority", "entity_ref": "AUTH-404", "content_fingerprint": "sha256:" + "f" * 64}},
+            {**row, "covered_by_entity": None},
+            {**row, "covered_by_entity": {**row["covered_by_entity"], "content_fingerprint": "sha256:" + "f" * 64}},
+            {**row, "covered_by_entity": row["upstream_entity"]},
+            {**row, "handling": "対象外"},
+        ):
+            with self.subTest(invalid=invalid):
+                with self.assertRaises(runtime.InvalidInput):
+                    runtime.normalize_machine_entity_disposition(
+                        invalid, current, allowed_handlings={"対象外", "重複"}, allowed_upstream_entity_types={"authority"}, input_mode="artifact",
+                    )
+
+    def test_same_invocation_entity_dependency_accepts_current_runtime_placeholder(self) -> None:
+        parent = runtime.make_machine_entity(
+            "test-condition-design", "tcn", "TCN-001", {"tcn_id": "TCN-001"},
+            runtime_dependencies=[{"skill": "test-condition-design", "runtime_unit_key": "artifact:condition_structure:all", "generation_fingerprint": "__CURRENT__"}],
+        )
+        dependencies = runtime.resolve_entity_dependencies([("test-condition-design", "tcn", "TCN-001")], [parent])
+        self.assertEqual(dependencies[0]["content_fingerprint"], parent["content_fingerprint"])
+
     def test_evidence_builder_is_independent_of_actual_unit_set(self) -> None:
         normalized, artifact = self._artifact()
         valid = runtime.verify_runtime_evidence(

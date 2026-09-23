@@ -19,11 +19,12 @@ from runtime_contract import (
     ensure_list,
     ensure_nonempty_string,
     make_machine_entity,
+    normalize_machine_entity_disposition,
     reject_unknown,
+    resolve_entity_dependencies,
     run_cli,
     seed_legacy_ids,
     validate_upstream_entities,
-    upstream_entity_fingerprints,
 )
 
 
@@ -165,28 +166,26 @@ def _validate_selection_rows(rows: Any) -> dict[str, dict[str, Any]]:
     return result
 
 
-def _validate_dispositions(rows: Any) -> set[str]:
+def _validate_dispositions(rows: Any, current_entities: list[dict], input_mode: str) -> list[tuple[dict, list[dict[str, str]]]]:
+    result: list[tuple[dict, list[dict[str, str]]]] = []
     disposed: set[str] = set()
     for index, row in enumerate(ensure_list(rows, "requirement_dispositions")):
-        if not isinstance(row, dict):
-            raise InvalidInput(f"requirement_dispositions[{index}]が不正です")
-        reject_unknown(row, {"upstream_entity", "handling", "reason", "authority_refs", "covered_by_entity"})
-        upstream = row["upstream_entity"]
-        if not isinstance(upstream, dict) or set(upstream) != {"skill", "entity_type", "entity_ref", "content_fingerprint"}:
-            raise InvalidInput("requirement disposition upstream_entityが不正です")
-        if upstream["entity_type"] != "tr":
-            raise InvalidInput("condition structure dispositionはTRだけを対象にできます")
+        normalized, dependencies = normalize_machine_entity_disposition(
+            row,
+            current_entities,
+            allowed_handlings={"対象外", "別テストレベル", "残存リスク", "ブロック中", "重複"},
+            allowed_upstream_entity_types={"tr"},
+            input_mode=input_mode,
+        )
+        upstream = normalized["upstream_entity"]
+        if upstream["skill"] != "test-requirement-design":
+            raise InvalidInput("condition structure disposition upstream_entity skill/typeが不一致です")
         tr_id = ensure_nonempty_string(upstream["entity_ref"], "requirement disposition tr_id")
         if tr_id in disposed:
             raise InvalidInput("同じTRへのdispositionが重複しています")
-        if row["handling"] not in {"対象外", "別テストレベル", "残存リスク", "ブロック中", "重複"}:
-            raise InvalidInput("requirement disposition handlingが不正です")
-        ensure_nonempty_string(row["reason"], "requirement disposition reason")
-        _unique_strings(row["authority_refs"], "requirement disposition authority_refs")
-        if row["covered_by_entity"] is not None and not isinstance(row["covered_by_entity"], dict):
-            raise InvalidInput("requirement disposition covered_by_entityが不正です")
         disposed.add(tr_id)
-    return disposed
+        result.append((normalized, dependencies))
+    return result
 
 
 def _validate_tcn_drafts(rows: Any) -> list[dict[str, Any]]:
@@ -287,9 +286,11 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
         {"test_requirements", "technique_selections", "test_conditions", "requirement_dispositions", "models", "previous_tcn_ids", "previous_model_keys", "update_scope_tcn_ids", "update_scope_model_keys"},
         {"legacy_tcn_ids"},
     )
+    current_entities = validate_upstream_entities(metadata)
     tr_rows = _validate_tr_rows(input_value["test_requirements"])
     selections = _validate_selection_rows(input_value["technique_selections"])
-    disposed_trs = _validate_dispositions(input_value["requirement_dispositions"])
+    disposition_rows = _validate_dispositions(input_value["requirement_dispositions"], current_entities, metadata["input_mode"])
+    disposed_trs = {row["upstream_entity"]["entity_ref"] for row, _deps in disposition_rows}
     tcn_drafts = _validate_tcn_drafts(input_value["test_conditions"])
     model_drafts = _validate_model_drafts(input_value["models"])
     previous_tcn = _validate_state_rows(input_value["previous_tcn_ids"], "tcn")
@@ -415,7 +416,10 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
                 violations.append({"target_key": f"violation:selection-unreached:{selection['selection_key']}:{slug}", "issue_type": "selection_not_reached", "entity_ref": selection["selection_key"]})
 
     tcn_entities: dict[str, dict[str, Any]] = {}
-    external_refs = upstream_entity_fingerprints(validate_upstream_entities(metadata))
+    external_entities_by_identity = {
+        (row["skill"], row["entity_type"], row["entity_ref"]): row
+        for row in current_entities
+    }
     for draft in tcn_drafts:
         tcn_id = tcn_mapping[draft["draft_key"]]
         content = {
@@ -431,28 +435,46 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
             "priority_override_reason": draft["priority_override_reason"],
             "status": "active",
         }
-        dependencies = [row for row in external_refs if row["entity_type"] == "tr" and row["entity_ref"] in set(draft["tr_refs"])]
+        dependency_identities = [
+            ("test-requirement-design", "tr", ref)
+            for ref in draft["tr_refs"]
+            if ref in tr_rows
+        ]
+        dependency_identities.extend(("spec-analysis", "authority", ref) for ref in draft["authority_refs"])
+        dependency_identities.extend(("test-analysis", "product_risk", ref) for ref in draft["risk_refs"])
+        dependencies = resolve_entity_dependencies(
+            dependency_identities,
+            current_entities,
+            require_all=metadata["input_mode"] == "artifact",
+        )
         tcn_entities[tcn_id] = make_machine_entity(SKILL, "tcn", tcn_id, content, upstream_entity_dependencies=dependencies, runtime_dependencies=[{"skill": SKILL, "runtime_unit_key": "artifact:condition_structure:all", "generation_fingerprint": "__CURRENT__"}])
     entities = list(tcn_entities.values())
     for draft in model_drafts:
         model_key = model_mapping[draft["draft_key"]]
         row = model_metadata[model_key]
-        dependencies = [
-            {"skill": entity["skill"], "entity_type": entity["entity_type"], "entity_ref": entity["entity_ref"], "content_fingerprint": entity["content_fingerprint"]}
-            for entity in [tcn_entities[row["parent_tcn_id"]]]
-        ]
+        dependency_identities = [(SKILL, "tcn", row["parent_tcn_id"])]
+        if row["selection_source"] == "analysis":
+            dependency_identities.append(("test-analysis", "technique_selection", row["selection_key"]))
         if row["derived_from_model_key"] is not None:
-            adapter = next(entity for entity in entities if entity["entity_type"] == "model" and entity["entity_ref"] == row["derived_from_model_key"])
-            dependencies.append({"skill": adapter["skill"], "entity_type": adapter["entity_type"], "entity_ref": adapter["entity_ref"], "content_fingerprint": adapter["content_fingerprint"]})
+            dependency_identities.append((SKILL, "model", row["derived_from_model_key"]))
+        local_entities = [*tcn_entities.values(), *(entity for entity in entities if entity["entity_type"] == "model")]
+        local_identities = [identity for identity in dependency_identities if identity[0] == SKILL]
+        external_identities = [identity for identity in dependency_identities if identity[0] != SKILL]
+        dependencies = resolve_entity_dependencies(local_identities, local_entities, require_all=True)
+        dependencies.extend(resolve_entity_dependencies(
+            external_identities,
+            current_entities,
+            require_all=row["selection_source"] == "analysis" or metadata["input_mode"] == "artifact",
+        ))
+        dependencies.sort(key=lambda item: (item["skill"], item["entity_type"], item["entity_ref"]))
         content = canonicalize(row)
         entity = make_machine_entity(SKILL, "model", model_key, content, model_key=model_key, upstream_entity_dependencies=dependencies, runtime_dependencies=[{"skill": SKILL, "runtime_unit_key": "artifact:condition_structure:all", "generation_fingerprint": "__CURRENT__"}])
         entities.append(entity)
 
-    for row in ensure_list(input_value["requirement_dispositions"], "requirement_dispositions"):
+    for row, deps in disposition_rows:
         upstream = row["upstream_entity"]
         ref = f"{upstream['entity_type']}:{upstream['entity_ref']}"
-        dependencies = [item for item in external_refs if item["skill"] == upstream["skill"] and item["entity_type"] == upstream["entity_type"] and item["entity_ref"] == upstream["entity_ref"]]
-        entities.append(make_machine_entity(SKILL, "disposition", ref, row, upstream_entity_dependencies=dependencies, runtime_dependencies=[{"skill": SKILL, "runtime_unit_key": "artifact:condition_structure:all", "generation_fingerprint": "__CURRENT__"}]))
+        entities.append(make_machine_entity(SKILL, "disposition", ref, row, upstream_entity_dependencies=deps, runtime_dependencies=[{"skill": SKILL, "runtime_unit_key": "artifact:condition_structure:all", "generation_fingerprint": "__CURRENT__"}]))
 
     tcn_state = []
     for row in previous_tcn:

@@ -10,12 +10,14 @@ import unittest
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CONDITION_SCRIPT = REPO_ROOT / "skills" / "test-condition-design" / "scripts" / "condition_structure.py"
+REQUIREMENT_SCRIPT = REPO_ROOT / "skills" / "test-requirement-design" / "scripts" / "requirement_structure.py"
 EP_SCRIPT = REPO_ROOT / "skills" / "test-condition-design" / "scripts" / "equivalence_partitions.py"
 MATERIALIZE_SCRIPT = REPO_ROOT / "skills" / "test-condition-design" / "scripts" / "materialize_coverage.py"
 TDR_SCRIPT = REPO_ROOT / "skills" / "test-condition-design" / "scripts" / "test_data_requirements.py"
 CASE_SCRIPT = REPO_ROOT / "skills" / "test-case-design" / "scripts" / "case_structure.py"
 WORKFLOW_SCRIPT = REPO_ROOT / "skills" / "qa-workflow" / "scripts" / "workflow_runtime.py"
 TRACEABILITY_SCRIPT = REPO_ROOT / "skills" / "coverage-analysis" / "scripts" / "traceability.py"
+SCHEMA_SCRIPT = REPO_ROOT / "skills" / "test-condition-design" / "scripts" / "schema_cases.py"
 RUNTIME_PATH = REPO_ROOT / "skills" / "test-condition-design" / "scripts" / "runtime_contract.py"
 SPEC = importlib.util.spec_from_file_location("vertical_runtime_contract", RUNTIME_PATH)
 assert SPEC is not None and SPEC.loader is not None
@@ -74,8 +76,114 @@ def workflow_metadata() -> dict:
 
 
 class EpVerticalIntegrationTests(unittest.TestCase):
+    def test_schema_adapter_model_wide_requirements_flow_through_tdr_entity_to_materialize(self) -> None:
+        schema_metadata = {
+            "envelope_version": "1", "skill": "test-condition-design", "runtime_contract_version": "runtime-v1", "generator_contract_version": "schema-cases-v1",
+            "runtime_unit_key": "model:schema-001", "model_key": "schema-001", "model_type": "schema", "technique_slug": None, "selection_source": None, "selection_key": None,
+            "scope_key": None, "input_mode": "artifact", "upstream_entities": [], "upstream_runtime_units": [], "static_data_versions": {}, "authority_refs": [], "reference_refs": [],
+        }
+        schema_input = {
+            "schema_kind": "json-schema-2020-12", "schema_pointer": "#", "context": "validation",
+            "document": {"type": "object", "properties": {"role": {"enum": ["admin", "member"]}, "age": {"type": "integer", "minimum": 0, "maximum": 100}}, "required": ["role"]},
+            "child_models": [],
+        }
+        schema = run_script(SCHEMA_SCRIPT, {"metadata": schema_metadata, "input": schema_input})
+        self.assertEqual(schema["runtime_status"], "ok", schema)
+        self.assertEqual(schema["result_status"], "ready", schema)
+
+        tcn = runtime.make_machine_entity("test-condition-design", "tcn", "TCN-001", {
+            "tcn_id": "TCN-001", "tr_refs": [], "condition": "schema-derived checkout fields", "category": None,
+            "technique_slugs": [], "coverage_criterion": "schema constraints", "authority_refs": [], "risk_refs": [],
+            "priority": 1, "priority_override_reason": None, "status": "active",
+        })
+        model = runtime.make_machine_entity("test-condition-design", "model", "schema-001", {
+            "model_key": "schema-001", "model_type": "schema", "technique_slug": None, "parent_tcn_id": "TCN-001",
+            "selection_key": None, "selection_source": None, "derived_from_model_key": None, "status": "active",
+        }, model_key="schema-001", upstream_entity_dependencies=[{
+            "skill": tcn["skill"], "entity_type": tcn["entity_type"], "entity_ref": tcn["entity_ref"], "content_fingerprint": tcn["content_fingerprint"],
+        }])
+        tdr_metadata = {
+            "envelope_version": "1", "skill": "test-condition-design", "runtime_contract_version": "runtime-v1", "generator_contract_version": "test-data-requirements-v1",
+            "runtime_unit_key": "artifact:test_data_requirements:all", "model_key": None, "model_type": None, "technique_slug": None, "selection_source": None, "selection_key": None,
+            "scope_key": "all", "input_mode": "artifact", "upstream_entities": [{"skill": model["skill"], "entity_type": model["entity_type"], "entity_ref": model["entity_ref"], "content": model["content"]}],
+            "upstream_runtime_units": [{"skill": "test-condition-design", "runtime_unit_key": "model:schema-001", "generation_fingerprint": schema["generation_fingerprint"]}],
+            "static_data_versions": {}, "authority_refs": [], "reference_refs": [],
+        }
+        tdr_input = {
+            "current_source_targets": [{
+                "source_model_key": "schema-001", "target_ref": row["target_ref"], "target_content_fingerprint": row["target_content_fingerprint"],
+                "generation_fingerprint": schema["generation_fingerprint"],
+            } for row in schema["payload"]["targets"]],
+            "requirements": schema["payload"]["derived"]["test_data_requirements"],
+        }
+        tdr = run_script(TDR_SCRIPT, {"metadata": tdr_metadata, "input": tdr_input})
+        self.assertEqual(tdr["runtime_status"], "ok", tdr)
+        self.assertEqual({row["source_model_key"] for row in tdr["payload"]["normalized_requirements"]}, {"schema-001"})
+        self.assertTrue(all({
+            "skill": "test-condition-design", "entity_type": "model", "entity_ref": "schema-001", "content_fingerprint": model["content_fingerprint"],
+        } in row["upstream_entity_dependencies"] for row in tdr["payload"]["entities"]))
+        self.assertTrue(all({
+            "skill": "test-condition-design", "runtime_unit_key": "model:schema-001", "generation_fingerprint": schema["generation_fingerprint"],
+        } in row["runtime_dependencies"] for row in tdr["payload"]["entities"]))
+
+        materialize_metadata = {
+            "envelope_version": "1", "skill": "test-condition-design", "runtime_contract_version": "runtime-v1", "generator_contract_version": "materialize-coverage-v1",
+            "runtime_unit_key": "artifact:materialize_coverage:TCN-001", "model_key": None, "model_type": None, "technique_slug": None, "selection_source": None, "selection_key": None,
+            "scope_key": "TCN-001", "input_mode": "artifact",
+            "upstream_entities": [
+                {"skill": row["skill"], "entity_type": row["entity_type"], "entity_ref": row["entity_ref"], "content": row["content"]}
+                for row in [tcn, model, *tdr["payload"]["entities"]]
+            ],
+            "upstream_runtime_units": [
+                {"skill": "test-condition-design", "runtime_unit_key": "model:schema-001", "generation_fingerprint": schema["generation_fingerprint"]},
+                {"skill": "test-condition-design", "runtime_unit_key": "artifact:test_data_requirements:all", "generation_fingerprint": tdr["generation_fingerprint"]},
+            ],
+            "static_data_versions": {}, "authority_refs": [], "reference_refs": [],
+        }
+        model_result = {
+            "skill": "test-condition-design", "model_key": "schema-001", "model_type": "schema", "technique_slug": None,
+            "runtime_unit_key": "model:schema-001", "input_fingerprint": schema["input_fingerprint"], "model_fingerprint": schema["model_fingerprint"],
+            "generation_fingerprint": schema["generation_fingerprint"], "generator_contract_version": schema["generator_contract_version"],
+            "support_status": schema["support_status"], "runtime_status": schema["runtime_status"], "result_status": schema["result_status"],
+            "deterministic_generated": schema["deterministic_generated"], "freshness_status": "current", "targets": schema["payload"]["targets"], "unsupported_items": [],
+        }
+        materialized = run_script(MATERIALIZE_SCRIPT, {
+            "metadata": materialize_metadata,
+            "input": {
+                "tcn_id": "TCN-001",
+                "active_model_metadata": [{"model_key": "schema-001", "model_type": "schema", "technique_slug": None, "parent_tcn_id": "TCN-001", "content_fingerprint": model["content_fingerprint"]}],
+                "models": [model_result], "semantic_coverage_items": [], "test_data_requirements": tdr["payload"]["normalized_requirements"],
+                "target_annotations": [], "target_dispositions": [], "previous_target_id_map": [], "previous_semantic_ci_map": [], "previous_ci_ids": [],
+                "previous_expected_result_roots": [], "merge_groups": [],
+            },
+        })
+        self.assertEqual(materialized["runtime_status"], "ok", materialized)
+        self.assertEqual(materialized["result_status"], "ready", materialized)
+
     def test_standalone_evidence_and_qa_workflow_integration(self) -> None:
-        condition = run_script(CONDITION_SCRIPT, {"metadata": condition_metadata(), "input": condition_input()})
+        requirement = run_script(REQUIREMENT_SCRIPT, {
+            "metadata": {
+                "envelope_version": "1", "skill": "test-requirement-design", "runtime_contract_version": "runtime-v1", "generator_contract_version": "requirement-structure-v1",
+                "runtime_unit_key": "artifact:requirement_structure:all", "model_key": None, "model_type": None, "technique_slug": None, "selection_source": None, "selection_key": None,
+                "scope_key": "all", "input_mode": "direct", "upstream_entities": [], "upstream_runtime_units": [], "static_data_versions": {}, "authority_refs": [], "reference_refs": [],
+            },
+            "input": {
+                "authorities": [], "risks": [], "test_requirements": [{
+                    "draft_key": "checkout", "identity_action": "new", "reuse_id": None, "text": "checkout completes",
+                    "authority_refs": [], "risk_refs": [], "priority": "中", "priority_override_reason": None,
+                    "test_level": "system", "observation_method": "assertion",
+                }], "dispositions": [], "previous_tr_ids": [], "update_scope_tr_ids": [],
+            },
+        })
+        tr_entity = next(row for row in requirement["payload"]["entities"] if row["entity_type"] == "tr")
+        selection_entity = runtime.make_machine_entity("test-analysis", "technique_selection", "SEL-001", {"selection_key": "SEL-001", "selected_techniques": ["ep"]})
+        condition_meta = condition_metadata()
+        condition_meta["input_mode"] = "artifact"
+        condition_meta["upstream_entities"] = [
+            {"skill": tr_entity["skill"], "entity_type": tr_entity["entity_type"], "entity_ref": tr_entity["entity_ref"], "content": tr_entity["content"]},
+            {"skill": selection_entity["skill"], "entity_type": selection_entity["entity_type"], "entity_ref": selection_entity["entity_ref"], "content": selection_entity["content"]},
+        ]
+        condition = run_script(CONDITION_SCRIPT, {"metadata": condition_meta, "input": condition_input()})
         self.assertEqual(condition["result_status"], "ready")
         condition_entities = condition["payload"]["entities"]
         ep = run_script(EP_SCRIPT, {"metadata": ep_metadata(), "input": ep_input()})
@@ -84,7 +192,10 @@ class EpVerticalIntegrationTests(unittest.TestCase):
         tdr_metadata = {
             "envelope_version": "1", "skill": "test-condition-design", "runtime_contract_version": "runtime-v1", "generator_contract_version": "test-data-requirements-v1",
             "runtime_unit_key": "artifact:test_data_requirements:all", "model_key": None, "model_type": None, "technique_slug": None, "selection_source": None, "selection_key": None,
-            "scope_key": "all", "input_mode": "artifact", "upstream_entities": [],
+            "scope_key": "all", "input_mode": "artifact", "upstream_entities": [
+                {"skill": row["skill"], "entity_type": row["entity_type"], "entity_ref": row["entity_ref"], "content": row["content"]}
+                for row in condition_entities if row["entity_type"] == "model"
+            ],
             "upstream_runtime_units": [{"skill": "test-condition-design", "runtime_unit_key": "model:ep-001", "generation_fingerprint": ep["generation_fingerprint"]}],
             "static_data_versions": {}, "authority_refs": [], "reference_refs": [],
         }
@@ -121,7 +232,13 @@ class EpVerticalIntegrationTests(unittest.TestCase):
         materialize_input = {"tcn_id": "TCN-001", "active_model_metadata": condition["payload"]["active_model_metadata"], "models": [model_result], "semantic_coverage_items": [], "test_data_requirements": requirement_rows, "target_annotations": annotations, "target_dispositions": [], "previous_target_id_map": [], "previous_semantic_ci_map": [], "previous_ci_ids": [], "previous_expected_result_roots": [], "merge_groups": []}
         materialize = run_script(MATERIALIZE_SCRIPT, {"metadata": materialize_meta, "input": materialize_input})
         self.assertEqual(materialize["result_status"], "ready")
-        entities = condition_entities + requirement_entities + materialize["payload"]["entities"]
+        entities = [tr_entity, selection_entity] + condition_entities + requirement_entities + materialize["payload"]["entities"]
+        for entity in entities:
+            try:
+                runtime.validate_machine_entity(entity)
+            except runtime.InvalidInput as exc:
+                self.fail(f"invalid current entity {(entity.get('skill'), entity.get('entity_type'), entity.get('entity_ref'))}: {exc}")
+        runtime.validate_entity_collection(entities)
 
         case_metadata = {
             "envelope_version": "1", "skill": "test-case-design", "runtime_contract_version": "runtime-v1", "generator_contract_version": "case-structure-v1",
@@ -130,6 +247,11 @@ class EpVerticalIntegrationTests(unittest.TestCase):
         }
         ci_entities = [row for row in materialize["payload"]["entities"] if row["entity_type"] == "ci"]
         data_entities = requirement_entities
+        case_current_entities = [tr_entity, next(row for row in condition_entities if row["entity_type"] == "tcn"), *ci_entities, *data_entities]
+        case_metadata["upstream_entities"] = [
+            {"skill": row["skill"], "entity_type": row["entity_type"], "entity_ref": row["entity_ref"], "content": row["content"]}
+            for row in case_current_entities
+        ]
         case_input = {
             "test_conditions": [{"tcn_id": "TCN-001", "tr_refs": ["TR-001"], "priority": "中"}],
             "coverage_items": [row["content"] for row in ci_entities], "environment_requirements": [], "test_data_requirements": [row["content"] for row in data_entities],
@@ -145,7 +267,7 @@ class EpVerticalIntegrationTests(unittest.TestCase):
         self.assertEqual(case_result["result_status"], "ready", case_result)
 
         artifact_parts = [
-            runtime.render_runtime_input("test-condition-design", condition_metadata(), condition_input()),
+            runtime.render_runtime_input("test-condition-design", condition_meta, condition_input()),
             runtime.render_runtime_result("test-condition-design", condition),
             runtime.render_runtime_input("test-condition-design", ep_metadata(), ep_input()),
             runtime.render_runtime_result("test-condition-design", ep),
@@ -153,10 +275,23 @@ class EpVerticalIntegrationTests(unittest.TestCase):
             runtime.render_runtime_result("test-condition-design", tdr),
             runtime.render_runtime_input("test-condition-design", materialize_meta, materialize_input),
             runtime.render_runtime_result("test-condition-design", materialize),
-            runtime.render_machine_entities("test-condition-design", entities),
+            runtime.render_machine_entities("test-condition-design", condition_entities + requirement_entities + materialize["payload"]["entities"]),
+            runtime.render_machine_entities("test-requirement-design", [tr_entity]),
+            runtime.render_machine_entities("test-analysis", [selection_entity]),
         ]
         artifact = "\n".join(artifact_parts)
-        normalized = {"tcn_id": "TCN-001", "test_conditions": [{"tcn_id": "TCN-001"}], "models": [{"model_key": "ep-001", "model_type": "ep"}], "ci_ids": [row["ci_id"] for row in materialize["payload"]["ci_id_state"] if row["status"] == "active"], "test_data_requirements": requirement_rows}
+        normalized = {
+            "tcn_id": "TCN-001", "test_conditions": [{"tcn_id": "TCN-001"}], "models": [{"model_key": "ep-001", "model_type": "ep"}],
+            "ci_ids": [row["ci_id"] for row in materialize["payload"]["ci_id_state"] if row["status"] == "active"],
+            "test_data_requirements": requirement_rows,
+        }
+        workflow_normalized = {
+            **normalized,
+            "upstream_entities": [
+                {"skill": row["skill"], "entity_type": row["entity_type"], "entity_ref": row["entity_ref"]}
+                for row in (tr_entity, selection_entity)
+            ],
+        }
         evidence_request = {"operation": "verify_runtime_evidence", "skill": "test-condition-design", "normalized_skill_input": normalized, "artifact_markdown": artifact, "previous_artifact_markdown": None}
         evidence = runtime.verify_runtime_evidence(evidence_request)
         self.assertTrue(evidence["valid"], evidence)
@@ -165,11 +300,11 @@ class EpVerticalIntegrationTests(unittest.TestCase):
 
         rows = [runtime.runtime_unit_row(condition), runtime.runtime_unit_row(ep), runtime.runtime_unit_row(tdr), runtime.runtime_unit_row(materialize, materialize=materialize["payload"])]
         workflow_input = {
-            "workflow_scopes": [{"skill": "test-condition-design", "target": None, "execution_range": None, "input_mode": "artifact", "normalized_input": normalized, "current_structure_state": {"tcn_id": "TCN-001"}}],
-            "runtime_units": rows, "current_runtime_units": rows, "current_entities": entities, "unsupported_item_closures": [],
+            "workflow_scopes": [{"skill": "test-condition-design", "target": None, "execution_range": None, "input_mode": "artifact", "normalized_input": workflow_normalized, "current_structure_state": {"tcn_id": "TCN-001"}}],
+            "runtime_units": rows, "current_runtime_units": rows + [runtime.runtime_unit_row(requirement)], "current_entities": entities, "unsupported_item_closures": [],
         }
         workflow = run_script(WORKFLOW_SCRIPT, {"metadata": workflow_metadata(), "input": workflow_input})
-        self.assertEqual(workflow["runtime_status"], "ok")
+        self.assertEqual(workflow["runtime_status"], "ok", workflow)
         self.assertTrue(workflow["payload"]["can_complete"], workflow)
 
     def test_duplicate_target_closes_across_materialize_scopes_at_current_ci(self) -> None:

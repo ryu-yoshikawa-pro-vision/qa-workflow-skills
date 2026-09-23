@@ -7,7 +7,7 @@ import re
 import sys
 from typing import Any
 
-from runtime_contract import FULL_DIGEST_RE, InvalidInput, TECHNIQUE_SLUGS, canonicalize, ensure_int, ensure_key, ensure_list, ensure_nonempty_string, make_machine_entity, reject_unknown, run_cli, validate_upstream_entities, upstream_entity_fingerprints
+from runtime_contract import FULL_DIGEST_RE, InvalidInput, TECHNIQUE_SLUGS, canonicalize, ensure_int, ensure_key, ensure_list, ensure_nonempty_string, machine_entity_dependency, make_machine_entity, reject_unknown, resolve_entity_dependencies, run_cli, validate_upstream_entities
 
 
 SKILL = "test-analysis"
@@ -41,12 +41,7 @@ def _string_refs(value: Any, name: str) -> list[str]:
 
 
 def _entity_dependency(entity: dict[str, Any]) -> dict[str, str]:
-    return {
-        "skill": entity["skill"],
-        "entity_type": entity["entity_type"],
-        "entity_ref": entity["entity_ref"],
-        "content_fingerprint": entity["content_fingerprint"],
-    }
+    return machine_entity_dependency(entity)
 
 
 def _unique_dependencies(rows: list[dict[str, str]]) -> list[dict[str, str]]:
@@ -74,7 +69,7 @@ def _context(value: Any) -> dict[str, Any]:
 def _context_entity(context: dict[str, Any], upstream: list[dict], risks: list[dict[str, Any]], input_mode: str, runtime_refs: list[dict]) -> dict[str, Any]:
     authorities: dict[str, dict[str, Any]] = {}
     for entity in upstream:
-        if entity["entity_type"] != "authority":
+        if entity["skill"] != "spec-analysis" or entity["entity_type"] != "authority":
             continue
         ref = entity["entity_ref"]
         if ref in authorities:
@@ -90,25 +85,26 @@ def _context_entity(context: dict[str, Any], upstream: list[dict], risks: list[d
     if unknown_risks:
         raise InvalidInput("context risk_refsは同一invocationのcurrent Product Riskを参照する必要があります")
 
-    dependencies = [authorities[ref] for ref in context["authority_refs"] if ref in authorities]
-    dependencies.extend(risk_by_ref[ref] for ref in context["risk_refs"])
+    dependency_identities = [(authorities[ref]["skill"], "authority", ref) for ref in context["authority_refs"]]
+    dependency_identities.extend((risk_by_ref[ref]["skill"], "product_risk", ref) for ref in context["risk_refs"])
+    dependencies = resolve_entity_dependencies(dependency_identities, [*upstream, *risks], require_all=True)
     return make_machine_entity(
         SKILL,
         "test_analysis_context",
         "analysis-context:all",
         context,
-        upstream_entity_dependencies=_unique_dependencies([_entity_dependency(entity) for entity in dependencies]),
+        upstream_entity_dependencies=_unique_dependencies(dependencies),
         runtime_dependencies=runtime_refs,
     )
 
 
-def _risk_entities(rows: Any, results: dict[str, dict], upstream: list[dict], predecessors: list[dict[str, Any]], runtime_refs: list[dict]) -> list[dict]:
+def _risk_entities(rows: Any, results: dict[str, dict], upstream: list[dict], predecessors: list[dict[str, Any]], runtime_refs: list[dict], input_mode: str) -> list[dict]:
     entities = []
     seen = set()
     authorities = {
         ref["entity_ref"]: ref
         for ref in upstream
-        if ref["entity_type"] == "authority"
+        if ref["skill"] == "spec-analysis" and ref["entity_type"] == "authority"
     }
     predecessor_refs: dict[str, list[dict[str, str]]] = {}
     for entity in predecessors:
@@ -141,9 +137,33 @@ def _risk_entities(rows: Any, results: dict[str, dict], upstream: list[dict], pr
         ensure_int(row["likelihood"], f"product_risks[{index}].likelihood")
         seen.add(risk_id)
         joined = {**row, "level": results[risk_id]["level"], "mapped_priority": results[risk_id]["mapped_priority"]}
-        explicit_refs = set(row["authority_refs"] + row["source_refs"])
-        dependencies = [authorities[ref] for ref in sorted(explicit_refs & set(authorities))]
-        dependencies.extend(dependency for ref in sorted(set(row["source_refs"])) for dependency in predecessor_refs.get(ref, []))
+        authority_identities = [("spec-analysis", "authority", ref) for ref in row["authority_refs"]]
+        dependencies = resolve_entity_dependencies(authority_identities, upstream, require_all=input_mode == "artifact")
+        local_source_ids: set[tuple[str, str, str]] = set()
+        external_source_ids: set[tuple[str, str, str]] = set()
+        for ref in row["source_refs"]:
+            if ref in authorities:
+                external_source_ids.add(("spec-analysis", "authority", ref))
+            local_source_ids.update(
+                (dependency["skill"], dependency["entity_type"], dependency["entity_ref"])
+                for dependency in predecessor_refs.get(ref, [])
+            )
+            for entity in upstream:
+                if entity["entity_type"] not in {"change_node", "change_edge", "environment_requirement"}:
+                    continue
+                source_refs = {entity["entity_ref"]}
+                if entity["entity_type"] == "change_node":
+                    source_ref = entity["content"].get("source_ref")
+                    if isinstance(source_ref, str) and source_ref:
+                        source_refs.add(source_ref)
+                elif entity["entity_type"] == "change_edge":
+                    source_refs.update(value for value in entity["content"].get("evidence_refs", []) if isinstance(value, str))
+                if ref in source_refs:
+                    identity = (entity["skill"], entity["entity_type"], entity["entity_ref"])
+                    if identity not in local_source_ids:
+                        external_source_ids.add(identity)
+        dependencies.extend(resolve_entity_dependencies(local_source_ids, predecessors, require_all=True))
+        dependencies.extend(resolve_entity_dependencies(external_source_ids, upstream, require_all=True))
         dependencies = _unique_dependencies(dependencies)
         entities.append(make_machine_entity(SKILL, "product_risk", risk_id, joined, upstream_entity_dependencies=dependencies, runtime_dependencies=runtime_refs))
     if seen != set(results):
@@ -151,11 +171,11 @@ def _risk_entities(rows: Any, results: dict[str, dict], upstream: list[dict], pr
     return entities
 
 
-def _selection_entities(rows: Any, results: dict[str, dict], upstream: list[dict], risks: list[dict[str, Any]], runtime_refs: list[dict]) -> list[dict]:
+def _selection_entities(rows: Any, results: dict[str, dict], upstream: list[dict], risks: list[dict[str, Any]], runtime_refs: list[dict], input_mode: str) -> list[dict]:
     entities = []
     seen = set()
     risk_dependencies = {entity["entity_ref"]: _entity_dependency(entity) for entity in risks}
-    authorities = {ref["entity_ref"]: ref for ref in upstream if ref["entity_type"] == "authority"}
+    authorities = {ref["entity_ref"]: ref for ref in upstream if ref["skill"] == "spec-analysis" and ref["entity_type"] == "authority"}
     for index, row in enumerate(ensure_list(rows, "technique_selections")):
         if not isinstance(row, dict):
             raise InvalidInput("technique selection rowが不正です")
@@ -197,8 +217,10 @@ def _selection_entities(rows: Any, results: dict[str, dict], upstream: list[dict
         unknown_risks = set(row["risk_refs"]) - set(risk_dependencies)
         if unknown_risks:
             raise InvalidInput("Technique Selection risk_refsは同一invocationのcurrent Product Riskを参照する必要があります")
-        dependencies = [authorities[ref] for ref in sorted(set(row["authority_refs"]) & set(authorities))]
-        dependencies.extend(risk_dependencies[ref] for ref in sorted(set(row["risk_refs"])))
+        authority_identities = [("spec-analysis", "authority", ref) for ref in row["authority_refs"]]
+        dependencies = resolve_entity_dependencies(authority_identities, upstream, require_all=input_mode == "artifact")
+        risk_identities = [(risk_dependencies[ref]["skill"], "product_risk", ref) for ref in sorted(set(row["risk_refs"]))]
+        dependencies.extend(resolve_entity_dependencies(risk_identities, risks, require_all=True))
         dependencies = _unique_dependencies(dependencies)
         entities.append(make_machine_entity(SKILL, "technique_selection", key, {**row, "candidates": result["candidates"], "undetermined_signals": undetermined}, upstream_entity_dependencies=dependencies, runtime_dependencies=runtime_refs))
     if seen != set(results):
@@ -206,7 +228,7 @@ def _selection_entities(rows: Any, results: dict[str, dict], upstream: list[dict
     return entities
 
 
-def _graph_entities(nodes: Any, edges: Any, runtime_refs: list[dict]) -> list[dict]:
+def _graph_entities(nodes: Any, edges: Any, runtime_refs: list[dict], upstream: list[dict], input_mode: str) -> list[dict]:
     entities = []
     node_keys = set()
     for index, row in enumerate(ensure_list(nodes, "change_nodes")):
@@ -217,7 +239,9 @@ def _graph_entities(nodes: Any, edges: Any, runtime_refs: list[dict]) -> list[di
         if key in node_keys or row["node_type"] not in {"Authority", "Risk", "TR", "TCN", "CI", "TC"} or not isinstance(row["source_ref"], str) or not row["source_ref"] or row["change_kind"] not in {"新規", "変更", "削除", "回帰影響", "参考", None} or (row["expected_impact"] is not None and (not isinstance(row["expected_impact"], str) or not row["expected_impact"])):
             raise InvalidInput("change node keyが重複しています")
         node_keys.add(key)
-        entities.append(make_machine_entity(SKILL, "change_node", key, row, runtime_dependencies=runtime_refs))
+        source_identities = [("spec-analysis", "authority", row["source_ref"])] if row["node_type"] == "Authority" else []
+        dependencies = resolve_entity_dependencies(source_identities, upstream, require_all=input_mode == "artifact")
+        entities.append(make_machine_entity(SKILL, "change_node", key, row, upstream_entity_dependencies=dependencies, runtime_dependencies=runtime_refs))
     edge_keys = set()
     for index, row in enumerate(ensure_list(edges, "change_edges")):
         if not isinstance(row, dict):
@@ -227,13 +251,15 @@ def _graph_entities(nodes: Any, edges: Any, runtime_refs: list[dict]) -> list[di
         if key in edge_keys or row["from"] not in node_keys or row["to"] not in node_keys or row["edge_type"] not in {"depends_on", "traces_to", "derived_from"} or not isinstance(row["evidence_refs"], list) or not all(isinstance(value, str) and value for value in row["evidence_refs"]) or len(set(row["evidence_refs"])) != len(row["evidence_refs"]):
             raise InvalidInput("change edge referenceが不正です")
         edge_keys.add(key)
-        entities.append(make_machine_entity(SKILL, "change_edge", key, row, runtime_dependencies=runtime_refs))
+        authority_identities = [("spec-analysis", "authority", ref) for ref in row["evidence_refs"]]
+        dependencies = resolve_entity_dependencies(authority_identities, upstream, require_all=False)
+        entities.append(make_machine_entity(SKILL, "change_edge", key, row, upstream_entity_dependencies=dependencies, runtime_dependencies=runtime_refs))
     return entities
 
 
-def _environment_entities(rows: Any, upstream: list[dict], runtime_refs: list[dict]) -> list[dict]:
+def _environment_entities(rows: Any, upstream: list[dict], runtime_refs: list[dict], input_mode: str) -> list[dict]:
     entities = []
-    authorities = {ref["entity_ref"]: ref for ref in upstream if ref["entity_type"] == "authority"}
+    authorities = {ref["entity_ref"]: ref for ref in upstream if ref["skill"] == "spec-analysis" and ref["entity_type"] == "authority"}
     seen: set[str] = set()
     for index, row in enumerate(ensure_list(rows, "environment_requirements")):
         if not isinstance(row, dict):
@@ -245,7 +271,8 @@ def _environment_entities(rows: Any, upstream: list[dict], runtime_refs: list[di
             raise InvalidInput("environment requirement schemaが不正です")
         _string_refs(row["authority_refs"], f"environment_requirements[{index}].authority_refs")
         seen.add(key)
-        dependencies = [authorities[ref] for ref in sorted(set(row["authority_refs"]) & set(authorities))]
+        authority_identities = [("spec-analysis", "authority", ref) for ref in row["authority_refs"]]
+        dependencies = resolve_entity_dependencies(authority_identities, upstream, require_all=input_mode == "artifact")
         entities.append(make_machine_entity(SKILL, "environment_requirement", key, row, upstream_entity_dependencies=dependencies, runtime_dependencies=runtime_refs))
     return entities
 
@@ -268,12 +295,12 @@ def generate(input_value: dict, metadata: dict) -> dict:
             raise InvalidInput("technique_candidate_results schemaが不正です")
         candidate_results[row["selection_key"]] = canonicalize(row)
     upstream_entity_rows = validate_upstream_entities(metadata)
-    upstream_entities = upstream_entity_fingerprints(upstream_entity_rows)
-    entities = _graph_entities(input_value["change_nodes"], input_value["change_edges"], runtime_refs)
-    entities.extend(_environment_entities(input_value["environment_requirements"], upstream_entities, runtime_refs))
-    risk_entities = _risk_entities(input_value["product_risks"], risk_results, upstream_entities, entities, runtime_refs)
+    upstream_entities = upstream_entity_rows
+    entities = _graph_entities(input_value["change_nodes"], input_value["change_edges"], runtime_refs, upstream_entities, metadata["input_mode"])
+    entities.extend(_environment_entities(input_value["environment_requirements"], upstream_entities, runtime_refs, metadata["input_mode"]))
+    risk_entities = _risk_entities(input_value["product_risks"], risk_results, upstream_entities, entities, runtime_refs, metadata["input_mode"])
     entities.extend(risk_entities)
-    entities.extend(_selection_entities(input_value["technique_selections"], candidate_results, upstream_entities, risk_entities, runtime_refs))
+    entities.extend(_selection_entities(input_value["technique_selections"], candidate_results, upstream_entities, risk_entities, runtime_refs, metadata["input_mode"]))
     entities.append(_context_entity(context, upstream_entities, risk_entities, metadata["input_mode"], runtime_refs))
     entities.sort(key=lambda row: (row["entity_type"], row["entity_ref"]))
     expected_sources = [("test_analysis_context", "analysis-context:all")]

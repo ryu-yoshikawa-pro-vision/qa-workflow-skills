@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import hashlib
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -117,6 +118,8 @@ class SchemaCasesRuntimeTests(unittest.TestCase):
         requirements = rerun["payload"]["derived"]["test_data_requirements"]
         self.assertEqual({row["operator"] for row in requirements}, {"enum", "range", "boolean"})
         self.assertTrue(all(row["source_model_key"] == "schema-001" and row["source_target_versions"] == [] for row in requirements))
+        self.assertTrue(all(re.fullmatch(r"h[0-9a-f]{64}", row["requirement_key"]) for row in requirements))
+        self.assertTrue(all(re.fullmatch(r"h[0-9a-f]{64}", row["dimension_key"]) for row in requirements))
         self.assertTrue(any(row["operator"] == "enum" and row["values"] == [{"type": "string", "value": "admin"}, {"type": "string", "value": "user"}] for row in requirements))
         self.assertTrue(any(row["operator"] == "range" and row["minimum"] == {"type": "integer", "value": 1} and row["maximum"] == {"type": "integer", "value": 5} for row in requirements))
         self.assertTrue(any(row["operator"] == "boolean" and row["value"] is True for row in requirements))
@@ -138,8 +141,8 @@ class SchemaCasesRuntimeTests(unittest.TestCase):
         response = run({"schema_kind": "openapi-3.0", "schema_pointer": "#", "context": "response", "document": document, "child_models": []})
         request_refs = {row["requirement_key"] for row in request["payload"]["derived"]["test_data_requirements"]}
         response_refs = {row["requirement_key"] for row in response["payload"]["derived"]["test_data_requirements"]}
-        read_key = "schema-h" + hashlib.sha256(json.dumps({"schema_kind": "openapi-3.0", "schema_pointer": "#/properties/read", "keyword": "required", "role": "test-data-requirement"}, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-        write_key = "schema-h" + hashlib.sha256(json.dumps({"schema_kind": "openapi-3.0", "schema_pointer": "#/properties/write", "keyword": "required", "role": "test-data-requirement"}, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        read_key = "h" + hashlib.sha256(json.dumps({"schema_kind": "openapi-3.0", "schema_pointer": "#/properties/read", "keyword": "required", "role": "test-data-requirement"}, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        write_key = "h" + hashlib.sha256(json.dumps({"schema_kind": "openapi-3.0", "schema_pointer": "#/properties/write", "keyword": "required", "role": "test-data-requirement"}, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
         self.assertNotIn(read_key, request_refs)
         self.assertIn(write_key, request_refs)
         self.assertIn(read_key, response_refs)

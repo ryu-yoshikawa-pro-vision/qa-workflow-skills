@@ -101,6 +101,30 @@ class FlowPathsRuntimeTests(unittest.TestCase):
         self.assertTrue(result["payload"]["unsupported_items"])
         self.assertTrue(all(not row["materializable"] for row in result["payload"]["targets"]))
 
+    def test_whole_model_unsupported_fallback_does_not_create_unhashed_item_key(self) -> None:
+        value = {
+            "nodes": [
+                {"node_key": "f", "label": "Fork", "kind": "fork", "authority_refs": []},
+                {"node_key": "a", "label": "Nested fork", "kind": "fork", "authority_refs": []},
+                {"node_key": "j1", "label": "Join 1", "kind": "join", "authority_refs": []},
+                {"node_key": "j2", "label": "Join 2", "kind": "join", "authority_refs": []},
+            ],
+            "edges": [
+                {"edge_key": "E-1", "from": "f", "to": "a", "guard_status": True, "guard_refs": [], "label": "enter", "authority_refs": []},
+                {"edge_key": "E-2", "from": "a", "to": "j1", "guard_status": True, "guard_refs": [], "label": "left", "authority_refs": []},
+                {"edge_key": "E-3", "from": "j1", "to": "j2", "guard_status": True, "guard_refs": [], "label": "continue", "authority_refs": []},
+            ],
+            "initial_node_keys": ["f"],
+            "regions": [
+                {"region_key": "RG-1", "fork_node_key": "f", "join_node_key": "j1", "branches": [{"branch_key": "BR-1", "edge_keys": ["E-1", "E-2"]}]},
+                {"region_key": "RG-2", "fork_node_key": "a", "join_node_key": "j2", "branches": [{"branch_key": "BR-2", "edge_keys": ["E-2", "E-3"]}]},
+            ],
+            "loop_specs": [], "coverage_mode": "fork-join", "max_path_length": 10,
+        }
+        result = run(value)
+        self.assertEqual(result["runtime_status"], "unsupported")
+        self.assertEqual(result["payload"]["unsupported_items"], [])
+
     def test_partial_with_only_unsupported_items_can_be_ready(self) -> None:
         result = run(partial_with_separate_supported_edge(uncertain=False))
         self.assertEqual(result["support_status"], "partial")

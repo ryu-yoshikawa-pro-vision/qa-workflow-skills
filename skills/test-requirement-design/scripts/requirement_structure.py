@@ -6,7 +6,7 @@ from pathlib import Path
 import re
 import sys
 
-from runtime_contract import FULL_DIGEST_RE, InvalidInput, TR_ID_RE, canonicalize, ensure_list, ensure_nonempty_string, make_machine_entity, reject_unknown, run_cli, seed_legacy_ids, validate_upstream_entities, upstream_entity_fingerprints
+from runtime_contract import InvalidInput, TR_ID_RE, canonicalize, ensure_list, ensure_nonempty_string, make_machine_entity, normalize_machine_entity_disposition, reject_unknown, resolve_entity_dependencies, run_cli, seed_legacy_ids, validate_upstream_entities
 
 
 SKILL = "test-requirement-design"
@@ -37,31 +37,28 @@ def _state(rows: object) -> list[dict]:
     return result
 
 
-def _disposition_refs(rows: object) -> set[tuple[str, str]]:
+def _disposition_refs(rows: object, current_entities: list[dict], input_mode: str) -> tuple[set[tuple[str, str]], list[tuple[dict, list[dict[str, str]]]]]:
     result = set()
+    normalized_rows = []
     for index, row in enumerate(ensure_list(rows, "dispositions")):
-        if not isinstance(row, dict):
-            raise InvalidInput("disposition rowが不正です")
-        reject_unknown(row, {"upstream_entity", "handling", "reason", "authority_refs", "covered_by_entity"})
-        upstream = row["upstream_entity"]
-        if not isinstance(upstream, dict) or set(upstream) != {"skill", "entity_type", "entity_ref", "content_fingerprint"}:
-            raise InvalidInput("disposition upstream_entityが不正です")
-        if upstream["entity_type"] not in {"authority", "product_risk"} or not ensure_nonempty_string(upstream["skill"], "disposition.skill") or not FULL_DIGEST_RE.fullmatch(str(upstream["content_fingerprint"])):
-            raise InvalidInput("TR disposition upstream entity typeが不正です")
+        normalized, dependencies = normalize_machine_entity_disposition(
+            row,
+            current_entities,
+            allowed_handlings={"対象外", "別テストレベル", "残存リスク", "ブロック中", "重複"},
+            allowed_upstream_entity_types={"authority", "product_risk"},
+            input_mode=input_mode,
+        )
+        upstream = normalized["upstream_entity"]
+        expected_skill = {"authority": "spec-analysis", "product_risk": "test-analysis"}[upstream["entity_type"]]
+        if upstream["skill"] != expected_skill:
+            raise InvalidInput("TR disposition upstream_entity skill/typeが不一致です")
         ref = ensure_nonempty_string(upstream["entity_ref"], "disposition.entity_ref")
         key = (upstream["entity_type"], ref)
         if key in result:
             raise InvalidInput("dispositionが重複しています")
-        if row["handling"] not in {"対象外", "別テストレベル", "残存リスク", "ブロック中", "重複"} or not isinstance(row["reason"], str) or not row["reason"] or not isinstance(row["authority_refs"], list) or len(set(row["authority_refs"])) != len(row["authority_refs"]) or not all(isinstance(value, str) and value for value in row["authority_refs"]):
-            raise InvalidInput("disposition handling/reasonが不正です")
-        covered = row["covered_by_entity"]
-        if row["handling"] == "重複":
-            if not isinstance(covered, dict) or set(covered) != {"skill", "entity_type", "entity_ref", "content_fingerprint"} or not ensure_nonempty_string(covered["skill"], "covered_by_entity.skill") or covered["entity_type"] not in {"authority", "product_risk", "tr"} or not ensure_nonempty_string(covered["entity_ref"], "covered_by_entity.entity_ref") or not FULL_DIGEST_RE.fullmatch(str(covered["content_fingerprint"])):
-                raise InvalidInput("重複dispositionのcovered_by_entityが不正です")
-        elif covered is not None:
-            raise InvalidInput("重複以外のcovered_by_entityはnullである必要があります")
         result.add(key)
-    return result
+        normalized_rows.append((normalized, dependencies))
+    return result, normalized_rows
 
 
 def generate(input_value: dict, metadata: dict) -> dict:
@@ -84,7 +81,8 @@ def generate(input_value: dict, metadata: dict) -> dict:
         if row["risk_id"] in risk_priorities:
             raise InvalidInput("risk_idが重複しています")
         risk_priorities[row["risk_id"]] = row["mapped_priority"]
-    dispositions = _disposition_refs(input_value["dispositions"])
+    current_entities = validate_upstream_entities(metadata)
+    dispositions, disposition_rows = _disposition_refs(input_value["dispositions"], current_entities, metadata["input_mode"])
     previous = _state(input_value["previous_tr_ids"])
     previous_map = {row["tr_id"]: row for row in previous}
     update_scope = input_value["update_scope_tr_ids"]
@@ -157,17 +155,25 @@ def generate(input_value: dict, metadata: dict) -> dict:
             violations.append({"target_key": f"violation:linked-disposed:{key[0]}:{key[1]}", "issue_type": "linked_and_disposed", "entity_ref": key[1]})
         elif key not in linked and key not in dispositions:
             violations.append({"target_key": f"violation:unclosed:{key[0]}:{key[1]}", "issue_type": "unclosed_reference", "entity_ref": key[1]})
-    upstream_refs = upstream_entity_fingerprints(validate_upstream_entities(metadata))
     entities = []
     for draft in drafts:
         tr_id = mapping[draft["draft_key"]]
         content = {key: draft[key] for key in ("text", "authority_refs", "risk_refs", "priority", "priority_override_reason", "test_level", "observation_method")}
-        deps = [row for row in upstream_refs if row["entity_ref"] in draft["authority_refs"] or row["entity_ref"] in draft["risk_refs"]]
+        ref_identities = [
+            ("spec-analysis", "authority", ref)
+            for ref in draft["authority_refs"]
+            if ref in authority_ids
+        ]
+        ref_identities.extend(
+            ("test-analysis", "product_risk", ref)
+            for ref in draft["risk_refs"]
+            if ref in risk_priorities
+        )
+        deps = resolve_entity_dependencies(ref_identities, current_entities, require_all=metadata["input_mode"] == "artifact")
         entities.append(make_machine_entity(SKILL, "tr", tr_id, {"tr_id": tr_id, **content}, upstream_entity_dependencies=deps, runtime_dependencies=[{"skill": SKILL, "runtime_unit_key": "artifact:requirement_structure:all", "generation_fingerprint": "__CURRENT__"}]))
-    for row in ensure_list(input_value["dispositions"], "dispositions"):
+    for row, deps in disposition_rows:
         upstream_ref = row["upstream_entity"]
         ref = f"{upstream_ref['entity_type']}:{upstream_ref['entity_ref']}"
-        deps = [item for item in upstream_refs if item["skill"] == upstream_ref["skill"] and item["entity_type"] == upstream_ref["entity_type"] and item["entity_ref"] == upstream_ref["entity_ref"]]
         entities.append(make_machine_entity(SKILL, "disposition", ref, row, upstream_entity_dependencies=deps, runtime_dependencies=[{"skill": SKILL, "runtime_unit_key": "artifact:requirement_structure:all", "generation_fingerprint": "__CURRENT__"}]))
     states = []
     for row in previous:

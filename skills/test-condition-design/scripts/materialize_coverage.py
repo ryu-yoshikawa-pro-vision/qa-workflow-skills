@@ -23,6 +23,7 @@ from runtime_contract import (
     ensure_key,
     ensure_nonempty_string,
     make_machine_entity,
+    resolve_entity_dependencies,
     reject_unknown,
     run_cli,
     seed_legacy_ids,
@@ -224,8 +225,8 @@ def _validate_model_results(rows: Any, models: dict[str, dict[str, Any]], tcn_id
             _digest(row[digest_name], f"model_results.{digest_name}")
         model_type = models[model_key]["model_type"]
         if row["runtime_status"] == "unsupported":
-            if any(not isinstance(target, dict) or target.get("materializable") is not False for target in row["targets"]) or not row["unsupported_items"]:
-                raise InvalidInput("whole-model unsupported model resultは非materializable targetまたは空target・unsupported itemありである必要があります")
+            if any(not isinstance(target, dict) or target.get("materializable") is not False for target in row["targets"]):
+                raise InvalidInput("whole-model unsupported model resultは非materializable targetだけを含める必要があります")
         elif model_type == "crud":
             summary = row.get("coverage_summary")
             if not isinstance(summary, dict) or not isinstance(summary.get("completeness"), dict) or not isinstance(summary.get("consistency"), dict) or summary.get("complete") is not True or summary["completeness"].get("complete") is not True or summary["consistency"].get("complete") is not True:
@@ -369,7 +370,7 @@ def _validate_annotations(rows: Any, targets: dict[str, dict[str, Any]], generat
     return result
 
 
-def _validate_test_data_requirements(rows: Any, targets: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
+def _validate_test_data_requirements(rows: Any, targets: dict[str, dict[str, Any]], models: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
     result: dict[str, dict[str, Any]] = {}
     current_targets = {
         ref: {
@@ -391,6 +392,11 @@ def _validate_test_data_requirements(rows: Any, targets: dict[str, dict[str, Any
             raise InvalidInput("test_data_requirement data_refが不正または重複しています")
         requirement_input = {key: value for key, value in row.items() if key not in {"data_ref", "applicable_target_refs", "content_fingerprint"}}
         normalized = _normalize(requirement_input, index, current_targets)
+        source_model = models.get(normalized["source_model_key"])
+        if source_model is None:
+            raise InvalidInput("test_data_requirement source_model_keyがcurrent model metadataにありません")
+        if normalized["source_target_versions"] and source_model["model_type"] in ADAPTER_TYPES:
+            raise InvalidInput("target-specific test_data_requirementはCoverage所有modelが必要です")
         if "applicable_target_refs" in row:
             saved_applicable = row["applicable_target_refs"]
             if not isinstance(saved_applicable, list) or saved_applicable != normalized["applicable_target_refs"]:
@@ -532,11 +538,20 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
         entity = current_model_entities.get((SKILL, "model", model["model_key"]))
         if entity is None or entity["content_fingerprint"] != model["content_fingerprint"]:
             raise InvalidInput("active_model_metadataのcontent_fingerprintがcurrent model Entityと不一致です")
+        content = entity["content"]
+        if (
+            entity["entity_ref"] != model["model_key"]
+            or content.get("model_key") != model["model_key"]
+            or content.get("model_type") != model["model_type"]
+            or content.get("technique_slug") != model["technique_slug"]
+            or content.get("parent_tcn_id") != tcn_id
+        ):
+            raise InvalidInput("active_model_metadataがcurrent model Machine Entityと不一致です")
     models = {row["model_key"]: row for row in models_rows}
     model_results = _validate_model_results(input_value["models"], models, tcn_id)
     targets = _validate_targets(model_results, models, tcn_id)
     generation_by_ref = {ref: row["generation_fingerprint"] for ref, row in targets.items()}
-    data_requirements = _validate_test_data_requirements(input_value["test_data_requirements"], targets)
+    data_requirements = _validate_test_data_requirements(input_value["test_data_requirements"], targets, models)
     annotations = _validate_annotations(input_value["target_annotations"], targets, generation_by_ref)
     for ref, annotation in annotations.items():
         if any(data_ref not in data_requirements for data_ref in annotation["test_data_requirement_refs"]):
@@ -735,11 +750,17 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
             # here would silently turn a malformed artifact into a runtime
             # failure.
             raise InvalidInput("test data requirementがruntime model resultを参照していません")
+        model_entity = current_model_entities.get((SKILL, "model", source_model_key))
+        if model_entity is None:
+            raise InvalidInput("test_data_requirement source model Machine Entityがcurrentではありません")
+        authority_identities = [("spec-analysis", "authority", ref) for ref in row["authority_refs"]]
+        dependency_identities = [(SKILL, "model", source_model_key), *authority_identities]
         data_entities[data_ref] = make_machine_entity(
             SKILL,
             "test_data_requirement",
             data_ref,
             row,
+            upstream_entity_dependencies=resolve_entity_dependencies(dependency_identities, upstream_rows, require_all=True),
             runtime_dependencies=[{
                 "skill": SKILL,
                 "runtime_unit_key": f"model:{source_model_key}",

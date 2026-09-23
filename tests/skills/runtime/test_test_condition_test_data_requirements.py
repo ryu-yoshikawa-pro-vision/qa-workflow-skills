@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import importlib.util
 from pathlib import Path
 import subprocess
 import sys
@@ -10,18 +11,45 @@ import unittest
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = REPO_ROOT / "skills" / "test-condition-design" / "scripts" / "test_data_requirements.py"
 DIGEST = "sha256:" + "1" * 64
+RUNTIME_PATH = REPO_ROOT / "skills" / "test-condition-design" / "scripts" / "runtime_contract.py"
+SPEC = importlib.util.spec_from_file_location("tdr_runtime_contract", RUNTIME_PATH)
+assert SPEC is not None and SPEC.loader is not None
+runtime = importlib.util.module_from_spec(SPEC)
+sys.modules[SPEC.name] = runtime
+SPEC.loader.exec_module(runtime)
 
 
-def metadata() -> dict:
+def model_entity(model_key: str = "ep-001", model_type: str = "ep") -> dict:
+    technique = "ep" if model_type == "ep" else None
+    content = {
+        "model_key": model_key, "model_type": model_type, "technique_slug": technique,
+        "parent_tcn_id": "TCN-001", "selection_source": "analysis" if technique else None,
+        "selection_key": "SEL-001" if technique else None, "derived_from_model_key": None, "status": "active",
+    }
+    return runtime.make_machine_entity("test-condition-design", "model", model_key, content, model_key=model_key)
+
+
+def metadata(*, models: list[dict] | None = None, runtimes: list[dict] | None = None, authorities: list[dict] | None = None, input_mode: str = "artifact") -> dict:
+    models = models if models is not None else [model_entity()]
+    authorities = authorities or []
     return {
         "envelope_version": "1", "skill": "test-condition-design", "runtime_contract_version": "runtime-v1", "generator_contract_version": "test-data-requirements-v1",
         "runtime_unit_key": "artifact:test_data_requirements:all", "model_key": None, "model_type": None, "technique_slug": None, "selection_source": None, "selection_key": None,
-        "scope_key": "all", "input_mode": "artifact", "upstream_entities": [], "upstream_runtime_units": [], "static_data_versions": {}, "authority_refs": [], "reference_refs": [],
+        "scope_key": "all", "input_mode": input_mode,
+        "upstream_entities": [
+            {"skill": row["skill"], "entity_type": row["entity_type"], "entity_ref": row["entity_ref"], "content": row["content"]}
+            for row in [*models, *authorities]
+        ],
+        "upstream_runtime_units": runtimes if runtimes is not None else [
+            {"skill": "test-condition-design", "runtime_unit_key": f"model:{row['entity_ref']}", "generation_fingerprint": DIGEST}
+            for row in models if row["content"]["model_type"] in {"ep", "bva", "domain", "decision", "comb", "classification", "state", "flow", "crud", "cause-effect", "syntax", "schema", "ui", "random", "metamorphic"}
+        ],
+        "static_data_versions": {}, "authority_refs": [], "reference_refs": [],
     }
 
 
-def run(value: dict) -> dict:
-    result = subprocess.run([sys.executable, str(SCRIPT)], input=json.dumps({"metadata": metadata(), "input": value}, ensure_ascii=False).encode(), stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=REPO_ROOT, check=False)
+def run(value: dict, *, models: list[dict] | None = None, runtimes: list[dict] | None = None, authorities: list[dict] | None = None, input_mode: str = "artifact") -> dict:
+    result = subprocess.run([sys.executable, str(SCRIPT)], input=json.dumps({"metadata": metadata(models=models, runtimes=runtimes, authorities=authorities, input_mode=input_mode), "input": value}, ensure_ascii=False).encode(), stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=REPO_ROOT, check=False)
     if result.stderr:
         raise AssertionError(result.stderr.decode())
     return json.loads(result.stdout)
@@ -89,6 +117,62 @@ class TestDataRequirementRuntimeTests(unittest.TestCase):
                 candidate = {**requirement_row, "source_target_versions": versions}
                 result = run({"current_source_targets": [current], "requirements": [candidate]})
                 self.assertEqual(result["runtime_status"], "invalid_input")
+
+    def test_model_wide_requirement_resolves_current_coverage_or_adapter_model(self) -> None:
+        row = requirement("model-wide", "eq", value={"type": "string", "value": "admin"})
+        value = {"current_source_targets": [], "requirements": [row]}
+        current = run(value)
+        self.assertEqual(current["runtime_status"], "ok")
+        entity = current["payload"]["entities"][0]
+        dep = entity["upstream_entity_dependencies"]
+        self.assertEqual([(item["entity_type"], item["entity_ref"]) for item in dep], [("model", "ep-001")])
+        self.assertIn({"skill": "test-condition-design", "runtime_unit_key": "model:ep-001", "generation_fingerprint": DIGEST}, entity["runtime_dependencies"])
+
+        adapter = model_entity("schema-001", "schema")
+        adapter_result = run(
+            {"current_source_targets": [], "requirements": [{**row, "source_model_key": "schema-001"}]},
+            models=[adapter],
+            runtimes=[{"skill": "test-condition-design", "runtime_unit_key": "model:schema-001", "generation_fingerprint": DIGEST}],
+        )
+        self.assertEqual(adapter_result["runtime_status"], "ok")
+        self.assertEqual(adapter_result["payload"]["normalized_requirements"][0]["applicable_target_refs"], [])
+
+        unknown = run({"current_source_targets": [], "requirements": [{**row, "source_model_key": "ep-404"}]})
+        self.assertEqual(unknown["runtime_status"], "invalid_input")
+
+        mismatched = model_entity()
+        mismatched = runtime.make_machine_entity(
+            "test-condition-design", "model", "ep-001", {**mismatched["content"], "model_key": "ep-002"}, model_key="ep-001",
+        )
+        rejected = run(value, models=[mismatched])
+        self.assertEqual(rejected["runtime_status"], "invalid_input")
+
+    def test_source_model_entity_and_runtime_changes_propagate_freshness(self) -> None:
+        source = model_entity()
+        value = {"current_source_targets": [], "requirements": [requirement("model-wide", "eq", value={"type": "string", "value": "admin"})]}
+        old_result = run(value, models=[source])
+        self.assertEqual(old_result["runtime_status"], "ok")
+        old_requirement = old_result["payload"]["entities"][0]
+        unrelated = runtime.make_machine_entity("test-condition-design", "model", "bva-002", {"model_key": "bva-002", "model_type": "bva", "technique_slug": "bva"}, model_key="bva-002")
+        changed = runtime.make_machine_entity("test-condition-design", "model", "ep-001", {**source["content"], "selection_key": "SEL-002"}, model_key="ep-001")
+        unrelated_changed = runtime.make_machine_entity("test-condition-design", "model", "bva-002", {**unrelated["content"], "selection_key": "SEL-UNRELATED"}, model_key="bva-002")
+
+        rows = [source, unrelated, {**old_requirement, "runtime_dependencies": []}]
+        states = {row["entity_ref"]: row["freshness_status"] for row in runtime.evaluate_entity_freshness(rows, {}) if row["entity_type"] == "test_data_requirement"}
+        self.assertEqual(states["data:model-wide"], "current")
+
+        rows = [changed, unrelated, {**old_requirement, "runtime_dependencies": []}]
+        states = {row["entity_ref"]: row["freshness_status"] for row in runtime.evaluate_entity_freshness(rows, {}) if row["entity_type"] == "test_data_requirement"}
+        self.assertEqual(states["data:model-wide"], "stale")
+
+        current_runtime = {("test-condition-design", "artifact:test_data_requirements:all"): {"generation_fingerprint": old_result["generation_fingerprint"]}, ("test-condition-design", "model:ep-001"): {"generation_fingerprint": "sha256:" + "f" * 64}}
+        rows = [source, {**old_requirement, "runtime_dependencies": [dep for dep in old_requirement["runtime_dependencies"] if dep["runtime_unit_key"] == "model:ep-001"]}]
+        states = {row["entity_ref"]: row["freshness_status"] for row in runtime.evaluate_entity_freshness(rows, current_runtime) if row["entity_type"] == "test_data_requirement"}
+        self.assertEqual(states["data:model-wide"], "stale")
+
+        rows = [source, unrelated_changed, {**old_requirement, "runtime_dependencies": []}]
+        states = {row["entity_ref"]: row["freshness_status"] for row in runtime.evaluate_entity_freshness(rows, {}) if row["entity_type"] == "test_data_requirement"}
+        self.assertEqual(states["data:model-wide"], "current")
 
 
 if __name__ == "__main__":

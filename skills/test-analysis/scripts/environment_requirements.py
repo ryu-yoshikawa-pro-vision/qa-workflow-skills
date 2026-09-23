@@ -42,7 +42,7 @@ def _normalize_requirement(row: dict, index: int) -> dict:
     }
     if operator not in operator_fields or set(row) != required | operator_fields[operator]:
         if operator not in operator_fields:
-            raise UnsupportedInput("unknown environment operator", item_key=f"env:{key}", reason_code="unsupported_intersection")
+            raise UnsupportedInput("unknown environment operator", item_type="environment_requirement", source_key=key, reason_code="unsupported_intersection")
         raise InvalidInput("environment operator fieldが不正です")
     normalized = {"requirement_key": key, "environment_key": env, "dimension_key": dimension, "operator": operator, "authority_refs": sorted(set(row["authority_refs"])), "source_model_key": None, "source_target_versions": []}
     if operator == "eq":
@@ -74,7 +74,7 @@ def _normalize_requirement(row: dict, index: int) -> dict:
             raise InvalidInput("environment boolean valueが不正です")
         normalized["value"] = row["value"]
     else:
-        raise UnsupportedInput("unknown environment operator", item_key=f"env:{key}", reason_code="unsupported_intersection")
+        raise UnsupportedInput("unknown environment operator", item_type="environment_requirement", source_key=key, reason_code="unsupported_intersection")
     return normalized
 
 
@@ -86,7 +86,19 @@ def generate(input_value: dict, metadata: dict) -> dict:
     for index, row in enumerate(ensure_list(input_value["requirements"], "requirements")):
         if not isinstance(row, dict):
             raise InvalidInput("requirement rowが不正です")
-        rows.append(_normalize_requirement(row, index))
+        try:
+            rows.append(_normalize_requirement(row, index))
+        except UnsupportedInput as exc:
+            requirement_key = row.get("requirement_key")
+            if isinstance(requirement_key, str) and requirement_key:
+                raise UnsupportedInput(
+                    exc.message,
+                    item_type="environment_requirement",
+                    source_key=requirement_key,
+                    reason_code=exc.reason_code or "unsupported_intersection",
+                    affected_technique_slug=exc.affected_technique_slug,
+                ) from exc
+            raise
     if len({row["requirement_key"] for row in rows}) != len(rows):
         raise InvalidInput("requirement_keyが重複しています")
     conflicts = []
@@ -94,7 +106,17 @@ def generate(input_value: dict, metadata: dict) -> dict:
     for row in rows:
         grouped.setdefault((row["environment_key"], row["dimension_key"]), []).append(row)
     for (environment_key, dimension_key), group in sorted(grouped.items()):
-        if not constraint_intersection_compatible(group):
+        try:
+            compatible = constraint_intersection_compatible(group)
+        except UnsupportedInput as exc:
+            source_key = sorted(row["requirement_key"] for row in group)[0]
+            raise UnsupportedInput(
+                exc.message,
+                item_type="environment_requirement",
+                source_key=source_key,
+                reason_code=exc.reason_code or "unsupported_intersection",
+            ) from exc
+        if not compatible:
             conflicts.append({"environment_key": environment_key, "dimension_key": dimension_key, "requirement_keys": sorted(row["requirement_key"] for row in group)})
     conflicts.sort(key=lambda row: (row["environment_key"], row["dimension_key"], row["requirement_keys"]))
     rows.sort(key=lambda row: row["requirement_key"])

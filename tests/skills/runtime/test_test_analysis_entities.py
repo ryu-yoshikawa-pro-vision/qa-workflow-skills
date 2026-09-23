@@ -111,14 +111,15 @@ class AnalysisEntityRuntimeTests(unittest.TestCase):
 
     def test_same_invocation_predecessors_feed_risk_and_selection_dependencies_only_forward(self) -> None:
         value = valid_input()
-        value["product_risks"][0]["source_refs"] = ["payment-change", "edge-evidence", "TC-001"]
+        value["product_risks"][0]["source_refs"] = ["payment-change", "edge-evidence", "SPEC-001", "TC-001"]
         value["product_risks"][0]["authority_refs"] = ["SPEC-001"]
         value["technique_selections"][0]["authority_refs"] = ["SPEC-001"]
         value["change_nodes"] = [
             {"node_key": "CHANGE-001", "node_type": "TR", "source_ref": "payment-change", "change_kind": "変更", "expected_impact": "payment total"},
             {"node_key": "CHANGE-002", "node_type": "TR", "source_ref": "inventory-change", "change_kind": "変更", "expected_impact": "inventory"},
+            {"node_key": "CHANGE-003", "node_type": "Authority", "source_ref": "SPEC-001", "change_kind": "参考", "expected_impact": "authority basis"},
         ]
-        value["change_edges"] = [{"edge_key": "EDGE-001", "from": "CHANGE-001", "to": "CHANGE-002", "edge_type": "depends_on", "evidence_refs": ["edge-evidence"]}]
+        value["change_edges"] = [{"edge_key": "EDGE-001", "from": "CHANGE-001", "to": "CHANGE-002", "edge_type": "depends_on", "evidence_refs": ["edge-evidence", "SPEC-001"]}]
         authority = runtime.make_machine_entity("spec-analysis", "authority", "SPEC-001", {"authority_id": "SPEC-001"})
         downstream_tc = runtime.make_machine_entity("test-case-design", "tc", "TC-001", {"tc_id": "TC-001"})
         upstream = [{"skill": entity["skill"], "entity_type": entity["entity_type"], "entity_ref": entity["entity_ref"], "content": entity["content"]} for entity in (authority, downstream_tc)]
@@ -130,12 +131,50 @@ class AnalysisEntityRuntimeTests(unittest.TestCase):
         risk_deps = {(row["entity_type"], row["entity_ref"]) for row in risk["upstream_entity_dependencies"]}
         self.assertIn(("authority", "SPEC-001"), risk_deps)
         self.assertIn(("change_node", "CHANGE-001"), risk_deps)
+        self.assertIn(("change_node", "CHANGE-003"), risk_deps)
         self.assertIn(("change_edge", "EDGE-001"), risk_deps)
+        graph_entities = {row["entity_ref"]: row for row in entities if row["entity_type"] in {"change_node", "change_edge"}}
+        self.assertEqual([(row["entity_type"], row["entity_ref"]) for row in graph_entities["CHANGE-003"]["upstream_entity_dependencies"]], [("authority", "SPEC-001")])
+        self.assertEqual([(row["entity_type"], row["entity_ref"]) for row in graph_entities["EDGE-001"]["upstream_entity_dependencies"]], [("authority", "SPEC-001")])
         self.assertNotIn(("tc", "TC-001"), risk_deps)
         selection_deps = {(row["entity_type"], row["entity_ref"]): row for row in selection["upstream_entity_dependencies"]}
         self.assertEqual(selection_deps[("product_risk", "R-001")]["content_fingerprint"], risk["content_fingerprint"])
         self.assertIn(("authority", "SPEC-001"), selection_deps)
         self.assertNotIn(("tc", "TC-001"), selection_deps)
+
+    def test_risk_and_environment_authority_changes_follow_only_explicit_dependencies(self) -> None:
+        value = valid_input()
+        value["product_risks"][0]["authority_refs"] = ["SPEC-A"]
+        value["environment_requirements"][0]["authority_refs"] = ["SPEC-A"]
+        authority_a = runtime.make_machine_entity("spec-analysis", "authority", "SPEC-A", {"authority_id": "SPEC-A", "text": "old A"})
+        authority_b = runtime.make_machine_entity("spec-analysis", "authority", "SPEC-B", {"authority_id": "SPEC-B", "text": "stable B"})
+        upstream = [{"skill": row["skill"], "entity_type": row["entity_type"], "entity_ref": row["entity_ref"], "content": row["content"]} for row in (authority_a, authority_b)]
+        old = run(value, upstream)
+        self.assertEqual(old["runtime_status"], "ok")
+        old_risk = next(row for row in old["payload"]["machine_entities"] if row["entity_type"] == "product_risk")
+        old_environment = next(row for row in old["payload"]["machine_entities"] if row["entity_type"] == "environment_requirement")
+
+        changed_a = runtime.make_machine_entity("spec-analysis", "authority", "SPEC-A", {"authority_id": "SPEC-A", "text": "changed A"})
+        changed_b = runtime.make_machine_entity("spec-analysis", "authority", "SPEC-B", {"authority_id": "SPEC-B", "text": "changed unrelated B"})
+        for current_a, expected in ((changed_a, "stale"), (authority_a, "current")):
+            current_rows = [current_a, changed_b, {**old_risk, "runtime_dependencies": []}, {**old_environment, "runtime_dependencies": []}]
+            freshness = runtime.evaluate_entity_freshness(current_rows, {})
+            status_by_type = {row["entity_type"]: row["freshness_status"] for row in freshness if row["entity_type"] in {"product_risk", "environment_requirement"}}
+            self.assertEqual(status_by_type["product_risk"], expected)
+            self.assertEqual(status_by_type["environment_requirement"], expected)
+
+    def test_artifact_risk_and_environment_authority_refs_require_current_entities(self) -> None:
+        value = valid_input()
+        value["product_risks"][0]["authority_refs"] = ["SPEC-MISSING"]
+        self.assertEqual(run(value, input_mode="artifact")["runtime_status"], "invalid_input")
+
+        value = valid_input()
+        value["product_risks"] = []
+        value["technique_selections"] = []
+        value["risk_matrix_results"] = []
+        value["technique_candidate_results"] = []
+        value["environment_requirements"][0]["authority_refs"] = ["SPEC-MISSING"]
+        self.assertEqual(run(value, input_mode="artifact")["runtime_status"], "invalid_input")
 
     def test_context_does_not_infer_unreferenced_authority_or_risk_dependencies(self) -> None:
         value = valid_input()

@@ -96,9 +96,9 @@ class LimitExceeded(RuntimeErrorBase):
 
 
 class UnsupportedInput(RuntimeErrorBase):
-    def __init__(self, message: str, *, item_key: str | None = None, reason_code: str | None = None, source_key: str | None = None, affected_technique_slug: str | None = None) -> None:
+    def __init__(self, message: str, *, item_type: str | None = None, reason_code: str | None = None, source_key: str | None = None, affected_technique_slug: str | None = None) -> None:
         super().__init__(message, issue_type="unsupported")
-        self.item_key = item_key
+        self.item_type = item_type
         self.reason_code = reason_code
         self.source_key = source_key
         self.affected_technique_slug = affected_technique_slug
@@ -528,7 +528,7 @@ def typed_value_compare(left: dict[str, Any], right: dict[str, Any]) -> int:
     right_value = typed_value(right)
     kind = left_value["type"]
     if kind != right_value["type"]:
-        raise UnsupportedInput("異なるtyped valueのrange比較は未対応です", item_key="unsupported:typed-value:range", reason_code="unsupported_intersection")
+        raise UnsupportedInput("異なるtyped valueのrange比較は未対応です", reason_code="unsupported_intersection")
     if kind == "integer":
         return (left_value["value"] > right_value["value"]) - (left_value["value"] < right_value["value"])
     if kind == "decimal":
@@ -540,7 +540,7 @@ def typed_value_compare(left: dict[str, Any], right: dict[str, Any]) -> int:
     elif kind == "fixed_offset_datetime":
         a, b = datetime.fromisoformat(left_value["value"]), datetime.fromisoformat(right_value["value"])
     else:
-        raise UnsupportedInput("このtyped valueのrange比較は未対応です", item_key="unsupported:typed-value:range", reason_code="unsupported_intersection")
+        raise UnsupportedInput("このtyped valueのrange比較は未対応です", reason_code="unsupported_intersection")
     return (a > b) - (a < b)
 
 
@@ -556,11 +556,11 @@ def constraint_intersection_compatible(constraints: Iterable[dict[str, Any]]) ->
     operators = [row.get("operator") for row in rows]
     allowed = {"eq", "enum", "range", "version_range", "boolean"}
     if any(operator not in allowed for operator in operators):
-        raise UnsupportedInput("constraint operatorのintersectionは未対応です", item_key="unsupported:constraint:operator", reason_code="unsupported_intersection")
+        raise UnsupportedInput("constraint operatorのintersectionは未対応です", reason_code="unsupported_intersection")
 
     if "version_range" in operators:
         if any(operator != "version_range" for operator in operators):
-            raise UnsupportedInput("version_rangeと他operatorのintersectionは未対応です", item_key="unsupported:constraint:version-range", reason_code="unsupported_intersection")
+            raise UnsupportedInput("version_rangeと他operatorのintersectionは未対応です", reason_code="unsupported_intersection")
         lower: tuple[int, ...] | None = None
         lower_inclusive = True
         upper: tuple[int, ...] | None = None
@@ -586,7 +586,7 @@ def constraint_intersection_compatible(constraints: Iterable[dict[str, Any]]) ->
 
     has_boolean = "boolean" in operators
     if has_boolean and any(operator not in {"boolean", "eq"} for operator in operators):
-        raise UnsupportedInput("booleanとこのoperatorのintersectionは未対応です", item_key="unsupported:constraint:boolean", reason_code="unsupported_intersection")
+        raise UnsupportedInput("booleanとこのoperatorのintersectionは未対応です", reason_code="unsupported_intersection")
 
     finite_sets: list[set[str]] = []
     ranges: list[dict[str, Any]] = []
@@ -602,7 +602,7 @@ def constraint_intersection_compatible(constraints: Iterable[dict[str, Any]]) ->
             minimum = typed_value(row["minimum"])
             maximum = typed_value(row["maximum"])
             if minimum["type"] != maximum["type"]:
-                raise UnsupportedInput("異なるtyped valueのrange比較は未対応です", item_key="unsupported:constraint:range", reason_code="unsupported_intersection")
+                raise UnsupportedInput("異なるtyped valueのrange比較は未対応です", reason_code="unsupported_intersection")
             if typed_value_compare(minimum, maximum) > 0:
                 raise InvalidInput("constraint rangeのminimumがmaximumを超えています")
             ranges.append({**row, "minimum": minimum, "maximum": maximum})
@@ -631,7 +631,7 @@ def constraint_intersection_compatible(constraints: Iterable[dict[str, Any]]) ->
         return True
     range_type = ranges[0]["minimum"]["type"]
     if any(row["minimum"]["type"] != range_type for row in ranges):
-        raise UnsupportedInput("異なるtyped rangeのintersectionは未対応です", item_key="unsupported:constraint:range", reason_code="unsupported_intersection")
+        raise UnsupportedInput("異なるtyped rangeのintersectionは未対応です", reason_code="unsupported_intersection")
     lower = ranges[0]["minimum"]
     lower_inclusive = ranges[0]["minimum_inclusive"]
     upper = ranges[0]["maximum"]
@@ -1131,6 +1131,137 @@ def upstream_entity_fingerprints(entities: list[dict[str, Any]]) -> list[dict[st
         seen.add(identity)
         result.append({"skill": row["skill"], "entity_type": row["entity_type"], "entity_ref": row["entity_ref"], "content_fingerprint": row["content_fingerprint"]})
     return sorted(result, key=lambda row: (row["skill"], row["entity_type"], row["entity_ref"]))
+
+
+def machine_entity_dependency(entity: dict[str, Any]) -> dict[str, str]:
+    """Return the canonical freshness dependency for a current Machine Entity."""
+    # Generator-local entities carry this placeholder until run_cli binds the
+    # just-computed generation fingerprint. Their canonical content and
+    # content_fingerprint are already fixed and can safely supply an entity
+    # dependency during the same invocation.
+    candidate = dict(entity) if isinstance(entity, dict) else entity
+    if isinstance(candidate, dict) and isinstance(candidate.get("runtime_dependencies"), list):
+        candidate["runtime_dependencies"] = [
+            {
+                **dependency,
+                "generation_fingerprint": "sha256:" + "0" * 64,
+            }
+            if isinstance(dependency, dict) and dependency.get("generation_fingerprint") == "__CURRENT__"
+            else dependency
+            for dependency in candidate["runtime_dependencies"]
+        ]
+    current = validate_machine_entity(candidate)
+    return {
+        "skill": current["skill"],
+        "entity_type": current["entity_type"],
+        "entity_ref": current["entity_ref"],
+        "content_fingerprint": current["content_fingerprint"],
+    }
+
+
+def resolve_entity_dependencies(
+    references: Iterable[tuple[str, str, str]],
+    current_entities: Iterable[dict[str, Any]],
+    *,
+    require_all: bool = True,
+) -> list[dict[str, str]]:
+    """Resolve explicit full Machine Entity identities against current rows."""
+    current_by_identity: dict[tuple[str, str, str], dict[str, Any]] = {}
+    for value in current_entities:
+        dependency = machine_entity_dependency(value)
+        identity = entity_identity(dependency["skill"], dependency["entity_type"], dependency["entity_ref"])
+        if identity in current_by_identity:
+            raise InvalidInput("current Machine Entity identityが重複しています")
+        current_by_identity[identity] = {
+            "skill": dependency["skill"],
+            "entity_type": dependency["entity_type"],
+            "entity_ref": dependency["entity_ref"],
+            "content_fingerprint": dependency["content_fingerprint"],
+        }
+
+    requested: set[tuple[str, str, str]] = set()
+    for identity in references:
+        if not isinstance(identity, tuple) or len(identity) != 3 or not all(isinstance(value, str) and value.strip() for value in identity):
+            raise InvalidInput("Machine Entity reference identityが不正です")
+        if identity in requested:
+            raise InvalidInput("Machine Entity reference identityが重複しています")
+        requested.add(identity)
+
+    missing = requested - set(current_by_identity)
+    if missing and require_all:
+        raise InvalidInput("明示されたMachine Entity referenceをcurrent Entityへ解決できません")
+    return [
+        current_by_identity[identity]
+        for identity in sorted(requested & set(current_by_identity))
+    ]
+
+
+def normalize_machine_entity_disposition(
+    row: Any,
+    current_entities: Iterable[dict[str, Any]],
+    *,
+    allowed_handlings: set[str],
+    allowed_upstream_entity_types: set[str],
+    input_mode: str,
+) -> tuple[dict[str, Any], list[dict[str, str]]]:
+    """Validate the shared Machine Entity Disposition schema and dependencies."""
+    if not isinstance(row, dict) or set(row) != {"upstream_entity", "handling", "reason", "authority_refs", "covered_by_entity"}:
+        raise InvalidInput("Machine Entity disposition schemaが不正です")
+    current_rows = list(current_entities)
+    current_by_identity: dict[tuple[str, str, str], dict[str, Any]] = {}
+    for value in current_rows:
+        entity = validate_machine_entity(value)
+        identity = entity_identity(entity["skill"], entity["entity_type"], entity["entity_ref"])
+        if identity in current_by_identity:
+            raise InvalidInput("current Machine Entity identityが重複しています")
+        current_by_identity[identity] = entity
+
+    def current_reference(value: Any, name: str) -> tuple[str, str, str]:
+        if not isinstance(value, dict) or set(value) != {"skill", "entity_type", "entity_ref", "content_fingerprint"}:
+            raise InvalidInput(f"{name} schemaが不正です")
+        identity = (value["skill"], value["entity_type"], value["entity_ref"])
+        if not all(isinstance(part, str) and part.strip() for part in identity) or not FULL_DIGEST_RE.fullmatch(str(value["content_fingerprint"])):
+            raise InvalidInput(f"{name} identity/fingerprintが不正です")
+        current = current_by_identity.get(identity)
+        if current is None or current["content_fingerprint"] != value["content_fingerprint"]:
+            raise InvalidInput(f"{name}がunknownまたはstaleです")
+        return identity
+
+    upstream = row["upstream_entity"]
+    upstream_identity = current_reference(upstream, "disposition upstream_entity")
+    if upstream_identity[1] not in allowed_upstream_entity_types:
+        raise InvalidInput("disposition upstream_entity_typeがこのSkillで許可されていません")
+    handling = row["handling"]
+    if handling not in allowed_handlings or not isinstance(row["reason"], str) or not row["reason"].strip():
+        raise InvalidInput("disposition handling/reasonが不正です")
+    refs = row["authority_refs"]
+    if not isinstance(refs, list) or not all(isinstance(value, str) and value for value in refs) or len(set(refs)) != len(refs):
+        raise InvalidInput("disposition authority_refsが不正です")
+
+    covered = row["covered_by_entity"]
+    dependency_identities = [upstream_identity]
+    if handling == "重複":
+        covered_identity = current_reference(covered, "重複disposition covered_by_entity")
+        if covered_identity == upstream_identity:
+            raise InvalidInput("重複dispositionはself referenceできません")
+        dependency_identities.append(covered_identity)
+    elif covered is not None:
+        raise InvalidInput("重複以外のcovered_by_entityはnullである必要があります")
+
+    authority_identities = [("spec-analysis", "authority", ref) for ref in refs]
+    authority_dependencies = resolve_entity_dependencies(
+        authority_identities,
+        current_rows,
+        require_all=input_mode == "artifact",
+    )
+    dependency_identities.extend(
+        (row["skill"], row["entity_type"], row["entity_ref"])
+        for row in authority_dependencies
+    )
+    dependencies = resolve_entity_dependencies(sorted(set(dependency_identities)), current_rows, require_all=True)
+    normalized = canonicalize(row)
+    normalized["authority_refs"] = sorted(refs)
+    return normalized, dependencies
 
 
 def validate_upstream_entities(metadata: dict[str, Any]) -> list[dict[str, Any]]:
@@ -2579,8 +2710,24 @@ def run_cli(
                 "generation_fingerprint": envelope["generation_fingerprint"],
             })
         if isinstance(exc, UnsupportedInput):
-            item_key = exc.item_key or "unsupported:" + generator
-            envelope["payload"] = {"unsupported_items": [{"item_key": item_key, "item_type": "subtree", "source_key": exc.source_key, "reason_code": exc.reason_code, "affected_technique_slug": exc.affected_technique_slug, "authority_refs": []}]}
+            if (
+                isinstance(exc.item_type, str) and exc.item_type
+                and isinstance(exc.source_key, str) and exc.source_key
+                and isinstance(exc.reason_code, str) and exc.reason_code
+                and (exc.affected_technique_slug is None or isinstance(exc.affected_technique_slug, str))
+            ):
+                item = make_unsupported_item(
+                    generator=generator,
+                    item_type=exc.item_type,
+                    source_key=exc.source_key,
+                    reason_code=exc.reason_code,
+                    affected_technique_slug=exc.affected_technique_slug,
+                )
+                envelope["payload"] = {"unsupported_items": [item]}
+            else:
+                # No stable partial-item identity means the runtime can only
+                # report a whole-model unsupported closure.
+                envelope["payload"] = {"unsupported_items": []}
             envelope["runtime_status"] = "unsupported"
             envelope["support_status"] = "unsupported"
             envelope["runtime_required"] = False

@@ -55,9 +55,13 @@ def metadata(config: tuple) -> dict:
     adapter = model_type in {"cause-effect", "classification", "schema", "ui"}
     upstream = []
     if unit == "artifact:materialize_coverage:TCN-001":
+        model_content = {
+            "derived_from_model_key": None, "model_key": "ep-001", "model_type": "ep", "parent_tcn_id": "TCN-001",
+            "selection_key": "SEL-001", "selection_source": "analysis", "status": "active", "technique_slug": "ep",
+        }
         upstream = [
             {"skill": "test-condition-design", "entity_type": "tcn", "entity_ref": "TCN-001", "content": {"tcn_id": "TCN-001"}},
-            {"skill": "test-condition-design", "entity_type": "model", "entity_ref": "ep-001", "content": {"model_key": "ep-001", "model_type": "ep"}},
+            {"skill": "test-condition-design", "entity_type": "model", "entity_ref": "ep-001", "content": model_content},
         ]
     return {
         "envelope_version": "1", "skill": skill, "runtime_contract_version": "runtime-v1",

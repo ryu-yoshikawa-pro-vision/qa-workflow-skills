@@ -26,6 +26,13 @@ def digest(value: object) -> str:
     return "sha256:" + hashlib.sha256(encoded).hexdigest()
 
 
+def current_model_content() -> dict:
+    return {
+        "derived_from_model_key": None, "model_key": "ep-001", "model_type": "ep", "parent_tcn_id": "TCN-001",
+        "selection_key": "SEL-001", "selection_source": "analysis", "status": "active", "technique_slug": "ep",
+    }
+
+
 def ep_metadata() -> dict:
     return {
         "envelope_version": "1", "skill": "test-condition-design", "runtime_contract_version": "runtime-v1",
@@ -43,7 +50,7 @@ def materialize_metadata() -> dict:
         "model_type": None, "technique_slug": None, "selection_source": None, "selection_key": None, "scope_key": "TCN-001",
         "input_mode": "artifact", "upstream_entities": [
             {"skill": "test-condition-design", "entity_type": "tcn", "entity_ref": "TCN-001", "content": {"tcn_id": "TCN-001"}},
-            {"skill": "test-condition-design", "entity_type": "model", "entity_ref": "ep-001", "content": {"model_key": "ep-001", "model_type": "ep"}},
+            {"skill": "test-condition-design", "entity_type": "model", "entity_ref": "ep-001", "content": current_model_content()},
         ], "upstream_runtime_units": [], "static_data_versions": {}, "authority_refs": [], "reference_refs": [],
     }
 
@@ -88,7 +95,7 @@ def materialize_request(ep: dict, *, previous: dict | None = None) -> dict:
         "metadata": materialize_metadata(),
         "input": {
             "tcn_id": "TCN-001",
-            "active_model_metadata": [{"model_key": "ep-001", "model_type": "ep", "technique_slug": "ep", "parent_tcn_id": "TCN-001", "content_fingerprint": digest({"model_key": "ep-001", "model_type": "ep"})}],
+            "active_model_metadata": [{"model_key": "ep-001", "model_type": "ep", "technique_slug": "ep", "parent_tcn_id": "TCN-001", "content_fingerprint": digest(current_model_content())}],
             "models": [model_result], "semantic_coverage_items": [], "test_data_requirements": [],
             "target_annotations": annotations, "target_dispositions": [], "previous_semantic_ci_map": [],
             "previous_target_id_map": previous.get("target_mapping_state", []), "previous_ci_ids": previous.get("ci_id_state", []),
@@ -101,7 +108,10 @@ def test_data_output(ep: dict, requirements: list[dict]) -> dict:
     metadata = {
         "envelope_version": "1", "skill": "test-condition-design", "runtime_contract_version": "runtime-v1", "generator_contract_version": "test-data-requirements-v1",
         "runtime_unit_key": "artifact:test_data_requirements:all", "model_key": None, "model_type": None, "technique_slug": None, "selection_source": None, "selection_key": None,
-        "scope_key": "all", "input_mode": "artifact", "upstream_entities": [], "upstream_runtime_units": [], "static_data_versions": {}, "authority_refs": [], "reference_refs": [],
+        "scope_key": "all", "input_mode": "artifact",
+        "upstream_entities": [{"skill": "test-condition-design", "entity_type": "model", "entity_ref": "ep-001", "content": {"model_key": "ep-001", "model_type": "ep", "technique_slug": "ep"}}],
+        "upstream_runtime_units": [{"skill": "test-condition-design", "runtime_unit_key": "model:ep-001", "generation_fingerprint": ep["generation_fingerprint"]}],
+        "static_data_versions": {}, "authority_refs": [], "reference_refs": [],
     }
     current_targets = [{
         "source_model_key": "ep-001", "target_ref": target["target_ref"], "target_content_fingerprint": target["target_content_fingerprint"], "generation_fingerprint": ep["generation_fingerprint"],
@@ -175,7 +185,8 @@ class MaterializeRuntimeTests(unittest.TestCase):
             "model_key": "ep-001", "target_key": target["target_key"], "target_content_fingerprint": target["target_content_fingerprint"],
             "generation_fingerprint": ep["generation_fingerprint"], "execution_fingerprint": target["execution_fingerprint"], "materializable": target["materializable"],
         } for target in targets}
-        normalized = materialize_runtime._validate_test_data_requirements(produced["payload"]["normalized_requirements"], target_map)
+        current_models = {"ep-001": {"model_type": "ep", "technique_slug": "ep"}}
+        normalized = materialize_runtime._validate_test_data_requirements(produced["payload"]["normalized_requirements"], target_map, current_models)
         rows = {row["requirement_key"]: row for row in normalized.values()}
         self.assertEqual(rows["role-any"]["applicable_target_refs"], sorted(target["target_ref"] for target in targets))
         self.assertEqual(rows["role-one"]["applicable_target_refs"], [targets[0]["target_ref"]])
@@ -183,7 +194,7 @@ class MaterializeRuntimeTests(unittest.TestCase):
         tampered = [dict(row) for row in produced["payload"]["normalized_requirements"]]
         tampered[0]["applicable_target_refs"] = []
         with self.assertRaises(materialize_runtime.InvalidInput):
-            materialize_runtime._validate_test_data_requirements(tampered, target_map)
+            materialize_runtime._validate_test_data_requirements(tampered, target_map, current_models)
 
     def test_merge_union_detects_conflict_that_target_scoped_inputs_allow(self) -> None:
         ep = ep_result()
@@ -205,7 +216,8 @@ class MaterializeRuntimeTests(unittest.TestCase):
             "model_key": "ep-001", "target_key": target["target_key"], "target_content_fingerprint": target["target_content_fingerprint"],
             "generation_fingerprint": ep["generation_fingerprint"], "execution_fingerprint": common_execution, "materializable": True,
         } for target in source_targets}
-        data_rows = materialize_runtime._validate_test_data_requirements(produced["payload"]["normalized_requirements"], targets)
+        current_models = {"ep-001": {"model_type": "ep", "technique_slug": "ep"}}
+        data_rows = materialize_runtime._validate_test_data_requirements(produced["payload"]["normalized_requirements"], targets, current_models)
         data_refs = {row["requirement_key"]: row["data_ref"] for row in data_rows.values()}
         annotations = {
             source_targets[0]["target_ref"]: {"expected_result_root": "shared-root", "test_data_requirement_refs": [data_refs["role-0"]]},

@@ -6,7 +6,7 @@ from pathlib import Path
 import sys
 from typing import Any
 
-from runtime_contract import FULL_DIGEST_RE, InvalidInput, canonical_json_text, canonicalize, compare_versions, constraint_intersection_compatible, ensure_key, ensure_list, ensure_nonempty_string, make_machine_entity, reject_unknown, run_cli, typed_value, typed_value_compare
+from runtime_contract import FULL_DIGEST_RE, MODEL_GENERATORS, MODEL_TYPES, InvalidInput, UnsupportedInput, canonical_json_text, canonicalize, compare_versions, constraint_intersection_compatible, ensure_key, ensure_list, ensure_nonempty_string, make_machine_entity, reject_unknown, resolve_entity_dependencies, run_cli, typed_value, typed_value_compare, validate_upstream_entities
 
 
 SKILL = "test-condition-design"
@@ -22,7 +22,7 @@ def _typed(value: Any, name: str) -> dict:
     return typed_value(value)
 
 
-def _normalize(row: dict, index: int, current_targets: dict[str, dict]) -> dict:
+def _normalize(row: dict, index: int, current_targets: dict[str, dict], current_models: dict[str, dict]) -> dict:
     required = {"requirement_key", "environment_key", "dimension_key", "operator", "authority_refs", "source_model_key", "source_target_versions"}
     reject_unknown(row, required, {"value", "values", "minimum", "maximum", "minimum_inclusive", "maximum_inclusive"})
     key = ensure_key(row["requirement_key"], f"requirements[{index}].requirement_key")
@@ -33,7 +33,20 @@ def _normalize(row: dict, index: int, current_targets: dict[str, dict]) -> dict:
     source_model = row["source_model_key"]
     if not isinstance(source_model, str) or not source_model:
         raise InvalidInput("source_model_keyが不正です")
+    source_model_entity = current_models.get(source_model)
+    if source_model_entity is None:
+        raise InvalidInput("source_model_keyはcurrent model Machine Entityへ解決する必要があります")
+    source_model_content = source_model_entity["content"]
+    if (
+        source_model_entity["entity_ref"] != source_model
+        or source_model_content.get("model_key") != source_model
+        or source_model_content.get("model_type") not in MODEL_TYPES
+    ):
+        raise InvalidInput("source_model_keyとcurrent model metadataが一致しません")
     source_versions = ensure_list(row["source_target_versions"], f"requirements[{index}].source_target_versions")
+    source_model_type = source_model_content["model_type"]
+    if source_versions and (source_model_type in {"classification", "cause-effect", "schema", "ui"} or source_model_content.get("technique_slug") is None):
+        raise InvalidInput("target-specific requirementはCoverage所有modelを参照する必要があります")
     normalized = {"requirement_key": key, "environment_key": None, "dimension_key": row["dimension_key"], "operator": row["operator"], "authority_refs": sorted(row["authority_refs"]), "source_model_key": source_model, "source_target_versions": [], "data_ref": f"data:{key}"}
     if row["operator"] == "eq":
         normalized["value"] = _typed(row.get("value"), f"requirements[{index}].value")
@@ -89,6 +102,16 @@ def generate(input_value: dict, metadata: dict) -> dict:
         raise InvalidInput("test_data_requirements runtime unitが不正です")
     reject_unknown(input_value, {"requirements", "current_source_targets"})
     target_rows = ensure_list(input_value["current_source_targets"], "current_source_targets")
+    current_entities = validate_upstream_entities(metadata)
+    current_models = {
+        entity["entity_ref"]: entity
+        for entity in current_entities
+        if entity["skill"] == SKILL and entity["entity_type"] == "model"
+    }
+    source_runtimes = {
+        (row["skill"], row["runtime_unit_key"]): row
+        for row in metadata["upstream_runtime_units"]
+    }
     current_targets: dict[str, dict] = {}
     for index, row in enumerate(target_rows):
         if not isinstance(row, dict) or set(row) != {"source_model_key", "target_ref", "target_content_fingerprint", "generation_fingerprint"} or row["target_ref"] in current_targets:
@@ -101,7 +124,19 @@ def generate(input_value: dict, metadata: dict) -> dict:
     for index, row in enumerate(ensure_list(input_value["requirements"], "requirements")):
         if not isinstance(row, dict):
             raise InvalidInput("requirement rowが不正です")
-        normalized = _normalize(row, index, current_targets)
+        try:
+            normalized = _normalize(row, index, current_targets, current_models)
+        except UnsupportedInput as exc:
+            requirement_key = row.get("requirement_key")
+            if isinstance(requirement_key, str) and requirement_key:
+                raise UnsupportedInput(
+                    exc.message,
+                    item_type="test_data_requirement",
+                    source_key=requirement_key,
+                    reason_code=exc.reason_code or "unsupported_intersection",
+                    affected_technique_slug=exc.affected_technique_slug,
+                ) from exc
+            raise
         if normalized["requirement_key"] in seen:
             raise InvalidInput("requirement_keyが重複しています")
         seen.add(normalized["requirement_key"])
@@ -121,10 +156,48 @@ def generate(input_value: dict, metadata: dict) -> dict:
         for row in active:
             grouped.setdefault(row["dimension_key"], []).append(row)
         for dimension, rows in sorted(grouped.items()):
-            if not constraint_intersection_compatible(rows):
+            try:
+                compatible = constraint_intersection_compatible(rows)
+            except UnsupportedInput as exc:
+                source_key = sorted(row["requirement_key"] for row in rows)[0]
+                raise UnsupportedInput(
+                    exc.message,
+                    item_type="test_data_requirement",
+                    source_key=source_key,
+                    reason_code=exc.reason_code or "unsupported_intersection",
+                ) from exc
+            if not compatible:
                 conflicts.append({"target_ref": target_ref, "dimension_key": dimension, "requirement_keys": sorted(row["requirement_key"] for row in rows)})
     conflicts.sort(key=lambda row: (row["target_ref"], row["dimension_key"], row["requirement_keys"]))
-    entities = [make_machine_entity(SKILL, "test_data_requirement", row["data_ref"], row, runtime_dependencies=[{"skill": SKILL, "runtime_unit_key": "artifact:test_data_requirements:all", "generation_fingerprint": "__CURRENT__"}]) for row in requirements]
+    entities = []
+    for row in requirements:
+        source_model = current_models[row["source_model_key"]]
+        source_identity = (source_model["skill"], source_model["entity_type"], source_model["entity_ref"])
+        authority_identities = [("spec-analysis", "authority", ref) for ref in row["authority_refs"]]
+        dependencies = resolve_entity_dependencies(
+            [source_identity, *authority_identities],
+            current_entities,
+            require_all=metadata["input_mode"] == "artifact",
+        )
+        runtime_dependencies = [{"skill": SKILL, "runtime_unit_key": "artifact:test_data_requirements:all", "generation_fingerprint": "__CURRENT__"}]
+        model_runtime_key = (SKILL, f"model:{source_model['entity_ref']}")
+        if source_model["content"].get("model_type") in MODEL_GENERATORS:
+            model_runtime = source_runtimes.get(model_runtime_key)
+            if model_runtime is None:
+                raise InvalidInput("runtime generatorを持つsource modelのcurrent runtime dependencyが必要です")
+            runtime_dependencies.append({
+                "skill": model_runtime["skill"],
+                "runtime_unit_key": model_runtime["runtime_unit_key"],
+                "generation_fingerprint": model_runtime["generation_fingerprint"],
+            })
+        entities.append(make_machine_entity(
+            SKILL,
+            "test_data_requirement",
+            row["data_ref"],
+            row,
+            upstream_entity_dependencies=dependencies,
+            runtime_dependencies=runtime_dependencies,
+        ))
     return {"runtime_status": "ok", "support_status": "supported", "result_status": "unresolved" if conflicts else "ready", "runtime_required": True, "deterministic_generated": True, "payload": {"normalized_requirements": sorted(requirements, key=lambda row: row["requirement_key"]), "conflicts": conflicts, "entities": sorted(entities, key=lambda row: row["entity_ref"]), "expected_entity_identities": [{"skill": SKILL, "entity_type": "test_data_requirement", "entity_ref": row["data_ref"]} for row in sorted(requirements, key=lambda row: row["requirement_key"])]}, "issues": [{"issue_type": "test_data_conflict", "blocking": True, "target_key": row["target_ref"], "authority_refs": []} for row in conflicts]}
 
 

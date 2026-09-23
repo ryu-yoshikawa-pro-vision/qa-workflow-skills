@@ -112,8 +112,8 @@ def _resolve_schema(document: dict, schema: dict, base_pointer: str, active: set
 
 
 def _test_data_requirement(kind: str, source_pointer: str, keyword: str, dimension_role: str, model_key: str, operator: str, **fields: Any) -> dict[str, Any]:
-    requirement_key = "schema-" + _source_digest(kind, source_pointer, keyword, "test-data-requirement")[1]
-    dimension_key = "schema-" + _source_digest(kind, source_pointer, dimension_role, "test-data-dimension")[1]
+    requirement_key = _source_digest(kind, source_pointer, keyword, "test-data-requirement")[1]
+    dimension_key = _source_digest(kind, source_pointer, dimension_role, "test-data-dimension")[1]
     return {
         "requirement_key": requirement_key,
         "environment_key": None,
@@ -340,11 +340,11 @@ def _html_skeletons(document: dict, unsupported: list[dict], model_key: str) -> 
     reject_unknown(document, {"type"}, allowed - {"type"})
     control_type = document.get("type")
     if control_type not in {"text", "number", "date", "datetime-local"}:
-        raise UnsupportedInput("HTML control typeはruntime-v1未対応です", item_key="unsupported:schema:html-control", reason_code="unsupported_html_control")
+        raise UnsupportedInput("HTML control typeはruntime-v1未対応です", source_key="#", reason_code="unsupported_html_control")
     if document.get("disabled") is True or (control_type in {"text", "number", "date", "datetime-local"} and document.get("readonly") is True):
         return [], [], [], [], []
     if control_type == "text" and document.get("pattern") is not None:
-        raise UnsupportedInput("HTML patternはruntime-v1で安全に評価できません", item_key="unsupported:schema:html-pattern", reason_code="unsupported_html_constraint")
+        raise UnsupportedInput("HTML patternはruntime-v1で安全に評価できません", source_key="#", reason_code="unsupported_html_constraint")
     ep_sets: list[dict] = []
     bva: list[dict] = []
     factors: list[dict] = []

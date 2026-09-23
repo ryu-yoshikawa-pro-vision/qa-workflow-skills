@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import importlib.util
 from pathlib import Path
+import re
 import subprocess
 import sys
 import unittest
@@ -9,6 +11,12 @@ import unittest
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = REPO_ROOT / "skills" / "test-analysis" / "scripts" / "environment_requirements.py"
+RUNTIME_PATH = REPO_ROOT / "skills" / "test-analysis" / "scripts" / "runtime_contract.py"
+SPEC = importlib.util.spec_from_file_location("environment_runtime_contract", RUNTIME_PATH)
+assert SPEC is not None and SPEC.loader is not None
+runtime = importlib.util.module_from_spec(SPEC)
+sys.modules[SPEC.name] = runtime
+SPEC.loader.exec_module(runtime)
 
 
 def metadata() -> dict:
@@ -71,7 +79,19 @@ class EnvironmentRequirementRuntimeTests(unittest.TestCase):
 
     def test_unsupported_operator_is_explicit_and_wrong_fields_are_invalid(self) -> None:
         unsupported = base("r-1", "chrome", "regex", value={"type": "string", "value": "120"})
-        self.assertEqual(run({"requirements": [unsupported]})["runtime_status"], "unsupported")
+        result = run({"requirements": [unsupported]})
+        self.assertEqual(result["runtime_status"], "unsupported")
+        item = result["payload"]["unsupported_items"][0]
+        self.assertRegex(item["item_key"], r"^unsupported:environment_requirements:h[0-9a-f]{64}$")
+        self.assertNotIn("sha256:", item["item_key"])
+        self.assertEqual(run({"requirements": [unsupported]})["payload"]["unsupported_items"][0]["item_key"], item["item_key"])
+        changed_source = {**unsupported, "requirement_key": "r-2"}
+        changed = run({"requirements": [changed_source]})["payload"]["unsupported_items"][0]
+        self.assertNotEqual(changed["item_key"], item["item_key"])
+        changed_reason = runtime.make_unsupported_item(
+            generator="environment_requirements", item_type="environment_requirement", source_key="r-1", reason_code="different_reason",
+        )
+        self.assertEqual(changed_reason["item_key"], item["item_key"])
         invalid = base("r-1", "chrome", "eq", value={"type": "string", "value": "120"}, values=[{"type": "string", "value": "120"}])
         self.assertEqual(run({"requirements": [invalid]})["runtime_status"], "invalid_input")
 

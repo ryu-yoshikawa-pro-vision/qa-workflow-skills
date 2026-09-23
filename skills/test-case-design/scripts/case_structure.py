@@ -17,10 +17,13 @@ from runtime_contract import (
     ensure_list,
     ensure_nonempty_string,
     make_machine_entity,
+    normalize_machine_entity_disposition,
     reject_unknown,
+    resolve_entity_dependencies,
     run_cli,
     seed_legacy_ids,
     validate_machine_entity,
+    validate_upstream_entities,
 )
 
 
@@ -52,6 +55,11 @@ def _normalize_current_rows(rows: Any, *, kind: str) -> dict[str, dict[str, Any]
             entity = validate_machine_entity(row)
             if entity["entity_type"] != kind:
                 raise InvalidInput(f"{kind} Machine Entity typeが不一致です")
+            expected_skill = {"ci": "test-condition-design", "environment_requirement": "test-analysis", "test_data_requirement": "test-condition-design"}[kind]
+            if entity["skill"] != expected_skill:
+                raise InvalidInput(f"{kind} Machine Entity skillが不一致です")
+            if entity["entity_ref"] in result:
+                raise InvalidInput(f"{kind} identityが重複しています")
             result[entity["entity_ref"]] = entity
             continue
         if not isinstance(row, dict):
@@ -64,9 +72,12 @@ def _normalize_current_rows(rows: Any, *, kind: str) -> dict[str, dict[str, Any]
         if kind == "environment_requirement":
             content.setdefault("requirement_key", ref)
             content.setdefault("environment_key", ref)
+        if kind == "ci":
+            content.setdefault("ci_id", ref)
         if kind == "test_data_requirement":
             content.setdefault("data_ref", ref)
-        result[ref] = make_machine_entity(SKILL, kind, ref, content)
+        owner_skill = {"ci": "test-condition-design", "environment_requirement": "test-analysis", "test_data_requirement": "test-condition-design"}[kind]
+        result[ref] = make_machine_entity(owner_skill, kind, ref, content)
     return result
 
 
@@ -171,35 +182,45 @@ def _normalize_draft(row: Any, ci_map: dict[str, dict[str, Any]], tcn_map: dict[
     })
 
 
-def _validate_dispositions(rows: Any, known_entities: dict[tuple[str, str], dict[str, Any]]) -> list[dict[str, Any]]:
-    result: list[dict[str, Any]] = []
+def _validate_dispositions(rows: Any, current_entities: list[dict[str, Any]], input_mode: str) -> list[tuple[dict[str, Any], list[dict[str, str]]]]:
+    result: list[tuple[dict[str, Any], list[dict[str, str]]]] = []
     seen: set[tuple[str, str, str]] = set()
     for index, row in enumerate(ensure_list(rows, "dispositions")):
-        if not isinstance(row, dict):
-            raise InvalidInput(f"dispositions[{index}]が不正です")
-        required = {"upstream_entity", "handling", "reason", "authority_refs", "covered_by_entity"}
-        reject_unknown(row, required)
-        upstream = row["upstream_entity"]
-        if not isinstance(upstream, dict) or set(upstream) != {"skill", "entity_type", "entity_ref", "content_fingerprint"}:
-            raise InvalidInput("disposition upstream_entityが不正です")
+        normalized, dependencies = normalize_machine_entity_disposition(
+            row,
+            current_entities,
+            allowed_handlings=HANDLINGS,
+            allowed_upstream_entity_types={"tcn", "ci", "environment_requirement", "test_data_requirement"},
+            input_mode=input_mode,
+        )
+        upstream = normalized["upstream_entity"]
         key = (upstream["skill"], upstream["entity_type"], upstream["entity_ref"])
-        if key not in known_entities or key in seen:
-            raise InvalidInput("disposition upstream entityがunknownまたは重複しています")
+        if key in seen:
+            raise InvalidInput("disposition upstream entityが重複しています")
+        expected_skills = {"tcn": "test-condition-design", "ci": "test-condition-design", "environment_requirement": "test-analysis", "test_data_requirement": "test-condition-design"}
+        if upstream["skill"] != expected_skills[upstream["entity_type"]]:
+            raise InvalidInput("disposition upstream_entity skill/typeが不一致です")
         seen.add(key)
-        if row["handling"] not in HANDLINGS or not isinstance(row["reason"], str) or not row["reason"].strip():
-            raise InvalidInput("disposition handling/reasonが不正です")
-        refs = _refs(row["authority_refs"], "disposition authority_refs")
-        covered = row["covered_by_entity"]
-        if row["handling"] == "重複":
-            if not isinstance(covered, dict) or set(covered) != {"skill", "entity_type", "entity_ref", "content_fingerprint"} or (covered["skill"], covered["entity_type"], covered["entity_ref"]) == key:
-                raise InvalidInput("重複 dispositionのcovered_by_entityが不正です")
-            covered_key = (covered["skill"], covered["entity_type"], covered["entity_ref"])
-            if covered_key not in known_entities or covered["content_fingerprint"] != known_entities[covered_key]["content_fingerprint"]:
-                raise InvalidInput("重複 dispositionのcovered_by_entityがunknownまたはstaleです")
-        elif covered is not None:
-            raise InvalidInput("重複以外のcovered_by_entityはnullである必要があります")
-        result.append(canonicalize({"upstream_entity": upstream, "handling": row["handling"], "reason": row["reason"], "authority_refs": refs, "covered_by_entity": covered}))
+        result.append((normalized, dependencies))
     return result
+
+
+def _current_machine_entities(metadata: dict[str, Any], input_value: dict[str, Any]) -> list[dict[str, Any]]:
+    current = {
+        (row["skill"], row["entity_type"], row["entity_ref"]): row
+        for row in validate_upstream_entities(metadata)
+    }
+    for field in ("coverage_items", "environment_requirements", "test_data_requirements"):
+        for row in ensure_list(input_value[field], field):
+            if not isinstance(row, dict) or row.get("schema_version") != "entity-state-v1":
+                continue
+            entity = validate_machine_entity(row)
+            identity = (entity["skill"], entity["entity_type"], entity["entity_ref"])
+            previous = current.get(identity)
+            if previous is not None and previous["content_fingerprint"] != entity["content_fingerprint"]:
+                raise InvalidInput("同一current Machine Entityがmetadataとinputで不一致です")
+            current[identity] = entity
+    return [current[key] for key in sorted(current)]
 
 
 def _collect_requirement_violations(draft: dict[str, Any], ci_map: dict[str, dict[str, Any]], env_map: dict[str, dict[str, Any]], data_map: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
@@ -246,6 +267,7 @@ def generate(input_value: dict, metadata: dict) -> dict:
         raise InvalidInput("case_structureのruntime metadataが不正です")
     required = {"test_conditions", "coverage_items", "environment_requirements", "test_data_requirements", "test_cases", "dispositions", "previous_tc_ids", "update_scope_tc_ids"}
     reject_unknown(input_value, required, {"legacy_tc_ids"})
+    current_entities = _current_machine_entities(metadata, input_value)
     tcn_map = _normalize_tcn(input_value["test_conditions"])
     ci_map = _normalize_current_rows(input_value["coverage_items"], kind="ci")
     _validate_ci_entities(ci_map)
@@ -309,24 +331,34 @@ def generate(input_value: dict, metadata: dict) -> dict:
     entities: list[dict[str, Any]] = []
     for draft in drafts:
         tc_id = assignments[draft["draft_key"]]
-        upstream = []
-        for ref in draft["ci_refs"]:
-            ci = ci_map[ref]
-            upstream.append({"skill": ci["skill"], "entity_type": ci["entity_type"], "entity_ref": ci["entity_ref"], "content_fingerprint": ci["content_fingerprint"]})
-        for ref in draft["environment_requirement_refs"] + draft["test_data_requirement_refs"]:
-            source = env_map.get(ref) or data_map.get(ref)
-            if source:
-                upstream.append({"skill": source["skill"], "entity_type": source["entity_type"], "entity_ref": source["entity_ref"], "content_fingerprint": source["content_fingerprint"]})
+        dependency_identities = [("test-requirement-design", "tr", ref) for ref in draft["tr_refs"]]
+        dependency_identities.extend(("test-condition-design", "tcn", ref) for ref in draft["tcn_refs"])
+        dependency_identities.extend((ci_map[ref]["skill"], "ci", ci_map[ref]["entity_ref"]) for ref in draft["ci_refs"])
+        dependency_identities.extend(("test-analysis", "environment_requirement", ref) for ref in draft["environment_requirement_refs"])
+        dependency_identities.extend(("test-condition-design", "test_data_requirement", ref) for ref in draft["test_data_requirement_refs"])
+        authority_refs = sorted({ref for result in draft["expected_results"] for ref in result["authority_refs"]})
+        dependency_identities.extend(("spec-analysis", "authority", ref) for ref in authority_refs)
+        upstream = resolve_entity_dependencies(
+            dependency_identities,
+            current_entities,
+            require_all=metadata["input_mode"] == "artifact",
+        )
         content = {**draft, "tc_id": tc_id, "status": "active"}
         entities.append(make_machine_entity(SKILL, "tc", tc_id, content, upstream_entity_dependencies=upstream, runtime_dependencies=[{"skill": SKILL, "runtime_unit_key": "artifact:case_structure:all", "generation_fingerprint": "__CURRENT__"}]))
-    known_entities = {(entity["skill"], entity["entity_type"], entity["entity_ref"]): entity for entity in [*ci_map.values(), *env_map.values(), *data_map.values()]}
-    dispositions = _validate_dispositions(input_value["dispositions"], known_entities)
-    for disposition in dispositions:
+    disposition_rows = _validate_dispositions(input_value["dispositions"], current_entities, metadata["input_mode"])
+    for disposition, dependencies in disposition_rows:
         upstream = disposition["upstream_entity"]
-        entities.append(make_machine_entity(SKILL, "disposition", f"{upstream['entity_type']}:{upstream['entity_ref']}", disposition))
+        entities.append(make_machine_entity(
+            SKILL,
+            "disposition",
+            f"{upstream['entity_type']}:{upstream['entity_ref']}",
+            disposition,
+            upstream_entity_dependencies=dependencies,
+            runtime_dependencies=[{"skill": SKILL, "runtime_unit_key": "artifact:case_structure:all", "generation_fingerprint": "__CURRENT__"}],
+        ))
     return {
         "runtime_status": "ok", "support_status": "supported", "result_status": "ready" if not violations else "unresolved", "runtime_required": True, "deterministic_generated": True,
-        "payload": {"test_conditions": list(tcn_map.values()), "coverage_items": list(ci_map.values()), "environment_requirements": list(env_map.values()), "test_data_requirements": list(data_map.values()), "test_cases": [{**draft, "tc_id": assignments[draft["draft_key"]]} for draft in drafts], "dispositions": dispositions, "tc_id_map": tc_id_map, "tc_id_state": [{"tc_id": tc_id, "status": status} for tc_id, status in sorted(tc_state.items())], "violations": violations, "entities": sorted(entities, key=lambda row: (row["entity_type"], row["entity_ref"])), "expected_entity_identities": [{"skill": row["skill"], "entity_type": row["entity_type"], "entity_ref": row["entity_ref"]} for row in sorted(entities, key=lambda row: (row["entity_type"], row["entity_ref"]))]},
+        "payload": {"test_conditions": list(tcn_map.values()), "coverage_items": list(ci_map.values()), "environment_requirements": list(env_map.values()), "test_data_requirements": list(data_map.values()), "test_cases": [{**draft, "tc_id": assignments[draft["draft_key"]]} for draft in drafts], "dispositions": [row for row, _deps in disposition_rows], "tc_id_map": tc_id_map, "tc_id_state": [{"tc_id": tc_id, "status": status} for tc_id, status in sorted(tc_state.items())], "violations": violations, "entities": sorted(entities, key=lambda row: (row["entity_type"], row["entity_ref"])), "expected_entity_identities": [{"skill": row["skill"], "entity_type": row["entity_type"], "entity_ref": row["entity_ref"]} for row in sorted(entities, key=lambda row: (row["entity_type"], row["entity_ref"]))]},
         "issues": violations,
     }
 
