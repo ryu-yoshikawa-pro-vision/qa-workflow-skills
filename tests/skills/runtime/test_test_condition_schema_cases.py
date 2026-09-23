@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 from pathlib import Path
 import subprocess
 import sys
@@ -100,6 +101,61 @@ class SchemaCasesRuntimeTests(unittest.TestCase):
         malformed = {**cycle, "document": {"$ref": "#/%ZZ"}}
         invalid = run(malformed)
         self.assertEqual(invalid["runtime_status"], "invalid_input")
+
+    def test_derived_test_data_requirements_come_from_same_parameterized_schema_run(self) -> None:
+        value = {
+            "schema_kind": "json-schema-2020-12", "schema_pointer": "#", "context": "validation",
+            "document": {"type": "object", "properties": {"role": {"enum": ["admin", "user"]}, "age": {"type": "integer", "minimum": 1, "maximum": 5}}, "required": ["role"]},
+            "child_models": [{"child_model_key": "bva-child", "model_type": "bva", "derived_from_model_key": "schema-001", "semantic_parameters": None}],
+        }
+        first = run(value)
+        boundaries = first["payload"]["bva_skeletons"]
+        value["child_models"][0]["semantic_parameters"] = {"boundaries": [{"boundary_key": row["boundary_key"], "mode": "2-value", "coverage_selection_reason": ""} for row in boundaries]}
+        rerun = run(value)
+        self.assertEqual(rerun["result_status"], "ready")
+        self.assertEqual(len(rerun["payload"]["derived_child_inputs"]), 1)
+        requirements = rerun["payload"]["derived"]["test_data_requirements"]
+        self.assertEqual({row["operator"] for row in requirements}, {"enum", "range", "boolean"})
+        self.assertTrue(all(row["source_model_key"] == "schema-001" and row["source_target_versions"] == [] for row in requirements))
+        self.assertTrue(any(row["operator"] == "enum" and row["values"] == [{"type": "string", "value": "admin"}, {"type": "string", "value": "user"}] for row in requirements))
+        self.assertTrue(any(row["operator"] == "range" and row["minimum"] == {"type": "integer", "value": 1} and row["maximum"] == {"type": "integer", "value": 5} for row in requirements))
+        self.assertTrue(any(row["operator"] == "boolean" and row["value"] is True for row in requirements))
+
+    def test_min_max_properties_are_supported_and_reversed_range_is_invalid(self) -> None:
+        base = {"schema_kind": "json-schema-2020-12", "schema_pointer": "#", "context": "validation", "child_models": []}
+        for document, keywords in (({"type": "object", "minProperties": 1}, {"minProperties"}), ({"type": "object", "maxProperties": 3}, {"maxProperties"}), ({"type": "object", "minProperties": 1, "maxProperties": 3}, {"minProperties", "maxProperties"})):
+            with self.subTest(keywords=keywords):
+                result = run({**base, "document": document})
+                self.assertEqual(result["runtime_status"], "ok")
+                self.assertFalse(result["payload"]["unsupported_items"])
+                self.assertEqual({row["keyword"] for row in result["payload"]["bva_skeletons"]}, keywords)
+        invalid = run({**base, "document": {"type": "object", "minProperties": 4, "maxProperties": 2}})
+        self.assertEqual(invalid["runtime_status"], "invalid_input")
+
+    def test_openapi_read_only_and_write_only_filter_by_request_or_response_context(self) -> None:
+        document = {"type": "object", "required": ["read", "write"], "properties": {"read": {"type": "string", "readOnly": True}, "write": {"type": "string", "writeOnly": True}}}
+        request = run({"schema_kind": "openapi-3.0", "schema_pointer": "#", "context": "request", "document": document, "child_models": []})
+        response = run({"schema_kind": "openapi-3.0", "schema_pointer": "#", "context": "response", "document": document, "child_models": []})
+        request_refs = {row["requirement_key"] for row in request["payload"]["derived"]["test_data_requirements"]}
+        response_refs = {row["requirement_key"] for row in response["payload"]["derived"]["test_data_requirements"]}
+        read_key = "schema-h" + hashlib.sha256(json.dumps({"schema_kind": "openapi-3.0", "schema_pointer": "#/properties/read", "keyword": "required", "role": "test-data-requirement"}, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        write_key = "schema-h" + hashlib.sha256(json.dumps({"schema_kind": "openapi-3.0", "schema_pointer": "#/properties/write", "keyword": "required", "role": "test-data-requirement"}, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        self.assertNotIn(read_key, request_refs)
+        self.assertIn(write_key, request_refs)
+        self.assertIn(read_key, response_refs)
+        self.assertNotIn(write_key, response_refs)
+
+    def test_unsupported_property_does_not_erase_independent_supported_property(self) -> None:
+        result = run({
+            "schema_kind": "json-schema-2020-12", "schema_pointer": "#", "context": "validation",
+            "document": {"type": "object", "properties": {"external": {"$ref": "https://example.invalid/schema"}, "role": {"enum": ["admin", "user"]}}},
+            "child_models": [],
+        })
+        self.assertEqual(result["runtime_status"], "ok")
+        self.assertEqual(result["support_status"], "partial")
+        self.assertTrue(result["payload"]["unsupported_items"])
+        self.assertEqual(len(result["payload"]["ep_skeletons"]), 1)
+        self.assertTrue(any(row["operator"] == "enum" for row in result["payload"]["derived"]["test_data_requirements"]))
 
 
 if __name__ == "__main__":

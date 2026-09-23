@@ -11,6 +11,7 @@ from runtime_contract import (
     InvalidInput,
     _default_expected_runtime_units,
     _expected_entities,
+    canonical_json_text,
     canonicalize,
     evaluate_entity_freshness,
     evaluate_materialize_completion,
@@ -146,7 +147,7 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
         input_value["unsupported_item_closures"],
         runtime_rows,
         entities,
-        normalized=scopes[0]["normalized_input"] if len(scopes) == 1 else None,
+        normalized=[scope["normalized_input"] for scope in scopes],
     )
 
     expected_units: list[dict[str, Any]] = []
@@ -199,17 +200,15 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
     issues.extend(freshness_issues)
     issues.extend(closure_issues)
     issues.extend(evaluate_target_disposition_closure(runtime_rows, entities))
-    issues.extend(evaluate_materialize_completion(
-        scopes[0]["normalized_input"] if len(scopes) == 1 else {},
-        runtime_rows,
-        entities,
-        closures,
-    ))
+    for scope in scopes:
+        issues.extend(evaluate_materialize_completion(scope["normalized_input"], runtime_rows, entities, closures))
     if any(row.get("handling") == "ブロック中" for row in closures):
         issues.append({"issue_type": "unsupported_closure_blocked", "blocking": True})
     for row in fresh_rows:
         if row["result_status"] != "ready" or row["freshness_status"] != "current" or (row["runtime_required"] and not row["deterministic_generated"]):
             issues.append({"issue_type": "runtime_not_complete", "blocking": True, "skill": row["skill"], "runtime_unit_key": row["runtime_unit_key"]})
+    issues_by_key = {canonical_json_text(row): row for row in issues}
+    issues = [issues_by_key[key] for key in sorted(issues_by_key)]
     can_complete = not issues and bool(scopes)
     return {
         "runtime_status": "ok",

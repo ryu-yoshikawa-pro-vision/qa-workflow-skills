@@ -331,6 +331,10 @@ def canonical_json_bytes(value: Any) -> bytes:
 
 
 def _sort_record_array(key: str, values: list[Any]) -> list[Any]:
+    if key in {"authority_refs", "risk_refs"} and all(isinstance(value, str) for value in values):
+        # Keep duplicate semantic references visible to the owning schema
+        # validator; canonicalization orders these sets but must not hide input errors.
+        return sorted(values)
     if key in {"authority_refs", "reference_refs", "risk_refs", "tr_refs", "ci_refs", "source_refs", "related_authority_refs", "selected_techniques", "changed_node_keys", "initial_states", "initial_node_keys"}:
         unique: dict[str, Any] = {}
         for value in values:
@@ -501,6 +505,150 @@ def typed_value(value: Any) -> dict[str, Any]:
         except ValueError as exc:
             raise InvalidInput("fixed_offset_datetime typed valueが不正です") from exc
     return {"type": kind, "value": raw}
+
+
+def version_components(value: Any, name: str = "version") -> tuple[int, ...]:
+    if not isinstance(value, str) or not value or any(not part.isdigit() or (len(part) > 1 and part.startswith("0")) for part in value.split(".")):
+        raise InvalidInput(f"{name}のversion形式が不正です")
+    return tuple(int(part) for part in value.split("."))
+
+
+def compare_versions(left: Any, right: Any) -> int:
+    left_parts = version_components(left, "minimum")
+    right_parts = version_components(right, "maximum")
+    width = max(len(left_parts), len(right_parts))
+    left_padded = left_parts + (0,) * (width - len(left_parts))
+    right_padded = right_parts + (0,) * (width - len(right_parts))
+    return (left_padded > right_padded) - (left_padded < right_padded)
+
+
+def typed_value_compare(left: dict[str, Any], right: dict[str, Any]) -> int:
+    """Compare same-type range values without changing their canonical form."""
+    left_value = typed_value(left)
+    right_value = typed_value(right)
+    kind = left_value["type"]
+    if kind != right_value["type"]:
+        raise UnsupportedInput("異なるtyped valueのrange比較は未対応です", item_key="unsupported:typed-value:range", reason_code="unsupported_intersection")
+    if kind == "integer":
+        return (left_value["value"] > right_value["value"]) - (left_value["value"] < right_value["value"])
+    if kind == "decimal":
+        return exact_compare(left_value["value"], right_value["value"])
+    if kind == "date":
+        a, b = date.fromisoformat(left_value["value"]), date.fromisoformat(right_value["value"])
+    elif kind == "local_datetime":
+        a, b = datetime.fromisoformat(left_value["value"]), datetime.fromisoformat(right_value["value"])
+    elif kind == "fixed_offset_datetime":
+        a, b = datetime.fromisoformat(left_value["value"]), datetime.fromisoformat(right_value["value"])
+    else:
+        raise UnsupportedInput("このtyped valueのrange比較は未対応です", item_key="unsupported:typed-value:range", reason_code="unsupported_intersection")
+    return (a > b) - (a < b)
+
+
+def constraint_intersection_compatible(constraints: Iterable[dict[str, Any]]) -> bool:
+    """Return whether normalized constraints on one dimension have a common value.
+
+    This is the shared runtime-v1 intersection contract used by environment,
+    test-data, merge, and case-level requirement validation.
+    """
+    rows = list(constraints)
+    if not rows:
+        return True
+    operators = [row.get("operator") for row in rows]
+    allowed = {"eq", "enum", "range", "version_range", "boolean"}
+    if any(operator not in allowed for operator in operators):
+        raise UnsupportedInput("constraint operatorのintersectionは未対応です", item_key="unsupported:constraint:operator", reason_code="unsupported_intersection")
+
+    if "version_range" in operators:
+        if any(operator != "version_range" for operator in operators):
+            raise UnsupportedInput("version_rangeと他operatorのintersectionは未対応です", item_key="unsupported:constraint:version-range", reason_code="unsupported_intersection")
+        lower: tuple[int, ...] | None = None
+        lower_inclusive = True
+        upper: tuple[int, ...] | None = None
+        upper_inclusive = True
+        for row in rows:
+            minimum = version_components(row.get("minimum"), "minimum")
+            maximum = version_components(row.get("maximum"), "maximum")
+            minimum_text = row["minimum"]
+            maximum_text = row["maximum"]
+            if compare_versions(minimum_text, maximum_text) > 0:
+                raise InvalidInput("version_rangeのminimumがmaximumを超えています")
+            if lower is None or compare_versions(minimum_text, ".".join(map(str, lower))) > 0:
+                lower, lower_inclusive = minimum, row["minimum_inclusive"]
+            elif compare_versions(minimum_text, ".".join(map(str, lower))) == 0:
+                lower_inclusive = lower_inclusive and row["minimum_inclusive"]
+            if upper is None or compare_versions(maximum_text, ".".join(map(str, upper))) < 0:
+                upper, upper_inclusive = maximum, row["maximum_inclusive"]
+            elif compare_versions(maximum_text, ".".join(map(str, upper))) == 0:
+                upper_inclusive = upper_inclusive and row["maximum_inclusive"]
+        assert lower is not None and upper is not None
+        relation = compare_versions(".".join(map(str, lower)), ".".join(map(str, upper)))
+        return relation < 0 or (relation == 0 and lower_inclusive and upper_inclusive)
+
+    has_boolean = "boolean" in operators
+    if has_boolean and any(operator not in {"boolean", "eq"} for operator in operators):
+        raise UnsupportedInput("booleanとこのoperatorのintersectionは未対応です", item_key="unsupported:constraint:boolean", reason_code="unsupported_intersection")
+
+    finite_sets: list[set[str]] = []
+    ranges: list[dict[str, Any]] = []
+    for row in rows:
+        operator = row["operator"]
+        if operator == "eq":
+            finite_sets.append({canonical_json_text(typed_value(row["value"]))})
+        elif operator == "enum":
+            finite_sets.append({canonical_json_text(typed_value(value)) for value in row["values"]})
+        elif operator == "boolean":
+            finite_sets.append({canonical_json_text({"type": "boolean", "value": row["value"]})})
+        elif operator == "range":
+            minimum = typed_value(row["minimum"])
+            maximum = typed_value(row["maximum"])
+            if minimum["type"] != maximum["type"]:
+                raise UnsupportedInput("異なるtyped valueのrange比較は未対応です", item_key="unsupported:constraint:range", reason_code="unsupported_intersection")
+            if typed_value_compare(minimum, maximum) > 0:
+                raise InvalidInput("constraint rangeのminimumがmaximumを超えています")
+            ranges.append({**row, "minimum": minimum, "maximum": maximum})
+
+    if finite_sets:
+        candidates = set.intersection(*finite_sets)
+        if not ranges:
+            return bool(candidates)
+        for encoded in sorted(candidates):
+            value = strict_loads(encoded)
+            matches = True
+            for row in ranges:
+                if value["type"] != row["minimum"]["type"]:
+                    matches = False
+                    break
+                low = typed_value_compare(value, row["minimum"])
+                high = typed_value_compare(value, row["maximum"])
+                if not ((low > 0 or (low == 0 and row["minimum_inclusive"])) and (high < 0 or (high == 0 and row["maximum_inclusive"]))):
+                    matches = False
+                    break
+            if matches:
+                return True
+        return False
+
+    if not ranges:
+        return True
+    range_type = ranges[0]["minimum"]["type"]
+    if any(row["minimum"]["type"] != range_type for row in ranges):
+        raise UnsupportedInput("異なるtyped rangeのintersectionは未対応です", item_key="unsupported:constraint:range", reason_code="unsupported_intersection")
+    lower = ranges[0]["minimum"]
+    lower_inclusive = ranges[0]["minimum_inclusive"]
+    upper = ranges[0]["maximum"]
+    upper_inclusive = ranges[0]["maximum_inclusive"]
+    for row in ranges[1:]:
+        low_relation = typed_value_compare(row["minimum"], lower)
+        if low_relation > 0:
+            lower, lower_inclusive = row["minimum"], row["minimum_inclusive"]
+        elif low_relation == 0:
+            lower_inclusive = lower_inclusive and row["minimum_inclusive"]
+        high_relation = typed_value_compare(row["maximum"], upper)
+        if high_relation < 0:
+            upper, upper_inclusive = row["maximum"], row["maximum_inclusive"]
+        elif high_relation == 0:
+            upper_inclusive = upper_inclusive and row["maximum_inclusive"]
+    relation = typed_value_compare(lower, upper)
+    return relation < 0 or (relation == 0 and lower_inclusive and upper_inclusive)
 
 
 def typed_sort_key(value: dict[str, Any]) -> str:
@@ -1158,6 +1306,18 @@ def _normalized_models(normalized: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return result
 
 
+def _normalized_model_union(normalized: dict[str, Any] | list[dict[str, Any]] | None) -> dict[str, dict[str, Any]]:
+    scopes = normalized if isinstance(normalized, list) else [normalized or {}]
+    result: dict[str, dict[str, Any]] = {}
+    for scope in scopes:
+        for model_key, row in _normalized_models(scope).items():
+            previous = result.get(model_key)
+            if previous is not None and canonical_json_text(previous) != canonical_json_text(row):
+                raise InvalidInput("複数scopeでmodel metadataが不一致です")
+            result[model_key] = row
+    return result
+
+
 def _entity_map(entities: list[dict[str, Any]]) -> dict[tuple[str, str, str], dict[str, Any]]:
     return {
         entity_identity(row["skill"], row["entity_type"], row["entity_ref"]): row
@@ -1182,7 +1342,7 @@ def validate_unsupported_item_closures(
     value: Any,
     runtime_rows: list[dict[str, Any]],
     entities: list[dict[str, Any]],
-    normalized: dict[str, Any] | None = None,
+    normalized: dict[str, Any] | list[dict[str, Any]] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Validate per-item and whole-model unsupported closure state.
 
@@ -1194,7 +1354,7 @@ def validate_unsupported_item_closures(
     rows = ensure_list(value, "unsupported_item_closures")
     runtime_map = {(row["skill"], row["runtime_unit_key"]): row for row in runtime_rows}
     entity_map = _entity_map(entities)
-    model_map = _normalized_models(normalized or {})
+    model_map = _normalized_model_union(normalized)
     unsupported: dict[tuple[str, str, str, str], dict[str, Any]] = {}
     unsupported_by_runtime: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
     for runtime in runtime_rows:
@@ -1297,7 +1457,8 @@ def evaluate_target_disposition_closure(runtime_rows: list[dict[str, Any]], enti
     """Check materialized target mapping/disposition chains across all units."""
     mappings: dict[str, dict[str, Any]] = {}
     dispositions: dict[str, dict[str, Any]] = {}
-    entity_map = _entity_map(entities or []) if entities is not None else {}
+    entity_rows = validate_entity_collection(entities or []) if entities is not None else []
+    entity_map = _entity_map(entity_rows) if entity_rows else {}
     issues: list[dict[str, Any]] = []
     for runtime in runtime_rows:
         for row in runtime.get("target_mappings", []):
@@ -1320,21 +1481,95 @@ def evaluate_target_disposition_closure(runtime_rows: list[dict[str, Any]], enti
                 raise InvalidInput("target dispositionが重複またはmappingと重複しています")
             covered = row["covered_by_target_version"]
             if row["handling"] == "重複":
-                if not isinstance(covered, dict) or set(covered) != {"target_ref", "target_content_fingerprint", "generation_fingerprint", "execution_fingerprint"} or covered["target_ref"] == row["target_ref"]:
+                if (
+                    not isinstance(covered, dict)
+                    or set(covered) != {"target_ref", "target_content_fingerprint", "generation_fingerprint", "execution_fingerprint"}
+                    or covered["target_ref"] == row["target_ref"]
+                    or not FULL_DIGEST_RE.fullmatch(str(covered.get("target_ref")))
+                    or not FULL_DIGEST_RE.fullmatch(str(covered.get("target_content_fingerprint")))
+                    or not FULL_DIGEST_RE.fullmatch(str(covered.get("generation_fingerprint")))
+                    or (covered.get("execution_fingerprint") is not None and not FULL_DIGEST_RE.fullmatch(str(covered.get("execution_fingerprint"))))
+                ):
                     raise InvalidInput("target disposition covered versionが不正です")
             elif covered is not None:
                 raise InvalidInput("重複以外のtarget disposition covered versionはnullである必要があります")
             dispositions[row["target_ref"]] = row
 
-    def terminal(ref: str, visiting: set[str]) -> bool:
+    def semantic_terminal(version: dict[str, Any]) -> bool | None:
+        found_ref = False
+        for entity in entity_rows:
+            if entity["entity_type"] != "ci":
+                continue
+            content = entity.get("content", {})
+            if content.get("source_kind") != "semantic_item" or content.get("status") != "active":
+                continue
+            for source in content.get("semantic_source_targets", []):
+                if not isinstance(source, dict) or source.get("target_ref") != version["target_ref"]:
+                    continue
+                found_ref = True
+                if (
+                    source.get("target_content_fingerprint") == version["target_content_fingerprint"]
+                    and source.get("generation_fingerprint") == version["generation_fingerprint"]
+                ):
+                    if version["execution_fingerprint"] is not None:
+                        issues.append({"issue_type": "target_disposition_stale_execution", "blocking": True, "target_ref": version["target_ref"]})
+                        return False
+                    return True
+        if found_ref:
+            issues.append({"issue_type": "target_disposition_stale_covered_version", "blocking": True, "target_ref": version["target_ref"]})
+            return False
+        return None
+
+    def mapping_terminal(ref: str, version: dict[str, Any] | None) -> bool:
+        target = mappings[ref]
+        if version is not None:
+            if target["target_content_fingerprint"] != version["target_content_fingerprint"] or target["generation_fingerprint"] != version["generation_fingerprint"]:
+                issues.append({"issue_type": "target_disposition_stale_covered_version", "blocking": True, "target_ref": ref})
+                return False
+            if target["execution_fingerprint"] != version["execution_fingerprint"]:
+                issues.append({"issue_type": "target_disposition_stale_execution", "blocking": True, "target_ref": ref})
+                return False
+        ci = entity_map.get(("test-condition-design", "ci", target["ci_id"]))
+        if ci is None:
+            issues.append({"issue_type": "target_disposition_terminal_ci_missing", "blocking": True, "target_ref": ref})
+            return False
+        content = ci.get("content", {})
+        mapped_targets = content.get("covered_targets", [])
+        if (
+            content.get("source_kind") != "runtime_target"
+            or content.get("status") != "active"
+            or (ci.get("model_key") or content.get("model_key")) != target["model_key"]
+            or not any(
+                isinstance(item, dict)
+                and item.get("target_ref") == ref
+                and item.get("target_content_fingerprint") == target["target_content_fingerprint"]
+                and item.get("execution_fingerprint") == target["execution_fingerprint"]
+                for item in mapped_targets
+            )
+        ):
+            issues.append({"issue_type": "target_disposition_terminal_ci_mismatch", "blocking": True, "target_ref": ref})
+            return False
+        return True
+
+    def terminal(ref: str, visiting: set[str], version: dict[str, Any] | None = None, *, through_duplicate: bool = False) -> bool:
         if ref in mappings:
-            return True
+            return mapping_terminal(ref, version)
         if ref in visiting:
             issues.append({"issue_type": "target_disposition_cycle", "blocking": True, "target_ref": ref})
             return False
         row = dispositions.get(ref)
         if row is None:
+            if version is not None:
+                semantic = semantic_terminal(version)
+                if semantic is not None:
+                    return semantic
             issues.append({"issue_type": "target_disposition_missing", "blocking": True, "target_ref": ref})
+            return False
+        if version is not None and (row["target_content_fingerprint"] != version["target_content_fingerprint"] or row["generation_fingerprint"] != version["generation_fingerprint"]):
+            issues.append({"issue_type": "target_disposition_stale_covered_version", "blocking": True, "target_ref": ref})
+            return False
+        if through_duplicate and row["handling"] != "重複":
+            issues.append({"issue_type": "target_disposition_non_coverage_terminal", "blocking": True, "target_ref": ref})
             return False
         if row["handling"] == "ブロック中":
             issues.append({"issue_type": "target_disposition_blocked", "blocking": True, "target_ref": ref})
@@ -1342,15 +1577,16 @@ def evaluate_target_disposition_closure(runtime_rows: list[dict[str, Any]], enti
         if row["handling"] == "重複":
             covered = row["covered_by_target_version"]
             target = mappings.get(covered["target_ref"]) or dispositions.get(covered["target_ref"])
-            if target is None or target["target_content_fingerprint"] != covered["target_content_fingerprint"] or target["generation_fingerprint"] != covered["generation_fingerprint"]:
+            if target is not None and (target["target_content_fingerprint"] != covered["target_content_fingerprint"] or target["generation_fingerprint"] != covered["generation_fingerprint"]):
                 issues.append({"issue_type": "target_disposition_stale_covered_version", "blocking": True, "target_ref": ref})
                 return False
-            if target.get("handling") != "重複" and target.get("target_ref") in mappings:
-                expected_execution = target.get("execution_fingerprint")
-                if covered["execution_fingerprint"] != expected_execution:
-                    issues.append({"issue_type": "target_disposition_stale_execution", "blocking": True, "target_ref": ref})
-                    return False
-            return terminal(covered["target_ref"], visiting | {ref})
+            if target is None:
+                semantic = semantic_terminal(covered)
+                if semantic is not None:
+                    return semantic
+                issues.append({"issue_type": "target_disposition_missing", "blocking": True, "target_ref": covered["target_ref"]})
+                return False
+            return terminal(covered["target_ref"], visiting | {ref}, covered, through_duplicate=True)
         return True
 
     for ref in sorted(dispositions):
@@ -1368,7 +1604,13 @@ def evaluate_materialize_completion(
     models = _normalized_models(normalized)
     if not models:
         return []
-    materialize_rows = [row for row in runtime_rows if str(row.get("runtime_unit_key", "")).startswith("artifact:materialize_coverage:")]
+    tcn_id = normalized.get("tcn_id")
+    materialize_unit = f"artifact:materialize_coverage:{tcn_id}" if isinstance(tcn_id, str) and tcn_id else None
+    materialize_rows = [
+        row for row in runtime_rows
+        if str(row.get("runtime_unit_key", "")).startswith("artifact:materialize_coverage:")
+        and (materialize_unit is None or row.get("runtime_unit_key") == materialize_unit)
+    ]
     if len(materialize_rows) > 1:
         raise InvalidInput("materialize runtime unitが重複しています")
     materialize = materialize_rows[0] if materialize_rows else None
@@ -1429,7 +1671,11 @@ def runtime_unit_row(envelope: dict[str, Any], *, freshness_status: str = "curre
     if materialize is not None:
         row["model_completion"] = canonicalize(materialize.get("model_completion", []))
         row["target_mappings"] = canonicalize(materialize.get("target_id_map", []))
-        row["target_dispositions"] = canonicalize(materialize.get("disposed_target_refs", []))
+        disposition_fields = ("target_ref", "target_content_fingerprint", "generation_fingerprint", "handling", "covered_by_target_version")
+        dispositions = materialize.get("disposed_target_refs", [])
+        if not isinstance(dispositions, list) or any(not isinstance(item, dict) or not set(disposition_fields).issubset(item) for item in dispositions):
+            raise InvalidInput("materialize disposed_target_refs projectionが不正です")
+        row["target_dispositions"] = canonicalize([{key: item[key] for key in disposition_fields} for item in dispositions])
     return row
 
 
@@ -1881,6 +2127,8 @@ def _validate_runtime_pair(
     if not isinstance(result.get("payload"), dict) or not isinstance(result.get("issues"), list):
         issues.append({"issue_type": "invalid_runtime_payload", "blocking": True, "runtime_unit": identity})
         return issues
+    if result.get("result_status") == "ready" and any(isinstance(issue, dict) and issue.get("blocking") is True for issue in result["issues"]):
+        issues.append({"issue_type": "ready_runtime_has_blocking_issue", "blocking": True, "runtime_unit": identity})
     if result.get("runtime_implementation_fingerprint") != implementation_fingerprint(Path(__file__)):
         issues.append({"issue_type": "stale_runtime_implementation", "blocking": True, "runtime_unit": identity})
     if not isinstance(result.get("generator"), str) or not result["generator"]:
@@ -2259,6 +2507,9 @@ def run_cli(
         for issue in issues:
             if not isinstance(issue, dict):
                 raise InternalRuntimeError("issue rowはobjectである必要があります")
+        if result_status == "ready" and any(issue.get("blocking") is True for issue in issues):
+            raise InternalRuntimeError("blocking issueを含むruntime resultはreadyにできません")
+        for issue in issues:
             issue.setdefault("skill", skill)
             issue.setdefault("runtime_unit_key", metadata["runtime_unit_key"])
             issue.setdefault("model_key", metadata["model_key"])

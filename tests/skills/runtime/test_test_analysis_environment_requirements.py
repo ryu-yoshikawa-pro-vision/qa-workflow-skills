@@ -52,8 +52,22 @@ class EnvironmentRequirementRuntimeTests(unittest.TestCase):
         ]
         result = run({"requirements": rows})
         self.assertEqual(result["runtime_status"], "ok")
-        self.assertEqual(result["result_status"], "ready")
+        self.assertEqual(result["result_status"], "unresolved")
+        self.assertTrue(any(issue["issue_type"] == "environment_conflict" and issue["blocking"] for issue in result["issues"]))
         self.assertEqual(result["payload"]["conflicts"][0]["requirement_keys"], ["r-1", "r-2"])
+
+    def test_shared_range_and_version_intersection_rules(self) -> None:
+        base_range = {"operator": "range", "minimum": {"type": "integer", "value": 1}, "maximum": {"type": "integer", "value": 5}, "minimum_inclusive": True, "maximum_inclusive": True}
+        touching_exclusive = {**base_range, "minimum": {"type": "integer", "value": 5}, "maximum": {"type": "integer", "value": 8}, "minimum_inclusive": False}
+        touching_inclusive = {**touching_exclusive, "minimum_inclusive": True}
+        value = {"requirements": [base("r1", "chrome", "range", **{key: value for key, value in base_range.items() if key != "operator"}), base("r2", "chrome", "range", **{key: value for key, value in touching_exclusive.items() if key != "operator"})]}
+        self.assertEqual(run(value)["result_status"], "unresolved")
+        value["requirements"][1]["minimum_inclusive"] = True
+        self.assertEqual(run(value)["payload"]["conflicts"], [])
+
+        version_a = base("v1", "chrome", "version_range", minimum="1.0", maximum="2.0", minimum_inclusive=True, maximum_inclusive=True)
+        version_b = base("v2", "chrome", "version_range", minimum="2.1", maximum="3.0", minimum_inclusive=True, maximum_inclusive=True)
+        self.assertEqual(run({"requirements": [version_a, version_b]})["result_status"], "unresolved")
 
     def test_unsupported_operator_is_explicit_and_wrong_fields_are_invalid(self) -> None:
         unsupported = base("r-1", "chrome", "regex", value={"type": "string", "value": "120"})

@@ -167,10 +167,6 @@ def _matches(assignment: dict[str, dict[str, Any]], constraint: dict[str, Any]) 
     return all(assignment[key] == value for key, value in constraint["assignment"].items())
 
 
-def _hash_target(factor_keys: list[str], assignment: dict[str, dict[str, Any]]) -> str:
-    return "comb:" + ""  # replaced by caller with mode
-
-
 def _tuple_key(factor_keys: list[str], assignment: dict[str, dict[str, Any]]) -> str:
     return canonical_json_text({"factor_keys": factor_keys, "assignment": {key: assignment[key] for key in factor_keys}})
 
@@ -189,16 +185,14 @@ def _satisfies(assignment: dict[str, dict[str, Any]], constraints: list[dict[str
     return not any(_matches(assignment, constraint) for constraint in constraints)
 
 
-def _completion_search(factors: list[dict[str, Any]], constraints: list[dict[str, Any]], partial: dict[str, dict[str, Any]], *, collect: bool) -> tuple[str, list[dict[str, dict[str, Any]]]]:
+def _completion_search(factors: list[dict[str, Any]], constraints: list[dict[str, Any]], partial: dict[str, dict[str, Any]], *, collect: bool, exploration_budget: list[int]) -> tuple[str, list[dict[str, dict[str, Any]]]]:
     factor_map = {row["factor_key"]: row for row in factors}
     keys = [row["factor_key"] for row in factors]
-    nodes = 0
     completions: list[dict[str, dict[str, Any]]] = []
 
     def walk(index: int, assignment: dict[str, dict[str, Any]]) -> str:
-        nonlocal nodes
-        nodes += 1
-        if nodes > MAX_EXPLORATION_NODES:
+        exploration_budget[0] += 1
+        if exploration_budget[0] > MAX_EXPLORATION_NODES:
             return "limit_exceeded"
         if any(all(key in assignment for key in constraint["assignment"]) and _matches(assignment, constraint) for constraint in constraints):
             return "unsat"
@@ -227,7 +221,7 @@ def _completion_search(factors: list[dict[str, Any]], constraints: list[dict[str
     return status, sorted(completions, key=lambda row: tuple(canonical_json_text(row[key]) for key in keys))
 
 
-def _tuple_targets(factors: list[dict[str, Any]], constraints: list[dict[str, Any]], requests: list[tuple[list[str], int]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+def _tuple_targets(factors: list[dict[str, Any]], constraints: list[dict[str, Any]], requests: list[tuple[list[str], int]], exploration_budget: list[int]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     factor_map = {row["factor_key"]: row for row in factors}
     sat_targets: list[dict[str, Any]] = []
     diagnostics: list[dict[str, Any]] = []
@@ -242,7 +236,7 @@ def _tuple_targets(factors: list[dict[str, Any]], constraints: list[dict[str, An
                 if tuple_key in seen:
                     continue
                 seen.add(tuple_key)
-                status, _ = _completion_search(factors, constraints, assignment, collect=False)
+                status, _ = _completion_search(factors, constraints, assignment, collect=False, exploration_budget=exploration_budget)
                 diagnostics.append({"tuple": {"factor_keys": list(selected), "assignment": assignment}, "status": status})
                 if status == "sat":
                     sat_targets.append({"factor_keys": list(selected), "assignment": assignment, "tuple_key": tuple_key})
@@ -257,7 +251,7 @@ def _covers(row: dict[str, dict[str, Any]], target: dict[str, Any]) -> bool:
     return all(row[key] == value for key, value in target["assignment"].items())
 
 
-def _greedy_rows(factors: list[dict[str, Any]], constraints: list[dict[str, Any]], targets: list[dict[str, Any]]) -> list[dict[str, dict[str, Any]]]:
+def _greedy_rows(factors: list[dict[str, Any]], constraints: list[dict[str, Any]], targets: list[dict[str, Any]], exploration_budget: list[int]) -> list[dict[str, dict[str, Any]]]:
     if not targets:
         return []
     factor_count = 1
@@ -271,7 +265,7 @@ def _greedy_rows(factors: list[dict[str, Any]], constraints: list[dict[str, Any]
         by_row: dict[str, dict[str, dict[str, Any]]] = {}
         completion_count = 0
         for target in targets:
-            status, completions = _completion_search(factors, constraints, target["assignment"], collect=True)
+            status, completions = _completion_search(factors, constraints, target["assignment"], collect=True, exploration_budget=exploration_budget)
             if status == "limit_exceeded":
                 raise LimitExceeded("combinatorial row completionがhard limitを超えています")
             for completion in completions:
@@ -306,6 +300,7 @@ def generate(input_value: dict, metadata: dict) -> dict:
     if metadata["model_key"] is None or metadata["model_type"] != "comb" or metadata["runtime_unit_key"] != f"model:{metadata['model_key']}":
         raise InvalidInput("combinatorialのruntime metadataが不正です")
     mode, factors, constraints, strategy = _normalize(input_value)
+    exploration_budget = [0]
     factor_keys = [row["factor_key"] for row in factors]
     all_assignments: list[dict[str, dict[str, Any]]] = []
     feasible: list[dict[str, dict[str, Any]]] = []
@@ -341,8 +336,8 @@ def generate(input_value: dict, metadata: dict) -> dict:
             requests = [(factor_keys, strategy["strength"])]
         else:
             requests = [(factor_keys, strategy["global_strength"])] + [(row["factor_keys"], row["strength"]) for row in strategy["subsets"]]
-        tuple_targets, diagnostics = _tuple_targets(factors, constraints, requests)
-        rows = _greedy_rows(factors, constraints, tuple_targets)
+        tuple_targets, diagnostics = _tuple_targets(factors, constraints, requests, exploration_budget)
+        rows = _greedy_rows(factors, constraints, tuple_targets, exploration_budget)
         for target in tuple_targets:
             target_rows.append({"factor_keys": target["factor_keys"], "assignment": target["assignment"], "tuple_status": "sat"})
     rows = sorted(rows, key=lambda row: tuple(canonical_json_text(row[key]) for key in factor_keys))

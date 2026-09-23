@@ -28,7 +28,7 @@ def metadata() -> dict:
     }
 
 
-def runtime_row(skill: str, unit: str, model_key: str | None = None, *, materialize: bool = False, active_ci_ids: list[str] | None = None, materialize_model_key: str | None = None) -> dict:
+def runtime_row(skill: str, unit: str, model_key: str | None = None, *, materialize: bool = False, active_ci_ids: list[str] | None = None, materialize_model_key: str | None = None, materialize_complete: bool = True) -> dict:
     return {
         "skill": skill, "runtime_unit_key": unit, "model_key": model_key, "support_status": "supported", "result_status": "ready",
         "runtime_status": "ok", "runtime_required": True, "deterministic_generated": True, "generation_fingerprint": f"sha256:{unit.encode().hex()[:64].ljust(64, '0')}",
@@ -39,7 +39,7 @@ def runtime_row(skill: str, unit: str, model_key: str | None = None, *, material
             "closed_target_refs": [f"target:{materialize_model_key or model_key}"],
             "active_ci_ids": sorted(active_ci_ids or []),
             "semantic_item_keys": [],
-            "materialize_complete": True,
+            "materialize_complete": materialize_complete,
         }] if materialize else [],
         "target_mappings": [], "target_dispositions": [],
     }
@@ -106,6 +106,54 @@ class WorkflowRuntimeTests(unittest.TestCase):
         self.assertEqual(result["result_status"], "unresolved")
         self.assertFalse(result["payload"]["can_complete"])
         self.assertTrue(any(issue["issue_type"] == "stale_entity_dependency" for issue in result["issues"]))
+
+    def _multi_scope_request(self, *, scope_b_complete: bool = True) -> dict:
+        tcn_a = runtime.make_machine_entity("test-condition-design", "tcn", "TCN-001", {"tcn_id": "TCN-001"})
+        tcn_b = runtime.make_machine_entity("test-condition-design", "tcn", "TCN-002", {"tcn_id": "TCN-002"})
+        model_a = runtime.make_machine_entity("test-condition-design", "model", "ep-001", {"model_key": "ep-001", "model_type": "ep"}, model_key="ep-001")
+        model_b = runtime.make_machine_entity("test-condition-design", "model", "ep-002", {"model_key": "ep-002", "model_type": "ep"}, model_key="ep-002")
+        ci_a = runtime.make_machine_entity("test-condition-design", "ci", "TCN-001-CI01", {"ci_id": "TCN-001-CI01", "tcn_id": "TCN-001", "model_key": "ep-001"}, model_key="ep-001")
+        ci_b = runtime.make_machine_entity("test-condition-design", "ci", "TCN-002-CI01", {"ci_id": "TCN-002-CI01", "tcn_id": "TCN-002", "model_key": "ep-002"}, model_key="ep-002")
+        normalized_a = {"tcn_id": "TCN-001", "test_conditions": [{"tcn_id": "TCN-001"}], "models": [{"model_key": "ep-001", "model_type": "ep"}], "ci_ids": ["TCN-001-CI01"]}
+        normalized_b = {"tcn_id": "TCN-002", "test_conditions": [{"tcn_id": "TCN-002"}], "models": [{"model_key": "ep-002", "model_type": "ep"}], "ci_ids": ["TCN-002-CI01"]}
+        units = [
+            runtime_row("test-condition-design", "artifact:condition_structure:all"),
+            runtime_row("test-condition-design", "model:ep-001", "ep-001"),
+            runtime_row("test-condition-design", "model:ep-002", "ep-002"),
+            runtime_row("test-condition-design", "artifact:materialize_coverage:TCN-001", materialize=True, active_ci_ids=["TCN-001-CI01"], materialize_model_key="ep-001"),
+            runtime_row("test-condition-design", "artifact:materialize_coverage:TCN-002", materialize=True, active_ci_ids=["TCN-002-CI01"], materialize_model_key="ep-002", materialize_complete=scope_b_complete),
+        ]
+        return {
+            "metadata": metadata(),
+            "input": {
+                "workflow_scopes": [
+                    {"skill": "test-condition-design", "target": "TCN-001", "execution_range": None, "input_mode": "artifact", "normalized_input": normalized_a, "current_structure_state": {"tcn_id": "TCN-001"}},
+                    {"skill": "test-condition-design", "target": "TCN-002", "execution_range": None, "input_mode": "artifact", "normalized_input": normalized_b, "current_structure_state": {"tcn_id": "TCN-002"}},
+                ],
+                "runtime_units": units, "current_runtime_units": units, "current_entities": [tcn_a, tcn_b, model_a, model_b, ci_a, ci_b], "unsupported_item_closures": [],
+            },
+        }
+
+    def test_two_complete_scopes_are_checked_independently(self) -> None:
+        result = run(self._multi_scope_request())
+        self.assertEqual(result["runtime_status"], "ok")
+        self.assertTrue(result["payload"]["can_complete"], result)
+
+    def test_incomplete_scope_cannot_be_hidden_by_other_scope_ci(self) -> None:
+        result = run(self._multi_scope_request(scope_b_complete=False))
+        self.assertEqual(result["runtime_status"], "ok")
+        self.assertEqual(result["result_status"], "unresolved")
+        self.assertFalse(result["payload"]["can_complete"])
+        self.assertTrue(any(issue["issue_type"] == "model_materialize_incomplete" and issue.get("model_key") == "ep-002" for issue in result["issues"]))
+
+    def test_missing_runtime_and_entity_in_scope_b_are_not_filled_from_scope_a(self) -> None:
+        request = self._multi_scope_request()
+        request["input"]["runtime_units"] = [row for row in request["input"]["runtime_units"] if row["runtime_unit_key"] != "model:ep-002"]
+        request["input"]["current_entities"] = [entity for entity in request["input"]["current_entities"] if entity["entity_ref"] not in {"ep-002", "TCN-002-CI01"}]
+        result = run(request)
+        self.assertEqual(result["result_status"], "unresolved")
+        self.assertIn(["test-condition-design", "model:ep-002"], result["payload"]["missing_runtime_units"])
+        self.assertIn(["test-condition-design", "model", "ep-002"], result["payload"]["missing_entities"])
 
 
 if __name__ == "__main__":

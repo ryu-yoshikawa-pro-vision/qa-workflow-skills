@@ -1,14 +1,23 @@
 from __future__ import annotations
 
+import importlib.util
+import io
 import json
 from pathlib import Path
 import subprocess
 import sys
 import unittest
+from unittest.mock import patch
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = REPO_ROOT / "skills" / "test-condition-design" / "scripts" / "decision_table.py"
+sys.path.insert(0, str(SCRIPT.parent))
+SPEC = importlib.util.spec_from_file_location("runtime_test_decision_table_module", SCRIPT)
+assert SPEC is not None and SPEC.loader is not None
+decision_table = importlib.util.module_from_spec(SPEC)
+sys.modules[SPEC.name] = decision_table
+SPEC.loader.exec_module(decision_table)
 
 
 def metadata() -> dict:
@@ -78,6 +87,38 @@ class DecisionTableRuntimeTests(unittest.TestCase):
         self.assertEqual(result["runtime_status"], "ok")
         self.assertEqual(result["result_status"], "unresolved")
         self.assertEqual(result["issues"][0]["issue_type"], "invalid_accepted_merge")
+
+    def _run_with_rule_limit(self, value: dict, limit: int) -> tuple[int, dict]:
+        request = json.dumps({"metadata": metadata(), "input": value}).encode()
+        stdout = io.BytesIO()
+        input_stream = type("InputStream", (), {"buffer": io.BytesIO(request)})()
+        output_stream = type("OutputStream", (), {"buffer": stdout})()
+        with patch.object(decision_table, "MAX_RULES", limit):
+            old_stdin, old_stdout = sys.stdin, sys.stdout
+            try:
+                sys.stdin, sys.stdout = input_stream, output_stream
+                code = decision_table.run_cli(decision_table.generate, skill="test-condition-design", generator="decision_table", generator_contract_version="decision-table-v1", generator_path=SCRIPT)
+            finally:
+                sys.stdin, sys.stdout = old_stdin, old_stdout
+        return code, json.loads(stdout.getvalue())
+
+    def test_rule_space_limit_boundary_and_structured_exit_status(self) -> None:
+        value = base_rules()
+        value["conditions"] = [
+            {"condition_key": f"c{index:02d}", "label": f"Condition {index}", "values": [tv("boolean", False), tv("boolean", True)], "authority_refs": []}
+            for index in range(2)
+        ]
+        value["known_rules"] = []
+        code, exact = self._run_with_rule_limit(value, 4)
+        self.assertEqual(code, 0)
+        self.assertEqual(exact["runtime_status"], "ok")
+
+        value["conditions"].append({"condition_key": "c02", "label": "Condition 2", "values": [tv("boolean", False), tv("boolean", True)], "authority_refs": []})
+        code, exceeded = self._run_with_rule_limit(value, 4)
+        self.assertEqual(code, 0)
+        self.assertEqual(exceeded["runtime_status"], "limit_exceeded")
+        self.assertEqual(exceeded["result_status"], "blocked")
+        self.assertFalse(exceeded["deterministic_generated"])
 
 
 if __name__ == "__main__":

@@ -56,7 +56,7 @@ class StrictJsonTests(unittest.TestCase):
 class CanonicalAndFingerprintTests(unittest.TestCase):
     def test_canonicalizes_set_like_arrays_and_record_arrays(self) -> None:
         left = {
-            "authority_refs": ["SPEC-002", "SPEC-001", "SPEC-001"],
+            "authority_refs": ["SPEC-002", "SPEC-001"],
             "upstream_entities": [
                 {"skill": "z", "entity_type": "model", "entity_ref": "B"},
                 {"skill": "a", "entity_type": "model", "entity_ref": "A"},
@@ -72,6 +72,11 @@ class CanonicalAndFingerprintTests(unittest.TestCase):
         self.assertEqual(runtime.canonical_json_text(runtime.canonicalize(left)), runtime.canonical_json_text(runtime.canonicalize(right)))
         self.assertEqual(runtime.sha256_digest(left), runtime.sha256_digest(right))
 
+    def test_authority_and_risk_refs_are_sorted_without_hiding_duplicates(self) -> None:
+        normalized = runtime.canonicalize({"authority_refs": ["SPEC-002", "SPEC-001", "SPEC-001"], "risk_refs": ["R-002", "R-001", "R-001"]})
+        self.assertEqual(normalized["authority_refs"], ["SPEC-001", "SPEC-001", "SPEC-002"])
+        self.assertEqual(normalized["risk_refs"], ["R-001", "R-001", "R-002"])
+
     def test_lf_normalized_implementation_fingerprint(self) -> None:
         import tempfile
 
@@ -86,6 +91,44 @@ class CanonicalAndFingerprintTests(unittest.TestCase):
         self.assertEqual(runtime.exact_add("0.1", "0.2"), "0.3")
         self.assertEqual(runtime.exact_multiply("1.25", "0.8"), "1")
         self.assertEqual(runtime.exact_compare("1.00", "1"), 0)
+
+    def test_constraint_intersection_contract_covers_typed_ranges_and_versions(self) -> None:
+        tv = lambda kind, value: {"type": kind, "value": value}
+        eq = {"operator": "eq", "value": tv("integer", 5)}
+        enum = {"operator": "enum", "values": [tv("integer", 3), tv("integer", 5)]}
+        range_row = {"operator": "range", "minimum": tv("integer", 1), "maximum": tv("integer", 5), "minimum_inclusive": True, "maximum_inclusive": True}
+        self.assertTrue(runtime.constraint_intersection_compatible([eq, range_row]))
+        self.assertTrue(runtime.constraint_intersection_compatible([enum, range_row]))
+
+        left = {"operator": "range", "minimum": tv("integer", 1), "maximum": tv("integer", 5), "minimum_inclusive": True, "maximum_inclusive": True}
+        exclusive = {"operator": "range", "minimum": tv("integer", 5), "maximum": tv("integer", 8), "minimum_inclusive": False, "maximum_inclusive": True}
+        inclusive = {**exclusive, "minimum_inclusive": True}
+        self.assertFalse(runtime.constraint_intersection_compatible([left, exclusive]))
+        self.assertTrue(runtime.constraint_intersection_compatible([left, inclusive]))
+        point_open = {**left, "minimum": tv("integer", 5), "minimum_inclusive": False}
+        self.assertFalse(runtime.constraint_intersection_compatible([point_open]))
+        point_closed = {**point_open, "minimum_inclusive": True}
+        self.assertTrue(runtime.constraint_intersection_compatible([point_closed]))
+
+        version_a = {"operator": "version_range", "minimum": "1.0", "maximum": "2.0", "minimum_inclusive": True, "maximum_inclusive": True}
+        version_b = {"operator": "version_range", "minimum": "2.1", "maximum": "3.0", "minimum_inclusive": True, "maximum_inclusive": True}
+        version_touch_open = {**version_a, "minimum": "2.0", "maximum": "3.0", "minimum_inclusive": False}
+        version_touch_closed = {**version_touch_open, "minimum_inclusive": True, "maximum": "2.0"}
+        self.assertFalse(runtime.constraint_intersection_compatible([version_a, version_b]))
+        self.assertFalse(runtime.constraint_intersection_compatible([version_a, version_touch_open]))
+        self.assertTrue(runtime.constraint_intersection_compatible([version_a, version_touch_closed]))
+
+    def test_fixed_offset_datetime_range_uses_absolute_instants_and_keeps_offsets(self) -> None:
+        first = {"operator": "range", "minimum": {"type": "fixed_offset_datetime", "value": "2026-09-23T10:00:00+09:00"}, "maximum": {"type": "fixed_offset_datetime", "value": "2026-09-23T10:00:00+09:00"}, "minimum_inclusive": True, "maximum_inclusive": True}
+        second = {"operator": "range", "minimum": {"type": "fixed_offset_datetime", "value": "2026-09-23T01:00:00+00:00"}, "maximum": {"type": "fixed_offset_datetime", "value": "2026-09-23T01:00:00+00:00"}, "minimum_inclusive": True, "maximum_inclusive": True}
+        self.assertTrue(runtime.constraint_intersection_compatible([first, second]))
+        self.assertEqual(runtime.typed_value(first["minimum"])["value"], "2026-09-23T10:00:00+09:00")
+
+    def test_unsupported_intersection_is_not_assumed_compatible(self) -> None:
+        boolean = {"operator": "boolean", "value": True}
+        enum = {"operator": "enum", "values": [{"type": "boolean", "value": True}]}
+        with self.assertRaises(runtime.UnsupportedInput):
+            runtime.constraint_intersection_compatible([boolean, enum])
 
     def test_target_postprocessing_is_stable_and_requires_execution(self) -> None:
         rows = runtime.post_process_targets(
@@ -229,6 +272,86 @@ class EntityAndEvidenceTests(unittest.TestCase):
             })
 
 
+class TargetDispositionClosureTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.content_a = "sha256:" + "1" * 64
+        self.content_b = "sha256:" + "2" * 64
+        self.content_c = "sha256:" + "3" * 64
+        self.generation_a = "sha256:" + "4" * 64
+        self.generation_b = "sha256:" + "5" * 64
+        self.generation_c = "sha256:" + "6" * 64
+        self.execution_a = "sha256:" + "7" * 64
+        self.execution_b = "sha256:" + "8" * 64
+        self.execution_c = "sha256:" + "9" * 64
+        self.ref_a = runtime.target_ref("ep-001", "target-a")
+        self.ref_b = runtime.target_ref("ep-001", "target-b")
+        self.ref_c = runtime.target_ref("ep-001", "target-c")
+
+    def _version(self, ref: str, content: str, generation: str, execution: str | None) -> dict:
+        return {"target_ref": ref, "target_content_fingerprint": content, "generation_fingerprint": generation, "execution_fingerprint": execution}
+
+    def _disposition(self, ref: str, content: str, generation: str, handling: str, covered: dict | None = None) -> dict:
+        return {"target_ref": ref, "target_content_fingerprint": content, "generation_fingerprint": generation, "handling": handling, "covered_by_target_version": covered}
+
+    def _mapping(self, ref: str, target_key: str, content: str, generation: str, execution: str, ci_id: str = "TCN-001-CI01") -> tuple[dict, dict]:
+        mapping = {"target_ref": ref, "target_content_fingerprint": content, "generation_fingerprint": generation, "execution_fingerprint": execution, "model_key": "ep-001", "target_key": target_key, "ci_id": ci_id}
+        ci = runtime.make_machine_entity("test-condition-design", "ci", ci_id, {
+            "ci_id": ci_id, "model_key": "ep-001", "source_kind": "runtime_target", "status": "active",
+            "covered_targets": [{"target_ref": ref, "target_content_fingerprint": content, "execution_fingerprint": execution}],
+        }, model_key="ep-001")
+        return mapping, ci
+
+    def _evaluate(self, dispositions: list[dict], mappings: list[dict] | None = None, entities: list[dict] | None = None) -> list[dict]:
+        return runtime.evaluate_target_disposition_closure([{"target_mappings": mappings or [], "target_dispositions": dispositions}], entities or [])
+
+    def test_duplicate_chain_closes_only_at_current_mapping(self) -> None:
+        direct_mapping, direct_ci = self._mapping(self.ref_b, "target-b", self.content_b, self.generation_b, self.execution_b)
+        duplicate_a = self._disposition(self.ref_a, self.content_a, self.generation_a, "重複", self._version(self.ref_b, self.content_b, self.generation_b, self.execution_b))
+        duplicate_b = self._disposition(self.ref_b, self.content_b, self.generation_b, "重複", self._version(self.ref_c, self.content_c, self.generation_c, self.execution_c))
+        self.assertEqual(self._evaluate([duplicate_a], [direct_mapping], [direct_ci]), [])
+        chain_mapping, chain_ci = self._mapping(self.ref_c, "target-c", self.content_c, self.generation_c, self.execution_c)
+        self.assertEqual(self._evaluate([duplicate_a, duplicate_b], [chain_mapping], [chain_ci]), [])
+
+    def test_duplicate_can_close_at_current_semantic_ci_version(self) -> None:
+        semantic = runtime.make_machine_entity("test-condition-design", "ci", "TCN-001-CI02", {
+            "ci_id": "TCN-001-CI02", "model_key": "ep-001", "source_kind": "semantic_item", "status": "active",
+            "semantic_source_targets": [{"target_ref": self.ref_b, "target_content_fingerprint": self.content_b, "generation_fingerprint": self.generation_b}],
+        }, model_key="ep-001")
+        duplicate = self._disposition(self.ref_a, self.content_a, self.generation_a, "重複", self._version(self.ref_b, self.content_b, self.generation_b, None))
+        self.assertEqual(self._evaluate([duplicate], entities=[semantic]), [])
+
+    def test_noncoverage_dispositions_cannot_terminate_another_duplicate(self) -> None:
+        for handling in ("対象外", "残存リスク"):
+            with self.subTest(handling=handling):
+                duplicate = self._disposition(self.ref_a, self.content_a, self.generation_a, "重複", self._version(self.ref_b, self.content_b, self.generation_b, self.execution_b))
+                other = self._disposition(self.ref_b, self.content_b, self.generation_b, handling)
+                issues = self._evaluate([duplicate, other])
+                self.assertTrue(any(issue["issue_type"] == "target_disposition_non_coverage_terminal" for issue in issues))
+
+    def test_duplicate_rejects_stale_versions_execution_mismatch_cycle_and_missing_target(self) -> None:
+        mapping, ci = self._mapping(self.ref_b, "target-b", self.content_b, self.generation_b, self.execution_b)
+        cases = [
+            ("stale content", self._version(self.ref_b, self.content_c, self.generation_b, self.execution_b), [mapping], [ci], "target_disposition_stale_covered_version"),
+            ("stale generation", self._version(self.ref_b, self.content_b, self.generation_c, self.execution_b), [mapping], [ci], "target_disposition_stale_covered_version"),
+            ("execution mismatch", self._version(self.ref_b, self.content_b, self.generation_b, self.execution_c), [mapping], [ci], "target_disposition_stale_execution"),
+            ("missing", self._version(self.ref_b, self.content_b, self.generation_b, self.execution_b), [], [], "target_disposition_missing"),
+        ]
+        for label, covered, mappings, entities, expected in cases:
+            with self.subTest(label=label):
+                duplicate = self._disposition(self.ref_a, self.content_a, self.generation_a, "重複", covered)
+                issues = self._evaluate([duplicate], mappings, entities)
+                self.assertTrue(any(issue["issue_type"] == expected for issue in issues))
+
+        cycle_a = self._disposition(self.ref_a, self.content_a, self.generation_a, "重複", self._version(self.ref_b, self.content_b, self.generation_b, self.execution_b))
+        cycle_b = self._disposition(self.ref_b, self.content_b, self.generation_b, "重複", self._version(self.ref_a, self.content_a, self.generation_a, self.execution_a))
+        self.assertTrue(any(issue["issue_type"] == "target_disposition_cycle" for issue in self._evaluate([cycle_a, cycle_b])))
+
+    def test_duplicate_self_reference_is_invalid(self) -> None:
+        duplicate = self._disposition(self.ref_a, self.content_a, self.generation_a, "重複", self._version(self.ref_a, self.content_a, self.generation_a, self.execution_a))
+        with self.assertRaises(runtime.InvalidInput):
+            self._evaluate([duplicate])
+
+
 class DependencyAndAdapterValidationTests(unittest.TestCase):
     def _runtime_row(self, unit: str, generation: str, dependencies: list[dict] | None = None) -> dict:
         return {
@@ -272,6 +395,56 @@ class DependencyAndAdapterValidationTests(unittest.TestCase):
         }]
         with self.assertRaises(runtime.InvalidInput):
             runtime.validate_runtime_dependency_graph(cycle)
+
+    def test_common_runtime_validation_rejects_ready_with_blocking_issue(self) -> None:
+        metadata = {
+            "envelope_version": "1", "skill": "test-condition-design", "runtime_contract_version": "runtime-v1",
+            "generator_contract_version": "test-generator-v1", "runtime_unit_key": "artifact:test_generator:all", "model_key": None,
+            "model_type": None, "technique_slug": None, "selection_source": None, "selection_key": None, "scope_key": "all",
+            "input_mode": "direct", "upstream_entities": [], "upstream_runtime_units": [], "static_data_versions": {},
+            "authority_refs": [], "reference_refs": [],
+        }
+        digest = "sha256:" + "0" * 64
+        result = {
+            "envelope_version": "1", "skill": "test-condition-design", "runtime_contract_version": "runtime-v1",
+            "generator_contract_version": "test-generator-v1", "generator": "test_generator", "runtime_unit_key": "artifact:test_generator:all", "model_key": None,
+            "input_fingerprint": digest, "model_fingerprint": digest, "generation_fingerprint": digest,
+            "runtime_implementation_fingerprint": digest, "generator_implementation_fingerprint": digest,
+            "upstream_entity_fingerprints": [], "upstream_runtime_units": [], "support_status": "supported", "static_data_versions": {},
+            "runtime_status": "ok", "result_status": "ready", "runtime_required": True, "deterministic_generated": True,
+            "fallback_reason": None, "payload": {}, "issues": [{"issue_type": "blocking", "blocking": True}],
+        }
+        issues = runtime._validate_runtime_pair(
+            "test-condition-design", "test-condition-design::artifact:test_generator:all",
+            {"metadata": metadata, "input": {}}, result,
+        )
+        self.assertTrue(any(issue["issue_type"] == "ready_runtime_has_blocking_issue" for issue in issues))
+
+    def test_unsupported_fallback_uses_model_union_from_all_scope_inputs(self) -> None:
+        generation = "sha256:" + "a" * 64
+        ci = runtime.make_machine_entity("test-condition-design", "ci", "TCN-002-CI01", {
+            "ci_id": "TCN-002-CI01", "model_key": "ep-002", "source_kind": "runtime_target", "status": "active",
+        }, model_key="ep-002")
+        unsupported = [{
+            "item_key": "unsupported:item-1", "item_type": "constraint", "source_key": "rule-1", "reason_code": "outside_supported_subset",
+            "affected_technique_slug": "ep", "authority_refs": [],
+        }]
+        runtime_row = {
+            "skill": "test-condition-design", "runtime_unit_key": "model:adapter-001", "model_key": "adapter-001",
+            "generation_fingerprint": generation, "support_status": "partial", "unsupported_items": unsupported,
+        }
+        closure = {
+            "skill": "test-condition-design", "runtime_unit_key": "model:adapter-001", "generation_fingerprint": generation,
+            "item_key": "unsupported:item-1", "reason_code": "outside_supported_subset", "handling": "llm_fallback", "reason": "direct EP child covers the item",
+            "authority_refs": [], "covered_by_entity": {"skill": ci["skill"], "entity_type": ci["entity_type"], "entity_ref": ci["entity_ref"], "content_fingerprint": ci["content_fingerprint"]},
+        }
+        normalized = [
+            {"models": [{"model_key": "adapter-001", "model_type": "cause-effect", "technique_slug": None}]},
+            {"models": [{"model_key": "ep-002", "model_type": "ep", "technique_slug": "ep", "derived_from_model_key": "adapter-001"}]},
+        ]
+        rows, issues = runtime.validate_unsupported_item_closures([closure], [runtime_row], [ci], normalized=normalized)
+        self.assertEqual(rows, [closure])
+        self.assertEqual(issues, [])
 
     def test_stale_propagates_only_to_dependent_runtime_units(self) -> None:
         old = "sha256:" + "1" * 64

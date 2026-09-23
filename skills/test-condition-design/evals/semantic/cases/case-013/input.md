@@ -1,2 +1,2 @@
 # Eval Input
-2つの同一model targetは同じexecution fingerprintとexpected result rootを持つ。1つのCIへmergeし、別modelの同一実行はmergeしない。
+同一TCN / 同一modelのcurrent target A・Bは同じexecution fingerprintとexpected result rootを持ち、source modelも同じ。両source target versionはcurrent。Aのtest data requirementは`role=admin`、Bのrequirementは同じ`role` dimensionの`role=guest`で、両方がmerge後のCIへ適用される。別modelのtarget Cは同じexecution fingerprintとexpected result rootを持つが、別modelに属する。条件設計では製品behaviorの技法を選ぶ課題ではなく、materializationのdeterministic grouping predicateとrequirement union/intersection contractを検証する。

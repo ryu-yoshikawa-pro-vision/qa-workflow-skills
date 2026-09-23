@@ -27,8 +27,8 @@ def run(value: dict) -> dict:
     return json.loads(result.stdout)
 
 
-def target(ref: str, model: str = "ep-001") -> dict:
-    return {"source_model_key": model, "target_ref": ref, "target_content_fingerprint": DIGEST, "generation_fingerprint": DIGEST}
+def target(ref: str, model: str = "ep-001", *, content: str = DIGEST, generation: str = DIGEST) -> dict:
+    return {"source_model_key": model, "target_ref": ref, "target_content_fingerprint": content, "generation_fingerprint": generation}
 
 
 def requirement(key: str, operator: str, *, versions: list[dict] | None = None, **fields: object) -> dict:
@@ -47,6 +47,7 @@ class TestDataRequirementRuntimeTests(unittest.TestCase):
         self.assertEqual(result["result_status"], "ready")
         rows = {row["requirement_key"]: row for row in result["payload"]["normalized_requirements"]}
         self.assertEqual(rows["role-any"]["data_ref"], "data:role-any")
+        self.assertEqual(rows["role-any"]["applicable_target_refs"], sorted(row["target_ref"] for row in targets))
         self.assertEqual(rows["role-one"]["applicable_target_refs"], [targets[0]["target_ref"]])
         self.assertEqual({row["entity_ref"] for row in result["payload"]["entities"]}, {"data:role-any", "data:role-one"})
 
@@ -65,6 +66,29 @@ class TestDataRequirementRuntimeTests(unittest.TestCase):
         second = target("sha256:" + "3" * 64, "bva-001")
         value = {"current_source_targets": [first, second], "requirements": [requirement("bad", "eq", versions=[{key: second[key] for key in ("target_ref", "target_content_fingerprint", "generation_fingerprint")}], value={"type": "string", "value": "x"})]}
         self.assertEqual(run(value)["runtime_status"], "invalid_input")
+
+    def test_target_version_must_match_current_content_and_generation(self) -> None:
+        current = target("sha256:" + "2" * 64, content="sha256:" + "4" * 64, generation="sha256:" + "5" * 64)
+        exact = {key: current[key] for key in ("target_ref", "target_content_fingerprint", "generation_fingerprint")}
+        row = requirement("scoped", "eq", versions=[exact], value={"type": "string", "value": "admin"})
+        passed = run({"current_source_targets": [current], "requirements": [row]})
+        self.assertEqual(passed["runtime_status"], "ok")
+        self.assertEqual(passed["payload"]["normalized_requirements"][0]["applicable_target_refs"], [current["target_ref"]])
+
+        stale_content = {**exact, "target_content_fingerprint": DIGEST}
+        stale_generation = {**exact, "generation_fingerprint": DIGEST}
+        mismatched_model = {**row, "source_model_key": "bva-001"}
+        unknown_target = {**exact, "target_ref": "sha256:" + "6" * 64}
+        for label, versions, requirement_row in (
+            ("stale content", [stale_content], row),
+            ("stale generation", [stale_generation], row),
+            ("source model mismatch", [exact], mismatched_model),
+            ("unknown target", [unknown_target], row),
+        ):
+            with self.subTest(label=label):
+                candidate = {**requirement_row, "source_target_versions": versions}
+                result = run({"current_source_targets": [current], "requirements": [candidate]})
+                self.assertEqual(result["runtime_status"], "invalid_input")
 
 
 if __name__ == "__main__":

@@ -1,14 +1,23 @@
 from __future__ import annotations
 
+import importlib.util
+import io
 import json
 from pathlib import Path
 import subprocess
 import sys
 import unittest
+from unittest.mock import patch
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = REPO_ROOT / "skills" / "test-condition-design" / "scripts" / "combinatorial.py"
+sys.path.insert(0, str(SCRIPT.parent))
+SPEC = importlib.util.spec_from_file_location("runtime_test_combinatorial_module", SCRIPT)
+assert SPEC is not None and SPEC.loader is not None
+combinatorial = importlib.util.module_from_spec(SPEC)
+sys.modules[SPEC.name] = combinatorial
+SPEC.loader.exec_module(combinatorial)
 
 
 def metadata() -> dict:
@@ -66,6 +75,39 @@ class CombinatorialRuntimeTests(unittest.TestCase):
         self.assertEqual(result["runtime_status"], "ok")
         self.assertEqual(len(result["payload"]["targets"]), len({row["target_ref"] for row in result["payload"]["targets"]}))
         self.assertTrue(result["payload"]["coverage_summary"]["complete"])
+
+    def _run_with_budget(self, value: dict, budget: int) -> tuple[int, dict]:
+        request = json.dumps({"metadata": metadata(), "input": value}).encode()
+        stdout = io.BytesIO()
+        input_stream = type("InputStream", (), {"buffer": io.BytesIO(request)})()
+        output_stream = type("OutputStream", (), {"buffer": stdout})()
+        with patch.object(combinatorial, "MAX_EXPLORATION_NODES", budget), patch.object(combinatorial, "MAX_FULL_ASSIGNMENTS", 1):
+            old_stdin, old_stdout = sys.stdin, sys.stdout
+            try:
+                sys.stdin, sys.stdout = input_stream, output_stream
+                code = combinatorial.run_cli(combinatorial.generate, skill="test-condition-design", generator="combinatorial", generator_contract_version="combinatorial-v1", generator_path=SCRIPT)
+            finally:
+                sys.stdin, sys.stdout = old_stdin, old_stdout
+        return code, json.loads(stdout.getvalue())
+
+    def test_exploration_budget_accumulates_across_tuple_and_greedy_searches(self) -> None:
+        value = {"mode": "t-wise", "factors": factors()[:2], "constraints": [], "strength": 2}
+        code, exact = self._run_with_budget(value, 24)
+        self.assertEqual(code, 0)
+        self.assertEqual(exact["runtime_status"], "ok")
+        self.assertTrue(exact["payload"]["coverage_summary"]["complete"])
+
+        code, exceeded = self._run_with_budget(value, 23)
+        self.assertEqual(code, 0)
+        self.assertEqual(exceeded["runtime_status"], "limit_exceeded")
+        self.assertEqual(exceeded["result_status"], "blocked")
+        self.assertFalse(exceeded["deterministic_generated"])
+
+        # Twelve tuple-feasibility nodes plus the next tuple crosses this
+        # invocation-wide budget; it must not reset for each tuple.
+        code, cumulative = self._run_with_budget(value, 11)
+        self.assertEqual(code, 0)
+        self.assertEqual(cumulative["runtime_status"], "limit_exceeded")
 
 
 if __name__ == "__main__":

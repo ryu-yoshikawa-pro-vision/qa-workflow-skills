@@ -18,7 +18,7 @@ SCRIPT_PATH = Path(__file__).resolve()
 SCHEMA_KINDS = {"json-schema-2020-12", "openapi-3.0", "html-control"}
 CHILD_TYPES = {"ep", "bva", "comb"}
 ANNOTATIONS = {"title", "description", "$comment", "default", "examples"}
-JSON_SCHEMA_KEYWORDS = {"$schema", "$id", "$defs", "$ref", "type", "properties", "items", "enum", "const", "required", "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf", "minLength", "maxLength", "minItems", "maxItems", "title", "description", "$comment", "default", "examples"}
+JSON_SCHEMA_KEYWORDS = {"$schema", "$id", "$defs", "$ref", "type", "properties", "items", "enum", "const", "required", "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf", "minLength", "maxLength", "minItems", "maxItems", "minProperties", "maxProperties", "title", "description", "$comment", "default", "examples"}
 OPENAPI_KEYWORDS = {"$ref", "type", "format", "title", "description", "default", "example", "deprecated", "readOnly", "writeOnly", "nullable", "required", "properties", "items", "enum", "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf", "minLength", "maxLength", "minItems", "maxItems", "additionalProperties"}
 SCHEMA_UNSUPPORTED_REASONS = {"cyclic_local_ref", "unsupported_reference", "unsupported_schema_keyword", "unsupported_value_shape", "unsupported_html_control", "unsupported_html_constraint"}
 
@@ -111,13 +111,29 @@ def _resolve_schema(document: dict, schema: dict, base_pointer: str, active: set
     return {**resolved, **siblings}
 
 
-def _json_skeletons(kind: str, document: dict, pointer: str, context: str, unsupported: list[dict]) -> tuple[list[dict], list[dict], list[dict], list[dict]]:
+def _test_data_requirement(kind: str, source_pointer: str, keyword: str, dimension_role: str, model_key: str, operator: str, **fields: Any) -> dict[str, Any]:
+    requirement_key = "schema-" + _source_digest(kind, source_pointer, keyword, "test-data-requirement")[1]
+    dimension_key = "schema-" + _source_digest(kind, source_pointer, dimension_role, "test-data-dimension")[1]
+    return {
+        "requirement_key": requirement_key,
+        "environment_key": None,
+        "dimension_key": dimension_key,
+        "operator": operator,
+        "authority_refs": [],
+        "source_model_key": model_key,
+        "source_target_versions": [],
+        **fields,
+    }
+
+
+def _json_skeletons(kind: str, document: dict, pointer: str, context: str, unsupported: list[dict], model_key: str) -> tuple[list[dict], list[dict], list[dict], list[dict], list[dict]]:
     keywords = OPENAPI_KEYWORDS if kind == "openapi-3.0" else JSON_SCHEMA_KEYWORDS
     root = _resolve_schema(document, _pointer(document, pointer), pointer, {pointer}, unsupported, kind=kind)
     ep_sets: list[dict] = []
     bva_boundaries: list[dict] = []
     factors: list[dict] = []
     grid_constraints: list[dict] = []
+    data_requirements: list[dict] = []
 
     def visit(schema: dict, schema_pointer: str, label: str) -> None:
         if not isinstance(schema, dict):
@@ -157,6 +173,7 @@ def _json_skeletons(kind: str, document: dict, pointer: str, context: str, unsup
                 if schema["enum"] == []:
                     raise InvalidInput("schema enumが不正です")
             else:
+                data_requirements.append(_test_data_requirement(kind, schema_pointer, "enum", "value", model_key, "enum", values=values))
                 _digest, set_key = _source_digest(kind, schema_pointer, "enum", "set")
                 partitions = []
                 for index, value in enumerate(values):
@@ -170,6 +187,7 @@ def _json_skeletons(kind: str, document: dict, pointer: str, context: str, unsup
                 unsupported.append(make_unsupported_item(generator=GENERATOR, item_type="schema_subtree", source_key=exc.source_key or schema_pointer, reason_code="unsupported_value_shape"))
                 value = None
             if value is not None:
+                data_requirements.append(_test_data_requirement(kind, schema_pointer, "const", "value", model_key, "enum", values=[value]))
                 _digest, set_key = _source_digest(kind, schema_pointer, "const", "set")
                 _digest, partition_key = _source_digest(kind, schema_pointer, "const", "partition")
                 ep_sets.append({"set_key": set_key, "label": label, "partitions": [{"partition_key": partition_key, "label": f"{label} const", "validity": "valid", "definition": {"type": "enum", "values": [value]}, "representative": value, "authority_refs": []}], "source_pointer": schema_pointer, "keyword": "const"})
@@ -205,10 +223,24 @@ def _json_skeletons(kind: str, document: dict, pointer: str, context: str, unsup
             raw_value = schema[keyword]
             if isinstance(raw_value, bool) or not isinstance(raw_value, (int, ExactNumber)):
                 raise InvalidInput(f"schema.{keyword}はnumberである必要があります")
+        lower_constraint: tuple[dict[str, Any], bool] | None = None
+        upper_constraint: tuple[dict[str, Any], bool] | None = None
         for keyword, side, inclusive in bounds:
             value = _typed_scalar(schema["minimum" if keyword == "minimum" and kind == "openapi-3.0" else "maximum" if keyword == "maximum" and kind == "openapi-3.0" else keyword], schema_pointer)
+            if side == "lower":
+                if lower_constraint is None or exact_compare(str(value["value"]), str(lower_constraint[0]["value"])) > 0 or (exact_compare(str(value["value"]), str(lower_constraint[0]["value"])) == 0 and not inclusive):
+                    lower_constraint = (value, inclusive)
+            elif upper_constraint is None or exact_compare(str(value["value"]), str(upper_constraint[0]["value"])) < 0 or (exact_compare(str(value["value"]), str(upper_constraint[0]["value"])) == 0 and not inclusive):
+                upper_constraint = (value, inclusive)
             _digest, boundary_key = _source_digest(kind, schema_pointer, keyword, "bva-boundary")
             bva_boundaries.append({"boundary_key": boundary_key, "label": f"{label} {keyword}", "side": side, "threshold": value, "inclusive": inclusive, "step": {"unit": "integer" if value["type"] == "integer" else "decimal", "amount": 1 if value["type"] == "integer" else "1"}, "source_pointer": schema_pointer, "keyword": keyword, "authority_refs": []})
+        if lower_constraint is not None and upper_constraint is not None:
+            minimum, minimum_inclusive = lower_constraint
+            maximum, maximum_inclusive = upper_constraint
+            if minimum["type"] != maximum["type"]:
+                minimum = {"type": "decimal", "value": str(minimum["value"])}
+                maximum = {"type": "decimal", "value": str(maximum["value"])}
+            data_requirements.append(_test_data_requirement(kind, schema_pointer, "numeric-range", "value", model_key, "range", minimum=minimum, maximum=maximum, minimum_inclusive=minimum_inclusive, maximum_inclusive=maximum_inclusive))
         for keyword, side in (("minLength", "lower"), ("maxLength", "upper"), ("minItems", "lower"), ("maxItems", "upper"), ("minProperties", "lower"), ("maxProperties", "upper")):
             if keyword not in schema:
                 continue
@@ -220,6 +252,9 @@ def _json_skeletons(kind: str, document: dict, pointer: str, context: str, unsup
         for minimum_key, maximum_key in (("minLength", "maxLength"), ("minItems", "maxItems"), ("minProperties", "maxProperties")):
             if minimum_key in schema and maximum_key in schema and schema[minimum_key] > schema[maximum_key]:
                 raise InvalidInput(f"schema.{minimum_key}がschema.{maximum_key}を超えています")
+            if minimum_key in schema and maximum_key in schema:
+                dimension_role = {"minLength": "length", "minItems": "item-count", "minProperties": "property-count"}[minimum_key]
+                data_requirements.append(_test_data_requirement(kind, schema_pointer, f"{minimum_key}-{maximum_key}", dimension_role, model_key, "range", minimum={"type": "integer", "value": schema[minimum_key]}, maximum={"type": "integer", "value": schema[maximum_key]}, minimum_inclusive=True, maximum_inclusive=True))
         if "multipleOf" in schema:
             multiple = schema["multipleOf"]
             if isinstance(multiple, bool) or not isinstance(multiple, (int, ExactNumber)):
@@ -266,37 +301,60 @@ def _json_skeletons(kind: str, document: dict, pointer: str, context: str, unsup
                 raise InvalidInput("schema.propertiesが不正です")
             for name in sorted(properties):
                 child = properties[name]
-                if context == "request" and isinstance(child, dict) and child.get("readOnly") is True:
+                if kind == "openapi-3.0" and context == "request" and isinstance(child, dict) and child.get("readOnly") is True:
                     continue
-                if context == "response" and isinstance(child, dict) and child.get("writeOnly") is True:
+                if kind == "openapi-3.0" and context == "response" and isinstance(child, dict) and child.get("writeOnly") is True:
                     continue
                 child_pointer = schema_pointer.rstrip("/") + "/properties/" + name.replace("~", "~0").replace("/", "~1")
-                visit(_resolve_schema(document, child, child_pointer, {child_pointer}, unsupported, kind=kind), child_pointer, name)
+                try:
+                    resolved_child = _resolve_schema(document, child, child_pointer, {child_pointer}, unsupported, kind=kind)
+                except UnsupportedInput as exc:
+                    unsupported.append(make_unsupported_item(generator=GENERATOR, item_type="schema_subtree", source_key=exc.source_key or child_pointer, reason_code="unsupported_reference"))
+                    continue
+                visit(resolved_child, child_pointer, name)
+        if schema.get("required"):
+            for name in schema["required"]:
+                child = (properties or {}).get(name, {}) if isinstance(properties, dict) else {}
+                if kind == "openapi-3.0" and context == "request" and isinstance(child, dict) and child.get("readOnly") is True:
+                    continue
+                if kind == "openapi-3.0" and context == "response" and isinstance(child, dict) and child.get("writeOnly") is True:
+                    continue
+                child_pointer = schema_pointer.rstrip("/") + "/properties/" + name.replace("~", "~0").replace("/", "~1")
+                data_requirements.append(_test_data_requirement(kind, child_pointer, "required", "required", model_key, "boolean", value=True))
         if "items" in schema and isinstance(schema["items"], dict):
             child_pointer = schema_pointer.rstrip("/") + "/items"
-            visit(_resolve_schema(document, schema["items"], child_pointer, {child_pointer}, unsupported, kind=kind), child_pointer, label + " item")
+            try:
+                resolved_item = _resolve_schema(document, schema["items"], child_pointer, {child_pointer}, unsupported, kind=kind)
+            except UnsupportedInput as exc:
+                unsupported.append(make_unsupported_item(generator=GENERATOR, item_type="schema_subtree", source_key=exc.source_key or child_pointer, reason_code="unsupported_reference"))
+            else:
+                visit(resolved_item, child_pointer, label + " item")
 
     visit(root, pointer, pointer or "schema")
-    return ep_sets, bva_boundaries, factors, grid_constraints
+    data_requirements.sort(key=lambda row: row["requirement_key"])
+    return ep_sets, bva_boundaries, factors, grid_constraints, data_requirements
 
 
-def _html_skeletons(document: dict, unsupported: list[dict]) -> tuple[list[dict], list[dict], list[dict], list[dict]]:
+def _html_skeletons(document: dict, unsupported: list[dict], model_key: str) -> tuple[list[dict], list[dict], list[dict], list[dict], list[dict]]:
     allowed = {"type", "required", "min", "max", "minlength", "maxlength", "step", "value", "pattern", "disabled", "readonly", "multiple"}
     reject_unknown(document, {"type"}, allowed - {"type"})
     control_type = document.get("type")
     if control_type not in {"text", "number", "date", "datetime-local"}:
         raise UnsupportedInput("HTML control typeはruntime-v1未対応です", item_key="unsupported:schema:html-control", reason_code="unsupported_html_control")
     if document.get("disabled") is True or (control_type in {"text", "number", "date", "datetime-local"} and document.get("readonly") is True):
-        return [], [], [], []
+        return [], [], [], [], []
     if control_type == "text" and document.get("pattern") is not None:
         raise UnsupportedInput("HTML patternはruntime-v1で安全に評価できません", item_key="unsupported:schema:html-pattern", reason_code="unsupported_html_constraint")
     ep_sets: list[dict] = []
     bva: list[dict] = []
     factors: list[dict] = []
     grid_constraints: list[dict] = []
+    data_requirements: list[dict] = []
     for boolean_key in ("required", "disabled", "readonly", "multiple"):
         if boolean_key in document and not isinstance(document[boolean_key], bool):
             raise InvalidInput(f"HTML {boolean_key}が不正です")
+    if document.get("required") is True:
+        data_requirements.append(_test_data_requirement("html-control", "#", "required", "required", model_key, "boolean", value=True))
     if control_type == "text" and ("minlength" in document or "maxlength" in document):
         for key in ("minlength", "maxlength"):
             if key in document:
@@ -307,6 +365,8 @@ def _html_skeletons(document: dict, unsupported: list[dict]) -> tuple[list[dict]
                 bva.append({"boundary_key": boundary_key, "label": key, "side": "lower" if key == "minlength" else "upper", "threshold": {"type": "integer", "value": value}, "inclusive": True, "step": {"unit": "integer", "amount": 1}, "source_pointer": "#", "keyword": key, "authority_refs": []})
         if "minlength" in document and "maxlength" in document and document["minlength"] > document["maxlength"]:
             raise InvalidInput("HTML minlengthがmaxlengthを超えています")
+        if "minlength" in document and "maxlength" in document:
+            data_requirements.append(_test_data_requirement("html-control", "#", "minlength-maxlength", "length", model_key, "range", minimum={"type": "integer", "value": document["minlength"]}, maximum={"type": "integer", "value": document["maxlength"]}, minimum_inclusive=True, maximum_inclusive=True))
     if control_type in {"number", "date", "datetime-local"}:
         step_typed: dict[str, Any] | None = None
         valid_min: dict[str, Any] | None = None
@@ -359,7 +419,17 @@ def _html_skeletons(document: dict, unsupported: list[dict]) -> tuple[list[dict]
                 bva.append({"boundary_key": boundary_key, "label": key, "side": "lower" if key == "min" else "upper", "threshold": value, "inclusive": True, "step": boundary_step, "source_pointer": "#", "keyword": key, "authority_refs": []})
         if control_type == "number" and "min" in document and "max" in document and exact_compare(valid_min["value"], canonical_decimal(document["max"])) > 0:
             raise InvalidInput("HTML minがmaxを超えています")
-    return ep_sets, bva, factors, grid_constraints
+        if "min" in document and "max" in document:
+            minimum = valid_min if control_type == "number" else {"type": "date" if control_type == "date" else "local_datetime", "value": document["min"]}
+            maximum = number_value(document["max"], "max") if control_type == "number" else {"type": "date" if control_type == "date" else "local_datetime", "value": document["max"]}
+            if control_type != "number":
+                typed_value(minimum)
+                typed_value(maximum)
+            if minimum["type"] != maximum["type"]:
+                minimum = {"type": "decimal", "value": str(minimum["value"])}
+                maximum = {"type": "decimal", "value": str(maximum["value"])}
+            data_requirements.append(_test_data_requirement("html-control", "#", "min-max", "value", model_key, "range", minimum=minimum, maximum=maximum, minimum_inclusive=True, maximum_inclusive=True))
+    return ep_sets, bva, factors, grid_constraints, data_requirements
 
 
 def generate(input_value: dict, metadata: dict) -> dict:
@@ -382,13 +452,13 @@ def generate(input_value: dict, metadata: dict) -> dict:
     unsupported: list[dict] = []
     try:
         if kind == "html-control":
-            ep_sets, bva_boundaries, factors, grid_constraints = _html_skeletons(input_value["document"], unsupported)
+            ep_sets, bva_boundaries, factors, grid_constraints, test_data_requirements = _html_skeletons(input_value["document"], unsupported, metadata["model_key"])
         else:
-            ep_sets, bva_boundaries, factors, grid_constraints = _json_skeletons(kind, input_value["document"], pointer, input_value["context"], unsupported)
+            ep_sets, bva_boundaries, factors, grid_constraints, test_data_requirements = _json_skeletons(kind, input_value["document"], pointer, input_value["context"], unsupported, metadata["model_key"])
     except UnsupportedInput as exc:
         reason_code = exc.reason_code if exc.reason_code in SCHEMA_UNSUPPORTED_REASONS else "unsupported_schema_keyword"
         unsupported.append(make_unsupported_item(generator=GENERATOR, item_type="schema_subtree", source_key=exc.source_key, reason_code=reason_code, affected_technique_slug=None))
-        ep_sets, bva_boundaries, factors, grid_constraints = [], [], [], []
+        ep_sets, bva_boundaries, factors, grid_constraints, test_data_requirements = [], [], [], [], []
     children = ensure_list(input_value["child_models"], "child_models")
     seen_children: set[str] = set()
     requests: list[dict] = []
@@ -451,7 +521,7 @@ def generate(input_value: dict, metadata: dict) -> dict:
                 if not isinstance(input_value["document"][key], str) or not input_value["document"][key]:
                     raise InvalidInput(f"schema document metadata {key}が不正です")
                 document_metadata[key] = input_value["document"][key]
-    payload = {"schema_kind": kind, "schema_pointer": pointer, "document_metadata": document_metadata, "schema_targets": schema_targets, "targets": schema_targets, "ep_skeletons": canonicalize(ep_sets), "bva_skeletons": canonicalize(bva_boundaries), "comb_skeletons": canonicalize(factors), "grid_constraints": canonicalize(grid_constraints), "semantic_parameter_requests": requests, "derived_child_inputs": derived, "unsupported_items": canonicalize(unsupported)}
+    payload = {"schema_kind": kind, "schema_pointer": pointer, "document_metadata": document_metadata, "schema_targets": schema_targets, "targets": schema_targets, "ep_skeletons": canonicalize(ep_sets), "bva_skeletons": canonicalize(bva_boundaries), "comb_skeletons": canonicalize(factors), "grid_constraints": canonicalize(grid_constraints), "semantic_parameter_requests": requests, "derived_child_inputs": derived, "derived": {"test_data_requirements": canonicalize(test_data_requirements)}, "unsupported_items": canonicalize(unsupported)}
     status = "unresolved" if requests or issues else "ready"
     support = "partial" if unsupported else "supported"
     return {"runtime_status": "ok", "support_status": support, "result_status": status, "runtime_required": True, "deterministic_generated": True, "payload": payload, "issues": issues}

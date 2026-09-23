@@ -1,6 +1,6 @@
 ---
 name: test-condition-design
-description: テスト要求を、どの条件・観点で検証するかへ展開し、同値分割、境界値分析、デシジョンテーブル、状態遷移、Pairwise、エラー推測、シナリオなどのカバレッジ基準とカバレッジ項目を定義するSkill。候補母集団と扱いを管理し、テストケース設計前に必要なカバレッジを具体化するときに使用する。
+description: テスト要求を条件・観点へ展開し、同値分割、境界値・Domain、Decision Table、状態遷移、CRUD、組合せ・分類木、文法、schema/UI、Random、Metamorphic等のカバレッジ基準と項目を定義するSkill。候補母集団と扱いを管理し、テストケース設計前に必要なカバレッジを具体化するときに使用する。
 ---
 
 # テスト観点・条件設計
@@ -11,7 +11,7 @@ description: テスト要求を、どの条件・観点で検証するかへ展�
 2. 複数候補を持つ場合は候補母集団を先に識別し、カバレッジ基準、カバレッジ項目、採用しない候補の扱いを明示します。
 3. 期待挙動をプロダクトリスクやテスト仮説から創作しません。
 4. カバレッジ設計の基本手順、閉鎖、扱い、停止条件、最低品質は`references/guidance.md`に従います。
-5. 同値分割、BVA、デシジョンテーブル、状態遷移、Pairwise、エラー推測、シナリオ等を実際に適用する場合だけ`references/coverage-techniques.md`を追加で読み、採用技法の規則を使います。
+5. runtime dispatch表にある技法を適用する場合は`references/coverage-techniques.md`を読み、対応する技法の規則を使います。複数技法を採る場合やadapterからchild modelへ渡す場合も、各ownerの契約を確認します。
 6. 既定出力形式が必要な場合は`assets/output-template.md`を使用します。
 7. 他Skillを参照するときは正規Skill名を使用します。
 8. 最終出力前に、実際に利用した入力が本Skillの入力契約を満たし、停止条件に該当する未解決状態がないか確認します。あわせて、生成した成果物へ本Skill自身の出力契約・品質ゲートを適用して自己検証します。明白かつ局所的で新しい領域固有の判断を必要としない契約違反だけを最大1回修正し、修正後は修正箇所を含めて最終確認します。自己検証を理由にカバレッジ戦略を根本から再設計したり、未定義の期待結果や期待結果の根拠を追加したりしません。仕様根拠不足、上流判断不足、他Skillの領域固有ロジックが必要な問題は推測補完せず既存の停止条件・ブロック中・ルーティングに従います。最終確認後も本Skill自身の契約違反が残り、既存の停止条件・ブロック中・ルーティングに該当しない場合は2回目の自動修正を行わず、その成果物を契約適合済み・完成済みとして扱わず、現在残る契約上の制約だけを明示します。自己検証の経緯や修正回数は出力しません。
@@ -55,3 +55,5 @@ description: テスト要求を、どの条件・観点で検証するかへ展�
 - カバレッジ設計の基本契約: `references/guidance.md`
 - 技法固有のカバレッジ規則: `references/coverage-techniques.md`
 - 既定出力形式: `assets/output-template.md`
+
+`ui_pattern_candidates`を適用する場合は、`assets/ui-pattern-catalog.json`を参照し、同runtimeのcurrent結果にある`payload.catalog_version`と`static_data_versions.ui_pattern_catalog`、canonical `pattern_key`、candidate keyを根拠として保持します。カタログ候補は製品Authorityや期待結果の代わりにしません。

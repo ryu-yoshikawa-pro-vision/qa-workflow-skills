@@ -10,8 +10,10 @@ from runtime_contract import (
     CI_ID_RE,
     TC_ID_RE,
     InvalidInput,
+    UnsupportedInput,
     allocate_stable_id,
     canonicalize,
+    constraint_intersection_compatible,
     ensure_list,
     ensure_nonempty_string,
     make_machine_entity,
@@ -200,56 +202,21 @@ def _validate_dispositions(rows: Any, known_entities: dict[tuple[str, str], dict
     return result
 
 
-def _value_key(value: Any) -> str:
-    return repr(canonicalize(value))
-
-
-def _requirements_compatible(left: dict[str, Any], right: dict[str, Any]) -> bool:
-    if left.get("dimension_key") != right.get("dimension_key"):
-        return True
-    if left.get("operator") == "boolean" and right.get("operator") == "boolean":
-        return left.get("value") == right.get("value")
-    if left.get("operator") == "eq" and right.get("operator") == "eq":
-        return _value_key(left.get("value")) == _value_key(right.get("value"))
-    if left.get("operator") == "enum" and right.get("operator") == "enum":
-        return bool({_value_key(value) for value in left.get("values", [])} & {_value_key(value) for value in right.get("values", [])})
-    if left.get("operator") == "eq" and right.get("operator") == "enum":
-        return _value_key(left.get("value")) in {_value_key(value) for value in right.get("values", [])}
-    if right.get("operator") == "eq" and left.get("operator") == "enum":
-        return _requirements_compatible(right, left)
-    if left.get("operator") == "range" and right.get("operator") == "range":
-        left_min, right_min = left.get("minimum"), right.get("minimum")
-        left_max, right_max = left.get("maximum"), right.get("maximum")
-        # The normalized test-data runtime has already validated exact typed
-        # values.  This case-level check intentionally only combines ranges
-        # of the same exact type and never coerces values through float.
-        if not isinstance(left_min, dict) or not isinstance(right_min, dict) or left_min.get("type") != right_min.get("type"):
-            return False
-        if left_min.get("type") not in {"integer", "decimal"}:
-            return _value_key(left_min) == _value_key(right_min) and _value_key(left_max) == _value_key(right_max)
-        def cmp(a: dict, b: dict) -> int:
-            if a.get("type") == "decimal":
-                from fractions import Fraction
-                return (Fraction(a["value"]) > Fraction(b["value"])) - (Fraction(a["value"]) < Fraction(b["value"]))
-            return (a["value"] > b["value"]) - (a["value"] < b["value"])
-        low = left_min if cmp(left_min, right_min) >= 0 else right_min
-        high = left_max if cmp(left_max, right_max) <= 0 else right_max
-        relation = cmp(low, high)
-        low_inclusive = left.get("minimum_inclusive") if low is left_min else right.get("minimum_inclusive")
-        high_inclusive = left.get("maximum_inclusive") if high is left_max else right.get("maximum_inclusive")
-        return relation < 0 or relation == 0 and bool(low_inclusive and high_inclusive)
-    return True
-
-
 def _collect_requirement_violations(draft: dict[str, Any], ci_map: dict[str, dict[str, Any]], env_map: dict[str, dict[str, Any]], data_map: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
     violations: list[dict[str, Any]] = []
     data_refs = set(draft["test_data_requirement_refs"])
     data_refs.update(ref for ci_ref in draft["ci_refs"] for ref in ci_map[ci_ref]["content"].get("test_data_requirement_refs", []))
     requirements = [data_map[ref]["content"] for ref in sorted(data_refs)]
-    for index, left in enumerate(requirements):
-        for right in requirements[index + 1:]:
-            if left.get("dimension_key") == right.get("dimension_key") and not _requirements_compatible(left, right):
-                violations.append({"violation_type": "test_data_conflict", "draft_key": draft["draft_key"], "requirement_keys": sorted([left.get("requirement_key", left.get("data_ref")), right.get("requirement_key", right.get("data_ref"))]), "blocking": True})
+    data_by_dimension: dict[str, list[dict[str, Any]]] = {}
+    for requirement in requirements:
+        data_by_dimension.setdefault(requirement["dimension_key"], []).append(requirement)
+    for dimension, group in sorted(data_by_dimension.items()):
+        keys = sorted(row.get("requirement_key", row.get("data_ref")) for row in group)
+        try:
+            if not constraint_intersection_compatible(group):
+                violations.append({"violation_type": "test_data_conflict", "draft_key": draft["draft_key"], "dimension_key": dimension, "requirement_keys": keys, "blocking": True})
+        except UnsupportedInput:
+            violations.append({"violation_type": "test_data_intersection_unsupported", "draft_key": draft["draft_key"], "dimension_key": dimension, "requirement_keys": keys, "blocking": True})
     selected_env_refs = set(draft["environment_requirement_refs"])
     selected_by_key: dict[str, set[str]] = {}
     for ref in selected_env_refs:
@@ -259,6 +226,18 @@ def _collect_requirement_violations(draft: dict[str, Any], ci_map: dict[str, dic
         required = {ref for ref, entity in env_map.items() if entity["content"].get("environment_key", ref) == environment_key}
         if refs != required:
             violations.append({"violation_type": "environment_requirement_incomplete", "draft_key": draft["draft_key"], "environment_key": environment_key, "missing_refs": sorted(required - refs), "blocking": True})
+            continue
+        env_by_dimension: dict[str, list[dict[str, Any]]] = {}
+        for ref in sorted(refs):
+            content = env_map[ref]["content"]
+            env_by_dimension.setdefault(content["dimension_key"], []).append(content)
+        for dimension, group in sorted(env_by_dimension.items()):
+            keys = sorted(row["requirement_key"] for row in group)
+            try:
+                if not constraint_intersection_compatible(group):
+                    violations.append({"violation_type": "environment_requirement_conflict", "draft_key": draft["draft_key"], "environment_key": environment_key, "dimension_key": dimension, "requirement_keys": keys, "blocking": True})
+            except UnsupportedInput:
+                violations.append({"violation_type": "environment_requirement_unsupported", "draft_key": draft["draft_key"], "environment_key": environment_key, "dimension_key": dimension, "requirement_keys": keys, "blocking": True})
     return violations
 
 

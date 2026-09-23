@@ -11,6 +11,7 @@ from runtime_contract import (
     InvalidInput,
     _default_expected_runtime_units,
     _expected_entities,
+    canonical_json_text,
     canonicalize,
     ensure_list,
     ensure_nonempty_string,
@@ -165,84 +166,6 @@ def _dispositions(value: Any, entities: dict[tuple[str, str, str], dict[str, Any
     return sorted(result, key=lambda row: (row["upstream_entity"]["skill"], row["upstream_entity"]["entity_type"], row["upstream_entity"]["entity_ref"]))
 
 
-def _unsupported_closures(value: Any, runtime_rows: list[dict[str, Any]], entities: dict[tuple[str, str, str], dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    rows = ensure_list(value, "unsupported_item_closures")
-    allowed = {"llm_fallback", "対象外", "別テストレベル", "残存リスク", "成立不能", "重複", "ブロック中"}
-    unsupported: dict[tuple[str, str, str, str], dict[str, Any]] = {}
-    for runtime in runtime_rows:
-        for item in runtime["unsupported_items"]:
-            if not isinstance(item, dict) or not isinstance(item.get("item_key"), str) or not isinstance(item.get("reason_code"), str):
-                raise InvalidInput("unsupported_itemsのschemaが不正です")
-            key = (runtime["skill"], runtime["runtime_unit_key"], runtime["generation_fingerprint"], item["item_key"])
-            unsupported[key] = item
-    closures: list[dict[str, Any]] = []
-    seen: set[tuple[str, str, str, str]] = set()
-    issues: list[dict[str, Any]] = []
-    for index, row in enumerate(rows):
-        required = {"skill", "runtime_unit_key", "generation_fingerprint", "item_key", "reason_code", "handling", "covered_by_entity"}
-        if not isinstance(row, dict) or set(row) != required:
-            raise InvalidInput(f"unsupported_item_closures[{index}]のschemaが不正です")
-        key = (row["skill"], row["runtime_unit_key"], row["generation_fingerprint"], row["item_key"])
-        if key in seen:
-            raise InvalidInput("unsupported closureが重複しています")
-        seen.add(key)
-        item = unsupported.get(key)
-        if item is None or row["reason_code"] != item["reason_code"] or row["handling"] not in allowed:
-            issues.append({"issue_type": "unsupported_closure_mismatch", "blocking": True, "item_key": row["item_key"]})
-        covered = row["covered_by_entity"]
-        if row["handling"] in {"llm_fallback", "重複"}:
-            if not isinstance(covered, dict) or set(covered) != {"skill", "entity_type", "entity_ref", "content_fingerprint"}:
-                issues.append({"issue_type": "unsupported_closure_missing_entity", "blocking": True, "item_key": row["item_key"]})
-            else:
-                entity_key = entity_identity(covered["skill"], covered["entity_type"], covered["entity_ref"])
-                if entity_key not in entities or entities[entity_key]["content_fingerprint"] != covered["content_fingerprint"]:
-                    issues.append({"issue_type": "unsupported_closure_stale_entity", "blocking": True, "item_key": row["item_key"]})
-        elif covered is not None:
-            raise InvalidInput("unsupported closure covered_by_entityが不正です")
-        closures.append(canonicalize(row))
-    for key in sorted(set(unsupported) - seen):
-        issues.append({"issue_type": "unsupported_closure_missing", "blocking": True, "item_key": key[3], "runtime_unit_key": key[1]})
-    return sorted(closures, key=lambda row: (row["skill"], row["runtime_unit_key"], row["item_key"])), issues
-
-
-def _target_closure(runtime_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    mappings: dict[str, dict[str, Any]] = {}
-    dispositions: dict[str, dict[str, Any]] = {}
-    issues: list[dict[str, Any]] = []
-    for runtime in runtime_rows:
-        for row in runtime["target_mappings"]:
-            if not isinstance(row, dict) or not isinstance(row.get("target_ref"), str) or row["target_ref"] in mappings:
-                raise InvalidInput("target mappingが不正または重複しています")
-            mappings[row["target_ref"]] = row
-        for row in runtime["target_dispositions"]:
-            if not isinstance(row, dict) or not isinstance(row.get("target_ref"), str) or row["target_ref"] in dispositions:
-                raise InvalidInput("target dispositionが不正または重複しています")
-            dispositions[row["target_ref"]] = row
-    def terminal(ref: str, visiting: set[str]) -> bool:
-        if ref in mappings:
-            return True
-        if ref in visiting:
-            issues.append({"issue_type": "target_disposition_cycle", "blocking": True, "target_ref": ref})
-            return False
-        row = dispositions.get(ref)
-        if row is None:
-            issues.append({"issue_type": "target_disposition_missing", "blocking": True, "target_ref": ref})
-            return False
-        if row.get("handling") == "ブロック中":
-            issues.append({"issue_type": "target_disposition_blocked", "blocking": True, "target_ref": ref})
-            return False
-        covered = row.get("covered_by_target_version")
-        if row.get("handling") == "重複":
-            if not isinstance(covered, dict) or not isinstance(covered.get("target_ref"), str):
-                issues.append({"issue_type": "target_disposition_missing_covered_target", "blocking": True, "target_ref": ref})
-                return False
-            return terminal(covered["target_ref"], visiting | {ref})
-        return True
-    for ref in sorted(dispositions):
-        terminal(ref, set())
-    return issues
-
-
 def _graph_issues(nodes: list[dict[str, Any]], kinds: dict[str, str], edges: list[dict[str, str]], dispositions: list[dict[str, Any]], runtime_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     incoming: dict[str, set[str]] = {row["node_key"]: set() for row in nodes}
     outgoing: dict[str, set[str]] = {row["node_key"]: set() for row in nodes}
@@ -306,7 +229,7 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
     extra_entities = [list(key) for key in sorted(actual_entity_keys - set(expected_entity_map))]
     entity_freshness = evaluate_entity_freshness(entities_list, {(row["skill"], row["runtime_unit_key"]): row for row in current_runtime_rows})
     fresh_runtime_rows, freshness_issues = evaluate_runtime_unit_freshness(runtime_rows, current_runtime_rows, entities_list)
-    closures, closure_issues = validate_unsupported_item_closures(input_value["unsupported_item_closures"], current_runtime_rows, entities_list, normalized=scopes[0]["normalized_input"] if len(scopes) == 1 else None)
+    closures, closure_issues = validate_unsupported_item_closures(input_value["unsupported_item_closures"], current_runtime_rows, entities_list, normalized=[scope["normalized_input"] for scope in scopes])
     issues: list[dict[str, Any]] = []
     if missing_units:
         issues.append({"issue_type": "missing_runtime_unit", "blocking": True, "runtime_units": missing_units})
@@ -320,15 +243,13 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
     issues.extend(closure_issues)
     issues.extend(_graph_issues(nodes, kinds, edges, dispositions, current_runtime_rows))
     issues.extend(evaluate_target_disposition_closure(current_runtime_rows, entities_list))
-    if len(scopes) == 1:
-        issues.extend(evaluate_materialize_completion(scopes[0]["normalized_input"], current_runtime_rows, entities_list, closures))
+    for scope in scopes:
+        issues.extend(evaluate_materialize_completion(scope["normalized_input"], current_runtime_rows, entities_list, closures))
     for row in fresh_runtime_rows:
         if row["result_status"] != "ready" or row["freshness_status"] != "current" or (row["runtime_required"] and not row["deterministic_generated"]):
             issues.append({"issue_type": "runtime_not_complete", "blocking": True, "skill": row["skill"], "runtime_unit_key": row["runtime_unit_key"]})
-    for row in current_runtime_rows:
-        for completion in row["model_completion"]:
-            if isinstance(completion, dict) and completion.get("materialize_complete") is False:
-                issues.append({"issue_type": "model_materialize_incomplete", "blocking": True, "skill": row["skill"], "runtime_unit_key": row["runtime_unit_key"], "model_key": completion.get("model_key")})
+    issues_by_key = {canonical_json_text(row): row for row in issues}
+    issues = [issues_by_key[key] for key in sorted(issues_by_key)]
     can_complete = bool(scopes) and not issues
     return {
         "runtime_status": "ok", "support_status": "supported", "result_status": "ready" if can_complete else "unresolved", "runtime_required": True, "deterministic_generated": True,

@@ -34,6 +34,32 @@ def simple(mode="bounded-path"):
     }
 
 
+def partial_with_separate_supported_edge(*, uncertain: bool) -> dict:
+    nodes = [
+        {"node_key": "f", "label": "Fork", "kind": "fork", "authority_refs": []},
+        {"node_key": "a", "label": "A", "kind": "normal", "authority_refs": []},
+        {"node_key": "b", "label": "B", "kind": "normal", "authority_refs": []},
+        {"node_key": "j", "label": "Join", "kind": "join", "authority_refs": []},
+        {"node_key": "x", "label": "Other start", "kind": "normal", "authority_refs": []},
+        {"node_key": "y", "label": "Other end", "kind": "terminal", "authority_refs": []},
+        {"node_key": "z", "label": "Uncertain end", "kind": "terminal", "authority_refs": []},
+    ]
+    edges = [
+        {"edge_key": "A-1", "from": "f", "to": "a", "guard_status": True, "guard_refs": [], "label": "A", "authority_refs": []},
+        {"edge_key": "A-2", "from": "a", "to": "j", "guard_status": True, "guard_refs": [], "label": "A join", "authority_refs": []},
+        {"edge_key": "B-1", "from": "f", "to": "b", "guard_status": True, "guard_refs": [], "label": "B", "authority_refs": []},
+        {"edge_key": "B-2", "from": "b", "to": "j", "guard_status": True, "guard_refs": [], "label": "B join", "authority_refs": []},
+        {"edge_key": "X-1", "from": "x", "to": "y", "guard_status": True, "guard_refs": [], "label": "Supported", "authority_refs": []},
+    ]
+    if uncertain:
+        edges.append({"edge_key": "X-2", "from": "x", "to": "z", "guard_status": None, "guard_refs": ["SPEC-001"], "label": "Unknown", "authority_refs": []})
+    return {
+        "nodes": nodes, "edges": edges, "initial_node_keys": ["f", "x"],
+        "regions": [{"region_key": "RG-001", "fork_node_key": "f", "join_node_key": "j", "branches": [{"branch_key": "BR-A", "edge_keys": ["A-1", "A-2"]}, {"branch_key": "BR-B", "edge_keys": ["B-1", "B-2"]}]}],
+        "loop_specs": [], "coverage_mode": "edge", "max_path_length": 10,
+    }
+
+
 class FlowPathsRuntimeTests(unittest.TestCase):
     def test_bounded_path_and_node_execution_contains_labels(self) -> None:
         result = run(simple())
@@ -74,6 +100,19 @@ class FlowPathsRuntimeTests(unittest.TestCase):
         self.assertEqual(result["support_status"], "unsupported")
         self.assertTrue(result["payload"]["unsupported_items"])
         self.assertTrue(all(not row["materializable"] for row in result["payload"]["targets"]))
+
+    def test_partial_with_only_unsupported_items_can_be_ready(self) -> None:
+        result = run(partial_with_separate_supported_edge(uncertain=False))
+        self.assertEqual(result["support_status"], "partial")
+        self.assertEqual(result["result_status"], "ready")
+        self.assertTrue(result["payload"]["unsupported_items"])
+
+    def test_partial_with_blocking_uncertain_guard_is_unresolved(self) -> None:
+        result = run(partial_with_separate_supported_edge(uncertain=True))
+        self.assertEqual(result["runtime_status"], "ok")
+        self.assertEqual(result["support_status"], "partial")
+        self.assertEqual(result["result_status"], "unresolved")
+        self.assertTrue(any(issue["issue_type"] == "uncertain_edge_guard" and issue["blocking"] for issue in result["issues"]))
 
 
 if __name__ == "__main__":

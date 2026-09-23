@@ -30,6 +30,8 @@ description: 新規機能・変更機能・指定対象機能について、変�
 | 変更影響 | `change_impact` | 変更・依存・回帰影響 |
 | 環境要件 | `environment_requirements` | 操作・観測・準備要件 |
 
+`analysis_entities.py`へ渡すtest-analysis contextでは、本文の引用ではなく、判断で実際に参照したEntity identityを`authority_refs[]`（Authorityの`entity_ref`）と`risk_refs[]`（Product Riskの`risk_id`）へ明示します。配列は重複なし・canonical順にし、`residual_risks[]`等の自然言語fieldから参照を推測せず、fingerprintを入力しません。artifact modeではAuthorityをcurrent Machine Entityへ解決します。direct modeでも各Authority refを渡されたcurrent Machine Entityへ解決し、存在しないAuthority Entityを生成・推測しません。Riskは同一invocationで生成されたEntityへ解決されます。unknown refは正常完了にしません。
+
 `selection_key`は正規化済み入力から決まり、callerが期待runtime unit配列やfingerprintを注入してはいけません。`support_status`、`runtime_status`、`result_status`、`freshness_status`、`deterministic_generated`を保持し、partial / unsupported / stale / legacyを完全結果として扱いません。
 
 ## インターフェース

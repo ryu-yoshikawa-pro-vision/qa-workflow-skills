@@ -56,6 +56,8 @@
 
 runtime dispatchを行った場合は、入力・結果・Entityを次の固定ブロックで保存します。expected unitやfingerprintを実行者が追記してはいけません。
 
+`test_analysis_context`のMachine Entity contentには、実際に参照したAuthorityの`entity_ref`を`authority_refs[]`へ、同一invocation内のProduct Risk identityを`risk_refs[]`へ記録します。自然言語の残存リスクや重点から依存を推測せず、fingerprintはruntimeがcurrent Entityから決定します。
+
 ```text
 <!-- Machine Runtime Input: test-analysis -->
 { "skill": "test-analysis", "runtime_contract_version": "runtime-contract-v1", "input": {} }

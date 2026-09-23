@@ -6,7 +6,7 @@ from pathlib import Path
 import sys
 from typing import Any
 
-from runtime_contract import InvalidInput, UnsupportedInput, canonical_json_text, canonicalize, ensure_list, ensure_key, ensure_nonempty_string, exact_compare, reject_unknown, run_cli, typed_value
+from runtime_contract import InvalidInput, UnsupportedInput, canonical_json_text, canonicalize, compare_versions, constraint_intersection_compatible, ensure_list, ensure_key, ensure_nonempty_string, reject_unknown, run_cli, typed_value, typed_value_compare
 
 
 SKILL = "test-analysis"
@@ -19,92 +19,6 @@ def _typed(value: Any, name: str) -> dict:
     if not isinstance(value, dict):
         raise InvalidInput(f"{name}はtyped valueである必要があります")
     return typed_value(value)
-
-
-def _version(value: Any, name: str) -> tuple[int, ...]:
-    if not isinstance(value, str) or not value or any(component != "0" and component.startswith("0") for component in value.split(".")) or any(not component.isdigit() for component in value.split(".")):
-        raise InvalidInput(f"{name}のversion形式が不正です")
-    return tuple(int(component) for component in value.split("."))
-
-
-def _member(value: dict, constraint: dict) -> bool:
-    operator = constraint["operator"]
-    if operator == "eq":
-        return canonical_json_text(value) == canonical_json_text(constraint["value"])
-    if operator == "enum":
-        return any(canonical_json_text(value) == canonical_json_text(candidate) for candidate in constraint["values"])
-    if operator == "range":
-        low = _compare(value, constraint["minimum"])
-        high = _compare(value, constraint["maximum"])
-        return (low > 0 or (low == 0 and constraint["minimum_inclusive"])) and (high < 0 or (high == 0 and constraint["maximum_inclusive"]))
-    return False
-
-
-def _compare(left: dict, right: dict) -> int:
-    if left["type"] != right["type"]:
-        raise InvalidInput("constraint typed value typeが不一致です")
-    if left["type"] == "decimal":
-        return exact_compare(left["value"], right["value"])
-    return (left["value"] > right["value"]) - (left["value"] < right["value"])
-
-
-def _compatible(left: dict, right: dict) -> bool:
-    left_operator = left["operator"]
-    right_operator = right["operator"]
-    if left_operator in {"eq", "enum", "range"} and right_operator in {"eq", "enum", "range"}:
-        if left_operator == "eq" and right_operator == "eq":
-            return canonical_json_text(left["value"]) == canonical_json_text(right["value"])
-        if left_operator == "eq":
-            return _member(left["value"], right)
-        if right_operator == "eq":
-            return _member(right["value"], left)
-        if left_operator == "enum" and right_operator == "enum":
-            return any(canonical_json_text(value) == canonical_json_text(candidate) for value in left["values"] for candidate in right["values"])
-        if left_operator == "enum":
-            return any(_member(value, right) for value in left["values"])
-        if right_operator == "enum":
-            return any(_member(value, left) for value in right["values"])
-        if left["minimum"]["type"] != right["minimum"]["type"]:
-            raise UnsupportedInput("異なるtyped rangeのintersectionは未対応", item_key="environment:range", reason_code="unsupported_intersection")
-        low_side = _compare(left["minimum"], right["minimum"])
-        high_side = _compare(left["maximum"], right["maximum"])
-        if low_side > 0:
-            low, low_inclusive = left["minimum"], left["minimum_inclusive"]
-        elif low_side < 0:
-            low, low_inclusive = right["minimum"], right["minimum_inclusive"]
-        else:
-            low, low_inclusive = left["minimum"], left["minimum_inclusive"] and right["minimum_inclusive"]
-        if high_side < 0:
-            high, high_inclusive = left["maximum"], left["maximum_inclusive"]
-        elif high_side > 0:
-            high, high_inclusive = right["maximum"], right["maximum_inclusive"]
-        else:
-            high, high_inclusive = left["maximum"], left["maximum_inclusive"] and right["maximum_inclusive"]
-        comparison = _compare(low, high)
-        return comparison < 0 or (comparison == 0 and low_inclusive and high_inclusive)
-    if left_operator == "boolean" and right_operator == "boolean":
-        return left["value"] == right["value"]
-    if left_operator == "boolean" and right_operator == "eq":
-        return right["value"]["type"] == "boolean" and right["value"]["value"] == left["value"]
-    if right_operator == "boolean" and left_operator == "eq":
-        return left["value"]["type"] == "boolean" and left["value"]["value"] == right["value"]
-    if left["operator"] == "version_range" and right["operator"] == "version_range":
-        left_low, right_low = _version(left["minimum"], "minimum"), _version(right["minimum"], "minimum")
-        left_high, right_high = _version(left["maximum"], "maximum"), _version(right["maximum"], "maximum")
-        if left_low > right_low:
-            low, low_inclusive = left_low, left["minimum_inclusive"]
-        elif left_low < right_low:
-            low, low_inclusive = right_low, right["minimum_inclusive"]
-        else:
-            low, low_inclusive = left_low, left["minimum_inclusive"] and right["minimum_inclusive"]
-        if left_high < right_high:
-            high, high_inclusive = left_high, left["maximum_inclusive"]
-        elif left_high > right_high:
-            high, high_inclusive = right_high, right["maximum_inclusive"]
-        else:
-            high, high_inclusive = left_high, left["maximum_inclusive"] and right["maximum_inclusive"]
-        return low < high or (low == high and low_inclusive and high_inclusive)
-    raise UnsupportedInput("constraint operatorのintersectionが未対応", item_key="environment:operator", reason_code="unsupported_intersection")
 
 
 def _normalize_requirement(row: dict, index: int) -> dict:
@@ -143,16 +57,17 @@ def _normalize_requirement(row: dict, index: int) -> dict:
         normalized["maximum"] = _typed(row.get("maximum"), f"requirements[{index}].maximum")
         normalized["minimum_inclusive"] = row.get("minimum_inclusive")
         normalized["maximum_inclusive"] = row.get("maximum_inclusive")
-        if not isinstance(normalized["minimum_inclusive"], bool) or not isinstance(normalized["maximum_inclusive"], bool) or _compare(normalized["minimum"], normalized["maximum"]) > 0:
+        if not isinstance(normalized["minimum_inclusive"], bool) or not isinstance(normalized["maximum_inclusive"], bool):
             raise InvalidInput("environment rangeが不正です")
+        if typed_value_compare(normalized["minimum"], normalized["maximum"]) > 0:
+            raise InvalidInput("environment range minimumがmaximumを超えています")
+        constraint_intersection_compatible([normalized])
     elif operator == "version_range":
         normalized["minimum"] = row.get("minimum")
         normalized["maximum"] = row.get("maximum")
         normalized["minimum_inclusive"] = row.get("minimum_inclusive")
         normalized["maximum_inclusive"] = row.get("maximum_inclusive")
-        _version(normalized["minimum"], "minimum")
-        _version(normalized["maximum"], "maximum")
-        if not isinstance(normalized["minimum_inclusive"], bool) or not isinstance(normalized["maximum_inclusive"], bool):
+        if not isinstance(normalized["minimum_inclusive"], bool) or not isinstance(normalized["maximum_inclusive"], bool) or compare_versions(normalized["minimum"], normalized["maximum"]) > 0:
             raise InvalidInput("version range inclusiveが不正です")
     elif operator == "boolean":
         if not isinstance(row.get("value"), bool):
@@ -179,13 +94,11 @@ def generate(input_value: dict, metadata: dict) -> dict:
     for row in rows:
         grouped.setdefault((row["environment_key"], row["dimension_key"]), []).append(row)
     for (environment_key, dimension_key), group in sorted(grouped.items()):
-        for left_index, left in enumerate(group):
-            for right in group[left_index + 1 :]:
-                if not _compatible(left, right):
-                    conflicts.append({"environment_key": environment_key, "dimension_key": dimension_key, "requirement_keys": sorted([left["requirement_key"], right["requirement_key"]])})
+        if not constraint_intersection_compatible(group):
+            conflicts.append({"environment_key": environment_key, "dimension_key": dimension_key, "requirement_keys": sorted(row["requirement_key"] for row in group)})
     conflicts.sort(key=lambda row: (row["environment_key"], row["dimension_key"], row["requirement_keys"]))
     rows.sort(key=lambda row: row["requirement_key"])
-    return {"runtime_status": "ok", "support_status": "supported", "result_status": "ready", "runtime_required": True, "deterministic_generated": True, "payload": {"normalized_requirements": rows, "conflicts": conflicts}, "issues": [{"issue_type": "environment_conflict", "blocking": True, "target_key": f"env:{row['environment_key']}", "authority_refs": []} for row in conflicts]}
+    return {"runtime_status": "ok", "support_status": "supported", "result_status": "unresolved" if conflicts else "ready", "runtime_required": True, "deterministic_generated": True, "payload": {"normalized_requirements": rows, "conflicts": conflicts}, "issues": [{"issue_type": "environment_conflict", "blocking": True, "target_key": f"env:{row['environment_key']}", "authority_refs": []} for row in conflicts]}
 
 
 if __name__ == "__main__":

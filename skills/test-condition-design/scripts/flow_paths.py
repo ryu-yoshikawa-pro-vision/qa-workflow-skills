@@ -300,7 +300,8 @@ def generate(input_value: dict, metadata: dict) -> dict:
     partial = bool(unsupported_items) and supported_targets > 0
     runtime_status = "unsupported" if all_concurrency_unsupported else "ok"
     support_status = "unsupported" if all_concurrency_unsupported else ("partial" if partial else "supported")
-    result_status = "ready" if (all_concurrency_unsupported or partial or not issues) else "unresolved"
+    has_blocking_issue = any(issue.get("blocking") is True for issue in issues)
+    result_status = "unresolved" if has_blocking_issue else "ready"
     return {
         "runtime_status": runtime_status, "support_status": support_status, "result_status": result_status, "runtime_required": not all_concurrency_unsupported, "deterministic_generated": not all_concurrency_unsupported,
         "payload": {"nodes": nodes, "edges": edges, "initial_node_keys": initial_nodes, "regions": regions, "loop_specs": loops, "coverage_mode": mode, "max_path_length": max_path_length, "targets": targets, "unsupported_items": unsupported_items, "uncertain_edges": uncertain, "coverage_summary": {"criterion": mode, "required": supported_targets if partial else len(targets), "covered": supported_targets, "complete": (all_concurrency_unsupported or partial or (bool(targets) and supported_targets == len(targets) and not issues))}},

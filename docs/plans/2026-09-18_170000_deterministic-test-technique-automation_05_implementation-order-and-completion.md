@@ -188,7 +188,7 @@ Step 2.5で成立した経路を、現在Planで必要な全Skill / lifecycleへ
 - whole-model fallbackを再利用する場合もsupport判定を再実行する
 - runtime対象を既存`対象 / 実行範囲`へ限定したうえでの`(skill, runtime_unit_key)` dependency identity / missing / duplicate / cycle / self除外。workflow runtime自身は3つのruntime集合すべてでself inclusionを拒否する
 - expected runtime / Entity集合と実際集合の完全一致。必須unit / Entity丸ごと欠落はblocker、未知の余分なcurrent itemは`invalid_input`。`test_analysis_context / product_risk / technique_selection / change_node / change_edge / environment_requirement / test_data_requirement / disposition`も期待集合から省略しない
-- upstream Entity / semantic dependency / upstream runtime変更とEntity freshness
+- upstream Entity / semantic dependency / upstream runtime変更とEntity freshness。test-analysis contextでは明示`authority_refs[] / risk_refs[]`をcurrent Entityへ解決したdependencyだけを保存し、unknown refは拒否する。参照元変更のstale伝播と未参照Riskの非伝播を確認する
 - model / implementation変更
 - local block / partial unsupported。closureのhandling / currentな完全Machine Entity参照`covered_by_entity` / 既存Disposition条件まで検査し、closure行の存在だけで完了させない
 - whole-model unsupported fallback。通常Coverage modelの`llm_fallback`は同じmodelのcurrent semantic CIへ解決する。internal adapterはactiveのまま残すselected child techniqueごとに同一TCNへ直接定義Coverage modelをnew作成して通常generatorを通し、そのcurrent CIまたは既存Disposition closureへ到達させる。不適用 / 未解決とした技法はTechnique Selectionを更新してselected listから外すか既存block / unresolvedへ戻す。妥当なcurrent closureがない場合は完了させない

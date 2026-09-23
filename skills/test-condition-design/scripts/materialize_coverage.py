@@ -17,10 +17,11 @@ from runtime_contract import (
     TECHNIQUE_SLUGS,
     canonicalize,
     canonical_json_text,
+    compare_versions,
+    constraint_intersection_compatible,
     ensure_list,
     ensure_key,
     ensure_nonempty_string,
-    exact_compare,
     make_machine_entity,
     reject_unknown,
     run_cli,
@@ -29,6 +30,7 @@ from runtime_contract import (
     unsupported_item_key,
     target_ref,
     typed_value,
+    typed_value_compare,
     UnsupportedInput,
     validate_upstream_entities,
     upstream_entity_fingerprints,
@@ -50,78 +52,6 @@ MODEL_TECHNIQUE = {
     "metamorphic": "metamorphic", "error-guessing": "error-guessing",
 }
 OPERATORS = {"eq", "enum", "range", "version_range", "boolean"}
-
-
-def _version(value: Any, name: str) -> tuple[int, ...]:
-    if not isinstance(value, str) or not value or any(not part.isdigit() or (len(part) > 1 and part.startswith("0")) for part in value.split(".")):
-        raise InvalidInput(f"{name}のversion形式が不正です")
-    return tuple(int(part) for part in value.split("."))
-
-
-def _compare(left: dict, right: dict) -> int:
-    if left["type"] != right["type"]:
-        raise UnsupportedInput("異なるtyped valueのintersectionは未対応", item_key="unsupported:test-data:type", reason_code="unsupported_intersection")
-    if left["type"] == "decimal":
-        return exact_compare(left["value"], right["value"])
-    return (left["value"] > right["value"]) - (left["value"] < right["value"])
-
-
-def _member(value: dict, row: dict) -> bool:
-    if row["operator"] == "eq":
-        return canonical_json_text(value) == canonical_json_text(row["value"])
-    if row["operator"] == "enum":
-        return any(canonical_json_text(value) == canonical_json_text(candidate) for candidate in row["values"])
-    if row["operator"] == "range":
-        low = _compare(value, row["minimum"])
-        high = _compare(value, row["maximum"])
-        return (low > 0 or low == 0 and row["minimum_inclusive"]) and (high < 0 or high == 0 and row["maximum_inclusive"])
-    return False
-
-
-def _compatible(left: dict, right: dict) -> bool:
-    a, b = left["operator"], right["operator"]
-    if a in {"eq", "enum", "range"} and b in {"eq", "enum", "range"}:
-        if a == "eq":
-            return _member(left["value"], right)
-        if b == "eq":
-            return _member(right["value"], left)
-        if a == "enum" and b == "enum":
-            return any(canonical_json_text(x) == canonical_json_text(y) for x in left["values"] for y in right["values"])
-        if a == "enum":
-            return any(_member(value, right) for value in left["values"])
-        if b == "enum":
-            return any(_member(value, left) for value in right["values"])
-        low_cmp = _compare(left["minimum"], right["minimum"])
-        high_cmp = _compare(left["maximum"], right["maximum"])
-        low = left["minimum"] if low_cmp > 0 else right["minimum"] if low_cmp < 0 else left["minimum"]
-        high = left["maximum"] if high_cmp < 0 else right["maximum"] if high_cmp > 0 else left["maximum"]
-        low_inclusive = left["minimum_inclusive"] if low_cmp > 0 else right["minimum_inclusive"] if low_cmp < 0 else left["minimum_inclusive"] and right["minimum_inclusive"]
-        high_inclusive = left["maximum_inclusive"] if high_cmp < 0 else right["maximum_inclusive"] if high_cmp > 0 else left["maximum_inclusive"] and right["maximum_inclusive"]
-        comparison = _compare(low, high)
-        return comparison < 0 or comparison == 0 and low_inclusive and high_inclusive
-    if a == "boolean" and b == "boolean":
-        return left["value"] == right["value"]
-    if a == "boolean" and b == "eq":
-        return right["value"]["type"] == "boolean" and right["value"]["value"] == left["value"]
-    if b == "boolean" and a == "eq":
-        return left["value"]["type"] == "boolean" and left["value"]["value"] == right["value"]
-    if a == "version_range" and b == "version_range":
-        low_a, low_b = _version(left["minimum"], "minimum"), _version(right["minimum"], "minimum")
-        high_a, high_b = _version(left["maximum"], "maximum"), _version(right["maximum"], "maximum")
-        if low_a > low_b:
-            low, low_inc = low_a, left["minimum_inclusive"]
-        elif low_a < low_b:
-            low, low_inc = low_b, right["minimum_inclusive"]
-        else:
-            low, low_inc = low_a, left["minimum_inclusive"] and right["minimum_inclusive"]
-        if high_a < high_b:
-            high, high_inc = high_a, left["maximum_inclusive"]
-        elif high_a > high_b:
-            high, high_inc = high_b, right["maximum_inclusive"]
-        else:
-            high, high_inc = high_a, left["maximum_inclusive"] and right["maximum_inclusive"]
-        return low < high or low == high and low_inc and high_inc
-    raise UnsupportedInput("test-data operator組合せが未対応", item_key="unsupported:test-data:operator", reason_code="unsupported_intersection")
 
 
 def _normalize(row: dict, index: int, current_targets: dict[str, dict]) -> dict:
@@ -151,14 +81,15 @@ def _normalize(row: dict, index: int, current_targets: dict[str, dict]) -> dict:
         normalized["maximum"] = typed_value(row.get("maximum"))
         normalized["minimum_inclusive"] = row.get("minimum_inclusive")
         normalized["maximum_inclusive"] = row.get("maximum_inclusive")
-        if not isinstance(normalized["minimum_inclusive"], bool) or not isinstance(normalized["maximum_inclusive"], bool) or _compare(normalized["minimum"], normalized["maximum"]) > 0:
+        if not isinstance(normalized["minimum_inclusive"], bool) or not isinstance(normalized["maximum_inclusive"], bool):
             raise InvalidInput("test-data rangeが不正です")
+        if typed_value_compare(normalized["minimum"], normalized["maximum"]) > 0:
+            raise InvalidInput("test-data range minimumがmaximumを超えています")
+        constraint_intersection_compatible([normalized])
     elif row["operator"] == "version_range":
         normalized["minimum"], normalized["maximum"] = row.get("minimum"), row.get("maximum")
         normalized["minimum_inclusive"], normalized["maximum_inclusive"] = row.get("minimum_inclusive"), row.get("maximum_inclusive")
-        _version(normalized["minimum"], "minimum")
-        _version(normalized["maximum"], "maximum")
-        if not isinstance(normalized["minimum_inclusive"], bool) or not isinstance(normalized["maximum_inclusive"], bool):
+        if not isinstance(normalized["minimum_inclusive"], bool) or not isinstance(normalized["maximum_inclusive"], bool) or compare_versions(normalized["minimum"], normalized["maximum"]) > 0:
             raise InvalidInput("test-data version rangeが不正です")
     else:
         if not isinstance(row.get("value"), bool):
@@ -172,9 +103,23 @@ def _normalize(row: dict, index: int, current_targets: dict[str, dict]) -> dict:
             seen.add(version["target_ref"])
             if version["target_ref"] not in current_targets or not FULL_DIGEST_RE.fullmatch(str(version["target_content_fingerprint"])) or not FULL_DIGEST_RE.fullmatch(str(version["generation_fingerprint"])):
                 raise InvalidInput("source_target_versionsがcurrent targetと不一致です")
-            if current_targets[version["target_ref"]]["source_model_key"] != source_model:
+            current = current_targets[version["target_ref"]]
+            if current["source_model_key"] != source_model:
                 raise InvalidInput("source_target_versionsがsource_model_keyと不一致です")
+            if (
+                version["target_ref"] != current["target_ref"]
+                or version["target_content_fingerprint"] != current["target_content_fingerprint"]
+                or version["generation_fingerprint"] != current["generation_fingerprint"]
+            ):
+                raise InvalidInput("source_target_versionsはcurrent target versionと完全一致する必要があります")
         normalized["source_target_versions"] = sorted(canonicalize(source_versions), key=lambda value: value["target_ref"])
+    applicable = sorted(ref for ref, target in current_targets.items() if target["source_model_key"] == source_model)
+    if normalized["source_target_versions"]:
+        selected = [row["target_ref"] for row in normalized["source_target_versions"]]
+        if not set(selected).issubset(applicable):
+            raise InvalidInput("target-specific requirementのtarget所属が不正です")
+        applicable = sorted(selected)
+    normalized["applicable_target_refs"] = applicable
     return normalized
 
 
@@ -439,22 +384,22 @@ def _validate_test_data_requirements(rows: Any, targets: dict[str, dict[str, Any
         if not isinstance(row, dict):
             raise InvalidInput(f"test_data_requirements[{index}]が不正です")
         allowed = {"data_ref", "requirement_key", "environment_key", "dimension_key", "operator", "authority_refs", "source_model_key", "source_target_versions", "value", "values", "minimum", "maximum", "minimum_inclusive", "maximum_inclusive", "applicable_target_refs", "content_fingerprint"}
-        reject_unknown(row, {"data_ref", "requirement_key", "environment_key", "dimension_key", "operator", "source_model_key", "source_target_versions"}, allowed - {"data_ref", "requirement_key", "environment_key", "dimension_key", "operator", "source_model_key", "source_target_versions"})
+        reject_unknown(row, {"data_ref", "requirement_key", "environment_key", "dimension_key", "operator", "authority_refs", "source_model_key", "source_target_versions"}, allowed - {"data_ref", "requirement_key", "environment_key", "dimension_key", "operator", "authority_refs", "source_model_key", "source_target_versions"})
         data_ref = ensure_nonempty_string(row["data_ref"], "test_data_requirement.data_ref")
         requirement_key = ensure_nonempty_string(row["requirement_key"], "test_data_requirement.requirement_key")
         if data_ref != f"data:{requirement_key}" or data_ref in result:
             raise InvalidInput("test_data_requirement data_refが不正または重複しています")
         requirement_input = {key: value for key, value in row.items() if key not in {"data_ref", "applicable_target_refs", "content_fingerprint"}}
-        requirement_input.setdefault("authority_refs", [])
         normalized = _normalize(requirement_input, index, current_targets)
-        if row.get("applicable_target_refs") is not None and sorted(row["applicable_target_refs"]) != normalized["applicable_target_refs"]:
-            raise InvalidInput("test_data_requirement applicable_target_refsがcurrent targetと不一致です")
+        if "applicable_target_refs" in row:
+            saved_applicable = row["applicable_target_refs"]
+            if not isinstance(saved_applicable, list) or saved_applicable != normalized["applicable_target_refs"]:
+                raise InvalidInput("test_data_requirement applicable_target_refsがcurrent targetと不一致です")
         normalized["data_ref"] = data_ref
         content = canonicalize(normalized)
         if "content_fingerprint" in row and row["content_fingerprint"] != sha256_digest(content):
             raise InvalidInput("test_data_requirement content_fingerprintが不一致です")
-        normalized["content_fingerprint"] = sha256_digest(content)
-        result[data_ref] = canonicalize(normalized)
+        result[data_ref] = content
     return result
 
 
@@ -556,19 +501,17 @@ def _validate_merge_groups(rows: Any, targets: dict[str, dict[str, Any]], annota
         roots = {annotations.get(ref, {}).get("expected_result_root") for ref in refs}
         if len(fingerprints) != 1 or len(roots) != 1 or any(version_map[ref]["target_content_fingerprint"] != targets[ref]["target_content_fingerprint"] or version_map[ref]["generation_fingerprint"] != targets[ref]["generation_fingerprint"] or version_map[ref]["execution_fingerprint"] != targets[ref]["execution_fingerprint"] for ref in refs):
             raise InvalidInput("merge groupのcurrent version / execution / expected resultが一致しません")
-        requirement_rows = [
-            data_requirements[data_ref]
+        requirement_rows_by_ref = {
+            data_ref: data_requirements[data_ref]
             for ref in refs
             for data_ref in annotations[ref].get("test_data_requirement_refs", [])
-        ]
+        }
         by_dimension: dict[str, list[dict[str, Any]]] = {}
-        for requirement in requirement_rows:
+        for requirement in requirement_rows_by_ref.values():
             by_dimension.setdefault(requirement["dimension_key"], []).append(requirement)
         for dimension_rows in by_dimension.values():
-            for left_index, left in enumerate(dimension_rows):
-                for right in dimension_rows[left_index + 1:]:
-                    if left["requirement_key"] != right["requirement_key"] and not _compatible(left, right):
-                        raise InvalidInput("merge groupのtest data requirement intersectionが不成立です")
+            if not constraint_intersection_compatible(dimension_rows):
+                raise InvalidInput("merge groupのtest data requirement intersectionが不成立です")
         groups[key] = sorted(refs)
     return groups
 
@@ -803,12 +746,18 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
                 "generation_fingerprint": model_results[source_model_key]["generation_fingerprint"],
             }],
         )
-    ci_upstream_refs = list(upstream_refs)
-    ci_upstream_refs.extend(
-        {"skill": entity["skill"], "entity_type": entity["entity_type"], "entity_ref": entity["entity_ref"], "content_fingerprint": entity["content_fingerprint"]}
-        for entity in data_entities.values()
-    )
-    ci_upstream_refs = sorted(ci_upstream_refs, key=lambda row: (row["skill"], row["entity_type"], row["entity_ref"]))
+    ci_upstream_by_identity = {
+        (row["skill"], row["entity_type"], row["entity_ref"]): row
+        for row in upstream_refs
+    }
+    for entity in data_entities.values():
+        dependency = {"skill": entity["skill"], "entity_type": entity["entity_type"], "entity_ref": entity["entity_ref"], "content_fingerprint": entity["content_fingerprint"]}
+        identity = (dependency["skill"], dependency["entity_type"], dependency["entity_ref"])
+        existing = ci_upstream_by_identity.get(identity)
+        if existing is not None and existing["content_fingerprint"] != dependency["content_fingerprint"]:
+            raise InvalidInput("current test_data_requirement Machine Entityがnormalized requirementと不一致です")
+        ci_upstream_by_identity[identity] = dependency
+    ci_upstream_refs = [ci_upstream_by_identity[key] for key in sorted(ci_upstream_by_identity)]
     targets_by_ci: dict[str, list[dict[str, Any]]] = {}
     for mapping in active_mappings:
         targets_by_ci.setdefault(mapping["ci_id"], []).append(mapping)

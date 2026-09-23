@@ -42,7 +42,7 @@
 - プロダクトリスクや仮説から未定義の期待挙動を創作していないか
 - テストケースの実行手順へ先回りしていないか
 
-BVA / Pairwise / 状態遷移等の技法固有カバレッジルールは`test-condition-design`を正本とし、本referenceでは再定義しません。
+BVA / Domain / CRUD / Pairwise / 分類木 / 状態遷移 / Grammar / Schema / UI / Random / Metamorphic等の技法固有ルールは担当Skillの現行referenceとPlanを正本とし、本referenceでは再定義しません。技法名を含む成果物をレビューするときは、その技法の正本を確認し、候補母集団、required item、完了数、除外理由が技法固有契約に一致するかを照合します。技法固有の判定を行えない場合は確認した正本と不足根拠を示し、一般的なcoverageチェックリストで補いません。
 
 ## 詳細テストケース
 

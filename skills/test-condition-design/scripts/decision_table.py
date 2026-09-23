@@ -9,6 +9,7 @@ from typing import Any
 
 from runtime_contract import (
     InvalidInput,
+    LimitExceeded,
     MAX_EXPLORATION_NODES,
     canonical_json_bytes,
     canonical_json_text,
@@ -237,9 +238,9 @@ def generate(input_value: dict, metadata: dict) -> dict:
     for condition in conditions:
         domain_sizes *= len(condition["values"])
         if domain_sizes > MAX_RULES:
-            raise InvalidInput("Decision Table rule spaceがhard limitを超えています")
+            raise LimitExceeded("Decision Table rule spaceがhard limitを超えています")
     if domain_sizes > MAX_EXPLORATION_NODES:
-        raise InvalidInput("Decision Table exploration nodeがhard limitを超えています")
+        raise LimitExceeded("Decision Table exploration nodeがhard limitを超えています")
 
     assignments: list[dict[str, dict[str, Any]]] = []
     condition_values = [condition["values"] for condition in conditions]

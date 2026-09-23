@@ -6,7 +6,7 @@ from pathlib import Path
 import sys
 from typing import Any
 
-from runtime_contract import FULL_DIGEST_RE, InvalidInput, UnsupportedInput, canonical_json_text, canonicalize, ensure_key, ensure_list, ensure_nonempty_string, exact_compare, make_machine_entity, reject_unknown, run_cli, typed_value
+from runtime_contract import FULL_DIGEST_RE, InvalidInput, canonical_json_text, canonicalize, compare_versions, constraint_intersection_compatible, ensure_key, ensure_list, ensure_nonempty_string, make_machine_entity, reject_unknown, run_cli, typed_value, typed_value_compare
 
 
 SKILL = "test-condition-design"
@@ -16,82 +16,10 @@ SCRIPT_PATH = Path(__file__).resolve()
 OPERATORS = {"eq", "enum", "range", "version_range", "boolean"}
 
 
-def _version(value: Any, name: str) -> tuple[int, ...]:
-    if not isinstance(value, str) or not value or any(not part.isdigit() or (len(part) > 1 and part.startswith("0")) for part in value.split(".")):
-        raise InvalidInput(f"{name}のversion形式が不正です")
-    return tuple(int(part) for part in value.split("."))
-
-
 def _typed(value: Any, name: str) -> dict:
     if not isinstance(value, dict):
         raise InvalidInput(f"{name}はtyped valueである必要があります")
     return typed_value(value)
-
-
-def _compare(left: dict, right: dict) -> int:
-    if left["type"] != right["type"]:
-        raise UnsupportedInput("異なるtyped valueのintersectionは未対応", item_key="unsupported:test-data:type", reason_code="unsupported_intersection")
-    if left["type"] == "decimal":
-        return exact_compare(left["value"], right["value"])
-    return (left["value"] > right["value"]) - (left["value"] < right["value"])
-
-
-def _member(value: dict, row: dict) -> bool:
-    if row["operator"] == "eq":
-        return canonical_json_text(value) == canonical_json_text(row["value"])
-    if row["operator"] == "enum":
-        return any(canonical_json_text(value) == canonical_json_text(candidate) for candidate in row["values"])
-    if row["operator"] == "range":
-        low = _compare(value, row["minimum"])
-        high = _compare(value, row["maximum"])
-        return (low > 0 or low == 0 and row["minimum_inclusive"]) and (high < 0 or high == 0 and row["maximum_inclusive"])
-    return False
-
-
-def _compatible(left: dict, right: dict) -> bool:
-    a, b = left["operator"], right["operator"]
-    if a in {"eq", "enum", "range"} and b in {"eq", "enum", "range"}:
-        if a == "eq":
-            return _member(left["value"], right)
-        if b == "eq":
-            return _member(right["value"], left)
-        if a == "enum" and b == "enum":
-            return any(canonical_json_text(x) == canonical_json_text(y) for x in left["values"] for y in right["values"])
-        if a == "enum":
-            return any(_member(value, right) for value in left["values"])
-        if b == "enum":
-            return any(_member(value, left) for value in right["values"])
-        low_cmp = _compare(left["minimum"], right["minimum"])
-        high_cmp = _compare(left["maximum"], right["maximum"])
-        low = left["minimum"] if low_cmp > 0 else right["minimum"] if low_cmp < 0 else left["minimum"]
-        high = left["maximum"] if high_cmp < 0 else right["maximum"] if high_cmp > 0 else left["maximum"]
-        low_inclusive = left["minimum_inclusive"] if low_cmp > 0 else right["minimum_inclusive"] if low_cmp < 0 else left["minimum_inclusive"] and right["minimum_inclusive"]
-        high_inclusive = left["maximum_inclusive"] if high_cmp < 0 else right["maximum_inclusive"] if high_cmp > 0 else left["maximum_inclusive"] and right["maximum_inclusive"]
-        comparison = _compare(low, high)
-        return comparison < 0 or comparison == 0 and low_inclusive and high_inclusive
-    if a == "boolean" and b == "boolean":
-        return left["value"] == right["value"]
-    if a == "boolean" and b == "eq":
-        return right["value"]["type"] == "boolean" and right["value"]["value"] == left["value"]
-    if b == "boolean" and a == "eq":
-        return left["value"]["type"] == "boolean" and left["value"]["value"] == right["value"]
-    if a == "version_range" and b == "version_range":
-        low_a, low_b = _version(left["minimum"], "minimum"), _version(right["minimum"], "minimum")
-        high_a, high_b = _version(left["maximum"], "maximum"), _version(right["maximum"], "maximum")
-        if low_a > low_b:
-            low, low_inc = low_a, left["minimum_inclusive"]
-        elif low_a < low_b:
-            low, low_inc = low_b, right["minimum_inclusive"]
-        else:
-            low, low_inc = low_a, left["minimum_inclusive"] and right["minimum_inclusive"]
-        if high_a < high_b:
-            high, high_inc = high_a, left["maximum_inclusive"]
-        elif high_a > high_b:
-            high, high_inc = high_b, right["maximum_inclusive"]
-        else:
-            high, high_inc = high_a, left["maximum_inclusive"] and right["maximum_inclusive"]
-        return low < high or low == high and low_inc and high_inc
-    raise UnsupportedInput("test-data operator組合せが未対応", item_key="unsupported:test-data:operator", reason_code="unsupported_intersection")
 
 
 def _normalize(row: dict, index: int, current_targets: dict[str, dict]) -> dict:
@@ -119,14 +47,17 @@ def _normalize(row: dict, index: int, current_targets: dict[str, dict]) -> dict:
         normalized["maximum"] = _typed(row.get("maximum"), f"requirements[{index}].maximum")
         normalized["minimum_inclusive"] = row.get("minimum_inclusive")
         normalized["maximum_inclusive"] = row.get("maximum_inclusive")
-        if not isinstance(normalized["minimum_inclusive"], bool) or not isinstance(normalized["maximum_inclusive"], bool) or _compare(normalized["minimum"], normalized["maximum"]) > 0:
+        if not isinstance(normalized["minimum_inclusive"], bool) or not isinstance(normalized["maximum_inclusive"], bool):
             raise InvalidInput("test-data rangeが不正です")
+        if typed_value_compare(normalized["minimum"], normalized["maximum"]) > 0:
+            raise InvalidInput("test-data range minimumがmaximumを超えています")
+        # The range may itself be empty; the target-scoped intersection below
+        # reports that as an unresolved requirement conflict.
+        constraint_intersection_compatible([normalized])
     elif row["operator"] == "version_range":
         normalized["minimum"], normalized["maximum"] = row.get("minimum"), row.get("maximum")
         normalized["minimum_inclusive"], normalized["maximum_inclusive"] = row.get("minimum_inclusive"), row.get("maximum_inclusive")
-        _version(normalized["minimum"], "minimum")
-        _version(normalized["maximum"], "maximum")
-        if not isinstance(normalized["minimum_inclusive"], bool) or not isinstance(normalized["maximum_inclusive"], bool):
+        if not isinstance(normalized["minimum_inclusive"], bool) or not isinstance(normalized["maximum_inclusive"], bool) or compare_versions(normalized["minimum"], normalized["maximum"]) > 0:
             raise InvalidInput("test-data version rangeが不正です")
     else:
         if not isinstance(row.get("value"), bool):
@@ -140,8 +71,15 @@ def _normalize(row: dict, index: int, current_targets: dict[str, dict]) -> dict:
             seen.add(version["target_ref"])
             if version["target_ref"] not in current_targets or not FULL_DIGEST_RE.fullmatch(str(version["target_content_fingerprint"])) or not FULL_DIGEST_RE.fullmatch(str(version["generation_fingerprint"])):
                 raise InvalidInput("source_target_versionsがcurrent targetと不一致です")
-            if current_targets[version["target_ref"]]["source_model_key"] != source_model:
+            current = current_targets[version["target_ref"]]
+            if current["source_model_key"] != source_model:
                 raise InvalidInput("source_target_versionsがsource_model_keyと不一致です")
+            if (
+                version["target_ref"] != current["target_ref"]
+                or version["target_content_fingerprint"] != current["target_content_fingerprint"]
+                or version["generation_fingerprint"] != current["generation_fingerprint"]
+            ):
+                raise InvalidInput("source_target_versionsはcurrent target versionと完全一致する必要があります")
         normalized["source_target_versions"] = sorted(canonicalize(source_versions), key=lambda value: value["target_ref"])
     return normalized
 
@@ -183,10 +121,8 @@ def generate(input_value: dict, metadata: dict) -> dict:
         for row in active:
             grouped.setdefault(row["dimension_key"], []).append(row)
         for dimension, rows in sorted(grouped.items()):
-            for index, left in enumerate(rows):
-                for right in rows[index + 1 :]:
-                    if not _compatible(left, right):
-                        conflicts.append({"target_ref": target_ref, "dimension_key": dimension, "requirement_keys": sorted([left["requirement_key"], right["requirement_key"]])})
+            if not constraint_intersection_compatible(rows):
+                conflicts.append({"target_ref": target_ref, "dimension_key": dimension, "requirement_keys": sorted(row["requirement_key"] for row in rows)})
     conflicts.sort(key=lambda row: (row["target_ref"], row["dimension_key"], row["requirement_keys"]))
     entities = [make_machine_entity(SKILL, "test_data_requirement", row["data_ref"], row, runtime_dependencies=[{"skill": SKILL, "runtime_unit_key": "artifact:test_data_requirements:all", "generation_fingerprint": "__CURRENT__"}]) for row in requirements]
     return {"runtime_status": "ok", "support_status": "supported", "result_status": "unresolved" if conflicts else "ready", "runtime_required": True, "deterministic_generated": True, "payload": {"normalized_requirements": sorted(requirements, key=lambda row: row["requirement_key"]), "conflicts": conflicts, "entities": sorted(entities, key=lambda row: row["entity_ref"]), "expected_entity_identities": [{"skill": SKILL, "entity_type": "test_data_requirement", "entity_ref": row["data_ref"]} for row in sorted(requirements, key=lambda row: row["requirement_key"])]}, "issues": [{"issue_type": "test_data_conflict", "blocking": True, "target_key": row["target_ref"], "authority_refs": []} for row in conflicts]}
