@@ -125,14 +125,26 @@ The semantic shared suite skipped exactly these two symlink cases because the Wi
 
 The existing skip behavior and production code were not changed.
 
-## Plan recheck and remaining external check
+## Plan recheck and GitHub Actions on implementation commit
 
 - Context canonical schema and dependency contract are aligned.
 - Implementation completion conditions: 0 unmet.
 - Plan deviation: none found.
-- The remaining external check is GitHub Actions on Ubuntu for the latest revision, including the two symlink tests. The remote branch is still at the initial SHA because this task did not push; therefore that CI check remains pending.
+- Implementation/test commit: `18098995376190b14778dc04c55c1d0aae7f3636` (`fix: address deterministic runtime review findings`).
+- Local HEAD and PR head were both `18098995376190b14778dc04c55c1d0aae7f3636` when the following pull_request workflows completed:
 
-## GitHub PR body proposal (not applied)
+| Workflow | Run ID | Result |
+| --- | ---: | --- |
+| Validate Agent Skills | 35852216520 | success |
+| Validate Semantic Output Evals | 35852216454 | success |
+| Validate Deterministic Output Evals | 35852216435 | success |
+
+- Ubuntu symlink check: run 35852216454, job `semantic-output-evals`, step `Run Semantic Eval shared runtime tests`. Both `test_cases_directory_symlink_escape_raises` and `test_symlink_escape_raises` were discovered and reported `... ok`; the shared suite ran 27 tests and finished `OK` with no skips.
+- Saved external Semantic Judge set: current latest candidate set 24/24 cases, 91/91 criteria PASS; needs_review=0, fail=0, not_evaluable=0. The historical 12 Reference / Eval causes are resolved; current unresolved mismatch count is 0. Criterion evidence and the corrected cause record are in `docs/history/2026-09-23_pr11-semantic-judge-criteria-starting-state.md`.
+- Windows semantic shared suite still skips the same two symlink tests because of WinError 1314; Ubuntu execution above confirms both tests pass when symlink creation is available.
+- This report records CI run IDs for the implementation/test commit. The report-only follow-up head must also pass all three workflows before the PR description is updated.
+
+## GitHub PR body proposal (not yet applied; update after latest-head CI)
 
 > ## 実装状況
 >
@@ -140,15 +152,15 @@ The existing skip behavior and production code were not changed.
 >
 > ## 検証
 >
-> Python 3.11.5でruntime 186件、deterministic 66件、semantic dataset 14 Skill / 51 case、trigger dataset 14 Skill / 328 query、`skills-ref validate` 14/14を確認しました。最新candidateの外部Semantic Judgeは24/24 PASSです。`test-analysis`と`test-condition-design`のAgent runtime smokeもPASSしました。
+> Python 3.11.5でruntime 186件、deterministic 66件、semantic dataset 14 Skill / 51 case、trigger dataset 14 Skill / 328 query、deterministic dataset 14 Skill / 28 case、`skills-ref validate` 14/14を確認しました。最新candidateの外部Semantic Judgeは24/24 case、91/91 criteria PASSです。`test-analysis`と`test-condition-design`のAgent runtime smokeもPASSしました。GitHub Actionsは最新headで3 workflow成功、Ubuntu symlink testsは2/2 PASSです。
 >
-> ## 残確認
+> ## 残課題
 >
-> Windowsではsymlink権限不足によりsemantic shared testの2件がskipされました。最新revisionをpushした後、GitHub ActionsのUbuntu runnerでこの2件を含むCIを最終確認します。
+> 本PRのPlan完了条件に対する既知の未達なし。
 
 ## Git operations
 
-- Commit: not performed.
-- Push: not performed.
-- GitHub PR body update: not performed.
+- Commit `18098995376190b14778dc04c55c1d0aae7f3636`: performed (normal commit).
+- Push: performed; local HEAD = PR head at the time of the first GitHub Actions check.
+- GitHub PR body update: not yet performed; wait for CI on the documentation-only report commit's latest head.
 - Merge / branch deletion / issue or PR close: not performed.
