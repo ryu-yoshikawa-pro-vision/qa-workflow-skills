@@ -235,7 +235,7 @@ stored currentness dependencyとcurrent dependencyが一致しない場合、そ
 
 persisted stateをまだ`要再検証`へ更新できていない場合でも、dependency mismatchが確認できた時点で利用対象から除外します。
 
-保存権限がある場合はexpected entry revisionを使ってCAS更新します。
+保存権限がある場合はexpected entry revisionを保存先のatomic conditional writeへ渡して更新します。競合時は保存せずcurrent entryを再読込します。
 
 ## 12. replacement
 
