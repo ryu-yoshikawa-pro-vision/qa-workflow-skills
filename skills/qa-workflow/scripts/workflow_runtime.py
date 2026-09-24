@@ -162,7 +162,11 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
             current_structure_state=scope["current_structure_state"],
             current_runtime_units=current_runtime_rows,
         ))
-        expected_entities.extend(_expected_entities(scope_skill, normalized, []))
+        expected_entities.extend(_expected_entities(
+            scope_skill,
+            normalized,
+            current_structure_state=scope["current_structure_state"],
+        ))
     expected_unit_keys = sorted({(row["skill"], row["runtime_unit_key"]) for row in expected_units})
     actual_unit_keys = sorted((row["skill"], row["runtime_unit_key"]) for row in runtime_rows)
     missing_units = [list(value) for value in sorted(set(expected_unit_keys) - set(actual_unit_keys))]
@@ -186,8 +190,6 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
     actual_entity_keys = sorted((row["skill"], row["entity_type"], row["entity_ref"]) for row in entities)
     missing_entities = [list(value) for value in sorted(set(expected_entity_keys) - set(actual_entity_keys))]
     extra_entities = [list(value) for value in sorted(set(actual_entity_keys) - set(expected_entity_keys))]
-    if extra_entities:
-        raise InvalidInput("current_entitiesにexpected外のMachine Entityがあります")
     issues = []
     if missing_units:
         issues.append({"issue_type": "missing_runtime_unit", "blocking": True, "runtime_units": missing_units})
@@ -197,6 +199,13 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
         issues.append({"issue_type": "missing_entity", "blocking": True, "entities": missing_entities})
     if extra_entities:
         issues.append({"issue_type": "extra_entity", "blocking": True, "entities": extra_entities})
+    for row in entity_freshness:
+        if row["freshness_status"] == "stale":
+            issues.append({
+                "issue_type": "stale_entity", "blocking": True,
+                "skill": row["skill"], "entity_type": row["entity_type"], "entity_ref": row["entity_ref"],
+                "stale_reasons": row["stale_reasons"],
+            })
     issues.extend(freshness_issues)
     issues.extend(closure_issues)
     issues.extend(evaluate_target_disposition_closure(runtime_rows, entities))

@@ -21,6 +21,10 @@ description: 現在有効な仕様根拠とテスト分析から、何を検証�
 
 runtime入力・結果はSkill-local `runtime_contract.py`の共通envelopeで受け渡し、入力fingerprint、model fingerprint、generation fingerprint、実装fingerprint、upstream Entity fingerprintを保存します。既存結果を再利用する場合は同じmodel keyとgeneration / dependency fingerprintが一致する`current`結果だけを再利用します。
 
+### 最終runtime evidence gate
+
+最終成果物を返す直前に、Skill-local `scripts/runtime_contract.py`をPython 3.11で実行し、stdinへ`{"operation":"verify_runtime_evidence","skill":"test-requirement-design","normalized_skill_input":<実際に使ったcanonical normalized input>,"artifact_markdown":<candidate成果物全文>,"previous_artifact_markdown":null}`を渡します。full buildではpreviousを`null`にし、partial rerunでは同一成果物系列の直前成果物全文を渡します。返却JSONの`valid`が`true`の場合だけ最終出力できます。`valid=false`は既存の最大1回の局所修正・最終確認契約へ統合し、未解決なら完成済みとして返しません。`expected_runtime_units[]`、`expected_entities[]`、dispatch state、前回Entity配列を作って渡してはいけません。
+
 ## インターフェース
 
 - **入力**: 対象範囲の現在有効な仕様根拠とテスト対象範囲。プロダクトリスク / テスト重点、案件コンテキスト、テストレベル / 観測方法は利用可能な場合に補助入力とします。

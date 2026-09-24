@@ -6,7 +6,7 @@ from pathlib import Path
 import re
 import sys
 
-from runtime_contract import InvalidInput, TR_ID_RE, canonicalize, ensure_list, ensure_nonempty_string, make_machine_entity, normalize_machine_entity_disposition, reject_unknown, resolve_entity_dependencies, run_cli, seed_legacy_ids, validate_upstream_entities
+from runtime_contract import InvalidInput, TR_ID_RE, canonicalize, ensure_list, ensure_nonempty_string, machine_entity_runtime_dependency, make_machine_entity, normalize_machine_entity_disposition, reject_unknown, resolve_entity_dependencies, run_cli, seed_legacy_ids, validate_upstream_entities
 
 
 SKILL = "test-requirement-design"
@@ -170,11 +170,11 @@ def generate(input_value: dict, metadata: dict) -> dict:
             if ref in risk_priorities
         )
         deps = resolve_entity_dependencies(ref_identities, current_entities, require_all=metadata["input_mode"] == "artifact")
-        entities.append(make_machine_entity(SKILL, "tr", tr_id, {"tr_id": tr_id, **content}, upstream_entity_dependencies=deps, runtime_dependencies=[{"skill": SKILL, "runtime_unit_key": "artifact:requirement_structure:all", "generation_fingerprint": "__CURRENT__"}]))
+        entities.append(make_machine_entity(SKILL, "tr", tr_id, {"tr_id": tr_id, **content}, upstream_entity_dependencies=deps, runtime_dependencies=[machine_entity_runtime_dependency(SKILL, "artifact:requirement_structure:all")]))
     for row, deps in disposition_rows:
         upstream_ref = row["upstream_entity"]
         ref = f"{upstream_ref['entity_type']}:{upstream_ref['entity_ref']}"
-        entities.append(make_machine_entity(SKILL, "disposition", ref, row, upstream_entity_dependencies=deps, runtime_dependencies=[{"skill": SKILL, "runtime_unit_key": "artifact:requirement_structure:all", "generation_fingerprint": "__CURRENT__"}]))
+        entities.append(make_machine_entity(SKILL, "disposition", ref, row, upstream_entity_dependencies=deps, runtime_dependencies=[machine_entity_runtime_dependency(SKILL, "artifact:requirement_structure:all")]))
     states = []
     for row in previous:
         status = row["status"]

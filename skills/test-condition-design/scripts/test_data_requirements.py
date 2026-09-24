@@ -6,7 +6,7 @@ from pathlib import Path
 import sys
 from typing import Any
 
-from runtime_contract import FULL_DIGEST_RE, MODEL_GENERATORS, MODEL_TYPES, InvalidInput, UnsupportedInput, canonical_json_text, canonicalize, compare_versions, constraint_intersection_compatible, ensure_key, ensure_list, ensure_nonempty_string, make_machine_entity, reject_unknown, resolve_entity_dependencies, run_cli, typed_value, typed_value_compare, validate_upstream_entities
+from runtime_contract import FULL_DIGEST_RE, MODEL_GENERATORS, MODEL_TYPES, InvalidInput, UnsupportedInput, canonical_json_text, canonicalize, compare_versions, constraint_intersection_compatible, ensure_key, ensure_list, ensure_nonempty_string, machine_entity_runtime_dependency, make_machine_entity, reject_unknown, resolve_entity_dependencies, run_cli, typed_value, typed_value_compare, validate_upstream_entities
 
 
 SKILL = "test-condition-design"
@@ -179,7 +179,7 @@ def generate(input_value: dict, metadata: dict) -> dict:
             current_entities,
             require_all=metadata["input_mode"] == "artifact",
         )
-        runtime_dependencies = [{"skill": SKILL, "runtime_unit_key": "artifact:test_data_requirements:all", "generation_fingerprint": "__CURRENT__"}]
+        runtime_dependencies = [machine_entity_runtime_dependency(SKILL, "artifact:test_data_requirements:all")]
         model_runtime_key = (SKILL, f"model:{source_model['entity_ref']}")
         if source_model["content"].get("model_type") in MODEL_GENERATORS:
             model_runtime = source_runtimes.get(model_runtime_key)

@@ -155,6 +155,112 @@ class WorkflowRuntimeTests(unittest.TestCase):
         self.assertIn(["test-condition-design", "model:ep-002"], result["payload"]["missing_runtime_units"])
         self.assertIn(["test-condition-design", "model", "ep-002"], result["payload"]["missing_entities"])
 
+    def _partial_scope_request(self) -> tuple[dict, dict[str, object]]:
+        tcn_one = runtime.make_machine_entity("test-condition-design", "tcn", "TCN-001", {"tcn_id": "TCN-001"})
+        tcn_two = runtime.make_machine_entity("test-condition-design", "tcn", "TCN-002", {"tcn_id": "TCN-002"})
+        model_one = runtime.make_machine_entity("test-condition-design", "model", "ep-001", {"model_key": "ep-001", "model_type": "ep"}, model_key="ep-001")
+        model_two = runtime.make_machine_entity("test-condition-design", "model", "ep-002", {"model_key": "ep-002", "model_type": "ep"}, model_key="ep-002")
+        ci = runtime.make_machine_entity("test-condition-design", "ci", "TCN-001-CI01", {"ci_id": "TCN-001-CI01", "tcn_id": "TCN-001", "model_key": "ep-001"}, model_key="ep-001")
+        normalized = {
+            "tcn_id": "TCN-001", "test_conditions": [{"tcn_id": "TCN-001"}],
+            "models": [{"model_key": "ep-001", "model_type": "ep"}], "ci_ids": ["TCN-001-CI01"],
+            "previous_tcn_ids": [{"tcn_id": "TCN-001", "status": "active"}, {"tcn_id": "TCN-002", "status": "active"}],
+            "previous_model_keys": [
+                {"model_key": "ep-001", "model_type": "ep", "status": "active"},
+                {"model_key": "ep-002", "model_type": "ep", "status": "active"},
+            ],
+            "update_scope_tcn_ids": ["TCN-001"], "update_scope_model_keys": ["ep-001"],
+        }
+        units = [
+            runtime_row("test-condition-design", "artifact:condition_structure:all"),
+            runtime_row("test-condition-design", "model:ep-001", "ep-001"),
+            runtime_row("test-condition-design", "artifact:materialize_coverage:TCN-001", materialize=True, active_ci_ids=["TCN-001-CI01"], materialize_model_key="ep-001"),
+        ]
+        state = {
+            "runtime_results": [{
+                "skill": "test-condition-design", "runtime_unit_key": "artifact:condition_structure:all",
+                "result": {"payload": {"entities": [tcn_one, model_one]}},
+            }],
+        }
+        request = {
+            "metadata": metadata(),
+            "input": {
+                "workflow_scopes": [{"skill": "test-condition-design", "target": "TCN-001", "execution_range": None, "input_mode": "artifact", "normalized_input": normalized, "current_structure_state": state}],
+                "runtime_units": units, "current_runtime_units": units,
+                "current_entities": [tcn_one, tcn_two, model_one, model_two, ci],
+                "unsupported_item_closures": [],
+            },
+        }
+        return request, {"entities": [tcn_one, tcn_two, model_one, model_two, ci], "state": state, "units": units}
+
+    def test_partial_rerun_uses_normalized_scope_and_current_structure_projection(self) -> None:
+        request, parts = self._partial_scope_request()
+        result = run(request)
+        self.assertEqual(result["result_status"], "ready", result)
+        self.assertTrue(result["payload"]["can_complete"])
+        expected = {(row["entity_type"], row["entity_ref"]) for row in result["payload"]["expected_entities"]}
+        self.assertTrue({("tcn", "TCN-001"), ("tcn", "TCN-002"), ("model", "ep-001"), ("model", "ep-002")}.issubset(expected))
+
+        missing = json.loads(json.dumps(request))
+        missing["input"]["current_entities"] = [row for row in missing["input"]["current_entities"] if row["entity_ref"] != "ep-002"]
+        missing_result = run(missing)
+        self.assertEqual(missing_result["result_status"], "unresolved")
+        self.assertIn(["test-condition-design", "model", "ep-002"], missing_result["payload"]["missing_entities"])
+
+    def test_partial_rerun_rejects_deleted_scope_entity_left_in_current_entities(self) -> None:
+        request, parts = self._partial_scope_request()
+        scope = request["input"]["workflow_scopes"][0]
+        scope["normalized_input"]["test_conditions"] = []
+        scope["normalized_input"]["models"] = []
+        scope["normalized_input"]["ci_ids"] = []
+        scope["normalized_input"]["update_scope_model_keys"] = []
+        scope["normalized_input"]["update_scope_tcn_ids"] = ["TCN-001"]
+        scope["current_structure_state"] = {
+            "runtime_results": [{
+                "skill": "test-condition-design", "runtime_unit_key": "artifact:condition_structure:all",
+                "result": {"payload": {"entities": []}},
+            }],
+        }
+        request["input"]["runtime_units"] = [request["input"]["runtime_units"][0]]
+        request["input"]["current_runtime_units"] = request["input"]["runtime_units"]
+        result = run(request)
+        self.assertEqual(result["result_status"], "unresolved")
+        self.assertIn(["test-condition-design", "tcn", "TCN-001"], result["payload"]["extra_entities"])
+
+    def test_stale_scope_out_entity_blocks_partial_workflow_completion(self) -> None:
+        request, parts = self._partial_scope_request()
+        old_context = {
+            "runtime_contract_version": runtime.RUNTIME_CONTRACT_VERSION,
+            "generator_contract_version": "condition-structure-v1",
+            "runtime_implementation_fingerprint": runtime.implementation_fingerprint(RUNTIME_PATH),
+            "generator_implementation_fingerprint": "sha256:" + "1" * 64,
+            "static_data_versions": {},
+        }
+        stale_tcn = runtime.make_machine_entity(
+            "test-condition-design", "tcn", "TCN-002", {"tcn_id": "TCN-002"},
+            runtime_dependencies=[runtime.machine_entity_runtime_dependency("test-condition-design", "artifact:condition_structure:all")],
+        )
+        stale_tcn = runtime.bind_current_entity_runtime_dependencies(
+            {"entities": [stale_tcn]}, "sha256:" + "2" * 64, runtime_context=old_context,
+        )["entities"][0]
+        request["input"]["current_entities"] = [
+            stale_tcn if row["entity_type"] == "tcn" and row["entity_ref"] == "TCN-002" else row
+            for row in request["input"]["current_entities"]
+        ]
+        root_runtime = request["input"]["current_runtime_units"][0]
+        root_runtime.update({
+            "runtime_contract_version": runtime.RUNTIME_CONTRACT_VERSION,
+            "generator_contract_version": "condition-structure-v1",
+            "runtime_implementation_fingerprint": runtime.implementation_fingerprint(RUNTIME_PATH),
+            "generator_implementation_fingerprint": "sha256:" + "3" * 64,
+            "static_data_versions": {},
+        })
+        request["input"]["runtime_units"][0].update({key: value for key, value in root_runtime.items() if key not in {"model_completion", "target_mappings", "target_dispositions"}})
+        result = run(request)
+        self.assertEqual(result["result_status"], "unresolved")
+        self.assertFalse(result["payload"]["can_complete"])
+        self.assertTrue(any(issue["issue_type"] == "stale_entity" and issue.get("entity_ref") == "TCN-002" for issue in result["issues"]))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -115,7 +115,7 @@ class CaseStructureRuntimeTests(unittest.TestCase):
             {(row["skill"], row["entity_type"], row["entity_ref"]) for row in disposition["upstream_entity_dependencies"]},
             {("test-condition-design", "ci", "TCN-001-CI01"), ("test-condition-design", "ci", "TCN-001-CI02"), ("spec-analysis", "authority", "SPEC-001")},
         )
-        runtime_units = {("test-case-design", "artifact:case_structure:all"): {"generation_fingerprint": result["generation_fingerprint"]}}
+        runtime_units = {("test-case-design", "artifact:case_structure:all"): runtime.runtime_unit_row(result)}
         unrelated_authority = runtime.make_machine_entity("spec-analysis", "authority", "SPEC-OTHER", {"title": "unrelated"})
         unrelated_tc = runtime.make_machine_entity(
             "test-case-design", "tc", "TC-002", {"tc_id": "TC-002"},

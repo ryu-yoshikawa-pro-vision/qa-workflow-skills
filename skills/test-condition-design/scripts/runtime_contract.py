@@ -889,11 +889,21 @@ def evaluate_entity_freshness(
         for dependency in entity["runtime_dependencies"]:
             if not isinstance(dependency, dict) or set(dependency) != {"skill", "runtime_unit_key", "generation_fingerprint"}:
                 raise InvalidInput("Machine Entity runtime dependency schemaが不正です")
-            dep_key = (dependency["skill"], dependency["runtime_unit_key"])
+            runtime_unit_key = dependency["runtime_unit_key"]
+            scoped = "#entity:" in runtime_unit_key
+            base_runtime_unit_key = runtime_unit_key.rsplit("#entity:", 1)[0] if scoped else runtime_unit_key
+            dep_key = (dependency["skill"], base_runtime_unit_key if scoped else runtime_unit_key)
             current_runtime = current_runtime_units.get(dep_key)
             if current_runtime is None:
                 reasons.append({"reason_code": "missing_runtime_dependency", "dependency": list(dep_key)})
-            elif current_runtime.get("generation_fingerprint") != dependency["generation_fingerprint"]:
+            elif current_runtime.get("freshness_status") == "stale":
+                reasons.append({"reason_code": "runtime_dependency_stale", "dependency": list(dep_key)})
+            elif scoped and (
+                runtime_unit_key != machine_entity_runtime_unit_key(base_runtime_unit_key, entity)
+                or dependency["generation_fingerprint"] != machine_entity_runtime_generation(entity, current_runtime)
+            ):
+                reasons.append({"reason_code": "runtime_generation_mismatch", "dependency": list(dep_key)})
+            elif not scoped and current_runtime.get("generation_fingerprint") != dependency["generation_fingerprint"]:
                 reasons.append({"reason_code": "runtime_generation_mismatch", "dependency": list(dep_key)})
             elif current_runtime.get("freshness_status") == "stale":
                 reasons.append({"reason_code": "runtime_dependency_stale", "dependency": list(dep_key)})
@@ -1036,6 +1046,63 @@ def entity_identity(skill: str, entity_type: str, entity_ref: str) -> tuple[str,
     return (skill, entity_type, entity_ref)
 
 
+def machine_entity_runtime_unit_key(runtime_unit_key: str, entity: dict[str, Any]) -> str:
+    """Identify the generator's stable per-entity runtime projection."""
+    identity = {
+        "skill": entity.get("skill"),
+        "entity_type": entity.get("entity_type"),
+        "entity_ref": entity.get("entity_ref"),
+    }
+    return f"{runtime_unit_key}#entity:{sha256_digest(identity)}"
+
+
+def machine_entity_runtime_generation(entity: dict[str, Any], runtime_unit: dict[str, Any]) -> str:
+    """Return the current scoped generation for an entity-producing runtime.
+
+    The aggregate runtime generation changes when any partial scope changes.
+    Entity content and its explicit semantic dependencies provide the local
+    meaning boundary; this scoped generation tracks that content together
+    with the producer implementation and contract versions.
+    """
+    required = {
+        "runtime_contract_version", "generator_contract_version",
+        "runtime_implementation_fingerprint", "generator_implementation_fingerprint",
+    }
+    if not required.issubset(runtime_unit):
+        raise InvalidInput("current runtime unit lacks entity generation metadata")
+    for field in ("runtime_implementation_fingerprint", "generator_implementation_fingerprint"):
+        if not FULL_DIGEST_RE.fullmatch(str(runtime_unit[field])):
+            raise InvalidInput("current runtime implementation fingerprint is invalid")
+    static_versions = runtime_unit.get("static_data_versions", {})
+    if not isinstance(static_versions, dict):
+        raise InvalidInput("current runtime static_data_versions is invalid")
+    if not isinstance(entity, dict) or not isinstance(entity.get("content"), dict) or entity.get("content_fingerprint") != sha256_digest(entity.get("content")):
+        raise InvalidInput("Machine Entity content fingerprint is invalid for scoped generation")
+    return sha256_digest({
+        "schema": "machine-entity-runtime-generation-v1",
+        "identity": {
+            "skill": entity["skill"],
+            "entity_type": entity["entity_type"],
+            "entity_ref": entity["entity_ref"],
+        },
+        "content_fingerprint": entity["content_fingerprint"],
+        "runtime_contract_version": runtime_unit["runtime_contract_version"],
+        "generator_contract_version": runtime_unit["generator_contract_version"],
+        "runtime_implementation_fingerprint": runtime_unit["runtime_implementation_fingerprint"],
+        "generator_implementation_fingerprint": runtime_unit["generator_implementation_fingerprint"],
+        "static_data_versions": canonicalize(static_versions),
+    })
+
+
+def machine_entity_runtime_dependency(skill: str, runtime_unit_key: str) -> dict[str, str]:
+    """Mark an entity's local producer dependency for run_cli to bind."""
+    return {
+        "skill": ensure_nonempty_string(skill, "machine entity runtime skill"),
+        "runtime_unit_key": ensure_nonempty_string(runtime_unit_key, "machine entity runtime unit"),
+        "generation_fingerprint": "__CURRENT_ENTITY__",
+    }
+
+
 ALLOWED_ENTITY_TYPES = {
     "authority", "test_analysis_context", "product_risk", "technique_selection", "change_node", "change_edge",
     "environment_requirement", "test_data_requirement", "tr", "tcn", "model", "ci", "tc", "disposition",
@@ -1146,7 +1213,7 @@ def machine_entity_dependency(entity: dict[str, Any]) -> dict[str, str]:
                 **dependency,
                 "generation_fingerprint": "sha256:" + "0" * 64,
             }
-            if isinstance(dependency, dict) and dependency.get("generation_fingerprint") == "__CURRENT__"
+            if isinstance(dependency, dict) and dependency.get("generation_fingerprint") in {"__CURRENT__", "__CURRENT_ENTITY__"}
             else dependency
             for dependency in candidate["runtime_dependencies"]
         ]
@@ -1796,6 +1863,9 @@ def runtime_unit_row(envelope: dict[str, Any], *, freshness_status: str = "curre
     if row["unsupported_items"] is None:
         row["unsupported_items"] = canonicalize(payload.get("unsupported_items", []))
     row["freshness_status"] = freshness_status
+    for field in ("runtime_contract_version", "runtime_implementation_fingerprint", "generator_implementation_fingerprint", "generator_contract_version", "static_data_versions"):
+        if field in envelope:
+            row[field] = canonicalize(envelope[field])
     row["model_completion"] = []
     row["target_mappings"] = []
     row["target_dispositions"] = []
@@ -1830,21 +1900,35 @@ def current_model_result_row(envelope: dict[str, Any], metadata: dict[str, Any])
     return row
 
 
-def bind_current_entity_runtime_dependencies(value: Any, generation_fp: str) -> Any:
-    """Replace the private current-generation marker in generated Entity rows."""
+def bind_current_entity_runtime_dependencies(
+    value: Any,
+    generation_fp: str,
+    *,
+    runtime_context: dict[str, Any] | None = None,
+) -> Any:
+    """Bind current aggregate or content-scoped runtime generations."""
     if isinstance(value, dict):
-        result = {key: bind_current_entity_runtime_dependencies(child, generation_fp) for key, child in value.items()}
+        result = {key: bind_current_entity_runtime_dependencies(child, generation_fp, runtime_context=runtime_context) for key, child in value.items()}
         if "runtime_dependencies" in result and isinstance(result["runtime_dependencies"], list):
             dependencies = []
             for dependency in result["runtime_dependencies"]:
-                if isinstance(dependency, dict) and dependency.get("generation_fingerprint") == "__CURRENT__":
-                    dependency = dict(dependency)
+                if not isinstance(dependency, dict):
+                    dependencies.append(dependency)
+                    continue
+                dependency = dict(dependency)
+                if dependency.get("generation_fingerprint") == "__CURRENT__":
                     dependency["generation_fingerprint"] = generation_fp
+                elif dependency.get("generation_fingerprint") == "__CURRENT_ENTITY__":
+                    if not isinstance(runtime_context, dict):
+                        raise InvalidInput("entity-scoped runtime generation context is missing")
+                    base_unit_key = dependency["runtime_unit_key"]
+                    dependency["runtime_unit_key"] = machine_entity_runtime_unit_key(base_unit_key, result)
+                    dependency["generation_fingerprint"] = machine_entity_runtime_generation(result, runtime_context)
                 dependencies.append(dependency)
             result["runtime_dependencies"] = dependencies
         return result
     if isinstance(value, list):
-        return [bind_current_entity_runtime_dependencies(child, generation_fp) for child in value]
+        return [bind_current_entity_runtime_dependencies(child, generation_fp, runtime_context=runtime_context) for child in value]
     return value
 
 
@@ -2124,10 +2208,230 @@ def _expected_generator(skill: str, runtime_unit_key: str, normalized: dict[str,
     return None
 
 
-def _expected_entities(skill: str, normalized: dict[str, Any], previous_entities: list[dict[str, Any]]) -> list[dict[str, str]]:
+def _runtime_result_entities(result_blocks: Iterable[tuple[str, dict[str, Any]]], skill: str) -> list[dict[str, Any]]:
+    """Project generated Machine Entities only from fixed runtime result payloads."""
+    entities: dict[tuple[str, str, str], dict[str, Any]] = {}
+    for identity, result in result_blocks:
+        if not identity.startswith(skill + "::"):
+            continue
+        payload = result.get("payload")
+        if not isinstance(payload, dict) or "entities" not in payload:
+            continue
+        rows = validate_entity_collection(payload["entities"], expected_skill=skill)
+        for entity in rows:
+            key = entity_identity(entity["skill"], entity["entity_type"], entity["entity_ref"])
+            previous = entities.get(key)
+            if previous is not None and canonical_json_text(previous) != canonical_json_text(entity):
+                raise InvalidInput("current runtime result Machine Entity identity conflicts")
+            entities[key] = entity
+    return [entities[key] for key in sorted(entities)]
+
+
+def _artifact_machine_entity_map(markdown: str) -> dict[str, list[dict[str, Any]]]:
+    blocks = extract_machine_blocks(markdown, "Machine Entities", allow_duplicates=True)
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    seen_block_skills: set[str] = set()
+    identities: set[tuple[str, str, str]] = set()
+    for block_skill, body in blocks:
+        if block_skill in seen_block_skills:
+            raise InvalidInput("Machine Entities block is duplicated")
+        seen_block_skills.add(block_skill)
+        if set(body) != {"schema_version", "skill", "entities"} or body.get("schema_version") != ENTITY_SCHEMA_VERSION or body.get("skill") != block_skill:
+            raise InvalidInput("Machine Entities block schema or owner is invalid")
+        rows = validate_entity_collection(body.get("entities"), expected_skill=block_skill)
+        for row in rows:
+            key = entity_identity(row["skill"], row["entity_type"], row["entity_ref"])
+            if key in identities:
+                raise InvalidInput("Machine Entity identity is duplicated across blocks")
+            identities.add(key)
+        grouped[block_skill] = rows
+    return grouped
+
+
+def _validate_previous_entity_state(
+    skill: str,
+    entities: list[dict[str, Any]],
+    states: dict[str, dict[str, str]],
+) -> None:
+    for entity_type, state in states.items():
+        entity_refs = {row["entity_ref"] for row in entities if row["skill"] == skill and row["entity_type"] == entity_type}
+        if entity_refs != {ref for ref, status in state.items() if status == "active"}:
+            raise InvalidInput("previous ID state and Machine Entities are inconsistent")
+
+
+def _state_map(rows: Any, id_field: str, *, state_field: str = "status") -> dict[str, str]:
+    if not isinstance(rows, list):
+        return {}
+    result: dict[str, str] = {}
+    for row in rows:
+        if not isinstance(row, dict) or not isinstance(row.get(id_field), str) or row.get(state_field) not in {"active", "deleted"}:
+            raise InvalidInput("previous full ID state is invalid")
+        ref = row[id_field]
+        if ref in result:
+            raise InvalidInput("previous full ID state is duplicated")
+        result[ref] = row[state_field]
+    return result
+
+
+def _previous_entity_states(
+    skill: str,
+    normalized: dict[str, Any],
+    previous_result_blocks: Iterable[tuple[str, dict[str, Any]]] | None = None,
+) -> dict[str, dict[str, str]]:
+    state_fields = {
+        "test-requirement-design": {"tr": ("tr_id_state", "tr_id")},
+        "test-condition-design": {
+            "tcn": ("tcn_id_state", "tcn_id"),
+            "model": ("model_key_state", "model_key"),
+            "ci": ("ci_id_state", "ci_id"),
+        },
+        "test-case-design": {"tc": ("tc_id_state", "tc_id")},
+    }.get(skill, {})
+    payloads: list[dict[str, Any]] = []
+    if previous_result_blocks is not None:
+        for identity, result in previous_result_blocks:
+            if identity.startswith(skill + "::") and isinstance(result.get("payload"), dict):
+                payloads.append(result["payload"])
+    output: dict[str, dict[str, str]] = {}
+    for entity_type, (field, id_field) in state_fields.items():
+        artifact_values = [payload[field] for payload in payloads if field in payload]
+        normalized_field = {
+            "tr": "previous_tr_ids",
+            "tcn": "previous_tcn_ids",
+            "model": "previous_model_keys",
+            "tc": "previous_tc_ids",
+            "ci": "previous_ci_ids",
+        }[entity_type]
+        source = artifact_values[-1] if artifact_values else normalized.get(normalized_field, [])
+        output[entity_type] = _state_map(source, id_field)
+    return output
+
+
+def _identity_is_updated(skill: str, entity: dict[str, Any], normalized: dict[str, Any]) -> bool:
+    entity_type = entity["entity_type"]
+    ref = entity["entity_ref"]
+    update_tcn = set(normalized.get("update_scope_tcn_ids", []))
+    update_model = set(normalized.get("update_scope_model_keys", []))
+    update_tr = set(normalized.get("update_scope_tr_ids", []))
+    update_tc = set(normalized.get("update_scope_tc_ids", []))
+    if skill == "test-requirement-design" and entity_type == "tr":
+        return ref in update_tr
+    if skill == "test-condition-design":
+        if entity_type == "tcn":
+            return ref in update_tcn
+        if entity_type == "model":
+            return (entity.get("model_key") or ref) in update_model
+        if entity_type == "ci":
+            content = entity.get("content", {})
+            return content.get("tcn_id") in update_tcn or (entity.get("model_key") or content.get("model_key")) in update_model
+        if entity_type == "test_data_requirement":
+            content = entity.get("content", {})
+            model_key = content.get("source_model_key")
+            return isinstance(model_key, str) and model_key in update_model
+    if skill == "test-case-design" and entity_type == "tc":
+        return ref in update_tc
+    if entity_type == "disposition":
+        upstream = entity.get("content", {}).get("upstream_entity")
+        if not isinstance(upstream, dict):
+            raise InvalidInput("Disposition ownership is missing from previous Machine Entity")
+        upstream_type = upstream.get("entity_type")
+        upstream_ref = upstream.get("entity_ref")
+        if not isinstance(upstream_type, str) or not isinstance(upstream_ref, str):
+            raise InvalidInput("Disposition upstream identity is invalid")
+        if skill == "test-requirement-design" and upstream_type == "tr":
+            return upstream_ref in update_tr
+        if skill == "test-condition-design":
+            if upstream_type == "tcn":
+                return upstream_ref in update_tcn
+            if upstream_type == "model":
+                return upstream_ref in update_model
+            if upstream_type == "ci":
+                # CI belongs to the TCN/materialize update boundary; the
+                # scoped CI row supplies that owner below when available.
+                owner_entity = entity.get("_owner_entity")
+                if isinstance(owner_entity, dict):
+                    owner_content = owner_entity.get("content", {})
+                    return owner_content.get("tcn_id") in update_tcn or owner_entity.get("model_key") in update_model
+            if upstream_type == "test_data_requirement":
+                owner_entity = entity.get("_owner_entity")
+                if isinstance(owner_entity, dict):
+                    return owner_entity.get("content", {}).get("source_model_key") in update_model
+        if skill == "test-case-design":
+            return upstream_type == "tc" and upstream_ref in update_tc
+    return False
+
+
+def _active_previous_entity_identities(
+    skill: str,
+    normalized: dict[str, Any],
+    states: dict[str, dict[str, str]],
+) -> set[tuple[str, str, str]]:
+    result: set[tuple[str, str, str]] = set()
+    state_types = {
+        "test-requirement-design": (("tr", "update_scope_tr_ids"),),
+        "test-condition-design": (("tcn", "update_scope_tcn_ids"), ("model", "update_scope_model_keys")),
+        "test-case-design": (("tc", "update_scope_tc_ids"),),
+    }.get(skill, ())
+    for entity_type, scope_field in state_types:
+        scope = set(normalized.get(scope_field, []))
+        for ref, status in states.get(entity_type, {}).items():
+            if status == "active" and ref not in scope:
+                result.add((skill, entity_type, ref))
+    if skill == "test-condition-design":
+        current_tcn = normalized.get("tcn_id")
+        # materialize_coverage is TCN-scoped; an invoked TCN replaces its CI
+        # snapshot, while active CI state for other TCNs remains carryable.
+        materialized_tcn = current_tcn if isinstance(current_tcn, str) else None
+        for ref, status in states.get("ci", {}).items():
+            if status != "active":
+                continue
+            if materialized_tcn and ref.startswith(materialized_tcn + "-"):
+                continue
+            result.add((skill, "ci", ref))
+    return result
+
+
+def _carry_forward_machine_entities(
+    skill: str,
+    normalized: dict[str, Any],
+    previous_entities: list[dict[str, Any]],
+    states: dict[str, dict[str, str]],
+) -> list[dict[str, Any]]:
+    owners = {
+        entity_identity(row["skill"], row["entity_type"], row["entity_ref"]): row
+        for row in previous_entities
+        if isinstance(row, dict) and all(isinstance(row.get(field), str) for field in ("skill", "entity_type", "entity_ref"))
+    }
+    result: list[dict[str, Any]] = []
+    for row in previous_entities:
+        if not isinstance(row, dict) or row.get("skill") != skill:
+            continue
+        status_map = states.get(row["entity_type"], {})
+        if row["entity_type"] in states and status_map.get(row["entity_ref"]) != "active":
+            continue
+        candidate = dict(row)
+        if row["entity_type"] == "disposition":
+            upstream = row.get("content", {}).get("upstream_entity", {})
+            owner_key = (upstream.get("skill"), upstream.get("entity_type"), upstream.get("entity_ref")) if isinstance(upstream, dict) else None
+            if owner_key in owners:
+                candidate["_owner_entity"] = owners[owner_key]
+        if not _identity_is_updated(skill, candidate, normalized):
+            result.append(row)
+    return result
+
+
+def _expected_entities(
+    skill: str,
+    normalized: dict[str, Any],
+    previous_entities: list[dict[str, Any]] | None = None,
+    *,
+    current_result_entities: list[dict[str, Any]] | None = None,
+    previous_states: dict[str, dict[str, str]] | None = None,
+    current_structure_state: dict[str, Any] | None = None,
+) -> list[dict[str, str]]:
     result: list[dict[str, str]] = []
     def add(entity_type: str, ref: Any) -> None:
-        if isinstance(ref, str):
+        if isinstance(entity_type, str) and isinstance(ref, str):
             result.append({"skill": skill, "entity_type": entity_type, "entity_ref": ref})
     if skill == "spec-analysis":
         for row in normalized.get("authorities", []):
@@ -2186,7 +2490,18 @@ def _expected_entities(skill: str, normalized: dict[str, Any], previous_entities
             upstream_ref = row.get("entity_ref")
             if isinstance(upstream_ref, str):
                 result.append({"skill": row["skill"], "entity_type": row["entity_type"], "entity_ref": upstream_ref})
-    result.extend(previous_entities)
+    for entity in current_result_entities or []:
+        if isinstance(entity, dict):
+            add(entity.get("entity_type"), entity.get("entity_ref"))
+    state = previous_states if previous_states is not None else _previous_entity_states(skill, normalized)
+    if previous_entities is None:
+        for _skill, entity_type, ref in _active_previous_entity_identities(skill, normalized, state):
+            result.append({"skill": _skill, "entity_type": entity_type, "entity_ref": ref})
+    state_results = _state_result_blocks(current_structure_state, skill)
+    for entity in _runtime_result_entities([(identity, body) for identity, body in state_results.items()], skill):
+        result.append({"skill": entity["skill"], "entity_type": entity["entity_type"], "entity_ref": entity["entity_ref"]})
+    for row in _carry_forward_machine_entities(skill, normalized, previous_entities or [], state):
+        result.append({"skill": skill, "entity_type": row["entity_type"], "entity_ref": row["entity_ref"]})
     unique: dict[tuple[str, str, str], dict[str, str]] = {}
     for row in result:
         key = (row["skill"], row["entity_type"], row["entity_ref"])
@@ -2394,33 +2709,136 @@ def verify_runtime_evidence(request: dict[str, Any]) -> dict[str, Any]:
             actual_entities = validate_entity_collection(rows, expected_skill=skill)
         except RuntimeErrorBase as exc:
             issues.append({"issue_type": exc.issue_type, "blocking": True, "message": exc.message})
-    previous_entities: list[dict[str, str]] = []
-    if previous:
-        previous_blocks = extract_machine_blocks(previous, "Machine Entities", allow_duplicates=True)
-        previous_ids = [identity for identity, _ in previous_blocks if identity == skill]
-        if len(previous_ids) > 1:
-            issues.append({"issue_type": "duplicate_previous_machine_entities_block", "blocking": True, "skill": skill})
-        for identity, body in [block for block in previous_blocks if block[0] == skill][:1]:
-            if identity != skill or not isinstance(body, dict):
-                continue
-            try:
-                rows = validate_entity_collection(body.get("entities", []), expected_skill=skill)
-            except RuntimeErrorBase:
-                issues.append({"issue_type": "invalid_previous_artifact", "blocking": True})
-                continue
-            for row in rows:
-                previous_entities.append({"skill": row["skill"], "entity_type": row["entity_type"], "entity_ref": row["entity_ref"]})
-    expected_entity_rows = _expected_entities(skill, normalized, previous_entities)
+    previous_entities: list[dict[str, Any]] = []
+    previous_states: dict[str, dict[str, str]] = {}
+    previous_result_blocks: list[tuple[str, dict[str, Any]]] = []
+    if previous is not None:
+        try:
+            previous_entity_map = _artifact_machine_entity_map(previous)
+            if skill not in previous_entity_map:
+                raise InvalidInput("previous artifact has no Machine Entities block for this Skill")
+            previous_entities = [entity for rows in previous_entity_map.values() for entity in rows]
+            previous_result_blocks = extract_machine_blocks(previous, "Machine Runtime Result", allow_duplicates=True)
+            previous_input_blocks = extract_machine_blocks(previous, "Machine Runtime Input", allow_duplicates=True)
+            previous_result_ids = [identity for identity, _ in previous_result_blocks]
+            previous_input_ids = [identity for identity, _ in previous_input_blocks]
+            if len(previous_result_ids) != len(set(previous_result_ids)) or len(previous_input_ids) != len(set(previous_input_ids)) or set(previous_result_ids) != set(previous_input_ids):
+                raise InvalidInput("previous runtime input/result pairs are incomplete or duplicated")
+            previous_inputs = dict(previous_input_blocks)
+            for old_identity, old_result in previous_result_blocks:
+                old_skill = old_identity.split("::", 1)[0]
+                if old_skill != skill:
+                    continue
+                old_pair_issues = _validate_runtime_pair(skill, old_identity, previous_inputs[old_identity], old_result)
+                if old_pair_issues:
+                    raise InvalidInput("previous runtime evidence is not current under this runtime contract")
+            previous_states = _previous_entity_states(skill, normalized, previous_result_blocks)
+            tracked_types = set(previous_states)
+            state_keys = {key for _, row in previous_result_blocks if _.startswith(skill + "::") for key in (row.get("payload", {}) if isinstance(row.get("payload"), dict) else {})}
+            required_state_fields = {
+                "tr": "tr_id_state", "tcn": "tcn_id_state", "model": "model_key_state", "tc": "tc_id_state", "ci": "ci_id_state",
+            }
+            for entity_type in tracked_types:
+                if any(row["skill"] == skill and row["entity_type"] == entity_type for row in previous_entities) and required_state_fields[entity_type] not in state_keys:
+                    raise InvalidInput("previous full ID state is missing")
+            _validate_previous_entity_state(skill, previous_entities, previous_states)
+            normalized_states = _previous_entity_states(skill, normalized)
+            normalized_state_fields = {
+                "tr": "previous_tr_ids", "tcn": "previous_tcn_ids", "model": "previous_model_keys",
+                "tc": "previous_tc_ids", "ci": "previous_ci_ids",
+            }
+            for entity_type, state in previous_states.items():
+                field = normalized_state_fields[entity_type]
+                if field not in normalized or normalized_states.get(entity_type, {}) != state:
+                    raise InvalidInput("normalized previous ID state does not match previous artifact")
+            previous_result_entities = _runtime_result_entities(previous_result_blocks, skill)
+            previous_entity_by_key = {
+                entity_identity(row["skill"], row["entity_type"], row["entity_ref"]): row
+                for row in previous_entity_map[skill]
+            }
+            for row in previous_result_entities:
+                key = entity_identity(row["skill"], row["entity_type"], row["entity_ref"])
+                if key not in previous_entity_by_key or canonical_json_text(previous_entity_by_key[key]) != canonical_json_text(row):
+                    raise InvalidInput("previous runtime result entity does not match Machine Entities")
+        except RuntimeErrorBase as exc:
+            previous_entities = []
+            previous_states = {}
+            issues.append({"issue_type": "invalid_previous_artifact", "blocking": True, "message": exc.message})
+        except (KeyError, TypeError, ValueError) as exc:
+            previous_entities = []
+            previous_states = {}
+            issues.append({"issue_type": "invalid_previous_artifact", "blocking": True, "message": f"previous state could not be validated: {type(exc).__name__}"})
+    try:
+        current_result_entities = _runtime_result_entities(result_blocks, skill)
+    except RuntimeErrorBase as exc:
+        current_result_entities = []
+        issues.append({"issue_type": "invalid_current_runtime_entities", "blocking": True, "message": exc.message})
+    expected_entity_rows = _expected_entities(
+        skill,
+        normalized,
+        previous_entities,
+        current_result_entities=current_result_entities,
+        previous_states=previous_states if previous is not None else {},
+    )
     expected_entity_keys = sorted((row["skill"], row["entity_type"], row["entity_ref"]) for row in expected_entity_rows)
     actual_entity_keys = sorted((row["skill"], row["entity_type"], row["entity_ref"]) for row in actual_entities)
     missing_entities = sorted(set(expected_entity_keys) - set(actual_entity_keys))
     extra_entities = sorted(set(actual_entity_keys) - set(expected_entity_keys))
     if missing_entities:
-        issues.append({"issue_type": "missing_entity", "blocking": True, "entities": missing_entities})
+        issues.append({"issue_type": "missing_entity", "blocking": True, "entities": [list(row) for row in missing_entities]})
     if extra_entities:
-        issues.append({"issue_type": "extra_entity", "blocking": True, "entities": extra_entities})
+        issues.append({"issue_type": "extra_entity", "blocking": True, "entities": [list(row) for row in extra_entities]})
     if duplicate_entities:
-        issues.append({"issue_type": "duplicate_entity", "blocking": True, "entities": sorted(set(duplicate_entities))})
+        issues.append({"issue_type": "duplicate_entity", "blocking": True, "entities": [list(row) for row in sorted(set(duplicate_entities))]})
+    candidate_entity_map: dict[tuple[str, str, str], dict[str, Any]] = {}
+    try:
+        candidate_entity_map = {
+            entity_identity(row["skill"], row["entity_type"], row["entity_ref"]): row
+            for rows in _artifact_machine_entity_map(artifact).values()
+            for row in rows
+        }
+    except RuntimeErrorBase as exc:
+        issues.append({"issue_type": "invalid_machine_entities", "blocking": True, "message": exc.message})
+    current_result_map = {
+        entity_identity(row["skill"], row["entity_type"], row["entity_ref"]): row
+        for row in current_result_entities
+    }
+    for key, expected_entity in current_result_map.items():
+        actual_entity = candidate_entity_map.get(key)
+        if actual_entity is not None and canonical_json_text(actual_entity) != canonical_json_text(expected_entity):
+            issues.append({"issue_type": "current_entity_result_mismatch", "blocking": True, "entity": list(key)})
+    carry_rows = _carry_forward_machine_entities(skill, normalized, previous_entities, previous_states) if previous_entities else []
+    for row in carry_rows:
+        key = entity_identity(row["skill"], row["entity_type"], row["entity_ref"])
+        actual = candidate_entity_map.get(key)
+        if actual is not None and canonical_json_text(actual) != canonical_json_text(row):
+            issues.append({"issue_type": "carry_forward_entity_changed", "blocking": True, "entity": list(key)})
+    if carry_rows and candidate_entity_map:
+        try:
+            runtime_rows: list[dict[str, Any]] = []
+            for result_identity, body in result_blocks:
+                if "::" not in result_identity:
+                    continue
+                runtime_rows.append(runtime_unit_row(body))
+            fresh_runtime_rows, _runtime_issues = evaluate_runtime_unit_freshness(
+                runtime_rows, runtime_rows, list(candidate_entity_map.values()),
+            )
+            current_runtime_rows = {
+                (row["skill"], row["runtime_unit_key"]): row
+                for row in fresh_runtime_rows
+            }
+            freshness = evaluate_entity_freshness(list(candidate_entity_map.values()), current_runtime_rows)
+            freshness_by_key = {
+                (row["skill"], row["entity_type"], row["entity_ref"]): row
+                for row in freshness
+            }
+            for row in carry_rows:
+                key = entity_identity(row["skill"], row["entity_type"], row["entity_ref"])
+                status = freshness_by_key.get(key, {}).get("freshness_status")
+                if status != "current":
+                    issues.append({"issue_type": "stale_carry_forward_entity", "blocking": True, "entity": list(key), "stale_reasons": freshness_by_key.get(key, {}).get("stale_reasons", [])})
+        except RuntimeErrorBase as exc:
+            issues.append({"issue_type": exc.issue_type, "blocking": True, "message": exc.message})
     return {
         "valid": not issues,
         "issues": issues,
@@ -2432,9 +2850,9 @@ def verify_runtime_evidence(request: dict[str, Any]) -> dict[str, Any]:
         "duplicates": sorted(set(duplicates)),
         "expected_entities": expected_entity_rows,
         "actual_entities": actual_entities,
-        "missing_entities": missing_entities,
-        "extra_entities": extra_entities,
-        "duplicate_entities": sorted(set(duplicate_entities)),
+        "missing_entities": [list(row) for row in missing_entities],
+        "extra_entities": [list(row) for row in extra_entities],
+        "duplicate_entities": [list(row) for row in sorted(set(duplicate_entities))],
     }
 
 
@@ -2631,7 +3049,17 @@ def run_cli(
         if not isinstance(runtime_required, bool) or not isinstance(deterministic_generated, bool):
             raise InternalRuntimeError("runtime_required / deterministic_generatedが不正です")
         generation_fp = generation_fingerprint(generator=generator, input_fp=input_fp, model_fp=model_fp, runtime_contract_version=RUNTIME_CONTRACT_VERSION, generator_contract_version=generator_contract_version, runtime_impl_fp=runtime_fp, generator_impl_fp=generator_fp, upstream=upstream_fps, static_data_versions=effective_static_data_versions)
-        payload = bind_current_entity_runtime_dependencies(payload, generation_fp)
+        payload = bind_current_entity_runtime_dependencies(
+            payload,
+            generation_fp,
+            runtime_context={
+                "runtime_contract_version": RUNTIME_CONTRACT_VERSION,
+                "generator_contract_version": generator_contract_version,
+                "runtime_implementation_fingerprint": runtime_fp,
+                "generator_implementation_fingerprint": generator_fp,
+                "static_data_versions": effective_static_data_versions,
+            },
+        )
         issues = canonicalize(result.get("issues", []))
         if not isinstance(issues, list):
             raise InternalRuntimeError("issuesはarrayである必要があります")

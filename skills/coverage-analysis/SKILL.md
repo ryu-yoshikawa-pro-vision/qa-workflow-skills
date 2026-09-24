@@ -25,6 +25,10 @@ description: 現在有効な仕様根拠、プロダクトリスク、テスト�
 
 `current`だけを有効な証拠として扱い、`stale` / `legacy` / `deleted` / `unknown`は未閉鎖または要再検証へ分類します。件数、リンク数、`can_complete`だけで閉鎖済みと判定せず、semantic coverage itemと期待根拠が揃わない場合は完全カバレッジへ昇格しません。
 
+### 最終runtime evidence gate
+
+最終成果物を返す直前に、Skill-local `scripts/runtime_contract.py`をPython 3.11で実行し、stdinへ`{"operation":"verify_runtime_evidence","skill":"coverage-analysis","normalized_skill_input":<実際に使ったcanonical normalized input>,"artifact_markdown":<candidate成果物全文>,"previous_artifact_markdown":null}`を渡します。full buildではpreviousを`null`にし、partial rerunでは同一成果物系列の直前成果物全文を渡します。返却JSONの`valid`が`true`の場合だけ最終出力できます。`valid=false`は既存の最大1回の局所修正・最終確認契約へ統合し、未解決なら完成済みとして返しません。`expected_runtime_units[]`、`expected_entities[]`、dispatch state、前回Entity配列を作って渡してはいけません。
+
 ## インターフェース
 
 - **入力**: 部分実行では比較対象となる成果物と期待する上流 / 下流関係またはカバレッジ基準。全体ワークフローでは対象範囲の現在有効な仕様根拠からテストケースまでの利用可能な成果物、カバレッジ基準、扱いの情報。

@@ -34,6 +34,10 @@ description: 新規機能・変更機能・指定対象機能について、変�
 
 `selection_key`は正規化済み入力から決まり、callerが期待runtime unit配列やfingerprintを注入してはいけません。`support_status`、`runtime_status`、`result_status`、`freshness_status`、`deterministic_generated`を保持し、partial / unsupported / stale / legacyを完全結果として扱いません。
 
+### 最終runtime evidence gate
+
+最終成果物を返す直前に、Skill-local `scripts/runtime_contract.py`をPython 3.11で実行し、stdinへ`{"operation":"verify_runtime_evidence","skill":"test-analysis","normalized_skill_input":<実際に使ったcanonical normalized input>,"artifact_markdown":<candidate成果物全文>,"previous_artifact_markdown":null}`を渡します。full buildではpreviousを`null`にし、partial rerunでは同一成果物系列の直前成果物全文を渡します。返却JSONの`valid`が`true`の場合だけ最終出力できます。`valid=false`は既存の最大1回の局所修正・最終確認契約へ統合し、未解決なら完成済みとして返しません。`expected_runtime_units[]`、`expected_entities[]`、dispatch state、前回Entity配列を作って渡してはいけません。
+
 ## インターフェース
 
 - **入力**: 対象挙動と要求範囲を理解できる現在有効な仕様根拠または同等の仕様情報。変更情報、既存テスト / 不具合、案件コンテキスト等は利用可能な場合に補助入力とします。

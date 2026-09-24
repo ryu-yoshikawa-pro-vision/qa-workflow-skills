@@ -84,6 +84,42 @@ class TraceabilityRuntimeTests(unittest.TestCase):
         self.assertIn(["test-condition-design", "artifact:condition_structure:all"], result["payload"]["missing_runtime_units"])
         self.assertIn("model:ep-001", [row["runtime_unit_key"] for row in result["payload"]["expected_runtime_units"]])
 
+    def test_partial_rerun_projects_scope_out_entities_from_fixed_structure_state(self) -> None:
+        request = base_request()
+        tcn_two = runtime.make_machine_entity("test-condition-design", "tcn", "TCN-002", {"tcn_id": "TCN-002"})
+        model_two = runtime.make_machine_entity("test-condition-design", "model", "ep-002", {"model_key": "ep-002", "model_type": "ep"}, model_key="ep-002")
+        ci_two = runtime.make_machine_entity("test-condition-design", "ci", "TCN-002-CI01", {"ci_id": "TCN-002-CI01", "tcn_id": "TCN-002", "model_key": "ep-002"}, model_key="ep-002")
+        request["input"]["current_entities"].extend([tcn_two, model_two, ci_two])
+        request["input"]["nodes"].extend([
+            {"node_key": "TCN-002", "node_type": "TCN"},
+            {"node_key": "TCN-002-CI01", "node_type": "CI"},
+        ])
+        normalized = {
+            "tcn_id": "TCN-001", "test_conditions": [{"tcn_id": "TCN-001"}],
+            "models": [{"model_key": "ep-001", "model_type": "ep"}], "ci_ids": ["TCN-001-CI01"],
+            "previous_tcn_ids": [{"tcn_id": "TCN-001", "status": "active"}, {"tcn_id": "TCN-002", "status": "active"}],
+            "previous_model_keys": [{"model_key": "ep-001", "model_type": "ep", "status": "active"}, {"model_key": "ep-002", "model_type": "ep", "status": "active"}],
+            "previous_ci_ids": [{"ci_id": "TCN-001-CI01", "status": "active"}, {"ci_id": "TCN-002-CI01", "status": "active"}],
+            "update_scope_tcn_ids": ["TCN-001"], "update_scope_model_keys": ["ep-001"],
+        }
+        scope = request["input"]["analysis_scopes"][0]
+        scope["normalized_input"] = normalized
+        root = request["input"]["runtime_units"][0]
+        scope["current_structure_state"] = {
+            "runtime_results": [{
+                "skill": "test-condition-design", "runtime_unit_key": "artifact:condition_structure:all",
+                "result": {
+                    "generation_fingerprint": root["generation_fingerprint"],
+                    "payload": {"entities": request["input"]["current_entities"][:2]},
+                },
+            }],
+        }
+        result = run(request)
+        self.assertEqual(result["payload"]["missing_entities"], [])
+        self.assertEqual(result["payload"]["extra_entities"], [])
+        expected = {(row["entity_type"], row["entity_ref"]) for row in result["payload"]["expected_entities"]}
+        self.assertTrue({("tcn", "TCN-002"), ("model", "ep-002"), ("ci", "TCN-002-CI01")}.issubset(expected))
+
     def test_self_runtime_is_rejected(self) -> None:
         request = base_request()
         request["input"]["runtime_units"].append(runtime_row("coverage-analysis", "artifact:traceability:all"))

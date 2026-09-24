@@ -26,6 +26,10 @@ description: 新規機能・変更機能・指定対象機能を、テスト設�
 
 runtimeの`can_complete`はオーケストレーションの要約であり、下流のsemantic coverage、実行結果、報告、cleanup確認を置き換えません。`current`でない上流Entityやruntime結果は再利用せず、変更があれば依存fingerprintから影響対象だけを`要再検証`へ伝播します。
 
+### 最終runtime evidence gate
+
+最終成果物を返す直前に、Skill-local `scripts/runtime_contract.py`をPython 3.11で実行し、stdinへ`{"operation":"verify_runtime_evidence","skill":"qa-workflow","normalized_skill_input":<実際に使ったcanonical normalized input>,"artifact_markdown":<candidate成果物全文>,"previous_artifact_markdown":null}`を渡します。full buildではpreviousを`null`にし、partial rerunでは同一成果物系列の直前成果物全文を渡します。返却JSONの`valid`が`true`の場合だけ最終出力できます。`valid=false`は既存の最大1回の局所修正・最終確認契約へ統合し、未解決なら完成済みとして返しません。`expected_runtime_units[]`、`expected_entities[]`、dispatch state、前回Entity配列を作って渡してはいけません。これは`workflow_runtime.py`によるworkflow全体の検証を置き換えず、両方を実行します。
+
 ## インターフェース
 
 - **入力**: ユーザー要求、要求する最終成果物、識別可能な対象範囲。情報源、既存QA成果物、案件コンテキスト、進行モード、既知のブロック中 / 残存リスク / `要再検証`状態は利用可能な場合に補助入力とします。

@@ -127,6 +127,13 @@ class TestDataRequirementRuntimeTests(unittest.TestCase):
         dep = entity["upstream_entity_dependencies"]
         self.assertEqual([(item["entity_type"], item["entity_ref"]) for item in dep], [("model", "ep-001")])
         self.assertIn({"skill": "test-condition-design", "runtime_unit_key": "model:ep-001", "generation_fingerprint": DIGEST}, entity["runtime_dependencies"])
+        tdr_runtime = runtime.runtime_unit_row(current)
+        scoped_dependency = {
+            "skill": "test-condition-design",
+            "runtime_unit_key": runtime.machine_entity_runtime_unit_key("artifact:test_data_requirements:all", entity),
+            "generation_fingerprint": runtime.machine_entity_runtime_generation(entity, tdr_runtime),
+        }
+        self.assertIn(scoped_dependency, entity["runtime_dependencies"])
 
         adapter = model_entity("schema-001", "schema")
         adapter_result = run(
@@ -169,6 +176,23 @@ class TestDataRequirementRuntimeTests(unittest.TestCase):
         rows = [source, {**old_requirement, "runtime_dependencies": [dep for dep in old_requirement["runtime_dependencies"] if dep["runtime_unit_key"] == "model:ep-001"]}]
         states = {row["entity_ref"]: row["freshness_status"] for row in runtime.evaluate_entity_freshness(rows, current_runtime) if row["entity_type"] == "test_data_requirement"}
         self.assertEqual(states["data:model-wide"], "stale")
+
+        second_model = model_entity("bva-002", "bva")
+        expanded = run(
+            {"current_source_targets": [], "requirements": [
+                requirement("model-wide", "eq", value={"type": "string", "value": "admin"}),
+                {**requirement("unrelated", "eq", value={"type": "string", "value": "other"}), "source_model_key": "bva-002"},
+            ]},
+            models=[source, second_model],
+        )
+        self.assertNotEqual(expanded["generation_fingerprint"], old_result["generation_fingerprint"])
+        current_runtime = {
+            ("test-condition-design", "artifact:test_data_requirements:all"): runtime.runtime_unit_row(expanded),
+            ("test-condition-design", "model:ep-001"): {"generation_fingerprint": DIGEST},
+        }
+        rows = [source, second_model, old_requirement]
+        states = {row["entity_ref"]: row["freshness_status"] for row in runtime.evaluate_entity_freshness(rows, current_runtime) if row["entity_type"] == "test_data_requirement"}
+        self.assertEqual(states["data:model-wide"], "current")
 
         rows = [source, unrelated_changed, {**old_requirement, "runtime_dependencies": []}]
         states = {row["entity_ref"]: row["freshness_status"] for row in runtime.evaluate_entity_freshness(rows, {}) if row["entity_type"] == "test_data_requirement"}

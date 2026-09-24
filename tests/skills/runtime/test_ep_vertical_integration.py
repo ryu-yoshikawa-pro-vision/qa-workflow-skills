@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 from pathlib import Path
+import re
 import subprocess
 import sys
 import unittest
@@ -310,6 +311,27 @@ class EpVerticalIntegrationTests(unittest.TestCase):
         self.assertTrue(evidence["valid"], evidence)
         cli_evidence = run_script(RUNTIME_PATH, evidence_request)
         self.assertTrue(cli_evidence["valid"], cli_evidence)
+
+        def without_block(markdown: str, title: str) -> str:
+            return re.sub(
+                rf"(?ms)^### {re.escape(title)}\r?\n.*?(?=^### |\Z)",
+                "",
+                markdown,
+                count=1,
+            )
+
+        missing_root_artifact = without_block(
+            without_block(artifact, "Machine Runtime Input: test-condition-design::artifact:condition_structure:all"),
+            "Machine Runtime Result: test-condition-design::artifact:condition_structure:all",
+        )
+        missing_root = run_script(RUNTIME_PATH, {**evidence_request, "artifact_markdown": missing_root_artifact})
+        self.assertFalse(missing_root["valid"], missing_root)
+        self.assertIn("test-condition-design::artifact:condition_structure:all", missing_root["missing"])
+
+        missing_entities_artifact = without_block(artifact, "Machine Entities: test-condition-design")
+        missing_entities = run_script(RUNTIME_PATH, {**evidence_request, "artifact_markdown": missing_entities_artifact})
+        self.assertFalse(missing_entities["valid"], missing_entities)
+        self.assertTrue(missing_entities["missing_entities"], missing_entities)
 
         rows = [runtime.runtime_unit_row(condition), runtime.runtime_unit_row(ep), runtime.runtime_unit_row(tdr), runtime.runtime_unit_row(materialize, materialize=materialize["payload"])]
         workflow_input = {

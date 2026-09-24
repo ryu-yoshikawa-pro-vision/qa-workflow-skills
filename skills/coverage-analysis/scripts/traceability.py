@@ -217,7 +217,11 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
             current_structure_state=scope["current_structure_state"],
             current_runtime_units=current_runtime_rows,
         ))
-        expected_entities.extend(_expected_entities(scope["skill"], scope["normalized_input"], []))
+        expected_entities.extend(_expected_entities(
+            scope["skill"],
+            scope["normalized_input"],
+            current_structure_state=scope["current_structure_state"],
+        ))
     expected_unit_map = {(row["skill"], row["runtime_unit_key"]): row for row in expected_units if (row["skill"], row["runtime_unit_key"]) not in SELF_UNITS}
     expected_entity_map = {(row["skill"], row["entity_type"], row["entity_ref"]): row for row in expected_entities}
     actual_unit_keys = {(row["skill"], row["runtime_unit_key"]) for row in runtime_rows}
@@ -239,6 +243,13 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
         issues.append({"issue_type": "missing_entity", "blocking": True, "entities": missing_entities})
     if extra_entities:
         issues.append({"issue_type": "extra_entity", "blocking": True, "entities": extra_entities})
+    for row in entity_freshness:
+        if row["freshness_status"] == "stale":
+            issues.append({
+                "issue_type": "stale_entity", "blocking": True,
+                "skill": row["skill"], "entity_type": row["entity_type"], "entity_ref": row["entity_ref"],
+                "stale_reasons": row["stale_reasons"],
+            })
     issues.extend(freshness_issues)
     issues.extend(closure_issues)
     issues.extend(_graph_issues(nodes, kinds, edges, dispositions, current_runtime_rows))

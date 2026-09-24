@@ -425,6 +425,28 @@ class MaterializeRuntimeTests(unittest.TestCase):
         self.assertEqual(states[("ci", ci_b["entity_ref"])], "stale")
         self.assertEqual(states[("ci", semantic_ci["entity_ref"])], "stale")
 
+        current_runtime_rows = [runtime.runtime_unit_row(result) for result in (ep_a, ep_b, tdr)]
+        current_runtime_rows.append(runtime.runtime_unit_row(materialized, materialize=materialized["payload"]))
+        current_runtime_map = {(row["skill"], row["runtime_unit_key"]): row for row in current_runtime_rows}
+        current_states = {
+            (row["entity_type"], row["entity_ref"]): row["freshness_status"]
+            for row in runtime.evaluate_entity_freshness(machine_rows, current_runtime_map)
+        }
+        self.assertEqual(current_states[("ci", ci_a["entity_ref"])], "current")
+        self.assertEqual(current_states[("ci", ci_b["entity_ref"])], "current")
+
+        changed_aggregate = dict(current_runtime_map)
+        materialize_key = ("test-condition-design", "artifact:materialize_coverage:TCN-001")
+        changed_aggregate[materialize_key] = {
+            **changed_aggregate[materialize_key], "generation_fingerprint": "sha256:" + "f" * 64,
+        }
+        current_states = {
+            (row["entity_type"], row["entity_ref"]): row["freshness_status"]
+            for row in runtime.evaluate_entity_freshness(machine_rows, changed_aggregate)
+        }
+        self.assertEqual(current_states[("ci", ci_a["entity_ref"])] , "current")
+        self.assertEqual(current_states[("ci", ci_b["entity_ref"])] , "current")
+
     def test_consumer_rederives_applicability_and_rejects_tampered_saved_refs(self) -> None:
         ep = ep_result()
         targets = ep["payload"]["targets"]

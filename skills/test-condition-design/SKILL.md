@@ -35,6 +35,10 @@ description: テスト要求を条件・観点へ展開し、同値分割、境�
 
 すべてのruntimeは共通envelope、stable target ID、Machine Entity、freshnessを使用します。adapter childは親modelのgeneration fingerprintとderived child inputに依存し、親と同じ内容を独立再生成しません。`materialize_coverage`はcurrentかつdeterministicなruntime結果だけを統合し、unsupported / stale / legacy / semantic CI不足をcompleteへ昇格しません。
 
+### 最終runtime evidence gate
+
+最終成果物を返す直前に、Skill-local `scripts/runtime_contract.py`をPython 3.11で実行し、stdinへ`{"operation":"verify_runtime_evidence","skill":"test-condition-design","normalized_skill_input":<実際に使ったcanonical normalized input>,"artifact_markdown":<candidate成果物全文>,"previous_artifact_markdown":null}`を渡します。full buildではpreviousを`null`にし、partial rerunでは同一成果物系列の直前成果物全文を渡します。返却JSONの`valid`が`true`の場合だけ最終出力できます。`valid=false`は既存の最大1回の局所修正・最終確認契約へ統合し、未解決なら完成済みとして返しません。`expected_runtime_units[]`、`expected_entities[]`、dispatch state、前回Entity配列を作って渡してはいけません。
+
 ## インターフェース
 
 - **入力**: 何を検証するかが明確なテスト要求または同等の成果物。現在有効な仕様根拠、プロダクトリスク、状態モデル / 業務ルール等は利用可能な場合に補助入力とします。

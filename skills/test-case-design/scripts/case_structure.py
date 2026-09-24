@@ -16,6 +16,7 @@ from runtime_contract import (
     constraint_intersection_compatible,
     ensure_list,
     ensure_nonempty_string,
+    machine_entity_runtime_dependency,
     make_machine_entity,
     normalize_machine_entity_disposition,
     reject_unknown,
@@ -344,7 +345,7 @@ def generate(input_value: dict, metadata: dict) -> dict:
             require_all=metadata["input_mode"] == "artifact",
         )
         content = {**draft, "tc_id": tc_id, "status": "active"}
-        entities.append(make_machine_entity(SKILL, "tc", tc_id, content, upstream_entity_dependencies=upstream, runtime_dependencies=[{"skill": SKILL, "runtime_unit_key": "artifact:case_structure:all", "generation_fingerprint": "__CURRENT__"}]))
+        entities.append(make_machine_entity(SKILL, "tc", tc_id, content, upstream_entity_dependencies=upstream, runtime_dependencies=[machine_entity_runtime_dependency(SKILL, "artifact:case_structure:all")]))
     disposition_rows = _validate_dispositions(input_value["dispositions"], current_entities, metadata["input_mode"])
     for disposition, dependencies in disposition_rows:
         upstream = disposition["upstream_entity"]
@@ -354,7 +355,7 @@ def generate(input_value: dict, metadata: dict) -> dict:
             f"{upstream['entity_type']}:{upstream['entity_ref']}",
             disposition,
             upstream_entity_dependencies=dependencies,
-            runtime_dependencies=[{"skill": SKILL, "runtime_unit_key": "artifact:case_structure:all", "generation_fingerprint": "__CURRENT__"}],
+            runtime_dependencies=[machine_entity_runtime_dependency(SKILL, "artifact:case_structure:all")],
         ))
     return {
         "runtime_status": "ok", "support_status": "supported", "result_status": "ready" if not violations else "unresolved", "runtime_required": True, "deterministic_generated": True,

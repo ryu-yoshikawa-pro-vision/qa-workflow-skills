@@ -18,6 +18,7 @@ from runtime_contract import (
     ensure_int,
     ensure_list,
     ensure_nonempty_string,
+    machine_entity_runtime_dependency,
     make_machine_entity,
     normalize_machine_entity_disposition,
     reject_unknown,
@@ -447,7 +448,7 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
             current_entities,
             require_all=metadata["input_mode"] == "artifact",
         )
-        tcn_entities[tcn_id] = make_machine_entity(SKILL, "tcn", tcn_id, content, upstream_entity_dependencies=dependencies, runtime_dependencies=[{"skill": SKILL, "runtime_unit_key": "artifact:condition_structure:all", "generation_fingerprint": "__CURRENT__"}])
+        tcn_entities[tcn_id] = make_machine_entity(SKILL, "tcn", tcn_id, content, upstream_entity_dependencies=dependencies, runtime_dependencies=[machine_entity_runtime_dependency(SKILL, "artifact:condition_structure:all")])
     entities = list(tcn_entities.values())
     for draft in model_drafts:
         model_key = model_mapping[draft["draft_key"]]
@@ -468,13 +469,13 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
         ))
         dependencies.sort(key=lambda item: (item["skill"], item["entity_type"], item["entity_ref"]))
         content = canonicalize(row)
-        entity = make_machine_entity(SKILL, "model", model_key, content, model_key=model_key, upstream_entity_dependencies=dependencies, runtime_dependencies=[{"skill": SKILL, "runtime_unit_key": "artifact:condition_structure:all", "generation_fingerprint": "__CURRENT__"}])
+        entity = make_machine_entity(SKILL, "model", model_key, content, model_key=model_key, upstream_entity_dependencies=dependencies, runtime_dependencies=[machine_entity_runtime_dependency(SKILL, "artifact:condition_structure:all")])
         entities.append(entity)
 
     for row, deps in disposition_rows:
         upstream = row["upstream_entity"]
         ref = f"{upstream['entity_type']}:{upstream['entity_ref']}"
-        entities.append(make_machine_entity(SKILL, "disposition", ref, row, upstream_entity_dependencies=deps, runtime_dependencies=[{"skill": SKILL, "runtime_unit_key": "artifact:condition_structure:all", "generation_fingerprint": "__CURRENT__"}]))
+        entities.append(make_machine_entity(SKILL, "disposition", ref, row, upstream_entity_dependencies=deps, runtime_dependencies=[machine_entity_runtime_dependency(SKILL, "artifact:condition_structure:all")]))
 
     tcn_state = []
     for row in previous_tcn:

@@ -23,6 +23,7 @@ from runtime_contract import (
     ensure_key,
     ensure_nonempty_string,
     make_machine_entity,
+    machine_entity_runtime_dependency,
     resolve_entity_dependencies,
     reject_unknown,
     run_cli,
@@ -813,7 +814,7 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
                 content,
                 model_key=first["model_key"],
                 upstream_entity_dependencies=target_dependencies,
-                runtime_dependencies=[{"skill": SKILL, "runtime_unit_key": f"artifact:materialize_coverage:{tcn_id}", "generation_fingerprint": "__CURRENT__"}],
+                runtime_dependencies=[machine_entity_runtime_dependency(SKILL, f"artifact:materialize_coverage:{tcn_id}")],
             )
         )
 
@@ -826,7 +827,7 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
             "authority_refs": item["authority_refs"], "reference_refs": item["reference_refs"], "test_data_requirement_refs": item["test_data_requirement_refs"], "status": "active",
         }
         item_dependencies = ci_dependencies(item["model_key"], item["test_data_requirement_refs"])
-        ci_entities.append(make_machine_entity(SKILL, "ci", item["ci_id"], content, model_key=item["model_key"], upstream_entity_dependencies=item_dependencies, runtime_dependencies=[{"skill": SKILL, "runtime_unit_key": f"artifact:materialize_coverage:{tcn_id}", "generation_fingerprint": "__CURRENT__"}]))
+        ci_entities.append(make_machine_entity(SKILL, "ci", item["ci_id"], content, model_key=item["model_key"], upstream_entity_dependencies=item_dependencies, runtime_dependencies=[machine_entity_runtime_dependency(SKILL, f"artifact:materialize_coverage:{tcn_id}")]))
 
     model_completion = []
     for model_key in sorted(models):

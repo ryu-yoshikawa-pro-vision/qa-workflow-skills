@@ -23,6 +23,10 @@ description: テスト条件とカバレッジ項目を、第三者が迷わず�
 
 Machine Runtime Input / Resultは入力・model・generation・implementation fingerprintとupstream Entity fingerprintを持ち、`runtime_status=ok`かつ`result_status=ready`、`freshness_status=current`、`deterministic_generated=true`の結果だけを通常のケース生成へ使います。実行時のPASS / FAILはケース設計の期待結果を置き換えません。
 
+### 最終runtime evidence gate
+
+最終成果物を返す直前に、Skill-local `scripts/runtime_contract.py`をPython 3.11で実行し、stdinへ`{"operation":"verify_runtime_evidence","skill":"test-case-design","normalized_skill_input":<実際に使ったcanonical normalized input>,"artifact_markdown":<candidate成果物全文>,"previous_artifact_markdown":null}`を渡します。full buildではpreviousを`null`にし、partial rerunでは同一成果物系列の直前成果物全文を渡します。返却JSONの`valid`が`true`の場合だけ最終出力できます。`valid=false`は既存の最大1回の局所修正・最終確認契約へ統合し、未解決なら完成済みとして返しません。`expected_runtime_units[]`、`expected_entities[]`、dispatch state、前回Entity配列を作って渡してはいけません。
+
 ## インターフェース
 
 - **入力**: 対象テスト条件、必要なカバレッジ項目またはカバレッジ項目内包済みの具体テスト条件、期待挙動を判断できる現在有効な仕様根拠。

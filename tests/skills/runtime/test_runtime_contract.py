@@ -4,6 +4,7 @@ import importlib.util
 import json
 from pathlib import Path
 import re
+import subprocess
 import sys
 import unittest
 
@@ -337,6 +338,352 @@ class EntityAndEvidenceTests(unittest.TestCase):
         )
         self.assertFalse(invalid["valid"])
         self.assertIn("test-condition-design::model:ep-001", invalid["incomplete_pairs"])
+
+    def _tr_entity(self, ref: str, runtime_context: dict[str, object], generation_fp: str) -> dict:
+        entity = runtime.make_machine_entity(
+            "test-requirement-design", "tr", ref, {"tr_id": ref, "text": f"Requirement {ref}"},
+            runtime_dependencies=[runtime.machine_entity_runtime_dependency("test-requirement-design", "artifact:requirement_structure:all")],
+        )
+        return runtime.bind_current_entity_runtime_dependencies(
+            {"entities": [entity]}, generation_fp, runtime_context=runtime_context,
+        )["entities"][0]
+
+    def _tr_artifact(self, normalized: dict, entities: list[dict], state: list[dict], *, generator_fp: str | None = None, result_entities: list[dict] | None = None) -> str:
+        skill = "test-requirement-design"
+        unit = "artifact:requirement_structure:all"
+        generator = "requirement_structure"
+        generator_contract_version = "requirement-structure-v1"
+        generator_path = REPO_ROOT / "skills" / skill / "scripts" / "requirement_structure.py"
+        generator_impl_fp = generator_fp or runtime.implementation_fingerprint(generator_path)
+        metadata = {
+            "envelope_version": "1", "skill": skill, "runtime_contract_version": runtime.RUNTIME_CONTRACT_VERSION,
+            "generator_contract_version": generator_contract_version, "runtime_unit_key": unit, "model_key": None,
+            "model_type": None, "technique_slug": None, "selection_source": None, "selection_key": None,
+            "scope_key": "all", "input_mode": "direct", "upstream_entities": [], "upstream_runtime_units": [],
+            "static_data_versions": {}, "authority_refs": [], "reference_refs": [],
+        }
+        input_fp = runtime.input_fingerprint(skill, unit, "direct", normalized, [], [], None)
+        model_fp = runtime.model_fingerprint(metadata, input_fp)
+        runtime_impl_fp = runtime.implementation_fingerprint(RUNTIME_PATH)
+        generation_fp = runtime.generation_fingerprint(
+            generator=generator, input_fp=input_fp, model_fp=model_fp,
+            runtime_contract_version=runtime.RUNTIME_CONTRACT_VERSION,
+            generator_contract_version=generator_contract_version,
+            runtime_impl_fp=runtime_impl_fp, generator_impl_fp=generator_impl_fp,
+            upstream=[], static_data_versions={},
+        )
+        context = {
+            "runtime_contract_version": runtime.RUNTIME_CONTRACT_VERSION,
+            "generator_contract_version": generator_contract_version,
+            "runtime_implementation_fingerprint": runtime_impl_fp,
+            "generator_implementation_fingerprint": generator_impl_fp,
+            "static_data_versions": {},
+        }
+        envelope = {
+            "envelope_version": "1", "skill": skill, "runtime_contract_version": runtime.RUNTIME_CONTRACT_VERSION,
+            "generator_contract_version": generator_contract_version, "generator": generator, "runtime_unit_key": unit,
+            "model_key": None, "input_fingerprint": input_fp, "model_fingerprint": model_fp,
+            "generation_fingerprint": generation_fp, "runtime_implementation_fingerprint": runtime_impl_fp,
+            "generator_implementation_fingerprint": generator_impl_fp, "upstream_entity_fingerprints": [],
+            "upstream_runtime_units": [], "support_status": "supported", "static_data_versions": {},
+            "runtime_status": "ok", "result_status": "ready", "runtime_required": True,
+            "deterministic_generated": True, "fallback_reason": None,
+            "payload": {"tr_id_state": state, "entities": entities if result_entities is None else result_entities}, "issues": [],
+        }
+        return "\n".join((
+            runtime.render_runtime_input(skill, metadata, normalized),
+            runtime.render_runtime_result(skill, envelope),
+            runtime.render_machine_entities(skill, entities),
+        ))
+
+    def _structure_artifact(
+        self,
+        skill: str,
+        normalized: dict,
+        entities: list[dict],
+        state_payload: dict,
+        *,
+        result_entities: list[dict] | None = None,
+        extra_blocks: list[str] | None = None,
+    ) -> str:
+        generator, unit, version = {
+            "test-condition-design": ("condition_structure", "artifact:condition_structure:all", "condition-structure-v1"),
+            "test-case-design": ("case_structure", "artifact:case_structure:all", "case-structure-v1"),
+        }[skill]
+        runtime_path = REPO_ROOT / "skills" / skill / "scripts" / "runtime_contract.py"
+        generator_path = runtime_path.parent / f"{generator}.py"
+        metadata = {
+            "envelope_version": "1", "skill": skill, "runtime_contract_version": runtime.RUNTIME_CONTRACT_VERSION,
+            "generator_contract_version": version, "runtime_unit_key": unit, "model_key": None,
+            "model_type": None, "technique_slug": None, "selection_source": None, "selection_key": None,
+            "scope_key": "all", "input_mode": "direct", "upstream_entities": [], "upstream_runtime_units": [],
+            "static_data_versions": {}, "authority_refs": [], "reference_refs": [],
+        }
+        input_value = {"normalized": normalized}
+        input_fp = runtime.input_fingerprint(skill, unit, "direct", input_value, [], [], None)
+        model_fp = runtime.model_fingerprint(metadata, input_fp)
+        runtime_fp = runtime.implementation_fingerprint(runtime_path)
+        generator_fp = runtime.implementation_fingerprint(generator_path)
+        generation_fp = runtime.generation_fingerprint(
+            generator=generator, input_fp=input_fp, model_fp=model_fp,
+            runtime_contract_version=runtime.RUNTIME_CONTRACT_VERSION, generator_contract_version=version,
+            runtime_impl_fp=runtime_fp, generator_impl_fp=generator_fp, upstream=[], static_data_versions={},
+        )
+        payload = {**state_payload, "entities": entities if result_entities is None else result_entities}
+        result = {
+            "envelope_version": "1", "skill": skill, "runtime_contract_version": runtime.RUNTIME_CONTRACT_VERSION,
+            "generator_contract_version": version, "generator": generator, "runtime_unit_key": unit, "model_key": None,
+            "input_fingerprint": input_fp, "model_fingerprint": model_fp, "generation_fingerprint": generation_fp,
+            "runtime_implementation_fingerprint": runtime_fp, "generator_implementation_fingerprint": generator_fp,
+            "upstream_entity_fingerprints": [], "upstream_runtime_units": [], "support_status": "supported",
+            "static_data_versions": {}, "runtime_status": "ok", "result_status": "ready", "runtime_required": True,
+            "deterministic_generated": True, "fallback_reason": None, "payload": payload, "issues": [],
+        }
+        blocks = [
+            runtime.render_runtime_input(skill, metadata, input_value),
+            runtime.render_runtime_result(skill, result),
+            runtime.render_machine_entities(skill, entities),
+        ]
+        blocks.extend(extra_blocks or [])
+        return "\n".join(blocks)
+
+    def test_partial_rerun_carries_scope_out_tcn_model_ci_tdr_and_dispositions(self) -> None:
+        tcn_one = runtime.make_machine_entity("test-condition-design", "tcn", "TCN-001", {"tcn_id": "TCN-001"})
+        tcn_two = runtime.make_machine_entity("test-condition-design", "tcn", "TCN-002", {"tcn_id": "TCN-002"})
+        model_one = runtime.make_machine_entity("test-condition-design", "model", "ep-001", {"model_key": "ep-001", "model_type": "ep"}, model_key="ep-001")
+        model_two = runtime.make_machine_entity("test-condition-design", "model", "ep-002", {"model_key": "ep-002", "model_type": "ep"}, model_key="ep-002")
+        ci_one = runtime.make_machine_entity("test-condition-design", "ci", "TCN-001-CI01", {"ci_id": "TCN-001-CI01", "tcn_id": "TCN-001", "model_key": "ep-001"}, model_key="ep-001")
+        ci_two = runtime.make_machine_entity("test-condition-design", "ci", "TCN-002-CI01", {"ci_id": "TCN-002-CI01", "tcn_id": "TCN-002", "model_key": "ep-002"}, model_key="ep-002")
+        tdr_one = runtime.make_machine_entity("test-condition-design", "test_data_requirement", "data:REQ-001", {"data_ref": "data:REQ-001", "requirement_key": "REQ-001", "source_model_key": "ep-001"}, model_key="ep-001")
+        tdr_two = runtime.make_machine_entity("test-condition-design", "test_data_requirement", "data:REQ-002", {"data_ref": "data:REQ-002", "requirement_key": "REQ-002", "source_model_key": "ep-002"}, model_key="ep-002")
+
+        def disposition_for(entity: dict) -> dict:
+            upstream = runtime.machine_entity_dependency(entity)
+            return runtime.make_machine_entity(
+                "test-condition-design", "disposition",
+                f"{entity['entity_type']}:{entity['entity_ref']}",
+                {"upstream_entity": upstream, "handling": "対象外", "reason": "scope ownership", "authority_refs": [], "covered_by_entity": None},
+                upstream_entity_dependencies=[upstream],
+            )
+
+        dispositions = [disposition_for(entity) for entity in (tcn_one, tcn_two, model_one, model_two, ci_one, ci_two, tdr_one, tdr_two)]
+        previous_entities = [tcn_one, tcn_two, model_one, model_two, ci_one, ci_two, tdr_one, tdr_two, *dispositions]
+        previous_state = {
+            "tcn_id_state": [{"tcn_id": ref, "status": "active"} for ref in ("TCN-001", "TCN-002")],
+            "model_key_state": [{"model_key": ref, "model_type": "ep", "status": "active"} for ref in ("ep-001", "ep-002")],
+            "ci_id_state": [{"ci_id": ref, "status": "active"} for ref in ("TCN-001-CI01", "TCN-002-CI01")],
+        }
+        normalized = {
+            "tcn_id": "TCN-001", "test_conditions": [], "models": [], "test_data_requirements": [], "ci_ids": [],
+            "previous_tcn_ids": previous_state["tcn_id_state"], "previous_model_keys": previous_state["model_key_state"],
+            "previous_ci_ids": previous_state["ci_id_state"], "update_scope_tcn_ids": ["TCN-001"],
+            "update_scope_model_keys": ["ep-001"],
+        }
+        previous = self._structure_artifact("test-condition-design", normalized, previous_entities, previous_state)
+        current_state = {
+            "tcn_id_state": [{"tcn_id": "TCN-001", "status": "deleted"}, {"tcn_id": "TCN-002", "status": "active"}],
+            "model_key_state": [{"model_key": "ep-001", "model_type": "ep", "status": "deleted"}, {"model_key": "ep-002", "model_type": "ep", "status": "active"}],
+            "ci_id_state": [{"ci_id": "TCN-001-CI01", "status": "deleted"}, {"ci_id": "TCN-002-CI01", "status": "active"}],
+        }
+        carry = [tcn_two, model_two, ci_two, tdr_two, *[row for row in dispositions if row["content"]["upstream_entity"]["entity_ref"] in {"TCN-002", "ep-002", "TCN-002-CI01", "data:REQ-002"}]]
+        candidate = self._structure_artifact("test-condition-design", normalized, carry, current_state, result_entities=[])
+        checked = runtime.verify_runtime_evidence({
+            "operation": "verify_runtime_evidence", "skill": "test-condition-design",
+            "normalized_skill_input": normalized, "artifact_markdown": candidate,
+            "previous_artifact_markdown": previous,
+        })
+        self.assertTrue(checked["valid"], checked)
+        expected = {(row["entity_type"], row["entity_ref"]) for row in checked["expected_entities"]}
+        self.assertEqual(expected, {(row["entity_type"], row["entity_ref"]) for row in carry})
+
+    def test_partial_rerun_carries_scope_out_tc_and_does_not_resurrect_deleted_tc(self) -> None:
+        tc_one = runtime.make_machine_entity("test-case-design", "tc", "TC-001", {"tc_id": "TC-001"})
+        tc_two = runtime.make_machine_entity("test-case-design", "tc", "TC-002", {"tc_id": "TC-002"})
+        previous_state = [{"tc_id": "TC-001", "status": "active"}, {"tc_id": "TC-002", "status": "active"}]
+        normalized = {"test_cases": [], "previous_tc_ids": previous_state, "update_scope_tc_ids": ["TC-001"]}
+        previous = self._structure_artifact(
+            "test-case-design", normalized, [tc_one, tc_two], {"tc_id_state": previous_state},
+        )
+        current_state = [{"tc_id": "TC-001", "status": "deleted"}, {"tc_id": "TC-002", "status": "active"}]
+        candidate = self._structure_artifact(
+            "test-case-design", normalized, [tc_two], {"tc_id_state": current_state}, result_entities=[],
+        )
+        request = {
+            "operation": "verify_runtime_evidence", "skill": "test-case-design",
+            "normalized_skill_input": normalized, "artifact_markdown": candidate,
+            "previous_artifact_markdown": previous,
+        }
+        checked = runtime.verify_runtime_evidence(request)
+        self.assertTrue(checked["valid"], checked)
+        self.assertEqual(
+            {(row["entity_type"], row["entity_ref"]) for row in checked["expected_entities"]},
+            {("tc", "TC-002")},
+        )
+        deleted_left = runtime.verify_runtime_evidence({**request, "artifact_markdown": self._structure_artifact(
+            "test-case-design", normalized, [tc_one, tc_two], {"tc_id_state": current_state}, result_entities=[],
+        )})
+        self.assertFalse(deleted_left["valid"])
+        self.assertIn(("test-case-design", "tc", "TC-001"), [tuple(row) for row in deleted_left["extra_entities"]])
+
+    def test_partial_rerun_carries_only_active_entities_outside_tr_scope(self) -> None:
+        previous_state = [
+            {"tr_id": "TR-001", "status": "active"},
+            {"tr_id": "TR-002", "status": "active"},
+            {"tr_id": "TR-003", "status": "deleted"},
+        ]
+        normalized = {
+            "authorities": [], "risks": [], "test_requirements": [], "dispositions": [],
+            "previous_tr_ids": previous_state, "update_scope_tr_ids": ["TR-001"],
+        }
+        prior_entities = [
+            self._tr_entity("TR-001", {
+                "runtime_contract_version": runtime.RUNTIME_CONTRACT_VERSION,
+                "generator_contract_version": "requirement-structure-v1",
+                "runtime_implementation_fingerprint": runtime.implementation_fingerprint(RUNTIME_PATH),
+                "generator_implementation_fingerprint": runtime.implementation_fingerprint(REPO_ROOT / "skills" / "test-requirement-design" / "scripts" / "requirement_structure.py"),
+                "static_data_versions": {},
+            }, "sha256:" + "1" * 64),
+            self._tr_entity("TR-002", {
+                "runtime_contract_version": runtime.RUNTIME_CONTRACT_VERSION,
+                "generator_contract_version": "requirement-structure-v1",
+                "runtime_implementation_fingerprint": runtime.implementation_fingerprint(RUNTIME_PATH),
+                "generator_implementation_fingerprint": runtime.implementation_fingerprint(REPO_ROOT / "skills" / "test-requirement-design" / "scripts" / "requirement_structure.py"),
+                "static_data_versions": {},
+            }, "sha256:" + "1" * 64),
+        ]
+        previous = self._tr_artifact(normalized, prior_entities, previous_state)
+        current_state = [
+            {"tr_id": "TR-001", "status": "deleted"},
+            {"tr_id": "TR-002", "status": "active"},
+            {"tr_id": "TR-003", "status": "deleted"},
+        ]
+        candidate = self._tr_artifact(normalized, [prior_entities[1]], current_state, result_entities=[])
+        checked = runtime.verify_runtime_evidence({
+            "operation": "verify_runtime_evidence", "skill": "test-requirement-design",
+            "normalized_skill_input": normalized, "artifact_markdown": candidate,
+            "previous_artifact_markdown": previous,
+        })
+        self.assertTrue(checked["valid"], checked)
+        cli = subprocess.run(
+            [sys.executable, str(REPO_ROOT / "skills" / "test-requirement-design" / "scripts" / "runtime_contract.py")],
+            input=json.dumps({
+                "operation": "verify_runtime_evidence", "skill": "test-requirement-design",
+                "normalized_skill_input": normalized, "artifact_markdown": candidate,
+                "previous_artifact_markdown": previous,
+            }, ensure_ascii=False).encode("utf-8"),
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
+        )
+        self.assertEqual(cli.returncode, 0, cli.stderr.decode("utf-8", errors="replace"))
+        self.assertFalse(cli.stderr)
+        self.assertTrue(json.loads(cli.stdout)["valid"], cli.stdout.decode("utf-8", errors="replace"))
+        self.assertEqual(
+            {(row["entity_type"], row["entity_ref"]) for row in checked["expected_entities"]},
+            {("tr", "TR-002")},
+        )
+
+        missing = runtime.verify_runtime_evidence({
+            "operation": "verify_runtime_evidence", "skill": "test-requirement-design",
+            "normalized_skill_input": normalized, "artifact_markdown": self._tr_artifact(normalized, [], current_state, result_entities=[]),
+            "previous_artifact_markdown": previous,
+        })
+        self.assertFalse(missing["valid"])
+        self.assertIn(("test-requirement-design", "tr", "TR-002"), [tuple(row) for row in missing["missing_entities"]])
+
+        deleted_left = runtime.verify_runtime_evidence({
+            "operation": "verify_runtime_evidence", "skill": "test-requirement-design",
+            "normalized_skill_input": normalized, "artifact_markdown": self._tr_artifact(normalized, prior_entities, current_state, result_entities=[]),
+            "previous_artifact_markdown": previous,
+        })
+        self.assertFalse(deleted_left["valid"])
+        self.assertIn(("test-requirement-design", "tr", "TR-001"), [tuple(row) for row in deleted_left["extra_entities"]])
+
+        unknown_entity = runtime.make_machine_entity(
+            "test-requirement-design", "tr", "TR-404", {"tr_id": "TR-404", "text": "Unexpected"},
+        )
+        unknown = runtime.verify_runtime_evidence({
+            "operation": "verify_runtime_evidence", "skill": "test-requirement-design",
+            "normalized_skill_input": normalized,
+            "artifact_markdown": self._tr_artifact(normalized, [prior_entities[1], unknown_entity], current_state, result_entities=[]),
+            "previous_artifact_markdown": previous,
+        })
+        self.assertFalse(unknown["valid"])
+        self.assertIn(["test-requirement-design", "tr", "TR-404"], unknown["extra_entities"])
+
+        duplicate = runtime.verify_runtime_evidence({
+            "operation": "verify_runtime_evidence", "skill": "test-requirement-design",
+            "normalized_skill_input": normalized,
+            "artifact_markdown": self._tr_artifact(normalized, [prior_entities[1], prior_entities[1]], current_state, result_entities=[]),
+            "previous_artifact_markdown": previous,
+        })
+        self.assertFalse(duplicate["valid"])
+        self.assertIn(["test-requirement-design", "tr", "TR-002"], duplicate["duplicate_entities"])
+
+        fingerprint = prior_entities[1]["content_fingerprint"]
+        tampered_previous = previous.rsplit(fingerprint, 1)[0] + "sha256:" + "f" * 64 + previous.rsplit(fingerprint, 1)[1]
+        invalid_previous = runtime.verify_runtime_evidence({
+            "operation": "verify_runtime_evidence", "skill": "test-requirement-design",
+            "normalized_skill_input": normalized, "artifact_markdown": candidate,
+            "previous_artifact_markdown": tampered_previous,
+        })
+        self.assertFalse(invalid_previous["valid"])
+        self.assertTrue(any(issue["issue_type"] == "invalid_previous_artifact" for issue in invalid_previous["issues"]))
+
+    def test_partial_carry_forward_with_changed_producer_implementation_is_stale(self) -> None:
+        state = [{"tr_id": "TR-001", "status": "active"}]
+        normalized = {
+            "authorities": [], "risks": [], "test_requirements": [], "dispositions": [],
+            "previous_tr_ids": state, "update_scope_tr_ids": [],
+        }
+        old_generator_fp = "sha256:" + "2" * 64
+        old_context = {
+            "runtime_contract_version": runtime.RUNTIME_CONTRACT_VERSION,
+            "generator_contract_version": "requirement-structure-v1",
+            "runtime_implementation_fingerprint": runtime.implementation_fingerprint(RUNTIME_PATH),
+            "generator_implementation_fingerprint": old_generator_fp,
+            "static_data_versions": {},
+        }
+        previous_entity = self._tr_entity("TR-001", old_context, "sha256:" + "3" * 64)
+        previous = self._tr_artifact(normalized, [previous_entity], state, generator_fp=old_generator_fp)
+        current = self._tr_artifact(normalized, [previous_entity], state)
+        checked = runtime.verify_runtime_evidence({
+            "operation": "verify_runtime_evidence", "skill": "test-requirement-design",
+            "normalized_skill_input": normalized, "artifact_markdown": current,
+            "previous_artifact_markdown": previous,
+        })
+        self.assertFalse(checked["valid"])
+        self.assertTrue(any(issue["issue_type"] == "stale_carry_forward_entity" for issue in checked["issues"]))
+
+    def test_partial_carry_forward_with_changed_upstream_fingerprint_is_stale(self) -> None:
+        state = [{"tr_id": "TR-001", "status": "active"}]
+        normalized = {
+            "authorities": [], "risks": [], "test_requirements": [], "dispositions": [],
+            "previous_tr_ids": state, "update_scope_tr_ids": [],
+        }
+        old_authority = runtime.make_machine_entity("spec-analysis", "authority", "AUTH-001", {"authority_id": "AUTH-001", "text": "old"})
+        current_authority = runtime.make_machine_entity("spec-analysis", "authority", "AUTH-001", {"authority_id": "AUTH-001", "text": "current"})
+        tr = runtime.make_machine_entity(
+            "test-requirement-design", "tr", "TR-001", {"tr_id": "TR-001", "text": "Requirement TR-001"},
+            upstream_entity_dependencies=[runtime.machine_entity_dependency(old_authority)],
+            runtime_dependencies=[runtime.machine_entity_runtime_dependency("test-requirement-design", "artifact:requirement_structure:all")],
+        )
+        runtime_context = {
+            "runtime_contract_version": runtime.RUNTIME_CONTRACT_VERSION,
+            "generator_contract_version": "requirement-structure-v1",
+            "runtime_implementation_fingerprint": runtime.implementation_fingerprint(RUNTIME_PATH),
+            "generator_implementation_fingerprint": runtime.implementation_fingerprint(REPO_ROOT / "skills" / "test-requirement-design" / "scripts" / "requirement_structure.py"),
+            "static_data_versions": {},
+        }
+        tr = runtime.bind_current_entity_runtime_dependencies({"entities": [tr]}, "sha256:" + "1" * 64, runtime_context=runtime_context)["entities"][0]
+        previous = self._tr_artifact(normalized, [tr], state) + "\n" + runtime.render_machine_entities("spec-analysis", [old_authority])
+        candidate = self._tr_artifact(normalized, [tr], state) + "\n" + runtime.render_machine_entities("spec-analysis", [current_authority])
+        checked = runtime.verify_runtime_evidence({
+            "operation": "verify_runtime_evidence", "skill": "test-requirement-design",
+            "normalized_skill_input": normalized, "artifact_markdown": candidate,
+            "previous_artifact_markdown": previous,
+        })
+        self.assertFalse(checked["valid"])
+        stale = next(issue for issue in checked["issues"] if issue["issue_type"] == "stale_carry_forward_entity")
+        self.assertIn("upstream_entity_fingerprint_mismatch", [row["reason_code"] for row in stale["stale_reasons"]])
 
     def test_evidence_operation_is_fixed(self) -> None:
         with self.assertRaises(runtime.InvalidInput):
