@@ -72,7 +72,7 @@ class WorkflowRuntimeTests(unittest.TestCase):
         return {
             "metadata": metadata(),
             "input": {
-                "workflow_scopes": [{"skill": "test-condition-design", "target": None, "execution_range": None, "input_mode": "artifact", "normalized_input": normalized, "current_structure_state": {"runtime_results": [], "carry_forward_entities": []}}],
+                "workflow_scopes": [{"skill": "test-condition-design", "target": None, "execution_range": None, "input_mode": "artifact", "normalized_input": normalized, "current_structure_state": {"runtime_results": [], "carry_forward_entities": [], "previous_ci_id_state": []}}],
                 "runtime_units": units, "current_entities": [tcn, model, ci_one, ci_two, authority], "current_runtime_units": units,
                 "unsupported_item_closures": [],
             },
@@ -127,8 +127,8 @@ class WorkflowRuntimeTests(unittest.TestCase):
             "metadata": metadata(),
             "input": {
                 "workflow_scopes": [
-                    {"skill": "test-condition-design", "target": "TCN-001", "execution_range": None, "input_mode": "artifact", "normalized_input": normalized_a, "current_structure_state": {"runtime_results": [], "carry_forward_entities": []}},
-                    {"skill": "test-condition-design", "target": "TCN-002", "execution_range": None, "input_mode": "artifact", "normalized_input": normalized_b, "current_structure_state": {"runtime_results": [], "carry_forward_entities": []}},
+                    {"skill": "test-condition-design", "target": "TCN-001", "execution_range": None, "input_mode": "artifact", "normalized_input": normalized_a, "current_structure_state": {"runtime_results": [], "carry_forward_entities": [], "previous_ci_id_state": []}},
+                    {"skill": "test-condition-design", "target": "TCN-002", "execution_range": None, "input_mode": "artifact", "normalized_input": normalized_b, "current_structure_state": {"runtime_results": [], "carry_forward_entities": [], "previous_ci_id_state": []}},
                 ],
                 "runtime_units": units, "current_runtime_units": units, "current_entities": [tcn_a, tcn_b, model_a, model_b, ci_a, ci_b], "unsupported_item_closures": [],
             },
@@ -186,7 +186,14 @@ class WorkflowRuntimeTests(unittest.TestCase):
             runtime_row("test-condition-design", "model:ep-001", "ep-001"),
             runtime_row("test-condition-design", "artifact:materialize_coverage:TCN-001", materialize=True, active_ci_ids=["TCN-001-CI01"], materialize_model_key="ep-001"),
         ]
-        state = {"runtime_results": [], "carry_forward_entities": [tcn_two, model_two, ci_two, tdr_two, tr_disposition]}
+        state = {
+            "runtime_results": [],
+            "carry_forward_entities": [tcn_two, model_two, ci_two, tdr_two, tr_disposition],
+            "previous_ci_id_state": [
+                {"ci_id": "TCN-001-CI01", "status": "active"},
+                {"ci_id": "TCN-002-CI01", "status": "active"},
+            ],
+        }
         request = {
             "metadata": metadata(),
             "input": {
@@ -232,6 +239,7 @@ class WorkflowRuntimeTests(unittest.TestCase):
         unknown_tcn = runtime.make_machine_entity("test-condition-design", "tcn", "TCN-999", {"tcn_id": "TCN-999"})
         in_scope_tcn = runtime.make_machine_entity("test-condition-design", "tcn", "TCN-001", {"tcn_id": "TCN-001"})
         in_scope_tdr = runtime.make_machine_entity("test-condition-design", "test_data_requirement", "data:REQ-001", {"data_ref": "data:REQ-001", "requirement_key": "REQ-001", "source_model_key": "ep-001"}, model_key="ep-001")
+        extra_ci = runtime.make_machine_entity("test-condition-design", "ci", "TCN-002-CI99", {"ci_id": "TCN-002-CI99", "tcn_id": "TCN-002", "model_key": "ep-002"}, model_key="ep-002")
         unknown_owner = {"skill": "test-requirement-design", "entity_type": "tr", "entity_ref": "TR-999", "content_fingerprint": "sha256:" + ("0" * 64)}
         ownerless_disposition = runtime.make_machine_entity(
             "test-condition-design", "disposition", "tr:TR-999",
@@ -242,6 +250,7 @@ class WorkflowRuntimeTests(unittest.TestCase):
             ("unknown TCN", unknown_tcn),
             ("in-scope TCN", in_scope_tcn),
             ("TDR owned by in-scope model", in_scope_tdr),
+            ("CI absent from previous CI state", extra_ci),
             ("disposition with unknown owner", ownerless_disposition),
         ):
             with self.subTest(label=label):
@@ -273,6 +282,7 @@ class WorkflowRuntimeTests(unittest.TestCase):
         scope["current_structure_state"] = {
             "runtime_results": [],
             "carry_forward_entities": parts["state"]["carry_forward_entities"],
+            "previous_ci_id_state": parts["state"]["previous_ci_id_state"],
         }
         request["input"]["runtime_units"] = [request["input"]["runtime_units"][0]]
         request["input"]["current_runtime_units"] = request["input"]["runtime_units"]

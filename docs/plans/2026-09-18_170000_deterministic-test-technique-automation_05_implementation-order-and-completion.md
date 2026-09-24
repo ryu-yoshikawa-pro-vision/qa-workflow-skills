@@ -74,7 +74,7 @@ standalone成立のために`workflow_runtime.py`を必須にせず、workflow�
 - 同一入力再実行でMachine Runtime Result、target / CI mapping、fingerprintが一致する
 - 完成Markdownを保存・再読込し、同じinputでruntime再実行できる
 - standalone direct fixtureのcandidate Markdownへ`verify_runtime_evidence`を実行して`valid=true`になる。必須runtime blockを1件削除したfixtureではexpected集合を変えず`valid=false`になる。16 MiB aggregate stdin境界もここで代表確認する
-- production統合では担当Skillの`verify_runtime_evidence`が`valid=true`と固定`current_structure_state`を返し、そのstateを改変せず`workflow_scopes[].current_structure_state` / `analysis_scopes[].current_structure_state`へ渡す。失敗時stateはnullで、workflow / traceabilityはstrict共通validatorを通す。carry projectionはscope外primary identityとのexact matchとproducer-valid ownershipを満たし、余分なrowでExpectedを拡張できない
+- production統合では担当Skillの`verify_runtime_evidence`が`valid=true`と固定`current_structure_state`を返し、そのstateを改変せず`workflow_scopes[].current_structure_state` / `analysis_scopes[].current_structure_state`へ渡す。失敗時stateはnullで、workflow / traceabilityはstrict共通validatorを通す。carry projectionはscope外primary identityとのexact matchとproducer-valid ownershipを満たし、TCDのCIはstrict検証済みprevious artifact由来の`previous_ci_id_state[]`ともexact matchし、余分なrowでExpectedを拡張できない
 - 実AgentでPython起動、stdout envelope parse、成果物保存まで確認する。Agent側artifact transport上限がruntime 16 MiBより低い場合は後続generator実装前に`runtime-v1`へ固定する
 
 ここで共通契約不整合が見つかった場合はStep 1 / 2へ戻して修正します。この確認をPR完了の区切りにはせず、修正後は同じPRでStep 2.6以降へ進みます。

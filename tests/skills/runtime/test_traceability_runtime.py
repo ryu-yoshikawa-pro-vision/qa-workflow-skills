@@ -51,7 +51,7 @@ def base_request() -> dict:
     return {
         "metadata": metadata(),
         "input": {
-            "analysis_scopes": [{"skill": "test-condition-design", "target": None, "execution_range": None, "input_mode": "artifact", "normalized_input": {"tcn_id": "TCN-001", "test_conditions": [{"tcn_id": "TCN-001"}], "models": [{"model_key": "ep-001", "model_type": "ep"}], "ci_ids": ["TCN-001-CI01"]}, "current_structure_state": {"runtime_results": [], "carry_forward_entities": []}}],
+            "analysis_scopes": [{"skill": "test-condition-design", "target": None, "execution_range": None, "input_mode": "artifact", "normalized_input": {"tcn_id": "TCN-001", "test_conditions": [{"tcn_id": "TCN-001"}], "models": [{"model_key": "ep-001", "model_type": "ep"}], "ci_ids": ["TCN-001-CI01"]}, "current_structure_state": {"runtime_results": [], "carry_forward_entities": [], "previous_ci_id_state": []}}],
             "nodes": [{"node_key": "SPEC-001", "node_type": "Authority"}, {"node_key": "TR-001", "node_type": "TR"}, {"node_key": "TCN-001", "node_type": "TCN"}, {"node_key": "TCN-001-CI01", "node_type": "CI"}, {"node_key": "TC-001", "node_type": "TC"}],
             "edges": [{"from": "SPEC-001", "to": "TR-001"}, {"from": "TR-001", "to": "TCN-001"}, {"from": "TCN-001", "to": "TCN-001-CI01"}, {"from": "TCN-001-CI01", "to": "TC-001"}],
             "dispositions": [], "runtime_units": units, "current_entities": [tcn, model, ci], "current_runtime_units": units, "unsupported_item_closures": [],
@@ -116,6 +116,10 @@ class TraceabilityRuntimeTests(unittest.TestCase):
         scope["current_structure_state"] = {
             "runtime_results": [],
             "carry_forward_entities": [tcn_two, model_two, ci_two, tdr_two, tr_disposition],
+            "previous_ci_id_state": [
+                {"ci_id": "TCN-001-CI01", "status": "active"},
+                {"ci_id": "TCN-002-CI01", "status": "active"},
+            ],
         }
         result = run(request)
         self.assertEqual(result["runtime_status"], "ok", result)
@@ -142,6 +146,7 @@ class TraceabilityRuntimeTests(unittest.TestCase):
         unknown_tcn = runtime.make_machine_entity("test-condition-design", "tcn", "TCN-999", {"tcn_id": "TCN-999"})
         in_scope_tcn = runtime.make_machine_entity("test-condition-design", "tcn", "TCN-001", {"tcn_id": "TCN-001"})
         in_scope_tdr = runtime.make_machine_entity("test-condition-design", "test_data_requirement", "data:REQ-001", {"data_ref": "data:REQ-001", "requirement_key": "REQ-001", "source_model_key": "ep-001"}, model_key="ep-001")
+        extra_ci = runtime.make_machine_entity("test-condition-design", "ci", "TCN-002-CI99", {"ci_id": "TCN-002-CI99", "tcn_id": "TCN-002", "model_key": "ep-002"}, model_key="ep-002")
         unknown_owner = {"skill": "test-requirement-design", "entity_type": "tr", "entity_ref": "TR-999", "content_fingerprint": "sha256:" + ("0" * 64)}
         ownerless_disposition = runtime.make_machine_entity(
             "test-condition-design", "disposition", "tr:TR-999",
@@ -152,6 +157,7 @@ class TraceabilityRuntimeTests(unittest.TestCase):
             ("unknown TCN", unknown_tcn),
             ("in-scope TCN", in_scope_tcn),
             ("TDR owned by in-scope model", in_scope_tdr),
+            ("CI absent from previous CI state", extra_ci),
             ("disposition with unknown owner", ownerless_disposition),
         ):
             with self.subTest(label=label):
@@ -193,8 +199,8 @@ class TraceabilityRuntimeTests(unittest.TestCase):
             "metadata": metadata(),
             "input": {
                 "analysis_scopes": [
-                    {"skill": "test-condition-design", "target": "TCN-001", "execution_range": None, "input_mode": "artifact", "normalized_input": normalized_a, "current_structure_state": {"runtime_results": [], "carry_forward_entities": []}},
-                    {"skill": "test-condition-design", "target": "TCN-002", "execution_range": None, "input_mode": "artifact", "normalized_input": normalized_b, "current_structure_state": {"runtime_results": [], "carry_forward_entities": []}},
+                    {"skill": "test-condition-design", "target": "TCN-001", "execution_range": None, "input_mode": "artifact", "normalized_input": normalized_a, "current_structure_state": {"runtime_results": [], "carry_forward_entities": [], "previous_ci_id_state": []}},
+                    {"skill": "test-condition-design", "target": "TCN-002", "execution_range": None, "input_mode": "artifact", "normalized_input": normalized_b, "current_structure_state": {"runtime_results": [], "carry_forward_entities": [], "previous_ci_id_state": []}},
                 ],
                 "nodes": [
                     {"node_key": "SPEC-001", "node_type": "Authority"}, {"node_key": "TR-001", "node_type": "TR"}, {"node_key": "TR-002", "node_type": "TR"},

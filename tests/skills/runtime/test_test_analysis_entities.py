@@ -363,7 +363,7 @@ class AnalysisEntityRuntimeTests(unittest.TestCase):
         }
         runtime_rows = [runtime.runtime_unit_row(environment), runtime.runtime_unit_row(analysis)]
         workflow = run_runtime(WORKFLOW_SCRIPT, workflow_metadata, {
-            "workflow_scopes": [{"skill": "test-analysis", "target": None, "execution_range": None, "input_mode": "direct", "normalized_input": analysis_input, "current_structure_state": {"runtime_results": [], "carry_forward_entities": []}}],
+            "workflow_scopes": [{"skill": "test-analysis", "target": None, "execution_range": None, "input_mode": "direct", "normalized_input": analysis_input, "current_structure_state": {"runtime_results": [], "carry_forward_entities": [], "previous_ci_id_state": []}}],
             "runtime_units": runtime_rows, "current_runtime_units": runtime_rows, "current_entities": analysis["payload"]["machine_entities"], "unsupported_item_closures": [],
         })
         self.assertEqual(workflow["runtime_status"], "ok")

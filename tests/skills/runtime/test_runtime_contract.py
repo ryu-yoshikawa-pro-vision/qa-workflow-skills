@@ -642,6 +642,13 @@ class EntityAndEvidenceTests(unittest.TestCase):
         })
         self.assertTrue(checked["valid"], checked)
         self.assertIsNotNone(checked["current_structure_state"])
+        self.assertEqual(
+            checked["current_structure_state"]["previous_ci_id_state"],
+            [
+                {"ci_id": "TCN-001-CI01", "status": "active"},
+                {"ci_id": "TCN-002-CI01", "status": "active"},
+            ],
+        )
         expected = {(row["entity_type"], row["entity_ref"]) for row in checked["expected_entities"]}
         self.assertEqual(expected, {(row["entity_type"], row["entity_ref"]) for row in [*carry, tr_two]})
         self.assertEqual(
@@ -920,7 +927,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
                 for old in current_dispositions:
                     owner = next(row for row in owners if runtime.entity_identity(row["skill"], row["entity_type"], row["entity_ref"]) == runtime.entity_identity(old["content"]["upstream_entity"]["skill"], old["content"]["upstream_entity"]["entity_type"], old["content"]["upstream_entity"]["entity_ref"]))
                     changed_current.append(disposition(skill, owner, "current replacement"))
-                fixed_state = {"runtime_results": [], "carry_forward_entities": out_dispositions}
+                fixed_state = {"runtime_results": [], "carry_forward_entities": out_dispositions, "previous_ci_id_state": []}
                 current_expected = runtime._expected_entities(skill, normalized, [], current_result_entities=changed_current, previous_states={}, current_structure_state=fixed_state)
                 current_expected_ids = {row["entity_ref"] for row in current_expected if row["entity_type"] == "disposition"}
                 self.assertEqual(current_expected_ids, {row["entity_ref"] for row in current_dispositions} | expected_out_ids)

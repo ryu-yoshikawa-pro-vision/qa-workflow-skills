@@ -335,7 +335,7 @@ class EpVerticalIntegrationTests(unittest.TestCase):
 
         rows = [runtime.runtime_unit_row(condition), runtime.runtime_unit_row(ep), runtime.runtime_unit_row(tdr), runtime.runtime_unit_row(materialize, materialize=materialize["payload"])]
         workflow_input = {
-            "workflow_scopes": [{"skill": "test-condition-design", "target": None, "execution_range": None, "input_mode": "artifact", "normalized_input": workflow_normalized, "current_structure_state": {"runtime_results": [], "carry_forward_entities": []}}],
+            "workflow_scopes": [{"skill": "test-condition-design", "target": None, "execution_range": None, "input_mode": "artifact", "normalized_input": workflow_normalized, "current_structure_state": {"runtime_results": [], "carry_forward_entities": [], "previous_ci_id_state": []}}],
             "runtime_units": rows, "current_runtime_units": rows + [runtime.runtime_unit_row(requirement)], "current_entities": entities, "unsupported_item_closures": [],
         }
         workflow = run_script(WORKFLOW_SCRIPT, {"metadata": workflow_metadata(), "input": workflow_input})
@@ -417,7 +417,7 @@ class EpVerticalIntegrationTests(unittest.TestCase):
             {"tcn_id": "TCN-002", "test_conditions": [{"tcn_id": "TCN-002", "tr_refs": ["TR-001"], "priority": "中"}], "models": [{"model_key": "ep-002", "model_type": "ep"}], "ci_ids": [row["ci_id"] for row in materialize_b["payload"]["ci_id_state"] if row["status"] == "active"]},
         ]
         workflow_input = {
-            "workflow_scopes": [{"skill": "test-condition-design", "target": row["tcn_id"], "execution_range": None, "input_mode": "artifact", "normalized_input": row, "current_structure_state": {"runtime_results": [], "carry_forward_entities": []}} for row in normalized],
+            "workflow_scopes": [{"skill": "test-condition-design", "target": row["tcn_id"], "execution_range": None, "input_mode": "artifact", "normalized_input": row, "current_structure_state": {"runtime_results": [], "carry_forward_entities": [], "previous_ci_id_state": []}} for row in normalized],
             "runtime_units": runtime_rows, "current_runtime_units": runtime_rows, "current_entities": entities, "unsupported_item_closures": [],
         }
         workflow = run_script(WORKFLOW_SCRIPT, {"metadata": workflow_metadata(), "input": workflow_input})
@@ -426,7 +426,7 @@ class EpVerticalIntegrationTests(unittest.TestCase):
 
         traceability_metadata = {**workflow_metadata(), "skill": "coverage-analysis", "generator_contract_version": "traceability-v1", "runtime_unit_key": "artifact:traceability:all"}
         traceability = run_script(TRACEABILITY_SCRIPT, {"metadata": traceability_metadata, "input": {
-            "analysis_scopes": [{"skill": "test-condition-design", "target": row["tcn_id"], "execution_range": None, "input_mode": "artifact", "normalized_input": row, "current_structure_state": {"runtime_results": [], "carry_forward_entities": []}} for row in normalized],
+            "analysis_scopes": [{"skill": "test-condition-design", "target": row["tcn_id"], "execution_range": None, "input_mode": "artifact", "normalized_input": row, "current_structure_state": {"runtime_results": [], "carry_forward_entities": [], "previous_ci_id_state": []}} for row in normalized],
             "nodes": [], "edges": [], "dispositions": [], "runtime_units": runtime_rows, "current_runtime_units": runtime_rows, "current_entities": entities, "unsupported_item_closures": [],
         }})
         self.assertEqual(traceability["result_status"], "ready", traceability)
