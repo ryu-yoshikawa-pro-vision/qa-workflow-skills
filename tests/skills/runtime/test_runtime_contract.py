@@ -54,6 +54,18 @@ class StrictJsonTests(unittest.TestCase):
             runtime.strict_loads(raw)
 
 
+class MachineBlockExtractionTests(unittest.TestCase):
+    def test_extract_machine_blocks_preserves_identity_for_crlf_markdown(self) -> None:
+        markdown = runtime.render_machine_entities(
+            "test-condition-design",
+            [runtime.make_machine_entity("test-condition-design", "tcn", "TCN-001", {"tcn_id": "TCN-001"})],
+        ).replace("\n", "\r\n")
+
+        blocks = runtime.extract_machine_blocks(markdown, "Machine Entities")
+
+        self.assertEqual([identity for identity, _body in blocks], ["test-condition-design"])
+
+
 class CanonicalAndFingerprintTests(unittest.TestCase):
     def test_canonicalizes_set_like_arrays_and_record_arrays(self) -> None:
         left = {
@@ -579,17 +591,14 @@ class EntityAndEvidenceTests(unittest.TestCase):
         tdr_one = runtime.make_machine_entity("test-condition-design", "test_data_requirement", "data:REQ-001", {"data_ref": "data:REQ-001", "requirement_key": "REQ-001", "source_model_key": "ep-001"}, model_key="ep-001")
         tdr_two = runtime.make_machine_entity("test-condition-design", "test_data_requirement", "data:REQ-002", {"data_ref": "data:REQ-002", "requirement_key": "REQ-002", "source_model_key": "ep-002"}, model_key="ep-002")
 
-        def disposition_for(entity: dict) -> dict:
-            upstream = runtime.machine_entity_dependency(entity)
-            return runtime.make_machine_entity(
-                "test-condition-design", "disposition",
-                f"{entity['entity_type']}:{entity['entity_ref']}",
-                {"upstream_entity": upstream, "handling": "対象外", "reason": "scope ownership", "authority_refs": [], "covered_by_entity": None},
-                upstream_entity_dependencies=[upstream],
-            )
-
-        dispositions = [disposition_for(entity) for entity in (tcn_one, tcn_two, model_one, model_two, ci_one, ci_two, tdr_one, tdr_two)]
-        previous_entities = [tcn_one, tcn_two, model_one, model_two, ci_one, ci_two, tdr_one, tdr_two, *dispositions]
+        tr_two = runtime.make_machine_entity("test-requirement-design", "tr", "TR-002", {"tr_id": "TR-002"})
+        tr_two_dependency = runtime.machine_entity_dependency(tr_two)
+        tr_disposition = runtime.make_machine_entity(
+            "test-condition-design", "disposition", "tr:TR-002",
+            {"upstream_entity": tr_two_dependency, "handling": "対象外", "reason": "scope ownership", "authority_refs": [], "covered_by_entity": None},
+            upstream_entity_dependencies=[tr_two_dependency],
+        )
+        previous_entities = [tcn_one, tcn_two, model_one, model_two, ci_one, ci_two, tdr_one, tdr_two, tr_disposition]
         previous_state = {
             "tcn_id_state": [{"tcn_id": ref, "status": "active"} for ref in ("TCN-001", "TCN-002")],
             "model_key_state": [{"model_key": ref, "model_type": "ep", "status": "active"} for ref in ("ep-001", "ep-002")],
@@ -598,19 +607,20 @@ class EntityAndEvidenceTests(unittest.TestCase):
             "tcn_id": "TCN-001", "test_conditions": [], "models": [], "test_data_requirements": [], "ci_ids": [],
             "previous_tcn_ids": previous_state["tcn_id_state"], "previous_model_keys": previous_state["model_key_state"],
             "previous_ci_ids": [{"ci_id": "TCN-001-CI01", "status": "active"}], "update_scope_tcn_ids": ["TCN-001"],
-            "update_scope_model_keys": ["ep-001"],
+            "update_scope_model_keys": ["ep-001"], "upstream_entities": [{"skill": "test-requirement-design", "entity_type": "tr", "entity_ref": "TR-002"}],
         }
         root_entities = [
             *[row for row in previous_entities if row["entity_type"] in {"tcn", "model"}],
-            *[row for row in dispositions if row["content"]["upstream_entity"]["entity_type"] in {"tcn", "model"}],
+            tr_disposition,
         ]
         previous_root = self._structure_artifact(
             "test-condition-design", normalized, previous_entities, previous_state,
             result_entities=root_entities,
             extra_blocks=[
-                self._artifact_runtime_pair("materialize_coverage", "artifact:materialize_coverage:TCN-001", "materialize-coverage-v1", {"ci_id_state": [{"ci_id": "TCN-001-CI01", "status": "active"}], "entities": [ci_one, dispositions[4]]}),
-                self._artifact_runtime_pair("materialize_coverage", "artifact:materialize_coverage:TCN-002", "materialize-coverage-v1", {"ci_id_state": [{"ci_id": "TCN-002-CI01", "status": "active"}], "entities": [ci_two, dispositions[5]]}),
-                self._artifact_runtime_pair("test_data_requirements", "artifact:test_data_requirements:all", "test-data-requirements-v1", {"entities": [tdr_one, tdr_two, dispositions[6], dispositions[7]]}),
+                self._artifact_runtime_pair("materialize_coverage", "artifact:materialize_coverage:TCN-001", "materialize-coverage-v1", {"ci_id_state": [{"ci_id": "TCN-001-CI01", "status": "active"}], "entities": [ci_one]}),
+                self._artifact_runtime_pair("materialize_coverage", "artifact:materialize_coverage:TCN-002", "materialize-coverage-v1", {"ci_id_state": [{"ci_id": "TCN-002-CI01", "status": "active"}], "entities": [ci_two]}),
+                self._artifact_runtime_pair("test_data_requirements", "artifact:test_data_requirements:all", "test-data-requirements-v1", {"entities": [tdr_one, tdr_two]}),
+                runtime.render_machine_entities("test-requirement-design", [tr_two]),
             ],
         )
         # Keep the previous artifact's runtime result shape production-like:
@@ -620,16 +630,20 @@ class EntityAndEvidenceTests(unittest.TestCase):
             "tcn_id_state": [{"tcn_id": "TCN-001", "status": "deleted"}, {"tcn_id": "TCN-002", "status": "active"}],
             "model_key_state": [{"model_key": "ep-001", "model_type": "ep", "status": "deleted"}, {"model_key": "ep-002", "model_type": "ep", "status": "active"}],
         }
-        carry = [tcn_two, model_two, ci_two, tdr_two, *[row for row in dispositions if row["content"]["upstream_entity"]["entity_ref"] in {"TCN-002", "ep-002", "TCN-002-CI01", "data:REQ-002"}]]
-        candidate = self._structure_artifact("test-condition-design", normalized, carry, current_state, result_entities=[])
+        carry = [tcn_two, model_two, ci_two, tdr_two, tr_disposition]
+        candidate = self._structure_artifact(
+            "test-condition-design", normalized, carry, current_state, result_entities=[],
+            extra_blocks=[runtime.render_machine_entities("test-requirement-design", [tr_two])],
+        )
         checked = runtime.verify_runtime_evidence({
             "operation": "verify_runtime_evidence", "skill": "test-condition-design",
             "normalized_skill_input": normalized, "artifact_markdown": candidate,
             "previous_artifact_markdown": previous,
         })
         self.assertTrue(checked["valid"], checked)
+        self.assertIsNotNone(checked["current_structure_state"])
         expected = {(row["entity_type"], row["entity_ref"]) for row in checked["expected_entities"]}
-        self.assertEqual(expected, {(row["entity_type"], row["entity_ref"]) for row in carry})
+        self.assertEqual(expected, {(row["entity_type"], row["entity_ref"]) for row in [*carry, tr_two]})
         self.assertEqual(
             {runtime.entity_identity(row["skill"], row["entity_type"], row["entity_ref"]) for row in checked["current_structure_state"]["carry_forward_entities"]},
             {runtime.entity_identity(row["skill"], row["entity_type"], row["entity_ref"]) for row in carry},
@@ -653,7 +667,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
                 }],
                 "runtime_units": current_runtime_rows,
                 "current_runtime_units": current_runtime_rows,
-                "current_entities": carry,
+                "current_entities": [*carry, tr_two],
                 "unsupported_item_closures": [],
             },
         }
@@ -673,7 +687,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
                 }],
                 "nodes": [], "edges": [], "dispositions": [],
                 "runtime_units": current_runtime_rows,
-                "current_entities": carry,
+                "current_entities": [*carry, tr_two],
                 "current_runtime_units": current_runtime_rows,
                 "unsupported_item_closures": [],
             },
@@ -690,7 +704,8 @@ class EntityAndEvidenceTests(unittest.TestCase):
         for identity in reversed(sorted(result_blocks)):
             reversed_blocks.append(runtime.render_runtime_input("test-condition-design", input_blocks[identity]["metadata"], input_blocks[identity]["input"]))
             reversed_blocks.append(runtime.render_runtime_result("test-condition-design", result_blocks[identity]))
-        reversed_blocks.append(runtime.render_machine_entities("test-condition-design", previous_entities))
+        reversed_blocks.append(runtime.render_machine_entities("test-condition-design", [row for row in previous_entities if row["skill"] == "test-condition-design"]))
+        reversed_blocks.append(runtime.render_machine_entities("test-requirement-design", [tr_two]))
         reordered = runtime.verify_runtime_evidence({
             "operation": "verify_runtime_evidence", "skill": "test-condition-design",
             "normalized_skill_input": normalized,
@@ -704,9 +719,10 @@ class EntityAndEvidenceTests(unittest.TestCase):
             "test-condition-design", normalized, previous_entities, previous_state,
             result_entities=root_entities,
             extra_blocks=[
-                self._artifact_runtime_pair("materialize_coverage", "artifact:materialize_coverage:TCN-001", "materialize-coverage-v1", {"ci_id_state": [{"ci_id": "TCN-002-CI01", "status": "active"}], "entities": [ci_two, dispositions[5]]}),
-                self._artifact_runtime_pair("materialize_coverage", "artifact:materialize_coverage:TCN-002", "materialize-coverage-v1", {"ci_id_state": [{"ci_id": "TCN-002-CI01", "status": "active"}], "entities": [ci_two, dispositions[5]]}),
-                self._artifact_runtime_pair("test_data_requirements", "artifact:test_data_requirements:all", "test-data-requirements-v1", {"entities": [tdr_one, tdr_two, dispositions[6], dispositions[7]]}),
+                self._artifact_runtime_pair("materialize_coverage", "artifact:materialize_coverage:TCN-001", "materialize-coverage-v1", {"ci_id_state": [{"ci_id": "TCN-002-CI01", "status": "active"}], "entities": [ci_two]}),
+                self._artifact_runtime_pair("materialize_coverage", "artifact:materialize_coverage:TCN-002", "materialize-coverage-v1", {"ci_id_state": [{"ci_id": "TCN-002-CI01", "status": "active"}], "entities": [ci_two]}),
+                self._artifact_runtime_pair("test_data_requirements", "artifact:test_data_requirements:all", "test-data-requirements-v1", {"entities": [tdr_one, tdr_two]}),
+                runtime.render_machine_entities("test-requirement-design", [tr_two]),
             ],
         )
         bad_prefix = runtime.verify_runtime_evidence({
@@ -743,6 +759,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
             "previous_artifact_markdown": None,
         })
         self.assertFalse(missing_previous["valid"])
+        self.assertIsNone(missing_previous["current_structure_state"])
         self.assertIn("invalid_previous_artifact", [issue["issue_type"] for issue in missing_previous["issues"]])
         self.assertIn(["test-requirement-design", "tr", "TR-002"], missing_previous["missing_entities"])
 
@@ -802,6 +819,115 @@ class EntityAndEvidenceTests(unittest.TestCase):
         self.assertFalse(tc_missing["valid"])
         self.assertIn("invalid_previous_artifact", [issue["issue_type"] for issue in tc_missing["issues"]])
         self.assertIn(["test-case-design", "tc", "TC-002"], tc_missing["missing_entities"])
+
+    def test_skill_specific_previous_artifact_contracts(self) -> None:
+        for skill in ("test-analysis", "coverage-analysis", "qa-workflow"):
+            with self.subTest(skill=skill):
+                result = runtime.verify_runtime_evidence({
+                    "operation": "verify_runtime_evidence", "skill": skill,
+                    "normalized_skill_input": {}, "artifact_markdown": "",
+                    "previous_artifact_markdown": "previous artifact",
+                })
+                self.assertFalse(result["valid"])
+                self.assertIsNone(result["current_structure_state"])
+                self.assertIn("invalid_previous_artifact", [row["issue_type"] for row in result["issues"]])
+
+        previous_state = [{"tr_id": "TR-001", "status": "active"}]
+        normalized = {"authorities": [], "risks": [], "test_requirements": [], "dispositions": [], "previous_tr_ids": previous_state, "update_scope_tr_ids": ["TR-001"]}
+        old_tr = runtime.make_machine_entity("test-requirement-design", "tr", "TR-001", {"tr_id": "TR-001", "text": "Old"})
+        previous = self._tr_artifact(normalized, [old_tr], previous_state)
+        current_tr = runtime.make_machine_entity("test-requirement-design", "tr", "TR-001", {"tr_id": "TR-001", "text": "Updated"})
+        current = self._tr_artifact(normalized, [current_tr], previous_state)
+        no_carry_needed = runtime.verify_runtime_evidence({
+            "operation": "verify_runtime_evidence", "skill": "test-requirement-design",
+            "normalized_skill_input": normalized, "artifact_markdown": current,
+            "previous_artifact_markdown": previous,
+        })
+        self.assertFalse(no_carry_needed["valid"])
+        self.assertIsNone(no_carry_needed["current_structure_state"])
+        self.assertIn("previous artifact is not permitted", " ".join(row.get("message", "") for row in no_carry_needed["issues"]))
+
+    def test_cli_verify_error_has_fixed_null_current_structure_state(self) -> None:
+        completed = subprocess.run(
+            [sys.executable, str(RUNTIME_PATH)], input=b'{"operation":"verify_runtime_evidence"}',
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=REPO_ROOT, check=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr.decode())
+        response = json.loads(completed.stdout)
+        self.assertFalse(response["valid"])
+        self.assertIsNone(response["current_structure_state"])
+
+    def test_producer_valid_disposition_scope_replaces_current_and_carries_only_out_of_scope(self) -> None:
+        def disposition(producer_skill: str, owner: dict, row_reason: str) -> dict:
+            dependency = runtime.machine_entity_dependency(owner)
+            entity_type = owner["entity_type"]
+            ref = owner["entity_ref"]
+            return runtime.make_machine_entity(
+                producer_skill, "disposition", f"{entity_type}:{ref}",
+                {"upstream_entity": dependency, "handling": "対象外", "reason": row_reason, "authority_refs": [], "covered_by_entity": None},
+                upstream_entity_dependencies=[dependency],
+            )
+
+        cases = []
+        authority_current = runtime.make_machine_entity("spec-analysis", "authority", "AUTH-001", {"authority_id": "AUTH-001"})
+        authority_out = runtime.make_machine_entity("spec-analysis", "authority", "AUTH-002", {"authority_id": "AUTH-002"})
+        risk_current = runtime.make_machine_entity("test-analysis", "product_risk", "R-001", {"risk_id": "R-001"})
+        risk_out = runtime.make_machine_entity("test-analysis", "product_risk", "R-002", {"risk_id": "R-002"})
+        cases.append((
+            "test-requirement-design",
+            {"authorities": [{"authority_id": "AUTH-001"}], "risks": [{"risk_id": "R-001"}], "test_requirements": [], "test_cases": []},
+            [authority_current, authority_out, risk_current, risk_out],
+            [disposition("test-requirement-design", authority_current, "old authority"), disposition("test-requirement-design", risk_current, "old risk")],
+            [disposition("test-requirement-design", authority_out, "out authority"), disposition("test-requirement-design", risk_out, "out risk")],
+        ))
+
+        tr_current = runtime.make_machine_entity("test-requirement-design", "tr", "TR-001", {"tr_id": "TR-001"})
+        tr_out = runtime.make_machine_entity("test-requirement-design", "tr", "TR-002", {"tr_id": "TR-002"})
+        cases.append((
+            "test-condition-design",
+            {"test_requirements": [{"tr_id": "TR-001"}], "test_conditions": [], "models": [], "test_data_requirements": []},
+            [tr_current, tr_out],
+            [disposition("test-condition-design", tr_current, "old TR")],
+            [disposition("test-condition-design", tr_out, "out TR")],
+        ))
+
+        tcn_current = runtime.make_machine_entity("test-condition-design", "tcn", "TCN-001", {"tcn_id": "TCN-001"})
+        tcn_out = runtime.make_machine_entity("test-condition-design", "tcn", "TCN-002", {"tcn_id": "TCN-002"})
+        ci_current = runtime.make_machine_entity("test-condition-design", "ci", "TCN-001-CI01", {"ci_id": "TCN-001-CI01", "tcn_id": "TCN-001", "model_key": "ep-001"}, model_key="ep-001")
+        ci_out = runtime.make_machine_entity("test-condition-design", "ci", "TCN-002-CI01", {"ci_id": "TCN-002-CI01", "tcn_id": "TCN-002", "model_key": "ep-002"}, model_key="ep-002")
+        env_current = runtime.make_machine_entity("test-analysis", "environment_requirement", "ENV-001", {"requirement_key": "ENV-001"})
+        env_out = runtime.make_machine_entity("test-analysis", "environment_requirement", "ENV-002", {"requirement_key": "ENV-002"})
+        tdr_current = runtime.make_machine_entity("test-condition-design", "test_data_requirement", "data:REQ-001", {"data_ref": "data:REQ-001", "requirement_key": "REQ-001", "source_model_key": "ep-001"}, model_key="ep-001")
+        tdr_out = runtime.make_machine_entity("test-condition-design", "test_data_requirement", "data:REQ-002", {"data_ref": "data:REQ-002", "requirement_key": "REQ-002", "source_model_key": "ep-002"}, model_key="ep-002")
+        case_owners = [tcn_current, tcn_out, ci_current, ci_out, env_current, env_out, tdr_current, tdr_out]
+        cases.append((
+            "test-case-design",
+            {"test_conditions": [{"tcn_id": "TCN-001"}], "coverage_items": [{"ci_id": "TCN-001-CI01"}], "environment_requirements": [{"requirement_key": "ENV-001"}], "test_data_requirements": [{"data_ref": "data:REQ-001"}], "test_cases": []},
+            case_owners,
+            [disposition("test-case-design", owner, "old current") for owner in (tcn_current, ci_current, env_current, tdr_current)],
+            [disposition("test-case-design", owner, "scope-out") for owner in (tcn_out, ci_out, env_out, tdr_out)],
+        ))
+
+        for skill, normalized, owners, current_dispositions, out_dispositions in cases:
+            with self.subTest(skill=skill):
+                previous = [*owners, *current_dispositions, *out_dispositions]
+                carried = runtime._carry_forward_machine_entities(skill, normalized, previous, {})
+                carried_ids = {row["entity_ref"] for row in carried if row["entity_type"] == "disposition"}
+                expected_out_ids = {row["entity_ref"] for row in out_dispositions}
+                self.assertEqual(carried_ids, expected_out_ids)
+
+                changed_current = []
+                for old in current_dispositions:
+                    owner = next(row for row in owners if runtime.entity_identity(row["skill"], row["entity_type"], row["entity_ref"]) == runtime.entity_identity(old["content"]["upstream_entity"]["skill"], old["content"]["upstream_entity"]["entity_type"], old["content"]["upstream_entity"]["entity_ref"]))
+                    changed_current.append(disposition(skill, owner, "current replacement"))
+                fixed_state = {"runtime_results": [], "carry_forward_entities": out_dispositions}
+                current_expected = runtime._expected_entities(skill, normalized, [], current_result_entities=changed_current, previous_states={}, current_structure_state=fixed_state)
+                current_expected_ids = {row["entity_ref"] for row in current_expected if row["entity_type"] == "disposition"}
+                self.assertEqual(current_expected_ids, {row["entity_ref"] for row in current_dispositions} | expected_out_ids)
+                deleted_expected = runtime._expected_entities(skill, normalized, [], current_result_entities=[], previous_states={}, current_structure_state=fixed_state)
+                deleted_ids = {row["entity_ref"] for row in deleted_expected if row["entity_type"] == "disposition"}
+                self.assertFalse({row["entity_ref"] for row in current_dispositions} & deleted_ids)
+
 
     def test_partial_rerun_carries_scope_out_tc_and_does_not_resurrect_deleted_tc(self) -> None:
         tc_one = runtime.make_machine_entity("test-case-design", "tc", "TC-001", {"tc_id": "TC-001"})

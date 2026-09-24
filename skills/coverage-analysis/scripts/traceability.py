@@ -22,6 +22,7 @@ from runtime_contract import (
     evaluate_runtime_unit_freshness,
     reject_unknown,
     run_cli,
+    validate_current_structure_state,
     validate_unsupported_item_closures,
     validate_entity_collection,
 )
@@ -210,6 +211,13 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
     expected_units: list[dict[str, Any]] = []
     expected_entities: list[dict[str, str]] = []
     for scope in scopes:
+        validate_current_structure_state(
+            scope["skill"],
+            scope["normalized_input"],
+            scope["current_structure_state"],
+            current_entities=entities_list,
+            current_runtime_units=current_runtime_rows,
+        )
         expected_units.extend(_default_expected_runtime_units(
             scope["skill"],
             scope["normalized_input"],

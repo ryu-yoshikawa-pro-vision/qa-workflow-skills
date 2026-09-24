@@ -27,7 +27,7 @@ description: 現在有効な仕様根拠、プロダクトリスク、テスト�
 
 ### 最終runtime evidence gate
 
-最終成果物を返す直前に、Skill-local `scripts/runtime_contract.py`をPython 3.11で実行し、stdinへ`{"operation":"verify_runtime_evidence","skill":"coverage-analysis","normalized_skill_input":<実際に使ったcanonical normalized input>,"artifact_markdown":<candidate成果物全文>,"previous_artifact_markdown":null}`を渡します。full buildではpreviousを`null`にし、partial rerunでは同一成果物系列の直前成果物全文を渡します。返却JSONの`valid`が`true`の場合だけ最終出力できます。`valid=false`は既存の最大1回の局所修正・最終確認契約へ統合し、未解決なら完成済みとして返しません。`expected_runtime_units[]`、`expected_entities[]`、dispatch state、前回Entity配列を作って渡してはいけません。
+最終成果物の直前にSkill-local `scripts/runtime_contract.py`の`operation=verify_runtime_evidence`へ、実際に使用したcanonical normalized inputとcandidate成果物全文を渡し、`previous_artifact_markdown`は常に`null`にします。coverage-analysisは自Skill Entityをcarry-forwardしません。各`analysis_scopes[]`には担当Skill verifierの`valid=true`で返った`current_structure_state`を変更せず転記し、`runtime_results[]`や`carry_forward_entities[]`を組み立てません。`valid=false`なら既存の最大1回の局所修正・最終確認契約へ統合し、未解決なら完成扱いしません。
 
 ## インターフェース
 

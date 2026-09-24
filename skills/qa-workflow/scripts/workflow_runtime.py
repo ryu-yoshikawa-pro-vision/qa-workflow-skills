@@ -22,6 +22,7 @@ from runtime_contract import (
     entity_identity,
     reject_unknown,
     run_cli,
+    validate_current_structure_state,
     validate_unsupported_item_closures,
     validate_entity_collection,
 )
@@ -155,6 +156,13 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
     for scope in scopes:
         scope_skill = scope["skill"]
         normalized = scope["normalized_input"]
+        validate_current_structure_state(
+            scope_skill,
+            normalized,
+            scope["current_structure_state"],
+            current_entities=entities,
+            current_runtime_units=current_runtime_rows,
+        )
         expected_units.extend(_default_expected_runtime_units(
             scope_skill,
             normalized,

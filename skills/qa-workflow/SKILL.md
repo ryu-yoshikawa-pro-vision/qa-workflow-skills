@@ -28,7 +28,7 @@ runtimeの`can_complete`はオーケストレーションの要約であり、�
 
 ### 最終runtime evidence gate
 
-最終成果物を返す直前に、Skill-local `scripts/runtime_contract.py`をPython 3.11で実行し、stdinへ`{"operation":"verify_runtime_evidence","skill":"qa-workflow","normalized_skill_input":<実際に使ったcanonical normalized input>,"artifact_markdown":<candidate成果物全文>,"previous_artifact_markdown":null}`を渡します。full buildではpreviousを`null`にし、partial rerunでは同一成果物系列の直前成果物全文を渡します。返却JSONの`valid`が`true`の場合だけ最終出力できます。`valid=false`は既存の最大1回の局所修正・最終確認契約へ統合し、未解決なら完成済みとして返しません。`expected_runtime_units[]`、`expected_entities[]`、dispatch state、前回Entity配列を作って渡してはいけません。これは`workflow_runtime.py`によるworkflow全体の検証を置き換えず、両方を実行します。
+最終成果物の直前にqa-workflow-local `scripts/runtime_contract.py`の`operation=verify_runtime_evidence`へ、実際に使用したcanonical normalized inputとcandidate成果物全文を渡し、`previous_artifact_markdown`は常に`null`にします。qa-workflowは自Skill Entityをcarry-forwardしません。`workflow_runtime.py`の前に各scope担当Skill verifierを実行し、`valid=true`で返った`current_structure_state`を変更せず`workflow_scopes[]`へ転記します。stateやexpected Entityを組み立てません。最終gateの`valid=false`は既存の最大1回の局所修正・最終確認契約へ統合し、未解決なら完成扱いしません。`verify_runtime_evidence`は`workflow_runtime.py`のworkflow全体検証を置き換えず、両方を実行します。
 
 ## インターフェース
 
