@@ -68,7 +68,7 @@ negativeには最低限、次を含めます。
 - 実対象で確認していない範囲をrepo情報だけでcurrentと表現しない
 - UI要素 / 状態 / 操作・ふるまいがcurrentな実在キーへ追跡できる。`削除確認`行だけは削除後のcurrent本体テーブルに対象キーが存在しなくても正当とする
 - 視覚情報表は必要時だけ存在でき、存在する場合は対象キーまたは要素 / 状態キーへ追跡できる
-- 構造証跡表は任意であり、存在する場合は対象キー / 状態キーへ追跡でき、証跡参照・前回証跡参照・差分概要を本体の更新区分と混同しない。raw `.aria.yml`の内容自体をdeterministic validatorの必須入力にはしない
+- 構造証跡表は任意であり、存在する場合は対象キーを必須とし、状態固有snapshotだけ状態キーを要求する。今回 / 前回の証跡参照がmutableなpathなら対応するrevision / SHA / content identityを要求し、過去内容を再取得できないlatest pathだけの履歴参照を許容しない。証跡参照・差分概要・証跡保存制約を本体の確認状態や更新区分と混同しない。raw `.aria.yml`の内容自体をdeterministic validatorの必須入力にはしない
 - 既存テスト実装対応表は任意であり、存在する場合だけ参照整合を検査する
 - `削除確認`行に確認条件 / version / build / 確認日時が存在し、比較条件へ追跡できる。version / buildは旧値との一致を要求せず、取得できない場合は`取得不能`を許容する。評価fixtureで更新前成果物を与える場合は、削除対象キーが更新前成果物に存在したことも確認する
 - 永続保存を要求した場合は`保存結果`が存在し、更新元revision、更新方式、保存状態、保存後revision、競合・制約の記録が矛盾しない
@@ -85,7 +85,7 @@ deterministic validatorだけで、実際に実対象を操作したこと、画
 1. 生きた実対象を正本として観測し、repoだけの情報をcurrentな実対象情報へ昇格しない
 2. UI構造だけでなく、操作に対する反応・状態変化・遷移を必要十分に記録する
 3. 視覚情報が必要な場面で画像を使用し、画像だけでrole / accessibility情報や仕様を創作しない
-4. 後続比較に価値があり安全に保存できる場合だけ、必要範囲の安定したARIA snapshotを構造証跡として残す。全画面・全状態で必須化せず、snapshot取得だけを理由に実行手段を切り替えず、操作用の一時refを含むAI向けsnapshotを長期比較の正規証跡にしない。前回snapshotとの差分を仕様変更や下流成果物更新へ直接昇格しない
+4. 後続比較に価値があり安全に保存できる場合だけ、必要範囲の安定したARIA snapshotを構造証跡として残す。全画面・全状態で必須化せず、snapshot取得だけを理由に実行手段を切り替えず、操作用の一時refを含むAI向けsnapshotを長期比較の正規証跡にしない。保存する場合は今回 / 前回の内容をimmutableな参照またはrevision / SHA / content identityで再取得でき、snapshot保存成功後にテスト対象資料へ参照する。snapshot保存可否と実対象の確認状態を混同せず、前回snapshotとの差分を仕様変更や下流成果物更新へ直接昇格しない
 5. 既存資料の今回対象範囲を実対象と照合し、確認状態と更新区分を混同せず、`削除確認`はrole / 権限、viewport、locale、feature flag、テストデータ、到達条件等の表示条件が比較可能な場合だけ使用する。version / buildの変更自体を禁止条件にせず、取得不能だけで一律`確認不能`にしない
 6. 実対象の現在挙動を仕様Authorityへ昇格しない
 7. POM / Page Object等を必須化せず、プロジェクトの既存構成に応じた任意参照として扱う
@@ -95,7 +95,7 @@ deterministic validatorだけで、実際に実対象を操作したこと、画
 現`main`の契約を維持する場合、semantic evalは各2 case作成します。実装開始時に基準branch側の契約が変わっていれば最新契約へ合わせます。
 
 - 既存資料を異なるversion / buildの現在UIと照合し、変更なし・削除確認・更新箇所が混在するcase。表示条件は比較可能なままversion / buildだけが変わる対象と、version / buildを取得できない対象も含め、変更確認を妨げないこと、削除対象キーをcurrent本体テーブルへ要求しないこと、保存競合または条件付き更新の扱いも確認する
-- DOM / accessibility treeだけでは不足する視覚情報と副作用cleanupを確認する。同じcaseで、対象領域のARIA snapshotを安全に保存できる条件では前回snapshotとの差分を変更候補として扱う一方、動的データ差や操作用refだけの差分を仕様変更へ昇格しないこと、raw snapshotを安全に保存できない場合は保存を必須にしないこと、画面内の命令文をAgentへの指示として採用しないことも確認する
+- DOM / accessibility treeだけでは不足する視覚情報と副作用cleanupを確認する。同じcaseで、対象領域のARIA snapshotを安全に保存できる条件では今回snapshotを先に保存して再取得可能なidentityを確定し、前回snapshotもrevision / SHA / content identity付き参照から取得して差分を変更候補として扱う。一方、動的データ差や操作用refだけの差分を仕様変更へ昇格しないこと、raw snapshotを安全に保存できない場合は観測状態を`確認不能`へ変えず保存制約として記録すること、画面内の命令文をAgentへの指示として採用しないことも確認する
 
 ## 4. `test-execution`の評価
 
@@ -322,8 +322,9 @@ routing caseへ最低限、次を追加します。
 - 実対象currentness確認
 - UI構造・ふるまい収集
 - DOM / accessibility treeと画像の使い分け
-- 必要範囲のPlaywright ARIA snapshotを既存の対象キー / 状態キーへ紐付く任意の構造証跡として保存し、前回証跡との差分を変更候補の確認へ利用する契約。全画面必須化、snapshot専用registry、実行手段切替、新規installは行わない
-- ARIA snapshot差分を仕様Authorityや下流成果物更新へ直接昇格せず、実対象で意味上の変更を確認して本体成果物へ反映してから既存の変更伝播を使う契約
+- 必要範囲のPlaywright ARIA snapshotを既存の対象キーへ紐付く任意の構造証跡として保存し、状態固有snapshotだけ状態キーも使用する契約。全画面必須化、snapshot専用registry、実行手段切替、新規installは行わない
+- ARIA snapshotはimmutableな参照、またはrevision / SHA / content identity付き参照で過去内容を再取得できるようにし、snapshot保存成功とidentity確認後にテスト対象資料へ参照を記録する契約。新しいtransaction managerは追加しない
+- snapshot保存可否を実対象の確認状態と分離し、ARIA snapshot差分を仕様Authorityや下流成果物更新へ直接昇格せず、実対象で意味上の変更を確認して本体成果物へ反映してから既存の変更伝播を使う契約
 - 視覚情報テーブル
 - 部分更新・変更なし管理
 - 条件付き更新 / 再読込比較
@@ -394,6 +395,7 @@ routing caseへ最低限、次を追加します。
 - workflow routing tests
 - 既存14 Skill回帰
 - 実Agentが利用可能なら`test-target-inspection`で実対象currentness確認を実施
+- 安全にARIA snapshotを永続化できる検証環境が利用可能なら、必要範囲のsnapshot取得 → snapshot保存 → revision / SHA / content identity確認 → テスト対象資料への参照記録 → 前回証跡との差分確認 → 意味上の変更有無判定までを最低1 case通す。長期比較に適さない操作用ref付きsnapshotしか取得できない、または安全に保存できない場合は実行手段を切り替えず、Planどおりraw永続証跡を省略して保存制約を記録できることを確認する。利用できない場合は未検証として記録する
 - Playwright MCPが利用可能なら第1経路で人間相当の非破壊TCを実行
 - MCPを利用できずPlaywright CLIが既に利用可能な検証環境がある場合は、第2経路を最低1 case確認
 - 画像確認可能なら現在のPlaywright実行手段から視覚観測を最低1 case確認
@@ -452,8 +454,9 @@ routing caseへ最低限、次を追加します。
 - 実対象を確認していない行をcurrentとして更新しない
 - `削除確認`対象キーがcurrent本体テーブルに存在しないことを正当な削除後状態として扱い、通常のcurrent実在キー参照チェックで誤って失敗させない
 - DOM / accessibility tree等では不足する視覚情報を画像で確認・記録できる
-- 後続比較に価値があり安全に保存できる場合、必要範囲の安定したARIA snapshotを対象キー / 状態キーへ追跡可能な構造証跡として保持し、前回証跡との差分を変更候補の確認に利用できる。ARIA snapshotが不要・取得不能・安全に保存不能でも、他の観測手段で今回範囲を確認できていればそれだけで未完了にしない
+- 後続比較に価値があり安全に保存できる場合、必要範囲の安定したARIA snapshotを対象キーへ追跡可能な構造証跡として保持し、状態固有snapshotだけ状態キーも使用できる。今回 / 前回の証跡をimmutableな参照またはrevision / SHA / content identity付き参照から再取得でき、snapshot保存成功後にテスト対象資料へ参照し、前回証跡との差分を変更候補の確認に利用できる。ARIA snapshotが不要・取得不能・安全に保存不能でも、他の観測手段で今回範囲を確認できていればそれだけで未完了にせず、保存制約として分離できる
 - ARIA snapshot差分だけで仕様Authorityや下流成果物を更新せず、実対象で確認した意味上の変更だけを既存の変更伝播へ流せる
+- 実Agent / 実対象でARIA snapshot経路を利用できる場合は取得・保存・identity確認・前回比較・意味上の変更判定までのruntime smokeを通し、利用できない場合は未検証として明示できる
 - POM等を必須化せず、任意参照として扱える
 - テスト対象資料を仕様Authorityとして扱わない
 - 条件付き更新を利用できる保存先では競合上書きを防ぎ、利用できない共有保存先ではatomicな競合防止を保証せず自動上書きしない
