@@ -70,7 +70,7 @@ standalone成立のために`workflow_runtime.py`を必須にせず、workflow�
 
 - `direct`: 前工程Skill directory / Machine Entityなしで、既存test-condition-design入力契約からEP成果物を生成できる
 - `artifact`: current Machine Entity付き成果物を使い、missing / extra dependencyを拒否できる
-- partial rerun: scope外のactive TCN / model IDだけでなく対応Machine Entityも`runtime_contract.py`固定helperでprevious成果物からcanonical content / fingerprintを変えずcarry forwardし、scope内だけcurrent resultで置換する。scope外Entityでもdependency不一致ならcurrent扱いせず`要再検証`にする。scope内で明示的に外したIDだけdeletedへ遷移する
+- partial rerun: scope外のactive TCN / model IDだけでなく対応Machine Entityも`runtime_contract.py`固定helperでprevious成果物からcanonical content / fingerprintを変えずcarry forwardし、scope内だけcurrent resultで置換する。scope外Entityでもdependency不一致ならcurrent扱いせず`要再検証`にする。scope内で明示的に外したIDだけdeletedへ遷移する。scope外carry-forwardに必要なprevious artifactが欠落する場合はvalidatorが拒否し、standalone / `workflow_runtime.py` / `traceability.py`が同じ固定Entity集合とEntity-scoped runtime dependency freshnessを使用する
 - 同一入力再実行でMachine Runtime Result、target / CI mapping、fingerprintが一致する
 - 完成Markdownを保存・再読込し、同じinputでruntime再実行できる
 - standalone direct fixtureのcandidate Markdownへ`verify_runtime_evidence`を実行して`valid=true`になる。必須runtime blockを1件削除したfixtureではexpected集合を変えず`valid=false`になる。16 MiB aggregate stdin境界もここで代表確認する

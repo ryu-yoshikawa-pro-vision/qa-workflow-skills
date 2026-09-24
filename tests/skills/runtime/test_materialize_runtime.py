@@ -171,6 +171,12 @@ class MaterializeRuntimeTests(unittest.TestCase):
         self.assertEqual(first["payload"]["target_id_map"], second["payload"]["target_id_map"])
         self.assertEqual(first["payload"]["ci_id_state"], second["payload"]["ci_id_state"])
 
+    def test_previous_ci_state_rejects_ids_from_another_tcn(self) -> None:
+        request = materialize_request(ep_result())
+        request["input"]["previous_ci_ids"] = [{"ci_id": "TCN-002-CI01", "status": "active"}]
+        result = run_script(MATERIALIZE_SCRIPT, request)
+        self.assertEqual(result["runtime_status"], "invalid_input")
+
     def test_previous_mapping_target_ref_is_recomputed(self) -> None:
         ep = ep_result()
         request = materialize_request(ep)

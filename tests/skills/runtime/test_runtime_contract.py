@@ -256,6 +256,91 @@ class EntityAndEvidenceTests(unittest.TestCase):
         with self.assertRaises(runtime.InvalidInput):
             runtime.resolve_entity_dependencies([("spec-analysis", "authority", "SHARED")], [risk])
 
+    def _scoped_entity(self, *, content: dict | None = None, context: dict | None = None) -> tuple[dict, dict]:
+        current_context = context or {
+            "runtime_contract_version": runtime.RUNTIME_CONTRACT_VERSION,
+            "generator_contract_version": "condition-structure-v1",
+            "runtime_implementation_fingerprint": runtime.implementation_fingerprint(RUNTIME_PATH),
+            "generator_implementation_fingerprint": runtime.implementation_fingerprint(REPO_ROOT / "skills" / "test-condition-design" / "scripts" / "condition_structure.py"),
+            "static_data_versions": {},
+        }
+        entity = runtime.make_machine_entity(
+            "test-condition-design", "tcn", "TCN-001", content or {"tcn_id": "TCN-001", "conditions": ["A"]},
+            runtime_dependencies=[runtime.machine_entity_runtime_dependency("test-condition-design", "artifact:condition_structure:all")],
+        )
+        aggregate_generation = "sha256:" + "1" * 64
+        entity = runtime.bind_current_entity_runtime_dependencies(
+            {"entities": [entity]}, aggregate_generation, runtime_context=current_context,
+        )["entities"][0]
+        current_runtime = {
+            "skill": "test-condition-design", "runtime_unit_key": "artifact:condition_structure:all",
+            "generation_fingerprint": "sha256:" + "2" * 64, "freshness_status": "current",
+            **current_context,
+        }
+        return entity, current_runtime
+
+    def test_entity_scoped_runtime_dependency_is_fresh_across_unrelated_scope_generation(self) -> None:
+        entity, current_runtime = self._scoped_entity()
+        dependency = entity["runtime_dependencies"][0]
+        self.assertRegex(dependency["runtime_unit_key"], r"^artifact:condition_structure:all#entity:sha256:[0-9a-f]{64}$")
+        self.assertEqual(
+            dependency["runtime_unit_key"],
+            runtime.machine_entity_runtime_unit_key("artifact:condition_structure:all", entity),
+        )
+        current = runtime.evaluate_entity_freshness(
+            [entity], {("test-condition-design", "artifact:condition_structure:all"): current_runtime},
+        )
+        self.assertEqual(current[0]["freshness_status"], "current", current)
+
+        changed_content = runtime.make_machine_entity(
+            "test-condition-design", "tcn", "TCN-001", {"tcn_id": "TCN-001", "conditions": ["changed"]},
+            runtime_dependencies=entity["runtime_dependencies"],
+        )
+        stale_content = runtime.evaluate_entity_freshness(
+            [changed_content], {("test-condition-design", "artifact:condition_structure:all"): current_runtime},
+        )
+        self.assertEqual(stale_content[0]["freshness_status"], "stale")
+        self.assertTrue(any(row["reason_code"] == "runtime_generation_mismatch" for row in stale_content[0]["stale_reasons"]))
+
+    def test_entity_scoped_runtime_dependency_tracks_producer_metadata_and_key(self) -> None:
+        entity, current_runtime = self._scoped_entity()
+        runtime_key = ("test-condition-design", "artifact:condition_structure:all")
+        for field, changed_value in (
+            ("runtime_contract_version", "runtime-v2"),
+            ("generator_contract_version", "condition-structure-v2"),
+            ("runtime_implementation_fingerprint", "sha256:" + "3" * 64),
+            ("generator_implementation_fingerprint", "sha256:" + "4" * 64),
+            ("static_data_versions", {"schema_catalog": "v2"}),
+        ):
+            with self.subTest(field=field):
+                changed_runtime = {**current_runtime, field: changed_value}
+                stale = runtime.evaluate_entity_freshness([entity], {runtime_key: changed_runtime})
+                self.assertEqual(stale[0]["freshness_status"], "stale")
+
+        tampered = {**entity, "runtime_dependencies": [dict(entity["runtime_dependencies"][0])]}
+        tampered["runtime_dependencies"][0]["runtime_unit_key"] = "artifact:condition_structure:all#entity:sha256:" + "f" * 64
+        stale_key = runtime.evaluate_entity_freshness([tampered], {runtime_key: current_runtime})
+        self.assertEqual(stale_key[0]["freshness_status"], "stale")
+        self.assertTrue(any(row["reason_code"] == "runtime_generation_mismatch" for row in stale_key[0]["stale_reasons"]))
+
+        expected = runtime._default_expected_runtime_units("test-condition-design", {"test_conditions": [], "models": []}, "")
+        self.assertFalse(any("#entity:" in row["runtime_unit_key"] for row in expected))
+        envelope = {
+            "skill": "test-condition-design", "runtime_unit_key": "artifact:condition_structure:all", "model_key": None,
+            "support_status": "supported", "result_status": "ready", "runtime_status": "ok", "runtime_required": True,
+            "deterministic_generated": True, "generation_fingerprint": "sha256:" + "5" * 64,
+            "upstream_entity_fingerprints": [], "upstream_runtime_units": [], "unsupported_items": [], "payload": {},
+            **{field: current_runtime[field] for field in (
+                "runtime_contract_version", "generator_contract_version", "runtime_implementation_fingerprint",
+                "generator_implementation_fingerprint", "static_data_versions",
+            )},
+        }
+        runtime_projection = runtime.runtime_unit_row(envelope)
+        self.assertTrue({
+            "runtime_contract_version", "generator_contract_version", "runtime_implementation_fingerprint",
+            "generator_implementation_fingerprint", "static_data_versions",
+        }.issubset(runtime_projection))
+
     def test_common_disposition_currentness_covered_rules_and_dependencies(self) -> None:
         upstream = runtime.make_machine_entity("spec-analysis", "authority", "AUTH-001", {"authority_id": "AUTH-001"})
         covered = runtime.make_machine_entity("test-analysis", "product_risk", "R-001", {"risk_id": "R-001"})
@@ -447,6 +532,43 @@ class EntityAndEvidenceTests(unittest.TestCase):
         blocks.extend(extra_blocks or [])
         return "\n".join(blocks)
 
+    def _artifact_runtime_pair(self, generator: str, unit: str, version: str, payload: dict) -> str:
+        skill = "test-condition-design"
+        generator_path = REPO_ROOT / "skills" / skill / "scripts" / f"{generator}.py"
+        runtime_impl_fp = runtime.implementation_fingerprint(RUNTIME_PATH)
+        generator_impl_fp = runtime.implementation_fingerprint(generator_path)
+        scope_key = unit.split(":", 2)[-1]
+        metadata = {
+            "envelope_version": "1", "skill": skill, "runtime_contract_version": runtime.RUNTIME_CONTRACT_VERSION,
+            "generator_contract_version": version, "runtime_unit_key": unit, "model_key": None,
+            "model_type": None, "technique_slug": None, "selection_source": None, "selection_key": None,
+            "scope_key": scope_key, "input_mode": "direct", "upstream_entities": [], "upstream_runtime_units": [],
+            "static_data_versions": {}, "authority_refs": [], "reference_refs": [],
+        }
+        input_value = {"runtime_unit_key": unit}
+        input_fp = runtime.input_fingerprint(skill, unit, "direct", input_value, [], [], None)
+        model_fp = runtime.model_fingerprint(metadata, input_fp)
+        generation_fp = runtime.generation_fingerprint(
+            generator=generator, input_fp=input_fp, model_fp=model_fp,
+            runtime_contract_version=runtime.RUNTIME_CONTRACT_VERSION,
+            generator_contract_version=version, runtime_impl_fp=runtime_impl_fp,
+            generator_impl_fp=generator_impl_fp, upstream=[], static_data_versions={},
+        )
+        result = {
+            "envelope_version": "1", "skill": skill, "runtime_contract_version": runtime.RUNTIME_CONTRACT_VERSION,
+            "generator_contract_version": version, "generator": generator, "runtime_unit_key": unit,
+            "model_key": None, "input_fingerprint": input_fp, "model_fingerprint": model_fp,
+            "generation_fingerprint": generation_fp, "runtime_implementation_fingerprint": runtime_impl_fp,
+            "generator_implementation_fingerprint": generator_impl_fp, "upstream_entity_fingerprints": [],
+            "upstream_runtime_units": [], "support_status": "supported", "static_data_versions": {},
+            "runtime_status": "ok", "result_status": "ready", "runtime_required": True,
+            "deterministic_generated": True, "fallback_reason": None, "payload": payload, "issues": [],
+        }
+        return "\n".join((
+            runtime.render_runtime_input(skill, metadata, input_value),
+            runtime.render_runtime_result(skill, result),
+        ))
+
     def test_partial_rerun_carries_scope_out_tcn_model_ci_tdr_and_dispositions(self) -> None:
         tcn_one = runtime.make_machine_entity("test-condition-design", "tcn", "TCN-001", {"tcn_id": "TCN-001"})
         tcn_two = runtime.make_machine_entity("test-condition-design", "tcn", "TCN-002", {"tcn_id": "TCN-002"})
@@ -471,19 +593,32 @@ class EntityAndEvidenceTests(unittest.TestCase):
         previous_state = {
             "tcn_id_state": [{"tcn_id": ref, "status": "active"} for ref in ("TCN-001", "TCN-002")],
             "model_key_state": [{"model_key": ref, "model_type": "ep", "status": "active"} for ref in ("ep-001", "ep-002")],
-            "ci_id_state": [{"ci_id": ref, "status": "active"} for ref in ("TCN-001-CI01", "TCN-002-CI01")],
         }
         normalized = {
             "tcn_id": "TCN-001", "test_conditions": [], "models": [], "test_data_requirements": [], "ci_ids": [],
             "previous_tcn_ids": previous_state["tcn_id_state"], "previous_model_keys": previous_state["model_key_state"],
-            "previous_ci_ids": previous_state["ci_id_state"], "update_scope_tcn_ids": ["TCN-001"],
+            "previous_ci_ids": [{"ci_id": "TCN-001-CI01", "status": "active"}], "update_scope_tcn_ids": ["TCN-001"],
             "update_scope_model_keys": ["ep-001"],
         }
-        previous = self._structure_artifact("test-condition-design", normalized, previous_entities, previous_state)
+        root_entities = [
+            *[row for row in previous_entities if row["entity_type"] in {"tcn", "model"}],
+            *[row for row in dispositions if row["content"]["upstream_entity"]["entity_type"] in {"tcn", "model"}],
+        ]
+        previous_root = self._structure_artifact(
+            "test-condition-design", normalized, previous_entities, previous_state,
+            result_entities=root_entities,
+            extra_blocks=[
+                self._artifact_runtime_pair("materialize_coverage", "artifact:materialize_coverage:TCN-001", "materialize-coverage-v1", {"ci_id_state": [{"ci_id": "TCN-001-CI01", "status": "active"}], "entities": [ci_one, dispositions[4]]}),
+                self._artifact_runtime_pair("materialize_coverage", "artifact:materialize_coverage:TCN-002", "materialize-coverage-v1", {"ci_id_state": [{"ci_id": "TCN-002-CI01", "status": "active"}], "entities": [ci_two, dispositions[5]]}),
+                self._artifact_runtime_pair("test_data_requirements", "artifact:test_data_requirements:all", "test-data-requirements-v1", {"entities": [tdr_one, tdr_two, dispositions[6], dispositions[7]]}),
+            ],
+        )
+        # Keep the previous artifact's runtime result shape production-like:
+        # one condition_structure full snapshot and TCN-scoped materialize states.
+        previous = previous_root
         current_state = {
             "tcn_id_state": [{"tcn_id": "TCN-001", "status": "deleted"}, {"tcn_id": "TCN-002", "status": "active"}],
             "model_key_state": [{"model_key": "ep-001", "model_type": "ep", "status": "deleted"}, {"model_key": "ep-002", "model_type": "ep", "status": "active"}],
-            "ci_id_state": [{"ci_id": "TCN-001-CI01", "status": "deleted"}, {"ci_id": "TCN-002-CI01", "status": "active"}],
         }
         carry = [tcn_two, model_two, ci_two, tdr_two, *[row for row in dispositions if row["content"]["upstream_entity"]["entity_ref"] in {"TCN-002", "ep-002", "TCN-002-CI01", "data:REQ-002"}]]
         candidate = self._structure_artifact("test-condition-design", normalized, carry, current_state, result_entities=[])
@@ -495,6 +630,178 @@ class EntityAndEvidenceTests(unittest.TestCase):
         self.assertTrue(checked["valid"], checked)
         expected = {(row["entity_type"], row["entity_ref"]) for row in checked["expected_entities"]}
         self.assertEqual(expected, {(row["entity_type"], row["entity_ref"]) for row in carry})
+        self.assertEqual(
+            {runtime.entity_identity(row["skill"], row["entity_type"], row["entity_ref"]) for row in checked["current_structure_state"]["carry_forward_entities"]},
+            {runtime.entity_identity(row["skill"], row["entity_type"], row["entity_ref"]) for row in carry},
+        )
+
+        # Feed the standalone verifier's fixed projection unchanged into both
+        # production aggregators. Neither consumer reconstructs the scope-out
+        # rows from current_entities.
+        from tests.skills.runtime.test_traceability_runtime import metadata as traceability_metadata, run as run_traceability
+        from tests.skills.runtime.test_workflow_runtime import metadata as workflow_metadata, run as run_workflow
+
+        current_runtime_results = checked["current_structure_state"]["runtime_results"]
+        current_runtime_rows = [runtime.runtime_unit_row(row["result"]) for row in current_runtime_results]
+        workflow_request = {
+            "metadata": workflow_metadata(),
+            "input": {
+                "workflow_scopes": [{
+                    "skill": "test-condition-design", "target": "TCN-001", "execution_range": None,
+                    "input_mode": "artifact", "normalized_input": normalized,
+                    "current_structure_state": checked["current_structure_state"],
+                }],
+                "runtime_units": current_runtime_rows,
+                "current_runtime_units": current_runtime_rows,
+                "current_entities": carry,
+                "unsupported_item_closures": [],
+            },
+        }
+        workflow_result = run_workflow(workflow_request)
+        self.assertEqual(workflow_result["result_status"], "ready", workflow_result)
+        self.assertEqual(workflow_result["payload"]["missing_entities"], [])
+        self.assertEqual(workflow_result["payload"]["extra_entities"], [])
+        self.assertEqual(workflow_result["payload"]["expected_entities"], checked["expected_entities"])
+
+        traceability_request = {
+            "metadata": traceability_metadata(),
+            "input": {
+                "analysis_scopes": [{
+                    "skill": "test-condition-design", "target": "TCN-001", "execution_range": None,
+                    "input_mode": "artifact", "normalized_input": normalized,
+                    "current_structure_state": checked["current_structure_state"],
+                }],
+                "nodes": [], "edges": [], "dispositions": [],
+                "runtime_units": current_runtime_rows,
+                "current_entities": carry,
+                "current_runtime_units": current_runtime_rows,
+                "unsupported_item_closures": [],
+            },
+        }
+        traceability_result = run_traceability(traceability_request)
+        self.assertEqual(traceability_result["result_status"], "ready", traceability_result)
+        self.assertEqual(traceability_result["payload"]["missing_entities"], [])
+        self.assertEqual(traceability_result["payload"]["extra_entities"], [])
+        self.assertEqual(traceability_result["payload"]["expected_entities"], checked["expected_entities"])
+
+        input_blocks = dict(runtime.extract_machine_blocks(previous, "Machine Runtime Input", allow_duplicates=True))
+        result_blocks = dict(runtime.extract_machine_blocks(previous, "Machine Runtime Result", allow_duplicates=True))
+        reversed_blocks = []
+        for identity in reversed(sorted(result_blocks)):
+            reversed_blocks.append(runtime.render_runtime_input("test-condition-design", input_blocks[identity]["metadata"], input_blocks[identity]["input"]))
+            reversed_blocks.append(runtime.render_runtime_result("test-condition-design", result_blocks[identity]))
+        reversed_blocks.append(runtime.render_machine_entities("test-condition-design", previous_entities))
+        reordered = runtime.verify_runtime_evidence({
+            "operation": "verify_runtime_evidence", "skill": "test-condition-design",
+            "normalized_skill_input": normalized,
+            "artifact_markdown": candidate,
+            "previous_artifact_markdown": "\n".join(reversed_blocks),
+        })
+        self.assertTrue(reordered["valid"], reordered)
+        self.assertEqual(reordered["expected_entities"], checked["expected_entities"])
+
+        wrong_prefix_previous = self._structure_artifact(
+            "test-condition-design", normalized, previous_entities, previous_state,
+            result_entities=root_entities,
+            extra_blocks=[
+                self._artifact_runtime_pair("materialize_coverage", "artifact:materialize_coverage:TCN-001", "materialize-coverage-v1", {"ci_id_state": [{"ci_id": "TCN-002-CI01", "status": "active"}], "entities": [ci_two, dispositions[5]]}),
+                self._artifact_runtime_pair("materialize_coverage", "artifact:materialize_coverage:TCN-002", "materialize-coverage-v1", {"ci_id_state": [{"ci_id": "TCN-002-CI01", "status": "active"}], "entities": [ci_two, dispositions[5]]}),
+                self._artifact_runtime_pair("test_data_requirements", "artifact:test_data_requirements:all", "test-data-requirements-v1", {"entities": [tdr_one, tdr_two, dispositions[6], dispositions[7]]}),
+            ],
+        )
+        bad_prefix = runtime.verify_runtime_evidence({
+            "operation": "verify_runtime_evidence", "skill": "test-condition-design",
+            "normalized_skill_input": normalized, "artifact_markdown": candidate,
+            "previous_artifact_markdown": wrong_prefix_previous,
+        })
+        self.assertFalse(bad_prefix["valid"])
+        self.assertIn("invalid_previous_artifact", [issue["issue_type"] for issue in bad_prefix["issues"]])
+
+        for label, previous_ci_ids in (
+            ("other-tcn", [{"ci_id": "TCN-001-CI01", "status": "active"}, {"ci_id": "TCN-002-CI01", "status": "active"}]),
+            ("status-mismatch", [{"ci_id": "TCN-001-CI01", "status": "deleted"}]),
+        ):
+            with self.subTest(label=label):
+                invalid_normalized = {**normalized, "previous_ci_ids": previous_ci_ids}
+                invalid = runtime.verify_runtime_evidence({
+                    "operation": "verify_runtime_evidence", "skill": "test-condition-design",
+                    "normalized_skill_input": invalid_normalized, "artifact_markdown": candidate,
+                    "previous_artifact_markdown": previous,
+                })
+                self.assertFalse(invalid["valid"])
+                self.assertIn("invalid_previous_artifact", [issue["issue_type"] for issue in invalid["issues"]])
+
+    def test_partial_rerun_requires_previous_artifact_when_scope_out_entities_are_active(self) -> None:
+        tr_state = [{"tr_id": "TR-001", "status": "active"}, {"tr_id": "TR-002", "status": "active"}]
+        normalized = {"authorities": [], "risks": [], "test_requirements": [], "dispositions": [], "previous_tr_ids": tr_state, "update_scope_tr_ids": ["TR-001"]}
+        candidate = self._tr_artifact(
+            normalized, [], [{"tr_id": "TR-001", "status": "deleted"}, {"tr_id": "TR-002", "status": "active"}], result_entities=[],
+        )
+        missing_previous = runtime.verify_runtime_evidence({
+            "operation": "verify_runtime_evidence", "skill": "test-requirement-design",
+            "normalized_skill_input": normalized, "artifact_markdown": candidate,
+            "previous_artifact_markdown": None,
+        })
+        self.assertFalse(missing_previous["valid"])
+        self.assertIn("invalid_previous_artifact", [issue["issue_type"] for issue in missing_previous["issues"]])
+        self.assertIn(["test-requirement-design", "tr", "TR-002"], missing_previous["missing_entities"])
+
+        scoped_only_state = [{"tr_id": "TR-001", "status": "active"}]
+        scoped_only = {"authorities": [], "risks": [], "test_requirements": [], "dispositions": [], "previous_tr_ids": scoped_only_state, "update_scope_tr_ids": ["TR-001"]}
+        current_tr = runtime.make_machine_entity("test-requirement-design", "tr", "TR-001", {"tr_id": "TR-001", "text": "Current"})
+        scoped_candidate = self._tr_artifact(scoped_only, [current_tr], scoped_only_state, result_entities=[current_tr])
+        no_carry_needed = runtime.verify_runtime_evidence({
+            "operation": "verify_runtime_evidence", "skill": "test-requirement-design",
+            "normalized_skill_input": scoped_only, "artifact_markdown": scoped_candidate,
+            "previous_artifact_markdown": None,
+        })
+        self.assertTrue(no_carry_needed["valid"], no_carry_needed)
+
+        deleted_scoped = {"authorities": [], "risks": [], "test_requirements": [], "dispositions": [], "previous_tr_ids": scoped_only_state, "update_scope_tr_ids": ["TR-001"]}
+        deleted_candidate = self._tr_artifact(deleted_scoped, [], [{"tr_id": "TR-001", "status": "deleted"}], result_entities=[])
+        deleted_without_previous = runtime.verify_runtime_evidence({
+            "operation": "verify_runtime_evidence", "skill": "test-requirement-design",
+            "normalized_skill_input": deleted_scoped, "artifact_markdown": deleted_candidate,
+            "previous_artifact_markdown": None,
+        })
+        self.assertTrue(deleted_without_previous["valid"], deleted_without_previous)
+
+        condition_normalized = {
+            "tcn_id": "TCN-001", "test_conditions": [], "models": [], "ci_ids": [],
+            "previous_tcn_ids": [{"tcn_id": "TCN-001", "status": "active"}, {"tcn_id": "TCN-002", "status": "active"}],
+            "previous_model_keys": [{"model_key": "ep-001", "model_type": "ep", "status": "active"}, {"model_key": "ep-002", "model_type": "ep", "status": "active"}],
+            "previous_ci_ids": [], "update_scope_tcn_ids": ["TCN-001"], "update_scope_model_keys": ["ep-001"],
+        }
+        condition_candidate = self._structure_artifact(
+            "test-condition-design", condition_normalized, [],
+            {"tcn_id_state": [{"tcn_id": "TCN-001", "status": "deleted"}, {"tcn_id": "TCN-002", "status": "active"}],
+             "model_key_state": [{"model_key": "ep-001", "model_type": "ep", "status": "deleted"}, {"model_key": "ep-002", "model_type": "ep", "status": "active"}]},
+            result_entities=[],
+        )
+        condition_missing = runtime.verify_runtime_evidence({
+            "operation": "verify_runtime_evidence", "skill": "test-condition-design",
+            "normalized_skill_input": condition_normalized, "artifact_markdown": condition_candidate,
+            "previous_artifact_markdown": None,
+        })
+        self.assertFalse(condition_missing["valid"])
+        self.assertIn("invalid_previous_artifact", [issue["issue_type"] for issue in condition_missing["issues"]])
+        self.assertIn(["test-condition-design", "model", "ep-002"], condition_missing["missing_entities"])
+
+        tc_state = [{"tc_id": "TC-001", "status": "active"}, {"tc_id": "TC-002", "status": "active"}]
+        tc_normalized = {"test_cases": [], "previous_tc_ids": tc_state, "update_scope_tc_ids": ["TC-001"]}
+        tc_candidate = self._structure_artifact(
+            "test-case-design", tc_normalized, [],
+            {"tc_id_state": [{"tc_id": "TC-001", "status": "deleted"}, {"tc_id": "TC-002", "status": "active"}]},
+            result_entities=[],
+        )
+        tc_missing = runtime.verify_runtime_evidence({
+            "operation": "verify_runtime_evidence", "skill": "test-case-design",
+            "normalized_skill_input": tc_normalized, "artifact_markdown": tc_candidate,
+            "previous_artifact_markdown": None,
+        })
+        self.assertFalse(tc_missing["valid"])
+        self.assertIn("invalid_previous_artifact", [issue["issue_type"] for issue in tc_missing["issues"]])
+        self.assertIn(["test-case-design", "tc", "TC-002"], tc_missing["missing_entities"])
 
     def test_partial_rerun_carries_scope_out_tc_and_does_not_resurrect_deleted_tc(self) -> None:
         tc_one = runtime.make_machine_entity("test-case-design", "tc", "TC-001", {"tc_id": "TC-001"})

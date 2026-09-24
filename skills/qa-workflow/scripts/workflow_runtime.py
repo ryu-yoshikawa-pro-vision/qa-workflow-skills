@@ -166,6 +166,7 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
             scope_skill,
             normalized,
             current_structure_state=scope["current_structure_state"],
+            require_carry_forward_projection=True,
         ))
     expected_unit_keys = sorted({(row["skill"], row["runtime_unit_key"]) for row in expected_units})
     actual_unit_keys = sorted((row["skill"], row["runtime_unit_key"]) for row in runtime_rows)

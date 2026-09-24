@@ -2287,22 +2287,73 @@ def _previous_entity_states(
         },
         "test-case-design": {"tc": ("tc_id_state", "tc_id")},
     }.get(skill, {})
-    payloads: list[dict[str, Any]] = []
-    if previous_result_blocks is not None:
-        for identity, result in previous_result_blocks:
-            if identity.startswith(skill + "::") and isinstance(result.get("payload"), dict):
-                payloads.append(result["payload"])
+    normalized_fields = {
+        "tr": "previous_tr_ids",
+        "tcn": "previous_tcn_ids",
+        "model": "previous_model_keys",
+        "tc": "previous_tc_ids",
+        "ci": "previous_ci_ids",
+    }
+    if previous_result_blocks is None:
+        return {
+            entity_type: _state_map(normalized.get(normalized_fields[entity_type], []), id_field)
+            for entity_type, (_field, id_field) in state_fields.items()
+        }
+
+    payloads: list[tuple[str, dict[str, Any]]] = []
+    for identity, result in previous_result_blocks:
+        if identity.startswith(skill + "::") and isinstance(result.get("payload"), dict):
+            payloads.append((identity, result["payload"]))
     output: dict[str, dict[str, str]] = {}
+    root_units = {
+        "test-requirement-design": "artifact:requirement_structure:all",
+        "test-condition-design": "artifact:condition_structure:all",
+        "test-case-design": "artifact:case_structure:all",
+    }
     for entity_type, (field, id_field) in state_fields.items():
-        artifact_values = [payload[field] for payload in payloads if field in payload]
-        normalized_field = {
-            "tr": "previous_tr_ids",
-            "tcn": "previous_tcn_ids",
-            "model": "previous_model_keys",
-            "tc": "previous_tc_ids",
-            "ci": "previous_ci_ids",
-        }[entity_type]
-        source = artifact_values[-1] if artifact_values else normalized.get(normalized_field, [])
+        if entity_type == "ci":
+            merged_rows: list[dict[str, Any]] = []
+            seen_ci_ids: set[str] = set()
+            for identity, payload in sorted(payloads):
+                runtime_unit_key = identity.split("::", 1)[1]
+                prefix = "artifact:materialize_coverage:"
+                is_materialize = runtime_unit_key.startswith(prefix)
+                if is_materialize and field not in payload:
+                    raise InvalidInput("previous TCN materialize result is missing ci_id_state")
+                if field not in payload:
+                    continue
+                if not is_materialize:
+                    raise InvalidInput("previous ci_id_state must come from a TCN-scoped materialize result")
+                tcn_id = runtime_unit_key[len(prefix):]
+                if re.fullmatch(r"TCN-[0-9]{3}", tcn_id) is None:
+                    raise InvalidInput("previous materialize runtime TCN identity is invalid")
+                rows = payload[field]
+                if not isinstance(rows, list):
+                    raise InvalidInput("previous ci_id_state is invalid")
+                for row in rows:
+                    if not isinstance(row, dict) or set(row) != {id_field, "status"}:
+                        raise InvalidInput("previous ci_id_state row schema is invalid")
+                    ci_id = row.get(id_field)
+                    if not isinstance(ci_id, str) or re.fullmatch(re.escape(tcn_id) + r"-CI[0-9]{2,}", ci_id) is None:
+                        raise InvalidInput("previous ci_id_state TCN prefix does not match materialize runtime")
+                    if ci_id in seen_ci_ids:
+                        raise InvalidInput("previous ci_id_state contains a duplicate CI identity")
+                    seen_ci_ids.add(ci_id)
+                    merged_rows.append(row)
+            output[entity_type] = _state_map(merged_rows, id_field)
+            continue
+
+        field_rows: list[Any] = []
+        expected_identity = _unit_identity(skill, root_units[skill])
+        for identity, payload in payloads:
+            if field not in payload:
+                continue
+            if identity != expected_identity:
+                raise InvalidInput(f"previous {field} must come from {expected_identity}")
+            field_rows.append(payload[field])
+        if len(field_rows) > 1:
+            raise InvalidInput(f"previous {field} is duplicated")
+        source = field_rows[0] if field_rows else []
         output[entity_type] = _state_map(source, id_field)
     return output
 
@@ -2382,10 +2433,15 @@ def _active_previous_entity_identities(
         # materialize_coverage is TCN-scoped; an invoked TCN replaces its CI
         # snapshot, while active CI state for other TCNs remains carryable.
         materialized_tcn = current_tcn if isinstance(current_tcn, str) else None
+        updated_tcns = set(normalized.get("update_scope_tcn_ids", []))
         for ref, status in states.get("ci", {}).items():
             if status != "active":
                 continue
-            if materialized_tcn and ref.startswith(materialized_tcn + "-"):
+            match = re.fullmatch(r"(TCN-[0-9]{3})-CI[0-9]{2,}", ref)
+            if match is None:
+                raise InvalidInput("previous CI identity has no valid TCN owner")
+            owner_tcn = match.group(1)
+            if owner_tcn in updated_tcns or owner_tcn == materialized_tcn:
                 continue
             result.add((skill, "ci", ref))
     return result
@@ -2420,6 +2476,28 @@ def _carry_forward_machine_entities(
     return result
 
 
+def _previous_artifact_required_for_carry_forward(skill: str, normalized: dict[str, Any]) -> bool:
+    """Whether normalized full state proves that an out-of-scope entity must survive."""
+    states = _previous_entity_states(skill, normalized)
+    return bool(_active_previous_entity_identities(skill, normalized, states))
+
+
+def _current_structure_state_projection(
+    skill: str,
+    result_blocks: Iterable[tuple[str, dict[str, Any]]],
+    carry_forward_entities: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Expose only fixed runtime results and strictly validated prior entity rows."""
+    runtime_results = []
+    for identity, result in sorted(result_blocks, key=lambda row: row[0]):
+        if identity.startswith(skill + "::"):
+            runtime_results.append({"identity": identity, "result": canonicalize(result)})
+    return {
+        "runtime_results": runtime_results,
+        "carry_forward_entities": canonicalize(carry_forward_entities),
+    }
+
+
 def _expected_entities(
     skill: str,
     normalized: dict[str, Any],
@@ -2428,6 +2506,7 @@ def _expected_entities(
     current_result_entities: list[dict[str, Any]] | None = None,
     previous_states: dict[str, dict[str, str]] | None = None,
     current_structure_state: dict[str, Any] | None = None,
+    require_carry_forward_projection: bool = False,
 ) -> list[dict[str, str]]:
     result: list[dict[str, str]] = []
     def add(entity_type: str, ref: Any) -> None:
@@ -2498,7 +2577,22 @@ def _expected_entities(
         for _skill, entity_type, ref in _active_previous_entity_identities(skill, normalized, state):
             result.append({"skill": _skill, "entity_type": entity_type, "entity_ref": ref})
     state_results = _state_result_blocks(current_structure_state, skill)
-    for entity in _runtime_result_entities([(identity, body) for identity, body in state_results.items()], skill):
+    state_entities = _runtime_result_entities([(identity, body) for identity, body in state_results.items()], skill)
+    for entity in state_entities:
+        result.append({"skill": entity["skill"], "entity_type": entity["entity_type"], "entity_ref": entity["entity_ref"]})
+    carry_projection_present = isinstance(current_structure_state, dict) and "carry_forward_entities" in current_structure_state
+    carry_projection = validate_entity_collection(current_structure_state["carry_forward_entities"], expected_skill=skill) if carry_projection_present else []
+    if require_carry_forward_projection:
+        required_carry = _active_previous_entity_identities(skill, normalized, state)
+        if required_carry and not carry_projection_present:
+            raise InvalidInput("scope-out Machine Entity fixed projection is missing")
+        available = {
+            entity_identity(row["skill"], row["entity_type"], row["entity_ref"])
+            for row in [*state_entities, *carry_projection]
+        }
+        if not required_carry.issubset(available):
+            raise InvalidInput("scope-out active ID is missing from the fixed Machine Entity projection")
+    for entity in carry_projection:
         result.append({"skill": entity["skill"], "entity_type": entity["entity_type"], "entity_ref": entity["entity_ref"]})
     for row in _carry_forward_machine_entities(skill, normalized, previous_entities or [], state):
         result.append({"skill": skill, "entity_type": row["entity_type"], "entity_ref": row["entity_ref"]})
@@ -2712,6 +2806,7 @@ def verify_runtime_evidence(request: dict[str, Any]) -> dict[str, Any]:
     previous_entities: list[dict[str, Any]] = []
     previous_states: dict[str, dict[str, str]] = {}
     previous_result_blocks: list[tuple[str, dict[str, Any]]] = []
+    previous_valid = False
     if previous is not None:
         try:
             previous_entity_map = _artifact_machine_entity_map(previous)
@@ -2749,7 +2844,19 @@ def verify_runtime_evidence(request: dict[str, Any]) -> dict[str, Any]:
             }
             for entity_type, state in previous_states.items():
                 field = normalized_state_fields[entity_type]
-                if field not in normalized or normalized_states.get(entity_type, {}) != state:
+                if field not in normalized:
+                    raise InvalidInput("normalized previous ID state does not match previous artifact")
+                if entity_type == "ci":
+                    tcn_id = normalized.get("tcn_id")
+                    if not isinstance(tcn_id, str):
+                        raise InvalidInput("normalized previous_ci_ids require the current tcn_id")
+                    current_ci_state = normalized_states.get(entity_type, {})
+                    if any(not re.fullmatch(re.escape(tcn_id) + r"-CI[0-9]{2,}", ci_id) for ci_id in current_ci_state):
+                        raise InvalidInput("normalized previous_ci_ids contain another TCN")
+                    previous_ci_subset = {ci_id: status for ci_id, status in state.items() if ci_id.startswith(tcn_id + "-")}
+                    if current_ci_state != previous_ci_subset:
+                        raise InvalidInput("normalized previous_ci_ids do not match the current TCN state")
+                elif normalized_states.get(entity_type, {}) != state:
                     raise InvalidInput("normalized previous ID state does not match previous artifact")
             previous_result_entities = _runtime_result_entities(previous_result_blocks, skill)
             previous_entity_by_key = {
@@ -2760,14 +2867,32 @@ def verify_runtime_evidence(request: dict[str, Any]) -> dict[str, Any]:
                 key = entity_identity(row["skill"], row["entity_type"], row["entity_ref"])
                 if key not in previous_entity_by_key or canonical_json_text(previous_entity_by_key[key]) != canonical_json_text(row):
                     raise InvalidInput("previous runtime result entity does not match Machine Entities")
+            previous_valid = True
         except RuntimeErrorBase as exc:
             previous_entities = []
-            previous_states = {}
+            try:
+                previous_states = _previous_entity_states(skill, normalized)
+            except RuntimeErrorBase:
+                previous_states = {}
             issues.append({"issue_type": "invalid_previous_artifact", "blocking": True, "message": exc.message})
         except (KeyError, TypeError, ValueError) as exc:
             previous_entities = []
-            previous_states = {}
+            try:
+                previous_states = _previous_entity_states(skill, normalized)
+            except RuntimeErrorBase:
+                previous_states = {}
             issues.append({"issue_type": "invalid_previous_artifact", "blocking": True, "message": f"previous state could not be validated: {type(exc).__name__}"})
+    else:
+        try:
+            previous_states = _previous_entity_states(skill, normalized)
+            if _previous_artifact_required_for_carry_forward(skill, normalized):
+                issues.append({
+                    "issue_type": "invalid_previous_artifact",
+                    "blocking": True,
+                    "message": "scope-out active Machine Entities require the previous artifact全文",
+                })
+        except RuntimeErrorBase as exc:
+            issues.append({"issue_type": exc.issue_type, "blocking": True, "message": exc.message})
     try:
         current_result_entities = _runtime_result_entities(result_blocks, skill)
     except RuntimeErrorBase as exc:
@@ -2776,9 +2901,9 @@ def verify_runtime_evidence(request: dict[str, Any]) -> dict[str, Any]:
     expected_entity_rows = _expected_entities(
         skill,
         normalized,
-        previous_entities,
+        previous_entities if previous_valid else None,
         current_result_entities=current_result_entities,
-        previous_states=previous_states if previous is not None else {},
+        previous_states=previous_states,
     )
     expected_entity_keys = sorted((row["skill"], row["entity_type"], row["entity_ref"]) for row in expected_entity_rows)
     actual_entity_keys = sorted((row["skill"], row["entity_type"], row["entity_ref"]) for row in actual_entities)
@@ -2807,7 +2932,7 @@ def verify_runtime_evidence(request: dict[str, Any]) -> dict[str, Any]:
         actual_entity = candidate_entity_map.get(key)
         if actual_entity is not None and canonical_json_text(actual_entity) != canonical_json_text(expected_entity):
             issues.append({"issue_type": "current_entity_result_mismatch", "blocking": True, "entity": list(key)})
-    carry_rows = _carry_forward_machine_entities(skill, normalized, previous_entities, previous_states) if previous_entities else []
+    carry_rows = _carry_forward_machine_entities(skill, normalized, previous_entities, previous_states) if previous_valid and previous_entities else []
     for row in carry_rows:
         key = entity_identity(row["skill"], row["entity_type"], row["entity_ref"])
         actual = candidate_entity_map.get(key)
@@ -2839,8 +2964,9 @@ def verify_runtime_evidence(request: dict[str, Any]) -> dict[str, Any]:
                     issues.append({"issue_type": "stale_carry_forward_entity", "blocking": True, "entity": list(key), "stale_reasons": freshness_by_key.get(key, {}).get("stale_reasons", [])})
         except RuntimeErrorBase as exc:
             issues.append({"issue_type": exc.issue_type, "blocking": True, "message": exc.message})
+    valid = not issues
     return {
-        "valid": not issues,
+        "valid": valid,
         "issues": issues,
         "expected_runtime_units": expected,
         "actual_runtime_units": actual_ids,
@@ -2853,6 +2979,7 @@ def verify_runtime_evidence(request: dict[str, Any]) -> dict[str, Any]:
         "missing_entities": [list(row) for row in missing_entities],
         "extra_entities": [list(row) for row in extra_entities],
         "duplicate_entities": [list(row) for row in sorted(set(duplicate_entities))],
+        "current_structure_state": _current_structure_state_projection(skill, result_blocks, carry_rows) if valid else None,
     }
 
 

@@ -221,6 +221,7 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
             scope["skill"],
             scope["normalized_input"],
             current_structure_state=scope["current_structure_state"],
+            require_carry_forward_projection=True,
         ))
     expected_unit_map = {(row["skill"], row["runtime_unit_key"]): row for row in expected_units if (row["skill"], row["runtime_unit_key"]) not in SELF_UNITS}
     expected_entity_map = {(row["skill"], row["entity_type"], row["entity_ref"]): row for row in expected_entities}

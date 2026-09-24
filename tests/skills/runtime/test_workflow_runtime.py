@@ -161,6 +161,14 @@ class WorkflowRuntimeTests(unittest.TestCase):
         model_one = runtime.make_machine_entity("test-condition-design", "model", "ep-001", {"model_key": "ep-001", "model_type": "ep"}, model_key="ep-001")
         model_two = runtime.make_machine_entity("test-condition-design", "model", "ep-002", {"model_key": "ep-002", "model_type": "ep"}, model_key="ep-002")
         ci = runtime.make_machine_entity("test-condition-design", "ci", "TCN-001-CI01", {"ci_id": "TCN-001-CI01", "tcn_id": "TCN-001", "model_key": "ep-001"}, model_key="ep-001")
+        ci_two = runtime.make_machine_entity("test-condition-design", "ci", "TCN-002-CI01", {"ci_id": "TCN-002-CI01", "tcn_id": "TCN-002", "model_key": "ep-002"}, model_key="ep-002")
+        tdr_two = runtime.make_machine_entity("test-condition-design", "test_data_requirement", "data:REQ-002", {"data_ref": "data:REQ-002", "requirement_key": "REQ-002", "source_model_key": "ep-002"}, model_key="ep-002")
+        tdr_dependency = runtime.machine_entity_dependency(tdr_two)
+        tdr_disposition = runtime.make_machine_entity(
+            "test-condition-design", "disposition", "test_data_requirement:data:REQ-002",
+            {"upstream_entity": tdr_dependency, "handling": "対象外", "reason": "scope-out requirement", "authority_refs": [], "covered_by_entity": None},
+            upstream_entity_dependencies=[tdr_dependency],
+        )
         normalized = {
             "tcn_id": "TCN-001", "test_conditions": [{"tcn_id": "TCN-001"}],
             "models": [{"model_key": "ep-001", "model_type": "ep"}], "ci_ids": ["TCN-001-CI01"],
@@ -181,17 +189,18 @@ class WorkflowRuntimeTests(unittest.TestCase):
                 "skill": "test-condition-design", "runtime_unit_key": "artifact:condition_structure:all",
                 "result": {"payload": {"entities": [tcn_one, model_one]}},
             }],
+            "carry_forward_entities": [tcn_two, model_two, ci_two, tdr_two, tdr_disposition],
         }
         request = {
             "metadata": metadata(),
             "input": {
                 "workflow_scopes": [{"skill": "test-condition-design", "target": "TCN-001", "execution_range": None, "input_mode": "artifact", "normalized_input": normalized, "current_structure_state": state}],
                 "runtime_units": units, "current_runtime_units": units,
-                "current_entities": [tcn_one, tcn_two, model_one, model_two, ci],
+                "current_entities": [tcn_one, tcn_two, model_one, model_two, ci, ci_two, tdr_two, tdr_disposition],
                 "unsupported_item_closures": [],
             },
         }
-        return request, {"entities": [tcn_one, tcn_two, model_one, model_two, ci], "state": state, "units": units}
+        return request, {"entities": [tcn_one, tcn_two, model_one, model_two, ci, ci_two, tdr_two, tdr_disposition], "state": state, "units": units}
 
     def test_partial_rerun_uses_normalized_scope_and_current_structure_projection(self) -> None:
         request, parts = self._partial_scope_request()
@@ -200,6 +209,8 @@ class WorkflowRuntimeTests(unittest.TestCase):
         self.assertTrue(result["payload"]["can_complete"])
         expected = {(row["entity_type"], row["entity_ref"]) for row in result["payload"]["expected_entities"]}
         self.assertTrue({("tcn", "TCN-001"), ("tcn", "TCN-002"), ("model", "ep-001"), ("model", "ep-002")}.issubset(expected))
+        self.assertIn(("test_data_requirement", "data:REQ-002"), expected)
+        self.assertIn(("disposition", "test_data_requirement:data:REQ-002"), expected)
 
         missing = json.loads(json.dumps(request))
         missing["input"]["current_entities"] = [row for row in missing["input"]["current_entities"] if row["entity_ref"] != "ep-002"]
@@ -207,19 +218,32 @@ class WorkflowRuntimeTests(unittest.TestCase):
         self.assertEqual(missing_result["result_status"], "unresolved")
         self.assertIn(["test-condition-design", "model", "ep-002"], missing_result["payload"]["missing_entities"])
 
+        for ref in ("data:REQ-002", "test_data_requirement:data:REQ-002"):
+            with self.subTest(missing=ref):
+                missing_owner = json.loads(json.dumps(request))
+                missing_owner["input"]["current_entities"] = [row for row in missing_owner["input"]["current_entities"] if row["entity_ref"] != ref]
+                result_missing_owner = run(missing_owner)
+                self.assertEqual(result_missing_owner["result_status"], "unresolved")
+                self.assertIn(["test-condition-design", "test_data_requirement" if ref == "data:REQ-002" else "disposition", ref], result_missing_owner["payload"]["missing_entities"])
+
+        no_projection = json.loads(json.dumps(request))
+        del no_projection["input"]["workflow_scopes"][0]["current_structure_state"]["carry_forward_entities"]
+        rejected_projection = run(no_projection)
+        self.assertEqual(rejected_projection["runtime_status"], "invalid_input")
+
     def test_partial_rerun_rejects_deleted_scope_entity_left_in_current_entities(self) -> None:
         request, parts = self._partial_scope_request()
         scope = request["input"]["workflow_scopes"][0]
         scope["normalized_input"]["test_conditions"] = []
         scope["normalized_input"]["models"] = []
         scope["normalized_input"]["ci_ids"] = []
-        scope["normalized_input"]["update_scope_model_keys"] = []
         scope["normalized_input"]["update_scope_tcn_ids"] = ["TCN-001"]
         scope["current_structure_state"] = {
             "runtime_results": [{
                 "skill": "test-condition-design", "runtime_unit_key": "artifact:condition_structure:all",
                 "result": {"payload": {"entities": []}},
             }],
+            "carry_forward_entities": parts["state"]["carry_forward_entities"],
         }
         request["input"]["runtime_units"] = [request["input"]["runtime_units"][0]]
         request["input"]["current_runtime_units"] = request["input"]["runtime_units"]

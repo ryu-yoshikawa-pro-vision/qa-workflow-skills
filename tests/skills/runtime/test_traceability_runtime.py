@@ -89,7 +89,14 @@ class TraceabilityRuntimeTests(unittest.TestCase):
         tcn_two = runtime.make_machine_entity("test-condition-design", "tcn", "TCN-002", {"tcn_id": "TCN-002"})
         model_two = runtime.make_machine_entity("test-condition-design", "model", "ep-002", {"model_key": "ep-002", "model_type": "ep"}, model_key="ep-002")
         ci_two = runtime.make_machine_entity("test-condition-design", "ci", "TCN-002-CI01", {"ci_id": "TCN-002-CI01", "tcn_id": "TCN-002", "model_key": "ep-002"}, model_key="ep-002")
-        request["input"]["current_entities"].extend([tcn_two, model_two, ci_two])
+        tdr_two = runtime.make_machine_entity("test-condition-design", "test_data_requirement", "data:REQ-002", {"data_ref": "data:REQ-002", "requirement_key": "REQ-002", "source_model_key": "ep-002"}, model_key="ep-002")
+        tdr_dependency = runtime.machine_entity_dependency(tdr_two)
+        tdr_disposition = runtime.make_machine_entity(
+            "test-condition-design", "disposition", "test_data_requirement:data:REQ-002",
+            {"upstream_entity": tdr_dependency, "handling": "対象外", "reason": "scope-out requirement", "authority_refs": [], "covered_by_entity": None},
+            upstream_entity_dependencies=[tdr_dependency],
+        )
+        request["input"]["current_entities"].extend([tcn_two, model_two, ci_two, tdr_two, tdr_disposition])
         request["input"]["nodes"].extend([
             {"node_key": "TCN-002", "node_type": "TCN"},
             {"node_key": "TCN-002-CI01", "node_type": "CI"},
@@ -99,7 +106,7 @@ class TraceabilityRuntimeTests(unittest.TestCase):
             "models": [{"model_key": "ep-001", "model_type": "ep"}], "ci_ids": ["TCN-001-CI01"],
             "previous_tcn_ids": [{"tcn_id": "TCN-001", "status": "active"}, {"tcn_id": "TCN-002", "status": "active"}],
             "previous_model_keys": [{"model_key": "ep-001", "model_type": "ep", "status": "active"}, {"model_key": "ep-002", "model_type": "ep", "status": "active"}],
-            "previous_ci_ids": [{"ci_id": "TCN-001-CI01", "status": "active"}, {"ci_id": "TCN-002-CI01", "status": "active"}],
+            "previous_ci_ids": [{"ci_id": "TCN-001-CI01", "status": "active"}],
             "update_scope_tcn_ids": ["TCN-001"], "update_scope_model_keys": ["ep-001"],
         }
         scope = request["input"]["analysis_scopes"][0]
@@ -113,12 +120,28 @@ class TraceabilityRuntimeTests(unittest.TestCase):
                     "payload": {"entities": request["input"]["current_entities"][:2]},
                 },
             }],
+            "carry_forward_entities": [tcn_two, model_two, ci_two, tdr_two, tdr_disposition],
         }
         result = run(request)
         self.assertEqual(result["payload"]["missing_entities"], [])
         self.assertEqual(result["payload"]["extra_entities"], [])
         expected = {(row["entity_type"], row["entity_ref"]) for row in result["payload"]["expected_entities"]}
         self.assertTrue({("tcn", "TCN-002"), ("model", "ep-002"), ("ci", "TCN-002-CI01")}.issubset(expected))
+        self.assertIn(("test_data_requirement", "data:REQ-002"), expected)
+        self.assertIn(("disposition", "test_data_requirement:data:REQ-002"), expected)
+
+        for ref, entity_type in (("data:REQ-002", "test_data_requirement"), ("test_data_requirement:data:REQ-002", "disposition")):
+            with self.subTest(missing=ref):
+                missing = json.loads(json.dumps(request))
+                missing["input"]["current_entities"] = [row for row in missing["input"]["current_entities"] if row["entity_ref"] != ref]
+                missing_result = run(missing)
+                self.assertEqual(missing_result["result_status"], "unresolved")
+                self.assertIn(["test-condition-design", entity_type, ref], missing_result["payload"]["missing_entities"])
+
+        no_projection = json.loads(json.dumps(request))
+        del no_projection["input"]["analysis_scopes"][0]["current_structure_state"]["carry_forward_entities"]
+        rejected_projection = run(no_projection)
+        self.assertEqual(rejected_projection["runtime_status"], "invalid_input")
 
     def test_self_runtime_is_rejected(self) -> None:
         request = base_request()
