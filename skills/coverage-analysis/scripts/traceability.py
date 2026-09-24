@@ -99,7 +99,7 @@ def _edges(value: Any, kinds: dict[str, str]) -> list[dict[str, str]]:
 
 
 def _runtime_rows(value: Any, name: str) -> list[dict[str, Any]]:
-    required = {"skill", "runtime_unit_key", "model_key", "support_status", "result_status", "runtime_status", "runtime_required", "deterministic_generated", "generation_fingerprint", "upstream_entity_fingerprints", "upstream_runtime_units", "unsupported_items", "freshness_status", "model_completion", "target_mappings", "target_dispositions"}
+    required = {"skill", "runtime_unit_key", "model_key", "support_status", "result_status", "runtime_status", "runtime_required", "deterministic_generated", "generation_fingerprint", "result_fingerprint", "upstream_entity_fingerprints", "upstream_runtime_units", "unsupported_items", "freshness_status", "model_completion", "target_mappings", "target_dispositions"}
     rows = ensure_list(value, name)
     result: list[dict[str, Any]] = []
     seen: set[tuple[str, str]] = set()
@@ -115,7 +115,7 @@ def _runtime_rows(value: Any, name: str) -> list[dict[str, Any]]:
             raise InvalidInput(f"{name}のruntime identityが重複しています")
         if row["support_status"] not in {"supported", "partial", "unsupported", "unknown"} or row["result_status"] not in {"ready", "unresolved", "blocked"} or row["runtime_status"] not in {"ok", "invalid_input", "unsupported", "limit_exceeded", "internal_error", "not_run"}:
             raise InvalidInput("runtime row statusが不正です")
-        if row["freshness_status"] not in {"current", "stale"} or not isinstance(row["runtime_required"], bool) or not isinstance(row["deterministic_generated"], bool) or not FULL_DIGEST_RE.fullmatch(str(row["generation_fingerprint"])):
+        if row["freshness_status"] not in {"current", "stale"} or not isinstance(row["runtime_required"], bool) or not isinstance(row["deterministic_generated"], bool) or not FULL_DIGEST_RE.fullmatch(str(row["generation_fingerprint"])) or not FULL_DIGEST_RE.fullmatch(str(row["result_fingerprint"])):
             raise InvalidInput("runtime row fingerprint/statusが不正です")
         for field in ("upstream_entity_fingerprints", "upstream_runtime_units", "unsupported_items", "model_completion", "target_mappings", "target_dispositions"):
             if not isinstance(row[field], list):

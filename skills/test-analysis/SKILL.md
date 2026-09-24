@@ -36,7 +36,7 @@ description: 新規機能・変更機能・指定対象機能について、変�
 
 ### 最終runtime evidence gate
 
-最終成果物を返す直前に、Skill-local `scripts/runtime_contract.py`へ実際に使用したcanonical normalized inputとcandidate成果物全文を渡し、`operation=verify_runtime_evidence`を実行します。runtime-v1ではtest-analysis所有Entityをcarry-forwardしないため`previous_artifact_markdown`は常に`null`です。非nullは誤用としてrejectされます。返却`valid=true`の場合だけ完成として返し、`valid=false`なら既存の最大1回の局所修正・最終確認契約へ統合し、未解決なら完成扱いしません。expected集合や前回Entity配列を手組みしません。
+最終成果物を返す直前に、Skill-local `scripts/runtime_contract.py`へ実際に使用したcanonical normalized inputとcandidate成果物全文を渡し、`operation=verify_runtime_evidence`を実行します。runtime-v1では`partial_rerun=false`、test-analysis所有Entityをcarry-forwardしないため`previous_artifact_markdown=null`固定です。partial rerun指定または非null previousは誤用としてrejectされます。返却`valid=true`の場合だけ完成として返し、`valid=false`なら既存の最大1回の局所修正・最終確認契約へ統合し、未解決なら完成扱いしません。expected集合や前回Entity配列を手組みしません。
 
 ## インターフェース
 

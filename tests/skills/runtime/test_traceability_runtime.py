@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 from pathlib import Path
 import subprocess
@@ -28,7 +29,7 @@ def metadata() -> dict:
 
 
 def runtime_row(skill: str, unit: str, model_key: str | None = None, *, materialize: bool = False, materialize_model_key: str | None = None, active_ci_ids: list[str] | None = None, materialize_complete: bool = True) -> dict:
-    return {
+    row = {
         "skill": skill, "runtime_unit_key": unit, "model_key": model_key, "support_status": "supported", "result_status": "ready", "runtime_status": "ok",
         "runtime_required": True, "deterministic_generated": True, "generation_fingerprint": "sha256:" + (unit.encode().hex() * 64)[:64],
         "upstream_entity_fingerprints": [], "upstream_runtime_units": [], "unsupported_items": [], "freshness_status": "current",
@@ -41,6 +42,8 @@ def runtime_row(skill: str, unit: str, model_key: str | None = None, *, material
             "materialize_complete": materialize_complete,
         }] if materialize else [], "target_mappings": [], "target_dispositions": [],
     }
+    row["result_fingerprint"] = runtime.sha256_digest(row)
+    return row
 
 
 def base_request() -> dict:
@@ -67,6 +70,19 @@ def run(request: dict) -> dict:
 
 
 class TraceabilityRuntimeTests(unittest.TestCase):
+    def test_saved_result_projection_mismatch_is_stale_while_semantics_use_current_rows(self) -> None:
+        request = base_request()
+        request["input"]["runtime_units"] = copy.deepcopy(request["input"]["runtime_units"])
+        request["input"]["current_runtime_units"] = copy.deepcopy(request["input"]["current_runtime_units"])
+        saved = next(row for row in request["input"]["runtime_units"] if row["runtime_unit_key"] == "artifact:materialize_coverage:TCN-001")
+        current = next(row for row in request["input"]["current_runtime_units"] if row["runtime_unit_key"] == "artifact:materialize_coverage:TCN-001")
+        saved["model_completion"][0]["materialize_complete"] = False
+        result = run(request)
+        self.assertEqual(saved["generation_fingerprint"], current["generation_fingerprint"])
+        self.assertEqual(result["result_status"], "unresolved")
+        self.assertTrue(any(issue["issue_type"] == "current_runtime_result_mismatch" for issue in result["issues"]), result["issues"])
+        self.assertTrue(any(issue["issue_type"] == "runtime_not_complete" for issue in result["issues"]), result["issues"])
+
     def test_expected_sets_and_graph_are_complete(self) -> None:
         result = run(base_request())
         self.assertEqual(result["runtime_status"], "ok")

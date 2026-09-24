@@ -1021,6 +1021,9 @@ def evaluate_runtime_unit_freshness(
         if current is None or current.get("generation_fingerprint") != row.get("generation_fingerprint"):
             stale = True
             reasons.append({"reason_code": "current_runtime_generation_mismatch", "dependency": list(key)})
+        elif runtime_result_projection_mismatch(row, current):
+            stale = True
+            reasons.append({"reason_code": "current_runtime_result_mismatch", "dependency": list(key)})
         updated = dict(row)
         updated["freshness_status"] = "stale" if stale else "current"
         fresh_rows.append(updated)
@@ -1040,6 +1043,23 @@ def evaluate_runtime_unit_freshness(
                 **reason,
             })
     return fresh_rows, issues
+
+
+_RUNTIME_RESULT_PROJECTION_FIELDS = (
+    "skill", "runtime_unit_key", "model_key", "support_status", "runtime_status", "result_status",
+    "runtime_required", "deterministic_generated", "generation_fingerprint", "upstream_entity_fingerprints",
+    "upstream_runtime_units", "unsupported_items", "runtime_contract_version", "generator_contract_version",
+    "runtime_implementation_fingerprint", "generator_implementation_fingerprint", "static_data_versions",
+    "model_completion", "target_mappings", "target_dispositions", "result_fingerprint",
+)
+
+
+def runtime_result_projection_mismatch(saved: dict[str, Any], current: dict[str, Any]) -> bool:
+    """Compare the stored consumer projection with the projection of the current rerun."""
+    return any(
+        canonical_json_text(saved.get(field)) != canonical_json_text(current.get(field))
+        for field in _RUNTIME_RESULT_PROJECTION_FIELDS
+    )
 
 
 def entity_identity(skill: str, entity_type: str, entity_ref: str) -> tuple[str, str, str]:
@@ -1866,6 +1886,7 @@ def runtime_unit_row(envelope: dict[str, Any], *, freshness_status: str = "curre
     for field in ("runtime_contract_version", "runtime_implementation_fingerprint", "generator_implementation_fingerprint", "generator_contract_version", "static_data_versions"):
         if field in envelope:
             row[field] = canonicalize(envelope[field])
+    row["result_fingerprint"] = sha256_digest(envelope)
     row["model_completion"] = []
     row["target_mappings"] = []
     row["target_dispositions"] = []
@@ -1878,6 +1899,13 @@ def runtime_unit_row(envelope: dict[str, Any], *, freshness_status: str = "curre
             raise InvalidInput("materialize disposed_target_refs projectionが不正です")
         row["target_dispositions"] = canonicalize([{key: item[key] for key in disposition_fields} for item in dispositions])
     return row
+
+
+def _runtime_unit_result_row(envelope: dict[str, Any], *, freshness_status: str = "current") -> dict[str, Any]:
+    runtime_unit_key = envelope.get("runtime_unit_key")
+    payload = envelope.get("payload")
+    materialize = payload if isinstance(runtime_unit_key, str) and runtime_unit_key.startswith("artifact:materialize_coverage:") else None
+    return runtime_unit_row(envelope, freshness_status=freshness_status, materialize=materialize)
 
 
 def current_model_result_row(envelope: dict[str, Any], metadata: dict[str, Any]) -> dict[str, Any]:
@@ -2589,7 +2617,7 @@ def validate_current_structure_state(
                 raise InvalidInput("current_structure_state artifact model_fingerprint must be null")
         elif not FULL_DIGEST_RE.fullmatch(str(result.get("model_fingerprint"))):
             raise InvalidInput("current_structure_state model_fingerprint is invalid")
-        runtime_row = runtime_unit_row(result)
+        runtime_row = _runtime_unit_result_row(result)
         if _unit_identity(runtime_row["skill"], runtime_row["runtime_unit_key"]) != identity:
             raise InvalidInput("current_structure_state runtime result identity does not match its result")
         seen_results.add(identity)
@@ -2700,8 +2728,12 @@ def validate_current_structure_state(
     for identity, result in result_blocks:
         runtime_id = tuple(identity.split("::", 1))
         current = runtime_map.get(runtime_id)
-        if current is not None and current.get("generation_fingerprint") != result.get("generation_fingerprint"):
+        if current is None:
+            raise InvalidInput("current_structure_state runtime result has no current rerun counterpart")
+        if current.get("generation_fingerprint") != result.get("generation_fingerprint"):
             raise InvalidInput("current_structure_state runtime result is stale")
+        if runtime_result_projection_mismatch(_runtime_unit_result_row(result), current):
+            raise InvalidInput("current_structure_state runtime result differs from the current rerun")
     return {
         "runtime_results": canonicalize(raw_results),
         "carry_forward_entities": carry,
@@ -2961,7 +2993,7 @@ def _validate_runtime_pair(
 
 
 def verify_runtime_evidence(request: dict[str, Any]) -> dict[str, Any]:
-    reject_unknown(request, {"operation", "skill", "normalized_skill_input", "artifact_markdown", "previous_artifact_markdown"})
+    reject_unknown(request, {"operation", "skill", "normalized_skill_input", "artifact_markdown", "previous_artifact_markdown", "partial_rerun"})
     if request.get("operation") != "verify_runtime_evidence":
         raise InvalidInput("operationが不正です")
     skill = ensure_nonempty_string(request.get("skill"), "skill")
@@ -2972,6 +3004,9 @@ def verify_runtime_evidence(request: dict[str, Any]) -> dict[str, Any]:
     previous = request.get("previous_artifact_markdown")
     if previous is not None and not isinstance(previous, str):
         raise InvalidInput("previous_artifact_markdownはstringまたはnullである必要があります")
+    partial_rerun = request.get("partial_rerun")
+    if not isinstance(partial_rerun, bool):
+        raise InvalidInput("partial_rerunはbooleanである必要があります")
     input_blocks = extract_machine_blocks(artifact, "Machine Runtime Input", allow_duplicates=True)
     result_blocks = extract_machine_blocks(artifact, "Machine Runtime Result", allow_duplicates=True)
     input_map = {identity: body for identity, body in input_blocks}
@@ -2979,11 +3014,25 @@ def verify_runtime_evidence(request: dict[str, Any]) -> dict[str, Any]:
     actual_ids = sorted(set(input_map) | set(result_map))
     incomplete = sorted(set(input_map) ^ set(result_map))
     issues: list[dict[str, Any]] = []
-    if skill in {"test-analysis", "coverage-analysis", "qa-workflow"} and previous is not None:
+    carry_forward_skills = {"test-requirement-design", "test-condition-design", "test-case-design"}
+    no_carry_forward_skills = {"test-analysis", "coverage-analysis", "qa-workflow"}
+    if skill in no_carry_forward_skills and (partial_rerun or previous is not None):
         issues.append({
             "issue_type": "invalid_previous_artifact",
             "blocking": True,
-            "message": f"{skill} does not carry forward its owned Machine Entities in runtime-v1",
+            "message": f"{skill} requires partial_rerun=false and previous_artifact_markdown=null in runtime-v1",
+        })
+    elif skill in carry_forward_skills and partial_rerun != (previous is not None):
+        issues.append({
+            "issue_type": "invalid_previous_artifact",
+            "blocking": True,
+            "message": "partial rerun requires the full previous artifact; full build requires previous_artifact_markdown=null",
+        })
+    elif skill not in carry_forward_skills | no_carry_forward_skills and (partial_rerun or previous is not None):
+        issues.append({
+            "issue_type": "invalid_previous_artifact",
+            "blocking": True,
+            "message": f"{skill} does not support previous artifact carry-forward in runtime-v1",
         })
     graph_rows = []
     for identity, body in input_blocks:
@@ -3067,9 +3116,9 @@ def verify_runtime_evidence(request: dict[str, Any]) -> dict[str, Any]:
     previous_states: dict[str, dict[str, str]] = {}
     previous_result_blocks: list[tuple[str, dict[str, Any]]] = []
     previous_valid = False
-    if previous is not None and skill in {"test-analysis", "coverage-analysis", "qa-workflow"}:
+    if previous is not None and skill in no_carry_forward_skills:
         previous_valid = False
-    elif previous is not None:
+    elif previous is not None and skill in carry_forward_skills and partial_rerun:
         try:
             previous_entity_map = _artifact_machine_entity_map(previous)
             if skill not in previous_entity_map:
@@ -3129,9 +3178,6 @@ def verify_runtime_evidence(request: dict[str, Any]) -> dict[str, Any]:
                 key = entity_identity(row["skill"], row["entity_type"], row["entity_ref"])
                 if key not in previous_entity_by_key or canonical_json_text(previous_entity_by_key[key]) != canonical_json_text(row):
                     raise InvalidInput("previous runtime result entity does not match Machine Entities")
-            carry_candidates = _carry_forward_machine_entities(skill, normalized, previous_entities, previous_states)
-            if not carry_candidates:
-                raise InvalidInput("previous artifact is not permitted when no scope-out carry-forward is required")
             previous_valid = True
         except RuntimeErrorBase as exc:
             previous_entities = []
@@ -3150,7 +3196,13 @@ def verify_runtime_evidence(request: dict[str, Any]) -> dict[str, Any]:
     else:
         try:
             previous_states = _previous_entity_states(skill, normalized)
-            if _previous_artifact_required_for_carry_forward(skill, normalized):
+            if skill in carry_forward_skills and partial_rerun:
+                issues.append({
+                    "issue_type": "invalid_previous_artifact",
+                    "blocking": True,
+                    "message": "partial rerun requires the complete previous artifact, including when only a Disposition is out of scope",
+                })
+            elif skill in carry_forward_skills and _previous_artifact_required_for_carry_forward(skill, normalized):
                 issues.append({
                     "issue_type": "invalid_previous_artifact",
                     "blocking": True,
@@ -3209,7 +3261,7 @@ def verify_runtime_evidence(request: dict[str, Any]) -> dict[str, Any]:
             for result_identity, body in result_blocks:
                 if "::" not in result_identity:
                     continue
-                runtime_rows.append(runtime_unit_row(body))
+                runtime_rows.append(_runtime_unit_result_row(body))
             fresh_runtime_rows, _runtime_issues = evaluate_runtime_unit_freshness(
                 runtime_rows, runtime_rows, list(candidate_entity_map.values()),
             )
@@ -3232,7 +3284,7 @@ def verify_runtime_evidence(request: dict[str, Any]) -> dict[str, Any]:
     current_structure_state = _current_structure_state_projection(skill, result_blocks, carry_rows, previous_states)
     if skill in {"test-analysis", "test-requirement-design", "test-condition-design", "test-case-design", "coverage-analysis", "qa-workflow"}:
         try:
-            current_runtime_rows = [runtime_unit_row(body) for identity, body in result_blocks if identity.startswith(skill + "::")]
+            current_runtime_rows = [_runtime_unit_result_row(body) for identity, body in result_blocks if identity.startswith(skill + "::")]
             validate_current_structure_state(
                 skill,
                 normalized,

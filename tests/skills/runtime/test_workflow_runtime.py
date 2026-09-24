@@ -29,7 +29,7 @@ def metadata() -> dict:
 
 
 def runtime_row(skill: str, unit: str, model_key: str | None = None, *, materialize: bool = False, active_ci_ids: list[str] | None = None, materialize_model_key: str | None = None, materialize_complete: bool = True) -> dict:
-    return {
+    row = {
         "skill": skill, "runtime_unit_key": unit, "model_key": model_key, "support_status": "supported", "result_status": "ready",
         "runtime_status": "ok", "runtime_required": True, "deterministic_generated": True, "generation_fingerprint": f"sha256:{unit.encode().hex()[:64].ljust(64, '0')}",
         "upstream_entity_fingerprints": [], "upstream_runtime_units": [], "unsupported_items": [], "freshness_status": "current",
@@ -43,6 +43,8 @@ def runtime_row(skill: str, unit: str, model_key: str | None = None, *, material
         }] if materialize else [],
         "target_mappings": [], "target_dispositions": [],
     }
+    row["result_fingerprint"] = runtime.sha256_digest(row)
+    return row
 
 
 def run(request: dict) -> dict:
@@ -106,6 +108,40 @@ class WorkflowRuntimeTests(unittest.TestCase):
         self.assertEqual(result["result_status"], "unresolved")
         self.assertFalse(result["payload"]["can_complete"])
         self.assertTrue(any(issue["issue_type"] == "stale_entity_dependency" for issue in result["issues"]))
+
+    def test_current_runtime_result_is_authoritative_for_completion_and_closures(self) -> None:
+        baseline = self._request()
+        cases = (
+            ("model_completion", [{"model_key": "ep-001", "required_target_refs": ["target:ep-001"], "closed_target_refs": [], "active_ci_ids": ["TCN-001-CI01", "TCN-001-CI02"], "semantic_item_keys": [], "materialize_complete": False}], "current_runtime_result_mismatch"),
+            ("target_mappings", [{"target_ref": "sha256:" + "1" * 64, "target_content_fingerprint": "sha256:" + "2" * 64, "generation_fingerprint": "sha256:" + "3" * 64, "execution_fingerprint": "sha256:" + "4" * 64, "model_key": "ep-001", "target_key": "case", "ci_id": "TCN-001-CI01"}], "current_runtime_result_mismatch"),
+            ("target_dispositions", [{"target_ref": "sha256:" + "1" * 64, "target_content_fingerprint": "sha256:" + "2" * 64, "generation_fingerprint": "sha256:" + "3" * 64, "handling": "対象外", "covered_by_target_version": None}], "current_runtime_result_mismatch"),
+            ("unsupported_items", [{"item_key": "unsupported:generator:h" + "a" * 64, "item_type": "schema", "source_key": "field", "reason_code": "unsupported_schema", "affected_technique_slug": None, "authority_refs": []}], "current_runtime_result_mismatch"),
+        )
+        for field, changed_value, expected_issue in cases:
+            with self.subTest(field=field):
+                request = json.loads(json.dumps(baseline))
+                saved = next(row for row in request["input"]["runtime_units"] if row["runtime_unit_key"] == "artifact:materialize_coverage:TCN-001")
+                current = next(row for row in request["input"]["current_runtime_units"] if row["runtime_unit_key"] == "artifact:materialize_coverage:TCN-001")
+                saved[field] = changed_value
+                # Keep the producer generation identical; only saved result evidence changed.
+                result = run(request)
+                self.assertEqual(result["result_status"], "unresolved")
+                self.assertFalse(result["payload"]["can_complete"])
+                self.assertTrue(any(issue["issue_type"] == expected_issue for issue in result["issues"]), result["issues"])
+                self.assertEqual(saved["generation_fingerprint"], current["generation_fingerprint"])
+                if field == "unsupported_items":
+                    self.assertFalse(any(issue["issue_type"] == "whole_model_unsupported_closure_missing" for issue in result["issues"]))
+
+    def test_current_materialize_completion_wins_over_saved_complete_projection(self) -> None:
+        request = self._request()
+        saved = next(row for row in request["input"]["runtime_units"] if row["runtime_unit_key"] == "artifact:materialize_coverage:TCN-001")
+        current = next(row for row in request["input"]["current_runtime_units"] if row["runtime_unit_key"] == "artifact:materialize_coverage:TCN-001")
+        current["model_completion"][0]["materialize_complete"] = False
+        current["result_fingerprint"] = runtime.sha256_digest({key: value for key, value in current.items() if key != "result_fingerprint"})
+        result = run(request)
+        self.assertEqual(saved["generation_fingerprint"], current["generation_fingerprint"])
+        self.assertEqual(result["result_status"], "unresolved")
+        self.assertTrue(any(issue["issue_type"] == "model_materialize_incomplete" for issue in result["issues"]), result["issues"])
 
     def _multi_scope_request(self, *, scope_b_complete: bool = True) -> dict:
         tcn_a = runtime.make_machine_entity("test-condition-design", "tcn", "TCN-001", {"tcn_id": "TCN-001"})

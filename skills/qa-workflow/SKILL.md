@@ -28,7 +28,7 @@ runtimeの`can_complete`はオーケストレーションの要約であり、�
 
 ### 最終runtime evidence gate
 
-最終成果物の直前にqa-workflow-local `scripts/runtime_contract.py`の`operation=verify_runtime_evidence`へ、実際に使用したcanonical normalized inputとcandidate成果物全文を渡し、`previous_artifact_markdown`は常に`null`にします。qa-workflowは自Skill Entityをcarry-forwardしません。`workflow_runtime.py`の前に各scope担当Skill verifierを実行し、`valid=true`で返った`current_structure_state`を変更せず`workflow_scopes[]`へ転記します。stateやexpected Entityを組み立てません。最終gateの`valid=false`は既存の最大1回の局所修正・最終確認契約へ統合し、未解決なら完成扱いしません。`verify_runtime_evidence`は`workflow_runtime.py`のworkflow全体検証を置き換えず、両方を実行します。
+最終成果物の直前にqa-workflow-local `scripts/runtime_contract.py`の`operation=verify_runtime_evidence`へ、実際に使用したcanonical normalized inputとcandidate成果物全文を渡し、`partial_rerun=false`かつ`previous_artifact_markdown=null`に固定します。qa-workflowは自Skill Entityをcarry-forwardしません。`workflow_runtime.py`の前に各scope担当Skill verifierを実行し、`valid=true`で返った`current_structure_state`を変更せず`workflow_scopes[]`へ転記します。stateやexpected Entityを組み立てません。最終gateの`valid=false`は既存の最大1回の局所修正・最終確認契約へ統合し、未解決なら完成扱いしません。`verify_runtime_evidence`は`workflow_runtime.py`のworkflow全体検証を置き換えず、両方を実行します。
 
 ## インターフェース
 

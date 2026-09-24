@@ -306,7 +306,9 @@ class EpVerticalIntegrationTests(unittest.TestCase):
                 for row in (tr_entity, selection_entity)
             ],
         }
-        evidence_request = {"operation": "verify_runtime_evidence", "skill": "test-condition-design", "normalized_skill_input": normalized, "artifact_markdown": artifact, "previous_artifact_markdown": None}
+        evidence_request = {"operation": "verify_runtime_evidence", "skill": "test-condition-design", "normalized_skill_input": normalized, "artifact_markdown": artifact, "previous_artifact_markdown": None,
+            "partial_rerun": False,
+        }
         evidence = runtime.verify_runtime_evidence(evidence_request)
         self.assertTrue(evidence["valid"], evidence)
         cli_evidence = run_script(RUNTIME_PATH, evidence_request)
@@ -396,6 +398,7 @@ class EpVerticalIntegrationTests(unittest.TestCase):
 
         root_generation = runtime.sha256_digest({"condition_structure": "both-current-scopes"})
         root = {"skill": "test-condition-design", "runtime_unit_key": "artifact:condition_structure:all", "model_key": None, "support_status": "supported", "result_status": "ready", "runtime_status": "ok", "runtime_required": True, "deterministic_generated": True, "generation_fingerprint": root_generation, "upstream_entity_fingerprints": [], "upstream_runtime_units": [], "unsupported_items": [], "freshness_status": "current", "model_completion": [], "target_mappings": [], "target_dispositions": []}
+        root["result_fingerprint"] = runtime.sha256_digest(root)
         runtime_rows = [
             root, runtime.runtime_unit_row(ep_a), runtime.runtime_unit_row(ep_b),
             runtime.runtime_unit_row(materialize_a, materialize=materialize_a["payload"]), runtime.runtime_unit_row(materialize_b, materialize=materialize_b["payload"]),

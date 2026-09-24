@@ -419,6 +419,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
                 "normalized_skill_input": normalized,
                 "artifact_markdown": artifact,
                 "previous_artifact_markdown": None,
+                "partial_rerun": False,
             }
         )
         self.assertTrue(valid["valid"], valid)
@@ -431,10 +432,53 @@ class EntityAndEvidenceTests(unittest.TestCase):
                 "normalized_skill_input": normalized,
                 "artifact_markdown": incomplete,
                 "previous_artifact_markdown": None,
+                "partial_rerun": False,
             }
         )
         self.assertFalse(invalid["valid"])
         self.assertIn("test-condition-design::model:ep-001", invalid["incomplete_pairs"])
+
+    def test_current_structure_state_matches_materialize_result_projection(self) -> None:
+        normalized = {
+            "tcn_id": "TCN-001", "test_conditions": [], "models": [{"model_key": "ep-001", "model_type": "ep"}], "ci_ids": [], "test_data_requirements": [],
+            "previous_tcn_ids": [], "previous_model_keys": [], "previous_ci_ids": [],
+            "update_scope_tcn_ids": [], "update_scope_model_keys": [],
+        }
+        payload = {
+            "entities": [], "model_completion": [{
+                "model_key": "ep-001", "required_target_refs": [], "closed_target_refs": [], "active_ci_ids": [],
+                "semantic_item_keys": [], "materialize_complete": True,
+            }],
+            "target_id_map": [], "disposed_target_refs": [],
+        }
+        result = {
+            "envelope_version": "1", "skill": "test-condition-design", "runtime_contract_version": runtime.RUNTIME_CONTRACT_VERSION,
+            "generator_contract_version": "materialize-coverage-v1", "generator": "materialize_coverage",
+            "runtime_unit_key": "artifact:materialize_coverage:TCN-001", "model_key": None,
+            "input_fingerprint": "sha256:" + "1" * 64, "model_fingerprint": None, "generation_fingerprint": "sha256:" + "2" * 64,
+            "runtime_implementation_fingerprint": "sha256:" + "3" * 64, "generator_implementation_fingerprint": "sha256:" + "4" * 64,
+            "upstream_entity_fingerprints": [], "upstream_runtime_units": [], "support_status": "supported", "static_data_versions": {},
+            "runtime_status": "ok", "result_status": "ready", "runtime_required": True, "deterministic_generated": True,
+            "fallback_reason": None, "payload": payload, "issues": [],
+        }
+        state = {
+            "runtime_results": [{"identity": "test-condition-design::artifact:materialize_coverage:TCN-001", "result": result}],
+            "carry_forward_entities": [], "previous_ci_id_state": [],
+        }
+        current_row = runtime._runtime_unit_result_row(result)
+        self.assertEqual(current_row["model_completion"], payload["model_completion"])
+        runtime.validate_current_structure_state(
+            "test-condition-design", normalized, state,
+            current_entities=[], current_runtime_units=[current_row],
+        )
+
+        tampered = json.loads(json.dumps(state))
+        tampered["runtime_results"][0]["result"]["payload"]["model_completion"][0]["materialize_complete"] = False
+        with self.assertRaises(runtime.InvalidInput):
+            runtime.validate_current_structure_state(
+                "test-condition-design", normalized, tampered,
+                current_entities=[], current_runtime_units=[current_row],
+            )
 
     def _tr_entity(self, ref: str, runtime_context: dict[str, object], generation_fp: str) -> dict:
         entity = runtime.make_machine_entity(
@@ -639,6 +683,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
             "operation": "verify_runtime_evidence", "skill": "test-condition-design",
             "normalized_skill_input": normalized, "artifact_markdown": candidate,
             "previous_artifact_markdown": previous,
+            "partial_rerun": True,
         })
         self.assertTrue(checked["valid"], checked)
         self.assertIsNotNone(checked["current_structure_state"])
@@ -705,6 +750,18 @@ class EntityAndEvidenceTests(unittest.TestCase):
         self.assertEqual(traceability_result["payload"]["extra_entities"], [])
         self.assertEqual(traceability_result["payload"]["expected_entities"], checked["expected_entities"])
 
+        tampered_state = json.loads(json.dumps(checked["current_structure_state"]))
+        self.assertTrue(tampered_state["runtime_results"])
+        tampered_state["runtime_results"][0]["result"]["payload"]["tampered_projection"] = True
+        tampered_workflow = json.loads(json.dumps(workflow_request))
+        tampered_workflow["input"]["workflow_scopes"][0]["current_structure_state"] = tampered_state
+        workflow_rejected = run_workflow(tampered_workflow)
+        self.assertEqual(workflow_rejected["runtime_status"], "invalid_input")
+        tampered_traceability = json.loads(json.dumps(traceability_request))
+        tampered_traceability["input"]["analysis_scopes"][0]["current_structure_state"] = tampered_state
+        traceability_rejected = run_traceability(tampered_traceability)
+        self.assertEqual(traceability_rejected["runtime_status"], "invalid_input")
+
         input_blocks = dict(runtime.extract_machine_blocks(previous, "Machine Runtime Input", allow_duplicates=True))
         result_blocks = dict(runtime.extract_machine_blocks(previous, "Machine Runtime Result", allow_duplicates=True))
         reversed_blocks = []
@@ -718,6 +775,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
             "normalized_skill_input": normalized,
             "artifact_markdown": candidate,
             "previous_artifact_markdown": "\n".join(reversed_blocks),
+            "partial_rerun": True,
         })
         self.assertTrue(reordered["valid"], reordered)
         self.assertEqual(reordered["expected_entities"], checked["expected_entities"])
@@ -736,6 +794,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
             "operation": "verify_runtime_evidence", "skill": "test-condition-design",
             "normalized_skill_input": normalized, "artifact_markdown": candidate,
             "previous_artifact_markdown": wrong_prefix_previous,
+            "partial_rerun": True,
         })
         self.assertFalse(bad_prefix["valid"])
         self.assertIn("invalid_previous_artifact", [issue["issue_type"] for issue in bad_prefix["issues"]])
@@ -750,6 +809,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
                     "operation": "verify_runtime_evidence", "skill": "test-condition-design",
                     "normalized_skill_input": invalid_normalized, "artifact_markdown": candidate,
                     "previous_artifact_markdown": previous,
+                    "partial_rerun": True,
                 })
                 self.assertFalse(invalid["valid"])
                 self.assertIn("invalid_previous_artifact", [issue["issue_type"] for issue in invalid["issues"]])
@@ -764,6 +824,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
             "operation": "verify_runtime_evidence", "skill": "test-requirement-design",
             "normalized_skill_input": normalized, "artifact_markdown": candidate,
             "previous_artifact_markdown": None,
+            "partial_rerun": True,
         })
         self.assertFalse(missing_previous["valid"])
         self.assertIsNone(missing_previous["current_structure_state"])
@@ -778,6 +839,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
             "operation": "verify_runtime_evidence", "skill": "test-requirement-design",
             "normalized_skill_input": scoped_only, "artifact_markdown": scoped_candidate,
             "previous_artifact_markdown": None,
+            "partial_rerun": False,
         })
         self.assertTrue(no_carry_needed["valid"], no_carry_needed)
 
@@ -787,6 +849,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
             "operation": "verify_runtime_evidence", "skill": "test-requirement-design",
             "normalized_skill_input": deleted_scoped, "artifact_markdown": deleted_candidate,
             "previous_artifact_markdown": None,
+            "partial_rerun": False,
         })
         self.assertTrue(deleted_without_previous["valid"], deleted_without_previous)
 
@@ -806,6 +869,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
             "operation": "verify_runtime_evidence", "skill": "test-condition-design",
             "normalized_skill_input": condition_normalized, "artifact_markdown": condition_candidate,
             "previous_artifact_markdown": None,
+            "partial_rerun": True,
         })
         self.assertFalse(condition_missing["valid"])
         self.assertIn("invalid_previous_artifact", [issue["issue_type"] for issue in condition_missing["issues"]])
@@ -822,6 +886,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
             "operation": "verify_runtime_evidence", "skill": "test-case-design",
             "normalized_skill_input": tc_normalized, "artifact_markdown": tc_candidate,
             "previous_artifact_markdown": None,
+            "partial_rerun": True,
         })
         self.assertFalse(tc_missing["valid"])
         self.assertIn("invalid_previous_artifact", [issue["issue_type"] for issue in tc_missing["issues"]])
@@ -834,6 +899,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
                     "operation": "verify_runtime_evidence", "skill": skill,
                     "normalized_skill_input": {}, "artifact_markdown": "",
                     "previous_artifact_markdown": "previous artifact",
+                    "partial_rerun": False,
                 })
                 self.assertFalse(result["valid"])
                 self.assertIsNone(result["current_structure_state"])
@@ -849,10 +915,84 @@ class EntityAndEvidenceTests(unittest.TestCase):
             "operation": "verify_runtime_evidence", "skill": "test-requirement-design",
             "normalized_skill_input": normalized, "artifact_markdown": current,
             "previous_artifact_markdown": previous,
+            "partial_rerun": False,
         })
         self.assertFalse(no_carry_needed["valid"])
         self.assertIsNone(no_carry_needed["current_structure_state"])
-        self.assertIn("previous artifact is not permitted", " ".join(row.get("message", "") for row in no_carry_needed["issues"]))
+        self.assertIn("full build requires previous_artifact_markdown=null", " ".join(row.get("message", "") for row in no_carry_needed["issues"]))
+
+    def test_disposition_only_partial_reruns_require_previous_for_each_carry_skill(self) -> None:
+        cases = (
+            (
+                "test-requirement-design",
+                {"authorities": [], "risks": [], "test_requirements": [], "dispositions": [], "previous_tr_ids": [], "update_scope_tr_ids": []},
+                "spec-analysis", "authority", "AUTH-OUT", {"authority_id": "AUTH-OUT"},
+                {"tr_id_state": []},
+            ),
+            (
+                "test-condition-design",
+                {"tcn_id": "TCN-001", "test_requirements": [], "test_conditions": [], "models": [], "ci_ids": [], "test_data_requirements": [], "dispositions": [], "previous_tcn_ids": [], "previous_model_keys": [], "previous_ci_ids": [], "update_scope_tcn_ids": [], "update_scope_model_keys": []},
+                "test-requirement-design", "tr", "TR-OUT", {"tr_id": "TR-OUT", "text": "Out of current scope"},
+                {"tcn_id_state": [], "model_key_state": []},
+            ),
+            (
+                "test-case-design",
+                {"test_cases": [], "test_conditions": [], "coverage_items": [], "environment_requirements": [], "test_data_requirements": [], "previous_tc_ids": [], "update_scope_tc_ids": []},
+                "test-analysis", "environment_requirement", "ENV-OUT", {"requirement_key": "ENV-OUT"},
+                {"tc_id_state": []},
+            ),
+        )
+
+        for skill, normalized, owner_skill, owner_type, owner_ref, owner_content, state in cases:
+            with self.subTest(skill=skill):
+                owner = runtime.make_machine_entity(owner_skill, owner_type, owner_ref, owner_content)
+                dependency = runtime.machine_entity_dependency(owner)
+                disposition = runtime.make_machine_entity(
+                    skill, "disposition", f"{owner_type}:{owner_ref}",
+                    {"upstream_entity": dependency, "handling": "対象外", "reason": "outside current scope", "authority_refs": [], "covered_by_entity": None},
+                    upstream_entity_dependencies=[dependency],
+                )
+                owner_block = runtime.render_machine_entities(owner_skill, [owner])
+
+                def artifact(rows: list[dict]) -> str:
+                    if skill == "test-requirement-design":
+                        own = self._tr_artifact(normalized, rows, state["tr_id_state"], result_entities=[])
+                    else:
+                        own = self._structure_artifact(skill, normalized, rows, state, result_entities=[])
+                    return "\n".join((own, owner_block))
+
+                previous = artifact([disposition])
+                candidate = artifact([disposition])
+                omitted_previous = runtime.verify_runtime_evidence({
+                    "operation": "verify_runtime_evidence", "skill": skill,
+                    "normalized_skill_input": normalized, "artifact_markdown": candidate,
+                    "previous_artifact_markdown": None, "partial_rerun": True,
+                })
+                self.assertFalse(omitted_previous["valid"], omitted_previous)
+                self.assertIn("invalid_previous_artifact", [row["issue_type"] for row in omitted_previous["issues"]])
+
+                accepted = runtime.verify_runtime_evidence({
+                    "operation": "verify_runtime_evidence", "skill": skill,
+                    "normalized_skill_input": normalized, "artifact_markdown": candidate,
+                    "previous_artifact_markdown": previous, "partial_rerun": True,
+                })
+                self.assertTrue(accepted["valid"], accepted)
+                self.assertEqual(accepted["expected_entities"], [{"skill": skill, "entity_type": "disposition", "entity_ref": f"{owner_type}:{owner_ref}"}])
+
+                omitted_disposition = runtime.verify_runtime_evidence({
+                    "operation": "verify_runtime_evidence", "skill": skill,
+                    "normalized_skill_input": normalized, "artifact_markdown": artifact([]),
+                    "previous_artifact_markdown": previous, "partial_rerun": True,
+                })
+                self.assertFalse(omitted_disposition["valid"], omitted_disposition)
+                self.assertIn((skill, "disposition", f"{owner_type}:{owner_ref}"), [tuple(row) for row in omitted_disposition["missing_entities"]])
+
+                full_build = runtime.verify_runtime_evidence({
+                    "operation": "verify_runtime_evidence", "skill": skill,
+                    "normalized_skill_input": normalized, "artifact_markdown": artifact([]),
+                    "previous_artifact_markdown": None, "partial_rerun": False,
+                })
+                self.assertTrue(full_build["valid"], full_build)
 
     def test_cli_verify_error_has_fixed_null_current_structure_state(self) -> None:
         completed = subprocess.run(
@@ -952,6 +1092,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
             "operation": "verify_runtime_evidence", "skill": "test-case-design",
             "normalized_skill_input": normalized, "artifact_markdown": candidate,
             "previous_artifact_markdown": previous,
+            "partial_rerun": True,
         }
         checked = runtime.verify_runtime_evidence(request)
         self.assertTrue(checked["valid"], checked)
@@ -1002,6 +1143,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
             "operation": "verify_runtime_evidence", "skill": "test-requirement-design",
             "normalized_skill_input": normalized, "artifact_markdown": candidate,
             "previous_artifact_markdown": previous,
+            "partial_rerun": True,
         })
         self.assertTrue(checked["valid"], checked)
         cli = subprocess.run(
@@ -1010,6 +1152,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
                 "operation": "verify_runtime_evidence", "skill": "test-requirement-design",
                 "normalized_skill_input": normalized, "artifact_markdown": candidate,
                 "previous_artifact_markdown": previous,
+                "partial_rerun": True,
             }, ensure_ascii=False).encode("utf-8"),
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
         )
@@ -1025,6 +1168,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
             "operation": "verify_runtime_evidence", "skill": "test-requirement-design",
             "normalized_skill_input": normalized, "artifact_markdown": self._tr_artifact(normalized, [], current_state, result_entities=[]),
             "previous_artifact_markdown": previous,
+            "partial_rerun": True,
         })
         self.assertFalse(missing["valid"])
         self.assertIn(("test-requirement-design", "tr", "TR-002"), [tuple(row) for row in missing["missing_entities"]])
@@ -1033,6 +1177,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
             "operation": "verify_runtime_evidence", "skill": "test-requirement-design",
             "normalized_skill_input": normalized, "artifact_markdown": self._tr_artifact(normalized, prior_entities, current_state, result_entities=[]),
             "previous_artifact_markdown": previous,
+            "partial_rerun": True,
         })
         self.assertFalse(deleted_left["valid"])
         self.assertIn(("test-requirement-design", "tr", "TR-001"), [tuple(row) for row in deleted_left["extra_entities"]])
@@ -1045,6 +1190,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
             "normalized_skill_input": normalized,
             "artifact_markdown": self._tr_artifact(normalized, [prior_entities[1], unknown_entity], current_state, result_entities=[]),
             "previous_artifact_markdown": previous,
+            "partial_rerun": True,
         })
         self.assertFalse(unknown["valid"])
         self.assertIn(["test-requirement-design", "tr", "TR-404"], unknown["extra_entities"])
@@ -1054,6 +1200,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
             "normalized_skill_input": normalized,
             "artifact_markdown": self._tr_artifact(normalized, [prior_entities[1], prior_entities[1]], current_state, result_entities=[]),
             "previous_artifact_markdown": previous,
+            "partial_rerun": True,
         })
         self.assertFalse(duplicate["valid"])
         self.assertIn(["test-requirement-design", "tr", "TR-002"], duplicate["duplicate_entities"])
@@ -1064,6 +1211,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
             "operation": "verify_runtime_evidence", "skill": "test-requirement-design",
             "normalized_skill_input": normalized, "artifact_markdown": candidate,
             "previous_artifact_markdown": tampered_previous,
+            "partial_rerun": True,
         })
         self.assertFalse(invalid_previous["valid"])
         self.assertTrue(any(issue["issue_type"] == "invalid_previous_artifact" for issue in invalid_previous["issues"]))
@@ -1089,6 +1237,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
             "operation": "verify_runtime_evidence", "skill": "test-requirement-design",
             "normalized_skill_input": normalized, "artifact_markdown": current,
             "previous_artifact_markdown": previous,
+            "partial_rerun": True,
         })
         self.assertFalse(checked["valid"])
         self.assertTrue(any(issue["issue_type"] == "stale_carry_forward_entity" for issue in checked["issues"]))
@@ -1120,6 +1269,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
             "operation": "verify_runtime_evidence", "skill": "test-requirement-design",
             "normalized_skill_input": normalized, "artifact_markdown": candidate,
             "previous_artifact_markdown": previous,
+            "partial_rerun": True,
         })
         self.assertFalse(checked["valid"])
         stale = next(issue for issue in checked["issues"] if issue["issue_type"] == "stale_carry_forward_entity")
@@ -1134,6 +1284,16 @@ class EntityAndEvidenceTests(unittest.TestCase):
                 "artifact_markdown": "",
                 "previous_artifact_markdown": None,
             })
+
+    def test_evidence_operation_requires_partial_rerun_boolean(self) -> None:
+        base = {
+            "operation": "verify_runtime_evidence", "skill": "test-condition-design",
+            "normalized_skill_input": {}, "artifact_markdown": "", "previous_artifact_markdown": None,
+        }
+        for request in (base, {**base, "partial_rerun": "false"}, {**base, "partial_rerun": 0}):
+            with self.subTest(request=request):
+                with self.assertRaises(runtime.InvalidInput):
+                    runtime.verify_runtime_evidence(request)
 
 
 class TargetDispositionClosureTests(unittest.TestCase):

@@ -19,6 +19,7 @@ def _raw_request(artifact: str, normalized: dict | None = None) -> bytes:
         "normalized_skill_input": normalized or {},
         "artifact_markdown": artifact,
         "previous_artifact_markdown": None,
+        "partial_rerun": False,
     }
     return json.dumps(request, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
 

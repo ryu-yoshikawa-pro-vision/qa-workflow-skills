@@ -64,7 +64,7 @@ def _runtime_rows(value: Any, name: str) -> list[dict[str, Any]]:
     rows = ensure_list(value, name)
     result = []
     seen: set[tuple[str, str]] = set()
-    required = {"skill", "runtime_unit_key", "model_key", "support_status", "result_status", "runtime_status", "runtime_required", "deterministic_generated", "generation_fingerprint", "upstream_entity_fingerprints", "upstream_runtime_units", "unsupported_items", "freshness_status", "model_completion", "target_mappings", "target_dispositions"}
+    required = {"skill", "runtime_unit_key", "model_key", "support_status", "result_status", "runtime_status", "runtime_required", "deterministic_generated", "generation_fingerprint", "result_fingerprint", "upstream_entity_fingerprints", "upstream_runtime_units", "unsupported_items", "freshness_status", "model_completion", "target_mappings", "target_dispositions"}
     for index, row in enumerate(rows):
         if not isinstance(row, dict):
             raise InvalidInput(f"{name}[{index}]が不正です")
@@ -84,6 +84,8 @@ def _runtime_rows(value: Any, name: str) -> list[dict[str, Any]]:
             raise InvalidInput(f"{name}[{index}]のartifact model_keyはnullである必要があります")
         if not FULL_DIGEST_RE.fullmatch(str(row["generation_fingerprint"])):
             raise InvalidInput(f"{name}[{index}]のgeneration_fingerprintが不正です")
+        if not FULL_DIGEST_RE.fullmatch(str(row["result_fingerprint"])):
+            raise InvalidInput(f"{name}[{index}]のresult_fingerprintが不正です")
         if row["freshness_status"] not in {"current", "stale"}:
             raise InvalidInput("freshness_statusが不正です")
         if row["result_status"] not in {"ready", "unresolved", "blocked"} or row["support_status"] not in {"supported", "partial", "unsupported", "unknown"} or row["runtime_status"] not in {"ok", "invalid_input", "unsupported", "limit_exceeded", "internal_error", "not_run"}:
@@ -146,7 +148,7 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
     entities = _entity_rows(input_value["current_entities"])
     closures, closure_issues = validate_unsupported_item_closures(
         input_value["unsupported_item_closures"],
-        runtime_rows,
+        current_runtime_rows,
         entities,
         normalized=[scope["normalized_input"] for scope in scopes],
     )
@@ -217,9 +219,9 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
             })
     issues.extend(freshness_issues)
     issues.extend(closure_issues)
-    issues.extend(evaluate_target_disposition_closure(runtime_rows, entities))
+    issues.extend(evaluate_target_disposition_closure(current_runtime_rows, entities))
     for scope in scopes:
-        issues.extend(evaluate_materialize_completion(scope["normalized_input"], runtime_rows, entities, closures))
+        issues.extend(evaluate_materialize_completion(scope["normalized_input"], current_runtime_rows, entities, closures))
     if any(row.get("handling") == "ブロック中" for row in closures):
         issues.append({"issue_type": "unsupported_closure_blocked", "blocking": True})
     for row in fresh_rows:
