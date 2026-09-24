@@ -46,9 +46,17 @@ def runtime_row(skill: str, unit: str, model_key: str | None = None, *, material
     return row
 
 
+def model_content(model_key: str, parent_tcn_id: str, *, technique_slug: str | None = "ep", model_type: str = "ep") -> dict:
+    return {
+        "model_key": model_key, "model_type": model_type, "technique_slug": technique_slug,
+        "parent_tcn_id": parent_tcn_id, "selection_source": "condition_design" if technique_slug else None,
+        "selection_key": None, "derived_from_model_key": None,
+    }
+
+
 def base_request() -> dict:
     tcn = runtime.make_machine_entity("test-condition-design", "tcn", "TCN-001", {"tcn_id": "TCN-001"})
-    model = runtime.make_machine_entity("test-condition-design", "model", "ep-001", {"model_key": "ep-001", "model_type": "ep"}, model_key="ep-001")
+    model = runtime.make_machine_entity("test-condition-design", "model", "ep-001", model_content("ep-001", "TCN-001"), model_key="ep-001")
     ci = runtime.make_machine_entity("test-condition-design", "ci", "TCN-001-CI01", {"ci_id": "TCN-001-CI01", "tcn_id": "TCN-001", "model_key": "ep-001"}, model_key="ep-001")
     units = [runtime_row("test-condition-design", "artifact:condition_structure:all"), runtime_row("test-condition-design", "model:ep-001", "ep-001"), runtime_row("test-condition-design", "artifact:materialize_coverage:TCN-001", materialize=True, materialize_model_key="ep-001", active_ci_ids=["TCN-001-CI01"])]
     return {
@@ -70,6 +78,74 @@ def run(request: dict) -> dict:
 
 
 class TraceabilityRuntimeTests(unittest.TestCase):
+    def test_coverage_model_tcn_cannot_use_direct_tc_edge_as_closure(self) -> None:
+        request = base_request()
+        for row_set in ("runtime_units", "current_runtime_units"):
+            unsupported_model = next(row for row in request["input"][row_set] if row["runtime_unit_key"] == "model:ep-001")
+            unsupported_model["support_status"] = "unsupported"
+            unsupported_model["runtime_status"] = "unsupported"
+            materialize = next(row for row in request["input"][row_set] if row["runtime_unit_key"] == "artifact:materialize_coverage:TCN-001")
+            materialize["model_completion"] = []
+        request["input"]["edges"] = [
+            {"from": "SPEC-001", "to": "TR-001"},
+            {"from": "TR-001", "to": "TCN-001"},
+            {"from": "TCN-001", "to": "TC-001"},
+        ]
+        result = run(request)
+        self.assertEqual(result["runtime_status"], "invalid_input", result)
+
+    def test_coverage_model_tcn_rejects_extra_direct_tc_edge_even_with_ci_path(self) -> None:
+        request = base_request()
+        request["input"]["edges"].append({"from": "TCN-001", "to": "TC-001"})
+        result = run(request)
+        self.assertEqual(result["runtime_status"], "invalid_input", result)
+
+    def test_coverage_model_closure_is_scoped_to_its_parent_tcn(self) -> None:
+        request = base_request()
+        tcn_two = runtime.make_machine_entity("test-condition-design", "tcn", "TCN-002", {"tcn_id": "TCN-002"})
+        request["input"]["current_entities"].append(tcn_two)
+        scope = request["input"]["analysis_scopes"][0]
+        scope["normalized_input"]["test_conditions"].append({"tcn_id": "TCN-002"})
+        request["input"]["nodes"].append({"node_key": "TCN-002", "node_type": "TCN"})
+        request["input"]["edges"].append({"from": "TR-001", "to": "TCN-002"})
+
+        result = run(request)
+
+        self.assertEqual(result["runtime_status"], "ok", result)
+        self.assertTrue(result["payload"]["can_complete"], result["issues"])
+        self.assertFalse(any(
+            issue["issue_type"] == "coverage_model_closure_missing" and issue.get("node_key") == "TCN-002"
+            for issue in result["issues"]
+        ), result["issues"])
+
+    def test_runtime_row_model_identity_is_validated_for_saved_and_current_rows(self) -> None:
+        for row_set in ("runtime_units", "current_runtime_units"):
+            with self.subTest(row_set=row_set, case="model key mismatch"):
+                request = base_request()
+                model = next(row for row in request["input"][row_set] if row["runtime_unit_key"] == "model:ep-001")
+                model["model_key"] = "ep-999"
+                self.assertEqual(run(request)["runtime_status"], "invalid_input")
+
+            with self.subTest(row_set=row_set, case="artifact model key"):
+                request = base_request()
+                artifact = next(row for row in request["input"][row_set] if row["runtime_unit_key"] == "artifact:condition_structure:all")
+                artifact["model_key"] = "ep-001"
+                self.assertEqual(run(request)["runtime_status"], "invalid_input")
+
+    def test_non_materialize_runtime_rejects_coverage_projections(self) -> None:
+        cases = (
+            ("model:ep-001", "model_completion"),
+            ("artifact:condition_structure:all", "target_mappings"),
+            ("model:ep-001", "target_dispositions"),
+        )
+        for row_set in ("runtime_units", "current_runtime_units"):
+            for unit, field in cases:
+                with self.subTest(row_set=row_set, unit=unit, field=field):
+                    request = base_request()
+                    row = next(row for row in request["input"][row_set] if row["runtime_unit_key"] == unit)
+                    row[field] = [{"tampered": True}]
+                    self.assertEqual(run(request)["runtime_status"], "invalid_input")
+
     def test_saved_result_projection_mismatch_is_stale_while_semantics_use_current_rows(self) -> None:
         request = base_request()
         request["input"]["runtime_units"] = copy.deepcopy(request["input"]["runtime_units"])

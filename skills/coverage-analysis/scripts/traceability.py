@@ -82,7 +82,7 @@ def _nodes(value: Any) -> tuple[list[dict[str, Any]], dict[str, str]]:
     return sorted(result, key=lambda row: row["node_key"]), kinds
 
 
-def _edges(value: Any, kinds: dict[str, str]) -> list[dict[str, str]]:
+def _edges(value: Any, kinds: dict[str, str], coverage_model_tcn_ids: set[str]) -> list[dict[str, str]]:
     result: list[dict[str, str]] = []
     seen: set[tuple[str, str]] = set()
     for index, row in enumerate(ensure_list(value, "edges")):
@@ -93,6 +93,8 @@ def _edges(value: Any, kinds: dict[str, str]) -> list[dict[str, str]]:
         pair = (source, target)
         if source not in kinds or target not in kinds or pair in seen or (kinds[source], kinds[target]) not in ALLOWED_EDGES:
             raise InvalidInput("traceability edgeがunknown / duplicate / 不許可です")
+        if kinds[source] == "TCN" and kinds[target] == "TC" and source in coverage_model_tcn_ids:
+            raise InvalidInput("Coverage modelを持つTCNからTCへの直接edgeは許可されません")
         seen.add(pair)
         result.append({"from": source, "to": target})
     return sorted(result, key=lambda row: (row["from"], row["to"]))
@@ -113,6 +115,12 @@ def _runtime_rows(value: Any, name: str) -> list[dict[str, Any]]:
             raise InvalidInput("traceability / workflow_runtime自身をruntime集合へ含められません")
         if identity in seen:
             raise InvalidInput(f"{name}のruntime identityが重複しています")
+        if row["model_key"] is not None and (not isinstance(row["model_key"], str) or not row["model_key"].strip() or not unit.startswith("model:")):
+            raise InvalidInput(f"{name}[{index}]のmodel identityが不正です")
+        if unit.startswith("model:") and row["model_key"] != unit.split(":", 1)[1]:
+            raise InvalidInput(f"{name}[{index}]のmodel_keyが不一致です")
+        if not unit.startswith("model:") and row["model_key"] is not None:
+            raise InvalidInput(f"{name}[{index}]のartifact model_keyはnullである必要があります")
         if row["support_status"] not in {"supported", "partial", "unsupported", "unknown"} or row["result_status"] not in {"ready", "unresolved", "blocked"} or row["runtime_status"] not in {"ok", "invalid_input", "unsupported", "limit_exceeded", "internal_error", "not_run"}:
             raise InvalidInput("runtime row statusが不正です")
         if row["freshness_status"] not in {"current", "stale"} or not isinstance(row["runtime_required"], bool) or not isinstance(row["deterministic_generated"], bool) or not FULL_DIGEST_RE.fullmatch(str(row["generation_fingerprint"])) or not FULL_DIGEST_RE.fullmatch(str(row["result_fingerprint"])):
@@ -120,6 +128,8 @@ def _runtime_rows(value: Any, name: str) -> list[dict[str, Any]]:
         for field in ("upstream_entity_fingerprints", "upstream_runtime_units", "unsupported_items", "model_completion", "target_mappings", "target_dispositions"):
             if not isinstance(row[field], list):
                 raise InvalidInput(f"{name}.{field}がarrayではありません")
+        if not unit.startswith("artifact:materialize_coverage:") and any(row[field] for field in ("model_completion", "target_mappings", "target_dispositions")):
+            raise InvalidInput("materialize以外のruntime unitはcoverage projectionを持てません")
         seen.add(identity)
         result.append(canonicalize(row))
     return sorted(result, key=lambda row: (row["skill"], row["runtime_unit_key"]))
@@ -136,6 +146,21 @@ def _entity_rows(value: Any) -> list[dict[str, Any]]:
     for skill, skill_rows in grouped.items():
         result.extend(validate_entity_collection(skill_rows, expected_skill=skill))
     return sorted(result, key=lambda row: (row["skill"], row["entity_type"], row["entity_ref"]))
+
+
+def _coverage_models_by_tcn(entities: list[dict[str, Any]]) -> dict[str, list[str]]:
+    models: dict[str, set[str]] = {}
+    for row in entities:
+        if row["entity_type"] != "model":
+            continue
+        content = row["content"]
+        technique_slug = content.get("technique_slug")
+        if technique_slug is None:
+            continue
+        ensure_nonempty_string(technique_slug, "Coverage model technique_slug")
+        parent_tcn_id = ensure_nonempty_string(content.get("parent_tcn_id"), "Coverage model parent_tcn_id")
+        models.setdefault(parent_tcn_id, set()).add(row["entity_ref"])
+    return {tcn_id: sorted(model_keys) for tcn_id, model_keys in sorted(models.items())}
 
 
 def _dispositions(value: Any, entities: dict[tuple[str, str, str], dict[str, Any]]) -> list[dict[str, Any]]:
@@ -167,17 +192,13 @@ def _dispositions(value: Any, entities: dict[tuple[str, str, str], dict[str, Any
     return sorted(result, key=lambda row: (row["upstream_entity"]["skill"], row["upstream_entity"]["entity_type"], row["upstream_entity"]["entity_ref"]))
 
 
-def _graph_issues(nodes: list[dict[str, Any]], kinds: dict[str, str], edges: list[dict[str, str]], dispositions: list[dict[str, Any]], runtime_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _graph_issues(nodes: list[dict[str, Any]], kinds: dict[str, str], edges: list[dict[str, str]], dispositions: list[dict[str, Any]], coverage_models_by_tcn: dict[str, list[str]]) -> list[dict[str, Any]]:
     incoming: dict[str, set[str]] = {row["node_key"]: set() for row in nodes}
     outgoing: dict[str, set[str]] = {row["node_key"]: set() for row in nodes}
     for edge in edges:
         incoming[edge["to"]].add(edge["from"])
         outgoing[edge["from"]].add(edge["to"])
     disposed = {row["upstream_entity"]["entity_ref"] for row in dispositions}
-    active_coverage_models = 0
-    for runtime in runtime_rows:
-        if runtime["runtime_unit_key"].startswith("artifact:materialize_coverage:"):
-            active_coverage_models += sum(1 for row in runtime["model_completion"] if isinstance(row, dict) and row.get("model_key"))
     issues: list[dict[str, Any]] = []
     for node in nodes:
         key, node_type = node["node_key"], node["node_type"]
@@ -192,7 +213,8 @@ def _graph_issues(nodes: list[dict[str, Any]], kinds: dict[str, str], edges: lis
         if node_type == "TC" and not (incoming[key] & {source for source, kind in kinds.items() if kind in {"CI", "TCN"}}) and key not in disposed:
             issues.append({"issue_type": "missing_ci_edge", "blocking": True, "node_key": key})
     for source, kind in kinds.items():
-        if kind == "TCN" and active_coverage_models and not outgoing[source] and source not in disposed:
+        has_ci_edge = any(kinds[target] == "CI" for target in outgoing[source])
+        if kind == "TCN" and coverage_models_by_tcn.get(source) and not has_ci_edge and source not in disposed:
             issues.append({"issue_type": "coverage_model_closure_missing", "blocking": True, "node_key": source})
     return issues
 
@@ -202,8 +224,9 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
     reject_unknown(input_value, required)
     scopes = _scope_rows(input_value["analysis_scopes"])
     nodes, kinds = _nodes(input_value["nodes"])
-    edges = _edges(input_value["edges"], kinds)
     entities_list = _entity_rows(input_value["current_entities"])
+    coverage_models_by_tcn = _coverage_models_by_tcn(entities_list)
+    edges = _edges(input_value["edges"], kinds, set(coverage_models_by_tcn))
     entities = {entity_identity(row["skill"], row["entity_type"], row["entity_ref"]): row for row in entities_list}
     dispositions = _dispositions(input_value["dispositions"], entities)
     runtime_rows = _runtime_rows(input_value["runtime_units"], "runtime_units")
@@ -261,7 +284,7 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
             })
     issues.extend(freshness_issues)
     issues.extend(closure_issues)
-    issues.extend(_graph_issues(nodes, kinds, edges, dispositions, current_runtime_rows))
+    issues.extend(_graph_issues(nodes, kinds, edges, dispositions, coverage_models_by_tcn))
     issues.extend(evaluate_target_disposition_closure(current_runtime_rows, entities_list))
     for scope in scopes:
         issues.extend(evaluate_materialize_completion(scope["normalized_input"], current_runtime_rows, entities_list, closures))
