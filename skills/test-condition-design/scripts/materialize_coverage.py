@@ -34,7 +34,6 @@ from runtime_contract import (
     typed_value_compare,
     UnsupportedInput,
     validate_upstream_entities,
-    upstream_entity_fingerprints,
 )
 
 
@@ -739,46 +738,36 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
     expected_result_root_state = [{"expected_result_root": root, "status": status} for root, status in sorted(previous_root_state.items())]
 
     ci_entities = []
-    upstream_rows = validate_upstream_entities(metadata)
-    upstream_refs = upstream_entity_fingerprints(upstream_rows)
-    data_entities = {}
-    for data_ref, row in data_requirements.items():
-        source_model_key = row["source_model_key"]
-        if source_model_key not in model_results:
-            # A data requirement is runtime-backed only when it names a
-            # current target/model result.  Returning an internal KeyError
-            # here would silently turn a malformed artifact into a runtime
-            # failure.
-            raise InvalidInput("test data requirementがruntime model resultを参照していません")
-        model_entity = current_model_entities.get((SKILL, "model", source_model_key))
-        if model_entity is None:
-            raise InvalidInput("test_data_requirement source model Machine Entityがcurrentではありません")
-        authority_identities = [("spec-analysis", "authority", ref) for ref in row["authority_refs"]]
-        dependency_identities = [(SKILL, "model", source_model_key), *authority_identities]
-        data_entities[data_ref] = make_machine_entity(
-            SKILL,
-            "test_data_requirement",
-            data_ref,
-            row,
-            upstream_entity_dependencies=resolve_entity_dependencies(dependency_identities, upstream_rows, require_all=True),
-            runtime_dependencies=[{
-                "skill": SKILL,
-                "runtime_unit_key": f"model:{source_model_key}",
-                "generation_fingerprint": model_results[source_model_key]["generation_fingerprint"],
-            }],
-        )
-    ci_upstream_by_identity = {
-        (row["skill"], row["entity_type"], row["entity_ref"]): row
-        for row in upstream_refs
+    current_entities_by_identity = {
+        (entity["skill"], entity["entity_type"], entity["entity_ref"]): entity
+        for entity in current_upstream_entities
     }
-    for entity in data_entities.values():
-        dependency = {"skill": entity["skill"], "entity_type": entity["entity_type"], "entity_ref": entity["entity_ref"], "content_fingerprint": entity["content_fingerprint"]}
-        identity = (dependency["skill"], dependency["entity_type"], dependency["entity_ref"])
-        existing = ci_upstream_by_identity.get(identity)
-        if existing is not None and existing["content_fingerprint"] != dependency["content_fingerprint"]:
+    data_refs = sorted(data_requirements)
+    data_identities = [(SKILL, "test_data_requirement", data_ref) for data_ref in data_refs]
+    resolve_entity_dependencies(
+        data_identities,
+        current_upstream_entities,
+        require_all=metadata["input_mode"] == "artifact",
+    )
+    for data_ref, expected_content in data_requirements.items():
+        current = current_entities_by_identity.get((SKILL, "test_data_requirement", data_ref))
+        if current is None:
+            continue
+        canonical_content = canonicalize(expected_content)
+        if current["content"] != canonical_content or current["content_fingerprint"] != sha256_digest(canonical_content):
             raise InvalidInput("current test_data_requirement Machine Entityがnormalized requirementと不一致です")
-        ci_upstream_by_identity[identity] = dependency
-    ci_upstream_refs = [ci_upstream_by_identity[key] for key in sorted(ci_upstream_by_identity)]
+
+    def ci_dependencies(model_key: str, requirement_refs: list[str]) -> list[dict[str, str]]:
+        identities = [
+            (SKILL, "tcn", tcn_id),
+            (SKILL, "model", model_key),
+            *((SKILL, "test_data_requirement", ref) for ref in requirement_refs),
+        ]
+        return resolve_entity_dependencies(
+            identities,
+            current_upstream_entities,
+            require_all=metadata["input_mode"] == "artifact",
+        )
     targets_by_ci: dict[str, list[dict[str, Any]]] = {}
     for mapping in active_mappings:
         targets_by_ci.setdefault(mapping["ci_id"], []).append(mapping)
@@ -815,8 +804,7 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
             "test_data_requirement_refs": annotation.get("test_data_requirement_refs", []),
             "status": "active",
         }
-        target_data_refs = set(annotation.get("test_data_requirement_refs", []))
-        target_dependencies = [row for row in ci_upstream_refs if row["entity_type"] != "test_data_requirement" or row["entity_ref"] in target_data_refs]
+        target_dependencies = ci_dependencies(first["model_key"], annotation.get("test_data_requirement_refs", []))
         ci_entities.append(
             make_machine_entity(
                 SKILL,
@@ -837,7 +825,7 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
             "priority": item["priority"], "priority_override_reason": item["priority_override_reason"], "expected_result_root": item["expected_result_root"],
             "authority_refs": item["authority_refs"], "reference_refs": item["reference_refs"], "test_data_requirement_refs": item["test_data_requirement_refs"], "status": "active",
         }
-        item_dependencies = [row for row in ci_upstream_refs if row["entity_type"] != "test_data_requirement" or row["entity_ref"] in set(item["test_data_requirement_refs"])]
+        item_dependencies = ci_dependencies(item["model_key"], item["test_data_requirement_refs"])
         ci_entities.append(make_machine_entity(SKILL, "ci", item["ci_id"], content, model_key=item["model_key"], upstream_entity_dependencies=item_dependencies, runtime_dependencies=[{"skill": SKILL, "runtime_unit_key": f"artifact:materialize_coverage:{tcn_id}", "generation_fingerprint": "__CURRENT__"}]))
 
     model_completion = []

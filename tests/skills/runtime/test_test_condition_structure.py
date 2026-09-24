@@ -105,17 +105,45 @@ class ConditionStructureRuntimeTests(unittest.TestCase):
                 self.assertEqual(states[("tcn", "TCN-001")], expected_tcn)
                 self.assertEqual(states[("model", "ep-001")], expected_model)
 
-    def test_analysis_selection_and_adapter_parent_are_required_dependencies(self) -> None:
+    def test_direct_analysis_selection_is_optional_and_current_selection_is_recorded(self) -> None:
         value = condition_input()
         sources = current_sources()
         missing_selection = [row for row in sources if row["entity_type"] != "technique_selection"]
-        result = run_script(CONDITION_SCRIPT, request_for(value, missing_selection))
-        self.assertEqual(result["runtime_status"], "invalid_input")
-
         direct = condition_metadata()
+        direct["upstream_entities"] = [
+            {"skill": row["skill"], "entity_type": row["entity_type"], "entity_ref": row["entity_ref"], "content": row["content"]}
+            for row in missing_selection
+        ]
+        result = run_script(CONDITION_SCRIPT, {"metadata": direct, "input": value})
+        self.assertEqual(result["runtime_status"], "ok", result)
+        model = next(row for row in result["payload"]["entities"] if row["entity_type"] == "model")
+        self.assertNotIn(
+            ("test-analysis", "technique_selection", "SEL-001"),
+            {(row["skill"], row["entity_type"], row["entity_ref"]) for row in model["upstream_entity_dependencies"]},
+        )
+
         direct_value = condition_input()
+        direct = condition_metadata()
         result = run_script(CONDITION_SCRIPT, {"metadata": direct, "input": direct_value})
-        self.assertEqual(result["runtime_status"], "invalid_input")
+        self.assertEqual(result["runtime_status"], "ok", result)
+
+        selection = next(row for row in sources if row["entity_type"] == "technique_selection")
+        direct["upstream_entities"] = [{
+            "skill": selection["skill"], "entity_type": selection["entity_type"],
+            "entity_ref": selection["entity_ref"], "content": selection["content"],
+        }]
+        result = run_script(CONDITION_SCRIPT, {"metadata": direct, "input": direct_value})
+        self.assertEqual(result["runtime_status"], "ok", result)
+        model = next(row for row in result["payload"]["entities"] if row["entity_type"] == "model")
+        self.assertIn(
+            {"skill": selection["skill"], "entity_type": selection["entity_type"], "entity_ref": selection["entity_ref"], "content_fingerprint": selection["content_fingerprint"]},
+            model["upstream_entity_dependencies"],
+        )
+
+        artifact = request_for(condition_input(), missing_selection)
+        self.assertEqual(run_script(CONDITION_SCRIPT, artifact)["runtime_status"], "invalid_input")
+        artifact = request_for(condition_input(), sources)
+        self.assertEqual(run_script(CONDITION_SCRIPT, artifact)["runtime_status"], "ok")
 
         value["models"].insert(0, {
             "draft_key": "adapter", "model_type": "classification", "technique_slug": None, "selection_source": None, "selection_key": None,

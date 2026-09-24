@@ -232,6 +232,19 @@ class EpVerticalIntegrationTests(unittest.TestCase):
         materialize_input = {"tcn_id": "TCN-001", "active_model_metadata": condition["payload"]["active_model_metadata"], "models": [model_result], "semantic_coverage_items": [], "test_data_requirements": requirement_rows, "target_annotations": annotations, "target_dispositions": [], "previous_target_id_map": [], "previous_semantic_ci_map": [], "previous_ci_ids": [], "previous_expected_result_roots": [], "merge_groups": []}
         materialize = run_script(MATERIALIZE_SCRIPT, {"metadata": materialize_meta, "input": materialize_input})
         self.assertEqual(materialize["result_status"], "ready")
+        tdr_entity_by_ref = {row["entity_ref"]: row for row in requirement_entities}
+        for ci in materialize["payload"]["entities"]:
+            dependencies = {
+                (row["skill"], row["entity_type"], row["entity_ref"]): row["content_fingerprint"]
+                for row in ci["upstream_entity_dependencies"]
+            }
+            self.assertEqual(set(dependencies), {
+                ("test-condition-design", "tcn", "TCN-001"),
+                ("test-condition-design", "model", "ep-001"),
+                ("test-condition-design", "test_data_requirement", "data:role"),
+            })
+            self.assertEqual(dependencies[("test-condition-design", "test_data_requirement", "data:role")], tdr_entity_by_ref["data:role"]["content_fingerprint"])
+        self.assertEqual({row["entity_ref"] for row in requirement_entities}, {"data:role"})
         entities = [tr_entity, selection_entity] + condition_entities + requirement_entities + materialize["payload"]["entities"]
         for entity in entities:
             try:

@@ -464,7 +464,7 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
         dependencies.extend(resolve_entity_dependencies(
             external_identities,
             current_entities,
-            require_all=row["selection_source"] == "analysis" or metadata["input_mode"] == "artifact",
+            require_all=metadata["input_mode"] == "artifact",
         ))
         dependencies.sort(key=lambda item: (item["skill"], item["entity_type"], item["entity_ref"]))
         content = canonicalize(row)
