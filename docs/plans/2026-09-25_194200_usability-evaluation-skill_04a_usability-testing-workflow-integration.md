@@ -1,15 +1,15 @@
-# UI/UX評価・ユーザビリティテストSkill追加Plan
+# UI/UX評価・ユーザビリティ検査Skill追加Plan
 
 ## 1. workflow上の位置づけ
 
-`usability-testing` はlive targetを能動操作する独立Activityです。
+`usability-inspection` はlive targetを能動操作する独立Activityです。
 
 `test-target-inspection` や `test-execution` の暗黙の追加処理にはしません。
 
 ~~~text
 user goal / task scenario
           ↓
- usability-testing
+ usability-inspection
           ↓
  live browser interaction
           ↓
@@ -22,11 +22,11 @@ user goal / task scenario
  Finding
 ~~~
 
-`usability-testing` がbrowser / session owner、`usability-evaluation` はread-only evaluatorです。
+`usability-inspection` がbrowser / session owner、`usability-evaluation` はread-only evaluatorです。
 
 ## 2. direct trigger
 
-次のような依頼では `usability-testing` を直接開始できます。
+次のような依頼では `usability-inspection` を直接開始できます。
 
 - 実際に画面を触って使い勝手を確認
 - このサービスを初見ユーザーとして操作して問題を探す
@@ -48,7 +48,7 @@ user goal / task scenario
 
 `test-target-inspection` はcurrent target informationの収集・管理がownerです。
 
-`usability-testing` はcurrent target inventoryを更新するために動きません。
+`usability-inspection` はcurrent target inventoryを更新するために動きません。
 
 既存のcurrent target artifactが利用可能なら、
 
@@ -62,7 +62,7 @@ user goal / task scenario
 
 ただしtask実行では、current target artifactのlocatorやhidden implementation情報をuser-facing discoveryの代わりに使いません。
 
-`usability-testing` 中に得た新しいUI情報を、理由なくtest-target-inspectionの正本へ自動書き戻しません。
+`usability-inspection` 中に得た新しいUI情報を、理由なくtest-target-inspectionの正本へ自動書き戻しません。
 
 ## 4. test-executionとの境界
 
@@ -74,21 +74,21 @@ test-execution
 → 指定手順を忠実に実行
 → PASS / FAIL
 
-usability-testing
+usability-inspection
 user goal + task scenario + success condition
 → user-facing情報から操作方法を探索
 → task outcome + usability observation
 ~~~
 
-詳細TCが存在していても、usability-testingでそのstep sequenceを答えとして利用しません。
+詳細TCが存在していても、usability-inspectionでそのstep sequenceを答えとして利用しません。
 
 「このTCを実行して」はtest-executionです。
 
-「同じ機能を、手順を教えずuser goalだけで実際に使ってみて」はusability-testingです。
+「同じ機能を、手順を教えずuser goalだけで実際に使ってみて」はusability-inspectionです。
 
 ## 5. usability-evaluationとの統合
 
-`usability-testing` は実測を担当し、`usability-evaluation` はreference knowledgeによる意味判断を担当します。
+`usability-inspection` は実測を担当し、`usability-evaluation` はreference knowledgeによる意味判断を担当します。
 
 ### 受け渡すevidence
 
@@ -107,11 +107,11 @@ user goal + task scenario + success condition
 
 既定は次です。
 
-1. usability-testingがtaskを安全なcheckpointまで進める
+1. usability-inspectionがtaskを安全なcheckpointまで進める
 2. immutable evidenceをusability-evaluationへ渡す
 3. usability-evaluationがread-onlyで評価
 4. 追加観測が必要ならrequestを返す
-5. usability-testingがscope / safetyを確認して追加観測
+5. usability-inspectionがscope / safetyを確認して追加観測
 
 同じbrowser / sessionを両Skillが並行操作しません。
 
@@ -121,7 +121,7 @@ taskの各クリックごとにevaluationを割り込ませません。
 
 ## 6. exploratory-testingとの境界
 
-`usability-testing` はuser goal / task scenario / success conditionを持ちます。
+`usability-inspection` はuser goal / task scenario / success conditionを持ちます。
 
 Charterだけを持って自由に未知の問題を探索する場合は `exploratory-testing` です。
 
@@ -133,25 +133,25 @@ Charterだけを持って自由に未知の問題を探索する場合は `explo
 
 ことを優先します。
 
-`usability-testing` を汎用探索Skillへ拡張しません。
+`usability-inspection` を汎用探索Skillへ拡張しません。
 
 ## 7. test-analysis / test-condition-design
 
 ### test-analysis
 
-Product Riskや主要user goalから、usability-testingすべきtask候補を選ぶ入力にできます。
+Product Riskや主要user goalから、usability-inspectionすべきtask候補を選ぶ入力にできます。
 
-ただしusability-testing自身はProduct Riskを採点しません。
+ただしusability-inspection自身はProduct Riskを採点しません。
 
 ### test-condition-design
 
-UI / UXに関するcoverage観点から、どのtask / stateをusability-testingで実測する価値があるかを入力にできます。
+UI / UXに関するcoverage観点から、どのtask / stateをusability-inspectionで実測する価値があるかを入力にできます。
 
 ただしtask scenarioを詳細TCへ変換しません。
 
 ## 8. regression-testing
 
-全Regression Runへusability-testingを自動追加しません。
+全Regression Runへusability-inspectionを自動追加しません。
 
 次の場合だけRegression scopeに含められます。
 
@@ -183,7 +183,7 @@ project固有で繰り返し有効な知見は、PR #13のqa-knowledgeへrouting
 qa-workflowは最低限次をroutingします。
 
 - reference-based UI / UX review → usability-evaluation
-- live target task-based test → usability-testing
+- live target task-based test → usability-inspection
 - current target inventory → test-target-inspection
 - prescribed detailed TC execution → test-execution
 - Charter-based open exploration → exploratory-testing
@@ -192,7 +192,7 @@ Skill名の単語一致だけでroutingせず、ユーザー要求が「何を�
 
 ## 11. browser ownership
 
-usability-testing実行中はusability-testingがbrowser / session ownerです。
+usability-inspection実行中はusability-inspectionがbrowser / session ownerです。
 
 別Agent / Skillが同一sessionを操作しません。
 
@@ -226,7 +226,7 @@ user goalを達成するためでも、許可されていない副作用を実�
 
 ## 13. performance系workflowとの境界
 
-usability-testingが扱うのはtask中のuser-facing responsivenessです。
+usability-inspectionが扱うのはtask中のuser-facing responsivenessです。
 
 次は担当しません。
 
