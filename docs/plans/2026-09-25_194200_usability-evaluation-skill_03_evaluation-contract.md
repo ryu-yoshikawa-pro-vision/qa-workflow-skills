@@ -1,4 +1,14 @@
-# UIユーザビリティ評価Skill追加Plan
+# UI/UX評価・ユーザビリティテストSkill追加Plan
+
+## 0. 本契約の対象
+
+本ファイルは `usability-evaluation` のreference-based UI / UX評価契約です。
+
+UI pattern、principle、standard、Design System、heuristic等をevidenceへ照合して意味判断します。
+
+live targetをuser goal / task scenarioから能動操作する `usability-testing` の実行契約は `_01a_usability-testing-scope-and-contract.md` に分離します。
+
+`usability-evaluation` 自身はbrowser / session ownerにならず、代表ユーザーを用いたusability testingを実施したとは扱いません。
 
 ## 1. 評価の基本単位
 
@@ -8,6 +18,7 @@
 
 - user / role
 - user goal / task
+- user goal / taskの根拠または推定であること
 - platform
 - viewport / device
 - locale
@@ -26,6 +37,8 @@
 
 - 誰が使うか
 - 何を達成しようとしているか
+- user goal / taskがどの入力・根拠から得られたか
+- UIから推定したgoalなら仮定として扱う
 - どの画面 / flowか
 - platform
 - viewport / input method
@@ -56,6 +69,8 @@
 - primary actionを発見しにくい
 
 解釈だけを観測事実として書きません。
+
+`usability-testing` のtask outcome、action trace、timing、screenshot等が入力される場合も、それらをObservation / evidenceとして扱い、human user behaviorへ読み替えません。
 
 ### Step 3: pattern候補を識別
 
@@ -280,6 +295,8 @@ Findingを作る場合はPR #13の最低契約を満たし、評価項目からf
 - 対象外
 
 「問題なし」は対象に必要な観測を行った場合だけ使用します。
+
+意味は「今回のscope、利用可能なevidence、適用したreferenceの範囲で問題を確認しなかった」です。製品全体のusability、representative userのtask success、satisfaction等を保証しません。
 
 「想定される影響」は観測事実ではなく、観測事実とreferenceから導いた評価として根拠を残します。「ユーザーが迷った」「完了率が下がった」等の実ユーザー影響は、user research、analytics、明示された観測等の証拠がある場合だけ「観測済みのユーザー影響」に記録します。
 
