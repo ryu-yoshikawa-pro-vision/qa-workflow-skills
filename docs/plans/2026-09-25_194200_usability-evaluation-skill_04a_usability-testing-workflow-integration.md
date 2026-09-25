@@ -28,10 +28,12 @@ user goal / task scenario
 
 次のような依頼では `usability-inspection` を直接開始できます。
 
+「ユーザビリティテストして」という表現もlive Web UIのtask-based検査を意図する場合はtrigger aliasとして受けますが、成果物はAIによる `usability-inspection` として記録します。
+
 - 実際に画面を触って使い勝手を確認
 - このサービスを初見ユーザーとして操作して問題を探す
 - このtaskを実際に完了できるかユーザビリティテスト
-- mobileで操作して表示崩れや使いづらさを確認
+- mobile Web viewportで操作して表示崩れや使いづらさを確認
 - 操作後の表示やfeedbackが遅くないか実測
 - keyboardだけで主要taskを完了できるか確認
 
@@ -50,7 +52,7 @@ user goal / task scenario
 
 `usability-inspection` はcurrent target inventoryを更新するために動きません。
 
-既存のcurrent target artifactが利用可能なら、
+既存のcurrent target artifactが利用可能なら、read-onlyのpreflight contextとして
 
 - entry point
 - role / permission
@@ -63,6 +65,8 @@ user goal / task scenario
 ただしtask実行では、current target artifactのlocatorやhidden implementation情報をuser-facing discoveryの代わりに使いません。
 
 `usability-inspection` 中に得た新しいUI情報を、理由なくtest-target-inspectionの正本へ自動書き戻しません。
+
+current target artifactが存在することだけを理由にusability-inspectionを起動しません。逆にusability-inspection実行時も、既存artifactからentry point、role、viewport、known state等を再利用できるなら重複確認を減らします。
 
 ## 4. test-executionとの境界
 
@@ -81,6 +85,8 @@ user goal + task scenario + success condition
 ~~~
 
 詳細TCが存在していても、usability-inspectionでそのstep sequenceを答えとして利用しません。
+
+既存test-execution成果物は、対象機能・既知状態・既存evidence・仕様上のexpected resultを理解するread-only contextとして利用できます。ただし、その存在だけでusability-inspectionを起動せず、locatorやstep sequenceをtask pathの正解として利用しません。
 
 「このTCを実行して」はtest-executionです。
 
@@ -141,6 +147,8 @@ Charterだけを持って自由に未知の問題を探索する場合は `explo
 
 Product Riskや主要user goalから、usability-inspectionすべきtask候補を選ぶ入力にできます。
 
+広いscopeではproject requirement、user research、analytics / support data、Product Risk、検証済みproject knowledge等からtask候補を作り、selected / not-selected / deferredとcoverage limitationを残します。task母集団の根拠がない場合はUIからの推定taskを代表taskとして扱いません。
+
 ただしusability-inspection自身はProduct Riskを採点しません。
 
 ### test-condition-design
@@ -181,6 +189,8 @@ project固有で繰り返し有効な知見は、PR #13のqa-knowledgeへrouting
 ## 10. qa-workflow
 
 qa-workflowは最低限次をroutingします。
+
+初版のlive executionはPlaywrightで到達可能なWeb UIだけを対象にします。native appの能動操作要求はusability-inspectionへ無理にroutingせず、静的資料やscreenshot等で評価可能ならusability-evaluationを利用します。
 
 - reference-based UI / UX review → usability-evaluation
 - live target task-based test → usability-inspection
