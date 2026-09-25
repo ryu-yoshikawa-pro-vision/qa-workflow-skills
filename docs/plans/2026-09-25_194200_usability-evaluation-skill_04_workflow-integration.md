@@ -214,13 +214,23 @@ usability-evaluationはFindingの根拠強化を担当できますが、Session 
 
 usability-evaluationを全Regression Runへ無条件適用しません。
 
-次の場合に利用できます。
+regression-testing配下でtest-executionを使う場合は、このsectionのscope判定を§1.1のlive UI既定接続より優先します。通常のtest-executionで「UI / UX評価が明示的に対象外でない限り実施する」という既定だけを理由に、Regression対象へUX評価を追加しません。
+
+次の場合に利用します。
 
 - Regression scopeにusability / accessibility / visual確認が明示される
-- selected TCがUI状態の証拠を生成し、その評価が要求される
+- selected TCでUI / UX評価が必要と選定される
 - 過去のUX Findingに対する再確認がRegression対象へ入っている
 
-Regression membership判断はregression-testingのままです。
+~~~text
+通常のtest-execution
+→ UI / UX評価が明示的に対象外でなければ既定接続
+
+regression-testing配下のtest-execution
+→ regression-testingが確定したUI / UX評価scopeだけを接続
+~~~
+
+Regression membership / Run selection / UI / UX評価scopeの確定はregression-testingの責務を維持します。
 
 ## 8. qa-knowledgeとの統合
 
