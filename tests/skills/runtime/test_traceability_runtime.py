@@ -54,15 +54,39 @@ def model_content(model_key: str, parent_tcn_id: str, *, technique_slug: str | N
     }
 
 
+def structure_state(entities: list[dict]) -> tuple[dict, dict]:
+    active_models = [{
+        "model_key": row["entity_ref"], "model_type": row["content"]["model_type"],
+        "technique_slug": row["content"].get("technique_slug"), "parent_tcn_id": row["content"]["parent_tcn_id"],
+        "content_fingerprint": row["content_fingerprint"],
+    } for row in entities if row["entity_type"] == "model"]
+    result = {
+        "envelope_version": "1", "skill": "test-condition-design", "runtime_contract_version": runtime.RUNTIME_CONTRACT_VERSION,
+        "generator_contract_version": "condition-structure-v1", "generator": "condition_structure",
+        "runtime_unit_key": "artifact:condition_structure:all", "model_key": None,
+        "input_fingerprint": runtime.sha256_digest({"input": "condition_structure"}), "model_fingerprint": None,
+        "generation_fingerprint": runtime.sha256_digest({"generation": "condition_structure"}),
+        "runtime_implementation_fingerprint": "sha256:" + "1" * 64, "generator_implementation_fingerprint": "sha256:" + "2" * 64,
+        "upstream_entity_fingerprints": [], "upstream_runtime_units": [], "support_status": "supported", "static_data_versions": {},
+        "runtime_status": "ok", "result_status": "ready", "runtime_required": True, "deterministic_generated": True,
+        "fallback_reason": None, "payload": {"active_model_metadata": active_models, "entities": entities}, "issues": [],
+    }
+    row = runtime.runtime_unit_row(result)
+    state = {"runtime_results": [{"identity": "test-condition-design::artifact:condition_structure:all", "result": result}], "carry_forward_entities": [], "previous_ci_id_state": []}
+    return state, row
+
+
 def base_request() -> dict:
     tcn = runtime.make_machine_entity("test-condition-design", "tcn", "TCN-001", {"tcn_id": "TCN-001"})
     model = runtime.make_machine_entity("test-condition-design", "model", "ep-001", model_content("ep-001", "TCN-001"), model_key="ep-001")
     ci = runtime.make_machine_entity("test-condition-design", "ci", "TCN-001-CI01", {"ci_id": "TCN-001-CI01", "tcn_id": "TCN-001", "model_key": "ep-001"}, model_key="ep-001")
+    current_state, structure_row = structure_state([tcn, model])
     units = [runtime_row("test-condition-design", "artifact:condition_structure:all"), runtime_row("test-condition-design", "model:ep-001", "ep-001"), runtime_row("test-condition-design", "artifact:materialize_coverage:TCN-001", materialize=True, materialize_model_key="ep-001", active_ci_ids=["TCN-001-CI01"])]
+    units[0] = structure_row
     return {
         "metadata": metadata(),
         "input": {
-            "analysis_scopes": [{"skill": "test-condition-design", "target": None, "execution_range": None, "input_mode": "artifact", "normalized_input": {"tcn_id": "TCN-001", "test_conditions": [{"tcn_id": "TCN-001"}], "models": [{"model_key": "ep-001", "model_type": "ep"}], "ci_ids": ["TCN-001-CI01"]}, "current_structure_state": {"runtime_results": [], "carry_forward_entities": [], "previous_ci_id_state": []}}],
+            "analysis_scopes": [{"skill": "test-condition-design", "target": None, "execution_range": None, "input_mode": "artifact", "normalized_input": {"tcn_id": "TCN-001", "test_conditions": [{"tcn_id": "TCN-001"}], "models": [{"model_key": "ep-001", "model_type": "ep"}], "ci_ids": ["TCN-001-CI01"]}, "current_structure_state": current_state}],
             "nodes": [{"node_key": "SPEC-001", "node_type": "Authority"}, {"node_key": "TR-001", "node_type": "TR"}, {"node_key": "TCN-001", "node_type": "TCN"}, {"node_key": "TCN-001-CI01", "node_type": "CI"}, {"node_key": "TC-001", "node_type": "TC"}],
             "edges": [{"from": "SPEC-001", "to": "TR-001"}, {"from": "TR-001", "to": "TCN-001"}, {"from": "TCN-001", "to": "TCN-001-CI01"}, {"from": "TCN-001-CI01", "to": "TC-001"}],
             "dispositions": [], "runtime_units": units, "current_entities": [tcn, model, ci], "current_runtime_units": units, "unsupported_item_closures": [],
@@ -206,7 +230,7 @@ class TraceabilityRuntimeTests(unittest.TestCase):
         scope = request["input"]["analysis_scopes"][0]
         scope["normalized_input"] = normalized
         scope["current_structure_state"] = {
-            "runtime_results": [],
+            "runtime_results": scope["current_structure_state"]["runtime_results"],
             "carry_forward_entities": [tcn_two, model_two, ci_two, tdr_two, tr_disposition],
             "previous_ci_id_state": [
                 {"ci_id": "TCN-001-CI01", "status": "active"},
@@ -273,15 +297,16 @@ class TraceabilityRuntimeTests(unittest.TestCase):
         entities = [
             runtime.make_machine_entity("test-condition-design", "tcn", "TCN-001", {"tcn_id": "TCN-001"}),
             runtime.make_machine_entity("test-condition-design", "tcn", "TCN-002", {"tcn_id": "TCN-002"}),
-            runtime.make_machine_entity("test-condition-design", "model", "ep-001", {"model_key": "ep-001", "model_type": "ep"}, model_key="ep-001"),
-            runtime.make_machine_entity("test-condition-design", "model", "ep-002", {"model_key": "ep-002", "model_type": "ep"}, model_key="ep-002"),
+            runtime.make_machine_entity("test-condition-design", "model", "ep-001", model_content("ep-001", "TCN-001"), model_key="ep-001"),
+            runtime.make_machine_entity("test-condition-design", "model", "ep-002", model_content("ep-002", "TCN-002"), model_key="ep-002"),
             runtime.make_machine_entity("test-condition-design", "ci", "TCN-001-CI01", {"ci_id": "TCN-001-CI01", "tcn_id": "TCN-001", "model_key": "ep-001"}, model_key="ep-001"),
             runtime.make_machine_entity("test-condition-design", "ci", "TCN-002-CI01", {"ci_id": "TCN-002-CI01", "tcn_id": "TCN-002", "model_key": "ep-002"}, model_key="ep-002"),
         ]
         normalized_a = {"tcn_id": "TCN-001", "test_conditions": [{"tcn_id": "TCN-001"}], "models": [{"model_key": "ep-001", "model_type": "ep"}], "ci_ids": ["TCN-001-CI01"]}
         normalized_b = {"tcn_id": "TCN-002", "test_conditions": [{"tcn_id": "TCN-002"}], "models": [{"model_key": "ep-002", "model_type": "ep"}], "ci_ids": ["TCN-002-CI01"]}
+        current_state, structure_row = structure_state(entities[:4])
         units = [
-            runtime_row("test-condition-design", "artifact:condition_structure:all"),
+            structure_row,
             runtime_row("test-condition-design", "model:ep-001", "ep-001"),
             runtime_row("test-condition-design", "model:ep-002", "ep-002"),
             runtime_row("test-condition-design", "artifact:materialize_coverage:TCN-001", materialize=True, materialize_model_key="ep-001", active_ci_ids=["TCN-001-CI01"]),
@@ -291,8 +316,8 @@ class TraceabilityRuntimeTests(unittest.TestCase):
             "metadata": metadata(),
             "input": {
                 "analysis_scopes": [
-                    {"skill": "test-condition-design", "target": "TCN-001", "execution_range": None, "input_mode": "artifact", "normalized_input": normalized_a, "current_structure_state": {"runtime_results": [], "carry_forward_entities": [], "previous_ci_id_state": []}},
-                    {"skill": "test-condition-design", "target": "TCN-002", "execution_range": None, "input_mode": "artifact", "normalized_input": normalized_b, "current_structure_state": {"runtime_results": [], "carry_forward_entities": [], "previous_ci_id_state": []}},
+                    {"skill": "test-condition-design", "target": "TCN-001", "execution_range": None, "input_mode": "artifact", "normalized_input": normalized_a, "current_structure_state": current_state},
+                    {"skill": "test-condition-design", "target": "TCN-002", "execution_range": None, "input_mode": "artifact", "normalized_input": normalized_b, "current_structure_state": current_state},
                 ],
                 "nodes": [
                     {"node_key": "SPEC-001", "node_type": "Authority"}, {"node_key": "TR-001", "node_type": "TR"}, {"node_key": "TR-002", "node_type": "TR"},

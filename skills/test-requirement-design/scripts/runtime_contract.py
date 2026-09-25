@@ -2049,6 +2049,7 @@ def _default_expected_runtime_units(
     *,
     current_structure_state: dict[str, Any] | None = None,
     current_runtime_units: list[dict[str, Any]] | dict[tuple[str, str], dict[str, Any]] | None = None,
+    issues: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     """Derive root units from normalized input and fixed dispatch metadata.
 
@@ -2103,10 +2104,6 @@ def _default_expected_runtime_units(
                 roots.append((f"model:{model['model_key']}", model["model_key"]))
     if skill == "test-condition-design" and isinstance(normalized.get("test_data_requirements"), list) and normalized["test_data_requirements"]:
         roots.append(("artifact:test_data_requirements:all", None))
-    if skill == "test-condition-design" and isinstance(models, list) and models:
-        tcn_id = normalized.get("tcn_id")
-        if isinstance(tcn_id, str):
-            roots.append((f"artifact:materialize_coverage:{tcn_id}", None))
     deduped = {(skill, unit, model_key): {"skill": skill, "runtime_unit_key": unit, "model_key": model_key} for unit, model_key in roots}
     expected = [deduped[key] for key in sorted(deduped)]
     state_blocks = _state_result_blocks(current_structure_state, skill)
@@ -2121,7 +2118,7 @@ def _default_expected_runtime_units(
             for identity, result in state_blocks.items()
             if not current_map or current_map.get(tuple(identity.split("::", 1)), {}).get("generation_fingerprint") == result.get("generation_fingerprint")
         }
-        _verified_child_units(skill, normalized, verified_blocks, expected)
+        _verified_child_units(skill, normalized, verified_blocks, expected, issues=issues)
     return expected
 
 
@@ -2149,6 +2146,61 @@ def _verified_child_units(
     } if isinstance(models, list) else {}
     expected_keys = {(row["skill"], row["runtime_unit_key"]) for row in expected}
     adapter_types = {"classification", "cause-effect", "schema", "ui"}
+    if skill == "test-condition-design":
+        condition_identity = _unit_identity(skill, "artifact:condition_structure:all")
+        condition_result = blocks.get(condition_identity)
+        if condition_result is not None:
+            payload = condition_result.get("payload")
+            metadata_rows = payload.get("active_model_metadata") if isinstance(payload, dict) else None
+            invalid_projection = not isinstance(metadata_rows, list)
+            model_keys: set[str] = set()
+            materialize_tcn_ids: set[str] = set()
+            if isinstance(metadata_rows, list):
+                required_fields = {"model_key", "model_type", "technique_slug", "parent_tcn_id", "content_fingerprint"}
+                for row in metadata_rows:
+                    if (
+                        not isinstance(row, dict)
+                        or set(row) != required_fields
+                        or not isinstance(row.get("model_key"), str)
+                        or re.fullmatch(r"[a-z][a-z0-9-]*-[0-9]{3,}", row["model_key"]) is None
+                        or row.get("model_type") not in MODEL_TYPES
+                        or not row["model_key"].startswith(f"{row['model_type']}-")
+                        or not isinstance(row.get("parent_tcn_id"), str)
+                        or re.fullmatch(r"TCN-[0-9]{3}", row["parent_tcn_id"]) is None
+                        or not FULL_DIGEST_RE.fullmatch(str(row.get("content_fingerprint")))
+                    ):
+                        invalid_projection = True
+                        break
+                    model_key = row["model_key"]
+                    if model_key in model_keys:
+                        invalid_projection = True
+                        break
+                    model_keys.add(model_key)
+                    technique_slug = row.get("technique_slug")
+                    if row["model_type"] in adapter_types:
+                        if technique_slug is not None:
+                            invalid_projection = True
+                            break
+                    elif technique_slug not in TECHNIQUE_SLUGS:
+                        invalid_projection = True
+                        break
+                    if technique_slug is not None:
+                        materialize_tcn_ids.add(row["parent_tcn_id"])
+            if invalid_projection:
+                if issues is None:
+                    raise InvalidInput("condition_structure active_model_metadata is invalid")
+                issues.append({
+                    "issue_type": "invalid_runtime_payload",
+                    "blocking": True,
+                    "runtime_unit": condition_identity,
+                    "field": "active_model_metadata",
+                })
+            else:
+                for tcn_id in sorted(materialize_tcn_ids):
+                    unit = f"artifact:materialize_coverage:{tcn_id}"
+                    if (skill, unit) not in expected_keys:
+                        expected.append({"skill": skill, "runtime_unit_key": unit, "model_key": None})
+                        expected_keys.add((skill, unit))
     for identity, result in blocks.items():
         if not identity.startswith(skill + "::model:"):
             continue
@@ -2206,6 +2258,7 @@ def _verified_child_units(
                 matching = [child for child in children if child.get("child_model_key") == child_key]
                 if len(matching) != 1 and issues is not None:
                     issues.append({"issue_type": "missing_or_duplicate_derived_child_input", "blocking": True, "runtime_unit": identity, "child_model_key": child_key, "count": len(matching)})
+    expected.sort(key=lambda row: (row["skill"], row["runtime_unit_key"], row.get("model_key") or ""))
     return expected
 
 
@@ -2222,7 +2275,6 @@ def _expected_generator(skill: str, runtime_unit_key: str, normalized: dict[str,
         "test-condition-design": {
             "artifact:condition_structure:all": "condition_structure",
             "artifact:test_data_requirements:all": "test_data_requirements",
-            f"artifact:materialize_coverage:{normalized.get('tcn_id')}": "materialize_coverage",
         },
         "test-case-design": {"artifact:case_structure:all": "case_structure"},
         "coverage-analysis": {"artifact:traceability:all": "traceability"},
@@ -2230,6 +2282,8 @@ def _expected_generator(skill: str, runtime_unit_key: str, normalized: dict[str,
     }
     if runtime_unit_key in artifact_generators.get(skill, {}):
         return artifact_generators[skill][runtime_unit_key]
+    if skill == "test-condition-design" and re.fullmatch(r"artifact:materialize_coverage:TCN-[0-9]{3}", runtime_unit_key):
+        return "materialize_coverage"
     if skill == "test-analysis" and runtime_unit_key.startswith("artifact:technique_candidates:"):
         return "technique_candidates"
     if runtime_unit_key.startswith("model:"):
@@ -2916,8 +2970,14 @@ def _validate_runtime_pair(
                     if field in model and metadata.get(field) != model.get(field):
                         issues.append({"issue_type": "invalid_dispatch_input", "blocking": True, "runtime_unit": identity, "field": field})
         elif runtime_unit_key.startswith("artifact:materialize_coverage:"):
-            tcn_id = normalized.get("tcn_id")
-            if not isinstance(tcn_id, str) or runtime_unit_key != f"artifact:materialize_coverage:{tcn_id}":
+            match = re.fullmatch(r"artifact:materialize_coverage:(TCN-[0-9]{3})", runtime_unit_key)
+            tcn_id = match.group(1) if match is not None else None
+            if (
+                skill != "test-condition-design"
+                or tcn_id is None
+                or input_body["input"].get("tcn_id") != tcn_id
+                or metadata.get("scope_key") != tcn_id
+            ):
                 issues.append({"issue_type": "invalid_dispatch_input", "blocking": True, "runtime_unit": identity})
         elif skill == "test-analysis" and runtime_unit_key.startswith("artifact:technique_candidates:"):
             selection_key = runtime_unit_key.split("artifact:technique_candidates:", 1)[1]
@@ -3051,8 +3111,19 @@ def verify_runtime_evidence(request: dict[str, Any]) -> dict[str, Any]:
         validate_runtime_dependency_graph(graph_rows)
     except RuntimeErrorBase as exc:
         issues.append({"issue_type": exc.issue_type, "blocking": True, "message": exc.message})
-    expected = _default_expected_runtime_units(skill, normalized, artifact)
-    _verified_child_units(skill, normalized, result_map, expected, input_blocks=input_map, issues=issues)
+    verified_result_map: dict[str, dict[str, Any]] = {}
+    for identity in sorted(set(input_map) & set(result_map)):
+        pair_issues = _validate_runtime_pair(skill, identity, input_map[identity], result_map[identity], normalized=normalized)
+        issues.extend(pair_issues)
+        expected_generator = _expected_generator(skill, identity.split("::", 1)[1], normalized)
+        if expected_generator is not None and result_map[identity].get("generator") != expected_generator:
+            generator_issue = {"issue_type": "generator_mismatch", "blocking": True, "runtime_unit": identity}
+            issues.append(generator_issue)
+            pair_issues.append(generator_issue)
+        if not pair_issues:
+            verified_result_map[identity] = result_map[identity]
+    expected = _default_expected_runtime_units(skill, normalized, artifact, issues=issues)
+    _verified_child_units(skill, normalized, verified_result_map, expected, input_blocks=input_map, issues=issues)
     expected_keys = sorted(_unit_identity(row["skill"], row["runtime_unit_key"]) for row in expected)
     actual_keys = sorted(actual_ids)
     missing = sorted(set(expected_keys) - set(actual_keys))
@@ -3060,11 +3131,6 @@ def verify_runtime_evidence(request: dict[str, Any]) -> dict[str, Any]:
     input_ids = [identity for identity, _ in input_blocks]
     result_ids = [identity for identity, _ in result_blocks]
     duplicates = sorted({identity for identity in input_ids if input_ids.count(identity) > 1} | {identity for identity in result_ids if result_ids.count(identity) > 1})
-    for identity in sorted(set(input_map) & set(result_map)):
-        issues.extend(_validate_runtime_pair(skill, identity, input_map[identity], result_map[identity], normalized=normalized))
-        expected_generator = _expected_generator(skill, identity.split("::", 1)[1], normalized)
-        if expected_generator is not None and result_map[identity].get("generator") != expected_generator:
-            issues.append({"issue_type": "generator_mismatch", "blocking": True, "runtime_unit": identity})
     if missing:
         issues.append({"issue_type": "missing_runtime_unit", "blocking": True, "runtime_units": missing})
     if extra:
@@ -3273,11 +3339,31 @@ def verify_runtime_evidence(request: dict[str, Any]) -> dict[str, Any]:
             fresh_runtime_rows, _runtime_issues = evaluate_runtime_unit_freshness(
                 runtime_rows, runtime_rows, list(candidate_entity_map.values()),
             )
-            current_runtime_rows = {
+            freshness_runtime_rows = {
                 (row["skill"], row["runtime_unit_key"]): row
                 for row in fresh_runtime_rows
             }
-            freshness = evaluate_entity_freshness(list(candidate_entity_map.values()), current_runtime_rows)
+            # Scope-out entities retain their original runtime dependencies. The
+            # previous artifact was strictly validated above, so its producer
+            # rows can provide freshness metadata only when this invocation did
+            # not rerun that producer. They are deliberately excluded from the
+            # current runtime identity set and current_structure_state.
+            required_dependency_keys = {
+                (dependency["skill"], dependency["runtime_unit_key"].rsplit("#entity:", 1)[0])
+                for row in carry_rows
+                for dependency in row.get("runtime_dependencies", [])
+                if isinstance(dependency, dict)
+                and isinstance(dependency.get("skill"), str)
+                and isinstance(dependency.get("runtime_unit_key"), str)
+            }
+            for identity, body in previous_result_blocks:
+                if not previous_valid or not identity.startswith(skill + "::"):
+                    continue
+                previous_row = _runtime_unit_result_row(body)
+                dependency_key = (previous_row["skill"], previous_row["runtime_unit_key"])
+                if dependency_key in required_dependency_keys and dependency_key not in freshness_runtime_rows:
+                    freshness_runtime_rows[dependency_key] = previous_row
+            freshness = evaluate_entity_freshness(list(candidate_entity_map.values()), freshness_runtime_rows)
             freshness_by_key = {
                 (row["skill"], row["entity_type"], row["entity_ref"]): row
                 for row in freshness

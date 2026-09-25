@@ -47,6 +47,29 @@ def runtime_row(skill: str, unit: str, model_key: str | None = None, *, material
     return row
 
 
+def structure_state(entities: list[dict]) -> tuple[dict, dict]:
+    model_entities = [row for row in entities if row["entity_type"] == "model"]
+    active_models = [{
+        "model_key": row["entity_ref"], "model_type": row["content"]["model_type"],
+        "technique_slug": row["content"].get("technique_slug"), "parent_tcn_id": row["content"]["parent_tcn_id"],
+        "content_fingerprint": row["content_fingerprint"],
+    } for row in model_entities]
+    result = {
+        "envelope_version": "1", "skill": "test-condition-design", "runtime_contract_version": runtime.RUNTIME_CONTRACT_VERSION,
+        "generator_contract_version": "condition-structure-v1", "generator": "condition_structure",
+        "runtime_unit_key": "artifact:condition_structure:all", "model_key": None,
+        "input_fingerprint": runtime.sha256_digest({"input": "condition_structure"}), "model_fingerprint": None,
+        "generation_fingerprint": runtime.sha256_digest({"generation": "condition_structure"}),
+        "runtime_implementation_fingerprint": "sha256:" + "1" * 64, "generator_implementation_fingerprint": "sha256:" + "2" * 64,
+        "upstream_entity_fingerprints": [], "upstream_runtime_units": [], "support_status": "supported", "static_data_versions": {},
+        "runtime_status": "ok", "result_status": "ready", "runtime_required": True, "deterministic_generated": True,
+        "fallback_reason": None, "payload": {"active_model_metadata": active_models, "entities": entities}, "issues": [],
+    }
+    row = runtime.runtime_unit_row(result)
+    state = {"runtime_results": [{"identity": "test-condition-design::artifact:condition_structure:all", "result": result}], "carry_forward_entities": [], "previous_ci_id_state": []}
+    return state, row
+
+
 def run(request: dict) -> dict:
     result = subprocess.run([sys.executable, str(SCRIPT)], input=json.dumps(request).encode(), stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=REPO_ROOT, check=False)
     if result.stderr:
@@ -57,12 +80,13 @@ def run(request: dict) -> dict:
 class WorkflowRuntimeTests(unittest.TestCase):
     def _request(self) -> dict:
         tcn = runtime.make_machine_entity("test-condition-design", "tcn", "TCN-001", {"tcn_id": "TCN-001"})
-        model = runtime.make_machine_entity("test-condition-design", "model", "ep-001", {"model_key": "ep-001", "model_type": "ep"}, model_key="ep-001")
+        model = runtime.make_machine_entity("test-condition-design", "model", "ep-001", {"model_key": "ep-001", "model_type": "ep", "technique_slug": "ep", "parent_tcn_id": "TCN-001"}, model_key="ep-001")
         ci_one = runtime.make_machine_entity("test-condition-design", "ci", "TCN-001-CI01", {"ci_id": "TCN-001-CI01", "tcn_id": "TCN-001", "model_key": "ep-001"}, model_key="ep-001")
         ci_two = runtime.make_machine_entity("test-condition-design", "ci", "TCN-001-CI02", {"ci_id": "TCN-001-CI02", "tcn_id": "TCN-001", "model_key": "ep-001"}, model_key="ep-001")
         authority = runtime.make_machine_entity("spec-analysis", "authority", "SPEC-001", {"authority_id": "SPEC-001"})
+        condition_state, condition_row = structure_state([tcn, model])
         units = [
-            runtime_row("test-condition-design", "artifact:condition_structure:all"),
+            condition_row,
             runtime_row("test-condition-design", "model:ep-001", "ep-001"),
             runtime_row("test-condition-design", "artifact:materialize_coverage:TCN-001", materialize=True, active_ci_ids=["TCN-001-CI01", "TCN-001-CI02"], materialize_model_key="ep-001"),
         ]
@@ -74,7 +98,7 @@ class WorkflowRuntimeTests(unittest.TestCase):
         return {
             "metadata": metadata(),
             "input": {
-                "workflow_scopes": [{"skill": "test-condition-design", "target": None, "execution_range": None, "input_mode": "artifact", "normalized_input": normalized, "current_structure_state": {"runtime_results": [], "carry_forward_entities": [], "previous_ci_id_state": []}}],
+                "workflow_scopes": [{"skill": "test-condition-design", "target": None, "execution_range": None, "input_mode": "artifact", "normalized_input": normalized, "current_structure_state": condition_state}],
                 "runtime_units": units, "current_entities": [tcn, model, ci_one, ci_two, authority], "current_runtime_units": units,
                 "unsupported_item_closures": [],
             },
@@ -146,14 +170,15 @@ class WorkflowRuntimeTests(unittest.TestCase):
     def _multi_scope_request(self, *, scope_b_complete: bool = True) -> dict:
         tcn_a = runtime.make_machine_entity("test-condition-design", "tcn", "TCN-001", {"tcn_id": "TCN-001"})
         tcn_b = runtime.make_machine_entity("test-condition-design", "tcn", "TCN-002", {"tcn_id": "TCN-002"})
-        model_a = runtime.make_machine_entity("test-condition-design", "model", "ep-001", {"model_key": "ep-001", "model_type": "ep"}, model_key="ep-001")
-        model_b = runtime.make_machine_entity("test-condition-design", "model", "ep-002", {"model_key": "ep-002", "model_type": "ep"}, model_key="ep-002")
+        model_a = runtime.make_machine_entity("test-condition-design", "model", "ep-001", {"model_key": "ep-001", "model_type": "ep", "technique_slug": "ep", "parent_tcn_id": "TCN-001"}, model_key="ep-001")
+        model_b = runtime.make_machine_entity("test-condition-design", "model", "ep-002", {"model_key": "ep-002", "model_type": "ep", "technique_slug": "ep", "parent_tcn_id": "TCN-002"}, model_key="ep-002")
         ci_a = runtime.make_machine_entity("test-condition-design", "ci", "TCN-001-CI01", {"ci_id": "TCN-001-CI01", "tcn_id": "TCN-001", "model_key": "ep-001"}, model_key="ep-001")
         ci_b = runtime.make_machine_entity("test-condition-design", "ci", "TCN-002-CI01", {"ci_id": "TCN-002-CI01", "tcn_id": "TCN-002", "model_key": "ep-002"}, model_key="ep-002")
         normalized_a = {"tcn_id": "TCN-001", "test_conditions": [{"tcn_id": "TCN-001"}], "models": [{"model_key": "ep-001", "model_type": "ep"}], "ci_ids": ["TCN-001-CI01"]}
         normalized_b = {"tcn_id": "TCN-002", "test_conditions": [{"tcn_id": "TCN-002"}], "models": [{"model_key": "ep-002", "model_type": "ep"}], "ci_ids": ["TCN-002-CI01"]}
+        condition_state, condition_row = structure_state([tcn_a, tcn_b, model_a, model_b])
         units = [
-            runtime_row("test-condition-design", "artifact:condition_structure:all"),
+            condition_row,
             runtime_row("test-condition-design", "model:ep-001", "ep-001"),
             runtime_row("test-condition-design", "model:ep-002", "ep-002"),
             runtime_row("test-condition-design", "artifact:materialize_coverage:TCN-001", materialize=True, active_ci_ids=["TCN-001-CI01"], materialize_model_key="ep-001"),
@@ -163,8 +188,8 @@ class WorkflowRuntimeTests(unittest.TestCase):
             "metadata": metadata(),
             "input": {
                 "workflow_scopes": [
-                    {"skill": "test-condition-design", "target": "TCN-001", "execution_range": None, "input_mode": "artifact", "normalized_input": normalized_a, "current_structure_state": {"runtime_results": [], "carry_forward_entities": [], "previous_ci_id_state": []}},
-                    {"skill": "test-condition-design", "target": "TCN-002", "execution_range": None, "input_mode": "artifact", "normalized_input": normalized_b, "current_structure_state": {"runtime_results": [], "carry_forward_entities": [], "previous_ci_id_state": []}},
+                    {"skill": "test-condition-design", "target": "TCN-001", "execution_range": None, "input_mode": "artifact", "normalized_input": normalized_a, "current_structure_state": condition_state},
+                    {"skill": "test-condition-design", "target": "TCN-002", "execution_range": None, "input_mode": "artifact", "normalized_input": normalized_b, "current_structure_state": condition_state},
                 ],
                 "runtime_units": units, "current_runtime_units": units, "current_entities": [tcn_a, tcn_b, model_a, model_b, ci_a, ci_b], "unsupported_item_closures": [],
             },
@@ -194,8 +219,8 @@ class WorkflowRuntimeTests(unittest.TestCase):
     def _partial_scope_request(self) -> tuple[dict, dict[str, object]]:
         tcn_one = runtime.make_machine_entity("test-condition-design", "tcn", "TCN-001", {"tcn_id": "TCN-001"})
         tcn_two = runtime.make_machine_entity("test-condition-design", "tcn", "TCN-002", {"tcn_id": "TCN-002"})
-        model_one = runtime.make_machine_entity("test-condition-design", "model", "ep-001", {"model_key": "ep-001", "model_type": "ep"}, model_key="ep-001")
-        model_two = runtime.make_machine_entity("test-condition-design", "model", "ep-002", {"model_key": "ep-002", "model_type": "ep"}, model_key="ep-002")
+        model_one = runtime.make_machine_entity("test-condition-design", "model", "ep-001", {"model_key": "ep-001", "model_type": "ep", "technique_slug": "ep", "parent_tcn_id": "TCN-001"}, model_key="ep-001")
+        model_two = runtime.make_machine_entity("test-condition-design", "model", "ep-002", {"model_key": "ep-002", "model_type": "ep", "technique_slug": "ep", "parent_tcn_id": "TCN-002"}, model_key="ep-002")
         ci = runtime.make_machine_entity("test-condition-design", "ci", "TCN-001-CI01", {"ci_id": "TCN-001-CI01", "tcn_id": "TCN-001", "model_key": "ep-001"}, model_key="ep-001")
         ci_two = runtime.make_machine_entity("test-condition-design", "ci", "TCN-002-CI01", {"ci_id": "TCN-002-CI01", "tcn_id": "TCN-002", "model_key": "ep-002"}, model_key="ep-002")
         tdr_two = runtime.make_machine_entity("test-condition-design", "test_data_requirement", "data:REQ-002", {"data_ref": "data:REQ-002", "requirement_key": "REQ-002", "source_model_key": "ep-002"}, model_key="ep-002")
@@ -217,13 +242,15 @@ class WorkflowRuntimeTests(unittest.TestCase):
             ],
             "update_scope_tcn_ids": ["TCN-001"], "update_scope_model_keys": ["ep-001"],
         }
+        condition_state, condition_row = structure_state([tcn_one, model_one])
+        condition_state["carry_forward_entities"] = [tcn_two, model_two]
         units = [
-            runtime_row("test-condition-design", "artifact:condition_structure:all"),
+            condition_row,
             runtime_row("test-condition-design", "model:ep-001", "ep-001"),
             runtime_row("test-condition-design", "artifact:materialize_coverage:TCN-001", materialize=True, active_ci_ids=["TCN-001-CI01"], materialize_model_key="ep-001"),
         ]
         state = {
-            "runtime_results": [],
+            "runtime_results": condition_state["runtime_results"],
             "carry_forward_entities": [tcn_two, model_two, ci_two, tdr_two, tr_disposition],
             "previous_ci_id_state": [
                 {"ci_id": "TCN-001-CI01", "status": "active"},
@@ -315,12 +342,13 @@ class WorkflowRuntimeTests(unittest.TestCase):
         scope["normalized_input"]["models"] = []
         scope["normalized_input"]["ci_ids"] = []
         scope["normalized_input"]["update_scope_tcn_ids"] = ["TCN-001"]
+        deleted_state, deleted_root = structure_state([])
         scope["current_structure_state"] = {
-            "runtime_results": [],
+            "runtime_results": deleted_state["runtime_results"],
             "carry_forward_entities": parts["state"]["carry_forward_entities"],
             "previous_ci_id_state": parts["state"]["previous_ci_id_state"],
         }
-        request["input"]["runtime_units"] = [request["input"]["runtime_units"][0]]
+        request["input"]["runtime_units"] = [deleted_root]
         request["input"]["current_runtime_units"] = request["input"]["runtime_units"]
         result = run(request)
         self.assertEqual(result["result_status"], "unresolved")
@@ -346,15 +374,17 @@ class WorkflowRuntimeTests(unittest.TestCase):
             stale_tcn if row["entity_type"] == "tcn" and row["entity_ref"] == "TCN-002" else row
             for row in request["input"]["current_entities"]
         ]
-        root_runtime = request["input"]["current_runtime_units"][0]
-        root_runtime.update({
+        condition_result = request["input"]["workflow_scopes"][0]["current_structure_state"]["runtime_results"][0]["result"]
+        condition_result.update({
             "runtime_contract_version": runtime.RUNTIME_CONTRACT_VERSION,
             "generator_contract_version": "condition-structure-v1",
             "runtime_implementation_fingerprint": runtime.implementation_fingerprint(RUNTIME_PATH),
             "generator_implementation_fingerprint": "sha256:" + "3" * 64,
             "static_data_versions": {},
         })
-        request["input"]["runtime_units"][0].update({key: value for key, value in root_runtime.items() if key not in {"model_completion", "target_mappings", "target_dispositions"}})
+        root_runtime = runtime.runtime_unit_row(condition_result)
+        request["input"]["current_runtime_units"][0] = root_runtime
+        request["input"]["runtime_units"][0] = root_runtime
         result = run(request)
         self.assertEqual(result["result_status"], "unresolved")
         self.assertFalse(result["payload"]["can_complete"])

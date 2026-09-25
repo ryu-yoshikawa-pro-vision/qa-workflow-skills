@@ -199,7 +199,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
                 "input_mode": "direct", "upstream_entities": [], "upstream_runtime_units": [], "static_data_versions": {},
                 "authority_refs": [], "reference_refs": [],
             }
-            input_value = {"runtime_unit_key": unit}
+            input_value = {"tcn_id": "TCN-001"} if unit.startswith("artifact:materialize_coverage:") else {"runtime_unit_key": unit}
             input_fp = runtime.input_fingerprint("test-condition-design", unit, "direct", input_value, [], [], metadata["selection_source"])
             model_fp = runtime.model_fingerprint(metadata, input_fp)
             runtime_fp = runtime.implementation_fingerprint(RUNTIME_PATH)
@@ -217,7 +217,14 @@ class EntityAndEvidenceTests(unittest.TestCase):
                 "runtime_implementation_fingerprint": runtime_fp, "generator_implementation_fingerprint": generator_fp,
                 "upstream_entity_fingerprints": [], "upstream_runtime_units": [], "support_status": "supported",
                 "static_data_versions": {}, "runtime_status": "ok", "result_status": "ready", "runtime_required": True,
-                "deterministic_generated": True, "fallback_reason": None, "payload": {}, "issues": [],
+                "deterministic_generated": True, "fallback_reason": None,
+                "payload": ({
+                    "active_model_metadata": [{
+                        "model_key": "ep-001", "model_type": "ep", "technique_slug": "ep",
+                        "parent_tcn_id": "TCN-001", "content_fingerprint": "sha256:" + "a" * 64,
+                    }],
+                } if unit == "artifact:condition_structure:all" else {}),
+                "issues": [],
             }
             blocks.append(runtime.render_runtime_input("test-condition-design", metadata, input_value))
             blocks.append(runtime.render_runtime_result("test-condition-design", result))
@@ -481,6 +488,77 @@ class EntityAndEvidenceTests(unittest.TestCase):
         self.assertFalse(invalid["valid"])
         self.assertIn("test-condition-design::model:ep-001", invalid["incomplete_pairs"])
 
+    def test_condition_structure_current_models_derive_materialize_units_by_tcn(self) -> None:
+        active_models = [
+            {"model_key": "ep-001", "model_type": "ep", "technique_slug": "ep", "parent_tcn_id": "TCN-001", "content_fingerprint": "sha256:" + "1" * 64},
+            {"model_key": "bva-001", "model_type": "bva", "technique_slug": "bva", "parent_tcn_id": "TCN-001", "content_fingerprint": "sha256:" + "2" * 64},
+            {"model_key": "error-guessing-001", "model_type": "error-guessing", "technique_slug": "error-guessing", "parent_tcn_id": "TCN-002", "content_fingerprint": "sha256:" + "3" * 64},
+            {"model_key": "schema-001", "model_type": "schema", "technique_slug": None, "parent_tcn_id": "TCN-003", "content_fingerprint": "sha256:" + "4" * 64},
+        ]
+        expected = [{"skill": "test-condition-design", "runtime_unit_key": "artifact:condition_structure:all", "model_key": None}]
+        issues: list[dict] = []
+        runtime._verified_child_units(
+            "test-condition-design", {"tcn_id": "TCN-001"},
+            {"test-condition-design::artifact:condition_structure:all": {"result_status": "ready", "payload": {"active_model_metadata": active_models}}},
+            expected, issues=issues,
+        )
+        self.assertEqual(issues, [])
+        self.assertEqual(
+            [row["runtime_unit_key"] for row in expected if "materialize_coverage" in row["runtime_unit_key"]],
+            ["artifact:materialize_coverage:TCN-001", "artifact:materialize_coverage:TCN-002"],
+        )
+
+    def test_malformed_condition_parent_metadata_blocks_expected_derivation(self) -> None:
+        for label, metadata_rows in (
+            ("not-array", None),
+            ("not-object-row", ["ep-001"]),
+            ("unknown-model-type", [{"model_key": "ep-001", "model_type": "mystery", "technique_slug": "ep", "parent_tcn_id": "TCN-001", "content_fingerprint": "sha256:" + "1" * 64}]),
+            ("bad-parent-id", [{"model_key": "ep-001", "model_type": "ep", "technique_slug": "ep", "parent_tcn_id": "TCN-1", "content_fingerprint": "sha256:" + "1" * 64}]),
+            ("bad-coverage-slug", [{"model_key": "ep-001", "model_type": "ep", "technique_slug": "unknown", "parent_tcn_id": "TCN-001", "content_fingerprint": "sha256:" + "1" * 64}]),
+        ):
+            with self.subTest(label=label):
+                expected = [{"skill": "test-condition-design", "runtime_unit_key": "artifact:condition_structure:all", "model_key": None}]
+                issues: list[dict] = []
+                runtime._verified_child_units(
+                    "test-condition-design", {},
+                    {"test-condition-design::artifact:condition_structure:all": {"result_status": "ready", "payload": {"active_model_metadata": metadata_rows}}},
+                    expected, issues=issues,
+                )
+                self.assertTrue(any(row["issue_type"] == "invalid_runtime_payload" and row["blocking"] for row in issues), issues)
+                self.assertFalse(any("materialize_coverage" in row["runtime_unit_key"] for row in expected))
+
+    def test_materialize_generator_is_tcn_scoped_without_normalized_tcn_lookup(self) -> None:
+        for tcn_id in ("TCN-001", "TCN-002", "TCN-003"):
+            self.assertEqual(
+                runtime._expected_generator("test-condition-design", f"artifact:materialize_coverage:{tcn_id}", {"tcn_id": "TCN-001"}),
+                "materialize_coverage",
+            )
+        for unit in ("artifact:materialize_coverage:foo", "artifact:materialize_coverage:", "artifact:materialize_coverage:TCN-1"):
+            self.assertIsNone(runtime._expected_generator("test-condition-design", unit, {"tcn_id": "TCN-001"}))
+
+    def test_materialize_pair_matches_its_own_scope_not_normalized_single_tcn(self) -> None:
+        _normalized, artifact = self._artifact()
+        identity = "test-condition-design::artifact:materialize_coverage:TCN-001"
+        input_body = dict(runtime.extract_machine_blocks(artifact, "Machine Runtime Input"))[identity]
+        result = dict(runtime.extract_machine_blocks(artifact, "Machine Runtime Result"))[identity]
+        self.assertEqual(
+            runtime._validate_runtime_pair("test-condition-design", identity, input_body, result, normalized={"tcn_id": "TCN-002"}),
+            [],
+        )
+
+        bad_input = json.loads(json.dumps(input_body))
+        bad_input["input"]["tcn_id"] = "TCN-002"
+        self.assertIn(
+            "invalid_dispatch_input",
+            [row["issue_type"] for row in runtime._validate_runtime_pair("test-condition-design", identity, bad_input, result, normalized={"tcn_id": "TCN-002"})],
+        )
+        bad_scope = json.loads(json.dumps(input_body))
+        bad_scope["metadata"]["scope_key"] = "TCN-002"
+        self.assertIn(
+            "invalid_dispatch_input",
+            [row["issue_type"] for row in runtime._validate_runtime_pair("test-condition-design", identity, bad_scope, result, normalized={"tcn_id": "TCN-002"})],
+        )
+
     def test_current_structure_state_matches_materialize_result_projection(self) -> None:
         normalized = {
             "tcn_id": "TCN-001", "test_conditions": [], "models": [{"model_key": "ep-001", "model_type": "ep"}], "ci_ids": [], "test_data_requirements": [],
@@ -504,23 +582,37 @@ class EntityAndEvidenceTests(unittest.TestCase):
             "runtime_status": "ok", "result_status": "ready", "runtime_required": True, "deterministic_generated": True,
             "fallback_reason": None, "payload": payload, "issues": [],
         }
+        condition_metadata_row = {
+            "model_key": "ep-001", "model_type": "ep", "technique_slug": "ep", "parent_tcn_id": "TCN-001",
+            "content_fingerprint": "sha256:" + "5" * 64,
+        }
+        condition_artifact = self._structure_artifact(
+            "test-condition-design", normalized, [],
+            {"active_model_metadata": [condition_metadata_row]}, result_entities=[],
+        )
+        condition_result = dict(runtime.extract_machine_blocks(condition_artifact, "Machine Runtime Result"))["test-condition-design::artifact:condition_structure:all"]
         state = {
-            "runtime_results": [{"identity": "test-condition-design::artifact:materialize_coverage:TCN-001", "result": result}],
+            "runtime_results": [
+                {"identity": "test-condition-design::artifact:condition_structure:all", "result": condition_result},
+                {"identity": "test-condition-design::artifact:materialize_coverage:TCN-001", "result": result},
+            ],
             "carry_forward_entities": [], "previous_ci_id_state": [],
         }
         current_row = runtime._runtime_unit_result_row(result)
+        condition_row = runtime._runtime_unit_result_row(condition_result)
         self.assertEqual(current_row["model_completion"], payload["model_completion"])
         runtime.validate_current_structure_state(
             "test-condition-design", normalized, state,
-            current_entities=[], current_runtime_units=[current_row],
+            current_entities=[], current_runtime_units=[condition_row, current_row],
         )
 
         tampered = json.loads(json.dumps(state))
-        tampered["runtime_results"][0]["result"]["payload"]["model_completion"][0]["materialize_complete"] = False
+        materialize_result = next(row["result"] for row in tampered["runtime_results"] if row["identity"].endswith("artifact:materialize_coverage:TCN-001"))
+        materialize_result["payload"]["model_completion"][0]["materialize_complete"] = False
         with self.assertRaises(runtime.InvalidInput):
             runtime.validate_current_structure_state(
                 "test-condition-design", normalized, tampered,
-                current_entities=[], current_runtime_units=[current_row],
+                current_entities=[], current_runtime_units=[condition_row, current_row],
             )
 
     def _tr_entity(self, ref: str, runtime_context: dict[str, object], generation_fp: str) -> dict:
@@ -613,7 +705,20 @@ class EntityAndEvidenceTests(unittest.TestCase):
             runtime_contract_version=runtime.RUNTIME_CONTRACT_VERSION, generator_contract_version=version,
             runtime_impl_fp=runtime_fp, generator_impl_fp=generator_fp, upstream=[], static_data_versions={},
         )
-        payload = {**state_payload, "entities": entities if result_entities is None else result_entities}
+        selected_result_entities = entities if result_entities is None else result_entities
+        payload = {**state_payload, "entities": selected_result_entities}
+        if skill == "test-condition-design" and "active_model_metadata" not in payload:
+            payload["active_model_metadata"] = [
+                {
+                    "model_key": row["content"].get("model_key"),
+                    "model_type": row["content"].get("model_type"),
+                    "technique_slug": row["content"].get("technique_slug"),
+                    "parent_tcn_id": row["content"].get("parent_tcn_id"),
+                    "content_fingerprint": row["content_fingerprint"],
+                }
+                for row in selected_result_entities
+                if row.get("entity_type") == "model"
+            ]
         result = {
             "envelope_version": "1", "skill": skill, "runtime_contract_version": runtime.RUNTIME_CONTRACT_VERSION,
             "generator_contract_version": version, "generator": generator, "runtime_unit_key": unit, "model_key": None,
@@ -644,7 +749,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
             "scope_key": scope_key, "input_mode": "direct", "upstream_entities": [], "upstream_runtime_units": [],
             "static_data_versions": {}, "authority_refs": [], "reference_refs": [],
         }
-        input_value = {"runtime_unit_key": unit}
+        input_value = {"tcn_id": scope_key} if generator == "materialize_coverage" else {"runtime_unit_key": unit}
         input_fp = runtime.input_fingerprint(skill, unit, "direct", input_value, [], [], None)
         model_fp = runtime.model_fingerprint(metadata, input_fp)
         generation_fp = runtime.generation_fingerprint(
@@ -671,8 +776,14 @@ class EntityAndEvidenceTests(unittest.TestCase):
     def test_partial_rerun_carries_scope_out_tcn_model_ci_tdr_and_dispositions(self) -> None:
         tcn_one = runtime.make_machine_entity("test-condition-design", "tcn", "TCN-001", {"tcn_id": "TCN-001"})
         tcn_two = runtime.make_machine_entity("test-condition-design", "tcn", "TCN-002", {"tcn_id": "TCN-002"})
-        model_one = runtime.make_machine_entity("test-condition-design", "model", "ep-001", {"model_key": "ep-001", "model_type": "ep"}, model_key="ep-001")
-        model_two = runtime.make_machine_entity("test-condition-design", "model", "ep-002", {"model_key": "ep-002", "model_type": "ep"}, model_key="ep-002")
+        model_one = runtime.make_machine_entity("test-condition-design", "model", "ep-001", {
+            "model_key": "ep-001", "model_type": "ep", "technique_slug": "ep", "parent_tcn_id": "TCN-001",
+            "selection_source": "user", "selection_key": None, "derived_from_model_key": None, "status": "active",
+        }, model_key="ep-001")
+        model_two = runtime.make_machine_entity("test-condition-design", "model", "ep-002", {
+            "model_key": "ep-002", "model_type": "ep", "technique_slug": "ep", "parent_tcn_id": "TCN-002",
+            "selection_source": "user", "selection_key": None, "derived_from_model_key": None, "status": "active",
+        }, model_key="ep-002")
         ci_one = runtime.make_machine_entity("test-condition-design", "ci", "TCN-001-CI01", {"ci_id": "TCN-001-CI01", "tcn_id": "TCN-001", "model_key": "ep-001"}, model_key="ep-001")
         ci_two = runtime.make_machine_entity("test-condition-design", "ci", "TCN-002-CI01", {"ci_id": "TCN-002-CI01", "tcn_id": "TCN-002", "model_key": "ep-002"}, model_key="ep-002")
         tdr_one = runtime.make_machine_entity("test-condition-design", "test_data_requirement", "data:REQ-001", {"data_ref": "data:REQ-001", "requirement_key": "REQ-001", "source_model_key": "ep-001"}, model_key="ep-001")
