@@ -217,7 +217,8 @@ all-source coverage要件を人手だけに依存させないため、Skill-loca
 - included / merged-duplicate itemにreference destinationがある
 - included / merged-duplicate itemで `available_dimensions = captured_dimensions` が成立する
 - reference destinationが実在する
-- pattern entryのsource item refがsource-coverageへ解決し、そこからsource IDがsource-catalogへ解決する
+- pattern entryの各source item refがsource-coverageへ解決し、そこからsource IDがsource-catalogへ解決する
+- reference entryで各source item refにsource上の位置づけ / 適用条件が対応付いている
 - required metadataが欠けていない
 - orphan referenceがない
 - alias indexが存在しないentryを指さない
