@@ -239,9 +239,11 @@ component単体が妥当でもflow全体で問題になる場合があります�
 - user goal / task（評価条件から継承。行単位で異なる場合だけoverride）
 - pattern
 - 観測事実
-- reference entry refs
-- referenceの位置づけ
-- source item refs
+- 適用したreference:
+  - reference entry ref
+  - source item ref
+  - referenceの位置づけ
+  - project Authority refs（project固有のbinding根拠を使う場合だけ）
 - 期待される特性
 - 差異
 - 想定される影響
@@ -253,7 +255,7 @@ component単体が妥当でもflow全体で問題になる場合があります�
 - 推奨routing
 - finding ref（Findingを作成した場合だけ）
 
-`reference entry refs` は `_02_reference-knowledge.md` §6のreference entry ID、`source item refs` はsource-coverageの個別item refを使います。`status reason / 制約・未確認` は `判定不能` / `対象外` では必須です。
+`適用したreference` は1件以上の配列として扱い、1行につき1つの `reference entry ref + source item ref` の組を持ちます。`source item ref` はそのreference entryに実際に含まれるitemでなければなりません。同じ評価項目でproject Authority、WCAG、Design System、heuristic等を併用する場合も、各source itemごとの `referenceの位置づけ` を別行で保持し、1つの値へ統合しません。`status reason / 制約・未確認` は `判定不能` / `対象外` では必須です。
 
 ### Step 10: 必要な場合だけFindingを作る
 
