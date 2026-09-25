@@ -268,7 +268,7 @@ PR #12 / #13 merge後実装へ合わせて、
 
 各Skill側には「いつusability-evaluationを利用するか」「結果をどう受け取るか」の境界だけ追加します。
 
-Regression経由のtest-executionでは、regression-testingが確定したUI / UX評価scopeを通常のlive UI既定接続より優先します。
+test-target-inspection / test-executionの既存evidenceは、UI / UX評価が明示的に選定された場合だけread-only入力として再利用します。通常live UIにも既定接続は設けません。Regressionではregression-testingが確定したUI / UX評価scopeだけを接続します。
 
 ## 13. Step 11: repository integration
 
@@ -314,16 +314,18 @@ negative例:
 
 ~~~text
 ユーザー要求: TCを実行
-→ usability-evaluationは最初のSkillとして直接発火しない
+→ usability-evaluationは発火せず、test-executionだけで完了
+
+ユーザー要求: TCを実行し、そのevidenceでUI / UXも評価
 → test-executionがTCを実行してUI evidenceを取得
-→ UI / UX評価が対象外でなければusability-evaluationを後続で実行
+→ 明示されたUI / UX評価scopeに対してusability-evaluationがread-only評価
 → TCの仕様上PASS / FAILとUI / UX評価項目を分離
 → follow-upが必要な評価項目だけFindingを作る
 ~~~
 
 `test-target-inspection` もstandalone / qa-workflow経由の両経路を代表caseで確認します。
 
-Regression統合では、Regression scopeにUI / UX評価が含まれないTCについて、通常のtest-executionの既定接続だけを理由にusability-evaluationが追加実行されないことも確認します。
+Regression統合では、Regression scopeにUI / UX評価が含まれないTCについてusability-evaluationが追加実行されないこと、UI / UX評価scopeが明示された場合だけ既存evidenceを再利用することを確認します。
 
 test-analysis統合では、少なくとも次を確認します。
 
