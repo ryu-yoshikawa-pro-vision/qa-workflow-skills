@@ -193,6 +193,7 @@ source discoveryを「Web全体を完全探索した」とは表現しません�
 - adopted sourceがsource-catalog / source-coverageへ入っている
 
 新しいsourceが将来存在し得ることは鮮度契約で扱います。
+
 ## 6. source item母集団の固定
 
 sourceを採用したら、そのsourceのitem母集団を先に固定します。
@@ -380,6 +381,7 @@ Skill-local validatorで最低限確認します。
 - reference entryからsourceへ逆引きできる
 
 Web上の「未知のsourceが存在しないこと」や、source本文中のdimension抽出が意味的に正しいことまではvalidatorで証明しません。
+
 ## 13. Plan作成時点の確認事項
 
 2026-09-25時点の調査で、少なくとも次を確認しています。
@@ -400,7 +402,7 @@ Web上の「未知のsourceが存在しないこと」や、source本文中のdi
 
 ## 14. 実装時に残す調査記録
 
-最終referenceだけでなく、次を実装記録として残します。
+最終referenceだけでなく、次を `source-catalog.md` / `source-coverage.md` の対応項目へ実装記録として残します。別の調査ログを正本にしません。
 
 - discovery対象category
 - Query ID / cross-link元
