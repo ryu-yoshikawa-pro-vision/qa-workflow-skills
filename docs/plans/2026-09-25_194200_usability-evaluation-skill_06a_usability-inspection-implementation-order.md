@@ -321,6 +321,6 @@ repository標準件数に合わせます。
 - performance observability platform
 - screenshot pixel-diff engine
 - 新browser framework
-- global Usability Test Case ID体系
+- global usability-inspection task ID体系
 - native mobile / desktop app live automation runtime
 - automatic user persona generation
