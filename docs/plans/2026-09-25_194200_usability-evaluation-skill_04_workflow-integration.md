@@ -42,7 +42,7 @@ qa-workflowが要求・scope・利用可能な証拠からroutingします。
 
 #### workflow内呼び出し
 
-`qa-workflow` または同一Agent上で実行中のowner Skillが、取得済みevidenceとscopeから `usability-evaluation` を後続評価として呼び出します。これはdirect trigger評価とは別契約です。
+`qa-workflow` または同一Agent上のowner Skillは、UI / UX評価がユーザー要求・案件scope・workflow上で明示的に選定された場合だけ、取得済みevidenceを `usability-evaluation` へ渡します。test-target-inspection / test-executionがUIを扱ったという事実だけでは後続評価を自動追加しません。これはdirect trigger評価とは別契約です。
 
 live UIと設計時で扱いを分けます。
 
@@ -50,7 +50,7 @@ live UIと設計時で扱いを分けます。
 
 このsectionは `usability-inspection` のlive task executionではありません。
 
-`test-target-inspection` または `test-execution` がUIを実際に観測し、UI / UX評価が案件コンテキストまたはユーザー要求で明示的に対象外ではない場合、取得済みのUI evidenceを `usability-evaluation` へ渡すことを既定とします。
+`test-target-inspection` または `test-execution` が取得したUI evidenceは、UI / UX評価が明示的に要求・選定された場合に `usability-evaluation` へ再利用できます。UI / UX評価が単に「対象外と明示されていない」だけでは接続しません。
 
 この既定接続はbrowserの追加操作を意味しません。
 
@@ -70,7 +70,7 @@ UIを持たない対象、API / DBだけの実行、UX評価が明示的に対�
 
 #### standalone owner Skill
 
-`qa-workflow`を介さず `test-target-inspection` / `test-execution` 等を直接利用した場合も、同じAgentクライアント上で `usability-evaluation` が利用可能なら、owner Skill完了後または安全なcheckpointで同じAgentが順次読み込んで評価します。共通Skill-to-Skill APIの存在は前提にしません。
+`qa-workflow`を介さず `test-target-inspection` / `test-execution` 等を直接利用した場合は、UI / UX評価が同じ依頼で明示されている場合だけ、owner Skill完了後または安全なcheckpointで同じAgentが `usability-evaluation` を順次読み込めます。評価要求がなければowner Skill単独で完了します。共通Skill-to-Skill APIの存在は前提にしません。
 
 利用できない場合、UX評価が明示要求されていなければowner Skillの本来成果物は継続しUX評価未実施を必要範囲だけ明示します。UX評価が明示要求されている場合はfunctional / inspectionの判定可能範囲を継続し、UX評価scopeだけを利用不能として扱います。TCの仕様上PASS / FAILは変更しません。
 
@@ -138,7 +138,7 @@ test-condition-designがUI固有の観点を具体化する必要がある場合
 
 PR #12 merge後の実装を正本とします。
 
-test-target-inspectionが収集する、
+UI / UX評価が別scopeとして選定された場合、test-target-inspectionが収集する、
 
 - target region
 - UI elements
@@ -168,7 +168,7 @@ usability-evaluationのためだけに同じ画面を再scanすることを既�
 
 ## 5. test-executionとの統合
 
-TC実行中に各meaningful UI stateの証拠を取得できる場合、その証拠をusability-evaluationへ渡します。UI / UX評価が明示的に対象外なら渡しません。
+UI / UX評価が別scopeとして明示的に選定され、TC実行中に各meaningful UI stateの証拠を取得できる場合、その証拠をusability-evaluationへ渡します。TC実行だけを理由に自動接続しません。
 
 ~~~text
 test-execution
@@ -230,7 +230,7 @@ usability-evaluationはFindingの根拠強化を担当できますが、Session 
 
 usability-evaluationを全Regression Runへ無条件適用しません。
 
-regression-testing配下でtest-executionを使う場合は、このsectionのscope判定を§1.1のlive UI既定接続より優先します。通常のtest-executionで「UI / UX評価が明示的に対象外でない限り実施する」という既定だけを理由に、Regression対象へUX評価を追加しません。
+Regressionではregression-testingが確定したUI / UX評価scopeだけを接続します。通常のtest-executionにもUI / UX評価の既定接続はないため、Regression外・内を問わず明示的なscope選定なしに評価を追加しません。
 
 次の場合に利用します。
 
@@ -240,10 +240,10 @@ regression-testing配下でtest-executionを使う場合は、このsectionのsc
 
 ~~~text
 通常のtest-execution
-→ UI / UX評価が明示的に対象外でなければ既定接続
+→ UI / UX評価が明示的に選定された場合だけevidenceを再利用
 
 regression-testing配下のtest-execution
-→ regression-testingが確定したUI / UX評価scopeだけを接続
+→ regression-testingが確定したUI / UX評価scopeだけevidenceを再利用
 ~~~
 
 Regression membership / Run selection / UI / UX評価scopeの確定はregression-testingの責務を維持します。
