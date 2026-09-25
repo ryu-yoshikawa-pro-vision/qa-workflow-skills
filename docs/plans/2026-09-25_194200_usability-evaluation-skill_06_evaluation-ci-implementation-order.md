@@ -64,7 +64,7 @@ source-coverageの初期母集団を作ります。
 
 を確認します。
 
-既定は要約 + source refとし、本文コピーを避けます。
+既定は要約 + source item refとし、本文コピーを避けます。
 
 利用条件を確認できない場合は保守的に要約またはsource-reference-onlyとします。
 
@@ -202,7 +202,7 @@ source-coverage validatorを実行し、
 - access state未設定
 - includedなのにdestinationなし
 - included / merged-duplicateで `available_dimensions != captured_dimensions`
-- source ref不明
+- source item ref不明
 - orphan reference
 - broken index
 - required metadata不足
