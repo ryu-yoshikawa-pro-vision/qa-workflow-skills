@@ -187,8 +187,9 @@ source discoveryを「Web全体を完全探索した」とは表現しません�
 次を満たした状態を、本実装の探索完了とします。
 
 - 全categoryのseed sourceを確認済み
-- Q1〜Q7をそれぞれ1回以上実行し、確認範囲を `source-catalog.md` に記録済み
-- adopted sourceの§5.3対象linkを1 hop確認済み
+- Q1〜Q7がそれぞれsource-catalogのdiscovery実行記録で `completion=completed` へ閉じている
+- 各adopted sourceの1-hop cross-link確認がsource-catalogのdiscovery実行記録で `completion=completed` へ閉じている。対象linkまたは新規candidateが0件でも0件として記録されている
+- discovery実行記録に `blocked` が残っていない
 - 全candidateが `pending` 以外の `adopted / rejected / unavailable / duplicate` へ閉じている
 - adopted sourceがsource-catalog / source-coverageへ入っている
 
@@ -420,8 +421,20 @@ Web上の「未知のsourceが存在しないこと」や、source本文中のdi
 
 最終referenceだけでなく、次を `source-catalog.md` / `source-coverage.md` の対応項目へ実装記録として残します。別の調査ログを正本にしません。
 
+source-catalogのdiscovery実行記録として:
+
+- discovery type
+- Query ID / cross-link元source ID
 - discovery対象category
-- Query ID / cross-link元
+- checked_at
+- 確認範囲
+- 確認件数
+- 新規candidate件数
+- completion
+- block理由
+
+candidate / adopted sourceの記録として:
+
 - candidate source
 - discovery status
 - 採否理由
