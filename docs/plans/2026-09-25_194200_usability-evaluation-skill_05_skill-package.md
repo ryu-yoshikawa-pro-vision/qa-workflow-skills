@@ -149,7 +149,7 @@ merge後の既存artifact-local ref規則がある場合はそれを使い、な
 
 評価条件の `user goal / task` を各評価行のdefaultとして継承します。行単位で異なる場合だけ `user goal / task override` を記録します。
 
-`reference entry refs` は `_02_reference-knowledge.md` §6のreference entry IDを使い、どのSkill-local referenceを適用したかを追跡します。
+各評価行の `適用したreference` は `_02_reference-knowledge.md` §6のreference entry IDと、そのentryに含まれるsource item refを1対1で対応付けて保持します。複数の根拠を使う場合は複数行に分け、`referenceの位置づけ` を1つへ潰しません。
 
 各行:
 
@@ -159,15 +159,16 @@ merge後の既存artifact-local ref規則がある場合はそれを使い、な
 - user goal / task override（評価条件と異なる場合だけ）
 - observed fact
 - pattern / principle
-- reference entry refs
-- referenceの位置づけ
-- project Authority refs（project固有のbinding根拠がある場合）
+- 適用したreference:
+  - reference entry ref
+  - source item ref
+  - referenceの位置づけ
+  - project Authority refs（project固有のbinding根拠を使う場合だけ）
 - expected characteristic
 - difference
 - 想定される影響
 - 想定される影響の根拠
 - 観測済みのユーザー影響（証拠がある場合だけ）
-- source item refs
 - evidence ref
 - status
 - status reason / 制約・未確認
@@ -183,34 +184,44 @@ statusは評価契約の `問題を確認 / 問題なし / 判定不能 / 対象
 
 PR #13のFinding契約を再利用し、後続QA活動で扱う必要がある評価項目だけをFindingへ昇格します。`問題なし` / `対象外` にFinding refを付けません。
 
-## 6. source ID / source item ref
+## 6. package-local ID
 
-`source ID` と `source item ref` を分離します。
+`source ID`、`source item ref`、`reference entry ID` はusability-evaluation package内だけの追跡IDとします。PR #11のMachine Entityや全QA共通IDにはしません。
 
-- `source ID`: 情報源単位。例: `W3C-WCAG22`
-- `source item ref`: source-coverage上の個別item単位。例: `W3C-WCAG22-2.4.7`
+### source ID
 
-reference entry、UI / UX評価項目、Findingの根拠追跡では原則 `source item ref` を使用します。
+- 形式: `SRC-\d{3,}`
+- seed / Q1〜Q7でadoptしたsourceは、cross-link root set固定前にcanonical root昇順で `SRC-001` から採番する
+- cross-linkで新たにadoptしたsourceはcross-link探索完了後にcanonical root昇順で既存最大番号+1から採番する
+- 将来追加するsourceも既存最大番号+1を使う
+- 並び順、名称、canonical root変更だけを理由に既存IDを振り直さない
+- 削除・duplicate化したIDを別sourceへ再利用しない
+
+### source item ref
+
+- 形式: `<source ID>-ITEM-\d{4,}`
+- 初回inventoryでは同一source内をcanonical URL、source item名称の順で並べ、`ITEM-0001` から採番する
+- 初回採番後は並べ替え、名称変更、redirectだけを理由にrefを変更しない
+- 新規itemは同一source内の既存最大番号+1を使う
+- 削除・統合したrefを別itemへ再利用しない
+
+### reference entry ID
+
+- 形式: `REF-\d{4,}`
+- 初回作成時は最終reference file path、entry名称の順で並べ、`REF-0001` から採番する
+- 初回採番後は並べ替え、名称変更、file移動だけを理由にIDを変更しない
+- 新規entryは既存最大番号+1を使う
+- 削除・統合したIDを別entryへ再利用しない
+
+reference entry、UI / UX評価項目、Findingの根拠追跡ではsource item refを使い、評価項目ではさらにreference entry IDとの組を保持します。
 
 例:
 
 ~~~text
-W3C-WCAG22-2.4.7
-W3C-WAIARIA12-DIALOG
-W3C-HTMLARIA-BUTTON
-W3C-APG-DIALOG
-GOVUK-PATTERN-ERROR-RECOVERY
-USWDS-COMPONENT-ACCORDION
-CARBON-PATTERN-LOADING
-NNG-H01
-SOCIOMEDIA-...
+source ID: SRC-001
+source item ref: SRC-001-ITEM-0001
+reference entry ID: REF-0001
 ~~~
-
-実装時に実際のsource inventoryから命名規則を固定します。
-
-URLだけを自由記述して同一source itemが分散しないようにします。
-
-ただし新しい全QA共通ID体系にはしません。usability-evaluation package内のsource参照です。
 ## 7. reference catalog validator
 
 all-source coverage要件を人手だけに依存させないため、Skill-localの小さいvalidatorを追加します。
@@ -218,17 +229,18 @@ all-source coverage要件を人手だけに依存させないため、Skill-loca
 確認対象:
 
 - index linkが存在する
-- source-catalogのsource IDが一意
+- source-catalogのsource IDが `SRC-\d{3,}` 形式で一意かつappend-only規則に従う
 - source-catalogのcandidate statusが許可値で、pendingが残っていない
 - source-catalogのdiscovery実行記録でQ1〜Q7がそれぞれ1件以上 `completed` へ閉じている
 - 各adopted source IDのcross-link実行記録が1件以上 `completed` へ閉じ、0件結果も実行済みとして記録できる
 - discovery実行記録に `blocked` が残っていない
-- source-coverageのsource IDがcatalogへ存在し、source item refがsource-coverage内で一意
+- source-coverageのsource IDがcatalogへ存在し、source item refが `<source ID>-ITEM-\d{4,}` 形式でsource-coverage内一意かつappend-only規則に従う
 - coverage disposition / access stateが許可値
 - source自身がmaturity / lifecycleを明示する場合は値を保持する
 - included / merged-duplicate itemにreference destinationがある
 - included / merged-duplicate itemで `available_dimensions = captured_dimensions` が成立する
 - reference destinationが実在する
+- reference entry IDが `REF-\d{4,}` 形式で一意かつappend-only規則に従う
 - pattern entryの各source item refがsource-coverageへ解決し、そこからsource IDがsource-catalogへ解決する
 - reference entryで各source item refにsource上の位置づけ / 適用条件が対応付いている
 - required metadataが欠けていない
@@ -250,10 +262,12 @@ Webへアクセスしてsourceの最新状態を検査するruntimeにはしま�
 - status許可値
 - 評価条件で「今回評価する」とした全上位観点が、少なくとも1件の評価結果へ到達している
 - 評価条件で「対象外」とした上位観点に理由がある
-- 各評価項目に上位観点、reference entry refs、referenceの位置づけがある
+- 各評価項目に上位観点と1件以上の `適用したreference` がある
+- 各 `適用したreference` のreference entry refが実在し、source item refがそのentryに含まれ、referenceの位置づけがある
+- 同一評価項目で複数source itemを使う場合もsource itemごとのreferenceの位置づけを別々に保持する
 - user goal / task overrideがない評価項目は評価条件のuser goal / taskを継承できる
 - 問題を確認した評価項目にobserved fact / source / evidence / 想定影響の根拠がある
-- project固有のbinding根拠を適用した評価項目にproject Authority refがある
+- project固有のbinding根拠を適用した `適用したreference` にproject Authority refがある
 - finding refがある場合は対応Findingが存在し、PR #13の最低契約を満たす
 - 問題なし / 対象外の評価項目にfinding refがない
 - source item ref形式と参照先
