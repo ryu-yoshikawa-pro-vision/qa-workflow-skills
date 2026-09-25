@@ -120,6 +120,7 @@ NN/gの全記事を無条件に対象母集団にはしません。評価方法�
 - source ownerまたは運営主体を特定できる
 - canonicalまたはcurrentな入口を特定できる
 - 採用範囲のsource item母集団を一覧・category・sitemap・repository等から合理的に列挙できる。source全体を列挙できない場合は、公式index等から有限に列挙できるsubsetをadopted scopeとして固定できる
+- 既存adopted sourceに対して、少なくとも1つの明確な追加評価価値がある。例: normative requirement、platform固有要件、projectで採用されるDesign System、固有のpattern / rationale、既存sourceでは扱えないinteraction / accessibility / visual guidance
 
 優先:
 
@@ -135,9 +136,14 @@ NN/gの全記事を無条件に対象母集団にはしません。評価方法�
 - screenshot galleryだけでrationale / usage guidanceがないもの
 - SEO目的の断片的なbest-practice記事
 - 他sourceの転載だけのページ
+- 既存adopted sourceと実質同じ一般guidanceだけを持ち、追加の評価価値を説明できないDesign System / pattern library
 - loginしないと本文を取得できず公開sourceとして再利用できないもの
 
 採用しない候補も `source-catalog.md` にcandidateとして残し、採否と理由を記録します。別のsource discovery logは作りません。
+
+seed sourceであること自体はadoptedを意味しません。seedも§4の採用条件へ照合し、追加評価価値が不足する場合は `rejected` または意味上適切な `duplicate` として閉じます。
+
+一方、一度adoptしたsourceについては従来どおりadopted scope内の関連情報をitem単位で閉じ、代表例だけを収録して完了扱いにはしません。
 
 ## 5. source discoveryの進め方
 
