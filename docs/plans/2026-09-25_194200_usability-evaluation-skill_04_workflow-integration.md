@@ -52,7 +52,7 @@ live UIと設計時で扱いを分けます。
 
 `test-target-inspection` または `test-execution` が取得したUI evidenceは、UI / UX評価が明示的に要求・選定された場合に `usability-evaluation` へ再利用できます。UI / UX評価が単に「対象外と明示されていない」だけでは接続しません。
 
-この既定接続はbrowserの追加操作を意味しません。
+このread-only evidence再利用はbrowserの追加操作を意味しません。
 
 新しいtaskを実際に操作してusabilityを測る必要がある場合は `usability-inspection` へroutingし、test-target-inspection / test-executionのsessionへ暗黙に割り込みません。
 
