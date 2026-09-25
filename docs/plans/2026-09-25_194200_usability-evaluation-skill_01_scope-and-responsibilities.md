@@ -1,4 +1,4 @@
-# UI/UX評価・ユーザビリティテストSkill追加Plan
+# UI/UX評価・ユーザビリティ検査Skill追加Plan
 
 ## 1. 現状
 
@@ -19,7 +19,7 @@ PR #13では次が追加予定です。
 
 また、user goal / task scenarioだけを与え、詳細手順を正解として使わずに生きた実対象を操作し、task達成・visual breakage・feedback・error recovery・user-facing responsivenessを観測するownerもありません。
 
-後者は `usability-testing` として別Skillにし、本ファイルでは `usability-evaluation` の責務を定義します。
+後者は `usability-inspection` として別Skillにし、本ファイルでは `usability-evaluation` の責務を定義します。
 
 ## 2. 解決する問題
 
@@ -43,7 +43,7 @@ usability-evaluation は、これらの判断に使う参照知識と評価手�
 
 ここでいう評価はUI pattern knowledge、standard、Design System、heuristic等に基づく専門評価です。代表ユーザーへtaskを依頼するUX researchとしてのusability testingではありません。
 
-live targetをtask-basedに能動操作する責務は `_01a_usability-testing-scope-and-contract.md` の `usability-testing` が担当します。
+live targetをtask-basedに能動操作する責務は `_01a_usability-inspection-scope-and-contract.md` の `usability-inspection` が担当します。
 
 ## 3. 主責務
 
