@@ -171,7 +171,7 @@ UI / UXに関するcoverage観点から、どのtask / stateをusability-inspect
 
 再実行は新しいActivity / versionとして記録し、以前のtask outcomeを上書きしません。
 
-初版では新しいglobalなUsability Test Case ID体系を追加しません。
+初版では新しいglobalなusability-inspection task ID体系を追加しません。
 
 ## 9. qa-knowledge
 
