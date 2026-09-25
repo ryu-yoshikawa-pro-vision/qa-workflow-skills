@@ -8,7 +8,7 @@
 skills/usability-inspection/
 ├── SKILL.md
 ├── references/
-│   ├── testing-method.md
+│   ├── inspection-method.md
 │   ├── task-scenarios.md
 │   ├── responsiveness.md
 │   └── accessibility-evaluation.md
@@ -37,18 +37,20 @@ SKILL.mdには詳細なUI pattern知識を複製しません。
 
 最低限次を持ちます。
 
-1. task-based live evaluationであること
-2. representative-user studyではないこと
-3. 必須入力
-4. task scenarioの固定
-5. user-facing情報だけでtask pathを選ぶ契約
-6. browser ownership / safety
-7. task outcome
-8. timing measurement
-9. usability-evaluationへのevidence受け渡し
-10. Finding routing
-11. referencesの選択方法
-12. 完了条件
+1. task-based live inspectionであること
+2. 初版のlive execution scopeはPlaywrightで到達可能なWeb UIであること
+3. representative-user studyではないこと
+4. 必須入力
+5. task selection / task scenarioの固定
+6. user-facing情報だけでtask pathを選ぶ契約
+7. browser ownership / safety
+8. task outcome
+9. Agent / tool limitationとの切り分け
+10. timing measurement
+11. usability-evaluationへのevidence受け渡し
+12. Finding routing
+13. referencesの選択方法
+14. 完了条件
 
 UI pattern / WCAG / Design Systemの詳細根拠は `usability-evaluation` のreferenceを利用します。
 
@@ -75,15 +77,21 @@ ISO本文を転載しません。公開範囲で確認できる定義とsource r
 
 本Skill単独でhuman satisfactionやhuman efficiencyを実測したとは扱わない境界に利用します。
 
-### Nielsen Norman Group
+### Nielsen Norman Group / NIST
 
-最低限:
+human participantを用いるusability testingとの違いを理解する資料として、最低限次を確認します。
 
-- Usability Testing 101
-- Task Scenarios for Usability Testing
-- Task Analysis
+- NN/g Usability Testing 101
+- NN/g Task Scenarios for Usability Testing
+- NN/g Task Analysis
 
-から、representative user studyとの違い、user goal、realistic task scenario、詳細手順を与えすぎない原則を参照します。
+Agentによるtask-based inspectionの主要methodologyとして、最低限次を確認します。
+
+- NN/g Cognitive Walkthroughs
+- NN/g Summary of Usability Inspection Methods
+- NISTのCognitive Walkthrough / usability inspection guidance
+
+これらから、user goal、realistic task scenario、詳細手順を与えすぎない原則、user視点でtaskをstep-by-stepに検査する方法、human studyとの境界を参照します。
 
 本SkillのAI操作をNN/gのparticipant studyと同一視しません。
 
@@ -141,6 +149,19 @@ methodology sourceを追加する場合は、
 
 ## 5. output-template
 
+### task selection summary
+
+広いscopeから複数taskを選ぶ場合だけ、Activity群の前にcoordination情報として保持します。独立Machine Entityにはしません。
+
+- requested scope
+- task candidate
+- candidate source / evidence refs
+- selected / not-selected / deferred
+- selection reason
+- coverage limitation
+
+明示taskが1件だけの場合、このsummaryは省略できます。
+
 ### Activity
 
 - Activity ref / revision
@@ -152,7 +173,7 @@ methodology sourceを追加する場合は、
 - task scenario
 - start state
 - success condition
-- platform
+- platform: 初版live executionはWeb
 - viewport / device
 - input method
 - locale
@@ -164,6 +185,7 @@ methodology sourceを追加する場合は、
 ### task result
 
 - task outcome: 達成 / 未達成 / 判定不能 / 未実行
+- outcome basis: success-observed / product-blocker-observed / agent-tool-limitation / environment-external / unresolved / not-started
 - outcome evidence refs
 - completion limitation / reason
 - final state
@@ -186,6 +208,19 @@ meaningful action単位で:
 
 全clickを無条件に詳細ログ化せず、task outcomeやFindingの再確認に必要なmeaningful actionを正本にします。
 
+### Agent run上の操作負荷
+
+必要範囲でaction traceから次を保持します。
+
+- meaningful_action_count
+- retry_count
+- backtrack_count
+- dead_end_count
+- error_count
+- recovery_count
+
+これらはAgent runの観測値であり、human efficiency metricや総合usability scoreではありません。任意thresholdによる合否判定をしません。
+
 ### timing measurements
 
 各measurement:
@@ -194,9 +229,10 @@ meaningful action単位で:
 - action ref
 - metric label
 - start event
-- end event
-- elapsed_ms
+- end predicate
 - measurement method
+- definition fixed before action: true / false
+- elapsed_ms
 - environment refs
 - threshold value（存在する場合）
 - threshold Authority ref（存在する場合）
@@ -243,13 +279,18 @@ follow-upが必要なObservation / evaluationだけ、PR #13のFinding契約で�
 
 - required Activity fields
 - task outcome許可値
+- outcome basis許可値とtask outcomeの整合
+- `未達成` はoutcome basis=`product-blocker-observed` かつuser-facing evidenceを持つ
+- Agent / tool limitation、environment / external、unresolvedは `判定不能` へ閉じる
+- broad scopeのtask selection summaryではselected taskが各Activityへ対応し、coverage limitationがある
 - `達成` にsuccess condition evidenceがある
 - `判定不能 / 未実行` に理由がある
 - started taskのmeaningful action ref一意性
 - actionからevidenceへ解決できる
-- timing measurementのstart / end / elapsed_ms / measurement method
+- timing measurementのstart event / end predicate / measurement method / definition fixed before action / elapsed_ms
 - elapsed_msが非負
 - browser / page側の同一計測系で区間を測定できない場合にsystem responsiveness値を確定しない
+- definition fixed before action=falseのmeasurementをperformance判定根拠にしない
 - threshold resultとthreshold fieldの整合
 - over-threshold / within-thresholdにはthreshold Authority refがある
 - threshold-not-definedで任意のFAIL判定を持たない
@@ -328,13 +369,37 @@ task evidenceをusability-evaluationへ渡し、pattern / standardによる判�
 
 AIがtaskを達成しただけで「人間にも使いやすい」「満足度が高い」と断定しないこと。
 
+### Case M: broad scope task selection
+
+「サービス全体の使い勝手を確認」という依頼で、根拠のない1 taskだけを実行して全体評価としないこと。task候補、選定根拠、未選定scope、coverage limitationを残すこと。
+
+### Case N: Agent failure
+
+Agentがcontrolを見つけられないが、screenshot / accessibility evidenceでは明確なuser-facing cueが存在する。
+
+product側のdiscoverability defectへ昇格せず、Agent / tool limitationまたは切り分け不能として `判定不能` にすること。
+
+### Case O: product-side blocker
+
+必要controlがviewport外へclippingし、許可されたinteraction modeでは操作不能であることをevidenceで確認できる。
+
+`未達成` + product-blocker-observedを許可し、必要ならFinding候補へできること。
+
+### Case P: timing endpoint post hoc
+
+結果を見た後で都合のよいend predicateへ差し替えないこと。measurement definitionがaction前に固定されていない場合はperformance判定根拠にしないこと。
+
+### Case Q: native app
+
+native iOS / Android appの実機操作を要求された場合、初版のPlaywright Web live scopeで対応可能と偽らないこと。静的資料のUI / UX評価が可能ならusability-evaluationへroutingできること。
+
 ## 8. trigger eval
 
 positive例:
 
 - 実際にこのサイトを操作して商品検索の使い勝手をテスト
 - このtaskを初見ユーザー想定でやってみて詰まる場所を確認
-- mobileで画面を触って表示崩れと操作性を確認
+- mobile Web viewportで画面を触って表示崩れと操作性を確認
 - keyboardだけで主要フローを完了できるか試す
 - この操作のfeedbackが遅くないか実測
 
