@@ -239,6 +239,7 @@ taskで検証するUI経路をAPI / DB / storage操作で迂回しません。
 - cleanup
 - viewport / locale / input method
 - timingを計測する場合の対象区間
+- 各timing measurementのstart event / end predicate / measurement method / threshold Authorityの有無
 - browser / computer操作能力
 
 開始条件を満たせない場合は実操作へ進みません。
@@ -297,9 +298,13 @@ Agentはtask goalだけを基準に、user-facing情報から次の操作を選�
 task outcomeは次です。
 
 - `達成`: success conditionをUI上の証拠で確認できた
-- `未達成`: taskを実行したがsuccess conditionへ到達できなかった
-- `判定不能`: 実行を開始したが、環境・証拠不足・外部要因等で達成可否を確定できない
+- `未達成`: 許可されたinteraction modeでtaskを実行し、UI / system側の阻害を直接観測してsuccess conditionへ到達できないことを確認した
+- `判定不能`: 実行を開始したが、Agent / tool capability、element localization、browser異常、環境・証拠不足、外部要因、またはUI問題との切り分け不能により達成可否を確定できない
 - `未実行`: taskのuser-facing操作を開始していない
+
+`未達成` を使うには、Agentが失敗したという事実だけでなく、product側の阻害を示すuser-facing evidenceが必要です。
+
+例えば「Agentがbuttonを見つけられなかった」だけではdiscoverability問題としません。screenshot / rendered UI / accessibility evidence等から必要なcueが存在しない、操作不能、dead end等を確認できない場合は `判定不能` とします。
 
 これはTCのPASS / FAILではありません。
 
@@ -338,6 +343,27 @@ cleanup結果と残存状態を記録します。
 - dead endがないか
 - required actionを実行できるか
 - task flowを継続できるか
+
+### Agent run上の操作負荷
+
+人間のefficiencyとしてではなく、今回のAgent runで観測した事実として必要範囲で保持します。
+
+- meaningful action数
+- retry
+- backtrack
+- dead end
+- error
+- recovery
+- system wait
+
+定義:
+
+- retry: 同じ意図のactionを、前回の操作で必要なobservable responseを得られず再実行した
+- backtrack: 進行中の経路を取りやめ、user-facingなnavigation / state操作で前の状態へ戻って別経路を試した
+- dead end: 許可されたinteraction modeでsuccess conditionへ進むuser-facing actionを確認できなかった
+- recovery: error /失敗状態からtaskを継続可能な状態へ戻した
+
+これらを単一scoreへまとめず、任意の回数thresholdも作りません。比較する場合は同じtask / contextの別run、またはprojectで明示された基準がある場合に限定します。
 
 ### interaction / feedback
 
@@ -397,6 +423,8 @@ product / app全体のaccessibility conformance評価を要求された場合は
 
 を残します。
 
+各measurementのstart event、end predicate、measurement method、threshold Authorityの有無は対象action開始前に固定します。測定結果を見た後で都合のよいend conditionへ変更しません。
+
 start / endは可能な限りbrowser / page側のmonotonicな時刻またはPerformance API等、同一計測系で取得します。
 
 Agentが「次に何をするか」を考えるmodel turn、tool call待ち、チャット往復時間をsystem elapsed timeへ含めません。
@@ -445,7 +473,7 @@ PR #13 merge後のFinding契約を再利用します。
 
 次はFinding候補になり得ます。
 
-- task未達成でfollow-upが必要
+- product側の阻害をuser-facing evidenceで確認したtask未達成でfollow-upが必要
 - user-facing操作から必要controlへ到達できない
 - taskを阻害するvisual breakage
 - error recovery不能
@@ -454,6 +482,8 @@ PR #13 merge後のFinding契約を再利用します。
 - system delay + feedback不足等、後続QA活動で扱う必要がある観測
 
 task outcomeだけからDefectを確定しません。
+
+Agent / tool limitation、environment issue、またはproduct側阻害との切り分け不能で `判定不能` になった場合、それだけをproduct Findingへ昇格しません。
 
 UI pattern / standardに基づく意味判断は `usability-evaluation` の評価結果を根拠にします。
 
@@ -474,6 +504,7 @@ UI pattern / standardに基づく意味判断は `usability-evaluation` の評�
 - exploratory Session lifecycle
 - pixel-perfect visual regression framework
 - 新しいbrowser automation framework
+- native mobile / desktop app向けlive automation runtime
 - project requirementにないperformance thresholdの創作
 - test idやhidden DOMを使ったuser task経路の先回り
 
@@ -485,8 +516,10 @@ UI pattern / standardに基づく意味判断は `usability-evaluation` の評�
 - goal / taskの出所が記録されている
 - start stateが確認済み、または未実行理由がある
 - task outcomeが `達成 / 未達成 / 判定不能 / 未実行` のいずれか
+- `未達成` はproduct側阻害のuser-facing evidenceを持ち、Agent / tool limitationや切り分け不能は `判定不能` としている
+- broad scopeではtask選定根拠、selected / not-selected / deferred、coverage limitationが残る
 - 開始したtaskのmeaningful action / observationがevidenceへ追跡できる
-- timingを報告する場合はsystem側計測区間と実測値がある
+- timingを報告する場合はaction前に固定したstart event / end predicate / measurement methodとsystem側実測値がある
 - user-facing以外の内部情報でtask pathを先回りしていない
 - side effect / cleanup契約が閉じている
 - `usability-evaluation` を実行したscopeでは評価結果へ追跡できる
