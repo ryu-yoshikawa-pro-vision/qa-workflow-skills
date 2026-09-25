@@ -1,10 +1,10 @@
-# UI/UX評価・ユーザビリティテストSkill追加Plan
+# UI/UX評価・ユーザビリティ検査Skill追加Plan
 
 ## 0. 本ファイルの対象
 
 本ファイルは `usability-evaluation` の実装順序と完了条件です。
 
-`usability-testing` の実装順序は `_06a_usability-testing-implementation-order.md` を正本とします。
+`usability-inspection` の実装順序は `_06a_usability-inspection-implementation-order.md` を正本とします。
 
 本ファイルの完了だけではPR全体の後続実装完了とは扱いません。
 
