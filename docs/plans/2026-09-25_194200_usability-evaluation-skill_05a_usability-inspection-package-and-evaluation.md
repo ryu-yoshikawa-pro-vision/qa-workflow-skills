@@ -135,7 +135,7 @@ INPのfield判定や75 percentileを必要とする評価を、1回のAgent run�
 
 理由:
 
-- testing Skillが必要とするのはexecution methodologyであり、Design System catalogではない
+- inspection Skillが必要とするのはexecution methodologyであり、Design System catalogではない
 - UI pattern知識はusability-evaluationを正本にする
 - testing method sourceを大量収集してもtask executionの再現性が直接上がるとは限らない
 
@@ -363,7 +363,7 @@ task達成に決済・削除等が必要だが許可scope外。
 
 ### Case K: usability-evaluation連携
 
-task evidenceをusability-evaluationへ渡し、pattern / standardによる判断をtesting側で独自複製しないこと。
+task evidenceをusability-evaluationへ渡し、pattern / standardによる判断をinspection側で独自複製しないこと。
 
 ### Case L: human claims
 
