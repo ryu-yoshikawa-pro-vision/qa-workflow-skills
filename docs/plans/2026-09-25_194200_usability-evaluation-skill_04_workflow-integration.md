@@ -1,4 +1,12 @@
-# UIユーザビリティ評価Skill追加Plan
+# UI/UX評価・ユーザビリティテストSkill追加Plan
+
+## 0. 本ファイルの対象
+
+本ファイルは `usability-evaluation` のworkflow統合です。
+
+live targetをtask-basedに能動操作する `usability-testing` は `_04a_usability-testing-workflow-integration.md` を正本とします。
+
+`test-target-inspection` / `test-execution` から既存evidenceを `usability-evaluation` へ渡すことはできますが、それらを `usability-testing` の代わりにはしません。
 
 ## 1. 固定工程にしない
 
@@ -24,7 +32,11 @@ qa-workflowが要求・scope・利用可能な証拠からroutingします。
 
 #### 直接発火
 
-ユーザーがUI / UXレビュー、usability、accessibilityを含むinteraction評価、表示崩れ、UI patternの妥当性等を明示的に要求した場合は `usability-evaluation` を直接開始できます。
+ユーザーがUI / UXレビュー、UI patternの妥当性、accessibilityを含むinteraction評価、Design System / standard / heuristicとの照合等を明示的に要求した場合は `usability-evaluation` を直接開始できます。
+
+「実際に操作して使い勝手をテスト」「このtaskを初見想定でやってみる」「表示崩れや操作後の遅さをlive targetで確認」等、task-basedな実操作を要求する場合は `usability-testing` を開始します。
+
+「usabilityを確認」のように実操作の有無が曖昧な場合は、設計 / evidence reviewなのかlive task executionなのかを要求と利用可能なtargetからroutingします。
 
 「TCを実行して」「current UIを収集して」のようにUX評価を明示しない依頼では、`usability-evaluation` を最初のSkillとして直接発火させません。
 
@@ -34,11 +46,15 @@ qa-workflowが要求・scope・利用可能な証拠からroutingします。
 
 live UIと設計時で扱いを分けます。
 
-#### live UIを観測・操作する場合
+#### live UIの既存evidenceを評価する場合
+
+このsectionは `usability-testing` のlive task executionではありません。
 
 `test-target-inspection` または `test-execution` がUIを実際に観測し、UI / UX評価が案件コンテキストまたはユーザー要求で明示的に対象外ではない場合、取得済みのUI evidenceを `usability-evaluation` へ渡すことを既定とします。
 
 この既定接続はbrowserの追加操作を意味しません。
+
+新しいtaskを実際に操作してusabilityを測る必要がある場合は `usability-testing` へroutingし、test-target-inspection / test-executionのsessionへ暗黙に割り込みません。
 
 - DOM / accessibility tree
 - ARIA snapshot
