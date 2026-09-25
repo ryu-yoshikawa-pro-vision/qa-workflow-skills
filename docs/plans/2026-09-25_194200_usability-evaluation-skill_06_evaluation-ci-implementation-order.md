@@ -90,6 +90,8 @@ source-coverageの初期母集団を作ります。
 最低限:
 
 - Dialog pattern
+- WAI-ARIA 1.2のDialogに関係するrole / state / property
+- ARIA in HTMLのDialog実装に関係するauthor conformance requirement
 - WAI-ARIA APGのDialog guidance
 - Dialogに関係するWCAG 2.2の適用可能な項目
 - official Design System 1つのDialog guidance
@@ -107,8 +109,10 @@ source-coverageの初期母集団を作ります。
 - reference catalog validator
 - deterministic output validator
 - semantic evalの代表case
-- `test-target-inspection` / `test-execution` からのevidence連携
+- PR #12契約と同じ形のfixture / 保存済みevidenceを入力した評価
 - 同一browser / sessionを競合操作しないこと
+
+このStepでは `test-target-inspection` / `test-execution` / `qa-workflow` 自体を先行変更しません。PR #12の入力・evidence契約と同じ形のfixtureまたは既存の保存済みevidenceを使い、usability-evaluation単体の入出力・reference読込・評価契約を検証します。実owner Skillへの接続はStep 10だけで行います。
 
 このStepは最終収録範囲を縮小するものではありません。ここで契約を確認した後、Step 5〜7ですべてのadopted source itemを収録し、Step 8のcompleteness gateを満たすまで実装完了とは扱いません。
 
@@ -121,6 +125,8 @@ source-coverageの初期母集団を作ります。
 - WCAG 2.2
 - relevant Understanding
 - relevant Techniques / Failures
+- WAI-ARIA 1.2 Recommendation
+- current ARIA in HTML Recommendation
 - WAI-ARIA APG Patterns
 - WAI-ARIA APG Practices
 
@@ -174,7 +180,9 @@ source-coverage上の対象をすべて閉じます。
 
 実装時に再確認しますが、Plan作成時点では少なくとも次を確認しています。
 
-- WAI-ARIA APGはPatterns一覧とPractices一覧が公開され、patternページには目的、Keyboard Interaction、WAI-ARIA Roles / States / Propertiesを持つ。
+- WAI-ARIA 1.2は2023-06-06 Recommendation。WAI-ARIA 1.3はPlan確認時点で2026-06-04 Working Draftのためcurrent Recommendationと同じ強さで扱わない。
+- ARIA in HTMLはPlan確認時点で2026-08-11 Recommendationで、HTML要素へのARIA利用に関するauthor conformance requirementsを定義する。
+- WAI-ARIA APGはPatterns一覧とPractices一覧が公開され、patternページには目的、Keyboard Interaction、WAI-ARIA Roles / States / Propertiesを持つ。APGはinformative guidanceとして扱う。
 - GOV.UK Design SystemはComponentsとPatternsを分離し、Patternsをuser-focused taskのbest practice solutionとして公開している。
 - USWDSはComponents一覧とPatterns一覧を公開し、component lifecycle / statusも公開している。Plan調査時点のComponents overviewは47 componentsを表示する。
 - CarbonはcoreのUniversal patternsと、core非保証のCommunity patternsを分離している。
@@ -299,12 +307,30 @@ negative例:
 
 Regression統合では、Regression scopeにUI / UX評価が含まれないTCについて、通常のtest-executionの既定接続だけを理由にusability-evaluationが追加実行されないことも確認します。
 
+test-analysis統合では、少なくとも次を確認します。
+
+~~~text
+UI中心のtest-analysis
+→ usability-evaluationがuser goal / pattern / failure mode候補 / 観測候補を返す
+→ Product Riskの識別・impact / likelihood / score確定はtest-analysisだけが担当
+→ usability-evaluationがrisk scoreを出さない
+~~~
+
+test-condition-design統合では、少なくとも次を確認します。
+
+~~~text
+UI patternを含むtest-condition-design
+→ usability-evaluationがinteraction / state / accessibility / responsive等の検証観点候補を返す
+→ 一般guidanceだけを製品期待結果へ昇格しない
+→ current test requirement / Authority / Product Risk / scopeに基づく採否はtest-condition-designが担当
+~~~
+
 ## 15. deterministic eval
 
 最低限:
 
 - output schema
-- source ref
+- source item ref
 - evidence ref
 - status
 - required fields
@@ -402,14 +428,14 @@ PR #12の実行基盤を利用できる場合、
 - sub-indexから対象pattern / concern / platform別referenceへ到達できる
 - 通常評価で全referencesの一括読込を要求しない
 - Q1〜Q7と1-hop cross-link探索のcandidateがsource-catalogへ記録され、pendingが0
-- 採用sourceの対象母集団がsource-coverageへ記録されている
+- 採用sourceごとにadopted scope、列挙元、対象母集団がsource-coverageへ記録されている。source全体を列挙できない場合は有限に列挙できるsubsetだけをadopted scopeとし、source全体を全件取得済みと扱わない
 - 全source itemのcoverage dispositionがincluded / merged-duplicate / out-of-scope / unavailable / source-reference-onlyのいずれかへ閉じている
 - access stateがcoverage dispositionと分離され、restricted sourceを取得済みと誤認しない
 - source自身が明示するmaturity / lifecycleをcoverage dispositionと分離して保持している
 - included / merged-duplicate itemのfield-level coverageが `available_dimensions = captured_dimensions` で閉じている
 - 取得済みの関連情報を任意に除外してincluded扱いにする経路がない
 - JavaScript依存、login限定、deprecated / archived、redirect等の取得制約をcurrent sourceと混同せず状態化している
-- included referenceのsource追跡が可能
+- included referenceからsource item ref、source ID、canonical URLへ追跡できる
 - UI / UX評価項目にreferenceの位置づけが残り、project固有のbinding根拠を使う場合はproject Authority refを追跡できる
 - Regression配下ではregression-testingが確定したUI / UX評価scopeが通常のlive UI既定接続より優先される
 - reference catalog validator PASS
@@ -422,7 +448,8 @@ PR #12の実行基盤を利用できる場合、
 - 代表semantic caseを実Judgeで確認
 - 利用可能な場合、実Agent triggerとbrowser evidence連携を確認
 - TC PASS / FAILとUI / UX評価項目を分離し、後続対応が必要な評価項目だけFindingへ昇格することを確認
-- Product Risk owner境界を確認
+- test-analysis統合でProduct Riskの識別・評価・採点owner境界を確認
+- test-condition-design統合で一般UI guidanceを製品期待結果へ昇格せず、検証観点候補の採否owner境界を確認
 - user researchを捏造しないことを確認
 - 同一browser/sessionへの並行操作を要求しない
 - git diff --check PASS
