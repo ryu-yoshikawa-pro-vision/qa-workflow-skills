@@ -186,6 +186,13 @@ methodology sourceを追加する場合は、
 
 - task outcome: 達成 / 未達成 / 判定不能 / 未実行
 - outcome basis: success-observed / product-blocker-observed / agent-tool-limitation / environment-external / unresolved / not-started
+
+対応は固定します。
+
+- `達成` → `success-observed`
+- `未達成` → `product-blocker-observed`
+- `判定不能` → `agent-tool-limitation / environment-external / unresolved`
+- `未実行` → `not-started`
 - outcome evidence refs
 - completion limitation / reason
 - final state
@@ -197,6 +204,8 @@ meaningful action単位で:
 
 - action ref
 - action
+- action type: normal / retry / backtrack / recovery
+- related action ref（retry / backtrack / recoveryで必要な場合）
 - user-facing cue
 - interaction method
 - before evidence refs
@@ -218,6 +227,15 @@ meaningful action単位で:
 - dead_end_count
 - error_count
 - recovery_count
+
+集計規則:
+
+- meaningful_action_count: action trace件数
+- retry_count: action type=`retry` 件数
+- backtrack_count: action type=`backtrack` 件数
+- recovery_count: action type=`recovery` 件数
+- dead_end_count: observation category=`dead-end` 件数
+- error_count: observation category=`user-facing-error` 件数。Agent / tool / browser自身のerrorは含めない
 
 これらはAgent runの観測値であり、human efficiency metricや総合usability scoreではありません。任意thresholdによる合否判定をしません。
 
@@ -247,6 +265,7 @@ Agentの思考時間をelapsed_msへ含めません。
 PR #13のObservation契約へ接続できる形で、
 
 - observation ref
+- observation category: dead-end / user-facing-error / visual-breakage / feedback / other
 - observed fact
 - target state
 - evidence refs
@@ -287,6 +306,8 @@ follow-upが必要なObservation / evaluationだけ、PR #13のFinding契約で�
 - `判定不能 / 未実行` に理由がある
 - started taskのmeaningful action ref一意性
 - actionからevidenceへ解決できる
+- action type / observation categoryの許可値
+- Agent run上の操作負荷countがaction trace / Observationから導出できる
 - timing measurementのstart event / end predicate / measurement method / definition fixed before action / elapsed_ms
 - elapsed_msが非負
 - browser / page側の同一計測系で区間を測定できない場合にsystem responsiveness値を確定しない
