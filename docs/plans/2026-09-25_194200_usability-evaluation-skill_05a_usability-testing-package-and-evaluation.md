@@ -1,11 +1,11 @@
-# UI/UX評価・ユーザビリティテストSkill追加Plan
+# UI/UX評価・ユーザビリティ検査Skill追加Plan
 
 ## 1. Skill package
 
 予定構成:
 
 ~~~text
-skills/usability-testing/
+skills/usability-inspection/
 ├── SKILL.md
 ├── references/
 │   ├── testing-method.md
@@ -54,7 +54,7 @@ UI pattern / WCAG / Design Systemの詳細根拠は `usability-evaluation` のre
 
 ## 3. methodology reference
 
-usability-testing packageのreferenceは、実行方法・測定方法に限定します。
+usability-inspection packageのreferenceは、実行方法・測定方法に限定します。
 
 初版の主なsource:
 
@@ -103,7 +103,7 @@ accessibility conformance scopeを評価する場合に、
 
 単一component / 単一taskの観測だけからproduct全体のWCAG conformanceを宣言しません。
 
-通常のtask-based usability-testingで毎回WCAG-EM全手順を要求しません。
+通常のtask-based usability-inspectionで毎回WCAG-EM全手順を要求しません。
 
 ### web.dev user-centric performance guidance
 
@@ -123,7 +123,7 @@ INPのfield判定や75 percentileを必要とする評価を、1回のAgent run�
 
 ## 4. source方針
 
-`usability-evaluation` のUI pattern corpus向けall-source discoveryを、usability-testing methodologyへそのまま複製しません。
+`usability-evaluation` のUI pattern corpus向けall-source discoveryを、usability-inspection methodologyへそのまま複製しません。
 
 理由:
 
@@ -229,7 +229,7 @@ PR #13のObservation契約へ接続できる形で、
 
 を保持します。
 
-評価結果自体をusability-testing側へ複製しません。
+評価結果自体をusability-inspection側へ複製しません。
 
 ### Finding
 
@@ -280,7 +280,7 @@ test idをtask path選択に使わず、discoverability問題を隠さないこ�
 
 詳細stepとexpected resultを忠実に実行する依頼。
 
-usability-testingではなくtest-executionへroutingすること。
+usability-inspectionではなくtest-executionへroutingすること。
 
 ### Case D: visual breakage
 
