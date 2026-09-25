@@ -371,6 +371,18 @@ sourceに存在しない項目を推測補完しません。
 
 一方、今回のprojectでbindingかどうかはreferenceへ固定しません。project Authority、明示された適合基準、platform、採用Design System、対象文脈と組み合わせて評価時に決定し、UI / UX評価項目の `referenceの位置づけ` へ残します。
 
+### reference entry ID
+
+reference entryの `ID` はusability-evaluation package内だけのappend-onlyなIDとします。
+
+- 形式: `REF-\d{4,}`
+- 初回作成時は、最終的なreference file path、entry名称の順で並べ、`REF-0001` から採番する
+- 初回採番後は並べ替え、名称変更、file移動だけを理由にIDを変更しない
+- 新しいentryは既存最大番号+1を使う
+- 削除・統合したIDを別entryへ再利用しない
+- 同じ意味のentryを更新する場合は既存IDを維持し、意味上別entryへ分割する場合は新しいIDを付ける
+
+このIDはSkill package内のreference追跡用であり、新しい全QA共通identityやMachine Entityにはしません。
 ## 7. reference構造
 
 予定構成:
@@ -519,6 +531,30 @@ cross-linkでは各adopted source IDについて1件以上の実行記録を持�
 
 探索手段の障害等で所定範囲を確認できなかった場合は `blocked` とし、探索完了には数えません。
 
+### cross-link root set
+
+cross-link探索を始める前に、seed確認とQ1〜Q7のcandidate採否をすべて閉じます。その時点で `adopted` のsourceへsource IDを付与し、`discovery origin` が `seed / query` のsource ID集合を `cross-link root set` としてsource-catalog.mdへ固定します。
+
+- root setはsource ID昇順で記録する
+- §5.3のcross-link探索はこのroot setだけを起点にする
+- cross-linkで新しく見つけてadoptしたsourceは今回のroot setへ追加せず、さらに外部linkを辿らない
+- seed / Q1〜Q7の採否を後から変更してroot set対象が変わった場合は、root setを作り直し、そのroot setに対するcross-link確認を再実行してからdiscovery closureへ進む
+
+これにより1-hopを `root set → 直接link先` の1段だけに固定します。
+
+### package-local source ID
+
+source IDはusability-evaluation package内だけのappend-onlyなIDとします。
+
+- 形式: `SRC-\d{3,}`
+- seed / Q1〜Q7でadoptしたsourceは、cross-link root set固定前にcanonical root昇順で `SRC-001` から採番する
+- cross-linkで新たにadoptしたsourceは、cross-link探索完了後にcanonical root昇順で既存最大番号+1から採番する
+- 将来追加するsourceも既存最大番号+1を使う
+- canonical root、名称、並び順の変更だけを理由に既存source IDを振り直さない
+- 削除・duplicate化したsource IDを別sourceへ再利用しない
+
+candidate行の `adopted時のsource ID` にはこのIDを記録します。
+
 ## 10. source-coverage.md
 
 「すべて取得した」を検証可能にするため、対象ページ / pattern単位でcoverageを保持します。
@@ -548,14 +584,24 @@ cross-linkでは各adopted source IDについて1件以上の実行記録を持�
 source itemを追加・削除した場合、coverage表を更新します。
 source IDは情報源単位の識別子、source item refはsource-coverage上のitem単位のstable refとして分離します。
 
+source item refは次の規則で付与します。
+
+- 形式: `<source ID>-ITEM-\d{4,}`
+- 初回inventoryでは、同一source内のitemをcanonical URL、source item名称の順で並べ、`ITEM-0001` から採番する
+- 初回採番後は並べ替え、名称変更、redirectだけを理由にrefを変更しない。同じ意味のitemと確認できる場合は既存refを維持してcanonical URL等を更新する
+- 新しいitemは同一source内の既存最大番号+1を使う
+- 削除・統合したsource item refを別itemへ再利用しない
+
 例:
 
 ~~~text
-source ID: W3C-WCAG22
-source item ref: W3C-WCAG22-2.4.7
+source ID: SRC-001
+source item ref: SRC-001-ITEM-0001
 ~~~
 
 reference entryと評価結果から参照するのは原則としてsource item refです。source IDだけでは個別の要件・guidanceを特定した根拠として扱いません。
+
+source ID / source item ref / reference entry IDはいずれもusability-evaluation package内の追跡用であり、PR #11のMachine Entityや全QA共通IDへ昇格しません。
 
 ## 11. 著作権・ライセンス
 
