@@ -390,7 +390,7 @@ Skill-local validatorで最低限確認します。
 - included / merged-duplicateのdestinationが存在する
 - included / merged-duplicateの各itemに `available_dimensions` / `captured_dimensions` がある
 - included / merged-duplicateで `available_dimensions = captured_dimensions`
-- source refが一意
+- source item refがsource-coverage内で一意
 - canonical URLがある
 - checked_atがある
 - source itemの重複がない
