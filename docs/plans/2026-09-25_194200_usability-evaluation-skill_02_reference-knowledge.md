@@ -356,15 +356,18 @@ loading / empty / disabled等の関連状態
 観測方法
 評価時の注意
 関連pattern
-source item refs
-source上の位置づけ
-適用条件
+source items:
+  - source item ref
+  - source上の位置づけ
+  - 適用条件
 source確認日
 ~~~
 
 sourceに存在しない項目を推測補完しません。
 
-`source上の位置づけ` は、そのsource item自身の性質を保持します。少なくとも normative requirement / informative guidance / advisory guidance を区別できる表現にします。
+各 `source item ref` は、そのitem自身の `source上の位置づけ` と `適用条件` を1対1で保持します。複数source itemを1つのreference entryへ統合しても、normative requirement / informative guidance / advisory guidance等を1つの値へ潰しません。
+
+同じreference entry内で複数source itemが異なる位置づけ・適用条件を持つ場合も、その対応関係を維持します。
 
 一方、今回のprojectでbindingかどうかはreferenceへ固定しません。project Authority、明示された適合基準、platform、採用Design System、対象文脈と組み合わせて評価時に決定し、UI / UX評価項目の `referenceの位置づけ` へ残します。
 
