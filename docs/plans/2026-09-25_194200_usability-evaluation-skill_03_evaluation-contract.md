@@ -108,6 +108,10 @@ evidence-and-authority.mdに従い、
 
 を区別します。
 
+各source itemの `source上の位置づけ` と適用条件を確認し、project Authority、明示された適合基準、platform、採用Design System、今回の文脈を組み合わせて、今回の評価での `referenceの位置づけ` を決めます。
+
+reference側にあるnormative / informative / advisoryという性質だけから、projectへのbindingを自動確定しません。逆に、project固有のbinding根拠を使う場合はproject Authority refを評価項目へ残します。
+
 ### Step 6: 評価
 
 対象に応じて以下から必要なものを評価します。
