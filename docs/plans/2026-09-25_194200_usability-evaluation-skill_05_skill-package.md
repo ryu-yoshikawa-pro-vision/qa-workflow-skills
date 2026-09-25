@@ -1,10 +1,10 @@
-# UI/UX評価・ユーザビリティテストSkill追加Plan
+# UI/UX評価・ユーザビリティ検査Skill追加Plan
 
 ## 0. 本ファイルの対象
 
 本ファイルは `skills/usability-evaluation/` packageの正本です。
 
-live targetを能動操作する `skills/usability-testing/` packageは `_05a_usability-testing-package-and-evaluation.md` に分離します。
+live targetを能動操作する `skills/usability-inspection/` packageは `_05a_usability-inspection-package-and-evaluation.md` に分離します。
 
 usability-evaluationへbrowser runner、task execution、timing measurement runtimeを追加しません。
 
