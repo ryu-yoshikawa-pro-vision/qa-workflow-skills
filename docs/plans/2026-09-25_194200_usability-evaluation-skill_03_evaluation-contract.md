@@ -1,4 +1,4 @@
-# UI/UX評価・ユーザビリティテストSkill追加Plan
+# UI/UX評価・ユーザビリティ検査Skill追加Plan
 
 ## 0. 本契約の対象
 
@@ -6,7 +6,7 @@
 
 UI pattern、principle、standard、Design System、heuristic等をevidenceへ照合して意味判断します。
 
-live targetをuser goal / task scenarioから能動操作する `usability-testing` の実行契約は `_01a_usability-testing-scope-and-contract.md` に分離します。
+live targetをuser goal / task scenarioから能動操作する `usability-inspection` の実行契約は `_01a_usability-inspection-scope-and-contract.md` に分離します。
 
 `usability-evaluation` 自身はbrowser / session ownerにならず、代表ユーザーを用いたusability testingを実施したとは扱いません。
 
@@ -70,7 +70,7 @@ live targetをuser goal / task scenarioから能動操作する `usability-testi
 
 解釈だけを観測事実として書きません。
 
-`usability-testing` のtask outcome、action trace、timing、screenshot等が入力される場合も、それらをObservation / evidenceとして扱い、human user behaviorへ読み替えません。
+`usability-inspection` のtask outcome、action trace、timing、screenshot等が入力される場合も、それらをObservation / evidenceとして扱い、human user behaviorへ読み替えません。
 
 ### Step 3: pattern候補を識別
 
