@@ -156,6 +156,8 @@ DOM / accessibility treeだけでは確定できない場合、画像証跡を�
 
 ### 実対象確認時
 
+UI / UX評価が明示的に要求・選定された場合、既存情報をread-only入力として再利用できます。
+
 - test-target-inspectionのcurrent UI情報
 - DOM / accessibility tree
 - ARIA snapshot
@@ -167,6 +169,8 @@ DOM / accessibility treeだけでは確定できない場合、画像証跡を�
 を利用します。
 
 ### TC実行時
+
+TC実行とは別にUI / UX評価が明示的に要求・選定された場合、既存のTC実行evidenceをread-only入力として再利用できます。
 
 - test-executionが固定したTC
 - 実行中の観測
