@@ -413,22 +413,40 @@ skills/usability-evaluation/
 
 ## 8. index.md
 
-SKILL.mdから最初に読むreferenceは index.md だけにします。
+SKILL.mdから最初に読むreferenceは `references/index.md` だけにします。
 
-index.mdには次を持たせます。
+情報量が大きくなるため、root indexへ全pattern名・全aliasを平置きしません。
 
-- どの入力ならどのreferenceを読むか
-- pattern名 / alias → reference
-- user goal → reference
-- cross-cutting concern → reference
-- accessibility concern → reference
-- platform / Design System → reference
-- visual issue → reference
-- error / loading / empty / feedback → reference
+~~~text
+SKILL.md
+  ↓
+references/index.md
+  ├→ patterns/index.md
+  │    └→ 分野別pattern reference
+  ├→ accessibility/index.md
+  │    └→ WCAG / APG
+  └→ platforms/index.md
+       └→ Design System / HIG別reference
+~~~
+
+root indexには次だけを持たせます。
+
+- 評価段階 / 入力種別から最初に読むsub-index
+- user goal / UI種別の大分類からpattern indexへのrouting
+- accessibility concernからaccessibility indexへのrouting
+- platform / adopted Design Systemからplatform indexへのrouting
+- visual issue、error、loading、empty、feedback等のcross-cutting concernから該当indexへのrouting
+- source authority / evidence判断への導線
+
+pattern名 / aliasの詳細索引は `patterns/index.md` または必要に応じた分野別indexに置きます。
+
+Design System固有名称は `platforms/index.md` からcommon patternまたはsource-specific referenceへ解決します。
 
 Agentが全referenceを毎回読み込む前提にはしません。
 
-ただし、対象UIに関連する複数patternがある場合は必要なreferenceを複数読めるようにします。
+対象UIに関連する複数patternがある場合だけ、indexから複数referenceを選択します。
+
+root indexの肥大化が確認された場合も、新しい検索runtimeを追加する前にindexを意味単位で分割します。
 
 ## 9. source-catalog.md
 

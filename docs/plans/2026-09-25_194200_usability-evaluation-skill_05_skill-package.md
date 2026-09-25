@@ -42,18 +42,19 @@ SKILL.mdは詳細なUI pattern知識を抱えません。
 
 必須契約:
 
-1. 実行前に references/index.md を読む。
-2. indexから対象pattern、cross-cutting concern、platformに必要なreferenceだけを読む。
+1. 実行前に `references/index.md` を読む。
+2. root indexから必要な `patterns/index.md` / `accessibility/index.md` / `platforms/index.md` へ進み、対象pattern、cross-cutting concern、platformに必要なreferenceだけを読む。
+3. 全referencesを一括で読み込まない。
 3. user goal / context / applicabilityを確認してからpattern guidanceを適用する。
 4. project Authorityと一般guidanceを分離する。
 5. 観測事実と評価を分離する。
-6. TCのPASS / FAILを勝手に上書きしない。
-7. Product Riskを採点しない。
-8. live UIを観測していない場合、その事実を保持する。
-9. browser ownerが別Skillの場合は取得済みevidenceを優先し、同一sessionを勝手に操作しない。
-10. visual判断が必要な場合は画像証跡を利用する。
-11. sourceを必ず追跡できる形でFindingへ残す。
-12. user researchでしか確定できない事項を断定しない。
+7. TCのPASS / FAILを勝手に上書きしない。
+8. Product Riskを採点しない。
+9. live UIを観測していない場合、その事実を保持する。
+10. browser ownerが別Skillの場合は取得済みevidenceを優先し、同一sessionを勝手に操作しない。
+11. visual判断が必要な場合は画像証跡を利用する。
+12. sourceを必ず追跡できる形でFindingへ残す。
+13. user researchでしか確定できない事項を断定しない。
 
 ## 3. trigger
 

@@ -321,7 +321,7 @@ dataset構造検証だけで実装完了にしません。
 
 既存semantic runner + 実Judgeを使える環境で、代表caseのcandidate outputを生成・評価します。
 
-実AgentがSkillを正しく発火し、indexから必要referenceを読むことも確認します。
+実AgentがSkillを正しく発火し、root index → sub-index → 必要referenceの順で読み、無関係なreferenceを一括読込しないことも確認します。
 
 外部LLM APIをCIの必須条件にはしません。
 
@@ -344,7 +344,9 @@ PR #12の実行基盤を利用できる場合、
 
 - usability-evaluation Skill packageがAgent Skills仕様を満たす
 - SKILL.mdからreferences/index.mdへ到達できる
-- indexからpattern / concern / platform別referenceへ到達できる
+- root indexからpatterns / accessibility / platformsのsub-indexへ到達できる
+- sub-indexから対象pattern / concern / platform別referenceへ到達できる
+- 通常評価で全referencesの一括読込を要求しない
 - source discovery対象categoryと候補sourceの採否がsource inventoryへ記録されている
 - 採用sourceの対象母集団がsource-coverageへ記録されている
 - 全source itemがincluded / merged-duplicate / out-of-scope / unavailable / source-reference-onlyのいずれかへ閉じている
