@@ -497,6 +497,28 @@ adopted sourceでは加えて次を管理します。
 
 source全体を一律にnormative / advisoryへ固定できない場合は、defaultだけをcatalogへ置き、item / reference単位の位置づけで上書きします。WCAG本文とUnderstanding、同一Design System内のstable / experimental等をsource単位だけで同じ強さにしません。
 
+### source discovery実行記録
+
+candidate表とは別に、探索を実施した事実をsource-catalog.md内へ記録します。検索やcross-link確認で新規candidateが0件でも、実行記録は残します。
+
+最低限:
+
+- discovery type: query / cross-link
+- discovery target: Query IDまたはadopted source ID
+- discovery category
+- checked_at
+- 確認範囲
+- 確認件数
+- 新規candidate件数
+- completion: completed / blocked
+- block理由（blockedの場合だけ）
+
+queryではQ1〜Q7をそれぞれ1件以上 `completed` へ閉じます。
+
+cross-linkでは各adopted source IDについて1件以上の実行記録を持ち、直接参照される対象linkが0件でも `確認件数=0 / 新規candidate件数=0 / completion=completed` として確認済みであることを残します。
+
+探索手段の障害等で所定範囲を確認できなかった場合は `blocked` とし、探索完了には数えません。
+
 ## 10. source-coverage.md
 
 「すべて取得した」を検証可能にするため、対象ページ / pattern単位でcoverageを保持します。
