@@ -91,6 +91,8 @@ user goal / task scenarioの出所を区別します。
 - UIからの推定
 - 不明
 
+成果物では少なくとも `confirmed / inferred / unknown` を区別し、`inferred` は仮定として表示します。
+
 UIや一般知識から推定したgoalは、実ユーザーのgoalとして確定しません。
 
 推定しかない場合は「このgoalを仮定したtask-based inspection」として扱い、representative user taskとは表現しません。
@@ -322,6 +324,8 @@ scopeで指定した場合、
 
 WCAG conformance全体を単一taskから宣言しません。
 
+product / app全体のaccessibility conformance評価を要求された場合はW3C WCAG-EM 2.0のscope / product exploration / representative sample / evaluation / reporting契約を参照します。通常の単一task usability-testingへWCAG-EM全手順を無条件適用しません。
+
 ### system responsiveness
 
 測定対象はAgentの思考時間ではなく、system / browser側の待ち時間です。
@@ -338,11 +342,18 @@ WCAG conformance全体を単一taskから宣言しません。
 - start event
 - end event
 - elapsed time
+- measurement method
 - viewport / device
 - network等、取得できる実行条件
 - evidence ref
 
 を残します。
+
+start / endは可能な限りbrowser / page側のmonotonicな時刻またはPerformance API等、同一計測系で取得します。
+
+Agentが「次に何をするか」を考えるmodel turn、tool call待ち、チャット往復時間をsystem elapsed timeへ含めません。
+
+browser側で区間を直接計測できず、Agent turnを跨ぐwall-clockしか得られない場合はsystem responsivenessの測定値として確定せず、`measurement-unavailable` または制約付き観測として扱います。
 
 ## 8. performance判定
 
