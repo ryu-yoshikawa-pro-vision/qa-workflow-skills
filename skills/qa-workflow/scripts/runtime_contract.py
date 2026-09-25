@@ -169,16 +169,12 @@ def _object_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     return result
 
 
-def _scan_json_limits(text: str, *, max_depth: int = MAX_DEPTH) -> None:
+def _scan_json_depth(text: str, *, max_depth: int = MAX_DEPTH) -> None:
     depth = 0
     in_string = False
     escaped = False
-    string_bytes = 0
     for char in text:
         if in_string:
-            string_bytes += len(char.encode("utf-8", "surrogatepass"))
-            if string_bytes > MAX_STRING_BYTES:
-                raise LimitExceeded("1文字列の上限を超えました")
             if escaped:
                 escaped = False
             elif char == "\\":
@@ -188,7 +184,6 @@ def _scan_json_limits(text: str, *, max_depth: int = MAX_DEPTH) -> None:
             continue
         if char == '"':
             in_string = True
-            string_bytes = 0
         elif char in "[{":
             depth += 1
             if depth > max_depth:
@@ -201,6 +196,76 @@ def _scan_json_limits(text: str, *, max_depth: int = MAX_DEPTH) -> None:
         raise InvalidInput("閉じていないJSON string")
     if depth != 0:
         raise InvalidInput("JSON containerが閉じていません")
+
+
+def _scan_json_string_limits(
+    text: str,
+    *,
+    exempt_top_level_string_keys: frozenset[str] = frozenset(),
+) -> None:
+    """Apply the per-string limit, with narrowly scoped top-level exemptions."""
+    depth = 0
+    root_is_object = False
+    top_level_state: str | None = None
+    top_level_key: str | None = None
+    index = 0
+    while index < len(text):
+        char = text[index]
+        if char == '"':
+            end = index + 1
+            escaped = False
+            while end < len(text):
+                token_char = text[end]
+                if escaped:
+                    escaped = False
+                elif token_char == "\\":
+                    escaped = True
+                elif token_char == '"':
+                    end += 1
+                    break
+                end += 1
+            token = text[index:end]
+            is_top_level_key = (
+                root_is_object and depth == 1 and top_level_state == "key"
+            )
+            is_top_level_value = (
+                root_is_object and depth == 1 and top_level_state == "value"
+            )
+            string_bytes = len(text[index + 1:end].encode("utf-8", "surrogatepass"))
+            if not (
+                is_top_level_value
+                and top_level_key in exempt_top_level_string_keys
+            ) and string_bytes > MAX_STRING_BYTES:
+                raise LimitExceeded("1文字列の上限を超えました")
+            if is_top_level_key:
+                top_level_key = json.loads(token)
+                top_level_state = "colon"
+            elif is_top_level_value:
+                top_level_state = "member_done"
+            index = end
+            continue
+
+        if char in "[{":
+            if depth == 0 and char == "{":
+                root_is_object = True
+                top_level_state = "key"
+            elif root_is_object and depth == 1 and top_level_state == "value":
+                top_level_state = "nested"
+            depth += 1
+        elif char in "]}":
+            depth -= 1
+            if root_is_object and depth == 1 and top_level_state == "nested":
+                top_level_state = "member_done"
+        elif root_is_object and depth == 1:
+            if char == ":" and top_level_state == "colon":
+                top_level_state = "value"
+            elif char == "," and top_level_state == "member_done":
+                top_level_state = "key"
+                top_level_key = None
+            elif not char.isspace() and top_level_state == "value":
+                # A number, boolean, or null starts a scalar member value.
+                top_level_state = "member_done"
+        index += 1
 
 
 def _reject_surrogates(value: Any) -> None:
@@ -262,7 +327,12 @@ def _normalize_numbers(value: Any) -> Any:
     return value
 
 
-def strict_loads(raw: bytes | str, *, aggregate: bool = False) -> Any:
+def strict_loads(
+    raw: bytes | str,
+    *,
+    aggregate: bool = False,
+    allow_verify_artifact_transport: bool = False,
+) -> Any:
     raw_bytes = raw.encode("utf-8") if isinstance(raw, str) else raw
     limit = MAX_AGGREGATE_INPUT_BYTES if aggregate else MAX_NORMAL_INPUT_BYTES
     if len(raw_bytes) > limit:
@@ -271,7 +341,7 @@ def strict_loads(raw: bytes | str, *, aggregate: bool = False) -> Any:
         text = raw_bytes.decode("utf-8", errors="strict")
     except UnicodeDecodeError as exc:
         raise InvalidInput("stdinはUTF-8である必要があります") from exc
-    _scan_json_limits(text)
+    _scan_json_depth(text)
     try:
         value = json.loads(
             text,
@@ -284,6 +354,19 @@ def strict_loads(raw: bytes | str, *, aggregate: bool = False) -> Any:
         raise InvalidInput(str(exc)) from exc
     except (json.JSONDecodeError, TypeError, ValueError) as exc:
         raise InvalidInput(f"strict JSON decodeに失敗しました: {exc}") from exc
+    exempt_string_keys = frozenset()
+    if (
+        allow_verify_artifact_transport
+        and isinstance(value, dict)
+        and value.get("operation") == "verify_runtime_evidence"
+    ):
+        exempt_string_keys = frozenset(
+            {"artifact_markdown", "previous_artifact_markdown"}
+        )
+    _scan_json_string_limits(
+        text,
+        exempt_top_level_string_keys=exempt_string_keys,
+    )
     _reject_surrogates(value)
     return _normalize_numbers(value)
 
@@ -3529,7 +3612,11 @@ def run_cli(
     # generator requests are rejected at the 2 MiB boundary after decoding.
     raw = sys.stdin.buffer.read(MAX_AGGREGATE_INPUT_BYTES + 1)
     try:
-        request = strict_loads(raw, aggregate=True)
+        request = strict_loads(
+            raw,
+            aggregate=True,
+            allow_verify_artifact_transport=True,
+        )
         if not aggregate and not (isinstance(request, dict) and request.get("operation") == "verify_runtime_evidence") and len(raw) > MAX_NORMAL_INPUT_BYTES:
             raise LimitExceeded("通常runtime stdinのbyte上限を超えました")
     except RuntimeErrorBase as exc:
@@ -3759,7 +3846,11 @@ def run_cli(
 def verify_runtime_evidence_cli() -> int:
     raw = sys.stdin.buffer.read(MAX_AGGREGATE_INPUT_BYTES + 1)
     try:
-        request = strict_loads(raw, aggregate=True)
+        request = strict_loads(
+            raw,
+            aggregate=True,
+            allow_verify_artifact_transport=True,
+        )
         if not isinstance(request, dict):
             raise InvalidInput("top-level JSONはobjectである必要があります")
         _emit(verify_runtime_evidence(request))

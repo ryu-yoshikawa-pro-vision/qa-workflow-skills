@@ -65,6 +65,21 @@ class MachineBlockExtractionTests(unittest.TestCase):
 
         self.assertEqual([identity for identity, _body in blocks], ["test-condition-design"])
 
+    def test_machine_json_keeps_normal_string_limit_inside_large_artifact_transport(self) -> None:
+        body = json.dumps(
+            {"metadata": {"large": "x" * (runtime.MAX_STRING_BYTES + 1)}, "input": {}},
+            ensure_ascii=False,
+        )
+        markdown = (
+            "### Machine Runtime Input: test-condition-design::artifact:example\n\n"
+            "```json\n"
+            f"{body}\n"
+            "```\n"
+        )
+        self.assertGreater(len(markdown.encode("utf-8")), runtime.MAX_STRING_BYTES)
+        with self.assertRaises(runtime.LimitExceeded):
+            runtime.extract_machine_blocks(markdown, "Machine Runtime Input")
+
 
 class CanonicalAndFingerprintTests(unittest.TestCase):
     def test_canonicalizes_set_like_arrays_and_record_arrays(self) -> None:
