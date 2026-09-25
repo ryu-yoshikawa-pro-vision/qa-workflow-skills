@@ -45,9 +45,9 @@ SKILL.mdは詳細なUI pattern知識を抱えません。
 1. 実行前に `references/index.md` を読む。
 2. root indexから必要な `patterns/index.md` / `accessibility/index.md` / `platforms/index.md` へ進み、対象pattern、cross-cutting concern、platformに必要なreferenceだけを読む。
 3. 全referencesを一括で読み込まない。
-3. user goal / context / applicabilityを確認してからpattern guidanceを適用する。
-4. project Authorityと一般guidanceを分離する。
-5. 観測事実と評価を分離する。
+4. user goal / context / applicabilityを確認してからpattern guidanceを適用する。
+5. project Authorityと一般guidanceを分離する。
+6. 観測事実と評価を分離する。
 7. TCのPASS / FAILを勝手に上書きしない。
 8. Product Riskを採点しない。
 9. live UIを観測していない場合、その事実を保持する。

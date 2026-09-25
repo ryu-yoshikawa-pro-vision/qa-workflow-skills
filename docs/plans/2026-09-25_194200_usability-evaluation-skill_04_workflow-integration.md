@@ -16,7 +16,44 @@ spec-analysis → test-analysis → usability-evaluation → test-requirement-de
 - 実対象確認・実行・探索中にも再利用したい
 - 同じUIを異なる時点で評価することがある
 
-qa-workflowが要求・scope・利用可能な証拠から必要時にroutingします。
+qa-workflowが要求・scope・利用可能な証拠からroutingします。
+
+### 1.1 起動方針
+
+live UIと設計時で扱いを分けます。
+
+#### live UIを観測・操作する場合
+
+`test-target-inspection` または `test-execution` がUIを実際に観測し、UI / UX評価が案件コンテキストまたはユーザー要求で明示的に対象外ではない場合、取得済みのUI evidenceを `usability-evaluation` へ渡すことを既定とします。
+
+この既定接続はbrowserの追加操作を意味しません。
+
+- DOM / accessibility tree
+- ARIA snapshot
+- screenshot
+- viewport
+- before / after / intermediate state
+- role / locale / permission
+- 操作結果
+
+等、owner Skillが既に取得した証拠を再利用します。
+
+UIを持たない対象、API / DBだけの実行、UX評価が明示的に対象外のscopeでは起動しません。
+
+#### テスト分析・設計の場合
+
+UIが対象であり、次のいずれかが判断へ影響する場合に利用します。
+
+- user goal / task
+- interaction pattern
+- usability
+- accessibility
+- responsive / visual quality
+- error prevention / recovery
+- feedback / loading / empty state
+- UI構造から生じるProduct Risk候補
+
+backend-onlyの分析・設計へ無条件に起動しません。
 
 ## 2. test-analysisから利用
 
@@ -97,7 +134,7 @@ usability-evaluationのためだけに同じ画面を再scanすることを既�
 
 ## 5. test-executionとの統合
 
-TC実行中に各meaningful UI stateの証拠を取得できる場合、その証拠をusability-evaluationへ渡せます。
+TC実行中に各meaningful UI stateの証拠を取得できる場合、その証拠をusability-evaluationへ渡します。UI / UX評価が明示的に対象外なら渡しません。
 
 ~~~text
 test-execution
@@ -122,6 +159,19 @@ test-execution実行中に別Agentが同一browser / sessionへ並行操作し�
 に対する評価です。
 
 追加操作が必要ならtest-executionへ要求し、owner側の副作用・cleanup・開始状態契約に従います。
+
+### 評価タイミング
+
+usability-evaluationをTC操作のたびに同一sessionへ割り込ませません。
+
+owner Skillは評価に必要なmeaningful stateのevidence refを保持し、少なくとも現在TCの状態を壊さないcheckpointでread-only評価へ渡します。
+
+- UX評価結果が現在TCの仕様上PASS / FAIL判定条件でない場合、UX評価完了を待ってTCの仕様判定を変更しない
+- immutable evidenceを評価する処理はhostが並行実行可能でも、workflow契約として真の並行実行を要求しない
+- UX評価が追加観測を要求した場合はowner Skillへ戻し、勝手に同一browserを操作しない
+- 同じevidence / stateを同一Activity内で理由なく重複評価しない
+
+これにより、テスト実行の状態管理とUX評価を分離しながら、実行中に得たUI状態を失わず評価できます。
 
 ## 6. exploratory-testingとの統合
 

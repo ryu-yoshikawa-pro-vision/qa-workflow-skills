@@ -129,7 +129,7 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
 ## 固定方針
 
 1. usability-evaluation は横断的な専門評価Skillとし、通常の設計フローへ無条件に追加しない。
-2. UIを扱い、ユーザビリティ・アクセシビリティ・視覚品質の評価が要求または必要な場合に利用する。
+2. live UIを扱うtest-target-inspection / test-executionでは、UI / UX評価が明示的に対象外でない限り、取得済み証拠を使うread-only評価を既定で接続する。分析・設計ではUIが対象で、user goal / interaction / usability / accessibility / visual qualityが判断へ影響する場合に利用する。
 3. Skill自身がProduct Risk、TC、Regression membership等を所有しない。
 4. 仕様上のPASS / FAILとUX評価結果を分離する。
 5. UIパターン名だけからチェックリストを機械適用せず、ユーザー目的、利用文脈、適用条件を先に確認する。
