@@ -258,10 +258,11 @@ test-condition-designは現在有効なテスト要求と仕様根拠の範囲�
 
 - pattern候補と目的を確認した
 - 適用可能なreferenceを選んだ
-- 判定可能な観点を評価した
+- 目的・理解可能性 / interaction / feedback / error prevention・recovery / accessibility / visual integrity / cross-pattern・flowの各上位観点を「今回評価する」または理由付きの「対象外」へ固定した
+- 「今回評価する」とした上位観点が、UI / UX評価結果の `問題を確認 / 問題なし / 判定不能 / 対象外` のいずれかへ閉じている
 - 判定不能を理由付きで残した
 - 観測事実と解釈を分離した
-- sourceを追跡できる
+- source item refを追跡できる
 - 必要なFindingを出した
 
 状態になれば、その評価Activityは完了できます。
