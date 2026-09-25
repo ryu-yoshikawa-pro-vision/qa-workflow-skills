@@ -137,7 +137,7 @@ assets/output-template.mdは最低限次を持ちます。
 - pattern purpose
 - user goalとの関係
 - applicability
-- source refs
+- source item refs
 
 ### UI / UX評価結果
 
@@ -210,7 +210,7 @@ all-source coverage要件を人手だけに依存させないため、Skill-loca
 - included / merged-duplicate itemにreference destinationがある
 - included / merged-duplicate itemで `available_dimensions = captured_dimensions` が成立する
 - reference destinationが実在する
-- pattern entryのsource refがcatalog / coverageへ解決する
+- pattern entryのsource item refがsource-coverageへ解決し、そこからsource IDがsource-catalogへ解決する
 - required metadataが欠けていない
 - orphan referenceがない
 - alias indexが存在しないentryを指さない
