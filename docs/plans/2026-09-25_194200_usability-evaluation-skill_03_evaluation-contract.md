@@ -112,7 +112,27 @@ evidence-and-authority.mdに従い、
 
 reference側にあるnormative / informative / advisoryという性質だけから、projectへのbindingを自動確定しません。逆に、project固有のbinding根拠を使う場合はproject Authority refを評価項目へ残します。
 
-### Step 6: 評価
+### Step 6: 今回評価する観点を固定
+
+評価を始める前に、target scope、user goal / task、pattern候補、適用可能なreference、利用可能なevidenceから、今回扱う観点を固定します。
+
+最低限、次の上位観点をそれぞれ「今回評価する」または「対象外」とし、対象外には理由を残します。
+
+- 目的・理解可能性
+- interaction
+- feedback
+- error prevention / recovery
+- accessibility
+- visual integrity
+- cross-pattern / flow
+
+全上位観点へ同じ詳細checklistを機械適用しません。各上位観点の中で何を確認するかは、pattern、reference、evidence、対象状態に応じて選びます。
+
+「今回評価する」とした上位観点は、後続のUI / UX評価結果で少なくとも1件以上の `問題を確認 / 問題なし / 判定不能` へ閉じます。観測途中で適用外と分かった場合は、理由付きの `対象外` へ閉じられます。
+
+deterministic validatorは「固定した観点が結果へ閉じていること」だけを検証し、その観点を選ぶべきだったか、内部でどの確認項目が必要だったかはsemantic evalで確認します。
+
+### Step 7: 評価
 
 対象に応じて以下から必要なものを評価します。
 
@@ -193,7 +213,7 @@ reference側にあるnormative / informative / advisoryという性質だけか�
 
 を確認します。
 
-### Step 7: cross-pattern整合
+### Step 8: cross-pattern整合
 
 component単体が妥当でもflow全体で問題になる場合があります。
 
@@ -206,9 +226,13 @@ component単体が妥当でもflow全体で問題になる場合があります�
 
 必要な場合だけflow単位で再評価します。
 
-### Step 8: UI / UX評価項目を閉じる
+### Step 9: UI / UX評価項目を閉じる
 
 各評価項目は最低限次を持ちます。
+
+`evaluation ref` は1つのusability-evaluation成果物revision内だけで一意なartifact-local refです。新しいglobal QA IDやMachine Entityにはしません。成果物自体のidentity / revisionは、実装開始時に確認したPR #11 / #12 / #13 merge後の既存artifact契約を再利用します。
+
+同じ評価を別revisionで再実行した場合に `evaluation ref` のstable identity維持を要求しません。既存artifact-local ref規則がmerge後実装にある場合はそれを優先し、ない場合はcanonicalな出力順で `EVAL-001` から採番します。
 
 - evaluation ref
 - 対象
@@ -228,7 +252,7 @@ component単体が妥当でもflow全体で問題になる場合があります�
 - 推奨routing
 - finding ref（Findingを作成した場合だけ）
 
-### Step 9: 必要な場合だけFindingを作る
+### Step 10: 必要な場合だけFindingを作る
 
 PR #13のFinding定義を再利用し、後続QA活動で扱う必要がある検出事項だけに限定します。
 
@@ -237,7 +261,7 @@ PR #13のFinding定義を再利用し、後続QA活動で扱う必要がある�
 - `問題なし` / `対象外` → Findingを作らない
 - `判定不能` でもfollow-up不要で現在scopeを閉じられる → Findingを作らない
 
-Findingを作る場合はPR #13の最低契約を満たし、評価項目からfinding refで参照します。
+Findingを作る場合はPR #13の最低契約を満たし、評価項目からfinding refで参照します。`evaluation ref` 自体をPR #13のglobal identityやMachine Entityへ昇格しません。必要な追跡はusability-evaluation成果物ref / revisionと、その中のevaluation refの組で行います。
 
 ## 3. 判定
 
