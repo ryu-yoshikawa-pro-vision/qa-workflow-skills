@@ -154,7 +154,7 @@ assets/output-template.mdは最低限次を持ちます。
 - 想定される影響
 - 想定される影響の根拠
 - 観測済みのユーザー影響（証拠がある場合だけ）
-- source ref
+- source item refs
 - evidence ref
 - status
 - routing
@@ -167,14 +167,21 @@ statusは評価契約の `問題を確認 / 問題なし / 判定不能 / 対象
 
 PR #13のFinding契約を再利用し、後続QA活動で扱う必要がある評価項目だけをFindingへ昇格します。`問題なし` / `対象外` にFinding refを付けません。
 
-## 6. source ref
+## 6. source ID / source item ref
 
-reference内のsource catalog entryへstable refを持たせます。
+`source ID` と `source item ref` を分離します。
+
+- `source ID`: 情報源単位。例: `W3C-WCAG22`
+- `source item ref`: source-coverage上の個別item単位。例: `W3C-WCAG22-2.4.7`
+
+reference entry、UI / UX評価項目、Findingの根拠追跡では原則 `source item ref` を使用します。
 
 例:
 
 ~~~text
 W3C-WCAG22-2.4.7
+W3C-WAIARIA12-DIALOG
+W3C-HTMLARIA-BUTTON
 W3C-APG-DIALOG
 GOVUK-PATTERN-ERROR-RECOVERY
 USWDS-COMPONENT-ACCORDION
@@ -185,10 +192,9 @@ SOCIOMEDIA-...
 
 実装時に実際のsource inventoryから命名規則を固定します。
 
-URLだけを自由記述して同一sourceが分散しないようにします。
+URLだけを自由記述して同一source itemが分散しないようにします。
 
 ただし新しい全QA共通ID体系にはしません。usability-evaluation package内のsource参照です。
-
 ## 7. reference catalog validator
 
 all-source coverage要件を人手だけに依存させないため、Skill-localの小さいvalidatorを追加します。
@@ -198,7 +204,7 @@ all-source coverage要件を人手だけに依存させないため、Skill-loca
 - index linkが存在する
 - source-catalogのsource IDが一意
 - source-catalogのcandidate statusが許可値で、pendingが残っていない
-- source-coverageのsource refがcatalogへ存在する
+- source-coverageのsource IDがcatalogへ存在し、source item refがsource-coverage内で一意
 - coverage disposition / access stateが許可値
 - source自身がmaturity / lifecycleを明示する場合は値を保持する
 - included / merged-duplicate itemにreference destinationがある
@@ -226,12 +232,12 @@ Webへアクセスしてsourceの最新状態を検査するruntimeにはしま�
 - project固有のbinding根拠を適用した評価項目にproject Authority refがある
 - finding refがある場合は対応Findingが存在し、PR #13の最低契約を満たす
 - 問題なし / 対象外の評価項目にfinding refがない
-- source ref形式
+- source item ref形式と参照先
 - evidence ref存在
 - 判定不能に制約理由がある
 - 観測済みのユーザー影響を出す場合は対応evidenceがある
 - TC resultを書き換える欄を持たない
-- sourceなしのbest practice断定を拒否
+- source item refなしのbest practice断定を拒否
 
 意味上「本当にDialogか」「本当に使いづらいか」はdeterministic validatorで判定しません。
 
