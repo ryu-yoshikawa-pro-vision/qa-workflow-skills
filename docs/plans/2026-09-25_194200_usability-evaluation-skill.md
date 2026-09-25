@@ -1,6 +1,6 @@
-# UI/UX評価・ユーザビリティテストSkill追加Plan
+# UI/UX評価・ユーザビリティ検査Skill追加Plan
 
-このPlanは、UIパターンの目的・rationale・standard・Design System等の知識からUI / UXを根拠付きで評価する `usability-evaluation` と、user goal / task scenarioを起点に生きた実対象を能動操作してtask達成、interaction、visual integrity、accessibility上の操作性、user-facing responsivenessを観測・計測する `usability-testing` の2 Skillを追加する実装計画です。
+このPlanは、UIパターンの目的・rationale・standard・Design System等の知識からUI / UXを根拠付きで評価する `usability-evaluation` と、user goal / task scenarioを起点に生きた実対象を能動操作してtask達成、interaction、visual integrity、accessibility上の操作性、user-facing responsivenessを観測・計測する `usability-inspection` の2 Skillを追加する実装計画です。
 
 ## 対象ブランチ
 
@@ -16,7 +16,7 @@ feat/usability-evaluation-skill
 - PR #12: test-target-inspection、test-execution、実対象観測、画像確認、browser safety
 - PR #13: exploratory-testing、regression-testing、qa-knowledge、複数workflowのrouting / concurrency
 
-両Skillはこれらを再実装しません。`usability-evaluation` はreference knowledgeによる意味判断、`usability-testing` はtask-basedなlive executionと観測・計測に責務を限定します。
+両Skillはこれらを再実装しません。`usability-evaluation` はreference knowledgeによる意味判断、`usability-inspection` はtask-basedなlive executionと観測・計測に責務を限定します。
 
 ## 目的
 
@@ -43,9 +43,9 @@ feat/usability-evaluation-skill
 - actionからvisible feedback / task-ready stateまでのsystem側時間を測定する
 - task結果をTCのPASS / FAILと分離して記録する
 
-これを別Skillの `usability-testing` が担当します。
+これを別Skillの `usability-inspection` が担当します。
 
-`usability-testing` は代表ユーザーを用いたUX researchの代替ではありません。AIエージェントによるtask-basedな実対象検査として扱い、人間のsatisfaction、task completion rate、human task time等を捏造しません。
+`usability-inspection` は代表ユーザーを用いたUX researchの代替ではありません。AIエージェントによるtask-basedな実対象検査として扱い、人間のsatisfaction、task completion rate、human task time等を捏造しません。
 
 ## workflow上の位置づけ
 
@@ -53,7 +53,7 @@ feat/usability-evaluation-skill
 
 `usability-evaluation` は設計資料または既存evidenceをreference knowledgeへ照合する横断的な評価Skillです。
 
-`usability-testing` はlive targetがあり、実際にtaskを操作してusabilityを確認する要求がある場合だけ起動する独立Activityです。
+`usability-inspection` はlive targetがあり、実際にtaskを操作してusabilityを確認する要求がある場合だけ起動する独立Activityです。
 
 ~~~text
 UI pattern / standard / Design System knowledge
@@ -64,7 +64,7 @@ UI pattern / standard / Design System knowledge
                     │
 user goal / task scenario
           ↓
-   usability-testing
+   usability-inspection
           ↓
 live UI operation / observation / timing
           ↓
@@ -73,7 +73,7 @@ task outcome / Observation
 必要な場合だけ usability-evaluation → Finding
 ~~~
 
-`test-target-inspection` / `test-execution` から既存evidenceを `usability-evaluation` へ渡すことはできますが、`usability-testing` をそれらの追加処理として実行しません。
+`test-target-inspection` / `test-execution` から既存evidenceを `usability-evaluation` へ渡すことはできますが、`usability-inspection` をそれらの追加処理として実行しません。
 
 両Skillは他Skillのowner責務を置き換えません。
 
@@ -84,7 +84,7 @@ task outcome / Observation
 - TCの実操作・PASS / FAIL → test-execution
 - Exploration / Investigation → exploratory-testing
 - routing / common workflow state → qa-workflow
-- user goal / task scenarioからのlive usability task実行 → usability-testing
+- user goal / task scenarioからのlive usability task実行 → usability-inspection
 - UI pattern / standard / heuristicによる意味判断 → usability-evaluation
 
 ## 仕様上の期待結果とUIガイダンスの分離
@@ -131,8 +131,8 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
 
 1. 目的・現状・責務境界  
    2026-09-25_194200_usability-evaluation-skill_01_scope-and-responsibilities.md
-1a. usability-testingの責務・task / execution契約  
-   2026-09-25_194200_usability-evaluation-skill_01a_usability-testing-scope-and-contract.md
+1a. usability-inspectionの責務・task / execution契約  
+   2026-09-25_194200_usability-evaluation-skill_01a_usability-inspection-scope-and-contract.md
 2. 情報源・reference構造・網羅性契約  
    2026-09-25_194200_usability-evaluation-skill_02_reference-knowledge.md
 2a. 情報源探索・収集・網羅性ゲート  
@@ -141,16 +141,16 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
    2026-09-25_194200_usability-evaluation-skill_03_evaluation-contract.md
 4. 既存Skill / workflow統合  
    2026-09-25_194200_usability-evaluation-skill_04_workflow-integration.md
-4a. usability-testingのworkflow統合  
-   2026-09-25_194200_usability-evaluation-skill_04a_usability-testing-workflow-integration.md
+4a. usability-inspectionのworkflow統合  
+   2026-09-25_194200_usability-evaluation-skill_04a_usability-inspection-workflow-integration.md
 5. Skill package・成果物・validator  
    2026-09-25_194200_usability-evaluation-skill_05_skill-package.md
-5a. usability-testing package・成果物・評価  
-   2026-09-25_194200_usability-evaluation-skill_05a_usability-testing-package-and-evaluation.md
+5a. usability-inspection package・成果物・評価  
+   2026-09-25_194200_usability-evaluation-skill_05a_usability-inspection-package-and-evaluation.md
 6. 評価・CI・実装順序・完了条件  
    2026-09-25_194200_usability-evaluation-skill_06_evaluation-ci-implementation-order.md
-6a. usability-testingの実装順序・完了条件  
-   2026-09-25_194200_usability-evaluation-skill_06a_usability-testing-implementation-order.md
+6a. usability-inspectionの実装順序・完了条件  
+   2026-09-25_194200_usability-evaluation-skill_06a_usability-inspection-implementation-order.md
 
 ## 固定方針
 
@@ -184,10 +184,10 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
 28. source ID / source item ref / reference entry IDはusability-evaluation package内のappend-only IDとし、並べ替えや名称変更で振り直さず、削除済みIDを別identityへ再利用しない。
 29. usability-evaluationはUI pattern knowledgeによる専門評価を主責務とし、代表ユーザーを用いたusability studyを実施したとは扱わない。
 30. usability-evaluationの「問題なし」は今回のscope / evidence / referenceの範囲で問題を確認しなかったことを意味し、製品全体のusabilityを保証しない。
-31. usability-testingはuser goal / task scenario / success conditionを正本にし、詳細stepを正解として与えない。詳細TCを忠実に実行する依頼はtest-executionへroutingする。
-32. usability-testingの次actionは宣言したinteraction modeでユーザーが利用できる情報から選び、test id、hidden DOM、source code、backend state等でdiscoverability問題を回避しない。
-33. usability-testingがbrowser / session ownerとなり、usability-evaluationはimmutable evidenceをread-onlyで評価する。同一sessionを並行操作しない。
+31. usability-inspectionはuser goal / task scenario / success conditionを正本にし、詳細stepを正解として与えない。詳細TCを忠実に実行する依頼はtest-executionへroutingする。
+32. usability-inspectionの次actionは宣言したinteraction modeでユーザーが利用できる情報から選び、test id、hidden DOM、source code、backend state等でdiscoverability問題を回避しない。
+33. usability-inspectionがbrowser / session ownerとなり、usability-evaluationはimmutable evidenceをread-onlyで評価する。同一sessionを並行操作しない。
 34. timingではAgentの推論時間を除外し、system / browser側の測定区間だけを記録する。project thresholdがなければ任意のperformance FAIL thresholdを創作しない。
 35. 単一Agent runのelapsed timeをINP field result、Core Web Vitals達成、human task time等へ昇格しない。
-36. usability-testingはtest-target-inspection / test-executionの既定後処理にはせず、live task-based testが要求・選定された場合だけ起動する。
+36. usability-inspectionはtest-target-inspection / test-executionの既定後処理にはせず、live task-based testが要求・選定された場合だけ起動する。
 37. usability-evaluationのseed sourceは自動採用しない。既存adopted sourceにない明確な評価価値を確認してadoptし、一度adoptしたsourceはadopted scope内の関連情報を従来どおり全件closureする。
