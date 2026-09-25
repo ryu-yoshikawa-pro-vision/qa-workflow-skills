@@ -48,15 +48,18 @@ SKILL.mdは評価契約とindex参照方法だけを持ち、詳細知識はrefe
 - WCAG 2.2の全Success Criteriaとconformance上必要な関連定義
 - 各Success Criterionの公開Understanding document
 - Techniques / Failuresのうち、そのSuccess Criterionの理解・観測・判定に利用できる公開情報
+- WAI-ARIA 1.2 Recommendationのrole / state / property定義とauthor requirementsのうち、UI評価に必要な公開情報
+- current ARIA in HTML Recommendationのauthor conformance requirements
 - WAI-ARIA APGの全公開Patterns
 - WAI-ARIA APGの全公開Practices
 - APG examplesから、pattern理解・keyboard・roles / states / properties・注意点に必要な情報
 
 扱い:
 
-- WCAG Success Criterionはtestableな標準要件として扱う
-- Understanding / Techniquesはcriterionの理解・評価方法を補助する
-- APGはARIAの利用方法に関するguidanceであり、example実装を唯一のproduction正解としない
+- WCAG Success Criterion、WAI-ARIA 1.2、ARIA in HTMLで今回の対象へ適用されるnormative requirementは、該当要件として扱う
+- Understanding / Techniquesはcriterionの理解・評価方法を補助するinformative guidanceとして扱う
+- APGはARIAの利用方法に関するinformative guidanceであり、example実装を唯一のproduction正解としない
+- WAI-ARIA 1.3等のDraftをcurrent Recommendationと同じ強さで扱わない。projectが明示採用する場合または将来仕様の調査が目的の場合だけ、draft statusを保持して別扱いする
 - native HTMLで解決できる場合に不要なARIAを要求しない
 
 ### GOV.UK Design System
@@ -353,8 +356,9 @@ loading / empty / disabled等の関連状態
 観測方法
 評価時の注意
 関連pattern
-source refs
-source種別
+source item refs
+source上の位置づけ
+適用条件
 source確認日
 ~~~
 
@@ -490,6 +494,7 @@ source全体を一律にnormative / advisoryへ固定できない場合は、def
 最低限:
 
 - source ID
+- source item ref
 - source item
 - canonical URL
 - category
@@ -509,6 +514,17 @@ source全体を一律にnormative / advisoryへ固定できない場合は、def
 利用条件・取得制約等により取得済み情報をreferenceへ収録できないitemを `included` のまま閉じません。既存の `source-reference-only` / `unavailable` 等へ分類します。
 
 source itemを追加・削除した場合、coverage表を更新します。
+source IDは情報源単位の識別子、source item refはsource-coverage上のitem単位のstable refとして分離します。
+
+例:
+
+~~~text
+source ID: W3C-WCAG22
+source item ref: W3C-WCAG22-2.4.7
+~~~
+
+reference entryと評価結果から参照するのは原則としてsource item refです。source IDだけでは個別の要件・guidanceを特定した根拠として扱いません。
+
 ## 11. 著作権・ライセンス
 
 外部資料の長文をreferenceへコピーする設計にはしません。
