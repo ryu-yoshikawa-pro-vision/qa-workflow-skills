@@ -200,6 +200,9 @@ source-coverage上の対象をすべて閉じます。
 source-coverage validatorを実行し、
 
 - source-catalogのpending candidate
+- Q1〜Q7のdiscovery実行記録不足 / 未完了
+- adopted source IDのcross-link実行記録不足 / 未完了
+- discovery実行記録のblocked残存
 - coverage disposition未設定
 - access state未設定
 - includedなのにdestinationなし
@@ -343,7 +346,7 @@ UI patternを含むtest-condition-design
 - status
 - required fields
 - unresolved constraints
-- source catalog / coverage disposition / access state / maturity / field-level coverage
+- source catalog / discovery実行記録 / coverage disposition / access state / maturity / field-level coverage
 - index integrity
 
 を検証します。
@@ -441,7 +444,8 @@ PR #12の実行基盤を利用できる場合、
 - root indexからpatterns / accessibility / platformsのsub-indexへ到達できる
 - sub-indexから対象pattern / concern / platform別referenceへ到達できる
 - 通常評価で全referencesの一括読込を要求しない
-- Q1〜Q7と1-hop cross-link探索のcandidateがsource-catalogへ記録され、pendingが0
+- Q1〜Q7がsource-catalogのdiscovery実行記録でそれぞれ1件以上 `completed` へ閉じ、各adopted source IDの1-hop cross-link確認も `completed` へ閉じている。0件結果も確認件数 / 新規candidate件数=0として記録され、`blocked` が残っていない
+- discoveryで得たcandidateがsource-catalogへ記録され、pendingが0
 - 採用sourceごとのadopted scopeとitem列挙元 / 列挙方法がsource-catalogへ記録され、対象item母集団がsource-coverageへ記録されている。source全体を列挙できない場合は有限に列挙できるsubsetだけをadopted scopeとし、source全体を全件取得済みと扱わない
 - 全source itemのcoverage dispositionがincluded / merged-duplicate / out-of-scope / unavailable / source-reference-onlyのいずれかへ閉じている
 - access stateがcoverage dispositionと分離され、restricted sourceを取得済みと誤認しない
@@ -452,7 +456,8 @@ PR #12の実行基盤を利用できる場合、
 - included referenceからsource item ref、source ID、canonical URLへ追跡できる
 - reference entry内で各source item refにsource上の位置づけ / 適用条件が対応付いている
 - 内容を収録した各adopted sourceについて最低1件のreference spot-checkを実施し、patterns / accessibility / platformsの各経路で最低1件は原文との意味一致を確認している
-- UI / UX評価項目にreferenceの位置づけが残り、project固有のbinding根拠を使う場合はproject Authority refを追跡できる
+- UI / UX評価項目にreference entry refs / source item refs / referenceの位置づけが残り、project固有のbinding根拠を使う場合はproject Authority refを追跡できる
+- 判定不能 / 対象外のUI / UX評価項目にstatus reason / 制約・未確認が残る
 - usability-evaluation成果物で上位観点ごとの今回の扱いが固定され、「今回評価する」とした観点がすべて評価結果へ閉じている
 - evaluation refは成果物revision内だけで一意なartifact-local refで、新しいglobal QA ID / Machine Entityを追加していない
 - Regression配下ではregression-testingが確定したUI / UX評価scopeが通常のlive UI既定接続より優先される
