@@ -1,15 +1,15 @@
-# UI/UX評価・ユーザビリティテストSkill追加Plan
+# UI/UX評価・ユーザビリティ検査Skill追加Plan
 
 ## 1. 追加するSkill
 
-`usability-testing` は、生きた実対象に対してuser goal / task scenarioを与え、AIエージェント自身がUIを操作しながら、task達成可否、interaction、feedback、error recovery、visual integrity、accessibility上の操作性、system responsivenessを観測・計測するSkillです。
+`usability-inspection` は、生きた実対象に対してuser goal / task scenarioを与え、AIエージェント自身がUIを操作しながら、task達成可否、interaction、feedback、error recovery、visual integrity、accessibility上の操作性、system responsivenessを観測・計測するSkillです。
 
 `usability-evaluation` とは責務を分けます。
 
 | Skill | 主責務 | 実対象の能動操作 | 主な根拠 |
 | --- | --- | --- | --- |
 | `usability-evaluation` | UI pattern / principle / standard / Design System知識からUI / UXを評価 | 所有しない | reference knowledge + evidence |
-| `usability-testing` | user goal / task scenarioに沿って実対象を操作し、task遂行中の事実と計測値を取得 | 所有する | task scenario + live observation / measurement |
+| `usability-inspection` | user goal / task scenarioに沿って実対象を操作し、task遂行中の事実と計測値を取得 | 所有する | task scenario + live observation / measurement |
 | `test-target-inspection` | currentなテスト対象情報を収集・管理 | 必要範囲で行う | current target state |
 | `test-execution` | 定義済み詳細TCを実行し期待結果と比較 | 行う | TC expected result |
 
@@ -270,9 +270,9 @@ task実行で得たimmutable evidenceを `usability-evaluation` へ渡します�
 
 に照らして評価します。
 
-browser / sessionのownerは `usability-testing` のままです。
+browser / sessionのownerは `usability-inspection` のままです。
 
-追加観測が必要なら `usability-evaluation` は要求内容を返し、`usability-testing` がscope / safetyを確認して実行します。
+追加観測が必要なら `usability-evaluation` は要求内容を返し、`usability-inspection` がscope / safetyを確認して実行します。
 
 同じbrowser / sessionを両Skillが並行操作しません。
 
@@ -324,7 +324,7 @@ scopeで指定した場合、
 
 WCAG conformance全体を単一taskから宣言しません。
 
-product / app全体のaccessibility conformance評価を要求された場合はW3C WCAG-EM 2.0のscope / product exploration / representative sample / evaluation / reporting契約を参照します。通常の単一task usability-testingへWCAG-EM全手順を無条件適用しません。
+product / app全体のaccessibility conformance評価を要求された場合はW3C WCAG-EM 2.0のscope / product exploration / representative sample / evaluation / reporting契約を参照します。通常の単一task usability-inspectionへWCAG-EM全手順を無条件適用しません。
 
 ### system responsiveness
 
@@ -431,7 +431,7 @@ UI pattern / standardに基づく意味判断は `usability-evaluation` の評�
 
 ## 12. 完了条件
 
-1つのusability-testing Activityは、最低限次を満たせば完了できます。
+1つのusability-inspection Activityは、最低限次を満たせば完了できます。
 
 - task snapshotが固定されている
 - goal / taskの出所が記録されている
