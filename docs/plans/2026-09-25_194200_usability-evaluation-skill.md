@@ -115,6 +115,8 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
    2026-09-25_194200_usability-evaluation-skill_01_scope-and-responsibilities.md
 2. 情報源・reference構造・網羅性契約  
    2026-09-25_194200_usability-evaluation-skill_02_reference-knowledge.md
+2a. 情報源探索・収集・網羅性ゲート  
+   2026-09-25_194200_usability-evaluation-skill_02a_source-acquisition-and-coverage.md
 3. UI / UX評価方法・証拠・判定境界  
    2026-09-25_194200_usability-evaluation-skill_03_evaluation-contract.md
 4. 既存Skill / workflow統合  
@@ -140,9 +142,11 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
 12. WAI-ARIA APGのexample実装を唯一の正解やproduction要件として扱わない。
 13. Nielsen等のheuristicは一般原則として扱い、仕様Authorityへ昇格しない。
 14. 外部資料本文を丸ごと転載しない。referencesには構造化した要約、評価観点、適用条件、source refを保持する。
-15. 採用した情報源の対象ページは、収録済み / 対象外 / 取得不能を棚卸しして閉じる。代表例だけで網羅済みとしない。
-16. 実装時に情報源ごとの利用条件・ライセンスを確認し、許容範囲を超える複製をしない。
-17. runtime時の外部Webアクセスを必須にしない。Skill package単独で参照知識を利用可能にする。
-18. sourceの更新可能性を隠さず、referenceには出典URLと取得・確認時点を保持する。
-19. UX総合点や単一スコアを正本にしない。観測事実、適用根拠、期待される特性、差異、影響、sourceを保持する。
-20. user researchの代替とは扱わない。heuristic evaluationで分かることと、実ユーザーでしか確認できないことを区別する。
+15. 採用した情報源の対象ページは、収録済み / 重複統合済み / 対象外 / 取得不能 / source参照のみを棚卸しして閉じる。代表例だけで網羅済みとしない。
+16. seed sourceだけで探索を止めず、標準化団体、platform HIG、公式Design System、体系化されたUI pattern library、usability evaluation資料を所定のsource discoveryで追加調査し、採否をsource inventoryへ残す。
+17. 「取得できるすべて」は、採用したsourceのUX評価に関係する公開情報をitem単位で閉じることを意味し、無関係なAPI reference、install手順、code sample全文まで複製することは意味しない。
+18. 実装時に情報源ごとの利用条件・ライセンスを確認し、許容範囲を超える複製をしない。
+19. runtime時の外部Webアクセスを必須にしない。Skill package単独で参照知識を利用可能にする。
+20. sourceの更新可能性を隠さず、referenceには出典URLと取得・確認時点を保持する。
+21. UX総合点や単一スコアを正本にしない。観測事実、適用根拠、期待される特性、差異、影響、sourceを保持する。
+22. user researchの代替とは扱わない。heuristic evaluationで分かることと、実ユーザーでしか確認できないことを区別する。

@@ -45,9 +45,9 @@ SKILL.mdは評価契約とindex参照方法だけを持ち、詳細知識はrefe
 
 対象:
 
-- WCAG 2.2
-- WCAG 2.2 Understanding documents
-- WCAG Techniques / FailuresのうちUI評価に関係する公開情報
+- WCAG 2.2の全Success Criteriaとconformance上必要な関連定義
+- 各Success Criterionの公開Understanding document
+- Techniques / Failuresのうち、そのSuccess Criterionの理解・観測・判定に利用できる公開情報
 - WAI-ARIA APGの全公開Patterns
 - WAI-ARIA APGの全公開Practices
 - APG examplesから、pattern理解・keyboard・roles / states / properties・注意点に必要な情報
@@ -124,6 +124,62 @@ Microsoft製品固有の表現と一般化可能な原則を分離します。
 - public pattern guidance
 
 Atlassian製品固有の規約は、対象プロジェクトが採用していない限りbinding requirementにしません。
+
+### Adobe Spectrum
+
+対象:
+
+- 公開Components
+- componentごとのusage / behavior / state / content / accessibility
+- Inclusive Design
+- layout / typography / color等、UI評価に関係するFoundations
+- platform scale、responsive、internationalization等の公開guidance
+
+Spectrum固有のvisual stylingを、採用していないprojectへbinding requirementとして適用しません。
+
+### GitHub Primer
+
+対象:
+
+- 公開Components
+- 公開UI Patterns
+- Foundationsのうちcontent / layout / responsive / accessibility等の評価に必要なguidance
+- component / pattern usage guidance
+
+GitHub固有のproduct conventionと一般化可能なinteraction principleを分離します。
+
+### Salesforce Lightning Design System
+
+対象:
+
+- 現行SLDSの公開Components / Component Blueprints
+- accessibility
+- interaction / usage / visual language
+- responsive / spacing / sizing等の公開guidance
+
+Lightning Base Componentとstyle-only Blueprintの保証範囲を混同しません。
+
+### SAP Fiori
+
+対象:
+
+- 公開Design Principles / General Guidelines
+- platform別Design Guidelines
+- Components / Floorplans / Patterns相当の公開guidance
+- accessibility、responsive、loading / waiting、validation等のUI評価に関係する情報
+
+SAP固有業務・platform前提はsource metadataへ残します。
+
+### GNOME Human Interface Guidelines
+
+対象:
+
+- Design principles
+- Guidelines
+- 全公開Patterns
+- keyboard / pointer / touch / scaling / accessibility等の公開reference
+
+GNOME / GTK / Libadwaita向けplatform conventionは対象platformが一致する場合に優先します。
 
 ### Apple Human Interface Guidelines
 
@@ -227,6 +283,8 @@ heuristicは広い経験則であり、特定componentの仕様要件ではな�
 追加sourceを見つけた場合も、権威性だけで既存sourceより常に優先するとは扱わず、source-catalogへ位置づけを記録します。
 
 検索結果やブログ記事を無制限に蓄積することはしません。source inventoryへ採用するかどうかを明示的に判断し、採用したsourceについては対象母集団を全件棚卸しします。
+
+source discoveryと「取得できるすべて」の終了条件は `_02a_source-acquisition-and-coverage.md` を正本とします。
 
 ## 4. source優先順位
 
@@ -338,6 +396,11 @@ skills/usability-evaluation/
 │       ├── carbon.md
 │       ├── fluent.md
 │       ├── atlassian.md
+│       ├── spectrum.md
+│       ├── primer.md
+│       ├── salesforce-lightning.md
+│       ├── sap-fiori.md
+│       ├── gnome-hig.md
 │       ├── apple-hig.md
 │       ├── material.md
 │       ├── shopify-polaris.md

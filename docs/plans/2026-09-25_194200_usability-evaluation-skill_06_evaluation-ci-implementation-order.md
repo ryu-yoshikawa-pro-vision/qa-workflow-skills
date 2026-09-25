@@ -110,9 +110,14 @@ source-coverage上の対象をすべて閉じます。
 3. Carbon
 4. Fluent 2
 5. Atlassian Design System
-6. Apple Human Interface Guidelines
-7. Material Design
-8. Shopify Polaris
+6. Adobe Spectrum
+7. GitHub Primer
+8. Salesforce Lightning Design System
+9. SAP Fiori
+10. GNOME Human Interface Guidelines
+11. Apple Human Interface Guidelines
+12. Material Design
+13. Shopify Polaris
 
 各sourceで、
 
@@ -135,6 +140,21 @@ source-coverage上の対象をすべて閉じます。
 既にofficial sourceで十分定義される内容もsource provenanceとして価値があればmerged-duplicateで関係を保持できます。
 
 本文を重複コピーしません。
+
+## 8.1 Plan作成時点で確認済みの取得上の注意
+
+実装時に再確認しますが、Plan作成時点では少なくとも次を確認しています。
+
+- WAI-ARIA APGはPatterns一覧とPractices一覧が公開され、patternページには目的、Keyboard Interaction、WAI-ARIA Roles / States / Propertiesを持つ。
+- GOV.UK Design SystemはComponentsとPatternsを分離し、Patternsをuser-focused taskのbest practice solutionとして公開している。
+- USWDSはComponents一覧とPatterns一覧を公開し、component lifecycle / statusも公開している。Plan調査時点のComponents overviewは47 componentsを表示する。
+- CarbonはcoreのUniversal patternsと、core非保証のCommunity patternsを分離している。
+- PrimerはComponentsとは別にUI Patternsを公開している。
+- Apple HIGはDesign principles / Foundations / Patterns / Components / Inputsを分けて公開している。
+- GNOME HIGはPatternsをContainers / Navigation / Controls / Feedbackに分け、GuidelinesにKeyboard、Pointer & Touch、Scaling & Adaptiveness、Accessibility等を持つ。
+- ソシオメディア UIデザインパターン一覧は複数ページに分かれているため、1ページ目だけでinventoryを閉じない。
+- Material Design 3の主要ページはJavaScript依存で取得手段によって本文を取得できない場合がある。公式の代替公開経路を確認し、取得できなければunavailableとする。
+- 旧Polarisの一部URLは現在Shopify DeveloperのPolaris referencesへredirectする。旧URLの内容をcurrentと仮定せず現行canonical sourceを棚卸しする。
 
 ## 9. Step 7: completeness gate
 
@@ -325,8 +345,10 @@ PR #12の実行基盤を利用できる場合、
 - usability-evaluation Skill packageがAgent Skills仕様を満たす
 - SKILL.mdからreferences/index.mdへ到達できる
 - indexからpattern / concern / platform別referenceへ到達できる
+- source discovery対象categoryと候補sourceの採否がsource inventoryへ記録されている
 - 採用sourceの対象母集団がsource-coverageへ記録されている
 - 全source itemがincluded / merged-duplicate / out-of-scope / unavailable / source-reference-onlyのいずれかへ閉じている
+- JavaScript依存、login限定、deprecated / archived、redirect等の取得制約をcurrent sourceと混同せず状態化している
 - included referenceのsource追跡が可能
 - reference catalog validator PASS
 - deterministic eval PASS
