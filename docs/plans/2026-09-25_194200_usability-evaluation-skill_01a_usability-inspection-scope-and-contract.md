@@ -306,6 +306,13 @@ task outcomeは次です。
 
 例えば「Agentがbuttonを見つけられなかった」だけではdiscoverability問題としません。screenshot / rendered UI / accessibility evidence等から必要なcueが存在しない、操作不能、dead end等を確認できない場合は `判定不能` とします。
 
+outcome basisも固定します。
+
+- `達成` → `success-observed`
+- `未達成` → `product-blocker-observed`
+- `判定不能` → `agent-tool-limitation / environment-external / unresolved`
+- `未実行` → `not-started`
+
 これはTCのPASS / FAILではありません。
 
 ### Step 7: UI / UX評価
@@ -362,6 +369,7 @@ cleanup結果と残存状態を記録します。
 - backtrack: 進行中の経路を取りやめ、user-facingなnavigation / state操作で前の状態へ戻って別経路を試した
 - dead end: 許可されたinteraction modeでsuccess conditionへ進むuser-facing actionを確認できなかった
 - recovery: error /失敗状態からtaskを継続可能な状態へ戻した
+- errorはuser-facingなerror stateを数え、Agent / tool / browser自身のerrorを含めない
 
 これらを単一scoreへまとめず、任意の回数thresholdも作りません。比較する場合は同じtask / contextの別run、またはprojectで明示された基準がある場合に限定します。
 
