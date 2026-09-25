@@ -474,7 +474,7 @@ PR #12の実行基盤を利用できる場合、
 - usability-evaluation成果物で上位観点ごとの今回の扱いが固定され、「今回評価する」とした観点がすべて評価結果へ閉じている
 - source IDが `SRC-\d{3,}`、source item refが `<source ID>-ITEM-\d{4,}`、reference entry IDが `REF-\d{4,}` のpackage-local append-only規則に従い、削除済みIDを別identityへ再利用していない
 - evaluation refは成果物revision内だけで一意なartifact-local refで、新しいglobal QA ID / Machine Entityを追加していない
-- Regression配下ではregression-testingが確定したUI / UX評価scopeが通常のlive UI既定接続より優先される
+- Regression配下ではregression-testingが確定したUI / UX評価scopeだけが接続され、通常live UIの暗黙接続を前提にしない
 - reference catalog validator PASS
 - deterministic eval PASS
 - semantic dataset構造 PASS
