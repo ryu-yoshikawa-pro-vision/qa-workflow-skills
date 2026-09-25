@@ -1,4 +1,12 @@
-# UIユーザビリティ評価Skill追加Plan
+# UI/UX評価・ユーザビリティテストSkill追加Plan
+
+## 0. 本ファイルの対象
+
+本ファイルは `usability-evaluation` の実装順序と完了条件です。
+
+`usability-testing` の実装順序は `_06a_usability-testing-implementation-order.md` を正本とします。
+
+本ファイルの完了だけではPR全体の後続実装完了とは扱いません。
 
 ## 1. 実装開始条件
 
@@ -438,7 +446,7 @@ PR #12の実行基盤を利用できる場合、
 
 環境が利用できない場合、未検証として記録し、架空の成功結果を作りません。
 
-## 19. 完了条件
+## 19. usability-evaluation完了条件
 
 次をすべて満たしたとき実装完了とします。
 
