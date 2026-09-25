@@ -364,6 +364,10 @@ source確認日
 
 sourceに存在しない項目を推測補完しません。
 
+`source上の位置づけ` は、そのsource item自身の性質を保持します。少なくとも normative requirement / informative guidance / advisory guidance を区別できる表現にします。
+
+一方、今回のprojectでbindingかどうかはreferenceへ固定しません。project Authority、明示された適合基準、platform、採用Design System、対象文脈と組み合わせて評価時に決定し、UI / UX評価項目の `referenceの位置づけ` へ残します。
+
 ## 7. reference構造
 
 予定構成:
@@ -381,6 +385,8 @@ skills/usability-evaluation/
 │   ├── accessibility/
 │   │   ├── index.md
 │   │   ├── wcag-2.2.md
+│   │   ├── wai-aria-1.2.md
+│   │   ├── aria-in-html.md
 │   │   ├── aria-apg-patterns.md
 │   │   └── aria-apg-practices.md
 │   ├── patterns/
