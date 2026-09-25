@@ -70,7 +70,7 @@ SKILL.mdは詳細なUI pattern知識を抱えません。
 - test designでUI patternから観点候補が必要な要求
 - live UI / screenshot / DOMをbest practiceと照合する要求
 
-非発火対象:
+直接発火の非発火対象:
 
 - 単純なTC実行だけ
 - Product Risk採点だけ
@@ -79,6 +79,8 @@ SKILL.mdは詳細なUI pattern知識を抱えません。
 - screenshot pixel diffだけ
 - 一般的なデザイン案の創作だけ
 - user researchそのもの
+
+ここでのnegativeは「最初のSkillとして直接選択しない」という意味です。`test-execution` / `test-target-inspection` 等がevidenceを取得した後にworkflow内で `usability-evaluation` を呼ぶことは妨げません。
 
 境界queryをtrigger evalへ入れます。
 
@@ -137,31 +139,31 @@ assets/output-template.mdは最低限次を持ちます。
 - applicability
 - source refs
 
-### 評価結果
+### UI / UX評価結果
 
 各行:
 
-- finding ref
+- evaluation ref
 - target
 - observed fact
 - pattern / principle
 - expected characteristic
 - difference
-- user impact
+- 想定される影響
+- 想定される影響の根拠
+- 観測済みのユーザー影響（証拠がある場合だけ）
 - source ref
 - evidence ref
 - status
 - routing
+- finding ref（Findingを作成した場合だけ）
 - note
 
-statusは評価契約の、
+statusは評価契約の `問題を確認 / 問題なし / 判定不能 / 対象外` を使います。
 
-- 問題を確認
-- 問題なし
-- 判定不能
-- 対象外
+### Finding
 
-を使います。
+PR #13のFinding契約を再利用し、後続QA活動で扱う必要がある評価項目だけをFindingへ昇格します。`問題なし` / `対象外` にFinding refを付けません。
 
 ## 6. source ref
 
@@ -194,10 +196,13 @@ all-source coverage要件を人手だけに依存させないため、Skill-loca
 - index linkが存在する
 - source-catalogのsource IDが一意
 - source-coverageのsource refがcatalogへ存在する
-- included itemにreference destinationがある
+- coverage disposition / access stateが許可値
+- source自身がmaturity / lifecycleを明示する場合は値を保持する
+- included / merged-duplicate itemにreference destinationがある
+- included / merged-duplicate itemのfield-level coverageが閉じている
+- excluded dimensionに理由がある
 - reference destinationが実在する
 - pattern entryのsource refがcatalog / coverageへ解決する
-- coverage statusが許可値
 - required metadataが欠けていない
 - orphan referenceがない
 - alias indexが存在しないentryを指さない
@@ -212,12 +217,15 @@ Webへアクセスしてsourceの最新状態を検査するruntimeにはしま�
 
 候補:
 
-- finding ref一意性
+- evaluation ref一意性
 - status許可値
-- 問題を確認したFindingにobserved fact / source / evidence / impactがある
+- 問題を確認した評価項目にobserved fact / source / evidence / 想定影響の根拠がある
+- finding refがある場合は対応Findingが存在し、PR #13の最低契約を満たす
+- 問題なし / 対象外の評価項目にfinding refがない
 - source ref形式
 - evidence ref存在
 - 判定不能に制約理由がある
+- 観測済みのユーザー影響を出す場合は対応evidenceがある
 - TC resultを書き換える欄を持たない
 - sourceなしのbest practice断定を拒否
 
@@ -230,7 +238,7 @@ LLM Judgeで最低限次を評価します。
 - user goalとpattern識別の妥当性
 - applicability判断
 - source選択
-- sourceの強さを誤って扱っていないか
+- binding / advisoryとapplicabilityを誤って扱っていないか
 - observationとinterpretationの分離
 - false positive抑制
 - accessibility判断の妥当性

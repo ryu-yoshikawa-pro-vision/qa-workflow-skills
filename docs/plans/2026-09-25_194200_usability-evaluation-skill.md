@@ -131,7 +131,7 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
 1. usability-evaluation は横断的な専門評価Skillとし、通常の設計フローへ無条件に追加しない。
 2. live UIを扱うtest-target-inspection / test-executionでは、UI / UX評価が明示的に対象外でない限り、取得済み証拠を使うread-only評価を既定で接続する。分析・設計ではUIが対象で、user goal / interaction / usability / accessibility / visual qualityが判断へ影響する場合に利用する。
 3. Skill自身がProduct Risk、TC、Regression membership等を所有しない。
-4. 仕様上のPASS / FAILとUX評価結果を分離する。
+4. 仕様上のPASS / FAILとUI / UX評価結果を分離する。UI / UX評価項目は問題なし・判定不能・対象外も保持できるが、PR #13のFindingは後続QA活動で扱う必要がある項目だけに作成する。
 5. UIパターン名だけからチェックリストを機械適用せず、ユーザー目的、利用文脈、適用条件を先に確認する。
 6. プロジェクト固有仕様 / 採用Design System / platform要件を一般的なheuristicより優先する。
 7. 同じ観測事実を再取得するためにbrowserを重複操作せず、PR #12で得られるDOM、accessibility tree、ARIA snapshot、screenshot、状態、操作結果を優先して再利用する。
@@ -142,11 +142,11 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
 12. WAI-ARIA APGのexample実装を唯一の正解やproduction要件として扱わない。
 13. Nielsen等のheuristicは一般原則として扱い、仕様Authorityへ昇格しない。
 14. 外部資料本文を丸ごと転載しない。referencesには構造化した要約、評価観点、適用条件、source refを保持する。
-15. 採用した情報源の対象ページは、収録済み / 重複統合済み / 対象外 / 取得不能 / source参照のみを棚卸しして閉じる。代表例だけで網羅済みとしない。
+15. 採用した情報源の対象ページはcoverage dispositionで収録済み / 重複統合済み / 対象外 / 取得不能 / source参照のみへ閉じる。アクセス状態とsource自身のmaturity / lifecycleは別軸で保持し、代表例だけで網羅済みとしない。
 16. seed sourceだけで探索を止めず、標準化団体、platform HIG、公式Design System、体系化されたUI pattern library、usability evaluation資料を所定のsource discoveryで追加調査し、採否をsource inventoryへ残す。
 17. 「取得できるすべて」は、採用したsourceのUX評価に関係する公開情報をitem単位で閉じることを意味し、無関係なAPI reference、install手順、code sample全文まで複製することは意味しない。
 18. 実装時に情報源ごとの利用条件・ライセンスを確認し、許容範囲を超える複製をしない。
 19. runtime時の外部Webアクセスを必須にしない。Skill package単独で参照知識を利用可能にする。
 20. sourceの更新可能性を隠さず、referenceには出典URLと取得・確認時点を保持する。
-21. UX総合点や単一スコアを正本にしない。観測事実、適用根拠、期待される特性、差異、影響、sourceを保持する。
+21. UX総合点や単一スコアを正本にしない。観測事実、適用根拠、期待される特性、差異、想定される影響とその根拠、sourceを保持する。実ユーザー影響を観測していない場合は観測済み事実として書かない。
 22. user researchの代替とは扱わない。heuristic evaluationで分かることと、実ユーザーでしか確認できないことを区別する。

@@ -168,7 +168,7 @@ DOM / accessibility treeだけでは確定できない場合、画像証跡を�
 
 を利用します。
 
-TCのPASS / FAILはtest-executionの判定を維持し、UX上のFindingを別に返します。
+TCのPASS / FAILはtest-executionの判定を維持し、UI / UX評価結果を別に返します。後続QA活動で扱う必要がある評価結果だけをPR #13の定義に従うFindingとして返します。
 
 ### Exploration時
 
@@ -212,7 +212,9 @@ test-condition-designは現在有効なテスト要求と仕様根拠の範囲�
 
 ### 実UI評価
 
-現在UIを評価する場合は、観測事実と参照根拠を結び付けたFindingを返します。
+現在UIを評価する場合は、観測事実と参照根拠を結び付けたUI / UX評価項目を返します。
+
+評価項目は問題なし・判定不能・対象外も保持できます。PR #13のFindingは、問題を確認した項目、または追加観測・仕様確認等のfollow-upが必要で後続QA活動で扱う必要がある項目だけに作成します。
 
 ## 6. 担当しないこと
 

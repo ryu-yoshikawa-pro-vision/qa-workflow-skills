@@ -286,37 +286,41 @@ heuristicは広い経験則であり、特定componentの仕様要件ではな�
 
 source discoveryと「取得できるすべて」の終了条件は `_02a_source-acquisition-and-coverage.md` を正本とします。
 
-## 4. source優先順位
+## 4. sourceの適用性と要求の強さ
 
-評価時の既定優先順位を次とします。
+sourceの発行元だけを固定順位にして評価しません。
 
-1. 対象プロジェクトの現在有効な仕様 / 採用Design System / platform契約
-2. 明示的に適用される標準・適合基準
-3. 対象platformの公式Human Interface Guidelines
-4. W3C / WAI等の標準・公式accessibility guidance
-5. 対象プロジェクトが採用しているDesign Systemの公式guidance
-6. 他の公式Design Systemに共通して見られるpractice
-7. 一般的なUI pattern library
-8. usability heuristic
+評価対象ごとに、まず次を確認します。
 
-同じ優先度でも対象文脈が異なれば機械的多数決をしません。
+- 今回の対象へ適用されるprojectの現在有効な仕様 / 契約か
+- projectが明示採用しているDesign System / platform guidelineか
+- 明示的に適用されるstandard / conformance requirementか
+- source自身がnormative / bindingとして定義する要求か、advisory / informative guidanceか
+- 対象platform / user goal / interaction modelへ適用可能か
+- currentなversion / statusか
+
+### bindingな要求
+
+projectの現在有効な仕様、明示的な適合基準、対象platformで要求される契約等、今回の対象へbindingな要求は、一般的なadvisory guidanceより優先します。
+
+bindingな要求同士が矛盾する場合は、source種別の固定順位で片方を採用しません。仕様Authority / 適用範囲の解決が必要なconflictとして扱い、既存のquestion-analysis / spec-analysisへroutingします。
+
+### advisoryなguidance
+
+bindingな要求がない範囲では、projectでの明示採用、対象platform、user goal / task、interaction model、sourceの対象範囲、maturity / lifecycle、更新時点から適用可能なguidanceを選びます。
+
+対象projectが採用していないDesign Systemは、pattern理解や複数sourceに共通するpracticeの補助根拠にはできますが、そのDesign System固有規約をbinding requirementとして適用しません。
+
+一般的なUI pattern libraryやusability heuristicはadvisory guidanceとして扱います。
 
 ## 5. source conflict
 
-source間で異なる推奨がある場合、
+- binding requirement同士が競合する → 無理に選ばずAuthority conflictとしてrouting
+- binding requirementとadvisory guidanceが競合する → bindingな要求を評価基準とする
+- advisory guidance同士が競合する → project採用、platform、user goal、interaction model、maturity、更新時点から適用可能性を判断
+- 対象文脈だけでは選べない → 複数候補と判定不能理由を残す
 
-- 対象platform
-- user goal
-- interaction model
-- project採用規約
-- sourceのnormative / advisory区分
-- sourceの更新時点
-
-を比較します。
-
-競合を隠して1つの「正解」に統合しません。
-
-対象文脈だけでは選べない場合は、複数の妥当な選択肢と判定不能理由を残します。
+source数の多数決や、発行元の固定ランキングだけで「正解」を決めません。
 
 ## 6. reference entryの共通形式
 

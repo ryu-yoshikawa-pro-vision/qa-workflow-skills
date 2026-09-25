@@ -202,10 +202,11 @@ component単体が妥当でもflow全体で問題になる場合があります�
 
 必要な場合だけflow単位で再評価します。
 
-### Step 8: Findingを作る
+### Step 8: UI / UX評価項目を閉じる
 
-Findingは最低限次を持ちます。
+各評価項目は最低限次を持ちます。
 
+- evaluation ref
 - 対象
 - user goal / task
 - pattern
@@ -214,11 +215,25 @@ Findingは最低限次を持ちます。
 - referenceの位置づけ
 - 期待される特性
 - 差異
-- user impact
+- 想定される影響
+- 想定される影響の根拠
+- 観測済みのユーザー影響（実際に証拠がある場合だけ）
 - evidence
 - 判定
 - 制約 / 未確認
 - 推奨routing
+- finding ref（Findingを作成した場合だけ）
+
+### Step 9: 必要な場合だけFindingを作る
+
+PR #13のFinding定義を再利用し、後続QA活動で扱う必要がある検出事項だけに限定します。
+
+- `問題を確認` しfollow-upが必要 → Findingを作る
+- `判定不能` で追加観測・仕様確認等のfollow-upが必要 → Findingを作る
+- `問題なし` / `対象外` → Findingを作らない
+- `判定不能` でもfollow-up不要で現在scopeを閉じられる → Findingを作らない
+
+Findingを作る場合はPR #13の最低契約を満たし、評価項目からfinding refで参照します。
 
 ## 3. 判定
 
@@ -232,6 +247,8 @@ Findingは最低限次を持ちます。
 - 対象外
 
 「問題なし」は対象に必要な観測を行った場合だけ使用します。
+
+「想定される影響」は観測事実ではなく、観測事実とreferenceから導いた評価として根拠を残します。「ユーザーが迷った」「完了率が下がった」等の実ユーザー影響は、user research、analytics、明示された観測等の証拠がある場合だけ「観測済みのユーザー影響」に記録します。
 
 ## 4. 仕様上のFAILとの境界
 

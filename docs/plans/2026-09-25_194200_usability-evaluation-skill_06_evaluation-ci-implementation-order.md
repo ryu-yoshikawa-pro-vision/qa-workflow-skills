@@ -160,8 +160,11 @@ source-coverage上の対象をすべて閉じます。
 
 source-coverage validatorを実行し、
 
-- status未設定
+- coverage disposition未設定
+- access state未設定
 - includedなのにdestinationなし
+- included / merged-duplicateなのにfield-level coverage未完了
+- excluded dimensionに理由なし
 - source ref不明
 - orphan reference
 - broken index
@@ -169,7 +172,7 @@ source-coverage validatorを実行し、
 
 を0にします。
 
-unavailable / source-reference-onlyは理由があれば未達扱いにしません。
+`unavailable` / `source-reference-only` は理由があれば未達扱いにしません。maturity / lifecycleはsource自身が明示する場合だけ保持し、coverage dispositionやaccess stateへ混ぜません。
 
 未処理の空欄は未達です。
 
@@ -247,6 +250,21 @@ negative例:
 - current UI inventoryだけ更新
 - pixel diffだけ実施
 
+このnegativeはdirect triggerの評価です。
+
+別途workflow統合caseとして、少なくとも次を追加します。
+
+~~~text
+ユーザー要求: TCを実行
+→ usability-evaluationは最初のSkillとして直接発火しない
+→ test-executionがTCを実行してUI evidenceを取得
+→ UI / UX評価が対象外でなければusability-evaluationを後続で実行
+→ TCの仕様上PASS / FAILとUI / UX評価項目を分離
+→ follow-upが必要な評価項目だけFindingを作る
+~~~
+
+`test-target-inspection` もstandalone / qa-workflow経由の両経路を代表caseで確認します。
+
 ## 14. deterministic eval
 
 最低限:
@@ -257,7 +275,7 @@ negative例:
 - status
 - required fields
 - unresolved constraints
-- source catalog / coverage
+- source catalog / coverage disposition / access state / maturity / field-level coverage
 - index integrity
 
 を検証します。
@@ -273,6 +291,8 @@ negative例:
 - 仕様上のTCはPASS
 - focus / close / feedbackのUX問題あり
 - TC FAILへ昇格しないこと
+- UI / UX評価項目は問題を確認として残し、follow-upが必要な場合だけFindingを作ること
+- 問題なしの評価項目へFindingを作らないこと
 
 ### Case B: Form validation
 
@@ -281,7 +301,7 @@ negative例:
 - general pattern
 - heuristic
 
-が混在し、根拠の強さを正しく分けること
+が混在し、binding / advisoryとapplicabilityを正しく分けること
 
 ### Case C: responsive visual issue
 
@@ -349,7 +369,11 @@ PR #12の実行基盤を利用できる場合、
 - 通常評価で全referencesの一括読込を要求しない
 - source discovery対象categoryと候補sourceの採否がsource inventoryへ記録されている
 - 採用sourceの対象母集団がsource-coverageへ記録されている
-- 全source itemがincluded / merged-duplicate / out-of-scope / unavailable / source-reference-onlyのいずれかへ閉じている
+- 全source itemのcoverage dispositionがincluded / merged-duplicate / out-of-scope / unavailable / source-reference-onlyのいずれかへ閉じている
+- access stateがcoverage dispositionと分離され、restricted sourceを取得済みと誤認しない
+- source自身が明示するmaturity / lifecycleをcoverage dispositionと分離して保持している
+- included / merged-duplicate itemのfield-level coverageが `available - captured - excluded = 0` で閉じている
+- excluded dimensionに理由がある
 - JavaScript依存、login限定、deprecated / archived、redirect等の取得制約をcurrent sourceと混同せず状態化している
 - included referenceのsource追跡が可能
 - reference catalog validator PASS
@@ -361,7 +385,7 @@ PR #12の実行基盤を利用できる場合、
 - README / EVALS / repository Skill一覧整合
 - 代表semantic caseを実Judgeで確認
 - 利用可能な場合、実Agent triggerとbrowser evidence連携を確認
-- TC PASS / FAILとUX Findingの分離を確認
+- TC PASS / FAILとUI / UX評価項目を分離し、後続対応が必要な評価項目だけFindingへ昇格することを確認
 - Product Risk owner境界を確認
 - user researchを捏造しないことを確認
 - 同一browser/sessionへの並行操作を要求しない

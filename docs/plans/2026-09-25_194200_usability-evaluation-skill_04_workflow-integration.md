@@ -20,6 +20,18 @@ qa-workflowが要求・scope・利用可能な証拠からroutingします。
 
 ### 1.1 起動方針
 
+直接発火とworkflow内呼び出しを分けます。
+
+#### 直接発火
+
+ユーザーがUI / UXレビュー、usability、accessibilityを含むinteraction評価、表示崩れ、UI patternの妥当性等を明示的に要求した場合は `usability-evaluation` を直接開始できます。
+
+「TCを実行して」「current UIを収集して」のようにUX評価を明示しない依頼では、`usability-evaluation` を最初のSkillとして直接発火させません。
+
+#### workflow内呼び出し
+
+`qa-workflow` または同一Agent上で実行中のowner Skillが、取得済みevidenceとscopeから `usability-evaluation` を後続評価として呼び出します。これはdirect trigger評価とは別契約です。
+
 live UIと設計時で扱いを分けます。
 
 #### live UIを観測・操作する場合
@@ -39,6 +51,12 @@ live UIと設計時で扱いを分けます。
 等、owner Skillが既に取得した証拠を再利用します。
 
 UIを持たない対象、API / DBだけの実行、UX評価が明示的に対象外のscopeでは起動しません。
+
+#### standalone owner Skill
+
+`qa-workflow`を介さず `test-target-inspection` / `test-execution` 等を直接利用した場合も、同じAgentクライアント上で `usability-evaluation` が利用可能なら、owner Skill完了後または安全なcheckpointで同じAgentが順次読み込んで評価します。共通Skill-to-Skill APIの存在は前提にしません。
+
+利用できない場合、UX評価が明示要求されていなければowner Skillの本来成果物は継続しUX評価未実施を必要範囲だけ明示します。UX評価が明示要求されている場合はfunctional / inspectionの判定可能範囲を継続し、UX評価scopeだけを利用不能として扱います。TCの仕様上PASS / FAILは変更しません。
 
 #### テスト分析・設計の場合
 
@@ -142,7 +160,9 @@ test-execution
   ├→ TC expected result comparison
   └→ usability-evaluation
        ↓
-      UX Finding
+      UI / UX評価項目
+       ↓ follow-upが必要な場合だけ
+      Finding
 ~~~
 
 ### browser所有
@@ -228,7 +248,7 @@ qa-workflowへ次の責務を追加します。
 - UI / UX評価要求を usability-evaluation へrouting
 - analysis / design / inspection / execution / explorationとの接続
 - usability-evaluationが必要なscopeだけ状態管理
-- Finding後のowner routing
+- UI / UX評価項目と、必要な場合に作成されたFindingのowner routing
 
 qa-workflow自身はpattern判断やUX評価を再実装しません。
 

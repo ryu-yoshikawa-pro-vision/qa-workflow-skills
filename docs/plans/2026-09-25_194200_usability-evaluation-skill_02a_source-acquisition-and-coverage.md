@@ -215,19 +215,30 @@ sourceを採用したら、そのsourceのitem母集団を先に固定します�
 
 itemを見つけるたびに追加する方式ではなく、可能なsourceは先に全item一覧を作ります。
 
-## 7. source itemの取得状態
+## 7. source itemの状態
 
-source-coverageのstatusは少なくとも次を使います。
+source itemは次の3軸を分離して保持します。
+
+### coverage disposition
 
 - `included`: 意味情報をreferenceへ収録
 - `merged-duplicate`: 他entryへ統合し、source provenanceだけ保持
 - `out-of-scope`: UI / UX評価へ直接使わない
-- `unavailable`: 公開itemだが現在の取得手段では本文確認不能
+- `unavailable`: itemの存在は確認できるが、現在の取得手段では評価に必要な本文を確認できない
 - `source-reference-only`: 利用条件等により詳細要約を持たずsource参照だけ保持
-- `deprecated`: source自身がdeprecated / retiredとしている。current guidanceへ昇格せず必要な比較用途だけ保持
-- `restricted`: login / organization限定等で公開内容として取得不能
 
-`deprecated` / `restricted` を他statusへ畳むかは実装時のvalidator設計で最終決定します。少なくとも意味上は区別します。
+### access state
+
+- `public`
+- `restricted`
+
+login / organization限定等で本文を確認できないitemは `access_state=restricted` とし、coverage dispositionは実際の取り込み結果に応じて `unavailable` または `source-reference-only` とします。
+
+### maturity / lifecycle
+
+source自身が明示する状態だけを保持します。例: stable / beta / early access / experimental / community / proposal / deprecated / retired / feature flag。
+
+状態がsourceに存在しない場合は独自に推測しません。deprecatedなitemでもhistorical comparison等の目的で `included` になり得るため、coverage dispositionとは分離します。
 
 ## 8. 動的・取得困難なsource
 
@@ -253,27 +264,15 @@ Shopify Polaris等、旧URLが別documentationへredirectする場合:
 
 ### login / internal限定
 
-Carbon Community等で一部がinternal-onlyの場合、公開itemの存在だけ確認できても本文が取得できなければrestricted / unavailableとして閉じます。
+Carbon Community等で一部がinternal-onlyの場合、公開itemの存在だけ確認できても本文が取得できなければ `access_state=restricted` とし、coverage dispositionは `unavailable` または利用条件に応じて `source-reference-only` とします。
 
 内容を推測しません。
 
-## 9. source status / maturity
+## 9. source maturity / lifecycle
 
-source itemが次の状態を持つ場合はreferenceへ保持します。
+maturity / lifecycleは§7の独立軸を使用します。source自身が明示する状態だけを保持し、community / experimental / proposalをstable guidanceと同じ強さで評価しません。
 
-- stable
-- beta
-- early access
-- experimental
-- community
-- proposal
-- deprecated
-- retired
-- feature flag
-
-状態が存在しないsourceへ独自maturityを付けません。
-
-community / experimental / proposalをstable guidanceと同じ強さで評価しません。
+deprecated / retiredでも、current guidanceとしてではなく比較・移行判断に必要で、利用条件を満たす場合はreferenceへ含められます。
 
 ## 10. normalized referenceへの統合
 
@@ -339,23 +338,44 @@ sourceに存在しないfieldは空欄を埋めるために推測しません。
 
 sourceに存在するのに未収録ならcoverage未完了です。
 
+### field-level coverage
+
+`included` / `merged-duplicate` itemはitem単位のdispositionだけで完了扱いにしません。
+
+sourceに存在すると確認した情報種別を `available_dimensions`、referenceへ収録したものを `captured_dimensions`、意図的に収録しないものを理由付きの `excluded_dimensions` として記録します。
+
+完了条件:
+
+~~~text
+available_dimensions
+- captured_dimensions
+- excluded_dimensions
+= 0
+~~~
+
+sourceにそのdimensionが存在するかの意味判断は取得時に行い、deterministic validatorがWeb本文を再解釈しません。
+
 ## 12. completenessを機械検証する範囲
 
 Skill-local validatorで最低限確認します。
 
 - adopted sourceがcatalogにある
 - adopted sourceのinventory item数が0でない
-- 各itemにstatusがある
+- 各itemにcoverage dispositionがある
+- 各itemにaccess stateがある
+- source自身がmaturity / lifecycleを明示する場合はその値を保持している
 - included / merged-duplicateのdestinationが存在する
+- included / merged-duplicateの各itemに `available_dimensions` / `captured_dimensions` / `excluded_dimensions` がある
+- `available_dimensions - captured_dimensions - excluded_dimensions = 0`
+- excluded dimensionには理由がある
 - source refが一意
 - canonical URLがある
 - checked_atがある
 - source itemの重複がない
 - reference entryからsourceへ逆引きできる
-- sourceにfield inventoryを持たせる場合、required extraction stateが空欄でない
 - discovery candidateが未処理状態で残っていない
 
-Web上の「未知のsourceが存在しないこと」まではvalidatorで証明しません。
+Web上の「未知のsourceが存在しないこと」や、source本文中のdimension抽出が意味的に正しいことまではvalidatorで証明しません。
 
 ## 13. Plan作成時点の確認事項
 
