@@ -232,7 +232,9 @@ all-source coverage要件を人手だけに依存させないため、Skill-loca
 - source-catalogのsource IDが `SRC-\d{3,}` 形式で一意かつappend-only規則に従う
 - source-catalogのcandidate statusが許可値で、pendingが残っていない
 - source-catalogのdiscovery実行記録でQ1〜Q7がそれぞれ1件以上 `completed` へ閉じている
-- 各adopted source IDのcross-link実行記録が1件以上 `completed` へ閉じ、0件結果も実行済みとして記録できる
+- cross-link root setがseed / query由来adopted sourceのsource ID集合と一致する
+- cross-link root set内の各source IDの実行記録が1件以上 `completed` へ閉じ、0件結果も実行済みとして記録できる
+- cross-link由来sourceが今回のcross-link root setへ再帰追加されていない
 - discovery実行記録に `blocked` が残っていない
 - source-coverageのsource IDがcatalogへ存在し、source item refが `<source ID>-ITEM-\d{4,}` 形式でsource-coverage内一意かつappend-only規則に従う
 - coverage disposition / access stateが許可値
