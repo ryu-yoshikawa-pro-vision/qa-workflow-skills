@@ -169,7 +169,9 @@ seed以外のsource探索は、実装開始時に次のquery matrixを1回固定
 
 ### 5.3 cross-link探索
 
-adopted sourceの公式ページから直接参照される次のlinkを1 hopだけ確認します。
+seed確認とQ1〜Q7のcandidate採否を閉じた後、`_02_reference-knowledge.md` §9の規則で `cross-link root set` を固定します。
+
+cross-link探索は、そのroot setに含まれるsourceの公式ページから直接参照される次のlinkだけを1 hop確認します。
 
 - standard
 - accessibility guidance
@@ -178,7 +180,9 @@ adopted sourceの公式ページから直接参照される次のlinkを1 hopだ
 
 独立した評価根拠として§4の採用条件を満たすものをcandidateへ追加します。
 
-追加candidateからさらに外部linkを再帰的に辿りません。cross-link探索を無制限に連鎖させないためです。
+cross-linkで新しく見つけたcandidateをadoptしても、そのsourceは今回のcross-link root setへ追加しません。追加sourceからさらに外部linkを辿らず、`root set → 直接link先` の1段で終了します。
+
+seed / Q1〜Q7の採否変更でroot set対象が変わった場合は、root setを作り直してcross-link確認を再実行します。
 
 ### 5.4 source discovery closure
 
@@ -188,7 +192,9 @@ source discoveryを「Web全体を完全探索した」とは表現しません�
 
 - 全categoryのseed sourceを確認済み
 - Q1〜Q7がそれぞれsource-catalogのdiscovery実行記録で `completion=completed` へ閉じている
-- 各adopted sourceの1-hop cross-link確認がsource-catalogのdiscovery実行記録で `completion=completed` へ閉じている。対象linkまたは新規candidateが0件でも0件として記録されている
+- seed / query由来のadopted sourceへsource IDを付与し、cross-link root setが固定されている
+- cross-link root setの全source IDについて1-hop確認がsource-catalogのdiscovery実行記録で `completion=completed` へ閉じている。対象linkまたは新規candidateが0件でも0件として記録されている
+- cross-link由来で新たにadoptしたsourceはroot setへ追加せず、cross-link探索完了後にsource IDを付与している
 - discovery実行記録に `blocked` が残っていない
 - 全candidateが `pending` 以外の `adopted / rejected / unavailable / duplicate` へ閉じている
 - adopted sourceがsource-catalog / source-coverageへ入っている
@@ -432,6 +438,12 @@ source-catalogのdiscovery実行記録として:
 - 新規candidate件数
 - completion
 - block理由
+
+source-catalogのcross-link root set記録として:
+
+- fixed_at
+- source IDs（昇順）
+- root setを固定した時点のseed / Q1〜Q7採否状態
 
 candidate / adopted sourceの記録として:
 
