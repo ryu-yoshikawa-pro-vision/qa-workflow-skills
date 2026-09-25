@@ -119,7 +119,7 @@ NN/gの全記事を無条件に対象母集団にはしません。評価方法�
 - UI / UX評価に直接利用できる体系的な情報がある
 - source ownerまたは運営主体を特定できる
 - canonicalまたはcurrentな入口を特定できる
-- source itemの母集団を一覧・category・sitemap・repository等から合理的に列挙できる、または列挙不能であることを明示できる
+- 採用範囲のsource item母集団を一覧・category・sitemap・repository等から合理的に列挙できる。source全体を列挙できない場合は、公式index等から有限に列挙できるsubsetをadopted scopeとして固定できる
 
 優先:
 
@@ -217,6 +217,22 @@ sourceを採用したら、そのsourceのitem母集団を先に固定します�
 - ソシオメディア: UIデザインパターンcategoryの全pagination
 
 itemを見つけるたびに追加する方式ではなく、可能なsourceは先に全item一覧を作ります。
+
+source全体の公開itemを合理的に列挙できない場合、source全体をadopted scopeとして「全件取得済み」にはしません。
+
+その場合は、公式index / category / sitemap等から有限に列挙できる範囲をadopted scopeとして明示し、source-catalog / source-coverageへscope boundaryと列挙元を記録します。
+
+例:
+
+~~~text
+Apple HIG全体
+→ 全件取得済みとは扱わない
+
+Apple HIGのcurrent Components / Patterns / Inputs indexから列挙できた公開item
+→ adopted scopeとして全itemをclosure可能
+~~~
+
+列挙不能な残りのsource surfaceを暗黙にincluded扱いしません。
 
 ## 7. source itemの状態
 
@@ -367,7 +383,7 @@ Skill-local validatorで最低限確認します。
 
 - source-catalogの全candidateがpending以外へ閉じている
 - adopted sourceがcatalogにある
-- adopted sourceのinventory item数が0でない
+- adopted sourceのadopted scopeと列挙元が記録され、inventory item数が0でない
 - 各itemにcoverage dispositionがある
 - 各itemにaccess stateがある
 - source自身がmaturity / lifecycleを明示する場合はその値を保持している
