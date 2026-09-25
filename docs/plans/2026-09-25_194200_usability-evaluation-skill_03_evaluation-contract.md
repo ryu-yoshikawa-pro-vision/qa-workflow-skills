@@ -236,21 +236,24 @@ component単体が妥当でもflow全体で問題になる場合があります�
 
 - evaluation ref
 - 対象
-- user goal / task
+- user goal / task（評価条件から継承。行単位で異なる場合だけoverride）
 - pattern
 - 観測事実
-- 適用したreference
+- reference entry refs
 - referenceの位置づけ
+- source item refs
 - 期待される特性
 - 差異
 - 想定される影響
 - 想定される影響の根拠
 - 観測済みのユーザー影響（実際に証拠がある場合だけ）
-- evidence
-- 判定
-- 制約 / 未確認
+- evidence ref
+- status
+- status reason / 制約・未確認
 - 推奨routing
 - finding ref（Findingを作成した場合だけ）
+
+`reference entry refs` は `_02_reference-knowledge.md` §6のreference entry ID、`source item refs` はsource-coverageの個別item refを使います。`status reason / 制約・未確認` は `判定不能` / `対象外` では必須です。
 
 ### Step 10: 必要な場合だけFindingを作る
 
