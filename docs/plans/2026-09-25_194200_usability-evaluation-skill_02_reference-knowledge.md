@@ -454,20 +454,34 @@ root indexの肥大化が確認された場合も、新しい検索runtimeを追
 
 ## 9. source-catalog.md
 
-各情報源について最低限次を管理します。
+source-catalog.mdは、採用済みsourceだけでなくsource discoveryで確認した候補の正本にもします。別のdiscovery logは作りません。
+
+候補ごとに最低限次を管理します。
+
+- candidate name
+- URL root
+- discovery origin: seed / query / cross-link
+- discovery detail: query IDまたは参照元source ID
+- discovery status: pending / adopted / rejected / duplicate / unavailable
+- reason
+- checked_at
+- adopted時のsource ID
+
+adopted sourceでは加えて次を管理します。
 
 - source ID
 - 名称
 - official / third-party
-- URL root
 - 対象範囲
-- normative / advisory
+- defaultのreference位置づけ
 - platform
 - 公開状態
 - 取得日
 - license / terms確認結果
 - referenceへの取り込み方針
 - 注意事項
+
+source全体を一律にnormative / advisoryへ固定できない場合は、defaultだけをcatalogへ置き、item / reference単位の位置づけで上書きします。WCAG本文とUnderstanding、同一Design System内のstable / experimental等をsource単位だけで同じ強さにしません。
 
 ## 10. source-coverage.md
 
@@ -479,21 +493,22 @@ root indexの肥大化が確認された場合も、新しい検索runtimeを追
 - source item
 - canonical URL
 - category
-- status
+- coverage disposition: included / merged-duplicate / out-of-scope / unavailable / source-reference-only
+- access state: public / restricted
+- maturity / lifecycle: sourceが明示する場合だけ
 - reference destination
+- available_dimensions
+- captured_dimensions
 - reason
 - checked_at
 
-statusの例:
+`included` / `merged-duplicate` では、sourceに存在すると確認したUI / UX評価上の情報種別を `available_dimensions` に記録し、そのすべてが `captured_dimensions` に存在することを完了条件にします。
 
-- included
-- merged-duplicate
-- out-of-scope
-- unavailable
-- source-reference-only
+`merged-duplicate` の `captured_dimensions` は統合先referenceで収録済みの情報種別を表し、reference destinationから統合先を追跡できるようにします。
+
+利用条件・取得制約等により取得済み情報をreferenceへ収録できないitemを `included` のまま閉じません。既存の `source-reference-only` / `unavailable` 等へ分類します。
 
 source itemを追加・削除した場合、coverage表を更新します。
-
 ## 11. 著作権・ライセンス
 
 外部資料の長文をreferenceへコピーする設計にはしません。
