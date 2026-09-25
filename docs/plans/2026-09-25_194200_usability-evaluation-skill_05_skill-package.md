@@ -129,6 +129,8 @@ assets/output-template.mdは最低限次を持ちます。
 - evidence refs
 - project Authority / adopted Design System
 - 評価制約
+- 上位観点ごとの今回の扱い: 今回評価する / 対象外
+- 対象外理由
 
 ### pattern識別
 
@@ -141,9 +143,14 @@ assets/output-template.mdは最低限次を持ちます。
 
 ### UI / UX評価結果
 
+`evaluation ref` は1つのusability-evaluation成果物revision内だけで一意なartifact-local refとします。新しいglobal QA ID / Machine Entityにはしません。
+
+merge後の既存artifact-local ref規則がある場合はそれを使い、ない場合はcanonicalな出力順で `EVAL-001` から採番します。
+
 各行:
 
 - evaluation ref
+- 上位観点
 - target
 - observed fact
 - pattern / principle
@@ -225,9 +232,12 @@ Webへアクセスしてsourceの最新状態を検査するruntimeにはしま�
 
 候補:
 
-- evaluation ref一意性
+- evaluation refが成果物revision内で一意
+- evaluation refをglobal QA ID / Machine Entityとして要求しない
 - status許可値
-- 各評価項目にreferenceの位置づけがある
+- 評価条件で「今回評価する」とした全上位観点が、少なくとも1件の評価結果へ到達している
+- 評価条件で「対象外」とした上位観点に理由がある
+- 各評価項目に上位観点とreferenceの位置づけがある
 - 問題を確認した評価項目にobserved fact / source / evidence / 想定影響の根拠がある
 - project固有のbinding根拠を適用した評価項目にproject Authority refがある
 - finding refがある場合は対応Findingが存在し、PR #13の最低契約を満たす
@@ -273,10 +283,28 @@ LLM Judgeで最低限次を評価します。
 
 ことを確認します。
 
+加えて、内容をreferenceへ収録した各adopted sourceについて、少なくとも1件のsource itemを原文と照合します。
+
+spot-check対象は次で固定します。
+
+- `included` / `merged-duplicate` itemがあるsource: source item refの辞書順で最初の対象itemを最低1件
+- `unavailable` / `source-reference-only` しかないsource: 内容ではなくdisposition、理由、canonical URL、access stateの妥当性を最低1件
+- referencesの `patterns / accessibility / platforms` の各経路について、少なくとも1件は意味内容を原文と照合する
+
+実装上の明確な理由があり別itemをspot-checkへ使う場合は、fixtureへ選定理由を残します。確認しやすいitemだけへ恣意的に差し替えません。
+
+spot-checkでは少なくとも、
+
+- source item refが正しい原文を指す
+- source上の位置づけ / 適用条件が原文と整合する
+- referenceへ記載したpurpose / when / when not / interaction / accessibility等が原文の意味を歪めていない
+- sourceに存在しない意味を補っていない
+
+ことを確認します。
+
 全referenceをLLM Judgeで1件ずつ採点する方式は採用しません。
 
-構造網羅性はdeterministic、意味品質は代表case + source spot-checkで分離します。
-
+構造網羅性はdeterministic、意味品質は代表case + adopted sourceごとの最低1件spot-checkで分離します。
 ## 11. portable Skill
 
 Skill package単独で、
