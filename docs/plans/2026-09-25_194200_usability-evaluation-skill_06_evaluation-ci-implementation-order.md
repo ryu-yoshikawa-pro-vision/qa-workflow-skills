@@ -261,7 +261,7 @@ Regression経由のtest-executionでは、regression-testingが確定したUI / 
 - repository tests
 
 Skill件数・query件数は実装開始時の正本から再計算し、現在Plan記載値をハードコードしません。
-## 13. trigger eval
+## 14. trigger eval
 
 既存repository標準件数を維持します。
 
@@ -299,7 +299,7 @@ negative例:
 
 Regression統合では、Regression scopeにUI / UX評価が含まれないTCについて、通常のtest-executionの既定接続だけを理由にusability-evaluationが追加実行されないことも確認します。
 
-## 14. deterministic eval
+## 15. deterministic eval
 
 最低限:
 
@@ -316,7 +316,7 @@ Regression統合では、Regression scopeにUI / UX評価が含まれないTCに
 
 意味判断を正規表現で代替しません。
 
-## 15. semantic eval
+## 16. semantic eval
 
 最低限、以下のcaseを用意します。
 
@@ -369,7 +369,7 @@ project Authority、適用standard、platform guideline、generic Design System�
 
 false positiveを作らないこと。
 
-## 16. real Agent evaluation
+## 17. real Agent evaluation
 
 dataset構造検証だけで実装完了にしません。
 
@@ -379,7 +379,7 @@ dataset構造検証だけで実装完了にしません。
 
 外部LLM APIをCIの必須条件にはしません。
 
-## 17. browser smoke
+## 18. browser smoke
 
 PR #12の実行基盤を利用できる場合、
 
@@ -392,7 +392,7 @@ PR #12の実行基盤を利用できる場合、
 
 環境が利用できない場合、未検証として記録し、架空の成功結果を作りません。
 
-## 18. 完了条件
+## 19. 完了条件
 
 次をすべて満たしたとき実装完了とします。
 
@@ -410,6 +410,8 @@ PR #12の実行基盤を利用できる場合、
 - 取得済みの関連情報を任意に除外してincluded扱いにする経路がない
 - JavaScript依存、login限定、deprecated / archived、redirect等の取得制約をcurrent sourceと混同せず状態化している
 - included referenceのsource追跡が可能
+- UI / UX評価項目にreferenceの位置づけが残り、project固有のbinding根拠を使う場合はproject Authority refを追跡できる
+- Regression配下ではregression-testingが確定したUI / UX評価scopeが通常のlive UI既定接続より優先される
 - reference catalog validator PASS
 - deterministic eval PASS
 - semantic dataset構造 PASS
@@ -425,7 +427,7 @@ PR #12の実行基盤を利用できる場合、
 - 同一browser/sessionへの並行操作を要求しない
 - git diff --check PASS
 
-## 19. 対象外
+## 20. 対象外
 
 今回追加しません。
 
