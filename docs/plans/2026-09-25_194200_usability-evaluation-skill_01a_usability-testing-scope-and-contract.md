@@ -33,11 +33,13 @@
 
 目的は詳細TCのPASS / FAIL判定ではなく、**user goalを起点に実対象を使ったときに生じる観測可能なusability上の問題を検出すること**です。
 
-## 3. 「usability testing」の意味
+## 3. human usability testingとの境界
 
 一般的なusability testingは、代表的な参加者に現実的なtaskを実施してもらい、研究者が行動・発話等を観測するUX research methodです。
 
 本Skillは代表ユーザーを置き換えません。
+
+canonical Skill名を `usability-inspection` とし、human participantを用いる正式なusability testingと区別します。「ユーザビリティテストして」等の依頼はtrigger aliasとして受けられますが、成果物ではAIによるinspectionであることを明示します。
 
 本Skillが行うのはAIエージェントによるtask-basedな実対象検査です。
 
@@ -55,6 +57,20 @@
 実ユーザー調査、analytics、RUM等の証拠が入力に含まれる場合は、その証拠として参照できます。
 
 本Skillの「問題なし」は、**今回のtask scenario、実行条件、観測範囲、evidenceの範囲で問題を確認しなかった**という意味です。製品のusability全体を保証しません。
+
+### 初版のlive実行対象
+
+初版の能動操作対象は、既存Playwright / browser経路で到達できるWeb UIに限定します。
+
+- desktop Web
+- responsive Web
+- mobile Web viewport
+
+を対象にできます。
+
+native iOS / Android app、desktop native app等の能動操作は、対応runtimeがrepositoryへ実際に導入されるまで対象外です。
+
+`usability-evaluation` 自体はplatform非依存のreference-based評価を維持するため、native向けHIGや設計資料の評価まで制限しません。
 
 ## 4. user goal / task scenario
 
@@ -96,6 +112,38 @@ user goal / task scenarioの出所を区別します。
 UIや一般知識から推定したgoalは、実ユーザーのgoalとして確定しません。
 
 推定しかない場合は「このgoalを仮定したtask-based inspection」として扱い、representative user taskとは表現しません。
+
+### task選定
+
+ユーザーが実行するtaskを明示した場合は、そのtaskを正本にします。
+
+「このサービスの使い勝手を確認」「主要フローを見て」のようにscopeが広くtaskが明示されない場合は、次の既存情報からtask候補を作ります。
+
+- project requirement / specification
+- user research
+- analytics / support data
+- Product Risk / test scope
+- 検証済みproject knowledge
+- 既存の業務フロー / user journey
+- current target artifactのentry point / role / known state
+- 既存TCが示す機能・業務フローの存在
+
+`test-target-inspection` や `test-execution` の成果物はtask候補や実行条件を理解するread-only contextとして利用できます。ただし、TCのstep sequenceやlocatorをusability-inspectionの正解経路として使いません。
+
+候補から選定する場合は、最低限次を記録します。
+
+- requested scope
+- task candidate
+- candidateの根拠
+- selected / not-selected / deferred
+- 選定理由
+- coverage limitation
+
+優先対象は、根拠がある範囲で主要、頻出、業務上重要、または高Riskなtaskです。独自scoreは作りません。
+
+根拠あるtask母集団を作れない場合は、UIから推定したtaskを `inferred` として限定的に実行できますが、「製品全体」「代表task」「主要taskを網羅した」とは表現しません。
+
+1つのActivityは1つの固定task scenarioを扱います。広い依頼で複数taskを選定した場合はtaskごとに別Activityとして実行し、task選定summaryはcoordination情報として保持します。task selection専用の新しいglobal Machine Entityは追加しません。
 
 ### task scenarioと詳細手順の境界
 
