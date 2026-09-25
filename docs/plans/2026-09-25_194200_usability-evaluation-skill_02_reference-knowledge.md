@@ -482,7 +482,8 @@ adopted sourceでは加えて次を管理します。
 - source ID
 - 名称
 - official / third-party
-- 対象範囲
+- adopted scope
+- item列挙元 / 列挙方法
 - defaultのreference位置づけ
 - platform
 - 公開状態
