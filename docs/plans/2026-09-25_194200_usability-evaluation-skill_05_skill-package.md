@@ -145,15 +145,21 @@ assets/output-template.mdは最低限次を持ちます。
 
 `evaluation ref` は1つのusability-evaluation成果物revision内だけで一意なartifact-local refとします。新しいglobal QA ID / Machine Entityにはしません。
 
-merge後の既存artifact-local ref規則がある場合はそれを使い、ない場合はcanonicalな出力順で `EVAL-001` から採番します。
+merge後の既存artifact-local ref規則がある場合はそれを使い、ない場合は最終出力の評価行順で `EVAL-001` から採番します。並べ替えによるref維持は要求しません。
+
+評価条件の `user goal / task` を各評価行のdefaultとして継承します。行単位で異なる場合だけ `user goal / task override` を記録します。
+
+`reference entry refs` は `_02_reference-knowledge.md` §6のreference entry IDを使い、どのSkill-local referenceを適用したかを追跡します。
 
 各行:
 
 - evaluation ref
 - 上位観点
 - target
+- user goal / task override（評価条件と異なる場合だけ）
 - observed fact
 - pattern / principle
+- reference entry refs
 - referenceの位置づけ
 - project Authority refs（project固有のbinding根拠がある場合）
 - expected characteristic
@@ -164,9 +170,12 @@ merge後の既存artifact-local ref規則がある場合はそれを使い、な
 - source item refs
 - evidence ref
 - status
+- status reason / 制約・未確認
 - routing
 - finding ref（Findingを作成した場合だけ）
 - note
+
+`status reason / 制約・未確認` は `判定不能` / `対象外` では必須です。`問題を確認` / `問題なし` では、制約や補足理由を残す必要がある場合だけ記録します。
 
 statusは評価契約の `問題を確認 / 問題なし / 判定不能 / 対象外` を使います。
 
@@ -211,6 +220,9 @@ all-source coverage要件を人手だけに依存させないため、Skill-loca
 - index linkが存在する
 - source-catalogのsource IDが一意
 - source-catalogのcandidate statusが許可値で、pendingが残っていない
+- source-catalogのdiscovery実行記録でQ1〜Q7がそれぞれ1件以上 `completed` へ閉じている
+- 各adopted source IDのcross-link実行記録が1件以上 `completed` へ閉じ、0件結果も実行済みとして記録できる
+- discovery実行記録に `blocked` が残っていない
 - source-coverageのsource IDがcatalogへ存在し、source item refがsource-coverage内で一意
 - coverage disposition / access stateが許可値
 - source自身がmaturity / lifecycleを明示する場合は値を保持する
@@ -238,14 +250,15 @@ Webへアクセスしてsourceの最新状態を検査するruntimeにはしま�
 - status許可値
 - 評価条件で「今回評価する」とした全上位観点が、少なくとも1件の評価結果へ到達している
 - 評価条件で「対象外」とした上位観点に理由がある
-- 各評価項目に上位観点とreferenceの位置づけがある
+- 各評価項目に上位観点、reference entry refs、referenceの位置づけがある
+- user goal / task overrideがない評価項目は評価条件のuser goal / taskを継承できる
 - 問題を確認した評価項目にobserved fact / source / evidence / 想定影響の根拠がある
 - project固有のbinding根拠を適用した評価項目にproject Authority refがある
 - finding refがある場合は対応Findingが存在し、PR #13の最低契約を満たす
 - 問題なし / 対象外の評価項目にfinding refがない
 - source item ref形式と参照先
 - evidence ref存在
-- 判定不能に制約理由がある
+- 判定不能 / 対象外にstatus reason / 制約・未確認がある
 - 観測済みのユーザー影響を出す場合は対応evidenceがある
 - TC resultを書き換える欄を持たない
 - source item refなしのbest practice断定を拒否
@@ -264,7 +277,7 @@ LLM Judgeで最低限次を評価します。
 - false positive抑制
 - accessibility判断の妥当性
 - visual evidenceの使い方
-- project Authorityとの優先順位
+- project Authority / applicable standard / platform guidance等の関係をbinding / advisoryとapplicabilityに基づいて正しく扱っているか
 - 一般heuristicを仕様FAILへ昇格していないか
 - design-stageとlive-stageを混同していないか
 - user researchなしでユーザー行動を断定していないか
