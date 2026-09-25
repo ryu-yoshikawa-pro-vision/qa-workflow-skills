@@ -35,6 +35,8 @@ description: テスト要求を条件・観点へ展開し、同値分割、境�
 
 すべてのruntimeは共通envelope、stable target ID、Machine Entity、freshnessを使用します。adapter childは親modelのgeneration fingerprintとderived child inputに依存し、親と同じ内容を独立再生成しません。`materialize_coverage`はcurrentかつdeterministicなruntime結果だけを統合し、unsupported / stale / legacy / semantic CI不足をcompleteへ昇格しません。
 
+`materialize_coverage.py`の`models[]`は、current model runtimeのMachine Runtime Result envelopeと実行時metadataをSkill-local `runtime_contract.py::current_model_result_row(envelope, metadata)`へ渡した戻り値だけを使います。raw envelope、`runtime_unit_row()`の戻り値、Agent / LLMが手組みしたmodel resultは渡しません。
+
 ### 最終runtime evidence gate
 
 最終成果物の直前にSkill-local `scripts/runtime_contract.py`の`operation=verify_runtime_evidence`へ、実際に使用したcanonical normalized inputとcandidate成果物全文、固定booleanの`partial_rerun`を渡します。full buildでは`partial_rerun=false`かつ`previous_artifact_markdown=null`、partial rerunではscope外Entityの有無にかかわらず`partial_rerun=true`と同一成果物系列の直前artifact全文を渡します。Disposition-onlyのscope外Entityもpreviousから検証するためです。判定やprevious Entity配列を手組みしません。返却`valid=true`の場合だけ完成として返し、`valid=false`は既存の最大1回の局所修正・最終確認契約へ統合し、未解決なら完成扱いしません。

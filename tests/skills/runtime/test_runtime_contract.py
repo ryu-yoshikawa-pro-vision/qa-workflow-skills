@@ -353,6 +353,49 @@ class EntityAndEvidenceTests(unittest.TestCase):
             "generator_implementation_fingerprint", "static_data_versions",
         }.issubset(runtime_projection))
 
+    def test_current_model_result_row_has_exact_materialize_projection(self) -> None:
+        envelope = {
+            "skill": "test-condition-design", "runtime_unit_key": "model:ep-001", "input_fingerprint": "sha256:" + "1" * 64,
+            "model_fingerprint": "sha256:" + "2" * 64, "generation_fingerprint": "sha256:" + "3" * 64,
+            "generator_contract_version": "equivalence-partitions-v1", "support_status": "supported", "runtime_status": "ok",
+            "result_status": "ready", "runtime_required": True, "deterministic_generated": True,
+            "runtime_contract_version": "runtime-v1", "runtime_implementation_fingerprint": "sha256:" + "4" * 64,
+            "generator_implementation_fingerprint": "sha256:" + "5" * 64, "static_data_versions": {},
+            "upstream_entity_fingerprints": [], "upstream_runtime_units": [],
+            "payload": {
+                "targets": [{"target_key": "role:admin", "materializable": True}], "unsupported_items": [],
+                "coverage_summary": {"complete": True}, "model_completion": [{"model_key": "ep-001"}],
+                "target_mappings": [{"target_ref": "target:ep-001:role:admin"}],
+                "target_dispositions": [{"target_ref": "target:ep-001:role:admin"}],
+            },
+        }
+        metadata = {"model_key": "ep-001", "model_type": "ep", "technique_slug": "ep"}
+
+        projected = runtime.current_model_result_row(envelope, metadata)
+
+        self.assertEqual(set(projected), {
+            "skill", "model_key", "model_type", "technique_slug", "runtime_unit_key", "input_fingerprint", "model_fingerprint",
+            "generation_fingerprint", "generator_contract_version", "support_status", "runtime_status", "result_status",
+            "deterministic_generated", "freshness_status", "targets", "unsupported_items", "coverage_summary",
+        })
+        self.assertEqual(projected["freshness_status"], "current")
+        self.assertEqual(projected["coverage_summary"], {"complete": True})
+
+        completion_envelope = {
+            **envelope,
+            "runtime_unit_key": "model:random-001",
+            "payload": {"targets": [], "unsupported_items": [], "completion_summary": {"complete": True}},
+        }
+        completion_projection = runtime.current_model_result_row(
+            completion_envelope,
+            {"model_key": "random-001", "model_type": "random", "technique_slug": "random-testing"},
+        )
+        self.assertEqual(set(completion_projection), {
+            "skill", "model_key", "model_type", "technique_slug", "runtime_unit_key", "input_fingerprint", "model_fingerprint",
+            "generation_fingerprint", "generator_contract_version", "support_status", "runtime_status", "result_status",
+            "deterministic_generated", "freshness_status", "targets", "unsupported_items", "completion_summary",
+        })
+
     def test_common_disposition_currentness_covered_rules_and_dependencies(self) -> None:
         upstream = runtime.make_machine_entity("spec-analysis", "authority", "AUTH-001", {"authority_id": "AUTH-001"})
         covered = runtime.make_machine_entity("test-analysis", "product_risk", "R-001", {"risk_id": "R-001"})

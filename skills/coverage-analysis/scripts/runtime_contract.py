@@ -1909,19 +1909,27 @@ def _runtime_unit_result_row(envelope: dict[str, Any], *, freshness_status: str 
 
 
 def current_model_result_row(envelope: dict[str, Any], metadata: dict[str, Any]) -> dict[str, Any]:
-    row = runtime_unit_row(envelope)
-    payload = envelope.get("payload") or {}
-    row.update({
+    payload = envelope.get("payload")
+    if not isinstance(payload, dict):
+        payload = {}
+    row = {
+        "skill": envelope.get("skill"),
         "model_key": metadata.get("model_key"),
         "model_type": metadata.get("model_type"),
         "technique_slug": metadata.get("technique_slug"),
-        "generator_contract_version": envelope.get("generator_contract_version"),
+        "runtime_unit_key": envelope.get("runtime_unit_key"),
         "input_fingerprint": envelope.get("input_fingerprint"),
         "model_fingerprint": envelope.get("model_fingerprint"),
+        "generation_fingerprint": envelope.get("generation_fingerprint"),
+        "generator_contract_version": envelope.get("generator_contract_version"),
+        "support_status": envelope.get("support_status"),
+        "runtime_status": envelope.get("runtime_status"),
+        "result_status": envelope.get("result_status"),
+        "deterministic_generated": envelope.get("deterministic_generated"),
         "freshness_status": "current",
         "targets": canonicalize(payload.get("targets", [])),
         "unsupported_items": canonicalize(payload.get("unsupported_items", [])),
-    })
+    }
     for key in ("coverage_summary", "completion_summary"):
         if key in payload:
             row[key] = canonicalize(payload[key])

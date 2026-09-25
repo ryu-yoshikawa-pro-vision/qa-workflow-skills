@@ -80,13 +80,7 @@ def ep_result(model_key: str = "ep-001") -> dict:
 
 
 def materialize_request(ep: dict, *, previous: dict | None = None) -> dict:
-    model_result = {
-        "skill": "test-condition-design", "model_key": "ep-001", "model_type": "ep", "technique_slug": "ep", "runtime_unit_key": "model:ep-001",
-        "input_fingerprint": ep["input_fingerprint"], "model_fingerprint": ep["model_fingerprint"], "generator_contract_version": ep["generator_contract_version"],
-        "generation_fingerprint": ep["generation_fingerprint"], "support_status": ep["support_status"], "runtime_status": ep["runtime_status"],
-        "result_status": ep["result_status"], "deterministic_generated": ep["deterministic_generated"], "targets": ep["payload"]["targets"],
-        "unsupported_items": [], "coverage_summary": ep["payload"]["coverage_summary"], "freshness_status": "current",
-    }
+    model_result = runtime.current_model_result_row(ep, ep_metadata())
     previous = previous or {}
     annotations = [{
         "target_ref": target["target_ref"], "target_content_fingerprint": target["target_content_fingerprint"],
@@ -142,13 +136,7 @@ def test_data_output(
 
 
 def model_result_for(ep: dict, model_key: str) -> dict:
-    return {
-        "skill": "test-condition-design", "model_key": model_key, "model_type": "ep", "technique_slug": "ep", "runtime_unit_key": f"model:{model_key}",
-        "input_fingerprint": ep["input_fingerprint"], "model_fingerprint": ep["model_fingerprint"], "generator_contract_version": ep["generator_contract_version"],
-        "generation_fingerprint": ep["generation_fingerprint"], "support_status": ep["support_status"], "runtime_status": ep["runtime_status"],
-        "result_status": ep["result_status"], "deterministic_generated": ep["deterministic_generated"], "targets": ep["payload"]["targets"],
-        "unsupported_items": [], "coverage_summary": ep["payload"]["coverage_summary"], "freshness_status": "current",
-    }
+    return runtime.current_model_result_row(ep, ep_metadata(model_key))
 
 
 class MaterializeRuntimeTests(unittest.TestCase):
@@ -163,6 +151,14 @@ class MaterializeRuntimeTests(unittest.TestCase):
         self.assertEqual(len(result["payload"]["entities"]), 2)
         self.assertEqual(result["payload"]["entities"][0]["content"]["source_kind"], "runtime_target")
         self.assertIsNotNone(result["payload"]["entities"][0]["content"]["execution"])
+
+    def test_materialize_rejects_fields_outside_current_model_projection(self) -> None:
+        request = materialize_request(ep_result())
+        request["input"]["models"][0]["runtime_required"] = True
+
+        result = run_script(MATERIALIZE_SCRIPT, request)
+
+        self.assertEqual(result["runtime_status"], "invalid_input", result)
 
     def test_previous_full_state_preserves_ci_ids(self) -> None:
         ep = ep_result()

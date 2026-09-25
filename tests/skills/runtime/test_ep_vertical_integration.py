@@ -141,13 +141,7 @@ class EpVerticalIntegrationTests(unittest.TestCase):
             ],
             "static_data_versions": {}, "authority_refs": [], "reference_refs": [],
         }
-        model_result = {
-            "skill": "test-condition-design", "model_key": "schema-001", "model_type": "schema", "technique_slug": None,
-            "runtime_unit_key": "model:schema-001", "input_fingerprint": schema["input_fingerprint"], "model_fingerprint": schema["model_fingerprint"],
-            "generation_fingerprint": schema["generation_fingerprint"], "generator_contract_version": schema["generator_contract_version"],
-            "support_status": schema["support_status"], "runtime_status": schema["runtime_status"], "result_status": schema["result_status"],
-            "deterministic_generated": schema["deterministic_generated"], "freshness_status": "current", "targets": schema["payload"]["targets"], "unsupported_items": [],
-        }
+        model_result = runtime.current_model_result_row(schema, schema_metadata)
         materialized = run_script(MATERIALIZE_SCRIPT, {
             "metadata": materialize_metadata,
             "input": {
@@ -228,7 +222,7 @@ class EpVerticalIntegrationTests(unittest.TestCase):
                 {"skill": "test-condition-design", "runtime_unit_key": "artifact:test_data_requirements:all", "generation_fingerprint": tdr["generation_fingerprint"]},
             ], "static_data_versions": {}, "authority_refs": [], "reference_refs": [],
         }
-        model_result = {"skill": "test-condition-design", "model_key": "ep-001", "model_type": "ep", "technique_slug": "ep", "runtime_unit_key": "model:ep-001", "input_fingerprint": ep["input_fingerprint"], "model_fingerprint": ep["model_fingerprint"], "generator_contract_version": ep["generator_contract_version"], "generation_fingerprint": ep["generation_fingerprint"], "support_status": ep["support_status"], "runtime_status": ep["runtime_status"], "result_status": ep["result_status"], "deterministic_generated": ep["deterministic_generated"], "freshness_status": "current", "targets": ep["payload"]["targets"], "unsupported_items": [], "coverage_summary": ep["payload"]["coverage_summary"]}
+        model_result = runtime.current_model_result_row(ep, ep_metadata())
         annotations = [{"target_ref": target["target_ref"], "target_content_fingerprint": target["target_content_fingerprint"], "generation_fingerprint": ep["generation_fingerprint"], "priority": "中", "priority_override_reason": None, "expected_result_root": f"root-{target['target_key'].replace(':', '-')}", "test_data_requirement_refs": ["data:role"]} for target in ep["payload"]["targets"]]
         materialize_input = {"tcn_id": "TCN-001", "active_model_metadata": condition["payload"]["active_model_metadata"], "models": [model_result], "semantic_coverage_items": [], "test_data_requirements": requirement_rows, "target_annotations": annotations, "target_dispositions": [], "previous_target_id_map": [], "previous_semantic_ci_map": [], "previous_ci_ids": [], "previous_expected_result_roots": [], "merge_groups": []}
         materialize = run_script(MATERIALIZE_SCRIPT, {"metadata": materialize_meta, "input": materialize_input})
@@ -365,13 +359,7 @@ class EpVerticalIntegrationTests(unittest.TestCase):
                 "static_data_versions": {}, "authority_refs": [], "reference_refs": [],
             }
             active_model = {"model_key": model_key, "model_type": "ep", "technique_slug": "ep", "parent_tcn_id": tcn_id, "content_fingerprint": runtime.sha256_digest(model_content)}
-            model_result = {
-                "skill": "test-condition-design", "model_key": model_key, "model_type": "ep", "technique_slug": "ep", "runtime_unit_key": f"model:{model_key}",
-                "input_fingerprint": result["input_fingerprint"], "model_fingerprint": result["model_fingerprint"], "generator_contract_version": result["generator_contract_version"],
-                "generation_fingerprint": result["generation_fingerprint"], "support_status": result["support_status"], "runtime_status": result["runtime_status"],
-                "result_status": result["result_status"], "deterministic_generated": result["deterministic_generated"], "freshness_status": "current", "targets": result["payload"]["targets"],
-                "unsupported_items": [], "coverage_summary": result["payload"]["coverage_summary"],
-            }
+            model_result = runtime.current_model_result_row(result, model_metadata)
             return result, {"metadata": metadata, "input": {"tcn_id": tcn_id, "active_model_metadata": [active_model], "models": [model_result], "semantic_coverage_items": [], "test_data_requirements": [], "target_annotations": [], "target_dispositions": [], "previous_target_id_map": [], "previous_semantic_ci_map": [], "previous_ci_ids": [], "previous_expected_result_roots": [], "merge_groups": []}}
 
         ep_a, request_a = model_run("ep-001", "TCN-001")
