@@ -148,7 +148,7 @@ methodology sourceを追加する場合は、
 - user / role
 - user goal
 - user goal source / evidence refs
-- inferred / confirmed
+- goal state: confirmed / inferred / unknown
 - task scenario
 - start state
 - success condition
@@ -247,13 +247,14 @@ follow-upが必要なObservation / evaluationだけ、PR #13のFinding契約で�
 - `判定不能 / 未実行` に理由がある
 - started taskのmeaningful action ref一意性
 - actionからevidenceへ解決できる
-- timing measurementのstart / end / elapsed_ms
+- timing measurementのstart / end / elapsed_ms / measurement method
 - elapsed_msが非負
+- browser / page側の同一計測系で区間を測定できない場合にsystem responsiveness値を確定しない
 - threshold resultとthreshold fieldの整合
 - over-threshold / within-thresholdにはthreshold Authority refがある
 - threshold-not-definedで任意のFAIL判定を持たない
 - source test case PASS / FAIL欄を持たない
-- user goal source / inferred状態がある
+- user goal sourceとgoal state（confirmed / inferred / unknown）がある
 - evaluation refがある場合はusability-evaluation artifactへ解決する
 - Finding refがある場合はFindingが存在する
 - cleanup / residual state contract
