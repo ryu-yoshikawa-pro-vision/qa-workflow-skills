@@ -88,7 +88,7 @@ SKILL.mdは詳細なUI pattern知識を抱えません。
 - 一般的なデザイン案の創作だけ
 - user researchそのもの
 
-ここでのnegativeは「最初のSkillとして直接選択しない」という意味です。`test-execution` / `test-target-inspection` 等がevidenceを取得した後にworkflow内で `usability-evaluation` を呼ぶことは妨げません。
+ここでのnegativeは「最初のSkillとして直接選択しない」という意味です。`test-execution` / `test-target-inspection` 等の既存evidenceは、UI / UX評価が同じ依頼・案件scope・qa-workflowで明示的に選定された場合にread-only入力として再利用できます。evidenceが存在するだけでは `usability-evaluation` を自動起動しません。
 
 境界queryをtrigger evalへ入れます。
 
