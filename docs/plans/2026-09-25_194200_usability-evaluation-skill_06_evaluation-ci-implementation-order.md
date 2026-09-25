@@ -46,7 +46,7 @@ reference本文を書く前にsource母集団を固定します。
 
 を確認します。
 
-加えて、Plan作成時のseed sourceだけで閉じず、標準化団体、platform vendor、公開Design System、UI pattern library、usability評価資料を追加調査します。本Skillの対象に直接使える新しいsourceを採用した場合は、そのsourceも同じsource inventory / coverage契約へ追加します。
+加えて、Plan作成時のseed sourceだけで閉じず、`_02a_source-acquisition-and-coverage.md` §5のQ1〜Q7と1-hop cross-link探索を実施します。candidateは `source-catalog.md` へ記録し、pendingを0にしてからadopted sourceのitem inventoryへ進みます。
 
 source-coverageの初期母集団を作ります。
 
@@ -78,14 +78,45 @@ source-coverageの初期母集団を作ります。
 - evidence-and-authority.md
 - evaluation-method.md
 - reference entry共通形式
+- source discovery query matrix
+- reference catalog validatorの最小schema検証
 
-その後に個別patternを収録します。
+この時点で大量のreference本文は作りません。
 
-これにより、追加中でも何が未収録か分かる状態を維持します。
+## 6. Step 4: 縦断検証
 
-## 6. Step 4: standards / accessibility
+全source収録前に、最終契約を実測するための代表経路を1本成立させます。
 
-次を先に収録します。
+最低限:
+
+- Dialog pattern
+- WAI-ARIA APGのDialog guidance
+- Dialogに関係するWCAG 2.2の適用可能な項目
+- official Design System 1つのDialog guidance
+- usability heuristic 1つ以上
+- DOM / accessibility evidence
+- screenshotで確認するvisual観点
+
+このsubsetだけを使って、次を先に実装・検証します。
+
+- `SKILL.md` のindex参照
+- root index → sub-index → referenceの読込
+- output-template
+- UI / UX評価項目とFindingの分離
+- binding / advisoryとapplicability
+- reference catalog validator
+- deterministic output validator
+- semantic evalの代表case
+- `test-target-inspection` / `test-execution` からのevidence連携
+- 同一browser / sessionを競合操作しないこと
+
+このStepは最終収録範囲を縮小するものではありません。ここで契約を確認した後、Step 5〜7ですべてのadopted source itemを収録し、Step 8のcompleteness gateを満たすまで実装完了とは扱いません。
+
+縦断検証でschema変更が必要になった場合は、この時点で修正してから全source収録へ進みます。
+
+## 7. Step 5: standards / accessibilityを全件収録
+
+次をsource inventory順に処理します。
 
 - WCAG 2.2
 - relevant Understanding
@@ -93,11 +124,9 @@ source-coverageの初期母集団を作ります。
 - WAI-ARIA APG Patterns
 - WAI-ARIA APG Practices
 
-理由は、複数Design Systemがこれらを前提にするためです。
-
 source-coverage上の対象をすべて閉じます。
 
-## 7. Step 5: official Design Systems / platform guidance
+## 8. Step 6: official Design Systems / platform guidanceを全件収録
 
 情報源ごとに全公開対象をinventory順に処理します。
 
@@ -124,11 +153,11 @@ source-coverage上の対象をすべて閉じます。
 - source item取得
 - common entryへ統合可能か確認
 - source固有差分をplatform fileへ記録
-- coverage status更新
+- coverage disposition / access state / maturity / field-level coverage更新
 
 を同じ工程で行います。
 
-## 8. Step 6: general pattern / heuristic sources
+## 9. Step 7: general pattern / heuristic sourcesを全件収録
 
 - ソシオメディア UIデザインパターン
 - Nielsen Norman Groupの採用資料
@@ -141,7 +170,7 @@ source-coverage上の対象をすべて閉じます。
 
 本文を重複コピーしません。
 
-## 8.1 Plan作成時点で確認済みの取得上の注意
+### Plan作成時点で確認済みの取得上の注意
 
 実装時に再確認しますが、Plan作成時点では少なくとも次を確認しています。
 
@@ -156,15 +185,15 @@ source-coverage上の対象をすべて閉じます。
 - Material Design 3の主要ページはJavaScript依存で取得手段によって本文を取得できない場合がある。公式の代替公開経路を確認し、取得できなければunavailableとする。
 - 旧Polarisの一部URLは現在Shopify DeveloperのPolaris referencesへredirectする。旧URLの内容をcurrentと仮定せず現行canonical sourceを棚卸しする。
 
-## 9. Step 7: completeness gate
+## 10. Step 8: completeness gate
 
 source-coverage validatorを実行し、
 
+- source-catalogのpending candidate
 - coverage disposition未設定
 - access state未設定
 - includedなのにdestinationなし
-- included / merged-duplicateなのにfield-level coverage未完了
-- excluded dimensionに理由なし
+- included / merged-duplicateで `available_dimensions != captured_dimensions`
 - source ref不明
 - orphan reference
 - broken index
@@ -176,21 +205,23 @@ source-coverage validatorを実行し、
 
 未処理の空欄は未達です。
 
-## 10. Step 8: usability-evaluation Skill本体
+## 11. Step 9: Skill / evalを全referenceへ拡張
 
-reference inventoryが利用可能になった後に、
+Step 4で成立させた `SKILL.md`、output-template、validator、trigger / semantic evalを全referenceへ拡張します。
 
-- SKILL.md
-- output-template
-- deterministic validator
-- trigger eval
-- semantic rubric / cases
+追加したpattern / sourceで、
 
-を実装します。
+- index routing
+- alias
+- referenceの位置づけ
+- output contract
+- false positive抑制
 
-Skill本体を先に作り、後から知識を少しずつ足して完成扱いにはしません。
+が崩れていないことを確認します。
 
-## 11. Step 9: workflow統合
+全referenceを収録しただけでSkill完成扱いにせず、Step 4で確認した実行契約が全体でも維持されることを確認します。
+
+## 12. Step 10: workflow統合
 
 PR #12 / #13 merge後実装へ合わせて、
 
@@ -211,7 +242,9 @@ PR #12 / #13 merge後実装へ合わせて、
 
 各Skill側には「いつusability-evaluationを利用するか」「結果をどう受け取るか」の境界だけ追加します。
 
-## 12. Step 10: repository integration
+Regression経由のtest-executionでは、regression-testingが確定したUI / UX評価scopeを通常のlive UI既定接続より優先します。
+
+## 13. Step 11: repository integration
 
 最新mainを基準に更新します。
 
@@ -228,7 +261,6 @@ PR #12 / #13 merge後実装へ合わせて、
 - repository tests
 
 Skill件数・query件数は実装開始時の正本から再計算し、現在Plan記載値をハードコードしません。
-
 ## 13. trigger eval
 
 既存repository標準件数を維持します。
@@ -264,6 +296,8 @@ negative例:
 ~~~
 
 `test-target-inspection` もstandalone / qa-workflow経由の両経路を代表caseで確認します。
+
+Regression統合では、Regression scopeにUI / UX評価が含まれないTCについて、通常のtest-executionの既定接続だけを理由にusability-evaluationが追加実行されないことも確認します。
 
 ## 14. deterministic eval
 
@@ -325,9 +359,9 @@ Observationを一般heuristicへ照合するが、ユーザーが実際に困る
 
 ### Case G: source conflict
 
-platform guidelineとgeneric Design Systemで推奨が異なる。
+project Authority、適用standard、platform guideline、generic Design Systemで要求・推奨が異なる。
 
-対象platform / project採用規約を優先すること。
+固定順位で選ばず、binding / advisoryとapplicabilityを判定すること。binding requirement同士が競合する場合は勝手に解決せず、Authority conflictとしてroutingすること。
 
 ### Case H: no issue
 
@@ -367,13 +401,13 @@ PR #12の実行基盤を利用できる場合、
 - root indexからpatterns / accessibility / platformsのsub-indexへ到達できる
 - sub-indexから対象pattern / concern / platform別referenceへ到達できる
 - 通常評価で全referencesの一括読込を要求しない
-- source discovery対象categoryと候補sourceの採否がsource inventoryへ記録されている
+- Q1〜Q7と1-hop cross-link探索のcandidateがsource-catalogへ記録され、pendingが0
 - 採用sourceの対象母集団がsource-coverageへ記録されている
 - 全source itemのcoverage dispositionがincluded / merged-duplicate / out-of-scope / unavailable / source-reference-onlyのいずれかへ閉じている
 - access stateがcoverage dispositionと分離され、restricted sourceを取得済みと誤認しない
 - source自身が明示するmaturity / lifecycleをcoverage dispositionと分離して保持している
-- included / merged-duplicate itemのfield-level coverageが `available - captured - excluded = 0` で閉じている
-- excluded dimensionに理由がある
+- included / merged-duplicate itemのfield-level coverageが `available_dimensions = captured_dimensions` で閉じている
+- 取得済みの関連情報を任意に除外してincluded扱いにする経路がない
 - JavaScript依存、login限定、deprecated / archived、redirect等の取得制約をcurrent sourceと混同せず状態化している
 - included referenceのsource追跡が可能
 - reference catalog validator PASS
