@@ -1,4 +1,10 @@
-# UIユーザビリティ評価Skill追加Plan
+# UI/UX評価・ユーザビリティテストSkill追加Plan
+
+## 0. 本ファイルの対象
+
+本ファイルのsource discovery / coverage契約は `usability-evaluation` のUI / UX reference corpusに適用します。
+
+`usability-testing` のmethodology sourceへこのall-source discoveryを複製しません。
 
 ## 1. このPlanの目的
 
