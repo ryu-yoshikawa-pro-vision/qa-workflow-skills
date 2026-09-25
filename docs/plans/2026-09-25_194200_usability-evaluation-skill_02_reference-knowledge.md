@@ -1,10 +1,10 @@
-# UI/UX評価・ユーザビリティテストSkill追加Plan
+# UI/UX評価・ユーザビリティ検査Skill追加Plan
 
 ## 0. 本ファイルの対象
 
 本ファイルは `usability-evaluation` が使用するUI pattern / principle / accessibility / platform / Design System knowledgeのreference設計です。
 
-`usability-testing` のtask execution methodologyは `_05a_usability-testing-package-and-evaluation.md` で別管理し、本reference corpusへ重複収録しません。
+`usability-inspection` のtask execution methodologyは `_05a_usability-inspection-package-and-evaluation.md` で別管理し、本reference corpusへ重複収録しません。
 
 ## 1. reference知識の目的
 
