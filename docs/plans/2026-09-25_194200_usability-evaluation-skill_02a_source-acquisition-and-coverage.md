@@ -137,7 +137,7 @@ NN/gの全記事を無条件に対象母集団にはしません。評価方法�
 - 他sourceの転載だけのページ
 - loginしないと本文を取得できず公開sourceとして再利用できないもの
 
-採用しない候補も、調査対象として意味がある場合はsource discovery logに理由を残します。
+採用しない候補も `source-catalog.md` にcandidateとして残し、採否と理由を記録します。別のsource discovery logは作りません。
 
 ## 5. source discoveryの進め方
 
@@ -149,32 +149,36 @@ legacy URLや検索結果の古いversionをcurrent rootとして固定しませ
 
 ### 5.2 category別追加探索
 
-各source categoryで、seed以外の主要sourceを追加探索します。
+seed以外のsource探索は、実装開始時に次のquery matrixを1回固定して実施します。
 
-検索では少なくとも次の概念を組み合わせます。
+| Query ID | 検索語 |
+| --- | --- |
+| Q1 | `design system components patterns accessibility` |
+| Q2 | `human interface guidelines interaction accessibility` |
+| Q3 | `UI pattern library interaction design patterns` |
+| Q4 | `usability heuristics heuristic evaluation interface` |
+| Q5 | `accessibility design patterns keyboard focus` |
+| Q6 | `responsive adaptive design system patterns` |
+| Q7 | `form error feedback navigation design patterns` |
 
-- design system
-- human interface guidelines
-- UI patterns
-- interaction patterns
-- component usage
-- accessibility
-- usability heuristics
-- responsive / adaptive design
-- error / feedback / forms / navigation
+各queryについて、利用する検索手段が返す先頭20件または結果終了までのうち早い方を確認し、同一root URLの重複を除いた候補を `source-catalog.md` へ記録します。
 
-検索結果をそのまま採用せず、source採用条件へ照合します。
+検索結果をそのまま採用せず、§4のsource採用条件へ照合します。検索順位自体をsourceの強さには使いません。
+
+実装中にquery matrixを変更する場合は、旧query結果を消さず、変更理由と再実行したQuery IDを `source-catalog.md` に残します。
 
 ### 5.3 cross-link探索
 
-採用source自身が参照する、
+adopted sourceの公式ページから直接参照される次のlinkを1 hopだけ確認します。
 
 - standard
 - accessibility guidance
 - related official Design System
 - research / pattern source
 
-のうち、評価根拠として独立利用する価値があるものは候補へ追加します。
+独立した評価根拠として§4の採用条件を満たすものをcandidateへ追加します。
+
+追加candidateからさらに外部linkを再帰的に辿りません。cross-link探索を無制限に連鎖させないためです。
 
 ### 5.4 source discovery closure
 
@@ -182,15 +186,13 @@ source discoveryを「Web全体を完全探索した」とは表現しません�
 
 次を満たした状態を、本実装の探索完了とします。
 
-- 全categoryでseed sourceを確認済み
-- category別追加探索を実施済み
-- cross-linkから得た候補を確認済み
-- 候補ごとにadopted / rejected / unavailable / duplicateを記録済み
-- 未処理candidateが0件
-- 追加採用sourceがsource-catalog / source-coverageへ入っている
+- 全categoryのseed sourceを確認済み
+- Q1〜Q7をそれぞれ1回以上実行し、確認範囲を `source-catalog.md` に記録済み
+- adopted sourceの§5.3対象linkを1 hop確認済み
+- 全candidateが `pending` 以外の `adopted / rejected / unavailable / duplicate` へ閉じている
+- adopted sourceがsource-catalog / source-coverageへ入っている
 
 新しいsourceが将来存在し得ることは鮮度契約で扱います。
-
 ## 6. source item母集団の固定
 
 sourceを採用したら、そのsourceのitem母集団を先に固定します。
@@ -342,16 +344,19 @@ sourceに存在するのに未収録ならcoverage未完了です。
 
 `included` / `merged-duplicate` itemはitem単位のdispositionだけで完了扱いにしません。
 
-sourceに存在すると確認した情報種別を `available_dimensions`、referenceへ収録したものを `captured_dimensions`、意図的に収録しないものを理由付きの `excluded_dimensions` として記録します。
+sourceに存在すると確認したUI / UX評価上の情報種別を `available_dimensions`、referenceまたは統合先referenceへ収録したものを `captured_dimensions` として記録します。
 
 完了条件:
 
 ~~~text
-available_dimensions
-- captured_dimensions
-- excluded_dimensions
-= 0
+available_dimensions = captured_dimensions
 ~~~
+
+取得できた関連情報を「今回は省略する」という理由だけで除外できる `excluded_dimensions` は設けません。
+
+利用条件、取得制約、対象外等で収録できない場合は、そのitemを `included` のまま閉じず、`source-reference-only` / `unavailable` / `out-of-scope` 等の既存dispositionへ移します。
+
+`merged-duplicate` では、統合先referenceがそのitemの全 `available_dimensions` を収録していることを確認します。
 
 sourceにそのdimensionが存在するかの意味判断は取得時に行い、deterministic validatorがWeb本文を再解釈しません。
 
@@ -359,24 +364,22 @@ sourceにそのdimensionが存在するかの意味判断は取得時に行い�
 
 Skill-local validatorで最低限確認します。
 
+- source-catalogの全candidateがpending以外へ閉じている
 - adopted sourceがcatalogにある
 - adopted sourceのinventory item数が0でない
 - 各itemにcoverage dispositionがある
 - 各itemにaccess stateがある
 - source自身がmaturity / lifecycleを明示する場合はその値を保持している
 - included / merged-duplicateのdestinationが存在する
-- included / merged-duplicateの各itemに `available_dimensions` / `captured_dimensions` / `excluded_dimensions` がある
-- `available_dimensions - captured_dimensions - excluded_dimensions = 0`
-- excluded dimensionには理由がある
+- included / merged-duplicateの各itemに `available_dimensions` / `captured_dimensions` がある
+- included / merged-duplicateで `available_dimensions = captured_dimensions`
 - source refが一意
 - canonical URLがある
 - checked_atがある
 - source itemの重複がない
 - reference entryからsourceへ逆引きできる
-- discovery candidateが未処理状態で残っていない
 
 Web上の「未知のsourceが存在しないこと」や、source本文中のdimension抽出が意味的に正しいことまではvalidatorで証明しません。
-
 ## 13. Plan作成時点の確認事項
 
 2026-09-25時点の調査で、少なくとも次を確認しています。
@@ -400,9 +403,10 @@ Web上の「未知のsourceが存在しないこと」や、source本文中のdi
 最終referenceだけでなく、次を実装記録として残します。
 
 - discovery対象category
+- Query ID / cross-link元
 - candidate source
-- 採否
-- 理由
+- discovery status
+- 採否理由
 - canonical root
 - item enumeration method
 - inventory count
