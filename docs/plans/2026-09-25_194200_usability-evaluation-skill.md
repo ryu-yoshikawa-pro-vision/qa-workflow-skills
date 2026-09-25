@@ -150,3 +150,6 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
 20. sourceの更新可能性を隠さず、referenceには出典URLと取得・確認時点を保持する。
 21. UX総合点や単一スコアを正本にしない。観測事実、適用根拠、期待される特性、差異、想定される影響とその根拠、sourceを保持する。実ユーザー影響を観測していない場合は観測済み事実として書かない。
 22. user researchの代替とは扱わない。heuristic evaluationで分かることと、実ユーザーでしか確認できないことを区別する。
+23. 評価開始時に上位観点ごとの今回の扱いを固定し、「今回評価する」とした観点をすべて評価結果へ閉じる。上位観点を選ぶ妥当性はsemantic eval、closureはdeterministic validatorで確認する。
+24. `evaluation ref` はusability-evaluation成果物revision内だけで一意なartifact-local refとし、新しいglobal QA ID / Machine Entityを追加しない。
+25. 複数source itemを1つのreferenceへ統合しても、各source itemの位置づけと適用条件を保持する。内容を収録した各adopted sourceは最低1件を原文とspot-checkする。
