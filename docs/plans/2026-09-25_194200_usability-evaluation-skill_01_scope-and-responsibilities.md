@@ -1,4 +1,4 @@
-# UIユーザビリティ評価Skill追加Plan
+# UI/UX評価・ユーザビリティテストSkill追加Plan
 
 ## 1. 現状
 
@@ -16,6 +16,10 @@ PR #13では次が追加予定です。
 - qa-knowledge
 
 これらはUIを観測または操作できますが、UIパターンの目的・rationale・一般的なinteraction原則・アクセシビリティ・視覚品質を専門的に評価するownerではありません。
+
+また、user goal / task scenarioだけを与え、詳細手順を正解として使わずに生きた実対象を操作し、task達成・visual breakage・feedback・error recovery・user-facing responsivenessを観測するownerもありません。
+
+後者は `usability-testing` として別Skillにし、本ファイルでは `usability-evaluation` の責務を定義します。
 
 ## 2. 解決する問題
 
@@ -36,6 +40,10 @@ PR #13では次が追加予定です。
 この状態では、同じUIを評価してもAgentごとに判断基準が揺れます。
 
 usability-evaluation は、これらの判断に使う参照知識と評価手順をSkill package内へ持ち、出典と適用条件に基づく再現性のある評価を行います。
+
+ここでいう評価はUI pattern knowledge、standard、Design System、heuristic等に基づく専門評価です。代表ユーザーへtaskを依頼するUX researchとしてのusability testingではありません。
+
+live targetをtask-basedに能動操作する責務は `_01a_usability-testing-scope-and-contract.md` の `usability-testing` が担当します。
 
 ## 3. 主責務
 
@@ -216,6 +224,8 @@ test-condition-designは現在有効なテスト要求と仕様根拠の範囲�
 
 評価項目は問題なし・判定不能・対象外も保持できます。PR #13のFindingは、問題を確認した項目、または追加観測・仕様確認等のfollow-upが必要で後続QA活動で扱う必要がある項目だけに作成します。
 
+`問題なし` は、今回のscope、利用可能なevidence、適用したreferenceの範囲で問題を確認しなかったことを表します。実ユーザーにとって使いやすいこと、製品全体のusability、human satisfaction等を保証しません。
+
 ## 6. 担当しないこと
 
 - Product Riskの採点
@@ -232,6 +242,9 @@ test-condition-designは現在有効なテスト要求と仕様根拠の範囲�
 - browser automation frameworkの新設
 - screenshot diff専用runtimeの新設
 - 全外部Design Systemへの準拠を要求すること
+- representative userを用いたusability testingの代替
+- human satisfaction / human task completion rate / human task timeの推測
+- user goal / user behaviorをUIだけから実証済み事実として断定すること
 
 ## 7. 「使いやすい」の扱い
 
