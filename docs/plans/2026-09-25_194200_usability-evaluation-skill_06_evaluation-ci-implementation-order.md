@@ -428,7 +428,7 @@ PR #12の実行基盤を利用できる場合、
 - sub-indexから対象pattern / concern / platform別referenceへ到達できる
 - 通常評価で全referencesの一括読込を要求しない
 - Q1〜Q7と1-hop cross-link探索のcandidateがsource-catalogへ記録され、pendingが0
-- 採用sourceごとにadopted scope、列挙元、対象母集団がsource-coverageへ記録されている。source全体を列挙できない場合は有限に列挙できるsubsetだけをadopted scopeとし、source全体を全件取得済みと扱わない
+- 採用sourceごとのadopted scopeとitem列挙元 / 列挙方法がsource-catalogへ記録され、対象item母集団がsource-coverageへ記録されている。source全体を列挙できない場合は有限に列挙できるsubsetだけをadopted scopeとし、source全体を全件取得済みと扱わない
 - 全source itemのcoverage dispositionがincluded / merged-duplicate / out-of-scope / unavailable / source-reference-onlyのいずれかへ閉じている
 - access stateがcoverage dispositionと分離され、restricted sourceを取得済みと誤認しない
 - source自身が明示するmaturity / lifecycleをcoverage dispositionと分離して保持している
