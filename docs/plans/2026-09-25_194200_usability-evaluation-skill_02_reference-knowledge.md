@@ -211,6 +211,23 @@ heuristicは広い経験則であり、特定componentの仕様要件ではな�
 
 古い資料では年代と現代Web / mobileへの適用制約を保持します。
 
+
+## 3.1 追加source discovery
+
+上記の情報源だけを固定リストとして「全情報」とは扱いません。
+
+実装時に、UI / UX評価へ直接利用できる公開情報源を追加調査し、次の条件を満たすsourceが見つかった場合はsource inventoryへ追加します。
+
+- 標準化団体またはplatform vendorの公式UI / accessibility guidance
+- 公開Design Systemのcomponent / pattern / interaction guidance
+- UI patternの目的・適用条件・rationaleを体系化した公開資料
+- usability評価方法を体系化した一次または代表的な資料
+- visual / responsive / error / feedback / form / navigation等、本Skillの既存sourceで不足する領域を補う資料
+
+追加sourceを見つけた場合も、権威性だけで既存sourceより常に優先するとは扱わず、source-catalogへ位置づけを記録します。
+
+検索結果やブログ記事を無制限に蓄積することはしません。source inventoryへ採用するかどうかを明示的に判断し、採用したsourceについては対象母集団を全件棚卸しします。
+
 ## 4. source優先順位
 
 評価時の既定優先順位を次とします。

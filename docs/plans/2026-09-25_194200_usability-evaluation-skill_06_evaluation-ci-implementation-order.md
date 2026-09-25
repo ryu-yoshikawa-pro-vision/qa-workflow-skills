@@ -46,6 +46,8 @@ reference本文を書く前にsource母集団を固定します。
 
 を確認します。
 
+加えて、Plan作成時のseed sourceだけで閉じず、標準化団体、platform vendor、公開Design System、UI pattern library、usability評価資料を追加調査します。本Skillの対象に直接使える新しいsourceを採用した場合は、そのsourceも同じsource inventory / coverage契約へ追加します。
+
 source-coverageの初期母集団を作ります。
 
 この時点では代表patternだけ先に完成扱いにしません。
