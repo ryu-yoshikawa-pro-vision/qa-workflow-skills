@@ -104,6 +104,8 @@ source-coverageの初期母集団を作ります。
 - `SKILL.md` のindex参照
 - root index → sub-index → referenceの読込
 - output-template
+- 上位観点の評価scope固定とclosure
+- artifact-localなevaluation ref
 - UI / UX評価項目とFindingの分離
 - binding / advisoryとapplicability
 - reference catalog validator
@@ -221,11 +223,14 @@ Step 4で成立させた `SKILL.md`、output-template、validator、trigger / se
 
 - index routing
 - alias
-- referenceの位置づけ
+- 各source item refとsource上の位置づけ / 適用条件の対応
+- 実行時のreferenceの位置づけ
 - output contract
 - false positive抑制
 
 が崩れていないことを確認します。
+
+さらに、`_05_skill-package.md` §10の規則でadopted sourceごとのreference spot-check fixtureを作り、原文との意味一致を確認します。
 
 全referenceを収録しただけでSkill完成扱いにせず、Step 4で確認した実行契約が全体でも維持されることを確認します。
 
@@ -330,7 +335,10 @@ UI patternを含むtest-condition-design
 最低限:
 
 - output schema
+- evaluation refの成果物revision内一意性
+- 上位観点の評価scopeとclosure
 - source item ref
+- reference entry内のsource item ref / source上の位置づけ / 適用条件の対応
 - evidence ref
 - status
 - required fields
@@ -395,6 +403,12 @@ project Authority、適用standard、platform guideline、generic Design System�
 
 false positiveを作らないこと。
 
+### Case I: 評価scopeのclosure
+
+Dialogの評価で、目的・interaction・feedback・accessibility・visual等の上位観点の一部を根拠なく未評価のまま完了しないこと。
+
+対象外にする場合は理由を残し、「今回評価する」とした観点は `問題を確認 / 問題なし / 判定不能 / 対象外` のいずれかへ閉じること。
+
 ## 17. real Agent evaluation
 
 dataset構造検証だけで実装完了にしません。
@@ -436,7 +450,11 @@ PR #12の実行基盤を利用できる場合、
 - 取得済みの関連情報を任意に除外してincluded扱いにする経路がない
 - JavaScript依存、login限定、deprecated / archived、redirect等の取得制約をcurrent sourceと混同せず状態化している
 - included referenceからsource item ref、source ID、canonical URLへ追跡できる
+- reference entry内で各source item refにsource上の位置づけ / 適用条件が対応付いている
+- 内容を収録した各adopted sourceについて最低1件のreference spot-checkを実施し、patterns / accessibility / platformsの各経路で最低1件は原文との意味一致を確認している
 - UI / UX評価項目にreferenceの位置づけが残り、project固有のbinding根拠を使う場合はproject Authority refを追跡できる
+- usability-evaluation成果物で上位観点ごとの今回の扱いが固定され、「今回評価する」とした観点がすべて評価結果へ閉じている
+- evaluation refは成果物revision内だけで一意なartifact-local refで、新しいglobal QA ID / Machine Entityを追加していない
 - Regression配下ではregression-testingが確定したUI / UX評価scopeが通常のlive UI既定接続より優先される
 - reference catalog validator PASS
 - deterministic eval PASS
