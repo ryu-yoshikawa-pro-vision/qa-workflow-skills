@@ -53,7 +53,7 @@ SKILL.mdは詳細なUI pattern知識を抱えません。
 9. live UIを観測していない場合、その事実を保持する。
 10. browser ownerが別Skillの場合は取得済みevidenceを優先し、同一sessionを勝手に操作しない。
 11. visual判断が必要な場合は画像証跡を利用する。
-12. sourceを必ず追跡できる形でFindingへ残す。
+12. sourceをUI / UX評価項目から追跡できるようにする。Findingを作成する場合も、元の評価項目・source・evidenceを追跡可能にする。
 13. user researchでしか確定できない事項を断定しない。
 
 ## 3. trigger
@@ -147,6 +147,8 @@ assets/output-template.mdは最低限次を持ちます。
 - target
 - observed fact
 - pattern / principle
+- referenceの位置づけ
+- project Authority refs（project固有のbinding根拠がある場合）
 - expected characteristic
 - difference
 - 想定される影響
@@ -195,12 +197,12 @@ all-source coverage要件を人手だけに依存させないため、Skill-loca
 
 - index linkが存在する
 - source-catalogのsource IDが一意
+- source-catalogのcandidate statusが許可値で、pendingが残っていない
 - source-coverageのsource refがcatalogへ存在する
 - coverage disposition / access stateが許可値
 - source自身がmaturity / lifecycleを明示する場合は値を保持する
 - included / merged-duplicate itemにreference destinationがある
-- included / merged-duplicate itemのfield-level coverageが閉じている
-- excluded dimensionに理由がある
+- included / merged-duplicate itemで `available_dimensions = captured_dimensions` が成立する
 - reference destinationが実在する
 - pattern entryのsource refがcatalog / coverageへ解決する
 - required metadataが欠けていない
@@ -219,7 +221,9 @@ Webへアクセスしてsourceの最新状態を検査するruntimeにはしま�
 
 - evaluation ref一意性
 - status許可値
+- 各評価項目にreferenceの位置づけがある
 - 問題を確認した評価項目にobserved fact / source / evidence / 想定影響の根拠がある
+- project固有のbinding根拠を適用した評価項目にproject Authority refがある
 - finding refがある場合は対応Findingが存在し、PR #13の最低契約を満たす
 - 問題なし / 対象外の評価項目にfinding refがない
 - source ref形式
