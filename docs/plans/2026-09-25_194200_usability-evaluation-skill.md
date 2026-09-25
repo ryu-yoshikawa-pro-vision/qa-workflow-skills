@@ -155,7 +155,7 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
 ## 固定方針
 
 1. usability-evaluation は横断的な専門評価Skillとし、通常の設計フローへ無条件に追加しない。
-2. live UIを扱うtest-target-inspection / test-executionでは、UI / UX評価が明示的に対象外でない限り、取得済み証拠を使うread-only評価を既定で接続する。分析・設計ではUIが対象で、user goal / interaction / usability / accessibility / visual qualityが判断へ影響する場合に利用する。
+2. test-target-inspection / test-executionの成果物は、UI / UX評価がユーザー要求・案件scope・qa-workflowで明示的に選定された場合にread-only入力として再利用できる。ただし、それらの実行だけを理由にusability-evaluation / usability-inspectionを既定起動しない。分析・設計ではUIが対象で、user goal / interaction / usability / accessibility / visual qualityが判断へ影響する場合にusability-evaluationを利用する。
 3. Skill自身がProduct Risk、TC、Regression membership等を所有しない。
 4. 仕様上のPASS / FAILとUI / UX評価結果を分離する。UI / UX評価項目は問題なし・判定不能・対象外も保持できるが、PR #13のFindingは後続QA活動で扱う必要がある項目だけに作成する。
 5. UIパターン名だけからチェックリストを機械適用せず、ユーザー目的、利用文脈、適用条件を先に確認する。
@@ -191,3 +191,9 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
 35. 単一Agent runのelapsed timeをINP field result、Core Web Vitals達成、human task time等へ昇格しない。
 36. usability-inspectionはtest-target-inspection / test-executionの既定後処理にはせず、live task-based testが要求・選定された場合だけ起動する。
 37. usability-evaluationのseed sourceは自動採用しない。既存adopted sourceにない明確な評価価値を確認してadoptし、一度adoptしたsourceはadopted scope内の関連情報を従来どおり全件closureする。
+38. usability-inspectionのlive実行対象は初版では既存Playwright経路で到達できるWeb UIに限定する。mobileはresponsive Web viewportを意味し、native mobile appの能動操作は対象外とする。
+39. 広い依頼でtaskが明示されない場合は、project requirement、user research、analytics / support data、Product Risk、検証済みproject knowledge等からtask候補を作り、選定根拠と未選定scopeを残す。根拠あるtask母集団を作れない場合は製品全体や代表taskを評価したと主張しない。
+40. Agent / tool capabilityの失敗をproduct usability問題へ自動変換しない。UI側の阻害を直接観測できない場合、またはAgent失敗とUI問題を切り分けられない場合は判定不能として扱う。
+41. 操作しやすさはAgent runで観測したmeaningful action、retry、backtrack、dead end、error / recovery、system wait等の事実として保持できるが、human efficiencyや総合scoreへ昇格しない。
+42. performance measurementは各action開始前にstart event、end predicate、measurement method、threshold Authorityの有無を固定し、終了後に都合のよい測定区間へ変更しない。
+43. 「ユーザビリティテストして」等の依頼はusability-inspectionのtrigger aliasとして受けられるが、成果物ではhuman participantを用いる正式なusability testingを実施したとは表現しない。
