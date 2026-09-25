@@ -190,3 +190,4 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
 34. timingではAgentの推論時間を除外し、system / browser側の測定区間だけを記録する。project thresholdがなければ任意のperformance FAIL thresholdを創作しない。
 35. 単一Agent runのelapsed timeをINP field result、Core Web Vitals達成、human task time等へ昇格しない。
 36. usability-testingはtest-target-inspection / test-executionの既定後処理にはせず、live task-based testが要求・選定された場合だけ起動する。
+37. usability-evaluationのseed sourceは自動採用しない。既存adopted sourceにない明確な評価価値を確認してadoptし、一度adoptしたsourceはadopted scope内の関連情報を従来どおり全件closureする。
