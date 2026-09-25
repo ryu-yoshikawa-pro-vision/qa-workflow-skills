@@ -39,6 +39,9 @@
 - NN/g Usability Testing 101
 - NN/g Task Scenarios for Usability Testing
 - NN/g Task Analysis
+- NN/g Cognitive Walkthroughs
+- NN/g Summary of Usability Inspection Methods
+- NIST Cognitive Walkthrough / usability inspection guidance
 - W3C WCAG-EM 2.0
 - web.dev User-centric Performance Metrics
 - web.dev Interaction to Next Paint
@@ -60,7 +63,7 @@ current URL / publication state /利用条件を確認します。
 
 まだ実browser操作を追加しません。
 
-task snapshot、task outcome、action trace、timing measurement、Observation、evaluation ref、Finding refの構造を先に固定します。
+task selection summary、task snapshot、task outcome、outcome basis、action trace、Agent run上の操作負荷、timing measurement、Observation、evaluation ref、Finding refの構造を先に固定します。
 
 ## 5. Step 3: task execution contract
 
@@ -76,12 +79,18 @@ task snapshot、task outcome、action trace、timing measurement、Observation�
 - no arbitrary threshold
 - no TC PASS / FAIL
 - no human satisfaction claim
+- broad scope task selection / coverage limitation
+- Agent / tool limitationとproduct-side blockerの分離
+- live execution scopeがWeb UIに限定されること
+- timing definitionをaction開始前に固定
 
 詳細TCを入力したcaseがtest-executionへroutingされることも確認します。
 
 ## 6. Step 4: browser実行経路
 
 PR #12 merge後のbrowser実行基盤を再利用します。
+
+初版のlive実行対象は既存Playwright経路で到達可能なWeb UIに限定します。responsive mobile Web viewportは対象にできますが、native iOS / Android / desktop appの能動操作runtimeは追加しません。
 
 新しいbrowser frameworkを作りません。
 
@@ -131,16 +140,16 @@ Step 5で取得したimmutable evidenceを `usability-evaluation` へ渡しま�
 
 確認:
 
-- testingがbrowser ownerを維持
+- inspectionがbrowser ownerを維持
 - evaluationがread-only
-- pattern / standard判断をtesting側へ複製しない
+- pattern / standard判断をinspection側へ複製しない
 - evaluationから追加観測requestを返せる
-- requestはtesting側でscope / safety判定してから実行
+- requestはinspection側でscope / safety判定してから実行
 - finding traceability
 
 同一sessionへの並行操作を行いません。
 
-## 9. Step 7: visual / responsiveness
+## 9. Step 7: visual / operability / responsiveness
 
 ### visual
 
@@ -153,17 +162,25 @@ Step 5で取得したimmutable evidenceを `usability-evaluation` へ渡しま�
 - focus indicator
 - unexpected layout shift
 
+### operability
+
+代表taskでmeaningful action、retry、backtrack、dead end、error / recoveryをAgent run上の観測事実として記録します。
+
+回数をhuman efficiencyへ読み替えず、独自scoreや任意thresholdを作りません。
+
 を確認します。
 
 ### responsiveness
 
-代表actionで、
+代表actionで、action開始前にstart event / end predicate / measurement method / threshold Authorityの有無を固定したうえで、
 
 - action start
 - first visible feedback
 - task-ready state
 
 のsystem elapsed timeを取得します。
+
+測定結果を見た後でend predicateを差し替えないcaseも検証します。
 
 Agentの生成・推論時間を混ぜないことを確認します。
 
@@ -213,8 +230,10 @@ repository標準件数に合わせます。
 最低限:
 
 - output schema
-- task outcome
+- task selection summary / coverage limitation
+- task outcome / outcome basis
 - action / observation / measurement ref
+- Agent run上の操作負荷
 - timing value / threshold整合
 - goal provenance
 - cleanup
@@ -227,6 +246,8 @@ repository標準件数に合わせます。
 ### real Agent
 
 利用可能な環境で、実Agentがtask scenarioからuser-facing情報だけを使って操作することを確認します。
+
+あわせて、Agentがcontrolを見落としただけのcaseをproduct defectへ昇格しないこと、UI側の阻害を直接観測したcaseだけ `未達成` を許可することを確認します。
 
 ## 13. Step 11: repository integration
 
@@ -251,12 +272,18 @@ repository標準件数に合わせます。
 - Agent Skills仕様を満たす
 - task scenario / success condition契約がある
 - user goalの出所または推定状態を保持する
+- broad scopeではtask候補、selected / not-selected / deferred、coverage limitationを保持する
+- task母集団の根拠がない場合に製品全体 / 代表taskを評価したと主張しない
+- live execution対象をPlaywrightで到達可能なWeb UIへ限定する
 - detailed TCを正本にしない
 - user-facing informationからtask pathを選ぶ
 - hidden implementation情報でdiscoverability問題を回避しない
 - task outcomeをTC PASS / FAILと分離する
+- `未達成` はproduct-side blocker evidenceがある場合だけ使用し、Agent / tool limitationまたは切り分け不能は `判定不能` とする
+- meaningful action / retry / backtrack / dead end / error / recoveryをhuman efficiencyへ読み替えない
 - visual observationをscreenshot等へ追跡できる
 - timing measurementでAgent思考時間を除外する
+- measurement definitionをaction前に固定し、結果を見た後でend predicateを変更しない
 - arbitrary performance thresholdを作らない
 - single-run elapsed timeをINP field resultへ昇格しない
 - keyboard-only representative caseを確認する
@@ -295,4 +322,5 @@ repository標準件数に合わせます。
 - screenshot pixel-diff engine
 - 新browser framework
 - global Usability Test Case ID体系
+- native mobile / desktop app live automation runtime
 - automatic user persona generation
