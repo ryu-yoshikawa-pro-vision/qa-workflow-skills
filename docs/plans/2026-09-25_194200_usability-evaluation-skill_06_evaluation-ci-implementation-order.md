@@ -46,7 +46,7 @@ reference本文を書く前にsource母集団を固定します。
 
 を確認します。
 
-加えて、Plan作成時のseed sourceだけで閉じず、`_02a_source-acquisition-and-coverage.md` §5のQ1〜Q7と1-hop cross-link探索を実施します。candidateは `source-catalog.md` へ記録し、pendingを0にしてからadopted sourceのitem inventoryへ進みます。
+加えて、Plan作成時のseed sourceだけで閉じず、`_02a_source-acquisition-and-coverage.md` §5のsource discoveryを順番どおり実施します。まずseed確認とQ1〜Q7のcandidate採否を閉じ、seed / query由来のadopted sourceへsource IDを付与してcross-link root setを固定します。そのroot setからだけ1-hop cross-link探索を行い、cross-link由来で新たにadoptしたsourceへ探索完了後にsource IDを付与します。candidateは `source-catalog.md` へ記録し、pendingを0にしてからadopted sourceのitem inventoryへ進みます。
 
 source-coverageの初期母集団を作ります。
 
@@ -201,7 +201,9 @@ source-coverage validatorを実行し、
 
 - source-catalogのpending candidate
 - Q1〜Q7のdiscovery実行記録不足 / 未完了
-- adopted source IDのcross-link実行記録不足 / 未完了
+- cross-link root set未固定、またはroot setとseed / query由来adopted source集合の不一致
+- cross-link root set内source IDのcross-link実行記録不足 / 未完了
+- cross-link由来sourceを今回のroot setへ再帰追加している状態
 - discovery実行記録のblocked残存
 - coverage disposition未設定
 - access state未設定
@@ -227,7 +229,7 @@ Step 4で成立させた `SKILL.md`、output-template、validator、trigger / se
 - index routing
 - alias
 - 各source item refとsource上の位置づけ / 適用条件の対応
-- 実行時のreferenceの位置づけ
+- 評価行の各 `適用したreference` でreference entry ref / source item ref / 今回のreferenceの位置づけが対応していること
 - output contract
 - false positive抑制
 
@@ -340,13 +342,14 @@ UI patternを含むtest-condition-design
 - output schema
 - evaluation refの成果物revision内一意性
 - 上位観点の評価scopeとclosure
-- source item ref
+- package-local source ID / source item ref / reference entry IDの形式、一意性、参照整合
 - reference entry内のsource item ref / source上の位置づけ / 適用条件の対応
+- 各評価項目の `適用したreference` におけるreference entry ref / source item ref / 今回のreferenceの位置づけの対応
 - evidence ref
 - status
 - required fields
 - unresolved constraints
-- source catalog / discovery実行記録 / coverage disposition / access state / maturity / field-level coverage
+- source catalog / cross-link root set / discovery実行記録 / coverage disposition / access state / maturity / field-level coverage
 - index integrity
 
 を検証します。
@@ -372,7 +375,7 @@ UI patternを含むtest-condition-design
 - general pattern
 - heuristic
 
-が混在し、binding / advisoryとapplicabilityを正しく分けること
+が混在し、各source itemを別々の `適用したreference` として保持し、binding / advisoryとapplicabilityを正しく分けること。複数根拠を1つのreferenceの位置づけへ潰さないこと
 
 ### Case C: responsive visual issue
 
@@ -398,7 +401,7 @@ Observationを一般heuristicへ照合するが、ユーザーが実際に困る
 
 project Authority、適用standard、platform guideline、generic Design Systemで要求・推奨が異なる。
 
-固定順位で選ばず、binding / advisoryとapplicabilityを判定すること。binding requirement同士が競合する場合は勝手に解決せず、Authority conflictとしてroutingすること。
+各根拠の `適用したreference` と位置づけを個別に保持し、固定順位で選ばずbinding / advisoryとapplicabilityを判定すること。binding requirement同士が競合する場合は勝手に1つへ統合せず、Authority conflictとしてroutingすること。
 
 ### Case H: no issue
 
@@ -444,7 +447,7 @@ PR #12の実行基盤を利用できる場合、
 - root indexからpatterns / accessibility / platformsのsub-indexへ到達できる
 - sub-indexから対象pattern / concern / platform別referenceへ到達できる
 - 通常評価で全referencesの一括読込を要求しない
-- Q1〜Q7がsource-catalogのdiscovery実行記録でそれぞれ1件以上 `completed` へ閉じ、各adopted source IDの1-hop cross-link確認も `completed` へ閉じている。0件結果も確認件数 / 新規candidate件数=0として記録され、`blocked` が残っていない
+- Q1〜Q7がsource-catalogのdiscovery実行記録でそれぞれ1件以上 `completed` へ閉じ、seed / query由来adopted sourceのsource ID集合とcross-link root setが一致し、そのroot set内の全source IDだけが1-hop cross-link確認で `completed` へ閉じている。cross-link由来sourceをroot setへ再帰追加せず、0件結果も確認件数 / 新規candidate件数=0として記録され、`blocked` が残っていない
 - discoveryで得たcandidateがsource-catalogへ記録され、pendingが0
 - 採用sourceごとのadopted scopeとitem列挙元 / 列挙方法がsource-catalogへ記録され、対象item母集団がsource-coverageへ記録されている。source全体を列挙できない場合は有限に列挙できるsubsetだけをadopted scopeとし、source全体を全件取得済みと扱わない
 - 全source itemのcoverage dispositionがincluded / merged-duplicate / out-of-scope / unavailable / source-reference-onlyのいずれかへ閉じている
@@ -456,9 +459,10 @@ PR #12の実行基盤を利用できる場合、
 - included referenceからsource item ref、source ID、canonical URLへ追跡できる
 - reference entry内で各source item refにsource上の位置づけ / 適用条件が対応付いている
 - 内容を収録した各adopted sourceについて最低1件のreference spot-checkを実施し、patterns / accessibility / platformsの各経路で最低1件は原文との意味一致を確認している
-- UI / UX評価項目にreference entry refs / source item refs / referenceの位置づけが残り、project固有のbinding根拠を使う場合はproject Authority refを追跡できる
+- 各UI / UX評価項目に1件以上の `適用したreference` があり、各行でreference entry ref / source item ref / 今回のreferenceの位置づけが対応し、project固有のbinding根拠を使う場合はその行からproject Authority refを追跡できる
 - 判定不能 / 対象外のUI / UX評価項目にstatus reason / 制約・未確認が残る
 - usability-evaluation成果物で上位観点ごとの今回の扱いが固定され、「今回評価する」とした観点がすべて評価結果へ閉じている
+- source IDが `SRC-\d{3,}`、source item refが `<source ID>-ITEM-\d{4,}`、reference entry IDが `REF-\d{4,}` のpackage-local append-only規則に従い、削除済みIDを別identityへ再利用していない
 - evaluation refは成果物revision内だけで一意なartifact-local refで、新しいglobal QA ID / Machine Entityを追加していない
 - Regression配下ではregression-testingが確定したUI / UX評価scopeが通常のlive UI既定接続より優先される
 - reference catalog validator PASS
