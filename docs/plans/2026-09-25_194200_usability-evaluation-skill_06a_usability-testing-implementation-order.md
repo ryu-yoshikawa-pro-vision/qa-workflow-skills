@@ -1,8 +1,8 @@
-# UI/UX評価・ユーザビリティテストSkill追加Plan
+# UI/UX評価・ユーザビリティ検査Skill追加Plan
 
 ## 1. 実装開始条件
 
-`usability-testing` の実装は、次を確認してから開始します。
+`usability-inspection` の実装は、次を確認してから開始します。
 
 - PR #11 / #12 / #13がmainへmerge済み
 - `usability-evaluation` の少なくともDialog縦断検証が成立済み
@@ -31,7 +31,7 @@
 
 ## 3. Step 1: methodology reference
 
-`_05a_usability-testing-package-and-evaluation.md` のmethodology sourceを確認します。
+`_05a_usability-inspection-package-and-evaluation.md` のmethodology sourceを確認します。
 
 最低限:
 
@@ -51,7 +51,7 @@ current URL / publication state /利用条件を確認します。
 
 先に次を実装します。
 
-- `skills/usability-testing/SKILL.md`
+- `skills/usability-inspection/SKILL.md`
 - method references
 - `assets/output-template.md`
 - deterministic validator最小schema
@@ -87,7 +87,7 @@ PR #12 merge後のbrowser実行基盤を再利用します。
 
 利用手段の選択規則が共有可能なら既存規則を利用し、Skill固有に別のrunner hierarchyを増やしません。
 
-`usability-testing` がbrowser / session ownerになります。
+`usability-inspection` がbrowser / session ownerになります。
 
 意味上の次actionを選ぶときはuser-facing information contractを適用します。
 
@@ -187,7 +187,7 @@ screen reader等の実行能力がrepository / hostで利用可能でない場�
 
 ## 11. Step 9: workflow integration
 
-`_04a_usability-testing-workflow-integration.md` に従い、
+`_04a_usability-inspection-workflow-integration.md` に従い、
 
 - direct trigger
 - qa-workflow
@@ -200,7 +200,7 @@ screen reader等の実行能力がrepository / hostで利用可能でない場�
 
 を接続します。
 
-test-target-inspection / test-executionのownerロジックへusability-testing固有処理を埋め込みません。
+test-target-inspection / test-executionのownerロジックへusability-inspection固有処理を埋め込みません。
 
 ## 12. Step 10: repository eval
 
@@ -222,7 +222,7 @@ repository標準件数に合わせます。
 
 ### semantic
 
-`_05a_usability-testing-package-and-evaluation.md` §7のcaseを最低限含めます。
+`_05a_usability-inspection-package-and-evaluation.md` §7のcaseを最低限含めます。
 
 ### real Agent
 
@@ -246,7 +246,7 @@ repository標準件数に合わせます。
 
 ## 14. 完了条件
 
-次をすべて満たしたら `usability-testing` 実装完了とします。
+次をすべて満たしたら `usability-inspection` 実装完了とします。
 
 - Agent Skills仕様を満たす
 - task scenario / success condition契約がある
@@ -260,7 +260,7 @@ repository標準件数に合わせます。
 - arbitrary performance thresholdを作らない
 - single-run elapsed timeをINP field resultへ昇格しない
 - keyboard-only representative caseを確認する
-- browser ownerがusability-testingである
+- browser ownerがusability-inspectionである
 - usability-evaluationとのread-only連携が成立する
 - same session concurrent manipulationを要求しない
 - side-effect / cleanup契約を満たす
@@ -277,7 +277,7 @@ repository標準件数に合わせます。
 本PRの後続実装は、
 
 1. `usability-evaluation` が `_06_evaluation-ci-implementation-order.md` の完了条件を満たす
-2. `usability-testing` が本ファイル§14の完了条件を満たす
+2. `usability-inspection` が本ファイル§14の完了条件を満たす
 3. 両Skillのqa-workflow routingと相互連携が成立する
 
 まで完了扱いにしません。
