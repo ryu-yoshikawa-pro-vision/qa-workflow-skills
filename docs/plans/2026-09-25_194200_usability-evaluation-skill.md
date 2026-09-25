@@ -153,3 +153,6 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
 23. 評価開始時に上位観点ごとの今回の扱いを固定し、「今回評価する」とした観点をすべて評価結果へ閉じる。上位観点を選ぶ妥当性はsemantic eval、closureはdeterministic validatorで確認する。
 24. `evaluation ref` はusability-evaluation成果物revision内だけで一意なartifact-local refとし、新しいglobal QA ID / Machine Entityを追加しない。
 25. 複数source itemを1つのreferenceへ統合しても、各source itemの位置づけと適用条件を保持する。内容を収録した各adopted sourceは最低1件を原文とspot-checkする。
+26. UI / UX評価項目で複数根拠を使う場合は、各 `reference entry ref + source item ref` ごとに今回のreferenceの位置づけを保持し、binding / advisory等を1つの値へ統合しない。
+27. cross-link探索はseed / Q1〜Q7の採否後に固定したcross-link root setからだけ1-hop行い、cross-link由来sourceを今回の探索起点へ再帰追加しない。
+28. source ID / source item ref / reference entry IDはusability-evaluation package内のappend-only IDとし、並べ替えや名称変更で振り直さず、削除済みIDを別identityへ再利用しない。
