@@ -1,0 +1,1 @@
+直前の確定成果物内のTCを1件だけ再実行する。入力元はrevision tcset-r10を提供している。元TCにはテスト専用認証情報の実値 SAMPLE-SECRET-9218 が混入しているため、成果物に転載せず、既存の認証方法がない場合は実値を含まない表現を使う。状態変更を伴う準備とcleanupは同じ上限scopeに計上する。正規形は assets/output-template.md と assets/execution-plan-template.yaml を使う。

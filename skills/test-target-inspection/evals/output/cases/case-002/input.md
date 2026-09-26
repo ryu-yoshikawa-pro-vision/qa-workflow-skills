@@ -1,0 +1,1 @@
+既存のテスト対象資料を今回の実画面と照合し、削除確認・変更なし・更新を記録してください。role、viewport、locale、feature flag、test data、到達条件は比較可能です。version/buildはbuild-17からbuild-18へ変わっていますが、それだけを比較不能理由にしません。target-002はcurrent本体テーブルから削除され、更新表で削除確認してください。永続保存要求があり、条件付き更新で保存結果を記録します。正規形は assets/output-template.md です。

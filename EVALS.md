@@ -28,9 +28,9 @@
 
 ## 正規 / 診断
 
-正規の発火評価は**14 Skillすべてを同一のAgentクライアント上で同時に利用可能**にし、クエリごとに独立したコンテキストで実行します。対象Skillの発火、想定外発火、ルーティングの正しさを確認します。
+正規の発火評価は**16 Skillすべてを同一のAgentクライアント上で同時に利用可能**にし、クエリごとに独立したコンテキストで実行します。対象Skillの発火、想定外発火、ルーティングの正しさを確認します。
 
-対象Skill: `qa-workflow`, `spec-analysis`, `question-analysis`, `test-analysis`, `test-requirement-design`, `test-condition-design`, `test-case-design`, `coverage-analysis`, `adversarial-review`, `e2e-test-inspection`, `e2e-test-implementation`, `e2e-test-execution`, `e2e-test-result-analysis`, `e2e-test-reporting`。
+対象Skill: `qa-workflow`, `spec-analysis`, `question-analysis`, `test-analysis`, `test-requirement-design`, `test-condition-design`, `test-case-design`, `coverage-analysis`, `adversarial-review`, `e2e-test-inspection`, `e2e-test-implementation`, `e2e-test-execution`, `e2e-test-result-analysis`, `e2e-test-reporting`, `test-target-inspection`, `test-execution`。
 
 対象Skill単独または限定Skillだけを利用可能にする実行は診断モードです。正規の発火スコアには使いません。
 
@@ -46,9 +46,9 @@ skills/<skill-name>/evals/trigger/
 
 - train: 通常Skillは12件（positive 6 / negative 6）、`test-analysis` / `test-condition-design`は24件（positive 12 / negative 12）
 - validation: 通常Skillは8件（positive 4 / negative 4）、`test-analysis` / `test-condition-design`は20件（positive 10 / negative 10）
-- 14 Skill合計: 328クエリ
+- 16 Skill合計: 368クエリ
 
-現`description`と328クエリは基準として固定します。`description`選定後、train / validationに未使用の新規クエリで最終ホールドアウトを行います。
+現`description`と368クエリは基準として固定します。`description`選定後、train / validationに未使用の新規クエリで最終ホールドアウトを行います。
 
 ---
 
@@ -106,7 +106,7 @@ skills/<skill-name>/evals/
     └── validator.py
 ```
 
-`test-analysis`は7ケース、`test-condition-design`は14ケース、`adversarial-review`は8ケース、その他11 Skillは各2ケースです（合計51ケース）。`expected.json`はGolden文章ではなく、評価プログラムが比較する既知事実だけを持ちます。
+各Skillのdeterministic output evalは2ケースずつです。現在は16 Skill・合計32ケースで、`expected.json`はGolden文章ではなく、評価プログラムが比較する既知事実だけを持ちます。
 
 Skill固有の発火評価データセット、出力フィクスチャ、決定論的validatorは各Skillの`evals/`配下に置きます。`scripts/skills/evals/deterministic/`は実行処理、validatorの読み込み、Markdown parser、共通utility、result model、評価プログラムの自己テストを提供する共通評価ランタイムです。
 
@@ -198,6 +198,12 @@ Pairwiseフィクスチャでは、2-wiseカバレッジ計算の前に生成組
 
 Agent実行と出力保存は評価プログラムの責務外です。
 
+`test-execution`のdeterministic evalはMarkdown内の実行前YAMLを`yaml.safe_load`で検証します。依存は評価環境だけで`PyYAML==6.0.3`を使用し、Skill runtimeや今回run用Playwrightコードの依存にはしません。ローカルでdeterministic evalを実行する場合は、評価用環境へ次を入れてください。
+
+```bash
+python -m pip install "PyYAML==6.0.3"
+```
+
 ```bash
 python scripts/skills/evals/deterministic/run.py \
   --skill test-case-design \
@@ -237,7 +243,7 @@ python scripts/skills/evals/deterministic/run.py \
 
 リポジトリ決定論的契約テストは`tests/skills/evals/deterministic/`に置き、このリポジトリのvalidator assertion、false-pass regression、closure exclusivity、CLI契約、出力評価manifestとvalidatorの対応、1 Skill + 共通Skill評価ランタイムの移植可能性を検証します。
 
-14個の正規Skillの存在とAgent Skills仕様適合は`Validate Agent Skills`で検証します。
+16個の正規Skillの存在とAgent Skills仕様適合は`Validate Agent Skills`で検証します。
 
 CIでは次を実行します。
 
@@ -277,7 +283,7 @@ skills/<skill>/evals/semantic/
         └── reference.md
 ```
 
-Skillごとのケース数は`test-analysis=7`、`test-condition-design=14`、`adversarial-review=8`、その他11 Skillは各2（合計51）です。`evals.json`の各caseは、そのフィクスチャで評価可能な評価基準だけを`criteria`へ列挙します。
+Skillごとのsemantic case数は`test-analysis=7`、`test-condition-design=14`、`adversarial-review=8`、`qa-workflow=3`、`test-target-inspection=2`、`test-execution=2`、その他10 Skillは各2（合計56）です。新規2 Skillでは各Skillのcritical criterionが少なくとも1 semantic caseから参照されます。`evals.json`の各caseは、そのフィクスチャで評価可能な評価基準だけを`criteria`へ列挙します。
 
 本Planで追加した意味責務とcase対応は次のとおりです。
 
@@ -294,6 +300,9 @@ Skillごとのケース数は`test-analysis=7`、`test-condition-design=14`、`a
 | `test-condition-design` | test data / merge / disposition | `TCN-SEM-012`, `TCN-SEM-013`, `TCN-SEM-014` |
 | `test-case-design` | canonical CI Machine Entityからの具体TC展開、環境・test data、Authority限定Oracle | `TC-SEM-001` |
 | `adversarial-review` | 新技法の6誤用 | `REV-SEM-003`, `REV-SEM-004`, `REV-SEM-005`, `REV-SEM-006`, `REV-SEM-007`, `REV-SEM-008` |
+| `test-target-inspection` | 実対象currentness、条件・鮮度、snapshot、視覚・副作用・secret境界 | `TTI-SEM-001`, `TTI-SEM-002` |
+| `test-execution` | snapshot追跡、実行前YAML、Playwright順序、結果・secret・cleanup | `TEX-SEM-001`, `TEX-SEM-002` |
+| `qa-workflow` | 対象確認・今回runと永続E2Eのrouting境界 | `WF-SEM-003` |
 
 `rubric.json`の評価基準は`id`, `title`, `description`, `critical`を持ちます。重み付きスコアは持ちません。
 
@@ -374,11 +383,11 @@ scripts/skills/evals/semantic/
 └── tests/
 ```
 
-`loader.py`はrubric / eval manifest / input / referenceを読み込み、汎用スキーマ検証を行います。`prompt_builder.py`はJudgeプロンプトを構築し、`result.py`はJudge JSON検証、評価基準のstatus、全体判定、正規化を担当します。`validate.py`は任意の`skills_root`を検証し、14 Skill必須や2 cases必須をハードコードしません。
+`loader.py`はrubric / eval manifest / input / referenceを読み込み、汎用スキーマ検証を行います。`prompt_builder.py`はJudgeプロンプトを構築し、`result.py`はJudge JSON検証、評価基準のstatus、全体判定、正規化を担当します。`validate.py`は任意の`skills_root`を検証し、正規Skill数やSkillごとのcase数をハードコードしません。
 
 共通ランタイム自己テストは`scripts/skills/evals/semantic/tests/`に置き、特定Skill名に依存しない一時フィクスチャでloader、prompt、result、CLI契約を検証します。
 
-リポジトリ固有テストは`tests/skills/evals/semantic/`に置き、14個の正規Skillの意味評価構造、Skill別固定件数（合計51 cases）、評価データセット品質、1 Skill + 共通ランタイムの移植性を検証します。
+リポジトリ固有テストは`tests/skills/evals/semantic/`に置き、16個の正規Skillの意味評価構造、Skill別固定件数（合計56 cases）、評価データセット品質、1 Skill + 共通ランタイムの移植性を検証します。
 
 ## CLI / Judge Adapterプロトコル
 
@@ -435,6 +444,6 @@ scripts/skills/evals/
 
 決定論的な`qa-workflow` validatorは、開始・省略・再利用・ブロック・再開・修正routing、対象 / 実行範囲付き状態、TCあり / TCなし経路の成果物整合を評価します。実Agentクライアント上のSkill読み込み・遷移・実runtime操作は、利用可能なクライアント環境がある場合に限って別途評価し、dataset検証を実Agent発火PASSとは扱いません。
 
-Planで定義した29件のrouting fixtureは、入力条件と独立した期待routingを`skills/qa-workflow/evals/deterministic/routing_cases.json`へ、検証対象のcandidate outputを`routing_candidate_outputs.json`へ分離して保持します。リポジトリ決定論的テストではcandidateを期待routingから生成せず、開始・省略・再利用・ブロック・再開・修正routingの代表経路と誤route回帰を検証します。
+最新mainの29件に今回18件を加えた47件のrouting fixtureは、入力条件と独立した期待routingを`skills/qa-workflow/evals/deterministic/routing_cases.json`へ、検証対象のcandidate outputを`routing_candidate_outputs.json`へ分離して保持します。リポジトリ決定論的テストではcandidateを期待routingから生成せず、開始・省略・再利用・ブロック・再開・修正routingの代表経路と新規Skill・既存E2E間の誤route回帰を検証します。
 
 Agent Skills Specificationは共通Skill-to-Skill APIを規定しません。特定クライアントとの互換性はE2Eで確認します。

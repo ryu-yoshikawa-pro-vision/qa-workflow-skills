@@ -1,0 +1,14 @@
+[
+  {"query":"この詳細TCを入力順で固定し、Given When Then YAMLを作って実際のPlaywright画面操作と結果報告をして","should_trigger":true},
+  {"query":"手動テストと同じ手順で入力フォームを操作し、期待結果をDOMと画面画像で確かめて","should_trigger":true},
+  {"query":"MCPが使えない場合だけ、すでにあるPlaywright CLIでこのTCを実行して結果を記録して","should_trigger":true},
+  {"query":"必要操作をMCPやCLIで表現できないときだけ、既存Libraryによる独立した一時PlaywrightコードでTCを試して","should_trigger":true},
+  {"query":"TCの途中でbrowser手段を切り替えたらsession継続を確認し、できなければ判定不能で閉じて","should_trigger":true},
+  {"query":"同じ副作用scopeを使う複数TCを直列で実行し、毎回cleanup回数を共有して結果を報告して","should_trigger":true},
+  {"query":"既存のplaywright test runnerを指定projectで起動しraw resultを収集して","should_trigger":false},
+  {"query":"認証画面のPage Objectと永続するPlaywright E2Eをrepoへ実装して","should_trigger":false},
+  {"query":"テストケースの期待結果を仕様根拠に照らして詳しく設計し直して","should_trigger":false},
+  {"query":"既存E2E runがタイムアウトした原因と再現可能性を分析して","should_trigger":false},
+  {"query":"Playwrightのlogical primaryとretry attemptのrunner固有報告だけを作成して","should_trigger":false},
+  {"query":"現在の実画面のボタン名と状態遷移を調べてテスト対象資料を更新して","should_trigger":false}
+]
