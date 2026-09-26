@@ -96,6 +96,8 @@ user goal + task scenario + success condition
 
 `usability-inspection` は実測を担当し、`usability-evaluation` はreference knowledgeによる意味判断を担当します。
 
+Cognitive Walkthroughは `usability-inspection` のpost-task diagnosisとして扱います。primary runは正解経路を知らない状態で完了させ、その後に意図されたuser flowを確認できる場合だけstep-by-step診断へ使います。
+
 ### 受け渡すevidence
 
 - task / success condition
@@ -111,19 +113,23 @@ user goal + task scenario + success condition
 
 ### 実行タイミング
 
+primary task中は `usability-evaluation` を割り込ませません。
+
 既定は次です。
 
-1. usability-inspectionがtaskを安全なcheckpointまで進める
-2. immutable evidenceをusability-evaluationへ渡す
-3. usability-evaluationがread-onlyで評価
-4. 追加観測が必要ならrequestを返す
-5. usability-inspectionがscope / safetyを確認して追加観測
+1. usability-inspectionがuser-facing情報だけでprimary taskを最後まで実行
+2. task outcome / outcome basis / primary action traceを固定
+3. 必要ならcurrent user flow / specification / validated TC等をread-onlyで使い、post-task Cognitive Walkthroughを実施
+4. primary runとpost-task diagnostic evidenceをusability-evaluationへ渡す
+5. usability-evaluationがread-onlyで評価
+6. 追加観測が必要ならrequestを返す
+7. usability-inspectionがscope / safetyを確認し、post-task diagnostic observationとして実行
+
+Cognitive Walkthroughやusability-evaluationから得た知識をprimary taskの次action選択へ戻しません。
+
+追加観測によってprimary task outcomeやprimary action traceを書き換えません。primary run自体を再確認する必要がある場合は別Activityで再実行します。
 
 同じbrowser / sessionを両Skillが並行操作しません。
-
-taskの各クリックごとにevaluationを割り込ませません。
-
-意味判断に必要なcheckpointまたはtask終了時にまとめて評価します。
 
 ## 6. exploratory-testingとの境界
 
