@@ -10,5 +10,17 @@
   {"query":"仕様は整理済みです。次にリスクベースでテスト重点と適用技法を決めてください。","should_trigger":true},
   {"query":"変更差分と過去不具合を踏まえて、どの領域を高・中・低リスクで扱うか決めて。","should_trigger":true},
   {"query":"今回の改修はどの失敗が怖いか、影響度と発生可能性を根拠付きで評価して。","should_trigger":true},
-  {"query":"高リスク領域について具体的な境界値とCoverage Itemを出してください。","should_trigger":false}
+  {"query":"高リスク領域について具体的な境界値とCoverage Itemを出してください。","should_trigger":false},
+  {"query":"Domain Testingを採用すべきか、複数変数の境界とrelationの有無から判断してください。","should_trigger":true},
+  {"query":"CRUDモデルなので、completenessとconsistencyのリスクに対してCRUD Testingを採用すべきか分析してください。","should_trigger":true},
+  {"query":"運用プロファイルと入力分布を踏まえ、Random Testingを採用する価値を判断してください。","should_trigger":true},
+  {"query":"同じ入力に対する変換前後の関係を確認したいので、Metamorphic Testingを採用すべきか判断してください。","should_trigger":true},
+  {"query":"文法とproductionが定義された入力言語なので、Syntax-Based Testingを採用すべきか判断してください。","should_trigger":true},
+  {"query":"Domain Testingの具体的なborder pointとcoordinatesを生成してください。","should_trigger":false},
+  {"query":"CRUDの操作行列とsequenceを作成してCoverageを埋めてください。","should_trigger":false},
+  {"query":"Random Testingのseedと生成ケースを決めてください。","should_trigger":false},
+  {"query":"Metamorphic relationとfollow-up inputを具体化してください。","should_trigger":false},
+  {"query":"Syntax grammarからmutation caseとproduction sequenceを作成してください。","should_trigger":false},
+  {"query":"この5つの新しいテスト技法が何かだけを説明してください。","should_trigger":false},
+  {"query":"変更の影響範囲とProduct Riskから、テストの重点領域を整理してください。","should_trigger":true}
 ]

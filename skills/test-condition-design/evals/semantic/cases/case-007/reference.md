@@ -1,0 +1,2 @@
+# 判定根拠
+cause・effect・constraintの意味を保ったままDecision Tableへ伝播する。Authorityが実行不能assignmentとして定義した`guest × private`をaction付き実行ruleやCoverage Itemにせず、成立不能として扱い、Authority付きconstraintの根拠を保持する。ほかのactionは未定義のままとし、don't-care統合で覆い隠さない。

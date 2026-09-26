@@ -59,8 +59,29 @@ jobs:
           python -m compileall -q skills/*/evals/deterministic
           python -m compileall -q tests/skills/evals/deterministic
 
+      - name: Compile runtime scripts
+        run: |
+          python -m compileall -q skills/spec-analysis/scripts
+          python -m compileall -q skills/test-analysis/scripts
+          python -m compileall -q skills/test-requirement-design/scripts
+          python -m compileall -q skills/test-condition-design/scripts
+          python -m compileall -q skills/test-case-design/scripts
+          python -m compileall -q skills/coverage-analysis/scripts
+          python -m compileall -q skills/qa-workflow/scripts
+
       - name: Run shared deterministic runtime unit tests
         run: python -m unittest discover -s scripts/skills/evals/deterministic/tests -v
 
       - name: Run repository deterministic eval tests
         run: python -m unittest discover -s tests/skills/evals/deterministic -v
+
+      - name: Run runtime unit and integration tests
+        run: python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v
+
+      - name: Validate semantic datasets and runtime
+        run: |
+          python -m compileall -q scripts/skills/evals/semantic
+          python -m compileall -q tests/skills/evals/semantic
+          python scripts/skills/evals/semantic/validate.py
+          python -m unittest discover -s scripts/skills/evals/semantic/tests -v
+          python -m unittest discover -s tests/skills/evals/semantic -v

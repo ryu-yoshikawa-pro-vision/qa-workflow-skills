@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from scripts.skills.evals.deterministic.common import (
     CANONICAL_SKILLS,
     MULTI_USE_SKILL_TARGETS,
@@ -16,6 +18,9 @@ from scripts.skills.evals.deterministic.result import EvalResult
 CLASSIFICATIONS = {"ブロッカー", "要確認", "仮定可能", "提案・任意"}
 NORMALIZATIONS = {"SPEC", "DECISION", "ASM", "未確定"}
 ASSUMPTION_STATES = {"提案", "承認済み", "撤回", "置換済み"}
+RUNTIME_SKILLS = CANONICAL_SKILLS
+RUNTIME_STATUSES = {"ok", "invalid_input", "unsupported", "limit_exceeded", "internal_error", "not_run"}
+RUNTIME_FINGERPRINT = re.compile(r"^sha256:[0-9a-f]{64}$")
 
 
 def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
@@ -34,6 +39,23 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     add_required_fields_assertion(result, "QUESTION-D012", questions, ("ID", "問題 / 質問", "根拠", "分類", "影響範囲 / 成果物", "回答なしの場合の扱い", "回答後の正規化先", "再開Skill"), "ID", "質問")
     add_required_fields_assertion(result, "QUESTION-D013", blocked, ("ブロッカーID", "ブロック中成果物 / 範囲", "必要な決定 / 情報源", "再開Skill"), "ブロッカーID", "ブロック中範囲")
     add_required_fields_assertion(result, "QUESTION-D014", assumptions, ("仮定候補", "状態", "根拠 / 理由", "影響範囲"), "正式ASM ID", "仮定候補")
+
+    runtime_fields = ("Runtime Skill", "Runtime Unit Key", "Model Key", "Target Key", "Generation Fingerprint")
+    runtime_issues = []
+    for row in questions + blocked:
+        values = {field: clean(row.get(field, "")) for field in runtime_fields}
+        has_runtime = any(values[field] for field in runtime_fields)
+        if not has_runtime:
+            continue
+        if not values["Runtime Skill"] or values["Runtime Skill"] not in RUNTIME_SKILLS:
+            runtime_issues.append({"row": clean(row.get("ID", row.get("ブロッカーID", ""))), "field": "Runtime Skill"})
+        if not values["Runtime Unit Key"]:
+            runtime_issues.append({"row": clean(row.get("ID", row.get("ブロッカーID", ""))), "field": "Runtime Unit Key"})
+        if values["Runtime Unit Key"].startswith("model:") and not values["Model Key"]:
+            runtime_issues.append({"row": clean(row.get("ID", row.get("ブロッカーID", ""))), "field": "Model Key"})
+        if values["Generation Fingerprint"] and not RUNTIME_FINGERPRINT.fullmatch(values["Generation Fingerprint"]):
+            runtime_issues.append({"row": clean(row.get("ID", row.get("ブロッカーID", ""))), "field": "Generation Fingerprint"})
+    result.add("QUESTION-D019", not runtime_issues, "runtime issue由来の質問がRuntime identityとgenerationを保持すること", evidence=runtime_issues or None)
 
     ids = [clean(r.get("ID", "")) for r in questions]
     bad = [v for v in ids if not ID_PATTERNS["QUESTION"].fullmatch(v)]
@@ -142,4 +164,13 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         "フィクスチャで期待する再開Skill / 対象が一致し、質問一覧とブロック中範囲で整合すること",
         evidence=restart_mismatches or None,
     )
+    runtime_consistency = []
+    for qid, brow in blocked_by_id.items():
+        qrow = question_by_id.get(qid)
+        if qrow is None:
+            continue
+        for field in runtime_fields:
+            if clean(qrow.get(field, "")) != clean(brow.get(field, "")):
+                runtime_consistency.append({"id": qid, "field": field})
+    result.add("QUESTION-D020", not runtime_consistency, "質問一覧とブロック中範囲のruntime identityが一致すること", evidence=runtime_consistency or None)
     return result

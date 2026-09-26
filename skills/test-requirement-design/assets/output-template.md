@@ -18,3 +18,7 @@
 | 上流ID | 種別 | 扱い | 理由 / 根拠 |
 | --- | --- | --- | --- |
 |  | 仕様根拠 / プロダクトリスク | 別テストレベル / 残存リスク / 対象外 / ブロック中 |  |
+
+## Machine Runtime / Entity（機械証拠）
+
+`requirement_structure`の入力・結果・Entityを保存し、active / deleted / legacy / update scopeと依存fingerprintを人間向け表から省略しません。`current`でない上流Entityを要求の根拠に使う場合は、要再検証またはブロック中として明示します。

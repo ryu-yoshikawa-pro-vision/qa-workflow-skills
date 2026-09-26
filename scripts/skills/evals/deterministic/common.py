@@ -45,7 +45,7 @@ ID_PATTERNS = {
     "RISK": re.compile(r"^RISK-\d{3}$"),
     "TR": re.compile(r"^TR-\d{3}$"),
     "TCN": re.compile(r"^TCN-\d{3}$"),
-    "CI": re.compile(r"^TCN-\d{3}-CI\d{2}$"),
+    "CI": re.compile(r"^TCN-\d{3}-CI\d{2,}$"),
     "TC": re.compile(r"^TC-\d{3}$"),
     "REV": re.compile(r"^REV-\d{3}$"),
     "SRC": re.compile(r"^SRC-\d{3}$"),
@@ -55,7 +55,7 @@ ID_PATTERNS = {
 }
 
 ALL_ID_RE = re.compile(
-    r"\b(?:SPEC|DEC|INF|UNK|Q|RISK|TR|TCN|TC|REV|SRC|ASM|CHG|DEP)-\d{3}(?:-CI\d{2})?\b"
+    r"\b(?:SPEC|DEC|INF|UNK|Q|RISK|TR|TCN|TC|REV|SRC|ASM|CHG|DEP)-\d{3}(?:-CI\d{2,})?\b"
 )
 
 
