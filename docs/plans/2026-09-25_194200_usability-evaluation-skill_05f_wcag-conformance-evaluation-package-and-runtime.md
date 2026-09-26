@@ -12,6 +12,7 @@ skills/wcag-conformance-evaluation/
 ├── references/
 │   ├── source-catalog.md
 │   ├── wcag-em-2.md
+│   ├── earl-1.0.md
 │   └── report-tool.md
 ├── assets/
 │   ├── output-template.md
@@ -22,7 +23,8 @@ skills/wcag-conformance-evaluation/
 │   ├── runtime_contract.py
 │   ├── wcag_requirements.py
 │   ├── wcag_em_structure.py
-│   └── sampling.py
+│   ├── sampling.py
+│   └── earl_report.py
 └── evals/
     ├── trigger/
     ├── output/
@@ -42,6 +44,7 @@ skills/wcag-conformance-evaluation/
 - WCAG-EM 2.0
 - WCAG-EM Report Tool
 - ACT Rules Format 1.1 / All ACT Rules
+- Evaluation and Report Language (EARL) 1.0 Schema
 - WAI-ARIA / ARIA in HTML
 - Understanding Accessibility Support
 
@@ -90,10 +93,12 @@ target WCAG version自体が不明・未指定の場合はInput不足として `
 10. Sample Evaluation Results
 11. Structured / Random Comparison
 12. Findings
-13. Evaluation Statement（通常 / partial。作成した場合だけ）
-14. WCAG Conformance Claim / Statement of Partial Conformance（作成条件を満たした場合だけ）
-15. Limitations
-16. Machine Runtime / Summary
+13. Evaluation Specifics（記録する場合だけ）
+14. Evaluation Statement（通常 / partial。作成した場合だけ）
+15. WCAG Conformance Claim / Statement of Partial Conformance（作成条件を満たした場合だけ）
+16. Machine-readable Report（生成する場合だけ）
+17. Limitations
+18. Machine Runtime / Summary
 
 ### Evaluation Header
 
@@ -253,7 +258,22 @@ Step 5.1は、Step 1〜4のoutcomeを成果物内で追跡できることを必�
 - Step 4.2 complete process evaluation
 - Step 4.3 structured / random comparisonと必要な再sampling loop
 
-Step 5.2のevaluation specifics、Step 5.3のevaluation statement、Step 5.4のaggregated score、Step 5.5のmachine-readable reportはoptionalとして別扱いにします。本Planではaggregated scoreを生成しません。
+Step 5.2 / 5.3 / 5.5はoptional methodology requirementですが、本Skillの目的内機能として実装します。利用者要求、Step 1.4 additional requirements、またはreport出力条件に応じて生成します。Step 5.4 aggregated scoreだけは、単一scoreが誤解を招きやすくWCAG 2もrating schemeを提供しないため、本Planの目的外として生成しません。
+
+### Evaluation Specifics
+
+Step 5.2を記録する場合、次をglobal / sample / individual checkの適切なscopeへ保持できます。
+
+- evaluated sample archive ref。raw copyを保存する場合はimmutable ref / revision / SHA / content identityを必須にする
+- screenshot / DOM等の保存済みevidence ref
+- sampleへ到達するpath
+- sample生成・navigationに使ったsettings / input / actions
+- evaluation tool、browser、add-on、assistive technology、その他softwareのname / version
+- evaluation method / procedure / technique
+- record scope: evaluation / sample / check
+- confidentiality / retention / access limitation
+
+sample copyやDOM等を保存できない場合は無理に複製せず、保存不可理由と再取得可能な非secret参照を残します。password、token、cookie、storageState値等のsecretは保存しません。test accountが必要でもcredential valueを記録せず、role / 非secret alias / external credential refだけを保持します。不要な個人識別情報は複製しません。
 
 ### Evaluation Statement
 
@@ -297,7 +317,44 @@ WCAG Statement of Partial ConformanceはConformance Claimではありません�
 - `third-party-content`: 対象pageが非適合だが、明示したuncontrolled contentを除けば指定version / levelへ適合する。該当contentがauthor control外で、利用者が識別できるdescriptionを持つこと
 - `language`: 対象pageが非適合だが、明示したlanguageについてaccessibility supportが存在すれば指定version / levelへ適合すること
 
-semantic layerはcontrol ownership、language support不足、除外時に適合するという意味判断を行い、scriptはtype、必須field、対象範囲、target version / level、生成可否をmaterialize / validateします。
+scriptはtarget version / levelと対象parts / languagesからW3Cのstatement formに沿うcanonical文をrenderし、LLMへ定型文を手書きさせません。semantic layerはcontrol ownership、language support不足、除外時に適合するという意味判断を行い、scriptはtype、必須field、対象範囲、target version / level、生成可否をmaterialize / validateします。
+
+Conformance Claimのoptional componentsもevidenceがある場合に保持できます。
+
+- claimed levelを超えて満たしたSuccess Criteria
+- used but not relied upon technologies
+- testingに使用したuser agents / assistive technologies
+- versionで定義されているadditional accessibility characteristics
+- Success Criteriaを超えて行った追加accessibility施策
+- technologies relied uponのmachine-readable mirror
+- conformance claimのmachine-readable mirror
+
+optional componentsはrequired componentsを代替しません。machine-readable mirrorはMachine Runtimeのnormalized claim objectを正本とし、W3Cが指定していない独自claim標準を新設しません。
+
+### Machine-readable Report
+
+Step 5.5を生成する場合はEARL 1.0 vocabularyを使ったcanonical JSON-LD sidecar `earl-report.jsonld` を `earl_report.py` が生成します。追加RDF libraryは導入せず、固定したEARL subsetを標準libraryでrenderします。
+
+formal requirement resultごとに少なくとも次を出力します。
+
+- `earl:Assertion`
+- `earl:assertedBy`
+- `earl:subject`: canonical sample identityに対応するartifact-local subject
+- `earl:test`: target version static catalogが持つcanonical Success Criterion / conformance requirement URI
+- `earl:result`
+- `earl:outcome`
+- `earl:mode`
+
+outcome mapping:
+
+- `satisfied → earl:passed`
+- `not-satisfied → earl:failed`
+- `undetermined → earl:cantTell`
+- 未実施resultをblocked / incomplete artifactへ明示する場合だけ `earl:untested`
+
+WCAG Success Criterionにrelevant contentがない場合はformal result contractどおり `satisfied` とし、EARLだけ `inapplicable` へ変換しません。test modeはevidence provenanceから `automatic / manual / semiAuto / undisclosed / unknownMode` のいずれかを選び、判定できないmodeを推測しません。
+
+EARL sidecarはhuman-readable WCAG-EM reportの代替ではありません。assertion数、subject / test / outcome、artifact refsがhuman-readable reportと一致することをdeterministic validatorで確認します。
 
 ## 3.1 wcag_requirements.py
 

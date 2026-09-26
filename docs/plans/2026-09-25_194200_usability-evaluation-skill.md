@@ -142,9 +142,11 @@ formalなWCAG conformance evaluationはgeneral inspectionと分離し、`wcag-co
 7. Step 4.1 / 4.2でselected sample set / complete processを評価する
 8. samplingを使う場合だけStep 4.3でstructured / random sampleを比較し、新content type / findingがあればStep 2 / 3へ戻る
 9. live observationが必要なsample / requirementについてnormalized handoffを出し、`qa-workflow` が `usability-inspection` を直列実行してimmutable evidenceを戻す
-10. Step 5でevaluation reportを作成する
-11. 条件を満たす場合だけoptional Evaluation Statementを作成する。通常statementとpartial conformance statementを区別する
-12. WCAG側の条件を満たす場合だけConformance ClaimまたはStatement of Partial Conformanceを作成する
+10. Step 5.1でevaluation reportを作成する
+11. Step 5.2のevaluation specificsを記録する要求・合意がある場合、安全なarchive / tool / browser / assistive technology / method情報を記録する
+12. 条件を満たす場合だけoptional Evaluation Statementを作成する。通常statementとpartial conformance statementを区別する
+13. WCAG側の条件を満たす場合だけConformance ClaimまたはStatement of Partial Conformanceを作成する
+14. machine-readable reportを要求する場合はStep 5.5に従いEARL 1.0 JSON-LDを生成する
 
 **Output**
 
@@ -159,9 +161,11 @@ formalなWCAG conformance evaluationはgeneral inspectionと分離し、`wcag-co
 - sample requirement results / evidence refs
 - structured / random comparison iteration
 - WCAG-EM evaluation report
+- optional Evaluation Specifics record
 - optional Evaluation Statement（通常 / partial）
 - WCAG Conformance Claim（条件を満たす場合だけ）
 - WCAG Statement of Partial Conformance（third-party content / language。条件を満たす場合だけ）
+- optional EARL 1.0 JSON-LD report
 - Finding refs
 - limitation / blocked reason
 
@@ -382,5 +386,8 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
 60. `wcag-conformance-evaluation` もPR #11のcurrent `runtime_contract.py` / Machine Runtime契約を再利用する。requirement集合導出、sample集合演算、comparison / reconcile、成果物materialize、statement / claim guardをdeterministic runtimeへ載せる。random selectionそのものは同一Input→同一Outputを要求するdeterministic runtimeへ含めず、選択結果を後続runtime Inputとして渡す。
 61. WCAG 2.0 / 2.1 / 2.2の各requirement catalogはversionごとのcanonical JSON SHA-256を `static_data_versions` へ保持する。validatorは選択versionのasset hashを独立再計算し、各catalogをW3C正本と照合した承認済みhashをcontract testで固定する。別versionのSuccess Criteria集合を合成しない。
 62. Step 4.3後の既存sample result再利用は、PR #11のfreshness契約でcurrentと判定できる場合だけ許可する。target WCAG version / level、scope、accessibility support baseline、environment、sample identity、evidence identity、requirement catalog hash、upstream dependencyのいずれかが変わればstaleとして必要なsampleを再評価する。
-63. WCAG-EM Evaluation Statementは通常statementとpartial statementの両方を扱い、WCAG Conformance ClaimとWCAG Statement of Partial Conformanceも条件を満たす場合に生成できるようにする。意味上のpartial理由・第三者管理範囲等はsemantic判断とし、必須field、生成可否、claim scope coverageはscript / validatorで閉じる。
-64. formal observation handoffはoriginating evaluation identity / revision、handoff ref、resume operation、expected sample / process / requirement refsをworkflow stateへ保持し、currentかつvalidなreturned result集合が期待集合を満たした場合だけ同じevaluationをresumeする。LLMが「戻り値は揃った」と手判断しない。
+63. WCAG-EM Step 5.2 Evaluation Specificsを目的内機能として扱い、安全に保存可能なsample archive ref、再現path / settings / actions、tool / browser / assistive technology / software / methodを記録できるようにする。secret、token、password、storageState値、不要な個人識別情報は保存せず、credentialは非secretなrole / alias / external refだけを保持する。
+64. WCAG-EM Evaluation Statementは通常statementとpartial statementの両方を扱い、WCAG Conformance ClaimとWCAG Statement of Partial Conformanceも条件を満たす場合に生成できるようにする。意味上のpartial理由・第三者管理範囲等はsemantic判断とし、必須field、生成可否、claim scope coverageはscript / validatorで閉じる。
+65. WCAG Conformance ClaimのW3C optional componentsも、evidenceが存在する場合に保持できるようにする。必須fieldの代替には使わない。machine-readable claim mirrorは既存Machine Runtimeのnormalized claim objectを再利用し、新しい独自claim標準を作らない。
+66. WCAG-EM Step 5.5を目的内機能として扱い、要求された場合はEARL 1.0 vocabularyを用いたcanonical JSON-LD sidecarをdeterministic scriptで生成する。formal requirement resultからAssertion / subject / test / result / outcome / modeを導出し、未確定modeを推測しない。Step 5.4 aggregated scoreだけは本Planの目的外として生成しない。
+67. formal observation handoffはoriginating evaluation identity / revision、handoff ref、resume operation、expected sample / process / requirement refsをworkflow stateへ保持し、currentかつvalidなreturned result集合が期待集合を満たした場合だけ同じevaluationをresumeする。LLMが「戻り値は揃った」と手判断しない。

@@ -57,7 +57,9 @@ catalogに載っているだけで、そのsource全体をbundled corpusへ収�
 | W3C-APG | WAI-ARIA Authoring Practices Guide | https://www.w3.org/WAI/ARIA/apg/ | informative guidance / examples |
 | W3C-ACT-FORMAT11 | ACT Rules Format 1.1 | https://www.w3.org/TR/act-rules-format/ | normative rule-format standard |
 | W3C-ACT-RULES | All ACT Rules | https://www.w3.org/WAI/standards-guidelines/act/rules/ | informative test rules |
+| W3C-EARL10 | Evaluation and Report Language (EARL) 1.0 Schema | https://www.w3.org/TR/EARL10-Schema/ | WCAG-EM Step 5.5 machine-readable report |
 | W3C-ACT-OVERVIEW | Accessibility Conformance Testing Overview | https://www.w3.org/WAI/standards-guidelines/act/ | informative overview |
+| W3C-EARL10 | Evaluation and Report Language (EARL) 1.0 Schema | https://www.w3.org/TR/EARL10-Schema/ | machine-readable evaluation reporting vocabulary / W3C Note |
 
 WCAG-EM 2.0は2026-07-23公開のW3C Group Noteとして、WCAG conformance evaluationを明示要求された経路のmethodologyに使用します。一般的なpage inspectionへ無条件適用しません。
 
