@@ -158,15 +158,21 @@ deterministic validatorは「固定した観点が結果へ閉じていること
 
 `usability-inspection` 等からstandard / binding criterion resultが渡された場合、そのPASS / FAIL / 判定不能 / 対象外をevidenceとして保持します。
 
+W3C ACT Rule等のtest rule resultが渡された場合は、test rule resultとrequirement全体のcriterion resultを別のevidenceとして扱います。rule PASSだけを理由にcriterion PASSへ変更しません。
+
 usability-evaluationは、
 
 - criterionのapplicability
+- evaluation scope
+- population / required checksのclosure
 - projectへのbinding根拠
 - criterionの意味
 - pattern / heuristicとの関係
 - user / product impactの可能性
 
 を評価できます。
+
+criterion PASSの前提が不足している場合、専門評価によって不足を補ったことにせず判定不能または追加確認として残します。
 
 ただし、一般heuristicやadvisory guidanceの差異をstrict criterion FAILへ変換しません。逆に、明確なbinding requirementのFAILを単なる「好み」の問題へ弱めません。
 
