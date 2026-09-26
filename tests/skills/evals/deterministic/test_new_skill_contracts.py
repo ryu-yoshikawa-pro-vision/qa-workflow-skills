@@ -301,6 +301,14 @@ class NewSkillDeterministicContractTests(unittest.TestCase):
     def test_test_execution_tracks_only_rerun_tcs_when_snapshot_mixes_new_tcs(self):
         validate = load_validator("test-execution")
         text, expected = eval_case("test-execution", "TEX-OUT-001")
+        no_rerun_refs = text.replace(
+            "| 前回実行成果物参照 | なし | 初回実行 |",
+            "| 前回実行成果物参照 | execution-v1 | 前回成果物 |",
+            1,
+        )
+        result = validate(no_rerun_refs, expected, "TEX-OUT-001")
+        self.assertEqual(next(item.status for item in result.assertions if item.id == "TEX-D006"), "fail")
+
         text = text.replace(
             "| 前回実行成果物参照 | なし | 初回実行 |",
             "| 前回実行成果物参照 | execution-v1 | 前回成果物 |",

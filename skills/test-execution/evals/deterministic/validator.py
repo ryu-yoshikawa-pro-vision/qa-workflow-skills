@@ -190,9 +190,21 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
     previous = _value(info, "前回実行成果物参照")
     previous_issues = []
     prior_map = {_value(row, "TC参照"): _value(row, "前回TC参照") for row in mappings}
+    actual_previous_refs = {
+        ref: value
+        for ref, value in prior_map.items()
+        if _nonempty(value) and value not in {"なし", "初回"}
+    }
     if not _nonempty(previous) or previous in {"なし", "初回"}:
-        invalid_prior = [{"ref": ref, "previous_ref": prior} for ref, prior in prior_map.items() if _nonempty(prior) and prior not in {"なし", "初回"}]
-        previous_issues.extend(invalid_prior)
+        if actual_previous_refs:
+            previous_issues.append({"unexpected_previous_refs": actual_previous_refs})
+    elif not actual_previous_refs:
+        previous_issues.append(
+            {
+                "issue": "previous artifact reference requires at least one previous TC reference",
+                "previous_artifact": previous,
+            }
+        )
     expected_previous = expected.get("expected_previous_artifact")
     if expected_previous and previous != expected_previous:
         previous_issues.append({"expected_previous_artifact": expected_previous, "actual": previous})
@@ -204,11 +216,6 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
             expected_ref_set = set(expected_previous_refs)
             if not expected_ref_set <= set(ids):
                 previous_issues.append({"unknown_expected_refs": sorted(expected_ref_set - set(ids))})
-            actual_previous_refs = {
-                ref: value
-                for ref, value in prior_map.items()
-                if _nonempty(value) and value not in {"なし", "初回"}
-            }
             if actual_previous_refs != expected_previous_refs:
                 previous_issues.append(
                     {
