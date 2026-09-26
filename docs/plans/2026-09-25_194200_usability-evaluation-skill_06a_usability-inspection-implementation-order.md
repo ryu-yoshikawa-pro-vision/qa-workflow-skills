@@ -63,13 +63,14 @@ current URL / publication state /利用条件を確認します。
 
 まだ実browser操作を追加しません。
 
-task selection summary、task snapshot、task outcome、outcome basis、action trace、Agent run上の操作負荷、timing measurement、Observation、evaluation ref、Finding refの構造を先に固定します。
+task selection summary、task snapshot、prior knowledge / experience assumptions、primary task outcome固定、outcome basis、action trace、Agent run上の操作負荷、post-task diagnosis、timing measurement、Observation、evaluation ref、Finding refの構造を先に固定します。
 
 ## 5. Step 3: task execution contract
 
 実browser接続前にfixtureで次を成立させます。
 
 - goal / task source
+- prior knowledge / experience assumptionsとその根拠
 - start state
 - success condition
 - user-facing cue
@@ -123,10 +124,12 @@ success:
 確認:
 
 - task snapshot
+- prior knowledge / experience assumptions
 - visible / accessible cueからのaction選択
 - browser操作
 - screenshot / accessibility evidence
-- task outcome
+- task outcome / outcome basis
+- primary outcome固定
 - action timing
 - visual observation
 - cleanup
@@ -134,17 +137,37 @@ success:
 
 この段階では複数taskの大量実行へ広げません。
 
-## 8. Step 6: usability-evaluation統合
+## 8. Step 6: post-task diagnosis / usability-evaluation統合
 
-Step 5で取得したimmutable evidenceを `usability-evaluation` へ渡します。
+Step 5のprimary task outcome / primary action traceを固定した後だけ診断へ進みます。
+
+### Cognitive Walkthrough
+
+current specification、user flow、validated TC等からintended flowを確認できる代表caseで、post-task Cognitive Walkthroughを実施します。
+
+確認:
+
+- primary run開始前にstep sequenceをAgentへ正解経路として与えない
+- walkthroughはprimary outcome固定後だけ実行
+- fixed user / prior knowledge assumptionsで各stepのsub-goal / action visibility / mapping / execution / feedbackを確認
+- intended flow source refを残す
+- walkthrough結果でprimary task outcome / action traceを変更しない
+- authoritative / validated flowがないcaseでは正解sequenceを創作せずwalkthroughを省略
+
+### usability-evaluation
+
+primary runおよびpost-task diagnostic evidenceを `usability-evaluation` へ渡します。
 
 確認:
 
 - inspectionがbrowser ownerを維持
 - evaluationがread-only
 - pattern / standard判断をinspection側へ複製しない
+- evaluationはprimary task中へ割り込まない
 - evaluationから追加観測requestを返せる
-- requestはinspection側でscope / safety判定してから実行
+- requestはinspection側でscope / safety判定し、post-task diagnostic observationとして実行
+- 追加観測でprimary task outcome / action traceを書き換えない
+- primary runを再確認する場合は別Activityで実行
 - finding traceability
 
 同一sessionへの並行操作を行いません。
@@ -236,6 +259,8 @@ repository標準件数に合わせます。
 - Agent run上の操作負荷
 - timing value / threshold整合
 - goal provenance
+- prior knowledge / experience assumptions provenance
+- primary outcome固定 / post-task diagnosis順序
 - cleanup
 - evaluation / Finding ref
 
@@ -248,6 +273,8 @@ repository標準件数に合わせます。
 利用可能な環境で、実Agentがtask scenarioからuser-facing情報だけを使って操作することを確認します。
 
 あわせて、Agentがcontrolを見落としただけのcaseをproduct defectへ昇格しないこと、UI側の阻害を直接観測したcaseだけ `未達成` を許可することを確認します。
+
+さらに、primary task中にusability-evaluationやTC stepで正解経路を補助しないこと、primary outcome固定後にだけCognitive Walkthrough / usability-evaluationを実行することを確認します。
 
 ## 13. Step 11: repository integration
 
@@ -272,6 +299,7 @@ repository標準件数に合わせます。
 - Agent Skills仕様を満たす
 - task scenario / success condition契約がある
 - user goalの出所または推定状態を保持する
+- prior knowledge / experience assumptionsとその根拠を保持し、不明な経験レベルを勝手に確定しない
 - broad scopeではtask候補、selected / not-selected / deferred、coverage limitationを保持する
 - task母集団の根拠がない場合に製品全体 / 代表taskを評価したと主張しない
 - live execution対象をPlaywrightで到達可能なWeb UIへ限定する
@@ -288,6 +316,9 @@ repository標準件数に合わせます。
 - single-run elapsed timeをINP field resultへ昇格しない
 - keyboard-only representative caseを確認する
 - browser ownerがusability-inspectionである
+- primary task outcome / action traceをpost-task diagnosis前に固定する
+- Cognitive Walkthroughを行う場合はintended flow sourceを追跡でき、primary run後にだけ実行する
+- usability-evaluationはprimary task中へ割り込まず、追加観測もpost-task diagnosisとして扱う
 - usability-evaluationとのread-only連携が成立する
 - same session concurrent manipulationを要求しない
 - side-effect / cleanup契約を満たす
