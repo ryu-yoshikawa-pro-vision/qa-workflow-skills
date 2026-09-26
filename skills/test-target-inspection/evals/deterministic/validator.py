@@ -320,15 +320,17 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
             evidence_issues.append({"target": target, "ref": previous_ref, "issue": "前回証跡identityがない"})
     result.add("TTI-D010", not evidence_issues, "任意ARIA snapshot証跡が対象キーと再取得可能なidentityへ追跡すること", evidence=evidence_issues or None)
 
-    save_requested = confirm.get("永続保存要求", "").strip() in {"はい", "Yes", "yes", "true"}
+    save_requirement = confirm.get("永続保存要求", "").strip()
     save_table = _table(tables, "保存結果", ("保存先", "更新元revision / content identity", "更新方式", "保存状態"))
     save_rows = [
         row for row in _rows(save_table) if any(value.strip() for value in row.values())
     ]
     save_issues = []
-    if save_requested and not save_rows:
+    if save_requirement not in {"はい", "いいえ"}:
+        save_issues.append({"value": save_requirement, "issue": "永続保存要求が正規値ではない"})
+    if save_requirement == "はい" and not save_rows:
         save_issues.append({"issue": "保存要求に対する保存結果がない"})
-    if confirm.get("永続保存要求", "").strip() == "いいえ" and save_rows:
+    elif save_requirement == "いいえ" and save_rows:
         save_issues.append({"issue": "保存要求なしに保存結果recordがある"})
     conditional_update_required = expected.get("conditional_update_required", False)
     for row in save_rows:

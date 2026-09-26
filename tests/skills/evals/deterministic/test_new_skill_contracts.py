@@ -182,6 +182,10 @@ class NewSkillDeterministicContractTests(unittest.TestCase):
     def test_target_inspection_disallows_save_records_without_persistence_request(self):
         validate = load_validator("test-target-inspection")
         text, expected = eval_case("test-target-inspection", "TTI-OUT-001")
+        self.assertEqual(
+            next(item.status for item in validate(text, expected, "TTI-OUT-001").assertions if item.id == "TTI-D011"),
+            "pass",
+        )
         empty_template_table = text + "\n| 保存先 | 更新元revision / content identity | 更新方式 | 保存状態 | 保存後revision / content identity | 競合・制約 / 理由 | 確認元 |\n| --- | --- | --- | --- | --- | --- | --- |\n|  |  |  |  |  |  |  |\n"
         self.assertEqual(
             next(item.status for item in validate(empty_template_table, expected, "TTI-OUT-001").assertions if item.id == "TTI-D011"),
@@ -192,6 +196,19 @@ class NewSkillDeterministicContractTests(unittest.TestCase):
         with_record = empty_template_table.replace("|  |  |  |  |  |  |  |", save_record, 1)
         result = validate(with_record, expected, "TTI-OUT-001")
         self.assertEqual(next(item.status for item in result.assertions if item.id == "TTI-D011"), "fail")
+
+        for invalid_value in ("不明", "", "Yes", "true"):
+            with self.subTest(invalid_value=invalid_value):
+                invalid_requirement = text.replace(
+                    "| 永続保存要求 | いいえ | 入力 |",
+                    f"| 永続保存要求 | {invalid_value} | 入力 |",
+                    1,
+                )
+                result = validate(invalid_requirement, expected, "TTI-OUT-001")
+                self.assertEqual(
+                    next(item.status for item in result.assertions if item.id == "TTI-D011"),
+                    "fail",
+                )
 
         update_text, update_expected = eval_case("test-target-inspection", "TTI-OUT-002")
         self.assertEqual(

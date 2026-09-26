@@ -283,7 +283,7 @@
 - `TTI-D008` 既存成果物だけ更新recordを持ち、新規成果物では更新recordを持たないこと
 - `TTI-D009` 対象種別ごとの削除確認条件と削除キーのcurrent本体からの除外
 - `TTI-D010` 任意ARIA snapshotの対象追跡・再取得可能identity
-- `TTI-D011` 保存要求と保存recordの整合、既存成果物の更新元revision・保存後revision・競合安全な更新方式・制約
+- `TTI-D011` 保存要求の正規値（はい / いいえ）と保存recordの整合、既存成果物の更新元revision・保存後revision・競合安全な更新方式・制約
 - `TTI-D012` 副作用scopeの一意な正本行・回数・cleanup
 - `TTI-D013` secret実値の非漏えい
 - `TTI-D014` 旧 / 今回buildの保持とbuild差のみで比較を拒否しないこと
