@@ -322,13 +322,12 @@ class NewSkillDeterministicContractTests(unittest.TestCase):
             "pass",
         )
 
+        no_tc_cleanup_row = "| input-001 | 対象なし | 対象なし | なし | 元TCに事後cleanupの定義なし |"
         post_row = "| input-001 | 元TCで定義された事後処理 | 成功 | 変更前の値へ復元済み | 元TC cleanup |"
-        post_table = (
-            "| TC参照 | 事後状態 / 後処理 | 実施結果 | 残存状態 | 根拠 |\n"
-            "| --- | --- | --- | --- | --- |"
-        )
         inconsistent = text.replace("| input-001 | profile-update | なし |", "| input-001 | profile-update | 元TCで定義された事後処理 |", 1)
-        inconsistent = inconsistent.replace(post_table, post_table + "\n" + post_row, 1)
+        inconsistent = inconsistent.replace(
+            no_tc_cleanup_row, no_tc_cleanup_row + "\n" + post_row, 1
+        )
         result = validate(inconsistent, expected, "TEX-OUT-002")
         self.assertEqual(next(item.status for item in result.assertions if item.id == "TEX-D011"), "fail")
 
@@ -343,7 +342,7 @@ class NewSkillDeterministicContractTests(unittest.TestCase):
             "| profile-update | 1回はプロフィール値1件の変更操作 | 4 | 1 | 1 | 1 | 1 | 4 |",
             1,
         )
-        declared_cleanup = declared_cleanup.replace(post_table, post_table + "\n" + post_row, 1)
+        declared_cleanup = declared_cleanup.replace(no_tc_cleanup_row, post_row, 1)
         result = validate(declared_cleanup, expected, "TEX-OUT-002")
         self.assertEqual(next(item.status for item in result.assertions if item.id == "TEX-D011"), "pass")
 
