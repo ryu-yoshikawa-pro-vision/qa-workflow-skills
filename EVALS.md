@@ -44,11 +44,11 @@ skills/<skill-name>/evals/trigger/
 └── validation_queries.json
 ```
 
-- train: 12件 / Skill（positive 6 / negative 6）
-- validation: 8件 / Skill（positive 4 / negative 4）
-- 14 Skill合計: 280クエリ
+- train: 通常Skillは12件（positive 6 / negative 6）、`test-analysis` / `test-condition-design`は24件（positive 12 / negative 12）
+- validation: 通常Skillは8件（positive 4 / negative 4）、`test-analysis` / `test-condition-design`は20件（positive 10 / negative 10）
+- 14 Skill合計: 328クエリ
 
-現`description`と280クエリは基準として固定します。`description`選定後、train / validationに未使用の新規クエリで最終ホールドアウトを行います。
+現`description`と328クエリは基準として固定します。`description`選定後、train / validationに未使用の新規クエリで最終ホールドアウトを行います。
 
 ---
 
@@ -72,6 +72,20 @@ skills/<skill-name>/evals/trigger/
 
 案件固有フォーマットを許容するSkill契約自体は変更しません。任意形式を万能parserで解析することは対象外です。
 
+## runtime証拠の評価契約
+
+runtime対応Skillは、正規化されたMachine Runtime Input、Machine Runtime Result、Machine Entityを保存します。独立validatorは保存済み入力、upstream Entityのcontent、Skill-local `runtime_contract.py` / generator sourceから、期待runtime unit、input / model / generation / implementation fingerprint、target stable ID、Entity identityを再計算します。actual Resultからexpected rootやfingerprintを推測しません。
+
+次を決定論的回帰として評価します。
+
+- Skill-local helperの同一内容、Python 3.11標準ライブラリのみのimport、stdin / stdoutの厳格なCLI契約
+- runtime unitのinput/result pair、duplicate / missing / extra、status projection、runtime required、deterministic generated
+- `entity-state-v1`のidentity、content fingerprint、dependency、missing / extra / duplicate
+- stable target ref、execution、target content fingerprint、freshness、stale伝播、dependency graphの重複 / cycle
+- Markdownのruntime round-trip、aggregate input/output limit、独立validatorのfalse-pass防止
+
+semantic Judgeはruntimeの機械判定を代替しません。runtimeが`unsupported`、`unresolved`、`stale`、またはsemantic coverage不足を返した場合、意味評価・materialize・workflow評価でも完全結果へ昇格しません。
+
 ## 評価データセット
 
 ```text
@@ -92,7 +106,7 @@ skills/<skill-name>/evals/
     └── validator.py
 ```
 
-14 Skillすべてに最低2ケースあります。`expected.json`はGolden文章ではなく、評価プログラムが比較する既知事実だけを持ちます。
+`test-analysis`は7ケース、`test-condition-design`は14ケース、`adversarial-review`は8ケース、その他11 Skillは各2ケースです（合計51ケース）。`expected.json`はGolden文章ではなく、評価プログラムが比較する既知事実だけを持ちます。
 
 Skill固有の発火評価データセット、出力フィクスチャ、決定論的validatorは各Skillの`evals/`配下に置きます。`scripts/skills/evals/deterministic/`は実行処理、validatorの読み込み、Markdown parser、共通utility、result model、評価プログラムの自己テストを提供する共通評価ランタイムです。
 
@@ -230,9 +244,12 @@ CIでは次を実行します。
 ```bash
 python -m compileall -q scripts/skills/evals/deterministic
 python -m compileall -q skills/*/evals/deterministic
+python -m compileall -q skills/*/scripts
 python -m compileall -q tests/skills/evals/deterministic
+python -m compileall -q tests/skills/runtime
 python -m unittest discover -s scripts/skills/evals/deterministic/tests -v
 python -m unittest discover -s tests/skills/evals/deterministic -v
+python -m unittest discover -s tests/skills/runtime -v
 ```
 
 ---
@@ -260,7 +277,23 @@ skills/<skill>/evals/semantic/
         └── reference.md
 ```
 
-14 Skill × 2ケース、合計28ケースです。`evals.json`の各caseは、そのフィクスチャで評価可能な評価基準だけを`criteria`へ列挙します。
+Skillごとのケース数は`test-analysis=7`、`test-condition-design=14`、`adversarial-review=8`、その他11 Skillは各2（合計51）です。`evals.json`の各caseは、そのフィクスチャで評価可能な評価基準だけを`criteria`へ列挙します。
+
+本Planで追加した意味責務とcase対応は次のとおりです。
+
+| Skill | 責務 | Case ID |
+| --- | --- | --- |
+| `test-analysis` | Domain Testing採用 | `RISK-SEM-003` |
+| `test-analysis` | CRUD Testing採用 | `RISK-SEM-004` |
+| `test-analysis` | Random Testing採用 | `RISK-SEM-005` |
+| `test-analysis` | Metamorphic Testing採用 | `RISK-SEM-006` |
+| `test-analysis` | Syntax-Based Testing採用 | `RISK-SEM-007` |
+| `test-condition-design` | Domain / CRUD / Random / Metamorphic / Syntax | `TCN-SEM-003`, `TCN-SEM-004`, `TCN-SEM-005`, `TCN-SEM-006` |
+| `test-condition-design` | Decision / Cause-Effect、classification / combination | `TCN-SEM-007`, `TCN-SEM-008` |
+| `test-condition-design` | state / flow / schema / UI | `TCN-SEM-009`, `TCN-SEM-010`, `TCN-SEM-011` |
+| `test-condition-design` | test data / merge / disposition | `TCN-SEM-012`, `TCN-SEM-013`, `TCN-SEM-014` |
+| `test-case-design` | canonical CI Machine Entityからの具体TC展開、環境・test data、Authority限定Oracle | `TC-SEM-001` |
+| `adversarial-review` | 新技法の6誤用 | `REV-SEM-003`, `REV-SEM-004`, `REV-SEM-005`, `REV-SEM-006`, `REV-SEM-007`, `REV-SEM-008` |
 
 `rubric.json`の評価基準は`id`, `title`, `description`, `critical`を持ちます。重み付きスコアは持ちません。
 
@@ -345,7 +378,7 @@ scripts/skills/evals/semantic/
 
 共通ランタイム自己テストは`scripts/skills/evals/semantic/tests/`に置き、特定Skill名に依存しない一時フィクスチャでloader、prompt、result、CLI契約を検証します。
 
-リポジトリ固有テストは`tests/skills/evals/semantic/`に置き、14個の正規Skillの意味評価構造、2 cases / Skill、28 cases合計、評価データセット品質、1 Skill + 共通ランタイムの移植性を検証します。
+リポジトリ固有テストは`tests/skills/evals/semantic/`に置き、14個の正規Skillの意味評価構造、Skill別固定件数（合計51 cases）、評価データセット品質、1 Skill + 共通ランタイムの移植性を検証します。
 
 ## CLI / Judge Adapterプロトコル
 

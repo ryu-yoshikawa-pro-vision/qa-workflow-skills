@@ -1,0 +1,2 @@
+# 判定根拠
+relationごとのrequired point欠落を具体的に指摘し、単なる点数不足ではなくReliable Domain Coverageの基準違反として説明する。

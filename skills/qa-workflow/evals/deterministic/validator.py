@@ -13,6 +13,10 @@ from scripts.skills.evals.deterministic.result import EvalResult
 
 WORKFLOW_STATES = {"未開始", "実行中", "部分完了（ブロック中あり）", "ブロック中", "完了"}
 SKILL_STATES = {"未開始", "実行中", "要再検証", "ブロック中", "完了", "再利用", "省略"}
+SUPPORT_STATUSES = {"supported", "partial", "unsupported", "unknown"}
+RESULT_STATUSES = {"ready", "unresolved", "blocked"}
+FRESHNESS_STATUSES = {"current", "stale"}
+RUNTIME_STATUSES = {"ok", "invalid_input", "unsupported", "limit_exceeded", "internal_error", "not_run"}
 
 
 def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
@@ -161,4 +165,56 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             scoped_mismatches.append({"skill": key[0], "target": key[1], "expected": expected_state, "actual": actual_state})
     state_mismatches.extend(scoped_mismatches)
     result.add("WF-D014", not state_mismatches, "フィクスチャで期待するSkill状態（必要時は対象別）が一致すること", evidence=state_mismatches or None)
+
+    runtime_table = find_table(tables, required_headers=("Runtime Unit Key", "Runtime Status"))
+    runtime_rows = nonempty_rows(runtime_table)
+    runtime_issues = []
+    runtime_keys = []
+    for row in runtime_rows:
+        key = (clean(row.get("Skill", "")), clean(row.get("Runtime Unit Key", "")))
+        runtime_keys.append("|".join(key))
+        support = clean(row.get("Support Status", ""))
+        result_status = clean(row.get("Result Status", ""))
+        freshness = clean(row.get("Freshness", ""))
+        runtime_status = clean(row.get("Runtime Status", ""))
+        required = clean(row.get("Runtime Required", ""))
+        deterministic = clean(row.get("Deterministic Generated", ""))
+        if key[0] not in CANONICAL_SKILLS or not key[1]:
+            runtime_issues.append({"row": key, "reason": "identity"})
+        if support not in SUPPORT_STATUSES or result_status not in RESULT_STATUSES or freshness not in FRESHNESS_STATUSES or runtime_status not in RUNTIME_STATUSES:
+            runtime_issues.append({"row": key, "reason": "status"})
+        if required not in {"Yes", "No"} or deterministic not in {"Yes", "No"}:
+            runtime_issues.append({"row": key, "reason": "flags"})
+        if required == "Yes" and deterministic != "Yes":
+            runtime_issues.append({"row": key, "reason": "required runtime must be deterministic"})
+        if runtime_status == "unsupported" and (support, result_status, required, deterministic) != ("unsupported", "ready", "No", "No"):
+            runtime_issues.append({"row": key, "reason": "unsupported projection"})
+        if runtime_status == "not_run" and (support, result_status, required, deterministic) != ("unknown", "blocked", "Yes", "No"):
+            runtime_issues.append({"row": key, "reason": "not_run projection"})
+    result.add("WF-D018", len(runtime_keys) == len(set(runtime_keys)), "runtime状態のSkill + Runtime Unit Keyが一意であること", evidence=runtime_keys if len(runtime_keys) != len(set(runtime_keys)) else None)
+    result.add("WF-D019", not runtime_issues, "runtime状態のstatus projectionが契約どおりであること", evidence=runtime_issues or None)
+    if runtime_rows and overall == "完了":
+        incomplete_runtime = [
+            clean(row.get("Runtime Unit Key", ""))
+            for row in runtime_rows
+            if clean(row.get("Result Status", "")) != "ready" or clean(row.get("Freshness", "")) != "current"
+        ]
+        result.add("WF-D020", not incomplete_runtime, "runtime dispatch済みの完了workflowに未完了またはstale unitを残さないこと", evidence=incomplete_runtime or None)
+    expected_runtime = expected.get("expected_runtime_rows", [])
+    runtime_expected_issues = []
+    actual_runtime = {(clean(row.get("Skill", "")), clean(row.get("Runtime Unit Key", ""))): row for row in runtime_rows}
+    for item in expected_runtime:
+        if not isinstance(item, dict):
+            runtime_expected_issues.append({"expected": item})
+            continue
+        key = (clean(str(item.get("skill", ""))), clean(str(item.get("runtime_unit_key", ""))))
+        row = actual_runtime.get(key)
+        if row is None:
+            runtime_expected_issues.append({"expected": key, "reason": "missing"})
+            continue
+        for field, column in (("support_status", "Support Status"), ("result_status", "Result Status"), ("freshness_status", "Freshness"), ("runtime_status", "Runtime Status")):
+            if field in item and clean(row.get(column, "")) != clean(str(item[field])):
+                runtime_expected_issues.append({"unit": key, "field": field})
+    if expected_runtime:
+        result.add("WF-D021", not runtime_expected_issues, "runtime状態がfixtureの期待projectionと一致すること", evidence=runtime_expected_issues or None)
     return result

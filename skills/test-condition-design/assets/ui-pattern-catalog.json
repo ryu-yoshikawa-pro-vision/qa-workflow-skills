@@ -1,0 +1,105 @@
+[
+  {
+    "pattern_key": "button",
+    "name": "Button",
+    "aliases": ["action-button"],
+    "identifiers": ["button", "role=button"],
+    "candidates": [
+      {"candidate_key": "enabled-disabled", "category": "state", "check": "enabled / disabled状態", "reference_refs": ["HTML"], "requires_product_authority": true},
+      {"candidate_key": "keyboard-activation", "category": "keyboard", "check": "keyboard activation", "reference_refs": ["WAI-ARIA APG"], "requires_product_authority": true},
+      {"candidate_key": "double-operation", "category": "lifecycle", "check": "二重操作とloading中の状態", "reference_refs": ["HTML"], "requires_product_authority": true}
+    ]
+  },
+  {
+    "pattern_key": "link",
+    "name": "Link",
+    "aliases": ["anchor"],
+    "identifiers": ["a[href]", "role=link"],
+    "candidates": [
+      {"candidate_key": "destination", "category": "navigation", "check": "遷移先と内部 / 外部遷移", "reference_refs": ["HTML"], "requires_product_authority": true},
+      {"candidate_key": "focus", "category": "focus", "check": "focus到達性", "reference_refs": ["WAI-ARIA APG"], "requires_product_authority": true}
+    ]
+  },
+  {
+    "pattern_key": "text-input",
+    "name": "Text Input",
+    "aliases": ["input-text"],
+    "identifiers": ["input[type=text]", "role=textbox"],
+    "candidates": [
+      {"candidate_key": "required-empty", "category": "validation", "check": "required時の空入力候補", "reference_refs": ["HTML"], "requires_product_authority": true},
+      {"candidate_key": "length-boundary", "category": "value", "check": "文字数境界", "reference_refs": ["HTML"], "requires_product_authority": true},
+      {"candidate_key": "readonly-disabled", "category": "state", "check": "readonly / disabled", "reference_refs": ["HTML"], "requires_product_authority": true},
+      {"candidate_key": "clear-paste", "category": "interaction", "check": "clear / paste", "reference_refs": ["HTML"], "requires_product_authority": true}
+    ]
+  },
+  {
+    "pattern_key": "textarea",
+    "name": "Textarea",
+    "aliases": ["multi-line-input"],
+    "identifiers": ["textarea", "role=textbox"],
+    "candidates": [
+      {"candidate_key": "multiline", "category": "value", "check": "複数行と改行", "reference_refs": ["HTML"], "requires_product_authority": true},
+      {"candidate_key": "max-length", "category": "validation", "check": "max length境界", "reference_refs": ["HTML"], "requires_product_authority": true}
+    ]
+  },
+  {
+    "pattern_key": "number-input",
+    "name": "Number Input",
+    "aliases": ["spinbutton"],
+    "identifiers": ["input[type=number]", "role=spinbutton"],
+    "candidates": [
+      {"candidate_key": "min-max-step", "category": "validation", "check": "min / max / step", "reference_refs": ["HTML"], "requires_product_authority": true},
+      {"candidate_key": "non-numeric", "category": "value", "check": "非数値入力", "reference_refs": ["HTML"], "requires_product_authority": true}
+    ]
+  },
+  {
+    "pattern_key": "checkbox",
+    "name": "Checkbox",
+    "aliases": ["check-box"],
+    "identifiers": ["input[type=checkbox]", "role=checkbox"],
+    "candidates": [
+      {"candidate_key": "checked-unchecked", "category": "state", "check": "checked / uncheckedと初期状態", "reference_refs": ["HTML", "WAI-ARIA APG"], "requires_product_authority": true},
+      {"candidate_key": "keyboard", "category": "keyboard", "check": "keyboard操作", "reference_refs": ["WAI-ARIA APG"], "requires_product_authority": true}
+    ]
+  },
+  {
+    "pattern_key": "select",
+    "name": "Select",
+    "aliases": ["select-box"],
+    "identifiers": ["select", "role=listbox"],
+    "candidates": [
+      {"candidate_key": "option-selection", "category": "interaction", "check": "option一覧と選択", "reference_refs": ["HTML"], "requires_product_authority": true},
+      {"candidate_key": "keyboard", "category": "keyboard", "check": "keyboard選択", "reference_refs": ["WAI-ARIA APG"], "requires_product_authority": true}
+    ]
+  },
+  {
+    "pattern_key": "dialog",
+    "name": "Dialog",
+    "aliases": ["modal"],
+    "identifiers": ["dialog", "role=dialog"],
+    "candidates": [
+      {"candidate_key": "open-close", "category": "lifecycle", "check": "open / close経路", "reference_refs": ["WAI-ARIA APG"], "requires_product_authority": true},
+      {"candidate_key": "focus-management", "category": "focus", "check": "focus初期位置とreturn", "reference_refs": ["WAI-ARIA APG"], "requires_product_authority": true}
+    ]
+  },
+  {
+    "pattern_key": "tabs",
+    "name": "Tabs",
+    "aliases": ["tab-list"],
+    "identifiers": ["role=tablist", "role=tab"],
+    "candidates": [
+      {"candidate_key": "selected-panel", "category": "state", "check": "selected tabとpanel対応", "reference_refs": ["WAI-ARIA APG"], "requires_product_authority": true},
+      {"candidate_key": "keyboard-navigation", "category": "keyboard", "check": "keyboard移動", "reference_refs": ["WAI-ARIA APG"], "requires_product_authority": true}
+    ]
+  },
+  {
+    "pattern_key": "form",
+    "name": "Form",
+    "aliases": ["form-container"],
+    "identifiers": ["form"],
+    "candidates": [
+      {"candidate_key": "submit-validation", "category": "validation", "check": "submitとvalidation順序", "reference_refs": ["HTML"], "requires_product_authority": true},
+      {"candidate_key": "double-submit", "category": "lifecycle", "check": "二重submitと再送信", "reference_refs": ["HTML"], "requires_product_authority": true}
+    ]
+  }
+]
