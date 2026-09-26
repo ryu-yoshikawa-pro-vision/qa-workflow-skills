@@ -79,6 +79,8 @@ native iOS / Android app、desktop native app等の能動操作は、対応runti
 最低限:
 
 - user / role
+- prior knowledge / experience assumptions
+- prior knowledge / experience assumption source / evidence refs
 - user goal
 - user goalの根拠
 - task scenario
@@ -108,6 +110,8 @@ user goal / task scenarioの出所を区別します。
 - 不明
 
 成果物では少なくとも `confirmed / inferred / unknown` を区別し、`inferred` は仮定として表示します。
+
+user / roleだけで事前知識を推測しません。今回のinspectionで前提とする製品利用経験、業務知識、一般的なUI経験等を `prior knowledge / experience assumptions` として明示し、その根拠も残します。根拠がない場合は `unknown` とし、「初見」「熟練」等を勝手に確定しません。
 
 UIや一般知識から推定したgoalは、実ユーザーのgoalとして確定しません。
 
@@ -153,7 +157,10 @@ task scenarioは、何を達成するかを与えます。
 
 ~~~text
 user:
-初回利用者
+一般購入者
+
+prior knowledge / experience assumptions:
+このECサイトは初回利用、一般的なECサイトの利用経験あり
 
 goal:
 条件に合う商品を見つける
@@ -233,6 +240,7 @@ taskで検証するUI経路をAPI / DB / storage操作で迂回しません。
 
 - targetへ安全に到達できる
 - user / role / permission
+- prior knowledge / experience assumptionsとその根拠
 - start state
 - task scenario / success condition
 - side effect scope
@@ -246,7 +254,7 @@ taskで検証するUI経路をAPI / DB / storage操作で迂回しません。
 
 ### Step 2: task snapshotを固定
 
-今回runで使用するuser goal / task scenario / success condition / contextを固定します。
+今回runで使用するuser / role、prior knowledge / experience assumptions、user goal、task scenario、success condition、contextを固定します。
 
 実行開始後にgoal、success condition、対象scopeを都合よく変更しません。
 
@@ -315,9 +323,39 @@ outcome basisも固定します。
 
 これはTCのPASS / FAILではありません。
 
-### Step 7: UI / UX評価
+### Step 7: primary task outcomeを固定
 
-task実行で得たimmutable evidenceを `usability-evaluation` へ渡します。
+Step 6で確定したtask outcome、outcome basis、primary action traceをprimary runの結果として固定します。
+
+以降のwalkthrough、UI / UX評価、追加観測によってprimary runのtask outcomeやaction traceを書き換えません。
+
+primary runをやり直す必要がある場合は、同じActivityを上書きせず別Activityとして再実行します。
+
+### Step 8: post-task diagnosis
+
+primary task outcome固定後に、必要な場合だけdiagnostic evaluationを行います。
+
+#### Cognitive Walkthrough
+
+currentなuser flow、specification、検証済みTC等から意図されたtask flowを確認できる場合は、read-onlyの参照情報としてCognitive Walkthroughを実施できます。
+
+Cognitive Walkthroughでは、既知のflowをstep-by-stepでたどり、各stepについて少なくとも次を確認します。
+
+- 今回固定したuser / prior knowledgeの前提で、次に達成すべきsub-goalを持てるか
+- 必要なactionやcontrolへ気付けるか
+- そのactionがsub-goalへつながると理解できるか
+- actionを実行できるか
+- action後のsystem response / feedbackから進捗を理解できるか
+
+TCのstep sequenceを利用する場合も、primary run開始前には正解経路として渡しません。primary outcome固定後に、意図されたuser flowを表すと確認できる場合だけwalkthroughのread-only参照として利用します。
+
+意図されたflowを信頼できるsourceから確認できない場合は、正しいstep sequenceを創作せずCognitive Walkthroughを省略します。
+
+walkthroughで得た診断結果はprimary action traceへ混ぜず、post-task diagnostic evidenceとして保持します。
+
+#### UI / UX評価
+
+primary runおよび必要なpost-task diagnostic evidenceを `usability-evaluation` へ渡します。
 
 `usability-evaluation` は、
 
@@ -332,11 +370,13 @@ task実行で得たimmutable evidenceを `usability-evaluation` へ渡します�
 
 browser / sessionのownerは `usability-inspection` のままです。
 
-追加観測が必要なら `usability-evaluation` は要求内容を返し、`usability-inspection` がscope / safetyを確認して実行します。
+追加観測が必要なら `usability-evaluation` は要求内容を返せますが、追加観測は必ずpost-task diagnosisとして扱います。`usability-inspection` がscope / safetyを確認して実行し、その結果によってprimary task outcomeを変更しません。
+
+追加観測で新しいproduct-side problemを確認した場合は、別Observation / evaluation / Findingとして記録します。primary run自体を再評価する必要がある場合は新しいActivityで再実行します。
 
 同じbrowser / sessionを両Skillが並行操作しません。
 
-### Step 8: cleanup
+### Step 9: cleanup
 
 副作用がある場合は、PR #12 merge後のbrowser / side-effect / cleanup契約を再利用します。
 
@@ -530,7 +570,9 @@ UI pattern / standardに基づく意味判断は `usability-evaluation` の評�
 - timingを報告する場合はaction前に固定したstart event / end predicate / measurement methodとsystem側実測値がある
 - user-facing以外の内部情報でtask pathを先回りしていない
 - side effect / cleanup契約が閉じている
-- `usability-evaluation` を実行したscopeでは評価結果へ追跡できる
+- primary task outcome / action traceがpost-task diagnosis開始前に固定されている
+- Cognitive Walkthroughを実施した場合はintended flowのsource refsとpost-task diagnostic evidenceへ追跡できる
+- `usability-evaluation` を実行したscopeでは評価結果へ追跡でき、追加観測がprimary task outcomeを書き換えていない
 - 必要なFindingがroutingされている
 - human usability / satisfactionを捏造していない
 
