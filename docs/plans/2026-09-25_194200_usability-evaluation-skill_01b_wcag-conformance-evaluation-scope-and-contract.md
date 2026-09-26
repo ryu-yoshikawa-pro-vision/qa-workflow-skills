@@ -23,7 +23,7 @@
 
 - live Web target / entry point
 - evaluation commissioner。self-evaluationの場合はself-evaluationであることと責任主体
-- target WCAG version。初期実装のsupported valueは `2.2`
+- target WCAG version。supported valueは `2.0 / 2.1 / 2.2`
 - target conformance level: A / AA / AAA
 - digital product scope
 - product enclosure。評価対象として定義したself-enclosedなWeb productの全view / state / functionalityを含むこと
@@ -35,7 +35,7 @@
 - evaluation期間または開始時点
 - project Authority / release gateとの関係（存在する場合）
 
-target WCAG version、level、self-enclosedなdigital product scope、accessibility support baselineを確定できない場合は推測せず `unresolved` とし、formal evaluationを開始しません。初期実装でsupportedとするversionはWCAG 2.2だけです。2.0 / 2.1等、supported subset外のversionが明示された場合はsupport statusを `unsupported` としてformal evaluationを開始せず、version自体が不明・未指定の場合の `unresolved` と混同しません。product内の特定page / componentを任意に除外してscopeを狭めません。
+target WCAG version、level、self-enclosedなdigital product scope、accessibility support baselineを確定できない場合は推測せず `unresolved` とし、formal evaluationを開始しません。WCAG 2.0 / 2.1 / 2.2はsupportedです。指定versionを別versionへ暗黙変換しません。version自体が不明・未指定の場合は `unresolved`、現在catalogを持たない将来version等が明示された場合は `unsupported` としてformal evaluationを開始しません。product内の特定page / componentを任意に除外してscopeを狭めません。
 
 追加評価要件は任意Inputです。
 
@@ -63,6 +63,8 @@ WCAG-EM 2.0 Step 1へ対応付けます。
 - accessibilityに特に関係するその他sample
 
 探索結果からstructured sampleの候補を意味判断します。target scopeを有限に列挙できる場合は、currentなtarget inventoryとそのprovenance / completenessを別に固定します。このfinite inventoryはrandom samplingのcandidate集合をscriptが導出するmachine inputであり、LLMがrandom candidate refsを都合よく手作成しません。
+
+sample identityはURLだけでは決めません。currentな `test-target-inspection` の対象キー / 状態キーを利用できる場合はidentity sourceとして再利用します。利用できない場合はsemantic layerが同一view/stateか別sampleかを判断し、scriptがartifact-local sample identityをmaterializeします。duplicate / structured-random overlap / sample union / process membershipはこのidentityで判定します。
 
 ### Step 3: representative sample set
 
@@ -134,7 +136,7 @@ structured / random sampleにcomplete processが含まれる場合、
 
 ### Step 4: evaluation
 
-`assets/wcag-2.2-requirements.json` のversioned static catalogからtarget levelに必要なSuccess Criteria / conformance requirementsをscriptが導出し、selected sample setをその期待集合に対して評価します。formal初期実装ではWCAG 2.2だけを扱います。
+target WCAG versionに対応する `assets/wcag-2.0-requirements.json` / `assets/wcag-2.1-requirements.json` / `assets/wcag-2.2-requirements.json` のいずれかから、target levelに必要なSuccess Criteria / conformance requirementsをscriptが導出し、selected sample setをその期待集合に対して評価します。別versionのcatalogを合成しません。
 
 - complete process外のinitial sample
 - complete process
@@ -160,12 +162,14 @@ scriptはstructured / randomのkey集合差分から、
 差分がある場合、semantic layerが追加すべきstructured sampleを選びます。scriptはその追加を新しいstructured sample revisionへmaterializeし、次を順に実行します。
 
 1. 新structured countから `ceil(count * 0.10)` でrandom targetを再計算する
-2. 新structured setへ移った旧random sampleをrandom setから除外する
-3. structuredと重複せずcurrentな旧random sampleは保持する
-4. target countへ不足する件数だけ、現在のcandidate scope / provenanceに従って追加random selectionする
-5. 追加random sampleにcomplete processが含まれる場合はprocess-added sampleを再materializeする
-6. 新たに追加されたsample / processだけを未評価としてhandoff / evaluationへ送る。既存current resultは再利用できる
-7. 新structured / random revisionで次のcomparison iterationを作る
+2. current candidate scope / inventory / provenanceからcandidate population fingerprintを再計算する
+3. population fingerprintが前revisionと同じ場合、new structured setへ移った旧random sampleだけを除外し、structuredと重複せずcurrentな旧random sampleは保持する
+4. population fingerprintが変わった場合、旧random selectionをstaleとしてcurrent populationからrandom setを再選択する
+5. population fingerprintが同じ場合はtarget countへ不足する件数だけ追加random selectionする
+6. 新random sampleにcomplete processが含まれる場合はprocess-added sampleを再materializeする
+7. 既存sample resultはPR #11のfreshness検証でcurrentの場合だけ再利用する。target version / level、scope、baseline、environment、sample identity、evidence identity、catalog hash、upstream dependencyの変更でstaleになったresultは再評価する
+8. 新たに必要になったsample / processだけをhandoff / evaluationへ送る
+9. 新structured / random revisionで次のcomparison iterationを作る
 
 このloopは、集合差分がなく、structured sampleが十分representativeであるというsemantic確認も成立するまで閉じません。
 
@@ -173,9 +177,11 @@ scriptはstructured / randomのkey集合差分から、
 
 Step 1〜4のoutcomeをreportへ記録します。
 
-evaluation statementはWCAG-EM 2.0の条件を満たす場合だけ任意で作成できます。
+WCAG-EM Evaluation Statementは任意ですが、要求された場合またはreport出力方針で選択された場合に、通常statementとpartial conformance statementを区別して生成条件を評価します。通常statementは全sampleがtargetを満たす場合、partial statementはWCAG-EM 2.0が認めるpartial理由とnon-conforming areaを特定できる場合に限ります。
 
-product-wide WCAG conformance claimは、WCAG-EMのrepresentative sampleがtargetを満たしたことだけでは作成しません。
+WCAG Conformance Claimはrepresentative sampleだけから作成しません。claim scope内の全Web page / complete processを評価した証拠、または各pageがconformance requirementsを満たすことを保証するprocess evidenceがあり、指定versionのWCAG Conformance Claim必須fieldをすべて埋められる場合だけ生成します。
+
+WCAG側のStatement of Partial ConformanceはConformance Claimと分離し、third-party contentまたはlanguageの条件を満たす場合だけ生成します。
 
 aggregated accessibility scoreは生成しません。
 
@@ -294,8 +300,9 @@ live observationが必要な場合:
 - Step 4.3 outcome
 - unmet requirement / Success Criterion examples
 - Finding refs
-- evaluation statement（条件を満たし作成した場合だけ）
-- conformance claim（WCAG側のclaim条件を別途満たした場合だけ）
+- Evaluation Statement（通常 / partial。条件を満たし作成した場合だけ）
+- WCAG Conformance Claim（条件を満たし作成した場合だけ）
+- WCAG Statement of Partial Conformance（third-party content / language。条件を満たし作成した場合だけ）
 
 ## 6. human expertiseの境界
 
@@ -324,14 +331,16 @@ WCAG-EM 2.0はWCAG、accessible design、assistive technology、障害のある�
 - sampling skippedではcompleteな全体inventoryからselected sample setをmaterializeし、structured / random / Step 4.3をnot-applicableとして閉じる
 - sampling usedではstructured sampleをStep 2探索結果へ追跡できる
 - random sample countがPlanの10%整数化規則を満たす
-- random sampleの重複 / structured sampleとの重複を検証できる
+- artifact-local sample identityでrandom sampleの重複 / structured sampleとの重複を検証できる
 - random selection methodを記録する
 - predictable fixed-seed selectionを必須化していない
 - complete processを閉じる
-- Step 4.3で新content / findingが出た場合、structured revision更新後のrandom target再計算、overlap除外、current random保持、不足分top-up、process再materializeまでscriptで閉じる
+- Step 4.3で新content / findingが出た場合、structured revision更新後のrandom target再計算、candidate population fingerprint再計算、population同一時のoverlap除外 / current random保持 / 不足分top-up、population変更時のrandom再選択、process再materializeまでscriptで閉じる
+- 既存sample resultはPR #11のfreshness判定がcurrentの場合だけ再利用する
 - Step 5.1の必須outcomeをreportできる
-- evaluation statementの生成条件を満たさない場合は作成しない
-- representative sampleだけからproduct-wide WCAG conformance claimを作らない
+- Evaluation Statementの通常 / partial生成条件をそれぞれ閉じ、条件を満たさない場合は作成しない
+- representative sampleだけからWCAG Conformance Claimを作らない
+- WCAG Conformance ClaimとWCAG Statement of Partial Conformanceの必須field / generation guardを分離して検証する
 - aggregated accessibility scoreを作らない
 - browser / sessionを本Skillが直接所有せず、複数Skill実行はqa-workflowが直列オーケストレーションする
 - standalone packageがsibling Skillのscriptsへruntime依存しない

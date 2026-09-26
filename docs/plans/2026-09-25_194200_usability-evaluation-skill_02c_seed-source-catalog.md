@@ -41,6 +41,8 @@ catalogに載っているだけで、そのsource全体をbundled corpusへ収�
 
 | Seed | Source | 公式URL | 既定の扱い |
 | --- | --- | --- | --- |
+| W3C-WCAG20 | WCAG 2.0 | https://www.w3.org/TR/WCAG20/ | normative standard |
+| W3C-WCAG21 | WCAG 2.1 | https://www.w3.org/TR/WCAG21/ | normative standard |
 | W3C-WCAG22 | WCAG 2.2 | https://www.w3.org/TR/WCAG22/ | normative standard |
 | W3C-WCAG22-UNDERSTANDING | Understanding WCAG 2.2 | https://www.w3.org/WAI/WCAG22/Understanding/ | informative guidance |
 | W3C-WCAG22-TECHNIQUES | Techniques for WCAG 2.2 | https://www.w3.org/WAI/WCAG22/Techniques/ | informative techniques |
@@ -124,6 +126,8 @@ formal WCAG evaluation packageは次を最低限catalog化します。
 
 | Seed | Source | 公式URL | 用途 |
 | --- | --- | --- | --- |
+| W3C-WCAG20 | WCAG 2.0 | https://www.w3.org/TR/WCAG20/ | normative conformance target |
+| W3C-WCAG21 | WCAG 2.1 | https://www.w3.org/TR/WCAG21/ | normative conformance target |
 | W3C-WCAG22 | WCAG 2.2 | https://www.w3.org/TR/WCAG22/ | normative conformance target |
 | W3C-WCAGEM2 | WCAG Evaluation Methodology 2.0 | https://www.w3.org/TR/wcag-em-2/ | methodology |
 | W3C-WCAGEM-REPORT-TOOL | WCAG-EM Report Tool | https://www.w3.org/WAI/eval/report-tool/ | supplementary report tool。WCAG-EM 2.0本文と同一の成果物schemaを提供することは確認できていないため、EM 2 report schemaのAuthorityにはしない |

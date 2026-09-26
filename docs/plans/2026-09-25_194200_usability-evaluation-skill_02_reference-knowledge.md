@@ -50,7 +50,7 @@ source catalogへ登録したsource全体の全pageをnormalized corpusへ収録
 
 利用対象:
 
-- WCAG 2.2 Success Criteriaとconformance関連定義
+- WCAG 2.0 / 2.1 / 2.2 Success Criteriaと各versionのconformance関連定義
 - Understanding / Techniques / Failuresのうち、対象requirementの理解・観測・判定に必要な公開情報
 - WCAG-EM 2.0
 - WAI-ARIA 1.2
@@ -250,6 +250,8 @@ skills/usability-evaluation/
 │   ├── heuristics.md
 │   ├── accessibility/
 │   │   ├── index.md
+│   │   ├── wcag-2.0.md
+│   │   ├── wcag-2.1.md
 │   │   ├── wcag-2.2.md
 │   │   ├── wai-aria-1.2.md
 │   │   ├── aria-in-html.md

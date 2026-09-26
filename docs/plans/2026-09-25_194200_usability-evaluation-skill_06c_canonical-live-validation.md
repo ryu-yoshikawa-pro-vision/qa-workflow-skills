@@ -36,6 +36,7 @@ fixtureは少なくとも次を満たします。
 - side effectがfixture内で閉じる
 - browser / viewport / input methodを固定できる
 - 複数viewまたはstateを持ち、samplingを使うstructured sample / random sample / complete processの経路検証ができる
+- 同一URLで異なるstateと、同一stateへ別経路で到達するcaseを持ち、sample identity canonicalizationをbrowser evidence付きで検証できる
 - 同じfixture server内に、製品全体を列挙できる小さいself-enclosed product scopeを持ち、sampling procedure skip経路を追加serverなしで検証できる
 - keyboard / focus、visual / responsive、general accessibility observationを少なくとも1件ずつ実行できる
 - taskなしpage inspectionと、明示task / flow inspectionの両方を実行できる
@@ -118,13 +119,12 @@ formal request
 - random sample
 - complete process
 - Step 4.3で再samplingなしのcase
-- semantic / fixtureでStep 4.3再samplingありのcase。structured追加後のrandom target再計算、overlap除外、retained random、不足分top-up、process再materializeを確認する
+- semantic / fixtureでStep 4.3再samplingありのcase。structured追加後のcandidate populationが同じcaseでrandom target再計算、overlap除外、retained random、不足分top-up、process再materializeを確認する
 - sampling procedure skippedのcase。completeなin-scope inventory全件がselected sample setとなり、structured / random / Step 4.3がnot-applicableでもcomplete process / Step 4.2評価が続くこと
-- explicit unsupported WCAG versionとmissing / unresolved version inputが別状態になること
-- finite inventoryがないrandom selection pathでLLMがsample identityを手選択しないこと
+- 同一URLの異なるstateを別sample、同じstateへの別経路を同一sampleとして扱えること
+- observation結果がPR #11 freshness契約でcurrentな場合だけformal evaluationへ再利用されること
 - Step 5.1 outcome closure
-- evaluation statement生成条件成立 / 不成立
-- product-wide conformance claim guard
+- report materialization
 
 を確認します。
 
@@ -157,8 +157,9 @@ repository implementationの完了条件:
 - expected handoff集合とcurrent valid returned result集合が一致するまでresumeしないことをPASS
 - evidence safety / side-effect / browser ownershipをPASS
 - repository標準のdeterministic / semantic / routing / Skill validationをPASS
-- WCAG 2.2 requirement catalogのcanonical hash再計算と承認済みhash contract testをPASS
-- sampling used / skipped、Step 4.3 structured update後の再sampling、unsupported / unresolved分離をPASS
+- WCAG 2.0 / 2.1 / 2.2 requirement catalogのcanonical hash再計算と承認済みhash contract testをdeterministic validationでPASS
+- version切替、unsupported / unresolved / out-of-scope分離、non-finite random selection guard、candidate population変更時のreselection、Evaluation Statement / Claim各guardはdeterministic / semantic evalでPASS
+- browser E2Eではsampling used / skipped、sample identity、same-population Step 4.3再sampling、freshness付きobservation handoff / resumeをPASS
 - canonical fixtureで未解決blockedが0
 
 external acceptance:

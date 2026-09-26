@@ -10,7 +10,7 @@
 - PR #12はmainへmerge済みでcurrent実装を確認済み
 - PR #13 main merge済み
 - usability-inspectionのgeneral accessibility / browser observation contract成立
-- WCAG-EM 2.0 / WCAG 2.2 current official source確認
+- WCAG-EM 2.0 / WCAG 2.0 / 2.1 / 2.2 current official source確認
 - repository標準eval / CI確認
 
 ## 2. Step 0: baseline
@@ -34,6 +34,8 @@ latest mainで、
 
 source-catalogへ少なくとも、
 
+- WCAG 2.0
+- WCAG 2.1
 - WCAG 2.2
 - WCAG-EM 2.0
 - WCAG-EM Report Tool。WAI Overview上の公式resourceとして保持するが、WCAG-EM 2.0本文と同一の成果物schemaを提供することは前提にせず、WCAG-EM 2 schema Authorityにはしない
@@ -51,8 +53,11 @@ WCAG-EM 2のoutput contractはReport ToolのschemaではなくWCAG-EM 2.0本文�
 先に次をfixtureで固定します。
 
 - required Input
-- supported WCAG version = 2.2 / explicit unsupported version / missing versionの状態分離
-- static requirement catalog / target level expected set / canonical hash
+- supported WCAG version = 2.0 / 2.1 / 2.2 / explicit unsupported or out-of-scope version / missing versionの状態分離
+- version別static requirement catalog / target level expected set / canonical hash
+- runtime envelope / input / generation fingerprint / freshness
+- canonical sample identity registry
+- candidate population fingerprint
 - evaluation header
 - accessibility support baseline
 - exploration
@@ -64,42 +69,50 @@ WCAG-EM 2のoutput contractはReport ToolのschemaではなくWCAG-EM 2.0本文�
 - sample result
 - sampling used時のStep 4.3 comparison
 - Step 5.1 report outcome closure
-- Step 5.3 evaluation statement minimum fields / generation guard
-- conformance claim guard
+- Step 5.3 Evaluation Statement full / partial minimum fields / generation guard
+- WCAG Conformance Claim required fields / full-scope coverage guard
+- WCAG Statement of Partial Conformance - Third Party Content / Language required fields / generation guard
 
 ## 5. Step 3: production helper
 
-`wcag_requirements.py`、`sampling.py`、`wcag_em_structure.py` を実装します。
+`runtime_contract.py`、`wcag_requirements.py`、`sampling.py`、`wcag_em_structure.py` を実装します。`runtime_contract.py` はPR #11のcurrent契約を再利用し、独自runtime frameworkは追加しません。
 
 ### requirements
 
-- supported WCAG versionを2.2へ固定
-- `assets/wcag-2.2-requirements.json` からA / AA / AAAごとのrequired Success Criteria集合を導出
-- 5つのconformance requirement集合を別に導出
-- canonical JSON SHA-256を `static_data_versions.wcag_2_2_requirements` へ出力
-- validatorはassetからhashを独立再計算
-- contract testでW3C正本と照合済みcatalogの承認済みhashを固定
-- 明示的な2.0 / 2.1等は `support_status=unsupported`、version未指定・不明は `unresolved`
-- actual result coverageをLLM supplied listではなくstatic expected setと比較
+- supported WCAG versionを2.0 / 2.1 / 2.2へ固定
+- `assets/wcag-2.0-requirements.json` / `wcag-2.1-requirements.json` / `wcag-2.2-requirements.json` からtarget versionだけを選択
+- A / AA / AAAごとのrequired Success Criteria集合と5つのconformance requirement集合を導出
+- versionごとのcanonical JSON SHA-256を `static_data_versions.wcag_2_0_requirements` / `wcag_2_1_requirements` / `wcag_2_2_requirements` へ出力
+- validatorは選択versionのassetからhashを独立再計算
+- 3 catalogそれぞれについてW3C正本と照合済みの承認済みhashをcontract testで固定
+- version未指定・不明は `unresolved`、現在catalogを持たない将来version等は `unsupported`、WCAG 3はout-of-scope
+- actual result coverageをLLM supplied listではなくtarget versionのstatic expected setと比較
 
 ### sampling
 
+- current `test-target-inspection` の対象 / 状態キー、またはsemantic同一性decisionからcanonical artifact-local sample identity registryをmaterialize
+- duplicate / overlap / union / process membershipをcanonical sample identityで判定
 - complete inventoryとsemantic decisionから製品全体をselected sample setへmaterializeし、sampling procedureをskipする経路
 - sampling skippedではstructured / random / Step 4.3をnot-applicableとして閉じるが、complete process / Step 4.2評価は継続
 - 10% count計算。WCAG-EM本文の丸め規則ではなく本Planの `ceil` 規則として扱い、structured count 1 / 9 / 10 / 11の境界fixtureを持つ
 - finite inventoryからrandom candidate集合を導出し、structured sampleを除外
+- candidate scope / inventory / provenanceからcandidate population fingerprintを導出
 - target全体を有限列挙できない場合、LLMはmethod / provenanceだけを判断し、candidate listがあればscript、外部tool自体がrandom selectionする場合は外部random mechanismにsample identity選択を任せる
 - duplicate / overlap検証
 - optional random select
 - fixed seed禁止
 - complete process sequenceからsample union / process-added sampleを導出
 - normalized content type / Finding group keyの集合差分からStep 4.3 boolean / actionを導出
-- structured sample更新後のrandom target再計算、overlap除外、current random保持、不足分top-up、process再materialize
+- structured sample更新後のrandom target再計算。population fingerprint同一ならoverlap除外 / current random保持 / 不足分top-up、population変更なら旧random setをstaleとして再選択
+- process再materialize
+- 既存sample resultはPR #11 freshnessがcurrentの場合だけ再利用し、version / level / scope / baseline / environment / sample identity / evidence / catalog hash / upstream dependency変更では再評価
 - selection method記録
 - no-new-sample completion
 
-### structure
+### runtime / structure
 
+- random selectionそのものはdeterministic runtimeへ含めず、method / provenance / selected refsを後続Machine Runtime Inputへ渡す
+- PR #11 runtime input / generation fingerprint / static_data_versions / current verifierでfreshnessを管理
 - semantic decisionからfixed machine rowをmaterialize
 - draft ref採番
 - cross-reference
@@ -107,6 +120,9 @@ WCAG-EM 2のoutput contractはReport ToolのschemaではなくWCAG-EM 2.0本文�
 - static expected requirement coverage
 - handoff expected / returned closure
 - comparison iteration chain
+- sample result freshness closure
+- Evaluation Statement full / partial generation guard
+- WCAG Conformance Claim / Statement of Partial Conformance generation guard
 - machine-owned Markdown render
 - summary
 
@@ -187,11 +203,12 @@ semantic layerはcontent type / Findingのartifact-local grouping keyだけを�
 - scriptによるnew structured revision生成
 - new structured countからrandom target再計算
 - structuredへ移った旧random sampleを除外
-- currentな旧random sampleを保持
-- target不足分だけ追加random selection
+- candidate population fingerprintを再計算
+- populationが同じ場合だけcurrentな旧random sampleを保持し、target不足分だけ追加random selection
+- populationが変わった場合は旧random selectionをstaleとして再選択
 - 追加random sampleのcomplete processを再materialize
-- 新たに追加されたsample / processだけを評価
-- existing current resultを再利用
+- PR #11 freshness判定でcurrentな既存sample resultだけ再利用し、stale resultは再評価
+- 新たに必要になったsample / processだけを評価
 - comparison iteration chain
 
 を閉じます。
@@ -200,9 +217,11 @@ semantic layerはcontent type / Findingのartifact-local grouping keyだけを�
 
 Step 5.1に従い、Step 1〜4のrequired outcomeをreportへ記録します。
 
-evaluation statementは条件成立case / 不成立caseを分け、成立caseでは `_05f_wcag-conformance-evaluation-package-and-runtime.md` のStep 5.3 minimum fieldsをすべて保持します。
+Evaluation Statementはfull / partial /生成不可を分け、`_05f_wcag-conformance-evaluation-package-and-runtime.md` のStep 5.3 contractを閉じます。
 
-product-wide claimは通常のsample評価では生成しません。
+WCAG Conformance Claimはcomplete claim scope evidenceとversion別required fieldsが揃うcaseだけ生成します。representative sampleだけでは生成しません。
+
+WCAG Statement of Partial Conformanceはthird-party content / languageを別caseとして実装し、Conformance Claimと混同しません。
 
 aggregated scoreは生成しません。
 
@@ -232,27 +251,32 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 ### deterministic
 
 - schema
-- supported WCAG version / explicit unsupported / missing unresolvedの状態分離
-- static requirement catalog / `static_data_versions.wcag_2_2_requirements` / approved hash contract
-- target level expected Success Criteria / conformance requirement set
+- supported WCAG version 2.0 / 2.1 / 2.2 / explicit unsupported or out-of-scope / missing unresolvedの状態分離
+- version別static requirement catalog / `static_data_versions` / approved hash contract
+- target version / level expected Success Criteria / conformance requirement set
+- runtime input / generation fingerprint / freshness
+- canonical sample identity registry
 - sampling procedure used / skippedとselected sample set closure
 - observation handoff origin / resume identity / expected-returned closure
 - ref
 - sample count
 - finite inventory candidate derivation / recorded method provenance
+- candidate population fingerprint
 - duplicate / overlap
 - process sequence → process-added sample materialization
 - Step 4.3 set difference → boolean / action derivation
-- structured revision更新 → random target再計算 / overlap除外 / retained random / top-up / process再materialize
+- structured revision更新 → candidate population fingerprint再計算 / population同一時のoverlap除外・retained random・top-up / population変更時のreselection / process再materialize
+- sample result freshness / stale再評価
 - non-finite sourceでもLLMがrandom sample identityを選ばないこと
 - machine-owned structured section materialization
 - closure
 - report
-- statement / claim guard
+- Evaluation Statement full / partial guard
+- WCAG Conformance Claim / Statement of Partial Conformance guard
 
 ### semantic
 
-`_05f` Case A〜Pをすべて実Judgeで確認します。
+`_05f` Case A〜Wをすべて実Judgeで確認します。
 
 ### real Agent / browser
 
@@ -268,19 +292,23 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 - WCAG-EM Step 1〜5 traceability
 - WCAG-EM 2 output schemaがReport Toolへ依存せず、WCAG-EM 2.0本文を正本としている
 - accessibility support baseline必須
-- WCAG 2.2だけをsupported versionとし、明示unsupported versionとmissing / unresolved inputを分離
-- target levelからrequired Success Criteria / conformance requirement集合をstatic catalogで独立導出し、canonical hashを既存static data契約で検証
+- WCAG 2.0 / 2.1 / 2.2をsupported versionとし、missing / unresolved、unsupported / out-of-scopeを分離
+- target version / levelからrequired Success Criteria / conformance requirement集合を該当versionのstatic catalogだけで独立導出し、3 catalogのcanonical hashを既存static data契約で検証
+- `runtime_contract.py` でPR #11 Machine Runtime / freshness契約を再利用し、random selectionそのものはdeterministic runtimeへ含めない
 - Step 2 exploration closure
 - sampling procedure used / skippedの両経路
 - sampling skippedではcomplete inventoryから全in-scope sampleをselected sample setへmaterializeし、structured / random / Step 4.3をnot-applicableとして閉じる
 - sampling usedではStep 3.1 structured sample
-- sampling usedではStep 3.2 random sample。finite inventory時のcandidate集合はscript導出し、非finite時もLLMがsample identityを選ばない
+- canonical sample identity registryをscriptがmaterializeし、duplicate / overlap / union / process membershipを機械判定
+- sampling usedではStep 3.2 random sample。finite inventory時のcandidate集合とcandidate population fingerprintはscript導出し、非finite時もLLMがsample identityを選ばない
 - complete process。sequenceからprocess-added sample / membershipをscript導出
 - Step 4.1 / 4.2評価
-- Step 4.3 retry loop。semantic grouping keyから集合差分 / boolean / actionをscript導出し、structured revision変更後のrandom target再計算・overlap除外・retained random・不足分top-up・process再materializeまで閉じる
+- Step 4.3 retry loop。semantic grouping keyから集合差分 / boolean / actionをscript導出し、structured revision変更後のcandidate population fingerprint再計算、population同一時のrandom target再計算 / overlap除外 / retained random / 不足分top-up、population変更時のreselection、process再materializeまで閉じる
+- 既存sample resultはPR #11 freshnessがcurrentの場合だけ再利用する
 - Step 5.1のStep 1〜4 required outcome closure
-- Step 5.3 optional evaluation statement minimum fields / generation guard
-- product-wide claim guard
+- Step 5.3 Evaluation Statement full / partial minimum fields / generation guard
+- WCAG 2.0 / 2.1 / 2.2 Conformance Claim required fields / full-scope guard
+- WCAG Statement of Partial Conformance - Third Party Content / Language required fields / guard
 - requirements / sampling / structure helperでmachine-owned fieldをmaterializeし、Agentがfinal refs / expected集合 / derived status / countを手作成しない
 - independent deterministic validator
 - trigger / deterministic / semantic PASS

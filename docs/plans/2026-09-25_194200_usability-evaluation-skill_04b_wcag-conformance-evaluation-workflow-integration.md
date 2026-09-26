@@ -8,7 +8,7 @@
 
 次は `wcag-conformance-evaluation` をformal methodology ownerとして最初に選びます。
 
-- WCAG 2.2 AAに適合しているか評価
+- WCAG 2.0 / 2.1 / 2.2の指定levelに適合しているか評価
 - WCAG conformance evaluationを実施
 - WCAG-EM 2.0で評価
 - WCAG適合評価reportを作成
@@ -78,7 +78,7 @@ WCAG requirement resultをheuristic評価で上書きしません。
 例:
 
 ```text
-release前のWCAG 2.2 AA評価
+release前の指定WCAG version / level評価
 → wcag-conformance-evaluation
 → selected sampleごとに必要なら usability-inspection
 → WCAG-EM report
