@@ -8,12 +8,12 @@ feat/usability-evaluation-skill
 
 このブランチは main@3510e6ffce87ba8c025ebde22f9947dbb6074f9c から作成しました。2026-09-26にPR #11がmainへmergeされ、このbranchにもmainを取り込み済みです。本Plan revisionではPR #11の実装済みruntime契約を正本として扱います。
 
-実装開始時はPR #12 / #13がmainへmerge済みであることを前提とし、merge後の実装、Skill数、評価契約、workflow state、browser safety契約を再確認してから実装へ進みます。
+PR #12は2026-09-26にmainへmerge済みで、このbranchにも取り込み済みです。実装開始時はPR #12のcurrent実装を正本として扱い、PR #13がmainへmerge済みであることを確認してから、最新のSkill数、評価契約、workflow state、browser safety契約を再確認して実装へ進みます。
 
 現在の依存関係:
 
 - PR #11: merge済み。決定論的runtime、Machine Entity、traceability / freshness
-- PR #12: test-target-inspection、test-execution、実対象観測、画像確認、browser safety
+- PR #12: merge済み。test-target-inspection、test-execution、実対象観測、画像確認、browser safety
 - PR #13: exploratory-testing、regression-testing、qa-knowledge、複数workflowのrouting / concurrency
 
 3 Skillはこれらを再実装しません。`usability-evaluation` はreference knowledgeによる専門評価、`usability-inspection` はlive Web UIの操作・観測・測定とgeneral accessibility inspection、`wcag-conformance-evaluation` はWeb targetに対するWCAG-EM 2.0 methodology / sampling / evaluation closure / reportに責務を限定します。
@@ -123,7 +123,7 @@ formalなWCAG conformance evaluationはgeneral inspectionと分離し、`wcag-co
 
 - live Web target / entry point
 - evaluation commissioner / self-evaluation responsibility
-- target WCAG 2 version
+- target WCAG version。初期実装でsupportedとするのは `2.2` だけとし、2.0 / 2.1等を2.2へ暗黙変換しない
 - target conformance level
 - digital product scope / excluded scope
 - accessibility support baseline
@@ -160,9 +160,11 @@ formalなWCAG conformance evaluationはgeneral inspectionと分離し、`wcag-co
 - Finding refs
 - limitation / blocked reason
 
-random sampleの選択自体はpredictable fixed patternにしません。10%件数計算、duplicate / overlap、cross-reference、Step closure、report構造はSkill-local scriptで機械処理します。
+random sampleの選択自体はpredictable fixed patternにしません。有限なtarget inventoryをcurrent evidenceとして確定できる場合、random candidate集合はLLMが手で列挙せず、そのinventoryからSkill-local scriptがscope内候補を導出してstructured sampleを除外します。有限列挙できない場合だけ、別のrandom selection methodとcandidate scope / provenanceを記録します。10%件数計算、candidate集合導出、duplicate / overlap、complete process由来sampleのunion、Step 4.3の集合差分と遷移、cross-reference、Step closure、report構造はSkill-local scriptで機械処理します。
 
-browser操作は `usability-inspection`、inspectionのmachine計算はruntime script、意味判断はLLM / `usability-evaluation` が担当し、同じ判断を複数箇所で再計算しません。formal WCAG評価では `wcag-conformance-evaluation` がmethodology / sample set / reportを所有し、個別sampleのlive observationが必要な場合はhandoff requirementを出します。`qa-workflow` が `usability-inspection` を直列実行し、immutable resultをformal評価へ戻します。
+browser操作は `usability-inspection`、意味判断は各owner SkillのLLM、機械的な導出・検証・成果物組立はSkill-local production scriptが担当します。LLMは、UI patternの適用性、Authority、criterion applicability / exception、source採否、content type / Findingの意味的同一性、follow-up要否等、意味判断でしか確定できない最小のdecision fieldだけを返します。固定enum、期待集合、row skeleton、派生boolean、集計、順序、ID、cross-reference、status transition、required observation集合、Finding作成要否、machine-owned Markdown sectionはscriptが導出します。required production helperが失敗した場合、LLMが同じ機械値を手作成してfallbackせず、影響scopeを `incomplete / unresolved / blocked` へ閉じます。
+
+formal WCAG評価では `wcag-conformance-evaluation` がmethodology / semantic sample selection / report責務を所有し、個別sampleのlive observationが必要な場合はhandoff requirementを出します。`qa-workflow` が `usability-inspection` を直列実行し、originating evaluation / resume pointへ紐付いたimmutable resultをformal評価へ戻します。
 
 ## workflow上の位置づけ
 
@@ -362,8 +364,12 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
 47. usability-inspectionはtest-target-inspection / test-executionの既定後処理にはしない。ただし既存成果物はpreflight / evidenceとしてread-only再利用できる。
 48. 「ユーザビリティテストして」等の依頼はusability-inspectionのtrigger aliasとして受けられるが、成果物ではhuman participantを用いる正式なusability testingを実施したとは表現しない。
 49. 「usabilityを確認」「UIの使いやすさを見て」等の実操作有無が不明な依頼はtrigger boundaryとして扱い、live Web UIを操作して検査するならusability-inspection、design artifact / screenshot / 取得済みevidenceのreference-based評価ならusability-evaluationへroutingする。
-50. usability-inspectionでref採番、scope closure、数値計算、threshold比較、supported machine-decidable test rule等をLLMへ手計算させず、PR #11のcurrent Skill runtime contractを使って決定論的scriptへ移す。usability-evaluationのevaluation ref / closure / cross-referenceも `evaluation_structure.py` へ移し、Agentへ手採番させない。`test-rule-catalog.json` はsupported ACT / project test ruleのmetadataだけを保持し、structure / geometry / elapsed / threshold helperは `inspection_structure.py` / `measurement.py` に置く。generic rule DSL / plugin systemは追加しない。
+50. usability-inspectionでref採番、固定scope row生成、required observation field集合、scope closure、数値計算、threshold比較、supported machine-decidable test rule、Finding作成要否等をLLMへ手計算させず、PR #11のcurrent Skill runtime contractを使って決定論的scriptへ移す。usability-evaluationも固定上位観点row、evaluation ref、closure、cross-reference、Finding作成要否、machine-owned成果物sectionを `evaluation_structure.py` でmaterializeし、Agentが計算結果をMarkdownへ手で転記しない。`test-rule-catalog.json` はsupported ACT / project test ruleのmetadataだけを保持し、structure / geometry / elapsed / threshold helperは `inspection_structure.py` / `measurement.py` に置く。generic rule DSL / plugin systemは追加しない。
 51. W3C ACT Rulesはinformative testing methodとして利用する。全ruleの実装は要求せず、live Web scopeで忠実に実装でき、required evidenceを取得でき、official examplesでconsistency検証できるruleだけsupportedとする。supported ACT RuleのoutcomeはACT Rules Format 1.1の `inapplicable / passed / failed / cantTell / untested` を使用する。`untested` はsupported ruleが今回scopeへ選定されたがtest subjectを評価していない場合だけ、`cantTell` は評価を開始したがapplicabilityまたはexpectationを完全に判定できない場合に使用し、rule status、requirements mapping、execution modeと分離する。
-52. general accessibility inspectionとformal WCAG conformance evaluationを別Skillへ分離する。formal評価ではtarget WCAG version / level / self-enclosedなdigital product scope / accessibility support baselineを事前に確定し、WCAG-EM 2.0へ従う。supported test ruleがrequirementの一部だけを評価する場合、rule outcomeが `passed` でもrequirementを `satisfied` にしない。
+52. general accessibility inspectionとformal WCAG conformance evaluationを別Skillへ分離する。formal評価の初期実装はWCAG 2.2だけをsupported versionとし、target level / self-enclosedなdigital product scope / accessibility support baselineを事前に確定してWCAG-EM 2.0へ従う。2.2以外を暗黙変換しない。target levelから必要なSuccess Criteria / conformance requirement集合はversioned static catalogからscriptが独立導出し、LLMの自己申告集合を正本にしない。supported test ruleがrequirementの一部だけを評価する場合、rule outcomeが `passed` でもrequirementを `satisfied` にしない。
 53. screenshot、DOM、accessibility tree、raw snapshot等はsecret・個人データ・機密情報を含み得るため、PR #12のevidence安全契約を再利用して必要最小限だけ取得・保存し、raw evidenceを成果物の必須条件にしない。
 54. deterministic runtime、deterministic validator、semantic evalを分離し、同じ実装で生成と検証を行わない。
+55. semantic layerは意味判断でしか確定できない最小decisionだけをproduction helperへ渡す。完成row、final ref、expected集合、derived status / boolean、summary count等をLLMが組み立ててhelperへ自己申告しない。
+56. production helperはmachine-owned sectionをcanonicalにrender / materializeし、Agentは返却されたmachine-owned contentを値単位で転記・再構築しない。repository fileへのwrite自体は既存の安全な保存経路を使い、scriptの直接writeを必須にはしない。
+57. formal WCAGの有限inventory時random candidate集合、complete process由来sample union、Step 4.3のcontent type / Finding集合差分と次action、target levelからのrequired requirement集合はscriptで導出する。意味的なcontent type / Finding grouping、structured sampleの代表性、inventory completeness等だけをsemantic evalへ残す。
+58. formal observation handoffはoriginating evaluation identity / revision、handoff ref、resume operation、expected sample / process / requirement refsをworkflow stateへ保持し、currentかつvalidなreturned result集合が期待集合を満たした場合だけ同じevaluationをresumeする。LLMが「戻り値は揃った」と手判断しない。

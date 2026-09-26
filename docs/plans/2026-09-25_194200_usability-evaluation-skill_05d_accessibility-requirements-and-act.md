@@ -38,7 +38,7 @@ formalなWCAG conformance要求で、
 
 を所有します。
 
-個別sampleのlive observationでは本ファイルのrequirement / ACT semanticsを再利用できます。
+個別sampleのlive observationでは本ファイルのrequirement / ACT semanticsを再利用できます。ただしformal評価で「target levelに必要な全Success Criteria / conformance requirements」を列挙する正本は `_05f_wcag-conformance-evaluation-package-and-runtime.md` のversioned static catalogとし、usability-inspectionやLLMの選択済みrequirement集合を正本にしません。
 
 ## 2. requirement result
 

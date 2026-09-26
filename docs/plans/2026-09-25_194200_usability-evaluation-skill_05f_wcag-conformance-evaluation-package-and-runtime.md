@@ -14,8 +14,10 @@ skills/wcag-conformance-evaluation/
 │   ├── wcag-em-2.md
 │   └── report-tool.md
 ├── assets/
-│   └── output-template.md
+│   ├── output-template.md
+│   └── wcag-2.2-requirements.json
 ├── scripts/
+│   ├── wcag_requirements.py
 │   ├── wcag_em_structure.py
 │   └── sampling.py
 └── evals/
@@ -39,6 +41,19 @@ skills/wcag-conformance-evaluation/
 - Understanding Accessibility Support
 
 WAI OverviewはWCAG-EM 2.0のresourceとしてWCAG-EM Report Toolを案内しています。ただし、Report Toolのfield / export schemaがWCAG-EM 2.0本文のStep 5要件と完全に同一であることは確認できていないため、本Skillのoutput contractはWCAG-EM 2.0本文を正本にします。Report Toolは補助resourceとして保持し、runtime dependencyにもschema Authorityにもしません。`references/source-catalog.md` は `_02d_reference-artifact-schema.md` の共通Sources table契約を再利用します。
+
+### supported WCAG version
+
+初期実装でsupportedとするWCAG versionは `2.2` だけです。`assets/wcag-2.2-requirements.json` に、少なくともSuccess Criterion number / levelと5つのWCAG conformance requirementの固定machine keyを保持します。自然言語のSuccess Criterion本文をruntimeへ複製する必要はなく、source item / canonical URLへ追跡できるmetadataに限定します。
+
+`wcag_requirements.py` はtarget levelから期待requirement集合を独立導出します。
+
+- A → Level A Success Criteria
+- AA → Level A + AA Success Criteria
+- AAA → Level A + AA + AAA Success Criteria
+- いずれもWCAG conformance requirementsを別集合として含める
+
+2.0 / 2.1等を指定された場合は2.2へ暗黙変換せず `unsupported / unresolved` とします。別version対応はそのversionのstatic catalogとfixtureを追加した時点でsupportedにします。
 
 ## 3. output-template.md
 
@@ -106,6 +121,9 @@ WAI OverviewはWCAG-EM 2.0のresourceとしてWCAG-EM Report Toolを案内して
 各row:
 
 - handoff ref
+- originating evaluation artifact ref / revision
+- workflow_ref（qa-workflow管理下の場合）
+- resume operation: step-4.1-sample / step-4.2-process
 - sample ref
 - process ref（存在する場合）
 - required requirement refs
@@ -134,7 +152,8 @@ WAI OverviewはWCAG-EM 2.0のresourceとしてWCAG-EM Report Toolを案内して
 - target random sample count
 - actual random sample count
 - selection method
-- candidate scope / source
+- candidate scope / provenance
+- finite inventory ref / completeness（finite inventoryを使う場合）
 - selected sample refs
 - duplicate replacement記録
 - no-new-sample completion reason（該当時）
@@ -174,12 +193,15 @@ URLだけでdynamic state / process sampleを識別できない場合は、必�
 - comparison ref
 - structured sample revision
 - random sample revision
+- normalized content type keys / finding group keysへのref
 - new content type detected
 - new finding detected
 - new content / finding refs
 - action: closed / return-to-step-2-3
 - added structured sample refs
 - next iteration ref
+
+content type / Findingの意味的groupingはsemantic layerが行いますが、boolean、集合差分、`closed / return-to-step-2-3` は `sampling.py compare` が導出します。
 
 ### Step 5 report closure
 
@@ -213,6 +235,31 @@ Step 5.2のevaluation specifics、Step 5.3のevaluation statement、Step 5.4のa
 - partial conformance statementの場合だけ、理由。WCAG-EM 2.0が定める理由語彙へ従う
 - product ownerのvalidity / accuracy維持commitmentを確認したevidence / ref
 
+## 3.1 wcag_requirements.py
+
+Input:
+
+- target WCAG version
+- target conformance level
+
+Function:
+
+- supported versionが2.2であることを検証
+- `assets/wcag-2.2-requirements.json` からtarget levelに必要なSuccess Criteria集合を導出
+- 5つのWCAG conformance requirement集合を導出
+- duplicate / unknown requirement keyをreject
+- expected requirement setをcanonical sort
+
+Output:
+
+- supported / unsupported
+- required Success Criterion refs
+- required conformance requirement refs
+- static catalog identity
+- issues
+
+Agent / LLMが「今回評価すべきSuccess Criteria一覧」を完成集合として入力しません。semantic applicability / exceptionは各requirement result内で判断しますが、requirement universe自体はstatic catalogが正本です。
+
 ## 4. sampling.py
 
 random selectionはpredictable fixed patternにしてはいけないため、production helperのうち選択処理は意図的にnon-deterministicです。
@@ -235,21 +282,39 @@ Output:
 
 - target random sample count
 
-### select
+### derive-candidates
 
-有限なcandidate集合を取得できる場合だけ使用できます。
+finite inventoryを取得できる場合に使用します。
 
 Input:
 
-- candidate sample refs
+- current target inventory rows
+- inventory provenance / completeness
+- evaluation scope
 - structured sample refs
-- target count
 
 Function:
 
-- duplicate除去
-- structured sample除外
-- OSが提供するrandomnessを使用してunique sampleを選択
+- scope外rowを除外
+- duplicate sample identityをreject / canonicalize
+- structured sampleを除外
+- deterministic sortしたeligible candidate setを生成
+
+LLMはeligible candidate refsを手で列挙しません。
+
+### select
+
+Input:
+
+- `derive-candidates` のeligible candidate set、またはfinite inventoryを使えない場合のrecorded random selection result
+- structured sample refs
+- target count
+- selection method / candidate scope provenance
+
+Function:
+
+- finite inventory経路ではOSが提供するrandomnessを使用してunique sampleを選択
+- recorded method経路ではselected refsを再選択せず、count / duplicate / overlap / method / provenanceを検証
 - fixed seedを受け付けない
 
 Output:
@@ -261,7 +326,41 @@ Output:
 
 同じInputから同じselectionを返すことは要求しません。
 
-target全体を有限候補として列挙できない場合は、このselect機能を無理に使わず、WCAG-EM 2.0が許容する別のrandom selection methodを利用し、そのmethodとselected samplesを記録します。
+target全体を有限候補として列挙できない場合はfinite inventory経路を無理に使わず、WCAG-EM 2.0が許容する別のrandom selection methodを利用します。semantic / research工程はmethod、candidate scope、provenance、selected samplesをrecordし、scriptはその記録の構造・count・duplicate / overlapを検証します。
+
+### materialize-process
+
+Input:
+
+- process semantic definition: starting sample、default sequence、critical / commonly accessed branch sequence
+- sequence内のsample refs / action refs
+- current sample set
+
+Function:
+
+- sequence内sampleのunion
+- duplicate除去
+- current sample setにないsampleを `process-added` として導出
+- process membership / sequence closureをmaterialize
+
+LLMがsequenceと別にprocess-added sample集合を手組みしません。
+
+### compare
+
+Input:
+
+- structured sample revisionと各sampleのnormalized content type keys / finding group keys
+- random sample revisionと各sampleのnormalized content type keys / finding group keys
+
+Function:
+
+- structured / random set difference
+- new content / finding refs導出
+- `new content type detected` / `new finding detected` 導出
+- 差分なし → `closed`
+- 差分あり → `return-to-step-2-3`
+
+global content type / Finding identityは作りません。keyの意味妥当性はsemantic evalが担当します。
 
 ### validate
 
@@ -290,20 +389,19 @@ final artifact assemblyのownerです。
 
 Input:
 
-- evaluation header
-- scope draft
-- accessibility support baseline drafts
-- exploration drafts
-- structured sample drafts
-- random sample drafts
-- complete process drafts
-- observation handoff drafts
+- evaluation headerのsemantic field
+- scope / accessibility support baselineのsemantic decisions
+- exploration decisions
+- structured sample selection decisions
+- finite inventory / recorded random selection provenance
+- process semantic definitions
+- observation handoff semantic requirements
 - returned inspection artifact / evidence refs
-- sample result drafts
-- comparison iteration drafts
-- Finding refs
-- optional evaluation statement
-- optional conformance claim
+- sample requirement result decisions / evidence
+- content type / Finding grouping decisions
+- Finding semantic input
+- optional evaluation statement semantic input
+- optional conformance claim evidence
 - limitation
 
 各draftはinvocation内で一意な `draft_key` を持ちます。
@@ -311,6 +409,8 @@ Input:
 Function:
 
 - unknown field / enum / required field検証
+- `wcag_requirements.py` のexpected requirement universeを読み、LLM supplied listではなくtarget levelからrequired coverageを生成
+- `sampling.py` のcandidate / selection / process / comparison resultだけからmachine-owned sample / comparison fieldをmaterialize
 - artifact-local ref採番
   - accessibility support baseline: `BASELINE-001`
   - exploration: `EXPLORE-001`
@@ -320,14 +420,17 @@ Function:
 - WCAG-EM Step 1〜5 closure
 - scope / accessibility support baseline closure
 - exploration → structured sample traceability
-- observation handoff closure
+- observation handoffごとにoriginating evaluation / revision / resume operation / expected refsをmaterialize
+- expected handoff集合とreturned current valid result集合のclosure
 - complete process sequence closure
-- required sample result coverage
-- Step 4.3 iteration chain closure
+- process-added sample coverage
+- target levelから独立導出したrequired sample result coverage
+- Step 4.3集合差分からiteration action / chain closureをmaterialize
 - Step 5.1でStep 1〜4の各required outcomeが成果物へ存在すること
 - evaluation statementを作成した場合のStep 5.3 minimum fieldsと生成条件
 - report section order固定
 - summary count生成
+- machine-owned structured sectionをcanonical Markdownとしてrender。Agentがfinal refs / derived flags / counts / closure rowsを値単位で再構築しない
 
 ref prefixはartifact-localです。
 
@@ -341,6 +444,7 @@ evaluation artifact自体のidentity / revisionはmerge後current artifact契約
 Output:
 
 - normalized WCAG-EM evaluation artifact
+- rendered machine-owned structured sections
 - summary
 - issues
 
@@ -373,16 +477,19 @@ production helperとは別実装で少なくとも次を検証します。
 
 - output section / schema
 - required Input
+- supported WCAG version = 2.2
+- static catalogから独立導出したtarget level required Success Criteria / conformance requirement集合とactual coverageの一致
 - accessibility support baseline
 - structured sample traceability
 - random sample target count
 - random sample duplicate / overlap
+- finite inventory時のcandidate derivation / provenance、またはrecorded method時のcandidate scope provenance
 - selection method
-- complete process closure
-- observation handoff / returned inspection artifact cross-reference
+- process sequenceから導出したprocess-added sample / membership closure
+- observation handoffのoriginating evaluation / revision / resume operation / expected refsとreturned inspection artifact cross-reference
 - sample result cross-reference
 - target levelに必要なrequirement result coverage
-- Step 4.3 comparison iteration chain
+- normalized content type / Finding group keyの集合差分とStep 4.3 derived action / iteration chain
 - Step 5.1のStep 1〜4 outcome closure
 - evaluation statement生成条件とStep 5.3 minimum fields
 - product-wide claim guard
@@ -449,17 +556,31 @@ representative sampleが全PASSでもproduct-wide conformance claimを作らな�
 
 → blocked / undetermined。
 
+### Case L: unsupported WCAG version
+
+WCAG 2.0 / 2.1等を指定。
+
+→ 2.2へ暗黙変換せずunsupported / unresolved。
+
+### Case M: missing Success Criterion
+
+target levelの静的expected setから1件を成果物で欠落させる。
+
+→ deterministic validatorが欠落を検出し、LLMが「評価済み」と自己申告しても完了にしない。
+
 ## 10. 完了条件
 
 - package単体でSkill contractを理解できる
 - sibling Skillのscriptsへruntime依存しない
 - formal direct trigger後にlive observationが必要な場合、qa-workflowが利用可能ならhandoff → usability-inspection → formal Skill resumeへ遷移し、qa-workflowを利用できないstandalone環境だけblockedへ閉じられる
 - WCAG-EM Report ToolをWCAG-EM 2 schema Authorityとして扱わず、runtime dependencyにもしていない
+- WCAG 2.2 target levelからrequired Success Criteria / conformance requirement集合をversioned static catalogから独立導出でき、2.2以外を暗黙変換しない
 - random sample 10%整数化がscript化され、structured count 1 / 9 / 10 / 11の境界fixtureを持つ
 - random selectionへfixed seedを要求しない
-- sample / process / result / comparison refをAgentが手採番しない
+- finite inventory時のrandom candidate集合、process-added sample、Step 4.3のboolean / actionをscriptが導出し、Agentが手組みしない
+- sample / process / result / comparison refとmachine-owned structured sectionをscriptがmaterializeし、Agentが値単位で再構築しない
 - Step 4.3 loopをartifact上で追跡できる
 - Step 5.1のrequired outcome closureとStep 5.3 evaluation statement minimum fieldsをvalidatorで検証できる
 - production helperとvalidatorが別実装
-- semantic Case A〜K PASS
+- semantic Case A〜M PASS
 - `_06c_canonical-live-validation.md` のrepository-controlled canonical fixtureでWCAG-EM orchestration E2EをPASSできる

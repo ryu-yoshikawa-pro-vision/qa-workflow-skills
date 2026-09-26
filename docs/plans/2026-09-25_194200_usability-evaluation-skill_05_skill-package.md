@@ -251,7 +251,7 @@ reference entry ID: REF-0001
 
 Agentへ手計算させない処理をproduction scriptへ移します。
 
-scriptはMarkdown本文を書き換えず、既存artifactをread-onlyで読み、canonical JSONだけをstdoutへ返します。Agentはその結果をsource-catalog / source-coverage / reference entryへ反映します。
+scriptはrepository fileを直接writeする必要はありませんが、machine-owned fieldをcanonical JSONだけで返してAgentに値単位で転記させる構造にはしません。semantic layerはsource採用理由、dimension、merge / split等の意味判断だけをnormalized decision inputとして渡し、scriptがID、enum、sort、cross-reference、table rowを含むcanonical Markdown section / file contentをmaterializeします。Agentは返却されたmachine-owned contentを値単位で再構築せず、既存の安全な保存経路でそのまま保存します。
 
 CLIは次のsubcommandに固定します。
 
@@ -333,6 +333,23 @@ Output:
 {"reference_entry_id":"REF-0042"}
 ~~~
 
+#### materialize
+
+production artifact生成では `next-source-id` / `next-item-ref` / `next-reference-id` の結果をAgentが個別に貼り付けません。`materialize` が既存artifactとsemantic decision inputを受け、必要なIDを内部採番して次をcanonicalにrenderします。
+
+- `references/source-catalog.md` のmachine-owned table
+- `references/source-coverage.md` のCapability Coverage / Source Items table
+- leaf reference entryのID marker / Source Items table
+
+自然言語の要約本文はsemantic inputとして受け取れますが、ID、enum、row順序、locator分離、cross-reference、summary countはscript ownerです。
+
+Output:
+
+- target path
+- rendered content
+- allocated IDs / refs
+- issues
+
 #### summary
 
 Input:
@@ -379,24 +396,28 @@ semantic layerが決めた評価内容からmachine処理だけを担当しま�
 
 Input:
 
-- evaluation condition
-- top-level aspect closure drafts
-- pattern identification drafts
-- evaluation row drafts
-- Finding refs
+- evaluation conditionのsemantic field
+- top-level aspect decisions: aspect key / 今回評価する・対象外 / semantic reason
+- pattern identification decisions
+- evaluation decisions。status、observed fact、semantic impact、applied reference decision、follow_up_required等、意味判断でしか確定できないfield
+- evidence / requirement / test rule / measurement refs
+- Finding本文に必要なsemantic input（Findingを作る場合）
 
-各draftはinvocation内一意の `draft_key` を持ちます。
+各semantic decisionはinvocation内一意の `draft_key` を持ちます。Agentはfinal evaluation ref、完成したclosure row、summary count、`finding_required` を入力しません。
 
 Function:
 
 - unknown field / enum / required field検証
-- evaluation draft順を保持
+- Planで固定したtop-level aspectのrow skeletonを全件生成し、semantic decisionを適用
+- evaluation decision順を保持
 - `EVAL-001` からartifact-local refを決定論的に採番
 - draft key → final ref解決
-- applied reference / evidence / related test rule / requirement / measurement / Finding cross-reference解決
+- applied reference / evidence / related test rule / requirement / measurement cross-reference解決
+- statusと `follow_up_required` からFinding作成要否を固定ruleで導出し、必要な場合だけFinding draft / refとのclosureを要求
 - top-level aspect closure検証
 - row order固定
 - summary count生成
+- machine-owned structured sectionをcanonical Markdownとしてrender
 
 意味判断は行いません。
 
@@ -405,8 +426,9 @@ Output:
 - normalized evaluation condition
 - pattern identification rows
 - evaluation rows
-- Finding refs
+- Finding requirement / refs
 - summary
+- rendered machine-owned structured sections
 - issues
 
 同じnormalized inputから同じmachine outputになることをfixtureで検証します。
@@ -458,7 +480,8 @@ Webへアクセスしてsourceの最新状態を検査するruntimeにもせず�
 - 評価条件にuser goal / task / flowが存在する場合だけ、overrideがない評価項目はその値を継承できる
 - 問題を確認した評価項目にobserved fact / source / evidence / 想定影響の根拠がある
 - project固有のbinding根拠を適用した `適用したreference` にproject Authority refがある
-- finding refがある場合は対応Findingが存在し、PR #13の最低契約を満たす
+- `follow_up_required` とstatusから導出したFinding作成要否が成果物と一致する
+- finding refが必要な場合は対応Findingが存在し、PR #13の最低契約を満たす
 - 問題なし / 対象外の評価項目にfinding refがない
 - source item ref形式と参照先
 - evidence ref存在
@@ -469,7 +492,7 @@ Webへアクセスしてsourceの最新状態を検査するruntimeにもせず�
 - TC resultを書き換える欄を持たない
 - source item refなしのbest practice断定を拒否
 
-意味上「本当にDialogか」「本当に使いづらいか」はdeterministic validatorで判定しません。production `evaluation_structure.py` とdeterministic validatorは別実装とし、同じ処理を互いにimportしません。
+意味上「本当にDialogか」「本当に使いづらいか」「follow-upが必要か」はdeterministic validatorで判定しません。semantic layerが返した最小decisionを前提に、固定row、ID、Finding要否、cross-reference、summary、machine-owned renderingだけを機械検証します。production `evaluation_structure.py` とdeterministic validatorは別実装とし、同じ処理を互いにimportしません。
 
 ## 9. semantic eval
 

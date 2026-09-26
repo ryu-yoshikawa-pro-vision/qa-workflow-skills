@@ -6,12 +6,16 @@
 
 目的は、LLMへ次を任せないことです。
 
+- fixed inspection scope row skeletonの生成
 - ref採番
 - scope closureの構造検査
+- selected supported ruleからrequired observation field集合の導出
 - 数値計算
 - threshold比較
 - 同じ入力から同じ結果を導けるaccessibility test rule
+- status + follow_up_requiredからのFinding作成要否導出
 - artifact内の参照整合
+- machine-owned structured sectionのmaterialize
 - machine-readableな集計
 
 一方、次はscriptへ押し込みません。
@@ -50,18 +54,21 @@ PR #11のcurrent実装に同じhelperが存在する場合、その契約を `us
 ~~~text
 ユーザー要求 / project Authority / current target context
         ↓
-LLM: inspection scopeと必要な観測を決定
+LLM: scope applicability、criterion exception、follow-up要否等のsemantic decisionだけを返す
         ↓
-browser owner: live UIからmachine-readableな観測値を取得
+Skill runtime script: fixed scope skeleton / selected rule metadataから必要な観測fieldを導出
+        ↓
+browser owner: live UIから要求されたmachine-readableな観測値を取得
         ↓
 Skill runtime script
-  - structure materialization
+  - structure / machine-owned section materialization
   - exact measurement calculation
   - supported deterministic test rule
+  - derived status / Finding requirement
         ↓
 machine evidence
         ↓
-LLM: scriptでは決められないapplicability / UX意味判断
+LLM: scriptでは決められないapplicability / exception / UX意味判断
         ↓
 usability-evaluation
         ↓
@@ -104,23 +111,25 @@ Skill固有のcriterion logicやmeasurement logicは入れません。
 正規化済みの次を受け取ります。
 
 - inspection metadata
-- inspection scope drafts
-- observation drafts
-- measurement drafts
-- test rule result drafts
-- requirement check drafts
-- action trace drafts
-- optional task / flow result draft
+- top-level aspect decisions: aspect key / 今回確認する・対象外 / semantic reason
+- browser ownerが取得したraw observation records
+- measurement inputs
+- selected supported test rule keys
+- machine evidenceだけで確定できないrequirement applicability / exception等のsemantic decisions
+- action inputs
+- optional task / flow semantic result
 - usability-evaluation refs
-- Finding refs
+- follow_up_required / Finding本文に必要なsemantic input
 
-inspection内で生成する全draft rowはinvocation内で一意な `draft_key` を持ちます。`measurement.py` / `criterion_checks.py` はfinal refを生成せずdraftを返します。
+inspection内で生成するsemantic input / raw recordはinvocation内で一意な `draft_key` を持ちます。`measurement.py` / `criterion_checks.py` はfinal refを生成せずdraft resultを返します。Agentは完成したscope closure row、required observation field集合、final ref、summary count、`finding_required` を入力しません。
 
 #### Function
 
 - unknown field拒否
 - enum / required field検証
 - duplicate draft key拒否
+- Planで固定したtop-level aspectのscope row skeletonを全件生成し、semantic applicability decisionを適用
+- selected supported test ruleについて `test-rule-catalog.json.required_observation_fields` のunionを導出し、browser observation requirementとしてmaterialize
 - artifact-local refの決定論的採番
   - scope: `SCOPE-001`
   - observation: `OBS-001`
@@ -132,9 +141,11 @@ inspection内で生成する全draft rowはinvocation内で一意な `draft_key`
 - draft同士のcross-reference解決
 - inspection scope closure検証
 - selected scopeごとのevidence / result参照検証
+- statusと `follow_up_required` からFinding作成要否を固定ruleで導出
 - final row order固定
 - summary count導出
 - unresolved / limitation整合確認
+- machine-owned structured sectionをcanonical Markdownとしてrender
 
 artifact-local refは同じ正規化済み入力から同じ順序で生成します。
 
@@ -153,8 +164,9 @@ Outputは次を必須で持ちます。
 - action traces
 - optional task / flow result
 - evaluation refs
-- Finding refs
+- Finding requirement / refs
 - summary counts
+- rendered machine-owned structured sections
 - issues
 
 ### measurement.py
@@ -306,7 +318,7 @@ catalogの各entry:
 
 `source type` と `source status` を同じfieldへ混ぜません。
 
-`criterion_checks.py` は `automatic` のsupported ruleだけをdispatchします。
+`criterion_checks.py` は `automatic` のsupported ruleだけをdispatchします。selected rule keyが確定した後、必要なbrowser observation fieldはcatalogからscriptが導出し、LLMがruleごとに手で列挙しません。
 
 `manual / semiAuto` は自動resultを生成せず、必要evidence・未評価部分・semantic procedure refをhandoffとして返し、定義済みsemantic/manual経路で閉じます。
 
@@ -416,8 +428,9 @@ Playwright version差を吸収する独自browser wrapper frameworkは作りま�
 
 | 処理 | runtime script |
 | --- | --- |
-| ref採番・row順序 | 必須 |
+| fixed scope row skeleton・ref採番・row順序 | 必須 |
 | schema / cross-reference | 必須 |
+| selected ruleからrequired observation field集合導出 | 必須 |
 | scope closure集計 | 必須 |
 | elapsed計算 | 必須 |
 | threshold比較 | 必須 |
@@ -429,7 +442,9 @@ Playwright version差を吸収する独自browser wrapper frameworkは作りま�
 | UI pattern同定 | usability-evaluation |
 | heuristic評価 | usability-evaluation |
 | user impact推定 | usability-evaluation |
-| Finding化の意味判断 | LLM / workflow |
+| follow-upが必要かの意味判断 | LLM / workflow |
+| status + follow_up_requiredからFinding作成要否導出 | 必須 |
+| machine-owned structured section materialize | 必須 |
 
 ## 11. runtimeとvalidatorの分離
 
@@ -446,7 +461,9 @@ runtime generatorとdeterministic eval validatorを同じ実装へしません�
 次を必須runtime fixtureとして持ちます。
 
 - valid inspection structure
-- observation / measurement / rule / requirement / action draftからfinal ref解決
+- fixed top-level aspect skeleton + semantic applicability decisionからscope row生成
+- selected ruleからrequired observation field集合導出
+- observation / measurement / rule / requirement / action inputからfinal ref解決
 - duplicate draft key
 - unresolved reference
 - selected scope未closure
@@ -458,6 +475,8 @@ runtime generatorとdeterministic eval validatorを同じ実装へしません�
 - supported automatic ACT Rule `failed`
 - supported ACT Rule outcome `cantTell / inapplicable`
 - selected supported ACT Ruleの非実行経路 → `untested`。automatic checkを実行済みの入力不足は `untested` にしない
+- status + follow_up_requiredからFinding作成要否を導出し、不整合な手入力をreject
+- rendered machine-owned sectionをAgentが値単位で再構築しない
 - source typeとsource statusの分離
 - partial / manual ruleを自動 `passed / failed` へしない
 - rule `passed` からrequirement全体を `satisfied` へ昇格しない
@@ -473,6 +492,7 @@ runtime generatorとdeterministic eval validatorを同じ実装へしません�
 - 別runtime frameworkを作っていない
 - 同じnormalized inputから同じmachine resultになる
 - 数値計算 / threshold比較をLLMが再計算しない
+- fixed scope row、required observation field集合、Finding作成要否、summary、machine-owned sectionを `inspection_structure.py` が導出 / materializeし、Agentが同じ機械処理を手作業で再構築していない
 - inspection成果物内のscope / observation / measurement / test rule / requirement / action refを `inspection_structure.py` が一括採番・cross-reference解決し、Agentや個別helperがfinal refを手採番していない
 - deterministic checkのdispatchが `assets/test-rule-catalog.json` のsupported automatic ruleだけへ固定され、catalogを式DSL / plugin frameworkとして実装していない
 - structure / measurement helperをtest rule catalogへ混ぜていない

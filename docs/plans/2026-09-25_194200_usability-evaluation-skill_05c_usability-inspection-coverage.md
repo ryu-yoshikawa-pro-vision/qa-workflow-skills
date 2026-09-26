@@ -191,23 +191,23 @@ PR #12 / #13 merge後の実装が実際に提供するartifact identity / revisi
 
 `_05a_usability-inspection-package-and-evaluation.md` のCase A〜ADを実Judgeで評価します。
 
-canonical real Agent validationでは次を含めます。
+canonical real Agent validationは `_06c_canonical-live-validation.md` を正本とし、repository-controlled fixtureで次を含めます。
 
 - taskなしgeneral page inspection
 - task / flowありinspection
 - desktop pointer + keyboard
 - responsive boundary
 - touch-capable case
-- mobile device emulationが利用可能なcase
+- fixtureで提供可能なmobile device emulation
 - accessibility inspection
 - formal WCAG conformance request routing（wcag-conformance-evaluationへhandoff）
 - visual screenshot evidence
 - thresholdあり / なしmeasurement
-- external Core Web Vitals sourceあり / なし
+- fixtureまたは保存済みprovenanceで閉じられるexternal Core Web Vitals sourceあり / なしの契約case
 - usability-evaluation read-only連携
 - cleanup
 
-環境が利用できない必須caseはblockedであり、実装完了にしません。
+外部実対象、実アカウント、特定assistive technology等が必要なacceptanceは別statusです。それらが利用できないことだけでrepository implementationを未完了にしません。
 
 ## 11. 完了条件
 
@@ -222,5 +222,5 @@ canonical real Agent validationでは次を含めます。
 - formal WCAG conformance要求を `wcag-conformance-evaluation` へroutingできる
 - `_05e_performance-measurement.md` の完了条件を満たす
 - Case A〜AD PASS
-- canonical live Web E2E PASS
-- blocked 0
+- `_06c_canonical-live-validation.md` のrepository-controlled canonical live Web E2E PASS
+- repository-controlled validationのblocked 0。external acceptance未実施は別statusとして扱う

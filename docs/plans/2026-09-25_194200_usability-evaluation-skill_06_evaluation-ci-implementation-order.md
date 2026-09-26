@@ -93,8 +93,8 @@ normative dependency、successor / current version、coverage gap解消、意味
 - evaluation-method.md
 - reference entry共通形式
 - source discovery query matrix
-- `scripts/reference_catalog.py` のcanonical URL / ID / coverage生成fixture
-- `scripts/evaluation_structure.py` のevaluation draft → final ref / closure / cross-reference fixture
+- `scripts/reference_catalog.py` のcanonical URL / ID / coverage生成とmachine-owned Markdown materialize fixture
+- `scripts/evaluation_structure.py` のsemantic decision → fixed aspect rows / final ref / Finding要否 / closure / cross-reference / machine-owned section materialize fixture
 - reference catalog validatorの最小schema検証
 
 この時点で大量のreference本文は作りません。
@@ -119,7 +119,7 @@ normative dependency、successor / current version、coverage gap解消、意味
 - root index → sub-index → referenceの読込
 - output-template
 - 上位観点の評価scope固定とclosure
-- `evaluation_structure.py` によるartifact-local evaluation ref / draft cross-reference解決
+- `evaluation_structure.py` によるfixed top-level aspect row生成、artifact-local evaluation ref、Finding作成要否、cross-reference、machine-owned section materialize
 - UI / UX評価項目とFindingの分離
 - binding / advisoryとapplicability
 - reference catalog validator
@@ -372,10 +372,10 @@ UI patternを含むtest-condition-design
 - required fields
 - unresolved constraints
 - source catalog / seed確認 / discovery実行記録 / retrieval boundary / capability coverage / source item disposition / field-level coverage
-- `reference_catalog.py` のcanonical URL / ID / summary生成とvalidatorの独立検証
+- `reference_catalog.py` のcanonical URL / ID / summary / machine-owned Markdown materializeとvalidatorの独立検証
 - `_02d_reference-artifact-schema.md` の物理Markdown schema
 - source item document canonical URL / locator整合
-- `evaluation_structure.py` のEVAL ref / closure / cross-reference生成とvalidatorの独立検証
+- `evaluation_structure.py` のfixed row / EVAL ref / Finding要否 / closure / cross-reference / machine-owned section materializeとvalidatorの独立検証
 - index integrity
 
 を検証します。
@@ -489,6 +489,7 @@ dataset構造検証だけで実装完了にしません。
 - usability-evaluation成果物で上位観点ごとの今回の扱いが固定され、「今回評価する」とした観点がすべて評価結果へ閉じている
 - source IDが `SRC-\d{3,}`、source item refが `<source ID>-ITEM-\d{4,}`、reference entry IDが `REF-\d{4,}` のpackage-local append-only規則に従い、削除済みIDを別identityへ再利用していない
 - evaluation refは `evaluation_structure.py` が成果物revision内だけで一意なartifact-local refとして生成し、新しいglobal QA ID / Machine Entityを追加していない
+- semantic layerが完成row / final ref / summary count / Finding要否を手組みせず、production helperのrendered machine-owned contentを値単位で再構築していない
 - Regression配下ではregression-testingが確定したUI / UX評価scopeだけが接続され、通常live UIの暗黙接続を前提にしない
 - `_02d_reference-artifact-schema.md` のschema validator PASS
 - reference catalog validator PASS

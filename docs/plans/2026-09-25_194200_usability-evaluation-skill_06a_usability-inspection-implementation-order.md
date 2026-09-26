@@ -5,7 +5,8 @@
 `usability-inspection` の実装は、次を確認してから開始します。
 
 - PR #11のmerge済みruntime実装をlatest mainで確認済み
-- PR #12 / #13がmainへmerge済み
+- PR #12はmainへmerge済みでcurrent実装を確認済み
+- PR #13がmainへmerge済み
 - `usability-evaluation` の少なくともDialog縦断検証が成立済み
 - 最新mainのbrowser safety / side-effect / cleanup契約
 - 最新mainのqa-workflow / Activity / Finding契約
@@ -93,7 +94,11 @@ skills/usability-inspection/scripts/
 このStepではbrowserを操作しません。fixtureだけで次を確認します。
 
 - same normalized input → same machine result
-- observation / measurement / test rule / requirement / action draftを `inspection_structure.py` が一括してartifact-local refへ採番
+- fixed top-level aspect row skeletonを `inspection_structure.py` が生成し、LLMはaspect applicability / reasonだけを返す
+- selected supported ruleからrequired observation field集合をscriptが導出
+- observation / measurement / test rule / requirement / action inputを `inspection_structure.py` が一括してartifact-local refへ採番
+- status + follow_up_requiredからFinding作成要否をscriptが導出
+- machine-owned structured sectionをscriptがmaterialize
 - inspection scope closure
 - draft key → final ref / cross-reference解決
 - exact elapsed計算
@@ -133,7 +138,7 @@ task / flow未指定caseでも成果物が成立することを確認します�
 
 ## 7. Step 5: browser observation contract
 
-PR #12 merge後のbrowser実行基盤を再利用します。
+current mainへmerge済みのPR #12 browser実行基盤を再利用します。
 
 今回のlive実行対象は既存Playwright経路で到達可能なWeb UIに限定します。
 
@@ -416,7 +421,7 @@ repository標準件数に合わせます。
 - Agent Skills仕様を満たす
 - task / user personaなしでもlive Web UIを検査できる
 - inspection scopeを固定し、選定観点をclosureできる
-- scope / observation / measurement / test rule / requirement / action ref採番とcross-referenceを `inspection_structure.py` へ一元化し、数値計算・threshold比較をdeterministic runtimeへ移している
+- fixed scope row、required observation field集合、scope / observation / measurement / test rule / requirement / action ref採番、Finding作成要否、cross-reference、machine-owned section materializeを `inspection_structure.py` へ一元化し、数値計算・threshold比較をdeterministic runtimeへ移している
 - runtime generatorとdeterministic validatorを別実装にしている
 - objective observationとexpert evaluationを分離する
 - applicable standard / binding requirementをcriterion単位で判定できる

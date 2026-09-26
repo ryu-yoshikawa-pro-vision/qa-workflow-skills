@@ -7,7 +7,8 @@
 ## 1. 実装開始条件
 
 - PR #11 merge済みcurrent runtime確認
-- PR #12 / #13 main merge済み
+- PR #12はmainへmerge済みでcurrent実装を確認済み
+- PR #13 main merge済み
 - usability-inspectionのgeneral accessibility / browser observation contract成立
 - WCAG-EM 2.0 / WCAG 2.2 current official source確認
 - repository標準eval / CI確認
@@ -50,6 +51,8 @@ WCAG-EM 2のoutput contractはReport ToolのschemaではなくWCAG-EM 2.0本文�
 先に次をfixtureで固定します。
 
 - required Input
+- supported WCAG version = 2.2 / unsupported version rejection
+- static requirement catalog / target level expected set
 - evaluation header
 - accessibility support baseline
 - exploration
@@ -63,24 +66,39 @@ WCAG-EM 2のoutput contractはReport ToolのschemaではなくWCAG-EM 2.0本文�
 
 ## 5. Step 3: production helper
 
-`sampling.py` と `wcag_em_structure.py` を実装します。
+`wcag_requirements.py`、`sampling.py`、`wcag_em_structure.py` を実装します。
+
+### requirements
+
+- supported WCAG versionを2.2へ固定
+- `assets/wcag-2.2-requirements.json` からA / AA / AAAごとのrequired Success Criteria集合を導出
+- 5つのconformance requirement集合を別に導出
+- 2.0 / 2.1等はunsupported / unresolved
+- actual result coverageをLLM supplied listではなくstatic expected setと比較
 
 ### sampling
 
 - 10% count計算。WCAG-EM本文の丸め規則ではなく本Planの `ceil` 規則として扱い、structured count 1 / 9 / 10 / 11の境界fixtureを持つ
+- finite inventoryからrandom candidate集合を導出し、structured sampleを除外
+- target全体を有限列挙できない場合はrecorded method / candidate scope / provenanceを検証
 - duplicate / overlap検証
 - optional random select
 - fixed seed禁止
+- complete process sequenceからsample union / process-added sampleを導出
+- normalized content type / Finding group keyの集合差分からStep 4.3 boolean / actionを導出
 - selection method記録
 - no-new-sample completion
 
 ### structure
 
+- semantic decisionからfixed machine rowをmaterialize
 - draft ref採番
 - cross-reference
 - Step closure
-- result coverage
+- static expected requirement coverage
+- handoff expected / returned closure
 - comparison iteration chain
+- machine-owned Markdown render
 - summary
 
 production helperとdeterministic validatorは別実装にします。
@@ -106,12 +124,13 @@ production helperとdeterministic validatorは別実装にします。
 
 selected sampleごとにlive accessibility observationが必要なcaseで、
 
-- wcag-conformance-evaluationがsample / requirement scopeを固定してnormalized handoffを出す
-- qa-workflowがhandoffをworkflow stateへ記録する
+- wcag-conformance-evaluationがsample / requirement scope、originating evaluation / revision、resume operationを固定してnormalized handoffを出す
+- qa-workflowがhandoffとexpected sample / process / requirement refsをworkflow stateへ記録する
 - usability-inspectionがbrowser ownerとして直列実行する
-- immutable evidence / inspection artifact refをqa-workflowへ返す
-- qa-workflowがformal Skillへresultをhandoffする
-- wcag-conformance-evaluationがaggregationする
+- immutable evidence / inspection artifact refをhandoff ref付きでqa-workflowへ返す
+- qa-workflow helperがexpected handoff集合とcurrent valid returned result集合を照合する
+- 全expected handoffが閉じた場合だけqa-workflowが元evaluation / revision / resume operationへresultをhandoffする
+- wcag-conformance-evaluationが同じevaluationをresumeしてaggregationする
 
 ことを確認します。
 
@@ -126,6 +145,8 @@ W3C WCAG-EM 2.0 Step 3.2へ合わせて確認します。
 - target count = ceil(structured * 0.10)
 - unique
 - structured sampleと非重複
+- finite inventoryがある場合はcurrent inventoryからcandidate集合をscript導出し、LLMがcandidate refsを手列挙しない
+- finite inventoryがない場合はcandidate scope / provenance付きの別random methodを記録する
 - target scope全体をselection scopeとする
 - predictable fixed patternを使わない
 - selection method記録
@@ -135,7 +156,7 @@ selection結果そのものをdeterministic fixtureへ固定して「random性�
 
 ## 9. Step 7: complete process
 
-default sequenceとcommonly accessed / critical branch sequenceをsample setへ含めます。
+default sequenceとcommonly accessed / critical branch sequenceはsemantic layerがsequenceとして識別し、`sampling.py materialize-process` がsample union、duplicate除去、process-added分類、membershipを生成します。LLMがsequenceとsample setを二重管理しません。
 
 全interactionをStep 4.2契約へ結び付けます。
 
@@ -143,10 +164,13 @@ default sequenceとcommonly accessed / critical branch sequenceをsample setへ�
 
 random sampleに新content type / findingがないcaseと、あるcaseを実装します。
 
-ある場合:
+semantic layerはcontent type / Findingのartifact-local grouping keyだけを確定し、`sampling.py compare` がstructured / random集合差分、detected boolean、new refs、`closed / return-to-step-2-3` を導出します。
+
+差分がある場合:
 
 - exploration update
-- structured sample update
+- semantic layerによる追加structured sample選定
+- scriptによるsample set / revision更新
 - new random / process condition確認
 - re-evaluation
 - comparison iteration chain
@@ -189,10 +213,16 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 ### deterministic
 
 - schema
-- observation handoff schema / closure
+- supported WCAG version / static requirement catalog
+- target level expected Success Criteria / conformance requirement set
+- observation handoff origin / resume identity / expected-returned closure
 - ref
 - sample count
+- finite inventory candidate derivation / recorded method provenance
 - duplicate / overlap
+- process sequence → process-added sample materialization
+- Step 4.3 set difference → boolean / action derivation
+- machine-owned structured section materialization
 - closure
 - report
 - statement / claim guard
@@ -215,16 +245,17 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 - WCAG-EM Step 1〜5 traceability
 - WCAG-EM 2 output schemaがReport Toolへ依存せず、WCAG-EM 2.0本文を正本としている
 - accessibility support baseline必須
+- WCAG 2.2だけをsupported versionとし、target levelからrequired Success Criteria / conformance requirement集合をstatic catalogで独立導出
 - Step 2 exploration closure
 - Step 3.1 structured sample
-- Step 3.2 random sample
-- Step 3.3 complete process
+- Step 3.2 random sample。finite inventory時のcandidate集合はscript導出、非finite時はmethod / provenanceを保持
+- Step 3.3 complete process。sequenceからprocess-added sample / membershipをscript導出
 - Step 4.1 / 4.2評価
-- Step 4.3 retry loop
+- Step 4.3 retry loop。semantic grouping keyから集合差分 / boolean / actionをscript導出
 - Step 5.1のStep 1〜4 required outcome closure
 - Step 5.3 optional evaluation statement minimum fields / generation guard
 - product-wide claim guard
-- sampling helper / structure helper
+- requirements / sampling / structure helperでmachine-owned fieldをmaterializeし、Agentがfinal refs / expected集合 / derived status / countを手作成しない
 - independent deterministic validator
 - trigger / deterministic / semantic PASS
 - `_06c_canonical-live-validation.md` のrepository-controlled canonical Web E2E PASS

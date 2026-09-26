@@ -24,7 +24,7 @@ external acceptanceが要求されていない、または必要入力が提供�
 
 ## 2. canonical fixtureの要件
 
-実装時にrepository内へ、またはrepositoryから固定手順で起動できるWeb fixtureを1つ定義します。既存fixtureで要件を満たせる場合は新設しません。
+実装時にrepository内へ、またはrepositoryから固定手順で起動できるWeb fixtureを1つ定義します。既存fixtureで要件を満たせる場合は新設しません。canonical validationのためだけに新しいbackend、database、authentication system、browser frameworkを追加せず、必要なら最小のstatic HTML / JavaScript fixtureで成立させます。
 
 fixtureは少なくとも次を満たします。
 
@@ -148,7 +148,8 @@ repository implementationの完了条件:
 - fixtureの初期化 / cleanupが再現可能
 - external secret / user dataを必須にしない
 - 3 Skillの対象canonical E2EがPASS
-- formal direct triggerから `qa-workflow → usability-inspection → formal Skill resume` をPASS
+- formal direct triggerからoriginating evaluation / revision / resume operationを保持して `qa-workflow → usability-inspection → formal Skill resume` をPASS
+- expected handoff集合とcurrent valid returned result集合が一致するまでresumeしないことをPASS
 - evidence safety / side-effect / browser ownershipをPASS
 - repository標準のdeterministic / semantic / routing / Skill validationをPASS
 - canonical fixtureで未解決blockedが0

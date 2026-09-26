@@ -27,7 +27,7 @@ formal request
 → WCAG-EM report
 ```
 
-この遷移でユーザーへ別依頼として再入力させません。`wcag-conformance-evaluation` がbrowser ownerへ変形したり、sibling Skillのscriptを直接実行したりもしません。
+この遷移でユーザーへ別依頼として再入力させません。`wcag-conformance-evaluation` がbrowser ownerへ変形したり、sibling Skillのscriptを直接実行したりもしません。handoffはoriginating evaluation / revision、handoff ref、resume operation、expected sample / process / requirement refsを持ち、別evaluationへ誤って戻らないようにします。
 
 `qa-workflow` を利用できない真のstandalone環境では、必要なcurrent evidenceがInputにない場合だけhandoff requirementを出して `blocked` へ閉じます。
 
@@ -104,12 +104,13 @@ Findingを作ってもWCAG-EM report内のrequirement resultを置き換えま�
 
 sample observationが必要な場合:
 
-1. wcag-conformance-evaluationがsample / requirement scopeを固定してhandoffを出す
-2. qa-workflowがhandoffをworkflow stateへ記録する
+1. wcag-conformance-evaluationがsample / requirement scopeを固定し、originating evaluation / revisionとresume operationを含むhandoffを出す
+2. qa-workflowがhandoffとexpected sample / process / requirement refsをworkflow stateへ記録する
 3. usability-inspectionがbrowser ownerとして操作する
-4. immutable evidence / resultをqa-workflowへ返す
-5. qa-workflowがresult refをwcag-conformance-evaluationへhandoffする
-6. wcag-conformance-evaluationが集約する
+4. immutable evidence / resultをhandoff ref付きでqa-workflowへ返す
+5. qa-workflowのproduction helperがexpected handoff集合とcurrent valid returned result集合を照合する
+6. 全expected handoffが閉じた場合だけqa-workflowが元のwcag-conformance-evaluation / revision / resume operationへresult refsを返す
+7. wcag-conformance-evaluationが同じevaluationをresumeして集約する
 
 を直列に行います。
 
@@ -121,7 +122,8 @@ sample observationが必要な場合:
 - general accessibility要求がformal evaluationへ誤routingされない
 - sample selection ownerがwcag-conformance-evaluationへ一意
 - browser ownerが同時に複数存在しない
-- formal direct triggerからlive observationが必要になった場合にqa-workflow → usability-inspection → formal Skill resumeへ一意に遷移できる
+- formal direct triggerからlive observationが必要になった場合にoriginating evaluation / revision / resume operationを保持してqa-workflow → usability-inspection → formal Skill resumeへ一意に遷移できる
+- expected handoff集合とcurrent valid returned result集合のclosureをproduction helperで検証し、LLMの手判断でresumeしない
 - multi-Skill executionをqa-workflowがownerし、formal Skillがsibling scriptsへruntime依存しない
 - TC result / expert evaluation / WCAG resultを混同しない
 - Findingがreportの正本を置き換えない

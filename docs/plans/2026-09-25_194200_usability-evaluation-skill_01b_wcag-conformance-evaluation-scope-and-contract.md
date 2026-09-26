@@ -23,7 +23,7 @@
 
 - live Web target / entry point
 - evaluation commissioner。self-evaluationの場合はself-evaluationであることと責任主体
-- target WCAG 2 version
+- target WCAG version。初期実装のsupported valueは `2.2`
 - target conformance level: A / AA / AAA
 - digital product scope
 - product enclosure。評価対象として定義したself-enclosedなWeb productの全view / state / functionalityを含むこと
@@ -35,7 +35,7 @@
 - evaluation期間または開始時点
 - project Authority / release gateとの関係（存在する場合）
 
-target WCAG version、level、self-enclosedなdigital product scope、accessibility support baselineを確定できない場合は推測せず `unresolved` とし、formal evaluationを開始しません。product内の特定page / componentを任意に除外してscopeを狭めません。
+target WCAG version、level、self-enclosedなdigital product scope、accessibility support baselineを確定できない場合は推測せず `unresolved` とし、formal evaluationを開始しません。初期実装でsupportedとするversionはWCAG 2.2だけです。2.0 / 2.1等が指定された場合は2.2へ暗黙変換せず `unsupported / unresolved` として、対応versionを追加するまでformal evaluationを開始しません。product内の特定page / componentを任意に除外してscopeを狭めません。
 
 追加評価要件は任意Inputです。
 
@@ -62,7 +62,7 @@ WCAG-EM 2.0 Step 1へ対応付けます。
 - technologies relied upon
 - accessibilityに特に関係するその他sample
 
-探索結果からsample候補を作ります。
+探索結果からstructured sampleの候補を意味判断します。target scopeを有限に列挙できる場合は、currentなtarget inventoryとそのprovenance / completenessを別に固定します。このfinite inventoryはrandom samplingのcandidate集合をscriptが導出するmachine inputであり、LLMがrandom candidate refsを都合よく手作成しません。
 
 ### Step 3: representative sample set
 
@@ -100,6 +100,10 @@ random sampleは、
 
 ことを必須にします。
 
+target scopeをfinite inventoryとして列挙できる場合、`sampling.py` がcurrent inventoryからscope内candidateを導出し、duplicate除去とstructured sample除外を行ってからrandom selectionします。Agent / LLMが `candidate sample refs` を手で列挙しません。
+
+target全体を有限列挙できない場合は、WCAG-EM 2.0が許容する別のrandom selection methodを使い、そのmethod、candidate scope、provenance、selected sampleを記録します。この経路でもcount / duplicate / overlapはscriptで検証します。
+
 選択方法が既存sampleを選び、別のunique sampleが存在する場合は再選択します。新しいunique sampleが存在しない場合は、その事実と候補母集団を記録してStep 3.2を完了できます。
 
 random selectionそのものを固定seedで決定論化しません。
@@ -112,11 +116,11 @@ structured / random sampleにcomplete processが含まれる場合、
 - default sequence
 - commonly accessed / critical branch sequence
 
-を識別し、必要な全sampleをsample setへ追加します。
+はsemantic layerが意味上のsequenceとして識別します。sequence内のsample union、duplicate除去、`process-added` sampleの追加、process membership、countはscriptがmaterializeし、LLMが同じsample集合を別途手組みしません。
 
 ### Step 4: evaluation
 
-selected sample setをtarget levelのWCAG 2に対して評価します。
+`assets/wcag-2.2-requirements.json` のversioned static catalogからtarget levelに必要なSuccess Criteria / conformance requirementsをscriptが導出し、selected sample setをその期待集合に対して評価します。formal初期実装ではWCAG 2.2だけを扱います。
 
 - complete process外のinitial sample
 - complete process
@@ -128,16 +132,18 @@ selected sample setをtarget levelのWCAG 2に対して評価します。
 
 ### Step 4.3: structured / random comparison
 
-random sampleに、
+semantic layerは各sample / findingについて、今回のevaluation artifact内で比較に使うnormalized content type key / finding group keyを意味判断として確定します。global identityにはしません。
 
-- structured sampleにない新しいcontent type
-- structured sampleにない新しいevaluation finding
+scriptはstructured / randomのkey集合差分から、
 
-があるか比較します。
+- new content type detected
+- new finding detected
+- new content / finding refs
+- `closed / return-to-step-2-3`
 
-どちらかが見つかった場合はStep 2 / Step 3へ戻り、探索結果とstructured sampleを更新して再評価します。
+を導出します。LLMがbooleanや次actionを手入力しません。
 
-このloopは、random sampleが新しいcontent type / findingを示さず、structured sampleが十分representativeであると確認できるまで閉じません。
+差分がある場合、semantic layerが追加すべきstructured sampleを選び、scriptがsample set / revision / comparison chainを更新します。このloopは、集合差分がなく、structured sampleが十分representativeであるというsemantic確認も成立するまで閉じません。
 
 ### Step 5: report
 
@@ -156,6 +162,9 @@ aggregated accessibility scoreは生成しません。
 live Web observationが必要なsample / complete processでは、次のnormalized handoffを作ります。
 
 - handoff draft key
+- originating evaluation artifact ref / revision
+- workflow_ref（qa-workflow管理下の場合）
+- resume operation: Step 4.1 sample / Step 4.2 process
 - sample ref
 - process ref（存在する場合）
 - required requirement / Success Criterion refs
@@ -168,7 +177,7 @@ live Web observationが必要なsample / complete processでは、次のnormaliz
 
 複数Skillが必要なworkflowでは `qa-workflow` がこのhandoffを受け、`usability-inspection` をbrowser ownerとして直列実行し、immutableなinspection artifact / evidence refsを戻します。
 
-formal要求から `wcag-conformance-evaluation` が直接発火した場合も、live observationが必要になり同一Agent環境で `qa-workflow` が利用可能なら、formal Skillはhandoff requirementを `qa-workflow` へ返し、`usability-inspection` の結果を受け取った後に同じevaluationをresumeします。ユーザーへ別依頼として再入力させず、formal Skill自身がbrowser ownerへ変形もしません。
+formal要求から `wcag-conformance-evaluation` が直接発火した場合も、live observationが必要になり同一Agent環境で `qa-workflow` が利用可能なら、formal Skillはhandoff requirementを `qa-workflow` へ返します。`qa-workflow` はoriginating evaluation / revision、handoff ref、resume operation、expected sample / process / requirement refsをworkflow stateへ保持し、currentかつvalidなreturned inspection artifact / evidence集合が期待handoff集合を満たした場合だけ同じevaluationをresumeします。ユーザーへ別依頼として再入力させず、formal Skill自身がbrowser ownerへ変形もしません。
 
 `wcag-conformance-evaluation` はsibling Skillの `scripts/` を直接import / 実行しません。
 
