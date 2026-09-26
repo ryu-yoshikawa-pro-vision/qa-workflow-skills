@@ -9,9 +9,8 @@ skills/usability-inspection/
 ├── SKILL.md
 ├── references/
 │   ├── inspection-method.md
-│   ├── task-scenarios.md
-│   ├── responsiveness.md
-│   └── accessibility-evaluation.md
+│   ├── standards-and-measurements.md
+│   └── playwright-observation.md
 ├── assets/
 │   └── output-template.md
 └── evals/
@@ -29,288 +28,224 @@ skills/usability-inspection/
         └── cases/
 ~~~
 
-browser automation framework、performance measurement framework、RUM serviceはpackage内へ新設しません。
+browser automation framework、performance measurement service、RUM serviceはpackage内へ新設しません。
 
 ## 2. SKILL.mdの役割
 
-SKILL.mdには詳細なUI pattern知識を複製しません。
+SKILL.mdにはUI pattern知識を複製しません。
 
 最低限次を持ちます。
 
-1. task-based live inspectionであること
+1. live Web UIのユーザビリティ検査Skillであること
 2. 初版のlive execution scopeはPlaywrightで到達可能なWeb UIであること
-3. representative-user studyではないこと
-4. 必須入力
-5. task selection / task scenarioの固定
-6. user-facing情報だけでtask pathを選ぶ契約
-7. browser ownership / safety
-8. task outcome
-9. Agent / tool limitationとの切り分け
-10. timing measurement
-11. usability-evaluationへのevidence受け渡し
-12. Finding routing
-13. referencesの選択方法
+3. human usability testing / user researchではないこと
+4. inspection scopeの決め方
+5. objective observation / measurementの取得方法
+6. applicable standard / binding criterionの判定方法
+7. user-facing情報とPlaywright automationの境界
+8. visual / keyboard / accessibility / responsive inspection
+9. performance / responsiveness measurement
+10. optional task / flow execution
+11. browser ownership / side-effect / cleanup
+12. usability-evaluationへのevidence受け渡し
+13. Finding routing
 14. 完了条件
 
-UI pattern / WCAG / Design Systemの詳細根拠は `usability-evaluation` のreferenceを利用します。
+UI pattern、heuristic、Design System、WCAG等の詳細knowledgeは `usability-evaluation` のreferenceを正本とします。
 
-## 3. methodology reference
+## 3. methodology / reference
 
-usability-inspection packageのreferenceは、実行方法・測定方法に限定します。
+usability-inspection packageのreferenceは、実対象の検査・測定・Playwright上の観測方法に限定します。
 
-初版の主なsource:
+### accessibility / standard criteria
 
-### ISO 9241-11
+適用可能なWCAG Success Criterion等をcriterion単位で評価します。
 
-usabilityの定義として、
+例:
 
-- specified users
-- specified goals
-- effectiveness
-- efficiency
-- satisfaction
-- specified context of use
+- target size / spacing
+- keyboard operation
+- focus visibility
+- reflow
+- error identification
+- accessible name / role / state
+- contrast
 
-を参照します。
+criterionの例外、applicability、必要な証拠を無視して数値だけでFAILにしません。
 
-ISO本文を転載しません。公開範囲で確認できる定義とsource refを使い、詳細本文はsource-reference-onlyとします。
+WCAG / WAI-ARIA / ARIA in HTML等の詳細referenceは `usability-evaluation` のsource catalogを再利用します。
 
-本Skill単独でhuman satisfactionやhuman efficiencyを実測したとは扱わない境界に利用します。
+### interaction principles / UI pattern
 
-### Nielsen Norman Group / NIST
+ISO 9241-110等のinteraction principles、Nielsen等のheuristic、Design System guidance、UI pattern knowledgeは、strictなcriterion resultではなく専門評価の根拠として `usability-evaluation` が利用します。
 
-human participantを用いるusability testingとの違いを理解する資料として、最低限次を確認します。
+一般guidanceをproduct specificationへ自動昇格しません。
 
-- NN/g Usability Testing 101
-- NN/g Task Scenarios for Usability Testing
-- NN/g Task Analysis
+### Cognitive Walkthrough
 
-Agentによるtask-based inspectionの主要methodologyとして、最低限次を確認します。
+Cognitive Walkthroughは任意のinspection techniqueとしてreferenceに残します。
 
-- NN/g Cognitive Walkthroughs
-- NN/g Summary of Usability Inspection Methods
-- NISTのCognitive Walkthrough / usability inspection guidance
+learnabilityやstepごとのdiscoverability / feedbackを重点確認する必要がある場合だけ利用します。
 
-これらから、user goal、realistic task scenario、詳細手順を与えすぎない原則、user視点でtaskをstep-by-stepに検査する方法、human studyとの境界を参照します。
+固定workflow、独立Skill、独立成果物種別にはしません。
 
-本SkillのAI操作をNN/gのparticipant studyと同一視しません。
+### performance
 
-### W3C WCAG-EM 2.0
+最低限、currentなweb.dev等から次を確認します。
 
-2026-07-23公開のW3C Group Noteを参照します。
+- Core Web Vitalsのmetric定義
+- LCP / INP / CLSの判定条件
+- lab / fieldの違い
+- user-centric performance measurement
+- browser Performance API等で取得できるmeasurement
 
-accessibility conformance scopeを評価する場合に、
+単一Playwright runでfield dataのpercentileを満たしたと扱いません。
 
-- scope定義
-- product探索
-- representative sample
-- sample評価
-- findings report
+### Playwright
 
-というmethodologyを利用します。
+公式Playwright documentationから最低限次を確認します。
 
-単一component / 単一taskの観測だけからproduct全体のWCAG conformanceを宣言しません。
+- locator
+- actionability / auto-wait
+- viewport / visibility
+- scroll
+- screenshot
+- keyboard
+- accessibility-related observation
+- browser / page performance measurementに利用できる機構
 
-通常のtask-based usability-inspectionで毎回WCAG-EM全手順を要求しません。
-
-### web.dev user-centric performance guidance
-
-最低限:
-
-- User-centric Performance Metrics
-- Interaction to Next Paint
-- INP optimization guidance
-
-を参照します。
-
-user-facing responsiveness、visual stability、loading responsiveness等の用語と測定上の注意に利用します。
-
-単一actionのelapsed timeをINPと呼びません。
-
-INPのfield判定や75 percentileを必要とする評価を、1回のAgent runで代替しません。
+通常E2E向けのauto-wait / auto-scrollがusability frictionを隠さないようにする契約へ利用します。
 
 ## 4. source方針
 
-`usability-evaluation` のUI pattern corpus向けall-source discoveryを、usability-inspection methodologyへそのまま複製しません。
+`usability-evaluation` のUI pattern corpus向けall-source discoveryを、usability-inspection packageへ複製しません。
 
 理由:
 
-- inspection Skillが必要とするのはexecution methodologyであり、Design System catalogではない
-- UI pattern知識はusability-evaluationを正本にする
-- testing method sourceを大量収集してもtask executionの再現性が直接上がるとは限らない
+- UI / UX knowledgeの正本を1箇所に保つ
+- inspection packageはlive execution / observation方法に集中する
+- Design Systemやpattern catalogを重複保持しない
+- source freshness / license確認を二重化しない
 
-methodology sourceを追加する場合は、
-
-- task execution contractを変える一次・代表的source
-- accessibility evaluation methodology
-- user-facing performance measurement methodology
-
-に限定します。
+usability-inspection固有sourceを追加するのは、実行・測定契約を変える公式または代表的なmethodologyに限定します。
 
 ## 5. output-template
 
-### task selection summary
-
-広いscopeから複数taskを選ぶ場合だけ、Activity群の前にcoordination情報として保持します。独立Machine Entityにはしません。
-
-- requested scope
-- task candidate
-- candidate source / evidence refs
-- selected / not-selected / deferred
-- selection reason
-- coverage limitation
-
-明示taskが1件だけの場合、このsummaryは省略できます。
-
-### Activity
+### inspection
 
 - Activity ref / revision
-- target
-- user / role
-- prior knowledge / experience assumptions
-- prior knowledge state: confirmed / inferred / unknown
-- prior knowledge / experience assumption source / evidence refs
-- user goal
-- user goal source / evidence refs
-- goal state: confirmed / inferred / unknown
-- task scenario
-- start state
-- success condition
-- platform: 初版live executionはWeb
+- target / entry point
+- requested scope
+- inspected scope
+- environment / origin
 - viewport / device
 - input method
-- locale
-- role / permission
-- environment
+- role / permission（必要な場合）
 - side effect scope
+- unresolved / limitation
 - previous Activity ref（再実行の場合）
 
-### task result
+task / flowは指定された場合だけ保持します。
 
-- primary outcome fixed before diagnosis: true / false
-- primary outcome fixed_at
-- task outcome: 達成 / 未達成 / 判定不能 / 未実行
-- outcome basis: success-observed / product-blocker-observed / agent-tool-limitation / environment-external / unresolved / not-started
+- task / flow
+- start state
+- success condition
+- task result
 
-対応は固定します。
+### objective observations
 
-- `達成` → `success-observed`
-- `未達成` → `product-blocker-observed`
-- `判定不能` → `agent-tool-limitation / environment-external / unresolved`
-- `未実行` → `not-started`
-- outcome evidence refs
-- completion limitation / reason
-- final state
-- cleanup result / residual state
+各Observation:
 
-### action trace
+- observation ref
+- category
+- target / region / state
+- observed fact
+- observed value（数値がある場合）
+- unit（数値がある場合）
+- interaction / input method
+- evidence refs
+- limitation
+- related measurement refs
+- related criterion check refs
 
-meaningful action単位で:
+観測事実に「使いにくい」「分かりづらい」等の専門評価を書きません。
 
-- action ref
-- action
-- action type: normal / retry / backtrack / recovery
-- related action ref（retry / backtrack / recoveryで必要な場合）
-- user-facing cue
-- interaction method
-- before evidence refs
-- observed response
-- after evidence refs
-- continuation state
-- unexpected behavior
-- timing refs
+### standard / binding criterion checks
 
-全clickを無条件に詳細ログ化せず、task outcomeやFindingの再確認に必要なmeaningful actionを正本にします。
+明確なrequirementを判定できる場合だけ保持します。
 
-### Agent run上の操作負荷
+- criterion check ref
+- criterion ref / source item ref
+- criterion type: standard / project requirement / adopted Design System / performance threshold
+- applicability
+- applicability reason
+- expected requirement / threshold
+- observed fact / value
+- result: PASS / FAIL / 判定不能 / 対象外
+- evidence refs
+- project Authority refs（project bindingの場合）
+- note
 
-必要範囲でaction traceから次を保持します。
+一般heuristicやadvisory guidanceをこの表へFAILとして入れません。
 
-- meaningful_action_count
-- retry_count
-- backtrack_count
-- dead_end_count
-- error_count
-- recovery_count
+単一criterionのPASSを製品全体のconformanceへ昇格しません。
 
-集計規則:
-
-- meaningful_action_count: action trace件数
-- retry_count: action type=`retry` 件数
-- backtrack_count: action type=`backtrack` 件数
-- recovery_count: action type=`recovery` 件数
-- dead_end_count: observation category=`dead-end` 件数
-- error_count: observation category=`user-facing-error` 件数。Agent / tool / browser自身のerrorは含めない
-
-これらはAgent runの観測値であり、human efficiency metricや総合usability scoreではありません。任意thresholdによる合否判定をしません。
-
-### timing measurements
+### measurements
 
 各measurement:
 
 - measurement ref
-- action ref
-- metric label
+- metric / measurement label
+- target action / region
 - start event
-- end predicate
+- end event / predicate
 - measurement method
-- definition fixed before action: true / false
-- elapsed_ms
-- environment refs
+- elapsed / value
+- unit
+- environment / viewport
 - threshold value（存在する場合）
-- threshold Authority ref（存在する場合）
+- threshold source / Authority（存在する場合）
 - result: within-threshold / over-threshold / threshold-not-defined / measurement-unavailable
 - evidence refs
-- note
+- limitation
 
-Agentの思考時間をelapsed_msへ含めません。
+Playwright actionability waitをpost-input responsivenessへ含めたかどうかを曖昧にしません。
 
-### visual / interaction observations
+独自measurementを既存metric名へ読み替えません。
 
-PR #13のObservation契約へ接続できる形で、
+### Playwright action trace
 
-- observation ref
-- observation category: dead-end / user-facing-error / visual-breakage / feedback / other
-- observed fact
-- target state
-- evidence refs
-- related action ref
-- measurement refs
-- unresolved
+全clickの詳細logを必須にしません。
 
-を保持します。
+usability判断に意味があるactionだけを記録します。
 
-### post-task diagnosis
+- action ref
+- action
+- discovery basis
+- target visibility / viewport state before action
+- explicit scroll performed: true / false
+- locator type
+- Playwright actionability waitが観測上意味を持ったか
+- before evidence refs
+- after evidence refs
+- related observation / measurement refs
 
-primary task outcome固定後にdiagnosisを実施した場合だけ保持します。
+visual / pointer inspectionでoff-viewport controlへ到達するためのimplicit auto-scrollを、userがcontrolを発見できた証拠にしません。
 
-- diagnosis ref
-- method: cognitive-walkthrough / evaluation-requested-observation
-- intended flow source refs（Cognitive Walkthroughの場合）
-- diagnostic evidence refs
-- related primary action refs
-- note
+### usability-evaluation
 
-Cognitive Walkthroughでは、intended flowをcurrentなspecification、user flow、検証済みTC等から確認できる場合だけ使います。正しいstep sequenceを推測で作りません。
-
-post-task diagnosisはprimary task outcome / primary action traceを書き換えません。
-
-### UI / UX evaluation
-
-`usability-evaluation` を実行した場合、
+専門評価を実行した場合:
 
 - usability-evaluation Activity / artifact ref
 - related evaluation refs
 
-を保持します。
+専門評価本文をinspection成果物へ複製しません。
 
-評価結果自体をusability-inspection側へ複製しません。
-
-usability-evaluationからの追加観測はpost-task diagnosisとして記録し、primary task outcomeを変更しません。
+最終報告ではobjective observation / criterion result / measurementとexpert evaluationを別sectionで表示できます。
 
 ### Finding
 
-follow-upが必要なObservation / evaluationだけ、PR #13のFinding契約で作成します。
+follow-upが必要なObservation、criterion FAIL、measurement、専門評価だけPR #13のFindingへroutingします。
 
 ## 6. deterministic validator
 
@@ -318,51 +253,45 @@ follow-upが必要なObservation / evaluationだけ、PR #13のFinding契約で�
 
 最低限:
 
-- required Activity fields
-- task outcome許可値
-- outcome basis許可値とtask outcomeの整合
-- `未達成` はoutcome basis=`product-blocker-observed` かつuser-facing evidenceを持つ
-- Agent / tool limitation、environment / external、unresolvedは `判定不能` へ閉じる
-- broad scopeのtask selection summaryではselected taskが各Activityへ対応し、coverage limitationがある
-- `達成` にsuccess condition evidenceがある
-- `判定不能 / 未実行` に理由がある
-- started taskのmeaningful action ref一意性
-- actionからevidenceへ解決できる
-- action type / observation categoryの許可値
-- Agent run上の操作負荷countがaction trace / Observationから導出できる
-- timing measurementのstart event / end predicate / measurement method / definition fixed before action / elapsed_ms
-- elapsed_msが非負
-- browser / page側の同一計測系で区間を測定できない場合にsystem responsiveness値を確定しない
-- definition fixed before action=falseのmeasurementをperformance判定根拠にしない
+- required inspection fields
+- inspection scope closure
+- observation ref一意性
+- measurement ref一意性
+- criterion check ref一意性
+- evidence ref解決
+- 数値Observationのunit
+- criterion result許可値
+- criterion checkにcriterion ref / applicability / observed factまたはvalue / evidenceがある
+- standard / binding criterion以外をstrict FAILとして扱っていない
+- project binding checkにproject Authority refがある
+- measurementのmethod / value / unit
 - threshold resultとthreshold fieldの整合
-- over-threshold / within-thresholdにはthreshold Authority refがある
-- threshold-not-definedで任意のFAIL判定を持たない
-- source test case PASS / FAIL欄を持たない
-- user goal sourceとgoal state（confirmed / inferred / unknown）がある
-- prior knowledge / experience assumptions、prior knowledge state（confirmed / inferred / unknown）、source / evidence refsがある。根拠がなければstate=unknownとして表現する
-- primary outcome fixed before diagnosis=trueでないActivityにpost-task diagnosis / usability-evaluation refを持たせない
-- Cognitive Walkthrough diagnosisがある場合はintended flow source refsがあり、primary outcome固定後の診断として記録される
-- evaluation-requested-observationがある場合はpost-task diagnosisとして記録される
+- threshold-not-definedで仕様FAIL判定を持たない
+- task / flow未指定時にtask fieldsを必須要求しない
+- task / flow指定時だけtask result contractを適用する
+- Playwright actionability waitをpost-input responsivenessへ無根拠に含めない
 - evaluation refがある場合はusability-evaluation artifactへ解決する
 - Finding refがある場合はFindingが存在する
 - cleanup / residual state contract
 - secret実値を成果物へ要求しない
 
-semanticな「本当にuser-facingか」「taskが適切か」はdeterministic validatorで判定しません。
+semanticな適用性やUI / UX上の意味判断をdeterministic validatorで代替しません。
 
 ## 7. semantic eval
 
 最低限次を評価します。
 
-### Case A: goal-based task
+### Case A: page inspection without task
 
-詳細stepを与えずtask scenarioからvisible UIを使ってgoalへ到達する。
+「この画面のユーザビリティを検査して」という依頼。
 
-### Case B: test id shortcut
+user goal / task / personaを創作せず、applicableなinteraction、feedback、accessibility、visual、responsive、measurementを検査できること。
 
-visible UIではcontrolを発見しにくいがtest idを知れば操作できる。
+### Case B: optional task
 
-test idをtask path選択に使わず、discoverability問題を隠さないこと。
+「商品を検索して詳細へ進むflowの使い勝手を確認」という依頼。
+
+指定されたflowを実操作できるが、詳細TCのPASS / FAILには変換しないこと。
 
 ### Case C: prescribed detailed TC
 
@@ -370,117 +299,119 @@ test idをtask path選択に使わず、discoverability問題を隠さないこ�
 
 usability-inspectionではなくtest-executionへroutingすること。
 
-### Case D: visual breakage
+### Case D: WCAG target size
 
-mobile viewportでprimary actionがclippingしtaskを継続できない。
+pointer targetのsize / spacingを測定し、applicable criterionとexceptionを確認して判定すること。
 
-screenshot / observed stateをevidenceとして残すこと。
+単純に24 CSS px未満という理由だけでexception確認なしにFAILへしないこと。
 
-### Case E: slow feedback
+### Case E: focus / keyboard
 
-action後のvisible feedbackまでのsystem elapsed timeを測る。
+keyboardでfocusを移動し、focus indicator、focus order、operationを観測すること。
 
-Agentの推論時間を測定値へ含めないこと。
+画像・DOM / accessibility evidenceを適切に使い分けること。
 
-project thresholdがなければ独自FAIL thresholdを作らないこと。
+### Case F: form error
 
-### Case F: project performance threshold
+invalid inputを安全に作れる場合、error identification / feedback / recoveryを観測すること。
+
+一般的な「分かりにくい」という感想とcriterion判定を分離すること。
+
+### Case G: responsive visual issue
+
+viewport変更でprimary actionがclippingする。
+
+screenshotとviewport条件をevidenceとして残すこと。
+
+### Case H: project performance threshold
 
 current Authorityに明示されたthresholdを超える。
 
-measurementとAuthorityを結び付けてFinding候補にできること。
+measurementとAuthorityを結び付けてcriterion FAIL / Finding候補にできること。
 
-### Case G: INP misuse
+### Case I: performance without threshold
 
-単一action 1回のelapsed timeをINPやfield Core Web Vitals結果と呼ばないこと。
+操作後のvisible feedbackまでの実測値を取得するが、project thresholdがない。
 
-### Case H: keyboard task
+値を報告し、独自FAIL thresholdを作らないこと。
 
-keyboard-only scopeでpointer shortcutを使わずtaskを継続する。
+### Case J: Core Web Vitals misuse
 
-### Case I: inaccessible hidden implementation data
+単一Playwright runのinteraction elapsed timeをfield INPやCore Web Vitals達成判定と呼ばないこと。
 
-hidden DOM / source code / backend stateから正解actionを取得しないこと。
+### Case K: Playwright auto-scroll
 
-### Case J: side effect
+controlがDOM上には存在するが現在viewport外にある。
 
-task達成に決済・削除等が必要だが許可scope外。
+visual / pointer inspectionでlocatorから直接clickしてimplicit auto-scrollした結果をdiscoverability成功としないこと。
 
-実行せず、taskを適切なoutcomeで閉じること。
+必要なscrollをuser actionとして扱うこと。
 
-### Case K: usability-evaluation連携
+### Case L: Playwright actionability wait
 
-primary task中にusability-evaluationを割り込ませず、task outcome / primary action traceを固定してからevidenceを渡すこと。
+controlが操作可能になるまでPlaywrightが800 ms待機し、実際のinput dispatch後120 msでvisible feedbackが出る。
 
-pattern / standardによる判断をinspection側で独自複製しないこと。
+post-input responsivenessを920 msと誤計測せず、pre-action waitとpost-input responseを分離すること。
 
-usability-evaluationから追加観測requestが返ってもpost-task diagnosisとして扱い、primary task outcomeを書き換えないこと。
+### Case M: hidden implementation shortcut
 
-### Case L: human claims
+test id / hidden DOM / source code / backend stateから、UI上で発見できないcontrolや正解経路を取得しないこと。
 
-AIがtaskを達成しただけで「人間にも使いやすい」「満足度が高い」と断定しないこと。
+### Case N: usability-evaluation integration
 
-### Case M: broad scope task selection
+objective observation / criterion result / measurementをusability-evaluationへ渡し、専門評価と客観観測を混ぜないこと。
 
-「サービス全体の使い勝手を確認」という依頼で、根拠のない1 taskだけを実行して全体評価としないこと。task候補、選定根拠、未選定scope、coverage limitationを残すこと。
+### Case O: advisory guidance
 
-### Case N: Agent failure
+一般heuristicや第三者Design System guidanceに違反して見えるが、project binding requirementではない。
 
-Agentがcontrolを見つけられないが、screenshot / accessibility evidenceでは明確なuser-facing cueが存在する。
+strict FAILへ変換せず、usability-evaluationの専門評価として扱うこと。
 
-product側のdiscoverability defectへ昇格せず、Agent / tool limitationまたは切り分け不能として `判定不能` にすること。
+### Case P: side effect
 
-### Case O: product-side blocker
+inspectionで決済・削除等の状態変更が必要だが許可scope外。
 
-必要controlがviewport外へclippingし、許可されたinteraction modeでは操作不能であることをevidenceで確認できる。
+実行せず、判定可能な範囲だけ閉じること。
 
-`未達成` + product-blocker-observedを許可し、必要ならFinding候補へできること。
+### Case Q: Agent limitation
 
-### Case P: timing endpoint post hoc
+Agent / tool limitationで操作を完了できない。
 
-結果を見た後で都合のよいend predicateへ差し替えないこと。measurement definitionがaction前に固定されていない場合はperformance判定根拠にしないこと。
+それだけをproduct usability defectとして確定しないこと。
 
-### Case Q: native app
+### Case R: human claim
 
-native iOS / Android appの実機操作を要求された場合、初版のPlaywright Web live scopeで対応可能と偽らないこと。静的資料のUI / UX評価が可能ならusability-evaluationへroutingできること。
+AIが問題なく操作できても「人間にも使いやすい」「初見ユーザーでも必ず使える」と断定しないこと。
 
-### Case R: prior knowledge
+### Case S: Cognitive Walkthrough optional
 
-同じtaskでも「製品初回利用・一般的なWeb UI経験あり」と「製品熟練利用者」でdiscoverabilityの期待が異なるcase。
+learnabilityを重点確認する依頼ではCognitive Walkthroughを利用できる。
 
-user / roleだけから経験レベルを推測せず、prior knowledge / experience assumptions、prior knowledge state、根拠をtask snapshotへ固定すること。
+通常のpage inspectionでは必須工程にしないこと。
 
-### Case S: post-task Cognitive Walkthrough
+### Case T: native app
 
-primary runではTC stepを見ずにuser-facing情報だけでtaskを実行してoutcomeを固定する。
-
-その後、current specification / user flow / validated TCからintended flowを確認できる場合だけCognitive Walkthroughを実施し、各stepのgoal / action visibility / mapping / execution / feedbackを診断すること。
-
-walkthrough結果でprimary outcomeを書き換えないこと。
-
-### Case T: no authoritative flow
-
-primary run後にCognitive Walkthroughを行いたいが、currentなuser flow / specification / validated TCを確認できない。
-
-正しいstep sequenceを創作せずwalkthroughを省略し、利用できるevidenceだけをusability-evaluationへ渡すこと。
+native iOS / Android appの実機操作を要求された場合、初版Web scopeで対応可能と偽らないこと。
 
 ## 8. trigger eval
 
 positive例:
 
-- 実際にこのサイトを操作して商品検索の使い勝手をテスト
-- このtaskを初見ユーザー想定でやってみて詰まる場所を確認
-- mobile Web viewportで画面を触って表示崩れと操作性を確認
-- keyboardだけで主要フローを完了できるか試す
-- この操作のfeedbackが遅くないか実測
+- このWeb画面を実際に触ってユーザビリティ上の問題を確認
+- この機能のUI / UXを実画面で検査
+- mobile Webで表示崩れと操作性を確認
+- keyboard / focus / error表示を確認
+- target sizeなどをWCAG基準で確認
+- この操作のfeedback速度を実測
+- このflowを実際に操作して使い勝手を確認
 
 negative例:
 
 - このDialog patternが妥当かレビュー → usability-evaluation
+- このscreenshotをUI pattern knowledgeで評価 → usability-evaluation
 - このTCを実行 → test-execution
 - current UI一覧を更新 → test-target-inspection
-- 仕様が曖昧なので調べる → question / spec analysis
-- 自由に触って未知の不具合を探す → exploratory-testing
+- 自由に未知の不具合を探索 → exploratory-testing
 
 ## 9. repository integration
 
