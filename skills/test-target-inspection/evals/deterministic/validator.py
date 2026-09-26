@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from typing import Any
 
@@ -32,6 +33,18 @@ def _nonempty(value: str) -> bool:
 
 def _integer(value: str) -> int | None:
     return int(value) if re.fullmatch(r"\d+", value.strip()) else None
+
+
+def _freshness_key(section: str, row: dict[str, str]) -> str:
+    fields = {
+        "画面 / 領域": ("対象キー",),
+        "UI要素": ("要素キー",),
+        "状態": ("状態キー",),
+        "操作・ふるまい": ("対象キー", "要素キー", "操作"),
+        "視覚情報": ("対象キー", "要素キー / 状態キー", "確認観点"),
+        "データ・権限依存": ("対象キー", "要素キー / 状態キー", "条件"),
+    }
+    return json.dumps((section, *(_value(row, field) for field in fields[section])), ensure_ascii=False)
 
 
 def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
@@ -175,13 +188,21 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
 
     unconfirmed_issues = []
     prior_facts = expected.get("unconfirmed_facts", {})
-    for row in screen + elements + states + behaviors + visual + deps:
-        key = _value(row, "対象キー") or _value(row, "要素キー") or _value(row, "状態キー")
-        if _value(row, "確認状態") == "未確認" and key in prior_facts:
-            actual = {field: _value(row, field) for field in ("確認条件", "確認version / build", "確認日時")}
-            if actual != prior_facts[key]:
-                unconfirmed_issues.append({"key": key, "expected_old_facts": prior_facts[key], "actual": actual})
-    result.add("TTI-D007", not unconfirmed_issues, "未確認行の鮮度を今回値へ更新していないこと", evidence=unconfirmed_issues or None)
+    for section, rows in (
+        ("画面 / 領域", screen),
+        ("UI要素", elements),
+        ("状態", states),
+        ("操作・ふるまい", behaviors),
+        ("視覚情報", visual),
+        ("データ・権限依存", deps),
+    ):
+        for row in rows:
+            key = _freshness_key(section, row)
+            if _value(row, "確認状態") == "未確認" and key in prior_facts:
+                actual = {field: _value(row, field) for field in ("確認条件", "確認version / build", "確認日時")}
+                if actual != prior_facts[key]:
+                    unconfirmed_issues.append({"key": key, "expected_old_facts": prior_facts[key], "actual": actual})
+    result.add("TTI-D007", not unconfirmed_issues, "未確認の鮮度管理行単位で旧確認条件・version / build・日時を維持すること", evidence=unconfirmed_issues or None)
 
     update_table = _table(tables, "今回の更新", ("対象種別", "対象キー", "更新区分"))
     update_rows = _rows(update_table)
@@ -189,7 +210,18 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
     update_missing = existing_artifact and update_table is None
     update_values = [_value(row, "更新区分") for row in update_rows]
     invalid_updates = [value for value in update_values if value not in UPDATE_STATES]
-    result.add("TTI-D008", not update_missing and not invalid_updates, "既存資料更新時だけ今回の更新があり、更新区分が正規値であること", evidence={"missing_table": update_missing, "invalid": invalid_updates} if update_missing or invalid_updates else None)
+    unexpected_new_artifact_updates = not existing_artifact and bool(update_rows)
+    update_issues = {
+        "missing_table": update_missing,
+        "invalid": invalid_updates,
+        "new_artifact_records": unexpected_new_artifact_updates,
+    }
+    result.add(
+        "TTI-D008",
+        not update_missing and not invalid_updates and not unexpected_new_artifact_updates,
+        "既存資料更新時だけ更新recordを持ち、新規成果物は更新recordを持たず、更新区分が正規値であること",
+        evidence=update_issues if any(update_issues.values()) else None,
+    )
 
     deleted = [row for row in update_rows if _value(row, "更新区分") == "削除確認"]
     deleted_issues = []

@@ -133,18 +133,45 @@ class NewSkillDeterministicContractTests(unittest.TestCase):
     def test_unconfirmed_visual_row_keeps_previous_freshness(self):
         validate = load_validator("test-target-inspection")
         text, expected = eval_case("test-target-inspection", "TTI-OUT-001")
-        old = "| target-001 | state-001 | 行の重なり | 行の間隔が保たれている | evidence/orders.png | 確認済み | 1440x900 | build-23 | 2026-09-26T09:00:00+09:00 | 画像で確認 |"
-        refreshed = "| target-001 | state-001 | 行の重なり | 行の間隔が保たれている | evidence/orders.png | 未確認 | 1440x900 | build-24 | 2026-09-26T09:30:00+09:00 | 今回未確認 |"
-        broken = text.replace(old, refreshed, 1)
-        expected["unconfirmed_facts"] = {
-            "target-001": {
-                "確認条件": "1440x900",
-                "確認version / build": "build-23",
-                "確認日時": "2026-09-26T09:00:00+09:00",
-            }
+        visual_a = "| target-001 | state-001 | 行の重なり | 行の間隔が保たれている | evidence/orders.png | 確認済み | 1440x900 | build-23 | 2026-09-26T09:00:00+09:00 | 画像で確認 |"
+        old_visual_a = "| target-001 | state-001 | 行の重なり | 行の間隔が保たれている | evidence/orders.png | 未確認 | 1440x900 | build-22 | 2026-09-25T09:00:00+09:00 | 前回未確認 |"
+        old_visual_b = "| target-001 | element-001 | 文字色 | 文字色と背景色の差 | evidence/orders-text.png | 未確認 | 1280x800 | build-21 | 2026-09-24T09:00:00+09:00 | 前回未確認 |"
+        prior_a = {
+            "確認条件": "1440x900",
+            "確認version / build": "build-22",
+            "確認日時": "2026-09-25T09:00:00+09:00",
         }
+        prior_b = {
+            "確認条件": "1280x800",
+            "確認version / build": "build-21",
+            "確認日時": "2026-09-24T09:00:00+09:00",
+        }
+        prepared = text.replace(visual_a, old_visual_a, 1).replace(
+            old_visual_a, old_visual_a + "\n" + old_visual_b, 1
+        )
+        expected["unconfirmed_facts"] = {
+            '["視覚情報", "target-001", "state-001", "行の重なり"]': prior_a,
+            '["視覚情報", "target-001", "element-001", "文字色"]': prior_b,
+        }
+        refreshed_visual_a = old_visual_a.replace("| build-22 |", "| build-23 |", 1)
+        broken = prepared.replace(old_visual_a, refreshed_visual_a, 1)
         result = validate(broken, expected, "TTI-OUT-001")
-        self.assertEqual(next(item.status for item in result.assertions if item.id == "TTI-D007"), "fail")
+        freshness = next(item for item in result.assertions if item.id == "TTI-D007")
+        self.assertEqual(freshness.status, "fail")
+        self.assertEqual(len(freshness.evidence), 1)
+        self.assertEqual(freshness.evidence[0]["key"], '["視覚情報", "target-001", "state-001", "行の重なり"]')
+
+    def test_new_target_artifact_rejects_update_records(self):
+        validate = load_validator("test-target-inspection")
+        text, expected = eval_case("test-target-inspection", "TTI-OUT-001")
+        update_record = (
+            "\n## 今回の更新\n\n"
+            "| 対象種別 | 対象キー | 更新区分 |\n"
+            "| --- | --- | --- |\n"
+            "| 画面 | target-001 | 追加 |\n"
+        )
+        result = validate(text + update_record, expected, "TTI-OUT-001")
+        self.assertEqual(next(item.status for item in result.assertions if item.id == "TTI-D008"), "fail")
 
     def test_snapshot_reference_requires_retrievable_identity(self):
         validate = load_validator("test-target-inspection")
@@ -223,6 +250,102 @@ class NewSkillDeterministicContractTests(unittest.TestCase):
         broken = text.replace("| input-001 | TC-044 | 1 | input-001 |", "| input-001 | TC-044 | 1 | なし |", 1)
         result = validate(broken, expected, "TEX-OUT-002")
         self.assertEqual(next(item.status for item in result.assertions if item.id == "TEX-D006"), "fail")
+
+    def test_test_execution_tracks_only_rerun_tcs_when_snapshot_mixes_new_tcs(self):
+        validate = load_validator("test-execution")
+        text, expected = eval_case("test-execution", "TEX-OUT-001")
+        text = text.replace(
+            "| 前回実行成果物参照 | なし | 初回実行 |",
+            "| 前回実行成果物参照 | execution-v1 | 前回成果物 |",
+            1,
+        )
+        text = text.replace(
+            "| input-001 | EXT-17 | 1 | なし |",
+            "| input-001 | EXT-17 | 1 | input-001 |",
+            1,
+        )
+        expected["expected_previous_artifact"] = "execution-v1"
+        expected["expected_previous_refs"] = {"input-001": "input-001"}
+        self.assertEqual(validate(text, expected, "TEX-OUT-001").status, "pass")
+
+        without_known_map = dict(expected)
+        without_known_map.pop("expected_previous_refs")
+        self.assertEqual(validate(text, without_known_map, "TEX-OUT-001").status, "pass")
+
+        missing_rerun_ref = text.replace(
+            "| input-001 | EXT-17 | 1 | input-001 |",
+            "| input-001 | EXT-17 | 1 | なし |",
+            1,
+        )
+        unexpected_new_tc_ref = text.replace(
+            "| input-002 | EXT-17 | 2 | なし |",
+            "| input-002 | EXT-17 | 2 | input-002 |",
+            1,
+        )
+        for name, broken in (
+            ("missing rerun TC reference", missing_rerun_ref),
+            ("unexpected reference for new TC", unexpected_new_tc_ref),
+        ):
+            with self.subTest(name=name):
+                result = validate(broken, expected, "TEX-OUT-001")
+                self.assertEqual(next(item.status for item in result.assertions if item.id == "TEX-D006"), "fail")
+
+    def test_test_execution_validates_run_safety_rows_and_precondition_refs(self):
+        validate = load_validator("test-execution")
+        text, expected = eval_case("test-execution", "TEX-OUT-002")
+        mutations = {}
+        for condition in ("対象環境", "許可origin", "version / build"):
+            lines = text.splitlines()
+            lines = [line for line in lines if not line.startswith(f"| {condition} |")]
+            mutations[f"missing {condition}"] = "\n".join(lines)
+
+        lines = text.splitlines()
+        precondition = next(index for index, line in enumerate(lines) if line.startswith("| input-001 | profile-update |"))
+        lines[precondition] = lines[precondition].replace("| input-001 |", "| input-999 |", 1)
+        mutations["unknown precondition TC"] = "\n".join(lines)
+
+        lines = text.splitlines()
+        precondition_index = next(index for index, line in enumerate(lines) if line.startswith("| input-001 | profile-update |"))
+        lines.insert(precondition_index + 1, lines[precondition_index])
+        mutations["duplicate precondition TC"] = "\n".join(lines)
+
+        for name, broken in mutations.items():
+            with self.subTest(name=name):
+                result = validate(broken, expected, "TEX-OUT-002")
+                self.assertEqual(next(item.status for item in result.assertions if item.id == "TEX-D009"), "fail")
+
+    def test_test_execution_separates_tc_postprocessing_from_runtime_cleanup(self):
+        validate = load_validator("test-execution")
+        text, expected = eval_case("test-execution", "TEX-OUT-002")
+        self.assertEqual(
+            next(item.status for item in validate(text, expected, "TEX-OUT-002").assertions if item.id == "TEX-D011"),
+            "pass",
+        )
+
+        post_row = "| input-001 | 元TCで定義された事後処理 | 成功 | 変更前の値へ復元済み | 元TC cleanup |"
+        post_table = (
+            "| TC参照 | 事後状態 / 後処理 | 実施結果 | 残存状態 | 根拠 |\n"
+            "| --- | --- | --- | --- | --- |"
+        )
+        inconsistent = text.replace("| input-001 | profile-update | なし |", "| input-001 | profile-update | 元TCで定義された事後処理 |", 1)
+        inconsistent = inconsistent.replace(post_table, post_table + "\n" + post_row, 1)
+        result = validate(inconsistent, expected, "TEX-OUT-002")
+        self.assertEqual(next(item.status for item in result.assertions if item.id == "TEX-D011"), "fail")
+
+        declared_cleanup = text.replace("cleanup: []", "cleanup:\n  - 元TCで定義された事後状態を確認する", 1)
+        declared_cleanup = declared_cleanup.replace(
+            "| input-001 | profile-update | なし |",
+            "| input-001 | profile-update | 元TCで定義された事後状態を確認する |",
+            1,
+        )
+        declared_cleanup = declared_cleanup.replace(
+            "| profile-update | 1回はプロフィール値1件の変更操作 | 3 | 1 | 1 | 0 | 1 | 3 |",
+            "| profile-update | 1回はプロフィール値1件の変更操作 | 4 | 1 | 1 | 1 | 1 | 4 |",
+            1,
+        )
+        declared_cleanup = declared_cleanup.replace(post_table, post_table + "\n" + post_row, 1)
+        result = validate(declared_cleanup, expected, "TEX-OUT-002")
+        self.assertEqual(next(item.status for item in result.assertions if item.id == "TEX-D011"), "pass")
 
     def test_test_execution_rejects_scope_limit_overrun(self):
         validate = load_validator("test-execution")

@@ -61,7 +61,7 @@ cleanup: []
 
 | TC参照 | 副作用scope | TC事後状態 / 後処理 | 確認結果 |
 | --- | --- | --- | --- |
-| input-001 | profile-update | 更新後に元の表示名へ戻す | cleanup残数を含めて実施可 |
+| input-001 | profile-update | なし | cleanup残数を含めて実施可 |
 
 ## 副作用上限・実行時cleanup
 
@@ -100,7 +100,6 @@ cleanup: []
 
 | TC参照 | 事後状態 / 後処理 | 実施結果 | 残存状態 | 根拠 |
 | --- | --- | --- | --- | --- |
-| input-001 | 元の表示名へ戻す | 成功 | 変更前の値へ復元済み | cleanupを観測 |
 
 ## 実行時cleanup・残存状態
 
@@ -121,5 +120,5 @@ cleanup: []
 - input-001をstagingでPlaywright CLIにより再実行した。
 - 結果: PASS 1、FAIL 0、未実行 0、判定不能 0。
 - 前回成果物 execution-v1 の input-001 へ追跡できる。
-- 表示名変更scopeの準備、TC操作、cleanupを合計3回として記録し、最大3回内で復元を確認した。
+- 表示名変更scopeの準備、TC操作、実行時cleanupを合計3回として記録し、最大3回内で復元を確認した。
 - 元入力にあったsecret実値はYAMLと報告へ複製していない。

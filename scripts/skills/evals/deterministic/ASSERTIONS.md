@@ -279,8 +279,8 @@
 - `TTI-D004` 確認状態の許可値
 - `TTI-D005` current行と任意repo対応表の対象・要素参照整合
 - `TTI-D006` 今回確認した行の条件・version / build・日時
-- `TTI-D007` 未確認行の鮮度維持
-- `TTI-D008` 更新表・更新区分
+- `TTI-D007` 未確認の鮮度管理行単位で旧確認条件・version / build・日時を維持
+- `TTI-D008` 既存成果物だけ更新recordを持ち、新規成果物では更新recordを持たないこと
 - `TTI-D009` 削除確認条件と削除キーのcurrent本体からの除外
 - `TTI-D010` 任意ARIA snapshotの対象追跡・再取得可能identity
 - `TTI-D011` 永続保存結果・既存成果物の更新元revision・保存後revision・競合安全な更新方式・制約
@@ -295,12 +295,12 @@
 - `TEX-D003` 実行前YAMLのyaml.safe_load構造・step参照
 - `TEX-D004` 元source_test_case_idの維持
 - `TEX-D005` 入力元identityまたはsnapshot成果物固定
-- `TEX-D006` 前回成果物と前回TC参照によるrerun追跡
+- `TEX-D006` 再実行対象TCだけを前回成果物と前回TC参照で追跡
 - `TEX-D007` browser実行手段の記録
 - `TEX-D008` unresolved・開始状態・TC結果整合
-- `TEX-D009` TC別条件とrun固定条件の分離
+- `TEX-D009` run固定条件の安全項目とTC実行条件・実行前条件の参照整合
 - `TEX-D010` 操作・観測・画像確認のTC / step追跡
-- `TEX-D011` TC参照scopeと一意な正本行・工程別回数・累計・cleanup
+- `TEX-D011` TC cleanupと実行時cleanupの分離、およびTC参照scope・一意な正本行・工程別回数・累計・cleanup
 - `TEX-D012` TC結果と集計一致
 - `TEX-D013` secret実値の非漏えい
 - `TEX-D014` fixtureで固定したsnapshot参照集合

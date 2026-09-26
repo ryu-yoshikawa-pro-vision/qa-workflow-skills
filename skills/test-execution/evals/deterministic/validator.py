@@ -98,6 +98,7 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
     info = {_value(row, "項目"): _value(row, "値") for row in _rows(required_tables["実行情報"])}
     mappings = _rows(required_tables["TC参照対応"])
     conditions = _rows(required_tables["TC実行条件"])
+    preconditions = _rows(required_tables["実行前条件"])
     results = _rows(required_tables["TC実行結果"])
     ids = [_value(row, "TC参照") for row in mappings]
     result_ids = [_value(row, "TC参照") for row in results]
@@ -188,20 +189,32 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
     previous = _value(info, "前回実行成果物参照")
     previous_issues = []
     prior_map = {_value(row, "TC参照"): _value(row, "前回TC参照") for row in mappings}
-    if _nonempty(previous) and previous not in {"なし", "初回"}:
-        for ref in ids:
-            prior_ref = prior_map.get(ref, "")
-            if not _nonempty(prior_ref) or prior_ref in {"なし", "初回"}:
-                previous_issues.append({"ref": ref, "issue": "前回TC参照がない"})
-    else:
+    if not _nonempty(previous) or previous in {"なし", "初回"}:
         invalid_prior = [{"ref": ref, "previous_ref": prior} for ref, prior in prior_map.items() if _nonempty(prior) and prior not in {"なし", "初回"}]
         previous_issues.extend(invalid_prior)
     expected_previous = expected.get("expected_previous_artifact")
     if expected_previous and previous != expected_previous:
         previous_issues.append({"expected_previous_artifact": expected_previous, "actual": previous})
-    for ref, value in expected.get("expected_previous_refs", {}).items():
-        if prior_map.get(ref) != value:
-            previous_issues.append({"ref": ref, "expected_previous_ref": value, "actual": prior_map.get(ref)})
+    if "expected_previous_refs" in expected:
+        expected_previous_refs = expected["expected_previous_refs"]
+        if not isinstance(expected_previous_refs, dict):
+            previous_issues.append({"issue": "expected_previous_refs must be a mapping"})
+        else:
+            expected_ref_set = set(expected_previous_refs)
+            if not expected_ref_set <= set(ids):
+                previous_issues.append({"unknown_expected_refs": sorted(expected_ref_set - set(ids))})
+            actual_previous_refs = {
+                ref: value
+                for ref, value in prior_map.items()
+                if _nonempty(value) and value not in {"なし", "初回"}
+            }
+            if actual_previous_refs != expected_previous_refs:
+                previous_issues.append(
+                    {
+                        "expected_previous_refs": expected_previous_refs,
+                        "actual_previous_refs": actual_previous_refs,
+                    }
+                )
     result.add("TEX-D006", not previous_issues, "再実行時に前回成果物参照と前回TC参照の組で元TCを追跡すること", evidence=previous_issues or None)
 
     method = _value(info, "使用した実行手段")
@@ -237,7 +250,16 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
     condition_issues = []
     if condition_refs != ids or len(condition_refs) != len(set(condition_refs)):
         condition_issues.append({"mapping_refs": ids, "condition_refs": condition_refs})
-    result.add("TEX-D009", not condition_issues, "TC実行条件がTC参照ごとに一意でありrun固定条件と分離されること", evidence=condition_issues or None)
+    precondition_refs = [_value(row, "TC参照") for row in preconditions]
+    if set(precondition_refs) != set(ids) or len(precondition_refs) != len(set(precondition_refs)):
+        condition_issues.append({"mapping_refs": ids, "precondition_refs": precondition_refs})
+    run_fixed_rows = _rows(required_tables["run固定条件"])
+    run_fixed_items = [_value(row, "条件") for row in run_fixed_rows]
+    required_run_fixed_items = {"対象環境", "許可origin", "version / build"}
+    missing_run_fixed_items = sorted(required_run_fixed_items - set(run_fixed_items))
+    if missing_run_fixed_items:
+        condition_issues.append({"missing_run_fixed_conditions": missing_run_fixed_items})
+    result.add("TEX-D009", not condition_issues, "run固定条件の安全項目とTC実行条件・実行前条件の参照整合を検証すること", evidence=condition_issues or None)
 
     procedure_rows = _rows(required_tables["手順・観測結果"])
     procedure_issues = []
@@ -285,11 +307,42 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
 
     side_rows = _rows(required_tables["副作用上限・実行時cleanup"])
     side_issues = []
+    post_rows = _rows(required_tables["TC事後状態・後処理"])
+    post_rows_by_ref: dict[str, list[dict[str, str]]] = {}
+    for row in post_rows:
+        post_rows_by_ref.setdefault(_value(row, "TC参照"), []).append(row)
+    preconditions_by_ref = {_value(row, "TC参照"): row for row in preconditions}
+    for ref, plan in plans.items():
+        tc_cleanup = plan.get("cleanup")
+        if not isinstance(tc_cleanup, list):
+            continue
+        precondition = preconditions_by_ref.get(ref)
+        claimed_cleanup = _value(precondition, "TC事後状態 / 後処理") if precondition else ""
+        recorded_post_rows = post_rows_by_ref.get(ref, [])
+        if tc_cleanup:
+            if not any(_nonempty(_value(row, "事後状態 / 後処理")) for row in recorded_post_rows):
+                side_issues.append({"ref": ref, "issue": "YAML cleanupに対応するTC事後状態・後処理の記録がない"})
+        else:
+            if _nonempty(claimed_cleanup):
+                side_issues.append({"ref": ref, "issue": "空のYAML cleanupと実行前条件のTC事後処理記録が矛盾"})
+            for row in recorded_post_rows:
+                post_values = {
+                    field: _value(row, field)
+                    for field in ("事後状態 / 後処理", "実施結果", "残存状態", "根拠")
+                }
+                if any(_nonempty(value) for value in post_values.values()):
+                    side_issues.append(
+                        {
+                            "ref": ref,
+                            "issue": "空のYAML cleanupとTC事後状態・後処理記録が矛盾",
+                            "record": post_values,
+                        }
+                    )
     scope_values = [_value(row, "副作用scope") for row in side_rows]
     duplicate_scopes = sorted(scope for scope in set(scope_values) if scope and scope_values.count(scope) > 1)
     side_issues.extend({"scope": scope, "issue": "scopeの正本行が重複"} for scope in duplicate_scopes)
     defined_scopes = {scope for scope in scope_values if _nonempty(scope)}
-    for row in _rows(required_tables["実行前条件"]):
+    for row in preconditions:
         scope = _value(row, "副作用scope")
         if _nonempty(scope) and scope not in defined_scopes:
             side_issues.append(
@@ -316,7 +369,7 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
             side_issues.append({"scope": scope, "cleanup_state": cleanup_state})
         if cleanup_state == "成功" and not any(token in _value(row, "残存状態") for token in ("なし", "元に戻", "復元", "解消")):
             side_issues.append({"scope": scope, "issue": "cleanup result conflicts with remaining state"})
-    result.add("TEX-D011", not side_issues, "副作用scopeの定義・工程別回数・累計・cleanupが整合すること", evidence=side_issues or None)
+    result.add("TEX-D011", not side_issues, "TC事後cleanupと実行時cleanupを分け、副作用scopeの定義・回数・cleanupを整合させること", evidence=side_issues or None)
 
     aggregate_table = required_tables["集計"]
     totals = {_value(row, "状態"): _integer(_value(row, "件数")) for row in _rows(aggregate_table)}

@@ -291,7 +291,7 @@ run固定条件が途中で変わった場合、または元TCが要求してい
 | 今回の実行対象`test_case_ref`集合 |  |  |
 | 前回実行成果物参照 | 初回実行では`なし` |  |
 | 実行日時 |  |  |
-| 使用した実行手段 | Playwright MCP / Playwright CLI / 独立一時Playwright Libraryコード |  |
+| 使用した実行手段 | Playwright MCP / Playwright CLI / 独立した今回run用Playwright Libraryコード / 未実行 |  |
 | テスト対象資料参照 |  |  |
 
 ### run固定条件
