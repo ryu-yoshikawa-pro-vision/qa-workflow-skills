@@ -139,6 +139,9 @@ source-coverageの初期母集団を作ります。
 - current ARIA in HTML Recommendation
 - WAI-ARIA APG Patterns
 - WAI-ARIA APG Practices
+- current ACT Rules Format
+- W3C formal ACT Rulesとrequirements / outcome mapping
+- proposed ACT Rulesはformal inventoryと分離してstatus付きで必要範囲だけ確認
 
 source-coverage上の対象をすべて閉じます。
 
@@ -193,6 +196,7 @@ source-coverage上の対象をすべて閉じます。
 - WAI-ARIA 1.2は2023-06-06 Recommendation。WAI-ARIA 1.3はPlan確認時点で2026-06-04 Working Draftのためcurrent Recommendationと同じ強さで扱わない。
 - ARIA in HTMLはPlan確認時点で2026-08-11 Recommendationで、HTML要素へのARIA利用に関するauthor conformance requirementsを定義する。
 - WAI-ARIA APGはPatterns一覧とPractices一覧が公開され、patternページには目的、Keyboard Interaction、WAI-ARIA Roles / States / Propertiesを持つ。APGはinformative guidanceとして扱う。
+- ACT Rulesはtesting methodのinformative ruleとして扱い、WCAG / ARIA requirementそのもののnormative basisへ昇格しない。formal ruleのapplicability / expectation / requirements mapping / outcome mappingをdeterministic check候補へ利用する。
 - GOV.UK Design SystemはComponentsとPatternsを分離し、Patternsをuser-focused taskのbest practice solutionとして公開している。
 - USWDSはComponents一覧とPatterns一覧を公開し、component lifecycle / statusも公開している。Plan調査時点のComponents overviewは47 componentsを表示する。
 - CarbonはcoreのUniversal patternsと、core非保証のCommunity patternsを分離している。
