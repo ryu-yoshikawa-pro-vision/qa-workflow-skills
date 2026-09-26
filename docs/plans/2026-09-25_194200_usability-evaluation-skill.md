@@ -1,6 +1,6 @@
 # UI/UX評価・ユーザビリティ検査Skill追加Plan
 
-このPlanは、UIパターンの目的・rationale・standard・Design System等の知識からUI / UXを根拠付きで評価する `usability-evaluation` と、user goal / task scenarioを起点に生きた実対象を能動操作してtask達成、interaction、visual integrity、accessibility上の操作性、user-facing responsivenessを観測・計測する `usability-inspection` の2 Skillを追加する実装計画です。
+このPlanは、UIパターンの目的・rationale・standard・Design System等の知識からUI / UXを根拠付きで評価する `usability-evaluation` と、生きたWeb UIを実際に操作・観測してユーザビリティ上の問題を検出し、標準・明示基準で判定可能な項目は客観的に判定する `usability-inspection` の2 Skillを追加する実装計画です。
 
 ## 対象ブランチ
 
@@ -16,7 +16,7 @@ feat/usability-evaluation-skill
 - PR #12: test-target-inspection、test-execution、実対象観測、画像確認、browser safety
 - PR #13: exploratory-testing、regression-testing、qa-knowledge、複数workflowのrouting / concurrency
 
-両Skillはこれらを再実装しません。`usability-evaluation` はreference knowledgeによる意味判断、`usability-inspection` はtask-basedなlive executionと観測・計測に責務を限定します。
+両Skillはこれらを再実装しません。`usability-evaluation` はreference knowledgeによる専門評価、`usability-inspection` はlive Web UIの操作・観測・測定と適用可能な標準判定に責務を限定します。
 
 ## 目的
 
@@ -36,16 +36,16 @@ feat/usability-evaluation-skill
 
 加えて、次の責務も既存Skillにはありません。
 
-- 詳細TCではなくuser goal / task scenarioから実対象を操作する
-- user-facingな情報からtask pathを選び、goalへ到達できるか実測する
-- task中のvisual breakage、interaction、feedback、error recoveryを観測する
-- keyboard等、scopeで指定したinput methodでtaskを遂行できるか確認する
-- actionからvisible feedback / task-ready stateまでのsystem側時間を測定する
-- task結果をTCのPASS / FAILと分離して記録する
+- 実対象を操作し、interaction、feedback、error recovery、keyboard / focus、accessibility、visual / responsive上の問題を観測する
+- target size、contrast、focus、reflow等、標準・明示基準で判定可能な項目をcriterion単位で検査する
+- visual breakage、clipping、overflow、見切れ等を画像証拠と条件付きで確認する
+- user-facing responsivenessやperformanceを、測定条件と数値を保持して実測する
+- 客観的な観測事実・標準判定・数値と、AIによる専門評価を分離する
+- task / flowが明示された場合は、そのflowも実際に操作してユーザビリティ上の問題を確認する
 
 これを別Skillの `usability-inspection` が担当します。
 
-`usability-inspection` は代表ユーザーを用いたUX researchの代替ではありません。AIエージェントによるtask-basedな実対象検査として扱い、人間のsatisfaction、task completion rate、human task time等を捏造しません。
+`usability-inspection` は代表ユーザーを用いたUX researchの代替ではありません。AIエージェントによる実対象検査として扱い、人間のsatisfaction、task completion rate、human task time等を捏造しません。personaやtaskは既定の必須入力にせず、ユーザーまたは案件が明示した場合だけ利用します。
 
 ## workflow上の位置づけ
 
@@ -53,24 +53,25 @@ feat/usability-evaluation-skill
 
 `usability-evaluation` は設計資料または既存evidenceをreference knowledgeへ照合する横断的な評価Skillです。
 
-`usability-inspection` はlive targetがあり、実際にtaskを操作してusabilityを確認する要求がある場合だけ起動する独立Activityです。
+`usability-inspection` はlive Web UIを実際に操作・観測してユーザビリティ上の問題を確認する要求がある場合に起動する独立Activityです。
 
 ~~~text
+live Web UI
+    ↓
+usability-inspection
+    ├→ objective observation / measurement
+    ├→ applicable standard / binding criterion check
+    └→ optional task / flow execution
+             ↓
+      immutable evidence
+             ↓
 UI pattern / standard / Design System knowledge
-                    ↓
-          usability-evaluation
-                    ↑
-                    │ immutable evidence
-                    │
-user goal / task scenario
-          ↓
-   usability-inspection
-          ↓
-live UI operation / observation / timing
-          ↓
-task outcome / Observation
-          ↓
-必要な場合だけ usability-evaluation → Finding
+             ↓
+      usability-evaluation
+             ↓
+      expert UI / UX evaluation
+             ↓
+      follow-upが必要な場合だけFinding
 ~~~
 
 `test-target-inspection` / `test-execution` から既存evidenceを `usability-evaluation` へ渡すことはできますが、`usability-inspection` をそれらの追加処理として実行しません。
@@ -84,7 +85,7 @@ task outcome / Observation
 - TCの実操作・PASS / FAIL → test-execution
 - Exploration / Investigation → exploratory-testing
 - routing / common workflow state → qa-workflow
-- user goal / task scenarioからのlive usability task実行 → usability-inspection
+- live Web UIのユーザビリティ検査・測定 → usability-inspection
 - UI pattern / standard / heuristicによる意味判断 → usability-evaluation
 
 ## 仕様上の期待結果とUIガイダンスの分離
@@ -131,7 +132,7 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
 
 1. 目的・現状・責務境界  
    2026-09-25_194200_usability-evaluation-skill_01_scope-and-responsibilities.md
-1a. usability-inspectionの責務・task / execution契約  
+1a. usability-inspectionの責務・live inspection契約  
    2026-09-25_194200_usability-evaluation-skill_01a_usability-inspection-scope-and-contract.md
 2. 情報源・reference構造・網羅性契約  
    2026-09-25_194200_usability-evaluation-skill_02_reference-knowledge.md
@@ -184,21 +185,22 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
 28. source ID / source item ref / reference entry IDはusability-evaluation package内のappend-only IDとし、並べ替えや名称変更で振り直さず、削除済みIDを別identityへ再利用しない。
 29. usability-evaluationはUI pattern knowledgeによる専門評価を主責務とし、代表ユーザーを用いたusability studyを実施したとは扱わない。
 30. usability-evaluationの「問題なし」は今回のscope / evidence / referenceの範囲で問題を確認しなかったことを意味し、製品全体のusabilityを保証しない。
-31. usability-inspectionはuser goal / task scenario / success conditionを正本にし、詳細stepを正解として与えない。詳細TCを忠実に実行する依頼はtest-executionへroutingする。
-32. usability-inspectionの次actionは宣言したinteraction modeでユーザーが利用できる情報から選び、test id、hidden DOM、source code、backend state等でdiscoverability問題を回避しない。
-33. usability-inspectionがbrowser / session ownerとなり、usability-evaluationはimmutable evidenceをread-onlyで評価する。同一sessionを並行操作しない。
-34. timingではAgentの推論時間を除外し、system / browser側の測定区間だけを記録する。project thresholdがなければ任意のperformance FAIL thresholdを創作しない。
-35. 単一Agent runのelapsed timeをINP field result、Core Web Vitals達成、human task time等へ昇格しない。
-36. usability-inspectionはtest-target-inspection / test-executionの既定後処理にはせず、live task-based testが要求・選定された場合だけ起動する。
+31. usability-inspectionはtask / personaを必須入力にせず、対象scopeからapplicableなinteraction、feedback、accessibility、visual / responsive、standard criterion、performanceを検査する。task / flowは明示された場合だけ追加で扱う。
+32. usability-inspectionでは製品固有の正解手順、test id、hidden DOM、source code、backend state等をUI発見shortcutとして使わない。特別な利用者条件はユーザーまたは案件が明示した場合だけ適用する。
+33. 観測事実、measurement、standard / binding criterion result、usability-evaluationによる専門評価を成果物上で分離する。
+34. 明確なstandard / binding requirementはcriterion単位でPASS / FAIL / 判定不能 / 対象外へ閉じ、applicability、exception、観測事実 / 値、evidence、必要なAuthorityを保持する。
+35. 一般heuristic、ISO interaction principles、第三者Design System等のadvisory guidanceをstrictな仕様FAILへ自動変換しない。
+36. 単一component / 単一画面のcriterion PASSから製品全体のWCAG conformance等を宣言しない。
 37. usability-evaluationのseed sourceは自動採用しない。既存adopted sourceにない明確な評価価値を確認してadoptし、一度adoptしたsourceはadopted scope内の関連情報を従来どおり全件closureする。
 38. usability-inspectionのlive実行対象は初版では既存Playwright経路で到達できるWeb UIに限定する。mobileはresponsive Web viewportを意味し、native mobile appの能動操作は対象外とする。
-39. 広い依頼でtaskが明示されない場合は、project requirement、user research、analytics / support data、Product Risk、検証済みproject knowledge等からtask候補を作り、選定根拠と未選定scopeを残す。根拠あるtask母集団を作れない場合は製品全体や代表taskを評価したと主張しない。
-40. Agent / tool capabilityの失敗をproduct usability問題へ自動変換しない。UI側の阻害を直接観測できない場合、またはAgent失敗とUI問題を切り分けられない場合は判定不能として扱う。
-41. 操作しやすさはAgent runで観測したmeaningful action、retry、backtrack、dead end、error / recovery、system wait等の事実として保持できるが、human efficiencyや総合scoreへ昇格しない。
-42. performance measurementは各action開始前にstart event、end predicate、measurement method、threshold Authorityの有無を固定し、終了後に都合のよい測定区間へ変更しない。
-43. 「ユーザビリティテストして」等の依頼はusability-inspectionのtrigger aliasとして受けられるが、成果物ではhuman participantを用いる正式なusability testingを実施したとは表現しない。
-44. usability-inspectionのtask snapshotにはuser / roleだけでなく、prior knowledge / experience assumptions、prior knowledge state（confirmed / inferred / unknown）、その根拠を含める。不明な経験レベルを勝手に初見・熟練として確定しない。
-45. primary taskはuser-facing情報だけで完了し、task outcome / outcome basis / primary action traceを固定するまでCognitive Walkthroughやusability-evaluationを次action選択へ利用しない。
-46. Cognitive Walkthroughはprimary run後の診断としてのみ実施し、current specification / user flow / validated TC等からintended flowを確認できる場合だけstep-by-stepで使う。正しいstep sequenceを創作せず、walkthrough結果でprimary outcomeを書き換えない。
-47. usability-evaluationからの追加観測requestもpost-task diagnosisとして扱い、primary runのtask outcome / action traceを変更しない。primary runを再確認する場合は別Activityとして再実行する。
-48. 「usabilityを確認」「UIの使いやすさを見て」等の実操作有無が不明な依頼はtrigger boundaryとして扱い、live task executionならusability-inspection、design artifact / screenshot / 取得済みevidenceのreference-based評価ならusability-evaluationへroutingする。
+39. usability-inspectionがbrowser / session ownerとなり、usability-evaluationはimmutable evidenceをread-onlyで評価する。同一sessionを並行操作しない。
+40. Playwrightのimplicit auto-scrollをvisual / pointer上のdiscoverability成功として扱わず、必要なscrollはuser actionとして観測する。
+41. Playwrightのactionability auto-waitを操作後のsystem responsivenessへ混ぜない。pre-action waitとactual input後のresponseを分離する。
+42. performance measurementはmeasurement method、start / end、value / unit、environment、threshold Authorityの有無を保持し、project thresholdがなければ任意の仕様FAIL thresholdを創作しない。
+43. metricの定義・測定条件を満たさない値を既存metric名へ読み替えない。単一Playwright runからfield percentileを要求するCore Web Vitals達成等を断定しない。
+44. task / flowが明示された場合は実操作できるが、詳細TCの忠実実行と仕様上のPASS / FAILはtest-executionへroutingする。
+45. Agent / tool capabilityの失敗だけをproduct usability問題へ自動変換しない。
+46. Cognitive Walkthroughはlearnability等を重点確認する場合の任意技法とし、通常inspectionの固定工程や独立Skillにはしない。
+47. usability-inspectionはtest-target-inspection / test-executionの既定後処理にはしない。ただし既存成果物はpreflight / evidenceとしてread-only再利用できる。
+48. 「ユーザビリティテストして」等の依頼はusability-inspectionのtrigger aliasとして受けられるが、成果物ではhuman participantを用いる正式なusability testingを実施したとは表現しない。
+49. 「usabilityを確認」「UIの使いやすさを見て」等の実操作有無が不明な依頼はtrigger boundaryとして扱い、live Web UIを操作して検査するならusability-inspection、design artifact / screenshot / 取得済みevidenceのreference-based評価ならusability-evaluationへroutingする。
