@@ -14,14 +14,15 @@ SKILL.mdは評価契約とindex参照方法だけを持ち、詳細知識はrefe
 
 ## 2. 網羅性の定義
 
-「すべての情報」はインターネット全体を無制限に収集する意味にはしません。
+reference corpusの完成条件は、公開Web上のUI / UX資料をできるだけ多く複製することではありません。
 
-Planで定義したsource category・採用条件・探索closureからadoptされた、公開かつ認証なしで取得可能な情報を対象母集団とします。
+本Skillが今回提供する評価能力を有限なcoverage軸として定義し、その各軸に必要な根拠・pattern知識・standard・methodologyを辿れる状態を完成条件にします。
 
-- UI component / interaction pattern
-- user task / user goal pattern
+能力coverageは次を含みます。
+
+- UI component / interaction patternのpurpose / applicability
 - usability principle / heuristic
-- accessibility
+- accessibility standard / conformance methodology
 - keyboard / focus / semantics
 - layout / responsive / visual hierarchy
 - status / feedback
@@ -31,284 +32,110 @@ Planで定義したsource category・採用条件・探索closureからadoptさ�
 - dialog / disclosure / overlay
 - selection / collections / tables / grids
 - onboarding / guidance / help
-- platform固有UI guidance
+- target project / platformにapplicableなDesign System / HIG
 
-対象母集団を先にsource inventoryとして固定し、各対象を次のいずれかへ閉じます。
+既知sourceの公式URLは `_02c_seed-source-catalog.md` に固定します。
 
-- 収録済み
-- 重複統合済み
-- 本Skill対象外
-- 取得不能
-- 利用条件上、内容収録不可のためsource参照のみ
+source catalogへ登録したsource全体の全pageをnormalized corpusへ収録する必要はありません。normalized referenceへ実際に使うsource itemだけを取り込み、その全itemを原文と意味照合します。
 
-代表patternを数件入れただけで網羅済みとは扱いません。
+探索・採用・能力coverageの終了条件は `_02a_source-acquisition-and-coverage.md`、normalized corpusの完全性は `_02b_reference-validation-and-completeness.md` を正本とします。
 
 ## 3. 採用する情報源
 
-reference取得時に各サイトの公開範囲、robots / access、利用条件、更新状況を確認します。非公開・認証必須・有料本文はbundled corpusへ取り込みません。
+既知sourceの公式URL・publisher・category・既定の位置づけは `_02c_seed-source-catalog.md` を正本とします。
+
+本ファイルではsourceの「役割」を定義し、各sourceの全pageをnormalized corpusへ取り込むことは要求しません。
 
 ### W3C / WAI
 
-対象:
+利用対象:
 
-- WCAG 2.2の全Success Criteriaとconformance上必要な関連定義
-- 各Success Criterionの公開Understanding document
-- Techniques / Failuresのうち、そのSuccess Criterionの理解・観測・判定に利用できる公開情報
-- WAI-ARIA 1.2 Recommendationのrole / state / property定義とauthor requirementsのうち、UI評価に必要な公開情報
-- current ARIA in HTML Recommendationのauthor conformance requirements
-- WAI-ARIA APGの全公開Patterns
-- WAI-ARIA APGの全公開Practices
-- APG examplesから、pattern理解・keyboard・roles / states / properties・注意点に必要な情報
-- currentなACT Rules Format
-- W3Cがformalに公開しているACT Rulesとrequirements / outcome mapping
-- 取得時点でW3Cが公開しているproposed ACT Rulesを全件inventoryし、formal ruleと区別したstatusを保持
+- WCAG 2.2 Success Criteriaとconformance関連定義
+- Understanding / Techniques / Failuresのうち、対象requirementの理解・観測・判定に必要な公開情報
+- WCAG-EM 2.0
+- WAI-ARIA 1.2
+- current ARIA in HTML
+- WAI-ARIA APGの対象pattern / practice
+- ACT Rules Format 1.1
+- All ACT Rulesのうち、supported ACT Ruleまたはrequirement理解に必要なrule
 
 扱い:
 
-- WCAG Success Criterion、WAI-ARIA 1.2、ARIA in HTMLで今回の対象へ適用されるnormative requirementは、該当要件として扱う。観測・測定・applicabilityを確定できる場合は `usability-inspection` のrequirement-level `satisfied / not-satisfied / undetermined` の根拠として利用できる
-- Understanding / Techniquesはcriterionの理解・評価方法を補助するinformative guidanceとして扱う
-- ACT Rulesはaccessibility testing methodのinformative ruleとして扱い、WCAG / ARIA requirementそのもののnormative basisへ昇格しない
-- formal ACT Ruleのapplicability / expectation / requirements mapping / outcome mappingをACT Rule coverageの正本にし、独自解釈で別ruleへ作り替えない
-- proposed / community ACT Ruleをformal ruleと同じstatusで扱わない
-- APGはARIAの利用方法に関するinformative guidanceであり、example実装を唯一のproduction正解としない
-- WAI-ARIA 1.3等のDraftをcurrent Recommendationと同じ強さで扱わない。projectが明示採用している場合だけ、そのAuthorityとしてdraft statusを保持して別扱いする
+- WCAG / WAI-ARIA / ARIA in HTMLのnormative requirementとinformative guidanceを分離する
+- WCAG-EM 2.0はexplicit WCAG conformance evaluationのmethodologyとして扱う
+- APGはinformative guidanceであり、example実装を唯一のproduction要件へ昇格しない
+- ACT Rulesはinformative testing methodであり、全rule実装を完成条件にしない
+- WAI-ARIA 1.3等のDraftをcurrent Recommendationと同じ強さで扱わない
 - native HTMLで解決できる場合に不要なARIAを要求しない
 
-### GOV.UK Design System
+WCAG Success Criteriaはstandard inventoryとして全criterionを参照可能にします。ただしgeneral accessibility inspectionで全criterionを毎回実行することとは別です。
 
-対象:
+### public Design System / platform guidance
 
-- 公開されている全Components
-- 公開されている全Patterns
-- accessibility / layout / content等、pattern利用判断に必要な関連guidance
+seed catalogに登録するDesign System / HIG:
 
-目的:
+- GOV.UK Design System
+- USWDS
+- Carbon Design System
+- Fluent 2
+- Atlassian Design System
+- Adobe Spectrum
+- GitHub Primer
+- Salesforce Lightning Design System 2
+- SAP Fiori for Web
+- GNOME Human Interface Guidelines
+- Apple Human Interface Guidelines
+- Material Design 3
+- Shopify Polaris
 
-- user-focused task
-- when to use / when not to use
-- how it works
-- error / validation / task completion
-- government service向けに具体化されたinteraction
+これらは、次の場合にreference itemとして読み込みます。
 
-GOV.UK固有の制度・ブランド要件は一般UI要件へ昇格しません。
+- projectがそのDesign Systemを明示採用している
+- target platform / productが直接該当する
+- common UI patternのpurpose / interaction / accessibility / responsive guidanceを補う必要がある
+- source固有差分を保持しないと誤適用が生じる
 
-### U.S. Web Design System
+Design Systemの全component / pattern pageをbundled normalized corpusへ複製することは完成条件にしません。
 
-対象:
+projectが採用していないDesign System固有規約をbinding requirementへ昇格しません。
 
-- 公開されている全Components
-- 公開されている全Patterns
-- accessibility guidance
-- component maturity / usability guidanceで評価に必要な情報
+### usability / interaction principles
 
-USWDS固有の米国政府要件と一般化可能なUI原則を分離します。
+seed catalogに登録するsource:
 
-### Carbon Design System
+- ISO 9241-110
+- Nielsen Norman Groupの10 Usability Heuristics / heuristic evaluation methodology
+- UI-Patterns.com
+- Welie Interaction Design Pattern Library
+- ソシオメディア UIデザインパターン
 
-対象:
+扱い:
 
-- 公開されているstable Components
-- 公開されているuniversal Patterns
-- 公開されているcommunity patternはsource statusを明示して別扱い
-- accessibility guidance
-- component usage / behavior / content guidance
+- ISOの有料本文は公開metadata / previewを超えて複製しない
+- heuristicはadvisory guidanceであり仕様Authorityへ昇格しない
+- pattern libraryはpurpose / when / when not / interaction / rationale等、評価能力に必要なitemだけnormalized referenceへ取り込む
+- 古いsourceは公開されていること自体をcurrent best practiceの証明にせず、年代・platform前提・current sourceとの整合を保持する
+- sourceのlicense / termsを実装時に確認する
 
-community / experimentalをstable guidanceと同じ強さで扱いません。
+### inspection-specific source
 
-### Fluent 2 Design System
+Playwright、WCAG-EM、Navigation Timing、Paint Timing、Web Vitals等のlive inspection / measurement sourceは `usability-inspection/references/source-catalog.md` に置きます。
 
-対象:
-
-- 公開Components
-- accessibility
-- layout
-- content
-- interaction / behavior guidance
-- patternに相当する公開guidance
-
-Microsoft製品固有の表現と一般化可能な原則を分離します。
-
-### Atlassian Design System
-
-対象:
-
-- 公開Components
-- Foundations
-- accessibility
-- interaction guidance
-- public pattern guidance
-
-Atlassian製品固有の規約は、対象プロジェクトが採用していない限りbinding requirementにしません。
-
-### Adobe Spectrum
-
-対象:
-
-- 公開Components
-- componentごとのusage / behavior / state / content / accessibility
-- Inclusive Design
-- layout / typography / color等、UI評価に関係するFoundations
-- platform scale、responsive、internationalization等の公開guidance
-
-Spectrum固有のvisual stylingを、採用していないprojectへbinding requirementとして適用しません。
-
-### GitHub Primer
-
-対象:
-
-- 公開Components
-- 公開UI Patterns
-- Foundationsのうちcontent / layout / responsive / accessibility等の評価に必要なguidance
-- component / pattern usage guidance
-
-GitHub固有のproduct conventionと一般化可能なinteraction principleを分離します。
-
-### Salesforce Lightning Design System
-
-対象:
-
-- 現行SLDSの公開Components / Component Blueprints
-- accessibility
-- interaction / usage / visual language
-- responsive / spacing / sizing等の公開guidance
-
-Lightning Base Componentとstyle-only Blueprintの保証範囲を混同しません。
-
-### SAP Fiori
-
-対象:
-
-- 公開Design Principles / General Guidelines
-- platform別Design Guidelines
-- Components / Floorplans / Patterns相当の公開guidance
-- accessibility、responsive、loading / waiting、validation等のUI評価に関係する情報
-
-SAP固有業務・platform前提はsource metadataへ残します。
-
-### GNOME Human Interface Guidelines
-
-対象:
-
-- Design principles
-- Guidelines
-- 全公開Patterns
-- keyboard / pointer / touch / scaling / accessibility等の公開reference
-
-GNOME / GTK / Libadwaita向けplatform conventionは対象platformが一致する場合に優先します。
-
-### Apple Human Interface Guidelines
-
-対象:
-
-- 公開Design principles
-- Foundations
-- Patterns
-- Components
-- Inputs
-- accessibility
-- platform差がUI評価に必要なguidance
-
-iOS / iPadOS / macOS / watchOS / tvOS / visionOS等のplatform固有要件は、対象platformが一致する場合だけ優先します。
-
-### Material Design
-
-reference取得時点で公開・取得可能なMaterial Design 3の、
-
-- foundations
-- components
-- interaction / behavior
-- accessibility
-- adaptive / responsive guidance
-
-を対象inventoryへ入れます。
-
-取得不能ページを推測で埋めません。
-
-### Shopify Polaris
-
-reference取得時点で公開・取得可能な、
-
-- components
-- patterns
-- accessibility
-- content / interaction guidance
-
-を対象inventoryへ入れます。
-
-取得不能または現行公開範囲が縮小している場合は状態を記録します。
-
-### ソシオメディア UIデザインパターン
-
-公開されているUIデザインパターンページを対象inventoryへ入れます。
-
-各patternから主に次を構造化します。
-
-- pattern名
-- 目的 / 理由
-- 効能
-- 用法
-- 注意
-- 関連pattern
-
-本文をそのまま複製せず、評価に必要な意味を要約します。
-
-### ISO 9241-110
-
-ISO 9241-110:2020はinteraction principlesの体系を確認するsourceとして扱います。
-
-- current statusはISO公式情報で確認する
-- 公開範囲を超える本文をrepositoryへ複製しない
-- 詳細本文を合法的に参照できない場合はsource-reference-onlyとする
-- interaction principlesは専門評価の根拠として扱い、個別productへのstrict FAIL criterionへ自動変換しない
-
-### Nielsen Norman Group
-
-対象を無制限な全記事にはしません。
-
-本Skillの評価方法に直接必要な公開資料を対象とします。
-
-対象:
-
-- 10 Usability Heuristics
-- Heuristic Evaluationの実施方法
-- 各heuristicを理解するための公式公開補足
-- `_02b_reference-validation-and-completeness.md` の採用条件を満たす、UI pattern / interaction評価に直接関係する公開資料
-
-heuristicは広い経験則であり、特定componentの仕様要件ではないことをreferenceに明記します。
-
-### UI-Patterns.com / Welie等
-
-公開され、UI patternの、
-
-- problem
-- context
-- use when
-- solution
-- rationale
-- examples / related patterns
-
-を確認できる範囲を補助sourceとしてinventory化します。
-
-古い資料では年代と現代Web / mobileへの適用制約を保持します。
-
+UI pattern knowledgeをinspection packageへ複製しません。
 
 ## 3.1 追加source discovery
 
-上記の情報源だけを固定リストとして「全情報」とは扱いません。
+`_02c_seed-source-catalog.md` の既知sourceは実装時に全件再確認します。
 
-source discoveryでは、UI / UX評価へ直接利用できる公開情報源を追加調査し、次の条件を満たすsourceが見つかった場合はsource inventoryへ追加します。探索・採用・終了条件は `_02b_reference-validation-and-completeness.md` を正本とします。
+追加source discoveryは、`_02a_source-acquisition-and-coverage.md` の能力coverageにgapがある場合だけ行います。
 
 - 標準化団体またはplatform vendorの公式UI / accessibility guidance
 - 公開Design Systemのcomponent / pattern / interaction guidance
 - UI patternの目的・適用条件・rationaleを体系化した公開資料
 - usability評価方法を体系化した一次資料、または方法論の原著が公開されていない場合に手順と出典を追跡できる公開資料
-- visual / responsive / error / feedback / form / navigation等、本Skillの既存sourceで不足する領域を補う資料
+- visual / responsive / error / feedback / form / navigation等、既存referenceで不足する領域を補う資料
 
-追加sourceを見つけた場合も、権威性だけで既存sourceより常に優先するとは扱わず、source-catalogへ位置づけを記録します。
-
-検索結果やブログ記事を無制限に蓄積することはしません。source inventoryへ採用するかどうかを明示的に判断し、採用したsourceについては対象母集団を全件棚卸しします。
-
-source discoveryと「取得できるすべて」の終了条件は `_02a_source-acquisition-and-coverage.md` を正本とします。
+追加sourceを見つけても「新しいsourceが見つからなくなるまで」探索を再帰的に拡大しません。coverage gapを埋めるか、独立して保持すべきAuthority / provenanceを持つかを判断し、source-catalogへ採否と理由を残します。
 
 ## 4. sourceの適用性と要求の強さ
 
@@ -499,136 +326,111 @@ root indexの肥大化が確認された場合も、新しい検索runtimeを追
 
 ## 9. source-catalog.md
 
-source-catalog.mdは、採用済みsourceだけでなくsource discoveryで確認した候補の正本にもします。別のdiscovery logは作りません。候補採否、探索固定点、public-only境界、item全件意味検証は `_02b_reference-validation-and-completeness.md` に従います。
+source-catalog.mdは、known source、採用source、reference-only source、source discoveryで確認したcandidateを辿る正本です。
 
-候補ごとに次を管理します。
+`_02c_seed-source-catalog.md` の公式URLを実装時に再確認して初期化します。
+
+source row:
+
+- source ID（adopted / reference-onlyとして追跡する場合）
+- source name
+- canonical URL
+- publisher / owner
+- category
+- source position: normative / informative / advisory / methodology
+- platform / product scope
+- source status / lifecycle
+- access state
+- checked_at
+- adoption status: adopted / reference-only / replaced / unavailable / rejected
+- license / terms確認結果
+- coverage axes
+- note
+
+projectへのbindingはcatalogのsource positionだけで決めません。project Authorityはevaluation時に別途解決します。
+
+candidate / discovery row:
 
 - candidate name
-- URL root
+- canonical URL
 - discovery origin: seed / query / cross-link
-- discovery detail: query IDまたは参照元source ID
-- discovery status: pending / adopted / rejected / duplicate / unavailable
+- discovery detail
+- coverage gap
+- status: pending / adopted / reference-only / rejected / duplicate / unavailable / replaced
 - reason
 - checked_at
-- adopted時のsource ID
-
-adopted sourceでは加えて次を管理します。
-
-- source ID
-- 名称
-- official / third-party
-- adopted scope
-- item列挙元 / 列挙方法
-- defaultのreference位置づけ
-- platform
-- 公開状態
-- 取得日
-- license / terms確認結果
-- referenceへの取り込み方針
-- 注意事項
-
-source全体を一律にnormative / advisoryへ固定できない場合は、defaultだけをcatalogへ置き、item / reference単位の位置づけで上書きします。WCAG本文とUnderstanding、同一Design System内のstable / experimental等をsource単位だけで同じ強さにしません。
 
 ### source discovery実行記録
 
-candidate表とは別に、探索を実施した事実をsource-catalog.md内へ記録します。検索やcross-link確認で新規candidateが0件でも、実行記録は残します。
+Q1〜Q7とcoverage gap由来の追加queryについて、
 
-discovery実行記録は次を持ちます。
-
-- discovery type: query / cross-link
-- discovery target: Query IDまたはadopted source ID
+- discovery type
+- discovery target
 - discovery category
 - checked_at
 - 確認範囲
 - 確認件数
 - 新規candidate件数
-- retrieval boundary: 検索結果終了 / source内対象link確認完了 / provider側の取得上限 / 取得不能等
+- retrieval boundary
 - completion: completed / blocked
-- block理由（blockedの場合だけ）
+- block理由
 
-Q1〜Q7は初期queryとしてすべて実行しますが、探索queryの上限にはしません。source category、coverage、candidate評価から不足領域が見つかった場合は追加queryを採番して継続します。Plan側でquery数、検索結果件数、page数に上限を設けません。
+をsource-catalog.mdへ残します。
 
-検索手段がpaginationや取得件数を制限する場合は、その外部制約を `retrieval boundary` に記録します。Plan側の都合で未確認結果を切り捨てて `completed` にはしません。
+Plan側で検索結果件数・page数を恣意的に制限しません。
 
-cross-linkでは、adopted sourceごとにadopted scope内のUI / UX評価へ関係するcross-linkを確認します。cross-linkから新しくadoptしたsourceも同じ確認対象へ追加し、canonical rootで重複排除しながら未確認のadopted sourceがなくなるまで続けます。対象linkが0件でも `確認件数=0 / 新規candidate件数=0 / completion=completed` として確認済みであることを残します。
+一方、cross-linkを「新しいsourceがなくなるまで」再帰探索することもcompletion条件にしません。normative dependency、current version / successor、coverage gap解消に必要なlinkだけを追跡します。
 
-探索手段の障害等で所定範囲を確認できなかった場合は `blocked` とし、探索完了には数えません。
-
-### source discovery closure
-
-source discoveryを「Web全体を完全探索した」とは表現しません。今回定義したsource categoryと採用条件の範囲で、次をすべて満たした状態を探索完了とします。
-
-- 全categoryのseed sourceを確認済み
-- Q1〜Q7と、coverage不足を埋めるために追加した全queryが `completed`
-- query結果について、検索手段が到達できた範囲と外部provider側の取得境界が記録されている
-- 全candidateが `pending` 以外へ閉じている
-- 全adopted sourceについてadopted scope内のcross-link確認が `completed`
-- cross-linkから追加されたcandidateも採否が閉じ、adoptされた場合はそのsourceのcross-link確認も完了している
-- discovery実行記録に `blocked` が残っていない
-- adopted sourceがsource-catalog / source-coverageへ入っている
-
-このclosureに検索件数、source数、cross-link段数の固定上限を使いません。
+source discoveryの完了条件は `_02a_source-acquisition-and-coverage.md` を正本とします。
 
 ### package-local source ID
 
-source IDはusability-evaluation package内だけのappend-onlyなIDとします。
+source IDはusability-evaluation package内だけのappend-onlyなprovenance keyです。
 
 - 形式: `SRC-\d{3,}`
-- 初回実装ではsource discovery closure後、全adopted sourceをcanonical root昇順で並べて `SRC-001` から採番する
-- 初回実装後に新しくadoptしたsourceは既存最大番号+1を使う
+- 初回実装ではadopted / reference-onlyとして追跡するsourceをcanonical URL昇順で並べて `SRC-001` から採番する
 - 追加sourceは既存最大番号+1を使う
-- canonical root、名称、並び順の変更だけを理由に既存source IDを振り直さない
+- canonical URL、名称、並び順の変更だけを理由に既存source IDを振り直さない
 - 削除・duplicate化したsource IDを別sourceへ再利用しない
+- Agentが手計算せず `scripts/reference_catalog.py` で採番する
 
-candidate行の `adopted時のsource ID` にはこのIDを記録します。
+candidate行は採用またはreference-onlyへ確定した時点でsource IDへ対応付けます。
 
 ## 10. source-coverage.md
 
-「すべて取得した」を検証可能にするため、対象ページ / pattern単位でcoverageを保持します。
+source-coverage.mdはsource page全件表ではなく、評価能力coverageを追跡します。
 
-source-coverage rowは次を持ちます。
+coverage row:
+
+- coverage axis
+- concern / pattern family
+- required source position
+- selected source refs
+- reference entry refs
+- coverage status: covered / not-applicable / blocked
+- gap / reason
+- checked_at
+
+normalized referenceへ実際に使うpage / sectionだけをsource itemとして別途登録します。
+
+source item:
 
 - source ID
 - source item ref
-- source item
+- source item name / section
 - canonical URL
-- category
-- coverage disposition: included / merged-duplicate / out-of-scope / unavailable / source-reference-only
-- access state: public / restricted
-- maturity / lifecycle: sourceが明示する場合だけ
+- coverage disposition: included / merged-duplicate / reference-only / unavailable / out-of-scope
+- access state
+- source status / lifecycle
 - reference destination
 - available_dimensions
 - captured_dimensions
-- reason
+- semantic validation
 - checked_at
 
-`included` / `merged-duplicate` では、sourceに存在すると確認したUI / UX評価上の情報種別を `available_dimensions` に記録し、そのすべてが `captured_dimensions` に存在することを完了条件にします。
+source全体の全pageをitem化しません。
 
-`merged-duplicate` の `captured_dimensions` は統合先referenceで収録済みの情報種別を表し、reference destinationから統合先を追跡できるようにします。
-
-利用条件・取得制約等により取得済み情報をreferenceへ収録できないitemを `included` のまま閉じません。既存の `source-reference-only` / `unavailable` 等へ分類します。
-
-source itemを追加・削除した場合、coverage表を更新します。
-source IDは情報源単位の識別子、source item refはsource-coverage上のitem単位のstable refとして分離します。
-
-source item refは次の規則で付与します。
-
-- 形式: `<source ID>-ITEM-\d{4,}`
-- 初回inventoryでは、同一source内のitemをcanonical URL、source item名称の順で並べ、`ITEM-0001` から採番する
-- 初回採番後は並べ替え、名称変更、redirectだけを理由にrefを変更しない。同じ意味のitemと確認できる場合は既存refを維持してcanonical URL等を更新する
-- 新しいitemは同一source内の既存最大番号+1を使う
-- 削除・統合したsource item refを別itemへ再利用しない
-
-例:
-
-~~~text
-source ID: SRC-001
-source item ref: SRC-001-ITEM-0001
-~~~
-
-reference entryと評価結果から参照するのは原則としてsource item refです。source IDだけでは個別の要件・guidanceを特定した根拠として扱いません。
-
-source ID / source item ref / reference entry IDはいずれもusability-evaluation package内の追跡用であり、PR #11のMachine Entityや全QA共通IDへ昇格しません。
+source ID / source item ref / reference entry IDの採番・canonicalizationは `_05_skill-package.md` のproduction scriptへ移します。
 
 ## 11. 著作権・ライセンス
 

@@ -87,7 +87,7 @@ skills/usability-inspection/
 │   └── criterion_checks.py
 ├── assets/
 │   ├── output-template.md
-│   └── deterministic-check-catalog.json
+│   └── test-rule-catalog.json
 └── ...
 ~~~
 
@@ -161,8 +161,10 @@ Outputは次を必須で持ちます。
 - measurement method
 - clock domain（elapsedをstart / endから導出する場合）
 - metric definition ref（既存metric名を使用する場合）
+- metric source type
+- external metric source ref（外部measurement sourceを受け取る場合）
 - threshold value / operator / Authority ref（存在する場合）
-- environment / viewport refs
+- environment / viewport / device profile refs
 
 timestamp / numeric valueはPR #11 current runtime contractのexact number表現を利用します。
 
@@ -176,6 +178,7 @@ timestamp / numeric valueはPR #11 current runtime contractのexact number表現
 - clock domain不一致の場合の `measurement-unavailable`
 - thresholdなしの場合の `threshold-not-defined`
 - metric definition ref不足時に既存metric名を確定しない
+- external metric source metadataの構造検証
 - inputとderived valueのcanonicalization
 
 LLMに引き算・大小比較をさせません。
@@ -189,6 +192,8 @@ Outputは次を必須で持ちます。
 - calculated value
 - unit
 - measurement method
+- metric source type
+- external metric source ref
 - threshold
 - threshold Authority ref
 - result: within-threshold / over-threshold / threshold-not-defined / measurement-unavailable
@@ -205,6 +210,8 @@ genericな自然言語rule engineや式DSLは作りません。
 1 checkごとに次を必須入力とします。
 
 - check_key
+- source type: act-rule / project-rule
+- source status: formal / proposed / project
 - source rule ref
 - mapped requirement ref
 - target scope / target ref
@@ -214,7 +221,9 @@ genericな自然言語rule engineや式DSLは作りません。
 
 #### Function
 
-machine evidenceだけで完全に判定できるcheckは `criterion_checks.py` の明示dispatchで自動判定します。今回扱う全checkのmetadataは `assets/deterministic-check-catalog.json` に固定します。catalogは実行可能コードや式を持たず、generic rule DSL / plugin registryにはしません。
+machine evidenceだけで完全に判定できるsupported test ruleは `criterion_checks.py` の明示dispatchで自動判定します。supported ruleのmetadataだけを `assets/test-rule-catalog.json` に固定します。catalogは実行可能コードや式を持たず、generic rule DSL / plugin registryにはしません。
+
+ref採番、cross-reference、scope closure、geometry、elapsed、threshold等のhelper処理はcatalogへ登録しません。
 
 次の場合は自動PASS / FAILへ進みません。
 
@@ -232,6 +241,8 @@ machine evidenceだけで完全に判定できるcheckは `criterion_checks.py` 
 check単位で次を必須出力とします。
 
 - check_key
+- source type
+- source status
 - source rule ref
 - mapped requirement ref
 - target ref
@@ -247,30 +258,33 @@ current WAI公開ACT RulesはACT Rules Format 1.1互換として扱い、outcome
 
 ACT Rule resultを、そのままWCAG Success Criterion全体のrequirement resultへ読み替えません。
 
-## 5. supported deterministic checkの管理
+## 5. test-rule-catalogとsupported ruleの管理
 
-runtime scriptが任意のreference本文を解釈しないよう、check metadataを `assets/deterministic-check-catalog.json`、実行処理を `criterion_checks.py` の明示dispatchへ分離します。
+runtime scriptが任意のreference本文を解釈しないよう、supported test ruleのmetadataを `assets/test-rule-catalog.json`、automatic実装を `criterion_checks.py` の明示dispatchへ分離します。
 
-catalogの各checkは次を固定します。
+catalogの各entry:
 
 - check key
-- source type / source rule ref
+- source type: act-rule / project-rule
+- source rule ref
 - mapped requirement refs
-- source status / ACT Rules Format version
-- implementation execution mode
+- source status: formal / proposed / project
+- ACT Rules Format version（ACT Ruleの場合）
+- execution mode: automatic / manual / semiAuto
 - required observation fields
 - output scope
+- implementation dispatch key（automaticの場合）
 - checked_atまたはsource version
 
-manual / semiAuto checkは `criterion_checks.py` で自動resultを生成せず、必要evidence・未評価部分・semantic procedure refをhandoffとして返し、定義済みsemantic/manual経路で閉じます。
+`source type` と `source status` を同じfieldへ混ぜません。
 
-catalogには `check_key / source type / source rule ref / mapped requirement refs / source status / ACT Rules Format version / execution mode / required observation fields / output scope / checked_atまたはsource version` を保持します。execution modeは当Skillでの実装方式として `automatic / manual / semiAuto` を使用し、独自の式言語は持ちません。
+`criterion_checks.py` は `automatic` のsupported ruleだけをdispatchします。
 
-`criterion_checks.py` は `automatic` として実装したcheckだけをdispatchします。`manual / semiAuto` はbrowser observationとAgentのsemantic evaluationを組み合わせ、source ruleのapplicability / expectationを省略しません。
+`manual / semiAuto` は自動resultを生成せず、必要evidence・未評価部分・semantic procedure refをhandoffとして返し、定義済みsemantic/manual経路で閉じます。
 
-W3C ACT Rulesでは、formal ruleとproposed ruleのstatusを混同しません。
+supported ACT Ruleの条件とofficial examplesによるconsistency検証は `_05d_accessibility-and-conformance.md` を正本とします。
 
-ACT RulesはWCAG / ARIA conformanceそのもののnormative basisではなく、testing methodのinformative ruleとして保持します。
+artifact structure / measurement helperはcatalog対象外です。
 
 ## 6. requirement resultとの関係
 
@@ -371,7 +385,7 @@ Playwright version差を吸収する独自browser wrapper frameworkは作りま�
 | scope closure集計 | 必須 |
 | elapsed計算 | 必須 |
 | threshold比較 | 必須 |
-| formal ACT Rule等、完全にmachine-decidableなcheck | 対応checkでは必須 |
+| supported ACT Rule / project ruleで完全にmachine-decidableなcheck | 対応checkでは必須 |
 | target size等のraw geometry取得後の数値計算 | 必須 |
 | criterion applicabilityで意味判断が必要 | LLM / manual |
 | WCAG exceptionで意味判断が必要 | LLM / manual |
@@ -403,9 +417,10 @@ runtime generatorとdeterministic eval validatorを同じ実装へしません�
 - project threshold以内 / 超過
 - thresholdなし
 - negative elapsed
-- fully automated deterministic check `passed`
-- fully automated deterministic check `failed`
-- ACT outcome `cantTell / untested / inapplicable`
+- supported automatic ACT Rule `passed`
+- supported automatic ACT Rule `failed`
+- supported ACT Rule outcome `cantTell / untested / inapplicable`
+- source typeとsource statusの分離
 - partial / manual ruleを自動 `passed / failed` へしない
 - rule `passed` からrequirement全体を `satisfied` へ昇格しない
 - insufficient evidence → `undetermined`
@@ -420,8 +435,10 @@ runtime generatorとdeterministic eval validatorを同じ実装へしません�
 - 別runtime frameworkを作っていない
 - 同じnormalized inputから同じmachine resultになる
 - 数値計算 / threshold比較をLLMが再計算しない
-- deterministic checkのdispatchが `assets/deterministic-check-catalog.json` の登録済みcheckだけへ固定され、catalogを式DSL / plugin frameworkとして実装していない
-- partial / manual checkを自動 `passed / failed` へ昇格しない
+- deterministic checkのdispatchが `assets/test-rule-catalog.json` のsupported automatic ruleだけへ固定され、catalogを式DSL / plugin frameworkとして実装していない
+- structure / measurement helperをtest rule catalogへ混ぜていない
+- source typeとsource statusを分離している
+- manual / semiAuto checkを自動 `passed / failed` へ昇格しない
 - ACT Rule resultとrequirement resultを分離する
 - requirement `satisfied` にはscope / population closureが必要
 - elapsed計算で同一clock domainを検証する

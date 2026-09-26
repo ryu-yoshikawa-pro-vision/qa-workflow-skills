@@ -35,15 +35,17 @@
 
 `_05a_usability-inspection-package-and-evaluation.md` のsourceをcurrentな公式資料で確認します。
 
-次をすべて確認します。
+次をすべて確認し、`references/source-catalog.md` へcanonical URL / status / checked_atを記録します。
 
 - WCAG 2.2 / Understanding
-- WAI-ARIA 1.2 / current ARIA in HTMLのcoverage matrix対象requirement
-- ACT Rules Format 1.1 / current WAI公開formal・proposed ACT Rules
+- WCAG-EM 2.0
+- WAI-ARIA 1.2 / current ARIA in HTML
+- ACT Rules Format 1.1 / All ACT Rules
 - ISO 9241-110 interaction principles
 - Cognitive Walkthroughの原著または手順・出典を追跡できる公開methodology
-- web.dev Core Web Vitals / user-centric performance guidance
-- Playwright locator / actionability / scrolling / keyboard / screenshot等の公式仕様
+- Navigation Timing / Paint Timing
+- web.dev Core Web Vitals / field measurement guidance
+- Playwright emulation / BrowserContext / locator / actionability / scrolling / keyboard / screenshot等の公式仕様
 
 current URL / publication state /利用条件を確認します。
 
@@ -87,7 +89,7 @@ skills/usability-inspection/scripts/
 └── criterion_checks.py
 ~~~
 
-`assets/deterministic-check-catalog.json` も同時に実装し、今回扱うACT Rule / ACT外checkのmetadataを全件登録します。catalogはrule DSLではなく、`criterion_checks.py` の明示dispatchとsemantic/manual経路の入力契約です。
+`assets/test-rule-catalog.json` も同時に実装します。登録対象は `_05d_accessibility-and-conformance.md` のsupported ACT Rule / project ruleだけです。artifact structure、ref、geometry、elapsed、threshold等のhelperはcatalogへ入れません。catalogはrule DSLではなく、`criterion_checks.py` の明示dispatchとsemantic/manual経路の入力契約です。
 
 このStepではbrowserを操作しません。fixtureだけで次を確認します。
 
@@ -98,8 +100,10 @@ skills/usability-inspection/scripts/
 - exact elapsed計算
 - threshold比較
 - threshold未定義
-- fully automated checkのdispatch
-- partial / manual checkを自動 `passed / failed` にしない
+- supported automatic test ruleのdispatch
+- source type / source statusを分離
+- structure / measurement helperをtest rule catalogへ混ぜない
+- manual / semiAuto ruleを自動 `passed / failed` にしない
 - ACT Rules Format 1.1の `inapplicable / passed / failed / cantTell / untested` を保持する
 - ACT Rule resultとrequirement resultを分離
 - insufficient evidenceをrequirement `undetermined` へ残す
@@ -221,64 +225,92 @@ taskを与えないcanonical caseで、1画面 / 1機能を端から端まで検
 
 この段階では全製品scanへ広げません。
 
-## 10. Step 8: accessibility / standard checks
+## 10. Step 8: accessibility / conformance
 
-`_05c_usability-inspection-coverage.md` のWCAG 2.2 / WAI-ARIA / ARIA in HTML coverage matrixを全件実装します。
+`_05d_accessibility-and-conformance.md` に従い2経路を実装します。
 
-target size / spacing、focus visible、keyboard operation、error identification、reflow / responsive、accessible name / role / state等を一部の代表項目として止めず、各Success Criterion / requirementをapplicability、必要evidence、判定owner、resultへ閉じます。
+### general accessibility inspection
+
+targetへapplicableなaccessibility concern / requirementだけを観測・評価します。WCAG全Success Criteriaを毎回実行せず、general inspection結果からproduct-wide conformance claimを作りません。
+
+### explicit WCAG conformance evaluation
+
+WCAG version / conformance level / evaluation scopeを事前に固定し、WCAG-EM 2.0の、
+
+1. scope定義
+2. target探索
+3. representative sample選定
+4. sample評価
+5. findings集約・report
+
+へ成果物を追跡できるようにします。
 
 確認:
 
 - applicability / exception
 - observation / measurement
-- formal ACT Rule等の対応済みdeterministic checkがある場合はtest rule result
+- supported ACT Ruleがある場合のtest rule result
 - requirement result
-- evidence
-- product-wide conformanceへ昇格しないこと
+- sample resultからpage / product `satisfied` へ昇格しない
+- complete process / conformance requirements
+- WCAG-EM Step 1〜4 outcomeをevaluation reportへ記録
+- optional evaluation statementの生成条件
+- representative sampleだけからWCAG conformance claimを作らない
+- WAI-ARIA / ARIA in HTMLのhost language requirement
+- APGをnormative requirementへ昇格しない
+- supported ACT RuleのACT Rules Format 1.1 §4.14.1 consistency fixture
 
 criterionの具体値や例外はcurrent referenceを正本にし、Plan記載値だけを実装へ固定しません。
 
-## 11. Step 9: visual / responsive
+## 11. Step 9: visual / responsive / mobile
 
-visual / responsive coverageとして、少なくとも次を対象UIの全applicable state / viewport boundaryで確認します。
+`_05c_usability-inspection-coverage.md` に従い、responsive viewport、touch-capable、mobile device emulationを別条件として実装します。
 
-- clipping
-- overflow
-- overlap
+確認:
+
+- project / targetのlayout boundary列挙
+- boundary直前 / boundary / 直後
+- clipping / overflow / overlap
 - primary action見切れ
 - modal / popup
 - unexpected horizontal scroll
 - focus indicator
 - visual instability
+- text loss / wrapping
+- screenshot evidence
+- touch-capable成功をmobile emulation成功へ読み替えない
+- mobile device emulationではdevice profile / viewport / screen / userAgent / deviceScaleFactor / hasTouch / isMobileを記録
+- full mobile profileを構成できない場合はresponsive / touchとしてscopeを限定
 
 DOMだけで確定せず、画像が必要な項目はscreenshotを正式なevidenceとして使います。
 
 ## 12. Step 10: performance / responsiveness
 
-### project thresholdあり
+`_05e_performance-measurement.md` に従います。
 
-current Authorityにthresholdがある全measurementで、
+直接取得するもの:
 
-- measurement
-- threshold
-- result
-- evidence
+- Navigation Timing
+- FCP
+- actual input event → first visible feedback
+- actual input event → task-ready state
+- loading start → completion state
 
-を結び付けます。
+確認:
 
-### project thresholdなし
+- same clock domain
+- actionability waitとpost-input responseの分離
+- project thresholdあり / なし
+- threshold Authority
+- metric source type
+- cache / navigation / device profile等の実行条件
 
-数値は取得するが、独自FAIL thresholdを作らないcaseを確認します。
+Core Web Vitals:
 
-### Playwright timing
-
-actionability waitとactual input後のresponseを分離できることを確認します。
-
-### Core Web Vitals
-
-metric定義・測定条件を満たす場合だけmetric名を使います。
-
-単一Playwright runをfield percentileの達成判定へ変換しないことを確認します。
+- LCP / CLS / INPを独自algorithmで再実装しない
+- project既存RUM / CrUX / web-vitals instrumentation / Lighthouse等、provenanceを確認できるsourceがある場合だけmetricとして受け取る
+- sourceがなければ `measurement-unavailable`
+- lab / single sessionをfield percentileへ変換しない
 
 ## 13. Step 11: optional task / flow
 
@@ -361,7 +393,7 @@ repository標準件数に合わせます。
 
 ### semantic
 
-`_05a_usability-inspection-package-and-evaluation.md` §7のCase A〜Xをすべて含めます。
+`_05a_usability-inspection-package-and-evaluation.md` §7のCase A〜ADをすべて含めます。
 
 ### real Agent
 
@@ -372,7 +404,10 @@ repository標準件数に合わせます。
 - objective factとAIの専門評価を分離する
 - off-viewport locator shortcutでdiscoverability問題を隠さない
 - actionability waitをpost-input responsivenessへ混ぜない
-- strict criterionとadvisory guidanceを分ける
+- strict requirementとadvisory guidanceを分ける
+- general accessibility inspectionとWCAG conformance evaluationを分ける
+- responsive / touch-capable / mobile device emulationを分ける
+- Core Web Vitalsを独自算出しない
 - taskが指定された場合だけtask modeを使う
 
 ことを確認します。
@@ -406,16 +441,21 @@ repository標準件数に合わせます。
 - applicable standard / binding requirementをcriterion単位で判定できる
 - test rule resultとrequirement resultを分離できる
 - requirement `satisfied` に必要なpopulation / required checks closureを検証できる
+- general accessibility inspectionとexplicit WCAG conformance evaluationを分離できる
+- WCAG conformance evaluationがWCAG-EM 2.0へ追跡できる
 - criterionのapplicability / exception / evidenceを保持する
 - advisory guidanceをstrict FAILへ変換しない
 - project thresholdがなければ独自FAIL thresholdを作らない
-- measurementのmethod / value / unit / evidenceを保持する
+- measurementのmetric source / method / value / unit / device profile / evidenceを保持する
+- LCP / CLS / INPを独自algorithmで再実装しない
+- existing Core Web Vitals sourceがない場合を `measurement-unavailable` へ閉じられる
 - single-run measurementを条件未達のfield metricへ昇格しない
 - Playwright auto-scrollでdiscoverability問題を隠さない
 - Playwright actionability waitとpost-input responsivenessを分離する
 - hidden implementation情報でUI発見を先回りしない
 - visual observationをscreenshot等へ追跡できる
-- keyboard / focusの全applicable populationをcoverage matrixに従って確認する
+- keyboard / focusのapplicable populationをrequested scope / accessibility経路に従って確認する
+- responsive viewport / touch-capable / mobile device emulationを区別する
 - task / flowは指定された場合だけ扱う
 - detailed TC実行をtest-executionと分離する
 - Cognitive Walkthroughを定義済み入力条件で実行し、通常inspectionへ無条件適用しない
@@ -442,16 +482,14 @@ repository標準件数に合わせます。
 
 まで完了扱いにしません。
 
-### 全件coverage完了条件
+### coverage完了条件
 
-- `_05c_usability-inspection-coverage.md` のWeb execution context matrixを閉じる
-- WCAG 2.2の全Success Criteriaをcoverage matrixへ登録し、対象scopeで各行をclosure
-- applicableなWAI-ARIA 1.2 / ARIA in HTML requirement populationをclosure
-- current public formal / proposed ACT Rulesを全件inventoryし、source status・Format/version・execution mode・実装経路を記録
-- ACT外checkをdeterministic-check-catalogへ全件登録
-- measurement matrixのapplicable rowをすべて実行または理由付き `measurement-unavailable` へ閉じる
+- `_05c_usability-inspection-coverage.md` のWeb / responsive / touch / mobile / discoverability契約を閉じる
+- `_05d_accessibility-and-conformance.md` のgeneral accessibility / explicit conformance / ARIA / supported ACT契約を閉じる
+- supported ACT RuleはACT Rules Format 1.1 §4.14.1 consistency fixtureをPASS
+- `_05e_performance-measurement.md` のdirect measurement / external Core Web Vitals source境界を閉じる
 - general inspectionの全上位観点をclosure
-- Case A〜XをすべてPASS
+- Case A〜ADをすべてPASS
 - canonical live Web E2EをPASS
 
 ## 21. 対象外

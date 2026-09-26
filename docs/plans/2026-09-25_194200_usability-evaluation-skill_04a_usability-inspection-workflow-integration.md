@@ -38,6 +38,7 @@ follow-upが必要な場合だけFinding
 - mobile Web viewportで表示崩れや操作性を確認
 - keyboard操作やfocusに問題がないか確認
 - target sizeやaccessible name等を標準に照らして確認
+- WCAG 2.2 AAへのconformance evaluationを実施
 - 操作後のfeedbackや表示速度を実測
 - このflowを実際に操作しながら使い勝手を確認
 
@@ -51,6 +52,8 @@ follow-upが必要な場合だけFinding
 - WAI-ARIA / WCAG / Design Systemに照らして設計を評価
 
 「usabilityを確認」のように実操作有無が明示されない場合は、live targetを操作して確認する要求か、design artifact / 取得済みevidenceをreference knowledgeへ照合する要求かでroutingします。
+
+「accessibilityを確認」はgeneral accessibility inspection、「WCAG 2.2 AA適合を評価」のようにversion / level / conformanceを明示する要求はWCAG conformance evaluationとして区別します。後者でversion / level / evaluation scopeを確定できない場合は推測せず `unresolved` とします。
 
 ## 3. test-target-inspectionとの境界
 
@@ -194,6 +197,7 @@ qa-workflowは次をすべてrouting contractとして持ちます。
 
 - design artifact / 取得済みevidenceのreference-based UI / UX review → usability-evaluation
 - live Web UIのユーザビリティ検査 → usability-inspection
+- live Web UIのexplicit WCAG conformance evaluation → usability-inspection | WCAG-EM 2.0経路
 - current target inventory → test-target-inspection
 - prescribed detailed TC execution → test-execution
 - Charter-based open exploration → exploratory-testing
@@ -271,7 +275,7 @@ usability-inspectionが扱うのは、user-facingな表示・interactionの実�
 - distributed tracing基盤
 - RUM収集serviceの新設
 
-project thresholdや有効な標準metricがある場合は、その定義に従って評価できます。
+project thresholdがあるmeasurementはそのAuthorityに従って評価できます。Core Web Vitalsは `_05e_performance-measurement.md` の既存measurement source境界に従い、本Skill独自algorithmでは算出しません。
 
 条件を満たさない単一runの値をfield metricや製品全体のperformance判定へ昇格しません。
 

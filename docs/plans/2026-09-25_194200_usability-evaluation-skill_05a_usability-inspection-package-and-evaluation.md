@@ -8,8 +8,10 @@
 skills/usability-inspection/
 ├── SKILL.md
 ├── references/
+│   ├── source-catalog.md
 │   ├── inspection-method.md
-│   ├── standards-and-measurements.md
+│   ├── accessibility-and-conformance.md
+│   ├── performance-and-measurement.md
 │   └── playwright-observation.md
 ├── scripts/
 │   ├── runtime_contract.py
@@ -18,7 +20,7 @@ skills/usability-inspection/
 │   └── criterion_checks.py
 ├── assets/
 │   ├── output-template.md
-│   └── deterministic-check-catalog.json
+│   └── test-rule-catalog.json
 └── evals/
     ├── trigger/
     │   ├── train_queries.json
@@ -64,23 +66,17 @@ UI pattern、heuristic、Design System、WCAG等の詳細knowledgeは `usability
 
 usability-inspection packageのreferenceは、実対象の検査・測定・Playwright上の観測方法に限定します。
 
-### accessibility / standard criteria
+### accessibility / conformance
 
-適用可能なWCAG Success Criterion等をcriterion単位で評価します。
+一般的なaccessibility inspectionと、explicitなWCAG conformance evaluationを分離します。
 
-例:
+- general inspectionでは対象UIへapplicableなaccessibility concern / requirementを確認する
+- WCAG conformanceを明示要求された場合はWCAG-EM 2.0に従う
+- component / sample結果をproduct-wide conformanceへ昇格しない
+- WAI-ARIA / ARIA in HTMLのapplicable requirementをhost languageとともに確認する
+- ACT Rulesはinformativeなtesting methodとして使用し、全rule実装を完成条件にしない
 
-- target size / spacing
-- keyboard operation
-- focus visibility
-- reflow
-- error identification
-- accessible name / role / state
-- contrast
-
-criterionの例外、applicability、必要な証拠を無視して数値だけでFAILにしません。
-
-WCAG / WAI-ARIA / ARIA in HTML等の詳細referenceは `usability-evaluation` のsource catalogを再利用します。
+詳細は `_05d_accessibility-and-conformance.md` を正本とします。
 
 ### interaction principles / UI pattern
 
@@ -105,16 +101,11 @@ general inspectionの固定workflow、独立Skill、独立成果物種別には�
 
 ### performance
 
-performance / responsiveness referenceとしてcurrentな公式資料から次を確認し、実装対象を `_05c_usability-inspection-coverage.md` のmeasurement matrixへ固定します。
+本Skillが直接測定するのは、Navigation Timing、FCP、同一clock domainで定義できるuser-facing interaction timingです。
 
-- Core Web Vitalsのmetric定義
-- LCP / INP / CLSの測定条件
-- lab / fieldの違い
-- FCP等のdiagnostic metric
-- Navigation Timing / Performance API
-- user-facing interaction timing
+LCP / CLS / INPは独自algorithmで再実装せず、project既存のRUM / CrUX / web-vitals instrumentation / Lighthouse等、metric provenanceを確認できる既存measurement sourceがある場合だけCore Web Vitalsとして受け取ります。
 
-単一Playwright runでfield dataのpercentileを満たしたと扱いません。
+詳細は `_05e_performance-measurement.md` を正本とします。
 
 ### Playwright
 
@@ -133,20 +124,26 @@ performance / responsiveness referenceとしてcurrentな公式資料から次�
 
 ## 4. source方針
 
-`usability-evaluation` のUI pattern corpus向けall-source discoveryを、usability-inspection packageへ複製しません。
+`usability-evaluation` のUI pattern corpusをinspection packageへ複製しません。
+
+inspection packageには `references/source-catalog.md` を置き、live inspection / conformance / measurementに利用する公式sourceのURL、status、checked_atを保持します。
+
+seedは `_02c_seed-source-catalog.md` §3です。
 
 理由:
 
-- UI / UX knowledgeの正本を1箇所に保つ
+- UI pattern knowledgeの正本を1箇所に保つ
 - inspection packageはlive execution / observation方法に集中する
-- Design Systemやpattern catalogを重複保持しない
-- source freshness / license確認を二重化しない
+- inspection固有のPlaywright / WCAG-EM / measurement sourceはpackage単独で辿れる
+- external source URLをSKILL.mdへ散在させない
 
-usability-inspection固有sourceは、実行・測定契約を定義する公式資料を優先し、公式資料が存在しないinspection methodologyだけ、原著・手順・適用条件を追跡できる公開資料を採用します。採用条件は `_02b_reference-validation-and-completeness.md` と同じpublic-only境界を使います。
+## 4.1 coverageの正本
 
-## 4.1 全件coverageの正本
+- Web execution context / responsive / mobile / discoverability / Cognitive Walkthrough / E2E → `_05c_usability-inspection-coverage.md`
+- accessibility / WCAG conformance / WAI-ARIA / ACT → `_05d_accessibility-and-conformance.md`
+- performance / responsiveness measurement → `_05e_performance-measurement.md`
 
-Web execution context、WCAG 2.2全Success Criteria、WAI-ARIA / ARIA in HTML、formal / proposed ACT Rules、ACT外check、measurement、Cognitive Walkthrough、canonical E2Eの完全性は `_05c_usability-inspection-coverage.md` を正本とします。
+本ファイルのsemantic caseや例示だけを実装範囲の上限にしません。
 
 本ファイルのsemantic caseや例示だけを実装範囲の上限にしません。
 
@@ -247,7 +244,8 @@ W3C ACT Rule等の個別test ruleまたはSkill runtimeの対応済みdeterminis
 - test rule result ref
 - check key
 - source rule ref
-- source status: formal / proposed / project / helper
+- source type: act-rule / project-rule
+- source status: formal / proposed / project
 - mapped requirement refs
 - target ref
 - applicability
@@ -257,9 +255,11 @@ W3C ACT Rule等の個別test ruleまたはSkill runtimeの対応済みdeterminis
 
 result vocabulary:
 
-- ACT Rules Format 1.1に従うACT Rule implementation → `inapplicable / passed / failed / cantTell / untested`
-- proposed ACT Rule → source-defined ruleとACT Rules Format versionを確認し、対応するoutcomeを保持する。formal ruleと同じstatusにはしない
-- project / helper check → ACT outcomeを装わず、そのcheck自身の定義済みresult vocabularyを保持する
+- supported ACT Rule → ACT Rules Format 1.1の `inapplicable / passed / failed / cantTell / untested`
+- proposed ACT Rule →同じ5 outcomeを使い、source statusを `proposed` としてformal ruleと区別する
+- project rule → ACT outcomeを装わず、そのproject rule自身の定義済みresult vocabularyを保持する
+
+artifact ref、scope closure、geometry、elapsed、threshold等のhelperはtest rule resultへ入れず、inspection_structure.py / measurement.pyで処理します。
 
 test rule resultとrequirement全体のresultを分離します。
 
@@ -271,6 +271,7 @@ ACT Rule outcomeは、そのruleのtest subject / targetとrequirements mapping�
 
 - measurement ref
 - metric / measurement label
+- metric source type
 - target action / region
 - start event
 - start event取得方法
@@ -280,9 +281,12 @@ ACT Rule outcomeは、そのruleのtest subject / targetとrequirements mapping�
 - measurement method
 - elapsed / value
 - unit
-- environment / viewport
+- environment / viewport / device profile
+- input method
+- cache / navigation state等の実行条件
 - threshold value（存在する場合）
 - threshold source / Authority（存在する場合）
+- external metric source ref（存在する場合）
 - result: within-threshold / over-threshold / threshold-not-defined / measurement-unavailable
 - evidence refs
 - limitation
@@ -382,7 +386,7 @@ semanticな適用性やUI / UX上の意味判断をdeterministic validatorで代
 
 ## 7. semantic eval
 
-次のCase A〜Xをすべて評価します。
+次のCase A〜ADをすべて評価します。
 
 ### Case A: page inspection without task
 
@@ -500,11 +504,11 @@ native iOS / Android appの実機操作を要求された場合、Web-only live 
 
 1つのbuttonだけtarget sizeを確認してPASSだったが、同じpageには他のpointer targetがある。
 
-単一targetの結果からpage全体のWCAG requirementを `satisfied` へ昇格せず、必要なpopulationを閉じられなければrequirementは `undetermined` またはより狭いevaluation scopeで記録すること。
+単一targetの結果からpage全体のWCAG Success Criterionを `satisfied` へ昇格しないこと。element-localなcheck結果はtest rule / Observationとして保持し、Success Criterion全体を閉じられなければ `undetermined` とすること。
 
 ### Case V: ACT RuleとWCAG criterion
 
-formal ACT Ruleを実行してrule outcomeが `passed` になったが、そのruleのoutcome mappingだけではWCAG Success Criterion全体を `satisfied` と確定できない。
+supported formal ACT Ruleを実行してrule outcomeが `passed` になったが、そのruleのoutcome mappingだけではWCAG Success Criterion全体を `satisfied` と確定できない。
 
 test rule resultは `passed` として残し、requirement resultを独立して判定すること。
 
@@ -520,6 +524,42 @@ bounding boxの数値計算、elapsed計算、threshold比較はruntime script�
 
 必要最小限のevidenceだけ取得し、安全にraw保存できない場合は観測事実・条件・非保存理由だけで成果物を成立させること。
 
+### Case Y: general accessibility inspection
+
+「この画面のaccessibilityも確認して」という依頼。
+
+applicable concern / requirementを確認するが、WCAG 2.2 AA等のproduct-wide conformance claimを作らないこと。
+
+### Case Z: explicit WCAG conformance evaluation
+
+「このWeb productがWCAG 2.2 AAに適合しているか評価して」という依頼。
+
+WCAG-EM 2.0経路を選択し、version / level / evaluation scope / representative sample / complete process / Step 1〜4 outcomeをevaluation reportへ追跡できること。evaluation statementは全non-optional methodology requirement・全sampleのtarget達成・product owner commitmentを確認できる場合だけ生成し、representative sampleだけからproduct-wide WCAG conformance claimを作らないこと。
+
+### Case AA: conformance input unresolved
+
+「WCAGに適合しているか確認して」とだけ依頼され、target version / level / scopeを案件contextから解決できない。
+
+AA等を推測せず、conformance evaluationの不足条件を `unresolved` とすること。一般accessibility inspectionへ勝手に読み替えて「適合」と報告しないこと。
+
+### Case AB: touch-capable is not mobile emulation
+
+`hasTouch=true` だがdesktop user agent / viewport / mobile behaviorのcontext。
+
+touch-capable inspectionとして扱い、mobile device emulationを完了したと報告しないこと。mobile emulationでは使用device profile / viewport / screen / userAgent / deviceScaleFactor / hasTouch / isMobileを記録すること。
+
+### Case AC: Core Web Vitals source unavailable
+
+live Web pageは検査できるが、project既存RUM / CrUX / web-vitals instrumentation / Lighthouse等のvalid Core Web Vitals sourceがない。
+
+LCP / CLS / INPを独自実装して作らず `measurement-unavailable` とし、Navigation Timing / FCP / user-facing interaction timingは継続できること。
+
+### Case AD: supported ACT Rule consistency
+
+ACT Ruleをsupported implementationとして追加するcase。
+
+official examplesとrequirements mappingをfixture化し、ACT Rules Format 1.1 §4.14.1のconsistency条件を確認すること。条件を満たせないruleをsupported ACT implementationとして登録しないこと。
+
 ## 8. trigger eval
 
 positive例:
@@ -529,6 +569,9 @@ positive例:
 - mobile Webで表示崩れと操作性を確認
 - keyboard / focus / error表示を確認
 - target sizeなどをWCAG基準で確認
+- WCAG 2.2 AA conformance evaluationを実施
+- touch操作を確認
+- mobile device profileで操作性を確認
 - この操作のfeedback速度を実測
 - このflowを実際に操作して使い勝手を確認
 

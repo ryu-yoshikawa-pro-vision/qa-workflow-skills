@@ -36,9 +36,11 @@ qa-workflowが要求・scope・利用可能な証拠からroutingします。
 
 「実際に操作して使い勝手を確認」「表示崩れ・keyboard / focus・標準適合・操作後の遅さをlive targetで確認」「指定flowを実際に操作して確認」等、live UIの検査を要求する場合は `usability-inspection` を開始します。
 
+「WCAG 2.2 AAへ適合しているか評価して」等、live Web targetに対するconformance evaluationを明示する場合も `usability-inspection` を開始し、`_05d_accessibility-and-conformance.md` のWCAG-EM 2.0経路を使用します。単に「accessibilityも確認して」という依頼はgeneral accessibility inspectionであり、conformance claimを作りません。
+
 「usabilityを確認」「UIの使いやすさを見て」のように実操作の有無が明示されない場合は、次の順でroutingします。
 
-1. live Web entry pointが評価対象として与えられ、安全に到達できる → `usability-inspection`。取得したevidenceを `usability-evaluation` へ渡す
+1. live Web entry pointが評価対象として与えられ、安全に到達できる → `usability-inspection`。explicit WCAG conformance要求ならconformance経路、それ以外はgeneral inspection経路を選ぶ。取得したevidenceを `usability-evaluation` へ渡す
 2. live Web targetがなく、screenshot / Figma / specification / 保存済みevidenceがある → `usability-evaluation`
 3. live Web targetと静的evidenceの両方がある → live inspectionを行い、静的evidenceも同じevaluation contextへread-onlyで渡す
 4. ユーザーが「操作しない」「このscreenshotだけ」等の制約を明示した → その制約を優先して `usability-evaluation`

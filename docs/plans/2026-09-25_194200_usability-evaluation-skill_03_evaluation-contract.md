@@ -257,7 +257,7 @@ requirementを `satisfied` とする前提が不足している場合、専門�
 
 を確認します。
 
-### Step 8: cross-pattern整合
+### Step 9: cross-pattern整合
 
 component単体が妥当でもflow全体で問題になる場合があります。
 
@@ -270,7 +270,7 @@ component単体が妥当でもflow全体で問題になる場合があります�
 
 必要な場合だけflow単位で再評価します。
 
-### Step 9: UI / UX評価項目を閉じる
+### Step 10: UI / UX評価項目を閉じる
 
 各評価項目は次を必須fieldとして持ちます。
 
@@ -301,7 +301,7 @@ component単体が妥当でもflow全体で問題になる場合があります�
 
 `適用したreference` は1件以上の配列として扱い、1行につき1つの `reference entry ref + source item ref` の組を持ちます。`source item ref` はそのreference entryに実際に含まれるitemでなければなりません。同じ評価項目でproject Authority、WCAG、Design System、heuristic等を併用する場合も、各source itemごとの `referenceの位置づけ` を別行で保持し、1つの値へ統合しません。`status reason / 制約・未確認` は `判定不能` / `対象外` では必須です。
 
-### Step 10: 必要な場合だけFindingを作る
+### Step 11: 必要な場合だけFindingを作る
 
 PR #13のFinding定義を再利用し、後続QA活動で扱う必要がある検出事項だけに限定します。
 
@@ -380,17 +380,22 @@ usability-evaluationは一般guidanceをテスト要求へ昇格しません。
 
 ### WCAG
 
-Success Criterion単位で、
+`usability-evaluation` は、取得済みのWCAG requirement result / evidenceの意味をread-onlyで評価できます。live targetのWCAG conformance evaluation自体は `usability-inspection` と `_05d_accessibility-and-conformance.md` が担当します。
 
-- 今回のpage / process / evaluation scopeへ適用されるか
-- 必要なapplicable populationとrequired checksを閉じたか
+Success Criterion resultを扱う場合は、
+
+- 宣言したevaluation scope
+- applicable population
+- required checks
+- exception
+- evidence
 - `satisfied / not-satisfied / undetermined`
 
-を扱います。
+を保持します。
 
-applicableなcontentが存在しないことを必要なscopeで確認できた場合は、その根拠を保持してSuccess Criterionを `satisfied` と扱えます。ACT Ruleの `inapplicable` outcomeをWCAG Success Criterionのresult語彙へ流用しません。
+単一element / component / sampleだけの成功からpage / productのSuccess Criterionを `satisfied` へ昇格しません。
 
-ページ全体・process全体の適合が必要なcriterionをcomponentの一観測だけで完了扱いにしません。
+WCAG conformance claimはWCAG-EM 2.0に従うexplicit conformance evaluationの成果物でだけ扱います。ACT Ruleの `inapplicable` outcomeをWCAG Success Criterionのresult語彙へ流用しません。
 
 ### APG
 

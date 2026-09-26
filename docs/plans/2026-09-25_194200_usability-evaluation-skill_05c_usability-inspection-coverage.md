@@ -2,9 +2,9 @@
 
 ## 0. 本ファイルの対象
 
-本ファイルは `usability-inspection` のWeb live inspectionについて、実行条件、responsive / input coverage、WCAG / ARIA / ACT coverage、measurement、Cognitive Walkthrough、E2E完了条件を固定します。
+本ファイルは `usability-inspection` のWeb live inspectionについて、general inspectionのscope、Web実行条件、responsive / mobile、discoverability、Cognitive Walkthrough、evidence freshness、E2E完了条件を固定します。
 
-一部のcriterionや一部のsemantic caseだけを実装して完了扱いにしないための正本です。
+accessibility / WCAG conformanceは `_05d_accessibility-and-conformance.md`、performance measurementは `_05e_performance-measurement.md` を正本とします。
 
 ## 1. live対象
 
@@ -22,7 +22,7 @@
 - desktop native app
 - human participantを用いるusability study
 
-native screenshot / design artifact等は `usability-evaluation` の静的evidenceとして扱えます。native live automationを今回の未実装項目として残しません。
+native screenshot / design artifact等は `usability-evaluation` の静的evidenceとして扱えます。native live automationを未実装項目として残しません。
 
 ## 2. general inspectionのscope
 
@@ -42,11 +42,13 @@ native screenshot / design artifact等は `usability-evaluation` の静的eviden
 
 task / flowはユーザーまたは案件が明示した場合だけ追加します。
 
+accessibility rowを選んだことだけでWCAG conformance evaluationへ切り替えません。
+
 ## 3. Web実行条件
 
 ### 明示条件を優先
 
-user / project Authorityがbrowser、viewport、device、locale、input method、color scheme等を指定した場合はその条件を使用します。
+user / project Authorityがbrowser、viewport、device profile、locale、input method、color scheme等を指定した場合はその条件を使用します。
 
 ### desktop Web
 
@@ -61,198 +63,94 @@ user / project Authorityがbrowser、viewport、device、locale、input method�
 
 keyboard passはpointer操作で代替しません。
 
-### responsive / mobile Web
+## 4. responsive / touch / mobileを分離する
 
-responsive / mobileが対象の場合、次を確認します。
+### responsive viewport inspection
 
-1. project / adopted Design Systemに公開されたbreakpointがある場合は全breakpointを列挙
+layout breakpointやWCAG reflow等を確認する目的です。
+
+- current browser engineを維持
+- project / adopted Design Systemのbreakpointを列挙
+- current targetから取得できるmedia query / container query boundaryを列挙
+- boundary直前 / boundary / 直後を確認
+- viewport変更だけでdevice-specific behaviorを確認したとは扱わない
+
+### touch-capable inspection
+
+touch targetやtap操作等を確認する目的です。
+
+- `hasTouch=true` 等のtouch-capable contextを使用
+- touch成功をpointer成功から推測しない
+- touch-capableであることだけをmobile device emulationと呼ばない
+
+### mobile device emulation
+
+mobile browser behavior自体を確認する要求で使用します。
+
+user / projectがdevice profileを指定した場合はそのprofileを使います。
+
+指定がない場合は、現在利用するPlaywright実行経路が提供するbuilt-in device / generic mobile profileを使用し、実際に使用した
+
+- browser engine
+- device profile
+- viewport
+- screen
+- user agent
+- device scale factor
+- `hasTouch`
+- `isMobile`
+
+を成果物へ記録します。
+
+現在の実行経路で完全なmobile profileを構成できない場合は、responsive viewport / touch-capable inspectionとして実行できる範囲を明示し、device-specific mobile behaviorを確認済みとは扱いません。
+
+`isMobile` 等がbrowser engineでunsupportedな場合も同様です。
+
+## 5. responsive coverage
+
+responsive / mobileが対象の場合:
+
+1. project / adopted Design Systemに公開されたbreakpointがある場合は全boundaryを列挙
 2. current targetの公開CSS / machine-readable styleからwidth / heightに関係するmedia query / container query boundaryを取得できる場合は列挙
-3. 各layout boundaryの直前・boundary・直後で重要情報 / operation / clipping / overflow / overlapを確認
-4. WCAG 2.2 SC 1.4.10を評価する場合は、vertical scrolling contentを320 CSS px相当で確認し、該当する例外を評価
-5. mobile / touch interactionが対象の場合は `hasTouch=true` のbrowser contextを使い、pointer-only成功をtouch成功へ読み替えない
+3. 同じboundaryをcanonicalize
+4. 各boundaryの直前・boundary・直後で重要情報 / operation / clipping / overflow / overlapを確認
+5. applicable requirementがある場合はorientation、zoom、color scheme、reduced motion等もscopeへ追加
 
-同じ値の重複boundaryはcanonicalizeします。対象UIに存在しないbreakpointを創作しません。
+対象UIに存在しないbreakpointを創作しません。
 
-orientation、zoom、color scheme、reduced motion等は、applicable requirement / project Authority / target featureがある場合にcoverage matrixへ追加し、未確認のまま省略しません。
-
-## 4. discoverabilityとmachine population
+## 6. discoverabilityとmachine population
 
 DOM / accessibility tree / locatorは次に利用できます。
 
-- standard criterionの対象母集団列挙
+- requirement / test ruleの対象母集団列挙
 - applicability
 - machine-readable attribute / state取得
 - target発見後のautomation
 
 visual / pointer userがcontrolを発見できた証拠には利用しません。
 
-off-viewport targetのdiscoverability確認ではuser-facing scrollを行います。installed Playwrightがactionの `scroll: "none"` を提供する場合はreachability確認に使い、implicit auto-scroll成功をdiscoverability成功へ変換しません。
+off-viewport targetのdiscoverability確認ではuser-facing scrollを行います。installed Playwrightがactionのimplicit scrollを抑止する正式機能を提供する場合はreachability確認に使い、implicit auto-scroll成功をdiscoverability成功へ変換しません。
 
-## 5. WCAG 2.2 coverage matrix
+target発見後のtargeted scrollはautomation補助として使えますが、discoverability evidenceへ数えません。
 
-WCAG 2.2の全Success Criteriaを `references/standards-and-measurements.md` または専用coverage artifactへ登録します。
+## 7. visual / responsive concern
 
-各rowは次を持ちます。
+対象UIのapplicable state / viewport boundaryで次を確認します。
 
-- Success Criterion
-- conformance level: A / AA / AAA
-- applicable population
-- applicability evidence
-- required observations
-- related ACT Rule refs
-- deterministic check refs
-- semantic / interaction check
-- exceptions
-- execution owner
-- evidence refs
-- requirement result: satisfied / not-satisfied / undetermined
-- limitation
+- clipping
+- overflow
+- overlap
+- important / primary action見切れ
+- modal / popup positioning
+- unexpected horizontal scroll
+- focus indicator visibility
+- visual instability
+- text loss / unreadable wrapping
+- status / error visibility
 
-A / AA / AAAをinventoryから省略しません。
+DOM geometryだけで意味を確定できない場合はscreenshotを正式evidenceとして使用します。
 
-projectが特定conformance levelをbinding Authorityとして採用している場合、そのlevelまでをbinding requirementとして扱います。それ以外のlevelもstandard comparisonとして評価できますが、project defect / specification FAILへ自動変換しません。
-
-WCAG conformance claimはfull page等のconformance requirementを満たす場合だけ扱い、component / sample結果からproduct-wide conformanceを宣言しません。
-
-## 6. WAI-ARIA / ARIA in HTML coverage
-
-live target内のrole / state / property / host-language populationを列挙し、適用するWAI-ARIA 1.2 / current ARIA in HTML author requirementをcoverageへ登録します。
-
-各requirementで次を閉じます。
-
-- target population
-- host language / role applicability
-- required state / property / ownership関係
-- machine-readable observation
-- semantic exception
-- evidence
-- requirement result
-
-APG exampleをnormative requirementへ昇格しません。
-
-## 7. ACT Rules coverage
-
-取得時点でW3Cが公開するformal ACT Rulesとproposed ACT Rulesを全件inventoryします。
-
-各ruleについて次を保持します。
-
-- rule ID / URL
-- formal / proposed status
-- ACT Rules Format version
-- accessibility requirements mapping
-- applicability
-- expectation
-- assumptions
-- implementation execution mode: automatic / manual / semiAuto
-- required observations
-- Web-only scopeでの実行可否
-- check key / semantic procedure
-- limitation
-
-### automatic
-
-machine evidenceだけでrule全体を実行できる場合、`criterion_checks.py` の明示dispatchとして実装します。
-
-### manual / semiAuto
-
-browser ownerが必要evidenceを取得し、Agentがrule本文のapplicability / expectationに沿ってsemantic evaluationします。machine部分だけをrule全体のPASSへ昇格しません。
-
-### Web-only scopeで実行不能
-
-必要能力がnative app、human participant、取得不能external evidence等に依存しWeb live inspectionで閉じられない場合は理由をcoverageへ残し、rule outcomeを捏造しません。そのrule以外のrequired checks / evidenceでもmapped requirementを閉じられない場合だけrequirement resultを `undetermined` とします。
-
-current WAI公開ACT RulesはACT Rules Format 1.1互換として扱い、outcomeは `inapplicable / passed / failed / cantTell / untested` を使用します。formal / proposedはsource statusで区別します。
-
-## 8. ACT外check
-
-ACT Ruleではないmachine checkも `assets/deterministic-check-catalog.json` へ全件登録します。
-
-対象:
-
-- artifact-local ref / cross-reference
-- inspection scope closure
-- bounding box / target geometry
-- spacing calculation
-- viewport / overflow geometry
-- elapsed calculation
-- threshold comparison
-- project-specific machine-decidable rule
-- ACT Rule implementation helperで、ACT Ruleそのものではないcheck
-
-各checkはsource typeを明示し、独自checkをACT Ruleと呼びません。
-
-## 9. deterministic-check-catalog.json
-
-catalogはmetadataだけを持ち、式DSLやplugin registryにはしません。
-
-各entry:
-
-- check_key
-- source_type
-- source_rule_ref
-- mapped_requirement_refs
-- source_status
-- act_rules_format_version
-- execution_mode
-- required_observation_fields
-- output_scope
-- implementation_dispatch_key
-- checked_at / source_version
-
-`criterion_checks.py` は `implementation_dispatch_key` に対応する明示実装だけを実行します。
-
-## 10. performance / responsiveness measurement matrix
-
-次を実装対象として定義します。
-
-### Navigation / rendering diagnostic
-
-取得条件を満たす場合:
-
-- Navigation Timing
-- FCP
-- LCP
-- CLS
-
-### interaction
-
-該当interactionで:
-
-- observed user-facing input event → first visible feedback
-- observed user-facing input event → task-ready state
-- loading start → completion state
-
-### INP
-
-INPとして報告するのは、current metric定義と必要なinteraction observationを満たす場合だけです。単一の任意elapsedをINPと呼びません。
-
-### 共通measurement contract
-
-各measurement:
-
-- metric / measurement name
-- start event
-- start acquisition method
-- end event / predicate
-- end acquisition method
-- clock domain
-- method
-- value / unit
-- viewport / device / input method
-- browser / environment
-- cache / navigation state等、値の解釈に必要な実行条件
-- threshold
-- threshold Authority ref
-- evidence
-- result
-
-start / endは同一clock domainで取得します。保証できない場合は `measurement-unavailable` とします。
-
-project thresholdがなければ値は報告しても仕様FAIL thresholdを創作しません。
-
-field percentile / RUMを必要とする判定を単一Playwright runから作りません。
-
-## 11. Cognitive Walkthrough
+## 8. Cognitive Walkthrough
 
 次のいずれかが明示された場合に実行します。
 
@@ -271,47 +169,57 @@ intended flowはcurrent specification / user flow / validated TC等から確認�
 
 各回答にevidence、reference、status reasonを保持します。
 
-## 12. evidence freshness
+## 9. evidence freshness
 
-PR #11 / #12 merge後のcurrent identity / fingerprint / freshness contractを再利用します。
+PR #12 / #13 merge後の実装が実際に提供するartifact identity / revision / SHA / content identity / currentness条件を再利用します。
 
-既存evidenceをcurrentとして再利用するには、少なくとも対象identity、revision / fingerprint、state、environment、viewport / device、role / permission等、判定に影響する条件が今回scopeと一致する必要があります。
+上流成果物がfingerprintを正式に持つ場合だけ、そのfingerprintを利用します。PR #14のためにPR #12成果物へ新しいfingerprint contractを要求しません。
+
+既存evidenceをcurrentとして再利用するには、少なくとも判定に影響する次の条件を今回scopeと照合します。
+
+- target identity
+- artifact revision / content identity
+- environment / origin
+- version / build（取得できる場合）
+- viewport / device profile
+- role / permission
+- locale / feature flag / test data等、元成果物がcurrentness条件として保持する値
 
 一致を確認できないevidenceはhistorical contextとしては使えてもcurrent observationの代替にはしません。
 
-## 13. semantic / E2E validation
+## 10. semantic / E2E validation
 
-`_05a_usability-inspection-package-and-evaluation.md` のCase A〜Xをすべて実Judgeで評価します。
+`_05a_usability-inspection-package-and-evaluation.md` のCase A〜ADを実Judgeで評価します。
 
-canonical real Agent validationでは次を必須にします。
+canonical real Agent validationでは次を含めます。
 
 - taskなしgeneral page inspection
 - task / flowありinspection
 - desktop pointer + keyboard
 - responsive boundary
-- mobile / touch applicable case
-- accessibility criterion population closure
-- ACT automatic case
-- ACT manual / semiAuto case
+- touch-capable case
+- mobile device emulationが利用可能なcase
+- accessibility inspection
+- explicit WCAG conformance evaluation
 - visual screenshot evidence
 - thresholdあり / なしmeasurement
+- external Core Web Vitals sourceあり / なし
 - usability-evaluation read-only連携
 - cleanup
 
-環境が利用できない場合はblockedであり、実装完了にしません。
+環境が利用できない必須caseはblockedであり、実装完了にしません。
 
-## 14. 完了条件
+## 11. 完了条件
 
 - general inspectionの全上位観点がclosure
-- Web execution condition matrixのapplicable rowがclosure
-- WCAG 2.2全Success Criteriaがcoverage matrixへ登録済み
-- applicable WCAG populationがclosure
-- applicable WAI-ARIA / ARIA in HTML requirement populationがclosure
-- current public formal / proposed ACT Rulesが全件inventory済み
-- 各ACT Ruleにstatus / Format version / execution mode / implementation pathがある
-- ACT外checkがcatalogへ全件登録済み
-- applicable measurement matrixがclosure
+- responsive / touch / mobileの実行条件が区別される
+- applicable responsive boundaryがclosure
+- discoverabilityとmachine populationが分離される
+- applicable visual concernがclosure
 - Cognitive Walkthrough対象caseが定義手順でclosure
-- Case A〜X PASS
+- PR #12 currentness契約に存在しないfingerprintを要求しない
+- `_05d_accessibility-and-conformance.md` の完了条件を満たす
+- `_05e_performance-measurement.md` の完了条件を満たす
+- Case A〜AD PASS
 - canonical live Web E2E PASS
 - blocked 0

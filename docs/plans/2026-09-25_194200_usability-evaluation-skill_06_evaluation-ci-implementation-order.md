@@ -38,27 +38,30 @@ PR #11 / #12 / #13がPlanから変更されて実装された場合、実装をP
 
 既存Skillで今回責務が既に実装済みなら重複Skillを作らず再評価します。
 
-## 3. Step 1: source inventory
+## 3. Step 1: seed source catalog / capability coverage
 
-reference本文を書く前にsource母集団を固定します。
+reference本文を書く前に `_02c_seed-source-catalog.md` の既知sourceを全件再確認します。
 
-各採用sourceについて、
+各seedで、
 
-- index / sitemap / category pages
-- 公開pattern一覧
-- 公開component一覧
-- accessibility guidance
-- interaction / layout / content guidance
-- source status
-- terms / license
+- canonical URL / redirect
+- publisher / owner
+- source category
+- publication / lifecycle status
+- public access
+- checked_at
+- license / terms上の扱い
+- adopted / reference-only / replaced / unavailable / rejected
 
-を確認します。
+を `references/source-catalog.md` へ記録します。
 
-加えて、Plan作成時のseed sourceだけで閉じず、`_02a_source-acquisition-and-coverage.md` §5のsource discoveryを順番どおり実施します。Q1〜Q7は初期queryとして実行し、source categoryやcoverageに不足があれば追加queryを続けます。各queryは検索手段が実際に到達できる結果終了またはprovider側の取得境界まで確認し、Plan側の件数・page数上限では打ち切りません。adopted sourceの関連cross-linkも確認し、cross-link由来でadoptしたsourceを同じ確認対象へ追加して、未処理candidate / 未確認adopted sourceがなくなるまで閉じます。candidateは `source-catalog.md` へ記録し、pendingを0にしてからadopted sourceのitem inventoryへ進みます。
+同時に `_02a_source-acquisition-and-coverage.md` §3のcapability coverageを `source-coverage.md` に作成します。
 
-source-coverageの初期母集団を作ります。
+Q1〜Q7はすべて実行し、検索手段が到達できるresult boundaryを記録します。capability coverageにgapがある場合だけ追加queryを作り、candidateの採否を閉じます。
 
-この時点では代表patternだけ先に完成扱いにしません。
+Plan側の任意件数で検索を打ち切りません。一方、「新しいsourceが見つからなくなるまで」cross-linkを再帰探索することも完了条件にしません。
+
+normative dependency、successor / current version、coverage gap解消、意味理解に必要な公式関連documentだけをcross-link確認します。
 
 ## 4. Step 2: source利用条件確認
 
@@ -87,6 +90,7 @@ source-coverageの初期母集団を作ります。
 - evaluation-method.md
 - reference entry共通形式
 - source discovery query matrix
+- `scripts/reference_catalog.py` のcanonical URL / ID / coverage生成fixture
 - reference catalog validatorの最小schema検証
 
 この時点で大量のreference本文は作りません。
@@ -122,70 +126,53 @@ source-coverageの初期母集団を作ります。
 
 このStepでは `test-target-inspection` / `test-execution` / `qa-workflow` 自体を先行変更しません。PR #12の入力・evidence契約と同じ形のfixtureまたは既存の保存済みevidenceを使い、usability-evaluation単体の入出力・reference読込・評価契約を検証します。実owner Skillへの接続はStep 10だけで行います。
 
-このStepは最終収録範囲を縮小するものではありません。ここで契約を確認した後、Step 5〜7ですべてのadopted source itemを収録し、Step 8のcompleteness gateを満たすまで実装完了とは扱いません。
+このStepは最終能力coverageを縮小するものではありません。ここで契約を確認した後、Step 5〜7で各coverage axisに必要なnormalized referenceを実装し、Step 8のcompleteness gateを満たすまで実装完了とは扱いません。
 
 縦断検証でschema変更が必要になった場合は、この時点で修正してから全source収録へ進みます。
 
-## 7. Step 5: standards / accessibilityを全件収録
+## 7. Step 5: standards / accessibility reference
 
-次をsource inventory順に処理します。
+次をsource catalogでcurrentな公式sourceへ解決し、必要なnormalized referenceを実装します。
 
 - WCAG 2.2
-- relevant Understanding
-- relevant Techniques / Failures
-- WAI-ARIA 1.2 Recommendation
-- current ARIA in HTML Recommendation
-- WAI-ARIA APG Patterns
-- WAI-ARIA APG Practices
-- current ACT Rules Format
-- W3C formal ACT Rulesとrequirements / outcome mapping
-- 取得時点で公開されているproposed ACT Rulesを全件inventoryし、formal inventoryと分離してstatus付きで確認
+- relevant Understanding / Techniques / Failures
+- WCAG-EM 2.0
+- WAI-ARIA 1.2
+- current ARIA in HTML
+- WAI-ARIA APG
+- ACT Rules Format 1.1 / All ACT Rules
 
-source-coverage上の対象をすべて閉じます。
+WCAG / ARIAのbinding / normative requirement、informative guidance、ACT testing methodを混同しません。
 
-## 8. Step 6: official Design Systems / platform guidanceを全件収録
+All ACT RulesのURL / rule一覧はcatalogから辿れるようにしますが、全ruleを本Skillのsupported implementationへすることは要求しません。
 
-情報源ごとに全公開対象をinventory順に処理します。
+## 8. Step 6: Design System / platform source catalog
 
-順序自体は実装効率のためであり、重要度ランキングではありません。
+`_02c_seed-source-catalog.md` に列挙したGOV.UK、USWDS、Carbon、Fluent 2、Atlassian、Spectrum、Primer、SLDS、SAP Fiori、GNOME HIG、Apple HIG、Material 3、Shopify Polarisをsource catalogへ登録・再確認します。
 
-実装順:
+各sourceの全公開pageをnormalized corpusへ複製しません。
 
-1. GOV.UK Design System
-2. USWDS
-3. Carbon
-4. Fluent 2
-5. Atlassian Design System
-6. Adobe Spectrum
-7. GitHub Primer
-8. Salesforce Lightning Design System
-9. SAP Fiori
-10. GNOME Human Interface Guidelines
-11. Apple Human Interface Guidelines
-12. Material Design
-13. Shopify Polaris
+次の場合にsource item / reference entryを作ります。
 
-各sourceで、
+- capability coverageに必要
+- target platform固有のguidanceを保持する必要がある
+- projectがDesign Systemを採用している
+- common patternへ統合できないsource固有差分がある
 
-- source item取得
-- common entryへ統合可能か確認
-- source固有差分をplatform fileへ記録
-- coverage disposition / access state / maturity / field-level coverage更新
+## 9. Step 7: general pattern / heuristic reference
 
-を同じ工程で行います。
-
-## 9. Step 7: general pattern / heuristic sourcesを全件収録
+seed catalogの、
 
 - ソシオメディア UIデザインパターン
-- Nielsen Norman Groupの採用資料
+- Nielsen Norman Group
 - UI-Patterns.com
-- source discovery closureでadoptされた全pattern source
+- Welie
 
-を処理します。
+を再確認します。
 
-既にofficial sourceで十分定義される内容もsource provenanceとして価値があればmerged-duplicateで関係を保持できます。
+capability coverageに必要なpattern / heuristic / methodologyだけnormalized referenceへ取り込みます。
 
-本文を重複コピーしません。
+同じ意味を別sourceから重複コピーせず、provenance価値がある場合はmerged-duplicateとしてsource item関係を保持します。
 
 ### Plan作成時点で確認済みの取得上の注意
 
@@ -207,28 +194,26 @@ source-coverage上の対象をすべて閉じます。
 
 ## 10. Step 8: completeness gate
 
-source-coverage validatorを実行し、
+`reference_catalog.py` と独立validatorを実行し、次を閉じます。
 
-- source-catalogのpending candidate
-- Q1〜Q7または追加queryのdiscovery実行記録不足 / 未完了
-- queryのretrieval boundary未記録、またはPlan側の件数上限による打ち切り
-- adopted sourceのcross-link実行記録不足 / 未完了
-- cross-link由来でadoptしたsourceがcross-link確認対象へ追加されていない状態
-- pending candidate / discovery実行記録のblocked残存
-- coverage disposition未設定
-- access state未設定
-- includedなのにdestinationなし
+- seed catalogの未確認source
+- Q1〜Q7 / gap queryの未完了
+- retrieval boundary未記録
+- capability coverageの未closure / blocked
+- pending candidate
+- canonical URL duplicate
+- source / item / reference ID不整合
+- included / merged-duplicateなのにreference destinationなし
 - included / merged-duplicateで `available_dimensions != captured_dimensions`
-- source item ref不明
-- orphan reference
-- broken index
+- semantic validation fail / 未実施
+- orphan reference / broken index
 - required metadata不足
 
 を0にします。
 
-`unavailable` / `source-reference-only` は理由があれば未達扱いにしません。maturity / lifecycleはsource自身が明示する場合だけ保持し、coverage dispositionやaccess stateへ混ぜません。
+reference-only / unavailableは理由があれば未達扱いにしません。
 
-未処理の空欄は未達です。
+catalogへ載せたsource全pageをitem化・意味検証することは要求しません。normalized corpusへ採用した全itemはsemantic validationをPASSさせます。
 
 ## 11. Step 9: Skill / evalを全referenceへ拡張
 
@@ -382,7 +367,8 @@ UI patternを含むtest-condition-design
 - status
 - required fields
 - unresolved constraints
-- source catalog / discovery実行記録 / retrieval boundary / coverage disposition / access state / maturity / field-level coverage
+- source catalog / seed確認 / discovery実行記録 / retrieval boundary / capability coverage / source item disposition / field-level coverage
+- `reference_catalog.py` のcanonical URL / ID / summary生成とvalidatorの独立検証
 - index integrity
 
 を検証します。
@@ -481,20 +467,18 @@ PR #12 / #13 merge後の実行基盤を使い、
 - root indexからpatterns / accessibility / platformsのsub-indexへ到達できる
 - sub-indexから対象pattern / concern / platform別referenceへ到達できる
 - 通常評価で全referencesの一括読込を要求しない
-- Q1〜Q7と追加した全queryがsource-catalogのdiscovery実行記録で `completed` へ閉じ、検索手段が実際に到達できた範囲とprovider側のretrieval boundaryが記録されている。Plan側で検索件数・page数・source数の上限を設けていない
-- 全adopted sourceのcross-link確認が `completed` へ閉じ、cross-link由来でadoptしたsourceも同じ確認対象へ追加されている。Plan側でcross-link段数の上限を設けていない
-- 0件結果も確認件数 / 新規candidate件数=0として記録され、pending candidateと `blocked` が残っていない
-- discoveryで得たcandidateがsource-catalogへ記録され、pendingが0
-- 採用sourceごとのadopted scopeとitem列挙元 / 列挙方法がsource-catalogへ記録され、対象item母集団がsource-coverageへ記録されている。source全体を列挙できない場合は有限に列挙できるsubsetだけをadopted scopeとし、source全体を全件取得済みと扱わない
-- 全source itemのcoverage dispositionがincluded / merged-duplicate / out-of-scope / unavailable / source-reference-onlyのいずれかへ閉じている
-- access stateがcoverage dispositionと分離され、restricted sourceを取得済みと誤認しない
-- source自身が明示するmaturity / lifecycleをcoverage dispositionと分離して保持している
-- included / merged-duplicate itemのfield-level coverageが `available_dimensions = captured_dimensions` で閉じている
-- 取得済みの関連情報を任意に除外してincluded扱いにする経路がない
-- JavaScript依存、login限定、deprecated / archived、redirect等の取得制約をcurrent sourceと混同せず状態化している
+- `_02c_seed-source-catalog.md` の全seedがsource-catalogへ確認結果・canonical URL・checked_at付きで記録されている
+- Q1〜Q7とcapability gapから追加したqueryがcompletedで、retrieval boundaryが記録されている
+- capability coverageの全rowがcovered / not-applicableへ閉じ、blockedが0
+- source candidateのpendingが0
+- cross-linkはnormative dependency / successor / coverage gap / 必要な公式関連documentだけを閉じている
+- source status / access state / adoption stateを分離して保持している
+- normalized corpusへ使う全source itemがincluded / merged-duplicate / reference-only / unavailable / out-of-scopeへ閉じている
+- included / merged-duplicate itemのfield-level coverageが `available_dimensions = captured_dimensions`
+- included / merged-duplicate全itemのsemantic validation PASS
 - included referenceからsource item ref、source ID、canonical URLへ追跡できる
 - reference entry内で各source item refにsource上の位置づけ / 適用条件が対応付いている
-- `included / merged-duplicate` の全source itemが原文との意味照合をPASSし、`unavailable / source-reference-only` の全itemでdisposition / canonical URL / access stateが確認されている
+- catalogへ載せただけのsource全pageを収録済み・意味検証済みとは主張していない
 - 各UI / UX評価項目に1件以上の `適用したreference` があり、各行でreference entry ref / source item ref / 今回のreferenceの位置づけが対応し、project固有のbinding根拠を使う場合はその行からproject Authority refを追跡できる
 - 判定不能 / 対象外のUI / UX評価項目にstatus reason / 制約・未確認が残る
 - usability-evaluation成果物で上位観点ごとの今回の扱いが固定され、「今回評価する」とした観点がすべて評価結果へ閉じている
@@ -519,9 +503,11 @@ PR #12 / #13 merge後の実行基盤を使い、
 
 ### 完全性に関する追加ゲート
 
-- `_02b_reference-validation-and-completeness.md` のsource discovery固定点、merge/split、全item semantic validationをPASS
-- source discoveryで未知のWeb sourceが存在しないとは主張しないが、定義済みcategory・query・cross-link・candidate集合に未処理を残さない
-- samplingだけのreference意味検証を完了条件に使わない
+- `_02a_source-acquisition-and-coverage.md` のcapability coverageをPASS
+- `_02b_reference-validation-and-completeness.md` のmerge / splitと全included item semantic validationをPASS
+- `_02c_seed-source-catalog.md` のknown sourceを公式URL付きでcatalogから辿れる
+- source discoveryで未知のWeb sourceが存在しないとは主張しない
+- normalized corpusへ採用したitemの意味検証ではsamplingを使わない
 
 ## 20. 対象外
 

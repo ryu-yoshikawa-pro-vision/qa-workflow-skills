@@ -26,6 +26,7 @@ skills/usability-evaluation/
 ├── assets/
 │   └── output-template.md
 ├── scripts/
+│   ├── reference_catalog.py
 │   └── validate-reference-catalog.py
 └── evals/
     ├── trigger/
@@ -210,27 +211,29 @@ PR #13のFinding契約を再利用し、後続QA活動で扱う必要がある�
 ### source ID
 
 - 形式: `SRC-\d{3,}`
-- 初回実装ではsource discovery closure後、全adopted sourceをcanonical root昇順で `SRC-001` から採番する
-- 初回実装後に新しくadoptしたsourceは既存最大番号+1を使う
+- 初回実装では採用・reference-onlyとして追跡するsourceをcanonical URL昇順で `SRC-001` から採番する
 - 追加sourceは既存最大番号+1を使う
-- 並び順、名称、canonical root変更だけを理由に既存IDを振り直さない
+- 並び順、名称、canonical URL変更だけを理由に既存IDを振り直さない
 - 削除・duplicate化したIDを別sourceへ再利用しない
 
 ### source item ref
 
 - 形式: `<source ID>-ITEM-\d{4,}`
-- 初回inventoryでは同一source内をcanonical URL、source item名称の順で並べ、`ITEM-0001` から採番する
-- 初回採番後は並べ替え、名称変更、redirectだけを理由にrefを変更しない
-- 新規itemは同一source内の既存最大番号+1を使う
+- normalized referenceへ実際に使うpage / sectionへだけ付与する
+- 初回採番では同一source内をcanonical URL、source item名称の順で並べ、`ITEM-0001` から採番する
+- 追加itemは既存最大番号+1を使う
+- 名称変更、redirectだけを理由にrefを変更しない
 - 削除・統合したrefを別itemへ再利用しない
 
 ### reference entry ID
 
 - 形式: `REF-\d{4,}`
-- 初回作成時は最終reference file path、entry名称の順で並べ、`REF-0001` から採番する
-- 初回採番後は並べ替え、名称変更、file移動だけを理由にIDを変更しない
-- 新規entryは既存最大番号+1を使う
+- 初回作成時は最終reference file path、entry名称の順で `REF-0001` から採番する
+- 追加entryは既存最大番号+1を使う
+- 並べ替え、名称変更、file移動だけを理由にIDを変更しない
 - 削除・統合したIDを別entryへ再利用しない
+
+source ID / source item ref / reference entry IDはAgentが手計算しません。`reference_catalog.py` が既存catalogと候補入力から決定論的に採番します。
 
 reference entry、UI / UX評価項目、Findingの根拠追跡ではsource item refを使い、評価項目ではさらにreference entry IDとの組を保持します。
 
@@ -241,36 +244,159 @@ source ID: SRC-001
 source item ref: SRC-001-ITEM-0001
 reference entry ID: REF-0001
 ~~~
-## 7. reference catalog validator
+## 7. reference catalog production script / validator
 
-all-source coverage要件を人手だけに依存させないため、Skill-localの小さいvalidatorを追加します。
+### reference_catalog.py
+
+Agentへ手計算させない処理をproduction scriptへ移します。
+
+scriptはMarkdown本文を書き換えず、既存artifactをread-onlyで読み、canonical JSONだけをstdoutへ返します。Agentはその結果をsource-catalog / source-coverage / reference entryへ反映します。
+
+CLIは次のsubcommandに固定します。
+
+#### normalize-url
+
+Input:
+
+- `--url <confirmed-canonical-url>`
+
+Function:
+
+- URL syntax検証
+- scheme / hostのcase正規化
+- fragment除去
+- default port等、URL identityを変えないsyntax正規化
+
+redirect追跡、official canonicalの意味判断、tracking parameter除去は行いません。Agent / research工程が公式sourceを確認してcanonical URLを入力します。
+
+Output:
+
+~~~json
+{"canonical_url":"https://example.com/path"}
+~~~
+
+#### next-source-id
+
+Input:
+
+- `--catalog references/source-catalog.md`
+
+Function:
+
+- existing `SRC-\d{3,}` を全件読取
+- duplicate / malformed IDを拒否
+- 既存最大番号+1を採番
+
+Output:
+
+~~~json
+{"source_id":"SRC-014"}
+~~~
+
+#### next-item-ref
+
+Input:
+
+- `--coverage references/source-coverage.md`
+- `--source-id SRC-014`
+
+Function:
+
+- 同一sourceのexisting item refを全件読取
+- duplicate / malformed refを拒否
+- 既存最大番号+1を採番
+
+Output:
+
+~~~json
+{"source_item_ref":"SRC-014-ITEM-0003"}
+~~~
+
+#### next-reference-id
+
+Input:
+
+- `--references-dir references`
+
+Function:
+
+- reference entry IDをreferences配下から全件読取
+- duplicate / malformed IDを拒否
+- 既存最大番号+1を採番
+
+Output:
+
+~~~json
+{"reference_entry_id":"REF-0042"}
+~~~
+
+#### summary
+
+Input:
+
+- `--catalog references/source-catalog.md`
+- `--coverage references/source-coverage.md`
+- `--references-dir references`
+
+Function:
+
+- pending / blocked件数集計
+- capability coverage status集計
+- source / item / reference件数集計
+- duplicate ID / unresolved cross-reference検出
+- deterministic sortしたsummary生成
+
+Output:
+
+~~~json
+{
+  "pending_candidates": 0,
+  "blocked_coverage": 0,
+  "source_count": 0,
+  "source_item_count": 0,
+  "reference_entry_count": 0,
+  "issues": []
+}
+~~~
+
+全subcommand:
+
+- 成功時exit 0
+- input / schema / duplicate / unresolved reference error時はnon-zero
+- stdoutは1つのJSON objectだけ
+- diagnosticはstderr
+- locale / 実行順に依存しない
+- network accessしない
+
+source採用、dimension抽出、merge / split、source position、projectへのbinding等の意味判断は行いません。
+
+### validate-reference-catalog.py
+
+production generatorとは別実装で検証します。
 
 確認対象:
 
 - index linkが存在する
-- source-catalogのsource IDが `SRC-\d{3,}` 形式で一意かつappend-only規則に従う
-- source-catalogのcandidate statusが許可値で、pendingが残っていない
-- source-catalogのdiscovery実行記録でQ1〜Q7と追加した全queryが `completed` へ閉じている
-- queryごとに検索手段のretrieval boundaryが記録され、Plan側の件数上限による打ち切りがない
-- 全adopted sourceのcross-link確認が `completed` へ閉じ、cross-link由来でadoptしたsourceも同じ確認対象へ追加されている
-- candidateが `pending` 以外へ閉じている
-- discovery実行記録に `blocked` が残っていない
-- source-coverageのsource IDがcatalogへ存在し、source item refが `<source ID>-ITEM-\d{4,}` 形式でsource-coverage内一意かつappend-only規則に従う
-- coverage disposition / access stateが許可値
-- source自身がmaturity / lifecycleを明示する場合は値を保持する
+- `_02c_seed-source-catalog.md` のseed確認結果がcatalogにある
+- source-catalogにcanonical URLがある
+- source IDが `SRC-\d{3,}` 形式で一意かつappend-only規則に従う
+- candidate statusが許可値でpendingが残っていない
+- Q1〜Q7とcoverage gapから追加したqueryがcompleted
+- queryごとにretrieval boundaryが記録されている
+- capability coverageの全rowがcovered / not-applicable / blockedへ閉じ、blockedが0
+- source item refが `<source ID>-ITEM-\d{4,}` 形式で一意
 - included / merged-duplicate itemにreference destinationがある
-- included / merged-duplicate itemで `available_dimensions = captured_dimensions` が成立する
-- reference destinationが実在する
-- reference entry IDが `REF-\d{4,}` 形式で一意かつappend-only規則に従う
-- pattern entryの各source item refがsource-coverageへ解決し、そこからsource IDがsource-catalogへ解決する
-- reference entryで各source item refにsource上の位置づけ / 適用条件が対応付いている
-- required metadataが欠けていない
+- included / merged-duplicate itemで `available_dimensions = captured_dimensions`
+- semantic validation recordがありfailが0
+- reference entry IDが `REF-\d{4,}` 形式で一意
+- source / item / referenceのcross-referenceが解決する
+- source position / platform / status / access state等のrequired metadataがある
 - orphan referenceがない
 - alias indexが存在しないentryを指さない
 
 validatorはsource本文の意味品質を判定しません。
 
-Webへアクセスしてsourceの最新状態を検査するruntimeにはしません。
+Webへアクセスしてsourceの最新状態を検査するruntimeにもせず、実装時のsource再確認はAgent / research工程が担当します。
 
 ## 8. deterministic output validator
 
@@ -325,14 +451,15 @@ LLM Judgeで次をすべて評価します。
 
 通常のSkill出力とは別に、reference自体の品質をfixtureで確認します。
 
-reference semantic evalは `_02b_reference-validation-and-completeness.md` の全item検証を実施します。
+reference semantic evalは `_02b_reference-validation-and-completeness.md` の全included item検証を実施します。
 
-- `included / merged-duplicate` の全source itemを原文と照合する
-- `unavailable / source-reference-only` は全itemのdisposition、理由、canonical URL、access stateを確認する
+- normalized corpusへ `included / merged-duplicate` とした全source itemを原文と照合する
+- `reference-only / unavailable` はcatalog / itemとして保持したmetadata、理由、canonical URL、access stateを確認する
 - referencesの `patterns / accessibility / platforms` の各経路についてindex解決を検証する
 - source conflict / merge / split / aliasのfixtureを検証する
+- capability coverageの各axisからreferenceへ到達できることを確認する
 
-samplingやsourceごとの1件spot-checkでは完了扱いにしません。
+normalized corpusへ採用したitemについてsamplingは使いません。catalogへ載せただけのsource全pageをsemantic validation対象にはしません。
 
 各itemの照合では少なくとも、
 

@@ -106,19 +106,21 @@ usability-evaluation の主責務は次です。
 
 ### accessibilityの評価
 
-- WCAG 2.2の対象Success Criterion
-- WAI-ARIA APGのpattern guidance
-- native semanticsを優先する原則
+general accessibility inspectionでは、対象UIへapplicableな、
+
+- WCAG 2.2のSuccess Criterion / concern
+- native semantics
 - role / state / property
 - accessible name / description
 - keyboard interaction
 - focus management
 - reading / navigation structure
 - contrast等、観測可能な視覚条件
+- WAI-ARIA APGのinformative pattern guidance
 
 を対象scopeに応じて確認します。
 
-単一画面・単一componentの観測から製品全体のWCAG適合を宣言しません。
+「WCAG 2.2 AAへの適合評価」のようにconformanceを明示された場合だけ、`usability-inspection` がWCAG-EM 2.0経路でscope / level / representative sample / complete process等を固定します。general accessibility inspectionや単一componentの観測から製品全体のWCAG適合を宣言しません。
 
 ### visual integrityの評価
 

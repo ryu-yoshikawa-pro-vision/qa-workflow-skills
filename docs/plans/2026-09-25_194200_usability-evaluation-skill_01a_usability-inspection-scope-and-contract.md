@@ -79,11 +79,13 @@ native iOS / Android app、desktop native app等の能動操作は本Skillの対
 - 今回検査する画面・機能・領域
 - environment / origin
 - viewport / device条件。指定がなければ現在の実行条件
+- responsive viewport / touch-capable / mobile device emulationのどれを要求しているか。明示がなければgeneral Web inspectionとして開始する
 - input method。指定がなければpointer + keyboardを基本とする
 - role / permissionが必要な場合は利用条件
 - 許可された副作用scope
 - 利用可能なtest data / account
 - project固有の仕様 / Design System / accessibility基準 / performance thresholdがある場合はそのAuthority
+- WCAG conformance evaluationを要求する場合はtarget WCAG version / conformance level / evaluation scope。確定できなければ推測せず `unresolved`
 
 ### 任意
 
@@ -115,7 +117,13 @@ general inspectionでは、次の上位観点をすべてscope rowへ作成し�
 - user-facing performance / responsiveness
 - task / flow（明示された場合のみrowを追加）
 
-特定観点だけを明示した依頼ではそのrequested scopeを尊重します。general inspectionで対象外にする場合は、UIに該当populationがない、実行条件上観測不能、または本Skillの責務外である理由を残します。詳細なWeb実行条件と全件coverageは `_05c_usability-inspection-coverage.md` を正本とします。
+特定観点だけを明示した依頼ではそのrequested scopeを尊重します。general inspectionで対象外にする場合は、UIに該当populationがない、実行条件上観測不能、または本Skillの責務外である理由を残します。
+
+- Web実行条件 / responsive / touch / mobile / discoverability → `_05c_usability-inspection-coverage.md`
+- accessibility / WCAG conformance / WAI-ARIA / ACT → `_05d_accessibility-and-conformance.md`
+- performance / responsiveness measurement → `_05e_performance-measurement.md`
+
+accessibilityをgeneral inspectionへ含めたことだけでWCAG conformance evaluationへ切り替えません。
 
 「今回確認する」とした観点は、最後に少なくとも次のいずれかへ閉じます。
 
@@ -274,28 +282,18 @@ task / flowが明示されている場合だけ、start state / success conditio
 
 破壊的操作や外部送信等はPR #12 merge後のside-effect契約へ従います。
 
-### Step 4: measurable checks
+### Step 4: standard / measurement checks
 
-適用可能なcriterion / metricについて測定します。
+今回scopeでapplicableなstandard / project requirementとmeasurementを実行します。
 
-例:
+- accessibility inspection / explicit WCAG conformance → `_05d_accessibility-and-conformance.md`
+- Navigation Timing / FCP / user-facing interaction timing / external Core Web Vitals source → `_05e_performance-measurement.md`
 
-- target size / spacing
-- reflow
-- focus visibility
-- keyboard operation
-- error identification
-- accessible name / state
-- contrast
-- visual clipping / overflow
-- project performance threshold
-- browser / page側で取得可能なperformance metric
+target size、contrast、focus、reflow等はcriterionのexceptionやapplicabilityを確認し、数値だけでFAILにしません。
 
-criterionのexceptionやapplicabilityを無視して数値だけでFAILにしません。
+ref採番、elapsed計算、threshold比較、scope closure、supported deterministic test rule等は `_05b_usability-inspection-deterministic-runtime.md` のruntime scriptを使い、LLMが手計算・再計算しません。
 
-ref採番、elapsed計算、threshold比較、scope closure、対応済みdeterministic test rule等は `_05b_usability-inspection-deterministic-runtime.md` のruntime scriptを使い、LLMが手計算・再計算しません。
-
-W3C ACT Rule等の個別test ruleを実行した場合、rule resultとWCAG / ARIA requirement全体のrequirement resultを分離します。rule outcomeが `passed` でも、それだけでrequirementを `satisfied` へ昇格しません。
+W3C ACT Rule等の個別test ruleを実行した場合、rule resultとWCAG / ARIA requirement全体のrequirement resultを分離します。rule outcomeが `passed` でも、それだけでrequirementを `satisfied` へ昇格しません。Core Web Vitalsを独自algorithmで再実装しません。
 
 ### Step 5: optional task / flow
 
@@ -361,46 +359,11 @@ current specification、user flow、validated TC等からintended flowを確認�
 
 ## 12. performance / responsiveness
 
-### project thresholdがある場合
+performance / responsivenessの取得対象、Core Web Vitalsの外部measurement source、field / lab境界、measurement input / output、deterministic処理は `_05e_performance-measurement.md` を正本とします。
 
-現在有効なperformance budget、SLO、仕様等をAuthorityとして比較できます。
+本SkillはNavigation Timing、FCP、定義済みuser-facing interaction timingを現在のbrowser/sessionから取得できます。
 
-### 標準metric / benchmarkを使う場合
-
-metricの定義・測定条件を満たす場合だけ、そのmetric名で報告します。
-
-Core Web Vitals等でfield dataやpercentileを要求する判定は、単一のPlaywright runだけから達成 / 不達成を宣言しません。
-
-### interaction measurement
-
-独自に測る場合は、何を測ったかを明示します。
-
-例:
-
-- 観測できたuser-facing input event → first visible feedback
-- 観測できたuser-facing input event → task-ready state
-- navigation start →主要内容が利用可能
-- loading start → completion state
-
-測定には、
-
-- start event
-- start event取得方法
-- end event / predicate
-- end predicate取得方法
-- clock domain
-- measurement method
-- elapsed time
-- viewport / device
-- environment
-- threshold Authority（存在する場合）
-- evidence ref
-
-を残します。
-
-elapsedを導出するstart / endは同一clock domainで取得します。host wall clockとpage側 `performance.now()` 等、異なるclockを直接減算しません。同一clock domainを保証できない場合は値を作らず `measurement-unavailable` とします。visible feedback等のend predicateは原則としてaction前に固定します。
-
-Playwright action呼び出し開始からの時間を、そのまま「ユーザー操作後の応答時間」とみなしません。actionability wait等のpre-action時間と、実際に観測できたinput event後のresponseを分離します。
+LCP / CLS / INPは本Skill独自のalgorithmで再実装しません。project既存のvalid measurement sourceがない場合は `measurement-unavailable` とし、他のmeasurementを継続します。
 
 project thresholdがない場合、独自の仕様FAIL thresholdを作りません。
 
@@ -465,7 +428,8 @@ Finding候補になり得るもの:
 - 観測事実とevidenceが追跡できる
 - standard / binding requirementを判定した場合はrequirement ref、evaluation scope、applicability、population closure、観測値 / 事実、test rule result refs、result、evidenceへ追跡できる
 - requirement `satisfied` は宣言scopeのapplicable population / required checksを閉じた場合だけ使用している
-- measurementを報告する場合は測定区間・方法・実測値へ追跡できる
+- measurementを報告する場合はmetric source、測定区間・方法・実測値、device profile / environmentへ追跡できる
+- Core Web Vitalsを報告する場合は既存measurement sourceへ追跡でき、本Skill独自計算値をCore Web Vitalsへ読み替えていない
 - Playwrightのauto-scroll / actionability waitでinspection対象のfrictionを隠していない
 - hidden implementation情報で操作対象を先回りしていない
 - task / flowが指定された場合は、その実行結果と制約を記録している
