@@ -396,7 +396,8 @@ deterministic runtimeへ載せるもの:
 - complete process materialization
 - Step 4.3 compare / reconcile
 - freshness / currentnessに必要なnormalized input
-- `wcag_em_structure.py` のclosure / cross-reference / statement / claim guard / machine-owned section materialization
+- `wcag_em_structure.py` のclosure / cross-reference / Evaluation Specifics / statement / claim guard / machine-owned section materialization
+- `earl_report.py` のhuman-readable result → EARL 1.0 JSON-LD materialization
 
 deterministic runtimeへ載せないもの:
 
@@ -622,9 +623,11 @@ Input:
 - sample requirement result decisions / evidence
 - content type / Finding grouping decisions
 - Finding semantic input
+- optional Evaluation Specifics input / archive refs
 - optional Evaluation Statement semantic input
-- optional WCAG Conformance Claim evidence
+- optional WCAG Conformance Claim evidence / optional components
 - optional WCAG Statement of Partial Conformance semantic input / evidence
+- machine-readable report request / assertor metadata
 - limitation
 
 各draftはinvocation内で一意な `draft_key` を持ちます。
@@ -655,8 +658,10 @@ Function:
 - structured revision更新時のcandidate population fingerprint再計算、population同一時のold random retention / overlap removal / top-up、population変更時のreselection、process再materializeを反映
 - sample result freshnessをPR #11 current verifier結果から反映し、stale resultをclosureへ数えない
 - Step 5.1でStep 1〜4の各required outcomeが成果物へ存在すること
+- Step 5.2 Evaluation Specificsのrecord scope / evidence refs / software metadata / secret非複製
 - Evaluation Statementのfull / partial minimum fieldsと生成条件
-- WCAG Conformance Claim / Statement of Partial Conformanceのtype別required fieldsと生成条件
+- WCAG Conformance Claim / Statement of Partial Conformanceのtype別required / optional fieldsと生成条件
+- Step 5.5 EARL sidecar request / ref / closure
 - report section order固定
 - summary count生成
 - machine-owned structured sectionをcanonical Markdownとしてrender。Agentがfinal refs / derived flags / counts / closure rowsを値単位で再構築しない
@@ -724,7 +729,33 @@ Conformance Claimとは別の非適合statementです。
 
 semantic layerはcontrol ownership、language support不足、除外時に適合するという意味判断を行います。script / validatorはstatement type、target version / level、required field、対象area / language、生成可否を閉じます。
 
-## 8. deterministic validator
+## 8. earl_report.py
+
+Input:
+
+- evaluation / assertor identity
+- canonical sample registry
+- target version static catalog
+- current sample requirement results
+- evidence provenance / test mode
+- optional pointer / human-readable info
+
+Function:
+
+- static catalogのcanonical criterion URIを使ってassertionを生成
+- artifact-local subject / assertion / result refを決定論的に生成
+- formal result statusをEARL outcomeへ固定mapping
+- modeはactual provenanceからのみmappingし、判定不能なら `unknownMode`
+- stable sort
+- canonical JSON-LDをrender
+
+Output:
+
+- `earl-report.jsonld` content
+- assertion refs / count
+- issues
+
+## 9. deterministic validator
 
 production helperとは別実装で少なくとも次を検証します。
 
@@ -754,15 +785,17 @@ production helperとは別実装で少なくとも次を検証します。
 - structured revision更新後のcandidate population fingerprint再計算、population同一時のoverlap除外 / retained random / top-up、population変更時のreselection、process再materialize
 - sample result freshness / stale再評価
 - Step 5.1のStep 1〜4 outcome closure
+- Step 5.2 Evaluation Specificsのscope / archive identity / tool metadata / secret・不要PII非複製
 - Evaluation Statement full / partial生成条件とStep 5.3 minimum fields
-- WCAG Conformance Claim required fields / full-scope coverage guard
-- WCAG Statement of Partial Conformance third-party / language guard
+- WCAG Conformance Claim required / optional fields / full-scope coverage guard
+- WCAG Statement of Partial Conformance third-party / language guard / canonical wording
+- Step 5.5 EARL assertion coverage、criterion URI、outcome mapping、mode provenance、human-readable reportとの一致
 - Finding refs
 - secret / credential非複製
 
 random selectionの結果そのものが「十分randomだったか」を同じvalidatorで証明しません。method / candidate scope / fixed-seed禁止等の契約を検証します。
 
-## 9. semantic eval
+## 10. semantic eval
 
 少なくとも次を実Judgeで確認します。
 
@@ -894,7 +927,25 @@ author control外で利用者が識別可能なthird-party contentを除けばta
 
 → WCAG Statement of Partial Conformance - Languageを生成する。
 
-## 10. 完了条件
+### Case X: Evaluation Specifics
+
+Step 5.2記録を要求し、sample archive、browser / tool / assistive technology、path / settings / actionsを入力する。
+
+→ immutable evidence refと再現情報を保存し、password / token / cookie / storageState値や不要PIIを保存しない。
+
+### Case Y: EARL machine-readable report
+
+Step 5.5を要求し、`satisfied / not-satisfied / undetermined` のformal resultを含む。
+
+→ canonical JSON-LDを生成し、`passed / failed / cantTell` へ一意にmappingし、assertion coverageがhuman-readable reportと一致する。
+
+### Case Z: optional Conformance Claim components
+
+required claim fieldsを満たし、higher-level SC、not-relied-upon technology、user agent / AT等のoptional evidenceも存在する。
+
+→ optional componentsをnormalized claimへ保持するが、required fieldの代替には使わない。
+
+## 11. 完了条件
 
 - package単体でSkill contractを理解できる
 - sibling Skillのscriptsへruntime依存しない
@@ -914,9 +965,13 @@ author control外で利用者が識別可能なthird-party contentを除けばta
 - 既存sample resultはPR #11 freshness判定がcurrentの場合だけ再利用する
 - sample / process / result / comparison refとmachine-owned structured sectionをscriptがmaterializeし、Agentが値単位で再構築しない
 - Step 4.3 loopをartifact上で追跡できる
-- Step 5.1のrequired outcome closureとStep 5.3 Evaluation Statement full / partial minimum fieldsをvalidatorで検証できる
-- WCAG 2.0 / 2.1 / 2.2 Conformance Claimのrequired fields / full-scope guardをvalidatorで検証できる
-- WCAG Statement of Partial Conformance - Third Party Content / Languageのrequired fields / guardをvalidatorで検証できる
+- Step 5.1 required outcome closureをvalidatorで検証できる
+- Step 5.2 Evaluation Specificsの安全なarchive / tool / method記録を実装し、secret / unnecessary PIIを複製しない
+- Step 5.3 Evaluation Statement full / partial minimum fieldsをvalidatorで検証できる
+- WCAG 2.0 / 2.1 / 2.2 Conformance Claimのrequired / optional fields / full-scope guardをvalidatorで検証できる
+- WCAG Statement of Partial Conformance - Third Party Content / Languageのrequired fields / canonical wording / guardをvalidatorで検証できる
+- Step 5.5 EARL 1.0 JSON-LD sidecarをdeterministically生成し、human-readable reportとのassertion coverage一致を検証できる
+- Step 5.4 aggregated scoreは目的外として生成しない
 - production helperとvalidatorが別実装
-- semantic Case A〜W PASS
+- semantic Case A〜Z PASS
 - `_06c_canonical-live-validation.md` のrepository-controlled canonical fixtureでWCAG-EM orchestration E2EをPASSできる

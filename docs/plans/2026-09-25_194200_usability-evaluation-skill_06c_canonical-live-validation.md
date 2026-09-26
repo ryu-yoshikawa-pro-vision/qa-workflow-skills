@@ -125,6 +125,8 @@ formal request
 - observation結果がPR #11 freshness契約でcurrentな場合だけformal evaluationへ再利用されること
 - Step 5.1 outcome closure
 - report materialization
+- Step 5.2 Evaluation Specificsを有効化したcaseで、browser / tool metadataとsafe evidence refがreportへ戻ること。secret値は保持しない
+- Step 5.5を有効化したcaseで、browser observation由来のformal resultがEARL assertionへ対応しhuman-readable reportと一致すること
 
 を確認します。
 
@@ -158,8 +160,8 @@ repository implementationの完了条件:
 - evidence safety / side-effect / browser ownershipをPASS
 - repository標準のdeterministic / semantic / routing / Skill validationをPASS
 - WCAG 2.0 / 2.1 / 2.2 requirement catalogのcanonical hash再計算と承認済みhash contract testをdeterministic validationでPASS
-- version切替、unsupported / unresolved / out-of-scope分離、non-finite random selection guard、candidate population変更時のreselection、Evaluation Statement / Claim各guardはdeterministic / semantic evalでPASS
-- browser E2Eではsampling used / skipped、sample identity、same-population Step 4.3再sampling、freshness付きobservation handoff / resumeをPASS
+- version切替、unsupported / unresolved / out-of-scope分離、non-finite random selection guard、candidate population変更時のreselection、Evaluation Statement / Claim各guard、EARL全mappingはdeterministic / semantic evalでPASS
+- browser E2Eではsampling used / skipped、sample identity、same-population Step 4.3再sampling、freshness付きobservation handoff / resume、safe Evaluation Specifics handoff、EARL assertionとのresult一致をPASS
 - canonical fixtureで未解決blockedが0
 
 external acceptance:

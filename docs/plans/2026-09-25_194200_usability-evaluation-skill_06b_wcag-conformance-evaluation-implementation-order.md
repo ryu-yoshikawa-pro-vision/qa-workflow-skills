@@ -40,6 +40,7 @@ source-catalogへ少なくとも、
 - WCAG-EM 2.0
 - WCAG-EM Report Tool。WAI Overview上の公式resourceとして保持するが、WCAG-EM 2.0本文と同一の成果物schemaを提供することは前提にせず、WCAG-EM 2 schema Authorityにはしない
 - ACT Rules Format 1.1 / All ACT Rules
+- EARL 1.0 Schema
 - Understanding Accessibility Support
 
 をcurrent URL / status / checked_at付きで登録します。
@@ -48,7 +49,7 @@ source-catalogへ少なくとも、
 
 browser操作前にoutput-templateとvalidator最小schemaを実装します。
 
-WCAG-EM 2のoutput contractはReport ToolのschemaではなくWCAG-EM 2.0本文を正本にします。Step 5.1のStep 1〜4 outcome closureと、Step 5.3のoptional evaluation statement minimum fieldsを別々に固定します。
+WCAG-EM 2のoutput contractはReport ToolのschemaではなくWCAG-EM 2.0本文を正本にします。Step 5.1 outcome closure、Step 5.2 Evaluation Specifics、Step 5.3 Evaluation Statement、Step 5.5 machine-readable reportを別契約として固定します。Step 5.4 aggregated scoreだけは目的外です。
 
 先に次をfixtureで固定します。
 
@@ -69,13 +70,15 @@ WCAG-EM 2のoutput contractはReport ToolのschemaではなくWCAG-EM 2.0本文�
 - sample result
 - sampling used時のStep 4.3 comparison
 - Step 5.1 report outcome closure
+- Step 5.2 Evaluation Specifics / archive identity / tool metadata / secret safety
 - Step 5.3 Evaluation Statement full / partial minimum fields / generation guard
-- WCAG Conformance Claim required fields / full-scope coverage guard
-- WCAG Statement of Partial Conformance - Third Party Content / Language required fields / generation guard
+- WCAG Conformance Claim required / optional fields / full-scope coverage guard
+- WCAG Statement of Partial Conformance - Third Party Content / Language required fields / canonical wording / generation guard
+- Step 5.5 EARL JSON-LD output / assertion coverage
 
 ## 5. Step 3: production helper
 
-`runtime_contract.py`、`wcag_requirements.py`、`sampling.py`、`wcag_em_structure.py` を実装します。`runtime_contract.py` はPR #11のcurrent契約を再利用し、独自runtime frameworkは追加しません。
+`runtime_contract.py`、`wcag_requirements.py`、`sampling.py`、`wcag_em_structure.py`、`earl_report.py` を実装します。`runtime_contract.py` はPR #11のcurrent契約を再利用し、独自runtime frameworkは追加しません。
 
 ### requirements
 
@@ -121,8 +124,10 @@ WCAG-EM 2のoutput contractはReport ToolのschemaではなくWCAG-EM 2.0本文�
 - handoff expected / returned closure
 - comparison iteration chain
 - sample result freshness closure
+- Evaluation Specifics safe materialization
 - Evaluation Statement full / partial generation guard
-- WCAG Conformance Claim / Statement of Partial Conformance generation guard
+- WCAG Conformance Claim required / optional fields / Statement of Partial Conformance generation guard
+- EARL 1.0 JSON-LD materialization
 - machine-owned Markdown render
 - summary
 
@@ -217,13 +222,17 @@ semantic layerはcontent type / Findingのartifact-local grouping keyだけを�
 
 Step 5.1に従い、Step 1〜4のrequired outcomeをreportへ記録します。
 
+Step 5.2 Evaluation Specificsは要求・合意があるcaseでsample archive ref、path / settings / actions、tool / browser / AT / software / methodを記録し、secretや不要PIIを保存しません。
+
 Evaluation Statementはfull / partial /生成不可を分け、`_05f_wcag-conformance-evaluation-package-and-runtime.md` のStep 5.3 contractを閉じます。
 
-WCAG Conformance Claimはcomplete claim scope evidenceとversion別required fieldsが揃うcaseだけ生成します。representative sampleだけでは生成しません。
+WCAG Conformance Claimはcomplete claim scope evidenceとversion別required fieldsが揃うcaseだけ生成します。representative sampleだけでは生成しません。W3C optional claim componentsもevidenceがある場合に保持します。
 
-WCAG Statement of Partial Conformanceはthird-party content / languageを別caseとして実装し、Conformance Claimと混同しません。
+WCAG Statement of Partial Conformanceはthird-party content / languageを別caseとして実装し、Conformance Claimと混同せず、canonical wordingをscriptでrenderします。
 
-aggregated scoreは生成しません。
+Step 5.5を要求するcaseでは `earl_report.py` がEARL 1.0 JSON-LDを生成し、formal result → EARL outcomeとassertion coverageをdeterministic validatorで照合します。
+
+aggregated scoreは目的外として生成しません。
 
 ## 12. Step 10: repository integration
 
@@ -271,12 +280,14 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 - machine-owned structured section materialization
 - closure
 - report
+- Evaluation Specifics / archive ref / secret safety
 - Evaluation Statement full / partial guard
-- WCAG Conformance Claim / Statement of Partial Conformance guard
+- WCAG Conformance Claim required / optional fields / Statement of Partial Conformance guard
+- EARL JSON-LD schema subset / outcome mapping / assertion coverage
 
 ### semantic
 
-`_05f` Case A〜Wをすべて実Judgeで確認します。
+`_05f` Case A〜Zをすべて実Judgeで確認します。
 
 ### real Agent / browser
 
@@ -306,9 +317,12 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 - Step 4.3 retry loop。semantic grouping keyから集合差分 / boolean / actionをscript導出し、structured revision変更後のcandidate population fingerprint再計算、population同一時のrandom target再計算 / overlap除外 / retained random / 不足分top-up、population変更時のreselection、process再materializeまで閉じる
 - 既存sample resultはPR #11 freshnessがcurrentの場合だけ再利用する
 - Step 5.1のStep 1〜4 required outcome closure
+- Step 5.2 Evaluation Specificsのsafe archive / environment / method record
 - Step 5.3 Evaluation Statement full / partial minimum fields / generation guard
-- WCAG 2.0 / 2.1 / 2.2 Conformance Claim required fields / full-scope guard
-- WCAG Statement of Partial Conformance - Third Party Content / Language required fields / guard
+- WCAG 2.0 / 2.1 / 2.2 Conformance Claim required / optional fields / full-scope guard
+- WCAG Statement of Partial Conformance - Third Party Content / Language required fields / canonical wording / guard
+- Step 5.5 EARL 1.0 JSON-LD / assertion coverage
+- Step 5.4 aggregated scoreは目的外として生成しない
 - requirements / sampling / structure helperでmachine-owned fieldをmaterializeし、Agentがfinal refs / expected集合 / derived status / countを手作成しない
 - independent deterministic validator
 - trigger / deterministic / semantic PASS
