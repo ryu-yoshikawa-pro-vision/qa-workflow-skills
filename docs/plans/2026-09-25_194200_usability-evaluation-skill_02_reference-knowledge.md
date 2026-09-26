@@ -4,7 +4,7 @@
 
 本ファイルは `usability-evaluation` が使用するUI pattern / principle / accessibility / platform / Design System knowledgeのreference設計です。
 
-`usability-inspection` のtask execution methodologyは `_05a_usability-inspection-package-and-evaluation.md` で別管理し、本reference corpusへ重複収録しません。
+`usability-inspection` のlive inspection / measurement / Playwright-specific methodologyは `_05a_usability-inspection-package-and-evaluation.md` で別管理し、本reference corpusへ重複収録しません。
 
 ## 1. reference知識の目的
 
@@ -62,7 +62,7 @@ SKILL.mdは評価契約とindex参照方法だけを持ち、詳細知識はrefe
 
 扱い:
 
-- WCAG Success Criterion、WAI-ARIA 1.2、ARIA in HTMLで今回の対象へ適用されるnormative requirementは、該当要件として扱う
+- WCAG Success Criterion、WAI-ARIA 1.2、ARIA in HTMLで今回の対象へ適用されるnormative requirementは、該当要件として扱う。観測・測定・applicabilityを確定できる場合は `usability-inspection` のcriterion-level PASS / FAIL根拠として利用できる
 - Understanding / Techniquesはcriterionの理解・評価方法を補助するinformative guidanceとして扱う
 - APGはARIAの利用方法に関するinformative guidanceであり、example実装を唯一のproduction正解としない
 - WAI-ARIA 1.3等のDraftをcurrent Recommendationと同じ強さで扱わない。projectが明示採用する場合または将来仕様の調査が目的の場合だけ、draft statusを保持して別扱いする
@@ -245,6 +245,15 @@ iOS / iPadOS / macOS / watchOS / tvOS / visionOS等のplatform固有要件は、
 - 関連pattern
 
 本文をそのまま複製せず、評価に必要な意味を要約します。
+
+### ISO 9241-110
+
+ISO 9241-110:2020はinteraction principlesの体系を確認するsourceとして扱います。
+
+- current statusはISO公式情報で確認する
+- 公開範囲を超える本文をrepositoryへ複製しない
+- 詳細本文を合法的に参照できない場合はsource-reference-onlyとする
+- interaction principlesは専門評価の根拠として扱い、個別productへのstrict FAIL criterionへ自動変換しない
 
 ### Nielsen Norman Group
 
