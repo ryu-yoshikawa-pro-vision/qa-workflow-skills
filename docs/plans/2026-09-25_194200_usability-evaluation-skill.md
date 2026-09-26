@@ -197,7 +197,7 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
 41. 操作しやすさはAgent runで観測したmeaningful action、retry、backtrack、dead end、error / recovery、system wait等の事実として保持できるが、human efficiencyや総合scoreへ昇格しない。
 42. performance measurementは各action開始前にstart event、end predicate、measurement method、threshold Authorityの有無を固定し、終了後に都合のよい測定区間へ変更しない。
 43. 「ユーザビリティテストして」等の依頼はusability-inspectionのtrigger aliasとして受けられるが、成果物ではhuman participantを用いる正式なusability testingを実施したとは表現しない。
-44. usability-inspectionのtask snapshotにはuser / roleだけでなく、prior knowledge / experience assumptionsとその根拠を含める。不明な経験レベルを勝手に初見・熟練として確定しない。
+44. usability-inspectionのtask snapshotにはuser / roleだけでなく、prior knowledge / experience assumptions、prior knowledge state（confirmed / inferred / unknown）、その根拠を含める。不明な経験レベルを勝手に初見・熟練として確定しない。
 45. primary taskはuser-facing情報だけで完了し、task outcome / outcome basis / primary action traceを固定するまでCognitive Walkthroughやusability-evaluationを次action選択へ利用しない。
 46. Cognitive Walkthroughはprimary run後の診断としてのみ実施し、current specification / user flow / validated TC等からintended flowを確認できる場合だけstep-by-stepで使う。正しいstep sequenceを創作せず、walkthrough結果でprimary outcomeを書き換えない。
 47. usability-evaluationからの追加観測requestもpost-task diagnosisとして扱い、primary runのtask outcome / action traceを変更しない。primary runを再確認する場合は別Activityとして再実行する。
