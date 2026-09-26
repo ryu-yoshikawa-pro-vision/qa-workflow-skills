@@ -375,6 +375,167 @@ class EntityAndEvidenceTests(unittest.TestCase):
             "generator_implementation_fingerprint", "static_data_versions",
         }.issubset(runtime_projection))
 
+    def test_standalone_freshness_stops_at_matching_cross_skill_entity(self) -> None:
+        requirement_path = REPO_ROOT / "skills" / "test-requirement-design" / "scripts" / "requirement_structure.py"
+        condition_path = REPO_ROOT / "skills" / "test-condition-design" / "scripts" / "condition_structure.py"
+        requirement_context = {
+            "runtime_contract_version": runtime.RUNTIME_CONTRACT_VERSION,
+            "generator_contract_version": "requirement-structure-v1",
+            "runtime_implementation_fingerprint": runtime.implementation_fingerprint(RUNTIME_PATH),
+            "generator_implementation_fingerprint": runtime.implementation_fingerprint(requirement_path),
+            "static_data_versions": {},
+        }
+        requirement = runtime.make_machine_entity(
+            "test-requirement-design", "tr", "TR-002",
+            {"tr_id": "TR-002", "text": "checkout permission is enforced"},
+            runtime_dependencies=[runtime.machine_entity_runtime_dependency(
+                "test-requirement-design", "artifact:requirement_structure:all",
+            )],
+        )
+        requirement = runtime.bind_current_entity_runtime_dependencies(
+            {"entities": [requirement]}, "sha256:" + "1" * 64,
+            runtime_context=requirement_context,
+        )["entities"][0]
+
+        condition_context = {
+            "runtime_contract_version": runtime.RUNTIME_CONTRACT_VERSION,
+            "generator_contract_version": "condition-structure-v1",
+            "runtime_implementation_fingerprint": runtime.implementation_fingerprint(RUNTIME_PATH),
+            "generator_implementation_fingerprint": runtime.implementation_fingerprint(condition_path),
+            "static_data_versions": {},
+        }
+        carry = runtime.make_machine_entity(
+            "test-condition-design", "tcn", "TCN-002",
+            {"tcn_id": "TCN-002", "tr_refs": ["TR-002"], "status": "active"},
+            upstream_entity_dependencies=[runtime.machine_entity_dependency(requirement)],
+            runtime_dependencies=[runtime.machine_entity_runtime_dependency(
+                "test-condition-design", "artifact:condition_structure:all",
+            )],
+        )
+        carry = runtime.bind_current_entity_runtime_dependencies(
+            {"entities": [carry]}, "sha256:" + "2" * 64,
+            runtime_context=condition_context,
+        )["entities"][0]
+        current_condition_runtime = {
+            "skill": "test-condition-design",
+            "runtime_unit_key": "artifact:condition_structure:all",
+            "generation_fingerprint": "sha256:" + "3" * 64,
+            "freshness_status": "current",
+            **condition_context,
+        }
+        runtime_rows = {("test-condition-design", "artifact:condition_structure:all"): current_condition_runtime}
+        carry_identity = ("test-condition-design", "tcn", "TCN-002")
+
+        current = runtime.evaluate_entity_freshness(
+            [carry, requirement], runtime_rows,
+            root_identities={carry_identity},
+            recursive_upstream_skills={"test-condition-design"},
+        )
+        self.assertEqual(len(current), 1)
+        self.assertEqual(current[0]["freshness_status"], "current", current)
+        self.assertNotIn(("test-requirement-design", "artifact:requirement_structure:all"), runtime_rows)
+
+        changed_requirement = runtime.make_machine_entity(
+            "test-requirement-design", "tr", "TR-002",
+            {"tr_id": "TR-002", "text": "checkout permission changed"},
+            runtime_dependencies=requirement["runtime_dependencies"],
+        )
+        changed = runtime.evaluate_entity_freshness(
+            [carry, changed_requirement], runtime_rows,
+            root_identities={carry_identity},
+            recursive_upstream_skills={"test-condition-design"},
+        )
+        self.assertEqual(changed[0]["freshness_status"], "stale", changed)
+        self.assertIn("upstream_entity_fingerprint_mismatch", [row["reason_code"] for row in changed[0]["stale_reasons"]])
+
+        missing = runtime.evaluate_entity_freshness(
+            [carry], runtime_rows,
+            root_identities={carry_identity},
+            recursive_upstream_skills={"test-condition-design"},
+        )
+        self.assertEqual(missing[0]["freshness_status"], "stale", missing)
+        self.assertIn("missing_upstream_entity", [row["reason_code"] for row in missing[0]["stale_reasons"]])
+
+        own_producer_missing = runtime.evaluate_entity_freshness(
+            [carry, requirement], {},
+            root_identities={carry_identity},
+            recursive_upstream_skills={"test-condition-design"},
+        )
+        self.assertEqual(own_producer_missing[0]["freshness_status"], "stale", own_producer_missing)
+        self.assertIn("missing_runtime_dependency", [row["reason_code"] for row in own_producer_missing[0]["stale_reasons"]])
+
+        changed_producer = {
+            **current_condition_runtime,
+            "generator_contract_version": "condition-structure-v2",
+        }
+        own_generation_mismatch = runtime.evaluate_entity_freshness(
+            [carry, requirement], {("test-condition-design", "artifact:condition_structure:all"): changed_producer},
+            root_identities={carry_identity},
+            recursive_upstream_skills={"test-condition-design"},
+        )
+        self.assertEqual(own_generation_mismatch[0]["freshness_status"], "stale", own_generation_mismatch)
+        self.assertIn("runtime_generation_mismatch", [row["reason_code"] for row in own_generation_mismatch[0]["stale_reasons"]])
+
+        same_skill_stale = runtime.make_machine_entity(
+            "test-condition-design", "model", "ep-002",
+            {"model_key": "ep-002", "model_type": "ep", "technique_slug": "ep", "parent_tcn_id": "TCN-002"},
+            model_key="ep-002",
+            runtime_dependencies=[runtime.machine_entity_runtime_dependency(
+                "test-condition-design", "model:ep-002",
+            )],
+        )
+        model_context = {
+            "runtime_contract_version": runtime.RUNTIME_CONTRACT_VERSION,
+            "generator_contract_version": "equivalence-partitions-v1",
+            "runtime_implementation_fingerprint": runtime.implementation_fingerprint(RUNTIME_PATH),
+            "generator_implementation_fingerprint": runtime.implementation_fingerprint(
+                REPO_ROOT / "skills" / "test-condition-design" / "scripts" / "equivalence_partitions.py",
+            ),
+            "static_data_versions": {},
+        }
+        same_skill_stale = runtime.bind_current_entity_runtime_dependencies(
+            {"entities": [same_skill_stale]}, "sha256:" + "4" * 64,
+            runtime_context=model_context,
+        )["entities"][0]
+        same_skill_root = runtime.make_machine_entity(
+            "test-condition-design", "disposition", "model:ep-002",
+            {"upstream_entity": runtime.machine_entity_dependency(same_skill_stale), "handling": "対象外"},
+            upstream_entity_dependencies=[runtime.machine_entity_dependency(same_skill_stale)],
+        )
+        same_skill = runtime.evaluate_entity_freshness(
+            [same_skill_root, same_skill_stale], runtime_rows,
+            root_identities={("test-condition-design", "disposition", "model:ep-002")},
+            recursive_upstream_skills={"test-condition-design"},
+        )
+        self.assertEqual(same_skill[0]["freshness_status"], "stale", same_skill)
+        self.assertIn("upstream_entity_stale", [row["reason_code"] for row in same_skill[0]["stale_reasons"]])
+
+        full_graph = runtime.evaluate_entity_freshness([carry, requirement], runtime_rows)
+        full_by_identity = {
+            (row["skill"], row["entity_type"], row["entity_ref"]): row
+            for row in full_graph
+        }
+        self.assertEqual(full_by_identity[("test-requirement-design", "tr", "TR-002")]["freshness_status"], "stale")
+        self.assertEqual(full_by_identity[carry_identity]["freshness_status"], "stale")
+
+        tcd_runtime_row = {
+            "skill": "test-condition-design",
+            "runtime_unit_key": "artifact:condition_structure:all",
+            "generation_fingerprint": current_condition_runtime["generation_fingerprint"],
+            "freshness_status": "current",
+            "upstream_entity_fingerprints": [runtime.machine_entity_dependency(requirement)],
+            "upstream_runtime_units": [],
+        }
+        scoped_runtime, _scoped_issues = runtime.evaluate_runtime_unit_freshness(
+            [tcd_runtime_row], [tcd_runtime_row], [requirement],
+            recursive_upstream_skills={"test-condition-design"},
+        )
+        self.assertEqual(scoped_runtime[0]["freshness_status"], "current", scoped_runtime)
+        full_runtime, _full_issues = runtime.evaluate_runtime_unit_freshness(
+            [tcd_runtime_row], [tcd_runtime_row], [requirement],
+        )
+        self.assertEqual(full_runtime[0]["freshness_status"], "stale", full_runtime)
+
     def test_current_model_result_row_has_exact_materialize_projection(self) -> None:
         envelope = {
             "skill": "test-condition-design", "runtime_unit_key": "model:ep-001", "input_fingerprint": "sha256:" + "1" * 64,

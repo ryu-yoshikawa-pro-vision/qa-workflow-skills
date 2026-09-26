@@ -943,10 +943,26 @@ def compare_runtime_dependencies(runtime_unit: dict[str, Any], current_runtime_u
 def evaluate_entity_freshness(
     entities: list[dict[str, Any]],
     current_runtime_units: dict[tuple[str, str], dict[str, Any]],
+    *,
+    root_identities: set[tuple[str, str, str]] | None = None,
+    recursive_upstream_skills: set[str] | None = None,
 ) -> list[dict[str, Any]]:
     """Evaluate upstream Entity and runtime dependencies using one shared rule."""
     validated = validate_entity_collection(entities)
     entity_map = {entity_identity(row["skill"], row["entity_type"], row["entity_ref"]): row for row in validated}
+    if root_identities is None:
+        roots = validated
+    else:
+        if not isinstance(root_identities, set) or any(
+            not isinstance(identity, tuple)
+            or len(identity) != 3
+            or not all(isinstance(value, str) and value for value in identity)
+            for identity in root_identities
+        ):
+            raise InvalidInput("freshness root identities schemaが不正です")
+        if not root_identities.issubset(entity_map):
+            raise InvalidInput("freshness root identityがEntity collectionにありません")
+        roots = [entity_map[key] for key in sorted(root_identities)]
     state: dict[tuple[str, str, str], tuple[str, list[dict[str, Any]]]] = {}
     visiting: set[tuple[str, str, str]] = set()
 
@@ -965,7 +981,7 @@ def evaluate_entity_freshness(
                 reasons.append({"reason_code": "missing_upstream_entity", "dependency": list(dep_key)})
             elif current["content_fingerprint"] != dependency["content_fingerprint"]:
                 reasons.append({"reason_code": "upstream_entity_fingerprint_mismatch", "dependency": list(dep_key)})
-            else:
+            elif recursive_upstream_skills is None or current["skill"] in recursive_upstream_skills:
                 dep_status, _ = visit(current)
                 if dep_status == "stale":
                     reasons.append({"reason_code": "upstream_entity_stale", "dependency": list(dep_key)})
@@ -996,7 +1012,7 @@ def evaluate_entity_freshness(
         return state[key]
 
     rows: list[dict[str, Any]] = []
-    for entity in validated:
+    for entity in roots:
         status, reasons = visit(entity)
         rows.append({
             "skill": entity["skill"], "entity_type": entity["entity_type"], "entity_ref": entity["entity_ref"],
@@ -1051,6 +1067,8 @@ def evaluate_runtime_unit_freshness(
     runtime_units: list[dict[str, Any]],
     current_runtime_units: list[dict[str, Any]],
     entities: list[dict[str, Any]],
+    *,
+    recursive_upstream_skills: set[str] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Apply the same runtime/entity dependency rule to workflow and traceability."""
     entity_map = {
@@ -1062,9 +1080,19 @@ def evaluate_runtime_unit_freshness(
         for row in current_runtime_units
     }
     validate_runtime_dependency_graph(current_runtime_units)
+    freshness_roots = None if recursive_upstream_skills is None else {
+        identity
+        for identity, row in entity_map.items()
+        if row["skill"] in recursive_upstream_skills
+    }
     entity_status = {
         (row["skill"], row["entity_type"], row["entity_ref"]): row
-        for row in evaluate_entity_freshness(entities, current_runtime)
+        for row in evaluate_entity_freshness(
+            entities,
+            current_runtime,
+            root_identities=freshness_roots,
+            recursive_upstream_skills=recursive_upstream_skills,
+        )
     }
     fresh_rows: list[dict[str, Any]] = []
     issues: list[dict[str, Any]] = []
@@ -1083,7 +1111,10 @@ def evaluate_runtime_unit_freshness(
             elif current["content_fingerprint"] != dependency["content_fingerprint"]:
                 stale = True
                 reasons.append({"reason_code": "upstream_entity_fingerprint_mismatch", "dependency": list(entity_key)})
-            elif entity_status.get(entity_key, {}).get("freshness_status") == "stale":
+            elif (
+                (recursive_upstream_skills is None or current["skill"] in recursive_upstream_skills)
+                and entity_status.get(entity_key, {}).get("freshness_status") == "stale"
+            ):
                 stale = True
                 reasons.append({"reason_code": "upstream_entity_stale", "dependency": list(entity_key)})
         for dependency in row.get("upstream_runtime_units", []):
@@ -3421,6 +3452,7 @@ def verify_runtime_evidence(request: dict[str, Any]) -> dict[str, Any]:
                 runtime_rows.append(_runtime_unit_result_row(body))
             fresh_runtime_rows, _runtime_issues = evaluate_runtime_unit_freshness(
                 runtime_rows, runtime_rows, list(candidate_entity_map.values()),
+                recursive_upstream_skills={skill},
             )
             freshness_runtime_rows = {
                 (row["skill"], row["runtime_unit_key"]): row
@@ -3446,7 +3478,16 @@ def verify_runtime_evidence(request: dict[str, Any]) -> dict[str, Any]:
                 dependency_key = (previous_row["skill"], previous_row["runtime_unit_key"])
                 if dependency_key in required_dependency_keys and dependency_key not in freshness_runtime_rows:
                     freshness_runtime_rows[dependency_key] = previous_row
-            freshness = evaluate_entity_freshness(list(candidate_entity_map.values()), freshness_runtime_rows)
+            carry_keys = {
+                entity_identity(row["skill"], row["entity_type"], row["entity_ref"])
+                for row in carry_rows
+            }
+            freshness = evaluate_entity_freshness(
+                list(candidate_entity_map.values()),
+                freshness_runtime_rows,
+                root_identities=carry_keys,
+                recursive_upstream_skills={skill},
+            )
             freshness_by_key = {
                 (row["skill"], row["entity_type"], row["entity_ref"]): row
                 for row in freshness

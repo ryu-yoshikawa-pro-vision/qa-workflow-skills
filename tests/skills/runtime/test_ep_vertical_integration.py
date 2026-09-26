@@ -339,10 +339,27 @@ class EpVerticalIntegrationTests(unittest.TestCase):
         self.assertTrue(workflow["payload"]["can_complete"], workflow)
 
     def test_multi_tcn_materialize_expected_and_partial_rerun_use_current_structure(self) -> None:
-        tr_entities = [
-            runtime.make_machine_entity("test-requirement-design", "tr", f"TR-{number:03d}", {"tr_id": f"TR-{number:03d}", "text": f"Requirement {number}"})
-            for number in (1, 2, 3)
-        ]
+        requirement_metadata = {
+            "envelope_version": "1", "skill": "test-requirement-design", "runtime_contract_version": "runtime-v1",
+            "generator_contract_version": "requirement-structure-v1", "runtime_unit_key": "artifact:requirement_structure:all",
+            "model_key": None, "model_type": None, "technique_slug": None, "selection_source": None, "selection_key": None,
+            "scope_key": "all", "input_mode": "direct", "upstream_entities": [], "upstream_runtime_units": [],
+            "static_data_versions": {}, "authority_refs": [], "reference_refs": [],
+        }
+        requirement_input = {
+            "authorities": [], "risks": [], "dispositions": [], "previous_tr_ids": [], "update_scope_tr_ids": [],
+            "test_requirements": [{
+                "draft_key": f"requirement-{number:03d}", "identity_action": "new", "reuse_id": None,
+                "text": f"Requirement {number}", "authority_refs": [], "risk_refs": [], "priority": "中",
+                "priority_override_reason": None, "test_level": "system", "observation_method": "assertion",
+            } for number in (1, 2, 3)],
+        }
+        requirement_result = run_script(REQUIREMENT_SCRIPT, {"metadata": requirement_metadata, "input": requirement_input})
+        self.assertEqual(requirement_result["runtime_status"], "ok", requirement_result)
+        self.assertEqual(requirement_result["result_status"], "ready", requirement_result)
+        tr_entities = requirement_result["payload"]["entities"]
+        self.assertEqual({row["entity_ref"] for row in tr_entities}, {"TR-001", "TR-002", "TR-003"})
+        self.assertTrue(all(row["runtime_dependencies"] for row in tr_entities))
         selection = runtime.make_machine_entity(
             "test-analysis", "technique_selection", "SEL-001",
             {"selection_key": "SEL-001", "selected_techniques": ["ep"]},
@@ -541,6 +558,10 @@ class EpVerticalIntegrationTests(unittest.TestCase):
         }
         full_checked = runtime.verify_runtime_evidence(full_request)
         self.assertTrue(full_checked["valid"], full_checked)
+        self.assertFalse(any(
+            identity.startswith("test-requirement-design::")
+            for identity, _body in runtime.extract_machine_blocks(full_artifact, "Machine Runtime Result")
+        ))
         expected_runtime_ids = {row["runtime_unit_key"] for row in full_checked["expected_runtime_units"]}
         self.assertIn("artifact:materialize_coverage:TCN-001", expected_runtime_ids)
         self.assertIn("artifact:materialize_coverage:TCN-002", expected_runtime_ids)
@@ -653,6 +674,11 @@ class EpVerticalIntegrationTests(unittest.TestCase):
         partial_runtime_ids = {row["identity"] for row in partial_checked["current_structure_state"]["runtime_results"]}
         self.assertIn("test-condition-design::artifact:materialize_coverage:TCN-001", partial_runtime_ids)
         self.assertNotIn("test-condition-design::artifact:materialize_coverage:TCN-002", partial_runtime_ids)
+        self.assertFalse(any(identity.startswith("test-requirement-design::") for identity in partial_runtime_ids))
+        tcn_two = next(row for row in carried if row["entity_type"] == "tcn" and row["entity_ref"] == "TCN-002")
+        tr_two = tr_by_ref["TR-002"]
+        self.assertIn(runtime.machine_entity_dependency(tr_two), tcn_two["upstream_entity_dependencies"])
+        self.assertTrue(tr_two["runtime_dependencies"])
         self.assertEqual(
             partial_checked["current_structure_state"]["previous_ci_id_state"],
             [{"ci_id": row["ci_id"], "status": row["status"]} for tcn_id in ("TCN-001", "TCN-002") for row in materialize_values[tcn_id][2]["payload"]["ci_id_state"]],
