@@ -146,6 +146,8 @@
 - テスト要求が変わる → `test-requirement-design`
 - テスト条件 / カバレッジ項目が変わる → `test-condition-design`
 - テストケース / 期待結果の根拠だけが変わる → `test-case-design`
+- currentなUI情報・実対象の確認状態が変わる → `test-target-inspection`
+- 詳細TCの今回run条件・操作・結果判定に必要な実行情報が変わる → `test-execution`
 - E2E対象・repo / 実対象の事実が変わる → `e2e-test-inspection`
 - Playwright実装判断が変わる → `e2e-test-implementation`
 - E2E実行結果の期待解釈が変わる → `e2e-test-result-analysis`

@@ -21,6 +21,8 @@ CANONICAL_SKILLS = (
     "e2e-test-execution",
     "e2e-test-result-analysis",
     "e2e-test-reporting",
+    "test-target-inspection",
+    "test-execution",
 )
 
 

@@ -1,0 +1,10 @@
+[
+  {"query":"元TCの曖昧な観測タイミングをunresolvedに残し、MCPで実画面を操作した後に判定根拠をまとめて","should_trigger":true},
+  {"query":"元TCに認証情報があるが、実値は出力せず既存のsecret参照だけを記録して実行して","should_trigger":true},
+  {"query":"入力元identityがないTC群を成果物内snapshotとして固定し、独自hashを生成せずに実行して","should_trigger":true},
+  {"query":"前回確定したTCを再実行し、前回成果物参照と前回TC参照を残した別versionで報告して","should_trigger":true},
+  {"query":"ログイン用のPlaywright E2Eをrepoのfixtureで実装して保守対象にして","should_trigger":false},
+  {"query":"既存のPlaywright runnerが出した失敗原因を分析し修正案を決めて","should_trigger":false},
+  {"query":"既存E2EのTestResult status、outcome、attemptをPlaywright形式で詳細報告して","should_trigger":false},
+  {"query":"現在のUI挙動を確認し、ARIA snapshot差分で仕様と期待結果を更新して","should_trigger":false}
+]

@@ -16,6 +16,8 @@ CANONICAL_SKILLS = {
     "test-requirement-design",
     "test-condition-design",
     "test-case-design",
+    "test-target-inspection",
+    "test-execution",
     "coverage-analysis",
     "adversarial-review",
     "e2e-test-inspection",

@@ -271,3 +271,36 @@
 - `RT-D013` runtime dependency graphの重複・自己依存・cycle拒否
 - `RT-D014` adapter childのderived input、親generation依存、重複・欠落の検出
 - `RT-D015` expected root / Entity集合をactual出力から推測しない独立validator
+
+## test-target-inspection
+- `TTI-D001` 必須セクション表とMarkdown表構造
+- `TTI-D002` 対象 / 要素 / 状態キーの一意性
+- `TTI-D003` 新規成果物キー形式
+- `TTI-D004` 確認状態の許可値
+- `TTI-D005` current行の参照整合
+- `TTI-D006` 今回確認した行の条件・version / build・日時
+- `TTI-D007` 未確認行の鮮度維持
+- `TTI-D008` 更新表・更新区分
+- `TTI-D009` 削除確認条件と削除キーのcurrent本体からの除外
+- `TTI-D010` 任意ARIA snapshotの対象追跡・再取得可能identity
+- `TTI-D011` 永続保存結果・競合安全な更新方式・revision・制約
+- `TTI-D012` 副作用scopeの一意な正本行・回数・cleanup
+- `TTI-D013` secret実値の非漏えい
+- `TTI-D014` 旧 / 今回buildの保持とbuild差のみで比較を拒否しないこと
+- `TTI-D015` fixtureで必須の対象・要素・状態キー
+
+## test-execution
+- `TEX-D001` 必須実行報告・表構造
+- `TEX-D002` snapshot内の成果物ローカルtest_case_ref整合
+- `TEX-D003` 実行前YAMLのyaml.safe_load構造・step参照
+- `TEX-D004` 元source_test_case_idの維持
+- `TEX-D005` 入力元identityまたはsnapshot成果物固定
+- `TEX-D006` 前回成果物と前回TC参照によるrerun追跡
+- `TEX-D007` browser実行手段の記録
+- `TEX-D008` unresolved・開始状態・TC結果整合
+- `TEX-D009` TC別条件とrun固定条件の分離
+- `TEX-D010` 操作・観測・画像確認のTC / step追跡
+- `TEX-D011` 副作用scopeの一意な正本行・工程別回数・累計・cleanup
+- `TEX-D012` TC結果と集計一致
+- `TEX-D013` secret実値の非漏えい
+- `TEX-D014` fixtureで固定したsnapshot参照集合
