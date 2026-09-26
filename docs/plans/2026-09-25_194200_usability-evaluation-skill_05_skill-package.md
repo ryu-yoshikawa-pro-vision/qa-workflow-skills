@@ -123,6 +123,7 @@ user / role、user goal / task / flow、特定の利用者条件は、入力・�
 - before / after
 - accessibility tree / DOM
 - screenshot
+- usability-inspectionのobjective observation refs / test rule result refs / criterion check refs / measurement refs（存在する場合）
 - existing Finding / Observation
 - related Product Risk / TR / TCN / TC refs
 
@@ -185,6 +186,9 @@ merge後の既存artifact-local ref規則がある場合はそれを使い、な
 - 想定される影響の根拠
 - 観測済みのユーザー影響（証拠がある場合だけ）
 - evidence ref
+- related test rule result refs（存在する場合）
+- related criterion check refs（存在する場合）
+- related measurement refs（存在する場合）
 - status
 - status reason / 制約・未確認
 - routing
@@ -282,13 +286,15 @@ Webへアクセスしてsourceの最新状態を検査するruntimeにはしま�
 - 各評価項目に上位観点と1件以上の `適用したreference` がある
 - 各 `適用したreference` のreference entry refが実在し、source item refがそのentryに含まれ、referenceの位置づけがある
 - 同一評価項目で複数source itemを使う場合もsource itemごとのreferenceの位置づけを別々に保持する
-- user goal / task overrideがない評価項目は評価条件のuser goal / taskを継承できる
+- 評価条件にuser goal / task / flowが存在する場合だけ、overrideがない評価項目はその値を継承できる
 - 問題を確認した評価項目にobserved fact / source / evidence / 想定影響の根拠がある
 - project固有のbinding根拠を適用した `適用したreference` にproject Authority refがある
 - finding refがある場合は対応Findingが存在し、PR #13の最低契約を満たす
 - 問題なし / 対象外の評価項目にfinding refがない
 - source item ref形式と参照先
 - evidence ref存在
+- related test rule / criterion check / measurement refsがある場合は参照先が実在する
+- strict criterion resultを参照する評価項目が、そのresultをadvisory評価で上書きしていない
 - 判定不能 / 対象外にstatus reason / 制約・未確認がある
 - 観測済みのユーザー影響を出す場合は対応evidenceがある
 - TC resultを書き換える欄を持たない
@@ -300,7 +306,8 @@ Webへアクセスしてsourceの最新状態を検査するruntimeにはしま�
 
 LLM Judgeで最低限次を評価します。
 
-- user goalとpattern識別の妥当性
+- target purpose / contextとpattern識別の妥当性
+- user goal / task / flowが存在する場合はそのcontextとの整合
 - applicability判断
 - source選択
 - binding / advisoryとapplicabilityを誤って扱っていないか
