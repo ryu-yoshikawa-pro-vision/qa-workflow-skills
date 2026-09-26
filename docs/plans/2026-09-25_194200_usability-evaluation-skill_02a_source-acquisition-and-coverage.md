@@ -117,9 +117,18 @@ source discoveryの完了は、次の能力coverageを正本とします。
 
 ## 4. seed source
 
-_02c_seed-source-catalog.md に列挙した既知sourceは実装時に全件再確認します。
+_02c_seed-source-catalog.md は既知source inventoryです。seed一覧そのものをcompletion gateにはしません。
 
-各seedを次へ閉じます。
+実装時に必須で再確認するcore sourceは、今回の固定capability coverageを成立させるstandard / methodology / browser measurement sourceです。少なくとも、対象Skillへ適用するWCAG / WAI-ARIA / ARIA in HTML / ACT / Playwright / Navigation Timing / Paint Timing / WCAG-EM等を含みます。
+
+Design System、platform guidance、一般pattern library、restricted ISO本文等の条件付きsourceは、次のいずれかに該当する場合だけ確認し、source catalog上で採否を閉じます。
+
+- projectが採用している
+- target platform / productへ直接適用する
+- capability coverage gapを埋める
+- 独立したAuthority / provenanceとして保持する必要がある
+
+確認対象にしたsourceは次へ閉じます。
 
 - adopted
 - reference-only
@@ -127,7 +136,7 @@ _02c_seed-source-catalog.md に列挙した既知sourceは実装時に全件再�
 - unavailable
 - rejected
 
-seedであることだけを理由に全本文をnormalized corpusへ収録しません。
+seedであることだけを理由に全本文をnormalized corpusへ収録せず、未使用の条件付きseedを全件確認することも要求しません。
 
 ## 5. source採用条件
 
@@ -144,7 +153,7 @@ sourceをnormalized reference knowledgeへadoptする条件:
 
 ## 6. 追加source discovery
 
-seed catalogを確認した後、§3の能力coverageに未解決gapがある場合だけ追加調査します。
+core sourceと今回適用する条件付きsourceを確認した後、§3の能力coverageに未解決gapがある場合だけ追加調査します。
 
 初期query:
 
@@ -179,7 +188,8 @@ cross-link先を見つけたことだけで探索を再帰的に拡大しませ�
 
 次をすべて満たしたらsource discoveryを完了とします。
 
-- _02c_seed-source-catalog.md の全seedを確認済み
+- current capability coverageに必要なcore sourceを確認済み
+- project / target / coverage gapにより選定した条件付きsourceの採否が完了
 - Q1〜Q7を実行済み
 - 検索手段のretrieval boundaryを記録済み
 - §3の各能力coverageが covered / not-applicable / blocked のいずれかへ閉じている
@@ -258,7 +268,8 @@ source discoveryの意味判断はLLM / Agentへ残しますが、次はscript�
 
 ## 13. 完了条件
 
-- seed catalog全件確認
+- current capability coverageに必要なcore sourceを確認
+- 選定した条件付きsourceの採否が完了
 - Q1〜Q7実行記録あり
 - Plan側の任意検索件数上限なし
 - capability coverageの全row closure

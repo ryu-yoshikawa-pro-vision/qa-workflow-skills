@@ -35,7 +35,7 @@ source-catalogへ少なくとも、
 
 - WCAG 2.2
 - WCAG-EM 2.0
-- WCAG-EM Report Tool。2026-09-26確認時点ではWCAG-EM 1向けであることをstatusとして記録し、WCAG-EM 2 schema Authorityにはしない
+- WCAG-EM Report Tool。WAI Overview上の公式resourceとして保持するが、WCAG-EM 2.0本文と同一の成果物schemaを提供することは前提にせず、WCAG-EM 2 schema Authorityにはしない
 - ACT Rules Format 1.1 / All ACT Rules
 - Understanding Accessibility Support
 
@@ -45,7 +45,7 @@ source-catalogへ少なくとも、
 
 browser操作前にoutput-templateとvalidator最小schemaを実装します。
 
-WCAG-EM 2のoutput contractはcurrent Report ToolのschemaではなくWCAG-EM 2.0 Step 5.1を正本にします。
+WCAG-EM 2のoutput contractはReport ToolのschemaではなくWCAG-EM 2.0本文を正本にします。Step 5.1のStep 1〜4 outcome closureと、Step 5.3のoptional evaluation statement minimum fieldsを別々に固定します。
 
 先に次をfixtureで固定します。
 
@@ -57,8 +57,9 @@ WCAG-EM 2のoutput contractはcurrent Report ToolのschemaではなくWCAG-EM 2.
 - complete process
 - sample result
 - Step 4.3 comparison
-- report
-- statement / claim guard
+- Step 5.1 report outcome closure
+- Step 5.3 evaluation statement minimum fields / generation guard
+- conformance claim guard
 
 ## 5. Step 3: production helper
 
@@ -66,7 +67,7 @@ WCAG-EM 2のoutput contractはcurrent Report ToolのschemaではなくWCAG-EM 2.
 
 ### sampling
 
-- 10% count計算
+- 10% count計算。WCAG-EM本文の丸め規則ではなく本Planの `ceil` 規則として扱い、structured count 1 / 9 / 10 / 11の境界fixtureを持つ
 - duplicate / overlap検証
 - optional random select
 - fixed seed禁止
@@ -116,7 +117,7 @@ selected sampleごとにlive accessibility observationが必要なcaseで、
 
 sample selectionをusability-inspectionへ移しません。formal Skillからsibling Skillのscriptsを直接import / 実行しません。
 
-standalone formal Skillではcurrent evidenceがInputに不足する場合、handoff requirementを出してblockedへ閉じます。
+formal Skillが直接発火した場合も、同一Agent環境で `qa-workflow` が利用可能ならhandoff requirementをworkflowへ返し、`usability-inspection` の結果を受けてformal evaluationをresumeします。`qa-workflow` を利用できない真のstandalone環境でcurrent evidenceがInputに不足する場合だけ、handoff requirementを出してblockedへ閉じます。
 
 ## 8. Step 6: random sampling
 
@@ -154,9 +155,9 @@ random sampleに新content type / findingがないcaseと、あるcaseを実装�
 
 ## 11. Step 9: report / statement
 
-Step 5.1 required outcomeをreportへ記録します。
+Step 5.1に従い、Step 1〜4のrequired outcomeをreportへ記録します。
 
-evaluation statementは条件成立case / 不成立caseを分けます。
+evaluation statementは条件成立case / 不成立caseを分け、成立caseでは `_05f_wcag-conformance-evaluation-package-and-runtime.md` のStep 5.3 minimum fieldsをすべて保持します。
 
 product-wide claimは通常のsample評価では生成しません。
 
@@ -202,9 +203,9 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 
 ### real Agent / browser
 
-canonical live Web targetでWCAG-EM E2Eを実行します。
+`_06c_canonical-live-validation.md` のrepository-controlled canonical fixtureで、formal direct trigger → observation handoff → qa-workflow → usability-inspection → formal Skill resume → reportまでのWCAG-EM E2Eを実行します。
 
-実行環境・必要expertise・必要assistive technologyを利用できず必須caseを閉じられない場合はblockedであり、実装完了にはしません。
+外部実対象・実アカウント・特定assistive technologyを必要とするacceptanceは別ゲートです。それらが提供されていないことだけでrepository implementationを未完了にしません。
 
 ## 14. 完了条件
 
@@ -212,7 +213,7 @@ canonical live Web targetでWCAG-EM E2Eを実行します。
 - qa-workflowがmulti-Skill observation handoffを直列オーケストレーション
 - standalone packageがsibling Skill scriptsへruntime依存しない
 - WCAG-EM Step 1〜5 traceability
-- WCAG-EM 2 output schemaがcurrent WCAG-EM 1 Report Toolへ依存していない
+- WCAG-EM 2 output schemaがReport Toolへ依存せず、WCAG-EM 2.0本文を正本としている
 - accessibility support baseline必須
 - Step 2 exploration closure
 - Step 3.1 structured sample
@@ -220,11 +221,11 @@ canonical live Web targetでWCAG-EM E2Eを実行します。
 - Step 3.3 complete process
 - Step 4.1 / 4.2評価
 - Step 4.3 retry loop
-- Step 5.1 report
-- optional statement guard
+- Step 5.1のStep 1〜4 required outcome closure
+- Step 5.3 optional evaluation statement minimum fields / generation guard
 - product-wide claim guard
 - sampling helper / structure helper
 - independent deterministic validator
 - trigger / deterministic / semantic PASS
-- canonical real Web E2E PASS
-- blocked 0
+- `_06c_canonical-live-validation.md` のrepository-controlled canonical Web E2E PASS
+- repository-controlled validationのblocked 0。外部acceptance未実施は別statusとして記録し、このblocked件数へ含めない

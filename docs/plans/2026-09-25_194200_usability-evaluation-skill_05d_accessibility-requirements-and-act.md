@@ -154,6 +154,15 @@ supported ACT RuleではACT Rules Format 1.1のoutcomeを使用します。
 - `cantTell`
 - `untested`
 
+使い分けはACT Rules Format 1.1のOutcome定義に従います。
+
+- `inapplicable`: applicabilityを評価し、test subject内にtest targetがない
+- `passed / failed`: test targetを評価し、expectation結果を確定した
+- `cantTell`: evaluationを開始したが、applicabilityまたはexpectationを完全に判定できない
+- `untested`: supported ruleが今回scopeへ選定されたが、test subjectを評価していない
+
+automatic implementationを実行済みなのに必要evidenceが不足した場合、単に `untested` へ落とさず、`cantTell` またはstructured limitationへ閉じます。unsupported ruleにはこれらのoutcome自体を生成しません。
+
 formal / proposedはsource statusとして分離します。
 
 rule outcomeをmapped WCAG / ARIA requirement全体のresultへ自動変換しません。

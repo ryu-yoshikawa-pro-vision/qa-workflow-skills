@@ -16,6 +16,8 @@ source本文をこのPlanへ複製することが目的ではありません。
 
 Plan内のseed keyは実装時の `SRC-...` IDではありません。package-local IDは実装時に決定論的scriptで採番します。
 
+この一覧は既知source inventoryです。全rowの再確認を実装完了条件にはしません。WCAG / ARIA / ACT / Playwright / Web timing / WCAG-EM等、current capability coverageを成立させるcore sourceは実装時に再確認します。Design System、platform guidance、一般pattern library等は、project採用、target platformへの直接適用、coverage gap解消、独立したAuthority / provenanceのいずれかで必要になった場合だけ確認・採否を閉じます。
+
 ## 1. source-catalogの役割
 
 `source-catalog.md` はreference本文そのものではなく、次を追跡する索引です。
@@ -43,7 +45,7 @@ catalogに載っているだけで、そのsource全体をbundled corpusへ収�
 | W3C-WCAG22-UNDERSTANDING | Understanding WCAG 2.2 | https://www.w3.org/WAI/WCAG22/Understanding/ | informative guidance |
 | W3C-WCAG22-TECHNIQUES | Techniques for WCAG 2.2 | https://www.w3.org/WAI/WCAG22/Techniques/ | informative techniques |
 | W3C-WCAGEM2 | WCAG Evaluation Methodology 2.0 | https://www.w3.org/TR/wcag-em-2/ | conformance evaluation methodology |
-| W3C-WCAGEM-REPORT-TOOL | WCAG-EM Report Tool | https://www.w3.org/WAI/eval/report-tool/ | supplementary tool reference。2026-09-26確認時点のWAI Overviewではcurrent toolはWCAG-EM 1向け。WCAG-EM 2 schemaのAuthorityにはしない |
+| W3C-WCAGEM-REPORT-TOOL | WCAG-EM Report Tool | https://www.w3.org/WAI/eval/report-tool/ | supplementary tool reference。WCAG-EM 2.0本文と同一の成果物schemaを提供することは確認できていないため、WCAG-EM 2 schemaのAuthorityにはしない |
 | W3C-WAI-ARIA12 | WAI-ARIA 1.2 | https://www.w3.org/TR/wai-aria-1.2/ | normative standard |
 | W3C-ARIA-IN-HTML | ARIA in HTML | https://www.w3.org/TR/html-aria/ | normative author requirements |
 | W3C-APG | WAI-ARIA Authoring Practices Guide | https://www.w3.org/WAI/ARIA/apg/ | informative guidance / examples |
@@ -124,7 +126,7 @@ formal WCAG evaluation packageは次を最低限catalog化します。
 | --- | --- | --- | --- |
 | W3C-WCAG22 | WCAG 2.2 | https://www.w3.org/TR/WCAG22/ | normative conformance target |
 | W3C-WCAGEM2 | WCAG Evaluation Methodology 2.0 | https://www.w3.org/TR/wcag-em-2/ | methodology |
-| W3C-WCAGEM-REPORT-TOOL | WCAG-EM Report Tool | https://www.w3.org/WAI/eval/report-tool/ | supplementary report tool。2026-09-26確認時点ではWCAG-EM 1向け。EM 2 report schemaのAuthorityにはしない |
+| W3C-WCAGEM-REPORT-TOOL | WCAG-EM Report Tool | https://www.w3.org/WAI/eval/report-tool/ | supplementary report tool。WCAG-EM 2.0本文と同一の成果物schemaを提供することは確認できていないため、EM 2 report schemaのAuthorityにはしない |
 | W3C-ACT-FORMAT11 | ACT Rules Format 1.1 | https://www.w3.org/TR/act-rules-format/ | supported ACT implementation consistency |
 | W3C-ACT-RULES | All ACT Rules | https://www.w3.org/WAI/standards-guidelines/act/rules/ | informative test rules |
 | W3C-WAI-ARIA12 | WAI-ARIA 1.2 | https://www.w3.org/TR/wai-aria-1.2/ | applicable normative requirements |
@@ -137,11 +139,11 @@ formal WCAG evaluation packageは次を最低限catalog化します。
 | W3C-SELECTING-TOOLS | Selecting Web Accessibility Evaluation Tools | https://www.w3.org/WAI/test-evaluate/tools/selecting/ | WCAG-EM background reading |
 | W3C-COMBINED-EXPERTISE | Using Combined Expertise to Evaluate Web Accessibility | https://www.w3.org/WAI/test-evaluate/combined-expertise/ | WCAG-EM required expertise background reading |
 
-2026-09-26確認時点でWAI Overviewはcurrent WCAG-EM Report ToolをWCAG-EM 1向けとしています。リンクは既知の公式resourceとしてcatalogへ保持しますが、WCAG-EM 2のfield / JSON schemaを決めるAuthorityにはしません。WCAG-EM 2成果物はWCAG-EM 2.0本文、とくにStep 5.1を正本にします。tool自体もruntime dependencyにはしません。
+WAI OverviewはWCAG-EM 2.0のresourceとしてWCAG-EM Report Toolを案内しています。一方、Report Toolのfield / export schemaがWCAG-EM 2.0本文のStep 5要件と完全に同一であることは確認できていません。そのため、toolは補助resourceとしてcatalogへ保持し、WCAG-EM 2の成果物契約はWCAG-EM 2.0本文を正本にします。tool自体もruntime dependencyにはしません。
 
 ## 5. 実装時のcatalog初期化
 
-実装時はこのseed一覧を機械入力としてそのままコピーするのではなく、各URLを再確認して次を確定します。
+実装時はこのseed一覧を機械入力としてそのままコピーしません。core sourceと、project / target / coverage gapにより今回選定した条件付きsourceについてURLを再確認し、次を確定します。
 
 - canonical URL
 - current status

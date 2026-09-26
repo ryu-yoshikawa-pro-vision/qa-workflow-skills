@@ -275,7 +275,14 @@ check単位で次を必須出力とします。
 
 W3C ACT Ruleを完全に実装した場合は、そのruleで定義されたoutcomeを保持します。
 
-current WAI公開ACT RulesはACT Rules Format 1.1互換として扱い、outcomeは `inapplicable / passed / failed / cantTell / untested` を使用します。proposed ruleはsource statusを保持し、formal ruleと混同しません。
+current WAI公開ACT RulesはACT Rules Format 1.1互換として扱い、outcomeは `inapplicable / passed / failed / cantTell / untested` を使用します。
+
+- `inapplicable`: applicabilityを評価し、test targetがないと確定した
+- `passed / failed`: applicableなtest targetを評価してexpectation結果を確定した
+- `cantTell`: evaluationを開始したが、applicabilityまたはexpectationを完全に判定できない
+- `untested`: supported ruleが今回scopeへ選定されたが、そのtest subjectを評価していない
+
+automatic checkが `criterion_checks.py` までdispatchされmachine evidenceを評価した場合、単なる入力不足を `untested` へ逃がしません。完全判定できなければ `cantTell` またはstructured issueへ閉じます。`untested` は、選定済みsupported ruleを実行前にskip / blockしたことを明示する非実行経路でだけ使用します。proposed ruleはsource statusを保持し、formal ruleと混同しません。
 
 ACT Rule resultを、そのままWCAG Success Criterion全体のrequirement resultへ読み替えません。
 
@@ -358,7 +365,7 @@ unsupported ACT Ruleへ、
 - `untested` result
 - `cantTell` result
 
-を機械的に作りません。`untested / cantTell` はsupported ruleを実際のevaluation scopeで処理した際のACT outcomeです。
+を機械的に作りません。`untested / cantTell` はsupported ruleにだけ使用します。`untested` は選定済みruleを評価していない場合、`cantTell` は評価を開始したが完全判定できない場合です。unsupported ruleへはどちらも作りません。
 
 formal ACT Ruleが存在しないrequirementについて、ACT互換を装う独自ruleを作りません。
 
@@ -449,7 +456,8 @@ runtime generatorとdeterministic eval validatorを同じ実装へしません�
 - negative elapsed
 - supported automatic ACT Rule `passed`
 - supported automatic ACT Rule `failed`
-- supported ACT Rule outcome `cantTell / untested / inapplicable`
+- supported ACT Rule outcome `cantTell / inapplicable`
+- selected supported ACT Ruleの非実行経路 → `untested`。automatic checkを実行済みの入力不足は `untested` にしない
 - source typeとsource statusの分離
 - partial / manual ruleを自動 `passed / failed` へしない
 - rule `passed` からrequirement全体を `satisfied` へ昇格しない

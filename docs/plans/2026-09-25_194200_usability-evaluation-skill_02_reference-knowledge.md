@@ -125,7 +125,7 @@ UI pattern knowledgeをinspection packageへ複製しません。
 
 ## 3.1 追加source discovery
 
-`_02c_seed-source-catalog.md` の既知sourceは実装時に全件再確認します。
+`_02c_seed-source-catalog.md` は既知source inventoryとして利用します。実装時に必須で再確認するのはcurrent capability coverageに必要なcore sourceです。Design System / platform / pattern library等の条件付きsourceは、project採用、target platformへの直接適用、またはcoverage gapがある場合だけ確認・採否を閉じます。
 
 追加source discoveryは、`_02a_source-acquisition-and-coverage.md` の能力coverageにgapがある場合だけ行います。
 

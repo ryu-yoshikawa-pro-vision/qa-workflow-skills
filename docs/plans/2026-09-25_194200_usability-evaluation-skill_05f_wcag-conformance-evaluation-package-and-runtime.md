@@ -38,7 +38,7 @@ skills/wcag-conformance-evaluation/
 - WAI-ARIA / ARIA in HTML
 - Understanding Accessibility Support
 
-WCAG-EM Report Toolは既知の公式resourceとして保持しますが、2026-09-26確認時点のWAI Overviewではcurrent toolはWCAG-EM 1向けです。WCAG-EM 2のfield / JSON schemaを決めるAuthorityにはせず、本Skillのoutput contractはWCAG-EM 2.0本文、とくにStep 5.1を正本にします。Report Tool自体もruntime dependencyにはしません。`references/source-catalog.md` は `_02d_reference-artifact-schema.md` の共通Sources table契約を再利用します。
+WAI OverviewはWCAG-EM 2.0のresourceとしてWCAG-EM Report Toolを案内しています。ただし、Report Toolのfield / export schemaがWCAG-EM 2.0本文のStep 5要件と完全に同一であることは確認できていないため、本Skillのoutput contractはWCAG-EM 2.0本文を正本にします。Report Toolは補助resourceとして保持し、runtime dependencyにもschema Authorityにもしません。`references/source-catalog.md` は `_02d_reference-artifact-schema.md` の共通Sources table契約を再利用します。
 
 ## 3. output-template.md
 
@@ -181,6 +181,38 @@ URLだけでdynamic state / process sampleを識別できない場合は、必�
 - added structured sample refs
 - next iteration ref
 
+### Step 5 report closure
+
+Step 5.1は、Step 1〜4のoutcomeを成果物内で追跡できることを必須にします。validatorは少なくとも次を確認します。
+
+- Step 1.1 product scope
+- Step 1.2 target WCAG level
+- Step 1.3 accessibility support baseline
+- Step 1.4 additional evaluation requirements（採用した場合）
+- Step 2.1〜2.5 exploration outcome
+- Step 3.1 structured sample
+- Step 3.2 random sample
+- Step 3.3 complete process
+- Step 4.1 initial sample evaluation
+- Step 4.2 complete process evaluation
+- Step 4.3 structured / random comparisonと必要な再sampling loop
+
+Step 5.2のevaluation specifics、Step 5.3のevaluation statement、Step 5.4のaggregated score、Step 5.5のmachine-readable reportはoptionalとして別扱いにします。本Planではaggregated scoreを生成しません。
+
+### Evaluation Statement
+
+作成する場合は、他sectionへのrefだけで意味が失われないよう、少なくとも次をstatement sectionへ明示します。
+
+- issued date
+- WCAG title / version / URI
+- evaluated conformance level
+- digital product definition / scope ref
+- technologies relied upon。Step 2.4のexploration refへ追跡可能にする
+- accessibility support baseline ref
+- partial conformance statementの場合だけ、non-conforming product areas
+- partial conformance statementの場合だけ、理由。WCAG-EM 2.0が定める理由語彙へ従う
+- product ownerのvalidity / accuracy維持commitmentを確認したevidence / ref
+
 ## 4. sampling.py
 
 random selectionはpredictable fixed patternにしてはいけないため、production helperのうち選択処理は意図的にnon-deterministicです。
@@ -196,6 +228,8 @@ Function:
 ```text
 ceil(count * 0.10)
 ```
+
+これはWCAG-EM 2.0本文が整数丸め方法を規定しているという意味ではなく、「10%を切り捨てて0件にしない」ための本Planの整数化規則です。少なくともstructured sample count = 1 / 9 / 10 / 11で、それぞれtarget = 1 / 1 / 1 / 2になるfixtureを持ちます。
 
 Output:
 
@@ -290,6 +324,8 @@ Function:
 - complete process sequence closure
 - required sample result coverage
 - Step 4.3 iteration chain closure
+- Step 5.1でStep 1〜4の各required outcomeが成果物へ存在すること
+- evaluation statementを作成した場合のStep 5.3 minimum fieldsと生成条件
 - report section order固定
 - summary count生成
 
@@ -323,6 +359,9 @@ evaluation statementは次をすべて確認できる場合だけ生成します
 - 全non-optional methodology requirement完了
 - 全sampleがtarget conformance levelを満たす
 - product ownerがvalidity / accuracy維持責任を明示的に引き受ける
+- §3のEvaluation Statement minimum fieldsをすべて埋められる
+
+partial conformance statementを作る場合は、WCAG-EM 2.0 Step 5.3が要求するnon-conforming product areasとreasonも必須です。
 
 通常のrepresentative sample evaluationからproduct-wide WCAG conformance claimを生成しません。
 
@@ -344,8 +383,8 @@ production helperとは別実装で少なくとも次を検証します。
 - sample result cross-reference
 - target levelに必要なrequirement result coverage
 - Step 4.3 comparison iteration chain
-- report Step 1〜4 outcome
-- evaluation statement生成条件
+- Step 5.1のStep 1〜4 outcome closure
+- evaluation statement生成条件とStep 5.3 minimum fields
 - product-wide claim guard
 - Finding refs
 - secret / credential非複製
@@ -360,7 +399,7 @@ random selectionの結果そのものが「十分randomだったか」を同じv
 
 「WCAG 2.2 AAへ適合しているか評価」
 
-→ wcag-conformance-evaluation。
+→ `wcag-conformance-evaluation` をmethodology ownerとして開始する。live observationが必要で `qa-workflow` を利用できる場合は、`qa-workflow → usability-inspection → qa-workflow → wcag-conformance-evaluation resume` まで同一要求内で閉じる。
 
 ### Case B: general accessibility boundary
 
@@ -414,12 +453,13 @@ representative sampleが全PASSでもproduct-wide conformance claimを作らな�
 
 - package単体でSkill contractを理解できる
 - sibling Skillのscriptsへruntime依存しない
-- live observation不足時にnormalized handoffを出してblockedへ閉じられる
-- current WCAG-EM Report ToolをWCAG-EM 2 schema Authorityとして扱わず、runtime dependencyにもしていない
-- random sample 10%整数化がscript化されている
+- formal direct trigger後にlive observationが必要な場合、qa-workflowが利用可能ならhandoff → usability-inspection → formal Skill resumeへ遷移し、qa-workflowを利用できないstandalone環境だけblockedへ閉じられる
+- WCAG-EM Report ToolをWCAG-EM 2 schema Authorityとして扱わず、runtime dependencyにもしていない
+- random sample 10%整数化がscript化され、structured count 1 / 9 / 10 / 11の境界fixtureを持つ
 - random selectionへfixed seedを要求しない
 - sample / process / result / comparison refをAgentが手採番しない
 - Step 4.3 loopをartifact上で追跡できる
+- Step 5.1のrequired outcome closureとStep 5.3 evaluation statement minimum fieldsをvalidatorで検証できる
 - production helperとvalidatorが別実装
 - semantic Case A〜K PASS
-- real Web targetでcanonical WCAG-EM E2Eを実行できる
+- `_06c_canonical-live-validation.md` のrepository-controlled canonical fixtureでWCAG-EM orchestration E2EをPASSできる

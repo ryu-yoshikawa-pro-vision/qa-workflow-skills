@@ -294,19 +294,21 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
    2026-09-25_194200_usability-evaluation-skill_06a_usability-inspection-implementation-order.md
 6b. wcag-conformance-evaluationの実装順序・完了条件  
    2026-09-25_194200_usability-evaluation-skill_06b_wcag-conformance-evaluation-implementation-order.md
+6c. 3 Skill共通のcanonical live validation・外部実対象検証境界  
+   2026-09-25_194200_usability-evaluation-skill_06c_canonical-live-validation.md
 
 ## 今回の完成範囲
 
 - live inspectionはWeb UIだけを対象とする。native app向けlive automationは対象外として完結させる。
 - bundled reference corpusは公開情報だけを対象とする。認証必須・有料・非公開本文はcorpusへ取り込まない。
 - human participantへtaskを依頼して成功率・所要時間・satisfaction等を測定するusability studyは対象外とする。AIによるexpert evaluation / Web live inspectionの結果をhuman studyの結果へ読み替えない。
-- 現時点で把握している公開sourceは `_02c_seed-source-catalog.md` に公式URL付きで固定し、実装時の `references/source-catalog.md` へ反映する。
+- 現時点で把握している公開sourceは `_02c_seed-source-catalog.md` に公式URL付きで保持する。実装完了の必須確認対象はcurrent capability coverageに必要なcore sourceと、project / platform条件またはcoverage gapにより実際に採用するsourceに限定する。
 - source discoveryは固定件数で打ち切らない一方、公開Web上のsourceを再帰的に無制限探索することも完成条件にしない。定義済みの有限な評価能力coverageを全row closureする。
 - normalized corpusへ `included / merged-duplicate` としたsource itemは全件をsource原文と意味照合する。catalogへ載せただけのsource全pageをsemantic validation対象にはしない。
 - general accessibility inspectionとformal WCAG conformance evaluationを別Skillへ分離する。formal評価は `wcag-conformance-evaluation` がWCAG-EM 2.0をmethodologyとして使用する。
 - ACT Rulesはinformative testing methodとして利用し、全formal / proposed ruleの実装を完成条件にしない。supported ruleだけを実装し、ACT Rules Format 1.1 §4.14.1のconsistencyを検証する。
 - general live inspectionでは定義済み上位観点をすべてapplicability判定し、未選択のまま残さない。
-- canonical live Web E2Eを実行できない状態は実装完了ではなくblockedとする。
+- repository implementationの完了には `_06c_canonical-live-validation.md` のrepository-controlled canonical fixtureでAgent / browser E2Eを1本以上PASSさせる。外部実対象・実アカウント・特定assistive technologyを必要とするacceptanceは別ゲートとし、それらが提供されていないことだけでrepository implementationを未完了にしない。
 - formal WCAG conformance evaluationは `wcag-conformance-evaluation` でWCAG-EM 2.0 Step 1〜5、accessibility support baseline、structured / random sample、complete process、Step 4.3再sampling loop、reportまで閉じる。
 
 ## 固定方針
@@ -326,7 +328,7 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
 13. Nielsen等のheuristicは一般原則として扱い、仕様Authorityへ昇格しない。
 14. 外部資料本文を丸ごと転載しない。referencesには構造化した要約、評価観点、適用条件、source item refを保持する。
 15. source-catalogは既知sourceとcandidateの公式URL・位置づけ・状態を追跡する索引とし、source全page一覧にはしない。normalized referenceへ実際に採用したsource itemだけをincluded / merged-duplicate / reference-only / unavailable / out-of-scopeへ閉じる。
-16. `_02c_seed-source-catalog.md` のseedを全件再確認し、Q1〜Q7を実行する。追加source discoveryは能力coverage gapがある場合に行う。Plan側で検索件数・page数を恣意的に制限しないが、「新しいsourceが見つからなくなるまで」の再帰探索も完成条件にしない。
+16. `_02c_seed-source-catalog.md` のうちcurrent capability coverageに必要なcore sourceを再確認し、Q1〜Q7を実行する。Design System / platform / pattern library等の条件付きseedは、projectで採用されている、target platformへ直接適用する、または能力coverage gapを埋める場合だけ確認・採否を閉じる。Plan側で検索件数・page数を恣意的に制限せず、「新しいsourceが見つからなくなるまで」の再帰探索も完成条件にしない。
 17. 「今回すべて対応する」は、今回定義した評価能力・実行経路・成果物契約・検証を閉じることを意味する。公開sourceの全pageや全Design Systemの内容を複製することは意味しない。
 18. 実装時に情報源ごとの利用条件・ライセンスを確認し、許容範囲を超える複製をしない。
 19. runtime時の外部Webアクセスを必須にしない。Skill package単独で参照知識を利用可能にする。
@@ -347,7 +349,7 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
 34. 明確なstandard / binding requirementはrequirement単位で `satisfied / not-satisfied / undetermined` へ閉じ、applicability、exception、観測事実 / 値、evidence、必要なAuthorityを保持する。WCAG Success Criterionを `passed / failed / inapplicable` とは表現しない。今回のscopeについて必要なapplicable populationとrequired checksを閉じ、requirement全体を満たす根拠が揃った場合だけ `satisfied` とする。検査scopeとして扱わない項目はrequirement resultではなくscope closure側の `対象外` とする。
 35. 一般heuristic、ISO interaction principles、第三者Design System等のadvisory guidanceをstrictな仕様FAILへ自動変換しない。
 36. 単一component / 単一画面のrequirement `satisfied` から製品全体のWCAG conformance等を宣言しない。formalなWCAG評価要求は `wcag-conformance-evaluation` へroutingする。
-37. usability-evaluationのseed sourceは実装時に全件URL / status / accessを再確認する。seedであることだけを理由に全本文をadoptせず、能力coverageまたはAuthority / provenance上必要なsource itemだけnormalized corpusへ採用する。
+37. usability-evaluationのsource確認は、current capability coverageに必要なcore sourceと、実際に採用する条件付きsourceへ限定する。seed一覧に存在するだけの未使用Design System / platform guidanceまで実装完了のために全件再確認しない。採用したsourceでも全本文をadoptせず、能力coverageまたはAuthority / provenance上必要なsource itemだけnormalized corpusへ採用する。
 38. usability-inspectionのlive実行対象は既存Playwright経路で到達できるWeb UIに固定する。desktop Web、responsive viewport inspection、touch-capable inspection、mobile device emulationを区別する。mobile device emulationでは実際のdevice profile / viewport / screen / userAgent / deviceScaleFactor / hasTouch / isMobileを記録する。native iOS / Android / desktop appの能動操作は本Skillの対象外とする。
 39. usability-inspectionがbrowser / session ownerとなり、usability-evaluationはimmutable evidenceをread-onlyで評価する。同一sessionを並行操作しない。
 40. Playwrightのimplicit auto-scrollをvisual / pointer上のdiscoverability成功として扱わず、必要なscrollはuser actionとして観測する。
@@ -361,7 +363,7 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
 48. 「ユーザビリティテストして」等の依頼はusability-inspectionのtrigger aliasとして受けられるが、成果物ではhuman participantを用いる正式なusability testingを実施したとは表現しない。
 49. 「usabilityを確認」「UIの使いやすさを見て」等の実操作有無が不明な依頼はtrigger boundaryとして扱い、live Web UIを操作して検査するならusability-inspection、design artifact / screenshot / 取得済みevidenceのreference-based評価ならusability-evaluationへroutingする。
 50. usability-inspectionでref採番、scope closure、数値計算、threshold比較、supported machine-decidable test rule等をLLMへ手計算させず、PR #11のcurrent Skill runtime contractを使って決定論的scriptへ移す。usability-evaluationのevaluation ref / closure / cross-referenceも `evaluation_structure.py` へ移し、Agentへ手採番させない。`test-rule-catalog.json` はsupported ACT / project test ruleのmetadataだけを保持し、structure / geometry / elapsed / threshold helperは `inspection_structure.py` / `measurement.py` に置く。generic rule DSL / plugin systemは追加しない。
-51. W3C ACT Rulesはinformative testing methodとして利用する。全ruleの実装は要求せず、live Web scopeで忠実に実装でき、required evidenceを取得でき、official examplesでconsistency検証できるruleだけsupportedとする。supported ACT RuleのoutcomeはACT Rules Format 1.1の `inapplicable / passed / failed / cantTell / untested` を使用し、rule status、requirements mapping、execution modeを分離する。
+51. W3C ACT Rulesはinformative testing methodとして利用する。全ruleの実装は要求せず、live Web scopeで忠実に実装でき、required evidenceを取得でき、official examplesでconsistency検証できるruleだけsupportedとする。supported ACT RuleのoutcomeはACT Rules Format 1.1の `inapplicable / passed / failed / cantTell / untested` を使用する。`untested` はsupported ruleが今回scopeへ選定されたがtest subjectを評価していない場合だけ、`cantTell` は評価を開始したがapplicabilityまたはexpectationを完全に判定できない場合に使用し、rule status、requirements mapping、execution modeと分離する。
 52. general accessibility inspectionとformal WCAG conformance evaluationを別Skillへ分離する。formal評価ではtarget WCAG version / level / self-enclosedなdigital product scope / accessibility support baselineを事前に確定し、WCAG-EM 2.0へ従う。supported test ruleがrequirementの一部だけを評価する場合、rule outcomeが `passed` でもrequirementを `satisfied` にしない。
 53. screenshot、DOM、accessibility tree、raw snapshot等はsecret・個人データ・機密情報を含み得るため、PR #12のevidence安全契約を再利用して必要最小限だけ取得・保存し、raw evidenceを成果物の必須条件にしない。
 54. deterministic runtime、deterministic validator、semantic evalを分離し、同じ実装で生成と検証を行わない。

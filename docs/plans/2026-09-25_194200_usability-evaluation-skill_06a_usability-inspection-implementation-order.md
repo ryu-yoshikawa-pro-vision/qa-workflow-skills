@@ -378,7 +378,7 @@ repository標準件数に合わせます。
 
 ### real Agent
 
-実Agentがtaskなしのpage inspectionと、taskありのflow inspectionをcanonical live Web targetで完了できることを確認します。環境が利用できない場合はblockedであり、実装完了にはしません。
+`_06c_canonical-live-validation.md` のrepository-controlled canonical fixtureを使い、実Agentがtaskなしのpage inspectionとtaskありのflow inspectionを完了できることを確認します。外部実対象や実アカウントが提供されていないことだけでrepository implementationを未完了にしません。
 
 あわせて、
 
@@ -474,7 +474,7 @@ repository標準件数に合わせます。
 - `_05e_performance-measurement.md` のdirect measurement / external Core Web Vitals source境界を閉じる
 - general inspectionの全上位観点をclosure
 - Case A〜ADをすべてPASS
-- canonical live Web E2EをPASS
+- `_06c_canonical-live-validation.md` のrepository-controlled canonical live Web E2EをPASS
 
 ## 21. 対象外
 

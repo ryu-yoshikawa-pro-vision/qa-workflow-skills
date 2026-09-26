@@ -40,9 +40,11 @@ PR #11 / #12 / #13がPlanから変更されて実装された場合、実装をP
 
 ## 3. Step 1: seed source catalog / capability coverage
 
-reference本文を書く前に `_02c_seed-source-catalog.md` の既知sourceを全件再確認します。
+reference本文を書く前に、`_02c_seed-source-catalog.md` のうちcurrent capability coverageに必要なcore sourceを再確認します。
 
-各seedで、
+project採用、target platformへの直接適用、coverage gap解消、独立Authority / provenanceのために選定した条件付きsourceも同じ手順で確認します。未使用の条件付きseedを全件確認することはcompletion gateにしません。
+
+確認対象sourceごとに、
 
 - canonical URL / redirect
 - publisher / owner
@@ -149,9 +151,14 @@ All ACT RulesのURL / rule一覧はcatalogから辿れるようにしますが�
 
 ## 8. Step 6: Design System / platform source catalog
 
-`_02c_seed-source-catalog.md` に列挙したGOV.UK、USWDS、Carbon、Fluent 2、Atlassian、Spectrum、Primer、SLDS、SAP Fiori、GNOME HIG、Apple HIG、Material 3、Shopify Polarisをsource catalogへ登録・再確認します。
+`_02c_seed-source-catalog.md` のDesign System / platform sourceは、次の条件に該当したものだけsource catalogへ登録・再確認します。
 
-各sourceの全公開pageをnormalized corpusへ複製しません。
+- projectが採用している
+- target platform / productへ直接適用する
+- capability coverage gapを埋める
+- common patternへ統合できないsource固有差分をAuthority / provenanceとして保持する必要がある
+
+未使用のDesign System / platform sourceを実装完了のために全件確認しません。各sourceの全公開pageもnormalized corpusへ複製しません。
 
 次の場合にsource item / reference entryを作ります。
 
@@ -162,16 +169,9 @@ All ACT RulesのURL / rule一覧はcatalogから辿れるようにしますが�
 
 ## 9. Step 7: general pattern / heuristic reference
 
-seed catalogの、
+general pattern / heuristic sourceはcapability coverageへ必要なものを選定して再確認します。seed catalogのソシオメディア UIデザインパターン、Nielsen Norman Group、UI-Patterns.com、Welieは候補であり、全件確認をcompletion gateにはしません。
 
-- ソシオメディア UIデザインパターン
-- Nielsen Norman Group
-- UI-Patterns.com
-- Welie
-
-を再確認します。
-
-capability coverageに必要なpattern / heuristic / methodologyだけnormalized referenceへ取り込みます。
+選定したpattern / heuristic / methodologyだけnormalized referenceへ取り込みます。
 
 同じ意味を別sourceから重複コピーせず、provenance価値がある場合はmerged-duplicateとしてsource item関係を保持します。
 
@@ -453,17 +453,15 @@ dataset構造検証だけで実装完了にしません。
 
 ## 18. browser smoke
 
-PR #12 / #13 merge後の実行基盤を使い、
+`_06c_canonical-live-validation.md` を正本とします。repository-controlled canonical fixtureで少なくとも、
 
 - test-target-inspection evidence → usability-evaluation
 - test-execution evidence → usability-evaluation
 - live Web target → usability-inspection → usability-evaluation
 
-のcanonical経路を実Agentで確認します。環境が利用できなければblockedであり、実装完了にはしません。
+の経路を実Agent / browserで確認します。
 
-同一sessionへの並行操作をしないことを確認します。
-
-環境が利用できない場合、未検証として記録し、架空の成功結果を作りません。
+外部実対象・実アカウント・特定assistive technologyを必要とするacceptanceは別ゲートです。外部入力が提供されていないことだけでrepository implementationを未完了にしません。同一sessionへの並行操作をしないことはcanonical fixtureで検証します。
 
 ## 19. usability-evaluation完了条件
 
@@ -474,7 +472,7 @@ PR #12 / #13 merge後の実行基盤を使い、
 - root indexからpatterns / accessibility / platformsのsub-indexへ到達できる
 - sub-indexから対象pattern / concern / platform別referenceへ到達できる
 - 通常評価で全referencesの一括読込を要求しない
-- `_02c_seed-source-catalog.md` の全seedがsource-catalogへ確認結果・canonical URL・checked_at付きで記録されている
+- current capability coverageに必要なcore sourceと、今回選定した条件付きsourceがsource-catalogへ確認結果・canonical URL・checked_at付きで記録されている
 - Q1〜Q7とcapability gapから追加したqueryがcompletedで、retrieval boundaryが記録されている
 - capability coverageの全rowがcovered / not-applicableへ閉じ、blockedが0
 - source candidateのpendingが0
@@ -501,7 +499,7 @@ PR #12 / #13 merge後の実行基盤を使い、
 - qa-workflow routing tests PASS
 - README / EVALS / repository Skill一覧整合
 - Planで定義した全semantic caseを実Judgeで確認
-- canonical real Agent trigger、browser evidence連携、live Web inspection E2Eを確認。実行環境が利用できない場合はblockedとして実装未完了
+- `_06c_canonical-live-validation.md` のrepository-controlled fixtureでcanonical Agent trigger、browser evidence連携、live Web inspection E2EをPASS
 - TC PASS / FAILとUI / UX評価項目を分離し、追加QA活動が必要な評価項目だけFindingへ昇格することを確認
 - test-analysis統合でProduct Riskの識別・評価・採点owner境界を確認
 - test-condition-design統合で一般UI guidanceを製品期待結果へ昇格せず、検証観点候補の採否owner境界を確認
@@ -513,7 +511,7 @@ PR #12 / #13 merge後の実行基盤を使い、
 
 - `_02a_source-acquisition-and-coverage.md` のcapability coverageをPASS
 - `_02b_reference-validation-and-completeness.md` のmerge / splitと全included item semantic validationをPASS
-- `_02c_seed-source-catalog.md` のknown sourceを公式URL付きでcatalogから辿れる
+- 実際に採用したcore / conditional sourceを公式URL付きでcatalogから辿れる。未使用の条件付きseedまでcatalog登録を要求しない
 - source discoveryで未知のWeb sourceが存在しないとは主張しない
 - normalized corpusへ採用したitemの意味検証ではsamplingを使わない
 

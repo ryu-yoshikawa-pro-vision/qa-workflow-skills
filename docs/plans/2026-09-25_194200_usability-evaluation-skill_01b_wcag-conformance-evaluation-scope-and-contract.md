@@ -168,9 +168,11 @@ live Web observationが必要なsample / complete processでは、次のnormaliz
 
 複数Skillが必要なworkflowでは `qa-workflow` がこのhandoffを受け、`usability-inspection` をbrowser ownerとして直列実行し、immutableなinspection artifact / evidence refsを戻します。
 
+formal要求から `wcag-conformance-evaluation` が直接発火した場合も、live observationが必要になり同一Agent環境で `qa-workflow` が利用可能なら、formal Skillはhandoff requirementを `qa-workflow` へ返し、`usability-inspection` の結果を受け取った後に同じevaluationをresumeします。ユーザーへ別依頼として再入力させず、formal Skill自身がbrowser ownerへ変形もしません。
+
 `wcag-conformance-evaluation` はsibling Skillの `scripts/` を直接import / 実行しません。
 
-standalone利用時は、
+`qa-workflow` を利用できない真のstandalone環境では、
 
 - callerから必要なcurrent observation / evidence artifactをInputとして受け取る
 - live observationが不足する場合はrequired handoffをOutputし、formal evaluationを `blocked` のまま終了する

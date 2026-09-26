@@ -6,12 +6,30 @@
 
 ## 1. direct trigger
 
-次は `wcag-conformance-evaluation` へroutingします。
+次は `wcag-conformance-evaluation` をformal methodology ownerとして最初に選びます。
 
 - WCAG 2.2 AAに適合しているか評価
 - WCAG conformance evaluationを実施
 - WCAG-EM 2.0で評価
 - WCAG適合評価reportを作成
+
+直接発火は「formal Skillだけで最後まで実行する」という意味ではありません。sample / complete processでcurrent live observationが必要になった場合は、同一Agent環境で `qa-workflow` が利用可能なら次の経路へ遷移します。
+
+```text
+formal request
+→ wcag-conformance-evaluation
+→ observation handoff requirement
+→ qa-workflow
+→ usability-inspection
+→ immutable observation / evidence
+→ qa-workflow
+→ wcag-conformance-evaluation resume
+→ WCAG-EM report
+```
+
+この遷移でユーザーへ別依頼として再入力させません。`wcag-conformance-evaluation` がbrowser ownerへ変形したり、sibling Skillのscriptを直接実行したりもしません。
+
+`qa-workflow` を利用できない真のstandalone環境では、必要なcurrent evidenceがInputにない場合だけhandoff requirementを出して `blocked` へ閉じます。
 
 「accessibilityを確認」「keyboard / focusを確認」のようなformal conformanceを要求しない依頼は `usability-inspection` のgeneral accessibility inspectionです。
 
@@ -95,7 +113,7 @@ sample observationが必要な場合:
 
 を直列に行います。
 
-standalone `wcag-conformance-evaluation` はsibling Skillのscriptsを直接実行しません。必要evidenceがInputにない場合はhandoff requirementを出してblockedになります。
+`wcag-conformance-evaluation` はsibling Skillのscriptsを直接実行しません。同一Agent環境で `qa-workflow` が利用可能ならhandoffをworkflowへ返してresumeします。`qa-workflow` を利用できない真のstandalone環境で必要evidenceがInputにない場合だけ、handoff requirementを出してblockedになります。
 
 ## 8. 完了条件
 
@@ -103,6 +121,7 @@ standalone `wcag-conformance-evaluation` はsibling Skillのscriptsを直接実�
 - general accessibility要求がformal evaluationへ誤routingされない
 - sample selection ownerがwcag-conformance-evaluationへ一意
 - browser ownerが同時に複数存在しない
+- formal direct triggerからlive observationが必要になった場合にqa-workflow → usability-inspection → formal Skill resumeへ一意に遷移できる
 - multi-Skill executionをqa-workflowがownerし、formal Skillがsibling scriptsへruntime依存しない
 - TC result / expert evaluation / WCAG resultを混同しない
 - Findingがreportの正本を置き換えない
