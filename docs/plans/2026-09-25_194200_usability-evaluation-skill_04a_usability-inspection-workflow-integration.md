@@ -83,7 +83,7 @@ test-execution
 usability-inspection
 検査scope
 → live UIを操作・観測
-→ objective fact / measurement / criterion result
+→ objective fact / measurement / requirement result
 → UI / UX問題候補
 ~~~
 
@@ -109,7 +109,7 @@ TCのstep sequenceやlocatorを、usability-inspectionのUI発見shortcutとし�
 - DOM / accessibility evidence
 - focus / keyboard result
 - visual measurement
-- standard / binding criterion result
+- standard / binding requirement result
 - performance measurement
 - task / flow result（実施した場合）
 
@@ -119,7 +119,7 @@ TCのstep sequenceやlocatorを、usability-inspectionのUI発見shortcutとし�
 
 1. usability-inspectionが必要なlive observationをmachine-readableな形で取得
 2. ref採番、scope closure、数値計算、threshold比較、対応済みtest ruleをdeterministic runtimeで処理
-3. runtimeでは決められないapplicability / exceptionを必要に応じて意味判断し、strict criterion resultを確定
+3. runtimeでは決められないapplicability / exceptionを必要に応じて意味判断し、strict requirement resultを確定
 4. immutable evidenceをusability-evaluationへ渡す
 5. usability-evaluationがread-onlyで専門評価
 6. 追加観測が必要ならrequestを返す
@@ -227,7 +227,7 @@ PR #12 merge後に共通browser safety / side-effect / cleanup契約が実装さ
 
 visual / pointer inspectionでは、現在viewportに見えていないcontrolをlocatorで直接指定してimplicit auto-scrollさせた結果を「発見・操作できた」と扱いません。
 
-必要なscrollはuser actionとして実行・記録します。
+current Playwrightでactionの `scroll: "none"` 等の正式機能を利用できる場合はreachability確認で優先します。discoverability確認中にscrollが必要な場合はwheel / keyboard / viewport単位のscroll等をuser actionとして実行・記録し、既知targetへ直接到達するtargeted scrollをdiscoverability成功の証拠にしません。target発見後のautomation補助としてtargeted scrollを使う場合は別扱いにします。
 
 ### actionability auto-wait
 
@@ -240,6 +240,8 @@ actionability wait自体が長い、または操作可能になるまでのUI fe
 role / name等のuser-facing locatorは、既に対象と判断したcontrolを実操作するために利用できます。
 
 test id、hidden DOM、implementation-specific selector等を、UI上で発見できないcontrolの存在を知るshortcutにしません。
+
+一方、WCAG等のstandard criterionで対象母集団を閉じるためにDOM / accessibility treeからcandidate elementを列挙することは許可します。その列挙はcriterion population evidenceであり、visual / pointer discoverability evidenceとは分離します。
 
 ## 14. 副作用
 

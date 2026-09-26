@@ -76,7 +76,7 @@ taskやpersonaがないことだけを理由に評価不能にしません。
 
 解釈だけを観測事実として書きません。
 
-`usability-inspection` のobjective observation、criterion result、measurement、screenshot、optional task / flow result等が入力される場合も、それらをevidenceとして扱い、human user behaviorへ読み替えません。criterion resultと専門評価も混同しません。
+`usability-inspection` のobjective observation、requirement result、measurement、screenshot、optional task / flow result等が入力される場合も、それらをevidenceとして扱い、human user behaviorへ読み替えません。requirement resultと専門評価も混同しません。
 
 ### Step 3: pattern候補を識別
 
@@ -154,11 +154,11 @@ reference側にあるnormative / informative / advisoryという性質だけか�
 
 deterministic validatorは「固定した観点が結果へ閉じていること」だけを検証し、その観点を選ぶべきだったか、内部でどの確認項目が必要だったかはsemantic evalで確認します。
 
-### Step 7: strict criterion resultと専門評価を分離
+### Step 7: strict requirement resultと専門評価を分離
 
-`usability-inspection` 等からstandard / binding criterion resultが渡された場合、そのPASS / FAIL / 判定不能 / 対象外をevidenceとして保持します。
+`usability-inspection` 等からstandard / binding requirement resultが渡された場合、その `satisfied / not-satisfied / undetermined` をevidenceとして保持します。検査scopeとして扱わない項目の `対象外` はscope closure側で保持します。
 
-W3C ACT Rule等のtest rule resultが渡された場合は、test rule resultとrequirement全体のcriterion resultを別のevidenceとして扱います。rule PASSだけを理由にcriterion PASSへ変更しません。
+W3C ACT Rule等のtest rule resultが渡された場合は、test rule outcomeとrequirement全体のresultを別のevidenceとして扱います。rule outcomeが `passed` であることだけを理由にrequirementを `satisfied` へ変更しません。
 
 usability-evaluationは、
 
@@ -172,9 +172,9 @@ usability-evaluationは、
 
 を評価できます。
 
-criterion PASSの前提が不足している場合、専門評価によって不足を補ったことにせず判定不能または追加確認として残します。
+requirementを `satisfied` とする前提が不足している場合、専門評価によって不足を補ったことにせず `undetermined` または追加確認として残します。
 
-ただし、一般heuristicやadvisory guidanceの差異をstrict criterion FAILへ変換しません。逆に、明確なbinding requirementのFAILを単なる「好み」の問題へ弱めません。
+ただし、一般heuristicやadvisory guidanceの差異を `not-satisfied` へ変換しません。逆に、明確なbinding requirementの `not-satisfied` を単なる「好み」の問題へ弱めません。
 
 ### Step 8: 評価
 
@@ -382,11 +382,13 @@ usability-evaluationは一般guidanceをテスト要求へ昇格しません。
 
 Success Criterion単位で、
 
-- applicableか
-- 必要な証拠を取得できたか
-- observed pass / observed failure / unable to determine
+- 今回のpage / process / evaluation scopeへ適用されるか
+- 必要なapplicable populationとrequired checksを閉じたか
+- `satisfied / not-satisfied / undetermined`
 
 を扱います。
+
+applicableなcontentが存在しないことを必要なscopeで確認できた場合は、その根拠を保持してSuccess Criterionを `satisfied` と扱えます。ACT Ruleの `inapplicable` outcomeをWCAG Success Criterionのresult語彙へ流用しません。
 
 ページ全体・process全体の適合が必要なcriterionをcomponentの一観測だけで完了扱いにしません。
 

@@ -86,8 +86,7 @@ skills/usability-inspection/
 │   ├── measurement.py
 │   └── criterion_checks.py
 ├── assets/
-│   ├── output-template.md
-│   └── deterministic-check-catalog.json
+│   └── output-template.md
 └── ...
 ~~~
 
@@ -159,6 +158,7 @@ artifact-local refは同じ正規化済み入力から同じ順序で生成し�
 - end value
 - value / unitを直接与えるmeasurementの場合はraw value
 - measurement method
+- clock domain（elapsedをstart / endから導出する場合）
 - metric definition ref（既存metric名を使用する場合）
 - threshold value / operator / Authority ref（存在する場合）
 - environment / viewport refs
@@ -167,10 +167,12 @@ timestamp / numeric valueはPR #11 current runtime contractのexact number表現
 
 #### Function
 
+- start / endが同一clock domainであることの検証
 - start / end差分の計算
 - unit整合
 - non-negative検証
 - threshold comparison
+- clock domain不一致の場合の `measurement-unavailable`
 - thresholdなしの場合の `threshold-not-defined`
 - metric definition ref不足時に既存metric名を確定しない
 - inputとderived valueのcanonicalization
@@ -211,7 +213,7 @@ genericな自然言語rule engineや式DSLは作りません。
 
 #### Function
 
-`deterministic-check-catalog.json` で `automation=full` とされたcheckだけを自動判定します。
+初版で実装済みとして `criterion_checks.py` に明示登録した、machine evidenceだけで完全に判定できるcheckだけを自動判定します。将来のrule追加だけを理由に別manifest、rule DSL、plugin registryを先行追加しません。
 
 次の場合は自動PASS / FAILへ進みません。
 
@@ -240,34 +242,33 @@ check単位で最低限:
 
 W3C ACT Ruleを完全に実装した場合は、そのruleで定義されたoutcomeを保持します。
 
-formal ACT Ruleでは原則として passed / failed / inapplicable をsource-native outcomeとして保持します。proposed rule等で別outcome vocabularyが定義されている場合はsource statusと一緒に保持し、formal ruleと混同しません。
+ACT Rules Format 1.1に従うACT Rule implementationでは、outcomeとして `inapplicable / passed / failed / cantTell / untested` を保持します。proposed rule等はruleが従うACT Rules Format versionとsource statusを一緒に保持し、formal ruleと混同しません。
 
-ACT Rule resultを、そのままWCAG Success Criterion全体のPASSへ読み替えません。
+ACT Rule resultを、そのままWCAG Success Criterion全体のrequirement resultへ読み替えません。
 
-## 5. deterministic-check-catalog.json
+## 5. supported deterministic checkの管理
 
-runtime scriptが任意のreference本文を解釈しないよう、実装済みcheckだけを固定catalogで管理します。
+runtime scriptが任意のreference本文を解釈しないよう、実装済みcheckだけを `criterion_checks.py` の明示的なdispatchと定数で管理します。
 
-最低限のfield:
+各実装済みcheckは最低限次をcode上で固定します。
 
-- check_key
-- source type
-- source rule ref
+- check key
+- source type / source rule ref
 - mapped requirement refs
-- source status
-- automation: full / partial / manual
-- runtime function key
+- source status / ACT Rules Format version
 - required observation fields
 - output scope
-- version / checked_at
+- checked_atまたはsource version
 
-`automation=partial / manual` は `criterion_checks.py` の自動PASS / FAIL対象外です。
+partial / manual checkは自動resultを生成せずstructured issueへ戻します。
+
+同じmetadataが複数checkで実際に重複し、別file化で単純化できることが実装時に確認された場合だけdata fileへの分離を検討します。初版から別catalog file、generic rule DSL、plugin systemを必須構成にはしません。
 
 W3C ACT Rulesでは、正式公開ruleとproposed / community ruleのstatusを混同しません。
 
 ACT RulesはWCAG / ARIA conformanceそのもののnormative basisではなく、testing methodのinformative ruleとして保持します。
 
-## 6. criterion resultとの関係
+## 6. requirement resultとの関係
 
 ### test rule result
 
@@ -279,15 +280,15 @@ rule単位の結果と、WCAG Success Criterion等のrequirement全体の結果�
 
 最終成果物の `standard / binding criterion check` です。
 
-FAILは、applicableなrequirement違反を証拠で確認できた場合に記録できます。
+`not-satisfied` は、applicableなrequirement違反を証拠で確認できた場合に記録できます。
 
-PASSは、今回宣言したevaluation scopeについて必要なapplicable populationとrequired checksを閉じられた場合だけ記録します。
+`satisfied` は、今回宣言したevaluation scopeについて必要なapplicable populationとrequired checksを閉じられた場合だけ記録します。WCAG Success Criterionでapplicable contentが存在しないことを必要なscopeで閉じた場合は、その根拠を保持して `satisfied` と扱えます。
 
-例えば1要素だけを確認して問題がなかったことを、page全体のcriterion PASSへ昇格しません。
+例えば1要素だけを確認して問題がなかったことを、page全体のrequirement `satisfied` へ昇格しません。
 
-ruleがrequirementの一部分だけを評価する場合、rule PASSだけではrequirement PASSにしません。
+ruleがrequirementの一部分だけを評価する場合、rule outcomeが `passed` でもrequirementを `satisfied` にしません。
 
-必要なpopulation / exception / manual checkを閉じられない場合は `判定不能` とし、確認済みrule結果はevidenceとして残します。
+必要なpopulation / exception / manual checkを閉じられない場合は `undetermined` とし、確認済みrule結果はevidenceとして残します。
 
 ## 7. W3C ACT Rulesの利用
 
@@ -304,7 +305,7 @@ W3Cが正式公開しているACT Rulesをdeterministic候補sourceとしてinve
 - machine evidenceだけでfully executableか
 - current browser observation contractで必要入力を取得できるか
 
-`automation=full` にできるruleだけruntime実装候補にします。
+machine evidenceだけでrule全体を実装できるruleだけruntime実装候補にします。
 
 rule本文を独自解釈して別の判定方法へ変更しません。
 
@@ -346,7 +347,8 @@ current Playwright versionをStep 0で確認します。
 
 - targetのviewport内状態をaction前に取得
 - off-viewport targetへlocator actionを直接実行しない
-- explicit scroll後に再観測
+- discoverability確認ではwheel / keyboard / viewport単位のuser-facingなexplicit scroll後に再観測
+- target発見後のtargeted scrollはdiscoverability evidenceへ数えない
 
 で代替します。
 
@@ -393,11 +395,14 @@ runtime generatorとdeterministic eval validatorを同じ実装へしません�
 - project threshold以内 / 超過
 - thresholdなし
 - negative elapsed
-- fully automated deterministic check PASS
-- fully automated deterministic check FAIL
-- partial / manual ruleを自動PASSへしない
-- rule PASSからrequirement全体PASSへ昇格しない
-- insufficient evidence → 判定不能
+- fully automated deterministic check `passed`
+- fully automated deterministic check `failed`
+- ACT outcome `cantTell / untested / inapplicable`
+- partial / manual ruleを自動 `passed / failed` へしない
+- rule `passed` からrequirement全体を `satisfied` へ昇格しない
+- insufficient evidence → `undetermined`
+- clock domain一致のelapsed計算
+- clock domain不一致 → `measurement-unavailable`
 - off-viewport target
 - secret / sensitive raw evidenceを成果物必須にしない
 
@@ -407,10 +412,11 @@ runtime generatorとdeterministic eval validatorを同じ実装へしません�
 - 別runtime frameworkを作っていない
 - 同じnormalized inputから同じmachine resultになる
 - 数値計算 / threshold比較をLLMが再計算しない
-- deterministic checkのdispatchが固定されている
-- partial / manual checkを自動PASS / FAILへ昇格しない
+- deterministic checkのdispatchが実装済みcheckだけへ固定され、別manifest / generic rule frameworkを先行追加していない
+- partial / manual checkを自動 `passed / failed` へ昇格しない
 - ACT Rule resultとrequirement resultを分離する
-- requirement PASSにはscope / population closureが必要
+- requirement `satisfied` にはscope / population closureが必要
+- elapsed計算で同一clock domainを検証する
 - browser操作runtimeを二重実装しない
 - raw evidenceを必要以上に永続化しない
 - runtime / validator / semantic evalが分離されている

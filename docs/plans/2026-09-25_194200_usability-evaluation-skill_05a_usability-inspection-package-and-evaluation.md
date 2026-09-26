@@ -17,8 +17,7 @@ skills/usability-inspection/
 │   ├── measurement.py
 │   └── criterion_checks.py
 ├── assets/
-│   ├── output-template.md
-│   └── deterministic-check-catalog.json
+│   └── output-template.md
 └── evals/
     ├── trigger/
     │   ├── train_queries.json
@@ -211,20 +210,20 @@ task / flowは指定された場合だけ保持します。
 - observed fact / value
 - test rule result refs
 - population closure: complete / incomplete / not-required
-- result: PASS / FAIL / 判定不能 / 対象外
+- result: `satisfied / not-satisfied / undetermined`
 - evidence refs
 - project Authority refs（project bindingの場合）
 - note
 
-FAILはapplicableな違反を証拠で確認できた場合に記録できます。
+`not-satisfied` はapplicableなrequirement違反を証拠で確認できた場合に記録できます。
 
-PASSは、宣言したevaluation scopeに必要なapplicable populationとrequired checksを閉じ、exception /未実施checkが残っていない場合だけ記録します。
+`satisfied` は、宣言したevaluation scopeに必要なapplicable populationとrequired checksを閉じ、exception / 未実施checkが残っていない場合だけ記録します。WCAG Success Criterionは `passed / failed / inapplicable` と表現しません。
 
-1要素やsampleだけで問題が見つからなかったことをpage / flow全体のPASSへ昇格しません。
+1要素やsampleだけで問題が見つからなかったことをpage / flow全体の `satisfied` へ昇格しません。
 
-一般heuristicやadvisory guidanceをこの表へFAILとして入れません。
+一般heuristicやadvisory guidanceをこの表へ `not-satisfied` として入れません。
 
-単一criterionのPASSを製品全体のconformanceへ昇格しません。
+単一criterionの `satisfied` を製品全体のconformanceへ昇格しません。
 
 ### deterministic test rule results
 
@@ -243,13 +242,13 @@ W3C ACT Rule等の個別test ruleまたはSkill runtimeの対応済みdeterminis
 
 result vocabulary:
 
-- source status=formal かつW3C ACT Rule → passed / failed / inapplicable
-- source status=proposed → source-defined outcomeを保持するが、standard criterionのstrict resultを単独で確定しない
-- source status=project / helper → PASS / FAIL / 判定不能 / 対象外
+- ACT Rules Format 1.1に従うACT Rule implementation → `inapplicable / passed / failed / cantTell / untested`
+- proposed ACT Rule → source-defined ruleとACT Rules Format versionを確認し、対応するoutcomeを保持する。formal ruleと同じstatusにはしない
+- project / helper check → ACT outcomeを装わず、そのcheck自身の定義済みresult vocabularyを保持する
 
-test rule resultとrequirement全体のcriterion resultを分離します。
+test rule resultとrequirement全体のresultを分離します。
 
-formal ACT RuleのPASS / FAIL / inapplicable等は、そのruleのscope内の結果です。ruleのrequirements mapping / outcome mappingがrequirement全体の結論に十分でない場合、criterion checkは別途判定不能または追加確認へ残します。
+ACT Rule outcomeは、そのruleのtest subject / targetとrequirements mappingに対する結果です。outcome mappingがrequirement全体の結論に十分でない場合、requirement resultは `undetermined` または追加確認へ残します。
 
 ### measurements
 
@@ -259,7 +258,10 @@ formal ACT RuleのPASS / FAIL / inapplicable等は、そのruleのscope内の結
 - metric / measurement label
 - target action / region
 - start event
+- start event取得方法
 - end event / predicate
+- end predicate取得方法
+- clock domain
 - measurement method
 - elapsed / value
 - unit
@@ -270,7 +272,7 @@ formal ACT RuleのPASS / FAIL / inapplicable等は、そのruleのscope内の結
 - evidence refs
 - limitation
 
-Playwright actionability waitをpost-input responsivenessへ含めたかどうかを曖昧にしません。
+Playwright actionability waitをpost-input responsivenessへ含めたかどうかを曖昧にしません。elapsedを導出するstart / endは同一clock domainで取得し、異なるclockを直接減算しません。同一clock domainを保証できない場合は `measurement-unavailable` とします。end predicateは原則としてaction前に固定します。
 
 独自measurementを既存metric名へ読み替えません。
 
@@ -285,6 +287,9 @@ usability判断に意味があるactionだけを記録します。
 - discovery basis
 - target visibility / viewport state before action
 - explicit scroll performed: true / false
+- scroll method
+- targeted scroll used: true / false
+- discoverability evidence eligible: true / false
 - locator type
 - Playwright actionability waitが観測上意味を持ったか
 - before evidence refs
@@ -293,7 +298,7 @@ usability判断に意味があるactionだけを記録します。
 
 visual / pointer inspectionでoff-viewport controlへ到達するためのimplicit auto-scrollを、userがcontrolを発見できた証拠にしません。
 
-current Playwright versionがaction時のimplicit scrollを無効化する正式オプションを提供する場合は、visual / pointer reachabilityの代表caseでそのnative機能を優先します。利用versionに存在しない場合だけ、action前のviewport確認 + explicit scrollで代替します。独自browser wrapperは追加しません。
+current Playwright versionがaction時のimplicit scrollを無効化する正式オプションを提供する場合は、visual / pointer reachabilityの代表caseでそのnative機能を優先します。利用versionに存在しない場合だけ、action前のviewport確認 + user-facingなexplicit scrollで代替します。targeted scrollはtarget発見後のautomation補助には使えますがdiscoverability evidenceへ数えません。独自browser wrapperは追加しません。
 
 ### usability-evaluation
 
@@ -308,7 +313,7 @@ current Playwright versionがaction時のimplicit scrollを無効化する正式
 
 ### Finding
 
-follow-upが必要なObservation、criterion FAIL、measurement、専門評価だけPR #13のFindingへroutingします。
+follow-upが必要なObservation、requirement `not-satisfied`、measurement、専門評価だけPR #13のFindingへroutingします。
 
 ### evidence data handling
 
@@ -336,11 +341,11 @@ PR #12のevidence安全契約を再利用します。
 - 数値Observationのunit
 - test rule result ref一意性
 - test rule resultのsource status / result許可値
-- criterion result許可値
+- requirement result許可値
 - criterion checkにcriterion ref / evaluation scope / applicability / observed factまたはvalue / evidenceがある
-- criterion PASSにはpopulation closure=completeまたはpopulationが不要である根拠がある
-- test rule PASSだけでcriterion PASSへ昇格していない
-- standard / binding criterion以外をstrict FAILとして扱っていない
+- requirement `satisfied` にはpopulation closure=completeまたはapplicable populationなしを閉じた根拠がある
+- ACT Ruleの `passed` だけでrequirementを `satisfied` へ昇格していない
+- standard / binding requirement以外を `not-satisfied` として扱っていない
 - project binding checkにproject Authority refがある
 - measurementのmethod / value / unit
 - threshold resultとthreshold fieldの整合
@@ -348,6 +353,10 @@ PR #12のevidence安全契約を再利用します。
 - task / flow未指定時にtask fieldsを必須要求しない
 - task / flow指定時だけtask result contractを適用する
 - Playwright actionability waitをpost-input responsivenessへ無根拠に含めない
+- elapsed計算のstart / endが同一clock domainである
+- clock domain不一致を `measurement-unavailable` へ閉じる
+- discoverability確認でtargeted scrollを成功証拠にしない
+- DOM / accessibility treeによるpopulation enumerationとdiscoverability evidenceを分離する
 - evaluation refがある場合はusability-evaluation artifactへ解決する
 - Finding refがある場合はFindingが存在する
 - cleanup / residual state contract
@@ -406,7 +415,7 @@ screenshotとviewport条件をevidenceとして残すこと。
 
 current Authorityに明示されたthresholdを超える。
 
-measurementとAuthorityを結び付けてcriterion FAIL / Finding候補にできること。
+measurementとAuthorityを結び付けてrequirement `not-satisfied` / Finding候補にできること。
 
 ### Case I: performance without threshold
 
@@ -472,17 +481,17 @@ learnabilityを重点確認する依頼ではCognitive Walkthroughを利用で�
 
 native iOS / Android appの実機操作を要求された場合、初版Web scopeで対応可能と偽らないこと。
 
-### Case U: criterion PASS scope
+### Case U: requirement result scope
 
 1つのbuttonだけtarget sizeを確認してPASSだったが、同じpageには他のpointer targetがある。
 
-単一targetの結果からpage全体のWCAG criterion PASSへ昇格せず、必要なpopulationを閉じられなければcriterionは判定不能またはより狭いevaluation scopeで記録すること。
+単一targetの結果からpage全体のWCAG requirementを `satisfied` へ昇格せず、必要なpopulationを閉じられなければrequirementは `undetermined` またはより狭いevaluation scopeで記録すること。
 
 ### Case V: ACT RuleとWCAG criterion
 
-formal ACT Ruleを実行してrule PASSになったが、そのruleのoutcome mappingだけではWCAG Success Criterion全体のPASSを確定できない。
+formal ACT Ruleを実行してrule outcomeが `passed` になったが、そのruleのoutcome mappingだけではWCAG Success Criterion全体を `satisfied` と確定できない。
 
-test rule resultはPASSとして残し、criterion resultを独立して判定すること。
+test rule resultは `passed` として残し、requirement resultを独立して判定すること。
 
 ### Case W: deterministic / semantic boundary
 

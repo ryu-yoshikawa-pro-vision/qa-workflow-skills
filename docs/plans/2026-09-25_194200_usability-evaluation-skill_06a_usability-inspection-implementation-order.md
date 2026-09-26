@@ -4,7 +4,8 @@
 
 `usability-inspection` の実装は、次を確認してから開始します。
 
-- PR #11 / #12 / #13がmainへmerge済み
+- PR #11のmerge済みruntime実装をlatest mainで確認済み
+- PR #12 / #13がmainへmerge済み
 - `usability-evaluation` の少なくともDialog縦断検証が成立済み
 - 最新mainのbrowser safety / side-effect / cleanup契約
 - 最新mainのqa-workflow / Activity / Finding契約
@@ -86,7 +87,7 @@ skills/usability-inspection/scripts/
 └── criterion_checks.py
 ~~~
 
-加えて `assets/deterministic-check-catalog.json` を追加します。
+別manifest / generic rule catalogは先行追加しません。実装済みのfully machine-decidable checkだけを `criterion_checks.py` の明示dispatchへ置きます。
 
 このStepではbrowserを操作しません。fixtureだけで次を確認します。
 
@@ -98,9 +99,10 @@ skills/usability-inspection/scripts/
 - threshold比較
 - threshold未定義
 - fully automated checkのdispatch
-- partial / manual checkを自動PASS / FAILにしない
+- partial / manual checkを自動 `passed / failed` にしない
+- ACT Rules Format 1.1の `inapplicable / passed / failed / cantTell / untested` を保持する
 - ACT Rule resultとrequirement resultを分離
-- insufficient evidenceを判定不能へ残す
+- insufficient evidenceをrequirement `undetermined` へ残す
 - runtime generatorとdeterministic validatorを別実装にする
 
 新しいrule DSL、plugin framework、browser runnerは追加しません。
@@ -114,13 +116,14 @@ fixtureで次を成立させます。
 - exception
 - observed fact / value
 - unit
-- PASS / FAIL / 判定不能 / 対象外
+- requirement result: `satisfied / not-satisfied / undetermined`
+- inspection scopeで扱わない場合の `対象外` はscope closure側で保持
 - project binding時のAuthority ref
 - thresholdの有無
 - thresholdなしの場合に独自FAILを作らない
-- advisory guidanceをstrict FAILへ変換しない
-- 単一criterion結果を製品全体のconformanceへ昇格しない
-- criterion PASSには宣言scopeのpopulation / required checks closureが必要
+- advisory guidanceを `not-satisfied` へ変換しない
+- 単一requirement resultを製品全体のconformanceへ昇格しない
+- requirement `satisfied` には宣言scopeのpopulation / required checks closureが必要
 - ACT Rule等のtest rule resultとrequirement resultを分離する
 
 task / flow未指定caseでも成果物が成立することを確認します。
@@ -166,8 +169,9 @@ PR #12 merge後のbrowser実行基盤を再利用します。
 
 - visual / pointer inspectionでlocatorのimplicit auto-scrollをdiscoverability成功にしない
 - current Playwright versionでimplicit scrollを無効化する正式オプションが利用可能ならnative機能を優先する
-- 利用できないversionではaction前viewport確認 + explicit scrollで代替する
-- 必要なscrollをexplicit user actionとして扱う
+- 利用できないversionではaction前viewport確認 + wheel / keyboard / viewport単位のuser-facingなexplicit scrollで代替する
+- target発見前のtargeted scrollをdiscoverability evidenceへ数えない
+- target発見後のautomation補助scrollとdiscoverability用scrollを区別する
 - scroll前後のevidenceを残せる
 
 ### locator
@@ -188,6 +192,10 @@ PR #12 merge後のbrowser実行基盤を再利用します。
 
 - pre-action actionability waitとpost-input responsivenessを分離
 - locator action呼び出し開始からのwall-clockをそのままuser response timeへしない
+- start event / end predicateの取得方法とclock domainを固定する
+- elapsedを導出するstart / endは同一clock domainで取得する
+- clock domain不一致は `measurement-unavailable` にする
+- end predicateを原則action前に定義する
 - actionability wait自体にUI上の問題がある場合は別Observationにできる
 
 ## 9. Step 7: page inspection vertical slice
@@ -231,7 +239,7 @@ taskを与えない代表caseで、1画面 / 1機能を端から端まで検査�
 - applicability / exception
 - observation / measurement
 - formal ACT Rule等の対応済みdeterministic checkがある場合はtest rule result
-- criterion result
+- requirement result
 - evidence
 - product-wide conformanceへ昇格しないこと
 
@@ -306,7 +314,7 @@ learnabilityを重点確認する代表caseでだけCognitive Walkthroughを利�
 
 ## 15. Step 13: usability-evaluation統合
 
-objective observation、criterion result、measurementを `usability-evaluation` へ渡します。
+objective observation、requirement result、measurementを `usability-evaluation` へ渡します。
 
 確認:
 
@@ -350,9 +358,9 @@ repository標準件数に合わせます。
 - inspection scope closure
 - runtime script fixture / dispatch
 - observation / test rule / criterion / measurement refs
-- criterion result / applicability / evidence
+- requirement result / applicability / evidence
 - project Authority ref
-- criterion PASSのpopulation closure
+- requirement `satisfied` のpopulation closure
 - ACT Rule resultとrequirement resultの分離
 - threshold整合
 - task optionality
@@ -406,7 +414,7 @@ repository標準件数に合わせます。
 - objective observationとexpert evaluationを分離する
 - applicable standard / binding criterionをcriterion単位で判定できる
 - test rule resultとrequirement resultを分離できる
-- criterion PASSに必要なpopulation / required checks closureを検証できる
+- requirement `satisfied` に必要なpopulation / required checks closureを検証できる
 - criterionのapplicability / exception / evidenceを保持する
 - advisory guidanceをstrict FAILへ変換しない
 - project thresholdがなければ独自FAIL thresholdを作らない

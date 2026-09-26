@@ -35,7 +35,7 @@
 - user actionに対するsystem responsivenessを測定できるか
 - task / flowが明示された場合、そのtaskを実際に進める際に詰まりがないか
 
-task / flowが指定されていない場合でも実行できます。
+task / flowが指定されていない場合でも実行できます。ただし、その場合に確定できるのは宣言したscope内のUI品質上の観測、standard / binding requirementの確認、ユーザビリティ関連の懸念候補です。specified user / goal / contextを必要とする製品全体のusability、human task success、efficiency、satisfactionを本Skill単独で確定しません。
 
 ## 3. human usability testingとの境界
 
@@ -156,16 +156,17 @@ scopeは次から必要なものを選びます。
 - project Design Systemのbinding requirement
 - project performance budget / SLO
 
-criterion resultは次です。
+requirement resultは次です。
 
-- PASS
-- FAIL
-- 判定不能
-- 対象外
+- `satisfied`
+- `not-satisfied`
+- `undetermined`
 
-criterion ref、適用条件、観測値 / 観測事実、判定根拠、evidence refを必ず保持します。
+criterion / requirement ref、適用条件、観測値 / 観測事実、判定根拠、evidence refを必ず保持します。
 
-単一componentや単一画面のcriterion結果から、製品全体のWCAG conformance等を宣言しません。
+WCAG Success Criterionは `passed / failed / inapplicable` とは表現しません。今回宣言したscopeでapplicable populationが存在しないことまで閉じられた場合は、その根拠を保持して `satisfied` と扱えます。検査scopeとして扱わない項目はrequirement resultへ `対象外` を入れず、inspection scope closure側で `対象外` とします。
+
+単一componentや単一画面のrequirement resultから、製品全体のWCAG conformance等を宣言しません。
 
 ### 専門評価
 
@@ -190,6 +191,8 @@ keyboard inspectionではfocus可能なcontrol、focus order、focus indicator�
 
 accessibility inspectionではaccessibility tree、role、accessible name / description、state / propertyを利用できます。
 
+DOM / accessibility treeは、standard criterionの対象母集団列挙、applicability確認、machine-readableな属性取得には利用できます。ただし、その列挙結果をvisual / pointer利用者がcontrolを発見できた証拠へ読み替えません。machine population enumerationとdiscoverability evidenceを分離します。
+
 ### 正解経路の先回りに使わないもの
 
 - test id
@@ -208,11 +211,11 @@ Playwrightで、既にuser-facing情報から対象と判断したcontrolを実�
 
 ただしlocator検索結果を、visual userがまだ発見していないoff-viewport controlの存在を知るためのshortcutにしません。
 
-visual / pointer inspectionでoff-viewport controlへ進む必要がある場合、scroll自体をuser actionとして実行・記録します。
+visual / pointer inspectionでoff-viewport controlへ進む必要がある場合、scroll自体をuser actionとして実行・記録します。discoverability確認中は、既知targetへ直接到達するtargeted scrollを使って「発見できた」とは扱わず、wheel / keyboard / viewport単位のscroll等、user-facingな探索操作で到達します。
 
 Playwrightのimplicit auto-scrollによって、発見できていないcontrolへ直接到達した結果を「問題なく操作できた」と扱いません。
 
-実装時に確認したPlaywright versionがaction時のscrollを無効化する正式オプションを提供する場合は、visual / pointer reachabilityの代表caseでそのnative機能を優先します。利用versionに存在しない場合はaction前のviewport確認とexplicit scrollで代替し、独自browser wrapperは作りません。
+実装時に確認したPlaywright versionがaction時のscrollを無効化する正式オプションを提供する場合は、visual / pointer reachabilityの代表caseでそのnative機能を優先します。利用versionに存在しない場合はaction前のviewport確認とuser-facingなexplicit scrollで代替し、独自browser wrapperは作りません。target発見後にautomation補助としてtargeted scrollを使う場合はdiscoverability evidenceには数えません。
 
 ### actionability auto-wait
 
@@ -292,7 +295,7 @@ criterionのexceptionやapplicabilityを無視して数値だけでFAILにしま
 
 ref採番、elapsed計算、threshold比較、scope closure、対応済みdeterministic test rule等は `_05b_usability-inspection-deterministic-runtime.md` のruntime scriptを使い、LLMが手計算・再計算しません。
 
-W3C ACT Rule等の個別test ruleを実行した場合、rule resultとWCAG / ARIA requirement全体のcriterion resultを分離します。rule PASSだけでrequirement PASSへ昇格しません。
+W3C ACT Rule等の個別test ruleを実行した場合、rule resultとWCAG / ARIA requirement全体のrequirement resultを分離します。rule outcomeが `passed` でも、それだけでrequirementを `satisfied` へ昇格しません。
 
 ### Step 5: optional task / flow
 
@@ -304,7 +307,7 @@ usability-inspectionではtaskを実行しても、結果をTCのPASS / FAILへ�
 
 ### Step 6: usability-evaluation
 
-取得したimmutable evidence、measurement、criterion resultを `usability-evaluation` へ渡し、UI pattern / heuristic / standard / Design System等から意味を評価します。
+取得したimmutable evidence、measurement、requirement resultを `usability-evaluation` へ渡し、UI pattern / heuristic / standard / Design System等から意味を評価します。
 
 `usability-evaluation` はread-onlyで、browser / session ownerは `usability-inspection` のままです。
 
@@ -372,15 +375,18 @@ Core Web Vitals等でfield dataやpercentileを要求する判定は、単一の
 
 例:
 
-- actual input dispatch → first visible feedback
-- actual input dispatch → task-ready state
+- 観測できたuser-facing input event → first visible feedback
+- 観測できたuser-facing input event → task-ready state
 - navigation start →主要内容が利用可能
 - loading start → completion state
 
 測定には、
 
 - start event
+- start event取得方法
 - end event / predicate
+- end predicate取得方法
+- clock domain
 - measurement method
 - elapsed time
 - viewport / device
@@ -390,7 +396,9 @@ Core Web Vitals等でfield dataやpercentileを要求する判定は、単一の
 
 を残します。
 
-Playwright action呼び出し開始からの時間を、そのまま「ユーザー操作後の応答時間」とみなしません。actionability wait等のpre-action時間とpost-input responseを分離します。
+elapsedを導出するstart / endは同一clock domainで取得します。host wall clockとpage側 `performance.now()` 等、異なるclockを直接減算しません。同一clock domainを保証できない場合は値を作らず `measurement-unavailable` とします。visible feedback等のend predicateは原則としてaction前に固定します。
+
+Playwright action呼び出し開始からの時間を、そのまま「ユーザー操作後の応答時間」とみなしません。actionability wait等のpre-action時間と、実際に観測できたinput event後のresponseを分離します。
 
 project thresholdがない場合、独自の仕様FAIL thresholdを作りません。
 
@@ -454,13 +462,13 @@ Finding候補になり得るもの:
 - 「今回確認する」とした観点が問題を確認 / 問題なし / 判定不能 / 対象外へ閉じている
 - 観測事実とevidenceが追跡できる
 - standard / binding criterionを判定した場合はcriterion ref、evaluation scope、applicability、population closure、観測値 / 事実、test rule result refs、result、evidenceへ追跡できる
-- criterion PASSは宣言scopeのapplicable population / required checksを閉じた場合だけ使用している
+- requirement `satisfied` は宣言scopeのapplicable population / required checksを閉じた場合だけ使用している
 - measurementを報告する場合は測定区間・方法・実測値へ追跡できる
 - Playwrightのauto-scroll / actionability waitでinspection対象のfrictionを隠していない
 - hidden implementation情報で操作対象を先回りしていない
 - task / flowが指定された場合は、その実行結果と制約を記録している
 - side effect / cleanup契約が閉じている
-- `usability-evaluation` を実行した場合は、観測事実 / criterion resultと専門評価が分離されている
+- `usability-evaluation` を実行した場合は、観測事実 / requirement resultと専門評価が分離されている
 - 必要なFindingがroutingされている
 - human usability / satisfactionを捏造していない
 - secret・個人データ・機密情報を含むraw evidenceを成果物の成立条件にしていない

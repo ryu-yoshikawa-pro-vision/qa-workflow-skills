@@ -41,7 +41,7 @@ PR #13では次が追加予定です。
 
 usability-evaluation は、これらの判断に使う参照知識と評価手順をSkill package内へ持ち、出典と適用条件に基づく再現性のある評価を行います。
 
-ここでいう評価はUI pattern knowledge、standard、Design System、heuristic等に基づく専門評価です。代表ユーザーへtaskを依頼するUX researchとしてのusability testingではありません。
+ここでいう評価はUI pattern knowledge、standard、Design System、heuristic等に基づく専門評価です。代表ユーザーへtaskを依頼するUX researchとしてのusability testingではありません。specified user / goal / contextがない場合は、宣言scope内のUI品質上の観測・懸念候補とreferenceへの適合性を扱い、製品全体のusability、human task success、efficiency、satisfactionを確定したとは扱いません。
 
 live Web UIを能動操作・観測し、ユーザビリティ上の問題を検査する責務は `_01a_usability-inspection-scope-and-contract.md` の `usability-inspection` が担当します。
 
