@@ -68,15 +68,13 @@ SKILL.mdは詳細なUI pattern知識を抱えません。
 
 発火対象:
 
-- UI / UXレビュー
-- usability評価
-- accessibilityを含むinteraction評価
-- UI patternの妥当性確認
-- UIの使いやすさ確認
-- 表示崩れ / responsive問題の評価
-- test analysisでUI / UXリスクを洗い出す要求
+- このDialogをUI pattern / heuristicに照らしてレビュー
+- このscreenshot / Figma / specificationのUI / UXをbest practiceと照合
+- WAI-ARIA / WCAG / Design Systemに照らして評価
+- accessibilityを含むinteraction設計をreference knowledgeから評価
+- test analysisでUI / UXリスク候補をpattern / heuristicから洗い出す要求
 - test designでUI patternから観点候補が必要な要求
-- live UI / screenshot / DOMをbest practiceと照合する要求
+- 取得済みlive UI / screenshot / DOM evidenceをbest practiceと照合する要求
 
 直接発火の非発火対象:
 
@@ -89,6 +87,15 @@ SKILL.mdは詳細なUI pattern知識を抱えません。
 - user researchそのもの
 
 ここでのnegativeは「最初のSkillとして直接選択しない」という意味です。`test-execution` / `test-target-inspection` 等の既存evidenceは、UI / UX評価が同じ依頼・案件scope・qa-workflowで明示的に選定された場合にread-only入力として再利用できます。evidenceが存在するだけでは `usability-evaluation` を自動起動しません。
+
+次は `usability-evaluation` / `usability-inspection` のどちらかへ固定せず、boundary queryとして扱います。
+
+- usabilityを確認して
+- UIの使いやすさを見て
+- 表示崩れやresponsive問題を確認して
+- この画面にUX上の問題がないか確認して
+
+live targetを実際に操作する要求なら `usability-inspection`、design artifact / screenshot / 取得済みevidenceをreference knowledgeへ照合する要求なら `usability-evaluation` へroutingします。
 
 境界queryをtrigger evalへ入れます。
 
