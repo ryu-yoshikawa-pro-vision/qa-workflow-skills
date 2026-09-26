@@ -65,7 +65,7 @@ SKILL.mdは評価契約とindex参照方法だけを持ち、詳細知識はrefe
 
 扱い:
 
-- WCAG Success Criterion、WAI-ARIA 1.2、ARIA in HTMLで今回の対象へ適用されるnormative requirementは、該当要件として扱う。観測・測定・applicabilityを確定できる場合は `usability-inspection` のcriterion-level PASS / FAIL根拠として利用できる
+- WCAG Success Criterion、WAI-ARIA 1.2、ARIA in HTMLで今回の対象へ適用されるnormative requirementは、該当要件として扱う。観測・測定・applicabilityを確定できる場合は `usability-inspection` のrequirement-level `satisfied / not-satisfied / undetermined` の根拠として利用できる
 - Understanding / Techniquesはcriterionの理解・評価方法を補助するinformative guidanceとして扱う
 - ACT Rulesはaccessibility testing methodのinformative ruleとして扱い、WCAG / ARIA requirementそのもののnormative basisへ昇格しない
 - formal ACT Ruleのapplicability / expectation / requirements mapping / outcome mappingをdeterministic check候補の正本にし、独自解釈で別ruleへ作り替えない
@@ -544,33 +544,40 @@ candidate表とは別に、探索を実施した事実をsource-catalog.md内へ
 - 確認範囲
 - 確認件数
 - 新規candidate件数
+- retrieval boundary: 検索結果終了 / source内対象link確認完了 / provider側の取得上限 / 取得不能等
 - completion: completed / blocked
 - block理由（blockedの場合だけ）
 
-queryではQ1〜Q7をそれぞれ1件以上 `completed` へ閉じます。
+Q1〜Q7は初期queryとしてすべて実行しますが、探索queryの上限にはしません。source category、coverage、candidate評価から不足領域が見つかった場合は追加queryを採番して継続します。Plan側でquery数、検索結果件数、page数に上限を設けません。
 
-cross-linkでは各adopted source IDについて1件以上の実行記録を持ち、直接参照される対象linkが0件でも `確認件数=0 / 新規candidate件数=0 / completion=completed` として確認済みであることを残します。
+検索手段がpaginationや取得件数を制限する場合は、その外部制約を `retrieval boundary` に記録します。Plan側の都合で未確認結果を切り捨てて `completed` にはしません。
+
+cross-linkでは、adopted sourceごとにadopted scope内のUI / UX評価へ関係するcross-linkを確認します。cross-linkから新しくadoptしたsourceも同じ確認対象へ追加し、canonical rootで重複排除しながら未確認のadopted sourceがなくなるまで続けます。対象linkが0件でも `確認件数=0 / 新規candidate件数=0 / completion=completed` として確認済みであることを残します。
 
 探索手段の障害等で所定範囲を確認できなかった場合は `blocked` とし、探索完了には数えません。
 
-### cross-link root set
+### source discovery closure
 
-cross-link探索を始める前に、seed確認とQ1〜Q7のcandidate採否をすべて閉じます。その時点で `adopted` のsourceへsource IDを付与し、`discovery origin` が `seed / query` のsource ID集合を `cross-link root set` としてsource-catalog.mdへ固定します。
+source discoveryを「Web全体を完全探索した」とは表現しません。今回定義したsource categoryと採用条件の範囲で、次をすべて満たした状態を探索完了とします。
 
-- root setはsource ID昇順で記録する
-- §5.3のcross-link探索はこのroot setだけを起点にする
-- cross-linkで新しく見つけてadoptしたsourceは今回のroot setへ追加せず、さらに外部linkを辿らない
-- seed / Q1〜Q7の採否を後から変更してroot set対象が変わった場合は、root setを作り直し、そのroot setに対するcross-link確認を再実行してからdiscovery closureへ進む
+- 全categoryのseed sourceを確認済み
+- Q1〜Q7と、coverage不足を埋めるために追加した全queryが `completed`
+- query結果について、検索手段が到達できた範囲と外部provider側の取得境界が記録されている
+- 全candidateが `pending` 以外へ閉じている
+- 全adopted sourceについてadopted scope内のcross-link確認が `completed`
+- cross-linkから追加されたcandidateも採否が閉じ、adoptされた場合はそのsourceのcross-link確認も完了している
+- discovery実行記録に `blocked` が残っていない
+- adopted sourceがsource-catalog / source-coverageへ入っている
 
-これにより1-hopを `root set → 直接link先` の1段だけに固定します。
+このclosureに検索件数、source数、cross-link段数の固定上限を使いません。
 
-### package-local source ID
+### package-local source ID### package-local source ID
 
 source IDはusability-evaluation package内だけのappend-onlyなIDとします。
 
 - 形式: `SRC-\d{3,}`
-- seed / Q1〜Q7でadoptしたsourceは、cross-link root set固定前にcanonical root昇順で `SRC-001` から採番する
-- cross-linkで新たにadoptしたsourceは、cross-link探索完了後にcanonical root昇順で既存最大番号+1から採番する
+- 初回実装ではsource discovery closure後、全adopted sourceをcanonical root昇順で並べて `SRC-001` から採番する
+- 初回実装後に新しくadoptしたsourceは既存最大番号+1を使う
 - 将来追加するsourceも既存最大番号+1を使う
 - canonical root、名称、並び順の変更だけを理由に既存source IDを振り直さない
 - 削除・duplicate化したsource IDを別sourceへ再利用しない

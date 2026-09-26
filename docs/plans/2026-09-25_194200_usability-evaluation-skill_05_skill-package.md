@@ -205,13 +205,13 @@ PR #13のFinding契約を再利用し、後続QA活動で扱う必要がある�
 
 ## 6. package-local ID
 
-`source ID`、`source item ref`、`reference entry ID` はusability-evaluation package内だけの追跡IDとします。PR #11のMachine Entityや全QA共通IDにはしません。
+`source ID`、`source item ref`、`reference entry ID` はusability-evaluation package内だけの追跡IDとします。PR #11のMachine Entityや全QA共通IDにはしません。これらはsource-coverage、reference entry、後続の評価成果物がfile移動や名称変更をまたいで同じsource / item / entryを参照するためのpackage-local provenance keyです。
 
 ### source ID
 
 - 形式: `SRC-\d{3,}`
-- seed / Q1〜Q7でadoptしたsourceは、cross-link root set固定前にcanonical root昇順で `SRC-001` から採番する
-- cross-linkで新たにadoptしたsourceはcross-link探索完了後にcanonical root昇順で既存最大番号+1から採番する
+- 初回実装ではsource discovery closure後、全adopted sourceをcanonical root昇順で `SRC-001` から採番する
+- 初回実装後に新しくadoptしたsourceは既存最大番号+1を使う
 - 将来追加するsourceも既存最大番号+1を使う
 - 並び順、名称、canonical root変更だけを理由に既存IDを振り直さない
 - 削除・duplicate化したIDを別sourceへ再利用しない
@@ -250,10 +250,10 @@ all-source coverage要件を人手だけに依存させないため、Skill-loca
 - index linkが存在する
 - source-catalogのsource IDが `SRC-\d{3,}` 形式で一意かつappend-only規則に従う
 - source-catalogのcandidate statusが許可値で、pendingが残っていない
-- source-catalogのdiscovery実行記録でQ1〜Q7がそれぞれ1件以上 `completed` へ閉じている
-- cross-link root setがseed / query由来adopted sourceのsource ID集合と一致する
-- cross-link root set内の各source IDの実行記録が1件以上 `completed` へ閉じ、0件結果も実行済みとして記録できる
-- cross-link由来sourceが今回のcross-link root setへ再帰追加されていない
+- source-catalogのdiscovery実行記録でQ1〜Q7と追加した全queryが `completed` へ閉じている
+- queryごとに検索手段のretrieval boundaryが記録され、Plan側の件数上限による打ち切りがない
+- 全adopted sourceのcross-link確認が `completed` へ閉じ、cross-link由来でadoptしたsourceも同じ確認対象へ追加されている
+- candidateが `pending` 以外へ閉じている
 - discovery実行記録に `blocked` が残っていない
 - source-coverageのsource IDがcatalogへ存在し、source item refが `<source ID>-ITEM-\d{4,}` 形式でsource-coverage内一意かつappend-only規則に従う
 - coverage disposition / access stateが許可値

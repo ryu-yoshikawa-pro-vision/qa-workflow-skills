@@ -1,18 +1,18 @@
 # UI/UX評価・ユーザビリティ検査Skill追加Plan
 
-このPlanは、UIパターンの目的・rationale・standard・Design System等の知識からUI / UXを根拠付きで評価する `usability-evaluation` と、生きたWeb UIを実際に操作・観測してユーザビリティ上の問題を検出し、標準・明示基準で判定可能な項目は客観的に判定する `usability-inspection` の2 Skillを追加する実装計画です。
+このPlanは、UIパターンの目的・rationale・standard・Design System等の知識からUI / UXを根拠付きで評価する `usability-evaluation` と、生きたWeb UIを実際に操作・観測してUI上のユーザビリティ関連の問題候補を検出し、標準・明示基準で判定可能な項目は客観的に判定する `usability-inspection` の2 Skillを追加する実装計画です。task / user contextがない場合はUI品質上の観測・懸念を扱い、製品全体のusabilityやhuman task successを確定したとは扱いません。
 
 ## 対象ブランチ
 
 feat/usability-evaluation-skill
 
-このブランチは main@3510e6ffce87ba8c025ebde22f9947dbb6074f9c から作成しています。
+このブランチは main@3510e6ffce87ba8c025ebde22f9947dbb6074f9c から作成しました。2026-09-26にPR #11がmainへmergeされ、このbranchにもmainを取り込み済みです。本Plan revisionではPR #11の実装済みruntime契約を正本として扱います。
 
-実装開始時はPR #11 / #12 / #13がmainへmerge済みであることを前提とし、merge後の実装、Skill数、評価契約、workflow state、browser safety契約を再確認してから本Planを最新mainへ追従させます。
+実装開始時はPR #12 / #13がmainへmerge済みであることを前提とし、merge後の実装、Skill数、評価契約、workflow state、browser safety契約を再確認してから実装へ進みます。
 
 現在の依存関係:
 
-- PR #11: 決定論的runtime、Machine Entity、traceability / freshness
+- PR #11: merge済み。決定論的runtime、Machine Entity、traceability / freshness
 - PR #12: test-target-inspection、test-execution、実対象観測、画像確認、browser safety
 - PR #13: exploratory-testing、regression-testing、qa-knowledge、複数workflowのrouting / concurrency
 
@@ -242,7 +242,7 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
 13. Nielsen等のheuristicは一般原則として扱い、仕様Authorityへ昇格しない。
 14. 外部資料本文を丸ごと転載しない。referencesには構造化した要約、評価観点、適用条件、source item refを保持する。
 15. 採用した情報源の対象ページはcoverage dispositionで収録済み / 重複統合済み / 対象外 / 取得不能 / source参照のみへ閉じる。アクセス状態とsource自身のmaturity / lifecycleは別軸で保持し、代表例だけで網羅済みとしない。
-16. seed sourceだけで探索を止めず、標準化団体、platform HIG、公式Design System、体系化されたUI pattern library、usability evaluation資料を所定のsource discoveryで追加調査し、採否をsource inventoryへ残す。
+16. seed sourceだけで探索を止めず、標準化団体、platform HIG、公式Design System、体系化されたUI pattern library、usability evaluation資料を所定のsource discoveryで追加調査し、採否をsource inventoryへ残す。Plan側では検索件数、検索結果ページ数、source数、cross-linkの段数に恣意的な上限を設けず、検索手段が実際に到達できる範囲とsource discovery closureで終了を判断する。
 17. 「取得できるすべて」は、採用したsourceのUX評価に関係する公開情報をitem単位で閉じることを意味し、無関係なAPI reference、install手順、code sample全文まで複製することは意味しない。
 18. 実装時に情報源ごとの利用条件・ライセンスを確認し、許容範囲を超える複製をしない。
 19. runtime時の外部Webアクセスを必須にしない。Skill package単独で参照知識を利用可能にする。
@@ -253,16 +253,16 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
 24. `evaluation ref` はusability-evaluation成果物revision内だけで一意なartifact-local refとし、新しいglobal QA ID / Machine Entityを追加しない。
 25. 複数source itemを1つのreferenceへ統合しても、各source itemの位置づけと適用条件を保持する。内容を収録した各adopted sourceは最低1件を原文とspot-checkする。
 26. UI / UX評価項目で複数根拠を使う場合は、各 `reference entry ref + source item ref` ごとに今回のreferenceの位置づけを保持し、binding / advisory等を1つの値へ統合しない。
-27. cross-link探索はseed / Q1〜Q7の採否後に固定したcross-link root setからだけ1-hop行い、cross-link由来sourceを今回の探索起点へ再帰追加しない。
+27. source discoveryでは、seed、初期query、追加query、adopted sourceのcross-linkから得たcandidateを同じcandidate集合へ追加し、canonical rootで重複排除しながら未処理candidateを閉じる。cross-link由来でadoptしたsourceも、そのadopted scope内の関連cross-link確認対象とし、Plan側で固定段数の上限を設けない。
 28. source ID / source item ref / reference entry IDはusability-evaluation package内のappend-only IDとし、並べ替えや名称変更で振り直さず、削除済みIDを別identityへ再利用しない。
 29. usability-evaluationはUI pattern knowledgeによる専門評価を主責務とし、代表ユーザーを用いたusability studyを実施したとは扱わない。
 30. usability-evaluationの「問題なし」は今回のscope / evidence / referenceの範囲で問題を確認しなかったことを意味し、製品全体のusabilityを保証しない。
 31. usability-inspectionはtask / personaを必須入力にせず、対象scopeからapplicableなinteraction、feedback、accessibility、visual / responsive、standard criterion、performanceを検査する。task / flowは明示された場合だけ追加で扱う。
 32. usability-inspectionでは製品固有の正解手順、test id、hidden DOM、source code、backend state等をUI発見shortcutとして使わない。特別な利用者条件はユーザーまたは案件が明示した場合だけ適用する。
 33. 観測事実、measurement、standard / binding criterion result、usability-evaluationによる専門評価を成果物上で分離する。
-34. 明確なstandard / binding requirementはcriterion単位でPASS / FAIL / 判定不能 / 対象外へ閉じ、applicability、exception、観測事実 / 値、evidence、必要なAuthorityを保持する。FAILは適用可能な違反を確認できた場合に記録できるが、PASSは今回宣言したscopeについて必要なapplicable populationとrequired checksを閉じられた場合だけ記録する。
+34. 明確なstandard / binding requirementはrequirement単位で `satisfied / not-satisfied / undetermined` へ閉じ、applicability、exception、観測事実 / 値、evidence、必要なAuthorityを保持する。WCAG Success Criterionを `passed / failed / inapplicable` とは表現しない。今回のscopeについて必要なapplicable populationとrequired checksを閉じ、requirement全体を満たす根拠が揃った場合だけ `satisfied` とする。検査scopeとして扱わない項目はrequirement resultではなくscope closure側の `対象外` とする。
 35. 一般heuristic、ISO interaction principles、第三者Design System等のadvisory guidanceをstrictな仕様FAILへ自動変換しない。
-36. 単一component / 単一画面のcriterion PASSから製品全体のWCAG conformance等を宣言しない。
+36. 単一component / 単一画面のrequirement `satisfied` から製品全体のWCAG conformance等を宣言しない。
 37. usability-evaluationのseed sourceは自動採用しない。既存adopted sourceにない明確な評価価値を確認してadoptし、一度adoptしたsourceはadopted scope内の関連情報を従来どおり全件closureする。
 38. usability-inspectionのlive実行対象は初版では既存Playwright経路で到達できるWeb UIに限定する。mobileはresponsive Web viewportを意味し、native mobile appの能動操作は対象外とする。
 39. usability-inspectionがbrowser / session ownerとなり、usability-evaluationはimmutable evidenceをread-onlyで評価する。同一sessionを並行操作しない。
@@ -276,8 +276,8 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
 47. usability-inspectionはtest-target-inspection / test-executionの既定後処理にはしない。ただし既存成果物はpreflight / evidenceとしてread-only再利用できる。
 48. 「ユーザビリティテストして」等の依頼はusability-inspectionのtrigger aliasとして受けられるが、成果物ではhuman participantを用いる正式なusability testingを実施したとは表現しない。
 49. 「usabilityを確認」「UIの使いやすさを見て」等の実操作有無が不明な依頼はtrigger boundaryとして扱い、live Web UIを操作して検査するならusability-inspection、design artifact / screenshot / 取得済みevidenceのreference-based評価ならusability-evaluationへroutingする。
-50. usability-inspectionでref採番、scope closure、数値計算、threshold比較、完全にmachine-decidableなtest rule等をLLMへ手計算させず、PR #11 merge後のcurrent Skill runtime contractを使って決定論的scriptへ移す。
-51. W3C ACT Rulesはaccessibility test methodのinformative sourceとして利用できるが、ACT Rule resultをWCAG / ARIA requirement全体のconformance resultへ無条件に読み替えない。formal / proposed等のsource statusを保持する。
-52. deterministic checkがrequirementの一部だけを評価する場合、rule PASSだけでcriterion PASSにしない。population / exception / manual checkを閉じられない場合はcriterionを判定不能として、確認済みrule resultをevidenceとして残す。
+50. usability-inspectionでref採番、scope closure、数値計算、threshold比較、実装済みで完全にmachine-decidableなtest rule等をLLMへ手計算させず、PR #11のcurrent Skill runtime contractを使って決定論的scriptへ移す。将来のrule追加だけを理由に別manifest / generic rule frameworkを先行追加しない。
+51. W3C ACT Rulesはaccessibility test methodのinformative sourceとして利用できるが、ACT Rule resultをWCAG / ARIA requirement全体のconformance resultへ無条件に読み替えない。ACT Rules Format 1.1のoutcome `inapplicable / passed / failed / cantTell / untested` を保持し、formal / proposed等のsource statusとrequirements mappingを別に保持する。
+52. deterministic checkがrequirementの一部だけを評価する場合、rule outcomeが `passed` でもrequirementを `satisfied` にしない。population / exception / manual checkを閉じられない場合はrequirementを `undetermined` とし、確認済みrule resultをevidenceとして残す。
 53. screenshot、DOM、accessibility tree、raw snapshot等はsecret・個人データ・機密情報を含み得るため、PR #12のevidence安全契約を再利用して必要最小限だけ取得・保存し、raw evidenceを成果物の必須条件にしない。
 54. deterministic runtime、deterministic validator、semantic evalを分離し、同じ実装で生成と検証を行わない。

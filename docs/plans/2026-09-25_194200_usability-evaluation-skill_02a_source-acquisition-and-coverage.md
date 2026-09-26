@@ -165,7 +165,7 @@ legacy URLや検索結果の古いversionをcurrent rootとして固定しませ
 
 ### 5.2 category別追加探索
 
-seed以外のsource探索は、実装開始時に次のquery matrixを1回固定して実施します。
+seed以外のsource探索は、実装開始時に次のquery matrixを初期queryとして実施します。これは探索の開始点であり、query数の上限ではありません。
 
 | Query ID | 検索語 |
 | --- | --- |
@@ -177,28 +177,27 @@ seed以外のsource探索は、実装開始時に次のquery matrixを1回固定
 | Q6 | `responsive adaptive design system patterns` |
 | Q7 | `form error feedback navigation design patterns` |
 
-各queryについて、利用する検索手段が返す先頭20件または結果終了までのうち早い方を確認し、同一root URLの重複を除いた候補を `source-catalog.md` へ記録します。
+各queryについて、利用する検索手段がpagination可能な範囲を結果終了まで確認します。検索手段自体に取得件数・pagination・rate limit等の外部制約がある場合は、その実際の到達境界を実行記録へ残します。Plan側では「先頭N件」「N pageまで」等の上限を置きません。
 
-検索結果をそのまま採用せず、§4のsource採用条件へ照合します。検索順位自体をsourceの強さには使いません。
+同一canonical rootの重複を除いた候補を `source-catalog.md` へ記録し、§4のsource採用条件へ照合します。検索順位自体をsourceの強さには使いません。
 
-実装中にquery matrixを変更する場合は、旧query結果を消さず、変更理由と再実行したQuery IDを `source-catalog.md` に残します。
+初期queryを閉じた後も、source category、coverage、採用候補の内容から不足領域が残る場合は追加queryを採番して探索します。追加queryの件数も固定しません。追加queryを実行した場合はquery、理由、確認範囲、結果をsource-catalogへ残します。
 
 ### 5.3 cross-link探索
 
-seed確認とQ1〜Q7のcandidate採否を閉じた後、`_02_reference-knowledge.md` §9の規則で `cross-link root set` を固定します。
-
-cross-link探索は、そのroot setに含まれるsourceの公式ページから直接参照される次のlinkだけを1 hop確認します。
+adoptした各sourceについて、adopted scope内の公式ページから直接参照される次のlinkを確認します。
 
 - standard
 - accessibility guidance
 - related official Design System
 - research / pattern source
+- その他、§4の採用条件へ照らしてUI / UX評価上の追加価値を持つ可能性があるsource
 
 独立した評価根拠として§4の採用条件を満たすものをcandidateへ追加します。
 
-cross-linkで新しく見つけたcandidateをadoptしても、そのsourceは今回のcross-link root setへ追加しません。追加sourceからさらに外部linkを辿らず、`root set → 直接link先` の1段で終了します。
+cross-linkで新しく見つけたcandidateをadoptした場合、そのsourceもcross-link確認対象へ追加します。canonical rootでvisited sourceを重複排除し、未確認のadopted sourceがなくなるまで同じ処理を続けます。Plan側で固定段数の上限は設けません。
 
-seed / Q1〜Q7の採否変更でroot set対象が変わった場合は、root setを作り直してcross-link確認を再実行します。
+これは無制限な一般Web crawlではありません。adopted scopeから参照される関連linkと§4の採用条件で探索対象を制約します。無関係なmarketing、実装API、広告、任意の外部linkは探索対象へ拡張しません。
 
 ### 5.4 source discovery closure
 
@@ -207,17 +206,19 @@ source discoveryを「Web全体を完全探索した」とは表現しません�
 次を満たした状態を、本実装の探索完了とします。
 
 - 全categoryのseed sourceを確認済み
-- Q1〜Q7がそれぞれsource-catalogのdiscovery実行記録で `completion=completed` へ閉じている
-- seed / query由来のadopted sourceへsource IDを付与し、cross-link root setが固定されている
-- cross-link root setの全source IDについて1-hop確認がsource-catalogのdiscovery実行記録で `completion=completed` へ閉じている。対象linkまたは新規candidateが0件でも0件として記録されている
-- cross-link由来で新たにadoptしたsourceはroot setへ追加せず、cross-link探索完了後にsource IDを付与している
-- discovery実行記録に `blocked` が残っていない
+- Q1〜Q7と追加した全queryがsource-catalogのdiscovery実行記録で `completion=completed` へ閉じている
+- 検索手段ごとの実際の到達範囲とprovider側の取得境界が記録されている
 - 全candidateが `pending` 以外の `adopted / rejected / unavailable / duplicate` へ閉じている
+- 全adopted sourceについてadopted scope内のcross-link確認が `completion=completed`
+- cross-link由来candidateも採否が閉じ、adoptされたsourceのcross-link確認も完了している
+- discovery実行記録に `blocked` が残っていない
 - adopted sourceがsource-catalog / source-coverageへ入っている
+
+Plan側では検索件数、検索結果page数、source数、cross-link段数を探索終了条件にしません。
 
 新しいsourceが将来存在し得ることは鮮度契約で扱います。
 
-## 6. source item母集団の固定
+## 6. source item母集団の固定## 6. source item母集団の固定
 
 sourceを採用したら、そのsourceのitem母集団を先に固定します。
 
@@ -456,11 +457,14 @@ source-catalogのdiscovery実行記録として:
 - completion
 - block理由
 
-source-catalogのcross-link root set記録として:
+source-catalogのsource discovery closure記録として:
 
-- fixed_at
-- source IDs（昇順）
-- root setを固定した時点のseed / Q1〜Q7採否状態
+- 初期query / 追加queryの実行状態
+- 検索手段ごとのretrieval boundary
+- cross-link確認済みadopted source IDs
+- pending candidate数
+- blocked discovery数
+- closure確認日時
 
 candidate / adopted sourceの記録として:
 

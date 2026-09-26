@@ -14,7 +14,7 @@
 
 最低限:
 
-- PR #11のmerge状態とmain実装
+- PR #11 merge済みのlatest main実装とcurrent runtime contract
 - PR #12のmerge状態と test-target-inspection / test-execution 実装
 - PR #13のmerge状態と exploratory-testing / qa-knowledge / qa-workflow 実装
 - 最新main SHA
@@ -54,7 +54,7 @@ reference本文を書く前にsource母集団を固定します。
 
 を確認します。
 
-加えて、Plan作成時のseed sourceだけで閉じず、`_02a_source-acquisition-and-coverage.md` §5のsource discoveryを順番どおり実施します。まずseed確認とQ1〜Q7のcandidate採否を閉じ、seed / query由来のadopted sourceへsource IDを付与してcross-link root setを固定します。そのroot setからだけ1-hop cross-link探索を行い、cross-link由来で新たにadoptしたsourceへ探索完了後にsource IDを付与します。candidateは `source-catalog.md` へ記録し、pendingを0にしてからadopted sourceのitem inventoryへ進みます。
+加えて、Plan作成時のseed sourceだけで閉じず、`_02a_source-acquisition-and-coverage.md` §5のsource discoveryを順番どおり実施します。Q1〜Q7は初期queryとして実行し、source categoryやcoverageに不足があれば追加queryを続けます。各queryは検索手段が実際に到達できる結果終了またはprovider側の取得境界まで確認し、Plan側の件数・page数上限では打ち切りません。adopted sourceの関連cross-linkも確認し、cross-link由来でadoptしたsourceを同じ確認対象へ追加して、未処理candidate / 未確認adopted sourceがなくなるまで閉じます。candidateは `source-catalog.md` へ記録し、pendingを0にしてからadopted sourceのitem inventoryへ進みます。
 
 source-coverageの初期母集団を作ります。
 
@@ -212,11 +212,11 @@ source-coverage上の対象をすべて閉じます。
 source-coverage validatorを実行し、
 
 - source-catalogのpending candidate
-- Q1〜Q7のdiscovery実行記録不足 / 未完了
-- cross-link root set未固定、またはroot setとseed / query由来adopted source集合の不一致
-- cross-link root set内source IDのcross-link実行記録不足 / 未完了
-- cross-link由来sourceを今回のroot setへ再帰追加している状態
-- discovery実行記録のblocked残存
+- Q1〜Q7または追加queryのdiscovery実行記録不足 / 未完了
+- queryのretrieval boundary未記録、またはPlan側の件数上限による打ち切り
+- adopted sourceのcross-link実行記録不足 / 未完了
+- cross-link由来でadoptしたsourceがcross-link確認対象へ追加されていない状態
+- pending candidate / discovery実行記録のblocked残存
 - coverage disposition未設定
 - access state未設定
 - includedなのにdestinationなし
@@ -384,7 +384,7 @@ UI patternを含むtest-condition-design
 - status
 - required fields
 - unresolved constraints
-- source catalog / cross-link root set / discovery実行記録 / coverage disposition / access state / maturity / field-level coverage
+- source catalog / discovery実行記録 / retrieval boundary / coverage disposition / access state / maturity / field-level coverage
 - index integrity
 
 を検証します。
@@ -482,7 +482,9 @@ PR #12の実行基盤を利用できる場合、
 - root indexからpatterns / accessibility / platformsのsub-indexへ到達できる
 - sub-indexから対象pattern / concern / platform別referenceへ到達できる
 - 通常評価で全referencesの一括読込を要求しない
-- Q1〜Q7がsource-catalogのdiscovery実行記録でそれぞれ1件以上 `completed` へ閉じ、seed / query由来adopted sourceのsource ID集合とcross-link root setが一致し、そのroot set内の全source IDだけが1-hop cross-link確認で `completed` へ閉じている。cross-link由来sourceをroot setへ再帰追加せず、0件結果も確認件数 / 新規candidate件数=0として記録され、`blocked` が残っていない
+- Q1〜Q7と追加した全queryがsource-catalogのdiscovery実行記録で `completed` へ閉じ、検索手段が実際に到達できた範囲とprovider側のretrieval boundaryが記録されている。Plan側で検索件数・page数・source数の上限を設けていない
+- 全adopted sourceのcross-link確認が `completed` へ閉じ、cross-link由来でadoptしたsourceも同じ確認対象へ追加されている。Plan側でcross-link段数の上限を設けていない
+- 0件結果も確認件数 / 新規candidate件数=0として記録され、pending candidateと `blocked` が残っていない
 - discoveryで得たcandidateがsource-catalogへ記録され、pendingが0
 - 採用sourceごとのadopted scopeとitem列挙元 / 列挙方法がsource-catalogへ記録され、対象item母集団がsource-coverageへ記録されている。source全体を列挙できない場合は有限に列挙できるsubsetだけをadopted scopeとし、source全体を全件取得済みと扱わない
 - 全source itemのcoverage dispositionがincluded / merged-duplicate / out-of-scope / unavailable / source-reference-onlyのいずれかへ閉じている
