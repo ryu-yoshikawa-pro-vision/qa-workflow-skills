@@ -47,6 +47,76 @@ feat/usability-evaluation-skill
 
 `usability-inspection` は代表ユーザーを用いたUX researchの代替ではありません。AIエージェントによる実対象検査として扱い、人間のsatisfaction、task completion rate、human task time等を捏造しません。personaやtaskは既定の必須入力にせず、ユーザーまたは案件が明示した場合だけ利用します。
 
+## Input / Function / Output
+
+### usability-evaluation
+
+**Input**
+
+- target scope
+- design artifactまたは取得済みevidence
+- platform / viewport / state
+- project Authority / adopted Design System / applicable standard
+- user / role / task / flow等が明示されている場合はそのcontext
+
+**Function**
+
+1. target contextを固定する
+2. UI pattern / principle候補とapplicabilityを判断する
+3. applicable referenceと要求の位置づけを解決する
+4. 観測事実、strict criterion result、advisory guidanceを分離する
+5. UI / UX上の差異・想定影響を専門評価する
+6. follow-upが必要な項目だけFindingへroutingする
+
+**Output**
+
+- evaluation条件
+- UI / UX評価項目
+- applied reference refs
+- evidence refs
+- strict criterion resultとの対応
+- status / status reason
+- Finding refs
+
+### usability-inspection
+
+**Input**
+
+- live Web target / entry point
+- requested inspection scope
+- environment / origin
+- viewport / input method
+- role / permissionが必要な場合はその条件
+- side-effect / cleanup scope
+- project Authority / standard / threshold
+- task / flowが明示されている場合だけその条件
+
+**Function**
+
+1. preflightとinspection scopeを固定する
+2. live UIを操作・観測する
+3. machine-readableな事実・測定値を取得する
+4. ref採番、scope closure、数値計算、threshold比較、対応済みdeterministic test ruleをSkill runtime scriptへ渡す
+5. strict criterionと専門評価を分離する
+6. usability-evaluationへimmutable evidenceを渡す
+7. cleanupとscope closureを完了する
+
+**Output**
+
+- inspection header
+- inspection scope closure
+- objective observations
+- deterministic test rule results
+- standard / binding criterion checks
+- measurements
+- 必要なPlaywright action trace
+- optional task / flow result
+- usability-evaluation refs
+- Finding refs
+- limitation / cleanup result
+
+browser操作は `usability-inspection`、machine計算はruntime script、意味判断はLLM / `usability-evaluation` が担当し、同じ判断を複数箇所で再計算しません。
+
 ## workflow上の位置づけ
 
 どちらも通常フローの固定工程にはしません。
