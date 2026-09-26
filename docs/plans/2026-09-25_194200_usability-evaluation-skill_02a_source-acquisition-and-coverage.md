@@ -71,6 +71,7 @@
 - W3C / WAI
 - WCAG
 - WAI-ARIA / APG
+- ACT Rules Format / formal ACT Rules
 - UI操作・入力・認知・視覚に直接関係する公開accessibility guidance
 
 ### Platform HIG
@@ -231,6 +232,7 @@ sourceを採用したら、そのsourceのitem母集団を先に固定します�
 例:
 
 - APG: Patterns一覧 / Practices一覧
+- ACT Rules: W3Cのformal rules一覧。proposed ruleを確認する場合はformal inventoryと分離し、statusを保持する
 - GOV.UK: Components一覧 / Patterns一覧
 - USWDS: Components overview / Patterns
 - Carbon: Components overview / Patterns overview / Community patterns
