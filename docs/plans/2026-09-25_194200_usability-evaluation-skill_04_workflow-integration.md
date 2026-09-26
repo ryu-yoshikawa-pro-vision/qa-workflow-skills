@@ -4,7 +4,7 @@
 
 本ファイルは `usability-evaluation` のworkflow統合です。
 
-live targetをtask-basedに能動操作する `usability-inspection` は `_04a_usability-inspection-workflow-integration.md` を正本とします。
+live Web UIを能動操作・観測してユーザビリティ上の問題を検査する `usability-inspection` は `_04a_usability-inspection-workflow-integration.md` を正本とします。
 
 `test-target-inspection` / `test-execution` から既存evidenceを `usability-evaluation` へ渡すことはできますが、それらを `usability-inspection` の代わりにはしません。
 
@@ -34,7 +34,7 @@ qa-workflowが要求・scope・利用可能な証拠からroutingします。
 
 ユーザーがUI / UXレビュー、UI patternの妥当性、accessibilityを含むinteraction評価、Design System / standard / heuristicとの照合等を明示的に要求した場合は `usability-evaluation` を直接開始できます。
 
-「実際に操作して使い勝手をテスト」「このtaskを初見想定でやってみる」「表示崩れや操作後の遅さをlive targetで確認」等、task-basedな実操作を要求する場合は `usability-inspection` を開始します。
+「実際に操作して使い勝手を確認」「表示崩れ・keyboard / focus・標準適合・操作後の遅さをlive targetで確認」「指定flowを実際に操作して確認」等、live UIの検査を要求する場合は `usability-inspection` を開始します。
 
 「usabilityを確認」のように実操作の有無が曖昧な場合は、設計 / evidence reviewなのかlive task executionなのかを要求と利用可能なtargetからroutingします。
 
