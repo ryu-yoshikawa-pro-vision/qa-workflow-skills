@@ -17,7 +17,7 @@ PR #13では次が追加予定です。
 
 これらはUIを観測または操作できますが、UIパターンの目的・rationale・一般的なinteraction原則・アクセシビリティ・視覚品質を専門的に評価するownerではありません。
 
-また、user goal / task scenarioだけを与え、詳細手順を正解として使わずに生きた実対象を操作し、task達成・visual breakage・feedback・error recovery・user-facing responsivenessを観測するownerもありません。
+また、生きた実対象を操作・観測し、interaction、feedback、error recovery、accessibility、visual / responsive、user-facing performanceを体系的に検査するownerもありません。task / flowが明示された場合は、そのflowも検査対象に含めます。
 
 後者は `usability-inspection` として別Skillにし、本ファイルでは `usability-evaluation` の責務を定義します。
 
@@ -43,7 +43,7 @@ usability-evaluation は、これらの判断に使う参照知識と評価手�
 
 ここでいう評価はUI pattern knowledge、standard、Design System、heuristic等に基づく専門評価です。代表ユーザーへtaskを依頼するUX researchとしてのusability testingではありません。
 
-live targetをtask-basedに能動操作する責務は `_01a_usability-inspection-scope-and-contract.md` の `usability-inspection` が担当します。
+live Web UIを能動操作・観測し、ユーザビリティ上の問題を検査する責務は `_01a_usability-inspection-scope-and-contract.md` の `usability-inspection` が担当します。
 
 ## 3. 主責務
 
@@ -56,12 +56,12 @@ usability-evaluation の主責務は次です。
 - pattern名が確定できない場合は無理に1つへ分類せず、観測できた構造と候補を保持する
 - visual similarityだけでpatternを確定せず、目的とinteractionを確認する
 
-### 目的・ユーザー目標・rationaleの評価
+### 目的・利用文脈・rationaleの評価
 
 各patternについて、
 
 - 解決しようとしているユーザー課題
-- ユーザーが達成しようとしていること
+- ユーザーが達成しようとしていること（user goal / taskが分かる場合）
 - そのpatternを使う理由
 - 適する状況
 - 適さない状況
