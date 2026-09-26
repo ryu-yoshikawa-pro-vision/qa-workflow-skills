@@ -144,7 +144,7 @@ formalなWCAG conformance evaluationはgeneral inspectionと分離し、`wcag-co
 9. live observationが必要なsample / requirementについてnormalized handoffを出し、`qa-workflow` が `usability-inspection` を直列実行してimmutable evidenceを戻す
 10. Step 5.1でevaluation reportを作成する
 11. Step 5.2のevaluation specificsを記録する要求・合意がある場合、安全なarchive / tool / browser / assistive technology / method情報を記録する
-12. 条件を満たす場合だけoptional Evaluation Statementを作成する。通常statementとpartial conformance statementを区別する
+12. target WCAG versionが2.2でStep 5.3条件を満たす場合だけoptional Evaluation Statementを作成する。通常statementとpartial conformance statementを区別する。WCAG 2.0 / 2.1評価ではStep 5.1 reportを生成するが、現行WCAG-EM 2.0 Step 5.3準拠のEvaluation Statementとは称さない
 13. WCAG側の条件を満たす場合だけConformance ClaimまたはStatement of Partial Conformanceを作成する
 14. machine-readable reportを要求する場合はStep 5.5に従いEARL 1.0 JSON-LDを生成する
 
@@ -162,7 +162,7 @@ formalなWCAG conformance evaluationはgeneral inspectionと分離し、`wcag-co
 - structured / random comparison iteration
 - WCAG-EM evaluation report
 - optional Evaluation Specifics record
-- optional Evaluation Statement（通常 / partial）
+- optional Evaluation Statement（通常 / partial。現行WCAG-EM 2.0 Step 5.3準拠はtarget WCAG 2.2だけ）
 - WCAG Conformance Claim（条件を満たす場合だけ）
 - WCAG Statement of Partial Conformance（third-party content / language。条件を満たす場合だけ）
 - optional EARL 1.0 JSON-LD report
@@ -387,7 +387,7 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
 61. WCAG 2.0 / 2.1 / 2.2の各requirement catalogはversionごとのcanonical JSON SHA-256を `static_data_versions` へ保持する。validatorは選択versionのasset hashを独立再計算し、各catalogをW3C正本と照合した承認済みhashをcontract testで固定する。別versionのSuccess Criteria集合を合成しない。
 62. Step 4.3後の既存sample result再利用は、PR #11のfreshness契約でcurrentと判定できる場合だけ許可する。target WCAG version / level、scope、accessibility support baseline、environment、sample identity、evidence identity、requirement catalog hash、upstream dependencyのいずれかが変わればstaleとして必要なsampleを再評価する。
 63. WCAG-EM Step 5.2 Evaluation Specificsを目的内機能として扱い、安全に保存可能なsample archive ref、再現path / settings / actions、tool / browser / assistive technology / software / methodを記録できるようにする。secret、token、password、storageState値、不要な個人識別情報は保存せず、credentialは非secretなrole / alias / external refだけを保持する。
-64. WCAG-EM Evaluation Statementは通常statementとpartial statementの両方を扱い、WCAG Conformance ClaimとWCAG Statement of Partial Conformanceも条件を満たす場合に生成できるようにする。意味上のpartial理由・第三者管理範囲等はsemantic判断とし、必須field、生成可否、claim scope coverageはscript / validatorで閉じる。
+64. WCAG-EM Evaluation Statementは通常statementとpartial statementの両方を扱う。ただし現行WCAG-EM 2.0 Step 5.3のminimum fieldがWCAG 2.2を固定指定するため、Step 5.3準拠statementの生成対象はtarget WCAG 2.2だけとする。WCAG 2.0 / 2.1のformal evaluationはStep 5.1 reportまで閉じ、別versionへ読み替えたStep 5.3 statementを作らない。WCAG Conformance ClaimとWCAG Statement of Partial Conformanceは各target versionのWCAG contractに従って生成可能とする。意味上のpartial理由・第三者管理範囲等はsemantic判断とし、必須field、生成可否、claim scope coverageはscript / validatorで閉じる。
 65. WCAG Conformance ClaimのW3C optional componentsも、evidenceが存在する場合に保持できるようにする。必須fieldの代替には使わない。machine-readable claim mirrorは既存Machine Runtimeのnormalized claim objectを再利用し、新しい独自claim標準を作らない。
 66. WCAG-EM Step 5.5を目的内機能として扱い、要求された場合はEARL 1.0 vocabularyを用いたcanonical JSON-LD sidecarをdeterministic scriptで生成する。formal requirement resultからAssertion / subject / test / result / outcome / modeを導出し、未確定modeを推測しない。Step 5.4 aggregated scoreだけは本Planの目的外として生成しない。
 67. formal observation handoffはoriginating evaluation identity / revision、handoff ref、resume operation、expected sample / process / requirement refsをworkflow stateへ保持し、currentかつvalidなreturned result集合が期待集合を満たした場合だけ同じevaluationをresumeする。LLMが「戻り値は揃った」と手判断しない。

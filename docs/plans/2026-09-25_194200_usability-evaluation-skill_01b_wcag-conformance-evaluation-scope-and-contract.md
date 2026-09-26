@@ -177,13 +177,17 @@ scriptはstructured / randomのkey集合差分から、
 
 Step 1〜4のoutcomeをreportへ記録します。
 
-WCAG-EM Evaluation Statementは任意ですが、要求された場合またはreport出力方針で選択された場合に、通常statementとpartial conformance statementを区別して生成条件を評価します。通常statementは全sampleがtargetを満たす場合、partial statementはWCAG-EM 2.0が認めるpartial理由とnon-conforming areaを特定できる場合に限ります。
+Step 5.2 Evaluation Specificsは要求・合意がある場合に記録し、sample archive / evidence / path / settings / actions / tool / browser / assistive technology / software / methodを安全な参照として保持します。secretや不要PIIは保存しません。
+
+WCAG-EM Evaluation Statementは任意ですが、現行WCAG-EM 2.0 Step 5.3のminimum fieldがWCAG 2.2を固定指定するため、target WCAG versionが2.2の場合だけ通常statement / partial conformance statementの生成条件を評価します。WCAG 2.0 / 2.1のformal evaluationはStep 5.1 reportまで生成しますが、Step 5.3準拠のEvaluation Statementとは称しません。
 
 WCAG Conformance Claimはrepresentative sampleだけから作成しません。claim scope内の全Web page / complete processを評価した証拠、または各pageがconformance requirementsを満たすことを保証するprocess evidenceがあり、指定versionのWCAG Conformance Claim必須fieldをすべて埋められる場合だけ生成します。
 
 WCAG側のStatement of Partial ConformanceはConformance Claimと分離し、third-party contentまたはlanguageの条件を満たす場合だけ生成します。
 
-aggregated accessibility scoreは生成しません。
+Step 5.5 machine-readable reportを要求する場合はEARL 1.0 JSON-LD sidecarを生成し、human-readable reportとassertion coverageを一致させます。
+
+aggregated accessibility scoreはStep 5.4の目的外機能として生成しません。
 
 ## 4. browser observationのhandoff
 
@@ -300,9 +304,11 @@ live observationが必要な場合:
 - Step 4.3 outcome
 - unmet requirement / Success Criterion examples
 - Finding refs
-- Evaluation Statement（通常 / partial。条件を満たし作成した場合だけ）
+- Evaluation Specifics（要求・合意があり記録した場合だけ）
+- Evaluation Statement（通常 / partial。現行WCAG-EM 2.0 Step 5.3準拠はtarget WCAG 2.2だけ）
 - WCAG Conformance Claim（条件を満たし作成した場合だけ）
 - WCAG Statement of Partial Conformance（third-party content / language。条件を満たし作成した場合だけ）
+- EARL 1.0 JSON-LD report（要求された場合だけ）
 
 ## 6. human expertiseの境界
 
@@ -338,10 +344,12 @@ WCAG-EM 2.0はWCAG、accessible design、assistive technology、障害のある�
 - Step 4.3で新content / findingが出た場合、structured revision更新後のrandom target再計算、candidate population fingerprint再計算、population同一時のoverlap除外 / current random保持 / 不足分top-up、population変更時のrandom再選択、process再materializeまでscriptで閉じる
 - 既存sample resultはPR #11のfreshness判定がcurrentの場合だけ再利用する
 - Step 5.1の必須outcomeをreportできる
-- Evaluation Statementの通常 / partial生成条件をそれぞれ閉じ、条件を満たさない場合は作成しない
+- Step 5.2 Evaluation Specificsを要求時に安全に記録でき、secret / unnecessary PIIを複製しない
+- 現行WCAG-EM 2.0 Step 5.3 Evaluation Statementはtarget WCAG 2.2だけで通常 / partial生成条件を閉じ、WCAG 2.0 / 2.1ではStep 5.3 statementを生成しない
 - representative sampleだけからWCAG Conformance Claimを作らない
-- WCAG Conformance ClaimとWCAG Statement of Partial Conformanceの必須field / generation guardを分離して検証する
-- aggregated accessibility scoreを作らない
+- WCAG Conformance ClaimとWCAG Statement of Partial Conformanceの必須 / optional field / generation guardを分離して検証する
+- Step 5.5 EARL 1.0 JSON-LD reportを要求時に生成し、human-readable reportと一致検証できる
+- Step 5.4 aggregated accessibility scoreは目的外として作らない
 - browser / sessionを本Skillが直接所有せず、複数Skill実行はqa-workflowが直列オーケストレーションする
 - standalone packageがsibling Skillのscriptsへruntime依存しない
 - 必要なexpertise / environment不足を成功扱いしない

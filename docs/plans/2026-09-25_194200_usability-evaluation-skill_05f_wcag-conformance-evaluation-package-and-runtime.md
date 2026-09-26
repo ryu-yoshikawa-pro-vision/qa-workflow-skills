@@ -58,7 +58,16 @@ WAI OverviewはWCAG-EM 2.0のresourceとしてWCAG-EM Report Toolを案内して
 - `assets/wcag-2.1-requirements.json`
 - `assets/wcag-2.2-requirements.json`
 
-各catalogは少なくともSuccess Criterion number / levelと5つのWCAG conformance requirementの固定machine keyを保持します。自然言語のSuccess Criterion本文をruntimeへ複製する必要はなく、source item / canonical URLへ追跡できるmetadataに限定します。version間でSuccess Criteria集合を合成せず、target versionのcatalogだけをrequirement universeとして使用します。
+各catalogは少なくとも次を保持します。
+
+- WCAG version / canonical URI
+- Success Criterion machine key / number / level / canonical criterion URI
+- 5つのWCAG conformance requirement machine key / canonical URI
+- Conformance Claim required field keys
+- versionで利用できるConformance Claim optional field keys
+- Statement of Partial Conformance type / required semantic input / version-specific render metadata
+
+自然言語のSuccess Criterion本文をruntimeへ複製する必要はなく、source item / canonical URLへ追跡できるmetadataに限定します。version間でSuccess Criteria集合やclaim contractを合成せず、target versionのcatalogだけをrequirement universe / claim contractとして使用します。
 
 catalogはPR #11のstatic data契約を再利用します。strict JSON decode後のcanonical JSON SHA-256をtarget versionに応じて次へ保持します。
 
@@ -277,21 +286,23 @@ sample copyやDOM等を保存できない場合は無理に複製せず、保存
 
 ### Evaluation Statement
 
+現行WCAG-EM 2.0 Step 5.3はminimum fieldとしてWCAG 2.2を明示しているため、**このmethodologyに従うEvaluation Statementの生成対象はtarget WCAG 2.2だけ**とします。target WCAG 2.0 / 2.1のformal evaluationではStep 5.1 report、Step 5.2、Step 5.5、version別WCAG Conformance Claim / Statement of Partial Conformanceは利用できますが、WCAG 2.2を2.0 / 2.1へ読み替えたStep 5.3 Evaluation Statementは生成しません。
+
 作成する場合は `statement type: full / partial` を必須にし、他sectionへのrefだけで意味が失われないよう、少なくとも次をstatement sectionへ明示します。
 
 共通field:
 
 - issued date
-- target WCAG title / version / URI
+- WCAG 2.2 title / canonical URI
 - evaluated conformance level
 - digital product definition / scope ref
 - technologies relied upon。Step 2.4のexploration refへ追跡可能にする
 - accessibility support baseline ref
 - product ownerのvalidity / accuracy維持commitmentを確認したevidence / ref
 
-`full` は全non-optional methodology requirementが完了し、全sampleがtarget conformance levelを満たす場合だけ生成できます。
+`full` はtarget WCAG versionが2.2で、全non-optional methodology requirementが完了し、全sampleがtarget conformance levelを満たす場合だけ生成できます。
 
-`partial` は全non-optional methodology requirementとproduct owner commitmentを満たしたうえで、次を追加で必須にします。
+`partial` はtarget WCAG versionが2.2で、全non-optional methodology requirementとproduct owner commitmentを満たしたうえで、次を追加で必須にします。
 
 - non-conforming product areas
 - 各areaのreason: `third-party-content / lack-of-accessibility-support-for-languages`
@@ -380,6 +391,7 @@ Output:
 - required Success Criterion refs（supported時だけ）
 - required conformance requirement refs（supported時だけ）
 - target versionに対応する `static_data_versions` key / hash
+- target versionのclaim contract metadata
 - issues
 
 Agent / LLMが「今回評価すべきSuccess Criteria一覧」を完成集合として入力しません。semantic applicability / exceptionは各requirement result内で判断しますが、requirement universe自体は指定versionのstatic catalogが正本です。明示的なunsupported versionとmissing / unresolved inputもこのhelperの出力・呼び出し前validationで区別します。
@@ -659,8 +671,8 @@ Function:
 - sample result freshnessをPR #11 current verifier結果から反映し、stale resultをclosureへ数えない
 - Step 5.1でStep 1〜4の各required outcomeが成果物へ存在すること
 - Step 5.2 Evaluation Specificsのrecord scope / evidence refs / software metadata / secret非複製
-- Evaluation Statementのfull / partial minimum fieldsと生成条件
-- WCAG Conformance Claim / Statement of Partial Conformanceのtype別required / optional fieldsと生成条件
+- Evaluation Statementはtarget WCAG 2.2の場合だけfull / partial minimum fieldsと生成条件をmaterializeし、2.0 / 2.1ではStep 5.3 sectionを生成しない
+- WCAG Conformance Claim / Statement of Partial Conformanceはtarget version catalogのclaim contractからtype別required / optional fieldsと生成条件をmaterialize
 - Step 5.5 EARL sidecar request / ref / closure
 - report section order固定
 - summary count生成
@@ -693,6 +705,8 @@ supported ACT Ruleの利用条件は `_05d_accessibility-requirements-and-act.md
 ## 7. Evaluation Statement / WCAG claim
 
 ### WCAG-EM Evaluation Statement
+
+現行Step 5.3 contractに従い、target WCAG versionが2.2の場合だけ生成します。2.0 / 2.1のevaluation結果をStep 5.3準拠statementと表現しません。
 
 `full` は次をすべて確認できる場合だけ生成します。
 
@@ -786,8 +800,8 @@ production helperとは別実装で少なくとも次を検証します。
 - sample result freshness / stale再評価
 - Step 5.1のStep 1〜4 outcome closure
 - Step 5.2 Evaluation Specificsのscope / archive identity / tool metadata / secret・不要PII非複製
-- Evaluation Statement full / partial生成条件とStep 5.3 minimum fields
-- WCAG Conformance Claim required / optional fields / full-scope coverage guard
+- Evaluation Statementはtarget WCAG 2.2だけでfull / partial生成条件とStep 5.3 minimum fieldsを検証し、2.0 / 2.1ではsection不存在を要求
+- WCAG Conformance Claim required / optional fieldsをtarget version catalogのclaim contractから検証し、full-scope coverage guardを適用
 - WCAG Statement of Partial Conformance third-party / language guard / canonical wording
 - Step 5.5 EARL assertion coverage、criterion URI、outcome mapping、mode provenance、human-readable reportとの一致
 - Finding refs
@@ -841,13 +855,13 @@ random sampleから新content type / findingを検出。
 
 ### Case I: full Evaluation Statement
 
-全non-optional methodology requirement、全sample target達成、product owner commitment、minimum fieldsが揃う。
+target WCAG 2.2で、全non-optional methodology requirement、全sample target達成、product owner commitment、minimum fieldsが揃う。
 
 → `statement_type=full` を生成する。条件不足なら生成しない。
 
 ### Case J: partial Evaluation Statement
 
-一部sampleがtargetを満たさないが、全non-conforming areaをWCAG-EM 2.0のpartial理由へ対応付けられ、他の共通条件を満たす。
+target WCAG 2.2で、一部sampleがtargetを満たさないが、全non-conforming areaをWCAG-EM 2.0のpartial理由へ対応付けられ、他の共通条件を満たす。
 
 → `statement_type=partial` とarea / reasonを生成する。許可reason外または未説明areaがあれば生成しない。
 
@@ -861,7 +875,7 @@ random sampleから新content type / findingを検出。
 
 WCAG 2.0 / 2.1 / 2.2をそれぞれ指定。
 
-→ 各versionのcatalogだけを使い、version / levelに対応するexpected requirement集合を生成する。2.0 / 2.1を2.2へ変換しない。
+→ 各versionのcatalogだけを使い、version / levelに対応するexpected requirement集合を生成する。2.0 / 2.1を2.2へ変換しない。2.0 / 2.1でもformal reportは閉じるが、Step 5.3 Evaluation Statementは生成しない。
 
 ### Case M: unsupported / unresolved WCAG version
 
@@ -967,7 +981,7 @@ required claim fieldsを満たし、higher-level SC、not-relied-upon technology
 - Step 4.3 loopをartifact上で追跡できる
 - Step 5.1 required outcome closureをvalidatorで検証できる
 - Step 5.2 Evaluation Specificsの安全なarchive / tool / method記録を実装し、secret / unnecessary PIIを複製しない
-- Step 5.3 Evaluation Statement full / partial minimum fieldsをvalidatorで検証できる
+- Step 5.3 Evaluation Statementはtarget WCAG 2.2だけでfull / partial minimum fieldsをvalidator検証し、2.0 / 2.1ではStep 5.3 sectionを生成しない
 - WCAG 2.0 / 2.1 / 2.2 Conformance Claimのrequired / optional fields / full-scope guardをvalidatorで検証できる
 - WCAG Statement of Partial Conformance - Third Party Content / Languageのrequired fields / canonical wording / guardをvalidatorで検証できる
 - Step 5.5 EARL 1.0 JSON-LD sidecarをdeterministically生成し、human-readable reportとのassertion coverage一致を検証できる

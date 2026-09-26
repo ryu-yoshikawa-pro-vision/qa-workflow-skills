@@ -160,7 +160,7 @@ repository implementationの完了条件:
 - evidence safety / side-effect / browser ownershipをPASS
 - repository標準のdeterministic / semantic / routing / Skill validationをPASS
 - WCAG 2.0 / 2.1 / 2.2 requirement catalogのcanonical hash再計算と承認済みhash contract testをdeterministic validationでPASS
-- version切替、unsupported / unresolved / out-of-scope分離、non-finite random selection guard、candidate population変更時のreselection、Evaluation Statement / Claim各guard、EARL全mappingはdeterministic / semantic evalでPASS
+- version切替、unsupported / unresolved / out-of-scope分離、non-finite random selection guard、candidate population変更時のreselection、Step 5.3 Evaluation Statementの2.2-only guard、version別Claim各guard、EARL全mappingはdeterministic / semantic evalでPASS
 - browser E2Eではsampling used / skipped、sample identity、same-population Step 4.3再sampling、freshness付きobservation handoff / resume、safe Evaluation Specifics handoff、EARL assertionとのresult一致をPASS
 - canonical fixtureで未解決blockedが0
 

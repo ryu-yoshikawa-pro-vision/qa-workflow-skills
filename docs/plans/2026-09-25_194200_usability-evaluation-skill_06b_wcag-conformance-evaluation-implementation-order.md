@@ -71,7 +71,7 @@ WCAG-EM 2のoutput contractはReport ToolのschemaではなくWCAG-EM 2.0本文�
 - sampling used時のStep 4.3 comparison
 - Step 5.1 report outcome closure
 - Step 5.2 Evaluation Specifics / archive identity / tool metadata / secret safety
-- Step 5.3 Evaluation Statement full / partial minimum fields / generation guard
+- Step 5.3 Evaluation Statementはtarget WCAG 2.2だけでfull / partial minimum fields / generation guard。2.0 / 2.1ではsection非生成
 - WCAG Conformance Claim required / optional fields / full-scope coverage guard
 - WCAG Statement of Partial Conformance - Third Party Content / Language required fields / canonical wording / generation guard
 - Step 5.5 EARL JSON-LD output / assertion coverage
@@ -224,7 +224,7 @@ Step 5.1に従い、Step 1〜4のrequired outcomeをreportへ記録します。
 
 Step 5.2 Evaluation Specificsは要求・合意があるcaseでsample archive ref、path / settings / actions、tool / browser / AT / software / methodを記録し、secretや不要PIIを保存しません。
 
-Evaluation Statementはfull / partial /生成不可を分け、`_05f_wcag-conformance-evaluation-package-and-runtime.md` のStep 5.3 contractを閉じます。
+Evaluation Statementはtarget WCAG 2.2だけでfull / partial /生成不可を分け、`_05f_wcag-conformance-evaluation-package-and-runtime.md` のStep 5.3 contractを閉じます。WCAG 2.0 / 2.1のformal evaluationではStep 5.1 reportを生成しますが、Step 5.3 Evaluation Statementは生成しません。
 
 WCAG Conformance Claimはcomplete claim scope evidenceとversion別required fieldsが揃うcaseだけ生成します。representative sampleだけでは生成しません。W3C optional claim componentsもevidenceがある場合に保持します。
 
@@ -281,7 +281,7 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 - closure
 - report
 - Evaluation Specifics / archive ref / secret safety
-- Evaluation Statement full / partial guard
+- Evaluation Statementはtarget WCAG 2.2だけでfull / partial guardを検証し、2.0 / 2.1ではsection不存在を検証
 - WCAG Conformance Claim required / optional fields / Statement of Partial Conformance guard
 - EARL JSON-LD schema subset / outcome mapping / assertion coverage
 
@@ -318,7 +318,7 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 - 既存sample resultはPR #11 freshnessがcurrentの場合だけ再利用する
 - Step 5.1のStep 1〜4 required outcome closure
 - Step 5.2 Evaluation Specificsのsafe archive / environment / method record
-- Step 5.3 Evaluation Statement full / partial minimum fields / generation guard
+- Step 5.3 Evaluation Statementはtarget WCAG 2.2だけでfull / partial minimum fields / generation guardを検証し、2.0 / 2.1では非生成
 - WCAG 2.0 / 2.1 / 2.2 Conformance Claim required / optional fields / full-scope guard
 - WCAG Statement of Partial Conformance - Third Party Content / Language required fields / canonical wording / guard
 - Step 5.5 EARL 1.0 JSON-LD / assertion coverage
