@@ -59,11 +59,17 @@ SKILL.mdは評価契約とindex参照方法だけを持ち、詳細知識はrefe
 - WAI-ARIA APGの全公開Patterns
 - WAI-ARIA APGの全公開Practices
 - APG examplesから、pattern理解・keyboard・roles / states / properties・注意点に必要な情報
+- currentなACT Rules Format
+- W3Cがformalに公開しているACT Rulesとrequirements / outcome mapping
+- proposed ACT Rulesはformal ruleと区別したstatus付きcandidateとして必要な範囲だけ確認
 
 扱い:
 
 - WCAG Success Criterion、WAI-ARIA 1.2、ARIA in HTMLで今回の対象へ適用されるnormative requirementは、該当要件として扱う。観測・測定・applicabilityを確定できる場合は `usability-inspection` のcriterion-level PASS / FAIL根拠として利用できる
 - Understanding / Techniquesはcriterionの理解・評価方法を補助するinformative guidanceとして扱う
+- ACT Rulesはaccessibility testing methodのinformative ruleとして扱い、WCAG / ARIA requirementそのもののnormative basisへ昇格しない
+- formal ACT Ruleのapplicability / expectation / requirements mapping / outcome mappingをdeterministic check候補の正本にし、独自解釈で別ruleへ作り替えない
+- proposed / community ACT Ruleをformal ruleと同じstatusで扱わない
 - APGはARIAの利用方法に関するinformative guidanceであり、example実装を唯一のproduction正解としない
 - WAI-ARIA 1.3等のDraftをcurrent Recommendationと同じ強さで扱わない。projectが明示採用する場合または将来仕様の調査が目的の場合だけ、draft statusを保持して別扱いする
 - native HTMLで解決できる場合に不要なARIAを要求しない
@@ -374,6 +380,7 @@ loading / empty / disabled等の関連状態
 source items:
   - source item ref
   - source上の位置づけ
+  - source status / maturity（formal / proposed / draft / stable等、sourceが持つ場合）
   - 適用条件
 source確認日
 ~~~
