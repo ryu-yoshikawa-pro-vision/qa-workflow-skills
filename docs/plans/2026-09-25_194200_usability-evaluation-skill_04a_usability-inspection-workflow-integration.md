@@ -2,24 +2,25 @@
 
 ## 1. workflow上の位置づけ
 
-`usability-inspection` はlive targetを能動操作する独立Activityです。
+`usability-inspection` はlive Web UIを能動操作し、ユーザビリティ上の問題を検査する独立Activityです。
 
 `test-target-inspection` や `test-execution` の暗黙の追加処理にはしません。
 
 ~~~text
-user goal / task scenario
-          ↓
- usability-inspection
-          ↓
- live browser interaction
-          ↓
- observation / timing / screenshot / accessibility evidence
-          ↓
- usability-evaluation
-          ↓
- UI / UX評価項目
-          ↓ follow-upが必要
- Finding
+live Web UI
+    ↓
+usability-inspection
+    ├→ objective observation / measurement
+    ├→ applicable standard / binding criterion check
+    └→ optional task / flow execution
+             ↓
+      immutable evidence
+             ↓
+      usability-evaluation
+             ↓
+      reference-based UI / UX evaluation
+             ↓
+      follow-upが必要な場合だけFinding
 ~~~
 
 `usability-inspection` がbrowser / session owner、`usability-evaluation` はread-only evaluatorです。
@@ -28,23 +29,24 @@ user goal / task scenario
 
 次のような依頼では `usability-inspection` を直接開始できます。
 
-「ユーザビリティテストして」という表現もlive Web UIのtask-based検査を意図する場合はtrigger aliasとして受けますが、成果物はAIによる `usability-inspection` として記録します。
+- この画面を実際に触ってユーザビリティ上の問題を確認
+- この機能のUI / UXを実画面で検査
+- mobile Web viewportで表示崩れや操作性を確認
+- keyboard操作やfocusに問題がないか確認
+- target sizeやaccessible name等を標準に照らして確認
+- 操作後のfeedbackや表示速度を実測
+- このflowを実際に操作しながら使い勝手を確認
 
-- 実際に画面を触って使い勝手を確認
-- このサービスを初見ユーザーとして操作して問題を探す
-- このtaskを実際に完了できるかユーザビリティテスト
-- mobile Web viewportで操作して表示崩れや使いづらさを確認
-- 操作後の表示やfeedbackが遅くないか実測
-- keyboardだけで主要taskを完了できるか確認
+「ユーザビリティテストして」という依頼も、live Web UIの検査を意図する場合はtrigger aliasとして扱えます。ただし成果物ではAIによる `usability-inspection` として記録します。
 
 一方、次は `usability-evaluation` を優先します。
 
 - このDialog patternが妥当かレビュー
 - このUIをbest practiceと照合
 - Figma / screenshot / specificationからUI / UXレビュー
-- WAI-ARIA / WCAG / Design Systemに照らして評価
+- WAI-ARIA / WCAG / Design Systemに照らして設計を評価
 
-「usabilityを確認」のように操作有無が明示されない場合は、利用可能なlive targetと依頼文から、実対象のtask実行が要求されているかをqa-workflowが判定します。
+「usabilityを確認」のように実操作有無が明示されない場合は、live targetを操作して確認する要求か、design artifact / 取得済みevidenceをreference knowledgeへ照合する要求かでroutingします。
 
 ## 3. test-target-inspectionとの境界
 
@@ -52,7 +54,7 @@ user goal / task scenario
 
 `usability-inspection` はcurrent target inventoryを更新するために動きません。
 
-既存のcurrent target artifactが利用可能なら、read-onlyのpreflight contextとして
+既存のcurrent target artifactが利用可能なら、read-onlyのpreflight contextとして次を利用できます。
 
 - entry point
 - role / permission
@@ -60,13 +62,9 @@ user goal / task scenario
 - current UI情報
 - known state
 
-をpreflightの補助に利用できます。
+ただしcurrent target artifactのlocator、test id、hidden implementation情報を、inspection中のUI発見shortcutとして使いません。
 
-ただしtask実行では、current target artifactのlocatorやhidden implementation情報をuser-facing discoveryの代わりに使いません。
-
-`usability-inspection` 中に得た新しいUI情報を、理由なくtest-target-inspectionの正本へ自動書き戻しません。
-
-current target artifactが存在することだけを理由にusability-inspectionを起動しません。逆にusability-inspection実行時も、既存artifactからentry point、role、viewport、known state等を再利用できるなら重複確認を減らします。
+current target artifactが存在することだけを理由にusability-inspectionを起動しません。
 
 ## 4. test-executionとの境界
 
@@ -79,142 +77,135 @@ test-execution
 → PASS / FAIL
 
 usability-inspection
-user goal + task scenario + success condition
-→ user-facing情報から操作方法を探索
-→ task outcome + usability observation
+検査scope
+→ live UIを操作・観測
+→ objective fact / measurement / criterion result
+→ UI / UX問題候補
 ~~~
 
-詳細TCが存在していても、usability-inspectionでそのstep sequenceを答えとして利用しません。
+特定task / flowが依頼に含まれる場合、usability-inspectionでもそのflowを実際に操作できます。
 
-既存test-execution成果物は、対象機能・既知状態・既存evidence・仕様上のexpected resultを理解するread-only contextとして利用できます。ただし、その存在だけでusability-inspectionを起動せず、locatorやstep sequenceをtask pathの正解として利用しません。
+ただし詳細TCの忠実な実行と仕様上のPASS / FAILが目的なら `test-execution` へroutingします。
 
-「このTCを実行して」はtest-executionです。
+既存test-execution成果物は、対象機能、既知状態、既存evidence、仕様上のexpected resultを理解するread-only contextとして利用できます。
 
-「同じ機能を、手順を教えずuser goalだけで実際に使ってみて」はusability-inspectionです。
+TCのstep sequenceやlocatorを、usability-inspectionのUI発見shortcutとして利用しません。
 
 ## 5. usability-evaluationとの統合
 
-`usability-inspection` は実測を担当し、`usability-evaluation` はreference knowledgeによる意味判断を担当します。
+`usability-inspection` は実対象から事実と測定値を取得します。
 
-Cognitive Walkthroughは `usability-inspection` のpost-task diagnosisとして扱います。primary runは正解経路を知らない状態で完了させ、その後に意図されたuser flowを確認できる場合だけstep-by-step診断へ使います。
+`usability-evaluation` は、そのevidenceをUI pattern、standard、Design System、heuristic等へ照合して意味を評価します。
 
 ### 受け渡すevidence
 
-- task / success condition
-- meaningful action trace
-- before / after state
+- inspection scope
+- observed fact
 - screenshot
 - DOM / accessibility evidence
 - focus / keyboard result
-- error / recovery result
-- viewport
-- measured system timing
-- task outcome
+- visual measurement
+- standard / binding criterion result
+- performance measurement
+- task / flow result（実施した場合）
 
-### 実行タイミング
-
-primary task中は `usability-evaluation` を割り込ませません。
+### 実行順
 
 既定は次です。
 
-1. usability-inspectionがuser-facing情報だけでprimary taskを最後まで実行
-2. task outcome / outcome basis / primary action traceを固定
-3. 必要ならcurrent user flow / specification / validated TC等をread-onlyで使い、post-task Cognitive Walkthroughを実施
-4. primary runとpost-task diagnostic evidenceをusability-evaluationへ渡す
-5. usability-evaluationがread-onlyで評価
-6. 追加観測が必要ならrequestを返す
-7. usability-inspectionがscope / safetyを確認し、post-task diagnostic observationとして実行
+1. usability-inspectionが必要なlive observation / measurementを取得
+2. 適用可能なstandard / binding criterionを明確な条件で判定
+3. immutable evidenceをusability-evaluationへ渡す
+4. usability-evaluationがread-onlyで専門評価
+5. 追加観測が必要ならrequestを返す
+6. usability-inspectionがscope / safetyを確認して追加観測
 
-Cognitive Walkthroughやusability-evaluationから得た知識をprimary taskの次action選択へ戻しません。
-
-追加観測によってprimary task outcomeやprimary action traceを書き換えません。primary run自体を再確認する必要がある場合は別Activityで再実行します。
+追加観測によって既存の観測事実や測定値を書き換えません。新しい証拠として追加します。
 
 同じbrowser / sessionを両Skillが並行操作しません。
 
-## 6. exploratory-testingとの境界
+## 6. Cognitive Walkthrough
 
-`usability-inspection` はuser goal / task scenario / success conditionを持ちます。
+Cognitive Walkthroughはworkflowの固定工程にしません。
 
-Charterだけを持って自由に未知の問題を探索する場合は `exploratory-testing` です。
+learnability、新機能の操作理解、stepごとのdiscoverability / feedback等を重点確認する依頼で有用な場合に、既存2 Skill内の参考技法として利用できます。
 
-実行中にtask goal自体を変更しながら別領域へ広く探索する必要が出た場合、
+current specification、user flow、validated TC等からintended flowを確認できない場合は正しいstep sequenceを創作しません。
 
-- 現在taskを閉じる
-- Finding / Observationを残す
-- exploratory-testingへroutingする
+独立Skillへ分離しません。
 
-ことを優先します。
+## 7. exploratory-testingとの境界
 
-`usability-inspection` を汎用探索Skillへ拡張しません。
+`usability-inspection` はユーザビリティ観点の体系的な検査です。
 
-## 7. test-analysis / test-condition-design
+Charterに基づいて対象領域を自由に探索し、未知のProduct Riskや問題を広く探す場合は `exploratory-testing` です。
+
+usability-inspection中にscope外の未知領域へ探索を広げる必要が出た場合は、現在のinspection結果を閉じ、必要に応じてexploratory-testingへroutingします。
+
+## 8. test-analysis / test-condition-design
 
 ### test-analysis
 
-Product Riskや主要user goalから、usability-inspectionすべきtask候補を選ぶ入力にできます。
+`usability-evaluation` / `usability-inspection` の結果をProduct Risk候補の入力にできます。
 
-広いscopeではproject requirement、user research、analytics / support data、Product Risk、検証済みproject knowledge等からtask候補を作り、selected / not-selected / deferredとcoverage limitationを残します。task母集団の根拠がない場合はUIからの推定taskを代表taskとして扱いません。
-
-ただしusability-inspection自身はProduct Riskを採点しません。
+ただし両Skill自身はProduct Riskを採点しません。
 
 ### test-condition-design
 
-UI / UXに関するcoverage観点から、どのtask / stateをusability-inspectionで実測する価値があるかを入力にできます。
+UI / UX上のfailure mode、standard criterion、interaction / accessibility / responsive観点をテスト条件候補の入力にできます。
 
-ただしtask scenarioを詳細TCへ変換しません。
+ただし一般guidanceを製品期待結果へ自動昇格しません。
 
-## 8. regression-testing
+## 9. regression-testing
 
 全Regression Runへusability-inspectionを自動追加しません。
 
 次の場合だけRegression scopeに含められます。
 
-- usability regression taskが明示的に選定された
 - 過去のusability Findingを再確認する
-- 主要task flowをrelease前に再実行する方針がprojectにある
+- release前に特定UI / flowのusability regression inspectionを行う方針がある
+- applicable standard / project criterionを継続確認する
 
-過去runのtask snapshotを再利用する場合も、role / goal / start state / success condition / environmentがcurrentか確認します。
-
-再実行は新しいActivity / versionとして記録し、以前のtask outcomeを上書きしません。
+再実行は新しいActivity / versionとして記録し、以前の観測値を上書きしません。
 
 初版では新しいglobalなusability-inspection task ID体系を追加しません。
 
-## 9. qa-knowledge
+## 10. qa-knowledge
 
 project固有で繰り返し有効な知見は、PR #13のqa-knowledgeへroutingできます。
 
 例:
 
-- 特定user roleで毎回問題になるnavigation
 - project独自UI convention
-- projectで採用したresponse threshold
+- projectで採用したDesign System requirement
+- projectで採用したperformance threshold
 - 継続確認すべきinteraction上の注意
 
-汎用UI pattern知識はusability-evaluationのreferenceへ保持し、qa-knowledgeへ複製しません。
+汎用UI pattern knowledgeや標準知識はusability-evaluationのreferenceへ保持し、qa-knowledgeへ複製しません。
 
-## 10. qa-workflow
+## 11. qa-workflow
 
 qa-workflowは最低限次をroutingします。
 
-初版のlive executionはPlaywrightで到達可能なWeb UIだけを対象にします。native appの能動操作要求はusability-inspectionへ無理にroutingせず、静的資料やscreenshot等で評価可能ならusability-evaluationを利用します。
-
-- reference-based UI / UX review → usability-evaluation
-- live target task-based test → usability-inspection
+- design artifact / 取得済みevidenceのreference-based UI / UX review → usability-evaluation
+- live Web UIのユーザビリティ検査 → usability-inspection
 - current target inventory → test-target-inspection
 - prescribed detailed TC execution → test-execution
 - Charter-based open exploration → exploratory-testing
 
-Skill名の単語一致だけでroutingせず、ユーザー要求が「何を正本にして、何を実行したいか」で分けます。
+初版のlive executionはPlaywrightで到達可能なWeb UIだけを対象にします。
 
-## 11. browser ownership
+native appの能動操作要求はusability-inspectionへ無理にroutingせず、静的資料やscreenshot等で評価可能ならusability-evaluationを利用します。
+
+## 12. browser ownership
 
 usability-inspection実行中はusability-inspectionがbrowser / session ownerです。
 
 別Agent / Skillが同一sessionを操作しません。
 
-利用できるのは、
+`usability-evaluation` が行えるのは、
 
-- read-only evidence evaluation
+- immutable evidenceのread-only評価
 - ownerへ追加観測requestを返すこと
 
 です。
@@ -223,9 +214,31 @@ PR #12 merge後に共通browser safety / side-effect / cleanup契約が実装さ
 
 存在しない汎用Skill-to-Skill browser APIを新設しません。
 
-## 12. 副作用
+## 13. Playwright固有の検査境界
 
-task scenarioに、
+通常のE2Eで便利なPlaywrightの挙動が、usability問題を隠さないようにします。
+
+### auto-scroll
+
+visual / pointer inspectionでは、現在viewportに見えていないcontrolをlocatorで直接指定してimplicit auto-scrollさせた結果を「発見・操作できた」と扱いません。
+
+必要なscrollはuser actionとして実行・記録します。
+
+### actionability auto-wait
+
+Playwrightがclick等の前に行うactionability waitを、操作後のsystem responsivenessへ含めません。
+
+actionability wait自体が長い、または操作可能になるまでのUI feedbackに問題がある場合は別Observationとして扱えます。
+
+### locator
+
+role / name等のuser-facing locatorは、既に対象と判断したcontrolを実操作するために利用できます。
+
+test id、hidden DOM、implementation-specific selector等を、UI上で発見できないcontrolの存在を知るshortcutにしません。
+
+## 14. 副作用
+
+inspection中の操作に、
 
 - 削除
 - 決済
@@ -236,13 +249,11 @@ task scenarioに、
 
 等が含まれる場合、PR #12 merge後の許可scope / 最大回数 / cleanup契約を適用します。
 
-user goalを達成するためでも、許可されていない副作用を実行しません。
+ユーザビリティ検査を理由に、許可されていない副作用を実行しません。
 
-安全にtaskを継続できない場合はtask outcomeを未達成または判定不能として閉じ、必要な条件を報告します。
+## 15. performance系workflowとの境界
 
-## 13. performance系workflowとの境界
-
-usability-inspectionが扱うのはtask中のuser-facing responsivenessです。
+usability-inspectionが扱うのは、user-facingな表示・interactionの実測です。
 
 次は担当しません。
 
@@ -253,6 +264,8 @@ usability-inspectionが扱うのはtask中のuser-facing responsivenessです。
 - distributed tracing基盤
 - RUM収集serviceの新設
 
-performance専門調査が必要になった場合は、その担当workflowへroutingできるよう観測値と対象actionを残します。
+project thresholdや有効な標準metricがある場合は、その定義に従って評価できます。
+
+条件を満たさない単一runの値をfield metricや製品全体のperformance判定へ昇格しません。
 
 初版では新しいperformance testing Skillを追加しません。
