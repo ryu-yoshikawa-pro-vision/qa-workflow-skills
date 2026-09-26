@@ -87,7 +87,7 @@ fixtureで次を成立させます。
 - thresholdの有無
 - thresholdなしの場合に独自FAILを作らない
 - advisory guidanceをstrict FAILへ変換しない
--単一criterion結果を製品全体のconformanceへ昇格しない
+- 単一criterion結果を製品全体のconformanceへ昇格しない
 
 task / flow未指定caseでも成果物が成立することを確認します。
 
