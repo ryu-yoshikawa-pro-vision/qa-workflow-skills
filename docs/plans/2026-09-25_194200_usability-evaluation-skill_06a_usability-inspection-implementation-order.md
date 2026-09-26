@@ -70,7 +70,7 @@ task selection summary、task snapshot、prior knowledge / experience assumption
 実browser接続前にfixtureで次を成立させます。
 
 - goal / task source
-- prior knowledge / experience assumptionsとその根拠
+- prior knowledge / experience assumptions、prior knowledge state（confirmed / inferred / unknown）、その根拠
 - start state
 - success condition
 - user-facing cue
@@ -259,7 +259,7 @@ repository標準件数に合わせます。
 - Agent run上の操作負荷
 - timing value / threshold整合
 - goal provenance
-- prior knowledge / experience assumptions provenance
+- prior knowledge / experience assumptions / state / provenance
 - primary outcome固定 / post-task diagnosis順序
 - cleanup
 - evaluation / Finding ref
@@ -299,7 +299,7 @@ repository標準件数に合わせます。
 - Agent Skills仕様を満たす
 - task scenario / success condition契約がある
 - user goalの出所または推定状態を保持する
-- prior knowledge / experience assumptionsとその根拠を保持し、不明な経験レベルを勝手に確定しない
+- prior knowledge / experience assumptions、state、根拠を保持し、不明な経験レベルを勝手に確定しない
 - broad scopeではtask候補、selected / not-selected / deferred、coverage limitationを保持する
 - task母集団の根拠がない場合に製品全体 / 代表taskを評価したと主張しない
 - live execution対象をPlaywrightで到達可能なWeb UIへ限定する
