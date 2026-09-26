@@ -168,6 +168,7 @@ methodology sourceを追加する場合は、
 - target
 - user / role
 - prior knowledge / experience assumptions
+- prior knowledge state: confirmed / inferred / unknown
 - prior knowledge / experience assumption source / evidence refs
 - user goal
 - user goal source / evidence refs
@@ -338,7 +339,7 @@ follow-upが必要なObservation / evaluationだけ、PR #13のFinding契約で�
 - threshold-not-definedで任意のFAIL判定を持たない
 - source test case PASS / FAIL欄を持たない
 - user goal sourceとgoal state（confirmed / inferred / unknown）がある
-- prior knowledge / experience assumptionsとそのsource / evidence refsがある。不明ならunknownとして表現できる
+- prior knowledge / experience assumptions、prior knowledge state（confirmed / inferred / unknown）、source / evidence refsがある。根拠がなければstate=unknownとして表現する
 - primary outcome fixed before diagnosis=trueでないActivityにpost-task diagnosis / usability-evaluation refを持たせない
 - Cognitive Walkthrough diagnosisがある場合はintended flow source refsがあり、primary outcome固定後の診断として記録される
 - evaluation-requested-observationがある場合はpost-task diagnosisとして記録される
@@ -447,7 +448,7 @@ native iOS / Android appの実機操作を要求された場合、初版のPlayw
 
 同じtaskでも「製品初回利用・一般的なWeb UI経験あり」と「製品熟練利用者」でdiscoverabilityの期待が異なるcase。
 
-user / roleだけから経験レベルを推測せず、prior knowledge / experience assumptionsとその根拠をtask snapshotへ固定すること。
+user / roleだけから経験レベルを推測せず、prior knowledge / experience assumptions、prior knowledge state、根拠をtask snapshotへ固定すること。
 
 ### Case S: post-task Cognitive Walkthrough
 
