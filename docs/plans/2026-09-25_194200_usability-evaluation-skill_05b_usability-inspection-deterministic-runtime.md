@@ -240,6 +240,8 @@ check単位で最低限:
 
 W3C ACT Ruleを完全に実装した場合は、そのruleで定義されたoutcomeを保持します。
 
+formal ACT Ruleでは原則として passed / failed / inapplicable をsource-native outcomeとして保持します。proposed rule等で別outcome vocabularyが定義されている場合はsource statusと一緒に保持し、formal ruleと混同しません。
+
 ACT Rule resultを、そのままWCAG Success Criterion全体のPASSへ読み替えません。
 
 ## 5. deterministic-check-catalog.json
