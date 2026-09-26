@@ -16,7 +16,7 @@ SKILL.mdは評価契約とindex参照方法だけを持ち、詳細知識はrefe
 
 「すべての情報」はインターネット全体を無制限に収集する意味にはしません。
 
-実装時に定義した採用情報源について、次を満たす公開・取得可能な情報を対象母集団とします。
+Planで定義したsource category・採用条件・探索closureからadoptされた、公開かつ認証なしで取得可能な情報を対象母集団とします。
 
 - UI component / interaction pattern
 - user task / user goal pattern
@@ -45,7 +45,7 @@ SKILL.mdは評価契約とindex参照方法だけを持ち、詳細知識はrefe
 
 ## 3. 採用する情報源
 
-実装時に各サイトの公開範囲、robots / access、利用条件、更新状況を再確認します。
+reference取得時に各サイトの公開範囲、robots / access、利用条件、更新状況を確認します。非公開・認証必須・有料本文はbundled corpusへ取り込みません。
 
 ### W3C / WAI
 
@@ -61,17 +61,17 @@ SKILL.mdは評価契約とindex参照方法だけを持ち、詳細知識はrefe
 - APG examplesから、pattern理解・keyboard・roles / states / properties・注意点に必要な情報
 - currentなACT Rules Format
 - W3Cがformalに公開しているACT Rulesとrequirements / outcome mapping
-- proposed ACT Rulesはformal ruleと区別したstatus付きcandidateとして必要な範囲だけ確認
+- 取得時点でW3Cが公開しているproposed ACT Rulesを全件inventoryし、formal ruleと区別したstatusを保持
 
 扱い:
 
 - WCAG Success Criterion、WAI-ARIA 1.2、ARIA in HTMLで今回の対象へ適用されるnormative requirementは、該当要件として扱う。観測・測定・applicabilityを確定できる場合は `usability-inspection` のrequirement-level `satisfied / not-satisfied / undetermined` の根拠として利用できる
 - Understanding / Techniquesはcriterionの理解・評価方法を補助するinformative guidanceとして扱う
 - ACT Rulesはaccessibility testing methodのinformative ruleとして扱い、WCAG / ARIA requirementそのもののnormative basisへ昇格しない
-- formal ACT Ruleのapplicability / expectation / requirements mapping / outcome mappingをdeterministic check候補の正本にし、独自解釈で別ruleへ作り替えない
+- formal ACT Ruleのapplicability / expectation / requirements mapping / outcome mappingをACT Rule coverageの正本にし、独自解釈で別ruleへ作り替えない
 - proposed / community ACT Ruleをformal ruleと同じstatusで扱わない
 - APGはARIAの利用方法に関するinformative guidanceであり、example実装を唯一のproduction正解としない
-- WAI-ARIA 1.3等のDraftをcurrent Recommendationと同じ強さで扱わない。projectが明示採用する場合または将来仕様の調査が目的の場合だけ、draft statusを保持して別扱いする
+- WAI-ARIA 1.3等のDraftをcurrent Recommendationと同じ強さで扱わない。projectが明示採用している場合だけ、そのAuthorityとしてdraft statusを保持して別扱いする
 - native HTMLで解決できる場合に不要なARIAを要求しない
 
 ### GOV.UK Design System
@@ -212,7 +212,7 @@ iOS / iPadOS / macOS / watchOS / tvOS / visionOS等のplatform固有要件は、
 
 ### Material Design
 
-実装時に公開・取得可能なMaterial Design 3の、
+reference取得時点で公開・取得可能なMaterial Design 3の、
 
 - foundations
 - components
@@ -226,7 +226,7 @@ iOS / iPadOS / macOS / watchOS / tvOS / visionOS等のplatform固有要件は、
 
 ### Shopify Polaris
 
-実装時に公開・取得可能な、
+reference取得時点で公開・取得可能な、
 
 - components
 - patterns
@@ -267,12 +267,12 @@ ISO 9241-110:2020はinteraction principlesの体系を確認するsourceとし�
 
 本Skillの評価方法に直接必要な公開資料を対象とします。
 
-最低限:
+対象:
 
 - 10 Usability Heuristics
 - Heuristic Evaluationの実施方法
 - 各heuristicを理解するための公式公開補足
-- UI pattern / interaction評価に直接関係し、source inventoryへ採用すると判断した公開資料
+- `_02b_reference-validation-and-completeness.md` の採用条件を満たす、UI pattern / interaction評価に直接関係する公開資料
 
 heuristicは広い経験則であり、特定componentの仕様要件ではないことをreferenceに明記します。
 
@@ -296,12 +296,12 @@ heuristicは広い経験則であり、特定componentの仕様要件ではな�
 
 上記の情報源だけを固定リストとして「全情報」とは扱いません。
 
-実装時に、UI / UX評価へ直接利用できる公開情報源を追加調査し、次の条件を満たすsourceが見つかった場合はsource inventoryへ追加します。
+source discoveryでは、UI / UX評価へ直接利用できる公開情報源を追加調査し、次の条件を満たすsourceが見つかった場合はsource inventoryへ追加します。探索・採用・終了条件は `_02b_reference-validation-and-completeness.md` を正本とします。
 
 - 標準化団体またはplatform vendorの公式UI / accessibility guidance
 - 公開Design Systemのcomponent / pattern / interaction guidance
 - UI patternの目的・適用条件・rationaleを体系化した公開資料
-- usability評価方法を体系化した一次または代表的な資料
+- usability評価方法を体系化した一次資料、または方法論の原著が公開されていない場合に手順と出典を追跡できる公開資料
 - visual / responsive / error / feedback / form / navigation等、本Skillの既存sourceで不足する領域を補う資料
 
 追加sourceを見つけた場合も、権威性だけで既存sourceより常に優先するとは扱わず、source-catalogへ位置づけを記録します。
@@ -407,7 +407,7 @@ reference entryの `ID` はusability-evaluation package内だけのappend-only�
 このIDはSkill package内のreference追跡用であり、新しい全QA共通identityやMachine Entityにはしません。
 ## 7. reference構造
 
-予定構成:
+実装構成:
 
 ~~~text
 skills/usability-evaluation/
@@ -458,9 +458,7 @@ skills/usability-evaluation/
 │       └── sociomedia.md
 ~~~
 
-実装時の実測で1ファイルが過大になる場合だけ意味単位で分割します。
-
-1 pattern = 1 fileを機械的に強制しません。
+reference fileの分割単位はruntime契約に含めません。1 pattern = 1 fileを機械的に強制せず、意味上同じentryのsource provenanceを分断しない範囲で分割できます。
 
 ## 8. index.md
 
@@ -489,7 +487,7 @@ root indexには次だけを持たせます。
 - visual issue、error、loading、empty、feedback等のcross-cutting concernから該当indexへのrouting
 - source authority / evidence判断への導線
 
-pattern名 / aliasの詳細索引は `patterns/index.md` または必要に応じた分野別indexに置きます。
+pattern名 / aliasの詳細索引は `patterns/index.md` または既存の分野別indexに置きます。root indexへ全aliasを平置きしません。
 
 Design System固有名称は `platforms/index.md` からcommon patternまたはsource-specific referenceへ解決します。
 
@@ -501,9 +499,9 @@ root indexの肥大化が確認された場合も、新しい検索runtimeを追
 
 ## 9. source-catalog.md
 
-source-catalog.mdは、採用済みsourceだけでなくsource discoveryで確認した候補の正本にもします。別のdiscovery logは作りません。
+source-catalog.mdは、採用済みsourceだけでなくsource discoveryで確認した候補の正本にもします。別のdiscovery logは作りません。候補採否、探索固定点、public-only境界、item全件意味検証は `_02b_reference-validation-and-completeness.md` に従います。
 
-候補ごとに最低限次を管理します。
+候補ごとに次を管理します。
 
 - candidate name
 - URL root
@@ -535,7 +533,7 @@ source全体を一律にnormative / advisoryへ固定できない場合は、def
 
 candidate表とは別に、探索を実施した事実をsource-catalog.md内へ記録します。検索やcross-link確認で新規candidateが0件でも、実行記録は残します。
 
-最低限:
+discovery実行記録は次を持ちます。
 
 - discovery type: query / cross-link
 - discovery target: Query IDまたはadopted source ID
@@ -571,14 +569,14 @@ source discoveryを「Web全体を完全探索した」とは表現しません�
 
 このclosureに検索件数、source数、cross-link段数の固定上限を使いません。
 
-### package-local source ID### package-local source ID
+### package-local source ID
 
 source IDはusability-evaluation package内だけのappend-onlyなIDとします。
 
 - 形式: `SRC-\d{3,}`
 - 初回実装ではsource discovery closure後、全adopted sourceをcanonical root昇順で並べて `SRC-001` から採番する
 - 初回実装後に新しくadoptしたsourceは既存最大番号+1を使う
-- 将来追加するsourceも既存最大番号+1を使う
+- 追加sourceは既存最大番号+1を使う
 - canonical root、名称、並び順の変更だけを理由に既存source IDを振り直さない
 - 削除・duplicate化したsource IDを別sourceへ再利用しない
 
@@ -588,7 +586,7 @@ candidate行の `adopted時のsource ID` にはこのIDを記録します。
 
 「すべて取得した」を検証可能にするため、対象ページ / pattern単位でcoverageを保持します。
 
-最低限:
+source-coverage rowは次を持ちます。
 
 - source ID
 - source item ref

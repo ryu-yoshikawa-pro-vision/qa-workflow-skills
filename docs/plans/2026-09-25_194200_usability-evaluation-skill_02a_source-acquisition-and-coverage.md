@@ -62,9 +62,20 @@
 
 外部source本文をそのまま複製することを「全情報」とは定義しません。評価に必要な意味を欠落させない構造化要約を作り、sourceへ追跡可能にします。
 
+## 2.1 public-only境界
+
+bundled reference corpusへ収録する本文・要約の根拠は、認証なしで公開参照できる情報に限定します。
+
+- paywall、契約者限定、organization限定、login必須本文を迂回取得しない
+- 公開metadataだけ確認できる非公開sourceは、公開metadataの範囲をcandidateとして記録できますが、非公開本文を推測しない
+- projectから別途正当に提供された内部仕様・契約資料はruntime時のproject Authorityとして利用できますが、bundled corpusのsource discoveryへ混ぜない
+- public sourceでも利用条件上要約収録できない場合は公開metadata / URLだけを `source-reference-only` として保持する
+
+この境界はsource数を減らすためではなく、取得権限と再配布条件を守るための固定条件です。
+
 ## 3. source discoveryの対象category
 
-最低限、次を別categoryとして探索します。
+次をすべて独立したcategoryとして探索します。
 
 ### Standards / accessibility
 
@@ -79,7 +90,7 @@
 - Apple
 - Android / Material
 - GNOME
-- その他、実装時に公開かつ現行で、UI behaviorを体系化した主要platform HIG
+- source ownerが公開し、currentなplatform向けUI behaviorを体系化し、§4の採用条件を満たすplatform HIG
 
 ### Official public Design Systems
 
@@ -138,7 +149,7 @@ NN/gの全記事を無条件に対象母集団にはしません。評価方法�
 - platform vendor
 - Design System owner
 - 長期利用されている体系的pattern library
-- usability methodの一次資料または代表的な公開資料
+- usability methodの一次資料。一次資料が公開されていない場合は、手順・原著・適用条件を追跡できる公開資料
 
 原則採用しない:
 
@@ -181,7 +192,7 @@ seed以外のsource探索は、実装開始時に次のquery matrixを初期quer
 
 同一canonical rootの重複を除いた候補を `source-catalog.md` へ記録し、§4のsource採用条件へ照合します。検索順位自体をsourceの強さには使いません。
 
-初期queryを閉じた後も、source category、coverage、採用候補の内容から不足領域が残る場合は追加queryを採番して探索します。追加queryの件数も固定しません。追加queryを実行した場合はquery、理由、確認範囲、結果をsource-catalogへ残します。
+初期queryを閉じた後も、source category、coverage、採用候補の内容から未探索の領域が見つかった場合は追加queryを採番して探索します。追加queryの件数は固定しません。追加queryを実行した場合はquery、理由、確認範囲、結果をsource-catalogへ残します。探索は `_02b_reference-validation-and-completeness.md` の固定点条件まで続けます。
 
 ### 5.3 cross-link探索
 
@@ -216,9 +227,9 @@ source discoveryを「Web全体を完全探索した」とは表現しません�
 
 Plan側では検索件数、検索結果page数、source数、cross-link段数を探索終了条件にしません。
 
-新しいsourceが将来存在し得ることは鮮度契約で扱います。
+取得日以後にsourceが更新・追加され得ることは鮮度契約で扱います。今回の完成条件は取得時点の公開source discovery closureです。定期crawlerは要求しません。
 
-## 6. source item母集団の固定## 6. source item母集団の固定
+## 6. source item母集団の固定
 
 sourceを採用したら、そのsourceのitem母集団を先に固定します。
 
@@ -276,7 +287,7 @@ source itemは次の3軸を分離して保持します。
 - `public`
 - `restricted`
 
-login / organization限定等で本文を確認できないitemは `access_state=restricted` とし、coverage dispositionは実際の取り込み結果に応じて `unavailable` または `source-reference-only` とします。
+login / organization限定等で本文を確認できないitemはbundled corpusへadoptしません。公開metadataだけ確認できる場合はcandidate行へ `access_state=restricted` と理由を残し、公開metadataをsource参照として保持する場合だけ `source-reference-only` とします。非公開本文の内容はcoverageへ含めません。
 
 ### maturity / lifecycle
 
@@ -404,7 +415,7 @@ sourceにそのdimensionが存在するかの意味判断は取得時に行い�
 
 ## 12. completenessを機械検証する範囲
 
-Skill-local validatorで最低限確認します。
+Skill-local validatorで次をすべて確認します。
 
 - source-catalogの全candidateがpending以外へ閉じている
 - adopted sourceがcatalogにある
@@ -421,7 +432,7 @@ Skill-local validatorで最低限確認します。
 - source itemの重複がない
 - reference entryからsourceへ逆引きできる
 
-Web上の「未知のsourceが存在しないこと」や、source本文中のdimension抽出が意味的に正しいことまではvalidatorで証明しません。
+Web上に未知のsourceが存在しないことまではvalidatorで証明しません。一方、adopted source本文からのdimension抽出とreferenceへの意味反映は `_02b_reference-validation-and-completeness.md` の全item semantic validationで検証し、samplingだけで完了扱いにしません。
 
 ## 13. Plan作成時点の確認事項
 

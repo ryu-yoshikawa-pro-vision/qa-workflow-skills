@@ -4,12 +4,12 @@
 
 mainでは、仕様根拠からテスト分析・設計を行うSkillと、Playwright E2Eを扱うSkillが存在します。
 
-PR #12では次が追加予定です。
+PR #12のPlanでは次を追加します。
 
 - test-target-inspection: currentな実対象UI・ふるまい・視覚状態の収集
 - test-execution: 詳細TCを人間の手動テスト相当で実行し、期待結果と実測を比較
 
-PR #13では次が追加予定です。
+PR #13のPlanでは次を追加します。
 
 - exploratory-testing: Charterに基づく探索 / Investigation
 - regression-testing
@@ -20,6 +20,13 @@ PR #13では次が追加予定です。
 また、生きた実対象を操作・観測し、interaction、feedback、error recovery、accessibility、visual / responsive、user-facing performanceを体系的に検査するownerもありません。task / flowが明示された場合は、そのflowも検査対象に含めます。
 
 後者は `usability-inspection` として別Skillにし、本ファイルでは `usability-evaluation` の責務を定義します。
+
+## 今回の対象境界
+
+- bundled reference corpusは公開情報だけを対象とします。
+- usability-inspectionのlive操作対象はWeb UIだけです。native appの能動操作は対象外です。
+- human participantを募集・観察してtask success、task time、satisfaction等を測るusability studyは担当しません。
+- AIによる専門評価・Web実対象検査とhuman studyの結果を混同しません。
 
 ## 2. 解決する問題
 
@@ -72,7 +79,7 @@ usability-evaluation の主責務は次です。
 
 ### interactionの評価
 
-必要に応じて次を確認します。
+対象UIへapplicableな次のinteraction項目をすべて確認します。該当しない項目は評価対象へ無理に追加しません。
 
 - affordance / discoverability
 - controlの状態

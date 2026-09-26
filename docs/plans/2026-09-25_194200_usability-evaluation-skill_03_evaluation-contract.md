@@ -138,7 +138,7 @@ reference側にあるnormative / informative / advisoryという性質だけか�
 
 評価を始める前に、target scope、pattern候補、適用可能なreference、利用可能なevidence、明示されたuser goal / taskがある場合はその条件から、今回扱う観点を固定します。
 
-最低限、次の上位観点をそれぞれ「今回評価する」または「対象外」とし、対象外には理由を残します。
+次の上位観点をすべて「今回評価する」または「対象外」とし、対象外には理由を残します。
 
 - 目的・理解可能性
 - interaction
@@ -150,7 +150,7 @@ reference側にあるnormative / informative / advisoryという性質だけか�
 
 全上位観点へ同じ詳細checklistを機械適用しません。各上位観点の中で何を確認するかは、pattern、reference、evidence、対象状態に応じて選びます。
 
-「今回評価する」とした上位観点は、後続のUI / UX評価結果で少なくとも1件以上の `問題を確認 / 問題なし / 判定不能` へ閉じます。観測途中で適用外と分かった場合は、理由付きの `対象外` へ閉じられます。
+「今回評価する」とした上位観点は、その観点で適用対象として識別した全target / concernをUI / UX評価結果へ閉じます。少なくとも1件だけ出力して残りを暗黙に省略しません。各結果は `問題を確認 / 問題なし / 判定不能 / 対象外` のいずれかへ閉じます。
 
 deterministic validatorは「固定した観点が結果へ閉じていること」だけを検証し、その観点を選ぶべきだったか、内部でどの確認項目が必要だったかはsemantic evalで確認します。
 
@@ -272,7 +272,7 @@ component単体が妥当でもflow全体で問題になる場合があります�
 
 ### Step 9: UI / UX評価項目を閉じる
 
-各評価項目は最低限次を持ちます。
+各評価項目は次を必須fieldとして持ちます。
 
 `evaluation ref` は1つのusability-evaluation成果物revision内だけで一意なartifact-local refです。新しいglobal QA IDやMachine Entityにはしません。成果物自体のidentity / revisionは、実装開始時に確認したPR #11 / #12 / #13 merge後の既存artifact契約を再利用します。
 

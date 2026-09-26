@@ -12,7 +12,7 @@
 
 実装開始前に最新状態を再確認します。
 
-最低限:
+次をすべて確認します。
 
 - PR #11 merge済みのlatest main実装とcurrent runtime contract
 - PR #12のmerge状態と test-target-inspection / test-execution 実装
@@ -93,9 +93,7 @@ source-coverageの初期母集団を作ります。
 
 ## 6. Step 4: 縦断検証
 
-全source収録前に、最終契約を実測するための代表経路を1本成立させます。
-
-最低限:
+全source収録前に、最終契約を実測するための縦断経路を1本成立させます。縦断経路には次を含めます。
 
 - Dialog pattern
 - WAI-ARIA 1.2のDialogに関係するrole / state / property
@@ -118,7 +116,7 @@ source-coverageの初期母集団を作ります。
 - binding / advisoryとapplicability
 - reference catalog validator
 - deterministic output validator
-- semantic evalの代表case
+- semantic evalの縦断case
 - PR #12契約と同じ形のfixture / 保存済みevidenceを入力した評価
 - 同一browser / sessionを競合操作しないこと
 
@@ -141,7 +139,7 @@ source-coverageの初期母集団を作ります。
 - WAI-ARIA APG Practices
 - current ACT Rules Format
 - W3C formal ACT Rulesとrequirements / outcome mapping
-- proposed ACT Rulesはformal inventoryと分離してstatus付きで必要範囲だけ確認
+- 取得時点で公開されているproposed ACT Rulesを全件inventoryし、formal inventoryと分離してstatus付きで確認
 
 source-coverage上の対象をすべて閉じます。
 
@@ -151,7 +149,7 @@ source-coverage上の対象をすべて閉じます。
 
 順序自体は実装効率のためであり、重要度ランキングではありません。
 
-候補順:
+実装順:
 
 1. GOV.UK Design System
 2. USWDS
@@ -181,7 +179,7 @@ source-coverage上の対象をすべて閉じます。
 - ソシオメディア UIデザインパターン
 - Nielsen Norman Groupの採用資料
 - UI-Patterns.com
-- Welie等、実装時に採用確定したpattern source
+- source discovery closureでadoptされた全pattern source
 
 を処理します。
 
@@ -196,7 +194,7 @@ source-coverage上の対象をすべて閉じます。
 - WAI-ARIA 1.2は2023-06-06 Recommendation。WAI-ARIA 1.3はPlan確認時点で2026-06-04 Working Draftのためcurrent Recommendationと同じ強さで扱わない。
 - ARIA in HTMLはPlan確認時点で2026-08-11 Recommendationで、HTML要素へのARIA利用に関するauthor conformance requirementsを定義する。
 - WAI-ARIA APGはPatterns一覧とPractices一覧が公開され、patternページには目的、Keyboard Interaction、WAI-ARIA Roles / States / Propertiesを持つ。APGはinformative guidanceとして扱う。
-- ACT Rulesはtesting methodのinformative ruleとして扱い、WCAG / ARIA requirementそのもののnormative basisへ昇格しない。formal ruleのapplicability / expectation / requirements mapping / outcome mappingをdeterministic check候補へ利用する。
+- ACT Rulesはtesting methodのinformative ruleとして扱い、WCAG / ARIA requirementそのもののnormative basisへ昇格しない。formal / proposed ruleのapplicability / expectation / requirements mapping / outcome mappingをACT Rule coverageとcheck catalogへ反映する。
 - GOV.UK Design SystemはComponentsとPatternsを分離し、Patternsをuser-focused taskのbest practice solutionとして公開している。
 - USWDSはComponents一覧とPatterns一覧を公開し、component lifecycle / statusも公開している。Plan調査時点のComponents overviewは47 componentsを表示する。
 - CarbonはcoreのUniversal patternsと、core非保証のCommunity patternsを分離している。
@@ -247,7 +245,7 @@ Step 4で成立させた `SKILL.md`、output-template、validator、trigger / se
 
 が崩れていないことを確認します。
 
-さらに、`_05_skill-package.md` §10の規則でadopted sourceごとのreference spot-check fixtureを作り、原文との意味一致を確認します。
+さらに、`_02b_reference-validation-and-completeness.md` の規則で `included / merged-duplicate` の全source itemを原文と意味照合し、`unavailable / source-reference-only` の全itemでdisposition / access state / canonical URLを確認します。samplingだけで完了扱いにしません。
 
 全referenceを収録しただけでSkill完成扱いにせず、Step 4で確認した実行契約が全体でも維持されることを確認します。
 
@@ -314,7 +312,7 @@ negative例:
 
 このnegativeはdirect triggerの評価です。
 
-boundary caseとして最低限次を追加します。
+boundary caseとして次を追加します。
 
 ~~~text
 ユーザー要求: usabilityを確認して
@@ -348,7 +346,7 @@ live browserでviewportを変えて実操作・観測
 → follow-upが必要な評価項目だけFindingを作る
 ~~~
 
-`test-target-inspection` もstandalone / qa-workflow経由の両経路を代表caseで確認します。
+`test-target-inspection` はstandalone / qa-workflow経由の両経路をそれぞれ確認します。
 
 Regression統合では、Regression scopeにUI / UX評価が含まれないTCについてusability-evaluationが追加実行されないこと、UI / UX評価scopeが明示された場合だけ既存evidenceを再利用することを確認します。
 
@@ -372,7 +370,7 @@ UI patternを含むtest-condition-design
 
 ## 15. deterministic eval
 
-最低限:
+次をすべて検証します。
 
 - output schema
 - evaluation refの成果物revision内一意性
@@ -393,7 +391,7 @@ UI patternを含むtest-condition-design
 
 ## 16. semantic eval
 
-最低限、以下のcaseを用意します。
+以下のcaseをすべて用意し、実Judgeで評価します。
 
 ### Case A: Dialog
 
@@ -454,7 +452,7 @@ Dialogの評価で、目的・interaction・feedback・accessibility・visual等
 
 dataset構造検証だけで実装完了にしません。
 
-既存semantic runner + 実Judgeを使える環境で、代表caseのcandidate outputを生成・評価します。
+既存semantic runner + 実Judgeを使い、Planで定義した全semantic caseのcandidate outputを生成・評価します。
 
 実AgentがSkillを正しく発火し、root index → sub-index → 必要referenceの順で読み、無関係なreferenceを一括読込しないことも確認します。
 
@@ -462,12 +460,13 @@ dataset構造検証だけで実装完了にしません。
 
 ## 18. browser smoke
 
-PR #12の実行基盤を利用できる場合、
+PR #12 / #13 merge後の実行基盤を使い、
 
 - test-target-inspection evidence → usability-evaluation
 - test-execution evidence → usability-evaluation
+- live Web target → usability-inspection → usability-evaluation
 
-の代表経路を実Agentで確認します。
+のcanonical経路を実Agentで確認します。環境が利用できなければblockedであり、実装完了にはしません。
 
 同一sessionへの並行操作をしないことを確認します。
 
@@ -495,7 +494,7 @@ PR #12の実行基盤を利用できる場合、
 - JavaScript依存、login限定、deprecated / archived、redirect等の取得制約をcurrent sourceと混同せず状態化している
 - included referenceからsource item ref、source ID、canonical URLへ追跡できる
 - reference entry内で各source item refにsource上の位置づけ / 適用条件が対応付いている
-- 内容を収録した各adopted sourceについて最低1件のreference spot-checkを実施し、patterns / accessibility / platformsの各経路で最低1件は原文との意味一致を確認している
+- `included / merged-duplicate` の全source itemが原文との意味照合をPASSし、`unavailable / source-reference-only` の全itemでdisposition / canonical URL / access stateが確認されている
 - 各UI / UX評価項目に1件以上の `適用したreference` があり、各行でreference entry ref / source item ref / 今回のreferenceの位置づけが対応し、project固有のbinding根拠を使う場合はその行からproject Authority refを追跡できる
 - 判定不能 / 対象外のUI / UX評価項目にstatus reason / 制約・未確認が残る
 - usability-evaluation成果物で上位観点ごとの今回の扱いが固定され、「今回評価する」とした観点がすべて評価結果へ閉じている
@@ -509,14 +508,20 @@ PR #12の実行基盤を利用できる場合、
 - skills-ref validate PASS
 - qa-workflow routing tests PASS
 - README / EVALS / repository Skill一覧整合
-- 代表semantic caseを実Judgeで確認
-- 利用可能な場合、実Agent triggerとbrowser evidence連携を確認
-- TC PASS / FAILとUI / UX評価項目を分離し、後続対応が必要な評価項目だけFindingへ昇格することを確認
+- Planで定義した全semantic caseを実Judgeで確認
+- canonical real Agent trigger、browser evidence連携、live Web inspection E2Eを確認。実行環境が利用できない場合はblockedとして実装未完了
+- TC PASS / FAILとUI / UX評価項目を分離し、追加QA活動が必要な評価項目だけFindingへ昇格することを確認
 - test-analysis統合でProduct Riskの識別・評価・採点owner境界を確認
 - test-condition-design統合で一般UI guidanceを製品期待結果へ昇格せず、検証観点候補の採否owner境界を確認
 - user researchを捏造しないことを確認
 - 同一browser/sessionへの並行操作を要求しない
 - git diff --check PASS
+
+### 完全性に関する追加ゲート
+
+- `_02b_reference-validation-and-completeness.md` のsource discovery固定点、merge/split、全item semantic validationをPASS
+- source discoveryで未知のWeb sourceが存在しないとは主張しないが、定義済みcategory・query・cross-link・candidate集合に未処理を残さない
+- samplingだけのreference意味検証を完了条件に使わない
 
 ## 20. 対象外
 

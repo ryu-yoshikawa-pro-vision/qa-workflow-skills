@@ -19,7 +19,7 @@
 
 本Skillの目的は、詳細TCやpersonaを前提にせず、対象UIを実際に操作・観測して、ユーザビリティ上の問題がないかを検査することです。
 
-最低限、対象scopeに応じて次を確認します。
+対象scopeに応じて次を確認します。
 
 - controlを実際に操作できるか
 - 操作可能なものを発見・識別できるか
@@ -57,15 +57,15 @@ AIエージェントが実際にUIを操作した結果は、AI Agentによるin
 
 これは人間の初見ユーザーを再現するという意味ではありません。
 
-## 4. 初版のlive実行対象
+## 4. live実行対象
 
-初版の能動操作対象は、既存Playwright / browser経路で到達できるWeb UIに限定します。
+能動操作対象は、既存Playwright / browser経路で到達できるWeb UIに固定します。これは段階的な暫定scopeではなく、本Skillのlive inspection境界です。
 
 - desktop Web
 - responsive Web
 - mobile Web viewport
 
-native iOS / Android app、desktop native app等の能動操作は、対応runtimeがrepositoryへ実際に導入されるまで対象外です。
+native iOS / Android app、desktop native app等の能動操作は本Skillの対象外です。nativeのscreenshot、仕様、design artifact等は `usability-evaluation` の静的evidenceとして評価できますが、native live automationを未実装項目として残しません。
 
 `usability-evaluation` 自体はplatform非依存のreference-based評価を維持します。
 
@@ -73,7 +73,7 @@ native iOS / Android app、desktop native app等の能動操作は、対応runti
 
 ### 必須
 
-最低限、次を確定します。
+次を確定します。
 
 - target / entry point
 - 今回検査する画面・機能・領域
@@ -104,7 +104,7 @@ Skill自身がpersona、業務経験年数、初見 / 熟練等を自動生成�
 
 実操作前に今回確認するscopeを固定します。
 
-scopeは次から必要なものを選びます。
+general inspectionでは、次の上位観点をすべてscope rowへ作成し、各観点を `今回確認する / 対象外` のどちらかへapplicability判定します。実装者が任意に観点を省略しません。
 
 - interaction / operability
 - feedback / system status
@@ -113,9 +113,9 @@ scopeは次から必要なものを選びます。
 - visual integrity / responsive
 - measurable standard criteria
 - user-facing performance / responsiveness
-- task / flow（明示された場合）
+- task / flow（明示された場合のみrowを追加）
 
-各観点を無条件に全件実施するのではなく、対象UIに適用可能かを確認します。
+特定観点だけを明示した依頼ではそのrequested scopeを尊重します。general inspectionで対象外にする場合は、UIに該当populationがない、実行条件上観測不能、または本Skillの責務外である理由を残します。詳細なWeb実行条件と全件coverageは `_05c_usability-inspection-coverage.md` を正本とします。
 
 「今回確認する」とした観点は、最後に少なくとも次のいずれかへ閉じます。
 
@@ -215,7 +215,7 @@ visual / pointer inspectionでoff-viewport controlへ進む必要がある場合
 
 Playwrightのimplicit auto-scrollによって、発見できていないcontrolへ直接到達した結果を「問題なく操作できた」と扱いません。
 
-実装時に確認したPlaywright versionがaction時のscrollを無効化する正式オプションを提供する場合は、visual / pointer reachabilityの代表caseでそのnative機能を優先します。利用versionに存在しない場合はaction前のviewport確認とuser-facingなexplicit scrollで代替し、独自browser wrapperは作りません。target発見後にautomation補助としてtargeted scrollを使う場合はdiscoverability evidenceには数えません。
+実装時に確認したPlaywright versionがaction時のscrollを無効化する正式オプションを提供する場合は、visual / pointer reachabilityを確認するapplicable caseでそのnative機能を優先します。利用versionに存在しない場合はaction前のviewport確認とuser-facingなexplicit scrollで代替し、独自browser wrapperは作りません。target発見後にautomation補助としてtargeted scrollを使う場合はdiscoverability evidenceには数えません。
 
 ### actionability auto-wait
 
@@ -328,7 +328,7 @@ inspection開始時に扱うとした各観点を、次のいずれかへ1行ず
 - 判定不能
 - 対象外
 
-各closure rowから、必要に応じてObservation、measurement、criterion check、usability-evaluation、Findingへ追跡できるようにします。
+各closure rowは、そのrowの判定に実際に使用したObservation、measurement、requirement check、usability-evaluation、Findingのrefをすべて保持します。存在しない成果物種別のrefは作りません。
 
 `問題なし` は、当該観点で今回必要と定義した検査を完了した場合だけ使用します。Findingが0件という理由だけでは使用しません。
 
@@ -345,15 +345,17 @@ PR #12のevidence安全契約を再利用します。
 
 ## 11. Cognitive Walkthrough
 
-Cognitive Walkthroughは必須工程にしません。
+Cognitive Walkthroughはgeneral inspectionへ無条件に適用しません。
 
-次のような依頼・状況で有用な場合にだけ、`usability-inspection` / `usability-evaluation` が利用できる参考技法とします。
+次の入力条件に該当する場合は、`usability-inspection` / `usability-evaluation` が実行するinspection techniqueとして使用します。
 
 - learnabilityを重点的に確認する
 - 新しい機能の操作理解を確認する
 - user flowのstepごとにdiscoverability / feedbackを詳しく診断する
 
 current specification、user flow、validated TC等からintended flowを確認できる場合だけ利用し、正しいstep sequenceを創作しません。
+
+実行時はintended action sequenceをstepへ分解し、各stepで「正しい効果を達成しようとするか」「正しいactionを認識できるか」「actionと効果を結び付けられるか」「実行後に進行を認識できるfeedbackがあるか」をevidence付きで確認します。各質問を `問題を確認 / 問題なし / 判定不能 / 対象外` へ閉じます。
 
 独立Skill、独立runtime、独立Finding lifecycleは追加しません。
 
@@ -404,7 +406,7 @@ project thresholdがない場合、独自の仕様FAIL thresholdを作りませ�
 
 ## 13. task / flowを実行した場合の結果
 
-task / flowが指定された場合だけ、必要に応じて次を保持できます。
+task / flowが指定された場合はtask result rowを必ず1件以上作り、各resultを次のいずれかへ閉じます。
 
 - 達成
 - 未達成
@@ -456,12 +458,12 @@ Finding候補になり得るもの:
 
 ## 16. 完了条件
 
-1つのusability-inspection Activityは、最低限次を満たせば完了できます。
+1つのusability-inspection Activityは、次をすべて満たした場合だけ完了できます。
 
 - inspection scopeが固定されている
 - 「今回確認する」とした観点が問題を確認 / 問題なし / 判定不能 / 対象外へ閉じている
 - 観測事実とevidenceが追跡できる
-- standard / binding criterionを判定した場合はcriterion ref、evaluation scope、applicability、population closure、観測値 / 事実、test rule result refs、result、evidenceへ追跡できる
+- standard / binding requirementを判定した場合はrequirement ref、evaluation scope、applicability、population closure、観測値 / 事実、test rule result refs、result、evidenceへ追跡できる
 - requirement `satisfied` は宣言scopeのapplicable population / required checksを閉じた場合だけ使用している
 - measurementを報告する場合は測定区間・方法・実測値へ追跡できる
 - Playwrightのauto-scroll / actionability waitでinspection対象のfrictionを隠していない

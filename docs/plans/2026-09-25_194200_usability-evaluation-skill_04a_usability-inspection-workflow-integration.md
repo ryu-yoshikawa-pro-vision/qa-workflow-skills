@@ -119,7 +119,7 @@ TCのstep sequenceやlocatorを、usability-inspectionのUI発見shortcutとし�
 
 1. usability-inspectionが必要なlive observationをmachine-readableな形で取得
 2. ref採番、scope closure、数値計算、threshold比較、対応済みtest ruleをdeterministic runtimeで処理
-3. runtimeでは決められないapplicability / exceptionを必要に応じて意味判断し、strict requirement resultを確定
+3. runtimeだけでapplicability / exceptionを確定できないrowはすべてsemantic evaluationへ渡し、必要evidenceが揃えばstrict requirement resultを確定、揃わなければ `undetermined` へ閉じる
 4. immutable evidenceをusability-evaluationへ渡す
 5. usability-evaluationがread-onlyで専門評価
 6. 追加観測が必要ならrequestを返す
@@ -133,7 +133,7 @@ TCのstep sequenceやlocatorを、usability-inspectionのUI発見shortcutとし�
 
 Cognitive Walkthroughはworkflowの固定工程にしません。
 
-learnability、新機能の操作理解、stepごとのdiscoverability / feedback等を重点確認する依頼で有用な場合に、既存2 Skill内の参考技法として利用できます。
+learnability、新機能の初見理解、またはspecified flowのstepごとのdiscoverability / feedback診断が明示された場合に実行します。手順・4つの確認質問・成果物契約は `_05c_usability-inspection-coverage.md` §11を正本とします。
 
 current specification、user flow、validated TC等からintended flowを確認できない場合は正しいstep sequenceを創作しません。
 
@@ -145,7 +145,7 @@ current specification、user flow、validated TC等からintended flowを確認�
 
 Charterに基づいて対象領域を自由に探索し、未知のProduct Riskや問題を広く探す場合は `exploratory-testing` です。
 
-usability-inspection中にscope外の未知領域へ探索を広げる必要が出た場合は、現在のinspection結果を閉じ、必要に応じてexploratory-testingへroutingします。
+usability-inspection中にscope外の未知領域へ探索を広げる必要が出た場合は、現在のinspection結果を理由付きで閉じます。ユーザー要求またはqa-workflow scopeが未知領域の自由探索まで含む場合だけ `exploratory-testing` へroutingし、含まない場合はscope外として終了します。
 
 ## 8. test-analysis / test-condition-design
 
@@ -173,7 +173,7 @@ UI / UX上のfailure mode、standard criterion、interaction / accessibility / r
 
 再実行は新しいActivity / versionとして記録し、以前の観測値を上書きしません。
 
-初版では新しいglobalなusability-inspection task ID体系を追加しません。
+新しいglobalなusability-inspection task ID体系は追加しません。
 
 ## 10. qa-knowledge
 
@@ -190,7 +190,7 @@ project固有で繰り返し有効な知見は、PR #13のqa-knowledgeへrouting
 
 ## 11. qa-workflow
 
-qa-workflowは最低限次をroutingします。
+qa-workflowは次をすべてrouting contractとして持ちます。
 
 - design artifact / 取得済みevidenceのreference-based UI / UX review → usability-evaluation
 - live Web UIのユーザビリティ検査 → usability-inspection
@@ -198,9 +198,9 @@ qa-workflowは最低限次をroutingします。
 - prescribed detailed TC execution → test-execution
 - Charter-based open exploration → exploratory-testing
 
-初版のlive executionはPlaywrightで到達可能なWeb UIだけを対象にします。
+live executionはPlaywrightで到達可能なWeb UIだけを対象にします。native appの能動操作は本Skillの対象外です。
 
-native appの能動操作要求はusability-inspectionへ無理にroutingせず、静的資料やscreenshot等で評価可能ならusability-evaluationを利用します。
+native appの依頼では、静的資料やscreenshot等で評価可能な範囲だけ `usability-evaluation` を利用し、native live inspectionを未完了taskとして残しません。
 
 ## 12. browser ownership
 
@@ -275,4 +275,4 @@ project thresholdや有効な標準metricがある場合は、その定義に従
 
 条件を満たさない単一runの値をfield metricや製品全体のperformance判定へ昇格しません。
 
-初版では新しいperformance testing Skillを追加しません。
+新しいperformance testing Skillは追加しません。user-facing responsivenessの測定は `usability-inspection` の責務として `_05c_usability-inspection-coverage.md` のmeasurement matrixを実装します。

@@ -27,7 +27,7 @@
 
 PR #11 merge後のcurrent runtime contractを再利用します。
 
-実装開始時に最低限次を確認します。
+実装開始時に次のcurrent contractをすべて確認します。
 
 - `skills/*/scripts/runtime_contract.py` のcurrent契約
 - common envelope
@@ -76,7 +76,7 @@ browserから取得できるDOM属性、accessibility属性、bounding box、vie
 
 ## 4. 追加するscript
 
-予定構成:
+実装構成:
 
 ~~~text
 skills/usability-inspection/
@@ -86,7 +86,8 @@ skills/usability-inspection/
 │   ├── measurement.py
 │   └── criterion_checks.py
 ├── assets/
-│   └── output-template.md
+│   ├── output-template.md
+│   └── deterministic-check-catalog.json
 └── ...
 ~~~
 
@@ -106,7 +107,7 @@ Skill固有のcriterion logicやmeasurement logicは入れません。
 - inspection scope rows
 - observation drafts
 - measurement result refs
-- criterion check drafts
+- requirement check drafts
 - optional task / flow result
 - usability-evaluation refs
 - Finding refs
@@ -133,13 +134,13 @@ artifact-local refは同じ正規化済み入力から同じ順序で生成し�
 
 #### Output
 
-最低限:
+Outputは次を必須で持ちます。
 
 - normalized inspection header
 - inspection scope closure rows
 - observations
 - measurements refs
-- criterion check rows
+- requirement check rows
 - optional task / flow result
 - evaluation refs
 - Finding refs
@@ -150,7 +151,7 @@ artifact-local refは同じ正規化済み入力から同じ順序で生成し�
 
 #### Input
 
-1 measurementごとに最低限:
+1 measurementごとに次を必須入力とします。
 
 - measurement_key
 - measurement label
@@ -181,7 +182,7 @@ LLMに引き算・大小比較をさせません。
 
 #### Output
 
-最低限:
+Outputは次を必須で持ちます。
 
 - measurement ref用draft key
 - normalized label
@@ -201,7 +202,7 @@ genericな自然言語rule engineや式DSLは作りません。
 
 #### Input
 
-1 checkごとに最低限:
+1 checkごとに次を必須入力とします。
 
 - check_key
 - source rule ref
@@ -213,7 +214,7 @@ genericな自然言語rule engineや式DSLは作りません。
 
 #### Function
 
-初版で実装済みとして `criterion_checks.py` に明示登録した、machine evidenceだけで完全に判定できるcheckだけを自動判定します。将来のrule追加だけを理由に別manifest、rule DSL、plugin registryを先行追加しません。
+machine evidenceだけで完全に判定できるcheckは `criterion_checks.py` の明示dispatchで自動判定します。今回扱う全checkのmetadataは `assets/deterministic-check-catalog.json` に固定します。catalogは実行可能コードや式を持たず、generic rule DSL / plugin registryにはしません。
 
 次の場合は自動PASS / FAILへ進みません。
 
@@ -228,7 +229,7 @@ genericな自然言語rule engineや式DSLは作りません。
 
 #### Output
 
-check単位で最低限:
+check単位で次を必須出力とします。
 
 - check_key
 - source rule ref
@@ -242,29 +243,32 @@ check単位で最低限:
 
 W3C ACT Ruleを完全に実装した場合は、そのruleで定義されたoutcomeを保持します。
 
-ACT Rules Format 1.1に従うACT Rule implementationでは、outcomeとして `inapplicable / passed / failed / cantTell / untested` を保持します。proposed rule等はruleが従うACT Rules Format versionとsource statusを一緒に保持し、formal ruleと混同しません。
+current WAI公開ACT RulesはACT Rules Format 1.1互換として扱い、outcomeは `inapplicable / passed / failed / cantTell / untested` を使用します。proposed ruleはsource statusを保持し、formal ruleと混同しません。
 
 ACT Rule resultを、そのままWCAG Success Criterion全体のrequirement resultへ読み替えません。
 
 ## 5. supported deterministic checkの管理
 
-runtime scriptが任意のreference本文を解釈しないよう、実装済みcheckだけを `criterion_checks.py` の明示的なdispatchと定数で管理します。
+runtime scriptが任意のreference本文を解釈しないよう、check metadataを `assets/deterministic-check-catalog.json`、実行処理を `criterion_checks.py` の明示dispatchへ分離します。
 
-各実装済みcheckは最低限次をcode上で固定します。
+catalogの各checkは次を固定します。
 
 - check key
 - source type / source rule ref
 - mapped requirement refs
 - source status / ACT Rules Format version
+- implementation execution mode
 - required observation fields
 - output scope
 - checked_atまたはsource version
 
-partial / manual checkは自動resultを生成せずstructured issueへ戻します。
+manual / semiAuto checkは `criterion_checks.py` で自動resultを生成せず、必要evidence・未評価部分・semantic procedure refをhandoffとして返し、定義済みsemantic/manual経路で閉じます。
 
-同じmetadataが複数checkで実際に重複し、別file化で単純化できることが実装時に確認された場合だけdata fileへの分離を検討します。初版から別catalog file、generic rule DSL、plugin systemを必須構成にはしません。
+catalogには `check_key / source type / source rule ref / mapped requirement refs / source status / ACT Rules Format version / execution mode / required observation fields / output scope / checked_atまたはsource version` を保持します。execution modeは当Skillでの実装方式として `automatic / manual / semiAuto` を使用し、独自の式言語は持ちません。
 
-W3C ACT Rulesでは、正式公開ruleとproposed / community ruleのstatusを混同しません。
+`criterion_checks.py` は `automatic` として実装したcheckだけをdispatchします。`manual / semiAuto` はbrowser observationとAgentのsemantic evaluationを組み合わせ、source ruleのapplicability / expectationを省略しません。
+
+W3C ACT Rulesでは、formal ruleとproposed ruleのstatusを混同しません。
 
 ACT RulesはWCAG / ARIA conformanceそのもののnormative basisではなく、testing methodのinformative ruleとして保持します。
 
@@ -278,7 +282,7 @@ rule単位の結果と、WCAG Success Criterion等のrequirement全体の結果�
 
 ### requirement result
 
-最終成果物の `standard / binding criterion check` です。
+最終成果物の `standard / binding requirement check` です。
 
 `not-satisfied` は、applicableなrequirement違反を証拠で確認できた場合に記録できます。
 
@@ -292,9 +296,9 @@ ruleがrequirementの一部分だけを評価する場合、rule outcomeが `pas
 
 ## 7. W3C ACT Rulesの利用
 
-W3Cが正式公開しているACT Rulesをdeterministic候補sourceとしてinventoryへ含めます。
+取得時点でW3Cが公開しているformal ACT Rulesとproposed ACT Rulesを全件inventoryへ含めます。formal / proposedを別statusで保持し、proposedをWCAG / ARIAのbinding根拠へ昇格しません。
 
-各ruleについて最低限確認します。
+各ruleについて次をすべて確認します。
 
 - formal / proposed等のstatus
 - applicability
@@ -302,10 +306,14 @@ W3Cが正式公開しているACT Rulesをdeterministic候補sourceとしてinve
 - assumptions
 - accessibility requirements mapping
 - outcome mapping
+- ACT Rules Format version
+- current WAI公開ruleとして1.1互換であること
 - machine evidenceだけでfully executableか
+- semantic判断が必要なexpectationがあるか
 - current browser observation contractで必要入力を取得できるか
+- Web-only scopeでrule全体を実行できるか
 
-machine evidenceだけでrule全体を実装できるruleだけruntime実装候補にします。
+全ruleを `automatic / manual / semiAuto` の実行経路へ割り当てます。Web-only scopeや必要evidence不足で実行できないruleは、その理由と必要能力をcoverageへ残し、評価を実施しなかったruleはACT Rules Format 1.1の `untested`、applicabilityまたはexpectationを完全に判断できないruleは `cantTell` として閉じます。mapped requirement全体は他のrequired checks / evidenceも含めて独立判定します。
 
 rule本文を独自解釈して別の判定方法へ変更しません。
 
@@ -341,7 +349,7 @@ secret、個人データ、機密情報を含む可能性があるraw snapshot /
 
 current Playwright versionをStep 0で確認します。
 
-現在利用可能なPlaywright APIに、action時のimplicit scrollを無効化する正式オプションがある場合は、それをvisual / pointer reachabilityの代表caseで優先します。
+現在利用可能なPlaywright APIに、action時のimplicit scrollを無効化する正式オプションがある場合は、それをvisual / pointer reachabilityを確認するapplicable caseで優先します。
 
 利用versionにそのAPIがない場合は、
 
@@ -383,9 +391,9 @@ runtime generatorとdeterministic eval validatorを同じ実装へしません�
 
 同じhelperをgeneratorとvalidatorで共有して、同じ不具合で両方がPASSする構造を避けます。
 
-## 12. 最低限のfixture
+## 12. runtime fixture
 
-最低限次をruntime fixtureとして持ちます。
+次を必須runtime fixtureとして持ちます。
 
 - valid inspection structure
 - duplicate draft key
@@ -412,7 +420,7 @@ runtime generatorとdeterministic eval validatorを同じ実装へしません�
 - 別runtime frameworkを作っていない
 - 同じnormalized inputから同じmachine resultになる
 - 数値計算 / threshold比較をLLMが再計算しない
-- deterministic checkのdispatchが実装済みcheckだけへ固定され、別manifest / generic rule frameworkを先行追加していない
+- deterministic checkのdispatchが `assets/deterministic-check-catalog.json` の登録済みcheckだけへ固定され、catalogを式DSL / plugin frameworkとして実装していない
 - partial / manual checkを自動 `passed / failed` へ昇格しない
 - ACT Rule resultとrequirement resultを分離する
 - requirement `satisfied` にはscope / population closureが必要

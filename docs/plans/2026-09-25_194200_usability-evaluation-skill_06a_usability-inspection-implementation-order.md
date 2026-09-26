@@ -35,13 +35,13 @@
 
 `_05a_usability-inspection-package-and-evaluation.md` のsourceをcurrentな公式資料で確認します。
 
-最低限:
+次をすべて確認します。
 
 - WCAG 2.2 / Understanding
-- WAI-ARIA / ARIA in HTMLの必要箇所
-- ACT Rules Format / formal ACT Rules
+- WAI-ARIA 1.2 / current ARIA in HTMLのcoverage matrix対象requirement
+- ACT Rules Format 1.1 / current WAI公開formal・proposed ACT Rules
 - ISO 9241-110 interaction principles
-- Cognitive Walkthroughの代表的methodology
+- Cognitive Walkthroughの原著または手順・出典を追跡できる公開methodology
 - web.dev Core Web Vitals / user-centric performance guidance
 - Playwright locator / actionability / scrolling / keyboard / screenshot等の公式仕様
 
@@ -66,7 +66,7 @@ current URL / publication state /利用条件を確認します。
 
 - inspection scope / closure rows
 - objective observation
-- standard / binding criterion check
+- standard / binding requirement check
 - measurement
 - Playwright action trace
 - optional task / flow result
@@ -87,7 +87,7 @@ skills/usability-inspection/scripts/
 └── criterion_checks.py
 ~~~
 
-別manifest / generic rule catalogは先行追加しません。実装済みのfully machine-decidable checkだけを `criterion_checks.py` の明示dispatchへ置きます。
+`assets/deterministic-check-catalog.json` も同時に実装し、今回扱うACT Rule / ACT外checkのmetadataを全件登録します。catalogはrule DSLではなく、`criterion_checks.py` の明示dispatchとsemantic/manual経路の入力契約です。
 
 このStepではbrowserを操作しません。fixtureだけで次を確認します。
 
@@ -111,7 +111,7 @@ skills/usability-inspection/scripts/
 
 fixtureで次を成立させます。
 
-- criterion ref
+- requirement ref
 - applicability
 - exception
 - observed fact / value
@@ -132,7 +132,7 @@ task / flow未指定caseでも成果物が成立することを確認します�
 
 PR #12 merge後のbrowser実行基盤を再利用します。
 
-初版のlive実行対象は既存Playwright経路で到達可能なWeb UIに限定します。
+今回のlive実行対象は既存Playwright経路で到達可能なWeb UIに限定します。
 
 新しいbrowser frameworkを作りません。
 
@@ -159,7 +159,7 @@ PR #12 merge後のbrowser実行基盤を再利用します。
 
 ### auto-scroll
 
-代表case:
+必須case:
 
 - controlはDOM上に存在する
 - current viewportからは見えない
@@ -183,7 +183,7 @@ PR #12 merge後のbrowser実行基盤を再利用します。
 
 ### actionability / auto-wait
 
-代表case:
+必須case:
 
 - controlが操作可能になるまで待機時間あり
 - input dispatch後のvisible feedbackは短い
@@ -200,7 +200,7 @@ PR #12 merge後のbrowser実行基盤を再利用します。
 
 ## 9. Step 7: page inspection vertical slice
 
-taskを与えない代表caseで、1画面 / 1機能を端から端まで検査します。
+taskを与えないcanonical caseで、1画面 / 1機能を端から端まで検査します。
 
 確認:
 
@@ -211,7 +211,7 @@ taskを与えない代表caseで、1画面 / 1機能を端から端まで検査�
 - keyboard / focus
 - screenshot
 - responsive observation
-- criterion check
+- requirement check
 - measurement
 - usability-evaluation連携
 - cleanup
@@ -223,16 +223,9 @@ taskを与えない代表caseで、1画面 / 1機能を端から端まで検査�
 
 ## 10. Step 8: accessibility / standard checks
 
-適用可能な代表criterionを実際に判定します。
+`_05c_usability-inspection-coverage.md` のWCAG 2.2 / WAI-ARIA / ARIA in HTML coverage matrixを全件実装します。
 
-最低限、代表caseとして次を含めます。
-
-- target size / spacing
-- focus visible
-- keyboard operation
-- error identification
-- reflow / responsive
-- accessible name / role / state
+target size / spacing、focus visible、keyboard operation、error identification、reflow / responsive、accessible name / role / state等を一部の代表項目として止めず、各Success Criterion / requirementをapplicability、必要evidence、判定owner、resultへ閉じます。
 
 確認:
 
@@ -247,7 +240,7 @@ criterionの具体値や例外はcurrent referenceを正本にし、Plan記載�
 
 ## 11. Step 9: visual / responsive
 
-代表caseで、
+visual / responsive coverageとして、少なくとも次を対象UIの全applicable state / viewport boundaryで確認します。
 
 - clipping
 - overflow
@@ -258,15 +251,13 @@ criterionの具体値や例外はcurrent referenceを正本にし、Plan記載�
 - focus indicator
 - visual instability
 
-を確認します。
-
 DOMだけで確定せず、画像が必要な項目はscreenshotを正式なevidenceとして使います。
 
 ## 12. Step 10: performance / responsiveness
 
 ### project thresholdあり
 
-current Authorityにthresholdがある代表caseで、
+current Authorityにthresholdがある全measurementで、
 
 - measurement
 - threshold
@@ -291,7 +282,7 @@ metric定義・測定条件を満たす場合だけmetric名を使います。
 
 ## 13. Step 11: optional task / flow
 
-task / flowが明示された代表caseだけ実施します。
+task / flowが明示されたsemantic / E2E caseで実施します。task未指定のgeneral inspectionへflowを創作しません。
 
 確認:
 
@@ -303,7 +294,7 @@ task / flowが明示された代表caseだけ実施します。
 
 ## 14. Step 12: Cognitive Walkthrough optional case
 
-learnabilityを重点確認する代表caseでだけCognitive Walkthroughを利用します。
+learnabilityを重点確認する入力条件に該当する全caseでCognitive Walkthroughを利用します。
 
 確認:
 
@@ -352,12 +343,12 @@ repository標準件数に合わせます。
 
 ### deterministic
 
-最低限:
+次をすべて検証します。
 
 - output schema
 - inspection scope closure
 - runtime script fixture / dispatch
-- observation / test rule / criterion / measurement refs
+- observation / test rule / requirement / measurement refs
 - requirement result / applicability / evidence
 - project Authority ref
 - requirement `satisfied` のpopulation closure
@@ -370,11 +361,11 @@ repository標準件数に合わせます。
 
 ### semantic
 
-`_05a_usability-inspection-package-and-evaluation.md` §7のcaseを最低限含めます。
+`_05a_usability-inspection-package-and-evaluation.md` §7のCase A〜Xをすべて含めます。
 
 ### real Agent
 
-利用可能な環境で、実Agentがtaskなしのpage inspectionを完了できることを確認します。
+実Agentがtaskなしのpage inspectionと、taskありのflow inspectionをcanonical live Web targetで完了できることを確認します。環境が利用できない場合はblockedであり、実装完了にはしません。
 
 あわせて、
 
@@ -412,7 +403,7 @@ repository標準件数に合わせます。
 - ref採番、scope closure、数値計算、threshold比較をdeterministic runtimeへ移している
 - runtime generatorとdeterministic validatorを別実装にしている
 - objective observationとexpert evaluationを分離する
-- applicable standard / binding criterionをcriterion単位で判定できる
+- applicable standard / binding requirementをcriterion単位で判定できる
 - test rule resultとrequirement resultを分離できる
 - requirement `satisfied` に必要なpopulation / required checks closureを検証できる
 - criterionのapplicability / exception / evidenceを保持する
@@ -424,10 +415,10 @@ repository標準件数に合わせます。
 - Playwright actionability waitとpost-input responsivenessを分離する
 - hidden implementation情報でUI発見を先回りしない
 - visual observationをscreenshot等へ追跡できる
-- keyboard / focus representative caseを確認する
+- keyboard / focusの全applicable populationをcoverage matrixに従って確認する
 - task / flowは指定された場合だけ扱う
 - detailed TC実行をtest-executionと分離する
-- Cognitive Walkthroughをoptional techniqueとして扱う
+- Cognitive Walkthroughを定義済み入力条件で実行し、通常inspectionへ無条件適用しない
 - browser ownerがusability-inspectionである
 - usability-evaluationとのread-only連携が成立する
 - same session concurrent manipulationを要求しない
@@ -450,6 +441,18 @@ repository標準件数に合わせます。
 3. 両Skillのqa-workflow routingと相互連携が成立する
 
 まで完了扱いにしません。
+
+### 全件coverage完了条件
+
+- `_05c_usability-inspection-coverage.md` のWeb execution context matrixを閉じる
+- WCAG 2.2の全Success Criteriaをcoverage matrixへ登録し、対象scopeで各行をclosure
+- applicableなWAI-ARIA 1.2 / ARIA in HTML requirement populationをclosure
+- current public formal / proposed ACT Rulesを全件inventoryし、source status・Format/version・execution mode・実装経路を記録
+- ACT外checkをdeterministic-check-catalogへ全件登録
+- measurement matrixのapplicable rowをすべて実行または理由付き `measurement-unavailable` へ閉じる
+- general inspectionの全上位観点をclosure
+- Case A〜XをすべてPASS
+- canonical live Web E2EをPASS
 
 ## 21. 対象外
 

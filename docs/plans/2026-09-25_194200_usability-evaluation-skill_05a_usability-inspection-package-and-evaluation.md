@@ -2,7 +2,7 @@
 
 ## 1. Skill package
 
-予定構成:
+実装構成:
 
 ~~~text
 skills/usability-inspection/
@@ -17,7 +17,8 @@ skills/usability-inspection/
 │   ├── measurement.py
 │   └── criterion_checks.py
 ├── assets/
-│   └── output-template.md
+│   ├── output-template.md
+│   └── deterministic-check-catalog.json
 └── evals/
     ├── trigger/
     │   ├── train_queries.json
@@ -39,14 +40,14 @@ browser automation framework、performance measurement service、RUM serviceはp
 
 SKILL.mdにはUI pattern知識を複製しません。
 
-最低限次を持ちます。
+次を必須で持ちます。
 
 1. live Web UIのユーザビリティ検査Skillであること
-2. 初版のlive execution scopeはPlaywrightで到達可能なWeb UIであること
+2. live execution scopeはPlaywrightで到達可能なWeb UIに固定し、native live automationを対象外として完結すること
 3. human usability testing / user researchではないこと
 4. inspection scopeの決め方
 5. objective observation / measurementの取得方法
-6. applicable standard / binding criterionの判定方法
+6. applicable standard / binding requirementの判定方法
 7. user-facing情報とPlaywright automationの境界
 8. visual / keyboard / accessibility / responsive inspection
 9. performance / responsiveness measurement
@@ -83,33 +84,41 @@ WCAG / WAI-ARIA / ARIA in HTML等の詳細referenceは `usability-evaluation` �
 
 ### interaction principles / UI pattern
 
-ISO 9241-110等のinteraction principles、Nielsen等のheuristic、Design System guidance、UI pattern knowledgeは、strictなcriterion resultではなく専門評価の根拠として `usability-evaluation` が利用します。
+ISO 9241-110等のinteraction principles、Nielsen等のheuristic、Design System guidance、UI pattern knowledgeは、strictなrequirement resultではなく専門評価の根拠として `usability-evaluation` が利用します。
 
 一般guidanceをproduct specificationへ自動昇格しません。
 
 ### Cognitive Walkthrough
 
-Cognitive Walkthroughは任意のinspection techniqueとしてreferenceに残します。
+Cognitive Walkthroughはlearnabilityやstepごとのdiscoverability / feedbackを重点確認する入力条件で使用します。
 
-learnabilityやstepごとのdiscoverability / feedbackを重点確認する必要がある場合だけ利用します。
+実行時はintended flowを仕様・user flow・validated TC等から確認し、各stepで次の4点をevidence付きで確認します。
 
-固定workflow、独立Skill、独立成果物種別にはしません。
+1. ユーザーがそのstepで正しい効果を達成しようとする根拠があるか
+2. 正しいactionを認識できるか
+3. actionと期待する効果を結び付けられるか
+4. action後に進行・結果を認識できるfeedbackがあるか
+
+各質問は `問題を確認 / 問題なし / 判定不能 / 対象外` へ閉じます。正しいstep sequenceを確認できない場合はWalkthrough自体を `判定不能` とし、flowを創作しません。
+
+general inspectionの固定workflow、独立Skill、独立成果物種別にはしません。
 
 ### performance
 
-最低限、currentなweb.dev等から次を確認します。
+performance / responsiveness referenceとしてcurrentな公式資料から次を確認し、実装対象を `_05c_usability-inspection-coverage.md` のmeasurement matrixへ固定します。
 
 - Core Web Vitalsのmetric定義
-- LCP / INP / CLSの判定条件
+- LCP / INP / CLSの測定条件
 - lab / fieldの違い
-- user-centric performance measurement
-- browser Performance API等で取得できるmeasurement
+- FCP等のdiagnostic metric
+- Navigation Timing / Performance API
+- user-facing interaction timing
 
 単一Playwright runでfield dataのpercentileを満たしたと扱いません。
 
 ### Playwright
 
-公式Playwright documentationから最低限次を確認します。
+公式Playwright documentationから次を確認します。
 
 - locator
 - actionability / auto-wait
@@ -133,7 +142,13 @@ learnabilityやstepごとのdiscoverability / feedbackを重点確認する必�
 - Design Systemやpattern catalogを重複保持しない
 - source freshness / license確認を二重化しない
 
-usability-inspection固有sourceを追加するのは、実行・測定契約を変える公式または代表的なmethodologyに限定します。
+usability-inspection固有sourceは、実行・測定契約を定義する公式資料を優先し、公式資料が存在しないinspection methodologyだけ、原著・手順・適用条件を追跡できる公開資料を採用します。採用条件は `_02b_reference-validation-and-completeness.md` と同じpublic-only境界を使います。
+
+## 4.1 全件coverageの正本
+
+Web execution context、WCAG 2.2全Success Criteria、WAI-ARIA / ARIA in HTML、formal / proposed ACT Rules、ACT外check、measurement、Cognitive Walkthrough、canonical E2Eの完全性は `_05c_usability-inspection-coverage.md` を正本とします。
+
+本ファイルのsemantic caseや例示だけを実装範囲の上限にしません。
 
 ## 5. output-template
 
@@ -163,7 +178,7 @@ usability-inspection固有sourceを追加するのは、実行・測定契約を
 - reason / limitation
 - observation refs
 - measurement refs
-- criterion check refs
+- requirement check refs
 - usability-evaluation refs
 - Finding refs
 
@@ -192,16 +207,16 @@ task / flowは指定された場合だけ保持します。
 - evidence refs
 - limitation
 - related measurement refs
-- related criterion check refs
+- related requirement check refs
 
 観測事実に「使いにくい」「分かりづらい」等の専門評価を書きません。
 
-### standard / binding criterion checks
+### standard / binding requirement checks
 
 明確なrequirementを判定できる場合だけ保持します。
 
-- criterion check ref
-- criterion ref / source item ref
+- requirement check ref
+- requirement ref / source item ref
 - criterion type: standard / project requirement / adopted Design System / performance threshold
 - evaluation scope: element / region / page / flow / inspected-sample
 - applicability
@@ -298,7 +313,7 @@ usability判断に意味があるactionだけを記録します。
 
 visual / pointer inspectionでoff-viewport controlへ到達するためのimplicit auto-scrollを、userがcontrolを発見できた証拠にしません。
 
-current Playwright versionがaction時のimplicit scrollを無効化する正式オプションを提供する場合は、visual / pointer reachabilityの代表caseでそのnative機能を優先します。利用versionに存在しない場合だけ、action前のviewport確認 + user-facingなexplicit scrollで代替します。targeted scrollはtarget発見後のautomation補助には使えますがdiscoverability evidenceへ数えません。独自browser wrapperは追加しません。
+current Playwright versionがaction時のimplicit scrollを無効化する正式オプションを提供する場合は、visual / pointer reachabilityを確認するapplicable caseでそのnative機能を優先します。利用versionに存在しない場合だけ、action前のviewport確認 + user-facingなexplicit scrollで代替します。targeted scrollはtarget発見後のautomation補助には使えますがdiscoverability evidenceへ数えません。独自browser wrapperは追加しません。
 
 ### usability-evaluation
 
@@ -309,7 +324,7 @@ current Playwright versionがaction時のimplicit scrollを無効化する正式
 
 専門評価本文をinspection成果物へ複製しません。
 
-最終報告ではobjective observation / criterion result / measurementとexpert evaluationを別sectionで表示できます。
+最終報告ではobjective observation / requirement result / measurementとexpert evaluationを別sectionで表示できます。
 
 ### Finding
 
@@ -328,7 +343,7 @@ PR #12のevidence安全契約を再利用します。
 
 機械的に確認できるものだけを扱います。
 
-最低限:
+deterministic validatorは次をすべて確認します。
 
 - required inspection fields
 - inspection scope closure rowのaspect一意性
@@ -336,13 +351,13 @@ PR #12のevidence安全契約を再利用します。
 - 問題なしに必要なinspection closure参照
 - observation ref一意性
 - measurement ref一意性
-- criterion check ref一意性
+- requirement check ref一意性
 - evidence ref解決
 - 数値Observationのunit
 - test rule result ref一意性
 - test rule resultのsource status / result許可値
 - requirement result許可値
-- criterion checkにcriterion ref / evaluation scope / applicability / observed factまたはvalue / evidenceがある
+- requirement checkにrequirement ref / evaluation scope / applicability / observed factまたはvalue / evidenceがある
 - requirement `satisfied` にはpopulation closure=completeまたはapplicable populationなしを閉じた根拠がある
 - ACT Ruleの `passed` だけでrequirementを `satisfied` へ昇格していない
 - standard / binding requirement以外を `not-satisfied` として扱っていない
@@ -367,7 +382,7 @@ semanticな適用性やUI / UX上の意味判断をdeterministic validatorで代
 
 ## 7. semantic eval
 
-最低限次を評価します。
+次のCase A〜Xをすべて評価します。
 
 ### Case A: page inspection without task
 
@@ -447,7 +462,7 @@ test id / hidden DOM / source code / backend stateから、UI上で発見でき�
 
 ### Case N: usability-evaluation integration
 
-objective observation / criterion result / measurementをusability-evaluationへ渡し、専門評価と客観観測を混ぜないこと。
+objective observation / requirement result / measurementをusability-evaluationへ渡し、専門評価と客観観測を混ぜないこと。
 
 ### Case O: advisory guidance
 
@@ -471,7 +486,7 @@ Agent / tool limitationで操作を完了できない。
 
 AIが問題なく操作できても「人間にも使いやすい」「初見ユーザーでも必ず使える」と断定しないこと。
 
-### Case S: Cognitive Walkthrough optional
+### Case S: Cognitive Walkthrough
 
 learnabilityを重点確認する依頼ではCognitive Walkthroughを利用できる。
 
@@ -479,7 +494,7 @@ learnabilityを重点確認する依頼ではCognitive Walkthroughを利用で�
 
 ### Case T: native app
 
-native iOS / Android appの実機操作を要求された場合、初版Web scopeで対応可能と偽らないこと。
+native iOS / Android appの実機操作を要求された場合、Web-only live scopeで対応可能と偽らず、静的evidenceで評価可能な範囲だけusability-evaluationへroutingすること。
 
 ### Case U: requirement result scope
 

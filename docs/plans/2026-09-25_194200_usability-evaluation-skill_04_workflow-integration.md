@@ -36,7 +36,15 @@ qa-workflowが要求・scope・利用可能な証拠からroutingします。
 
 「実際に操作して使い勝手を確認」「表示崩れ・keyboard / focus・標準適合・操作後の遅さをlive targetで確認」「指定flowを実際に操作して確認」等、live UIの検査を要求する場合は `usability-inspection` を開始します。
 
-「usabilityを確認」のように実操作の有無が曖昧な場合は、設計 / evidence reviewなのかlive task executionなのかを要求と利用可能なtargetからroutingします。
+「usabilityを確認」「UIの使いやすさを見て」のように実操作の有無が明示されない場合は、次の順でroutingします。
+
+1. live Web entry pointが評価対象として与えられ、安全に到達できる → `usability-inspection`。取得したevidenceを `usability-evaluation` へ渡す
+2. live Web targetがなく、screenshot / Figma / specification / 保存済みevidenceがある → `usability-evaluation`
+3. live Web targetと静的evidenceの両方がある → live inspectionを行い、静的evidenceも同じevaluation contextへread-onlyで渡す
+4. ユーザーが「操作しない」「このscreenshotだけ」等の制約を明示した → その制約を優先して `usability-evaluation`
+5. 詳細TCの忠実実行が主要求 → `test-execution`。UI / UX評価も明示されている場合だけ、そのevidenceを後段の `usability-evaluation` へ渡す
+
+このroutingで解決できる依頼をAgent判断のまま残しません。
 
 「TCを実行して」「current UIを収集して」のようにUX評価を明示しない依頼では、`usability-evaluation` を最初のSkillとして直接発火させません。
 
@@ -72,7 +80,7 @@ UIを持たない対象、API / DBだけの実行、UX評価が明示的に対�
 
 `qa-workflow`を介さず `test-target-inspection` / `test-execution` 等を直接利用した場合は、UI / UX評価が同じ依頼で明示されている場合だけ、owner Skill完了後または安全なcheckpointで同じAgentが `usability-evaluation` を順次読み込めます。評価要求がなければowner Skill単独で完了します。共通Skill-to-Skill APIの存在は前提にしません。
 
-利用できない場合、UX評価が明示要求されていなければowner Skillの本来成果物は継続しUX評価未実施を必要範囲だけ明示します。UX評価が明示要求されている場合はfunctional / inspectionの判定可能範囲を継続し、UX評価scopeだけを利用不能として扱います。TCの仕様上PASS / FAILは変更しません。
+利用できない場合、UX評価が明示要求されていなければowner Skillの本来成果物だけを返し、UX評価用の成果物・Findingは作りません。UX評価が明示要求されている場合はfunctional / inspectionの判定可能範囲を継続し、UX評価成果物のlimitationへ利用不能理由と未評価scopeを記録します。TCの仕様上PASS / FAILは変更しません。
 
 #### テスト分析・設計の場合
 

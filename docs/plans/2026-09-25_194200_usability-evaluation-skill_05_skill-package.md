@@ -103,7 +103,7 @@ live targetを実際に操作する要求なら `usability-inspection`、design 
 
 必須入力は利用形態で変わります。
 
-共通で最低限必要:
+共通で必須:
 
 - evaluation purpose
 - target scope
@@ -112,7 +112,7 @@ live targetを実際に操作する要求なら `usability-inspection`、design 
 
 user / role、user goal / task / flow、特定の利用者条件は、入力・仕様・evidenceに存在する場合だけ利用します。存在しないことだけで評価を停止せず、不足値を創作しません。
 
-可能なら:
+contextに存在する場合:
 
 - project Authority
 - adopted Design System
@@ -123,7 +123,7 @@ user / role、user goal / task / flow、特定の利用者条件は、入力・�
 - before / after
 - accessibility tree / DOM
 - screenshot
-- usability-inspectionのobjective observation refs / test rule result refs / criterion check refs / measurement refs（存在する場合）
+- usability-inspectionのobjective observation refs / test rule result refs / requirement check refs / measurement refs（存在する場合）
 - existing Finding / Observation
 - related Product Risk / TR / TCN / TC refs
 
@@ -131,7 +131,7 @@ user / role、user goal / task / flow、特定の利用者条件は、入力・�
 
 ## 5. 成果物
 
-assets/output-template.mdは最低限次を持ちます。
+assets/output-template.mdは次を必須fieldとして持ちます。
 
 ### 評価条件
 
@@ -187,7 +187,7 @@ merge後の既存artifact-local ref規則がある場合はそれを使い、な
 - 観測済みのユーザー影響（証拠がある場合だけ）
 - evidence ref
 - related test rule result refs（存在する場合）
-- related criterion check refs（存在する場合）
+- related requirement check refs（存在する場合）
 - related measurement refs（存在する場合）
 - status
 - status reason / 制約・未確認
@@ -212,7 +212,7 @@ PR #13のFinding契約を再利用し、後続QA活動で扱う必要がある�
 - 形式: `SRC-\d{3,}`
 - 初回実装ではsource discovery closure後、全adopted sourceをcanonical root昇順で `SRC-001` から採番する
 - 初回実装後に新しくadoptしたsourceは既存最大番号+1を使う
-- 将来追加するsourceも既存最大番号+1を使う
+- 追加sourceは既存最大番号+1を使う
 - 並び順、名称、canonical root変更だけを理由に既存IDを振り直さない
 - 削除・duplicate化したIDを別sourceへ再利用しない
 
@@ -276,7 +276,7 @@ Webへアクセスしてsourceの最新状態を検査するruntimeにはしま�
 
 評価成果物から機械的に検証できるものだけ扱います。
 
-候補:
+検証項目:
 
 - evaluation refが成果物revision内で一意
 - evaluation refをglobal QA ID / Machine Entityとして要求しない
@@ -293,8 +293,8 @@ Webへアクセスしてsourceの最新状態を検査するruntimeにはしま�
 - 問題なし / 対象外の評価項目にfinding refがない
 - source item ref形式と参照先
 - evidence ref存在
-- related test rule / criterion check / measurement refsがある場合は参照先が実在する
-- strict criterion resultを参照する評価項目が、そのresultをadvisory評価で上書きしていない
+- related test rule / requirement check / measurement refsがある場合は参照先が実在する
+- strict requirement resultを参照する評価項目が、そのresultをadvisory評価で上書きしていない
 - 判定不能 / 対象外にstatus reason / 制約・未確認がある
 - 観測済みのユーザー影響を出す場合は対応evidenceがある
 - TC resultを書き換える欄を持たない
@@ -304,7 +304,7 @@ Webへアクセスしてsourceの最新状態を検査するruntimeにはしま�
 
 ## 9. semantic eval
 
-LLM Judgeで最低限次を評価します。
+LLM Judgeで次をすべて評価します。
 
 - target purpose / contextとpattern識別の妥当性
 - user goal / task / flowが存在する場合はそのcontextとの整合
@@ -325,27 +325,16 @@ LLM Judgeで最低限次を評価します。
 
 通常のSkill出力とは別に、reference自体の品質をfixtureで確認します。
 
-代表的な複合patternを選び、
+reference semantic evalは `_02b_reference-validation-and-completeness.md` の全item検証を実施します。
 
-- indexから必要referenceへ到達できる
-- pattern purposeが判断に使える
-- when / when notが区別できる
-- source conflictを扱える
-- accessibility / interaction / visualを横断できる
+- `included / merged-duplicate` の全source itemを原文と照合する
+- `unavailable / source-reference-only` は全itemのdisposition、理由、canonical URL、access stateを確認する
+- referencesの `patterns / accessibility / platforms` の各経路についてindex解決を検証する
+- source conflict / merge / split / aliasのfixtureを検証する
 
-ことを確認します。
+samplingやsourceごとの1件spot-checkでは完了扱いにしません。
 
-加えて、内容をreferenceへ収録した各adopted sourceについて、少なくとも1件のsource itemを原文と照合します。
-
-spot-check対象は次で固定します。
-
-- `included` / `merged-duplicate` itemがあるsource: source item refの辞書順で最初の対象itemを最低1件
-- `unavailable` / `source-reference-only` しかないsource: 内容ではなくdisposition、理由、canonical URL、access stateの妥当性を最低1件
-- referencesの `patterns / accessibility / platforms` の各経路について、少なくとも1件は意味内容を原文と照合する
-
-実装上の明確な理由があり別itemをspot-checkへ使う場合は、fixtureへ選定理由を残します。確認しやすいitemだけへ恣意的に差し替えません。
-
-spot-checkでは少なくとも、
+各itemの照合では少なくとも、
 
 - source item refが正しい原文を指す
 - source上の位置づけ / 適用条件が原文と整合する
@@ -354,9 +343,7 @@ spot-checkでは少なくとも、
 
 ことを確認します。
 
-全referenceをLLM Judgeで1件ずつ採点する方式は採用しません。
-
-構造網羅性はdeterministic、意味品質は代表case + adopted sourceごとの最低1件spot-checkで分離します。
+全itemを同じLLM点数へ変換する方式は採用しません。構造網羅性はdeterministic validator、source原文との意味一致は全item semantic validation、Skillの判断品質はsemantic eval caseで分離して検証します。
 ## 11. portable Skill
 
 Skill package単独で、

@@ -64,7 +64,7 @@ feat/usability-evaluation-skill
 1. target contextを固定する
 2. UI pattern / principle候補とapplicabilityを判断する
 3. applicable referenceと要求の位置づけを解決する
-4. 観測事実、strict criterion result、advisory guidanceを分離する
+4. 観測事実、strict requirement result、advisory guidanceを分離する
 5. UI / UX上の差異・想定影響を専門評価する
 6. follow-upが必要な項目だけFindingへroutingする
 
@@ -74,7 +74,7 @@ feat/usability-evaluation-skill
 - UI / UX評価項目
 - applied reference refs
 - evidence refs
-- strict criterion resultとの対応
+- strict requirement resultとの対応
 - status / status reason
 - Finding refs
 
@@ -107,7 +107,7 @@ feat/usability-evaluation-skill
 - inspection scope closure
 - objective observations
 - deterministic test rule results
-- standard / binding criterion checks
+- standard / binding requirement checks
 - measurements
 - 必要なPlaywright action trace
 - optional task / flow result
@@ -130,7 +130,7 @@ live Web UI
     ↓
 usability-inspection
     ├→ objective observation / measurement
-    ├→ applicable standard / binding criterion check
+    ├→ applicable standard / binding requirement check
     └→ optional task / flow execution
              ↓
       immutable evidence
@@ -176,9 +176,9 @@ usability-evaluation がW3C、Design System、UIパターン集、一般的なhe
 
 ## referenceの方針
 
-初版の代表パターンだけを収録する方式にはしません。
+今回の代表パターンだけを収録する方式にはしません。
 
-実装時に採用する情報源について、公開かつ取得可能で本Skillの対象に該当する情報を棚卸しし、取得できたUI / UX知識を構造化して references 配下へ収録します。
+bundled reference corpusは公開情報だけを対象とします。Planで定義したsource category・採用条件・探索closureに従って候補を閉じ、adoptしたsourceの公開itemを全件inventoryし、取得できたUI / UX知識を構造化して references 配下へ収録します。非公開・認証必須・有料本文を推測・迂回取得してcorpusへ含めません。
 
 SKILL.mdには個別パターンの詳細を大量に持たせません。
 
@@ -208,6 +208,8 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
    2026-09-25_194200_usability-evaluation-skill_02_reference-knowledge.md
 2a. 情報源探索・収集・網羅性ゲート  
    2026-09-25_194200_usability-evaluation-skill_02a_source-acquisition-and-coverage.md
+2b. reference統合・全item意味検証・完全性  
+   2026-09-25_194200_usability-evaluation-skill_02b_reference-validation-and-completeness.md
 3. UI / UX評価方法・証拠・判定境界  
    2026-09-25_194200_usability-evaluation-skill_03_evaluation-contract.md
 4. 既存Skill / workflow統合  
@@ -220,10 +222,23 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
    2026-09-25_194200_usability-evaluation-skill_05a_usability-inspection-package-and-evaluation.md
 5b. usability-inspectionの決定論的runtime契約  
    2026-09-25_194200_usability-evaluation-skill_05b_usability-inspection-deterministic-runtime.md
+5c. Web inspectionの全件coverage・実行条件  
+   2026-09-25_194200_usability-evaluation-skill_05c_usability-inspection-coverage.md
 6. 評価・CI・実装順序・完了条件  
    2026-09-25_194200_usability-evaluation-skill_06_evaluation-ci-implementation-order.md
 6a. usability-inspectionの実装順序・完了条件  
    2026-09-25_194200_usability-evaluation-skill_06a_usability-inspection-implementation-order.md
+
+## 今回の完成範囲
+
+- live inspectionはWeb UIだけを対象とする。native app向けlive automationは対象外として完結させる。
+- bundled reference corpusは公開情報だけを対象とする。認証必須・有料・非公開本文はcorpusへ取り込まない。
+- human participantへtaskを依頼して成功率・所要時間・satisfaction等を測定するusability studyは対象外とする。AIによるexpert evaluation / Web live inspectionの結果をhuman studyの結果へ読み替えない。
+- source discoveryは固定件数で打ち切らず、定義済みcategory・query・cross-link・candidate処理が固定点へ到達するまで閉じる。
+- adopted sourceの `included / merged-duplicate` itemは全件をsource原文と意味照合する。spot-check samplingだけでは完了にしない。
+- WCAG 2.2 Success Criteria、適用するWAI-ARIA / ARIA in HTML requirement、current public ACT Rulesをcoverage matrixへ全件載せ、各項目の観測・判定経路を閉じる。
+- general live inspectionでは定義済み上位観点をすべてapplicability判定し、未選択のまま残さない。
+- canonical live Web E2Eを実行できない状態は実装完了ではなくblockedとする。
 
 ## 固定方針
 
@@ -251,7 +266,7 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
 22. user researchの代替とは扱わない。heuristic evaluationで分かることと、実ユーザーでしか確認できないことを区別する。
 23. 評価開始時に上位観点ごとの今回の扱いを固定し、「今回評価する」とした観点をすべて評価結果へ閉じる。上位観点を選ぶ妥当性はsemantic eval、closureはdeterministic validatorで確認する。
 24. `evaluation ref` はusability-evaluation成果物revision内だけで一意なartifact-local refとし、新しいglobal QA ID / Machine Entityを追加しない。
-25. 複数source itemを1つのreferenceへ統合しても、各source itemの位置づけと適用条件を保持する。内容を収録した各adopted sourceは最低1件を原文とspot-checkする。
+25. 複数source itemを1つのreferenceへ統合しても、各source itemの位置づけと適用条件を保持する。`included / merged-duplicate` の全source itemを原文と意味照合し、samplingだけでreference corpusを完了扱いにしない。
 26. UI / UX評価項目で複数根拠を使う場合は、各 `reference entry ref + source item ref` ごとに今回のreferenceの位置づけを保持し、binding / advisory等を1つの値へ統合しない。
 27. source discoveryでは、seed、初期query、追加query、adopted sourceのcross-linkから得たcandidateを同じcandidate集合へ追加し、canonical rootで重複排除しながら未処理candidateを閉じる。cross-link由来でadoptしたsourceも、そのadopted scope内の関連cross-link確認対象とし、Plan側で固定段数の上限を設けない。
 28. source ID / source item ref / reference entry IDはusability-evaluation package内のappend-only IDとし、並べ替えや名称変更で振り直さず、削除済みIDを別identityへ再利用しない。
@@ -259,12 +274,12 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
 30. usability-evaluationの「問題なし」は今回のscope / evidence / referenceの範囲で問題を確認しなかったことを意味し、製品全体のusabilityを保証しない。
 31. usability-inspectionはtask / personaを必須入力にせず、対象scopeからapplicableなinteraction、feedback、accessibility、visual / responsive、standard criterion、performanceを検査する。task / flowは明示された場合だけ追加で扱う。
 32. usability-inspectionでは製品固有の正解手順、test id、hidden DOM、source code、backend state等をUI発見shortcutとして使わない。特別な利用者条件はユーザーまたは案件が明示した場合だけ適用する。
-33. 観測事実、measurement、standard / binding criterion result、usability-evaluationによる専門評価を成果物上で分離する。
+33. 観測事実、measurement、standard / binding requirement result、usability-evaluationによる専門評価を成果物上で分離する。
 34. 明確なstandard / binding requirementはrequirement単位で `satisfied / not-satisfied / undetermined` へ閉じ、applicability、exception、観測事実 / 値、evidence、必要なAuthorityを保持する。WCAG Success Criterionを `passed / failed / inapplicable` とは表現しない。今回のscopeについて必要なapplicable populationとrequired checksを閉じ、requirement全体を満たす根拠が揃った場合だけ `satisfied` とする。検査scopeとして扱わない項目はrequirement resultではなくscope closure側の `対象外` とする。
 35. 一般heuristic、ISO interaction principles、第三者Design System等のadvisory guidanceをstrictな仕様FAILへ自動変換しない。
 36. 単一component / 単一画面のrequirement `satisfied` から製品全体のWCAG conformance等を宣言しない。
 37. usability-evaluationのseed sourceは自動採用しない。既存adopted sourceにない明確な評価価値を確認してadoptし、一度adoptしたsourceはadopted scope内の関連情報を従来どおり全件closureする。
-38. usability-inspectionのlive実行対象は初版では既存Playwright経路で到達できるWeb UIに限定する。mobileはresponsive Web viewportを意味し、native mobile appの能動操作は対象外とする。
+38. usability-inspectionのlive実行対象は既存Playwright経路で到達できるWeb UIに固定する。desktop Web / responsive Web / mobile Webを扱う。native iOS / Android / desktop appの能動操作は本Skillの対象外であり、今回の未実装項目や後続対応として残さない。nativeのscreenshot / design artifact等はusability-evaluationの静的evidenceとして扱える。
 39. usability-inspectionがbrowser / session ownerとなり、usability-evaluationはimmutable evidenceをread-onlyで評価する。同一sessionを並行操作しない。
 40. Playwrightのimplicit auto-scrollをvisual / pointer上のdiscoverability成功として扱わず、必要なscrollはuser actionとして観測する。
 41. Playwrightのactionability auto-waitを操作後のsystem responsivenessへ混ぜない。pre-action waitとactual input後のresponseを分離する。
@@ -272,12 +287,12 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
 43. metricの定義・測定条件を満たさない値を既存metric名へ読み替えない。単一Playwright runからfield percentileを要求するCore Web Vitals達成等を断定しない。
 44. task / flowが明示された場合は実操作できるが、詳細TCの忠実実行と仕様上のPASS / FAILはtest-executionへroutingする。
 45. Agent / tool capabilityの失敗だけをproduct usability問題へ自動変換しない。
-46. Cognitive Walkthroughはlearnability等を重点確認する場合の任意技法とし、通常inspectionの固定工程や独立Skillにはしない。
+46. Cognitive Walkthroughはlearnability等を重点確認する入力条件で使用するinspection techniqueとし、起動条件・4つの確認質問・step単位のevidence / result契約を今回実装する。通常inspectionへ無条件には適用せず、独立Skillにはしない。
 47. usability-inspectionはtest-target-inspection / test-executionの既定後処理にはしない。ただし既存成果物はpreflight / evidenceとしてread-only再利用できる。
 48. 「ユーザビリティテストして」等の依頼はusability-inspectionのtrigger aliasとして受けられるが、成果物ではhuman participantを用いる正式なusability testingを実施したとは表現しない。
 49. 「usabilityを確認」「UIの使いやすさを見て」等の実操作有無が不明な依頼はtrigger boundaryとして扱い、live Web UIを操作して検査するならusability-inspection、design artifact / screenshot / 取得済みevidenceのreference-based評価ならusability-evaluationへroutingする。
-50. usability-inspectionでref採番、scope closure、数値計算、threshold比較、実装済みで完全にmachine-decidableなtest rule等をLLMへ手計算させず、PR #11のcurrent Skill runtime contractを使って決定論的scriptへ移す。将来のrule追加だけを理由に別manifest / generic rule frameworkを先行追加しない。
-51. W3C ACT Rulesはaccessibility test methodのinformative sourceとして利用できるが、ACT Rule resultをWCAG / ARIA requirement全体のconformance resultへ無条件に読み替えない。ACT Rules Format 1.1のoutcome `inapplicable / passed / failed / cantTell / untested` を保持し、formal / proposed等のsource statusとrequirements mappingを別に保持する。
+50. usability-inspectionでref採番、scope closure、数値計算、threshold比較、machine-decidableなtest rule等をLLMへ手計算させず、PR #11のcurrent Skill runtime contractを使って決定論的scriptへ移す。今回扱うACT Rule / ACT外checkのmetadataは `assets/deterministic-check-catalog.json` へ固定し、実装は `criterion_checks.py` の明示dispatchへ対応付ける。generic rule DSL / plugin systemは追加しない。
+51. W3C ACT Rulesはaccessibility test methodのinformative sourceとして利用できるが、ACT Rule resultをWCAG / ARIA requirement全体のconformance resultへ無条件に読み替えない。current WAI公開ACT RulesはACT Rules Format 1.1互換として扱い、outcomeは `inapplicable / passed / failed / cantTell / untested` を使用する。rule status、requirements mapping、当Skillでのexecution modeを別に保持する。
 52. deterministic checkがrequirementの一部だけを評価する場合、rule outcomeが `passed` でもrequirementを `satisfied` にしない。population / exception / manual checkを閉じられない場合はrequirementを `undetermined` とし、確認済みrule resultをevidenceとして残す。
 53. screenshot、DOM、accessibility tree、raw snapshot等はsecret・個人データ・機密情報を含み得るため、PR #12のevidence安全契約を再利用して必要最小限だけ取得・保存し、raw evidenceを成果物の必須条件にしない。
 54. deterministic runtime、deterministic validator、semantic evalを分離し、同じ実装で生成と検証を行わない。
