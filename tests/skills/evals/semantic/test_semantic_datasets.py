@@ -38,7 +38,13 @@ class SemanticDatasetTests(unittest.TestCase):
                     self.assertTrue(set(case["criteria"]) <= set(dataset["criteria_by_id"]))
                 if skill in {"test-target-inspection", "test-execution"}:
                     critical_ids = {criterion["id"] for criterion in dataset["criteria"] if criterion["critical"]}
-                    self.assertTrue(any(critical_ids.intersection(case["criteria"]) for case in dataset["cases"]))
+                    covered_ids = {
+                        criterion_id
+                        for case in dataset["cases"]
+                        for criterion_id in case["criteria"]
+                    }
+                    missing_critical_ids = sorted(critical_ids - covered_ids)
+                    self.assertFalse(missing_critical_ids, f"critical criteria without semantic case coverage: {missing_critical_ids}")
                 total_cases += len(dataset["cases"])
 
         self.assertEqual(total_cases, 56)

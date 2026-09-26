@@ -273,17 +273,17 @@
 - `RT-D015` expected root / Entity集合をactual出力から推測しない独立validator
 
 ## test-target-inspection
-- `TTI-D001` 必須セクション表とMarkdown表構造
+- `TTI-D001` 必須セクション・確認情報項目とMarkdown表構造
 - `TTI-D002` 対象 / 要素 / 状態キーの一意性
 - `TTI-D003` 新規成果物キー形式
 - `TTI-D004` 確認状態の許可値
-- `TTI-D005` current行の参照整合
+- `TTI-D005` current行と任意repo対応表の対象・要素参照整合
 - `TTI-D006` 今回確認した行の条件・version / build・日時
 - `TTI-D007` 未確認行の鮮度維持
 - `TTI-D008` 更新表・更新区分
 - `TTI-D009` 削除確認条件と削除キーのcurrent本体からの除外
 - `TTI-D010` 任意ARIA snapshotの対象追跡・再取得可能identity
-- `TTI-D011` 永続保存結果・競合安全な更新方式・revision・制約
+- `TTI-D011` 永続保存結果・既存成果物の更新元revision・保存後revision・競合安全な更新方式・制約
 - `TTI-D012` 副作用scopeの一意な正本行・回数・cleanup
 - `TTI-D013` secret実値の非漏えい
 - `TTI-D014` 旧 / 今回buildの保持とbuild差のみで比較を拒否しないこと
@@ -300,7 +300,7 @@
 - `TEX-D008` unresolved・開始状態・TC結果整合
 - `TEX-D009` TC別条件とrun固定条件の分離
 - `TEX-D010` 操作・観測・画像確認のTC / step追跡
-- `TEX-D011` 副作用scopeの一意な正本行・工程別回数・累計・cleanup
+- `TEX-D011` TC参照scopeと一意な正本行・工程別回数・累計・cleanup
 - `TEX-D012` TC結果と集計一致
 - `TEX-D013` secret実値の非漏えい
 - `TEX-D014` fixtureで固定したsnapshot参照集合

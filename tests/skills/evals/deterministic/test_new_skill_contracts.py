@@ -37,6 +37,81 @@ class NewSkillDeterministicContractTests(unittest.TestCase):
                 text, expected = eval_case("test-target-inspection", eval_id)
                 self.assertEqual(validate(text, expected, eval_id).status, "pass")
 
+    def test_target_inspection_requires_confirmation_info_table_and_items(self):
+        validate = load_validator("test-target-inspection")
+        text, expected = eval_case("test-target-inspection", "TTI-OUT-001")
+        section_start = text.index("## 確認情報")
+        next_section = text.index("\n## 画面 / 領域", section_start)
+        without_table = text[:section_start] + text[next_section + 1 :]
+        without_item = "\n".join(
+            line for line in text.splitlines() if not line.startswith("| 対象URL / origin |")
+        )
+
+        for name, broken in (("missing table", without_table), ("missing item", without_item)):
+            with self.subTest(name=name):
+                result = validate(broken, expected, "TTI-OUT-001")
+                self.assertEqual(next(item.status for item in result.assertions if item.id == "TTI-D001"), "fail")
+
+    def test_target_inspection_checks_optional_tables_confirmation_states(self):
+        validate = load_validator("test-target-inspection")
+        text, expected = eval_case("test-target-inspection", "TTI-OUT-001")
+        lines = text.splitlines()
+        visual_row = next(
+            index
+            for index, line in enumerate(lines)
+            if line.startswith("| target-001 | state-001 | 行の重なり |")
+        )
+        lines[visual_row] = lines[visual_row].replace("| 確認済み |", "| 不明 |", 1)
+        invalid_visual_state = "\n".join(lines)
+
+        lines = text.splitlines()
+        dependency_section = lines.index("## データ・権限依存")
+        dependency_row = "| target-001 | state-001 | role=admin | 管理者メニューを確認 | 不明 | 管理者 | build-23 | 2026-09-26T09:00:00+09:00 |"
+        lines.insert(dependency_section + 4, dependency_row)
+        invalid_dependency_state = "\n".join(lines)
+
+        for name, broken in (
+            ("visual state", invalid_visual_state),
+            ("dependency state", invalid_dependency_state),
+        ):
+            with self.subTest(name=name):
+                result = validate(broken, expected, "TTI-OUT-001")
+                self.assertEqual(next(item.status for item in result.assertions if item.id == "TTI-D004"), "fail")
+
+    def test_target_inspection_checks_optional_implementation_references(self):
+        validate = load_validator("test-target-inspection")
+        text, expected = eval_case("test-target-inspection", "TTI-OUT-001")
+        lines = text.splitlines()
+        mapping_section = lines.index("## 既存テスト実装との対応（任意）")
+        lines.insert(mapping_section + 4, "| target-999 | なし | POM | src/pages/orders.ts | 注文画面 | rev-2 |")
+        broken = "\n".join(lines)
+
+        result = validate(broken, expected, "TTI-OUT-001")
+        self.assertEqual(next(item.status for item in result.assertions if item.id == "TTI-D005"), "fail")
+
+    def test_target_inspection_requires_and_matches_existing_source_revision(self):
+        validate = load_validator("test-target-inspection")
+        text, expected = eval_case("test-target-inspection", "TTI-OUT-002")
+        save_row = "| user-specified-store | rev-4 | If-Match | 保存済み | rev-5 | 条件付き更新成功を再読込で確認 | 保存先 |"
+        missing_source_revision = text.replace(
+            save_row,
+            "| user-specified-store |  | If-Match | 保存済み | rev-5 | 条件付き更新成功を再読込で確認 | 保存先 |",
+            1,
+        )
+        mismatched_source_revision = text.replace(
+            save_row,
+            "| user-specified-store | rev-999 | If-Match | 保存済み | rev-5 | 条件付き更新成功を再読込で確認 | 保存先 |",
+            1,
+        )
+
+        for name, broken in (
+            ("missing source revision", missing_source_revision),
+            ("mismatched source revision", mismatched_source_revision),
+        ):
+            with self.subTest(name=name):
+                result = validate(broken, expected, "TTI-OUT-002")
+                self.assertEqual(next(item.status for item in result.assertions if item.id == "TTI-D011"), "fail")
+
     def test_deleted_target_may_be_absent_from_current_body(self):
         validate = load_validator("test-target-inspection")
         text, expected = eval_case("test-target-inspection", "TTI-OUT-002")
@@ -162,6 +237,21 @@ class NewSkillDeterministicContractTests(unittest.TestCase):
         row = "| profile-update | 1回はプロフィール値1件の変更操作 | 3 | 1 | 1 | 0 | 1 | 3 | 元の表示名へ戻す | 成功 | 元の表示名へ復元済み | 0 | scope契約 |"
         duplicated = text.replace(row, row + "\n" + row, 1)
         result = validate(duplicated, expected, "TEX-OUT-002")
+        self.assertEqual(next(item.status for item in result.assertions if item.id == "TEX-D011"), "fail")
+
+    def test_test_execution_rejects_undefined_tc_side_effect_scope(self):
+        validate = load_validator("test-execution")
+        text, expected = eval_case("test-execution", "TEX-OUT-002")
+        lines = text.splitlines()
+        precondition_row = next(
+            index
+            for index, line in enumerate(lines)
+            if line.startswith("| input-001 | profile-update |")
+        )
+        lines[precondition_row] = lines[precondition_row].replace("profile-update", "unknown-scope", 1)
+        broken = "\n".join(lines)
+
+        result = validate(broken, expected, "TEX-OUT-002")
         self.assertEqual(next(item.status for item in result.assertions if item.id == "TEX-D011"), "fail")
 
     def test_test_execution_requires_observation_for_passed_steps(self):

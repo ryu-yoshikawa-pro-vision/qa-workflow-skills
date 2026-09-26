@@ -288,6 +288,17 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
     scope_values = [_value(row, "副作用scope") for row in side_rows]
     duplicate_scopes = sorted(scope for scope in set(scope_values) if scope and scope_values.count(scope) > 1)
     side_issues.extend({"scope": scope, "issue": "scopeの正本行が重複"} for scope in duplicate_scopes)
+    defined_scopes = {scope for scope in scope_values if _nonempty(scope)}
+    for row in _rows(required_tables["実行前条件"]):
+        scope = _value(row, "副作用scope")
+        if _nonempty(scope) and scope not in defined_scopes:
+            side_issues.append(
+                {
+                    "ref": _value(row, "TC参照"),
+                    "scope": scope,
+                    "issue": "TCが参照する副作用scopeの正本行がない",
+                }
+            )
     for row in side_rows:
         scope = _value(row, "副作用scope")
         definition = _value(row, "1回の定義")

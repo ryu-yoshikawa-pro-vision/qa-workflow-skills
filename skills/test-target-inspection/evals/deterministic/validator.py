@@ -43,6 +43,7 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
         tables = []
 
     required = {
+        "確認情報": ("項目", "値", "確認元"),
         "画面 / 領域": ("対象キー", "確認状態"),
         "UI要素": ("要素キー", "対象キー", "確認状態"),
         "状態": ("状態キー", "対象キー", "確認状態"),
@@ -51,14 +52,39 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
     }
     required_tables = {section: _table(tables, section, headers) for section, headers in required.items()}
     missing = [section for section, table in required_tables.items() if table is None]
-    result.add("TTI-D001", not missing, "正規の必須セクション表が存在すること", evidence=missing or None)
+    required_confirm_items = {
+        "対象",
+        "対象URL / origin",
+        "version / build",
+        "確認日時",
+        "role / 権限",
+        "viewport",
+        "locale",
+        "feature flag",
+        "テストデータ条件",
+        "既存成果物参照",
+        "更新元revision / content identity",
+        "永続保存要求",
+    }
+    confirm_rows = _rows(required_tables["確認情報"])
+    confirm_items = {_value(row, "項目") for row in confirm_rows}
+    missing_confirm_items = sorted(required_confirm_items - confirm_items)
+    result.add(
+        "TTI-D001",
+        not missing and not missing_confirm_items,
+        "正規の必須セクション表と確認情報項目が存在すること",
+        evidence={"missing_tables": missing, "missing_confirm_items": missing_confirm_items}
+        if missing or missing_confirm_items
+        else None,
+    )
 
-    confirm_table = _table(tables, "確認情報", ("項目", "値", "確認元"))
-    confirm = {_value(row, "項目"): _value(row, "値") for row in _rows(confirm_table)}
+    confirm = {_value(row, "項目"): _value(row, "値") for row in confirm_rows}
     screen = _rows(required_tables["画面 / 領域"])
     elements = _rows(required_tables["UI要素"])
     states = _rows(required_tables["状態"])
     behaviors = _rows(required_tables["操作・ふるまい"])
+    visual = _rows(find_table(tables, section_contains="視覚情報"))
+    deps = _rows(find_table(tables, section_contains="データ・権限依存"))
     target_keys = [_value(row, "対象キー") for row in screen if _nonempty(_value(row, "対象キー"))]
     element_keys = [_value(row, "要素キー") for row in elements if _nonempty(_value(row, "要素キー"))]
     state_keys = [_value(row, "状態キー") for row in states if _nonempty(_value(row, "状態キー"))]
@@ -81,7 +107,7 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
     result.add("TTI-D003", not key_issues, "新規成果物が正規の文書ローカルキー形式を使うこと", evidence=key_issues or None)
 
     status_issues = []
-    for table in (screen, elements, states, behaviors):
+    for table in (screen, elements, states, behaviors, visual, deps):
         for row in table:
             state = _value(row, "確認状態")
             if state not in CONFIRM_STATES:
@@ -106,7 +132,6 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
             reference_issues.append({"section": "操作・ふるまい", "target": target})
         if element and element not in current_elements:
             reference_issues.append({"section": "操作・ふるまい", "element": element})
-    visual = _rows(_table(tables, "視覚情報", ("対象キー", "要素キー / 状態キー")))
     for row in visual:
         target = _value(row, "対象キー")
         subkey = _value(row, "要素キー / 状態キー")
@@ -114,7 +139,6 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
             reference_issues.append({"section": "視覚情報", "target": target})
         if subkey not in NONE and subkey not in current_elements | current_states:
             reference_issues.append({"section": "視覚情報", "subkey": subkey})
-    deps = _rows(_table(tables, "データ・権限依存", ("対象キー", "要素キー / 状態キー")))
     for row in deps:
         target = _value(row, "対象キー")
         subkey = _value(row, "要素キー / 状態キー")
@@ -122,7 +146,22 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
             reference_issues.append({"section": "データ・権限依存", "target": target})
         if subkey not in NONE and subkey not in current_elements | current_states:
             reference_issues.append({"section": "データ・権限依存", "subkey": subkey})
-    result.add("TTI-D005", not reference_issues, "current行の対象・要素・状態キー参照が整合すること", evidence=reference_issues or None)
+    implementation_table = find_table(tables, section_contains="既存テスト実装との対応")
+    implementation_rows = _rows(implementation_table)
+    if implementation_table is not None:
+        missing_headers = sorted({"対象キー", "要素キー"} - set(implementation_table.headers))
+        if missing_headers:
+            reference_issues.append(
+                {"section": "既存テスト実装との対応", "missing_headers": missing_headers}
+            )
+    for row in implementation_rows:
+        target = _value(row, "対象キー")
+        element = _value(row, "要素キー")
+        if _nonempty(target) and target not in current_targets:
+            reference_issues.append({"section": "既存テスト実装との対応", "target": target})
+        if _nonempty(element) and element not in current_elements:
+            reference_issues.append({"section": "既存テスト実装との対応", "element": element})
+    result.add("TTI-D005", not reference_issues, "current行と任意repo対応表の対象・要素参照が整合すること", evidence=reference_issues or None)
 
     freshness_issues = []
     for section, rows in (("画面 / 領域", screen), ("UI要素", elements), ("状態", states), ("操作・ふるまい", behaviors), ("視覚情報", visual), ("データ・権限依存", deps)):
@@ -200,6 +239,23 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
             for field in ("保存先", "更新方式", "保存後revision / content identity"):
                 if not _nonempty(_value(row, field)):
                     save_issues.append({"status": status, "missing": field})
+            source_revision = _value(row, "更新元revision / content identity")
+            confirmed_source_revision = confirm.get("更新元revision / content identity", "")
+            if existing_artifact and not _nonempty(source_revision):
+                save_issues.append({"status": status, "missing": "更新元revision / content identity"})
+            if (
+                _nonempty(source_revision)
+                and _nonempty(confirmed_source_revision)
+                and source_revision != confirmed_source_revision
+            ):
+                save_issues.append(
+                    {
+                        "status": status,
+                        "save_source_revision": source_revision,
+                        "confirmed_source_revision": confirmed_source_revision,
+                        "issue": "更新元revisionが確認情報と一致しない",
+                    }
+                )
             if conditional_update_required and not re.search(r"if[- ]?match|etag|revision|sha", _value(row, "更新方式"), re.IGNORECASE):
                 save_issues.append({"status": status, "method": _value(row, "更新方式"), "issue": "共有保存先の条件付き更新方式が確認できない"})
         if status in {"保存中止", "保存失敗"} and not _nonempty(_value(row, "競合・制約 / 理由")):
