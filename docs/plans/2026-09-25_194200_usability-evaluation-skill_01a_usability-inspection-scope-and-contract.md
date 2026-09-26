@@ -80,6 +80,7 @@ native iOS / Android app、desktop native app等の能動操作は、対応runti
 
 - user / role
 - prior knowledge / experience assumptions
+- prior knowledge state: confirmed / inferred / unknown
 - prior knowledge / experience assumption source / evidence refs
 - user goal
 - user goalの根拠
@@ -111,7 +112,7 @@ user goal / task scenarioの出所を区別します。
 
 成果物では少なくとも `confirmed / inferred / unknown` を区別し、`inferred` は仮定として表示します。
 
-user / roleだけで事前知識を推測しません。今回のinspectionで前提とする製品利用経験、業務知識、一般的なUI経験等を `prior knowledge / experience assumptions` として明示し、その根拠も残します。根拠がない場合は `unknown` とし、「初見」「熟練」等を勝手に確定しません。
+user / roleだけで事前知識を推測しません。今回のinspectionで前提とする製品利用経験、業務知識、一般的なUI経験等を `prior knowledge / experience assumptions` として明示し、`prior knowledge state` を `confirmed / inferred / unknown` で保持します。根拠がない場合は `unknown` とし、「初見」「熟練」等を勝手に確定しません。
 
 UIや一般知識から推定したgoalは、実ユーザーのgoalとして確定しません。
 
