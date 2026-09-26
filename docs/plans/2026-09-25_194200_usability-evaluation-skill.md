@@ -231,7 +231,7 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
 2. test-target-inspection / test-executionの成果物は、UI / UX評価がユーザー要求・案件scope・qa-workflowで明示的に選定された場合にread-only入力として再利用できる。ただし、それらの実行だけを理由にusability-evaluation / usability-inspectionを既定起動しない。分析・設計ではUIが対象で、user goal / interaction / usability / accessibility / visual qualityが判断へ影響する場合にusability-evaluationを利用する。
 3. Skill自身がProduct Risk、TC、Regression membership等を所有しない。
 4. 仕様上のPASS / FAILとUI / UX評価結果を分離する。UI / UX評価項目は問題なし・判定不能・対象外も保持できるが、PR #13のFindingは後続QA活動で扱う必要がある項目だけに作成する。
-5. UIパターン名だけからチェックリストを機械適用せず、ユーザー目的、利用文脈、適用条件を先に確認する。
+5. UIパターン名だけからチェックリストを機械適用せず、target purpose、利用文脈、適用条件を先に確認する。user goal / taskが明示・確認できる場合は追加contextとして利用し、存在しない場合に創作しない。
 6. プロジェクト固有仕様 / 採用Design System / platform要件を一般的なheuristicより優先する。
 7. 同じ観測事実を再取得するためにbrowserを重複操作せず、PR #12で得られるDOM、accessibility tree、ARIA snapshot、screenshot、状態、操作結果を優先して再利用する。
 8. test-execution等がbrowser / sessionを所有している最中に、別Agentが同じ実対象を並行操作することを前提にしない。
