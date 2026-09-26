@@ -6,5 +6,17 @@
   {"query":"Pairwiseの一般的な意味を初心者向けに説明して。","should_trigger":false},
   {"query":"仕様からケースまで全部の工程を順番に進めて。","should_trigger":false},
   {"query":"高リスクのTRについて、境界・状態・権限のどこを深く見るべきか条件設計してください。","should_trigger":true},
-  {"query":"テストケースの手順はまだ書かず、必要なCoverage Itemまで具体化してください。","should_trigger":true}
+  {"query":"テストケースの手順はまだ書かず、必要なCoverage Itemまで具体化してください。","should_trigger":true},
+  {"query":"Domain Testingのborderごとにinner / outer pointを具体的な値で出してください。","should_trigger":true},
+  {"query":"CRUDモデルのmissing operationとconsistency sequenceをCoverageへ反映してください。","should_trigger":true},
+  {"query":"固定PCG32 seedからRandom Testingの入力を作り、ケース数の完了判定まで設定してください。","should_trigger":true},
+  {"query":"Metamorphic Testingのrelation、source input、follow-up、expected relationを設計してください。","should_trigger":true},
+  {"query":"Syntax-Based Testingでreachable / unreachable productionとmutationをケース化してください。","should_trigger":true},
+  {"query":"この変更にDomain Testingを採用するかリスク観点で判断してください。","should_trigger":false},
+  {"query":"CRUD Testingを採用する必要性をテスト分析として評価してください。","should_trigger":false},
+  {"query":"入力分布を見てRandom Testingを使うか判断してください。","should_trigger":false},
+  {"query":"仕様に関係があるのでMetamorphic Testingを採用すべきか決めてください。","should_trigger":false},
+  {"query":"文法モデルがあるためSyntax-Based Testingを選択するか判断してください。","should_trigger":false},
+  {"query":"5つの技法の概要と選び分けだけを説明してください。","should_trigger":false},
+  {"query":"選択済みのBoundary Valueモデルから、実行可能なCoverage targetを作成してください。","should_trigger":true}
 ]

@@ -253,3 +253,21 @@
 - `E2E-REPORT-D014` cleanupのフィクスチャ整合
 - `E2E-REPORT-D015` retry発生時の初回 / retry履歴保持
 - `E2E-REPORT-D016` フィクスチャで期待する初回 / retry履歴
+
+## 共通runtime / Machine Entity
+
+- `RT-D001` stdinは単一JSON object、未知CLI入力・duplicate key・非有限数を拒否
+- `RT-D002` JSON depth、文字列、数値、通常入力、aggregate入力、stdoutの上限
+- `RT-D003` runtime envelopeの固定フィールドと許可値
+- `RT-D004` runtime unit identity、input/result pair、duplicate / missing / extra
+- `RT-D005` input / model / generation fingerprintの独立再計算
+- `RT-D006` runtime / generator implementation fingerprintのLF正規化再計算
+- `RT-D007` upstream Entity fingerprintとruntime dependencyの整合
+- `RT-D008` runtime required、deterministic generated、support / result / freshnessの状態整合
+- `RT-D009` target ref、execution、target content fingerprintのstable ID整合
+- `RT-D010` Machine Entityの`entity-state-v1`、identity、content fingerprint、依存配列
+- `RT-D011` Entityのmissing / extra / duplicateとruntime blockのround-trip
+- `RT-D012` stale / legacy / deleted / unsupportedの完全結果への昇格禁止
+- `RT-D013` runtime dependency graphの重複・自己依存・cycle拒否
+- `RT-D014` adapter childのderived input、親generation依存、重複・欠落の検出
+- `RT-D015` expected root / Entity集合をactual出力から推測しない独立validator

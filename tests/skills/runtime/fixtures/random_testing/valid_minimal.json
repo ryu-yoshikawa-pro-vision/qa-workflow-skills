@@ -1,0 +1,1 @@
+{"input_label":"role","seed":42,"case_count":1,"distribution":{"type":"uniform_finite","values":[{"type":"enum","value":"admin"},{"type":"enum","value":"user"}]},"authority_refs":[],"reference_refs":[]}

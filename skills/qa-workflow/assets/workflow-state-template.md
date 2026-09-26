@@ -23,3 +23,11 @@
 | e2e-test-execution |  | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |  |  |
 | e2e-test-result-analysis |  | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |  |  |
 | e2e-test-reporting |  | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |  |  |
+
+## runtime状態（runtime dispatch時だけ表示）
+
+| Skill | Runtime Unit Key | Model Key | Support Status | Result Status | Freshness | Runtime Status | Runtime Required | Deterministic Generated | Fallback Reason | Blocker / Issue |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+|  |  |  | supported / partial / unsupported / unknown | ready / unresolved / blocked | current / stale | ok / invalid_input / unsupported / limit_exceeded / internal_error / not_run | Yes / No | Yes / No | outside_supported_subset / python_unavailable /  |  |
+
+runtime行は保存されたMachine Runtime Input / ResultとMachine Entityから転記し、`can_complete`や人間向け要約から推測しません。scopeが0件の場合はこの表を表示せず、runtimeをdispatchしない既存経路を維持します。

@@ -15,6 +15,16 @@ description: 現在有効な仕様根拠とテスト分析から、何を検証�
 6. 他Skillを参照するときは正規Skill名を使用します。
 7. 最終出力前に、実際に利用した入力が本Skillの入力契約を満たし、停止条件に該当する未解決状態がないか確認します。あわせて、生成した成果物へ本Skill自身の出力契約・品質ゲートを適用して自己検証します。明白かつ局所的で新しい領域固有の判断を必要としない契約違反だけを最大1回修正し、修正後は修正箇所を含めて最終確認します。未解決の仕様根拠やプロダクトリスクを自己検証の名目で再解釈せず、テスト条件設計へ越境しません。仕様根拠不足、上流判断不足、他Skillの領域固有ロジックが必要な問題は推測補完せず既存の停止条件・ブロック中・ルーティングに従います。最終確認後も本Skill自身の契約違反が残り、既存の停止条件・ブロック中・ルーティングに該当しない場合は2回目の自動修正を行わず、その成果物を契約適合済み・完成済みとして扱わず、現在残る契約上の制約だけを明示します。自己検証の経緯や修正回数は出力しません。
 
+## 決定論的runtime dispatch
+
+`requirement_structure`はテスト要求の構造をruntimeで正規化し、`entity-state-v1` Machine Entityを生成します。active / deleted / legacy / update scopeを区別し、親Entityの変更は依存fingerprintを通じて下流のfreshnessへ伝播します。runtimeの成功は入力が妥当で要求構造を生成できたことだけを示し、未解決仕様やブロッカーを要求へ変換して埋めません。
+
+runtime入力・結果はSkill-local `runtime_contract.py`の共通envelopeで受け渡し、入力fingerprint、model fingerprint、generation fingerprint、実装fingerprint、upstream Entity fingerprintを保存します。既存結果を再利用する場合は同じmodel keyとgeneration / dependency fingerprintが一致する`current`結果だけを再利用します。
+
+### 最終runtime evidence gate
+
+最終成果物の直前にSkill-local `scripts/runtime_contract.py`の`operation=verify_runtime_evidence`へ、実際に使用したcanonical normalized inputとcandidate成果物全文、固定booleanの`partial_rerun`を渡します。full buildでは`partial_rerun=false`かつ`previous_artifact_markdown=null`、partial rerunではscope外primary Entityの有無にかかわらず`partial_rerun=true`と同一成果物系列の直前artifact全文を渡します。Disposition-onlyのscope外Entityもpreviousから検証するためです。判定やprevious Entity配列を手組みしません。返却`valid=true`の場合だけ完成として返し、`valid=false`は既存の最大1回の局所修正・最終確認契約へ統合し、未解決なら完成扱いしません。
+
 ## インターフェース
 
 - **入力**: 対象範囲の現在有効な仕様根拠とテスト対象範囲。プロダクトリスク / テスト重点、案件コンテキスト、テストレベル / 観測方法は利用可能な場合に補助入力とします。

@@ -17,6 +17,16 @@ description: テスト条件とカバレッジ項目を、第三者が迷わず�
 8. 他Skillを参照するときは正規Skill名を使用します。
 9. 最終出力前に、実際に利用した入力が本Skillの入力契約を満たし、停止条件に該当する未解決状態がないか確認します。あわせて、生成した成果物へ本Skill自身の出力契約・品質ゲートを適用して自己検証します。明白かつ局所的で新しい領域固有の判断を必要としない契約違反だけを最大1回修正し、修正後は修正箇所を含めて最終確認します。不足仕様や不明な期待結果の根拠、未解決の仕様根拠を自己検証の名目で創作・補完せず、詳細テストケース完了基準を含む既存契約を正本として扱います。仕様根拠不足、上流判断不足、他Skillの領域固有ロジックが必要な問題は既存の停止条件・ブロック中・ルーティングに従います。最終確認後も本Skill自身の契約違反が残り、既存の停止条件・ブロック中・ルーティングに該当しない場合は2回目の自動修正を行わず、その成果物を契約適合済み・完成済みとして扱わず、現在残る契約上の制約だけを明示します。自己検証の経緯や修正回数は出力しません。
 
+## 決定論的runtime dispatch
+
+`case_structure`は、currentなTCN / CIと現在有効な仕様根拠から、独立して実施できるテストケース構造を生成します。ケースID、coverage item、test data requirement、前提・手順・観測・期待結果・根拠をstable IDで追跡し、秘密値を出力へ複製しません。semantic itemが不足するケースは実行可能ケースとしてcompleteにせず、未解決・ブロック中・対象外の扱いを保持します。
+
+Machine Runtime Input / Resultは入力・model・generation・implementation fingerprintとupstream Entity fingerprintを持ち、`runtime_status=ok`かつ`result_status=ready`、`freshness_status=current`、`deterministic_generated=true`の結果だけを通常のケース生成へ使います。実行時のPASS / FAILはケース設計の期待結果を置き換えません。
+
+### 最終runtime evidence gate
+
+最終成果物の直前にSkill-local `scripts/runtime_contract.py`の`operation=verify_runtime_evidence`へ、実際に使用したcanonical normalized inputとcandidate成果物全文、固定booleanの`partial_rerun`を渡します。full buildでは`partial_rerun=false`かつ`previous_artifact_markdown=null`、partial rerunではscope外primary Entityの有無にかかわらず`partial_rerun=true`と同一成果物系列の直前artifact全文を渡します。Disposition-onlyのscope外Entityもpreviousから検証するためです。判定やprevious Entity配列を手組みしません。返却`valid=true`の場合だけ完成として返し、`valid=false`は既存の最大1回の局所修正・最終確認契約へ統合し、未解決なら完成扱いしません。
+
 ## インターフェース
 
 - **入力**: 対象テスト条件、必要なカバレッジ項目またはカバレッジ項目内包済みの具体テスト条件、期待挙動を判断できる現在有効な仕様根拠。

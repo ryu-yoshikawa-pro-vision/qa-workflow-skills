@@ -1,0 +1,2 @@
+# 判定根拠
+整数limitの0〜100 domain、categorical weight、seed=42、case_count=10を入力どおり使い、fixed `pcg32-v1` / 復元抽出runtimeで生成された10個のtyped valueを具体的なcoverage itemとして保持する。必要件数10とruntimeのgenerated件数の一致でcompletionを判定する。weightは抽選確率であり、sample後のカテゴリ件数を必ず70/20/10に揃える規則ではない。Random件数の完了だけで境界targetや仕様AuthorityのCoverageを完了扱いしない。
