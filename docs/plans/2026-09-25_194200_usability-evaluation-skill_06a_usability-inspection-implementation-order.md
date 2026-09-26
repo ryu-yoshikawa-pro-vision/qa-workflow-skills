@@ -24,27 +24,24 @@
 - Finding
 - qa-workflow routing
 - evaluation runner
+- Playwright version /利用可能API
 
 を確認します。
 
 同じ責務が既に実装されている場合は重複実装しません。
 
-## 3. Step 1: methodology reference
+## 3. Step 1: methodology / official reference
 
-`_05a_usability-inspection-package-and-evaluation.md` のmethodology sourceを確認します。
+`_05a_usability-inspection-package-and-evaluation.md` のsourceをcurrentな公式資料で確認します。
 
 最低限:
 
-- ISO 9241-11の公開定義
-- NN/g Usability Testing 101
-- NN/g Task Scenarios for Usability Testing
-- NN/g Task Analysis
-- NN/g Cognitive Walkthroughs
-- NN/g Summary of Usability Inspection Methods
-- NIST Cognitive Walkthrough / usability inspection guidance
-- W3C WCAG-EM 2.0
-- web.dev User-centric Performance Metrics
-- web.dev Interaction to Next Paint
+- WCAG 2.2 / Understanding
+- WAI-ARIA / ARIA in HTMLの必要箇所
+- ISO 9241-110 interaction principles
+- Cognitive Walkthroughの代表的methodology
+- web.dev Core Web Vitals / user-centric performance guidance
+- Playwright locator / actionability / scrolling / keyboard / screenshot等の公式仕様
 
 current URL / publication state /利用条件を確認します。
 
@@ -55,7 +52,7 @@ current URL / publication state /利用条件を確認します。
 先に次を実装します。
 
 - `skills/usability-inspection/SKILL.md`
-- method references
+- inspection-specific references
 - `assets/output-template.md`
 - deterministic validator最小schema
 - trigger fixture
@@ -63,169 +60,226 @@ current URL / publication state /利用条件を確認します。
 
 まだ実browser操作を追加しません。
 
-task selection summary、task snapshot、prior knowledge / experience assumptions、primary task outcome固定、outcome basis、action trace、Agent run上の操作負荷、post-task diagnosis、timing measurement、Observation、evaluation ref、Finding refの構造を先に固定します。
+先に次の分離をschemaで固定します。
 
-## 5. Step 3: task execution contract
+- inspection scope
+- objective observation
+- standard / binding criterion check
+- measurement
+- Playwright action trace
+- optional task / flow result
+- usability-evaluation ref
+- Finding ref
 
-実browser接続前にfixtureで次を成立させます。
+task / persona / prior knowledgeを必須schemaにしません。
 
-- goal / task source
-- prior knowledge / experience assumptions、prior knowledge state（confirmed / inferred / unknown）、その根拠
-- start state
-- success condition
-- user-facing cue
-- meaningful action
-- task outcome
-- timing start / end
-- no arbitrary threshold
-- no TC PASS / FAIL
-- no human satisfaction claim
-- broad scope task selection / coverage limitation
-- Agent / tool limitationとproduct-side blockerの分離
-- live execution scopeがWeb UIに限定されること
-- timing definitionをaction開始前に固定
+## 5. Step 3: criterion / measurement contract
 
-詳細TCを入力したcaseがtest-executionへroutingされることも確認します。
+fixtureで次を成立させます。
 
-## 6. Step 4: browser実行経路
+- criterion ref
+- applicability
+- exception
+- observed fact / value
+- unit
+- PASS / FAIL / 判定不能 / 対象外
+- project binding時のAuthority ref
+- thresholdの有無
+- thresholdなしの場合に独自FAILを作らない
+- advisory guidanceをstrict FAILへ変換しない
+-単一criterion結果を製品全体のconformanceへ昇格しない
+
+task / flow未指定caseでも成果物が成立することを確認します。
+
+## 6. Step 4: browser observation contract
 
 PR #12 merge後のbrowser実行基盤を再利用します。
 
-初版のlive実行対象は既存Playwright経路で到達可能なWeb UIに限定します。responsive mobile Web viewportは対象にできますが、native iOS / Android / desktop appの能動操作runtimeは追加しません。
+初版のlive実行対象は既存Playwright経路で到達可能なWeb UIに限定します。
 
 新しいbrowser frameworkを作りません。
 
-利用手段の選択規則が共有可能なら既存規則を利用し、Skill固有に別のrunner hierarchyを増やしません。
+確認:
+
+- rendered UI / screenshot observation
+- DOM / accessibility observation
+- viewport
+- pointer
+- keyboard
+- focus
+- explicit scroll
+- resize
+- form / error state
+- safe state transition
 
 `usability-inspection` がbrowser / session ownerになります。
 
-意味上の次actionを選ぶときはuser-facing information contractを適用します。
+## 7. Step 5: Playwright固有の検査境界
 
-## 7. Step 5: 安全な縦断検証
+通常E2E向けのPlaywright behaviorでusability frictionを隠さないことを先に検証します。
 
-最初に1つの低リスクtaskを端から端まで通します。
+### auto-scroll
 
-例:
+代表case:
 
-~~~text
-goal:
-公開情報から目的のコンテンツを探す
-
-side effect:
-なし
-
-start:
-landing page
-
-success:
-指定条件を満たすdetail viewへ到達
-~~~
+- controlはDOM上に存在する
+- current viewportからは見えない
+- locator.click()なら操作可能
 
 確認:
 
-- task snapshot
-- prior knowledge / experience assumptions
-- visible / accessible cueからのaction選択
-- browser操作
-- screenshot / accessibility evidence
-- task outcome / outcome basis
-- primary outcome固定
-- action timing
-- visual observation
+- visual / pointer inspectionでlocatorのimplicit auto-scrollをdiscoverability成功にしない
+- 必要なscrollをexplicit user actionとして扱う
+- scroll前後のevidenceを残せる
+
+### locator
+
+確認:
+
+- role / name locatorは、user-facing情報から対象と判断した後のautomation手段として使える
+- test id / hidden DOM / implementation-specific selectorでUI発見を先回りしない
+
+### actionability / auto-wait
+
+代表case:
+
+- controlが操作可能になるまで待機時間あり
+- input dispatch後のvisible feedbackは短い
+
+確認:
+
+- pre-action actionability waitとpost-input responsivenessを分離
+- locator action呼び出し開始からのwall-clockをそのままuser response timeへしない
+- actionability wait自体にUI上の問題がある場合は別Observationにできる
+
+## 8. Step 6: page inspection vertical slice
+
+taskを与えない代表caseで、1画面 / 1機能を端から端まで検査します。
+
+確認:
+
+- inspection scope固定
+- initial observation
+- safe interaction
+- keyboard / focus
+- screenshot
+- responsive observation
+- criterion check
+- measurement
+- usability-evaluation連携
 - cleanup
 - output validator
 
-この段階では複数taskの大量実行へ広げません。
+「taskがないので実行不能」にならないことを確認します。
 
-## 8. Step 6: post-task diagnosis / usability-evaluation統合
+この段階では全製品scanへ広げません。
 
-Step 5のprimary task outcome / primary action traceを固定した後だけ診断へ進みます。
+## 9. Step 7: accessibility / standard checks
 
-### Cognitive Walkthrough
+適用可能な代表criterionを実際に判定します。
 
-current specification、user flow、validated TC等からintended flowを確認できる代表caseで、post-task Cognitive Walkthroughを実施します。
+最低限、代表caseとして次を含めます。
 
-確認:
-
-- primary run開始前にstep sequenceをAgentへ正解経路として与えない
-- walkthroughはprimary outcome固定後だけ実行
-- fixed user / prior knowledge assumptionsで各stepのsub-goal / action visibility / mapping / execution / feedbackを確認
-- intended flow source refを残す
-- walkthrough結果でprimary task outcome / action traceを変更しない
-- authoritative / validated flowがないcaseでは正解sequenceを創作せずwalkthroughを省略
-
-### usability-evaluation
-
-primary runおよびpost-task diagnostic evidenceを `usability-evaluation` へ渡します。
+- target size / spacing
+- focus visible
+- keyboard operation
+- error identification
+- reflow / responsive
+- accessible name / role / state
 
 確認:
 
-- inspectionがbrowser ownerを維持
-- evaluationがread-only
-- pattern / standard判断をinspection側へ複製しない
-- evaluationはprimary task中へ割り込まない
-- evaluationから追加観測requestを返せる
-- requestはinspection側でscope / safety判定し、post-task diagnostic observationとして実行
-- 追加観測でprimary task outcome / action traceを書き換えない
-- primary runを再確認する場合は別Activityで実行
-- finding traceability
+- applicability / exception
+- observation / measurement
+- criterion result
+- evidence
+- product-wide conformanceへ昇格しないこと
 
-同一sessionへの並行操作を行いません。
+criterionの具体値や例外はcurrent referenceを正本にし、Plan記載値だけを実装へ固定しません。
 
-## 9. Step 7: visual / operability / responsiveness
-
-### visual
+## 10. Step 8: visual / responsive
 
 代表caseで、
 
 - clipping
 - overflow
+- overlap
 - primary action見切れ
-- overlay / modal
+- modal / popup
+- unexpected horizontal scroll
 - focus indicator
-- unexpected layout shift
-
-### operability
-
-代表taskでmeaningful action、retry、backtrack、dead end、error / recoveryをAgent run上の観測事実として記録します。
-
-回数をhuman efficiencyへ読み替えず、独自scoreや任意thresholdを作りません。
+- visual instability
 
 を確認します。
 
-### responsiveness
+DOMだけで確定せず、画像が必要な項目はscreenshotを正式なevidenceとして使います。
 
-代表actionで、action開始前にstart event / end predicate / measurement method / threshold Authorityの有無を固定したうえで、
+## 11. Step 9: performance / responsiveness
 
-- action start
-- first visible feedback
-- task-ready state
+### project thresholdあり
 
-のsystem elapsed timeを取得します。
+current Authorityにthresholdがある代表caseで、
 
-測定結果を見た後でend predicateを差し替えないcaseも検証します。
+- measurement
+- threshold
+- result
+- evidence
 
-Agentの生成・推論時間を混ぜないことを確認します。
+を結び付けます。
 
-project thresholdがないcaseと、Authorityにthresholdがあるcaseの両方を検証します。
+### project thresholdなし
 
-単一runをINP field resultへ誤変換しないcaseも含めます。
+数値は取得するが、独自FAIL thresholdを作らないcaseを確認します。
 
-## 10. Step 8: input method
+### Playwright timing
 
-最低限keyboard-only caseを実行します。
+actionability waitとactual input後のresponseを分離できることを確認します。
 
-- pointerでshortcutしない
-- focus progression
-- focus visibility
-- keyboard activation
-- task continuation
+### Core Web Vitals
 
-を確認します。
+metric定義・測定条件を満たす場合だけmetric名を使います。
 
-screen reader等の実行能力がrepository / hostで利用可能でない場合は、利用可能と偽らず、accessibility tree / keyboard evidenceまでを確認範囲として記録します。
+単一Playwright runをfield percentileの達成判定へ変換しないことを確認します。
 
-## 11. Step 9: workflow integration
+## 12. Step 10: optional task / flow
+
+task / flowが明示された代表caseだけ実施します。
+
+確認:
+
+- task / flow未指定では必須にならない
+- 指定されたflowは実操作できる
+- detailed TC実行要求はtest-executionへrouting
+- task resultをTC PASS / FAILへ変換しない
+- Agent / tool limitationをproduct defectへ自動変換しない
+
+## 13. Step 11: Cognitive Walkthrough optional case
+
+learnabilityを重点確認する代表caseでだけCognitive Walkthroughを利用します。
+
+確認:
+
+- 通常inspectionの固定工程ではない
+- intended flowを確認できるsourceがある場合だけ利用
+- 正しいstep sequenceを創作しない
+- 独立Skill / runtimeを追加しない
+
+## 14. Step 12: usability-evaluation統合
+
+objective observation、criterion result、measurementを `usability-evaluation` へ渡します。
+
+確認:
+
+- inspectionがbrowser ownerを維持
+- evaluationがread-only
+- objective factとexpert evaluationを混ぜない
+- standard / project binding resultとadvisory evaluationを混ぜない
+- additional observationはinspection側でscope / safety確認
+- finding traceability
+
+同一sessionへの並行操作を行いません。
+
+## 15. Step 13: workflow integration
 
 `_04a_usability-inspection-workflow-integration.md` に従い、
 
@@ -242,7 +296,7 @@ screen reader等の実行能力がrepository / hostで利用可能でない場�
 
 test-target-inspection / test-executionのownerロジックへusability-inspection固有処理を埋め込みません。
 
-## 12. Step 10: repository eval
+## 16. Step 14: repository eval
 
 ### trigger
 
@@ -253,14 +307,13 @@ repository標準件数に合わせます。
 最低限:
 
 - output schema
-- task selection summary / coverage limitation
-- task outcome / outcome basis
-- action / observation / measurement ref
-- Agent run上の操作負荷
-- timing value / threshold整合
-- goal provenance
-- prior knowledge / experience assumptions / state / provenance
-- primary outcome固定 / post-task diagnosis順序
+- inspection scope closure
+- observation / criterion / measurement refs
+- criterion result / applicability / evidence
+- project Authority ref
+- threshold整合
+- task optionality
+- Playwright observation fields
 - cleanup
 - evaluation / Finding ref
 
@@ -270,13 +323,19 @@ repository標準件数に合わせます。
 
 ### real Agent
 
-利用可能な環境で、実Agentがtask scenarioからuser-facing情報だけを使って操作することを確認します。
+利用可能な環境で、実Agentがtaskなしのpage inspectionを完了できることを確認します。
 
-あわせて、Agentがcontrolを見落としただけのcaseをproduct defectへ昇格しないこと、UI側の阻害を直接観測したcaseだけ `未達成` を許可することを確認します。
+あわせて、
 
-さらに、primary task中にusability-evaluationやTC stepで正解経路を補助しないこと、primary outcome固定後にだけCognitive Walkthrough / usability-evaluationを実行することを確認します。
+- objective factとAIの専門評価を分離する
+- off-viewport locator shortcutでdiscoverability問題を隠さない
+- actionability waitをpost-input responsivenessへ混ぜない
+- strict criterionとadvisory guidanceを分ける
+- taskが指定された場合だけtask modeを使う
 
-## 13. Step 11: repository integration
+ことを確認します。
+
+## 17. Step 15: repository integration
 
 最新mainを基準に、
 
@@ -292,57 +351,54 @@ repository標準件数に合わせます。
 
 数値をPlan記載値で固定しません。
 
-## 14. 完了条件
+## 18. 完了条件
 
 次をすべて満たしたら `usability-inspection` 実装完了とします。
 
 - Agent Skills仕様を満たす
-- task scenario / success condition契約がある
-- user goalの出所または推定状態を保持する
-- prior knowledge / experience assumptions、state、根拠を保持し、不明な経験レベルを勝手に確定しない
-- broad scopeではtask候補、selected / not-selected / deferred、coverage limitationを保持する
-- task母集団の根拠がない場合に製品全体 / 代表taskを評価したと主張しない
-- live execution対象をPlaywrightで到達可能なWeb UIへ限定する
-- detailed TCを正本にしない
-- user-facing informationからtask pathを選ぶ
-- hidden implementation情報でdiscoverability問題を回避しない
-- task outcomeをTC PASS / FAILと分離する
-- `未達成` はproduct-side blocker evidenceがある場合だけ使用し、Agent / tool limitationまたは切り分け不能は `判定不能` とする
-- meaningful action / retry / backtrack / dead end / error / recoveryをhuman efficiencyへ読み替えない
+- task / user personaなしでもlive Web UIを検査できる
+- inspection scopeを固定し、選定観点をclosureできる
+- objective observationとexpert evaluationを分離する
+- applicable standard / binding criterionをcriterion単位で判定できる
+- criterionのapplicability / exception / evidenceを保持する
+- advisory guidanceをstrict FAILへ変換しない
+- project thresholdがなければ独自FAIL thresholdを作らない
+- measurementのmethod / value / unit / evidenceを保持する
+- single-run measurementを条件未達のfield metricへ昇格しない
+- Playwright auto-scrollでdiscoverability問題を隠さない
+- Playwright actionability waitとpost-input responsivenessを分離する
+- hidden implementation情報でUI発見を先回りしない
 - visual observationをscreenshot等へ追跡できる
-- timing measurementでAgent思考時間を除外する
-- measurement definitionをaction前に固定し、結果を見た後でend predicateを変更しない
-- arbitrary performance thresholdを作らない
-- single-run elapsed timeをINP field resultへ昇格しない
-- keyboard-only representative caseを確認する
+- keyboard / focus representative caseを確認する
+- task / flowは指定された場合だけ扱う
+- detailed TC実行をtest-executionと分離する
+- Cognitive Walkthroughをoptional techniqueとして扱う
 - browser ownerがusability-inspectionである
-- primary task outcome / action traceをpost-task diagnosis前に固定する
-- Cognitive Walkthroughを行う場合はintended flow sourceを追跡でき、primary run後にだけ実行する
-- usability-evaluationはprimary task中へ割り込まず、追加観測もpost-task diagnosisとして扱う
 - usability-evaluationとのread-only連携が成立する
 - same session concurrent manipulationを要求しない
 - side-effect / cleanup契約を満たす
 - FindingがPR #13契約へ接続する
-- representative-user usability studyを実施したと偽らない
+- human usability studyを実施したと偽らない
 - test-target-inspection / test-execution / exploratory-testingと責務重複しない
 - trigger / deterministic / semantic eval PASS
 - repository validation PASS
 - README / EVALS / Skill一覧整合
 - git diff --check PASS
 
-## 15. Plan全体の完了
+## 19. Plan全体の完了
 
 本PRの後続実装は、
 
 1. `usability-evaluation` が `_06_evaluation-ci-implementation-order.md` の完了条件を満たす
-2. `usability-inspection` が本ファイル§14の完了条件を満たす
+2. `usability-inspection` が本ファイル§18の完了条件を満たす
 3. 両Skillのqa-workflow routingと相互連携が成立する
 
 まで完了扱いにしません。
 
-## 16. 対象外
+## 20. 対象外
 
 - human participant recruitment / study management
+- persona generation
 - survey platform
 - eye tracking
 - session replay基盤
@@ -354,4 +410,3 @@ repository標準件数に合わせます。
 - 新browser framework
 - global usability-inspection task ID体系
 - native mobile / desktop app live automation runtime
-- automatic user persona generation
