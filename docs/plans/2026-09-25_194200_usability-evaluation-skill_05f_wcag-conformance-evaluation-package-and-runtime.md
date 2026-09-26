@@ -12,6 +12,10 @@ skills/wcag-conformance-evaluation/
 ├── references/
 │   ├── source-catalog.md
 │   ├── wcag-em-2.md
+│   ├── wcag-overview.md
+│   ├── wcag-quickref.md
+│   ├── understanding-conformance.md
+│   ├── wcag2mobile-22.md
 │   ├── earl-1.0.md
 │   └── report-tool.md
 ├── assets/
@@ -43,6 +47,10 @@ skills/wcag-conformance-evaluation/
 - WCAG 2.2
 - WCAG-EM 2.0
 - WCAG-EM Report Tool
+- WCAG Overview
+- How to Meet WCAG 2 (Quick Reference)
+- Understanding Conformance
+- Guidance on Applying WCAG 2.2 to Mobile Applications（responsive / touch / mobile Webがcurrent targetに含まれる場合）
 - ACT Rules Format 1.1 / All ACT Rules
 - Evaluation and Report Language (EARL) 1.0 Schema
 - WAI-ARIA / ARIA in HTML
@@ -60,11 +68,24 @@ WAI OverviewはWCAG-EM 2.0のresourceとしてWCAG-EM Report Toolを案内して
 
 各catalogは少なくとも次を保持します。
 
-- WCAG version / canonical URI
+- WCAG version / source canonical URI
+- Conformance Claimに使用するguideline title / version / claim URI
 - Success Criterion machine key / number / level / canonical criterion URI
 - 5つのWCAG conformance requirement machine key / canonical URI
+- Conformance Requirementごとの固定rule metadata
+  - Conformance Level: target level required Success Criteria refs
+  - Full Pages: full page / automatically presented responsive variation closure
+  - Complete Processes: process全stepのsame-or-better conformance requirement
+  - Only Accessibility-Supported Ways of Using Technologies: baseline ref requirement
+  - Non-Interference: version固有の固定Success Criteria refs
+- Conforming Alternate Version contract
+  - designated level
+  - same information / functionality / human language
+  - currentness
+  - W3Cが定めるreachability alternatives
 - Conformance Claim required field keys
 - versionで利用できるConformance Claim optional field keys
+- third-party monitoring / repair contract metadata。repair windowは2 business days
 - Statement of Partial Conformance type / required semantic input / version-specific render metadata
 
 自然言語のSuccess Criterion本文をruntimeへ複製する必要はなく、source item / canonical URLへ追跡できるmetadataに限定します。version間でSuccess Criteria集合やclaim contractを合成せず、target versionのcatalogだけをrequirement universe / claim contractとして使用します。
@@ -125,6 +146,7 @@ target WCAG version自体が不明・未指定の場合はInput不足として `
 
 - product enclosure
 - in-scope root / boundary
+- scope coverage rows: third-party content / services、language versions、responsive / device-dependent variations、separately hosted related areas、authenticated / restricted views
 - out-of-product boundary / reason（存在する場合）
 - conformance target
 - additional requirement refs（存在する場合）
@@ -145,13 +167,18 @@ semantic layerは要求の意味とaffected step / output、本Skill目的内か
 
 ### Accessibility Support Baseline
 
-- baseline ref
+- baseline ref / revision
+- previous baseline ref（拡張時）
 - baseline description
 - browser / user agent conditions
 - assistive technology / adaptive approach conditions
 - other software / settings conditions
 - source / Authority refs
+- formal evidenceへ使用したenvironment refs
+- added environment refs / extension reason（拡張時）
 - limitation
+
+initial baseline外のenvironmentをformal evidenceへ使用した場合、scriptがbaseline setを比較しnew revisionをmaterializeします。diagnostic-only environmentはsemantic inputでformal evidence対象外と明示し、baselineへ追加しません。
 
 ### Target Exploration
 
@@ -189,6 +216,9 @@ semantic layerは要求の意味とaffected step / output、本Skill目的内か
 - decision rationale
 - inventory / candidate scope provenance
 - selected sample refs
+- previous evaluation / sample set ref（再評価の場合）
+- rerun lineage: retained / replaced / added / unavailable sample refs（再評価の場合）
+- sampling approach / size change reason（再評価で変更する場合）
 - sampling skippedの場合のcomplete inventory ref / completeness
 - sampling skippedの場合、Structured Sample / Random Sample / Structured / Random Comparisonがnot-applicableであること
 - sampling skippedでもComplete Processes / Step 4.2評価が必要であること
@@ -246,7 +276,11 @@ URLだけでdynamic state / process sampleを識別できない場合は、必�
 - result: satisfied / not-satisfied / undetermined
 - observation / test rule result refs
 - evidence refs
+- unmet example refs（not-satisfiedの場合）
+- reused result ref / unchanged-content evidence（Step 4.2でcurrent resultを再利用した場合）
 - limitation
+
+Conforming Alternate Versionを使う場合、alternate versionを別sample rowとして数えません。同じfull page resultへalternate version refsを紐付け、target level、same information / functionality / human language、currentness、reachability alternativeの各condition resultを保持します。Non-Interferenceはtarget version catalogの固定Success Criteria refsからscriptがrequired result refsを生成します。
 
 ### Structured / Random Comparison
 
@@ -280,6 +314,11 @@ Step 5.1は、Step 1〜4のoutcomeを成果物内で追跡できることを必�
 - Step 4.1 initial sample evaluation
 - Step 4.2 complete process evaluation
 - Step 4.3 structured / random comparisonと必要な再sampling loop
+- not-satisfied Conformance Requirement / Success Criterionごとの最低1 example coverage
+- Step 1.4で全occurrence報告が要求された場合の追加coverage
+- human-readable report / Evaluation Statement / accompanying documentationのaccessible output closure
+
+script / validatorは `not-satisfied requirement set - example-covered requirement set` を計算し、差分0を要求します。accessible output closureでは、少なくともheading hierarchy、table header、画像 / screenshot evidenceのtext description、色だけに依存しない状態表現、意味の分かるlink textを検証します。HTML / PDF等へ別ownerが変換した後の形式はこのclosureへ含めません。
 
 Step 5.2 / 5.3 / 5.5はoptional methodology requirementですが、本Skillの目的内機能として実装します。利用者要求、Step 1.4 additional requirements、またはreport出力条件に応じて生成します。Step 5.4 aggregated scoreだけは、単一scoreが誤解を招きやすくWCAG 2もrating schemeを提供しないため、本Planの目的外として生成しません。
 
@@ -335,7 +374,7 @@ WCAG Conformance Claimは指定versionのWCAG側contractとして扱い、WCAG-E
 - web content technologies relied upon
 - claim scope内の全Web page / complete processを評価済みであるevidence、またはclaim scope内の各pageがconformance requirementsを満たすことを保証するprocess evidence
 
-representative sampleだけではclaimを生成しません。third-party contentを監視・修復する経路でfull claimを成立させる場合は、WCAG側条件を満たすmonitoring / repair evidenceも必須にします。
+representative sampleだけではclaimを生成しません。claimに使用するguideline title / version / URIはtarget version catalogのclaim fieldを使い、source取得用canonical URLから推測しません。third-party contentを監視・修復する経路でfull claimを成立させる場合は、全該当pageでnon-conforming contentを識別できること、継続monitoringできること、検出したnon-conforming contentを2 business days以内にremove / bring into conformanceできることをevidenceで必須にします。scriptはrepair window / coverage guardを固定し、control ownershipやmonitoring可能性の意味判断だけをsemantic layerへ残します。
 
 WCAG Statement of Partial ConformanceはConformance Claimではありません。次を別typeとして扱います。
 
@@ -394,6 +433,9 @@ Function:
 - target versionに対応するstatic catalogを選択
 - target levelに必要なSuccess Criteria集合を導出
 - target versionの5つのWCAG conformance requirement集合を導出
+- Non-Interference required Success Criteria refsを導出
+- Conforming Alternate Version required condition keys / reachability alternativesを導出
+- target versionのclaim guideline title / version / URIとthird-party repair contractを導出
 - duplicate / unknown requirement keyをreject
 - expected requirement setをcanonical sort
 - target version以外のcatalogを混在させない
@@ -405,6 +447,7 @@ Output:
 - required Success Criterion refs（supported時だけ）
 - required conformance requirement refs（supported時だけ）
 - target versionに対応する `static_data_versions` key / hash
+- target versionのconformance rule metadata
 - target versionのclaim contract metadata
 - issues
 
@@ -416,11 +459,16 @@ PR #11のcurrent Machine Runtime契約を再利用します。独自runtime enve
 
 deterministic runtimeへ載せるもの:
 
-- `wcag_requirements.py` のversion / level → expected requirement集合
+- `wcag_requirements.py` のversion / level → expected requirement集合 / Conformance Requirement fixed rule metadata
 - sample identity registry / selected set / duplicate / overlap / union
+- rerun sample lineage / previous-current identity resolution
 - random target count、candidate population fingerprint、selection result validation
 - complete process materialization
+- accessibility support baseline set / revision extension
+- Conforming Alternate Version condition row skeleton / Non-Interference fixed Success Criteria refs
+- Step 4.2 unchanged-result reuse eligibility
 - Step 4.3 compare / reconcile
+- Step 5.1 unmet-example coverage / accessible output closure
 - freshness / currentnessに必要なnormalized input
 - `wcag_em_structure.py` のclosure / cross-reference / Evaluation Specifics / statement / claim guard / machine-owned section materialization
 - `earl_report.py` のhuman-readable result → EARL 1.0 JSON-LD materialization
@@ -431,10 +479,12 @@ deterministic runtimeへ載せないもの:
 - structured sampleの代表性判断
 - sample / content type / Findingの意味的同一性判断
 - partial statement reason、third-party control、language support等の意味判断
+- previous structured sampleのうち比較可能性 / current representativenessのため何をretain / replaceすべきか
+- Conforming Alternate Versionのsame information / functionality / human language / currentnessの意味判断
 
 random selection結果はmethod / provenance / selected sample identityとともに後続Machine Runtime Inputへ渡します。保存済みsample resultはPR #11 current verifierでfreshnessを再計算し、currentの場合だけ再利用します。
 
-runtime Inputには少なくともtarget WCAG version / level、scope、normalized additional evaluation requirements、accessibility support baseline、environment、sample identity、evidence identity、Authority / reference refs、選択versionのstatic data versionを含め、これらが変わった場合に旧resultをcurrent扱いしません。
+runtime Inputには少なくともtarget WCAG version / level、scope、scope coverage rows、normalized additional evaluation requirements、accessibility support baseline revision、environment、previous evaluation / sample lineage（再評価の場合）、sample identity、evidence identity、Authority / reference refs、選択versionのstatic data versionを含め、これらが変わった場合に旧resultをcurrent扱いしません。
 
 ## 4. sampling.py
 
@@ -484,6 +534,38 @@ Output:
 - skip rationale / provenance
 - closure data
 - issues
+
+### materialize-repeat-evaluation
+
+samplingを使う再評価で使用します。
+
+Input:
+
+- previous evaluation / sample set ref
+- previous structured / random / process sample identities
+- current canonical sample identity registry
+- current exploration coverage refs
+- semantic decision: significant change / structured retain-replace decisions
+- current candidate population / provenance
+
+Function:
+
+- previous identityをcurrent identityへ解決し、見つからないものを `unavailable` にする
+- structured sampleを `retained / replaced / added` へmaterialize
+- stale / duplicate identityをrejectする
+- significant changeで比較可能性を維持できない場合はprevious sampleをcurrent setへ無理に保持しない
+- sampling approach / target size変更があればreasonを要求する
+- random sampleのreplacement identityをLLM inputから受け付けず、current candidate populationから `select` へ渡す
+
+Output:
+
+- retained / replaced / added / unavailable sample refs
+- current structured revision
+- random replacement count / selection request
+- sampling approach / size change reason
+- issues
+
+W3Cの「typically about half」はsemantic guidanceとして扱い、replacement ratioを固定値にはしません。
 
 ### derive-candidates
 
@@ -638,7 +720,9 @@ final artifact assemblyのownerです。
 Input:
 
 - evaluation headerのsemantic field
-- scope / accessibility support baselineのsemantic decisions
+- previous evaluation / sample lineage semantic input（再評価の場合）
+- scope / scope coverage / accessibility support baselineのsemantic decisions
+- formal evidenceへ採用するenvironment decisions
 - additional evaluation requirement semantic decisions
 - sampling procedure semantic decision: 製品全体を評価可能か
 - exploration decisions
@@ -648,6 +732,8 @@ Input:
 - observation handoff semantic requirements
 - returned inspection artifact / evidence refs
 - sample requirement result decisions / evidence
+- Conforming Alternate Version semantic decisions: same information / functionality / human language / currentness
+- Step 4.2 changed / unchanged content semantic identity decisions（machine identityだけで確定できない場合）
 - content type / Finding grouping decisions
 - Finding semantic input
 - optional Evaluation Specifics input / archive refs
@@ -673,7 +759,9 @@ Function:
 - draft key → final ref解決
 - cross-reference解決
 - WCAG-EM Step 1〜5 closure
-- scope / accessibility support baseline closure
+- scope coverage row / in-scope closure
+- accessibility support baseline set / revisionをmaterializeし、formal evidenceで使ったinitial-baseline外environmentを追加する
+- previous evaluation / sample lineageをcurrent identityへ解決し、rerun retained / replaced / added / unavailable closureをmaterializeする
 - additional evaluation requirementごとにaffected step / outputを固定し、`applied / blocked / out-of-scope` とrequired evidence / output refsのclosureをmaterializeする。目的内要件のout-of-scopeは禁止
 - sampling procedure used / skippedとselected sample set closure
 - sampling skippedではcomplete inventory → selected sample set traceabilityとstructured / random / Step 4.3 not-applicable closure
@@ -682,14 +770,19 @@ Function:
 - expected handoff集合とreturned current valid result集合のclosure
 - complete process sequence closure
 - process-added sample coverage
+- Conforming Alternate Versionを別sampleへ数えずfull page resultへcondition rowsをmaterializeする
+- Non-Interference fixed Success Criteria refsをtarget version catalogからmaterializeする
+- Step 4.2でcurrent unchanged resultのreuse eligibilityをmachine evidence / freshnessからmaterializeし、変化または不明なcontentを再評価対象へ送る
 - target levelから独立導出したrequired sample result coverage
 - Step 4.3集合差分からiteration action / chain closureをmaterialize
 - structured revision更新時のcandidate population fingerprint再計算、population同一時のold random retention / overlap removal / top-up、population変更時のreselection、process再materializeを反映
 - sample result freshnessをPR #11 current verifier結果から反映し、stale resultをclosureへ数えない
 - Step 5.1でStep 1〜4の各required outcomeが成果物へ存在すること
+- not-satisfied Conformance Requirement / Success Criterionごとの最低1example coverageをmaterialize / validateする。Step 1.4でall-occurrence reportingを要求した場合は全occurrence closureも分離して検証する
+- human-readable report / Evaluation Statement / accompanying documentationについて本Skill所有形式のaccessible output closureをmaterializeする
 - Step 5.2 Evaluation Specificsのrecord scope / evidence refs / software metadata / secret非複製
 - Evaluation Statementはtarget WCAG 2.2の場合だけfull / partial minimum fieldsと生成条件をmaterializeし、2.0 / 2.1ではStep 5.3 sectionを生成しない
-- WCAG Conformance Claim / Statement of Partial Conformanceはtarget version catalogのclaim contractからtype別required / optional fieldsと生成条件をmaterialize
+- WCAG Conformance Claim / Statement of Partial Conformanceはtarget version catalogのclaim contractからtype別required / optional fieldsと生成条件をmaterialize。third-party monitoring / repair経路では2 business days / all-affected-pages identification guardを適用
 - Step 5.5 EARL sidecar request / ref / closure
 - report section order固定
 - summary count生成
@@ -798,7 +891,9 @@ production helperとは別実装で少なくとも次を検証します。
 - target versionに対応する承認済みcatalog hashと一致
 - target version以外のcatalogをexpected requirement集合へ混在させていない
 - static catalogから独立導出したtarget level required Success Criteria / conformance requirement集合とactual coverageの一致
-- accessibility support baseline
+- scope coverage rows / in-scope closure
+- accessibility support baseline revision / extensionとformal evidence environmentの一致
+- previous evaluation / rerun sample lineage（該当時）
 - additional evaluation requirementsのref / affected step / status / output closure
 - sampling procedure used / skippedとselected sample set closure
 - sampling skipped時のcomplete inventory / selected set一致、structured / random / Step 4.3 not-applicable、complete process評価継続
@@ -810,6 +905,9 @@ production helperとは別実装で少なくとも次を検証します。
 - candidate population fingerprint
 - selection method
 - process sequenceから導出したprocess-added sample / membership closure
+- Conforming Alternate Versionが別sampleに数えられず、required condition / reachability alternativeがtarget version contractと一致
+- Non-Interference fixed Success Criteria refs / result coverage
+- Step 4.2 unchanged-result reuseがidentity / evidence / freshnessでcurrentなものだけに限定される
 - observation handoffのoriginating evaluation / revision / resume operation / expected refsとreturned inspection artifact cross-reference
 - sample result cross-reference
 - target levelに必要なrequirement result coverage
@@ -817,9 +915,12 @@ production helperとは別実装で少なくとも次を検証します。
 - structured revision更新後のcandidate population fingerprint再計算、population同一時のoverlap除外 / retained random / top-up、population変更時のreselection、process再materialize
 - sample result freshness / stale再評価
 - Step 5.1のStep 1〜4 outcome closure
+- not-satisfied Conformance Requirement / Success Criterion setとexample-covered setの差分0
+- Step 1.4 all-occurrence reporting指定時の全occurrence closure
+- human-readable report / Evaluation Statement / accompanying documentationのaccessible output contract
 - Step 5.2 Evaluation Specificsのscope / archive identity / tool metadata / secret・不要PII非複製
 - Evaluation Statementはtarget WCAG 2.2だけでfull / partial生成条件とStep 5.3 minimum fieldsを検証し、2.0 / 2.1ではsection不存在を要求
-- WCAG Conformance Claim required / optional fieldsをtarget version catalogのclaim contractから検証し、full-scope coverage guardを適用
+- WCAG Conformance Claim required / optional fieldsをtarget version catalogのclaim contractから検証し、claim guideline URI / full-scope coverage / third-party 2-business-day monitoring-repair guardを適用
 - WCAG Statement of Partial Conformance third-party / language guard / canonical wording
 - Step 5.5 EARL assertion coverage、criterion URI、outcome mapping、mode provenance、human-readable reportとの一致
 - Finding refs
@@ -983,6 +1084,42 @@ required claim fieldsを満たし、higher-level SC、not-relied-upon technology
 
 → optional componentsをnormalized claimへ保持するが、required fieldの代替には使わない。
 
+### Case AA: baseline extension
+
+initial baseline外のscreen reader / browser combinationをformal evidence取得に使用する。
+
+→ returned environmentをbaselineへ追加してnew baseline revisionを生成し、関連freshnessを再計算する。diagnostic-only利用なら追加しない。
+
+### Case AB: repeat evaluation
+
+previous evaluation / sample setがあり、current productにsignificant changeはなく一部sampleを比較用に保持しつつcoverageを更新する。
+
+→ previous sampleをcurrent identityへ解決し、structured sampleをretained / replaced / addedへmaterializeする。50% replacementを固定規則にせず、random replacement identityはscript / external random mechanismが選ぶ。
+
+### Case AC: conforming alternate version
+
+primary contentがtarget levelを満たさないがalternate version候補がある。
+
+→ alternate versionを別sampleへ数えず、target level、same information / functionality / human language、currentness、reachability alternativeの全conditionを閉じる。意味条件が不足すればConformance Levelをsatisfiedにしない。
+
+### Case AD: non-interference
+
+not-relied-upon contentを含むsampleを評価する。
+
+→ target version catalogのNon-Interference Success Criteria refsをscriptが追加し、required resultが欠ければconformance requirementをsatisfiedにしない。
+
+### Case AE: Step 5.1 example coverage / accessible report
+
+複数のnot-satisfied Success Criterion / Conformance Requirementを含むreportを生成する。
+
+→ 各not-satisfied refに最低1exampleを対応付け、human-readable reportのheading / table / image text / status expression contractを検証する。Step 1.4でall-occurrence reporting指定時は全occurrenceも閉じる。
+
+### Case AF: third-party monitored full claim
+
+uncontrolled third-party contentを含むpageについてmonitoring / repair経路でfull conformance claimを作る。
+
+→ all affected pagesでcontentを識別でき、monitoring可能で、non-conforming contentを2 business days以内にremove / bring into conformanceできるevidenceが揃う場合だけclaim guardを通す。
+
 ## 11. 完了条件
 
 - package単体でSkill contractを理解できる
@@ -990,27 +1127,35 @@ required claim fieldsを満たし、higher-level SC、not-relied-upon technology
 - formal direct trigger後にlive observationが必要な場合、qa-workflowが利用可能ならhandoff → usability-inspection → formal Skill resumeへ遷移し、qa-workflowを利用できないstandalone環境だけblockedへ閉じられる
 - WCAG-EM Report ToolをWCAG-EM 2 schema Authorityとして扱わず、runtime dependencyにもしていない
 - Step 1.4 additional evaluation requirementsをartifact-local refへ採番し、目的内要件をaffected step / outputへ反映してappliedまたはblockedへ、明示目的外だけを理由付きout-of-scopeへ閉じられる
+- scope coverageでthird-party / language / responsive-device / separately-hosted / authenticated-restricted領域を明示的に閉じられる
+- initial baseline外environmentをformal evidenceへ使用した場合にbaseline revisionをscriptで拡張し、freshnessを再計算できる
 - WCAG 2.0 / 2.1 / 2.2の各target version / levelからrequired Success Criteria / conformance requirement集合を該当versionのstatic catalogだけで独立導出できる
 - 3 catalogのcanonical hashをversion別 `static_data_versions` keyへ保持し、validator独立再計算と承認済みhash contract testをPASS
 - missing / unresolved versionとunsupported / out-of-scope versionを区別し、別versionへ暗黙変換しない
 - `runtime_contract.py` でPR #11 Machine Runtime / freshness契約を再利用し、random selectionそのものはdeterministic runtimeへ含めない
 - sampling procedure used / skippedの両経路を持ち、skippedでは全in-scope sampleをselected sample setへmaterializeできる
+- 再評価ではprevious sampleをcurrent identityへ解決し、retained / replaced / added / unavailable lineageをmaterializeできる。replacement ratioは固定しない
 - random sample 10%整数化がscript化され、structured count 1 / 9 / 10 / 11の境界fixtureを持つ
 - random selectionへfixed seedを要求しない
 - canonical sample identity registryをscriptがmaterializeし、duplicate / overlap / union / process membershipを同じidentityで判定する
 - finite inventory時のrandom candidate集合、process-added sample、Step 4.3のboolean / actionをscriptが導出し、Agentが手組みしない
 - finite inventoryがない場合もLLMがselected sample identityを選ばず、scriptまたは外部random mechanismの結果だけを受ける
 - candidate population fingerprintをscriptが導出し、Step 4.3でstructured revisionが変わった場合、population同一時のrandom target再計算 / overlap除外 / retained random / 不足分top-up、population変更時のreselection、process再materializeを閉じる
+- Conforming Alternate Versionを別sampleに数えずcondition closureをmaterializeし、Non-Interference fixed Success Criteria集合をcatalogから導出できる
+- Step 4.2ではcurrent unchanged resultだけを再利用し、変化 / 不明contentとinteractionを再評価できる
 - 既存sample resultはPR #11 freshness判定がcurrentの場合だけ再利用する
 - sample / process / result / comparison refとmachine-owned structured sectionをscriptがmaterializeし、Agentが値単位で再構築しない
 - Step 4.3 loopをartifact上で追跡できる
 - Step 5.1 required outcome closureをvalidatorで検証できる
+- 各not-satisfied Conformance Requirement / Success Criterionを最低1exampleへ対応付け、all-occurrence追加要件も別closureで検証できる
+- human-readable report / Evaluation Statement / accompanying documentationを本Skill所有形式ではaccessible output contractへ閉じられる
 - Step 5.2 Evaluation Specificsの安全なarchive / tool / method記録を実装し、secret / unnecessary PIIを複製しない
 - Step 5.3 Evaluation Statementはtarget WCAG 2.2だけでfull / partial minimum fieldsをvalidator検証し、2.0 / 2.1ではStep 5.3 sectionを生成しない
-- WCAG 2.0 / 2.1 / 2.2 Conformance Claimのrequired / optional fields / full-scope guardをvalidatorで検証できる
+- WCAG 2.0 / 2.1 / 2.2 Conformance Claimのrequired / optional fields / version別claim URI / full-scope guardをvalidatorで検証できる
+- third-party monitoring / repair経路ではall affected pages identification / monitoring / 2 business days repair guardを検証できる
 - WCAG Statement of Partial Conformance - Third Party Content / Languageのrequired fields / canonical wording / guardをvalidatorで検証できる
 - Step 5.5 EARL 1.0 JSON-LD sidecarをdeterministically生成し、human-readable reportとのassertion coverage一致を検証できる
 - Step 5.4 aggregated scoreは目的外として生成しない
 - production helperとvalidatorが別実装
-- semantic Case A〜ZおよびCase C2 PASS
+- semantic Case A〜Z、Case C2、Case AA〜AF PASS
 - `_06c_canonical-live-validation.md` のrepository-controlled canonical fixtureでWCAG-EM orchestration E2EをPASSできる

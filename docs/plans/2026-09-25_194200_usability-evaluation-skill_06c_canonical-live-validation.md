@@ -37,6 +37,8 @@ fixtureは少なくとも次を満たします。
 - browser / viewport / input methodを固定できる
 - 複数viewまたはstateを持ち、samplingを使うstructured sample / random sample / complete processの経路検証ができる
 - 同一URLで異なるstateと、同一stateへ別経路で到達するcaseを持ち、sample identity canonicalizationをbrowser evidence付きで検証できる
+- complete process内に、共通header等のunchanged contentとinteraction後に変化するcontentを持ち、Step 4.2のcurrent-result reuse境界を検証できる
+- 必要なら同一static fixture内の別pathでConforming Alternate Version候補を表現できる。新しいserver / originはこのためだけに追加しない
 - 同じfixture server内に、製品全体を列挙できる小さいself-enclosed product scopeを持ち、sampling procedure skip経路を追加serverなしで検証できる
 - keyboard / focus、visual / responsive、general accessibility observationを少なくとも1件ずつ実行できる
 - taskなしpage inspectionと、明示task / flow inspectionの両方を実行できる
@@ -123,9 +125,12 @@ formal request
 - sampling procedure skippedのcase。completeなin-scope inventory全件がselected sample setとなり、structured / random / Step 4.3がnot-applicableでもcomplete process / Step 4.2評価が続くこと
 - 同一URLの異なるstateを別sample、同じstateへの別経路を同一sampleとして扱えること
 - observation結果がPR #11 freshness契約でcurrentな場合だけformal evaluationへ再利用されること
+- Step 4.2でunchangedかつcurrentなcontent resultは再利用し、interaction後にchanged / unknownとなったcontentだけを再評価すること
+- Conforming Alternate Version候補を別sampleへ数えず、primary contentと同じfull-page evaluationへ紐付けること
 - Step 1.4 additional evaluation requirementとして「代表sampleに加えてfixtureの特定viewを追加評価し、Step 5.5 reportも出力する」を指定し、`ADDREQ-001` 等のref、sample追加、output closureまで同一evaluationで追跡できること
 - Step 5.1 outcome closure
-- report materialization
+- not-satisfied requirement / Success Criterionごとのexample coverageと、all-occurrence追加要件がある場合の追加coverage
+- report materialization / accessible output contract
 - Step 5.2 Evaluation Specificsを有効化したcaseで、browser / tool metadataとsafe evidence refがreportへ戻ること。secret値は保持しない
 - Step 5.5を有効化したcaseで、browser observation由来のformal resultがEARL assertionへ対応しhuman-readable reportと一致すること
 
@@ -161,8 +166,8 @@ repository implementationの完了条件:
 - evidence safety / side-effect / browser ownershipをPASS
 - repository標準のdeterministic / semantic / routing / Skill validationをPASS
 - WCAG 2.0 / 2.1 / 2.2 requirement catalogのcanonical hash再計算と承認済みhash contract testをdeterministic validationでPASS
-- version切替、unsupported / unresolved / out-of-scope分離、non-finite random selection guard、candidate population変更時のreselection、Step 5.3 Evaluation Statementの2.2-only guard、version別Claim各guard、EARL全mappingはdeterministic / semantic evalでPASS
-- browser E2EではStep 1.4 additional requirementのsample / report反映、sampling used / skipped、sample identity、same-population Step 4.3再sampling、freshness付きobservation handoff / resume、safe Evaluation Specifics handoff、EARL assertionとのresult一致をPASS
+- version切替、unsupported / unresolved / out-of-scope分離、scope coverage row、baseline extension、repeat-evaluation retained / replaced / added lineage、non-finite random selection guard、candidate population変更時のreselection、Conforming Alternate Version条件、Non-Interference固定SC集合、Step 5.1 example coverage / accessible output、Step 5.3 Evaluation Statementの2.2-only guard、version別Claim URI / third-party 2-business-day guard、EARL全mappingはdeterministic / semantic evalでPASS
+- browser E2EではStep 1.4 additional requirementのsample / report反映、sampling used / skipped、sample identity、Conforming Alternate Versionのfull-page grouping、Step 4.2 unchanged-result reuse、same-population Step 4.3再sampling、freshness付きobservation handoff / resume、safe Evaluation Specifics handoff、EARL assertionとのresult一致をPASS
 - canonical fixtureで未解決blockedが0
 
 external acceptance:

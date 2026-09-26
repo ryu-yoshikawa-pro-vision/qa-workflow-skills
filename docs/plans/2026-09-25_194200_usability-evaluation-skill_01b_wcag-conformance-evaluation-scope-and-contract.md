@@ -34,6 +34,7 @@
 - side-effect / cleanup scope
 - evaluation期間または開始時点
 - project Authority / release gateとの関係（存在する場合）
+- previous evaluation ref / revision（再評価の場合）
 
 target WCAG version、level、self-enclosedなdigital product scope、accessibility support baselineを確定できない場合は推測せず `unresolved` とし、formal evaluationを開始しません。WCAG 2.0 / 2.1 / 2.2はsupportedです。指定versionを別versionへ暗黙変換しません。version自体が不明・未指定の場合は `unresolved`、現在catalogを持たない将来version等が明示された場合は `unsupported` としてformal evaluationを開始しません。product内の特定page / componentを任意に除外してscopeを狭めません。
 
@@ -58,7 +59,21 @@ WCAG-EM 2.0 Step 1へ対応付けます。
 - accessibility support baseline
 - additional evaluation requirements（存在する場合）
 
-を成果物へ固定します。additional requirementがsample追加、全occurrence報告、特定use case / user group分析、追加解決案、Step 5.2 / 5.5出力、特定report template等を要求する場合は、既存Skill責務の範囲でaffected stepへ反映します。human participantを使う評価等、本Planで明示的に目的外とした要求はout-of-scope理由を残します。
+を成果物へ固定します。
+
+scopeは自由記述だけで閉じず、少なくとも次を個別に確認します。
+
+- third-party content / services
+- language versions
+- responsive / device-dependent variations
+- 別origin / subdomain / hosted application等にある同一product領域
+- authenticated / restricted views
+
+semantic layerは各領域が同じdigital productへ属するか、in-scopeかを判断します。scriptは確認対象row、scope ref、in-scope / out-of-product closure、reason / evidence refをmaterializeし、未確認rowを暗黙に省略しません。
+
+additional requirementがsample追加、全occurrence報告、特定use case / user group分析、追加解決案、Step 5.2 / 5.5出力、特定report template等を要求する場合は、既存Skill責務の範囲でaffected stepへ反映します。human participantを使う評価等、本Planで明示的に目的外とした要求はout-of-scope理由を残します。
+
+accessibility support baselineは初期定義後に固定不変とは扱いません。formal evidence取得で初期baseline外のOS / browser / assistive technology / other user agentを実際に使用した場合、scriptがreturned environmentをcurrent baseline setと比較し、formal resultへ採用する組合せだけをbaselineへ追加してnew baseline revisionをmaterializeします。baseline revisionが変わった場合は関連sample resultのfreshnessを再計算します。diagnostic用途だけの環境はbaselineへ自動追加しません。
 
 ### Step 2: target exploration
 
@@ -132,6 +147,19 @@ target全体を有限列挙できない場合も、LLMが個々のsample identit
 
 random selectionそのものを固定seedで決定論化しません。
 
+#### repeat evaluation
+
+previous evaluation refがある場合、再評価としてsample lineageを保持します。
+
+- previous sample identity / revisionをcurrent targetへ解決する
+- previous sampleがcurrent scope / inventoryへ存在するかをscriptが検証する
+- significant changeの有無と、比較可能性のため残すstructured sample / coverage更新のため置き換えるstructured sampleはsemantic layerが判断する
+- scriptが `retained / replaced / added / unavailable` をmaterializeし、同一sampleのduplicateやstale identityを拒否する
+- samplingを使う場合、previous random sampleの個別置換をLLMが選ばず、current candidate populationからscriptまたは記録済み外部random mechanismで選択する
+- sampling approach / sizeを変更する場合はreasonを記録する
+
+W3Cの「typically about half」はguidanceとして保持し、50%を固定contractにはしません。significant changeにより前回sampleとの比較可能性を維持できない場合は、その意味判断を記録してcurrent explorationからsample setを再構成します。
+
 #### complete process
 
 structured / random sampleにcomplete processが含まれる場合、
@@ -152,7 +180,19 @@ target WCAG versionに対応する `assets/wcag-2.0-requirements.json` / `assets
 
 を分離して記録します。
 
-各sampleの評価ではtarget levelのSuccess Criteriaだけでなく、WCAG 2のconformance requirementsを確認します。
+各sampleの評価ではtarget levelのSuccess Criteriaだけでなく、WCAG 2の5つのconformance requirementsを確認します。
+
+固定rule部分はversioned catalog / scriptで処理します。
+
+- Conformance Level: target levelのrequired Success Criteria集合をcatalogから導出する。Conforming Alternate Versionを使う場合は別sampleへ数えず、元contentと合わせてfull pageとして扱う
+- Full Pages: sampleの一部を任意に除外せず、responsive / automatically presented variationも同じfull page conformanceへ含める
+- Complete Processes: processの全sample / stepがtarget level以上でconformすることを要求する
+- Only Accessibility-Supported Ways of Using Technologies: Step 1.3 baselineへ照らしてrelied-upon technology useを評価する
+- Non-Interference: relied-uponでないcontentを含め、target version catalogが固定するNon-Interference Success Criteria集合を評価する
+
+Conforming Alternate Versionの固定条件は、target level適合、同一情報 / 機能 / human language、non-conforming contentと同程度にcurrent、W3Cが認めるreachability条件のいずれかです。これらのfield / required set / reachability alternativeはscriptが生成し、同一情報 / 機能 / language / currentnessの意味妥当性だけをsemantic layerへ残します。
+
+Step 4.2ではcomplete process中の全contentを毎step再評価しません。current identity / evidence / freshnessから同一と機械確認できるcontent/resultは再利用し、変化したcontentとinteraction / input / notification / feedbackを評価します。同一性を確認できない場合は再評価します。
 
 ### Step 4.3: structured / random comparison
 
@@ -185,11 +225,15 @@ scriptはstructured / randomのkey集合差分から、
 
 Step 1〜4のoutcomeをreportへ記録します。
 
+Step 5.1では、`not-satisfied` のConformance Requirement / Success Criterionごとに最低1件のexample refを必須にします。script / validatorは `not-satisfied set - example-covered set` を計算し差分0を要求します。Step 1.4で全occurrence報告が追加要件として指定された場合は、代表example coverageとは別に全occurrence closureを検証します。
+
+human-readable evaluation report、Step 5.3 Evaluation Statement、accompanying documentationは、本Skillが所有するMarkdown等の成果物についてaccessible formatを必須にします。少なくとも見出し構造、table header、画像 / screenshot evidenceのtext description、色や画像だけに依存しない状態表現、意味の分かるlink textを満たします。別ownerがHTML / PDF等へ変換した後の形式まで本Skillが自動保証するとは扱いません。
+
 Step 5.2 Evaluation Specificsは要求・合意がある場合に記録し、sample archive / evidence / path / settings / actions / tool / browser / assistive technology / software / methodを安全な参照として保持します。secretや不要PIIは保存しません。
 
 WCAG-EM Evaluation Statementは任意ですが、現行WCAG-EM 2.0 Step 5.3のminimum fieldがWCAG 2.2を固定指定するため、target WCAG versionが2.2の場合だけ通常statement / partial conformance statementの生成条件を評価します。WCAG 2.0 / 2.1のformal evaluationはStep 5.1 reportまで生成しますが、Step 5.3準拠のEvaluation Statementとは称しません。
 
-WCAG Conformance Claimはrepresentative sampleだけから作成しません。claim scope内の全Web page / complete processを評価した証拠、または各pageがconformance requirementsを満たすことを保証するprocess evidenceがあり、指定versionのWCAG Conformance Claim必須fieldをすべて埋められる場合だけ生成します。
+WCAG Conformance Claimはrepresentative sampleだけから作成しません。claim scope内の全Web page / complete processを評価した証拠、または各pageがconformance requirementsを満たすことを保証するprocess evidenceがあり、指定versionのWCAG Conformance Claim必須fieldをすべて埋められる場合だけ生成します。guideline title / version / claim URIはsource取得用URLと分離したversioned catalog fieldを使用します。third-party contentをmonitoring / repairによりfull conformanceへ含める場合は、全該当pageでnon-conforming contentを識別でき、継続monitoringが可能で、検出したnon-conforming contentを2 business days以内にremove / bring into conformanceできるevidenceを必須にします。
 
 WCAG側のStatement of Partial ConformanceはConformance Claimと分離し、third-party contentまたはlanguageの条件を満たす場合だけ生成します。
 
@@ -239,6 +283,7 @@ formal要求から `wcag-conformance-evaluation` が直接発火した場合も�
 ### evaluation header
 
 - evaluation ref / revision
+- previous evaluation ref / revision（再評価の場合）
 - evaluation type: wcag-em-2-evaluation
 - evaluator
 - evaluation commissioner / self-evaluation
@@ -247,8 +292,9 @@ formal要求から `wcag-conformance-evaluation` が直接発火した場合も�
 - target conformance level
 - digital product scope
 - product enclosure / scope boundary
+- scope coverage rows: third-party / language / responsive-device / separately-hosted / authenticated-restricted
 - out-of-product boundary / reason（存在する場合）
-- accessibility support baseline
+- accessibility support baseline / baseline revision
 - additional requirement refs
 - limitations
 
@@ -289,6 +335,7 @@ live observationが必要な場合:
 
 - structured samples
 - random samples
+- 再評価の場合のretained / replaced / added / unavailable sample lineage
 - random sample target count
 - random selection method
 - random selection candidate scope / limitation
@@ -322,7 +369,8 @@ live observationが必要な場合:
 - Step 4.1 outcome
 - Step 4.2 outcome
 - Step 4.3 outcome
-- unmet requirement / Success Criterion examples
+- unmet requirement / Success Criterion examples。各not-satisfied requirement / Success Criterionを最低1件cover
+- report accessibility closure
 - Finding refs
 - Evaluation Specifics（要求・合意があり記録した場合だけ）
 - Evaluation Statement（通常 / partial。現行WCAG-EM 2.0 Step 5.3準拠はtarget WCAG 2.2だけ）
@@ -352,23 +400,30 @@ WCAG-EM 2.0はWCAG、accessible design、assistive technology、障害のある�
 
 - general accessibility inspectionと責務が分離されている
 - target WCAG version / level / scope / accessibility support baselineを創作しない
+- third-party / language / responsive-device / separately-hosted / authenticated-restricted領域をscope coverageとして明示的に閉じる
+- initial baseline外の環境をformal evidenceへ使った場合にbaseline revisionをscriptで拡張し、freshnessを再計算できる
 - WCAG-EM 2.0 Step 1〜5へ成果物を追跡できる
 - Step 1.4 additional evaluation requirementsをartifact-local refへ採番し、目的内要件はaffected step / outputへ反映してappliedまたはblockedへ、目的外だけを理由付きout-of-scopeへ閉じる
 - sampling procedure used / skippedを一意に閉じられる
 - sampling skippedではcompleteな全体inventoryからselected sample setをmaterializeし、structured / random / Step 4.3をnot-applicableとして閉じる
 - sampling usedではstructured sampleをStep 2探索結果へ追跡できる
+- 再評価ではprevious sampleをcurrent identityへ解決し、retained / replaced / added / unavailable lineageをmaterializeできる。50% replacementを固定規則にしない
 - random sample countがPlanの10%整数化規則を満たす
 - artifact-local sample identityでrandom sampleの重複 / structured sampleとの重複を検証できる
 - random selection methodを記録する
 - predictable fixed-seed selectionを必須化していない
-- complete processを閉じる
+- 5つのWCAG conformance requirementsをversioned catalog / semantic decisionへ分解し、Conforming Alternate Versionを別sampleにせず、Non-Interference固定SC集合をscriptで導出できる
+- complete processを閉じ、Step 4.2ではcurrentで同一なcontent/resultを再利用して変化部分とinteractionを評価できる
 - Step 4.3で新content / findingが出た場合、structured revision更新後のrandom target再計算、candidate population fingerprint再計算、population同一時のoverlap除外 / current random保持 / 不足分top-up、population変更時のrandom再選択、process再materializeまでscriptで閉じる
 - 既存sample resultはPR #11のfreshness判定がcurrentの場合だけ再利用する
-- Step 5.1の必須outcomeをreportできる
+- Step 5.1の必須outcomeをreportでき、各not-satisfied Conformance Requirement / Success Criterionを最低1exampleへ対応付けられる
+- Step 1.4で全occurrence報告が要求された場合は代表exampleとは別に全occurrence closureを検証できる
+- human-readable report / Evaluation Statement / accompanying documentationを本Skill所有形式ではaccessible output contractへ閉じられる
 - Step 5.2 Evaluation Specificsを要求時に安全に記録でき、secret / unnecessary PIIを複製しない
 - 現行WCAG-EM 2.0 Step 5.3 Evaluation Statementはtarget WCAG 2.2だけで通常 / partial生成条件を閉じ、WCAG 2.0 / 2.1ではStep 5.3 statementを生成しない
 - representative sampleだけからWCAG Conformance Claimを作らない
 - WCAG Conformance ClaimとWCAG Statement of Partial Conformanceの必須 / optional field / generation guardを分離して検証する
+- claim guideline URIをsource URLと分離し、third-party monitoring / repair経路では2 business days条件と全該当pageでの識別可能性をmachine guardで検証する
 - Step 5.5 EARL 1.0 JSON-LD reportを要求時に生成し、human-readable reportと一致検証できる
 - Step 5.4 aggregated accessibility scoreは目的外として作らない
 - browser / sessionを本Skillが直接所有せず、複数Skill実行はqa-workflowが直列オーケストレーションする

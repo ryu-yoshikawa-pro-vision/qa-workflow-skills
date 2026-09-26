@@ -131,19 +131,20 @@ formalなWCAG conformance evaluationはgeneral inspectionと分離し、`wcag-co
 - side-effect / cleanup scope
 - project Authority / release gate（存在する場合）
 - Step 1.4 additional evaluation requirements（存在する場合）
+- previous evaluation ref / revision（再評価の場合）
 
 **Function**
 
-1. WCAG-EM 2.0 Step 1でscope / target / accessibility support baselineを固定し、Step 1.4 additional evaluation requirementsがあればaffected step / outputとclosure条件まで固定する
-2. Step 2でtargetを探索する
-3. Step 3開始時にsampling procedureを使うか、製品全体をselected sample setとしてsamplingをskipするかを確定する
+1. WCAG-EM 2.0 Step 1でscope / target / accessibility support baselineを固定し、third-party content / services、language version、responsive / device-dependent variation、別origin / subdomain等にある同一product領域もscope coverageとして閉じる。Step 1.4 additional evaluation requirementsがあればaffected step / outputとclosure条件まで固定する
+2. Step 2でtargetを探索する。再評価ではprevious evaluation / sample refsもcurrent exploration inputとして扱う
+3. Step 3開始時にsampling procedureを使うか、製品全体をselected sample setとしてsamplingをskipするかを確定する。再評価でsamplingを使う場合は、previous sampleのcurrentnessと現在coverageを基に比較用に保持するsubsetと入れ替えるsubsetを確定し、scriptがretain / replace / addのsample lineageをmaterializeする
 4. samplingを使う場合だけStep 3.1でstructured sampleを選定する
 5. samplingを使う場合だけStep 3.2でstructured sample数の10%以上となるrandom sampleを選定し、selection methodを記録する
 6. samplingを使う場合はStep 3.3でcomplete processをsample setへ追加する。samplingをskipする場合もcomplete processの識別・Step 4.2評価は省略しない
-7. Step 4.1 / 4.2でselected sample set / complete processを評価する
+7. Step 4.1 / 4.2でselected sample set / complete processを5つのWCAG conformance requirementsへ評価する。Conforming Alternate Versionは別sampleにせずfull pageの一部として扱い、Non-Interferenceの固定Success Criteria集合はversioned catalogからscriptが導出する。Step 4.2ではcurrentで同一と確認できるcontent/resultを再利用し、process中に変化したcontentとinteraction / feedbackを評価する
 8. samplingを使う場合だけStep 4.3でstructured / random sampleを比較し、新content type / findingがあればStep 2 / 3へ戻る
 9. live observationが必要なsample / requirementについてnormalized handoffを出し、`qa-workflow` が `usability-inspection` を直列実行してimmutable evidenceを戻す
-10. Step 5.1でevaluation reportを作成する
+10. Step 5.1でevaluation reportを作成する。各 `not-satisfied` Conformance Requirement / Success Criterionへ最低1件のexampleを対応付け、Step 1.4で全occurrenceが要求された場合はその追加coverageも閉じる。human-readable report / Evaluation Statement / accompanying documentationは本Skillが所有する形式についてaccessible output contractを満たす
 11. Step 5.2のevaluation specificsを記録する要求・合意がある場合、安全なarchive / tool / browser / assistive technology / method情報を記録する
 12. target WCAG versionが2.2でStep 5.3条件を満たす場合だけoptional Evaluation Statementを作成する。通常statementとpartial conformance statementを区別する。WCAG 2.0 / 2.1評価ではStep 5.1 reportを生成するが、現行WCAG-EM 2.0 Step 5.3準拠のEvaluation Statementとは称さない
 13. WCAG側の条件を満たす場合だけConformance ClaimまたはStatement of Partial Conformanceを作成する
@@ -151,12 +152,14 @@ formalなWCAG conformance evaluationはgeneral inspectionと分離し、`wcag-co
 
 **Output**
 
-- evaluation header / revision
-- accessibility support baseline
+- evaluation header / revision / previous evaluation ref（再評価の場合）
+- scope coverage
+- accessibility support baseline / baseline revision
 - additional evaluation requirement refs / closure（存在する場合）
 - target exploration
 - sampling procedure: used / skipped
 - selected sample set
+- 再評価の場合のretained / replaced / added sample lineage
 - samplingを使う場合のstructured sample set
 - samplingを使う場合のrandom sample set / selection method
 - complete process set
@@ -394,3 +397,10 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
 66. WCAG Conformance ClaimのW3C optional componentsも、evidenceが存在する場合に保持できるようにする。必須fieldの代替には使わない。machine-readable claim mirrorは既存Machine Runtimeのnormalized claim objectを再利用し、新しい独自claim標準を作らない。
 67. WCAG-EM Step 5.5を目的内機能として扱い、要求された場合はEARL 1.0 vocabularyを用いたcanonical JSON-LD sidecarをdeterministic scriptで生成する。formal requirement resultからAssertion / subject / test / result / outcome / modeを導出し、未確定modeを推測しない。Step 5.4 aggregated scoreだけは本Planの目的外として生成しない。
 68. formal observation handoffはoriginating evaluation identity / revision、handoff ref、resume operation、expected sample / process / requirement refsをworkflow stateへ保持し、currentかつvalidなreturned result集合が期待集合を満たした場合だけ同じevaluationをresumeする。LLMが「戻り値は揃った」と手判断しない。
+69. Step 1.1 scopeは自由記述だけにせず、third-party content / services、language version、responsive / device-dependent variation、別origin / subdomain等にある同一product領域を明示的に確認し、各viewがin-scopeかを一意に閉じる。scope relationshipの意味判断はsemantic layer、row / ref / closureはscriptが担当する。
+70. Step 1.3 baselineは初期定義後もformal evidenceへ実際に使用した追加OS / browser / assistive technology / user agentがあれば拡張する。scriptが既存baseline setとreturned environmentを比較しbaseline revisionをmaterializeし、baseline変更後のfreshnessを再計算する。diagnostic用途だけの環境はformal baselineへ自動追加しない。
+71. 再評価ではprevious evaluation / sample lineageをInputへ含める。semantic layerはproductのsignificant changeと現在のrepresentativenessから前回structured sampleの保持 / 置換必要性を判断し、scriptがcurrent identityへ解決してretained / replaced / added refsをmaterializeする。W3Cの「typically about half」は固定比率にせず、random replacementはLLMに選ばせない。
+72. 5つのWCAG conformance requirementsはversioned catalogへ固定rule metadataを持たせる。Conforming Alternate Versionはtarget level適合、同一情報 / 機能 / human language、currentness、到達条件を別fieldで閉じ、alternate versionを別sampleとして数えない。Non-Interferenceの固定Success Criteria集合はcatalogからscriptが導出する。
+73. Step 4.2ではcomplete process中の全contentを毎回再評価しない。current identity / evidence / freshnessで同一と機械確認できるcontent/resultは再利用し、変化したcontentとinteraction / input / notification / feedbackを評価対象へmaterializeする。確認できない場合は再評価する。
+74. Step 5.1では `not-satisfied` Conformance Requirement / Success Criterion集合とexample-covered集合の差分をscript / validatorで0へ閉じる。Step 1.4で全occurrence報告が要求された場合はその追加coverageも別に検証する。human-readable report、Evaluation Statement、accompanying documentationは本Skillが生成する形式について見出し構造、table header、画像evidenceのtext description、色だけに依存しない表現等のaccessible output contractを満たす。
+75. Conformance Claim用のguideline title / version / URIはsource取得用canonical URLと別fieldでversioned catalogへ固定する。third-party contentをmonitoring / repairによりfull conformanceへ含める場合は、全該当pageでの識別可能性、monitoring可能性、non-conforming contentを2 business days以内にremove / bring into conformanceできるevidenceをmachine guardで要求する。

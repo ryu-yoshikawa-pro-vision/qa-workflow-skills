@@ -39,6 +39,10 @@ source-catalogへ少なくとも、
 - WCAG 2.2
 - WCAG-EM 2.0
 - WCAG-EM Report Tool。WAI Overview上の公式resourceとして保持するが、WCAG-EM 2.0本文と同一の成果物schemaを提供することは前提にせず、WCAG-EM 2 schema Authorityにはしない
+- WCAG Overview
+- How to Meet WCAG 2 (Quick Reference)
+- Understanding Conformance
+- Guidance on Applying WCAG 2.2 to Mobile Applications（current Web targetへresponsive / touch / mobile Webが含まれる場合）
 - ACT Rules Format 1.1 / All ACT Rules
 - EARL 1.0 Schema
 - Understanding Accessibility Support
@@ -59,21 +63,25 @@ WCAG-EM 2のoutput contractはReport ToolのschemaではなくWCAG-EM 2.0本文�
 - runtime envelope / input / generation fingerprint / freshness
 - canonical sample identity registry
 - candidate population fingerprint
-- evaluation header
+- evaluation header / previous evaluation lineage
+- Step 1.1 scope coverage rows
 - Step 1.4 additional evaluation requirement ref / affected step / status / output closure
-- accessibility support baseline
+- accessibility support baseline revision / extension
 - exploration
 - sampling procedure used / skipped
 - selected sample set
 - sampling used時のstructured / random sample
+- 再評価時のretained / replaced / added / unavailable sample lineage
 - sampling skipped時のcomplete inventory closure
 - complete process
+- Conforming Alternate Version / Non-Interference固定rule
+- Step 4.2 unchanged-result reuse
 - sample result
 - sampling used時のStep 4.3 comparison
-- Step 5.1 report outcome closure
+- Step 5.1 report outcome closure / not-satisfied example coverage / accessible output contract
 - Step 5.2 Evaluation Specifics / archive identity / tool metadata / secret safety
 - Step 5.3 Evaluation Statementはtarget WCAG 2.2だけでfull / partial minimum fields / generation guard。2.0 / 2.1ではsection非生成
-- WCAG Conformance Claim required / optional fields / full-scope coverage guard
+- WCAG Conformance Claim required / optional fields / version別claim URI / full-scope coverage / third-party 2-business-day monitoring-repair guard
 - WCAG Statement of Partial Conformance - Third Party Content / Language required fields / canonical wording / generation guard
 - Step 5.5 EARL JSON-LD output / assertion coverage
 
@@ -86,6 +94,8 @@ WCAG-EM 2のoutput contractはReport ToolのschemaではなくWCAG-EM 2.0本文�
 - supported WCAG versionを2.0 / 2.1 / 2.2へ固定
 - `assets/wcag-2.0-requirements.json` / `wcag-2.1-requirements.json` / `wcag-2.2-requirements.json` からtarget versionだけを選択
 - A / AA / AAAごとのrequired Success Criteria集合と5つのconformance requirement集合を導出
+- Conforming Alternate Version required condition keys / reachability alternatives、Non-Interference固定Success Criteria refs、Full Pages / Complete Processes / Accessibility-Supportedの固定rule metadataを導出
+- source canonical URLとは別にversion別claim guideline title / version / URI、third-party repair window = 2 business daysを保持
 - versionごとのcanonical JSON SHA-256を `static_data_versions.wcag_2_0_requirements` / `wcag_2_1_requirements` / `wcag_2_2_requirements` へ出力
 - validatorは選択versionのassetからhashを独立再計算
 - 3 catalogそれぞれについてW3C正本と照合済みの承認済みhashをcontract testで固定
@@ -96,6 +106,7 @@ WCAG-EM 2のoutput contractはReport ToolのschemaではなくWCAG-EM 2.0本文�
 
 - current `test-target-inspection` の対象 / 状態キー、またはsemantic同一性decisionからcanonical artifact-local sample identity registryをmaterialize
 - duplicate / overlap / union / process membershipをcanonical sample identityで判定
+- 再評価ではprevious sample identityをcurrent targetへ解決し、structured sampleをretained / replaced / added / unavailableへmaterializeする。replacement ratioは固定せず、significant change / representativenessはsemantic判断、random replacementはscript / external random mechanismへ委ねる
 - complete inventoryとsemantic decisionから製品全体をselected sample setへmaterializeし、sampling procedureをskipする経路
 - sampling skippedではstructured / random / Step 4.3をnot-applicableとして閉じるが、complete process / Step 4.2評価は継続
 - 10% count計算。WCAG-EM本文の丸め規則ではなく本Planの `ceil` 規則として扱い、structured count 1 / 9 / 10 / 11の境界fixtureを持つ
@@ -110,12 +121,15 @@ WCAG-EM 2のoutput contractはReport ToolのschemaではなくWCAG-EM 2.0本文�
 - structured sample更新後のrandom target再計算。population fingerprint同一ならoverlap除外 / current random保持 / 不足分top-up、population変更なら旧random setをstaleとして再選択
 - process再materialize
 - 既存sample resultはPR #11 freshnessがcurrentの場合だけ再利用し、version / level / scope / baseline / environment / sample identity / evidence / catalog hash / upstream dependency変更では再評価
+- Step 4.2ではidentity / evidence / freshnessでcurrentなunchanged content resultだけを再利用し、changed / unknown contentとinteraction / feedbackを再評価
 - selection method記録
 - no-new-sample completion
 
 ### runtime / structure
 
+- Step 1.1 scope coverage rowsをmaterializeし、third-party / language / responsive-device / separately-hosted / authenticated-restricted領域を明示的に閉じる
 - additional evaluation requirementsのsemantic inputから `ADDREQ-001` 等を採番し、affected step / output、`applied / blocked / out-of-scope`、required evidence / output refsをmaterializeする。目的内要件のout-of-scopeは禁止
+- formal evidenceへinitial baseline外environmentを使った場合、baseline revisionを拡張してfreshnessを再計算する。diagnostic-only environmentは追加しない
 - random selectionそのものはdeterministic runtimeへ含めず、method / provenance / selected refsを後続Machine Runtime Inputへ渡す
 - PR #11 runtime input / generation fingerprint / static_data_versions / current verifierでfreshnessを管理
 - semantic decisionからfixed machine rowをmaterialize
@@ -123,12 +137,15 @@ WCAG-EM 2のoutput contractはReport ToolのschemaではなくWCAG-EM 2.0本文�
 - cross-reference
 - Step closure
 - static expected requirement coverage
+- Conforming Alternate Version condition / Non-Interference fixed Success Criteria closure
 - handoff expected / returned closure
 - comparison iteration chain
 - sample result freshness closure
+- not-satisfied example coverage / Step 1.4 all-occurrence coverage
+- human-readable report / Evaluation Statement / accompanying documentationのaccessible output closure
 - Evaluation Specifics safe materialization
 - Evaluation Statement full / partial generation guard
-- WCAG Conformance Claim required / optional fields / Statement of Partial Conformance generation guard
+- WCAG Conformance Claim required / optional fields / version別claim URI / third-party 2-business-day monitoring-repair / Statement of Partial Conformance generation guard
 - EARL 1.0 JSON-LD materialization
 - machine-owned Markdown render
 - summary
@@ -195,7 +212,7 @@ selection結果そのものをdeterministic fixtureへ固定して「random性�
 
 default sequenceとcommonly accessed / critical branch sequenceはsemantic layerがsequenceとして識別し、`sampling.py materialize-process` がsample union、duplicate除去、process-added分類、membershipを生成します。LLMがsequenceとsample setを二重管理しません。
 
-全interactionをStep 4.2契約へ結び付けます。
+全interactionをStep 4.2契約へ結び付けます。Step 4.2ではprocess中に変化したcontentとinteraction / input / notification / feedbackを評価し、current identity / evidence / freshnessで同一と確認できるcontent resultは再利用します。確認できないcontentは再評価します。
 
 ## 10. Step 8: Step 4.3 loop
 
@@ -222,13 +239,13 @@ semantic layerはcontent type / Findingのartifact-local grouping keyだけを�
 
 ## 11. Step 9: report / statement
 
-Step 5.1に従い、Step 1〜4のrequired outcomeをreportへ記録します。
+Step 5.1に従い、Step 1〜4のrequired outcomeをreportへ記録します。各 `not-satisfied` Conformance Requirement / Success Criterionへ最低1exampleを対応付け、Step 1.4でall-occurrence reportingを要求した場合は全occurrence closureも検証します。human-readable report / Evaluation Statement / accompanying documentationは、本Skillが所有する形式についてheading / table header / image text description / color-independent status / meaningful link textを満たします。
 
 Step 5.2 Evaluation Specificsは要求・合意があるcaseでsample archive ref、path / settings / actions、tool / browser / AT / software / methodを記録し、secretや不要PIIを保存しません。
 
 Evaluation Statementはtarget WCAG 2.2だけでfull / partial /生成不可を分け、`_05f_wcag-conformance-evaluation-package-and-runtime.md` のStep 5.3 contractを閉じます。WCAG 2.0 / 2.1のformal evaluationではStep 5.1 reportを生成しますが、Step 5.3 Evaluation Statementは生成しません。
 
-WCAG Conformance Claimはcomplete claim scope evidenceとversion別required fieldsが揃うcaseだけ生成します。representative sampleだけでは生成しません。W3C optional claim componentsもevidenceがある場合に保持します。
+WCAG Conformance Claimはcomplete claim scope evidenceとversion別required fields / claim guideline URIが揃うcaseだけ生成します。representative sampleだけでは生成しません。W3C optional claim componentsもevidenceがある場合に保持します。third-party contentをmonitoring / repairによりfull claimへ含めるcaseでは、all affected pagesでの識別、monitoring可能性、2 business days以内のremove / bring-into-conformance evidenceをmachine guardで検証します。
 
 WCAG Statement of Partial Conformanceはthird-party content / languageを別caseとして実装し、Conformance Claimと混同せず、canonical wordingをscriptでrenderします。
 
@@ -265,9 +282,13 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 - supported WCAG version 2.0 / 2.1 / 2.2 / explicit unsupported or out-of-scope / missing unresolvedの状態分離
 - version別static requirement catalog / `static_data_versions` / approved hash contract
 - target version / level expected Success Criteria / conformance requirement set
+- Conforming Alternate Version / Non-Interference / Full Pages / Complete Processes / Accessibility-Supported fixed rule metadata
+- version別claim guideline title / URI / third-party repair contract
 - runtime input / generation fingerprint / freshness
 - canonical sample identity registry
+- Step 1.1 scope coverage / baseline revision extension
 - sampling procedure used / skippedとselected sample set closure
+- rerun retained / replaced / added / unavailable sample lineage
 - observation handoff origin / resume identity / expected-returned closure
 - ref
 - sample count
@@ -275,21 +296,23 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 - candidate population fingerprint
 - duplicate / overlap
 - process sequence → process-added sample materialization
+- Step 4.2 unchanged-result reuse eligibility
+- Conforming Alternate Version full-page grouping / Non-Interference fixed SC coverage
 - Step 4.3 set difference → boolean / action derivation
 - structured revision更新 → candidate population fingerprint再計算 / population同一時のoverlap除外・retained random・top-up / population変更時のreselection / process再materialize
 - sample result freshness / stale再評価
 - non-finite sourceでもLLMがrandom sample identityを選ばないこと
 - machine-owned structured section materialization
 - closure
-- report
+- report / not-satisfied example coverage / all-occurrence追加要件 / accessible output contract
 - Evaluation Specifics / archive ref / secret safety
 - Evaluation Statementはtarget WCAG 2.2だけでfull / partial guardを検証し、2.0 / 2.1ではsection不存在を検証
-- WCAG Conformance Claim required / optional fields / Statement of Partial Conformance guard
+- WCAG Conformance Claim required / optional fields / version別claim URI / third-party 2-business-day monitoring-repair / Statement of Partial Conformance guard
 - EARL JSON-LD schema subset / outcome mapping / assertion coverage
 
 ### semantic
 
-`_05f` Case A〜ZとCase C2をすべて実Judgeで確認します。
+`_05f` Case A〜Z、Case C2、Case AA〜AFをすべて実Judgeで確認します。
 
 ### real Agent / browser
 
@@ -305,7 +328,8 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 - WCAG-EM Step 1〜5 traceability
 - Step 1.4 additional evaluation requirementsをref採番し、目的内要件をaffected step / outputへ反映してappliedまたはblocked、明示目的外だけを理由付きout-of-scopeへ閉じる
 - WCAG-EM 2 output schemaがReport Toolへ依存せず、WCAG-EM 2.0本文を正本としている
-- accessibility support baseline必須
+- accessibility support baseline必須。formal evidenceへinitial baseline外environmentを使った場合はbaseline revisionを拡張してfreshnessを再計算
+- Step 1.1でthird-party / language / responsive-device / separately-hosted / authenticated-restricted scope coverageを明示的に閉じる
 - WCAG 2.0 / 2.1 / 2.2をsupported versionとし、missing / unresolved、unsupported / out-of-scopeを分離
 - target version / levelからrequired Success Criteria / conformance requirement集合を該当versionのstatic catalogだけで独立導出し、3 catalogのcanonical hashを既存static data契約で検証
 - `runtime_contract.py` でPR #11 Machine Runtime / freshness契約を再利用し、random selectionそのものはdeterministic runtimeへ含めない
@@ -313,16 +337,21 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 - sampling procedure used / skippedの両経路
 - sampling skippedではcomplete inventoryから全in-scope sampleをselected sample setへmaterializeし、structured / random / Step 4.3をnot-applicableとして閉じる
 - sampling usedではStep 3.1 structured sample
+- 再評価ではprevious sampleをcurrent identityへ解決し、retained / replaced / added / unavailable lineageをscriptでmaterializeする。replacement ratioは固定しない
 - canonical sample identity registryをscriptがmaterializeし、duplicate / overlap / union / process membershipを機械判定
 - sampling usedではStep 3.2 random sample。finite inventory時のcandidate集合とcandidate population fingerprintはscript導出し、非finite時もLLMがsample identityを選ばない
 - complete process。sequenceからprocess-added sample / membershipをscript導出
-- Step 4.1 / 4.2評価
+- Step 4.1でConforming Alternate Versionを別sampleに数えず、Non-Interference fixed SC集合をcatalogから導出する
+- Step 4.2ではcurrent unchanged resultだけを再利用し、changed / unknown contentとinteractionを再評価する
 - Step 4.3 retry loop。semantic grouping keyから集合差分 / boolean / actionをscript導出し、structured revision変更後のcandidate population fingerprint再計算、population同一時のrandom target再計算 / overlap除外 / retained random / 不足分top-up、population変更時のreselection、process再materializeまで閉じる
 - 既存sample resultはPR #11 freshnessがcurrentの場合だけ再利用する
 - Step 5.1のStep 1〜4 required outcome closure
+- 各not-satisfied Conformance Requirement / Success Criterionを最低1exampleへ対応付け、all-occurrence追加要件も別closureで検証する
+- human-readable report / Evaluation Statement / accompanying documentationを本Skill所有形式ではaccessible output contractへ閉じる
 - Step 5.2 Evaluation Specificsのsafe archive / environment / method record
 - Step 5.3 Evaluation Statementはtarget WCAG 2.2だけでfull / partial minimum fields / generation guardを検証し、2.0 / 2.1では非生成
-- WCAG 2.0 / 2.1 / 2.2 Conformance Claim required / optional fields / full-scope guard
+- WCAG 2.0 / 2.1 / 2.2 Conformance Claim required / optional fields / version別claim URI / full-scope guard
+- third-party monitoring / repair full-claim caseでall affected pages identification / monitoring / 2 business days repair guard
 - WCAG Statement of Partial Conformance - Third Party Content / Language required fields / canonical wording / guard
 - Step 5.5 EARL 1.0 JSON-LD / assertion coverage
 - Step 5.4 aggregated scoreは目的外として生成しない

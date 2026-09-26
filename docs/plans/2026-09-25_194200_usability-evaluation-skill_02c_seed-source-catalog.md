@@ -44,12 +44,16 @@ catalogに載っているだけで、そのsource全体をbundled corpusへ収�
 | W3C-WCAG20 | WCAG 2.0 | https://www.w3.org/TR/WCAG20/ | normative standard |
 | W3C-WCAG21 | WCAG 2.1 | https://www.w3.org/TR/WCAG21/ | normative standard |
 | W3C-WCAG22 | WCAG 2.2 | https://www.w3.org/TR/WCAG22/ | normative standard |
+| W3C-WCAG-OVERVIEW | WCAG Overview | https://www.w3.org/WAI/standards-guidelines/wcag/ | informative overview / WCAG-EM background reading |
+| W3C-WCAG-QUICKREF | How to Meet WCAG 2 (Quick Reference) | https://www.w3.org/WAI/WCAG22/quickref/ | customizable supporting reference for WCAG 2.0 / 2.1 / 2.2 |
 | W3C-WCAG20-UNDERSTANDING | Understanding WCAG 2.0 | https://www.w3.org/WAI/WCAG20/Understanding/ | informative guidance / W3C上でno longer maintained。2.0 requirementの正本にはしない |
 | W3C-WCAG21-UNDERSTANDING | Understanding WCAG 2.1 | https://www.w3.org/WAI/WCAG21/Understanding/ | informative guidance |
 | W3C-WCAG22-UNDERSTANDING | Understanding WCAG 2.2 | https://www.w3.org/WAI/WCAG22/Understanding/ | informative guidance |
 | W3C-WCAG20-TECHNIQUES | Techniques for WCAG 2.0 | https://www.w3.org/WAI/WCAG20/Techniques/ | informative techniques |
 | W3C-WCAG21-TECHNIQUES | Techniques for WCAG 2.1 | https://www.w3.org/WAI/WCAG21/Techniques/ | informative techniques |
 | W3C-WCAG22-TECHNIQUES | Techniques for WCAG 2.2 | https://www.w3.org/WAI/WCAG22/Techniques/ | informative techniques |
+| W3C-WCAG22-CONFORMANCE | Understanding Conformance | https://www.w3.org/WAI/WCAG22/Understanding/conformance | informative guidance for conformance requirements / alternate versions / partial conformance |
+| W3C-WCAG2MOBILE22 | Guidance on Applying WCAG 2.2 to Mobile Applications | https://www.w3.org/TR/wcag2mobile-22/ | conditional guidance for mobile Web / responsive / touch scope。native app live automationを意味しない |
 | W3C-WCAGEM2 | WCAG Evaluation Methodology 2.0 | https://www.w3.org/TR/wcag-em-2/ | conformance evaluation methodology |
 | W3C-WCAGEM-REPORT-TOOL | WCAG-EM Report Tool | https://www.w3.org/WAI/eval/report-tool/ | supplementary tool reference。WCAG-EM 2.0本文と同一の成果物schemaを提供することは確認できていないため、WCAG-EM 2 schemaのAuthorityにはしない |
 | W3C-WAI-ARIA12 | WAI-ARIA 1.2 | https://www.w3.org/TR/wai-aria-1.2/ | normative standard |
@@ -57,9 +61,8 @@ catalogに載っているだけで、そのsource全体をbundled corpusへ収�
 | W3C-APG | WAI-ARIA Authoring Practices Guide | https://www.w3.org/WAI/ARIA/apg/ | informative guidance / examples |
 | W3C-ACT-FORMAT11 | ACT Rules Format 1.1 | https://www.w3.org/TR/act-rules-format/ | normative rule-format standard |
 | W3C-ACT-RULES | All ACT Rules | https://www.w3.org/WAI/standards-guidelines/act/rules/ | informative test rules |
-| W3C-EARL10 | Evaluation and Report Language (EARL) 1.0 Schema | https://www.w3.org/TR/EARL10-Schema/ | WCAG-EM Step 5.5 machine-readable report |
+| W3C-EARL10 | Evaluation and Report Language (EARL) 1.0 Schema | https://www.w3.org/TR/EARL10-Schema/ | WCAG-EM Step 5.5 machine-readable report / W3C Note |
 | W3C-ACT-OVERVIEW | Accessibility Conformance Testing Overview | https://www.w3.org/WAI/standards-guidelines/act/ | informative overview |
-| W3C-EARL10 | Evaluation and Report Language (EARL) 1.0 Schema | https://www.w3.org/TR/EARL10-Schema/ | machine-readable evaluation reporting vocabulary / W3C Note |
 
 WCAG-EM 2.0は2026-07-23公開のW3C Group Noteとして、WCAG conformance evaluationを明示要求された経路のmethodologyに使用します。一般的なpage inspectionへ無条件適用しません。
 
@@ -135,12 +138,16 @@ formal WCAG evaluation packageは次を最低限catalog化します。
 | W3C-WCAG20 | WCAG 2.0 | https://www.w3.org/TR/WCAG20/ | normative conformance target |
 | W3C-WCAG21 | WCAG 2.1 | https://www.w3.org/TR/WCAG21/ | normative conformance target |
 | W3C-WCAG22 | WCAG 2.2 | https://www.w3.org/TR/WCAG22/ | normative conformance target |
+| W3C-WCAG-OVERVIEW | WCAG Overview | https://www.w3.org/WAI/standards-guidelines/wcag/ | WCAG-EM required background reading |
+| W3C-WCAG-QUICKREF | How to Meet WCAG 2 (Quick Reference) | https://www.w3.org/WAI/WCAG22/quickref/ | WCAG-EM required background reading / supporting reference for 2.0 / 2.1 / 2.2 |
 | W3C-WCAG20-UNDERSTANDING | Understanding WCAG 2.0 | https://www.w3.org/WAI/WCAG20/Understanding/ | informative / no longer maintained。2.0評価時の補助資料 |
 | W3C-WCAG21-UNDERSTANDING | Understanding WCAG 2.1 | https://www.w3.org/WAI/WCAG21/Understanding/ | informative。2.1評価時の補助資料 |
 | W3C-WCAG22-UNDERSTANDING | Understanding WCAG 2.2 | https://www.w3.org/WAI/WCAG22/Understanding/ | informative。2.2評価時の補助資料 |
 | W3C-WCAG20-TECHNIQUES | Techniques for WCAG 2.0 | https://www.w3.org/WAI/WCAG20/Techniques/ | informative techniques |
 | W3C-WCAG21-TECHNIQUES | Techniques for WCAG 2.1 | https://www.w3.org/WAI/WCAG21/Techniques/ | informative techniques |
 | W3C-WCAG22-TECHNIQUES | Techniques for WCAG 2.2 | https://www.w3.org/WAI/WCAG22/Techniques/ | informative techniques |
+| W3C-WCAG22-CONFORMANCE | Understanding Conformance | https://www.w3.org/WAI/WCAG22/Understanding/conformance | alternate version / accessibility support / non-interference / partial conformance guidance |
+| W3C-WCAG2MOBILE22 | Guidance on Applying WCAG 2.2 to Mobile Applications | https://www.w3.org/TR/wcag2mobile-22/ | conditional source when current Web target includes responsive / touch / mobile Web behavior。native app live automationは対象外 |
 | W3C-WCAGEM2 | WCAG Evaluation Methodology 2.0 | https://www.w3.org/TR/wcag-em-2/ | methodology |
 | W3C-WCAGEM-REPORT-TOOL | WCAG-EM Report Tool | https://www.w3.org/WAI/eval/report-tool/ | supplementary report tool。WCAG-EM 2.0本文と同一の成果物schemaを提供することは確認できていないため、EM 2 report schemaのAuthorityにはしない |
 | W3C-ACT-FORMAT11 | ACT Rules Format 1.1 | https://www.w3.org/TR/act-rules-format/ | supported ACT implementation consistency |
