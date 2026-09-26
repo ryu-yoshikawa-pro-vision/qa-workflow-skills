@@ -241,6 +241,12 @@ W3C ACT Rule等の個別test ruleまたはSkill runtimeの対応済みdeterminis
 - evidence refs
 - limitation
 
+result vocabulary:
+
+- source status=formal かつW3C ACT Rule → passed / failed / inapplicable
+- source status=proposed → source-defined outcomeを保持するが、standard criterionのstrict resultを単独で確定しない
+- source status=project / helper → PASS / FAIL / 判定不能 / 対象外
+
 test rule resultとrequirement全体のcriterion resultを分離します。
 
 formal ACT RuleのPASS / FAIL / inapplicable等は、そのruleのscope内の結果です。ruleのrequirements mapping / outcome mappingがrequirement全体の結論に十分でない場合、criterion checkは別途判定不能または追加確認へ残します。
