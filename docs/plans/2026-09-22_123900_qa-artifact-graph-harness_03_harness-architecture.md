@@ -1,0 +1,348 @@
+# Regression / Exploratory Testing 統合Plan
+
+## 1. 決定論的処理の位置づけ
+
+PR #13では、QA上の意味判断と、同じ確定入力から機械的に一意に導出できる処理を分離します。
+
+user-facingな意味判断は`regression-testing` / `exploratory-testing` / `qa-knowledge` / 既存owner Skillへ残します。一方、workflow分岐、currentness、completeness、安全性、保存可否へ使う機械的な導出値はLLMへ手計算させずproduction codeで生成します。
+
+`script化`とPR #11型のpersisted runtime unit化は同義にしません。
+
+| 処理 | 配置 |
+| --- | --- |
+| PR #11のMachine Entity / fingerprint / dependency / freshnessで解ける処理 | PR #11 runtimeを再利用し、PR #13で再実装しない |
+| sort / filter / deduplicate、snapshot、batch / resume、completeness、ref / path解決、projection、currentness比較等、実行時に必要な機械処理 | owner Skillまたは`qa-workflow`のproduction script / helper |
+| 保存済みartifactのschema / invariant / ref整合 | deterministic validator |
+| create-if-absent、atomic conditional write、reservation acquire / release等のatomicity | Step 0で確定した保存先のnative primitive |
+| membership、selected Regression、residual risk、Charter妥当性、Finding分類、knowledge semantic identity等 | owner Skillの意味判断 |
+| source / backend実装がPR #11 / #12 merge後でないと確定しない処理 | Step 0で既存実装を確認して配置を確定 |
+
+PR #11型のpersisted runtime unitを新設するのは、少なくとも次をすべて満たす場合に限定します。
+
+1. structured inputから後続処理が参照するMachine Evidenceを生成する。
+2. 下流のidentity / freshness / completenessがそのgeneration結果へ依存する。
+3. generator implementation変更時に保存済みresultをstaleとして扱う必要がある。
+
+それ以外の決定論的処理は、必要ならproduction helperとしてコード化しますが、Machine Runtime Input / Resultやgeneration fingerprintを増やす理由にはしません。
+
+production helperが必須と定義された処理では、helper失敗、入力不正、不完全な列挙、current dependency解決不能をLLMが同じ計算で代替しません。影響scopeを`incomplete` / `unresolved` / `blocked`として扱います。保存先が必要なatomic primitiveを提供しない場合も、自動write / reservationをLLMやread-compare-writeで代替しません。
+
+明示的なsemantic fallbackを許すのは、処理が事前に定義したmachine対応subset外であることを確認し、owner Skillへ意味判断として戻す場合だけです。
+
+relation index runtimeはgateを通るまで追加しません。
+
+## 2. 配置方針
+
+Regression固有runtime / templateは`skills/regression-testing/`配下を第一候補とします。
+
+予定:
+
+```text
+skills/regression-testing/
+├── SKILL.md
+├── references/
+│   └── guidance.md
+├── assets/
+│   ├── regression-suite-template.md
+│   └── regression-activity-template.md
+├── evals/
+└── scripts/
+    ├── validate_regression_artifact.py
+    └── discover_regression_artifacts.py
+```
+
+user-facing artifactの値、workflow分岐、currentness、completion、安全性へ使う決定論的な導出値はproduction script / helperで生成します。`evals/deterministic/validator.py`はその代替にせず、保存済み成果物を独立して再検証します。schema presence、enum、ref整合等、値生成を必要としないinvariantだけはvalidatorのみで構いません。
+
+production生成処理とdeterministic validatorは独立させ、validatorをproduction処理から呼んで正しさの根拠にしません。PR #11の既存runtime / helperで解ける処理は再利用し、同じ意味上の処理を新3 Skillへそれぞれ独自実装しません。
+
+ただし、standaloneで起動可能なSkillがproductionで必須とする決定論的処理は、そのSkill package単独で実行可能にします。別Skillの`scripts/`やrepository rootのproduction helperを実行時の必須依存にしません。
+
+複数のstandalone Skillで同じ機械処理が必要な場合は、次のいずれかでpackage境界を保ちます。
+
+- PR #11のSkill-local helper方針と同様に、同じ契約を満たす最小helperを各Skill packageへ同梱する
+- callerから既に正規化済みのmachine inputを受け取ることをSkillの入力契約として明示し、standalone Skill側でrepository-local codeを要求しない
+
+rawなProject Contextをstandalone Skillが直接受け取り、その値をcurrentness判定へ使う場合は、stable key解決・正規化・比較に必要なproduction helperをそのSkill package内で実行可能にします。helperを利用できない場合にLLMへ同じ計算を戻しません。
+
+このportabilityのためだけにgeneric shared runtime module、plugin framework、repository-wide helper packageを追加しません。
+
+Exploratory Testing固有契約は`skills/exploratory-testing/`に置き、Regression runtimeへ混在させません。
+
+QA knowledge固有contract / template / validator / discovery helperは`skills/qa-knowledge/`配下を第一候補とし、project-local knowledge本文はSkill package内へ保存しません。project contextから案件側fixed rootを参照します。
+
+`qa-workflow`自身が行うProject Contextのstable key解決、値の正規化、利用項目だけのcurrentness比較は`skills/qa-workflow/scripts/`配下の専用production helperへ置くことを第一候補とします。このhelperを`regression-testing` / `qa-knowledge`等のstandalone Skillから必須参照させません。
+
+standalone経路でも同じProject Context機械処理が必要な場合は、前項のpackage境界に従い、Skill-localな最小helperまたは明示された正規化済みmachine input境界を使用します。Project Context parsing自体をPR #11の共通`runtime_contract.py`へ追加しません。具体的なserializationはStep 0でmerge後のparser / template実装と照合して固定します。
+
+Git / GitHub / filesystem等の保存処理を統一するgeneric storage adapterは追加しません。atomicityは採用backendのnative primitiveが担います。
+
+## 3. current TC discovery snapshot
+
+PR #11 merge後、identity / lifecycleとartifact discoveryを分けて確認します。
+
+discovery root:
+
+1. PR #11 merge後にproject-wide current TCを列挙できるcanonical inventoryがあれば再利用する
+2. なければproject contextの「既存QA成果物」をauthoritative sourceの入口にする
+
+initial baseline開始時に、次を含むdiscovery snapshotを固定します。
+
+- discovery roots
+- source refs / revisions
+- 発見したTC refs
+- deterministic ordering
+- 判定済み / 未判定refs
+- completeness
+
+TC数が多い場合、同じsnapshotを複数batchへ分けて処理できます。
+
+全TCのmembershipが閉じるまで`complete=false`です。
+
+source revisionが途中で変わった場合、旧snapshotへ新しいTCを継ぎ足さず、新しいsnapshotでreconciliationを開始します。
+
+## 4. completenessを分解する
+
+少なくとも次を別判定にします。
+
+- discovery completeness: authoritative sourceを列挙できたか
+- lifecycle resolvability: 発見TCをPR #11 current stateへ解決できたか
+- membership completeness: 全current TCのmembershipが閉じたか
+- coverage adequacy: current Regression test basisがmember TCへ意味上閉じるか
+
+legacy TCを発見したがPR #11 lifecycleへ解決できない場合はdiscovery失敗にはしません。一方、current baselineを確定できないためoverall baseline completenessはfalseです。
+
+coverage gapはinventory欠落とは別に保持します。
+
+## 5. Suiteの保持方法
+
+### 再構成できる場合
+
+current TCとpersistしたmembership判断からSuiteを再構成し、派生viewを優先します。
+
+保持するRegression固有情報:
+
+- Regression対象範囲ref / revision
+- TC refごとのmembership判断
+- membership source refs / revisions
+- one-off / 対象外理由
+- optional filter
+
+### 再構成できない場合
+
+project-local Suite artifactへmember refを保持します。
+
+TC本文、stable ID lifecycle、freshnessはPR #11を正本とします。
+
+## 6. Regression Activity validator
+
+確認すること:
+
+- baseline / project context / selection inputのsource ref / revisionがある
+- selected TCがmember snapshot内にある
+- fullの場合、complete baseline snapshotの全memberがselectedである
+- incomplete baselineをfullとして確定していない
+- TCなし補助testwareをTC countへ混ぜていない
+- selected TCごとにrequired execution routeがある
+- required routeとsource execution ref / state / resultを辿れる
+- execution artifactの存在だけでexecutedへ数えていない
+- executed / unexecuted / blockedとsource resultを混同していない
+- completed Activityを上書きしていない
+
+## 7. required execution routeと実行状態
+
+required routeは「今回何を実行する必要があるか」だけを表します。
+
+許可する構成:
+
+- manual
+- 1件以上の具体的E2E testware ref
+- manual + E2E testware ref(s)
+
+`未実行` / `blocked` / `判定不能`はrequired routeの種類にしません。
+
+### source execution state
+
+routeごとにPR #12 / E2Eのsource execution契約を参照します。
+
+manual相当`test-execution`では、PR #12の契約上、最初の`scenario.when`操作を開始した時点が開始済み境界です。preflightだけで成果物が生成されてもexecutedには数えません。
+
+E2Eもmerge後の実契約で実際のattempt開始条件を確認し、preflight block等でartifactだけ存在する状態をexecuted扱いしません。
+
+### logical TCのexecuted
+
+logical TCをexecutedとして数えるのは、今回requiredとした全routeについてsource execution契約上の開始事実が確認できる場合だけです。
+
+- 1 routeでも未開始ならTC全体をexecutedへ入れない
+- blockedは未開始routeの状態として別に保持する
+- source resultがFAIL / 判定不能でも、開始済みであれば「実行した」事実とは両立する
+- 1 executionが複数TCをcoverする場合、同じexecution refを再利用できる
+- 1 TCに複数E2E testwareがrequiredなら全routeを追跡する
+
+## 8. source resultの投影
+
+Regression Activityはsource execution resultを再判定しません。
+
+routeごとに少なくとも次へ辿れるようにします。
+
+- execution ref
+- source上の開始状態
+- source result / outcome
+- evidence ref
+- cleanup / unresolved（Run完了へ影響する場合）
+
+Activity summaryでPASS / FAIL / 判定不能等を表示する場合、PR #12 / E2E merge後の正規状態から決定論的に投影できる範囲だけ集計します。
+
+独自の別result taxonomyは作りません。
+
+## 9. Activity discovery
+
+固定project-relative rootを優先します。
+
+固定rootを使える場合:
+
+- indexを追加しない
+- deterministic scanで全Activityを発見する
+
+固定rootを使えない場合だけproject-local activity indexを検討します。
+
+indexが必要になった場合もproject contextから一意に発見できる入口にし、Activity artifact保存とindex登録の両方が成功するまで保存完了にしません。
+
+## 10. Activity lifecycle
+
+Regression Activityのdomain stateは`regression-testing`が判断します。
+
+state値は既存`qa-workflow`語彙を再利用します。
+
+- 未開始
+- 実行中
+- 部分完了（ブロック中あり）
+- ブロック中
+- 完了
+
+`qa-workflow`は同じstateを独立計算せず、Regression Activity stateをworkflow stateへ反映します。
+
+- scope / baseline snapshot不変 → 同じActivityを再開可能
+- scope / snapshot変更 → 別Activity / version
+- 完了後 → immutable
+
+## 11. versioning
+
+persistするSuite metadata / Activity machine blockには必要なschema versionを持たせます。
+
+relation indexを実装しない限りGraph schema versionやrelation schema versionを追加しません。
+
+## 12. workflow identity / concurrency validator
+
+複数workflowを同時進行できる前提で、workflow state / persisted artifactの機械検査を追加します。
+
+確認対象:
+
+- workflow_refが存在し、同一workflow内で不変
+- workflow stateがworkflowごとに独立したartifactである
+- state revision / content identityを保持している
+- state更新がCASを使用し、競合時に古いstateを上書きしていない
+- started source refs / revisionsを保持している
+- used knowledge refs / revisionsを保持している
+- project context全体のref / revisionをprovenance snapshotとして保持している
+- currentness判定に利用したproject context項目のstable key + content identityまたは正規化値 + 影響scope / operationを保持している
+- resource条件を保持している
+- persisted updateが読み込み時revisionを保持している
+- conflict後に古い内容を上書きしていない
+- owner Skillがpartial update boundaryを定義していないartifactを自動rebaseしていない
+- owner contractがある場合もscope disjoint + upstream dependency不変を確認している
+- latest current state向けの完了判定前に依存revision / fingerprintを再確認している
+
+`workflow_ref`はLLMではなくcodeがcollision-resistantなopaque identityとして生成し、作成後はstableに保持します。同じobjective / scope等のsemantic inputから常に同じ`workflow_ref`を導出することは要求しません。この生成をPR #11型のpersisted runtime unitにする必要もありません。具体形式は実装時に既存ID規約 / portability制約を確認して決定します。
+
+persisted workflow stateはproject contextから一意に発見できるproject-local fixed workflow state rootから発見し、同じ`workflow_ref`は必ず同じstate artifactへ決定論的に解決します。初回保存はatomic create-if-absent、更新はそのstate artifact自身のexpected revisionを使うatomic conditional writeとします。read → revision比較 → 無条件writeはCASとして扱いません。
+
+## 13. knowledge artifact validator
+
+継続利用するQA knowledgeはproject contextから発見するfixed root配下で1 entry = 1 artifactとします。
+
+最低限次を検査します。
+
+- fixed rootを完全列挙できる
+- 1 entry = 1 artifact
+- stable entry ref一意性
+- entry artifact自身のstorage revision tokenを取得できる
+- content identityが必要なbackendでは決定論的に計算できる
+- 種別の許可値
+- provenance source refs / revisions
+- currentness dependency refs / revisions
+- 適用scope
+- environment / version条件
+- 状態: 有効 / 要再検証 / 置換済み
+- 置換済みentryの置換先
+- 有効entryのcurrentness dependencyがcurrentである
+- 未検証candidateをcurrent knowledge entryとして保存していない
+- same-entry updateがtarget entry自身のexpected revisionを使うatomic conditional writeである
+- new entry作成がidentity判定時のcompleteなknowledge snapshotとpublishを競合検出可能な形で結び付けている
+- 同一semantic identityの並行createでcurrent entryが複数残らない
+- snapshot変更時にcurrent rootを再読込してidentity判定からやり直す
+- knowledge root / repository HEAD変更だけで無関係entryをstaleにしていない
+- central manifest / global mutable ID counterを要求していない
+- secret実値を保存していない
+- 既存正本へ属する内容を第二のAuthority / Risk / TCとして再定義していない
+
+relation indexは不要です。
+
+## 14. cross-workflow currentness
+
+workflow Aが参照したMachine Entity / artifact / knowledge / project context / environment conditionをworkflow Bが更新しても、event busで即時通知する仕組みは追加しません。
+
+次のcheckpointでcurrentnessをdeterministically確認します。
+
+- workflow / Run開始時
+- resume時
+- 未開始のexecution / side-effect等のmutable operation開始直前
+- latest current state向け完了判定直前
+- 過去成果物のcurrent再利用直前
+
+PR #11対象のEntityはdependency / content fingerprintを優先し、PR #11対象外はworkflowが保持したref / revision / resource conditionをcurrent値と比較します。project context全体のrevisionはprovenance snapshotとして扱い、revisionが変わった場合はworkflowが実際に利用した項目だけをcurrent値と比較します。
+
+Project Contextのcurrentness対象には、表示文言や行番号と独立したtemplate-defined stable keyを使います。
+
+- scalar fieldはstable keyから決定論的に解決し、前後空白と改行形式等、field typeごとにPlan / schemaで許可した最小限の正規化だけを行う
+- 順序に意味があるfree text / listを勝手にsortしない
+- table rowをdependencyにする場合は既存のstable ID / keyを持つrowだけを対象にする
+- missing / duplicate / ambiguous keyは別項目を推測せず`unresolved`とする
+- workflow stateには利用したstable key、normalized valueまたはcontent identity、影響するworkflow scope / operationを保持する
+- exact serializationはStep 0でmerge後のProject Context parser / template実装と照合して固定する
+
+whole MarkdownをLLMへ再投入してcurrentness差分を意味推定させません。
+
+- historical Activity / execution / Sessionは変更しない
+- 利用したproject context項目が変わった場合だけ関係scopeを要再検証へ戻す
+- 未使用project context項目だけの変更ではworkflowをstaleにしない
+- dependencyが無関係ならworkflow全体を再実行しない
+- dependencyを安全に再解決できない場合はcurrent完了をblockする
+
+この検査を成立させるためだけの中央workflow database / coordinatorは追加しません。
+
+## 15. shared environment / resource coordination
+
+test user / tenant / test data / external account等の共有mutable resourceは、Activity / Session / executionから参照できる形にします。
+
+優先順位:
+
+1. workflowごとにresourceを分離する。
+2. 分離できず既存の外部reservation / exclusive ownership機構がある場合は利用する。
+3. 外部機構がなく、保存先がatomic CASを提供する場合だけproject-local reservation recordを利用する。
+4. 排他を保証できず相互影響も否定できない場合はblockする。
+
+最低限の検査:
+
+- shared mutable resourceを利用する場合、resource refまたは再現可能な識別条件がある
+- read-only / parallel-safeか、isolation済みか、exclusive ownershipがあるかを区別できる
+- 同じ`resource_ref`が全workflowから同じcanonical reservation targetへ解決される
+- 未予約をabsenceで表す場合はacquireがatomic create-if-absent、persistent recordを使う場合はexpected revision付き`available → reserved` CASである
+- releaseはcurrent owner / workflowとexpected reservation revisionが一致する場合だけ成功する
+- recoveryは時間経過だけでreleaseせず、current reservation、owner workflow / Activity / Session、必要cleanupの状態を再確認する
+- ownerがactiveか不明、cleanupが失敗 / 未確認 / 一部失敗、または安全な解放を機械判定できない場合は明示的確認へblockする
+- policy不明で他workflowへの影響を否定できない場合に並行実行していない
+- cleanup対象が当該workflow / Activityの所有または予約範囲へ限定されている
+- 別workflowのresourceをcleanupしていない
+
+自動expiry付きlease、distributed lock service、environment managerは追加しません。
+
