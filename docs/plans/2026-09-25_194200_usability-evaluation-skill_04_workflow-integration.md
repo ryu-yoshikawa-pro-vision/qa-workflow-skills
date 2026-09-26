@@ -36,7 +36,7 @@ qa-workflowが要求・scope・利用可能な証拠からroutingします。
 
 「実際に操作して使い勝手を確認」「表示崩れ・keyboard / focus・標準適合・操作後の遅さをlive targetで確認」「指定flowを実際に操作して確認」等、live UIの検査を要求する場合は `usability-inspection` を開始します。
 
-「WCAG 2.2 AAへ適合しているか評価して」等、live Web targetに対するformal conformance evaluationを明示する場合は `wcag-conformance-evaluation` を開始します。単に「accessibilityも確認して」という依頼は `usability-inspection` のgeneral accessibility inspectionであり、conformance evaluationへ昇格しません。
+「指定したWCAG 2.0 / 2.1 / 2.2のlevelへ適合しているか評価して」等、live Web targetに対するformal conformance evaluationを明示する場合は `wcag-conformance-evaluation` を開始します。単に「accessibilityも確認して」という依頼は `usability-inspection` のgeneral accessibility inspectionであり、conformance evaluationへ昇格しません。
 
 「usabilityを確認」「UIの使いやすさを見て」のように実操作の有無が明示されない場合は、次の順でroutingします。
 

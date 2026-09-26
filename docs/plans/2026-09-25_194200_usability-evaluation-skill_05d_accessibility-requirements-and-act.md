@@ -76,7 +76,7 @@ applicable contentが存在しないこと自体がrequirement satisfactionに�
 
 ## 3. general accessibility inspection
 
-general inspectionではWCAG 2.2の全Success Criteriaを毎回実行しません。
+general inspectionではWCAG 2.0 / 2.1 / 2.2のいずれについても、formal conformance evaluationのようにtarget version / levelの全Success Criteriaを毎回実行しません。
 
 対象UI・requested scope・project Authorityからapplicable concernを列挙し、少なくとも次を対象にできます。
 

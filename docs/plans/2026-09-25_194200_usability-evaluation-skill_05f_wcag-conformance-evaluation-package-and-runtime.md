@@ -711,7 +711,7 @@ random selectionの結果そのものが「十分randomだったか」を同じv
 
 ### Case A: formal request routing
 
-「WCAG 2.2 AAへ適合しているか評価」
+「指定したWCAG 2.0 / 2.1 / 2.2のlevelへ適合しているか評価」
 
 → `wcag-conformance-evaluation` をmethodology ownerとして開始する。live observationが必要で `qa-workflow` を利用できる場合は、`qa-workflow → usability-inspection → qa-workflow → wcag-conformance-evaluation resume` まで同一要求内で閉じる。
 

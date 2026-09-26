@@ -44,7 +44,11 @@ catalogに載っているだけで、そのsource全体をbundled corpusへ収�
 | W3C-WCAG20 | WCAG 2.0 | https://www.w3.org/TR/WCAG20/ | normative standard |
 | W3C-WCAG21 | WCAG 2.1 | https://www.w3.org/TR/WCAG21/ | normative standard |
 | W3C-WCAG22 | WCAG 2.2 | https://www.w3.org/TR/WCAG22/ | normative standard |
+| W3C-WCAG20-UNDERSTANDING | Understanding WCAG 2.0 | https://www.w3.org/WAI/WCAG20/Understanding/ | informative guidance / W3C上でno longer maintained。2.0 requirementの正本にはしない |
+| W3C-WCAG21-UNDERSTANDING | Understanding WCAG 2.1 | https://www.w3.org/WAI/WCAG21/Understanding/ | informative guidance |
 | W3C-WCAG22-UNDERSTANDING | Understanding WCAG 2.2 | https://www.w3.org/WAI/WCAG22/Understanding/ | informative guidance |
+| W3C-WCAG20-TECHNIQUES | Techniques for WCAG 2.0 | https://www.w3.org/WAI/WCAG20/Techniques/ | informative techniques |
+| W3C-WCAG21-TECHNIQUES | Techniques for WCAG 2.1 | https://www.w3.org/WAI/WCAG21/Techniques/ | informative techniques |
 | W3C-WCAG22-TECHNIQUES | Techniques for WCAG 2.2 | https://www.w3.org/WAI/WCAG22/Techniques/ | informative techniques |
 | W3C-WCAGEM2 | WCAG Evaluation Methodology 2.0 | https://www.w3.org/TR/wcag-em-2/ | conformance evaluation methodology |
 | W3C-WCAGEM-REPORT-TOOL | WCAG-EM Report Tool | https://www.w3.org/WAI/eval/report-tool/ | supplementary tool reference。WCAG-EM 2.0本文と同一の成果物schemaを提供することは確認できていないため、WCAG-EM 2 schemaのAuthorityにはしない |
@@ -129,6 +133,12 @@ formal WCAG evaluation packageは次を最低限catalog化します。
 | W3C-WCAG20 | WCAG 2.0 | https://www.w3.org/TR/WCAG20/ | normative conformance target |
 | W3C-WCAG21 | WCAG 2.1 | https://www.w3.org/TR/WCAG21/ | normative conformance target |
 | W3C-WCAG22 | WCAG 2.2 | https://www.w3.org/TR/WCAG22/ | normative conformance target |
+| W3C-WCAG20-UNDERSTANDING | Understanding WCAG 2.0 | https://www.w3.org/WAI/WCAG20/Understanding/ | informative / no longer maintained。2.0評価時の補助資料 |
+| W3C-WCAG21-UNDERSTANDING | Understanding WCAG 2.1 | https://www.w3.org/WAI/WCAG21/Understanding/ | informative。2.1評価時の補助資料 |
+| W3C-WCAG22-UNDERSTANDING | Understanding WCAG 2.2 | https://www.w3.org/WAI/WCAG22/Understanding/ | informative。2.2評価時の補助資料 |
+| W3C-WCAG20-TECHNIQUES | Techniques for WCAG 2.0 | https://www.w3.org/WAI/WCAG20/Techniques/ | informative techniques |
+| W3C-WCAG21-TECHNIQUES | Techniques for WCAG 2.1 | https://www.w3.org/WAI/WCAG21/Techniques/ | informative techniques |
+| W3C-WCAG22-TECHNIQUES | Techniques for WCAG 2.2 | https://www.w3.org/WAI/WCAG22/Techniques/ | informative techniques |
 | W3C-WCAGEM2 | WCAG Evaluation Methodology 2.0 | https://www.w3.org/TR/wcag-em-2/ | methodology |
 | W3C-WCAGEM-REPORT-TOOL | WCAG-EM Report Tool | https://www.w3.org/WAI/eval/report-tool/ | supplementary report tool。WCAG-EM 2.0本文と同一の成果物schemaを提供することは確認できていないため、EM 2 report schemaのAuthorityにはしない |
 | W3C-ACT-FORMAT11 | ACT Rules Format 1.1 | https://www.w3.org/TR/act-rules-format/ | supported ACT implementation consistency |
