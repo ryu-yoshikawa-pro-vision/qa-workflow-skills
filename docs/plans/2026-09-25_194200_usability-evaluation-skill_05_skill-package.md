@@ -53,7 +53,7 @@ SKILL.mdは詳細なUI pattern知識を抱えません。
 1. 実行前に `references/index.md` を読む。
 2. root indexから必要な `patterns/index.md` / `accessibility/index.md` / `platforms/index.md` へ進み、対象pattern、cross-cutting concern、platformに必要なreferenceだけを読む。
 3. 全referencesを一括で読み込まない。
-4. user goal / context / applicabilityを確認してからpattern guidanceを適用する。
+4. target purpose / context / applicabilityを確認してからpattern guidanceを適用する。user goal / taskは存在する場合だけ利用し、存在しない場合に創作しない。
 5. project Authorityと一般guidanceを分離する。
 6. 観測事実と評価を分離する。
 7. TCのPASS / FAILを勝手に上書きしない。
@@ -107,10 +107,10 @@ live targetを実際に操作する要求なら `usability-inspection`、design 
 
 - evaluation purpose
 - target scope
-- user / roleまたは不明であること
-- user goal / taskまたは不明であること
 - platform
 - 利用可能なevidence / design artifact
+
+user / role、user goal / task / flow、特定の利用者条件は、入力・仕様・evidenceに存在する場合だけ利用します。存在しないことだけで評価を停止せず、不足値を創作しません。
 
 可能なら:
 
@@ -135,8 +135,6 @@ assets/output-template.mdは最低限次を持ちます。
 ### 評価条件
 
 - 対象
-- user / role
-- user goal / task
 - platform
 - viewport / device
 - locale
@@ -144,6 +142,8 @@ assets/output-template.mdは最低限次を持ちます。
 - evidence refs
 - project Authority / adopted Design System
 - 評価制約
+- user / role（存在する場合）
+- user goal / task / flow（存在する場合）
 - 上位観点ごとの今回の扱い: 今回評価する / 対象外
 - 対象外理由
 
@@ -152,7 +152,7 @@ assets/output-template.mdは最低限次を持ちます。
 - 対象領域
 - pattern
 - pattern purpose
-- user goalとの関係
+- target purpose / user goalとの関係（user goalがある場合）
 - applicability
 - source item refs
 
@@ -162,7 +162,7 @@ assets/output-template.mdは最低限次を持ちます。
 
 merge後の既存artifact-local ref規則がある場合はそれを使い、ない場合は最終出力の評価行順で `EVAL-001` から採番します。並べ替えによるref維持は要求しません。
 
-評価条件の `user goal / task` を各評価行のdefaultとして継承します。行単位で異なる場合だけ `user goal / task override` を記録します。
+評価条件に `user goal / task / flow` が存在する場合だけ各評価行のdefaultとして継承します。行単位で異なる場合だけoverrideを記録します。存在しない場合は必須にしません。
 
 各評価行の `適用したreference` は `_02_reference-knowledge.md` §6のreference entry IDと、そのentryに含まれるsource item refを1対1で対応付けて保持します。複数の根拠を使う場合は複数行に分け、`referenceの位置づけ` を1つへ潰しません。
 
@@ -171,7 +171,7 @@ merge後の既存artifact-local ref規則がある場合はそれを使い、な
 - evaluation ref
 - 上位観点
 - target
-- user goal / task override（評価条件と異なる場合だけ）
+- user goal / task / flow override（評価条件と異なる場合だけ。評価条件に存在しない場合は省略）
 - observed fact
 - pattern / principle
 - 適用したreference:
