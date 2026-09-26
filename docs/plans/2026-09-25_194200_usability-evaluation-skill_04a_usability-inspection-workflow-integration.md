@@ -9,18 +9,22 @@
 ~~~text
 live Web UI
     ↓
-usability-inspection
-    ├→ objective observation / measurement
-    ├→ applicable standard / binding criterion check
-    └→ optional task / flow execution
+usability-inspection browser observation
+    ↓
+normalized machine evidence
+    ↓
+deterministic runtime
+    ├→ ref / scope closure
+    ├→ measurement / threshold calculation
+    └→ supported test rule result
              ↓
-      immutable evidence
+objective observation / measurement / criterion evidence
              ↓
-      usability-evaluation
+usability-evaluation
              ↓
-      reference-based UI / UX evaluation
+reference-based UI / UX evaluation
              ↓
-      follow-upが必要な場合だけFinding
+follow-upが必要な場合だけFinding
 ~~~
 
 `usability-inspection` がbrowser / session owner、`usability-evaluation` はread-only evaluatorです。
@@ -113,12 +117,13 @@ TCのstep sequenceやlocatorを、usability-inspectionのUI発見shortcutとし�
 
 既定は次です。
 
-1. usability-inspectionが必要なlive observation / measurementを取得
-2. 適用可能なstandard / binding criterionを明確な条件で判定
-3. immutable evidenceをusability-evaluationへ渡す
-4. usability-evaluationがread-onlyで専門評価
-5. 追加観測が必要ならrequestを返す
-6. usability-inspectionがscope / safetyを確認して追加観測
+1. usability-inspectionが必要なlive observationをmachine-readableな形で取得
+2. ref採番、scope closure、数値計算、threshold比較、対応済みtest ruleをdeterministic runtimeで処理
+3. runtimeでは決められないapplicability / exceptionを必要に応じて意味判断し、strict criterion resultを確定
+4. immutable evidenceをusability-evaluationへ渡す
+5. usability-evaluationがread-onlyで専門評価
+6. 追加観測が必要ならrequestを返す
+7. usability-inspectionがscope / safetyを確認して追加観測
 
 追加観測によって既存の観測事実や測定値を書き換えません。新しい証拠として追加します。
 
