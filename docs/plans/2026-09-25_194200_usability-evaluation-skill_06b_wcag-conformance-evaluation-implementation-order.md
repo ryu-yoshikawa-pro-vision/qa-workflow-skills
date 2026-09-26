@@ -51,15 +51,18 @@ WCAG-EM 2のoutput contractはReport ToolのschemaではなくWCAG-EM 2.0本文�
 先に次をfixtureで固定します。
 
 - required Input
-- supported WCAG version = 2.2 / unsupported version rejection
-- static requirement catalog / target level expected set
+- supported WCAG version = 2.2 / explicit unsupported version / missing versionの状態分離
+- static requirement catalog / target level expected set / canonical hash
 - evaluation header
 - accessibility support baseline
 - exploration
-- structured / random sample
+- sampling procedure used / skipped
+- selected sample set
+- sampling used時のstructured / random sample
+- sampling skipped時のcomplete inventory closure
 - complete process
 - sample result
-- Step 4.3 comparison
+- sampling used時のStep 4.3 comparison
 - Step 5.1 report outcome closure
 - Step 5.3 evaluation statement minimum fields / generation guard
 - conformance claim guard
@@ -73,19 +76,25 @@ WCAG-EM 2のoutput contractはReport ToolのschemaではなくWCAG-EM 2.0本文�
 - supported WCAG versionを2.2へ固定
 - `assets/wcag-2.2-requirements.json` からA / AA / AAAごとのrequired Success Criteria集合を導出
 - 5つのconformance requirement集合を別に導出
-- 2.0 / 2.1等はunsupported / unresolved
+- canonical JSON SHA-256を `static_data_versions.wcag_2_2_requirements` へ出力
+- validatorはassetからhashを独立再計算
+- contract testでW3C正本と照合済みcatalogの承認済みhashを固定
+- 明示的な2.0 / 2.1等は `support_status=unsupported`、version未指定・不明は `unresolved`
 - actual result coverageをLLM supplied listではなくstatic expected setと比較
 
 ### sampling
 
+- complete inventoryとsemantic decisionから製品全体をselected sample setへmaterializeし、sampling procedureをskipする経路
+- sampling skippedではstructured / random / Step 4.3をnot-applicableとして閉じるが、complete process / Step 4.2評価は継続
 - 10% count計算。WCAG-EM本文の丸め規則ではなく本Planの `ceil` 規則として扱い、structured count 1 / 9 / 10 / 11の境界fixtureを持つ
 - finite inventoryからrandom candidate集合を導出し、structured sampleを除外
-- target全体を有限列挙できない場合はrecorded method / candidate scope / provenanceを検証
+- target全体を有限列挙できない場合、LLMはmethod / provenanceだけを判断し、candidate listがあればscript、外部tool自体がrandom selectionする場合は外部random mechanismにsample identity選択を任せる
 - duplicate / overlap検証
 - optional random select
 - fixed seed禁止
 - complete process sequenceからsample union / process-added sampleを導出
 - normalized content type / Finding group keyの集合差分からStep 4.3 boolean / actionを導出
+- structured sample更新後のrandom target再計算、overlap除外、current random保持、不足分top-up、process再materialize
 - selection method記録
 - no-new-sample completion
 
@@ -105,7 +114,7 @@ production helperとdeterministic validatorは別実装にします。
 
 ## 6. Step 4: methodology vertical slice
 
-小さいWeb targetで、
+小さいWeb targetでまずsamplingを使う経路を、
 
 1. scope
 2. exploration
@@ -116,7 +125,9 @@ production helperとdeterministic validatorは別実装にします。
 7. comparison
 8. report
 
-を1本通します。
+まで1本通します。
+
+同じrepository-controlled fixture内の小さいself-enclosed product scopeで、製品全体をselected sample setとしてsamplingをskipする経路も1本通します。新しいserver / frameworkは追加しません。
 
 この時点では全repo integrationへ広げません。
 
@@ -147,6 +158,9 @@ W3C WCAG-EM 2.0 Step 3.2へ合わせて確認します。
 - structured sampleと非重複
 - finite inventoryがある場合はcurrent inventoryからcandidate集合をscript導出し、LLMがcandidate refsを手列挙しない
 - finite inventoryがない場合はcandidate scope / provenance付きの別random methodを記録する
+- finite candidate listを得られる場合はscriptがrandom選択する
+- 外部tool自体がrandom selectionする場合だけselected refsを外部random resultとして受ける
+- LLMがindividual sample identityをrandom sampleとして手選択する経路を持たない
 - target scope全体をselection scopeとする
 - predictable fixed patternを使わない
 - selection method記録
@@ -170,9 +184,14 @@ semantic layerはcontent type / Findingのartifact-local grouping keyだけを�
 
 - exploration update
 - semantic layerによる追加structured sample選定
-- scriptによるsample set / revision更新
-- new random / process condition確認
-- re-evaluation
+- scriptによるnew structured revision生成
+- new structured countからrandom target再計算
+- structuredへ移った旧random sampleを除外
+- currentな旧random sampleを保持
+- target不足分だけ追加random selection
+- 追加random sampleのcomplete processを再materialize
+- 新たに追加されたsample / processだけを評価
+- existing current resultを再利用
 - comparison iteration chain
 
 を閉じます。
@@ -213,8 +232,10 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 ### deterministic
 
 - schema
-- supported WCAG version / static requirement catalog
+- supported WCAG version / explicit unsupported / missing unresolvedの状態分離
+- static requirement catalog / `static_data_versions.wcag_2_2_requirements` / approved hash contract
 - target level expected Success Criteria / conformance requirement set
+- sampling procedure used / skippedとselected sample set closure
 - observation handoff origin / resume identity / expected-returned closure
 - ref
 - sample count
@@ -222,6 +243,8 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 - duplicate / overlap
 - process sequence → process-added sample materialization
 - Step 4.3 set difference → boolean / action derivation
+- structured revision更新 → random target再計算 / overlap除外 / retained random / top-up / process再materialize
+- non-finite sourceでもLLMがrandom sample identityを選ばないこと
 - machine-owned structured section materialization
 - closure
 - report
@@ -229,7 +252,7 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 
 ### semantic
 
-`_05f` Case A〜Kをすべて実Judgeで確認します。
+`_05f` Case A〜Pをすべて実Judgeで確認します。
 
 ### real Agent / browser
 
@@ -245,13 +268,16 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 - WCAG-EM Step 1〜5 traceability
 - WCAG-EM 2 output schemaがReport Toolへ依存せず、WCAG-EM 2.0本文を正本としている
 - accessibility support baseline必須
-- WCAG 2.2だけをsupported versionとし、target levelからrequired Success Criteria / conformance requirement集合をstatic catalogで独立導出
+- WCAG 2.2だけをsupported versionとし、明示unsupported versionとmissing / unresolved inputを分離
+- target levelからrequired Success Criteria / conformance requirement集合をstatic catalogで独立導出し、canonical hashを既存static data契約で検証
 - Step 2 exploration closure
-- Step 3.1 structured sample
-- Step 3.2 random sample。finite inventory時のcandidate集合はscript導出、非finite時はmethod / provenanceを保持
-- Step 3.3 complete process。sequenceからprocess-added sample / membershipをscript導出
+- sampling procedure used / skippedの両経路
+- sampling skippedではcomplete inventoryから全in-scope sampleをselected sample setへmaterializeし、structured / random / Step 4.3をnot-applicableとして閉じる
+- sampling usedではStep 3.1 structured sample
+- sampling usedではStep 3.2 random sample。finite inventory時のcandidate集合はscript導出し、非finite時もLLMがsample identityを選ばない
+- complete process。sequenceからprocess-added sample / membershipをscript導出
 - Step 4.1 / 4.2評価
-- Step 4.3 retry loop。semantic grouping keyから集合差分 / boolean / actionをscript導出
+- Step 4.3 retry loop。semantic grouping keyから集合差分 / boolean / actionをscript導出し、structured revision変更後のrandom target再計算・overlap除外・retained random・不足分top-up・process再materializeまで閉じる
 - Step 5.1のStep 1〜4 required outcome closure
 - Step 5.3 optional evaluation statement minimum fields / generation guard
 - product-wide claim guard

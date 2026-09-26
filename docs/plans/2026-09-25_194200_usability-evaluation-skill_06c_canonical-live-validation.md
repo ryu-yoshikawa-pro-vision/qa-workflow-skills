@@ -35,7 +35,8 @@ fixtureは少なくとも次を満たします。
 - 初期dataとreset / cleanup手順を固定できる
 - side effectがfixture内で閉じる
 - browser / viewport / input methodを固定できる
-- 複数viewまたはstateを持ち、structured sample / random sample / complete processの経路検証ができる
+- 複数viewまたはstateを持ち、samplingを使うstructured sample / random sample / complete processの経路検証ができる
+- 同じfixture server内に、製品全体を列挙できる小さいself-enclosed product scopeを持ち、sampling procedure skip経路を追加serverなしで検証できる
 - keyboard / focus、visual / responsive、general accessibility observationを少なくとも1件ずつ実行できる
 - taskなしpage inspectionと、明示task / flow inspectionの両方を実行できる
 - intentional issueを使う場合はfixture contractとして期待状態を固定し、実製品の仕様と混同しない
@@ -112,11 +113,15 @@ formal request
 
 さらに、
 
+- sampling procedure usedのcase
 - structured sample
 - random sample
 - complete process
 - Step 4.3で再samplingなしのcase
-- semantic / fixtureでStep 4.3再samplingありのcase
+- semantic / fixtureでStep 4.3再samplingありのcase。structured追加後のrandom target再計算、overlap除外、retained random、不足分top-up、process再materializeを確認する
+- sampling procedure skippedのcase。completeなin-scope inventory全件がselected sample setとなり、structured / random / Step 4.3がnot-applicableでもcomplete process / Step 4.2評価が続くこと
+- explicit unsupported WCAG versionとmissing / unresolved version inputが別状態になること
+- finite inventoryがないrandom selection pathでLLMがsample identityを手選択しないこと
 - Step 5.1 outcome closure
 - evaluation statement生成条件成立 / 不成立
 - product-wide conformance claim guard
@@ -152,6 +157,8 @@ repository implementationの完了条件:
 - expected handoff集合とcurrent valid returned result集合が一致するまでresumeしないことをPASS
 - evidence safety / side-effect / browser ownershipをPASS
 - repository標準のdeterministic / semantic / routing / Skill validationをPASS
+- WCAG 2.2 requirement catalogのcanonical hash再計算と承認済みhash contract testをPASS
+- sampling used / skipped、Step 4.3 structured update後の再sampling、unsupported / unresolved分離をPASS
 - canonical fixtureで未解決blockedが0
 
 external acceptance:

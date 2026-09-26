@@ -35,7 +35,7 @@
 - evaluation期間または開始時点
 - project Authority / release gateとの関係（存在する場合）
 
-target WCAG version、level、self-enclosedなdigital product scope、accessibility support baselineを確定できない場合は推測せず `unresolved` とし、formal evaluationを開始しません。初期実装でsupportedとするversionはWCAG 2.2だけです。2.0 / 2.1等が指定された場合は2.2へ暗黙変換せず `unsupported / unresolved` として、対応versionを追加するまでformal evaluationを開始しません。product内の特定page / componentを任意に除外してscopeを狭めません。
+target WCAG version、level、self-enclosedなdigital product scope、accessibility support baselineを確定できない場合は推測せず `unresolved` とし、formal evaluationを開始しません。初期実装でsupportedとするversionはWCAG 2.2だけです。2.0 / 2.1等、supported subset外のversionが明示された場合はsupport statusを `unsupported` としてformal evaluationを開始せず、version自体が不明・未指定の場合の `unresolved` と混同しません。product内の特定page / componentを任意に除外してscopeを狭めません。
 
 追加評価要件は任意Inputです。
 
@@ -65,6 +65,20 @@ WCAG-EM 2.0 Step 1へ対応付けます。
 探索結果からstructured sampleの候補を意味判断します。target scopeを有限に列挙できる場合は、currentなtarget inventoryとそのprovenance / completenessを別に固定します。このfinite inventoryはrandom samplingのcandidate集合をscriptが導出するmachine inputであり、LLMがrandom candidate refsを都合よく手作成しません。
 
 ### Step 3: representative sample set
+
+Step 3開始時に、sampling procedureを使うか、製品全体をselected sample setとしてsamplingをskipするかを確定します。
+
+samplingをskipできるのは、currentなtarget inventoryまたは同等のauthoritative sourceからin-scope sample全体を列挙でき、semantic layerが「製品全体を評価可能」と判断できる場合です。scriptは次をmaterializeします。
+
+- sampling procedure: skipped
+- sampling skip rationale
+- completeなin-scope inventory / provenance
+- selected sample set = 全in-scope sample refs
+- structured sample / random sample / Step 4.3 = not-applicable
+
+samplingをskipしてもcomplete processの識別とStep 4.2評価は省略しません。inventory completenessを確認できない場合はsampling skipを選びません。
+
+それ以外はsampling procedureを使用し、以下のstructured / random sample contractへ進みます。
 
 #### structured sample
 
@@ -102,7 +116,7 @@ random sampleは、
 
 target scopeをfinite inventoryとして列挙できる場合、`sampling.py` がcurrent inventoryからscope内candidateを導出し、duplicate除去とstructured sample除外を行ってからrandom selectionします。Agent / LLMが `candidate sample refs` を手で列挙しません。
 
-target全体を有限列挙できない場合は、WCAG-EM 2.0が許容する別のrandom selection methodを使い、そのmethod、candidate scope、provenance、selected sampleを記録します。この経路でもcount / duplicate / overlapはscriptで検証します。
+target全体を有限列挙できない場合も、LLMが個々のsample identityをrandom sampleとして選びません。manual list、crawler / server log / search等から有限なcandidate listを得られる場合はそのlistをscriptへ渡してrandom selectionします。外部tool自体がrandom selectionを行う場合は、tool / method / candidate scope / provenance / selected sampleを記録し、scriptがcount / duplicate / overlap / methodを検証します。LLMはmethodの適用性を判断できますが、selected sample identityを手選択しません。
 
 選択方法が既存sampleを選び、別のunique sampleが存在する場合は再選択します。新しいunique sampleが存在しない場合は、その事実と候補母集団を記録してStep 3.2を完了できます。
 
@@ -143,7 +157,17 @@ scriptはstructured / randomのkey集合差分から、
 
 を導出します。LLMがbooleanや次actionを手入力しません。
 
-差分がある場合、semantic layerが追加すべきstructured sampleを選び、scriptがsample set / revision / comparison chainを更新します。このloopは、集合差分がなく、structured sampleが十分representativeであるというsemantic確認も成立するまで閉じません。
+差分がある場合、semantic layerが追加すべきstructured sampleを選びます。scriptはその追加を新しいstructured sample revisionへmaterializeし、次を順に実行します。
+
+1. 新structured countから `ceil(count * 0.10)` でrandom targetを再計算する
+2. 新structured setへ移った旧random sampleをrandom setから除外する
+3. structuredと重複せずcurrentな旧random sampleは保持する
+4. target countへ不足する件数だけ、現在のcandidate scope / provenanceに従って追加random selectionする
+5. 追加random sampleにcomplete processが含まれる場合はprocess-added sampleを再materializeする
+6. 新たに追加されたsample / processだけを未評価としてhandoff / evaluationへ送る。既存current resultは再利用できる
+7. 新structured / random revisionで次のcomparison iterationを作る
+
+このloopは、集合差分がなく、structured sampleが十分representativeであるというsemantic確認も成立するまで閉じません。
 
 ### Step 5: report
 
@@ -296,13 +320,15 @@ WCAG-EM 2.0はWCAG、accessible design、assistive technology、障害のある�
 - general accessibility inspectionと責務が分離されている
 - target WCAG version / level / scope / accessibility support baselineを創作しない
 - WCAG-EM 2.0 Step 1〜5へ成果物を追跡できる
-- structured sampleをStep 2探索結果へ追跡できる
+- sampling procedure used / skippedを一意に閉じられる
+- sampling skippedではcompleteな全体inventoryからselected sample setをmaterializeし、structured / random / Step 4.3をnot-applicableとして閉じる
+- sampling usedではstructured sampleをStep 2探索結果へ追跡できる
 - random sample countがPlanの10%整数化規則を満たす
 - random sampleの重複 / structured sampleとの重複を検証できる
 - random selection methodを記録する
 - predictable fixed-seed selectionを必須化していない
 - complete processを閉じる
-- Step 4.3で新content / findingが出た場合の再sampling loopを閉じる
+- Step 4.3で新content / findingが出た場合、structured revision更新後のrandom target再計算、overlap除外、current random保持、不足分top-up、process再materializeまでscriptで閉じる
 - Step 5.1の必須outcomeをreportできる
 - evaluation statementの生成条件を満たさない場合は作成しない
 - representative sampleだけからproduct-wide WCAG conformance claimを作らない

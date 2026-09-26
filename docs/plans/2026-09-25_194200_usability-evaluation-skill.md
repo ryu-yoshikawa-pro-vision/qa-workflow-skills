@@ -135,22 +135,25 @@ formalなWCAG conformance evaluationはgeneral inspectionと分離し、`wcag-co
 
 1. WCAG-EM 2.0 Step 1でscope / target / accessibility support baselineを固定する
 2. Step 2でtargetを探索する
-3. Step 3.1でstructured sampleを選定する
-4. Step 3.2でstructured sample数の10%以上となるrandom sampleを選定し、selection methodを記録する
-5. Step 3.3でcomplete processをsample setへ追加する
-6. Step 4.1 / 4.2でsample / complete processを評価する
-7. Step 4.3でstructured / random sampleを比較し、新content type / findingがあればStep 2 / 3へ戻る
-8. live observationが必要なsample / requirementについてnormalized handoffを出し、`qa-workflow` が `usability-inspection` を直列実行してimmutable evidenceを戻す
-9. Step 5でevaluation reportを作成する
-10. 条件を満たす場合だけoptional evaluation statementを作成する
+3. Step 3開始時にsampling procedureを使うか、製品全体をselected sample setとしてsamplingをskipするかを確定する
+4. samplingを使う場合だけStep 3.1でstructured sampleを選定する
+5. samplingを使う場合だけStep 3.2でstructured sample数の10%以上となるrandom sampleを選定し、selection methodを記録する
+6. samplingを使う場合はStep 3.3でcomplete processをsample setへ追加する。samplingをskipする場合もcomplete processの識別・Step 4.2評価は省略しない
+7. Step 4.1 / 4.2でselected sample set / complete processを評価する
+8. samplingを使う場合だけStep 4.3でstructured / random sampleを比較し、新content type / findingがあればStep 2 / 3へ戻る
+9. live observationが必要なsample / requirementについてnormalized handoffを出し、`qa-workflow` が `usability-inspection` を直列実行してimmutable evidenceを戻す
+10. Step 5でevaluation reportを作成する
+11. 条件を満たす場合だけoptional evaluation statementを作成する
 
 **Output**
 
 - evaluation header / revision
 - accessibility support baseline
 - target exploration
-- structured sample set
-- random sample set / selection method
+- sampling procedure: used / skipped
+- selected sample set
+- samplingを使う場合のstructured sample set
+- samplingを使う場合のrandom sample set / selection method
 - complete process set
 - sample requirement results / evidence refs
 - structured / random comparison iteration
@@ -160,7 +163,7 @@ formalなWCAG conformance evaluationはgeneral inspectionと分離し、`wcag-co
 - Finding refs
 - limitation / blocked reason
 
-random sampleの選択自体はpredictable fixed patternにしません。有限なtarget inventoryをcurrent evidenceとして確定できる場合、random candidate集合はLLMが手で列挙せず、そのinventoryからSkill-local scriptがscope内候補を導出してstructured sampleを除外します。有限列挙できない場合だけ、別のrandom selection methodとcandidate scope / provenanceを記録します。10%件数計算、candidate集合導出、duplicate / overlap、complete process由来sampleのunion、Step 4.3の集合差分と遷移、cross-reference、Step closure、report構造はSkill-local scriptで機械処理します。
+random sampleの選択自体はpredictable fixed patternにしません。有限なtarget inventoryをcurrent evidenceとして確定できる場合、random candidate集合はLLMが手で列挙せず、そのinventoryからSkill-local scriptがscope内候補を導出してstructured sampleを除外します。有限列挙できない場合も、LLMが個々のsample identityをrandom sampleとして選びません。manual list、crawler / server log / search等から有限なcandidate listを得られる場合はscriptがrandom選択し、外部tool自体がrandom selectionを行う場合はtool / method / candidate scope / provenance / selected refsを記録してscriptが契約を検証します。10%件数計算、candidate集合導出、duplicate / overlap、complete process由来sampleのunion、Step 4.3の集合差分・再sampling遷移、cross-reference、Step closure、report構造はSkill-local scriptで機械処理します。
 
 browser操作は `usability-inspection`、意味判断は各owner SkillのLLM、機械的な導出・検証・成果物組立はSkill-local production scriptが担当します。LLMは、UI patternの適用性、Authority、criterion applicability / exception、source採否、content type / Findingの意味的同一性、follow-up要否等、意味判断でしか確定できない最小のdecision fieldだけを返します。固定enum、期待集合、row skeleton、派生boolean、集計、順序、ID、cross-reference、status transition、required observation集合、Finding作成要否、machine-owned Markdown sectionはscriptが導出します。required production helperが失敗した場合、LLMが同じ機械値を手作成してfallbackせず、影響scopeを `incomplete / unresolved / blocked` へ閉じます。
 
@@ -311,7 +314,7 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
 - ACT Rulesはinformative testing methodとして利用し、全formal / proposed ruleの実装を完成条件にしない。supported ruleだけを実装し、ACT Rules Format 1.1 §4.14.1のconsistencyを検証する。
 - general live inspectionでは定義済み上位観点をすべてapplicability判定し、未選択のまま残さない。
 - repository implementationの完了には `_06c_canonical-live-validation.md` のrepository-controlled canonical fixtureでAgent / browser E2Eを1本以上PASSさせる。外部実対象・実アカウント・特定assistive technologyを必要とするacceptanceは別ゲートとし、それらが提供されていないことだけでrepository implementationを未完了にしない。
-- formal WCAG conformance evaluationは `wcag-conformance-evaluation` でWCAG-EM 2.0 Step 1〜5、accessibility support baseline、structured / random sample、complete process、Step 4.3再sampling loop、reportまで閉じる。
+- formal WCAG conformance evaluationは `wcag-conformance-evaluation` でWCAG-EM 2.0 Step 1〜5、accessibility support baseline、sampling procedure使用 / 製品全体評価によるsampling skip、complete process、必要なStep 4.3再sampling loop、reportまで閉じる。
 
 ## 固定方針
 
@@ -366,10 +369,12 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
 49. 「usabilityを確認」「UIの使いやすさを見て」等の実操作有無が不明な依頼はtrigger boundaryとして扱い、live Web UIを操作して検査するならusability-inspection、design artifact / screenshot / 取得済みevidenceのreference-based評価ならusability-evaluationへroutingする。
 50. usability-inspectionでref採番、固定scope row生成、required observation field集合、scope closure、数値計算、threshold比較、supported machine-decidable test rule、Finding作成要否等をLLMへ手計算させず、PR #11のcurrent Skill runtime contractを使って決定論的scriptへ移す。usability-evaluationも固定上位観点row、evaluation ref、closure、cross-reference、Finding作成要否、machine-owned成果物sectionを `evaluation_structure.py` でmaterializeし、Agentが計算結果をMarkdownへ手で転記しない。`test-rule-catalog.json` はsupported ACT / project test ruleのmetadataだけを保持し、structure / geometry / elapsed / threshold helperは `inspection_structure.py` / `measurement.py` に置く。generic rule DSL / plugin systemは追加しない。
 51. W3C ACT Rulesはinformative testing methodとして利用する。全ruleの実装は要求せず、live Web scopeで忠実に実装でき、required evidenceを取得でき、official examplesでconsistency検証できるruleだけsupportedとする。supported ACT RuleのoutcomeはACT Rules Format 1.1の `inapplicable / passed / failed / cantTell / untested` を使用する。`untested` はsupported ruleが今回scopeへ選定されたがtest subjectを評価していない場合だけ、`cantTell` は評価を開始したがapplicabilityまたはexpectationを完全に判定できない場合に使用し、rule status、requirements mapping、execution modeと分離する。
-52. general accessibility inspectionとformal WCAG conformance evaluationを別Skillへ分離する。formal評価の初期実装はWCAG 2.2だけをsupported versionとし、target level / self-enclosedなdigital product scope / accessibility support baselineを事前に確定してWCAG-EM 2.0へ従う。2.2以外を暗黙変換しない。target levelから必要なSuccess Criteria / conformance requirement集合はversioned static catalogからscriptが独立導出し、LLMの自己申告集合を正本にしない。supported test ruleがrequirementの一部だけを評価する場合、rule outcomeが `passed` でもrequirementを `satisfied` にしない。
+52. general accessibility inspectionとformal WCAG conformance evaluationを別Skillへ分離する。formal評価の初期実装はWCAG 2.2だけをsupported versionとし、target level / self-enclosedなdigital product scope / accessibility support baselineを事前に確定してWCAG-EM 2.0へ従う。明示的に2.0 / 2.1等が指定された場合はsupport statusを `unsupported` とし、version自体が不明・未指定の場合の `unresolved` と混同しない。target levelから必要なSuccess Criteria / conformance requirement集合はversioned static catalogからscriptが独立導出し、LLMの自己申告集合を正本にしない。supported test ruleがrequirementの一部だけを評価する場合、rule outcomeが `passed` でもrequirementを `satisfied` にしない。
 53. screenshot、DOM、accessibility tree、raw snapshot等はsecret・個人データ・機密情報を含み得るため、PR #12のevidence安全契約を再利用して必要最小限だけ取得・保存し、raw evidenceを成果物の必須条件にしない。
 54. deterministic runtime、deterministic validator、semantic evalを分離し、同じ実装で生成と検証を行わない。
 55. semantic layerは意味判断でしか確定できない最小decisionだけをproduction helperへ渡す。完成row、final ref、expected集合、derived status / boolean、summary count等をLLMが組み立ててhelperへ自己申告しない。
 56. production helperはmachine-owned sectionをcanonicalにrender / materializeし、Agentは返却されたmachine-owned contentを値単位で転記・再構築しない。repository fileへのwrite自体は既存の安全な保存経路を使い、scriptの直接writeを必須にはしない。
-57. formal WCAGの有限inventory時random candidate集合、complete process由来sample union、Step 4.3のcontent type / Finding集合差分と次action、target levelからのrequired requirement集合はscriptで導出する。意味的なcontent type / Finding grouping、structured sampleの代表性、inventory completeness等だけをsemantic evalへ残す。
-58. formal observation handoffはoriginating evaluation identity / revision、handoff ref、resume operation、expected sample / process / requirement refsをworkflow stateへ保持し、currentかつvalidなreturned result集合が期待集合を満たした場合だけ同じevaluationをresumeする。LLMが「戻り値は揃った」と手判断しない。
+57. formal WCAGのsampling procedure使用可否はsemantic layerが「製品全体を評価可能か」を判断し、scriptが成果物構造と後続Step applicabilityを確定する。samplingをskipする場合はcurrentでcompleteな全体inventoryをselected sample setへmaterializeし、structured / random selectionとStep 4.3をnot-applicableとして閉じる。complete processの識別・Step 4.2評価は省略しない。
+58. formal WCAGの有限inventory時random candidate集合、complete process由来sample union、Step 4.3のcontent type / Finding集合差分と次action、target levelからのrequired requirement集合はscriptで導出する。Step 4.3でstructured sampleが増えた場合は、scriptが新structured countからrandom targetを再計算し、structuredへ移った旧random sampleを除外し、currentな旧random sampleを保持したまま不足分だけ追加random selectionする。意味的なcontent type / Finding grouping、structured sampleの代表性、inventory completeness等だけをsemantic evalへ残す。
+59. WCAG 2.2 requirement catalogはPR #11のstatic data契約を再利用し、canonical JSON SHA-256を `static_data_versions.wcag_2_2_requirements` として保持する。validatorはassetから独立再計算し、別contract testでW3C正本と照合済みcatalogの承認済みhashを固定する。
+60. formal observation handoffはoriginating evaluation identity / revision、handoff ref、resume operation、expected sample / process / requirement refsをworkflow stateへ保持し、currentかつvalidなreturned result集合が期待集合を満たした場合だけ同じevaluationをresumeする。LLMが「戻り値は揃った」と手判断しない。
