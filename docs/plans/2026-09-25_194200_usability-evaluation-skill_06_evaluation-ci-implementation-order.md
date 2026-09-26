@@ -310,6 +310,27 @@ negative例:
 
 このnegativeはdirect triggerの評価です。
 
+boundary caseとして最低限次を追加します。
+
+~~~text
+ユーザー要求: usabilityを確認して
+live targetを実際に操作する意図あり
+→ usability-inspection
+
+ユーザー要求: UIの使いやすさを見て
+screenshot / Figma / specification / 取得済みevidenceだけをreference knowledgeへ照合
+→ usability-evaluation
+
+ユーザー要求: 表示崩れを確認して
+live browserでviewportを変えて実操作・観測
+→ usability-inspection
+
+ユーザー要求: このscreenshotの表示崩れを評価して
+→ usability-evaluation
+~~~
+
+曖昧queryを文字列だけでusability-evaluationへ固定しません。
+
 別途workflow統合caseとして、少なくとも次を追加します。
 
 ~~~text
