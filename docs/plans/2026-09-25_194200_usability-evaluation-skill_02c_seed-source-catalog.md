@@ -43,7 +43,7 @@ catalogに載っているだけで、そのsource全体をbundled corpusへ収�
 | W3C-WCAG22-UNDERSTANDING | Understanding WCAG 2.2 | https://www.w3.org/WAI/WCAG22/Understanding/ | informative guidance |
 | W3C-WCAG22-TECHNIQUES | Techniques for WCAG 2.2 | https://www.w3.org/WAI/WCAG22/Techniques/ | informative techniques |
 | W3C-WCAGEM2 | WCAG Evaluation Methodology 2.0 | https://www.w3.org/TR/wcag-em-2/ | conformance evaluation methodology |
-| W3C-WCAGEM-REPORT-TOOL | WCAG-EM Report Tool | https://www.w3.org/WAI/eval/report-tool/ | WCAG-EM report structure / machine-readable report reference |
+| W3C-WCAGEM-REPORT-TOOL | WCAG-EM Report Tool | https://www.w3.org/WAI/eval/report-tool/ | supplementary tool reference。2026-09-26確認時点のWAI Overviewではcurrent toolはWCAG-EM 1向け。WCAG-EM 2 schemaのAuthorityにはしない |
 | W3C-WAI-ARIA12 | WAI-ARIA 1.2 | https://www.w3.org/TR/wai-aria-1.2/ | normative standard |
 | W3C-ARIA-IN-HTML | ARIA in HTML | https://www.w3.org/TR/html-aria/ | normative author requirements |
 | W3C-APG | WAI-ARIA Authoring Practices Guide | https://www.w3.org/WAI/ARIA/apg/ | informative guidance / examples |
@@ -124,14 +124,20 @@ formal WCAG evaluation packageは次を最低限catalog化します。
 | --- | --- | --- | --- |
 | W3C-WCAG22 | WCAG 2.2 | https://www.w3.org/TR/WCAG22/ | normative conformance target |
 | W3C-WCAGEM2 | WCAG Evaluation Methodology 2.0 | https://www.w3.org/TR/wcag-em-2/ | methodology |
-| W3C-WCAGEM-REPORT-TOOL | WCAG-EM Report Tool | https://www.w3.org/WAI/eval/report-tool/ | report field / JSON / HTML reference |
+| W3C-WCAGEM-REPORT-TOOL | WCAG-EM Report Tool | https://www.w3.org/WAI/eval/report-tool/ | supplementary report tool。2026-09-26確認時点ではWCAG-EM 1向け。EM 2 report schemaのAuthorityにはしない |
 | W3C-ACT-FORMAT11 | ACT Rules Format 1.1 | https://www.w3.org/TR/act-rules-format/ | supported ACT implementation consistency |
 | W3C-ACT-RULES | All ACT Rules | https://www.w3.org/WAI/standards-guidelines/act/rules/ | informative test rules |
 | W3C-WAI-ARIA12 | WAI-ARIA 1.2 | https://www.w3.org/TR/wai-aria-1.2/ | applicable normative requirements |
 | W3C-ARIA-IN-HTML | ARIA in HTML | https://www.w3.org/TR/html-aria/ | applicable author requirements |
 | W3C-ACCESSIBILITY-SUPPORT | Understanding Accessibility Support | https://www.w3.org/WAI/WCAG22/Understanding/conformance#accessibility-support | accessibility support baseline reference |
+| W3C-ESSENTIAL-COMPONENTS | Essential Components of Web Accessibility | https://www.w3.org/WAI/fundamentals/components/ | WCAG-EM required expertise background reading |
+| W3C-PEOPLE-USE-WEB | How People with Disabilities Use the Web | https://www.w3.org/WAI/people-use-web/ | WCAG-EM required expertise background reading |
+| W3C-EASY-CHECKS | Easy Checks – A First Review of Web Accessibility | https://www.w3.org/WAI/test-evaluate/preliminary/ | preliminary evaluation / WCAG-EM background reading |
+| W3C-INVOLVING-USERS | Involving Users in Evaluating Web Accessibility | https://www.w3.org/WAI/test-evaluate/involving-users/ | WCAG-EM background reading。human participant study自体は本Skill対象外 |
+| W3C-SELECTING-TOOLS | Selecting Web Accessibility Evaluation Tools | https://www.w3.org/WAI/test-evaluate/tools/selecting/ | WCAG-EM background reading |
+| W3C-COMBINED-EXPERTISE | Using Combined Expertise to Evaluate Web Accessibility | https://www.w3.org/WAI/test-evaluate/combined-expertise/ | WCAG-EM required expertise background reading |
 
-WCAG-EM Report Toolはreport schemaの参考にしますがruntime dependencyにはしません。
+2026-09-26確認時点でWAI Overviewはcurrent WCAG-EM Report ToolをWCAG-EM 1向けとしています。リンクは既知の公式resourceとしてcatalogへ保持しますが、WCAG-EM 2のfield / JSON schemaを決めるAuthorityにはしません。WCAG-EM 2成果物はWCAG-EM 2.0本文、とくにStep 5.1を正本にします。tool自体もruntime dependencyにはしません。
 
 ## 5. 実装時のcatalog初期化
 

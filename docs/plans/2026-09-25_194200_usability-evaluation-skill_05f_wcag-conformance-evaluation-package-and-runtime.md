@@ -38,7 +38,7 @@ skills/wcag-conformance-evaluation/
 - WAI-ARIA / ARIA in HTML
 - Understanding Accessibility Support
 
-WCAG-EM Report Toolはfield / report構造のreferenceとして利用できますが、tool自体をruntime dependencyにはしません。`references/source-catalog.md` の物理schemaは `_02d_reference-artifact-schema.md` のSources table契約を再利用します。
+WCAG-EM Report Toolは既知の公式resourceとして保持しますが、2026-09-26確認時点のWAI Overviewではcurrent toolはWCAG-EM 1向けです。WCAG-EM 2のfield / JSON schemaを決めるAuthorityにはせず、本Skillのoutput contractはWCAG-EM 2.0本文、とくにStep 5.1を正本にします。Report Tool自体もruntime dependencyにはしません。`references/source-catalog.md` は `_02d_reference-artifact-schema.md` の共通Sources table契約を再利用します。
 
 ## 3. output-template.md
 
@@ -415,7 +415,7 @@ representative sampleが全PASSでもproduct-wide conformance claimを作らな�
 - package単体でSkill contractを理解できる
 - sibling Skillのscriptsへruntime依存しない
 - live observation不足時にnormalized handoffを出してblockedへ閉じられる
-- WCAG-EM Report Toolをruntime dependencyにしない
+- current WCAG-EM Report ToolをWCAG-EM 2 schema Authorityとして扱わず、runtime dependencyにもしていない
 - random sample 10%整数化がscript化されている
 - random selectionへfixed seedを要求しない
 - sample / process / result / comparison refをAgentが手採番しない

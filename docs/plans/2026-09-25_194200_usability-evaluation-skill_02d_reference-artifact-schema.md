@@ -2,7 +2,7 @@
 
 ## 0. 本ファイルの対象
 
-本ファイルは、`usability-evaluation` のsource catalog、source coverage、reference entryについて、production scriptとvalidatorが読む物理Markdown形式を固定します。
+本ファイルは、3 Skillの `references/source-catalog.md` で共有するSources tableと、`usability-evaluation` のsource discovery / source coverage / reference entryについて、production scriptとvalidatorが読む物理Markdown形式を固定します。
 
 logical fieldの意味は `_02_reference-knowledge.md`、source discoveryは `_02a_source-acquisition-and-coverage.md`、semantic validationは `_02b_reference-validation-and-completeness.md` を正本とします。
 
@@ -26,7 +26,13 @@ Markdown本文の説明文をmachine fieldとして推測解析しません。
 
 ## 2. references/source-catalog.md
 
-必須sectionは次の3つです。
+### Skillごとの適用範囲
+
+- `usability-evaluation`: `Sources / Candidates / Discovery Runs` の3 sectionを必須にする
+- `usability-inspection`: `Sources` sectionだけを共通schemaとして必須にする。source discoveryのCandidates / Discovery Runsは持たない
+- `wcag-conformance-evaluation`: `Sources` sectionだけを共通schemaとして必須にする。source discoveryのCandidates / Discovery Runsは持たない
+
+以下の `Sources` table schemaは3 Skillで共通です。
 
 ### Sources
 

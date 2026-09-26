@@ -276,7 +276,7 @@ component単体が妥当でもflow全体で問題になる場合があります�
 
 `evaluation ref` は1つのusability-evaluation成果物revision内だけで一意なartifact-local refです。新しいglobal QA IDやMachine Entityにはしません。成果物自体のidentity / revisionは、実装開始時に確認したPR #11 / #12 / #13 merge後の既存artifact契約を再利用します。
 
-同じ評価を別revisionで再実行した場合に `evaluation ref` のstable identity維持を要求しません。既存artifact-local ref規則がmerge後実装にある場合はそれを優先し、ない場合は最終出力の評価行順で `EVAL-001` から採番します。並べ替えによるref維持は要求しません。
+同じ評価を別revisionで再実行した場合に `evaluation ref` のstable identity維持を要求しません。既存artifact-local ref規則がmerge後実装にある場合はそれを優先し、ない場合はsemantic layerが確定したevaluation draft順を `evaluation_structure.py` が保持して `EVAL-001` から決定論的に採番します。Agentがfinal refを手採番せず、別revisionでの並べ替えによるref維持は要求しません。
 
 - evaluation ref
 - 対象

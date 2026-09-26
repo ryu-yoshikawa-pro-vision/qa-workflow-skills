@@ -35,7 +35,7 @@ source-catalogへ少なくとも、
 
 - WCAG 2.2
 - WCAG-EM 2.0
-- WCAG-EM Report Tool
+- WCAG-EM Report Tool。2026-09-26確認時点ではWCAG-EM 1向けであることをstatusとして記録し、WCAG-EM 2 schema Authorityにはしない
 - ACT Rules Format 1.1 / All ACT Rules
 - Understanding Accessibility Support
 
@@ -44,6 +44,8 @@ source-catalogへ少なくとも、
 ## 4. Step 2: output contract
 
 browser操作前にoutput-templateとvalidator最小schemaを実装します。
+
+WCAG-EM 2のoutput contractはcurrent Report ToolのschemaではなくWCAG-EM 2.0 Step 5.1を正本にします。
 
 先に次をfixtureで固定します。
 
@@ -210,6 +212,7 @@ canonical live Web targetでWCAG-EM E2Eを実行します。
 - qa-workflowがmulti-Skill observation handoffを直列オーケストレーション
 - standalone packageがsibling Skill scriptsへruntime依存しない
 - WCAG-EM Step 1〜5 traceability
+- WCAG-EM 2 output schemaがcurrent WCAG-EM 1 Report Toolへ依存していない
 - accessibility support baseline必須
 - Step 2 exploration closure
 - Step 3.1 structured sample
