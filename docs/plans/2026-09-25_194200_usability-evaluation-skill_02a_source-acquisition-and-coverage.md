@@ -109,9 +109,12 @@ Plan作成時点のseed:
 
 Plan作成時点のseed:
 
+- ISO 9241-110のcurrent公式情報
 - Nielsen Norman Groupの10 Usability Heuristics
 - Heuristic Evaluation方法
 - 各heuristicの理解に直接必要な公式公開補足
+
+ISO本文が公開範囲を超える場合は、公開metadata / abstract等で確認できる範囲をsource-reference-onlyとして扱い、本文を推測・複製しません。
 
 NN/gの全記事を無条件に対象母集団にはしません。評価方法・principle・UI interactionの判断根拠としてsource catalogへ採用した記事だけをitemとして閉じます。
 
