@@ -6,7 +6,7 @@
 
 UI pattern、principle、standard、Design System、heuristic等をevidenceへ照合して意味判断します。
 
-live targetをuser goal / task scenarioから能動操作する `usability-inspection` の実行契約は `_01a_usability-inspection-scope-and-contract.md` に分離します。
+live Web UIを能動操作・観測する `usability-inspection` の実行契約は `_01a_usability-inspection-scope-and-contract.md` に分離します。
 
 `usability-evaluation` 自身はbrowser / session ownerにならず、代表ユーザーを用いたusability testingを実施したとは扱いません。
 
@@ -16,9 +16,7 @@ live targetをuser goal / task scenarioから能動操作する `usability-inspe
 
 対象を次の組合せで固定します。
 
-- user / role
-- user goal / task
-- user goal / taskの根拠または推定であること
+- target scope
 - platform
 - viewport / device
 - locale
@@ -26,8 +24,17 @@ live targetをuser goal / task scenarioから能動操作する `usability-inspe
 - target region / flow
 - relevant pattern
 - evidence
+- project Authority / adopted Design System / applicable standard
 
-同じ画面でもrole、device、stateが変われば別評価になり得ます。
+次は存在する場合だけ利用します。
+
+- user / role
+- user goal / task / flow
+- 特定の利用者条件
+
+taskやpersonaがないことだけを理由に評価不能にしません。
+
+同じ画面でもdevice、state、role等の条件が変われば別評価になり得ます。
 
 ## 2. 評価手順
 
@@ -35,19 +42,18 @@ live targetをuser goal / task scenarioから能動操作する `usability-inspe
 
 確認するもの:
 
-- 誰が使うか
-- 何を達成しようとしているか
-- user goal / taskがどの入力・根拠から得られたか
-- UIから推定したgoalなら仮定として扱う
-- どの画面 / flowか
+- どの画面 / component / flowを評価するか
 - platform
 - viewport / input method
+- current state
 - project固有Design System
+- applicable standard
 - accessibility scope
 - usability scope
 - 評価に利用可能な証拠
+- user goal / task / role等が明示されている場合はその条件
 
-不足しても判定可能な部分は継続します。
+対象UIの目的やuser goalをevidence / specificationから確認できない場合は、無理にpersonaやgoalを創作せず、判定可能な観点だけ継続します。
 
 ### Step 2: 観測事実を整理
 
@@ -70,7 +76,7 @@ live targetをuser goal / task scenarioから能動操作する `usability-inspe
 
 解釈だけを観測事実として書きません。
 
-`usability-inspection` のtask outcome、action trace、timing、screenshot等が入力される場合も、それらをObservation / evidenceとして扱い、human user behaviorへ読み替えません。
+`usability-inspection` のobjective observation、criterion result、measurement、screenshot、optional task / flow result等が入力される場合も、それらをevidenceとして扱い、human user behaviorへ読み替えません。criterion resultと専門評価も混同しません。
 
 ### Step 3: pattern候補を識別
 
@@ -78,7 +84,8 @@ DOM role名だけでpatternを確定しません。
 
 次を組み合わせます。
 
-- user goal
+- user goal / task（存在する場合）
+- target UIの目的・周辺文脈
 - controlの構造
 - interaction
 - role / semantics
@@ -129,7 +136,7 @@ reference側にあるnormative / informative / advisoryという性質だけか�
 
 ### Step 6: 今回評価する観点を固定
 
-評価を始める前に、target scope、user goal / task、pattern候補、適用可能なreference、利用可能なevidenceから、今回扱う観点を固定します。
+評価を始める前に、target scope、pattern候補、適用可能なreference、利用可能なevidence、明示されたuser goal / taskがある場合はその条件から、今回扱う観点を固定します。
 
 最低限、次の上位観点をそれぞれ「今回評価する」または「対象外」とし、対象外には理由を残します。
 
@@ -147,7 +154,23 @@ reference側にあるnormative / informative / advisoryという性質だけか�
 
 deterministic validatorは「固定した観点が結果へ閉じていること」だけを検証し、その観点を選ぶべきだったか、内部でどの確認項目が必要だったかはsemantic evalで確認します。
 
-### Step 7: 評価
+### Step 7: strict criterion resultと専門評価を分離
+
+`usability-inspection` 等からstandard / binding criterion resultが渡された場合、そのPASS / FAIL / 判定不能 / 対象外をevidenceとして保持します。
+
+usability-evaluationは、
+
+- criterionのapplicability
+- projectへのbinding根拠
+- criterionの意味
+- pattern / heuristicとの関係
+- user / product impactの可能性
+
+を評価できます。
+
+ただし、一般heuristicやadvisory guidanceの差異をstrict criterion FAILへ変換しません。逆に、明確なbinding requirementのFAILを単なる「好み」の問題へ弱めません。
+
+### Step 8: 評価
 
 対象に応じて以下から必要なものを評価します。
 
