@@ -38,6 +38,7 @@
 
 - WCAG 2.2 / Understanding
 - WAI-ARIA / ARIA in HTMLの必要箇所
+- ACT Rules Format / formal ACT Rules
 - ISO 9241-110 interaction principles
 - Cognitive Walkthroughの代表的methodology
 - web.dev Core Web Vitals / user-centric performance guidance
@@ -62,7 +63,7 @@ current URL / publication state /利用条件を確認します。
 
 先に次の分離をschemaで固定します。
 
-- inspection scope
+- inspection scope / closure rows
 - objective observation
 - standard / binding criterion check
 - measurement
@@ -73,7 +74,38 @@ current URL / publication state /利用条件を確認します。
 
 task / persona / prior knowledgeを必須schemaにしません。
 
-## 5. Step 3: criterion / measurement contract
+## 5. Step 3: deterministic runtime skeleton
+
+`_05b_usability-inspection-deterministic-runtime.md` に従い、PR #11 current runtime contractを再利用して次を先に実装します。
+
+~~~text
+skills/usability-inspection/scripts/
+├── runtime_contract.py
+├── inspection_structure.py
+├── measurement.py
+└── criterion_checks.py
+~~~
+
+加えて `assets/deterministic-check-catalog.json` を追加します。
+
+このStepではbrowserを操作しません。fixtureだけで次を確認します。
+
+- same normalized input → same machine result
+- artifact-local ref採番
+- inspection scope closure
+- cross-reference解決
+- exact elapsed計算
+- threshold比較
+- threshold未定義
+- fully automated checkのdispatch
+- partial / manual checkを自動PASS / FAILにしない
+- ACT Rule resultとrequirement resultを分離
+- insufficient evidenceを判定不能へ残す
+- runtime generatorとdeterministic validatorを別実装にする
+
+新しいrule DSL、plugin framework、browser runnerは追加しません。
+
+## 6. Step 4: criterion / measurement contract
 
 fixtureで次を成立させます。
 
@@ -88,10 +120,12 @@ fixtureで次を成立させます。
 - thresholdなしの場合に独自FAILを作らない
 - advisory guidanceをstrict FAILへ変換しない
 - 単一criterion結果を製品全体のconformanceへ昇格しない
+- criterion PASSには宣言scopeのpopulation / required checks closureが必要
+- ACT Rule等のtest rule resultとrequirement resultを分離する
 
 task / flow未指定caseでも成果物が成立することを確認します。
 
-## 6. Step 4: browser observation contract
+## 7. Step 5: browser observation contract
 
 PR #12 merge後のbrowser実行基盤を再利用します。
 
@@ -111,10 +145,12 @@ PR #12 merge後のbrowser実行基盤を再利用します。
 - resize
 - form / error state
 - safe state transition
+- raw screenshot / DOM / accessibility treeを必要最小限にする
+- secret・個人データ・機密情報を含むraw evidenceを安全に保存できない場合の非保存契約
 
 `usability-inspection` がbrowser / session ownerになります。
 
-## 7. Step 5: Playwright固有の検査境界
+## 8. Step 6: Playwright固有の検査境界
 
 通常E2E向けのPlaywright behaviorでusability frictionを隠さないことを先に検証します。
 
@@ -129,6 +165,8 @@ PR #12 merge後のbrowser実行基盤を再利用します。
 確認:
 
 - visual / pointer inspectionでlocatorのimplicit auto-scrollをdiscoverability成功にしない
+- current Playwright versionでimplicit scrollを無効化する正式オプションが利用可能ならnative機能を優先する
+- 利用できないversionではaction前viewport確認 + explicit scrollで代替する
 - 必要なscrollをexplicit user actionとして扱う
 - scroll前後のevidenceを残せる
 
@@ -152,13 +190,14 @@ PR #12 merge後のbrowser実行基盤を再利用します。
 - locator action呼び出し開始からのwall-clockをそのままuser response timeへしない
 - actionability wait自体にUI上の問題がある場合は別Observationにできる
 
-## 8. Step 6: page inspection vertical slice
+## 9. Step 7: page inspection vertical slice
 
 taskを与えない代表caseで、1画面 / 1機能を端から端まで検査します。
 
 確認:
 
-- inspection scope固定
+- inspection scope固定 / closure row生成
+- deterministic runtime実行
 - initial observation
 - safe interaction
 - keyboard / focus
@@ -174,7 +213,7 @@ taskを与えない代表caseで、1画面 / 1機能を端から端まで検査�
 
 この段階では全製品scanへ広げません。
 
-## 9. Step 7: accessibility / standard checks
+## 10. Step 8: accessibility / standard checks
 
 適用可能な代表criterionを実際に判定します。
 
@@ -191,13 +230,14 @@ taskを与えない代表caseで、1画面 / 1機能を端から端まで検査�
 
 - applicability / exception
 - observation / measurement
+- formal ACT Rule等の対応済みdeterministic checkがある場合はtest rule result
 - criterion result
 - evidence
 - product-wide conformanceへ昇格しないこと
 
 criterionの具体値や例外はcurrent referenceを正本にし、Plan記載値だけを実装へ固定しません。
 
-## 10. Step 8: visual / responsive
+## 11. Step 9: visual / responsive
 
 代表caseで、
 
@@ -214,7 +254,7 @@ criterionの具体値や例外はcurrent referenceを正本にし、Plan記載�
 
 DOMだけで確定せず、画像が必要な項目はscreenshotを正式なevidenceとして使います。
 
-## 11. Step 9: performance / responsiveness
+## 12. Step 10: performance / responsiveness
 
 ### project thresholdあり
 
@@ -241,7 +281,7 @@ metric定義・測定条件を満たす場合だけmetric名を使います。
 
 単一Playwright runをfield percentileの達成判定へ変換しないことを確認します。
 
-## 12. Step 10: optional task / flow
+## 13. Step 11: optional task / flow
 
 task / flowが明示された代表caseだけ実施します。
 
@@ -253,7 +293,7 @@ task / flowが明示された代表caseだけ実施します。
 - task resultをTC PASS / FAILへ変換しない
 - Agent / tool limitationをproduct defectへ自動変換しない
 
-## 13. Step 11: Cognitive Walkthrough optional case
+## 14. Step 12: Cognitive Walkthrough optional case
 
 learnabilityを重点確認する代表caseでだけCognitive Walkthroughを利用します。
 
@@ -264,7 +304,7 @@ learnabilityを重点確認する代表caseでだけCognitive Walkthroughを利�
 - 正しいstep sequenceを創作しない
 - 独立Skill / runtimeを追加しない
 
-## 14. Step 12: usability-evaluation統合
+## 15. Step 13: usability-evaluation統合
 
 objective observation、criterion result、measurementを `usability-evaluation` へ渡します。
 
@@ -279,7 +319,7 @@ objective observation、criterion result、measurementを `usability-evaluation`
 
 同一sessionへの並行操作を行いません。
 
-## 15. Step 13: workflow integration
+## 16. Step 14: workflow integration
 
 `_04a_usability-inspection-workflow-integration.md` に従い、
 
@@ -296,7 +336,7 @@ objective observation、criterion result、measurementを `usability-evaluation`
 
 test-target-inspection / test-executionのownerロジックへusability-inspection固有処理を埋め込みません。
 
-## 16. Step 14: repository eval
+## 17. Step 15: repository eval
 
 ### trigger
 
@@ -308,9 +348,12 @@ repository標準件数に合わせます。
 
 - output schema
 - inspection scope closure
-- observation / criterion / measurement refs
+- runtime script fixture / dispatch
+- observation / test rule / criterion / measurement refs
 - criterion result / applicability / evidence
 - project Authority ref
+- criterion PASSのpopulation closure
+- ACT Rule resultとrequirement resultの分離
 - threshold整合
 - task optionality
 - Playwright observation fields
@@ -335,7 +378,7 @@ repository標準件数に合わせます。
 
 ことを確認します。
 
-## 17. Step 15: repository integration
+## 18. Step 16: repository integration
 
 最新mainを基準に、
 
@@ -351,15 +394,19 @@ repository標準件数に合わせます。
 
 数値をPlan記載値で固定しません。
 
-## 18. 完了条件
+## 19. 完了条件
 
 次をすべて満たしたら `usability-inspection` 実装完了とします。
 
 - Agent Skills仕様を満たす
 - task / user personaなしでもlive Web UIを検査できる
 - inspection scopeを固定し、選定観点をclosureできる
+- ref採番、scope closure、数値計算、threshold比較をdeterministic runtimeへ移している
+- runtime generatorとdeterministic validatorを別実装にしている
 - objective observationとexpert evaluationを分離する
 - applicable standard / binding criterionをcriterion単位で判定できる
+- test rule resultとrequirement resultを分離できる
+- criterion PASSに必要なpopulation / required checks closureを検証できる
 - criterionのapplicability / exception / evidenceを保持する
 - advisory guidanceをstrict FAILへ変換しない
 - project thresholdがなければ独自FAIL thresholdを作らない
@@ -377,6 +424,7 @@ repository標準件数に合わせます。
 - usability-evaluationとのread-only連携が成立する
 - same session concurrent manipulationを要求しない
 - side-effect / cleanup契約を満たす
+- raw screenshot / DOM / accessibility tree等を必要以上に永続化せず、PR #12のevidence安全契約を満たす
 - FindingがPR #13契約へ接続する
 - human usability studyを実施したと偽らない
 - test-target-inspection / test-execution / exploratory-testingと責務重複しない
@@ -385,17 +433,17 @@ repository標準件数に合わせます。
 - README / EVALS / Skill一覧整合
 - git diff --check PASS
 
-## 19. Plan全体の完了
+## 20. Plan全体の完了
 
 本PRの後続実装は、
 
 1. `usability-evaluation` が `_06_evaluation-ci-implementation-order.md` の完了条件を満たす
-2. `usability-inspection` が本ファイル§18の完了条件を満たす
+2. `usability-inspection` が本ファイル§19の完了条件を満たす
 3. 両Skillのqa-workflow routingと相互連携が成立する
 
 まで完了扱いにしません。
 
-## 20. 対象外
+## 21. 対象外
 
 - human participant recruitment / study management
 - persona generation
