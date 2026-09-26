@@ -10,7 +10,7 @@ skills/usability-inspection/
 ├── references/
 │   ├── source-catalog.md
 │   ├── inspection-method.md
-│   ├── accessibility-and-conformance.md
+│   ├── accessibility-inspection.md
 │   ├── performance-and-measurement.md
 │   └── playwright-observation.md
 ├── scripts/
@@ -66,17 +66,17 @@ UI pattern、heuristic、Design System、WCAG等の詳細knowledgeは `usability
 
 usability-inspection packageのreferenceは、実対象の検査・測定・Playwright上の観測方法に限定します。
 
-### accessibility / conformance
+### accessibility
 
-一般的なaccessibility inspectionと、explicitなWCAG conformance evaluationを分離します。
+本Skillではgeneral accessibility inspectionだけを扱います。
 
-- general inspectionでは対象UIへapplicableなaccessibility concern / requirementを確認する
-- WCAG conformanceを明示要求された場合はWCAG-EM 2.0に従う
-- component / sample結果をproduct-wide conformanceへ昇格しない
+- 対象UIへapplicableなaccessibility concern / requirementを確認する
+- component結果をpage / product-wide conformanceへ昇格しない
 - WAI-ARIA / ARIA in HTMLのapplicable requirementをhost languageとともに確認する
-- ACT Rulesはinformativeなtesting methodとして使用し、全rule実装を完成条件にしない
+- supported ACT Rulesをinformative testing methodとして利用できる
+- formal WCAG conformance要求は `wcag-conformance-evaluation` へroutingする
 
-詳細は `_05d_accessibility-and-conformance.md` を正本とします。
+requirement result / WAI-ARIA / ACTの共有契約は `_05d_accessibility-requirements-and-act.md` を正本とします。
 
 ### interaction principles / UI pattern
 
@@ -126,7 +126,7 @@ LCP / CLS / INPは独自algorithmで再実装せず、project既存のRUM / CrUX
 
 `usability-evaluation` のUI pattern corpusをinspection packageへ複製しません。
 
-inspection packageには `references/source-catalog.md` を置き、live inspection / conformance / measurementに利用する公式sourceのURL、status、checked_atを保持します。
+inspection packageには `references/source-catalog.md` を置き、live inspection / general accessibility / measurementに利用する公式sourceのURL、status、checked_atを保持します。
 
 seedは `_02c_seed-source-catalog.md` §3です。
 
@@ -134,16 +134,15 @@ seedは `_02c_seed-source-catalog.md` §3です。
 
 - UI pattern knowledgeの正本を1箇所に保つ
 - inspection packageはlive execution / observation方法に集中する
-- inspection固有のPlaywright / WCAG-EM / measurement sourceはpackage単独で辿れる
+- inspection固有のPlaywright / accessibility / measurement sourceはpackage単独で辿れる
 - external source URLをSKILL.mdへ散在させない
 
 ## 4.1 coverageの正本
 
 - Web execution context / responsive / mobile / discoverability / Cognitive Walkthrough / E2E → `_05c_usability-inspection-coverage.md`
-- accessibility / WCAG conformance / WAI-ARIA / ACT → `_05d_accessibility-and-conformance.md`
+- general accessibility / WAI-ARIA / ACT → `_05d_accessibility-requirements-and-act.md`
+- formal WCAG conformance evaluation → `_05f_wcag-conformance-evaluation-package-and-runtime.md`
 - performance / responsiveness measurement → `_05e_performance-measurement.md`
-
-本ファイルのsemantic caseや例示だけを実装範囲の上限にしません。
 
 本ファイルのsemantic caseや例示だけを実装範囲の上限にしません。
 
@@ -237,9 +236,9 @@ task / flowは指定された場合だけ保持します。
 
 単一criterionの `satisfied` を製品全体のconformanceへ昇格しません。
 
-### deterministic test rule results
+### test rule results
 
-W3C ACT Rule等の個別test ruleまたはSkill runtimeの対応済みdeterministic checkを実行した場合に保持します。
+supported ACT Rule等の個別test ruleを実行した場合に保持します。
 
 - test rule result ref
 - check key
@@ -287,6 +286,10 @@ ACT Rule outcomeは、そのruleのtest subject / targetとrequirements mapping�
 - threshold value（存在する場合）
 - threshold source / Authority（存在する場合）
 - external metric source ref（存在する場合）
+- external source name / tool
+- external source version（取得可能な場合）
+- external source mode: field / lab / RUM / synthetic（applicableな場合）
+- population / period / device class / percentile（field判定へ必要な場合）
 - result: within-threshold / over-threshold / threshold-not-defined / measurement-unavailable
 - evidence refs
 - limitation
@@ -530,17 +533,17 @@ bounding boxの数値計算、elapsed計算、threshold比較はruntime script�
 
 applicable concern / requirementを確認するが、WCAG 2.2 AA等のproduct-wide conformance claimを作らないこと。
 
-### Case Z: explicit WCAG conformance evaluation
+### Case Z: formal WCAG conformance routing
 
 「このWeb productがWCAG 2.2 AAに適合しているか評価して」という依頼。
 
-WCAG-EM 2.0経路を選択し、version / level / evaluation scope / representative sample / complete process / Step 1〜4 outcomeをevaluation reportへ追跡できること。evaluation statementは全non-optional methodology requirement・全sampleのtarget達成・product owner commitmentを確認できる場合だけ生成し、representative sampleだけからproduct-wide WCAG conformance claimを作らないこと。
+`usability-inspection` 内でWCAG-EM modeへ切り替えず、`wcag-conformance-evaluation` へroutingすること。
 
-### Case AA: conformance input unresolved
+### Case AA: formal conformance input unresolved
 
-「WCAGに適合しているか確認して」とだけ依頼され、target version / level / scopeを案件contextから解決できない。
+「WCAGに適合しているか確認して」とだけ依頼され、target version / level / scope等を案件contextから解決できない。
 
-AA等を推測せず、conformance evaluationの不足条件を `unresolved` とすること。一般accessibility inspectionへ勝手に読み替えて「適合」と報告しないこと。
+`wcag-conformance-evaluation` へroutingし、不足Inputを推測しないこと。一般accessibility inspectionへ勝手に読み替えて「適合」と報告しないこと。
 
 ### Case AB: touch-capable is not mobile emulation
 
@@ -569,7 +572,6 @@ positive例:
 - mobile Webで表示崩れと操作性を確認
 - keyboard / focus / error表示を確認
 - target sizeなどをWCAG基準で確認
-- WCAG 2.2 AA conformance evaluationを実施
 - touch操作を確認
 - mobile device profileで操作性を確認
 - この操作のfeedback速度を実測
@@ -577,6 +579,7 @@ positive例:
 
 negative例:
 
+- WCAG 2.2 AA conformance evaluationを実施 → wcag-conformance-evaluation
 - このDialog patternが妥当かレビュー → usability-evaluation
 - このscreenshotをUI pattern knowledgeで評価 → usability-evaluation
 - このTCを実行 → test-execution

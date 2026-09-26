@@ -10,6 +10,7 @@ source本文をこのPlanへ複製することが目的ではありません。
 
 - `skills/usability-evaluation/references/source-catalog.md`
 - `skills/usability-inspection/references/source-catalog.md`
+- `skills/wcag-conformance-evaluation/references/source-catalog.md`
 
 へ、source名、canonical URL、publisher、category、source status、適用範囲、checked_at、採用状態を保持します。
 
@@ -42,6 +43,7 @@ catalogに載っているだけで、そのsource全体をbundled corpusへ収�
 | W3C-WCAG22-UNDERSTANDING | Understanding WCAG 2.2 | https://www.w3.org/WAI/WCAG22/Understanding/ | informative guidance |
 | W3C-WCAG22-TECHNIQUES | Techniques for WCAG 2.2 | https://www.w3.org/WAI/WCAG22/Techniques/ | informative techniques |
 | W3C-WCAGEM2 | WCAG Evaluation Methodology 2.0 | https://www.w3.org/TR/wcag-em-2/ | conformance evaluation methodology |
+| W3C-WCAGEM-REPORT-TOOL | WCAG-EM Report Tool | https://www.w3.org/WAI/eval/report-tool/ | WCAG-EM report structure / machine-readable report reference |
 | W3C-WAI-ARIA12 | WAI-ARIA 1.2 | https://www.w3.org/TR/wai-aria-1.2/ | normative standard |
 | W3C-ARIA-IN-HTML | ARIA in HTML | https://www.w3.org/TR/html-aria/ | normative author requirements |
 | W3C-APG | WAI-ARIA Authoring Practices Guide | https://www.w3.org/WAI/ARIA/apg/ | informative guidance / examples |
@@ -83,7 +85,11 @@ Design System固有規約は、そのDesign Systemをprojectが採用してい�
 
 | Seed | Source | 公式URL | 既定の扱い |
 | --- | --- | --- | --- |
-| ISO-9241-110 | ISO 9241-110:2020 | https://www.iso.org/standard/75258.html | interaction principles。公開metadata / previewを超える本文はsource-reference-only |
+| ISO-9241-11 | ISO 9241-11:2018 | https://www.iso.org/standard/63500.html | usability definitions / concepts。公開metadata / previewを超える本文はreference-only |
+| ISO-9241-110 | ISO 9241-110:2020 | https://www.iso.org/standard/75258.html | interaction principles。公開metadata / previewを超える本文はreference-only |
+| ISO-9241-112 | ISO 9241-112:2025 | https://www.iso.org/standard/87518.html | information presentation principles。公開metadata / previewを超える本文はreference-only |
+| ISO-9241-115 | ISO 9241-115:2024 | https://www.iso.org/standard/80773.html | user-system interaction / UI / navigation guidance。公開metadata / previewを超える本文はreference-only |
+| ISO-9241-171 | ISO 9241-171:2025 | https://www.iso.org/standard/86308.html | software accessibility。公開metadata / previewを超える本文はreference-only |
 | NNG-HEURISTICS | NN/g 10 Usability Heuristics | https://www.nngroup.com/articles/ten-usability-heuristics/ | advisory heuristic |
 | NNG-HEURISTIC-EVAL | NN/g How to Conduct a Heuristic Evaluation | https://www.nngroup.com/articles/how-to-conduct-a-heuristic-evaluation/ | methodology |
 | UI-PATTERNS | UI-Patterns.com Design Patterns | https://ui-patterns.com/patterns | advisory pattern library |
@@ -102,7 +108,6 @@ inspection packageにはUI pattern本文を複製せず、live inspection / meas
 | PW-BROWSER | Playwright Browser API | https://playwright.dev/docs/api/class-browser | BrowserContext / hasTouch / isMobile / userAgent / viewport |
 | PW-ACTIONABILITY | Playwright Actionability | https://playwright.dev/docs/actionability | auto-wait境界 |
 | PW-LOCATORS | Playwright Locators | https://playwright.dev/docs/locators | locator利用境界 |
-| W3C-WCAGEM2 | WCAG Evaluation Methodology 2.0 | https://www.w3.org/TR/wcag-em-2/ | explicit conformance evaluation |
 | W3C-ACT-RULES | All ACT Rules | https://www.w3.org/WAI/standards-guidelines/act/rules/ | supported ACT checkのsource |
 | W3C-NAV-TIMING | Navigation Timing Level 2 | https://www.w3.org/TR/navigation-timing-2/ | navigation timing |
 | W3C-PAINT-TIMING | Paint Timing | https://www.w3.org/TR/paint-timing/ | FCP等のpaint timing |
@@ -111,7 +116,24 @@ inspection packageにはUI pattern本文を複製せず、live inspection / meas
 
 Core Web Vitalsはcatalogへsourceを置きますが、本SkillがLCP / CLS / INPの計算実装を独自に再実装することは意味しません。詳細は `_05e_performance-measurement.md` を正本とします。
 
-## 4. 実装時のcatalog初期化
+## 4. wcag-conformance-evaluation seed sources
+
+formal WCAG evaluation packageは次を最低限catalog化します。
+
+| Seed | Source | 公式URL | 用途 |
+| --- | --- | --- | --- |
+| W3C-WCAG22 | WCAG 2.2 | https://www.w3.org/TR/WCAG22/ | normative conformance target |
+| W3C-WCAGEM2 | WCAG Evaluation Methodology 2.0 | https://www.w3.org/TR/wcag-em-2/ | methodology |
+| W3C-WCAGEM-REPORT-TOOL | WCAG-EM Report Tool | https://www.w3.org/WAI/eval/report-tool/ | report field / JSON / HTML reference |
+| W3C-ACT-FORMAT11 | ACT Rules Format 1.1 | https://www.w3.org/TR/act-rules-format/ | supported ACT implementation consistency |
+| W3C-ACT-RULES | All ACT Rules | https://www.w3.org/WAI/standards-guidelines/act/rules/ | informative test rules |
+| W3C-WAI-ARIA12 | WAI-ARIA 1.2 | https://www.w3.org/TR/wai-aria-1.2/ | applicable normative requirements |
+| W3C-ARIA-IN-HTML | ARIA in HTML | https://www.w3.org/TR/html-aria/ | applicable author requirements |
+| W3C-ACCESSIBILITY-SUPPORT | Understanding Accessibility Support | https://www.w3.org/WAI/WCAG22/Understanding/conformance#accessibility-support | accessibility support baseline reference |
+
+WCAG-EM Report Toolはreport schemaの参考にしますがruntime dependencyにはしません。
+
+## 5. 実装時のcatalog初期化
 
 実装時はこのseed一覧を機械入力としてそのままコピーするのではなく、各URLを再確認して次を確定します。
 
@@ -124,5 +146,7 @@ Core Web Vitalsはcatalogへsourceを置きますが、本SkillがLCP / CLS / IN
 - license / terms上の扱い
 
 redirect等でcanonical URLが変わった場合はcurrent URLをcatalogへ記録し、本PlanのURLとの差分を実装記録へ残します。
+
+catalog / coverageの物理Markdown形式は `_02d_reference-artifact-schema.md` を正本とします。
 
 このseed一覧にないsourceは、`_02a_source-acquisition-and-coverage.md` の能力coverageで不足が確認された場合に追加調査します。

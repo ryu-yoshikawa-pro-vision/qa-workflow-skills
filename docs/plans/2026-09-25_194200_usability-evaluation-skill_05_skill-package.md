@@ -27,6 +27,7 @@ skills/usability-evaluation/
 │   └── output-template.md
 ├── scripts/
 │   ├── reference_catalog.py
+│   ├── evaluation_structure.py
 │   └── validate-reference-catalog.py
 └── evals/
     ├── trigger/
@@ -162,7 +163,7 @@ assets/output-template.mdは次を必須fieldとして持ちます。
 
 `evaluation ref` は1つのusability-evaluation成果物revision内だけで一意なartifact-local refとします。新しいglobal QA ID / Machine Entityにはしません。
 
-merge後の既存artifact-local ref規則がある場合はそれを使い、ない場合は最終出力の評価行順で `EVAL-001` から採番します。並べ替えによるref維持は要求しません。
+merge後の既存artifact-local ref規則がある場合はそれを使います。ない場合はsemantic layerが確定したevaluation draft順を `evaluation_structure.py` が保持し、`EVAL-001` から決定論的に採番します。Agentがfinal refを手採番しません。別revisionでのstable identity維持は要求しません。
 
 評価条件に `user goal / task / flow` が存在する場合だけ各評価行のdefaultとして継承します。行単位で異なる場合だけoverrideを記録します。存在しない場合は必須にしません。
 
@@ -220,7 +221,7 @@ PR #13のFinding契約を再利用し、後続QA活動で扱う必要がある�
 
 - 形式: `<source ID>-ITEM-\d{4,}`
 - normalized referenceへ実際に使うpage / sectionへだけ付与する
-- 初回採番では同一source内をcanonical URL、source item名称の順で並べ、`ITEM-0001` から採番する
+- 初回採番では同一source内をdocument canonical URL、locator type、locator、source item名称の順で並べ、`ITEM-0001` から採番する
 - 追加itemは既存最大番号+1を使う
 - 名称変更、redirectだけを理由にrefを変更しない
 - 削除・統合したrefを別itemへ再利用しない
@@ -264,8 +265,10 @@ Function:
 
 - URL syntax検証
 - scheme / hostのcase正規化
-- fragment除去
 - default port等、URL identityを変えないsyntax正規化
+- fragment付きURLをreject
+
+source / document canonical URLとdocument内locatorを分離するため、fragmentを黙って除去しません。source itemは `_02d_reference-artifact-schema.md` の `Document Canonical URL + Locator Type + Locator` で保持します。
 
 redirect追跡、official canonicalの意味判断、tracking parameter除去は行いません。Agent / research工程が公式sourceを確認してcanonical URLを入力します。
 
@@ -370,6 +373,44 @@ Output:
 
 source採用、dimension抽出、merge / split、source position、projectへのbinding等の意味判断は行いません。
 
+### evaluation_structure.py
+
+semantic layerが決めた評価内容からmachine処理だけを担当します。
+
+Input:
+
+- evaluation condition
+- top-level aspect closure drafts
+- pattern identification drafts
+- evaluation row drafts
+- Finding refs
+
+各draftはinvocation内一意の `draft_key` を持ちます。
+
+Function:
+
+- unknown field / enum / required field検証
+- evaluation draft順を保持
+- `EVAL-001` からartifact-local refを決定論的に採番
+- draft key → final ref解決
+- applied reference / evidence / related test rule / requirement / measurement / Finding cross-reference解決
+- top-level aspect closure検証
+- row order固定
+- summary count生成
+
+意味判断は行いません。
+
+Output:
+
+- normalized evaluation condition
+- pattern identification rows
+- evaluation rows
+- Finding refs
+- summary
+- issues
+
+同じnormalized inputから同じmachine outputになることをfixtureで検証します。
+
 ### validate-reference-catalog.py
 
 production generatorとは別実装で検証します。
@@ -378,6 +419,7 @@ production generatorとは別実装で検証します。
 
 - index linkが存在する
 - `_02c_seed-source-catalog.md` のseed確認結果がcatalogにある
+- `_02d_reference-artifact-schema.md` の必須heading / table column / empty / list / escaping規則を満たす
 - source-catalogにcanonical URLがある
 - source IDが `SRC-\d{3,}` 形式で一意かつappend-only規則に従う
 - candidate statusが許可値でpendingが残っていない
@@ -385,6 +427,7 @@ production generatorとは別実装で検証します。
 - queryごとにretrieval boundaryが記録されている
 - capability coverageの全rowがcovered / not-applicable / blockedへ閉じ、blockedが0
 - source item refが `<source ID>-ITEM-\d{4,}` 形式で一意
+- source itemのDocument Canonical URLにfragmentがなく、Locator Type / Locatorが整合する
 - included / merged-duplicate itemにreference destinationがある
 - included / merged-duplicate itemで `available_dimensions = captured_dimensions`
 - semantic validation recordがありfailが0
@@ -404,7 +447,7 @@ Webへアクセスしてsourceの最新状態を検査するruntimeにもせず�
 
 検証項目:
 
-- evaluation refが成果物revision内で一意
+- evaluation refが `evaluation_structure.py` により成果物revision内で一意に採番されている
 - evaluation refをglobal QA ID / Machine Entityとして要求しない
 - status許可値
 - 評価条件で「今回評価する」とした全上位観点が、少なくとも1件の評価結果へ到達している
@@ -426,7 +469,7 @@ Webへアクセスしてsourceの最新状態を検査するruntimeにもせず�
 - TC resultを書き換える欄を持たない
 - source item refなしのbest practice断定を拒否
 
-意味上「本当にDialogか」「本当に使いづらいか」はdeterministic validatorで判定しません。
+意味上「本当にDialogか」「本当に使いづらいか」はdeterministic validatorで判定しません。production `evaluation_structure.py` とdeterministic validatorは別実装とし、同じ処理を互いにimportしません。
 
 ## 9. semantic eval
 

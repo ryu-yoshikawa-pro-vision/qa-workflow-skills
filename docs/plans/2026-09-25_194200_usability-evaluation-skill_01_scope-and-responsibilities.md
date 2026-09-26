@@ -19,7 +19,7 @@ PR #13のPlanでは次を追加します。
 
 また、生きた実対象を操作・観測し、interaction、feedback、error recovery、accessibility、visual / responsive、user-facing performanceを体系的に検査するownerもありません。task / flowが明示された場合は、そのflowも検査対象に含めます。
 
-後者は `usability-inspection` として別Skillにし、本ファイルでは `usability-evaluation` の責務を定義します。
+後者は `usability-inspection` として別Skillにします。formalなWCAG conformance evaluationは、page-level inspectionとは別のproduct evaluation methodologyであるため `wcag-conformance-evaluation` が担当します。本ファイルでは `usability-evaluation` の責務を定義します。
 
 ## 今回の対象境界
 
@@ -50,7 +50,7 @@ usability-evaluation は、これらの判断に使う参照知識と評価手�
 
 ここでいう評価はUI pattern knowledge、standard、Design System、heuristic等に基づく専門評価です。代表ユーザーへtaskを依頼するUX researchとしてのusability testingではありません。specified user / goal / contextがない場合は、宣言scope内のUI品質上の観測・懸念候補とreferenceへの適合性を扱い、製品全体のusability、human task success、efficiency、satisfactionを確定したとは扱いません。
 
-live Web UIを能動操作・観測し、ユーザビリティ上の問題を検査する責務は `_01a_usability-inspection-scope-and-contract.md` の `usability-inspection` が担当します。
+live Web UIを能動操作・観測し、ユーザビリティ上の問題を検査する責務は `_01a_usability-inspection-scope-and-contract.md` の `usability-inspection` が担当します。formalなWCAG conformance evaluationは `_01b_wcag-conformance-evaluation-scope-and-contract.md` の `wcag-conformance-evaluation` が担当します。
 
 ## 3. 主責務
 
@@ -120,7 +120,7 @@ general accessibility inspectionでは、対象UIへapplicableな、
 
 を対象scopeに応じて確認します。
 
-「WCAG 2.2 AAへの適合評価」のようにconformanceを明示された場合だけ、`usability-inspection` がWCAG-EM 2.0経路でscope / level / representative sample / complete process等を固定します。general accessibility inspectionや単一componentの観測から製品全体のWCAG適合を宣言しません。
+「WCAG 2.2 AAへの適合評価」のようにformal conformanceを明示された場合は `wcag-conformance-evaluation` へroutingします。`usability-evaluation` / `usability-inspection` のgeneral accessibility確認や単一componentの観測から製品全体のWCAG適合を宣言しません。
 
 ### visual integrityの評価
 

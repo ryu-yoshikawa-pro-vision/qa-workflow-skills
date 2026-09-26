@@ -1,6 +1,6 @@
 # UI/UX評価・ユーザビリティ検査Skill追加Plan
 
-このPlanは、Web UIについて公開根拠と取得済みevidenceから専門評価を行う `usability-evaluation` と、生きたWeb UIを操作・観測してobjective observation、measurement、applicable requirement / supported test rule resultを得る `usability-inspection` の2 Skillを追加する実装計画です。目的は、観測事実・標準上の判定・専門評価を分離したまま既存QA workflowへ接続できるようにすることです。UI / UX資料の網羅収集基盤、独自accessibility testing engine、performance testing platform、人間を用いたusability studyは作りません。task / user contextがない場合はUI品質上の観測・懸念を扱い、製品全体のusabilityやhuman task successを確定したとは扱いません。
+このPlanは、Web UIについて公開根拠と取得済みevidenceから専門評価を行う `usability-evaluation`、生きたWeb UIを操作・観測してobjective observation、measurement、applicable requirement / supported test rule resultを得る `usability-inspection`、formalなWCAG conformance evaluationをWCAG-EM 2.0で実施する `wcag-conformance-evaluation` の3 Skillを追加する実装計画です。目的は、観測事実・標準上の判定・専門評価・formal conformance methodologyを責務分離したまま既存QA workflowへ接続できるようにすることです。UI / UX資料の網羅収集基盤、独自accessibility testing engine、performance testing platform、人間を用いたusability studyは作りません。task / user contextがない場合はUI品質上の観測・懸念を扱い、製品全体のusabilityやhuman task successを確定したとは扱いません。
 
 ## 対象ブランチ
 
@@ -16,7 +16,7 @@ feat/usability-evaluation-skill
 - PR #12: test-target-inspection、test-execution、実対象観測、画像確認、browser safety
 - PR #13: exploratory-testing、regression-testing、qa-knowledge、複数workflowのrouting / concurrency
 
-両Skillはこれらを再実装しません。`usability-evaluation` はreference knowledgeによる専門評価、`usability-inspection` はlive Web UIの操作・観測・測定と適用可能な標準判定に責務を限定します。
+3 Skillはこれらを再実装しません。`usability-evaluation` はreference knowledgeによる専門評価、`usability-inspection` はlive Web UIの操作・観測・測定とgeneral accessibility inspection、`wcag-conformance-evaluation` はWeb targetに対するWCAG-EM 2.0 methodology / sampling / evaluation closure / reportに責務を限定します。
 
 ## 目的
 
@@ -46,6 +46,8 @@ feat/usability-evaluation-skill
 これを別Skillの `usability-inspection` が担当します。
 
 `usability-inspection` は代表ユーザーを用いたUX researchの代替ではありません。AIエージェントによる実対象検査として扱い、人間のsatisfaction、task completion rate、human task time等を捏造しません。personaやtaskは既定の必須入力にせず、ユーザーまたは案件が明示した場合だけ利用します。
+
+formalなWCAG conformance evaluationはgeneral inspectionと分離し、`wcag-conformance-evaluation` がWCAG-EM 2.0のscope / exploration / sampling / evaluation / reportを所有します。複数Skillが必要なlive評価は `qa-workflow` が直列にオーケストレーションし、`wcag-conformance-evaluation` がsibling Skillのscriptを直接実行しません。
 
 ## Input / Function / Output
 
@@ -85,7 +87,7 @@ feat/usability-evaluation-skill
 - live Web target / entry point
 - requested inspection scope
 - environment / origin
-- viewport / input method
+- viewport / device profile / input method
 - role / permissionが必要な場合はその条件
 - side-effect / cleanup scope
 - project Authority / standard / threshold
@@ -106,7 +108,7 @@ feat/usability-evaluation-skill
 - inspection header
 - inspection scope closure
 - objective observations
-- deterministic test rule results
+- test rule results
 - standard / binding requirement checks
 - measurements
 - 必要なPlaywright action trace
@@ -115,7 +117,52 @@ feat/usability-evaluation-skill
 - Finding refs
 - limitation / cleanup result
 
-browser操作は `usability-inspection`、machine計算はruntime script、意味判断はLLM / `usability-evaluation` が担当し、同じ判断を複数箇所で再計算しません。
+### wcag-conformance-evaluation
+
+**Input**
+
+- live Web target / entry point
+- evaluation commissioner / self-evaluation responsibility
+- target WCAG 2 version
+- target conformance level
+- digital product scope / excluded scope
+- accessibility support baseline
+- browser / assistive technology / environment条件
+- side-effect / cleanup scope
+- project Authority / release gate（存在する場合）
+
+**Function**
+
+1. WCAG-EM 2.0 Step 1でscope / target / accessibility support baselineを固定する
+2. Step 2でtargetを探索する
+3. Step 3.1でstructured sampleを選定する
+4. Step 3.2でstructured sample数の10%以上となるrandom sampleを選定し、selection methodを記録する
+5. Step 3.3でcomplete processをsample setへ追加する
+6. Step 4.1 / 4.2でsample / complete processを評価する
+7. Step 4.3でstructured / random sampleを比較し、新content type / findingがあればStep 2 / 3へ戻る
+8. live observationが必要なsample / requirementについてnormalized handoffを出し、`qa-workflow` が `usability-inspection` を直列実行してimmutable evidenceを戻す
+9. Step 5でevaluation reportを作成する
+10. 条件を満たす場合だけoptional evaluation statementを作成する
+
+**Output**
+
+- evaluation header / revision
+- accessibility support baseline
+- target exploration
+- structured sample set
+- random sample set / selection method
+- complete process set
+- sample requirement results / evidence refs
+- structured / random comparison iteration
+- WCAG-EM evaluation report
+- optional evaluation statement
+- conformance claim（WCAG側のclaim条件を別途満たす場合だけ）
+- Finding refs
+- limitation / blocked reason
+
+random sampleの選択自体はpredictable fixed patternにしません。10%件数計算、duplicate / overlap、cross-reference、Step closure、report構造はSkill-local scriptで機械処理します。
+
+browser操作は `usability-inspection`、inspectionのmachine計算はruntime script、意味判断はLLM / `usability-evaluation` が担当し、同じ判断を複数箇所で再計算しません。formal WCAG評価では `wcag-conformance-evaluation` がmethodology / sample set / reportを所有し、個別sampleのlive observationが必要な場合はhandoff requirementを出します。`qa-workflow` が `usability-inspection` を直列実行し、immutable resultをformal評価へ戻します。
 
 ## workflow上の位置づけ
 
@@ -124,6 +171,8 @@ browser操作は `usability-inspection`、machine計算はruntime script、意�
 `usability-evaluation` は設計資料または既存evidenceをreference knowledgeへ照合する横断的な評価Skillです。
 
 `usability-inspection` はlive Web UIを実際に操作・観測してユーザビリティ上の問題を確認する要求がある場合に起動する独立Activityです。
+
+`wcag-conformance-evaluation` は「WCAG 2.2 AAへ適合しているか評価」のようなformal conformance要求で起動し、WCAG-EM 2.0の評価methodologyを所有します。
 
 ~~~text
 live Web UI
@@ -146,7 +195,7 @@ UI pattern / standard / Design System knowledge
 
 `test-target-inspection` / `test-execution` から既存evidenceを `usability-evaluation` へ渡すことはできますが、`usability-inspection` をそれらの追加処理として実行しません。
 
-両Skillは他Skillのowner責務を置き換えません。
+3 Skillは他Skillのowner責務を置き換えません。
 
 - Product Riskの識別・評価・採点 → test-analysis
 - テスト条件 / カバレッジ項目 → test-condition-design
@@ -155,7 +204,8 @@ UI pattern / standard / Design System knowledge
 - TCの実操作・PASS / FAIL → test-execution
 - Exploration / Investigation → exploratory-testing
 - routing / common workflow state → qa-workflow
-- live Web UIのユーザビリティ検査・測定 → usability-inspection
+- live Web UIのユーザビリティ検査・測定 / general accessibility inspection → usability-inspection
+- formal WCAG conformance evaluation → wcag-conformance-evaluation
 - UI pattern / standard / heuristicによる意味判断 → usability-evaluation
 
 ## 仕様上の期待結果とUIガイダンスの分離
@@ -204,6 +254,8 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
    2026-09-25_194200_usability-evaluation-skill_01_scope-and-responsibilities.md
 1a. usability-inspectionの責務・live inspection契約  
    2026-09-25_194200_usability-evaluation-skill_01a_usability-inspection-scope-and-contract.md
+1b. wcag-conformance-evaluationの責務・WCAG-EM契約  
+   2026-09-25_194200_usability-evaluation-skill_01b_wcag-conformance-evaluation-scope-and-contract.md
 2. 情報源・reference構造・網羅性契約  
    2026-09-25_194200_usability-evaluation-skill_02_reference-knowledge.md
 2a. 情報源探索・収集・網羅性ゲート  
@@ -212,12 +264,16 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
    2026-09-25_194200_usability-evaluation-skill_02b_reference-validation-and-completeness.md
 2c. seed source catalog・公式URL  
    2026-09-25_194200_usability-evaluation-skill_02c_seed-source-catalog.md
+2d. reference artifactの機械可読Markdown schema  
+   2026-09-25_194200_usability-evaluation-skill_02d_reference-artifact-schema.md
 3. UI / UX評価方法・証拠・判定境界  
    2026-09-25_194200_usability-evaluation-skill_03_evaluation-contract.md
 4. 既存Skill / workflow統合  
    2026-09-25_194200_usability-evaluation-skill_04_workflow-integration.md
 4a. usability-inspectionのworkflow統合  
    2026-09-25_194200_usability-evaluation-skill_04a_usability-inspection-workflow-integration.md
+4b. wcag-conformance-evaluationのworkflow統合  
+   2026-09-25_194200_usability-evaluation-skill_04b_wcag-conformance-evaluation-workflow-integration.md
 5. Skill package・成果物・validator  
    2026-09-25_194200_usability-evaluation-skill_05_skill-package.md
 5a. usability-inspection package・成果物・評価  
@@ -226,14 +282,18 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
    2026-09-25_194200_usability-evaluation-skill_05b_usability-inspection-deterministic-runtime.md
 5c. Web inspectionの実行条件・responsive / mobile・E2E  
    2026-09-25_194200_usability-evaluation-skill_05c_usability-inspection-coverage.md
-5d. accessibility inspection・WCAG conformance・ARIA / ACT  
-   2026-09-25_194200_usability-evaluation-skill_05d_accessibility-and-conformance.md
+5d. general accessibility・WCAG requirement semantics・ARIA / ACT  
+   2026-09-25_194200_usability-evaluation-skill_05d_accessibility-requirements-and-act.md
 5e. performance / responsiveness measurement  
    2026-09-25_194200_usability-evaluation-skill_05e_performance-measurement.md
+5f. wcag-conformance-evaluation package / sampling / runtime  
+   2026-09-25_194200_usability-evaluation-skill_05f_wcag-conformance-evaluation-package-and-runtime.md
 6. 評価・CI・実装順序・完了条件  
    2026-09-25_194200_usability-evaluation-skill_06_evaluation-ci-implementation-order.md
 6a. usability-inspectionの実装順序・完了条件  
    2026-09-25_194200_usability-evaluation-skill_06a_usability-inspection-implementation-order.md
+6b. wcag-conformance-evaluationの実装順序・完了条件  
+   2026-09-25_194200_usability-evaluation-skill_06b_wcag-conformance-evaluation-implementation-order.md
 
 ## 今回の完成範囲
 
@@ -243,10 +303,11 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
 - 現時点で把握している公開sourceは `_02c_seed-source-catalog.md` に公式URL付きで固定し、実装時の `references/source-catalog.md` へ反映する。
 - source discoveryは固定件数で打ち切らない一方、公開Web上のsourceを再帰的に無制限探索することも完成条件にしない。定義済みの有限な評価能力coverageを全row closureする。
 - normalized corpusへ `included / merged-duplicate` としたsource itemは全件をsource原文と意味照合する。catalogへ載せただけのsource全pageをsemantic validation対象にはしない。
-- general accessibility inspectionとexplicit WCAG conformance evaluationを分離する。後者はWCAG-EM 2.0をmethodologyとして使用する。
+- general accessibility inspectionとformal WCAG conformance evaluationを別Skillへ分離する。formal評価は `wcag-conformance-evaluation` がWCAG-EM 2.0をmethodologyとして使用する。
 - ACT Rulesはinformative testing methodとして利用し、全formal / proposed ruleの実装を完成条件にしない。supported ruleだけを実装し、ACT Rules Format 1.1 §4.14.1のconsistencyを検証する。
 - general live inspectionでは定義済み上位観点をすべてapplicability判定し、未選択のまま残さない。
 - canonical live Web E2Eを実行できない状態は実装完了ではなくblockedとする。
+- formal WCAG conformance evaluationは `wcag-conformance-evaluation` でWCAG-EM 2.0 Step 1〜5、accessibility support baseline、structured / random sample、complete process、Step 4.3再sampling loop、reportまで閉じる。
 
 ## 固定方針
 
@@ -280,12 +341,12 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
 28. source ID / source item ref / reference entry IDはusability-evaluation package内のappend-only IDとし、並べ替えや名称変更で振り直さず、削除済みIDを別identityへ再利用しない。
 29. usability-evaluationはUI pattern knowledgeによる専門評価を主責務とし、代表ユーザーを用いたusability studyを実施したとは扱わない。
 30. usability-evaluationの「問題なし」は今回のscope / evidence / referenceの範囲で問題を確認しなかったことを意味し、製品全体のusabilityを保証しない。
-31. usability-inspectionはtask / personaを必須入力にせず、対象scopeからapplicableなinteraction、feedback、accessibility、visual / responsive、standard criterion、performanceを検査する。task / flowは明示された場合だけ追加で扱う。
+31. usability-inspectionはtask / personaを必須入力にせず、対象scopeからapplicableなinteraction、feedback、general accessibility、visual / responsive、standard criterion、performanceを検査する。task / flowは明示された場合だけ追加で扱う。formal WCAG conformance evaluationは担当しない。
 32. usability-inspectionでは製品固有の正解手順、test id、hidden DOM、source code、backend state等をUI発見shortcutとして使わない。特別な利用者条件はユーザーまたは案件が明示した場合だけ適用する。
 33. 観測事実、measurement、standard / binding requirement result、usability-evaluationによる専門評価を成果物上で分離する。
 34. 明確なstandard / binding requirementはrequirement単位で `satisfied / not-satisfied / undetermined` へ閉じ、applicability、exception、観測事実 / 値、evidence、必要なAuthorityを保持する。WCAG Success Criterionを `passed / failed / inapplicable` とは表現しない。今回のscopeについて必要なapplicable populationとrequired checksを閉じ、requirement全体を満たす根拠が揃った場合だけ `satisfied` とする。検査scopeとして扱わない項目はrequirement resultではなくscope closure側の `対象外` とする。
 35. 一般heuristic、ISO interaction principles、第三者Design System等のadvisory guidanceをstrictな仕様FAILへ自動変換しない。
-36. 単一component / 単一画面のrequirement `satisfied` から製品全体のWCAG conformance等を宣言しない。
+36. 単一component / 単一画面のrequirement `satisfied` から製品全体のWCAG conformance等を宣言しない。formalなWCAG評価要求は `wcag-conformance-evaluation` へroutingする。
 37. usability-evaluationのseed sourceは実装時に全件URL / status / accessを再確認する。seedであることだけを理由に全本文をadoptせず、能力coverageまたはAuthority / provenance上必要なsource itemだけnormalized corpusへ採用する。
 38. usability-inspectionのlive実行対象は既存Playwright経路で到達できるWeb UIに固定する。desktop Web、responsive viewport inspection、touch-capable inspection、mobile device emulationを区別する。mobile device emulationでは実際のdevice profile / viewport / screen / userAgent / deviceScaleFactor / hasTouch / isMobileを記録する。native iOS / Android / desktop appの能動操作は本Skillの対象外とする。
 39. usability-inspectionがbrowser / session ownerとなり、usability-evaluationはimmutable evidenceをread-onlyで評価する。同一sessionを並行操作しない。
@@ -299,8 +360,8 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
 47. usability-inspectionはtest-target-inspection / test-executionの既定後処理にはしない。ただし既存成果物はpreflight / evidenceとしてread-only再利用できる。
 48. 「ユーザビリティテストして」等の依頼はusability-inspectionのtrigger aliasとして受けられるが、成果物ではhuman participantを用いる正式なusability testingを実施したとは表現しない。
 49. 「usabilityを確認」「UIの使いやすさを見て」等の実操作有無が不明な依頼はtrigger boundaryとして扱い、live Web UIを操作して検査するならusability-inspection、design artifact / screenshot / 取得済みevidenceのreference-based評価ならusability-evaluationへroutingする。
-50. usability-inspectionでref採番、scope closure、数値計算、threshold比較、supported machine-decidable test rule等をLLMへ手計算させず、PR #11のcurrent Skill runtime contractを使って決定論的scriptへ移す。`test-rule-catalog.json` はsupported ACT / project test ruleのmetadataだけを保持し、structure / geometry / elapsed / threshold helperは `inspection_structure.py` / `measurement.py` に置く。generic rule DSL / plugin systemは追加しない。
+50. usability-inspectionでref採番、scope closure、数値計算、threshold比較、supported machine-decidable test rule等をLLMへ手計算させず、PR #11のcurrent Skill runtime contractを使って決定論的scriptへ移す。usability-evaluationのevaluation ref / closure / cross-referenceも `evaluation_structure.py` へ移し、Agentへ手採番させない。`test-rule-catalog.json` はsupported ACT / project test ruleのmetadataだけを保持し、structure / geometry / elapsed / threshold helperは `inspection_structure.py` / `measurement.py` に置く。generic rule DSL / plugin systemは追加しない。
 51. W3C ACT Rulesはinformative testing methodとして利用する。全ruleの実装は要求せず、live Web scopeで忠実に実装でき、required evidenceを取得でき、official examplesでconsistency検証できるruleだけsupportedとする。supported ACT RuleのoutcomeはACT Rules Format 1.1の `inapplicable / passed / failed / cantTell / untested` を使用し、rule status、requirements mapping、execution modeを分離する。
-52. general accessibility inspectionとexplicit WCAG conformance evaluationを分離する。後者ではtarget WCAG version / level / evaluation scopeを事前に確定し、WCAG-EM 2.0へ従う。supported test ruleがrequirementの一部だけを評価する場合、rule outcomeが `passed` でもrequirementを `satisfied` にしない。
+52. general accessibility inspectionとformal WCAG conformance evaluationを別Skillへ分離する。formal評価ではtarget WCAG version / level / self-enclosedなdigital product scope / accessibility support baselineを事前に確定し、WCAG-EM 2.0へ従う。supported test ruleがrequirementの一部だけを評価する場合、rule outcomeが `passed` でもrequirementを `satisfied` にしない。
 53. screenshot、DOM、accessibility tree、raw snapshot等はsecret・個人データ・機密情報を含み得るため、PR #12のevidence安全契約を再利用して必要最小限だけ取得・保存し、raw evidenceを成果物の必須条件にしない。
 54. deterministic runtime、deterministic validator、semantic evalを分離し、同じ実装で生成と検証を行わない。

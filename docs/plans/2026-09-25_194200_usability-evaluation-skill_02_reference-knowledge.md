@@ -119,7 +119,7 @@ seed catalogに登録するsource:
 
 ### inspection-specific source
 
-Playwright、WCAG-EM、Navigation Timing、Paint Timing、Web Vitals等のlive inspection / measurement sourceは `usability-inspection/references/source-catalog.md` に置きます。
+Playwright、Navigation Timing、Paint Timing、Web Vitals等のlive inspection / measurement sourceは `usability-inspection/references/source-catalog.md` に置きます。WCAG-EM / WCAG-EM Report Tool等のformal conformance methodology sourceは `wcag-conformance-evaluation/references/source-catalog.md` に置きます。
 
 UI pattern knowledgeをinspection packageへ複製しません。
 
@@ -219,6 +219,8 @@ sourceに存在しない項目を推測補完しません。
 同じreference entry内で複数source itemが異なる位置づけ・適用条件を持つ場合も、その対応関係を維持します。
 
 一方、今回のprojectでbindingかどうかはreferenceへ固定しません。project Authority、明示された適合基準、platform、採用Design System、対象文脈と組み合わせて評価時に決定し、UI / UX評価項目の `referenceの位置づけ` へ残します。
+
+reference entryの物理marker / Source Items tableは `_02d_reference-artifact-schema.md` を正本とします。
 
 ### reference entry ID
 
@@ -326,7 +328,7 @@ root indexの肥大化が確認された場合も、新しい検索runtimeを追
 
 ## 9. source-catalog.md
 
-source-catalog.mdは、known source、採用source、reference-only source、source discoveryで確認したcandidateを辿る正本です。
+source-catalog.mdは、known source、採用source、reference-only source、source discoveryで確認したcandidateを辿る正本です。machine-readableなheading / table column / escapingは `_02d_reference-artifact-schema.md` を正本とします。
 
 `_02c_seed-source-catalog.md` の公式URLを実装時に再確認して初期化します。
 
@@ -418,7 +420,9 @@ source item:
 - source ID
 - source item ref
 - source item name / section
-- canonical URL
+- document canonical URL
+- locator type
+- locator
 - coverage disposition: included / merged-duplicate / reference-only / unavailable / out-of-scope
 - access state
 - source status / lifecycle
@@ -429,6 +433,8 @@ source item:
 - checked_at
 
 source全体の全pageをitem化しません。
+
+source itemのdocument URLとdocument内locatorを分離します。fragment付きURLをcanonical document URLへ変換する際にlocatorを失いません。source item identityと物理Markdown形式は `_02d_reference-artifact-schema.md` を正本とします。
 
 source ID / source item ref / reference entry IDの採番・canonicalizationは `_05_skill-package.md` のproduction scriptへ移します。
 
@@ -442,7 +448,7 @@ source ID / source item ref / reference entry IDの採番・canonicalizationは 
 - source URLを保持
 - 必要な attribution を保持
 - code exampleや長文説明を転載しない
-- 許諾条件が不明なsourceはsource-reference-onlyまたは要約に限定
+- 許諾条件が不明なsourceはreference-onlyまたは要約に限定
 
 W3C等、明示ライセンスがあるsourceも実装時に対象ページの適用ライセンスを確認します。
 

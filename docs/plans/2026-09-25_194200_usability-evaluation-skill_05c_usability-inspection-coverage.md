@@ -4,7 +4,7 @@
 
 本ファイルは `usability-inspection` のWeb live inspectionについて、general inspectionのscope、Web実行条件、responsive / mobile、discoverability、Cognitive Walkthrough、evidence freshness、E2E完了条件を固定します。
 
-accessibility / WCAG conformanceは `_05d_accessibility-and-conformance.md`、performance measurementは `_05e_performance-measurement.md` を正本とします。
+accessibility / WCAG conformanceは `_05d_accessibility-requirements-and-act.md`、performance measurementは `_05e_performance-measurement.md` を正本とします。
 
 ## 1. live対象
 
@@ -200,7 +200,7 @@ canonical real Agent validationでは次を含めます。
 - touch-capable case
 - mobile device emulationが利用可能なcase
 - accessibility inspection
-- explicit WCAG conformance evaluation
+- formal WCAG conformance request routing（wcag-conformance-evaluationへhandoff）
 - visual screenshot evidence
 - thresholdあり / なしmeasurement
 - external Core Web Vitals sourceあり / なし
@@ -218,7 +218,8 @@ canonical real Agent validationでは次を含めます。
 - applicable visual concernがclosure
 - Cognitive Walkthrough対象caseが定義手順でclosure
 - PR #12 currentness契約に存在しないfingerprintを要求しない
-- `_05d_accessibility-and-conformance.md` の完了条件を満たす
+- `_05d_accessibility-requirements-and-act.md` のgeneral accessibility / WAI-ARIA / ACT完了条件を満たす
+- formal WCAG conformance要求を `wcag-conformance-evaluation` へroutingできる
 - `_05e_performance-measurement.md` の完了条件を満たす
 - Case A〜AD PASS
 - canonical live Web E2E PASS

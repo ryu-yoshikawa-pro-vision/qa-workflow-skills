@@ -97,15 +97,23 @@ source discoveryの完了は、次の能力coverageを正本とします。
 
 すべてのDesign Systemを全page収録することはcompletion条件にしません。
 
-### inspection methodology
+### inspection / formal evaluation methodology
 
-usability-inspection に必要な、
+`usability-inspection` に必要な、
 
 - Playwright observation / emulation
-- WCAG-EM
+- general accessibility observation
 - performance measurement source
 
-を別catalogで保持します。
+をinspection catalogで保持します。
+
+`wcag-conformance-evaluation` に必要な、
+
+- WCAG-EM 2.0
+- WCAG-EM Report Tool
+- accessibility support baseline guidance
+
+をformal evaluation catalogで保持します。
 
 ## 4. seed source
 
@@ -242,6 +250,8 @@ source discoveryの意味判断はLLM / Agentへ残しますが、次はscript�
 - coverage status集計
 - pending / blocked件数集計
 - source / item / reference cross-reference整合
+- document canonical URL / source locator整合
+- `_02d_reference-artifact-schema.md` のheading / column / enum / escaping検証
 - required field検証
 
 詳細は _05_skill-package.md を正本とします。
@@ -256,4 +266,5 @@ source discoveryの意味判断はLLM / Agentへ残しますが、次はscript�
 - pending source candidate 0
 - normalized corpusで使用するsource itemのdisposition closure
 - public-only境界違反0
-- canonical URL / source ID / source item ref整合PASS
+- canonical URL / source locator / source ID / source item ref整合PASS
+- `_02d_reference-artifact-schema.md` の物理schema PASS

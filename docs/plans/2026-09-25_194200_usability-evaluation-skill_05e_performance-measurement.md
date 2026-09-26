@@ -73,6 +73,10 @@ lab値や単一session値をfield 75th percentileへ読み替えません。
 - project threshold（存在する場合）
 - threshold Authority ref
 - external metric source ref（Core Web Vitals等を外部sourceから受け取る場合）
+- external source name / tool
+- external source version（取得可能な場合）
+- external source mode: field / lab / RUM / synthetic（applicableな場合）
+- population / period / device class / percentile（field判定へ必要な場合）
 
 ## 5. measurement output
 
@@ -94,6 +98,11 @@ lab値や単一session値をfield 75th percentileへ読み替えません。
 - viewport / device profile
 - input method
 - cache / navigation state等
+- external metric source ref
+- external source name / tool
+- external source version
+- external source mode
+- population / period / device class / percentile（applicableな場合）
 - threshold value
 - threshold Authority ref
 - result
@@ -120,6 +129,7 @@ result:
 - result vocabulary
 - missing field検証
 - external metric source metadataの構造検証
+- field判定で必要なpopulation / period / device class / percentileのrequired field検証
 
 意味判断へ残すもの:
 
@@ -150,4 +160,5 @@ measurement helperを `test-rule-catalog.json` へ登録しません。
 - Core Web Vitalsを独自再実装しない
 - Core Web Vitalsの既存measurement sourceがない場合を `measurement-unavailable` へ閉じられる
 - field / labを混同しない
+- external Core Web Vitalsをsource name / version / mode / population / period / device class / percentileへ追跡できる
 - measurement helperをtest rule catalogへ混ぜない

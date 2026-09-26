@@ -104,15 +104,17 @@ Skill固有のcriterion logicやmeasurement logicは入れません。
 正規化済みの次を受け取ります。
 
 - inspection metadata
-- inspection scope rows
+- inspection scope drafts
 - observation drafts
-- measurement result refs
+- measurement drafts
+- test rule result drafts
 - requirement check drafts
-- optional task / flow result
+- action trace drafts
+- optional task / flow result draft
 - usability-evaluation refs
 - Finding refs
 
-draft rowはinvocation内で一意な `draft_key` を持ちます。
+inspection内で生成する全draft rowはinvocation内で一意な `draft_key` を持ちます。`measurement.py` / `criterion_checks.py` はfinal refを生成せずdraftを返します。
 
 #### Function
 
@@ -120,8 +122,14 @@ draft rowはinvocation内で一意な `draft_key` を持ちます。
 - enum / required field検証
 - duplicate draft key拒否
 - artifact-local refの決定論的採番
+  - scope: `SCOPE-001`
+  - observation: `OBS-001`
+  - measurement: `MEAS-001`
+  - test rule result: `RULE-001`
+  - requirement check: `REQ-001`
+  - action trace: `ACT-001`
 - draft key → final ref解決
-- cross-reference解決
+- draft同士のcross-reference解決
 - inspection scope closure検証
 - selected scopeごとのevidence / result参照検証
 - final row order固定
@@ -139,8 +147,10 @@ Outputは次を必須で持ちます。
 - normalized inspection header
 - inspection scope closure rows
 - observations
-- measurements refs
+- measurements
+- test rule results
 - requirement check rows
+- action traces
 - optional task / flow result
 - evaluation refs
 - Finding refs
@@ -153,7 +163,7 @@ Outputは次を必須で持ちます。
 
 1 measurementごとに次を必須入力とします。
 
-- measurement_key
+- draft_key
 - measurement label
 - start value
 - end value
@@ -163,6 +173,10 @@ Outputは次を必須で持ちます。
 - metric definition ref（既存metric名を使用する場合）
 - metric source type
 - external metric source ref（外部measurement sourceを受け取る場合）
+- external source name / tool
+- external source version（取得可能な場合）
+- external source mode: field / lab / RUM / synthetic（applicableな場合）
+- population / period / device class / percentile（field判定へ必要な場合）
 - threshold value / operator / Authority ref（存在する場合）
 - environment / viewport / device profile refs
 
@@ -179,6 +193,7 @@ timestamp / numeric valueはPR #11 current runtime contractのexact number表現
 - thresholdなしの場合の `threshold-not-defined`
 - metric definition ref不足時に既存metric名を確定しない
 - external metric source metadataの構造検証
+- field判定で必要なpopulation / period / device class / percentileのrequired field検証
 - inputとderived valueのcanonicalization
 
 LLMに引き算・大小比較をさせません。
@@ -187,13 +202,17 @@ LLMに引き算・大小比較をさせません。
 
 Outputは次を必須で持ちます。
 
-- measurement ref用draft key
+- draft_key
 - normalized label
 - calculated value
 - unit
 - measurement method
 - metric source type
 - external metric source ref
+- external source name / tool
+- external source version
+- external source mode
+- population / period / device class / percentile
 - threshold
 - threshold Authority ref
 - result: within-threshold / over-threshold / threshold-not-defined / measurement-unavailable
@@ -209,6 +228,7 @@ genericな自然言語rule engineや式DSLは作りません。
 
 1 checkごとに次を必須入力とします。
 
+- draft_key
 - check_key
 - source type: act-rule / project-rule
 - source status: formal / proposed / project
@@ -240,6 +260,7 @@ ref採番、cross-reference、scope closure、geometry、elapsed、threshold等�
 
 check単位で次を必須出力とします。
 
+- draft_key
 - check_key
 - source type
 - source status
@@ -282,7 +303,7 @@ catalogの各entry:
 
 `manual / semiAuto` は自動resultを生成せず、必要evidence・未評価部分・semantic procedure refをhandoffとして返し、定義済みsemantic/manual経路で閉じます。
 
-supported ACT Ruleの条件とofficial examplesによるconsistency検証は `_05d_accessibility-and-conformance.md` を正本とします。
+supported ACT Ruleの条件とofficial examplesによるconsistency検証は `_05d_accessibility-requirements-and-act.md` を正本とします。
 
 artifact structure / measurement helperはcatalog対象外です。
 
@@ -310,30 +331,38 @@ ruleがrequirementの一部分だけを評価する場合、rule outcomeが `pas
 
 ## 7. W3C ACT Rulesの利用
 
-取得時点でW3Cが公開しているformal ACT Rulesとproposed ACT Rulesを全件inventoryへ含めます。formal / proposedを別statusで保持し、proposedをWCAG / ARIAのbinding根拠へ昇格しません。
+All ACT Rulesの公式source / rule一覧はsource catalogから辿れるようにしますが、runtime coverage inventoryとして全ruleへexecution modeを割り当てません。
 
-各ruleについて次をすべて確認します。
+runtimeが扱うのは `_05d_accessibility-requirements-and-act.md` の条件を満たして `test-rule-catalog.json` へ登録したsupported ruleだけです。
 
-- formal / proposed等のstatus
+supported ruleごとに確認します。
+
+- source status
 - applicability
 - expectation
 - assumptions
 - accessibility requirements mapping
 - outcome mapping
 - ACT Rules Format version
-- current WAI公開ruleとして1.1互換であること
-- machine evidenceだけでfully executableか
-- semantic判断が必要なexpectationがあるか
+- execution mode
+- required observation fields
 - current browser observation contractで必要入力を取得できるか
-- Web-only scopeでrule全体を実行できるか
 
-全ruleを `automatic / manual / semiAuto` の実行経路へ割り当てます。Web-only scopeや必要evidence不足で実行できないruleは、その理由と必要能力をcoverageへ残し、評価を実施しなかったruleはACT Rules Format 1.1の `untested`、applicabilityまたはexpectationを完全に判断できないruleは `cantTell` として閉じます。mapped requirement全体は他のrequired checks / evidenceも含めて独立判定します。
+automatic ruleだけを `criterion_checks.py` がdispatchします。
 
-rule本文を独自解釈して別の判定方法へ変更しません。
+manual / semiAuto supported ruleはcatalog metadataとsemantic procedureに従い、machine evidenceだけでresultを確定しません。
 
-formal ACT Ruleが存在しないcriterionについて、ACT互換であると偽る独自ruleを作りません。
+unsupported ACT Ruleへ、
 
-独自のmachine checkが必要な場合はsource typeをproject / inspection helperとして区別し、WCAG ACT Ruleとは呼びません。
+- automatic / manual / semiAutoのexecution mode
+- `untested` result
+- `cantTell` result
+
+を機械的に作りません。`untested / cantTell` はsupported ruleを実際のevaluation scopeで処理した際のACT outcomeです。
+
+formal ACT Ruleが存在しないrequirementについて、ACT互換を装う独自ruleを作りません。
+
+project固有checkが必要な場合は `source_type=project-rule` とし、artifact helperとは分離します。
 
 ## 8. browser observationとの境界
 
@@ -410,6 +439,7 @@ runtime generatorとdeterministic eval validatorを同じ実装へしません�
 次を必須runtime fixtureとして持ちます。
 
 - valid inspection structure
+- observation / measurement / rule / requirement / action draftからfinal ref解決
 - duplicate draft key
 - unresolved reference
 - selected scope未closure
@@ -435,6 +465,7 @@ runtime generatorとdeterministic eval validatorを同じ実装へしません�
 - 別runtime frameworkを作っていない
 - 同じnormalized inputから同じmachine resultになる
 - 数値計算 / threshold比較をLLMが再計算しない
+- inspection成果物内のscope / observation / measurement / test rule / requirement / action refを `inspection_structure.py` が一括採番・cross-reference解決し、Agentや個別helperがfinal refを手採番していない
 - deterministic checkのdispatchが `assets/test-rule-catalog.json` のsupported automatic ruleだけへ固定され、catalogを式DSL / plugin frameworkとして実装していない
 - structure / measurement helperをtest rule catalogへ混ぜていない
 - source typeとsource statusを分離している

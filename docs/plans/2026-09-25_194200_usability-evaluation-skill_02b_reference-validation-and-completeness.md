@@ -4,7 +4,7 @@
 
 本ファイルは usability-evaluation のnormalized reference corpusについて、reference entryのmerge / split、field coverage、意味検証、完全性を固定します。
 
-source探索の終了条件は _02a_source-acquisition-and-coverage.md、既知sourceのURLは _02c_seed-source-catalog.md を正本とします。
+source探索の終了条件は _02a_source-acquisition-and-coverage.md、既知sourceのURLは _02c_seed-source-catalog.md、物理Markdown schemaは _02d_reference-artifact-schema.md を正本とします。
 
 ## 1. 完全性の定義
 
@@ -87,7 +87,7 @@ normalized corpusへ included / merged-duplicate とした全source itemにつ�
 
 確認:
 
-- canonical source / itemが正しい
+- canonical source / document URL / locatorが正しく、原文の該当sectionへ一意に戻れる
 - source status / positionが正しい
 - applicability / platform条件が一致する
 - available_dimensionsに評価上必要なdimensionを取りこぼしていない
@@ -103,7 +103,7 @@ normalized corpusへ included / merged-duplicate とした全source itemにつ�
 
 normalized本文を持たないitemは次を確認します。
 
-- canonical URL / public metadata
+- canonical URL / locator（source itemを持つ場合） / public metadata
 - access state
 - disposition
 - reason
@@ -142,7 +142,7 @@ catalogへsourceを載せてもnormalized reference本文を作る必要はあ�
 
 - platform-specific Design Systemで、今回のcommon Web評価能力へ追加知識がない → catalogには保持、normalized common entryは作らない
 - projectがそのDesign Systemを採用 → relevant source itemを読み、project-specific / platform-specific guidanceとして利用
-- paid ISO本文 → official metadataをcatalogへ保持し、公開範囲を超える本文はsource-reference-only
+- paid ISO本文 → official metadataをcatalogへ保持し、公開範囲を超える本文はreference-only
 
 ## 10. 完了条件
 
@@ -152,6 +152,8 @@ catalogへsourceを載せてもnormalized reference本文を作る必要はあ�
 - included / merged-duplicate全itemのsemantic validation PASS
 - merge / split / alias規則違反0
 - source / item / reference ID参照整合PASS
+- document canonical URL / locator整合PASS
+- `_02d_reference-artifact-schema.md` の物理schema PASS
 - source position / project bindingの混同0
 - public-only境界違反0
 - blocked 0

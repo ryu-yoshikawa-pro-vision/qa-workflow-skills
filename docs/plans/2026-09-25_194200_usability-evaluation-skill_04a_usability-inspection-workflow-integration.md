@@ -27,7 +27,7 @@ reference-based UI / UX evaluation
 follow-upが必要な場合だけFinding
 ~~~
 
-`usability-inspection` がbrowser / session owner、`usability-evaluation` はread-only evaluatorです。
+`usability-inspection` が通常inspection中のbrowser / session owner、`usability-evaluation` はread-only evaluatorです。formal WCAG評価では `wcag-conformance-evaluation` がsample / methodologyを所有し、個別sampleのbrowser observationを必要な範囲で `usability-inspection` へ直列委譲します。
 
 ## 2. direct trigger
 
@@ -38,7 +38,6 @@ follow-upが必要な場合だけFinding
 - mobile Web viewportで表示崩れや操作性を確認
 - keyboard操作やfocusに問題がないか確認
 - target sizeやaccessible name等を標準に照らして確認
-- WCAG 2.2 AAへのconformance evaluationを実施
 - 操作後のfeedbackや表示速度を実測
 - このflowを実際に操作しながら使い勝手を確認
 
@@ -53,7 +52,7 @@ follow-upが必要な場合だけFinding
 
 「usabilityを確認」のように実操作有無が明示されない場合は、live targetを操作して確認する要求か、design artifact / 取得済みevidenceをreference knowledgeへ照合する要求かでroutingします。
 
-「accessibilityを確認」はgeneral accessibility inspection、「WCAG 2.2 AA適合を評価」のようにversion / level / conformanceを明示する要求はWCAG conformance evaluationとして区別します。後者でversion / level / evaluation scopeを確定できない場合は推測せず `unresolved` とします。
+「accessibilityを確認」はgeneral accessibility inspectionです。「WCAG 2.2 AA適合を評価」のようにformal conformanceを明示する要求は `wcag-conformance-evaluation` へroutingし、usability-inspection内のmodeとして処理しません。
 
 ## 3. test-target-inspectionとの境界
 
@@ -130,7 +129,7 @@ TCのstep sequenceやlocatorを、usability-inspectionのUI発見shortcutとし�
 
 追加観測によって既存の観測事実や測定値を書き換えません。新しい証拠として追加します。
 
-同じbrowser / sessionを両Skillが並行操作しません。
+同じbrowser / sessionを `usability-inspection` と `usability-evaluation` が並行操作しません。
 
 ## 6. Cognitive Walkthrough
 
@@ -156,7 +155,7 @@ usability-inspection中にscope外の未知領域へ探索を広げる必要が�
 
 `usability-evaluation` / `usability-inspection` の結果をProduct Risk候補の入力にできます。
 
-ただし両Skill自身はProduct Riskを採点しません。
+ただし `usability-inspection` / `usability-evaluation` 自身はProduct Riskを採点しません。
 
 ### test-condition-design
 
@@ -197,7 +196,7 @@ qa-workflowは次をすべてrouting contractとして持ちます。
 
 - design artifact / 取得済みevidenceのreference-based UI / UX review → usability-evaluation
 - live Web UIのユーザビリティ検査 → usability-inspection
-- live Web UIのexplicit WCAG conformance evaluation → usability-inspection | WCAG-EM 2.0経路
+- live Web UIのformal WCAG conformance evaluation → wcag-conformance-evaluation
 - current target inventory → test-target-inspection
 - prescribed detailed TC execution → test-execution
 - Charter-based open exploration → exploratory-testing
@@ -279,4 +278,4 @@ project thresholdがあるmeasurementはそのAuthorityに従って評価でき�
 
 条件を満たさない単一runの値をfield metricや製品全体のperformance判定へ昇格しません。
 
-新しいperformance testing Skillは追加しません。user-facing responsivenessの測定は `usability-inspection` の責務として `_05c_usability-inspection-coverage.md` のmeasurement matrixを実装します。
+新しいperformance testing Skillは追加しません。user-facing responsivenessの測定は `usability-inspection` の責務として `_05e_performance-measurement.md` の契約を実装します。

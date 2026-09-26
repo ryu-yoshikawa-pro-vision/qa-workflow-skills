@@ -380,7 +380,7 @@ usability-evaluationは一般guidanceをテスト要求へ昇格しません。
 
 ### WCAG
 
-`usability-evaluation` は、取得済みのWCAG requirement result / evidenceの意味をread-onlyで評価できます。live targetのWCAG conformance evaluation自体は `usability-inspection` と `_05d_accessibility-and-conformance.md` が担当します。
+`usability-evaluation` は、取得済みのWCAG requirement result / evidenceの意味をread-onlyで評価できます。general accessibilityのlive observationは `usability-inspection`、formalなWCAG conformance evaluationは `wcag-conformance-evaluation` が担当します。requirement result / ACT semanticsは `_05d_accessibility-requirements-and-act.md` を共有します。
 
 Success Criterion resultを扱う場合は、
 
@@ -395,7 +395,7 @@ Success Criterion resultを扱う場合は、
 
 単一element / component / sampleだけの成功からpage / productのSuccess Criterionを `satisfied` へ昇格しません。
 
-WCAG conformance claimはWCAG-EM 2.0に従うexplicit conformance evaluationの成果物でだけ扱います。ACT Ruleの `inapplicable` outcomeをWCAG Success Criterionのresult語彙へ流用しません。
+WCAG-EM evaluation report / evaluation statement / conformance claimは `wcag-conformance-evaluation` の成果物だけで扱います。ACT Ruleの `inapplicable` outcomeをWCAG Success Criterionのresult語彙へ流用しません。
 
 ### APG
 

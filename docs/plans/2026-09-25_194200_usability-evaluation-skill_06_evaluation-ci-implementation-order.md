@@ -77,7 +77,7 @@ normative dependency、successor / current version、coverage gap解消、意味
 
 既定は要約 + source item refとし、本文コピーを避けます。
 
-利用条件を確認できない場合は保守的に要約またはsource-reference-onlyとします。
+利用条件を確認できない場合は保守的に要約またはreference-onlyとします。
 
 ## 5. Step 3: reference schemaとindex
 
@@ -85,12 +85,14 @@ normative dependency、successor / current version、coverage gap解消、意味
 
 - source-catalog.md
 - source-coverage.md
+- `_02d_reference-artifact-schema.md` のfixed heading / table column / locator / escaping契約
 - index.md
 - evidence-and-authority.md
 - evaluation-method.md
 - reference entry共通形式
 - source discovery query matrix
 - `scripts/reference_catalog.py` のcanonical URL / ID / coverage生成fixture
+- `scripts/evaluation_structure.py` のevaluation draft → final ref / closure / cross-reference fixture
 - reference catalog validatorの最小schema検証
 
 この時点で大量のreference本文は作りません。
@@ -115,7 +117,7 @@ normative dependency、successor / current version、coverage gap解消、意味
 - root index → sub-index → referenceの読込
 - output-template
 - 上位観点の評価scope固定とclosure
-- artifact-localなevaluation ref
+- `evaluation_structure.py` によるartifact-local evaluation ref / draft cross-reference解決
 - UI / UX評価項目とFindingの分離
 - binding / advisoryとapplicability
 - reference catalog validator
@@ -136,13 +138,12 @@ normative dependency、successor / current version、coverage gap解消、意味
 
 - WCAG 2.2
 - relevant Understanding / Techniques / Failures
-- WCAG-EM 2.0
 - WAI-ARIA 1.2
 - current ARIA in HTML
 - WAI-ARIA APG
 - ACT Rules Format 1.1 / All ACT Rules
 
-WCAG / ARIAのbinding / normative requirement、informative guidance、ACT testing methodを混同しません。
+WCAG / ARIAのbinding / normative requirement、informative guidance、ACT testing methodを混同しません。WCAG-EM 2.0 / WCAG-EM Report Toolはformal evaluation Skillのsource catalogで正本管理し、`usability-evaluation` 側では必要なcross-referenceだけを保持します。
 
 All ACT RulesのURL / rule一覧はcatalogから辿れるようにしますが、全ruleを本Skillのsupported implementationへすることは要求しません。
 
@@ -202,6 +203,8 @@ capability coverageに必要なpattern / heuristic / methodologyだけnormalized
 - capability coverageの未closure / blocked
 - pending candidate
 - canonical URL duplicate
+- fragment付きdocument canonical URL / locator不整合
+- `_02d_reference-artifact-schema.md` のheading / column / enum / escaping違反
 - source / item / reference ID不整合
 - included / merged-duplicateなのにreference destinationなし
 - included / merged-duplicateで `available_dimensions != captured_dimensions`
@@ -230,7 +233,7 @@ Step 4で成立させた `SKILL.md`、output-template、validator、trigger / se
 
 が崩れていないことを確認します。
 
-さらに、`_02b_reference-validation-and-completeness.md` の規則で `included / merged-duplicate` の全source itemを原文と意味照合し、`unavailable / source-reference-only` の全itemでdisposition / access state / canonical URLを確認します。samplingだけで完了扱いにしません。
+さらに、`_02b_reference-validation-and-completeness.md` の規則で `included / merged-duplicate` の全source itemをdocument canonical URL + locatorから原文へ戻して意味照合し、`unavailable / reference-only` のitemでdisposition / access state / canonical URLを確認します。samplingだけで完了扱いにしません。
 
 全referenceを収録しただけでSkill完成扱いにせず、Step 4で確認した実行契約が全体でも維持されることを確認します。
 
@@ -239,6 +242,7 @@ Step 4で成立させた `SKILL.md`、output-template、validator、trigger / se
 PR #12 / #13 merge後実装へ合わせて、
 
 - qa-workflow
+- wcag-conformance-evaluation
 - test-analysis
 - test-condition-design
 - test-target-inspection
@@ -369,6 +373,9 @@ UI patternを含むtest-condition-design
 - unresolved constraints
 - source catalog / seed確認 / discovery実行記録 / retrieval boundary / capability coverage / source item disposition / field-level coverage
 - `reference_catalog.py` のcanonical URL / ID / summary生成とvalidatorの独立検証
+- `_02d_reference-artifact-schema.md` の物理Markdown schema
+- source item document canonical URL / locator整合
+- `evaluation_structure.py` のEVAL ref / closure / cross-reference生成とvalidatorの独立検証
 - index integrity
 
 を検証します。
@@ -483,8 +490,9 @@ PR #12 / #13 merge後の実行基盤を使い、
 - 判定不能 / 対象外のUI / UX評価項目にstatus reason / 制約・未確認が残る
 - usability-evaluation成果物で上位観点ごとの今回の扱いが固定され、「今回評価する」とした観点がすべて評価結果へ閉じている
 - source IDが `SRC-\d{3,}`、source item refが `<source ID>-ITEM-\d{4,}`、reference entry IDが `REF-\d{4,}` のpackage-local append-only規則に従い、削除済みIDを別identityへ再利用していない
-- evaluation refは成果物revision内だけで一意なartifact-local refで、新しいglobal QA ID / Machine Entityを追加していない
+- evaluation refは `evaluation_structure.py` が成果物revision内だけで一意なartifact-local refとして生成し、新しいglobal QA ID / Machine Entityを追加していない
 - Regression配下ではregression-testingが確定したUI / UX評価scopeだけが接続され、通常live UIの暗黙接続を前提にしない
+- `_02d_reference-artifact-schema.md` のschema validator PASS
 - reference catalog validator PASS
 - deterministic eval PASS
 - semantic dataset構造 PASS

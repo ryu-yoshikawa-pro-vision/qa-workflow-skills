@@ -38,7 +38,6 @@
 次をすべて確認し、`references/source-catalog.md` へcanonical URL / status / checked_atを記録します。
 
 - WCAG 2.2 / Understanding
-- WCAG-EM 2.0
 - WAI-ARIA 1.2 / current ARIA in HTML
 - ACT Rules Format 1.1 / All ACT Rules
 - ISO 9241-110 interaction principles
@@ -89,14 +88,14 @@ skills/usability-inspection/scripts/
 └── criterion_checks.py
 ~~~
 
-`assets/test-rule-catalog.json` も同時に実装します。登録対象は `_05d_accessibility-and-conformance.md` のsupported ACT Rule / project ruleだけです。artifact structure、ref、geometry、elapsed、threshold等のhelperはcatalogへ入れません。catalogはrule DSLではなく、`criterion_checks.py` の明示dispatchとsemantic/manual経路の入力契約です。
+`assets/test-rule-catalog.json` も同時に実装します。登録対象は `_05d_accessibility-requirements-and-act.md` のsupported ACT Rule / project ruleだけです。artifact structure、ref、geometry、elapsed、threshold等のhelperはcatalogへ入れません。catalogはrule DSLではなく、`criterion_checks.py` の明示dispatchとsemantic/manual経路の入力契約です。
 
 このStepではbrowserを操作しません。fixtureだけで次を確認します。
 
 - same normalized input → same machine result
-- artifact-local ref採番
+- observation / measurement / test rule / requirement / action draftを `inspection_structure.py` が一括してartifact-local refへ採番
 - inspection scope closure
-- cross-reference解決
+- draft key → final ref / cross-reference解決
 - exact elapsed計算
 - threshold比較
 - threshold未定義
@@ -225,40 +224,22 @@ taskを与えないcanonical caseで、1画面 / 1機能を端から端まで検
 
 この段階では全製品scanへ広げません。
 
-## 10. Step 8: accessibility / conformance
+## 10. Step 8: general accessibility
 
-`_05d_accessibility-and-conformance.md` に従い2経路を実装します。
-
-### general accessibility inspection
-
-targetへapplicableなaccessibility concern / requirementだけを観測・評価します。WCAG全Success Criteriaを毎回実行せず、general inspection結果からproduct-wide conformance claimを作りません。
-
-### explicit WCAG conformance evaluation
-
-WCAG version / conformance level / evaluation scopeを事前に固定し、WCAG-EM 2.0の、
-
-1. scope定義
-2. target探索
-3. representative sample選定
-4. sample評価
-5. findings集約・report
-
-へ成果物を追跡できるようにします。
+`_05d_accessibility-requirements-and-act.md` に従い、targetへapplicableなaccessibility concern / requirementを観測・評価します。
 
 確認:
 
+- WCAG全Success Criteriaを毎回実行しない
 - applicability / exception
 - observation / measurement
 - supported ACT Ruleがある場合のtest rule result
 - requirement result
-- sample resultからpage / product `satisfied` へ昇格しない
-- complete process / conformance requirements
-- WCAG-EM Step 1〜4 outcomeをevaluation reportへ記録
-- optional evaluation statementの生成条件
-- representative sampleだけからWCAG conformance claimを作らない
+- sample / element resultからpage / product `satisfied` へ昇格しない
 - WAI-ARIA / ARIA in HTMLのhost language requirement
 - APGをnormative requirementへ昇格しない
 - supported ACT RuleのACT Rules Format 1.1 §4.14.1 consistency fixture
+- formal WCAG conformance要求を検出した場合は `wcag-conformance-evaluation` へroutingし、本Skill内でWCAG-EM modeへ変形しない
 
 criterionの具体値や例外はcurrent referenceを正本にし、Plan記載値だけを実装へ固定しません。
 
@@ -405,7 +386,7 @@ repository標準件数に合わせます。
 - off-viewport locator shortcutでdiscoverability問題を隠さない
 - actionability waitをpost-input responsivenessへ混ぜない
 - strict requirementとadvisory guidanceを分ける
-- general accessibility inspectionとWCAG conformance evaluationを分ける
+- general accessibility inspectionとformal WCAG conformance evaluationのSkill routingを分ける
 - responsive / touch-capable / mobile device emulationを分ける
 - Core Web Vitalsを独自算出しない
 - taskが指定された場合だけtask modeを使う
@@ -435,18 +416,19 @@ repository標準件数に合わせます。
 - Agent Skills仕様を満たす
 - task / user personaなしでもlive Web UIを検査できる
 - inspection scopeを固定し、選定観点をclosureできる
-- ref採番、scope closure、数値計算、threshold比較をdeterministic runtimeへ移している
+- scope / observation / measurement / test rule / requirement / action ref採番とcross-referenceを `inspection_structure.py` へ一元化し、数値計算・threshold比較をdeterministic runtimeへ移している
 - runtime generatorとdeterministic validatorを別実装にしている
 - objective observationとexpert evaluationを分離する
 - applicable standard / binding requirementをcriterion単位で判定できる
 - test rule resultとrequirement resultを分離できる
 - requirement `satisfied` に必要なpopulation / required checks closureを検証できる
-- general accessibility inspectionとexplicit WCAG conformance evaluationを分離できる
-- WCAG conformance evaluationがWCAG-EM 2.0へ追跡できる
+- general accessibility inspectionを本Skillで完結できる
+- formal WCAG conformance要求を `wcag-conformance-evaluation` へroutingし、本Skillでproduct-level WCAG-EM評価を実装していない
 - criterionのapplicability / exception / evidenceを保持する
 - advisory guidanceをstrict FAILへ変換しない
 - project thresholdがなければ独自FAIL thresholdを作らない
 - measurementのmetric source / method / value / unit / device profile / evidenceを保持する
+- external Core Web Vitalsをsource name / version / mode / population / period / device class / percentileへ追跡できる
 - LCP / CLS / INPを独自algorithmで再実装しない
 - existing Core Web Vitals sourceがない場合を `measurement-unavailable` へ閉じられる
 - single-run measurementを条件未達のfield metricへ昇格しない
@@ -478,14 +460,16 @@ repository標準件数に合わせます。
 
 1. `usability-evaluation` が `_06_evaluation-ci-implementation-order.md` の完了条件を満たす
 2. `usability-inspection` が本ファイル§19の完了条件を満たす
-3. 両Skillのqa-workflow routingと相互連携が成立する
+3. `wcag-conformance-evaluation` が `_06b_wcag-conformance-evaluation-implementation-order.md` の完了条件を満たす
+4. 3 Skillのqa-workflow routingと相互連携が成立する
 
 まで完了扱いにしません。
 
 ### coverage完了条件
 
 - `_05c_usability-inspection-coverage.md` のWeb / responsive / touch / mobile / discoverability契約を閉じる
-- `_05d_accessibility-and-conformance.md` のgeneral accessibility / explicit conformance / ARIA / supported ACT契約を閉じる
+- `_05d_accessibility-requirements-and-act.md` のgeneral accessibility / ARIA / supported ACT契約を閉じる
+- formal WCAG conformanceは `_06b_wcag-conformance-evaluation-implementation-order.md` 側で閉じる
 - supported ACT RuleはACT Rules Format 1.1 §4.14.1 consistency fixtureをPASS
 - `_05e_performance-measurement.md` のdirect measurement / external Core Web Vitals source境界を閉じる
 - general inspectionの全上位観点をclosure

@@ -85,7 +85,6 @@ native iOS / Android app、desktop native app等の能動操作は本Skillの対
 - 許可された副作用scope
 - 利用可能なtest data / account
 - project固有の仕様 / Design System / accessibility基準 / performance thresholdがある場合はそのAuthority
-- WCAG conformance evaluationを要求する場合はtarget WCAG version / conformance level / evaluation scope。確定できなければ推測せず `unresolved`
 
 ### 任意
 
@@ -120,10 +119,11 @@ general inspectionでは、次の上位観点をすべてscope rowへ作成し�
 特定観点だけを明示した依頼ではそのrequested scopeを尊重します。general inspectionで対象外にする場合は、UIに該当populationがない、実行条件上観測不能、または本Skillの責務外である理由を残します。
 
 - Web実行条件 / responsive / touch / mobile / discoverability → `_05c_usability-inspection-coverage.md`
-- accessibility / WCAG conformance / WAI-ARIA / ACT → `_05d_accessibility-and-conformance.md`
+- general accessibility / WAI-ARIA / supported ACT Rule → `_05d_accessibility-requirements-and-act.md`
+- formal WCAG conformance evaluation → `_01b_wcag-conformance-evaluation-scope-and-contract.md` / `wcag-conformance-evaluation`
 - performance / responsiveness measurement → `_05e_performance-measurement.md`
 
-accessibilityをgeneral inspectionへ含めたことだけでWCAG conformance evaluationへ切り替えません。
+accessibilityをgeneral inspectionへ含めたことだけでWCAG conformance evaluationへ切り替えません。formal conformance要求を検出した場合は現在のinspectionをformal評価へ変形せず `wcag-conformance-evaluation` へroutingします。
 
 「今回確認する」とした観点は、最後に少なくとも次のいずれかへ閉じます。
 
@@ -286,7 +286,8 @@ task / flowが明示されている場合だけ、start state / success conditio
 
 今回scopeでapplicableなstandard / project requirementとmeasurementを実行します。
 
-- accessibility inspection / explicit WCAG conformance → `_05d_accessibility-and-conformance.md`
+- general accessibility inspection → `_05d_accessibility-requirements-and-act.md`
+- formal WCAG conformance evaluation → `wcag-conformance-evaluation` へrouting
 - Navigation Timing / FCP / user-facing interaction timing / external Core Web Vitals source → `_05e_performance-measurement.md`
 
 target size、contrast、focus、reflow等はcriterionのexceptionやapplicabilityを確認し、数値だけでFAILにしません。
