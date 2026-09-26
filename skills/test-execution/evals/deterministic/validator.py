@@ -144,9 +144,23 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
             continue
         when_rows = scenario["when"]
         then_rows = scenario["then"]
-        step_refs = [row.get("step_ref") for row in when_rows if isinstance(row, dict)]
-        if not when_rows or len(step_refs) != len(when_rows) or any(not isinstance(step, str) or not step.strip() for step in step_refs) or len(step_refs) != len(set(step_refs)):
-            yaml_issues.append({"ref": ref, "issue": "scenario.when step_ref must be nonempty and unique"})
+        step_refs = []
+        if not when_rows:
+            yaml_issues.append({"ref": ref, "issue": "scenario.when is empty"})
+        for when_index, row in enumerate(when_rows):
+            if not isinstance(row, dict):
+                yaml_issues.append({"ref": ref, "when_index": when_index, "issue": "scenario.when entry must be a mapping"})
+                continue
+            step_ref = row.get("step_ref")
+            if not isinstance(step_ref, str) or not step_ref.strip():
+                yaml_issues.append({"ref": ref, "when_index": when_index, "issue": "scenario.when step_ref must be a nonempty string"})
+            else:
+                step_refs.append(step_ref)
+            action = row.get("action")
+            if not isinstance(action, str) or not action.strip():
+                yaml_issues.append({"ref": ref, "when_index": when_index, "issue": "scenario.when action must be a nonempty string"})
+        if len(step_refs) != len(set(step_refs)):
+            yaml_issues.append({"ref": ref, "issue": "scenario.when step_ref must be unique"})
         if not then_rows:
             yaml_issues.append({"ref": ref, "issue": "scenario.then is empty"})
         for row in then_rows:
@@ -156,7 +170,7 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
             yaml_issues.append({"ref": ref, "issue": "unresolved and cleanup must be arrays"})
     if list(plans) != ids:
         yaml_issues.append({"mapping_refs": ids, "yaml_refs": list(plans), "issue": "snapshot YAML order differs from input order"})
-    result.add("TEX-D003", not yaml_issues, "実行前YAMLをyaml.safe_loadでparseし、必須構造・多段step参照・TC集合を検証すること", evidence=yaml_issues or None)
+    result.add("TEX-D003", not yaml_issues, "実行前YAMLをyaml.safe_loadでparseし、step_ref / action・多段step参照・TC集合を検証すること", evidence=yaml_issues or None)
 
     source_issues = []
     source_field = "元TC ID (source_test_case_id)"
@@ -229,7 +243,10 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
     method_issues = []
     if method not in EXECUTION_METHODS:
         method_issues.append({"method": method})
-    result.add("TEX-D007", not method_issues, "使用したbrowser実行手段が正規値で記録されること", evidence=method_issues or None)
+    started_refs = [_value(row, "TC参照") for row in results if _value(row, "実行開始") == "開始済み"]
+    if method == "未実行" and started_refs:
+        method_issues.append({"method": method, "started_tcs": started_refs})
+    result.add("TEX-D007", not method_issues, "使用したbrowser実行手段が正規値で記録され、開始済みTCと矛盾しないこと", evidence=method_issues or None)
 
     result_by_ref = {_value(row, "TC参照"): row for row in results}
     state_issues = []
@@ -267,7 +284,13 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
     missing_run_fixed_items = sorted(required_run_fixed_items - set(run_fixed_items))
     if missing_run_fixed_items:
         condition_issues.append({"missing_run_fixed_conditions": missing_run_fixed_items})
-    result.add("TEX-D009", not condition_issues, "run固定条件の安全項目とTC実行条件・実行前条件の参照整合を検証すること", evidence=condition_issues or None)
+    for item in sorted(required_run_fixed_items):
+        matching_rows = [row for row in run_fixed_rows if _value(row, "条件") == item]
+        if len(matching_rows) > 1:
+            condition_issues.append({"duplicate_run_fixed_condition": item})
+        if matching_rows and not _value(matching_rows[0], "値"):
+            condition_issues.append({"empty_run_fixed_condition_value": item})
+    result.add("TEX-D009", not condition_issues, "run固定条件の必須項目・非空値とTC実行条件・実行前条件の参照整合を検証すること", evidence=condition_issues or None)
 
     procedure_rows = _rows(required_tables["手順・観測結果"])
     procedure_issues = []

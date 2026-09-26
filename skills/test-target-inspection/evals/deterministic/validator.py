@@ -101,6 +101,16 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
     target_keys = [_value(row, "対象キー") for row in screen if _nonempty(_value(row, "対象キー"))]
     element_keys = [_value(row, "要素キー") for row in elements if _nonempty(_value(row, "要素キー"))]
     state_keys = [_value(row, "状態キー") for row in states if _nonempty(_value(row, "状態キー"))]
+    element_targets = {
+        _value(row, "要素キー"): _value(row, "対象キー")
+        for row in elements
+        if _nonempty(_value(row, "要素キー"))
+    }
+    state_targets = {
+        _value(row, "状態キー"): _value(row, "対象キー")
+        for row in states
+        if _nonempty(_value(row, "状態キー"))
+    }
 
     unique_issues = {}
     for label, values in (("対象キー", target_keys), ("要素キー", element_keys), ("状態キー", state_keys)):
@@ -143,22 +153,49 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
         target, element = _value(row, "対象キー"), _value(row, "要素キー")
         if target and target not in current_targets:
             reference_issues.append({"section": "操作・ふるまい", "target": target})
-        if element and element not in current_elements:
-            reference_issues.append({"section": "操作・ふるまい", "element": element})
+        if _nonempty(element):
+            if element not in current_elements:
+                reference_issues.append({"section": "操作・ふるまい", "element": element})
+            elif element_targets[element] != target:
+                reference_issues.append(
+                    {"section": "操作・ふるまい", "target": target, "element": element, "issue": "element parent target mismatch"}
+                )
     for row in visual:
         target = _value(row, "対象キー")
         subkey = _value(row, "要素キー / 状態キー")
         if target and target not in current_targets:
             reference_issues.append({"section": "視覚情報", "target": target})
-        if subkey not in NONE and subkey not in current_elements | current_states:
-            reference_issues.append({"section": "視覚情報", "subkey": subkey})
+        if subkey not in NONE:
+            if subkey in element_targets:
+                if element_targets[subkey] != target:
+                    reference_issues.append(
+                        {"section": "視覚情報", "target": target, "subkey": subkey, "issue": "parent target mismatch"}
+                    )
+            elif subkey in state_targets:
+                if state_targets[subkey] != target:
+                    reference_issues.append(
+                        {"section": "視覚情報", "target": target, "subkey": subkey, "issue": "parent target mismatch"}
+                    )
+            else:
+                reference_issues.append({"section": "視覚情報", "subkey": subkey})
     for row in deps:
         target = _value(row, "対象キー")
         subkey = _value(row, "要素キー / 状態キー")
         if target and target not in current_targets:
             reference_issues.append({"section": "データ・権限依存", "target": target})
-        if subkey not in NONE and subkey not in current_elements | current_states:
-            reference_issues.append({"section": "データ・権限依存", "subkey": subkey})
+        if subkey not in NONE:
+            if subkey in element_targets:
+                if element_targets[subkey] != target:
+                    reference_issues.append(
+                        {"section": "データ・権限依存", "target": target, "subkey": subkey, "issue": "parent target mismatch"}
+                    )
+            elif subkey in state_targets:
+                if state_targets[subkey] != target:
+                    reference_issues.append(
+                        {"section": "データ・権限依存", "target": target, "subkey": subkey, "issue": "parent target mismatch"}
+                    )
+            else:
+                reference_issues.append({"section": "データ・権限依存", "subkey": subkey})
     implementation_table = find_table(tables, section_contains="既存テスト実装との対応")
     implementation_rows = _rows(implementation_table)
     if implementation_table is not None:
@@ -172,9 +209,21 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
         element = _value(row, "要素キー")
         if _nonempty(target) and target not in current_targets:
             reference_issues.append({"section": "既存テスト実装との対応", "target": target})
-        if _nonempty(element) and element not in current_elements:
-            reference_issues.append({"section": "既存テスト実装との対応", "element": element})
-    result.add("TTI-D005", not reference_issues, "current行と任意repo対応表の対象・要素参照が整合すること", evidence=reference_issues or None)
+        if _nonempty(element):
+            if element not in current_elements:
+                reference_issues.append({"section": "既存テスト実装との対応", "element": element})
+            elif element_targets[element] != target:
+                reference_issues.append(
+                    {"section": "既存テスト実装との対応", "target": target, "element": element, "issue": "element parent target mismatch"}
+                )
+    evidence_table = _table(tables, "構造証跡", ("対象キー", "証跡参照", "証跡revision / content identity"))
+    for row in _rows(evidence_table):
+        target, state = _value(row, "対象キー"), _value(row, "状態キー")
+        if state not in NONE and state in state_targets and state_targets[state] != target:
+            reference_issues.append(
+                {"section": "構造証跡", "target": target, "state": state, "issue": "state parent target mismatch"}
+            )
+    result.add("TTI-D005", not reference_issues, "current行と任意repo対応表の参照先および親対象キーが整合すること", evidence=reference_issues or None)
 
     freshness_issues = []
     for section, rows in (("画面 / 領域", screen), ("UI要素", elements), ("状態", states), ("操作・ふるまい", behaviors), ("視覚情報", visual), ("データ・権限依存", deps)):
@@ -225,21 +274,36 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
 
     deleted = [row for row in update_rows if _value(row, "更新区分") == "削除確認"]
     deleted_issues = []
-    deleted_keys = {_value(row, "対象キー") for row in deleted}
+    deleted_screen_keys = set()
     for row in deleted:
+        kind = _value(row, "対象種別")
+        if kind in {"画面", "画面 / 領域"}:
+            key = _value(row, "対象キー")
+            current_keys = current_targets
+            deleted_screen_keys.add(key)
+        elif kind == "UI要素":
+            key = _value(row, "要素キー / 状態キー")
+            current_keys = current_elements
+        elif kind == "状態":
+            key = _value(row, "要素キー / 状態キー")
+            current_keys = current_states
+        else:
+            deleted_issues.append({"kind": kind, "issue": "削除確認の対象種別が不正"})
+            continue
+        if not _nonempty(key):
+            deleted_issues.append({"kind": kind, "issue": "削除確認の対象キーがない"})
+        elif key in current_keys:
+            deleted_issues.append({"kind": kind, "key": key, "issue": "削除対象がcurrent本体テーブルに残っている"})
         for field in ("確認条件", "確認version / build", "確認日時"):
             if not _nonempty(_value(row, field)):
-                deleted_issues.append({"key": _value(row, "対象キー"), "missing": field})
+                deleted_issues.append({"kind": kind, "key": key, "missing": field})
         if _value(row, "確認version / build") != "取得不能" and not _nonempty(_value(row, "確認version / build")):
-            deleted_issues.append({"key": _value(row, "対象キー"), "missing": "version / build"})
-    resurrected = sorted(deleted_keys & current_targets)
-    deleted_issues.extend({"key": key, "issue": "削除対象がcurrent本体テーブルに残っている"} for key in resurrected)
+            deleted_issues.append({"kind": kind, "key": key, "missing": "version / build"})
     for key in expected.get("deleted_target_keys", []):
-        if key not in deleted_keys:
+        if key not in deleted_screen_keys:
             deleted_issues.append({"key": key, "issue": "期待された削除確認行がない"})
-    result.add("TTI-D009", not deleted_issues, "削除確認が比較条件を持ち、削除キーをcurrent本体参照から除外すること", evidence=deleted_issues or None)
+    result.add("TTI-D009", not deleted_issues, "対象種別ごとの削除キーが対応するcurrent本体表から除外され、比較条件があること", evidence=deleted_issues or None)
 
-    evidence_table = _table(tables, "構造証跡", ("対象キー", "証跡参照", "証跡revision / content identity"))
     evidence_issues = []
     for row in _rows(evidence_table):
         target, state = _value(row, "対象キー"), _value(row, "状態キー")
@@ -258,10 +322,14 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
 
     save_requested = confirm.get("永続保存要求", "").strip() in {"はい", "Yes", "yes", "true"}
     save_table = _table(tables, "保存結果", ("保存先", "更新元revision / content identity", "更新方式", "保存状態"))
-    save_rows = _rows(save_table)
+    save_rows = [
+        row for row in _rows(save_table) if any(value.strip() for value in row.values())
+    ]
     save_issues = []
     if save_requested and not save_rows:
         save_issues.append({"issue": "保存要求に対する保存結果がない"})
+    if confirm.get("永続保存要求", "").strip() == "いいえ" and save_rows:
+        save_issues.append({"issue": "保存要求なしに保存結果recordがある"})
     conditional_update_required = expected.get("conditional_update_required", False)
     for row in save_rows:
         status = _value(row, "保存状態")
@@ -292,7 +360,7 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
                 save_issues.append({"status": status, "method": _value(row, "更新方式"), "issue": "共有保存先の条件付き更新方式が確認できない"})
         if status in {"保存中止", "保存失敗"} and not _nonempty(_value(row, "競合・制約 / 理由")):
             save_issues.append({"status": status, "issue": "制約 / 理由がない"})
-    result.add("TTI-D011", not save_issues, "永続保存要求に保存結果・競合安全な更新方式・revision・制約が対応すること", evidence=save_issues or None)
+    result.add("TTI-D011", not save_issues, "保存要求の有無と保存recordが整合し、要求時は競合安全な更新方式・revision・制約が対応すること", evidence=save_issues or None)
 
     side_table = _table(tables, "副作用・cleanup", ("副作用scope", "1回の定義", "最大回数", "累計実施回数"))
     side_issues = []

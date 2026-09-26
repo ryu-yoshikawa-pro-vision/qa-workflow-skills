@@ -132,6 +132,7 @@ DOM / accessibility tree等の構造情報だけで確認できない場合、�
 | テストデータ条件 |  |  |
 | 既存成果物参照 |  |  |
 | 更新元revision / content identity |  |  |
+| 永続保存要求 | はい / いいえ |  |
 
 ### 画面 / 領域
 

@@ -89,6 +89,73 @@ class NewSkillDeterministicContractTests(unittest.TestCase):
         result = validate(broken, expected, "TTI-OUT-001")
         self.assertEqual(next(item.status for item in result.assertions if item.id == "TTI-D005"), "fail")
 
+    def test_target_inspection_checks_parent_target_for_entity_references(self):
+        validate = load_validator("test-target-inspection")
+        text, expected = eval_case("test-target-inspection", "TTI-OUT-001")
+        screen_row = "| target-001 | 注文履歴 | ナビゲーションから注文履歴 | 確認済み | 閲覧者、ja-JP、1440x900、test-order-42 | build-23 | 2026-09-26T09:00:00+09:00 |"
+        target_2 = "| target-002 | 別領域 | 別経路 | 確認済み | 管理者 | build-23 | 2026-09-26T09:00:00+09:00 |"
+        element_row = "| element-002 | target-002 | 別領域のボタン | button / 保存 | 操作可能 | 確認済み | 管理者 | build-23 | 2026-09-26T09:00:00+09:00 |"
+        state_row = "| state-002 | target-002 | 別領域の状態 | 表示される | 初期表示 | 確認済み | 管理者 | build-23 | 2026-09-26T09:00:00+09:00 |"
+
+        def add_row(source, anchor, row):
+            self.assertIn(anchor, source)
+            return source.replace(anchor, anchor + "\n" + row, 1)
+
+        def with_second_target(source):
+            return add_row(source, screen_row, target_2)
+
+        cases = {}
+        behavior = with_second_target(text)
+        behavior = add_row(
+            behavior,
+            "| element-001 | target-001 | 注文番号リンク | link / Order 42 | 操作可能 | 確認済み | test-order-42、閲覧者 | build-23 | 2026-09-26T09:00:00+09:00 |",
+            element_row,
+        )
+        cases["behavior element parent"] = add_row(
+            behavior,
+            "| target-001 | element-001 | 履歴表示 | 注文番号リンクを開く | 注文詳細へ遷移 | 注文詳細表示 | 確認済み | test-order-42、閲覧者 | build-23 | 2026-09-26T09:00:00+09:00 |",
+            "| target-001 | element-002 | 別領域表示 | クリック | 保存画面へ遷移 | 保存画面 | 確認済み | 管理者 | build-23 | 2026-09-26T09:00:00+09:00 |",
+        )
+
+        state_base = with_second_target(text)
+        state_base = add_row(
+            state_base,
+            "| state-001 | target-001 | 履歴表示 | 注文42が一覧に表示 | test-order-42を準備 | 確認済み | 閲覧者、ja-JP | build-23 | 2026-09-26T09:00:00+09:00 |",
+            state_row,
+        )
+        cases["visual state parent"] = add_row(
+            state_base,
+            "| target-001 | state-001 | 行の重なり | 行の間隔が保たれている | evidence/orders.png | 確認済み | 1440x900 | build-23 | 2026-09-26T09:00:00+09:00 | 画像で確認 |",
+            "| target-001 | state-002 | 別領域の表示 | 別領域状態を観測 |  | 確認済み | 管理者 | build-23 | 2026-09-26T09:00:00+09:00 | 参照のみ |",
+        )
+        dependency_table_end = "| --- | --- | --- | --- | --- | --- | --- | --- |\n\n## 既存テスト実装との対応（任意）"
+        dependency_row = "| target-001 | state-002 | role=admin | 別領域の差異 | 確認済み | 管理者 | build-23 | 2026-09-26T09:00:00+09:00 |"
+        self.assertIn(dependency_table_end, state_base)
+        cases["dependency state parent"] = state_base.replace(
+            dependency_table_end,
+            "| --- | --- | --- | --- | --- | --- | --- | --- |\n" + dependency_row + "\n\n## 既存テスト実装との対応（任意）",
+            1,
+        )
+
+        mapping_table_end = "| --- | --- | --- | --- | --- | --- |\n\n## 未確認 / 確認不能"
+        mapping_row = "| target-001 | element-002 | POM | src/pages/other.ts | 別領域 | rev-2 |"
+        self.assertIn(mapping_table_end, behavior)
+        cases["repository mapping element parent"] = behavior.replace(
+            mapping_table_end,
+            "| --- | --- | --- | --- | --- | --- |\n" + mapping_row + "\n\n## 未確認 / 確認不能",
+            1,
+        )
+        cases["snapshot state parent"] = add_row(
+            state_base,
+            "| target-001 | なし | 注文履歴領域 | snapshots/orders.yml | sha256:ab23 | なし | なし | 初回取得 | 機密値なしを確認 | 閲覧者、ja-JP | build-23 | 2026-09-26T09:00:00+09:00 |",
+            "| target-001 | state-002 | 別領域 | snapshots/other.yml | sha256:cd45 | なし | なし | 初回取得 | 機密値なしを確認 | 管理者 | build-23 | 2026-09-26T09:00:00+09:00 |",
+        )
+
+        for name, broken in cases.items():
+            with self.subTest(name=name):
+                result = validate(broken, expected, "TTI-OUT-001")
+                self.assertEqual(next(item.status for item in result.assertions if item.id == "TTI-D005"), "fail")
+
     def test_target_inspection_requires_and_matches_existing_source_revision(self):
         validate = load_validator("test-target-inspection")
         text, expected = eval_case("test-target-inspection", "TTI-OUT-002")
@@ -112,6 +179,26 @@ class NewSkillDeterministicContractTests(unittest.TestCase):
                 result = validate(broken, expected, "TTI-OUT-002")
                 self.assertEqual(next(item.status for item in result.assertions if item.id == "TTI-D011"), "fail")
 
+    def test_target_inspection_disallows_save_records_without_persistence_request(self):
+        validate = load_validator("test-target-inspection")
+        text, expected = eval_case("test-target-inspection", "TTI-OUT-001")
+        empty_template_table = text + "\n| 保存先 | 更新元revision / content identity | 更新方式 | 保存状態 | 保存後revision / content identity | 競合・制約 / 理由 | 確認元 |\n| --- | --- | --- | --- | --- | --- | --- |\n|  |  |  |  |  |  |  |\n"
+        self.assertEqual(
+            next(item.status for item in validate(empty_template_table, expected, "TTI-OUT-001").assertions if item.id == "TTI-D011"),
+            "pass",
+        )
+
+        save_record = "| some-store | なし | create | 保存済み | rev-1 | 保存成功を確認 | 保存先 |"
+        with_record = empty_template_table.replace("|  |  |  |  |  |  |  |", save_record, 1)
+        result = validate(with_record, expected, "TTI-OUT-001")
+        self.assertEqual(next(item.status for item in result.assertions if item.id == "TTI-D011"), "fail")
+
+        update_text, update_expected = eval_case("test-target-inspection", "TTI-OUT-002")
+        self.assertEqual(
+            next(item.status for item in validate(update_text, update_expected, "TTI-OUT-002").assertions if item.id == "TTI-D011"),
+            "pass",
+        )
+
     def test_deleted_target_may_be_absent_from_current_body(self):
         validate = load_validator("test-target-inspection")
         text, expected = eval_case("test-target-inspection", "TTI-OUT-002")
@@ -129,6 +216,51 @@ class NewSkillDeterministicContractTests(unittest.TestCase):
         broken = text.replace(current_row, current_row + "\n" + resurrected, 1)
         result = validate(broken, expected, "TTI-OUT-002")
         self.assertEqual(next(item.status for item in result.assertions if item.id == "TTI-D009"), "fail")
+
+        invalid_kind = text.replace("| 画面 | target-002 | なし | 削除確認 |", "| 未知種別 | target-002 | なし | 削除確認 |", 1)
+        result = validate(invalid_kind, expected, "TTI-OUT-002")
+        self.assertEqual(next(item.status for item in result.assertions if item.id == "TTI-D009"), "fail")
+
+    def test_deleted_elements_and_states_are_checked_against_their_own_tables(self):
+        validate = load_validator("test-target-inspection")
+        text, expected = eval_case("test-target-inspection", "TTI-OUT-002")
+
+        element_deletion = "| UI要素 | target-001 | element-002 | 削除確認 | 要素が比較条件で存在しない | 管理者、user-25 | build-18 | 2026-09-26T09:30:00+09:00 |"
+        element_update_table = "| UI要素 | target-001 | element-001 | 更新 | 検索ラベルを確認 | 管理者、user-25、同じ到達経路 | build-18 | 2026-09-26T09:30:00+09:00 |"
+        with_element_deletion = text.replace(element_update_table, element_update_table + "\n" + element_deletion, 1)
+        self.assertEqual(
+            next(item.status for item in validate(with_element_deletion, expected, "TTI-OUT-002").assertions if item.id == "TTI-D009"),
+            "pass",
+        )
+        current_element = "| element-002 | target-001 | 削除済み要素 | button / 削除済み | disabled | 確認済み | 管理者 | build-18 | 2026-09-26T09:30:00+09:00 |"
+        resurrected_element = with_element_deletion.replace(
+            "| element-001 | target-001 | ユーザー検索 | textbox / ユーザーを検索 | 操作可能 | 確認済み | 管理者、user-25 | build-18 | 2026-09-26T09:30:00+09:00 |",
+            "| element-001 | target-001 | ユーザー検索 | textbox / ユーザーを検索 | 操作可能 | 確認済み | 管理者、user-25 | build-18 | 2026-09-26T09:30:00+09:00 |\n" + current_element,
+            1,
+        )
+        self.assertEqual(
+            next(item.status for item in validate(resurrected_element, expected, "TTI-OUT-002").assertions if item.id == "TTI-D009"),
+            "fail",
+        )
+
+        state_deletion = "| 状態 | target-001 | state-002 | 削除確認 | 状態が比較条件で存在しない | 管理者、user-25 | build-18 | 2026-09-26T09:30:00+09:00 |"
+        with_state_deletion = with_element_deletion.replace(element_deletion, "", 1).replace(
+            element_update_table, element_update_table + "\n" + state_deletion, 1
+        )
+        self.assertEqual(
+            next(item.status for item in validate(with_state_deletion, expected, "TTI-OUT-002").assertions if item.id == "TTI-D009"),
+            "pass",
+        )
+        current_state = "| state-002 | target-001 | 削除済み状態 | 状態が表示される | user-25 | 確認済み | 管理者 | build-18 | 2026-09-26T09:30:00+09:00 |"
+        resurrected_state = with_state_deletion.replace(
+            "| state-001 | target-001 | 検索結果 | user-25が表示される | user-25あり | 確認済み | 管理者、ja-JP | build-18 | 2026-09-26T09:30:00+09:00 |",
+            "| state-001 | target-001 | 検索結果 | user-25が表示される | user-25あり | 確認済み | 管理者、ja-JP | build-18 | 2026-09-26T09:30:00+09:00 |\n" + current_state,
+            1,
+        )
+        self.assertEqual(
+            next(item.status for item in validate(resurrected_state, expected, "TTI-OUT-002").assertions if item.id == "TTI-D009"),
+            "fail",
+        )
 
     def test_unconfirmed_visual_row_keeps_previous_freshness(self):
         validate = load_validator("test-target-inspection")
@@ -280,6 +412,20 @@ class NewSkillDeterministicContractTests(unittest.TestCase):
         result = validate(broken, expected, "TEX-OUT-001")
         self.assertEqual(next(item.status for item in result.assertions if item.id == "TEX-D003"), "fail")
 
+    def test_test_execution_requires_nonempty_when_action(self):
+        validate = load_validator("test-execution")
+        text, expected = eval_case("test-execution", "TEX-OUT-001")
+        action_line = "      action: 注文番号42を検索欄へ入力する"
+        self.assertIn(action_line, text)
+        mutations = {
+            "missing action": text.replace(action_line + "\n", "", 1),
+            "empty action": text.replace(action_line, '      action: ""', 1),
+        }
+        for name, broken in mutations.items():
+            with self.subTest(name=name):
+                result = validate(broken, expected, "TEX-OUT-001")
+                self.assertEqual(next(item.status for item in result.assertions if item.id == "TEX-D003"), "fail")
+
     def test_test_execution_rejects_yaml_snapshot_out_of_input_order(self):
         validate = load_validator("test-execution")
         text, expected = eval_case("test-execution", "TEX-OUT-001")
@@ -368,6 +514,40 @@ class NewSkillDeterministicContractTests(unittest.TestCase):
             with self.subTest(name=name):
                 result = validate(broken, expected, "TEX-OUT-002")
                 self.assertEqual(next(item.status for item in result.assertions if item.id == "TEX-D009"), "fail")
+
+        for condition in ("対象環境", "許可origin", "version / build"):
+            with self.subTest(empty_value=condition):
+                lines = text.splitlines()
+                index = next(i for i, line in enumerate(lines) if line.startswith(f"| {condition} |"))
+                cells = lines[index].split("|")
+                cells[2] = "  "
+                lines[index] = "|".join(cells)
+                broken = "\n".join(lines)
+                result = validate(broken, expected, "TEX-OUT-002")
+                self.assertEqual(next(item.status for item in result.assertions if item.id == "TEX-D009"), "fail")
+
+        unavailable_version = text.replace(
+            "| version / build | build-23 | 実対象 |",
+            "| version / build | 取得不能 | 実対象 |",
+            1,
+        )
+        result = validate(unavailable_version, expected, "TEX-OUT-002")
+        self.assertEqual(next(item.status for item in result.assertions if item.id == "TEX-D009"), "pass")
+
+    def test_test_execution_rejects_unrun_method_when_a_tc_started(self):
+        validate = load_validator("test-execution")
+        text, expected = eval_case("test-execution", "TEX-OUT-002")
+        self.assertEqual(
+            next(item.status for item in validate(text, expected, "TEX-OUT-002").assertions if item.id == "TEX-D007"),
+            "pass",
+        )
+        started_but_unrun = text.replace(
+            "| 使用した実行手段 | Playwright CLI | MCPに必要な能力なし、既存CLI利用可 |",
+            "| 使用した実行手段 | 未実行 | MCPに必要な能力なし、既存CLI利用可 |",
+            1,
+        )
+        result = validate(started_but_unrun, expected, "TEX-OUT-002")
+        self.assertEqual(next(item.status for item in result.assertions if item.id == "TEX-D007"), "fail")
 
     def test_test_execution_separates_tc_postprocessing_from_runtime_cleanup(self):
         validate = load_validator("test-execution")
