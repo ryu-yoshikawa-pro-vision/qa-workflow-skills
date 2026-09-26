@@ -127,7 +127,21 @@ target WCAG version自体が不明・未指定の場合はInput不足として `
 - in-scope root / boundary
 - out-of-product boundary / reason（存在する場合）
 - conformance target
-- additional evaluation requirements（存在する場合）
+- additional requirement refs（存在する場合）
+
+### Additional Evaluation Requirements
+
+存在する場合、各row:
+
+- additional requirement ref
+- requester / source
+- requirement summary
+- affected step / output refs
+- status: applied / blocked / out-of-scope
+- required evidence / output refs
+- closure evidence / reason
+
+semantic layerは要求の意味とaffected step / output、本Skill目的内かを判断します。scriptはref採番、status enum、cross-reference、closureを担当します。本Skill目的内のrequirementをout-of-scopeへ変換しません。
 
 ### Accessibility Support Baseline
 
@@ -420,7 +434,7 @@ deterministic runtimeへ載せないもの:
 
 random selection結果はmethod / provenance / selected sample identityとともに後続Machine Runtime Inputへ渡します。保存済みsample resultはPR #11 current verifierでfreshnessを再計算し、currentの場合だけ再利用します。
 
-runtime Inputには少なくともtarget WCAG version / level、scope、accessibility support baseline、environment、sample identity、evidence identity、Authority / reference refs、選択versionのstatic data versionを含め、これらが変わった場合に旧resultをcurrent扱いしません。
+runtime Inputには少なくともtarget WCAG version / level、scope、normalized additional evaluation requirements、accessibility support baseline、environment、sample identity、evidence identity、Authority / reference refs、選択versionのstatic data versionを含め、これらが変わった場合に旧resultをcurrent扱いしません。
 
 ## 4. sampling.py
 
@@ -625,6 +639,7 @@ Input:
 
 - evaluation headerのsemantic field
 - scope / accessibility support baselineのsemantic decisions
+- additional evaluation requirement semantic decisions
 - sampling procedure semantic decision: 製品全体を評価可能か
 - exploration decisions
 - structured sample selection decisions
@@ -651,6 +666,7 @@ Function:
 - `sampling.py` のentire-product / candidate / selection / process / reconciliation / comparison resultだけからmachine-owned sample / comparison fieldをmaterialize
 - canonical sample identity registryを先にmaterializeし、structured / random / process-added集合は同じsample refを参照する
 - artifact-local ref採番
+  - additional evaluation requirement: `ADDREQ-001`
   - accessibility support baseline: `BASELINE-001`
   - exploration: `EXPLORE-001`
   - observation handoff: `HANDOFF-001`
@@ -658,6 +674,7 @@ Function:
 - cross-reference解決
 - WCAG-EM Step 1〜5 closure
 - scope / accessibility support baseline closure
+- additional evaluation requirementごとにaffected step / outputを固定し、`applied / blocked / out-of-scope` とrequired evidence / output refsのclosureをmaterializeする。目的内要件のout-of-scopeは禁止
 - sampling procedure used / skippedとselected sample set closure
 - sampling skippedではcomplete inventory → selected sample set traceabilityとstructured / random / Step 4.3 not-applicable closure
 - sampling usedではexploration → structured sample traceability
@@ -782,6 +799,7 @@ production helperとは別実装で少なくとも次を検証します。
 - target version以外のcatalogをexpected requirement集合へ混在させていない
 - static catalogから独立導出したtarget level required Success Criteria / conformance requirement集合とactual coverageの一致
 - accessibility support baseline
+- additional evaluation requirementsのref / affected step / status / output closure
 - sampling procedure used / skippedとselected sample set closure
 - sampling skipped時のcomplete inventory / selected set一致、structured / random / Step 4.3 not-applicable、complete process評価継続
 - sampling used時のstructured sample traceability
@@ -830,6 +848,12 @@ random selectionの結果そのものが「十分randomだったか」を同じv
 target levelまたはaccessibility support baseline不明。
 
 → 推測せずunresolved。
+
+### Case C2: additional evaluation requirement
+
+evaluation commissionerが「representative examplesだけでなく、検出したissueの全occurrenceをreportする」「Step 5.5 machine-readable reportを含める」等、本Skill目的内の追加要件を指定する。
+
+→ semantic layerがaffected step / outputを確定し、scriptが `ADDREQ-001` 等を採番して必要outputへcross-referenceし、`applied` closureを作る。目的内だが環境不足なら `blocked`、human participant study等の明示目的外だけを理由付き `out-of-scope` とする。
 
 ### Case D: structured sample
 
@@ -965,6 +989,7 @@ required claim fieldsを満たし、higher-level SC、not-relied-upon technology
 - sibling Skillのscriptsへruntime依存しない
 - formal direct trigger後にlive observationが必要な場合、qa-workflowが利用可能ならhandoff → usability-inspection → formal Skill resumeへ遷移し、qa-workflowを利用できないstandalone環境だけblockedへ閉じられる
 - WCAG-EM Report ToolをWCAG-EM 2 schema Authorityとして扱わず、runtime dependencyにもしていない
+- Step 1.4 additional evaluation requirementsをartifact-local refへ採番し、目的内要件をaffected step / outputへ反映してappliedまたはblockedへ、明示目的外だけを理由付きout-of-scopeへ閉じられる
 - WCAG 2.0 / 2.1 / 2.2の各target version / levelからrequired Success Criteria / conformance requirement集合を該当versionのstatic catalogだけで独立導出できる
 - 3 catalogのcanonical hashをversion別 `static_data_versions` keyへ保持し、validator独立再計算と承認済みhash contract testをPASS
 - missing / unresolved versionとunsupported / out-of-scope versionを区別し、別versionへ暗黙変換しない
@@ -987,5 +1012,5 @@ required claim fieldsを満たし、higher-level SC、not-relied-upon technology
 - Step 5.5 EARL 1.0 JSON-LD sidecarをdeterministically生成し、human-readable reportとのassertion coverage一致を検証できる
 - Step 5.4 aggregated scoreは目的外として生成しない
 - production helperとvalidatorが別実装
-- semantic Case A〜Z PASS
+- semantic Case A〜ZおよびCase C2 PASS
 - `_06c_canonical-live-validation.md` のrepository-controlled canonical fixtureでWCAG-EM orchestration E2EをPASSできる

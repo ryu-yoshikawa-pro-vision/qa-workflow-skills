@@ -37,7 +37,15 @@
 
 target WCAG version、level、self-enclosedなdigital product scope、accessibility support baselineを確定できない場合は推測せず `unresolved` とし、formal evaluationを開始しません。WCAG 2.0 / 2.1 / 2.2はsupportedです。指定versionを別versionへ暗黙変換しません。version自体が不明・未指定の場合は `unresolved`、現在catalogを持たない将来version等が明示された場合は `unsupported` としてformal evaluationを開始しません。product内の特定page / componentを任意に除外してscopeを狭めません。
 
-追加評価要件は任意Inputです。
+追加評価要件は任意Inputですが、指定された場合の処理は必須です。各要件についてsemantic layerが、
+
+- 要求内容
+- requester / source
+- 本Skillの目的内か
+- affected WCAG-EM step / output
+- semantic completion condition
+
+を確定します。本Skillの目的内要件を `out-of-scope` へ逃がしません。目的内だが現在のevidence / environmentで実行不能なら `blocked`、本Skillの目的外であれば理由付き `out-of-scope` とします。scriptは `ADDREQ-001` からartifact-local refを採番し、status `applied / blocked / out-of-scope`、required evidence / output refs、closureをmaterializeします。無視・黙示的省略を許可しません。
 
 ## 3. Function
 
@@ -50,7 +58,7 @@ WCAG-EM 2.0 Step 1へ対応付けます。
 - accessibility support baseline
 - additional evaluation requirements（存在する場合）
 
-を成果物へ固定します。
+を成果物へ固定します。additional requirementがsample追加、全occurrence報告、特定use case / user group分析、追加解決案、Step 5.2 / 5.5出力、特定report template等を要求する場合は、既存Skill責務の範囲でaffected stepへ反映します。human participantを使う評価等、本Planで明示的に目的外とした要求はout-of-scope理由を残します。
 
 ### Step 2: target exploration
 
@@ -241,8 +249,20 @@ formal要求から `wcag-conformance-evaluation` が直接発火した場合も�
 - product enclosure / scope boundary
 - out-of-product boundary / reason（存在する場合）
 - accessibility support baseline
-- additional requirements
+- additional requirement refs
 - limitations
+
+### additional evaluation requirements
+
+存在する場合、各row:
+
+- additional requirement ref
+- requester / source
+- requirement summary
+- affected step / output refs
+- status: applied / blocked / out-of-scope
+- required evidence / output refs
+- closure evidence / reason
 
 ### exploration
 
@@ -333,6 +353,7 @@ WCAG-EM 2.0はWCAG、accessible design、assistive technology、障害のある�
 - general accessibility inspectionと責務が分離されている
 - target WCAG version / level / scope / accessibility support baselineを創作しない
 - WCAG-EM 2.0 Step 1〜5へ成果物を追跡できる
+- Step 1.4 additional evaluation requirementsをartifact-local refへ採番し、目的内要件はaffected step / outputへ反映してappliedまたはblockedへ、目的外だけを理由付きout-of-scopeへ閉じる
 - sampling procedure used / skippedを一意に閉じられる
 - sampling skippedではcompleteな全体inventoryからselected sample setをmaterializeし、structured / random / Step 4.3をnot-applicableとして閉じる
 - sampling usedではstructured sampleをStep 2探索結果へ追跡できる

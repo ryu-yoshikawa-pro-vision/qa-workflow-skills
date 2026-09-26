@@ -60,6 +60,7 @@ WCAG-EM 2のoutput contractはReport ToolのschemaではなくWCAG-EM 2.0本文�
 - canonical sample identity registry
 - candidate population fingerprint
 - evaluation header
+- Step 1.4 additional evaluation requirement ref / affected step / status / output closure
 - accessibility support baseline
 - exploration
 - sampling procedure used / skipped
@@ -114,6 +115,7 @@ WCAG-EM 2のoutput contractはReport ToolのschemaではなくWCAG-EM 2.0本文�
 
 ### runtime / structure
 
+- additional evaluation requirementsのsemantic inputから `ADDREQ-001` 等を採番し、affected step / output、`applied / blocked / out-of-scope`、required evidence / output refsをmaterializeする。目的内要件のout-of-scopeは禁止
 - random selectionそのものはdeterministic runtimeへ含めず、method / provenance / selected refsを後続Machine Runtime Inputへ渡す
 - PR #11 runtime input / generation fingerprint / static_data_versions / current verifierでfreshnessを管理
 - semantic decisionからfixed machine rowをmaterialize
@@ -287,7 +289,7 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 
 ### semantic
 
-`_05f` Case A〜Zをすべて実Judgeで確認します。
+`_05f` Case A〜ZとCase C2をすべて実Judgeで確認します。
 
 ### real Agent / browser
 
@@ -301,6 +303,7 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 - qa-workflowがmulti-Skill observation handoffを直列オーケストレーション
 - standalone packageがsibling Skill scriptsへruntime依存しない
 - WCAG-EM Step 1〜5 traceability
+- Step 1.4 additional evaluation requirementsをref採番し、目的内要件をaffected step / outputへ反映してappliedまたはblocked、明示目的外だけを理由付きout-of-scopeへ閉じる
 - WCAG-EM 2 output schemaがReport Toolへ依存せず、WCAG-EM 2.0本文を正本としている
 - accessibility support baseline必須
 - WCAG 2.0 / 2.1 / 2.2をsupported versionとし、missing / unresolved、unsupported / out-of-scopeを分離

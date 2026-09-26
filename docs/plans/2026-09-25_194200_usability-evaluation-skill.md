@@ -130,10 +130,11 @@ formalなWCAG conformance evaluationはgeneral inspectionと分離し、`wcag-co
 - browser / assistive technology / environment条件
 - side-effect / cleanup scope
 - project Authority / release gate（存在する場合）
+- Step 1.4 additional evaluation requirements（存在する場合）
 
 **Function**
 
-1. WCAG-EM 2.0 Step 1でscope / target / accessibility support baselineを固定する
+1. WCAG-EM 2.0 Step 1でscope / target / accessibility support baselineを固定し、Step 1.4 additional evaluation requirementsがあればaffected step / outputとclosure条件まで固定する
 2. Step 2でtargetを探索する
 3. Step 3開始時にsampling procedureを使うか、製品全体をselected sample setとしてsamplingをskipするかを確定する
 4. samplingを使う場合だけStep 3.1でstructured sampleを選定する
@@ -152,6 +153,7 @@ formalなWCAG conformance evaluationはgeneral inspectionと分離し、`wcag-co
 
 - evaluation header / revision
 - accessibility support baseline
+- additional evaluation requirement refs / closure（存在する場合）
 - target exploration
 - sampling procedure: used / skipped
 - selected sample set
@@ -386,8 +388,9 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
 60. `wcag-conformance-evaluation` もPR #11のcurrent `runtime_contract.py` / Machine Runtime契約を再利用する。requirement集合導出、sample集合演算、comparison / reconcile、成果物materialize、statement / claim guardをdeterministic runtimeへ載せる。random selectionそのものは同一Input→同一Outputを要求するdeterministic runtimeへ含めず、選択結果を後続runtime Inputとして渡す。
 61. WCAG 2.0 / 2.1 / 2.2の各requirement catalogはversionごとのcanonical JSON SHA-256を `static_data_versions` へ保持する。validatorは選択versionのasset hashを独立再計算し、各catalogをW3C正本と照合した承認済みhashをcontract testで固定する。別versionのSuccess Criteria集合を合成しない。
 62. Step 4.3後の既存sample result再利用は、PR #11のfreshness契約でcurrentと判定できる場合だけ許可する。target WCAG version / level、scope、accessibility support baseline、environment、sample identity、evidence identity、requirement catalog hash、upstream dependencyのいずれかが変わればstaleとして必要なsampleを再評価する。
-63. WCAG-EM Step 5.2 Evaluation Specificsを目的内機能として扱い、安全に保存可能なsample archive ref、再現path / settings / actions、tool / browser / assistive technology / software / methodを記録できるようにする。secret、token、password、storageState値、不要な個人識別情報は保存せず、credentialは非secretなrole / alias / external refだけを保持する。
-64. WCAG-EM Evaluation Statementは通常statementとpartial statementの両方を扱う。ただし現行WCAG-EM 2.0 Step 5.3のminimum fieldがWCAG 2.2を固定指定するため、Step 5.3準拠statementの生成対象はtarget WCAG 2.2だけとする。WCAG 2.0 / 2.1のformal evaluationはStep 5.1 reportまで閉じ、別versionへ読み替えたStep 5.3 statementを作らない。WCAG Conformance ClaimとWCAG Statement of Partial Conformanceは各target versionのWCAG contractに従って生成可能とする。意味上のpartial理由・第三者管理範囲等はsemantic判断とし、必須field、生成可否、claim scope coverageはscript / validatorで閉じる。
-65. WCAG Conformance ClaimのW3C optional componentsも、evidenceが存在する場合に保持できるようにする。必須fieldの代替には使わない。machine-readable claim mirrorは既存Machine Runtimeのnormalized claim objectを再利用し、新しい独自claim標準を作らない。
-66. WCAG-EM Step 5.5を目的内機能として扱い、要求された場合はEARL 1.0 vocabularyを用いたcanonical JSON-LD sidecarをdeterministic scriptで生成する。formal requirement resultからAssertion / subject / test / result / outcome / modeを導出し、未確定modeを推測しない。Step 5.4 aggregated scoreだけは本Planの目的外として生成しない。
-67. formal observation handoffはoriginating evaluation identity / revision、handoff ref、resume operation、expected sample / process / requirement refsをworkflow stateへ保持し、currentかつvalidなreturned result集合が期待集合を満たした場合だけ同じevaluationをresumeする。LLMが「戻り値は揃った」と手判断しない。
+63. Step 1.4 additional evaluation requirementsは任意Inputとして完全対応する。semantic layerは要件の意味と本Skill内のaffected step / outputを判断し、scriptはartifact-local ref、affected step enum、required evidence / output refs、`applied / blocked / out-of-scope` closureをmaterializeする。本Skillの目的内要件をout-of-scopeへ逃がさず、実行不能ならblockedとして残し、無視しない。
+64. WCAG-EM Step 5.2 Evaluation Specificsを目的内機能として扱い、安全に保存可能なsample archive ref、再現path / settings / actions、tool / browser / assistive technology / software / methodを記録できるようにする。secret、token、password、storageState値、不要な個人識別情報は保存せず、credentialは非secretなrole / alias / external refだけを保持する。
+65. WCAG-EM Evaluation Statementは通常statementとpartial statementの両方を扱う。ただし現行WCAG-EM 2.0 Step 5.3のminimum fieldがWCAG 2.2を固定指定するため、Step 5.3準拠statementの生成対象はtarget WCAG 2.2だけとする。WCAG 2.0 / 2.1のformal evaluationはStep 5.1 reportまで閉じ、別versionへ読み替えたStep 5.3 statementを作らない。WCAG Conformance ClaimとWCAG Statement of Partial Conformanceは各target versionのWCAG contractに従って生成可能とする。意味上のpartial理由・第三者管理範囲等はsemantic判断とし、必須field、生成可否、claim scope coverageはscript / validatorで閉じる。
+66. WCAG Conformance ClaimのW3C optional componentsも、evidenceが存在する場合に保持できるようにする。必須fieldの代替には使わない。machine-readable claim mirrorは既存Machine Runtimeのnormalized claim objectを再利用し、新しい独自claim標準を作らない。
+67. WCAG-EM Step 5.5を目的内機能として扱い、要求された場合はEARL 1.0 vocabularyを用いたcanonical JSON-LD sidecarをdeterministic scriptで生成する。formal requirement resultからAssertion / subject / test / result / outcome / modeを導出し、未確定modeを推測しない。Step 5.4 aggregated scoreだけは本Planの目的外として生成しない。
+68. formal observation handoffはoriginating evaluation identity / revision、handoff ref、resume operation、expected sample / process / requirement refsをworkflow stateへ保持し、currentかつvalidなreturned result集合が期待集合を満たした場合だけ同じevaluationをresumeする。LLMが「戻り値は揃った」と手判断しない。

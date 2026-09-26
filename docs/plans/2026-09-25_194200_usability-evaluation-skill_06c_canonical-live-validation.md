@@ -123,6 +123,7 @@ formal request
 - sampling procedure skippedのcase。completeなin-scope inventory全件がselected sample setとなり、structured / random / Step 4.3がnot-applicableでもcomplete process / Step 4.2評価が続くこと
 - 同一URLの異なるstateを別sample、同じstateへの別経路を同一sampleとして扱えること
 - observation結果がPR #11 freshness契約でcurrentな場合だけformal evaluationへ再利用されること
+- Step 1.4 additional evaluation requirementとして「代表sampleに加えてfixtureの特定viewを追加評価し、Step 5.5 reportも出力する」を指定し、`ADDREQ-001` 等のref、sample追加、output closureまで同一evaluationで追跡できること
 - Step 5.1 outcome closure
 - report materialization
 - Step 5.2 Evaluation Specificsを有効化したcaseで、browser / tool metadataとsafe evidence refがreportへ戻ること。secret値は保持しない
@@ -161,7 +162,7 @@ repository implementationの完了条件:
 - repository標準のdeterministic / semantic / routing / Skill validationをPASS
 - WCAG 2.0 / 2.1 / 2.2 requirement catalogのcanonical hash再計算と承認済みhash contract testをdeterministic validationでPASS
 - version切替、unsupported / unresolved / out-of-scope分離、non-finite random selection guard、candidate population変更時のreselection、Step 5.3 Evaluation Statementの2.2-only guard、version別Claim各guard、EARL全mappingはdeterministic / semantic evalでPASS
-- browser E2Eではsampling used / skipped、sample identity、same-population Step 4.3再sampling、freshness付きobservation handoff / resume、safe Evaluation Specifics handoff、EARL assertionとのresult一致をPASS
+- browser E2EではStep 1.4 additional requirementのsample / report反映、sampling used / skipped、sample identity、same-population Step 4.3再sampling、freshness付きobservation handoff / resume、safe Evaluation Specifics handoff、EARL assertionとのresult一致をPASS
 - canonical fixtureで未解決blockedが0
 
 external acceptance:
