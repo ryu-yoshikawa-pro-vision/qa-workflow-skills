@@ -1,0 +1,7 @@
+{
+  "skill": "test-execution",
+  "cases": [
+    {"id": "TEX-OUT-001", "input": "cases/case-001/input.md", "expected": "cases/case-001/expected.json"},
+    {"id": "TEX-OUT-002", "input": "cases/case-002/input.md", "expected": "cases/case-002/expected.json"}
+  ]
+}

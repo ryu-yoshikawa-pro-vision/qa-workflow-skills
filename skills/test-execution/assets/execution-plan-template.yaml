@@ -1,0 +1,16 @@
+test_case_ref: input-001
+source_test_case_id: null
+title: 入力TCの名称
+scenario:
+  given:
+    - 元TCで指定された開始状態
+  when:
+    - step_ref: step-001
+      action: 元TCの操作
+  then:
+    - after_step_ref: step-001
+      expected: 元TCの期待結果
+      observation:
+        - accessibility_tree
+unresolved: []
+cleanup: []

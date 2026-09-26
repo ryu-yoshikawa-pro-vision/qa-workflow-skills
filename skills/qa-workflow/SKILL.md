@@ -46,6 +46,8 @@ runtimeの`can_complete`はオーケストレーションの要約であり、�
 | テスト要求 | `test-requirement-design` |
 | テスト条件 / カバレッジ基準 / カバレッジ項目 | `test-condition-design` |
 | 詳細テストケース / 期待結果の根拠の具体化 | `test-case-design` |
+| 生きたテスト対象のUI情報・ふるまい収集 / 管理 | `test-target-inspection` |
+| AIによる詳細TCの実行・期待結果比較・結果記録 | `test-execution` |
 | カバレッジ / ギャップ | `coverage-analysis` |
 | 独立レビュー / 重大度 | `adversarial-review` |
 | E2E対象・実装可能性・安全条件 | `e2e-test-inspection` |
@@ -56,7 +58,7 @@ runtimeの`can_complete`はオーケストレーションの要約であり、�
 
 ## ランタイム前提
 
-本Skillは、同一のAgentクライアント上で14 Skillすべてが利用可能で、Agentが必要なSkillを追加で読み込み / 利用できる環境を前提とします。これはAgent Skills Specificationが共通Skill-to-Skill APIを保証しているという意味ではありません。
+本Skillは、同一のAgentクライアント上で16 Skillすべてが利用可能で、Agentが必要なSkillを追加で読み込み / 利用できる環境を前提とします。これはAgent Skills Specificationが共通Skill-to-Skill APIを保証しているという意味ではありません。
 
 ## リソース
 

@@ -22,6 +22,8 @@ SKILLS = (
     "e2e-test-execution",
     "e2e-test-result-analysis",
     "e2e-test-reporting",
+    "test-target-inspection",
+    "test-execution",
 )
 
 
@@ -43,7 +45,7 @@ class TriggerDatasetTests(unittest.TestCase):
                     {row["query"] for row in train}.isdisjoint({row["query"] for row in validation})
                 )
                 total += len(train) + len(validation)
-        self.assertEqual(total, 328)
+        self.assertEqual(total, 368)
 
 
 if __name__ == "__main__":

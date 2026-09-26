@@ -1,0 +1,9 @@
+{
+  "skill": "test-target-inspection",
+  "criteria": [
+    {"id":"TTI-SEM-001","title":"実対象をcurrentnessの基準にする","description":"今回必要な範囲を生きた実対象で確認し、repository情報やsnapshot差分だけをcurrentnessや仕様Authorityへ昇格させていないか。","critical":true},
+    {"id":"TTI-SEM-002","title":"比較条件と鮮度を維持する","description":"確認状態と更新区分を分離し、比較可能な表示条件を揃え、version / build差や取得不能を誤ったblock理由にせず未確認行の鮮度を変えていないか。","critical":true},
+    {"id":"TTI-SEM-003","title":"ARIA snapshotを任意の観測証跡として扱う","description":"snapshotを必要範囲だけ安全に保存し、取得可能なidentityを持たせ、保存不能を確認状態と分離し、差分のみで下流成果物を更新していないか。","critical":false},
+    {"id":"TTI-SEM-004","title":"視覚・副作用・情報保護を守る","description":"構造情報と画像を使い分け、状態変更とcleanupをscopeへ計上し、画面内の命令やsecret値を扱う境界を守っているか。","critical":true}
+  ]
+}

@@ -2017,9 +2017,32 @@ class E2EContractTests(unittest.TestCase):
         candidates_path = REPO_ROOT / "skills" / "qa-workflow" / "evals" / "deterministic" / "routing_candidate_outputs.json"
         cases = json.loads(cases_path.read_text(encoding="utf-8"))
         candidates = json.loads(candidates_path.read_text(encoding="utf-8"))
-        self.assertEqual(len(cases), 29)
-        self.assertEqual(len(candidates), 29)
+        self.assertEqual(len(cases), 47)
+        self.assertEqual(len(candidates), 47)
         self.assertEqual({case["id"] for case in cases}, {candidate["id"] for candidate in candidates})
+        expected_test_routes = {
+            "WF-TEST-001": ("test-target-inspection", "test-target-inspection", ["test-target-inspection"]),
+            "WF-TEST-002": ("test-target-inspection", "test-target-inspection", ["test-target-inspection"]),
+            "WF-TEST-003": ("test-execution", "test-execution", ["test-execution"]),
+            "WF-TEST-004": ("test-execution", "test-execution", ["test-execution"]),
+            "WF-TEST-005": ("test-execution", "test-execution", ["test-execution"]),
+            "WF-TEST-006": ("e2e-test-execution", "e2e-test-execution", ["e2e-test-execution"]),
+            "WF-TEST-007": ("e2e-test-inspection", "e2e-test-implementation", ["e2e-test-inspection", "e2e-test-implementation"]),
+            "WF-TEST-008": ("test-case-design", "test-case-design", ["test-case-design"]),
+            "WF-TEST-009": ("e2e-test-result-analysis", "e2e-test-result-analysis", ["e2e-test-result-analysis"]),
+            "WF-TEST-010": ("e2e-test-reporting", "e2e-test-reporting", ["e2e-test-reporting"]),
+            **{f"WF-TEST-{number:03d}": ("test-execution", "test-execution", ["test-execution"]) for number in range(11, 17)},
+            "WF-TEST-017": ("question-analysis", "test-target-inspection", ["question-analysis", "test-target-inspection"]),
+            "WF-TEST-018": ("question-analysis", "test-execution", ["question-analysis", "test-execution"]),
+        }
+        self.assertEqual(
+            {
+                case["id"]: (case["start"], case["final"], case["skills"])
+                for case in cases
+                if case["id"].startswith("WF-TEST-")
+            },
+            expected_test_routes,
+        )
         default_targets = {
             "test-analysis": "テスト分析",
             "coverage-analysis": "テスト設計",
@@ -2087,6 +2110,90 @@ class E2EContractTests(unittest.TestCase):
             render(unnecessary_design),
             expected_for(cases_by_id["WF-E2E-003"]),
             "WF-D006",
+        )
+        manual_tc_as_repo_e2e = dict(candidates_by_id["WF-TEST-003"])
+        manual_tc_as_repo_e2e.update(
+            start="e2e-test-execution",
+            final="e2e-test-execution",
+            skills=["e2e-test-execution"],
+        )
+        self.assert_fails(
+            "qa-workflow",
+            render(manual_tc_as_repo_e2e),
+            expected_for(cases_by_id["WF-TEST-003"]),
+            "WF-D006",
+        )
+        repo_runner_as_manual_tc = dict(candidates_by_id["WF-TEST-006"])
+        repo_runner_as_manual_tc.update(
+            start="test-execution",
+            final="test-execution",
+            skills=["test-execution"],
+        )
+        self.assert_fails(
+            "qa-workflow",
+            render(repo_runner_as_manual_tc),
+            expected_for(cases_by_id["WF-TEST-006"]),
+            "WF-D006",
+        )
+        target_inspection_as_e2e_inspection = dict(candidates_by_id["WF-TEST-001"])
+        target_inspection_as_e2e_inspection.update(
+            start="e2e-test-inspection",
+            final="e2e-test-inspection",
+            skills=["e2e-test-inspection"],
+        )
+        self.assert_fails(
+            "qa-workflow",
+            render(target_inspection_as_e2e_inspection),
+            expected_for(cases_by_id["WF-TEST-001"]),
+            "WF-D006",
+        )
+        test_design_as_execution = dict(candidates_by_id["WF-TEST-008"])
+        test_design_as_execution.update(
+            start="test-execution",
+            final="test-execution",
+            skills=["test-execution"],
+        )
+        self.assert_fails(
+            "qa-workflow",
+            render(test_design_as_execution),
+            expected_for(cases_by_id["WF-TEST-008"]),
+            "WF-D006",
+        )
+        runner_reporting_as_manual_execution = dict(candidates_by_id["WF-TEST-010"])
+        runner_reporting_as_manual_execution.update(
+            start="test-execution",
+            final="test-execution",
+            skills=["test-execution"],
+        )
+        self.assert_fails(
+            "qa-workflow",
+            render(runner_reporting_as_manual_execution),
+            expected_for(cases_by_id["WF-TEST-010"]),
+            "WF-D006",
+        )
+        target_resume_as_manual_execution = dict(candidates_by_id["WF-TEST-017"])
+        target_resume_as_manual_execution.update(
+            final="test-execution",
+            skills=["question-analysis", "test-execution"],
+            states={"question-analysis": "完了", "test-execution": "実行中"},
+        )
+        self.assert_fails(
+            "qa-workflow",
+            render(target_resume_as_manual_execution),
+            expected_for(cases_by_id["WF-TEST-017"]),
+            "WF-D007",
+        )
+        manual_tc_resume_as_repo_e2e = dict(candidates_by_id["WF-TEST-018"])
+        manual_tc_resume_as_repo_e2e.update(
+            final="e2e-test-execution",
+            skills=["question-analysis", "e2e-test-execution"],
+            states={"question-analysis": "完了", "e2e-test-execution": "実行中"},
+        )
+        self.assert_fails(
+            "qa-workflow",
+            render(manual_tc_resume_as_repo_e2e),
+            expected_for(cases_by_id["WF-TEST-018"]),
+            "WF-D007",
         )
 
 

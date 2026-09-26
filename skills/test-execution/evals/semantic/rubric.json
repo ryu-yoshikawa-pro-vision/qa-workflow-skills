@@ -1,0 +1,9 @@
+{
+  "skill": "test-execution",
+  "criteria": [
+    {"id":"TEX-SEM-001","title":"snapshot・参照・再実行追跡","description":"入力snapshotを固定し、test_case_refをsource_test_case_idと分離し、元IDの重複を改名せず、再実行を前回成果物・前回TC参照で追跡するか。","critical":true},
+    {"id":"TEX-SEM-002","title":"実行前YAMLと曖昧さ","description":"元TCの意味と操作順を保つGiven / When / Then YAMLを実操作前に作り、中間期待結果のstep対応を維持し、判定に影響する曖昧さを推測せずunresolvedにするか。","critical":true},
+    {"id":"TEX-SEM-003","title":"Playwrightの順序とUI経路","description":"MCP、CLI、独立した今回run用Libraryコードの順を守り、前段で足りる場合に下位へ移らず、UI操作を別経路で代替しないか。","critical":true},
+    {"id":"TEX-SEM-004","title":"結果・secret・副作用","description":"PASS / FAIL等を実測に基づき判定し、TCを直列実行し、secretを複製せず、副作用・cleanupをscope上限へ正しく計上するか。","critical":true}
+  ]
+}

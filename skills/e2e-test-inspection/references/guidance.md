@@ -10,6 +10,8 @@ TCが存在しない対象では、対象説明・既存test file / title path�
 
 inspectionの主な確認元は`repo`、`実対象`、`ユーザー提供情報`です。未確認事項を確認済みとして補いません。実UI確認が必要な範囲だけURLと操作能力を要求し、repo構造や既存specの確認は可能な範囲で続けます。
 
+currentな`test-target-inspection`成果物があれば、画面名・到達経路・UI要素・実対象で観測した反応の一部を再利用できます。適用範囲・確認条件・確認日時を照合し、repoのPlaywright設定・既存spec・fixture・runner・setup / teardown・安全条件のinspectionを省略しません。必要な実対象行が古い場合はその範囲だけ`test-target-inspection`へ戻します。
+
 implementationへ渡す実装参照は対象repoの既存識別子を優先し、なければrepo-relative test file + Playwright title pathで表します。
 
 ## 安全境界

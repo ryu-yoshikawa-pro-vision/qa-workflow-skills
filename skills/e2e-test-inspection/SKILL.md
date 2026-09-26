@@ -16,6 +16,7 @@ description: Playwright E2Eの実装前に対象repo・workspace・既存E2E・�
 7. Playwright設定は新規設計せず、対象testへ効くconfig / project / file / fixture / hook / setup / teardown / reporter / artifact / cleanupの実効事実を確認します。
 8. branch / commit / working tree、対象URL / origin、実対象確認日時、取得できるversion / build ID、主要事実の確認元と鮮度を成果物へ残します。secret、cookie、token、storageStateの値は記録しません。
 9. 最終出力前に、対象決定を最低1行、各行の識別子・決定根拠・扱いを確認します。既存E2Eとの関係を出力する場合は対象ごとに正規の`扱い`を記録します。実装・実行に影響する事実も最低1行以上で、内容・確認元・影響を空欄にしません。存在を確認できないlocator、fixture、helper、URL、API、データ準備方法を推測しません。
+10. currentな`test-target-inspection`成果物があれば実対象情報の一部を任意に再利用できますが、repo構造・Playwright設定・実効runner契約のinspectionを省略しません。古い範囲だけを`test-target-inspection`で再確認し、E2E全体を不要に再実行しません。
 
 ## 調査範囲
 
