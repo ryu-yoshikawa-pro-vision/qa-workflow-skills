@@ -1,0 +1,2 @@
+# Eval Input
+確定済みTCの再実行を求められた。MCPは利用できず、すでにあるPlaywright CLIは必要なUI操作を表現できる。元TCにはdummy secretが含まれる。プロフィールの変更を検証し、test dataを元に戻すcleanupが同じ副作用scopeを消費する。実行途中にLibraryへ切替が必要と見込まれるが、同じbrowser/sessionを継続できない場合がある。

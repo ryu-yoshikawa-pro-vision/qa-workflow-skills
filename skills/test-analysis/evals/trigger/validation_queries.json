@@ -6,5 +6,17 @@
   {"query":"テストケースを書く前に、何をなぜどの深さで確認するか戦略を決めたいです。","should_trigger":true},
   {"query":"実装変更は小さいですが業務影響が大きそうです。リスク評価とテスト重点をしてください。","should_trigger":true},
   {"query":"この不具合票の重大度をBugのSeverityとして分類してください。","should_trigger":false},
-  {"query":"仕様から最終テストケースまで工程ごとに全部進めてください。","should_trigger":false}
+  {"query":"仕様から最終テストケースまで工程ごとに全部進めてください。","should_trigger":false},
+  {"query":"多変数の線形境界を持つ変更でDomain Testingを選ぶべきか、根拠付きで評価してください。","should_trigger":true},
+  {"query":"登録・更新・削除の整合性リスクがある場合にCRUD Testingを使うべきか判断してください。","should_trigger":true},
+  {"query":"ユーザー行動の頻度差が大きい機能でRandom Testingを採用するか決めてください。","should_trigger":true},
+  {"query":"変換に対する期待関係が仕様で定義されています。Metamorphic Testingの採用を判断してください。","should_trigger":true},
+  {"query":"DSLのproductionとmutation方針があります。Syntax-Based Testingの採用可否を分析してください。","should_trigger":true},
+  {"query":"各domain borderについてReliable Domain Coverageのrequired pointを列挙してください。","should_trigger":false},
+  {"query":"CRUD completenessとconsistencyを分けたCoverage matrixを設計してください。","should_trigger":false},
+  {"query":"固定seedでRandom Testingのケース入力を生成し、完了条件を設定してください。","should_trigger":false},
+  {"query":"Metamorphic relationごとにsourceとfollow-upのペアを設計してください。","should_trigger":false},
+  {"query":"文法のunreachable productionを含めたSyntax-Based Testingのcaseを設計してください。","should_trigger":false},
+  {"query":"Domain、CRUD、Random、Metamorphic、Syntax-Based Testingの違いを一般向けに説明してください。","should_trigger":false},
+  {"query":"過去不具合と今回の変更範囲を踏まえたテストリスクの優先順位を決めてください。","should_trigger":true}
 ]

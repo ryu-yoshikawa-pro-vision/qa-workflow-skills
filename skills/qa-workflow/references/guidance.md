@@ -20,7 +20,7 @@
 
 ## ランタイム前提
 
-全体ワークフローでは次の14 Skillが同一のAgentクライアント上で利用可能であることを前提とします。
+全体ワークフローでは次の16 Skillが同一のAgentクライアント上で利用可能であることを前提とします。
 
 - `qa-workflow`
 - `spec-analysis`
@@ -36,6 +36,8 @@
 - `e2e-test-execution`
 - `e2e-test-result-analysis`
 - `e2e-test-reporting`
+- `test-target-inspection`
+- `test-execution`
 
 Agent Skills Specificationは共通Skill-to-Skill呼び出しAPIを規定しません。本ワークフローは、Agentクライアントが必要なSkillを追加で読み込み / 利用できる実装で動作することを前提とします。
 
@@ -51,6 +53,8 @@ Agent Skills Specificationは共通Skill-to-Skill呼び出しAPIを規定しま�
 | テスト要求粒度 / 上流閉鎖 | `test-requirement-design` |
 | カバレッジ基準 / カバレッジ項目 / テスト技法 | `test-condition-design` |
 | 詳細テストケース / 期待結果の根拠の具体化 | `test-case-design` |
+| 生きたテスト対象のUI情報・ふるまい収集 / 管理 | `test-target-inspection` |
+| AIによる詳細TC実行・期待結果比較・結果記録 | `test-execution` |
 | カバレッジ / 閉鎖性 / ギャップ | `coverage-analysis` |
 | 独立レビュー / 重大度 | `adversarial-review` |
 | E2E対象、repo / 実対象の事実、実装可能性、安全条件 | `e2e-test-inspection` |
@@ -77,6 +81,8 @@ Agent Skills Specificationは共通Skill-to-Skill呼び出しAPIを規定しま�
 - カバレッジ判定が必要 → `coverage-analysis`
 - 重大度付き独立レビューが必要 → `adversarial-review`
 
+currentな画面名称・到達方法・操作可能性・観測可能性が必要なら、必要範囲を`test-target-inspection`で実対象確認してから設計Skillへ戻します。既存のテスト対象資料は補助情報として再利用できますが、資料やrepoだけで今回のcurrentnessを判定せず、実対象の挙動を期待結果の仕様根拠にしません。詳細TCの実操作・比較が要求された場合だけ`test-execution`へ進みます。
+
 ## 成果物チェーン
 
 ```text
@@ -97,7 +103,12 @@ Agent Skills Specificationは共通Skill-to-Skill呼び出しAPIを規定しま�
 
 ## E2E要求時の分岐
 
-全14 Skillを固定順に実行しません。要求成果物と有効な成果物から必要な依存だけを選びます。
+全16 Skillを固定順に実行しません。要求成果物と有効な成果物から必要な依存だけを選びます。
+
+- 生きたテスト対象の情報収集・更新・鮮度確認だけが必要 → `test-target-inspection`
+- 設計前にcurrentな対象情報が必要 → `test-target-inspection` → 必要な設計Skillへ戻る
+- 詳細TCをAIが今回runとして実行・観測 → `test-execution`
+- repoへ残すPlaywright E2Eのinspection / 実装 / 正式runner実行 → 既存の`e2e-test-inspection` / `e2e-test-implementation` / `e2e-test-execution`
 
 - 詳細TCからE2E実装: `e2e-test-inspection` → `e2e-test-implementation` → `adversarial-review`（対象: `E2E実装`） → `coverage-analysis`（対象: `TC → E2E実装`）
 - TCなしの明示E2E対象 / 既存E2E更新: 確認済みinspection情報がなければ `e2e-test-inspection` → `e2e-test-implementation`。E2E対象選定が要求されない限り`test-analysis`を必須にせず、TC生成のためだけに`test-case-design`へ戻さない
@@ -229,11 +240,13 @@ adversarial-review
 - テストケース → `test-case-design`
 - カバレッジ判定自体 → `coverage-analysis`
 - E2E対象選定の価値判断 → `test-analysis`（対象: `E2E対象選定`）
-- E2E対象・repo / 実対象事実 → `e2e-test-inspection`
+- currentな実対象UI情報・テスト対象資料の鮮度 → `test-target-inspection`
+- E2E対象選定後のrepo構造、Playwright設定、実装可能性、安全条件 → `e2e-test-inspection`
 - Playwright E2E実装 → `e2e-test-implementation`
 - E2E実装レビュー → `adversarial-review`（対象: `E2E実装`）
 - TC → E2E実装追跡 → `coverage-analysis`（対象: `TC → E2E実装`）
-- 実行条件、実行不足、状態準備、cleanup → `e2e-test-execution`
+- 詳細TCの今回run条件、preflight、実行不足、TC後処理 / cleanup → `test-execution`
+- 既存repo Playwright E2Eのrunner実行条件、状態準備、cleanup → `e2e-test-execution`
 - E2E実行結果の原因分析 / 証拠不足 → `e2e-test-result-analysis`
 - 確定済み結果の報告 → `e2e-test-reporting`
 

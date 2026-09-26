@@ -1,0 +1,10 @@
+[
+  {"query":"サポート画面の現在の入力欄・状態・送信反応を指定したテスト環境で確認し、資料を更新して","should_trigger":true},
+  {"query":"古い画面メモを実サイトと照らし、見えない項目を権限条件も確かめてから削除確認にしたい","should_trigger":true},
+  {"query":"アカウント画面のUI構造と操作時の非同期更新を実対象で観察して引き継ぎたい","should_trigger":true},
+  {"query":"実環境の表示崩れを画像でも確認し、今回確認した範囲だけ画面資料に記録して","should_trigger":true},
+  {"query":"仕様書を根拠に登録機能の期待結果と受入条件を分析して","should_trigger":false},
+  {"query":"Playwrightの既存テストをrunner設定どおり実行してraw resultを保存して","should_trigger":false},
+  {"query":"ブラウザ操作を含む詳細テストケースをGiven When Thenで作成して","should_trigger":false},
+  {"query":"Playwrightの期待値snapshot更新を実施し、ページオブジェクトも生成して","should_trigger":false}
+]

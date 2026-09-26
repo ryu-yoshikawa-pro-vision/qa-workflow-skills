@@ -19,7 +19,9 @@ skills/
 ├── e2e-test-implementation/
 ├── e2e-test-execution/
 ├── e2e-test-result-analysis/
-└── e2e-test-reporting/
+├── e2e-test-reporting/
+├── test-target-inspection/
+└── test-execution/
 ```
 
 各Skillは`skills/<skill-name>/SKILL.md`を持つ独立Skillです。`qa-workflow`も1 Skillとして扱います。
@@ -40,6 +42,8 @@ skills/
 | `e2e-test-execution` | 実行安全確認、準備、Playwright実行、構造化結果、cleanup |
 | `e2e-test-result-analysis` | 実行事実の原因分析、追加証拠、修正routing |
 | `e2e-test-reporting` | 検証済み実行・分析結果の人間向け報告 |
+| `test-target-inspection` | 生きた実対象のUI情報・ふるまい確認とテスト対象資料管理 |
+| `test-execution` | 詳細TCの今回run、観測・比較、構造化結果とcleanup |
 
 ## テスト分析・設計フロー
 
@@ -99,7 +103,9 @@ flowchart TB
 
 ### E2E要求時の条件分岐
 
-全14 Skillを常に通すわけではありません。要求成果物と有効な既存成果物に応じ、必要な依存だけを実行します。
+全16 Skillを常に通すわけではありません。要求成果物と有効な既存成果物に応じ、必要な依存だけを実行します。
+
+currentな実対象情報の確認が必要な場合だけ`test-target-inspection`を使い、設計前には必要な設計Skillへ戻します。詳細TCをAIが今回runとして実行する要求は`test-execution`へ進めます。repoへ残すPlaywright E2Eのinspection・実装・既存runner実行は既存の`e2e-test-inspection`、`e2e-test-implementation`、`e2e-test-execution`が担当します。
 
 ```text
 詳細TC / 明示E2E対象 / 既存E2E参照
@@ -223,6 +229,7 @@ scripts/skills/evals/
 │   ├── loader.py
 │   ├── markdown_parser.py
 │   ├── common.py
+│   ├── runtime_validator.py
 │   ├── result.py
 │   └── tests/
 └── semantic/
@@ -246,15 +253,23 @@ Skillを利用するだけの場合は`skills/<skill-name>/`のみをコピー�
 
 `evals/`や評価プログラムはAgent Skills Specificationの必須標準機能ではありません。
 
+## 決定論的runtime
+
+runtime対応Skillは、LLMによる意味判断と、再現可能な機械処理を分離します。Skill-localの`runtime_contract.py`とgeneratorはPython 3.11標準ライブラリだけで動作し、stdinの厳格なJSON objectを受け、stdoutへ1つのruntime envelopeを返します。CLI引数・入力ファイル・環境変数による業務入力・外部ネットワーク・タイムアウト制御には依存しません。
+
+Machine Runtime Input / ResultとMachine Entityは、Skill、runtime unit、Model Key、stable ID、input / model / generation / implementation fingerprint、upstream dependency、support / runtime / result / freshness statusを保持します。保存済み結果の再利用は`current`かつfingerprint一致の場合だけ許可し、`stale` / `legacy` / `deleted` / `unsupported`を完全結果へ昇格しません。独立validatorは保存済み入力・Entity・Skill-local sourceから期待値を再計算し、actual出力から期待値を推測しません。
+
+runtimeのためにLLMの意味判断をPythonへ複製せず、unsupported subset、undetermined、semantic coverage不足は理由付き状態として保持します。Skill単体の移植では`skills/<skill-name>/`と、そのSkillに同梱された`scripts/runtime_contract.py`だけでruntimeが成立することを検証します。
+
 ## 評価
 
 ### 発火評価
 
-14 Skillの選択精度を評価します。正規モードは14 Skill同時利用、単独・限定Skillは診断モードです。train / validationは各Skill12 / 8件、positive / negative比率を維持し、合計280 queryです。repo内データセット検証と実Agentクライアント上の実発火評価は別物です。
+16 Skillの選択精度を評価します。正規モードは16 Skill同時利用、単独・限定Skillは診断モードです。`test-analysis` / `test-condition-design`はtrain 24件・validation 20件、その他14 Skillはtrain 12件・validation 8件で、合計368 queryです。repo内データセット検証と実Agentクライアント上の実発火評価は別物です。
 
 ### 決定論的出力評価
 
-14 Skillの正規出力について、ID、参照整合、必須フィールド、リスクマトリクス、成果物閉鎖、Pairwise、レビュー / ワークフロー、E2Eの対象・raw fact・primary / attempt・cleanup不変条件など、意味解釈なしで判定できる契約を評価します。
+16 Skillの正規出力について、ID、参照整合、必須フィールド、リスクマトリクス、成果物閉鎖、Pairwise、レビュー / ワークフロー、E2Eの対象・raw fact・primary / attempt・cleanup不変条件など、意味解釈なしで判定できる契約を評価します。現行deterministic output datasetは32ケース（各Skill 2件）です。
 
 - `known_*`: フィクスチャ側で既知の参照集合。Skill自身が出力内で生成するEntityの扱いは各Skill契約に従う。キー未指定なら対応する参照検査を行わない。
 - `required_*`: 出力に実際に存在しなければならないEntity / 値。
@@ -282,7 +297,7 @@ Agent実行と評価対象出力の生成は決定論的 / 意味評価ランタ
 
 ## qa-workflowのランタイム前提
 
-同一のAgentクライアント上で14 Skillすべてが利用可能で、Agentが必要なSkillを追加で読み込み / 利用できる環境を前提とします。Agent Skills Specificationが共通Skill-to-Skill APIを保証するとは扱いません。
+同一のAgentクライアント上で16 Skillすべてが利用可能で、Agentが必要なSkillを追加で読み込み / 利用できる環境を前提とします。Agent Skills Specificationが共通Skill-to-Skill APIを保証するとは扱いません。
 
 ## 検証
 

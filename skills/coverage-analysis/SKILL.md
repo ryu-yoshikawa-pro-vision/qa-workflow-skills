@@ -19,6 +19,16 @@ description: 現在有効な仕様根拠、プロダクトリスク、テスト�
 10. 他Skillを参照するときは正規Skill名を使用します。
 11. 最終出力前に、実際に利用した入力が本Skillの入力契約を満たし、停止条件に該当する未解決状態がないか確認します。あわせて、生成した成果物へ本Skill自身の出力契約・品質ゲートを適用して自己検証します。明白かつ局所的で新しい領域固有の判断を必要としない契約違反だけを最大1回修正し、修正後は修正箇所を含めて最終確認します。自己検証でカバレッジ基準や他層成果物を再設計せず、責務外問題は既存ルーティングへ戻します。仕様根拠不足、上流判断不足、他Skillの領域固有ロジックが必要な問題は推測補完せず既存の停止条件・ブロック中・ルーティングに従います。最終確認後も本Skill自身の契約違反が残り、既存の停止条件・ブロック中・ルーティングに該当しない場合は2回目の自動修正を行わず、その成果物を契約適合済み・完成済みとして扱わず、現在残る契約上の制約だけを明示します。自己検証の経緯や修正回数は出力しません。
 
+## 決定論的runtime dispatch
+
+`traceability`は、正規化されたcanonical scopeから、期待されるruntime unitと派生対象を決めます。callerがexpected root、stable ID、fingerprintを注入してはいけません。runtime結果、Machine Entity、target mapping、coverage item、test caseの各層を、同じModel Key・generation fingerprint・freshnessで比較します。
+
+`current`だけを有効な証拠として扱い、`stale` / `legacy` / `deleted` / `unknown`は未閉鎖または要再検証へ分類します。件数、リンク数、`can_complete`だけで閉鎖済みと判定せず、semantic coverage itemと期待根拠が揃わない場合は完全カバレッジへ昇格しません。
+
+### 最終runtime evidence gate
+
+最終成果物の直前にSkill-local `scripts/runtime_contract.py`の`operation=verify_runtime_evidence`へ、実際に使用したcanonical normalized inputとcandidate成果物全文を渡し、`partial_rerun=false`かつ`previous_artifact_markdown=null`に固定します。coverage-analysisは自Skill Entityをcarry-forwardしません。各`analysis_scopes[]`には担当Skill verifierの`valid=true`で返った`current_structure_state`を変更せず転記し、`runtime_results[]`や`carry_forward_entities[]`を組み立てません。`valid=false`なら既存の最大1回の局所修正・最終確認契約へ統合し、未解決なら完成扱いしません。
+
 ## インターフェース
 
 - **入力**: 部分実行では比較対象となる成果物と期待する上流 / 下流関係またはカバレッジ基準。全体ワークフローでは対象範囲の現在有効な仕様根拠からテストケースまでの利用可能な成果物、カバレッジ基準、扱いの情報。

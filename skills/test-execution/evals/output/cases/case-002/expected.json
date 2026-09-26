@@ -1,0 +1,8 @@
+{
+  "source_identity_present": true,
+  "expected_snapshot_method": "入力元identity",
+  "expected_refs": ["input-001"],
+  "expected_previous_artifact": "execution-v1",
+  "expected_previous_refs": {"input-001":"input-001"},
+  "forbidden_output_values": ["SAMPLE-SECRET-9218"]
+}

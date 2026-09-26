@@ -1,0 +1,2 @@
+# Eval Input
+入力元identityのない2件の詳細TCを入力順で実行する。正式source_test_case_idは同じ値だが、今回対象は2件とも入力順で特定できる。1件目に中間期待結果があり、その観測タイミングは元TCで明示されていないため、PASS/FAILに影響するならunresolvedとする。Playwright MCPは必要な操作と観測を提供できる。

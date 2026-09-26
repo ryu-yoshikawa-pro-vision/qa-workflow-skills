@@ -1,0 +1,14 @@
+[
+  {"query":"実際に現在の注文画面をブラウザで確認し、表示要素と操作後の遷移をテスト対象資料にまとめて","should_trigger":true},
+  {"query":"前回保存した画面資料が今も正しいか、指定環境へ接続して今回対象範囲を照合してほしい","should_trigger":true},
+  {"query":"管理画面の一覧で検索条件を変えたときのローディングと空状態を実画面で調べて記録したい","should_trigger":true},
+  {"query":"DOMだけでは分からないモーダルの重なりと文字切れをスクリーンショットで確認して資料化して","should_trigger":true},
+  {"query":"必要な領域のPlaywright ARIA snapshotを安全に保存できる場合だけ前回証跡と比較したい","should_trigger":true},
+  {"query":"ロールとfeature flagを揃えて、実対象で消えたボタンが本当に削除されたか確認して","should_trigger":true},
+  {"query":"注文画面のPage Objectを作ってlocatorとhelperを実装して","should_trigger":false},
+  {"query":"Playwright E2Eを実装する前にrepoのfixtureとlocator方針を調査して","should_trigger":false},
+  {"query":"仕様書の優先順位を整理し、現在有効な期待結果のAuthorityを確定して","should_trigger":false},
+  {"query":"決済の境界値ケースと期待結果を設計してテストケース表を作って","should_trigger":false},
+  {"query":"ログインの詳細TCをブラウザ上で実行しPASSかFAILか報告して","should_trigger":false},
+  {"query":"ARIA snapshotをtoMatchAriaSnapshotの期待値としてE2Eへ追加して更新して","should_trigger":false}
+]
