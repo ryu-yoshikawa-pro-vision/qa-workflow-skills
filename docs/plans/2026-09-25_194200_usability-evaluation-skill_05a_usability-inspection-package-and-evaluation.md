@@ -167,6 +167,8 @@ methodology sourceを追加する場合は、
 - Activity ref / revision
 - target
 - user / role
+- prior knowledge / experience assumptions
+- prior knowledge / experience assumption source / evidence refs
 - user goal
 - user goal source / evidence refs
 - goal state: confirmed / inferred / unknown
@@ -184,6 +186,8 @@ methodology sourceを追加する場合は、
 
 ### task result
 
+- primary outcome fixed before diagnosis: true / false
+- primary outcome fixed_at
 - task outcome: 達成 / 未達成 / 判定不能 / 未実行
 - outcome basis: success-observed / product-blocker-observed / agent-tool-limitation / environment-external / unresolved / not-started
 
@@ -275,6 +279,21 @@ PR #13のObservation契約へ接続できる形で、
 
 を保持します。
 
+### post-task diagnosis
+
+primary task outcome固定後にdiagnosisを実施した場合だけ保持します。
+
+- diagnosis ref
+- method: cognitive-walkthrough / evaluation-requested-observation
+- intended flow source refs（Cognitive Walkthroughの場合）
+- diagnostic evidence refs
+- related primary action refs
+- note
+
+Cognitive Walkthroughでは、intended flowをcurrentなspecification、user flow、検証済みTC等から確認できる場合だけ使います。正しいstep sequenceを推測で作りません。
+
+post-task diagnosisはprimary task outcome / primary action traceを書き換えません。
+
 ### UI / UX evaluation
 
 `usability-evaluation` を実行した場合、
@@ -285,6 +304,8 @@ PR #13のObservation契約へ接続できる形で、
 を保持します。
 
 評価結果自体をusability-inspection側へ複製しません。
+
+usability-evaluationからの追加観測はpost-task diagnosisとして記録し、primary task outcomeを変更しません。
 
 ### Finding
 
@@ -317,6 +338,10 @@ follow-upが必要なObservation / evaluationだけ、PR #13のFinding契約で�
 - threshold-not-definedで任意のFAIL判定を持たない
 - source test case PASS / FAIL欄を持たない
 - user goal sourceとgoal state（confirmed / inferred / unknown）がある
+- prior knowledge / experience assumptionsとそのsource / evidence refsがある。不明ならunknownとして表現できる
+- primary outcome fixed before diagnosis=trueでないActivityにpost-task diagnosis / usability-evaluation refを持たせない
+- Cognitive Walkthrough diagnosisがある場合はintended flow source refsがあり、primary outcome固定後の診断として記録される
+- evaluation-requested-observationがある場合はpost-task diagnosisとして記録される
 - evaluation refがある場合はusability-evaluation artifactへ解決する
 - Finding refがある場合はFindingが存在する
 - cleanup / residual state contract
@@ -384,7 +409,11 @@ task達成に決済・削除等が必要だが許可scope外。
 
 ### Case K: usability-evaluation連携
 
-task evidenceをusability-evaluationへ渡し、pattern / standardによる判断をinspection側で独自複製しないこと。
+primary task中にusability-evaluationを割り込ませず、task outcome / primary action traceを固定してからevidenceを渡すこと。
+
+pattern / standardによる判断をinspection側で独自複製しないこと。
+
+usability-evaluationから追加観測requestが返ってもpost-task diagnosisとして扱い、primary task outcomeを書き換えないこと。
 
 ### Case L: human claims
 
@@ -413,6 +442,26 @@ product側のdiscoverability defectへ昇格せず、Agent / tool limitationま�
 ### Case Q: native app
 
 native iOS / Android appの実機操作を要求された場合、初版のPlaywright Web live scopeで対応可能と偽らないこと。静的資料のUI / UX評価が可能ならusability-evaluationへroutingできること。
+
+### Case R: prior knowledge
+
+同じtaskでも「製品初回利用・一般的なWeb UI経験あり」と「製品熟練利用者」でdiscoverabilityの期待が異なるcase。
+
+user / roleだけから経験レベルを推測せず、prior knowledge / experience assumptionsとその根拠をtask snapshotへ固定すること。
+
+### Case S: post-task Cognitive Walkthrough
+
+primary runではTC stepを見ずにuser-facing情報だけでtaskを実行してoutcomeを固定する。
+
+その後、current specification / user flow / validated TCからintended flowを確認できる場合だけCognitive Walkthroughを実施し、各stepのgoal / action visibility / mapping / execution / feedbackを診断すること。
+
+walkthrough結果でprimary outcomeを書き換えないこと。
+
+### Case T: no authoritative flow
+
+primary run後にCognitive Walkthroughを行いたいが、currentなuser flow / specification / validated TCを確認できない。
+
+正しいstep sequenceを創作せずwalkthroughを省略し、利用できるevidenceだけをusability-evaluationへ渡すこと。
 
 ## 8. trigger eval
 
