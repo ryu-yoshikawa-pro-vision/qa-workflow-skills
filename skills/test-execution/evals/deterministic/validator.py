@@ -13,7 +13,8 @@ RESULT_STATES = {"PASS", "FAIL", "未実行", "判定不能"}
 START_STATES = {"未開始", "開始済み"}
 CLEANUP_STATES = {"成功", "失敗", "未確認", "対象なし", "意図的に残した状態", "一部失敗"}
 EXECUTION_METHODS = {"Playwright MCP", "Playwright CLI", "独立した今回run用Playwright Libraryコード", "未実行"}
-NONE = {"", "なし", "対象なし", "-", "—", "N/A", "n/a", "null"}
+NONE = {"", "なし", "-", "—", "N/A", "n/a", "null"}
+TC_CLEANUP_NONE = NONE | {"対象なし"}
 
 
 def _value(row: dict[str, str], field: str) -> str:
@@ -320,17 +321,22 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
         claimed_cleanup = _value(precondition, "TC事後状態 / 後処理") if precondition else ""
         recorded_post_rows = post_rows_by_ref.get(ref, [])
         if tc_cleanup:
-            if not any(_nonempty(_value(row, "事後状態 / 後処理")) for row in recorded_post_rows):
+            if claimed_cleanup in TC_CLEANUP_NONE:
+                side_issues.append({"ref": ref, "issue": "YAML cleanupに対する実行前条件のTC事後処理記録がない"})
+            if not any(
+                _value(row, "事後状態 / 後処理") not in TC_CLEANUP_NONE
+                for row in recorded_post_rows
+            ):
                 side_issues.append({"ref": ref, "issue": "YAML cleanupに対応するTC事後状態・後処理の記録がない"})
         else:
-            if _nonempty(claimed_cleanup):
+            if claimed_cleanup not in TC_CLEANUP_NONE:
                 side_issues.append({"ref": ref, "issue": "空のYAML cleanupと実行前条件のTC事後処理記録が矛盾"})
             for row in recorded_post_rows:
                 post_values = {
                     field: _value(row, field)
                     for field in ("事後状態 / 後処理", "実施結果", "残存状態")
                 }
-                if any(_nonempty(value) for value in post_values.values()):
+                if any(value not in TC_CLEANUP_NONE for value in post_values.values()):
                     side_issues.append(
                         {
                             "ref": ref,

@@ -161,6 +161,41 @@ class NewSkillDeterministicContractTests(unittest.TestCase):
         self.assertEqual(len(freshness.evidence), 1)
         self.assertEqual(freshness.evidence[0]["key"], '["視覚情報", "target-001", "state-001", "行の重なり"]')
 
+    def test_unconfirmed_behavior_rows_include_start_state_in_freshness_identity(self):
+        validate = load_validator("test-target-inspection")
+        text, expected = eval_case("test-target-inspection", "TTI-OUT-001")
+        behavior_a = "| target-001 | element-001 | 履歴表示 | 注文番号リンクを開く | 注文詳細へ遷移 | 注文詳細表示 | 確認済み | test-order-42、閲覧者 | build-23 | 2026-09-26T09:00:00+09:00 |"
+        old_behavior_a = behavior_a.replace("| 確認済み | test-order-42、閲覧者 | build-23 | 2026-09-26T09:00:00+09:00 |", "| 未確認 | test-order-42、閲覧者 | build-22 | 2026-09-25T09:00:00+09:00 |", 1)
+        old_behavior_b = old_behavior_a.replace("| 履歴表示 |", "| 注文一覧 |", 1).replace(
+            "| test-order-42、閲覧者 | build-22 | 2026-09-25T09:00:00+09:00 |",
+            "| test-order-41、閲覧者 | build-21 | 2026-09-24T09:00:00+09:00 |",
+            1,
+        )
+        prepared = text.replace(behavior_a, old_behavior_a, 1).replace(
+            old_behavior_a, old_behavior_a + "\n" + old_behavior_b, 1
+        )
+        key_a = '["操作・ふるまい", "target-001", "element-001", "履歴表示", "注文番号リンクを開く"]'
+        key_b = '["操作・ふるまい", "target-001", "element-001", "注文一覧", "注文番号リンクを開く"]'
+        expected["unconfirmed_facts"] = {
+            key_a: {
+                "確認条件": "test-order-42、閲覧者",
+                "確認version / build": "build-22",
+                "確認日時": "2026-09-25T09:00:00+09:00",
+            },
+            key_b: {
+                "確認条件": "test-order-41、閲覧者",
+                "確認version / build": "build-21",
+                "確認日時": "2026-09-24T09:00:00+09:00",
+            },
+        }
+        refreshed_behavior_a = old_behavior_a.replace("| build-22 |", "| build-23 |", 1)
+        broken = prepared.replace(old_behavior_a, refreshed_behavior_a, 1)
+        result = validate(broken, expected, "TTI-OUT-001")
+        freshness = next(item for item in result.assertions if item.id == "TTI-D007")
+        self.assertEqual(freshness.status, "fail")
+        self.assertEqual(len(freshness.evidence), 1)
+        self.assertEqual(freshness.evidence[0]["key"], key_a)
+
     def test_new_target_artifact_rejects_update_records(self):
         validate = load_validator("test-target-inspection")
         text, expected = eval_case("test-target-inspection", "TTI-OUT-001")
@@ -218,6 +253,18 @@ class NewSkillDeterministicContractTests(unittest.TestCase):
             with self.subTest(eval_id=eval_id):
                 text, expected = eval_case("test-execution", eval_id)
                 self.assertEqual(validate(text, expected, eval_id).status, "pass")
+
+    def test_test_execution_treats_target_none_as_a_value_outside_tc_cleanup(self):
+        validate = load_validator("test-execution")
+        text, expected = eval_case("test-execution", "TEX-OUT-001")
+        row = "| input-001 | 開始済み | PASS | 注文番号42が表示 | 注文番号42を観測 | accessibility treeで確認 | observation:input-001 |"
+        updated = text.replace(
+            row,
+            "| input-001 | 開始済み | PASS | 対象なし | 対象なし | accessibility treeで確認 | observation:input-001 |",
+            1,
+        )
+        result = validate(updated, expected, "TEX-OUT-001")
+        self.assertEqual(next(item.status for item in result.assertions if item.id == "TEX-D008"), "pass")
 
     def test_test_execution_detects_secret_leak(self):
         validate = load_validator("test-execution")
@@ -345,6 +392,16 @@ class NewSkillDeterministicContractTests(unittest.TestCase):
         declared_cleanup = declared_cleanup.replace(no_tc_cleanup_row, post_row, 1)
         result = validate(declared_cleanup, expected, "TEX-OUT-002")
         self.assertEqual(next(item.status for item in result.assertions if item.id == "TEX-D011"), "pass")
+
+        for absent_value in ("なし", "対象なし"):
+            with self.subTest(absent_precondition=absent_value):
+                missing_precondition_cleanup = declared_cleanup.replace(
+                    "| input-001 | profile-update | 元TCで定義された事後状態を確認する |",
+                    f"| input-001 | profile-update | {absent_value} |",
+                    1,
+                )
+                result = validate(missing_precondition_cleanup, expected, "TEX-OUT-002")
+                self.assertEqual(next(item.status for item in result.assertions if item.id == "TEX-D011"), "fail")
 
     def test_test_execution_rejects_scope_limit_overrun(self):
         validate = load_validator("test-execution")
