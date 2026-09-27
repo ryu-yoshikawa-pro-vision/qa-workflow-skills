@@ -38,8 +38,10 @@
 
 次をすべて確認し、`references/source-catalog.md` へcanonical URL / status / checked_atを記録します。
 
-- WCAG 2.2 / Understanding
+- WCAG 2.0 / 2.1 / 2.2 / applicable Understanding
 - WAI-ARIA 1.2 / current ARIA in HTML
+- Accessible Name and Description Computation 1.1。1.2を利用する場合はcurrent Working Draft statusも記録
+- HTML Accessibility API Mappings 1.0を利用する場合はcurrent Working Draft / mapping sourceとして記録し、author requirementへ昇格しない
 - ACT Rules Format 1.1 / All ACT Rules
 - ISO 9241-110 interaction principles
 - Cognitive Walkthroughの原著または手順・出典を追跡できる公開methodology
@@ -431,7 +433,10 @@ repository標準件数に合わせます。
 - Agent Skills仕様を満たす
 - task / user personaなしでもlive Web UIを検査できる
 - inspection scopeを固定し、選定観点をclosureできる
-- fixed scope row、required observation field集合、scope / observation / measurement / test rule / requirement / action ref採番、Finding作成要否、cross-reference、machine-owned section materializeを `inspection_structure.py` へ一元化し、数値計算・threshold比較をdeterministic runtimeへ移している
+- general / scoped / formal-handoffのscope row、scope / observation / measurement / test rule / requirement / action ref採番、Finding作成要否、cross-reference、machine-owned section materializeを `inspection_structure.py` へ一元化している
+- selected rule / measurement / scopeからfixed probe request集合を `observation_contract.py` が導出し、probe ref / fixed payload / result schema / unit / capability / statusをmaterialize・検証している
+- browser raw resultのgeometry / responsive boundary / timing等をAgentが手計算せず、`observation_contract.py` と `measurement.py` のdeterministic処理へ移している
+- interaction timingはsame-page clockとfixed predicate vocabularyを使い、arbitrary JavaScript predicateや自然言語のready stateだけで測定しない
 - runtime generatorとdeterministic validatorを別実装にしている
 - objective observationとexpert evaluationを分離する
 - applicable standard / binding requirementをcriterion単位で判定できる
@@ -483,7 +488,8 @@ repository標準件数に合わせます。
 ### coverage完了条件
 
 - `_05c_usability-inspection-coverage.md` のWeb / responsive / touch / mobile / discoverability契約を閉じる
-- `_05d_accessibility-requirements-and-act.md` のgeneral accessibility / ARIA / supported ACT契約を閉じる
+- `_05g_usability-inspection-browser-observation-contract.md` のscope mode / fixed probe / responsive boundary / interaction timing / unavailable status契約を閉じる
+- `_05d_accessibility-requirements-and-act.md` のgeneral accessibility / ARIA / AccName source boundary / supported ACT契約を閉じる
 - formal WCAG conformanceは `_06b_wcag-conformance-evaluation-implementation-order.md` 側で閉じる
 - supported ACT RuleはACT Rules Format 1.1 §4.14.1 consistency fixtureをPASS
 - `_05e_performance-measurement.md` のdirect measurement / external Core Web Vitals source境界を閉じる

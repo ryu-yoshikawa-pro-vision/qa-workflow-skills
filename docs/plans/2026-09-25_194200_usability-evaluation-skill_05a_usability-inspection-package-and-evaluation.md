@@ -62,11 +62,11 @@ SKILL.mdにはUI pattern知識を複製しません。
 14. 決定論的runtimeとの境界
 15. 完了条件
 
-UI pattern、heuristic、Design System、WCAG等の詳細knowledgeは `usability-evaluation` のreferenceを正本とします。
+UI pattern、heuristic、Design System等のadvisory knowledgeは `usability-evaluation` のreferenceを正本とします。`usability-inspection` がstrict requirement checkで直接使うWCAG / WAI-ARIA / ARIA in HTML / AccName / ACT等のsourceはinspection package自身の `references/source-catalog.md` から辿れるようにし、詳細契約は `_05d_accessibility-requirements-and-act.md` を正本とします。
 
 ## 3. methodology / reference
 
-usability-inspection packageのreferenceは、実対象の検査・測定・Playwright上の観測方法に限定します。
+usability-inspection packageのreferenceは、実対象の検査・測定・Playwright上の観測方法と、本Skillがstrict requirement checkを実施するために直接必要なnormative / mapping sourceへ限定します。UI pattern / heuristic /第三者Design Systemのadvisory corpusは複製しません。
 
 ### accessibility
 
