@@ -311,16 +311,38 @@ sampling skippedではselected sample refsをcompleteなin-scope inventoryから
 
 URLだけでdynamic state / process sampleを識別できない場合は、必要なstate / action / locatorを保持します。
 
+### Criterion Evaluation Plan
+
+`_05h_wcag-criterion-evaluation-contract.md` のcanonical outputを保存します。
+
+各row:
+
+- criterion evaluation ref
+- sample ref
+- variation ref
+- process ref（存在する場合）
+- criterion ref
+- procedure execution refs
+- applicable population: `present / none / unknown`
+- execution status: `pending / in-progress / complete / blocked`
+- result: `satisfied / not-satisfied / undetermined / null`
+- observation / measurement / ACT / semantic / manual / AT / external evidence refs
+- limitation / blocker
+
+このsectionは `wcag_criterion_plan.py` のmachine-owned outputです。Agentが別のSuccess Criterion result一覧を手作成しません。
+
 ### Sample Evaluation Results
 
 各row:
 
 - sample result ref
 - sample ref
+- variation ref
 - sample kind
 - process ref（存在する場合）
 - requirement ref
 - Success Criterion / conformance requirement
+- criterion evaluation ref（Success Criterion rowでは必須）
 - result: satisfied / not-satisfied / undetermined
 - observation / test rule result refs
 - evidence refs
@@ -328,7 +350,9 @@ URLだけでdynamic state / process sampleを識別できない場合は、必�
 - reused result ref / unchanged-content evidence（Step 4.2でcurrent resultを再利用した場合）
 - limitation
 
-Conforming Alternate Versionを使う場合、alternate versionを別sample rowとして数えません。同じfull page resultへalternate version refsを紐付け、target level、same information / functionality / human language、currentness、reachability alternativeの各condition resultを保持します。Non-Interferenceはtarget version catalogの固定Success Criteria refsからscriptがrequired result refsを生成します。
+Success Criterion rowはcurrentな `criterion_evaluation_ref` の `execution_status=complete` / resultからだけscriptがmaterializeします。Conformance requirement rowはcurrent Success Criterion result集合とversioned conformance requirement metadataから導出します。
+
+Conforming Alternate Versionを使う場合、alternate versionを別sample rowとして数えません。同じfull page resultへalternate version refsを紐付け、target level、same information / functionality / human language、currentness、reachability alternativeの各condition resultを保持します。Full Pagesはsampleのrequired variation集合すべてがtarget levelへ閉じている場合だけsatisfiedにできます。Non-Interferenceはtarget version catalogの固定Success Criteria refsからscriptがrequired result refsを生成します。
 
 ### Structured / Random Comparison
 
@@ -836,10 +860,11 @@ Input:
 - structured sample selection decisions
 - finite inventory / recorded random selection provenance
 - process semantic definitions
+- presentation variation semantic decisions / Authority / responsive boundary inventory
 - observation handoff semantic requirements
 - qa-workflow handoff closure result / `may_resume` / current returned result refs（`_04c` のdeterministic helper出力）
 - returned inspection artifact / evidence refs
-- sample requirement result decisions / evidence
+- `wcag_criterion_plan.py` のcurrent criterion evaluation plan / procedure execution result
 - Conforming Alternate Version semantic decisions: same information / functionality / human language / currentness
 - Step 4.2 changed / unchanged content semantic identity decisions（machine identityだけで確定できない場合）
 - content type / Finding grouping decisions
@@ -863,6 +888,7 @@ Function:
   - additional evaluation requirement: `ADDREQ-001`
   - accessibility support baseline: `BASELINE-001`
   - exploration: `EXPLORE-001`
+  - presentation variation: `VAR-001`
   - observation handoff: `HANDOFF-001`
 - draft key → final ref解決
 - cross-reference解決
@@ -874,7 +900,8 @@ Function:
 - sampling procedure used / skippedとselected sample set closure
 - sampling skippedではcomplete inventory → selected sample set traceabilityとstructured / random / Step 4.3 not-applicable closure
 - sampling usedではexploration → structured sample traceability
-- observation handoffごとにoriginating evaluation / revision / resume operation / expected observation refsをmaterializeする
+- selected sampleごとにrequired presentation variation registryをmaterializeし、Full Pages variation coverageを閉じる。unknown / unreachable variationをsuccess扱いしない
+- observation handoffごとにoriginating evaluation / revision / resume operation / sample / variation / expected observation refsをmaterializeする
 - workflow stateへの永続化・returned result集合のcurrentness / supersedes / CAS closureは `_04c` のqa-workflow helperを正本とし、`wcag_em_structure.py` はその `may_resume` / current returned refsだけを受け取る
 - `may_resume=false`、origin stale、handoff blockedのいずれかではformal aggregationへ進めない
 - complete process sequence closure
@@ -882,7 +909,9 @@ Function:
 - Conforming Alternate Versionを別sampleへ数えずfull page resultへcondition rowsをmaterializeする
 - Non-Interference fixed Success Criteria refsをtarget version catalogからmaterializeする
 - Step 4.2でcurrent unchanged resultのreuse eligibilityをmachine evidence / freshnessからmaterializeし、変化または不明なcontentを再評価対象へ送る
+- `wcag_criterion_plan.py` のrequired criterion × variation coverage、execution status / result closureを正本としてSuccess Criterion sample resultをmaterializeし、LLM supplied result listを受け付けない
 - target levelから独立導出したrequired sample result coverage
+- Full Pages requirementはrequired variation集合の全current Success Criterion / target level resultからmaterializeする
 - Step 4.3集合差分からiteration action / chain closureをmaterialize
 - structured revision更新時のcandidate population fingerprint再計算、population同一時のold random retention / overlap removal / top-up、population変更時のreselection、process再materializeを反映
 - sample result freshnessをPR #11 current verifier結果から反映し、stale resultをclosureへ数えない
