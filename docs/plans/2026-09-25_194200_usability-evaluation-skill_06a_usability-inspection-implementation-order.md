@@ -154,7 +154,7 @@ task / flow未指定caseでも成果物が成立することを確認します�
 
 ## 7. Step 5: browser observation contract
 
-current mainへmerge済みのPR #12 browser実行基盤を再利用します。request / fixed probe / result normalizationは `_05g_usability-inspection-browser-observation-contract.md` を正本とします。
+current mainへmerge済みのPR #12 browser実行基盤を再利用します。semantic追加観測のrequest / fixed probe / result normalizationは `_05g_usability-inspection-browser-observation-contract.md`、formal WCAG machine request / fixed dispatchは `_05j_wcag-machine-browser-observation-contract.md` を正本とします。
 
 今回のlive実行対象は既存Playwright経路で到達可能なWeb UIに限定します。
 
@@ -176,7 +176,7 @@ current mainへmerge済みのPR #12 browser実行基盤を再利用します。r
 - focus
 - explicit scroll
 - resize
-- responsive boundary probe。general modeではcompleteなboundary inventoryが1件以上あればbefore / boundary / afterを全件実行し、boundary 0件はnot-applicable、inventory incompleteは別Authorityで閉じない限り判定不能
+- responsive condition / boundary probe。general modeではcondition inventoryを閉じ、size conditionのnumeric transitionはbefore / transition / afterを実行する。style / scroll-state queryは数値boundaryへ変換せずpresentation variationとして扱い、inventory incomplete / not-executableは別Authorityで閉じない限り判定不能
 - CSSOM responsive処理は `_05g` のcondition inventoryを使い、既知の標準構文をPlan都合のsupported subsetへ切らない。media / container size conditionはbrowser自身のquery評価を正本にし、`px / em / rem / viewport-relative / container-relative / calc()` 等を文字列parserで拒否せず、実際のmatch transitionからCSS px boundaryをmaterializeする。style / scroll-state queryは数値boundaryへ変換せずpresentation variation conditionとしてclosureする。browser capability不足は `unsupported`、安全にstateを作れない場合は `not-executable / incomplete`
 - boundary detectionとexecution feasibilityを分離し、container / compound query等でrequired stateを安全に実現できない場合は `not-executable / incomplete` とする
 - cross-origin等でread不能sourceがある場合の `incomplete` closure
@@ -459,7 +459,7 @@ repository標準件数に合わせます。
 - inspection scopeを固定し、選定観点をclosureできる
 - general / scoped / formal-handoffのscope row、scope / observation / measurement / test rule / requirement / action ref採番、Finding作成要否、cross-reference、machine-owned section materializeを `inspection_structure.py` へ一元化している
 - selected rule / measurement / scopeからfixed probe request集合を `observation_contract.py` が導出し、probe ref / fixed payload / result schema / unit / capability / statusをmaterialize・検証している
-- browser raw resultのgeometry / responsive boundary / timing等をAgentが手計算せず、`observation_contract.py` と `measurement.py` のdeterministic処理へ移している
+- browser raw resultのgeometry / responsive condition・boundary / timing等をAgentが手計算せず、`observation_contract.py` と `measurement.py` のdeterministic処理へ移している
 - interaction timingはsame-page clockとfixed predicate vocabularyを使い、arbitrary JavaScript predicateや自然言語のready stateだけで測定しない
 - runtime generatorとdeterministic validatorを別実装にしている
 - objective observationとexpert evaluationを分離する
@@ -512,7 +512,7 @@ repository標準件数に合わせます。
 ### coverage完了条件
 
 - `_05c_usability-inspection-coverage.md` のWeb / responsive / touch / mobile / discoverability契約を閉じる
-- `_05g_usability-inspection-browser-observation-contract.md` のscope mode / fixed probe / responsive boundary / interaction timing / unavailable status契約を閉じる
+- `_05g_usability-inspection-browser-observation-contract.md` のscope mode / semantic fixed probe / responsive condition・boundary / interaction timing / unavailable statusと、`_05j` のformal WCAG machine probe typed request / local fixed dispatch契約を閉じる
 - `_05d_accessibility-requirements-and-act.md` のgeneral accessibility / ARIA / AccName source boundary / supported ACT契約を閉じる
 - formal WCAG conformanceは `_06b_wcag-conformance-evaluation-implementation-order.md` 側で閉じる
 - supported ACT RuleはACT Rules Format 1.1 §4.14.1 consistency fixtureをPASS
