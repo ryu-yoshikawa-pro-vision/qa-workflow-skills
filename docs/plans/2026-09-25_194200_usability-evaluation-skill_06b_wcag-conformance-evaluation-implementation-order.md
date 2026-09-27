@@ -10,7 +10,7 @@
 - PR #12はmainへmerge済みでcurrent実装を確認済み
 - PR #13 main merge済み
 - usability-inspectionのgeneral accessibility / `_05g` browser observation request / probe contract成立
-- `_04c` formal observation handoff state / CAS contractをPR #13 merge後current qa-workflowへ適用可能なことを確認。production local filesystemはconditional writeを提供しない事実を維持し、canonical E2E用test-only SQLite providerをproduction能力と混同しない
+- 実装開始前にbranchをcurrent main `dec3f7c764db2869dc24eb3d6f154712a6677068` 以降へ同期し、PR #15反映後のqa-workflow template / guidance / deterministic contractを再確認する。`workflow-state-template.md` のenvelope同期は既にmainで完了しているため再実装しない。`_04c` formal observation handoff state / CAS contractをそのcurrent qa-workflowへ適用し、production local filesystemはconditional writeを提供しない事実を維持し、canonical E2E用test-only SQLite providerをproduction能力と混同しない
 - WCAG-EM 2.0 / WCAG 2.0 / 2.1 / 2.2 current official source確認
 - repository標準eval / CI確認
 
