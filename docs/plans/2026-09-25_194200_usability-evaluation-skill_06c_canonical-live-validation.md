@@ -140,8 +140,9 @@ formal request
 - formal procedure catalogの全machine procedure → machine probe mapping / typed request schema / capabilityが確定していること
 - repository-level contract testでformal required machine probe key集合とinspection `wcag-machine-probe-catalog.json` のmissing / extra / unusedが0件
 - formal machine probeを処理したinspection runtimeが `static_data_versions.wcag_machine_probes` を保持し、formal consumerがその `runtime_unit_key / generation_fingerprint` を `metadata.upstream_runtime_units` へexactly-onceで保持すること。inspection generation変更 / missing dependencyでformal resultがstaleになり、formal `static_data_versions` へsibling hashを複製しないこと
-- `_05k` の全supported version / SC semantic contract row、normative clause / exception / evidence role coverageがapproved hashと一致
-- finite procedure catalogの全key解決 / machine dispatch / approved hash。inventoryにないkey / catalogにないkey / unused keyを許可しない
+- `_05k` の全supported version / SC semantic contract row、normative clause / exception / evidence role coverageがapproved hashと一致し、1.3.1 / 1.3.2 / 4.1.2 / 4.1.3のAT `procedure_applicability_contracts[]` が `_05i` decision keyとversion別に一致
+- finite procedure catalogの全key解決 / machine dispatch / `applicability_decision_key` / approved hash。inventoryにないkey / catalogにないkey / unused keyを許可しない
+- AT fixtureで `unknown applicability → AT pre-execution applicability decision → applicable時だけAT result → final s-wcag semantic` の順序を確認し、applicability decisionがAT result / final semantic resultへ依存しないこと。not-applicable caseではfinal semantic required evidenceにAT resultを要求せず、unknown caseではfinal semanticを開始しないこと
 - sample × required presentation variation × required Success Criterionのcriterion plan coverage
 - current criterion evaluation refからだけSample Evaluation Resultsを生成し、LLM supplied result listをreject
 - semantic procedureが追加evidenceを必要とするcaseで、required criterion / procedure集合を変更せずfixed observation requestを追加し、new handoffが必要なら `_04c` lineageで再観測して同じprocedureを再評価する
@@ -155,15 +156,15 @@ formal request
 - sampling procedure skippedのcase。completeなin-scope inventory全件がselected sample setとなり、structured / random / Step 4.3がnot-applicableでもcomplete process / Step 4.2評価が続くこと
 - 同一URLの異なるstateを別sample、同じstateへの別経路を同一sampleとして扱えること
 - production helperのouter envelopeと `state.handoffs` physical schema、storage-provided state revisionを区別できること
-- test-only SQLite providerでinitial create、successful conditional write、stale revision conflict、same expected revisionからのconcurrent write 1件成功、reservation owner / revision付きconditional releaseを実CASで確認すること。production local filesystemのexact-content SHAをCAS tokenへ読み替えないこと
+- test-only SQLite providerでworkflow state initial create、successful conditional write、stale revision conflict、same expected revisionからのconcurrent write 1件成功を確認すること。canonical happy pathでは同providerをexternal reservation providerとして使い、acquire時のprovider revisionを `reserve_shared_resource()` external pathが保持し、`release_shared_resource()` decision後にowner / revision付きconditional releaseを実CASで確認すること。production local filesystemのexact-content SHAをCAS tokenへ読み替えないこと
 - 同じ `HANDOFF-001` でもorigin artifact / revisionが異なれば別operation refになること
 - same handoff identityのCAS retry / exact immutable result再適用は同じoperation refのidempotent処理でbrowserを再開始しないこと
 - browser開始済みhandoffのstale / evidence不足再観測は `HANDOFF-002` 等のnew handoff + `retry_of_handoff_ref` + new operation refになること
 - handoffをworkflow stateへ `pending` CAS保存するまでbrowser ownerを開始しないこと
 - mutable operation claim / canonical-order resource reservation後に `in-progress` CASを保存できた場合だけbrowser actionを開始すること
-- resource取得途中失敗 / in-progress CAS conflictではbrowser未開始のままreservation逆順releaseとsafe claim recoveryを行うこと
+- resource取得途中失敗 / in-progress CAS conflictの負系fixtureではbrowser未開始のままexternal reservationを逆順releaseし、その後current local claimの `recover_claim()` が `atomic_claim_release_unavailable` でblockedになることをPASSとする。成功するclaim recoveryを仮定しないこと
 - partial return、stale origin、conflicting current return、cleanup未完了、reservation未releaseではresumeしないこと
-- normal completionでreservationを逆順releaseし、release失敗 / revision conflictではcloseしないこと
+- normal completionでexternal reservationを逆順にprovider-native conditional releaseし、release失敗 / revision conflictではcloseしないこと
 - close-ready → closed CAS → state再読込 → may-resumeの順序を満たすこと
 - exact duplicate returnはidempotentに扱い、明示supersedes lineageでのみcurrent resultを置き換えること
 - observation結果がPR #11 freshness契約でcurrentな場合だけformal evaluationへ再利用されること
@@ -209,7 +210,7 @@ repository implementationの完了条件:
 - external secret / user dataを必須にしない
 - 3 Skillの対象canonical E2EがPASS
 - formal direct triggerからoriginating evaluation / revision / resume operationを保持して `qa-workflow → usability-inspection → formal Skill resume` をPASS
-- `_04c` handoff stateをcanonical E2Eのtest-only SQLite providerで実CAS更新し、composite operation identity、claim / reservation lifecycle、expected observation集合とcurrent valid returned result集合、origin revision / cleanup / lineage / releaseがcurrentになり、closed CAS後の再読込まで完了するまでresumeしないことをPASS。production local filesystemがCAS可能になったとは扱わない
+- `_04c` handoff stateをcanonical E2Eのtest-only SQLite providerで実CAS更新し、external reservationのacquire / releaseをprovider revision付きで通し、composite operation identity、claim / reservation lifecycle、expected observation集合とcurrent valid returned result集合、origin revision / cleanup / lineage / releaseがcurrentになり、closed CAS後の再読込まで完了するまでresumeしないことをPASS。claimはcurrent local create-if-absent契約を維持し、recovery成功を要求しない。production local filesystemがCAS可能になったとは扱わない
 - `_05g` fixed probe request / normalize契約をbrowser E2EでPASSし、Agentのad hoc JavaScript / raw値手計算を必要としない
 - fixed coverage外の複合的懸念、semantic追加観測、Authority付きbusiness outcomeの3ケースをsemantic / browser E2EでPASSし、機械化がLLMのscope内意味判断を抑制しないことを確認する
 - evidence safety / side-effect / browser ownershipをPASS
@@ -217,7 +218,7 @@ repository implementationの完了条件:
 - WCAG 2.0 / 2.1 / 2.2 requirement catalogのcanonical hash再計算と承認済みhash contract testをdeterministic validationでPASS
 - version切替、unsupported / unresolved / out-of-scope分離、4.1.1 version / technology rule、scope coverage row、presentation variation / Full Pages closure、baseline extension、finite procedure catalog、procedure applicability / conditional manual fallback、formal typed machine probe request / cross-package probe catalog整合、inspection→formal `upstream_runtime_units` freshness、Resize Text machine / manual path、`_05k` semantic contract coverage、criterion plan→final result linkage、applicable population none guard、repeat-evaluation retained / replaced / added lineage、random `target-met / exhausted-no-new-view / blocked` 分離、non-finite random selection guard、candidate population変更時のreselection、Conforming Alternate Version条件、Non-Interference固定SC集合、Step 5.1 example coverage / accessible output、Step 5.3 Evaluation Statementの2.2-only guard、version別Claim URI / third-party 2-business-day guard、`_05l` EARL JSON-LD `inapplicable` を含む全mapping / serializationはdeterministic / semantic evalでPASS
 - browser E2EではStep 1.4 additional requirementのsample / report反映、sampling used / skipped、sample identity、Conforming Alternate Versionのfull-page grouping、Step 4.2 unchanged-result reuse、same-population Step 4.3再sampling、freshness付きobservation handoff / resume、safe Evaluation Specifics handoff、EARL assertionとのresult一致をPASS
-- canonical fixtureで未解決blockedが0
+- canonical happy-path fixtureで未解決blockedが0。安全性を確認する負系fixtureのexpected `blocked` は未解決blockedへ数えない
 
 external acceptance:
 
