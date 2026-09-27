@@ -2,7 +2,7 @@
 
 ## 0. 本ファイルの対象
 
-本ファイルは、`wcag-conformance-evaluation → qa-workflow → usability-inspection → qa-workflow → wcag-conformance-evaluation resume` のformal observation handoffについて、workflow stateへ永続化する物理契約、CAS更新順序、claim / shared resource lifecycle、再実行・重複return・stale originの扱い、resume条件を固定します。
+本ファイルは、`wcag-conformance-evaluation → qa-workflow → usability-inspection → qa-workflow → wcag-conformance-evaluation resume` のformal observation handoffについて、workflow stateへ永続化する物理契約、CAS更新順序、claim / shared resource lifecycle、再観測、重複return、stale origin、resume条件を固定します。
 
 workflow state / concurrency基盤はPR #13 merge後current mainの `skills/qa-workflow/scripts/artifact_graph.py`、`assets/workflow-state-template.md`、`references/guidance.md` を正本とします。
 
@@ -26,9 +26,9 @@ current `workflow-state-template.md` は説明例でpayload fieldをtop-levelに
 
 ## 1. owner
 
-`wcag-conformance-evaluation` はlive observationが必要なsample / process / requirement、observation request、resume operationを確定し、formal artifact内で `HANDOFF-001` からartifact-local refを生成します。
+`wcag-conformance-evaluation` はlive observationが必要なsample / variation / process / requirement、observation request、resume operationを確定し、formal artifact内で `HANDOFF-001` からartifact-local refを生成します。
 
-`qa-workflow` は永続化、mutable operation identity / claim、resource reservation、returned result closure、reservation release、resume可否を所有します。
+`qa-workflow` は永続化、mutable operation identity / claim、resource reservation、returned result closure、reservation release、再観測handoff lineage、resume可否を所有します。
 
 `usability-inspection` はbrowser / session ownerとしてhandoff scopeだけを観測し、immutable resultを返します。
 
@@ -54,7 +54,11 @@ operation_ref =
   }))
 ```
 
-`claim_mutable_operation()` は自身で `workflow_ref + operation_ref` をclaim pathへ使うため、workflow refをoperation refへ重複して入れません。同じorigin revision / handoff retryでは同じoperation ref、別origin revision / artifactでは別operation refです。LLMは生成しません。
+`claim_mutable_operation()` は自身で `workflow_ref + operation_ref` をclaim pathへ使うため、workflow refをoperation refへ重複して入れません。
+
+同じhandoff identityについて、CAS再試行、同じimmutable resultの再適用、resume判定の再実行は同じ `operation_ref` を使います。**browserを一度開始したhandoffを同じidentityで再実行しません。**
+
+browser再観測が必要な場合は§9の再観測契約に従って新しい `handoff_ref` をmaterializeし、新しい `operation_ref` を導出します。LLMはhandoff ref / operation refを手作成しません。
 
 ## 3. physical state
 
@@ -67,8 +71,9 @@ handoffは `state.handoffs` にだけ保存します。
   "state": {
     "handoffs": [
       {
-        "handoff_ref": "HANDOFF-001",
+        "handoff_ref": "HANDOFF-002",
         "handoff_kind": "wcag-observation",
+        "retry_of_handoff_ref": "HANDOFF-001",
         "origin": {
           "skill": "wcag-conformance-evaluation",
           "artifact_ref": "...",
@@ -80,6 +85,7 @@ handoffは `state.handoffs` にだけ保存します。
         "expected_observations": [
           {
             "sample_ref": "...",
+            "variation_ref": "...",
             "process_ref": null,
             "requirement_ref": "...",
             "observation_request_ref": "..."
@@ -89,13 +95,15 @@ handoffは `state.handoffs` にだけ保存します。
           {
             "observation_key": {
               "sample_ref": "...",
+              "variation_ref": "...",
               "process_ref": null,
               "requirement_ref": "...",
               "observation_request_ref": "..."
             },
             "result_ref": "...",
             "result_revision": "...",
-            "supersedes_result_ref": null
+            "previous_result_ref": "...",
+            "supersedes_result_ref": "..."
           }
         ],
         "operation_claim_ref": null,
@@ -117,6 +125,8 @@ handoffは `state.handoffs` にだけ保存します。
 }
 ```
 
+初回handoffの `retry_of_handoff_ref` は `null` です。
+
 `expected_observations` はformal helperがmaterializeした集合だけを受け取ります。`returned_results.observation_key` はimmutable result本文からhelperが導出しexpected keyと照合します。raw observation / screenshot / DOMはstateへ複製しません。
 
 status:
@@ -130,10 +140,10 @@ status:
 
 ## 4. create
 
-1. formal helperがhandoff ref、origin、resume operation、expected集合をmaterializeする。
+1. formal helperがhandoff ref、origin、resume operation、expected集合、必要なら `retry_of_handoff_ref` をmaterializeする。
 2. qa-workflow helperがhandoff identity / operation refを導出する。
 3. current stateとstorage-provided `state_revision` を読む。
-4. origin currentnessとduplicate identity conflictを検証する。
+4. origin currentness、duplicate identity conflict、retry lineageを検証する。
 5. `state.handoffs[]` へ `pending` をnative CASで保存する。
 6. CAS不可ならbrowserへ進まず `blocked`。
 
@@ -152,11 +162,13 @@ resource途中失敗または `in-progress` CAS失敗ではbrowserを開始し�
 
 ## 6. return
 
-resultはhandoff / origin、observation request、sample、process、requirement、result ref / revision、evidence、currentness dependency、owner execution state、cleanup、previous / supersedes relationを保持します。
+resultはhandoff / origin、observation request、sample、variation、process、requirement、result ref / revision、evidence、currentness dependency、owner execution state、cleanup、previous / supersedes relationを保持します。
 
 qa-workflowはreturn時にcurrentness / identityを検証し、observation keyをscript導出してCAS反映します。
 
-同じimmutable `result_ref + revision` はidempotent no-opにできます。同一expected observationへ複数current resultがある場合は明示 `supersedes_result_ref` で一意に閉じなければ `blocked` です。return CAS失敗ではbrowserを再実行せず、同じimmutable resultを最新stateへ再適用できる場合はそれを優先します。
+同じimmutable `result_ref + revision` の再送はidempotent no-opにできます。これはbrowser再観測ではありません。
+
+同一expected observationに複数current resultがある場合は明示 `supersedes_result_ref` で一意に閉じなければ `blocked` です。return CAS失敗ではbrowserを再実行せず、同じimmutable resultを最新stateへ再適用できる場合はそれを優先します。
 
 ## 7. normal release
 
@@ -188,20 +200,47 @@ owner executionが `complete` かつrequired cleanup成功 / 対象なしの後�
 
 `may_resume` をclosed CAS前のstateへ保存する設計にはしません。
 
-## 9. stale origin
+## 9. browser再観測
 
-origin revisionが変わった旧handoffは `stale` です。owner開始済みならcurrent execution / cleanupを確認してrequired reservationを安全にreleaseし、開始前なら§5のrecoveryを使います。旧resultはhistorical evidenceとして保持できますが旧revisionへresumeしません。新revisionにはnew handoffをmaterializeします。
+一度 `in-progress` へ入りbrowserを開始したhandoffは、同じhandoff identityで再実行しません。started claimを残す既存PR #13契約と矛盾させないためです。
 
-## 10. standalone
+再観測が必要になる例:
+
+- returned resultがfreshness検証でstale
+- evidenceが不足し、同じ対象へ追加または再観測が必要
+- previous resultをsupersedeする新しい観測が必要
+- browser開始後にowner executionが失敗し、安全なcleanupは完了したが結果を再取得する必要がある
+
+再観測時:
+
+1. old handoff / claim / resultを履歴として保持する。
+2. formal helperが同じorigin revision内で次のartifact-local handoff refを決定論的に採番する。
+3. new handoffへ `retry_of_handoff_ref=<old handoff ref>` を設定する。
+4. 必要なexpected observationだけをnew handoffへmaterializeする。
+5. new handoff refを含むidentityからnew operation refを導出する。
+6. §4〜§8を新しいclaim / reservationで実行する。
+7. new resultがold current resultを置き換える場合はresult側の `previous_result_ref / supersedes_result_ref` でlineageを閉じる。
+
+同じold handoffから同じ目的の再観測handoffを複数作らないよう、helperは `retry_of_handoff_ref + expected observation set + origin revision` のcurrent open lineageを検証します。既にcurrentなpending / in-progress / returned再観測handoffがある場合、新しいhandoffを追加せずその状態を返します。
+
+## 10. stale origin
+
+origin revisionが変わった旧handoffは `stale` です。owner開始済みならcurrent execution / cleanupを確認してrequired reservationを安全にreleaseし、開始前なら§5のrecoveryを使います。旧resultはhistorical evidenceとして保持できますが旧revisionへresumeしません。
+
+新origin revisionで観測が必要なら、旧handoffをretryせず新revisionの通常handoffとしてmaterializeします。
+
+## 11. standalone
 
 qa-workflowを利用できない真のstandalone環境では第二state storeを作りません。required current evidenceがない場合は該当scopeを `blocked` にします。
 
-## 11. deterministic fixture
+## 12. deterministic fixture
 
 - outer envelope `schema_version=1` + `state.handoffs`
 - template / helper physical shape一致
 - same `HANDOFF-001` + different origin/revision → different operation ref
-- same origin/revision/handoff retry → same operation ref
+- same handoff identityのCAS retry / immutable result再適用 → same operation ref、browser再開始なし
+- started `HANDOFF-001` の再観測 → `HANDOFF-002` + new operation ref
+- `retry_of_handoff_ref` lineage / duplicate current rerun抑止
 - pending CAS / missing revision / conditional write不可
 - duplicate identity / origin mismatch
 - claim conflict → browser未開始
@@ -209,22 +248,26 @@ qa-workflowを利用できない真のstandalone環境では第二state storeを
 - resource途中失敗 → acquired reservation逆順release → safe claim recovery
 - `in-progress` CAS conflict → browser未開始 + release / recovery
 - recovery不能 → blocked
-- immutable result → observation key導出 / mismatch reject
+- immutable result → observation key導出 / variation含むkey mismatch reject
 - partial return → close-ready false
-- exact duplicate / conflicting result / explicit supersedes
+- exact duplicate return → idempotent no-op / browser再実行なし
+- conflicting result / explicit supersedes
 - cleanup前 / release前 → close-ready false
 - normal completion → reverse release
 - release failure / revision conflict → blocked
 - close-ready → closed CAS → re-read → may-resume
 - closed CAS failure → may-resume false、browser再実行なし
-- stale origin / stale result → resume不可
+- stale result → new handoffで再観測
+- stale origin →旧revisionへresume不可
 
-## 12. 完了条件
+## 13. 完了条件
 
 - production helperとtemplateのphysical shapeが一致
 - `state.handoffs` とouter `schema_version=1` の責務が固定
 - artifact-local handoff ref単独をworkflow identity / operation refに使わない
 - operation identityをscript導出
+- browser開始済みhandoffを同じclaim identityで再実行せず、再観測はnew handoff lineageへ分離
+- exact duplicate result再送とbrowser再観測を混同しない
 - create / start / return / release / closeがnative CAS前提
 - resource acquire / rollback / normal releaseが閉じる
 - started claimをnormal completionでreleaseせず、not-started recoveryだけ既存helperを使う
