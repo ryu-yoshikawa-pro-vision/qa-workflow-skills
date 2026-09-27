@@ -41,6 +41,8 @@ assets/
 
 catalogに任意expression、自然言語instruction、JavaScript本文、selector文字列を保存しません。
 
+catalogのcanonical JSON SHA-256を `static_data_versions.wcag_machine_probes` へ保持し、runtime freshness / validatorでcurrent assetとapproved hashを照合します。
+
 ## 3. finite machine probe inventory
 
 ### document / metadata
@@ -180,6 +182,7 @@ fixtureにはdocument metadata、non-text / media / link / heading / form / stru
 
 - `_05i` の全machine procedureに固定probe mappingがある
 - machine probe catalogの全keyにfixed dispatch / request / result schemaがある
+- machine probe catalogのcanonical hashを `static_data_versions.wcag_machine_probes` へ固定し、変更時にformal runtime evidenceをstale判定できる
 - LLMがmachine probe集合を入力しない
 - browser ownerがmaterialize済みrequestだけを実行する
 - machine化できる列挙・値取得・固定操作・数値計算をsemanticへ逃がさない
