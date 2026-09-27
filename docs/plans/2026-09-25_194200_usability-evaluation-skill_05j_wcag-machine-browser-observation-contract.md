@@ -50,7 +50,7 @@ formal Skillからsibling Skillのscript / assetを直接import・readしませ�
 
 catalogに任意expression、自然言語instruction、JavaScript本文、selector文字列を保存しません。
 
-catalogのcanonical JSON SHA-256は `usability-inspection` の `static_data_versions.wcag_machine_probes` へ保持し、inspection runtime freshness / validatorでcurrent assetとapproved hashを照合します。formal Skillはこのsibling assetを直接読まず、returned inspection artifact / Machine Runtime evidenceのfingerprintとstatic data provenanceを通してcurrentnessを受け取ります。
+catalogのcanonical JSON SHA-256は、`request_kind=wcag-machine-probe` を1件以上処理した `usability-inspection` runtime unitだけ `static_data_versions.wcag_machine_probes` へ保持し、inspection runtime freshness / validatorでcurrent assetとapproved hashを照合します。formal machine requestを扱っていないgeneral / scoped inspectionへこのkeyを無条件追加しません。formal Skillはこのsibling assetを直接読まず、returned inspection artifact / Machine Runtime evidenceのfingerprintとstatic data provenanceを通してcurrentnessを受け取ります。
 
 ## 3. finite machine probe inventory
 
@@ -222,7 +222,7 @@ fixtureにはdocument metadata、non-text / media / link / heading / form / stru
 - `_05i` の全machine procedureにformal procedure catalog上の固定probe mappingがある
 - formal Skillがtyped `wcag-machine-probe` requestをmaterializeし、inspection側がprocedure catalogを再読込しない
 - machine probe catalogの全keyにfixed dispatch / request / result schemaがある
-- machine probe catalogのcanonical hashを `usability-inspection` の `static_data_versions.wcag_machine_probes` へ固定し、変更時はreturned inspection runtime evidenceのfingerprint変化としてformal評価へ伝播する
+- formal machine probeを処理したinspection runtimeではmachine probe catalogのcanonical hashを `static_data_versions.wcag_machine_probes` へ固定し、変更時はreturned inspection runtime evidenceのfingerprint変化としてformal評価へ伝播する。formal machine probe未使用のinspection runtimeへは含めない
 - repository-level contract testでformal required probe keyとinspection catalog keyのmissing / extra / unusedが0件
 - LLMがmachine probe集合を入力しない
 - browser ownerがmaterialize済みrequestだけを実行する
