@@ -151,11 +151,13 @@ procedure execution rowは少なくとも次を持ちます。
 `wcag_criterion_plan.py` がcatalogの `applicability_mode` から次を決定論的に閉じます。
 
 - `always`: procedureは常にapplicable
-- `population-present`: criterion populationが `present` ならapplicable、`none` ならnot-applicable、`unknown` ならunknown
+- `population-present`: criterion-specific population discovery / semantic applicabilityのcurrent resultが `present` ならapplicable、`none` ならnot-applicable、`unknown` ならunknown。final criterion rowの `applicable_population` を入力にせず、このdiscovery resultをprocedure applicabilityとfinal populationの共通入力にする
 - `semantic`: fixed semantic contractのdecision refからapplicable / not-applicable / unknownを受け、scriptがprocedure rowへ投影する。LLMがprocedure keyを追加・削除しない
 - `machine-limitation`: source machine procedureが未closureならunknown。sourceがcompleteし `activation_limitation_codes` のいずれかを返した場合だけapplicable。それ以外の正常closureではnot-applicable
 
 `not-applicable` は `execution_status=complete`、procedure resultは `null` とし、applicability basisを必須にします。required applicable procedureのclosureには数えません。
+
+criterion-level `applicable_population` はpopulation discovery / semantic applicability resultとそのevidenceからscriptが最終投影します。procedure applicabilityから逆算しません。これにより `population-present procedure applicability → procedure closure → applicable_population` の循環を作りません。
 
 `unknown` を残したままcriterionを `satisfied / not-satisfied` にしません。必要evidenceを取得・評価したうえで意味的に確定できない場合はcriterionを `undetermined`、required capability / environment自体がなくprocedureを実施できない場合は `blocked` とします。
 
