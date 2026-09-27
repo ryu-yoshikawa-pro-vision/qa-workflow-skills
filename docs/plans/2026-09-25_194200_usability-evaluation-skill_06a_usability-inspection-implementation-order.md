@@ -107,10 +107,11 @@ skills/usability-inspection/scripts/
 - target draftから `TARGET-001` 等のtarget registry / resolver schema / currentness / uniquenessを `observation_contract.py` がmaterialize / validate
 - `PROBE-001` 等のsemantic追加観測probe request ref、probe schema / unit / capabilityを `observation_contract.py` がmaterialize / validate
 - formal WCAG machine procedure用browser入力はformal Skillがmaterializeしたtyped `request_kind=wcag-machine-probe` requestを受け、`observation_contract.py` がlocal `_05j` catalogへ解決する。procedure → probe mappingをinspection側で再計算せず、LLMや `_05g` の自由選択fieldへ混ぜない
+- `_05j` のformal machine probe resultはfinite `status / limitation_code` へnormalizeし、gradient / image背景contrast、complex focus indicator、Resize Text capabilityの既知limitation codeをfixtureで固定する。inspection側はcodeを返すだけでmanual fallbackやcriterion resultを決めない
 - semantic additional observation draftのrequester kind `usability-evaluation / inspection-requirement / wcag-procedure`、canonical requester identity、state basis refs / current document identityを検証し、`OBSREQ-001` 等、request identity / input evidence fingerprintをmaterializeしてfield → probe mappingを一意に解決
 - same request identity + same evidence fingerprintは `no-progress`、state description変更だけでは別identityにせず、unknown observation fieldは `unsupported`
 - additional observation requestはfinal artifactで `planned` を残さず、requester側semantic resultも対応するevidenceまたはlimitationへ閉じる
-- arbitrary JavaScript / unknown probe keyをreject
+- arbitrary JavaScript / unknown probe key / unknown formal limitation codeをreject
 - formal required machine probe key集合とlocal catalog key集合のmissing / extra / unused 0をrepository-level contract testで検証し、standalone inspection runtimeはformal sibling assetをreadしない
 - observation / measurement / test rule / requirement / action inputを `inspection_structure.py` が一括してartifact-local refへ採番
 - status + follow_up_requiredからFinding作成要否をscriptが導出
@@ -512,7 +513,7 @@ repository標準件数に合わせます。
 ### coverage完了条件
 
 - `_05c_usability-inspection-coverage.md` のWeb / responsive / touch / mobile / discoverability契約を閉じる
-- `_05g_usability-inspection-browser-observation-contract.md` のscope mode / semantic fixed probe / responsive condition・boundary / interaction timing / unavailable statusと、`_05j` のformal WCAG machine probe typed request / local fixed dispatch契約を閉じる
+- `_05g_usability-inspection-browser-observation-contract.md` のscope mode / semantic fixed probe / responsive condition・boundary / interaction timing / unavailable statusと、`_05j` のformal WCAG machine probe typed request / local fixed dispatch / finite limitation code契約を閉じる
 - `_05d_accessibility-requirements-and-act.md` のgeneral accessibility / ARIA / AccName source boundary / supported ACT契約を閉じる
 - formal WCAG conformanceは `_06b_wcag-conformance-evaluation-implementation-order.md` 側で閉じる
 - supported ACT RuleはACT Rules Format 1.1 §4.14.1 consistency fixtureをPASS
