@@ -4,27 +4,35 @@
 
 本ファイルは `wcag-conformance-evaluation` のmachine procedureがbrowserから必要とする固定観測を、`usability-inspection` が実行できる有限contractとして定義します。
 
-`_05g_usability-inspection-browser-observation-contract.md` の16 canonical observation fieldはsemantic layerが追加evidenceを必要とした場合に選択できるinterfaceです。本ファイルのmachine probeは別用途です。
+`_05g_usability-inspection-browser-observation-contract.md` の16 canonical observation fieldはsemantic layerが追加evidenceを必要とした場合に選択できるinterfaceです。本ファイルのmachine probeはformal WCAG machine procedure専用です。
 
-- required machine probe keyは `wcag_criterion_plan.py` がprocedure catalogから導出する
+- `wcag-conformance-evaluation` の `wcag_criterion_plan.py` が自packageのprocedure catalogからrequired machine probe keyを導出し、typed observation requestをmaterializeする
 - LLMはmachine probe keyを選択・省略・追加しない
-- browser ownerはmaterialize済みrequestだけを実行する
+- `usability-inspection` はtyped requestを自packageの `wcag-machine-probe-catalog.json` と照合し、current browser ownerとして固定dispatchだけを実行する
+- `usability-inspection` はformal procedure catalogを読まず、procedure key → probe keyを再解決しない
 - machine probe resultから意味判断を行わない
 - fixed probeで閉じない意味・例外・visual interpretationはsemantic / manual procedureへ残す
 - 任意JavaScript、任意selector、generic rule DSL、plugin registryは追加しない
 
-## 1. package
+formal Skillからsibling Skillのscript / assetを直接import・readしません。cross-packageの `required_machine_probe_keys ⊆ wcag-machine-probe-catalog` はrepository-level contract test / CIで検証し、runtimeではformal handoff requestとreturned inspection runtime evidenceで接続します。
 
-`skills/usability-inspection/` へ次を追加します。
+## 1. package / ownership
 
-```text
-scripts/
-└── wcag_machine_observation.py
-assets/
-└── wcag-machine-probe-catalog.json
-```
+`skills/usability-inspection/assets/wcag-machine-probe-catalog.json` を追加します。新しい `wcag_machine_observation.py` は作りません。既存Planで追加予定の `skills/usability-inspection/scripts/observation_contract.py` が、semantic追加観測とformal WCAG machine probe requestのrequest / result validationを同じbrowser I/O境界で担当します。
 
-`wcag_machine_observation.py` はbrowserを直接起動しません。procedure key → required machine probe key集合、fixed request payload、result schema / enum / unit / currentness、target / population ref、duplicate request / resultを検証し、machine-owned resultをmaterializeします。実browser操作はcurrent `usability-inspection` browser ownerが行います。
+`wcag-conformance-evaluation` 側は `wcag_criterion_plan.py` が次のtyped requestをmaterializeします。
+
+- `request_kind`: `wcag-machine-probe`
+- `observation_request_ref`
+- `criterion_evaluation_ref`
+- `procedure_execution_ref`
+- `machine_probe_key`
+- sample / variation / process / requirement refs
+- target / population identity input
+- required browser capability
+- currentness dependency
+
+`usability-inspection` は `procedure_execution_ref` の意味を再解釈せず、`request_kind` と `machine_probe_key` からlocal catalogのfixed dispatchへ一意に解決します。resultはrequest ref / machine probe key / currentness / runtime evidenceを保持してformal Skillへ返します。
 
 ## 2. machine probe catalog
 
@@ -41,7 +49,7 @@ assets/
 
 catalogに任意expression、自然言語instruction、JavaScript本文、selector文字列を保存しません。
 
-catalogのcanonical JSON SHA-256を `static_data_versions.wcag_machine_probes` へ保持し、runtime freshness / validatorでcurrent assetとapproved hashを照合します。
+catalogのcanonical JSON SHA-256は `usability-inspection` の `static_data_versions.wcag_machine_probes` へ保持し、inspection runtime freshness / validatorでcurrent assetとapproved hashを照合します。formal Skillはこのsibling assetを直接読まず、returned inspection artifact / Machine Runtime evidenceのfingerprintとstatic data provenanceを通してcurrentnessを受け取ります。
 
 ## 3. finite machine probe inventory
 
@@ -158,7 +166,7 @@ text resize / text spacing等で評価用stateを作る場合は、WCAG Techniqu
 
 ## 5. identity / status
 
-machine probe requestは対象に応じて `target_ref`、`population_ref + population_revision + identity_fingerprint`、`sample_ref + variation_ref + current document identity`、process / action refのいずれかを持ちます。LLM supplied selectorを受けません。
+formal Skillがmaterializeするmachine probe requestは対象に応じて `target_ref`、`population_ref + population_revision + identity_fingerprint`、`sample_ref + variation_ref + current document identity`、process / action refのいずれかを持ちます。LLM supplied selectorを受けません。inspection側はこのidentity inputをlocal target registry / current browser stateへ解決し、requestに存在しないprocedure意味を補完しません。
 
 result statusは `ok / unsupported / unavailable / incomplete / blocked` です。`unsupported` はcurrent browser / tool capabilityがrequired operationを提供しない場合だけに使い、既知標準の未実装を隠す用途には使いません。
 
@@ -172,15 +180,21 @@ result statusは `ok / unsupported / unavailable / incomplete / blocked` です�
 
 ## 7. deterministic validator / fixture
 
-validatorは `_05i` のmachine procedure全件、required machine probe mapping、probe catalog存在、request / result schema、target / population currentness、duplicate、unsupported理由を独立確認します。`m-parsing-version-rule` だけbrowser probe 0件を許可します。
+validatorを2層に分けます。
+
+- formal Skill validator: `_05i` のmachine procedure全件、procedure catalog内のrequired machine probe key、typed request schema、duplicateを検証する。`m-parsing-version-rule` だけbrowser probe 0件を許可する
+- usability-inspection validator: local machine probe catalog、request / result schema、fixed dispatch、target / population currentness、duplicate、unsupported理由、`static_data_versions.wcag_machine_probes` を検証する
+- repository-level contract test: formal procedure catalogが参照するmachine probe key集合とinspectionのmachine probe catalog key集合を比較し、missing / extra / unusedを0件にする
 
 fixtureにはdocument metadata、non-text / media / link / heading / form / structure population、keyboard / focus / pointer / hover-focus、error scenario、target size / spacing、text / non-text contrast、simple / complex focus appearance、responsive condition、orientation / reflow / resize text / text spacing、moving / timer / shortcut、multipage signature、stale population、missing capabilityを含めます。
 
 ## 8. 完了条件
 
-- `_05i` の全machine procedureに固定probe mappingがある
+- `_05i` の全machine procedureにformal procedure catalog上の固定probe mappingがある
+- formal Skillがtyped `wcag-machine-probe` requestをmaterializeし、inspection側がprocedure catalogを再読込しない
 - machine probe catalogの全keyにfixed dispatch / request / result schemaがある
-- machine probe catalogのcanonical hashを `static_data_versions.wcag_machine_probes` へ固定し、変更時にformal runtime evidenceをstale判定できる
+- machine probe catalogのcanonical hashを `usability-inspection` の `static_data_versions.wcag_machine_probes` へ固定し、変更時はreturned inspection runtime evidenceのfingerprint変化としてformal評価へ伝播する
+- repository-level contract testでformal required probe keyとinspection catalog keyのmissing / extra / unusedが0件
 - LLMがmachine probe集合を入力しない
 - browser ownerがmaterialize済みrequestだけを実行する
 - machine化できる列挙・値取得・固定操作・数値計算をsemanticへ逃がさない
