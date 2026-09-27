@@ -215,12 +215,12 @@ Full Pages requirementのため、selected sampleごとにcurrent evaluationで�
 
 - variation ref
 - sample ref
-- source: project / Design System Authority、current target observation、responsive boundary inventory、user agent / device condition
+- source: project / Design System Authority、current target observation、responsive condition / boundary inventory、user agent / device condition
 - variation description
 - presentation condition
 - environment ref
 - viewport / container condition refs（存在する場合）
-- responsive boundary refs（存在する場合）
+- responsive condition / boundary refs（存在する場合）
 - evidence refs
 - coverage status: `required / evaluated / undetermined / blocked`
 - limitation
@@ -229,7 +229,7 @@ variation refはartifact-localに `VAR-001` からscriptが採番します。
 
 semantic layerは、同じpageで情報・機能・interaction / presentationが意味上異なるautomatically presented variationかを判断できます。scriptはAuthority / machine observationからcandidate variation rowを生成し、duplicate、ref、required set、evaluation coverageをmaterializeします。
 
-current responsive boundary inventoryがcompleteで、project / Design System Authorityと観測結果から既知のautomatically presented variation集合を閉じられる場合だけ、その集合をrequired variation setとして使用できます。
+current responsive condition / boundary inventoryがcompleteで、project / Design System Authorityと観測結果から既知のautomatically presented variation集合を閉じられる場合だけ、その集合をrequired variation setとして使用できます。
 
 unreadable / unsupported / not-executable responsive condition、未知device-dependent variation、必要なvariationへ到達できない状態が残る場合はFull Pages requirementを `satisfied` にしません。`undetermined / blocked` として残します。
 
@@ -491,7 +491,7 @@ formal requirement resultごとに少なくとも次を出力します。
 
 - `earl:Assertion`
 - `earl:assertedBy`
-- `earl:subject`: canonical sample identityに対応するartifact-local subject
+- `earl:subject`: canonical sample / variation identityから `_05l` のstable IRIを生成
 - `earl:test`: target version static catalogが持つcanonical Success Criterion / conformance requirement URI
 - `earl:result`。`earl:TestResult` nodeへのIRI参照
 - `earl:mode`
@@ -500,12 +500,13 @@ formal requirement resultごとに少なくとも次を出力します。
 
 outcome mapping:
 
-- `satisfied → earl:passed`
+- Success Criterion rowで `applicable_population=none` かつrequired closure complete → human-readable resultは `satisfied` のまま `earl:inapplicable`
+- 上記以外の `satisfied → earl:passed`
 - `not-satisfied → earl:failed`
 - `undetermined → earl:cantTell`
 - 未実施resultをblocked / incomplete artifactへ明示する場合だけ `earl:untested`
 
-WCAG Success Criterionにrelevant contentがない場合はformal result contractどおり `satisfied` とし、EARLだけ `inapplicable` へ変換しません。test modeはevidence provenanceから `automatic / manual / semiAuto / undisclosed / unknownMode` のいずれかを選び、判定できないmodeを推測しません。
+test modeはevidence provenanceから `automatic / manual / semiAuto / undisclosed / unknownMode` のいずれかを選び、判定できないmodeを推測しません。EARL側でapplicabilityを保持し、human-readable WCAG resultの `satisfied` と機械的に1対1対応させません。
 
 EARL sidecarはhuman-readable WCAG-EM reportの代替ではありません。assertion数、stable assertion / subject identity、test / outcomeとhuman-readable formal result集合が一致することをdeterministic validatorで確認します。artifact-local refをEARL IRIとして直接公開しません。
 
@@ -871,7 +872,7 @@ Input:
 - structured sample selection decisions
 - finite inventory / recorded random selection provenance
 - process semantic definitions
-- presentation variation semantic decisions / Authority / responsive boundary inventory
+- presentation variation semantic decisions / Authority / responsive condition / boundary inventory
 - observation handoff semantic requirements
 - qa-workflow handoff closure result / `may_resume` / current returned result refs（`_04c` のdeterministic helper出力）
 - returned inspection artifact / evidence refs
@@ -1044,7 +1045,7 @@ production helperとは別実装で少なくとも次を検証します。
 - static catalogから独立導出したtarget level required Success Criteria / conformance requirement集合とactual coverageの一致
 - scope coverage rows / in-scope closure
 - selected sampleごとのrequired presentation variation registry / completeness / evidence
-- responsive boundary inventory incomplete / not-executableをFull Pages satisfiedへ数えていない
+- responsive condition / boundary inventory incomplete / not-executableをFull Pages satisfiedへ数えていない
 - accessibility support baseline revision / extensionとformal evidence environmentの一致
 - previous evaluation / rerun sample lineage（該当時）
 - additional evaluation requirementsのref / affected step / status / output closure
