@@ -110,17 +110,17 @@ WCAG-EM 2のoutput contractはReport ToolのschemaではなくWCAG-EM 2.0本文�
 
 - `_05i` のversion別集合からWCAG 2.0=61 / 2.1=78 / 2.2=86件を固定し、2.2から4.1.1を除外する
 - `_05i` の生成規則から全Success Criterionのexpected `procedure_keys` をscriptで導出し、3 versionのrequirements assetへ設定する。実装時にcriterionごとのprocedure構成を再設計しない
-- `assets/wcag-evaluation-procedure-catalog.json` を追加し、`_05i` に現れる全procedureを `machine / semantic / manual / assistive-technology / external-evidence` の有限inventoryへ固定する。各rowに `_05h` の `applicability_mode / activation_source_procedure_key / activation_limitation_codes` を持たせる
+- `assets/wcag-evaluation-procedure-catalog.json` を追加し、`_05i` に現れる全procedureを `machine / semantic / manual / assistive-technology / external-evidence` の有限inventoryへ固定する。各rowに `_05h` の `applicability_mode / applicability_decision_key / activation_source_procedure_key / activation_limitation_codes` を持たせる
 - procedure catalogに `TBD / other / custom` 等のcatch-allを置かず、`_05i` §3のmachine procedureは全件明示dispatch / fixtureを実装する。各machine procedureのbrowser入力はprocedure catalog内で `_05j` machine probe keyへ全件mappingし、`wcag_criterion_plan.py` がtyped `wcag-machine-probe` requestをmaterializeする。formal runtimeはinspection sibling assetをreadしない。cross-packageのprobe key missing / extra / unused 0はrepository-level contract testで検証する
-- `_05k` のversioned semantic contract assetを全supported Success Criterionへ作成し、normative clause / definition / exception refs、semantic evaluation point、required evidence role、forbidden shortcutをapproved hashで固定する。実装時にcriterion固有procedureを再設計しない
+- `_05k` のversioned semantic contract assetを全supported Success Criterionへ作成し、normative clause / definition / exception refs、semantic evaluation point、required evidence role、forbidden shortcutをapproved hashで固定する。1.3.1 / 1.3.2 / 4.1.2 / 4.1.3には `_05i` のfixed AT applicability decision keyに対応する `procedure_applicability_contracts[]` をversion別に追加し、AT result / final semantic resultをInputへ含めない。実装時にcriterion固有procedureを再設計しない
 - 4.1.1はWCAG 2.2でrowを作らず、WCAG 2.0 / 2.1 + HTML/XMLでは `always-satisfied-html-xml`、その他technologyではsemantic contractへ戻す
 - machine化できる数値計算、集合演算、固定enum / state比較、supported ACT Ruleをsemantic / manualへ逃がしていないことをsemantic reviewで確認する
-- assistive technologyはSuccess Criterion固定booleanにせず、selected procedure + current content / technology + accessibility support baselineからapplicabilityを閉じる
-- procedure executionごとに `applicable / not-applicable / unknown` とbasisをmaterializeし、`unknown` のままcriterionをsatisfied / not-satisfiedへ閉じない
+- assistive technologyはSuccess Criterion固定booleanにせず、selected procedure + current content / technology + accessibility support baselineから**AT実行前**のfixed semantic applicability decisionを閉じる。`unknown → applicability decision → AT execution（applicable時だけ）→ final s-wcag semantic` の順序を固定し、final semantic resultをAT applicabilityのInputへ戻さない
+- procedure executionごとに `applicable / not-applicable / unknown` とbasisをmaterializeし、`unknown` のままcriterionをsatisfied / not-satisfiedへ閉じない。final semantic required evidence roleはcurrent applicable procedure集合から導出し、not-applicable sibling resultを要求しない
 - `_05i` のcontrast / Resize Text / Focus Appearance conditional manual fallbackをsource machine limitation codeからscriptが起動し、machine limitationだけでcriterionをblockedへ短絡しない
 - selected sampleごとのrequired presentation variation集合を入力にし、`wcag_criterion_plan.py` がsample × variation × required Success Criterion rowを全件materializeする
 - execution status `pending / in-progress / complete / blocked` とresult `satisfied / not-satisfied / undetermined / null` を分離する
-- applicable population `present / none / unknown` をprocedure closureから導出し、単一ACT Ruleのinapplicableだけでcriterion satisfiedにしない
+- applicable population `present / none / unknown` はcriterion-specific semantic population discovery / applicability resultから導出し、procedure applicabilityから逆算しない。単一ACT Ruleのinapplicableだけでcriterion satisfiedにしない
 - live observation requirementをformal handoffへ渡す
 - target geometry / spacing、contrast ratio、viewport overflow / reflow数値、elapsed / threshold、supported ACT Rule等、入力が揃えば決定論的な処理をscriptへ移す
 - required criterion × variation集合とactual row集合の差分0をdeterministic validatorで検証する
@@ -205,21 +205,21 @@ production helperとdeterministic validatorは別実装にします。
 
 ## 7. Step 5: qa-workflow observation handoff
 
-canonical repository E2Eでは `_04c` のtest-only `tests/skills/evals/deterministic/wcag_handoff_cas_provider.py` を実装し、Python標準 `sqlite3` のtransactionでworkflow state conditional write / reservation conditional releaseを実際に通します。これはtest harness限定で、production `qa-workflow` へSQLite storage adapterを追加しません。production providerがnative CASを提供しない場合はcurrent契約どおりblockします。
+canonical repository E2Eでは `_04c` のtest-only `tests/skills/evals/deterministic/wcag_handoff_cas_provider.py` を実装し、Python標準 `sqlite3` のtransactionでworkflow state conditional writeと**external reservation provider**のacquire / conditional releaseを実際に通します。`artifact_graph.py` には既存external reservation経路へprovider revisionを返すoptional `external_reservation_revision` だけを追加し、SQLite adapter / generic storage interface / claim providerは追加しません。production providerがnative CAS / conditional releaseを提供しない場合はcurrent契約どおりblockします。
 
 selected sampleごとにlive accessibility observationが必要なcaseで、
 
 - wcag-conformance-evaluationがsample / process / requirement / observation request scope、originating evaluation / revision、resume operationを固定してnormalized handoffを出す
 - qa-workflowが `_04c` のhandoff recordを `pending` としてnative CASでworkflow stateへ保存する。CASできるまでbrowser操作を開始しない
 - qa-workflowがorigin artifact ref / revision / handoff refからdeterministic `operation_ref` を導出し、そのidentityでmutable operation claimを取得する
-- required shared resourceをcanonical orderで取得し、claim / reservation refsを含む `in-progress` をCAS保存した後だけusability-inspectionを開始する
-- resource取得途中失敗または `in-progress` CAS conflictではbrowserを開始せず、取得済みreservationを逆順releaseし、owner未開始 / cleanup確認済みの場合だけclaim recoveryする
+- canonical happy pathのrequired shared resourceはtest-only SQLite providerでexternal reservationとして取得し、そのreservation ref / provider revisionを既存 `reserve_shared_resource()` external pathへ渡す。claim / reservation refsを含む `in-progress` をCAS保存した後だけusability-inspectionを開始する
+- resource取得途中失敗または `in-progress` CAS conflictではbrowserを開始せず、取得済みreservationを逆順にprovider-native conditional releaseする。その後 `recover_claim()` を呼ぶが、current local claim storageはnative conditional releaseを持たないためcanonical negative fixtureでは `atomic_claim_release_unavailable` のblockedを正しい安全結果とする。成功するclaim recoveryをcompletion条件にしない
 - usability-inspectionがbrowser ownerとして `_05g` / `_05j` fixed observation requestを直列実行する
 - immutable evidence / inspection artifact refをhandoff ref / sample ref / variation ref / observation request ref / origin revision付きでqa-workflowへ返す
 - formal runtimeがreturned inspection runtimeを消費する時点で、そのinspection runtime unit identity / current generation fingerprintを `metadata.upstream_runtime_units` へmaterializeする
 - qa-workflow helperがreturned resultからobservation keyを導出し、result currentness、exact duplicate、supersedes lineage、expected-current-valid-returned集合を照合する
 - returned resultがstale / 不足でbrowser再観測が必要なら、started claimを削除・再利用せず次の `HANDOFF-NNN` を `retry_of_handoff_ref` 付きでmaterializeしてnew operation refを取得する。exact duplicate returnやCAS retryではnew handoffを作らない
-- owner complete / cleanup成功後、required shared reservationを逆順releaseし、release failureではcloseしない
+- owner complete / cleanup成功後、`release_shared_resource()` のowner / revision / cleanup decisionを通してrequired external reservationを逆順にprovider-native conditional releaseし、release failure / revision conflictではcloseしない
 - helperが `close_ready` を導出し、`closed` をCAS保存した後にstateを再読込して `may_resume` を判定する
 - origin stale、claim / CAS / release failure、conflicting current return、未充足expected observationがある場合はresumeしない
 - re-read後のcurrent stateで `may_resume=true` の場合だけ元evaluation / revision / resume operationへcurrent result refsをhandoffする
@@ -331,7 +331,7 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 - formal machine probeを処理したinspection runtimeが `static_data_versions.wcag_machine_probes` を保持すること
 - formal consumerの `metadata.upstream_runtime_units` がinspection `runtime_unit_key / generation_fingerprint` をexactly-onceで保持し、missing / generation mismatchでformal freshnessがstaleになること。formal `static_data_versions` へsibling hashを複製しない
 - repository-level contract testでformal required machine probe keyとinspection catalog keyのmissing / extra / unused 0
-- `_05k` versioned semantic contract coverage / normative clause・exception refs / required evidence role / approved hash
+- `_05k` versioned semantic contract coverage / normative clause・exception refs / required evidence role / AT `procedure_applicability_contracts[]` / approved hash
 - WCAG 2.0 / 2.1 4.1.1 HTML/XML shortcut / other technology semantic path / WCAG 2.2 removal
 - SC 1.4.4のvalid text scaling mechanism inventory、baseline / mechanism scale / used font sizeからrendered text scale ratioを計算して全applicable textの2.0x到達を確認、responsive breakpointを跨ぐcase、target到達までのincremental state、`deviceScaleFactor` / viewport resize / CSS injectionを代替としてreject
 - machine ownerがvalid text scaling mechanismを操作 / scale取得できないcaseではfixed limitation codeから `manual-wcag-1.4.4` をapplicable化し、manual evidenceでclosureできること。manualも実施不能な場合だけblocked / undetermined
@@ -350,8 +350,8 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 - sampling procedure used / skippedとselected sample set closure
 - rerun retained / replaced / added / unavailable sample lineage
 - observation handoff origin / resume identity / expected observation materialization
-- `_04c` physical `state.handoffs` schema、composite operation identity、state CAS、mutable operation claim、resource acquisition / rollback / normal release、started handoff rerun lineage、duplicate / conflicting return、stale origin、close-ready → closed CAS → re-read → resume guard
-- test-only SQLite providerでsame expected revisionのconcurrent writeは1件だけ成功し、stale write / wrong-owner releaseはconflict。production local filesystemではconditional write unavailableのままfail-closed
+- `_04c` physical `state.handoffs` schema、composite operation identity、state CAS、mutable operation claim、external reservation acquisition / rollback / normal release、current local claim recovery unavailable時のsafe block、started handoff rerun lineage、duplicate / conflicting return、stale origin、close-ready → closed CAS → re-read → resume guard
+- test-only SQLite providerでworkflow state same expected revisionのconcurrent writeは1件だけ成功し、external reservationのstale revision / wrong-owner releaseはconflict。current local claim storageではpre-start recoveryが `atomic_claim_release_unavailable` でblockedとなり、production local filesystemではstate conditional write unavailableのままfail-closed
 - ref
 - sample count
 - finite inventory candidate derivation / recorded method provenance
