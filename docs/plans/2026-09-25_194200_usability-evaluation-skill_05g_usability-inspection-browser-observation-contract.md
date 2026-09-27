@@ -37,6 +37,7 @@ catalog row:
 
 - `probe_key`
 - `execution_kind`: `playwright-native / fixed-page-evaluate / evidence-capture / external-source-read`
+- provided observation field keys
 - required request fields
 - required result fields
 - result value type / unit
@@ -45,7 +46,7 @@ catalog row:
 - sensitive-data handling
 - fixed implementation dispatch key
 
-`observation_contract.py` は明示dispatchでrequest / fixed payload / result validationを処理します。任意式、任意JavaScript、plugin registryを入力として受けません。
+`observation_contract.py` は明示dispatchでrequest / fixed payload / result validationを処理します。各canonical observation field keyはcatalog内で1つのfixed probeだけがownerとなり、field → probe mappingを一意にします。任意式、任意JavaScript、plugin registryを入力として受けません。
 
 ## 3. observation lifecycle
 
@@ -66,7 +67,7 @@ observation_contract.py materialize-targets
         ↓
 observation_contract.py plan
   - scope / selected rule / measurementからrequired observation field / probe key集合
-  - PROBE-001等のrequest ref
+  - PROBE-001等のprobe request ref
   - fixed predicate request
   - required result schema
         ↓
@@ -78,6 +79,22 @@ observation_contract.py normalize
   - target resolution / schema / enum / unit / capability検証
   - responsive boundary検出結果 / 実行可能性
   - canonical machine observation
+        ↓
+semantic evaluation
+  ├─ decision complete
+  └─ additional evidence required
+       ↓
+     semantic layer
+       - canonical observation field / fixed predicate keyを選択
+       - request reason / requester / target stateを返す
+       ↓
+     observation_contract.py materialize-additional
+       - OBSREQ-001等のobservation request ref
+       - request identity / input evidence fingerprint
+       - field → fixed probe mapping
+       - duplicate / no-progress判定
+       ↓
+     browser owner → normalize → same semantic decisionを再評価
         ↓
 criterion_checks.py / measurement.py / inspection_structure.py
 ```
@@ -171,6 +188,26 @@ viewport内外、target size、spacing、overlap候補等の数値導出はscrip
 - visible
 - enabled / disabled
 - checked / selected / expanded等、current pathでmachine-readableに取得できるstate
+
+### `document-location`
+
+canonical observation field:
+
+- `document.location`
+
+current document URLを取得します。raw URLを永続化する場合はPR #12のevidence安全契約へ従い、secret / token等を含み得るquery / fragmentを無条件に保存しません。安全に保持できない値がsemantic判断に必要な場合は、値を捏造・無断保存せず `unavailable / limitation` とします。
+
+### `element-content`
+
+target registryで一意に解決済みのtargetについて、requestされたfieldだけを取得します。
+
+canonical observation field:
+
+- `element.rendered-text`: user-facing rendered text
+- `element.control-value`: input / textarea / select等のcurrent value
+- `element.selected-values`: select等のcurrent selected value集合
+
+全DOM textや全form valueを無条件取得しません。fieldごとのfixed dispatchを使い、対象element種別で取得不能なら `unavailable` とします。値の意味がbusiness outcomeと一致するかはsemantic layerが判断します。
 
 ### `accessibility-semantics`
 
@@ -306,21 +343,27 @@ probeはUI発見shortcutになりません。
 
 固定probe集合は最低限必要なmachine observationを取得するための契約であり、semantic layerが評価途中で追加evidenceの必要性を発見することを禁止しません。
 
-semantic layerは追加観測が必要な場合、少なくとも次を返します。
+semantic layerは追加観測が必要な場合、少なくとも次のdraftを返します。
 
+- `request_draft_key`: invocation内一意
+- requester kind: `usability-evaluation / wcag-procedure`
+- requester refまたはrequester draft key
 - 関連scope ref
-- related evaluation refまたはcriterion / semantic procedure ref（存在する場合）
-- target / state / interactionの説明
-- 必要な観測内容
+- target refまたはtarget draft key（element対象の場合）
+- state draft key（特定stateが必要な場合）
+- canonical observation field key
+- fixed predicate key / payload（必要な場合）
+- 必要な観測内容の説明
 - 観測が必要な理由
-- requested observation field / evidence kind。既存catalog keyで表現できる場合はそのkey
 - current evidence refs
+
+canonical observation field / predicate keyの選択はsemantic layerの責務です。必要な観測内容の説明はLLMの判断理由として保持しますが、scriptがその自然言語からfield / probeを推論しません。field keyは `browser-observation-catalog.json` の `provided observation field keys` に存在し、一意なprobe ownerへ解決できる必要があります。
 
 browser ownerは宣言済みtarget / origin / role / side-effect scopeの中でuser-facing interactionを使って必要stateへ到達できます。LLMが任意CSS selector、XPath、test id、JavaScript式、hidden implementation stateを追加観測の実行方法として指定する契約にはしません。
 
-`observation_contract.py` は、追加観測draftを既存のtarget registry、browser observation catalog、fixed probe、fixed predicateへ解決できる場合だけrequestをmaterializeします。ref採番、required field、schema、capability、重複、currentnessはscriptが検証します。
+`observation_contract.py materialize-additional` はartifact-local `OBSREQ-001` 等を採番します。request identityは requester / scope / target / state draft key / canonical observation field / canonical predicate payloadから導出し、current evidence refsはcanonical sortしてinput evidence fingerprintを導出します。ref採番、field → probe mapping、required field、schema、capability、currentnessはscriptが検証します。
 
-同一semantic decisionについて、同じtarget / state / requested fieldの追加観測がcurrent evidenceを増やさないまま再要求された場合は同じbrowser操作を反復せず、`no-progress` としてsemantic layerへ返します。
+同じrequest identityかつ同じinput evidence fingerprintの既存requestがある場合はbrowser操作を反復せず `no-progress` として返します。evidence fingerprintが変わった場合だけ同じsemantic decisionをnew evidence付きで再評価できます。
 
 既存fixed contractで安全に取得できない場合は `unsupported / unavailable / blocked` とし、その結果をsemantic layerへ返します。追加観測のためだけにgeneric probe DSLやad hoc page scriptを追加しません。
 
@@ -412,6 +455,11 @@ tool failureやprobe unavailableをproduct defect / usability issueへ自動変�
 - current-session-ref navigation後stale
 - target unique / missing / ambiguous / stale
 - viewport / element geometry schema
+- `document.location` のfixed probe / sensitive URL handling
+- `element.rendered-text / element.control-value / element.selected-values` のtarget-local fixed probe
+- semantic additional observation draft → OBSREQ ref / field → probe mapping / request identity / evidence fingerprint
+- same request identity + same evidence fingerprint → no-progress
+- unknown observation field → unsupported。自然言語からprobeを推論しない
 - geometry machine calculation
 - media query px boundary
 - media query em / rem boundaryをcurrent browser評価でCSS pxへ正規化
@@ -436,6 +484,9 @@ tool failureやprobe unavailableをproduct defect / usability issueへ自動変�
 - locator matchingをPlaywright documented semantics + exact matchingへ固定し、独自曖昧matchingを作らない
 - machine-population-indexをrevision / fingerprintなしで再利用しない
 - fixed probe payload / normalizationをSkill-local scriptが所有
+- canonical observation field → fixed probe mappingをcatalogで一意にし、semantic layerはfield keyを選べるがscriptは自然言語からprobeを推論しない
+- semantic additional observation requestをOBSREQ ref / identity / evidence fingerprint付きでmaterializeし、no-progressを機械判定する
+- document location / rendered text / control value / selected value等、business flowの意味判断に必要でmachine取得可能な値をfixed probeで取得する
 - raw browser valueの算術・enum・closureをLLMへ戻さない
 - general / scoped / formal-handoff scope row生成が決定論化
 - rule / measurementから必要probe集合をscript導出

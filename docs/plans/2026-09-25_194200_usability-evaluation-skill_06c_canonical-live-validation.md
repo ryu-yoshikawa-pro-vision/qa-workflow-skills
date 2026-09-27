@@ -41,7 +41,7 @@ fixtureは少なくとも次を満たします。
 - 必要なら同一static fixture内の別pathでConforming Alternate Version候補を表現できる。新しいserver / originはこのためだけに追加しない
 - 同じfixture server内に、製品全体を列挙できる小さいself-enclosed product scopeを持ち、sampling procedure skip経路を追加serverなしで検証できる
 - keyboard / focus、visual / responsive、general accessibility observationを少なくとも1件ずつ実行できる
-- `_05g` のviewport / geometry / accessibility semantics / responsive-boundaries / interaction-timing fixed probeをfixture上で検証できる
+- `_05g` のviewport / geometry / document location / rendered text / control value / selected value / accessibility semantics / responsive-boundaries / interaction-timing fixed probeをfixture上で検証できる
 - responsive boundary取得ではreadable sourceと、意図的にcomplete扱いできないunreadable-source contract caseをdeterministic fixtureで再現できる
 - taskなしpage inspectionと、明示task / flow inspectionの両方を実行できる
 - intentional issueを使う場合はfixture contractとして期待状態を固定し、実製品の仕様と混同しない
@@ -100,11 +100,12 @@ current Playwright versionやPR #12 / #13 merge後のbrowser contractが変わ�
 10. fixed interaction timingで8種predicateごとのpayload、same-page clock、preexisting end state、timeout、unknown attribute / ARIA state rejectを扱えること
 11. measurement経路
 12. cleanup
-13. semantic layerからの追加観測要求を `_05g` のfixed observation contractへ解決し、追加evidenceを取得して再評価できること
-14. 同一追加観測をnew evidenceなしで反復せずno-progressを返せること
-15. business outcome / Authority refsがあるflowでobserved end state / outcomeを保持し、usability-evaluationへ渡せること
-16. `usability-evaluation` へのread-only handoff
-17. 同一sessionを別Skillが並行操作しない
+13. semantic layerがcanonical observation field / fixed predicate keyを選び、`observation_contract.py` が `OBSREQ-...` / request identity / evidence fingerprint / fixed probeへmaterializeして追加evidenceを取得し再評価できること
+14. scriptが自由記述からprobeを推論せず、unknown observation fieldをunsupportedへ閉じること
+15. 同一request identity + 同一input evidence fingerprintを再実行せずno-progressを返せること
+16. business outcome / Authority refsがあるflowでdocument location / rendered text / control value / selected value等のmachine observationとobserved end state / outcomeを保持し、usability-evaluationへ渡せること
+17. `usability-evaluation` へのread-only handoff
+18. 同一sessionを別Skillが並行操作しない
 
 ### wcag-conformance-evaluation
 

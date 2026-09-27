@@ -75,6 +75,18 @@ machine evidence
 LLM: scriptでは決められないapplicability / exception / UX意味判断
         ↓
 usability-evaluation
+        ├─ 判断を閉じられる → evaluation result
+        └─ 追加evidenceが必要
+             ↓
+           LLM: canonical observation field / fixed predicate keyを選択したadditional observation draft
+             ↓
+           observation_contract.py: OBSREQ ref / identity / no-progress検証 / fixed probeへ変換
+             ↓
+           browser owner: user-facing interactionで必要stateへ到達しfixed requestを実行
+             ↓
+           observation_contract.py normalize
+             ↓
+           同じsemantic decisionをnew evidence付きで再評価
         ↓
 runtime / validatorで構造を再検査
         ↓
@@ -122,6 +134,7 @@ Skill固有のcriterion logicやmeasurement logicは入れません。
 - formal handoff required scope / observation request refs（`formal-handoff` の場合）
 - top-level aspectのtarget-specific semantic applicability / reason。general時の固定row有無そのものは入力しない
 - `observation_contract.py normalize` 後のcanonical machine observation records
+- `observation_contract.py` がmaterializeしたadditional observation request records
 - measurement inputs
 - selected supported test rule keys
 - machine evidenceだけで確定できないrequirement applicability / exception等のsemantic decisions
@@ -172,6 +185,7 @@ Outputは次を必須で持ちます。
 - test rule results
 - requirement check rows
 - action traces
+- additional observation requests
 - optional task / flow result
 - evaluation refs
 - Finding requirement / refs
@@ -191,13 +205,19 @@ browser I/O前後のmachine contractを担当します。詳細は `_05g_usabili
 - target refs
 - environment / viewport / input method
 - formal handoff observation request refs（存在する場合）
+- semantic additional observation drafts（存在する場合）
+- previous additional observation request rows / current evidence refs（no-progress判定に必要な場合）
 
 #### Function
 
 - scope / selected supported rule / measurement kindからrequired observation field集合を導出し、field → fixed probe mappingを一意に解決
+- semantic additional observation draftでは、LLMが選択したcanonical observation field / predicate keyだけを受け付け、自由記述からfield / probeを推論しない
+- additional observation draftへ `OBSREQ-001` 等を決定論的に採番し、requester / scope / target / state / field / predicate payloadからrequest identity、sorted current evidence refsからinput evidence fingerprintを導出する
+- previous requestとidentity / evidence fingerprintが同一なら `no-progress` としbrowser requestを生成しない
 - target draftからartifact-local `TARGET-001` 等を採番し、5種resolverのpayload、Playwright exact matching、parent scope、population revision / fingerprint、current document / session、uniqueness契約をmaterialize
 - `browser-observation-catalog.json` の明示dispatchからrequired probe key集合を導出
-- `PROBE-001` 等のartifact-local request refを決定論的に採番
+- `PROBE-001` 等のartifact-local probe request refを決定論的に採番
+- additional observation request statusとprobe request refs / result evidence refsをmaterialize
 - fixed probe payload / execution metadataをmaterialize
 - unknown probe / unknown field / arbitrary JavaScript inputをreject
 - element probeごとにtarget resolverの `unique / missing / ambiguous / stale` を検証
@@ -206,7 +226,7 @@ browser I/O前後のmachine contractを担当します。詳細は `_05g_usabili
 - viewport / geometry / responsive boundary / timing等のmachine valueをcanonicalizeし、responsive boundaryではdetection / normalization / execution feasibilityを分離
 - interaction timingでは8種fixed predicateごとのpayload schemaとsame-page `performance.now()` clockを要求
 
-`observation_contract.py` 自身はbrowserを起動・操作しません。Agentはscriptがmaterializeしたfixed requestをcurrent PR #12 browser経路へ渡し、resultをscriptへ戻します。
+`observation_contract.py` 自身はbrowserを起動・操作しません。Agentはscriptがmaterializeしたfixed requestをcurrent PR #12 browser経路へ渡し、resultをscriptへ戻します。semantic additional observationで必要stateへの到達方法はbrowser ownerがuser-facing interactionとして判断しますが、観測field / predicate / probe実装はfixed contractから外しません。
 ### measurement.py
 
 #### Input

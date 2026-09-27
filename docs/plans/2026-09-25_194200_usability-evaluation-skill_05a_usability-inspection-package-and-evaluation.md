@@ -215,6 +215,31 @@ task / flowは指定された場合だけ保持します。
 
 観測事実に「使いにくい」「分かりづらい」等の専門評価を書きません。
 
+### additional observation requests
+
+semantic判断から追加evidenceが必要になった場合だけ保持します。request refは `observation_contract.py` が生成し、`inspection_structure.py` は再採番しません。
+
+- observation request ref: `OBSREQ-001` からartifact-localに採番
+- request draft key
+- requester kind: `usability-evaluation / wcag-procedure`
+- requester refまたはrequester draft key
+- scope ref
+- target refまたはtarget draft key（element対象の場合）
+- state draft key（特定stateが必要な場合）
+- canonical observation field key
+- fixed predicate key / canonical payload（必要な場合）
+- request reason
+- input evidence refs
+- input evidence fingerprint
+- status: `planned / completed / unsupported / no-progress / blocked`
+- probe request refs
+- result evidence refs
+- limitation / blocker
+
+同一request identityは requester / scope / target / state / canonical observation field / predicate payloadからscriptが導出します。同じidentityかつ同じinput evidence fingerprintのrequestを再実行しません。新しいevidenceが追加された場合だけ同じsemantic decisionを再評価できます。
+
+自由記述のrequest reasonはprobe選択に使いません。canonical observation field keyがcatalogに存在しない場合は `unsupported` へ閉じます。
+
 ### standard / binding requirement checks
 
 明確なrequirementを判定できる場合だけ保持します。
@@ -367,6 +392,11 @@ deterministic validatorは次をすべて確認します。
 - requested / inspected scopeとclosure rowの一致
 - 問題なしに必要なinspection closure参照
 - observation ref一意性
+- observation request ref一意性と `OBSREQ-\d{3,}` 形式
+- observation requestのrequester / scope / target / field cross-reference解決
+- canonical observation fieldがbrowser observation catalogへ解決し、field → probe mappingが一意
+- 同一request identity + 同一input evidence fingerprintを再実行せず `no-progress` へ閉じている
+- completed requestにprobe request refs / result evidence refsがあり、unsupported / blocked / no-progressにreasonがある
 - measurement ref一意性
 - requirement check ref一意性
 - evidence ref解決
