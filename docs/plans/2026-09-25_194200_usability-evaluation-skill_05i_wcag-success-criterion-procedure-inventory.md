@@ -171,9 +171,13 @@ AT procedureはSuccess Criterion固定で常に実行するという意味では
 
 ### external evidence
 
-- 2.3.1 → `external-wcag-2.3.1`
-- 2.3.2 → `external-wcag-2.3.2`
-- 3.1.5 → `external-wcag-3.1.5`
+| criterion | external procedure | applicability mode |
+| --- | --- | --- |
+| 2.3.1 | `external-wcag-2.3.1` | `external-evidence-available` |
+| 2.3.2 | `external-wcag-2.3.2` | `external-evidence-available` |
+| 3.1.5 | `external-wcag-3.1.5` | `external-evidence-available` |
+
+これらはoptional supporting evidenceです。requirements assetでは該当criterionだけ `external_evidence_allowed=true` とし、外部証拠がない場合もprocedure key自体はexpected集合へ残したまま、`_05h` のapplicability contractで `not-applicable` としてclosureします。外部証拠の不存在をcriterion未完了理由にしません。
 
 manual / AT / external procedureはrequired evidence kind、result contract、不足時status、`_05h` のapplicability modeをcatalogで固定し、証拠やfallback applicabilityをLLM推測で補いません。conditional manual fallbackはsource machine limitation codeからscriptが有効化します。
 
@@ -182,11 +186,11 @@ applicability modeの割当は次で固定します。
 - §3のmachine procedure全件 → `always`
 - 全Success Criterion共通の `s-wcag-<SC>` → `always`
 - 上記「常時またはcriterion populationに応じてrequiredになるmanual procedure」 → `always`
-- external evidence procedure → `always`
+- external evidence procedure → `external-evidence-available`
 - assistive technology procedure → `semantic` + 上表のfixed `applicability_decision_key`
 - 上記conditional manual fallback 5件 → `machine-limitation`
 
-`population-present` 等の追加modeは作りません。target populationなしの可能性も、required inventory / semantic procedureを実行したうえでcriterion-level `applicable_population=none` として閉じます。
+`population-present` 等の追加modeは作りません。external evidenceは上表の `external-evidence-available` だけを使い、外部証拠がない通常caseを `not-applicable` へ閉じます。target populationなしの可能性も、required inventory / semantic procedureを実行したうえでcriterion-level `applicable_population=none` として閉じます。
 
 ## 5. criterion別procedure_keysの決定方法
 
@@ -216,7 +220,7 @@ semantic layerへ残すもの:
 scriptへ残すもの:
 
 - required criterion集合 / procedure key集合
-- procedure applicability mode / AT applicability decision key / conditional manual fallback mapping
+- procedure applicability mode / AT applicability decision key / external evidence availability / conditional manual fallback mapping
 - population / target inventoryで機械的に閉じられる部分
 - browser値取得
 - 数値計算 / fixed comparison
