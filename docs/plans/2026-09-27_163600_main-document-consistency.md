@@ -1,0 +1,301 @@
+# main文書整合修正Plan
+
+このPlanは、PR #13 merge後の`main`で確認した現行文書の不整合を修正するための実装計画です。
+
+対象は、現在のリポジトリ状態を説明する文書に残ったSkill数・評価件数・責務表のずれです。過去時点のPlan、history、実装・検証記録は履歴として保持し、現在値へ書き換えません。
+
+## 対象ブランチ
+
+`docs/main-document-consistency`
+
+## 基準
+
+- 対象リポジトリ: `ryu-yoshikawa-pro-vision/qa-workflow-skills`
+- 基準branch: `main`
+- 基準commit: `1a13958180877971d77ba92ee7b13872bccb26b8`
+- 基準時点の正規Skill数: 19
+- trigger dataset: 428 query
+- deterministic output dataset: 38 case
+- semantic dataset: 72 case
+- `qa-workflow` routing fixture: 61件
+
+基準値は、`skills/`の19 Skill、GitHub Actions、`EVALS.md`、`tests/skills/evals/semantic/test_semantic_datasets.py`、`skills/qa-workflow/evals/deterministic/routing_cases.json`で確認済みです。
+
+## 目的
+
+PR #13 merge後の実装を正本として、現在状態を説明する文書同士の不整合を解消します。
+
+今回修正するのは次の4件です。
+
+1. `skills/qa-workflow/references/guidance.md`に残る「全16 Skill」を19 Skillへ合わせる
+2. `EVALS.md`のsemantic case内訳「その他13 Skill」を実データに合わせて「その他10 Skill」へ修正する
+3. `docs/PROJECT_CONTEXT.md`をPR #11時点の評価・実装一覧から、PR #12 / #13 merge後の現在状態へ同期する
+4. `README.md`の「工程固有ロジックの正本」表を、現在の19 Skill構成と責務境界へ同期する
+
+新しいSkill、runtime、評価方式、CI、文書生成機構は追加しません。
+
+## 確認済みの不整合
+
+### 1. qa-workflow guidanceのSkill数
+
+`skills/qa-workflow/references/guidance.md`は「ランタイム前提」で19 Skillを正しく列挙しています。
+
+一方、同じファイルの「E2E要求時の分岐」に、
+
+```text
+全16 Skillを固定順に実行しません。
+```
+
+が残っています。
+
+同一文書内で矛盾しているため、現在の19 Skill構成へ修正します。ルーティング内容そのものは変更しません。
+
+### 2. EVALS.mdのsemantic case内訳
+
+`EVALS.md`はsemantic datasetを合計72 caseとしています。この合計値は現在のrepository testと一致しています。
+
+個別件数が明示されているSkillは次の9 Skillです。
+
+- `test-analysis=7`
+- `test-condition-design=14`
+- `adversarial-review=8`
+- `qa-workflow=3`
+- `test-target-inspection=2`
+- `test-execution=2`
+- `regression-testing=6`
+- `exploratory-testing=4`
+- `qa-knowledge=6`
+
+正規Skillは19個なので、既定2 caseを使う残りは10 Skillです。
+
+`tests/skills/evals/semantic/test_semantic_datasets.py`も、上記9 Skillだけを`EXPECTED_CASE_COUNTS`へ定義し、その他Skillを2 caseとして合計72を検証しています。
+
+したがって、
+
+```text
+その他13 Skillは各2
+```
+
+を、
+
+```text
+その他10 Skillは各2
+```
+
+へ修正します。case数そのものは変更しません。
+
+### 3. PROJECT_CONTEXT.mdの現在値
+
+`docs/PROJECT_CONTEXT.md`の「評価・検証」は現在もPR #11時点の値を現在値として記述しています。
+
+現状:
+
+- 14 Skill
+- trigger 328件
+- semantic 51件
+- runtime CIは7 Skillのcompile
+
+PR #13 merge後の現在状態とは一致しません。
+
+現在の実装では次を確認済みです。
+
+- 19 Skill
+- trigger 428件
+- deterministic output 38件
+- semantic 72件
+- `deterministic-output-evals.yml`は`spec-analysis`、PR #11 runtime対象Skill、`regression-testing`、`exploratory-testing`、`qa-knowledge`のscriptをcompileする
+- PR #12で`test-target-inspection` / `test-execution`が追加済み
+- PR #13で`regression-testing` / `exploratory-testing` / `qa-knowledge`と`qa-workflow/scripts/artifact_graph.py`が追加済み
+
+`PROJECT_CONTEXT.md`は現在状態を説明する文書なので、現在値と主要実装面を同期します。
+
+PR #11固有のruntime契約や、PR #11実装時に24/24 PASSだった実Judge結果は履歴上の事実として残して構いません。ただし、現在の全repository評価件数と混同しない位置・表現へ整理します。
+
+### 4. READMEの責務表
+
+`README.md`冒頭のSkill構成表は19 Skillを正しく列挙しています。
+
+一方、「工程固有ロジックの正本」の表には、現在の責務表から次が欠落しています。
+
+- `test-target-inspection`
+- `test-execution`
+- `e2e-test-inspection`
+- `e2e-test-implementation`
+- `e2e-test-execution`
+- `e2e-test-result-analysis`
+- `e2e-test-reporting`
+- `regression-testing`
+- `exploratory-testing`
+- `qa-knowledge`
+
+正本は`skills/qa-workflow/references/guidance.md`の「工程固有ロジックの正本」とし、READMEの表を同じ責務境界へ合わせます。
+
+README側で詳細アルゴリズムを増やさず、担当Skillの一覧と責務だけを同期します。
+
+## 変更対象
+
+### `skills/qa-workflow/references/guidance.md`
+
+変更:
+
+- 「全16 Skill」を「全19 Skill」へ修正
+
+変更しないもの:
+
+- E2E routing
+- 各Skillの責務
+- workflow状態
+- production helper checkpoint
+
+### `EVALS.md`
+
+変更:
+
+- semantic case内訳の「その他13 Skill」を「その他10 Skill」へ修正
+- routing fixtureの説明にある「今回14件」がmerge後も意味を取りやすいよう、必要なら「PR #13で14件」へ修正する
+
+変更しないもの:
+
+- semantic case数
+- rubric
+- Judge契約
+- deterministic / semantic評価方式
+- routing fixture自体
+
+routing fixtureの「今回」の表現は事実誤りではないため、可読性改善として同じ変更内で直す場合も意味を変えない文言修正に限定します。
+
+### `docs/PROJECT_CONTEXT.md`
+
+現在状態を説明する部分だけを更新します。
+
+#### 維持する内容
+
+- PR #11 runtimeの基本契約
+- Skill-local `runtime_contract.py`の責務
+- PR #11実装時の検証事実
+- 既知の環境差
+
+#### 更新する内容
+
+「主な実装面」に、現在存在する次の主要経路を追記します。
+
+- `skills/test-target-inspection/`
+- `skills/test-execution/`
+- `skills/regression-testing/`
+- `skills/exploratory-testing/`
+- `skills/qa-knowledge/`
+- `skills/qa-workflow/scripts/artifact_graph.py`
+
+「評価・検証」の現在値を次へ更新します。
+
+- 19 Skill
+- trigger 428件
+- deterministic output 38件
+- semantic 72件
+- current CIで実行している主要検証
+
+PR #11の24/24実Judgeやruntime smoke等、過去の実行結果は「PR #11実装時の検証」と分かる表現で残します。
+
+現在値と過去時点の実績を同じ文で「固定する」と表現しません。
+
+### `README.md`
+
+「工程固有ロジックの正本」表を`skills/qa-workflow/references/guidance.md`へ同期します。
+
+追加する責務は現在のguidanceに存在するものだけとします。
+
+READMEへ新しい責務を定義せず、guidanceとの差異をなくします。
+
+## 対象外
+
+次は変更しません。
+
+- `docs/plans/`に残る14 Skill / 16 Skill等の過去時点の基準値
+- `docs/history/`の過去検証値
+- `docs/reports/`の実装・検証時点の記録
+- Skill本体の実行契約
+- runtime実装
+- validator
+- fixture / dataset
+- GitHub Actions
+- test code
+- PR #11 / #12 / #13の履歴
+
+過去Plan・history・reportの数値を現在値へ一括置換しません。これらは当時の基準・実績を残す文書であり、更新すると履歴の意味を壊します。
+
+## 実装順序
+
+1. 最新`main`との差分がないことを確認する
+2. `skills/qa-workflow/references/guidance.md`のSkill数を19へ修正する
+3. `EVALS.md`のsemantic case内訳を実データと一致させる
+4. `docs/PROJECT_CONTEXT.md`の現在状態をPR #12 / #13 merge後へ同期する
+5. `README.md`の責務表をqa-workflow guidanceへ同期する
+6. 現行文書に古い現在値が残っていないか検索する
+7. 既存の文書・評価契約検証を実行する
+
+## 検証
+
+### 文書横断確認
+
+少なくとも次を確認します。
+
+```bash
+git grep -nE '全?16 Skill|全?14 Skill|368クエリ|328件|その他13 Skill' --   README.md   EVALS.md   docs/PROJECT_CONTEXT.md   skills/*/SKILL.md   skills/*/references/*.md
+```
+
+過去文書である`docs/plans/`、`docs/history/`、`docs/reports/`はこの現在値確認から除外します。
+
+検索結果が存在する場合は、その文脈が現在値か過去値かを確認し、現在値として残っているものだけを修正します。
+
+### 現行値との照合
+
+次を確認します。
+
+- `skills/`の正規Skillが19個
+- trigger datasetが428 query
+- deterministic output datasetが38 case
+- semantic datasetが72 case
+- routing fixtureが61件
+- READMEと`qa-workflow` guidanceの責務表に担当Skillの欠落がない
+
+### 既存検証
+
+文書修正だけですが、現在の正本と矛盾していないことを確認するため、少なくとも次を実行します。
+
+```bash
+python scripts/skills/evals/semantic/validate.py
+python -m unittest discover -s tests/skills/evals/semantic -v
+python -m unittest discover -s tests/skills/evals/trigger -v
+git diff --check
+```
+
+`README.md` / `EVALS.md`のSkill一覧を検査する`Validate Agent Skills`相当のrepository eval structure検証も実行します。
+
+コード・dataset・runtimeを変更しないため、実Agent candidate / 実Judgeの再評価は行いません。
+
+## 完了条件
+
+次をすべて満たしたら完了です。
+
+- `qa-workflow` guidanceの現在Skill数が19で統一されている
+- `EVALS.md`のsemantic case内訳が実datasetと算術的に一致する
+- `PROJECT_CONTEXT.md`の現在値が19 Skill / 428 trigger / 38 deterministic / 72 semanticと一致する
+- `PROJECT_CONTEXT.md`にPR #12 / #13で追加された主要実装面が反映されている
+- READMEの「工程固有ロジックの正本」が現在のqa-workflow guidanceと責務上矛盾しない
+- 過去Plan / history / reportを現在値へ書き換えていない
+- 文書横断検索で、現行文書に14 / 16 Skill等の旧現在値が残っていない
+- semantic dataset validation、repository semantic test、trigger test、repository eval structure検証がpassする
+- `git diff --check`がpassする
+
+## 実装時に追加しないもの
+
+この不整合修正だけを理由に、次は追加しません。
+
+- 文書生成script
+- Skill数を埋め込む新しい設定ファイル
+- 文書専用lint framework
+- 新しいCI job
+- README / EVALS / PROJECT_CONTEXTの自動生成
+- 過去Planの一括修正
+
+同種の文書driftが今後も繰り返し発生し、既存CIでは防げないことが実測された場合に、その時点で必要な最小の自動検証を検討します。
