@@ -89,3 +89,48 @@ candidateとjudge result JSONは各Skillの`evals/semantic/candidate_outputs/`�
 - relation index、generic storage adapter、transaction manager、central scheduler / distributed lock、central knowledge manifest / global mutable ID counterは追加していません。固定root scan、stable direct refs、storage-native条件の要求で現在のscopeを満たし、追加はPlanが禁止または必要性未実証のためです。
 - PR #11 Machine Entity / runtime / freshness、およびPR #12 / E2E execution、result、evidence、rerun lineageは再実装・複製していません。
 - fix-confirmation専用Skill / artifact / state、Investigation専用Skillは追加していません。未検証Observation / Findingはcurrent knowledgeへ自動昇格しません。
+
+## PR #13レビュー4件の修正・最終検証
+
+- 対象レビューhead: `5d491b4ec75f941eea2f173d8363039f83250a27`
+- 修正commit: `081b6ad07aaf952412453c9b37d26696f32e3220`（PR #13 branchへ通常push）
+
+### 修正内容
+
+1. Regression Activityのactual startと完了を分離しました。logical TCの`executed`はowner executionのactual startだけで決めます。Activity完了にはrequired routeすべてのowner-confirmed `result_finalized`、投影可能なsource result、cleanup完了、unresolvedなしを要求します。結果未確定のrouteがあればActivityは`実行中`となり、同じActivityを後続結果で更新できます。Regression側でPASS / FAIL / 判定不能のtaxonomyから確定状態を推測しません。`REG-D011`も同じ完了条件を検査します。
+2. project-local shared resource reservationはacquire前にatomic conditional release能力を要求します。Step 0のlocal filesystem能力では`blocked`となり、予約ファイルを作りません。isolated resourceは`not_required`、取得済みexternal reservationと、create-if-absentおよびconditional releaseの両能力があるproject-local reservationは`reserved`です。既存のowner / expected revision / cleanupによるrelease検証は維持しました。
+3. `qa-knowledge.read_entry()`は`^KN-[0-9a-f]{64}$`以外のrefを`invalid_entry_ref`でblockします。parse後はbodyの`entry_ref`とcanonicalized `identity`の両方を要求refと照合し、不一致を`entry_identity_mismatch`でblockします。既存symlink拒否を維持しました。
+4. `qa-workflow/SKILL.md`とguidanceに`artifact_graph.py`を必須production helperとして接続しました。開始/resume、mutable operation直前、resource使用前、current成果物完了・再利用前のcheckpointとfail-closed動作を明記しました。pre-start claim pathは`<qa.workflow_state_root>/claims/<content_identity({workflow_ref, operation_ref})>.json`から導出し、`qa.claim_root`は追加していません。helperは`qa-workflow` package内に留めています。
+
+### 追加した回帰テストと特別確認値
+
+- Regression: actual start済み・結果未確定はTC=`executed` / Activity=`実行中`、同一Activityの`update_allowed`を確認。確定済みPASS / FAIL / 判定不能はActivity完了可能で、結果文字列を保持します。required routeの一部だけ未確定でもTCは`executed`、Activityは未完了です。
+- Reservation: local filesystemのみは`blocked` / `atomic_conditional_release_unavailable`で、予約ファイルなし。取得済みexternal reservation=`reserved`、isolated=`not_required`、必要な両atomic capabilityあり=`reserved`。
+- Knowledge: 正常canonical ref=`current`。malformed / slash・backslash traversal ref=`blocked` / `invalid_entry_ref`でroot外sentinelは不変。body ref / identity不一致は`blocked` / `entry_identity_mismatch`。
+- Claim: canonical targetは`<workflow_state_root>/claims/<content_identity({workflow_ref, operation_ref})>.json`。同一operationの並行claimは1件だけacquire。
+- Skill contract testはResources、実行checkpoint、処理operation、fail-closed、`qa.claim_root`不在を検証します。
+
+### 最終検証
+
+| コマンド / 検証 | 結果 |
+| --- | --- |
+| focused deterministic: `python -m unittest discover -s tests/skills/evals/deterministic -p 'test_qa_artifact_graph_skills.py' -v` | 26 tests pass |
+| deterministic: `python -m unittest discover -s tests/skills/evals/deterministic -v` | 114 tests pass |
+| runtime: `python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v` | 271 tests pass |
+| shared deterministic: `python -m unittest discover -s scripts/skills/evals/deterministic/tests -v` | 12 tests pass |
+| `python scripts/skills/evals/semantic/validate.py` | 19 Skills / 72 cases pass |
+| semantic runner tests: `python -m unittest discover -s scripts/skills/evals/semantic/tests -v` | 27 pass、2 Windows symlink privilege skips |
+| repository semantic: `python -m unittest discover -s tests/skills/evals/semantic -v` | 4 tests pass |
+| trigger: `python -m unittest discover -s tests/skills/evals/trigger -v` | 1 test pass |
+| `skills-ref validate`（19 Skill） | 19/19 valid |
+| CIと同じ対象群でのPython `compileall` | pass |
+| `git diff --check` | pass |
+| 影響caseの実Agent candidate + 既存semantic runner + 実Judge（`REG-SEM-004`のみ） | pass、rating 4。結果確定済みFAILと未開始blocked routeを区別し、source resultを保持 |
+
+修正commit `081b6ad07aaf952412453c9b37d26696f32e3220` に対するGitHub Actions 3件はすべてsuccessです: [Validate Agent Skills](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/36295746716)、[Validate Deterministic Output Evals](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/36295746695)、[Validate Semantic Output Evals](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/36295746709)。PR #13の最終headの状態は[PR checks](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/13)で確認します。
+
+### Plan整合・未達
+
+- 今回の4修正でPlanとの責務境界・保存モデル変更はありません。Step 0で記録したlocal filesystemの事実（atomic create-if-absentあり、atomic conditional update / releaseなし）は変更していません。
+- Regressionはowner-confirmed `result_finalized` projection factを受け取り、結果taxonomyを複製しません。shared reservationはconditional release capabilityがないlocal保存先でfail-closedです。
+- 今回指定された4件、ローカル検証、修正commit上のCIに未達事項はありません。意図的に未実装の対象は既存Plan節の記載どおりです。
