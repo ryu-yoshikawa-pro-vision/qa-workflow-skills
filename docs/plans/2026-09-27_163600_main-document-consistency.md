@@ -25,7 +25,7 @@
 
 PR #13 merge後の実装を正本として、現在状態を説明する文書同士の不整合を解消します。
 
-今回修正するのは次の10件です。
+今回修正するのは次の12件です。
 
 1. `skills/qa-workflow/references/guidance.md`に残る「全16 Skill」を19 Skillへ合わせる
 2. `EVALS.md`のsemantic case内訳「その他13 Skill」を実データに合わせて「その他10 Skill」へ修正する
@@ -37,8 +37,12 @@ PR #13 merge後の実装を正本として、現在状態を説明する文書�
 8. `workflow-state-template.md`のpersisted state項目と、現在のworkflow state契約を照合して文書上の不一致を解消する
 9. `qa-workflow/references/guidance.md`の全体完了条件を、Regression / Exploration / QA Knowledgeを含む現在のworkflow入口へ同期する
 10. Project Contextのhistory / shared resource関連入口について、現在の実装契約と文書の関係を明確にする
+11. `regression-testing`のBaseline / Run / Activity正規出力契約を、現在のvalidator / fixture / production helperと一致させる
+12. `qa-knowledge`の`entry_revision`をentry body必須fieldではなくstorage metadataとして統一する
 
 8〜10は単純な文言置換ではありません。詳細は[`workflow state / Project Context 文書整合Plan`](./2026-09-27_163600_main-document-consistency_workflow-contract-sync.md)を正本とします。
+
+11〜12の詳細は[`Skill artifact contract 文書整合Plan`](./2026-09-27_163600_main-document-consistency_skill-artifact-contract-sync.md)を正本とします。
 
 新しいSkill、runtime、評価方式、CI、文書生成機構は追加しません。
 
@@ -183,9 +187,36 @@ PR #11 / #12後の47件に今回14件を加えた61件
 
 case数やrouting fixture数は変更せず、例えば「現在の追加・拡張責務」「PR #13で14件を追加した61件」のように、`main`で読んでも参照先が明確な表現へ修正します。
 
+同じ節に残る「新規Skill」「新3 Skill」も対象を明示します。`regression-testing` / `exploratory-testing` / `qa-knowledge`を指す場合は、その3 Skill名または「PR #13で追加した3 Skill」と書き、文書単体で参照先が分かる状態へ揃えます。
+
+
+### 11. regression-testingの正規出力契約
+
+`skills/regression-testing/assets/output-template.md`は正規machine artifactを説明していますが、詳細fieldを「Plan記載の全field」として過去Planへ依存しています。
+
+また、baselineは`assets/baseline-template.json`を使うとしていますが、現在のdeterministic validator / fixtureが使う`artifact_type`、`completeness_evidence`等とtemplateの記載に差があります。
+
+`skills/regression-testing/SKILL.md`のResourcesも「baselineとActivityのmachine input」としており、参照先`references/data-contract.md`が扱うRunが説明から欠落しています。
+
+現在のproduction helper / validator / fixtureを正本として、過去PlanなしでBaseline / Run / Activityの正規契約を追える文書へ同期します。
+
+詳細は[`Skill artifact contract 文書整合Plan`](./2026-09-27_163600_main-document-consistency_skill-artifact-contract-sync.md)に分離します。
+
+### 12. qa-knowledgeのentry_revision
+
+`skills/qa-knowledge/references/guidance.md`は`entry_revision`をentryの必須項目として列挙しています。
+
+一方、`references/data-contract.md`と現在のproduction helperは、`entry_revision`をentry bodyへ書かないstorage metadataとして扱っています。`assets/entry-template.md` / `assets/entry-template.json`にも`entry_revision`はありません。
+
+現在のdata contract / runtimeを正本として、entry bodyの必須fieldとstorage metadataを分離して説明します。
+
+`entry_revision`をentry templateへ追加しません。
+
+詳細は[`Skill artifact contract 文書整合Plan`](./2026-09-27_163600_main-document-consistency_skill-artifact-contract-sync.md)に分離します。
+
 ## 追加の契約整合確認
 
-次の3件は、過去Planの文言をそのまま現在文書へコピーせず、merge済み実装と現在のSkill契約を確認してから同期します。
+8〜10の3件は、過去Planの文言をそのまま現在文書へコピーせず、merge済み実装と現在のSkill契約を確認してから同期します。
 
 - workflow state persisted recordの必須項目
 - `qa-workflow`全体完了条件の適用範囲
@@ -217,6 +248,7 @@ case数やrouting fixture数は変更せず、例えば「現在の追加・拡�
 - semantic case内訳の「その他13 Skill」を「その他10 Skill」へ修正
 - 「本Planで追加した意味責務」を、現在の評価文書として参照先が明確な表現へ修正する
 - routing fixtureの「今回14件」を「PR #13で14件」のようにmerge後も意味が確定する表現へ修正する
+- 「新規Skill」「新3 Skill」を、対象Skill名または「PR #13で追加した3 Skill」のように参照先が確定する表現へ修正する
 
 変更しないもの:
 
@@ -311,6 +343,24 @@ frontmatter変更後はtrigger datasetの回帰確認を実行します。
 
 実際に変更するファイルは、補助Planの確認手順で現在の契約を確定してから決めます。
 
+
+### Regression / QA Knowledge artifact契約
+
+11〜12の変更対象候補は次です。
+
+- `skills/regression-testing/SKILL.md`
+- `skills/regression-testing/references/data-contract.md`
+- `skills/regression-testing/assets/output-template.md`
+- 必要な場合だけ `skills/regression-testing/assets/baseline-template.json`
+- `skills/qa-knowledge/references/guidance.md`
+- 必要な場合だけ
+  - `skills/qa-knowledge/references/data-contract.md`
+  - `skills/qa-knowledge/assets/output-template.md`
+
+`qa-knowledge/assets/entry-template.md` / `entry-template.json`は現在のruntime / data contractと整合しているため、`entry_revision`を追加しません。
+
+実際の変更範囲と確認手順は[`2026-09-27_163600_main-document-consistency_skill-artifact-contract-sync.md`](./2026-09-27_163600_main-document-consistency_skill-artifact-contract-sync.md)を正本とします。
+
 ## 対象外
 
 次は変更しません。
@@ -340,8 +390,10 @@ frontmatter変更後はtrigger datasetの回帰確認を実行します。
 8. 補助Planに従ってworkflow state persisted recordの現在契約を確認し、templateとの不一致だけを修正する
 9. `qa-workflow`の全体完了条件を、要求されたworkflow / 成果物に応じた条件へ整理する
 10. Project Contextのhistory / shared resource関連入口を確認し、既存欄・既存rootで解決できる場合はその経路を文書化する。独立rootが現在契約上必須と確認できた場合だけstable key追加を検討する
-11. 現行文書に古い現在値・参照先不明のmerge前提表現・契約上の孤立項目が残っていないか検索する
-12. 既存の文書・評価契約検証を実行する
+11. Skill artifact contract補助Planに従い、`regression-testing`のBaseline / Run / Activity契約を現在のvalidator / fixture / helperへ同期する
+12. 同補助Planに従い、`qa-knowledge`のentry bodyと`entry_revision` storage metadataの境界を文書で統一する
+13. 現行文書に古い現在値・参照先不明のmerge前提表現・過去Plan依存・契約上の孤立項目が残っていないか検索する
+14. 既存の文書・評価契約検証を実行する
 
 ## 検証
 
@@ -350,7 +402,7 @@ frontmatter変更後はtrigger datasetの回帰確認を実行します。
 少なくとも次を確認します。
 
 ```bash
-git grep -nE '全?16 Skill|全?14 Skill|368クエリ|328件|その他13 Skill|本Plan|今回14件' -- \
+git grep -nE '全?16 Skill|全?14 Skill|368クエリ|328件|その他13 Skill|本Plan|今回14件|新3 Skill|新規Skill|Plan記載' -- \
   README.md \
   EVALS.md \
   docs/PROJECT_CONTEXT.md \
@@ -379,6 +431,9 @@ git grep -nE '全?16 Skill|全?14 Skill|368クエリ|328件|その他13 Skill|�
 - `qa-workflow`の完了条件が単独Regression / Exploration / QA Knowledgeへ旧テスト設計chainを強制しない
 - historyをfixed-root scanするSkillについて、rootまたは既存成果物入口の出所が文書から追える
 - shared resource policyの記録場所が現在文書から特定できる
+- `regression-testing`のBaseline / Run / Activity正規契約を過去Planなしで追える
+- `regression-testing/assets/baseline-template.json`とcurrent validator / fixtureの必須fieldに説明不能な差がない
+- `qa-knowledge`でentry bodyのfieldと`entry_revision` storage metadataが混同されていない
 
 ### 既存検証
 
@@ -397,6 +452,8 @@ git diff --check
 
 8〜10の契約文書同期では、既存の`tests/skills/evals/deterministic/test_qa_artifact_graph_skills.py`も実行し、現在のProject Context / workflow state / claim / reservation契約と矛盾しないことを確認します。
 
+11〜12では、同テストに加えてrepository deterministic test全体を実行し、現在のRegression / QA Knowledge contractと文書同期が矛盾しないことを確認します。validator / fixture / datasetは変更しません。
+
 コード・dataset・runtimeを変更しないため、実Agent candidate / 実Judgeの再評価は行いません。
 
 ## 完了条件
@@ -410,12 +467,17 @@ git diff --check
 - READMEの「工程固有ロジックの正本」が現在のqa-workflow guidanceと責務上矛盾しない
 - `workflow-state-template.md`のSkill状態表に`qa-workflow`を含む19 Skillが反映されている
 - README冒頭と`qa-workflow` frontmatter `description`がRegression / Exploration / QA knowledgeを含む本文の現在責務と矛盾しない
-- `EVALS.md`に参照先不明の「本Plan」「今回14件」が残っていない
+- `EVALS.md`に参照先不明の「本Plan」「今回14件」「新規Skill」「新3 Skill」が残っていない
 - workflow state persisted recordと現在のworkflow state契約に説明不能な差が残っていない
 - `qa-workflow`の全体完了条件が、要求していないspec / design / E2E工程を全workflowへ必須化していない
 - Regression / Exploration / workflow historyの発見入口が現在文書から追える
 - Project Contextへ、現在実装で必要性を確認できないhistory root / stable keyを追加していない
 - shared resource policyの記録場所が明確である
+- `regression-testing/assets/output-template.md`に「Plan記載の全field」のような過去Plan依存が残っていない
+- `regression-testing`のBaseline / Run / Activity正規契約と現在のvalidator / fixtureに説明不能な差が残っていない
+- `regression-testing/SKILL.md`のResources説明からRunだけが欠落していない
+- `qa-knowledge`のentry body必須fieldから`entry_revision`が分離され、storage metadataとして説明されている
+- `qa-knowledge` entry templateへ`entry_revision`を追加していない
 - 過去Plan / history / reportを現在値へ書き換えていない
 - 文書横断検索で、現行文書に14 / 16 Skill等の旧現在値が残っていない
 - semantic dataset validation、repository semantic test、trigger test、repository eval structure検証がpassする
@@ -435,5 +497,7 @@ git diff --check
 - relation index / central artifact registry
 - workflow state専用の新規runtime schema framework
 - 文書整合だけを理由にしたproduction code変更
+- `entry_revision`のentry bodyへの追加
+- `regression-testing`のvalidator / fixtureを文書へ合わせる変更
 
 同種の文書driftが今後も繰り返し発生し、既存CIでは防げないことが実測された場合に、その時点で必要な最小の自動検証を検討します。
