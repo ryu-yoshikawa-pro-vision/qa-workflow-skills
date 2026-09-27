@@ -194,6 +194,9 @@ merge後の既存artifact-local ref規則がある場合はそれを使います
 - 追加観測links（必要な場合）:
   - execution owner: `usability-inspection / test-target-inspection / test-execution`
   - request draft key
+  - canonical observation field key
+  - request signature
+  - state basis refs / current document identity（該当する場合）
   - inspection request ref（ownerがusability-inspectionの場合だけ）
   - owner activity ref（ownerがtest-target-inspection / test-executionの場合）
   - input evidence fingerprint
@@ -415,7 +418,7 @@ Input:
 - pattern identification decisions
 - evaluation decisions。status、observed fact、semantic impact、applied reference decision、project Authority refs、reference不使用理由、judgment reason、follow_up_required等、意味判断でしか確定できないfield
 - evidence / requirement / test rule / measurement refs
-- resolved additional observation link records（存在する場合）。usability-inspection ownerではOBSREQ ref、test-target-inspection / test-execution ownerではowner activity ref + returned evidence refsを持つ
+- resolved additional observation link records（存在する場合）。全ownerでcanonical observation field / request signature / input evidence fingerprintを持ち、usability-inspection ownerではOBSREQ ref、test-target-inspection / test-execution ownerではowner activity ref + returned evidence refsを持つ
 - Finding本文に必要なsemantic input（Findingを作る場合）
 
 各semantic decisionはinvocation内一意の `draft_key` を持ちます。Agentはfinal evaluation ref、完成したclosure row、summary count、`finding_required` を入力しません。
@@ -428,6 +431,7 @@ Function:
 - `EVAL-001` からartifact-local refを決定論的に採番
 - draft key → final ref解決
 - applied reference / project Authority / evidence / related test rule / requirement / measurement / additional observation linkのcross-reference解決
+- additional observation linkのrequest signatureを `_03` のcanonical JSON式から独立導出し、supplied signatureとの一致を検証する。same signature + input evidence fingerprintは `no-progress` 以外で再実行済みにしない
 - evaluation basis enumとbasis別required field検証
 - reference利用有無に応じたrequired field検証。standard / pattern / heuristic / best practice主張でreference 0件を許可しない一方、Authority-only / evidence-semantic評価では条件付きで0件を許可
 - statusと `follow_up_required` からFinding作成要否を固定ruleで導出し、必要な場合だけFinding draft / refとのclosureを要求
@@ -512,7 +516,8 @@ Webへアクセスしてsourceの最新状態を検査するruntimeにもせず�
 - 観測済みのユーザー影響を出す場合は対応evidenceがある
 - TC resultを書き換える欄を持たない
 - source item refなしのbest practice / standard断定を拒否
-- additional observation linkはexecution ownerごとに解決する。usability-inspection ownerではcurrent inspection artifactのOBSREQ、test-target-inspection / test-execution ownerではowner activity refとreturned evidence refsを要求し、別ownerのrefを混在させない
+- additional observation linkはcanonical observation field / request signature / input evidence fingerprintを必須とし、signatureをvalidatorが独立再計算する。execution ownerごとに解決し、usability-inspection ownerではcurrent inspection artifactのOBSREQ、test-target-inspection / test-execution ownerではowner activity refとreturned evidence refsを要求し、別ownerのrefを混在させない
+- same request signature + same input evidence fingerprintをstatus `completed` として複数実行していない
 
 意味上「本当にDialogか」「本当に使いづらいか」「follow-upが必要か」はdeterministic validatorで判定しません。production helperへ渡すmachine interfaceだけを必要fieldへ限定し、LLMの判断理由・uncertainty・複合判断まで最小化しません。固定row、ID、Finding要否、cross-reference、summary、machine-owned renderingだけを機械検証します。production `evaluation_structure.py` とdeterministic validatorは別実装とし、同じ処理を互いにimportしません。
 

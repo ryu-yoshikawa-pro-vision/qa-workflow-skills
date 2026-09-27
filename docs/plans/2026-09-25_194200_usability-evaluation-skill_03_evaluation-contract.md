@@ -307,7 +307,7 @@ scope外の別機能・別originを自由探索する要求へは変形しませ
 - state description / interaction（意味説明用。identityには使わない）
 - state basis refs。現在stateを識別する既存immutable action / evidence / sample / variation等のrefsをcanonical sortして保持
 - current document identity（live documentに依存する場合）
-- canonical observation field key（execution ownerがusability-inspectionの場合は必須）
+- canonical observation field key。execution ownerに関係なく `_05g` の有限inventoryから必須選択し、追加観測で必要なevidence semanticsの共通語彙にする
 - fixed predicate key / payload（timing等で必要な場合）
 - 必要な観測内容の説明
 - 観測が必要な理由
@@ -317,11 +317,26 @@ scope外の別機能・別originを自由探索する要求へは変形しませ
 
 追加観測の実行ownerは、追加観測を要求したSkillではなくcurrent mutable browser/session ownerで決めます。test-target-inspection / test-executionの実行中に得たevidenceを評価している場合は同じownerへ要求を返し、usability-evaluationが別sessionを操作しません。usability-inspectionがbrowser ownerの場合だけ `_05g` の `OBSREQ-...` contractを使います。
 
-canonical observation field / predicate keyの選択は意味判断側が行います。自由記述の「必要な観測内容」は説明であり、scriptが自然言語からprobeを推論する入力にはしません。
+canonical observation field / predicate keyの選択は意味判断側が行います。自由記述の「必要な観測内容」は説明であり、scriptが自然言語からfield / probeを推論する入力にはしません。test-target-inspection / test-execution ownerでもcanonical observation fieldは「何のevidenceを返すか」の意味契約として使い、owner独自のbrowser実装を `_05g` のprobe実装へ置き換える要求にはしません。
 
-usability-inspection ownerでは `observation_contract.py` がrequester identity / scope / target / canonical sort済みstate basis refs / document identity / observation field / predicate payloadからrequest identityを導出し、artifact-local `OBSREQ-001` 等を決定論的に採番します。同じidentityかつcurrent evidence集合が増えていない場合は `no-progress` とし、browser操作を再実行しません。
+全execution ownerで、次のcanonical JSONから `request_signature = sha256(canonical_json(...))` をscriptが導出します。
 
-test-target-inspection / test-execution ownerではOBSREQを捏造せず、同じnormalized draftをownerの安全なcheckpointへ返します。owner activity ref、returned evidence refs、実行可否をevaluation成果物のadditional observation linkへ保持します。同じnormalized requestを同じinput evidenceで再要求する場合は再実行せず `no-progress` として閉じます。
+- requester kind
+- canonical requester identity
+- execution owner
+- scope ref
+- canonical target identityまたはnull
+- canonical sort済みstate basis refs
+- current document identityまたはnull
+- canonical observation field key
+- fixed predicate keyまたはnull
+- canonical predicate payloadまたはnull
+
+input evidence refsはcanonical sortしたうえで別の `input_evidence_fingerprint` を導出します。state description、request reason、必要な観測内容の自由記述はsignatureへ含めません。
+
+usability-inspection ownerでは `observation_contract.py` がこの共通式でrequest signature / evidence fingerprintを導出し、artifact-local `OBSREQ-001` 等を決定論的に採番します。同じsignature + evidence fingerprintが既に存在する場合は `no-progress` とし、browser操作を再実行しません。
+
+test-target-inspection / test-execution ownerではOBSREQを捏造せず、`evaluation_structure.py` が同じ共通式を独立実装してrequest signature / evidence fingerprintをmaterializeし、normalized draftをownerの安全なcheckpointへ返します。owner activity ref、returned evidence refs、実行可否をevaluation成果物のadditional observation linkへ保持します。同じsignature + evidence fingerprintを再要求する場合は再実行せず `no-progress` として閉じます。
 
 追加evidenceが返った場合はreturned evidence refsを元evaluation / requirement / procedureへ戻し、同じsemantic decisionを再評価します。ownerが安全に追加観測できない、fixed observation contractで表現できない、またはscope外操作が必要な場合は、推測で閉じず `判定不能` または該当workflowの `blocked` とします。
 
