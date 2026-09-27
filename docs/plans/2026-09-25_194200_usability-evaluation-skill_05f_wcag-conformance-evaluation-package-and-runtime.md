@@ -546,7 +546,10 @@ PR #11のcurrent Machine Runtime契約を再利用します。独自runtime enve
 deterministic runtimeへ載せるもの:
 
 - `wcag_requirements.py` のversion / level → expected requirement集合 / Conformance Requirement fixed rule metadata
+- finite procedure catalog hash / key解決 / machine dispatch contract
 - sample identity registry / selected set / duplicate / overlap / union
+- presentation variation registry / required variation coverage
+- criterion evaluation planのrow / execution status / result closure
 - rerun sample lineage / previous-current identity resolution
 - random target count、candidate population fingerprint、selection result validation
 - complete process materialization
@@ -598,7 +601,8 @@ Output:
 
 - criterion evaluation plan rows
 - formal handoff observation requirements
-- missing / duplicate / unresolved criterion refs
+- missing / duplicate / unresolved criterion / variation refs
+- procedure catalog resolution issues
 - completion status
 - rendered machine-owned section
 - issues
