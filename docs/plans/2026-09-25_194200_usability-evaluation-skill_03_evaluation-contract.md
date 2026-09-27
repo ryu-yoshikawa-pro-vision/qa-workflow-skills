@@ -282,7 +282,9 @@ LLMは宣言済みtarget / origin / role / side-effect / evaluation scopeを暗�
 - 判断理由
 - 期待される特性または目的
 - 想定される影響
-- reference / Authority refs。直接適用できるreferenceがなければその事実
+- 適用できるreference refs
+- project Authority refs（project仕様 / business ruleを根拠に使う場合）
+- 直接適用できるreferenceがない場合はその理由
 - evidence refs
 - 追加観測が必要か
 
@@ -294,16 +296,24 @@ scope外の別機能・別originを自由探索する要求へは変形しませ
 
 現在のevidenceだけでは意味判断を閉じられない場合、LLMは「何を追加で確認すれば判断できるか」を返せます。
 
-追加観測要求は少なくとも、
+追加観測draftは少なくとも、
 
-- 関連scope / evaluation ref
-- 関連criterion / semantic procedure ref（存在する場合）
+- invocation内一意の `request_draft_key`
+- requester: evaluation draft key、またはcriterion / semantic procedure ref
+- 関連scope ref
+- target refまたはtarget draft key（element対象の場合）
 - 対象state / interaction
-- 必要な観測内容
+- canonical observation field key
+- fixed predicate key / payload（timing等で必要な場合）
+- 必要な観測内容の説明
 - 観測が必要な理由
-- 必要なevidence kind
+- current evidence refs
 
 を持ちます。
+
+canonical observation field / predicate keyの選択は意味判断側が行います。自由記述の「必要な観測内容」は説明であり、`observation_contract.py` が自然言語からprobeを推論する入力にはしません。catalogに対応keyがなければ `unsupported` として返します。
+
+`observation_contract.py` はdraftからartifact-local `OBSREQ-001` 等を決定論的に採番し、requester / scope / target / state / observation field / predicate payloadからrequest identityを導出します。同じidentityをcurrent evidence集合が増えていない状態で再要求した場合は `no-progress` とし、browser操作を再実行しません。追加evidenceが返った場合はrequest refとevidence refsを元evaluation / procedureへ戻し、同じsemantic decisionを再評価します。
 
 browser操作方法や任意JavaScriptをLLMが実装しません。`usability-inspection` / browser ownerが既存のside-effect / ownership契約で必要stateへ到達し、`_05g` のfixed observation field / probeへ変換して取得します。同一判断に対する同一追加観測を新evidenceなしで繰り返しません。
 
@@ -336,11 +346,13 @@ Authorityがないbusiness ruleを推測して評価基準へ追加しません�
 - user goal / task（評価条件から継承。行単位で異なる場合だけoverride）
 - pattern
 - 観測事実
-- 適用したreference:
+- project Authority refs（project仕様 / business ruleを根拠に使う場合）
+- 適用したreference（適用可能な場合）:
   - reference entry ref
   - source item ref
   - referenceの位置づけ
-  - project Authority refs（project固有のbinding根拠を使う場合だけ）
+  - project Authority refs（そのreferenceをproject bindingとして扱う根拠が必要な場合だけ）
+- reference不使用理由（`適用したreference` が0件の場合だけ必須）
 - 期待される特性
 - 差異
 - 想定される影響
@@ -354,7 +366,15 @@ Authorityがないbusiness ruleを推測して評価基準へ追加しません�
 - 推奨routing
 - finding ref（Findingを作成した場合だけ）
 
-`適用したreference` は1件以上の配列として扱い、1行につき1つの `reference entry ref + source item ref` の組を持ちます。`source item ref` はそのreference entryに実際に含まれるitemでなければなりません。同じ評価項目でproject Authority、WCAG、Design System、heuristic等を併用する場合も、各source itemごとの `referenceの位置づけ` を別行で保持し、1つの値へ統合しません。`status reason / 制約・未確認` は `判定不能` / `対象外` では必須です。
+`適用したreference` を使う場合は、1行につき1つの `reference entry ref + source item ref` の組を持ち、`source item ref` はそのreference entryに実際に含まれるitemでなければなりません。同じ評価項目でWCAG、Design System、heuristic等を併用する場合も、各source itemごとの `referenceの位置づけ` を別行で保持します。
+
+referenceは無条件必須にはしません。
+
+- standard / UI pattern / heuristic / best practiceを根拠として主張する → `適用したreference` を1件以上必須
+- project仕様 / business ruleを根拠とする → 対応するproject Authority refsを必須。public referenceは任意
+- 観測済みstate / component間の意味的不整合そのものを評価する → evidence ref、判断理由、`reference不使用理由` を必須とし、適用できるreferenceがなければ0件を許可
+
+referenceがないことを理由にbest practiceやstandard要求を創作しません。`status reason / 制約・未確認` は `判定不能` / `対象外` では必須です。
 
 ### Step 11: 必要な場合だけFindingを作る
 

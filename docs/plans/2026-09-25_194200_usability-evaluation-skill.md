@@ -59,7 +59,7 @@ formalなWCAG conformance evaluationはgeneral inspectionと分離し、`wcag-co
 - design artifactまたは取得済みevidence
 - platform / viewport / state
 - project Authority / adopted Design System / applicable standard
-- user / role / task / flow等が明示されている場合はそのcontext
+- user / role / task / flow、success condition、business outcome / business rule等が明示されている場合はそのcontext
 
 **Function**
 
@@ -178,7 +178,7 @@ random sampleの選択自体はpredictable fixed patternにしません。有限
 
 browser操作は `usability-inspection`、意味判断は各owner SkillのLLM、機械的な導出・検証・成果物組立はSkill-local production scriptが担当します。LLMは、UI patternの適用性、Authority、criterion applicability / exception、source採否、content type / Findingの意味的同一性、user / business goalと観測flowの意味的整合、cross-pattern / flow全体の複合的な懸念、follow-up要否等を判断します。固定enum、期待集合、row skeleton、派生boolean、集計、順序、ID、cross-reference、status transition、machine-owned Markdown sectionはscriptが導出します。
 
-「LLMへ必要最小限のstructured decisionを求める」は、LLMが発見できる問題や判断理由を事前定義fieldだけへ限定する意味ではありません。固定上位観点、procedure、semantic caseは最低限確認すべきcoverageであり、宣言済みscope内でevidenceから追加の複合的な懸念を発見した場合は、LLMが追加evaluation draftを返せます。判断に追加evidenceが必要なら、LLMは目的・対象状態・必要な観測内容・理由を示して追加観測を要求でき、`observation_contract.py` が既存の安全なprobe / observation fieldへ変換・検証します。任意JavaScriptやscope外操作へfallbackしません。required production helperが失敗した場合、LLMが同じ機械値を手作成してfallbackせず、影響scopeを `incomplete / unresolved / blocked` へ閉じます。
+「LLMへ必要最小限のstructured decisionを求める」は、LLMが発見できる問題や判断理由を事前定義fieldだけへ限定する意味ではありません。固定上位観点、procedure、semantic caseは最低限確認すべきcoverageであり、宣言済みscope内でevidenceから追加の複合的な懸念を発見した場合は、LLMが追加evaluation draftを返せます。判断に追加evidenceが必要なら、LLMは目的・対象状態・必要な観測内容・理由を判断し、既存catalogで表現できる場合はcanonical observation field / predicate keyまで選択します。`observation_contract.py` は自然言語を解釈せず、その有限keyを検証して既存の安全なprobeへ一意に変換します。対応keyがない場合はgeneric ruleや任意JavaScriptへfallbackせず `unsupported / 判定不能 / undetermined / blocked` へ閉じます。required production helperが失敗した場合もLLMが同じ機械値を手作成してfallbackしません。
 
 formal WCAG評価では `wcag-conformance-evaluation` がmethodology / semantic sample selection / report責務を所有し、個別sampleのlive observationが必要な場合はhandoff requirementを出します。`qa-workflow` が `usability-inspection` を直列実行し、originating evaluation / resume pointへ紐付いたimmutable resultをformal評価へ戻します。
 
@@ -403,7 +403,7 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
 52. general accessibility inspectionとformal WCAG conformance evaluationを別Skillへ分離する。formal評価はWCAG 2.0 / 2.1 / 2.2をsupported versionとし、target version / level / self-enclosedなdigital product scope / accessibility support baselineを事前に確定してWCAG-EM 2.0へ従う。指定versionを別versionへ暗黙変換しない。version自体が不明・未指定の場合は `unresolved`、現在catalogを持たない将来version等が明示された場合は `unsupported` として分離する。target levelから必要なSuccess Criteria / conformance requirement集合は指定versionのstatic catalogからscriptが独立導出し、LLMの自己申告集合を正本にしない。supported test ruleがrequirementの一部だけを評価する場合、rule outcomeが `passed` でもrequirementを `satisfied` にしない。
 53. screenshot、DOM、accessibility tree、raw snapshot等はsecret・個人データ・機密情報を含み得るため、PR #12のevidence安全契約を再利用して必要最小限だけ取得・保存し、raw evidenceを成果物の必須条件にしない。
 54. deterministic runtime、deterministic validator、semantic evalを分離し、同じ実装で生成と検証を行わない。
-55. semantic layerは意味判断でしか確定できない最小decisionだけをproduction helperへ渡す。完成row、final ref、expected集合、derived status / boolean、summary count等をLLMが組み立ててhelperへ自己申告しない。
+55. production helperへ渡すmachine interfaceは、意味判断に必要なfieldへ限定する。これはsemantic reasoningの量や発見可能な懸念を最小化する意味ではない。LLMは判断理由、uncertainty、複合的な関係、追加観測の必要性を保持できるが、完成row、final ref、expected集合、derived status / boolean、summary count等のmachine-owned fieldを組み立てて自己申告しない。
 56. production helperはmachine-owned sectionをcanonicalにrender / materializeし、Agentは返却されたmachine-owned contentを値単位で転記・再構築しない。repository fileへのwrite自体は既存の安全な保存経路を使い、scriptの直接writeを必須にはしない。
 57. formal WCAGのsampling procedure使用可否はsemantic layerが「製品全体を評価可能か」を判断し、scriptが成果物構造と後続Step applicabilityを確定する。samplingをskipする場合はcurrentでcompleteな全体inventoryをselected sample setへmaterializeし、structured / random selectionとStep 4.3をnot-applicableとして閉じる。complete processの識別・Step 4.2評価は省略しない。
 58. sampleの意味的同一性は、currentな `test-target-inspection` の対象キー / 状態キーを利用できる場合はそれをidentity sourceとして再利用する。利用できない場合はsemantic layerが「同一view/stateか別sampleか」だけを判断し、scriptがartifact-local sample identityをmaterializeする。URLだけでdynamic stateを同一sampleとみなさず、duplicate / overlap / union / process membershipはこのidentityで機械判定する。
@@ -430,5 +430,5 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
 79. formal observation handoffのworkflow state物理schema、CAS順序、mutable operation claim、resource reservation、duplicate / conflicting return、stale origin、expected-returned closure、resume guardは `_04c` を正本とする。LLMはhandoff completionやresume可否を判断せず、PR #13のcurrent coordination helperへ必要なdeterministic helperだけを追加する。
 80. `wcag-conformance-evaluation` が所有する出力形式はcanonical human-readable report、条件付きEvaluation Statement / WCAG Conformance Claim / Statement of Partial Conformance、要求時のEARL JSON-LDまでとする。追加評価要件として要求される情報・coverageは目的内ならappliedまたはblockedへ閉じるが、未知の外部document format / arbitrary template renderer自体は本Skillの目的外とし、generic template engineを追加しない。
 81. 固定上位観点、reference、procedure、semantic caseは最低coverageであり、LLMが宣言済みscope内で発見できる懸念の上限にはしない。複数component / state / interactionの組合せで初めて現れる問題や既存catalogへ直接一致しない懸念も、観測事実・判断理由・関連scopeを示して追加evaluation draftとして扱える。target / origin / side-effect等のscope自体を暗黙拡張しない。
-82. semantic判断に追加evidenceが必要な場合、LLMは関連scope / evaluation / procedure、対象state、必要な観測内容、理由を含む追加観測要求を返せる。browser ownerは既存のuser-facing interactionと `_05g` のfixed observation contractへ落とし込み、scriptがrequest ref、probe、schema、安全条件、重複を検証する。既存contractで安全に取得できない場合はad hoc JavaScriptやhidden implementation情報へ逃げず `判定不能 / undetermined / blocked` へ閉じる。
+82. semantic判断に追加evidenceが必要な場合、LLMは関連scope / evaluation / procedure、対象state、必要な観測内容、理由を判断し、既存catalogで表現できる場合はcanonical observation field / fixed predicate keyを選択して追加観測draftを返せる。browser ownerは既存のuser-facing interactionで必要stateへ到達し、`observation_contract.py` が有限key、request ref、probe、schema、安全条件、重複 / no-progressを検証する。scriptが自由記述からprobeを推論しない。既存contractで安全に取得できない場合はad hoc JavaScriptやhidden implementation情報へ逃げず `判定不能 / undetermined / blocked` へ閉じる。
 83. user goal / business outcome / business ruleがproject Authority、仕様、validated TC等から明示されている場合、LLMは複数step・stateを横断して「観測されたflowがその目的を理解・達成できる形になっているか」を意味的に評価できる。business logic自体の仕様上のPASS / FAIL、expected resultの確定、Product RiskやTC ownershipは既存のtest-analysis / test-condition-design / test-case-design / test-executionへ残し、Skillがbusiness ruleを創作しない。
