@@ -4,7 +4,7 @@
 
 本ファイルは、`wcag-conformance-evaluation → qa-workflow → usability-inspection → qa-workflow → wcag-conformance-evaluation resume` のformal observation handoffについて、workflow stateへ永続化する物理契約、CAS更新順序、claim / shared resource lifecycle、再観測、重複return、stale origin、resume条件を固定します。
 
-workflow state / concurrency基盤はPR #13 merge後current mainの `skills/qa-workflow/scripts/artifact_graph.py`、`assets/workflow-state-template.md`、`references/guidance.md` を正本とします。
+workflow state / concurrency基盤はcurrent main `dec3f7c764db2869dc24eb3d6f154712a6677068`（PR #15反映後）の `skills/qa-workflow/scripts/artifact_graph.py`、`assets/workflow-state-template.md`、`references/guidance.md` を正本とします。PR #14 branchはこのmain commitよりbehindの場合、実装開始前にcurrent mainを同期して同じ契約を再確認します。
 
 production helperが実際に扱うpersisted documentは次です。
 
@@ -20,7 +20,7 @@ production helperが実際に扱うpersisted documentは次です。
 
 `state_revision` は保存先 / read結果が返すconditional write tokenであり、このdocument内へ複製しません。
 
-current `workflow-state-template.md` は説明例でpayload fieldをtop-levelに示しているため、PR #14実装時はhandoff追加前にtemplateをproduction helperのshapeへ同期します。今回の追加は既存 `schema_version="1"` の `state` payloadへ `handoffs` を追加するadditive extensionとし、outer envelopeを変更しません。別state version、store、lock service、queue、汎用orchestration frameworkは追加しません。
+current mainの `workflow-state-template.md` は既にproduction helperと同じ `workflow_ref / schema_version / state` envelopeへ同期済みです。PR #14で既存template shapeを再修正しません。今回の追加は既存 `schema_version="1"` の `state` payloadへ `handoffs` を追加するadditive extensionだけとし、outer envelopeを変更しません。別state version、store、lock service、queue、汎用orchestration frameworkは追加しません。
 
 既存の `claim_mutable_operation()`、`recover_claim()`、`reserve_shared_resource()`、`release_shared_resource()` を再利用します。
 
