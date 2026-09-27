@@ -88,6 +88,7 @@ handoffは `state.handoffs` にだけ保存します。
             "variation_ref": "...",
             "process_ref": null,
             "requirement_ref": "...",
+            "request_kind": "wcag-machine-probe | semantic-observation",
             "observation_request_ref": "..."
           }
         ],
@@ -98,6 +99,7 @@ handoffは `state.handoffs` にだけ保存します。
               "variation_ref": "...",
               "process_ref": null,
               "requirement_ref": "...",
+              "request_kind": "wcag-machine-probe | semantic-observation",
               "observation_request_ref": "..."
             },
             "result_ref": "...",
@@ -127,7 +129,7 @@ handoffは `state.handoffs` にだけ保存します。
 
 初回handoffの `retry_of_handoff_ref` は `null` です。
 
-`expected_observations` はformal helperがmaterializeした集合だけを受け取ります。`returned_results.observation_key` はimmutable result本文からhelperが導出しexpected keyと照合します。raw observation / screenshot / DOMはstateへ複製しません。
+`expected_observations` はformal helperがmaterializeした集合だけを受け取ります。`request_kind=wcag-machine-probe` の `observation_request_ref` はformal artifact内のtyped requestへ解決し、そこに `machine_probe_key` とtarget / population identity inputを保持します。stateへprobe payloadやbrowser instructionを複製しません。`returned_results.observation_key` はimmutable result本文からhelperが導出し、request kindを含めてexpected keyと照合します。raw observation / screenshot / DOMはstateへ複製しません。
 
 status:
 
