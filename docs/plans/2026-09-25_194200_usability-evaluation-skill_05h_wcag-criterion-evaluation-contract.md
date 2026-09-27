@@ -74,6 +74,9 @@ supported WCAG 2.0 / 2.1 / 2.2の全Success Criterionで `procedure_keys` を1�
 - `result_contract`
 - `completion_evidence`
 - `limitation_behavior`
+- `applicability_mode`: `always / population-present / semantic / machine-limitation`
+- `activation_source_procedure_key`。`machine-limitation` の場合だけ必須。それ以外は `null`
+- `activation_limitation_codes`。`machine-limitation` の場合だけ非空。それ以外は空配列
 
 同じprocedureを複数Success Criterionで共有できますが、任意式、JavaScript、自然言語rule本文、plugin entry pointを入れません。
 
@@ -129,6 +132,39 @@ procedure catalogで `required_capabilities` に `assistive-technology` を含�
 
 既存監査結果、field data、project instrumentation等を利用できるprocedureだけをcatalogへ登録します。source / revision / environment / freshness / scope一致を必須にします。
 
+### 3.6 procedure applicability / fallback
+
+全procedure execution rowはcriterion-levelの `applicable_population` と別に、procedure自身のapplicabilityを保持します。
+
+procedure execution rowは少なくとも次を持ちます。
+
+- procedure execution ref
+- procedure key / execution kind
+- applicability: `applicable / not-applicable / unknown`
+- applicability basis refs / reason
+- activation source procedure ref（存在する場合）
+- execution status: `pending / in-progress / complete / blocked`
+- procedure result。値域はcatalogの `result_contract` を正本とする
+- evidence refs
+- limitation code / blocker
+
+`wcag_criterion_plan.py` がcatalogの `applicability_mode` から次を決定論的に閉じます。
+
+- `always`: procedureは常にapplicable
+- `population-present`: criterion populationが `present` ならapplicable、`none` ならnot-applicable、`unknown` ならunknown
+- `semantic`: fixed semantic contractのdecision refからapplicable / not-applicable / unknownを受け、scriptがprocedure rowへ投影する。LLMがprocedure keyを追加・削除しない
+- `machine-limitation`: source machine procedureが未closureならunknown。sourceがcompleteし `activation_limitation_codes` のいずれかを返した場合だけapplicable。それ以外の正常closureではnot-applicable
+
+`not-applicable` は `execution_status=complete`、procedure resultは `null` とし、applicability basisを必須にします。required applicable procedureのclosureには数えません。
+
+`unknown` を残したままcriterionを `satisfied / not-satisfied` にしません。必要evidenceを取得・評価したうえで意味的に確定できない場合はcriterionを `undetermined`、required capability / environment自体がなくprocedureを実施できない場合は `blocked` とします。
+
+machine procedureが既知のmachine limitationで閉じた場合、manual fallbackがcatalogにあるならそのlimitationだけでcriterionをblockedへ短絡しません。scriptがfallback procedureをapplicableへ遷移させ、manual evidenceのclosureを待ちます。fallbackも実施不能なら初めて `blocked / undetermined` へ閉じます。
+
+manual fallbackはmachine値をLLM推測で補う経路ではありません。対象・状態・評価方法・測定値または観測結果・evidence refを固定契約で要求し、数値が必要なcriterionでは目視推定値を正式測定値として扱いません。
+
+arbitrary condition expression、procedure selector DSL、LLM supplied fallback keyは追加しません。
+
 ## 4. criterion evaluation plan
 
 `wcag_criterion_plan.py materialize` は、sampleとrequired presentation variationの組合せごとにrequired Success Criterion全件をrow化します。
@@ -142,6 +178,7 @@ procedure catalogで `required_capabilities` に `assistive-technology` を含�
 - criterion ref
 - target WCAG version / level
 - procedure execution refs
+- procedure applicability / applicability basis refs
 - required capabilities
 - observation request refs
 - measurement refs
@@ -174,7 +211,7 @@ Success Criterionへ適用対象contentが存在するかもprocedure contract�
 
 ## 6. live observation requestへの変換
 
-`wcag_criterion_plan.py` はselected procedureからrequired capabilityを集約します。semantic/manual/AT側の追加観測は `_05g` canonical observation field requestへ、machine procedureのbrowser入力はprocedure catalogの `required_machine_probe_keys` から `_05j` のtyped `request_kind=wcag-machine-probe` requestへmaterializeし、formal handoffへ渡します。
+`wcag_criterion_plan.py` はselected procedureからrequired capabilityを集約します。observation requestはprocedure applicabilityが `applicable` のexecutionだけから生成します。semantic/manual/AT側の追加観測は `_05g` canonical observation field requestへ、machine procedureのbrowser入力はprocedure catalogの `required_machine_probe_keys` から `_05j` のtyped `request_kind=wcag-machine-probe` requestへmaterializeし、formal handoffへ渡します。`unknown / not-applicable` procedureからbrowser requestを先行生成しません。
 
 同一sample / variation / stateで共有できるrequestはdeduplicateします。
 
@@ -317,6 +354,9 @@ production `wcag_criterion_plan.py` と別実装で少なくとも次を検証�
 - execution statusとresultの組合せ整合
 - `applicable_population=none` のcompleteness evidence
 - 単一ACT `inapplicable` だけでpopulation none / criterion satisfiedにしていない
+- procedure applicability mode / activation source / limitation code整合
+- `not-applicable` procedureがbasis refなしでclosureされていない
+- `machine-limitation` fallbackがsource procedure closure前にapplicable / not-applicableへ確定されていない
 - `satisfied` にrequired applicable procedure未完了なし
 - `not-satisfied` にviolation evidenceあり
 - `undetermined` にreasonあり
@@ -346,7 +386,8 @@ production `wcag_criterion_plan.py` と別実装で少なくとも次を検証�
 - contrast ratio machine calculation + gradient background unavailable
 - reflow geometry + semantic exception
 - AT procedure applicable / environment unavailable → blocked
-- manual evidence不足 → undetermined
+- machine limitationに対応するmanual fallbackがscriptでapplicable化され、machine limitationだけでcriterionをblockedへ短絡しない
+- manual fallback evidence不足 → undetermined、manual実施環境 / evaluator capability自体がない場合 → blocked
 - semantic procedureが追加観測を要求 → fixed observation contractで取得 → 同じprocedureを再評価
 - 同一追加観測をnew evidenceなしで再要求 → no-progressとしてundetermined / blocked
 - fixed observation contractで表現できない追加観測 → ad hoc probeを作らずundetermined / blocked
