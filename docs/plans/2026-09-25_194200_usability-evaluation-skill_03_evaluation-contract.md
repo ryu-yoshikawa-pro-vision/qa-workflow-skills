@@ -148,7 +148,7 @@ reference側にあるnormative / informative / advisoryという性質だけか�
 - visual integrity
 - cross-pattern / flow
 
-全上位観点へ同じ詳細checklistを機械適用しません。各上位観点の中で何を確認するかは、pattern、reference、evidence、対象状態に応じて選びます。
+全上位観点へ同じ詳細checklistを機械適用しません。各上位観点の中で何を確認するかは、pattern、reference、evidence、対象状態に応じて選びます。固定上位観点は最低coverageであり、その配下で発見できる懸念を有限checklistへ限定しません。
 
 「今回評価する」とした上位観点は、その観点で適用対象として識別した全target / concernをUI / UX評価結果へ閉じます。少なくとも1件だけ出力して残りを暗黙に省略しません。各結果は `問題を確認 / 問題なし / 判定不能 / 対象外` のいずれかへ閉じます。
 
@@ -270,6 +270,59 @@ component単体が妥当でもflow全体で問題になる場合があります�
 
 必要な場合だけflow単位で再評価します。
 
+### Step 9.1: scope内で追加の複合的な懸念を扱う
+
+Step 6で固定した上位観点、既知pattern、reference、semantic caseは最低限のcoverageです。評価中に、複数component / state / interactionの組合せで初めて成立する問題や、既存pattern名へ直接一致しない懸念をevidenceから発見した場合、その懸念を無視しません。
+
+LLMは宣言済みtarget / origin / role / side-effect / evaluation scopeを暗黙に広げず、次を含む追加evaluation draftを返せます。
+
+- 関連する既存上位観点。複数に跨る場合はそのrefs
+- 対象component / state / flow
+- 観測事実
+- 判断理由
+- 期待される特性または目的
+- 想定される影響
+- reference / Authority refs。直接適用できるreferenceがなければその事実
+- evidence refs
+- 追加観測が必要か
+
+`evaluation_structure.py` はref採番、cross-reference、status / Finding routing、machine-owned sectionをmaterializeします。追加evaluation draftの意味をcatalogへ一致させるためにLLMの判断を捨てません。
+
+scope外の別機能・別originを自由探索する要求へは変形しません。open-endedな未知不具合探索そのものは `exploratory-testing` の責務を維持します。
+
+### Step 9.2: 追加観測を要求できる
+
+現在のevidenceだけでは意味判断を閉じられない場合、LLMは「何を追加で確認すれば判断できるか」を返せます。
+
+追加観測要求は少なくとも、
+
+- 関連scope / evaluation ref
+- 関連criterion / semantic procedure ref（存在する場合）
+- 対象state / interaction
+- 必要な観測内容
+- 観測が必要な理由
+- 必要なevidence kind
+
+を持ちます。
+
+browser操作方法や任意JavaScriptをLLMが実装しません。`usability-inspection` / browser ownerが既存のside-effect / ownership契約で必要stateへ到達し、`_05g` のfixed observation field / probeへ変換して取得します。同一判断に対する同一追加観測を新evidenceなしで繰り返しません。
+
+安全に取得できない、fixed observation contractで表現できない、またはscope外操作が必要な場合は、推測で閉じず `判定不能` または該当workflowの `blocked` とします。
+
+### Step 9.3: user goal / business outcomeとの意味的整合
+
+user goal、business outcome、business rule、success conditionがproject Authority、仕様、user flow、validated TC等から確認できる場合、component単体だけでなくflow全体で次を評価できます。
+
+- UIからgoal / next actionを理解できるか
+- 途中stateが最終business outcomeと矛盾した意味を示していないか
+- 複数stepを通じて入力・選択・権限・金額・状態等の意味が一貫しているか
+- success / failure / pending等のfeedbackが実際の業務状態を誤認させないか
+- 正しいbusiness outcomeへ到達するために必要な判断材料がUIから得られるか
+
+これはbusiness logicそのものの仕様上のPASS / FAILを所有する契約ではありません。expected resultの確定や機能正当性は既存のtest-analysis / test-condition-design / test-case-design / test-executionを正本とします。
+
+Authorityがないbusiness ruleを推測して評価基準へ追加しません。既存TC / requirement上の機能不一致を確認した場合は、その判定を勝手に置き換えず、UI / UX上の影響を別evaluationとして記録し、必要なら既存ownerへroutingします。
+
 ### Step 10: UI / UX評価項目を閉じる
 
 各評価項目は次を必須fieldとして持ちます。
@@ -292,6 +345,8 @@ component単体が妥当でもflow全体で問題になる場合があります�
 - 差異
 - 想定される影響
 - 想定される影響の根拠
+- 判断理由（複合判断または既知referenceだけで自明でない場合）
+- 追加観測request refs（必要な場合）
 - 観測済みのユーザー影響（実際に証拠がある場合だけ）
 - evidence ref
 - status

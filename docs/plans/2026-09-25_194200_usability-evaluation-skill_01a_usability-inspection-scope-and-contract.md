@@ -37,6 +37,8 @@
 
 task / flowが指定されていない場合でも実行できます。ただし、その場合に確定できるのは宣言したscope内のUI品質上の観測、standard / binding requirementの確認、ユーザビリティ関連の懸念候補です。specified user / goal / contextを必要とする製品全体のusability、human task success、efficiency、satisfactionを本Skill単独で確定しません。
 
+固定されたgeneral scopeは最低coverageであり、実行中にscope内の複数state / interactionの組合せから追加の懸念が見つかった場合、その観測を捨てません。意味判断と専門評価は `usability-evaluation` へ渡し、追加evidenceが必要なら `_05g` の追加観測契約を使います。target / origin / role / side-effect scopeを暗黙には広げません。
+
 ## 3. human usability testingとの境界
 
 本Skillはhuman participantを用いるusability testingやuser researchを代替しません。
@@ -94,6 +96,7 @@ native iOS / Android app、desktop native app等の能動操作は本Skillの対
 - task / flow
 - start state
 - success condition
+- business outcome / business rule / Authority refs（明示されている場合）
 - 特定の利用者条件
 - 特定のinput method
 - 特定viewport / device
@@ -115,6 +118,8 @@ general inspectionでは、次の上位観点をすべてscope rowへ作成し�
 - measurable standard criteria
 - user-facing performance / responsiveness
 - task / flow（明示された場合のみrowを追加）
+
+これらのrowは最低限閉じる観点です。既存rowの配下で発見した追加の複合的な懸念や追加Observationを禁止しません。追加懸念の意味判断は `usability-evaluation`、観測事実の取得は本Skillが担当します。
 
 特定観点だけを明示した依頼ではそのrequested scopeを尊重します。general inspectionで対象外にする場合は、UIに該当populationがない、実行条件上観測不能、または本Skillの責務外である理由を残します。
 
