@@ -83,7 +83,7 @@ selected versionの全required Success Criterionへ、必ず1件のcriterion-spe
 | `m-control-value-compare` | 3.3.7 | flow内の既取得control valueをcanonical valueとして比較し、同値 / 差分だけを返す。 |
 | `m-dom-sequence` | 1.3.2 | relevant content sequence / DOM order / accessibility orderのmachine-readable sequence refを生成する。 |
 | `m-error-state` | 3.3.1, 3.3.3 | declared input error scenario後のinvalid target、error text、association、focus / stateを取得する。 |
-| `m-focus-appearance` | 2.4.13 | focus indicatorのbefore / after pixel・geometry・contrastのmachine計測可能部分を取得・計算する。 |
+| `m-focus-appearance` | 2.4.13 | before / after screenshot evidence、target geometry、author-defined outline / border / background等のtechnology-defined color値を取得し、CSS値から一意に計算できるarea / contrastだけをmachine計算する。screenshotのpixel意味解釈や複雑なindicator shapeはsemantic/manualへ残す。 |
 | `m-focus-obscured` | 2.4.11, 2.4.12 | focused target geometryとauthor-created overlay / viewport geometryを取得し、obscured areaを計算する。 |
 | `m-focus-order` | 2.4.3, 2.4.7 | keyboard navigationでfocus target sequence、visible state、before / after refsを取得する。 |
 | `m-form-labels` | 3.3.2 | user input controlとlabel / instruction association、required / constraint metadataを取得する。 |
@@ -106,7 +106,7 @@ selected versionの全required Success Criterionへ、必ず1件のcriterion-spe
 | `m-nontext-inventory` | 1.1.1 | current scopeの非テキストcontent candidateをmachine-readable sourceから列挙し、target refとtypeを返す。 |
 | `m-orientation-run` | 1.3.4 | portrait / landscapeの2条件をfixed viewportで実行し、content / functionality loss evidenceを取得する。 |
 | `m-page-title` | 2.4.2 | document titleの存在とnormalized valueを取得する。 |
-| `m-parsing-version-rule` | 4.1.1 | target WCAG versionとcontent technologyから4.1.1のapplicability / version ruleを決定論的に導出する。 |
+| `m-parsing-version-rule` | 4.1.1 | WCAG 2.2ではcriterion不存在、WCAG 2.0 / 2.1かつcontent technologyがHTMLまたはXMLならW3C current conformance noteに従う `always-satisfied-html-xml`、それ以外は `evaluate-normative-rule` を決定論的に導出する。 |
 | `m-pointer-run` | 2.5.1, 2.5.2, 2.5.7 | 宣言済みpointer interactionをfixed browser actionで実行し、down / up / drag / path / alternative action traceを返す。 |
 | `m-reflow` | 1.4.10 | required viewport条件を実行し、horizontal / vertical overflow、clipping、target geometryを取得する。 |
 | `m-resize-text` | 1.4.4 | browser zoomとは分離したrequired text resize条件を適用し、overflow / clipping / functionality evidenceを取得する。 |
@@ -120,7 +120,7 @@ selected versionの全required Success Criterionへ、必ず1件のcriterion-spe
 | `m-timer-inventory` | 2.2.1, 2.2.3, 2.2.6 | UIに現れるtime limit / timeout / countdown candidateとcurrent machine-readable duration / notification stateを取得する。 |
 | `m-ui-purpose-metadata` | 1.3.6 | UI component / icon / regionのprogrammatic purpose関連metadataを取得する。 |
 
-machine procedureが必要とするbrowser値は `_05g_usability-inspection-browser-observation-contract.md` のcanonical observation fieldだけを使います。machine keyごとのfield mappingは `wcag-evaluation-procedure-catalog.json` に固定し、LLMがprocedureごとに手で列挙しません。
+machine procedureが必要とするbrowser値は `_05j_wcag-machine-browser-observation-contract.md` のfinite machine probeだけを使います。machine key → probe key mappingは `wcag-evaluation-procedure-catalog.json` に固定し、`wcag_criterion_plan.py` がrequired probe集合を導出します。LLMがprocedureごとにfield / probeを手で列挙しません。semantic/manual判断から追加観測が必要な場合だけ `_05g` の16 canonical observation fieldを使います。
 
 ## 4. manual / assistive technology / external evidence割当
 
@@ -166,7 +166,7 @@ manual / AT / external procedureはrequired evidence kind、result contract、�
 
 ## 6. criterion-specific semantic contract
 
-`s-wcag-*` はgenericな自然言語rule engineではありません。criterion refごとにversioned requirements assetのnormative requirement / definitions / exceptionsをInputへ固定し、共通Output schemaで意味判断します。
+`s-wcag-*` はgenericな自然言語rule engineではありません。criterion refごとの具体的なsemantic contractは `_05k_wcag-semantic-procedure-contract.md` を正本とします。versioned requirements assetへnormative requirement / definitions / exceptionsに加え、normative clause refs、semantic evaluation point、required evidence role、forbidden shortcutを固定し、共通Output schemaで意味判断します。
 
 semantic layerへ残すもの:
 
@@ -194,11 +194,13 @@ criterion固有の判断で追加evidenceが必要なら `_05g` のcanonical obs
 
 1. `wcag-2.0-requirements.json` / `wcag-2.1-requirements.json` / `wcag-2.2-requirements.json` の各SCへ本inventoryから導出した `procedure_keys` を設定する
 2. 本inventoryに現れる全procedure keyを `wcag-evaluation-procedure-catalog.json` へ登録する
-3. `m-` keyは全件 `machine_dispatch_key` とproduction implementation / fixtureを持つ
-4. `s-wcag-*` はcriterion ref、normative source refs、共通semantic schemaを持つ
+3. `m-` keyは全件 `machine_dispatch_key`、`_05j` のrequired machine probe key、production implementation / fixtureを持つ
+4. `s-wcag-*` はcriterion ref、normative source refs、`_05k` のversioned semantic contract row、共通semantic schemaを持つ
 5. `manual-* / at-* / external-*` はrequired evidence kindと不足時statusを固定する
 6. requirements assetのprocedure key集合と本inventoryのexpected集合をcontract testで比較する
 7. procedure catalogのcanonical hashを `static_data_versions.wcag_evaluation_procedures` へ保持する
+8. semantic contract assetのcanonical hashを `static_data_versions.wcag_semantic_contracts` へ保持する
+9. 4.1.1は `removed-wcag-2.2 / always-satisfied-html-xml / evaluate-normative-rule` の3経路以外を許可しない
 
 ## 8. deterministic / semantic eval
 
@@ -209,7 +211,9 @@ deterministic eval:
 - 全required SCに `s-wcag-<SC>` が1件ある
 - §3 / §4 mappingから導出したexpected procedure集合とrequirements assetが一致
 - inventoryにないprocedure key / catalogにないprocedure key / unused catalog keyをreject
-- machine procedure dispatch欠落をreject
+- machine procedure dispatch / `_05j` machine probe mapping欠落をreject
+- `_05k` semantic contract row / normative clause coverage欠落をreject
+- WCAG 2.0 / 2.1 HTML / XMLの4.1.1は `always-satisfied-html-xml`、その他technologyではshortcut禁止、WCAG 2.2では4.1.1 row自体を生成しないことを検証
 - machine化可能な値をsemantic resultとして自己申告してもfinal resultへ採用しない
 
 semantic eval:
