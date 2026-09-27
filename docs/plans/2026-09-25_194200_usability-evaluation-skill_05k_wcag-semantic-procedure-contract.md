@@ -204,7 +204,7 @@ project独自のHTML validity / parsing quality gateが存在しても、WCAG 4.
 | 2.4.13 | 2.2 | focus indicatorがrequired area / contrast changeを満たすか。CSSから一意に閉じないshape / visual stateはscreenshotを意味評価 |
 | 2.5.1 | 2.1 / 2.2 | multipoint / path-based gestureでoperableなfunctionalityにsingle-pointer alternativeがあるか、gestureがessentialか |
 | 2.5.2 | 2.1 / 2.2 | single-pointer operationのdown-event execution / abort / undo / up-event reversal条件、essential exception |
-| 2.5.3 | 2.1 / 2.2 | visible text / image-of-text labelとaccessible nameのmeaningful containment関係。machine normalized comparisonを意味上のlabel scopeへ適用できるか |
+| 2.5.3 | 2.1 / 2.2 | visible text / image-of-textとして提示されたlabelを特定し、そのtextがaccessible nameへ含まれるというmachine comparisonを当該label / controlへ適用できるか |
 | 2.5.4 | 2.1 / 2.2 | device / user motionでoperableなfunctionalityか、UI alternative / motion disableがあるか、motionがessentialか |
 | 2.5.5 | 2.1 / 2.2 | pointer target size requirementの対象か、equivalent / inline / UA-controlled / essential exceptionが成立するか |
 | 2.5.6 | 2.1 / 2.2 | platform-supported input modalitiesをrestrictしているか、security / essential / user setting等のnormative exception |
