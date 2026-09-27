@@ -218,8 +218,10 @@ browser I/O前後のmachine contractを担当します。詳細は `_05g_usabili
 - target draftからartifact-local `TARGET-001` 等を採番し、5種resolverのpayload、Playwright exact matching、parent scope、population revision / fingerprint、current document / session、uniqueness契約をmaterialize
 - `browser-observation-catalog.json` の明示dispatchからsemantic追加観測のrequired probe key集合を導出
 - `wcag-machine-probe-catalog.json` の明示dispatchからformal WCAG machine requestを検証し、`request_kind=wcag-machine-probe` を実際に処理したruntime unitだけ同catalogのcanonical hashを `static_data_versions.wcag_machine_probes` へ保持。formal machine request未使用のruntimeではこのkeyを出さない
+- formal machine probe resultの `status / limitation_code` を `_05j` のfinite組合せへ正規化し、unknown codeや自然言語fallback codeをrejectする。limitation codeからcriterion resultやmanual fallback選択はinspection側で行わない
 - `PROBE-001` 等のartifact-local probe request refを決定論的に採番
 - additional observation request statusとprobe request refs / result evidence refsをmaterialize
+- formal machine probe resultではrequest signature / machine probe key / status / optional limitation code / runtime unit identity / generation fingerprintをreturned handoff evidenceへ対応付ける
 - fixed probe payload / execution metadataをmaterialize
 - unknown probe / unknown field / arbitrary JavaScript inputをreject
 - element probeごとにtarget resolverの `unique / missing / ambiguous / stale` を検証
