@@ -52,7 +52,6 @@ catalogのcanonical JSON SHA-256を `static_data_versions.wcag_machine_probes` �
 | `mp-document-title` | document title raw value、存在、current document identity |
 | `mp-document-language` | document elementのlanguage metadata |
 | `mp-part-language-inventory` | current scope内のpart-level language metadata、target ref |
-| `mp-document-location` | safe current URL / limitation |
 | `mp-purpose-metadata` | autocomplete、role、purpose関連のallowlisted programmatic metadata |
 
 ### structure / population
@@ -82,7 +81,6 @@ catalogのcanonical JSON SHA-256を `static_data_versions.wcag_machine_probes` �
 | `mp-computed-color-context` | foreground / background / border / outline等のallowlisted computed color値 |
 | `mp-text-presentation-values` | line height / spacing / width / alignment等のmachine-readable presentation値 |
 | `mp-focus-appearance-evidence` | focused / unfocused screenshot refs、target geometry、author-defined outline / border / background / box-shadow等のtechnology-defined値、user-agent-owned flag |
-| `mp-responsive-condition-inventory` | `_05g` のresponsive condition / numeric transition result |
 | `mp-viewport-state` | viewport / document scroll metrics |
 
 `mp-focus-appearance-evidence` はscreenshotのpixel意味解析を行いません。CSS / SVG等のtechnology-defined colorとgeometryから一意に計算できる部分だけmachine計算へ渡し、複雑なshape、gradient、image background、anti-aliasing等はsemantic / manualへ残します。
