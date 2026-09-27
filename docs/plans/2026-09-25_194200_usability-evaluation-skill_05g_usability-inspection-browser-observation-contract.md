@@ -372,7 +372,6 @@ probeはUI発見shortcutになりません。
 semantic layerは追加観測が必要な場合、少なくとも次のdraftを返します。
 
 - `request_draft_key`: invocation内一意
-- requester kind: `usability-evaluation / wcag-procedure`
 - requester kind: `usability-evaluation / inspection-requirement / wcag-procedure`
 - requester identity。kindごとのref/draft keyは `_03` / `_05a` を正本とする
 - 関連scope ref
