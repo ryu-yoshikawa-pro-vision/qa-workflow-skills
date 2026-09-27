@@ -139,6 +139,102 @@ WCAG 2.0 / 2.1では `m-parsing-version-rule` を先に実行します。
 
 project独自のHTML validity / parsing quality gateが存在しても、WCAG 4.1.1 conformance resultとは別Authority / requirementとして扱います。
 
+## 7.1 criterion-specific semantic inventory
+
+次の87 unique Success CriterionをPlan上のsemantic inventoryとして固定します。実装時はこのrowをsupported versionへ展開し、`normative_source_item_refs / clause refs / definition refs / exception refs` だけを各versionのW3C正本へbindingします。semantic focus自体を実装者が再設計しません。
+
+`required_evidence_roles` は本表のsemantic focusに加え、`_05i` procedure keysと `_05j` machine probe mappingからscriptが導出するsibling evidenceを必ず含みます。本表にmachine値の再計算指示は含めません。
+
+| SC | version | semantic focus / special evidence guard |
+| --- | --- | --- |
+| 1.1.1 | 2.0 / 2.1 / 2.2 | non-text contentのpurpose / meaningとtext alternativeのequivalence、normative exception。machine population / accessible-name evidenceだけで意味の同等性を確定しない |
+| 1.2.1 | 2.0 / 2.1 / 2.2 | prerecorded audio-only / video-onlyのmedia kind、equivalent alternative、normative exception。manual media evidence必須 |
+| 1.2.2 | 2.0 / 2.1 / 2.2 | prerecorded synchronized mediaのcaptionがspoken / non-speech informationを同等に伝えるか。manual media evidence必須 |
+| 1.2.3 | 2.0 / 2.1 / 2.2 | prerecorded synchronized mediaのaudio descriptionまたはmedia alternativeがvisual informationを同等に伝えるか |
+| 1.2.4 | 2.0 / 2.1 / 2.2 | live synchronized mediaのcaption coverage / equivalence。manual evidence必須 |
+| 1.2.5 | 2.0 / 2.1 / 2.2 | prerecorded synchronized mediaのaudio descriptionが必要visual informationを伝えるか |
+| 1.2.6 | 2.0 / 2.1 / 2.2 | prerecorded audio contentのsign language interpretation coverage / equivalence |
+| 1.2.7 | 2.0 / 2.1 / 2.2 | 通常pauseで収まらないvisual informationにextended audio descriptionが必要か、そのcoverage |
+| 1.2.8 | 2.0 / 2.1 / 2.2 | prerecorded synchronized mediaのmedia alternativeが必要情報を同等に伝えるか |
+| 1.2.9 | 2.0 / 2.1 / 2.2 | live audio-only contentのequivalent alternativeが必要情報を伝えるか |
+| 1.3.1 | 2.0 / 2.1 / 2.2 | visual / structural information and relationshipsの意味とprogrammatic determinability / text availability。structure / AT evidenceを総合 |
+| 1.3.2 | 2.0 / 2.1 / 2.2 | content sequenceがmeaningへ影響するか、programmatic sequenceがintended meaningを保持するか |
+| 1.3.3 | 2.0 / 2.1 / 2.2 | instructionがshape / color / size / visual location / orientation / sound等のsensory characteristicだけに依存するか |
+| 1.3.4 | 2.1 / 2.2 | portrait / landscape restrictionが存在するか、specific display orientationがessentialか |
+| 1.3.5 | 2.1 / 2.2 | user informationを収集するinputか、purpose metadataがnormative taxonomyの意味と一致するか |
+| 1.3.6 | 2.1 / 2.2 | UI component / icon / regionのpurposeをprogrammatically determineする必要がある対象か、metadataの意味がpurposeと一致するか |
+| 1.4.1 | 2.0 / 2.1 / 2.2 | colorがinformation / action / response / visual element distinctionの唯一の手段になっていないか |
+| 1.4.2 | 2.0 / 2.1 / 2.2 | auto-play audioの適用条件、pause / stop / independent volume controlが要求を満たすか |
+| 1.4.3 | 2.0 / 2.1 / 2.2 | text / image-of-textの対象分類、large text条件、incidental / logo等のexception。ratio計算はmachine resultを使用 |
+| 1.4.4 | 2.0 / 2.1 / 2.2 | text resize後にcontent / functionalityが失われるか、caption / image-of-text等のexception applicability |
+| 1.4.5 | 2.0 / 2.1 / 2.2 | image candidateにtextが含まれるか、customizable / essential image-of-text exceptionが成立するか |
+| 1.4.6 | 2.0 / 2.1 / 2.2 | enhanced contrast対象分類、large text / incidental / logo等のexception。ratio計算はmachine resultを使用 |
+| 1.4.7 | 2.0 / 2.1 / 2.2 | speechを主とするprerecorded audioか、background sound条件 / audio-only exceptionを満たすか |
+| 1.4.8 | 2.0 / 2.1 / 2.2 | blocks of textへのapplicabilityと、color selection / width / alignment / spacing / resize等のmachine valuesがsemantic requirementを満たすか |
+| 1.4.9 | 2.0 / 2.1 / 2.2 | image candidateにtextが含まれるか、decoration / essential exceptionが成立するか |
+| 1.4.10 | 2.1 / 2.2 | required reflow conditionでinformation / functionality lossがあるか、two-dimensional layout等のnormative exceptionが成立するか |
+| 1.4.11 | 2.1 / 2.2 | UI component / state / graphical objectを識別するためrequiredなvisual informationか、inactive / UA-controlled等のexception。contrast値はmachine result |
+| 1.4.12 | 2.1 / 2.2 | required text-spacing override後にcontent / functionality lossがあるか。固定overrideの適用結果を意味的に評価 |
+| 1.4.13 | 2.1 / 2.2 | hover / focusで追加contentが出るcaseか、dismissible / hoverable / persistent各条件とnormative exception |
+| 2.1.1 | 2.0 / 2.1 / 2.2 | functionalityがkeyboard interfaceでoperableか、underlying functionがpath-dependent inputを必要とするexceptionが成立するか |
+| 2.1.2 | 2.0 / 2.1 / 2.2 | keyboard focusがcomponent内にtrapされるか、standard exitまたはuser adviceで離脱可能か |
+| 2.1.3 | 2.0 / 2.1 / 2.2 | all functionalityがkeyboard interfaceでoperableか。2.1.1のpath-dependent exceptionを適用しない |
+| 2.1.4 | 2.1 / 2.2 | single printable character shortcutが存在するか、off / remap / focus時だけactiveのいずれかを満たすか |
+| 2.2.1 | 2.0 / 2.1 / 2.2 | time limitへのapplicability、turn off / adjust / extend条件、real-time / essential / 20-hour exception |
+| 2.2.2 | 2.0 / 2.1 / 2.2 | moving / blinking / scrolling / auto-updating contentの適用条件とpause / stop / hide / frequency control、essential exception |
+| 2.2.3 | 2.0 / 2.1 / 2.2 | content / eventにtimingがessentialか、normative exceptionを除きtiming requirementが存在しないか |
+| 2.2.4 | 2.0 / 2.1 / 2.2 | interruptionsをpostpone / suppressできるか、emergency exceptionが成立するか |
+| 2.2.5 | 2.0 / 2.1 / 2.2 | authenticated session expiry後のre-authenticationでuser dataをlossせずactivity継続できるか |
+| 2.2.6 | 2.1 / 2.2 | inactivityによるdata loss timeoutがあるか、duration warning / preservation exceptionを満たすか |
+| 2.3.1 | 2.0 / 2.1 / 2.2 | flash contentがthreshold対象か、three flashes / below-threshold条件を満たすか。manual / external evidence必須 |
+| 2.3.2 | 2.0 / 2.1 / 2.2 | flash contentのfrequencyがnormative upper boundを超えないか。manual / external evidence必須 |
+| 2.3.3 | 2.1 / 2.2 | interaction-triggered motion animationか、disable mechanismがあるか、animationがfunction / informationにessentialか |
+| 2.4.1 | 2.0 / 2.1 / 2.2 | repeated blocksが存在するか、それをbypassするmechanismが意味上成立するか |
+| 2.4.2 | 2.0 / 2.1 / 2.2 | page titleが存在するだけでなく、page topic / purposeをdescribeしているか |
+| 2.4.3 | 2.0 / 2.1 / 2.2 | sequential navigationがmeaning / operationへ影響する場合、focus orderがそれをpreserveしているか |
+| 2.4.4 | 2.0 / 2.1 / 2.2 | link purposeをlink text単独またはprogrammatically determined contextから判断できるか、normative ambiguity exception |
+| 2.4.5 | 2.0 / 2.1 / 2.2 | set of pages内のWeb pageをlocateする複数手段があるか、process step exceptionが成立するか |
+| 2.4.6 | 2.0 / 2.1 / 2.2 | heading / labelがtopic / purposeをdescribeしているか |
+| 2.4.7 | 2.0 / 2.1 / 2.2 | keyboard-operable UIでfocus indicatorが視覚的に認識可能か |
+| 2.4.8 | 2.0 / 2.1 / 2.2 | set of pages内でuser locationを示すinformationが利用可能か |
+| 2.4.9 | 2.0 / 2.1 / 2.2 | link textだけからpurposeを識別できるか、users generallyへのambiguity exception |
+| 2.4.10 | 2.0 / 2.1 / 2.2 | section headingがcontent organizationに使用されているか、content自体がsectionを必要とするか |
+| 2.4.11 | 2.2 | keyboard focusを受けるcomponentがauthor-created contentでentirely hiddenになっていないか。geometry evidenceの意味上のownershipを確認 |
+| 2.4.12 | 2.2 | keyboard focusを受けるcomponentのどの部分もauthor-created contentでhiddenになっていないか |
+| 2.4.13 | 2.2 | focus indicatorがrequired area / contrast changeを満たすか。CSSから一意に閉じないshape / visual stateはscreenshotを意味評価 |
+| 2.5.1 | 2.1 / 2.2 | multipoint / path-based gestureでoperableなfunctionalityにsingle-pointer alternativeがあるか、gestureがessentialか |
+| 2.5.2 | 2.1 / 2.2 | single-pointer operationのdown-event execution / abort / undo / up-event reversal条件、essential exception |
+| 2.5.3 | 2.1 / 2.2 | visible text / image-of-text labelとaccessible nameのmeaningful containment関係。machine normalized comparisonを意味上のlabel scopeへ適用できるか |
+| 2.5.4 | 2.1 / 2.2 | device / user motionでoperableなfunctionalityか、UI alternative / motion disableがあるか、motionがessentialか |
+| 2.5.5 | 2.1 / 2.2 | pointer target size requirementの対象か、equivalent / inline / UA-controlled / essential exceptionが成立するか |
+| 2.5.6 | 2.1 / 2.2 | platform-supported input modalitiesをrestrictしているか、security / essential / user setting等のnormative exception |
+| 2.5.7 | 2.2 | dragging movementを使うfunctionalityにdragなしsingle-pointer alternativeがあるか、draggingがessentialか |
+| 2.5.8 | 2.2 | minimum target size / spacing条件の対象か、equivalent / inline / UA-controlled / essential exceptionが成立するか |
+| 3.1.1 | 2.0 / 2.1 / 2.2 | page default human languageのactual languageとprogrammatic metadataが一致するか |
+| 3.1.2 | 2.0 / 2.1 / 2.2 | part-level language changeが存在するか、metadataがactual languageと一致するか、proper name / technical term等のexception |
+| 3.1.3 | 2.0 / 2.1 / 2.2 | unusual / restricted usageのwordやphraseが存在する場合、そのspecific meaningをidentifyするmechanismがあるか |
+| 3.1.4 | 2.0 / 2.1 / 2.2 | abbreviationのexpanded form / meaningをidentifyするmechanismがあるか |
+| 3.1.5 | 2.0 / 2.1 / 2.2 | textがadvanced reading abilityを要求する範囲か、supplemental content / lower-secondary reading versionがあるか。external evidenceを含む |
+| 3.1.6 | 2.0 / 2.1 / 2.2 | pronunciationなしではmeaningがambiguousなwordがあるか、specific pronunciationをidentifyするmechanismがあるか |
+| 3.2.1 | 2.0 / 2.1 / 2.2 | focus取得だけでchange of contextが発生するか |
+| 3.2.2 | 2.0 / 2.1 / 2.2 | user input setting変更だけでchange of contextが発生するか、事前にbehaviorがadvisedされているか |
+| 3.2.3 | 2.0 / 2.1 / 2.2 | set of pagesでrepeated navigation mechanismのrelative orderがconsistentか、userによる変更を除外 |
+| 3.2.4 | 2.0 / 2.1 / 2.2 | set of pagesでsame functionalityを持つcomponentがconsistently identifiedされているか |
+| 3.2.5 | 2.0 / 2.1 / 2.2 | change of contextがuser requestだけで開始されるか、automatic changeをoffにするmechanismがあるか |
+| 3.2.6 | 2.2 | help mechanismが複数pageに現れる場合、relative orderがconsistentか、user-initiated changeを除外 |
+| 3.3.1 | 2.0 / 2.1 / 2.2 | input errorがautomatically detectedされた場合、error itemがidentifiedされerrorがtextでdescribedされているか |
+| 3.3.2 | 2.0 / 2.1 / 2.2 | contentがuser inputを要求する場合、必要なlabel / instructionが提供されているか |
+| 3.3.3 | 2.0 / 2.1 / 2.2 | input errorがdetectedされsuggestionがknownな場合、security / purposeを害さずsuggestionを提供できるか |
+| 3.3.4 | 2.0 / 2.1 / 2.2 | legal / financial commitment、user-controlled data modification / deletion、test response submissionに該当するか、reversible / checked / confirmedのいずれかを満たすか |
+| 3.3.5 | 2.0 / 2.1 / 2.2 | userがtaskを完了するためのcontext-sensitive helpが利用可能か |
+| 3.3.6 | 2.0 / 2.1 / 2.2 | user submission一般についてreversible / checked / confirmedのいずれかを満たすか |
+| 3.3.7 | 2.2 | 同一processで以前入力 / 提供した情報を再要求しているか、auto-populate / selection alternativeがあるか、essential / security / invalidated information等のexception |
+| 3.3.8 | 2.2 | authentication processのcognitive function testへのapplicabilityと、alternative / assistance / normative exceptionが成立するか |
+| 3.3.9 | 2.2 | enhanced authentication requirementのcognitive function testへのapplicabilityと、許可されたalternative / exceptionが成立するか |
+| 4.1.1 | 2.0 / 2.1 | `m-parsing-version-rule` がHTML / XMLならsemantic実行不要。その他markup technologyだけversioned normative parsing requirementを評価 |
+| 4.1.2 | 2.0 / 2.1 / 2.2 | UI componentのname / role / value / user-settable stateがprogrammatically determinableで、変更通知が利用可能か。custom component等のapplicabilityを含む |
+| 4.1.3 | 2.1 / 2.2 | focusを受けず提示されるstatus informationか、appropriate role / propertyでATへprogrammatically determinedできるか |
+
 ## 8. asset作成契約
 
 実装時はW3C正本から各version / Success Criterionを全件確認し、rowを生成・レビューします。
