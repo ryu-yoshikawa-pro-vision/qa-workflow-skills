@@ -317,7 +317,13 @@ frontmatter変更後はtrigger datasetの回帰確認を実行します。
 少なくとも次を確認します。
 
 ```bash
-git grep -nE '全?16 Skill|全?14 Skill|368クエリ|328件|その他13 Skill' --   README.md   EVALS.md   docs/PROJECT_CONTEXT.md   skills/*/SKILL.md   skills/*/references/*.md
+git grep -nE '全?16 Skill|全?14 Skill|368クエリ|328件|その他13 Skill|本Plan|今回14件' -- \
+  README.md \
+  EVALS.md \
+  docs/PROJECT_CONTEXT.md \
+  skills/*/SKILL.md \
+  skills/*/references/*.md \
+  skills/*/assets/*.md
 ```
 
 過去文書である`docs/plans/`、`docs/history/`、`docs/reports/`はこの現在値確認から除外します。
