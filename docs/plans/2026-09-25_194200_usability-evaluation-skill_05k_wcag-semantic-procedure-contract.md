@@ -165,15 +165,15 @@ project独自のHTML validity / parsing quality gateが存在しても、WCAG 4.
 | 1.3.6 | 2.1 / 2.2 | UI component / icon / regionのpurposeをprogrammatically determineする必要がある対象か、metadataの意味がpurposeと一致するか |
 | 1.4.1 | 2.0 / 2.1 / 2.2 | colorがinformation / action / response / visual element distinctionの唯一の手段になっていないか |
 | 1.4.2 | 2.0 / 2.1 / 2.2 | auto-play audioの適用条件、pause / stop / independent volume controlが要求を満たすか |
-| 1.4.3 | 2.0 / 2.1 / 2.2 | text / image-of-textの対象分類、large text条件、incidental / logo等のexception。ratio計算はmachine resultを使用 |
-| 1.4.4 | 2.0 / 2.1 / 2.2 | caption / image-of-text等のexception applicabilityと、current environmentで確認したvalid text scaling mechanismのevidenceをSCへ適用できるか。少なくとも1つのvalid mechanismで全applicable textがbaseline比2.0xのrendered enlargementへ到達し、到達までcontent / functionality lossなしならsatisfied候補。browser zoom control値だけで2.0x到達を推測せず、未確認mechanism / text populationが残る状態をfailureへ短絡しない |
+| 1.4.3 | 2.0 / 2.1 / 2.2 | text / image-of-textの対象分類、large text条件、incidental / logo等のexception。ratioはmachine result、`background-not-machine-resolvable` 時は `_05i` のmanual fallback evidenceを使用し、LLMが画像から数値を推測しない |
+| 1.4.4 | 2.0 / 2.1 / 2.2 | caption / image-of-text等のexception applicabilityと、current environmentで確認したvalid text scaling mechanismのevidenceをSCへ適用できるか。少なくとも1つのvalid mechanismで全applicable textがbaseline比2.0xのrendered enlargementへ到達し、到達までcontent / functionality lossなしならsatisfied候補。machine ownerがvalid mechanismを操作・scale取得できない場合は `_05i` のmanual fallback evidenceを使用でき、browser capability不足だけでfailureへ短絡しない。browser zoom control値だけで2.0x到達を推測せず、未確認mechanism / text populationが残る状態をfailureへ短絡しない |
 | 1.4.5 | 2.0 / 2.1 / 2.2 | image candidateにtextが含まれるか、customizable / essential image-of-text exceptionが成立するか |
-| 1.4.6 | 2.0 / 2.1 / 2.2 | enhanced contrast対象分類、large text / incidental / logo等のexception。ratio計算はmachine resultを使用 |
+| 1.4.6 | 2.0 / 2.1 / 2.2 | enhanced contrast対象分類、large text / incidental / logo等のexception。ratioはmachine result、`background-not-machine-resolvable` 時はmanual fallback evidenceを使用 |
 | 1.4.7 | 2.0 / 2.1 / 2.2 | speechを主とするprerecorded audioか、background sound条件 / audio-only exceptionを満たすか |
 | 1.4.8 | 2.0 / 2.1 / 2.2 | blocks of textへのapplicabilityと、color selection / width / alignment / spacing / resize等のmachine valuesがsemantic requirementを満たすか |
 | 1.4.9 | 2.0 / 2.1 / 2.2 | image candidateにtextが含まれるか、decoration / essential exceptionが成立するか |
 | 1.4.10 | 2.1 / 2.2 | required reflow conditionでinformation / functionality lossがあるか、two-dimensional layout等のnormative exceptionが成立するか |
-| 1.4.11 | 2.1 / 2.2 | UI component / state / graphical objectを識別するためrequiredなvisual informationか、inactive / UA-controlled等のexception。contrast値はmachine result |
+| 1.4.11 | 2.1 / 2.2 | UI component / state / graphical objectを識別するためrequiredなvisual informationか、inactive / UA-controlled等のexception。contrast値はmachine result、`background-not-machine-resolvable` 時はmanual fallback evidenceを使用 |
 | 1.4.12 | 2.1 / 2.2 | required text-spacing override後にcontent / functionality lossがあるか。固定overrideの適用結果を意味的に評価 |
 | 1.4.13 | 2.1 / 2.2 | hover / focusで追加contentが出るcaseか、dismissible / hoverable / persistent各条件とnormative exception |
 | 2.1.1 | 2.0 / 2.1 / 2.2 | functionalityがkeyboard interfaceでoperableか、underlying functionがpath-dependent inputを必要とするexceptionが成立するか |
@@ -201,7 +201,7 @@ project独自のHTML validity / parsing quality gateが存在しても、WCAG 4.
 | 2.4.10 | 2.0 / 2.1 / 2.2 | section headingがcontent organizationに使用されているか、content自体がsectionを必要とするか |
 | 2.4.11 | 2.2 | keyboard focusを受けるcomponentがauthor-created contentでentirely hiddenになっていないか。geometry evidenceの意味上のownershipを確認 |
 | 2.4.12 | 2.2 | keyboard focusを受けるcomponentのどの部分もauthor-created contentでhiddenになっていないか |
-| 2.4.13 | 2.2 | focus indicatorがrequired area / contrast changeを満たすか。CSSから一意に閉じないshape / visual stateはscreenshotを意味評価 |
+| 2.4.13 | 2.2 | focus indicatorがrequired area / contrast changeを満たすか。CSS / SVG等から一意に閉じないshape / visual stateでは `focus-indicator-not-machine-resolvable` によりmanual fallbackを有効化し、manual測定evidenceとscreenshotの意味評価を組み合わせる。LLMがarea / contrast数値を推測しない |
 | 2.5.1 | 2.1 / 2.2 | multipoint / path-based gestureでoperableなfunctionalityにsingle-pointer alternativeがあるか、gestureがessentialか |
 | 2.5.2 | 2.1 / 2.2 | single-pointer operationのdown-event execution / abort / undo / up-event reversal条件、essential exception |
 | 2.5.3 | 2.1 / 2.2 | visible text / image-of-textとして提示されたlabelを特定し、そのtextがaccessible nameへ含まれるというmachine comparisonを当該label / controlへ適用できるか |
