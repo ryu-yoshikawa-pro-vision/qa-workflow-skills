@@ -312,6 +312,8 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
    2026-09-25_194200_usability-evaluation-skill_05g_usability-inspection-browser-observation-contract.md
 5h. formal WCAG Success Criterion評価経路  
    2026-09-25_194200_usability-evaluation-skill_05h_wcag-criterion-evaluation-contract.md
+5i. WCAG 2.0 / 2.1 / 2.2全Success Criterionのprocedure inventory  
+   2026-09-25_194200_usability-evaluation-skill_05i_wcag-success-criterion-procedure-inventory.md
 6. 評価・CI・実装順序・完了条件  
    2026-09-25_194200_usability-evaluation-skill_06_evaluation-ci-implementation-order.md
 6a. usability-inspectionの実装順序・完了条件  
@@ -323,7 +325,7 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
 
 ## 今回レビューで固定する追加契約
 
-- formal WCAG評価では、target version / levelのrequired Success Criterion全件をfinite `wcag-evaluation-procedure-catalog.json` へ接続し、selected sample × required presentation variation × criterionのrowを `wcag_criterion_plan.py` が生成する。procedure / criterion選択、execution status、final resultをLLMへ手組みさせない。詳細は `_05h_wcag-criterion-evaluation-contract.md` を正本とする。
+- formal WCAG評価では、target version / levelのrequired Success Criterion全件をfinite `wcag-evaluation-procedure-catalog.json` へ接続し、selected sample × required presentation variation × criterionのrowを `wcag_criterion_plan.py` が生成する。criterion evaluation runtimeは `_05h_wcag-criterion-evaluation-contract.md`、WCAG 2.0 / 2.1 / 2.2全Success Criterionのprocedure key割当は `_05i_wcag-success-criterion-procedure-inventory.md` を正本とし、実装時にcriterionごとのprocedure構成を決めない。
 - machine処理可能なtarget geometry / spacing、contrast ratio、viewport overflow / reflow用数値、elapsed / threshold、supported ACT Ruleはscriptへ移す。machine stepの部分PASSだけでSuccess Criterion全体を `satisfied` にしない。
 - supported ACT Ruleは今回の実装対象を明示的に固定し、0件のまま「supported ruleだけ実装した」と扱える経路をなくす。ACT RuleがないSuccess Criterionもcriterion evaluation planから落とさない。
 - browser element probeはartifact-local target registryを通す。`observation_contract.py` が5種resolverのpayload、Playwright exact matching、parent scope、population revision / fingerprint、session currentness、`TARGET-001` 等のrefを検証する。interaction timingの8種fixed predicateも種類ごとのpayloadを固定する。

@@ -106,11 +106,12 @@ WCAG-EM 2のoutput contractはReport ToolのschemaではなくWCAG-EM 2.0本文�
 
 ### Success Criterion evaluation plan
 
-`_05h_wcag-criterion-evaluation-contract.md` を実装します。
+`_05h_wcag-criterion-evaluation-contract.md` と `_05i_wcag-success-criterion-procedure-inventory.md` を実装します。
 
-- 3 versionのrequirements assetに全Success Criterionの `procedure_keys` を追加する
-- `assets/wcag-evaluation-procedure-catalog.json` を追加し、全procedureを `machine / semantic / manual / assistive-technology / external-evidence` の有限inventoryへ固定する
-- procedure catalogに `TBD / other / custom` 等のcatch-allを置かず、machine procedureは全件明示dispatch / fixtureを実装する
+- `_05i` のversion別集合からWCAG 2.0=61 / 2.1=78 / 2.2=86件を固定し、2.2から4.1.1を除外する
+- `_05i` の生成規則から全Success Criterionのexpected `procedure_keys` をscriptで導出し、3 versionのrequirements assetへ設定する。実装時にcriterionごとのprocedure構成を再設計しない
+- `assets/wcag-evaluation-procedure-catalog.json` を追加し、`_05i` に現れる全procedureを `machine / semantic / manual / assistive-technology / external-evidence` の有限inventoryへ固定する
+- procedure catalogに `TBD / other / custom` 等のcatch-allを置かず、`_05i` §3のmachine procedureは全件明示dispatch / fixtureを実装する。requirements asset / `_05i` / procedure catalogのmissing / extra / unused keyをdeterministic validatorで0件にする
 - machine化できる数値計算、集合演算、固定enum / state比較、supported ACT Ruleをsemantic / manualへ逃がしていないことをsemantic reviewで確認する
 - assistive technologyはSuccess Criterion固定booleanにせず、selected procedure + current content / technology + accessibility support baselineからapplicabilityを閉じる
 - selected sampleごとのrequired presentation variation集合を入力にし、`wcag_criterion_plan.py` がsample × variation × required Success Criterion rowを全件materializeする

@@ -6,7 +6,7 @@
 
 目的は、required criterionの選択・省略、評価procedure、machine処理、semantic / manual判断、assistive technology利用、未完了判定を実装者やLLMのその場判断へ残さないことです。
 
-WCAG-EM 2.0のsample / variation / process / report契約は `_05f_wcag-conformance-evaluation-package-and-runtime.md`、browser observationは `_05g_usability-inspection-browser-observation-contract.md`、general accessibility / ACT Rule semanticsは `_05d_accessibility-requirements-and-act.md` を正本とします。
+WCAG-EM 2.0のsample / variation / process / report契約は `_05f_wcag-conformance-evaluation-package-and-runtime.md`、browser observationは `_05g_usability-inspection-browser-observation-contract.md`、general accessibility / ACT Rule semanticsは `_05d_accessibility-requirements-and-act.md`、WCAG 2.0 / 2.1 / 2.2全Success Criterionのprocedure割当は `_05i_wcag-success-criterion-procedure-inventory.md` を正本とします。
 
 ## 1. owner境界
 
@@ -45,15 +45,15 @@ LLMはrequired Success Criterion集合、criterion row、required procedure集�
   "criterion_ref": "wcag22:2.4.2",
   "evaluation": {
     "procedure_keys": [
-      "page-title-machine-presence",
-      "page-title-purpose-semantic"
+      "m-page-title",
+      "s-wcag-2.4.2"
     ],
     "external_evidence_allowed": false
   }
 }
 ```
 
-supported WCAG 2.0 / 2.1 / 2.2の全Success Criterionで `procedure_keys` を1件以上必須にします。`TBD`、空集合、未登録keyを許可しません。
+supported WCAG 2.0 / 2.1 / 2.2の全Success Criterionで `procedure_keys` を1件以上必須にします。expected procedure集合は `_05i` の固定生成規則から導出し、requirements assetの実値と一致させます。`TBD`、空集合、未登録key、実装時のad hoc追加を許可しません。
 
 3 versionのrequirements assetは既存 `static_data_versions` / approved hash契約対象で、evaluation metadataもcanonical hashへ含めます。
 
@@ -92,7 +92,7 @@ supported WCAG 2.0 / 2.1 / 2.2の全Success Criterionで `procedure_keys` を1�
 
 固定Inputから意味判断なしで結果を導出できる処理です。
 
-今回少なくとも次のdispatchを固定します。
+ACT / measurementの既存dispatchに加え、`_05i` §3のmachine procedureを全件実装します。少なくとも既存の次のdispatchもそのmachine procedureから再利用します。
 
 - `act:2779a5`
 - `act:97a4e1`
