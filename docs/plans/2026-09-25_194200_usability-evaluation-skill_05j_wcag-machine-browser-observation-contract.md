@@ -105,11 +105,33 @@ catalogのcanonical JSON SHA-256は `usability-inspection` の `static_data_vers
 | `mp-error-scenario-run` | declared error scenario後のinvalid target、error text、association、focus / state |
 | `mp-orientation-run` | portrait / landscape環境とcontent / functionality evidence |
 | `mp-reflow-run` | required viewport条件、overflow / clipping / geometry evidence |
-| `mp-resize-text-run` | required text resize条件、overflow / clipping / functionality evidence |
+| `mp-resize-text-run` | valid text scaling mechanism、100% / intermediate / 200% state、overflow / clipping / obscuring / functionality evidence、mechanism capability / cleanup |
 | `mp-text-spacing-run` | WCAG text spacing fixed override条件、clipping / overlap / scroll / functionality evidence |
 | `mp-control-value-history` | flow内のcurrent / previous control value ref |
 | `mp-multipage-signature` | selected page setのcontrol / help / navigation structure signature |
 | `mp-audio-autoplay-run` | page load後の自動再生audio candidate、開始条件、継続時間 |
+
+### Resize Text mechanism contract
+
+`mp-resize-text-run` の `resize_mechanism` は次の有限enumだけを許可します。
+
+- `user-agent-full-page-zoom`
+- `user-agent-text-only-resize`
+- `author-provided-resize-control`
+
+mechanism candidateはcurrent browser / user agent capabilityと、current pageで確認できるauthor-provided controlからmaterializeします。LLM supplied arbitrary mechanism名を受け付けません。
+
+- user agentがfull-page zoomを提供しbrowser ownerが実際にそのUI / session mechanismを安全に操作できる場合、100% baselineから200%まで実行する
+- user agentがtext-only resizeを提供しbrowser ownerが安全に操作できる場合、同様に200%まで実行する
+- author-provided resize controlはcurrent UI上のcontrol identityと作用が確認できる場合だけ実行する
+- incremental mechanismでは100%と200%だけでなく、mechanismが提供する100〜200%のintermediate stepでcontent / functionality lossがないことを確認する
+- 1つのvalid mechanismで200%までlossなしを確認できれば、そのmechanismはmachine evidence上success candidateになる。あるmechanismの失敗だけでSC全体をfailedへ固定せず、他のvalid mechanism / semantic evidenceのclosureを待つ
+- executableなvalid mechanismをすべて確認しても200%まで成立しない場合だけnot-satisfied candidateへ進める。未確認mechanismが残る場合は `incomplete / blocked` とする
+- Playwright `deviceScaleFactor` はDPR emulationでありtext scaling mechanismとして扱わない
+- viewport resize、CSS `transform: scale()`、test専用font-size / zoom style注入を1.4.4のtext scaling mechanismとして扱わない
+- browser ownerがvalid user-agent mechanismを操作できずauthor-provided mechanismもない場合は、擬似的なstyle変更へfallbackせず `unsupported / blocked` とする
+
+W3C Technique G142等の評価で必要なuser-agent zoomは、current browser経路が実際のuser-agent zoom capabilityを提供する場合だけfixed dispatchへ登録します。特定browserのprivate protocolやundocumented shortcutをgeneric fallbackとして追加しません。
 
 text resize / text spacing等で評価用stateを作る場合は、WCAG Techniqueで定義された固定overrideだけをdispatchします。任意style injection interfaceにはせず、元状態、適用したoverride、cleanup結果を保持します。
 
