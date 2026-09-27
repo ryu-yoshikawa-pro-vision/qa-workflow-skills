@@ -1057,7 +1057,7 @@ production helperとは別実装で少なくとも次を検証します。
 - target versionに対応する承認済みcatalog hashと一致
 - `wcag-evaluation-procedure-catalog.json` のcanonical hash / approved hash一致
 - `wcag-semantic-contracts.json` のcanonical hash / approved hash一致とtarget version criterion coverage
-- requirements assetの `external_evidence_allowed` とexternal-evidence procedure割当が一致し、trueをrequired evidenceと解釈していない
+- requirements assetの `external_evidence_allowed` とexternal-evidence procedure割当が一致し、trueのexpected件数が2.0=3 / 2.1=3 / 2.2=3（合計9）、trueをrequired evidenceと解釈していない
 - external evidence candidateなし / current valid candidateなしでprocedureがnot-applicableへ閉じ、valid candidateありでのみapplicableになる
 - `_05i` の4 AT procedure / `applicability_decision_key` とsemantic assetの `procedure_applicability_contracts[]` がversionごとに1対1で一致し、expected件数が2.0=3 / 2.1=4 / 2.2=4（合計11）、4.1.3を2.0へ混在させず、AT applicability contractがAT result / final semantic resultをrequired inputにしていない
 - semantic assetのstatic `required_evidence_roles` にprocedure-result roleを保存せず、machine / manual / AT / external result roleがcurrent applicable procedure集合からruntimeでのみ導出される
