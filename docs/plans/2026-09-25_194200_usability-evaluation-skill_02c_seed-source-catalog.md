@@ -122,7 +122,7 @@ inspection packageにはUI pattern本文を複製せず、live inspection / meas
 
 | Seed | Source | 公式URL | 用途 |
 | --- | --- | --- | --- |
-| PW-EMULATION | Playwright Emulation | https://playwright.dev/docs/emulation | viewport / device / locale / isMobile等 |
+| PW-EMULATION | Playwright Emulation | https://playwright.dev/docs/emulation | viewport / device / deviceScaleFactor（DPR）/ locale / isMobile等。deviceScaleFactorをtext resize / browser zoomと同一視しない |
 | PW-BROWSER | Playwright Browser API | https://playwright.dev/docs/api/class-browser | BrowserContext / hasTouch / isMobile / userAgent / viewport |
 | PW-ACTIONABILITY | Playwright Actionability | https://playwright.dev/docs/actionability | auto-wait境界 |
 | PW-LOCATORS | Playwright Locators | https://playwright.dev/docs/locators | locator利用境界 |
