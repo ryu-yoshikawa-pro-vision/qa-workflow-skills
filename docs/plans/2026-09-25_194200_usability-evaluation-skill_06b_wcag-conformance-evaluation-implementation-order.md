@@ -110,13 +110,14 @@ WCAG-EM 2のoutput contractはReport ToolのschemaではなくWCAG-EM 2.0本文�
 
 - `_05i` のversion別集合からWCAG 2.0=61 / 2.1=78 / 2.2=86件を固定し、2.2から4.1.1を除外する
 - `_05i` の生成規則から全Success Criterionのexpected `procedure_keys` をscriptで導出し、3 versionのrequirements assetへ設定する。実装時にcriterionごとのprocedure構成を再設計しない
-- `assets/wcag-evaluation-procedure-catalog.json` を追加し、`_05i` に現れる全procedureを `machine / semantic / manual / assistive-technology / external-evidence` の有限inventoryへ固定する。各rowに `_05h` の `applicability_mode / applicability_decision_key / activation_source_procedure_key / activation_limitation_codes` を持たせる
+- `assets/wcag-evaluation-procedure-catalog.json` を追加し、`_05i` に現れる全procedureを `machine / semantic / manual / assistive-technology / external-evidence` の有限inventoryへ固定する。各rowに `_05h` の `applicability_mode / applicability_decision_key / activation_source_procedure_key / activation_limitation_codes` を持たせる。external-evidence procedureは3件とも `applicability_mode=external-evidence-available` に固定する
 - procedure catalogに `TBD / other / custom` 等のcatch-allを置かず、`_05i` §3のmachine procedureは全件明示dispatch / fixtureを実装する。各machine procedureのbrowser入力はprocedure catalog内で `_05j` machine probe keyへ全件mappingし、`wcag_criterion_plan.py` がtyped `wcag-machine-probe` requestをmaterializeする。formal runtimeはinspection sibling assetをreadしない。cross-packageのprobe key missing / extra / unused 0はrepository-level contract testで検証する
 - `_05k` のversioned semantic contract assetを全supported Success Criterionへ作成し、normative clause / definition / exception refs、semantic evaluation point、required evidence role、forbidden shortcutをapproved hashで固定する。1.3.1 / 1.3.2 / 4.1.2 / 4.1.3には `_05i` のfixed AT applicability decision keyに対応する `procedure_applicability_contracts[]` をversion別に追加し、AT result / final semantic resultをInputへ含めない。実装時にcriterion固有procedureを再設計しない
 - 4.1.1はWCAG 2.2でrowを作らず、WCAG 2.0 / 2.1 + HTML/XMLでは `always-satisfied-html-xml`、その他technologyではsemantic contractへ戻す
 - machine化できる数値計算、集合演算、固定enum / state比較、supported ACT Ruleをsemantic / manualへ逃がしていないことをsemantic reviewで確認する
 - assistive technologyはSuccess Criterion固定booleanにせず、selected procedure + current content / technology + accessibility support baselineから**AT実行前**のfixed semantic applicability decisionを閉じる。`unknown → applicability decision → AT execution（applicable時だけ）→ final s-wcag semantic` の順序を固定し、final semantic resultをAT applicabilityのInputへ戻さない
 - procedure executionごとに `applicable / not-applicable / unknown` とbasisをmaterializeし、`unknown` のままcriterionをsatisfied / not-satisfiedへ閉じない。final semantic required evidence roleはcurrent applicable procedure集合から導出し、not-applicable sibling resultを要求しない
+- external evidence candidate refsをsource / revision / environment / freshness / scopeでscript検証し、candidate 0件またはcurrent scope matching evidence 0件ならexternal procedureをnot-applicableへ閉じる。valid current evidenceが1件以上ある場合だけapplicable化し、外部証拠不足だけでcriterionをundetermined / blockedにしない
 - semantic assetのstatic `required_evidence_roles` にはprocedure-result roleを書かず、machine / manual / AT / external result roleはcurrent applicable procedure集合からruntime effective roleとしてscript追加する
 - `_05i` のcontrast / Resize Text / Focus Appearance conditional manual fallbackをsource machine limitation codeからscriptが起動し、machine limitationだけでcriterionをblockedへ短絡しない
 - selected sampleごとのrequired presentation variation集合を入力にし、`wcag_criterion_plan.py` がsample × variation × required Success Criterion rowを全件materializeする
@@ -125,7 +126,9 @@ WCAG-EM 2のoutput contractはReport ToolのschemaではなくWCAG-EM 2.0本文�
 - live observation requirementをformal handoffへ渡す
 - target geometry / spacing、contrast ratio、viewport overflow / reflow数値、elapsed / threshold、supported ACT Rule等、入力が揃えば決定論的な処理をscriptへ移す
 - required criterion × variation集合とactual row集合の差分0をdeterministic validatorで検証する
-- supported ACT Ruleがないcriterionもsemantic / manual / AT / external evidence procedureで評価対象から落とさない
+- supported ACT Ruleがないcriterionもsemantic / manual / AT procedureで評価対象から落とさない。external evidenceはcurrent valid evidenceがある場合だけ補助procedureとして追加closureし、存在を必須条件にしない
+- external evidence candidateなし、全candidate stale / scope mismatch、valid candidateありの3caseをfixture化し、前2caseはnot-applicable +他procedureでclosure継続、valid caseだけexternal procedure resultを要求する
+- `external_evidence_allowed=false` のcriterionへexternal procedureが混ざるassetをinvalidとしてrejectする
 - required evidence不足は `undetermined / blocked` とし、LLM推測で閉じない
 - final Success Criterion resultはcurrent criterion evaluation refからだけmaterializeし、LLM supplied result listを別経路で受け付けない
 
