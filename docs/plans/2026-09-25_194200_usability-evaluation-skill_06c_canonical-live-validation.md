@@ -175,7 +175,7 @@ formal request
 - report materialization / accessible output contract
 - Step 5.2 Evaluation Specificsを有効化したcaseで、browser / tool metadataとsafe evidence refがreportへ戻ること。secret値は保持しない
 - Step 5.5を有効化したcaseで、browser observation由来のformal resultが `_05l` のfixed JSON-LD graphへ対応し、`@context` / Assertion→TestResult→outcome / stable IRI / mode mapping / deterministic bytes / human-readable reportとのassertion coverageが一致すること。applicableな `satisfied` は `earl:passed`、`applicable_population=none` + complete closureはhuman-readable `satisfied` のまま `earl:inapplicable` になること
-- SC 1.4.4 fixtureで `user-agent-full-page-zoom / user-agent-text-only-resize / author-provided-resize-control` のうちcurrent browser ownerが安全に実行できるvalid mechanismを100%→200%まで評価し、incremental mechanismはintermediate stepも確認すること。`deviceScaleFactor`、viewport resize、CSS transform / test専用font-size注入を代替mechanismとして受理しないこと。valid mechanismを実行できないcaseは擬似resizeへfallbackせず `blocked / undetermined` へ閉じること
+- SC 1.4.4 fixtureで `user-agent-full-page-zoom / user-agent-text-only-resize / author-provided-resize-control` のvalid mechanismを評価し、baseline / mechanism scale / used font sizeから全applicable rendered textの2.0x到達を確認すること。responsive breakpointでzoom control値200%時にtextが2.0x未満となり、後続stateで2.0xへ到達するcaseを含める。incremental mechanismはtarget到達までのintermediate stateも確認する。`deviceScaleFactor`、viewport resize、CSS transform / test専用font-size注入を代替mechanismとして受理せず、text populationまたはvalid mechanismを閉じられないcaseは擬似resizeへfallbackせず `blocked / undetermined` へ閉じること
 
 を確認します。
 
