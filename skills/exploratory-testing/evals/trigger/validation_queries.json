@@ -1,0 +1,34 @@
+[
+  {
+    "query": "未知領域をCharterと許可操作の範囲内で探索して。",
+    "should_trigger": true
+  },
+  {
+    "query": "原因ownerの決まっていないsymptomについて実対象で仮説を検証して。",
+    "should_trigger": true
+  },
+  {
+    "query": "Observationからfollow-upが必要なFindingを記録してcleanupする。",
+    "should_trigger": true
+  },
+  {
+    "query": "安全条件とscopeを保ったままblocked Sessionを再開できるか判断して。",
+    "should_trigger": true
+  },
+  {
+    "query": "既知TCの期待結果と画面の実測を照合して合否を付けて。",
+    "should_trigger": false
+  },
+  {
+    "query": "現在のUI構造を最新の実対象から収集して。",
+    "should_trigger": false
+  },
+  {
+    "query": "E2E runの実行失敗とcleanup errorを分析して。",
+    "should_trigger": false
+  },
+  {
+    "query": "仕様のどちらを正本とすべきか確認して。",
+    "should_trigger": false
+  }
+]

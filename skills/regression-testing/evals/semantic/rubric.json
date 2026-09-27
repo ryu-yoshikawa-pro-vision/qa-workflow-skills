@@ -1,0 +1,41 @@
+{
+  "skill": "regression-testing",
+  "criteria": [
+    {
+      "id": "REG-SEM-001",
+      "title": "Membershipとcurrent TC scope",
+      "description": "membershipはcurrent logical TC、Regression scope、継続再検証の価値から判断し、legacy / deleted / one-offを適切に区別しているか。",
+      "critical": true
+    },
+    {
+      "id": "REG-SEM-002",
+      "title": "Baseline completenessとcurrentness",
+      "description": "complete authoritative snapshot、lifecycle解決、全件membership、Run前currentnessを分離し、未解決・stale baselineをfull扱いしていないか。",
+      "critical": true
+    },
+    {
+      "id": "REG-SEM-003",
+      "title": "Run selectionとresidual risk",
+      "description": "user scopeを優先し、candidateのみで範囲を狭めず、existing Riskに対するexcluded / blocked / unexecutedの影響を示し、Riskを新規採点していないか。",
+      "critical": true
+    },
+    {
+      "id": "REG-SEM-004",
+      "title": "Required routeとactual execution",
+      "description": "manual / concrete E2E routeを固定し、実際のsource start後だけexecutedとし、source resultを再解釈せず、全required routeを論理TC単位で扱っているか。",
+      "critical": true
+    },
+    {
+      "id": "REG-SEM-005",
+      "title": "FAIL feedbackと修正確認routing",
+      "description": "FAIL / Findingを自動Defectにせず、既存ownerへ原因判断を戻し、current既存TCで修正確認し、別目的のRegressionを区別しているか。",
+      "critical": true
+    },
+    {
+      "id": "REG-SEM-006",
+      "title": "Auxiliary testwareとcoverage境界",
+      "description": "TCなしE2Eは明示された場合だけ補助testwareとして含め、TC IDを作らずTC member / TC-based coverageから分けているか。",
+      "critical": true
+    }
+  ]
+}

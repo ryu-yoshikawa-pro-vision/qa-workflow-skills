@@ -1,0 +1,42 @@
+{
+  "skill": "regression-testing",
+  "eval_id": "REG-SEM-003",
+  "verdict": "needs_review",
+  "criteria": [
+    {
+      "id": "REG-SEM-001",
+      "title": "Membershipとcurrent TC scope",
+      "critical": true,
+      "rating": 4,
+      "status": "pass",
+      "reason": "明示されたcheckout変更の対象TC-201を選択し、ユーザー指定のTC-202を除外しています。3 member全体の実行とは区別し、情報のない残りのmemberについては判断できないとしています。",
+      "evidence": [
+        "「選択: TC-201。checkout変更に関連するTCとして明示されています」",
+        "「除外: TC-202。ユーザー指定による除外です」",
+        "「complete baselineの3 member全体を実行するfull Runではありません」",
+        "「1件のrefが提示されていないため、このRunでの候補・選択・除外を確認できません」"
+      ]
+    },
+    {
+      "id": "REG-SEM-003",
+      "title": "Run selectionとresidual risk",
+      "critical": true,
+      "rating": 2,
+      "status": "needs_review",
+      "reason": "明示scopeを優先し、R-8のscoreを変更していない点は適切です。一方、Referenceが求めるTC-202の未実行・除外とR-8の残存影響の関係を明示せず、関連TCが不明としており、さらに実行開始をブロックする条件を追加しています。",
+      "evidence": [
+        "「TC-202。ユーザー指定による除外です」",
+        "「既存Risk『決済二重計上』のscoreは変更しません」",
+        "「TCとR-8のtraceabilityが提示されていないため、R-8に関連するTCと、このRunで残る未検証影響は未解決です」",
+        "「開始前にブロック」",
+        "「TC-201のrequired routeと、R-8に関連するTCのtraceabilityを確認できていません」"
+      ]
+    }
+  ],
+  "summary": {
+    "pass": 1,
+    "needs_review": 1,
+    "fail": 0,
+    "not_evaluable": 0
+  }
+}

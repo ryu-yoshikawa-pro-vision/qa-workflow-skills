@@ -57,6 +57,9 @@ jobs:
               "e2e-test-reporting",
               "test-target-inspection",
               "test-execution",
+              "regression-testing",
+              "exploratory-testing",
+              "qa-knowledge",
           ]
 
           skill_root = Path("skills")
@@ -133,21 +136,24 @@ jobs:
                   sorted(train_queries & validation_queries),
               )
 
-          assert len(names) == len(set(names)) == 16, names
-          assert total_queries == 368, total_queries
+          assert len(names) == len(set(names)) == 19, names
+          assert total_queries == 428, total_queries
 
           for doc in (Path("README.md"), Path("EVALS.md")):
               text = doc.read_text(encoding="utf-8")
               missing = [name for name in expected if f"`{name}`" not in text]
               assert not missing, (doc, missing)
 
-          print("Skill count: 16")
+          print("Skill count: 19")
           print("通常Skill: train=12 (6/6), validation=8 (4/4)")
           print("test-analysis / test-condition-design: train=24 (12/12), validation=20 (10/10)")
-          print("Total trigger queries: 368")
+          print("Total trigger queries: 428")
           PY
 
       - name: Validate semantic dataset counts
         run: |
           python scripts/skills/evals/semantic/validate.py
           python -m unittest discover -s tests/skills/evals/semantic -v
+
+      - name: Validate trigger dataset contract
+        run: python -m unittest discover -s tests/skills/evals/trigger -v

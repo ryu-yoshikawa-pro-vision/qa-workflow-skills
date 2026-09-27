@@ -1,0 +1,3 @@
+# Reference
+
+Observationには操作条件・実測事実・evidenceを記録します。仕様違反や原因を断定しません。follow-up価値がある場合だけ別Findingとし、未確定分類 / unresolvedと最も早いownerへのrouteを示します。ObservationだけでDefectまたはQA knowledgeへ自動昇格しません。

@@ -1,0 +1,41 @@
+{
+  "skill": "qa-knowledge",
+  "criteria": [
+    {
+      "id": "KN-SEM-001",
+      "title": "既存正本への先行routing",
+      "description": "specification、Product Risk、current UI fact、formal design candidateをsecond source化せずowner Skillへ戻しているか。",
+      "critical": true
+    },
+    {
+      "id": "KN-SEM-002",
+      "title": "Candidate有効化の根拠",
+      "description": "source、scope、environment/version applicability、再利用価値、currentness dependency、complete root snapshotが揃うまでentryを有効化していないか。",
+      "critical": true
+    },
+    {
+      "id": "KN-SEM-003",
+      "title": "適用scopeとenvironment/version",
+      "description": "knowledgeをsource evidenceが支えるscope / environment / versionへ限定し、他へ安易に一般化していないか。",
+      "critical": true
+    },
+    {
+      "id": "KN-SEM-004",
+      "title": "Dependency currentnessとrevision",
+      "description": "provenanceとcurrentness dependencyを分離し、dependency mismatchをcurrent useから除外し、entry revisionを利用workflowへ記録しているか。",
+      "critical": true
+    },
+    {
+      "id": "KN-SEM-005",
+      "title": "Same identity updateとreplacement",
+      "description": "same identityのrevalidationは同一entry refを維持し、identity変更時だけreplacementを使い、same-entry CAS conflictを自動mergeしていないか。",
+      "critical": true
+    },
+    {
+      "id": "KN-SEM-006",
+      "title": "Atomic create / update concurrency",
+      "description": "same semantic identityをcanonical create targetへ収束させ、incomplete root / missing native atomic conditionでは保存をblockし、別entry更新だけで無関係entryをstaleにしていないか。",
+      "critical": true
+    }
+  ]
+}

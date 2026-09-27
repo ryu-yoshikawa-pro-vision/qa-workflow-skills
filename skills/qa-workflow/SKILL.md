@@ -30,6 +30,12 @@ runtimeの`can_complete`はオーケストレーションの要約であり、�
 
 最終成果物の直前にqa-workflow-local `scripts/runtime_contract.py`の`operation=verify_runtime_evidence`へ、実際に使用したcanonical normalized inputとcandidate成果物全文を渡し、`partial_rerun=false`かつ`previous_artifact_markdown=null`に固定します。qa-workflowは自Skill Entityをcarry-forwardしません。`workflow_runtime.py`の前に各scope担当Skill verifierを実行し、`valid=true`で返った`current_structure_state`を変更せず`workflow_scopes[]`へ転記します。stateやexpected Entityを組み立てません。最終gateの`valid=false`は既存の最大1回の局所修正・最終確認契約へ統合し、未解決なら完成扱いしません。`verify_runtime_evidence`は`workflow_runtime.py`のworkflow全体検証を置き換えず、両方を実行します。
 
+## 継続管理workflowの決定論的処理
+
+persisted workflowのProject Context stable key parse / 必須key検証 / used-field currentness、workflow stateのcanonical path / 初回create、fixed-root scan、state CAS capability gate、mutable operation pre-start claim、shared resource reservationは、Resourcesに記載した`artifact_graph.py` production helperで実行します。これらの処理結果をAgentの意味判断や手計算で置き換えません。
+
+helperの必須処理が入力不足・実行不能・保存先能力不足で失敗した場合、影響するscopeを`incomplete` / `unresolved` / `blocked`として閉じます。LLM fallbackで保存、CAS、claim、reservationを成立したことにしません。
+
 ## インターフェース
 
 - **入力**: ユーザー要求、要求する最終成果物、識別可能な対象範囲。情報源、既存QA成果物、案件コンテキスト、進行モード、既知のブロック中 / 残存リスク / `要再検証`状態は利用可能な場合に補助入力とします。
@@ -55,13 +61,17 @@ runtimeの`can_complete`はオーケストレーションの要約であり、�
 | E2E安全確認・実行・構造化結果・cleanup | `e2e-test-execution` |
 | E2E実行結果の原因分析・修正routing | `e2e-test-result-analysis` |
 | 検証済みE2E結果の報告 | `e2e-test-reporting` |
+| Regression baseline / membership / Run / Activity | `regression-testing` |
+| Charterに沿ったExploration / Investigation | `exploratory-testing` |
+| 継続QA knowledgeのtriage / lifecycle / lookup | `qa-knowledge` |
 
 ## ランタイム前提
 
-本Skillは、同一のAgentクライアント上で16 Skillすべてが利用可能で、Agentが必要なSkillを追加で読み込み / 利用できる環境を前提とします。これはAgent Skills Specificationが共通Skill-to-Skill APIを保証しているという意味ではありません。
+本Skillは、同一のAgentクライアント上で19 Skillすべてが利用可能で、Agentが必要なSkillを追加で読み込み / 利用できる環境を前提とします。これはAgent Skills Specificationが共通Skill-to-Skill APIを保証しているという意味ではありません。
 
 ## リソース
 
 - オーケストレーション詳細: `references/guidance.md`
+- artifact graph / workflow state / currentness / claim / reservation production helper: `scripts/artifact_graph.py`
 - 案件コンテキスト既定形: `assets/project-context-template.md`
 - 任意のワークフロー状態表: `assets/workflow-state-template.md`

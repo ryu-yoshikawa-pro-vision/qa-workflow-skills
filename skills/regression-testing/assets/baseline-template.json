@@ -1,0 +1,13 @@
+{
+  "schema_version": "1",
+  "baseline_ref": "",
+  "discovery_snapshot_ref": "",
+  "source_revisions": [],
+  "scope_refs": [],
+  "memberships": [],
+  "one_off": [],
+  "unresolved_tc_refs": [],
+  "undecided_tc_refs": [],
+  "coverage_gaps": [],
+  "complete": false
+}

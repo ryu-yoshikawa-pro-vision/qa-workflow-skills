@@ -1,0 +1,3 @@
+# Eval Input
+
+有効entry KN-Aのprovenance finding revisionは変わっていませんが、currentness dependencyのjob configuration revisionがr3からr4へ変わりました。userは今後のQAへのcurrent recommendationを求めています。

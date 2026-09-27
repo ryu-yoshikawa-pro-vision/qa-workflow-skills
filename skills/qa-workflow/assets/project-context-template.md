@@ -146,3 +146,33 @@
 ## 15. 案件固有メモ
 
 -
+
+## 16. QA artifact graphの固定rootとcurrentness項目
+
+各fieldのstable keyは表示文言・heading・行番号から独立しています。workflowが依存するfieldは、このkeyと正規化値をsnapshotへ記録します。値を未設定のまま利用できると推測しません。
+
+<!-- qa-context-field:start key=qa.regression_scope type=ordered_text -->
+（未設定）
+<!-- qa-context-field:end -->
+
+<!-- qa-context-field:start key=qa.regression_policy type=scalar -->
+（未設定）
+<!-- qa-context-field:end -->
+
+<!-- qa-context-field:start key=qa.knowledge_root type=path -->
+（未設定）
+<!-- qa-context-field:end -->
+
+<!-- qa-context-field:start key=qa.workflow_state_root type=path -->
+（未設定）
+<!-- qa-context-field:end -->
+
+<!-- qa-context-field:start key=qa.reservation_root type=path -->
+（未設定）
+<!-- qa-context-field:end -->
+
+<!-- qa-context-field:start key=qa.auxiliary_testware_refs type=ordered_lines -->
+（未設定）
+<!-- qa-context-field:end -->
+
+root pathはproject-local fixed locationにし、同じ案件内のworkflowから一意に解決できる値を記録します。secret実値は追加しません。

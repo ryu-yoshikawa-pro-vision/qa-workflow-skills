@@ -1,0 +1,39 @@
+{
+  "skill": "exploratory-testing",
+  "cases": [
+    {
+      "id": "EXP-SEM-001",
+      "input": "cases/exp-sem-001/input.md",
+      "reference": "cases/exp-sem-001/reference.md",
+      "criteria": [
+        "EXP-SEM-001",
+        "EXP-SEM-002"
+      ]
+    },
+    {
+      "id": "EXP-SEM-002",
+      "input": "cases/exp-sem-002/input.md",
+      "reference": "cases/exp-sem-002/reference.md",
+      "criteria": [
+        "EXP-SEM-003"
+      ]
+    },
+    {
+      "id": "EXP-SEM-003",
+      "input": "cases/exp-sem-003/input.md",
+      "reference": "cases/exp-sem-003/reference.md",
+      "criteria": [
+        "EXP-SEM-004"
+      ]
+    },
+    {
+      "id": "EXP-SEM-004",
+      "input": "cases/exp-sem-004/input.md",
+      "reference": "cases/exp-sem-004/reference.md",
+      "criteria": [
+        "EXP-SEM-001",
+        "EXP-SEM-004"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,3 @@
+# Reference
+
+manual sourceの開始済み/FAILはそのまま記録します。E2E artifact存在やpreflightだけで開始済みにしません。required route全てが開始されていないためlogical TC-301はexecuted countに入らず、E2Eをblocked/unstartedとして保持します。
