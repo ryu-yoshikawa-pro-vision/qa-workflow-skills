@@ -505,7 +505,7 @@ outcome mapping:
 
 WCAG Success Criterionにrelevant contentがない場合はformal result contractどおり `satisfied` とし、EARLだけ `inapplicable` へ変換しません。test modeはevidence provenanceから `automatic / manual / semiAuto / undisclosed / unknownMode` のいずれかを選び、判定できないmodeを推測しません。
 
-EARL sidecarはhuman-readable WCAG-EM reportの代替ではありません。assertion数、subject / test / outcome、artifact refsがhuman-readable reportと一致することをdeterministic validatorで確認します。
+EARL sidecarはhuman-readable WCAG-EM reportの代替ではありません。assertion数、stable assertion / subject identity、test / outcomeとhuman-readable formal result集合が一致することをdeterministic validatorで確認します。artifact-local refをEARL IRIとして直接公開しません。
 
 ## 3.1 wcag_requirements.py
 
