@@ -308,6 +308,8 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
    2026-09-25_194200_usability-evaluation-skill_05f_wcag-conformance-evaluation-package-and-runtime.md
 5g. usability-inspection browser observation request / probe契約  
    2026-09-25_194200_usability-evaluation-skill_05g_usability-inspection-browser-observation-contract.md
+5h. formal WCAG Success Criterion評価経路  
+   2026-09-25_194200_usability-evaluation-skill_05h_wcag-criterion-evaluation-contract.md
 6. 評価・CI・実装順序・完了条件  
    2026-09-25_194200_usability-evaluation-skill_06_evaluation-ci-implementation-order.md
 6a. usability-inspectionの実装順序・完了条件  

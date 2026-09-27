@@ -88,8 +88,7 @@ WCAG-EM 2のoutput contractはReport ToolのschemaではなくWCAG-EM 2.0本文�
 
 ## 5. Step 3: production helper
 
-`runtime_contract.py`、`wcag_requirements.py
-├── wcag_criterion_plan.py`、`sampling.py`、`wcag_em_structure.py`、`earl_report.py` を実装します。`runtime_contract.py` はPR #11のcurrent契約を再利用し、独自runtime frameworkは追加しません。
+`runtime_contract.py`、`wcag_requirements.py`、`wcag_criterion_plan.py`、`sampling.py`、`wcag_em_structure.py`、`earl_report.py` を実装します。`runtime_contract.py` はPR #11のcurrent契約を再利用し、独自runtime frameworkは追加しません。
 
 ### requirements
 
