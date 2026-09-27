@@ -326,6 +326,7 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 - repository-level contract testでformal required machine probe keyとinspection catalog keyのmissing / extra / unused 0
 - `_05k` versioned semantic contract coverage / normative clause・exception refs / required evidence role / approved hash
 - WCAG 2.0 / 2.1 4.1.1 HTML/XML shortcut / other technology semantic path / WCAG 2.2 removal
+- SC 1.4.4のvalid text scaling mechanism inventory、100%→200%、incremental step、`deviceScaleFactor` / viewport resize / CSS injectionを代替としてreject、valid mechanism未実行時blocked / undetermined
 - semantic procedure resultの判断理由 / uncertainty / additional observation request refs
 - additional observationがrequired criterion / procedure集合を変更せず、fixed observation contractへ解決されること。解決不能またはno-progressではundetermined / blockedへ閉じること
 - semantic判断で発見した別のusability / business flow concernをWCAG resultへ混ぜず別routingできること
@@ -360,7 +361,7 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 - Evaluation Specifics / archive ref / secret safety
 - Evaluation Statementはtarget WCAG 2.2だけでfull / partial guardを検証し、2.0 / 2.1ではsection不存在を検証
 - WCAG Conformance Claim required / optional fields / version別claim URI / third-party 2-business-day monitoring-repair / Statement of Partial Conformance guard
-- EARL JSON-LD fixed `@context` / node shape / stable IRI / result reference closure / outcome・mode mapping / deterministic byte rendering / assertion coverage
+- EARL JSON-LD fixed `@context` / node shape / stable IRI / result reference closure / `applicable_population=none → earl:inapplicable` を含むoutcome・mode mapping / deterministic property ordering・byte rendering / assertion coverage
 
 ### semantic
 
