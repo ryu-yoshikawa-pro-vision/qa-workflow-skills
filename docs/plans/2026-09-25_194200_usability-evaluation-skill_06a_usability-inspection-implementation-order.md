@@ -105,7 +105,8 @@ skills/usability-inspection/scripts/
 - `general / scoped / formal-handoff` からscope rowを `inspection_structure.py` が生成し、LLMはraw依頼から正規aspect keyへのmappingとtarget-specific applicability / reasonだけを返す
 - selected supported rule / measurement / scopeからrequired observation field集合とfixed probe request集合をscriptが導出
 - target draftから `TARGET-001` 等のtarget registry / resolver schema / currentness / uniquenessを `observation_contract.py` がmaterialize / validate
-- `PROBE-001` 等のprobe request ref、probe schema / unit / capabilityを `observation_contract.py` がmaterialize / validate
+- `PROBE-001` 等のsemantic追加観測probe request ref、probe schema / unit / capabilityを `observation_contract.py` がmaterialize / validate
+- formal WCAG machine procedure用browser入力は `_05j` のfinite machine probe contractからmaterializeし、LLMや `_05g` の自由選択fieldへ混ぜない
 - semantic additional observation draftのrequester kind `usability-evaluation / inspection-requirement / wcag-procedure`、canonical requester identity、state basis refs / current document identityを検証し、`OBSREQ-001` 等、request identity / input evidence fingerprintをmaterializeしてfield → probe mappingを一意に解決
 - same request identity + same evidence fingerprintは `no-progress`、state description変更だけでは別identityにせず、unknown observation fieldは `unsupported`
 - additional observation requestはfinal artifactで `planned` を残さず、requester側semantic resultも対応するevidenceまたはlimitationへ閉じる
@@ -165,7 +166,7 @@ current mainへmerge済みのPR #12 browser実行基盤を再利用します。r
 - `observation_contract.py plan` が生成したfixed requestをcurrent browser経路で実行し、normalize結果をruntimeへ戻す
 - rendered UI / screenshot observation
 - DOM / accessibility observation
-- canonical observation field inventory全15 keyのexactly-one probe mapping
+- canonical observation field inventory全16 keyのexactly-one probe mapping
 - current document locationは `page.url()`
 - target-local rendered textは `locator.innerText()`、control valueは `locator.inputValue()`、selected valueはselectedOptionsの `{value,label}` 配列
 - viewport / geometry
@@ -175,7 +176,7 @@ current mainへmerge済みのPR #12 browser実行基盤を再利用します。r
 - explicit scroll
 - resize
 - responsive boundary probe。general modeではcompleteなboundary inventoryが1件以上あればbefore / boundary / afterを全件実行し、boundary 0件はnot-applicable、inventory incompleteは別Authorityで閉じない限り判定不能
-- CSSOM boundary処理は `_05g` のsupported subsetを扱い、media query `px / em / rem` と条件付きcontainer size query `px / em / rem` を固定procedureでCSS pxへ正規化する。unsupported unit / calc / var / style queryはincompleteへ閉じる
+- CSSOM responsive処理は `_05g` のcondition inventoryを使い、既知の標準構文をPlan都合のsupported subsetへ切らない。media / container size conditionはbrowser自身のquery評価を正本にし、`px / em / rem / viewport-relative / container-relative / calc()` 等を文字列parserで拒否せず、実際のmatch transitionからCSS px boundaryをmaterializeする。style / scroll-state queryは数値boundaryへ変換せずpresentation variation conditionとしてclosureする。browser capability不足は `unsupported`、安全にstateを作れない場合は `not-executable / incomplete`
 - boundary detectionとexecution feasibilityを分離し、container / compound query等でrequired stateを安全に実現できない場合は `not-executable / incomplete` とする
 - cross-origin等でread不能sourceがある場合の `incomplete` closure
 - fixed interaction-timing probe。8種end predicateごとのrequired payload、same-page `performance.now()`、preexisting predicate、timeout、unknown attribute / ARIA state rejectを含む
