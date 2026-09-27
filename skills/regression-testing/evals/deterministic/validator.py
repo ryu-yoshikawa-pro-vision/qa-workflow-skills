@@ -61,7 +61,11 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
                 and membership_shape_valid
                 and set(refs) == set(expected_current_refs)
             )
-        result.add("REG-D003", evidence_valid and doc.get("complete") is derived and population_valid, "baseline completeはdiscovery・lifecycle・membershipの各完了根拠と期待されたcurrent TC全件のmembershipから導出されること", evidence={"expected": derived, "actual": doc.get("complete"), "expected_current_tc_refs": expected_current_refs, "actual_membership_refs": refs})
+        unresolved_memberships = membership_shape_valid and any(
+            item.get("decision") == "unresolved" for item in memberships if isinstance(item, dict)
+        )
+        derived = derived and not unresolved_memberships
+        result.add("REG-D003", evidence_valid and doc.get("complete") is derived and population_valid, "baseline completeはdiscovery・lifecycle・解決済みmembershipの各完了根拠と期待されたcurrent TC全件のmembershipから導出されること", evidence={"expected": derived, "actual": doc.get("complete"), "unresolved_memberships": unresolved_memberships, "expected_current_tc_refs": expected_current_refs, "actual_membership_refs": refs})
         result.add("REG-D004", membership_shape_valid and not duplicate_refs and not invalid_members, "membership refが一意でcurrent logical TCだけをmemberにすること", evidence={"duplicate_refs": duplicate_refs, "invalid_members": invalid_members})
         result.add("REG-D005", doc.get("coverage_gaps") is not None, "traceability coverage gapをinventory / lifecycle不完全と分けて保持すること")
         valid_decisions = {"member", "one_off", "out_of_scope", "unresolved"}

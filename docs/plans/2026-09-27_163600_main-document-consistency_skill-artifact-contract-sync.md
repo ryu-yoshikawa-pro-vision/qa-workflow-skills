@@ -26,7 +26,7 @@
 
 Plan 11の実装時、`memberships`にcurrentな`member`があり`complete=true`でも、`member_tc_refs`欠落をdeterministic validatorが受理し、`plan_run()`が欠落を空集合としてfull Runを0件で`ready`にできることが分かりました。再レビューではmembership provenance revisionがBaseline top-level `source_revisions` / Run前currentnessへ含まれず、古い判断がcurrent扱いされる点と、current TC 3件を要求する`REG-OUT-001`がmembership 2件のままcompleteとして通る点も確認されました。文書だけを現在fixtureへ合わせると、production helperが使うBaseline / Run planning / currentness契約を壊します。
 
-この不整合を解消する範囲に限り、既存Baseline fieldを使った最小限のRegression runtime、deterministic validator、deterministic fixture、Regression runtime testの変更を許可します。加えて、既存`REG-OUT-001`のexpected metadataを、inputに定義済みのcurrent TC populationをvalidatorが照合できるよう同期します。新しいRegression caseの追加やcaseの意味変更はしません。Regression以外のruntime / validator / fixture / dataset / test、semantic / trigger dataset、Regressionの他case、CIは対象外のままです。新しいfieldやschemaは追加しません。
+この不整合を解消する範囲に限り、既存Baseline fieldを使った最小限のRegression runtime、deterministic validator、deterministic fixture、Regression runtime testの変更を許可します。加えて、既存`REG-OUT-001`のexpected metadataを、inputに定義済みのcurrent TC populationをvalidatorが照合できるよう同期します。新しいRegression caseの追加やcaseの意味変更はしません。Baseline currentnessではsaved `discovery_snapshot_ref`とcurrent snapshotの`snapshot_ref`も照合し、unresolved membershipをcompleteとして扱いません。Regression以外のruntime / validator / fixture / dataset / test、semantic / trigger dataset、Regressionの他case、CIは対象外のままです。新しいfieldやschemaは追加しません。
 
 現在の実装と文書が一致している箇所は変更しません。文書整合だけを理由にvalidatorやfixtureを現在文書へ合わせて変更しません。
 

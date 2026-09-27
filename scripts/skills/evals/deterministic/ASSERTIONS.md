@@ -303,7 +303,7 @@
 ## regression-testing
 - `REG-D001` 正規JSON artifactが一つだけ整形式で存在する
 - `REG-D002` artifact typeがbaseline / run / activityのいずれか
-- `REG-D003` Baseline completeとdiscovery・lifecycle・membership根拠および期待current TC populationの整合
+- `REG-D003` Baseline completeとdiscovery・lifecycle・解決済みmembership根拠および期待current TC populationの整合
 - `REG-D004` membership refの一意性とcurrent logical TCだけのmember化
 - `REG-D005` traceability coverage gapをinventory / lifecycle不完全と分離
 - `REG-D006` full Runにcompleteかつcurrentなbaselineを要求

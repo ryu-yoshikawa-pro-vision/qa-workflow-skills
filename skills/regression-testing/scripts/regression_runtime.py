@@ -178,7 +178,8 @@ def reconcile_membership(snapshot: dict[str, Any], decisions: list[dict[str, Any
     undecided = sorted(set(cases) - set(decision_by_ref))
     member_refs = sorted(ref for ref, item in decision_by_ref.items() if item.get("decision") == "member" and ref in cases)
     one_off = sorted(ref for ref, item in decision_by_ref.items() if item.get("decision") == "one_off" and ref in cases)
-    complete = bool(snapshot.get("complete")) and not undecided and not issues
+    unresolved_decisions = {ref for ref, item in decision_by_ref.items() if item.get("decision") == "unresolved"}
+    complete = bool(snapshot.get("complete")) and not undecided and not unresolved_decisions and not issues
     memberships = [
         {
             **decision_by_ref[ref],
@@ -203,6 +204,15 @@ def reconcile_membership(snapshot: dict[str, Any], decisions: list[dict[str, Any
 def check_baseline_currentness(baseline: dict[str, Any], current: dict[str, Any]) -> dict[str, Any]:
     if baseline.get("complete") is not True:
         return {"status": "incomplete", "changed_sources": [], "reason": "baseline_incomplete"}
+    unresolved_refs = baseline.get("unresolved_tc_refs")
+    undecided_refs = baseline.get("undecided_tc_refs")
+    if (
+        not isinstance(unresolved_refs, list)
+        or unresolved_refs
+        or not isinstance(undecided_refs, list)
+        or undecided_refs
+    ):
+        return {"status": "incomplete", "changed_sources": [], "reason": "baseline_membership_completion_invalid"}
     if current.get("complete") is not True:
         return {"status": "unresolved", "changed_sources": [], "reason": "current_discovery_incomplete"}
     baseline_scope = baseline.get("scope_identity")
@@ -211,6 +221,12 @@ def check_baseline_currentness(baseline: dict[str, Any], current: dict[str, Any]
         return {"status": "incomplete", "changed_sources": [], "reason": "baseline_scope_identity_missing"}
     if not isinstance(current_scope, str) or not current_scope.strip():
         return {"status": "unresolved", "changed_sources": [], "reason": "current_scope_identity_missing"}
+    baseline_snapshot_ref = baseline.get("discovery_snapshot_ref")
+    current_snapshot_ref = current.get("snapshot_ref")
+    if not isinstance(baseline_snapshot_ref, str) or not baseline_snapshot_ref.strip():
+        return {"status": "incomplete", "changed_sources": [], "reason": "baseline_discovery_snapshot_ref_missing"}
+    if not isinstance(current_snapshot_ref, str) or not current_snapshot_ref.strip():
+        return {"status": "unresolved", "changed_sources": [], "reason": "current_discovery_snapshot_ref_missing"}
     old, old_errors = _revision_map(baseline.get("source_revisions"))
     if old_errors:
         return {"status": "incomplete", "changed_sources": [], "reason": "baseline_source_revisions_invalid"}
@@ -239,6 +255,9 @@ def check_baseline_currentness(baseline: dict[str, Any], current: dict[str, Any]
     changed = sorted(ref for ref in set(old) | set(new) if old.get(ref) != new.get(ref))
     if baseline_scope != current_scope:
         changed.append("<scope>")
+    if baseline_snapshot_ref != current_snapshot_ref:
+        changed.append("<discovery_snapshot>")
+    changed.sort()
     return {"status": "stale" if changed else "current", "changed_sources": changed, "reason": "dependency_changed" if changed else "dependencies_match"}
 
 
