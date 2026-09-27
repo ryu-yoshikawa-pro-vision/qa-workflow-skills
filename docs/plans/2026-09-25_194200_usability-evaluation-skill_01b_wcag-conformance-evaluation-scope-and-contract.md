@@ -71,7 +71,7 @@ scopeは自由記述だけで閉じず、少なくとも次を個別に確認し
 
 semantic layerは各領域が同じdigital productへ属するか、in-scopeかを判断します。scriptは確認対象row、scope ref、in-scope / out-of-product closure、reason / evidence refをmaterializeし、未確認rowを暗黙に省略しません。
 
-additional requirementがsample追加、全occurrence報告、特定use case / user group分析、追加解決案、Step 5.2 / 5.5出力、特定report template等を要求する場合は、既存Skill責務の範囲でaffected stepへ反映します。human participantを使う評価等、本Planで明示的に目的外とした要求はout-of-scope理由を残します。
+additional requirementがsample追加、全occurrence報告、特定use case / user group分析、追加解決案、Step 5.2 / 5.5出力、reportに必要な追加field / section等を要求する場合は、既存Skill責務の範囲でaffected stepへ反映します。評価内容・coverageとして本Skillの目的内なら、既存の物理出力形式で表現できないことを理由に `out-of-scope` へ逃がさず、必要情報を `applied / blocked` へ閉じます。一方、未知の外部document format、任意の第三者templateへの変換、PDF / Office生成等のrenderer自体は本Skillの評価責務とは分離し、generic template engineを追加しません。human participantを使う評価等、本Planで明示的に目的外とした要求はout-of-scope理由を残します。
 
 accessibility support baselineは初期定義後に固定不変とは扱いません。formal evidence取得で初期baseline外のOS / browser / assistive technology / other user agentを実際に使用した場合、scriptがreturned environmentをcurrent baseline setと比較し、formal resultへ採用する組合せだけをbaselineへ追加してnew baseline revisionをmaterializeします。baseline revisionが変わった場合は関連sample resultのfreshnessを再計算します。diagnostic用途だけの環境はbaselineへ自動追加しません。
 
@@ -229,6 +229,20 @@ Step 5.1では、`not-satisfied` のConformance Requirement / Success Criterion�
 
 human-readable evaluation report、Step 5.3 Evaluation Statement、accompanying documentationは、本Skillが所有するMarkdown等の成果物についてaccessible formatを必須にします。少なくとも見出し構造、table header、画像 / screenshot evidenceのtext description、色や画像だけに依存しない状態表現、意味の分かるlink textを満たします。別ownerがHTML / PDF等へ変換した後の形式まで本Skillが自動保証するとは扱いません。
 
+### Step 5 output format boundary
+
+`wcag-conformance-evaluation` が直接所有する物理出力は次に固定します。
+
+- canonical human-readable WCAG-EM report
+- target WCAG 2.2で条件を満たす場合のEvaluation Statement
+- target versionの条件を満たす場合のWCAG Conformance Claim / Statement of Partial Conformance
+- Step 5.5を要求する場合のEARL 1.0 JSON-LD sidecar
+
+外部HTML / PDF / Office文書、任意の顧客template、第三者report systemへのupload / exportは、このSkillのbuilt-in rendererにはしません。
+
+追加評価要件が「この情報をreportへ含める」「このoccurrenceを全件出す」等の評価内容を要求する場合は目的内です。canonical reportへmaterializeし、必要ならdownstream ownerが別formatへ変換できるようにfield / refを保持します。
+
+任意templateへの変換機構を将来用途だけでgeneric plugin / template engine化しません。
 Step 5.2 Evaluation Specificsは要求・合意がある場合に記録し、sample archive / evidence / path / settings / actions / tool / browser / assistive technology / software / methodを安全な参照として保持します。secretや不要PIIは保存しません。
 
 WCAG-EM Evaluation Statementは任意ですが、現行WCAG-EM 2.0 Step 5.3のminimum fieldがWCAG 2.2を固定指定するため、target WCAG versionが2.2の場合だけ通常statement / partial conformance statementの生成条件を評価します。WCAG 2.0 / 2.1のformal evaluationはStep 5.1 reportまで生成しますが、Step 5.3準拠のEvaluation Statementとは称しません。

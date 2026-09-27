@@ -58,6 +58,9 @@ catalogに載っているだけで、そのsource全体をbundled corpusへ収�
 | W3C-WCAGEM-REPORT-TOOL | WCAG-EM Report Tool | https://www.w3.org/WAI/eval/report-tool/ | supplementary tool reference。WCAG-EM 2.0本文と同一の成果物schemaを提供することは確認できていないため、WCAG-EM 2 schemaのAuthorityにはしない |
 | W3C-WAI-ARIA12 | WAI-ARIA 1.2 | https://www.w3.org/TR/wai-aria-1.2/ | normative standard |
 | W3C-ARIA-IN-HTML | ARIA in HTML | https://www.w3.org/TR/html-aria/ | normative author requirements |
+| W3C-ACCNAME11 | Accessible Name and Description Computation 1.1 | https://www.w3.org/TR/accname-1.1/ | W3C Recommendation / accessible name・description computationのstable reference |
+| W3C-ACCNAME12 | Accessible Name and Description Computation 1.2 | https://www.w3.org/TR/accname-1.2/ | 2026-09-27確認時点Working Draft。current draft差分確認用で、Recommendation相当のbinding sourceへ昇格しない |
+| W3C-HTML-AAM10 | HTML Accessibility API Mappings 1.0 | https://www.w3.org/TR/html-aam-1.0/ | 2026-09-27確認時点Working Draft / user agent mapping reference。author requirementそのものへ昇格しない |
 | W3C-APG | WAI-ARIA Authoring Practices Guide | https://www.w3.org/WAI/ARIA/apg/ | informative guidance / examples |
 | W3C-ACT-FORMAT11 | ACT Rules Format 1.1 | https://www.w3.org/TR/act-rules-format/ | normative rule-format standard |
 | W3C-ACT-RULES | All ACT Rules | https://www.w3.org/WAI/standards-guidelines/act/rules/ | informative test rules |
@@ -121,12 +124,24 @@ inspection packageにはUI pattern本文を複製せず、live inspection / meas
 | PW-BROWSER | Playwright Browser API | https://playwright.dev/docs/api/class-browser | BrowserContext / hasTouch / isMobile / userAgent / viewport |
 | PW-ACTIONABILITY | Playwright Actionability | https://playwright.dev/docs/actionability | auto-wait境界 |
 | PW-LOCATORS | Playwright Locators | https://playwright.dev/docs/locators | locator利用境界 |
+| W3C-WCAG20 | WCAG 2.0 | https://www.w3.org/TR/WCAG20/ | general requirement checkで指定versionを使う場合のnormative source |
+| W3C-WCAG21 | WCAG 2.1 | https://www.w3.org/TR/WCAG21/ | general requirement checkで指定versionを使う場合のnormative source |
+| W3C-WCAG22 | WCAG 2.2 | https://www.w3.org/TR/WCAG22/ | general requirement checkで指定versionを使う場合のnormative source |
+| W3C-WAI-ARIA12 | WAI-ARIA 1.2 | https://www.w3.org/TR/wai-aria-1.2/ | normative standard |
+| W3C-ARIA-IN-HTML | ARIA in HTML | https://www.w3.org/TR/html-aria/ | normative author requirements |
+| W3C-ACCNAME11 | Accessible Name and Description Computation 1.1 | https://www.w3.org/TR/accname-1.1/ | stable accessible name・description computation reference |
+| W3C-ACCNAME12 | Accessible Name and Description Computation 1.2 | https://www.w3.org/TR/accname-1.2/ | current Working Draft。必要なcurrent差分確認時だけ利用しsource statusを保持 |
+| W3C-HTML-AAM10 | HTML Accessibility API Mappings 1.0 | https://www.w3.org/TR/html-aam-1.0/ | current Working Draft / conditional user-agent mapping reference |
+| W3C-ACT-FORMAT11 | ACT Rules Format 1.1 | https://www.w3.org/TR/act-rules-format/ | supported ACT implementation consistency |
 | W3C-ACT-RULES | All ACT Rules | https://www.w3.org/WAI/standards-guidelines/act/rules/ | supported ACT checkのsource |
 | W3C-NAV-TIMING | Navigation Timing Level 2 | https://www.w3.org/TR/navigation-timing-2/ | navigation timing |
 | W3C-PAINT-TIMING | Paint Timing | https://www.w3.org/TR/paint-timing/ | FCP等のpaint timing |
 | WEBDEV-VITALS | Web Vitals | https://web.dev/articles/vitals | Core Web Vitals定義の補助 |
 | WEBDEV-FIELD | Web Vitals field measurement best practices | https://web.dev/articles/vitals-field-measurement-best-practices | field / percentile境界 |
 
+inspection packageはUI pattern corpusを複製しませんが、strict requirement checkとmachine observationの意味を追跡するために必要なWCAG / WAI-ARIA / ARIA in HTML / AccName / ACT sourceは自身の `references/source-catalog.md` から辿れるようにします。
+
+AccName 1.2とHTML-AAM 1.0は2026-09-27確認時点でWorking Draftです。current browser observationの解釈やdraft差分確認に使う場合もsource statusを保持し、それだけを根拠にproject binding requirementやRecommendation相当のauthor requirementへ昇格しません。
 Core Web Vitalsはcatalogへsourceを置きますが、本SkillがLCP / CLS / INPの計算実装を独自に再実装することは意味しません。詳細は `_05e_performance-measurement.md` を正本とします。
 
 ## 4. wcag-conformance-evaluation seed sources
@@ -154,6 +169,9 @@ formal WCAG evaluation packageは次を最低限catalog化します。
 | W3C-ACT-RULES | All ACT Rules | https://www.w3.org/WAI/standards-guidelines/act/rules/ | informative test rules |
 | W3C-WAI-ARIA12 | WAI-ARIA 1.2 | https://www.w3.org/TR/wai-aria-1.2/ | applicable normative requirements |
 | W3C-ARIA-IN-HTML | ARIA in HTML | https://www.w3.org/TR/html-aria/ | applicable author requirements |
+| W3C-ACCNAME11 | Accessible Name and Description Computation 1.1 | https://www.w3.org/TR/accname-1.1/ | applicable accessible name / description computation reference |
+| W3C-ACCNAME12 | Accessible Name and Description Computation 1.2 | https://www.w3.org/TR/accname-1.2/ | current Working Draft。必要なcurrent差分確認時だけ利用 |
+| W3C-HTML-AAM10 | HTML Accessibility API Mappings 1.0 | https://www.w3.org/TR/html-aam-1.0/ | current Working Draft / conditional user-agent mapping reference |
 | W3C-ACCESSIBILITY-SUPPORT | Understanding Accessibility Support | https://www.w3.org/WAI/WCAG22/Understanding/conformance#accessibility-support | accessibility support baseline reference |
 | W3C-ESSENTIAL-COMPONENTS | Essential Components of Web Accessibility | https://www.w3.org/WAI/fundamentals/components/ | WCAG-EM required expertise background reading |
 | W3C-PEOPLE-USE-WEB | How People with Disabilities Use the Web | https://www.w3.org/WAI/people-use-web/ | WCAG-EM required expertise background reading |

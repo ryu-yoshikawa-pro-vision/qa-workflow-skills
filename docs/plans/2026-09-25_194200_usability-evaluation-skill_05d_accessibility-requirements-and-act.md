@@ -40,6 +40,30 @@ formalなWCAG conformance要求で、
 
 個別sampleのlive observationでは本ファイルのrequirement / ACT semanticsを再利用できます。ただしformal評価で「target levelに必要な全Success Criteria / conformance requirements」を列挙する正本は `_05f_wcag-conformance-evaluation-package-and-runtime.md` のversioned static catalogとし、usability-inspectionやLLMの選択済みrequirement集合を正本にしません。
 
+## 1.1 strict requirement sourceとbrowser observationの境界
+
+`usability-inspection` がstrictなstandard / author requirementを判定する場合、根拠sourceを `skills/usability-inspection/references/source-catalog.md` から一意に辿れるようにします。
+
+少なくとも次を対象sourceとして保持します。
+
+- targetとして使用するWCAG 2.0 / 2.1 / 2.2
+- WAI-ARIA 1.2
+- ARIA in HTML
+- Accessible Name and Description Computation 1.1
+- supported ACT Ruleを実装する場合のACT Rules Format 1.1 / All ACT Rules
+
+Accessible Name and Description Computation 1.2とHTML Accessibility API Mappings 1.0を利用する場合はcurrent draft / mapping referenceとしてsource statusを保持します。2026-09-27確認時点ではいずれもWorking Draftであり、Recommendation相当のbinding author requirementへ昇格しません。
+
+browserがrole / accessible name / description / stateを返したことはmachine observationです。その値だけからrequirement `satisfied / not-satisfied` を導出しません。
+
+- browser-computed accessible nameを取得 → Observation
+- target requirement / applicability / exceptionをsourceへ照合 → requirement check
+- machine-decidable supported ruleで完全判定可能 → `criterion_checks.py`
+- purpose、visible labelとの関係、例外等の意味判断が必要 → semantic/manual
+
+HTML-AAM等のuser-agent mapping sourceをauthor requirementそのものとして扱いません。projectが特定browser / accessibility API mappingをAuthorityとして採用する場合だけ、そのAuthorityを別に記録します。
+
+formal WCAG evaluationで必要なrequirement universeは引き続き `_05f` のversioned static catalogが正本です。
 ## 2. requirement result
 
 明確なstandard / project binding requirementのresultは、

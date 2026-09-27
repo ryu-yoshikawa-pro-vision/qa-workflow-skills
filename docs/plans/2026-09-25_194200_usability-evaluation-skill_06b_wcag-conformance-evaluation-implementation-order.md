@@ -9,7 +9,8 @@
 - PR #11 merge済みcurrent runtime確認
 - PR #12はmainへmerge済みでcurrent実装を確認済み
 - PR #13 main merge済み
-- usability-inspectionのgeneral accessibility / browser observation contract成立
+- usability-inspectionのgeneral accessibility / `_05g` browser observation request / probe contract成立
+- `_04c` formal observation handoff state / CAS contractをPR #13 merge後current qa-workflowへ適用可能なことを確認
 - WCAG-EM 2.0 / WCAG 2.0 / 2.1 / 2.2 current official source確認
 - repository標準eval / CI確認
 
@@ -175,15 +176,19 @@ production helperとdeterministic validatorは別実装にします。
 
 selected sampleごとにlive accessibility observationが必要なcaseで、
 
-- wcag-conformance-evaluationがsample / requirement scope、originating evaluation / revision、resume operationを固定してnormalized handoffを出す
-- qa-workflowがhandoffとexpected sample / process / requirement refsをworkflow stateへ記録する
-- usability-inspectionがbrowser ownerとして直列実行する
-- immutable evidence / inspection artifact refをhandoff ref付きでqa-workflowへ返す
-- qa-workflow helperがexpected handoff集合とcurrent valid returned result集合を照合する
-- 全expected handoffが閉じた場合だけqa-workflowが元evaluation / revision / resume operationへresultをhandoffする
-- wcag-conformance-evaluationが同じevaluationをresumeしてaggregationする
+- wcag-conformance-evaluationがsample / process / requirement / observation request scope、originating evaluation / revision、resume operationを固定してnormalized handoffを出す
+- qa-workflowが `_04c` のhandoff recordを `pending` としてnative CASでworkflow stateへ保存する。CASできるまでbrowser操作を開始しない
+- qa-workflowが `handoff_ref` のmutable operation claimと必要なshared resource reservationを取得し、`in-progress` をCAS保存した後だけusability-inspectionを開始する
+- usability-inspectionがbrowser ownerとして `_05g` fixed observation requestを直列実行する
+- immutable evidence / inspection artifact refをhandoff ref / observation request ref / origin revision付きでqa-workflowへ返す
+- qa-workflow helperがresult currentness、exact duplicate、supersedes lineage、cleanup、expected-current-valid-returned集合を照合する
+- origin stale、claim / CAS failure、conflicting current return、未充足expected observationがある場合はresumeしない
+- `may_resume=true` をCAS保存できた場合だけ元evaluation / revision / resume operationへcurrent result refsをhandoffする
+- wcag-conformance-evaluationが同じevaluation revisionをresumeしてaggregationする
 
 ことを確認します。
+
+handoff stateの物理field、status、CAS順序、recovery / duplicate / stale handlingは `_04c_wcag-observation-handoff-state-contract.md` を正本とします。`wcag-conformance-evaluation` に第二のstate storeを作りません。
 
 sample selectionをusability-inspectionへ移しません。formal Skillからsibling Skillのscriptsを直接import / 実行しません。
 
@@ -289,7 +294,8 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 - Step 1.1 scope coverage / baseline revision extension
 - sampling procedure used / skippedとselected sample set closure
 - rerun retained / replaced / added / unavailable sample lineage
-- observation handoff origin / resume identity / expected-returned closure
+- observation handoff origin / resume identity / expected observation materialization
+- `_04c` state CAS、mutable operation claim、resource reservation、duplicate / conflicting return、stale origin、expected-returned closure、resume guard
 - ref
 - sample count
 - finite inventory candidate derivation / recorded method provenance
@@ -323,7 +329,7 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 ## 14. 完了条件
 
 - Skill責務がusability-inspectionと分離
-- qa-workflowがmulti-Skill observation handoffを直列オーケストレーション
+- qa-workflowがmulti-Skill observation handoffを直列オーケストレーションし、handoff state / CAS / claim / closureを `_04c` どおり実装
 - standalone packageがsibling Skill scriptsへruntime依存しない
 - WCAG-EM Step 1〜5 traceability
 - Step 1.4 additional evaluation requirementsをref採番し、目的内要件をaffected step / outputへ反映してappliedまたはblocked、明示目的外だけを理由付きout-of-scopeへ閉じる

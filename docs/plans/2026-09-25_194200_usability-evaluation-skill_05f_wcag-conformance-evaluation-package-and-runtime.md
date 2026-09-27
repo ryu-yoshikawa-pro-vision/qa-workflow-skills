@@ -2,7 +2,7 @@
 
 ## 0. 本ファイルの対象
 
-本ファイルは `wcag-conformance-evaluation` のSkill package、成果物、production helper、deterministic validator、semantic evalを固定します。
+本ファイルは `wcag-conformance-evaluation` のSkill package、成果物、production helper、deterministic validator、semantic evalを固定します。formal observation handoffのworkflow state / CAS / resume物理契約は `_04c_wcag-observation-handoff-state-contract.md` を正本とします。
 
 ## 1. package
 
@@ -322,6 +322,20 @@ script / validatorは `not-satisfied requirement set - example-covered requireme
 
 Step 5.2 / 5.3 / 5.5はoptional methodology requirementですが、本Skillの目的内機能として実装します。利用者要求、Step 1.4 additional requirements、またはreport出力条件に応じて生成します。Step 5.4 aggregated scoreだけは、単一scoreが誤解を招きやすくWCAG 2もrating schemeを提供しないため、本Planの目的外として生成しません。
 
+### Supported output formats / external template boundary
+
+本Skillが直接materializeする物理出力は次へ固定します。
+
+- `output-template.md` に基づくcanonical human-readable WCAG-EM report
+- target WCAG 2.2で条件を満たす場合のEvaluation Statement section
+- target version contractを満たす場合のWCAG Conformance Claim / Statement of Partial Conformance
+- Step 5.5要求時の`earl-report.jsonld`
+
+任意の外部document format、顧客固有template engine、PDF / Office generator、第三者report service exporterは追加しません。
+
+追加評価要件がreportへ必要なfield / occurrence / sectionを要求する場合は、canonical report上で目的内情報として `applied / blocked` へ閉じます。別formatへの変換が必要ならcanonical field / refをdownstream ownerへ渡し、評価内容を欠落させたまま「format非対応」でout-of-scopeにはしません。
+
+未知templateのためにgeneric renderer / plugin frameworkを作りません。
 ### Evaluation Specifics
 
 Step 5.2を記録する場合、次をglobal / sample / individual checkの適切なscopeへ保持できます。
@@ -730,6 +744,7 @@ Input:
 - finite inventory / recorded random selection provenance
 - process semantic definitions
 - observation handoff semantic requirements
+- qa-workflow handoff closure result / `may_resume` / current returned result refs（`_04c` のdeterministic helper出力）
 - returned inspection artifact / evidence refs
 - sample requirement result decisions / evidence
 - Conforming Alternate Version semantic decisions: same information / functionality / human language / currentness
@@ -766,8 +781,9 @@ Function:
 - sampling procedure used / skippedとselected sample set closure
 - sampling skippedではcomplete inventory → selected sample set traceabilityとstructured / random / Step 4.3 not-applicable closure
 - sampling usedではexploration → structured sample traceability
-- observation handoffごとにoriginating evaluation / revision / resume operation / expected refsをmaterialize
-- expected handoff集合とreturned current valid result集合のclosure
+- observation handoffごとにoriginating evaluation / revision / resume operation / expected observation refsをmaterializeする
+- workflow stateへの永続化・returned result集合のcurrentness / supersedes / CAS closureは `_04c` のqa-workflow helperを正本とし、`wcag_em_structure.py` はその `may_resume` / current returned refsだけを受け取る
+- `may_resume=false`、origin stale、handoff blockedのいずれかではformal aggregationへ進めない
 - complete process sequence closure
 - process-added sample coverage
 - Conforming Alternate Versionを別sampleへ数えずfull page resultへcondition rowsをmaterializeする
@@ -908,7 +924,8 @@ production helperとは別実装で少なくとも次を検証します。
 - Conforming Alternate Versionが別sampleに数えられず、required condition / reachability alternativeがtarget version contractと一致
 - Non-Interference fixed Success Criteria refs / result coverage
 - Step 4.2 unchanged-result reuseがidentity / evidence / freshnessでcurrentなものだけに限定される
-- observation handoffのoriginating evaluation / revision / resume operation / expected refsとreturned inspection artifact cross-reference
+- observation handoffのoriginating evaluation / revision / resume operation / expected observation refsとreturned inspection artifact cross-reference
+- `_04c` helperが出したhandoff state / CAS / current returned lineage / `may_resume` とformal artifactの整合
 - sample result cross-reference
 - target levelに必要なrequirement result coverage
 - normalized content type / Finding group keyの集合差分とStep 4.3 derived action / iteration chain
@@ -1124,7 +1141,7 @@ uncontrolled third-party contentを含むpageについてmonitoring / repair経�
 
 - package単体でSkill contractを理解できる
 - sibling Skillのscriptsへruntime依存しない
-- formal direct trigger後にlive observationが必要な場合、qa-workflowが利用可能ならhandoff → usability-inspection → formal Skill resumeへ遷移し、qa-workflowを利用できないstandalone環境だけblockedへ閉じられる
+- formal direct trigger後にlive observationが必要な場合、qa-workflowが利用可能なら `_04c` のstate / CAS / claim / expected-returned closureを通ってhandoff → usability-inspection → formal Skill resumeへ遷移し、qa-workflowを利用できないstandalone環境だけblockedへ閉じられる
 - WCAG-EM Report ToolをWCAG-EM 2 schema Authorityとして扱わず、runtime dependencyにもしていない
 - Step 1.4 additional evaluation requirementsをartifact-local refへ採番し、目的内要件をaffected step / outputへ反映してappliedまたはblockedへ、明示目的外だけを理由付きout-of-scopeへ閉じられる
 - scope coverageでthird-party / language / responsive-device / separately-hosted / authenticated-restricted領域を明示的に閉じられる

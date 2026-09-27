@@ -85,17 +85,24 @@ task / persona / prior knowledgeを必須schemaにしません。
 skills/usability-inspection/scripts/
 ├── runtime_contract.py
 ├── inspection_structure.py
+├── observation_contract.py
 ├── measurement.py
 └── criterion_checks.py
 ~~~
 
-`assets/test-rule-catalog.json` も同時に実装します。登録対象は `_05d_accessibility-requirements-and-act.md` のsupported ACT Rule / project ruleだけです。artifact structure、ref、geometry、elapsed、threshold等のhelperはcatalogへ入れません。catalogはrule DSLではなく、`criterion_checks.py` の明示dispatchとsemantic/manual経路の入力契約です。
+`assets/test-rule-catalog.json` と `assets/browser-observation-catalog.json` も同時に実装します。
+
+`test-rule-catalog.json` の登録対象は `_05d_accessibility-requirements-and-act.md` のsupported ACT Rule / project ruleだけです。artifact structure、ref、geometry、elapsed、threshold等のhelperはcatalogへ入れません。catalogはrule DSLではなく、`criterion_checks.py` の明示dispatchとsemantic/manual経路の入力契約です。
+
+`browser-observation-catalog.json` は `_05g` のfixed probe metadataだけを持ちます。任意JavaScript式、汎用selector DSL、plugin registryを入れません。
 
 このStepではbrowserを操作しません。fixtureだけで次を確認します。
 
 - same normalized input → same machine result
-- fixed top-level aspect row skeletonを `inspection_structure.py` が生成し、LLMはaspect applicability / reasonだけを返す
-- selected supported ruleからrequired observation field集合をscriptが導出
+- `general / scoped / formal-handoff` からscope rowを `inspection_structure.py` が生成し、LLMはraw依頼から正規aspect keyへのmappingとtarget-specific applicability / reasonだけを返す
+- selected supported rule / measurement / scopeからrequired observation field集合とfixed probe request集合をscriptが導出
+- `PROBE-001` 等のrequest ref、probe schema / unit / capabilityを `observation_contract.py` がmaterialize / validate
+- arbitrary JavaScript / unknown probe keyをreject
 - observation / measurement / test rule / requirement / action inputを `inspection_structure.py` が一括してartifact-local refへ採番
 - status + follow_up_requiredからFinding作成要否をscriptが導出
 - machine-owned structured sectionをscriptがmaterialize
@@ -138,7 +145,7 @@ task / flow未指定caseでも成果物が成立することを確認します�
 
 ## 7. Step 5: browser observation contract
 
-current mainへmerge済みのPR #12 browser実行基盤を再利用します。
+current mainへmerge済みのPR #12 browser実行基盤を再利用します。request / fixed probe / result normalizationは `_05g_usability-inspection-browser-observation-contract.md` を正本とします。
 
 今回のlive実行対象は既存Playwright経路で到達可能なWeb UIに限定します。
 
@@ -146,14 +153,17 @@ current mainへmerge済みのPR #12 browser実行基盤を再利用します。
 
 確認:
 
+- `observation_contract.py plan` が生成したfixed requestをcurrent browser経路で実行し、normalize結果をruntimeへ戻す
 - rendered UI / screenshot observation
 - DOM / accessibility observation
-- viewport
+- viewport / geometry
 - pointer
 - keyboard
 - focus
 - explicit scroll
 - resize
+- responsive boundary probe。cross-origin等でread不能sourceがある場合の `incomplete` closure
+- fixed interaction-timing probe。same-page `performance.now()` / fixed end predicate / preexisting predicate / timeoutを含む
 - form / error state
 - safe state transition
 - raw screenshot / DOM / accessibility treeを必要最小限にする

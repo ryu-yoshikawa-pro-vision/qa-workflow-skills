@@ -41,6 +41,8 @@ fixtureは少なくとも次を満たします。
 - 必要なら同一static fixture内の別pathでConforming Alternate Version候補を表現できる。新しいserver / originはこのためだけに追加しない
 - 同じfixture server内に、製品全体を列挙できる小さいself-enclosed product scopeを持ち、sampling procedure skip経路を追加serverなしで検証できる
 - keyboard / focus、visual / responsive、general accessibility observationを少なくとも1件ずつ実行できる
+- `_05g` のviewport / geometry / accessibility semantics / responsive-boundaries / interaction-timing fixed probeをfixture上で検証できる
+- responsive boundary取得ではreadable sourceと、意図的にcomplete扱いできないunreadable-source contract caseをdeterministic fixtureで再現できる
 - taskなしpage inspectionと、明示task / flow inspectionの両方を実行できる
 - intentional issueを使う場合はfixture contractとして期待状態を固定し、実製品の仕様と混同しない
 
@@ -89,10 +91,14 @@ current Playwright versionやPR #12 / #13 merge後のbrowser contractが変わ�
 4. keyboard / focus
 5. visual / responsive evidence
 6. applicable general accessibility check
-7. measurement経路
-8. cleanup
-9. `usability-evaluation` へのread-only handoff
-10. 同一sessionを別Skillが並行操作しない
+7. `inspection_structure.py` がgeneral / scoped / formal-handoffのscope rowをmaterializeすること
+8. `observation_contract.py` がrequired probe requestをmaterializeし、browser resultをschema / unit / capability検証してnormalizeすること
+9. responsive boundaryのreadable / incomplete両case
+10. fixed interaction timingでsame-page clock、fixed end predicate、preexisting end state、timeoutを扱えること
+11. measurement経路
+12. cleanup
+13. `usability-evaluation` へのread-only handoff
+14. 同一sessionを別Skillが並行操作しない
 
 ### wcag-conformance-evaluation
 
@@ -124,6 +130,10 @@ formal request
 - semantic / fixtureでStep 4.3再samplingありのcase。structured追加後のcandidate populationが同じcaseでrandom target再計算、overlap除外、retained random、不足分top-up、process再materializeを確認する
 - sampling procedure skippedのcase。completeなin-scope inventory全件がselected sample setとなり、structured / random / Step 4.3がnot-applicableでもcomplete process / Step 4.2評価が続くこと
 - 同一URLの異なるstateを別sample、同じstateへの別経路を同一sampleとして扱えること
+- handoffをworkflow stateへ `pending` CAS保存するまでbrowser ownerを開始しないこと
+- mutable operation claim / resource reservation後に `in-progress` CASを保存できた場合だけbrowser actionを開始すること
+- partial return、stale origin、conflicting current return、cleanup未完了ではresumeしないこと
+- exact duplicate returnはidempotentに扱い、明示supersedes lineageでのみcurrent resultを置き換えること
 - observation結果がPR #11 freshness契約でcurrentな場合だけformal evaluationへ再利用されること
 - Step 4.2でunchangedかつcurrentなcontent resultは再利用し、interaction後にchanged / unknownとなったcontentだけを再評価すること
 - Conforming Alternate Version候補を別sampleへ数えず、primary contentと同じfull-page evaluationへ紐付けること
@@ -162,7 +172,8 @@ repository implementationの完了条件:
 - external secret / user dataを必須にしない
 - 3 Skillの対象canonical E2EがPASS
 - formal direct triggerからoriginating evaluation / revision / resume operationを保持して `qa-workflow → usability-inspection → formal Skill resume` をPASS
-- expected handoff集合とcurrent valid returned result集合が一致するまでresumeしないことをPASS
+- `_04c` handoff stateをnative CASで更新し、expected observation集合とcurrent valid returned result集合が一致し、origin revision / cleanup / lineageがcurrentになるまでresumeしないことをPASS
+- `_05g` fixed probe request / normalize契約をbrowser E2EでPASSし、Agentのad hoc JavaScript / raw値手計算を必要としない
 - evidence safety / side-effect / browser ownershipをPASS
 - repository標準のdeterministic / semantic / routing / Skill validationをPASS
 - WCAG 2.0 / 2.1 / 2.2 requirement catalogのcanonical hash再計算と承認済みhash contract testをdeterministic validationでPASS
