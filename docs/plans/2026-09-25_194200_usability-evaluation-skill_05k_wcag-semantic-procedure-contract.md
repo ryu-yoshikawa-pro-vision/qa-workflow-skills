@@ -205,8 +205,8 @@ project独自のHTML validity / parsing quality gateが存在しても、WCAG 4.
 | 2.2.4 | 2.0 / 2.1 / 2.2 | interruptionsをpostpone / suppressできるか、emergency exceptionが成立するか |
 | 2.2.5 | 2.0 / 2.1 / 2.2 | authenticated session expiry後のre-authenticationでuser dataをlossせずactivity継続できるか |
 | 2.2.6 | 2.1 / 2.2 | inactivityによるdata loss timeoutがあるか、duration warning / preservation exceptionを満たすか |
-| 2.3.1 | 2.0 / 2.1 / 2.2 | flash contentがthreshold対象か、three flashes / below-threshold条件を満たすか。manual / external evidence必須 |
-| 2.3.2 | 2.0 / 2.1 / 2.2 | flash contentのfrequencyがnormative upper boundを超えないか。manual / external evidence必須 |
+| 2.3.1 | 2.0 / 2.1 / 2.2 | flash contentがthreshold対象か、three flashes / below-threshold条件を満たすか。manual evidenceを必須とし、current scope matching external evidenceがapplicableな場合だけ補助evidenceとして含める |
+| 2.3.2 | 2.0 / 2.1 / 2.2 | flash contentのfrequencyがnormative upper boundを超えないか。manual evidenceを必須とし、current scope matching external evidenceがapplicableな場合だけ補助evidenceとして含める |
 | 2.3.3 | 2.1 / 2.2 | interaction-triggered motion animationか、disable mechanismがあるか、animationがfunction / informationにessentialか |
 | 2.4.1 | 2.0 / 2.1 / 2.2 | repeated blocksが存在するか、それをbypassするmechanismが意味上成立するか |
 | 2.4.2 | 2.0 / 2.1 / 2.2 | page titleが存在するだけでなく、page topic / purposeをdescribeしているか |
@@ -233,7 +233,7 @@ project独自のHTML validity / parsing quality gateが存在しても、WCAG 4.
 | 3.1.2 | 2.0 / 2.1 / 2.2 | part-level language changeが存在するか、metadataがactual languageと一致するか、proper name / technical term等のexception |
 | 3.1.3 | 2.0 / 2.1 / 2.2 | unusual / restricted usageのwordやphraseが存在する場合、そのspecific meaningをidentifyするmechanismがあるか |
 | 3.1.4 | 2.0 / 2.1 / 2.2 | abbreviationのexpanded form / meaningをidentifyするmechanismがあるか |
-| 3.1.5 | 2.0 / 2.1 / 2.2 | textがadvanced reading abilityを要求する範囲か、supplemental content / lower-secondary reading versionがあるか。external evidenceを含む |
+| 3.1.5 | 2.0 / 2.1 / 2.2 | textがadvanced reading abilityを要求する範囲か、supplemental content / lower-secondary reading versionがあるか。current scope matching external evidenceがapplicableな場合は補助evidenceとして含め、存在しないことをfailure / undetermined理由にしない |
 | 3.1.6 | 2.0 / 2.1 / 2.2 | pronunciationなしではmeaningがambiguousなwordがあるか、specific pronunciationをidentifyするmechanismがあるか |
 | 3.2.1 | 2.0 / 2.1 / 2.2 | focus取得だけでchange of contextが発生するか |
 | 3.2.2 | 2.0 / 2.1 / 2.2 | user input setting変更だけでchange of contextが発生するか、事前にbehaviorがadvisedされているか |
