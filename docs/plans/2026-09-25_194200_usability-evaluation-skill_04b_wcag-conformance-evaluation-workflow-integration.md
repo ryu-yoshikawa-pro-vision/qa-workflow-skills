@@ -125,7 +125,8 @@ handoff recordは `_04c_wcag-observation-handoff-state-contract.md` に従い、
 - handoffを `pending` としてCAS保存できるまでbrowser ownerを開始しない
 - `handoff_ref` 単独ではなくorigin artifact ref / revision / handoff refからscript導出した `operation_ref` をmutable operation claimへ使い、必要なshared browser / account / test dataはcanonical resource orderで既存resource reservationを使う
 - returned immutable resultはhandoff identity / origin revision / currentness / cleanupを検証し、observation keyをscript導出してからCAS反映する
-- exact duplicate returnはidempotentに扱えるが、同一expected observationへ複数current resultがある場合は明示supersedes relationがなければblockする
+- exact duplicate return / state CAS再試行はidempotentに扱いbrowserを再実行しない
+- browser開始済みhandoffのresultがstale / 不足で再観測が必要な場合は、started claimを削除・再利用せずnew handoff ref + `retry_of_handoff_ref` + new operation refへ分離する。同一expected observationへ複数current resultがある場合は明示supersedes relationがなければblockする
 - origin evaluation revisionが変わったhandoffはstaleとし、旧revisionへresumeしない
 - owner完了 / cleanup後にrequired reservationを逆順releaseし、未release resourceがある状態でcloseしない
 - expected-current-valid-returned、origin currentness、cleanup、reservation releaseから `close_ready` をscript導出し、`closed` CAS成功後にstateを再読込して `may_resume` を判定する
@@ -135,9 +136,9 @@ handoff recordは `_04c_wcag-observation-handoff-state-contract.md` に従い、
 - general accessibility要求がformal evaluationへ誤routingされない
 - sample selection ownerがwcag-conformance-evaluationへ一意
 - browser ownerが同時に複数存在しない
-- formal direct triggerからlive observationが必要になった場合にoriginating evaluation / revision / resume operationを保持してqa-workflow → usability-inspection → formal Skill resumeへ一意に遷移できる
+- formal direct triggerからlive observationが必要になった場合にoriginating evaluation / revision / sample / variation / resume operationを保持してqa-workflow → usability-inspection → formal Skill resumeへ一意に遷移できる
 - expected handoff集合とcurrent valid returned result集合のclosureをproduction helperで検証し、LLMの手判断でresumeしない
-- handoffのpending保存、owner start、return反映、reservation release、closeをPR #13のstate revision / native conditional writeで更新し、CAS不能・claim競合・release failure・stale origin・conflicting current returnではresumeしない
+- handoffのpending保存、owner start、return反映、reservation release、closeをPR #13のstate revision / native conditional writeで更新し、CAS不能・claim競合・release failure・stale origin・conflicting current returnではresumeしない。started handoffの再観測はnew handoff lineageでのみ開始する
 - multi-Skill executionをqa-workflowがownerし、formal Skillがsibling scriptsへruntime依存しない
 - TC result / expert evaluation / WCAG resultを混同しない
 - Findingがreportの正本を置き換えない

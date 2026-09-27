@@ -257,15 +257,19 @@ aggregated accessibility scoreはStep 5.4の目的外機能として生成しま
 
 ### Step 4.4: criterion evaluation plan
 
-target WCAG version / levelからrequired Success Criterion集合を導出した後、各sample / processについて `_05h_wcag-criterion-evaluation-contract.md` の `wcag_criterion_plan.py` で全criterion rowをmaterializeします。
+target WCAG version / levelからrequired Success Criterion集合を導出した後、selected sampleごとのrequired presentation variation集合と組み合わせ、`_05h_wcag-criterion-evaluation-contract.md` の `wcag_criterion_plan.py` で全criterion rowをmaterializeします。
 
-- required Success Criterion集合とcriterion row集合の差分をscriptで0件にする
-- versioned requirements assetのevaluation metadataから必要capability / machine step / semantic-manual stepを取得する
-- live observationが必要なrowだけformal handoffへ変換する
-- supported ACT Ruleやmachine measurementがないcriterionもsemantic/manual / assistive technology経路を持つ
+- required Success Criterion × required variation集合とcriterion row集合の差分をscriptで0件にする
+- versioned requirements assetの `procedure_keys` をfinite procedure catalogへ解決する
+- machine procedureは明示dispatch、semantic / manual / assistive-technology / external-evidence procedureは固定Input / Output / evidence contractで処理する
+- assistive technology利用要否をSuccess Criterion固定booleanにせず、selected procedure + current content / technology + accessibility support baselineから閉じる
+- applicable population `present / none / unknown`、execution status `pending / in-progress / complete / blocked`、result `satisfied / not-satisfied / undetermined / null` を分離する
+- live observationが必要なprocedureだけformal handoffへ変換する
+- supported ACT Ruleやmachine measurementがないcriterionもprocedure catalogから落とさない
 - required evidence不足を `undetermined / blocked` に閉じ、LLMの推測で `satisfied` にしない
+- final Success Criterion resultはcurrent criterion evaluation refからだけ生成する
 
-required criterion rowに `pending / in-progress` が残る場合、sample evaluationとformal evaluationを完了扱いしません。
+required criterion rowに `pending / in-progress / blocked` が残る場合、sample evaluationとformal evaluationを完了扱いしません。
 
 ## 4. browser observationのhandoff
 
@@ -274,10 +278,12 @@ required criterion rowに `pending / in-progress` が残る場合、sample evalu
 live Web observationが必要なsample / complete processでは、次のnormalized handoffを作ります。
 
 - handoff draft key
+- retry_of_handoff_ref（browser再観測の場合）
 - originating evaluation artifact ref / revision
 - workflow_ref（qa-workflow管理下の場合）
 - resume operation: Step 4.1 sample / Step 4.2 process
 - sample ref
+- variation ref
 - process ref（存在する場合）
 - required requirement / Success Criterion refs
 - required state / action / sequence
@@ -289,7 +295,7 @@ live Web observationが必要なsample / complete processでは、次のnormaliz
 
 複数Skillが必要なworkflowでは `qa-workflow` がこのhandoffを受け、`usability-inspection` をbrowser ownerとして直列実行し、immutableなinspection artifact / evidence refsを戻します。
 
-formal要求から `wcag-conformance-evaluation` が直接発火した場合も、live observationが必要になり同一Agent環境で `qa-workflow` が利用可能なら、formal Skillはhandoff requirementを `qa-workflow` へ返します。`qa-workflow` はoriginating evaluation / revision、handoff ref、resume operation、expected sample / process / requirement refsをworkflow stateへ保持し、currentかつvalidなreturned inspection artifact / evidence集合が期待handoff集合を満たした場合だけ同じevaluationをresumeします。ユーザーへ別依頼として再入力させず、formal Skill自身がbrowser ownerへ変形もしません。
+formal要求から `wcag-conformance-evaluation` が直接発火した場合も、live observationが必要になり同一Agent環境で `qa-workflow` が利用可能なら、formal Skillはhandoff requirementを `qa-workflow` へ返します。`qa-workflow` はoriginating evaluation / revision、handoff ref、resume operation、expected sample / variation / process / requirement refsをworkflow stateへ保持し、currentかつvalidなreturned inspection artifact / evidence集合が期待handoff集合を満たした場合だけ同じevaluationをresumeします。browser開始済みhandoffの再観測は同じclaimを再利用せずnew handoff refで行います。ユーザーへ別依頼として再入力させず、formal Skill自身がbrowser ownerへ変形もしません。
 
 `wcag-conformance-evaluation` はsibling Skillの `scripts/` を直接import / 実行しません。
 
@@ -344,12 +350,22 @@ formal要求から `wcag-conformance-evaluation` が直接発火した場合も�
 - technologies relied upon
 - other relevant samples
 
+### presentation variations
+
+- variation ref
+- sample ref
+- presentation condition / environment ref
+- responsive boundary refs
+- coverage status
+- evidence / limitation
+
 ### observation handoff
 
 live observationが必要な場合:
 
 - handoff ref
-- sample / process ref
+- retry_of_handoff_ref（再観測の場合）
+- sample / variation / process ref
 - required requirement refs
 - required state / action / sequence
 - execution conditions
