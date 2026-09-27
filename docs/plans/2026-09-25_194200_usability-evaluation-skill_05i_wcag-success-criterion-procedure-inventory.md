@@ -106,7 +106,7 @@ selected versionの全required Success Criterionへ、必ず1件のcriterion-spe
 | `m-nontext-inventory` | 1.1.1 | current scopeの非テキストcontent candidateをmachine-readable sourceから列挙し、target refとtypeを返す。 |
 | `m-orientation-run` | 1.3.4 | portrait / landscapeの2条件をfixed viewportで実行し、content / functionality loss evidenceを取得する。 |
 | `m-page-title` | 2.4.2 | document titleの存在とnormalized valueを取得する。 |
-| `m-parsing-version-rule` | 4.1.1 | WCAG 2.2ではcriterion不存在、WCAG 2.0 / 2.1かつcontent technologyがHTMLまたはXMLならW3C current conformance noteに従う `always-satisfied-html-xml`、それ以外は `evaluate-normative-rule` を決定論的に導出する。 |
+| `m-parsing-version-rule` | 4.1.1 | `W3C-WCAG-FAQ` とtarget versionのcurrent normative sourceを根拠に、WCAG 2.2ではcriterion不存在、WCAG 2.0 / 2.1かつcontent technologyがHTMLまたはXMLなら `always-satisfied-html-xml`、それ以外は `evaluate-normative-rule` を決定論的に導出する。 |
 | `m-pointer-run` | 2.5.1, 2.5.2, 2.5.7 | 宣言済みpointer interactionをfixed browser actionで実行し、down / up / drag / path / alternative action traceを返す。 |
 | `m-reflow` | 1.4.10 | required viewport条件を実行し、horizontal / vertical overflow、clipping、target geometryを取得する。 |
 | `m-resize-text` | 1.4.4 | browser zoomとは分離したrequired text resize条件を適用し、overflow / clipping / functionality evidenceを取得する。 |
