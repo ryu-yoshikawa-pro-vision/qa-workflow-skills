@@ -581,19 +581,22 @@ Input:
 
 - target WCAG version / level
 - `wcag_requirements.py` のrequired Success Criterion集合
-- versioned requirements assetのevaluation metadata
-- canonical sample / process refs
+- versioned requirements assetの `procedure_keys`
+- `wcag-evaluation-procedure-catalog.json`
+- canonical sample / required presentation variation / process refs
 - current observation / measurement / supported ACT Rule refs
-- semantic/manual / assistive technology decision refs
+- semantic / manual / assistive technology / external evidence procedure result refs
 
 Function:
 
-- required Success Criterion全件を `CRIT-001` からartifact-localに採番
-- criterionごとのrequired capability / machine step / semantic-manual stepをmaterialize
-- live observation requirementをdeduplicateしてformal handoff inputへ変換
-- required criterion集合とactual row集合の集合差分
-- required step closure
-- `pending / in-progress / satisfied / not-satisfied / undetermined / blocked` のstatus整合
+- required sample × variation × Success Criterion全件を `CRIT-001` からartifact-localに採番
+- procedure keyをfinite procedure catalogへ解決し、execution rowをmaterialize
+- machine procedureのdispatch key / semantic decision key / required evidenceを検証
+- selected procedureからlive observation requirementをdeduplicateしてformal handoff inputへ変換
+- required criterion × variation集合とactual row集合の集合差分
+- applicable population `present / none / unknown` のclosure
+- execution status `pending / in-progress / complete / blocked` とresult `satisfied / not-satisfied / undetermined / null` の整合
+- required procedure closure
 - ACT Rule部分結果をSuccess Criterion全体の `satisfied` へ不当に昇格しない
 - machine-owned criterion section / summaryをrender
 
@@ -1344,5 +1347,5 @@ LLM suppliedのSuccess Criterion resultをfinal sample resultへ直接入力す�
 - Step 5.5 EARL 1.0 JSON-LD sidecarをdeterministically生成し、human-readable reportとのassertion coverage一致を検証できる
 - Step 5.4 aggregated scoreは目的外として生成しない
 - production helperとvalidatorが別実装
-- semantic Case A〜Z、Case C2、Case AA〜AF PASS
+- semantic Case A〜AJ（Case C2を含む）PASS
 - `_06c_canonical-live-validation.md` のrepository-controlled canonical fixtureでWCAG-EM orchestration E2EをPASSできる

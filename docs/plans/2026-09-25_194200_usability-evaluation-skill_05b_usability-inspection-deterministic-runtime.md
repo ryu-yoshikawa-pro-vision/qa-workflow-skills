@@ -195,7 +195,7 @@ browser I/O前後のmachine contractを担当します。詳細は `_05g_usabili
 #### Function
 
 - scope / selected supported rule / measurement kindからrequired observation field集合を導出し、field → fixed probe mappingを一意に解決
-- target draftからartifact-local `TARGET-001` 等を採番し、resolver schema / current document / uniqueness契約をmaterialize
+- target draftからartifact-local `TARGET-001` 等を採番し、5種resolverのpayload、Playwright exact matching、parent scope、population revision / fingerprint、current document / session、uniqueness契約をmaterialize
 - `browser-observation-catalog.json` の明示dispatchからrequired probe key集合を導出
 - `PROBE-001` 等のartifact-local request refを決定論的に採番
 - fixed probe payload / execution metadataをmaterialize
@@ -203,8 +203,8 @@ browser I/O前後のmachine contractを担当します。詳細は `_05g_usabili
 - element probeごとにtarget resolverの `unique / missing / ambiguous / stale` を検証
 - browser resultのschema / enum / unit / capabilityを検証
 - `ok / unsupported / unavailable / incomplete / blocked` を正規化
-- viewport / geometry / responsive boundary / timing等のmachine valueをcanonicalize
-- interaction timingではfixed predicate vocabularyとsame-page `performance.now()` clockを要求
+- viewport / geometry / responsive boundary / timing等のmachine valueをcanonicalizeし、responsive boundaryではdetection / normalization / execution feasibilityを分離
+- interaction timingでは8種fixed predicateごとのpayload schemaとsame-page `performance.now()` clockを要求
 
 `observation_contract.py` 自身はbrowserを起動・操作しません。Agentはscriptがmaterializeしたfixed requestをcurrent PR #12 browser経路へ渡し、resultをscriptへ戻します。
 ### measurement.py

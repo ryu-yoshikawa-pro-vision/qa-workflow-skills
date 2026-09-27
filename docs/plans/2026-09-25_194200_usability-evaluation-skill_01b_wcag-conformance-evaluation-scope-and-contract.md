@@ -380,19 +380,37 @@ live observationが必要な場合:
 - 再評価の場合のretained / replaced / added / unavailable sample lineage
 - random sample target count
 - random selection method
-- random selection candidate scope / limitation
+- random selection status: `target-met / exhausted-no-new-view / blocked`
+- random selection candidate scope / provenance
+- exhaustion evidence（該当時）
+- blocked reason（該当時）
 - complete processes
 - default / critical branch sequences
+
+### criterion evaluation plan
+
+- criterion evaluation ref
+- sample / variation / process ref
+- criterion ref
+- procedure execution refs
+- applicable population
+- execution status
+- result
+- evidence / limitation refs
 
 ### evaluation results
 
 - sample ref
+- variation ref
 - sample kind: structured / random / process-added
 - requirement / Success Criterion ref
+- criterion evaluation ref（Success Criterionの場合）
 - result
 - evidence refs
 - test rule result refs（存在する場合）
 - limitation
+
+Success Criterion resultはcurrent criterion evaluation refからだけscriptがmaterializeし、LLM supplied result listを別経路で受け付けません。
 
 ### structured / random comparison
 
