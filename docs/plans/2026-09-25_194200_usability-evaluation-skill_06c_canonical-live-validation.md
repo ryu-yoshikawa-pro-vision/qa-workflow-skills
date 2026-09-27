@@ -81,7 +81,8 @@ current Playwright versionやPR #12 / #13 merge後のbrowser contractが変わ�
 3. reference entry / source item / evidence / evaluation refを追跡できる
 4. browser / sessionを `usability-evaluation` 自身が操作しない
 5. 固定上位観点に直接名前がない複合的な懸念を、宣言済みscope内のevidenceから追加evaluationとして保持できる
-6. user / business goalがAuthority付きで与えられたcaseでflow全体の意味的整合を評価できるが、business logicの仕様上のPASS / FAILを再定義しない
+6. 直接適用できるpublic referenceがないevidence-semantic評価を、fakeなreferenceなしでreference不使用理由 / 判断理由 / evidence付きで保持できる。一方でbest practice / standard主張はsource item refなしで成立させない
+7. user / business goal / success condition / business outcomeがAuthority付きで与えられたcaseでflow全体の意味的整合を評価できるが、business logicの仕様上のPASS / FAILを再定義しない
 
 ### usability-inspection
 

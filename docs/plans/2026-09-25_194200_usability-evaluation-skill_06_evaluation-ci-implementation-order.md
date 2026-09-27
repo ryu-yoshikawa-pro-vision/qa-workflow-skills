@@ -366,7 +366,9 @@ UI patternを含むtest-condition-design
 - 上位観点の評価scopeとclosure
 - package-local source ID / source item ref / reference entry IDの形式、一意性、参照整合
 - reference entry内のsource item ref / source上の位置づけ / 適用条件の対応
-- 各評価項目の `適用したreference` におけるreference entry ref / source item ref / 今回のreferenceの位置づけの対応
+- `適用したreference` を使う評価項目ではreference entry ref / source item ref / 今回のreferenceの位置づけが対応する
+- standard / UI pattern / heuristic / best practice主張ではreference 1件以上、project Authority根拠ではAuthority ref、reference 0件のevidence-semantic評価ではreference不使用理由 / 判断理由 / evidenceがある
+- additional observation request refが存在する場合はcurrent inspection requestへ解決する
 - evidence ref
 - status
 - required fields
@@ -440,6 +442,24 @@ false positiveを作らないこと。
 Dialogの評価で、目的・interaction・feedback・accessibility・visual等の上位観点の一部を根拠なく未評価のまま完了しないこと。
 
 対象外にする場合は理由を残し、「今回評価する」とした観点は `問題を確認 / 問題なし / 判定不能 / 対象外` のいずれかへ閉じること。
+
+### Case J: public referenceなしの複合問題
+
+複数stateのevidenceと明示されたuser goalから意味的不整合を確認できるが、直接適用できるpublic pattern / heuristic referenceがない。
+
+fakeなreferenceを付与せず、reference不使用理由・判断理由・evidenceを保持して評価できること。best practiceやstandard要求へ言い換えないこと。
+
+### Case K: semantic追加観測
+
+現在evidenceだけでは判断できず、別stateのrendered textまたはcontrol value確認が必要。
+
+LLMはcanonical observation fieldを選び、`observation_contract.py` がrequest ref / fixed probeをmaterializeすること。自由記述からscriptがprobeを推論したり、LLMがJavaScriptを生成したりしないこと。
+
+### Case L: business outcome
+
+Authority付きbusiness outcomeとsuccess conditionがあり、個々のcontrolは操作可能だがflow途中と最終表示の意味が矛盾する。
+
+usability-evaluationはflow全体の意味的不整合を評価できるが、business rule自体のexpected result / TC PASS・FAILを再定義しないこと。
 
 ## 17. real Agent evaluation
 
