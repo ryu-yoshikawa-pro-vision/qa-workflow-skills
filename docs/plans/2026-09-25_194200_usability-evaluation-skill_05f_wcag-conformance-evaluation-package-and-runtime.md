@@ -483,7 +483,7 @@ optional componentsはrequired componentsを代替しません。machine-readabl
 
 ### Machine-readable Report
 
-Step 5.5を生成する場合はEARL 1.0 vocabularyを使ったcanonical JSON-LD sidecar `earl-report.jsonld` を `earl_report.py` が生成します。追加RDF libraryは導入せず、固定したEARL subsetを標準libraryでrenderします。
+Step 5.5を生成する場合はEARL 1.0 vocabularyを使ったJSON-LD sidecar `earl-report.jsonld` を `earl_report.py` が生成します。物理serialization、固定 `@context`、node identity、Assertion / TestResult分離、outcome / mode mapping、byte-level deterministic renderingは `_05l_earl-jsonld-serialization-contract.md` を正本とします。追加RDF / JSON-LD libraryは導入せず、固定したEARL subsetを標準libraryでrenderします。ここでいうcanonicalはrepository内のdeterministic serializationであり、RDF dataset canonicalizationを意味しません。
 
 formal requirement resultごとに少なくとも次を出力します。
 
@@ -491,9 +491,10 @@ formal requirement resultごとに少なくとも次を出力します。
 - `earl:assertedBy`
 - `earl:subject`: canonical sample identityに対応するartifact-local subject
 - `earl:test`: target version static catalogが持つcanonical Success Criterion / conformance requirement URI
-- `earl:result`
-- `earl:outcome`
+- `earl:result`。`earl:TestResult` nodeへのIRI参照
 - `earl:mode`
+
+対応する `earl:TestResult` nodeに `earl:outcome` を持たせます。`earl:outcome` をAssertion直下へ置きません。
 
 outcome mapping:
 
@@ -522,6 +523,7 @@ Function:
 - Non-Interference required Success Criteria refsを導出
 - Conforming Alternate Version required condition keys / reachability alternativesを導出
 - target versionのclaim guideline title / version / URIとthird-party repair contractを導出
+- WCAG 2.0 / 2.1の4.1.1についてcontent technologyがHTML / XMLなら `always-satisfied-html-xml`、それ以外は `evaluate-normative-rule`、WCAG 2.2はcriterion不存在というversion rule metadataを導出
 - duplicate / unknown requirement keyをreject
 - expected requirement setをcanonical sort
 - target version以外のcatalogを混在させない
@@ -560,7 +562,7 @@ deterministic runtimeへ載せるもの:
 - Step 5.1 unmet-example coverage / accessible output closure
 - freshness / currentnessに必要なnormalized input
 - `wcag_em_structure.py` のclosure / cross-reference / Evaluation Specifics / statement / claim guard / machine-owned section materialization
-- `earl_report.py` のhuman-readable result → EARL 1.0 JSON-LD materialization
+- `earl_report.py` のhuman-readable result → `_05l` 固定EARL 1.0 JSON-LD graph / deterministic byte materialization
 
 deterministic runtimeへ載せないもの:
 
@@ -1077,7 +1079,7 @@ production helperとは別実装で少なくとも次を検証します。
 - Evaluation Statementはtarget WCAG 2.2だけでfull / partial生成条件とStep 5.3 minimum fieldsを検証し、2.0 / 2.1ではsection不存在を要求
 - WCAG Conformance Claim required / optional fieldsをtarget version catalogのclaim contractから検証し、claim guideline URI / full-scope coverage / third-party 2-business-day monitoring-repair guardを適用
 - WCAG Statement of Partial Conformance third-party / language guard / canonical wording
-- Step 5.5 EARL assertion coverage、criterion URI、outcome mapping、mode provenance、human-readable reportとの一致
+- Step 5.5 EARL固定 `@context`、Assertion / TestResult node shape、stable IRI、criterion URI、outcome mapping、mode provenance、deterministic bytes、human-readable reportとのassertion coverage一致
 - Finding refs
 - secret / credential非複製
 
@@ -1344,7 +1346,8 @@ LLM suppliedのSuccess Criterion resultをfinal sample resultへ直接入力す�
 - WCAG 2.0 / 2.1 / 2.2 Conformance Claimのrequired / optional fields / version別claim URI / full-scope guardをvalidatorで検証できる
 - third-party monitoring / repair経路ではall affected pages identification / monitoring / 2 business days repair guardを検証できる
 - WCAG Statement of Partial Conformance - Third Party Content / Languageのrequired fields / canonical wording / guardをvalidatorで検証できる
-- Step 5.5 EARL 1.0 JSON-LD sidecarをdeterministically生成し、human-readable reportとのassertion coverage一致を検証できる
+- Step 5.5 EARL 1.0 JSON-LD sidecarを `_05l` のfixed graph contractでdeterministically生成し、JSON-LD structural validation、再render byte一致、human-readable reportとのassertion coverage一致を検証できる
+- WCAG 2.0 / 2.1 4.1.1のHTML / XML `always-satisfied` と非HTML/XMLのsemantic評価、WCAG 2.2でのcriterion不存在をversion別fixtureで検証できる
 - Step 5.4 aggregated scoreは目的外として生成しない
 - production helperとvalidatorが別実装
 - semantic Case A〜AJ（Case C2を含む）PASS
