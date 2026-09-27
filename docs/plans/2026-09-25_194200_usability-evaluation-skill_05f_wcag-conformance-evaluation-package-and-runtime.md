@@ -1027,9 +1027,13 @@ production helperとは別実装で少なくとも次を検証します。
 - explicit unsupported versionとmissing / unresolved inputが混同されていない
 - target versionに対応する `static_data_versions` hashをassetから独立再計算
 - target versionに対応する承認済みcatalog hashと一致
+- `wcag-evaluation-procedure-catalog.json` のcanonical hash / approved hash一致
+- requirement assetのprocedure key全件がprocedure catalogへ解決し、machine procedure全件に明示dispatchがある
 - target version以外のcatalogをexpected requirement集合へ混在させていない
 - static catalogから独立導出したtarget level required Success Criteria / conformance requirement集合とactual coverageの一致
 - scope coverage rows / in-scope closure
+- selected sampleごとのrequired presentation variation registry / completeness / evidence
+- responsive boundary inventory incomplete / not-executableをFull Pages satisfiedへ数えていない
 - accessibility support baseline revision / extensionとformal evidence environmentの一致
 - previous evaluation / rerun sample lineage（該当時）
 - additional evaluation requirementsのref / affected step / status / output closure
@@ -1042,6 +1046,8 @@ production helperとは別実装で少なくとも次を検証します。
 - finite inventory時のcandidate derivation / provenance、またはrecorded method時のcandidate scope provenance
 - candidate population fingerprint
 - selection method
+- selection status `target-met / exhausted-no-new-view / blocked`
+- `exhausted-no-new-view` のcomplete exhaustion evidence、`blocked` のreason
 - process sequenceから導出したprocess-added sample / membership closure
 - Conforming Alternate Versionが別sampleに数えられず、required condition / reachability alternativeがtarget version contractと一致
 - Non-Interference fixed Success Criteria refs / result coverage
@@ -1050,7 +1056,9 @@ production helperとは別実装で少なくとも次を検証します。
 - `_04c` helperが出したhandoff state / CAS / current returned lineage / `may_resume` とformal artifactの整合
 - sample result cross-reference
 - target levelに必要なrequirement result coverage
-- `wcag_criterion_plan.py` が生成したrequired Success Criterion row coverage / required step closure。required集合との差分、duplicate、pending / in-progress残存を許可しない
+- `wcag_criterion_plan.py` が生成したrequired Success Criterion × variation row coverage / procedure closure。required集合との差分、duplicate、pending / in-progress / blocked残存を完了へ数えない
+- final Success Criterion resultがcurrent `criterion_evaluation_ref` から生成され、LLM supplied result listで迂回されていない
+- applicable population noneがcomplete procedure evidenceなしに生成されていない
 - normalized content type / Finding group keyの集合差分とStep 4.3 derived action / iteration chain
 - structured revision更新後のcandidate population fingerprint再計算、population同一時のoverlap除外 / retained random / top-up、population変更時のreselection、process再materialize
 - sample result freshness / stale再評価
@@ -1274,6 +1282,24 @@ target WCAG version / levelのrequired Success Criterion集合を生成し、1 c
 
 → `wcag_criterion_plan.py` / deterministic validatorが欠落を検出し、他criterionがすべて `satisfied` でもsampleをcompleteにしない。supported ACT Ruleがないcriterionもsemantic/manual / assistive technology経路を持ち、評価対象から落とさない。
 
+### Case AH: responsive Full Pages variation
+
+同じsampleにscreen sizeで自動提示される複数variationがあり、1 variationのcriterion resultが欠落する。
+
+→ required variation registryとcriterion planの集合差分を検出し、Full Pagesをsatisfiedにしない。unreadable / unsupported / not-executable responsive conditionが残る場合もvariation completenessを推測しない。
+
+### Case AI: browser再観測
+
+`HANDOFF-001` でbrowserを開始済みだがreturned resultがstaleになり、同じorigin revisionで再観測が必要になる。
+
+→ started claimを削除・再利用せず、`HANDOFF-002` を `retry_of_handoff_ref=HANDOFF-001` としてmaterializeし、新operation refで観測する。exact duplicate result再送はnew handoffを作らない。
+
+### Case AJ: criterion plan bypass
+
+LLM suppliedのSuccess Criterion resultをfinal sample resultへ直接入力する。
+
+→ `wcag_em_structure.py` がrejectし、current criterion evaluation ref / complete procedure closureからだけsample resultを生成する。
+
 ## 11. 完了条件
 
 - package単体でSkill contractを理解できる
@@ -1285,7 +1311,7 @@ target WCAG version / levelのrequired Success Criterion集合を生成し、1 c
 - initial baseline外environmentをformal evidenceへ使用した場合にbaseline revisionをscriptで拡張し、freshnessを再計算できる
 - WCAG 2.0 / 2.1 / 2.2の各target version / levelからrequired Success Criteria / conformance requirement集合を該当versionのstatic catalogだけで独立導出できる
 - 全Success Criterion rowにevaluation metadataがあり、`wcag_criterion_plan.py` がrequired criterion evaluation planを全件materializeできる。criterion選択・省略・required step countをLLMへ任せない
-- 3 catalogのcanonical hashをversion別 `static_data_versions` keyへ保持し、validator独立再計算と承認済みhash contract testをPASS
+- 3 requirement catalogとfinite procedure catalogのcanonical hashを `static_data_versions` へ保持し、validator独立再計算と承認済みhash contract testをPASS
 - missing / unresolved versionとunsupported / out-of-scope versionを区別し、別versionへ暗黙変換しない
 - `runtime_contract.py` でPR #11 Machine Runtime / freshness契約を再利用し、random selectionそのものはdeterministic runtimeへ含めない
 - sampling procedure used / skippedの両経路を持ち、skippedでは全in-scope sampleをselected sample setへmaterializeできる
@@ -1293,8 +1319,10 @@ target WCAG version / levelのrequired Success Criterion集合を生成し、1 c
 - random sample 10%整数化がscript化され、structured count 1 / 9 / 10 / 11の境界fixtureを持つ
 - random selectionへfixed seedを要求しない
 - canonical sample identity registryをscriptがmaterializeし、duplicate / overlap / union / process membershipを同じidentityで判定する
+- selected sampleごとにrequired presentation variation registryをmaterializeし、unknown / unreachable / incomplete variationが残る場合にFull Pagesをsatisfiedにしない
+- criterion evaluation planをsample × variation × required Success Criterionで全件materializeし、final Success Criterion resultをcurrent criterion evaluation refからだけ生成する
 - finite inventory時のrandom candidate集合、process-added sample、Step 4.3のboolean / actionをscriptが導出し、Agentが手組みしない
-- finite inventoryがない場合もLLMがselected sample identityを選ばず、scriptまたは外部random mechanismの結果だけを受ける。target count未達時はscope-wide exhaustionを証明できる場合だけ `exhausted-no-new-view`、証明できなければ `blocked`
+- finite inventoryがない場合もLLMがselected sample identityを選ばず、scriptまたは外部random mechanismの結果だけを受ける。target count未達時はscope-wide exhaustionを証明できる場合だけ `exhausted-no-new-view`、証明できなければ `blocked`。selection status / exhaustion evidence / blocked reasonをcanonical Random Sample sectionへ保存する
 - candidate population fingerprintをscriptが導出し、Step 4.3でstructured revisionが変わった場合、population同一時のrandom target再計算 / overlap除外 / retained random / 不足分top-up、population変更時のreselection、process再materializeを閉じる
 - Conforming Alternate Versionを別sampleに数えずcondition closureをmaterializeし、Non-Interference fixed Success Criteria集合をcatalogから導出できる
 - Step 4.2ではcurrent unchanged resultだけを再利用し、変化 / 不明contentとinteractionを再評価できる
