@@ -334,6 +334,8 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
 - handoffのmutable operation identityはorigin artifact ref / revision / handoff refからscriptが導出する。shared resourceは固定順で取得・解放する。browser開始済みhandoffの再観測はstarted claimを再利用せずnew handoff ref + `retry_of_handoff_ref` + new operation refへ分離し、CAS retry / exact duplicate result再送ではbrowserを再実行しない。
 - random sampleでは「candidateを完全に確認した結果、新しいunique sampleが存在しない」と「candidate取得能力不足」を別statusにする。canonical Random Sample sectionへ `selection_status / exhaustion evidence / blocked reason` を保存する。
 - Full Pages requirementのため、selected sampleごとにautomatically presented presentation variationをmaterializeし、unknown / unreachable / incomplete variationが残る場合はFull Pagesをsatisfiedにしない。
+- usability-evaluationの追加観測はcurrent mutable browser/session ownerへ返す。usability-inspectionがownerの場合だけ `_05g` のOBSREQ contractを使い、test-target-inspection / test-executionがownerの場合はowner activityで観測してimmutable evidenceを返す。別sessionへの暗黙切替やOBSREQの捏造をしない。
+- `_05g` のcanonical observation fieldは有限inventoryへ固定し、semantic layerは必要field keyを選択、scriptはexactly-one probe mapping / request identity / no-progress / value取得を担当する。
 
 ## 今回の完成範囲
 

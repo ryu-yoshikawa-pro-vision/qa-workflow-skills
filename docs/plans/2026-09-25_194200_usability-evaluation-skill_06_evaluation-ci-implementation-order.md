@@ -454,7 +454,9 @@ fakeなreferenceを付与せず、reference不使用理由・判断理由・evid
 
 現在evidenceだけでは判断できず、別stateのrendered textまたはcontrol value確認が必要。
 
-LLMはcanonical observation fieldを選び、`observation_contract.py` がrequest ref / fixed probeをmaterializeすること。自由記述からscriptがprobeを推論したり、LLMがJavaScriptを生成したりしないこと。
+usability-inspectionがcurrent browser ownerのcaseでは、LLMがcanonical observation fieldを選び、`observation_contract.py` がrequester identity / state basis refs / OBSREQ ref / fixed probeをmaterializeすること。自由記述からscriptがprobeを推論したり、LLMがJavaScriptを生成したりしないこと。
+
+test-target-inspectionまたはtest-executionのimmutable evidenceを評価しているcaseでは、追加観測を同じownerへ返し、usability-inspectionのOBSREQや第二sessionを開始しないこと。owner activity / returned evidenceをadditional observation linkへ記録し、同じnormalized request + input evidenceを繰り返す場合はno-progressへ閉じること。
 
 ### Case L: business outcome
 
@@ -505,7 +507,9 @@ dataset構造検証だけで実装完了にしません。
 - included referenceからsource item ref、source ID、canonical URLへ追跡できる
 - reference entry内で各source item refにsource上の位置づけ / 適用条件が対応付いている
 - catalogへ載せただけのsource全pageを収録済み・意味検証済みとは主張していない
+- 全UI / UX評価項目に1件以上のevaluation basisがあり、basisごとのrequired context / evidenceをvalidatorで閉じる
 - standard / UI pattern / heuristic / best practiceを根拠にするUI / UX評価項目は1件以上の `適用したreference` を持ち、各行でreference entry ref / source item ref / 今回のreferenceの位置づけが対応する。project Authorityだけを根拠にする場合はAuthority ref、reference 0件のevidence-semantic評価ではreference不使用理由 / 判断理由 / evidenceを追跡できる
+- additional observation linkがある場合、execution ownerに応じてOBSREQまたはowner activity / returned evidenceへ解決し、別ownerのrequest refを混在させない
 - 判定不能 / 対象外のUI / UX評価項目にstatus reason / 制約・未確認が残る
 - usability-evaluation成果物で上位観点ごとの今回の扱いが固定され、「今回評価する」とした観点がすべて評価結果へ閉じている
 - source IDが `SRC-\d{3,}`、source item refが `<source ID>-ITEM-\d{4,}`、reference entry IDが `REF-\d{4,}` のpackage-local append-only規則に従い、削除済みIDを別identityへ再利用していない
