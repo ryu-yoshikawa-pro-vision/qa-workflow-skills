@@ -14,7 +14,7 @@
 - fixed probeで閉じない意味・例外・visual interpretationはsemantic / manual procedureへ残す
 - 任意JavaScript、任意selector、generic rule DSL、plugin registryは追加しない
 
-formal Skillからsibling Skillのscript / assetを直接import・readしません。cross-packageの `required_machine_probe_keys ⊆ wcag-machine-probe-catalog` はrepository-level contract test / CIで検証し、runtimeではformal handoff requestとreturned inspection runtime evidenceで接続します。
+formal Skillからsibling Skillのscript / assetを直接import・readしません。cross-packageのformal required machine probe key集合と `wcag-machine-probe-catalog` key集合の一致はrepository-level contract test / CIで検証し、runtimeではformal handoff requestとreturned inspection runtime evidenceで接続します。
 
 ## 1. package / ownership
 
