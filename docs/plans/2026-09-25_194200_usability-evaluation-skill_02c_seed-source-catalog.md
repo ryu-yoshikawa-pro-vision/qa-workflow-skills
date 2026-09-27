@@ -45,6 +45,7 @@ catalogに載っているだけで、そのsource全体をbundled corpusへ収�
 | W3C-WCAG21 | WCAG 2.1 | https://www.w3.org/TR/WCAG21/ | normative standard |
 | W3C-WCAG22 | WCAG 2.2 | https://www.w3.org/TR/WCAG22/ | normative standard |
 | W3C-WCAG-OVERVIEW | WCAG Overview | https://www.w3.org/WAI/standards-guidelines/wcag/ | informative overview / WCAG-EM background reading |
+| W3C-WCAG-FAQ | WCAG 2 FAQ | https://www.w3.org/WAI/standards-guidelines/wcag/faq/ | current WAI guidance / SC 4.1.1 Parsing obsolete・HTML/XML always-satisfied conformance noteの確認 |
 | W3C-WCAG-QUICKREF | How to Meet WCAG 2 (Quick Reference) | https://www.w3.org/WAI/WCAG22/quickref/ | customizable supporting reference for WCAG 2.0 / 2.1 / 2.2 |
 | W3C-WCAG20-UNDERSTANDING | Understanding WCAG 2.0 | https://www.w3.org/WAI/WCAG20/Understanding/ | informative guidance / W3C上でno longer maintained。2.0 requirementの正本にはしない |
 | W3C-WCAG21-UNDERSTANDING | Understanding WCAG 2.1 | https://www.w3.org/WAI/WCAG21/Understanding/ | informative guidance |
