@@ -161,6 +161,8 @@ procedure execution rowは少なくとも次を持ちます。
 
 machine procedureが既知のmachine limitationで閉じた場合、manual fallbackがcatalogにあるならそのlimitationだけでcriterionをblockedへ短絡しません。scriptがfallback procedureをapplicableへ遷移させ、manual evidenceのclosureを待ちます。fallbackも実施不能なら初めて `blocked / undetermined` へ閉じます。
 
+fixed probeを契約どおり実行し、machine値を完全判定できないこと自体を正しく観測できた場合、そのsource machine procedureは `execution_status=complete` とし、catalogのresult contractで定義したlimitation result + finite `limitation_code` を保持します。これはbrowser action未開始、cleanup失敗、request schema不正等の `blocked` と分離します。conditional manual fallbackはこの `complete + limitation_code` からだけ起動します。
+
 manual fallbackはmachine値をLLM推測で補う経路ではありません。対象・状態・評価方法・測定値または観測結果・evidence refを固定契約で要求し、数値が必要なcriterionでは目視推定値を正式測定値として扱いません。
 
 arbitrary condition expression、procedure selector DSL、LLM supplied fallback keyは追加しません。
