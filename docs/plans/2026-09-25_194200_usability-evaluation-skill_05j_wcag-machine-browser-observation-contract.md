@@ -50,7 +50,7 @@ formal Skillからsibling Skillのscript / assetを直接import・readしませ�
 
 catalogに任意expression、自然言語instruction、JavaScript本文、selector文字列を保存しません。
 
-catalogのcanonical JSON SHA-256は、`request_kind=wcag-machine-probe` を1件以上処理した `usability-inspection` runtime unitだけ `static_data_versions.wcag_machine_probes` へ保持し、inspection runtime freshness / validatorでcurrent assetとapproved hashを照合します。formal machine requestを扱っていないgeneral / scoped inspectionへこのkeyを無条件追加しません。formal Skillはこのsibling assetを直接読まず、returned inspection artifact / Machine Runtime evidenceのfingerprintとstatic data provenanceを通してcurrentnessを受け取ります。
+catalogのcanonical JSON SHA-256は、`request_kind=wcag-machine-probe` を1件以上処理した `usability-inspection` runtime unitだけ `static_data_versions.wcag_machine_probes` へ保持し、inspection runtime freshness / validatorでcurrent assetとapproved hashを照合します。formal machine requestを扱っていないgeneral / scoped inspectionへこのkeyを無条件追加しません。formal Skillはこのsibling assetを直接読まず、returned inspection artifact / evidence refsに加えてinspection Machine Runtimeの `runtime_unit_key / generation_fingerprint` を受け取り、formal consumerの `metadata.upstream_runtime_units` からcurrentnessを検証します。inspection static data hashをformal `static_data_versions` へ複製しません。
 
 ## 3. finite machine probe inventory
 
@@ -206,7 +206,7 @@ manual fallback activationへ使う `limitation_code` は次の有限値だけ�
 - `text-scaling-mechanism-not-machine-executable`: valid text scaling mechanismは候補として存在するがcurrent browser ownerが安全に操作できない
 - `text-scaling-state-not-machine-readable`: valid mechanismを操作できてもscale / rendered stateをmachine-readableに確定できない
 
-上記codeは `_05i` に明示したconditional manual fallbackだけを起動します。probe resultやmachine procedureがこのcodeからcriterion resultを直接決定しません。
+上記codeは `_05i` に明示したconditional manual fallbackだけを起動します。probe resultやmachine procedureがこのcodeからcriterion resultを直接決定しません。fixed probeを契約どおり完了してlimitationを正しく取得した場合、formal側source machine procedureは `_05h` に従い `complete + limitation_code` として閉じます。browser action未開始、request不正、cleanup未完了等のblockedとは混同しません。
 
 - `m-text-contrast / m-nontext-contrast` はcomputed color contextから一意にcontrastを算出できない場合、statusを `unavailable`、limitation codeを `background-not-machine-resolvable` とする
 - `m-focus-appearance` はsimple machine pathで閉じないcomplex shape / gradient / image background / anti-aliasing等の場合、statusを `incomplete`、limitation codeを `focus-indicator-not-machine-resolvable` とする
