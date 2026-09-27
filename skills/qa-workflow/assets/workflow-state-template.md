@@ -8,6 +8,32 @@
 - 最終Skill:
 - 最終対象 / 実行範囲: 複数用途Skillの場合は正規値
 
+## persisted workflow state record
+
+継続管理するworkflowは、Project Contextの`qa.workflow_state_root`配下で1 `workflow_ref` = 1 artifactにします。下記のrecordを案件全体で共有する一枚のstate fileに集約しません。
+
+```json
+{
+  "schema_version": "1",
+  "workflow_ref": "opaque UUID",
+  "state_revision": "storage-provided revision token",
+  "overall_state": "実行中",
+  "started_source_refs": [],
+  "knowledge_entry_refs": [],
+  "project_context_ref": "",
+  "project_context_revision": "",
+  "used_project_context_fields": [
+    {"stable_key":"qa.regression_scope","content_identity":"sha256","affected_scope":"Regression baseline","operation":"Run計画"}
+  ],
+  "source_dependencies": [],
+  "resource_conditions": [],
+  "mutable_operation_claims": [],
+  "unresolved": []
+}
+```
+
+`state_revision`は保存先から取得し、更新時はそのartifactへのnative atomic conditional writeへ渡します。read後の比較と無条件writeをCAS扱いしません。Project Context全体revisionは記録できますが、currentnessは利用したstable keyだけを比較します。
+
 | Skill | 対象 / 実行範囲 | 状態 | 成果物 / バージョン | ブロッカー / 備考 |
 | --- | --- | --- | --- | --- |
 | spec-analysis |  | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |  |  |
@@ -25,6 +51,17 @@
 | e2e-test-reporting |  | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |  |  |
 | test-target-inspection |  | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |  |  |
 | test-execution |  | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |  |  |
+| regression-testing | baseline / membership / Run計画 / Run結果更新 / 履歴参照のいずれか | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |  |  |
+| exploratory-testing | exploration / investigation のいずれか | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |  |  |
+| qa-knowledge | triage / create / update / revalidation / lookup / history のいずれか | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |  |  |
+
+## workflow state永続化契約
+
+- 複数workflowを扱う場合は、案件コンテキストに定義したfixed workflow state root配下で`workflow_ref`ごとに1 state artifactを保持します。
+- `workflow_ref`は初回作成時にopaque UUIDとして発行し、state artifactのcanonical pathへ決定論的に解決します。
+- state自身のrevisionを保存先のatomic conditional writeへ渡せない場合、更新を保存済みとして扱いません。
+- 同じworkflowのmutable operationはstate更新だけで二重開始を防げません。owner側のactual-start claimがない場合、atomic pre-start claimを確保できなければ開始をblockします。
+- shared resource reservationは既存の外部reservationを優先します。atomic create-if-absentを保証できない保存先では取得済みと扱わず、状態を安全に確認できないreservation recoveryもblockします。
 
 ## runtime状態（runtime dispatch時だけ表示）
 

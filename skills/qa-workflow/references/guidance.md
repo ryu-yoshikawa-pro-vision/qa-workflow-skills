@@ -20,7 +20,7 @@
 
 ## ランタイム前提
 
-全体ワークフローでは次の16 Skillが同一のAgentクライアント上で利用可能であることを前提とします。
+全体ワークフローでは次の19 Skillが同一のAgentクライアント上で利用可能であることを前提とします。
 
 - `qa-workflow`
 - `spec-analysis`
@@ -38,6 +38,9 @@
 - `e2e-test-reporting`
 - `test-target-inspection`
 - `test-execution`
+- `regression-testing`
+- `exploratory-testing`
+- `qa-knowledge`
 
 Agent Skills Specificationは共通Skill-to-Skill呼び出しAPIを規定しません。本ワークフローは、Agentクライアントが必要なSkillを追加で読み込み / 利用できる実装で動作することを前提とします。
 
@@ -62,6 +65,9 @@ Agent Skills Specificationは共通Skill-to-Skill呼び出しAPIを規定しま�
 | 実行安全確認、準備、Playwright実行、構造化結果、cleanup | `e2e-test-execution` |
 | 実行事実からの原因分析、追加証拠要求、修正routing | `e2e-test-result-analysis` |
 | 検証済み結果の人間向け報告 | `e2e-test-reporting` |
+| Regression baseline / membership / Run selection / Activity | `regression-testing` |
+| Charterに沿った探索・owner不明hypothesisの実対象調査 | `exploratory-testing` |
+| QA knowledge candidate triage / entry lifecycle / lookup | `qa-knowledge` |
 | ルーティング / ブロック中 / 再開 / 変更伝播 / 完了 | `qa-workflow` |
 
 ### 現在有効な仕様根拠への依存
@@ -131,6 +137,20 @@ currentな画面名称・到達方法・操作可能性・観測可能性が必�
 | `adversarial-review` | `テスト設計成果物` / `E2E実装` |
 
 単一用途Skillの対象欄は空欄にできます。開始Skill、最終Skill、`question-analysis`回答後の再開Skillが複数用途Skillなら対象 / 実行範囲も必須です。
+
+追加した複数用途Skillの正規対象:
+
+| Skill | 正規対象 / 実行範囲 |
+| --- | --- |
+| `regression-testing` | `baseline / membership` / `Run計画` / `Run結果更新` / `履歴参照` |
+| `exploratory-testing` | `exploration` / `investigation` |
+| `qa-knowledge` | `triage` / `create / update` / `revalidation` / `lookup / history` |
+
+単独baseline、Regression membership、Run計画、履歴参照だけなら`regression-testing`から開始できます。manual / E2E実行まで要求されたRegressionは`qa-workflow`が全体を追跡し、`regression-testing`と既存execution Skillを接続します。変更影響候補 / Product Riskは`test-analysis`、Regression Run selectionは`regression-testing`の責務です。
+
+Explorationは未知領域のCharterベース探索、Investigationは既存ownerで解けないsymptom / hypothesisの実対象検証に限ります。current UI収集、既知TC実行、E2E failure分析は既存ownerへ直接送ります。
+
+`qa-knowledge`はknowledge lifecycle要求の入口です。既存knowledgeを入力に使うだけならgatewayにせず、candidateが仕様 / Risk / current UI / formal designへ属する場合は正本ownerへ戻します。
 
 ワークフロー完了は全E2E結果がPASSであることを意味しません。要求された実行・分析・報告が完了し、必要なcleanup確認、未処理ブロッカー、`要再検証`、未実施の必須実行が残っていないことを判定します。FAILでも、必要な分析・報告と安全なcleanupが完了し、追加修正が要求されていなければ完了できます。
 

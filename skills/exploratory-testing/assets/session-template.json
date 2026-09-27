@@ -1,0 +1,32 @@
+{
+  "schema_version": "1",
+  "session_ref": "",
+  "mode": "exploration",
+  "charter": {
+    "purpose": "",
+    "in_scope": [],
+    "out_of_scope": [],
+    "source_refs": [],
+    "focus_refs": [],
+    "timebox_or_exit_condition": "",
+    "allowed_origins": [],
+    "allowed_operations": [],
+    "side_effect_operations": [],
+    "side_effect_scope": "",
+    "side_effect_action_definition": "",
+    "side_effect_maximum": 0,
+    "cleanup_plan": "",
+    "evidence_policy": "",
+    "block_conditions": []
+  },
+  "state": "未開始",
+  "observations": [],
+  "findings": [],
+  "evidence_refs": [],
+  "unresolved": [],
+  "follow_up_refs": [],
+  "cleanup": {"required": false, "status": "対象なし", "evidence_refs": []},
+  "residual_side_effect": [],
+  "started_at": null,
+  "completed_at": null
+}

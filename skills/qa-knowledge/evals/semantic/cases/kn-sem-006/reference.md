@@ -1,0 +1,3 @@
+# Reference
+
+両者が別refを作ることを許しません。native atomic create-if-absentなしではcreateをblockします。もし同一canonical targetが既に存在する場合は再読込してidentityを再評価し、別entry更新だけの変更はこのentryを自動staleにしません。

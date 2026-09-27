@@ -1,0 +1,25 @@
+{
+  "skill": "qa-knowledge",
+  "eval_id": "KN-SEM-001",
+  "verdict": "pass",
+  "criteria": [
+    {
+      "id": "KN-SEM-001",
+      "title": "既存正本への先行routing",
+      "critical": true,
+      "rating": 4,
+      "status": "pass",
+      "reason": "仕様にあたるFindingをownerのspec-analysisへ戻し、QA Knowledge entryを第二の仕様正本として作らない判断を明示しています。",
+      "evidence": [
+        "「期待挙動・仕様にあたるため、ownerは`spec-analysis`です。」",
+        "「QA Knowledge entryにはしません。」"
+      ]
+    }
+  ],
+  "summary": {
+    "pass": 1,
+    "needs_review": 0,
+    "fail": 0,
+    "not_evaluable": 0
+  }
+}

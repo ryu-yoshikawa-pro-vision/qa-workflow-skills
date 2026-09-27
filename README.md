@@ -21,7 +21,10 @@ skills/
 ├── e2e-test-result-analysis/
 ├── e2e-test-reporting/
 ├── test-target-inspection/
-└── test-execution/
+├── test-execution/
+├── regression-testing/
+├── exploratory-testing/
+└── qa-knowledge/
 ```
 
 各Skillは`skills/<skill-name>/SKILL.md`を持つ独立Skillです。`qa-workflow`も1 Skillとして扱います。
@@ -44,6 +47,9 @@ skills/
 | `e2e-test-reporting` | 検証済み実行・分析結果の人間向け報告 |
 | `test-target-inspection` | 生きた実対象のUI情報・ふるまい確認とテスト対象資料管理 |
 | `test-execution` | 詳細TCの今回run、観測・比較、構造化結果とcleanup |
+| `regression-testing` | Regression baseline / membership / Run selection / Activity / history |
+| `exploratory-testing` | Charterベースのexplorationとowner不明hypothesisのinvestigation |
+| `qa-knowledge` | QA knowledge candidate triage / entry lifecycle / lookup |
 
 ## テスト分析・設計フロー
 
@@ -103,7 +109,7 @@ flowchart TB
 
 ### E2E要求時の条件分岐
 
-全16 Skillを常に通すわけではありません。要求成果物と有効な既存成果物に応じ、必要な依存だけを実行します。
+全19 Skillを常に通すわけではありません。要求成果物と有効な既存成果物に応じ、必要な依存だけを実行します。
 
 currentな実対象情報の確認が必要な場合だけ`test-target-inspection`を使い、設計前には必要な設計Skillへ戻します。詳細TCをAIが今回runとして実行する要求は`test-execution`へ進めます。repoへ残すPlaywright E2Eのinspection・実装・既存runner実行は既存の`e2e-test-inspection`、`e2e-test-implementation`、`e2e-test-execution`が担当します。
 
@@ -265,11 +271,11 @@ runtimeのためにLLMの意味判断をPythonへ複製せず、unsupported subs
 
 ### 発火評価
 
-16 Skillの選択精度を評価します。正規モードは16 Skill同時利用、単独・限定Skillは診断モードです。`test-analysis` / `test-condition-design`はtrain 24件・validation 20件、その他14 Skillはtrain 12件・validation 8件で、合計368 queryです。repo内データセット検証と実Agentクライアント上の実発火評価は別物です。
+19 Skillの選択精度を評価します。正規モードは19 Skill同時利用、単独・限定Skillは診断モードです。`test-analysis` / `test-condition-design`はtrain 24件・validation 20件、その他17 Skillはtrain 12件・validation 8件で、合計428 queryです。repo内データセット検証と実Agentクライアント上の実発火評価は別物です。
 
 ### 決定論的出力評価
 
-16 Skillの正規出力について、ID、参照整合、必須フィールド、リスクマトリクス、成果物閉鎖、Pairwise、レビュー / ワークフロー、E2Eの対象・raw fact・primary / attempt・cleanup不変条件など、意味解釈なしで判定できる契約を評価します。現行deterministic output datasetは32ケース（各Skill 2件）です。
+19 Skillの正規出力について、ID、参照整合、必須フィールド、リスクマトリクス、成果物閉鎖、Pairwise、レビュー / ワークフロー、E2Eの対象・raw fact・primary / attempt・cleanup不変条件、Regression baseline / route execution、Exploratory lifecycle、QA knowledge currentness / CAS条件など、意味解釈なしで判定できる契約を評価します。現行deterministic output datasetは38ケースです。
 
 - `known_*`: フィクスチャ側で既知の参照集合。Skill自身が出力内で生成するEntityの扱いは各Skill契約に従う。キー未指定なら対応する参照検査を行わない。
 - `required_*`: 出力に実際に存在しなければならないEntity / 値。
@@ -297,7 +303,7 @@ Agent実行と評価対象出力の生成は決定論的 / 意味評価ランタ
 
 ## qa-workflowのランタイム前提
 
-同一のAgentクライアント上で16 Skillすべてが利用可能で、Agentが必要なSkillを追加で読み込み / 利用できる環境を前提とします。Agent Skills Specificationが共通Skill-to-Skill APIを保証するとは扱いません。
+同一のAgentクライアント上で19 Skillすべてが利用可能で、Agentが必要なSkillを追加で読み込み / 利用できる環境を前提とします。Agent Skills Specificationが共通Skill-to-Skill APIを保証するとは扱いません。
 
 ## 検証
 

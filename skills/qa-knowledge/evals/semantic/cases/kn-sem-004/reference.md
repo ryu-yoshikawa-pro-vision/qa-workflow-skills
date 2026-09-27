@@ -1,0 +1,3 @@
+# Reference
+
+dependency mismatchを検出した時点でKN-Aをcurrent recommendationから外し、`要再検証`として扱います。Finding provenanceは書き換えません。current evidenceが必要ならconfiguration ownerへ再確認を依頼し、workflowが使ったentry revisionはそのまま残します。

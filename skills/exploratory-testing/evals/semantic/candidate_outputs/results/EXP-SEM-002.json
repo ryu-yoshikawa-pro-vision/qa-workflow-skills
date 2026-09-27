@@ -1,0 +1,27 @@
+{
+  "skill": "exploratory-testing",
+  "eval_id": "EXP-SEM-002",
+  "verdict": "pass",
+  "criteria": [
+    {
+      "id": "EXP-SEM-003",
+      "title": "Observation / Finding判断",
+      "critical": true,
+      "rating": 3,
+      "status": "pass",
+      "reason": "観測事実と証拠を記録し、期待挙動・再現範囲・原因・Defect判定が未確定であることを分けています。Findingも未解決として示しています。実際の最も早いownerへのrouteは特定されず、question-analysisを通じてownerを確認する記述にとどまるため、軽微な不足があります。",
+      "evidence": [
+        "Observation: 「viewer roleで取消済み注文の詳細が表示された事実を1回観測しました。」",
+        "Evidence: 「E1, the screen recording referenced in the Eval Input」",
+        "Finding: 「F1 — Unresolved」および「期待されるrole permissions、再現性、責任ownerが未確認」",
+        "「no defect conclusion」"
+      ]
+    }
+  ],
+  "summary": {
+    "pass": 1,
+    "needs_review": 0,
+    "fail": 0,
+    "not_evaluable": 0
+  }
+}

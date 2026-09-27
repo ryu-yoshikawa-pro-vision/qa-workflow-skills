@@ -557,5 +557,192 @@
       "question-analysis": "完了",
       "test-execution": "実行中"
     }
+  },
+  {
+    "id": "WF-ARTIFACT-001",
+    "start": "regression-testing",
+    "final": "regression-testing",
+    "skills": [
+      "regression-testing"
+    ],
+    "overall": "実行中",
+    "targets": {
+      "regression-testing": "baseline / membership"
+    },
+    "states": {}
+  },
+  {
+    "id": "WF-ARTIFACT-002",
+    "start": "regression-testing",
+    "final": "regression-testing",
+    "skills": [
+      "regression-testing"
+    ],
+    "overall": "実行中",
+    "targets": {
+      "regression-testing": "Run計画"
+    },
+    "states": {}
+  },
+  {
+    "id": "WF-ARTIFACT-003",
+    "start": "regression-testing",
+    "final": "regression-testing",
+    "skills": [
+      "regression-testing"
+    ],
+    "overall": "実行中",
+    "targets": {
+      "regression-testing": "履歴参照"
+    },
+    "states": {}
+  },
+  {
+    "id": "WF-ARTIFACT-004",
+    "start": "qa-workflow",
+    "final": "test-execution",
+    "skills": [
+      "qa-workflow",
+      "regression-testing",
+      "test-execution"
+    ],
+    "overall": "実行中",
+    "targets": {
+      "regression-testing": "Run計画"
+    },
+    "states": {}
+  },
+  {
+    "id": "WF-ARTIFACT-005",
+    "start": "qa-workflow",
+    "final": "regression-testing",
+    "skills": [
+      "qa-workflow",
+      "test-execution",
+      "regression-testing"
+    ],
+    "overall": "実行中",
+    "targets": {
+      "regression-testing": "Run結果更新"
+    },
+    "states": {}
+  },
+  {
+    "id": "WF-ARTIFACT-006",
+    "start": "test-analysis",
+    "final": "test-analysis",
+    "skills": [
+      "test-analysis"
+    ],
+    "overall": "実行中",
+    "targets": {
+      "test-analysis": "テスト分析"
+    },
+    "states": {}
+  },
+  {
+    "id": "WF-ARTIFACT-007",
+    "start": "exploratory-testing",
+    "final": "exploratory-testing",
+    "skills": [
+      "exploratory-testing"
+    ],
+    "overall": "実行中",
+    "targets": {
+      "exploratory-testing": "investigation"
+    },
+    "states": {}
+  },
+  {
+    "id": "WF-ARTIFACT-008",
+    "start": "exploratory-testing",
+    "final": "exploratory-testing",
+    "skills": [
+      "exploratory-testing"
+    ],
+    "overall": "実行中",
+    "targets": {
+      "exploratory-testing": "exploration"
+    },
+    "states": {}
+  },
+  {
+    "id": "WF-ARTIFACT-009",
+    "start": "test-target-inspection",
+    "final": "test-target-inspection",
+    "skills": [
+      "test-target-inspection"
+    ],
+    "overall": "実行中",
+    "targets": {},
+    "states": {}
+  },
+  {
+    "id": "WF-ARTIFACT-010",
+    "start": "test-execution",
+    "final": "test-execution",
+    "skills": [
+      "test-execution"
+    ],
+    "overall": "実行中",
+    "targets": {},
+    "states": {}
+  },
+  {
+    "id": "WF-ARTIFACT-011",
+    "start": "qa-knowledge",
+    "final": "qa-knowledge",
+    "skills": [
+      "qa-knowledge"
+    ],
+    "overall": "実行中",
+    "targets": {
+      "qa-knowledge": "triage"
+    },
+    "states": {}
+  },
+  {
+    "id": "WF-ARTIFACT-012",
+    "start": "qa-workflow",
+    "final": "spec-analysis",
+    "skills": [
+      "qa-workflow",
+      "qa-knowledge",
+      "spec-analysis"
+    ],
+    "overall": "実行中",
+    "targets": {
+      "qa-knowledge": "triage"
+    },
+    "states": {}
+  },
+  {
+    "id": "WF-ARTIFACT-013",
+    "start": "test-analysis",
+    "final": "test-analysis",
+    "skills": [
+      "test-analysis"
+    ],
+    "overall": "実行中",
+    "targets": {
+      "test-analysis": "テスト分析"
+    },
+    "states": {}
+  },
+  {
+    "id": "WF-ARTIFACT-014",
+    "start": "qa-workflow",
+    "final": "qa-knowledge",
+    "skills": [
+      "qa-workflow",
+      "exploratory-testing",
+      "qa-knowledge"
+    ],
+    "overall": "実行中",
+    "targets": {
+      "exploratory-testing": "exploration",
+      "qa-knowledge": "revalidation"
+    },
+    "states": {}
   }
 ]

@@ -1,0 +1,16 @@
+{
+  "skill": "regression-testing",
+  "canonical_output": true,
+  "cases": [
+    {
+      "id": "REG-OUT-001",
+      "input": "cases/reg-out-001/input.md",
+      "expected": "cases/reg-out-001/expected.json"
+    },
+    {
+      "id": "REG-OUT-002",
+      "input": "cases/reg-out-002/input.md",
+      "expected": "cases/reg-out-002/expected.json"
+    }
+  ]
+}

@@ -17,6 +17,9 @@ EXPECTED_CASE_COUNTS = {
     "qa-workflow": 3,
     "test-target-inspection": 2,
     "test-execution": 2,
+    "regression-testing": 6,
+    "exploratory-testing": 4,
+    "qa-knowledge": 6,
 }
 
 
@@ -36,7 +39,7 @@ class SemanticDatasetTests(unittest.TestCase):
                     self.assertTrue(case["reference_text"].strip())
                     self.assertTrue(case["criteria"])
                     self.assertTrue(set(case["criteria"]) <= set(dataset["criteria_by_id"]))
-                if skill in {"test-target-inspection", "test-execution"}:
+                if skill in {"test-target-inspection", "test-execution", "regression-testing", "exploratory-testing", "qa-knowledge"}:
                     critical_ids = {criterion["id"] for criterion in dataset["criteria"] if criterion["critical"]}
                     covered_ids = {
                         criterion_id
@@ -47,7 +50,7 @@ class SemanticDatasetTests(unittest.TestCase):
                     self.assertFalse(missing_critical_ids, f"critical criteria without semantic case coverage: {missing_critical_ids}")
                 total_cases += len(dataset["cases"])
 
-        self.assertEqual(total_cases, 56)
+        self.assertEqual(total_cases, 72)
 
     def test_plan_responsibility_mapping_is_documented(self):
         text = (REPO_ROOT / "EVALS.md").read_text(encoding="utf-8")

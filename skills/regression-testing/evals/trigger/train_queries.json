@@ -1,0 +1,50 @@
+[
+  {
+    "query": "Regression baselineを初期構築し、発見したcurrent TCのmembershipを判断して。",
+    "should_trigger": true
+  },
+  {
+    "query": "currentなRegression Suite memberと除外理由を再評価して。",
+    "should_trigger": true
+  },
+  {
+    "query": "今回の変更候補に対するRegression Runのselected TCを決めて。",
+    "should_trigger": true
+  },
+  {
+    "query": "前回のRegression Activityからblocked routeとsource resultを確認して。",
+    "should_trigger": true
+  },
+  {
+    "query": "baselineが古い可能性があるので、Run開始前にcurrentnessを照合して。",
+    "should_trigger": true
+  },
+  {
+    "query": "completeなSuiteからfull Regression計画を作って、required execution routeを割り当てて。",
+    "should_trigger": true
+  },
+  {
+    "query": "今回の変更で影響しそうなProduct Riskを分析して。",
+    "should_trigger": false
+  },
+  {
+    "query": "変更の重大度と発生可能性を評価して。",
+    "should_trigger": false
+  },
+  {
+    "query": "現行仕様から詳細Test Caseを作成して。",
+    "should_trigger": false
+  },
+  {
+    "query": "既知のTCをブラウザで実行して結果を記録して。",
+    "should_trigger": false
+  },
+  {
+    "query": "Charterに沿って未知の不具合を探索して。",
+    "should_trigger": false
+  },
+  {
+    "query": "E2E runの失敗原因をログから分析して。",
+    "should_trigger": false
+  }
+]

@@ -23,6 +23,9 @@ CANONICAL_SKILLS = (
     "e2e-test-reporting",
     "test-target-inspection",
     "test-execution",
+    "regression-testing",
+    "exploratory-testing",
+    "qa-knowledge",
 )
 
 

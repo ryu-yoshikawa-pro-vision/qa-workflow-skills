@@ -35,6 +35,7 @@ jobs:
               "e2e-test-implementation", "e2e-test-execution",
               "e2e-test-result-analysis", "e2e-test-reporting",
               "test-target-inspection", "test-execution",
+              "regression-testing", "exploratory-testing", "qa-knowledge",
           ]
           total = 0
           for skill in skills:
@@ -53,7 +54,7 @@ jobs:
                   assert "output-template.md" in input_path.read_text(encoding="utf-8") or skill == "qa-workflow", input_path
                   assert isinstance(json.loads(expected_path.read_text(encoding="utf-8")), dict)
                   total += 1
-          assert total >= 32, total
+          assert total >= 38, total
           print(f"Deterministic output eval cases: {total}")
           PY
 
@@ -72,6 +73,9 @@ jobs:
           python -m compileall -q skills/test-case-design/scripts
           python -m compileall -q skills/coverage-analysis/scripts
           python -m compileall -q skills/qa-workflow/scripts
+          python -m compileall -q skills/regression-testing/scripts
+          python -m compileall -q skills/exploratory-testing/scripts
+          python -m compileall -q skills/qa-knowledge/scripts
 
       - name: Run shared deterministic runtime unit tests
         run: python -m unittest discover -s scripts/skills/evals/deterministic/tests -v

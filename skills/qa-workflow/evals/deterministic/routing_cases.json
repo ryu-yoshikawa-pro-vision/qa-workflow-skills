@@ -534,5 +534,180 @@
       "question-analysis": "完了",
       "test-execution": "実行中"
     }
+  },
+  {
+    "id": "WF-ARTIFACT-001",
+    "input_conditions": "Regression baselineを初期構築して現在のTC membershipを判断する",
+    "start": "regression-testing",
+    "start_target": "baseline / membership",
+    "final": "regression-testing",
+    "final_target": "baseline / membership",
+    "skills": [
+      "regression-testing"
+    ],
+    "overall": "実行中"
+  },
+  {
+    "id": "WF-ARTIFACT-002",
+    "input_conditions": "今回の変更に対して実行するRegression TCを選びRun計画を作る",
+    "start": "regression-testing",
+    "start_target": "Run計画",
+    "final": "regression-testing",
+    "final_target": "Run計画",
+    "skills": [
+      "regression-testing"
+    ],
+    "overall": "実行中"
+  },
+  {
+    "id": "WF-ARTIFACT-003",
+    "input_conditions": "過去のRegression Activityとsource execution結果を確認する",
+    "start": "regression-testing",
+    "start_target": "履歴参照",
+    "final": "regression-testing",
+    "final_target": "履歴参照",
+    "skills": [
+      "regression-testing"
+    ],
+    "overall": "実行中"
+  },
+  {
+    "id": "WF-ARTIFACT-004",
+    "input_conditions": "full Regressionを計画して選定済みTCを実行し結果をまとめる",
+    "start": "qa-workflow",
+    "final": "test-execution",
+    "skills": [
+      "qa-workflow",
+      "regression-testing",
+      "test-execution"
+    ],
+    "targets": {
+      "regression-testing": "Run計画"
+    },
+    "overall": "実行中"
+  },
+  {
+    "id": "WF-ARTIFACT-005",
+    "input_conditions": "修正が直ったか既存のcurrent TCを実行し周辺Regressionも行う",
+    "start": "qa-workflow",
+    "final": "regression-testing",
+    "final_target": "Run結果更新",
+    "skills": [
+      "qa-workflow",
+      "test-execution",
+      "regression-testing"
+    ],
+    "overall": "実行中"
+  },
+  {
+    "id": "WF-ARTIFACT-006",
+    "input_conditions": "変更による回帰影響候補とProduct Riskを整理する",
+    "start": "test-analysis",
+    "start_target": "テスト分析",
+    "final": "test-analysis",
+    "final_target": "テスト分析",
+    "skills": [
+      "test-analysis"
+    ],
+    "overall": "実行中"
+  },
+  {
+    "id": "WF-ARTIFACT-007",
+    "input_conditions": "未知症状の仮説を実対象を操作しながら検証する。既存ownerは未確定",
+    "start": "exploratory-testing",
+    "start_target": "investigation",
+    "final": "exploratory-testing",
+    "final_target": "investigation",
+    "skills": [
+      "exploratory-testing"
+    ],
+    "overall": "実行中"
+  },
+  {
+    "id": "WF-ARTIFACT-008",
+    "input_conditions": "変更領域をCharterに沿って探索して未知の問題を探す",
+    "start": "exploratory-testing",
+    "start_target": "exploration",
+    "final": "exploratory-testing",
+    "final_target": "exploration",
+    "skills": [
+      "exploratory-testing"
+    ],
+    "overall": "実行中"
+  },
+  {
+    "id": "WF-ARTIFACT-009",
+    "input_conditions": "現在のUIとaccessible nameを確認する",
+    "start": "test-target-inspection",
+    "final": "test-target-inspection",
+    "skills": [
+      "test-target-inspection"
+    ],
+    "overall": "実行中"
+  },
+  {
+    "id": "WF-ARTIFACT-010",
+    "input_conditions": "既知のTest Caseを手順どおりに実行して結果を記録する",
+    "start": "test-execution",
+    "final": "test-execution",
+    "skills": [
+      "test-execution"
+    ],
+    "overall": "実行中"
+  },
+  {
+    "id": "WF-ARTIFACT-011",
+    "input_conditions": "このFindingが今後のQA knowledgeとして再利用できるかtriageする",
+    "start": "qa-knowledge",
+    "start_target": "triage",
+    "final": "qa-knowledge",
+    "final_target": "triage",
+    "skills": [
+      "qa-knowledge"
+    ],
+    "overall": "実行中"
+  },
+  {
+    "id": "WF-ARTIFACT-012",
+    "input_conditions": "このObservationを仕様正本へ反映すべきか判断する",
+    "start": "qa-workflow",
+    "final": "spec-analysis",
+    "skills": [
+      "qa-workflow",
+      "qa-knowledge",
+      "spec-analysis"
+    ],
+    "targets": {
+      "qa-knowledge": "triage"
+    },
+    "overall": "実行中"
+  },
+  {
+    "id": "WF-ARTIFACT-013",
+    "input_conditions": "過去のcurrent QA knowledgeを使って今回の変更をリスク分析する。knowledge更新やtriageは不要",
+    "start": "test-analysis",
+    "start_target": "テスト分析",
+    "final": "test-analysis",
+    "final_target": "テスト分析",
+    "skills": [
+      "test-analysis"
+    ],
+    "overall": "実行中"
+  },
+  {
+    "id": "WF-ARTIFACT-014",
+    "input_conditions": "今回のExploration Findingを今後の知識として保存し既存entryも再検証する",
+    "start": "qa-workflow",
+    "final": "qa-knowledge",
+    "final_target": "revalidation",
+    "skills": [
+      "qa-workflow",
+      "exploratory-testing",
+      "qa-knowledge"
+    ],
+    "targets": {
+      "exploratory-testing": "exploration"
+    },
+    "overall": "実行中"
   }
 ]

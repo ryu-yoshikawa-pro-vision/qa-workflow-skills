@@ -1,0 +1,56 @@
+{
+  "skill": "qa-knowledge",
+  "cases": [
+    {
+      "id": "KN-SEM-001",
+      "input": "cases/kn-sem-001/input.md",
+      "reference": "cases/kn-sem-001/reference.md",
+      "criteria": [
+        "KN-SEM-001"
+      ]
+    },
+    {
+      "id": "KN-SEM-002",
+      "input": "cases/kn-sem-002/input.md",
+      "reference": "cases/kn-sem-002/reference.md",
+      "criteria": [
+        "KN-SEM-002"
+      ]
+    },
+    {
+      "id": "KN-SEM-003",
+      "input": "cases/kn-sem-003/input.md",
+      "reference": "cases/kn-sem-003/reference.md",
+      "criteria": [
+        "KN-SEM-002",
+        "KN-SEM-003"
+      ]
+    },
+    {
+      "id": "KN-SEM-004",
+      "input": "cases/kn-sem-004/input.md",
+      "reference": "cases/kn-sem-004/reference.md",
+      "criteria": [
+        "KN-SEM-004"
+      ]
+    },
+    {
+      "id": "KN-SEM-005",
+      "input": "cases/kn-sem-005/input.md",
+      "reference": "cases/kn-sem-005/reference.md",
+      "criteria": [
+        "KN-SEM-005",
+        "KN-SEM-006"
+      ]
+    },
+    {
+      "id": "KN-SEM-006",
+      "input": "cases/kn-sem-006/input.md",
+      "reference": "cases/kn-sem-006/reference.md",
+      "criteria": [
+        "KN-SEM-002",
+        "KN-SEM-006"
+      ]
+    }
+  ]
+}

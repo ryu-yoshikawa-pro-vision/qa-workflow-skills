@@ -1,0 +1,34 @@
+[
+  {
+    "query": "未検証Observationを保存せず、既存QA正本かknowledgeか判定して。",
+    "should_trigger": true
+  },
+  {
+    "query": "半年過ぎたenvironment entryを現在利用できるか再確認して。",
+    "should_trigger": true
+  },
+  {
+    "query": "scopeとversionに合うQA knowledgeの履歴を確認して。",
+    "should_trigger": true
+  },
+  {
+    "query": "semantic identityを維持したentryの再検証結果を同じrefへ更新して。",
+    "should_trigger": true
+  },
+  {
+    "query": "正しい仕様を一次情報から確定して。",
+    "should_trigger": false
+  },
+  {
+    "query": "現行UIを実機で観測してdocumentに残して。",
+    "should_trigger": false
+  },
+  {
+    "query": "この変更で優先すべきRegression TCを選定して。",
+    "should_trigger": false
+  },
+  {
+    "query": "既存knowledgeを入力としてProduct Riskを評価して。",
+    "should_trigger": false
+  }
+]

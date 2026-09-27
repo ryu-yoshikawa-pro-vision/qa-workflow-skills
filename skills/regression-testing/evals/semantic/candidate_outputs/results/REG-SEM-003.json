@@ -1,0 +1,40 @@
+{
+  "skill": "regression-testing",
+  "eval_id": "REG-SEM-003",
+  "verdict": "pass",
+  "criteria": [
+    {
+      "id": "REG-SEM-001",
+      "title": "Membershipとcurrent TC scope",
+      "critical": true,
+      "rating": 4,
+      "status": "pass",
+      "reason": "TC-201をuser明示のcheckout変更scopeとして扱い、TC-202は今回除外と区別しています。残る1 memberは入力に根拠がないため判断を保留し、TC-201だけにscopeを確定していません。",
+      "evidence": [
+        "「選択済み: TC-201 — userがcheckout変更に関連すると明示」",
+        "「除外: TC-202 — user指定」",
+        "「残る1 memberはrefと変更との関連が入力にないため、選択・除外を判断できない」"
+      ]
+    },
+    {
+      "id": "REG-SEM-003",
+      "title": "Run selectionとresidual risk",
+      "critical": true,
+      "rating": 4,
+      "status": "pass",
+      "reason": "明示されたuser scopeと既存Riskへの影響を記録し、TC-202の除外・未実行によるR-8の残存影響を示しています。Risk scoreは変更せず、TC-201の選択をSuite全体の完了とも扱っていません。",
+      "evidence": [
+        "「Baseline: complete、3 members」",
+        "「TC-202 ... 今回のRunでは未実行となる」",
+        "「このRunでは決済二重計上の検証が残る。R-8のscoreは変更しない。」",
+        "「全memberの候補確認ができていないので、TC-201だけにscopeを確定できない」"
+      ]
+    }
+  ],
+  "summary": {
+    "pass": 2,
+    "needs_review": 0,
+    "fail": 0,
+    "not_evaluable": 0
+  }
+}

@@ -1,0 +1,404 @@
+from __future__ import annotations
+
+from concurrent.futures import ThreadPoolExecutor
+import importlib.util
+import json
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import tempfile
+import unittest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+from scripts.skills.evals.deterministic.run import grade
+
+
+REPO_ROOT = Path(__file__).resolve().parents[4]
+
+
+def load_skill_helper(skill: str, filename: str):
+    path = REPO_ROOT / "skills" / skill / "scripts" / filename
+    spec = importlib.util.spec_from_file_location(f"test_{skill.replace('-', '_')}_{filename[:-3]}", path)
+    if spec is None or spec.loader is None:
+        raise ImportError(path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+regression = load_skill_helper("regression-testing", "regression_runtime.py")
+exploratory = load_skill_helper("exploratory-testing", "exploratory_runtime.py")
+knowledge = load_skill_helper("qa-knowledge", "knowledge_runtime.py")
+workflow = load_skill_helper("qa-workflow", "artifact_graph.py")
+
+
+class RegressionRuntimeTests(unittest.TestCase):
+    def discovery(self, *, lifecycle="current", revision="r1", listing_complete=True):
+        return regression.build_discovery_snapshot({
+            "discovery_roots": ["qa/test-cases"],
+            "listing_complete": listing_complete,
+            "source_revisions": [{"source_ref": "repo:qa/test-cases", "revision": revision}],
+            "cases": [
+                {"tc_ref": "TC-002", "source_ref": "repo:qa/test-cases", "source_revision": revision, "lifecycle_status": lifecycle, "content_fingerprint": "owner-fingerprint-2"},
+                {"tc_ref": "TC-001", "source_ref": "repo:qa/test-cases", "source_revision": revision, "lifecycle_status": "current", "content_fingerprint": "owner-fingerprint-1"},
+            ],
+        })
+
+    def test_discovery_snapshot_and_lifecycle_resolution_are_separate(self):
+        snapshot = self.discovery(lifecycle="unresolved")
+        self.assertTrue(snapshot["discovery_complete"])
+        self.assertFalse(snapshot["lifecycle_complete"])
+        self.assertFalse(snapshot["complete"])
+        self.assertEqual(snapshot["unresolved_tc_refs"], ["TC-002"])
+
+        deleted = self.discovery(lifecycle="deleted")
+        self.assertTrue(deleted["complete"])
+        self.assertEqual([case["tc_ref"] for case in deleted["cases"]], ["TC-001", "TC-002"])
+
+        truncated = self.discovery(listing_complete=False)
+        self.assertFalse(truncated["discovery_complete"])
+        self.assertFalse(truncated["complete"])
+
+    def test_snapshot_batches_are_stable_and_stale_resume_requires_new_snapshot(self):
+        old = self.discovery()
+        first = regression.deterministic_batch(old, offset=0, limit=1)
+        second = regression.deterministic_batch(old, offset=1, limit=1, expected_snapshot_ref=old["snapshot_ref"])
+        self.assertEqual(first["tc_refs"], ["TC-001"])
+        self.assertEqual(second["tc_refs"], ["TC-002"])
+        self.assertTrue(second["complete"])
+
+        new = self.discovery(revision="r2")
+        resume = regression.deterministic_batch(new, offset=1, limit=1, expected_snapshot_ref=old["snapshot_ref"])
+        self.assertEqual(resume["status"], "new_snapshot_required")
+
+    def test_membership_and_coverage_gap_are_independent(self):
+        snapshot = self.discovery()
+        partial = regression.reconcile_membership(snapshot, [{"tc_ref": "TC-001", "decision": "member", "reason": "current in scope"}])
+        self.assertFalse(partial["complete"])
+        self.assertEqual(partial["undecided_tc_refs"], ["TC-002"])
+        complete = regression.reconcile_membership(snapshot, [
+            {"tc_ref": "TC-001", "decision": "member", "reason": "current recurring path"},
+            {"tc_ref": "TC-002", "decision": "one_off", "reason": "migration only"},
+        ])
+        self.assertTrue(complete["complete"])
+        self.assertEqual(complete["member_tc_refs"], ["TC-001"])
+        complete["coverage_gaps"] = ["scope:refund"]
+        self.assertTrue(complete["complete"])
+
+    def test_currentness_precedes_full_and_selected_run_planning(self):
+        baseline = {"complete": True, "member_tc_refs": ["TC-001", "TC-002"]}
+        self.assertEqual(regression.plan_run(baseline, requested_scope="full")["status"], "blocked")
+        stale = regression.plan_run(baseline, requested_scope="full", currentness={"status": "stale"})
+        self.assertEqual(stale["reason"], "baseline_not_current")
+        full = regression.plan_run(baseline, requested_scope="full", currentness={"status": "current"})
+        self.assertEqual(full["selected_tc_refs"], ["TC-001", "TC-002"])
+        selected = regression.plan_run(baseline, requested_scope="selected", requested_tc_refs=["TC-002"], currentness={"status": "current"})
+        self.assertFalse(selected["suite_complete"])
+        self.assertEqual(selected["selected_tc_refs"], ["TC-002"])
+        incomplete_candidates = regression.plan_run(baseline, requested_scope=None, candidate_query_complete=False, currentness={"status": "current"})
+        self.assertEqual(incomplete_candidates["scope"], "full")
+        self.assertTrue(incomplete_candidates["suite_complete"])
+
+    def test_route_state_uses_actual_start_and_preserves_source_result(self):
+        routes = regression.validate_required_routes([
+            {"tc_ref": "TC-001", "route_type": "manual", "route_ref": "manual"},
+            {"tc_ref": "TC-001", "route_type": "e2e", "route_ref": "e2e:one", "e2e_testware_ref": "E2E-1"},
+            {"tc_ref": "TC-002", "route_type": "e2e", "route_ref": "e2e:two", "e2e_testware_ref": "E2E-2"},
+        ])
+        self.assertTrue(routes["valid"])
+        invalid = regression.validate_required_routes([{"tc_ref": "TC-001", "route_type": "blocked", "route_ref": "blocked"}])
+        self.assertFalse(invalid["valid"])
+
+        # Supply execution refs without changing route kind / state contract.
+        run = {"required_routes": [
+            {**routes["routes"][0], "execution_ref": "RUN-M"},
+            {**routes["routes"][1], "execution_ref": "RUN-E1"},
+            {**routes["routes"][2], "execution_ref": "RUN-E2"},
+            {"tc_ref": "TC-003", "route_type": "manual", "route_ref": "manual:003", "execution_ref": "RUN-M3"},
+        ]}
+        activity = regression.project_activity(run, {
+            "RUN-M": {"start_state": "開始済み", "actual_start_confirmed": True, "source_result": "FAIL", "evidence_refs": ["ev:m"]},
+            "RUN-E1": {"start_state": "未開始", "actual_start_confirmed": False, "source_result": "未実行", "blocked": True},
+            "RUN-E2": {"start_state": "開始済み", "actual_start_confirmed": True, "source_result": "判定不能", "evidence_refs": ["ev:e"]},
+            "RUN-M3": {"start_state": "未開始", "actual_start_confirmed": False, "source_result": "未実行"},
+        })
+        self.assertEqual(activity["tc_execution_state"], {"TC-001": "blocked", "TC-002": "executed", "TC-003": "unexecuted"})
+        self.assertTrue(activity["route_results"][0]["executed"])
+        self.assertFalse(activity["route_results"][1]["executed"])
+        self.assertEqual(activity["route_results"][0]["source_result"], "FAIL")
+        self.assertEqual(activity["counts"]["executed_tc_count"], 1)
+        self.assertEqual(activity["counts"]["blocked_tc_count"], 1)
+        self.assertEqual(activity["counts"]["unexecuted_tc_count"], 1)
+
+    def test_auxiliary_testware_needs_explicit_scope_and_is_separate(self):
+        rejected = regression.select_auxiliary_testware(requested_refs=["E2E-9"], user_explicit_refs=[], policy_refs=[], available_refs=["E2E-9"])
+        self.assertEqual(rejected["status"], "unresolved")
+        accepted = regression.select_auxiliary_testware(requested_refs=["E2E-9"], user_explicit_refs=[], policy_refs=["E2E-9"], available_refs=["E2E-9"])
+        self.assertEqual(accepted["selected_refs"], ["E2E-9"])
+        self.assertEqual(accepted["tc_member_count"], 0)
+
+    def test_activity_immutability_and_listing_completeness(self):
+        completed = {"activity_state": "完了", "scope_identity": "s1", "snapshot_ref": "d1"}
+        self.assertEqual(regression.update_activity(completed, completed)["reason"], "completed_activity_is_immutable")
+        changed = regression.update_activity({"activity_state": "実行中", "scope_identity": "s1", "snapshot_ref": "d1"}, {"scope_identity": "s2", "snapshot_ref": "d2"})
+        self.assertEqual(changed["status"], "new_activity_required")
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "ACT-2.json").write_text("{}", encoding="utf-8")
+            (root / "ACT-1.json").write_text("{}", encoding="utf-8")
+            self.assertEqual(regression.scan_activity_files(root)["activity_refs"], ["ACT-1", "ACT-2"])
+            self.assertFalse(regression.scan_activity_files(root, listing_complete=False)["complete"])
+
+
+class ExploratoryRuntimeTests(unittest.TestCase):
+    def charter(self):
+        return {
+            "purpose": "verify one unresolved behavior", "in_scope": ["checkout"], "out_of_scope": ["payment"],
+            "source_refs": ["symptom:S-1"], "focus_refs": [], "timebox_or_exit_condition": "20 minutes",
+            "allowed_origins": ["https://staging.example.test"], "allowed_operations": ["navigate", "invalidate_session"],
+            "side_effect_operations": ["invalidate_session"], "side_effect_scope": "session only",
+            "side_effect_action_definition": "one session invalidation", "side_effect_maximum": 1,
+            "cleanup_plan": "restore session", "evidence_policy": "retain refs, never credentials", "block_conditions": ["state unavailable"],
+            "symptom": "redirect to login mid-operation",
+        }
+
+    def test_mode_and_charter_are_explicit(self):
+        charter = self.charter()
+        self.assertTrue(exploratory.validate_charter("investigation", charter)["valid"])
+        no_hypothesis = dict(charter)
+        no_hypothesis.pop("symptom")
+        self.assertIn("investigation_requires_symptom_or_hypothesis", exploratory.validate_charter("investigation", no_hypothesis)["issues"])
+        self.assertIn("invalid_mode", exploratory.validate_charter("research", charter)["issues"])
+
+    def test_origin_and_side_effect_limits_fail_closed(self):
+        charter = self.charter()
+        self.assertEqual(exploratory.authorize_operation(charter, target_url="https://staging.example.test/orders", operation="navigate", prior_side_effect_attempts=0)["status"], "allowed")
+        self.assertEqual(exploratory.authorize_operation(charter, target_url="https://staging.example.test.evil/orders", operation="navigate", prior_side_effect_attempts=0)["status"], "blocked")
+        self.assertEqual(exploratory.authorize_operation(charter, target_url="https://staging.example.test", operation="invalidate_session", prior_side_effect_attempts=1, uncertain_previous_attempt=True)["reason"], "side_effect_limit_reached")
+        attempt = {"attempt_ref": "ATT-1", "operation": "invalidate_session", "side_effect": True, "outcome": "unknown"}
+        recorded = exploratory.record_attempt(charter, [], attempt)
+        self.assertTrue(recorded["retry_without_state_check"])
+        self.assertEqual(recorded["side_effect_count"], 1)
+        attempt2 = {"attempt_ref": "ATT-2", "operation": "invalidate_session", "side_effect": True, "outcome": "completed"}
+        self.assertEqual(exploratory.record_attempt(charter, recorded["attempts"], attempt2)["reason"], "side_effect_limit_reached")
+
+    def test_cleanup_block_resume_and_completed_immutability(self):
+        session = {"session_ref": "SES-1", "state": "実行中", "charter_snapshot_identity": exploratory.charter_identity(self.charter(), {"build": "b1"}, {"role": "viewer"})}
+        same = exploratory.can_resume(session, self.charter(), {"build": "b1"}, {"role": "viewer"})
+        self.assertEqual(same["status"], "resume_allowed")
+        changed = exploratory.can_resume(session, self.charter(), {"build": "b2"}, {"role": "viewer"})
+        self.assertEqual(changed["status"], "new_session_required")
+        self.assertEqual(exploratory.complete_session(session, exit_condition_reached=True, cleanup={"required": True, "status": "未確認"})["status"], "blocked")
+        complete = exploratory.complete_session(session, exit_condition_reached=True, cleanup={"required": False, "status": "対象なし"})
+        self.assertEqual(complete["status"], "complete")
+        self.assertEqual(exploratory.complete_session(complete["session"], exit_condition_reached=True, cleanup={"required": False, "status": "対象なし"})["reason"], "completed_session_is_immutable")
+        self.assertEqual(exploratory.complete_session(session, exit_condition_reached=True, cleanup={"required": True, "status": "意図的に残した状態"}, residual_side_effects=["record-1"])["status"], "blocked")
+
+
+class KnowledgeRuntimeTests(unittest.TestCase):
+    def entry(self, identity=None):
+        identity = identity or {"kind": "test_environment", "scope_refs": ["project:checkout"], "subject": "staging-job-delay"}
+        return {
+            "schema_version": "1", "entry_ref": knowledge.canonical_entry_ref(identity), "identity": identity,
+            "kind": "test_environment", "content": "Wait for authoritative staging job completion state.",
+            "scope_refs": ["project:checkout"], "applicability": {"environment": ["staging"], "version": "job-v3"},
+            "provenance": [{"ref": "activity:ACT-1", "revision": "r1"}],
+            "currentness_dependencies": [{"ref": "config:job", "revision": "r3"}],
+            "last_verified": {"at": "2026-09-27", "condition": "staging/job-v3"},
+            "state": "有効", "replacement_ref": None, "related_qa_refs": ["TC-1"],
+        }
+
+    def test_entry_identity_is_stable_and_update_requires_native_cas(self):
+        identity = {"subject": "delay", "scope_refs": ["project:a"], "kind": "test_environment"}
+        reversed_identity = {"kind": "test_environment", "subject": "delay", "scope_refs": ["project:a"]}
+        self.assertEqual(knowledge.canonical_entry_ref(identity), knowledge.canonical_entry_ref(reversed_identity))
+        self.assertNotEqual(knowledge.canonical_entry_ref(identity), knowledge.canonical_entry_ref({**identity, "subject": "other"}))
+        self.assertEqual(knowledge.plan_update(expected_entry_revision="r1", native_atomic_conditional_write=False)["status"], "blocked")
+        self.assertEqual(knowledge.plan_update(expected_entry_revision="r1", native_atomic_conditional_write=True)["status"], "conditional_write_required")
+        self.assertFalse(knowledge.handle_update_conflict(target_entry_revision_changed=True, different_entry_only_changed=False)["auto_merge"])
+        self.assertEqual(knowledge.plan_replacement(old_entry_ref="KN-1", new_entry_ref="KN-2", native_atomic_multi_entry_update=False)["status"], "blocked")
+
+    def test_same_entry_concurrent_updates_fail_closed_without_provider_cas(self):
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            decisions = list(executor.map(lambda _: knowledge.plan_update(expected_entry_revision="r1", native_atomic_conditional_write=False), range(2)))
+        self.assertEqual([decision["status"] for decision in decisions], ["blocked", "blocked"])
+        conflict = knowledge.handle_update_conflict(target_entry_revision_changed=True, different_entry_only_changed=False)
+        self.assertEqual(conflict["status"], "reread_and_semantic_reevaluation")
+        self.assertFalse(conflict["auto_merge"])
+
+    def test_same_semantic_identity_concurrent_create_uses_one_canonical_file(self):
+        entry = self.entry()
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "knowledge"
+            with ThreadPoolExecutor(max_workers=8) as executor:
+                results = list(executor.map(lambda _: knowledge.create_entry(root, entry, complete_root_snapshot=True, atomic_create_if_absent_available=True, current_dependencies={"config:job": "r3"}), range(8)))
+            self.assertEqual(sum(result["status"] == "created" for result in results), 1)
+            self.assertEqual({result["entry_ref"] for result in results}, {entry["entry_ref"]})
+            self.assertEqual(len(list(root.glob("*.md"))), 1)
+            read = knowledge.read_entry(root, entry["entry_ref"], expected_revision=results[0]["entry_revision"])
+            self.assertEqual(read["status"], "current")
+            self.assertFalse(read["historical_revision_available"])
+            self.assertEqual(knowledge.read_entry(root, entry["entry_ref"], expected_revision="sha256:old")["reason"], "historical_revision_unavailable")
+
+    def test_distinct_identities_do_not_contend_and_incomplete_storage_blocks(self):
+        first = self.entry()
+        second = self.entry({"kind": "test_environment", "scope_refs": ["project:checkout"], "subject": "different-job"})
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "knowledge"
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                results = list(executor.map(lambda entry: knowledge.create_entry(root, entry, complete_root_snapshot=True, atomic_create_if_absent_available=True, current_dependencies={"config:job": "r3"}), [first, second]))
+            self.assertEqual([item["status"] for item in results], ["created", "created"])
+            self.assertEqual(len(list(root.glob("*.md"))), 2)
+            self.assertFalse(knowledge.scan_knowledge_root(root, max_entries=1)["complete"])
+            self.assertEqual(knowledge.create_entry(root, first, complete_root_snapshot=False, atomic_create_if_absent_available=True, current_dependencies={"config:job": "r3"})["status"], "blocked")
+            self.assertEqual(knowledge.create_entry(root, first, complete_root_snapshot=True, atomic_create_if_absent_available=False, current_dependencies={"config:job": "r3"})["status"], "blocked")
+            unverified = {**first, "state": "要再検証"}
+            self.assertEqual(knowledge.create_entry(root, unverified, complete_root_snapshot=True, atomic_create_if_absent_available=True, current_dependencies={"config:job": "r3"})["status"], "blocked")
+
+    def test_currentness_lookup_ignores_unrelated_updates_but_excludes_stale_entry(self):
+        entry = self.entry()
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            created = knowledge.create_entry(root, entry, complete_root_snapshot=True, atomic_create_if_absent_available=True, current_dependencies={"config:job": "r3"})
+            current_entry = {**entry, "entry_revision": created["entry_revision"]}
+            found = knowledge.lookup([current_entry], scope_refs={"project:checkout"}, kind="test_environment", environment="staging", version="job-v3", current_dependencies={"config:job": "r3", "other:entry": "r2"}, listing_complete=True)
+            self.assertEqual(found["status"], "complete")
+            self.assertEqual(len(found["entries"]), 1)
+            stale = knowledge.lookup([current_entry], scope_refs={"project:checkout"}, kind="test_environment", environment="staging", version="job-v3", current_dependencies={"config:job": "r4"}, listing_complete=True)
+            self.assertEqual(stale["entries"], [])
+            self.assertEqual(stale["historical_excluded_refs"], [entry["entry_ref"]])
+            self.assertFalse(knowledge.lookup([current_entry], scope_refs=set(), kind=None, environment=None, version=None, current_dependencies={}, listing_complete=False)["complete"])
+
+
+class WorkflowArtifactGraphTests(unittest.TestCase):
+    def project_text(self, scope="checkout", root=".qa/knowledge"):
+        return f"""# Context\n\n<!-- qa-context-field:start key=qa.regression_scope type=ordered_text -->\n{scope}\n<!-- qa-context-field:end -->\n\n<!-- qa-context-field:start key=qa.knowledge_root type=path -->\n{root}\n<!-- qa-context-field:end -->\n"""
+
+    def test_project_context_stable_keys_normalize_and_compare_only_used_fields(self):
+        old_text = self.project_text()
+        old = workflow.parse_project_context(old_text)
+        self.assertTrue(old["complete"])
+        snapshot = {**old, "used_fields": ["qa.regression_scope"]}
+        reordered = workflow.parse_project_context(self.project_text(root=".qa/knowledge-v2").replace("checkout", " checkout "))
+        self.assertEqual(workflow.compare_used_context(snapshot, reordered)["status"], "current")
+        changed = workflow.parse_project_context(self.project_text(scope="refund"))
+        self.assertEqual(workflow.compare_used_context(snapshot, changed)["status"], "stale")
+        # Explicit duplicate key markers are unresolved even when their values match.
+        block = "<!-- qa-context-field:start key=qa.knowledge_root type=path -->\n.qa/knowledge\n<!-- qa-context-field:end -->"
+        duplicate = workflow.parse_project_context(old_text + "\n" + block)
+        self.assertFalse(duplicate["complete"])
+        self.assertIn("duplicate_key", {item["reason"] for item in duplicate["unresolved"]})
+        missing = workflow.parse_project_context("<!-- qa-context-field:start key=qa.workflow_state_root type=path -->\nroot")
+        self.assertEqual(missing["status"] if "status" in missing else missing["complete"], False)
+        required = workflow.validate_required_context_fields(workflow.parse_project_context(self.project_text(root="（未設定）")), ["qa.knowledge_root"])
+        self.assertEqual(required["status"], "unresolved")
+
+    def test_workflow_states_have_canonical_identity_and_atomic_create(self):
+        ref = workflow.new_workflow_ref()
+        other = workflow.new_workflow_ref()
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "states"
+            with ThreadPoolExecutor(max_workers=8) as executor:
+                results = list(executor.map(lambda _: workflow.create_workflow_state(root, ref, {"overall_state": "実行中"}), range(8)))
+            self.assertEqual(sum(item["status"] == "created" for item in results), 1)
+            self.assertEqual(workflow.canonical_state_path(root, ref), Path(root) / f"{ref}.json")
+            self.assertEqual(workflow.create_workflow_state(root, other, {"overall_state": "実行中"})["status"], "created")
+            self.assertEqual(len(list(root.glob("*.json"))), 2)
+            revision = next(item["state_revision"] for item in results if item["status"] == "created")
+            self.assertEqual(workflow.read_workflow_state(root, ref, expected_revision=revision)["status"], "current")
+            self.assertEqual(workflow.state_update_decision(revision, revision, False)["status"], "blocked")
+            self.assertEqual(workflow.state_update_decision(revision, "new", True)["status"], "conflict")
+            self.assertEqual(workflow.verify_historical_revision(revision, False)["status"], "blocked")
+
+    def test_same_workflow_concurrent_resume_blocks_state_updates_without_provider_cas(self):
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            decisions = list(executor.map(lambda _: workflow.state_update_decision("r1", "r1", False), range(2)))
+        self.assertEqual([decision["status"] for decision in decisions], ["blocked", "blocked"])
+        ready_for_provider = workflow.state_update_decision("r1", "r1", True)
+        self.assertEqual(ready_for_provider["status"], "conditional_write_required")
+
+    def test_pre_start_claim_and_resource_reservation_serialize_mutable_work(self):
+        workflow_ref = workflow.new_workflow_ref()
+        with tempfile.TemporaryDirectory() as temp:
+            claim_root = Path(temp) / "claims"
+            with ThreadPoolExecutor(max_workers=8) as executor:
+                claims = list(executor.map(lambda _: workflow.claim_mutable_operation(claim_root, workflow_ref, "browser:save-order"), range(8)))
+            self.assertEqual(sum(item["status"] == "claim_acquired" for item in claims), 1)
+            winner = next(item for item in claims if item["status"] == "claim_acquired")
+            self.assertTrue(winner["may_start"])
+            self.assertEqual(workflow.recover_claim(owner_source_state=None, cleanup_confirmed=False, expected_claim_revision=winner["claim_revision"], native_atomic_conditional_release=True)["status"], "blocked")
+            self.assertEqual(workflow.recover_claim(owner_source_state="not_started", cleanup_confirmed=True, expected_claim_revision=winner["claim_revision"], native_atomic_conditional_release=False)["status"], "blocked")
+            self.assertEqual(workflow.recover_claim(owner_source_state="not_started", cleanup_confirmed=True, expected_claim_revision=winner["claim_revision"], native_atomic_conditional_release=True)["status"], "conditional_release_required")
+
+            reservation_root = Path(temp) / "reservations"
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                reservations = list(executor.map(lambda owner: workflow.reserve_shared_resource(reservation_root, "resource:shared-user-1", owner), [workflow_ref, workflow.new_workflow_ref()]))
+            self.assertEqual(sum(item["status"] == "reserved" for item in reservations), 1)
+            reservation = next(item for item in reservations if item["status"] == "reserved")
+            reservation_data = json.loads(Path(reservation["reservation_ref"]).read_text(encoding="utf-8"))
+            owner_ref = reservation_data["workflow_ref"]
+            self.assertEqual(workflow.release_shared_resource(current_workflow_ref=owner_ref, expected_workflow_ref=owner_ref, expected_reservation_revision=reservation["reservation_revision"], current_reservation_revision=reservation["reservation_revision"], native_atomic_conditional_release=False, owner_state_verified=True, owner_execution_state="complete", cleanup_confirmed=True)["status"], "blocked")
+            self.assertEqual(workflow.release_shared_resource(current_workflow_ref="other", expected_workflow_ref=owner_ref, expected_reservation_revision=reservation["reservation_revision"], current_reservation_revision=reservation["reservation_revision"], native_atomic_conditional_release=True, owner_state_verified=True, owner_execution_state="complete", cleanup_confirmed=True)["reason"], "reservation_owner_mismatch")
+            self.assertEqual(workflow.reserve_shared_resource(reservation_root, "resource:isolation", workflow_ref, isolated=True)["status"], "not_required")
+
+    def test_partial_update_requires_owner_scope_dependency_and_cas_proof(self):
+        base = {"owner_boundary_defined": True, "same_target_identity": True, "update_scopes_disjoint": True, "upstream_dependencies_unchanged": True, "native_atomic_conditional_write": True, "expected_revision": "r1"}
+        self.assertEqual(workflow.partial_update_decision(**base)["status"], "conditional_write_required")
+        self.assertEqual(workflow.partial_update_decision(**{**base, "same_target_identity": False})["status"], "blocked")
+        self.assertEqual(workflow.partial_update_decision(**{**base, "native_atomic_conditional_write": False})["status"], "blocked")
+
+    def test_provider_helper_failure_is_blocked_not_misreported_as_conflict(self):
+        with tempfile.TemporaryDirectory() as temp:
+            parent = Path(temp) / "not-a-directory"
+            parent.write_text("file", encoding="utf-8")
+            result = workflow.create_if_absent(parent / "state.json", b"{}")
+            self.assertEqual(result["status"], "blocked")
+            self.assertFalse(result["atomic"])
+
+
+class StandaloneSkillPortabilityTests(unittest.TestCase):
+    def test_new_skill_candidate_outputs_pass_existing_deterministic_runner(self):
+        skills = {
+            "regression-testing": ["REG-OUT-001", "REG-OUT-002"],
+            "exploratory-testing": ["EXP-OUT-001", "EXP-OUT-002"],
+            "qa-knowledge": ["KN-OUT-001", "KN-OUT-002"],
+        }
+        for skill, eval_ids in skills.items():
+            eval_file = REPO_ROOT / "skills" / skill / "evals" / "output" / "evals.json"
+            for eval_id in eval_ids:
+                with self.subTest(skill=skill, eval_id=eval_id):
+                    output = eval_file.parent / "cases" / eval_id.lower() / "output.md"
+                    result = grade(skill, eval_id, output)
+                    self.assertEqual(result["status"], "pass", json.dumps(result, ensure_ascii=False))
+
+    def test_each_required_production_helper_runs_from_a_copied_skill_package(self):
+        probes = {
+            "regression-testing": ("regression_runtime.py", "assert module.build_discovery_snapshot({'discovery_roots':['tc'], 'listing_complete':True, 'source_revisions':[{'source_ref':'repo:tc','revision':'r1'}], 'cases':[]})['complete']"),
+            "exploratory-testing": ("exploratory_runtime.py", "assert module.validate_charter('exploration', {'purpose':'p','in_scope':['x'],'out_of_scope':['y'],'source_refs':['s'],'focus_refs':[],'timebox_or_exit_condition':'t','allowed_origins':['https://example.test'],'allowed_operations':['read'],'side_effect_operations':[],'side_effect_scope':'none','side_effect_action_definition':'none','side_effect_maximum':0,'cleanup_plan':'none','evidence_policy':'refs','block_conditions':['unsafe']})['valid']"),
+            "qa-knowledge": ("knowledge_runtime.py", "assert module.canonical_entry_ref({'kind':'test_environment','scope_refs':['p'],'subject':'s'}).startswith('KN-')"),
+        }
+        for skill, (filename, assertion) in probes.items():
+            with self.subTest(skill=skill), tempfile.TemporaryDirectory() as temp:
+                source = REPO_ROOT / "skills" / skill
+                copied = Path(temp) / skill
+                shutil.copytree(source, copied)
+                helper = copied / "scripts" / filename
+                script = Path(temp) / "probe.py"
+                script.write_text(
+                    "import importlib.util\n"
+                    f"spec=importlib.util.spec_from_file_location('module', r'{helper}')\n"
+                    "module=importlib.util.module_from_spec(spec)\n"
+                    "spec.loader.exec_module(module)\n"
+                    + assertion + "\n",
+                    encoding="utf-8",
+                )
+                env = dict(__import__("os").environ)
+                env["PYTHONPATH"] = ""
+                env["PYTHONUTF8"] = "1"
+                result = subprocess.run([sys.executable, str(script)], cwd=temp, env=env, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -1,0 +1,50 @@
+[
+  {
+    "query": "この探索Findingを既存正本か再利用QA knowledgeかtriageして。",
+    "should_trigger": true
+  },
+  {
+    "query": "sourceとscopeを確認して、この環境知識を今後も使えるentryにして。",
+    "should_trigger": true
+  },
+  {
+    "query": "登録済みQA knowledgeのdependencyが変わったので再検証して。",
+    "should_trigger": true
+  },
+  {
+    "query": "checkoutに適用できるcurrentな過去QA knowledgeを検索して。",
+    "should_trigger": true
+  },
+  {
+    "query": "同じsemantic identityの既存entryをexpected revision付きで更新したい。",
+    "should_trigger": true
+  },
+  {
+    "query": "同一entryを分割すべきかreplacementが必要か判断して。",
+    "should_trigger": true
+  },
+  {
+    "query": "現行仕様のauthorityと矛盾を整理して。",
+    "should_trigger": false
+  },
+  {
+    "query": "新しい変更のProduct Riskを特定して採点して。",
+    "should_trigger": false
+  },
+  {
+    "query": "生きたアプリの現在のUIとaccessible nameを調べて。",
+    "should_trigger": false
+  },
+  {
+    "query": "Test Requirementと詳細Test Caseを設計して。",
+    "should_trigger": false
+  },
+  {
+    "query": "既知のTCをPlaywrightで実行して結果を記録して。",
+    "should_trigger": false
+  },
+  {
+    "query": "current QA knowledgeを使って今回のテスト分析をして。",
+    "should_trigger": false
+  }
+]

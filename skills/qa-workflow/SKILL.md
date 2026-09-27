@@ -55,10 +55,13 @@ runtimeの`can_complete`はオーケストレーションの要約であり、�
 | E2E安全確認・実行・構造化結果・cleanup | `e2e-test-execution` |
 | E2E実行結果の原因分析・修正routing | `e2e-test-result-analysis` |
 | 検証済みE2E結果の報告 | `e2e-test-reporting` |
+| Regression baseline / membership / Run / Activity | `regression-testing` |
+| Charterに沿ったExploration / Investigation | `exploratory-testing` |
+| 継続QA knowledgeのtriage / lifecycle / lookup | `qa-knowledge` |
 
 ## ランタイム前提
 
-本Skillは、同一のAgentクライアント上で16 Skillすべてが利用可能で、Agentが必要なSkillを追加で読み込み / 利用できる環境を前提とします。これはAgent Skills Specificationが共通Skill-to-Skill APIを保証しているという意味ではありません。
+本Skillは、同一のAgentクライアント上で19 Skillすべてが利用可能で、Agentが必要なSkillを追加で読み込み / 利用できる環境を前提とします。これはAgent Skills Specificationが共通Skill-to-Skill APIを保証しているという意味ではありません。
 
 ## リソース
 

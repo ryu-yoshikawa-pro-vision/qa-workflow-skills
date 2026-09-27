@@ -1,0 +1,26 @@
+{
+  "skill": "regression-testing",
+  "eval_id": "REG-SEM-005",
+  "verdict": "needs_review",
+  "criteria": [
+    {
+      "id": "REG-SEM-005",
+      "title": "FAIL feedbackと修正確認routing",
+      "critical": true,
+      "rating": 2,
+      "status": "needs_review",
+      "reason": "原因判断を既存ownerへ戻し、修正後に同じcurrent TC-401で確認し、周辺Regressionを別目的のRunとして扱う点は満たしています。一方、FAIL / FindingからDefectを自動登録しないことが明記されておらず、この重要な routing 条件を確認できません。",
+      "evidence": [
+        "「原因の確定とFAILの再判定は担当ownerに委ねる」",
+        "「同じcurrent TC-401を`test-execution`で再実行する」",
+        "「修正確認とは別目的のRunとして扱う」"
+      ]
+    }
+  ],
+  "summary": {
+    "pass": 0,
+    "needs_review": 1,
+    "fail": 0,
+    "not_evaluable": 0
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "skill": "regression-testing",
+  "eval_id": "REG-SEM-004",
+  "verdict": "pass",
+  "criteria": [
+    {
+      "id": "REG-SEM-004",
+      "title": "Required routeとactual execution",
+      "critical": true,
+      "rating": 4,
+      "status": "pass",
+      "reason": "ManualとE2E-55のrequired routeを個別に記録し、manualはscenario.when開始後のFAILをそのまま保持しています。E2Eはartifactの存在とpreflight blockedを実際の開始と混同せず、全required routeが開始されていないためTC-301をexecuted countに含めていません。",
+      "evidence": [
+        "| TC-301 | Manual | Yes — `scenario.when` started | `FAIL` |",
+        "| TC-301 | E2E-55 | No — preflight was blocked; the artifact exists | Preflight blocked; no actual attempt |",
+        "**Logical TC execution:** TC-301 does not count as executed because required route E2E-55 has not started."
+      ]
+    }
+  ],
+  "summary": {
+    "pass": 1,
+    "needs_review": 0,
+    "fail": 0,
+    "not_evaluable": 0
+  }
+}
