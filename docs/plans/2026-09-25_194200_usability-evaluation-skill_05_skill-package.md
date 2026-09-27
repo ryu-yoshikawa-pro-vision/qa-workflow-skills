@@ -168,7 +168,7 @@ merge後の既存artifact-local ref規則がある場合はそれを使います
 
 評価条件に `user goal / task / flow` が存在する場合だけ各評価行のdefaultとして継承します。行単位で異なる場合だけoverrideを記録します。存在しない場合は必須にしません。
 
-各評価行の `適用したreference` は、standard / pattern / heuristic / best practiceを根拠に使う場合に `_02_reference-knowledge.md` §6のreference entry IDと、そのentryに含まれるsource item refを1対1で対応付けて保持します。複数のreferenceを使う場合は複数行に分け、`referenceの位置づけ` を1つへ潰しません。project Authorityだけを根拠にする場合や、evidence間の意味的不整合を直接評価する場合はreference 0件を許可し、後述の条件付き根拠契約で閉じます。
+各評価行は `evaluation basis` を1件以上持ちます。許可値は `reference / project-authority / user-goal / success-condition / cross-state-consistency` です。standard / pattern / heuristic / best practiceを根拠に使う場合は `_02_reference-knowledge.md` §6のreference entry IDと、そのentryに含まれるsource item refを1対1で対応付けて保持します。複数のreferenceを使う場合は複数行に分け、`referenceの位置づけ` を1つへ潰しません。project Authorityだけを根拠にする場合や、evidence間の意味的不整合を直接評価する場合はreference 0件を許可し、basisごとの条件付き根拠契約で閉じます。
 
 各行:
 
@@ -176,8 +176,9 @@ merge後の既存artifact-local ref規則がある場合はそれを使います
 - 上位観点
 - target
 - user goal / task / flow override（評価条件と異なる場合だけ。評価条件に存在しない場合は省略）
+- evaluation basis: 1件以上
 - observed fact
-- pattern / principle
+- pattern / principle（該当する場合）
 - project Authority refs（project仕様 / business ruleを根拠に使う場合）
 - 適用したreference（適用可能な場合）:
   - reference entry ref
@@ -190,7 +191,15 @@ merge後の既存artifact-local ref規則がある場合はそれを使います
 - 想定される影響
 - 想定される影響の根拠
 - 判断理由（複合判断またはreferenceだけで自明でない場合）
-- 追加観測request refs（必要な場合）
+- 追加観測links（必要な場合）:
+  - execution owner: `usability-inspection / test-target-inspection / test-execution`
+  - request draft key
+  - inspection request ref（ownerがusability-inspectionの場合だけ）
+  - owner activity ref（ownerがtest-target-inspection / test-executionの場合）
+  - input evidence fingerprint
+  - status: `completed / unsupported / no-progress / blocked`
+  - returned evidence refs
+  - limitation / blocker
 - 観測済みのユーザー影響（証拠がある場合だけ）
 - evidence ref
 - related test rule result refs（存在する場合）
@@ -406,7 +415,7 @@ Input:
 - pattern identification decisions
 - evaluation decisions。status、observed fact、semantic impact、applied reference decision、project Authority refs、reference不使用理由、judgment reason、follow_up_required等、意味判断でしか確定できないfield
 - evidence / requirement / test rule / measurement refs
-- `observation_contract.py` がmaterializeした追加観測request refs（存在する場合）
+- resolved additional observation link records（存在する場合）。usability-inspection ownerではOBSREQ ref、test-target-inspection / test-execution ownerではowner activity ref + returned evidence refsを持つ
 - Finding本文に必要なsemantic input（Findingを作る場合）
 
 各semantic decisionはinvocation内一意の `draft_key` を持ちます。Agentはfinal evaluation ref、完成したclosure row、summary count、`finding_required` を入力しません。
@@ -418,7 +427,8 @@ Function:
 - evaluation decision順を保持
 - `EVAL-001` からartifact-local refを決定論的に採番
 - draft key → final ref解決
-- applied reference / project Authority / evidence / related test rule / requirement / measurement / additional observation request cross-reference解決
+- applied reference / project Authority / evidence / related test rule / requirement / measurement / additional observation linkのcross-reference解決
+- evaluation basis enumとbasis別required field検証
 - reference利用有無に応じたrequired field検証。standard / pattern / heuristic / best practice主張でreference 0件を許可しない一方、Authority-only / evidence-semantic評価では条件付きで0件を許可
 - statusと `follow_up_required` からFinding作成要否を固定ruleで導出し、必要な場合だけFinding draft / refとのclosureを要求
 - top-level aspect closure検証
@@ -481,14 +491,15 @@ Webへアクセスしてsourceの最新状態を検査するruntimeにもせず�
 - status許可値
 - 評価条件で「今回評価する」とした全上位観点が、少なくとも1件の評価結果へ到達している
 - 評価条件で「対象外」とした上位観点に理由がある
-- 各評価項目に上位観点がある
+- 各評価項目に上位観点と1件以上のevaluation basisがある
+- `reference` basisは `適用したreference` 1件以上、`project-authority` basisはproject Authority ref、`user-goal` basisは評価条件のuser goal / task / flow、`success-condition` basisはsuccess condition / business outcome、`cross-state-consistency` basisは判断理由とevidence refsを要求する
 - `適用したreference` がある場合、reference entry refが実在し、source item refがそのentryに含まれ、referenceの位置づけがある
 - standard / UI pattern / heuristic / best practiceを根拠にする評価は `適用したreference` 1件以上
 - project仕様 / business ruleを根拠にする評価はproject Authority ref必須。public referenceは任意
 - reference 0件のevidence-semantic評価はreference不使用理由、判断理由、evidence ref必須
 - 同一評価項目で複数source itemを使う場合もsource itemごとのreferenceの位置づけを別々に保持する
 - 評価条件にuser goal / task / flowが存在する場合だけ、overrideがない評価項目はその値を継承できる
-- 問題を確認した評価項目にobserved fact / source / evidence / 想定影響の根拠がある
+- 問題を確認した評価項目にobserved fact / evidence / 想定影響の根拠がある
 - project固有のbinding根拠を適用した `適用したreference` にproject Authority refがある
 - `follow_up_required` とstatusから導出したFinding作成要否が成果物と一致する
 - finding refが必要な場合は対応Findingが存在し、PR #13の最低契約を満たす
@@ -501,7 +512,7 @@ Webへアクセスしてsourceの最新状態を検査するruntimeにもせず�
 - 観測済みのユーザー影響を出す場合は対応evidenceがある
 - TC resultを書き換える欄を持たない
 - source item refなしのbest practice / standard断定を拒否
-- 追加観測request refがある場合はcurrent inspection artifactのrequestへ解決する
+- additional observation linkはexecution ownerごとに解決する。usability-inspection ownerではcurrent inspection artifactのOBSREQ、test-target-inspection / test-execution ownerではowner activity refとreturned evidence refsを要求し、別ownerのrefを混在させない
 
 意味上「本当にDialogか」「本当に使いづらいか」「follow-upが必要か」はdeterministic validatorで判定しません。production helperへ渡すmachine interfaceだけを必要fieldへ限定し、LLMの判断理由・uncertainty・複合判断まで最小化しません。固定row、ID、Finding要否、cross-reference、summary、machine-owned renderingだけを機械検証します。production `evaluation_structure.py` とdeterministic validatorは別実装とし、同じ処理を互いにimportしません。
 

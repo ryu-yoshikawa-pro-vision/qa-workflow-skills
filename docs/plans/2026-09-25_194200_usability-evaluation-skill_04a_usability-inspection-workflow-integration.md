@@ -125,7 +125,7 @@ TCのstep sequenceやlocatorを、usability-inspectionのUI発見shortcutとし�
 4. immutable evidenceをusability-evaluationへ渡す
 5. usability-evaluationがread-onlyで専門評価
 6. 追加観測が必要ならrequestを返す
-7. usability-inspectionがscope / safetyを確認して追加観測
+7. current mutable ownerがusability-inspectionなら `_05g` のOBSREQ contractで追加観測する。test-target-inspection / test-execution由来evidenceのread-only評価では `_04_workflow-integration.md` のowner返却契約を使い、usability-inspectionへsession ownershipを暗黙移動しない
 
 追加観測によって既存の観測事実や測定値を書き換えません。新しい証拠として追加します。
 
@@ -214,9 +214,9 @@ usability-inspection実行中はusability-inspectionがbrowser / session owner�
 `usability-evaluation` が行えるのは、
 
 - immutable evidenceのread-only評価
-- ownerへ追加観測requestを返すこと
+- current mutable ownerへ追加観測requestを返すこと
 
-です。
+です。usability-inspectionがownerの場合だけOBSREQを使い、test-target-inspection / test-executionがownerなら各owner activityへ返してreturned evidenceを受け取ります。共通browser APIや第二sessionを新設しません。
 
 PR #12 merge後に共通browser safety / side-effect / cleanup契約が実装されている場合はそれを再利用します。
 

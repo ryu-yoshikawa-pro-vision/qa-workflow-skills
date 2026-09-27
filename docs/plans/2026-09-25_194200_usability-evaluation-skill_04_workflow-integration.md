@@ -174,7 +174,7 @@ current observation artifact
 
 usability-evaluationのためだけに同じ画面を再scanすることを既定にしません。
 
-必要証拠が不足する場合だけ、追加観測要求をtest-target-inspectionへ返します。
+必要証拠が不足する場合だけ、追加観測要求をtest-target-inspectionへ返します。test-target-inspectionがcurrent mutable ownerの場合、その追加観測はtest-target-inspectionの既存safe observation / cleanup契約で実行し、`usability-inspection` の `OBSREQ` を別sessionで開始しません。evaluation成果物にはexecution owner、owner activity ref、returned evidence refs、statusをadditional observation linkとして保持します。同じnormalized requestを同じinput evidenceで繰り返す場合は再実行せず `no-progress` へ閉じます。
 
 ## 5. test-executionとの統合
 
@@ -204,7 +204,7 @@ test-execution実行中に別Agentが同一browser / sessionへ並行操作し�
 
 に対する評価です。
 
-追加操作が必要ならtest-executionへ要求し、owner側の副作用・cleanup・開始状態契約に従います。
+追加操作が必要ならtest-executionへ要求し、owner側の副作用・cleanup・開始状態契約に従います。test-executionがcurrent mutable ownerの間は `usability-inspection` へsession ownershipを移さず、OBSREQを捏造しません。evaluation成果物にはexecution owner、owner activity ref、returned evidence refs、statusをadditional observation linkとして保持します。同じnormalized request + input evidenceを再要求する場合は `no-progress` へ閉じます。
 
 ### 評価タイミング
 

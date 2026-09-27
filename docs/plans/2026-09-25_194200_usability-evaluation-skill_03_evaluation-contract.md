@@ -299,11 +299,15 @@ scope外の別機能・別originを自由探索する要求へは変形しませ
 追加観測draftは少なくとも、
 
 - invocation内一意の `request_draft_key`
-- requester: evaluation draft key、またはcriterion / semantic procedure ref
+- requester kind: `usability-evaluation / inspection-requirement / wcag-procedure`
+- requester identity。usability-evaluationはevaluation draft key/ref、inspection-requirementはrequirement ref/draft key、wcag-procedureはcriterion evaluation ref + procedure execution ref
+- execution owner: `usability-inspection / test-target-inspection / test-execution`
 - 関連scope ref
 - target refまたはtarget draft key（element対象の場合）
-- 対象state / interaction
-- canonical observation field key
+- state description / interaction（意味説明用。identityには使わない）
+- state basis refs。現在stateを識別する既存immutable action / evidence / sample / variation等のrefsをcanonical sortして保持
+- current document identity（live documentに依存する場合）
+- canonical observation field key（execution ownerがusability-inspectionの場合は必須）
 - fixed predicate key / payload（timing等で必要な場合）
 - 必要な観測内容の説明
 - 観測が必要な理由
@@ -311,13 +315,15 @@ scope外の別機能・別originを自由探索する要求へは変形しませ
 
 を持ちます。
 
-canonical observation field / predicate keyの選択は意味判断側が行います。自由記述の「必要な観測内容」は説明であり、`observation_contract.py` が自然言語からprobeを推論する入力にはしません。catalogに対応keyがなければ `unsupported` として返します。
+追加観測の実行ownerは、追加観測を要求したSkillではなくcurrent mutable browser/session ownerで決めます。test-target-inspection / test-executionの実行中に得たevidenceを評価している場合は同じownerへ要求を返し、usability-evaluationが別sessionを操作しません。usability-inspectionがbrowser ownerの場合だけ `_05g` の `OBSREQ-...` contractを使います。
 
-`observation_contract.py` はdraftからartifact-local `OBSREQ-001` 等を決定論的に採番し、requester / scope / target / state / observation field / predicate payloadからrequest identityを導出します。同じidentityをcurrent evidence集合が増えていない状態で再要求した場合は `no-progress` とし、browser操作を再実行しません。追加evidenceが返った場合はrequest refとevidence refsを元evaluation / procedureへ戻し、同じsemantic decisionを再評価します。
+canonical observation field / predicate keyの選択は意味判断側が行います。自由記述の「必要な観測内容」は説明であり、scriptが自然言語からprobeを推論する入力にはしません。
 
-browser操作方法や任意JavaScriptをLLMが実装しません。`usability-inspection` / browser ownerが既存のside-effect / ownership契約で必要stateへ到達し、`_05g` のfixed observation field / probeへ変換して取得します。同一判断に対する同一追加観測を新evidenceなしで繰り返しません。
+usability-inspection ownerでは `observation_contract.py` がrequester identity / scope / target / canonical sort済みstate basis refs / document identity / observation field / predicate payloadからrequest identityを導出し、artifact-local `OBSREQ-001` 等を決定論的に採番します。同じidentityかつcurrent evidence集合が増えていない場合は `no-progress` とし、browser操作を再実行しません。
 
-安全に取得できない、fixed observation contractで表現できない、またはscope外操作が必要な場合は、推測で閉じず `判定不能` または該当workflowの `blocked` とします。
+test-target-inspection / test-execution ownerではOBSREQを捏造せず、同じnormalized draftをownerの安全なcheckpointへ返します。owner activity ref、returned evidence refs、実行可否をevaluation成果物のadditional observation linkへ保持します。同じnormalized requestを同じinput evidenceで再要求する場合は再実行せず `no-progress` として閉じます。
+
+追加evidenceが返った場合はreturned evidence refsを元evaluation / requirement / procedureへ戻し、同じsemantic decisionを再評価します。ownerが安全に追加観測できない、fixed observation contractで表現できない、またはscope外操作が必要な場合は、推測で閉じず `判定不能` または該当workflowの `blocked` とします。
 
 ### Step 9.3: user goal / business outcomeとの意味的整合
 
@@ -344,7 +350,8 @@ Authorityがないbusiness ruleを推測して評価基準へ追加しません�
 - evaluation ref
 - 対象
 - user goal / task（評価条件から継承。行単位で異なる場合だけoverride）
-- pattern
+- evaluation basis: `reference / project-authority / user-goal / success-condition / cross-state-consistency` の1件以上
+- pattern / principle（該当する場合）
 - 観測事実
 - project Authority refs（project仕様 / business ruleを根拠に使う場合）
 - 適用したreference（適用可能な場合）:
@@ -358,7 +365,7 @@ Authorityがないbusiness ruleを推測して評価基準へ追加しません�
 - 想定される影響
 - 想定される影響の根拠
 - 判断理由（複合判断または既知referenceだけで自明でない場合）
-- 追加観測request refs（必要な場合）
+- 追加観測links（必要な場合。execution owner、inspection request refまたはowner activity ref、status、returned evidence refsを保持）
 - 観測済みのユーザー影響（実際に証拠がある場合だけ）
 - evidence ref
 - status
@@ -374,7 +381,15 @@ referenceは無条件必須にはしません。
 - project仕様 / business ruleを根拠とする → 対応するproject Authority refsを必須。public referenceは任意
 - 観測済みstate / component間の意味的不整合そのものを評価する → evidence ref、判断理由、`reference不使用理由` を必須とし、適用できるreferenceがなければ0件を許可
 
-referenceがないことを理由にbest practiceやstandard要求を創作しません。`status reason / 制約・未確認` は `判定不能` / `対象外` では必須です。
+evaluation basisは1件以上必須です。basisごとの最低根拠は次です。
+
+- `reference` → `適用したreference` 1件以上
+- `project-authority` → project Authority ref
+- `user-goal` → evaluation条件にuser goal / task / flowが存在
+- `success-condition` → evaluation条件にsuccess condition / business outcomeが存在
+- `cross-state-consistency` → 判断理由と関連evidence refs
+
+`pattern / principle` は既知pattern / principleを適用できる場合だけ記録し、複合問題を既存pattern名へ無理に割り当てません。referenceがないことを理由にbest practiceやstandard要求を創作しません。`status reason / 制約・未確認` は `判定不能` / `対象外` では必須です。
 
 ### Step 11: 必要な場合だけFindingを作る
 

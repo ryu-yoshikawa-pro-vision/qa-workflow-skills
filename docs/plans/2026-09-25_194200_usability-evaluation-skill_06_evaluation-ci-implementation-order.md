@@ -367,8 +367,9 @@ UI patternを含むtest-condition-design
 - package-local source ID / source item ref / reference entry IDの形式、一意性、参照整合
 - reference entry内のsource item ref / source上の位置づけ / 適用条件の対応
 - `適用したreference` を使う評価項目ではreference entry ref / source item ref / 今回のreferenceの位置づけが対応する
+- evaluation basisが許可enumで1件以上あり、`reference / project-authority / user-goal / success-condition / cross-state-consistency` ごとのrequired evidence / contextがある
 - standard / UI pattern / heuristic / best practice主張ではreference 1件以上、project Authority根拠ではAuthority ref、reference 0件のevidence-semantic評価ではreference不使用理由 / 判断理由 / evidenceがある
-- additional observation request refが存在する場合はcurrent inspection requestへ解決する
+- additional observation linkはexecution ownerに応じ、usability-inspectionならOBSREQ、test-target-inspection / test-executionならowner activity ref + returned evidenceへ解決する
 - evidence ref
 - status
 - required fields
