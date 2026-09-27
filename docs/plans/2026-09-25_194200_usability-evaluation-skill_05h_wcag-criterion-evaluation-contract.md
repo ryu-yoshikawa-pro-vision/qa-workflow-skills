@@ -55,6 +55,8 @@ LLMはrequired Success Criterion集合、criterion row、required procedure集�
 
 supported WCAG 2.0 / 2.1 / 2.2の全Success Criterionで `procedure_keys` を1件以上必須にします。expected procedure集合は `_05i` の固定生成規則から導出し、requirements assetの実値と一致させます。`TBD`、空集合、未登録key、実装時のad hoc追加を許可しません。
 
+`external_evidence_allowed=true` はcurrent scopeへ適合する既存監査結果、field data、project instrumentation等を**利用してよい**ことを示し、外部証拠の存在や利用をSuccess Criterion完了の必須条件にはしません。`false` のcriterionへexternal-evidence procedureを割り当てた場合はasset不整合としてrejectします。
+
 3 versionのrequirements assetは既存 `static_data_versions` / approved hash契約対象で、evaluation metadataもcanonical hashへ含めます。
 
 ### 2.2 finite procedure catalog
@@ -75,7 +77,7 @@ supported WCAG 2.0 / 2.1 / 2.2の全Success Criterionで `procedure_keys` を1�
 - `result_contract`
 - `completion_evidence`
 - `limitation_behavior`
-- `applicability_mode`: `always / semantic / machine-limitation`
+- `applicability_mode`: `always / semantic / machine-limitation / external-evidence-available`
 - `activation_source_procedure_key`。`machine-limitation` の場合だけ必須。それ以外は `null`
 - `activation_limitation_codes`。`machine-limitation` の場合だけ非空。それ以外は空配列
 
@@ -135,6 +137,18 @@ AT applicability decisionは自身のAT procedure resultやfinal `s-wcag-*` sema
 
 既存監査結果、field data、project instrumentation等を利用できるprocedureだけをcatalogへ登録します。source / revision / environment / freshness / scope一致を必須にします。
 
+external evidenceはoptional supporting evidenceです。外部証拠が存在しないこと自体でcriterionを `undetermined / blocked` にしません。
+
+`applicability_mode=external-evidence-available` は `wcag_criterion_plan.py` がcurrent evaluation inputのexternal evidence candidate refsを機械検証して閉じます。
+
+- candidate refが0件 → `not-applicable`、reason `external-evidence-not-provided`
+- candidateがあるがsource / revision / environment / freshness / scopeのいずれかを満たすcurrent evidenceが0件 → `not-applicable`、reason `no-current-scope-matching-external-evidence`。candidate refsとrejection reasonをtraceabilityへ残す
+- current scopeへ適合するvalid evidenceが1件以上 → `applicable`。valid refsだけをprocedure Inputへ渡す
+- candidate refの不存在・stale・scope mismatchだけを理由に `unknown / blocked` へしない
+- evidence ref自体が構文不正、許可されないsource kind、またはtrust boundary validationに失敗した場合は入力不正としてrejectし、外部証拠不足とは混同しない
+
+このapplicability判定にLLMを使いません。
+
 ### 3.6 procedure applicability / fallback
 
 全procedure execution rowはcriterion-levelの `applicable_population` と別に、procedure自身のapplicabilityを保持します。
@@ -156,6 +170,7 @@ procedure execution rowは少なくとも次を持ちます。
 - `always`: procedureは常にapplicable
 - `semantic`: procedure catalogの `applicability_decision_key` に対応するfixed pre-execution semantic applicability decisionから `applicable / not-applicable / unknown` を受け、scriptがprocedure rowへ投影する。final `s-wcag-*` semantic decisionをapplicability sourceに使わず、LLMがprocedure keyを追加・削除しない
 - `machine-limitation`: source machine procedureが未closureならunknown。sourceがcompleteし `activation_limitation_codes` のいずれかを返した場合だけapplicable。それ以外の正常closureではnot-applicable
+- `external-evidence-available`: current evaluation inputのexternal evidence candidate refsをsource / revision / environment / freshness / scopeで機械検証し、valid current evidenceが1件以上ならapplicable、0件ならnot-applicable。LLM判断やexternal evidenceの存在待ちでunknownにしない
 
 `not-applicable` は `execution_status=complete`、procedure resultは `null` とし、applicability basisを必須にします。required applicable procedureのclosureには数えません。
 
@@ -174,11 +189,11 @@ procedure catalogのmode割当は `_05i` の生成規則へ固定します。
 - machine procedure: `always`
 - criterion-specific `s-wcag-*`: `always`
 - `_05i` の通常manual procedure: `always`
-- external-evidence procedure: `always`
+- external-evidence procedure: `external-evidence-available`
 - assistive-technology procedure: `semantic`
 - `_05i` のconditional manual fallback: `machine-limitation`
 
-同じprocedure keyについて実装者が別modeを選びません。`always` procedureでも対象populationが存在しないことを確認するためのinventory / semantic closureは実行し、criterion-level `applicable_population=none` の根拠に使えます。
+同じprocedure keyについて実装者が別modeを選びません。external-evidence procedureも外部証拠が存在しない通常caseでは `not-applicable` としてclosureし、manual / semantic等の他のapplicable procedureでcriterion評価を継続します。`always` procedureでも対象populationが存在しないことを確認するためのinventory / semantic closureは実行し、criterion-level `applicable_population=none` の根拠に使えます。
 
 ### 3.7 AT applicability → execution → final semantic の順序
 
@@ -381,11 +396,14 @@ production `wcag_criterion_plan.py` と別実装で少なくとも次を検証�
 - formal procedure catalogでmachine procedure全件のrequired machine probe keyが確定し、typed requestへ一意にmaterializeされる
 - formal required machine probe key集合とinspection `_05j` catalogのmissing / extra / unused 0はrepository-level contract testで検証する
 - supported version / Success Criterion全件の `_05k` semantic contract rowが存在し、versioned requirement assetとsource refが一致
-- required observation / measurement / ACT result / semantic / manual / AT / external evidence refs解決
+- required observation / measurement / ACT result / semantic / manual / AT refs解決
+- applicableなexternal-evidence procedureだけexternal evidence result refを要求し、not-applicable external procedureにresult refを要求しない
 - execution statusとresultの組合せ整合
 - `applicable_population=none` のcompleteness evidence
 - 単一ACT `inapplicable` だけでpopulation none / criterion satisfiedにしていない
 - procedure applicability mode / `applicability_decision_key` / activation source / limitation code整合
+- `external_evidence_allowed=false` のcriterionにexternal-evidence procedureが割り当てられていない
+- `external-evidence-available` procedureがcandidateなし / current valid evidenceなしをnot-applicableへ閉じ、外部証拠不足だけでcriterionをundetermined / blockedにしていない
 - `applicability_mode=semantic` procedureのapplicability decisionが自身のprocedure resultまたはfinal semantic resultへ依存していない
 - final semantic required evidence roleがcurrent applicable procedure集合から導出され、not-applicable sibling resultを要求していない
 - `not-applicable` procedureがbasis refなしでclosureされていない
@@ -418,6 +436,10 @@ production `wcag_criterion_plan.py` と別実装で少なくとも次を検証�
 - target-size machine calculation + exception semantic judgment
 - contrast ratio machine calculation + gradient background unavailable
 - reflow geometry + semantic exception
+- external evidence candidate 0件 → external procedure not-applicable + manual / semantic経路でcriterion closure継続
+- external evidence candidateあり、全件stale / scope mismatch → external procedure not-applicable + rejection traceability、criterionは外部証拠不足だけでblockedにしない
+- current scope matching external evidenceあり → external procedure applicable + valid evidence refだけをresultへ使用
+- `external_evidence_allowed=false` + external procedure割当 → invalid
 - AT procedure applicable / environment unavailable → blocked
 - machine limitationに対応するmanual fallbackがscriptでapplicable化され、machine limitationだけでcriterionをblockedへ短絡しない
 - manual fallback evidence不足 → undetermined、manual実施環境 / evaluator capability自体がない場合 → blocked
