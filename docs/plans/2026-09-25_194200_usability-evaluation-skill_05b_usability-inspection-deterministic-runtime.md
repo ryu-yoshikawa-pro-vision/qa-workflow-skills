@@ -112,7 +112,8 @@ skills/usability-inspection/
 ├── assets/
 │   ├── output-template.md
 │   ├── test-rule-catalog.json
-│   └── browser-observation-catalog.json
+│   ├── browser-observation-catalog.json
+│   └── wcag-machine-probe-catalog.json
 └── ...
 ~~~
 
@@ -215,7 +216,8 @@ browser I/O前後のmachine contractを担当します。詳細は `_05g_usabili
 - additional observation draftへ `OBSREQ-001` 等を決定論的に採番し、canonical requester identity / scope / target / canonical sort済みstate basis refs / current document identity / field / predicate payloadからrequest identity、sorted current evidence refsからinput evidence fingerprintを導出する。state descriptionはidentityへ使わない
 - previous requestとidentity / evidence fingerprintが同一なら `no-progress` としbrowser requestを生成しない
 - target draftからartifact-local `TARGET-001` 等を採番し、5種resolverのpayload、Playwright exact matching、parent scope、population revision / fingerprint、current document / session、uniqueness契約をmaterialize
-- `browser-observation-catalog.json` の明示dispatchからrequired probe key集合を導出
+- `browser-observation-catalog.json` の明示dispatchからsemantic追加観測のrequired probe key集合を導出
+- `wcag-machine-probe-catalog.json` の明示dispatchからformal WCAG machine requestを検証し、同catalogのcanonical hashを `static_data_versions.wcag_machine_probes` へ保持
 - `PROBE-001` 等のartifact-local probe request refを決定論的に採番
 - additional observation request statusとprobe request refs / result evidence refsをmaterialize
 - fixed probe payload / execution metadataをmaterialize
