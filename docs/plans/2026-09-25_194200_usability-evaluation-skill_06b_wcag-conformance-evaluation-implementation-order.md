@@ -318,6 +318,9 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 - version別static requirement catalog / `static_data_versions` / approved hash contract
 - target version / level expected Success Criteria / conformance requirement set
 - finite procedure catalog key / kind / dispatch / hash
+- semantic procedure resultの判断理由 / uncertainty / additional observation request refs
+- additional observationがrequired criterion / procedure集合を変更せず、fixed observation contractへ解決されること。解決不能またはno-progressではundetermined / blockedへ閉じること
+- semantic判断で発見した別のusability / business flow concernをWCAG resultへ混ぜず別routingできること
 - required presentation variation registry / Full Pages coverage
 - criterion evaluation execution status / result / applicable population / final result linkage
 - required Success Criterion全件のevaluation metadata / criterion plan row / required step closure / missing・duplicate detection
@@ -353,7 +356,7 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 
 ### semantic
 
-`_05f` Case A〜Z、Case C2、Case AA〜AFをすべて実Judgeで確認します。
+`_05f` Case A〜Z、Case C2、Case AA〜AFに加え、`_05h` のsemantic追加観測 / no-progress / 別usability concern routing fixtureを実Judgeで確認します。
 
 ### real Agent / browser
 
@@ -374,6 +377,7 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 - WCAG 2.0 / 2.1 / 2.2をsupported versionとし、missing / unresolved、unsupported / out-of-scopeを分離
 - target version / levelからrequired Success Criteria / conformance requirement集合を該当versionのstatic catalogだけで独立導出し、3 catalogのcanonical hashを既存static data契約で検証
 - 全required Success Criterionにfinite procedure keyがあり、sample × required variation × criterion evaluation rowをscriptでmaterializeし、procedure / criterionをLLMが選択・省略しない。machine化可能なprocedureは明示dispatchし、AT要否はselected procedure + current content / technology + baselineから閉じる
+- semantic procedureは判断理由・uncertainty・追加観測要求を保持でき、finite procedure catalogを意味判断の上限にしない。追加観測はrequired criterion / procedure集合を変えずexisting fixed observation contractで取得する
 - `runtime_contract.py` でPR #11 Machine Runtime / freshness契約を再利用し、random selectionそのものはdeterministic runtimeへ含めない
 - Step 2 exploration closure
 - sampling procedure used / skippedの両経路

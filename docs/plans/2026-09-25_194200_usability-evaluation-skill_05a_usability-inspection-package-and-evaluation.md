@@ -399,7 +399,7 @@ semanticな適用性やUI / UX上の意味判断をdeterministic validatorで代
 
 ## 7. semantic eval
 
-次のCase A〜ADをすべて評価します。
+次のCase A〜AGをすべて評価します。
 
 ### Case A: page inspection without task
 

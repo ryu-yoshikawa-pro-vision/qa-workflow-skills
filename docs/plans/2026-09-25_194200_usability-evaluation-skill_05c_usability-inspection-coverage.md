@@ -207,7 +207,7 @@ PR #12 / #13 merge後の実装が実際に提供するartifact identity / revisi
 
 ## 10. semantic / E2E validation
 
-`_05a_usability-inspection-package-and-evaluation.md` のCase A〜ADを実Judgeで評価します。
+`_05a_usability-inspection-package-and-evaluation.md` のCase A〜AGを実Judgeで評価します。
 
 canonical real Agent validationは `_06c_canonical-live-validation.md` を正本とし、repository-controlled fixtureで次を含めます。
 
@@ -241,6 +241,6 @@ canonical real Agent validationは `_06c_canonical-live-validation.md` を正本
 - `_05d_accessibility-requirements-and-act.md` のgeneral accessibility / WAI-ARIA / ACT完了条件を満たす
 - formal WCAG conformance要求を `wcag-conformance-evaluation` へroutingできる
 - `_05e_performance-measurement.md` の完了条件を満たす
-- Case A〜AD PASS
+- Case A〜AG PASS
 - `_06c_canonical-live-validation.md` のrepository-controlled canonical live Web E2E PASS
 - repository-controlled validationのblocked 0。external acceptance未実施は別statusとして扱う

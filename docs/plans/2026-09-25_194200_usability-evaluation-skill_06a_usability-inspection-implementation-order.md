@@ -324,8 +324,11 @@ task / flowが明示されたsemantic / E2E caseで実施します。task未指�
 
 - task / flow未指定では必須にならない
 - 指定されたflowは実操作できる
+- user goal / business outcome / business ruleがAuthority付きで提供される場合、observed end state / outcomeを保持してusability-evaluationへ渡す
+- flow全体でgoal / outcomeの意味的整合を評価できるが、business logic自体のPASS / FAILやexpected resultを本Skillで再定義しない
 - detailed TC実行要求はtest-executionへrouting
 - task resultをTC PASS / FAILへ変換しない
+- Authorityがないbusiness ruleを創作しない
 - Agent / tool limitationをproduct defectへ自動変換しない
 
 ## 14. Step 12: Cognitive Walkthrough optional case
@@ -347,9 +350,12 @@ objective observation、requirement result、measurementを `usability-evaluatio
 
 - inspectionがbrowser ownerを維持
 - evaluationがread-only
+- fixed上位観点 / semantic caseを最低coverageとして扱い、scope内で発見した複合的な懸念を有限checklistにないという理由で捨てない
 - objective factとexpert evaluationを混ぜない
 - standard / project binding resultとadvisory evaluationを混ぜない
-- additional observationはinspection側でscope / safety確認
+- semantic layerの追加観測要求は `_05g` のfixed observation contractへ変換し、inspection側でscope / safety / currentness / duplicateを確認する
+- 同一追加観測をnew evidenceなしで反復せず、no-progressでは判定不能等へ閉じる
+- user / business goalとの意味的整合を評価できるが、business logicの仕様判定は既存test系ownerへ残す
 - finding traceability
 
 同一sessionへの並行操作を行いません。
@@ -397,7 +403,7 @@ repository標準件数に合わせます。
 
 ### semantic
 
-`_05a_usability-inspection-package-and-evaluation.md` §7のCase A〜ADをすべて含めます。
+`_05a_usability-inspection-package-and-evaluation.md` §7のCase A〜AGをすべて含めます。
 
 ### real Agent
 

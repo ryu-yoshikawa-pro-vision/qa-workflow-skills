@@ -80,6 +80,8 @@ current Playwright versionやPR #12 / #13 merge後のbrowser contractが変わ�
 2. live Web targetを `usability-inspection` が観測したimmutable evidenceを評価できる
 3. reference entry / source item / evidence / evaluation refを追跡できる
 4. browser / sessionを `usability-evaluation` 自身が操作しない
+5. 固定上位観点に直接名前がない複合的な懸念を、宣言済みscope内のevidenceから追加evaluationとして保持できる
+6. user / business goalがAuthority付きで与えられたcaseでflow全体の意味的整合を評価できるが、business logicの仕様上のPASS / FAILを再定義しない
 
 ### usability-inspection
 
@@ -97,8 +99,11 @@ current Playwright versionやPR #12 / #13 merge後のbrowser contractが変わ�
 10. fixed interaction timingで8種predicateごとのpayload、same-page clock、preexisting end state、timeout、unknown attribute / ARIA state rejectを扱えること
 11. measurement経路
 12. cleanup
-13. `usability-evaluation` へのread-only handoff
-14. 同一sessionを別Skillが並行操作しない
+13. semantic layerからの追加観測要求を `_05g` のfixed observation contractへ解決し、追加evidenceを取得して再評価できること
+14. 同一追加観測をnew evidenceなしで反復せずno-progressを返せること
+15. business outcome / Authority refsがあるflowでobserved end state / outcomeを保持し、usability-evaluationへ渡せること
+16. `usability-evaluation` へのread-only handoff
+17. 同一sessionを別Skillが並行操作しない
 
 ### wcag-conformance-evaluation
 
@@ -128,6 +133,9 @@ formal request
 - finite procedure catalogの全key解決 / machine dispatch / approved hash
 - sample × required presentation variation × required Success Criterionのcriterion plan coverage
 - current criterion evaluation refからだけSample Evaluation Resultsを生成し、LLM supplied result listをreject
+- semantic procedureが追加evidenceを必要とするcaseで、required criterion / procedure集合を変更せずfixed observation requestを追加し、new handoffが必要なら `_04c` lineageで再観測して同じprocedureを再評価する
+- fixed observation contractで表現できない、または同一requestがno-progressとなるcaseではad hoc probeを作らずundetermined / blockedへ閉じる
+- semantic判断で別のusability / business flow concernを発見してもWCAG resultへ混ぜず別routingする
 - complete candidate exhaustionによる `exhausted-no-new-view`。exhaustion evidence / provenanceをcanonical Random Sample sectionへ保存
 - candidate取得不完全による `blocked`。blocked reasonをcanonical Random Sample sectionへ保存し、no-new-sample completionへ誤変換しない
 - complete process
@@ -188,6 +196,7 @@ repository implementationの完了条件:
 - formal direct triggerからoriginating evaluation / revision / resume operationを保持して `qa-workflow → usability-inspection → formal Skill resume` をPASS
 - `_04c` handoff stateをnative CASで更新し、composite operation identity、claim / reservation lifecycle、expected observation集合とcurrent valid returned result集合、origin revision / cleanup / lineage / releaseがcurrentになり、closed CAS後の再読込まで完了するまでresumeしないことをPASS
 - `_05g` fixed probe request / normalize契約をbrowser E2EでPASSし、Agentのad hoc JavaScript / raw値手計算を必要としない
+- fixed coverage外の複合的懸念、semantic追加観測、Authority付きbusiness outcomeの3ケースをsemantic / browser E2EでPASSし、機械化がLLMのscope内意味判断を抑制しないことを確認する
 - evidence safety / side-effect / browser ownershipをPASS
 - repository標準のdeterministic / semantic / routing / Skill validationをPASS
 - WCAG 2.0 / 2.1 / 2.2 requirement catalogのcanonical hash再計算と承認済みhash contract testをdeterministic validationでPASS
