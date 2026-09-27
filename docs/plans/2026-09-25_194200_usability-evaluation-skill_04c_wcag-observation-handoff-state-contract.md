@@ -24,6 +24,24 @@ current `workflow-state-template.md` は説明例でpayload fieldをtop-levelに
 
 既存の `claim_mutable_operation()`、`recover_claim()`、`reserve_shared_resource()`、`release_shared_resource()` を再利用します。
 
+### canonical E2Eで使うtest-only CAS provider
+
+current `artifact_graph.py` のlocal filesystem経路はinitial create-if-absentまでを提供し、`state_revision` はCAS conditionではありません。したがってrepository-controlled canonical E2Eでhandoffを `pending → in-progress → returned → closed` まで通すために、test harnessだけで使う `tests/skills/evals/deterministic/wcag_handoff_cas_provider.py` を追加します。
+
+このproviderはPython標準ライブラリの `sqlite3` だけを使い、一時DB内で次を提供します。
+
+- workflow state initial create: `workflow_ref` unique keyへのtransactional insert
+- workflow state read: current state + provider revision token取得
+- workflow state conditional write: transaction内でcurrent revision一致を確認して更新し、一致しない場合はconflict。read → 比較 → 無条件writeをCASとして扱わない
+- project-local reservation create-if-absent
+- reservation conditional release: owner / expected revision一致を同一transactionで確認してrelease
+- concurrent writer fixtureで同じexpected revisionから成功するwriteが1件だけになること
+- stale expected revision / wrong owner / duplicate createを明示conflictへ閉じること
+
+provider revisionはtest provider内部の単調増加revisionまたは同等のtransaction内更新tokenを使い、productionのlocal exact-content SHAをCAS tokenへ読み替えません。
+
+このproviderはcanonical E2E / deterministic test専用です。production Skill package、Project Context、routing、`artifact_graph.py` のpublic contractへSQLite adapterやgeneric storage interfaceを追加しません。productionでは従来どおり保存先がnative atomic conditional write / releaseを提供する場合だけhandoff更新を実行し、提供しない場合はfail-closedにします。
+
 ## 1. owner
 
 `wcag-conformance-evaluation` はlive observationが必要なsample / variation / process / requirement、observation request、resume operationを確定し、formal artifact内で `HANDOFF-001` からartifact-local refを生成します。
@@ -243,7 +261,8 @@ qa-workflowを利用できない真のstandalone環境では第二state storeを
 - same handoff identityのCAS retry / immutable result再適用 → same operation ref、browser再開始なし
 - started `HANDOFF-001` の再観測 → `HANDOFF-002` + new operation ref
 - `retry_of_handoff_ref` lineage / duplicate current rerun抑止
-- pending CAS / missing revision / conditional write不可
+- test-only SQLite providerでinitial create / successful CAS / stale revision conflict / concurrent same-revision writer 1件成功
+- production local filesystemだけのpending CAS / missing revision / conditional write不可
 - duplicate identity / origin mismatch
 - claim conflict → browser未開始
 - resource canonical acquisition order
@@ -271,6 +290,7 @@ qa-workflowを利用できない真のstandalone環境では第二state storeを
 - browser開始済みhandoffを同じclaim identityで再実行せず、再観測はnew handoff lineageへ分離
 - exact duplicate result再送とbrowser再観測を混同しない
 - create / start / return / release / closeがnative CAS前提
+- canonical E2Eはtest-only SQLite providerで実CASを通し、productionへtest provider / generic storage abstractionを持ち込まない
 - resource acquire / rollback / normal releaseが閉じる
 - started claimをnormal completionでreleaseせず、not-started recoveryだけ既存helperを使う
 - result key / currentness / duplicate / supersedesをLLM判断にしない
