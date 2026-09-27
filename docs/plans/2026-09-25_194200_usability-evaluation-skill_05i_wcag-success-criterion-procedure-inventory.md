@@ -151,7 +151,7 @@ fallback mappingは次に固定します。
 | source machine procedure | criterion | activation limitation code | manual fallback |
 | --- | --- | --- | --- |
 | `m-text-contrast` | 1.4.3 | `background-not-machine-resolvable` | `manual-wcag-1.4.3` |
-| `m-resize-text` | 1.4.4 | `text-scaling-mechanism-not-machine-executable / text-scaling-state-not-machine-readable` | `manual-wcag-1.4.4` |
+| `m-resize-text` | 1.4.4 | `text-scaling-mechanism-not-machine-executable`, `text-scaling-state-not-machine-readable` | `manual-wcag-1.4.4` |
 | `m-text-contrast` | 1.4.6 | `background-not-machine-resolvable` | `manual-wcag-1.4.6` |
 | `m-nontext-contrast` | 1.4.11 | `background-not-machine-resolvable` | `manual-wcag-1.4.11` |
 | `m-focus-appearance` | 2.4.13 | `focus-indicator-not-machine-resolvable` | `manual-wcag-2.4.13` |
