@@ -138,10 +138,9 @@ def reconcile_membership(snapshot: dict[str, Any], decisions: list[dict[str, Any
     complete = bool(snapshot.get("complete")) and not undecided and not issues
     memberships = [
         {
+            **decision_by_ref[ref],
             "tc_ref": ref,
             "lifecycle_status": cases[ref]["lifecycle_status"],
-            "decision": decision_by_ref[ref].get("decision"),
-            "reason": decision_by_ref[ref].get("reason"),
         }
         for ref in sorted(decision_by_ref)
         if ref in cases

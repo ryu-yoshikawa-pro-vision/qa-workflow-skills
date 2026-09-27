@@ -100,13 +100,41 @@ class RegressionRuntimeTests(unittest.TestCase):
     def test_discovery_membership_baseline_currentness_and_full_run_contract(self):
         snapshot = self.discovery()
         decisions = [
-            {"tc_ref": "TC-001", "decision": "member", "reason": "current recurring path"},
-            {"tc_ref": "TC-002", "decision": "one_off", "reason": "migration only"},
+            {
+                "tc_ref": "TC-001",
+                "decision": "member",
+                "reason": "current recurring path",
+                "lifecycle_status": "stale",
+                "source_refs": ["risk:RISK-001"],
+                "source_revisions": [{"source_ref": "risk:RISK-001", "revision": "r3"}],
+            },
+            {
+                "tc_ref": "TC-002",
+                "decision": "one_off",
+                "reason": "migration only",
+                "lifecycle_status": "deleted",
+                "source_refs": ["issue:ISSUE-002"],
+                "source_revisions": [{"source_ref": "issue:ISSUE-002", "revision": "r8"}],
+            },
         ]
         membership = regression.reconcile_membership(snapshot, decisions)
         expected_memberships = [
-            {"tc_ref": "TC-001", "lifecycle_status": "current", "decision": "member", "reason": "current recurring path"},
-            {"tc_ref": "TC-002", "lifecycle_status": "current", "decision": "one_off", "reason": "migration only"},
+            {
+                "tc_ref": "TC-001",
+                "lifecycle_status": "current",
+                "decision": "member",
+                "reason": "current recurring path",
+                "source_refs": ["risk:RISK-001"],
+                "source_revisions": [{"source_ref": "risk:RISK-001", "revision": "r3"}],
+            },
+            {
+                "tc_ref": "TC-002",
+                "lifecycle_status": "current",
+                "decision": "one_off",
+                "reason": "migration only",
+                "source_refs": ["issue:ISSUE-002"],
+                "source_revisions": [{"source_ref": "issue:ISSUE-002", "revision": "r8"}],
+            },
         ]
         self.assertEqual(membership["memberships"], expected_memberships)
         self.assertEqual(membership["member_tc_refs"], ["TC-001"])
