@@ -117,6 +117,7 @@ WCAG-EM 2のoutput contractはReport ToolのschemaではなくWCAG-EM 2.0本文�
 - machine化できる数値計算、集合演算、固定enum / state比較、supported ACT Ruleをsemantic / manualへ逃がしていないことをsemantic reviewで確認する
 - assistive technologyはSuccess Criterion固定booleanにせず、selected procedure + current content / technology + accessibility support baselineから**AT実行前**のfixed semantic applicability decisionを閉じる。`unknown → applicability decision → AT execution（applicable時だけ）→ final s-wcag semantic` の順序を固定し、final semantic resultをAT applicabilityのInputへ戻さない
 - procedure executionごとに `applicable / not-applicable / unknown` とbasisをmaterializeし、`unknown` のままcriterionをsatisfied / not-satisfiedへ閉じない。final semantic required evidence roleはcurrent applicable procedure集合から導出し、not-applicable sibling resultを要求しない
+- semantic assetのstatic `required_evidence_roles` にはprocedure-result roleを書かず、machine / manual / AT / external result roleはcurrent applicable procedure集合からruntime effective roleとしてscript追加する
 - `_05i` のcontrast / Resize Text / Focus Appearance conditional manual fallbackをsource machine limitation codeからscriptが起動し、machine limitationだけでcriterionをblockedへ短絡しない
 - selected sampleごとのrequired presentation variation集合を入力にし、`wcag_criterion_plan.py` がsample × variation × required Success Criterion rowを全件materializeする
 - execution status `pending / in-progress / complete / blocked` とresult `satisfied / not-satisfied / undetermined / null` を分離する
