@@ -26,6 +26,7 @@ skills/wcag-conformance-evaluation/
 ├── scripts/
 │   ├── runtime_contract.py
 │   ├── wcag_requirements.py
+│   ├── wcag_criterion_plan.py
 │   ├── wcag_em_structure.py
 │   ├── sampling.py
 │   └── earl_report.py
@@ -71,6 +72,7 @@ WAI OverviewはWCAG-EM 2.0のresourceとしてWCAG-EM Report Toolを案内して
 - WCAG version / source canonical URI
 - Conformance Claimに使用するguideline title / version / claim URI
 - Success Criterion machine key / number / level / canonical criterion URI
+- Success Criterionごとのevaluation metadata。詳細は `_05h_wcag-criterion-evaluation-contract.md` を正本とし、procedure ref、required capabilities、machine steps、semantic steps、assistive technology requirement、external evidence可否を保持する
 - 5つのWCAG conformance requirement machine key / canonical URI
 - Conformance Requirementごとの固定rule metadata
   - Conformance Level: target level required Success Criteria refs
@@ -106,6 +108,14 @@ deterministic validatorは選択versionのassetからhashを独立再計算し�
 - いずれも指定versionのWCAG conformance requirementsを別集合として含める
 
 target WCAG version自体が不明・未指定の場合はInput不足として `unresolved` にします。現在catalogを持たない将来version等が明示された場合は `support_status=unsupported` とし、別versionへ暗黙変換しません。WCAG 3はWCAG-EM 2.0が対象とするWCAG 2 conformanceではないため本Skillの対象外です。
+
+### Success Criterion evaluation contract
+
+target version / levelから必要Success Criterionを列挙するだけでは完了としません。
+
+`wcag_criterion_plan.py` は `wcag_requirements.py` が導出したrequired集合とversioned requirements assetのevaluation metadataから、sample / processごとのcriterion evaluation rowを全件生成します。required集合とrow集合の差分、required machine / semantic / manual / assistive technology step、未完了criterion集合、summary countはscriptが導出します。
+
+具体的な契約は `_05h_wcag-criterion-evaluation-contract.md` を正本とします。
 
 ## 3. output-template.md
 
@@ -499,6 +509,39 @@ deterministic runtimeへ載せないもの:
 random selection結果はmethod / provenance / selected sample identityとともに後続Machine Runtime Inputへ渡します。保存済みsample resultはPR #11 current verifierでfreshnessを再計算し、currentの場合だけ再利用します。
 
 runtime Inputには少なくともtarget WCAG version / level、scope、scope coverage rows、normalized additional evaluation requirements、accessibility support baseline revision、environment、previous evaluation / sample lineage（再評価の場合）、sample identity、evidence identity、Authority / reference refs、選択versionのstatic data versionを含め、これらが変わった場合に旧resultをcurrent扱いしません。
+
+## 3.2 wcag_criterion_plan.py
+
+Input:
+
+- target WCAG version / level
+- `wcag_requirements.py` のrequired Success Criterion集合
+- versioned requirements assetのevaluation metadata
+- canonical sample / process refs
+- current observation / measurement / supported ACT Rule refs
+- semantic/manual / assistive technology decision refs
+
+Function:
+
+- required Success Criterion全件を `CRIT-001` からartifact-localに採番
+- criterionごとのrequired capability / machine step / semantic-manual stepをmaterialize
+- live observation requirementをdeduplicateしてformal handoff inputへ変換
+- required criterion集合とactual row集合の集合差分
+- required step closure
+- `pending / in-progress / satisfied / not-satisfied / undetermined / blocked` のstatus整合
+- ACT Rule部分結果をSuccess Criterion全体の `satisfied` へ不当に昇格しない
+- machine-owned criterion section / summaryをrender
+
+Output:
+
+- criterion evaluation plan rows
+- formal handoff observation requirements
+- missing / duplicate / unresolved criterion refs
+- completion status
+- rendered machine-owned section
+- issues
+
+scriptはSuccess Criterion本文を自然言語rule engineとして解釈しません。固定metadataと明示dispatchだけを扱います。
 
 ## 4. sampling.py
 
@@ -928,6 +971,7 @@ production helperとは別実装で少なくとも次を検証します。
 - `_04c` helperが出したhandoff state / CAS / current returned lineage / `may_resume` とformal artifactの整合
 - sample result cross-reference
 - target levelに必要なrequirement result coverage
+- `wcag_criterion_plan.py` が生成したrequired Success Criterion row coverage / required step closure。required集合との差分、duplicate、pending / in-progress残存を許可しない
 - normalized content type / Finding group keyの集合差分とStep 4.3 derived action / iteration chain
 - structured revision更新後のcandidate population fingerprint再計算、population同一時のoverlap除外 / retained random / top-up、population変更時のreselection、process再materialize
 - sample result freshness / stale再評価
@@ -1137,6 +1181,12 @@ uncontrolled third-party contentを含むpageについてmonitoring / repair経�
 
 → all affected pagesでcontentを識別でき、monitoring可能で、non-conforming contentを2 business days以内にremove / bring into conformanceできるevidenceが揃う場合だけclaim guardを通す。
 
+### Case AG: required criterion execution coverage
+
+target WCAG version / levelのrequired Success Criterion集合を生成し、1 criterionのevaluation rowを欠落させる。
+
+→ `wcag_criterion_plan.py` / deterministic validatorが欠落を検出し、他criterionがすべて `satisfied` でもsampleをcompleteにしない。supported ACT Ruleがないcriterionもsemantic/manual / assistive technology経路を持ち、評価対象から落とさない。
+
 ## 11. 完了条件
 
 - package単体でSkill contractを理解できる
@@ -1147,6 +1197,7 @@ uncontrolled third-party contentを含むpageについてmonitoring / repair経�
 - scope coverageでthird-party / language / responsive-device / separately-hosted / authenticated-restricted領域を明示的に閉じられる
 - initial baseline外environmentをformal evidenceへ使用した場合にbaseline revisionをscriptで拡張し、freshnessを再計算できる
 - WCAG 2.0 / 2.1 / 2.2の各target version / levelからrequired Success Criteria / conformance requirement集合を該当versionのstatic catalogだけで独立導出できる
+- 全Success Criterion rowにevaluation metadataがあり、`wcag_criterion_plan.py` がrequired criterion evaluation planを全件materializeできる。criterion選択・省略・required step countをLLMへ任せない
 - 3 catalogのcanonical hashをversion別 `static_data_versions` keyへ保持し、validator独立再計算と承認済みhash contract testをPASS
 - missing / unresolved versionとunsupported / out-of-scope versionを区別し、別versionへ暗黙変換しない
 - `runtime_contract.py` でPR #11 Machine Runtime / freshness契約を再利用し、random selectionそのものはdeterministic runtimeへ含めない

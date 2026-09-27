@@ -8,7 +8,7 @@ feat/usability-evaluation-skill
 
 このブランチは main@3510e6ffce87ba8c025ebde22f9947dbb6074f9c から作成しました。2026-09-26にPR #11がmainへmergeされ、このbranchにもmainを取り込み済みです。本Plan revisionではPR #11の実装済みruntime契約を正本として扱います。
 
-PR #12は2026-09-26にmainへmerge済みで、このbranchにも取り込み済みです。実装開始時はPR #12のcurrent実装を正本として扱い、PR #13がmainへmerge済みであることを確認してから、最新のSkill数、評価契約、workflow state、browser safety契約を再確認して実装へ進みます。
+PR #12は2026-09-26、PR #13は2026-09-27にmainへmerge済みです。実装開始時はmainのcurrent実装を正本として、最新のSkill数、評価契約、workflow state、browser safety契約を再確認して実装へ進みます。
 
 現在の依存関係:
 
@@ -316,6 +316,17 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
    2026-09-25_194200_usability-evaluation-skill_06b_wcag-conformance-evaluation-implementation-order.md
 6c. 3 Skill共通のcanonical live validation・外部実対象検証境界  
    2026-09-25_194200_usability-evaluation-skill_06c_canonical-live-validation.md
+
+## 今回レビューで固定する追加契約
+
+- formal WCAG評価では、target version / levelのrequired Success Criterion全件について `wcag_criterion_plan.py` がcriterion evaluation rowを生成する。各rowはversioned requirements assetのevaluation metadataからmachine / semantic / manual / assistive technology経路を取得し、LLMがcriterionを選択・省略しない。詳細は `_05h_wcag-criterion-evaluation-contract.md` を正本とする。
+- machine処理可能なtarget geometry / spacing、contrast ratio、viewport overflow / reflow用数値、elapsed / threshold、supported ACT Ruleはscriptへ移す。machine stepの部分PASSだけでSuccess Criterion全体を `satisfied` にしない。
+- supported ACT Ruleは今回の実装対象を明示的に固定し、0件のまま「supported ruleだけ実装した」と扱える経路をなくす。ACT RuleがないSuccess Criterionもcriterion evaluation planから落とさない。
+- browser element probeはartifact-local target registryを通す。semantic layer / browser ownerがuser-facing discovery後にtarget draftを返し、`observation_contract.py` が `TARGET-001` 等のref、resolver schema、一意性・currentness、probeへのtarget解決を検証する。
+- general inspectionの `visual-responsive` は、project / Design System boundaryまたはsupported CSSOM boundaryが存在する場合、before / boundary / afterを検査する。boundary inventoryがcompleteでboundary 0件ならcurrent viewportで閉じ、inventoryがincompleteなら別Authorityで閉じない限り `判定不能` とする。
+- formal observation handoffはPR #13 merge後の実装に合わせ、persisted documentの `state.handoffs` を物理保存先とする。PR #13のtemplateとhelperの物理shape差はPR #14実装時にhelper側のcurrent shapeへtemplateを同期してからhandoff fieldを追加する。
+- handoffのmutable operation identityはartifact-local `handoff_ref` 単独ではなく、origin artifact ref / revision / handoff refからscriptが導出する。shared resourceは固定順で取得・解放し、正常完了・開始前失敗・CAS競合のrelease / recoveryを閉じる。
+- random sampleでは「candidateを完全に確認した結果、新しいunique sampleが存在しない」と「candidate取得能力不足」を別statusにする。後者をno-new-sample completionへ変換しない。
 
 ## 今回の完成範囲
 

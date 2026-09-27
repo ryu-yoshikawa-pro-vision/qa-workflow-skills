@@ -88,7 +88,8 @@ WCAG-EM 2のoutput contractはReport ToolのschemaではなくWCAG-EM 2.0本文�
 
 ## 5. Step 3: production helper
 
-`runtime_contract.py`、`wcag_requirements.py`、`sampling.py`、`wcag_em_structure.py`、`earl_report.py` を実装します。`runtime_contract.py` はPR #11のcurrent契約を再利用し、独自runtime frameworkは追加しません。
+`runtime_contract.py`、`wcag_requirements.py
+├── wcag_criterion_plan.py`、`sampling.py`、`wcag_em_structure.py`、`earl_report.py` を実装します。`runtime_contract.py` はPR #11のcurrent契約を再利用し、独自runtime frameworkは追加しません。
 
 ### requirements
 
@@ -102,6 +103,21 @@ WCAG-EM 2のoutput contractはReport ToolのschemaではなくWCAG-EM 2.0本文�
 - 3 catalogそれぞれについてW3C正本と照合済みの承認済みhashをcontract testで固定
 - version未指定・不明は `unresolved`、現在catalogを持たない将来version等は `unsupported`、WCAG 3はout-of-scope
 - actual result coverageをLLM supplied listではなくtarget versionのstatic expected setと比較
+
+### Success Criterion evaluation plan
+
+`_05h_wcag-criterion-evaluation-contract.md` を実装します。
+
+- 3 versionのrequirements assetに全Success Criterionのevaluation metadataを追加
+- `wcag_criterion_plan.py` でtarget version / level → required criterion row全件をmaterialize
+- required capability / machine step / semantic-manual step / assistive technology requirementを固定metadataから導出
+- live observation requirementをformal handoffへ渡す
+- target geometry / spacing、contrast ratio、viewport overflow / reflow数値、elapsed / threshold、supported ACT Rule等、入力が揃えば決定論的な処理をscriptへ移す
+- required criterion集合とactual row集合の差分0をdeterministic validatorで検証
+- supported ACT Ruleがないcriterionもsemantic/manual / AT経路で評価対象から落とさない
+- required evidence不足は `undetermined / blocked` とし、LLM推測で閉じない
+
+`criterion plan → observation handoff → returned evidence → criterion closure → sample result` の順序を固定します。
 
 ### sampling
 
@@ -287,6 +303,7 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 - supported WCAG version 2.0 / 2.1 / 2.2 / explicit unsupported or out-of-scope / missing unresolvedの状態分離
 - version別static requirement catalog / `static_data_versions` / approved hash contract
 - target version / level expected Success Criteria / conformance requirement set
+- required Success Criterion全件のevaluation metadata / criterion plan row / required step closure / missing・duplicate detection
 - Conforming Alternate Version / Non-Interference / Full Pages / Complete Processes / Accessibility-Supported fixed rule metadata
 - version別claim guideline title / URI / third-party repair contract
 - runtime input / generation fingerprint / freshness
@@ -338,6 +355,7 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 - Step 1.1でthird-party / language / responsive-device / separately-hosted / authenticated-restricted scope coverageを明示的に閉じる
 - WCAG 2.0 / 2.1 / 2.2をsupported versionとし、missing / unresolved、unsupported / out-of-scopeを分離
 - target version / levelからrequired Success Criteria / conformance requirement集合を該当versionのstatic catalogだけで独立導出し、3 catalogのcanonical hashを既存static data契約で検証
+- 全required Success Criterionにevaluation metadataとcriterion evaluation rowがあり、machine / semantic-manual / assistive technology経路をscriptでmaterializeして、LLMがcriterionを選択・省略しない
 - `runtime_contract.py` でPR #11 Machine Runtime / freshness契約を再利用し、random selectionそのものはdeterministic runtimeへ含めない
 - Step 2 exploration closure
 - sampling procedure used / skippedの両経路

@@ -255,6 +255,18 @@ Step 5.5 machine-readable reportを要求する場合はEARL 1.0 JSON-LD sidecar
 
 aggregated accessibility scoreはStep 5.4の目的外機能として生成しません。
 
+### Step 4.4: criterion evaluation plan
+
+target WCAG version / levelからrequired Success Criterion集合を導出した後、各sample / processについて `_05h_wcag-criterion-evaluation-contract.md` の `wcag_criterion_plan.py` で全criterion rowをmaterializeします。
+
+- required Success Criterion集合とcriterion row集合の差分をscriptで0件にする
+- versioned requirements assetのevaluation metadataから必要capability / machine step / semantic-manual stepを取得する
+- live observationが必要なrowだけformal handoffへ変換する
+- supported ACT Ruleやmachine measurementがないcriterionもsemantic/manual / assistive technology経路を持つ
+- required evidence不足を `undetermined / blocked` に閉じ、LLMの推測で `satisfied` にしない
+
+required criterion rowに `pending / in-progress` が残る場合、sample evaluationとformal evaluationを完了扱いしません。
+
 ## 4. browser observationのhandoff
 
 `wcag-conformance-evaluation` はWCAG-EM methodology、sample set、evaluation closure、reportのownerですが、browser / session ownerにはしません。

@@ -148,6 +148,22 @@ ACT RulesはWCAG / ARIA testing methodのinformative sourceとして使用しま
 
 全ACT Rulesをsupported implementationへすることは完成条件にしません。
 
+### 今回実装するsupported ACT Rule
+
+今回のbrowser observation契約でapplicability / expectationを忠実に実装でき、公式exampleを使ったACT Rules Format 1.1 consistency確認まで閉じられるautomatic ruleは次の3件に固定します。
+
+| Rule ID | Rule | 主なmapping | execution mode |
+| --- | --- | --- | --- |
+| `2779a5` | HTML page has non-empty title | WCAG 2.4.2 | automatic |
+| `97a4e1` | Button has non-empty accessible name | WCAG 4.1.2 | automatic |
+| `23a2a8` | Image has non-empty accessible name | WCAG 1.1.1 | automatic |
+
+この3件は `test-rule-catalog.json` へsource status / ACT Rules Format version / required observation fields / implementation dispatch keyを固定し、`criterion_checks.py` が明示dispatchします。
+
+上記以外のACT Ruleは今回のsupported implementationとして扱いません。これは対応するWCAG Success Criterionを評価しないという意味ではありません。formal評価では `_05h_wcag-criterion-evaluation-contract.md` のcriterion evaluation planで全required Success Criterionを別経路も含めて閉じます。
+
+新しいACT Ruleを追加する場合は、公式ruleのapplicability / expectation / assumptions / requirement mapping / current statusを確認し、同じconsistency fixtureを追加してからsupported inventoryへ入れます。
+
 ### supported rule
 
 ACT Ruleをsupported ruleとして登録する条件:
