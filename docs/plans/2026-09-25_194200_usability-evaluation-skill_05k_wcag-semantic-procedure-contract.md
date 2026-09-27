@@ -166,7 +166,7 @@ project独自のHTML validity / parsing quality gateが存在しても、WCAG 4.
 | 1.4.1 | 2.0 / 2.1 / 2.2 | colorがinformation / action / response / visual element distinctionの唯一の手段になっていないか |
 | 1.4.2 | 2.0 / 2.1 / 2.2 | auto-play audioの適用条件、pause / stop / independent volume controlが要求を満たすか |
 | 1.4.3 | 2.0 / 2.1 / 2.2 | text / image-of-textの対象分類、large text条件、incidental / logo等のexception。ratio計算はmachine resultを使用 |
-| 1.4.4 | 2.0 / 2.1 / 2.2 | caption / image-of-text等のexception applicabilityと、current environmentで確認したvalid text scaling mechanismのevidenceをSCへ適用できるか。少なくとも1つのvalid mechanismで200%までcontent / functionality lossなしならsatisfied候補。未確認のvalid mechanismが残る状態をfailureへ短絡しない |
+| 1.4.4 | 2.0 / 2.1 / 2.2 | caption / image-of-text等のexception applicabilityと、current environmentで確認したvalid text scaling mechanismのevidenceをSCへ適用できるか。少なくとも1つのvalid mechanismで全applicable textがbaseline比2.0xのrendered enlargementへ到達し、到達までcontent / functionality lossなしならsatisfied候補。browser zoom control値だけで2.0x到達を推測せず、未確認mechanism / text populationが残る状態をfailureへ短絡しない |
 | 1.4.5 | 2.0 / 2.1 / 2.2 | image candidateにtextが含まれるか、customizable / essential image-of-text exceptionが成立するか |
 | 1.4.6 | 2.0 / 2.1 / 2.2 | enhanced contrast対象分類、large text / incidental / logo等のexception。ratio計算はmachine resultを使用 |
 | 1.4.7 | 2.0 / 2.1 / 2.2 | speechを主とするprerecorded audioか、background sound条件 / audio-only exceptionを満たすか |
