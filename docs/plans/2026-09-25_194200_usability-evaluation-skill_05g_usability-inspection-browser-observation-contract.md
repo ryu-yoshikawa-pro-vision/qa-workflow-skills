@@ -37,7 +37,7 @@ catalog row:
 
 - `probe_key`
 - `execution_kind`: `playwright-native / fixed-page-evaluate / evidence-capture / external-source-read`
-- provided observation field keys
+- `provided_observation_fields`
 - required request fields
 - required result fields
 - result value type / unit
@@ -357,7 +357,7 @@ semantic layerは追加観測が必要な場合、少なくとも次のdraftを�
 - 観測が必要な理由
 - current evidence refs
 
-canonical observation field / predicate keyの選択はsemantic layerの責務です。必要な観測内容の説明はLLMの判断理由として保持しますが、scriptがその自然言語からfield / probeを推論しません。field keyは `browser-observation-catalog.json` の `provided observation field keys` に存在し、一意なprobe ownerへ解決できる必要があります。
+canonical observation field / predicate keyの選択はsemantic layerの責務です。必要な観測内容の説明はLLMの判断理由として保持しますが、scriptがその自然言語からfield / probeを推論しません。field keyは `browser-observation-catalog.json` の ``provided_observation_fields`` に存在し、一意なprobe ownerへ解決できる必要があります。
 
 browser ownerは宣言済みtarget / origin / role / side-effect scopeの中でuser-facing interactionを使って必要stateへ到達できます。LLMが任意CSS selector、XPath、test id、JavaScript式、hidden implementation stateを追加観測の実行方法として指定する契約にはしません。
 
@@ -486,6 +486,7 @@ tool failureやprobe unavailableをproduct defect / usability issueへ自動変�
 - fixed probe payload / normalizationをSkill-local scriptが所有
 - canonical observation field → fixed probe mappingをcatalogで一意にし、semantic layerはfield keyを選べるがscriptは自然言語からprobeを推論しない
 - semantic additional observation requestをOBSREQ ref / identity / evidence fingerprint付きでmaterializeし、no-progressを機械判定する
+- final artifactに `planned` requestを残さず、completed / unsupported / no-progress / blockedのいずれかへ閉じる
 - document location / rendered text / control value / selected value等、business flowの意味判断に必要でmachine取得可能な値をfixed probeで取得する
 - raw browser valueの算術・enum・closureをLLMへ戻さない
 - general / scoped / formal-handoff scope row生成が決定論化

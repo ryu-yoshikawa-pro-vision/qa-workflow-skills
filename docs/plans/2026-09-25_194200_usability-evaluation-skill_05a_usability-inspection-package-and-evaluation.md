@@ -397,6 +397,7 @@ deterministic validatorは次をすべて確認します。
 - canonical observation fieldがbrowser observation catalogへ解決し、field → probe mappingが一意
 - 同一request identity + 同一input evidence fingerprintを再実行せず `no-progress` へ閉じている
 - completed requestにprobe request refs / result evidence refsがあり、unsupported / blocked / no-progressにreasonがある
+- final artifactに `planned` のadditional observation requestが残らない。追加観測を実施できなければ `unsupported / no-progress / blocked` へ閉じ、そのrequester側evaluationも `判定不能 / undetermined / blocked` 等へ閉じる
 - measurement ref一意性
 - requirement check ref一意性
 - evidence ref解決

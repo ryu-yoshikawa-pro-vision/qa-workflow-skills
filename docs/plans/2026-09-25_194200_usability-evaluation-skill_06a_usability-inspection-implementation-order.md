@@ -74,7 +74,7 @@ current URL / publication state /利用条件を確認します。
 - measurement
 - Playwright action trace
 - optional task / flow result
-- additional observation request
+- additional observation request。final artifactでは `planned` を残さず `completed / unsupported / no-progress / blocked` へ閉じる
 - usability-evaluation ref
 - Finding ref
 
@@ -108,6 +108,7 @@ skills/usability-inspection/scripts/
 - `PROBE-001` 等のprobe request ref、probe schema / unit / capabilityを `observation_contract.py` がmaterialize / validate
 - semantic additional observation draftから `OBSREQ-001` 等、request identity / input evidence fingerprintをmaterializeし、field → probe mappingを一意に解決
 - same request identity + same evidence fingerprintは `no-progress`、unknown observation fieldは `unsupported`
+- additional observation requestはfinal artifactで `planned` を残さず、requester側semantic resultも対応するevidenceまたはlimitationへ閉じる
 - arbitrary JavaScript / unknown probe keyをreject
 - observation / measurement / test rule / requirement / action inputを `inspection_structure.py` が一括してartifact-local refへ採番
 - status + follow_up_requiredからFinding作成要否をscriptが導出

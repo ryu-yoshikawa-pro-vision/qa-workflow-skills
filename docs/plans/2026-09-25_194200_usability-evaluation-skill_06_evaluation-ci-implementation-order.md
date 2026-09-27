@@ -504,7 +504,7 @@ dataset構造検証だけで実装完了にしません。
 - included referenceからsource item ref、source ID、canonical URLへ追跡できる
 - reference entry内で各source item refにsource上の位置づけ / 適用条件が対応付いている
 - catalogへ載せただけのsource全pageを収録済み・意味検証済みとは主張していない
-- 各UI / UX評価項目に1件以上の `適用したreference` があり、各行でreference entry ref / source item ref / 今回のreferenceの位置づけが対応し、project固有のbinding根拠を使う場合はその行からproject Authority refを追跡できる
+- standard / UI pattern / heuristic / best practiceを根拠にするUI / UX評価項目は1件以上の `適用したreference` を持ち、各行でreference entry ref / source item ref / 今回のreferenceの位置づけが対応する。project Authorityだけを根拠にする場合はAuthority ref、reference 0件のevidence-semantic評価ではreference不使用理由 / 判断理由 / evidenceを追跡できる
 - 判定不能 / 対象外のUI / UX評価項目にstatus reason / 制約・未確認が残る
 - usability-evaluation成果物で上位観点ごとの今回の扱いが固定され、「今回評価する」とした観点がすべて評価結果へ閉じている
 - source IDが `SRC-\d{3,}`、source item refが `<source ID>-ITEM-\d{4,}`、reference entry IDが `REF-\d{4,}` のpackage-local append-only規則に従い、削除済みIDを別identityへ再利用していない
