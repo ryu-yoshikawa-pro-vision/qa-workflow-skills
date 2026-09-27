@@ -92,9 +92,9 @@ current Playwright versionやPR #12 / #13 merge後のbrowser contractが変わ�
 5. visual / responsive evidence
 6. applicable general accessibility check
 7. `inspection_structure.py` がgeneral / scoped / formal-handoffのscope rowをmaterializeすること
-8. `observation_contract.py` がtarget registry / resolver currentness / uniquenessとrequired probe requestをmaterializeし、browser resultをschema / unit / capability検証してnormalizeすること
-9. responsive boundaryのcomplete+boundaryあり / complete+boundaryなし / unreadable・unsupportedによるincomplete各case
-10. fixed interaction timingでsame-page clock、fixed end predicate、preexisting end state、timeoutを扱えること
+8. `observation_contract.py` が5種resolver payload、exact matching、parent scope、population revision / fingerprint、session currentnessとrequired probe requestをmaterializeし、browser resultをschema / unit / capability検証してnormalizeすること
+9. responsive boundaryのmedia `px / em / rem`、条件付きcontainer `px / em / rem`、complete+boundaryなし、unreadable・unsupported、normalizedだがnot-executableによるincomplete各case
+10. fixed interaction timingで8種predicateごとのpayload、same-page clock、preexisting end state、timeout、unknown attribute / ARIA state rejectを扱えること
 11. measurement経路
 12. cleanup
 13. `usability-evaluation` へのread-only handoff
@@ -124,16 +124,21 @@ formal request
 
 - sampling procedure usedのcase
 - structured sample
-- random sample target-met
-- complete candidate exhaustionによる `exhausted-no-new-view`
-- candidate取得不完全による `blocked`。no-new-sample completionへ誤変換しない
+- random sample target-met。canonical Random Sample sectionへ `selection_status=target-met` を保存
+- finite procedure catalogの全key解決 / machine dispatch / approved hash
+- sample × required presentation variation × required Success Criterionのcriterion plan coverage
+- current criterion evaluation refからだけSample Evaluation Resultsを生成し、LLM supplied result listをreject
+- complete candidate exhaustionによる `exhausted-no-new-view`。exhaustion evidence / provenanceをcanonical Random Sample sectionへ保存
+- candidate取得不完全による `blocked`。blocked reasonをcanonical Random Sample sectionへ保存し、no-new-sample completionへ誤変換しない
 - complete process
 - Step 4.3で再samplingなしのcase
 - semantic / fixtureでStep 4.3再samplingありのcase。structured追加後のcandidate populationが同じcaseでrandom target再計算、overlap除外、retained random、不足分top-up、process再materializeを確認する
 - sampling procedure skippedのcase。completeなin-scope inventory全件がselected sample setとなり、structured / random / Step 4.3がnot-applicableでもcomplete process / Step 4.2評価が続くこと
 - 同一URLの異なるstateを別sample、同じstateへの別経路を同一sampleとして扱えること
 - production helperのouter envelopeと `state.handoffs` physical schema、storage-provided state revisionを区別できること
-- 同じ `HANDOFF-001` でもorigin artifact / revisionが異なれば別operation ref、同じorigin retryなら同じoperation refになること
+- 同じ `HANDOFF-001` でもorigin artifact / revisionが異なれば別operation refになること
+- same handoff identityのCAS retry / exact immutable result再適用は同じoperation refのidempotent処理でbrowserを再開始しないこと
+- browser開始済みhandoffのstale / evidence不足再観測は `HANDOFF-002` 等のnew handoff + `retry_of_handoff_ref` + new operation refになること
 - handoffをworkflow stateへ `pending` CAS保存するまでbrowser ownerを開始しないこと
 - mutable operation claim / canonical-order resource reservation後に `in-progress` CASを保存できた場合だけbrowser actionを開始すること
 - resource取得途中失敗 / in-progress CAS conflictではbrowser未開始のままreservation逆順releaseとsafe claim recoveryを行うこと
@@ -142,6 +147,8 @@ formal request
 - close-ready → closed CAS → state再読込 → may-resumeの順序を満たすこと
 - exact duplicate returnはidempotentに扱い、明示supersedes lineageでのみcurrent resultを置き換えること
 - observation結果がPR #11 freshness契約でcurrentな場合だけformal evaluationへ再利用されること
+- selected sampleにautomatically presented responsive variationが複数あるcaseで `VAR-...` をmaterializeし、1 variation未評価ではFull Pagesをsatisfiedにしないこと
+- unreadable / unsupported / not-executable responsive conditionでvariation completenessを閉じられない場合にFull Pagesをundetermined / blockedへ残すこと
 - Step 4.2でunchangedかつcurrentなcontent resultは再利用し、interaction後にchanged / unknownとなったcontentだけを再評価すること
 - Conforming Alternate Version候補を別sampleへ数えず、primary contentと同じfull-page evaluationへ紐付けること
 - Step 1.4 additional evaluation requirementとして「代表sampleに加えてfixtureの特定viewを追加評価し、Step 5.5 reportも出力する」を指定し、`ADDREQ-001` 等のref、sample追加、output closureまで同一evaluationで追跡できること
@@ -184,7 +191,7 @@ repository implementationの完了条件:
 - evidence safety / side-effect / browser ownershipをPASS
 - repository標準のdeterministic / semantic / routing / Skill validationをPASS
 - WCAG 2.0 / 2.1 / 2.2 requirement catalogのcanonical hash再計算と承認済みhash contract testをdeterministic validationでPASS
-- version切替、unsupported / unresolved / out-of-scope分離、scope coverage row、baseline extension、repeat-evaluation retained / replaced / added lineage、random `target-met / exhausted-no-new-view / blocked` 分離、non-finite random selection guard、candidate population変更時のreselection、Conforming Alternate Version条件、Non-Interference固定SC集合、Step 5.1 example coverage / accessible output、Step 5.3 Evaluation Statementの2.2-only guard、version別Claim URI / third-party 2-business-day guard、EARL全mappingはdeterministic / semantic evalでPASS
+- version切替、unsupported / unresolved / out-of-scope分離、scope coverage row、presentation variation / Full Pages closure、baseline extension、finite procedure catalog、criterion plan→final result linkage、applicable population none guard、repeat-evaluation retained / replaced / added lineage、random `target-met / exhausted-no-new-view / blocked` 分離、non-finite random selection guard、candidate population変更時のreselection、Conforming Alternate Version条件、Non-Interference固定SC集合、Step 5.1 example coverage / accessible output、Step 5.3 Evaluation Statementの2.2-only guard、version別Claim URI / third-party 2-business-day guard、EARL全mappingはdeterministic / semantic evalでPASS
 - browser E2EではStep 1.4 additional requirementのsample / report反映、sampling used / skipped、sample identity、Conforming Alternate Versionのfull-page grouping、Step 4.2 unchanged-result reuse、same-population Step 4.3再sampling、freshness付きobservation handoff / resume、safe Evaluation Specifics handoff、EARL assertionとのresult一致をPASS
 - canonical fixtureで未解決blockedが0
 
