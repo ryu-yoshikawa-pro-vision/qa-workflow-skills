@@ -110,13 +110,27 @@ user / projectがdevice profileを指定した場合はそのprofileを使いま
 
 ## 5. responsive coverage
 
-responsive / mobileが対象の場合:
+### general inspectionの既定
+
+`general` modeでは `visual-responsive` rowを必ず生成するため、responsive確認を「ユーザーがresponsiveと言った場合だけ」にしません。
+
+1. project / adopted Design Systemに公開されたCSS px boundaryがある場合は全件取得する
+2. current targetのCSSOMから `_05g` のsupported subsetに該当するwidth / height media query / size container query boundaryを取得する
+3. boundary inventoryがcompleteで1件以上ある場合、`observation_contract.py` がduplicate除去・sort・before / boundary / after集合を生成し、全boundaryを確認する
+4. inventoryがcompleteでboundaryが0件の場合、current viewportでvisual integrityを確認し、responsive boundary sub-scopeは `not-applicable:no-boundary` として閉じる
+5. unreadable / unsupported query等でinventoryがincompleteの場合、project / Design System Authority等の別sourceで不足範囲を閉じられなければ `visual-responsive` を `問題なし` にせず `判定不能` とする
+
+touch-capable inspection / mobile device emulationは引き続き明示要求またはproject条件がある場合だけ追加し、responsive viewport inspectionと混同しません。
+
+### boundary実行
 
 1. project / adopted Design Systemに公開されたbreakpointがある場合は全boundaryを列挙
 2. current targetのCSSOM / machine-readable styleからwidth / heightに関係するmedia query / container query boundaryを `_05g` の `responsive-boundaries` probeで取得する
 3. `observation_contract.py` が同じboundaryをcanonicalizeし、duplicate除去とbefore / boundary / afterの数値集合を生成する
 4. 各boundaryの直前・boundary・直後で重要情報 / operation / clipping / overflow / overlapを確認
 5. applicable requirementがある場合はorientation、zoom、color scheme、reduced motion等もscopeへ追加
+
+CSSOMのsupported grammar / unitは `_05g` を正本とします。relative unitや `calc()` 等をLLMがCSS pxへ推測換算しません。
 
 対象UIに存在しないbreakpointを創作しません。
 

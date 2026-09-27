@@ -103,6 +103,7 @@ skills/usability-inspection/scripts/
 - same normalized input → same machine result
 - `general / scoped / formal-handoff` からscope rowを `inspection_structure.py` が生成し、LLMはraw依頼から正規aspect keyへのmappingとtarget-specific applicability / reasonだけを返す
 - selected supported rule / measurement / scopeからrequired observation field集合とfixed probe request集合をscriptが導出
+- target draftから `TARGET-001` 等のtarget registry / resolver schema / currentness / uniquenessを `observation_contract.py` がmaterialize / validate
 - `PROBE-001` 等のrequest ref、probe schema / unit / capabilityを `observation_contract.py` がmaterialize / validate
 - arbitrary JavaScript / unknown probe keyをreject
 - observation / measurement / test rule / requirement / action inputを `inspection_structure.py` が一括してartifact-local refへ採番
@@ -110,7 +111,7 @@ skills/usability-inspection/scripts/
 - machine-owned structured sectionをscriptがmaterialize
 - inspection scope closure
 - draft key → final ref / cross-reference解決
-- exact elapsed計算
+- exact elapsed / target-size / contrast-ratio / viewport-overflow計算
 - threshold比較
 - threshold未定義
 - supported automatic test ruleのdispatch
@@ -155,6 +156,7 @@ current mainへmerge済みのPR #12 browser実行基盤を再利用します。r
 
 確認:
 
+- target registryをcurrent browser sessionで再解決し、uniqueなtargetだけprobeへ渡す。missing / ambiguous / staleは成功扱いしない
 - `observation_contract.py plan` が生成したfixed requestをcurrent browser経路で実行し、normalize結果をruntimeへ戻す
 - rendered UI / screenshot observation
 - DOM / accessibility observation
@@ -164,7 +166,9 @@ current mainへmerge済みのPR #12 browser実行基盤を再利用します。r
 - focus
 - explicit scroll
 - resize
-- responsive boundary probe。cross-origin等でread不能sourceがある場合の `incomplete` closure
+- responsive boundary probe。general modeではcompleteなboundary inventoryが1件以上あればbefore / boundary / afterを全件実行し、boundary 0件はnot-applicable、inventory incompleteは別Authorityで閉じない限り判定不能
+- CSSOM boundary parserは `_05g` のsupported px subsetだけを扱い、relative unit / calc / unsupported queryをincompleteへ閉じる
+- cross-origin等でread不能sourceがある場合の `incomplete` closure
 - fixed interaction-timing probe。same-page `performance.now()` / fixed end predicate / preexisting predicate / timeoutを含む
 - form / error state
 - safe state transition

@@ -276,7 +276,7 @@ task / flowが明示されている場合だけ、start state / success conditio
 - validation
 - error / recovery
 - focus / keyboard
-- resize / responsive
+- resize / responsive。general modeでは `_05c` のboundary inventory契約に従い、completeなboundaryが存在する場合はbefore / boundary / afterを全件確認する
 - scroll
 - state transition
 
@@ -292,7 +292,7 @@ task / flowが明示されている場合だけ、start state / success conditio
 
 target size、contrast、focus、reflow等はcriterionのexceptionやapplicabilityを確認し、数値だけでFAILにしません。
 
-ref採番、elapsed計算、threshold比較、scope closure、supported deterministic test rule等は `_05b_usability-inspection-deterministic-runtime.md` のruntime scriptを使い、LLMが手計算・再計算しません。
+target ref / resolver採番、geometry / target-size / contrast-ratio / viewport-overflow / elapsed計算、threshold比較、scope closure、supported deterministic test rule等は `_05b_usability-inspection-deterministic-runtime.md` のruntime scriptを使い、LLMが手計算・再計算しません。
 
 W3C ACT Rule等の個別test ruleを実行した場合、rule resultとWCAG / ARIA requirement全体のrequirement resultを分離します。rule outcomeが `passed` でも、それだけでrequirementを `satisfied` へ昇格しません。Core Web Vitalsを独自algorithmで再実装しません。
 
@@ -431,6 +431,8 @@ Finding候補になり得るもの:
 - requirement `satisfied` は宣言scopeのapplicable population / required checksを閉じた場合だけ使用している
 - measurementを報告する場合はmetric source、測定区間・方法・実測値、device profile / environmentへ追跡できる
 - Core Web Vitalsを報告する場合は既存measurement sourceへ追跡でき、本Skill独自計算値をCore Web Vitalsへ読み替えていない
+- browser target registryのresolverがcurrent targetを一意に解決し、missing / ambiguous / staleを成功扱いしていない
+- general visual-responsiveでcompleteなboundary inventoryがある場合にrequired boundaryを省略せず、incomplete inventoryを問題なし扱いしていない
 - Playwrightのauto-scroll / actionability waitでinspection対象のfrictionを隠していない
 - hidden implementation情報で操作対象を先回りしていない
 - task / flowが指定された場合は、その実行結果と制約を記録している

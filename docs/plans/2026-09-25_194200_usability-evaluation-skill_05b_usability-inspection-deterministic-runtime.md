@@ -121,7 +121,7 @@ Skill固有のcriterion logicやmeasurement logicは入れません。
 - normalized requested aspect keys（`scoped` の場合。raw自然言語ではなく正規key）
 - formal handoff required scope / observation request refs（`formal-handoff` の場合）
 - top-level aspectのtarget-specific semantic applicability / reason。general時の固定row有無そのものは入力しない
-- browser ownerが取得したraw observation records
+- `observation_contract.py normalize` 後のcanonical machine observation records
 - measurement inputs
 - selected supported test rule keys
 - machine evidenceだけで確定できないrequirement applicability / exception等のsemantic decisions
@@ -140,7 +140,6 @@ inspection内で生成するsemantic input / raw recordはinvocation内で一意
 - inspection modeからscope row skeletonを生成する。`general` は固定7観点、`scoped` はnormalized requested aspect集合、`formal-handoff` はhandoff required scopeを正本とする
 - task / flowが明示された場合だけtask-flow rowを追加する
 - target-specific semantic applicability decisionを生成済みrowへ適用
-- selected supported test ruleについて `test-rule-catalog.json.required_observation_fields` のunionを導出し、browser observation requirementとしてmaterialize
 - artifact-local refの決定論的採番
   - scope: `SCOPE-001`
   - observation: `OBS-001`
@@ -195,10 +194,13 @@ browser I/O前後のmachine contractを担当します。詳細は `_05g_usabili
 
 #### Function
 
+- scope / selected supported rule / measurement kindからrequired observation field集合を導出し、field → fixed probe mappingを一意に解決
+- target draftからartifact-local `TARGET-001` 等を採番し、resolver schema / current document / uniqueness契約をmaterialize
 - `browser-observation-catalog.json` の明示dispatchからrequired probe key集合を導出
 - `PROBE-001` 等のartifact-local request refを決定論的に採番
 - fixed probe payload / execution metadataをmaterialize
 - unknown probe / unknown field / arbitrary JavaScript inputをreject
+- element probeごとにtarget resolverの `unique / missing / ambiguous / stale` を検証
 - browser resultのschema / enum / unit / capabilityを検証
 - `ok / unsupported / unavailable / incomplete / blocked` を正規化
 - viewport / geometry / responsive boundary / timing等のmachine valueをcanonicalize
@@ -213,9 +215,13 @@ browser I/O前後のmachine contractを担当します。詳細は `_05g_usabili
 
 - draft_key
 - measurement label
+- measurement kind: `elapsed / target-size / contrast-ratio / viewport-overflow / raw-value`
 - start value
 - end value
 - value / unitを直接与えるmeasurementの場合はraw value
+- target-sizeの場合のnormalized target / neighboring geometry
+- contrast-ratioの場合のnormalized foreground / alpha-resolved effective background sRGB
+- viewport-overflowの場合のviewport / scroll extent
 - measurement method
 - clock domain（elapsedをstart / endから導出する場合）
 - metric definition ref（既存metric名を使用する場合）
@@ -232,8 +238,12 @@ timestamp / numeric valueはPR #11 current runtime contractのexact number表現
 
 #### Function
 
+- measurement kind別required field検証
 - start / endが同一clock domainであることの検証
 - start / end差分の計算
+- target-sizeのwidth / height / spacing導出
+- normalized sRGBからrelative luminance / contrast ratioを計算
+- viewport / scroll extentからoverflow量を導出
 - unit整合
 - non-negative検証
 - threshold comparison
@@ -466,11 +476,12 @@ Playwright version差を吸収する独自browser wrapper frameworkは作りま�
 | --- | --- |
 | inspection modeからfixed scope row skeleton・ref採番・row順序 | 必須 |
 | selected rule / measurement / scopeからfixed probe request集合導出 | 必須 |
+| browser target registry / resolver / currentness / uniqueness | 必須 |
 | browser probe result schema / unit / capability正規化 | 必須 |
 | schema / cross-reference | 必須 |
 | selected ruleからrequired observation field集合導出 | 必須 |
 | scope closure集計 | 必須 |
-| elapsed計算 | 必須 |
+| elapsed / target-size / contrast-ratio / viewport-overflow計算 | 必須 |
 | threshold比較 | 必須 |
 | supported ACT Rule / project ruleで完全にmachine-decidableなcheck | 対応checkでは必須 |
 | target size等のraw geometry取得後の数値計算 | 必須 |
@@ -501,14 +512,15 @@ runtime generatorとdeterministic eval validatorを同じ実装へしません�
 - valid inspection structure
 - general / scoped / formal-handoff modeからscope row生成
 - raw requestからnormalized aspect keyへのsemantic mapping後、scriptが固定row有無を決める
-- selected rule / measurement / scopeからfixed probe request集合導出
+- target registryのunique / missing / ambiguous / stale
+- selected rule / measurement / scopeからrequired observation field / fixed probe request集合導出
 - unknown / unsupported probeとresult schema不整合をreject
 - selected ruleからrequired observation field集合導出
 - observation / measurement / rule / requirement / action inputからfinal ref解決
 - duplicate draft key
 - unresolved reference
 - selected scope未closure
-- exact elapsed calculation
+- exact elapsed / target-size / contrast-ratio / viewport-overflow calculation
 - project threshold以内 / 超過
 - thresholdなし
 - negative elapsed

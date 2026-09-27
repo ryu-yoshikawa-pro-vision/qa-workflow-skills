@@ -58,22 +58,75 @@ inspection_structure.py
   - scope row
   - target-specific semantic applicability
         ↓
+semantic / browser owner
+  - user-facing discovery後のtarget draft
+        ↓
+observation_contract.py materialize-targets
+  - TARGET-001等のtarget ref
+  - resolver schema / currentness / uniqueness contract
+        ↓
 observation_contract.py plan
-  - required probe key集合
+  - scope / selected rule / measurementからrequired observation field / probe key集合
   - PROBE-001等のrequest ref
   - required result schema
         ↓
 browser owner
+  - target resolverをcurrent sessionで再解決
   - current PR #12 browser経路でrequestを直列実行
         ↓
 observation_contract.py normalize
-  - schema / enum / unit / capability検証
+  - target resolution / schema / enum / unit / capability検証
   - canonical machine observation
         ↓
 criterion_checks.py / measurement.py / inspection_structure.py
 ```
 
 LLMはraw tool resultからbounding box算術、viewport内外、elapsed、threshold、required field closure等を再計算しません。
+
+## 3.1 browser target registry
+
+element単位のprobeは、自然言語labelやPlaywright locator文字列を直接requestへ埋めません。
+
+user-facing情報から対象を識別した後、semantic / browser ownerはtarget draftを返し、`observation_contract.py materialize-targets` がartifact-local target registryを生成します。
+
+target row:
+
+- `target_ref`: `TARGET-001` から決定論的に採番
+- `draft_target_key`: invocation内一意
+- scope / state ref
+- semantic label
+- discovery basis
+- resolver kind
+- resolver payload
+- current document / session identity
+- expected match count: 1
+- resolution status
+- limitation
+
+resolver kindは次に固定します。
+
+- `role-name`
+- `label`
+- `visible-text`
+- `machine-population-index`
+- `current-session-ref`
+
+任意CSS selector、XPath、JavaScript式、source code path、test idをtarget registryの汎用入力として受けません。
+
+`machine-population-index` はDOM / accessibility populationをmachine-readableに列挙した後で、そのpopulation内のcanonical orderとindexから対象を再解決する場合だけ使います。discoverabilityの証拠にはしません。
+
+`current-session-ref` はcurrent browser ownerが返すopaque refです。同じdocument / session内だけ有効で、navigation、document replacement、session変更後は `stale` とします。永続identityとして再利用しません。
+
+各element probe直前にbrowser ownerがresolverを再解決し、match count / current document identityを返します。`observation_contract.py normalize` は次へ閉じます。
+
+- `unique`: current targetを1件に解決
+- `missing`
+- `ambiguous`
+- `stale`
+
+`unique` 以外ではelement probeを成功扱いせず `unavailable / blocked` へ閉じます。DOM replacement後も同じresolverが一意に同じ意味対象へ解決できる場合だけ同じ `target_ref` を継続できます。
+
+target ref採番、一意性、resolver enum、session currentness、probeとのcross-referenceはscriptが検証します。LLMは `TARGET-001` 等を手採番しません。
 
 ## 4. fixed probe key
 
@@ -132,6 +185,27 @@ current documentから取得可能なwidth / height関連のmedia query / contai
 - inaccessible cross-origin stylesheet等は `unreadable_source_count` とsource refを返す
 - unreadable sourceが存在し、project / Design System Authority等の別sourceでもboundary completenessを閉じられない場合はcurrent target boundary inventoryをcomplete扱いしない
 - duplicate boundary / sort / before-boundary-afterの数値集合はscriptがcanonicalizeする
+- project / Design System Authorityから得るboundaryは、CSS pxとして明示済み、またはAuthority側に明示的なCSS px変換根拠がある値だけmachine boundaryとして受ける。LLMがrelative unitを換算しない
+
+browser probeが直接parseするCSSOMのsupported subsetを固定します。
+
+- media query / size container queryの `width / min-width / max-width / height / min-height / max-height`
+- legacy min/max syntax
+- Media Queries Level 4の単純range syntax
+- length unitは `px` のみ
+- `and` で結合されたqueryはsupported size conditionごとにboundaryを抽出し、他conditionをcontextとして保持
+- comma-separated queryはbranchごとに処理
+
+次は推測変換せず `incomplete` とします。
+
+- `em / rem / vw / vh / vmin / vmax / cqw / cqh` 等のrelative unit
+- `calc()` / `var()`
+- `not` を含み単純なsize boundaryへ分解できない条件
+- style query等のsize query以外のcontainer query
+- parse不能なnested condition
+- unreadable stylesheet
+
+unsupported queryのraw全文を成果物へ無条件保存せず、source ref / query kind / unsupported reasonだけを保持します。
 
 CSS本文をraw evidenceとして無条件保存しません。
 
@@ -164,7 +238,7 @@ probeはUI発見shortcutになりません。
 
 ## 6. scopeからprobe集合を導出する
 
-`inspection_structure.py` はraw user requestから完成scope rowをLLMへ作らせません。
+`inspection_structure.py` はraw user requestから完成scope rowをLLMへ作らせません。required observation field集合とprobe集合の導出ownerは `observation_contract.py` に一元化し、`inspection_structure.py` はその集合を再計算しません。
 
 inspection mode:
 
@@ -247,10 +321,13 @@ probeは必要最小fieldだけ返します。
 - task / flow未指定でtask-flow rowを作らない
 - selected rule / measurementからrequired probe集合を導出
 - unknown probe key拒否
+- target draft → `TARGET-001` 等の決定論的採番 / resolver enum / unique resolution
+- missing / ambiguous / stale targetを成功扱いしない
 - probe request refの決定論的採番
 - viewport / element geometryのschema
 - geometryからのmachine calculationをLLMへ戻さない
 - readable / unreadable stylesheetを含むresponsive boundary closure
+- supported px media / container size queryとunsupported relative unit / calc / style queryの分離
 - accessible semanticsをobservationとして保持しrequirement resultへ自動昇格しない
 - interaction timing start / endを同一clock domainで取得
 - end predicate preexisting → measurement-unavailable
@@ -261,7 +338,7 @@ probeは必要最小fieldだけ返します。
 
 ## 11. 完了条件
 
-- browser observation request / result schemaが固定されている
+- browser target registry / resolver / currentness / uniquenessとbrowser observation request / result schemaが固定されている
 - fixed probe payload / normalizationをSkill-local scriptが所有する
 - raw browser valueの算術・enum・closureをLLMへ戻していない
 - general / scoped / formal-handoffのscope row生成が決定論化されている

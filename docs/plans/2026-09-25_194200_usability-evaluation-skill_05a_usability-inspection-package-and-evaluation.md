@@ -200,6 +200,7 @@ task / flowは指定された場合だけ保持します。
 
 - observation ref
 - category
+- target ref（element targetがある場合）
 - target / region / state
 - observed fact
 - observed value（数値がある場合）
@@ -310,6 +311,8 @@ Playwright actionability waitをpost-input responsivenessへ含めたかどう�
 usability判断に意味があるactionだけを記録します。
 
 - action ref
+- target ref（element actionの場合）
+- target resolution status
 - action
 - discovery basis
 - target visibility / viewport state before action
