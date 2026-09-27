@@ -41,7 +41,9 @@ Product Riskは新規採点しません。Runに関係する既存Riskごとに�
 - E2Eが存在するだけでmanual routeを不要と判断しません。必要時はmanual + E2Eを設定し、coverage判断は`coverage-analysis`へ依頼します。
 - PR #12 manual executionは最初の`scenario.when`操作開始、E2Eはsource contractでactual attempt開始を確認します。artifact作成やpreflight通過だけでは開始扱いにしません。
 - 全required routeのactual startが確認できた場合だけlogical TCをexecutedと数えます。FAIL / 判定不能でも開始済みならexecutedの事実と両立します。
-- source result / outcome / evidence / cleanupを再解釈せず参照し、履歴へ投影します。
+- owner execution contractからactual startとresult finalizationの事実を別々に受け取ります。resultの文字列・分類からfinalizationを推測しません。
+- source result / outcome / evidence / cleanupを再解釈せず参照し、履歴へ投影します。FAIL / 判定不能もownerのraw resultのまま保持します。
+- Activityを`完了`にできるのは、全required routeのactual startが確認され、各owner resultがfinalizedで、そのsource result / outcomeを投影でき、必要cleanupが閉じ、unresolvedがない場合だけです。開始済みでもresult未確定またはraw resultを投影できないrouteがあればActivityは`実行中`のまま更新可能です。
 - TCなしE2Eはuser / policyで指定された補助testwareだけを別枠集計します。TC IDを作りません。
 - scope / snapshot不変のblockは同Activityでresumeできます。scope / snapshot変更は別Activity / versionです。完了Activityはimmutableです。
 

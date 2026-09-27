@@ -60,8 +60,8 @@
 - 複数workflowを扱う場合は、案件コンテキストに定義したfixed workflow state root配下で`workflow_ref`ごとに1 state artifactを保持します。
 - `workflow_ref`は初回作成時にopaque UUIDとして発行し、state artifactのcanonical pathへ決定論的に解決します。
 - state自身のrevisionを保存先のatomic conditional writeへ渡せない場合、更新を保存済みとして扱いません。
-- 同じworkflowのmutable operationはstate更新だけで二重開始を防げません。owner側のactual-start claimがない場合、atomic pre-start claimを確保できなければ開始をblockします。
-- shared resource reservationは既存の外部reservationを優先します。atomic create-if-absentを保証できない保存先では取得済みと扱わず、状態を安全に確認できないreservation recoveryもblockします。
+- 同じworkflowのmutable operationはstate更新だけで二重開始を防げません。owner側のatomic pre-start claim / idempotent startがない場合、`qa.workflow_state_root/claims/<workflow_ref + operation_refのcanonical identity digest>.json`へatomic pre-start claimを作成します。claim targetはhelperが導出し、別claim rootをProject Contextへ追加しません。claimを取得できなければ開始をblockします。
+- shared resource reservationは既存の外部reservationを優先します。project-local reservationはatomic create-if-absentとlifecycleを閉じるnative atomic conditional releaseの両方がある場合だけ取得します。どちらかがない保存先では予約を作らず、状態を安全に確認できないreservation recoveryもblockします。rootは既存の`qa.reservation_root`を使います。
 
 ## runtime状態（runtime dispatch時だけ表示）
 

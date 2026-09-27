@@ -230,12 +230,17 @@ def project_activity(run: dict[str, Any], source_executions: dict[str, dict[str,
         source = source_executions.get(execution_ref, {}) if execution_ref else {}
         start_state = source.get("start_state", "未開始")
         actual_start = start_state == "開始済み" and source.get("actual_start_confirmed") is True
+        source_result = source.get("source_result")
+        result_finalized = source.get("result_finalized") is True
+        source_result_projectable = isinstance(source_result, str) and bool(source_result.strip())
         item = {
             "tc_ref": route.get("tc_ref"),
             "route_ref": route.get("route_ref"),
             "execution_ref": execution_ref,
             "source_start_state": start_state,
-            "source_result": source.get("source_result"),
+            "source_result": source_result,
+            "result_finalized": result_finalized,
+            "source_result_projectable": source_result_projectable,
             "evidence_refs": list(source.get("evidence_refs", [])),
             "executed": actual_start,
             "blocked": not actual_start and source.get("blocked") is True,
@@ -247,11 +252,14 @@ def project_activity(run: dict[str, Any], source_executions: dict[str, dict[str,
         execution_ref = route.get("execution_ref")
         source = source_executions.get(execution_ref, {}) if execution_ref else {}
         actual_start = source.get("start_state") == "開始済み" and source.get("actual_start_confirmed") is True
+        source_result = source.get("source_result")
         auxiliary_projected.append({
             "testware_ref": route.get("testware_ref"),
             "execution_ref": execution_ref,
             "source_start_state": source.get("start_state", "未開始"),
-            "source_result": source.get("source_result"),
+            "source_result": source_result,
+            "result_finalized": source.get("result_finalized") is True,
+            "source_result_projectable": isinstance(source_result, str) and bool(source_result.strip()),
             "evidence_refs": list(source.get("evidence_refs", [])),
             "executed": actual_start,
             "blocked": not actual_start and source.get("blocked") is True,
@@ -279,6 +287,11 @@ def project_activity(run: dict[str, Any], source_executions: dict[str, dict[str,
         state = "部分完了（ブロック中あり）" if started_count else "ブロック中"
     elif unexecuted_count or blocked_count:
         state = "部分完了（ブロック中あり）" if started_count else "ブロック中"
+    elif routes and any(
+        not (item["result_finalized"] and item["source_result_projectable"])
+        for item in projected
+    ):
+        state = "実行中"
     elif routes:
         state = "完了"
     else:

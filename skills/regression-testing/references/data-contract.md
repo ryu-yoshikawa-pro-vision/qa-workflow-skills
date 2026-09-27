@@ -23,6 +23,8 @@ Production helperはPR #11 ownerが解決したcurrent TCデータと保存先�
 
 ## Baseline / Run / Activity input
 
-Membership decisionには`tc_ref`, `decision` (`member`, `one_off`, `out_of_scope`, `unresolved`), `reason`, source refs / revisionsが必要です。Run routeは`manual`またはconcrete `e2e_ref`のいずれかです。Activity route resultにsource artifact ref、source start state、source outcome、evidence refsを保持します。source result stringはsource artifactの値をそのまま保持し、新しいRegression taxonomyへ変換しません。
+Membership decisionには`tc_ref`, `decision` (`member`, `one_off`, `out_of_scope`, `unresolved`), `reason`, source refs / revisionsが必要です。Run routeは`manual`またはconcrete `e2e_ref`のいずれかです。Activity route resultにsource artifact ref、source start state、owner execution contractが返す`actual_start_confirmed`と`result_finalized`、source outcome、evidence refsを保持します。source result stringはsource artifactの値をそのまま保持し、新しいRegression taxonomyへ変換しません。
+
+`executed`はrequired routeのactual startだけから判定します。Activity `完了`には、全required routeのactual start確認、owner側result finalization、source result / outcomeのraw projection、必要cleanupの閉鎖、unresolvedなしを別々に確認します。result finalizationはsource contractから渡される事実であり、Regressionはresult文字列から推測しません。
 
 `complete`はroot listingが完全、source revisionsが取得でき、discovery TCが全件lifecycle-resolved、membership判定が全件完了した場合だけtrueです。coverage gapは別項目です。

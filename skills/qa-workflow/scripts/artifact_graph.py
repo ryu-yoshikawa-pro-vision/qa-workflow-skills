@@ -200,16 +200,16 @@ def verify_historical_revision(revision_token: str | None, provider_can_refetch:
     return {"status": "available", "revision": revision_token}
 
 
-def _claim_path(claim_root: str | Path, workflow_ref: str, operation_ref: str) -> Path:
+def _claim_path(workflow_state_root: str | Path, workflow_ref: str, operation_ref: str) -> Path:
     digest = content_identity({"workflow_ref": workflow_ref, "operation_ref": operation_ref})
-    return Path(claim_root) / f"{digest}.json"
+    return Path(workflow_state_root) / "claims" / f"{digest}.json"
 
 
-def claim_mutable_operation(claim_root: str | Path, workflow_ref: str, operation_ref: str) -> dict[str, Any]:
+def claim_mutable_operation(workflow_state_root: str | Path, workflow_ref: str, operation_ref: str) -> dict[str, Any]:
     """Claim before browser/API mutation; an existing claim never implies safe retry."""
     claim = {"workflow_ref": workflow_ref, "operation_ref": operation_ref, "status": "claimed"}
     raw = _json_bytes(claim)
-    result = create_if_absent(_claim_path(claim_root, workflow_ref, operation_ref), raw)
+    result = create_if_absent(_claim_path(workflow_state_root, workflow_ref, operation_ref), raw)
     if result["status"] == "created":
         return {**result, "status": "claim_acquired", "may_start": True, "claim_revision": "sha256:" + hashlib.sha256(raw).hexdigest()}
     if result["status"] == "conflict":
@@ -225,13 +225,15 @@ def recover_claim(*, owner_source_state: str | None, cleanup_confirmed: bool, ex
     return {"status": "conditional_release_required", "expected_revision": expected_claim_revision}
 
 
-def reserve_shared_resource(reservation_root: str | Path, resource_ref: str, workflow_ref: str, *, isolated: bool = False, external_reservation: str | None = None, external_reservation_acquired: bool = False) -> dict[str, Any]:
+def reserve_shared_resource(reservation_root: str | Path, resource_ref: str, workflow_ref: str, *, native_atomic_conditional_release: bool, isolated: bool = False, external_reservation: str | None = None, external_reservation_acquired: bool = False) -> dict[str, Any]:
     if isolated:
         return {"status": "not_required", "reason": "isolated_resource"}
     if external_reservation and external_reservation_acquired:
         return {"status": "reserved", "reservation_ref": external_reservation, "owner_workflow_ref": workflow_ref, "provider": "existing_external_reservation"}
     if external_reservation:
         return {"status": "blocked", "reason": "external_reservation_not_confirmed"}
+    if not native_atomic_conditional_release:
+        return {"status": "blocked", "reason": "atomic_conditional_release_unavailable"}
     target_ref = content_identity({"resource_ref": resource_ref})
     target = Path(reservation_root) / f"{target_ref}.json"
     reservation = {"resource_ref": resource_ref, "workflow_ref": workflow_ref, "status": "reserved"}

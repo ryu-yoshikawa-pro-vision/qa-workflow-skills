@@ -5,15 +5,16 @@
   "criteria": [
     {
       "id": "REG-SEM-004",
-      "title": "Required routeとactual execution",
+      "title": "Required route\u3068actual execution",
       "critical": true,
       "rating": 4,
       "status": "pass",
-      "reason": "ManualとE2E-55のrequired routeを個別に記録し、manualはscenario.when開始後のFAILをそのまま保持しています。E2Eはartifactの存在とpreflight blockedを実際の開始と混同せず、全required routeが開始されていないためTC-301をexecuted countに含めていません。",
+      "reason": "manual\u3068E2E-55\u306erequired route\u3092\u5225\u3005\u306b\u8a18\u9332\u3057\u3001manual\u306f\u958b\u59cb\u6e08\u307f\u30fbfinalized=true\u30fbraw result=FAIL\u306e\u307e\u307e\u4fdd\u6301\u3057\u3066\u3044\u307e\u3059\u3002E2E-55\u306fpreflight blocked\u3067\u672a\u958b\u59cb\u3068\u3057\u3001artifact\u306e\u5b58\u5728\u3092actual start\u6271\u3044\u3057\u3066\u3044\u307e\u305b\u3093\u3002\u5168route\u304c\u958b\u59cb\u3055\u308c\u3066\u3044\u306a\u3044\u305f\u3081logical TC-301\u3092executed=false\u3068\u3057\u3066\u3044\u307e\u3059\u3002",
       "evidence": [
-        "| TC-301 | Manual | Yes — `scenario.when` started | `FAIL` |",
-        "| TC-301 | E2E-55 | No — preflight was blocked; the artifact exists | Preflight blocked; no actual attempt |",
-        "**Logical TC execution:** TC-301 does not count as executed because required route E2E-55 has not started."
+        "\u300cmanual source\u306fscenario.when\u958b\u59cb\u300d\u300cresult finalized=true\u300d\u300cRaw source result: FAIL\u300d",
+        "\u300cE2E-55 | \u672a\u958b\u59cb\uff08preflight blocked\uff09| false\u300d",
+        "\u300cTC-301\uff1a\u672a\u5b9f\u884c\uff08required route \u306e\u3059\u3079\u3066\u3067 actual start \u304c\u78ba\u8a8d\u3055\u308c\u3066\u3044\u306a\u3044\u305f\u3081\uff09\u300d",
+        "JSON\u5185\u306e\"executed\": false\u3068\u3001E2E-55\u306e\"actual_start_confirmed\": false"
       ]
     }
   ],

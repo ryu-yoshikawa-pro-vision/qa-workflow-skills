@@ -14,6 +14,7 @@ from typing import Any
 KINDS = {"test_subject_or_mechanism", "test_focus", "test_environment"}
 STATES = {"有効", "要再検証", "置換済み"}
 _ENTRY_BLOCK = re.compile(r"```json\s*\n(.*?)\n```", re.DOTALL)
+_ENTRY_REF = re.compile(r"^KN-[0-9a-f]{64}$")
 _SECRET = re.compile(r"(?i)(?:password|access[_-]?token|client[_-]?secret|api[_-]?key)\s*[:=]\s*['\"]?[A-Za-z0-9_./+=-]{8,}")
 
 
@@ -196,7 +197,7 @@ def create_entry(root: str | Path, entry: dict[str, Any], *, complete_root_snaps
 
 
 def read_entry(root: str | Path, entry_ref: str, *, expected_revision: str | None = None) -> dict[str, Any]:
-    if not entry_ref.startswith("KN-"):
+    if not isinstance(entry_ref, str) or not _ENTRY_REF.fullmatch(entry_ref):
         return {"status": "blocked", "reason": "invalid_entry_ref"}
     path = Path(root) / f"{entry_ref}.md"
     if path.is_symlink():
@@ -206,6 +207,12 @@ def read_entry(root: str | Path, entry_ref: str, *, expected_revision: str | Non
         entry = _parse_entry(raw.decode("utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError):
         return {"status": "blocked", "reason": "entry_unreadable"}
+    try:
+        identity_ref = canonical_entry_ref(entry.get("identity"))
+    except (TypeError, ValueError):
+        return {"status": "blocked", "reason": "entry_identity_mismatch"}
+    if entry.get("entry_ref") != entry_ref or identity_ref != entry_ref:
+        return {"status": "blocked", "reason": "entry_identity_mismatch"}
     revision = "sha256:" + hashlib.sha256(raw).hexdigest()
     if expected_revision and expected_revision != revision:
         return {"status": "blocked", "reason": "historical_revision_unavailable", "current_revision": revision}

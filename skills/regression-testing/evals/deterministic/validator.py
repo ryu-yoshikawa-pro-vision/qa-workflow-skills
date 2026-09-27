@@ -63,6 +63,8 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
                 source_mismatches.append({"tc_ref": tc_ref, "route_ref": route.get("route_ref")})
             if route.get("source_result") != execution.get("source_result"):
                 source_mismatches.append({"tc_ref": tc_ref, "issue": "source_result_reinterpreted"})
+            if route.get("result_finalized") is not (execution.get("result_finalized") is True):
+                source_mismatches.append({"tc_ref": tc_ref, "issue": "source_result_finalization_not_projected"})
         state_errors = []
         for tc_ref, tc_routes in by_tc.items():
             started = all(route.get("executed") is True for route in tc_routes)
@@ -72,8 +74,23 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
         result.add("REG-D010", not source_mismatches and not state_errors, "source actual start/resultをそのまま投影し、全required route開始後だけlogical TCをexecutedにすること", evidence={"source_mismatches": source_mismatches, "state_errors": state_errors})
         cleanup = doc.get("cleanup_status")
         expected_state = doc.get("activity_state")
-        completion_valid = expected_state != "完了" or (all(route.get("executed") is True for route in routes) and cleanup in {"成功", "対象なし", "意図的に残した状態"} and not doc.get("unresolved"))
-        result.add("REG-D011", completion_valid, "required routeとcleanupが未解決ならActivityを完了にしないこと")
+        source = doc.get("source_executions", {})
+        completion_valid = expected_state != "完了" or (
+            bool(routes)
+            and all(
+                route.get("executed") is True
+                and route.get("result_finalized") is True
+                and route.get("source_result_projectable") is True
+                and isinstance(route.get("source_result"), str)
+                and bool(route.get("source_result", "").strip())
+                and route.get("source_result") == source.get(route.get("execution_ref"), {}).get("source_result")
+                and source.get(route.get("execution_ref"), {}).get("result_finalized") is True
+                for route in routes
+            )
+            and cleanup in {"成功", "対象なし", "意図的に残した状態"}
+            and not doc.get("unresolved")
+        )
+        result.add("REG-D011", completion_valid, "required routeのactual start・owner result確定・source result投影とcleanupが未解決ならActivityを完了にしないこと")
         result.add("REG-D012", not (doc.get("previous_activity_state") == "完了" and doc.get("mutation_applied") is True), "completed Activityをimmutableとして扱うこと")
         result.add("REG-D013", doc.get("activity_ref") and doc.get("snapshot_ref") and doc.get("scope_identity"), "Activityがidentityと固定snapshotを参照すること")
         auxiliary = doc.get("auxiliary_route_results", [])

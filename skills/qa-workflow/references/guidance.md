@@ -176,6 +176,37 @@ Explorationは未知領域のCharterベース探索、Investigationは既存owne
 
 工程固有の扱い（例: `成立不能`、`重複`）の詳細条件は担当Skillを正本とします。
 
+## 継続管理workflowのproduction helper checkpoint
+
+### workflow開始 / resume
+
+継続管理workflowの決定論的処理はqa-workflow package内の`scripts/artifact_graph.py`を使います。
+
+1. `parse_project_context`でProject Context stable keyをparseし、`validate_required_context_fields`で今回必要なkeyを検証します。
+2. Project Contextの`qa.workflow_state_root`からworkflow state rootを解決します。値が未設定または解決できない場合は継続をblockします。
+3. persisted workflowのresumeでは`canonical_state_path` / `read_workflow_state`でstateをcanonical pathから取得します。初回保存は`create_workflow_state`のatomic create-if-absent結果を確認します。
+4. workflow snapshotで記録した`used_fields`だけを`compare_used_context`でcurrentness比較します。Project Context全体revision差だけで未使用fieldをstaleにしません。
+5. 必要なfixed-root scanは`scan_fixed_root`を使い、scan failure / truncationをcomplete扱いしません。state更新前は`state_update_decision`でnative atomic conditional write capabilityをgateします。
+
+### mutable operation開始直前
+
+1. owner execution contractに同一operation identity向けatomic pre-start claimまたはidempotent startがあるか確認し、ある場合はowner contractを利用します。
+2. owner contractがなければ`claim_mutable_operation(workflow_state_root, workflow_ref, operation_ref)`を使います。helperは`qa.workflow_state_root`配下の`claims/<canonical identity digest>.json`へclaimを導出し、callerに別claim rootを選ばせません。
+3. claimを取得できない、またはhelper / filesystem能力が失敗した場合はmutable operationを開始せず`blocked`にします。state CASだけで実operationの二重開始を防止済みと扱いません。
+
+### shared resource使用前
+
+Project Contextの既存`qa.reservation_root`を使い、次の順で`reserve_shared_resource`を適用します。
+
+1. resourceがworkflowごとにisolatedならreservationは`not_required`です。
+2. 既存external reservationが取得済みならそれを使います。
+3. project-local reservationはatomic create-if-absentに加えてlifecycleを閉じるnative atomic conditional release能力も確認できる場合だけ取得します。release capabilityがないlocal filesystemではreservation fileを作らず`blocked`にします。
+4. いずれも満たさなければshared resource使用を`blocked`にします。recovery / releaseはowner execution state、cleanup確認、expected revisionを確認し、native conditional releaseがなければ実行しません。
+
+### current完了直前 / current成果物再利用直前
+
+利用したProject Context stable keyとsource dependency revisionを、`compare_used_context`を含む既存currentness契約で再確認します。変更・欠落・曖昧さ・helper failureをLLMで補わず、影響範囲を`unresolved` / `blocked` / `要再検証`へ戻します。
+
 ## 開始点
 
 要求成果物を作るために必要な、最も早い担当Skillから開始します。

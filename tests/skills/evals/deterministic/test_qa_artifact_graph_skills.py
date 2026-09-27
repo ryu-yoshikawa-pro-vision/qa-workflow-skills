@@ -27,7 +27,18 @@ def load_skill_helper(skill: str, filename: str):
     return module
 
 
+def load_skill_validator(skill: str):
+    path = REPO_ROOT / "skills" / skill / "evals" / "deterministic" / "validator.py"
+    spec = importlib.util.spec_from_file_location(f"test_{skill.replace('-', '_')}_validator", path)
+    if spec is None or spec.loader is None:
+        raise ImportError(path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 regression = load_skill_helper("regression-testing", "regression_runtime.py")
+regression_validator = load_skill_validator("regression-testing")
 exploratory = load_skill_helper("exploratory-testing", "exploratory_runtime.py")
 knowledge = load_skill_helper("qa-knowledge", "knowledge_runtime.py")
 workflow = load_skill_helper("qa-workflow", "artifact_graph.py")
@@ -118,10 +129,10 @@ class RegressionRuntimeTests(unittest.TestCase):
             {"tc_ref": "TC-003", "route_type": "manual", "route_ref": "manual:003", "execution_ref": "RUN-M3"},
         ]}
         activity = regression.project_activity(run, {
-            "RUN-M": {"start_state": "開始済み", "actual_start_confirmed": True, "source_result": "FAIL", "evidence_refs": ["ev:m"]},
-            "RUN-E1": {"start_state": "未開始", "actual_start_confirmed": False, "source_result": "未実行", "blocked": True},
-            "RUN-E2": {"start_state": "開始済み", "actual_start_confirmed": True, "source_result": "判定不能", "evidence_refs": ["ev:e"]},
-            "RUN-M3": {"start_state": "未開始", "actual_start_confirmed": False, "source_result": "未実行"},
+            "RUN-M": {"start_state": "開始済み", "actual_start_confirmed": True, "result_finalized": True, "source_result": "FAIL", "evidence_refs": ["ev:m"]},
+            "RUN-E1": {"start_state": "未開始", "actual_start_confirmed": False, "result_finalized": False, "source_result": "未実行", "blocked": True},
+            "RUN-E2": {"start_state": "開始済み", "actual_start_confirmed": True, "result_finalized": True, "source_result": "判定不能", "evidence_refs": ["ev:e"]},
+            "RUN-M3": {"start_state": "未開始", "actual_start_confirmed": False, "result_finalized": False, "source_result": "未実行"},
         })
         self.assertEqual(activity["tc_execution_state"], {"TC-001": "blocked", "TC-002": "executed", "TC-003": "unexecuted"})
         self.assertTrue(activity["route_results"][0]["executed"])
@@ -130,6 +141,58 @@ class RegressionRuntimeTests(unittest.TestCase):
         self.assertEqual(activity["counts"]["executed_tc_count"], 1)
         self.assertEqual(activity["counts"]["blocked_tc_count"], 1)
         self.assertEqual(activity["counts"]["unexecuted_tc_count"], 1)
+
+    def test_activity_completion_waits_for_owner_result_finalization(self):
+        one_route = {"required_routes": [{"tc_ref": "TC-101", "route_type": "manual", "route_ref": "manual:101", "execution_ref": "RUN-101"}]}
+        pending_source = {"RUN-101": {"start_state": "開始済み", "actual_start_confirmed": True, "result_finalized": False}}
+        pending = regression.project_activity(one_route, pending_source)
+        self.assertEqual(pending["tc_execution_state"]["TC-101"], "executed")
+        self.assertEqual(pending["activity_state"], "実行中")
+        self.assertFalse(pending["route_results"][0]["result_finalized"])
+        update = regression.update_activity(
+            {**pending, "scope_identity": "scope-1", "snapshot_ref": "snapshot-1"},
+            {**regression.project_activity(one_route, {"RUN-101": {"start_state": "開始済み", "actual_start_confirmed": True, "result_finalized": True, "source_result": "PASS"}}), "scope_identity": "scope-1", "snapshot_ref": "snapshot-1"},
+        )
+        self.assertEqual(update["status"], "update_allowed")
+
+        for owner_result in ("PASS", "FAIL", "判定不能"):
+            with self.subTest(owner_result=owner_result):
+                source = {"RUN-101": {"start_state": "開始済み", "actual_start_confirmed": True, "result_finalized": True, "source_result": owner_result}}
+                completed = regression.project_activity(one_route, source, cleanup_status="対象なし")
+                self.assertEqual(completed["tc_execution_state"]["TC-101"], "executed")
+                self.assertEqual(completed["activity_state"], "完了")
+                self.assertEqual(completed["route_results"][0]["source_result"], owner_result)
+
+        multiple_routes = {"required_routes": [
+            {"tc_ref": "TC-102", "route_type": "manual", "route_ref": "manual:102", "execution_ref": "RUN-102M"},
+            {"tc_ref": "TC-102", "route_type": "e2e", "route_ref": "e2e:102", "execution_ref": "RUN-102E", "e2e_testware_ref": "E2E-102"},
+        ]}
+        partial_results = regression.project_activity(multiple_routes, {
+            "RUN-102M": {"start_state": "開始済み", "actual_start_confirmed": True, "result_finalized": True, "source_result": "FAIL"},
+            "RUN-102E": {"start_state": "開始済み", "actual_start_confirmed": True, "result_finalized": False},
+        })
+        self.assertEqual(partial_results["tc_execution_state"]["TC-102"], "executed")
+        self.assertEqual(partial_results["activity_state"], "実行中")
+
+        def d011_status(activity: dict, source_executions: dict) -> str:
+            doc = {
+                **activity,
+                "artifact_type": "activity",
+                "activity_ref": "ACT-REG-1",
+                "scope_identity": "scope-1",
+                "snapshot_ref": "snapshot-1",
+                "source_executions": source_executions,
+                "counts": {"auxiliary_testware_count": 0},
+                "auxiliary_route_results": [],
+            }
+            rendered = "```json\n" + json.dumps(doc, ensure_ascii=False) + "\n```"
+            result = regression_validator.validate(rendered, {}, "REG-D011-UNIT")
+            return next(item.status for item in result.assertions if item.id == "REG-D011")
+
+        invalid_completed = {**pending, "activity_state": "完了"}
+        self.assertEqual(d011_status(invalid_completed, pending_source), "fail")
+        final_source = {"RUN-101": {"start_state": "開始済み", "actual_start_confirmed": True, "result_finalized": True, "source_result": "FAIL"}}
+        self.assertEqual(d011_status(regression.project_activity(one_route, final_source), final_source), "pass")
 
     def test_auxiliary_testware_needs_explicit_scope_and_is_separate(self):
         rejected = regression.select_auxiliary_testware(requested_refs=["E2E-9"], user_explicit_refs=[], policy_refs=[], available_refs=["E2E-9"])
@@ -241,6 +304,44 @@ class KnowledgeRuntimeTests(unittest.TestCase):
             self.assertFalse(read["historical_revision_available"])
             self.assertEqual(knowledge.read_entry(root, entry["entry_ref"], expected_revision="sha256:old")["reason"], "historical_revision_unavailable")
 
+    def test_read_entry_enforces_canonical_ref_path_and_body_identity(self):
+        entry = self.entry()
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp)
+            root = base / "knowledge"
+            root.mkdir()
+            canonical_path = root / f"{entry['entry_ref']}.md"
+            canonical_path.write_bytes(knowledge.render_entry(entry))
+            self.assertEqual(knowledge.read_entry(root, entry["entry_ref"])["status"], "current")
+
+            outside = base / "outside.md"
+            outside.write_bytes(knowledge.render_entry(entry))
+            (root / "KN-..").mkdir()
+            malformed_refs = [
+                "KN-../../outside",
+                "KN-../../../outside",
+                "KN-..\\..\\..\\outside",
+                "KN-abc",
+                "KN-" + "a" * 63,
+                "KN-" + "a" * 65,
+                "KN-" + "g" * 64,
+                "KN-" + "A" * 64,
+            ]
+            for invalid_ref in malformed_refs:
+                with self.subTest(entry_ref=invalid_ref):
+                    self.assertEqual(knowledge.read_entry(root, invalid_ref)["status"], "blocked")
+                    self.assertEqual(outside.read_bytes(), knowledge.render_entry(entry))
+
+            body_ref_mismatch = {**entry, "entry_ref": knowledge.canonical_entry_ref({"kind": "other"})}
+            canonical_path.write_bytes(knowledge.render_entry(body_ref_mismatch))
+            read = knowledge.read_entry(root, entry["entry_ref"])
+            self.assertEqual((read["status"], read["reason"]), ("blocked", "entry_identity_mismatch"))
+
+            identity_mismatch = {**entry, "identity": {"kind": "other"}}
+            canonical_path.write_bytes(knowledge.render_entry(identity_mismatch))
+            read = knowledge.read_entry(root, entry["entry_ref"])
+            self.assertEqual((read["status"], read["reason"]), ("blocked", "entry_identity_mismatch"))
+
     def test_distinct_identities_do_not_contend_and_incomplete_storage_blocks(self):
         first = self.entry()
         second = self.entry({"kind": "test_environment", "scope_refs": ["project:checkout"], "subject": "different-job"})
@@ -321,26 +422,40 @@ class WorkflowArtifactGraphTests(unittest.TestCase):
     def test_pre_start_claim_and_resource_reservation_serialize_mutable_work(self):
         workflow_ref = workflow.new_workflow_ref()
         with tempfile.TemporaryDirectory() as temp:
-            claim_root = Path(temp) / "claims"
+            workflow_state_root = Path(temp) / "states"
             with ThreadPoolExecutor(max_workers=8) as executor:
-                claims = list(executor.map(lambda _: workflow.claim_mutable_operation(claim_root, workflow_ref, "browser:save-order"), range(8)))
+                claims = list(executor.map(lambda _: workflow.claim_mutable_operation(workflow_state_root, workflow_ref, "browser:save-order"), range(8)))
             self.assertEqual(sum(item["status"] == "claim_acquired" for item in claims), 1)
             winner = next(item for item in claims if item["status"] == "claim_acquired")
             self.assertTrue(winner["may_start"])
+            expected_claim_path = workflow_state_root / "claims" / f"{workflow.content_identity({'workflow_ref': workflow_ref, 'operation_ref': 'browser:save-order'})}.json"
+            self.assertEqual(Path(winner["path"]), expected_claim_path)
+            self.assertTrue(expected_claim_path.is_file())
             self.assertEqual(workflow.recover_claim(owner_source_state=None, cleanup_confirmed=False, expected_claim_revision=winner["claim_revision"], native_atomic_conditional_release=True)["status"], "blocked")
             self.assertEqual(workflow.recover_claim(owner_source_state="not_started", cleanup_confirmed=True, expected_claim_revision=winner["claim_revision"], native_atomic_conditional_release=False)["status"], "blocked")
             self.assertEqual(workflow.recover_claim(owner_source_state="not_started", cleanup_confirmed=True, expected_claim_revision=winner["claim_revision"], native_atomic_conditional_release=True)["status"], "conditional_release_required")
 
             reservation_root = Path(temp) / "reservations"
             with ThreadPoolExecutor(max_workers=2) as executor:
-                reservations = list(executor.map(lambda owner: workflow.reserve_shared_resource(reservation_root, "resource:shared-user-1", owner), [workflow_ref, workflow.new_workflow_ref()]))
+                reservations = list(executor.map(lambda owner: workflow.reserve_shared_resource(reservation_root, "resource:shared-user-1", owner, native_atomic_conditional_release=True), [workflow_ref, workflow.new_workflow_ref()]))
             self.assertEqual(sum(item["status"] == "reserved" for item in reservations), 1)
             reservation = next(item for item in reservations if item["status"] == "reserved")
             reservation_data = json.loads(Path(reservation["reservation_ref"]).read_text(encoding="utf-8"))
             owner_ref = reservation_data["workflow_ref"]
             self.assertEqual(workflow.release_shared_resource(current_workflow_ref=owner_ref, expected_workflow_ref=owner_ref, expected_reservation_revision=reservation["reservation_revision"], current_reservation_revision=reservation["reservation_revision"], native_atomic_conditional_release=False, owner_state_verified=True, owner_execution_state="complete", cleanup_confirmed=True)["status"], "blocked")
             self.assertEqual(workflow.release_shared_resource(current_workflow_ref="other", expected_workflow_ref=owner_ref, expected_reservation_revision=reservation["reservation_revision"], current_reservation_revision=reservation["reservation_revision"], native_atomic_conditional_release=True, owner_state_verified=True, owner_execution_state="complete", cleanup_confirmed=True)["reason"], "reservation_owner_mismatch")
-            self.assertEqual(workflow.reserve_shared_resource(reservation_root, "resource:isolation", workflow_ref, isolated=True)["status"], "not_required")
+            self.assertEqual(workflow.reserve_shared_resource(reservation_root, "resource:isolation", workflow_ref, native_atomic_conditional_release=False, isolated=True)["status"], "not_required")
+            external = workflow.reserve_shared_resource(reservation_root, "resource:external", workflow_ref, native_atomic_conditional_release=False, external_reservation="external:reservation-1", external_reservation_acquired=True)
+            self.assertEqual(external["status"], "reserved")
+            self.assertEqual(external["provider"], "existing_external_reservation")
+
+            unsafe_resource = "resource:local-without-release"
+            unsafe_target = reservation_root / f"{workflow.content_identity({'resource_ref': unsafe_resource})}.json"
+            unsafe_local = workflow.reserve_shared_resource(reservation_root, unsafe_resource, workflow_ref, native_atomic_conditional_release=False)
+            self.assertEqual((unsafe_local["status"], unsafe_local["reason"]), ("blocked", "atomic_conditional_release_unavailable"))
+            self.assertFalse(unsafe_target.exists())
+            safe_local = workflow.reserve_shared_resource(reservation_root, "resource:local-with-release", workflow_ref, native_atomic_conditional_release=True)
+            self.assertEqual(safe_local["status"], "reserved")
 
     def test_partial_update_requires_owner_scope_dependency_and_cas_proof(self):
         base = {"owner_boundary_defined": True, "same_target_identity": True, "update_scopes_disjoint": True, "upstream_dependencies_unchanged": True, "native_atomic_conditional_write": True, "expected_revision": "r1"}
@@ -355,6 +470,32 @@ class WorkflowArtifactGraphTests(unittest.TestCase):
             result = workflow.create_if_absent(parent / "state.json", b"{}")
             self.assertEqual(result["status"], "blocked")
             self.assertFalse(result["atomic"])
+
+    def test_qa_workflow_contract_requires_artifact_graph_helper_at_checkpoints(self):
+        skill = (REPO_ROOT / "skills" / "qa-workflow" / "SKILL.md").read_text(encoding="utf-8")
+        guidance = (REPO_ROOT / "skills" / "qa-workflow" / "references" / "guidance.md").read_text(encoding="utf-8")
+        workflow_template = (REPO_ROOT / "skills" / "qa-workflow" / "assets" / "workflow-state-template.md").read_text(encoding="utf-8")
+        project_template = (REPO_ROOT / "skills" / "qa-workflow" / "assets" / "project-context-template.md").read_text(encoding="utf-8")
+
+        resources = skill.split("## リソース", 1)[1].split("\n## ", 1)[0]
+        self.assertIn("scripts/artifact_graph.py", resources)
+        helper_contract = skill.split("## 継続管理workflowの決定論的処理", 1)[1].split("\n## ", 1)[0]
+        for operation in ("stable key", "used-field currentness", "canonical path", "fixed-root scan", "CAS capability gate", "pre-start claim", "shared resource reservation"):
+            with self.subTest(operation=operation):
+                self.assertIn(operation, helper_contract)
+        self.assertRegex(helper_contract, r"incomplete.{0,30}unresolved.{0,30}blocked")
+        self.assertIn("LLM fallback", helper_contract)
+
+        checkpoint_contract = guidance.split("## 継続管理workflowのproduction helper checkpoint", 1)[1].split("\n## ", 1)[0]
+        for checkpoint in ("### workflow開始 / resume", "### mutable operation開始直前", "### shared resource使用前", "### current完了直前 / current成果物再利用直前"):
+            with self.subTest(checkpoint=checkpoint):
+                self.assertIn(checkpoint, checkpoint_contract)
+        for operation in ("parse_project_context", "validate_required_context_fields", "canonical_state_path", "create_workflow_state", "compare_used_context", "claim_mutable_operation(workflow_state_root", "reserve_shared_resource", "scan_fixed_root", "state_update_decision"):
+            with self.subTest(operation=operation):
+                self.assertIn(operation, checkpoint_contract)
+        self.assertIn("qa.workflow_state_root/claims/", workflow_template)
+        self.assertIn("qa.reservation_root", workflow_template)
+        self.assertNotIn("qa.claim_root", project_template)
 
 
 class StandaloneSkillPortabilityTests(unittest.TestCase):

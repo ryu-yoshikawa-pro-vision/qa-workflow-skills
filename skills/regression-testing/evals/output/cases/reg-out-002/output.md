@@ -23,6 +23,7 @@
     "EXEC-M-001": {
       "start_state": "開始済み",
       "actual_start_confirmed": true,
+      "result_finalized": true,
       "source_result": "FAIL",
       "evidence_refs": [
         "ev:manual-1"
@@ -31,6 +32,7 @@
     "EXEC-E-001": {
       "start_state": "未開始",
       "actual_start_confirmed": false,
+      "result_finalized": false,
       "source_result": "未実行",
       "blocked": true,
       "evidence_refs": []
@@ -43,6 +45,8 @@
       "execution_ref": "EXEC-M-001",
       "source_start_state": "開始済み",
       "source_result": "FAIL",
+      "result_finalized": true,
+      "source_result_projectable": true,
       "executed": true,
       "blocked": false
     },
@@ -52,6 +56,8 @@
       "execution_ref": "EXEC-E-001",
       "source_start_state": "未開始",
       "source_result": "未実行",
+      "result_finalized": false,
+      "source_result_projectable": true,
       "executed": false,
       "blocked": true
     }
