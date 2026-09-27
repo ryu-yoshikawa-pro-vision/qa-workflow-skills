@@ -369,7 +369,7 @@ UI patternを含むtest-condition-design
 - `適用したreference` を使う評価項目ではreference entry ref / source item ref / 今回のreferenceの位置づけが対応する
 - evaluation basisが許可enumで1件以上あり、`reference / project-authority / user-goal / success-condition / cross-state-consistency` ごとのrequired evidence / contextがある
 - standard / UI pattern / heuristic / best practice主張ではreference 1件以上、project Authority根拠ではAuthority ref、reference 0件のevidence-semantic評価ではreference不使用理由 / 判断理由 / evidenceがある
-- additional observation linkはexecution ownerに応じ、usability-inspectionならOBSREQ、test-target-inspection / test-executionならowner activity ref + returned evidenceへ解決する
+- additional observation linkは全ownerでcanonical observation field / request signature / input evidence fingerprintを保持し、signatureをdeterministic validatorが独立再計算する。execution ownerに応じ、usability-inspectionならOBSREQ、test-target-inspection / test-executionならowner activity ref + returned evidenceへ解決する
 - evidence ref
 - status
 - required fields
@@ -456,7 +456,7 @@ fakeなreferenceを付与せず、reference不使用理由・判断理由・evid
 
 usability-inspectionがcurrent browser ownerのcaseでは、LLMがcanonical observation fieldを選び、`observation_contract.py` がrequester identity / state basis refs / OBSREQ ref / fixed probeをmaterializeすること。自由記述からscriptがprobeを推論したり、LLMがJavaScriptを生成したりしないこと。
 
-test-target-inspectionまたはtest-executionのimmutable evidenceを評価しているcaseでは、追加観測を同じownerへ返し、usability-inspectionのOBSREQや第二sessionを開始しないこと。owner activity / returned evidenceをadditional observation linkへ記録し、同じnormalized request + input evidenceを繰り返す場合はno-progressへ閉じること。
+test-target-inspectionまたはtest-executionのimmutable evidenceを評価しているcaseでは、同じcanonical observation field vocabularyで必要evidenceを指定し、追加観測を同じownerへ返してusability-inspectionのOBSREQや第二sessionを開始しないこと。`evaluation_structure.py` がrequest signature / input evidence fingerprintを導出し、owner activity / returned evidenceをadditional observation linkへ記録すること。同じsignature + fingerprintを繰り返す場合はno-progressへ閉じること。
 
 ### Case L: business outcome
 
@@ -509,7 +509,7 @@ dataset構造検証だけで実装完了にしません。
 - catalogへ載せただけのsource全pageを収録済み・意味検証済みとは主張していない
 - 全UI / UX評価項目に1件以上のevaluation basisがあり、basisごとのrequired context / evidenceをvalidatorで閉じる
 - standard / UI pattern / heuristic / best practiceを根拠にするUI / UX評価項目は1件以上の `適用したreference` を持ち、各行でreference entry ref / source item ref / 今回のreferenceの位置づけが対応する。project Authorityだけを根拠にする場合はAuthority ref、reference 0件のevidence-semantic評価ではreference不使用理由 / 判断理由 / evidenceを追跡できる
-- additional observation linkがある場合、execution ownerに応じてOBSREQまたはowner activity / returned evidenceへ解決し、別ownerのrequest refを混在させない
+- additional observation linkがある場合、全ownerでcanonical observation field / request signature / input evidence fingerprintを保持し、execution ownerに応じてOBSREQまたはowner activity / returned evidenceへ解決する。別ownerのrequest refを混在させず、same signature + fingerprintの重複実行を許可しない
 - 判定不能 / 対象外のUI / UX評価項目にstatus reason / 制約・未確認が残る
 - usability-evaluation成果物で上位観点ごとの今回の扱いが固定され、「今回評価する」とした観点がすべて評価結果へ閉じている
 - source IDが `SRC-\d{3,}`、source item refが `<source ID>-ITEM-\d{4,}`、reference entry IDが `REF-\d{4,}` のpackage-local append-only規則に従い、削除済みIDを別identityへ再利用していない
