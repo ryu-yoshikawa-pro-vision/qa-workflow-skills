@@ -24,6 +24,7 @@ formal Skillからsibling Skillのscript / assetを直接import・readしませ�
 
 - `request_kind`: `wcag-machine-probe`
 - `observation_request_ref`
+- `request_signature`
 - `criterion_evaluation_ref`
 - `procedure_execution_ref`
 - `machine_probe_key`
@@ -32,7 +33,7 @@ formal Skillからsibling Skillのscript / assetを直接import・readしませ�
 - required browser capability
 - currentness dependency
 
-`usability-inspection` は `procedure_execution_ref` の意味を再解釈せず、`request_kind` と `machine_probe_key` からlocal catalogのfixed dispatchへ一意に解決します。resultはrequest ref / machine probe key / currentness / runtime evidenceを保持してformal Skillへ返します。
+`usability-inspection` は `procedure_execution_ref` の意味を再解釈せず、`request_kind` と `machine_probe_key` からlocal catalogのfixed dispatchへ一意に解決します。formal側 `request_signature` とcurrent target / population identityを検証し、resultはrequest ref / request signature / machine probe key / currentness / runtime evidenceを保持してformal Skillへ返します。
 
 ## 2. machine probe catalog
 
@@ -133,7 +134,7 @@ mechanism candidateはcurrent browser / user agent capabilityと、current page�
 
 W3C Technique G142等の評価で必要なuser-agent zoomは、current browser経路が実際のuser-agent zoom capabilityを提供する場合だけfixed dispatchへ登録します。特定browserのprivate protocolやundocumented shortcutをgeneric fallbackとして追加しません。
 
-text resize / text spacing等で評価用stateを作る場合は、WCAG Techniqueで定義された固定overrideだけをdispatchします。任意style injection interfaceにはせず、元状態、適用したoverride、cleanup結果を保持します。
+Text Spacing等、W3Cの評価手順自体がauthor style overrideを要求するprocedureだけ、Techniqueで定義された固定overrideをdispatchします。Resize Textは上記valid text scaling mechanism contractを使用し、style overrideで代替しません。固定overrideを使うprocedureでも任意style injection interfaceにはせず、元状態、適用したoverride、cleanup結果を保持します。
 
 ## 4. machine procedure → probe mapping
 
@@ -208,7 +209,7 @@ validatorを2層に分けます。
 - usability-inspection validator: local machine probe catalog、request / result schema、fixed dispatch、target / population currentness、duplicate、unsupported理由、`static_data_versions.wcag_machine_probes` を検証する
 - repository-level contract test: formal procedure catalogが参照するmachine probe key集合とinspectionのmachine probe catalog key集合を比較し、missing / extra / unusedを0件にする
 
-fixtureにはdocument metadata、non-text / media / link / heading / form / structure population、keyboard / focus / pointer / hover-focus、error scenario、target size / spacing、text / non-text contrast、simple / complex focus appearance、responsive condition、orientation / reflow / resize text / text spacing、moving / timer / shortcut、multipage signature、stale population、missing capabilityを含めます。
+fixtureにはdocument metadata、non-text / media / link / heading / form / structure population、keyboard / focus / pointer / hover-focus、error scenario、target size / spacing、text / non-text contrast、simple / complex focus appearance、responsive condition、orientation / reflow / text spacing、moving / timer / shortcut、multipage signature、stale population、missing capabilityを含めます。Resize Textはfull-page zoom、text-only resize、author-provided control、incremental step、valid mechanism実行不能、`deviceScaleFactor` / viewport / CSS injection rejectを個別fixtureで持ちます。
 
 ## 8. 完了条件
 
