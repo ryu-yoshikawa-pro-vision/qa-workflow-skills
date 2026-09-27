@@ -670,11 +670,19 @@ Output:
 - selection method
 - candidate population fingerprint
 - available unique candidate count
+- selection status: `target-met / exhausted-no-new-view / blocked`
 - targetを満たせなかった場合のreason
+- exhaustion evidence / provenance（`exhausted-no-new-view` の場合）
+
+`target-met` はselected unique countがtarget countへ到達した場合です。
+
+`exhausted-no-new-view` はtarget count未満でも、complete finite inventoryのeligible unique candidateを全件消費した場合、または外部random mechanismがtarget scope全体を対象に追加unique viewなしまで探索したことをtool identity / method / candidate scope / completeness / provenance付きで返しvalidatorが確認できる場合だけ使用します。
+
+listing truncation、crawler / search / log取得失敗、permission不足、rate limit、unknown completeness、外部toolが十分なsampleを返さなかっただけの状態は `blocked` とします。
 
 同じInputから同じselectionを返すことは要求しません。
 
-target全体を有限候補として列挙できない場合はfinite inventory経路を無理に使いません。semantic / research工程はWCAG-EM 2.0で許容されるmethodの適用性とcandidate scope / provenanceを判断できますが、個々のsample identityは選びません。candidate listを作れる場合はscriptがそこからrandom選択し、外部tool自体がrandom selectionする場合だけそのselected refsを外部random resultとして受け取ります。
+target全体を有限候補として列挙できない場合はfinite inventory経路を無理に使いません。semantic / research工程はmethodの適用性とcandidate scope / provenanceを判断できますが、個々のsample identityは選びません。candidate listを作れる場合はscriptがそこからrandom選択し、外部tool自体がrandom selectionする場合だけそのselected refsを受け取ります。target件数を満たせずscope-wide exhaustionも証明できない場合はStep 3.2を完了せず `blocked` にします。
 
 ### materialize-process
 
@@ -730,6 +738,7 @@ Function:
 - population fingerprintが同じ場合だけnew structured setと重複する旧random sampleを除外し、structuredと重複せずcurrentな旧random sampleを保持する
 - population fingerprintが同じ場合はtarget countへ不足する件数だけ追加random selectionする
 - population fingerprintが変わった場合は旧random selectionをstaleとしてcurrent populationからrandom setを再選択する
+- top-up / reselection結果が `blocked` の場合は次comparisonへ進まない。`exhausted-no-new-view` はscope-wide exhaustion evidenceを保持した場合だけcompletionに数える
 - 新random sampleに対してcomplete process由来sampleを再materialize
 - PR #11 freshness検証でstaleになったsample resultを再評価対象へ戻す
 - currentな既存resultと新たに必要なsample / processを分離して返す
@@ -766,6 +775,9 @@ Function:
 - target count
 - candidate population fingerprint
 - selection method存在
+- selection statusとselected count / target countの整合
+- `exhausted-no-new-view` のcomplete candidate / scope-wide exhaustion evidence
+- `blocked` をStep 3.2 completionへ数えていない
 - no-new-sample exception整合
 
 を検証します。
@@ -1027,7 +1039,15 @@ structured sampleの10%要件、unique、non-overlap、selection methodを満た
 
 ### Case F: no unique random candidate
 
-新しいunique sampleが存在しないことを記録してStep 3.2を閉じる。
+complete finite inventoryまたはscope-wide exhaustionを証明できる外部mechanismで、新しいunique sampleが存在しない。
+
+→ `selection_status=exhausted-no-new-view` とevidenceを記録してStep 3.2を閉じる。
+
+### Case F2: candidate acquisition incomplete
+
+crawler / search / log / external random mechanismがtarget countを満たせず、listing / scope-wide exhaustionのcomplete evidenceもない。
+
+→ `selection_status=blocked`。no-new-sample completionへ変換せずStep 3.2を完了しない。
 
 ### Case G: complete process
 
@@ -1207,7 +1227,7 @@ target WCAG version / levelのrequired Success Criterion集合を生成し、1 c
 - random selectionへfixed seedを要求しない
 - canonical sample identity registryをscriptがmaterializeし、duplicate / overlap / union / process membershipを同じidentityで判定する
 - finite inventory時のrandom candidate集合、process-added sample、Step 4.3のboolean / actionをscriptが導出し、Agentが手組みしない
-- finite inventoryがない場合もLLMがselected sample identityを選ばず、scriptまたは外部random mechanismの結果だけを受ける
+- finite inventoryがない場合もLLMがselected sample identityを選ばず、scriptまたは外部random mechanismの結果だけを受ける。target count未達時はscope-wide exhaustionを証明できる場合だけ `exhausted-no-new-view`、証明できなければ `blocked`
 - candidate population fingerprintをscriptが導出し、Step 4.3でstructured revisionが変わった場合、population同一時のrandom target再計算 / overlap除外 / retained random / 不足分top-up、population変更時のreselection、process再materializeを閉じる
 - Conforming Alternate Versionを別sampleに数えずcondition closureをmaterializeし、Non-Interference fixed Success Criteria集合をcatalogから導出できる
 - Step 4.2ではcurrent unchanged resultだけを再利用し、変化 / 不明contentとinteractionを再評価できる

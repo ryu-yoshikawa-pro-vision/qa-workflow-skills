@@ -434,7 +434,7 @@ WCAG-EM 2.0はWCAG、accessible design、assistive technology、障害のある�
 - sampling skippedではcompleteな全体inventoryからselected sample setをmaterializeし、structured / random / Step 4.3をnot-applicableとして閉じる
 - sampling usedではstructured sampleをStep 2探索結果へ追跡できる
 - 再評価ではprevious sampleをcurrent identityへ解決し、retained / replaced / added / unavailable lineageをmaterializeできる。50% replacementを固定規則にしない
-- random sample countがPlanの10%整数化規則を満たす
+- random sample countがPlanの10%整数化規則を満たし、target未達時はcomplete exhaustion evidenceのある `exhausted-no-new-view` とcandidate取得不完全の `blocked` を分離する
 - artifact-local sample identityでrandom sampleの重複 / structured sampleとの重複を検証できる
 - random selection methodを記録する
 - predictable fixed-seed selectionを必須化していない

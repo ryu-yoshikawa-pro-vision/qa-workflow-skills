@@ -92,8 +92,8 @@ current Playwright versionやPR #12 / #13 merge後のbrowser contractが変わ�
 5. visual / responsive evidence
 6. applicable general accessibility check
 7. `inspection_structure.py` がgeneral / scoped / formal-handoffのscope rowをmaterializeすること
-8. `observation_contract.py` がrequired probe requestをmaterializeし、browser resultをschema / unit / capability検証してnormalizeすること
-9. responsive boundaryのreadable / incomplete両case
+8. `observation_contract.py` がtarget registry / resolver currentness / uniquenessとrequired probe requestをmaterializeし、browser resultをschema / unit / capability検証してnormalizeすること
+9. responsive boundaryのcomplete+boundaryあり / complete+boundaryなし / unreadable・unsupportedによるincomplete各case
 10. fixed interaction timingでsame-page clock、fixed end predicate、preexisting end state、timeoutを扱えること
 11. measurement経路
 12. cleanup
@@ -124,15 +124,22 @@ formal request
 
 - sampling procedure usedのcase
 - structured sample
-- random sample
+- random sample target-met
+- complete candidate exhaustionによる `exhausted-no-new-view`
+- candidate取得不完全による `blocked`。no-new-sample completionへ誤変換しない
 - complete process
 - Step 4.3で再samplingなしのcase
 - semantic / fixtureでStep 4.3再samplingありのcase。structured追加後のcandidate populationが同じcaseでrandom target再計算、overlap除外、retained random、不足分top-up、process再materializeを確認する
 - sampling procedure skippedのcase。completeなin-scope inventory全件がselected sample setとなり、structured / random / Step 4.3がnot-applicableでもcomplete process / Step 4.2評価が続くこと
 - 同一URLの異なるstateを別sample、同じstateへの別経路を同一sampleとして扱えること
+- production helperのouter envelopeと `state.handoffs` physical schema、storage-provided state revisionを区別できること
+- 同じ `HANDOFF-001` でもorigin artifact / revisionが異なれば別operation ref、同じorigin retryなら同じoperation refになること
 - handoffをworkflow stateへ `pending` CAS保存するまでbrowser ownerを開始しないこと
-- mutable operation claim / resource reservation後に `in-progress` CASを保存できた場合だけbrowser actionを開始すること
-- partial return、stale origin、conflicting current return、cleanup未完了ではresumeしないこと
+- mutable operation claim / canonical-order resource reservation後に `in-progress` CASを保存できた場合だけbrowser actionを開始すること
+- resource取得途中失敗 / in-progress CAS conflictではbrowser未開始のままreservation逆順releaseとsafe claim recoveryを行うこと
+- partial return、stale origin、conflicting current return、cleanup未完了、reservation未releaseではresumeしないこと
+- normal completionでreservationを逆順releaseし、release失敗 / revision conflictではcloseしないこと
+- close-ready → closed CAS → state再読込 → may-resumeの順序を満たすこと
 - exact duplicate returnはidempotentに扱い、明示supersedes lineageでのみcurrent resultを置き換えること
 - observation結果がPR #11 freshness契約でcurrentな場合だけformal evaluationへ再利用されること
 - Step 4.2でunchangedかつcurrentなcontent resultは再利用し、interaction後にchanged / unknownとなったcontentだけを再評価すること
@@ -172,12 +179,12 @@ repository implementationの完了条件:
 - external secret / user dataを必須にしない
 - 3 Skillの対象canonical E2EがPASS
 - formal direct triggerからoriginating evaluation / revision / resume operationを保持して `qa-workflow → usability-inspection → formal Skill resume` をPASS
-- `_04c` handoff stateをnative CASで更新し、expected observation集合とcurrent valid returned result集合が一致し、origin revision / cleanup / lineageがcurrentになるまでresumeしないことをPASS
+- `_04c` handoff stateをnative CASで更新し、composite operation identity、claim / reservation lifecycle、expected observation集合とcurrent valid returned result集合、origin revision / cleanup / lineage / releaseがcurrentになり、closed CAS後の再読込まで完了するまでresumeしないことをPASS
 - `_05g` fixed probe request / normalize契約をbrowser E2EでPASSし、Agentのad hoc JavaScript / raw値手計算を必要としない
 - evidence safety / side-effect / browser ownershipをPASS
 - repository標準のdeterministic / semantic / routing / Skill validationをPASS
 - WCAG 2.0 / 2.1 / 2.2 requirement catalogのcanonical hash再計算と承認済みhash contract testをdeterministic validationでPASS
-- version切替、unsupported / unresolved / out-of-scope分離、scope coverage row、baseline extension、repeat-evaluation retained / replaced / added lineage、non-finite random selection guard、candidate population変更時のreselection、Conforming Alternate Version条件、Non-Interference固定SC集合、Step 5.1 example coverage / accessible output、Step 5.3 Evaluation Statementの2.2-only guard、version別Claim URI / third-party 2-business-day guard、EARL全mappingはdeterministic / semantic evalでPASS
+- version切替、unsupported / unresolved / out-of-scope分離、scope coverage row、baseline extension、repeat-evaluation retained / replaced / added lineage、random `target-met / exhausted-no-new-view / blocked` 分離、non-finite random selection guard、candidate population変更時のreselection、Conforming Alternate Version条件、Non-Interference固定SC集合、Step 5.1 example coverage / accessible output、Step 5.3 Evaluation Statementの2.2-only guard、version別Claim URI / third-party 2-business-day guard、EARL全mappingはdeterministic / semantic evalでPASS
 - browser E2EではStep 1.4 additional requirementのsample / report反映、sampling used / skipped、sample identity、Conforming Alternate Versionのfull-page grouping、Step 4.2 unchanged-result reuse、same-population Step 4.3再sampling、freshness付きobservation handoff / resume、safe Evaluation Specifics handoff、EARL assertionとのresult一致をPASS
 - canonical fixtureで未解決blockedが0
 

@@ -140,7 +140,7 @@ WCAG-EM 2のoutput contractはReport ToolのschemaではなくWCAG-EM 2.0本文�
 - 既存sample resultはPR #11 freshnessがcurrentの場合だけ再利用し、version / level / scope / baseline / environment / sample identity / evidence / catalog hash / upstream dependency変更では再評価
 - Step 4.2ではidentity / evidence / freshnessでcurrentなunchanged content resultだけを再利用し、changed / unknown contentとinteraction / feedbackを再評価
 - selection method記録
-- no-new-sample completion
+- random selection status `target-met / exhausted-no-new-view / blocked`。complete finite inventoryまたはscope-wide exhaustion evidenceがある場合だけ `exhausted-no-new-view` でStep 3.2を閉じ、candidate取得不完全は `blocked`
 
 ### runtime / structure
 
@@ -194,12 +194,16 @@ selected sampleごとにlive accessibility observationが必要なcaseで、
 
 - wcag-conformance-evaluationがsample / process / requirement / observation request scope、originating evaluation / revision、resume operationを固定してnormalized handoffを出す
 - qa-workflowが `_04c` のhandoff recordを `pending` としてnative CASでworkflow stateへ保存する。CASできるまでbrowser操作を開始しない
-- qa-workflowが `handoff_ref` のmutable operation claimと必要なshared resource reservationを取得し、`in-progress` をCAS保存した後だけusability-inspectionを開始する
+- qa-workflowがorigin artifact ref / revision / handoff refからdeterministic `operation_ref` を導出し、そのidentityでmutable operation claimを取得する
+- required shared resourceをcanonical orderで取得し、claim / reservation refsを含む `in-progress` をCAS保存した後だけusability-inspectionを開始する
+- resource取得途中失敗または `in-progress` CAS conflictではbrowserを開始せず、取得済みreservationを逆順releaseし、owner未開始 / cleanup確認済みの場合だけclaim recoveryする
 - usability-inspectionがbrowser ownerとして `_05g` fixed observation requestを直列実行する
 - immutable evidence / inspection artifact refをhandoff ref / observation request ref / origin revision付きでqa-workflowへ返す
-- qa-workflow helperがresult currentness、exact duplicate、supersedes lineage、cleanup、expected-current-valid-returned集合を照合する
-- origin stale、claim / CAS failure、conflicting current return、未充足expected observationがある場合はresumeしない
-- `may_resume=true` をCAS保存できた場合だけ元evaluation / revision / resume operationへcurrent result refsをhandoffする
+- qa-workflow helperがreturned resultからobservation keyを導出し、result currentness、exact duplicate、supersedes lineage、expected-current-valid-returned集合を照合する
+- owner complete / cleanup成功後、required shared reservationを逆順releaseし、release failureではcloseしない
+- helperが `close_ready` を導出し、`closed` をCAS保存した後にstateを再読込して `may_resume` を判定する
+- origin stale、claim / CAS / release failure、conflicting current return、未充足expected observationがある場合はresumeしない
+- re-read後のcurrent stateで `may_resume=true` の場合だけ元evaluation / revision / resume operationへcurrent result refsをhandoffする
 - wcag-conformance-evaluationが同じevaluation revisionをresumeしてaggregationする
 
 ことを確認します。
@@ -225,7 +229,7 @@ W3C WCAG-EM 2.0 Step 3.2へ合わせて確認します。
 - target scope全体をselection scopeとする
 - predictable fixed patternを使わない
 - selection method記録
-- unique candidate exhaustion
+- unique candidate exhaustionはcomplete finite inventoryまたはscope-wide exhaustion evidenceがある場合だけ `exhausted-no-new-view`。candidate取得不完全は `blocked`
 
 selection結果そのものをdeterministic fixtureへ固定して「random性」を証明しません。
 
@@ -312,11 +316,12 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 - sampling procedure used / skippedとselected sample set closure
 - rerun retained / replaced / added / unavailable sample lineage
 - observation handoff origin / resume identity / expected observation materialization
-- `_04c` state CAS、mutable operation claim、resource reservation、duplicate / conflicting return、stale origin、expected-returned closure、resume guard
+- `_04c` physical `state.handoffs` schema、composite operation identity、state CAS、mutable operation claim、resource acquisition / rollback / normal release、duplicate / conflicting return、stale origin、close-ready → closed CAS → re-read → resume guard
 - ref
 - sample count
 - finite inventory candidate derivation / recorded method provenance
 - candidate population fingerprint
+- random selection status / exhaustion evidence / blocked completion guard
 - duplicate / overlap
 - process sequence → process-added sample materialization
 - Step 4.2 unchanged-result reuse eligibility
@@ -346,7 +351,7 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 ## 14. 完了条件
 
 - Skill責務がusability-inspectionと分離
-- qa-workflowがmulti-Skill observation handoffを直列オーケストレーションし、handoff state / CAS / claim / closureを `_04c` どおり実装
+- qa-workflowがmulti-Skill observation handoffを直列オーケストレーションし、physical state schema / composite operation identity / CAS / claim / reservation lifecycle / closureを `_04c` どおり実装
 - standalone packageがsibling Skill scriptsへruntime依存しない
 - WCAG-EM Step 1〜5 traceability
 - Step 1.4 additional evaluation requirementsをref採番し、目的内要件をaffected step / outputへ反映してappliedまたはblocked、明示目的外だけを理由付きout-of-scopeへ閉じる
