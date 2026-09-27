@@ -217,7 +217,7 @@ browser I/O前後のmachine contractを担当します。詳細は `_05g_usabili
 - previous requestとidentity / evidence fingerprintが同一なら `no-progress` としbrowser requestを生成しない
 - target draftからartifact-local `TARGET-001` 等を採番し、5種resolverのpayload、Playwright exact matching、parent scope、population revision / fingerprint、current document / session、uniqueness契約をmaterialize
 - `browser-observation-catalog.json` の明示dispatchからsemantic追加観測のrequired probe key集合を導出
-- `wcag-machine-probe-catalog.json` の明示dispatchからformal WCAG machine requestを検証し、同catalogのcanonical hashを `static_data_versions.wcag_machine_probes` へ保持
+- `wcag-machine-probe-catalog.json` の明示dispatchからformal WCAG machine requestを検証し、`request_kind=wcag-machine-probe` を実際に処理したruntime unitだけ同catalogのcanonical hashを `static_data_versions.wcag_machine_probes` へ保持。formal machine request未使用のruntimeではこのkeyを出さない
 - `PROBE-001` 等のartifact-local probe request refを決定論的に採番
 - additional observation request statusとprobe request refs / result evidence refsをmaterialize
 - fixed probe payload / execution metadataをmaterialize
