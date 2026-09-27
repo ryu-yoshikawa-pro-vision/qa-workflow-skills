@@ -302,6 +302,30 @@ probeはUI発見shortcutになりません。
 
 `observation_contract.py` は自然言語UIからtargetを選びません。targetの意味的発見はsemantic/browser owner、request schemaとmachine observation closureはscriptです。
 
+## 6.1 semantic判断からの追加観測
+
+固定probe集合は最低限必要なmachine observationを取得するための契約であり、semantic layerが評価途中で追加evidenceの必要性を発見することを禁止しません。
+
+semantic layerは追加観測が必要な場合、少なくとも次を返します。
+
+- 関連scope ref
+- related evaluation refまたはcriterion / semantic procedure ref（存在する場合）
+- target / state / interactionの説明
+- 必要な観測内容
+- 観測が必要な理由
+- requested observation field / evidence kind。既存catalog keyで表現できる場合はそのkey
+- current evidence refs
+
+browser ownerは宣言済みtarget / origin / role / side-effect scopeの中でuser-facing interactionを使って必要stateへ到達できます。LLMが任意CSS selector、XPath、test id、JavaScript式、hidden implementation stateを追加観測の実行方法として指定する契約にはしません。
+
+`observation_contract.py` は、追加観測draftを既存のtarget registry、browser observation catalog、fixed probe、fixed predicateへ解決できる場合だけrequestをmaterializeします。ref採番、required field、schema、capability、重複、currentnessはscriptが検証します。
+
+同一semantic decisionについて、同じtarget / state / requested fieldの追加観測がcurrent evidenceを増やさないまま再要求された場合は同じbrowser操作を反復せず、`no-progress` としてsemantic layerへ返します。
+
+既存fixed contractで安全に取得できない場合は `unsupported / unavailable / blocked` とし、その結果をsemantic layerへ返します。追加観測のためだけにgeneric probe DSLやad hoc page scriptを追加しません。
+
+formal WCAG handoffでは、追加観測は既存のrequired criterion / procedureを解くためのevidence取得に限定します。追加観測によってrequired Success Criterion集合やprocedure集合を増減しません。browser再実行が必要な場合は `_04c` のnew handoff lineageを使います。
+
 ## 7. scopeからprobe集合を導出する
 
 `inspection_structure.py` はraw user requestから完成scope rowをLLMへ作らせません。required observation field集合とprobe集合の導出ownerは `observation_contract.py` に一元化し、`inspection_structure.py` は再計算しません。

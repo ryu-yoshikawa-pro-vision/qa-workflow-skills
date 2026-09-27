@@ -233,9 +233,13 @@ ACT Rule `failed` がmapped requirementの `not-satisfied` を直接証明でき
 
 machineへ移せないものも実行経路を未定義にしません。
 
-procedure catalogに基づき必要execution rowを必ずmaterializeし、semantic layerはそのprocedureで定義したdecision fieldだけを返します。
+procedure catalogに基づき必要execution rowを必ずmaterializeします。semantic layerはprocedureで定義したdecisionに加えて、判断理由、uncertainty / unresolved condition、使用したevidence refs、必要な場合の追加観測要求を返せます。structured outputを求めるのはcriterion / procedure集合やstatusをLLMに手組みさせないためであり、意味判断そのものを固定enumだけへ縮退させるためではありません。
 
-「どのcriterionを確認するか」「どのprocedureを省略するか」「何を未実施として残すか」をsemantic layerへ自由入力させません。
+「どのcriterionを確認するか」「どのrequired procedureを省略するか」「何を未実施として隠すか」をsemantic layerへ自由入力させません。一方で、required procedureを評価する過程で複数evidenceの関係、目的、意味、例外、content equivalence等を総合判断することはsemantic layerの責務です。
+
+追加evidenceが必要な場合は `_05g` のsemantic追加観測契約へ要求を返します。追加観測によってrequired Success Criterion集合 / procedure集合を変更せず、fixed observation contractで安全に取得できなければ `undetermined / blocked` に残します。
+
+semantic判断からWCAG criterionとは別のユーザビリティ / business flow上の懸念を発見した場合、その懸念をWCAG resultへ混ぜません。必要なら別のusability-evaluation / Findingへroutingできます。
 
 必要evidence不足は `undetermined`、必要環境自体がなく実施不能なら `blocked` とします。
 
@@ -316,6 +320,10 @@ production `wcag_criterion_plan.py` と別実装で少なくとも次を検証�
 - reflow geometry + semantic exception
 - AT procedure applicable / environment unavailable → blocked
 - manual evidence不足 → undetermined
+- semantic procedureが追加観測を要求 → fixed observation contractで取得 → 同じprocedureを再評価
+- 同一追加観測をnew evidenceなしで再要求 → no-progressとしてundetermined / blocked
+- fixed observation contractで表現できない追加観測 → ad hoc probeを作らずundetermined / blocked
+- semantic判断で別のusability concernを発見 → WCAG resultへ混ぜず別routing
 - execution pending / blocked + result非null → invalid
 - all required applicable procedure closure → satisfied可能
 - stale observation → new handoffで再観測
@@ -329,6 +337,7 @@ production `wcag_criterion_plan.py` と別実装で少なくとも次を検証�
 - machine化できる処理をsemantic / manualへ逃がしていないことをprocedure catalog semantic reviewで確認する
 - target version / level × required variationからcriterion planをscriptが全件materializeする
 - criterionの選択・省略・procedure集合をLLMへ任せない
+- semantic procedureの判断理由・uncertainty・追加観測要求を保持でき、fixed procedure catalogをLLMが発見できる意味上の問題の上限として扱わない
 - geometry / contrast / overflow / elapsed / supported ACT check等、決定論的処理をscriptへ移す
 - AT利用要否をSuccess Criterion固定booleanにせず、selected procedure + current content / technology + baselineから閉じる
 - applicable contentが存在しない場合のsatisfied条件をpopulation completeness付きで閉じる

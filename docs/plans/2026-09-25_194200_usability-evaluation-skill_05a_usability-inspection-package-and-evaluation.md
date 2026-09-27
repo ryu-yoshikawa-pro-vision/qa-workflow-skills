@@ -192,6 +192,8 @@ task / flowは指定された場合だけ保持します。
 - task / flow
 - start state
 - success condition
+- business outcome / business rule / Authority refs（提供されている場合）
+- observed end state / outcome
 - task result
 
 ### objective observations
@@ -570,6 +572,24 @@ LCP / CLS / INPを独自実装して作らず `measurement-unavailable` とし�
 ACT Ruleをsupported implementationとして追加するcase。
 
 official examplesとrequirements mappingをfixture化し、ACT Rules Format 1.1 §4.14.1のconsistency条件を確認すること。条件を満たせないruleをsupported ACT implementationとして登録しないこと。
+
+### Case AE: fixed coverage外の複合的な懸念
+
+general inspectionの固定観点と既知checkはすべて実行できたが、filter変更とpagination、または複数stateの組合せで初めて意味的不整合が確認できる。
+
+固定checklistに名称がないことを理由に無視せず、宣言済みscope内の追加Observation / usability-evaluation draftとして扱うこと。新しい上位aspect keyやscope外探索を勝手に作らないこと。
+
+### Case AF: semantic追加観測
+
+usability-evaluationが現在のevidenceだけでは判断できず、別stateのfeedback確認が必要と判断する。
+
+必要な観測内容と理由を返し、usability-inspectionが既存side-effect / ownership契約の範囲でstateへ到達し、`observation_contract.py` のfixed field / probeへ変換して追加evidenceを取得できること。任意JavaScript、hidden DOM、test idによるshortcutへfallbackしないこと。同一requestをnew evidenceなしで反復しないこと。
+
+### Case AG: business outcomeとの意味的整合
+
+仕様またはvalidated TCにbusiness outcomeが明示されており、各controlは個別には操作できるが、flow途中の表示・入力保持・最終feedbackの意味がbusiness outcomeと矛盾する。
+
+LLMはflow全体の意味的な懸念を評価できること。一方、business rule自体の仕様上のPASS / FAILやexpected resultをusability-inspection / usability-evaluationが再定義せず、必要ならtest-execution等の既存ownerへroutingすること。Authorityがないbusiness ruleを創作しないこと。
 
 ## 8. trigger eval
 
