@@ -65,6 +65,7 @@ catalogに載っているだけで、そのsource全体をbundled corpusへ収�
 | W3C-ACT-FORMAT11 | ACT Rules Format 1.1 | https://www.w3.org/TR/act-rules-format/ | normative rule-format standard |
 | W3C-ACT-RULES | All ACT Rules | https://www.w3.org/WAI/standards-guidelines/act/rules/ | informative test rules |
 | W3C-EARL10 | Evaluation and Report Language (EARL) 1.0 Schema | https://www.w3.org/TR/EARL10-Schema/ | WCAG-EM Step 5.5 machine-readable report / W3C Note |
+| W3C-JSON-LD11 | JSON-LD 1.1 | https://www.w3.org/TR/json-ld11/ | EARL JSON-LD serialization / context・IRI semantics |
 | W3C-ACT-OVERVIEW | Accessibility Conformance Testing Overview | https://www.w3.org/WAI/standards-guidelines/act/ | informative overview |
 
 WCAG-EM 2.0は2026-07-23公開のW3C Group Noteとして、WCAG conformance evaluationを明示要求された経路のmethodologyに使用します。一般的なpage inspectionへ無条件適用しません。
@@ -134,6 +135,8 @@ inspection packageにはUI pattern本文を複製せず、live inspection / meas
 | W3C-HTML-AAM10 | HTML Accessibility API Mappings 1.0 | https://www.w3.org/TR/html-aam-1.0/ | current Working Draft / conditional user-agent mapping reference |
 | W3C-ACT-FORMAT11 | ACT Rules Format 1.1 | https://www.w3.org/TR/act-rules-format/ | supported ACT implementation consistency |
 | W3C-ACT-RULES | All ACT Rules | https://www.w3.org/WAI/standards-guidelines/act/rules/ | supported ACT checkのsource |
+| W3C-CSS-CONDITIONAL5 | CSS Conditional Rules Module Level 5 | https://www.w3.org/TR/css-conditional-5/ | media / container size・style・scroll-state query semantics |
+| W3C-CSS-VALUES4 | CSS Values and Units Module Level 4 | https://www.w3.org/TR/css-values-4/ | relative / container length、math function・computed value semantics |
 | W3C-NAV-TIMING | Navigation Timing Level 2 | https://www.w3.org/TR/navigation-timing-2/ | navigation timing |
 | W3C-PAINT-TIMING | Paint Timing | https://www.w3.org/TR/paint-timing/ | FCP等のpaint timing |
 | WEBDEV-VITALS | Web Vitals | https://web.dev/articles/vitals | Core Web Vitals定義の補助 |
