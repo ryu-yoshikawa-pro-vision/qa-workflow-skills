@@ -93,7 +93,7 @@ urn:qa-workflow-skills:earl:<kind>:<sha256(canonical_identity)>
 - `@type`: `earl:TestResult`
 - `earl:outcome`: `{ "@id": "earl:passed | earl:failed | earl:cantTell | earl:untested" }`
 
-evaluation issued timeをformal inputとして保持している場合だけ `dct:date` を出せます。renderer実行時の現在時刻を挿入しません。
+evaluation issued timeをformal inputとして保持している場合だけ `dct:date` を `{ "@value": "<RFC 3339 value>", "@type": "xsd:dateTime" }` で出せます。renderer実行時の現在時刻を挿入しません。
 
 outcome mapping:
 
