@@ -423,7 +423,7 @@ frontmatter変更後はtrigger datasetの回帰確認を実行します。
 
 変更方針・全件照合条件は[`2026-09-27_163600_main-document-consistency_evaluation-doc-sync.md`](./2026-09-27_163600_main-document-consistency_evaluation-doc-sync.md)を正本とします。
 
-validator、fixture、dataset、runtime、CI、test codeは変更しません。
+13〜15ではvalidator、fixture、dataset、runtime、CI、test codeを変更しません。
 
 ## 対象外
 
@@ -526,11 +526,11 @@ git diff --check
 
 8〜10の契約文書同期では、既存の`tests/skills/evals/deterministic/test_qa_artifact_graph_skills.py`も実行し、現在のProject Context / workflow state / claim / reservation契約と矛盾しないことを確認します。
 
-11〜12では、同テストに加えてrepository deterministic test全体を実行し、現在のRegression / QA Knowledge contractと文書同期が矛盾しないことを確認します。validator / fixture / datasetは変更しません。
+11〜12では、同テストに加えてrepository deterministic test全体を実行し、現在のRegression / QA Knowledge contractと文書同期が矛盾しないことを確認します。Plan 11の明示例外であるRegression runtime / validator / fixture / runtime test以外は変更せず、datasetも変更しません。
 
 13〜15ではrepository deterministic test全体を実行し、E2E cleanup契約とAssertion一覧の文書同期が現在validatorを壊していないことを確認します。Assertion IDの照合はvalidator → `ASSERTIONS.md`と`ASSERTIONS.md` → validatorの両方向で行い、Skill-local IDの差分を0件にします。共通runtimeの`RT-Dxxx`は別契約として扱います。
 
-コード・dataset・runtimeを変更しないため、実Agent candidate / 実Judgeの再評価は行いません。
+今回のruntime変更はRegression Baselineのfail-closed検証とmembership projection整合に限定され、semantic / trigger datasetやSkill routing契約を変更していません。このため実Agent candidate / 外部Judgeの再評価は要求せず、deterministic Regression testsと既存semantic / trigger validationで回帰を確認します。
 
 ## 完了条件
 

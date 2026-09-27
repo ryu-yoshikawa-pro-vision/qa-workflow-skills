@@ -136,9 +136,19 @@ def reconcile_membership(snapshot: dict[str, Any], decisions: list[dict[str, Any
     member_refs = sorted(ref for ref, item in decision_by_ref.items() if item.get("decision") == "member" and ref in cases)
     one_off = sorted(ref for ref, item in decision_by_ref.items() if item.get("decision") == "one_off" and ref in cases)
     complete = bool(snapshot.get("complete")) and not undecided and not issues
+    memberships = [
+        {
+            "tc_ref": ref,
+            "lifecycle_status": cases[ref]["lifecycle_status"],
+            "decision": decision_by_ref[ref].get("decision"),
+            "reason": decision_by_ref[ref].get("reason"),
+        }
+        for ref in sorted(decision_by_ref)
+        if ref in cases
+    ]
     return {
         "snapshot_ref": snapshot.get("snapshot_ref"),
-        "memberships": [decision_by_ref[ref] for ref in sorted(decision_by_ref) if ref in cases],
+        "memberships": memberships,
         "member_tc_refs": member_refs,
         "one_off_tc_refs": one_off,
         "unresolved_tc_refs": sorted(set(snapshot.get("unresolved_tc_refs", [])) | {ref for ref, item in decision_by_ref.items() if item.get("decision") == "unresolved"}),

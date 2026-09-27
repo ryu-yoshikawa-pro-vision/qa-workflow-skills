@@ -239,7 +239,7 @@ python -m unittest discover -s tests/skills/evals/deterministic -v
 git diff --check
 ```
 
-コード、validator、fixtureを変更しないため、deterministic datasetの期待値変更は行いません。
+Plan 11の例外としてRegression runtime / validator / fixture / runtime testを変更しましたが、deterministic datasetのcase構成やexpected contractを変更する必要はないため、datasetは変更しません。
 
 ## 完了条件
 

@@ -97,6 +97,65 @@ class RegressionRuntimeTests(unittest.TestCase):
         complete["coverage_gaps"] = ["scope:refund"]
         self.assertTrue(complete["complete"])
 
+    def test_discovery_membership_baseline_currentness_and_full_run_contract(self):
+        snapshot = self.discovery()
+        decisions = [
+            {"tc_ref": "TC-001", "decision": "member", "reason": "current recurring path"},
+            {"tc_ref": "TC-002", "decision": "one_off", "reason": "migration only"},
+        ]
+        membership = regression.reconcile_membership(snapshot, decisions)
+        expected_memberships = [
+            {"tc_ref": "TC-001", "lifecycle_status": "current", "decision": "member", "reason": "current recurring path"},
+            {"tc_ref": "TC-002", "lifecycle_status": "current", "decision": "one_off", "reason": "migration only"},
+        ]
+        self.assertEqual(membership["memberships"], expected_memberships)
+        self.assertEqual(membership["member_tc_refs"], ["TC-001"])
+        self.assertEqual(membership["one_off_tc_refs"], ["TC-002"])
+        caller_lifecycle = regression.reconcile_membership(snapshot, [
+            {**decisions[0], "lifecycle_status": "stale"},
+            {**decisions[1], "lifecycle_status": "deleted"},
+        ])
+        self.assertEqual(caller_lifecycle["memberships"], expected_memberships)
+
+        scope_identity = "scope:checkout"
+        baseline = {
+            "artifact_type": "baseline",
+            "schema_version": "1",
+            "baseline_ref": "BASE-TEST-001",
+            "discovery_snapshot_ref": snapshot["snapshot_ref"],
+            "source_revisions": snapshot["source_revisions"],
+            "scope_identity": scope_identity,
+            "scope_refs": [],
+            "memberships": membership["memberships"],
+            "member_tc_refs": membership["member_tc_refs"],
+            "one_off_tc_refs": membership["one_off_tc_refs"],
+            "unresolved_tc_refs": membership["unresolved_tc_refs"],
+            "undecided_tc_refs": membership["undecided_tc_refs"],
+            "coverage_gaps": [],
+            "completeness_evidence": {
+                "root_listing_complete": True,
+                "source_revisions_complete": True,
+                "lifecycle_resolved": True,
+                "membership_decisions_complete": True,
+            },
+            "complete": membership["complete"],
+        }
+        rendered = "```json\n" + json.dumps(baseline, ensure_ascii=False) + "\n```"
+        validation = regression_validator.validate(rendered, {"artifact_type": "baseline"}, "REG-OUT-001")
+        statuses = {item.id: item.status for item in validation.assertions}
+        self.assertEqual(statuses["REG-D003"], "pass")
+        self.assertEqual(statuses["REG-D004"], "pass")
+        self.assertEqual(statuses["REG-D016"], "pass")
+        self.assertTrue(all(status == "pass" for status in statuses.values()), statuses)
+
+        current = {**snapshot, "scope_identity": scope_identity}
+        currentness = regression.check_baseline_currentness(baseline, current)
+        self.assertEqual(currentness["status"], "current")
+        full = regression.plan_run(baseline, requested_scope="full", currentness=currentness)
+        self.assertEqual(full["status"], "ready")
+        self.assertEqual(full["selected_tc_refs"], ["TC-001"])
+        self.assertTrue(full["suite_complete"])
+
     def test_currentness_precedes_full_and_selected_run_planning(self):
         baseline = {"complete": True, "member_tc_refs": ["TC-001", "TC-002"]}
         self.assertEqual(regression.plan_run(baseline, requested_scope="full")["status"], "blocked")
