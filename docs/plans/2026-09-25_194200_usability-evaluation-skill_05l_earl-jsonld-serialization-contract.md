@@ -91,18 +91,19 @@ urn:qa-workflow-skills:earl:<kind>:<sha256(canonical_identity)>
 
 - `@id`
 - `@type`: `earl:TestResult`
-- `earl:outcome`: `{ "@id": "earl:passed | earl:failed | earl:cantTell | earl:untested" }`
+- `earl:outcome`: `{ "@id": "earl:passed | earl:failed | earl:cantTell | earl:inapplicable | earl:untested" }`
 
 evaluation issued timeをformal inputとして保持している場合だけ `dct:date` を `{ "@value": "<RFC 3339 value>", "@type": "xsd:dateTime" }` で出せます。renderer実行時の現在時刻を挿入しません。
 
 outcome mapping:
 
-- `satisfied` → `earl:passed`
+- Success Criterion rowで `applicable_population=none` かつrequired population / procedure closureがcomplete → human-readable WCAG resultは `satisfied` のまま、EARL TestResultは `earl:inapplicable`
+- 上記以外の `satisfied` → `earl:passed`
 - `not-satisfied` → `earl:failed`
 - `undetermined` → `earl:cantTell`
 - 明示的な未実施resultをblocked / incomplete artifactへ出力する場合だけ `earl:untested`
 
-Success Criterionにapplicable contentが存在しないことをprocedure closureで確認してformal resultが `satisfied` になった場合、EARLだけ別のoutcomeへ変更しません。
+EARL outcomeは「testがsubjectへ適用された結果」を保持するため、WCAG conformance集計上の `satisfied` とEARL outcomeを1対1で潰しません。`applicable_population=none` を `earl:passed` へ変換して適用有無を失わないようにします。
 
 fixed `@context` はprefix mappingだけなので、IRI-valued propertyをplain stringで書きません。`earl:assertedBy / subject / test / result / mode / outcome` のIRI valueは必ず `{"@id": ...}` objectとしてrenderし、JSON-LD processorがliteralとして解釈する形を禁止します。
 
@@ -136,7 +137,7 @@ subject nodeにはsecret query / fragmentを含むraw URLを必須にしませ�
 - top-level key順: `@context`, `@graph`
 - `@context` key順: `earl`, `dct`, `xsd`
 - graph nodeは `@id` 昇順
-- 各node propertyはlexicographic order。ただし `@id`, `@type` を先頭にrenderしてもよく、その順序をrenderer / validatorで固定する
+- 各node property順は `@id` → `@type` → 残りのproperty keyをlexicographic orderへ固定する
 - set semanticsのarrayはIRI / canonical scalar昇順
 - duplicate node / duplicate property valueをreject
 - compact JSONまたはindent付きJSONのどちらか1形式を実装開始時に選ばず、**indent=2、ensure_ascii=false、末尾LFあり**へ固定する
@@ -161,6 +162,7 @@ rendererを同じnormalized inputへ2回実行してbyte一致することをfix
 - subject / assertedBy ref解決
 - `earl:test` がtarget version static catalogのcanonical URI
 - outcome / modeが許可IRI
+- `applicable_population=none` のcomplete Success Criterion resultが `earl:inapplicable`、applicableな `satisfied` が `earl:passed` へ分離されていること
 - human-readable reportのformal result集合とAssertion集合の差分0
 - normalized inputから期待identityを独立再計算しIRI一致
 - canonical ordering / duplicate無し
@@ -179,7 +181,8 @@ rendererを同じnormalized inputへ2回実行してbyte一致することをfix
 
 少なくとも次を持ちます。
 
-- `satisfied / not-satisfied / undetermined / explicit untested`
+- applicable `satisfied / not-satisfied / undetermined / explicit untested`
+- `applicable_population=none + complete closure → earl:inapplicable`
 - automatic / manual / semiAuto / unknownMode
 - multiple sample / variation subject
 - same normalized input → same IRI / same bytes
@@ -198,7 +201,7 @@ rendererを同じnormalized inputへ2回実行してbyte一致することをfix
 - JSON-LD 1.1のfixed context / IRI semanticsを固定する
 - arbitrary context / arbitrary RDF graphを受け付けない
 - artifact-local refとmachine-readable IRIを混同しない
-- formal resultからoutcome / mode / test URI / identityをscript導出する
+- formal resultとapplicable populationからoutcome / mode / test URI / identityをscript導出する
 - same normalized inputからbyte-identicalなsidecarを生成する
 - human-readable reportとassertion coverageが一致する
 - production rendererと独立validatorを分離する
