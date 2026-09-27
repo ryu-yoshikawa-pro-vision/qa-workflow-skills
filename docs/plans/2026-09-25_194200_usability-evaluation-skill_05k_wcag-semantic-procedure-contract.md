@@ -58,7 +58,7 @@ supported target versionごとに、そのversionに存在する全Success Crite
 - `allowed_additional_observation_fields`
 - `missing_evidence_behavior`
 
-PR #14では `_05i` の4 AT procedureだけがこのrowを持ち、decision keyも `_05i` の固定値と一致させます。required evidence roleは `population-completeness / machine-procedure-result / current-browser-observation / presentation-variation / accessibility-support-baseline / technology-context / authority-context` の部分集合だけを許可します。`assistive-technology-result`、`manual-procedure-result`、`external-evidence-result`、final `s-wcag-*` semantic resultはAT applicability decisionのInputにしません。
+PR #14では `_05i` の4 AT procedureだけがこのrowを持ち、decision keyも `_05i` の固定値と一致させます。 version別のexpected件数はWCAG 2.0=3（1.3.1 / 1.3.2 / 4.1.2）、WCAG 2.1=4、WCAG 2.2=4の合計11件です。4.1.3はWCAG 2.0へ作りません。required evidence roleは `population-completeness / machine-procedure-result / current-browser-observation / presentation-variation / accessibility-support-baseline / technology-context / authority-context` の部分集合だけを許可します。`assistive-technology-result`、`manual-procedure-result`、`external-evidence-result`、final `s-wcag-*` semantic resultはAT applicability decisionのInputにしません。
 
 applicability decision Outputは `procedure_key / applicability(applicable|not-applicable|unknown) / reason / evidence_refs / uncertainty` だけです。criterion result、procedure result、final semantic decisionをここで生成しません。
 
