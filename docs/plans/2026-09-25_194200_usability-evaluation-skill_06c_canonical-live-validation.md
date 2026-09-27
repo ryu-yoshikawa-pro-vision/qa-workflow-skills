@@ -67,6 +67,7 @@ performance値そのものを安定した製品SLOとしてfixtureへ持ち込�
 - cleanup / reset
 - timeoutはrepository既存基準があればそれを使用する
 - evidence保存境界
+- formal handoff用workflow state provider: canonical E2Eでは `tests/skills/evals/deterministic/wcag_handoff_cas_provider.py` のtest-only SQLite provider + testごとの一時DB。production providerとして扱わない
 
 current Playwright versionやPR #12 / #13 merge後のbrowser contractが変わった場合はcurrent implementationを正本にしてこの値を確定します。Plan内で存在しないAPIや固定versionを創作しません。
 
@@ -138,7 +139,7 @@ formal request
 - WCAG 2.0 / 2.1の4.1.1はHTML / XML fixtureで `always-satisfied-html-xml`、非HTML/XML technology fixtureでsemantic evaluation path、WCAG 2.2でrow不存在
 - formal procedure catalogの全machine procedure → machine probe mapping / typed request schema / capabilityが確定していること
 - repository-level contract testでformal required machine probe key集合とinspection `wcag-machine-probe-catalog.json` のmissing / extra / unusedが0件
-- returned inspection artifact / Machine Runtime evidenceの `static_data_versions.wcag_machine_probes` がformal input fingerprint / freshnessへ反映されること
+- formal machine probeを処理したinspection runtimeが `static_data_versions.wcag_machine_probes` を保持し、formal consumerがその `runtime_unit_key / generation_fingerprint` を `metadata.upstream_runtime_units` へexactly-onceで保持すること。inspection generation変更 / missing dependencyでformal resultがstaleになり、formal `static_data_versions` へsibling hashを複製しないこと
 - `_05k` の全supported version / SC semantic contract row、normative clause / exception / evidence role coverageがapproved hashと一致
 - finite procedure catalogの全key解決 / machine dispatch / approved hash。inventoryにないkey / catalogにないkey / unused keyを許可しない
 - sample × required presentation variation × required Success Criterionのcriterion plan coverage
@@ -154,6 +155,7 @@ formal request
 - sampling procedure skippedのcase。completeなin-scope inventory全件がselected sample setとなり、structured / random / Step 4.3がnot-applicableでもcomplete process / Step 4.2評価が続くこと
 - 同一URLの異なるstateを別sample、同じstateへの別経路を同一sampleとして扱えること
 - production helperのouter envelopeと `state.handoffs` physical schema、storage-provided state revisionを区別できること
+- test-only SQLite providerでinitial create、successful conditional write、stale revision conflict、same expected revisionからのconcurrent write 1件成功、reservation owner / revision付きconditional releaseを実CASで確認すること。production local filesystemのexact-content SHAをCAS tokenへ読み替えないこと
 - 同じ `HANDOFF-001` でもorigin artifact / revisionが異なれば別operation refになること
 - same handoff identityのCAS retry / exact immutable result再適用は同じoperation refのidempotent処理でbrowserを再開始しないこと
 - browser開始済みhandoffのstale / evidence不足再観測は `HANDOFF-002` 等のnew handoff + `retry_of_handoff_ref` + new operation refになること
@@ -175,7 +177,9 @@ formal request
 - report materialization / accessible output contract
 - Step 5.2 Evaluation Specificsを有効化したcaseで、browser / tool metadataとsafe evidence refがreportへ戻ること。secret値は保持しない
 - Step 5.5を有効化したcaseで、browser observation由来のformal resultが `_05l` のfixed JSON-LD graphへ対応し、`@context` / Assertion→TestResult→outcome / stable IRI / mode mapping / deterministic bytes / human-readable reportとのassertion coverageが一致すること。applicableな `satisfied` は `earl:passed`、`applicable_population=none` + complete closureはhuman-readable `satisfied` のまま `earl:inapplicable` になること
-- SC 1.4.4 fixtureで `user-agent-full-page-zoom / user-agent-text-only-resize / author-provided-resize-control` のvalid mechanismを評価し、baseline / mechanism scale / used font sizeから全applicable rendered textの2.0x到達を確認すること。responsive breakpointでzoom control値200%時にtextが2.0x未満となり、後続stateで2.0xへ到達するcaseを含める。incremental mechanismはtarget到達までのintermediate stateも確認する。`deviceScaleFactor`、viewport resize、CSS transform / test専用font-size注入を代替mechanismとして受理せず、text populationまたはvalid mechanismを閉じられないcaseは擬似resizeへfallbackせず `blocked / undetermined` へ閉じること
+- SC 1.4.4のbrowser E2Eはfixture内の `author-provided-resize-control` をmachine-executable mechanismとして用意し、baseline / used font sizeから全applicable rendered textの2.0x到達を確認すること。responsive breakpointでcontrol stateとrendered scaleが単純一致しないcase、target到達までのintermediate stateも含める。`deviceScaleFactor`、viewport resize、CSS transform / test専用font-size注入を代替mechanismとして受理しないこと
+- 別fixtureでuser-agent mechanismは存在するがcurrent browser ownerが操作できない、またはscaleをmachine-readableに取得できないcaseを作り、`text-scaling-mechanism-not-machine-executable / text-scaling-state-not-machine-readable` から `manual-wcag-1.4.4` がapplicableになること。固定manual evidenceがあればcriterionをclosureでき、manual evidence / capabilityも不足するcaseだけ `blocked / undetermined` になること
+- 1.4.3 / 1.4.6 / 1.4.11でgradient / image / blend背景により `background-not-machine-resolvable`、2.4.13でcomplex focus indicatorにより `focus-indicator-not-machine-resolvable` を返すfixtureを持ち、対応manual fallbackがscriptでapplicableになること。machine limitationだけでcriterionをblockedへ短絡しないこと
 
 を確認します。
 
@@ -205,13 +209,13 @@ repository implementationの完了条件:
 - external secret / user dataを必須にしない
 - 3 Skillの対象canonical E2EがPASS
 - formal direct triggerからoriginating evaluation / revision / resume operationを保持して `qa-workflow → usability-inspection → formal Skill resume` をPASS
-- `_04c` handoff stateをnative CASで更新し、composite operation identity、claim / reservation lifecycle、expected observation集合とcurrent valid returned result集合、origin revision / cleanup / lineage / releaseがcurrentになり、closed CAS後の再読込まで完了するまでresumeしないことをPASS
+- `_04c` handoff stateをcanonical E2Eのtest-only SQLite providerで実CAS更新し、composite operation identity、claim / reservation lifecycle、expected observation集合とcurrent valid returned result集合、origin revision / cleanup / lineage / releaseがcurrentになり、closed CAS後の再読込まで完了するまでresumeしないことをPASS。production local filesystemがCAS可能になったとは扱わない
 - `_05g` fixed probe request / normalize契約をbrowser E2EでPASSし、Agentのad hoc JavaScript / raw値手計算を必要としない
 - fixed coverage外の複合的懸念、semantic追加観測、Authority付きbusiness outcomeの3ケースをsemantic / browser E2EでPASSし、機械化がLLMのscope内意味判断を抑制しないことを確認する
 - evidence safety / side-effect / browser ownershipをPASS
 - repository標準のdeterministic / semantic / routing / Skill validationをPASS
 - WCAG 2.0 / 2.1 / 2.2 requirement catalogのcanonical hash再計算と承認済みhash contract testをdeterministic validationでPASS
-- version切替、unsupported / unresolved / out-of-scope分離、4.1.1 version / technology rule、scope coverage row、presentation variation / Full Pages closure、baseline extension、finite procedure catalog、formal typed machine probe request / cross-package probe catalog整合、Resize Text valid mechanism、`_05k` semantic contract coverage、criterion plan→final result linkage、applicable population none guard、repeat-evaluation retained / replaced / added lineage、random `target-met / exhausted-no-new-view / blocked` 分離、non-finite random selection guard、candidate population変更時のreselection、Conforming Alternate Version条件、Non-Interference固定SC集合、Step 5.1 example coverage / accessible output、Step 5.3 Evaluation Statementの2.2-only guard、version別Claim URI / third-party 2-business-day guard、`_05l` EARL JSON-LD `inapplicable` を含む全mapping / serializationはdeterministic / semantic evalでPASS
+- version切替、unsupported / unresolved / out-of-scope分離、4.1.1 version / technology rule、scope coverage row、presentation variation / Full Pages closure、baseline extension、finite procedure catalog、procedure applicability / conditional manual fallback、formal typed machine probe request / cross-package probe catalog整合、inspection→formal `upstream_runtime_units` freshness、Resize Text machine / manual path、`_05k` semantic contract coverage、criterion plan→final result linkage、applicable population none guard、repeat-evaluation retained / replaced / added lineage、random `target-met / exhausted-no-new-view / blocked` 分離、non-finite random selection guard、candidate population変更時のreselection、Conforming Alternate Version条件、Non-Interference固定SC集合、Step 5.1 example coverage / accessible output、Step 5.3 Evaluation Statementの2.2-only guard、version別Claim URI / third-party 2-business-day guard、`_05l` EARL JSON-LD `inapplicable` を含む全mapping / serializationはdeterministic / semantic evalでPASS
 - browser E2EではStep 1.4 additional requirementのsample / report反映、sampling used / skipped、sample identity、Conforming Alternate Versionのfull-page grouping、Step 4.2 unchanged-result reuse、same-population Step 4.3再sampling、freshness付きobservation handoff / resume、safe Evaluation Specifics handoff、EARL assertionとのresult一致をPASS
 - canonical fixtureで未解決blockedが0
 
