@@ -50,7 +50,7 @@ catalog row:
 
 ### 2.1 canonical observation field inventory
 
-semantic layerとmachine procedureが指定できるobservation field keyは次だけです。key名は実装時に変更・追加せず、追加が必要なら先にPlanを更新します。
+semantic layerが追加evidence取得のために指定できるobservation field keyは次だけです。key名は実装時に変更・追加せず、追加が必要なら先にPlanを更新します。formal WCAGのmachine procedureが必要とする固定browser取得はこの自由選択interfaceへ載せず、`_05j_wcag-machine-browser-observation-contract.md` の `machine_probe_key` を `wcag_criterion_plan.py` がprocedureから導出します。
 
 | observation field key | owner probe | request payload | canonical result |
 | --- | --- | --- | --- |
@@ -64,13 +64,14 @@ semantic layerとmachine procedureが指定できるobservation field keyは次�
 | `accessibility.semantics` | `accessibility-semantics` | `target_ref` | role / accessible name / description / relevant state-property |
 | `focus.state` | `focus-state` | target / before-after context | active target identity、focusable / focus-visible machine values |
 | `computed-style.properties` | `computed-style` | `target_ref`, allowlisted `property_names` | requested property name/value map |
-| `responsive.boundaries` | `responsive-boundaries` | current document / Authority context | normalized boundary rows / completeness / execution feasibility |
+| `responsive.conditions` | `responsive-conditions` | current document / Authority context | media / container size / style / scroll-state condition rows、source / capability / execution feasibility |
+| `responsive.boundaries` | `responsive-boundaries` | `responsive.conditions` のsize condition | browser-evaluated numeric transition rows / completeness / execution feasibility |
 | `navigation.timing` | `navigation-timing` | なし | allowlisted Navigation Timing fields |
 | `paint.timing` | `paint-timing` | なし | allowlisted Paint Timing entries |
 | `interaction.timing` | `interaction-timing` | fixed predicate payload | same-page clockのstart/end/elapsedとpredicate result |
 | `screenshot.image` | `screenshot` | viewport / target / state context | evidence ref |
 
-`browser-observation-catalog.json` の `provided_observation_fields` はこのinventoryの部分集合だけを持ち、全fieldはちょうど1つのprobeへ解決します。unknown key、alias、自然言語field名を受け付けません。
+`browser-observation-catalog.json` の `provided_observation_fields` はこの16-key inventoryの部分集合だけを持ち、全fieldはちょうど1つのprobeへ解決します。unknown key、alias、自然言語field名を受け付けません。これら16 keyはsemantic追加観測interfaceです。WCAG machine procedure内部の固定probe inventoryとは別契約で、LLMへmachine probe keyを返させません。
 
 ## 3. observation lifecycle
 
@@ -259,84 +260,77 @@ criterion / visual checkで必要と確定したpropertyだけ取得します。
 
 allowlistはcurrent implemented checkからscriptが導出し、LLMが任意property集合を作りません。
 
+### `responsive-conditions`
+
+current documentで有効になり得るresponsive / conditional presentation条件をinventory化します。独自の完全CSS parserを作らず、CSSOMとbrowser自身のcondition evaluationを正本にします。
+
+各condition row:
+
+- condition ref
+- source ref
+- query kind: `media / container-size / container-style / container-scroll-state`
+- raw condition textの必要最小部分
+- query container name / type / identity（container queryの場合）
+- axis / feature（該当する場合）
+- browser capability
+- evaluation method
+- current match state
+- execution status: `executable / not-executable / unsupported`
+- execution reason
+- evidence refs
+
+既知の標準構文を、Plan側のparserが理解できないことだけを理由に `unsupported` にしません。browserがそのconditionを受理・評価できる場合はbrowser評価を使用します。browser / Playwright経路自体が必要capabilityを持たない場合だけ `unsupported` とします。
+
+size query以外のstyle query / scroll-state queryは数値boundaryへ変換しません。presentation variation conditionとして保持し、既存user-facing interactionまたは安全なenvironment操作でrequired stateを作れる場合だけ実行します。required stateを安全に作れない場合は `not-executable` です。
+
 ### `responsive-boundaries`
 
-current documentからwidth / height関連のmedia query / size container queryを列挙し、boundary検出結果と実行可能性を返します。
+`responsive.conditions` のうちsize conditionについて、browser評価で観測できるnumeric transitionをCSS pxへmaterializeします。
 
-各boundary row:
+media size condition:
+
+- condition text全体を `matchMedia()` へ渡し、browser parser / evaluation semanticsを正本にする
+- width / heightの対象axisを固定したうえで、current browserが設定できる有限viewport rangeを整数CSS pxで探索する
+- transitionが存在する場合は固定binary search + neighboring verificationで最小transitionを求める
+- `px / em / rem / vw / vh / vi / vb / vmin / vmax` や `calc()` 等、browserが評価できるlength表現を独自換算しない
+- query textに対して独自に `var()` を展開しない。browserがconditionを有効に評価でき、viewport変更でtransitionを観測できる場合だけ結果を採用する
+- boolean combination / comma branchはraw conditionとbranch identityを保持し、transitionを一意に分離できない場合はcondition自体を失わず `incomplete` とする
+
+container size condition:
+
+- CSSOMとcomputed `container-name / container-type` からquery containerを一意に解決する
+- `px / em / rem / viewport-relative / container-relative length / calc()` 等はbrowserのcomputed / used valueと実際のquery match変化を正本にし、固定16px等で換算しない
+- `cqw / cqh / cqi / cqb / cqmin / cqmax` を既知なのに未対応として落とさない
+- viewport resizeまたは既存user-facing interactionでquery container sizeを安全に変化させられる場合、condition matchとcontainer geometryを同じiterationで取得してtransition CSS pxを導出する
+- testのためだけにDOM / stylesheetへstyle属性、class、custom propertyを注入しない
+- current product behaviorからrequired transitionを安全に作れない場合、condition inventoryは保持して `not-executable / incomplete` とする
+
+custom property / math function:
+
+- `calc()` / `min()` / `max()` / `clamp()` 等のmath functionはbrowserがconditionを評価できる限り、文字列parserで拒否しない
+- `var()` やstyle query custom propertyはsource textの手計算をしない。computed value / condition matchをbrowserから取得できる場合だけmachine evidenceとして使用する
+- unresolved custom property、invalid at computed-value time、browser capability不足は理由付き状態へ閉じる
+
+boundary row:
 
 - boundary ref
-- source ref
-- query kind: `media / container-size`
-- query / container ref
-- axis: `width / height / inline-size / block-size`
-- comparator
-- raw value / unit
-- normalized boundary CSS px（導出できる場合）
-- normalization method
-- condition context
-- detection status: `normalized / unsupported / incomplete`
-- execution status: `executable / not-executable / not-needed`
-- execution reason
-- before / boundary / after target values（executableの場合）
+- condition ref
+- axis
+- before / transition / after CSS px
+- browser match state
+- query container geometry（container sizeの場合）
+- derivation method
+- detection status: `normalized / incomplete / unsupported`
+- execution status: `executable / not-executable`
+- evidence refs
 
-#### media query
+同じconditionのtransitionをcanonicalize / deduplicate / sortします。numeric transitionが存在しないstyle / scroll-state conditionをboundary 0件として消さず、`responsive.conditions` 側でclosureします。
 
-supported:
+#### unreadable / incomplete
 
-- `width / min-width / max-width / height / min-height / max-height`
-- legacy min/max syntax
-- Media Queries Level 4/5の単純range syntax
-- `px / em / rem`
-- `and` / comma-separated branch。ただし各size conditionと他conditionを保持する
+cross-origin stylesheet等でcondition sourceを読み出せない場合、project / adopted Design System Authority、browserから取得できるCSSOM / matched condition evidenceで不足範囲を閉じます。閉じられないsourceが残る場合はinventoryをcomplete扱いしません。
 
-`px` は直接CSS pxへ正規化します。
-
-`em / rem` を16px等の固定値で換算しません。media queryのrelative unitはpage declarationではなくuser agent / user preferenceを含むinitial valueに基づくため、current browserでqueryを評価してeffective CSS px boundaryを導出します。
-
-単一size thresholdまたは他conditionを固定したまま評価できるbranchでは、browser ownerがviewportを整数CSS px単位で変更し `matchMedia()` のtransitionを固定search procedureで求めます。search range、axis、他condition、取得したtransition pxをresultへ保持します。
-
-他conditionが不安定、複数size conditionを分離できない、transitionを一意に求められない場合は `incomplete` とします。
-
-#### container size query
-
-supported:
-
-- `width / height / inline-size / block-size`
-- simple range / min / max
-- `px`
-- query containerを一意に解決でき、browserからrequired computed referenceを取得できる場合の `em / rem`
-
-container queryのrelative unitを固定16pxで換算しません。query container / rootのcurrent computed referenceをbrowser resultとして取得し、scriptがCSS pxへ正規化します。
-
-`var()`、`calc()`、container query length unit、style query、query containerが一意に解決できないcaseは今回のsupported subset外として `incomplete` にします。
-
-#### boundary executable
-
-boundaryを検出・正規化できることと、そのpresentation stateを安全に作れることを分離します。
-
-- media width / heightでcurrent browserがviewportを設定できる → `viewport-resize`
-- width + height compoundで両axisを設定し他conditionを保持できる → `viewport-resize`
-- container queryは、既存のuser-facing操作またはviewport resizeでquery containerがrequired boundaryを跨ぐことを観測できる場合だけ `container-observe`
-- testのためだけにDOMへstyle属性を注入したりquery container widthを直接書き換えたりしない
-- required stateを安全に作れない → `not-executable`。boundary inventory自体は保持するがcoverageをcomplete扱いしない
-
-before / boundary / afterの値はscriptがcanonicalizeし、同じCSS px boundaryをdeduplicate / sortします。
-
-#### unsupported / incomplete
-
-次を推測変換しません。
-
-- `vw / vh / vmin / vmax / cqw / cqh` 等、今回のfixed resolution procedureを持たないunit
-- `calc()`
-- `var()`
-- style query
-- parse不能なnested condition
-- unreadable stylesheet
-- query container unresolved
-- normalizedできてもpresentation stateを実現できないrequired boundary
-
-raw CSS全文を成果物へ無条件保存せず、source ref / query kind / raw conditionの必要最小部分 / unsupported reasonを保持します。
+`unsupported` はcurrent browser/tool capabilityが標準機能を実行できない場合に限定します。既知の標準構文を実装都合で恒久的なsupported subset外へ置きません。
 
 ### `navigation-timing`
 
@@ -485,7 +479,7 @@ tool failureやprobe unavailableをproduct defect / usability issueへ自動変�
 - viewport / element geometry schema
 - `document.location` のfixed probe / sensitive URL handling
 - `element.rendered-text / element.control-value / element.selected-values` のtarget-local fixed probe
-- canonical observation field inventory全15 key → exactly-one probe mapping
+- canonical observation field inventory全16 key → exactly-one probe mapping
 - `document.location` は `page.url()`、`element.rendered-text` は `locator.innerText()`、`element.control-value` は `locator.inputValue()`、`element.selected-values` はselectedOptions `{value,label}` を使用
 - semantic additional observation draft → OBSREQ ref / requester kind / field → probe mapping / state basis identity / evidence fingerprint
 - same request identity + same evidence fingerprint → no-progress
