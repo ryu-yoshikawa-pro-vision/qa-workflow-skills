@@ -321,6 +321,7 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 - version別static requirement catalog / `static_data_versions` / approved hash contract
 - target version / level expected Success Criteria / conformance requirement set
 - finite procedure catalog key / kind / dispatch / hash
+- `_05j` machine probe catalog / `static_data_versions.wcag_machine_probes` / approved hash
 - machine procedure → `_05j` finite machine probe mapping / result schema / capability
 - `_05k` versioned semantic contract coverage / normative clause・exception refs / required evidence role / approved hash
 - WCAG 2.0 / 2.1 4.1.1 HTML/XML shortcut / other technology semantic path / WCAG 2.2 removal
