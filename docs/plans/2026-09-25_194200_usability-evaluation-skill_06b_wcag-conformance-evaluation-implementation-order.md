@@ -326,7 +326,7 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 - repository-level contract testでformal required machine probe keyとinspection catalog keyのmissing / extra / unused 0
 - `_05k` versioned semantic contract coverage / normative clause・exception refs / required evidence role / approved hash
 - WCAG 2.0 / 2.1 4.1.1 HTML/XML shortcut / other technology semantic path / WCAG 2.2 removal
-- SC 1.4.4のvalid text scaling mechanism inventory、100%→200%、incremental step、`deviceScaleFactor` / viewport resize / CSS injectionを代替としてreject、valid mechanism未実行時blocked / undetermined
+- SC 1.4.4のvalid text scaling mechanism inventory、baseline / mechanism scale / used font sizeからrendered text scale ratioを計算して全applicable textの2.0x到達を確認、responsive breakpointを跨ぐcase、target到達までのincremental state、`deviceScaleFactor` / viewport resize / CSS injectionを代替としてreject、text population / valid mechanism未完了時blocked / undetermined
 - semantic procedure resultの判断理由 / uncertainty / additional observation request refs
 - additional observationがrequired criterion / procedure集合を変更せず、fixed observation contractへ解決されること。解決不能またはno-progressではundetermined / blockedへ閉じること
 - semantic判断で発見した別のusability / business flow concernをWCAG resultへ混ぜず別routingできること
