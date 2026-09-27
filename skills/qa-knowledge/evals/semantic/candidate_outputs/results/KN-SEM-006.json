@@ -1,0 +1,37 @@
+{
+  "skill": "qa-knowledge",
+  "eval_id": "KN-SEM-006",
+  "verdict": "pass",
+  "criteria": [
+    {
+      "id": "KN-SEM-002",
+      "title": "Candidate有効化の根拠",
+      "critical": true,
+      "rating": 4,
+      "status": "pass",
+      "reason": "entryの作成を停止し、候補を元レコードに残すとしているため、この状況では有効化していません。Eval Inputでは完全snapshotも与えられています。",
+      "evidence": [
+        "「同一identityのentry作成は停止します」",
+        "「候補は元Activity / Finding / Follow-upに残してください」"
+      ]
+    },
+    {
+      "id": "KN-SEM-006",
+      "title": "Atomic create / update concurrency",
+      "critical": true,
+      "rating": 4,
+      "status": "pass",
+      "reason": "atomic create-if-absentがない場合に作成を停止し、別refを作らない方針です。作成や別entryの更新を行わないため、この状況で無関係entryをstaleにしません。",
+      "evidence": [
+        "「保存先にatomic create-if-absentがないため、同一identityのentry作成は停止します」",
+        "「別refの作成やsemantic auto-mergeには進みません」"
+      ]
+    }
+  ],
+  "summary": {
+    "pass": 2,
+    "needs_review": 0,
+    "fail": 0,
+    "not_evaluable": 0
+  }
+}

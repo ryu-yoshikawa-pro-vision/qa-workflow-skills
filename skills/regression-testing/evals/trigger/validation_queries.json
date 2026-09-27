@@ -1,0 +1,34 @@
+[
+  {
+    "query": "Regression Suiteのbaseline membershipを更新して。",
+    "should_trigger": true
+  },
+  {
+    "query": "Regression Activityの履歴と未実行TCを確認して。",
+    "should_trigger": true
+  },
+  {
+    "query": "明示されたTC scopeでselected Regression Runを計画して。",
+    "should_trigger": true
+  },
+  {
+    "query": "古いbaselineをそのままfull扱いせず、Run前currentnessを確認して。",
+    "should_trigger": true
+  },
+  {
+    "query": "今回の差分によるリスクを新しく採点して。",
+    "should_trigger": false
+  },
+  {
+    "query": "テストケースの手順に従って画面を実操作して。",
+    "should_trigger": false
+  },
+  {
+    "query": "既知ownerがない症状をhypothesisで探索して。",
+    "should_trigger": false
+  },
+  {
+    "query": "現在のaccessible nameとUI stateを確認して。",
+    "should_trigger": false
+  }
+]

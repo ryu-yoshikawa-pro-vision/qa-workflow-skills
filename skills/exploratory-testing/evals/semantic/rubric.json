@@ -1,0 +1,29 @@
+{
+  "skill": "exploratory-testing",
+  "criteria": [
+    {
+      "id": "EXP-SEM-001",
+      "title": "Owner境界とmode選択",
+      "description": "explorationとinvestigationを正しく使い分け、current UI / known TC / E2E failure等を既存ownerへroutingしているか。",
+      "critical": true
+    },
+    {
+      "id": "EXP-SEM-002",
+      "title": "Charter scopeと操作の適合",
+      "description": "目的、scope、source、終了条件、origin、許可操作、side-effect上限、cleanup、evidence、block条件が目的に見合い、操作を許可する前に固定されているか。",
+      "critical": true
+    },
+    {
+      "id": "EXP-SEM-003",
+      "title": "Observation / Finding判断",
+      "description": "Observationは観測事実、Findingは後続判断が必要な項目として証拠・仮説・unresolvedを分離し、自動仕様 / Defect判定していないか。",
+      "critical": true
+    },
+    {
+      "id": "EXP-SEM-004",
+      "title": "Session cleanupとresume",
+      "description": "unknown attemptをside effectとして計上し、cleanup失敗を未解決として保ち、終了条件・cleanup・Charter / environment不変性に従って完了またはresumeを判断しているか。",
+      "critical": true
+    }
+  ]
+}

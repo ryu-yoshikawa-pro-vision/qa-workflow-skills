@@ -2017,8 +2017,8 @@ class E2EContractTests(unittest.TestCase):
         candidates_path = REPO_ROOT / "skills" / "qa-workflow" / "evals" / "deterministic" / "routing_candidate_outputs.json"
         cases = json.loads(cases_path.read_text(encoding="utf-8"))
         candidates = json.loads(candidates_path.read_text(encoding="utf-8"))
-        self.assertEqual(len(cases), 47)
-        self.assertEqual(len(candidates), 47)
+        self.assertEqual(len(cases), 61)
+        self.assertEqual(len(candidates), 61)
         self.assertEqual({case["id"] for case in cases}, {candidate["id"] for candidate in candidates})
         expected_test_routes = {
             "WF-TEST-001": ("test-target-inspection", "test-target-inspection", ["test-target-inspection"]),
@@ -2047,6 +2047,9 @@ class E2EContractTests(unittest.TestCase):
             "test-analysis": "テスト分析",
             "coverage-analysis": "テスト設計",
             "adversarial-review": "テスト設計成果物",
+            "regression-testing": "baseline / membership",
+            "exploratory-testing": "exploration",
+            "qa-knowledge": "triage",
         }
         multi_use = set(default_targets)
         cases_by_id = {case["id"]: case for case in cases}

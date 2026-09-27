@@ -1,0 +1,27 @@
+{
+  "skill": "regression-testing",
+  "eval_id": "REG-SEM-005",
+  "verdict": "needs_review",
+  "criteria": [
+    {
+      "id": "REG-SEM-005",
+      "title": "FAIL feedbackと修正確認routing",
+      "critical": true,
+      "rating": 2,
+      "status": "needs_review",
+      "reason": "原因調査をquestion-analysisへ戻し、回帰側で原因を再判定せず、有効なcurrent TC-401を既存のtest-executionで修正確認する点は合っています。一方、Defectを自動登録しないことが明示されず、必要時のspec-analysisへのルーティングもなく、周辺Regressionを別Run目的として計画する説明もありません。修正後の結果を別Activityとして記録する説明では、Regressionとの目的の区別が不明確です。",
+      "evidence": [
+        "「原因調査は`question-analysis`へ回し、期待結果の仕様authorityを確認します。」",
+        "「TC-401の改修が必要かどうかは、その確認後に判断します。」",
+        "「修正後の確認は`qa-workflow`経由で既存の`test-execution`を使い、TC-401を再実行します。」",
+        "「修正後の実行結果も別Activityとして記録します。」"
+      ]
+    }
+  ],
+  "summary": {
+    "pass": 0,
+    "needs_review": 1,
+    "fail": 0,
+    "not_evaluable": 0
+  }
+}

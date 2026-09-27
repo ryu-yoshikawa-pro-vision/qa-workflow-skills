@@ -1,0 +1,50 @@
+[
+  {
+    "query": "scripted testだけでなく、変更領域を探索的テストして未知の問題を探して。",
+    "should_trigger": true
+  },
+  {
+    "query": "許可範囲とside effect上限を決めたCharterでexplorationを開始して。",
+    "should_trigger": true
+  },
+  {
+    "query": "再現条件の分からない症状を、実対象でhypothesisを変えて検証して。",
+    "should_trigger": true
+  },
+  {
+    "query": "manual FAILのownerが証拠から特定できないので追加観測でinvestigationして。",
+    "should_trigger": true
+  },
+  {
+    "query": "探索SessionのObservationとFindingを分け、Follow-upを記録して。",
+    "should_trigger": true
+  },
+  {
+    "query": "中断した探索を、Charterとenvironmentが同じなら安全にresumeして。",
+    "should_trigger": true
+  },
+  {
+    "query": "今のUI上のbutton roleとaccessible nameを確認して記録して。",
+    "should_trigger": false
+  },
+  {
+    "query": "詳細TCのGiven/When/Thenを固定順にブラウザで実行して。",
+    "should_trigger": false
+  },
+  {
+    "query": "E2E failureのstack traceから原因と修正先を分析して。",
+    "should_trigger": false
+  },
+  {
+    "query": "矛盾する仕様記述と未回答質問を分類して。",
+    "should_trigger": false
+  },
+  {
+    "query": "今回変更によるProduct Riskを採点して優先度を付けて。",
+    "should_trigger": false
+  },
+  {
+    "query": "機能仕様に基づいてTest Caseを追加設計して。",
+    "should_trigger": false
+  }
+]

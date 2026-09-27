@@ -18,6 +18,9 @@ CANONICAL_SKILLS = {
     "test-case-design",
     "test-target-inspection",
     "test-execution",
+    "regression-testing",
+    "exploratory-testing",
+    "qa-knowledge",
     "coverage-analysis",
     "adversarial-review",
     "e2e-test-inspection",
@@ -33,6 +36,9 @@ MULTI_USE_SKILL_TARGETS = {
     "test-analysis": {"テスト分析", "E2E対象選定"},
     "coverage-analysis": {"テスト設計", "TC → E2E実装", "E2E実装 → 実行結果"},
     "adversarial-review": {"テスト設計成果物", "E2E実装"},
+    "regression-testing": {"baseline / membership", "Run計画", "Run結果更新", "履歴参照"},
+    "exploratory-testing": {"exploration", "investigation"},
+    "qa-knowledge": {"triage", "create / update", "revalidation", "lookup / history"},
 }
 
 PRIORITIES = {"高", "中", "低"}

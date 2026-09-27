@@ -1,0 +1,27 @@
+{
+  "skill": "regression-testing",
+  "eval_id": "REG-SEM-005",
+  "verdict": "pass",
+  "criteria": [
+    {
+      "id": "REG-SEM-005",
+      "title": "FAIL feedbackと修正確認routing",
+      "critical": true,
+      "rating": 4,
+      "status": "pass",
+      "reason": "FAILだけでDefectを自動登録せず、仕様authorityの曖昧さをquestion-analysisへ戻し、必要ならspec-analysisへ引き継いでいます。修正後は有効なcurrent TC-401を既存のtest-executionで再実行し、周辺Regressionを別目的のRunとして扱っています。",
+      "evidence": [
+        "「FAIL / FindingだけではDefectへ自動登録しない」",
+        "「question-analysisで…期待結果の不足条件を確認」「…authorityの確定が必要なら、spec-analysisへ引き継ぎます」",
+        "「同じcurrent TC-401を`test-execution`で再実行して修正確認します」",
+        "「周辺Regressionは修正確認とは別目的のRunとして`regression-testing`で選定します」"
+      ]
+    }
+  ],
+  "summary": {
+    "pass": 1,
+    "needs_review": 0,
+    "fail": 0,
+    "not_evaluable": 0
+  }
+}
