@@ -25,7 +25,7 @@
 
 PR #13 merge後の実装を正本として、現在状態を説明する文書同士の不整合を解消します。
 
-今回修正するのは次の12件です。
+今回修正するのは次の15件です。
 
 1. `skills/qa-workflow/references/guidance.md`に残る「全16 Skill」を19 Skillへ合わせる
 2. `EVALS.md`のsemantic case内訳「その他13 Skill」を実データに合わせて「その他10 Skill」へ修正する
@@ -39,10 +39,15 @@ PR #13 merge後の実装を正本として、現在状態を説明する文書�
 10. Project Contextのhistory / shared resource関連入口について、現在の実装契約と文書の関係を明確にする
 11. `regression-testing`のBaseline / Run / Activity正規出力契約を、現在のvalidator / fixture / production helperと一致させる
 12. `qa-knowledge`の`entry_revision`をentry body必須fieldではなくstorage metadataとして統一する
+13. E2E execution / reportingのcleanup状態一覧を、現在のvalidator契約へ同期する
+14. `README.md`とdeterministic評価READMEのディレクトリ構成図を現在のtreeへ同期する
+15. `scripts/skills/evals/deterministic/ASSERTIONS.md`を現在のdeterministic validatorと一致させる
 
 8〜10は単純な文言置換ではありません。詳細は[`workflow state / Project Context 文書整合Plan`](./2026-09-27_163600_main-document-consistency_workflow-contract-sync.md)を正本とします。
 
 11〜12の詳細は[`Skill artifact contract 文書整合Plan`](./2026-09-27_163600_main-document-consistency_skill-artifact-contract-sync.md)を正本とします。
+
+13〜15の詳細は[`評価ランタイム文書整合Plan`](./2026-09-27_163600_main-document-consistency_evaluation-doc-sync.md)を正本とします。
 
 新しいSkill、runtime、評価方式、CI、文書生成機構は追加しません。
 
@@ -214,6 +219,43 @@ case数やrouting fixture数は変更せず、例えば「現在の追加・拡�
 
 詳細は[`Skill artifact contract 文書整合Plan`](./2026-09-27_163600_main-document-consistency_skill-artifact-contract-sync.md)に分離します。
 
+### 13. E2E cleanup状態の許可値
+
+`e2e-test-execution`と`e2e-test-reporting`のdeterministic validatorは、cleanup状態として次の6状態を受理します。
+
+- `成功`
+- `失敗`
+- `未確認`
+- `対象なし`
+- `意図的に残した状態`
+- `一部失敗`
+
+一方、各`SKILL.md`と`assets/output-template.md`の許可値一覧では`一部失敗`が抜けています。
+
+現在のvalidator契約へ文書だけを同期します。`e2e-test-execution`固有の`要再確認`は現在validatorでも独立状態なので、この変更だけを理由に`要再検証`へ変更しません。
+
+詳細は[`評価ランタイム文書整合Plan`](./2026-09-27_163600_main-document-consistency_evaluation-doc-sync.md)に分離します。
+
+### 14. 評価ディレクトリ構成図
+
+`README.md`の評価構成図では`tests/skills/evals/trigger/`が抜けています。
+
+また、`scripts/skills/evals/deterministic/README.md`の構成図は、現在存在する`runtime_validator.py`、`tests/test_runtime_validator.py`、repository側の`test_e2e_contracts.py`、`test_new_skill_contracts.py`、`test_qa_artifact_graph_skills.py`を反映していません。
+
+現在のtreeへ文書構成図を同期します。全ファイル一覧へ拡張せず、既存の図が説明している粒度で現在実体との差だけをなくします。
+
+詳細は[`評価ランタイム文書整合Plan`](./2026-09-27_163600_main-document-consistency_evaluation-doc-sync.md)に分離します。
+
+### 15. ASSERTIONS.mdと現在validatorの同期
+
+`scripts/skills/evals/deterministic/README.md`は`ASSERTIONS.md`をAssertion IDの正本としています。
+
+一方、現在のSkill-local deterministic validatorと照合すると、`ASSERTIONS.md`には80件の現行Assertion IDが未記載です。PR #13で追加した`REG-D001..015`、`EXP-D001..008`、`KN-D001..011`に加え、既存Skillへ追加されたAssertionも未反映です。
+
+現在のvalidatorに存在するIDと判定内容を正本として`ASSERTIONS.md`を全件照合します。連番の欠番を推測で追加せず、validatorに存在するIDだけを記載します。
+
+詳細は[`評価ランタイム文書整合Plan`](./2026-09-27_163600_main-document-consistency_evaluation-doc-sync.md)に分離します。
+
 ## 追加の契約整合確認
 
 8〜10の3件は、過去Planの文言をそのまま現在文書へコピーせず、merge済み実装と現在のSkill契約を確認してから同期します。
@@ -361,6 +403,22 @@ frontmatter変更後はtrigger datasetの回帰確認を実行します。
 
 実際の変更範囲と確認手順は[`2026-09-27_163600_main-document-consistency_skill-artifact-contract-sync.md`](./2026-09-27_163600_main-document-consistency_skill-artifact-contract-sync.md)を正本とします。
 
+### E2E / 評価ランタイム文書
+
+13〜15の変更対象は次です。
+
+- `skills/e2e-test-execution/SKILL.md`
+- `skills/e2e-test-execution/assets/output-template.md`
+- `skills/e2e-test-reporting/SKILL.md`
+- `skills/e2e-test-reporting/assets/output-template.md`
+- `README.md`
+- `scripts/skills/evals/deterministic/README.md`
+- `scripts/skills/evals/deterministic/ASSERTIONS.md`
+
+変更方針・全件照合条件は[`2026-09-27_163600_main-document-consistency_evaluation-doc-sync.md`](./2026-09-27_163600_main-document-consistency_evaluation-doc-sync.md)を正本とします。
+
+validator、fixture、dataset、runtime、CI、test codeは変更しません。
+
 ## 対象外
 
 次は変更しません。
@@ -392,8 +450,11 @@ frontmatter変更後はtrigger datasetの回帰確認を実行します。
 10. Project Contextのhistory / shared resource関連入口を確認し、既存欄・既存rootで解決できる場合はその経路を文書化する。独立rootが現在契約上必須と確認できた場合だけstable key追加を検討する
 11. Skill artifact contract補助Planに従い、`regression-testing`のBaseline / Run / Activity契約を現在のvalidator / fixture / helperへ同期する
 12. 同補助Planに従い、`qa-knowledge`のentry bodyと`entry_revision` storage metadataの境界を文書で統一する
-13. 現行文書に古い現在値・参照先不明のmerge前提表現・過去Plan依存・契約上の孤立項目が残っていないか検索する
-14. 既存の文書・評価契約検証を実行する
+13. 評価ランタイム文書整合Planに従い、E2E execution / reportingのcleanup状態一覧へ`一部失敗`を反映する
+14. 同補助Planに従い、root READMEとdeterministic評価READMEの構成図を現在treeへ同期する
+15. 同補助Planに従い、全Skill-local deterministic validatorのAssertion IDと`ASSERTIONS.md`を相互照合して同期する
+16. 現行文書に古い現在値・参照先不明のmerge前提表現・過去Plan依存・契約上の孤立項目が残っていないか検索する
+17. 既存の文書・評価契約検証を実行する
 
 ## 検証
 
@@ -402,10 +463,13 @@ frontmatter変更後はtrigger datasetの回帰確認を実行します。
 少なくとも次を確認します。
 
 ```bash
-git grep -nE '全?16 Skill|全?14 Skill|368クエリ|328件|その他13 Skill|本Plan|今回14件|新3 Skill|新規Skill|Plan記載|entry_revision' -- \
+git grep -nE '全?16 Skill|全?14 Skill|368クエリ|328件|その他13 Skill|本Plan|今回14件|新3 Skill|新規Skill|Plan記載|entry_revision|成功 / 失敗 / 未確認 / 対象なし / 意図的に残した状態' -- \
   README.md \
   EVALS.md \
   docs/PROJECT_CONTEXT.md \
+  scripts/skills/evals/deterministic/README.md \
+  scripts/skills/evals/deterministic/ASSERTIONS.md \
+  scripts/skills/evals/semantic/README.md \
   skills/*/SKILL.md \
   skills/*/references/*.md \
   skills/*/assets/*.md
@@ -434,6 +498,9 @@ git grep -nE '全?16 Skill|全?14 Skill|368クエリ|328件|その他13 Skill|�
 - `regression-testing`のBaseline / Run / Activity正規契約を過去Planなしで追える
 - `regression-testing/assets/baseline-template.json`とcurrent validator / fixtureの必須fieldに説明不能な差がない
 - `qa-knowledge`でentry bodyのfieldと`entry_revision` storage metadataが混同されていない
+- E2E execution / reportingのcleanup許可値表示が現在validatorの6状態と一致する
+- `README.md`とdeterministic評価READMEの構成図が現在treeと一致する
+- 全Skill-local deterministic validatorのAssertion IDと`ASSERTIONS.md`が一致し、欠番を推測で追加していない
 
 ### 既存検証
 
@@ -454,6 +521,8 @@ git diff --check
 8〜10の契約文書同期では、既存の`tests/skills/evals/deterministic/test_qa_artifact_graph_skills.py`も実行し、現在のProject Context / workflow state / claim / reservation契約と矛盾しないことを確認します。
 
 11〜12では、同テストに加えてrepository deterministic test全体を実行し、現在のRegression / QA Knowledge contractと文書同期が矛盾しないことを確認します。validator / fixture / datasetは変更しません。
+
+13〜15ではrepository deterministic test全体を実行し、E2E cleanup契約とAssertion一覧の文書同期が現在validatorを壊していないことを確認します。Assertion IDの照合はvalidator → `ASSERTIONS.md`と`ASSERTIONS.md` → validatorの両方向で行い、Skill-local IDの差分を0件にします。共通runtimeの`RT-Dxxx`は別契約として扱います。
 
 コード・dataset・runtimeを変更しないため、実Agent candidate / 実Judgeの再評価は行いません。
 
@@ -479,6 +548,12 @@ git diff --check
 - `regression-testing/SKILL.md`のResources説明からRunだけが欠落していない
 - `qa-knowledge`のentry body必須fieldから`entry_revision`が分離され、storage metadataとして説明されている
 - `qa-knowledge` entry templateへ`entry_revision`を追加していない
+- E2E execution / reportingのcleanup許可値一覧に`一部失敗`が反映され、現在validatorと一致する
+- `README.md`の評価構成図に`tests/skills/evals/trigger/`が反映されている
+- deterministic評価READMEの構成図に現在の`runtime_validator.py`と主要repository deterministic testが反映されている
+- 全Skill-local deterministic validatorのAssertion IDが`ASSERTIONS.md`へ存在し、`ASSERTIONS.md`のSkill-local IDも対応validatorに存在する
+- `REG-Dxxx` / `EXP-Dxxx` / `KN-Dxxx`が`ASSERTIONS.md`へ反映されている
+- validatorに存在しない欠番Assertion IDを追加していない
 - 過去Plan / history / reportを現在値へ書き換えていない
 - 文書横断検索で、現行文書に14 / 16 Skill等の旧現在値が残っていない
 - semantic dataset validation、repository semantic test、trigger test、repository eval structure検証がpassする
@@ -500,5 +575,8 @@ git diff --check
 - 文書整合だけを理由にしたproduction code変更
 - `entry_revision`のentry bodyへの追加
 - `regression-testing`のvalidator / fixtureを文書へ合わせる変更
+- E2E cleanupのvalidator値域変更
+- Assertion IDの新設・採番変更
+- 評価ディレクトリ構成の変更
 
 同種の文書driftが今後も繰り返し発生し、既存CIでは防げないことが実測された場合に、その時点で必要な最小の自動検証を検討します。
