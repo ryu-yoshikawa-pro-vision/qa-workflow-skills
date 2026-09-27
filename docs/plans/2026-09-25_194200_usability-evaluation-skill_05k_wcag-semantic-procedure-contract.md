@@ -35,6 +35,7 @@ supported target versionごとに、そのversionに存在する全Success Crite
 - `allowed_additional_observation_fields`
 - `forbidden_shortcuts`
 - `missing_evidence_behavior`
+- `procedure_applicability_contracts[]`。該当criterionに`applicability_mode=semantic` procedureがある場合だけ非空
 
 `normative_clause_refs` はSuccess Criterion本文の意味上独立した要求、例外、conditionへ一意に戻れるsource item locatorです。単にSuccess Criterion全体のURLだけを持って「実装時に本文を読んで分解する」構造にしません。
 
@@ -47,6 +48,19 @@ supported target versionごとに、そのversionに存在する全Success Crite
 - `completion_required`: boolean
 
 `other-normative-semantic` は自由なcatch-allではありません。W3C本文上の意味判断が上記kindへ自然に分類できない場合だけ使用し、`source_clause_refs` を必須にします。実装時にsource clauseなしで独自観点を追加しません。
+
+`procedure_applicability_contracts[]` は次のfieldだけを持ちます。
+
+- `procedure_key`
+- `decision_key`
+- `source_clause_refs`
+- `required_evidence_roles`
+- `allowed_additional_observation_fields`
+- `missing_evidence_behavior`
+
+PR #14では `_05i` の4 AT procedureだけがこのrowを持ち、decision keyも `_05i` の固定値と一致させます。required evidence roleは `population-completeness / machine-procedure-result / current-browser-observation / presentation-variation / accessibility-support-baseline / technology-context / authority-context` の部分集合だけを許可します。`assistive-technology-result`、`manual-procedure-result`、`external-evidence-result`、final `s-wcag-*` semantic resultはAT applicability decisionのInputにしません。
+
+applicability decision Outputは `procedure_key / applicability(applicable|not-applicable|unknown) / reason / evidence_refs / uncertainty` だけです。criterion result、procedure result、final semantic decisionをここで生成しません。
 
 ## 3. required evidence role
 
@@ -67,7 +81,7 @@ evidence roleはprocedure catalogから決定論的に導出できるものを�
 - `technology-context`
 - `authority-context`
 
-`wcag_criterion_plan.py` はcriterionのprocedure keysとsemantic contractを突合し、required procedure resultに対応するevidence roleをmaterializeします。LLMがrequired evidence role集合を完成集合として入力しません。
+`wcag_criterion_plan.py` はAT等のsemantic applicability decisionを先に閉じた後、current applicable procedure keysとsemantic contractを突合し、final `s-wcag-*` evaluationでrequiredなprocedure result roleをmaterializeします。`not-applicable` procedureのresult roleは要求せず、applicability basis refだけを保持します。LLMがrequired evidence role集合を完成集合として入力しません。
 
 ## 4. semantic procedure Input / Output
 
@@ -76,7 +90,8 @@ Input:
 - semantic contract row
 - sample / variation / process refs
 - current population result
-- sibling machine / manual / AT / external procedure result refs
+- current applicableかつclosure済みのsibling machine / manual / AT / external procedure result refs
+- not-applicable sibling procedureのapplicability basis refs
 - current evidence refs
 - accessibility support baseline
 - technology context
@@ -94,6 +109,8 @@ Output:
 - additional observation draft（必要な場合）
 
 scriptはoverall decision本文を生成しません。validatorはrequired point coverage、enum、source / evidence refs、procedure closureとの整合だけを検証します。
+
+AT procedureを持つcriterionでは、`procedure_applicability_contracts[]` のdecisionをfinal semantic evaluationより前に実行します。final semantic evaluationはAT applicability `unknown` のまま開始せず、ATが `applicable` ならAT result closure後、`not-applicable` ならそのbasis確認後に開始します。final semantic evaluationのInputをAT applicability decisionのInputへ戻さないため、循環依存を作りません。
 
 ## 5. LLMへ残す判断
 
@@ -273,7 +290,9 @@ validatorは次を独立確認します。
 - duplicate contract key / duplicate point key 0
 - source / clause / definition / exception refs全解決
 - semantic evaluation pointのsource clause coverage
-- required evidence roleが許可enumで、procedure catalogとの整合がある
+- required evidence roleが許可enumで、current applicable procedure集合とprocedure catalogとの整合がある
+- `_05i` の4 AT procedureと `procedure_applicability_contracts[]` のdecision key / source clause / allowed evidence roleが1対1で一致
+- AT applicability contractが `assistive-technology-result` またはfinal semantic resultへ依存していない
 - machine-only decisionをsemantic pointへ重複させていない
 - allowed additional observation fieldが `_05g` の16 keyの部分集合
 - forbidden shortcutがrequired common guardを含む
@@ -290,6 +309,8 @@ semantic evalは代表SCだけの品質確認ではなく、asset全件のcontra
 - normative exception成立 / 不成立 / evidence不足
 - machine resultとsemantic meaningが一致しないcase
 - visual evidenceが必要なcase
+- AT applicability applicable / not-applicable / unknownをAT resultなしで判定するcase
+- applicable判定後にAT evidenceを取得してfinal semantic evaluationへ渡すcase
 - manual / AT evidenceが必要なcase
 - additional observationで解決するcase
 - no-progressでundeterminedへ残るcase
