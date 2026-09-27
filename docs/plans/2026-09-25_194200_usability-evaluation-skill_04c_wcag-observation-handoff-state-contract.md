@@ -33,14 +33,18 @@ current `artifact_graph.py` のlocal filesystem経路はinitial create-if-absent
 - workflow state initial create: `workflow_ref` unique keyへのtransactional insert
 - workflow state read: current state + provider revision token取得
 - workflow state conditional write: transaction内でcurrent revision一致を確認して更新し、一致しない場合はconflict。read → 比較 → 無条件writeをCASとして扱わない
-- project-local reservation create-if-absent
-- reservation conditional release: owner / expected revision一致を同一transactionで確認してrelease
-- concurrent writer fixtureで同じexpected revisionから成功するwriteが1件だけになること
-- stale expected revision / wrong owner / duplicate createを明示conflictへ閉じること
+- canonical E2E用external reservation acquire: `resource_ref` unique key、owner workflow ref、provider revisionをtransactionalに保存
+- external reservation conditional release: owner / expected provider revision一致を同一transactionで確認してrelease
+- concurrent writer fixtureで同じexpected revisionから成功するworkflow state writeが1件だけになること
+- stale expected revision / wrong owner / duplicate reservationを明示conflictへ閉じること
 
 provider revisionはtest provider内部の単調増加revisionまたは同等のtransaction内更新tokenを使い、productionのlocal exact-content SHAをCAS tokenへ読み替えません。
 
-このproviderはcanonical E2E / deterministic test専用です。production Skill package、Project Context、routing、`artifact_graph.py` のpublic contractへSQLite adapterやgeneric storage interfaceを追加しません。productionでは従来どおり保存先がnative atomic conditional write / releaseを提供する場合だけhandoff更新を実行し、提供しない場合はfail-closedにします。
+canonical E2EではSQLite reservationを既存 `reserve_shared_resource()` のexternal reservation経路へ渡します。そのためPR #14では同helperへoptional `external_reservation_revision` を1引数だけ追加し、`external_reservation + external_reservation_acquired=true` の場合は非空revisionを必須としてreturned reservation rowへそのまま保持します。project-local reservation経路、claim path、public storage abstractionは変更しません。正常release時は既存 `release_shared_resource()` がowner / expected revision / cleanupを検証して `conditional_release_required` を返した後、test providerがそのexpected revisionで実releaseします。
+
+このproviderはcanonical E2E / deterministic test専用です。production Skill package、Project Context、routingへSQLite adapterやgeneric storage interfaceを追加しません。`artifact_graph.py` の変更は上記external reservation revisionの伝播だけです。productionでは従来どおりworkflow state / external reservationの保存先がnative atomic conditional write / releaseを提供する場合だけ更新・解放を実行し、提供しない場合はfail-closedにします。
+
+`claim_mutable_operation()` はcurrent mainどおりlocal filesystem create-if-absentを使い、test-only SQLite providerへ移しません。current local claim storageにはnative atomic conditional releaseがないため、`recover_claim()` の成功をcanonical E2Eの要件にしません。pre-start failureでclaim release能力がない場合は `atomic_claim_release_unavailable` で安全にblockedとなることを負系fixtureで確認します。normal completionではstarted claimを履歴として残す既存契約のため、この制約はhappy-path closureを妨げません。
 
 ## 1. owner
 
@@ -176,9 +180,9 @@ browser開始前の順序を固定します。
 3. claim ref / revisionとreservation rowsを入れて `in-progress` をCAS保存。
 4. ここまで完了した場合だけ最初のmutable browser action。
 
-resource途中失敗または `in-progress` CAS失敗ではbrowserを開始しません。取得済みproject-local reservationは取得と逆順に `release_shared_resource()` へ渡し、external reservationは既存provider契約へ従います。
+resource途中失敗または `in-progress` CAS失敗ではbrowserを開始しません。取得済みreservationは取得と逆順にreleaseします。project-local reservationはcurrent helper契約、external reservationはprovider revision付きで `release_shared_resource()` のdecisionを通した後にprovider-native conditional releaseを実行します。
 
-全reservation release確認後だけ、owner `not_started` / cleanup確認済みとして `recover_claim()` を使えます。安全に回収できなければ `blocked` とし別claimでretryしません。
+全reservation release確認後だけ、owner `not_started` / cleanup確認済みとして `recover_claim()` を呼びます。claim保存先がnative atomic conditional releaseを提供する場合だけreturned expected revisionで実releaseできます。current local claim storageは提供しないため `recover_claim()` は `atomic_claim_release_unavailable` でblockedとなり、browser未開始の安全な停止として扱います。canonical negative fixtureはこのblockedをPASS条件とし、成功するclaim recoveryを捏造しません。
 
 ## 6. return
 
@@ -261,14 +265,16 @@ qa-workflowを利用できない真のstandalone環境では第二state storeを
 - same handoff identityのCAS retry / immutable result再適用 → same operation ref、browser再開始なし
 - started `HANDOFF-001` の再観測 → `HANDOFF-002` + new operation ref
 - `retry_of_handoff_ref` lineage / duplicate current rerun抑止
-- test-only SQLite providerでinitial create / successful CAS / stale revision conflict / concurrent same-revision writer 1件成功
+- test-only SQLite providerでworkflow state initial create / successful CAS / stale revision conflict / concurrent same-revision writer 1件成功
+- test-only SQLite external reservationでacquire / owner+revision付きconditional release / stale revision・wrong owner conflict
+- `reserve_shared_resource()` external pathがprovider revisionを保持し、`release_shared_resource()` decision後にprovider-native releaseできること
 - production local filesystemだけのpending CAS / missing revision / conditional write不可
 - duplicate identity / origin mismatch
 - claim conflict → browser未開始
 - resource canonical acquisition order
-- resource途中失敗 → acquired reservation逆順release → safe claim recovery
-- `in-progress` CAS conflict → browser未開始 + release / recovery
-- recovery不能 → blocked
+- resource途中失敗 → acquired reservation逆順release → current local claim recoveryは `atomic_claim_release_unavailable` でblocked、browser未開始
+- `in-progress` CAS conflict → browser未開始 + reservation release → current local claim recovery unavailableでblocked
+- native claim conditional releaseを持たない環境で成功recoveryを仮定しない
 - immutable result → observation key導出 / variation含むkey mismatch reject
 - partial return → close-ready false
 - exact duplicate return → idempotent no-op / browser再実行なし
@@ -291,8 +297,8 @@ qa-workflowを利用できない真のstandalone環境では第二state storeを
 - exact duplicate result再送とbrowser再観測を混同しない
 - create / start / return / release / closeがnative CAS前提
 - canonical E2Eはtest-only SQLite providerで実CASを通し、productionへtest provider / generic storage abstractionを持ち込まない
-- resource acquire / rollback / normal releaseが閉じる
-- started claimをnormal completionでreleaseせず、not-started recoveryだけ既存helperを使う
+- resource acquire / reservation rollback / normal releaseが閉じる。canonical happy pathはtest-only external reservation providerで実releaseする
+- started claimをnormal completionでreleaseしない。not-started recoveryは既存helperで能力判定し、current local claim storageでは安全にblockedとなることを確認する
 - result key / currentness / duplicate / supersedesをLLM判断にしない
 - `close_ready → closed CAS → re-read → may_resume` 固定
 - stale originへresumeしない
