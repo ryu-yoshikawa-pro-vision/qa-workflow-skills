@@ -10,7 +10,7 @@
 - PR #12はmainへmerge済みでcurrent実装を確認済み
 - PR #13 main merge済み
 - usability-inspectionのgeneral accessibility / `_05g` browser observation request / probe contract成立
-- `_04c` formal observation handoff state / CAS contractをPR #13 merge後current qa-workflowへ適用可能なことを確認
+- `_04c` formal observation handoff state / CAS contractをPR #13 merge後current qa-workflowへ適用可能なことを確認。production local filesystemはconditional writeを提供しない事実を維持し、canonical E2E用test-only SQLite providerをproduction能力と混同しない
 - WCAG-EM 2.0 / WCAG 2.0 / 2.1 / 2.2 current official source確認
 - repository標準eval / CI確認
 
@@ -110,12 +110,14 @@ WCAG-EM 2のoutput contractはReport ToolのschemaではなくWCAG-EM 2.0本文�
 
 - `_05i` のversion別集合からWCAG 2.0=61 / 2.1=78 / 2.2=86件を固定し、2.2から4.1.1を除外する
 - `_05i` の生成規則から全Success Criterionのexpected `procedure_keys` をscriptで導出し、3 versionのrequirements assetへ設定する。実装時にcriterionごとのprocedure構成を再設計しない
-- `assets/wcag-evaluation-procedure-catalog.json` を追加し、`_05i` に現れる全procedureを `machine / semantic / manual / assistive-technology / external-evidence` の有限inventoryへ固定する
+- `assets/wcag-evaluation-procedure-catalog.json` を追加し、`_05i` に現れる全procedureを `machine / semantic / manual / assistive-technology / external-evidence` の有限inventoryへ固定する。各rowに `_05h` の `applicability_mode / activation_source_procedure_key / activation_limitation_codes` を持たせる
 - procedure catalogに `TBD / other / custom` 等のcatch-allを置かず、`_05i` §3のmachine procedureは全件明示dispatch / fixtureを実装する。各machine procedureのbrowser入力はprocedure catalog内で `_05j` machine probe keyへ全件mappingし、`wcag_criterion_plan.py` がtyped `wcag-machine-probe` requestをmaterializeする。formal runtimeはinspection sibling assetをreadしない。cross-packageのprobe key missing / extra / unused 0はrepository-level contract testで検証する
 - `_05k` のversioned semantic contract assetを全supported Success Criterionへ作成し、normative clause / definition / exception refs、semantic evaluation point、required evidence role、forbidden shortcutをapproved hashで固定する。実装時にcriterion固有procedureを再設計しない
 - 4.1.1はWCAG 2.2でrowを作らず、WCAG 2.0 / 2.1 + HTML/XMLでは `always-satisfied-html-xml`、その他technologyではsemantic contractへ戻す
 - machine化できる数値計算、集合演算、固定enum / state比較、supported ACT Ruleをsemantic / manualへ逃がしていないことをsemantic reviewで確認する
 - assistive technologyはSuccess Criterion固定booleanにせず、selected procedure + current content / technology + accessibility support baselineからapplicabilityを閉じる
+- procedure executionごとに `applicable / not-applicable / unknown` とbasisをmaterializeし、`unknown` のままcriterionをsatisfied / not-satisfiedへ閉じない
+- `_05i` のcontrast / Resize Text / Focus Appearance conditional manual fallbackをsource machine limitation codeからscriptが起動し、machine limitationだけでcriterionをblockedへ短絡しない
 - selected sampleごとのrequired presentation variation集合を入力にし、`wcag_criterion_plan.py` がsample × variation × required Success Criterion rowを全件materializeする
 - execution status `pending / in-progress / complete / blocked` とresult `satisfied / not-satisfied / undetermined / null` を分離する
 - applicable population `present / none / unknown` をprocedure closureから導出し、単一ACT Ruleのinapplicableだけでcriterion satisfiedにしない
@@ -159,6 +161,7 @@ WCAG-EM 2のoutput contractはReport ToolのschemaではなくWCAG-EM 2.0本文�
 - formal evidenceへinitial baseline外environmentを使った場合、baseline revisionを拡張してfreshnessを再計算する。diagnostic-only environmentは追加しない
 - random selectionそのものはdeterministic runtimeへ含めず、method / provenance / selected refsを後続Machine Runtime Inputへ渡す
 - PR #11 runtime input / generation fingerprint / static_data_versions / current verifierでfreshnessを管理
+- formal runtimeがinspection Machine Runtime resultを消費する場合は `metadata.upstream_runtime_units` へ `usability-inspection + runtime_unit_key + generation_fingerprint` を必須登録する。inspectionの `static_data_versions.wcag_machine_probes` をformal static dataへ複製せず、dependency generation mismatchを既存verifierでstale伝播させる
 - semantic decisionからfixed machine rowをmaterialize
 - draft ref採番
 - cross-reference
@@ -202,6 +205,8 @@ production helperとdeterministic validatorは別実装にします。
 
 ## 7. Step 5: qa-workflow observation handoff
 
+canonical repository E2Eでは `_04c` のtest-only `tests/skills/evals/deterministic/wcag_handoff_cas_provider.py` を実装し、Python標準 `sqlite3` のtransactionでworkflow state conditional write / reservation conditional releaseを実際に通します。これはtest harness限定で、production `qa-workflow` へSQLite storage adapterを追加しません。production providerがnative CASを提供しない場合はcurrent契約どおりblockします。
+
 selected sampleごとにlive accessibility observationが必要なcaseで、
 
 - wcag-conformance-evaluationがsample / process / requirement / observation request scope、originating evaluation / revision、resume operationを固定してnormalized handoffを出す
@@ -209,8 +214,9 @@ selected sampleごとにlive accessibility observationが必要なcaseで、
 - qa-workflowがorigin artifact ref / revision / handoff refからdeterministic `operation_ref` を導出し、そのidentityでmutable operation claimを取得する
 - required shared resourceをcanonical orderで取得し、claim / reservation refsを含む `in-progress` をCAS保存した後だけusability-inspectionを開始する
 - resource取得途中失敗または `in-progress` CAS conflictではbrowserを開始せず、取得済みreservationを逆順releaseし、owner未開始 / cleanup確認済みの場合だけclaim recoveryする
-- usability-inspectionがbrowser ownerとして `_05g` fixed observation requestを直列実行する
+- usability-inspectionがbrowser ownerとして `_05g` / `_05j` fixed observation requestを直列実行する
 - immutable evidence / inspection artifact refをhandoff ref / sample ref / variation ref / observation request ref / origin revision付きでqa-workflowへ返す
+- formal runtimeがreturned inspection runtimeを消費する時点で、そのinspection runtime unit identity / current generation fingerprintを `metadata.upstream_runtime_units` へmaterializeする
 - qa-workflow helperがreturned resultからobservation keyを導出し、result currentness、exact duplicate、supersedes lineage、expected-current-valid-returned集合を照合する
 - returned resultがstale / 不足でbrowser再観測が必要なら、started claimを削除・再利用せず次の `HANDOFF-NNN` を `retry_of_handoff_ref` 付きでmaterializeしてnew operation refを取得する。exact duplicate returnやCAS retryではnew handoffを作らない
 - owner complete / cleanup成功後、required shared reservationを逆順releaseし、release failureではcloseしない
@@ -322,11 +328,14 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 - target version / level expected Success Criteria / conformance requirement set
 - finite procedure catalog key / kind / dispatch / hash
 - formal procedure catalog内のmachine procedure → `_05j` finite machine probe key mapping / typed request schema / capability
-- returned inspection artifact / Machine Runtime evidenceが `static_data_versions.wcag_machine_probes` を含み、formal input fingerprint / upstream freshnessへ反映されること
+- formal machine probeを処理したinspection runtimeが `static_data_versions.wcag_machine_probes` を保持すること
+- formal consumerの `metadata.upstream_runtime_units` がinspection `runtime_unit_key / generation_fingerprint` をexactly-onceで保持し、missing / generation mismatchでformal freshnessがstaleになること。formal `static_data_versions` へsibling hashを複製しない
 - repository-level contract testでformal required machine probe keyとinspection catalog keyのmissing / extra / unused 0
 - `_05k` versioned semantic contract coverage / normative clause・exception refs / required evidence role / approved hash
 - WCAG 2.0 / 2.1 4.1.1 HTML/XML shortcut / other technology semantic path / WCAG 2.2 removal
-- SC 1.4.4のvalid text scaling mechanism inventory、baseline / mechanism scale / used font sizeからrendered text scale ratioを計算して全applicable textの2.0x到達を確認、responsive breakpointを跨ぐcase、target到達までのincremental state、`deviceScaleFactor` / viewport resize / CSS injectionを代替としてreject、text population / valid mechanism未完了時blocked / undetermined
+- SC 1.4.4のvalid text scaling mechanism inventory、baseline / mechanism scale / used font sizeからrendered text scale ratioを計算して全applicable textの2.0x到達を確認、responsive breakpointを跨ぐcase、target到達までのincremental state、`deviceScaleFactor` / viewport resize / CSS injectionを代替としてreject
+- machine ownerがvalid text scaling mechanismを操作 / scale取得できないcaseではfixed limitation codeから `manual-wcag-1.4.4` をapplicable化し、manual evidenceでclosureできること。manualも実施不能な場合だけblocked / undetermined
+- 1.4.3 / 1.4.6 / 1.4.11のmachine contrast unavailableと2.4.13 complex focus indicatorで、対応するconditional manual fallbackを決定論的に起動できること
 - semantic procedure resultの判断理由 / uncertainty / additional observation request refs
 - additional observationがrequired criterion / procedure集合を変更せず、fixed observation contractへ解決されること。解決不能またはno-progressではundetermined / blockedへ閉じること
 - semantic判断で発見した別のusability / business flow concernをWCAG resultへ混ぜず別routingできること
@@ -342,6 +351,7 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 - rerun retained / replaced / added / unavailable sample lineage
 - observation handoff origin / resume identity / expected observation materialization
 - `_04c` physical `state.handoffs` schema、composite operation identity、state CAS、mutable operation claim、resource acquisition / rollback / normal release、started handoff rerun lineage、duplicate / conflicting return、stale origin、close-ready → closed CAS → re-read → resume guard
+- test-only SQLite providerでsame expected revisionのconcurrent writeは1件だけ成功し、stale write / wrong-owner releaseはconflict。production local filesystemではconditional write unavailableのままfail-closed
 - ref
 - sample count
 - finite inventory candidate derivation / recorded method provenance
