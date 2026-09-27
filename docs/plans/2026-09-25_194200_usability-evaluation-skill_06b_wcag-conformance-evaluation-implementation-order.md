@@ -106,12 +106,14 @@ WCAG-EM 2のoutput contractはReport ToolのschemaではなくWCAG-EM 2.0本文�
 
 ### Success Criterion evaluation plan
 
-`_05h_wcag-criterion-evaluation-contract.md` と `_05i_wcag-success-criterion-procedure-inventory.md` を実装します。
+`_05h_wcag-criterion-evaluation-contract.md`、`_05i_wcag-success-criterion-procedure-inventory.md`、`_05j_wcag-machine-browser-observation-contract.md`、`_05k_wcag-semantic-procedure-contract.md` を実装します。
 
 - `_05i` のversion別集合からWCAG 2.0=61 / 2.1=78 / 2.2=86件を固定し、2.2から4.1.1を除外する
 - `_05i` の生成規則から全Success Criterionのexpected `procedure_keys` をscriptで導出し、3 versionのrequirements assetへ設定する。実装時にcriterionごとのprocedure構成を再設計しない
 - `assets/wcag-evaluation-procedure-catalog.json` を追加し、`_05i` に現れる全procedureを `machine / semantic / manual / assistive-technology / external-evidence` の有限inventoryへ固定する
-- procedure catalogに `TBD / other / custom` 等のcatch-allを置かず、`_05i` §3のmachine procedureは全件明示dispatch / fixtureを実装する。requirements asset / `_05i` / procedure catalogのmissing / extra / unused keyをdeterministic validatorで0件にする
+- procedure catalogに `TBD / other / custom` 等のcatch-allを置かず、`_05i` §3のmachine procedureは全件明示dispatch / fixtureを実装する。各machine procedureのbrowser入力は `_05j` finite machine probeへ全件mappingし、requirements asset / `_05i` / procedure catalog / machine probe catalogのmissing / extra / unused keyをdeterministic validatorで0件にする
+- `_05k` のversioned semantic contract assetを全supported Success Criterionへ作成し、normative clause / definition / exception refs、semantic evaluation point、required evidence role、forbidden shortcutをapproved hashで固定する。実装時にcriterion固有procedureを再設計しない
+- 4.1.1はWCAG 2.2でrowを作らず、WCAG 2.0 / 2.1 + HTML/XMLでは `always-satisfied-html-xml`、その他technologyではsemantic contractへ戻す
 - machine化できる数値計算、集合演算、固定enum / state比較、supported ACT Ruleをsemantic / manualへ逃がしていないことをsemantic reviewで確認する
 - assistive technologyはSuccess Criterion固定booleanにせず、selected procedure + current content / technology + accessibility support baselineからapplicabilityを閉じる
 - selected sampleごとのrequired presentation variation集合を入力にし、`wcag_criterion_plan.py` がsample × variation × required Success Criterion rowを全件materializeする
@@ -285,7 +287,7 @@ WCAG Conformance Claimはcomplete claim scope evidenceとversion別required fiel
 
 WCAG Statement of Partial Conformanceはthird-party content / languageを別caseとして実装し、Conformance Claimと混同せず、canonical wordingをscriptでrenderします。
 
-Step 5.5を要求するcaseでは `earl_report.py` がEARL 1.0 JSON-LDを生成し、formal result → EARL outcomeとassertion coverageをdeterministic validatorで照合します。
+Step 5.5を要求するcaseでは `_05l_earl-jsonld-serialization-contract.md` を実装し、`earl_report.py` が固定 `@context` / stable IRI / Assertion・TestResult node shapeでEARL 1.0 JSON-LDを生成します。formal result → EARL outcome / mode、graph reference closure、deterministic byte再render、human-readable assertion coverageをvalidatorで照合します。
 
 aggregated scoreは目的外として生成しません。
 
@@ -319,6 +321,9 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 - version別static requirement catalog / `static_data_versions` / approved hash contract
 - target version / level expected Success Criteria / conformance requirement set
 - finite procedure catalog key / kind / dispatch / hash
+- machine procedure → `_05j` finite machine probe mapping / result schema / capability
+- `_05k` versioned semantic contract coverage / normative clause・exception refs / required evidence role / approved hash
+- WCAG 2.0 / 2.1 4.1.1 HTML/XML shortcut / other technology semantic path / WCAG 2.2 removal
 - semantic procedure resultの判断理由 / uncertainty / additional observation request refs
 - additional observationがrequired criterion / procedure集合を変更せず、fixed observation contractへ解決されること。解決不能またはno-progressではundetermined / blockedへ閉じること
 - semantic判断で発見した別のusability / business flow concernをWCAG resultへ混ぜず別routingできること
@@ -353,7 +358,7 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 - Evaluation Specifics / archive ref / secret safety
 - Evaluation Statementはtarget WCAG 2.2だけでfull / partial guardを検証し、2.0 / 2.1ではsection不存在を検証
 - WCAG Conformance Claim required / optional fields / version別claim URI / third-party 2-business-day monitoring-repair / Statement of Partial Conformance guard
-- EARL JSON-LD schema subset / outcome mapping / assertion coverage
+- EARL JSON-LD fixed `@context` / node shape / stable IRI / result reference closure / outcome・mode mapping / deterministic byte rendering / assertion coverage
 
 ### semantic
 
@@ -377,7 +382,7 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 - Step 1.1でthird-party / language / responsive-device / separately-hosted / authenticated-restricted scope coverageを明示的に閉じる
 - WCAG 2.0 / 2.1 / 2.2をsupported versionとし、missing / unresolved、unsupported / out-of-scopeを分離
 - target version / levelからrequired Success Criteria / conformance requirement集合を該当versionのstatic catalogだけで独立導出し、3 catalogのcanonical hashを既存static data契約で検証
-- 全required Success Criterionにfinite procedure keyがあり、sample × required variation × criterion evaluation rowをscriptでmaterializeし、procedure / criterionをLLMが選択・省略しない。machine化可能なprocedureは明示dispatchし、AT要否はselected procedure + current content / technology + baselineから閉じる
+- 全required Success Criterionにfinite procedure keyがあり、sample × required variation × criterion evaluation rowをscriptでmaterializeし、procedure / criterionをLLMが選択・省略しない。machine化可能なprocedureは明示dispatchし、`_05j` fixed machine probeをscript導出する。criterion固有semantic判断は `_05k` static contractを使用し、AT要否はselected procedure + current content / technology + baselineから閉じる
 - semantic procedureは判断理由・uncertainty・追加観測要求を保持でき、finite procedure catalogを意味判断の上限にしない。追加観測はrequired criterion / procedure集合を変えずexisting fixed observation contractで取得する
 - `runtime_contract.py` でPR #11 Machine Runtime / freshness契約を再利用し、random selectionそのものはdeterministic runtimeへ含めない
 - Step 2 exploration closure
@@ -402,7 +407,7 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 - WCAG 2.0 / 2.1 / 2.2 Conformance Claim required / optional fields / version別claim URI / full-scope guard
 - third-party monitoring / repair full-claim caseでall affected pages identification / monitoring / 2 business days repair guard
 - WCAG Statement of Partial Conformance - Third Party Content / Language required fields / canonical wording / guard
-- Step 5.5 EARL 1.0 JSON-LD / assertion coverage
+- Step 5.5 EARL 1.0 JSON-LD fixed graph / deterministic serialization / assertion coverage
 - Step 5.4 aggregated scoreは目的外として生成しない
 - requirements / sampling / structure helperでmachine-owned fieldをmaterializeし、Agentがfinal refs / expected集合 / derived status / countを手作成しない
 - independent deterministic validator
