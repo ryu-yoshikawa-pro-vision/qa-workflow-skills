@@ -1055,6 +1055,7 @@ production helperとは別実装で少なくとも次を検証します。
 - `wcag-evaluation-procedure-catalog.json` のcanonical hash / approved hash一致
 - `wcag-semantic-contracts.json` のcanonical hash / approved hash一致とtarget version criterion coverage
 - `_05i` の4 AT procedure / `applicability_decision_key` とsemantic assetの `procedure_applicability_contracts[]` がversionごとに1対1で一致し、AT applicability contractがAT result / final semantic resultをrequired inputにしていない
+- semantic assetのstatic `required_evidence_roles` にprocedure-result roleを保存せず、machine / manual / AT / external result roleがcurrent applicable procedure集合からruntimeでのみ導出される
 - requirement assetのprocedure key全件がprocedure catalogへ解決し、machine procedure全件に明示dispatchがある
 - target version以外のcatalogをexpected requirement集合へ混在させていない
 - static catalogから独立導出したtarget level required Success Criteria / conformance requirement集合とactual coverageの一致
