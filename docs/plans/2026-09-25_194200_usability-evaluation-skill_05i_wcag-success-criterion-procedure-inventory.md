@@ -160,12 +160,14 @@ fallback mappingは次に固定します。
 
 ### assistive technology
 
-- 1.3.1 → `at-wcag-1.3.1`
-- 1.3.2 → `at-wcag-1.3.2`
-- 4.1.2 → `at-wcag-4.1.2`
-- 4.1.3 → `at-wcag-4.1.3`
+| criterion | AT procedure | applicability decision key |
+| --- | --- | --- |
+| 1.3.1 | `at-wcag-1.3.1` | `at-applicability-wcag-1.3.1` |
+| 1.3.2 | `at-wcag-1.3.2` | `at-applicability-wcag-1.3.2` |
+| 4.1.2 | `at-wcag-4.1.2` | `at-applicability-wcag-4.1.2` |
+| 4.1.3 | `at-wcag-4.1.3` | `at-applicability-wcag-4.1.3` |
 
-AT procedureはSuccess Criterion固定で常に実行するという意味ではありません。`_05h` の契約どおり、selected technology / content / accessibility support baselineから実行applicabilityを閉じ、requiredなのに環境がない場合は `blocked` とします。
+AT procedureはSuccess Criterion固定で常に実行するという意味ではありません。`_05h` の契約どおり、AT procedure実行前にselected technology / content / accessibility support baselineとcurrent evidenceだけを使うfixed applicability decisionを閉じます。decisionは自身のAT resultやfinal `s-wcag-*` resultへ依存しません。`applicable` でrequiredなのに環境がない場合は `blocked` とします。
 
 ### external evidence
 
@@ -181,7 +183,7 @@ applicability modeの割当は次で固定します。
 - 全Success Criterion共通の `s-wcag-<SC>` → `always`
 - 上記「常時またはcriterion populationに応じてrequiredになるmanual procedure」 → `always`
 - external evidence procedure → `always`
-- assistive technology procedure → `semantic`
+- assistive technology procedure → `semantic` + 上表のfixed `applicability_decision_key`
 - 上記conditional manual fallback 5件 → `machine-limitation`
 
 `population-present` 等の追加modeは作りません。target populationなしの可能性も、required inventory / semantic procedureを実行したうえでcriterion-level `applicable_population=none` として閉じます。
@@ -214,7 +216,7 @@ semantic layerへ残すもの:
 scriptへ残すもの:
 
 - required criterion集合 / procedure key集合
-- procedure applicability mode / conditional manual fallback mapping
+- procedure applicability mode / AT applicability decision key / conditional manual fallback mapping
 - population / target inventoryで機械的に閉じられる部分
 - browser値取得
 - 数値計算 / fixed comparison
