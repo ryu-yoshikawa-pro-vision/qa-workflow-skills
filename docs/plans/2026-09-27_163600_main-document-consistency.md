@@ -25,12 +25,15 @@
 
 PR #13 merge後の実装を正本として、現在状態を説明する文書同士の不整合を解消します。
 
-今回修正するのは次の4件です。
+今回修正するのは次の7件です。
 
 1. `skills/qa-workflow/references/guidance.md`に残る「全16 Skill」を19 Skillへ合わせる
 2. `EVALS.md`のsemantic case内訳「その他13 Skill」を実データに合わせて「その他10 Skill」へ修正する
 3. `docs/PROJECT_CONTEXT.md`をPR #11時点の評価・実装一覧から、PR #12 / #13 merge後の現在状態へ同期する
 4. `README.md`の「工程固有ロジックの正本」表を、現在の19 Skill構成と責務境界へ同期する
+5. `skills/qa-workflow/assets/workflow-state-template.md`のSkill状態表へ`qa-workflow`行を追加し、19 Skill構成と揃える
+6. `README.md`冒頭説明と`skills/qa-workflow/SKILL.md` frontmatter `description`を、Regression / Exploration / QA knowledgeを含む現在の責務範囲へ同期する
+7. `EVALS.md`に残るmerge前提の「本Plan」「今回14件」等を、`main`上で参照先が明確な表現へ修正する
 
 新しいSkill、runtime、評価方式、CI、文書生成機構は追加しません。
 
@@ -132,6 +135,49 @@ PR #11固有のruntime契約や、PR #11実装時に24/24 PASSだった実Judge�
 
 README側で詳細アルゴリズムを増やさず、担当Skillの一覧と責務だけを同期します。
 
+
+### 5. workflow-state-template.mdのSkill状態表
+
+`skills/qa-workflow/assets/workflow-state-template.md`のSkill状態表は、`spec-analysis`から`qa-knowledge`まで18 Skillを列挙していますが、`qa-workflow`自身の行がありません。
+
+現在の正規Skillは19個で、READMEは`qa-workflow`も1 Skillとして扱うと明記しています。また、`skills/qa-workflow/evals/deterministic/routing_cases.json`では複合workflowの開始Skillとして`qa-workflow`自身を利用するcaseがあります。
+
+テンプレート側に`qa-workflow`だけを除外する契約はないため、単一用途Skillとして対象 / 実行範囲を空欄にした状態行を追加します。
+
+新しい状態値や対象値は追加しません。
+
+### 6. README / qa-workflow descriptionの現在スコープ
+
+README冒頭と`skills/qa-workflow/SKILL.md` frontmatterの`description`は、新規・変更機能のテスト設計からE2E実装・実行までを中心に説明しています。
+
+一方、同じREADME / Skill本文では現在、
+
+- Regression baseline / membership / Run / Activity
+- Charterに沿ったExploration / Investigation
+- QA knowledgeのtriage / lifecycle / lookup
+
+まで扱う19 Skill構成になっています。
+
+冒頭説明だけPR #13以前の範囲に留まっているため、既に本文で定義済みの現在責務へ同期します。
+
+`SKILL.md`のfrontmatter `description`はSkill選択へ影響するため、責務を新しく追加する表現は使いません。本文と`references/guidance.md`に存在する現在の入口だけを簡潔に反映し、既存trigger datasetの回帰確認を必須にします。
+
+### 7. EVALS.mdのmerge前提表現
+
+`EVALS.md`には現在も次の表現があります。
+
+```text
+本Planで追加した意味責務とcase対応は次のとおりです。
+```
+
+```text
+PR #11 / #12後の47件に今回14件を加えた61件
+```
+
+`EVALS.md`は現在の評価契約を説明する文書であり、「本Plan」「今回」が指す対象を文書単体では確定できません。
+
+case数やrouting fixture数は変更せず、例えば「現在の追加・拡張責務」「PR #13で14件を追加した61件」のように、`main`で読んでも参照先が明確な表現へ修正します。
+
 ## 変更対象
 
 ### `skills/qa-workflow/references/guidance.md`
@@ -152,7 +198,8 @@ README側で詳細アルゴリズムを増やさず、担当Skillの一覧と責
 変更:
 
 - semantic case内訳の「その他13 Skill」を「その他10 Skill」へ修正
-- routing fixtureの説明にある「今回14件」がmerge後も意味を取りやすいよう、必要なら「PR #13で14件」へ修正する
+- 「本Planで追加した意味責務」を、現在の評価文書として参照先が明確な表現へ修正する
+- routing fixtureの「今回14件」を「PR #13で14件」のようにmerge後も意味が確定する表現へ修正する
 
 変更しないもの:
 
@@ -206,6 +253,34 @@ PR #11の24/24実Judgeやruntime smoke等、過去の実行結果は「PR #11実
 
 READMEへ新しい責務を定義せず、guidanceとの差異をなくします。
 
+冒頭のタイトル・説明も、Regression / Exploration / QA knowledgeを含む現在のSkill群の対象範囲が分かる表現へ更新します。ただし、README冒頭で個別Skillの詳細責務を再定義しません。
+
+### `skills/qa-workflow/assets/workflow-state-template.md`
+
+Skill状態表へ`qa-workflow`行を追加します。
+
+- 対象 / 実行範囲は空欄
+- 状態の許可値は既存行と同一
+- 新しいworkflow stateやfieldは追加しない
+
+persisted workflow state recordやCAS / claim / reservation契約は変更しません。
+
+### `skills/qa-workflow/SKILL.md`
+
+frontmatter `description`だけを、本文で既に定義済みの現在のオーケストレーション範囲へ同期します。
+
+含める対象は、既存の新規・変更機能のQA workflowに加えて、既に本文が担当として持つRegression / Exploration / QA knowledgeの接続です。
+
+変更しないもの:
+
+- 実行契約
+- 工程固有ロジックの担当表
+- runtime統合
+- production helper checkpoint
+- 入出力契約
+
+frontmatter変更後はtrigger datasetの回帰確認を実行します。
+
 ## 対象外
 
 次は変更しません。
@@ -227,11 +302,13 @@ READMEへ新しい責務を定義せず、guidanceとの差異をなくします
 
 1. 最新`main`との差分がないことを確認する
 2. `skills/qa-workflow/references/guidance.md`のSkill数を19へ修正する
-3. `EVALS.md`のsemantic case内訳を実データと一致させる
+3. `EVALS.md`のsemantic case内訳とmerge前提表現を現在の評価文書へ同期する
 4. `docs/PROJECT_CONTEXT.md`の現在状態をPR #12 / #13 merge後へ同期する
-5. `README.md`の責務表をqa-workflow guidanceへ同期する
-6. 現行文書に古い現在値が残っていないか検索する
-7. 既存の文書・評価契約検証を実行する
+5. `README.md`の責務表と冒頭説明を現在の19 Skill構成へ同期する
+6. `skills/qa-workflow/assets/workflow-state-template.md`へ`qa-workflow`状態行を追加する
+7. `skills/qa-workflow/SKILL.md`のfrontmatter `description`を本文の現在責務へ同期する
+8. 現行文書に古い現在値・参照先不明のmerge前提表現が残っていないか検索する
+9. 既存の文書・評価契約検証を実行する
 
 ## 検証
 
@@ -257,6 +334,8 @@ git grep -nE '全?16 Skill|全?14 Skill|368クエリ|328件|その他13 Skill' -
 - semantic datasetが72 case
 - routing fixtureが61件
 - READMEと`qa-workflow` guidanceの責務表に担当Skillの欠落がない
+- `workflow-state-template.md`のSkill状態表が現在の19 Skill構成と整合する
+- README / `qa-workflow` descriptionの対象範囲が本文の現在責務と矛盾しない
 
 ### 既存検証
 
@@ -271,6 +350,8 @@ git diff --check
 
 `README.md` / `EVALS.md`のSkill一覧を検査する`Validate Agent Skills`相当のrepository eval structure検証も実行します。
 
+`skills/qa-workflow/SKILL.md`のfrontmatter `description`を変更するため、trigger dataset validationを必須とします。今回は既存責務の記述同期であり、trigger dataset自体は変更しません。既存trigger testが失敗した場合は、description変更が既存選択境界を変えていないかを確認し、文書同期の範囲で修正します。
+
 コード・dataset・runtimeを変更しないため、実Agent candidate / 実Judgeの再評価は行いません。
 
 ## 完了条件
@@ -282,6 +363,9 @@ git diff --check
 - `PROJECT_CONTEXT.md`の現在値が19 Skill / 428 trigger / 38 deterministic / 72 semanticと一致する
 - `PROJECT_CONTEXT.md`にPR #12 / #13で追加された主要実装面が反映されている
 - READMEの「工程固有ロジックの正本」が現在のqa-workflow guidanceと責務上矛盾しない
+- `workflow-state-template.md`のSkill状態表に`qa-workflow`を含む19 Skillが反映されている
+- README冒頭と`qa-workflow` frontmatter `description`がRegression / Exploration / QA knowledgeを含む本文の現在責務と矛盾しない
+- `EVALS.md`に参照先不明の「本Plan」「今回14件」が残っていない
 - 過去Plan / history / reportを現在値へ書き換えていない
 - 文書横断検索で、現行文書に14 / 16 Skill等の旧現在値が残っていない
 - semantic dataset validation、repository semantic test、trigger test、repository eval structure検証がpassする
