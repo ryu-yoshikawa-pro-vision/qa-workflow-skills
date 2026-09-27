@@ -106,8 +106,8 @@ skills/usability-inspection/scripts/
 - selected supported rule / measurement / scopeからrequired observation field集合とfixed probe request集合をscriptが導出
 - target draftから `TARGET-001` 等のtarget registry / resolver schema / currentness / uniquenessを `observation_contract.py` がmaterialize / validate
 - `PROBE-001` 等のprobe request ref、probe schema / unit / capabilityを `observation_contract.py` がmaterialize / validate
-- semantic additional observation draftから `OBSREQ-001` 等、request identity / input evidence fingerprintをmaterializeし、field → probe mappingを一意に解決
-- same request identity + same evidence fingerprintは `no-progress`、unknown observation fieldは `unsupported`
+- semantic additional observation draftのrequester kind `usability-evaluation / inspection-requirement / wcag-procedure`、canonical requester identity、state basis refs / current document identityを検証し、`OBSREQ-001` 等、request identity / input evidence fingerprintをmaterializeしてfield → probe mappingを一意に解決
+- same request identity + same evidence fingerprintは `no-progress`、state description変更だけでは別identityにせず、unknown observation fieldは `unsupported`
 - additional observation requestはfinal artifactで `planned` を残さず、requester側semantic resultも対応するevidenceまたはlimitationへ閉じる
 - arbitrary JavaScript / unknown probe keyをreject
 - observation / measurement / test rule / requirement / action inputを `inspection_structure.py` が一括してartifact-local refへ採番
@@ -165,8 +165,9 @@ current mainへmerge済みのPR #12 browser実行基盤を再利用します。r
 - `observation_contract.py plan` が生成したfixed requestをcurrent browser経路で実行し、normalize結果をruntimeへ戻す
 - rendered UI / screenshot observation
 - DOM / accessibility observation
-- current document location
-- target-local rendered text / control value / selected value
+- canonical observation field inventory全15 keyのexactly-one probe mapping
+- current document locationは `page.url()`
+- target-local rendered textは `locator.innerText()`、control valueは `locator.inputValue()`、selected valueはselectedOptionsの `{value,label}` 配列
 - viewport / geometry
 - pointer
 - keyboard
@@ -178,6 +179,7 @@ current mainへmerge済みのPR #12 browser実行基盤を再利用します。r
 - boundary detectionとexecution feasibilityを分離し、container / compound query等でrequired stateを安全に実現できない場合は `not-executable / incomplete` とする
 - cross-origin等でread不能sourceがある場合の `incomplete` closure
 - fixed interaction-timing probe。8種end predicateごとのrequired payload、same-page `performance.now()`、preexisting predicate、timeout、unknown attribute / ARIA state rejectを含む
+- general accessibilityのsemantic/manual requirementが追加観測を必要とするcaseでは requester kind `inspection-requirement` を使う
 - semantic追加観測はLLMがcatalogのcanonical observation field / predicate keyを選び、scriptは自由記述をprobeへ変換しない
 - same request identity / evidence fingerprintのno-progress guard
 - form / error state

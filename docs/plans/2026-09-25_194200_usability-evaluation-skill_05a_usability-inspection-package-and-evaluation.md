@@ -217,15 +217,17 @@ task / flowは指定された場合だけ保持します。
 
 ### additional observation requests
 
-semantic判断から追加evidenceが必要になった場合だけ保持します。request refは `observation_contract.py` が生成し、`inspection_structure.py` は再採番しません。
+usability-inspectionがcurrent browser/session ownerで、semantic判断から追加evidenceが必要になった場合だけ保持します。request refは `observation_contract.py` が生成し、`inspection_structure.py` は再採番しません。test-target-inspection / test-executionがownerの場合は本sectionへOBSREQを作らず、usability-evaluation側のadditional observation linkでowner activity / returned evidenceを追跡します。
 
 - observation request ref: `OBSREQ-001` からartifact-localに採番
 - request draft key
-- requester kind: `usability-evaluation / wcag-procedure`
-- requester refまたはrequester draft key
+- requester kind: `usability-evaluation / inspection-requirement / wcag-procedure`
+- requester identity。`usability-evaluation` はevaluation ref/draft key、`inspection-requirement` はrequirement ref/draft key、`wcag-procedure` はcriterion evaluation ref + procedure execution ref
 - scope ref
 - target refまたはtarget draft key（element対象の場合）
-- state draft key（特定stateが必要な場合）
+- state description（説明用。request identityには使わない）
+- state basis refs。現在stateを識別する既存immutable action / evidence / sample / variation refsをcanonical sortして保持
+- current document identity（live documentに依存する場合）
 - canonical observation field key
 - fixed predicate key / canonical payload（必要な場合）
 - request reason
@@ -236,7 +238,7 @@ semantic判断から追加evidenceが必要になった場合だけ保持しま�
 - result evidence refs
 - limitation / blocker
 
-同一request identityは requester / scope / target / state / canonical observation field / predicate payloadからscriptが導出します。同じidentityかつ同じinput evidence fingerprintのrequestを再実行しません。新しいevidenceが追加された場合だけ同じsemantic decisionを再評価できます。
+同一request identityは canonical requester identity / scope / target / canonical sort済みstate basis refs / current document identity / canonical observation field / predicate payloadからscriptが導出します。state descriptionの自由記述はidentityへ含めません。同じidentityかつ同じinput evidence fingerprintのrequestを再実行しません。新しいevidenceが追加された場合だけ同じsemantic decisionを再評価できます。
 
 自由記述のrequest reasonはprobe選択に使いません。canonical observation field keyがcatalogに存在しない場合は `unsupported` へ閉じます。
 

@@ -100,10 +100,10 @@ current Playwright versionやPR #12 / #13 merge後のbrowser contractが変わ�
 10. fixed interaction timingで8種predicateごとのpayload、same-page clock、preexisting end state、timeout、unknown attribute / ARIA state rejectを扱えること
 11. measurement経路
 12. cleanup
-13. semantic layerがcanonical observation field / fixed predicate keyを選び、`observation_contract.py` が `OBSREQ-...` / request identity / evidence fingerprint / fixed probeへmaterializeして追加evidenceを取得し再評価できること
-14. scriptが自由記述からprobeを推論せず、unknown observation fieldをunsupportedへ閉じること
-15. 同一request identity + 同一input evidence fingerprintを再実行せずno-progressを返せること
-16. business outcome / Authority refsがあるflowでdocument location / rendered text / control value / selected value等のmachine observationとobserved end state / outcomeを保持し、usability-evaluationへ渡せること
+13. semantic layerがcanonical observation field / fixed predicate keyを選び、`observation_contract.py` が requester kind / state basis refs / current document identity / `OBSREQ-...` / request identity / evidence fingerprint / fixed probeへmaterializeして追加evidenceを取得し再評価できること。general accessibilityのsemantic requirementでは `inspection-requirement` requesterを使えること
+14. canonical observation field inventory全15 keyがexactly-one probeへ解決し、scriptが自由記述からprobeを推論せず、unknown observation fieldをunsupportedへ閉じること
+15. 同一request identity + 同一input evidence fingerprintを再実行せずno-progressを返し、state descriptionの言い換えだけでguardを回避できないこと
+16. business outcome / Authority refsがあるflowで `page.url()` / `locator.innerText()` / `locator.inputValue()` / selectedOptions `{value,label}` 等のmachine observationとobserved end state / outcomeを保持し、usability-evaluationへ渡せること
 17. `usability-evaluation` へのread-only handoff
 18. 同一sessionを別Skillが並行操作しない
 
@@ -132,7 +132,8 @@ formal request
 - sampling procedure usedのcase
 - structured sample
 - random sample target-met。canonical Random Sample sectionへ `selection_status=target-met` を保存
-- finite procedure catalogの全key解決 / machine dispatch / approved hash
+- `_05i` のversion別Success Criterion集合 2.0=61 / 2.1=78 / 2.2=86、2.2の4.1.1除外、machine / manual / AT / external割当と全SCの `s-wcag-<SC>` 生成規則から導出したexpected procedure集合がrequirements assetと完全一致
+- finite procedure catalogの全key解決 / machine dispatch / approved hash。inventoryにないkey / catalogにないkey / unused keyを許可しない
 - sample × required presentation variation × required Success Criterionのcriterion plan coverage
 - current criterion evaluation refからだけSample Evaluation Resultsを生成し、LLM supplied result listをreject
 - semantic procedureが追加evidenceを必要とするcaseで、required criterion / procedure集合を変更せずfixed observation requestを追加し、new handoffが必要なら `_04c` lineageで再観測して同じprocedureを再評価する

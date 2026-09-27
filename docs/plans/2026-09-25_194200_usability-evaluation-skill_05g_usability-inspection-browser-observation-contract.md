@@ -48,6 +48,30 @@ catalog row:
 
 `observation_contract.py` は明示dispatchでrequest / fixed payload / result validationを処理します。各canonical observation field keyはcatalog内で1つのfixed probeだけがownerとなり、field → probe mappingを一意にします。任意式、任意JavaScript、plugin registryを入力として受けません。
 
+### 2.1 canonical observation field inventory
+
+semantic layerとmachine procedureが指定できるobservation field keyは次だけです。key名は実装時に変更・追加せず、追加が必要なら先にPlanを更新します。
+
+| observation field key | owner probe | request payload | canonical result |
+| --- | --- | --- | --- |
+| `viewport.metrics` | `viewport-state` | なし | viewport width/height、scroll x/y、document scroll width/height、device scale factor |
+| `element.geometry` | `element-geometry` | `target_ref` | x/y/width/height CSS px、取得不能理由 |
+| `element.state` | `element-state` | `target_ref` | visible、enabled/disabled、checked、selected、expanded等のfixed state object |
+| `document.location` | `document-location` | なし | current page URLのsafe value / limitation |
+| `element.rendered-text` | `element-content` | `target_ref` | Playwright `locator.innerText()` の返却値 |
+| `element.control-value` | `element-content` | `target_ref` | Playwright `locator.inputValue()` の返却値 |
+| `element.selected-values` | `element-content` | `target_ref` | selected optionをDOM順で `{value,label}` 配列化した値 |
+| `accessibility.semantics` | `accessibility-semantics` | `target_ref` | role / accessible name / description / relevant state-property |
+| `focus.state` | `focus-state` | target / before-after context | active target identity、focusable / focus-visible machine values |
+| `computed-style.properties` | `computed-style` | `target_ref`, allowlisted `property_names` | requested property name/value map |
+| `responsive.boundaries` | `responsive-boundaries` | current document / Authority context | normalized boundary rows / completeness / execution feasibility |
+| `navigation.timing` | `navigation-timing` | なし | allowlisted Navigation Timing fields |
+| `paint.timing` | `paint-timing` | なし | allowlisted Paint Timing entries |
+| `interaction.timing` | `interaction-timing` | fixed predicate payload | same-page clockのstart/end/elapsedとpredicate result |
+| `screenshot.image` | `screenshot` | viewport / target / state context | evidence ref |
+
+`browser-observation-catalog.json` の `provided_observation_fields` はこのinventoryの部分集合だけを持ち、全fieldはちょうど1つのprobeへ解決します。unknown key、alias、自然言語field名を受け付けません。
+
 ## 3. observation lifecycle
 
 ```text
@@ -86,7 +110,7 @@ semantic evaluation
        ↓
      semantic layer
        - canonical observation field / fixed predicate keyを選択
-       - request reason / requester / target stateを返す
+       - request reason / requester kind / requester identity / target / state basis refsを返す
        ↓
      observation_contract.py materialize-additional
        - OBSREQ-001等のobservation request ref
@@ -111,7 +135,9 @@ user-facing情報から対象を識別した後、semantic / browser ownerはtar
 
 - `target_ref`: `TARGET-001` から決定論的に採番
 - `draft_target_key`: invocation内一意
-- scope / state ref
+- scope ref
+- current document / session identity
+- discovery evidence refs
 - semantic label
 - discovery basis
 - resolver kind
@@ -195,7 +221,7 @@ canonical observation field:
 
 - `document.location`
 
-current document URLを取得します。raw URLを永続化する場合はPR #12のevidence安全契約へ従い、secret / token等を含み得るquery / fragmentを無条件に保存しません。安全に保持できない値がsemantic判断に必要な場合は、値を捏造・無断保存せず `unavailable / limitation` とします。
+current document URLはPlaywright `page.url()` のcurrent valueを取得します。observation layerで独自URL正規化をしません。永続化前にPR #12のevidence安全契約へ従い、secret / token等を含み得るquery / fragmentを無条件に保存しません。sanitizationで意味判断に必要な部分を保持できない場合は、値を捏造・無断保存せず `unavailable / limitation` とします。
 
 ### `element-content`
 
@@ -203,11 +229,11 @@ target registryで一意に解決済みのtargetについて、requestされたf
 
 canonical observation field:
 
-- `element.rendered-text`: user-facing rendered text
-- `element.control-value`: input / textarea / select等のcurrent value
-- `element.selected-values`: select等のcurrent selected value集合
+- `element.rendered-text`: Playwright `locator.innerText()` の返却値をそのままcanonical raw valueとして保持する。observation layerではtrim / case folding / whitespace collapseをしない
+- `element.control-value`: Playwright `locator.inputValue()` を使い、current DOM propertyとしてのvalueを保持する。対象外elementでは `unavailable`
+- `element.selected-values`: uniqueな`<select>`に対するfixed page evaluateで `HTMLSelectElement.selectedOptions` をDOM順に読み、各optionを `{value: option.value, label: option.label}` として返す。semantic判断ではuser-facing labelを優先できるが、machine resultではvalueとlabelを両方保持する
 
-全DOM textや全form valueを無条件取得しません。fieldごとのfixed dispatchを使い、対象element種別で取得不能なら `unavailable` とします。値の意味がbusiness outcomeと一致するかはsemantic layerが判断します。
+全DOM textや全form valueを無条件取得しません。fieldごとのfixed dispatchを使い、対象element種別で取得不能なら `unavailable` とします。値の比較に必要な正規化は個別machine procedureが所有し、observation layerへ汎用text normalizationを入れません。値の意味がbusiness outcomeと一致するかはsemantic layerが判断します。
 
 ### `accessibility-semantics`
 
@@ -347,10 +373,13 @@ semantic layerは追加観測が必要な場合、少なくとも次のdraftを�
 
 - `request_draft_key`: invocation内一意
 - requester kind: `usability-evaluation / wcag-procedure`
-- requester refまたはrequester draft key
+- requester kind: `usability-evaluation / inspection-requirement / wcag-procedure`
+- requester identity。kindごとのref/draft keyは `_03` / `_05a` を正本とする
 - 関連scope ref
 - target refまたはtarget draft key（element対象の場合）
-- state draft key（特定stateが必要な場合）
+- state description（説明用。identityには使わない）
+- state basis refs。既存immutable action / evidence / sample / variation refsをcanonical sortして保持
+- current document identity（live documentに依存する場合）
 - canonical observation field key
 - fixed predicate key / payload（必要な場合）
 - 必要な観測内容の説明
@@ -361,7 +390,7 @@ canonical observation field / predicate keyの選択はsemantic layerの責務�
 
 browser ownerは宣言済みtarget / origin / role / side-effect scopeの中でuser-facing interactionを使って必要stateへ到達できます。LLMが任意CSS selector、XPath、test id、JavaScript式、hidden implementation stateを追加観測の実行方法として指定する契約にはしません。
 
-`observation_contract.py materialize-additional` はartifact-local `OBSREQ-001` 等を採番します。request identityは requester / scope / target / state draft key / canonical observation field / canonical predicate payloadから導出し、current evidence refsはcanonical sortしてinput evidence fingerprintを導出します。ref採番、field → probe mapping、required field、schema、capability、currentnessはscriptが検証します。
+`observation_contract.py materialize-additional` はusability-inspectionがcurrent browser/session ownerの場合だけartifact-local `OBSREQ-001` 等を採番します。request identityはcanonical requester identity / scope / target / canonical sort済みstate basis refs / current document identity / canonical observation field / canonical predicate payloadから導出し、state descriptionの自由記述は含めません。current evidence refsはcanonical sortしてinput evidence fingerprintを導出します。ref採番、field → probe mapping、required field、schema、capability、currentnessはscriptが検証します。
 
 同じrequest identityかつ同じinput evidence fingerprintの既存requestがある場合はbrowser操作を反復せず `no-progress` として返します。evidence fingerprintが変わった場合だけ同じsemantic decisionをnew evidence付きで再評価できます。
 
@@ -457,7 +486,9 @@ tool failureやprobe unavailableをproduct defect / usability issueへ自動変�
 - viewport / element geometry schema
 - `document.location` のfixed probe / sensitive URL handling
 - `element.rendered-text / element.control-value / element.selected-values` のtarget-local fixed probe
-- semantic additional observation draft → OBSREQ ref / field → probe mapping / request identity / evidence fingerprint
+- canonical observation field inventory全15 key → exactly-one probe mapping
+- `document.location` は `page.url()`、`element.rendered-text` は `locator.innerText()`、`element.control-value` は `locator.inputValue()`、`element.selected-values` はselectedOptions `{value,label}` を使用
+- semantic additional observation draft → OBSREQ ref / requester kind / field → probe mapping / state basis identity / evidence fingerprint
 - same request identity + same evidence fingerprint → no-progress
 - unknown observation field → unsupported。自然言語からprobeを推論しない
 - geometry machine calculation
@@ -484,7 +515,7 @@ tool failureやprobe unavailableをproduct defect / usability issueへ自動変�
 - locator matchingをPlaywright documented semantics + exact matchingへ固定し、独自曖昧matchingを作らない
 - machine-population-indexをrevision / fingerprintなしで再利用しない
 - fixed probe payload / normalizationをSkill-local scriptが所有
-- canonical observation field → fixed probe mappingをcatalogで一意にし、semantic layerはfield keyを選べるがscriptは自然言語からprobeを推論しない
+- canonical observation field inventoryを本ファイルの15 keyへ固定し、catalogでexactly-one fixed probeへ解決する。semantic layerはfield keyを選べるがscriptは自然言語からprobeを推論しない
 - semantic additional observation requestをOBSREQ ref / identity / evidence fingerprint付きでmaterializeし、no-progressを機械判定する
 - final artifactに `planned` requestを残さず、completed / unsupported / no-progress / blockedのいずれかへ閉じる
 - document location / rendered text / control value / selected value等、business flowの意味判断に必要でmachine取得可能な値をfixed probeで取得する

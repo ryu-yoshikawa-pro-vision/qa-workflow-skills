@@ -60,6 +60,7 @@ browserがrole / accessible name / description / stateを返したことはmachi
 - target requirement / applicability / exceptionをsourceへ照合 → requirement check
 - machine-decidable supported ruleで完全判定可能 → `criterion_checks.py`
 - purpose、visible labelとの関係、例外等の意味判断が必要 → semantic/manual
+- semantic/manual判断に追加browser evidenceが必要 → requester kind `inspection-requirement` とrequirement ref/draft keyを使って `_05g` のadditional observation draftへ戻す。required observation fieldはLLMがcanonical keyを選び、request identity / no-progressはscriptが処理する
 
 HTML-AAM等のuser-agent mapping sourceをauthor requirementそのものとして扱いません。projectが特定browser / accessibility API mappingをAuthorityとして採用する場合だけ、そのAuthorityを別に記録します。
 

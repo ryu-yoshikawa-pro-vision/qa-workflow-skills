@@ -205,14 +205,14 @@ browser I/O前後のmachine contractを担当します。詳細は `_05g_usabili
 - target refs
 - environment / viewport / input method
 - formal handoff observation request refs（存在する場合）
-- semantic additional observation drafts（存在する場合）
+- semantic additional observation drafts（存在する場合。execution ownerがusability-inspectionのものだけ）
 - previous additional observation request rows / current evidence refs（no-progress判定に必要な場合）
 
 #### Function
 
 - scope / selected supported rule / measurement kindからrequired observation field集合を導出し、field → fixed probe mappingを一意に解決
-- semantic additional observation draftでは、LLMが選択したcanonical observation field / predicate keyだけを受け付け、自由記述からfield / probeを推論しない
-- additional observation draftへ `OBSREQ-001` 等を決定論的に採番し、requester / scope / target / state / field / predicate payloadからrequest identity、sorted current evidence refsからinput evidence fingerprintを導出する
+- semantic additional observation draftでは、requester kind `usability-evaluation / inspection-requirement / wcag-procedure` とcanonical requester identityを検証し、LLMが選択したcanonical observation field / predicate keyだけを受け付け、自由記述からfield / probeを推論しない
+- additional observation draftへ `OBSREQ-001` 等を決定論的に採番し、canonical requester identity / scope / target / canonical sort済みstate basis refs / current document identity / field / predicate payloadからrequest identity、sorted current evidence refsからinput evidence fingerprintを導出する。state descriptionはidentityへ使わない
 - previous requestとidentity / evidence fingerprintが同一なら `no-progress` としbrowser requestを生成しない
 - target draftからartifact-local `TARGET-001` 等を採番し、5種resolverのpayload、Playwright exact matching、parent scope、population revision / fingerprint、current document / session、uniqueness契約をmaterialize
 - `browser-observation-catalog.json` の明示dispatchからrequired probe key集合を導出
