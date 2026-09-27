@@ -2,7 +2,7 @@
 
 ## 0. 本ファイルの対象
 
-本ファイルは `usability-inspection` が扱うuser-facing responsiveness / performance measurementの範囲と取得元を固定します。
+本ファイルは `usability-inspection` が扱うuser-facing responsiveness / performance measurementの範囲と取得元を固定します。browserからtimestamp / PerformanceEntryを取得するrequest / probe契約は `_05g_usability-inspection-browser-observation-contract.md` を正本とします。
 
 performance testing framework、RUM service、独自Core Web Vitals implementationは作りません。
 
@@ -27,6 +27,10 @@ Paint Timing APIからFirst Contentful Paintを取得できる場合に保持し
 - loading start → completion state
 
 start event / end predicateはaction前に固定します。
+
+interaction timingは `_05g` の `interaction-timing` fixed probeを使います。startはpage内でactual input eventを観測した時点の `performance.now()`、endも同じpage clockでfixed predicate成立時に取得します。Playwright action呼び出し開始時刻や別processのwall-clockを混ぜません。
+
+end predicateは `_05g` のfixed vocabularyへ正規化します。`task-ready` や `first visible feedback` という自然言語labelだけをpredicateにせず、今回targetで何が成立したらendかをaction前に `element-visible / element-hidden / text-present / attribute-equals / aria-state-equals / element-enabled / element-disabled / url-changed` のいずれかへmaterializeします。表現できない場合はad hoc JavaScriptを生成せず `measurement-unavailable` とします。
 
 Playwright action call開始からのwall-clockをそのままuser response timeにはしません。
 
@@ -118,13 +122,14 @@ result:
 
 ## 6. deterministic runtime
 
-`measurement.py` が担当します。
+`observation_contract.py` がbrowserから取得するraw timing / PerformanceEntryのrequestとschemaを担当し、`measurement.py` が取得済みの正規化値に対する計算・threshold判定を担当します。
 
 決定論化するもの:
 
 - canonical unit
 - exact elapsed calculation
 - start / end clock domain一致確認
+- `interaction-timing` probeが返したstart / end acquisition metadataとfixed predicate refのrequired field検証
 - threshold比較
 - result vocabulary
 - missing field検証
@@ -155,7 +160,7 @@ measurement helperを `test-rule-catalog.json` へ登録しません。
 
 - Navigation Timing取得経路が固定されている
 - FCP取得経路が固定されている
-- user-facing interaction timingのstart / end / clock domainが固定されている
+- user-facing interaction timingのstart / end / fixed predicate / clock domainが固定され、arbitrary JavaScript predicateを使わない
 - project thresholdなしでFAIL thresholdを創作しない
 - Core Web Vitalsを独自再実装しない
 - Core Web Vitalsの既存measurement sourceがない場合を `measurement-unavailable` へ閉じられる

@@ -4,6 +4,8 @@
 
 本ファイルは `wcag-conformance-evaluation` と既存workflow / Skillのroutingとbrowser ownershipを固定します。
 
+formal observation handoffのworkflow state物理schema、CAS更新順序、二重開始防止、returned result closure、resume guardは `_04c_wcag-observation-handoff-state-contract.md` を正本とします。
+
 ## 1. direct trigger
 
 次は `wcag-conformance-evaluation` をformal methodology ownerとして最初に選びます。
@@ -116,6 +118,16 @@ sample observationが必要な場合:
 
 `wcag-conformance-evaluation` はsibling Skillのscriptsを直接実行しません。同一Agent環境で `qa-workflow` が利用可能ならhandoffをworkflowへ返してresumeします。`qa-workflow` を利用できない真のstandalone環境で必要evidenceがInputにない場合だけ、handoff requirementを出してblockedになります。
 
+## 7.1 handoff state / resume
+
+handoff recordは `_04c_wcag-observation-handoff-state-contract.md` に従い、PR #13 merge後current workflow stateへnative CASで永続化します。
+
+- handoffを `pending` としてCAS保存できるまでbrowser ownerを開始しない
+- `handoff_ref` をmutable operation claimへ対応付け、必要なshared browser / account / test dataは既存resource reservationを使う
+- returned immutable resultはhandoff identity / origin revision / currentness / cleanupを検証してからCAS反映する
+- exact duplicate returnはidempotentに扱えるが、同一expected observationへ複数current resultがある場合は明示supersedes relationがなければblockする
+- origin evaluation revisionが変わったhandoffはstaleとし、旧revisionへresumeしない
+- expected-current-valid-returned集合のclosureとorigin currentnessをdeterministic helperが確認した場合だけresumeする
 ## 8. 完了条件
 
 - formal WCAG要求がusability-inspectionへ誤routingされない
@@ -124,6 +136,7 @@ sample observationが必要な場合:
 - browser ownerが同時に複数存在しない
 - formal direct triggerからlive observationが必要になった場合にoriginating evaluation / revision / resume operationを保持してqa-workflow → usability-inspection → formal Skill resumeへ一意に遷移できる
 - expected handoff集合とcurrent valid returned result集合のclosureをproduction helperで検証し、LLMの手判断でresumeしない
+- handoffのpending保存、owner start、return反映、closeをPR #13のstate revision / native conditional writeで更新し、CAS不能・claim競合・stale origin・conflicting current returnではresumeしない
 - multi-Skill executionをqa-workflowがownerし、formal Skillがsibling scriptsへruntime依存しない
 - TC result / expert evaluation / WCAG resultを混同しない
 - Findingがreportの正本を置き換えない

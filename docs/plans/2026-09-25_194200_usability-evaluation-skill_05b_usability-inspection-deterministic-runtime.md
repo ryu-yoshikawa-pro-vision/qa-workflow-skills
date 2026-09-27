@@ -54,11 +54,15 @@ PR #11のcurrent実装に同じhelperが存在する場合、その契約を `us
 ~~~text
 ユーザー要求 / project Authority / current target context
         ↓
-LLM: scope applicability、criterion exception、follow-up要否等のsemantic decisionだけを返す
+LLM: raw requestを正規aspect keyへmappingし、target-specific applicability / criterion exception / follow-up要否等のsemantic decisionだけを返す
         ↓
-Skill runtime script: fixed scope skeleton / selected rule metadataから必要な観測fieldを導出
+inspection_structure.py: inspection modeからfixed scope skeletonを生成
         ↓
-browser owner: live UIから要求されたmachine-readableな観測値を取得
+observation_contract.py: selected rule / measurement / scopeからfixed probe request集合を導出
+        ↓
+browser owner: current PR #12経路でfixed requestを直列実行
+        ↓
+observation_contract.py: result schema / unit / capabilityを検証してcanonical machine observationへ正規化
         ↓
 Skill runtime script
   - structure / machine-owned section materialization
@@ -90,11 +94,13 @@ skills/usability-inspection/
 ├── scripts/
 │   ├── runtime_contract.py
 │   ├── inspection_structure.py
+│   ├── observation_contract.py
 │   ├── measurement.py
 │   └── criterion_checks.py
 ├── assets/
 │   ├── output-template.md
-│   └── test-rule-catalog.json
+│   ├── test-rule-catalog.json
+│   └── browser-observation-catalog.json
 └── ...
 ~~~
 
@@ -111,7 +117,10 @@ Skill固有のcriterion logicやmeasurement logicは入れません。
 正規化済みの次を受け取ります。
 
 - inspection metadata
-- top-level aspect decisions: aspect key / 今回確認する・対象外 / semantic reason
+- inspection mode: `general / scoped / formal-handoff`
+- normalized requested aspect keys（`scoped` の場合。raw自然言語ではなく正規key）
+- formal handoff required scope / observation request refs（`formal-handoff` の場合）
+- top-level aspectのtarget-specific semantic applicability / reason。general時の固定row有無そのものは入力しない
 - browser ownerが取得したraw observation records
 - measurement inputs
 - selected supported test rule keys
@@ -128,7 +137,9 @@ inspection内で生成するsemantic input / raw recordはinvocation内で一意
 - unknown field拒否
 - enum / required field検証
 - duplicate draft key拒否
-- Planで固定したtop-level aspectのscope row skeletonを全件生成し、semantic applicability decisionを適用
+- inspection modeからscope row skeletonを生成する。`general` は固定7観点、`scoped` はnormalized requested aspect集合、`formal-handoff` はhandoff required scopeを正本とする
+- task / flowが明示された場合だけtask-flow rowを追加する
+- target-specific semantic applicability decisionを生成済みrowへ適用
 - selected supported test ruleについて `test-rule-catalog.json.required_observation_fields` のunionを導出し、browser observation requirementとしてmaterialize
 - artifact-local refの決定論的採番
   - scope: `SCOPE-001`
@@ -169,6 +180,31 @@ Outputは次を必須で持ちます。
 - rendered machine-owned structured sections
 - issues
 
+### observation_contract.py
+
+browser I/O前後のmachine contractを担当します。詳細は `_05g_usability-inspection-browser-observation-contract.md` を正本とします。
+
+#### Input
+
+- inspection scope rows
+- selected supported test rule keys
+- measurement kinds
+- target refs
+- environment / viewport / input method
+- formal handoff observation request refs（存在する場合）
+
+#### Function
+
+- `browser-observation-catalog.json` の明示dispatchからrequired probe key集合を導出
+- `PROBE-001` 等のartifact-local request refを決定論的に採番
+- fixed probe payload / execution metadataをmaterialize
+- unknown probe / unknown field / arbitrary JavaScript inputをreject
+- browser resultのschema / enum / unit / capabilityを検証
+- `ok / unsupported / unavailable / incomplete / blocked` を正規化
+- viewport / geometry / responsive boundary / timing等のmachine valueをcanonicalize
+- interaction timingではfixed predicate vocabularyとsame-page `performance.now()` clockを要求
+
+`observation_contract.py` 自身はbrowserを起動・操作しません。Agentはscriptがmaterializeしたfixed requestをcurrent PR #12 browser経路へ渡し、resultをscriptへ戻します。
 ### measurement.py
 
 #### Input
@@ -428,7 +464,9 @@ Playwright version差を吸収する独自browser wrapper frameworkは作りま�
 
 | 処理 | runtime script |
 | --- | --- |
-| fixed scope row skeleton・ref採番・row順序 | 必須 |
+| inspection modeからfixed scope row skeleton・ref採番・row順序 | 必須 |
+| selected rule / measurement / scopeからfixed probe request集合導出 | 必須 |
+| browser probe result schema / unit / capability正規化 | 必須 |
 | schema / cross-reference | 必須 |
 | selected ruleからrequired observation field集合導出 | 必須 |
 | scope closure集計 | 必須 |
@@ -461,7 +499,10 @@ runtime generatorとdeterministic eval validatorを同じ実装へしません�
 次を必須runtime fixtureとして持ちます。
 
 - valid inspection structure
-- fixed top-level aspect skeleton + semantic applicability decisionからscope row生成
+- general / scoped / formal-handoff modeからscope row生成
+- raw requestからnormalized aspect keyへのsemantic mapping後、scriptが固定row有無を決める
+- selected rule / measurement / scopeからfixed probe request集合導出
+- unknown / unsupported probeとresult schema不整合をreject
 - selected ruleからrequired observation field集合導出
 - observation / measurement / rule / requirement / action inputからfinal ref解決
 - duplicate draft key
@@ -493,6 +534,7 @@ runtime generatorとdeterministic eval validatorを同じ実装へしません�
 - 同じnormalized inputから同じmachine resultになる
 - 数値計算 / threshold比較をLLMが再計算しない
 - fixed scope row、required observation field集合、Finding作成要否、summary、machine-owned sectionを `inspection_structure.py` が導出 / materializeし、Agentが同じ機械処理を手作業で再構築していない
+- fixed probe request / result schema、interaction timingのclock / predicate contract、responsive boundary resultを `observation_contract.py` が導出 / validateし、Agentがad hoc JavaScriptやraw tool resultの手計算で代替していない
 - inspection成果物内のscope / observation / measurement / test rule / requirement / action refを `inspection_structure.py` が一括採番・cross-reference解決し、Agentや個別helperがfinal refを手採番していない
 - deterministic checkのdispatchが `assets/test-rule-catalog.json` のsupported automatic ruleだけへ固定され、catalogを式DSL / plugin frameworkとして実装していない
 - structure / measurement helperをtest rule catalogへ混ぜていない

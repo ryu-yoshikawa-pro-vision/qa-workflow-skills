@@ -290,6 +290,8 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
    2026-09-25_194200_usability-evaluation-skill_04a_usability-inspection-workflow-integration.md
 4b. wcag-conformance-evaluationのworkflow統合  
    2026-09-25_194200_usability-evaluation-skill_04b_wcag-conformance-evaluation-workflow-integration.md
+4c. formal WCAG observation handoffのworkflow state / CAS契約  
+   2026-09-25_194200_usability-evaluation-skill_04c_wcag-observation-handoff-state-contract.md
 5. Skill package・成果物・validator  
    2026-09-25_194200_usability-evaluation-skill_05_skill-package.md
 5a. usability-inspection package・成果物・評価  
@@ -304,6 +306,8 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
    2026-09-25_194200_usability-evaluation-skill_05e_performance-measurement.md
 5f. wcag-conformance-evaluation package / sampling / runtime  
    2026-09-25_194200_usability-evaluation-skill_05f_wcag-conformance-evaluation-package-and-runtime.md
+5g. usability-inspection browser observation request / probe契約  
+   2026-09-25_194200_usability-evaluation-skill_05g_usability-inspection-browser-observation-contract.md
 6. 評価・CI・実装順序・完了条件  
    2026-09-25_194200_usability-evaluation-skill_06_evaluation-ci-implementation-order.md
 6a. usability-inspectionの実装順序・完了条件  
@@ -404,3 +408,8 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
 73. Step 4.2ではcomplete process中の全contentを毎回再評価しない。current identity / evidence / freshnessで同一と機械確認できるcontent/resultは再利用し、変化したcontentとinteraction / input / notification / feedbackを評価対象へmaterializeする。確認できない場合は再評価する。
 74. Step 5.1では `not-satisfied` Conformance Requirement / Success Criterion集合とexample-covered集合の差分をscript / validatorで0へ閉じる。Step 1.4で全occurrence報告が要求された場合はその追加coverageも別に検証する。human-readable report、Evaluation Statement、accompanying documentationは本Skillが生成する形式について見出し構造、table header、画像evidenceのtext description、色だけに依存しない表現等のaccessible output contractを満たす。
 75. Conformance Claim用のguideline title / version / URIはsource取得用canonical URLと別fieldでversioned catalogへ固定する。third-party contentをmonitoring / repairによりfull conformanceへ含める場合は、全該当pageでの識別可能性、monitoring可能性、non-conforming contentを2 business days以内にremove / bring into conformanceできるevidenceをmachine guardで要求する。
+76. `usability-inspection` のgeneral / scoped / formal-handoff scope rowは `_05g` のinspection mode契約で生成し、general時の固定7観点、task / flowの明示有無、formal handoffのrequired scope等、機械的に決められるON/OFFをLLMへ返さない。自然言語要求から正規aspect keyへのmappingやtarget-specific applicabilityだけをsemantic判断へ残す。
+77. browserから取得するviewport、geometry、state、accessibility semantics、focus、computed style、responsive boundary、Navigation / Paint Timing、interaction timingは `_05g` のfixed probe request / result契約へ統一する。`observation_contract.py` がprobe集合、request ref、fixed payload、schema / unit / capability検証を所有し、Agentがraw値から派生値やclosureを手計算しない。任意JavaScriptやgeneric probe DSLは追加しない。
+78. `usability-inspection` がstrictなWCAG / WAI-ARIA / ARIA in HTML requirementやaccessible name関連の観測を扱う場合、inspection package自身のsource catalogから根拠へ一意に戻れるようにする。AccName / HTML-AAM等を利用する場合はpublication statusを保持し、Working DraftをRecommendation相当のbinding author requirementへ昇格しない。
+79. formal observation handoffのworkflow state物理schema、CAS順序、mutable operation claim、resource reservation、duplicate / conflicting return、stale origin、expected-returned closure、resume guardは `_04c` を正本とする。LLMはhandoff completionやresume可否を判断せず、PR #13のcurrent coordination helperへ必要なdeterministic helperだけを追加する。
+80. `wcag-conformance-evaluation` が所有する出力形式はcanonical human-readable report、条件付きEvaluation Statement / WCAG Conformance Claim / Statement of Partial Conformance、要求時のEARL JSON-LDまでとする。追加評価要件として要求される情報・coverageは目的内ならappliedまたはblockedへ閉じるが、未知の外部document format / arbitrary template renderer自体は本Skillの目的外とし、generic template engineを追加しない。

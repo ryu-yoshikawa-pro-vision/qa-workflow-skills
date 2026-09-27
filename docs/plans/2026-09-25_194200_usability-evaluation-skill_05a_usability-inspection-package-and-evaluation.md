@@ -16,11 +16,13 @@ skills/usability-inspection/
 ├── scripts/
 │   ├── runtime_contract.py
 │   ├── inspection_structure.py
+│   ├── observation_contract.py
 │   ├── measurement.py
 │   └── criterion_checks.py
 ├── assets/
 │   ├── output-template.md
-│   └── test-rule-catalog.json
+│   ├── test-rule-catalog.json
+│   └── browser-observation-catalog.json
 └── evals/
     ├── trigger/
     │   ├── train_queries.json
@@ -122,6 +124,8 @@ LCP / CLS / INPは独自algorithmで再実装せず、project既存のRUM / CrUX
 
 通常E2E向けのauto-wait / auto-scrollがusability frictionを隠さないようにする契約へ利用します。
 
+browser observationのrequest / fixed probe / result schema / interaction timing取得方法は `_05g_usability-inspection-browser-observation-contract.md` を正本とします。Agentがbrowser tool resultを見てgeometry算術、probe required field、clock domain、responsive boundary closureを手で決めません。
+
 ## 4. source方針
 
 `usability-evaluation` のUI pattern corpusをinspection packageへ複製しません。
@@ -140,6 +144,7 @@ seedは `_02c_seed-source-catalog.md` §3です。
 ## 4.1 coverageの正本
 
 - Web execution context / responsive / mobile / discoverability / Cognitive Walkthrough / E2E → `_05c_usability-inspection-coverage.md`
+- browser observation request / fixed probe / raw machine evidence normalization → `_05g_usability-inspection-browser-observation-contract.md`
 - general accessibility / WAI-ARIA / ACT → `_05d_accessibility-requirements-and-act.md`
 - formal WCAG conformance evaluation → `_05f_wcag-conformance-evaluation-package-and-runtime.md`
 - performance / responsiveness measurement → `_05e_performance-measurement.md`

@@ -4,7 +4,7 @@
 
 本ファイルは `usability-inspection` のWeb live inspectionについて、general inspectionのscope、Web実行条件、responsive / mobile、discoverability、Cognitive Walkthrough、evidence freshness、E2E完了条件を固定します。
 
-accessibility / WCAG conformanceは `_05d_accessibility-requirements-and-act.md`、performance measurementは `_05e_performance-measurement.md` を正本とします。
+accessibility / WCAG conformanceは `_05d_accessibility-requirements-and-act.md`、performance measurementは `_05e_performance-measurement.md`、browser observation request / fixed probe / result normalizationは `_05g_usability-inspection-browser-observation-contract.md` を正本とします。
 
 ## 1. live対象
 
@@ -41,6 +41,8 @@ native screenshot / design artifact等は `usability-evaluation` の静的eviden
 対象外にはpopulation不存在、責務外、必要evidenceを安全に取得できない等の理由を必須にします。
 
 task / flowはユーザーまたは案件が明示した場合だけ追加します。
+
+scope rowの有無は `_05g` のinspection mode契約で機械化します。`general` は上記7観点を全件生成し、`scoped` はsemantic layerがraw依頼を正規aspect keyへmappingした集合だけを生成し、`formal-handoff` はhandoff required scopeを正本にします。LLMが毎回7観点のON/OFFを完成rowとして入力しません。
 
 accessibility rowを選んだことだけでWCAG conformance evaluationへ切り替えません。
 
@@ -111,12 +113,14 @@ user / projectがdevice profileを指定した場合はそのprofileを使いま
 responsive / mobileが対象の場合:
 
 1. project / adopted Design Systemに公開されたbreakpointがある場合は全boundaryを列挙
-2. current targetの公開CSS / machine-readable styleからwidth / heightに関係するmedia query / container query boundaryを取得できる場合は列挙
-3. 同じboundaryをcanonicalize
+2. current targetのCSSOM / machine-readable styleからwidth / heightに関係するmedia query / container query boundaryを `_05g` の `responsive-boundaries` probeで取得する
+3. `observation_contract.py` が同じboundaryをcanonicalizeし、duplicate除去とbefore / boundary / afterの数値集合を生成する
 4. 各boundaryの直前・boundary・直後で重要情報 / operation / clipping / overflow / overlapを確認
 5. applicable requirementがある場合はorientation、zoom、color scheme、reduced motion等もscopeへ追加
 
 対象UIに存在しないbreakpointを創作しません。
+
+cross-origin stylesheet等をbrowserから読めず、project / adopted Design SystemのAuthorityでも不足boundaryを閉じられない場合はboundary inventoryをcomplete扱いしません。`incomplete` とunreadable source情報を保持し、LLMが「たぶん他にない」と補完しません。
 
 ## 6. discoverabilityとmachine population
 
@@ -202,6 +206,8 @@ canonical real Agent validationは `_06c_canonical-live-validation.md` を正本
 - accessibility inspection
 - formal WCAG conformance request routing（wcag-conformance-evaluationへhandoff）
 - visual screenshot evidence
+- fixed probe request → browser result → `observation_contract.py` normalization
+- responsive boundary sourceのreadable / unreadable両case
 - thresholdあり / なしmeasurement
 - fixtureまたは保存済みprovenanceで閉じられるexternal Core Web Vitals sourceあり / なしの契約case
 - usability-evaluation read-only連携
