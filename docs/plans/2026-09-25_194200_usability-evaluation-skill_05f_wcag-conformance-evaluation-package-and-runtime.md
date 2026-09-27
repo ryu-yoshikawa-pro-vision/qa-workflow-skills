@@ -253,6 +253,7 @@ continuousなwidthの全CSS pixelをvariation rowとして列挙しません。d
 - execution condition refs
 - required evidence kind
 - returned inspection artifact / evidence refs
+- consumed inspection Machine Runtime dependency refs (`skill / runtime_unit_key / generation_fingerprint`)
 - status: satisfied / blocked
 
 ### Sampling Procedure / Selected Sample Set
@@ -580,6 +581,16 @@ deterministic runtimeへ載せないもの:
 random selection結果はmethod / provenance / selected sample identityとともに後続Machine Runtime Inputへ渡します。保存済みsample resultはPR #11 current verifierでfreshnessを再計算し、currentの場合だけ再利用します。
 
 runtime Inputには少なくともtarget WCAG version / level、scope、scope coverage rows、normalized additional evaluation requirements、accessibility support baseline revision、environment、previous evaluation / sample lineage（再評価の場合）、sample identity、evidence identity、Authority / reference refs、選択versionのstatic data versionを含め、これらが変わった場合に旧resultをcurrent扱いしません。
+
+formal runtime unitが `usability-inspection` のMachine Runtime resultを消費する場合、PR #11 current contractの `metadata.upstream_runtime_units` へ、消費したinspection runtime unitごとに次を必須登録します。
+
+- `skill = usability-inspection`
+- inspection `runtime_unit_key`
+- inspection current `generation_fingerprint`
+
+複数dependencyは既存canonical order / duplicate検証を使います。formal Skillはinspectionの `static_data_versions.wcag_machine_probes` を自分の `static_data_versions` へコピーしません。sibling runtime implementation / static dataのcurrentnessは `upstream_runtime_units` のgeneration mismatch / missing dependencyで既存current verifierが `stale` へ伝播させます。
+
+returned inspection result ref / revision / evidence identityはtraceabilityと入力内容のcurrentnessのためnormalized inputへ保持しますが、sibling runtime implementation freshnessをformal `input_fingerprint` だけで代替しません。inspection runtimeが再生成されgeneration fingerprintが変わった場合、保存済みformal resultはdependency mismatchによりcurrent扱いしません。
 
 ## 3.2 wcag_criterion_plan.py
 
@@ -1067,6 +1078,7 @@ production helperとは別実装で少なくとも次を検証します。
 - Non-Interference fixed Success Criteria refs / result coverage
 - Step 4.2 unchanged-result reuseがidentity / evidence / freshnessでcurrentなものだけに限定される
 - observation handoffのoriginating evaluation / revision / resume operation / expected observation refsとreturned inspection artifact cross-reference
+- consumed inspection runtimeをformal `metadata.upstream_runtime_units` へ接続し、generation mismatchをstale伝播させること
 - `_04c` helperが出したhandoff state / CAS / current returned lineage / `may_resume` とformal artifactの整合
 - sample result cross-reference
 - target levelに必要なrequirement result coverage
