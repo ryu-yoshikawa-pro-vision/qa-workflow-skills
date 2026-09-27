@@ -156,6 +156,7 @@ current mainへmerge済みのPR #12 browser実行基盤を再利用します。r
 
 確認:
 
+- target registryの5 resolver kindについてpayload schemaを `_05g` どおり実装し、Playwright documented locator semantics + `exact=true`、parent scope、population revision / fingerprint、session currentnessを検証する
 - target registryをcurrent browser sessionで再解決し、uniqueなtargetだけprobeへ渡す。missing / ambiguous / staleは成功扱いしない
 - `observation_contract.py plan` が生成したfixed requestをcurrent browser経路で実行し、normalize結果をruntimeへ戻す
 - rendered UI / screenshot observation
@@ -167,9 +168,10 @@ current mainへmerge済みのPR #12 browser実行基盤を再利用します。r
 - explicit scroll
 - resize
 - responsive boundary probe。general modeではcompleteなboundary inventoryが1件以上あればbefore / boundary / afterを全件実行し、boundary 0件はnot-applicable、inventory incompleteは別Authorityで閉じない限り判定不能
-- CSSOM boundary parserは `_05g` のsupported px subsetだけを扱い、relative unit / calc / unsupported queryをincompleteへ閉じる
+- CSSOM boundary処理は `_05g` のsupported subsetを扱い、media query `px / em / rem` と条件付きcontainer size query `px / em / rem` を固定procedureでCSS pxへ正規化する。unsupported unit / calc / var / style queryはincompleteへ閉じる
+- boundary detectionとexecution feasibilityを分離し、container / compound query等でrequired stateを安全に実現できない場合は `not-executable / incomplete` とする
 - cross-origin等でread不能sourceがある場合の `incomplete` closure
-- fixed interaction-timing probe。same-page `performance.now()` / fixed end predicate / preexisting predicate / timeoutを含む
+- fixed interaction-timing probe。8種end predicateごとのrequired payload、same-page `performance.now()`、preexisting predicate、timeout、unknown attribute / ARIA state rejectを含む
 - form / error state
 - safe state transition
 - raw screenshot / DOM / accessibility treeを必要最小限にする
