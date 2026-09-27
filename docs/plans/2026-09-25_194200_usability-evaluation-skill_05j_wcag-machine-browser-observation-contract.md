@@ -136,7 +136,7 @@ mechanism candidateはcurrent browser / user agent capabilityと、current page�
 - executableなvalid mechanismをすべて確認してもapplicable textが2.0xへ到達できない、または到達前後でcontent / functionality lossがある場合だけnot-satisfied candidateへ進める。未確認mechanism / text population / exception closureが残る場合は `incomplete / blocked` とする
 - Playwright `deviceScaleFactor` はDPR emulationでありtext scaling mechanismとして扱わない
 - viewport resize、CSS `transform: scale()`、test専用font-size / zoom style注入を1.4.4のtext scaling mechanismとして扱わない
-- browser / toolが存在するuser-agent mechanismを操作・scale取得できない場合、そのmechanism probeは `unsupported` とする。author-provided mechanismも含め executable candidateが残らない場合、criterion executionを `blocked` にし、擬似的なstyle変更へfallbackしない
+- browser / toolが存在するuser-agent mechanismを操作できない場合は `unsupported + text-scaling-mechanism-not-machine-executable`、mechanism state / scaleをmachine-readableに取得できない場合は `unavailable + text-scaling-state-not-machine-readable` とする。author-provided mechanismも含めmachine-executable candidateが残らない場合でも、このmachine limitationだけでcriterionをblockedへ短絡せず、formal側 `_05i` のconditional manual fallbackをapplicable化する。manual fallbackも閉じられない場合だけcriterionを `blocked / undetermined` とする。擬似的なstyle変更へfallbackしない
 
 W3C Technique G142等の評価で必要なuser-agent zoomは、current browser経路が実際のuser-agent zoom capabilityとscale stateを安全に提供する場合だけfixed dispatchへ登録します。responsive breakpointによりCSS font sizeが変わるcaseでもbaseline比2.0x enlargementを確認し、特定browserのprivate protocolやundocumented shortcutをgeneric fallbackとして追加しません。
 
@@ -199,6 +199,20 @@ formal Skillがmaterializeするmachine probe requestは対象に応じて `targ
 
 result statusは `ok / unsupported / unavailable / incomplete / blocked` です。`unsupported` はcurrent browser / tool capabilityがrequired operationを提供しない場合だけに使い、既知標準の未実装を隠す用途には使いません。
 
+manual fallback activationへ使う `limitation_code` は次の有限値だけを許可します。
+
+- `background-not-machine-resolvable`: gradient / image background / blend / anti-aliasing等によりrequired contrast値をmachineで一意に閉じられない
+- `focus-indicator-not-machine-resolvable`: focus indicatorのshape / area / visual stateをCSS / SVG等のmachine-readable値だけで一意に閉じられない
+- `text-scaling-mechanism-not-machine-executable`: valid text scaling mechanismは候補として存在するがcurrent browser ownerが安全に操作できない
+- `text-scaling-state-not-machine-readable`: valid mechanismを操作できてもscale / rendered stateをmachine-readableに確定できない
+
+上記codeは `_05i` に明示したconditional manual fallbackだけを起動します。probe resultやmachine procedureがこのcodeからcriterion resultを直接決定しません。
+
+- `m-text-contrast / m-nontext-contrast` はcomputed color contextから一意にcontrastを算出できない場合、statusを `unavailable`、limitation codeを `background-not-machine-resolvable` とする
+- `m-focus-appearance` はsimple machine pathで閉じないcomplex shape / gradient / image background / anti-aliasing等の場合、statusを `incomplete`、limitation codeを `focus-indicator-not-machine-resolvable` とする
+- `m-resize-text` は上記Resize Text contractの2 codeだけを使う
+- unknown limitation code、自然言語だけのfallback理由、LLM supplied limitation codeをrejectする
+
 ## 6. sensitive data
 
 - full DOM / full accessibility treeを保存しない
@@ -212,16 +226,17 @@ result statusは `ok / unsupported / unavailable / incomplete / blocked` です�
 validatorを2層に分けます。
 
 - formal Skill validator: `_05i` のmachine procedure全件、procedure catalog内のrequired machine probe key、typed request schema、duplicateを検証する。`m-parsing-version-rule` だけbrowser probe 0件を許可する
-- usability-inspection validator: local machine probe catalog、request / result schema、fixed dispatch、target / population currentness、duplicate、unsupported理由、`static_data_versions.wcag_machine_probes` を検証する
+- usability-inspection validator: local machine probe catalog、request / result schema、fixed dispatch、target / population currentness、duplicate、status / limitation code整合、unsupported理由、`static_data_versions.wcag_machine_probes` を検証する
 - repository-level contract test: formal procedure catalogが参照するmachine probe key集合とinspectionのmachine probe catalog key集合を比較し、missing / extra / unusedを0件にする
 
-fixtureにはdocument metadata、non-text / media / link / heading / form / structure population、keyboard / focus / pointer / hover-focus、error scenario、target size / spacing、text / non-text contrast、simple / complex focus appearance、responsive condition、orientation / reflow / text spacing、moving / timer / shortcut、multipage signature、stale population、missing capabilityを含めます。Resize Textはfull-page zoom、text-only resize、author-provided control、incremental step、responsive breakpointでzoom control値とrendered text scaleが一致しないcase、2.0x到達、text population incomplete、valid mechanism実行不能、`deviceScaleFactor` / viewport / CSS injection rejectを個別fixtureで持ちます。
+fixtureにはdocument metadata、non-text / media / link / heading / form / structure population、keyboard / focus / pointer / hover-focus、error scenario、target size / spacing、text / non-text contrast、simple / complex focus appearance、responsive condition、orientation / reflow / text spacing、moving / timer / shortcut、multipage signature、stale population、missing capabilityを含めます。gradient / image / blend背景のcontrast unavailable、complex focus indicator limitation codeとmanual fallback activationも含めます。Resize Textはfull-page zoom、text-only resize、author-provided control、incremental step、responsive breakpointでzoom control値とrendered text scaleが一致しないcase、2.0x到達、text population incomplete、valid mechanism実行不能、`deviceScaleFactor` / viewport / CSS injection rejectを個別fixtureで持ちます。
 
 ## 8. 完了条件
 
 - `_05i` の全machine procedureにformal procedure catalog上の固定probe mappingがある
 - formal Skillがtyped `wcag-machine-probe` requestをmaterializeし、inspection側がprocedure catalogを再読込しない
 - machine probe catalogの全keyにfixed dispatch / request / result schemaがある
+- fallback対象machine limitationは有限 `limitation_code` へ正規化され、unknown codeを許可しない
 - formal machine probeを処理したinspection runtimeではmachine probe catalogのcanonical hashを `static_data_versions.wcag_machine_probes` へ固定し、変更時はreturned inspection runtime evidenceのfingerprint変化としてformal評価へ伝播する。formal machine probe未使用のinspection runtimeへは含めない
 - repository-level contract testでformal required probe keyとinspection catalog keyのmissing / extra / unusedが0件
 - LLMがmachine probe集合を入力しない
