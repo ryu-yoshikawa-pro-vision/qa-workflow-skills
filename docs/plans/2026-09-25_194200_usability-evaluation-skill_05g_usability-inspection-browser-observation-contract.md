@@ -4,9 +4,9 @@
 
 本ファイルは `usability-inspection` で、live browserからmachine-readable observationを取得する前後の契約を固定します。
 
-目的は、bounding box、viewport、focus、accessible semantics、computed style、responsive boundary、PerformanceEntry、interaction timing等の取得方法・result schema・取得不能状態をAgentのその場判断へ残さないことです。
+目的は、target解決、bounding box、viewport、focus、accessible semantics、computed style、responsive boundary、PerformanceEntry、interaction timing等の取得方法・request schema・result schema・取得不能状態をAgentのその場判断へ残さないことです。
 
-browser I/OそのものはPR #12のcurrent browser execution pathが所有します。今回新しいbrowser runner / wrapper / accessibility engineは作りません。決定論化できるrequest生成、fixed probe payload、result schema、normalization、required field / capability検証はSkill-local scriptへ移します。
+browser I/OそのものはPR #12のcurrent browser execution pathが所有します。今回新しいbrowser runner / wrapper / accessibility engineは作りません。決定論化できるrequest生成、fixed probe payload、target resolver、result normalization、required field / capability検証はSkill-local scriptへ移します。
 
 ## 1. 既存browser経路との関係
 
@@ -18,7 +18,7 @@ browser I/OそのものはPR #12のcurrent browser execution pathが所有しま
 
 `usability-inspection` のために新しいrunner selection frameworkを追加しません。
 
-browser ownerは `observation_contract.py` がmaterializeしたobservation requestを実行します。Agentが観測値の単位、enum、派生値、required field、probe result statusを手で決めません。
+browser ownerは `observation_contract.py` がmaterializeしたrequest / target resolver / fixed predicateだけを実行します。Agentが観測値の単位、enum、派生値、required field、probe result statusを手で決めません。
 
 ## 2. package追加
 
@@ -49,8 +49,6 @@ catalog row:
 
 ## 3. observation lifecycle
 
-処理順を固定します。
-
 ```text
 requested scope / formal handoff / selected rule / measurement kind
         ↓
@@ -63,33 +61,36 @@ semantic / browser owner
         ↓
 observation_contract.py materialize-targets
   - TARGET-001等のtarget ref
-  - resolver schema / currentness / uniqueness contract
+  - resolver kind / payload
+  - population / document currentness
         ↓
 observation_contract.py plan
   - scope / selected rule / measurementからrequired observation field / probe key集合
   - PROBE-001等のrequest ref
+  - fixed predicate request
   - required result schema
         ↓
 browser owner
-  - target resolverをcurrent sessionで再解決
-  - current PR #12 browser経路でrequestを直列実行
+  - resolverをcurrent sessionで再解決
+  - fixed requestをPR #12 browser経路で直列実行
         ↓
 observation_contract.py normalize
   - target resolution / schema / enum / unit / capability検証
+  - responsive boundary検出結果 / 実行可能性
   - canonical machine observation
         ↓
 criterion_checks.py / measurement.py / inspection_structure.py
 ```
 
-LLMはraw tool resultからbounding box算術、viewport内外、elapsed、threshold、required field closure等を再計算しません。
+LLMはraw tool resultからbounding box算術、viewport内外、elapsed、threshold、boundary変換、required field closureを再計算しません。
 
-## 3.1 browser target registry
+## 4. browser target registry
 
-element単位のprobeは、自然言語labelやPlaywright locator文字列を直接requestへ埋めません。
+element単位のprobeは自然言語labelやPlaywright locator文字列を直接requestへ埋めません。
 
 user-facing情報から対象を識別した後、semantic / browser ownerはtarget draftを返し、`observation_contract.py materialize-targets` がartifact-local target registryを生成します。
 
-target row:
+共通field:
 
 - `target_ref`: `TARGET-001` から決定論的に採番
 - `draft_target_key`: invocation内一意
@@ -103,7 +104,7 @@ target row:
 - resolution status
 - limitation
 
-resolver kindは次に固定します。
+resolver kindは次だけです。
 
 - `role-name`
 - `label`
@@ -111,26 +112,44 @@ resolver kindは次に固定します。
 - `machine-population-index`
 - `current-session-ref`
 
-任意CSS selector、XPath、JavaScript式、source code path、test idをtarget registryの汎用入力として受けません。
+任意CSS selector、XPath、JavaScript式、source code path、test idを汎用resolver入力として受けません。
 
-`machine-population-index` はDOM / accessibility populationをmachine-readableに列挙した後で、そのpopulation内のcanonical orderとindexから対象を再解決する場合だけ使います。discoverabilityの証拠にはしません。
+### 4.1 resolver payload
 
-`current-session-ref` はcurrent browser ownerが返すopaque refです。同じdocument / session内だけ有効で、navigation、document replacement、session変更後は `stale` とします。永続identityとして再利用しません。
+| resolver kind | 必須payload | 任意payload | 固定動作 |
+| --- | --- | --- | --- |
+| `role-name` | `role`, `name` | `within_target_ref` | Playwrightのrole / accessible name semanticsを使用し `exact=true`、hiddenを明示要求しない |
+| `label` | `label_text` | `within_target_ref` | Playwrightのlabel semanticsを使用し `exact=true` |
+| `visible-text` | `text` | `within_target_ref` | Playwrightのtext semanticsを使用し `exact=true` |
+| `machine-population-index` | `population_ref`, `population_revision`, `index`, `identity_fingerprint` | なし | 同じcurrent population revision内だけで解決 |
+| `current-session-ref` | `session_target_ref`, `document_identity` | なし | 同一document / session内だけ有効 |
 
-各element probe直前にbrowser ownerがresolverを再解決し、match count / current document identityを返します。`observation_contract.py normalize` は次へ閉じます。
+text matchingのための独自case folding / whitespace algorithmは実装せず、選択したPlaywright locator APIのdocumented matching semanticsを使います。scriptは `exact=true` を固定し、曖昧なsubstring matchを成功扱いしません。
 
-- `unique`: current targetを1件に解決
+`within_target_ref` がある場合、parent targetを先に一意解決し、そのsubtree内でresolverを評価します。parentがmissing / ambiguous / staleならchildも成功扱いしません。
+
+`machine-population-index` はindex単独で再解決しません。`population_revision` と `identity_fingerprint` が一致する場合だけ同じtargetとみなし、population内容や順序が変わった場合は `stale` です。
+
+`current-session-ref` はnavigation、document replacement、session変更後に `stale` とします。永続identityとして再利用しません。
+
+### 4.2 resolution
+
+各element probe直前にbrowser ownerがresolverを再解決し、match count / current document identity / population revisionを返します。`observation_contract.py normalize` は次へ閉じます。
+
+- `unique`
 - `missing`
 - `ambiguous`
 - `stale`
 
-`unique` 以外ではelement probeを成功扱いせず `unavailable / blocked` へ閉じます。DOM replacement後も同じresolverが一意に同じ意味対象へ解決できる場合だけ同じ `target_ref` を継続できます。
+`unique` 以外ではelement probeを成功扱いせず `unavailable / blocked` へ閉じます。
 
-target ref採番、一意性、resolver enum、session currentness、probeとのcross-referenceはscriptが検証します。LLMは `TARGET-001` 等を手採番しません。
+DOM replacement後もrole/name等のstable resolverが一意に同じ意味対象へ解決できる場合は同じ `target_ref` を継続できます。`machine-population-index` / `current-session-ref` は各currentness条件を満たす場合だけ継続できます。
 
-## 4. fixed probe key
+target ref採番、resolver enum / payload、parent cross-reference、population revision、session currentnessはscriptが検証します。
 
-current scopeで少なくとも次を固定probeとして実装します。
+## 5. fixed probe key
+
+current scopeで少なくとも次を実装します。
 
 ### `viewport-state`
 
@@ -145,7 +164,7 @@ current scopeで少なくとも次を固定probeとして実装します。
 - bounding box x / y / width / height
 - box取得不能理由
 
-viewport内外、target size、overlap候補等の数値導出はraw boxとviewportを入力にscriptが行います。
+viewport内外、target size、spacing、overlap候補等の数値導出はscriptが行います。
 
 ### `element-state`
 
@@ -159,9 +178,9 @@ viewport内外、target size、overlap候補等の数値導出はraw boxとviewp
 - accessible name
 - accessible description（取得可能な場合）
 - relevant state / property
-- host element / role applicabilityの判定に必要なmachine-readable field
+- host element / role applicabilityに必要なmachine-readable field
 
-browserが返すaccessible name等は観測事実です。値を取得できたことだけでWCAG / ARIA requirementを `satisfied` にしません。
+値取得だけでWCAG / ARIA requirementを `satisfied` にしません。
 
 ### `focus-state`
 
@@ -169,128 +188,177 @@ browserが返すaccessible name等は観測事実です。値を取得できた�
 - focusable / focus-visible判定に必要なmachine-readable値
 - before / after request ref
 
-視覚上focus indicatorが認識可能かはscreenshot等のvisual evidenceを別に扱います。
+視覚上focus indicatorが認識可能かはvisual evidenceへ残します。
 
 ### `computed-style`
 
 criterion / visual checkで必要と確定したpropertyだけ取得します。全computed styleを無条件保存しません。
 
-allowlistはcurrent implemented checkから導出し、LLMが任意property集合を成果物用に作りません。
+allowlistはcurrent implemented checkからscriptが導出し、LLMが任意property集合を作りません。
 
 ### `responsive-boundaries`
 
-current documentから取得可能なwidth / height関連のmedia query / container query条件を列挙し、正規化可能なboundary valueを返します。
+current documentからwidth / height関連のmedia query / size container queryを列挙し、boundary検出結果と実行可能性を返します。
 
-- same-origin / readable CSSOMを対象にする
-- inaccessible cross-origin stylesheet等は `unreadable_source_count` とsource refを返す
-- unreadable sourceが存在し、project / Design System Authority等の別sourceでもboundary completenessを閉じられない場合はcurrent target boundary inventoryをcomplete扱いしない
-- duplicate boundary / sort / before-boundary-afterの数値集合はscriptがcanonicalizeする
-- project / Design System Authorityから得るboundaryは、CSS pxとして明示済み、またはAuthority側に明示的なCSS px変換根拠がある値だけmachine boundaryとして受ける。LLMがrelative unitを換算しない
+各boundary row:
 
-browser probeが直接parseするCSSOMのsupported subsetを固定します。
+- boundary ref
+- source ref
+- query kind: `media / container-size`
+- query / container ref
+- axis: `width / height / inline-size / block-size`
+- comparator
+- raw value / unit
+- normalized boundary CSS px（導出できる場合）
+- normalization method
+- condition context
+- detection status: `normalized / unsupported / incomplete`
+- execution status: `executable / not-executable / not-needed`
+- execution reason
+- before / boundary / after target values（executableの場合）
 
-- media query / size container queryの `width / min-width / max-width / height / min-height / max-height`
+#### media query
+
+supported:
+
+- `width / min-width / max-width / height / min-height / max-height`
 - legacy min/max syntax
-- Media Queries Level 4の単純range syntax
-- length unitは `px` のみ
-- `and` で結合されたqueryはsupported size conditionごとにboundaryを抽出し、他conditionをcontextとして保持
-- comma-separated queryはbranchごとに処理
+- Media Queries Level 4/5の単純range syntax
+- `px / em / rem`
+- `and` / comma-separated branch。ただし各size conditionと他conditionを保持する
 
-次は推測変換せず `incomplete` とします。
+`px` は直接CSS pxへ正規化します。
 
-- `em / rem / vw / vh / vmin / vmax / cqw / cqh` 等のrelative unit
-- `calc()` / `var()`
-- `not` を含み単純なsize boundaryへ分解できない条件
-- style query等のsize query以外のcontainer query
+`em / rem` を16px等の固定値で換算しません。media queryのrelative unitはpage declarationではなくuser agent / user preferenceを含むinitial valueに基づくため、current browserでqueryを評価してeffective CSS px boundaryを導出します。
+
+単一size thresholdまたは他conditionを固定したまま評価できるbranchでは、browser ownerがviewportを整数CSS px単位で変更し `matchMedia()` のtransitionを固定search procedureで求めます。search range、axis、他condition、取得したtransition pxをresultへ保持します。
+
+他conditionが不安定、複数size conditionを分離できない、transitionを一意に求められない場合は `incomplete` とします。
+
+#### container size query
+
+supported:
+
+- `width / height / inline-size / block-size`
+- simple range / min / max
+- `px`
+- query containerを一意に解決でき、browserからrequired computed referenceを取得できる場合の `em / rem`
+
+container queryのrelative unitを固定16pxで換算しません。query container / rootのcurrent computed referenceをbrowser resultとして取得し、scriptがCSS pxへ正規化します。
+
+`var()`、`calc()`、container query length unit、style query、query containerが一意に解決できないcaseは今回のsupported subset外として `incomplete` にします。
+
+#### boundary executable
+
+boundaryを検出・正規化できることと、そのpresentation stateを安全に作れることを分離します。
+
+- media width / heightでcurrent browserがviewportを設定できる → `viewport-resize`
+- width + height compoundで両axisを設定し他conditionを保持できる → `viewport-resize`
+- container queryは、既存のuser-facing操作またはviewport resizeでquery containerがrequired boundaryを跨ぐことを観測できる場合だけ `container-observe`
+- testのためだけにDOMへstyle属性を注入したりquery container widthを直接書き換えたりしない
+- required stateを安全に作れない → `not-executable`。boundary inventory自体は保持するがcoverageをcomplete扱いしない
+
+before / boundary / afterの値はscriptがcanonicalizeし、同じCSS px boundaryをdeduplicate / sortします。
+
+#### unsupported / incomplete
+
+次を推測変換しません。
+
+- `vw / vh / vmin / vmax / cqw / cqh` 等、今回のfixed resolution procedureを持たないunit
+- `calc()`
+- `var()`
+- style query
 - parse不能なnested condition
 - unreadable stylesheet
+- query container unresolved
+- normalizedできてもpresentation stateを実現できないrequired boundary
 
-unsupported queryのraw全文を成果物へ無条件保存せず、source ref / query kind / unsupported reasonだけを保持します。
-
-CSS本文をraw evidenceとして無条件保存しません。
+raw CSS全文を成果物へ無条件保存せず、source ref / query kind / raw conditionの必要最小部分 / unsupported reasonを保持します。
 
 ### `navigation-timing`
 
-Navigation Timingの必要fieldをcurrent page/sessionから取得します。
+Navigation Timingの必要fieldだけをcurrent page/sessionから取得します。
 
 ### `paint-timing`
 
-Paint TimingからFCP等、Planで対象にしたentryだけを取得します。
+Paint TimingからFCP等、Plan対象entryだけを取得します。
 
 ### `interaction-timing`
 
-actual user-facing input eventから固定したuser-facing end predicateまでの時刻を、同一pageの`performance.now()` clockで取得します。詳細は§7を正本とします。
+actual user-facing input eventからfixed end predicateまでを同一page `performance.now()` clockで取得します。§8を正本とします。
 
 ### `screenshot`
 
 visual judgmentが必要なstate / viewportのevidence refを取得します。画像の意味判断はdeterministic runtimeへ押し込みません。
 
-## 5. target discoveryとの境界
+## 6. target discoveryとの境界
 
 probeはUI発見shortcutになりません。
 
-- visual / pointer inspectionでtargetを発見する前にtest id / hidden selector / source code情報を使わない
-- user-facing情報から対象と判断した後、browser ownerがrole / accessible name等のlocatorをautomation手段として使える
-- `element-geometry` 等はtarget ref確定後の観測に使う
+- visual / pointer inspectionでtarget発見前にtest id / hidden selector / source code情報を使わない
+- user-facing情報から対象と判断した後、role / accessible name等をautomation手段として使える
+- `element-geometry` 等はtarget ref確定後に使う
 - off-viewport targetのdiscoverability確認はuser-facing scrollとbefore / after evidenceで行う
 
-`observation_contract.py` は自然言語UIからtargetを選びません。targetの意味的同一性・発見はsemantic/browser owner境界、request schemaとmachine observation closureはscript境界です。
+`observation_contract.py` は自然言語UIからtargetを選びません。targetの意味的発見はsemantic/browser owner、request schemaとmachine observation closureはscriptです。
 
-## 6. scopeからprobe集合を導出する
+## 7. scopeからprobe集合を導出する
 
-`inspection_structure.py` はraw user requestから完成scope rowをLLMへ作らせません。required observation field集合とprobe集合の導出ownerは `observation_contract.py` に一元化し、`inspection_structure.py` はその集合を再計算しません。
+`inspection_structure.py` はraw user requestから完成scope rowをLLMへ作らせません。required observation field集合とprobe集合の導出ownerは `observation_contract.py` に一元化し、`inspection_structure.py` は再計算しません。
 
 inspection mode:
 
-- `general`: `_05c` の固定上位観点7件をrowとして生成する
-- `scoped`: semantic layerが明示要求を正規のaspect key集合へmappingし、scriptがその集合だけをrowへ生成する
-- `formal-handoff`: handoffのrequired sample / requirement / observation request集合を正本として必要rowを生成する
+- `general`: `_05c` の固定上位観点7件
+- `scoped`: semantic layerが明示要求を正規aspect keyへmappingした集合
+- `formal-handoff`: handoffのrequired sample / variation / requirement / observation request集合
 
 `task-flow` rowはtask / flowが明示された場合だけscriptが追加します。
 
-semantic layerへ残すのは、対象UIにpopulationが存在するか、意味上のapplicability / exception、visual interpretation等です。
+semantic layerへ残すのはpopulationの意味的applicability / exception、visual interpretation等です。
 
-scope rowとselected supported rule / measurement kindから必要probe key集合を `observation_contract.py plan` が導出します。Agentがruleごとに必要probeを手で列挙しません。
+scope rowとselected supported rule / measurement kindから必要probe key集合を `observation_contract.py plan` が導出します。
 
-## 7. interaction timing
+## 8. interaction timing
 
-`actual input event → first visible feedback`、`actual input event → task-ready state` 等をPlaywright action呼び出しwall-clockで測りません。
+Playwright action呼び出しwall-clockで測りません。
 
-### start
+### 8.1 start
 
-- action前にfixed probeをarmする
-- browser page内で対象eventを観測した時点に `performance.now()` を記録する
-- `event.timeStamp` と別clockを混ぜず、start / endとも同じpage `performance.now()` domainへ固定する
-- input eventを観測できなければstart未取得として `measurement-unavailable`
+- action前にfixed probeをarm
+- browser page内で対象eventを観測した時点の `performance.now()`
+- start / endを同じpage clockへ固定
+- input event未観測 → `measurement-unavailable`
 
-### end predicate
+### 8.2 end predicate schema
 
-semantic layerは「何をuser-facing feedback / ready stateとみなすか」を判断できますが、browserへ渡すpredicateは次のfixed vocabularyへ正規化します。
+predicate keyとpayloadを固定します。
 
-- `element-visible`
-- `element-hidden`
-- `text-present`
-- `attribute-equals`
-- `aria-state-equals`
-- `element-enabled`
-- `element-disabled`
-- `url-changed`
+| predicate | 必須field | 固定判定 |
+| --- | --- | --- |
+| `element-visible` | `target_ref` | targetがuniqueでvisible |
+| `element-hidden` | `target_ref` | targetがhidden、または事前に存在したtargetがcurrent documentで消失 |
+| `text-present` | `expected_text` | pageまたは `within_target_ref` 内でPlaywright text semantics + `exact=true` |
+| `attribute-equals` | `target_ref`, `attribute_name`, `expected_value` | current attribute値の完全一致 |
+| `aria-state-equals` | `target_ref`, `state_name`, `expected_value` | fixed ARIA state valueの一致 |
+| `element-enabled` | `target_ref` | unique targetがenabled |
+| `element-disabled` | `target_ref` | unique targetがdisabled |
+| `url-changed` | `baseline_url` | current URLがarm時URLから変化 |
 
-predicateはtarget refとexpected valueを持ち、action前にmaterializeします。
+`text-present` だけ `within_target_ref` を任意fieldとして持てます。`url-changed` はelement targetを要求しません。`baseline_url` はarm時にbrowser ownerが取得し、LLM入力を正本にしません。
 
-任意JavaScript式、任意CSS selector式、LLM生成predicate functionをmeasurement inputとして受けません。必要なend conditionをfixed vocabularyで表現できず、project既存instrumentationもない場合はそのmeasurementを `measurement-unavailable` とします。
+`attribute_name` とARIA `state_name` はallowlistをcatalogへ固定します。unknown nameを任意property accessへ変換しません。
 
-end predicateがaction前から成立している場合は `preexisting-end-state` issueを返し、0ms成功として扱いません。
+semantic layerは「何をuser-facing feedback / ready stateとみなすか」を判断できますが、browserへ渡すのはこのfixed schemaだけです。
 
-fixed probeはMutationObserver / animation frame等、current browserで必要な監視をpackage-owned dispatchとして実装し、end成立時の `performance.now()` を返します。timeout時はtimeout reasonを返し、任意の値を補完しません。
+任意JavaScript式、CSS selector式、LLM生成predicate functionを受けません。fixed vocabularyで表現できずproject既存instrumentationもない場合は `measurement-unavailable` です。
 
-### task-ready
+end predicateがaction前から成立している場合は `preexisting-end-state` issueを返し、0ms成功にしません。
 
-`task-ready state` という自然言語labelだけでは測定を開始しません。今回のtargetでreadyを表すfixed predicateをaction前に確定できる場合だけ測定します。
+fixed probeはMutationObserver / animation frame等のpackage-owned dispatchを使い、end成立時の `performance.now()` を返します。timeout時はtimeout reasonを返します。
 
-## 8. unavailable / partial result
+## 9. unavailable / partial result
 
-probe result statusは少なくとも次へ閉じます。
+probe result status:
 
 - `ok`
 - `unsupported`
@@ -298,55 +366,61 @@ probe result statusは少なくとも次へ閉じます。
 - `incomplete`
 - `blocked`
 
-`unsupported` はcurrent browser/tool capabilityに機能がない場合、`unavailable` は対象状態や必要eventを取得できない場合、`incomplete` は一部sourceを読めずpopulation completenessを閉じられない場合です。
+`unsupported` はcurrent browser/tool capabilityに機能がない場合、`unavailable` は対象状態や必要eventを取得できない場合、`incomplete` は一部source / boundary / population completenessを閉じられない場合です。
 
 tool failureやprobe unavailableをproduct defect / usability issueへ自動変換しません。
 
-## 9. sensitive data
-
-probeは必要最小fieldだけ返します。
+## 10. sensitive data
 
 - full DOM / accessibility tree / CSS全文を既定で保存しない
-- screenshotはPR #12のevidence safety契約を再利用する
+- screenshotはPR #12のevidence safety契約を再利用
 - password、token、cookie、storageState、secret値をresultへ含めない
-- user textやaccessible nameに個人情報が含まれ得る場合は成果物へ必要最小限だけ残す
+- user text / accessible nameに個人情報が含まれ得る場合は必要最小限だけ残す
 
-## 10. deterministic fixture
+## 11. deterministic fixture
 
-少なくとも次を検証します。
-
-- general mode → 固定7 aspect
-- scoped mode → normalized requested aspectだけ
-- formal-handoff mode → handoff required scopeだけ
-- task / flow未指定でtask-flow rowを作らない
-- selected rule / measurementからrequired probe集合を導出
-- unknown probe key拒否
-- target draft → `TARGET-001` 等の決定論的採番 / resolver enum / unique resolution
-- missing / ambiguous / stale targetを成功扱いしない
-- probe request refの決定論的採番
-- viewport / element geometryのschema
-- geometryからのmachine calculationをLLMへ戻さない
-- readable / unreadable stylesheetを含むresponsive boundary closure
-- supported px media / container size queryとunsupported relative unit / calc / style queryの分離
-- accessible semanticsをobservationとして保持しrequirement resultへ自動昇格しない
-- interaction timing start / endを同一clock domainで取得
-- end predicate preexisting → measurement-unavailable
-- unsupported custom predicate拒否
+- general / scoped / formal-handoff mode
+- task / flow未指定でtask-flow rowなし
+- selected rule / measurement → required observation field / probe集合
+- unknown probe reject
+- `role-name / label / visible-text` exact resolver、within scope
+- machine population revision一致 / 変更時stale
+- current-session-ref navigation後stale
+- target unique / missing / ambiguous / stale
+- viewport / element geometry schema
+- geometry machine calculation
+- media query px boundary
+- media query em / rem boundaryをcurrent browser評価でCSS pxへ正規化
+- media compound conditionを保持
+- container px / resolvable em / rem
+- unsupported relative unit / calc / var / style query
+- boundary normalizedだがstateを実現できない → not-executable / incomplete
+- complete boundary inventory → before / boundary / after
+- accessibility semanticsをrequirement resultへ自動昇格しない
+- 8種fixed end predicate schema
+- predicate required field欠落 / unknown attribute or ARIA state reject
+- start / end same clock
+- preexisting end → measurement-unavailable
+- unsupported custom predicate reject
 - timeout → measurement-unavailable
-- screenshotはsemantic resultを自動生成しない
+- screenshotからsemantic result自動生成なし
 - secret / full raw snapshotを必須resultにしない
 
-## 11. 完了条件
+## 12. 完了条件
 
-- browser target registry / resolver / currentness / uniquenessとbrowser observation request / result schemaが固定されている
-- fixed probe payload / normalizationをSkill-local scriptが所有する
-- raw browser valueの算術・enum・closureをLLMへ戻していない
-- general / scoped / formal-handoffのscope row生成が決定論化されている
-- rule / measurementから必要probe集合をscriptが導出する
-- arbitrary JavaScript / generic probe DSLを導入していない
-- responsive boundary completenessをunreadable source込みで扱える
-- interaction timingのstart / end / predicate / clock domainが固定されている
+- browser target registry / resolver payload / currentness / uniquenessが固定
+- locator matchingをPlaywright documented semantics + exact matchingへ固定し、独自曖昧matchingを作らない
+- machine-population-indexをrevision / fingerprintなしで再利用しない
+- fixed probe payload / normalizationをSkill-local scriptが所有
+- raw browser valueの算術・enum・closureをLLMへ戻さない
+- general / scoped / formal-handoff scope row生成が決定論化
+- rule / measurementから必要probe集合をscript導出
+- arbitrary JavaScript / generic probe DSLなし
+- media query `px / em / rem` と、条件付きでcontainer query `px / em / rem` を固定procedureで正規化
+- boundary detectionとexecution feasibilityを分離し、実現不能stateをcomplete扱いしない
+- responsive boundary completenessをunreadable / unsupported / not-executable source込みで扱う
+- 8種fixed end predicateのrequest schema / required fieldが固定
+- interaction timing start / end / predicate / clock domainが固定
 - fixed predicateで表せないmeasurementを捏造しない
-- PR #12のbrowser ownership / side-effect / cleanup / evidence safety契約を再利用する
+- PR #12のbrowser ownership / side-effect / cleanup / evidence safety契約を再利用
 - browser runner / wrapperを二重実装しない
-
