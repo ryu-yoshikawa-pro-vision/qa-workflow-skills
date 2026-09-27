@@ -183,6 +183,7 @@ formal artifact内のobservation request rowは次の2 kindだけを許可しま
 `wcag-machine-probe`:
 
 - observation request ref
+- request signature
 - request kind
 - criterion evaluation ref
 - procedure execution ref
@@ -195,6 +196,7 @@ formal artifact内のobservation request rowは次の2 kindだけを許可しま
 `semantic-observation`:
 
 - observation request ref
+- request signature
 - request kind
 - criterion evaluation ref
 - procedure execution ref
@@ -204,7 +206,7 @@ formal artifact内のobservation request rowは次の2 kindだけを許可しま
 - target / state basis refs
 - input evidence refs / fingerprint
 
-request ref、kind、procedure、sample / variation / process / requirement、target / population identityからrequest identityをscriptがmaterializeします。machine requestへ自然言語browser instructionを保存せず、semantic requestへmachine probe keyを直接入力しません。
+`request_signature` はrequest kind、criterion / procedure identity、sample / variation / process / requirement、machine probe keyまたはcanonical observation field / predicate、target / population / state identityからscriptが導出します。自然言語reason、render順、artifact-local request refはsignatureへ含めません。同一signatureをdeduplicateした後にartifact-local observation request refを決定論的に採番します。machine requestへ自然言語browser instructionを保存せず、semantic requestへmachine probe keyを直接入力しません。
 
 例:
 
