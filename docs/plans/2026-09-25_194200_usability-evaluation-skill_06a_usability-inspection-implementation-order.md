@@ -506,7 +506,7 @@ repository標準件数に合わせます。
 - supported ACT RuleはACT Rules Format 1.1 §4.14.1 consistency fixtureをPASS
 - `_05e_performance-measurement.md` のdirect measurement / external Core Web Vitals source境界を閉じる
 - general inspectionの全上位観点をclosure
-- Case A〜ADをすべてPASS
+- Case A〜AGをすべてPASS
 - `_06c_canonical-live-validation.md` のrepository-controlled canonical live Web E2EをPASS
 
 ## 21. 対象外
