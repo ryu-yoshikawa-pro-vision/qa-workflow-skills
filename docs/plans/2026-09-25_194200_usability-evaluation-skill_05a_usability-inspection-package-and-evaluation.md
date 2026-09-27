@@ -22,7 +22,8 @@ skills/usability-inspection/
 ├── assets/
 │   ├── output-template.md
 │   ├── test-rule-catalog.json
-│   └── browser-observation-catalog.json
+│   ├── browser-observation-catalog.json
+│   └── wcag-machine-probe-catalog.json
 └── evals/
     ├── trigger/
     │   ├── train_queries.json
@@ -124,7 +125,7 @@ LCP / CLS / INPは独自algorithmで再実装せず、project既存のRUM / CrUX
 
 通常E2E向けのauto-wait / auto-scrollがusability frictionを隠さないようにする契約へ利用します。
 
-browser observationのrequest / fixed probe / result schema / interaction timing取得方法は `_05g_usability-inspection-browser-observation-contract.md` を正本とします。Agentがbrowser tool resultを見てgeometry算術、probe required field、clock domain、responsive boundary closureを手で決めません。
+semantic追加観測のrequest / fixed probe / result schema / interaction timing取得方法は `_05g_usability-inspection-browser-observation-contract.md`、formal WCAG machine probeのtyped request / fixed dispatchは `_05j_wcag-machine-browser-observation-contract.md` を正本とします。Agentがbrowser tool resultを見てgeometry算術、probe required field、clock domain、responsive boundary closureを手で決めません。
 
 ## 4. source方針
 
