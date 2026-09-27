@@ -248,6 +248,7 @@ continuousなwidthの全CSS pixelをvariation rowとして列挙しません。d
 - variation ref
 - process ref（存在する場合）
 - required requirement refs
+- observation request refs / request kind (`wcag-machine-probe / semantic-observation`)
 - required state / action / sequence
 - execution condition refs
 - required evidence kind
@@ -1040,6 +1041,7 @@ production helperとは別実装で少なくとも次を検証します。
 - target versionに対応する `static_data_versions` hashをassetから独立再計算
 - target versionに対応する承認済みcatalog hashと一致
 - `wcag-evaluation-procedure-catalog.json` のcanonical hash / approved hash一致
+- `wcag-semantic-contracts.json` のcanonical hash / approved hash一致とtarget version criterion coverage
 - requirement assetのprocedure key全件がprocedure catalogへ解決し、machine procedure全件に明示dispatchがある
 - target version以外のcatalogをexpected requirement集合へ混在させていない
 - static catalogから独立導出したtarget level required Success Criteria / conformance requirement集合とactual coverageの一致
