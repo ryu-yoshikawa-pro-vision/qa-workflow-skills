@@ -142,7 +142,7 @@ formal request
 - formal machine probeを処理したinspection runtimeが `static_data_versions.wcag_machine_probes` を保持し、formal consumerがその `runtime_unit_key / generation_fingerprint` を `metadata.upstream_runtime_units` へexactly-onceで保持すること。inspection generation変更 / missing dependencyでformal resultがstaleになり、formal `static_data_versions` へsibling hashを複製しないこと
 - `_05k` の全supported version / SC semantic contract row、normative clause / exception / evidence role coverageがapproved hashと一致し、1.3.1 / 1.3.2 / 4.1.2 / 4.1.3のAT `procedure_applicability_contracts[]` が `_05i` decision keyとversion別に一致
 - finite procedure catalogの全key解決 / machine dispatch / `applicability_decision_key` / approved hash。inventoryにないkey / catalogにないkey / unused keyを許可しない
-- AT fixtureで `unknown applicability → AT pre-execution applicability decision → applicable時だけAT result → final s-wcag semantic` の順序を確認し、applicability decisionがAT result / final semantic resultへ依存しないこと。not-applicable caseではfinal semantic required evidenceにAT resultを要求せず、unknown caseではfinal semanticを開始しないこと
+- AT fixtureで `unknown applicability → AT pre-execution applicability decision → applicable時だけAT result → final s-wcag semantic` の順序を確認し、applicability decisionがAT result / final semantic resultへ依存しないこと。semantic assetのstatic roleにAT resultを保持せず、not-applicable caseではruntime effective required evidenceにもAT resultを要求しないこと。unknown caseではfinal semanticを開始しないこと
 - sample × required presentation variation × required Success Criterionのcriterion plan coverage
 - current criterion evaluation refからだけSample Evaluation Resultsを生成し、LLM supplied result listをreject
 - semantic procedureが追加evidenceを必要とするcaseで、required criterion / procedure集合を変更せずfixed observation requestを追加し、new handoffが必要なら `_04c` lineageで再観測して同じprocedureを再評価する
