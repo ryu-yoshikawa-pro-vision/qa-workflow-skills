@@ -103,7 +103,7 @@ current Playwright versionやPR #12 / #13 merge後のbrowser contractが変わ�
 12. cleanup
 13. semantic layerがcanonical observation field / fixed predicate keyを選び、`observation_contract.py` が requester kind / state basis refs / current document identity / `OBSREQ-...` / request identity / evidence fingerprint / fixed probeへmaterializeして追加evidenceを取得し再評価できること。general accessibilityのsemantic requirementでは `inspection-requirement` requesterを使えること
 14. canonical semantic observation field inventory全16 keyがexactly-one probeへ解決し、scriptが自由記述からprobeを推論せず、unknown observation fieldをunsupportedへ閉じること
-15. formal Skillから渡されたtyped `request_kind=wcag-machine-probe` requestをlocal `wcag-machine-probe-catalog.json` へ一意に解決し、procedure catalogをinspection側で再読込しないこと。local catalog hashが `static_data_versions.wcag_machine_probes` へ入ること
+15. formal Skillから渡されたtyped `request_kind=wcag-machine-probe` requestをlocal `wcag-machine-probe-catalog.json` へ一意に解決し、procedure catalogをinspection側で再読込しないこと。formal machine probeを処理したruntimeではlocal catalog hashが `static_data_versions.wcag_machine_probes` へ入り、formal machine probeを使わないgeneral / scoped inspectionではこのkeyを不要に付与しないこと
 16. 同一request identity + 同一input evidence fingerprintを再実行せずno-progressを返し、state descriptionの言い換えだけでguardを回避できないこと
 17. business outcome / Authority refsがあるflowで `page.url()` / `locator.innerText()` / `locator.inputValue()` / selectedOptions `{value,label}` 等のmachine observationとobserved end state / outcomeを保持し、usability-evaluationへ渡せること
 18. `usability-evaluation` へのread-only handoff
