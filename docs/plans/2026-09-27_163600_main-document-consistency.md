@@ -2,7 +2,7 @@
 
 このPlanは、PR #13 merge後の`main`で確認した現行文書の不整合を修正するための実装計画です。
 
-対象は、現在のリポジトリ状態を説明する文書に残ったSkill数・評価件数・責務表のずれです。過去時点のPlan、history、実装・検証記録は履歴として保持し、現在値へ書き換えません。
+対象は、現在のリポジトリ状態を説明する文書に残ったSkill数・評価件数・責務・workflow state / Project Context・正規artifact契約のずれです。過去時点のPlan、history、実装・検証記録は履歴として保持し、現在値へ書き換えません。
 
 ## 対象ブランチ
 
@@ -402,7 +402,7 @@ frontmatter変更後はtrigger datasetの回帰確認を実行します。
 少なくとも次を確認します。
 
 ```bash
-git grep -nE '全?16 Skill|全?14 Skill|368クエリ|328件|その他13 Skill|本Plan|今回14件|新3 Skill|新規Skill|Plan記載' -- \
+git grep -nE '全?16 Skill|全?14 Skill|368クエリ|328件|その他13 Skill|本Plan|今回14件|新3 Skill|新規Skill|Plan記載|entry_revision' -- \
   README.md \
   EVALS.md \
   docs/PROJECT_CONTEXT.md \
@@ -440,6 +440,7 @@ git grep -nE '全?16 Skill|全?14 Skill|368クエリ|328件|その他13 Skill|�
 文書修正だけですが、現在の正本と矛盾していないことを確認するため、少なくとも次を実行します。
 
 ```bash
+python -m unittest discover -s tests/skills/evals/deterministic -v
 python scripts/skills/evals/semantic/validate.py
 python -m unittest discover -s tests/skills/evals/semantic -v
 python -m unittest discover -s tests/skills/evals/trigger -v
