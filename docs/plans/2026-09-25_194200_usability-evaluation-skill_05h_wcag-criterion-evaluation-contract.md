@@ -6,7 +6,7 @@
 
 目的は、required criterionの選択・省略、評価procedure、machine処理、semantic / manual判断、assistive technology利用、未完了判定を実装者やLLMのその場判断へ残さないことです。
 
-WCAG-EM 2.0のsample / variation / process / report契約は `_05f_wcag-conformance-evaluation-package-and-runtime.md`、browser observationは `_05g_usability-inspection-browser-observation-contract.md`、general accessibility / ACT Rule semanticsは `_05d_accessibility-requirements-and-act.md`、WCAG 2.0 / 2.1 / 2.2全Success Criterionのprocedure割当は `_05i_wcag-success-criterion-procedure-inventory.md` を正本とします。
+WCAG-EM 2.0のsample / variation / process / report契約は `_05f_wcag-conformance-evaluation-package-and-runtime.md`、semantic追加観測は `_05g_usability-inspection-browser-observation-contract.md`、machine procedureの固定browser入力は `_05j_wcag-machine-browser-observation-contract.md`、criterion固有semantic契約は `_05k_wcag-semantic-procedure-contract.md`、general accessibility / ACT Rule semanticsは `_05d_accessibility-requirements-and-act.md`、WCAG 2.0 / 2.1 / 2.2全Success Criterionのprocedure割当は `_05i_wcag-success-criterion-procedure-inventory.md` を正本とします。
 
 ## 1. owner境界
 
@@ -66,7 +66,8 @@ supported WCAG 2.0 / 2.1 / 2.2の全Success Criterionで `procedure_keys` を1�
 - `source_item_refs`
 - `applicable_criterion_refs`
 - `required_capabilities`
-- `required_observation_fields`
+- `required_observation_fields`。semantic/manual追加観測で `_05g` の16 canonical fieldを使う場合
+- `required_machine_probe_keys`。machine procedureで `_05j` のfixed probeを使う場合
 - `required_input_refs`
 - `machine_dispatch_key`。execution kindがmachineの場合だけ必須
 - `semantic_decision_key`。execution kindがsemanticの場合だけ必須
@@ -110,14 +111,7 @@ ACT / measurementの既存dispatchに加え、`_05i` §3のmachine procedureを�
 
 applicability、exception、purpose、meaning、content equivalence等、意味判断が必要な処理です。
 
-`semantic_decision_key` ごとに、
-
-- 必須evidence
-- 許可decision field
-- 不足時の `undetermined / blocked`
-- machine resultから自動昇格してはいけない条件
-
-をreference / procedure catalogへ固定します。
+`semantic_decision_key` ごとの契約は `_05k_wcag-semantic-procedure-contract.md` を正本とします。各supported version / Success Criterionにversioned semantic contract rowを必須とし、normative clause / definition / exception refs、必須semantic evaluation point、procedureから導出したrequired evidence role、不足時の `undetermined / blocked`、machine resultから自動昇格してはいけない条件をapproved static dataへ固定します。実装者やruntime LLMがcriterionごとに新しい評価手順を作りません。
 
 ### 3.3 manual
 
@@ -180,7 +174,7 @@ Success Criterionへ適用対象contentが存在するかもprocedure contract�
 
 ## 6. live observation requestへの変換
 
-`wcag_criterion_plan.py` はselected procedureからrequired capability / observation fieldを集約し、formal handoffへ渡すobservation requirementを生成します。
+`wcag_criterion_plan.py` はselected procedureからrequired capabilityを集約し、semantic/manual/AT側の追加観測は `_05g` canonical observation fieldへ、machine procedureのbrowser入力は `_05j` machine probe keyへ分けてformal handoffへ渡すobservation requirementを生成します。
 
 同一sample / variation / stateで共有できるrequestはdeduplicateします。
 
@@ -286,6 +280,8 @@ production `wcag_criterion_plan.py` と別実装で少なくとも次を検証�
 - procedure key全件がfinite procedure catalogへ解決
 - unknown execution kind / capability / machine dispatch / semantic decision key reject
 - machine procedure全件に明示dispatch実装
+- machine procedure全件の `_05j` required machine probe key mappingがmissing / extra 0
+- supported version / Success Criterion全件の `_05k` semantic contract rowが存在し、versioned requirement assetとsource refが一致
 - required observation / measurement / ACT result / semantic / manual / AT / external evidence refs解決
 - execution statusとresultの組合せ整合
 - `applicable_population=none` のcompleteness evidence
@@ -333,6 +329,7 @@ production `wcag_criterion_plan.py` と別実装で少なくとも次を検証�
 ## 13. 完了条件
 
 - supported WCAG 2.0 / 2.1 / 2.2の全Success Criterionに1件以上のfinite procedure keyがある
+- supported version / Success Criterion全件に `_05k` のsemantic contract rowがあり、normative clause / exception / evidence role coverageを実装時判断へ残さない
 - procedure catalogに `TBD` / catch-all / generic DSLがなく、全machine procedureに明示dispatchがある
 - machine化できる処理をsemantic / manualへ逃がしていないことをprocedure catalog semantic reviewで確認する
 - target version / level × required variationからcriterion planをscriptが全件materializeする
