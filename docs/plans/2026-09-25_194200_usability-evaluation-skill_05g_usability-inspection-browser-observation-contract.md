@@ -485,13 +485,15 @@ tool failureやprobe unavailableをproduct defect / usability issueへ自動変�
 - same request identity + same evidence fingerprint → no-progress
 - unknown observation field → unsupported。自然言語からprobeを推論しない
 - geometry machine calculation
-- media query px boundary
-- media query em / rem boundaryをcurrent browser評価でCSS pxへ正規化
-- media compound conditionを保持
-- container px / resolvable em / rem
-- unsupported relative unit / calc / var / style query
+- media / container size conditionのbrowser evaluationとnumeric transition
+- `px / em / rem / viewport-relative / container-relative / calc()` を含むsize queryを独自換算せずbrowser match transitionで評価
+- `var()` 等を含むconditionはsource textから展開せず、browserが有効に評価できる場合だけ採用
+- media compound condition / comma branch identityを保持
+- container query container identity / geometryとtransitionの対応
+- style / scroll-state queryを非数値responsive conditionとして保持
+- browser capability不足 → unsupported、safe state作成不能 → not-executable / incomplete
 - boundary normalizedだがstateを実現できない → not-executable / incomplete
-- complete boundary inventory → before / boundary / after
+- complete responsive condition inventory → numeric boundaryまたはstate別closure
 - accessibility semanticsをrequirement resultへ自動昇格しない
 - 8種fixed end predicate schema
 - predicate required field欠落 / unknown attribute or ARIA state reject
@@ -508,7 +510,7 @@ tool failureやprobe unavailableをproduct defect / usability issueへ自動変�
 - locator matchingをPlaywright documented semantics + exact matchingへ固定し、独自曖昧matchingを作らない
 - machine-population-indexをrevision / fingerprintなしで再利用しない
 - fixed probe payload / normalizationをSkill-local scriptが所有
-- canonical observation field inventoryを本ファイルの15 keyへ固定し、catalogでexactly-one fixed probeへ解決する。semantic layerはfield keyを選べるがscriptは自然言語からprobeを推論しない
+- semantic追加観測用canonical observation field inventoryを本ファイルの16 keyへ固定し、catalogでexactly-one fixed probeへ解決する。semantic layerはfield keyを選べるがscriptは自然言語からprobeを推論しない。formal WCAG machine procedureの固定browser入力は `_05j` を正本とする
 - semantic additional observation requestをOBSREQ ref / identity / evidence fingerprint付きでmaterializeし、no-progressを機械判定する
 - final artifactに `planned` requestを残さず、completed / unsupported / no-progress / blockedのいずれかへ閉じる
 - document location / rendered text / control value / selected value等、business flowの意味判断に必要でmachine取得可能な値をfixed probeで取得する
@@ -516,9 +518,10 @@ tool failureやprobe unavailableをproduct defect / usability issueへ自動変�
 - general / scoped / formal-handoff scope row生成が決定論化
 - rule / measurementから必要probe集合をscript導出
 - arbitrary JavaScript / generic probe DSLなし
-- media query `px / em / rem` と、条件付きでcontainer query `px / em / rem` を固定procedureで正規化
-- boundary detectionとexecution feasibilityを分離し、実現不能stateをcomplete扱いしない
-- responsive boundary completenessをunreadable / unsupported / not-executable source込みで扱う
+- responsive condition inventoryとnumeric size transitionを分離し、browserが評価可能な標準構文をPlan都合のsupported subsetへ落とさない
+- size queryのlength / math functionを独自換算せずbrowser evaluationを正本にし、style / scroll-state queryは数値boundaryへ偽装しない
+- condition detectionとexecution feasibilityを分離し、実現不能stateをcomplete扱いしない
+- responsive completenessをunreadable / unsupported / not-executable source込みで扱う
 - 8種fixed end predicateのrequest schema / required fieldが固定
 - interaction timing start / end / predicate / clock domainが固定
 - fixed predicateで表せないmeasurementを捏造しない
