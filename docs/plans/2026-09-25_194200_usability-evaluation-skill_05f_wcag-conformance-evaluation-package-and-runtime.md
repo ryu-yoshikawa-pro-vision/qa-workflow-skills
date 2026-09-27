@@ -74,7 +74,7 @@ WAI OverviewはWCAG-EM 2.0のresourceとしてWCAG-EM Report Toolを案内して
 - WCAG version / source canonical URI
 - Conformance Claimに使用するguideline title / version / claim URI
 - Success Criterion machine key / number / level / canonical criterion URI
-- Success Criterionごとのevaluation metadata。詳細は `_05h_wcag-criterion-evaluation-contract.md` を正本とし、finite procedure catalogへ解決する `procedure_keys` とexternal evidence可否を保持する
+- Success Criterionごとのevaluation metadata。詳細は `_05h_wcag-criterion-evaluation-contract.md` を正本とし、finite procedure catalogへ解決する `procedure_keys` と `external_evidence_allowed` を保持する。`external_evidence_allowed=true` は利用可否であり必須性を意味せず、falseのcriterionへexternal-evidence procedureを割り当てない
 - 5つのWCAG conformance requirement machine key / canonical URI
 - Conformance Requirementごとの固定rule metadata
   - Conformance Level: target level required Success Criteria refs
@@ -580,7 +580,7 @@ deterministic runtimeへ載せないもの:
 
 random selection結果はmethod / provenance / selected sample identityとともに後続Machine Runtime Inputへ渡します。保存済みsample resultはPR #11 current verifierでfreshnessを再計算し、currentの場合だけ再利用します。
 
-runtime Inputには少なくともtarget WCAG version / level、scope、scope coverage rows、normalized additional evaluation requirements、accessibility support baseline revision、environment、previous evaluation / sample lineage（再評価の場合）、sample identity、evidence identity、Authority / reference refs、選択versionのstatic data versionを含め、これらが変わった場合に旧resultをcurrent扱いしません。
+runtime Inputには少なくともtarget WCAG version / level、scope、scope coverage rows、normalized additional evaluation requirements、accessibility support baseline revision、environment、previous evaluation / sample lineage（再評価の場合）、sample identity、evidence identity、Authority / reference refs、current external evidence candidate refsとprovenance metadata、選択versionのstatic data versionを含め、これらが変わった場合に旧resultをcurrent扱いしません。
 
 formal runtime unitが `usability-inspection` のMachine Runtime resultを消費する場合、PR #11 current contractの `metadata.upstream_runtime_units` へ、消費したinspection runtime unitごとに次を必須登録します。
 
@@ -602,8 +602,9 @@ Input:
 - `wcag-evaluation-procedure-catalog.json`
 - canonical sample / required presentation variation / process refs
 - current observation / measurement / supported ACT Rule refs
+- current external evidence candidate refsとsource / revision / environment / freshness / scope metadata
 - procedure applicability decision refs
-- semantic / manual / assistive technology / external evidence procedure result refs
+- semantic / manual / assistive technology / applicable external evidence procedure result refs
 
 Function:
 
@@ -615,6 +616,8 @@ Function:
 - applicable population `present / none / unknown` のclosure
 - execution status `pending / in-progress / complete / blocked` とresult `satisfied / not-satisfied / undetermined / null` の整合
 - required procedure closure
+- `external-evidence-available` procedureのcandidate refsを機械検証し、valid current scope evidenceが0件ならnot-applicable、1件以上ならapplicableとしてvalid refsだけをprocedure Inputへmaterializeする
+- external evidence candidateの不存在 / stale / scope mismatchだけでcriterionをundetermined / blockedにしない
 - ACT Rule部分結果をSuccess Criterion全体の `satisfied` へ不当に昇格しない
 - machine-owned criterion section / summaryをrender
 
@@ -1054,6 +1057,8 @@ production helperとは別実装で少なくとも次を検証します。
 - target versionに対応する承認済みcatalog hashと一致
 - `wcag-evaluation-procedure-catalog.json` のcanonical hash / approved hash一致
 - `wcag-semantic-contracts.json` のcanonical hash / approved hash一致とtarget version criterion coverage
+- requirements assetの `external_evidence_allowed` とexternal-evidence procedure割当が一致し、trueをrequired evidenceと解釈していない
+- external evidence candidateなし / current valid candidateなしでprocedureがnot-applicableへ閉じ、valid candidateありでのみapplicableになる
 - `_05i` の4 AT procedure / `applicability_decision_key` とsemantic assetの `procedure_applicability_contracts[]` がversionごとに1対1で一致し、expected件数が2.0=3 / 2.1=4 / 2.2=4（合計11）、4.1.3を2.0へ混在させず、AT applicability contractがAT result / final semantic resultをrequired inputにしていない
 - semantic assetのstatic `required_evidence_roles` にprocedure-result roleを保存せず、machine / manual / AT / external result roleがcurrent applicable procedure集合からruntimeでのみ導出される
 - requirement assetのprocedure key全件がprocedure catalogへ解決し、machine procedure全件に明示dispatchがある
