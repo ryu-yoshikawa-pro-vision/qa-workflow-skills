@@ -175,6 +175,17 @@ AT procedureはSuccess Criterion固定で常に実行するという意味では
 
 manual / AT / external procedureはrequired evidence kind、result contract、不足時status、`_05h` のapplicability modeをcatalogで固定し、証拠やfallback applicabilityをLLM推測で補いません。conditional manual fallbackはsource machine limitation codeからscriptが有効化します。
 
+applicability modeの割当は次で固定します。
+
+- §3のmachine procedure全件 → `always`
+- 全Success Criterion共通の `s-wcag-<SC>` → `always`
+- 上記「常時またはcriterion populationに応じてrequiredになるmanual procedure」 → `always`
+- external evidence procedure → `always`
+- assistive technology procedure → `semantic`
+- 上記conditional manual fallback 5件 → `machine-limitation`
+
+`population-present` 等の追加modeは作りません。target populationなしの可能性も、required inventory / semantic procedureを実行したうえでcriterion-level `applicable_population=none` として閉じます。
+
 ## 5. criterion別procedure_keysの決定方法
 
 各criterionの最終 `procedure_keys` は次の集合演算だけで生成します。
