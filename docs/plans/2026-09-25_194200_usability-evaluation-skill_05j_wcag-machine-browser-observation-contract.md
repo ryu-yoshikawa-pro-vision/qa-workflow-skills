@@ -106,7 +106,7 @@ catalogのcanonical JSON SHA-256は `usability-inspection` の `static_data_vers
 | `mp-error-scenario-run` | declared error scenario後のinvalid target、error text、association、focus / state |
 | `mp-orientation-run` | portrait / landscape環境とcontent / functionality evidence |
 | `mp-reflow-run` | required viewport条件、overflow / clipping / geometry evidence |
-| `mp-resize-text-run` | valid text scaling mechanism、100% / intermediate / 200% state、overflow / clipping / obscuring / functionality evidence、mechanism capability / cleanup |
+| `mp-resize-text-run` | valid text scaling mechanism、baseline / intermediate / target state、mechanism scale、rendered text candidateのbaseline / current used font size、rendered scale ratio、overflow / clipping / obscuring / functionality evidence、mechanism capability / cleanup |
 | `mp-text-spacing-run` | WCAG text spacing fixed override条件、clipping / overlap / scroll / functionality evidence |
 | `mp-control-value-history` | flow内のcurrent / previous control value ref |
 | `mp-multipage-signature` | selected page setのcontrol / help / navigation structure signature |
@@ -122,17 +122,20 @@ catalogのcanonical JSON SHA-256は `usability-inspection` の `static_data_vers
 
 mechanism candidateはcurrent browser / user agent capabilityと、current pageで確認できるauthor-provided controlからmaterializeします。LLM supplied arbitrary mechanism名を受け付けません。
 
-- user agentがfull-page zoomを提供しbrowser ownerが実際にそのUI / session mechanismを安全に操作できる場合、100% baselineから200%まで実行する
-- user agentがtext-only resizeを提供しbrowser ownerが安全に操作できる場合、同様に200%まで実行する
+- baselineでin-scope rendered text candidateごとのused font sizeとapplicable variation identityを取得する。caption / image-of-text等のnormative exception判定はsemanticへ残す
+- user agentがfull-page zoomを提供しbrowser ownerが実際にそのUI / session mechanismを安全に操作できる場合、browserが提供する実際のzoom stateをbaselineから順に実行する
+- user agentがtext-only resizeを提供しbrowser ownerが安全に操作できる場合、その実際のresize stateをbaselineから順に実行する
 - author-provided resize controlはcurrent UI上のcontrol identityと作用が確認できる場合だけ実行する
-- incremental mechanismでは100%と200%だけでなく、mechanismが提供する100〜200%のintermediate stepでcontent / functionality lossがないことを確認する
-- 1つのvalid mechanismで200%までlossなしを確認できれば、そのmechanismはmachine evidence上success candidateになる。あるmechanismの失敗だけでSC全体をfailedへ固定せず、他のvalid mechanism / semantic evidenceのclosureを待つ
-- executableなvalid mechanismをすべて確認しても200%まで成立しない場合だけnot-satisfied candidateへ進める。未確認mechanismが残る場合は `incomplete / blocked` とする
+- user-agent mechanismでscale factorを取得できる場合、各text candidateの `rendered_scale_ratio = mechanism_scale_ratio × current_used_font_size_css_px / baseline_used_font_size_css_px` をscript計算する。text-only / author controlで別scale factorを持たない場合はcurrent / baseline used font size比を使用する
+- responsive breakpoint等でcomputed text sizeが変わることを許容し、mechanism control値が200%という理由だけでtarget到達としない。全applicable text candidateがbaseline比2.0xへ到達するまで、current mechanismが提供する次の実stateを進める
+- incremental mechanismではtarget rendered enlargementへ到達するまでに通過するintermediate stateでもcontent / functionality lossがないことを確認する
+- 1つのvalid mechanismで全applicable text candidateが2.0xへ到達し、そこまでのstateでcontent / functionality lossなしを確認できれば、そのmechanismはmachine evidence上success candidateになる。あるmechanismの失敗だけでSC全体をfailedへ固定せず、他のvalid mechanism / semantic evidenceのclosureを待つ
+- executableなvalid mechanismをすべて確認しても2.0xへ到達できない、または到達前後でcontent / functionality lossがある場合だけnot-satisfied candidateへ進める。未確認mechanism / text population completenessが残る場合は `incomplete / blocked` とする
 - Playwright `deviceScaleFactor` はDPR emulationでありtext scaling mechanismとして扱わない
 - viewport resize、CSS `transform: scale()`、test専用font-size / zoom style注入を1.4.4のtext scaling mechanismとして扱わない
-- browser ownerがvalid user-agent mechanismを操作できずauthor-provided mechanismもない場合は、擬似的なstyle変更へfallbackせず `unsupported / blocked` とする
+- browser / toolが存在するuser-agent mechanismを操作・scale取得できない場合、そのmechanism probeは `unsupported` とする。author-provided mechanismも含め executable candidateが残らない場合、criterion executionを `blocked` にし、擬似的なstyle変更へfallbackしない
 
-W3C Technique G142等の評価で必要なuser-agent zoomは、current browser経路が実際のuser-agent zoom capabilityを提供する場合だけfixed dispatchへ登録します。特定browserのprivate protocolやundocumented shortcutをgeneric fallbackとして追加しません。
+W3C Technique G142等の評価で必要なuser-agent zoomは、current browser経路が実際のuser-agent zoom capabilityとscale stateを安全に提供する場合だけfixed dispatchへ登録します。responsive breakpointによりCSS font sizeが変わるcaseでもbaseline比2.0x enlargementを確認し、特定browserのprivate protocolやundocumented shortcutをgeneric fallbackとして追加しません。
 
 Text Spacing等、W3Cの評価手順自体がauthor style overrideを要求するprocedureだけ、Techniqueで定義された固定overrideをdispatchします。Resize Textは上記valid text scaling mechanism contractを使用し、style overrideで代替しません。固定overrideを使うprocedureでも任意style injection interfaceにはせず、元状態、適用したoverride、cleanup結果を保持します。
 
@@ -209,7 +212,7 @@ validatorを2層に分けます。
 - usability-inspection validator: local machine probe catalog、request / result schema、fixed dispatch、target / population currentness、duplicate、unsupported理由、`static_data_versions.wcag_machine_probes` を検証する
 - repository-level contract test: formal procedure catalogが参照するmachine probe key集合とinspectionのmachine probe catalog key集合を比較し、missing / extra / unusedを0件にする
 
-fixtureにはdocument metadata、non-text / media / link / heading / form / structure population、keyboard / focus / pointer / hover-focus、error scenario、target size / spacing、text / non-text contrast、simple / complex focus appearance、responsive condition、orientation / reflow / text spacing、moving / timer / shortcut、multipage signature、stale population、missing capabilityを含めます。Resize Textはfull-page zoom、text-only resize、author-provided control、incremental step、valid mechanism実行不能、`deviceScaleFactor` / viewport / CSS injection rejectを個別fixtureで持ちます。
+fixtureにはdocument metadata、non-text / media / link / heading / form / structure population、keyboard / focus / pointer / hover-focus、error scenario、target size / spacing、text / non-text contrast、simple / complex focus appearance、responsive condition、orientation / reflow / text spacing、moving / timer / shortcut、multipage signature、stale population、missing capabilityを含めます。Resize Textはfull-page zoom、text-only resize、author-provided control、incremental step、responsive breakpointでzoom control値とrendered text scaleが一致しないcase、2.0x到達、text population incomplete、valid mechanism実行不能、`deviceScaleFactor` / viewport / CSS injection rejectを個別fixtureで持ちます。
 
 ## 8. 完了条件
 
