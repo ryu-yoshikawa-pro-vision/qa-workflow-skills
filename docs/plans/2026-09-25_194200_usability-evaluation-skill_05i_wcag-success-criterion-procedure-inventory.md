@@ -128,6 +128,8 @@ machine procedureが必要とするbrowser値は `_05j_wcag-machine-browser-obse
 
 ### manual
 
+常時またはcriterion populationに応じてrequiredになるmanual procedure:
+
 - 1.2.1–1.2.9 → 各 `manual-wcag-<SC>`
 - 1.4.7 → `manual-wcag-1.4.7`
 - 2.3.1 → `manual-wcag-2.3.1`
@@ -135,6 +137,26 @@ machine procedureが必要とするbrowser値は `_05j_wcag-machine-browser-obse
 - 2.5.6 → `manual-wcag-2.5.6`
 - 3.3.8 → `manual-wcag-3.3.8`
 - 3.3.9 → `manual-wcag-3.3.9`
+
+machine limitation時だけapplicableになるconditional manual fallback:
+
+- 1.4.3 → `manual-wcag-1.4.3`
+- 1.4.4 → `manual-wcag-1.4.4`
+- 1.4.6 → `manual-wcag-1.4.6`
+- 1.4.11 → `manual-wcag-1.4.11`
+- 2.4.13 → `manual-wcag-2.4.13`
+
+fallback mappingは次に固定します。
+
+| source machine procedure | criterion | activation limitation code | manual fallback |
+| --- | --- | --- | --- |
+| `m-text-contrast` | 1.4.3 | `background-not-machine-resolvable` | `manual-wcag-1.4.3` |
+| `m-resize-text` | 1.4.4 | `text-scaling-mechanism-not-machine-executable / text-scaling-state-not-machine-readable` | `manual-wcag-1.4.4` |
+| `m-text-contrast` | 1.4.6 | `background-not-machine-resolvable` | `manual-wcag-1.4.6` |
+| `m-nontext-contrast` | 1.4.11 | `background-not-machine-resolvable` | `manual-wcag-1.4.11` |
+| `m-focus-appearance` | 2.4.13 | `focus-indicator-not-machine-resolvable` | `manual-wcag-2.4.13` |
+
+これらのmanual fallback keyはrequirements assetのexpected procedure集合に含めますが、`_05h` の `applicability_mode=machine-limitation` によりsource machine procedureが該当limitationで閉じた場合だけapplicableになります。machineが正常に完全判定できたcaseではnot-applicableです。
 
 ### assistive technology
 
@@ -151,7 +173,7 @@ AT procedureはSuccess Criterion固定で常に実行するという意味では
 - 2.3.2 → `external-wcag-2.3.2`
 - 3.1.5 → `external-wcag-3.1.5`
 
-manual / AT / external procedureはrequired evidence kind、result contract、不足時statusをcatalogで固定し、証拠をLLM推測で補いません。
+manual / AT / external procedureはrequired evidence kind、result contract、不足時status、`_05h` のapplicability modeをcatalogで固定し、証拠やfallback applicabilityをLLM推測で補いません。conditional manual fallbackはsource machine limitation codeからscriptが有効化します。
 
 ## 5. criterion別procedure_keysの決定方法
 
@@ -176,10 +198,12 @@ semantic layerへ残すもの:
 - user-facing instruction / feedbackの意味
 - machine evidenceをcriterion全体へ適用できるか
 - manual / AT / external evidenceを含めた最終semantic closure
+- machine limitation発生時のconditional manual fallback closure
 
 scriptへ残すもの:
 
 - required criterion集合 / procedure key集合
+- procedure applicability mode / conditional manual fallback mapping
 - population / target inventoryで機械的に閉じられる部分
 - browser値取得
 - 数値計算 / fixed comparison
