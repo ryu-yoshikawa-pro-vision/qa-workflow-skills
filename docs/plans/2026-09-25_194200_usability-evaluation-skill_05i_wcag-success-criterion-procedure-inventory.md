@@ -90,7 +90,7 @@ selected versionの全required Success Criterionへ、必ず1件のcriterion-spe
 | `m-form-purpose-metadata` | 1.3.5 | 対象inputのautocomplete等、input purposeを示すprogrammatic metadataを取得する。 |
 | `m-heading-label-inventory` | 2.4.6, 2.4.10 | heading / label candidate、level / association、rendered / accessibility textを列挙する。 |
 | `m-hover-focus-content` | 1.4.13 | hover / focusのbefore / after stateを固定操作で取得し、追加contentのvisible / dismiss / persist stateを返す。 |
-| `m-image-text-inventory` | 1.4.5, 1.4.9 | textを含むimage candidateを列挙し、target / evidence refを返す。画像内textの意味判定はsemantic / manual。 |
+| `m-image-text-inventory` | 1.4.5, 1.4.9 | current scopeのimage / rendered graphical candidateを列挙し、target / screenshot evidence ref / machine-readable metadataを返す。画像にtextが含まれるか、essential / customizable等の意味判定はsemantic / manual。 |
 | `m-keyboard-run` | 2.1.1, 2.1.2, 2.1.3 | 宣言済みfunctionality / flowをkeyboard-onlyで実行し、focus / action trace、unreachable / trap evidenceを返す。 |
 | `m-label-name` | 2.5.3 | visible label textとaccessible nameをtarget単位で取得し、normalized containment比較用valueを返す。 |
 | `m-language-page` | 3.1.1 | page default human language metadataを取得する。 |
