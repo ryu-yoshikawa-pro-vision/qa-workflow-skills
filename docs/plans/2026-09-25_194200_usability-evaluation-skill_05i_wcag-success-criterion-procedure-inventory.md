@@ -177,7 +177,7 @@ AT procedureはSuccess Criterion固定で常に実行するという意味では
 | 2.3.2 | `external-wcag-2.3.2` | `external-evidence-available` |
 | 3.1.5 | `external-wcag-3.1.5` | `external-evidence-available` |
 
-これらはoptional supporting evidenceです。requirements assetでは該当criterionだけ `external_evidence_allowed=true` とし、外部証拠がない場合もprocedure key自体はexpected集合へ残したまま、`_05h` のapplicability contractで `not-applicable` としてclosureします。外部証拠の不存在をcriterion未完了理由にしません。
+これらはoptional supporting evidenceです。requirements assetでは該当criterionだけ `external_evidence_allowed=true` とし、外部証拠がない場合もprocedure key自体はexpected集合へ残したまま、`_05h` のapplicability contractで `not-applicable` としてclosureします。外部証拠の不存在をcriterion未完了理由にしません。 3 criterionはいずれもWCAG 2.0 / 2.1 / 2.2に存在するため、`external_evidence_allowed=true` のexpected件数は各version 3件、合計9件です。
 
 manual / AT / external procedureはrequired evidence kind、result contract、不足時status、`_05h` のapplicability modeをcatalogで固定し、証拠やfallback applicabilityをLLM推測で補いません。conditional manual fallbackはsource machine limitation codeからscriptが有効化します。
 
