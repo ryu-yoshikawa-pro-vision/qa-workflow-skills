@@ -23,7 +23,8 @@ skills/wcag-conformance-evaluation/
 │   ├── wcag-2.0-requirements.json
 │   ├── wcag-2.1-requirements.json
 │   ├── wcag-2.2-requirements.json
-│   └── wcag-evaluation-procedure-catalog.json
+│   ├── wcag-evaluation-procedure-catalog.json
+│   └── wcag-semantic-contracts.json
 ├── scripts/
 │   ├── runtime_contract.py
 │   ├── wcag_requirements.py
@@ -99,6 +100,7 @@ catalogはPR #11のstatic data契約を再利用します。strict JSON decode�
 - `static_data_versions.wcag_2_1_requirements`
 - `static_data_versions.wcag_2_2_requirements`
 - `static_data_versions.wcag_evaluation_procedures`
+- `static_data_versions.wcag_semantic_contracts`
 
 deterministic validatorは選択versionのassetからhashを独立再計算します。さらに各catalogについてW3C正本と照合済みの承認済みhashをcontract testへ固定し、Success Criterion / levelの欠落や変更をassetとvalidatorが同時に見逃す構造を避けます。
 
@@ -1014,11 +1016,11 @@ Input:
 Function:
 
 - static catalogのcanonical criterion URIを使ってassertionを生成
-- artifact-local subject / assertion / result refを決定論的に生成
-- formal result statusをEARL outcomeへ固定mapping
+- `_05l` のcanonical identityからsubject / assertion / TestResultのstable `urn:qa-workflow-skills:earl:...` IRIを生成し、artifact-local refをIRIへ直接使用しない
+- formal criterion resultと `applicable_population` からEARL outcomeを固定mappingする。`applicable_population=none` かつcomplete closureならhuman-readable resultは `satisfied` のまま、EARL outcomeだけ `earl:inapplicable` とする
 - modeはactual provenanceからのみmappingし、判定不能なら `unknownMode`
-- stable sort
-- canonical JSON-LDをrender
+- `_05l` の固定key / node orderingでstable sort
+- repository内deterministic JSON-LDをrender
 
 Output:
 
@@ -1320,7 +1322,7 @@ LLM suppliedのSuccess Criterion resultをfinal sample resultへ直接入力す�
 - initial baseline外environmentをformal evidenceへ使用した場合にbaseline revisionをscriptで拡張し、freshnessを再計算できる
 - WCAG 2.0 / 2.1 / 2.2の各target version / levelからrequired Success Criteria / conformance requirement集合を該当versionのstatic catalogだけで独立導出できる
 - 全Success Criterion rowにevaluation metadataがあり、`wcag_criterion_plan.py` がrequired criterion evaluation planを全件materializeできる。criterion選択・省略・required step countをLLMへ任せない
-- 3 requirement catalogとfinite procedure catalogのcanonical hashを `static_data_versions` へ保持し、validator独立再計算と承認済みhash contract testをPASS
+- 3 requirement catalog、finite procedure catalog、versioned semantic contract assetのcanonical hashをformal Skillの `static_data_versions` へ保持し、validator独立再計算と承認済みhash contract testをPASS
 - missing / unresolved versionとunsupported / out-of-scope versionを区別し、別versionへ暗黙変換しない
 - `runtime_contract.py` でPR #11 Machine Runtime / freshness契約を再利用し、random selectionそのものはdeterministic runtimeへ含めない
 - sampling procedure used / skippedの両経路を持ち、skippedでは全in-scope sampleをselected sample setへmaterializeできる
