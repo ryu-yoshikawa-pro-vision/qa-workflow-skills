@@ -74,7 +74,7 @@ supported WCAG 2.0 / 2.1 / 2.2の全Success Criterionで `procedure_keys` を1�
 - `result_contract`
 - `completion_evidence`
 - `limitation_behavior`
-- `applicability_mode`: `always / population-present / semantic / machine-limitation`
+- `applicability_mode`: `always / semantic / machine-limitation`
 - `activation_source_procedure_key`。`machine-limitation` の場合だけ必須。それ以外は `null`
 - `activation_limitation_codes`。`machine-limitation` の場合だけ非空。それ以外は空配列
 
@@ -151,13 +151,12 @@ procedure execution rowは少なくとも次を持ちます。
 `wcag_criterion_plan.py` がcatalogの `applicability_mode` から次を決定論的に閉じます。
 
 - `always`: procedureは常にapplicable
-- `population-present`: criterion-specific population discovery / semantic applicabilityのcurrent resultが `present` ならapplicable、`none` ならnot-applicable、`unknown` ならunknown。final criterion rowの `applicable_population` を入力にせず、このdiscovery resultをprocedure applicabilityとfinal populationの共通入力にする
 - `semantic`: fixed semantic contractのdecision refからapplicable / not-applicable / unknownを受け、scriptがprocedure rowへ投影する。LLMがprocedure keyを追加・削除しない
 - `machine-limitation`: source machine procedureが未closureならunknown。sourceがcompleteし `activation_limitation_codes` のいずれかを返した場合だけapplicable。それ以外の正常closureではnot-applicable
 
 `not-applicable` は `execution_status=complete`、procedure resultは `null` とし、applicability basisを必須にします。required applicable procedureのclosureには数えません。
 
-criterion-level `applicable_population` はpopulation discovery / semantic applicability resultとそのevidenceからscriptが最終投影します。procedure applicabilityから逆算しません。これにより `population-present procedure applicability → procedure closure → applicable_population` の循環を作りません。
+criterion-level `applicable_population` はcriterion-specific semantic procedureのpopulation discovery / applicability resultとevidenceからscriptが最終投影します。procedure applicabilityから逆算しません。
 
 `unknown` を残したままcriterionを `satisfied / not-satisfied` にしません。必要evidenceを取得・評価したうえで意味的に確定できない場合はcriterionを `undetermined`、required capability / environment自体がなくprocedureを実施できない場合は `blocked` とします。
 
@@ -166,6 +165,17 @@ machine procedureが既知のmachine limitationで閉じた場合、manual fallb
 fixed probeを契約どおり実行し、machine値を完全判定できないこと自体を正しく観測できた場合、そのsource machine procedureは `execution_status=complete` とし、catalogのresult contractで定義したlimitation result + finite `limitation_code` を保持します。これはbrowser action未開始、cleanup失敗、request schema不正等の `blocked` と分離します。conditional manual fallbackはこの `complete + limitation_code` からだけ起動します。
 
 manual fallbackはmachine値をLLM推測で補う経路ではありません。対象・状態・評価方法・測定値または観測結果・evidence refを固定契約で要求し、数値が必要なcriterionでは目視推定値を正式測定値として扱いません。
+
+procedure catalogのmode割当は `_05i` の生成規則へ固定します。
+
+- machine procedure: `always`
+- criterion-specific `s-wcag-*`: `always`
+- `_05i` の通常manual procedure: `always`
+- external-evidence procedure: `always`
+- assistive-technology procedure: `semantic`
+- `_05i` のconditional manual fallback: `machine-limitation`
+
+同じprocedure keyについて実装者が別modeを選びません。`always` procedureでも対象populationが存在しないことを確認するためのinventory / semantic closureは実行し、criterion-level `applicable_population=none` の根拠に使えます。
 
 arbitrary condition expression、procedure selector DSL、LLM supplied fallback keyは追加しません。
 
