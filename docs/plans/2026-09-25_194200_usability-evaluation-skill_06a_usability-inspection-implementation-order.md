@@ -93,7 +93,7 @@ skills/usability-inspection/scripts/
 └── criterion_checks.py
 ~~~
 
-`assets/test-rule-catalog.json`、`assets/browser-observation-catalog.json`、`assets/wcag-machine-probe-catalog.json` も同時に実装します。`wcag-machine-probe-catalog.json` は `_05j` のfinite inventoryを正本とし、canonical hashを `usability-inspection` の `static_data_versions.wcag_machine_probes` へ保持します。
+`assets/test-rule-catalog.json`、`assets/browser-observation-catalog.json`、`assets/wcag-machine-probe-catalog.json` も同時に実装します。`wcag-machine-probe-catalog.json` は `_05j` のfinite inventoryを正本とし、formal machine probe requestを1件以上処理したruntime unitだけcanonical hashを `usability-inspection` の `static_data_versions.wcag_machine_probes` へ保持します。
 
 `test-rule-catalog.json` の登録対象は `_05d_accessibility-requirements-and-act.md` のsupported ACT Rule / project ruleだけです。artifact structure、ref、geometry、elapsed、threshold等のhelperはcatalogへ入れません。catalogはrule DSLではなく、`criterion_checks.py` の明示dispatchとsemantic/manual経路の入力契約です。
 
