@@ -1,6 +1,6 @@
-# QAテスト分析・設計・E2Eワークフロー Agent Skills
+# QAテスト分析・設計・Regression・Exploration・知識管理・E2Eワークフロー Agent Skills
 
-新規機能・変更機能・指定対象機能を分析し、**テスト実施者が迷わず実行できる詳細テストケースまで落とし込む**ためのAgent Skills群です。要求された場合は、確認済みのPlaywright E2E対象を実装し、指定されたテスト環境へローカル実行し、結果分析・報告まで成果物ベースで扱います。
+新規・変更機能のQA成果物作成を中心に、Regression baseline / Run履歴、Charterに沿った探索・Investigation、QA knowledge lifecycle、要求されたPlaywright E2E実装・実行・分析・報告を成果物ベースで扱うAgent Skills群です。
 
 ## Skill構成
 
@@ -186,8 +186,18 @@ e2e-test-execution
 | テスト要求 | `test-requirement-design` |
 | カバレッジ基準 / カバレッジ項目 / テスト技法 | `test-condition-design` |
 | 詳細テストケース / 期待結果の根拠 | `test-case-design` |
+| 生きたテスト対象のUI情報・ふるまい収集 / 管理 | `test-target-inspection` |
+| AIによる詳細TC実行・期待結果比較・結果記録 | `test-execution` |
 | カバレッジ / ギャップ | `coverage-analysis` |
 | 独立レビュー / 重大度 | `adversarial-review` |
+| E2E対象、repo / 実対象の事実、実装可能性、安全条件 | `e2e-test-inspection` |
+| Playwright E2Eコード変更、静的 / 軽量検証 | `e2e-test-implementation` |
+| 実行安全確認、準備、Playwright実行、構造化結果、cleanup | `e2e-test-execution` |
+| 実行事実からの原因分析、追加証拠要求、修正routing | `e2e-test-result-analysis` |
+| 検証済み結果の人間向け報告 | `e2e-test-reporting` |
+| Regression baseline / membership / Run selection / Activity | `regression-testing` |
+| Charterに沿った探索・owner不明hypothesisの実対象調査 | `exploratory-testing` |
+| QA knowledge candidate triage / entry lifecycle / lookup | `qa-knowledge` |
 | ルーティング / ブロック中 / 再開 / ワークフロー完了 | `qa-workflow` |
 
 ## 段階的開示
@@ -237,6 +247,8 @@ scripts/skills/evals/
 │   ├── common.py
 │   ├── runtime_validator.py
 │   ├── result.py
+│   ├── ASSERTIONS.md
+│   ├── README.md
 │   └── tests/
 └── semantic/
     ├── run.py
@@ -244,11 +256,13 @@ scripts/skills/evals/
     ├── prompt_builder.py
     ├── result.py
     ├── validate.py
+    ├── README.md
     └── tests/
 
 tests/skills/evals/
 ├── deterministic/
-└── semantic/
+├── semantic/
+└── trigger/
 ```
 
 Skill固有の発火評価データセット、出力フィクスチャ、決定論的validator、意味評価ルーブリック / フィクスチャは各Skillの`evals/`配下に置きます。

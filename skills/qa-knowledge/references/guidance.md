@@ -15,7 +15,9 @@ Finding / Observationの存在だけでentryを作りません。source、scope�
 
 ## Entry lifecycle
 
-Entryは1ファイル / 1独立revisionのproject-local artifactです。必須項目は`entry_ref`, `identity`, `kind`, `content`, `scope_refs`, `applicability`, `provenance`, `currentness_dependencies`, `last_verified`, `state`, `replacement_ref`, `related_qa_refs`, `entry_revision`です。secret値を含めません。
+Entry bodyは1ファイル / 1独立revisionのproject-local artifactです。body fieldは`entry_ref`, `identity`, `kind`, `content`, `scope_refs`, `applicability`, `provenance`, `currentness_dependencies`, `last_verified`, `state`, `replacement_ref`, `related_qa_refs`です。`replacement_ref`は置換済みentryで使い、それ以外はnullにします。templateの`schema_version`も維持します。secret値を含めません。
+
+`entry_revision`はbody fieldではなく、保存先 / helperが返すstorage metadataです。callerはworkflow / Activity側で保持し、update / revalidationのexpected revisionや、保存先が対応する場合のhistorical readに使います。entry templateへ書き込みません。
 
 `provenance`は知識を得たsource refs / revisions、`currentness_dependencies`は今後の再利用前に変化を確認すべきrefs / revisionsです。2種類のrefは別々に保持します。
 

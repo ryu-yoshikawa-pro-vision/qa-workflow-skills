@@ -17,6 +17,8 @@ current UI / accessible name / 既知範囲の事実収集は`test-target-inspec
 
 1 Sessionは固定Charterと対象snapshotに結び付けます。resumeはCharter、scope、許可範囲、重要environment条件が意味的に同じ場合だけ許可します。変化時は新Session/versionとし、旧Sessionを変更しません。
 
+既存Sessionは、要求 / workflowから渡されたdirect refまたはProject Contextの「既存QA成果物」欄から解決します。現在のSkill contractに固定Session history rootはないため、未提示のrootを推測してscanしません。
+
 Observationは操作 / 観測、実際に起きたこと、evidence refを記録し、推測と分離します。Findingはsource observation / evidence、observed fact、follow-up理由、判定可能な分類、unresolved、recommended routeを記録します。両者の配列とrefを混在させません。
 
 ## Safety and cleanup

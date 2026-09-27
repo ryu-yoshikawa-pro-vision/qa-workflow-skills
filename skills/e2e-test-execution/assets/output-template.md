@@ -70,8 +70,8 @@ attempt行はPlaywright `TestResult`単位の事実（status、retry、duration�
 
 | cleanup対象 / 実行主体 | 状態 | 結果 / 残存副作用 | 確認元 |
 | --- | --- | --- | --- |
-| runner管理 | 成功 / 失敗 / 未確認 / 対象なし / 意図的に残した状態 |  |  |
-| run外処理 | 成功 / 失敗 / 未確認 / 対象なし / 意図的に残した状態 |  |  |
+| runner管理 | 成功 / 失敗 / 未確認 / 対象なし / 意図的に残した状態 / 一部失敗 |  |  |
+| run外処理 | 成功 / 失敗 / 未確認 / 対象なし / 意図的に残した状態 / 一部失敗 |  |  |
 
 `setup / dependency / webServer / teardown`の4番目が`none` / `なし` / `対象なし` / `未使用`等でなければ、明示的なrunner管理cleanup対象として扱います。`cleanup不要`、`対象なし`、`不要`は、既知のcleanup対象が存在しない場合にrunner管理またはrun外の契約へ記録できます。今回run所有かつcleanup対象のwebServer、または明示teardownがある場合は、runner管理cleanup対象 / 方法とcleanup表のrunner管理行を対応付けます。run外cleanupの実績は、run外準備の有無ではなく、事前に確認したrun外cleanup対象 / 方法と対応付けます。各cleanup契約は`確認済み`等の確認状態だけでは足りず、特定語のallow-listに依存しない通常の具体的な説明を記録します。
 

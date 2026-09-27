@@ -31,7 +31,7 @@ def _revision_map(items: Any) -> tuple[dict[str, str], list[str]]:
             errors.append("invalid_source_revision")
             continue
         ref, revision = item.get("source_ref"), item.get("revision")
-        if not isinstance(ref, str) or not ref or not isinstance(revision, str) or not revision:
+        if not isinstance(ref, str) or not ref.strip() or not isinstance(revision, str) or not revision.strip():
             errors.append("missing_source_ref_or_revision")
             continue
         if ref in mapping:
@@ -149,39 +149,81 @@ def reconcile_membership(snapshot: dict[str, Any], decisions: list[dict[str, Any
 
 
 def check_baseline_currentness(baseline: dict[str, Any], current: dict[str, Any]) -> dict[str, Any]:
-    if not baseline.get("complete"):
+    if baseline.get("complete") is not True:
         return {"status": "incomplete", "changed_sources": [], "reason": "baseline_incomplete"}
-    if not current.get("complete"):
+    if current.get("complete") is not True:
         return {"status": "unresolved", "changed_sources": [], "reason": "current_discovery_incomplete"}
-    old = {item.get("source_ref"): item.get("revision") for item in baseline.get("source_revisions", [])}
-    new = {item.get("source_ref"): item.get("revision") for item in current.get("source_revisions", [])}
+    baseline_scope = baseline.get("scope_identity")
+    current_scope = current.get("scope_identity")
+    if not isinstance(baseline_scope, str) or not baseline_scope.strip():
+        return {"status": "incomplete", "changed_sources": [], "reason": "baseline_scope_identity_missing"}
+    if not isinstance(current_scope, str) or not current_scope.strip():
+        return {"status": "unresolved", "changed_sources": [], "reason": "current_scope_identity_missing"}
+    old, old_errors = _revision_map(baseline.get("source_revisions"))
+    if old_errors:
+        return {"status": "incomplete", "changed_sources": [], "reason": "baseline_source_revisions_invalid"}
+    new, new_errors = _revision_map(current.get("source_revisions"))
+    if new_errors:
+        return {"status": "unresolved", "changed_sources": [], "reason": "current_source_revisions_invalid"}
     changed = sorted(ref for ref in set(old) | set(new) if old.get(ref) != new.get(ref))
-    if baseline.get("scope_identity") != current.get("scope_identity"):
+    if baseline_scope != current_scope:
         changed.append("<scope>")
     return {"status": "stale" if changed else "current", "changed_sources": changed, "reason": "dependency_changed" if changed else "dependencies_match"}
 
 
 def plan_run(baseline: dict[str, Any], *, requested_scope: str | None, requested_tc_refs: list[str] | None = None, candidate_query_complete: bool = True, currentness: dict[str, Any] | None = None) -> dict[str, Any]:
-    members = set(baseline.get("member_tc_refs", []))
     if currentness is None:
         return {"status": "blocked", "reason": "baseline_currentness_unverified", "selected_tc_refs": []}
     if currentness.get("status") != "current":
         return {"status": "blocked", "reason": "baseline_not_current", "selected_tc_refs": []}
     if requested_scope == "full":
-        if not baseline.get("complete"):
+        if baseline.get("complete") is not True:
             return {"status": "blocked", "reason": "full_requires_complete_baseline", "selected_tc_refs": []}
-        return {"status": "ready", "scope": "full", "selected_tc_refs": sorted(members), "suite_complete": True}
+    elif requested_scope not in {None, "selected"}:
+        return {"status": "blocked", "reason": "invalid_scope", "selected_tc_refs": []}
     if requested_scope == "selected":
         selected = sorted(set(requested_tc_refs or []))
         if not selected:
             return {"status": "unresolved", "reason": "selected_scope_empty", "selected_tc_refs": []}
+
+    needs_members = requested_scope in {"full", "selected"} or (
+        requested_scope is None and not candidate_query_complete and baseline.get("complete") is True
+    )
+    members: set[str] = set()
+    if needs_members:
+        raw_members = baseline.get("member_tc_refs")
+        if not isinstance(raw_members, list) or any(not isinstance(ref, str) or not ref.strip() for ref in raw_members) or len(raw_members) != len(set(raw_members)):
+            return {"status": "blocked", "reason": "baseline_member_projection_invalid", "selected_tc_refs": []}
+        members = set(raw_members)
+        if "memberships" in baseline:
+            memberships = baseline.get("memberships")
+            if not isinstance(memberships, list):
+                return {"status": "blocked", "reason": "baseline_membership_projection_invalid", "selected_tc_refs": []}
+            membership_refs: set[str] = set()
+            expected_members: set[str] = set()
+            for item in memberships:
+                if not isinstance(item, dict):
+                    return {"status": "blocked", "reason": "baseline_membership_projection_invalid", "selected_tc_refs": []}
+                tc_ref = item.get("tc_ref")
+                decision = item.get("decision")
+                if not isinstance(tc_ref, str) or not tc_ref.strip() or tc_ref in membership_refs or decision not in MEMBERSHIP:
+                    return {"status": "blocked", "reason": "baseline_membership_projection_invalid", "selected_tc_refs": []}
+                membership_refs.add(tc_ref)
+                if decision == "member":
+                    if item.get("lifecycle_status") != "current":
+                        return {"status": "blocked", "reason": "baseline_membership_projection_invalid", "selected_tc_refs": []}
+                    expected_members.add(tc_ref)
+            if members != expected_members:
+                return {"status": "blocked", "reason": "baseline_membership_projection_mismatch", "selected_tc_refs": []}
+
+    if requested_scope == "full":
+        return {"status": "ready", "scope": "full", "selected_tc_refs": sorted(members), "suite_complete": True}
+    if requested_scope == "selected":
         unknown = sorted(set(selected) - members)
         if unknown:
             return {"status": "unresolved", "reason": "selected_tc_not_in_current_suite", "unresolved_tc_refs": unknown, "selected_tc_refs": []}
         return {"status": "ready", "scope": "selected", "selected_tc_refs": selected, "suite_complete": False}
-    if requested_scope is not None:
-        return {"status": "blocked", "reason": "invalid_scope", "selected_tc_refs": []}
-    if not candidate_query_complete and baseline.get("complete"):
+    if not candidate_query_complete and baseline.get("complete") is True:
         return {"status": "ready", "scope": "full", "selected_tc_refs": sorted(members), "suite_complete": True, "fallback_reason": "candidate_query_incomplete"}
     if not candidate_query_complete:
         return {"status": "blocked", "reason": "candidate_query_and_baseline_incomplete", "selected_tc_refs": []}

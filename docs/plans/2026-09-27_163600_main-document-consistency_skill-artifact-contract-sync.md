@@ -2,7 +2,7 @@
 
 この文書は、`docs/plans/2026-09-27_163600_main-document-consistency.md`のうち、新規Skillの正規出力・storage metadataに関する文書不整合を扱います。
 
-対象は文書整合だけです。production runtime、validator、fixture、dataset、CIの実装変更は行いません。
+原則は文書整合です。ただし、Plan 11の実装時に既存Baseline contractの不整合が見つかり、Plan本文の例外を適用します。
 
 ## 対象
 
@@ -21,6 +21,12 @@
 4. 現在のSkill / guidance / data contract / asset template
 5. 実装・検証記録
 6. 過去Plan
+
+### Plan 11の実装例外: Regression Baseline contractの既存不整合
+
+Plan 11の実装時、`memberships`にcurrentな`member`があり`complete=true`でも、`member_tc_refs`欠落をdeterministic validatorが受理し、`plan_run()`が欠落を空集合としてfull Runを0件で`ready`にできることが分かりました。文書だけを現在fixtureへ合わせると、production helperが使うBaseline projectionとRun planning契約を壊します。
+
+この不整合を解消する範囲に限り、既存Baseline fieldを使った最小限のRegression runtime、deterministic validator、deterministic fixture、Regression runtime testの変更を許可します。Regression以外のruntime / validator / fixture / dataset / test、Regression dataset、CIは対象外のままです。新しいfieldやschemaは追加しません。
 
 現在の実装と文書が一致している箇所は変更しません。文書整合だけを理由にvalidatorやfixtureを現在文書へ合わせて変更しません。
 
@@ -111,8 +117,9 @@ baseline / Run / Activityのmachine input / data contract
 - Run selection
 - required route
 - Activity actual start / result finalization
-- validator criterion
-- fixture
+- Plan 11の例外で許可したBaseline contract修正以外のvalidator criterion
+- Plan 11の例外で許可したBaseline fixture以外のfixture
+- Regression dataset、Regression以外のruntime / validator / fixture / test、CI
 - production helper
 
 ## 12. qa-knowledgeのentry_revision
@@ -193,6 +200,12 @@ update / revalidation / historical readで必要な場合は、そのstorage rev
 - `skills/regression-testing/references/data-contract.md`
 - `skills/regression-testing/assets/output-template.md`
 - 必要な場合だけ `skills/regression-testing/assets/baseline-template.json`
+- Plan 11の例外で許可する最小範囲に限り
+  - `skills/regression-testing/scripts/regression_runtime.py`
+  - `skills/regression-testing/evals/deterministic/validator.py`
+  - `skills/regression-testing/evals/output/cases/reg-out-001/output.md`
+  - `tests/skills/evals/deterministic/test_qa_artifact_graph_skills.py`
+- Assertion契約を追加する場合は `scripts/skills/evals/deterministic/ASSERTIONS.md`
 
 ### qa-knowledge
 
@@ -211,6 +224,7 @@ update / revalidation / historical readで必要な場合は、そのstorage rev
 
 - `regression-testing`の正規Baseline / Run / Activity契約が過去Planなしで追える
 - `baseline-template.json`とcurrent validator / fixtureの必須fieldが矛盾しない
+- `member_tc_refs`欠落や不正なscope identityのBaselineがvalidator / runtimeでfull Runとして受理されず、正規Baselineではmembership projectionとRun planningが一致する
 - `regression-testing/SKILL.md`のResources説明がdata contractの実際の範囲と一致する
 - `qa-knowledge`のentry bodyとstorage metadataが明確に分離されている
 - `entry_revision`をentry body必須fieldとして説明している現行文書が残っていない
@@ -235,4 +249,4 @@ git diff --check
 - `regression-testing/SKILL.md`でRunだけがResources説明から欠落していない
 - `qa-knowledge`のentry body必須fieldから`entry_revision`が除外されている
 - `entry_revision`がstorage metadataとしてcaller側で保持されることが明記されている
-- runtime / validator / fixture / dataset / CIを変更していない
+- Plan 11の例外で列挙したRegression runtime / validator / fixture / testだけを必要最小限変更し、Regression datasetおよびRegression以外のruntime / validator / fixture / test / CIは変更していない

@@ -207,6 +207,12 @@ case数やrouting fixture数は変更せず、例えば「現在の追加・拡�
 
 詳細は[`Skill artifact contract 文書整合Plan`](./2026-09-27_163600_main-document-consistency_skill-artifact-contract-sync.md)に分離します。
 
+### Plan 11の実装例外: Regression Baseline contractの既存不整合
+
+Plan 11の実装時に、現在のBaseline contractとvalidator / fixtureの既存不整合が見つかりました。`memberships`にcurrentな`member`があり、`complete=true`でも、`member_tc_refs`を欠くBaselineをdeterministic validatorが受理できます。`plan_run()`は欠落fieldを空集合として扱うため、currentnessが渡されるとfull Runを選択0件・`suite_complete=true`で`ready`にできます。Baseline文書だけを現在fixtureへ合わせると、production helperが使うmember projectionとRun planning契約を壊します。
+
+この不整合の解消に限り、既存contractへ揃える最小限の`regression-testing` runtime、deterministic validator、deterministic fixture、Regression runtime testの変更を許可します。Assertion IDを追加する場合は、そのIDの説明を`ASSERTIONS.md`へ同時に反映します。Regression以外のruntime / validator / fixture / dataset / test codeは引き続き対象外です。新しいBaseline fieldやschemaは追加しません。
+
 ### 12. qa-knowledgeのentry_revision
 
 `skills/qa-knowledge/references/guidance.md`は`entry_revision`をentryの必須項目として列挙しています。
@@ -427,11 +433,11 @@ validator、fixture、dataset、runtime、CI、test codeは変更しません。
 - `docs/history/`の過去検証値
 - `docs/reports/`の実装・検証時点の記録
 - 各Skillのdomain責務・実行意味の変更
-- runtime実装
-- validator
-- fixture / dataset
+- runtime実装（Plan 11で明記したRegression例外を除く）
+- validator（同例外を除く）
+- fixture / dataset（同例外で許可したRegression fixtureを除く）
 - GitHub Actions
-- test code
+- test code（同例外で許可したRegression runtime testを除く）
 - PR #11 / #12 / #13の履歴
 
 過去Plan・history・reportの数値を現在値へ一括置換しません。これらは当時の基準・実績を残す文書であり、更新すると履歴の意味を壊します。
@@ -572,7 +578,7 @@ git diff --check
 - generic history registry
 - relation index / central artifact registry
 - workflow state専用の新規runtime schema framework
-- 文書整合だけを理由にしたproduction code変更
+- Plan 11で明記したRegression例外以外の、文書整合だけを理由にしたproduction code変更
 - `entry_revision`のentry bodyへの追加
 - `regression-testing`のvalidator / fixtureを文書へ合わせる変更
 - E2E cleanupのvalidator値域変更

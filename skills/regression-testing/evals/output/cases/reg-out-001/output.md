@@ -11,6 +11,7 @@
       "revision": "r18"
     }
   ],
+  "scope_identity": "scope:checkout",
   "completeness_evidence": {
     "root_listing_complete": true,
     "source_revisions_complete": true,
@@ -31,6 +32,12 @@
       "decision": "one_off",
       "reason": "一時的な移行確認"
     }
+  ],
+  "member_tc_refs": [
+    "TC-001"
+  ],
+  "one_off_tc_refs": [
+    "TC-002"
   ],
   "coverage_gaps": [
     {

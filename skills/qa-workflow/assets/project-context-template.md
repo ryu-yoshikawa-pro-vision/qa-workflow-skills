@@ -55,6 +55,7 @@
 - 認証情報の取得方法または環境変数名:
 - 利用可能なtest user / role:
 - テストデータ・状態準備方法:
+- 共有環境 / resource policy（resource ref、workflow別isolation、外部reservationの取得条件、owner / release条件）:
 - 副作用の許可範囲 / 1回の定義 / 最大回数 / 根拠:
 - テスト対象資料成果物参照:
 - cleanup制約:
@@ -139,6 +140,8 @@
 
 ## 14. 既存QA成果物
 
+既存成果物や履歴を固定root scanする場合は、そのrootまたはdirect refを「場所」に記録し、対象範囲と鮮度 / revisionを併記します。Regression baseline / ActivityやExploration Sessionのrootを専用stable keyとして推測追加しません。workflow stateのrootは下記`qa.workflow_state_root`を使います。
+
 | 成果物 | 場所 | 範囲 | 鮮度 / バージョン | 備考 |
 | --- | --- | --- | --- | --- |
 |  |  |  |  |  |
@@ -149,7 +152,7 @@
 
 ## 16. QA artifact graphの固定rootとcurrentness項目
 
-各fieldのstable keyは表示文言・heading・行番号から独立しています。workflowが依存するfieldは、このkeyと正規化値をsnapshotへ記録します。値を未設定のまま利用できると推測しません。
+各fieldのstable keyは表示文言・heading・行番号から独立しています。workflowが依存するfieldは、このkeyと正規化値をsnapshotへ記録します。値を未設定のまま利用できると推測しません。`qa.reservation_root`はproject-local reservation artifactの保存先です。resourceのisolation / external reservation / cleanup policyはこのroot値ではなく、Section 4の環境・resource条件へ記録します。
 
 <!-- qa-context-field:start key=qa.regression_scope type=ordered_text -->
 （未設定）

@@ -53,4 +53,6 @@ Product Riskは新規採点しません。Runに関係する既存Riskごとに�
 
 ## Storage and history
 
+TC discovery root、baseline、Activity historyのrootまたはdirect refsは、明示要求またはProject Contextの「既存QA成果物」欄から解決します。`qa.workflow_state_root`はworkflow state用であり、Regression artifact rootへ流用しません。出所のないrootを推測せず、必要な参照が解決できない範囲は未解決にします。
+
 固定rootの完全scanとdirect refsを優先します。scan error / truncationは`complete=false`です。historical revisionは実際に再取得できるrevisionのみ入力に使います。state / Activityのexpected revisionをatomic conditional writeへ渡せない場合、mutable updateは`blocked`です。過去Activityの入力snapshotは後続変更で書き換えません。

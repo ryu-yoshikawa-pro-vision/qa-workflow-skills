@@ -18,6 +18,10 @@
 - `WF-D015` ワークフロー状態表の対象 / 実行範囲列
 - `WF-D016` 複数用途Skillの対象 / 実行範囲値
 - `WF-D017` 開始 / 最終Skillの対象 / 実行範囲値
+- `WF-D018` runtime状態のSkill + Runtime Unit Key一意性
+- `WF-D019` runtime状態のstatus projection
+- `WF-D020` 完了workflowでruntime unitを未完了 / staleのまま残さない
+- `WF-D021` fixtureに基づくruntime状態projection
 
 ## spec-analysis
 - `SPEC-D001` 分析項目ID形式
@@ -58,6 +62,8 @@
 - `QUESTION-D016` フィクスチャに基づく回答後正規化先
 - `QUESTION-D017` 複数用途Skillの再開対象 / 実行範囲値
 - `QUESTION-D018` フィクスチャに基づく再開Skill / 対象整合
+- `QUESTION-D019` runtime issue由来質問のRuntime identity / generation保持
+- `QUESTION-D020` 質問一覧とブロック中範囲のruntime identity整合
 
 ## test-analysis
 - `RISK-D001` RISK ID形式
@@ -157,6 +163,7 @@
 - `COV-D010` 既存カバレッジマトリクスでE2E実装 → 実行結果を追跡可能
 - `COV-D011` E2E実装から実行結果への追跡整合
 - `COV-D012` TCなし経路のTC ID創作禁止
+- `COV-D013` 指定されたModel Keyのstable形式
 
 ## adversarial-review
 - `REV-D001` REV ID形式
@@ -189,6 +196,10 @@
 - `E2E-INSP-D010` フィクスチャで期待するTC ID
 - `E2E-INSP-D011` TCなし経路のTC ID創作禁止
 - `E2E-INSP-D012` 事実の確認元表示
+- `E2E-INSP-D013` inspection対象・事実・安全条件・既存E2E関係の有効行
+- `E2E-INSP-D014` 実装可否 / 未確認 / block状態と理由・次の担当
+- `E2E-INSP-D015` 対象決定の識別子・根拠・扱い
+- `E2E-INSP-D016` 実装 / 実行に影響する事実・確認元・影響
 
 ## e2e-test-implementation
 - `E2E-IMPL-D001` 必須実装テーブル
@@ -204,6 +215,14 @@
 - `E2E-IMPL-D011` フィクスチャで期待するTC ID
 - `E2E-IMPL-D012` TCなし経路のTC ID創作禁止
 - `E2E-IMPL-D013` 実行禁止 / 未実行の明示
+- `E2E-IMPL-D014` 静的 / 軽量検証の実施結果または未実施理由
+- `E2E-IMPL-D015` 静的検証FAILを完了扱いしない
+- `E2E-IMPL-D016` 実装前のbranch / HEAD / working tree / 競合 / inspection差分
+- `E2E-IMPL-D018` 実装対象・識別子・確認済み期待挙動
+- `E2E-IMPL-D019` 成立対象のE2E実装参照、全対象block時は参照0件
+- `E2E-IMPL-D020` 実装前block理由・不足範囲・次の担当
+- `E2E-IMPL-D021` 確認済み期待挙動の未確認状態を完了扱いしない
+- `E2E-IMPL-D022` 全対象block時に実装済み変更 / PASSを残さない
 
 ## e2e-test-execution
 - `E2E-EXEC-D001` 必須実行テーブル
@@ -223,6 +242,23 @@
 - `E2E-EXEC-D015` フィクスチャで期待するlogical件数
 - `E2E-EXEC-D016` フィクスチャで期待するresolved件数
 - `E2E-EXEC-D017` フィクスチャで期待するretry attemptのstatus / 番号保持
+- `E2E-EXEC-D018` preflight必須項目の値または明示状態・確認元
+- `E2E-EXEC-D019` working tree / 証跡 / stale artifact利用前後の状態・安全確認
+- `E2E-EXEC-D021` runner開始時の今回run artifact生成 / 更新根拠とstale利用禁止
+- `E2E-EXEC-D022` preflight block時のrunner未開始 / artifact未生成の理由
+- `E2E-EXEC-D023` 開始した成果物のlogical primary対象記録
+- `E2E-EXEC-D024` runner未開始時にPlaywright runのraw fact / 成功cleanupを持たない
+- `E2E-EXEC-D025` webServer各processの起動 / ownership / 再利用 / cleanup対象
+- `E2E-EXEC-D026` 実行前に確定が必要な安全情報の確認
+- `E2E-EXEC-D027` run外cleanup実績と事前cleanup契約の対応
+- `E2E-EXEC-D028` run外準備時のcleanup行と対象なし理由
+- `E2E-EXEC-D029` 既知のrunner管理cleanup対象とのcleanup行対応
+- `E2E-EXEC-D030` resolved primary開始状態の既存marker分類
+- `E2E-EXEC-D032` resolved primary TestCaseからlogical primaryへの逆参照
+- `E2E-EXEC-D033` attempt / retry番号のTestCase単位の一意性と連番
+- `E2E-EXEC-D034` primary結果statusと最後のattempt / Playwright outcomeの整合
+- `E2E-EXEC-D035` attempt表でTestCase単位expectedStatus / outcomeを重複保持しない
+- `E2E-EXEC-D036` primary attemptとresolved TestCaseのfile / title / project / repeatEachIndex整合
 
 ## e2e-test-result-analysis
 - `E2E-AN-D001` 必須分析テーブル
@@ -235,6 +271,11 @@
 - `E2E-AN-D008` TCなし経路のTC ID創作禁止
 - `E2E-AN-D009` cleanup未確認の明示
 - `E2E-AN-D010` 追加実行依頼の目的 / 仮説 / 範囲 / owner
+- `E2E-AN-D011` fixtureに基づく追加実行の目的 / 仮説 / 範囲 / routingまたは不要判断
+- `E2E-AN-D012` 必須の実行事実と参照を空欄にしない
+- `E2E-AN-D013` 判定行の状態・原因・根拠・再現性
+- `E2E-AN-D014` 追加実行判断の明示
+- `E2E-AN-D015` 判定対象が宣言済みの実行結果参照に含まれる
 
 ## e2e-test-reporting
 - `E2E-REPORT-D001` 必須報告テーブル
@@ -253,6 +294,52 @@
 - `E2E-REPORT-D014` cleanupのフィクスチャ整合
 - `E2E-REPORT-D015` retry発生時の初回 / retry履歴保持
 - `E2E-REPORT-D016` フィクスチャで期待する初回 / retry履歴
+- `E2E-REPORT-D017` resolved primary結果とlogical対象 / 開始状態 / outcome / 結果参照の追跡
+- `E2E-REPORT-D018` E2E対象 / resolved結果がある場合の追跡行
+- `E2E-REPORT-D019` 開始したlogical primaryの対象 / E2E参照 / 件数
+- `E2E-REPORT-D020` 分析実施時の結果参照完全一致と未実施時の参照なし
+- `E2E-REPORT-D021` resolved primaryからlogical primaryへの逆参照
+
+## regression-testing
+- `REG-D001` 正規JSON artifactが一つだけ整形式で存在する
+- `REG-D002` artifact typeがbaseline / run / activityのいずれか
+- `REG-D003` Baseline completeとdiscovery・lifecycle・membership根拠の整合
+- `REG-D004` membership refの一意性とcurrent logical TCだけのmember化
+- `REG-D005` traceability coverage gapをinventory / lifecycle不完全と分離
+- `REG-D006` full Runにcompleteかつcurrentなbaselineを要求
+- `REG-D007` selected RunをSuite memberのsubsetとしSuite完了と区別
+- `REG-D008` required routeをmanualまたはconcrete E2E testware refで表現
+- `REG-D009` TCなし補助testwareとTC countの分離
+- `REG-D010` source actual start / resultを投影し、全required route開始後にlogical TCをexecuted化
+- `REG-D011` route開始・result確定・source result投影・cleanupの未解決時にActivityを未完了とする
+- `REG-D012` completed Activityのimmutable性
+- `REG-D013` Activityからidentityと固定snapshotを追跡
+- `REG-D014` fixture指定のartifact kindとの一致
+- `REG-D015` TCなし補助testwareを別枠に保ちTC ref / countへ混在させない
+- `REG-D016` Baselineのscope identity / source revisionsとmember・one_off projectionがcurrentness / Run planning用に一致すること
+
+## exploratory-testing
+- `EXP-D001` Session artifactが一つだけ整形式で存在する
+- `EXP-D002` modeとCharter必須項目が揃う
+- `EXP-D003` investigationをsymptomまたはhypothesisから開始
+- `EXP-D004` Observation / Finding、unique ref、evidence、source / follow-upの分離・追跡
+- `EXP-D005` required cleanupの未確認 / 失敗を安全完了にしない
+- `EXP-D006` completed Sessionのimmutable性
+- `EXP-D007` 正規Sessionへのsecret実値の混入禁止
+- `EXP-D008` fixtureのunsafe / unavailable条件をblock
+
+## qa-knowledge
+- `KN-D001` knowledge decision / entry artifactの整形式
+- `KN-D002` owner routingまたはqa-knowledge正規lifecycleへの一致
+- `KN-D003` structured semantic identityからentry_refを決定論的に解決し、entryなしのrouting / lookup outcomeを許可
+- `KN-D004` entry schema、kind、stateの存在・許可値
+- `KN-D005` provenanceとcurrentness dependencyのref / revision分離
+- `KN-D006` 有効entryのcurrentness確認
+- `KN-D007` 保存成功に該当するnative atomic conditionを要求
+- `KN-D008` same-entry CAS conflictのsemantic auto-merge禁止
+- `KN-D009` 既存QA正本候補をownerへ戻す
+- `KN-D010` CAS / completeness不足時の保存fail-closed
+- `KN-D011` entry / outputへのsecret実値の混入禁止
 
 ## 共通runtime / Machine Entity
 

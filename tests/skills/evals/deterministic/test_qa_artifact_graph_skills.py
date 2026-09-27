@@ -111,6 +111,127 @@ class RegressionRuntimeTests(unittest.TestCase):
         self.assertEqual(incomplete_candidates["scope"], "full")
         self.assertTrue(incomplete_candidates["suite_complete"])
 
+    def test_full_run_requires_member_projection_and_preserves_valid_empty_projection(self):
+        currentness = {"status": "current"}
+        fixture_memberships = [{"tc_ref": "TC-001", "decision": "member", "lifecycle_status": "current"}]
+        missing = regression.plan_run(
+            {"complete": True, "memberships": fixture_memberships},
+            requested_scope="full",
+            currentness=currentness,
+        )
+        self.assertNotEqual(missing["status"], "ready")
+        self.assertFalse(missing.get("suite_complete", False))
+        self.assertEqual(missing["selected_tc_refs"], [])
+
+        for projection in (None, "TC-001", [None], ["TC-001", "TC-001"]):
+            with self.subTest(projection=projection):
+                malformed = regression.plan_run(
+                    {"complete": True, "member_tc_refs": projection},
+                    requested_scope="full",
+                    currentness=currentness,
+                )
+                self.assertEqual(malformed["status"], "blocked")
+
+        full = regression.plan_run(
+            {"complete": True, "member_tc_refs": ["TC-001", "TC-002"]},
+            requested_scope="full",
+            currentness=currentness,
+        )
+        self.assertEqual(full["selected_tc_refs"], ["TC-001", "TC-002"])
+        self.assertTrue(full["suite_complete"])
+
+        empty = regression.plan_run(
+            {"complete": True, "member_tc_refs": []},
+            requested_scope="full",
+            currentness=currentness,
+        )
+        self.assertEqual(empty["status"], "ready")
+        self.assertEqual(empty["selected_tc_refs"], [])
+        self.assertTrue(empty["suite_complete"])
+
+        mismatch = regression.plan_run(
+            {"complete": True, "member_tc_refs": [], "memberships": fixture_memberships},
+            requested_scope="full",
+            currentness=currentness,
+        )
+        self.assertEqual(mismatch["status"], "blocked")
+        self.assertFalse(mismatch.get("suite_complete", False))
+
+        fallback_missing = regression.plan_run(
+            {"complete": True},
+            requested_scope=None,
+            candidate_query_complete=False,
+            currentness=currentness,
+        )
+        self.assertEqual(fallback_missing["status"], "blocked")
+        self.assertFalse(fallback_missing.get("suite_complete", False))
+        fallback_full = regression.plan_run(
+            {"complete": True, "member_tc_refs": ["TC-001"]},
+            requested_scope=None,
+            candidate_query_complete=False,
+            currentness=currentness,
+        )
+        self.assertEqual(fallback_full["selected_tc_refs"], ["TC-001"])
+        self.assertTrue(fallback_full["suite_complete"])
+
+    def test_currentness_requires_scope_identity_and_revision_list(self):
+        revisions = [{"source_ref": "repo:qa/test-cases", "revision": "r1"}]
+        baseline = {"complete": True, "scope_identity": "scope:checkout", "source_revisions": revisions}
+        current = {"complete": True, "scope_identity": "scope:checkout", "source_revisions": revisions}
+        self.assertEqual(regression.check_baseline_currentness(baseline, current)["status"], "current")
+
+        missing_baseline_scope = regression.check_baseline_currentness(
+            {"complete": True, "source_revisions": revisions}, current
+        )
+        self.assertEqual(missing_baseline_scope["status"], "incomplete")
+        missing_current_scope = regression.check_baseline_currentness(
+            baseline, {"complete": True, "source_revisions": revisions}
+        )
+        self.assertEqual(missing_current_scope["status"], "unresolved")
+        missing_baseline_revisions = regression.check_baseline_currentness(
+            {"complete": True, "scope_identity": "scope:checkout"}, current
+        )
+        self.assertEqual(missing_baseline_revisions["status"], "incomplete")
+
+    def test_baseline_validator_rejects_missing_scope_and_projection_fields(self):
+        fixture_path = REPO_ROOT / "skills" / "regression-testing" / "evals" / "output" / "cases" / "reg-out-001" / "output.md"
+        fixture_text = fixture_path.read_text(encoding="utf-8")
+        baseline, errors = regression_validator._document(fixture_text)
+        self.assertEqual(errors, [])
+        self.assertIsNotNone(baseline)
+
+        for field in ("scope_identity", "member_tc_refs", "one_off_tc_refs", "source_revisions"):
+            with self.subTest(field=field):
+                candidate = dict(baseline)
+                candidate.pop(field)
+                rendered = "```json\n" + json.dumps(candidate, ensure_ascii=False) + "\n```"
+                result = regression_validator.validate(rendered, {"artifact_type": "baseline"}, f"REG-D016-MISSING-{field}")
+                statuses = {item.id: item.status for item in result.assertions}
+                self.assertEqual(statuses["REG-D016"], "fail")
+
+        candidate = dict(baseline)
+        candidate["member_tc_refs"] = []
+        rendered = "```json\n" + json.dumps(candidate, ensure_ascii=False) + "\n```"
+        result = regression_validator.validate(rendered, {"artifact_type": "baseline"}, "REG-D016-MISMATCH")
+        statuses = {item.id: item.status for item in result.assertions}
+        self.assertEqual(statuses["REG-D016"], "fail")
+
+        candidate = dict(baseline)
+        candidate["one_off_tc_refs"] = []
+        rendered = "```json\n" + json.dumps(candidate, ensure_ascii=False) + "\n```"
+        result = regression_validator.validate(rendered, {"artifact_type": "baseline"}, "REG-D016-ONE-OFF-MISMATCH")
+        statuses = {item.id: item.status for item in result.assertions}
+        self.assertEqual(statuses["REG-D016"], "fail")
+
+        for field, value in (("scope_identity", " "), ("member_tc_refs", "TC-001")):
+            with self.subTest(field=field, value=value):
+                candidate = dict(baseline)
+                candidate[field] = value
+                rendered = "```json\n" + json.dumps(candidate, ensure_ascii=False) + "\n```"
+                result = regression_validator.validate(rendered, {"artifact_type": "baseline"}, f"REG-D016-INVALID-{field}")
+                statuses = {item.id: item.status for item in result.assertions}
+                self.assertEqual(statuses["REG-D016"], "fail")
+
     def test_route_state_uses_actual_start_and_preserves_source_result(self):
         routes = regression.validate_required_routes([
             {"tc_ref": "TC-001", "route_type": "manual", "route_ref": "manual"},

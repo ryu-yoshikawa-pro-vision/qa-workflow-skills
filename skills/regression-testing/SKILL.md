@@ -29,7 +29,7 @@ description: 既存のcurrent QA成果物を継続Regressionへ接続し、basel
 ## リソース
 
 - 手順・責務境界・停止条件: `references/guidance.md`
-- baselineとActivityのmachine input: `references/data-contract.md`
+- Baseline / Run / Activityのmachine inputとdata contract: `references/data-contract.md`
 - 正規出力形: `assets/output-template.md`
 - production helper: `scripts/regression_runtime.py`
 - deterministic contract: `evals/deterministic/validator.py`

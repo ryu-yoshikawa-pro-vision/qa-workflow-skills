@@ -1,6 +1,6 @@
 ---
 name: qa-workflow
-description: 新規機能・変更機能・指定対象機能を、テスト設計から要求されたE2E実装・ローカル実行・結果分析・報告まで成果物ベースでルーティングするQAオーケストレーションSkill。開始工程判断、停止・再開・既存成果物再利用、対象別状態、修正routingが必要なときに使用する。
+description: 新規・変更機能のQA設計と要求されたE2E工程に加え、Regression / Exploration / QA Knowledgeを含む複合QA workflowの開始点、既存成果物の再利用、routing、停止・再開、修正確認を成果物ベースで判断する。workflowを複数Skillへ接続するときに使用する。
 ---
 
 # QAワークフロー
