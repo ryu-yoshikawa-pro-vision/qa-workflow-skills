@@ -129,9 +129,9 @@ mechanism candidateはcurrent browser / user agent capabilityと、current page�
 - `user-agent-full-page-zoom` はbrowser ownerがdocumentedに取得したzoom scale ratioとcurrent / baseline computed font sizeから `rendered_scale_ratio = zoom_scale_ratio × current_font_size_css_px / baseline_font_size_css_px` をscript計算する
 - `user-agent-text-only-resize` はbrowser ownerがdocumentedに取得できるtext scale / rendered font metricを正本にする。computed styleへscaleが反映されることを確認できる場合だけcurrent / baseline font size比を使い、scale factorとの二重計算をしない。機構のscaleをmachine-readableに確定できない場合はそのprobeを `unsupported` とする
 - `author-provided-resize-control` はcurrent / baseline used font size比を正本とし、control操作が対象textへ作用した結果を取得する
-- responsive breakpoint等でcomputed text sizeが変わることを許容し、mechanism control値が200%という理由だけでtarget到達としない。全applicable text candidateがbaseline比2.0xへ到達するまで、current mechanismが提供する次の実stateを進める
-- incremental mechanismではtarget rendered enlargementへ到達するまでに通過するintermediate stateでもcontent / functionality lossがないことを確認する
-- machine resultはtext candidateごとのrendered scale ratio、state別loss evidence、population completenessを返し、caption / image-of-text等のexceptionを自動判定しない。semantic procedureがexception target refsを確定した後、scriptが残るapplicable text集合の2.0x coverageを集計する
+- responsive breakpoint等でcomputed text sizeが変わることを許容し、mechanism control値が200%という理由だけでtarget到達としない。machine stageはcurrent mechanismが提供する有限state列をbaselineから順に取得し、全machine-observed text candidateが2.0xへ到達するか、documented / machine-readableなmechanism最大stateへ到達するまで記録する。semantic exception未確定を理由にstate列を途中でsuccess closureしない
+- machine resultはtext candidateごとのrendered scale ratio、state別loss evidence、population completeness、mechanism state sequence completenessを返し、caption / image-of-text等のexceptionを自動判定しない
+- semantic procedureがexception target refsを確定した後、scriptがrecorded state列から残るapplicable text集合の全targetが初めて2.0xへ到達するstateを導出する。incremental mechanismではbaselineからそのtarget stateまでに通過するstateのcontent / functionality loss evidenceをrequired coverageとする
 - 1つのvalid mechanismでsemantic exception除外後の全applicable text candidateが2.0xへ到達し、そこまでのstateでcontent / functionality lossなしを確認できれば、そのmechanismをsatisfied candidateへできる。あるmechanismの失敗だけでSC全体をfailedへ固定せず、他のvalid mechanism / semantic evidenceのclosureを待つ
 - executableなvalid mechanismをすべて確認してもapplicable textが2.0xへ到達できない、または到達前後でcontent / functionality lossがある場合だけnot-satisfied candidateへ進める。未確認mechanism / text population / exception closureが残る場合は `incomplete / blocked` とする
 - Playwright `deviceScaleFactor` はDPR emulationでありtext scaling mechanismとして扱わない
