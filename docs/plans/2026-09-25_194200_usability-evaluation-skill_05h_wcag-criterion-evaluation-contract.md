@@ -71,6 +71,7 @@ supported WCAG 2.0 / 2.1 / 2.2の全Success Criterionで `procedure_keys` を1�
 - `required_input_refs`
 - `machine_dispatch_key`。execution kindがmachineの場合だけ必須
 - `semantic_decision_key`。execution kindがsemanticの場合だけ必須
+- `applicability_decision_key`。`applicability_mode=semantic` の場合だけ必須。それ以外は `null`
 - `result_contract`
 - `completion_evidence`
 - `limitation_behavior`
@@ -124,9 +125,11 @@ applicability、exception、purpose、meaning、content equivalence等、意味�
 
 AT利用はSuccess Criterionごとの静的booleanにしません。
 
-procedure catalogで `required_capabilities` に `assistive-technology` を含むprocedureを定義し、current content / technology / accessibility support baselineに対してそのprocedureがapplicableかをsemantic layerが判断します。scriptは選択されたprocedureとbaseline / environmentを照合します。
+procedure catalogで `required_capabilities` に `assistive-technology` を含むprocedureを定義し、current content / technology / accessibility support baselineに対してそのprocedureがapplicableかを**AT procedure実行前のsemantic applicability decision**で判断します。`applicability_decision_key` は `_05i` の4 AT procedureごとに固定し、対応contractは `_05k` の `procedure_applicability_contracts[]` を正本とします。
 
-必要なAT procedureを実施できない場合は推測で閉じず `blocked` またはresult `undetermined` とします。
+AT applicability decisionは自身のAT procedure resultやfinal `s-wcag-*` semantic resultをInputにしません。current population discovery、current machine-readable observation / machine result、technology context、accessibility support baseline、Authorityだけから `applicable / not-applicable / unknown` を返します。scriptはそのdecision refをprocedure execution rowへ投影し、`applicable` の場合だけAT executionを開始します。
+
+必要なAT procedureがapplicableだが実施環境を用意できない場合は推測で閉じず `blocked` またはresult `undetermined` とします。
 
 ### 3.5 external evidence
 
@@ -151,7 +154,7 @@ procedure execution rowは少なくとも次を持ちます。
 `wcag_criterion_plan.py` がcatalogの `applicability_mode` から次を決定論的に閉じます。
 
 - `always`: procedureは常にapplicable
-- `semantic`: fixed semantic contractのdecision refからapplicable / not-applicable / unknownを受け、scriptがprocedure rowへ投影する。LLMがprocedure keyを追加・削除しない
+- `semantic`: procedure catalogの `applicability_decision_key` に対応するfixed pre-execution semantic applicability decisionから `applicable / not-applicable / unknown` を受け、scriptがprocedure rowへ投影する。final `s-wcag-*` semantic decisionをapplicability sourceに使わず、LLMがprocedure keyを追加・削除しない
 - `machine-limitation`: source machine procedureが未closureならunknown。sourceがcompleteし `activation_limitation_codes` のいずれかを返した場合だけapplicable。それ以外の正常closureではnot-applicable
 
 `not-applicable` は `execution_status=complete`、procedure resultは `null` とし、applicability basisを必須にします。required applicable procedureのclosureには数えません。
@@ -176,6 +179,20 @@ procedure catalogのmode割当は `_05i` の生成規則へ固定します。
 - `_05i` のconditional manual fallback: `machine-limitation`
 
 同じprocedure keyについて実装者が別modeを選びません。`always` procedureでも対象populationが存在しないことを確認するためのinventory / semantic closureは実行し、criterion-level `applicable_population=none` の根拠に使えます。
+
+### 3.7 AT applicability → execution → final semantic の順序
+
+AT procedureを持つcriterionは次の順序に固定します。
+
+1. criterion row / 全procedure execution rowをmaterializeする。AT procedureのapplicabilityは `unknown` で開始する
+2. machine / population discovery等、AT applicability decisionに必要なcurrent evidenceを取得する
+3. `_05k` の `procedure_applicability_contracts[]` に従ってAT applicability decisionだけを実行する。このdecisionは `assistive-technology-result` とfinal `s-wcag-*` semantic resultをInputにしない
+4. scriptがdecision refをAT procedure rowへ投影する
+5. `applicable` ならAT procedureを実行、`not-applicable` ならcomplete + null result、`unknown` ならcriterionをfinal resultへ進めない
+6. ATを含む全applicable sibling procedureがclosureした後で、final `s-wcag-*` semantic evaluationを実行する
+7. final semantic procedureのrequired evidence roleはcurrent applicable procedure集合から導出する。`not-applicable` procedureのresult roleは要求せず、applicability basis refだけをtraceabilityへ残す
+
+これにより `final semantic decision → AT applicability → AT result → final semantic decision` の循環を作りません。
 
 arbitrary condition expression、procedure selector DSL、LLM supplied fallback keyは追加しません。
 
@@ -368,7 +385,9 @@ production `wcag_criterion_plan.py` と別実装で少なくとも次を検証�
 - execution statusとresultの組合せ整合
 - `applicable_population=none` のcompleteness evidence
 - 単一ACT `inapplicable` だけでpopulation none / criterion satisfiedにしていない
-- procedure applicability mode / activation source / limitation code整合
+- procedure applicability mode / `applicability_decision_key` / activation source / limitation code整合
+- `applicability_mode=semantic` procedureのapplicability decisionが自身のprocedure resultまたはfinal semantic resultへ依存していない
+- final semantic required evidence roleがcurrent applicable procedure集合から導出され、not-applicable sibling resultを要求していない
 - `not-applicable` procedureがbasis refなしでclosureされていない
 - `machine-limitation` fallbackがsource procedure closure前にapplicable / not-applicableへ確定されていない
 - `satisfied` にrequired applicable procedure未完了なし
