@@ -174,7 +174,7 @@ Success Criterionへ適用対象contentが存在するかもprocedure contract�
 
 ## 6. live observation requestへの変換
 
-`wcag_criterion_plan.py` はselected procedureからrequired capabilityを集約し、semantic/manual/AT側の追加観測は `_05g` canonical observation fieldへ、machine procedureのbrowser入力は `_05j` machine probe keyへ分けてformal handoffへ渡すobservation requirementを生成します。
+`wcag_criterion_plan.py` はselected procedureからrequired capabilityを集約します。semantic/manual/AT側の追加観測は `_05g` canonical observation field requestへ、machine procedureのbrowser入力はprocedure catalogの `required_machine_probe_keys` から `_05j` のtyped `request_kind=wcag-machine-probe` requestへmaterializeし、formal handoffへ渡します。
 
 同一sample / variation / stateで共有できるrequestはdeduplicateします。
 
@@ -187,7 +187,7 @@ Success Criterionへ適用対象contentが存在するかもprocedure contract�
 - `visual` →必要state / viewportのscreenshot
 - `timing` →fixed interaction timing request
 
-LLMはcriterionごとにprobe keyを手列挙しません。machine observationからfixed probeへの変換は `_05g` の `observation_contract.py` が所有します。
+LLMはcriterionごとにprobe keyを手列挙しません。procedure → machine probe keyの解決はformal側 `wcag_criterion_plan.py` が所有します。`usability-inspection` の `observation_contract.py` は渡されたtyped requestの `machine_probe_key` をlocal `_05j` catalogへ解決してfixed browser dispatchをmaterializeしますが、formal procedure catalogを読み直しません。
 
 returned evidenceがstale、観測失敗、追加観測必要等でbrowser再実行が必要な場合、同じstarted handoffを再利用せず `_04c` のnew handoff lineageを使います。
 
@@ -280,7 +280,8 @@ production `wcag_criterion_plan.py` と別実装で少なくとも次を検証�
 - procedure key全件がfinite procedure catalogへ解決
 - unknown execution kind / capability / machine dispatch / semantic decision key reject
 - machine procedure全件に明示dispatch実装
-- machine procedure全件の `_05j` required machine probe key mappingがmissing / extra 0
+- formal procedure catalogでmachine procedure全件のrequired machine probe keyが確定し、typed requestへ一意にmaterializeされる
+- formal required machine probe key集合とinspection `_05j` catalogのmissing / extra / unused 0はrepository-level contract testで検証する
 - supported version / Success Criterion全件の `_05k` semantic contract rowが存在し、versioned requirement assetとsource refが一致
 - required observation / measurement / ACT result / semantic / manual / AT / external evidence refs解決
 - execution statusとresultの組合せ整合
