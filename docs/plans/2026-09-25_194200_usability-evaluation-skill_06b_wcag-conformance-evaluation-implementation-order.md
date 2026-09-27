@@ -99,7 +99,8 @@ WCAG-EM 2のoutput contractはReport ToolのschemaではなくWCAG-EM 2.0本文�
 - source canonical URLとは別にversion別claim guideline title / version / URI、third-party repair window = 2 business daysを保持
 - versionごとのcanonical JSON SHA-256を `static_data_versions.wcag_2_0_requirements` / `wcag_2_1_requirements` / `wcag_2_2_requirements` へ出力
 - validatorは選択versionのassetからhashを独立再計算
-- 3 catalogそれぞれについてW3C正本と照合済みの承認済みhashをcontract testで固定
+- 3 requirement catalogそれぞれについてW3C正本と照合済みの承認済みhashをcontract testで固定
+- `wcag-evaluation-procedure-catalog.json` のcanonical hashを `static_data_versions.wcag_evaluation_procedures` へ保持し、承認済みhashをcontract testで固定
 - version未指定・不明は `unresolved`、現在catalogを持たない将来version等は `unsupported`、WCAG 3はout-of-scope
 - actual result coverageをLLM supplied listではなくtarget versionのstatic expected setと比較
 
@@ -107,16 +108,22 @@ WCAG-EM 2のoutput contractはReport ToolのschemaではなくWCAG-EM 2.0本文�
 
 `_05h_wcag-criterion-evaluation-contract.md` を実装します。
 
-- 3 versionのrequirements assetに全Success Criterionのevaluation metadataを追加
-- `wcag_criterion_plan.py` でtarget version / level → required criterion row全件をmaterialize
-- required capability / machine step / semantic-manual step / assistive technology requirementを固定metadataから導出
+- 3 versionのrequirements assetに全Success Criterionの `procedure_keys` を追加する
+- `assets/wcag-evaluation-procedure-catalog.json` を追加し、全procedureを `machine / semantic / manual / assistive-technology / external-evidence` の有限inventoryへ固定する
+- procedure catalogに `TBD / other / custom` 等のcatch-allを置かず、machine procedureは全件明示dispatch / fixtureを実装する
+- machine化できる数値計算、集合演算、固定enum / state比較、supported ACT Ruleをsemantic / manualへ逃がしていないことをsemantic reviewで確認する
+- assistive technologyはSuccess Criterion固定booleanにせず、selected procedure + current content / technology + accessibility support baselineからapplicabilityを閉じる
+- selected sampleごとのrequired presentation variation集合を入力にし、`wcag_criterion_plan.py` がsample × variation × required Success Criterion rowを全件materializeする
+- execution status `pending / in-progress / complete / blocked` とresult `satisfied / not-satisfied / undetermined / null` を分離する
+- applicable population `present / none / unknown` をprocedure closureから導出し、単一ACT Ruleのinapplicableだけでcriterion satisfiedにしない
 - live observation requirementをformal handoffへ渡す
 - target geometry / spacing、contrast ratio、viewport overflow / reflow数値、elapsed / threshold、supported ACT Rule等、入力が揃えば決定論的な処理をscriptへ移す
-- required criterion集合とactual row集合の差分0をdeterministic validatorで検証
-- supported ACT Ruleがないcriterionもsemantic/manual / AT経路で評価対象から落とさない
+- required criterion × variation集合とactual row集合の差分0をdeterministic validatorで検証する
+- supported ACT Ruleがないcriterionもsemantic / manual / AT / external evidence procedureで評価対象から落とさない
 - required evidence不足は `undetermined / blocked` とし、LLM推測で閉じない
+- final Success Criterion resultはcurrent criterion evaluation refからだけmaterializeし、LLM supplied result listを別経路で受け付けない
 
-`criterion plan → observation handoff → returned evidence → criterion closure → sample result` の順序を固定します。
+`presentation variation registry → criterion plan → observation handoff → returned evidence → procedure closure → criterion result → sample / conformance requirement result` の順序を固定します。
 
 ### sampling
 
@@ -139,11 +146,12 @@ WCAG-EM 2のoutput contractはReport ToolのschemaではなくWCAG-EM 2.0本文�
 - 既存sample resultはPR #11 freshnessがcurrentの場合だけ再利用し、version / level / scope / baseline / environment / sample identity / evidence / catalog hash / upstream dependency変更では再評価
 - Step 4.2ではidentity / evidence / freshnessでcurrentなunchanged content resultだけを再利用し、changed / unknown contentとinteraction / feedbackを再評価
 - selection method記録
-- random selection status `target-met / exhausted-no-new-view / blocked`。complete finite inventoryまたはscope-wide exhaustion evidenceがある場合だけ `exhausted-no-new-view` でStep 3.2を閉じ、candidate取得不完全は `blocked`
+- random selection status `target-met / exhausted-no-new-view / blocked`。complete finite inventoryまたはscope-wide exhaustion evidenceがある場合だけ `exhausted-no-new-view` でStep 3.2を閉じ、candidate取得不完全は `blocked`。status / exhaustion evidence / blocked reasonをcanonical Random Sample sectionへ保存する
 
 ### runtime / structure
 
 - Step 1.1 scope coverage rowsをmaterializeし、third-party / language / responsive-device / separately-hosted / authenticated-restricted領域を明示的に閉じる
+- selected sampleごとにproject / Design System Authority、responsive boundary inventory、current observationからpresentation variation candidateをmaterializeし、`VAR-001` 等のrequired variation set / completeness / evidenceを閉じる。unknown / unreachable / incomplete variationをFull Pages satisfiedへ数えない
 - additional evaluation requirementsのsemantic inputから `ADDREQ-001` 等を採番し、affected step / output、`applied / blocked / out-of-scope`、required evidence / output refsをmaterializeする。目的内要件のout-of-scopeは禁止
 - formal evidenceへinitial baseline外environmentを使った場合、baseline revisionを拡張してfreshnessを再計算する。diagnostic-only environmentは追加しない
 - random selectionそのものはdeterministic runtimeへ含めず、method / provenance / selected refsを後続Machine Runtime Inputへ渡す
@@ -155,7 +163,9 @@ WCAG-EM 2のoutput contractはReport ToolのschemaではなくWCAG-EM 2.0本文�
 - static expected requirement coverage
 - Conforming Alternate Version condition / Non-Interference fixed Success Criteria closure
 - handoff expected / returned closure
+- browser開始済みhandoffの再観測はstarted claimを再利用せずnew handoff ref + `retry_of_handoff_ref` + new operation refで実行する。CAS再試行 / exact duplicate result再送は同じhandoffのidempotent処理としてbrowserを再実行しない
 - comparison iteration chain
+- criterion planのexecution status / result / applicable population closureと、current criterion evaluation refからのsample result materialize
 - sample result freshness closure
 - not-satisfied example coverage / Step 1.4 all-occurrence coverage
 - human-readable report / Evaluation Statement / accompanying documentationのaccessible output closure
@@ -197,8 +207,9 @@ selected sampleごとにlive accessibility observationが必要なcaseで、
 - required shared resourceをcanonical orderで取得し、claim / reservation refsを含む `in-progress` をCAS保存した後だけusability-inspectionを開始する
 - resource取得途中失敗または `in-progress` CAS conflictではbrowserを開始せず、取得済みreservationを逆順releaseし、owner未開始 / cleanup確認済みの場合だけclaim recoveryする
 - usability-inspectionがbrowser ownerとして `_05g` fixed observation requestを直列実行する
-- immutable evidence / inspection artifact refをhandoff ref / observation request ref / origin revision付きでqa-workflowへ返す
+- immutable evidence / inspection artifact refをhandoff ref / sample ref / variation ref / observation request ref / origin revision付きでqa-workflowへ返す
 - qa-workflow helperがreturned resultからobservation keyを導出し、result currentness、exact duplicate、supersedes lineage、expected-current-valid-returned集合を照合する
+- returned resultがstale / 不足でbrowser再観測が必要なら、started claimを削除・再利用せず次の `HANDOFF-NNN` を `retry_of_handoff_ref` 付きでmaterializeしてnew operation refを取得する。exact duplicate returnやCAS retryではnew handoffを作らない
 - owner complete / cleanup成功後、required shared reservationを逆順releaseし、release failureではcloseしない
 - helperが `close_ready` を導出し、`closed` をCAS保存した後にstateを再読込して `may_resume` を判定する
 - origin stale、claim / CAS / release failure、conflicting current return、未充足expected observationがある場合はresumeしない
@@ -306,6 +317,9 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 - supported WCAG version 2.0 / 2.1 / 2.2 / explicit unsupported or out-of-scope / missing unresolvedの状態分離
 - version別static requirement catalog / `static_data_versions` / approved hash contract
 - target version / level expected Success Criteria / conformance requirement set
+- finite procedure catalog key / kind / dispatch / hash
+- required presentation variation registry / Full Pages coverage
+- criterion evaluation execution status / result / applicable population / final result linkage
 - required Success Criterion全件のevaluation metadata / criterion plan row / required step closure / missing・duplicate detection
 - Conforming Alternate Version / Non-Interference / Full Pages / Complete Processes / Accessibility-Supported fixed rule metadata
 - version別claim guideline title / URI / third-party repair contract
@@ -315,12 +329,12 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 - sampling procedure used / skippedとselected sample set closure
 - rerun retained / replaced / added / unavailable sample lineage
 - observation handoff origin / resume identity / expected observation materialization
-- `_04c` physical `state.handoffs` schema、composite operation identity、state CAS、mutable operation claim、resource acquisition / rollback / normal release、duplicate / conflicting return、stale origin、close-ready → closed CAS → re-read → resume guard
+- `_04c` physical `state.handoffs` schema、composite operation identity、state CAS、mutable operation claim、resource acquisition / rollback / normal release、started handoff rerun lineage、duplicate / conflicting return、stale origin、close-ready → closed CAS → re-read → resume guard
 - ref
 - sample count
 - finite inventory candidate derivation / recorded method provenance
 - candidate population fingerprint
-- random selection status / exhaustion evidence / blocked completion guard
+- random selection status / exhaustion evidence / blocked reason / canonical Random Sample section closure
 - duplicate / overlap
 - process sequence → process-added sample materialization
 - Step 4.2 unchanged-result reuse eligibility
@@ -350,7 +364,7 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 ## 14. 完了条件
 
 - Skill責務がusability-inspectionと分離
-- qa-workflowがmulti-Skill observation handoffを直列オーケストレーションし、physical state schema / composite operation identity / CAS / claim / reservation lifecycle / closureを `_04c` どおり実装
+- qa-workflowがmulti-Skill observation handoffを直列オーケストレーションし、physical state schema / composite operation identity / CAS / claim / reservation lifecycle / started handoffのnew-handoff rerun lineage / closureを `_04c` どおり実装
 - standalone packageがsibling Skill scriptsへruntime依存しない
 - WCAG-EM Step 1〜5 traceability
 - Step 1.4 additional evaluation requirementsをref採番し、目的内要件をaffected step / outputへ反映してappliedまたはblocked、明示目的外だけを理由付きout-of-scopeへ閉じる
@@ -359,7 +373,7 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 - Step 1.1でthird-party / language / responsive-device / separately-hosted / authenticated-restricted scope coverageを明示的に閉じる
 - WCAG 2.0 / 2.1 / 2.2をsupported versionとし、missing / unresolved、unsupported / out-of-scopeを分離
 - target version / levelからrequired Success Criteria / conformance requirement集合を該当versionのstatic catalogだけで独立導出し、3 catalogのcanonical hashを既存static data契約で検証
-- 全required Success Criterionにevaluation metadataとcriterion evaluation rowがあり、machine / semantic-manual / assistive technology経路をscriptでmaterializeして、LLMがcriterionを選択・省略しない
+- 全required Success Criterionにfinite procedure keyがあり、sample × required variation × criterion evaluation rowをscriptでmaterializeし、procedure / criterionをLLMが選択・省略しない。machine化可能なprocedureは明示dispatchし、AT要否はselected procedure + current content / technology + baselineから閉じる
 - `runtime_contract.py` でPR #11 Machine Runtime / freshness契約を再利用し、random selectionそのものはdeterministic runtimeへ含めない
 - Step 2 exploration closure
 - sampling procedure used / skippedの両経路
@@ -367,6 +381,8 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 - sampling usedではStep 3.1 structured sample
 - 再評価ではprevious sampleをcurrent identityへ解決し、retained / replaced / added / unavailable lineageをscriptでmaterializeする。replacement ratioは固定しない
 - canonical sample identity registryをscriptがmaterializeし、duplicate / overlap / union / process membershipを機械判定
+- selected sampleごとのrequired presentation variation registryをscriptがmaterializeし、unknown / unreachable / incomplete variationをFull Pages satisfiedへ数えない
+- final Success Criterion resultはcurrent criterion evaluation refからだけmaterializeし、LLM supplied result listを受け付けない
 - sampling usedではStep 3.2 random sample。finite inventory時のcandidate集合とcandidate population fingerprintはscript導出し、非finite時もLLMがsample identityを選ばない
 - complete process。sequenceからprocess-added sample / membershipをscript導出
 - Step 4.1でConforming Alternate Versionを別sampleに数えず、Non-Interference fixed SC集合をcatalogから導出する
