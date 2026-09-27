@@ -83,6 +83,8 @@ evidence roleはprocedure catalogから決定論的に導出できるものを�
 
 `wcag_criterion_plan.py` はAT等のsemantic applicability decisionを先に閉じた後、current applicable procedure keysとsemantic contractを突合し、final `s-wcag-*` evaluationでrequiredなprocedure result roleをmaterializeします。`not-applicable` procedureのresult roleは要求せず、applicability basis refだけを保持します。LLMがrequired evidence role集合を完成集合として入力しません。
 
+`wcag-semantic-contracts.json` のcontract row / `semantic_evaluation_points[].required_evidence_roles` に静的記載できるのは `population-completeness / current-browser-observation / visual-evidence / process-context / presentation-variation / accessibility-support-baseline / technology-context / authority-context` だけです。`machine-procedure-result / manual-procedure-result / assistive-technology-result / external-evidence-result` はstatic semantic assetへ直接書かず、current applicable procedure集合から `wcag_criterion_plan.py` がruntime effective roleとして追加します。これによりnot-applicable AT procedureがstatic role経由で再びrequiredになる経路を作りません。
+
 ## 4. semantic procedure Input / Output
 
 Input:
@@ -290,7 +292,8 @@ validatorは次を独立確認します。
 - duplicate contract key / duplicate point key 0
 - source / clause / definition / exception refs全解決
 - semantic evaluation pointのsource clause coverage
-- required evidence roleが許可enumで、current applicable procedure集合とprocedure catalogとの整合がある
+- static semantic required evidence roleがnon-procedure role集合だけに限定されている
+- runtime effective procedure-result roleがcurrent applicable procedure集合とprocedure catalogからだけ導出されている
 - `_05i` の4 AT procedureと `procedure_applicability_contracts[]` のdecision key / source clause / allowed evidence roleが1対1で一致
 - AT applicability contractが `assistive-technology-result` またはfinal semantic resultへ依存していない
 - machine-only decisionをsemantic pointへ重複させていない
