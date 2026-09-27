@@ -178,6 +178,34 @@ Success Criterionへ適用対象contentが存在するかもprocedure contract�
 
 同一sample / variation / stateで共有できるrequestはdeduplicateします。
 
+formal artifact内のobservation request rowは次の2 kindだけを許可します。
+
+`wcag-machine-probe`:
+
+- observation request ref
+- request kind
+- criterion evaluation ref
+- procedure execution ref
+- machine probe key
+- sample / variation / process / requirement refs
+- target refまたはpopulation identity input
+- required browser capability
+- currentness dependency
+
+`semantic-observation`:
+
+- observation request ref
+- request kind
+- criterion evaluation ref
+- procedure execution ref
+- `_05g` canonical observation field key
+- fixed predicate / payload（必要な場合）
+- sample / variation / process / requirement refs
+- target / state basis refs
+- input evidence refs / fingerprint
+
+request ref、kind、procedure、sample / variation / process / requirement、target / population identityからrequest identityをscriptがmaterializeします。machine requestへ自然言語browser instructionを保存せず、semantic requestへmachine probe keyを直接入力しません。
+
 例:
 
 - `dom` + supported ACT Rule → title / element population / relevant DOM fields
