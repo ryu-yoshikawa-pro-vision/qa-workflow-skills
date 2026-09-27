@@ -111,7 +111,7 @@ WCAG-EM 2のoutput contractはReport ToolのschemaではなくWCAG-EM 2.0本文�
 - `_05i` のversion別集合からWCAG 2.0=61 / 2.1=78 / 2.2=86件を固定し、2.2から4.1.1を除外する
 - `_05i` の生成規則から全Success Criterionのexpected `procedure_keys` をscriptで導出し、3 versionのrequirements assetへ設定する。実装時にcriterionごとのprocedure構成を再設計しない
 - `assets/wcag-evaluation-procedure-catalog.json` を追加し、`_05i` に現れる全procedureを `machine / semantic / manual / assistive-technology / external-evidence` の有限inventoryへ固定する
-- procedure catalogに `TBD / other / custom` 等のcatch-allを置かず、`_05i` §3のmachine procedureは全件明示dispatch / fixtureを実装する。各machine procedureのbrowser入力は `_05j` finite machine probeへ全件mappingし、requirements asset / `_05i` / procedure catalog / machine probe catalogのmissing / extra / unused keyをdeterministic validatorで0件にする
+- procedure catalogに `TBD / other / custom` 等のcatch-allを置かず、`_05i` §3のmachine procedureは全件明示dispatch / fixtureを実装する。各machine procedureのbrowser入力はprocedure catalog内で `_05j` machine probe keyへ全件mappingし、`wcag_criterion_plan.py` がtyped `wcag-machine-probe` requestをmaterializeする。formal runtimeはinspection sibling assetをreadしない。cross-packageのprobe key missing / extra / unused 0はrepository-level contract testで検証する
 - `_05k` のversioned semantic contract assetを全supported Success Criterionへ作成し、normative clause / definition / exception refs、semantic evaluation point、required evidence role、forbidden shortcutをapproved hashで固定する。実装時にcriterion固有procedureを再設計しない
 - 4.1.1はWCAG 2.2でrowを作らず、WCAG 2.0 / 2.1 + HTML/XMLでは `always-satisfied-html-xml`、その他technologyではsemantic contractへ戻す
 - machine化できる数値計算、集合演算、固定enum / state比較、supported ACT Ruleをsemantic / manualへ逃がしていないことをsemantic reviewで確認する
@@ -321,8 +321,9 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 - version別static requirement catalog / `static_data_versions` / approved hash contract
 - target version / level expected Success Criteria / conformance requirement set
 - finite procedure catalog key / kind / dispatch / hash
-- `_05j` machine probe catalog / `static_data_versions.wcag_machine_probes` / approved hash
-- machine procedure → `_05j` finite machine probe mapping / result schema / capability
+- formal procedure catalog内のmachine procedure → `_05j` finite machine probe key mapping / typed request schema / capability
+- returned inspection artifact / Machine Runtime evidenceが `static_data_versions.wcag_machine_probes` を含み、formal input fingerprint / upstream freshnessへ反映されること
+- repository-level contract testでformal required machine probe keyとinspection catalog keyのmissing / extra / unused 0
 - `_05k` versioned semantic contract coverage / normative clause・exception refs / required evidence role / approved hash
 - WCAG 2.0 / 2.1 4.1.1 HTML/XML shortcut / other technology semantic path / WCAG 2.2 removal
 - semantic procedure resultの判断理由 / uncertainty / additional observation request refs
@@ -408,7 +409,7 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 - WCAG 2.0 / 2.1 / 2.2 Conformance Claim required / optional fields / version別claim URI / full-scope guard
 - third-party monitoring / repair full-claim caseでall affected pages identification / monitoring / 2 business days repair guard
 - WCAG Statement of Partial Conformance - Third Party Content / Language required fields / canonical wording / guard
-- Step 5.5 EARL 1.0 JSON-LD fixed graph / deterministic serialization / assertion coverage
+- Step 5.5 EARL 1.0 JSON-LD fixed graph / stable IRI / `applicable_population=none → earl:inapplicable` / deterministic serialization / assertion coverage
 - Step 5.4 aggregated scoreは目的外として生成しない
 - requirements / sampling / structure helperでmachine-owned fieldをmaterializeし、Agentがfinal refs / expected集合 / derived status / countを手作成しない
 - independent deterministic validator
