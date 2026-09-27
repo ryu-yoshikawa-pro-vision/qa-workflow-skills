@@ -31,13 +31,141 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
     result.add("REG-D002", kind in {"baseline", "run", "activity"}, "artifact typeがbaseline / run / activityのいずれかであること", evidence=kind)
     if kind == "baseline":
         evidence = doc.get("completeness_evidence", {})
-        derived = all(evidence.get(key) is True for key in ("root_listing_complete", "source_revisions_complete", "lifecycle_resolved", "membership_decisions_complete"))
-        result.add("REG-D003", doc.get("complete") is derived, "baseline completeはdiscovery・lifecycle・membershipの各完了根拠から導出されること", evidence={"expected": derived, "actual": doc.get("complete")})
-        refs = [item.get("tc_ref") for item in doc.get("memberships", []) if isinstance(item, dict)]
+        evidence_keys = ("root_listing_complete", "source_revisions_complete", "lifecycle_resolved", "membership_decisions_complete")
+        evidence_valid = isinstance(evidence, dict) and all(type(evidence.get(key)) is bool for key in evidence_keys)
+        derived = evidence_valid and all(evidence[key] is True for key in evidence_keys)
+        memberships = doc.get("memberships")
+        membership_shape_valid = isinstance(memberships, list)
+        refs: list[str] = []
+        invalid_members = []
+        if membership_shape_valid:
+            for item in memberships:
+                if not isinstance(item, dict):
+                    membership_shape_valid = False
+                    continue
+                tc_ref = item.get("tc_ref")
+                if not isinstance(tc_ref, str) or not tc_ref.strip():
+                    membership_shape_valid = False
+                else:
+                    refs.append(tc_ref)
+                if item.get("decision") == "member" and item.get("lifecycle_status") != "current":
+                    invalid_members.append(tc_ref)
         duplicate_refs = len(refs) != len(set(refs))
-        invalid_members = [item.get("tc_ref") for item in doc.get("memberships", []) if item.get("decision") == "member" and item.get("lifecycle_status") != "current"]
-        result.add("REG-D004", not duplicate_refs and not invalid_members, "membership refが一意でcurrent logical TCだけをmemberにすること", evidence={"duplicate_refs": duplicate_refs, "invalid_members": invalid_members})
+        expected_current_refs = expected.get("expected_current_tc_refs")
+        population_valid = True
+        if "expected_current_tc_refs" in expected:
+            population_valid = (
+                isinstance(expected_current_refs, list)
+                and all(isinstance(ref, str) and bool(ref.strip()) for ref in expected_current_refs)
+                and len(expected_current_refs) == len(set(expected_current_refs))
+                and membership_shape_valid
+                and set(refs) == set(expected_current_refs)
+            )
+        unresolved_memberships = membership_shape_valid and any(
+            item.get("decision") == "unresolved" for item in memberships if isinstance(item, dict)
+        )
+        derived = derived and not unresolved_memberships
+        result.add("REG-D003", evidence_valid and doc.get("complete") is derived and population_valid, "baseline completeはdiscovery・lifecycle・解決済みmembershipの各完了根拠と期待されたcurrent TC全件のmembershipから導出されること", evidence={"expected": derived, "actual": doc.get("complete"), "unresolved_memberships": unresolved_memberships, "expected_current_tc_refs": expected_current_refs, "actual_membership_refs": refs})
+        result.add("REG-D004", membership_shape_valid and not duplicate_refs and not invalid_members, "membership refが一意でcurrent logical TCだけをmemberにすること", evidence={"duplicate_refs": duplicate_refs, "invalid_members": invalid_members})
         result.add("REG-D005", doc.get("coverage_gaps") is not None, "traceability coverage gapをinventory / lifecycle不完全と分けて保持すること")
+        valid_decisions = {"member", "one_off", "out_of_scope", "unresolved"}
+        decisions_valid = membership_shape_valid and all(item.get("decision") in valid_decisions for item in memberships if isinstance(item, dict))
+        scope_identity = doc.get("scope_identity")
+        source_revisions = doc.get("source_revisions")
+        revisions_valid = isinstance(source_revisions, list) and bool(source_revisions)
+        revision_refs: set[str] = set()
+        revision_map: dict[str, str] = {}
+        if revisions_valid:
+            for item in source_revisions:
+                if not isinstance(item, dict):
+                    revisions_valid = False
+                    continue
+                source_ref, revision = item.get("source_ref"), item.get("revision")
+                if not isinstance(source_ref, str) or not source_ref.strip() or not isinstance(revision, str) or not revision.strip() or source_ref in revision_refs:
+                    revisions_valid = False
+                elif isinstance(source_ref, str):
+                    revision_refs.add(source_ref)
+                    revision_map[source_ref] = revision
+
+        provenance_valid = membership_shape_valid
+        membership_revision_map: dict[str, str] = {}
+        if membership_shape_valid:
+            for item in memberships:
+                if not isinstance(item, dict):
+                    provenance_valid = False
+                    continue
+                source_refs = item.get("source_refs")
+                source_revisions = item.get("source_revisions")
+                if (
+                    not isinstance(source_refs, list)
+                    or not source_refs
+                    or any(not isinstance(ref, str) or not ref.strip() for ref in source_refs)
+                    or len(source_refs) != len(set(source_refs))
+                    or not isinstance(source_revisions, list)
+                    or not source_revisions
+                ):
+                    provenance_valid = False
+                    continue
+                item_revisions: dict[str, str] = {}
+                for revision_item in source_revisions:
+                    if not isinstance(revision_item, dict):
+                        provenance_valid = False
+                        continue
+                    source_ref, revision = revision_item.get("source_ref"), revision_item.get("revision")
+                    if (
+                        not isinstance(source_ref, str)
+                        or not source_ref.strip()
+                        or not isinstance(revision, str)
+                        or not revision.strip()
+                        or source_ref in item_revisions
+                    ):
+                        provenance_valid = False
+                        continue
+                    item_revisions[source_ref] = revision
+                if set(source_refs) != set(item_revisions):
+                    provenance_valid = False
+                for source_ref, revision in item_revisions.items():
+                    if source_ref in membership_revision_map and membership_revision_map[source_ref] != revision:
+                        provenance_valid = False
+                    if revision_map.get(source_ref) != revision:
+                        provenance_valid = False
+                    membership_revision_map[source_ref] = revision
+
+        def projection_matches(field: str, expected_refs: list[str]) -> bool:
+            values = doc.get(field)
+            return (
+                isinstance(values, list)
+                and all(isinstance(value, str) and bool(value.strip()) for value in values)
+                and len(values) == len(set(values))
+                and set(values) == set(expected_refs)
+            )
+
+        expected_members = [item["tc_ref"] for item in memberships if isinstance(item, dict) and item.get("decision") == "member" and item.get("lifecycle_status") == "current"] if membership_shape_valid else []
+        expected_one_off = [item["tc_ref"] for item in memberships if isinstance(item, dict) and item.get("decision") == "one_off"] if membership_shape_valid else []
+        canonical_projection = (
+            isinstance(scope_identity, str)
+            and bool(scope_identity.strip())
+            and revisions_valid
+            and provenance_valid
+            and decisions_valid
+            and projection_matches("member_tc_refs", expected_members)
+            and projection_matches("one_off_tc_refs", expected_one_off)
+        )
+        result.add("REG-D016", canonical_projection, "Baselineのscope identity / source revisionsとmembership provenance / member・one_off projectionがcurrentness / Run planning用に一致すること")
+        unresolved_refs = doc.get("unresolved_tc_refs")
+        undecided_refs = doc.get("undecided_tc_refs")
+        shape_valid = (
+            doc.get("schema_version") == "1"
+            and isinstance(doc.get("baseline_ref"), str)
+            and bool(doc.get("baseline_ref", "").strip())
+            and isinstance(doc.get("discovery_snapshot_ref"), str)
+            and bool(doc.get("discovery_snapshot_ref", "").strip())
+            and isinstance(doc.get("scope_refs"), list)
+            and isinstance(unresolved_refs, list)
+            and isinstance(undecided_refs, list)
+            and (doc.get("complete") is not True or (not unresolved_refs and not undecided_refs))
+        )
+        result.add("REG-D017", shape_valid, "Baselineがtemplateのschema / identity / list fieldとcomplete時の未解決refなしを満たすこと")
     elif kind == "run":
         scope = doc.get("run_scope")
         baseline = doc.get("baseline", {})

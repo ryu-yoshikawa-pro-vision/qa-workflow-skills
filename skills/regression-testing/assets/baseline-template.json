@@ -1,13 +1,22 @@
 {
+  "artifact_type": "baseline",
   "schema_version": "1",
   "baseline_ref": "",
   "discovery_snapshot_ref": "",
   "source_revisions": [],
+  "scope_identity": "",
   "scope_refs": [],
   "memberships": [],
-  "one_off": [],
+  "member_tc_refs": [],
+  "one_off_tc_refs": [],
   "unresolved_tc_refs": [],
   "undecided_tc_refs": [],
   "coverage_gaps": [],
+  "completeness_evidence": {
+    "root_listing_complete": false,
+    "source_revisions_complete": false,
+    "lifecycle_resolved": false,
+    "membership_decisions_complete": false
+  },
   "complete": false
 }

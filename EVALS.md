@@ -283,9 +283,9 @@ skills/<skill>/evals/semantic/
         └── reference.md
 ```
 
-Skillごとのsemantic case数は`test-analysis=7`、`test-condition-design=14`、`adversarial-review=8`、`qa-workflow=3`、`test-target-inspection=2`、`test-execution=2`、`regression-testing=6`、`exploratory-testing=4`、`qa-knowledge=6`、その他13 Skillは各2（合計72）です。新規Skillでは各critical criterionが少なくとも1 semantic caseから参照されます。`evals.json`の各caseは、そのフィクスチャで評価可能な評価基準だけを`criteria`へ列挙します。
+Skillごとのsemantic case数は`test-analysis=7`、`test-condition-design=14`、`adversarial-review=8`、`qa-workflow=3`、`test-target-inspection=2`、`test-execution=2`、`regression-testing=6`、`exploratory-testing=4`、`qa-knowledge=6`、その他10 Skillは各2（合計72）です。PR #13で追加した`regression-testing`、`exploratory-testing`、`qa-knowledge`では、各critical criterionが少なくとも1 semantic caseから参照されます。`evals.json`の各caseは、そのフィクスチャで評価可能な評価基準だけを`criteria`へ列挙します。
 
-本Planで追加した意味責務とcase対応は次のとおりです。
+現在の意味評価で扱う拡張責務とcase対応は次のとおりです。
 
 | Skill | 責務 | Case ID |
 | --- | --- | --- |
@@ -447,6 +447,6 @@ scripts/skills/evals/
 
 決定論的な`qa-workflow` validatorは、開始・省略・再利用・ブロック・再開・修正routing、対象 / 実行範囲付き状態、TCあり / TCなし経路の成果物整合を評価します。実Agentクライアント上のSkill読み込み・遷移・実runtime操作は、利用可能なクライアント環境がある場合に限って別途評価し、dataset検証を実Agent発火PASSとは扱いません。
 
-PR #11 / #12後の47件に今回14件を加えた61件のrouting fixtureは、入力条件と独立した期待routingを`skills/qa-workflow/evals/deterministic/routing_cases.json`へ、検証対象のcandidate outputを`routing_candidate_outputs.json`へ分離して保持します。リポジトリ決定論的テストではcandidateを期待routingから生成せず、新3 Skill、Regression / Exploration / knowledge境界、既存E2E / execution間の誤route回帰を検証します。
+61件のrouting fixture（PR #11 / #12後の47件にPR #13で14件を追加）は、入力条件と独立した期待routingを`skills/qa-workflow/evals/deterministic/routing_cases.json`へ、検証対象のcandidate outputを`routing_candidate_outputs.json`へ分離して保持します。リポジトリ決定論的テストではcandidateを期待routingから生成せず、`regression-testing` / `exploratory-testing` / `qa-knowledge`のrouting境界、Regression / Exploration / knowledge間、既存E2E / execution間の誤route回帰を検証します。
 
 Agent Skills Specificationは共通Skill-to-Skill APIを規定しません。特定クライアントとの互換性はE2Eで確認します。

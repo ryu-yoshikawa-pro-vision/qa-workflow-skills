@@ -20,11 +20,13 @@ scripts/skills/evals/deterministic/
 ├── markdown_parser.py
 ├── result.py
 ├── common.py
+├── runtime_validator.py
 ├── ASSERTIONS.md
 ├── README.md
 └── tests/
     ├── test_loader.py
-    └── test_markdown_parser.py
+    ├── test_markdown_parser.py
+    └── test_runtime_validator.py
 
 tests/skills/evals/deterministic/
 ├── test_deterministic.py
@@ -32,6 +34,9 @@ tests/skills/evals/deterministic/
 ├── test_closure_exclusivity.py
 ├── test_cli_integration.py
 ├── test_repository_integration.py
+├── test_e2e_contracts.py
+├── test_new_skill_contracts.py
+├── test_qa_artifact_graph_skills.py
 └── test_runtime_portability.py
 ```
 
