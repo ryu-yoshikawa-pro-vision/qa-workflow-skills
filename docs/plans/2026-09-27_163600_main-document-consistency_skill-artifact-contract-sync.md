@@ -24,9 +24,9 @@
 
 ### Plan 11の実装例外: Regression Baseline contractの既存不整合
 
-Plan 11の実装時、`memberships`にcurrentな`member`があり`complete=true`でも、`member_tc_refs`欠落をdeterministic validatorが受理し、`plan_run()`が欠落を空集合としてfull Runを0件で`ready`にできることが分かりました。文書だけを現在fixtureへ合わせると、production helperが使うBaseline projectionとRun planning契約を壊します。
+Plan 11の実装時、`memberships`にcurrentな`member`があり`complete=true`でも、`member_tc_refs`欠落をdeterministic validatorが受理し、`plan_run()`が欠落を空集合としてfull Runを0件で`ready`にできることが分かりました。再レビューではmembership provenance revisionがBaseline top-level `source_revisions` / Run前currentnessへ含まれず、古い判断がcurrent扱いされる点と、current TC 3件を要求する`REG-OUT-001`がmembership 2件のままcompleteとして通る点も確認されました。文書だけを現在fixtureへ合わせると、production helperが使うBaseline / Run planning / currentness契約を壊します。
 
-この不整合を解消する範囲に限り、既存Baseline fieldを使った最小限のRegression runtime、deterministic validator、deterministic fixture、Regression runtime testの変更を許可します。Regression以外のruntime / validator / fixture / dataset / test、Regression dataset、CIは対象外のままです。新しいfieldやschemaは追加しません。
+この不整合を解消する範囲に限り、既存Baseline fieldを使った最小限のRegression runtime、deterministic validator、deterministic fixture、Regression runtime testの変更を許可します。加えて、既存`REG-OUT-001`のexpected metadataを、inputに定義済みのcurrent TC populationをvalidatorが照合できるよう同期します。新しいRegression caseの追加やcaseの意味変更はしません。Regression以外のruntime / validator / fixture / dataset / test、semantic / trigger dataset、Regressionの他case、CIは対象外のままです。新しいfieldやschemaは追加しません。
 
 現在の実装と文書が一致している箇所は変更しません。文書整合だけを理由にvalidatorやfixtureを現在文書へ合わせて変更しません。
 
@@ -119,7 +119,7 @@ baseline / Run / Activityのmachine input / data contract
 - Activity actual start / result finalization
 - Plan 11の例外で許可したBaseline contract修正以外のvalidator criterion
 - Plan 11の例外で許可したBaseline fixture以外のfixture
-- Regression dataset、Regression以外のruntime / validator / fixture / test、CI
+- Regressionの他case、Regression以外のruntime / validator / fixture / dataset / test、CI
 - production helper
 
 ## 12. qa-knowledgeのentry_revision
@@ -204,6 +204,7 @@ update / revalidation / historical readで必要な場合は、そのstorage rev
   - `skills/regression-testing/scripts/regression_runtime.py`
   - `skills/regression-testing/evals/deterministic/validator.py`
   - `skills/regression-testing/evals/output/cases/reg-out-001/output.md`
+  - `skills/regression-testing/evals/output/cases/reg-out-001/expected.json`（既存caseのexpected population metadataのみ）
   - `tests/skills/evals/deterministic/test_qa_artifact_graph_skills.py`
 - Assertion契約を追加する場合は `scripts/skills/evals/deterministic/ASSERTIONS.md`
 
@@ -225,6 +226,8 @@ update / revalidation / historical readで必要な場合は、そのstorage rev
 - `regression-testing`の正規Baseline / Run / Activity契約が過去Planなしで追える
 - `baseline-template.json`とcurrent validator / fixtureの必須fieldが矛盾しない
 - `member_tc_refs`欠落や不正なscope identityのBaselineがvalidator / runtimeでfull Runとして受理されず、正規Baselineではmembership projectionとRun planningが一致する
+- membership decisionのsource revisionsがBaseline top-level dependencyへ含まれ、revision変更時はstale、current revision不足時はunresolvedになりfull Runを開始しない
+- `REG-OUT-001`の期待current TC 3件がmembership populationと一致し、template必須Baseline fieldとmembership provenanceを満たす
 - `regression-testing/SKILL.md`のResources説明がdata contractの実際の範囲と一致する
 - `qa-knowledge`のentry bodyとstorage metadataが明確に分離されている
 - `entry_revision`をentry body必須fieldとして説明している現行文書が残っていない
@@ -239,7 +242,7 @@ python -m unittest discover -s tests/skills/evals/deterministic -v
 git diff --check
 ```
 
-Plan 11の例外としてRegression runtime / validator / fixture / runtime testを変更しましたが、deterministic datasetのcase構成やexpected contractを変更する必要はないため、datasetは変更しません。
+Plan 11の例外としてRegression runtime / validator / fixture / runtime testを変更し、既存`REG-OUT-001`のexpected metadataにcurrent TC populationを追加します。新しいcaseやcaseの意味は変更しません。Regressionの他case、semantic / trigger dataset、およびRegression以外のdatasetは変更しません。
 
 ## 完了条件
 
@@ -249,4 +252,4 @@ Plan 11の例外としてRegression runtime / validator / fixture / runtime test
 - `regression-testing/SKILL.md`でRunだけがResources説明から欠落していない
 - `qa-knowledge`のentry body必須fieldから`entry_revision`が除外されている
 - `entry_revision`がstorage metadataとしてcaller側で保持されることが明記されている
-- Plan 11の例外で列挙したRegression runtime / validator / fixture / testだけを必要最小限変更し、Regression datasetおよびRegression以外のruntime / validator / fixture / test / CIは変更していない
+- Plan 11の例外で列挙したRegression runtime / validator / fixture / testと既存`REG-OUT-001`のexpected population metadataだけを必要最小限変更し、Regressionの他case、semantic / trigger dataset、Regression以外のruntime / validator / fixture / test / CIは変更していない

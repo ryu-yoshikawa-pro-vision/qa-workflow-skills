@@ -40,6 +40,46 @@ def _revision_map(items: Any) -> tuple[dict[str, str], list[str]]:
     return mapping, errors
 
 
+def _membership_revision_map(membership: Any) -> tuple[dict[str, str], list[str]]:
+    errors: list[str] = []
+    source_refs = membership.get("source_refs") if isinstance(membership, dict) else None
+    if (
+        not isinstance(source_refs, list)
+        or not source_refs
+        or any(not isinstance(ref, str) or not ref.strip() for ref in source_refs)
+    ):
+        errors.append("membership_source_refs_invalid")
+    elif len(source_refs) != len(set(source_refs)):
+        errors.append("duplicate_membership_source_ref")
+
+    source_revisions = membership.get("source_revisions") if isinstance(membership, dict) else None
+    revisions: dict[str, str] = {}
+    if not isinstance(source_revisions, list) or not source_revisions:
+        errors.append("membership_source_revisions_invalid")
+    else:
+        for item in source_revisions:
+            if not isinstance(item, dict):
+                errors.append("invalid_membership_source_revision")
+                continue
+            source_ref, revision = item.get("source_ref"), item.get("revision")
+            if (
+                not isinstance(source_ref, str)
+                or not source_ref.strip()
+                or not isinstance(revision, str)
+                or not revision.strip()
+            ):
+                errors.append("missing_membership_source_ref_or_revision")
+                continue
+            if source_ref in revisions:
+                errors.append(f"duplicate_membership_source_revision:{source_ref}")
+            revisions[source_ref] = revision
+
+    if isinstance(source_refs, list) and all(isinstance(ref, str) and ref.strip() for ref in source_refs):
+        if set(source_refs) != set(revisions):
+            errors.append("membership_source_refs_revision_mismatch")
+    return revisions, errors
+
+
 def build_discovery_snapshot(data: dict[str, Any]) -> dict[str, Any]:
     """Freeze complete source listings and owner-resolved TC projections."""
     roots = data.get("discovery_roots")
@@ -131,6 +171,9 @@ def reconcile_membership(snapshot: dict[str, Any], decisions: list[dict[str, Any
             issues.append(f"decision_for_noncurrent_or_unknown_tc:{ref}")
         if decision.get("decision") not in MEMBERSHIP or not str(decision.get("reason", "")).strip():
             issues.append(f"invalid_membership_decision:{ref}")
+        _, provenance_errors = _membership_revision_map(decision)
+        if provenance_errors:
+            issues.append(f"invalid_membership_provenance:{ref}")
         decision_by_ref[ref] = decision
     undecided = sorted(set(cases) - set(decision_by_ref))
     member_refs = sorted(ref for ref, item in decision_by_ref.items() if item.get("decision") == "member" and ref in cases)
@@ -171,9 +214,28 @@ def check_baseline_currentness(baseline: dict[str, Any], current: dict[str, Any]
     old, old_errors = _revision_map(baseline.get("source_revisions"))
     if old_errors:
         return {"status": "incomplete", "changed_sources": [], "reason": "baseline_source_revisions_invalid"}
+    if not old:
+        return {"status": "incomplete", "changed_sources": [], "reason": "baseline_source_revisions_empty"}
+    memberships = baseline.get("memberships")
+    if not isinstance(memberships, list):
+        return {"status": "incomplete", "changed_sources": [], "reason": "baseline_memberships_invalid"}
+    membership_revisions: dict[str, str] = {}
+    for membership in memberships:
+        revisions, errors = _membership_revision_map(membership)
+        if errors:
+            return {"status": "incomplete", "changed_sources": [], "reason": "baseline_membership_provenance_invalid"}
+        for source_ref, revision in revisions.items():
+            if source_ref in membership_revisions and membership_revisions[source_ref] != revision:
+                return {"status": "incomplete", "changed_sources": [], "reason": "baseline_membership_revision_conflict"}
+            if old.get(source_ref) != revision:
+                return {"status": "incomplete", "changed_sources": [], "reason": "baseline_membership_revision_missing"}
+            membership_revisions[source_ref] = revision
     new, new_errors = _revision_map(current.get("source_revisions"))
     if new_errors:
         return {"status": "unresolved", "changed_sources": [], "reason": "current_source_revisions_invalid"}
+    missing_current = sorted(set(old) - set(new))
+    if missing_current:
+        return {"status": "unresolved", "changed_sources": missing_current, "reason": "current_source_revision_missing"}
     changed = sorted(ref for ref in set(old) | set(new) if old.get(ref) != new.get(ref))
     if baseline_scope != current_scope:
         changed.append("<scope>")

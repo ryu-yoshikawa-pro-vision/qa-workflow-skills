@@ -303,7 +303,7 @@
 ## regression-testing
 - `REG-D001` 正規JSON artifactが一つだけ整形式で存在する
 - `REG-D002` artifact typeがbaseline / run / activityのいずれか
-- `REG-D003` Baseline completeとdiscovery・lifecycle・membership根拠の整合
+- `REG-D003` Baseline completeとdiscovery・lifecycle・membership根拠および期待current TC populationの整合
 - `REG-D004` membership refの一意性とcurrent logical TCだけのmember化
 - `REG-D005` traceability coverage gapをinventory / lifecycle不完全と分離
 - `REG-D006` full Runにcompleteかつcurrentなbaselineを要求
@@ -316,7 +316,8 @@
 - `REG-D013` Activityからidentityと固定snapshotを追跡
 - `REG-D014` fixture指定のartifact kindとの一致
 - `REG-D015` TCなし補助testwareを別枠に保ちTC ref / countへ混在させない
-- `REG-D016` Baselineのscope identity / source revisionsとmember・one_off projectionがcurrentness / Run planning用に一致すること
+- `REG-D016` Baselineのscope / source revisions・membership provenance / member・one_off projectionがcurrentness / Run planning用に一致すること
+- `REG-D017` Baselineがtemplateのschema / identity / list fieldとcomplete時の未解決refなしを満たす
 
 ## exploratory-testing
 - `EXP-D001` Session artifactが一つだけ整形式で存在する

@@ -209,9 +209,9 @@ case数やrouting fixture数は変更せず、例えば「現在の追加・拡�
 
 ### Plan 11の実装例外: Regression Baseline contractの既存不整合
 
-Plan 11の実装時に、現在のBaseline contractとvalidator / fixtureの既存不整合が見つかりました。`memberships`にcurrentな`member`があり、`complete=true`でも、`member_tc_refs`を欠くBaselineをdeterministic validatorが受理できます。`plan_run()`は欠落fieldを空集合として扱うため、currentnessが渡されるとfull Runを選択0件・`suite_complete=true`で`ready`にできます。Baseline文書だけを現在fixtureへ合わせると、production helperが使うmember projectionとRun planning契約を壊します。
+Plan 11の実装時に、現在のBaseline contractとvalidator / fixtureの既存不整合が見つかりました。`memberships`にcurrentな`member`があり、`complete=true`でも、`member_tc_refs`を欠くBaselineをdeterministic validatorが受理できます。`plan_run()`は欠落fieldを空集合として扱うため、currentnessが渡されるとfull Runを選択0件・`suite_complete=true`で`ready`にできます。さらに再レビューで、membership provenance revisionがBaseline top-level `source_revisions`とRun前currentnessに含まれておらず、古い判断でもcurrent扱いできること、および3件のcurrent TCを要求する`REG-OUT-001`が2件membershipのままcompleteとして通ることが分かりました。Baseline文書だけを現在fixtureへ合わせると、production helperが使うRun planning / currentness契約を壊します。
 
-この不整合の解消に限り、既存contractへ揃える最小限の`regression-testing` runtime、deterministic validator、deterministic fixture、Regression runtime testの変更を許可します。Assertion IDを追加する場合は、そのIDの説明を`ASSERTIONS.md`へ同時に反映します。Regression以外のruntime / validator / fixture / dataset / test codeは引き続き対象外です。新しいBaseline fieldやschemaは追加しません。
+この不整合の解消に限り、既存contractへ揃える最小限の`regression-testing` runtime、deterministic validator、deterministic fixture、Regression runtime testの変更を許可します。さらに、`REG-OUT-001`の既存caseについて、inputですでに定義されたcurrent TC populationをvalidatorが照合できるよう、expected metadataを同期します。caseの追加・意味変更は行いません。Assertion IDを追加する場合は、そのIDの説明を`ASSERTIONS.md`へ同時に反映します。Regression以外のruntime / validator / fixture / dataset / test codeは引き続き対象外です。新しいBaseline fieldやschemaは追加しません。
 
 ### 12. qa-knowledgeのentry_revision
 
@@ -435,7 +435,7 @@ frontmatter変更後はtrigger datasetの回帰確認を実行します。
 - 各Skillのdomain責務・実行意味の変更
 - runtime実装（Plan 11で明記したRegression例外を除く）
 - validator（同例外を除く）
-- fixture / dataset（同例外で許可したRegression fixtureを除く）
+- fixture / dataset（同例外で許可したRegression fixtureと`REG-OUT-001`の既存expected metadataを除く）
 - GitHub Actions
 - test code（同例外で許可したRegression runtime testを除く）
 - PR #11 / #12 / #13の履歴
@@ -526,7 +526,7 @@ git diff --check
 
 8〜10の契約文書同期では、既存の`tests/skills/evals/deterministic/test_qa_artifact_graph_skills.py`も実行し、現在のProject Context / workflow state / claim / reservation契約と矛盾しないことを確認します。
 
-11〜12では、同テストに加えてrepository deterministic test全体を実行し、現在のRegression / QA Knowledge contractと文書同期が矛盾しないことを確認します。Plan 11の明示例外であるRegression runtime / validator / fixture / runtime test以外は変更せず、datasetも変更しません。
+11〜12では、同テストに加えてrepository deterministic test全体を実行し、現在のRegression / QA Knowledge contractと文書同期が矛盾しないことを確認します。Plan 11の明示例外であるRegression runtime / validator / fixture / runtime test、必要なAssertion catalog entry、および既存`REG-OUT-001`のexpected metadataだけを変更できます。新しいRegression case、caseの意味変更、semantic / trigger dataset、Regression以外のdatasetは対象外です。
 
 13〜15ではrepository deterministic test全体を実行し、E2E cleanup契約とAssertion一覧の文書同期が現在validatorを壊していないことを確認します。Assertion IDの照合はvalidator → `ASSERTIONS.md`と`ASSERTIONS.md` → validatorの両方向で行い、Skill-local IDの差分を0件にします。共通runtimeの`RT-Dxxx`は別契約として扱います。
 
@@ -582,7 +582,7 @@ git diff --check
 - `entry_revision`のentry bodyへの追加
 - `regression-testing`のvalidator / fixtureを文書へ合わせる変更
 - E2E cleanupのvalidator値域変更
-- Assertion IDの新設・採番変更
+- Assertion IDの新設・採番変更（Plan 11の例外で必要な`REG-D017`を除く）
 - 評価ディレクトリ構成の変更
 
 同種の文書driftが今後も繰り返し発生し、既存CIでは防げないことが実測された場合に、その時点で必要な最小の自動検証を検討します。
