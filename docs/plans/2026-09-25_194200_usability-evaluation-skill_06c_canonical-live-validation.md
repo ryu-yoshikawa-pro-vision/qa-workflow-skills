@@ -97,16 +97,17 @@ current Playwright versionやPR #12 / #13 merge後のbrowser contractが変わ�
 6. applicable general accessibility check
 7. `inspection_structure.py` がgeneral / scoped / formal-handoffのscope rowをmaterializeすること
 8. `observation_contract.py` が5種resolver payload、exact matching、parent scope、population revision / fingerprint、session currentnessとrequired probe requestをmaterializeし、browser resultをschema / unit / capability検証してnormalizeすること
-9. responsive boundaryのmedia `px / em / rem`、条件付きcontainer `px / em / rem`、complete+boundaryなし、unreadable・unsupported、normalizedだがnot-executableによるincomplete各case
+9. responsive condition inventory、media / container size queryのbrowser-evaluated transition、relative / viewport / container unitと `calc()`、style / scroll-state queryの非数値presentation variation、complete+numeric boundaryなし、unreadable / unsupported / not-executable各case
 10. fixed interaction timingで8種predicateごとのpayload、same-page clock、preexisting end state、timeout、unknown attribute / ARIA state rejectを扱えること
 11. measurement経路
 12. cleanup
 13. semantic layerがcanonical observation field / fixed predicate keyを選び、`observation_contract.py` が requester kind / state basis refs / current document identity / `OBSREQ-...` / request identity / evidence fingerprint / fixed probeへmaterializeして追加evidenceを取得し再評価できること。general accessibilityのsemantic requirementでは `inspection-requirement` requesterを使えること
-14. canonical observation field inventory全16 keyがexactly-one probeへ解決し、scriptが自由記述からprobeを推論せず、unknown observation fieldをunsupportedへ閉じること
-15. 同一request identity + 同一input evidence fingerprintを再実行せずno-progressを返し、state descriptionの言い換えだけでguardを回避できないこと
-16. business outcome / Authority refsがあるflowで `page.url()` / `locator.innerText()` / `locator.inputValue()` / selectedOptions `{value,label}` 等のmachine observationとobserved end state / outcomeを保持し、usability-evaluationへ渡せること
-17. `usability-evaluation` へのread-only handoff
-18. 同一sessionを別Skillが並行操作しない
+14. canonical semantic observation field inventory全16 keyがexactly-one probeへ解決し、scriptが自由記述からprobeを推論せず、unknown observation fieldをunsupportedへ閉じること
+15. formal Skillから渡されたtyped `request_kind=wcag-machine-probe` requestをlocal `wcag-machine-probe-catalog.json` へ一意に解決し、procedure catalogをinspection側で再読込しないこと。local catalog hashが `static_data_versions.wcag_machine_probes` へ入ること
+16. 同一request identity + 同一input evidence fingerprintを再実行せずno-progressを返し、state descriptionの言い換えだけでguardを回避できないこと
+17. business outcome / Authority refsがあるflowで `page.url()` / `locator.innerText()` / `locator.inputValue()` / selectedOptions `{value,label}` 等のmachine observationとobserved end state / outcomeを保持し、usability-evaluationへ渡せること
+18. `usability-evaluation` へのread-only handoff
+19. 同一sessionを別Skillが並行操作しない
 
 ### wcag-conformance-evaluation
 
@@ -135,7 +136,9 @@ formal request
 - random sample target-met。canonical Random Sample sectionへ `selection_status=target-met` を保存
 - `_05i` のversion別Success Criterion集合 2.0=61 / 2.1=78 / 2.2=86、2.2の4.1.1除外、machine / manual / AT / external割当と全SCの `s-wcag-<SC>` 生成規則から導出したexpected procedure集合がrequirements assetと完全一致
 - WCAG 2.0 / 2.1の4.1.1はHTML / XML fixtureで `always-satisfied-html-xml`、非HTML/XML technology fixtureでsemantic evaluation path、WCAG 2.2でrow不存在
-- `_05j` の全machine procedure → machine probe mapping / schema / capabilityがmissing / extra 0
+- formal procedure catalogの全machine procedure → machine probe mapping / typed request schema / capabilityが確定していること
+- repository-level contract testでformal required machine probe key集合とinspection `wcag-machine-probe-catalog.json` のmissing / extra / unusedが0件
+- returned inspection artifact / Machine Runtime evidenceの `static_data_versions.wcag_machine_probes` がformal input fingerprint / freshnessへ反映されること
 - `_05k` の全supported version / SC semantic contract row、normative clause / exception / evidence role coverageがapproved hashと一致
 - finite procedure catalogの全key解決 / machine dispatch / approved hash。inventoryにないkey / catalogにないkey / unused keyを許可しない
 - sample × required presentation variation × required Success Criterionのcriterion plan coverage
@@ -171,7 +174,8 @@ formal request
 - not-satisfied requirement / Success Criterionごとのexample coverageと、all-occurrence追加要件がある場合の追加coverage
 - report materialization / accessible output contract
 - Step 5.2 Evaluation Specificsを有効化したcaseで、browser / tool metadataとsafe evidence refがreportへ戻ること。secret値は保持しない
-- Step 5.5を有効化したcaseで、browser observation由来のformal resultが `_05l` のfixed JSON-LD graphへ対応し、`@context` / Assertion→TestResult→outcome / stable IRI / mode mapping / deterministic bytes / human-readable reportとのassertion coverageが一致すること
+- Step 5.5を有効化したcaseで、browser observation由来のformal resultが `_05l` のfixed JSON-LD graphへ対応し、`@context` / Assertion→TestResult→outcome / stable IRI / mode mapping / deterministic bytes / human-readable reportとのassertion coverageが一致すること。applicableな `satisfied` は `earl:passed`、`applicable_population=none` + complete closureはhuman-readable `satisfied` のまま `earl:inapplicable` になること
+- SC 1.4.4 fixtureで `user-agent-full-page-zoom / user-agent-text-only-resize / author-provided-resize-control` のうちcurrent browser ownerが安全に実行できるvalid mechanismを100%→200%まで評価し、incremental mechanismはintermediate stepも確認すること。`deviceScaleFactor`、viewport resize、CSS transform / test専用font-size注入を代替mechanismとして受理しないこと。valid mechanismを実行できないcaseは擬似resizeへfallbackせず `blocked / undetermined` へ閉じること
 
 を確認します。
 
@@ -207,7 +211,7 @@ repository implementationの完了条件:
 - evidence safety / side-effect / browser ownershipをPASS
 - repository標準のdeterministic / semantic / routing / Skill validationをPASS
 - WCAG 2.0 / 2.1 / 2.2 requirement catalogのcanonical hash再計算と承認済みhash contract testをdeterministic validationでPASS
-- version切替、unsupported / unresolved / out-of-scope分離、4.1.1 version / technology rule、scope coverage row、presentation variation / Full Pages closure、baseline extension、finite procedure catalog、`_05j` machine probe mapping、`_05k` semantic contract coverage、criterion plan→final result linkage、applicable population none guard、repeat-evaluation retained / replaced / added lineage、random `target-met / exhausted-no-new-view / blocked` 分離、non-finite random selection guard、candidate population変更時のreselection、Conforming Alternate Version条件、Non-Interference固定SC集合、Step 5.1 example coverage / accessible output、Step 5.3 Evaluation Statementの2.2-only guard、version別Claim URI / third-party 2-business-day guard、`_05l` EARL JSON-LD全mapping / serializationはdeterministic / semantic evalでPASS
+- version切替、unsupported / unresolved / out-of-scope分離、4.1.1 version / technology rule、scope coverage row、presentation variation / Full Pages closure、baseline extension、finite procedure catalog、formal typed machine probe request / cross-package probe catalog整合、Resize Text valid mechanism、`_05k` semantic contract coverage、criterion plan→final result linkage、applicable population none guard、repeat-evaluation retained / replaced / added lineage、random `target-met / exhausted-no-new-view / blocked` 分離、non-finite random selection guard、candidate population変更時のreselection、Conforming Alternate Version条件、Non-Interference固定SC集合、Step 5.1 example coverage / accessible output、Step 5.3 Evaluation Statementの2.2-only guard、version別Claim URI / third-party 2-business-day guard、`_05l` EARL JSON-LD `inapplicable` を含む全mapping / serializationはdeterministic / semantic evalでPASS
 - browser E2EではStep 1.4 additional requirementのsample / report反映、sampling used / skipped、sample identity、Conforming Alternate Versionのfull-page grouping、Step 4.2 unchanged-result reuse、same-population Step 4.3再sampling、freshness付きobservation handoff / resume、safe Evaluation Specifics handoff、EARL assertionとのresult一致をPASS
 - canonical fixtureで未解決blockedが0
 
