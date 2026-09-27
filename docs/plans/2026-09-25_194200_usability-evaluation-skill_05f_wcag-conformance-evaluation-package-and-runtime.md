@@ -22,7 +22,8 @@ skills/wcag-conformance-evaluation/
 │   ├── output-template.md
 │   ├── wcag-2.0-requirements.json
 │   ├── wcag-2.1-requirements.json
-│   └── wcag-2.2-requirements.json
+│   ├── wcag-2.2-requirements.json
+│   └── wcag-evaluation-procedure-catalog.json
 ├── scripts/
 │   ├── runtime_contract.py
 │   ├── wcag_requirements.py
@@ -72,7 +73,7 @@ WAI OverviewはWCAG-EM 2.0のresourceとしてWCAG-EM Report Toolを案内して
 - WCAG version / source canonical URI
 - Conformance Claimに使用するguideline title / version / claim URI
 - Success Criterion machine key / number / level / canonical criterion URI
-- Success Criterionごとのevaluation metadata。詳細は `_05h_wcag-criterion-evaluation-contract.md` を正本とし、procedure ref、required capabilities、machine steps、semantic steps、assistive technology requirement、external evidence可否を保持する
+- Success Criterionごとのevaluation metadata。詳細は `_05h_wcag-criterion-evaluation-contract.md` を正本とし、finite procedure catalogへ解決する `procedure_keys` とexternal evidence可否を保持する
 - 5つのWCAG conformance requirement machine key / canonical URI
 - Conformance Requirementごとの固定rule metadata
   - Conformance Level: target level required Success Criteria refs
@@ -97,6 +98,7 @@ catalogはPR #11のstatic data契約を再利用します。strict JSON decode�
 - `static_data_versions.wcag_2_0_requirements`
 - `static_data_versions.wcag_2_1_requirements`
 - `static_data_versions.wcag_2_2_requirements`
+- `static_data_versions.wcag_evaluation_procedures`
 
 deterministic validatorは選択versionのassetからhashを独立再計算します。さらに各catalogについてW3C正本と照合済みの承認済みhashをcontract testへ固定し、Success Criterion / levelの欠落や変更をassetとvalidatorが同時に見逃す構造を避けます。
 
@@ -113,7 +115,7 @@ target WCAG version自体が不明・未指定の場合はInput不足として `
 
 target version / levelから必要Success Criterionを列挙するだけでは完了としません。
 
-`wcag_criterion_plan.py` は `wcag_requirements.py` が導出したrequired集合とversioned requirements assetのevaluation metadataから、sample / processごとのcriterion evaluation rowを全件生成します。required集合とrow集合の差分、required machine / semantic / manual / assistive technology step、未完了criterion集合、summary countはscriptが導出します。
+`wcag_criterion_plan.py` は `wcag_requirements.py` が導出したrequired集合、required presentation variation集合、versioned requirements assetのevaluation metadata、`wcag-evaluation-procedure-catalog.json` から、sample / variation / processごとのcriterion evaluation rowを全件生成します。required集合 × variation集合とrow集合の差分、required procedure、未完了criterion集合、summary countはscriptが導出します。
 
 具体的な契約は `_05h_wcag-criterion-evaluation-contract.md` を正本とします。
 
@@ -125,20 +127,22 @@ target version / levelから必要Success Criterionを列挙するだけでは�
 2. Scope
 3. Accessibility Support Baseline
 4. Target Exploration
-5. Observation Handoffs
-6. Sampling Procedure / Selected Sample Set
-7. Structured Sample
-8. Random Sample
-9. Complete Processes
-10. Sample Evaluation Results
-11. Structured / Random Comparison
-12. Findings
-13. Evaluation Specifics（記録する場合だけ）
-14. Evaluation Statement（通常 / partial。作成した場合だけ）
-15. WCAG Conformance Claim / Statement of Partial Conformance（作成条件を満たした場合だけ）
-16. Machine-readable Report（生成する場合だけ）
-17. Limitations
-18. Machine Runtime / Summary
+5. Presentation Variations
+6. Observation Handoffs
+7. Sampling Procedure / Selected Sample Set
+8. Structured Sample
+9. Random Sample
+10. Complete Processes
+11. Criterion Evaluation Plan
+12. Sample Evaluation Results
+13. Structured / Random Comparison
+14. Findings
+15. Evaluation Specifics（記録する場合だけ）
+16. Evaluation Statement（通常 / partial。作成した場合だけ）
+17. WCAG Conformance Claim / Statement of Partial Conformance（作成条件を満たした場合だけ）
+18. Machine-readable Report（生成する場合だけ）
+19. Limitations
+20. Machine Runtime / Summary
 
 ### Evaluation Header
 
@@ -201,15 +205,45 @@ initial baseline外のenvironmentをformal evidenceへ使用した場合、scrip
 - rationale
 - evidence / source refs
 
+### Presentation Variations
+
+Full Pages requirementのため、selected sampleごとにcurrent evaluationで確認するautomatically presented variationを明示します。
+
+各row:
+
+- variation ref
+- sample ref
+- source: project / Design System Authority、current target observation、responsive boundary inventory、user agent / device condition
+- variation description
+- presentation condition
+- environment ref
+- viewport / container condition refs（存在する場合）
+- responsive boundary refs（存在する場合）
+- evidence refs
+- coverage status: `required / evaluated / undetermined / blocked`
+- limitation
+
+variation refはartifact-localに `VAR-001` からscriptが採番します。
+
+semantic layerは、同じpageで情報・機能・interaction / presentationが意味上異なるautomatically presented variationかを判断できます。scriptはAuthority / machine observationからcandidate variation rowを生成し、duplicate、ref、required set、evaluation coverageをmaterializeします。
+
+current responsive boundary inventoryがcompleteで、project / Design System Authorityと観測結果から既知のautomatically presented variation集合を閉じられる場合だけ、その集合をrequired variation setとして使用できます。
+
+unreadable / unsupported / not-executable responsive condition、未知device-dependent variation、必要なvariationへ到達できない状態が残る場合はFull Pages requirementを `satisfied` にしません。`undetermined / blocked` として残します。
+
+continuousなwidthの全CSS pixelをvariation rowとして列挙しません。distinct variationの意味判断とcriterion固有のviewport条件を分離し、Reflow等の特定viewport要求は `_05h` のcriterion procedureで別途評価します。
+
 ### Observation Handoffs
 
 各row:
 
 - handoff ref
+- retry_of_handoff_ref（再観測の場合）
 - originating evaluation artifact ref / revision
 - workflow_ref（qa-workflow管理下の場合）
 - resume operation: step-4.1-sample / step-4.2-process
 - sample ref
+- variation ref
 - process ref（存在する場合）
 - required requirement refs
 - required state / action / sequence
@@ -254,11 +288,15 @@ sampling skippedではselected sample refsをcompleteなin-scope inventoryから
 - target random sample count
 - actual random sample count
 - selection method
+- selection status: `target-met / exhausted-no-new-view / blocked`
 - candidate scope / provenance
 - finite inventory ref / completeness（finite inventoryを使う場合）
 - selected sample refs
 - duplicate replacement記録
-- no-new-sample completion reason（該当時）
+- exhaustion evidence / provenance（`exhausted-no-new-view` の場合）
+- blocked reason（`blocked` の場合）
+
+`exhausted-no-new-view` はcomplete finite inventoryまたはscope-wide exhaustion evidenceを持つ場合だけmaterializeします。candidate取得不完全をno-new-sample completionとして保存しません。
 
 ### Complete Processes
 
