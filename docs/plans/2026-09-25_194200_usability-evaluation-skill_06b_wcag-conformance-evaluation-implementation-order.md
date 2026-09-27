@@ -287,7 +287,7 @@ WCAG Conformance Claimはcomplete claim scope evidenceとversion別required fiel
 
 WCAG Statement of Partial Conformanceはthird-party content / languageを別caseとして実装し、Conformance Claimと混同せず、canonical wordingをscriptでrenderします。
 
-Step 5.5を要求するcaseでは `_05l_earl-jsonld-serialization-contract.md` を実装し、`earl_report.py` が固定 `@context` / stable IRI / Assertion・TestResult node shapeでEARL 1.0 JSON-LDを生成します。formal result → EARL outcome / mode、graph reference closure、deterministic byte再render、human-readable assertion coverageをvalidatorで照合します。
+Step 5.5を要求するcaseでは `_05l_earl-jsonld-serialization-contract.md` を実装し、`earl_report.py` が固定 `@context` / stable IRI / Assertion・TestResult node shape / property orderingでEARL 1.0 JSON-LDを生成します。formal result + applicable population → EARL outcome / modeを固定mappingし、`applicable_population=none` + complete closureは `earl:inapplicable`、applicableな `satisfied` は `earl:passed` とします。graph reference closure、deterministic byte再render、human-readable assertion coverageをvalidatorで照合します。
 
 aggregated scoreは目的外として生成しません。
 
