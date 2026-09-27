@@ -41,8 +41,8 @@ top-levelは次へ固定します。
 
 `@graph` に次のnodeだけを出します。
 
-- evaluator / toolを表すassertor node
-- canonical sample / variationを表すtest subject node
+- evaluator / toolを表すassertor node。`@type` は少なくとも `earl:Assertor`、software assertorなら `earl:Software` も保持する
+- canonical sample / variationを表すtest subject node。`@type` は `earl:TestSubject`
 - formal resultごとの `earl:Assertion` node
 - Assertionごとの `earl:TestResult` node
 
@@ -75,11 +75,11 @@ urn:qa-workflow-skills:earl:<kind>:<sha256(canonical_identity)>
 
 - `@id`
 - `@type`: `earl:Assertion`
-- `earl:assertedBy`: assertor IRI
-- `earl:subject`: subject IRI
-- `earl:test`: versioned static catalogのcanonical Success Criterion / conformance requirement URI
-- `earl:result`:対応するTestResult IRI
-- `earl:mode`: provenanceから導出したEARL mode IRI
+- `earl:assertedBy`: `{ "@id": "<assertor IRI>" }`
+- `earl:subject`: `{ "@id": "<subject IRI>" }`
+- `earl:test`: `{ "@id": "<versioned static catalogのcanonical Success Criterion / conformance requirement URI>" }`
+- `earl:result`: `{ "@id": "<TestResult IRI>" }`
+- `earl:mode`: `{ "@id": "<provenanceから導出したEARL mode IRI>" }`
 
 `earl:outcome` をAssertion直下へ置きません。
 
@@ -91,7 +91,7 @@ urn:qa-workflow-skills:earl:<kind>:<sha256(canonical_identity)>
 
 - `@id`
 - `@type`: `earl:TestResult`
-- `earl:outcome`
+- `earl:outcome`: `{ "@id": "earl:passed | earl:failed | earl:cantTell | earl:untested" }`
 
 evaluation issued timeをformal inputとして保持している場合だけ `dct:date` を出せます。renderer実行時の現在時刻を挿入しません。
 
@@ -103,6 +103,8 @@ outcome mapping:
 - 明示的な未実施resultをblocked / incomplete artifactへ出力する場合だけ `earl:untested`
 
 Success Criterionにapplicable contentが存在しないことをprocedure closureで確認してformal resultが `satisfied` になった場合、EARLだけ別のoutcomeへ変更しません。
+
+fixed `@context` はprefix mappingだけなので、IRI-valued propertyをplain stringで書きません。`earl:assertedBy / subject / test / result / mode / outcome` のIRI valueは必ず `{"@id": ...}` objectとしてrenderし、JSON-LD processorがliteralとして解釈する形を禁止します。
 
 ## 7. mode
 
@@ -153,6 +155,7 @@ rendererを同じnormalized inputへ2回実行してbyte一致することをfix
 - `@graph` node ID一意
 - 許可node typeだけ
 - Assertionのrequired property
+- IRI-valued EARL propertyがplain stringではなく `@id` objectであること
 - `earl:result` が存在するTestResultを参照
 - TestResultのrequired `earl:outcome`
 - subject / assertedBy ref解決
@@ -183,6 +186,7 @@ rendererを同じnormalized inputへ2回実行してbyte一致することをfix
 - input order shuffle → same bytes
 - broken result ref → reject
 - outcomeをAssertion直下へ置く → reject
+- `earl:result / mode / outcome` 等をplain string IRIとして置く → reject
 - unknown mode / outcome → reject
 - wrong criterion URI / wrong target version → reject
 - human-readable result欠落 / EARL extra assertion → reject
