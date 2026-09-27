@@ -236,7 +236,23 @@ def check_baseline_currentness(baseline: dict[str, Any], current: dict[str, Any]
     if not isinstance(memberships, list):
         return {"status": "incomplete", "changed_sources": [], "reason": "baseline_memberships_invalid"}
     membership_revisions: dict[str, str] = {}
+    membership_refs: set[str] = set()
     for membership in memberships:
+        if not isinstance(membership, dict):
+            return {"status": "incomplete", "changed_sources": [], "reason": "baseline_memberships_invalid"}
+        tc_ref = membership.get("tc_ref")
+        decision = membership.get("decision")
+        if (
+            not isinstance(tc_ref, str)
+            or not tc_ref.strip()
+            or tc_ref in membership_refs
+            or not isinstance(decision, str)
+            or decision not in MEMBERSHIP
+        ):
+            return {"status": "incomplete", "changed_sources": [], "reason": "baseline_memberships_invalid"}
+        membership_refs.add(tc_ref)
+        if decision == "unresolved":
+            return {"status": "incomplete", "changed_sources": [], "reason": "baseline_membership_completion_invalid"}
         revisions, errors = _membership_revision_map(membership)
         if errors:
             return {"status": "incomplete", "changed_sources": [], "reason": "baseline_membership_provenance_invalid"}
@@ -246,6 +262,31 @@ def check_baseline_currentness(baseline: dict[str, Any], current: dict[str, Any]
             if old.get(source_ref) != revision:
                 return {"status": "incomplete", "changed_sources": [], "reason": "baseline_membership_revision_missing"}
             membership_revisions[source_ref] = revision
+    current_cases = current.get("cases")
+    if not isinstance(current_cases, list):
+        return {"status": "unresolved", "changed_sources": [], "reason": "current_discovery_cases_invalid"}
+    current_tc_refs: set[str] = set()
+    seen_current_refs: set[str] = set()
+    for case in current_cases:
+        if not isinstance(case, dict):
+            return {"status": "unresolved", "changed_sources": [], "reason": "current_discovery_cases_invalid"}
+        tc_ref = case.get("tc_ref")
+        lifecycle = case.get("lifecycle_status")
+        if (
+            not isinstance(tc_ref, str)
+            or not tc_ref.strip()
+            or tc_ref in seen_current_refs
+            or not isinstance(lifecycle, str)
+            or lifecycle not in LIFECYCLE
+        ):
+            return {"status": "unresolved", "changed_sources": [], "reason": "current_discovery_cases_invalid"}
+        seen_current_refs.add(tc_ref)
+        if lifecycle == "current":
+            current_tc_refs.add(tc_ref)
+    population_mismatch = current_tc_refs != membership_refs
+    snapshot_changed = baseline_snapshot_ref != current_snapshot_ref
+    if population_mismatch and not snapshot_changed:
+        return {"status": "incomplete", "changed_sources": [], "reason": "baseline_membership_population_mismatch"}
     new, new_errors = _revision_map(current.get("source_revisions"))
     if new_errors:
         return {"status": "unresolved", "changed_sources": [], "reason": "current_source_revisions_invalid"}
@@ -255,7 +296,7 @@ def check_baseline_currentness(baseline: dict[str, Any], current: dict[str, Any]
     changed = sorted(ref for ref in set(old) | set(new) if old.get(ref) != new.get(ref))
     if baseline_scope != current_scope:
         changed.append("<scope>")
-    if baseline_snapshot_ref != current_snapshot_ref:
+    if snapshot_changed:
         changed.append("<discovery_snapshot>")
     changed.sort()
     return {"status": "stale" if changed else "current", "changed_sources": changed, "reason": "dependency_changed" if changed else "dependencies_match"}

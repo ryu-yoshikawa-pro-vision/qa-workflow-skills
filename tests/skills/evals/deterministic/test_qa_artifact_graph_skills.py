@@ -348,6 +348,96 @@ class RegressionRuntimeTests(unittest.TestCase):
         self.assertIn("<discovery_snapshot>", stale["changed_sources"])
         self.assertEqual(regression.plan_run(baseline, requested_scope="full", currentness=stale)["status"], "blocked")
 
+    def test_currentness_requires_complete_saved_membership_population(self):
+        snapshot = self.discovery()
+        decisions = [
+            {"tc_ref": "TC-001", "decision": "member", "reason": "recurring path", "source_refs": ["risk:RISK-001"], "source_revisions": [{"source_ref": "risk:RISK-001", "revision": "r3"}]},
+            {"tc_ref": "TC-002", "decision": "one_off", "reason": "migration-only check", "source_refs": ["issue:ISSUE-002"], "source_revisions": [{"source_ref": "issue:ISSUE-002", "revision": "r8"}]},
+        ]
+        membership = regression.reconcile_membership(snapshot, decisions)
+        source_revisions = [
+            *snapshot["source_revisions"],
+            *[revision for decision in decisions for revision in decision["source_revisions"]],
+        ]
+        baseline = {
+            "complete": membership["complete"],
+            "discovery_snapshot_ref": snapshot["snapshot_ref"],
+            "scope_identity": "scope:checkout",
+            "source_revisions": source_revisions,
+            "memberships": membership["memberships"],
+            "member_tc_refs": membership["member_tc_refs"],
+            "one_off_tc_refs": membership["one_off_tc_refs"],
+            "unresolved_tc_refs": membership["unresolved_tc_refs"],
+            "undecided_tc_refs": membership["undecided_tc_refs"],
+        }
+        current = {
+            **snapshot,
+            "scope_identity": "scope:checkout",
+            "source_revisions": source_revisions,
+        }
+        currentness = regression.check_baseline_currentness(baseline, current)
+        self.assertEqual(currentness["status"], "current")
+        full = regression.plan_run(baseline, requested_scope="full", currentness=currentness)
+        self.assertEqual(full["status"], "ready")
+        self.assertEqual(full["selected_tc_refs"], ["TC-001"])
+        self.assertTrue(full["suite_complete"])
+
+        missing = {
+            **baseline,
+            "memberships": [item for item in baseline["memberships"] if item["tc_ref"] == "TC-001"],
+        }
+        missing_currentness = regression.check_baseline_currentness(missing, current)
+        self.assertEqual(missing_currentness["status"], "incomplete")
+        self.assertEqual(
+            regression.plan_run(missing, requested_scope="full", currentness=missing_currentness)["status"],
+            "blocked",
+        )
+
+        extra_membership = {
+            **baseline["memberships"][1],
+            "tc_ref": "TC-003",
+            "decision": "out_of_scope",
+        }
+        extra = {**baseline, "memberships": [*baseline["memberships"], extra_membership]}
+        self.assertEqual(regression.check_baseline_currentness(extra, current)["status"], "incomplete")
+
+        unresolved_membership = json.loads(json.dumps(baseline))
+        unresolved_membership["memberships"][1]["decision"] = "unresolved"
+        self.assertEqual(regression.check_baseline_currentness(unresolved_membership, current)["status"], "incomplete")
+
+        for invalid_cases in (None, [{"lifecycle_status": "current"}]):
+            with self.subTest(invalid_cases=invalid_cases):
+                self.assertEqual(
+                    regression.check_baseline_currentness(baseline, {**current, "cases": invalid_cases})["status"],
+                    "unresolved",
+                )
+
+        empty_snapshot = regression.build_discovery_snapshot({
+            "discovery_roots": ["qa/test-cases"],
+            "listing_complete": True,
+            "source_revisions": [{"source_ref": "repo:qa/test-cases", "revision": "r1"}],
+            "cases": [],
+        })
+        empty_baseline = {
+            "complete": True,
+            "discovery_snapshot_ref": empty_snapshot["snapshot_ref"],
+            "scope_identity": "scope:checkout",
+            "source_revisions": empty_snapshot["source_revisions"],
+            "memberships": [],
+            "member_tc_refs": [],
+            "unresolved_tc_refs": [],
+            "undecided_tc_refs": [],
+        }
+        empty_currentness = regression.check_baseline_currentness(
+            empty_baseline,
+            {**empty_snapshot, "scope_identity": "scope:checkout"},
+        )
+        self.assertEqual(empty_currentness["status"], "current")
+        empty_full = regression.plan_run(empty_baseline, requested_scope="full", currentness=empty_currentness)
+        self.assertEqual(empty_full["status"], "ready")
+        self.assertEqual(empty_full["selected_tc_refs"], [])
+        self.assertTrue(empty_full["suite_complete"])
+
     def test_unresolved_membership_prevents_baseline_completion(self):
         snapshot = self.discovery()
         decisions = [
@@ -489,6 +579,7 @@ class RegressionRuntimeTests(unittest.TestCase):
         current = {
             "complete": True,
             "snapshot_ref": "DS-CURRENTNESS-TEST",
+            "cases": [{"tc_ref": "TC-001", "lifecycle_status": "current"}],
             "scope_identity": "scope:checkout",
             "source_revisions": revisions,
         }
@@ -599,6 +690,7 @@ class RegressionRuntimeTests(unittest.TestCase):
             regression.check_baseline_currentness(missing_dependency, {
                 "complete": True,
                 "snapshot_ref": baseline["discovery_snapshot_ref"],
+                "cases": [{"tc_ref": item["tc_ref"], "lifecycle_status": "current"} for item in baseline["memberships"]],
                 "scope_identity": baseline["scope_identity"],
                 "source_revisions": baseline["source_revisions"],
             })["status"],
@@ -618,6 +710,7 @@ class RegressionRuntimeTests(unittest.TestCase):
             regression.check_baseline_currentness(malformed_provenance, {
                 "complete": True,
                 "snapshot_ref": baseline["discovery_snapshot_ref"],
+                "cases": [{"tc_ref": item["tc_ref"], "lifecycle_status": "current"} for item in baseline["memberships"]],
                 "scope_identity": baseline["scope_identity"],
                 "source_revisions": baseline["source_revisions"],
             })["status"],
