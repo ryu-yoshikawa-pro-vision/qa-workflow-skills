@@ -1,6 +1,6 @@
 ---
 name: wcag-conformance-evaluation
-description: Web製品全体をWCAG 2.0/2.1/2.2の指定version・levelでWCAG-EM 2.0に沿ってformal評価し、scope、sampling、procedure、結果、reportを追跡する。製品のWCAG適合性評価やそのWCAG-EM reportを求める場合に使用する。WCAGやWCAG-EMの要件・手順の要約、学習用checklistだけを求める依頼では使用しない。特定画面のgeneral accessibility検査はusability-inspection、保存済みUI evidenceのheuristic/reference照合はusability-evaluationへroutingする。
+description: Web製品全体をWCAG 2.0/2.1/2.2の指定version・levelでWCAG-EM 2.0に沿ってformal評価し、scope、sampling、procedure、結果、reportを追跡する。versionやlevelが未指定でも、製品のformal conformance評価を実行して不足する入力を特定する依頼には使用する。製品のWCAG適合性評価やそのWCAG-EM reportを求める場合に使用する。WCAGやWCAG-EMの要件・手順の要約、学習用checklist、Conformance Claim / Statementに必要な項目の一覧だけを求め製品評価を不要とする依頼では使用しない。特定画面のgeneral accessibility検査はusability-inspection、保存済みUI evidenceのheuristic/reference照合はusability-evaluationへroutingする。
 ---
 
 # Formal WCAG-EM evaluation
