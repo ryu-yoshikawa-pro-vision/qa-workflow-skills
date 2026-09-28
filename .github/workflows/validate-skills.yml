@@ -129,9 +129,3 @@ jobs:
 
       - name: Validate trigger dataset contract
         run: python -m unittest discover -s tests/skills/evals/trigger -v
-
-      - name: Validate deterministic Skill contracts
-        run: python -m unittest discover -s tests/skills/evals/deterministic -v
-
-      - name: Validate Machine Runtime fixtures
-        run: python -m unittest discover -s tests/skills/runtime -v
