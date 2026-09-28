@@ -1,0 +1,368 @@
+{
+  "skill": "usability-inspection",
+  "cases": [
+    {
+      "id": "UI-SEM-A",
+      "input": "cases/case-001/input.md",
+      "reference": "cases/case-001/reference.md",
+      "criteria": [
+        "UI-SEM-001",
+        "UI-SEM-002",
+        "UI-SEM-003",
+        "UI-SEM-004"
+      ]
+    },
+    {
+      "id": "UI-SEM-B",
+      "input": "cases/case-002/input.md",
+      "reference": "cases/case-002/reference.md",
+      "criteria": [
+        "UI-SEM-001",
+        "UI-SEM-002",
+        "UI-SEM-003",
+        "UI-SEM-004"
+      ]
+    },
+    {
+      "id": "UI-SEM-C",
+      "input": "cases/case-003/input.md",
+      "reference": "cases/case-003/reference.md",
+      "criteria": [
+        "UI-SEM-001",
+        "UI-SEM-002",
+        "UI-SEM-003",
+        "UI-SEM-004"
+      ]
+    },
+    {
+      "id": "UI-SEM-D",
+      "input": "cases/case-004/input.md",
+      "reference": "cases/case-004/reference.md",
+      "criteria": [
+        "UI-SEM-001",
+        "UI-SEM-002",
+        "UI-SEM-003",
+        "UI-SEM-004"
+      ]
+    },
+    {
+      "id": "UI-SEM-E",
+      "input": "cases/case-005/input.md",
+      "reference": "cases/case-005/reference.md",
+      "criteria": [
+        "UI-SEM-001",
+        "UI-SEM-002",
+        "UI-SEM-003",
+        "UI-SEM-004"
+      ]
+    },
+    {
+      "id": "UI-SEM-F",
+      "input": "cases/case-006/input.md",
+      "reference": "cases/case-006/reference.md",
+      "criteria": [
+        "UI-SEM-001",
+        "UI-SEM-002",
+        "UI-SEM-003",
+        "UI-SEM-004"
+      ]
+    },
+    {
+      "id": "UI-SEM-G",
+      "input": "cases/case-007/input.md",
+      "reference": "cases/case-007/reference.md",
+      "criteria": [
+        "UI-SEM-001",
+        "UI-SEM-002",
+        "UI-SEM-003",
+        "UI-SEM-004"
+      ]
+    },
+    {
+      "id": "UI-SEM-H",
+      "input": "cases/case-008/input.md",
+      "reference": "cases/case-008/reference.md",
+      "criteria": [
+        "UI-SEM-001",
+        "UI-SEM-002",
+        "UI-SEM-003",
+        "UI-SEM-004"
+      ]
+    },
+    {
+      "id": "UI-SEM-I",
+      "input": "cases/case-009/input.md",
+      "reference": "cases/case-009/reference.md",
+      "criteria": [
+        "UI-SEM-001",
+        "UI-SEM-002",
+        "UI-SEM-003",
+        "UI-SEM-004"
+      ]
+    },
+    {
+      "id": "UI-SEM-J",
+      "input": "cases/case-010/input.md",
+      "reference": "cases/case-010/reference.md",
+      "criteria": [
+        "UI-SEM-001",
+        "UI-SEM-002",
+        "UI-SEM-003",
+        "UI-SEM-004"
+      ]
+    },
+    {
+      "id": "UI-SEM-K",
+      "input": "cases/case-011/input.md",
+      "reference": "cases/case-011/reference.md",
+      "criteria": [
+        "UI-SEM-001",
+        "UI-SEM-002",
+        "UI-SEM-003",
+        "UI-SEM-004"
+      ]
+    },
+    {
+      "id": "UI-SEM-L",
+      "input": "cases/case-012/input.md",
+      "reference": "cases/case-012/reference.md",
+      "criteria": [
+        "UI-SEM-001",
+        "UI-SEM-002",
+        "UI-SEM-003",
+        "UI-SEM-004"
+      ]
+    },
+    {
+      "id": "UI-SEM-M",
+      "input": "cases/case-013/input.md",
+      "reference": "cases/case-013/reference.md",
+      "criteria": [
+        "UI-SEM-001",
+        "UI-SEM-002",
+        "UI-SEM-003",
+        "UI-SEM-004"
+      ]
+    },
+    {
+      "id": "UI-SEM-N",
+      "input": "cases/case-014/input.md",
+      "reference": "cases/case-014/reference.md",
+      "criteria": [
+        "UI-SEM-001",
+        "UI-SEM-002",
+        "UI-SEM-003",
+        "UI-SEM-004"
+      ]
+    },
+    {
+      "id": "UI-SEM-O",
+      "input": "cases/case-015/input.md",
+      "reference": "cases/case-015/reference.md",
+      "criteria": [
+        "UI-SEM-001",
+        "UI-SEM-002",
+        "UI-SEM-003",
+        "UI-SEM-004"
+      ]
+    },
+    {
+      "id": "UI-SEM-P",
+      "input": "cases/case-016/input.md",
+      "reference": "cases/case-016/reference.md",
+      "criteria": [
+        "UI-SEM-001",
+        "UI-SEM-002",
+        "UI-SEM-003",
+        "UI-SEM-004"
+      ]
+    },
+    {
+      "id": "UI-SEM-Q",
+      "input": "cases/case-017/input.md",
+      "reference": "cases/case-017/reference.md",
+      "criteria": [
+        "UI-SEM-001",
+        "UI-SEM-002",
+        "UI-SEM-003",
+        "UI-SEM-004"
+      ]
+    },
+    {
+      "id": "UI-SEM-R",
+      "input": "cases/case-018/input.md",
+      "reference": "cases/case-018/reference.md",
+      "criteria": [
+        "UI-SEM-001",
+        "UI-SEM-002",
+        "UI-SEM-003",
+        "UI-SEM-004"
+      ]
+    },
+    {
+      "id": "UI-SEM-S",
+      "input": "cases/case-019/input.md",
+      "reference": "cases/case-019/reference.md",
+      "criteria": [
+        "UI-SEM-001",
+        "UI-SEM-002",
+        "UI-SEM-003",
+        "UI-SEM-004"
+      ]
+    },
+    {
+      "id": "UI-SEM-T",
+      "input": "cases/case-020/input.md",
+      "reference": "cases/case-020/reference.md",
+      "criteria": [
+        "UI-SEM-001",
+        "UI-SEM-002",
+        "UI-SEM-003",
+        "UI-SEM-004"
+      ]
+    },
+    {
+      "id": "UI-SEM-U",
+      "input": "cases/case-021/input.md",
+      "reference": "cases/case-021/reference.md",
+      "criteria": [
+        "UI-SEM-001",
+        "UI-SEM-002",
+        "UI-SEM-003",
+        "UI-SEM-004"
+      ]
+    },
+    {
+      "id": "UI-SEM-V",
+      "input": "cases/case-022/input.md",
+      "reference": "cases/case-022/reference.md",
+      "criteria": [
+        "UI-SEM-001",
+        "UI-SEM-002",
+        "UI-SEM-003",
+        "UI-SEM-004"
+      ]
+    },
+    {
+      "id": "UI-SEM-W",
+      "input": "cases/case-023/input.md",
+      "reference": "cases/case-023/reference.md",
+      "criteria": [
+        "UI-SEM-001",
+        "UI-SEM-002",
+        "UI-SEM-003",
+        "UI-SEM-004"
+      ]
+    },
+    {
+      "id": "UI-SEM-X",
+      "input": "cases/case-024/input.md",
+      "reference": "cases/case-024/reference.md",
+      "criteria": [
+        "UI-SEM-001",
+        "UI-SEM-002",
+        "UI-SEM-003",
+        "UI-SEM-004"
+      ]
+    },
+    {
+      "id": "UI-SEM-Y",
+      "input": "cases/case-025/input.md",
+      "reference": "cases/case-025/reference.md",
+      "criteria": [
+        "UI-SEM-001",
+        "UI-SEM-002",
+        "UI-SEM-003",
+        "UI-SEM-004"
+      ]
+    },
+    {
+      "id": "UI-SEM-Z",
+      "input": "cases/case-026/input.md",
+      "reference": "cases/case-026/reference.md",
+      "criteria": [
+        "UI-SEM-001",
+        "UI-SEM-002",
+        "UI-SEM-003",
+        "UI-SEM-004"
+      ]
+    },
+    {
+      "id": "UI-SEM-AA",
+      "input": "cases/case-027/input.md",
+      "reference": "cases/case-027/reference.md",
+      "criteria": [
+        "UI-SEM-001",
+        "UI-SEM-002",
+        "UI-SEM-003",
+        "UI-SEM-004"
+      ]
+    },
+    {
+      "id": "UI-SEM-AB",
+      "input": "cases/case-028/input.md",
+      "reference": "cases/case-028/reference.md",
+      "criteria": [
+        "UI-SEM-001",
+        "UI-SEM-002",
+        "UI-SEM-003",
+        "UI-SEM-004"
+      ]
+    },
+    {
+      "id": "UI-SEM-AC",
+      "input": "cases/case-029/input.md",
+      "reference": "cases/case-029/reference.md",
+      "criteria": [
+        "UI-SEM-001",
+        "UI-SEM-002",
+        "UI-SEM-003",
+        "UI-SEM-004"
+      ]
+    },
+    {
+      "id": "UI-SEM-AD",
+      "input": "cases/case-030/input.md",
+      "reference": "cases/case-030/reference.md",
+      "criteria": [
+        "UI-SEM-001",
+        "UI-SEM-002",
+        "UI-SEM-003",
+        "UI-SEM-004"
+      ]
+    },
+    {
+      "id": "UI-SEM-AE",
+      "input": "cases/case-031/input.md",
+      "reference": "cases/case-031/reference.md",
+      "criteria": [
+        "UI-SEM-001",
+        "UI-SEM-002",
+        "UI-SEM-003",
+        "UI-SEM-004"
+      ]
+    },
+    {
+      "id": "UI-SEM-AF",
+      "input": "cases/case-032/input.md",
+      "reference": "cases/case-032/reference.md",
+      "criteria": [
+        "UI-SEM-001",
+        "UI-SEM-002",
+        "UI-SEM-003",
+        "UI-SEM-004"
+      ]
+    },
+    {
+      "id": "UI-SEM-AG",
+      "input": "cases/case-033/input.md",
+      "reference": "cases/case-033/reference.md",
+      "criteria": [
+        "UI-SEM-001",
+        "UI-SEM-002",
+        "UI-SEM-003",
+        "UI-SEM-004"
+      ]
+    }
+  ]
+}

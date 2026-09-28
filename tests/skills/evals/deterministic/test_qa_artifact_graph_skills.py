@@ -1090,7 +1090,7 @@ class WorkflowArtifactGraphTests(unittest.TestCase):
             self.assertEqual(workflow.release_shared_resource(current_workflow_ref=owner_ref, expected_workflow_ref=owner_ref, expected_reservation_revision=reservation["reservation_revision"], current_reservation_revision=reservation["reservation_revision"], native_atomic_conditional_release=False, owner_state_verified=True, owner_execution_state="complete", cleanup_confirmed=True)["status"], "blocked")
             self.assertEqual(workflow.release_shared_resource(current_workflow_ref="other", expected_workflow_ref=owner_ref, expected_reservation_revision=reservation["reservation_revision"], current_reservation_revision=reservation["reservation_revision"], native_atomic_conditional_release=True, owner_state_verified=True, owner_execution_state="complete", cleanup_confirmed=True)["reason"], "reservation_owner_mismatch")
             self.assertEqual(workflow.reserve_shared_resource(reservation_root, "resource:isolation", workflow_ref, native_atomic_conditional_release=False, isolated=True)["status"], "not_required")
-            external = workflow.reserve_shared_resource(reservation_root, "resource:external", workflow_ref, native_atomic_conditional_release=False, external_reservation="external:reservation-1", external_reservation_acquired=True)
+            external = workflow.reserve_shared_resource(reservation_root, "resource:external", workflow_ref, native_atomic_conditional_release=False, external_reservation="external:reservation-1", external_reservation_acquired=True, external_reservation_revision="provider:revision-1")
             self.assertEqual(external["status"], "reserved")
             self.assertEqual(external["provider"], "existing_external_reservation")
 

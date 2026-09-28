@@ -64,10 +64,13 @@ helperの必須処理が入力不足・実行不能・保存先能力不足で�
 | Regression baseline / membership / Run / Activity | `regression-testing` |
 | Charterに沿ったExploration / Investigation | `exploratory-testing` |
 | 継続QA knowledgeのtriage / lifecycle / lookup | `qa-knowledge` |
+| referenceや既存evidenceに基づくUI / UX評価 | `usability-evaluation` |
+| live Web UIの操作・観測・ユーザビリティ検査 | `usability-inspection` |
+| WCAG-EM 2.0によるformal WCAG conformance evaluation | `wcag-conformance-evaluation` |
 
 ## ランタイム前提
 
-本Skillは、同一のAgentクライアント上で19 Skillすべてが利用可能で、Agentが必要なSkillを追加で読み込み / 利用できる環境を前提とします。これはAgent Skills Specificationが共通Skill-to-Skill APIを保証しているという意味ではありません。
+本Skillは、同一のAgentクライアント上でrepositoryの全Skillが利用可能で、Agentが必要なSkillを追加で読み込み / 利用できる環境を前提とします。これはAgent Skills Specificationが共通Skill-to-Skill APIを保証しているという意味ではありません。
 
 ## リソース
 

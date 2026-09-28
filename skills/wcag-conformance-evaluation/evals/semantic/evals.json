@@ -1,0 +1,423 @@
+{
+  "skill": "wcag-conformance-evaluation",
+  "cases": [
+    {
+      "id": "WCAG-SEM-A",
+      "input": "cases/case-001/input.md",
+      "reference": "cases/case-001/reference.md",
+      "criteria": [
+        "WCAG-SEM-001",
+        "WCAG-SEM-002",
+        "WCAG-SEM-003",
+        "WCAG-SEM-004"
+      ]
+    },
+    {
+      "id": "WCAG-SEM-B",
+      "input": "cases/case-002/input.md",
+      "reference": "cases/case-002/reference.md",
+      "criteria": [
+        "WCAG-SEM-001",
+        "WCAG-SEM-002",
+        "WCAG-SEM-003",
+        "WCAG-SEM-004"
+      ]
+    },
+    {
+      "id": "WCAG-SEM-C",
+      "input": "cases/case-003/input.md",
+      "reference": "cases/case-003/reference.md",
+      "criteria": [
+        "WCAG-SEM-001",
+        "WCAG-SEM-002",
+        "WCAG-SEM-003",
+        "WCAG-SEM-004"
+      ]
+    },
+    {
+      "id": "WCAG-SEM-C2",
+      "input": "cases/case-004/input.md",
+      "reference": "cases/case-004/reference.md",
+      "criteria": [
+        "WCAG-SEM-001",
+        "WCAG-SEM-002",
+        "WCAG-SEM-003",
+        "WCAG-SEM-004"
+      ]
+    },
+    {
+      "id": "WCAG-SEM-D",
+      "input": "cases/case-005/input.md",
+      "reference": "cases/case-005/reference.md",
+      "criteria": [
+        "WCAG-SEM-001",
+        "WCAG-SEM-002",
+        "WCAG-SEM-003",
+        "WCAG-SEM-004"
+      ]
+    },
+    {
+      "id": "WCAG-SEM-E",
+      "input": "cases/case-006/input.md",
+      "reference": "cases/case-006/reference.md",
+      "criteria": [
+        "WCAG-SEM-001",
+        "WCAG-SEM-002",
+        "WCAG-SEM-003",
+        "WCAG-SEM-004"
+      ]
+    },
+    {
+      "id": "WCAG-SEM-F",
+      "input": "cases/case-007/input.md",
+      "reference": "cases/case-007/reference.md",
+      "criteria": [
+        "WCAG-SEM-001",
+        "WCAG-SEM-002",
+        "WCAG-SEM-003",
+        "WCAG-SEM-004"
+      ]
+    },
+    {
+      "id": "WCAG-SEM-F2",
+      "input": "cases/case-008/input.md",
+      "reference": "cases/case-008/reference.md",
+      "criteria": [
+        "WCAG-SEM-001",
+        "WCAG-SEM-002",
+        "WCAG-SEM-003",
+        "WCAG-SEM-004"
+      ]
+    },
+    {
+      "id": "WCAG-SEM-G",
+      "input": "cases/case-009/input.md",
+      "reference": "cases/case-009/reference.md",
+      "criteria": [
+        "WCAG-SEM-001",
+        "WCAG-SEM-002",
+        "WCAG-SEM-003",
+        "WCAG-SEM-004"
+      ]
+    },
+    {
+      "id": "WCAG-SEM-H",
+      "input": "cases/case-010/input.md",
+      "reference": "cases/case-010/reference.md",
+      "criteria": [
+        "WCAG-SEM-001",
+        "WCAG-SEM-002",
+        "WCAG-SEM-003",
+        "WCAG-SEM-004"
+      ]
+    },
+    {
+      "id": "WCAG-SEM-I",
+      "input": "cases/case-011/input.md",
+      "reference": "cases/case-011/reference.md",
+      "criteria": [
+        "WCAG-SEM-001",
+        "WCAG-SEM-002",
+        "WCAG-SEM-003",
+        "WCAG-SEM-004"
+      ]
+    },
+    {
+      "id": "WCAG-SEM-J",
+      "input": "cases/case-012/input.md",
+      "reference": "cases/case-012/reference.md",
+      "criteria": [
+        "WCAG-SEM-001",
+        "WCAG-SEM-002",
+        "WCAG-SEM-003",
+        "WCAG-SEM-004"
+      ]
+    },
+    {
+      "id": "WCAG-SEM-K",
+      "input": "cases/case-013/input.md",
+      "reference": "cases/case-013/reference.md",
+      "criteria": [
+        "WCAG-SEM-001",
+        "WCAG-SEM-002",
+        "WCAG-SEM-003",
+        "WCAG-SEM-004"
+      ]
+    },
+    {
+      "id": "WCAG-SEM-L",
+      "input": "cases/case-014/input.md",
+      "reference": "cases/case-014/reference.md",
+      "criteria": [
+        "WCAG-SEM-001",
+        "WCAG-SEM-002",
+        "WCAG-SEM-003",
+        "WCAG-SEM-004"
+      ]
+    },
+    {
+      "id": "WCAG-SEM-M",
+      "input": "cases/case-015/input.md",
+      "reference": "cases/case-015/reference.md",
+      "criteria": [
+        "WCAG-SEM-001",
+        "WCAG-SEM-002",
+        "WCAG-SEM-003",
+        "WCAG-SEM-004"
+      ]
+    },
+    {
+      "id": "WCAG-SEM-N",
+      "input": "cases/case-016/input.md",
+      "reference": "cases/case-016/reference.md",
+      "criteria": [
+        "WCAG-SEM-001",
+        "WCAG-SEM-002",
+        "WCAG-SEM-003",
+        "WCAG-SEM-004"
+      ]
+    },
+    {
+      "id": "WCAG-SEM-O",
+      "input": "cases/case-017/input.md",
+      "reference": "cases/case-017/reference.md",
+      "criteria": [
+        "WCAG-SEM-001",
+        "WCAG-SEM-002",
+        "WCAG-SEM-003",
+        "WCAG-SEM-004"
+      ]
+    },
+    {
+      "id": "WCAG-SEM-P",
+      "input": "cases/case-018/input.md",
+      "reference": "cases/case-018/reference.md",
+      "criteria": [
+        "WCAG-SEM-001",
+        "WCAG-SEM-002",
+        "WCAG-SEM-003",
+        "WCAG-SEM-004"
+      ]
+    },
+    {
+      "id": "WCAG-SEM-Q",
+      "input": "cases/case-019/input.md",
+      "reference": "cases/case-019/reference.md",
+      "criteria": [
+        "WCAG-SEM-001",
+        "WCAG-SEM-002",
+        "WCAG-SEM-003",
+        "WCAG-SEM-004"
+      ]
+    },
+    {
+      "id": "WCAG-SEM-R",
+      "input": "cases/case-020/input.md",
+      "reference": "cases/case-020/reference.md",
+      "criteria": [
+        "WCAG-SEM-001",
+        "WCAG-SEM-002",
+        "WCAG-SEM-003",
+        "WCAG-SEM-004"
+      ]
+    },
+    {
+      "id": "WCAG-SEM-S",
+      "input": "cases/case-021/input.md",
+      "reference": "cases/case-021/reference.md",
+      "criteria": [
+        "WCAG-SEM-001",
+        "WCAG-SEM-002",
+        "WCAG-SEM-003",
+        "WCAG-SEM-004"
+      ]
+    },
+    {
+      "id": "WCAG-SEM-T",
+      "input": "cases/case-022/input.md",
+      "reference": "cases/case-022/reference.md",
+      "criteria": [
+        "WCAG-SEM-001",
+        "WCAG-SEM-002",
+        "WCAG-SEM-003",
+        "WCAG-SEM-004"
+      ]
+    },
+    {
+      "id": "WCAG-SEM-U",
+      "input": "cases/case-023/input.md",
+      "reference": "cases/case-023/reference.md",
+      "criteria": [
+        "WCAG-SEM-001",
+        "WCAG-SEM-002",
+        "WCAG-SEM-003",
+        "WCAG-SEM-004"
+      ]
+    },
+    {
+      "id": "WCAG-SEM-V",
+      "input": "cases/case-024/input.md",
+      "reference": "cases/case-024/reference.md",
+      "criteria": [
+        "WCAG-SEM-001",
+        "WCAG-SEM-002",
+        "WCAG-SEM-003",
+        "WCAG-SEM-004"
+      ]
+    },
+    {
+      "id": "WCAG-SEM-W",
+      "input": "cases/case-025/input.md",
+      "reference": "cases/case-025/reference.md",
+      "criteria": [
+        "WCAG-SEM-001",
+        "WCAG-SEM-002",
+        "WCAG-SEM-003",
+        "WCAG-SEM-004"
+      ]
+    },
+    {
+      "id": "WCAG-SEM-X",
+      "input": "cases/case-026/input.md",
+      "reference": "cases/case-026/reference.md",
+      "criteria": [
+        "WCAG-SEM-001",
+        "WCAG-SEM-002",
+        "WCAG-SEM-003",
+        "WCAG-SEM-004"
+      ]
+    },
+    {
+      "id": "WCAG-SEM-Y",
+      "input": "cases/case-027/input.md",
+      "reference": "cases/case-027/reference.md",
+      "criteria": [
+        "WCAG-SEM-001",
+        "WCAG-SEM-002",
+        "WCAG-SEM-003",
+        "WCAG-SEM-004"
+      ]
+    },
+    {
+      "id": "WCAG-SEM-Z",
+      "input": "cases/case-028/input.md",
+      "reference": "cases/case-028/reference.md",
+      "criteria": [
+        "WCAG-SEM-001",
+        "WCAG-SEM-002",
+        "WCAG-SEM-003",
+        "WCAG-SEM-004"
+      ]
+    },
+    {
+      "id": "WCAG-SEM-AA",
+      "input": "cases/case-029/input.md",
+      "reference": "cases/case-029/reference.md",
+      "criteria": [
+        "WCAG-SEM-001",
+        "WCAG-SEM-002",
+        "WCAG-SEM-003",
+        "WCAG-SEM-004"
+      ]
+    },
+    {
+      "id": "WCAG-SEM-AB",
+      "input": "cases/case-030/input.md",
+      "reference": "cases/case-030/reference.md",
+      "criteria": [
+        "WCAG-SEM-001",
+        "WCAG-SEM-002",
+        "WCAG-SEM-003",
+        "WCAG-SEM-004"
+      ]
+    },
+    {
+      "id": "WCAG-SEM-AC",
+      "input": "cases/case-031/input.md",
+      "reference": "cases/case-031/reference.md",
+      "criteria": [
+        "WCAG-SEM-001",
+        "WCAG-SEM-002",
+        "WCAG-SEM-003",
+        "WCAG-SEM-004"
+      ]
+    },
+    {
+      "id": "WCAG-SEM-AD",
+      "input": "cases/case-032/input.md",
+      "reference": "cases/case-032/reference.md",
+      "criteria": [
+        "WCAG-SEM-001",
+        "WCAG-SEM-002",
+        "WCAG-SEM-003",
+        "WCAG-SEM-004"
+      ]
+    },
+    {
+      "id": "WCAG-SEM-AE",
+      "input": "cases/case-033/input.md",
+      "reference": "cases/case-033/reference.md",
+      "criteria": [
+        "WCAG-SEM-001",
+        "WCAG-SEM-002",
+        "WCAG-SEM-003",
+        "WCAG-SEM-004"
+      ]
+    },
+    {
+      "id": "WCAG-SEM-AF",
+      "input": "cases/case-034/input.md",
+      "reference": "cases/case-034/reference.md",
+      "criteria": [
+        "WCAG-SEM-001",
+        "WCAG-SEM-002",
+        "WCAG-SEM-003",
+        "WCAG-SEM-004"
+      ]
+    },
+    {
+      "id": "WCAG-SEM-AG",
+      "input": "cases/case-035/input.md",
+      "reference": "cases/case-035/reference.md",
+      "criteria": [
+        "WCAG-SEM-001",
+        "WCAG-SEM-002",
+        "WCAG-SEM-003",
+        "WCAG-SEM-004"
+      ]
+    },
+    {
+      "id": "WCAG-SEM-AH",
+      "input": "cases/case-036/input.md",
+      "reference": "cases/case-036/reference.md",
+      "criteria": [
+        "WCAG-SEM-001",
+        "WCAG-SEM-002",
+        "WCAG-SEM-003",
+        "WCAG-SEM-004"
+      ]
+    },
+    {
+      "id": "WCAG-SEM-AI",
+      "input": "cases/case-037/input.md",
+      "reference": "cases/case-037/reference.md",
+      "criteria": [
+        "WCAG-SEM-001",
+        "WCAG-SEM-002",
+        "WCAG-SEM-003",
+        "WCAG-SEM-004"
+      ]
+    },
+    {
+      "id": "WCAG-SEM-AJ",
+      "input": "cases/case-038/input.md",
+      "reference": "cases/case-038/reference.md",
+      "criteria": [
+        "WCAG-SEM-001",
+        "WCAG-SEM-002",
+        "WCAG-SEM-003",
+        "WCAG-SEM-004"
+      ]
+    }
+  ]
+}

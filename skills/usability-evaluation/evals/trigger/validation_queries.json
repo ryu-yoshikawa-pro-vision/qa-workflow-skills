@@ -1,0 +1,34 @@
+[
+  {
+    "query": "この画像に写った検索結果の階層とラベルをUX観点で評価して。",
+    "should_trigger": true
+  },
+  {
+    "query": "保存済みARIA snapshotとkeyboard traceを、UI usabilityのreferenceに照合して。",
+    "should_trigger": true
+  },
+  {
+    "query": "ブラウザ操作を開始してDialogのfocus trapを確認して。",
+    "should_trigger": false
+  },
+  {
+    "query": "usabilityを確認して。 live targetを実際に操作したい。",
+    "should_trigger": false
+  },
+  {
+    "query": "usabilityを確認して。既存screenshotと仕様だけを見て。",
+    "should_trigger": true
+  },
+  {
+    "query": "TCを実行し、既存evidenceで別途UXも確認するよう依頼されている。",
+    "should_trigger": true
+  },
+  {
+    "query": "regression scopeにUI/UX評価が含まれていないTCだけ実行して。",
+    "should_trigger": false
+  },
+  {
+    "query": "Action timingを測るためPlaywrightを新規導入して。",
+    "should_trigger": false
+  }
+]

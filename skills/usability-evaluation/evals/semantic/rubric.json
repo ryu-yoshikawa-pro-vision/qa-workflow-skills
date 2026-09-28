@@ -1,0 +1,10 @@
+{
+  "skill": "usability-evaluation",
+  "criteria": [
+    {"id":"UE-SEM-001","title":"Evidence and interpretation stay distinct","description":"Observed facts are linked to the supplied evidence, semantic interpretation is identified as evaluation, and user behavior not present in evidence is not asserted.","critical":true},
+    {"id":"UE-SEM-002","title":"Source positions and applicability stay distinct","description":"Each applied reference retains its own source item and position; normative, informative, advisory, and project-binding force are not merged or silently promoted.","critical":true},
+    {"id":"UE-SEM-003","title":"Dialog behavior uses the right evidence","description":"DOM/accessibility evidence supports role/name, keyboard interaction evidence supports focus behavior, and screenshots support only visible presentation and obscuration claims.","critical":true},
+    {"id":"UE-SEM-004","title":"Evaluation and QA ownership stay bounded","description":"UI/UX evaluation does not change TC PASS/FAIL or score Product Risk, does not seize live browser ownership, and routes follow-up or additional observation to the correct owner.","critical":true},
+    {"id":"UE-SEM-005","title":"Findings and false positives are controlled","description":"A Finding is linked only when follow-up is required; no-issue/out-of-scope rows have none, heuristic advice alone is not a binding defect, and the result closes each selected aspect.","critical":true}
+  ]
+}

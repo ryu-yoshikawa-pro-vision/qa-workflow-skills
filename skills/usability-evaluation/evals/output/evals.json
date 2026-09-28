@@ -1,0 +1,7 @@
+{
+  "skill": "usability-evaluation",
+  "cases": [
+    {"id": "UE-OUT-001", "input": "cases/case-001/input.md", "expected": "cases/case-001/expected.json"},
+    {"id": "UE-OUT-002", "input": "cases/case-002/input.md", "expected": "cases/case-002/expected.json"}
+  ]
+}

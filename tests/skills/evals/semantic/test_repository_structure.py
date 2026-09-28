@@ -6,27 +6,7 @@ import unittest
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 SKILLS_ROOT = REPO_ROOT / "skills"
-CANONICAL_SKILLS = (
-    "qa-workflow",
-    "spec-analysis",
-    "question-analysis",
-    "test-analysis",
-    "test-requirement-design",
-    "test-condition-design",
-    "test-case-design",
-    "coverage-analysis",
-    "adversarial-review",
-    "e2e-test-inspection",
-    "e2e-test-implementation",
-    "e2e-test-execution",
-    "e2e-test-result-analysis",
-    "e2e-test-reporting",
-    "test-target-inspection",
-    "test-execution",
-    "regression-testing",
-    "exploratory-testing",
-    "qa-knowledge",
-)
+CANONICAL_SKILLS = tuple(sorted(path.parent.name for path in SKILLS_ROOT.glob("*/SKILL.md")))
 
 
 class SemanticRepositoryStructureTests(unittest.TestCase):

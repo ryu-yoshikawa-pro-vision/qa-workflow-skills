@@ -20,7 +20,7 @@
 
 ## ランタイム前提
 
-全体ワークフローでは次の19 Skillが同一のAgentクライアント上で利用可能であることを前提とします。
+全体ワークフローでは、repositoryの全Skillが同一のAgentクライアント上で利用可能であることを前提とします。
 
 - `qa-workflow`
 - `spec-analysis`
@@ -109,7 +109,7 @@ currentな画面名称・到達方法・操作可能性・観測可能性が必�
 
 ## E2E要求時の分岐
 
-全19 Skillを固定順に実行しません。要求成果物と有効な成果物から必要な依存だけを選びます。
+すべてのSkillを固定順に実行しません。要求成果物と有効な成果物から必要な依存だけを選びます。
 
 - 生きたテスト対象の情報収集・更新・鮮度確認だけが必要 → `test-target-inspection`
 - 設計前にcurrentな対象情報が必要 → `test-target-inspection` → 必要な設計Skillへ戻る
@@ -323,6 +323,16 @@ adversarial-review
 6. 独立レビューが要求される場合は意味が変わった範囲を`adversarial-review`で再確認する
 
 無関係な下流成果物まで全再生成しません。
+
+## WCAG observation handoff
+
+`wcag-conformance-evaluation` がformal sample / criterion / procedureに必要なlive browser evidenceを要求した場合、persistent handoffとresumeをこのSkillが所有します。formal Skillから `usability-inspection` のscriptやassetをimport / 実行せず、inspectionへtyped required scopeを渡してください。Browser/session ownerは `usability-inspection` です。同じsessionの操作を並行させません。
+
+`state.handoffs` は既存 `workflow_ref / schema_version / state` envelopeに追加するpayloadだけです。既存の `artifact_graph.py` のworkflow identity、claim、reservation、CAS helperを利用します。production local filesystemのexact-content revisionはCAS tokenではありません。storageがnative atomic conditional write/releaseを提供しない場合はbrowserを開始せずblockedにします。canonical repository E2EのSQLite CAS providerはtest専用です。
+
+handoff identityはorigin artifact/revisionとartifact-local handoff refの組です。`operation_ref`、expected observation集合、current result集合、lineage、close readinessはhelperが導出します。開始順はpending CAS → mutable-operation claim → canonical順resource reserve → in-progress CAS → browser開始です。owner resultはimmutable evidence refとcleanup状態を持ち、read-onlyに返します。started operationを同じidentityでbrowser再実行しません。再観測時はformal ownerが新handoff refと`retry_of_handoff_ref`をmaterializeします。
+
+結果をresumeへ返す前に、origin currentness、expected/returned集合、duplicateまたはsupersedes lineage、cleanup、reservation releaseを確認し、close-ready → closed CAS → state reread → resume decisionの順を守ります。release/CAS失敗や不一致はblockedへ閉じ、再browser実行で隠しません。開始前failureでlocal claim recoveryにnative conditional releaseがなければ`atomic_claim_release_unavailable`をexpected safe blockとして保持します。
 
 ## ワークフロー全体状態
 

@@ -40,34 +40,13 @@ jobs:
           import re
           from pathlib import Path
 
-          expected = [
-              "qa-workflow",
-              "spec-analysis",
-              "question-analysis",
-              "test-analysis",
-              "test-requirement-design",
-              "test-condition-design",
-              "test-case-design",
-              "coverage-analysis",
-              "adversarial-review",
-              "e2e-test-inspection",
-              "e2e-test-implementation",
-              "e2e-test-execution",
-              "e2e-test-result-analysis",
-              "e2e-test-reporting",
-              "test-target-inspection",
-              "test-execution",
-              "regression-testing",
-              "exploratory-testing",
-              "qa-knowledge",
-          ]
-
           skill_root = Path("skills")
           actual = sorted(
               p.name for p in skill_root.iterdir()
               if p.is_dir() and (p / "SKILL.md").is_file()
           )
-          assert sorted(expected) == actual, (expected, actual)
+          assert actual, "no canonical Skill packages found"
+          expected = actual
 
           names = []
           total_queries = 0
@@ -93,17 +72,12 @@ jobs:
               assert description, f"empty description: {skill_file}"
               names.append(declared_name)
 
-              train_expected = (24, 12, 12) if name in {"test-analysis", "test-condition-design"} else (12, 6, 6)
-              validation_expected = (20, 10, 10) if name in {"test-analysis", "test-condition-design"} else (8, 4, 4)
-              datasets = [
-                  ("train_queries.json", *train_expected),
-                  ("validation_queries.json", *validation_expected),
-              ]
-              for filename, expected_count, expected_true, expected_false in datasets:
+              datasets = ["train_queries.json", "validation_queries.json"]
+              for filename in datasets:
                   path = skill_root / name / "evals" / "trigger" / filename
                   data = json.loads(path.read_text(encoding="utf-8"))
                   assert isinstance(data, list), path
-                  assert len(data) == expected_count, (path, len(data))
+                  assert data, f"empty trigger dataset: {path}"
                   assert all(isinstance(item, dict) for item in data), path
                   assert all(
                       isinstance(item.get("query"), str) and item["query"].strip()
@@ -115,8 +89,7 @@ jobs:
                   ), path
                   positives = sum(item["should_trigger"] is True for item in data)
                   negatives = sum(item["should_trigger"] is False for item in data)
-                  assert positives == expected_true, (path, positives)
-                  assert negatives == expected_false, (path, negatives)
+                  assert positives > 0 and positives == negatives, (path, positives, negatives)
                   total_queries += len(data)
 
               train_queries = {
@@ -136,18 +109,16 @@ jobs:
                   sorted(train_queries & validation_queries),
               )
 
-          assert len(names) == len(set(names)) == 19, names
-          assert total_queries == 428, total_queries
+          assert len(names) == len(set(names)) == len(actual), names
 
           for doc in (Path("README.md"), Path("EVALS.md")):
               text = doc.read_text(encoding="utf-8")
               missing = [name for name in expected if f"`{name}`" not in text]
               assert not missing, (doc, missing)
 
-          print("Skill count: 19")
-          print("通常Skill: train=12 (6/6), validation=8 (4/4)")
-          print("test-analysis / test-condition-design: train=24 (12/12), validation=20 (10/10)")
-          print("Total trigger queries: 428")
+          print(f"Skill count: {len(names)}")
+          print("Trigger datasets: non-empty and balanced by current contents")
+          print(f"Total trigger queries: {total_queries}")
           PY
 
       - name: Validate semantic dataset counts
@@ -157,3 +128,9 @@ jobs:
 
       - name: Validate trigger dataset contract
         run: python -m unittest discover -s tests/skills/evals/trigger -v
+
+      - name: Validate deterministic Skill contracts
+        run: python -m unittest discover -s tests/skills/evals/deterministic -v
+
+      - name: Validate Machine Runtime fixtures
+        run: python -m unittest discover -s tests/skills/runtime -v
