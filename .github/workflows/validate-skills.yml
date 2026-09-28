@@ -111,10 +111,11 @@ jobs:
 
           assert len(names) == len(set(names)) == len(actual), names
 
-          for doc in (Path("README.md"), Path("EVALS.md")):
-              text = doc.read_text(encoding="utf-8")
-              missing = [name for name in expected if f"`{name}`" not in text]
-              assert not missing, (doc, missing)
+          readme = Path("README.md").read_text(encoding="utf-8")
+          missing = [name for name in expected if f"`{name}`" not in readme]
+          assert not missing, (Path("README.md"), missing)
+          evals = Path("EVALS.md").read_text(encoding="utf-8")
+          assert "current repository" in evals, "EVALS.md must derive the canonical Skill set from the repository"
 
           print(f"Skill count: {len(names)}")
           print("Trigger datasets: non-empty and balanced by current contents")
