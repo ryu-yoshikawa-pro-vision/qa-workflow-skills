@@ -2,6 +2,10 @@
 __pycache__/
 *.py[cod]
 *$py.class
+
+# Local Playwright session artifacts
+/.playwright-cli/
+/.playwright-mcp/
 .agents
 .codex
 AGENTS.md
