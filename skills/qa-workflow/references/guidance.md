@@ -109,7 +109,7 @@ currentな画面名称・到達方法・操作可能性・観測可能性が必�
 
 ## E2E要求時の分岐
 
-全16 Skillを固定順に実行しません。要求成果物と有効な成果物から必要な依存だけを選びます。
+全19 Skillを固定順に実行しません。要求成果物と有効な成果物から必要な依存だけを選びます。
 
 - 生きたテスト対象の情報収集・更新・鮮度確認だけが必要 → `test-target-inspection`
 - 設計前にcurrentな対象情報が必要 → `test-target-inspection` → 必要な設計Skillへ戻る
@@ -152,9 +152,15 @@ Explorationは未知領域のCharterベース探索、Investigationは既存owne
 
 `qa-knowledge`はknowledge lifecycle要求の入口です。既存knowledgeを入力に使うだけならgatewayにせず、candidateが仕様 / Risk / current UI / formal designへ属する場合は正本ownerへ戻します。
 
-ワークフロー完了は全E2E結果がPASSであることを意味しません。要求された実行・分析・報告が完了し、必要なcleanup確認、未処理ブロッカー、`要再検証`、未実施の必須実行が残っていないことを判定します。FAILでも、必要な分析・報告と安全なcleanupが完了し、追加修正が要求されていなければ完了できます。
+要求された成果物 / workflowの担当Skillが自身の完了条件を満たし、対象scopeに未解決の`ブロック中` / `要再検証`がなく、必要な追跡性とcurrentness確認が閉じている場合に完了できます。実操作を含む場合は、必要なcleanupとunresolved stateも閉じていることを確認します。全E2E結果のPASSは共通条件ではありません。
 
-全体ワークフローでは、対象範囲内の上流項目を無言で消しません。各担当Skillが定義する下流成果物または妥当な扱いへ閉じていることを、ワークフロー全体状態として確認します。
+工程固有の完了条件は担当Skillを正本とし、`qa-workflow`へ複製しません。要求内容に応じ、次を条件付きで確認します。
+
+- 新規・改修のテスト設計を要求する場合だけ、仕様根拠、Risk、TR、TCN、TC、coverage等の該当契約を要求します。
+- E2Eを要求する場合だけ、E2E実行・分析・報告・cleanupの該当契約を確認します。
+- Regressionは`regression-testing`、Exploration / Investigationは`exploratory-testing`、QA Knowledgeは`qa-knowledge`の完了条件を正本とします。
+
+要求された分析・報告と安全なcleanupが完了し、追加修正が要求されていなければ、FAILを含む実行結果でも完了できます。
 
 ## 共通の扱い
 
@@ -178,6 +184,8 @@ Explorationは未知領域のCharterベース探索、Investigationは既存owne
 
 ## 継続管理workflowのproduction helper checkpoint
 
+Project Contextの`qa.workflow_state_root`はworkflowごとのpersisted stateとhelperが導出するclaimのrootです。Regression ActivityやExploration Sessionの汎用history rootではありません。既存のRegression / Session artifactはProject Contextの「既存QA成果物」欄または要求で渡されたdirect ref / 明示rootから解決します。入口が与えられていないhistoryは推測せず未解決として扱います。
+
 ### workflow開始 / resume
 
 継続管理workflowの決定論的処理はqa-workflow package内の`scripts/artifact_graph.py`を使います。
@@ -196,7 +204,7 @@ Explorationは未知領域のCharterベース探索、Investigationは既存owne
 
 ### shared resource使用前
 
-Project Contextの既存`qa.reservation_root`を使い、次の順で`reserve_shared_resource`を適用します。
+resource ref、workflow間のisolation条件、外部reservationの取得状態などはProject Contextの実施環境 / 対象条件欄で確認します。project-local reservation artifactのrootには既存`qa.reservation_root`を使い、次の順で`reserve_shared_resource`を適用します。
 
 1. resourceがworkflowごとにisolatedならreservationは`not_required`です。
 2. 既存external reservationが取得済みならそれを使います。
@@ -324,19 +332,19 @@ adversarial-review
 
 ## 全体ワークフロー完了条件
 
-対象範囲について次を満たしたとき`完了`です。
+要求された成果物 / workflowについて次を満たしたとき`完了`です。
 
-- `spec-analysis`で必要な現在有効な仕様根拠が解決済み
-- 対象内の上流仕様根拠 / プロダクトリスク / テスト要求 / テスト条件 / カバレッジ項目が、担当Skillの契約に従って下流成果物または扱いへ閉じている
-- 各担当Skillの最低品質条件を満たす
-- 必要な追跡性がある
-- 出力テストケースが`test-case-design`の詳細テストケース完了条件を満たす
-- 必要なカバレッジ分析 / 反証レビューが完了している
-- `要再検証`が残っていない
-- 対象スコープ内にブロック中が残っていない
-- `adversarial-review`で利用停止が必要な未処置指摘が残っていない
-- E2E要求時は、必要なE2E工程の実行・分析・報告・cleanup確認が要求範囲に対して閉じている
-- logical primary / resolved primary TestCase / retry attemptが混同されていない
+- 要求された成果物 / workflowの担当Skillが、自身の完了条件を満たしている
+- 対象scopeに未解決の`ブロック中` / `要再検証`が残っていない
+- 必要な追跡性が閉じている
+- 必要なcurrentness確認が完了している
+- 実操作を含む場合、必要なcleanupとunresolved stateが閉じている
+
+要求内容に応じて、次の条件を追加します。
+
+- 新規・改修のテスト設計を要求する場合だけ、必要な仕様根拠、Risk、TR、TCN、TC、coverage等の契約を確認します。
+- E2Eを要求する場合だけ、必要なE2E実行・分析・報告・cleanup契約を確認します。primary / resolved TestCase / retry attemptも混同しません。
+- Regressionは`regression-testing`、Exploration / Investigationは`exploratory-testing`、QA Knowledgeは`qa-knowledge`の完了条件に従います。各Skillのdomain完了条件を本Skillへ複製しません。
 
 重大度の詳細条件や残存リスク受容条件は`adversarial-review`を正本とします。
 

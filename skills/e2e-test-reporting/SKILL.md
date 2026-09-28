@@ -12,7 +12,7 @@ description: 検証済みのPlaywright実行結果と、実施済みの場合は
 3. logical primary対象数、resolved primary TestCase数、実際に開始したresolved primary TestCase数、logical / resolved単位の未実行数・理由を区別します。retry attempt数をresolved件数へ混ぜません。
 4. Playwright run全体status、process exit code、run-level error、`TestResult.status`、`TestCase.expectedStatus`、Playwrightから取得したresolved TestCase単位の`TestCase.outcome()`を、確認元と単位を保ったまま別値域として報告します。retry attempt数がNなら履歴のretry番号は`0..N-1`を欠落・重複・範囲外なく保持し、canonicalな各entryのstatusとresolved結果末尾を維持します。`outcome = flaky`と2件未満のattempt数の明白な矛盾、およびexpected側 / unexpected側のattemptが混在しない履歴を追加確認します。outcome計算全体はexecutionの責務です。`未実行`はworkflow状態として扱います。
 5. TC IDは存在する場合だけ記載し、TCなし経路のために作成しません。E2E実装参照・実行結果参照・分析結果参照を保持して追跡可能にします。reporting対象として開始した場合はlogical primaryを最低1件記録します。
-6. cleanupの成功 / 失敗 / 未確認 / 対象なし / 意図的に残した状態と残存副作用、ブロック、残存リスク、未解決事項を隠しません。
+6. cleanupの成功 / 失敗 / 未確認 / 対象なし / 意図的に残した状態 / 一部失敗と残存副作用、ブロック、残存リスク、未解決事項を隠しません。
 7. 原因の再判定、仕様の再解釈、都合のよいPASS / FAIL単純化をしません。証跡からsecret、cookie、token、storageState、不要な個人データを転載しません。
 
 ## 出力

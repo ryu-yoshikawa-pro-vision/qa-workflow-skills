@@ -16,7 +16,7 @@ description: 既存または実装済みのPlaywright E2Eを指定されたテ�
 7. terminal表示だけを正本にせず、既存machine-readable reporterまたは標準JSON等を安全に取得します。reporter / Playwright API / process観測が直接提供したraw factと、process exit code / 導出値を区別し、提供されないraw値を推測補完しません。`TestCase.outcome()`はPlaywrightから取得したresolved TestCase単位のraw factとして保持し、validatorの補助計算で置き換えません。preflightでブロックした場合はrunner未開始・artifact未生成を正当な結果として記録し、FullResult.status、成功exit code、reporter由来の具体的run-level error、resolved / attempt、runner管理cleanup成功を残しません。事前cleanup契約に対応するrun外cleanup実績は、run外準備の有無だけを理由に拒否しません。stale artifactを今回結果として利用しません。
 8. logical primary対象、resolved primary TestCase、各attempt、dependency / teardown testを分けます。execution成果物を開始した以上、logical primaryは最低1件記録します。resolved primaryの`実行開始`は空欄にせず、開始済みまたは明示的な未開始markerで記録します。retryはresolved件数へ加算しません。logical primaryがresolved 0件なら未実行 / 解決不能理由を残し、dependency / teardownは実行区分・test file / title path・project・repeatEachIndexのTestCase単位でretry連番を保持します。
 9. runnerを開始した場合だけ、今回runで生成・更新されたresult artifactを確認し、古いartifactを再利用しません。trace、storageState、HTML report、network、stdout等は機密情報を含み得るため自動共有・commit・転載をしません。
-10. runner管理分とrun外処理を行単位で分け、cleanupの成功 / 失敗 / 未確認 / 対象なし / 意図的に残した状態と残存副作用を記録します。既知のrunner管理cleanup対象がある場合はrunner管理cleanup契約・cleanup表を対象なしにせず、run外cleanup実績は事前のrun外cleanup契約と対応付けます。runner未開始時のrunner管理cleanup成功は矛盾として扱い、必要cleanupが未確認のまま安全な完了や機械的再実行へ進みません。
+10. runner管理分とrun外処理を行単位で分け、cleanupの成功 / 失敗 / 未確認 / 対象なし / 意図的に残した状態 / 一部失敗と残存副作用を記録します。既知のrunner管理cleanup対象がある場合はrunner管理cleanup契約・cleanup表を対象なしにせず、run外cleanup実績は事前のrun外cleanup契約と対応付けます。runner未開始時のrunner管理cleanup成功は矛盾として扱い、必要cleanupが未確認のまま安全な完了や機械的再実行へ進みません。
 11. 原因分析は行いません。異常、未実行、cleanup問題、明示分析要求は検証済み結果を`e2e-test-result-analysis`へ渡します。
 
 ## 出力

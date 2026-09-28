@@ -14,25 +14,28 @@
 
 ```json
 {
-  "schema_version": "1",
   "workflow_ref": "opaque UUID",
-  "state_revision": "storage-provided revision token",
-  "overall_state": "実行中",
-  "started_source_refs": [],
-  "knowledge_entry_refs": [],
-  "project_context_ref": "",
-  "project_context_revision": "",
-  "used_project_context_fields": [
-    {"stable_key":"qa.regression_scope","content_identity":"sha256","affected_scope":"Regression baseline","operation":"Run計画"}
-  ],
-  "source_dependencies": [],
-  "resource_conditions": [],
-  "mutable_operation_claims": [],
-  "unresolved": []
+  "schema_version": "1",
+  "state": {
+    "overall_state": "実行中",
+    "started_source_refs": [],
+    "knowledge_entry_refs": [],
+    "project_context_ref": "",
+    "project_context_revision": "",
+    "used_project_context_fields": [
+      {"stable_key":"qa.regression_scope","content_identity":"sha256","affected_scope":"Regression baseline","operation":"Run計画"}
+    ],
+    "source_dependencies": [],
+    "resource_conditions": [],
+    "mutable_operation_claims": [],
+    "unresolved": []
+  }
 }
 ```
 
-`state_revision`は保存先から取得し、更新時はそのartifactへのnative atomic conditional writeへ渡します。read後の比較と無条件writeをCAS扱いしません。Project Context全体revisionは記録できますが、currentnessは利用したstable keyだけを比較します。
+`artifact_graph.py`が保存するrecordは`workflow_ref` / `schema_version` / caller提供の`state`からなるenvelopeです。helperはenvelopeとworkflow identityを扱いますが、`state`内部のfield schemaは検証しません。このtemplateにないobjective / scope / produced refs等の固定fieldを、現在helperにない契約として追加しません。
+
+`state_revision`は保存record内のfieldではありません。helperがcreate / read結果のmetadataとして返すexact-content tokenで、local token自体はCAS条件になりません。更新を保存済みとして扱うには、保存先のnative atomic conditional writeへexpected revisionを渡せる必要があります。read後の比較と無条件writeをCAS扱いしません。Project Context全体revisionはprovenanceとして記録できますが、currentnessは利用したstable keyだけを比較します。
 
 | Skill | 対象 / 実行範囲 | 状態 | 成果物 / バージョン | ブロッカー / 備考 |
 | --- | --- | --- | --- | --- |
@@ -51,6 +54,7 @@
 | e2e-test-reporting |  | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |  |  |
 | test-target-inspection |  | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |  |  |
 | test-execution |  | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |  |  |
+| qa-workflow |  | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |  |  |
 | regression-testing | baseline / membership / Run計画 / Run結果更新 / 履歴参照のいずれか | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |  |  |
 | exploratory-testing | exploration / investigation のいずれか | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |  |  |
 | qa-knowledge | triage / create / update / revalidation / lookup / history のいずれか | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |  |  |

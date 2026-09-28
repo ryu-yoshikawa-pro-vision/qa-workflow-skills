@@ -31,13 +31,53 @@ def _revision_map(items: Any) -> tuple[dict[str, str], list[str]]:
             errors.append("invalid_source_revision")
             continue
         ref, revision = item.get("source_ref"), item.get("revision")
-        if not isinstance(ref, str) or not ref or not isinstance(revision, str) or not revision:
+        if not isinstance(ref, str) or not ref.strip() or not isinstance(revision, str) or not revision.strip():
             errors.append("missing_source_ref_or_revision")
             continue
         if ref in mapping:
             errors.append(f"duplicate_source_revision:{ref}")
         mapping[ref] = revision
     return mapping, errors
+
+
+def _membership_revision_map(membership: Any) -> tuple[dict[str, str], list[str]]:
+    errors: list[str] = []
+    source_refs = membership.get("source_refs") if isinstance(membership, dict) else None
+    if (
+        not isinstance(source_refs, list)
+        or not source_refs
+        or any(not isinstance(ref, str) or not ref.strip() for ref in source_refs)
+    ):
+        errors.append("membership_source_refs_invalid")
+    elif len(source_refs) != len(set(source_refs)):
+        errors.append("duplicate_membership_source_ref")
+
+    source_revisions = membership.get("source_revisions") if isinstance(membership, dict) else None
+    revisions: dict[str, str] = {}
+    if not isinstance(source_revisions, list) or not source_revisions:
+        errors.append("membership_source_revisions_invalid")
+    else:
+        for item in source_revisions:
+            if not isinstance(item, dict):
+                errors.append("invalid_membership_source_revision")
+                continue
+            source_ref, revision = item.get("source_ref"), item.get("revision")
+            if (
+                not isinstance(source_ref, str)
+                or not source_ref.strip()
+                or not isinstance(revision, str)
+                or not revision.strip()
+            ):
+                errors.append("missing_membership_source_ref_or_revision")
+                continue
+            if source_ref in revisions:
+                errors.append(f"duplicate_membership_source_revision:{source_ref}")
+            revisions[source_ref] = revision
+
+    if isinstance(source_refs, list) and all(isinstance(ref, str) and ref.strip() for ref in source_refs):
+        if set(source_refs) != set(revisions):
+            errors.append("membership_source_refs_revision_mismatch")
+    return revisions, errors
 
 
 def build_discovery_snapshot(data: dict[str, Any]) -> dict[str, Any]:
@@ -131,14 +171,27 @@ def reconcile_membership(snapshot: dict[str, Any], decisions: list[dict[str, Any
             issues.append(f"decision_for_noncurrent_or_unknown_tc:{ref}")
         if decision.get("decision") not in MEMBERSHIP or not str(decision.get("reason", "")).strip():
             issues.append(f"invalid_membership_decision:{ref}")
+        _, provenance_errors = _membership_revision_map(decision)
+        if provenance_errors:
+            issues.append(f"invalid_membership_provenance:{ref}")
         decision_by_ref[ref] = decision
     undecided = sorted(set(cases) - set(decision_by_ref))
     member_refs = sorted(ref for ref, item in decision_by_ref.items() if item.get("decision") == "member" and ref in cases)
     one_off = sorted(ref for ref, item in decision_by_ref.items() if item.get("decision") == "one_off" and ref in cases)
-    complete = bool(snapshot.get("complete")) and not undecided and not issues
+    unresolved_decisions = {ref for ref, item in decision_by_ref.items() if item.get("decision") == "unresolved"}
+    complete = bool(snapshot.get("complete")) and not undecided and not unresolved_decisions and not issues
+    memberships = [
+        {
+            **decision_by_ref[ref],
+            "tc_ref": ref,
+            "lifecycle_status": cases[ref]["lifecycle_status"],
+        }
+        for ref in sorted(decision_by_ref)
+        if ref in cases
+    ]
     return {
         "snapshot_ref": snapshot.get("snapshot_ref"),
-        "memberships": [decision_by_ref[ref] for ref in sorted(decision_by_ref) if ref in cases],
+        "memberships": memberships,
         "member_tc_refs": member_refs,
         "one_off_tc_refs": one_off,
         "unresolved_tc_refs": sorted(set(snapshot.get("unresolved_tc_refs", [])) | {ref for ref, item in decision_by_ref.items() if item.get("decision") == "unresolved"}),
@@ -149,39 +202,159 @@ def reconcile_membership(snapshot: dict[str, Any], decisions: list[dict[str, Any
 
 
 def check_baseline_currentness(baseline: dict[str, Any], current: dict[str, Any]) -> dict[str, Any]:
-    if not baseline.get("complete"):
+    if baseline.get("complete") is not True:
         return {"status": "incomplete", "changed_sources": [], "reason": "baseline_incomplete"}
-    if not current.get("complete"):
+    unresolved_refs = baseline.get("unresolved_tc_refs")
+    undecided_refs = baseline.get("undecided_tc_refs")
+    if (
+        not isinstance(unresolved_refs, list)
+        or unresolved_refs
+        or not isinstance(undecided_refs, list)
+        or undecided_refs
+    ):
+        return {"status": "incomplete", "changed_sources": [], "reason": "baseline_membership_completion_invalid"}
+    if current.get("complete") is not True:
         return {"status": "unresolved", "changed_sources": [], "reason": "current_discovery_incomplete"}
-    old = {item.get("source_ref"): item.get("revision") for item in baseline.get("source_revisions", [])}
-    new = {item.get("source_ref"): item.get("revision") for item in current.get("source_revisions", [])}
+    baseline_scope = baseline.get("scope_identity")
+    current_scope = current.get("scope_identity")
+    if not isinstance(baseline_scope, str) or not baseline_scope.strip():
+        return {"status": "incomplete", "changed_sources": [], "reason": "baseline_scope_identity_missing"}
+    if not isinstance(current_scope, str) or not current_scope.strip():
+        return {"status": "unresolved", "changed_sources": [], "reason": "current_scope_identity_missing"}
+    baseline_snapshot_ref = baseline.get("discovery_snapshot_ref")
+    current_snapshot_ref = current.get("snapshot_ref")
+    if not isinstance(baseline_snapshot_ref, str) or not baseline_snapshot_ref.strip():
+        return {"status": "incomplete", "changed_sources": [], "reason": "baseline_discovery_snapshot_ref_missing"}
+    if not isinstance(current_snapshot_ref, str) or not current_snapshot_ref.strip():
+        return {"status": "unresolved", "changed_sources": [], "reason": "current_discovery_snapshot_ref_missing"}
+    old, old_errors = _revision_map(baseline.get("source_revisions"))
+    if old_errors:
+        return {"status": "incomplete", "changed_sources": [], "reason": "baseline_source_revisions_invalid"}
+    if not old:
+        return {"status": "incomplete", "changed_sources": [], "reason": "baseline_source_revisions_empty"}
+    memberships = baseline.get("memberships")
+    if not isinstance(memberships, list):
+        return {"status": "incomplete", "changed_sources": [], "reason": "baseline_memberships_invalid"}
+    membership_revisions: dict[str, str] = {}
+    membership_refs: set[str] = set()
+    for membership in memberships:
+        if not isinstance(membership, dict):
+            return {"status": "incomplete", "changed_sources": [], "reason": "baseline_memberships_invalid"}
+        tc_ref = membership.get("tc_ref")
+        decision = membership.get("decision")
+        if (
+            not isinstance(tc_ref, str)
+            or not tc_ref.strip()
+            or tc_ref in membership_refs
+            or not isinstance(decision, str)
+            or decision not in MEMBERSHIP
+        ):
+            return {"status": "incomplete", "changed_sources": [], "reason": "baseline_memberships_invalid"}
+        membership_refs.add(tc_ref)
+        if decision == "unresolved":
+            return {"status": "incomplete", "changed_sources": [], "reason": "baseline_membership_completion_invalid"}
+        revisions, errors = _membership_revision_map(membership)
+        if errors:
+            return {"status": "incomplete", "changed_sources": [], "reason": "baseline_membership_provenance_invalid"}
+        for source_ref, revision in revisions.items():
+            if source_ref in membership_revisions and membership_revisions[source_ref] != revision:
+                return {"status": "incomplete", "changed_sources": [], "reason": "baseline_membership_revision_conflict"}
+            if old.get(source_ref) != revision:
+                return {"status": "incomplete", "changed_sources": [], "reason": "baseline_membership_revision_missing"}
+            membership_revisions[source_ref] = revision
+    current_cases = current.get("cases")
+    if not isinstance(current_cases, list):
+        return {"status": "unresolved", "changed_sources": [], "reason": "current_discovery_cases_invalid"}
+    current_tc_refs: set[str] = set()
+    seen_current_refs: set[str] = set()
+    for case in current_cases:
+        if not isinstance(case, dict):
+            return {"status": "unresolved", "changed_sources": [], "reason": "current_discovery_cases_invalid"}
+        tc_ref = case.get("tc_ref")
+        lifecycle = case.get("lifecycle_status")
+        if (
+            not isinstance(tc_ref, str)
+            or not tc_ref.strip()
+            or tc_ref in seen_current_refs
+            or not isinstance(lifecycle, str)
+            or lifecycle not in LIFECYCLE
+        ):
+            return {"status": "unresolved", "changed_sources": [], "reason": "current_discovery_cases_invalid"}
+        seen_current_refs.add(tc_ref)
+        if lifecycle == "current":
+            current_tc_refs.add(tc_ref)
+    population_mismatch = current_tc_refs != membership_refs
+    snapshot_changed = baseline_snapshot_ref != current_snapshot_ref
+    if population_mismatch and not snapshot_changed:
+        return {"status": "incomplete", "changed_sources": [], "reason": "baseline_membership_population_mismatch"}
+    new, new_errors = _revision_map(current.get("source_revisions"))
+    if new_errors:
+        return {"status": "unresolved", "changed_sources": [], "reason": "current_source_revisions_invalid"}
+    missing_current = sorted(set(old) - set(new))
+    if missing_current:
+        return {"status": "unresolved", "changed_sources": missing_current, "reason": "current_source_revision_missing"}
     changed = sorted(ref for ref in set(old) | set(new) if old.get(ref) != new.get(ref))
-    if baseline.get("scope_identity") != current.get("scope_identity"):
+    if baseline_scope != current_scope:
         changed.append("<scope>")
+    if snapshot_changed:
+        changed.append("<discovery_snapshot>")
+    changed.sort()
     return {"status": "stale" if changed else "current", "changed_sources": changed, "reason": "dependency_changed" if changed else "dependencies_match"}
 
 
 def plan_run(baseline: dict[str, Any], *, requested_scope: str | None, requested_tc_refs: list[str] | None = None, candidate_query_complete: bool = True, currentness: dict[str, Any] | None = None) -> dict[str, Any]:
-    members = set(baseline.get("member_tc_refs", []))
     if currentness is None:
         return {"status": "blocked", "reason": "baseline_currentness_unverified", "selected_tc_refs": []}
     if currentness.get("status") != "current":
         return {"status": "blocked", "reason": "baseline_not_current", "selected_tc_refs": []}
     if requested_scope == "full":
-        if not baseline.get("complete"):
+        if baseline.get("complete") is not True:
             return {"status": "blocked", "reason": "full_requires_complete_baseline", "selected_tc_refs": []}
-        return {"status": "ready", "scope": "full", "selected_tc_refs": sorted(members), "suite_complete": True}
+    elif requested_scope not in {None, "selected"}:
+        return {"status": "blocked", "reason": "invalid_scope", "selected_tc_refs": []}
     if requested_scope == "selected":
         selected = sorted(set(requested_tc_refs or []))
         if not selected:
             return {"status": "unresolved", "reason": "selected_scope_empty", "selected_tc_refs": []}
+
+    needs_members = requested_scope in {"full", "selected"} or (
+        requested_scope is None and not candidate_query_complete and baseline.get("complete") is True
+    )
+    members: set[str] = set()
+    if needs_members:
+        raw_members = baseline.get("member_tc_refs")
+        if not isinstance(raw_members, list) or any(not isinstance(ref, str) or not ref.strip() for ref in raw_members) or len(raw_members) != len(set(raw_members)):
+            return {"status": "blocked", "reason": "baseline_member_projection_invalid", "selected_tc_refs": []}
+        members = set(raw_members)
+        if "memberships" in baseline:
+            memberships = baseline.get("memberships")
+            if not isinstance(memberships, list):
+                return {"status": "blocked", "reason": "baseline_membership_projection_invalid", "selected_tc_refs": []}
+            membership_refs: set[str] = set()
+            expected_members: set[str] = set()
+            for item in memberships:
+                if not isinstance(item, dict):
+                    return {"status": "blocked", "reason": "baseline_membership_projection_invalid", "selected_tc_refs": []}
+                tc_ref = item.get("tc_ref")
+                decision = item.get("decision")
+                if not isinstance(tc_ref, str) or not tc_ref.strip() or tc_ref in membership_refs or decision not in MEMBERSHIP:
+                    return {"status": "blocked", "reason": "baseline_membership_projection_invalid", "selected_tc_refs": []}
+                membership_refs.add(tc_ref)
+                if decision == "member":
+                    if item.get("lifecycle_status") != "current":
+                        return {"status": "blocked", "reason": "baseline_membership_projection_invalid", "selected_tc_refs": []}
+                    expected_members.add(tc_ref)
+            if members != expected_members:
+                return {"status": "blocked", "reason": "baseline_membership_projection_mismatch", "selected_tc_refs": []}
+
+    if requested_scope == "full":
+        return {"status": "ready", "scope": "full", "selected_tc_refs": sorted(members), "suite_complete": True}
+    if requested_scope == "selected":
         unknown = sorted(set(selected) - members)
         if unknown:
             return {"status": "unresolved", "reason": "selected_tc_not_in_current_suite", "unresolved_tc_refs": unknown, "selected_tc_refs": []}
         return {"status": "ready", "scope": "selected", "selected_tc_refs": selected, "suite_complete": False}
-    if requested_scope is not None:
-        return {"status": "blocked", "reason": "invalid_scope", "selected_tc_refs": []}
-    if not candidate_query_complete and baseline.get("complete"):
+    if not candidate_query_complete and baseline.get("complete") is True:
         return {"status": "ready", "scope": "full", "selected_tc_refs": sorted(members), "suite_complete": True, "fallback_reason": "candidate_query_incomplete"}
     if not candidate_query_complete:
         return {"status": "blocked", "reason": "candidate_query_and_baseline_incomplete", "selected_tc_refs": []}
