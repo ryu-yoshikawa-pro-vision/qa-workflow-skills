@@ -1,3 +1,3 @@
 # Expected semantic contract
 
-Judge the case against the wcag-conformance-evaluation responsibility and evidence boundaries defined by the Plan.
+Use the deterministic target count and current candidate population/provenance. Select unique candidates without overlap with the structured sample, retain the canonical selection method/fingerprint, and close `target-met` only from the actual selected set. Do not hand-pick or fabricate random identities.

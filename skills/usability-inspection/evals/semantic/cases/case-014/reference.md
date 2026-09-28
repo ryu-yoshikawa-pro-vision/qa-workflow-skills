@@ -1,3 +1,3 @@
 # Expected semantic contract
 
-Judge the case against the usability-inspection responsibility and evidence boundaries defined by the Plan.
+Pass objective observations, closed requirement results, measurements, and immutable evidence refs to `usability-evaluation`. Keep semantic UX judgment and user-impact interpretation there; do not make the inspection owner report a usability defect on its behalf.

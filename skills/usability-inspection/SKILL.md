@@ -1,6 +1,6 @@
 ---
 name: usability-inspection
-description: 生きたWeb UIをPlaywrightで操作・観測し、ユーザビリティ、general accessibility、responsive表示、feedback、performance等を証拠付きで検査する。live targetやcurrent browserでの観測が必要なときに使用する。保存済みscreenshot・Figma・仕様だけをreference知識へ照合する依頼はusability-evaluation、詳細TCの実行はtest-execution、formal WCAG-EM適合性評価はwcag-conformance-evaluationへroutingする。
+description: 生きたWeb UIをPlaywrightで操作・観測し、ユーザビリティ、general accessibility、responsive表示、feedback、performance等を証拠付きで検査する。live targetやcurrent browserでの観測が必要なときに使用する。保存済みscreenshot・Figma・仕様の評価はusability-evaluationへroutingする。保存済みPlaywright observationやschemaのoffline検証だけでlive browser observationやユーザビリティ検査が求められていない依頼では使用しない。詳細TCの実行はtest-execution、formal WCAG-EM適合性評価はwcag-conformance-evaluationへroutingする。
 ---
 
 # Live Web UI usability inspection

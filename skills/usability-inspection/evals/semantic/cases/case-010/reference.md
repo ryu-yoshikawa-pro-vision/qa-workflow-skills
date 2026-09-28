@@ -1,3 +1,3 @@
 # Expected semantic contract
 
-Judge the case against the usability-inspection responsibility and evidence boundaries defined by the Plan.
+Keep a single Playwright interaction-elapsed measurement distinct from INP and Core Web Vitals. The fixture supplies no RUM, CrUX, or web-vitals source, so report INP as unavailable rather than relabeling an action duration.

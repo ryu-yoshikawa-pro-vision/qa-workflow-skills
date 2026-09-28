@@ -1,3 +1,3 @@
 # Expected semantic contract
 
-Judge the case against the wcag-conformance-evaluation responsibility and evidence boundaries defined by the Plan.
+Materialize the declared ordered default and critical-branch sequence as a complete process with explicit start/end condition and sample membership. Do not infer that a process is complete from individual page checks or claim coverage beyond its declared sequence.

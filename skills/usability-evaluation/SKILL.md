@@ -1,6 +1,6 @@
 ---
 name: usability-evaluation
-description: Evaluate a UI or design artifact against applicable UI patterns, accessibility standards, heuristics, and project context. Use for screenshots, Figma, specifications, or explicitly selected saved UI evidence. Route requests that require operating a live target to usability-inspection through qa-workflow.
+description: Evaluate a UI or design artifact against applicable UI patterns, accessibility standards, heuristics, and project context. Use for screenshots (including a request that refers to an image whose attachment is missing), Figma, specifications, or explicitly selected saved UI evidence. Route requests that require operating a live target to usability-inspection through qa-workflow.
 ---
 
 # Usability Evaluation

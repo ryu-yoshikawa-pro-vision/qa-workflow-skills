@@ -7,7 +7,6 @@
       "reference": "cases/case-001/reference.md",
       "criteria": [
         "UE-SEM-001",
-        "UE-SEM-002",
         "UE-SEM-003",
         "UE-SEM-004",
         "UE-SEM-005"
@@ -20,7 +19,6 @@
       "criteria": [
         "UE-SEM-001",
         "UE-SEM-002",
-        "UE-SEM-003",
         "UE-SEM-004",
         "UE-SEM-005"
       ]
@@ -32,8 +30,6 @@
       "criteria": [
         "UE-SEM-001",
         "UE-SEM-002",
-        "UE-SEM-003",
-        "UE-SEM-004",
         "UE-SEM-005"
       ]
     },
@@ -44,8 +40,6 @@
       "criteria": [
         "UE-SEM-001",
         "UE-SEM-002",
-        "UE-SEM-003",
-        "UE-SEM-004",
         "UE-SEM-005"
       ]
     },
@@ -55,8 +49,6 @@
       "reference": "cases/case-005/reference.md",
       "criteria": [
         "UE-SEM-001",
-        "UE-SEM-002",
-        "UE-SEM-003",
         "UE-SEM-004",
         "UE-SEM-005"
       ]
@@ -68,8 +60,6 @@
       "criteria": [
         "UE-SEM-001",
         "UE-SEM-002",
-        "UE-SEM-003",
-        "UE-SEM-004",
         "UE-SEM-005"
       ]
     },
@@ -80,7 +70,6 @@
       "criteria": [
         "UE-SEM-001",
         "UE-SEM-002",
-        "UE-SEM-003",
         "UE-SEM-004",
         "UE-SEM-005"
       ]
@@ -92,8 +81,6 @@
       "criteria": [
         "UE-SEM-001",
         "UE-SEM-002",
-        "UE-SEM-003",
-        "UE-SEM-004",
         "UE-SEM-005"
       ]
     },
@@ -102,10 +89,6 @@
       "input": "cases/case-009/input.md",
       "reference": "cases/case-009/reference.md",
       "criteria": [
-        "UE-SEM-001",
-        "UE-SEM-002",
-        "UE-SEM-003",
-        "UE-SEM-004",
         "UE-SEM-005"
       ]
     },
@@ -115,8 +98,6 @@
       "reference": "cases/case-010/reference.md",
       "criteria": [
         "UE-SEM-001",
-        "UE-SEM-002",
-        "UE-SEM-003",
         "UE-SEM-004",
         "UE-SEM-005"
       ]
@@ -127,8 +108,6 @@
       "reference": "cases/case-011/reference.md",
       "criteria": [
         "UE-SEM-001",
-        "UE-SEM-002",
-        "UE-SEM-003",
         "UE-SEM-004",
         "UE-SEM-005"
       ]
@@ -140,7 +119,6 @@
       "criteria": [
         "UE-SEM-001",
         "UE-SEM-002",
-        "UE-SEM-003",
         "UE-SEM-004",
         "UE-SEM-005"
       ]

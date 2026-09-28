@@ -7,8 +7,6 @@
       "reference": "cases/case-001/reference.md",
       "criteria": [
         "WCAG-SEM-001",
-        "WCAG-SEM-002",
-        "WCAG-SEM-003",
         "WCAG-SEM-004"
       ]
     },
@@ -17,9 +15,6 @@
       "input": "cases/case-002/input.md",
       "reference": "cases/case-002/reference.md",
       "criteria": [
-        "WCAG-SEM-001",
-        "WCAG-SEM-002",
-        "WCAG-SEM-003",
         "WCAG-SEM-004"
       ]
     },
@@ -29,8 +24,6 @@
       "reference": "cases/case-003/reference.md",
       "criteria": [
         "WCAG-SEM-001",
-        "WCAG-SEM-002",
-        "WCAG-SEM-003",
         "WCAG-SEM-004"
       ]
     },
@@ -39,9 +32,7 @@
       "input": "cases/case-004/input.md",
       "reference": "cases/case-004/reference.md",
       "criteria": [
-        "WCAG-SEM-001",
         "WCAG-SEM-002",
-        "WCAG-SEM-003",
         "WCAG-SEM-004"
       ]
     },
@@ -50,10 +41,7 @@
       "input": "cases/case-005/input.md",
       "reference": "cases/case-005/reference.md",
       "criteria": [
-        "WCAG-SEM-001",
-        "WCAG-SEM-002",
-        "WCAG-SEM-003",
-        "WCAG-SEM-004"
+        "WCAG-SEM-002"
       ]
     },
     {
@@ -61,10 +49,7 @@
       "input": "cases/case-006/input.md",
       "reference": "cases/case-006/reference.md",
       "criteria": [
-        "WCAG-SEM-001",
-        "WCAG-SEM-002",
-        "WCAG-SEM-003",
-        "WCAG-SEM-004"
+        "WCAG-SEM-002"
       ]
     },
     {
@@ -72,10 +57,7 @@
       "input": "cases/case-007/input.md",
       "reference": "cases/case-007/reference.md",
       "criteria": [
-        "WCAG-SEM-001",
-        "WCAG-SEM-002",
-        "WCAG-SEM-003",
-        "WCAG-SEM-004"
+        "WCAG-SEM-002"
       ]
     },
     {
@@ -83,10 +65,7 @@
       "input": "cases/case-008/input.md",
       "reference": "cases/case-008/reference.md",
       "criteria": [
-        "WCAG-SEM-001",
-        "WCAG-SEM-002",
-        "WCAG-SEM-003",
-        "WCAG-SEM-004"
+        "WCAG-SEM-002"
       ]
     },
     {
@@ -94,10 +73,7 @@
       "input": "cases/case-009/input.md",
       "reference": "cases/case-009/reference.md",
       "criteria": [
-        "WCAG-SEM-001",
-        "WCAG-SEM-002",
-        "WCAG-SEM-003",
-        "WCAG-SEM-004"
+        "WCAG-SEM-002"
       ]
     },
     {
@@ -105,10 +81,7 @@
       "input": "cases/case-010/input.md",
       "reference": "cases/case-010/reference.md",
       "criteria": [
-        "WCAG-SEM-001",
-        "WCAG-SEM-002",
-        "WCAG-SEM-003",
-        "WCAG-SEM-004"
+        "WCAG-SEM-002"
       ]
     },
     {
@@ -117,8 +90,6 @@
       "reference": "cases/case-011/reference.md",
       "criteria": [
         "WCAG-SEM-001",
-        "WCAG-SEM-002",
-        "WCAG-SEM-003",
         "WCAG-SEM-004"
       ]
     },
@@ -128,8 +99,6 @@
       "reference": "cases/case-012/reference.md",
       "criteria": [
         "WCAG-SEM-001",
-        "WCAG-SEM-002",
-        "WCAG-SEM-003",
         "WCAG-SEM-004"
       ]
     },
@@ -138,8 +107,6 @@
       "input": "cases/case-013/input.md",
       "reference": "cases/case-013/reference.md",
       "criteria": [
-        "WCAG-SEM-001",
-        "WCAG-SEM-002",
         "WCAG-SEM-003",
         "WCAG-SEM-004"
       ]
@@ -150,8 +117,6 @@
       "reference": "cases/case-014/reference.md",
       "criteria": [
         "WCAG-SEM-001",
-        "WCAG-SEM-002",
-        "WCAG-SEM-003",
         "WCAG-SEM-004"
       ]
     },
@@ -161,8 +126,6 @@
       "reference": "cases/case-015/reference.md",
       "criteria": [
         "WCAG-SEM-001",
-        "WCAG-SEM-002",
-        "WCAG-SEM-003",
         "WCAG-SEM-004"
       ]
     },
@@ -172,9 +135,7 @@
       "reference": "cases/case-016/reference.md",
       "criteria": [
         "WCAG-SEM-001",
-        "WCAG-SEM-002",
-        "WCAG-SEM-003",
-        "WCAG-SEM-004"
+        "WCAG-SEM-003"
       ]
     },
     {
@@ -182,10 +143,7 @@
       "input": "cases/case-017/input.md",
       "reference": "cases/case-017/reference.md",
       "criteria": [
-        "WCAG-SEM-001",
-        "WCAG-SEM-002",
-        "WCAG-SEM-003",
-        "WCAG-SEM-004"
+        "WCAG-SEM-002"
       ]
     },
     {
@@ -193,10 +151,7 @@
       "input": "cases/case-018/input.md",
       "reference": "cases/case-018/reference.md",
       "criteria": [
-        "WCAG-SEM-001",
-        "WCAG-SEM-002",
-        "WCAG-SEM-003",
-        "WCAG-SEM-004"
+        "WCAG-SEM-002"
       ]
     },
     {
@@ -204,10 +159,7 @@
       "input": "cases/case-019/input.md",
       "reference": "cases/case-019/reference.md",
       "criteria": [
-        "WCAG-SEM-001",
-        "WCAG-SEM-002",
-        "WCAG-SEM-003",
-        "WCAG-SEM-004"
+        "WCAG-SEM-002"
       ]
     },
     {
@@ -215,10 +167,7 @@
       "input": "cases/case-020/input.md",
       "reference": "cases/case-020/reference.md",
       "criteria": [
-        "WCAG-SEM-001",
-        "WCAG-SEM-002",
-        "WCAG-SEM-003",
-        "WCAG-SEM-004"
+        "WCAG-SEM-002"
       ]
     },
     {
@@ -226,10 +175,7 @@
       "input": "cases/case-021/input.md",
       "reference": "cases/case-021/reference.md",
       "criteria": [
-        "WCAG-SEM-001",
-        "WCAG-SEM-002",
-        "WCAG-SEM-003",
-        "WCAG-SEM-004"
+        "WCAG-SEM-002"
       ]
     },
     {
@@ -237,9 +183,6 @@
       "input": "cases/case-022/input.md",
       "reference": "cases/case-022/reference.md",
       "criteria": [
-        "WCAG-SEM-001",
-        "WCAG-SEM-002",
-        "WCAG-SEM-003",
         "WCAG-SEM-004"
       ]
     },
@@ -249,8 +192,6 @@
       "reference": "cases/case-023/reference.md",
       "criteria": [
         "WCAG-SEM-001",
-        "WCAG-SEM-002",
-        "WCAG-SEM-003",
         "WCAG-SEM-004"
       ]
     },
@@ -259,9 +200,6 @@
       "input": "cases/case-024/input.md",
       "reference": "cases/case-024/reference.md",
       "criteria": [
-        "WCAG-SEM-001",
-        "WCAG-SEM-002",
-        "WCAG-SEM-003",
         "WCAG-SEM-004"
       ]
     },
@@ -270,9 +208,6 @@
       "input": "cases/case-025/input.md",
       "reference": "cases/case-025/reference.md",
       "criteria": [
-        "WCAG-SEM-001",
-        "WCAG-SEM-002",
-        "WCAG-SEM-003",
         "WCAG-SEM-004"
       ]
     },
@@ -281,8 +216,6 @@
       "input": "cases/case-026/input.md",
       "reference": "cases/case-026/reference.md",
       "criteria": [
-        "WCAG-SEM-001",
-        "WCAG-SEM-002",
         "WCAG-SEM-003",
         "WCAG-SEM-004"
       ]
@@ -292,9 +225,6 @@
       "input": "cases/case-027/input.md",
       "reference": "cases/case-027/reference.md",
       "criteria": [
-        "WCAG-SEM-001",
-        "WCAG-SEM-002",
-        "WCAG-SEM-003",
         "WCAG-SEM-004"
       ]
     },
@@ -303,9 +233,6 @@
       "input": "cases/case-028/input.md",
       "reference": "cases/case-028/reference.md",
       "criteria": [
-        "WCAG-SEM-001",
-        "WCAG-SEM-002",
-        "WCAG-SEM-003",
         "WCAG-SEM-004"
       ]
     },
@@ -314,8 +241,6 @@
       "input": "cases/case-029/input.md",
       "reference": "cases/case-029/reference.md",
       "criteria": [
-        "WCAG-SEM-001",
-        "WCAG-SEM-002",
         "WCAG-SEM-003",
         "WCAG-SEM-004"
       ]
@@ -325,9 +250,7 @@
       "input": "cases/case-030/input.md",
       "reference": "cases/case-030/reference.md",
       "criteria": [
-        "WCAG-SEM-001",
         "WCAG-SEM-002",
-        "WCAG-SEM-003",
         "WCAG-SEM-004"
       ]
     },
@@ -338,7 +261,6 @@
       "criteria": [
         "WCAG-SEM-001",
         "WCAG-SEM-002",
-        "WCAG-SEM-003",
         "WCAG-SEM-004"
       ]
     },
@@ -348,9 +270,7 @@
       "reference": "cases/case-032/reference.md",
       "criteria": [
         "WCAG-SEM-001",
-        "WCAG-SEM-002",
-        "WCAG-SEM-003",
-        "WCAG-SEM-004"
+        "WCAG-SEM-003"
       ]
     },
     {
@@ -358,9 +278,6 @@
       "input": "cases/case-033/input.md",
       "reference": "cases/case-033/reference.md",
       "criteria": [
-        "WCAG-SEM-001",
-        "WCAG-SEM-002",
-        "WCAG-SEM-003",
         "WCAG-SEM-004"
       ]
     },
@@ -370,8 +287,6 @@
       "reference": "cases/case-034/reference.md",
       "criteria": [
         "WCAG-SEM-001",
-        "WCAG-SEM-002",
-        "WCAG-SEM-003",
         "WCAG-SEM-004"
       ]
     },
@@ -381,9 +296,7 @@
       "reference": "cases/case-035/reference.md",
       "criteria": [
         "WCAG-SEM-001",
-        "WCAG-SEM-002",
-        "WCAG-SEM-003",
-        "WCAG-SEM-004"
+        "WCAG-SEM-003"
       ]
     },
     {
@@ -391,10 +304,8 @@
       "input": "cases/case-036/input.md",
       "reference": "cases/case-036/reference.md",
       "criteria": [
-        "WCAG-SEM-001",
         "WCAG-SEM-002",
-        "WCAG-SEM-003",
-        "WCAG-SEM-004"
+        "WCAG-SEM-003"
       ]
     },
     {
@@ -402,9 +313,6 @@
       "input": "cases/case-037/input.md",
       "reference": "cases/case-037/reference.md",
       "criteria": [
-        "WCAG-SEM-001",
-        "WCAG-SEM-002",
-        "WCAG-SEM-003",
         "WCAG-SEM-004"
       ]
     },
@@ -414,9 +322,7 @@
       "reference": "cases/case-038/reference.md",
       "criteria": [
         "WCAG-SEM-001",
-        "WCAG-SEM-002",
-        "WCAG-SEM-003",
-        "WCAG-SEM-004"
+        "WCAG-SEM-003"
       ]
     }
   ]

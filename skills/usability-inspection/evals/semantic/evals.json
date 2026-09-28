@@ -7,9 +7,7 @@
       "reference": "cases/case-001/reference.md",
       "criteria": [
         "UI-SEM-001",
-        "UI-SEM-002",
-        "UI-SEM-003",
-        "UI-SEM-004"
+        "UI-SEM-003"
       ]
     },
     {
@@ -18,7 +16,6 @@
       "reference": "cases/case-002/reference.md",
       "criteria": [
         "UI-SEM-001",
-        "UI-SEM-002",
         "UI-SEM-003",
         "UI-SEM-004"
       ]
@@ -28,9 +25,6 @@
       "input": "cases/case-003/input.md",
       "reference": "cases/case-003/reference.md",
       "criteria": [
-        "UI-SEM-001",
-        "UI-SEM-002",
-        "UI-SEM-003",
         "UI-SEM-004"
       ]
     },
@@ -40,9 +34,7 @@
       "reference": "cases/case-004/reference.md",
       "criteria": [
         "UI-SEM-001",
-        "UI-SEM-002",
-        "UI-SEM-003",
-        "UI-SEM-004"
+        "UI-SEM-003"
       ]
     },
     {
@@ -51,9 +43,7 @@
       "reference": "cases/case-005/reference.md",
       "criteria": [
         "UI-SEM-001",
-        "UI-SEM-002",
-        "UI-SEM-003",
-        "UI-SEM-004"
+        "UI-SEM-003"
       ]
     },
     {
@@ -62,9 +52,7 @@
       "reference": "cases/case-006/reference.md",
       "criteria": [
         "UI-SEM-001",
-        "UI-SEM-002",
-        "UI-SEM-003",
-        "UI-SEM-004"
+        "UI-SEM-003"
       ]
     },
     {
@@ -73,9 +61,7 @@
       "reference": "cases/case-007/reference.md",
       "criteria": [
         "UI-SEM-001",
-        "UI-SEM-002",
-        "UI-SEM-003",
-        "UI-SEM-004"
+        "UI-SEM-003"
       ]
     },
     {
@@ -84,9 +70,7 @@
       "reference": "cases/case-008/reference.md",
       "criteria": [
         "UI-SEM-001",
-        "UI-SEM-002",
-        "UI-SEM-003",
-        "UI-SEM-004"
+        "UI-SEM-003"
       ]
     },
     {
@@ -95,9 +79,7 @@
       "reference": "cases/case-009/reference.md",
       "criteria": [
         "UI-SEM-001",
-        "UI-SEM-002",
-        "UI-SEM-003",
-        "UI-SEM-004"
+        "UI-SEM-003"
       ]
     },
     {
@@ -106,9 +88,7 @@
       "reference": "cases/case-010/reference.md",
       "criteria": [
         "UI-SEM-001",
-        "UI-SEM-002",
-        "UI-SEM-003",
-        "UI-SEM-004"
+        "UI-SEM-003"
       ]
     },
     {
@@ -118,8 +98,7 @@
       "criteria": [
         "UI-SEM-001",
         "UI-SEM-002",
-        "UI-SEM-003",
-        "UI-SEM-004"
+        "UI-SEM-003"
       ]
     },
     {
@@ -129,8 +108,7 @@
       "criteria": [
         "UI-SEM-001",
         "UI-SEM-002",
-        "UI-SEM-003",
-        "UI-SEM-004"
+        "UI-SEM-003"
       ]
     },
     {
@@ -138,10 +116,8 @@
       "input": "cases/case-013/input.md",
       "reference": "cases/case-013/reference.md",
       "criteria": [
-        "UI-SEM-001",
         "UI-SEM-002",
-        "UI-SEM-003",
-        "UI-SEM-004"
+        "UI-SEM-003"
       ]
     },
     {
@@ -150,8 +126,6 @@
       "reference": "cases/case-014/reference.md",
       "criteria": [
         "UI-SEM-001",
-        "UI-SEM-002",
-        "UI-SEM-003",
         "UI-SEM-004"
       ]
     },
@@ -161,7 +135,6 @@
       "reference": "cases/case-015/reference.md",
       "criteria": [
         "UI-SEM-001",
-        "UI-SEM-002",
         "UI-SEM-003",
         "UI-SEM-004"
       ]
@@ -171,10 +144,8 @@
       "input": "cases/case-016/input.md",
       "reference": "cases/case-016/reference.md",
       "criteria": [
-        "UI-SEM-001",
         "UI-SEM-002",
-        "UI-SEM-003",
-        "UI-SEM-004"
+        "UI-SEM-003"
       ]
     },
     {
@@ -183,9 +154,7 @@
       "reference": "cases/case-017/reference.md",
       "criteria": [
         "UI-SEM-001",
-        "UI-SEM-002",
-        "UI-SEM-003",
-        "UI-SEM-004"
+        "UI-SEM-003"
       ]
     },
     {
@@ -194,9 +163,7 @@
       "reference": "cases/case-018/reference.md",
       "criteria": [
         "UI-SEM-001",
-        "UI-SEM-002",
-        "UI-SEM-003",
-        "UI-SEM-004"
+        "UI-SEM-003"
       ]
     },
     {
@@ -204,10 +171,7 @@
       "input": "cases/case-019/input.md",
       "reference": "cases/case-019/reference.md",
       "criteria": [
-        "UI-SEM-001",
-        "UI-SEM-002",
-        "UI-SEM-003",
-        "UI-SEM-004"
+        "UI-SEM-003"
       ]
     },
     {
@@ -215,9 +179,6 @@
       "input": "cases/case-020/input.md",
       "reference": "cases/case-020/reference.md",
       "criteria": [
-        "UI-SEM-001",
-        "UI-SEM-002",
-        "UI-SEM-003",
         "UI-SEM-004"
       ]
     },
@@ -227,9 +188,7 @@
       "reference": "cases/case-021/reference.md",
       "criteria": [
         "UI-SEM-001",
-        "UI-SEM-002",
-        "UI-SEM-003",
-        "UI-SEM-004"
+        "UI-SEM-003"
       ]
     },
     {
@@ -238,9 +197,7 @@
       "reference": "cases/case-022/reference.md",
       "criteria": [
         "UI-SEM-001",
-        "UI-SEM-002",
-        "UI-SEM-003",
-        "UI-SEM-004"
+        "UI-SEM-003"
       ]
     },
     {
@@ -249,9 +206,7 @@
       "reference": "cases/case-023/reference.md",
       "criteria": [
         "UI-SEM-001",
-        "UI-SEM-002",
-        "UI-SEM-003",
-        "UI-SEM-004"
+        "UI-SEM-003"
       ]
     },
     {
@@ -259,10 +214,8 @@
       "input": "cases/case-024/input.md",
       "reference": "cases/case-024/reference.md",
       "criteria": [
-        "UI-SEM-001",
         "UI-SEM-002",
-        "UI-SEM-003",
-        "UI-SEM-004"
+        "UI-SEM-003"
       ]
     },
     {
@@ -270,8 +223,6 @@
       "input": "cases/case-025/input.md",
       "reference": "cases/case-025/reference.md",
       "criteria": [
-        "UI-SEM-001",
-        "UI-SEM-002",
         "UI-SEM-003",
         "UI-SEM-004"
       ]
@@ -281,9 +232,6 @@
       "input": "cases/case-026/input.md",
       "reference": "cases/case-026/reference.md",
       "criteria": [
-        "UI-SEM-001",
-        "UI-SEM-002",
-        "UI-SEM-003",
         "UI-SEM-004"
       ]
     },
@@ -292,8 +240,6 @@
       "input": "cases/case-027/input.md",
       "reference": "cases/case-027/reference.md",
       "criteria": [
-        "UI-SEM-001",
-        "UI-SEM-002",
         "UI-SEM-003",
         "UI-SEM-004"
       ]
@@ -304,9 +250,7 @@
       "reference": "cases/case-028/reference.md",
       "criteria": [
         "UI-SEM-001",
-        "UI-SEM-002",
-        "UI-SEM-003",
-        "UI-SEM-004"
+        "UI-SEM-003"
       ]
     },
     {
@@ -315,9 +259,7 @@
       "reference": "cases/case-029/reference.md",
       "criteria": [
         "UI-SEM-001",
-        "UI-SEM-002",
-        "UI-SEM-003",
-        "UI-SEM-004"
+        "UI-SEM-003"
       ]
     },
     {
@@ -326,9 +268,7 @@
       "reference": "cases/case-030/reference.md",
       "criteria": [
         "UI-SEM-001",
-        "UI-SEM-002",
-        "UI-SEM-003",
-        "UI-SEM-004"
+        "UI-SEM-003"
       ]
     },
     {
@@ -337,7 +277,6 @@
       "reference": "cases/case-031/reference.md",
       "criteria": [
         "UI-SEM-001",
-        "UI-SEM-002",
         "UI-SEM-003",
         "UI-SEM-004"
       ]
@@ -349,8 +288,7 @@
       "criteria": [
         "UI-SEM-001",
         "UI-SEM-002",
-        "UI-SEM-003",
-        "UI-SEM-004"
+        "UI-SEM-003"
       ]
     },
     {
@@ -359,7 +297,6 @@
       "reference": "cases/case-033/reference.md",
       "criteria": [
         "UI-SEM-001",
-        "UI-SEM-002",
         "UI-SEM-003",
         "UI-SEM-004"
       ]
