@@ -22,8 +22,20 @@ def load(name: str, path: Path):
     return module
 
 
+def load_registered(name: str, path: Path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        raise ImportError(path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
 structure = load("usability_inspection_structure_contract", INSPECTION / "scripts/inspection_structure.py")
 observation = load("usability_inspection_observation_contract", INSPECTION / "scripts/observation_contract.py")
+runtime_contract = load_registered("usability_inspection_runtime_contract_for_observation_test",
+                                   INSPECTION / "scripts/runtime_contract.py")
 measurement = load("usability_inspection_measurements", INSPECTION / "scripts/measurement.py")
 checks = load("usability_inspection_criterion_checks", INSPECTION / "scripts/criterion_checks.py")
 criterion_plan = load("wcag_criterion_plan_for_inspection_test", WCAG / "scripts/wcag_criterion_plan.py")
@@ -122,10 +134,143 @@ class ObservationContractTests(unittest.TestCase):
             "evidence_refs": ["E-1"],
         }, current_document_identity="doc-1")
         self.assertEqual(normalized["status"], "ok")
+        exact_geometry_values = runtime_contract.strict_loads(json.dumps({
+            "x_css_px": 1.25, "y_css_px": 2, "width_css_px": 100.5, "height_css_px": 20,
+        }))
+        exact_geometry = observation.normalize_probe_result(geometry, {
+            "probe_key": "element-geometry", "document_identity": "doc-1", "status": "ok",
+            "value": exact_geometry_values,
+            "evidence_refs": ["E-1"],
+        }, current_document_identity="doc-1")
+        self.assertEqual(exact_geometry["value"]["width_css_px"].text(), "100.5")
         with self.assertRaises(observation.ObservationContractError):
             observation.normalize_probe_result(geometry, {
                 "probe_key": "element-geometry", "document_identity": "doc-1", "status": "ok",
                 "value": {"x_css_px": float("nan"), "y_css_px": 2, "width_css_px": 100, "height_css_px": 20},
+            }, current_document_identity="doc-1")
+
+    def test_responsive_boundaries_require_verified_rows_and_materialize_canonical_refs(self):
+        probe = next(row for row in observation.plan_probes(
+            selected_rule_keys=[], measurement_kinds=[], aspect_keys=["visual-responsive"], target_refs=[]
+        )["probes"] if row["observation_field"] == "responsive.boundaries")
+        base = {
+            "condition_ref": "COND-003", "axis": "width",
+            "before_viewport_css_px": 768, "transition_viewport_css_px": 769,
+            "after_viewport_css_px": 770, "match_states": [True, False, False],
+            "raw_condition": "(max-width: 48rem)",
+            "derivation_method": "fixed browser evaluation with neighboring verification",
+            "execution_status": "executable", "evidence_ref": "E-2",
+        }
+        payload = {
+            "probe_key": "responsive-boundaries", "document_identity": "doc-1", "status": "ok",
+            "value": {"boundaries": [base, {**base, "evidence_ref": "E-1"}], "complete": True, "status": "ok"},
+            "evidence_refs": ["E-2", "E-1"],
+        }
+        normalized = observation.normalize_probe_result(probe, payload, current_document_identity="doc-1")
+        self.assertEqual(normalized["value"]["boundaries"], [{
+            "boundary_ref": "BOUNDARY-001", "condition_ref": "COND-003", "axis": "width",
+            "before_viewport_css_px": 768, "transition_viewport_css_px": 769,
+            "after_viewport_css_px": 770, "match_states": [True, False, False],
+            "raw_condition": "(max-width: 48rem)",
+            "derivation_method": "fixed browser evaluation with neighboring verification",
+            "execution_status": "executable", "evidence_refs": ["E-1", "E-2"],
+            "detection_status": "normalized",
+        }])
+        self.assertEqual(normalized["value"]["closures"], [])
+
+        no_numeric_boundary = {**payload, "value": {"boundaries": [], "closures": [
+            {"condition_ref": "COND-004", "status": "non-numeric-presentation-variation",
+             "reason": "style query is retained as a presentation variation"},
+            {"condition_ref": "COND-005", "status": "no-numeric-transition",
+             "reason": "browser evaluation found no transition in the finite viewport range"},
+        ], "complete": True, "status": "ok"}}
+        closed = observation.normalize_probe_result(probe, no_numeric_boundary, current_document_identity="doc-1")
+        self.assertEqual([row["status"] for row in closed["value"]["closures"]],
+                         ["non-numeric-presentation-variation", "no-numeric-transition"])
+
+        exact_container_boundary = {**base, "axis": "inline-size",
+                                    "container_width_css_px": runtime_contract.strict_loads("[670.5,671.25,672.75]")}
+        exact_boundary_result = observation.normalize_probe_result(probe, {
+            "probe_key": "responsive-boundaries", "document_identity": "doc-1", "status": "ok",
+            "value": {"boundaries": [exact_container_boundary], "complete": True, "status": "ok"},
+            "evidence_refs": ["E-2"],
+        }, current_document_identity="doc-1")
+        self.assertEqual(exact_boundary_result["value"]["boundaries"][0]["container_width_css_px"][1].text(),
+                         "671.25")
+
+        malformed = {**payload, "value": {"boundaries": [{}], "complete": True, "status": "ok"}}
+        with self.assertRaises(observation.ObservationContractError):
+            observation.normalize_probe_result(probe, malformed, current_document_identity="doc-1")
+        inconsistent = {**payload, "value": {"boundaries": [
+            {**base, "match_states": [True, True, False]}
+        ], "complete": True, "status": "ok"}}
+        with self.assertRaises(observation.ObservationContractError):
+            observation.normalize_probe_result(probe, inconsistent, current_document_identity="doc-1")
+
+    def test_responsive_condition_inventory_is_typed_and_closed(self):
+        probe = next(row for row in observation.plan_probes(
+            selected_rule_keys=[], measurement_kinds=["responsive"], aspect_keys=[]
+        )["probes"] if row["observation_field"] == "responsive.conditions")
+        condition = {
+            "condition_ref": "COND-001", "source_ref": "CSS-SOURCE-001", "query_kind": "container-style",
+            "raw_condition": "style(--contrast: high)", "query_container_name": "product-layout",
+            "query_container_type": "inline-size", "query_container_identity": "main:nth-of-type(1)",
+            "axis": None, "feature": None, "browser_capability": "available",
+            "evaluation_method": "browser computed value of the queried container custom property",
+            "current_match_state": False, "execution_status": "executable", "execution_reason": None,
+            "evidence_refs": ["E-1"],
+        }
+        raw = {"conditions": [condition], "complete": True, "status": "ok", "issues": [],
+               "viewport": {"width_css_px": 1280, "height_css_px": 800}}
+        normalized = observation.normalize_probe_result({**probe, "probe_ref": "PROBE-001"}, {
+            "probe_key": "responsive-conditions", "document_identity": "doc-1", "status": "ok",
+            "value": raw, "evidence_refs": ["E-1"],
+        }, current_document_identity="doc-1")
+        self.assertEqual(normalized["value"]["conditions"][0]["query_kind"], "container-style")
+        self.assertEqual(normalized["value"]["viewport"]["width_css_px"], 1280)
+
+        unexecutable = {**condition, "condition_ref": "COND-002", "browser_capability": "unavailable",
+                        "current_match_state": None, "execution_status": "not-executable",
+                        "execution_reason": "required safe state is not available in this session"}
+        complete_inventory = observation.normalize_probe_result({**probe, "probe_ref": "PROBE-001"}, {
+            "probe_key": "responsive-conditions", "document_identity": "doc-1", "status": "ok",
+            "value": {**raw, "conditions": [unexecutable]}, "evidence_refs": ["E-1"],
+        }, current_document_identity="doc-1")
+        self.assertTrue(complete_inventory["value"]["complete"])
+        self.assertEqual(complete_inventory["value"]["conditions"][0]["execution_status"], "not-executable")
+
+        malformed = {**raw, "conditions": [{**condition, "execution_status": "ready"}]}
+        with self.assertRaises(observation.ObservationContractError):
+            observation.normalize_probe_result({**probe, "probe_ref": "PROBE-001"}, {
+                "probe_key": "responsive-conditions", "document_identity": "doc-1", "status": "ok",
+                "value": malformed, "evidence_refs": ["E-1"],
+            }, current_document_identity="doc-1")
+
+    def test_interaction_timing_requires_same_page_clock_and_consistent_elapsed_value(self):
+        probe = next(row for row in observation.plan_probes(
+            selected_rule_keys=[], measurement_kinds=["interaction-timing"], aspect_keys=[]
+        )["probes"] if row["observation_field"] == "interaction.timing")
+        valid = {"start_ms": 12.5, "end_ms": 45.0, "elapsed_ms": 32.5,
+                 "predicate_result": {"predicate_key": "text-present", "matched": True},
+                 "clock_domain": "same-page-performance-now", "status": "ok"}
+        normalized = observation.normalize_probe_result({**probe, "probe_ref": "PROBE-001"}, {
+            "probe_key": "interaction-timing", "document_identity": "doc-1", "status": "ok",
+            "value": valid, "evidence_refs": ["E-1"],
+        }, current_document_identity="doc-1")
+        self.assertEqual(normalized["value"]["elapsed_ms"], 32.5)
+        exact_timing = runtime_contract.strict_loads(json.dumps({
+            **valid, "start_ms": 6579656.700000018, "end_ms": 6579672.800000012,
+            "elapsed_ms": 16.099999994039536,
+        }))
+        exact_normalized = observation.normalize_probe_result({**probe, "probe_ref": "PROBE-001"}, {
+            "probe_key": "interaction-timing", "document_identity": "doc-1", "status": "ok",
+            "value": exact_timing, "evidence_refs": ["E-1"],
+        }, current_document_identity="doc-1")
+        self.assertEqual(exact_normalized["value"]["elapsed_ms"].text(), "16.099999994039536")
+        with self.assertRaises(observation.ObservationContractError):
+            observation.normalize_probe_result({**probe, "probe_ref": "PROBE-001"}, {
+                "probe_key": "interaction-timing", "document_identity": "doc-1", "status": "ok",
+                "value": {**valid, "elapsed_ms": 40}, "evidence_refs": ["E-1"],
             }, current_document_identity="doc-1")
 
     def test_fixed_predicates_reject_unknown_code_and_browser_owned_baseline(self):

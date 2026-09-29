@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-import math
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 
@@ -83,6 +83,25 @@ def _exact_fields(value: dict[str, Any], required: set[str], optional: set[str] 
     extra = set(value) - required - optional
     if missing or extra:
         raise ObservationContractError(f"field mismatch missing={sorted(missing)} extra={sorted(extra)}")
+
+
+def _decimal_number(value: Any) -> Decimal | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float, Decimal)):
+        try:
+            number = Decimal(str(value))
+        except (InvalidOperation, TypeError, ValueError):
+            return None
+        return number if number.is_finite() else None
+    exact_text = getattr(value, "text", None)
+    if not callable(exact_text):
+        return None
+    try:
+        number = Decimal(exact_text())
+    except (InvalidOperation, TypeError, ValueError):
+        return None
+    return number if number.is_finite() else None
 
 
 def validate_predicate(predicate: dict[str, Any]) -> dict[str, Any]:
@@ -273,6 +292,215 @@ def _required_result_fields(field: str) -> list[str]:
     return fields[field]
 
 
+def _normalize_responsive_boundaries(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise ObservationContractError("responsive boundary value must be an object")
+    _exact_fields(value, {"boundaries", "complete", "status"}, {"closures"})
+    if not isinstance(value["complete"], bool) or value["status"] not in FORMAL_STATUSES:
+        raise ObservationContractError("responsive boundary completeness/status is invalid")
+    if value["status"] != "ok" or not value["complete"]:
+        raise ObservationContractError("successful responsive boundary result must be complete")
+    if not isinstance(value["boundaries"], list):
+        raise ObservationContractError("responsive boundaries must be an array")
+
+    required = {
+        "condition_ref", "axis", "before_viewport_css_px", "transition_viewport_css_px",
+        "after_viewport_css_px", "match_states", "raw_condition", "derivation_method",
+        "execution_status",
+    }
+    optional = {"container_width_css_px", "container_height_css_px", "evidence_ref", "evidence_refs"}
+    by_identity: dict[tuple[str, str, int], dict[str, Any]] = {}
+    for row in value["boundaries"]:
+        if not isinstance(row, dict):
+            raise ObservationContractError("responsive boundary row must be an object")
+        _exact_fields(row, required, optional)
+        if not all(isinstance(row[name], str) and row[name].strip()
+                   for name in ("condition_ref", "raw_condition", "derivation_method")):
+            raise ObservationContractError("responsive boundary identity and derivation fields must be non-empty strings")
+        axis = row["axis"]
+        if axis not in {"width", "height", "inline-size", "block-size"}:
+            raise ObservationContractError("responsive boundary axis is not supported by the fixed contract")
+        before, transition, after = (
+            row["before_viewport_css_px"], row["transition_viewport_css_px"], row["after_viewport_css_px"]
+        )
+        if any(isinstance(number, bool) or not isinstance(number, int) or number < 0
+               for number in (before, transition, after)):
+            raise ObservationContractError("responsive boundary positions must be non-negative integer CSS px")
+        if (transition != before + 1 or after != transition + 1):
+            raise ObservationContractError("responsive boundary positions must be neighboring CSS px values")
+        states = row["match_states"]
+        if (not isinstance(states, list) or len(states) != 3
+                or any(not isinstance(state, bool) for state in states)
+                or states[0] == states[1] or states[1] != states[2]):
+            raise ObservationContractError("responsive boundary must retain a verified before/transition/after match sequence")
+        if row["execution_status"] not in {"executable", "not-executable"}:
+            raise ObservationContractError("responsive boundary execution status is invalid")
+        if axis in {"inline-size", "block-size"}:
+            geometry_field = "container_width_css_px" if axis == "inline-size" else "container_height_css_px"
+            geometry = row.get(geometry_field)
+            if (not isinstance(geometry, list) or len(geometry) != 3
+                    or any((number_value := _decimal_number(number)) is None or number_value < 0
+                           for number in geometry)):
+                raise ObservationContractError("container boundary must retain its three query-container measurements")
+        elif "container_width_css_px" in row or "container_height_css_px" in row:
+            raise ObservationContractError("viewport boundary cannot carry query-container measurements")
+
+        refs: list[str] = []
+        if "evidence_ref" in row:
+            refs.append(row["evidence_ref"])
+        if "evidence_refs" in row:
+            evidence_refs = row["evidence_refs"]
+            if not isinstance(evidence_refs, list):
+                raise ObservationContractError("responsive boundary evidence_refs must be an array")
+            refs.extend(evidence_refs)
+        if not refs or any(not isinstance(ref, str) or not ref.strip() for ref in refs):
+            raise ObservationContractError("responsive boundary requires non-empty evidence references")
+
+        normalized = {
+            "condition_ref": row["condition_ref"],
+            "axis": axis,
+            "before_viewport_css_px": before,
+            "transition_viewport_css_px": transition,
+            "after_viewport_css_px": after,
+            "match_states": states,
+            "raw_condition": row["raw_condition"],
+            "derivation_method": row["derivation_method"],
+            "execution_status": row["execution_status"],
+            "evidence_refs": sorted(set(refs)),
+        }
+        for name in ("container_width_css_px", "container_height_css_px"):
+            if name in row:
+                normalized[name] = row[name]
+        identity = (row["condition_ref"], axis, transition)
+        existing = by_identity.get(identity)
+        if existing is not None:
+            left = {key: item for key, item in existing.items() if key != "evidence_refs"}
+            right = {key: item for key, item in normalized.items() if key != "evidence_refs"}
+            if left != right:
+                raise ObservationContractError("duplicate responsive boundary identity has conflicting observations")
+            existing["evidence_refs"] = sorted(set(existing["evidence_refs"] + normalized["evidence_refs"]))
+        else:
+            by_identity[identity] = normalized
+
+    boundaries = []
+    for index, identity in enumerate(sorted(by_identity), 1):
+        boundaries.append({
+            "boundary_ref": f"BOUNDARY-{index:03d}",
+            **by_identity[identity],
+            "detection_status": "normalized",
+        })
+    closures_by_identity: dict[tuple[str, str], dict[str, str]] = {}
+    closures = value.get("closures", [])
+    if not isinstance(closures, list):
+        raise ObservationContractError("responsive boundary closures must be an array")
+    allowed_closure_statuses = {
+        "non-numeric-presentation-variation", "no-numeric-transition", "not-executable", "unsupported",
+    }
+    for row in closures:
+        if not isinstance(row, dict):
+            raise ObservationContractError("responsive boundary closure must be an object")
+        _exact_fields(row, {"condition_ref", "status", "reason"})
+        if (not isinstance(row["condition_ref"], str) or not row["condition_ref"].strip()
+                or row["status"] not in allowed_closure_statuses
+                or not isinstance(row["reason"], str) or not row["reason"].strip()):
+            raise ObservationContractError("responsive boundary closure fields are invalid")
+        identity_key = (row["condition_ref"], row["status"])
+        normalized = {"condition_ref": row["condition_ref"], "status": row["status"], "reason": row["reason"]}
+        existing = closures_by_identity.get(identity_key)
+        if existing is not None and existing != normalized:
+            raise ObservationContractError("duplicate responsive closure has conflicting reasons")
+        closures_by_identity[identity_key] = normalized
+    normalized_closures = [closures_by_identity[key] for key in sorted(closures_by_identity)]
+    return {"boundaries": boundaries, "closures": normalized_closures, "complete": True, "status": "ok"}
+
+
+def _normalize_responsive_conditions(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise ObservationContractError("responsive conditions value must be an object")
+    _exact_fields(value, {"conditions", "complete", "status"}, {"issues", "viewport"})
+    if value["status"] != "ok" or value["complete"] is not True:
+        raise ObservationContractError("successful responsive conditions must be complete")
+    if not isinstance(value["conditions"], list):
+        raise ObservationContractError("responsive conditions must be an array")
+    required = {
+        "condition_ref", "source_ref", "query_kind", "raw_condition", "browser_capability",
+        "evaluation_method", "current_match_state", "execution_status", "execution_reason", "evidence_refs",
+    }
+    optional = {"query_container_name", "query_container_type", "query_container_identity", "axis", "feature"}
+    kinds = {"media", "container-size", "container-style", "container-scroll-state"}
+    statuses = {"executable", "not-executable", "unsupported"}
+    normalized_rows: list[dict[str, Any]] = []
+    refs: set[str] = set()
+    for row in value["conditions"]:
+        if not isinstance(row, dict):
+            raise ObservationContractError("responsive condition row must be an object")
+        _exact_fields(row, required, optional)
+        for name in ("condition_ref", "source_ref", "raw_condition", "evaluation_method"):
+            if not isinstance(row[name], str) or not row[name].strip():
+                raise ObservationContractError(f"responsive condition {name} must be non-empty")
+        if row["condition_ref"] in refs:
+            raise ObservationContractError("responsive condition refs must be unique")
+        refs.add(row["condition_ref"])
+        if row["query_kind"] not in kinds or row["execution_status"] not in statuses:
+            raise ObservationContractError("responsive query kind or execution status is unsupported")
+        if row["browser_capability"] not in {"available", "unavailable"}:
+            raise ObservationContractError("responsive browser capability status is invalid")
+        if row["current_match_state"] is not None and not isinstance(row["current_match_state"], bool):
+            raise ObservationContractError("responsive current match state must be boolean or null")
+        if row["execution_status"] != "executable" and (
+                not isinstance(row["execution_reason"], str) or not row["execution_reason"].strip()):
+            raise ObservationContractError("unexecutable responsive condition requires a reason")
+        if row["execution_status"] == "executable" and row["current_match_state"] is None:
+            raise ObservationContractError("executable responsive condition requires a current match state")
+        evidence_refs = row["evidence_refs"]
+        if (not isinstance(evidence_refs, list) or not evidence_refs
+                or any(not isinstance(ref, str) or not ref.strip() for ref in evidence_refs)):
+            raise ObservationContractError("responsive condition requires evidence refs")
+        normalized_rows.append({key: row[key] for key in sorted(row)})
+    if "issues" in value and not isinstance(value["issues"], list):
+        raise ObservationContractError("responsive condition issues must be an array")
+    result: dict[str, Any] = {
+        "conditions": sorted(normalized_rows, key=lambda row: row["condition_ref"]),
+        "complete": True,
+        "status": "ok",
+    }
+    if "issues" in value:
+        result["issues"] = value["issues"]
+    if "viewport" in value:
+        viewport = value["viewport"]
+        if (not isinstance(viewport, dict) or set(viewport) != {"width_css_px", "height_css_px"}
+                or any(isinstance(viewport[name], bool) or not isinstance(viewport[name], int) or viewport[name] < 0
+                       for name in ("width_css_px", "height_css_px"))):
+            raise ObservationContractError("responsive viewport metrics are invalid")
+        result["viewport"] = viewport
+    return result
+
+
+def _normalize_interaction_timing(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise ObservationContractError("interaction timing value must be an object")
+    required = {"start_ms", "end_ms", "elapsed_ms", "predicate_result", "clock_domain", "status"}
+    _exact_fields(value, required)
+    if (value["status"] != "ok" or value["clock_domain"] != "same-page-performance-now"
+            or not isinstance(value["predicate_result"], dict)
+            or set(value["predicate_result"]) != {"predicate_key", "matched"}
+            or value["predicate_result"]["predicate_key"] not in PREDICATES
+            or value["predicate_result"]["matched"] is not True):
+        raise ObservationContractError("interaction timing status, clock, or predicate result is invalid")
+    timestamps = (value["start_ms"], value["end_ms"], value["elapsed_ms"])
+    decimals = [_decimal_number(number) for number in timestamps]
+    if any(number is None or number < 0 for number in decimals):
+        raise ObservationContractError("interaction timing values must be finite non-negative numbers")
+    if len(decimals) != 3:
+        raise ObservationContractError("interaction timing values must be finite non-negative numbers")
+    start_ms, end_ms, elapsed_ms = decimals
+    if start_ms is None or end_ms is None or elapsed_ms is None:
+        raise ObservationContractError("interaction timing values must be finite non-negative numbers")
+    if end_ms < start_ms or abs(elapsed_ms - (end_ms - start_ms)) > Decimal("0.01"):
+        raise ObservationContractError("interaction timing elapsed value does not match its same-page timestamps")
+    return {**value, "predicate_result": dict(value["predicate_result"])}
+
+
 def normalize_probe_result(probe: dict[str, Any], result: dict[str, Any], *, current_document_identity: str,
                            formal: bool = False, formal_request: dict[str, Any] | None = None) -> dict[str, Any]:
     if formal:
@@ -315,6 +543,8 @@ def normalize_probe_result(probe: dict[str, Any], result: dict[str, Any], *, cur
         raise ObservationContractError("probe identity mismatch or stale document")
     if result.get("status") not in {"ok", "unavailable", "unsupported", "incomplete", "blocked"}:
         raise ObservationContractError("invalid probe status")
+    if result.get("status") == "ok" and not isinstance(result.get("value"), dict):
+        raise ObservationContractError("successful probe result requires an object value")
     missing = set(probe["required_result_fields"]) - set(result.get("value", {})) if result.get("status") == "ok" else set()
     if missing:
         raise ObservationContractError(f"missing required result values: {sorted(missing)}")
@@ -324,9 +554,15 @@ def normalize_probe_result(probe: dict[str, Any], result: dict[str, Any], *, cur
     if not isinstance(evidence_refs, list) or any(not isinstance(ref, str) or not ref.strip() for ref in evidence_refs):
         raise ObservationContractError("evidence refs must be non-empty strings")
     value = result.get("value", {})
+    if probe["observation_field"] == "responsive.boundaries" and result.get("status") == "ok":
+        value = _normalize_responsive_boundaries(value)
+    if probe["observation_field"] == "responsive.conditions" and result.get("status") == "ok":
+        value = _normalize_responsive_conditions(value)
+    if probe["observation_field"] == "interaction.timing" and result.get("status") == "ok":
+        value = _normalize_interaction_timing(value)
     if probe["observation_field"] == "element.geometry" and result.get("status") == "ok":
         for name in ("x_css_px", "y_css_px", "width_css_px", "height_css_px"):
-            if isinstance(value[name], bool) or not isinstance(value[name], (int, float)) or not math.isfinite(value[name]):
+            if _decimal_number(value[name]) is None:
                 raise ObservationContractError("geometry values must be numeric CSS px")
     return {"observation_field": probe["observation_field"], "probe_ref": probe["probe_ref"],
             "probe_key": probe["probe_key"], "document_identity": current_document_identity,
