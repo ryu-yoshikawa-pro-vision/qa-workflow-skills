@@ -74,7 +74,7 @@ UIテスト設計前の対象理解を継続利用する成果物として残す
 
 modeでは `09_authority_and_traceability.md` をcanonical仕様モデルの正本とし、他ファイルはそのstable IDを参照する構造化ビューとします。SPEC / DECISION / INFERENCE / UNKNOWNやCurrent Effective Authorityを複数ファイルで別々に再定義しません。
 
-Machine Entityは既存 `authority_entities.py` の入力となるCurrent Effective Authorityから生成し、fingerprintを手入力しません。
+Authority Machine Entityは既存 `authority_entities.py`、下流handoff用のcurrent Acceptance Criteria Machine Entityは `ui_target_package.py build-machine-evidence` から決定論生成します。US / UC / Behavior自体はMachine Entity化せず、fingerprint / normalized machine input / expected identityをLLMが手入力しません。
 
 ### 4. 実装は仕様Authorityではない
 
@@ -127,6 +127,8 @@ version更新時は変更ファイルだけではなく、そのversionの完全
   - 2026-10-01_201500_ui-test-target-analysis-mode_07_pr14-baseline-and-integration.md
 - UI操作の振る舞い分解 / Acceptance Criteria traceability:
   - 2026-10-01_201500_ui-test-target-analysis-mode_08_behavior-decomposition-and-acceptance-traceability.md
+- Acceptance Criterion Machine Entity / shared runtime / test-requirement-design v2:
+  - 2026-10-01_201500_ui-test-target-analysis-mode_09_runtime-entity-and-test-requirement-contracts.md
 
 各詳細Planが担当範囲の正本です。本親Planへ詳細契約を重複記載しません。
 
@@ -146,7 +148,7 @@ version更新時は変更ファイルだけではなく、そのversionの完全
 - tests/skills/evals/semantic/*
 - UI target package helper用repository unit test
 
-既存 `skills/spec-analysis/scripts/authority_entities.py` は変更要否を確認し、既存contractで足りる場合は変更しません。Machine Entity生成の正本として再利用します。
+既存 `skills/spec-analysis/scripts/authority_entities.py` はAuthority Entity生成の正本として再利用します。current AC Entity / spec-analysis normalized_skill_input / expected identityは `ui_target_package.py` が生成します。
 
 ### test-requirement-design
 
@@ -154,13 +156,13 @@ version更新時は変更ファイルだけではなく、そのversionの完全
 - skills/test-requirement-design/SKILL.md
 - skills/test-requirement-design/references/guidance.md
 - skills/test-requirement-design/assets/output-template.md
-- skills/test-requirement-design/scripts/requirement_structure.py
+- skills/test-requirement-design/scripts/requirement_structure.py（`requirement-structure-v2`）
 - skills/test-requirement-design/evals/deterministic/*
 - skills/test-requirement-design/evals/semantic/*
 - skills/test-requirement-design/evals/output/*
 - runtime / repository contract tests
 
-目的はcurrent ACをTRまたは明示的dispositionへ閉じ、AC変更をTR freshnessへ伝播させることです。TRの責務をACの言い換えへ変更しません。
+目的はcurrent ACをTRまたは明示的dispositionへ閉じ、AC / 親Behavior / 親UC / 親US / Authority変更をTR freshnessへ伝播させることです。TRの責務をACの言い換えへ変更しません。
 
 ### question-analysis
 
@@ -175,6 +177,16 @@ version更新時は変更ファイルだけではなく、そのversionの完全
 - unknown_links.py用repository unit test
 
 目的はUNKNOWNの安定参照、回答後の差分反映、解消済み履歴とcurrent unknownの分離です。既存の質問分類自体は変更しません。
+
+### shared runtime contract
+
+変更:
+- spec-analysis / test-analysis / test-requirement-design / test-condition-design / test-case-design / coverage-analysis / qa-workflow の7 Skill-local `scripts/runtime_contract.py`
+- `tests/skills/runtime/test_runtime_dispatch.py`
+- `tests/skills/runtime/test_runtime_portability.py`
+- requirement-structure contract versionを参照するruntime / fixture / integration tests
+
+7コピーはbyte-identicalを維持し、`acceptance_criterion` Entity type、`acceptance_refs` canonicalization、spec-analysis Authority + AC expected Entity導出を同一内容で追加します。shared runtime envelopeは `runtime-v1` を維持します。
 
 ### qa-workflow
 
@@ -220,14 +232,15 @@ PR #14後のCIは `skills/*/scripts` を動的compileするため、helper compi
 - 通常のspec-analysis出力は従来どおり利用できる
 - test-target-inspectionの責務を侵食しない
 - qa-workflowが最短経路でmodeを選択でき、usability-evaluation / usability-inspection / wcag-conformance-evaluationへ誤routeしない
-- package内のcanonical Authority / Machine Entity契約が既存spec-analysisと互換であり、09からMachine EntityまでLLM手組みなしで接続できる
+- package内のcanonical Authority契約が既存spec-analysisと互換であり、Authority + current AC Machine Entity、spec-analysis normalized_skill_input、expected identityまでLLM手組みなしで接続できる
 - 複数Markdown packageを既存semantic runnerへ入力できる一意なevaluation projectionが定義されている
 - modeが既存Agent Skills形式のままAIエージェントから利用できる
 - mode導入前のlegacy / unversioned packageをsemantic mapping + deterministic validationでcurrent schemaへ移行できる
 - PR #14後のAgent Skills検証、trigger、semantic、deterministic / workflow routing回帰がPASSする
 - README / EVALS等の現在値を変更した場合はPR #14後のcurrent repositoryから導出した実データと一致する
 - PR #14のusability / WCAG finding・observation・resultを仕様Authorityへ自動昇格しない
-- UI操作scopeではUS → UC → Behavior → ACが完全に分析され、情報不足はnot-applicableへ逃げずUNKNOWN / blockedとして残る
-- current ACがTRまたは明示的dispositionへ閉じ、AC変更がTR freshnessへ伝播する
-- LLMは仕様意味・UI意味・semantic identity判断に集中し、version / hash /参照整合 / UNKNOWN件数 / MANIFEST等の定型処理はhelper / validatorで補助・検証される
+- 機能scopeごとにUI操作有無を判定し、UI操作ありではUS → UC → Behavior → ACを完全に分析し、情報不足はnot-applicableへ逃げずUNKNOWN / blockedとして残る
+- current ACがTRまたは明示的dispositionへ閉じ、AC / 親Behavior / 親UC / 親US / Authority変更が必要なTR freshnessへ伝播する
+- 標準package fileはrequired core + 固定triggerによる条件付き必須とし、Agentの自由裁量で作成有無を変えない
+- LLMは仕様意味・UI意味・semantic identity判断に集中し、version / hash /参照整合 / UNKNOWN件数 / MANIFEST / file applicability整合 / Machine Entity projection等の定型処理はhelper / validatorへ移る
 - helperがsemantic判断を代替せず、通常spec-analysisの柔軟性を損なわない
