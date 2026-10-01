@@ -38,13 +38,25 @@ profile packageのUNKNOWNを、回答反映のたびに再質問・再採番せ�
 
 既存Q-xxxを廃止しません。
 
-次の列追加を検討します。
+次の列を追加します。
 
 - 関連UNKNOWN ID
 
 spec-analysis由来の論点ならUNK-xxxを記録し、質問単位のQ-xxxと仕様UNKNOWNを追跡できるようにします。
 
-新しいUNKNOWN registryは作りません。
+値は空欄または1件以上の `UNK-xxx` とします。複数の場合は既存Markdown tableで安全に扱える区切り形式を1つに固定します。新しいUNKNOWN registryは作りません。
+
+### 1.5 deterministic validator
+
+既存 `skills/question-analysis/evals/deterministic/validator.py` を最小拡張します。
+
+- `関連UNKNOWN ID` の非空値が `UNK-xxx` 形式であること
+- fixtureに `known_unknown_ids` がある場合、参照UNKNOWNがその集合に含まれること
+- fixtureに `expected_related_unknowns` がある場合、Q IDごとの関連UNKNOWN集合が完全一致すること
+- spec-analysis由来でない質問は関連UNKNOWN ID空欄を許可する
+- 既存Q-xxx、分類、再開Skill、runtime identity等の契約は変更しない
+
+新しいdeterministic eval frameworkは作りません。既存QUESTION output fixtureの少なくとも1件へUNKNOWN mappingを追加し、repository unit testで未知UNK / 誤mappingのfalse-pass regressionを追加します。deterministic output case数を増やす必要はありません。
 
 ## 2. qa-workflow変更
 
@@ -52,11 +64,13 @@ spec-analysis由来の論点ならUNK-xxxを記録し、質問単位のQ-xxxと�
 
 次の要求をspec-analysisのUI target profileへroutingします。
 
-- テスト設計前に仕様理解だけ整理したい
-- テスト対象をMarkdown package化したい
-- PAGE / MODAL / STATE等に分けたい
-- 既存対象分析packageを更新したい
+- テスト設計前の対象理解を、後続工程で再利用する継続成果物として整理したい
+- 複数資料からPAGE / MODAL / STATE、業務ルール、不明点を統合したい
+- 既存UI target packageを更新したい
 - 不明点回答をpackageへ反映したい
+- 「テスト対象分析」「対象理解を固める」等が主目的で、テスト観点 / ケースへまだ進まない
+
+単なる「Markdownで出して」という形式要求だけではprofileへrouteしません。単発要約やAuthority解消だけなら通常spec-analysisを使います。
 
 基本経路:
 
@@ -99,7 +113,14 @@ repository事実が必要で、AIエージェントがrepositoryを利用でき�
 
 ### 2.5 routing fixture
 
-skills/qa-workflow/evals/deterministic/routing_cases.jsonへ最低限次を追加します。
+次の2ファイルを必ず同時に更新します。
+
+- `skills/qa-workflow/evals/deterministic/routing_cases.json`
+- `skills/qa-workflow/evals/deterministic/routing_candidate_outputs.json`
+
+expected routingからcandidate outputを自動生成せず、既存契約どおり独立fixtureとして保持します。
+
+最低限次の5 caseを追加します。
 
 1. 「テスト設計前に仕様理解を複数Markdownへ整理」→ spec-analysis
 2. 「既存仕様理解packageへ不明点回答を反映」→ question-analysis解消後spec-analysis resume
@@ -107,7 +128,7 @@ skills/qa-workflow/evals/deterministic/routing_cases.jsonへ最低限次を追�
 4. 「仕様書とrepoを比較して期待仕様を整理」→ spec-analysis。repo差分をAuthority化しない
 5. 「仕様理解だけで止めたい」→ test-analysisへ自動進行しない
 
-routing case数変更に伴うREADME / EVALS / PROJECT_CONTEXT等の現在値は実データに合わせて同期します。
+routing fixtureは現在61件から5件追加して66件になる想定です。実装開始時にStep 0で現在値を再確認し、追加数が変わらなければEVALS.md / docs/PROJECT_CONTEXT.md / 固定件数を検証するrepository testを66へ同期します。READMEにrouting件数を持つ場合のみ同様に更新します。
 
 ## 3. Agent Skillsとしての利用前提
 
@@ -149,7 +170,7 @@ READMEへ変更が必要な場合は、UIテスト対象分析profileがspec-ana
 ## 6. 完了条件
 
 - profile requestがspec-analysisへrouteされる
-- 不明点回答後に同じUNKNOWN lineageでspec-analysisへ戻る
+- 不明点回答後に同じUNKNOWN lineageでspec-analysisへ戻り、question-analysisの関連UNKNOWN IDが決定論的に検証される
 - 仕様理解だけの要求でtest-analysisへ勝手に進まない
 - current UI観測要求だけtest-target-inspectionへ分岐する
 - profileが既存Agent Skills構造でAIエージェントから利用できる
