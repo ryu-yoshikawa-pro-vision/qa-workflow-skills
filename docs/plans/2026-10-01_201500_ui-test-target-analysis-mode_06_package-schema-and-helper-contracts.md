@@ -675,7 +675,7 @@ legacy packageに独立progress fileがある場合:
 
 mode固有の新しい決定論契約を通常spec-analysis 2caseへ混ぜず、`SPEC-OUT-003` を追加します。
 
-- deterministic output case total: 38 → 39
+- deterministic output case total: 44 → 45
 - spec-analysis: 2 → 3
 - question-analysis: 2のまま
 
@@ -713,7 +713,7 @@ production helperのfilesystem / hash / projection / next-id / build-authorities
 - artifact `Machine Entities: spec-analysis` blockがruntime_contract.pyの `extract_machine_blocks(..., "Machine Entities")` で読めること
 - legacy migration後fixtureのvalidate PASS
 
-新しいGitHub Actions workflowは作らず、既存runtime / deterministic / semantic CIへ追加します。
+新しいGitHub Actions workflowは作りません。PR #14後の既存CIは `skills/*/scripts` を動的compileするため、helper compile目的のworkflow path追加は不要です。repository unit / runtime integration / portability testを既存test discoveryへ追加します。
 
 ## 17. 完了条件
 
