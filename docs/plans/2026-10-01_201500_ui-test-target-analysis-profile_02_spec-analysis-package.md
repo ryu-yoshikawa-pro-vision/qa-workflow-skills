@@ -28,16 +28,41 @@
 - skills/spec-analysis/assets/ui-test-target-analysis/06_spec_inconsistencies_and_pending.md
 - skills/spec-analysis/assets/ui-test-target-analysis/07_current_unknowns.md
 - skills/spec-analysis/assets/ui-test-target-analysis/08_repository_implementation_status.md
+- skills/spec-analysis/assets/ui-test-target-analysis/09_authority_and_traceability.md
 - skills/spec-analysis/assets/ui-test-target-analysis/CHANGELOG.md
 - skills/spec-analysis/assets/ui-test-target-analysis/MANIFEST.md
 
-ファイル数を増やすこと自体を目的にしません。案件に該当しないdomain fileは空ファイルとして強制せず、README / manifest上で「不使用」または省略可能とします。
+ファイル数を増やすこと自体を目的にしません。required coreとoptional domain fileを明確に分けます。
+
+### required core
+
+- README.md
+- 00_scope_and_context.md
+- 01_ui_structure_and_navigation.md
+- 02_behavior_and_business_rules.md
+- 06_spec_inconsistencies_and_pending.md
+- 07_current_unknowns.md
+- 09_authority_and_traceability.md
+- CHANGELOG.md
+- MANIFEST.md
+
+### optional
+
+対象仕様が存在する場合だけ含めます。
+
+- 03_fields_and_validation.md
+- 04_flows_and_data.md
+- 05_notifications_and_external_interactions.md
+- 08_repository_implementation_status.md
+- 案件固有domain file
+
+optional fileを空ファイルとして作りません。含めないfileはMANIFESTへ登録せず、READMEには必要な場合だけ「対象外 / 不使用」として説明します。
 
 ## 2. SKILL.mdの変更
 
 SKILL.mdには次だけを追加します。
 
-- 複数MarkdownのUIテスト対象理解packageを明示要求された場合はreferences/ui-test-target-analysis.mdを読む
+- テスト設計前の対象理解を継続成果物として残す場合、複数資料からUI構造・業務ルール・不明点を追跡可能に整理する場合、または既存UI target packageを更新する場合は `references/ui-test-target-analysis.md` を読む。単なるMarkdown出力要求だけではprofileを選ばない
 - 通常の仕様分析では既存assets/output-template.mdを維持する
 - profile利用時もSPEC / DECISION / INFERENCE / UNKNOWN、Authority解決、停止条件は既存契約を正本とする
 - test requirement / condition / caseへ先回りしない
@@ -62,6 +87,22 @@ SKILL.mdには次だけを追加します。
 既存spec-analysisのAuthority contractを再利用し、profile固有に新しい優先順位を作りません。
 
 案件固有優先順位がある場合はそれを使用します。
+
+### canonical Authority / traceability
+
+profile packageでも既存 `assets/output-template.md` のcanonical契約を維持します。
+
+- `09_authority_and_traceability.md` は既存output-templateの以下を正本として保持する
+  - 情報源 / 正本参照一覧
+  - 分析項目
+  - 現在有効な仕様根拠
+  - 後続Skillへの補足
+  - Machine Entity（機械証拠）
+- 業務ルール / 状態 / フロー / 制約は01〜05へ詳細ビューを持てるが、Authority item IDの正本は09
+- 01〜08で新たな仕様判断を追加した場合、必ず09のSPEC / DECISION / INFERENCE / UNKNOWNへ閉じる
+- 09のCurrent Effective Authorityを既存 `authority_entities.py` の入力へ変換できる状態を維持する
+- Machine Entityのfingerprintは既存helperで生成し、テンプレートやAgentが手入力しない
+- package version / file hashはMachine Entityのcontent fingerprintとは別物
 
 ### 正規UI分類
 
@@ -215,6 +256,21 @@ repository確認を行った場合のみ使用します。
 
 このファイルの内容を仕様本文へ自動昇格させません。
 
+### 09_authority_and_traceability.md
+
+package全体のcanonical仕様モデル。
+
+既存 `assets/output-template.md` の意味契約を再利用し、最低限次を含みます。
+
+- 情報源 / 正本参照一覧
+- SPEC / DECISION / INFERENCE / UNKNOWNの分析項目
+- Current Effective Authority
+- 各構造化ビューで使用するstable item ID
+- 後続Skillへの補足
+- Machine Entity
+
+01〜08に記載した期待挙動は、09のstable item IDへ追跡できなければなりません。
+
 ### CHANGELOG.md
 
 versionごとの差分と、どのUNKNOWN / issue / decisionを反映したかを記録します。
@@ -249,14 +305,16 @@ profileでversioned packageが要求された場合:
 
 1. 変更されたAuthority / DECISION / ASMを解決
 2. 影響するstable item / UNKを特定
-3. current本文を更新
-4. 07_current_unknownsの状態を更新
-5. 06の矛盾 / pending履歴を必要に応じ更新
-6. implementation statusに影響する場合だけ08を更新
-7. CHANGELOGへ変更を記録
-8. READMEのversion / current unknown件数を更新
-9. MANIFESTを更新
-10. package全体の整合を確認
+3. 09_authority_and_traceability.mdのcanonical modelを更新
+4. 09のstable itemを参照する01〜05の構造化ビューを必要な範囲だけ更新
+5. 07_current_unknownsの状態を更新
+6. 06の矛盾 / pending履歴を必要に応じ更新
+7. implementation statusに影響する場合だけ08を更新
+8. CHANGELOGへ変更を記録
+9. READMEのversion / current unknown件数を更新
+10. MANIFESTを更新
+11. 09のCurrent Effective AuthorityからMachine Entityを既存helperで再生成できることを確認
+12. package全体の整合を確認
 
 同じ回答を複数ファイルへ手動コピーすることを設計目的にしません。各ファイルへ必要な意味だけ反映します。
 
@@ -274,6 +332,7 @@ profileでversioned packageが要求された場合:
 - README / MANIFESTへ登録
 - current unknownの正本は07のまま
 - repository statusの正本は08のまま
+- canonical Authority / traceabilityの正本は09のまま
 - 同じ仕様項目を二重正本にしない
 
 ## 8. package品質ゲート
@@ -289,7 +348,10 @@ profileでversioned packageが要求された場合:
 - versionが全packageで一致する
 - READMEのcurrent unknown件数が07と一致する
 - CHANGELOGが今回変更を説明できる
-- MANIFESTにcurrent packageの全ファイルがある
+- MANIFESTにcurrent packageの全ファイルがあり、省略したoptional fileを存在するものとして列挙していない
+- 01〜08の期待挙動が09のstable item IDへ追跡できる
+- 09のCurrent Effective Authorityが既存spec-analysisのcanonical schemaを維持している
+- Machine Entityが既存 `authority_entities.py` で生成可能で、fingerprintを手入力していない
 - test requirement / condition / caseを先回りしていない
 - UIで観測不能な内部挙動をUIテスト期待結果として確定していない
 
