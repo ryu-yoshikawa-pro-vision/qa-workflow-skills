@@ -125,14 +125,14 @@ repository事実が必要で、AIエージェントがrepositoryを利用でき�
 
 ### 2.5 routing fixture
 
-次の2ファイルを必ず同時に更新します。
+PR #14後の61 routing fixtureをbaselineとして、次の2ファイルを必ず同時に更新します。
 
 - `skills/qa-workflow/evals/deterministic/routing_cases.json`
 - `skills/qa-workflow/evals/deterministic/routing_candidate_outputs.json`
 
 expected routingからcandidate outputを自動生成せず、既存契約どおり独立fixtureとして保持します。
 
-最低限次の5 caseを追加します。
+次の8 caseを追加します。
 
 1. 「テスト設計前に仕様理解を複数Markdownへ整理」→ spec-analysis
 2. 「既存仕様理解packageへ不明点回答を反映」→ question-analysis解消後spec-analysis resume
@@ -140,7 +140,7 @@ expected routingからcandidate outputを自動生成せず、既存契約どお
 4. 「仕様書とrepoを比較して期待仕様を整理」→ spec-analysis。repo差分をAuthority化しない
 5. 「仕様理解だけで止めたい」→ test-analysisへ自動進行しない
 
-routing fixtureは現在61件から5件追加して66件になる想定です。実装開始時にStep 0で現在値を再確認し、追加数が変わらなければEVALS.md / docs/PROJECT_CONTEXT.md / 固定件数を検証するrepository testを66へ同期します。READMEにrouting件数を持つ場合のみ同様に更新します。
+routing fixtureはPR #14後の61件から8件追加して69件になる想定です。実装開始時にStep 0で現在値を再確認し、追加数が変わらなければEVALS.md / docs/PROJECT_CONTEXT.md / 固定件数を検証するrepository testを66へ同期します。READMEにrouting件数を持つ場合のみ同様に更新します。
 
 ## 3. Agent Skillsとしての利用前提
 
@@ -162,7 +162,15 @@ AIエージェントは利用環境で提供される通常のSkill読み込み�
 - 新しいSkill-to-Skill API
 - 全19 Skillを一括読み込みするruntime
 
-## 4. README更新
+## 4. PR #14成果物のAuthority扱い
+
+usability-evaluation finding、usability-inspection observation / measurement、wcag-conformance-evaluation result / report / EARLは、そのままSPEC / DECISION / approved ASMへ昇格しません。
+
+- 既存Authorityとの一致 / 差分を対象理解packageへ補助evidenceとして記録できる
+- 仕様変更が必要ならquestion-analysis / stakeholder decisionへ送る
+- project contextでformal WCAG requirement自体がAuthorityとして明示されている場合はrequirementをAuthorityとして扱えるが、評価結果そのものは仕様へ自動変換しない
+
+## 5. README更新
 
 READMEへ、UIテスト対象分析modeがspec-analysisの条件付きmodeであることと、詳細契約の参照先を簡潔に追記します。通常spec-analysisを置換しないことも明記します。
 
