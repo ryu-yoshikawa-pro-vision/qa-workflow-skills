@@ -25,7 +25,7 @@ PR #16後の期待増分:
 
 したがってStep 0時点の期待値は 22 Skill / 488 trigger / 45 deterministic / 159 semantic / 69 routingです。ただしCI / repository testでは固定値を正本化せず、PR #14のcurrent repository / manifestからの動的導出を維持します。
 
-## 3. 評価方針
+## 2. 評価方針
 
 新しい評価frameworkは作りません。
 
@@ -150,15 +150,18 @@ spec-analysis / question-analysisで今回追加するcritical semantic criterio
 
 既存routing fixtureへmode routing caseを追加します。
 
-5 caseを追加し、routing fixtureは現在61件から66件へ増やします。各caseは `routing_cases.json` と `routing_candidate_outputs.json` の双方へ独立に追加します。
+8 caseを追加し、routing fixtureはPR #14後の61件から69件へ増やします。各caseは `routing_cases.json` と `routing_candidate_outputs.json` の双方へ独立に追加します。
 
 対象:
 
 1. UI仕様理解packageのみ
 2. UI仕様理解package + 質問あり
 3. 回答反映後のresume
-4. current live UI観測要求
+4. current live UIの対象情報観測要求
 5. 仕様理解完了後もtest design不要
+6. 保存済みFigma / screenshotのUI/UX評価
+7. live browserでのusability inspection
+8. formal WCAG conformance evaluation
 
 expected start / resume Skillを明示し、全Skill固定順実行へ回帰しないことを確認します。
 
@@ -168,7 +171,10 @@ expected start / resume Skillを明示し、全Skill固定順実行へ回帰し�
 
 特に次の誤選択を防ぎます。
 
-- 「実画面を見てcurrent UIを記録」→ test-target-inspection
+- 「実画面を見てcurrent UIの対象情報を記録」→ test-target-inspection
+- 「保存済みFigma / screenshotをUI/UX評価」→ usability-evaluation
+- 「live browserで使いやすさ / focus / responsiveを検査」→ usability-inspection
+- 「WCAG version / levelでformal適合性評価」→ wcag-conformance-evaluation
 - 「テスト重点を決めたい」→ test-analysis
 - 「テストケースを作りたい」→ test-case-design
 - 「テスト設計前の対象理解を継続成果物として作りたい」→ spec-analysis
@@ -276,7 +282,6 @@ Step 0でmainの現在値を再確認し、上記差分がそのまま適用可�
 - README.mdは件数またはmode説明を実際に持つ箇所だけ更新
 - PR #14後の `.github/workflows/deterministic-output-evals.yml` は `skills/*/scripts` を動的compileするため、helper compile目的のSkill固有workflow editは行わない
 
-を実データへ同期します。
 
 歴史文書の過去値は変更しません。
 
@@ -309,7 +314,7 @@ AIエージェント上で、既存Agent Skillsの読み込み方法に従い `s
 
 ## 10. 実装順序
 
-### Step 0: 現状再確認
+### Step 0: PR #14 merge後rebase / current repository再確認
 
 - main headがPlan基準から動いていないか確認
 - PR #14 merge済みlatest mainへrebase
@@ -362,7 +367,7 @@ mode単体が成立してからworkflowへ接続します。
 - test-target-inspection / usability-evaluation / usability-inspection / wcag-conformance-evaluationとの分岐
 - routing_cases.jsonへ8件追加
 - routing_candidate_outputs.jsonへ対応する独立candidate 8件追加
-- routing fixture合計66件へ同期
+- routing fixture合計69件へ同期
 
 ### Step 5: package schema / migration / helper contract validation
 
@@ -381,7 +386,7 @@ mode単体が成立してからworkflowへ接続します。
 
 ### Step 7: cross-repository validation
 
-- 全19 Skill構造
+- 全22 Skill構造
 - trigger
 - deterministic
 - semantic
