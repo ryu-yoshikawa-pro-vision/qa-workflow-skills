@@ -1,0 +1,292 @@
+# UIテスト対象分析モード: LLM / deterministic responsibility boundary
+
+親Plan:
+2026-10-01_201500_ui-test-target-analysis-mode.md
+
+この文書は、UIテスト対象分析モードにおけるLLMと決定論的処理の責務境界を正本とします。helperの正確なCLI I/O、table schema、Machine Entity bridge、filesystem safety、legacy migrationは `2026-10-01_201500_ui-test-target-analysis-mode_06_package-schema-and-helper-contracts.md` を正本とします。
+
+目的はLLMを置き換えることではありません。LLMが仕様理解・文脈解釈・意味判断へ集中できるように、同じ入力から同じ結果を導出できる定型処理だけをSkill-local helper / validatorへ移します。
+
+## 1. 基本原則
+
+決定論的処理へ移すのは、次の条件をすべて満たす処理です。
+
+1. 入力と出力を構造化できる
+2. 同じ入力なら同じ結果になる
+3. 製品・業務仕様の意味判断を必要としない
+4. scriptの結果が仕様意味を新しく決定しない
+5. script化してもLLMが情報源・文脈を解釈する自由度を失わない
+
+上記を満たさない処理はLLMに残します。
+
+「実装しやすいからscript化する」「validatorで判定できそうだから意味判断まで固定する」は行いません。
+
+## 2. 責務マトリクス
+
+| 処理 | 主担当 | 契約 |
+| --- | --- | --- |
+| SPEC / DECISION / INFERENCE / UNKNOWN分類 | LLM | 情報源・Authority・文脈から判断する |
+| 現在有効なAuthority解決 | LLM | 既存spec-analysis契約を使用する |
+| PAGE / STATE / VIEW / STEP / MODAL等の意味分類 | LLM | UI意味を判断する。scriptは分類結果の形式だけ検証できる |
+| 既存項目と意味的に同一か | LLM | stable IDをreuseする意味判断はLLMが行う |
+| repository差分の意味・重要性 | LLM | 実装事実をAuthorityへ自動昇格しない |
+| optional domain fileが必要か | LLM | 対象仕様の意味・規模から判断する |
+| 質問がどのUNKNOWNに対応するか | LLM | QとUNKの意味対応を判断する |
+| 仕様回答がどの項目へ影響するか | LLM | scriptが列挙した参照候補を補助情報として使える |
+| ID形式 / duplicate /参照先存在 | deterministic validation | 意味を変えず拒否できる |
+| version形式 / package内version一致 | deterministic helper / validation | default version policy利用時は次versionも導出できる |
+| required / optional file set | deterministic validation | optional fileを必要と判断するのはLLM |
+| MANIFEST file list / SHA-256 | deterministic helper | package内容から導出し、LLMに計算させない |
+| current UNKNOWN ID集合 / 件数 | deterministic helper | canonical分析項目から導出する。UNKNOWN本文はLLMが作る |
+| cross-file stable ID参照切れ | deterministic validation | exact ID参照だけを検証する |
+| changed stable IDの参照file候補 | deterministic helper | exact参照から候補を列挙する。意味上の修正要否はLLM |
+| Authority Machine Entity / fingerprint | 既存deterministic helper | authority_entities.pyを正本とする |
+| semantic eval用package projection | deterministic helper | package内容を要約・変更せず連結する |
+| semanticな重複・矛盾・不足 | LLM / semantic eval |文字列一致だけで自動統合しない |
+
+## 3. spec-analysis Skill-local helper
+
+新規:
+
+- skills/spec-analysis/scripts/ui_target_package.py
+
+本helperはruntime dispatchではなく、既存authority_entities.pyと同じくSkill-local production helperです。Python標準ライブラリだけを使用し、spec-analysis package単体コピーで実行できるようにします。
+
+### 3.1 helperが担当するoperation
+
+最低限、次を提供します。operation名は実装時にこの名称で固定します。
+
+#### inspect
+
+package rootを読み、次をJSONで返します。
+
+- package version
+- current file list
+- required coreのmissing
+- optional / domain file list
+- canonical analysis item ID集合
+- current UNKNOWN ID集合
+- current UNKNOWN件数
+- cross-file stable ID reference index
+- unresolved structural issues
+
+意味評価は返しません。
+
+#### validate
+
+次を決定論的に検証します。
+
+- required core fileの存在
+- package root外pathを参照していない
+- package内version表記の一致
+- canonical分析項目IDの形式・重複
+- UI / rule / flow等、modeで定義するstructural IDの形式・重複
+- exact stable ID参照先の存在
+- 07_current_unknownsに含まれるUNK ID集合が09のcurrent UNKNOWN集合と一致
+- READMEのcurrent UNKNOWN件数が09から導出した件数と一致
+- MANIFESTのfile set / order / SHA-256がcurrent packageと一致
+- READMEのCurrent payload filesがMANIFESTのpayload file listと一致
+- CHANGELOGの最新version見出しがpackage versionと一致
+- Machine Entity blockを持つ場合、既存authority_entities.py由来の形式と矛盾しないこと
+
+意味的な正しさ、Authority優先順位、PAGEかVIEWか等は検証しません。
+
+#### next-version
+
+default version policyを使うpackageだけを対象に、previous versionから次のvNNを導出します。
+
+案件固有version policyが明示されている場合はnext-versionを使用せず、そのversion文字列がpackage内で一致することだけvalidateします。
+
+#### next-id
+
+LLMがsemantic identityを判断して `new` と決めた後だけ使用します。prefixとcurrent / previous packageで既知の同prefix IDを入力し、既知最大番号+1を返します。
+
+- reuse / newの意味判断は行わない
+- 既存IDを別entityへ再割当てしない
+- previous packageがあるupdateではprevious / current双方の既知IDを考慮する
+- prefixはmodeで宣言済みのものだけ許可する
+
+#### build-manifest
+
+current package fileからMANIFEST bodyまたはmachine-readable manifest projectionを生成します。
+
+- MANIFEST自身は自己hash対象にしない
+- SHA-256はfileのraw bytesから計算する
+- file orderはmodeのcanonical orderに従う
+- optional / domain fileは存在するものだけ含める
+
+#### impact
+
+変更されたstable item ID集合を入力し、cross-file exact referenceから再確認候補file / rowを列挙します。
+
+この結果は「修正が必要」という意味判断ではありません。LLMが再確認対象を漏らさないための候補集合です。
+
+#### build-authorities
+
+09のCurrent Effective Authority tableを固定projectionし、既存 `authority_entities.py` builderを呼んでMachine Entityを生成します。何をCurrent Effective AuthorityとするかはLLMが判断し、wrapper / fingerprint / expected identityをhelperが決定論生成します。
+
+#### project-eval
+
+projection modeを `semantic / deterministic` に固定します。
+
+semantic:
+
+- README / 00〜09 / 10+ current domain files
+- CHANGELOG / MANIFESTは除外
+
+deterministic:
+
+- 全payload file
+- MANIFESTを最後にcontrol fileとして追加
+
+共通して各fileの前へ `<!-- FILE: <relative-path> -->` を付け、内容は要約・正規化・書換えしません。package root外path、symlink、duplicate / missing fileを拒否します。
+
+semantic / deterministic runnerのdirectory対応は追加せず、この固定projectionを1-file inputとして渡します。
+
+### 3.2 helperが担当しないこと
+
+- 仕様文章の生成
+- SPEC / DECISION / INFERENCE / UNKNOWN分類
+- PAGE / VIEW等の意味分類
+- optional domain fileが必要かの判断
+- semantic duplicateの統合
+- Authority競合解消
+- repository差分の意味判断
+- 質問文生成
+- stable IDをreuseする意味判断
+
+## 4. structural ID契約
+
+UI target packageでは、人間向け構造化ビューのentityをstable IDで参照できるようにします。
+
+最低限のprefix:
+
+- PAGE-xxx
+- STATE-xxx
+- VIEW-xxx
+- STEP-xxx
+- MODAL-xxx
+- BDLG-xxx
+- PANEL-xxx
+- EXT-xxx
+- SHARED-xxx
+- FIELD-xxx
+- RULE-xxx
+- FLOW-xxx
+- NOTIFY-xxx
+- INTERACT-xxx
+- ISSUE-xxx
+- IMPL-xxx
+
+案件固有entity typeが必要な場合はLLMが追加のprefixを勝手に作らず、packageの `00_scope_and_context.md` にある `案件固有構造ID` tableへprefixと意味を宣言してから使用します。helperは宣言済みprefixだけを許可します。
+
+IDが意味的に同一か、新IDにすべきかはLLM判断です。helperはIDを自動的に別entityへ再割当てしません。
+
+## 5. canonical stable reference contract
+
+01〜08のstructured tableで期待挙動・UI構造・ルール・不明点を表すrowは、少なくとも1件のcanonical itemへ根拠付けできる場合 `関連仕様項目ID` を必須とします。UI構造間の親子・遷移・関連を表すrowは、関係先が存在する場合 `関連構造ID` を持ちます。pure narrative / heading /説明専用rowには参照列を強制しません。
+
+- `関連仕様項目ID`: SPEC / DEC / INF / UNK等、09_authority_and_traceability.mdのcanonical item
+- `関連構造ID`: PAGE / STATE / VIEW / MODAL / FIELD / RULE / FLOW等
+
+複数参照の区切りは `<br>` に固定します。
+
+helperはexact ID参照の存在だけを検証します。文章中に偶然現れたIDらしき文字列を参照として抽出しません。
+
+pure narrativeや説明用sectionへ無理に参照列を追加しません。参照整合を機械判定するtable / structured rowだけを対象にします。
+
+## 6. current UNKNOWNの扱い
+
+09_authority_and_traceability.mdの分析項目では、UI target mode利用時の `現在有効か` を `Yes / No` に固定します。分類=UNKNOWNかつ `現在有効か=Yes` の項目をcanonical current UNKNOWN集合とします。
+
+07_current_unknowns.mdはその集合の人間向けビューです。
+
+- UNKNOWN本文・影響・質問内容はLLMが記述する
+- 07に載せるUNK ID集合と件数はhelperで検証する
+- READMEの件数は同じ集合から検証する
+- UNKNOWNが解消した場合、元のUNK rowは削除・再分類せず `現在有効か=No` とし、補足 / 上書き / 置換関係で新しいSPEC / DECISION / 承認済みASM等のstable IDへlineageを残す
+- 新しい確定内容は分類に合う新しいstable IDで記録する。`UNK-xxx` をDECISIONへ分類変更しない
+- resolved historyの説明はLLMがCHANGELOG / 06へ記載できる
+
+scriptがUNKNOWNを意味的に解消しません。
+
+## 7. version / MANIFEST
+
+UI target mode packageは継続更新成果物のためversionを持ちます。
+
+default policy:
+
+- 初回: v00
+- 次回: v01, v02 ... の1増分
+- 同じversionを別内容で完成版として上書きしない
+
+案件に別version policyがある場合はそちらを優先します。
+
+MANIFESTはcurrent package fileのfile listとSHA-256を持ちます。
+
+- MANIFEST自身はhash対象外
+- README / 00〜09 / 案件固有domain / CHANGELOGのうち存在するfileを列挙
+- file orderはmode referenceで固定する
+- SHA-256はhelperが計算する
+- Agentがhash値を手入力しない
+
+version変更の要否をpresentationだけの差分まで機械判定しません。案件で「material update」の定義が必要な場合はLLM / project policyが判断し、helperは指定されたversionの整合だけを検証します。
+
+## 8. question-analysis Skill-local helper
+
+新規:
+
+- skills/question-analysis/scripts/unknown_links.py
+
+本helperもPython標準ライブラリだけを使い、question-analysis package単体で実行可能にします。
+
+担当:
+
+- 関連UNKNOWN IDの形式検証
+- current known UNKNOWN集合に対する存在検証
+- Q IDごとのduplicate UNKNOWN参照検出
+- resolved-only UNKNOWNをcurrent questionへ関連付けた場合の検出（current / resolved集合が入力として与えられた場合）
+
+担当しない:
+
+- QとUNKが意味的に同一かの判断
+- 質問文生成
+- 回答のSPEC / DECISION / ASM分類
+- 新しいUNKを作るべきかの判断
+
+eval validatorはこのproduction helperと同じ意味契約を独立fixtureで検証し、production helperをimportしてexpectedを作りません。
+
+## 9. route / PAGE / VIEWの曖昧さ
+
+same-routeであることがAuthorityまたは確認済み実装事実から成立する場合だけVIEW / STEPへ統合します。
+
+routeが不明な場合:
+
+- pathは `PATH-TBD` として保持できる
+- 別画面として資料上明示されているものを、推測でsame-route VIEWへ畳まない
+- route不明だけを理由に別PAGEと断定もしない
+- PAGE / VIEW分類自体がテスト設計へ影響するならUNKNOWNとして残す
+
+この判断はLLMが行い、helperは `PATH-TBD` を許可値として扱うだけです。
+
+## 10. repository調査の境界
+
+repository sourceを読むこと自体はspec-analysisの補助入力収集です。
+
+e2e-test-inspectionへroutingするのは、E2E実装・Playwright等の既存テスト資産の実装詳細を分析する責務が必要な場合だけです。
+
+単に製品repositoryのUI / route / validation実装を確認したいだけでe2e-test-inspectionへroutingしません。
+
+## 11. 対象外
+
+今回の目的外として実装しません。
+
+- 仕様意味を自動判定するrule engine
+- semantic duplicateを自動mergeするscript
+- PAGE / VIEW分類器
+- 汎用Markdown AST framework
+- 任意文書merge engine
+- ZIP専用runtime
+- 特定AI製品向けintegration
+
+これらを「初回だから後回し」にするのではなく、UIテスト対象分析modeの目的に不要、またはLLMの意味判断を不必要に制約するため対象外とします。
