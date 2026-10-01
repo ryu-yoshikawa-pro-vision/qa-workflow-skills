@@ -44,19 +44,31 @@ profile packageのUNKNOWNを、回答反映のたびに再質問・再採番せ�
 
 spec-analysis由来の論点ならUNK-xxxを記録し、質問単位のQ-xxxと仕様UNKNOWNを追跡できるようにします。
 
-値は空欄または1件以上の `UNK-xxx` とします。複数の場合は既存Markdown tableで安全に扱える区切り形式を1つに固定します。新しいUNKNOWN registryは作りません。
+値は空欄または1件以上の `UNK-xxx` とし、複数参照は `<br>` 区切りに固定します。QとUNKが意味的に対応するかはLLMが判断し、`unknown_links.py` は形式・存在・duplicateだけを検証します。新しいUNKNOWN registryは作りません。
 
-### 1.5 deterministic validator
+### 1.5 Skill-local UNKNOWN helper
 
-既存 `skills/question-analysis/evals/deterministic/validator.py` を最小拡張します。
+新規 `skills/question-analysis/scripts/unknown_links.py` を追加します。
+
+productionで次を決定論的に検証します。
 
 - `関連UNKNOWN ID` の非空値が `UNK-xxx` 形式であること
+- current known UNKNOWN集合に参照先が存在すること
+- 同一Q内で同じUNKを重複参照していないこと
+- current / resolved集合が与えられた場合、resolved-only UNKをcurrent questionへ関連付けていないこと
+
+このhelperはQとUNKの意味的対応、質問文、回答後の正規化先を判断しません。
+
+### 1.6 deterministic eval
+
+既存 `skills/question-analysis/evals/deterministic/validator.py` も同じ外部契約を独立に評価します。
+
 - fixtureに `known_unknown_ids` がある場合、参照UNKNOWNがその集合に含まれること
 - fixtureに `expected_related_unknowns` がある場合、Q IDごとの関連UNKNOWN集合が完全一致すること
 - spec-analysis由来でない質問は関連UNKNOWN ID空欄を許可する
 - 既存Q-xxx、分類、再開Skill、runtime identity等の契約は変更しない
 
-新しいdeterministic eval frameworkは作りません。既存QUESTION output fixtureの少なくとも1件へUNKNOWN mappingを追加し、repository unit testで未知UNK / 誤mappingのfalse-pass regressionを追加します。deterministic output case数を増やす必要はありません。
+eval validatorはproduction helperをimportしてexpectedを作りません。既存QUESTION output fixtureの少なくとも1件へUNKNOWN mappingを追加し、repository unit testで未知UNK / 誤mappingのfalse-pass regressionを追加します。deterministic output case数を増やす必要はありません。
 
 ## 2. qa-workflow変更
 
@@ -170,7 +182,7 @@ READMEへ変更が必要な場合は、UIテスト対象分析profileがspec-ana
 ## 6. 完了条件
 
 - profile requestがspec-analysisへrouteされる
-- 不明点回答後に同じUNKNOWN lineageでspec-analysisへ戻り、question-analysisの関連UNKNOWN IDが決定論的に検証される
+- 不明点回答後に同じUNKNOWN lineageでspec-analysisへ戻り、question-analysisの関連UNKNOWN IDはSkill-local helperと独立deterministic evalの双方で構造検証される
 - 仕様理解だけの要求でtest-analysisへ勝手に進まない
 - current UI観測要求だけtest-target-inspectionへ分岐する
 - profileが既存Agent Skills構造でAIエージェントから利用できる
