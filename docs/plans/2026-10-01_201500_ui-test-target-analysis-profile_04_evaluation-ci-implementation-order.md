@@ -82,20 +82,33 @@ semantic rubricへはprofile固有の次の観点だけを追加し、既存SPEC
 
 ### 複数Markdown packageのevaluation projection
 
-既存 `scripts/skills/evals/semantic/run.py` は1つの `--output` fileだけを受けるため、semantic runner自体はdirectory対応へ変更しません。
+既存 `scripts/skills/evals/semantic/run.py` / deterministic runnerはいずれも1つの `--output` fileを受けるため、runner自体はdirectory対応へ変更しません。
 
-評価時だけ、packageを次の決定論的projectionへ変換します。
+production `skills/spec-analysis/scripts/ui_target_package.py project-eval` を使用し、projection modeを分けます。
 
-1. package rootの `MANIFEST.md` に列挙されたcurrent fileだけを対象にする
-2. path traversal / package root外参照を拒否する
-3. MANIFESTのfile順をevaluation順として固定する
-4. 各fileの前に `<!-- FILE: <relative-path> -->` markerを付ける
-5. UTF-8 textをそのまま連結し、内容の要約・変換・正規化を行わない
-6. 生成した1 Markdownを既存semantic runnerの `--output` へ渡す
+semantic projection:
 
-このprojectionは評価専用で、production packageやAuthorityを変更しません。
+- README
+- 00〜09
+- 10+ current domain files
+- CHANGELOG / MANIFESTは除外
+- 過去仕様を含むCHANGELOGをsemantic Judgeへ混ぜない
 
-production `skills/spec-analysis/scripts/ui_target_package.py project-eval` を使用し、semantic評価専用に同じ処理を再実装しません。MANIFEST外file混入、root外path、重複file、missing file、順序をrepository unit testで検証します。project-evalは内容を要約・変更しない単純projectionに限定し、汎用document merge frameworkにはしません。
+deterministic projection:
+
+- 全payload file
+- MANIFESTを最後にcontrol fileとして追加
+- version / file set / hash / stable ref等のprofile contractを1 Markdown上で評価可能にする
+
+共通:
+
+1. package root外path / symlink / duplicate / missing fileを拒否する
+2. canonical file orderを使用する
+3. 各fileの前に `<!-- FILE: <relative-path> -->` markerを付ける
+4. UTF-8 textをそのまま連結し、内容の要約・意味変換を行わない
+5. projectionは評価用transportであり、production packageやAuthorityを変更しない
+
+semantic / deterministicで同じprojection helperを使いますが、expected判定は各eval validator / rubricが独立して行い、production helper出力からexpectedを逆算しません。
 
 ## 3. question-analysis semantic eval
 
