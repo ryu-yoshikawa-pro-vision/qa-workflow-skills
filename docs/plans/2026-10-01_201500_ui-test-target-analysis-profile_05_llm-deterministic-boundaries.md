@@ -95,6 +95,15 @@ default version policyを使うpackageだけを対象に、previous versionか�
 
 案件固有version policyが明示されている場合はnext-versionを使用せず、そのversion文字列がpackage内で一致することだけvalidateします。
 
+#### next-id
+
+LLMがsemantic identityを判断して `new` と決めた後だけ使用します。prefixとcurrent / previous packageで既知の同prefix IDを入力し、既知最大番号+1を返します。
+
+- reuse / newの意味判断は行わない
+- 既存IDを別entityへ再割当てしない
+- previous packageがあるupdateではprevious / current双方の既知IDを考慮する
+- prefixはprofileで宣言済みのものだけ許可する
+
 #### build-manifest
 
 current package fileからMANIFEST bodyまたはmachine-readable manifest projectionを生成します。
