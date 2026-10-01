@@ -159,7 +159,7 @@ IDが意味的に同一か、新IDにすべきかはLLM判断です。helperはI
 
 ## 5. canonical stable reference contract
 
-01〜08で期待挙動・UI構造・ルール・不明点を記載するnormative rowには、必要に応じ次の2種の参照を持たせます。
+01〜08のstructured tableで期待挙動・UI構造・ルール・不明点を表すrowは、少なくとも1件のcanonical itemへ根拠付けできる場合 `関連仕様項目ID` を必須とします。UI構造間の親子・遷移・関連を表すrowは、関係先が存在する場合 `関連構造ID` を持ちます。pure narrative / heading /説明専用rowには参照列を強制しません。
 
 - `関連仕様項目ID`: SPEC / DEC / INF / UNK等、09_authority_and_traceability.mdのcanonical item
 - `関連構造ID`: PAGE / STATE / VIEW / MODAL / FIELD / RULE / FLOW等
@@ -172,14 +172,15 @@ pure narrativeや説明用sectionへ無理に参照列を追加しません。�
 
 ## 6. current UNKNOWNの扱い
 
-09_authority_and_traceability.mdの分析項目で、分類=UNKNOWNかつcurrentな項目をcanonical current UNKNOWN集合とします。
+09_authority_and_traceability.mdの分析項目では、UI target profile利用時の `現在有効か` を `Yes / No` に固定します。分類=UNKNOWNかつ `現在有効か=Yes` の項目をcanonical current UNKNOWN集合とします。
 
 07_current_unknowns.mdはその集合の人間向けビューです。
 
 - UNKNOWN本文・影響・質問内容はLLMが記述する
 - 07に載せるUNK ID集合と件数はhelperで検証する
 - READMEの件数は同じ集合から検証する
-- 解消したUNKNOWNをcurrent集合から除外する意味判断はLLMがAuthority更新時に行う
+- UNKNOWNが解消した場合、元のUNK rowは削除・再分類せず `現在有効か=No` とし、補足 / 上書き / 置換関係で新しいSPEC / DECISION / 承認済みASM等のstable IDへlineageを残す
+- 新しい確定内容は分類に合う新しいstable IDで記録する。`UNK-xxx` をDECISIONへ分類変更しない
 - resolved historyの説明はLLMがCHANGELOG / 06へ記載できる
 
 scriptがUNKNOWNを意味的に解消しません。
