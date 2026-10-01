@@ -21,6 +21,8 @@
 
 この追加責務はAuthority ownerを増やさず、spec-analysis内の条件付きprofileとして実現します。
 
+AIエージェントからの利用方法は既存のAgent Skills構造をそのまま使い、今回のための製品固有integrationやbootstrap機構は追加しません。
+
 ## 2. 責務表
 
 | 内容 | owner | 今回の変更 |
@@ -37,7 +39,6 @@
 | プロダクトリスク / テスト重点 | test-analysis | 対象外 |
 | テスト要求 / 条件 / ケース | 各既存設計Skill | 対象外 |
 | workflow開始 / 再開 / 変更伝播 | qa-workflow | profile routingのみ追加 |
-| 外部Agentからrepository Skillを読む手順 | docs/integrations | consumer文書のみ追加 |
 
 ## 3. profileを使う条件
 
