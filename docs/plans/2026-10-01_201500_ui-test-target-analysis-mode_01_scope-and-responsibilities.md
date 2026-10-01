@@ -3,7 +3,7 @@
 親Plan:
 2026-10-01_201500_ui-test-target-analysis-mode.md
 
-この文書は、今回追加する「UIテスト対象分析モード」のSkill間責務境界を正本とします。LLMと決定論的処理の内部責務境界は `2026-10-01_201500_ui-test-target-analysis-mode_05_llm-deterministic-boundaries.md`、package schema / helper I/O / legacy migrationは `2026-10-01_201500_ui-test-target-analysis-mode_06_package-schema-and-helper-contracts.md`、PR #14後のSkill境界は `2026-10-01_201500_ui-test-target-analysis-mode_07_pr14-baseline-and-integration.md`、UI操作のUS / UC / Behavior / AC分解と下流追跡は `2026-10-01_201500_ui-test-target-analysis-mode_08_behavior-decomposition-and-acceptance-traceability.md` を正本とします。
+この文書は、今回追加する「UIテスト対象分析モード」のSkill間責務境界を正本とします。LLMと決定論的処理の内部責務境界は `2026-10-01_201500_ui-test-target-analysis-mode_05_llm-deterministic-boundaries.md`、package schema / helper I/O / legacy migrationは `2026-10-01_201500_ui-test-target-analysis-mode_06_package-schema-and-helper-contracts.md`、PR #14後のSkill境界は `2026-10-01_201500_ui-test-target-analysis-mode_07_pr14-baseline-and-integration.md`、UI操作のUS / UC / Behavior / AC分解と下流追跡は `2026-10-01_201500_ui-test-target-analysis-mode_08_behavior-decomposition-and-acceptance-traceability.md`、Acceptance Criterion Machine Entity / shared runtime / test-requirement-design v2は `2026-10-01_201500_ui-test-target-analysis-mode_09_runtime-entity-and-test-requirement-contracts.md` を正本とします。
 
 ## 1. 解決する問題
 
@@ -33,7 +33,8 @@ AIエージェントからの利用方法は既存のAgent Skills構造をその
 | UI操作母集団 / User Story / Use Case / Behavior / Acceptance Criteria | spec-analysis | UI操作scopeでは必須分析としてmodeへ追加 |
 | 複数Markdown仕様理解package | spec-analysis | modeへ追加 |
 | mode導入前のlegacy package migration | spec-analysis | semantic mappingはLLM、current schema validationはhelper |
-| canonical仕様モデル / Current Effective Authority / Machine Entity | spec-analysis | 既存契約を維持し、package内の単一正本へ配置 |
+| canonical仕様モデル / Current Effective Authority / Authority Machine Entity | spec-analysis | 既存契約を維持し、package内の単一正本へ配置 |
+| Acceptance Criterion Machine Entity | spec-analysis | current ACだけを下流handoff用Entityとして決定論生成。US / UC / Behaviorはstructured modelのまま |
 | 不明点のブロック分類 | question-analysis | 既存維持 |
 | 回答のSPEC / DECISION / ASM正規化 | question-analysis | 安定UNKNOWN参照を補強 |
 | packageへの回答反映 | spec-analysis | question-analysisの正規化結果を入力に更新 |
@@ -43,7 +44,7 @@ AIエージェントからの利用方法は既存のAgent Skills構造をその
 | formal WCAG-EM適合性評価 | wcag-conformance-evaluation | #14責務を維持 |
 | repositoryの製品コード事実 | spec-analysisの補助入力 | Authorityへ自動昇格しない。E2E実装分析そのものが必要な場合だけe2e-test-inspectionへroutingする |
 | プロダクトリスク / テスト重点 | test-analysis | 対象外 |
-| Acceptance Criteria → テスト要求の追跡 / closure | test-requirement-design | current ACが存在するworkflowで追加 |
+| Acceptance Criteria → テスト要求の追跡 / closure | test-requirement-design | `requirement-structure-v2`でcurrent ACをTRまたはDispositionへ閉じる |
 | テスト条件 / ケース | 各既存設計Skill | 変更なし |
 | workflow開始 / 再開 / 変更伝播 | qa-workflow | mode routingのみ追加 |
 
@@ -86,7 +87,7 @@ mode選択を「Markdown」「複数ファイル」等の単語一致だけで�
 
 ## 5. UI操作scopeの必須分析
 
-対象scopeにユーザー / operatorによるUI操作が存在する場合、US → UC → Behavior → ACの順で分析します。資料不足は `not-applicable` の理由にせずUNKNOWN / blockedへします。UI操作が存在しない表示専用・非UI scopeのみnot-applicableを許可します。
+分析対象機能scopeごとにUI操作有無を判断します。UI操作ありはUS → UC → Behavior → ACをrequired、UI操作なしはnot-applicable、UI操作有無自体が未確定ならblocked + UNKNOWNです。資料不足をnot-applicableへ置き換えません。ユーザー操作を起点としない自動更新・session timeout・非同期表示更新等はUS / UCを無理に作らず、通常のstate / rule / notification等として残します。
 
 正常 / 準正常 / 例外はUse Case仕様の完全性確認軸であり、テスト技法ではありません。詳細は `_08_behavior-decomposition-and-acceptance-traceability.md` を正本とします。
 
@@ -98,7 +99,8 @@ UIテスト対象分析packageでも、既存spec-analysisのcanonical contract�
 - 既存 `assets/output-template.md` と同じ意味契約で、SRC / 分析項目 / Current Effective Authority / Machine Entityを保持する
 - 他のpackage fileはcanonical item IDを参照する構造化ビューであり、SPEC / DECISION / INFERENCE / UNKNOWNの別正本を作らない
 - 業務ルール、UI構造、入力制約等を人間向けに再配置しても、期待挙動のAuthorityは09へ戻れる
-- Current Effective AuthorityからMachine Entityを生成する既存 `authority_entities.py` 契約を維持する
+- Current Effective AuthorityからAuthority Machine Entityを生成する既存 `authority_entities.py` 契約を維持する
+- current ACだけを `acceptance_criterion` Machine Entityへ変換し、US / UC / Behaviorはglobal Entity typeへしない
 - package固有のversion / manifestはAuthority Machine Entityのidentityやfingerprintを置換しない
 
 ## 7. UI構造の正規分類
@@ -211,9 +213,9 @@ gatedの場合:
 
 ## 12. LLMと決定論的処理
 
-意味判断はLLMに残します。具体的には、SPEC / DECISION / INFERENCE / UNKNOWN、PAGE / VIEW等の分類、semantic identity、Authority競合、optional domainの必要性、repository差分の意味判断をscriptへ固定しません。
+意味判断はLLMに残します。具体的には、SPEC / DECISION / INFERENCE / UNKNOWN、PAGE / VIEW等の分類、semantic identity、Authority競合、scopeのUI操作有無、条件付き必須file trigger該当性、案件固有extension fileの必要性、repository差分の意味判断をscriptへ固定しません。
 
-定型処理は `05_llm-deterministic-boundaries.md` に従い、ID形式・参照存在・version整合・current UNKNOWN件数・MANIFEST / SHA-256・evaluation projection等をSkill-local helper / validatorへ移します。
+定型処理は `05_llm-deterministic-boundaries.md` に従い、ID形式・参照存在・scope applicability対応・条件付き必須file整合・version整合・current UNKNOWN件数・MANIFEST / SHA-256・AC Machine Entity / normalized machine input・evaluation projection等をhelper / validatorへ移します。
 
 helperの出力はLLMの再確認候補や構造エラーを示すための補助であり、仕様意味を新しく確定する根拠にはしません。
 
