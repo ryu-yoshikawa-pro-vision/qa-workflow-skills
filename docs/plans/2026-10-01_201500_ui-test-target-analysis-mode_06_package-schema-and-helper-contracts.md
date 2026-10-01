@@ -731,11 +731,14 @@ legacy packageに独立progress fileがある場合:
 
 mode固有の新しい決定論契約を通常spec-analysis 2caseへ混ぜず、`SPEC-OUT-003` を追加します。
 
-- deterministic output case total: 44 → 45
+- deterministic output case total: 44 → 46
 - spec-analysis: 2 → 3
+- test-requirement-design: 2 → 3
 - question-analysis: 2のまま
 
-SPEC-OUT-003はcurrent `ui-target-v1` package fixtureを持ちます。
+SPEC-OUT-003はcurrent `ui-target-v1` package fixtureを持ち、UI操作scopeのbehavior decomposition contractを含めます。
+
+TR-OUT-003はcurrent ACを入力に持ち、AC→TR / disposition closure、unknown AC、linked + disposed重複を検証します。
 
 評価経路:
 
