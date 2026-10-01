@@ -33,6 +33,7 @@ feat/ui-test-target-analysis-profile
 - UNKNOWNを安定IDで管理し、回答後に本文・不明点一覧・履歴を同期する
 - 更新のたびに差分ファイルではなく完全版を生成する
 - version、CHANGELOG、MANIFESTを揃え、複数ファイル間の状態を一貫させる
+- 既存spec-analysisのcanonical仕様モデル（SRC / SPEC / DECISION / INFERENCE / UNKNOWN / Current Effective Authority / Machine Entity）を維持したまま、人間が利用しやすい複数Markdownへ構造化する
 - テスト分析・テスト条件・テストケースへ先回りせず、「対象理解」の成果物として閉じる
 
 この不足を新Skillで埋めると、spec-analysisとのAuthority解決責務が重複します。またtest-target-inspectionへ統合すると、仕様理解と生きた実対象観測の境界を崩します。
@@ -42,7 +43,7 @@ feat/ui-test-target-analysis-profile
 ## 目的
 
 1. テスト設計前の仕様理解を、案件固有資料・Q&A・実装証拠から追跡可能な複数Markdown packageへ整理できるようにする
-2. UI構造、状態、業務ルール、入力制約、通知・外部連携、不明点、実装状況を同一の責務境界で継続更新できるようにする
+2. UI構造、状態、業務ルール、入力制約、通知・外部連携、不明点、実装状況を同一の責務境界で継続更新しつつ、既存spec-analysisのcanonical Authority / Machine Entity契約を壊さない
 3. question-analysisの回答正規化と連携し、既存UNKNOWNを再質問・再採番せず更新できるようにする
 4. qa-workflowから「仕様理解packageだけ欲しい」要求へ最短routingできるようにする
 5. test-target-inspectionの「生きた実対象観測」と役割を混同しない
@@ -60,9 +61,17 @@ UIテスト対象分析はspec-analysisの条件付き出力プロファイル�
 
 既存assets/output-template.mdは通常の単一仕様分析に引き続き使用します。
 
-複数Markdown packageが必要な場合だけ、追加するUIテスト対象分析プロファイルを選択します。
+UIテスト設計前の対象理解を継続利用する成果物として残す場合、複数資料を統合して画面・状態・業務ルール・不明点を追跡可能に管理する場合、または既存の対象理解packageを更新する場合にUIテスト対象分析プロファイルを選択します。単発の仕様要約、Authority競合解消、単一表で十分な仕様整理では既存の通常出力を使います。Markdownという語の有無だけでは選択しません。
 
-### 3. 実装は仕様Authorityではない
+### 3. canonical仕様モデルを1箇所に維持する
+
+複数Markdown packageでも、既存 `assets/output-template.md` が持つ `情報源 / 正本参照一覧`、`分析項目`、`現在有効な仕様根拠`、Machine Entityとの対応を失いません。
+
+profileでは `09_authority_and_traceability.md` をcanonical仕様モデルの正本とし、他ファイルはそのstable IDを参照する構造化ビューとします。SPEC / DECISION / INFERENCE / UNKNOWNやCurrent Effective Authorityを複数ファイルで別々に再定義しません。
+
+Machine Entityは既存 `authority_entities.py` の入力となるCurrent Effective Authorityから生成し、fingerprintを手入力しません。
+
+### 4. 実装は仕様Authorityではない
 
 repository、実画面、Page Object、API実装は既存契約どおり補助証拠です。
 
@@ -70,26 +79,26 @@ repository、実画面、Page Object、API実装は既存契約どおり補助�
 
 仕様と実装の差はrepository implementation statusとして分離します。
 
-### 4. test-target-inspectionと統合しない
+### 5. test-target-inspectionと統合しない
 
 - spec-analysis: 仕様書、Q&A、repository等から「期待挙動として何が有効か」を整理する
 - test-target-inspection: 生きた実対象へ接続して「現在何が観測できるか」を記録する
 
 currentなUI観測が必要になった場合だけqa-workflowでtest-target-inspectionへroutingし、観測事実をspec-analysisのAuthorityへ自動昇格させません。
 
-### 5. 質問回答はquestion-analysis経由で正規化する
+### 6. 質問回答はquestion-analysis経由で正規化する
 
 会話回答を生のまま仕様本文へ流しません。
 
 正式決定ならDECISION、更新済みAuthorityならSPEC、暫定前提なら承認済みASMへ正規化してからspec-analysis packageへ反映します。
 
-### 6. packageは完全版を正とする
+### 7. packageは完全版を正とする
 
 version更新時は変更ファイルだけではなく、そのversionの完全なpackageを成立させます。
 
 前versionの内容を参照しなければ現在状態を理解できない構造にしません。
 
-### 7. AIエージェント用Skillとして既存Agent Skills構造を維持する
+### 8. AIエージェント用Skillとして既存Agent Skills構造を維持する
 
 今回追加するprofileは、既存Skillと同じく `SKILL.md` / `references/` / `assets/` の段階的開示で利用できるようにします。
 
@@ -116,7 +125,7 @@ version更新時は変更ファイルだけではなく、そのversionの完全
 - skills/spec-analysis/SKILL.md
 - skills/spec-analysis/references/guidance.md
 - 新規 skills/spec-analysis/references/ui-test-target-analysis.md
-- 新規 skills/spec-analysis/assets/ui-test-target-analysis/*
+- 新規 skills/spec-analysis/assets/ui-test-target-analysis/*（`09_authority_and_traceability.md`を含む）
 
 必要に応じて:
 - skills/spec-analysis/evals/semantic/*
@@ -129,6 +138,8 @@ version更新時は変更ファイルだけではなく、そのversionの完全
 - skills/question-analysis/references/guidance.md
 - skills/question-analysis/assets/output-template.md
 - skills/question-analysis/evals/semantic/*
+- skills/question-analysis/evals/deterministic/validator.py
+- skills/question-analysis/evals/output/*（既存fixtureへ関連UNKNOWN ID契約を反映）
 
 目的はUNKNOWNの安定参照、回答後の差分反映、解消済み履歴とcurrent unknownの分離です。既存の質問分類自体は変更しません。
 
@@ -137,6 +148,7 @@ version更新時は変更ファイルだけではなく、そのversionの完全
 変更候補:
 - skills/qa-workflow/references/guidance.md
 - skills/qa-workflow/evals/deterministic/routing_cases.json
+- skills/qa-workflow/evals/deterministic/routing_candidate_outputs.json
 - 必要ならREADME.md
 
 「テスト設計前の仕様理解package」はspec-analysisから開始し、未解決事項があればquestion-analysisへ進み、回答反映後spec-analysisへ戻すroutingを追加します。
@@ -163,6 +175,8 @@ version更新時は変更ファイルだけではなく、そのversionの完全
 - 通常のspec-analysis出力は従来どおり利用できる
 - test-target-inspectionの責務を侵食しない
 - qa-workflowが最短経路でprofileを選択できる
+- package内のcanonical Authority / Machine Entity契約が既存spec-analysisと互換である
+- 複数Markdown packageを既存semantic runnerへ入力できる一意なevaluation projectionが定義されている
 - profileが既存Agent Skills形式のままAIエージェントから利用できる
 - 既存Agent Skills検証、trigger、semantic、deterministic / workflow routing回帰がPASSする
 - README / EVALS等の現在値を変更した場合は実データと一致する
