@@ -19,11 +19,11 @@ PR #14後の期待観測値:
 PR #16後の期待増分:
 - Skill: +0
 - Trigger: +0
-- Deterministic: +1
-- Semantic: +4
+- Deterministic: +2
+- Semantic: +5
 - routing: +8
 
-したがってStep 0時点の期待値は 22 Skill / 488 trigger / 45 deterministic / 159 semantic / 69 routingです。ただしCI / repository testでは固定値を正本化せず、PR #14のcurrent repository / manifestからの動的導出を維持します。
+したがってStep 0時点の期待値は 22 Skill / 488 trigger / 46 deterministic / 160 semantic / 69 routingです。ただしCI / repository testでは固定値を正本化せず、PR #14のcurrent repository / manifestからの動的導出を維持します。
 
 ## 2. 評価方針
 
@@ -55,6 +55,8 @@ PR #16後の期待増分:
 - field validation
 - notification / external interaction
 - Q&A decision
+- 複数のユーザーUI操作
+- 正常 / 準正常 / 例外のうち、定義あり / なし / 未定義が混在するUse Case
 - repository補助情報と仕様-実装差分
 - 1件以上のUNKNOWN
 - 一部矛盾
@@ -67,6 +69,11 @@ PR #16後の期待増分:
 - 直交STATEを無理に排他化しない
 - field / notification / external interactionを適切なoptional viewへ整理する
 - repository差分を実装状況へ分離
+- UI操作母集団を抽出し、US → UC → Behavior → ACの順で分解する
+- UI操作があるのに資料不足の場合はnot-applicableへ逃げずUNKNOWN / blockedへする
+- 各UCで正常 / 準正常 / 例外を全て検討し、なし / 未定義を区別する
+- ACで具体値・組合せ・テストケースへ先回りしない
+- Gherkin / Given-When-Thenを生成しない
 - canonical stable itemへの追跡を維持する
 - test condition / caseへ進まない
 
@@ -99,6 +106,8 @@ semantic rubricへはmode固有の次の観点だけを追加し、既存SPEC cr
 - UI構造分類の妥当性
 - implementation status分離
 - versioned package更新の整合
+- UI操作scopeのUS / UC / Behavior / AC分解の完全性
+- UI操作がないscopeでの非適用判断の妥当性
 
 ### 複数Markdown packageのevaluation projection
 
@@ -146,7 +155,26 @@ question-analysisの既存分類ロジックを変更しないため、trigger d
 
 spec-analysis / question-analysisで今回追加するcritical semantic criterionは、各criterionが最低1 semantic caseから参照されることをrepository testで検証します。既存normal spec-analysis caseにもmode非選択回帰を含めます。
 
-## 5. qa-workflow routing eval
+## 5. test-requirement-design semantic eval
+
+1 caseを追加し、test-requirement-designはPR #14後の2件から3件へ増やします。case IDは `TR-SEM-003` とします。
+
+入力:
+- current ACを持つUI target mode成果物
+- 1 ACから複数の検証責務が必要な例
+- 複数ACを1つの検証責務へ統合できる例
+- dispositionへ送るAC
+
+期待:
+- `関連AC ID` を追跡する
+- ACの文章をそのままTRへ言い換えず、「何を検証・保証するか」へ変換する
+- ACとTRの1:1対応を強制しない
+- current ACをTRまたは明示的dispositionへ閉じる
+- ACにない具体条件 / 値 / 組合せをTRへ先回りしない
+- current AC Entityをartifact modeの依存として保持する
+
+既存TR-SEM-001 / 002はACなしworkflowの回帰として維持し、`関連AC ID=-` / `acceptance_criteria=[]` で従来責務が変わらないことを確認します。
+## 6. qa-workflow routing eval
 
 既存routing fixtureへmode routing caseを追加します。
 
@@ -165,7 +193,7 @@ spec-analysis / question-analysisで今回追加するcritical semantic criterio
 
 expected start / resume Skillを明示し、全Skill固定順実行へ回帰しないことを確認します。
 
-## 6. trigger eval
+## 7. trigger eval
 
 今回のmode選択はspec-analysis内部の出力mode選択であり、Skill間trigger境界を変更しません。現在のspec-analysis trigger datasetには、複数資料統合・テスト分析前の仕様整理・repository/Figma/Q&A統合のpositive queryが既にあるため、frontmatter descriptionとtrigger datasetは変更しません。mode選択境界はspec-analysis semantic evalで検証します。
 
@@ -179,11 +207,11 @@ expected start / resume Skillを明示し、全Skill固定順実行へ回帰し�
 - 「テストケースを作りたい」→ test-case-design
 - 「テスト設計前の対象理解を継続成果物として作りたい」→ spec-analysis
 
-## 7. 決定論的support / validation
+## 8. 決定論的support / validation
 
 `05_llm-deterministic-boundaries.md` で定型処理としたものは今回実装対象とします。「初回なので後回し」という扱いはしません。
 
-### 7.1 spec-analysis production helper
+### 8.1 spec-analysis production helper
 
 `skills/spec-analysis/scripts/ui_target_package.py` を追加し、少なくとも次のoperationを実装します。
 
@@ -193,6 +221,7 @@ expected start / resume Skillを明示し、全Skill固定順実行へ回帰し�
 - next-id
 - build-manifest
 - impact
+- build-machine-evidence
 - project-eval
 
 repository unit testで最低限次を確認します。
@@ -209,9 +238,11 @@ repository unit testで最低限次を確認します。
 - domain file命名
 - next-idがsemantic identityを判断せず、new指定後だけ既知ID最大値から次番号を返すこと
 - impactがexact referenceだけから候補fileを返し、semantic変更を勝手に決定しないこと
-- project-evalが内容を変更せずMANIFEST順に連結すること
+- UI操作scopeのUIOP / US / UC / Behavior / AC hierarchy / closure / 3分類整合
+- build-machine-evidenceがAuthority + US / UC / Behavior / AC Entityを決定論生成すること
+- project-evalが内容を変更せずcanonical順に連結すること
 
-### 7.2 question-analysis production helper
+### 8.2 question-analysis production helper
 
 `skills/question-analysis/scripts/unknown_links.py` を追加し、次を検証します。
 
@@ -222,7 +253,7 @@ repository unit testで最低限次を確認します。
 
 QとUNKの意味的同一性は検証しません。
 
-### 7.3 deterministic output eval
+### 8.3 deterministic output eval
 
 既存spec-analysis / question-analysis validatorへ、production helperとは独立したfixture検証を追加します。
 
@@ -231,7 +262,7 @@ QとUNKの意味的同一性は検証しません。
 - production helperをimportしてexpectedを生成しない
 - spec-analysisはmode固有 `SPEC-OUT-003` を追加して2→3件とし、question-analysisは既存2件のfixture拡張で維持する。全体は38→39件
 
-### 7.4 semanticに残すもの
+### 8.4 semanticに残すもの
 
 次はLLM / semantic evalの責務として今回から明示的に対象外とします。
 
@@ -242,10 +273,13 @@ QとUNKの意味的同一性は検証しません。
 - optional domain fileの必要性
 - semantic duplicate /矛盾の判定
 - repository差分の意味的な重要性
+- US / UC / Behavior / ACの意味分解
+- 正常 / 準正常 / 例外、基本 / 代替 / 例外の意味分類
+- ACとTRの意味的対応 / TR分割統合
 
 これらは「後からvalidator化する候補」ではありません。機械化するとLLMの柔軟性を損なうため、意味判断として残します。
 
-## 8. CI
+## 9. CI
 
 既存workflowを再利用します。
 
@@ -264,12 +298,14 @@ QとUNKの意味的同一性は検証しません。
 
 - Skill数: 22のまま
 - trigger query: 488のまま
-- deterministic output case: 44 → 45
+- deterministic output case: 44 → 46
   - spec-analysis: 2 → 3
+  - test-requirement-design: 2 → 3
   - question-analysis: 2のまま
-- semantic case: 155 → 159
+- semantic case: 155 → 160
   - spec-analysis: 2 → 5
   - question-analysis: 2 → 3
+  - test-requirement-design: 2 → 3
   - その他Skill: 変更なし
 - qa-workflow routing fixture: 61 → 69
 
@@ -285,7 +321,7 @@ Step 0でmainの現在値を再確認し、上記差分がそのまま適用可�
 
 歴史文書の過去値は変更しません。
 
-## 9. 実Agent smoke
+## 10. 実Agent smoke
 
 実装完了前に少なくとも1回、実Agentクライアント相当で次を確認します。
 
@@ -301,18 +337,18 @@ Step 0でmainの現在値を再確認し、上記差分がそのまま適用可�
 - UI target用途ではspec-analysis modeを選択する
 - mode referenceを読む
 - repository事実を仕様Authority化しない
-- package構造を作れ、09_authority_and_traceability.mdから `ui_target_package.py build-authorities` → 既存authority_entities.pyでAuthority Machine Entityへ閉じられる
+- package構造を作れ、`ui_target_package.py build-machine-evidence` でAuthority + US / UC / Behavior / AC Machine Entityへ閉じられる
 - question-analysisが必要論点だけ扱う
 - test-analysisへ自動進行しない
 - outputがmodeの品質ゲートを満たす
-- `ui_target_package.py` により形式・参照・件数・version・MANIFEST / hashを検証できる
+- `ui_target_package.py` により形式・参照・件数・version・MANIFEST / hash・behavior decomposition closureを検証できる
 - MANIFEST順evaluation projectionを通して既存semantic runnerへ入力できる
 
 AIエージェント上で、既存Agent Skillsの読み込み方法に従い `spec-analysis` → mode reference / assetsを利用して成果物を生成できることを確認します。
 
 特定製品のtool名やconnectorを評価条件にはしません。
 
-## 10. 実装順序
+## 11. 実装順序
 
 ### Step 0: PR #14 merge後rebase / current repository再確認
 
@@ -360,7 +396,17 @@ mode単体が成立してからworkflowへ接続します。
 - 既存output fixture 1件へmapping追加 + false-pass unit test
 - question semantic caseを1件追加し合計3件へ
 
-### Step 4: qa-workflow routing
+### Step 4: test-requirement-design AC traceability
+
+- output templateへ `関連AC ID` を追加
+- guidanceへcurrent AC closure / ACとTRの責務差を追加
+- requirement_structure入力へ `acceptance_criteria[]`、TR draftへ `acceptance_refs[]` を必須fieldとして追加
+- ACなしworkflowは空arrayで明示し、optional fieldにはしない
+- artifact modeでcurrent spec-analysis / acceptance_criterion Entityへ依存
+- current ACをTRまたはdispositionへ閉じる
+- TR-OUT-003 / TR-SEM-003を追加
+- existing TR fixtures / runtime testsを新schemaへ同期
+### Step 5: qa-workflow routing
 
 - mode request routing
 - answer resume
@@ -369,22 +415,25 @@ mode単体が成立してからworkflowへ接続します。
 - routing_candidate_outputs.jsonへ対応する独立candidate 8件追加
 - routing fixture合計69件へ同期
 
-### Step 5: package schema / migration / helper contract validation
+### Step 6: package schema / migration / helper contract validation
 
 - current packageが `ui-target-v1` として識別できること
 - helper CLI JSON contract / failure / limit / filesystem safety
+- UI操作scopeのUS / UC / Behavior / AC exact schema / closure / Machine Entity
 - exact table schema / stable ref / MANIFEST / Machine Entity bridge
 - legacy vNN → current schema migration fixture
 - legacy progress情報がREADME / qa-workflow / CHANGELOGへ正しく分配されること
 
-### Step 6: deterministic / semantic boundary validation
+### Step 7: deterministic / semantic boundary validation
 
 - LLMが意味判断すべき項目をhelperが自動決定していないこと
+- US / UC / Behavior / ACの意味分類とAC→TRの意味対応をscriptが決定していないこと
+- Gherkin / Given-When-Thenを追加していないこと
 - helperが返すimpactは再確認候補であり変更必須判定ではないこと
 - normal spec-analysisがmode依存になっていないこと
 - helperがSkill package単体コピーで実行できること
 
-### Step 7: cross-repository validation
+### Step 8: cross-repository validation
 
 - 全22 Skill構造
 - trigger
@@ -394,14 +443,16 @@ mode単体が成立してからworkflowへ接続します。
 - docs current count
 - git diff --check
 
-### Step 8: 実Agent smoke
+### Step 9: 実Agent smoke
 
 - UI target package scenario（canonical Authority / Machine Entityを含む）
 - question-analysis回答反映からspec-analysis package更新までのscenario
+- UI操作からUS / UC / Behavior / ACを分析しAC→TRまで追跡するscenario
+- UI操作はあるが仕様不足のためUNKNOWN / blockedへ止めるscenario
 - semantic evaluation projection scenario
 - deterministic helperが構造エラーを返してもLLMの意味判断を勝手に上書きしないscenario
 
-### Step 9: final review
+### Step 10: final review
 
 次を確認します。
 
@@ -414,7 +465,7 @@ mode単体が成立してからworkflowへ接続します。
 - 特定AI製品固有のtool / connector / bootstrapをSkill契約へ入れていない
 - 実装時に参照すべき正本fileが一意に分かる
 
-## 11. 完了条件
+## 12. 完了条件
 
 - 新Skill追加なし
 - mode assets / referenceが存在
@@ -427,7 +478,8 @@ mode単体が成立してからworkflowへ接続します。
 - question-analysisのUNKNOWN lineageがsemantic + production helper + deterministic evalで確認済み
 - qa-workflow routing / resumeと#14の3 Skillとの誤routing境界がrouting case / independent candidateで確認済み
 - multi-file packageがproduction helperのevaluation projection経由で既存semantic runnerにより評価可能
-- version / UNKNOWN件数 / stable ref / MANIFEST / SHA-256等の定型整合をproduction helperで検証できる
+- version / UNKNOWN件数 / stable ref / MANIFEST / SHA-256 / behavior hierarchy / 3分類完全性等の定型整合をproduction helperで検証できる
+- current ACがtest-requirement-designでTRまたはdispositionへ閉じ、AC Entity変更がTR freshnessへ伝播する
 - spec-analysis / question-analysis production helperがSkill package単体で実行可能
 - test-target-inspectionへのcurrent UI分岐が維持される
 - existing CI / evalが全PASS
