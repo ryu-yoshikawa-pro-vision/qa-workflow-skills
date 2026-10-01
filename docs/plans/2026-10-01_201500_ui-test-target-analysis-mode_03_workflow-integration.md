@@ -134,13 +134,16 @@ expected routingからcandidate outputを自動生成せず、既存契約どお
 
 次の8 caseを追加します。
 
-1. 「テスト設計前に仕様理解を複数Markdownへ整理」→ spec-analysis
-2. 「既存仕様理解packageへ不明点回答を反映」→ question-analysis解消後spec-analysis resume
-3. 「current実画面を見て画面資料を更新」→ test-target-inspection
-4. 「仕様書とrepoを比較して期待仕様を整理」→ spec-analysis。repo差分をAuthority化しない
+1. 「テスト設計前に仕様理解を複数Markdownへ整理」→ spec-analysis UIテスト対象分析モード
+2. 「既存仕様理解packageへ不明点回答を反映」→ question-analysis解消後spec-analysis mode resume
+3. 「current実画面を見て対象資料を更新」→ test-target-inspection
+4. 「仕様書とrepoを比較して期待仕様を整理」→ spec-analysis mode。repo差分をAuthority化しない
 5. 「仕様理解だけで止めたい」→ test-analysisへ自動進行しない
+6. 「保存済みFigma / screenshotをUI/UX観点で評価」→ usability-evaluation
+7. 「live browserで使いやすさ / focus / responsiveを検査」→ usability-inspection
+8. 「WCAG 2.x / level指定でformal適合性評価」→ wcag-conformance-evaluation
 
-routing fixtureはPR #14後の61件から8件追加して69件になる想定です。実装開始時にStep 0で現在値を再確認し、追加数が変わらなければEVALS.md / docs/PROJECT_CONTEXT.md / 固定件数を検証するrepository testを66へ同期します。READMEにrouting件数を持つ場合のみ同様に更新します。
+routing fixtureはPR #14後の61件から8件追加して69件になる想定です。実装開始時にStep 0で現在値を再確認し、追加数が変わらなければEVALS.md / docs/PROJECT_CONTEXT.md / routing件数を保持するrepository contractを69へ同期します。READMEにrouting件数を持つ場合のみ同様に更新します。
 
 ## 3. Agent Skillsとしての利用前提
 
@@ -160,7 +163,7 @@ AIエージェントは利用環境で提供される通常のSkill読み込み�
 - GitHub connector固有手順
 - remote Skill loader
 - 新しいSkill-to-Skill API
-- 全19 Skillを一括読み込みするruntime
+- 全22 Skillを一括読み込みするruntime
 
 ## 4. PR #14成果物のAuthority扱い
 
@@ -176,9 +179,9 @@ READMEへ、UIテスト対象分析modeがspec-analysisの条件付きmodeであ
 
 特定AI製品の利用手順は追加しません。
 
-## 5. 変更しないもの
+## 6. 変更しないもの
 
-- qa-workflowの19 Skill前提
+- qa-workflowのPR #14後22 Skill前提
 - skill-to-skill API不存在の説明
 - question-analysisの分類4種
 - test-target-inspectionのlive target currentness契約
@@ -187,11 +190,12 @@ READMEへ、UIテスト対象分析modeがspec-analysisの条件付きmodeであ
 - Regression / Exploration routing
 - E2E Skill群
 
-## 6. 完了条件
+## 7. 完了条件
 
 - mode requestがspec-analysisへrouteされる
 - 不明点回答後に同じUNKNOWN lineageでspec-analysisへ戻り、question-analysisの関連UNKNOWN IDはSkill-local helperと独立deterministic evalの双方で構造検証される
 - 仕様理解だけの要求でtest-analysisへ勝手に進まない
-- current UI観測要求だけtest-target-inspectionへ分岐する
+- current UIの対象情報観測要求だけtest-target-inspectionへ分岐する
+- 保存済みUI資料のUX評価はusability-evaluation、live usability検査はusability-inspection、formal WCAG適合性評価はwcag-conformance-evaluationへ分岐する
 - modeが既存Agent Skills構造でAIエージェントから利用できる
 - 特定AI製品向けintegrationを追加していない
