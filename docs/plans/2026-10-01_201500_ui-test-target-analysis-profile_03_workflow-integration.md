@@ -42,13 +42,13 @@ profile packageのUNKNOWNを、回答反映のたびに再質問・再採番せ�
 
 - 関連UNKNOWN ID
 
-spec-analysis由来の論点ならUNK-xxxを記録し、質問単位のQ-xxxと仕様UNKNOWNを追跡できるようにします。
+spec-analysis由来の論点ならUNK-xxxを記録し、質問単位のQ-xxxと仕様UNKNOWNを追跡できるようにします。profile packageからquestion-analysisへ進む場合は `ui_target_package.py inspect` の `current_unknown_ids[] / resolved_unknown_ids[]` を正規handoffとし、Agentが09から集合を手作業で再構築しません。
 
 値は空欄または1件以上の `UNK-xxx` とし、複数参照は `<br>` 区切りに固定します。QとUNKが意味的に対応するかはLLMが判断し、`unknown_links.py` は形式・存在・duplicateだけを検証します。新しいUNKNOWN registryは作りません。
 
 ### 1.5 Skill-local UNKNOWN helper
 
-新規 `skills/question-analysis/scripts/unknown_links.py` を追加します。
+新規 `skills/question-analysis/scripts/unknown_links.py` を追加します。stdin / stdout JSON、failure、size limit等の正確なCLI契約は `_06_package-schema-and-helper-contracts.md` を正本とします。
 
 productionで次を決定論的に検証します。
 
