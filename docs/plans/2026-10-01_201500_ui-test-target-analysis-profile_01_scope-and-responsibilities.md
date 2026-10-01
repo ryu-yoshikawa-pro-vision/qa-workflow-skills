@@ -31,6 +31,7 @@ AIエージェントからの利用方法は既存のAgent Skills構造をその
 | SPEC / DECISION / INFERENCE / UNKNOWN分類 | spec-analysis | 既存維持 |
 | UI構造の仕様上の分類 | spec-analysis | profileへ追加 |
 | 複数Markdown仕様理解package | spec-analysis | profileへ追加 |
+| canonical仕様モデル / Current Effective Authority / Machine Entity | spec-analysis | 既存契約を維持し、package内の単一正本へ配置 |
 | 不明点のブロック分類 | question-analysis | 既存維持 |
 | 回答のSPEC / DECISION / ASM正規化 | question-analysis | 安定UNKNOWN参照を補強 |
 | packageへの回答反映 | spec-analysis | question-analysisの正規化結果を入力に更新 |
@@ -42,18 +43,42 @@ AIエージェントからの利用方法は既存のAgent Skills構造をその
 
 ## 3. profileを使う条件
 
-次のいずれかが明示された場合にUIテスト対象分析プロファイルを使用します。
+profileの選択は「Markdownを要求されたか」ではなく、成果物の目的で判断します。
 
-- テスト設計前に仕様理解を深めたい
-- テスト対象の情報をMarkdownへ整理したい
-- 仕様書、Figma、Q&A、repository等を統合した対象理解資料が欲しい
-- 画面、モーダル、状態、業務ルール、不明点を分けて整理したい
-- 既存の対象理解packageを更新・version upしたい
-- テスト観点 / ケース作成へ進む前に仕様理解だけ確定したい
+### profileを使う
 
-単純な仕様要約、単一表で十分な仕様分析、Authority競合解消だけで足りる場合は既存assets/output-template.mdを使い、package profileを強制しません。
+次のいずれかに該当する場合:
 
-## 4. UI構造の正規分類
+- テスト設計前の対象理解を、後続工程や別セッションでも再利用する継続成果物として残す
+- 仕様書、Figma、Q&A、repository等の複数資料を統合し、画面・状態・業務ルール・不明点を追跡可能に管理する
+- PAGE / STATE / VIEW / MODAL等のUI構造を正規化し、今後のテスト分析の入力にする
+- 既存のUIテスト対象分析packageを更新 / version upする
+- 「テスト対象分析」「対象理解を固める」等、テスト設計前の対象モデル作成が要求の中心である
+- テスト観点 / ケースへ進む前に対象理解だけを確定して止める
+
+### 通常spec-analysisを使う
+
+次の場合は既存 `assets/output-template.md` を使い、profileを強制しません。
+
+- 一回限りの仕様要約
+- Authority競合の解消だけが目的
+- 単一表で十分な小規模仕様整理
+- SPEC / DECISION / INFERENCE / UNKNOWN分類だけで要求を満たせる
+
+profile選択を「Markdown」「複数ファイル」等の単語一致だけで決めません。
+
+## 4. canonical仕様モデルと構造化ビュー
+
+UIテスト対象分析packageでも、既存spec-analysisのcanonical contractを維持します。
+
+- canonical正本: `09_authority_and_traceability.md`
+- 既存 `assets/output-template.md` と同じ意味契約で、SRC / 分析項目 / Current Effective Authority / Machine Entityを保持する
+- 他のpackage fileはcanonical item IDを参照する構造化ビューであり、SPEC / DECISION / INFERENCE / UNKNOWNの別正本を作らない
+- 業務ルール、UI構造、入力制約等を人間向けに再配置しても、期待挙動のAuthorityは09へ戻れる
+- Current Effective AuthorityからMachine Entityを生成する既存 `authority_entities.py` 契約を維持する
+- package固有のversion / manifestはAuthority Machine Entityのidentityやfingerprintを置換しない
+
+## 5. UI構造の正規分類
 
 profileでは次の意味を固定します。
 
@@ -105,7 +130,7 @@ Intercom、ご利用ガイド、外部サイト等。
 
 共通404等、本機能専用ではないが遷移・権限制御上重要な共通画面。
 
-## 5. 仕様と実装の分離
+## 6. 仕様と実装の分離
 
 次を必須ルールとします。
 
@@ -117,7 +142,7 @@ Intercom、ご利用ガイド、外部サイト等。
 6. repositoryだけでは決められない仕様を「コード上こうなので仕様もこう」と確定しない
 7. 案件コンテキストが実装をAuthorityと明示した場合だけ、既存Authority解決契約に従って扱う
 
-## 6. 不明点の扱い
+## 7. 不明点の扱い
 
 profile内の仕様UNKNOWNはspec-analysisの安定IDとしてUNK-xxxを使います。
 
@@ -134,7 +159,7 @@ question-analysisは必要なら質問単位のIDを持てますが、同じ論�
 
 「一度回答があるが暫定だった論点」を再確認する場合も、同じUNK IDを使います。
 
-## 7. packageとtest-target-inspectionの関係
+## 8. packageとtest-target-inspectionの関係
 
 profile packageは「仕様上どうあるべきか」を中心にします。
 
@@ -148,7 +173,7 @@ profileからcurrent実対象確認が必要になった場合:
 4. 仕様と一致 / 不一致 / 仕様未定義を区別
 5. 観測事実だけでSPEC / DECISIONへ昇格しない
 
-## 8. 進行モード
+## 9. 進行モード
 
 既存qa-workflowのcontinuous / gatedをそのまま使います。
 
@@ -161,7 +186,7 @@ gatedの場合:
 - question-analysis回答待ちでもブロッカーでない範囲はpackage更新可能
 - 次工程はユーザー承認後のみ
 
-## 9. 対象外となる誤った統合
+## 10. 対象外となる誤った統合
 
 次は実装しません。
 
