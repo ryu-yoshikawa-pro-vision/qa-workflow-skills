@@ -3,7 +3,7 @@
 親Plan:
 2026-10-01_201500_ui-test-target-analysis-profile.md
 
-この文書は、今回追加する「UIテスト対象分析プロファイル」の責務境界を正本とします。
+この文書は、今回追加する「UIテスト対象分析プロファイル」のSkill間責務境界を正本とします。LLMと決定論的処理の内部責務境界は `2026-10-01_201500_ui-test-target-analysis-profile_05_llm-deterministic-boundaries.md` を正本とします。
 
 ## 1. 解決する問題
 
@@ -36,7 +36,7 @@ AIエージェントからの利用方法は既存のAgent Skills構造をその
 | 回答のSPEC / DECISION / ASM正規化 | question-analysis | 安定UNKNOWN参照を補強 |
 | packageへの回答反映 | spec-analysis | question-analysisの正規化結果を入力に更新 |
 | 生きた実画面のcurrent観測 | test-target-inspection | 変更なし |
-| repositoryのコード事実 | spec-analysisの補助入力、必要に応じe2e-test-inspection等 | Authorityへ自動昇格しない |
+| repositoryの製品コード事実 | spec-analysisの補助入力 | Authorityへ自動昇格しない。E2E実装分析そのものが必要な場合だけe2e-test-inspectionへroutingする |
 | プロダクトリスク / テスト重点 | test-analysis | 対象外 |
 | テスト要求 / 条件 / ケース | 各既存設計Skill | 対象外 |
 | workflow開始 / 再開 / 変更伝播 | qa-workflow | profile routingのみ追加 |
@@ -104,7 +104,7 @@ pathが資料から確定できない場合は推測せずPATH-TBD等の明示�
 - 入力 → 確認
 - 発行フォーム → 発行完了
 
-routeが同一ならPAGEとは分離します。
+routeが同一であることをAuthorityまたは確認済み事実から判断できる場合はPAGEとは分離します。routeが不明な場合に、操作フローだけを根拠としてsame-route VIEW / STEPへ推測統合しません。資料上別画面として扱われているがpathが未確定なら `PATH-TBD` を保持し、PAGE / VIEW分類自体が後続設計へ影響する場合はUNKNOWNとして残します。
 
 ### MODAL
 
@@ -186,7 +186,15 @@ gatedの場合:
 - question-analysis回答待ちでもブロッカーでない範囲はpackage更新可能
 - 次工程はユーザー承認後のみ
 
-## 10. 対象外となる誤った統合
+## 10. LLMと決定論的処理
+
+意味判断はLLMに残します。具体的には、SPEC / DECISION / INFERENCE / UNKNOWN、PAGE / VIEW等の分類、semantic identity、Authority競合、optional domainの必要性、repository差分の意味判断をscriptへ固定しません。
+
+定型処理は `05_llm-deterministic-boundaries.md` に従い、ID形式・参照存在・version整合・current UNKNOWN件数・MANIFEST / SHA-256・evaluation projection等をSkill-local helper / validatorへ移します。
+
+helperの出力はLLMの再確認候補や構造エラーを示すための補助であり、仕様意味を新しく確定する根拠にはしません。
+
+## 11. 対象外となる誤った統合
 
 次は実装しません。
 
