@@ -1,17 +1,19 @@
 # UIテスト対象分析モード実装Plan
 
-このPlanは、現在の19 Skill構成を維持したまま、テスト設計前の「仕様理解・テスト対象整理」を再現可能なAgent Skill契約として追加するための実装計画です。特定のAI製品向け連携機構は追加せず、既存のAgent Skills構造の中でAIエージェントが利用できる形にします。
+このPlanは、PR #14マージ後の22 Skill構成を維持したまま、テスト設計前の「仕様理解・テスト対象整理」を再現可能なAgent Skill契約として追加するための実装計画です。特定のAI製品向け連携機構は追加せず、既存のAgent Skills構造の中でAIエージェントが利用できる形にします。
 
 ## 対象ブランチ
 
-feat/ui-test-target-analysis-mode
+feat/ui-test-target-analysis-profile
 
 ## 基準
 
 - 対象リポジトリ: ryu-yoshikawa-pro-vision/qa-workflow-skills
-- 基準branch: main
-- 基準commit: dec3f7c764db2869dc24eb3d6f154712a6677068
-- 正規Skill数: 19
+- 基準branch: PR #14 merge後のlatest main
+- 先行baseline: PR #14 `feat/usability-evaluation-skill`
+- PR #14確認head: db61c4f0697b07ff9abbba0d2dde2571dfaaddb0
+- 正規Skill数: 22
+- 実装開始前に `_07_pr14-baseline-and-integration.md` のrebase / conflict gateを必ず通す
 - 既存の主責務:
   - spec-analysis: 現在有効な仕様根拠、SPEC / DECISION / INFERENCE / UNKNOWN
   - question-analysis: 不明点・矛盾分類、回答正規化、再開先
@@ -47,7 +49,7 @@ feat/ui-test-target-analysis-mode
 3. question-analysisの回答正規化と連携し、既存UNKNOWNを再質問・再採番せず更新できるようにする
 4. qa-workflowから「仕様理解packageだけ欲しい」要求へ最短routingできるようにする
 5. test-target-inspectionの「生きた実対象観測」と役割を混同しない
-6. 既存19 Skill、runtime、artifact graph、Regression / Exploration / QA Knowledge契約を壊さない
+6. PR #14後の既存22 Skill、runtime、artifact graph、Regression / Exploration / QA Knowledge、UI/UX / live usability / formal WCAG契約を壊さない
 
 ## 固定方針
 
@@ -58,7 +60,7 @@ LLM / deterministic処理の責務境界は `2026-10-01_201500_ui-test-target-an
 
 UIテスト対象分析はspec-analysisの条件付き出力モードとして実装します。
 
-新しいSkill名、20個目のSkill、別のAuthority ownerは作りません。
+新しいSkill名、23個目のSkill、別のAuthority ownerは作りません。
 
 ### 2. spec-analysisの既定出力を置換しない
 
@@ -121,6 +123,8 @@ version更新時は変更ファイルだけではなく、そのversionの完全
   - 2026-10-01_201500_ui-test-target-analysis-mode_05_llm-deterministic-boundaries.md
 - package schema / helper I/O / legacy migration:
   - 2026-10-01_201500_ui-test-target-analysis-mode_06_package-schema-and-helper-contracts.md
+- PR #14 baseline / integration:
+  - 2026-10-01_201500_ui-test-target-analysis-mode_07_pr14-baseline-and-integration.md
 
 各詳細Planが担当範囲の正本です。本親Planへ詳細契約を重複記載しません。
 
@@ -168,14 +172,16 @@ version更新時は変更ファイルだけではなく、そのversionの完全
 
 ### repository docs / CI
 
-変更:
-- README.md: mode導線または現在値を持つ箇所のみ
-- EVALS.md
-- docs/PROJECT_CONTEXT.md
-- tests/skills/evals/semantic/test_semantic_datasets.py
-- production script compile / portabilityを検証する既存CI・repository test
+PR #14後のREADME / EVALS / PROJECT_CONTEXT / CIを編集baselineにします。
 
-新しいGitHub Actions workflowは追加せず、既存workflow内へ必要なcompile / test対象を追加します。
+変更:
+- README.md: mode導線と#14 Skillとの目的境界を必要最小限に追記
+- EVALS.md: PR #16固有の評価差分だけ追記
+- docs/PROJECT_CONTEXT.md: current状態を持つ場合だけ同期
+- tests/skills/evals/semantic/*: critical criterion coverage / mode非選択回帰を追加
+- production helperのrepository unit / portability test
+
+PR #14後のCIは `skills/*/scripts` を動的compileするため、helper compile目的のworkflow個別path追加は行いません。新しいGitHub Actions workflowも追加しません。
 
 ## 対象外
 
@@ -197,12 +203,13 @@ version更新時は変更ファイルだけではなく、そのversionの完全
 - package更新時にpackage schema version、content version、CHANGELOG、MANIFESTと各ファイルの現在状態が一致する
 - 通常のspec-analysis出力は従来どおり利用できる
 - test-target-inspectionの責務を侵食しない
-- qa-workflowが最短経路でmodeを選択できる
+- qa-workflowが最短経路でmodeを選択でき、usability-evaluation / usability-inspection / wcag-conformance-evaluationへ誤routeしない
 - package内のcanonical Authority / Machine Entity契約が既存spec-analysisと互換であり、09からMachine EntityまでLLM手組みなしで接続できる
 - 複数Markdown packageを既存semantic runnerへ入力できる一意なevaluation projectionが定義されている
 - modeが既存Agent Skills形式のままAIエージェントから利用できる
 - mode導入前のlegacy / unversioned packageをsemantic mapping + deterministic validationでcurrent schemaへ移行できる
-- 既存Agent Skills検証、trigger、semantic、deterministic / workflow routing回帰がPASSする
-- README / EVALS等の現在値を変更した場合は実データと一致する
+- PR #14後のAgent Skills検証、trigger、semantic、deterministic / workflow routing回帰がPASSする
+- README / EVALS等の現在値を変更した場合はPR #14後のcurrent repositoryから導出した実データと一致する
+- PR #14のusability / WCAG finding・observation・resultを仕様Authorityへ自動昇格しない
 - LLMは仕様意味・UI意味・semantic identity判断に集中し、version / hash /参照整合 / UNKNOWN件数 / MANIFEST等の定型処理はhelper / validatorで補助・検証される
 - helperがsemantic判断を代替せず、通常spec-analysisの柔軟性を損なわない
