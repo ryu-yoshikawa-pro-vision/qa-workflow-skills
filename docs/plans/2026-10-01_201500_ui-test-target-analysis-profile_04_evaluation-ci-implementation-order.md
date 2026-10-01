@@ -181,9 +181,9 @@ semantic case数、routing fixture数等の現在値が変わる場合:
 - test-analysisへ自動進行しない
 - outputがprofileの品質ゲートを満たす
 
-consumer bootstrapについては、GitHub remote fetch可能なAgent環境でqa-workflow → spec-analysis → profile referenceの段階的読み込みが成立することを1回確認します。
+AIエージェント上で、既存Agent Skillsの読み込み方法に従い `spec-analysis` → profile reference / assetsを利用して成果物を生成できることを確認します。
 
-特定製品のtool名を評価条件にはしません。
+特定製品のtool名やconnectorを評価条件にはしません。
 
 ## 10. 実装順序
 
@@ -227,14 +227,7 @@ profile単体が成立してからworkflowへ接続します。
 - live target観測との分岐
 - routing fixture
 
-### Step 5: consumer integration guide
-
-- docs/integrations/chatgpt-github-bootstrap.md
-- README導線
-
-Skill契約とconsumer tool手順を混ぜません。
-
-### Step 6: cross-repository validation
+### Step 5: cross-repository validation
 
 - 全19 Skill構造
 - trigger
@@ -244,12 +237,12 @@ Skill契約とconsumer tool手順を混ぜません。
 - docs current count
 - git diff --check
 
-### Step 7: 実Agent smoke
+### Step 6: 実Agent smoke
 
 - UI target package scenario
-- consumer remote loading scenario
+- question-analysis回答反映からspec-analysis package更新までのscenario
 
-### Step 8: final review
+### Step 7: final review
 
 次を確認します。
 
@@ -259,7 +252,7 @@ Skill契約とconsumer tool手順を混ぜません。
 - profileなしのspec-analysisが重くなっていない
 - question-analysisの分類契約を変更していない
 - qa-workflowが詳細ロジックを複製していない
-- ChatGPT固有tool名をSkill契約へ入れていない
+- 特定AI製品固有のtool / connector / bootstrapをSkill契約へ入れていない
 - 実装時に参照すべき正本fileが一意に分かる
 
 ## 11. 完了条件
@@ -273,7 +266,6 @@ Skill契約とconsumer tool手順を混ぜません。
 - repo implementation status分離が定義済み
 - qa-workflow routing / resumeが評価で確認済み
 - test-target-inspectionへのcurrent UI分岐が維持される
-- consumer bootstrap文書が存在
 - existing CI / evalが全PASS
 - 実Agent smokeがPASS
 - current repository counts / docsが同期
