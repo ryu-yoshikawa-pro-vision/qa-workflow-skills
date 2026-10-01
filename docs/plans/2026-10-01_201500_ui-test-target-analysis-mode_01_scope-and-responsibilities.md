@@ -56,7 +56,7 @@ AIエージェントからの利用方法は既存のAgent Skills構造をその
 
 #14成果物は補助evidence / observation / issue候補として参照できますが、それ自体をSPEC / DECISION / approved ASMへ自動昇格しません。product requirement変更が必要ならquestion-analysis / stakeholder decisionを経由します。
 
-## 5. modeを使う条件
+## 4. modeを使う条件
 
 modeの選択は「Markdownを要求されたか」ではなく、成果物の目的で判断します。
 
