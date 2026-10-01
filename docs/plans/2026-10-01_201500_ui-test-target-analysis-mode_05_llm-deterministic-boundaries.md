@@ -306,7 +306,6 @@ e2e-test-inspectionへroutingするのは、E2E実装・Playwright等の既存�
 - semantic duplicateを自動mergeするscript
 - PAGE / VIEW分類器
 - User Story / Use Case / Behavior / Acceptance Criteria自動意味分類器
-- Gherkin / Given-When-Then生成・parser
 - 汎用Markdown AST framework
 - 任意文書merge engine
 - ZIP専用runtime
