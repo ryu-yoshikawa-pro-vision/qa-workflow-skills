@@ -27,18 +27,27 @@
 ### case A: 複数資料からUI target packageを構成
 
 入力:
-- 画面設計
-- business rule
+- 複数PAGE
+- same-routeであることが明示されたVIEW / STEP
+- route未確定の別画面候補
+- MODALとbrowser dialog
+- 同時成立可能な直交STATE
+- field validation
+- notification / external interaction
 - Q&A decision
-- repository補助情報
+- repository補助情報と仕様-実装差分
+- 1件以上のUNKNOWN
 - 一部矛盾
 
 期待:
 - UI target profileを選ぶ
 - SPEC / DECISION / INFERENCE / UNKNOWNを区別
-- PAGEをpath単位で整理
-- same-route viewをPAGEへしない
+- 明示same-routeはVIEW / STEPとして扱い、route不明は推測統合しない
+- MODALとbrowser dialogを分離する
+- 直交STATEを無理に排他化しない
+- field / notification / external interactionを適切なoptional viewへ整理する
 - repository差分を実装状況へ分離
+- canonical stable itemへの追跡を維持する
 - test condition / caseへ進まない
 
 ### case B: repository実装が仕様と違う
@@ -102,6 +111,8 @@ production `skills/spec-analysis/scripts/ui_target_package.py project-eval` を�
 
 question-analysisの既存分類ロジックを変更しないため、trigger datasetは変更しません。関連UNKNOWN IDの意味的対応はsemantic case、形式・既知参照・duplicateはproduction `unknown_links.py`、fixture mappingは独立deterministic validatorで検証します。
 
+spec-analysis / question-analysisで今回追加するcritical semantic criterionは、各criterionが最低1 semantic caseから参照されることをrepository testで検証します。既存normal spec-analysis caseにもprofile非選択回帰を含めます。
+
 ## 4. qa-workflow routing eval
 
 既存routing fixtureへprofile routing caseを追加します。
@@ -120,9 +131,7 @@ expected start / resume Skillを明示し、全Skill固定順実行へ回帰し�
 
 ## 5. trigger eval
 
-今回のprofile選択はspec-analysis内部の出力profile選択であり、Skill間trigger境界を変更しません。現在のspec-analysis trigger datasetには、複数資料統合・テスト分析前の仕様整理・repository/Figma/Q&A統合のpositive queryが既にあるため、frontmatter descriptionとtrigger datasetは原則変更しません。
-
-実装時にfrontmatter descriptionを変更する必要が生じた場合のみ、変更理由を明示してpositive / negative boundaryを再評価します。
+今回のprofile選択はspec-analysis内部の出力profile選択であり、Skill間trigger境界を変更しません。現在のspec-analysis trigger datasetには、複数資料統合・テスト分析前の仕様整理・repository/Figma/Q&A統合のpositive queryが既にあるため、frontmatter descriptionとtrigger datasetは変更しません。profile選択境界はspec-analysis semantic evalで検証します。
 
 特に次の誤選択を防ぎます。
 
@@ -193,7 +202,7 @@ QとUNKの意味的同一性は検証しません。
 
 これらは「後からvalidator化する候補」ではありません。機械化するとLLMの柔軟性を損なうため、意味判断として残します。
 
-## 8. CI
+## 7. CI
 
 既存workflowを再利用します。
 
@@ -232,7 +241,7 @@ Step 0でmainの現在値を再確認し、上記差分がそのまま適用可�
 
 歴史文書の過去値は変更しません。
 
-## 9. 実Agent smoke
+## 8. 実Agent smoke
 
 実装完了前に少なくとも1回、実Agentクライアント相当で次を確認します。
 
@@ -259,7 +268,7 @@ AIエージェント上で、既存Agent Skillsの読み込み方法に従い `s
 
 特定製品のtool名やconnectorを評価条件にはしません。
 
-## 10. 実装順序
+## 9. 実装順序
 
 ### Step 0: 現状再確認
 
@@ -350,7 +359,7 @@ profile単体が成立してからworkflowへ接続します。
 - 特定AI製品固有のtool / connector / bootstrapをSkill契約へ入れていない
 - 実装時に参照すべき正本fileが一意に分かる
 
-## 11. 完了条件
+## 10. 完了条件
 
 - 新Skill追加なし
 - profile assets / referenceが存在
