@@ -28,12 +28,18 @@
 | SPEC / DECISION / INFERENCE / UNKNOWN分類 | LLM | 情報源・Authority・文脈から判断する |
 | 現在有効なAuthority解決 | LLM | 既存spec-analysis契約を使用する |
 | PAGE / STATE / VIEW / STEP / MODAL等の意味分類 | LLM | UI意味を判断する。scriptは分類結果の形式だけ検証できる |
+| UI操作抽出 / US / UC / Behavior / ACの意味分解 | LLM | UI操作scopeでは必須工程。資料不足を推測補完しない |
+| 正常 / 準正常 / 例外、基本 / 代替 / 例外の意味分類 | LLM | scriptは3分類の完全性と許可値だけ検証する |
+| AC→TRの意味対応 / TR分割統合 | LLM | ACの単純言い換えではなく検証責務として判断する |
 | 既存項目と意味的に同一か | LLM | stable IDをreuseする意味判断はLLMが行う |
 | repository差分の意味・重要性 | LLM | 実装事実をAuthorityへ自動昇格しない |
 | optional domain fileが必要か | LLM | 対象仕様の意味・規模から判断する |
 | 質問がどのUNKNOWNに対応するか | LLM | QとUNKの意味対応を判断する |
 | 仕様回答がどの項目へ影響するか | LLM | scriptが列挙した参照候補を補助情報として使える |
 | ID形式 / duplicate /参照先存在 | deterministic validation | 意味を変えず拒否できる |
+| UIOP→UC / US→UC / UC→BH / BH→AC closure | deterministic validation | semantic relationを決めず、LLMが作った参照の完全性だけ検証する |
+| UCごとの正常 / 準正常 / 例外3分類 | deterministic validation | 各1行、定義あり/なし/未定義の構造整合を検証する |
+| current AC→TR / disposition closure | test-requirement deterministic runtime | ACを無言で落とさない |
 | version形式 / package内version一致 | deterministic helper / validation | default version policy利用時は次versionも導出できる |
 | required / optional file set | deterministic validation | optional fileを必要と判断するのはLLM |
 | MANIFEST file list / SHA-256 | deterministic helper | package内容から導出し、LLMに計算させない |
@@ -121,10 +127,16 @@ current package fileからMANIFEST bodyまたはmachine-readable manifest projec
 
 この結果は「修正が必要」という意味判断ではありません。LLMが再確認対象を漏らさないための候補集合です。
 
-#### build-authorities
+#### build-machine-evidence
 
-09のCurrent Effective Authority tableを固定projectionし、既存 `authority_entities.py` builderを呼んでMachine Entityを生成します。何をCurrent Effective AuthorityとするかはLLMが判断し、wrapper / fingerprint / expected identityをhelperが決定論生成します。
+09のCurrent Effective Authority tableと02のUS / UC / Behavior / AC structured tableを固定projectionします。
 
+1. Authority rowを既存 `authority_entities.py` builderへ渡す
+2. User Story / Use Case / Behavior / Acceptance Criterion Entityを決定論生成する
+3. hierarchyとAuthority dependencyをMachine Entity dependenciesへ反映する
+4. Authority + behavior decomposition Entityを1つの `Machine Entities: spec-analysis` blockへcanonical順で統合する
+
+何をAuthorityとするか、US / UC / Behavior / ACをどう意味分解するかはLLM判断です。wrapper / dependency / fingerprint / expected identityはhelperが生成します。
 #### project-eval
 
 projection modeを `semantic / deterministic` に固定します。
@@ -146,6 +158,10 @@ semantic / deterministic runnerのdirectory対応は追加せず、この固定p
 ### 3.2 helperが担当しないこと
 
 - 仕様文章の生成
+- UI操作母集団の意味抽出
+- US / UC / Behavior / ACの意味分解
+- 正常 / 準正常 / 例外、基本 / 代替 / 例外の意味分類
+- ACとTRの意味的対応 / TR分割統合
 - SPEC / DECISION / INFERENCE / UNKNOWN分類
 - PAGE / VIEW等の意味分類
 - optional domain fileが必要かの判断
@@ -177,6 +193,11 @@ UI target packageでは、人間向け構造化ビューのentityをstable IDで
 - INTERACT-xxx
 - ISSUE-xxx
 - IMPL-xxx
+- UIOP-xxx
+- US-xxx
+- UC-xxx
+- BH-xxx
+- AC-xxx
 
 案件固有entity typeが必要な場合はLLMが追加のprefixを勝手に作らず、packageの `00_scope_and_context.md` にある `案件固有構造ID` tableへprefixと意味を宣言してから使用します。helperは宣言済みprefixだけを許可します。
 
@@ -284,6 +305,8 @@ e2e-test-inspectionへroutingするのは、E2E実装・Playwright等の既存�
 - 仕様意味を自動判定するrule engine
 - semantic duplicateを自動mergeするscript
 - PAGE / VIEW分類器
+- User Story / Use Case / Behavior / Acceptance Criteria自動意味分類器
+- Gherkin / Given-When-Then生成・parser
 - 汎用Markdown AST framework
 - 任意文書merge engine
 - ZIP専用runtime
