@@ -119,6 +119,8 @@ version更新時は変更ファイルだけではなく、そのversionの完全
   - 2026-10-01_201500_ui-test-target-analysis-profile_04_evaluation-ci-implementation-order.md
 - LLM / deterministic処理の責務境界:
   - 2026-10-01_201500_ui-test-target-analysis-profile_05_llm-deterministic-boundaries.md
+- package schema / helper I/O / legacy migration:
+  - 2026-10-01_201500_ui-test-target-analysis-profile_06_package-schema-and-helper-contracts.md
 
 各詳細Planが担当範囲の正本です。本親Planへ詳細契約を重複記載しません。
 
@@ -131,7 +133,7 @@ version更新時は変更ファイルだけではなく、そのversionの完全
 - skills/spec-analysis/references/guidance.md
 - 新規 skills/spec-analysis/references/ui-test-target-analysis.md
 - 新規 skills/spec-analysis/assets/ui-test-target-analysis/*
-- 新規 skills/spec-analysis/scripts/ui_target_package.py
+- 新規 skills/spec-analysis/scripts/ui_target_package.py（package schema / helper I/O / legacy migration contractは `_06_package-schema-and-helper-contracts.md` を正本とする）
 - skills/spec-analysis/evals/semantic/*
 - skills/spec-analysis/evals/deterministic/validator.py
 - skills/spec-analysis/evals/output/*
@@ -192,13 +194,14 @@ version更新時は変更ファイルだけではなく、そのversionの完全
 - UI構造をPAGE / STATE・VIEW・STEP / MODAL / browser dialog / panel / external / sharedへ区別できる
 - 仕様Authorityとrepository implementation statusが混同されない
 - UNKNOWNが安定参照され、回答後に解消済み履歴とcurrent unknownが整合する
-- package更新時にversion、CHANGELOG、MANIFESTと各ファイルの現在状態が一致する
+- package更新時にpackage schema version、content version、CHANGELOG、MANIFESTと各ファイルの現在状態が一致する
 - 通常のspec-analysis出力は従来どおり利用できる
 - test-target-inspectionの責務を侵食しない
 - qa-workflowが最短経路でprofileを選択できる
-- package内のcanonical Authority / Machine Entity契約が既存spec-analysisと互換である
+- package内のcanonical Authority / Machine Entity契約が既存spec-analysisと互換であり、09からMachine EntityまでLLM手組みなしで接続できる
 - 複数Markdown packageを既存semantic runnerへ入力できる一意なevaluation projectionが定義されている
 - profileが既存Agent Skills形式のままAIエージェントから利用できる
+- profile導入前のlegacy / unversioned packageをsemantic mapping + deterministic validationでcurrent schemaへ移行できる
 - 既存Agent Skills検証、trigger、semantic、deterministic / workflow routing回帰がPASSする
 - README / EVALS等の現在値を変更した場合は実データと一致する
 - LLMは仕様意味・UI意味・semantic identity判断に集中し、version / hash /参照整合 / UNKNOWN件数 / MANIFEST等の定型処理はhelper / validatorで補助・検証される
