@@ -6,6 +6,9 @@
 責務境界:
 2026-10-01_201500_ui-test-target-analysis-profile_01_scope-and-responsibilities.md
 
+LLM / deterministic責務境界:
+2026-10-01_201500_ui-test-target-analysis-profile_05_llm-deterministic-boundaries.md
+
 この文書はspec-analysisへ追加するUIテスト対象分析packageの構造と更新契約を正本とします。
 
 ## 1. 変更対象
@@ -31,6 +34,7 @@
 - skills/spec-analysis/assets/ui-test-target-analysis/09_authority_and_traceability.md
 - skills/spec-analysis/assets/ui-test-target-analysis/CHANGELOG.md
 - skills/spec-analysis/assets/ui-test-target-analysis/MANIFEST.md
+- skills/spec-analysis/scripts/ui_target_package.py
 
 ファイル数を増やすこと自体を目的にしません。required coreとoptional domain fileを明確に分けます。
 
@@ -104,6 +108,15 @@ profile packageでも既存 `assets/output-template.md` のcanonical契約を維
 - Machine Entityのfingerprintは既存helperで生成し、テンプレートやAgentが手入力しない
 - package version / file hashはMachine Entityのcontent fingerprintとは別物
 
+### structural ID / traceability
+
+- UI構造・業務ルール・入力項目・フロー等のstructured rowは、`05_llm-deterministic-boundaries.md` のprefix契約に従うstable structural IDを持つ
+- 期待挙動・仕様判断を表すnormative rowは、必要に応じ `関連仕様項目ID` で09のSPEC / DEC / INF / UNKへ追跡する
+- UI構造間の関係は `関連構造ID` で追跡する
+- 複数IDの区切りは `<br>` に固定する
+- exact ID参照の存在・duplicateはui_target_package.pyで検証する
+- semantic identity、reuse / new判断はLLMが行う
+
 ### 正規UI分類
 
 - PAGE
@@ -135,7 +148,7 @@ profile packageでも既存 `assets/output-template.md` のcanonical契約を維
 - external API
 - mobile-specific behavior
 
-ただし追加ファイルはREADMEとMANIFESTへ登録し、同じ責務を複数ファイルへ重複させません。
+ただし追加ファイルは `10_<domain-slug>.md` 以降の連番 + lowercase kebab-caseで命名し、READMEとMANIFESTへ登録します。同じ責務を複数ファイルへ重複させません。domainの切り分け自体はLLMが意味判断し、helperは命名・重複・file orderだけを検証します。
 
 ## 4. package各ファイルの責務
 
@@ -176,7 +189,7 @@ READMEを詳細仕様の複製場所にしません。
 - panel / external / shared UI
 - navigation / entry / exit
 
-同一route内のstepを別PAGEへしません。
+same-routeであることがAuthorityまたは確認済み事実から成立する場合はstep / viewを別PAGEへしません。routeが不明な場合は `PATH-TBD` を許可し、操作フローだけからsame-routeを推測しません。PAGE / VIEW分類自体が後続設計へ影響する場合はUNKNOWNとして保持します。
 
 ### 02_behavior_and_business_rules.md
 
@@ -237,11 +250,11 @@ DB値やAPI responseをUI期待結果としてテストケース化しません�
 
 ### 07_current_unknowns.md
 
-currentなUNKNOWNだけを一覧化します。
+09の分析項目でcurrentなUNKNOWNだけを人間向けに一覧化します。
 
 別節に回答反映済みを残してもよいですが、現在確認対象と解消済みを混ぜません。
 
-各UNKNOWNはstable UNK IDを持ちます。
+各UNKNOWNはstable UNK IDを持ちます。UNKNOWN本文・影響・質問内容はLLMが記述し、07に掲載されるUNK ID集合とREADMEの件数は `ui_target_package.py` が09から導出・検証します。
 
 ### 08_repository_implementation_status.md
 
@@ -280,44 +293,48 @@ versionごとの差分と、どのUNKNOWN / issue / decisionを反映したか�
 ### MANIFEST.md
 
 - package version
-- 含まれるファイル一覧
-- 任意でhash / source revision
+- current package file一覧
+- 各fileのSHA-256
 
-hashを採用する場合はAgentが実際に計算できる環境でのみ生成します。計算できないのに疑似hashを作りません。
+`ui_target_package.py build-manifest` で生成します。MANIFEST自身は自己hash対象にせず、SHA-256はcurrent fileのraw bytesから計算します。Agent / LLMがhashを手入力しません。file orderはREADME → 00〜09 → 10以降のdomain file → CHANGELOGのcanonical順とします。
 
 ## 5. version contract
 
-profileでversioned packageが要求された場合:
+UI target profile packageは継続更新成果物としてversionを持ちます。
+
+default policy:
 
 1. 初回はv00
-2. material updateごとにv01, v02...と1増分
-3. 既存packageがvNNなら次はvNN+1
-4. 同一versionの部分ファイルだけ差し替えた状態を最終成果物にしない
-5. README / CHANGELOG / MANIFESTのversionを一致させる
-6. 変更後も全ファイルを含む完全版を出力する
-7. 過去versionは履歴でありcurrent仕様の参照前提にしない
+2. vNNの次は1増分したvNN
+3. 同一versionを異なる完成内容で上書きしない
+4. README / CHANGELOG / MANIFESTのversionを一致させる
+5. 変更後もcurrent versionの全fileを含む完全版を成立させる
+6. 過去versionは履歴でありcurrent仕様の参照前提にしない
 
-ユーザーや案件が別version policyを指定した場合はそちらを優先します。
+default policyでは `ui_target_package.py next-version` が次versionを導出します。
 
+ユーザー / projectが別version policyを明示した場合はそちらを優先し、helperは指定versionのpackage内一致だけを検証します。何をmaterial updateとしてversion upするかの意味判断はproject policyまたはLLMに残し、presentationだけの差分までhelperが自動判定しません。
 ## 6. 更新契約
 
 回答や新資料が来た場合:
 
-1. 変更されたAuthority / DECISION / ASMを解決
-2. 影響するstable item / UNKを特定
-3. 09_authority_and_traceability.mdのcanonical modelを更新
-4. 09のstable itemを参照する01〜05の構造化ビューを必要な範囲だけ更新
-5. 07_current_unknownsの状態を更新
-6. 06の矛盾 / pending履歴を必要に応じ更新
-7. implementation statusに影響する場合だけ08を更新
-8. CHANGELOGへ変更を記録
-9. READMEのversion / current unknown件数を更新
-10. MANIFESTを更新
-11. 09のCurrent Effective AuthorityからMachine Entityを既存helperで再生成できることを確認
-12. package全体の整合を確認
+1. LLMが変更されたAuthority / DECISION / ASMを解決する
+2. LLMが影響するcanonical stable item / UNKを更新する
+3. 09_authority_and_traceability.mdのcanonical modelを更新する
+4. `ui_target_package.py impact` でchanged stable IDのexact参照先を再確認候補として列挙する
+5. LLMが候補fileを確認し、意味上変更が必要な01〜08 / domain fileだけを更新する
+6. LLMが07のUNKNOWN本文、06の矛盾 / resolved説明、CHANGELOGの変更理由を更新する
+7. repository確認を実施した場合だけ08を更新する
+8. default version policyならhelperで次versionを導出し、案件固有policyなら指定versionを使用する
+9. helperでcurrent UNKNOWN ID集合 / 件数を取得し、07 / READMEとの整合を確認する
+10. 09のCurrent Effective Authorityから既存authority_entities.pyでMachine Entityを生成する
+11. helperでMANIFEST / SHA-256を生成する
+12. helperのvalidateを実行し、形式・参照・件数・version・file set・hashの決定論違反を解消する
+13. semantic quality gateでsource / inference / UI分類 / 意味重複等を最終確認する
 
-同じ回答を複数ファイルへ手動コピーすることを設計目的にしません。各ファイルへ必要な意味だけ反映します。
+helperが列挙したimpact候補は再確認対象であり、変更必須という意味判断ではありません。LLMが仕様意味を判断します。
 
+同じ回答を複数ファイルへ機械コピーしません。canonical itemと構造化ビューの追跡を使い、必要な意味だけを反映します。
 ## 7. 大規模資料の分割規則
 
 次の場合は案件固有ファイルへ分割できます。
@@ -330,7 +347,7 @@ profileでversioned packageが要求された場合:
 分割時は:
 - ファイル名をdomain責務に合わせる
 - README / MANIFESTへ登録
-- current unknownの正本は07のまま
+- current UNKNOWNのcanonical正本は09の分析項目、07は人間向けcurrent view
 - repository statusの正本は08のまま
 - canonical Authority / traceabilityの正本は09のまま
 - 同じ仕様項目を二重正本にしない
@@ -345,20 +362,20 @@ profileでversioned packageが要求された場合:
 - 実装差分を仕様へ上書きしていない
 - current unknownとresolved historyが矛盾しない
 - 解消済みUNKNOWNを再質問していない
-- versionが全packageで一致する
-- READMEのcurrent unknown件数が07と一致する
+- versionが全packageで一致し、default policy利用時の次versionがhelper結果と一致する
+- 07のcurrent UNK ID集合とREADME件数が09からhelperで導出したcurrent UNKNOWN集合 / 件数と一致する
 - CHANGELOGが今回変更を説明できる
 - MANIFESTにcurrent packageの全ファイルがあり、省略したoptional fileを存在するものとして列挙していない
+- MANIFESTのfile order / SHA-256がhelper再計算結果と一致する
+- structured rowのexact stable ID参照がすべて存在し、duplicate structural IDがない
 - 01〜08の期待挙動が09のstable item IDへ追跡できる
 - 09のCurrent Effective Authorityが既存spec-analysisのcanonical schemaを維持している
 - Machine Entityが既存 `authority_entities.py` で生成可能で、fingerprintを手入力していない
 - test requirement / condition / caseを先回りしていない
 - UIで観測不能な内部挙動をUIテスト期待結果として確定していない
 
-## 9. zip / file artifact
+## 9. file artifact
 
-Skill contractとしてZIP生成手段を固定しません。
+UI target profileの正規成果物はpackage directory / file集合です。
 
-ユーザーが「zipで出力」を要求し、利用中Agentにfile artifact生成能力がある場合は、current versionの全packageを1 archiveへまとめます。
-
-能力がない場合は、同じpackage構造をtext / workspace上で提供し、存在しないdownload linkを捏造しません。
+ZIP化はSkillの意味契約・production helper責務に含めません。利用中Agent / workspaceがarchiveを要求された場合は、そのartifact機能でcurrent package全体をまとめられますが、ZIP作成可否をprofile完了条件にはしません。
