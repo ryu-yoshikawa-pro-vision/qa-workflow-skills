@@ -3,7 +3,7 @@
 親Plan:
 2026-10-01_201500_ui-test-target-analysis-profile.md
 
-この文書は、今回追加する「UIテスト対象分析プロファイル」のSkill間責務境界を正本とします。LLMと決定論的処理の内部責務境界は `2026-10-01_201500_ui-test-target-analysis-profile_05_llm-deterministic-boundaries.md` を正本とします。
+この文書は、今回追加する「UIテスト対象分析プロファイル」のSkill間責務境界を正本とします。LLMと決定論的処理の内部責務境界は `2026-10-01_201500_ui-test-target-analysis-profile_05_llm-deterministic-boundaries.md`、package schema / helper I/O / legacy migrationは `2026-10-01_201500_ui-test-target-analysis-profile_06_package-schema-and-helper-contracts.md` を正本とします。
 
 ## 1. 解決する問題
 
@@ -31,6 +31,7 @@ AIエージェントからの利用方法は既存のAgent Skills構造をその
 | SPEC / DECISION / INFERENCE / UNKNOWN分類 | spec-analysis | 既存維持 |
 | UI構造の仕様上の分類 | spec-analysis | profileへ追加 |
 | 複数Markdown仕様理解package | spec-analysis | profileへ追加 |
+| profile導入前のlegacy package migration | spec-analysis | semantic mappingはLLM、current schema validationはhelper |
 | canonical仕様モデル / Current Effective Authority / Machine Entity | spec-analysis | 既存契約を維持し、package内の単一正本へ配置 |
 | 不明点のブロック分類 | question-analysis | 既存維持 |
 | 回答のSPEC / DECISION / ASM正規化 | question-analysis | 安定UNKNOWN参照を補強 |
