@@ -42,7 +42,7 @@ UI操作の振る舞い分解 / AC traceability:
 - skills/spec-analysis/assets/ui-test-target-analysis/MANIFEST.md
 - skills/spec-analysis/scripts/ui_target_package.py
 
-ファイル数を増やすこと自体を目的にしません。required coreとoptional domain fileを明確に分けます。
+ファイル数を増やすこと自体を目的にしません。標準fileはrequired coreと条件付き必須へ分け、Agentの自由裁量による条件付き必須file選択は行いません。
 
 exact heading / exact table header、package schema version、ID形式、Machine Entity bridge、MANIFEST schemaは `_06_package-schema-and-helper-contracts.md` を正本とし、本Planでは意味責務だけを定義します。
 
@@ -58,17 +58,31 @@ exact heading / exact table header、package schema version、ID形式、Machine
 - CHANGELOG.md
 - MANIFEST.md
 
-### optional
+### 条件付き必須
 
-対象仕様が存在する場合だけ含めます。
+次のtriggerが1件でも成立した場合は必ず作成します。成立しない場合は作成しません。
 
-- 03_fields_and_validation.md
-- 04_flows_and_data.md
-- 05_notifications_and_external_interactions.md
-- 08_repository_implementation_status.md
-- 案件固有domain file
+| file | 作成trigger |
+| --- | --- |
+| 03_fields_and_validation.md | 入力・選択・検索・filter・sort・upload等のfield、入力制約、validation、enable/disable条件のいずれかが対象scopeに存在 |
+| 04_flows_and_data.md | 複数step / 画面をまたぐflow、state transitionに必要なI/O、import/export、data transformation、非同期処理flowのいずれかが対象scopeに存在 |
+| 05_notifications_and_external_interactions.md | notification、email、browser dialog、外部画面遷移、外部service連携、外部interactionのいずれかが対象scopeに存在 |
+| 08_repository_implementation_status.md | current package versionの分析でrepository / product implementation evidenceを実際に確認・利用した |
 
-optional fileを空ファイルとして作りません。含めないfileはMANIFESTへ登録せず、READMEには必要な場合だけ「対象外 / 不使用」として説明します。
+`00_scope_and_context.md` のfile applicability表に4fileすべての `required / not-applicable` と根拠を記録します。LLMは資料の意味からtrigger該当性を判断し、helperは宣言と実file / MANIFESTの一致を決定論検証します。
+
+情報不足を `not-applicable` にしません。trigger有無を判断できない場合は関連UNKNOWNを作成し、そのfile applicabilityをblockedとしてpackage completionを止めます。
+
+### 案件固有extension file
+
+標準fileへ入れると責務を混在させる独立domainが存在する場合だけ追加を許可します。単に内容量が多い、好みで分けたい、Markdownを細かくしたいという理由では追加しません。
+
+許可例:
+- CSV / export仕様が独立したAuthority / flow / rule集合を持つ
+- notification / email template群が05では独立管理が必要な規模・Authorityを持つ
+- UI対象機能と別Authorityを持つdomain仕様を同じpackageで追跡する必要がある
+
+extension fileを追加する場合は `00_scope_and_context.md` にfile名・責務・分割理由を記録し、README / MANIFESTへ登録します。
 
 ## 2. SKILL.mdの変更
 
@@ -112,7 +126,7 @@ mode packageでも既存 `assets/output-template.md` のcanonical契約を維持
   - Machine Entity（機械証拠）
 - 業務ルール / 状態 / フロー / 制約は01〜05へ詳細ビューを持てるが、Authority item IDの正本は09
 - 01〜08で新たな仕様判断を追加した場合、必ず09のSPEC / DECISION / INFERENCE / UNKNOWNへ閉じる
-- 09のCurrent Effective Authorityを既存 `authority_entities.py` の入力へ変換できる状態を維持する
+- 09のCurrent Effective Authorityを既存 `authority_entities.py` の入力へ変換できる状態を維持し、current ACを `ui_target_package.py` から下流handoff用Machine Entityへ固定projectionできるようにする
 - Machine Entityのfingerprintは既存helperで生成し、テンプレートやAgentが手入力しない
 - package version / file hashはMachine Entityのcontent fingerprintとは別物
 
@@ -187,6 +201,9 @@ READMEを詳細仕様の複製場所にしません。
 - 用語
 - repository実装確認基準がある場合の基準branch / commit
 - 分析上の前提
+- 分析対象機能scope一覧（SCOPE-xxx、対象機能 / 領域、UI操作判定、Behavior Decomposition、関連UNKNOWN ID、根拠）
+- 条件付き必須file applicability（03 / 04 / 05 / 08のrequired / not-applicable / blockedと根拠）
+- 案件固有extension fileを使う場合のfile名 / 責務 / 分割理由
 
 ### 01_ui_structure_and_navigation.md
 
@@ -213,7 +230,7 @@ UI操作を伴うscopeでは、`_08_behavior-decomposition-and-acceptance-tracea
 - Use Case振る舞い完全性（正常 / 準正常 / 例外）
 - Acceptance Criteria一覧
 
-UI操作が存在しないscopeでは適用判定を `not-applicable` とし、理由 / Authority根拠を残します。情報不足をnot-applicableとして扱いません。
+scopeごとの適用判定は `_08_behavior-decomposition-and-acceptance-traceability.md` を正本とします。UI操作ありはrequired、なしはnot-applicable、UI操作有無自体が未確定ならblocked + UNKNOWNです。
 
 上記に加えて既存の意味責務を保持します。
 
@@ -227,7 +244,7 @@ UI操作が存在しないscopeでは適用判定を `not-applicable` とし、�
 ### 03_fields_and_validation.md
 
 - field
-- required / optional
+- required / 条件付き
 - default
 - format
 - min / max
@@ -352,7 +369,7 @@ default policyでは `ui_target_package.py next-version` が次versionを導出�
 7. repository確認を実施した場合だけ08を更新する
 8. default version policyならhelperで次versionを導出し、案件固有policyなら指定versionを使用する
 9. helperでcurrent UNKNOWN ID集合 / 件数を取得し、07 / READMEとの整合を確認する
-10. `ui_target_package.py build-machine-evidence` で09のAuthority EntityとUS / UC / Behavior / AC Entityを決定論生成する
+10. `ui_target_package.py build-machine-evidence` で09のAuthority Entityとcurrent AC Entity、spec-analysis canonical `normalized_skill_input` を決定論生成する
 11. helperでMANIFEST / SHA-256を生成する
 12. helperのvalidateを実行し、形式・参照・件数・version・file set・hashの決定論違反を解消する
 13. semantic quality gateでsource / inference / UI分類 / 意味重複等を最終確認する
@@ -361,22 +378,20 @@ helperが列挙したimpact候補は再確認対象であり、変更必須と�
 
 同じ回答を複数ファイルへ機械コピーしません。canonical itemと構造化ビューの追跡を使い、必要な意味だけを反映します。
 
-## 7. 大規模資料の分割規則
+## 7. 案件固有extension fileの分割規則
 
-次の場合は案件固有ファイルへ分割できます。
+標準fileへ入れることで責務を混在させる独立domainが存在する場合だけextension fileへ分割します。
 
-- 1 domainが他のfileより明らかに大きい
-- notification / email template等で大量のvariantがある
-- external API等がUI仕様と別のAuthorityを持つ
-- CSV / export等が独立flowを持つ
+分割可否は意味判断なのでLLMが決めます。ただし次をすべて満たします。
 
-分割時は:
-- ファイル名をdomain責務に合わせる
-- README / MANIFESTへ登録
-- current UNKNOWNのcanonical正本は09の分析項目、07は人間向けcurrent view
-- repository statusの正本は08のまま
-- canonical Authority / traceabilityの正本は09のまま
+- domainが標準fileの責務とは独立している
+- 独立したAuthority / rule / flow集合として継続更新する必要がある
+- 00にfile名 / 責務 / 分割理由を記録する
+- README / MANIFESTへ登録する
+- current UNKNOWNのcanonical正本は09、repository statusの正本は08、canonical Authority / traceabilityの正本は09のまま
 - 同じ仕様項目を二重正本にしない
+
+内容量だけを理由にextension fileを追加しません。
 
 ## 8. package品質ゲート
 
@@ -391,14 +406,14 @@ helperが列挙したimpact候補は再確認対象であり、変更必須と�
 - versionが全packageで一致し、default policy利用時の次versionがhelper結果と一致する
 - 07のcurrent UNK ID集合とREADME件数が09からhelperで導出したcurrent UNKNOWN集合 / 件数と一致する
 - CHANGELOGが今回変更を説明できる
-- MANIFESTにcurrent packageの全ファイルがあり、省略したoptional fileを存在するものとして列挙していない
+- required coreが全て存在し、03 / 04 / 05 / 08は00の条件付き必須file applicabilityと実file / MANIFESTが一致する
 - MANIFESTのfile order / SHA-256がhelper再計算結果と一致する
 - structured rowのexact stable ID参照がすべて存在し、duplicate structural IDがない
 - 01〜08の期待挙動が09のstable item IDへ追跡できる
 - UI操作scopeのUIOP / US / UC / Behavior / ACが `_08` のclosure contractを満たす
 - current ACがAuthorityへ追跡でき、具体値 / 組合せへ先回りしていない
 - 09のCurrent Effective Authorityが既存spec-analysisのcanonical schemaを維持している
-- Machine Entityが `ui_target_package.py build-machine-evidence` から既存 `authority_entities.py` を再利用して生成され、US / UC / Behavior / ACを含むfingerprintを手入力していない
+- Authority Entityが既存 `authority_entities.py`、current AC Entityが `ui_target_package.py build-machine-evidence` から生成され、spec-analysis normalized_skill_input / expected identity / fingerprintを手入力していない
 - test requirement / condition / caseを先回りしていない
 - UIで観測不能な内部挙動をUIテスト期待結果として確定していない
 
