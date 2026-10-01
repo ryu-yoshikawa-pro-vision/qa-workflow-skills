@@ -12,6 +12,9 @@ LLM / deterministic責務境界:
 package schema / helper I/O / legacy migration:
 2026-10-01_201500_ui-test-target-analysis-mode_06_package-schema-and-helper-contracts.md
 
+UI操作の振る舞い分解 / AC traceability:
+2026-10-01_201500_ui-test-target-analysis-mode_08_behavior-decomposition-and-acceptance-traceability.md
+
 この文書はspec-analysisへ追加するUIテスト対象分析packageの構造と更新契約を正本とします。
 
 ## 1. 変更対象
@@ -200,6 +203,20 @@ same-routeであることがAuthorityまたは確認済み事実から成立す�
 
 ### 02_behavior_and_business_rules.md
 
+UI操作を伴うscopeでは、`_08_behavior-decomposition-and-acceptance-traceability.md` に従い次を必須で持ちます。
+
+- 振る舞い分解適用判定
+- UI操作一覧
+- User Story一覧
+- Use Case一覧
+- Behavior一覧
+- Use Case振る舞い完全性（正常 / 準正常 / 例外）
+- Acceptance Criteria一覧
+
+UI操作が存在しないscopeでは適用判定を `not-applicable` とし、理由 / Authority根拠を残します。情報不足をnot-applicableとして扱いません。
+
+上記に加えて既存の意味責務を保持します。
+
 - lifecycle
 - business rule
 - status transition
@@ -335,7 +352,7 @@ default policyでは `ui_target_package.py next-version` が次versionを導出�
 7. repository確認を実施した場合だけ08を更新する
 8. default version policyならhelperで次versionを導出し、案件固有policyなら指定versionを使用する
 9. helperでcurrent UNKNOWN ID集合 / 件数を取得し、07 / READMEとの整合を確認する
-10. 09のCurrent Effective Authorityから既存authority_entities.pyでMachine Entityを生成する
+10. `ui_target_package.py build-machine-evidence` で09のAuthority EntityとUS / UC / Behavior / AC Entityを決定論生成する
 11. helperでMANIFEST / SHA-256を生成する
 12. helperのvalidateを実行し、形式・参照・件数・version・file set・hashの決定論違反を解消する
 13. semantic quality gateでsource / inference / UI分類 / 意味重複等を最終確認する
@@ -378,14 +395,16 @@ helperが列挙したimpact候補は再確認対象であり、変更必須と�
 - MANIFESTのfile order / SHA-256がhelper再計算結果と一致する
 - structured rowのexact stable ID参照がすべて存在し、duplicate structural IDがない
 - 01〜08の期待挙動が09のstable item IDへ追跡できる
+- UI操作scopeのUIOP / US / UC / Behavior / ACが `_08` のclosure contractを満たす
+- current ACがAuthorityへ追跡でき、具体値 / 組合せへ先回りしていない
 - 09のCurrent Effective Authorityが既存spec-analysisのcanonical schemaを維持している
-- Machine Entityが既存 `authority_entities.py` で生成可能で、fingerprintを手入力していない
+- Machine Entityが `ui_target_package.py build-machine-evidence` から既存 `authority_entities.py` を再利用して生成され、US / UC / Behavior / ACを含むfingerprintを手入力していない
 - test requirement / condition / caseを先回りしていない
 - UIで観測不能な内部挙動をUIテスト期待結果として確定していない
 
 ## 9. legacy package migration
 
-mode導入前の既存仕様理解packageを更新する場合、semantic mappingはLLMが行い、current `ui-target-v1` へ変換後にhelperで検証します。既存stable IDは意味的に同一なら維持し、自動migration engineは作りません。version継続、legacy progress fileの扱い、schema versionなしpackageの判定は `_06_package-schema-and-helper-contracts.md` を正本とします。
+mode導入前の既存仕様理解packageを更新する場合、semantic mappingはLLMが行い、current `ui-target-v1` へ変換後にhelperで検証します。UI操作を含むlegacy packageではUS / UC / Behavior / AC分解もmigration完了条件に含めます。既存stable IDは意味的に同一なら維持し、自動migration engineは作りません。version継続、legacy progress fileの扱い、schema versionなしpackageの判定は `_06_package-schema-and-helper-contracts.md` を正本とします。
 
 ## 10. file artifact
 
