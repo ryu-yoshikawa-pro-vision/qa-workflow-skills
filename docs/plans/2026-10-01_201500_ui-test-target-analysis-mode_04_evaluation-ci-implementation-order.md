@@ -73,7 +73,6 @@ PR #16後の期待増分:
 - UI操作があるのに資料不足の場合はnot-applicableへ逃げずUNKNOWN / blockedへする
 - 各UCで正常 / 準正常 / 例外を全て検討し、なし / 未定義を区別する
 - ACで具体値・組合せ・テストケースへ先回りしない
-- Gherkin / Given-When-Thenを生成しない
 - canonical stable itemへの追跡を維持する
 - test condition / caseへ進まない
 
@@ -428,7 +427,6 @@ mode単体が成立してからworkflowへ接続します。
 
 - LLMが意味判断すべき項目をhelperが自動決定していないこと
 - US / UC / Behavior / ACの意味分類とAC→TRの意味対応をscriptが決定していないこと
-- Gherkin / Given-When-Thenを追加していないこと
 - helperが返すimpactは再確認候補であり変更必須判定ではないこと
 - normal spec-analysisがmode依存になっていないこと
 - helperがSkill package単体コピーで実行できること
