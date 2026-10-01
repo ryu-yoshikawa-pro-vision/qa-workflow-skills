@@ -3,7 +3,7 @@
 親Plan:
 2026-10-01_201500_ui-test-target-analysis-profile.md
 
-この文書は、UIテスト対象分析プロファイルにおけるLLMと決定論的処理の責務境界を正本とします。
+この文書は、UIテスト対象分析プロファイルにおけるLLMと決定論的処理の責務境界を正本とします。helperの正確なCLI I/O、table schema、Machine Entity bridge、filesystem safety、legacy migrationは `2026-10-01_201500_ui-test-target-analysis-profile_06_package-schema-and-helper-contracts.md` を正本とします。
 
 目的はLLMを置き換えることではありません。LLMが仕様理解・文脈解釈・意味判断へ集中できるように、同じ入力から同じ結果を導出できる定型処理だけをSkill-local helper / validatorへ移します。
 
@@ -85,7 +85,7 @@ package rootを読み、次をJSONで返します。
 - 07_current_unknownsに含まれるUNK ID集合が09のcurrent UNKNOWN集合と一致
 - READMEのcurrent UNKNOWN件数が09から導出した件数と一致
 - MANIFESTのfile set / order / SHA-256がcurrent packageと一致
-- READMEのfile一覧がcurrent MANIFESTと一致
+- READMEのCurrent payload filesがMANIFESTのpayload file listと一致
 - CHANGELOGの最新version見出しがpackage versionと一致
 - Machine Entity blockを持つ場合、既存authority_entities.py由来の形式と矛盾しないこと
 
@@ -120,6 +120,10 @@ current package fileからMANIFEST bodyまたはmachine-readable manifest projec
 変更されたstable item ID集合を入力し、cross-file exact referenceから再確認候補file / rowを列挙します。
 
 この結果は「修正が必要」という意味判断ではありません。LLMが再確認対象を漏らさないための候補集合です。
+
+#### build-authorities
+
+09のCurrent Effective Authority tableを固定projectionし、既存 `authority_entities.py` builderを呼んでMachine Entityを生成します。何をCurrent Effective AuthorityとするかはLLMが判断し、wrapper / fingerprint / expected identityをhelperが決定論生成します。
 
 #### project-eval
 
@@ -164,7 +168,7 @@ UI target packageでは、人間向け構造化ビューのentityをstable IDで
 - RULE-xxx
 - FLOW-xxx
 
-案件固有entity typeが必要な場合はLLMが追加のprefixを勝手に作らず、profile referenceの「案件固有ID」欄へprefixと意味を宣言してから使用します。helperは宣言済みprefixだけを許可します。
+案件固有entity typeが必要な場合はLLMが追加のprefixを勝手に作らず、packageの `00_scope_and_context.md` にある `案件固有構造ID` tableへprefixと意味を宣言してから使用します。helperは宣言済みprefixだけを許可します。
 
 IDが意味的に同一か、新IDにすべきかはLLM判断です。helperはIDを自動的に別entityへ再割当てしません。
 
