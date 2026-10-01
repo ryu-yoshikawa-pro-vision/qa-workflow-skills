@@ -115,7 +115,7 @@ profile packageでも既存 `assets/output-template.md` のcanonical契約を維
 - UI構造間の関係は `関連構造ID` で追跡する
 - 複数IDの区切りは `<br>` に固定する
 - exact ID参照の存在・duplicateはui_target_package.pyで検証する
-- semantic identity、reuse / new判断はLLMが行う
+- semantic identity、reuse / new判断はLLMが行う。LLMがnewと判断した後の次ID算出は `ui_target_package.py next-id` を利用できる
 
 ### 正規UI分類
 
