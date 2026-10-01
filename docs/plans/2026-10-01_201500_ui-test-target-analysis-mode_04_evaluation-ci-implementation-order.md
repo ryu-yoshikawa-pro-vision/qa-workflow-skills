@@ -67,7 +67,7 @@ PR #16後の期待増分:
 - 明示same-routeはVIEW / STEPとして扱い、route不明は推測統合しない
 - MODALとbrowser dialogを分離する
 - 直交STATEを無理に排他化しない
-- field / notification / external interactionを適切なoptional viewへ整理する
+- field / notification / external interactionを仕様上該当する構造化viewへ整理する
 - repository差分を実装状況へ分離
 - UI操作母集団を抽出し、US → UC → Behavior → ACの順で分解する
 - UI操作があるのに資料不足の場合はnot-applicableへ逃げずUNKNOWN / blockedへする
@@ -259,7 +259,7 @@ QとUNKの意味的同一性は検証しません。
 - spec-analysis: UI target packageのcanonical table / stable ref contractを評価
 - question-analysis: known_unknown_ids / expected_related_unknownsを評価
 - production helperをimportしてexpectedを生成しない
-- spec-analysisはmode固有 `SPEC-OUT-003` を追加して2→3件とし、question-analysisは既存2件のfixture拡張で維持する。全体は38→39件
+- spec-analysisはmode固有 `SPEC-OUT-003` を追加して2→3件、test-requirement-designは `TR-OUT-003` を追加して2→3件、question-analysisは既存2件のfixture拡張で維持する。PR #14後baseline 44件から全体46件とする
 
 ### 8.4 semanticに残すもの
 
