@@ -85,6 +85,8 @@ package rootを読み、次をJSONで返します。
 - 07_current_unknownsに含まれるUNK ID集合が09のcurrent UNKNOWN集合と一致
 - READMEのcurrent UNKNOWN件数が09から導出した件数と一致
 - MANIFESTのfile set / order / SHA-256がcurrent packageと一致
+- READMEのfile一覧がcurrent MANIFESTと一致
+- CHANGELOGの最新version見出しがpackage versionと一致
 - Machine Entity blockを持つ場合、既存authority_entities.py由来の形式と矛盾しないこと
 
 意味的な正しさ、Authority優先順位、PAGEかVIEWか等は検証しません。
