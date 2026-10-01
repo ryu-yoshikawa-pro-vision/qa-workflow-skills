@@ -5,7 +5,27 @@
 
 この文書は評価、CI、実装順序、完了条件を正本とします。
 
-## 1. 評価方針
+## 1. PR #14 baseline
+
+実装・評価はPR #14 merge後のlatest mainをbaselineとします。詳細は `_07_pr14-baseline-and-integration.md` を正本とします。
+
+PR #14後の期待観測値:
+- Skill: 22
+- Trigger queries: 488
+- Deterministic output cases: 44
+- Semantic cases: 155
+- qa-workflow routing fixtures: 61
+
+PR #16後の期待増分:
+- Skill: +0
+- Trigger: +0
+- Deterministic: +1
+- Semantic: +4
+- routing: +8
+
+したがってStep 0時点の期待値は 22 Skill / 488 trigger / 45 deterministic / 159 semantic / 69 routingです。ただしCI / repository testでは固定値を正本化せず、PR #14のcurrent repository / manifestからの動的導出を維持します。
+
+## 3. 評価方針
 
 新しい評価frameworkは作りません。
 
@@ -18,7 +38,7 @@
 
 今回の中心は意味分析なのでsemantic evalを主とします。同時に、`05_llm-deterministic-boundaries.md` で定型処理とした形式・参照・件数・version・MANIFEST / hash等はSkill-local production helperとdeterministic / repository testで扱います。意味判断そのものはscriptへ移しません。
 
-## 2. spec-analysis semantic eval
+## 3. spec-analysis semantic eval
 
 現在spec-analysisは2 semantic caseです。
 
@@ -110,7 +130,7 @@ deterministic projection:
 
 semantic / deterministicで同じprojection helperを使いますが、expected判定は各eval validator / rubricが独立して行い、production helper出力からexpectedを逆算しません。
 
-## 3. question-analysis semantic eval
+## 4. question-analysis semantic eval
 
 1 caseを追加し、question-analysisは現在2件から3件へ増やします。正式回答 / 暫定回答とUNKNOWN lineageを同時に扱うcaseを1件だけ追加します。
 
@@ -126,7 +146,7 @@ question-analysisの既存分類ロジックを変更しないため、trigger d
 
 spec-analysis / question-analysisで今回追加するcritical semantic criterionは、各criterionが最低1 semantic caseから参照されることをrepository testで検証します。既存normal spec-analysis caseにもmode非選択回帰を含めます。
 
-## 4. qa-workflow routing eval
+## 5. qa-workflow routing eval
 
 既存routing fixtureへmode routing caseを追加します。
 
@@ -142,7 +162,7 @@ spec-analysis / question-analysisで今回追加するcritical semantic criterio
 
 expected start / resume Skillを明示し、全Skill固定順実行へ回帰しないことを確認します。
 
-## 5. trigger eval
+## 6. trigger eval
 
 今回のmode選択はspec-analysis内部の出力mode選択であり、Skill間trigger境界を変更しません。現在のspec-analysis trigger datasetには、複数資料統合・テスト分析前の仕様整理・repository/Figma/Q&A統合のpositive queryが既にあるため、frontmatter descriptionとtrigger datasetは変更しません。mode選択境界はspec-analysis semantic evalで検証します。
 
@@ -153,11 +173,11 @@ expected start / resume Skillを明示し、全Skill固定順実行へ回帰し�
 - 「テストケースを作りたい」→ test-case-design
 - 「テスト設計前の対象理解を継続成果物として作りたい」→ spec-analysis
 
-## 6. 決定論的support / validation
+## 7. 決定論的support / validation
 
 `05_llm-deterministic-boundaries.md` で定型処理としたものは今回実装対象とします。「初回なので後回し」という扱いはしません。
 
-### 6.1 spec-analysis production helper
+### 7.1 spec-analysis production helper
 
 `skills/spec-analysis/scripts/ui_target_package.py` を追加し、少なくとも次のoperationを実装します。
 
@@ -185,7 +205,7 @@ repository unit testで最低限次を確認します。
 - impactがexact referenceだけから候補fileを返し、semantic変更を勝手に決定しないこと
 - project-evalが内容を変更せずMANIFEST順に連結すること
 
-### 6.2 question-analysis production helper
+### 7.2 question-analysis production helper
 
 `skills/question-analysis/scripts/unknown_links.py` を追加し、次を検証します。
 
@@ -196,7 +216,7 @@ repository unit testで最低限次を確認します。
 
 QとUNKの意味的同一性は検証しません。
 
-### 6.3 deterministic output eval
+### 7.3 deterministic output eval
 
 既存spec-analysis / question-analysis validatorへ、production helperとは独立したfixture検証を追加します。
 
@@ -205,7 +225,7 @@ QとUNKの意味的同一性は検証しません。
 - production helperをimportしてexpectedを生成しない
 - spec-analysisはmode固有 `SPEC-OUT-003` を追加して2→3件とし、question-analysisは既存2件のfixture拡張で維持する。全体は38→39件
 
-### 6.4 semanticに残すもの
+### 7.4 semanticに残すもの
 
 次はLLM / semantic evalの責務として今回から明示的に対象外とします。
 
@@ -219,7 +239,7 @@ QとUNKの意味的同一性は検証しません。
 
 これらは「後からvalidator化する候補」ではありません。機械化するとLLMの柔軟性を損なうため、意味判断として残します。
 
-## 7. CI
+## 8. CI
 
 既存workflowを再利用します。
 
@@ -236,16 +256,16 @@ QとUNKの意味的同一性は検証しません。
 
 今回の計画どおり実装した場合の想定現在値:
 
-- Skill数: 19のまま
-- trigger query: 428のまま
-- deterministic output case: 38 → 39
+- Skill数: 22のまま
+- trigger query: 488のまま
+- deterministic output case: 44 → 45
   - spec-analysis: 2 → 3
   - question-analysis: 2のまま
-- semantic case: 72 → 76
+- semantic case: 155 → 159
   - spec-analysis: 2 → 5
   - question-analysis: 2 → 3
   - その他Skill: 変更なし
-- qa-workflow routing fixture: 61 → 66
+- qa-workflow routing fixture: 61 → 69
 
 Step 0でmainの現在値を再確認し、上記差分がそのまま適用可能な場合は次を同期します:
 
@@ -254,13 +274,13 @@ Step 0でmainの現在値を再確認し、上記差分がそのまま適用可�
 - `tests/skills/evals/semantic/test_semantic_datasets.py` のSkill別件数とtotal
 - routing fixtureの固定件数を検証するrepository test / 文書
 - README.mdは件数またはmode説明を実際に持つ箇所だけ更新
-- `.github/workflows/deterministic-output-evals.yml` 等の既存compile対象へ `skills/question-analysis/scripts/*.py` を追加し、spec-analysis / question-analysis両production helperのsyntaxをCIで検証
+- PR #14後の `.github/workflows/deterministic-output-evals.yml` は `skills/*/scripts` を動的compileするため、helper compile目的のSkill固有workflow editは行わない
 
 を実データへ同期します。
 
 歴史文書の過去値は変更しません。
 
-## 8. 実Agent smoke
+## 9. 実Agent smoke
 
 実装完了前に少なくとも1回、実Agentクライアント相当で次を確認します。
 
@@ -287,12 +307,14 @@ AIエージェント上で、既存Agent Skillsの読み込み方法に従い `s
 
 特定製品のtool名やconnectorを評価条件にはしません。
 
-## 9. 実装順序
+## 10. 実装順序
 
 ### Step 0: 現状再確認
 
 - main headがPlan基準から動いていないか確認
-- spec-analysis / question-analysis / qa-workflowのcurrent契約確認
+- PR #14 merge済みlatest mainへrebase
+- 22 Skill / 488 trigger / 44 deterministic / 155 semantic / 61 routingが観測baselineと一致するか確認
+- spec-analysis / question-analysis / qa-workflow / test-target-inspection / usability-evaluation / usability-inspection / wcag-conformance-evaluationのcurrent契約確認
 - semantic / routing datasetの現在件数確認
 - README / EVALS / PROJECT_CONTEXTの現在値確認
 
@@ -337,9 +359,9 @@ mode単体が成立してからworkflowへ接続します。
 
 - mode request routing
 - answer resume
-- live target観測との分岐
-- routing_cases.jsonへ5件追加
-- routing_candidate_outputs.jsonへ対応する独立candidate 5件追加
+- test-target-inspection / usability-evaluation / usability-inspection / wcag-conformance-evaluationとの分岐
+- routing_cases.jsonへ8件追加
+- routing_candidate_outputs.jsonへ対応する独立candidate 8件追加
 - routing fixture合計66件へ同期
 
 ### Step 5: package schema / migration / helper contract validation
@@ -387,7 +409,7 @@ mode単体が成立してからworkflowへ接続します。
 - 特定AI製品固有のtool / connector / bootstrapをSkill契約へ入れていない
 - 実装時に参照すべき正本fileが一意に分かる
 
-## 10. 完了条件
+## 11. 完了条件
 
 - 新Skill追加なし
 - mode assets / referenceが存在
@@ -398,7 +420,7 @@ mode単体が成立してからworkflowへ接続します。
 - UNKNOWN answer lifecycleが定義済み
 - repo implementation status分離が定義済み
 - question-analysisのUNKNOWN lineageがsemantic + production helper + deterministic evalで確認済み
-- qa-workflow routing / resumeがrouting case / independent candidateで確認済み
+- qa-workflow routing / resumeと#14の3 Skillとの誤routing境界がrouting case / independent candidateで確認済み
 - multi-file packageがproduction helperのevaluation projection経由で既存semantic runnerにより評価可能
 - version / UNKNOWN件数 / stable ref / MANIFEST / SHA-256等の定型整合をproduction helperで検証できる
 - spec-analysis / question-analysis production helperがSkill package単体で実行可能
