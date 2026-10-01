@@ -127,15 +127,21 @@ current package fileからMANIFEST bodyまたはmachine-readable manifest projec
 
 #### project-eval
 
-MANIFEST順にcurrent package fileを読み、各fileの前へ `<!-- FILE: <relative-path> -->` を付けて1 Markdownへ連結します。
+projection modeを `semantic / deterministic` に固定します。
 
-- 要約しない
-- 正規化しない
-- 内容を書き換えない
-- package root外pathを拒否する
-- duplicate / missing fileを拒否する
+semantic:
 
-既存semantic runnerの1-file inputへ渡すためだけに使用します。
+- README / 00〜09 / 10+ current domain files
+- CHANGELOG / MANIFESTは除外
+
+deterministic:
+
+- 全payload file
+- MANIFESTを最後にcontrol fileとして追加
+
+共通して各fileの前へ `<!-- FILE: <relative-path> -->` を付け、内容は要約・正規化・書換えしません。package root外path、symlink、duplicate / missing fileを拒否します。
+
+semantic / deterministic runnerのdirectory対応は追加せず、この固定projectionを1-file inputとして渡します。
 
 ### 3.2 helperが担当しないこと
 
@@ -167,6 +173,10 @@ UI target packageでは、人間向け構造化ビューのentityをstable IDで
 - FIELD-xxx
 - RULE-xxx
 - FLOW-xxx
+- NOTIFY-xxx
+- INTERACT-xxx
+- ISSUE-xxx
+- IMPL-xxx
 
 案件固有entity typeが必要な場合はLLMが追加のprefixを勝手に作らず、packageの `00_scope_and_context.md` にある `案件固有構造ID` tableへprefixと意味を宣言してから使用します。helperは宣言済みprefixだけを許可します。
 
