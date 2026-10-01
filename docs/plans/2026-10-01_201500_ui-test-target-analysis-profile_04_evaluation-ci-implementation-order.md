@@ -16,7 +16,7 @@
 3. deterministic output / routing validation
 4. semantic evaluation
 
-今回の中心は意味分析なので、semantic evalを主とし、機械判定できるものだけ既存deterministic / repository testへ追加します。
+今回の中心は意味分析なのでsemantic evalを主とします。同時に、`05_llm-deterministic-boundaries.md` で定型処理とした形式・参照・件数・version・MANIFEST / hash等はSkill-local production helperとdeterministic / repository testで扱います。意味判断そのものはscriptへ移しません。
 
 ## 2. spec-analysis semantic eval
 
@@ -64,7 +64,7 @@
 - README / current unknown / changelog / manifestの意味整合
 - 差分だけを最終成果物にしない
 
-semantic rubricへはprofile固有の次の観点だけを追加し、既存SPEC criteriaと重複させません。
+semantic rubricへはprofile固有の次の観点だけを追加し、既存SPEC criteriaと重複させません。既存SPEC-SEM-001 / 002にも「要求が通常spec-analysisで足りる場合に不要なUI target packageへ昇格しない」回帰観点を適用し、profile追加による過剰出力を防ぎます。
 
 - canonical modelと構造化ビューの追跡性
 - UI構造分類の妥当性
@@ -86,7 +86,7 @@ semantic rubricへはprofile固有の次の観点だけを追加し、既存SPEC
 
 このprojectionは評価専用で、production packageやAuthorityを変更しません。
 
-実装は `scripts/skills/evals/semantic/package_projection.py` の小さいeval-only helperとして追加し、MANIFEST外file混入、root外path、重複file、missing file、順序をrepository unit testで検証します。汎用document merge frameworkにはしません。
+production `skills/spec-analysis/scripts/ui_target_package.py project-eval` を使用し、semantic評価専用に同じ処理を再実装しません。MANIFEST外file混入、root外path、重複file、missing file、順序をrepository unit testで検証します。project-evalは内容を要約・変更しない単純projectionに限定し、汎用document merge frameworkにはしません。
 
 ## 3. question-analysis semantic eval
 
@@ -100,7 +100,7 @@ semantic rubricへはprofile固有の次の観点だけを追加し、既存SPEC
 - 回答済み論点を再質問しない
 - current unknownとresolved historyを混同しない
 
-question-analysisの既存分類ロジックを変更しないため、trigger datasetは変更しません。関連UNKNOWN IDの形式・既知参照・fixture mappingはsemanticではなく既存deterministic validatorで検証します。
+question-analysisの既存分類ロジックを変更しないため、trigger datasetは変更しません。関連UNKNOWN IDの意味的対応はsemantic case、形式・既知参照・duplicateはproduction `unknown_links.py`、fixture mappingは独立deterministic validatorで検証します。
 
 ## 4. qa-workflow routing eval
 
@@ -131,37 +131,67 @@ expected start / resume Skillを明示し、全Skill固定順実行へ回帰し�
 - 「テストケースを作りたい」→ test-case-design
 - 「テスト設計前の対象理解を継続成果物として作りたい」→ spec-analysis
 
-## 6. 機械判定可能な整合
+## 6. 決定論的support / validation
 
-production runtimeは初回実装では追加しません。
+`05_llm-deterministic-boundaries.md` で定型処理としたものは今回実装対象とします。「初回なので後回し」という扱いはしません。
 
-まずSkill契約 + assets + semantic evalで実装します。
+### 6.1 spec-analysis production helper
 
-ただしrepository testまたはdeterministic evalで低コストに確認できる次は対象です。
+`skills/spec-analysis/scripts/ui_target_package.py` を追加し、少なくとも次のoperationを実装します。
 
-- required core assetがすべて存在し、optional assetをrequiredとして強制していない
-- `09_authority_and_traceability.md` が既存spec-analysis canonical table / Machine Entity契約を保持する
-- README / MANIFEST templateが同じversion placeholder contractを持つ
-- current unknown templateとresolved historyを同じ表として定義していない
-- question-analysisの関連UNKNOWN IDがUNK形式・既知参照・fixture期待mappingを満たす
-- semantic package projectionがMANIFEST順だけを使用し、package root外を読まない
-- spec-analysisのResource参照先が存在する
-- qa-workflow routing caseのSkill名が正規19 Skillに含まれる
-- EVALS.mdのcase数が実datasetと一致する
+- inspect
+- validate
+- next-version
+- build-manifest
+- impact
+- project-eval
 
-実Agent出力の任意packageを意味解析する汎用validatorは初回では作りません。追加するpackage projection helperはsemantic eval入力を1ファイル化するだけで、Markdown意味解析・merge判断・仕様修正を行いません。
+repository unit testで最低限次を確認します。
 
-## 7. 将来のvalidator追加条件
+- required core / optional file set
+- package root外path拒否
+- package内version一致
+- canonical / structural ID形式・duplicate
+- structured rowのexact stable ID参照
+- 09のcurrent UNKNOWN集合と07 / README件数の一致
+- MANIFEST file set / order / SHA-256
+- domain file命名
+- impactがexact referenceだけから候補fileを返し、semantic変更を勝手に決定しないこと
+- project-evalが内容を変更せずMANIFEST順に連結すること
 
-実運用で次の失敗が繰り返し発生した場合だけ、spec-analysis local helperまたはdeterministic validatorを追加検討します。
+### 6.2 question-analysis production helper
 
-- version不一致
-- READMEのunknown件数不一致
-- resolved UNKがcurrent unknownに残る
-- current file参照切れ
-- optional domain file間の意味重複
+`skills/question-analysis/scripts/unknown_links.py` を追加し、次を検証します。
 
-初回から汎用document engine、ZIP validator、Markdown AST frameworkを作りません。
+- UNK ID形式
+- current known UNKNOWNへの存在参照
+- 同一Q内duplicate
+- current / resolved集合が入力された場合のresolved-only参照
+
+QとUNKの意味的同一性は検証しません。
+
+### 6.3 deterministic output eval
+
+既存spec-analysis / question-analysis validatorへ、production helperとは独立したfixture検証を追加します。
+
+- spec-analysis: UI target packageのcanonical table / stable ref contractを評価
+- question-analysis: known_unknown_ids / expected_related_unknownsを評価
+- production helperをimportしてexpectedを生成しない
+- deterministic output case数は各Skill2件の現行38件を維持し、既存fixtureを拡張して検証する
+
+### 6.4 semanticに残すもの
+
+次はLLM / semantic evalの責務として今回から明示的に対象外とします。
+
+- SPEC / DECISION / INFERENCE / UNKNOWNの意味分類
+- PAGE / VIEW / STATE / MODAL等の意味分類
+- semantic identity / reuse判断
+- Authority競合解消
+- optional domain fileの必要性
+- semantic duplicate /矛盾の判定
+- repository差分の意味的な重要性
+
+これらは「後からvalidator化する候補」ではありません。機械化するとLLMの柔軟性を損なうため、意味判断として残します。
 
 ## 8. CI
 
@@ -172,6 +202,7 @@ production runtimeは初回実装では追加しません。
 - Validate Agent Skills
 - Validate Semantic Output Evals
 - Validate Deterministic Output Evals
+- production helper unit / portability tests
 - repository unit tests
 - git diff --check
 
@@ -195,6 +226,7 @@ Step 0でmainの現在値を再確認し、上記差分がそのまま適用可�
 - `tests/skills/evals/semantic/test_semantic_datasets.py` のSkill別件数とtotal
 - routing fixtureの固定件数を検証するrepository test / 文書
 - README.mdは件数またはprofile説明を実際に持つ箇所だけ更新
+- `.github/workflows/deterministic-output-evals.yml` 等の既存compile対象へ `skills/question-analysis/scripts/*.py` を追加し、spec-analysis / question-analysis両production helperのsyntaxをCIで検証
 
 を実データへ同期します。
 
@@ -212,13 +244,15 @@ Step 0でmainの現在値を再確認し、上記差分がそのまま適用可�
 - 「テスト設計へ進まず対象理解packageまで」の要求
 
 確認:
-- spec-analysisを選択する
+- 通常の小規模spec-analysis要求ではprofileへ不要に昇格しない
+- UI target用途ではspec-analysis profileを選択する
 - profile referenceを読む
 - repository事実を仕様Authority化しない
 - package構造を作れ、09_authority_and_traceability.mdから既存Authority Machine Entityへ閉じられる
 - question-analysisが必要論点だけ扱う
 - test-analysisへ自動進行しない
 - outputがprofileの品質ゲートを満たす
+- `ui_target_package.py` により形式・参照・件数・version・MANIFEST / hashを検証できる
 - MANIFEST順evaluation projectionを通して既存semantic runnerへ入力できる
 
 AIエージェント上で、既存Agent Skillsの読み込み方法に従い `spec-analysis` → profile reference / assetsを利用して成果物を生成できることを確認します。
@@ -236,13 +270,15 @@ AIエージェント上で、既存Agent Skillsの読み込み方法に従い `s
 
 mainが動いていてもPlanを盲目的に適用せず、責務契約が変わっていれば差分を再評価します。
 
-### Step 1: profile責務をspec-analysisへ追加
+### Step 1: profile責務とdeterministic helperをspec-analysisへ追加
 
 - SKILL.mdに目的ベースの条件付きResource導線
 - references/ui-test-target-analysis.md
 - required / optionalを分けたpackage assets
 - 09_authority_and_traceability.mdで既存canonical spec-analysis contractを維持
+- skills/spec-analysis/scripts/ui_target_package.py
 - 09から既存authority_entities.pyへ入力できることを確認
+- helper unit / portability test
 
 この時点ではquestion-analysis / qa-workflowは変更しません。
 
@@ -250,7 +286,7 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 
 - SPEC-SEM-003～005
 - profile固有rubric差分
-- eval-only package_projection.pyとunit test
+- production ui_target_package.py project-evalのunit test
 - projectionしたpackageを既存semantic runnerへ渡せることを確認
 - semantic countをspec-analysis=5へ同期
 - Agent Skills structure validation
@@ -262,7 +298,9 @@ profile単体が成立してからworkflowへ接続します。
 - stable UNKNOWN参照
 - 回答正規化後のspec-analysis resume
 - output templateの関連UNKNOWN ID
-- deterministic validatorのUNK形式 / known refs / expected mapping
+- skills/question-analysis/scripts/unknown_links.py
+- production helper unit / portability test
+- deterministic validatorのknown refs / expected mapping
 - 既存output fixture 1件へmapping追加 + false-pass unit test
 - question semantic caseを1件追加し合計3件へ
 
@@ -275,7 +313,14 @@ profile単体が成立してからworkflowへ接続します。
 - routing_candidate_outputs.jsonへ対応する独立candidate 5件追加
 - routing fixture合計66件へ同期
 
-### Step 5: cross-repository validation
+### Step 5: deterministic / semantic boundary validation
+
+- LLMが意味判断すべき項目をhelperが自動決定していないこと
+- helperが返すimpactは再確認候補であり変更必須判定ではないこと
+- normal spec-analysisがprofile依存になっていないこと
+- helperがSkill package単体コピーで実行できること
+
+### Step 6: cross-repository validation
 
 - 全19 Skill構造
 - trigger
@@ -285,13 +330,14 @@ profile単体が成立してからworkflowへ接続します。
 - docs current count
 - git diff --check
 
-### Step 6: 実Agent smoke
+### Step 7: 実Agent smoke
 
 - UI target package scenario（canonical Authority / Machine Entityを含む）
 - question-analysis回答反映からspec-analysis package更新までのscenario
 - semantic evaluation projection scenario
+- deterministic helperが構造エラーを返してもLLMの意味判断を勝手に上書きしないscenario
 
-### Step 7: final review
+### Step 8: final review
 
 次を確認します。
 
@@ -314,11 +360,13 @@ profile単体が成立してからworkflowへ接続します。
 - package内にcanonical Authority / traceability正本があり、既存Machine Entity契約へ閉じる
 - UNKNOWN answer lifecycleが定義済み
 - repo implementation status分離が定義済み
-- question-analysisのUNKNOWN lineageがsemantic + deterministic双方で確認済み
+- question-analysisのUNKNOWN lineageがsemantic + production helper + deterministic evalで確認済み
 - qa-workflow routing / resumeがrouting case / independent candidateで確認済み
-- multi-file packageがevaluation projection経由で既存semantic runnerにより評価可能
+- multi-file packageがproduction helperのevaluation projection経由で既存semantic runnerにより評価可能
+- version / UNKNOWN件数 / stable ref / MANIFEST / SHA-256等の定型整合をproduction helperで検証できる
+- spec-analysis / question-analysis production helperがSkill package単体で実行可能
 - test-target-inspectionへのcurrent UI分岐が維持される
 - existing CI / evalが全PASS
 - 実Agent smokeがPASS
 - current repository counts / docsが同期
-- 対象外のruntime / generic document frameworkを追加していない
+- 意味判断を固定するrule engine / generic document framework / ZIP runtimeを追加していない
