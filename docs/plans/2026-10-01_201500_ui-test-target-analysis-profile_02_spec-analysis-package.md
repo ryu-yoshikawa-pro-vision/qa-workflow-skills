@@ -9,6 +9,9 @@
 LLM / deterministic責務境界:
 2026-10-01_201500_ui-test-target-analysis-profile_05_llm-deterministic-boundaries.md
 
+package schema / helper I/O / legacy migration:
+2026-10-01_201500_ui-test-target-analysis-profile_06_package-schema-and-helper-contracts.md
+
 この文書はspec-analysisへ追加するUIテスト対象分析packageの構造と更新契約を正本とします。
 
 ## 1. 変更対象
@@ -37,6 +40,8 @@ LLM / deterministic責務境界:
 - skills/spec-analysis/scripts/ui_target_package.py
 
 ファイル数を増やすこと自体を目的にしません。required coreとoptional domain fileを明確に分けます。
+
+exact heading / exact table header、package schema version、ID形式、Machine Entity bridge、MANIFEST schemaは `_06_package-schema-and-helper-contracts.md` を正本とし、本Planでは意味責務だけを定義します。
 
 ### required core
 
@@ -109,6 +114,8 @@ profile packageでも既存 `assets/output-template.md` のcanonical契約を維
 - package version / file hashはMachine Entityのcontent fingerprintとは別物
 
 ### structural ID / traceability
+
+具体的なstandard prefix、案件固有prefix宣言場所、structured table列、`<br>`参照規則は `_06_package-schema-and-helper-contracts.md` を正本とします。
 
 - UI構造・業務ルール・入力項目・フロー等のstructured rowは、`05_llm-deterministic-boundaries.md` のprefix契約に従うstable structural IDを持つ
 - 期待挙動・仕様判断を表すnormative rowは、必要に応じ `関連仕様項目ID` で09のSPEC / DEC / INF / UNKへ追跡する
@@ -311,7 +318,7 @@ default policy:
 5. 変更後もcurrent versionの全fileを含む完全版を成立させる
 6. 過去versionは履歴でありcurrent仕様の参照前提にしない
 
-default policyでは `ui_target_package.py next-version` が次versionを導出します。
+default policyでは `ui_target_package.py next-version` が次versionを導出します。package schema versionはcontent versionと分離し、current schemaは `ui-target-v1` とします。
 
 ユーザー / projectが別version policyを明示した場合はそちらを優先し、helperは指定versionのpackage内一致だけを検証します。何をmaterial updateとしてversion upするかの意味判断はproject policyまたはLLMに残し、presentationだけの差分までhelperが自動判定しません。
 
@@ -376,7 +383,11 @@ helperが列挙したimpact候補は再確認対象であり、変更必須と�
 - test requirement / condition / caseを先回りしていない
 - UIで観測不能な内部挙動をUIテスト期待結果として確定していない
 
-## 9. file artifact
+## 9. legacy package migration
+
+profile導入前の既存仕様理解packageを更新する場合、semantic mappingはLLMが行い、current `ui-target-v1` へ変換後にhelperで検証します。既存stable IDは意味的に同一なら維持し、自動migration engineは作りません。version継続、legacy progress fileの扱い、schema versionなしpackageの判定は `_06_package-schema-and-helper-contracts.md` を正本とします。
+
+## 10. file artifact
 
 UI target profileの正規成果物はpackage directory / file集合です。
 
