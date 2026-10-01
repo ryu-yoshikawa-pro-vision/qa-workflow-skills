@@ -151,6 +151,7 @@ expected start / resume Skillを明示し、全Skill固定順実行へ回帰し�
 - inspect
 - validate
 - next-version
+- next-id
 - build-manifest
 - impact
 - project-eval
@@ -165,6 +166,7 @@ repository unit testで最低限次を確認します。
 - 09のcurrent UNKNOWN集合と07 / README件数の一致
 - MANIFEST file set / order / SHA-256
 - domain file命名
+- next-idがsemantic identityを判断せず、new指定後だけ既知ID最大値から次番号を返すこと
 - impactがexact referenceだけから候補fileを返し、semantic変更を勝手に決定しないこと
 - project-evalが内容を変更せずMANIFEST順に連結すること
 
