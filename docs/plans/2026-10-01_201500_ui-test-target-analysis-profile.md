@@ -51,6 +51,9 @@ feat/ui-test-target-analysis-profile
 
 ## 固定方針
 
+LLM / deterministic処理の責務境界は `2026-10-01_201500_ui-test-target-analysis-profile_05_llm-deterministic-boundaries.md` を正本とします。LLMの意味判断をscriptへ移さず、形式・参照・集計・fingerprint等の再現可能な定型処理だけをSkill-local helper / validatorへ移します。
+
+
 ### 1. 新Skillは追加しない
 
 UIテスト対象分析はspec-analysisの条件付き出力プロファイルとして実装します。
@@ -114,6 +117,8 @@ version更新時は変更ファイルだけではなく、そのversionの完全
   - 2026-10-01_201500_ui-test-target-analysis-profile_03_workflow-integration.md
 - 評価、CI、実装順序、完了条件:
   - 2026-10-01_201500_ui-test-target-analysis-profile_04_evaluation-ci-implementation-order.md
+- LLM / deterministic処理の責務境界:
+  - 2026-10-01_201500_ui-test-target-analysis-profile_05_llm-deterministic-boundaries.md
 
 各詳細Planが担当範囲の正本です。本親Planへ詳細契約を重複記載しません。
 
@@ -125,34 +130,50 @@ version更新時は変更ファイルだけではなく、そのversionの完全
 - skills/spec-analysis/SKILL.md
 - skills/spec-analysis/references/guidance.md
 - 新規 skills/spec-analysis/references/ui-test-target-analysis.md
-- 新規 skills/spec-analysis/assets/ui-test-target-analysis/*（`09_authority_and_traceability.md`を含む）
-
-必要に応じて:
+- 新規 skills/spec-analysis/assets/ui-test-target-analysis/*
+- 新規 skills/spec-analysis/scripts/ui_target_package.py
 - skills/spec-analysis/evals/semantic/*
-- spec-analysisのtrigger境界に影響がある場合のみtrigger dataset
+- skills/spec-analysis/evals/deterministic/validator.py
+- skills/spec-analysis/evals/output/*
+- tests/skills/evals/semantic/*
+- UI target package helper用repository unit test
+
+既存 `skills/spec-analysis/scripts/authority_entities.py` は変更要否を確認し、既存contractで足りる場合は変更しません。Machine Entity生成の正本として再利用します。
 
 ### question-analysis
 
-変更候補:
+変更:
 - skills/question-analysis/SKILL.md
 - skills/question-analysis/references/guidance.md
 - skills/question-analysis/assets/output-template.md
+- 新規 skills/question-analysis/scripts/unknown_links.py
 - skills/question-analysis/evals/semantic/*
 - skills/question-analysis/evals/deterministic/validator.py
-- skills/question-analysis/evals/output/*（既存fixtureへ関連UNKNOWN ID契約を反映）
+- skills/question-analysis/evals/output/*
+- unknown_links.py用repository unit test
 
 目的はUNKNOWNの安定参照、回答後の差分反映、解消済み履歴とcurrent unknownの分離です。既存の質問分類自体は変更しません。
 
 ### qa-workflow
 
-変更候補:
+変更:
 - skills/qa-workflow/references/guidance.md
 - skills/qa-workflow/evals/deterministic/routing_cases.json
 - skills/qa-workflow/evals/deterministic/routing_candidate_outputs.json
-- 必要ならREADME.md
+- routing fixtureの固定件数を検証するrepository test / docs current count
 
 「テスト設計前の仕様理解package」はspec-analysisから開始し、未解決事項があればquestion-analysisへ進み、回答反映後spec-analysisへ戻すroutingを追加します。
 
+### repository docs / CI
+
+変更:
+- README.md: profile導線または現在値を持つ箇所のみ
+- EVALS.md
+- docs/PROJECT_CONTEXT.md
+- tests/skills/evals/semantic/test_semantic_datasets.py
+- production script compile / portabilityを検証する既存CI・repository test
+
+新しいGitHub Actions workflowは追加せず、既存workflow内へ必要なcompile / test対象を追加します。
 
 ## 対象外
 
@@ -163,7 +184,7 @@ version更新時は変更ファイルだけではなく、そのversionの完全
 - test-analysis以降のテスト設計ロジック変更
 - test-target-inspectionのbrowser観測契約変更
 - Agent Skills Specificationの独自拡張
-- ZIP生成を必須とする特定AIエージェント環境依存runtime
+- ZIP専用runtime。archive出力は利用Agentのartifact機能で行い、Skillの正規処理には含めない
 
 ## 成功条件
 
@@ -180,3 +201,5 @@ version更新時は変更ファイルだけではなく、そのversionの完全
 - profileが既存Agent Skills形式のままAIエージェントから利用できる
 - 既存Agent Skills検証、trigger、semantic、deterministic / workflow routing回帰がPASSする
 - README / EVALS等の現在値を変更した場合は実データと一致する
+- LLMは仕様意味・UI意味・semantic identity判断に集中し、version / hash /参照整合 / UNKNOWN件数 / MANIFEST等の定型処理はhelper / validatorで補助・検証される
+- helperがsemantic判断を代替せず、通常spec-analysisの柔軟性を損なわない
