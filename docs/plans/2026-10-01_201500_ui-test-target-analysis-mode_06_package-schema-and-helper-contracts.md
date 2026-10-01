@@ -6,6 +6,7 @@
 関連Plan:
 - 2026-10-01_201500_ui-test-target-analysis-mode_02_spec-analysis-package.md
 - 2026-10-01_201500_ui-test-target-analysis-mode_05_llm-deterministic-boundaries.md
+- 2026-10-01_201500_ui-test-target-analysis-mode_09_runtime-entity-and-test-requirement-contracts.md
 
 この文書は、UIテスト対象分析packageの機械可読schema、Skill-local helperのI/O、Machine Entity bridge、legacy package移行、filesystem safetyの正本です。UI操作のUS / UC / Behavior / AC semantic contractは `2026-10-01_201500_ui-test-target-analysis-mode_08_behavior-decomposition-and-acceptance-traceability.md` を正本とします。
 
@@ -49,23 +50,33 @@ READMEには自由記述の概要に加え、次の2表をexact heading / exact 
 
 ## 3. package file classification
 
-### payload files
-
-hash対象かつcurrent package内容を構成するfile:
+### required core payload files
 
 - README.md
 - 00_scope_and_context.md
 - 01_ui_structure_and_navigation.md
 - 02_behavior_and_business_rules.md
-- 03_fields_and_validation.md（存在する場合）
-- 04_flows_and_data.md（存在する場合）
-- 05_notifications_and_external_interactions.md（存在する場合）
 - 06_spec_inconsistencies_and_pending.md
 - 07_current_unknowns.md
-- 08_repository_implementation_status.md（存在する場合）
 - 09_authority_and_traceability.md
-- 10_<domain-slug>.md以降（存在する場合）
 - CHANGELOG.md
+
+### 条件付き必須payload files
+
+`00_scope_and_context.md` のfile applicability判定に従います。
+
+- 03_fields_and_validation.md
+- 04_flows_and_data.md
+- 05_notifications_and_external_interactions.md
+- 08_repository_implementation_status.md
+
+statusがrequiredならfileが必須、not-applicableならfileを作成しません。blockedならpackageを完成扱いしません。
+
+### extension payload files
+
+- 10_<domain-slug>.md以降
+
+extension fileは00に責務・分割理由が宣言された場合だけ許可します。
 
 ### control file
 
@@ -100,6 +111,33 @@ domain fileは `10_<lowercase-kebab-case>.md` 以降の連番とします。同�
 自由記述sectionはLLMが対象に合わせて追加できます。ただしhelperが参照整合を検証するstructured tableは以下のexact heading / exact headerを使います。
 
 ### 5.1 00_scope_and_context.md
+
+#### 分析対象機能scope一覧
+
+| Scope ID | 対象機能 / 領域 | UI操作判定 | Behavior Decomposition | 関連UNKNOWN ID | 根拠 / 関連仕様項目ID |
+| --- | --- | --- | --- | --- | --- |
+
+標準ID: `SCOPE-xxx`
+
+許可値:
+- UI操作判定: あり / なし / 未確定
+- Behavior Decomposition: required / not-applicable / blocked
+
+固定対応:
+- あり → required
+- なし → not-applicable
+- 未確定 → blocked + 関連UNKNOWN ID必須
+
+#### 条件付き必須file applicability
+
+| ファイル | 状態 | 根拠 / 関連仕様項目ID | 関連UNKNOWN ID |
+| --- | --- | --- | --- |
+| 03_fields_and_validation.md | required / not-applicable / blocked |  |  |
+| 04_flows_and_data.md | required / not-applicable / blocked |  |  |
+| 05_notifications_and_external_interactions.md | required / not-applicable / blocked |  |  |
+| 08_repository_implementation_status.md | required / not-applicable / blocked |  |  |
+
+triggerの意味判断はLLMが行います。helperは4rowの存在、許可値、blocked時のUNKNOWN、required / not-applicableと実file / MANIFESTの一致を検証します。
 
 #### 案件固有構造ID
 
@@ -137,31 +175,26 @@ mode標準prefix以外を使う場合だけ記載します。
 
 ### 5.3 02_behavior_and_business_rules.md
 
-UI操作scopeでは、以下のexact tableを `_08` 契約どおり必須とします。
-
-#### 振る舞い分解適用判定
-
-| 項目 | 値 | 根拠 / 関連仕様項目ID |
-| --- | --- | --- |
+scope単位のsemantic contractは `_08` を正本とします。structured tableは次へ固定します。
 
 #### UI操作一覧
 
-| 操作ID | Actor / Role | 対象構造ID | 操作 | 目的 / 結果 | 関連仕様項目ID | 対応UC ID | 状態 |
-| --- | --- | --- | --- | --- | --- | --- | --- |
+| 操作ID | Scope ID | Actor / Role | 対象構造ID | 操作 | 関連仕様項目ID | 対応UC ID | 状態 | 関連UNKNOWN ID |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
 #### User Story一覧
 
-| US ID | Actor / Role | Goal | Value / 目的 | 関連仕様項目ID | 関連構造ID | 状態 |
-| --- | --- | --- | --- | --- | --- | --- |
+| US ID | Scope ID | Actor / Role | Goal | 関連仕様項目ID | 関連構造ID | 状態 | 関連UNKNOWN ID |
+| --- | --- | --- | --- | --- | --- | --- | --- |
 
 #### Use Case一覧
 
-| UC ID | 関連US ID | Use Case | Trigger | Preconditions | Success Postcondition | 関連仕様項目ID | 関連構造ID | 状態 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| UC ID | 関連US ID | Use Case | Trigger | Preconditions | Success Postcondition | 関連仕様項目ID | 関連構造ID | 状態 | 関連UNKNOWN ID |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
 #### Behavior一覧
 
-| Behavior ID | UC ID | フロー種別 | 結果分類 | 振る舞い | Postcondition / Result | 関連仕様項目ID | 関連構造ID | 状態 |
+| Behavior ID | UC ID | 結果分類 | 振る舞い | Postcondition / Result | 関連仕様項目ID | 関連構造ID | 状態 | 関連UNKNOWN ID |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
 #### Use Case振る舞い完全性
@@ -171,10 +204,10 @@ UI操作scopeでは、以下のexact tableを `_08` 契約どおり必須とし�
 
 #### Acceptance Criteria一覧
 
-| AC ID | Behavior ID | Acceptance Criteria | 可変要素 | 関連仕様項目ID | 関連構造ID | 状態 |
+| AC ID | Behavior ID | Acceptance Criteria | 関連仕様項目ID | 関連構造ID | 状態 | 関連UNKNOWN ID |
 | --- | --- | --- | --- | --- | --- | --- |
 
-UI操作がないscopeでも `振る舞い分解適用判定` tableは必須で、`not-applicable` と根拠を記録します。資料不足をnot-applicableとして扱いません。
+not-applicable scopeはUS / UC / Behavior / AC rowを持ちません。blocked scope / rowは `_08` のUNKNOWN contractへ従います。
 
 #### ビジネスルール一覧
 
@@ -305,6 +338,7 @@ helperは宣言されたheader名のexact ID参照だけを検証し、proseか�
 
 標準prefix:
 
+- SCOPE
 - PAGE
 - STATE
 - VIEW
@@ -413,7 +447,7 @@ payload:
 - package_version
 - previous_package_version
 - payload_files[]
-- optional_files[]
+- file_applicability[]
 - domain_files[]
 - canonical_item_ids[]
 - current_unknown_ids[]
@@ -499,12 +533,14 @@ stdin:
 {"operation":"build-machine-evidence","package_root":"<path>"}
 ```
 
-§9に従い09からnormalized Authority inputを生成して既存 `authority_entities.py` のbuilderを呼び、さらに02のUS / UC / Behavior / ACから構造Machine Entityを生成して統合します。
+§9に従い09からnormalized Authority inputを生成して既存 `authority_entities.py` のbuilderを呼び、02のcurrent ACと親US / UC / Behavior chainからAcceptance Criterion Machine Entityを生成して統合します。
 
 payload:
 
 - normalized_authorities[]
-- behavior_entities[]
+- normalized_acceptance_criteria[]
+- normalized_skill_input
+- acceptance_criterion_entities[]
 - machine_entities[]
 - expected_entity_identities[]
 - implementation_fingerprint
@@ -554,45 +590,53 @@ deterministic:
 
 各file前へ `<!-- FILE: <relative-path> -->` を付け、内容を変更せず連結します。
 
-## 9. deterministic Authority / behavior Machine Entity bridge
+## 9. deterministic Authority / Acceptance Criterion Machine Entity bridge
 
-LLMが09へ「現在有効な仕様根拠」を確定し、02へUS / UC / Behavior / ACを確定した後、`build-machine-evidence` がAuthorityとbehavior decompositionを固定変換します。
+LLMが09へCurrent Effective Authorityを確定し、02へcurrent US / UC / Behavior / ACを確定した後、`build-machine-evidence` がAuthority + current ACを固定変換します。
+
+### 9.1 Authority
+
+Authority部分は既存 `authority_entities.py` のnormalized input / builder契約をそのまま再利用します。
+
+規則:
+- 情報源 / 正本一覧と関連仕様根拠IDの複数IDは `<br>` 区切り
+- 空参照は空array
+- 種別は既存SPEC / DECISION / 承認済みASM
+- INF / UNKNOWNはCurrent Effective Authority inputへ含めない
+- LLMがJSON wrapper、fingerprint、expected identityを再生成しない
+
+### 9.2 Acceptance Criterion
+
+current ACだけを `spec-analysis / acceptance_criterion / AC-xxx` Entityへ変換します。blocked ACはEntity化しません。
+
+AC Entity contentは `_08` のcurrent chainから次を固定projectionします。
+
+- ac_id / acceptance_criteria
+- behavior_id / result classification / behavior / postcondition
+- uc_id / use case / trigger / preconditions / success postcondition
+- user_stories[] の us_id / actor_role / goal
+- scope_id
+- authority_refs[]
+- structure_refs[]
+
+AC Entity dependencyは参照current Authority Entityへ固定します。
+
+US / UC / BehaviorをMachine Entity typeへ追加しません。親chainをAC contentへ含めるため、親意味変更でAC content fingerprintが変わります。
+
+### 9.3 normalized_skill_input
+
+`build-machine-evidence` はqa-workflow / coverage-analysisへ渡すcanonical spec-analysis normalized inputも返します。
 
 ```json
 {
-  "authority_id": "<仕様根拠ID>",
-  "authority_type": "<種別>",
-  "active_content": {"text": "<現在有効な内容>"},
-  "scope": "<適用範囲>",
-  "source_refs": ["SRC-001"],
-  "relations": ["独立"],
-  "related_authority_refs": ["SPEC-002"]
+  "authorities": [{"authority_id":"SPEC-001"}],
+  "acceptance_criteria": [{"ac_id":"AC-001"}]
 }
 ```
 
-規則:
+Agent / LLMがMarkdownからnormalized inputやexpected Entity一覧を再構築しません。
 
-- `情報源 / 正本一覧` と `関連仕様根拠ID` の複数IDは `<br>` 区切り
-- 空参照は空array
-- `関係` は1値を1要素arrayへする
-- 種別は既存 `SPEC / DECISION / 承認済みASM`
-- 09のINF / UNKNOWNはCurrent Effective Authority inputへ含めない
-- normalized input生成後、同Skill package内の `authority_entities.py` builderを呼ぶ
-- artifactの `### Machine Entities: spec-analysis` blockは `machine_entities_block` と完全一致必須
-- LLMがJSON wrapper、fingerprint、expected identityを再生成しない
-
-このAuthority変換はtable valueの固定projectionであり、何をCurrent Effective Authorityへ載せるかはLLMの意味判断です。
-
-behavior Entity規則:
-
-- `user_story`: contentにUS rowを保持し、関連Authority Entityへ依存
-- `use_case`: 関連User Story Entity + Authority Entityへ依存
-- `behavior`: 親Use Case Entity + Authority Entityへ依存
-- `acceptance_criterion`: 親Behavior Entity + Authority Entityへ依存
-- blocked rowは完成済みcurrent Entityとして下流利用しない
-- entity_refはstable IDを使用する
-- hierarchy / Authority ref存在をhelperが検証する
-- semantic identity / classificationはLLM判断
+shared runtime contractの `acceptance_criterion` type / expected Entity / requirement-structure-v2連携は `_09_runtime-entity-and-test-requirement-contracts.md` を正本とします。
 
 ## 10. unknown_links.py contract
 
@@ -766,12 +810,15 @@ production helperのfilesystem / hash / projection / next-id / build-machine-evi
 - missing required file
 - invalid schema version
 - duplicate / unknown stable ref
+- scope applicability / conditional-required file mismatch
 - required UI operation decompositionのmissing table / parent / closure
 - UCごとの正常 / 準正常 / 例外3分類と定義あり / なし / 未定義整合
 - MANIFEST hash mismatch
 - semantic / deterministic projection差分
 - build-machine-evidence内のAuthority部分と既存authority_entities.py結果一致
-- US / UC / Behavior / AC Entityのhierarchy / Authority dependency / fingerprint再計算一致
+- current AC Entity contentへ親US / UC / Behavior chainが固定projectionされること
+- 親US / UC / Behavior変更でAC fingerprintが変わること
+- spec-analysis normalized_skill_input / expected identityがhelper結果から再現できること
 - artifact `Machine Entities: spec-analysis` blockがruntime_contract.pyの `extract_machine_blocks(..., "Machine Entities")` で読めること
 - legacy migration後fixtureのvalidate PASS
 
@@ -782,8 +829,9 @@ production helperのfilesystem / hash / projection / next-id / build-machine-evi
 - current packageを `ui-target-v1` として機械識別できる
 - helperのoperation / input / output / failure contractが一意
 - structured tableのheader / ID / ref列が一意
+- scopeごとのUI操作適用判定と条件付き必須fileの存在を機械検証できる
 - UI操作scopeでUIOP / US / UC / Behavior / AC hierarchyと3分類完全性を機械検証できる
-- 09 → Authority Machine EntityをLLM手組みなしで生成できる
+- 09 → Authority Entity、02 → current AC EntityをLLM手組みなしで生成できる
 - spec-analysis → question-analysisへUNKNOWN集合を手作業なしで渡せる
 - semantic projectionへ過去CHANGELOGを混ぜない
 - deterministic projectionでmulti-file contractを評価できる
