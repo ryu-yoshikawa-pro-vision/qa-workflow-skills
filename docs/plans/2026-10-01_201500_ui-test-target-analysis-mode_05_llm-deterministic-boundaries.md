@@ -3,7 +3,7 @@
 親Plan:
 2026-10-01_201500_ui-test-target-analysis-mode.md
 
-この文書は、UIテスト対象分析モードにおけるLLMと決定論的処理の責務境界を正本とします。helperの正確なCLI I/O、table schema、Machine Entity bridge、filesystem safety、legacy migrationは `2026-10-01_201500_ui-test-target-analysis-mode_06_package-schema-and-helper-contracts.md` を正本とします。
+この文書は、UIテスト対象分析モードにおけるLLMと決定論的処理の責務境界を正本とします。helperの正確なCLI I/O、table schema、filesystem safety、legacy migrationは `2026-10-01_201500_ui-test-target-analysis-mode_06_package-schema-and-helper-contracts.md`、Acceptance Criterion Machine Entity / shared runtime / test-requirement-design連携は `2026-10-01_201500_ui-test-target-analysis-mode_09_runtime-entity-and-test-requirement-contracts.md` を正本とします。
 
 目的はLLMを置き換えることではありません。LLMが仕様理解・文脈解釈・意味判断へ集中できるように、同じ入力から同じ結果を導出できる定型処理だけをSkill-local helper / validatorへ移します。
 
@@ -28,25 +28,28 @@
 | SPEC / DECISION / INFERENCE / UNKNOWN分類 | LLM | 情報源・Authority・文脈から判断する |
 | 現在有効なAuthority解決 | LLM | 既存spec-analysis契約を使用する |
 | PAGE / STATE / VIEW / STEP / MODAL等の意味分類 | LLM | UI意味を判断する。scriptは分類結果の形式だけ検証できる |
+| scopeごとのUI操作有無 / file applicability triggerの意味判断 | LLM | 資料の意味から判断する。scriptは宣言後の固定対応とfile存在だけ検証する |
 | UI操作抽出 / US / UC / Behavior / ACの意味分解 | LLM | UI操作scopeでは必須工程。資料不足を推測補完しない |
-| 正常 / 準正常 / 例外、基本 / 代替 / 例外の意味分類 | LLM | scriptは3分類の完全性と許可値だけ検証する |
+| 正常 / 準正常 / 例外の意味分類 | LLM | scriptは3分類の完全性と許可値だけ検証する |
 | AC→TRの意味対応 / TR分割統合 | LLM | ACの単純言い換えではなく検証責務として判断する |
 | 既存項目と意味的に同一か | LLM | stable IDをreuseする意味判断はLLMが行う |
 | repository差分の意味・重要性 | LLM | 実装事実をAuthorityへ自動昇格しない |
-| optional domain fileが必要か | LLM | 対象仕様の意味・規模から判断する |
+| 案件固有extension fileが必要か | LLM | 標準fileでは責務が混在する独立domainかを判断する。内容量だけを理由に分割しない |
 | 質問がどのUNKNOWNに対応するか | LLM | QとUNKの意味対応を判断する |
 | 仕様回答がどの項目へ影響するか | LLM | scriptが列挙した参照候補を補助情報として使える |
 | ID形式 / duplicate /参照先存在 | deterministic validation | 意味を変えず拒否できる |
+| SCOPE applicability / 条件付き必須fileと実fileの一致 | deterministic validation | LLMが意味判定した結果の固定対応を検証する |
 | UIOP→UC / US→UC / UC→BH / BH→AC closure | deterministic validation | semantic relationを決めず、LLMが作った参照の完全性だけ検証する |
 | UCごとの正常 / 準正常 / 例外3分類 | deterministic validation | 各1行、定義あり/なし/未定義の構造整合を検証する |
 | current AC→TR / disposition closure | test-requirement deterministic runtime | ACを無言で落とさない |
 | version形式 / package内version一致 | deterministic helper / validation | default version policy利用時は次versionも導出できる |
-| required / optional file set | deterministic validation | optional fileを必要と判断するのはLLM |
+| required core / 条件付き必須file set | deterministic validation | trigger該当性はLLM、required / not-applicable / blockedと実file / MANIFEST一致はscript |
 | MANIFEST file list / SHA-256 | deterministic helper | package内容から導出し、LLMに計算させない |
 | current UNKNOWN ID集合 / 件数 | deterministic helper | canonical分析項目から導出する。UNKNOWN本文はLLMが作る |
 | cross-file stable ID参照切れ | deterministic validation | exact ID参照だけを検証する |
 | changed stable IDの参照file候補 | deterministic helper | exact参照から候補を列挙する。意味上の修正要否はLLM |
 | Authority Machine Entity / fingerprint | 既存deterministic helper | authority_entities.pyを正本とする |
+| Acceptance Criterion Machine Entity / spec-analysis normalized input | deterministic helper | ui_target_package.pyがcurrent AC + parent chainから固定projectionする |
 | semantic eval用package projection | deterministic helper | package内容を要約・変更せず連結する |
 | semanticな重複・矛盾・不足 | LLM / semantic eval |文字列一致だけで自動統合しない |
 
@@ -69,7 +72,8 @@ package rootを読み、次をJSONで返します。
 - package version
 - current file list
 - required coreのmissing
-- optional / domain file list
+- file applicability状態
+- extension domain file list
 - canonical analysis item ID集合
 - current UNKNOWN ID集合
 - current UNKNOWN件数
@@ -93,7 +97,7 @@ package rootを読み、次をJSONで返します。
 - MANIFESTのfile set / order / SHA-256がcurrent packageと一致
 - READMEのCurrent payload filesがMANIFESTのpayload file listと一致
 - CHANGELOGの最新version見出しがpackage versionと一致
-- Machine Entity blockを持つ場合、既存authority_entities.py由来の形式と矛盾しないこと
+- Machine Entity blockを持つ場合、Authority + current ACのhelper再生成結果と一致すること
 
 意味的な正しさ、Authority優先順位、PAGEかVIEWか等は検証しません。
 
@@ -119,7 +123,8 @@ current package fileからMANIFEST bodyまたはmachine-readable manifest projec
 - MANIFEST自身は自己hash対象にしない
 - SHA-256はfileのraw bytesから計算する
 - file orderはmodeのcanonical orderに従う
-- optional / domain fileは存在するものだけ含める
+- 条件付き必須fileは00のapplicabilityと一致するものだけ含める
+- extension fileは00へ宣言済みのものだけ含める
 
 #### impact
 
@@ -129,14 +134,15 @@ current package fileからMANIFEST bodyまたはmachine-readable manifest projec
 
 #### build-machine-evidence
 
-09のCurrent Effective Authority tableと02のUS / UC / Behavior / AC structured tableを固定projectionします。
+09のCurrent Effective Authorityと02のcurrent AC + parent US / UC / Behavior chainを固定projectionします。
 
 1. Authority rowを既存 `authority_entities.py` builderへ渡す
-2. User Story / Use Case / Behavior / Acceptance Criterion Entityを決定論生成する
-3. hierarchyとAuthority dependencyをMachine Entity dependenciesへ反映する
-4. Authority + behavior decomposition Entityを1つの `Machine Entities: spec-analysis` blockへcanonical順で統合する
+2. current ACだけを `acceptance_criterion` Machine Entityへ変換する
+3. AC contentへ親US / UC / Behavior / Scope / Authority / structure refsを固定projectionする
+4. Authority + AC Entityを1つの `Machine Entities: spec-analysis` blockへcanonical順で統合する
+5. qa-workflow / coverage-analysisへ渡すcanonical `normalized_skill_input` と `expected_entity_identities` を同じsourceから生成する
 
-何をAuthorityとするか、US / UC / Behavior / ACをどう意味分解するかはLLM判断です。wrapper / dependency / fingerprint / expected identityはhelperが生成します。
+US / UC / Behaviorをglobal Machine Entity typeへしません。何をAuthorityとするか、UI操作やUS / UC / Behavior / ACをどう意味分解するかはLLM判断です。wrapper / content / dependency / fingerprint / normalized machine input / expected identityはhelperが生成します。
 #### project-eval
 
 projection modeを `semantic / deterministic` に固定します。
@@ -160,11 +166,12 @@ semantic / deterministic runnerのdirectory対応は追加せず、この固定p
 - 仕様文章の生成
 - UI操作母集団の意味抽出
 - US / UC / Behavior / ACの意味分解
-- 正常 / 準正常 / 例外、基本 / 代替 / 例外の意味分類
+- 正常 / 準正常 / 例外の意味分類
 - ACとTRの意味的対応 / TR分割統合
 - SPEC / DECISION / INFERENCE / UNKNOWN分類
 - PAGE / VIEW等の意味分類
-- optional domain fileが必要かの判断
+- scopeのUI操作有無 / 条件付き必須file trigger該当性の意味判断
+- 案件固有extension fileが必要かの判断
 - semantic duplicateの統合
 - Authority競合解消
 - repository差分の意味判断
@@ -177,6 +184,7 @@ UI target packageでは、人間向け構造化ビューのentityをstable IDで
 
 最低限のprefix:
 
+- SCOPE-xxx
 - PAGE-xxx
 - STATE-xxx
 - VIEW-xxx
@@ -306,6 +314,7 @@ e2e-test-inspectionへroutingするのは、E2E実装・Playwright等の既存�
 - semantic duplicateを自動mergeするscript
 - PAGE / VIEW分類器
 - User Story / Use Case / Behavior / Acceptance Criteria自動意味分類器
+- US / UC / Behaviorのglobal Machine Entity化
 - 汎用Markdown AST framework
 - 任意文書merge engine
 - ZIP専用runtime
