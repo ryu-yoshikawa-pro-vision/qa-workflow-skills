@@ -69,15 +69,15 @@ PR #14が追加する3 Skill:
 PR #16で追加する差分:
 
 - Trigger: +0
-- Deterministic: +1（SPEC-OUT-003）
-- Semantic: +4（spec-analysis +3 / question-analysis +1）
+- Deterministic: +2（SPEC-OUT-003 / TR-OUT-003）
+- Semantic: +5（spec-analysis +3 / question-analysis +1 / test-requirement-design +1）
 - qa-workflow routing: +8
 
 したがってPR #16実装後の期待値:
 
 - Trigger queries: 488
-- Deterministic output cases: 45
-- Semantic cases: 159
+- Deterministic output cases: 46
+- Semantic cases: 160
 - qa-workflow routing fixtures: 69
 
 ただしこれらはStep 0時点の観測baselineです。repository test / CIでは件数を固定値として正本化せず、PR #14で導入されたcurrent repository / manifestからの動的導出を維持します。
@@ -282,4 +282,4 @@ rebase前の旧mainとの差分を正として実装判断しません。
 - #14成果物を仕様Authorityへ自動昇格していない
 - routingで対象理解とUI/UX評価 / live inspection / formal WCAGを区別できる
 - evaluation / CIは#14の動的導出方式を維持している
-- #16固有のexpected増分がDeterministic +1 / Semantic +4 / routing +8で説明できる
+- #16固有のexpected増分がDeterministic +2 / Semantic +5 / routing +8で説明できる
