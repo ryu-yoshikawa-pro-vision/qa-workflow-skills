@@ -3,7 +3,7 @@
 親Plan:
 2026-10-01_201500_ui-test-target-analysis-mode.md
 
-この文書は、今回追加する「UIテスト対象分析モード」のSkill間責務境界を正本とします。LLMと決定論的処理の内部責務境界は `2026-10-01_201500_ui-test-target-analysis-mode_05_llm-deterministic-boundaries.md`、package schema / helper I/O / legacy migrationは `2026-10-01_201500_ui-test-target-analysis-mode_06_package-schema-and-helper-contracts.md` を正本とします。
+この文書は、今回追加する「UIテスト対象分析モード」のSkill間責務境界を正本とします。LLMと決定論的処理の内部責務境界は `2026-10-01_201500_ui-test-target-analysis-mode_05_llm-deterministic-boundaries.md`、package schema / helper I/O / legacy migrationは `2026-10-01_201500_ui-test-target-analysis-mode_06_package-schema-and-helper-contracts.md`、PR #14後のSkill境界は `2026-10-01_201500_ui-test-target-analysis-mode_07_pr14-baseline-and-integration.md` を正本とします。
 
 ## 1. 解決する問題
 
@@ -37,12 +37,26 @@ AIエージェントからの利用方法は既存のAgent Skills構造をその
 | 回答のSPEC / DECISION / ASM正規化 | question-analysis | 安定UNKNOWN参照を補強 |
 | packageへの回答反映 | spec-analysis | question-analysisの正規化結果を入力に更新 |
 | 生きた実画面のcurrent観測 | test-target-inspection | 変更なし |
+| 保存済みFigma / screenshot / evidenceのUI/UX意味評価 | usability-evaluation | #14責務を維持 |
+| live browserでの使いやすさ / focus / responsive / feedback検査 | usability-inspection | #14責務を維持 |
+| formal WCAG-EM適合性評価 | wcag-conformance-evaluation | #14責務を維持 |
 | repositoryの製品コード事実 | spec-analysisの補助入力 | Authorityへ自動昇格しない。E2E実装分析そのものが必要な場合だけe2e-test-inspectionへroutingする |
 | プロダクトリスク / テスト重点 | test-analysis | 対象外 |
 | テスト要求 / 条件 / ケース | 各既存設計Skill | 対象外 |
 | workflow開始 / 再開 / 変更伝播 | qa-workflow | mode routingのみ追加 |
 
-## 3. modeを使う条件
+## 3. PR #14 Skillとの境界
+
+入力資料が同じでも目的でownerを分けます。
+
+- 仕様・UI構造・状態・業務ルール・UNKNOWNを対象理解packageへ整理 → spec-analysis UIテスト対象分析モード
+- 保存済みFigma / screenshot / evidenceをUI/UX観点で評価 → usability-evaluation
+- live browserを操作して使いやすさ / focus / responsive / feedbackを検査 → usability-inspection
+- WCAG version / levelを指定したformal適合性評価 → wcag-conformance-evaluation
+
+#14成果物は補助evidence / observation / issue候補として参照できますが、それ自体をSPEC / DECISION / approved ASMへ自動昇格しません。product requirement変更が必要ならquestion-analysis / stakeholder decisionを経由します。
+
+## 5. modeを使う条件
 
 modeの選択は「Markdownを要求されたか」ではなく、成果物の目的で判断します。
 
@@ -68,7 +82,7 @@ modeの選択は「Markdownを要求されたか」ではなく、成果物の�
 
 mode選択を「Markdown」「複数ファイル」等の単語一致だけで決めません。
 
-## 4. canonical仕様モデルと構造化ビュー
+## 5. canonical仕様モデルと構造化ビュー
 
 UIテスト対象分析packageでも、既存spec-analysisのcanonical contractを維持します。
 
@@ -79,7 +93,7 @@ UIテスト対象分析packageでも、既存spec-analysisのcanonical contract�
 - Current Effective AuthorityからMachine Entityを生成する既存 `authority_entities.py` 契約を維持する
 - package固有のversion / manifestはAuthority Machine Entityのidentityやfingerprintを置換しない
 
-## 5. UI構造の正規分類
+## 6. UI構造の正規分類
 
 modeでは次の意味を固定します。
 
@@ -131,7 +145,7 @@ Intercom、ご利用ガイド、外部サイト等。
 
 共通404等、本機能専用ではないが遷移・権限制御上重要な共通画面。
 
-## 6. 仕様と実装の分離
+## 7. 仕様と実装の分離
 
 次を必須ルールとします。
 
@@ -143,7 +157,7 @@ Intercom、ご利用ガイド、外部サイト等。
 6. repositoryだけでは決められない仕様を「コード上こうなので仕様もこう」と確定しない
 7. 案件コンテキストが実装をAuthorityと明示した場合だけ、既存Authority解決契約に従って扱う
 
-## 7. 不明点の扱い
+## 8. 不明点の扱い
 
 mode内の仕様UNKNOWNはspec-analysisの安定IDとしてUNK-xxxを使います。
 
@@ -160,7 +174,7 @@ question-analysisは既存契約どおり質問単位のQ-xxxを持ち、spec-an
 
 「一度回答があるが暫定だった論点」を再確認する場合も、同じUNK IDを使います。
 
-## 8. packageとtest-target-inspectionの関係
+## 9. packageとtest-target-inspectionの関係
 
 mode packageは「仕様上どうあるべきか」を中心にします。
 
@@ -174,7 +188,7 @@ modeからcurrent実対象確認が必要になった場合:
 4. 仕様と一致 / 不一致 / 仕様未定義を区別
 5. 観測事実だけでSPEC / DECISIONへ昇格しない
 
-## 9. 進行モード
+## 10. 進行モード
 
 既存qa-workflowのcontinuous / gatedをそのまま使います。
 
@@ -187,7 +201,7 @@ gatedの場合:
 - question-analysis回答待ちでもブロッカーでない範囲はpackage更新可能
 - 次工程はユーザー承認後のみ
 
-## 10. LLMと決定論的処理
+## 11. LLMと決定論的処理
 
 意味判断はLLMに残します。具体的には、SPEC / DECISION / INFERENCE / UNKNOWN、PAGE / VIEW等の分類、semantic identity、Authority競合、optional domainの必要性、repository差分の意味判断をscriptへ固定しません。
 
@@ -195,7 +209,7 @@ gatedの場合:
 
 helperの出力はLLMの再確認候補や構造エラーを示すための補助であり、仕様意味を新しく確定する根拠にはしません。
 
-## 11. 対象外となる誤った統合
+## 12. 対象外となる誤った統合
 
 次は実装しません。
 
