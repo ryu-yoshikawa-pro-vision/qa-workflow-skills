@@ -174,7 +174,9 @@ profile標準prefix以外を使う場合だけ記載します。
 標準ID:
 
 - 通知 / メール → NOTIFY-xxx
-- 外部遷移 / 外部UI → EXT-xxx
+- 外部連携 / 外部遷移イベント → INTERACT-xxx
+
+外部画面そのものは01の `EXT-xxx` がownerであり、05では `関連構造ID` から参照します。
 
 ### 5.7 06_spec_inconsistencies_and_pending.md
 
@@ -237,7 +239,15 @@ UI target profileでは `現在有効か` を `Yes / No` に固定します。
 
 #### Machine Entity（機械証拠）
 
-既存output-templateと同じJSON blockを持ちます。内容はLLMが計算・再構築せず、§9のdeterministic bridge結果をそのまま使用します。
+人間向けheadingとしてこのsectionを持ち、その配下の機械ブロックは既存runtime contractに合わせて次のexact形式を使用します。
+
+`### Machine Entities: spec-analysis`
+
+```json
+{"schema_version":"entity-state-v1","skill":"spec-analysis","entities":[]}
+```
+
+`entities` は§9のdeterministic bridge結果をそのまま使用します。LLMがMachine Entity wrapper / fingerprintを計算・再構築しません。`expected_entity_identities` や `implementation_fingerprint` はhelper responseには保持しますが、artifactの `Machine Entities` block schemaへ混入させません。
 
 ### 5.11 10+ domain files
 
@@ -245,7 +255,7 @@ UI target profileでは `現在有効か` を `Yes / No` に固定します。
 
 structured tableを置く場合:
 
-- primary ID列を持つ
+- primary ID列名を `項目ID` に固定する
 - `関連仕様項目ID` を持つ
 - UI構造へ関連する場合 `関連構造ID` を持つ
 - primary ID prefixは00の `案件固有構造ID` で宣言する
@@ -269,6 +279,7 @@ helperは宣言されたheader名のexact ID参照だけを検証し、proseか�
 - RULE
 - FLOW
 - NOTIFY
+- INTERACT
 - ISSUE
 - IMPL
 
@@ -452,6 +463,7 @@ payload:
 - machine_entities[]
 - expected_entity_identities[]
 - implementation_fingerprint
+- machine_entities_block（`schema_version` / `skill` / `entities` だけを持つartifact保存用object）
 
 AgentがMachine Entity wrapper / content fingerprintを手組みしません。
 
@@ -521,7 +533,7 @@ LLMが09へ「現在有効な仕様根拠」を確定した後、`build-authorit
 - 種別は既存 `SPEC / DECISION / 承認済みASM`
 - 09のINF / UNKNOWNはCurrent Effective Authority inputへ含めない
 - normalized input生成後、同Skill package内の `authority_entities.py` builderを呼ぶ
-- Machine Entity blockはbuilder resultと一致必須
+- artifactの `### Machine Entities: spec-analysis` blockは `machine_entities_block` と完全一致必須
 - LLMがJSON wrapper、fingerprint、expected identityを再生成しない
 
 この変換はtable valueの固定projectionであり、何をCurrent Effective Authorityへ載せるかはLLMの意味判断です。
@@ -646,7 +658,7 @@ legacy packageに明示 `vNN` がある場合、default policyではnext-version
 - Package Schema Version = ui-target-v1
 - Previous Package Version = v14
 
-legacy versionが確定できない場合はLLMが推測せずUNKNOWN / migration noteへ残し、project / userが新package versionを決めるまで完成扱いしません。
+legacy versionが確定できない場合は推測せず、new schema側を `v00` から開始し `Previous Package Version = legacy-unversioned` とします。仕様意味ではなく成果物管理metadataなので、version不明だけを理由に分析全体をblockしません。
 
 ### 14.3 legacy progress file
 
@@ -698,6 +710,7 @@ production helperのfilesystem / hash / projection / next-id / build-authorities
 - MANIFEST hash mismatch
 - semantic / deterministic projection差分
 - build-authoritiesと既存authority_entities.py結果一致
+- artifact `Machine Entities: spec-analysis` blockがruntime_contract.pyの `extract_machine_blocks(..., "Machine Entities")` で読めること
 - legacy migration後fixtureのvalidate PASS
 
 新しいGitHub Actions workflowは作らず、既存runtime / deterministic / semantic CIへ追加します。
