@@ -146,7 +146,7 @@ Intercom、ご利用ガイド、外部サイト等。
 
 profile内の仕様UNKNOWNはspec-analysisの安定IDとしてUNK-xxxを使います。
 
-question-analysisは必要なら質問単位のIDを持てますが、同じ論点を再採番せず、元のUNK-xxxとの対応を保持します。
+question-analysisは既存契約どおり質問単位のQ-xxxを持ち、spec-analysis由来の論点では元のUNK-xxxとの対応を保持します。同じ論点を新しいUNKとして再採番しません。
 
 回答後:
 
