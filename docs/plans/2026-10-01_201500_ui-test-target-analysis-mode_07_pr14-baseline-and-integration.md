@@ -82,7 +82,7 @@ PR #16で追加する差分:
 
 ただしこれらはStep 0時点の観測baselineです。repository test / CIでは件数を固定値として正本化せず、PR #14で導入されたcurrent repository / manifestからの動的導出を維持します。
 
-PR #14 merge後に他PRがmainへ入って値が変わっていた場合、実データを正としてPlan / docsの観測値だけ同期します。Skillごとの期待増分（PR #16はTrigger +0 / Deterministic +1 / Semantic +4 / routing +8）は変更理由がない限り維持します。
+PR #14 merge後に他PRがmainへ入って値が変わっていた場合、実データを正としてPlan / docsの観測値だけ同期します。Skillごとの期待増分（PR #16はTrigger +0 / Deterministic +2 / Semantic +5 / routing +8）は変更理由がない限り維持します。
 
 ## 4. PR #14が追加するSkillとの責務境界
 
@@ -258,6 +258,19 @@ UIテスト対象分析モード固有のPAGE / STATE / VIEW / MODAL等のIDはs
 
 共通IDとして全Skillが参照すべき要件が実装中に発生した場合だけ、目的と影響を明示してcommon変更を再検討します。現Planでは不要です。
 
+### 11.1 shared runtime baseline
+
+PR #14後baselineでは7 Skill-local `runtime_contract.py` がbyte-identicalであることをrepository testが保証する前提です。
+
+Step 0で次を実測します。
+
+- 7コピーの実pathとbyte identity
+- `ALLOWED_ENTITY_TYPES` に `acceptance_criterion` がまだ存在しないこと
+- spec-analysis `_expected_entities()` がAuthorityだけを導出するbaselineであること
+- test-requirement-designのgenerator contractが `requirement-structure-v1` であること
+- Disposition upstream typeがAuthority / Product Risk中心のbaselineであること
+
+PR #16はこのbaselineへ `_09_runtime-entity-and-test-requirement-contracts.md` の変更を適用します。#14 merge後mainで上記が既に変わっていた場合、実装を開始せずPlanをcurrent contractへ同期します。
 ## 12. rebase / conflict gate
 
 PR #14 merge後、PR #16実装開始前に次を必須確認します。
@@ -269,7 +282,8 @@ PR #14 merge後、PR #16実装開始前に次を必須確認します。
 5. qa-workflow routing fixture数を確認
 6. PR #14のREADME / EVALS / qa-workflow / CI contractがPlan記載と一致すること
 7. spec-analysis / question-analysis / test-target-inspectionが#14後に追加変更されていないこと
-8. baselineに差分があれば、本Planを実データへ同期してから実装開始
+8. 7 runtime_contract.py / requirement_structure.py / qa-workflow expected Entity contractが§11.1 baselineと一致すること
+9. baselineに差分があれば、本Planを実データへ同期してから実装開始
 
 rebase前の旧mainとの差分を正として実装判断しません。
 
@@ -283,3 +297,4 @@ rebase前の旧mainとの差分を正として実装判断しません。
 - routingで対象理解とUI/UX評価 / live inspection / formal WCAGを区別できる
 - evaluation / CIは#14の動的導出方式を維持している
 - #16固有のexpected増分がDeterministic +2 / Semantic +5 / routing +8で説明できる
+- shared runtime / requirement-structure-v2の変更がPR #14後baselineとの差分として明示され、7コピーbyte identityを維持している
