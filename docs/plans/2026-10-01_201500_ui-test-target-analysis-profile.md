@@ -1,6 +1,6 @@
-# UIテスト対象分析プロファイル・外部Agent利用Plan
+# UIテスト対象分析プロファイル実装Plan
 
-このPlanは、現在の19 Skill構成を維持したまま、テスト設計前の「仕様理解・テスト対象整理」を再現可能なSkill契約として追加し、ChatGPT等の外部Agentクライアントからqa-workflow-skillsを必要範囲だけ利用できる導線を整備するための実装計画です。
+このPlanは、現在の19 Skill構成を維持したまま、テスト設計前の「仕様理解・テスト対象整理」を再現可能なAgent Skill契約として追加するための実装計画です。特定のAI製品向け連携機構は追加せず、既存のAgent Skills構造の中でAIエージェントが利用できる形にします。
 
 ## 対象ブランチ
 
@@ -17,9 +17,7 @@ feat/ui-test-target-analysis-profile
   - question-analysis: 不明点・矛盾分類、回答正規化、再開先
   - qa-workflow: 開始点、再利用、routing、変更伝播、完了
   - test-target-inspection: 生きた実対象のcurrent UI / ふるまい観測
-- Agent Skills Specificationは共通Skill-to-Skill APIやGitHub remote loading方式を規定しない
-- リポジトリ内にChatGPT / OpenCode向けbootstrap実装は現在存在しない
-- READMEではSkill利用だけならskills/<skill-name>/を単独移植できる既存方針を持つ
+- 各Skillは既存どおり `skills/<skill-name>/SKILL.md` を持つAgent Skills形式で管理され、AIエージェントが必要なSkillを利用する前提を維持する
 
 ## 背景
 
@@ -48,8 +46,7 @@ feat/ui-test-target-analysis-profile
 3. question-analysisの回答正規化と連携し、既存UNKNOWNを再質問・再採番せず更新できるようにする
 4. qa-workflowから「仕様理解packageだけ欲しい」要求へ最短routingできるようにする
 5. test-target-inspectionの「生きた実対象観測」と役割を混同しない
-6. ChatGPT等の外部AgentがGitHub上のqa-workflow-skillsを利用するための最小bootstrap手順を、Agent Skills標準と混同せず文書化する
-7. 既存19 Skill、runtime、artifact graph、Regression / Exploration / QA Knowledge契約を壊さない
+6. 既存19 Skill、runtime、artifact graph、Regression / Exploration / QA Knowledge契約を壊さない
 
 ## 固定方針
 
@@ -92,11 +89,11 @@ version更新時は変更ファイルだけではなく、そのversionの完全
 
 前versionの内容を参照しなければ現在状態を理解できない構造にしません。
 
-### 7. ChatGPT連携はconsumer integrationでありSkill runtimeではない
+### 7. AIエージェント用Skillとして既存Agent Skills構造を維持する
 
-ChatGPT connectorやGitHub remote fetchはAgent Skills Specificationの一部として実装しません。
+今回追加するprofileは、既存Skillと同じく `SKILL.md` / `references/` / `assets/` の段階的開示で利用できるようにします。
 
-docs/integrationsへconsumer向けbootstrapを置き、外部Agentがqa-workflow → 必要Skill → references/assetsの順に段階的開示できる手順だけを提供します。
+特定のAI製品、connector、remote loader、bootstrap runtimeは追加しません。AIエージェントがSkillを利用する方法そのものは既存のAgent Skills利用前提を継続します。
 
 ## Plan分割
 
@@ -104,8 +101,8 @@ docs/integrationsへconsumer向けbootstrapを置き、外部Agentがqa-workflow
   - 2026-10-01_201500_ui-test-target-analysis-profile_01_scope-and-responsibilities.md
 - spec-analysisのUIテスト対象分析package:
   - 2026-10-01_201500_ui-test-target-analysis-profile_02_spec-analysis-package.md
-- question-analysis / qa-workflow / ChatGPT bootstrap統合:
-  - 2026-10-01_201500_ui-test-target-analysis-profile_03_workflow-and-consumer-integration.md
+- question-analysis / qa-workflow統合:
+  - 2026-10-01_201500_ui-test-target-analysis-profile_03_workflow-integration.md
 - 評価、CI、実装順序、完了条件:
   - 2026-10-01_201500_ui-test-target-analysis-profile_04_evaluation-ci-implementation-order.md
 
@@ -144,25 +141,17 @@ docs/integrationsへconsumer向けbootstrapを置き、外部Agentがqa-workflow
 
 「テスト設計前の仕様理解package」はspec-analysisから開始し、未解決事項があればquestion-analysisへ進み、回答反映後spec-analysisへ戻すroutingを追加します。
 
-### consumer integration
-
-新規候補:
-- docs/integrations/chatgpt-github-bootstrap.md
-
-外部Agentがrepositoryのmainまたは明示commitから必要Skillだけを段階的に読む方法を記載します。
 
 ## 対象外
 
-- ChatGPT製品へSkillを自動installする仕組み
-- GitHub connector自体の実装
+- 特定のAI製品向けintegration / connector / remote loader
 - 新しいSkill-to-Skill API
-- 既存19 Skillを一括remote downloadするruntime
 - 案件固有の仕様資料をqa-workflow-skills repoへ保存する仕組み
 - 任意の複数Markdownをmergeする汎用document framework
 - test-analysis以降のテスト設計ロジック変更
 - test-target-inspectionのbrowser観測契約変更
 - Agent Skills Specificationの独自拡張
-- ZIP生成を必須とする特定ChatGPT環境依存runtime
+- ZIP生成を必須とする特定AIエージェント環境依存runtime
 
 ## 成功条件
 
@@ -174,6 +163,6 @@ docs/integrationsへconsumer向けbootstrapを置き、外部Agentがqa-workflow
 - 通常のspec-analysis出力は従来どおり利用できる
 - test-target-inspectionの責務を侵食しない
 - qa-workflowが最短経路でprofileを選択できる
-- consumer bootstrapがrepositoryを正本として必要Skillだけを読む手順を提供する
+- profileが既存Agent Skills形式のままAIエージェントから利用できる
 - 既存Agent Skills検証、trigger、semantic、deterministic / workflow routing回帰がPASSする
 - README / EVALS等の現在値を変更した場合は実データと一致する
