@@ -88,9 +88,9 @@ mode選択を「Markdown」「複数ファイル」等の単語一致だけで�
 
 対象scopeにユーザー / operatorによるUI操作が存在する場合、US → UC → Behavior → ACの順で分析します。資料不足は `not-applicable` の理由にせずUNKNOWN / blockedへします。UI操作が存在しない表示専用・非UI scopeのみnot-applicableを許可します。
 
-正常 / 準正常 / 例外はUse Case仕様の完全性確認軸であり、テスト技法ではありません。Gherkinは本モードへ導入しません。詳細は `_08_behavior-decomposition-and-acceptance-traceability.md` を正本とします。
+正常 / 準正常 / 例外はUse Case仕様の完全性確認軸であり、テスト技法ではありません。詳細は `_08_behavior-decomposition-and-acceptance-traceability.md` を正本とします。
 
-## 7. canonical仕様モデルと構造化ビュー
+## 6. canonical仕様モデルと構造化ビュー
 
 UIテスト対象分析packageでも、既存spec-analysisのcanonical contractを維持します。
 
