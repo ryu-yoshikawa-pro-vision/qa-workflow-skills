@@ -164,7 +164,7 @@ AIエージェントは利用環境で提供される通常のSkill読み込み�
 
 ## 4. README更新
 
-READMEへ変更が必要な場合は、UIテスト対象分析profileがspec-analysisの条件付きprofileであることだけを簡潔に追記します。
+READMEへ、UIテスト対象分析profileがspec-analysisの条件付きprofileであることと、詳細契約の参照先を簡潔に追記します。通常spec-analysisを置換しないことも明記します。
 
 特定AI製品の利用手順は追加しません。
 
