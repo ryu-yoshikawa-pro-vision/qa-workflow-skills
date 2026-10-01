@@ -218,7 +218,6 @@ ID: `AC-001` ～ `AC-999`
 - current ACは1件以上のcurrent Authority itemへ追跡する
 - 元Authorityに存在しない期待値をACに追加しない。必要ならINFERENCE / UNKNOWNへ戻す
 
-Gherkin / Given-When-Then表現は本モードへ導入しません。ACの正規表現は上記tableだけです。
 
 ## 9. ID / semantic identity
 
@@ -433,8 +432,6 @@ legacy UI target packageにUS / UC / Behavior / ACが存在しない場合でも
 
 ## 18. 対象外
 
-- Gherkin / Given-When-Then表現
-- Gherkin parser / Cucumber integration
 - US / UC / ACを別Skillへ分離すること
 - 正常 / 準正常 / 例外を新しいテスト技法にすること
 - ACからテストケースを直接生成すること
@@ -453,4 +450,3 @@ legacy UI target packageにUS / UC / Behavior / ACが存在しない場合でも
 - current AC変更がTRのfreshnessへ伝播する
 - current ACがTRまたは明示的dispositionへ閉じる
 - factor / value / combinationはtest-condition-designへ残る
-- Gherkinを追加していない
