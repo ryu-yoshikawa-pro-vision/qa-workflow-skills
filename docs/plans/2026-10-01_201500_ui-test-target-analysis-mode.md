@@ -125,6 +125,8 @@ version更新時は変更ファイルだけではなく、そのversionの完全
   - 2026-10-01_201500_ui-test-target-analysis-mode_06_package-schema-and-helper-contracts.md
 - PR #14 baseline / integration:
   - 2026-10-01_201500_ui-test-target-analysis-mode_07_pr14-baseline-and-integration.md
+- UI操作の振る舞い分解 / Acceptance Criteria traceability:
+  - 2026-10-01_201500_ui-test-target-analysis-mode_08_behavior-decomposition-and-acceptance-traceability.md
 
 各詳細Planが担当範囲の正本です。本親Planへ詳細契約を重複記載しません。
 
@@ -145,6 +147,20 @@ version更新時は変更ファイルだけではなく、そのversionの完全
 - UI target package helper用repository unit test
 
 既存 `skills/spec-analysis/scripts/authority_entities.py` は変更要否を確認し、既存contractで足りる場合は変更しません。Machine Entity生成の正本として再利用します。
+
+### test-requirement-design
+
+変更:
+- skills/test-requirement-design/SKILL.md
+- skills/test-requirement-design/references/guidance.md
+- skills/test-requirement-design/assets/output-template.md
+- skills/test-requirement-design/scripts/requirement_structure.py
+- skills/test-requirement-design/evals/deterministic/*
+- skills/test-requirement-design/evals/semantic/*
+- skills/test-requirement-design/evals/output/*
+- runtime / repository contract tests
+
+目的はcurrent ACをTRまたは明示的dispositionへ閉じ、AC変更をTR freshnessへ伝播させることです。TRの責務をACの言い換えへ変更しません。
 
 ### question-analysis
 
@@ -189,7 +205,7 @@ PR #14後のCIは `skills/*/scripts` を動的compileするため、helper compi
 - 新しいSkill-to-Skill API
 - 案件固有の仕様資料をqa-workflow-skills repoへ保存する仕組み
 - 任意の複数Markdownをmergeする汎用document framework
-- test-analysis以降のテスト設計ロジック変更
+- test-analysis / test-condition-design / test-case-designの責務変更。test-requirement-designにはAC traceability / closureだけを追加する
 - test-target-inspectionのbrowser観測契約変更
 - Agent Skills Specificationの独自拡張
 - ZIP専用runtime。archive出力は利用Agentのartifact機能で行い、Skillの正規処理には含めない
@@ -211,5 +227,8 @@ PR #14後のCIは `skills/*/scripts` を動的compileするため、helper compi
 - PR #14後のAgent Skills検証、trigger、semantic、deterministic / workflow routing回帰がPASSする
 - README / EVALS等の現在値を変更した場合はPR #14後のcurrent repositoryから導出した実データと一致する
 - PR #14のusability / WCAG finding・observation・resultを仕様Authorityへ自動昇格しない
+- UI操作scopeではUS → UC → Behavior → ACが完全に分析され、情報不足はnot-applicableへ逃げずUNKNOWN / blockedとして残る
+- current ACがTRまたは明示的dispositionへ閉じ、AC変更がTR freshnessへ伝播する
+- Gherkin / Given-When-Thenを本モードへ導入していない
 - LLMは仕様意味・UI意味・semantic identity判断に集中し、version / hash /参照整合 / UNKNOWN件数 / MANIFEST等の定型処理はhelper / validatorで補助・検証される
 - helperがsemantic判断を代替せず、通常spec-analysisの柔軟性を損なわない
