@@ -98,7 +98,7 @@ profile packageでも既存 `assets/output-template.md` のcanonical契約を維
 
 - `09_authority_and_traceability.md` は既存output-templateの以下を正本として保持する
   - 情報源 / 正本参照一覧
-  - 分析項目
+  - 分析項目（UI target profileでは `現在有効か=Yes / No` を固定値として使用する）
   - 現在有効な仕様根拠
   - 後続Skillへの補足
   - Machine Entity（機械証拠）
@@ -250,7 +250,7 @@ DB値やAPI responseをUI期待結果としてテストケース化しません�
 
 ### 07_current_unknowns.md
 
-09の分析項目でcurrentなUNKNOWNだけを人間向けに一覧化します。
+09の分析項目で `分類=UNKNOWN` かつ `現在有効か=Yes` のUNKNOWNだけを人間向けに一覧化します。解消済みUNKは09に `現在有効か=No` でlineageを残し、07のcurrent一覧から外します。
 
 別節に回答反映済みを残してもよいですが、現在確認対象と解消済みを混ぜません。
 
@@ -314,12 +314,13 @@ default policy:
 default policyでは `ui_target_package.py next-version` が次versionを導出します。
 
 ユーザー / projectが別version policyを明示した場合はそちらを優先し、helperは指定versionのpackage内一致だけを検証します。何をmaterial updateとしてversion upするかの意味判断はproject policyまたはLLMに残し、presentationだけの差分までhelperが自動判定しません。
+
 ## 6. 更新契約
 
 回答や新資料が来た場合:
 
 1. LLMが変更されたAuthority / DECISION / ASMを解決する
-2. LLMが影響するcanonical stable item / UNKを更新する
+2. LLMが影響するcanonical stable item / UNKを更新する。UNKNOWN解消時は元UNKを `現在有効か=No` にし、確定内容を分類に合う新stable IDとして追加してlineageを保持する
 3. 09_authority_and_traceability.mdのcanonical modelを更新する
 4. `ui_target_package.py impact` でchanged stable IDのexact参照先を再確認候補として列挙する
 5. LLMが候補fileを確認し、意味上変更が必要な01〜08 / domain fileだけを更新する
@@ -335,6 +336,7 @@ default policyでは `ui_target_package.py next-version` が次versionを導出�
 helperが列挙したimpact候補は再確認対象であり、変更必須という意味判断ではありません。LLMが仕様意味を判断します。
 
 同じ回答を複数ファイルへ機械コピーしません。canonical itemと構造化ビューの追跡を使い、必要な意味だけを反映します。
+
 ## 7. 大規模資料の分割規則
 
 次の場合は案件固有ファイルへ分割できます。
