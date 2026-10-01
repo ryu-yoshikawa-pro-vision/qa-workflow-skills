@@ -55,6 +55,7 @@ PR #16後の期待増分:
 - field validation
 - notification / external interaction
 - Q&A decision
+- 複数の分析対象機能scope（UI操作あり / なし / 未確定を含む）
 - 複数のユーザーUI操作
 - 正常 / 準正常 / 例外のうち、定義あり / なし / 未定義が混在するUse Case
 - repository補助情報と仕様-実装差分
@@ -69,9 +70,11 @@ PR #16後の期待増分:
 - 直交STATEを無理に排他化しない
 - field / notification / external interactionを仕様上該当する構造化viewへ整理する
 - repository差分を実装状況へ分離
-- UI操作母集団を抽出し、US → UC → Behavior → ACの順で分解する
+- scopeごとのUI操作判定を行い、UI操作ありscopeでUI操作母集団を抽出してUS → UC → Behavior → ACの順で分解する
 - UI操作があるのに資料不足の場合はnot-applicableへ逃げずUNKNOWN / blockedへする
-- 各UCで正常 / 準正常 / 例外を全て検討し、なし / 未定義を区別する
+- 各current UCで正常 / 準正常 / 例外を全て検討し、なし / 未定義を区別する
+- blocked UCへ無意味な3分類を生成しない
+- 非操作起点のUI挙動をnot-applicableを理由に落とさない
 - ACで具体値・組合せ・テストケースへ先回りしない
 - canonical stable itemへの追跡を維持する
 - test condition / caseへ進まない
@@ -105,8 +108,10 @@ semantic rubricへはmode固有の次の観点だけを追加し、既存SPEC cr
 - UI構造分類の妥当性
 - implementation status分離
 - versioned package更新の整合
+- scope適用判定の妥当性
 - UI操作scopeのUS / UC / Behavior / AC分解の完全性
 - UI操作がないscopeでの非適用判断の妥当性
+- 非操作起点UI挙動を通常spec-analysisへ残す妥当性
 
 ### 複数Markdown packageのevaluation projection
 
@@ -225,7 +230,7 @@ expected start / resume Skillを明示し、全Skill固定順実行へ回帰し�
 
 repository unit testで最低限次を確認します。
 
-- required core / optional file set
+- required core / 条件付き必須file applicability / extension file declaration
 - package root外path拒否
 - package内version一致
 - canonical / structural ID形式・duplicate
@@ -237,8 +242,9 @@ repository unit testで最低限次を確認します。
 - domain file命名
 - next-idがsemantic identityを判断せず、new指定後だけ既知ID最大値から次番号を返すこと
 - impactがexact referenceだけから候補fileを返し、semantic変更を勝手に決定しないこと
-- UI操作scopeのUIOP / US / UC / Behavior / AC hierarchy / closure / 3分類整合
-- build-machine-evidenceがAuthority + US / UC / Behavior / AC Entityを決定論生成すること
+- scope applicability、UI操作scopeのUIOP / US / UC / Behavior / AC hierarchy / closure / current UCの3分類整合
+- build-machine-evidenceがAuthority + current AC Entity、spec-analysis normalized_skill_input、expected identityを決定論生成すること
+- 親US / UC / Behavior変更でAC Entity fingerprintが変わること
 - project-evalが内容を変更せずcanonical順に連結すること
 
 ### 8.2 question-analysis production helper
@@ -269,11 +275,12 @@ QとUNKの意味的同一性は検証しません。
 - PAGE / VIEW / STATE / MODAL等の意味分類
 - semantic identity / reuse判断
 - Authority競合解消
-- optional domain fileの必要性
+- scopeのUI操作有無 / 条件付き必須file trigger該当性
+- 案件固有extension fileの必要性
 - semantic duplicate /矛盾の判定
 - repository差分の意味的な重要性
 - US / UC / Behavior / ACの意味分解
-- 正常 / 準正常 / 例外、基本 / 代替 / 例外の意味分類
+- 正常 / 準正常 / 例外の意味分類
 - ACとTRの意味的対応 / TR分割統合
 
 これらは「後からvalidator化する候補」ではありません。機械化するとLLMの柔軟性を損なうため、意味判断として残します。
@@ -336,7 +343,7 @@ Step 0でmainの現在値を再確認し、上記差分がそのまま適用可�
 - UI target用途ではspec-analysis modeを選択する
 - mode referenceを読む
 - repository事実を仕様Authority化しない
-- package構造を作れ、`ui_target_package.py build-machine-evidence` でAuthority + US / UC / Behavior / AC Machine Entityへ閉じられる
+- package構造を作れ、`ui_target_package.py build-machine-evidence` でAuthority + current AC Machine Entity、spec-analysis normalized_skill_inputへ閉じられる
 - question-analysisが必要論点だけ扱う
 - test-analysisへ自動進行しない
 - outputがmodeの品質ゲートを満たす
@@ -364,11 +371,13 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 
 - SKILL.mdに目的ベースの条件付きResource導線
 - references/ui-test-target-analysis.md
-- required / optionalを分けたpackage assets
+- required core / 固定triggerの条件付き必須 / 宣言制extensionを分けたpackage assets
 - 09_authority_and_traceability.mdで既存canonical spec-analysis contractを維持
 - skills/spec-analysis/scripts/ui_target_package.py
+- 7 Skill-local runtime_contract.pyへ `acceptance_criterion` / `acceptance_refs` / spec-analysis expected ACをbyte-identicalに追加
 - 09から既存authority_entities.pyへ入力できることを確認
-- helper unit / portability test
+- current ACだけをMachine Entity化し、US / UC / Behaviorをglobal Entity typeへしないことを確認
+- helper unit / portability / runtime contract byte-identity test
 
 この時点ではquestion-analysis / qa-workflowは変更しません。
 
@@ -395,16 +404,24 @@ mode単体が成立してからworkflowへ接続します。
 - 既存output fixture 1件へmapping追加 + false-pass unit test
 - question semantic caseを1件追加し合計3件へ
 
-### Step 4: test-requirement-design AC traceability
+### Step 4: test-requirement-design AC traceability / requirement-structure-v2
 
-- output templateへ `関連AC ID` を追加
+- generator contractを `requirement-structure-v1` → `requirement-structure-v2` へ更新
+- output templateへ `関連AC ID` と上流種別 `Acceptance Criteria` を追加
 - guidanceへcurrent AC closure / ACとTRの責務差を追加
-- requirement_structure入力へ `acceptance_criteria[]`、TR draftへ `acceptance_refs[]` を必須fieldとして追加
-- ACなしworkflowは空arrayで明示し、optional fieldにはしない
-- artifact modeでcurrent spec-analysis / acceptance_criterion Entityへ依存
-- current ACをTRまたはdispositionへ閉じる
+- requirement_structure top-levelへ `acceptance_criteria[]`、TR draftへ `acceptance_refs[]` を必須fieldとして追加
+- ACなしworkflowは空arrayで明示し、field省略を許可しない
+- artifact modeでcurrent `spec-analysis / acceptance_criterion` Entityへ依存
+- ACをDisposition upstream typeとして許可し、ownerをspec-analysisへ固定
+- current ACをTRまたはDispositionへ閉じる
+- TR Entity content / dependencyへacceptance_refsを保存
+- repository内の `requirement-structure-v1` 固定参照をcurrent v2へ同期
+- v1 evidenceをv2 current evidenceとして読み替えない
+- AC本文 / 親Behavior / 親UC / 親US / Authority変更のfreshness regressionを追加
+- partial rerunでscope外TRがchanged AC依存のままcurrentにならない regressionを追加
 - TR-OUT-003 / TR-SEM-003を追加
-- existing TR fixtures / runtime testsを新schemaへ同期
+- existing TR fixtures / runtime / portability / vertical integration testsをv2 schemaへ同期
+
 ### Step 5: qa-workflow routing
 
 - mode request routing
@@ -418,15 +435,15 @@ mode単体が成立してからworkflowへ接続します。
 
 - current packageが `ui-target-v1` として識別できること
 - helper CLI JSON contract / failure / limit / filesystem safety
-- UI操作scopeのUS / UC / Behavior / AC exact schema / closure / Machine Entity
-- exact table schema / stable ref / MANIFEST / Machine Entity bridge
+- scope / file applicability、UI操作scopeのUS / UC / Behavior / AC exact schema / closure / AC-only Machine Entity
+- exact table schema / stable ref / MANIFEST / Authority + AC Machine Entity bridge / normalized_skill_input
 - legacy vNN → current schema migration fixture
 - legacy progress情報がREADME / qa-workflow / CHANGELOGへ正しく分配されること
 
 ### Step 7: deterministic / semantic boundary validation
 
 - LLMが意味判断すべき項目をhelperが自動決定していないこと
-- US / UC / Behavior / ACの意味分類とAC→TRの意味対応をscriptが決定していないこと
+- scope applicability / US / UC / Behavior / ACの意味分類とAC→TRの意味対応をscriptが決定していないこと
 - helperが返すimpactは再確認候補であり変更必須判定ではないこと
 - normal spec-analysisがmode依存になっていないこと
 - helperがSkill package単体コピーで実行できること
@@ -443,9 +460,11 @@ mode単体が成立してからworkflowへ接続します。
 
 ### Step 9: 実Agent smoke
 
-- UI target package scenario（canonical Authority / Machine Entityを含む）
+- UI target package scenario（canonical Authority + current AC Machine Entityを含む）
 - question-analysis回答反映からspec-analysis package更新までのscenario
-- UI操作からUS / UC / Behavior / ACを分析しAC→TRまで追跡するscenario
+- 複数scopeの適用判定からUI操作→US / UC / Behavior / ACを分析しAC→TRまで追跡するscenario
+- 親Behavior / UC / US変更でAC fingerprintが変わり関連TRがstaleになるscenario
+- partial rerunでscope外TRがchanged AC参照によりstaleになるscenario
 - UI操作はあるが仕様不足のためUNKNOWN / blockedへ止めるscenario
 - semantic evaluation projection scenario
 - deterministic helperが構造エラーを返してもLLMの意味判断を勝手に上書きしないscenario
@@ -470,14 +489,16 @@ mode単体が成立してからworkflowへ接続します。
 - normal spec-analysisとmodeの選択境界が明確
 - UI構造分類が定義済み
 - versioned complete package契約が定義済み
-- package内にcanonical Authority / traceability正本があり、既存Machine Entity契約へ閉じる
+- package内にcanonical Authority / traceability正本があり、Authority + current ACだけを既存Machine Entity契約へ閉じる
 - UNKNOWN answer lifecycleが定義済み
 - repo implementation status分離が定義済み
 - question-analysisのUNKNOWN lineageがsemantic + production helper + deterministic evalで確認済み
 - qa-workflow routing / resumeと#14の3 Skillとの誤routing境界がrouting case / independent candidateで確認済み
 - multi-file packageがproduction helperのevaluation projection経由で既存semantic runnerにより評価可能
-- version / UNKNOWN件数 / stable ref / MANIFEST / SHA-256 / behavior hierarchy / 3分類完全性等の定型整合をproduction helperで検証できる
-- current ACがtest-requirement-designでTRまたはdispositionへ閉じ、AC Entity変更がTR freshnessへ伝播する
+- version / UNKNOWN件数 / stable ref / MANIFEST / SHA-256 / scope / file applicability / behavior hierarchy / current UCの3分類完全性等の定型整合をproduction helperで検証できる
+- current ACがrequirement-structure-v2でTRまたはDispositionへ閉じ、AC / 親Behavior / 親UC / 親US / Authority変更が関連TR freshnessへ伝播する
+- 7 Skill-local runtime_contract.pyがbyte-identicalのままacceptance_criterionを扱える
+- partial rerunでchanged ACへ依存するscope外TRをcurrent扱いしない
 - spec-analysis / question-analysis production helperがSkill package単体で実行可能
 - test-target-inspectionへのcurrent UI分岐が維持される
 - existing CI / evalが全PASS
