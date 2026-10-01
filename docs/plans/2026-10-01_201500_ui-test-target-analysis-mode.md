@@ -229,6 +229,5 @@ PR #14後のCIは `skills/*/scripts` を動的compileするため、helper compi
 - PR #14のusability / WCAG finding・observation・resultを仕様Authorityへ自動昇格しない
 - UI操作scopeではUS → UC → Behavior → ACが完全に分析され、情報不足はnot-applicableへ逃げずUNKNOWN / blockedとして残る
 - current ACがTRまたは明示的dispositionへ閉じ、AC変更がTR freshnessへ伝播する
-- Gherkin / Given-When-Thenを本モードへ導入していない
 - LLMは仕様意味・UI意味・semantic identity判断に集中し、version / hash /参照整合 / UNKNOWN件数 / MANIFEST等の定型処理はhelper / validatorで補助・検証される
 - helperがsemantic判断を代替せず、通常spec-analysisの柔軟性を損なわない
