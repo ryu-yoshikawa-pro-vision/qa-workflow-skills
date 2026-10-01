@@ -190,7 +190,7 @@ QとUNKの意味的同一性は検証しません。
 - spec-analysis: UI target packageのcanonical table / stable ref contractを評価
 - question-analysis: known_unknown_ids / expected_related_unknownsを評価
 - production helperをimportしてexpectedを生成しない
-- deterministic output case数は各Skill2件の現行38件を維持し、既存fixtureを拡張して検証する
+- spec-analysisはprofile固有 `SPEC-OUT-003` を追加して2→3件とし、question-analysisは既存2件のfixture拡張で維持する。全体は38→39件
 
 ### 6.4 semanticに残すもの
 
@@ -225,7 +225,9 @@ QとUNKの意味的同一性は検証しません。
 
 - Skill数: 19のまま
 - trigger query: 428のまま
-- deterministic output case: 38のまま
+- deterministic output case: 38 → 39
+  - spec-analysis: 2 → 3
+  - question-analysis: 2のまま
 - semantic case: 72 → 76
   - spec-analysis: 2 → 5
   - question-analysis: 2 → 3
@@ -261,7 +263,7 @@ Step 0でmainの現在値を再確認し、上記差分がそのまま適用可�
 - UI target用途ではspec-analysis profileを選択する
 - profile referenceを読む
 - repository事実を仕様Authority化しない
-- package構造を作れ、09_authority_and_traceability.mdから既存Authority Machine Entityへ閉じられる
+- package構造を作れ、09_authority_and_traceability.mdから `ui_target_package.py build-authorities` → 既存authority_entities.pyでAuthority Machine Entityへ閉じられる
 - question-analysisが必要論点だけ扱う
 - test-analysisへ自動進行しない
 - outputがprofileの品質ゲートを満たす
@@ -299,7 +301,8 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 
 - SPEC-SEM-003～005
 - profile固有rubric差分
-- production ui_target_package.py project-evalのunit test
+- production ui_target_package.py `project-eval` のsemantic / deterministic両projection unit test
+- `SPEC-OUT-003` package fixtureをdeterministic projectionして既存deterministic runnerへ入力
 - projectionしたpackageを既存semantic runnerへ渡せることを確認
 - semantic countをspec-analysis=5へ同期
 - Agent Skills structure validation
@@ -326,14 +329,22 @@ profile単体が成立してからworkflowへ接続します。
 - routing_candidate_outputs.jsonへ対応する独立candidate 5件追加
 - routing fixture合計66件へ同期
 
-### Step 5: deterministic / semantic boundary validation
+### Step 5: package schema / migration / helper contract validation
+
+- current packageが `ui-target-v1` として識別できること
+- helper CLI JSON contract / failure / limit / filesystem safety
+- exact table schema / stable ref / MANIFEST / Machine Entity bridge
+- legacy vNN → current schema migration fixture
+- legacy progress情報がREADME / qa-workflow / CHANGELOGへ正しく分配されること
+
+### Step 6: deterministic / semantic boundary validation
 
 - LLMが意味判断すべき項目をhelperが自動決定していないこと
 - helperが返すimpactは再確認候補であり変更必須判定ではないこと
 - normal spec-analysisがprofile依存になっていないこと
 - helperがSkill package単体コピーで実行できること
 
-### Step 6: cross-repository validation
+### Step 7: cross-repository validation
 
 - 全19 Skill構造
 - trigger
@@ -343,14 +354,14 @@ profile単体が成立してからworkflowへ接続します。
 - docs current count
 - git diff --check
 
-### Step 7: 実Agent smoke
+### Step 8: 実Agent smoke
 
 - UI target package scenario（canonical Authority / Machine Entityを含む）
 - question-analysis回答反映からspec-analysis package更新までのscenario
 - semantic evaluation projection scenario
 - deterministic helperが構造エラーを返してもLLMの意味判断を勝手に上書きしないscenario
 
-### Step 8: final review
+### Step 9: final review
 
 次を確認します。
 
@@ -382,4 +393,5 @@ profile単体が成立してからworkflowへ接続します。
 - existing CI / evalが全PASS
 - 実Agent smokeがPASS
 - current repository counts / docsが同期
+- package schema / helper I/O / migration contractが `_06_package-schema-and-helper-contracts.md` と実装で一致
 - 意味判断を固定するrule engine / generic document framework / ZIP runtimeを追加していない
