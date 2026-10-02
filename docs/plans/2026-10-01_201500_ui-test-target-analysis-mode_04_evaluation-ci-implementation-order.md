@@ -255,6 +255,8 @@ repository unit testで次を必須確認します。
 - domain file命名
 - next-idがsemantic identityを判断せず、UI target mode所有の `SRC / SPEC / INF / UNK` + structural prefixについてpackage rootのcurrent structured row + CHANGELOG stable ID履歴から次番号を返し、Agentへknown ID集合を要求しないこと
 - `DEC / ASM` をUI target modeのnext-idが採番しないこと
+- DEC / ASMはCHANGELOG / impactの追跡可能stable IDとして受理し、Project Contextがownerの場合だけproject_context_ids.pyで採番すること
+- Project Context以外の明示ownerをProject Contextへ複製せず、owner未採番時にLLM hand-numberingへfallbackしないこと
 - 同一prefixの複数new IDで、返却IDをstructured rowへ反映してから次のnext-idを呼ぶと重複せず単調に採番されること
 - current viewから消えた過去IDもCHANGELOG履歴に存在する限り再利用しないこと
 - resolved UNKNOWNの `解消先ID` がcurrent SPEC / DECISION / 承認済みASMへ閉じること
@@ -412,7 +414,7 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - variable structured tableはheader-only、固定applicability rowだけ事前配置し、例示stable IDを置かない
 - 09_authority_and_traceability.mdで既存canonical spec-analysis contractを維持
 - skills/spec-analysis/scripts/ui_target_package.py
-- 既存repository byte-identity契約の対象である7 Skill-local `runtime_contract.py` へ `acceptance_criterion` / `acceptance_refs` / spec-analysis expected ACをbyte-identicalに追加
+- 既存repository byte-identity契約の対象である7 Skill-local `runtime_contract.py` へ `acceptance_criterion` / `acceptance_refs` / spec-analysis expected ACをbyte-identicalに追加し、意味契約変更として `RUNTIME_CONTRACT_VERSION` を `runtime-v1` → `runtime-v2` へ更新
 - 09から既存authority_entities.pyへ入力できることを確認
 - current ACだけをMachine Entity化し、US / UC / Behaviorをglobal Entity typeへしないことを確認
 - helper unit / portability / runtime contract byte-identity test
@@ -431,7 +433,7 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 
 mode単体が成立してからworkflowへ接続します。
 
-### Step 3: question-analysis連携
+### Step 3: question-analysis連携 / DEC・ASM owner採番
 
 - stable UNKNOWN参照
 - 回答正規化後のspec-analysis resume
@@ -439,6 +441,11 @@ mode単体が成立してからworkflowへ接続します。
 - `不明点 / 質問一覧` をheader-onlyへ変更
 - skills/question-analysis/scripts/unknown_links.py
 - skills/question-analysis/scripts/question_ids.py
+- Project Context Section 12 / 13が案件の正本ownerであるdefault経路では同tableをheader-onlyへ変更
+- skills/qa-workflow/scripts/project_context_ids.py
+- Project Contextがownerの場合だけnew DEC / ASMの番号をhelperで決定し、意味判断はquestion-analysis / stakeholder側に残す
+- 別の決定事項 / 仮定の正本ownerが明示されている場合はそのownerを維持し、Project Contextへ複製・再採番しない
+- owner側にdeterministic allocatorがなくID未確定ならLLM hand-numberingへfallbackせず正本登録をblockedにする
 - production helper unit / portability test
 - deterministic validatorのknown refs / expected mapping
 - 既存output fixture 1件へmapping追加 + false-pass unit test
@@ -452,26 +459,25 @@ mode単体が成立してからworkflowへ接続します。
 - requirement_structure top-levelへ `acceptance_criteria[]`（`ac_id / authority_refs[]`）、TR draftへ `acceptance_refs[]` を必須fieldとして追加
 - `acceptance_criteria[].authority_refs[]` はspec-analysis helper結果をそのまま使用し、Agentが再構築しない
 - ACなしworkflowは空arrayで明示し、field省略を許可しない
+- UI target mode以外の既存spec-analysis normalized inputは `acceptance_criteria` key省略を空集合として許可し、既存Authority expected Entityだけを維持する
 - artifact modeでcurrent `spec-analysis / acceptance_criterion` Entityへ依存し、input `authority_refs[]` とAC EntityのAuthority dependency集合をexact一致検証する
 - ACをDisposition upstream typeとして許可し、ownerをspec-analysisへ固定
 - test-requirement-designまで進むworkflowでcurrent ACをTRまたはDispositionへ閉じる
 - TR Entity contentへacceptance_refsを保存
 - artifact modeのTR Entity dependencyへ参照AC Entityと、そのACが参照するcurrent Authority Entity unionを直接保存する。direct modeでは存在しないMachine Entity dependencyを生成しない
 - repository内の `requirement-structure-v1` 固定参照をcurrent v2へ同期
-- v1 evidenceをv2 current evidenceとして読み替えない
+- shared runtime-v1 evidenceをruntime-v2 current evidenceとして読み替えない
 - AC本文 / 親Behavior / 親UC / 親USのfreshness regressionを追加
 - artifact modeでAC本文・親chain不変のままAuthorityだけ変更しspec-analysisを再生成した後、未再実行TRが直接Authority dependencyによりstaleになるregressionを追加
 - partial rerunでscope外TRがchanged AC依存のままcurrentにならない regressionを追加
 - TR-OUT-003 / TR-SEM-003を追加
 - existing TR fixtures / runtime / portability / vertical integration testsをv2 schemaへ同期
 
-### Step 5: qa-workflow routing / Project Context ID owner
+### Step 5: qa-workflow routing
 
 - mode request routing
 - answer resume
-- Project Context Section 12 / 13をheader-onlyへ変更
-- skills/qa-workflow/scripts/project_context_ids.py
-- new DEC / ASMの意味判断はquestion-analysis / stakeholder側に残し、ID番号だけhelperで決定
+- Step 3で確定したDEC / ASM owner / IDをそのまま利用し、routing段階で再採番しない
 - test-target-inspection / usability-evaluation / usability-inspection / wcag-conformance-evaluationとの分岐
 - routing_cases.jsonへ8件追加
 - routing_candidate_outputs.jsonへ対応する独立candidate 8件追加
