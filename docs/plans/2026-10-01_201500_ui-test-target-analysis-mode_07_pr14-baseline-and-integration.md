@@ -82,7 +82,7 @@ PR #16で追加する差分:
 
 ただしこれらはStep 0時点の観測baselineです。repository test / CIでは件数を固定値として正本化せず、PR #14で導入されたcurrent repository / manifestからの動的導出を維持します。
 
-PR #14 merge後に他PRがmainへ入って値が変わっていた場合、実データを正としてPlan / docsの観測値だけ同期します。Skillごとの期待増分（PR #16はTrigger +0 / Deterministic +2 / Semantic +5 / routing +8）は変更理由がない限り維持します。
+PR #14 merge後に他PRがmainへ入って値が変わっていた場合、実データを正としてPlan / docsの観測値だけ同期します。Skillごとの現在Plan期待増分（PR #16はTrigger +0 / Deterministic +2 / Semantic +8 / routing +8）は変更理由がない限り維持します。ただしsemantic case数自体を受入条件にはせず、`_04_evaluation-ci-implementation-order.md` のLLM responsibility coverageを正本とします。
 
 ## 4. PR #14が追加するSkillとの責務境界
 
