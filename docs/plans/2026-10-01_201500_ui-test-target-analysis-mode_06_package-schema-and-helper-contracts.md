@@ -789,11 +789,12 @@ Authority部分は既存 `authority_entities.py` のnormalized input / builder�
 | 関連仕様根拠ID | `related_authority_refs[]` |
 
 規則:
-- `現在有効な内容` はtrim後の文字列を `active_content.text` へ入れ、helperが意味的な再要約・再構成をしない
-- `情報源 / 正本一覧` は `SRC-xxx` stable ID参照だけを許可し、複数IDは `<br>` 区切り
-- `関連仕様根拠ID` の複数IDも `<br>` 区切り
-- `source_refs[]` / `relations[]` / `related_authority_refs[]` はtrim・duplicate拒否後に昇順canonical化する
-- 空参照は空array
+- `現在有効な内容` はtrim後の非空文字列を `active_content.text` へ入れ、helperが意味的な再要約・再構成をしない
+- `適用範囲` はtrim後の非空文字列をそのまま `scope` へ入れる。UI target modeでは `null` / objectへ変換しない
+- `情報源 / 正本一覧` は1件以上の `SRC-xxx` stable ID参照を要求し、複数IDは `<br>` 区切り
+- `関係` は `独立 / 補足 / 上書き / 置換 / 未定義部分の補完` の単一値だけを許可し、`relations=[<trim済み値>]` へ固定する。`<br>` による複数関係は許可しない
+- `関連仕様根拠ID` の複数IDは `<br>` 区切り。空欄は `related_authority_refs=[]`
+- `source_refs[]` / `related_authority_refs[]` はtrim・duplicate拒否後に昇順canonical化する
 - 種別は既存SPEC / DECISION / 承認済みASM
 - INF / UNKNOWNはCurrent Effective Authority inputへ含めない
 - LLMがnormalized Authority JSON、Machine Entity wrapper、fingerprint、expected identityを再生成しない
