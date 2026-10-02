@@ -139,6 +139,7 @@ LLMが「標準fileへ混在させるべきでない独立domainが必要」と�
 - domain fileが必要かは判断しない
 - slugの意味は判断しない
 - Agent / LLMに次の連番を計算させない
+- 返却pathを00へ登録して実fileを作成してから次の採番を行い、未materializeの番号をAgent側だけで予約しない
 - 既存最大番号が999なら自動拡張せず `id_space_exhausted`
 
 #### build-manifest
@@ -152,11 +153,23 @@ README controls反映後のcurrent package fileからMANIFEST bodyを生成し�
 - extension fileは00へ宣言済みのものだけ含める
 - Agent / LLMがfile順・hashを再構築しない
 
-#### impact
+#### inspect / impact
 
-LLMがsemantic更新時に確定したstable ID lifecycle eventをcurrent versionのexact `Stable ID changes` tableへ先に記録します。許可値は `added / changed / resolved / retired / migrated` ですが、`resolved` はUNKNOWN解消専用です。DEC / ASMを含むtracked IDは初登場 `added`、同一identityを維持した内容・状態変更 `changed`、current structured modelからの除去 `retired` とします。その後、helperが同tableから変更対象ID集合を導出し、cross-file exact referenceから再確認候補file / rowを列挙します。Agent / LLMが同じchanged ID集合を別JSONへ手組みしません。
+通常更新では、内容編集前の `inspect` が `update_snapshot` を生成します。snapshotはtracked stable IDのowner row fingerprint、UNKNOWN state、previous exact reference、payload file hashを保持し、Agent / LLMは編集・再構築しません。
 
-この結果は「修正が必要」という意味判断ではありません。LLMが再確認対象を漏らさないための候補集合です。
+semantic identity、same-UNK reopen / new UNK等をLLMが判断してowner structured rowへ反映した後、`impact` がprevious snapshotとcurrent stateを比較して次を決定論生成します。
+
+- `added / changed / resolved / retired`
+- changed stable ID集合
+- `Stable ID changes` canonical Markdown
+- previous/current owner + exact referenceから導出した再確認候補file / row
+- `影響file` canonical Markdown
+
+LLMがCHANGELOG lifecycle eventや影響file一覧を手入力しません。更新途中でstable ID owner rowを削除しても、`next-id` は同じprevious snapshotを使用済みID集合へ含めるため、そのrevision内で過去IDを再利用しません。
+
+legacy migrationではsemantic identity mappingだけをLLMが行い、retained ID / 明示確認できるterminal eventを `impact(change_mode=legacy-migration)` へ渡します。helperが `migrated / added / resolved / retired` のtableを生成し、legacy proseからidentityを推測しません。
+
+この結果は「本文修正が必要」という意味判断ではありません。LLMが再確認対象を漏らさないための候補集合です。
 
 #### build-machine-evidence
 
@@ -166,9 +179,10 @@ LLMがsemantic更新時に確定したstable ID lifecycle eventをcurrent versio
 2. current ACだけを `acceptance_criterion` Machine Entityへ変換する
 3. AC contentへ親US / UC / Behavior / Scope / Authority / structure refsを固定projectionする
 4. Authority + AC Entityを1つの `Machine Entities: spec-analysis` blockへcanonical順で統合する
-5. qa-workflow / coverage-analysisへ渡すcanonical `normalized_skill_input` と `expected_entity_identities` を同じsourceから生成する
+5. 既存shared `render_machine_entities()` を使ってheading + JSON fenceを含むcanonical Markdown sectionまで生成する
+6. qa-workflow / coverage-analysisへ渡すcanonical `normalized_skill_input` と `expected_entity_identities` を同じsourceから生成する
 
-US / UC / Behaviorをglobal Machine Entity typeへしません。何をAuthorityとするか、UI操作やUS / UC / Behavior / ACをどう意味分解するかはLLM判断です。wrapper / content / dependency / fingerprint / normalized machine input / expected identityはhelperが生成します。
+US / UC / Behaviorをglobal Machine Entity typeへしません。何をAuthorityとするか、UI操作やUS / UC / Behavior / ACをどう意味分解するかはLLM判断です。wrapper / content / dependency / fingerprint / normalized machine input / expected identity / Markdown section serializationはhelperが生成します。
 #### project-eval
 
 projection modeを `semantic / deterministic` に固定します。
