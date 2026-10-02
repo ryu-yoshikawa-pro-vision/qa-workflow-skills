@@ -956,10 +956,10 @@ semantic:
 
 除外:
 
-- CHANGELOG
+- CHANGELOG全体
 - MANIFEST
 
-過去仕様を含むCHANGELOGをsemantic Judgeへ混ぜません。
+過去仕様を含むCHANGELOG全体はsemantic Judgeへ混ぜません。ただしcurrent Package Versionの `### 変更概要` bodyだけは今回のsemantic update説明として抽出し、synthetic control frame `CHANGELOG.current_change_summary` としてprojection末尾へ追加します。`Stable ID changes / 影響file` はdeterministic controlなのでsemantic projectionへ入れません。
 
 deterministic:
 
@@ -982,11 +982,12 @@ payloadは両projectionで次のexact shapeです。
 {
   "projection":"semantic",
   "files":["README.md","00_scope_and_context.md"],
-  "markdown":"<!-- FILE: README.md -->\n..."
+  "controls":["CHANGELOG.current_change_summary"],
+  "markdown":"<!-- FILE: README.md -->\n...\n<!-- CONTROL: CHANGELOG.current_change_summary -->\n..."
 }
 ```
 
-`files[]` は実際に連結したrelative pathをcanonical順で持ちます。各file frameは `<!-- FILE: <relative-path> -->` + LF + UTF-8 decodeしたfile textです。file textがLFで終わらない場合だけ、次のmarkerを独立行にするtransport separatorとしてLFを1文字追加します。このseparatorはsource file内容には含めず、その他の正規化・trim・改行変換を行いません。
+`files[]` は実際に連結したrelative pathをcanonical順で持ちます。`controls[]` はsynthetic control frame名を順序付きで持ち、semantic projectionでは `CHANGELOG.current_change_summary`、deterministic projectionでは空arrayです。各file frameは `<!-- FILE: <relative-path> -->` + LF + UTF-8 decodeしたfile textです。semantic change summary frameは `<!-- CONTROL: CHANGELOG.current_change_summary -->` + LF + current versionの `### 変更概要` bodyだけを使用します。file textがLFで終わらない場合だけ、次のmarkerを独立行にするtransport separatorとしてLFを1文字追加します。このseparatorはsource file内容には含めず、その他の正規化・trim・改行変換を行いません。
 
 raw SHA-256はprojectionから再計算しません。production `validate` / repository unit testがraw bytesでMANIFEST hashを検証し、projected deterministic evalはMANIFEST schema、file集合・順序、SHA-256文字列形式、stable ref等を検証します。
 
