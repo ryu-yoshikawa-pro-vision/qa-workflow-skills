@@ -42,7 +42,7 @@ UI操作の振る舞い分解 / AC traceability:
 - skills/spec-analysis/assets/ui-test-target-analysis/MANIFEST.md
 - skills/spec-analysis/scripts/ui_target_package.py
 
-ファイル数を増やすこと自体を目的にしません。標準fileはrequired coreと条件付き必須へ分け、Agentの自由裁量による条件付き必須file選択は行いません。
+ファイル数を増やすこと自体を目的にしません。標準fileはrequired coreと条件付き必須へ分け、Agentの自由裁量による標準fileの作成可否判断は行いません。
 
 exact heading / exact table header、package schema version、ID形式、Machine Entity bridge、MANIFEST schemaは `_06_package-schema-and-helper-contracts.md` を正本とし、本Planでは意味責務だけを定義します。
 
@@ -69,7 +69,7 @@ exact heading / exact table header、package schema version、ID形式、Machine
 | 05_notifications_and_external_interactions.md | notification、email、browser dialog、外部画面遷移、外部service連携、外部interactionのいずれかが対象scopeに存在 |
 | 08_repository_implementation_status.md | current package versionの分析でrepository / product implementation evidenceを実際に確認・利用した |
 
-`00_scope_and_context.md` のfile applicability表に4fileすべての `required / not-applicable` と根拠を記録します。LLMは資料の意味からtrigger該当性を判断し、helperは宣言と実file / MANIFESTの一致を決定論検証します。
+`00_scope_and_context.md` のfile applicability表に4fileすべての `required / not-applicable / blocked` と根拠を記録します。LLMは資料の意味からtrigger該当性を判断し、helperは宣言と実file / MANIFESTの一致を決定論検証します。
 
 情報不足を `not-applicable` にしません。trigger有無を判断できない場合は関連UNKNOWNを作成し、そのfile applicabilityをblockedとしてpackage completionを止めます。
 
