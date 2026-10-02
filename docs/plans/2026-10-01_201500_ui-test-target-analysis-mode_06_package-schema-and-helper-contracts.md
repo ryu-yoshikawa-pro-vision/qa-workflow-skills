@@ -835,7 +835,7 @@ production helperのfilesystem / hash / projection / next-id / build-machine-evi
 
 ## 16. CI / portability
 
-最低限追加:
+次を追加:
 
 - `skills/spec-analysis/scripts/ui_target_package.py` compile
 - `skills/question-analysis/scripts/unknown_links.py` compile
