@@ -357,24 +357,26 @@ test-requirement-design:
   - ACの単純言い換えを避ける
   - 複数AC統合 / 1AC複数TRを意味に応じて扱う
 
-PR #14後baselineからPR #16全体の増分:
+PR #14後baselineからPR #16全体の現在Plan増分:
 - Skill: +0
 - Trigger: +0
 - Deterministic output: +2
   - spec-analysis +1
   - test-requirement-design +1
-- Semantic: +5
-  - spec-analysis +3
-  - question-analysis +1
+- Semantic: +8
+  - spec-analysis +5
+  - question-analysis +2
   - test-requirement-design +1
 - qa-workflow routing: +8
 
-PR #14 baselineが22 Skill / 488 trigger / 44 deterministic / 155 semantic / 61 routingなら、PR #16後は:
+PR #14 baselineが22 Skill / 488 trigger / 44 deterministic / 155 semantic / 61 routingなら、PR #16後の現在Plan期待値は:
 - 22 Skill
 - 488 trigger
 - 46 deterministic
-- 160 semantic
+- 163 semantic
 - 69 routing
+
+semantic case数自体を目的にはせず、`_04_evaluation-ci-implementation-order.md` のLLM responsibility coverageを正本とします。
 
 ## 17. legacy migration
 
