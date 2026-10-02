@@ -235,7 +235,7 @@ test-requirement-designへ到達した場合は `requirement-structure-v2` を�
 - package templateはassets/ui-test-target-analysis/
 - qa-workflowは必要なSkillへroutingする
 - question-analysisは回答正規化とresume情報を返し、新規Qの番号はquestion_ids.pyで決定する
-- qa-workflowはProject Context Section 12 / 13が実際の正本ownerの場合だけproject_context_ids.pyでnew DEC / ASMの番号を決定し、previous ID削除をvalidate-historyで拒否する。別ownerが明示されている場合はその正本ID lifecycleを維持する
+- qa-workflowはProject Context Section 12 / 13が実際の正本ownerの場合だけproject_context_ids.py materializeでnew DEC / ASMの番号決定とSection 12 / 13 serializationを行い、previous ID削除をvalidate-historyで拒否する。別ownerが明示されている場合はそのownerが発行するcanonical `DEC-xxx / ASM-xxx` lifecycleを維持し、Jira / ADR等のowner固有IDをauthority_idへ流用しない
 
 AIエージェントは利用環境で提供される通常のSkill読み込み機構に従います。
 
