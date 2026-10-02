@@ -739,7 +739,7 @@ stdin:
   "target_version":null,
   "legacy_source_version":null,
   "migration_retained_ids":[],
-  "legacy_terminal_events":[],
+  "legacy_lifecycle_events":[],
   "change_summary":"<current versionの変更概要本文>",
   "retire_ids":["PAGE-009"],
   "table_changes":[
@@ -778,7 +778,7 @@ stdin:
 
 normalでは `version_policy` を `default / project` の2値から選びます。既存完成package更新のdefaultではhelperがprevious snapshotのversionから次versionを導出し、README / CHANGELOG / MANIFESTへ同時反映します。projectの場合だけ、案件で明示されたpolicyに基づく `target_version` を必須とし、helperはpackage内一致を検証します。完成済みpackageへ1 byteでも永続変更を加えて再び完成状態として保存する場合、default policyではsemantic / presentationを問わず必ずversionを+1します。in-memory生成結果がprevious packageと完全同一ならno-opとして書込み・version upを行いません。
 
-legacy-migrationでは `previous_snapshot=null` を要求し、`legacy_source_version` は明示 `vNN` または `legacy-unversioned` を必須とします。明示vNNならtargetを次のvNN、`legacy-unversioned` ならtargetをv00 / Previous=`legacy-unversioned`へ固定します。`version_policy=project` はlegacy-migrationでも案件に明示policyがある場合だけ許可します。`migration_retained_ids[]` と `legacy_terminal_events[]` は§14のsemantic mapping結果だけを受け、helperが番号予約・lifecycle生成へ使います。
+legacy-migrationでは `previous_snapshot=null` を要求し、`legacy_source_version` は明示 `vNN` または `legacy-unversioned` を必須とします。明示vNNならtargetを次のvNN、`legacy-unversioned` ならtargetをv00 / Previous=`legacy-unversioned`へ固定します。`version_policy=project` はlegacy-migrationでも案件に明示policyがある場合だけ許可します。`migration_retained_ids[]` と `legacy_lifecycle_events[]` は§14のsemantic mapping結果だけを受け、helperが番号予約・lifecycle生成へ使います。
 
 table input contract:
 
@@ -788,7 +788,7 @@ table input contract:
 - 既存row更新は `identity_action=reuse / reuse_id=<stable ID>`。normalではprevious snapshot / current packageに存在するIDだけをreuseでき、legacy-migrationでは `migration_retained_ids[]` に含まれるIDだけをreuseできる
 - request内の新規row参照はstable IDの代わりに `@draft:<draft_key>` をreference配列へ指定できる。helperが採番後に解決する
 - standard tableの `primary_prefix` はregistryと完全一致を要求する。10+ domain fileでは00の案件固有prefix宣言と一致する値だけを許可する
-- new IDはcanonical file order → section order → request row orderで割り当てる。同一JSON inputから同じID割当になる。legacy-migrationでは `migration_retained_ids[]` と `legacy_terminal_events[].stable_id` を採番前の使用済み集合へ必ず含め、current rowに存在しないretired / resolved legacy IDを再利用しない
+- new IDはcanonical file order → section order → request row orderで割り当てる。同一JSON inputから同じID割当になる。legacy-migrationでは `migration_retained_ids[]` と `legacy_lifecycle_events[].stable_id` を採番前の使用済み集合へ必ず含め、current rowに存在しないretired / resolved legacy IDを再利用しない
 - unchanged rowはcurrent packageから保持する。requestにない既存rowを削除しない
 - `retire_ids[]` はLLMが「このsemantic identityをcurrent package modelから意図的に除去する」と判断したIDだけを渡す。row消失だけからhelperがretireを推測しない
 - previous snapshotに存在するIDがmaterialize後modelから消えるのに `retire_ids[]` にない場合は `state_transition_required` で書込み前にblocked
@@ -800,9 +800,9 @@ file / control materialization order:
 
 1. normal updateではprevious snapshotとcurrent bytesを照合し、staleなら書込みしない。legacy-migrationでは新しいcurrent-schema target rootがasset初期状態であることを検証する
 2. change_mode / version policyを解決し、target version / Previous Package Versionをin-memory metadataへ設定する
-3. legacy-migrationでは `migration_retained_ids[] / legacy_terminal_events[]` の形式・duplicate・lifecycleを先に検証して使用済みID集合へ予約する
+3. legacy-migrationでは `migration_retained_ids[] / legacy_lifecycle_events[]` の形式・duplicate・lifecycleを先に検証して使用済みID集合へ予約する
 4. table changesをin-memory modelへ適用し、reuse / new ID / `@draft` referenceを解決する
-5. normal updateの `retire_ids[]` を検証してin-memory modelから除去する。legacy-migrationの過去terminal eventは `legacy_terminal_events[]` だけから扱い、current row削除操作へ流用しない
+5. normal updateの `retire_ids[]` を検証してin-memory modelから除去する。legacy-migrationの過去lifecycle eventは `legacy_lifecycle_events[]` だけから扱い、current row削除操作へ流用しない
 6. 00 applicabilityの最終状態に従い、条件付き標準fileをasset templateから作成または除去する。normal updateで除去対象fileにtracked rowがあれば対応 `retire_ids[]` を必須とする
 7. extension declarationと `extension_file_updates[]` を照合し、宣言済みfileだけ作成 / 更新する
 8. exact Markdown tableをescape / canonical sortしてserializeし、known sectionだけ置換する。prose updateはexact heading配下のbodyだけを置換し、意味を書き換えない
@@ -904,7 +904,7 @@ legacy migrationではsemantic identity mappingだけはLLM判断です。変換
   "previous_snapshot":null,
   "change_mode":"legacy-migration",
   "migration_retained_ids":["SPEC-001","DEC-001"],
-  "legacy_terminal_events":[
+  "legacy_lifecycle_events":[
     {"stable_id":"UNK-009","change":"resolved"}
   ]
 }
@@ -912,8 +912,8 @@ legacy migrationではsemantic identity mappingだけはLLM判断です。変換
 
 - `migration_retained_ids[]` はLLMがlegacy/currentのsemantic identity一致を判断した結果だけを渡し、helperが `migrated` に変換する
 - current tracked IDのうちretainedでないnew IDは `added`
-- `legacy_terminal_events[]` はlegacy資料から明示確認できる `resolved / retired` だけを許可し、helperが形式・duplicate・prefix/lifecycle整合を検証する
-- legacy proseからIDやterminal eventを自動推測しない
+- `legacy_lifecycle_events[]` はlegacy資料から明示確認できる `resolved / retired` だけを許可し、helperが形式・duplicate・prefix/lifecycle整合を検証する
+- legacy proseからIDやlifecycle eventを自動推測しない
 
 意味上の修正要否、semantic identity、legacy mappingは判断しません。
 
@@ -1480,7 +1480,7 @@ LLMは:
 3. semantic identityが同じ既存SRC / SPEC / INF / UNK / DEC / ASM / structural IDは、実際の正本ownerを維持したままID維持する
 4. retained current tracked ID集合と、legacy履歴から明示確認できるretired / resolved IDだけをsemantic mapping結果として確定する
 5. new entity / extension / file applicability / narrativeをsemantic inputとして確定する。new ID番号、Markdown row、CHANGELOG eventはまだ手組みしない
-6. assetから作った空のcurrent-schema target rootへ `materialize(change_mode=legacy-migration)` を1回実行し、`legacy_source_version / migration_retained_ids[] / legacy_terminal_events[] / table_changes[] / prose_updates[]` を渡す
+6. assetから作った空のcurrent-schema target rootへ `materialize(change_mode=legacy-migration)` を1回実行し、`legacy_source_version / migration_retained_ids[] / legacy_lifecycle_events[] / table_changes[] / prose_updates[]` を渡す
 7. helperがretained / terminal IDを採番前に予約し、reuse / new ID割当、Markdown serialization、`migrated / added / resolved / retired`、影響file、Machine Entity、README、MANIFESTまで生成する
 8. legacyで未確定だった内容を推測で確定しない
 9. current packageに不要な履歴説明はCHANGELOGの変更概要 / migration noteへ残し、current viewへ混ぜない
