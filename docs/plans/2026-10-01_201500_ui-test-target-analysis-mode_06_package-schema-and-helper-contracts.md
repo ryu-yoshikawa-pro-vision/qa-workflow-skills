@@ -812,7 +812,7 @@ legacy-migrationでは `previous_snapshot=null` を要求し、`legacy_source_ve
 
 table input contract:
 
-`table_changes[]` はstable IDのowner tableだけを対象にします。
+`table_changes[]` はstable IDのpackage tracking tableだけを対象にします。ここでいうtracking table / tracking rowはpackage内でstable ID lifecycleを保持する構造上の位置を意味し、DEC / ASM等の実際の正本ownerを意味しません。
 
 - owner table: 分析対象機能scope一覧、UI構造一覧、UI操作一覧、User Story一覧、Use Case一覧、Behavior一覧、Acceptance Criteria一覧、ビジネスルール一覧、項目・バリデーション一覧、処理フロー一覧、通知・外部連携一覧、仕様矛盾・保留一覧、Repository実装状況、情報源 / 正本参照一覧、分析項目、10+ domain fileの案件固有stable row
 - `file / section` は§2〜§5のregistryに存在するexact pairだけを許可する。extension fileのstructured table更新は、既存extensionなら宣言済みpath、新規extensionなら同requestの `extension_file_updates[].draft_key` で対象を特定する
@@ -833,7 +833,7 @@ table input contract:
 | `09_authority_and_traceability.md / 現在有効な仕様根拠` | `仕様根拠ID` | LLMが確定したCurrent Effective Authorityだけ。09分析項目のcurrent SPEC / DECISION / approved ASMへ存在参照 |
 | `09_authority_and_traceability.md / 後続Skillへの補足` | `項目` | 項目duplicate禁止。stable refsだけhelper検証 |
 
-`keyed_table_updates[]` のrowはexact header名をJSON keyとして持ち、stable reference列だけstring arrayを受けます。stable IDをkey / referenceとして持つcellでは、同requestのnew owner rowを `@draft:<draft_key>` で参照できます。helperはstable owner ID割当後にkey / reference内の `@draft` を解決し、未解決draftをrejectします。helperがcanonical key order / Markdown escape / `<br>` serialization / row sortを行います。view tableからrowが消えてもowner stable IDのretireとは扱いません。owner lifecycleは `table_changes[] / retire_ids[]` だけで管理します。
+`keyed_table_updates[]` のrowはexact header名をJSON keyとして持ち、stable reference列だけstring arrayを受けます。stable IDをkey / referenceとして持つcellでは、同requestのnew tracking rowを `@draft:<draft_key>` で参照できます。helperはstable tracking ID割当後にkey / reference内の `@draft` を解決し、未解決draftをrejectします。helperがcanonical key order / Markdown escape / `<br>` serialization / row sortを行います。view tableからrowが消えてもtracking stable IDのretireとは扱いません。owner lifecycleは `table_changes[] / retire_ids[]` だけで管理します。
 
 normal updateで `keyed_table_updates[]` にsectionが無い場合、そのsectionはcurrent packageの完成row集合を保持します。normal create / legacy-migrationでは `条件付き必須file applicability` を必須とし、その他view tableは必要な最終集合を明示します。owner stable row変更により保持したviewが不整合になればfinal validateでblockedし、helperが意味を推測して自動修正しません。
 extension input contract:
@@ -858,14 +858,14 @@ file / control materialization order:
 3. legacy-migrationでは `migration_retained_ids[] / legacy_lifecycle_events[]` の形式・duplicate・lifecycleを先に検証して使用済みID集合へ予約する
 4. `keyed_table_updates[]` のうちfile applicability / 案件固有prefix宣言を先にparseし、意味値を変更せず構造検証する
 5. applicabilityに従い条件付き標準fileのtemplateをin-memoryへ追加 / removal予定化し、`extension_file_updates[]` のnew pathをrequest順でbatch allocationして新規extension templateを準備する
-6. stable owner `table_changes[]` をin-memory modelへ適用し、reuse / new IDを割り当て、owner row内の `@draft` referenceを解決する。新規条件付きfile / extension fileのowner rowもこの段階で適用する
+6. stable tracking `table_changes[]` をin-memory modelへ適用し、reuse / new IDを割り当て、tracking row内の `@draft` referenceを解決する。新規条件付きfile / extension fileのtracking rowもこの段階で適用する
 7. remaining `keyed_table_updates[]` のkey / reference内 `@draft` を解決して完成row集合を確定する
-8. normal updateの `retire_ids[]` を検証してin-memory owner modelから除去する。removal予定fileにtracked owner rowが残る場合は対応retire intent不足としてblockedする。legacy-migrationの過去lifecycle eventは `legacy_lifecycle_events[]` だけから扱い、current row削除操作へ流用しない
+8. normal updateの `retire_ids[]` を検証してin-memory tracking modelから除去する。removal予定fileにtracked owner rowが残る場合は対応retire intent不足としてblockedする。legacy-migrationの過去lifecycle eventは `legacy_lifecycle_events[]` だけから扱い、current row削除操作へ流用しない
 9. extension最終集合から00の `案件固有extension file一覧` をcanonical生成し、stable owner / keyed / generated tableとprose updateをexact Markdownへ反映する
 10. `build-machine-evidence` 相当処理をprovisional current versionのまま実行し、Machine Entities sectionをcanonical生成する
 11. normal updateでは、version metadata・current CHANGELOG new entry・README generated controls・MANIFESTを除いたprovisional payload bytesをcurrent packageと比較する。差分がなければ `changed=false` を返し、change_summaryを適用せず書込みもしない
 12. changed normal update / normal create / legacy-migrationでtarget Package Version / Previous Package Versionを確定する。normal createはv00 / -、legacy-migrationはlegacy source contract、normal updateはStep 2のnext version候補を使う
-13. normal updateではprevious snapshot + explicit retire intent、legacy-migrationではmigration retained / lifecycle mapping + current owner modelからimpactを生成し、CHANGELOGのtarget version entryへ `変更概要 / Stable ID changes / 影響file` を生成する。normal createはv00 baseline entryを生成する
+13. normal updateではprevious snapshot + explicit retire intent、legacy-migrationではmigration retained / lifecycle mapping + current tracking modelからimpactを生成し、CHANGELOGのtarget version entryへ `変更概要 / Stable ID changes / 影響file` を生成する。normal createはv00 baseline entryを生成する
 14. README controlsをcanonical生成・置換する
 15. MANIFESTを最後に再生成する
 16. final validateを実行し、成功した場合だけpackage filesへ書き出す
@@ -928,8 +928,8 @@ stdin:
 helperはstable ID owner rowのprevious/current差分からlifecycleを決定します。
 
 - previousに存在せずcurrentに存在 → `added`
-- same IDがprevious/currentに存在しowner row fingerprintが不変 → eventなし
-- same IDが存在しowner row fingerprintが変化 → 原則 `changed`
+- same IDがprevious/currentに存在しtracking row fingerprintが不変 → eventなし
+- same IDが存在しtracking row fingerprintが変化 → 原則 `changed`
 - UNKが `unknown_active=true → false` → `resolved`
 - resolved UNKのresolver変更、`false → true` のsame-ID reopen → `changed`
 - reopen後の `true → false` → 再び `resolved`
@@ -1507,7 +1507,7 @@ tableにはpayload filesだけをcanonical順で列挙します。
 
 `### 影響file`
 
-`impact.affected_files_markdown` をそのまま使用します。changed stable IDのprevious/current owner fileとprevious/current exact reference先のunionであり、「実際に本文変更したfile」ではなく今回のsemantic変更に対する再確認候補fileです。`next-id` の入力には使用しません。
+`impact.affected_files_markdown` をそのまま使用します。changed stable IDのprevious/current tracking fileとprevious/current exact reference先のunionであり、「実際に本文変更したfile」ではなく今回のsemantic変更に対する再確認候補fileです。`next-id` の入力には使用しません。
 
 helperは次を検証します。
 
@@ -1626,7 +1626,7 @@ production helperのfilesystem / raw hash / projection / README control renderin
 - CHANGELOG `Stable ID changes` exact heading / header / Change enum / duplicate
 - inspectのupdate_snapshotがtracked tracking-row fingerprint / previous exact refs / payload file set・raw hash / MANIFEST raw hashをcanonical生成すること
 - next-id / materializeが標準prefix + 00宣言済み案件固有prefixについてcurrent structured row + historical stable ID + previous snapshotから使用済みIDを導出し、更新途中でowner rowから消えたIDも再利用しないこと
-- impactがprevious snapshotとcurrent owner row差分からadded / changed / resolvedを導出し、retiredだけは明示retire_idsから生成すること。row消失だけならstate_transition_requiredでblockedすること
+- impactがprevious snapshotとcurrent tracking row差分からadded / changed / resolvedを導出し、retiredだけは明示retire_idsから生成すること。row消失だけならstate_transition_requiredでblockedすること
 - materializeがdraft_key / identity_action / @draft referenceを解決し、canonical table serialization、条件付き標準file同期、CHANGELOG controls、Machine Entities section、README controls、MANIFESTを1 write pathで生成すること
 - duplicate canonical heading / table、row列数不一致、escaped pipe / `<br>` reference parse
 - duplicate / unknown stable ref
