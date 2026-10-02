@@ -159,6 +159,20 @@ mode標準prefix以外を使う場合だけ記載します。
 - 一度stable ID採番に使ったPrefix rowはidentity historyとして削除・意味変更しない。不要になっても宣言を残し、配下IDのlifecycleをCHANGELOGで追跡する
 - 宣言済み案件固有prefixはstandard structural prefixと同じく `inspect / next-id / materialize / impact / CHANGELOG / validate` の追跡・採番対象へ自動追加する
 
+#### 案件固有extension file一覧
+
+| ファイル | Slug | 責務 | 分割理由 |
+| --- | --- | --- | --- |
+
+extension fileを使う場合だけrowを持ち、templateはheader-onlyにします。
+
+- `ファイル` は `10_<slug>.md` 以降のcanonical relative path
+- `Slug` はlowercase kebab-case
+- `責務` と `分割理由` はLLMが意味判断して記述する
+- 同じファイル / Slugのduplicateを拒否する
+- final packageでは宣言rowと実file集合が完全一致する
+- 通常のcreate / updateではAgentがファイル番号やこのtableを手入力せず、`materialize.extension_file_updates[]` からhelperが連番・path・宣言rowをまとめて生成する
+
 ### 5.2 01_ui_structure_and_navigation.md
 
 #### UI構造一覧
@@ -770,7 +784,7 @@ stdin:
     {"file":"06_spec_inconsistencies_and_pending.md","section":"<exact heading>","body_markdown":"..."}
   ],
   "extension_file_updates":[
-    {"path":"10_csv-export.md","body_markdown":"..."}
+    {"draft_key":"domain-csv","identity_action":"new","path":null,"slug":"csv-export","responsibility":"CSV export仕様","split_reason":"標準fileと独立したAuthority / flow / rule集合を持つ","body_markdown":"..."}
   ]
 }
 ```
@@ -785,12 +799,15 @@ legacy-migrationでは `previous_snapshot=null` を要求し、`legacy_source_ve
 
 table input contract:
 
-- `file / section` は§2〜§5のregistryに存在するexact pairだけを許可する。extension fileは00で宣言済みpathだけを許可する
+- `file / section` は§2〜§5のregistryに存在するexact pairだけを許可する。extension fileのstructured table更新は、既存extensionなら宣言済みpath、新規extensionなら同requestの `extension_file_updates[].draft_key` で対象を特定する
 - `cells` はprimary ID列を除いたexact header名だけを許可する。stable reference列はJSON string array、通常cellはstringで受ける
 - 新規rowは `identity_action=new / reuse_id=null / draft_key=<request内unique>`
 - 既存row更新は `identity_action=reuse / reuse_id=<stable ID>`。normalではprevious snapshot / current packageに存在するIDだけをreuseでき、legacy-migrationでは `migration_retained_ids[]` に含まれるIDだけをreuseできる
 - request内の新規row参照はstable IDの代わりに `@draft:<draft_key>` をreference配列へ指定できる。helperが採番後に解決する
 - standard tableの `primary_prefix` はregistryと完全一致を要求する。10+ domain fileでは00の案件固有prefix宣言と一致する値だけを許可する
+- `extension_file_updates[]` のnew rowは `draft_key` unique、`identity_action=new / path=null`、lowercase kebab-case slug、非空responsibility / split_reasonを要求する。reuseは `identity_action=reuse / path=<existing canonical path>` とし、slugを変更しない
+- new extension pathはexisting extension最大番号+1から、request配列順に連続採番する。同じrequest内で複数追加しても空fileによる番号予約を要求しない
+- helperは最終pathを00の `案件固有extension file一覧` へcanonical orderで生成し、Agent / LLMがtable rowを組み立てない
 - new IDはcanonical file order → section order → request row orderで割り当てる。同一JSON inputから同じID割当になる。legacy-migrationでは `migration_retained_ids[]` と `legacy_lifecycle_events[].stable_id` を採番前の使用済み集合へ必ず含め、current rowに存在しないretired / resolved legacy IDを再利用しない
 - unchanged rowはcurrent packageから保持する。requestにない既存rowを削除しない
 - `retire_ids[]` はLLMが「このsemantic identityをcurrent package modelから意図的に除去する」と判断したIDだけを渡す。row消失だけからhelperがretireを推測しない
@@ -807,7 +824,7 @@ file / control materialization order:
 4. table changesをin-memory modelへ適用し、reuse / new ID / `@draft` referenceを解決する
 5. normal updateの `retire_ids[]` を検証してin-memory modelから除去する。legacy-migrationの過去lifecycle eventは `legacy_lifecycle_events[]` だけから扱い、current row削除操作へ流用しない
 6. 00 applicabilityの最終状態に従い、条件付き標準fileをasset templateから作成または除去する。normal updateで除去対象fileにtracked rowがあれば対応 `retire_ids[]` を必須とする
-7. extension declarationと `extension_file_updates[]` を照合し、宣言済みfileだけ作成 / 更新する
+7. `extension_file_updates[]` を解決し、new extensionは連番pathをbatch allocationして作成、reuse extensionは既存pathを更新する。最終集合から00の `案件固有extension file一覧` をcanonical生成する
 8. exact Markdown tableをescape / canonical sortしてserializeし、known sectionだけ置換する。prose updateはexact heading配下のbodyだけを置換し、意味を書き換えない
 9. normalではprevious snapshot + explicit retire intent、legacy-migrationではmigration retained / terminal mapping + current modelからimpactを生成し、CHANGELOGのtarget version entryを作成して `変更概要 / Stable ID changes / 影響file` を更新する
 10. `build-machine-evidence` 相当処理で09のMachine Entities sectionをcanonical生成・置換する
