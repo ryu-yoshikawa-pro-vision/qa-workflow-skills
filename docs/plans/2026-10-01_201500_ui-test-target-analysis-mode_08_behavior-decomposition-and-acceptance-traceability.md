@@ -127,8 +127,9 @@ ID: `UC-001` ～ `UC-999`
 - 関連US IDは1件以上必須
 - 複数USが同じUCを共有する場合はUCを意味なく複製しない
 - 1つのUCが参照するUSは同じScope IDに属する
+- current UCが参照するUSはすべてcurrentである。blocked USをcurrent UCの親にしない
 - current UCはTrigger / Preconditions / Success Postconditionが後続分析に必要な範囲で確定している
-- current UCは1つ以上のcurrent Behaviorを持つ
+- current UCはBehavior完全性3分類を持ち、各分類のclosure状態は§7で表す。current Behaviorだけでなく、存在・identityは追跡できるが結果未確定のblocked Behaviorを持てる
 - blocked UCは関連UNKNOWN IDを1件以上持ち、Behavior完全性3分類をまだ生成しない
 - 単なるPAGEとUse Caseを同一視しない
 
@@ -157,10 +158,12 @@ ID: `BH-001` ～ `BH-999`
 - blocked
 
 規則:
-- current Behaviorはcurrent UCだけを親に持つ
+- current Behavior / blocked Behaviorはいずれもcurrent UCだけを親に持つ
 - current Behaviorは1件以上のcurrent ACを持つ
-- expected behavior / resultを確定できない場合はblocked + UNKNOWNとし、ACを創作しない
+- Behaviorの存在・semantic identityまでは確定しているが、expected behavior / result等のAC生成に必要な意味が未確定の場合だけblocked Behavior rowを作り、関連UNKNOWN IDを1件以上要求する
+- Behaviorの存在・identity自体をまだ確定できない場合はblocked Behavior rowを作らず、§7の `未定義` + UNKNOWNだけで表す
 - blocked Behaviorはcurrent ACを持たない
+- blocked Behaviorをcurrent ACの親にしない
 
 ## 7. 正常 / 準正常 / 例外の完全性確認
 
@@ -168,8 +171,8 @@ ID: `BH-001` ～ `BH-999`
 
 #### Use Case振る舞い完全性
 
-| UC ID | 結果分類 | 判定 | 関連Behavior ID | 関連UNKNOWN ID | 理由 / 根拠 |
-| --- | --- | --- | --- | --- | --- |
+| UC ID | 結果分類 | 判定 | 関連Behavior ID | 関連仕様項目ID | 関連UNKNOWN ID | 理由 / 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
 
 判定:
 - 定義あり
@@ -179,9 +182,10 @@ ID: `BH-001` ～ `BH-999`
 deterministic contract:
 - current UCについて正常 / 準正常 / 例外が各1行存在する
 - blocked UCについてこの表のrowを生成しない
-- `定義あり` → 関連Behavior IDが1件以上、関連UNKNOWN IDは空
-- `なし` → Behavior / UNKNOWN IDは空、理由 / 根拠が必須
-- `未定義` → Behavior IDは空、関連UNKNOWN IDが1件以上必須
+- `定義あり` → 関連Behavior IDが1件以上で、すべてcurrent Behavior。関連UNKNOWN IDは空
+- `なし` → 関連Behavior ID / 関連UNKNOWN IDは空、理由 / 根拠と `関連仕様項目ID` が1件以上必須。関連仕様項目IDはcurrent SPEC / DECISION / approved ASMだけを許可し、「該当振る舞いなし」という判断根拠を機械追跡できるようにする
+- `未定義` → 関連Behavior IDは0件以上を許可し、関連UNKNOWN IDが1件以上必須。Behavior IDを持つ場合は、その分類で既知のcurrent / blocked Behaviorを列挙できる
+- 1分類にcurrent Behaviorが存在しても、別の未確定条件が残る場合は `未定義` とし、既知Behavior ID + UNKNOWNを同じrowで保持できる
 - `未定義`を `なし` として扱わない
 - `なし`は資料とAuthorityを確認した結果、該当振る舞いなしを意味し、単なる未記載に使わない
 
@@ -201,6 +205,7 @@ AC一覧に記載するrowはcurrentだけです。blocked ACという中間状�
 規則:
 - current Behaviorは1件以上のACを持つ
 - ACはcurrent Behaviorだけを親に持つ
+- ACへ到達するBehavior / UC / 関連USはすべてcurrentであることを要求する。blocked rowをcurrent AC chainへ混ぜない
 - ACは観測可能な振る舞い / 結果の意味を表す
 - expected behaviorを確定できない場合はAC rowを作らず、親BehaviorをblockedとしてUNKNOWNへ戻す
 - ACへ境界値一覧、入力値一覧、組合せ表、テストデータ一覧を展開しない
@@ -247,7 +252,7 @@ US / UC / Behavior自体はMachine Entity化しません。
 
 下流test-requirement-designへのhandoff pointであるcurrent ACだけを `spec-analysis / acceptance_criterion / AC-xxx` Machine Entityへ決定論変換します。
 
-AC Entityのcanonical contentには、AC自身だけでなくそのACへ到達するcurrent US / UC / Behavior chain、Scope、Authority refs、構造refsを固定projectionします。
+AC Entityのcanonical contentには、AC自身だけでなくそのACへ到達するcurrent US / UC / Behavior chain、Scope、Authority refs、構造refsを固定projectionします。helper / validatorはcurrent ACへ到達する全parentがcurrentであることを決定論検証します。
 
 これによりUS / UC / Behaviorの意味変更でもAC Entityのcontent fingerprintが変わり、AC IDや本文が同じでも関連TRをstaleにできます。
 
