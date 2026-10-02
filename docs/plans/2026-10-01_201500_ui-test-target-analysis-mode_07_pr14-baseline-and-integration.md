@@ -260,11 +260,16 @@ UIテスト対象分析モード固有のPAGE / STATE / VIEW / MODAL等のIDはs
 
 ### 11.1 shared runtime baseline
 
-PR #14後baselineでは7 Skill-local `runtime_contract.py` がbyte-identicalであることをrepository testが保証する前提です。
+PR #14確認headにはSkill-local `runtime_contract.py` が9コピー存在します。
+
+- PR #11由来の既存repository byte-identity test対象: spec-analysis / test-analysis / test-requirement-design / test-condition-design / test-case-design / coverage-analysis / qa-workflow の7コピー
+- PR #14で追加された再利用copy: usability-inspection / wcag-conformance-evaluation の2コピー
+
+確認headでは9コピーは同一blobですが、既存 `tests/skills/runtime/test_runtime_dispatch.py` のbyte-identity対象は7コピーだけです。PR #16では同じ `runtime-v1` helper契約をSkillごとに分岐させないため、current shared runtime 9コピーを同期対象へ統一し、repository byte-identity testも9コピーを対象にします。
 
 Step 0で次を実測します。
 
-- 7コピーの実pathとbyte identity
+- 9コピーの実path、byte identity、repository testの対象集合
 - `ALLOWED_ENTITY_TYPES` に `acceptance_criterion` がまだ存在しないこと
 - spec-analysis `_expected_entities()` がAuthorityだけを導出するbaselineであること
 - test-requirement-designのgenerator contractが `requirement-structure-v1` であること
@@ -282,7 +287,7 @@ PR #14 merge後、PR #16実装開始前に次を必須確認します。
 5. qa-workflow routing fixture数を確認
 6. PR #14のREADME / EVALS / qa-workflow / CI contractがPlan記載と一致すること
 7. spec-analysis / question-analysis / test-target-inspectionが#14後に追加変更されていないこと
-8. 7 runtime_contract.py / requirement_structure.py / qa-workflow expected Entity contractが§11.1 baselineと一致すること
+8. 9 runtime_contract.py / requirement_structure.py / qa-workflow expected Entity contractが§11.1 baselineと一致すること
 9. baselineに差分があれば、本Planを実データへ同期してから実装開始
 
 rebase前の旧mainとの差分を正として実装判断しません。
@@ -297,4 +302,4 @@ rebase前の旧mainとの差分を正として実装判断しません。
 - routingで対象理解とUI/UX評価 / live inspection / formal WCAGを区別できる
 - evaluation / CIは#14の動的導出方式を維持している
 - #16固有のexpected増分がDeterministic +2 / Semantic +5 / routing +8で説明できる
-- shared runtime / requirement-structure-v2の変更がPR #14後baselineとの差分として明示され、7コピーbyte identityを維持している
+- shared runtime / requirement-structure-v2の変更がPR #14後baselineとの差分として明示され、current shared runtime 9コピーbyte identityを維持している
