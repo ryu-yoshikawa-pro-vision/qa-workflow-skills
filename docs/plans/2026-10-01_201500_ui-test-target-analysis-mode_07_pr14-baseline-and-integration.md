@@ -197,7 +197,7 @@ UIテスト対象分析モードはspec-analysis内部modeであるため、新�
 
 PR #14後の `.github/workflows/deterministic-output-evals.yml` はcurrent Skill packageの `skills/*/scripts` を動的探索してcompileします。
 
-そのためPR #16では、`ui_target_package.py` / `unknown_links.py` をcompile対象へ追加するためのSkill固有workflow editを行いません。
+そのためPR #16では、`ui_target_package.py` / `unknown_links.py` / `question_ids.py` / `project_context_ids.py` をcompile対象へ追加するためのSkill固有workflow editを行いません。既存の動的`skills/*/scripts` compile対象に含め、repository unit / portability testだけ追加します。
 
 追加するもの:
 
