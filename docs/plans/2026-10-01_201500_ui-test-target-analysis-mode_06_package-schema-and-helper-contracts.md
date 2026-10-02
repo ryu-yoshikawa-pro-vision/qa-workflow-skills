@@ -113,8 +113,8 @@ domain fileは `10_<lowercase-kebab-case>.md` 以降の連番とします。同�
 
 #### 分析対象機能scope一覧
 
-| Scope ID | 対象機能 / 領域 | UI操作判定 | Behavior Decomposition | 関連UNKNOWN ID | 根拠 / 関連仕様項目ID |
-| --- | --- | --- | --- | --- | --- |
+| Scope ID | 対象機能 / 領域 | UI操作判定 | Behavior Decomposition | 関連UNKNOWN ID | 関連仕様項目ID | 根拠 / 備考 |
+| --- | --- | --- | --- | --- | --- | --- |
 
 標準ID: `SCOPE-xxx`
 
@@ -129,14 +129,18 @@ domain fileは `10_<lowercase-kebab-case>.md` 以降の連番とします。同�
 
 #### 条件付き必須file applicability
 
-| ファイル | 状態 | 根拠 / 関連仕様項目ID | 関連UNKNOWN ID |
-| --- | --- | --- | --- |
-| 03_fields_and_validation.md | required / not-applicable / blocked |  |  |
-| 04_flows_and_data.md | required / not-applicable / blocked |  |  |
-| 05_notifications_and_external_interactions.md | required / not-applicable / blocked |  |  |
-| 08_repository_implementation_status.md | required / not-applicable / blocked |  |  |
+| ファイル | 状態 | 関連仕様項目ID | 根拠 / 備考 | 関連UNKNOWN ID |
+| --- | --- | --- | --- | --- |
+| 03_fields_and_validation.md | required / not-applicable / blocked |  |  |  |
+| 04_flows_and_data.md | required / not-applicable / blocked |  |  |  |
+| 05_notifications_and_external_interactions.md | required / not-applicable / blocked |  |  |  |
+| 08_repository_implementation_status.md | required / not-applicable / blocked |  |  |  |
 
 triggerの意味判断はLLMが行います。helperは4rowの存在、許可値、blocked時のUNKNOWN、required / not-applicableと実file / MANIFESTの一致を検証します。
+
+上記2 tableの `関連仕様項目ID` はstable ID参照専用列です。値は空または `<br>` 区切りのexact stable IDだけを許可し、説明文を混在させません。`根拠 / 備考` は自由記述で、helperはそこに現れるID文字列をstable referenceとして扱いません。
+
+`08_repository_implementation_status.md` のapplicabilityは「そのversionでrepositoryを再確認したか」ではなく、current packageがrepository / product implementation evidenceを現在保持・利用しているかで判定します。前versionの08をcurrent packageが継続利用する場合は `required` のまま保持し、08内の基準branch / commit / revisionを変更しません。current分析からrepository evidenceを明示的に外した場合だけ `not-applicable` とし、08を除去します。
 
 #### 案件固有構造ID
 
@@ -558,6 +562,16 @@ payload:
   "exact_reference_index":[
     {"target_id":"SPEC-001","file":"02_behavior_and_business_rules.md","section":"Acceptance Criteria一覧","row_index":1,"column":"関連仕様項目ID"}
   ],
+  "update_snapshot":{
+    "package_version":"v15",
+    "tracked_items":[
+      {"stable_id":"SPEC-001","owner_file":"09_authority_and_traceability.md","owner_section":"分析項目","row_fingerprint":"<sha256>","unknown_active":null,"resolution_refs":[]}
+    ],
+    "exact_reference_index":[],
+    "payload_file_sha256":[
+      {"path":"README.md","sha256":"<lowercase-64-hex>"}
+    ]
+  },
   "unresolved_structural_issues":[]
 }
 ```
@@ -571,6 +585,10 @@ payload:
 - `exact_reference_index[]` は `target_id / file / section / row_index / column` の順で安定sort
 - `row_index` は対象structured tableのdata rowを1始まりで数える
 - `unresolved_structural_issues[]` は `issue_type / file / section / row_index / column / message` を持ち、存在しない位置はnull
+- `update_snapshot` は更新開始前の状態を後続operationへそのまま渡すmachine inputであり、Agent / LLMが編集・再構築しない
+- `tracked_items[]` は§6.1のtracked stable IDをowner row単位で1行に正規化し、`stable_id` 昇順。自由記述ではなくcanonical structured owner rowの正規化結果から `row_fingerprint` を計算する
+- UNKNOWN rowは `unknown_active=true / false` とcanonical `resolution_refs[]` を保持し、それ以外は `unknown_active=null / resolution_refs=[]`
+- snapshotの `exact_reference_index[]` と `payload_file_sha256[]` はsnapshot時点の値を保持し、retired IDの過去参照先や更新前file集合もimpact算出へ利用できるようにする
 
 `resolved_unknown_ids` は09で `分類=UNKNOWN` かつ `現在有効か=No` のUNK。
 
@@ -579,10 +597,14 @@ payload:
 stdin:
 
 ```json
-{"operation":"validate","package_root":"<path>"}
+{"operation":"validate","package_root":"<path>","previous_snapshot":null}
 ```
 
+fresh v00 / standalone検証では `previous_snapshot=null` を許可します。通常更新runでは内容編集前の `inspect.payload.update_snapshot` をそのまま渡します。
+
 §2〜§6およびfilesystem safetyを検証します。default version policyでは `v00 / Previous=-` またはcurrent / previousの1 revision差とpackage内version一致を検証します。加えて、resolved UNKNOWNの `解消先ID`、`Machine Entities: spec-analysis` blockのexactly-one存在、build-machine-evidence再生成結果との完全一致を検証します。
+
+通常更新で `previous_snapshot` が与えられた場合、latest `Stable ID changes` と `影響file` が同snapshotから `impact` を再実行した結果とexact一致することも検証します。standalone検証では過去snapshotがないため、CHANGELOGのschema / lifecycle履歴整合だけを検証し、latest差分の再計算は行いません。
 
 current packageだけから過去の同version内容とのbyte同一性は証明しません。「同一versionを異なる完成内容で上書きしない」は、material update時に内容変更前の `next-version` 実行を必須とする更新手順で保証します。
 
@@ -624,11 +646,12 @@ stdin:
 {
   "operation":"next-id",
   "package_root":"<path>",
-  "prefix":"PAGE"
+  "prefix":"PAGE",
+  "previous_snapshot":null
 }
 ```
 
-helperはcurrent structured rowと、CHANGELOG各versionのexact `Stable ID changes` tableから既知ID集合を内部導出します。CHANGELOG本文のproseに現れたID文字列は採番履歴として扱いません。
+helperはcurrent structured row、CHANGELOG各versionのexact `Stable ID changes` table、`previous_snapshot.tracked_items[]` のunionから既知ID集合を内部導出します。fresh v00では `previous_snapshot=null`、通常更新では内容編集前のinspect snapshotを必須とします。CHANGELOG本文のproseに現れたID文字列は採番履歴として扱いません。
 
 payload:
 
@@ -641,7 +664,7 @@ payload:
 
 semantic identityは判断しません。Agent / LLMが `known_ids[]` を組み立てる経路は作りません。
 
-同一prefixで複数IDを割り当てる場合は、返却された `next_id` を対象structured rowへ反映してから次の `next-id` を呼びます。current versionのCHANGELOGへ返却された `stable_id_change` rowを追加し、validate前に採番履歴を閉じます。
+同一prefixで複数IDを割り当てる場合は、返却された `next_id` を対象structured rowへ反映してから、同じ `previous_snapshot` を渡して次の `next-id` を呼びます。`stable_id_change` は即時CHANGELOG書込み用ではなく、採番結果確認用です。latest `Stable ID changes` tableは後段の `impact` がprevious/current差分からsection全体を生成します。
 
 ### render-readme-controls
 
@@ -682,6 +705,8 @@ payload:
 
 slugはlowercase kebab-caseを要求します。helperはsemanticなslug選択を行わず、existing 10+ fileの最大番号+1だけを決定します。
 
+同一更新で複数extension fileを追加する場合は、返却pathを00のextension宣言へ登録し、実fileを作成してから次の `next-domain-file` を呼びます。未materializeの返却番号をAgent側だけで予約して複数回呼びません。
+
 ### build-manifest
 
 stdin:
@@ -705,32 +730,71 @@ payload:
 
 ### impact
 
-通常のcurrent version更新では:
+通常のcurrent version更新では、内容編集前の `inspect.payload.update_snapshot` と更新中current packageを比較します。
+
+stdin:
 
 ```json
 {
   "operation":"impact",
-  "package_root":"<path>"
+  "package_root":"<path>",
+  "previous_snapshot":{"package_version":"v14","tracked_items":[],"exact_reference_index":[],"payload_file_sha256":[]},
+  "change_mode":"normal"
 }
 ```
 
-helperは最新versionのexact `Stable ID changes` tableから `added / changed / resolved / retired / migrated` のStable ID集合を内部導出し、cross-file exact reference indexから次のpayloadを返します。
+helperはstable ID owner rowのprevious/current差分からlifecycleを決定します。
+
+- previousに存在せずcurrentに存在 → `added`
+- same IDがprevious/currentに存在しowner row fingerprintが不変 → eventなし
+- same IDが存在しowner row fingerprintが変化 → 原則 `changed`
+- UNKが `unknown_active=true → false` → `resolved`
+- resolved UNKのresolver変更、`false → true` のsame-ID reopen → `changed`
+- reopen後の `true → false` → 再び `resolved`
+- previousに存在しcurrent structured modelから消えた → `retired`
+- previous CHANGELOGですでに `retired` のIDはcurrentへ再導入不可
+
+LLM / Agentが `added / changed / resolved / retired` を手入力しません。semantic identityのreuse / new、same-UNK reopenかnew UNKかはLLMが先に判断し、helperはその結果として成立したstructured stateの差分だけを分類します。
+
+payload:
 
 ```json
 {
   "changed_ids":["SPEC-001"],
-  "affected_files":["02_behavior_and_business_rules.md"],
+  "stable_id_changes_markdown":"### Stable ID changes\n\n| Stable ID | Change |\n| --- | --- |\n| SPEC-001 | changed |",
+  "affected_files":["02_behavior_and_business_rules.md","09_authority_and_traceability.md"],
+  "affected_files_markdown":"### 影響file\n\n- 02_behavior_and_business_rules.md\n- 09_authority_and_traceability.md",
   "affected_rows":[
     {"changed_id":"SPEC-001","file":"02_behavior_and_business_rules.md","section":"Acceptance Criteria一覧","row_index":1,"column":"関連仕様項目ID"}
   ]
 }
 ```
 
-`changed_ids[]` は昇順、`affected_files[]` はcanonical file order、`affected_rows[]` は `changed_id / file / section / row_index / column` で安定sortします。Agent / LLMが同じID集合をJSONへ再構築しません。operation実行前に、そのversionでsemanticに変更したstable IDを同tableへ記録済みであることを更新手順の前提とします。
+`affected_files[]` は「実際に本文変更が必要だったfile」ではなく、changed stable IDのprevious/current owner fileとprevious/current exact reference先のunionです。再確認対象を漏らさないための決定論的な影響候補としてcanonical file orderで返し、CHANGELOGの `影響file` もこの定義へ固定します。意味上そのfileを修正すべきかはLLMが判断します。
 
-legacy migration直後も同じcurrent versionの `Stable ID changes` tableを入力源とします。
+`stable_id_changes_markdown` と `affected_files_markdown` はsection全体を置換するcanonical Markdownです。Agent / LLMがchanged ID集合・Change値・影響file一覧を再構築しません。
 
-意味上の修正要否は判断しません。
+legacy migrationではsemantic identity mappingだけはLLM判断です。変換後current packageに対し次のmodeを使います。
+
+```json
+{
+  "operation":"impact",
+  "package_root":"<path>",
+  "previous_snapshot":null,
+  "change_mode":"legacy-migration",
+  "migration_retained_ids":["SPEC-001","DEC-001"],
+  "legacy_terminal_events":[
+    {"stable_id":"UNK-009","change":"resolved"}
+  ]
+}
+```
+
+- `migration_retained_ids[]` はLLMがlegacy/currentのsemantic identity一致を判断した結果だけを渡し、helperが `migrated` に変換する
+- current tracked IDのうちretainedでないnew IDは `added`
+- `legacy_terminal_events[]` はlegacy資料から明示確認できる `resolved / retired` だけを許可し、helperが形式・duplicate・prefix/lifecycle整合を検証する
+- legacy proseからIDやterminal eventを自動推測しない
+
+意味上の修正要否、semantic identity、legacy mappingは判断しません。
 
 ### build-machine-evidence
 
@@ -751,13 +815,13 @@ payload:
   "acceptance_criterion_entities":[],
   "machine_entities":[],
   "expected_entity_identities":[],
-  "machine_entities_block":{"schema_version":"entity-state-v2","skill":"spec-analysis","entities":[]}
+  "machine_entities_markdown":"### Machine Entities: spec-analysis\n\n\`\`\`json\n{...}\n\`\`\`\n"
 }
 ```
 
 各Machine Entity / identity rowのschemaはshared runtime contractを正本とします。配列はentity identityの `skill / entity_type / entity_ref` 順でcanonical sortします。統合responseに独自の `implementation_fingerprint` fieldは持ちません。
 
-AgentがMachine Entity wrapper / content fingerprintを手組みしません。
+`machine_entities_markdown` は既存shared `runtime_contract.py::render_machine_entities("spec-analysis", machine_entities)` の戻り値をそのまま使用します。Agentは09の `### Machine Entities: spec-analysis` section全体をこの文字列で置換し、heading / JSON fence / wrapper / content fingerprintを手組みしません。
 
 ### project-eval
 
@@ -1001,14 +1065,17 @@ current artifactに手書きされた既存 `質問ID履歴` は正本入力に�
 
 ### 10.3 project_context_ids.py
 
-Project ContextのSection 12 / 13が案件の決定事項 / 仮定の正本ownerである場合に使うdefault allocatorです。
+Project ContextのSection 12 / 13が案件の決定事項 / 仮定の正本ownerである場合に使うdefault allocatorです。Project Context ownerではstable ID rowをidentity履歴として保持し、撤回 / 置換済みでもID row自体を削除しません。内容・状態は更新できますが、previous Project Contextに存在したDEC / ASM IDをcandidateから消しません。
+
+#### next-id
 
 stdin:
 
 ```json
 {
   "operation":"next-id",
-  "artifact_markdown":"<Project Context>",
+  "previous_artifact_markdown":"<previous Project Context or null>",
+  "artifact_markdown":"<candidate Project Context>",
   "kind":"decision"
 }
 ```
@@ -1026,16 +1093,41 @@ payload:
 - `decision` → `## 12. 確定事項（決定事項の正本一覧）` の `ID` 列、prefix `DEC`
 - `assumption` → `## 13. 仮定（仮定の正本一覧）` の `ID` 列、prefix `ASM`
 
-helperは対象tableのexact heading / header、ID形式、duplicateを検証し、既知最大番号+1を返します。existing rowが0件ならDEC-001 / ASM-001、999使用済みなら `id_space_exhausted` です。
+helperはprevious + candidate両方の対象tableから使用済みID unionを取り、既知最大番号+1を返します。candidateからprevious IDが誤って消えていても、その番号を再利用しません。existing rowが0件ならDEC-001 / ASM-001、999使用済みなら `id_space_exhausted` です。
 
-LLM / stakeholder側がsemantic identityのreuse / new、DECISION / ASM区分、決定内容、関係、影響範囲、ASM承認可否を判断します。helperはProject Contextを書き換えません。
+#### validate-history
+
+stdin:
+
+```json
+{
+  "operation":"validate-history",
+  "previous_artifact_markdown":"<previous Project Context or null>",
+  "artifact_markdown":"<candidate Project Context>"
+}
+```
+
+payload:
+
+```json
+{
+  "missing_previous_ids":[],
+  "decision_ids":["DEC-001"],
+  "assumption_ids":["ASM-001"]
+}
+```
+
+previousが存在する場合、previous Section 12 / 13に存在した全DEC / ASM IDがcandidateにも存在することを要求します。削除されたIDが1件でもあればblockedです。row順は意味を持たず、ID集合で比較します。状態変更・置換先・本文の意味妥当性は検証しません。
+
+LLM / stakeholder側がsemantic identityのreuse / new、DECISION / ASM区分、決定内容、関係、影響範囲、状態遷移の意味、ASM承認可否を判断します。helperはProject Contextを書き換えません。
 
 案件でProject Contextとは別の決定事項 / 仮定の正本一覧が明示されている場合は、そのownerを維持します。
 
 - Project Contextへ同じDECISION / ASMを複製しない
 - `project_context_ids.py` で別ownerのIDを採番しない
-- ownerが提供するdeterministicなID割当て機構がある場合はそれを使用する
+- ownerが提供するdeterministicなID割当て / ID履歴機構がある場合はそれを使用する
 - ownerが新規IDをまだ確定できない場合、LLMが番号を手計算・推測せず、そのDECISION / ASMの正本登録をblockedとしてownerからIDが返るまでcurrent Authorityへ昇格させない
+- PR #16から任意の外部ownerへProject Contextのappend-only規則を強制しない
 - 任意schemaを読むgeneric allocatorはPR #16では作らない
 
 `skills/qa-workflow/assets/project-context-template.md` を正本ownerとして使う場合、Section 12 / 13はheader-onlyとし、placeholder `DEC-001` / `ASM-001` を配置しません。
@@ -1096,6 +1188,8 @@ tableにはpayload filesだけをcanonical順で列挙します。
 | Stable ID | Change |
 | --- | --- |
 
+通常更新ではこのtable全体を `impact.stable_id_changes_markdown` で生成します。Agent / LLMはrowを手入力しません。legacy migrationでは `impact(change_mode=legacy-migration)` がLLMのsemantic mapping結果を受けてtableを生成します。
+
 `Change` は次の5値だけを許可します。
 
 - `added`
@@ -1121,7 +1215,7 @@ tableにはpayload filesだけをcanonical順で列挙します。
 
 `### 影響file`
 
-影響したrelative pathを箇条書きで記録します。これは人間向け履歴であり、`next-id` の入力には使用しません。
+`impact.affected_files_markdown` をそのまま使用します。changed stable IDのprevious/current owner fileとprevious/current exact reference先のunionであり、「実際に本文変更したfile」ではなく今回のsemantic変更に対する再確認候補fileです。`next-id` の入力には使用しません。
 
 helperは次を検証します。
 
@@ -1139,7 +1233,7 @@ helperは次を検証します。
 
 helperは「そのIDが実際にnext-id operationから返されたか」という実行履歴を推測・検証しません。検証対象はcurrent packageとCHANGELOGに保存された成果物状態です。
 
-変更概要と影響fileの意味内容はLLMが作成します。
+`変更概要` だけをLLMが記述します。`Stable ID changes` と `影響file` はhelper生成です。
 
 ## 14. legacy / unversioned package migration
 
@@ -1234,7 +1328,9 @@ production helperのfilesystem / raw hash / projection / README control renderin
 - build-manifestがREADME controls反映後のraw bytesをlowercase 64 hex SHA-256でhashすること
 - next-domain-fileのlowercase kebab-case / max+1 / canonical path / id_space_exhausted
 - CHANGELOG `Stable ID changes` exact heading / header / Change enum / duplicate
-- next-idのcurrent structured row + historical stable ID導出、連続採番、retired ID非再利用
+- inspectのupdate_snapshotがtracked owner row fingerprint / previous exact refs / payload file hashをcanonical生成すること
+- next-idがcurrent structured row + historical stable ID + previous snapshotから使用済みIDを導出し、更新途中でowner rowから消えたIDも再利用しないこと
+- impactがprevious snapshotとcurrent owner row差分からadded / changed / resolved / retiredを一意に生成し、Stable ID changes / 影響fileのcanonical Markdownまで返すこと
 - duplicate canonical heading / table、row列数不一致、escaped pipe / `<br>` reference parse
 - duplicate / unknown stable ref
 - current UNKNOWNの `現在有効か / 解消先ID` 組合せ、resolved UNKNOWNのresolver変更、same-UNK reopen / re-resolve、`解消先ID` missing / invalid / non-current Authority
@@ -1253,7 +1349,7 @@ production helperのfilesystem / raw hash / projection / README control renderin
 - unknown_links.pyのexact `operation=validate-links` / payload / top-level issues contract
 - question_ids.pyのheader-only current質問table + `質問ID履歴`、previous + current artifactを読むnext-id / build-history exact contract、duplicate / Q-999
 - `Q-001` 解消でcurrent質問0件になった後の新規質問がQ-002となり、過去Q IDを再利用しないこと
-- project_context_ids.pyのSection 12 / 13 exact table、DEC / ASM kind、duplicate、999 exhaustion
+- project_context_ids.pyのSection 12 / 13 exact table、previous + candidate unionでのDEC / ASM採番、validate-historyによるprevious ID削除拒否、kind / duplicate / 999 exhaustion
 - Project Contextがownerでない案件ではproject_context_ids.pyを使わず、外部ownerのIDを維持し、owner未採番時にLLM hand-numberingへfallbackしないこと
 - CHANGELOG / impactがDEC / ASMを追跡可能stable IDとして受理しつつ、ui_target_package.py next-idではDEC / ASMを拒否すること
 - fresh v00の空change table、v01以降のDEC / ASM初登場=added、既追跡内容・状態変更=changed、current structured model除去=retiredを区別すること
@@ -1272,7 +1368,8 @@ production helperのfilesystem / raw hash / projection / README control renderin
 - UNKNOWNがopen / resolved / resolver変更 / same-ID reopen / re-resolveの各状態で `現在有効か / 解消先ID` 契約を満たし、resolved時はcurrent Authorityへ機械検証可能に閉じる
 - current packageの次versionをAgentが転記せずhelperが `package_root` から導出できる
 - README metadata / UNKNOWN件数 / payload file tableをAgentが再構築せずcanonical Markdownとして生成できる
-- extension fileの必要性 / slugだけLLMが判断し、連番 / pathはhelperが決定できる
+- extension fileの必要性 / slugだけLLMが判断し、連番 / pathはhelperが決定できる。同一更新で複数追加する場合は返却pathの00登録 + file作成後に次を採番する
+- Machine Entity sectionのheading / JSON fence / wrapperをAgentが組まず、build-machine-evidenceがshared render_machine_entities()由来のcanonical Markdown sectionを返す
 - new ID採番時にAgentが既知ID集合を手組みせず、CHANGELOG stable ID履歴を含めて過去IDを再利用しない
 - new Q / DEC / ASMのsemantic identityはLLM / stakeholder側に残す。Qはcurrent + 使用済み履歴からquestion-analysis helperが番号を決定して過去IDを再利用せず、Project ContextがDEC / ASM ownerの場合はqa-workflow helper、別ownerの場合はそのownerのdeterministic allocatorで番号を決定し、未採番時にLLM hand-numberingへfallbackしない
 - structured tableのheader / ID / ref列が一意
