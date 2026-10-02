@@ -139,7 +139,7 @@ mode packageでも既存 `assets/output-template.md` のcanonical契約を維持
 - UI構造間の関係は `関連構造ID` で追跡する
 - 複数IDの区切りは `<br>` に固定する
 - exact ID参照の存在・duplicateはui_target_package.pyで検証する
-- semantic identity、reuse / new判断はLLMが行う。UI target mode内でnewと判断した `SRC / SPEC / INF / UNK` とstructural IDの次番号は `ui_target_package.py next-id` を使用し、Agentが既知ID一覧を組み立てない。DEC / ASMはquestion-analysis / project側の正本IDを参照する
+- semantic identity、reuse / new判断はLLMが行う。UI target mode内でnewと判断した `SRC / SPEC / INF / UNK` とstructural IDの次番号は `ui_target_package.py next-id` を使用し、Agentが既知ID一覧を組み立てない。DEC / ASMは案件で実際に指定された正本ownerのIDを参照し、UI target packageでは採番しない。ただしpackage内stable reference / CHANGELOG / impactでは追跡対象に含める
 
 ### 正規UI分類
 
@@ -362,7 +362,7 @@ default policyでは `ui_target_package.py next-version` が次versionを導出�
 
 1. LLMが変更されたAuthority / DECISION / ASMを解決し、project policyに従ってmaterial updateかを判断する
 2. default version policyでversion upする場合は、**内容を書き換える前に**既存current packageへ `ui_target_package.py next-version` を `package_root` だけで実行する。返却された `readme_version_rows_markdown` をREADMEの該当2rowへ反映し、`next_version` をCHANGELOGのcurrent version headingへ使用する。Agentがcurrent versionを手で転記しない
-3. LLMが影響するcanonical stable item / UNKを更新する。semantic identityがnewの場合だけ `next-id` を使う。UI target modeがownerの `SRC / SPEC / INF / UNK` とstructural IDはhelperで採番し、DEC / ASMはproject側正本の既存IDを参照する。返却IDを対象structured rowへ反映してから同prefixの次の採番へ進み、返却された `stable_id_change` はcurrent versionのCHANGELOGへ記録する。既存identityの内容変更は `changed`、UNKNOWN解消は `resolved`、current viewから外すentityは `retired` として、この時点で `Stable ID changes` tableへ記録する。UNKNOWN解消時は元UNKを `現在有効か=No` にし、確定内容を分類に合うnew / reuse stable IDへ接続して `解消先ID` を保持する
+3. LLMが影響するcanonical stable item / UNKを更新する。semantic identityがnewの場合だけ `next-id` を使う。UI target modeがownerの `SRC / SPEC / INF / UNK` とstructural IDはhelperで採番し、DEC / ASMは実際の正本ownerの既存IDを参照する。返却IDを対象structured rowへ反映してから同prefixの次の採番へ進み、返却された `stable_id_change` はcurrent versionのCHANGELOGへ記録する。既存identityの内容変更は `changed`、UNKNOWN解消は `resolved`、current viewから外すentityは `retired` として、この時点で `Stable ID changes` tableへ記録する。packageが参照するDEC / ASMの内容・状態変更も同tableへ記録してimpact対象に含める。UNKNOWN解消時は元UNKを `現在有効か=No` にし、確定内容を分類に合うnew / reuse stable IDへ接続して `解消先ID` を保持する
 4. 09_authority_and_traceability.mdのcanonical modelを更新する
 5. `Stable ID changes` tableへ今回のsemantic変更対象IDが揃った後、`ui_target_package.py impact` を `package_root` だけで実行し、helperが導出したchanged IDのexact参照先を再確認候補として列挙する
 6. LLMが候補fileを確認し、意味上変更が必要な01〜08 / domain fileだけを更新する
