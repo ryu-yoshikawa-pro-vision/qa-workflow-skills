@@ -148,13 +148,14 @@ focused確認 / 個別利用用operationです。LLMが「標準fileへ混在さ
 
 #### materialize
 
-通常のUI target package作成 / 更新のwrite pathです。LLMがsemantic row / prose、reuse / new、explicit retire、file trigger、extension要否を決めた後、helperが次をまとめて実行します。
+通常のUI target package作成 / 更新のwrite pathです。normal create / updateとlegacy-migrationを明示modeで分けます。LLMがsemantic row / prose、reuse / new、explicit retire、file trigger、extension要否を決めた後、helperが次をまとめて実行します。
 
-- new ID / `@draft`参照解決
+- stable owner tableのnew ID / `@draft`参照解決
+- stable IDを採番しないfixed/view tableのfull-replacement `keyed_table_updates[]` と、そのkey / reference内 `@draft` 解決
 - Markdown escape / canonical row order / table serialization
 - known headingへのsection置換
-- 条件付き標準fileのtemplate作成 / 除去
-- new / reuse extension fileの連番解決、作成 / 更新、00の `案件固有extension file一覧` canonical生成
+- file applicabilityを先に解釈した条件付き標準fileのtemplate作成 / 除去
+- new / reuse extension fileの連番batch解決、作成 / 更新、00の `案件固有extension file一覧` canonical生成
 - explicit `retire_ids[]` のlifecycle検証。row消失だけではretireしない
 - Stable ID changes / 影響file
 - Machine Entities section
@@ -162,7 +163,7 @@ focused確認 / 個別利用用operationです。LLMが「標準fileへ混在さ
 - MANIFEST / hash
 - final validate
 
-汎用Markdown frameworkにはせず、`ui-target-v1` のknown file / heading / table registryだけを扱います。通常更新ではsingle writerとし、inspect snapshotからbytesが変わっていればstaleとして書込みません。
+汎用Markdown frameworkにはせず、`ui-target-v1` のknown file / heading / table registryだけを扱います。stable owner tableとfixed/view tableのregistryもPlanで固定します。通常更新ではsingle writerとし、inspect snapshotからbytesが変わっていればstaleとして書込みません。差分なしのnormal updateはno-opとしてversionを上げません。
 
 #### build-manifest
 
