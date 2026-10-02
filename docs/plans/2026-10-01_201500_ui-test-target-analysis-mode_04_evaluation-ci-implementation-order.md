@@ -246,7 +246,8 @@ repository unit testで次を必須確認します。
 - CHANGELOG最新version見出しとpackage versionの一致
 - CHANGELOGのexact `Stable ID changes` table、Change enum、version内duplicate
 - fresh v00の空change table、v01以降のDEC / ASM初登場=added、既追跡内容・状態変更=changed、current structured model除去=retired
-- resolvedはUNKだけに許可し、resolved / retiredをterminal eventとして後続eventをreject
+- resolvedはUNKだけに許可し、resolved後のresolver変更 / same-ID reopenを `changed`、reopen後の再closeを再 `resolved` として許可すること
+- retiredだけをterminal eventとして後続eventをrejectすること
 - 履歴全体で同じStable IDへ `added / migrated` を複数回記録できないこと
 - legacy migrationでDEC / ASMを含むretained tracked IDを `migrated` としてseedし、確認できるretired / resolved履歴だけをseedすること
 - current packageのnext-versionが `package_root` からcurrent versionを内部取得し、Agentへ `previous_version` の転記を要求しないこと
@@ -261,7 +262,7 @@ repository unit testで次を必須確認します。
 - Project Context以外の明示ownerをProject Contextへ複製せず、owner未採番時にLLM hand-numberingへfallbackしないこと
 - 同一prefixの複数new IDで、返却IDをstructured rowへ反映してから次のnext-idを呼ぶと重複せず単調に採番されること
 - current viewから消えた過去IDもCHANGELOG履歴に存在する限り再利用しないこと
-- resolved UNKNOWNの `解消先ID` がcurrent SPEC / DECISION / 承認済みASMへ閉じること
+- UNKNOWNのopen / resolved / resolver変更 / same-ID reopen / re-resolveで `現在有効か / 解消先ID` が整合し、resolved状態ではcurrent SPEC / DECISION / 承認済みASMへ閉じること
 - canonical structured Markdownのduplicate heading / table、row列数、escaped pipe、`<br>` referenceを固定parse契約で検証すること
 - impactが最新versionの `Stable ID changes` からchanged ID集合を内部導出し、Agentへchanged ID再入力を要求せず、exact referenceだけから候補fileを返してsemantic変更を勝手に決定しないこと
 - scope applicability、UI操作scopeのUIOP / US / UC / Behavior / AC hierarchy / closure / current UCの3分類整合
@@ -285,9 +286,11 @@ repository unit testで次を必須確認します。
 - issueをpayloadへ重複保持せず共通top-level `issues[]` だけへ返す
 
 `question_ids.py`:
-- new Qの意味判断をせず、header-only template / existing artifactのQ ID最大値+1を返す
+- new Qの意味判断をせず、current `不明点 / 質問一覧` + `質問ID履歴` の使用済みQ ID unionから最大値+1を返す
+- previous artifact + candidate current artifactからcanonical `質問ID履歴` tableを生成し、回答済みQがcurrent一覧から消えてもIDを保持する
 - malformed / duplicate Q IDを拒否
 - Q-999で `id_space_exhausted`
+- `Q-001解消 → current質問0件 → 新規質問` でQ-002となり、Q-001を再利用しない
 
 `project_context_ids.py`:
 - Project Context Section 12 / 13が案件のDEC / ASM正本ownerである場合だけ対象tableをparse
@@ -298,7 +301,7 @@ repository unit testで次を必須確認します。
 
 QとUNKの意味的同一性、Q / DEC / ASMのsemantic identity、DECISION内容、ASM承認可否、Project Context以外の正本schema解釈は検証しません。別ownerのIDが未確定ならLLM hand-numberingへfallbackせず正本登録をblockedとします。
 
-question-analysis output templateのQ tableはheader-onlyに変更します。Project Contextが正本ownerであるdefault経路ではSection 12 / 13もheader-onlyに変更し、Q-001 / DEC-001 / ASM-001のplaceholder rowを置きません。
+question-analysis output templateのcurrent Q tableと `質問ID履歴` はheader-onlyに変更します。Project Contextが正本ownerであるdefault経路ではSection 12 / 13もheader-onlyに変更し、Q-001 / DEC-001 / ASM-001のplaceholder rowを置きません。
 
 ### 8.3 deterministic output eval
 
@@ -335,8 +338,11 @@ runtime / Machine Entity version cutoverでは、current repository内のactive 
 
 - `runtime-v1` がshared runtime contractを指すcurrent code / Skill文書 / asset / eval fixture / test metadataは `runtime-v2` へ同期する
 - `entity-state-v1` がactive Machine Entity schemaを指すcurrent code / asset / eval fixture / deterministic validatorは `entity-state-v2` へ同期する
+- active output template / fixtureに `entity_schema_version`、単一 `dependencies`、`runtime-contract-v1`、`runtime-envelope-v1` の旧擬似schemaを残さず、runtime helperのcanonical block shapeと一致させる
+- template / fixtureのMachine Evidence例はcurrent v2 validatorでparse / validateできることをrepository testで確認する
 - `docs/history/**` と完了済み旧Planは変更しない
 - `workflow-runtime-v1`、`schema-cases-v1`、`usability-inspection-runtime-v1`、`wcag-em-runtime-v1` 等のgenerator contract identifierはshared runtime versionではないため変更しない
+- `schema_cases.py` / `flow_paths.py` 等の「runtime-v1未対応」表現がgenerator対応範囲を意味する箇所はshared runtime v2へ機械置換せず、必要なら `schema-cases-v1` / `flow-paths-v1` 等のgenerator contract名へ言い換える
 - 単純な文字列全置換ではなく、上記区分をrepository test / reviewで確認する
 
 今回必須:
@@ -430,6 +436,9 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - current ACだけをMachine Entity化し、US / UC / Behaviorをglobal Entity typeへしないことを確認
 - helper unit / portability / 9-copy runtime contract byte-identity test
 - independent `runtime_validator.py`、active code / Skill文書 / asset / eval fixture / repository testのshared runtime / Machine Entity schema referenceをv2へ同期
+- active `skills/spec-analysis/assets/output-template.md`、`skills/test-analysis/assets/output-template.md`、`skills/test-condition-design/assets/output-template.md` の旧手書きMachine Evidence例をversion文字列だけ置換しない
+- runtime Skillのtemplateでは、`render_runtime_input()` / `render_runtime_result()` / `render_machine_entities()` が生成するcanonical blockを正本とし、手書きの `runtime-contract-v1` / `runtime-envelope-v1` / `entity_schema_version` / `dependencies` 擬似schemaを削除する
+- spec-analysis templateでは `authority_entities.py` / UI target modeの `build-machine-evidence` が生成するcanonical `schema_version / model_key / upstream_entity_dependencies / runtime_dependencies` shapeを正本とし、Machine Entity JSONをAgentに手組みさせない
 
 この時点ではquestion-analysis / qa-workflowは変更しません。
 
@@ -450,9 +459,9 @@ mode単体が成立してからworkflowへ接続します。
 - stable UNKNOWN参照
 - 回答正規化後のspec-analysis resume
 - output templateの関連UNKNOWN ID
-- `不明点 / 質問一覧` をheader-onlyへ変更
+- `不明点 / 質問一覧` と `質問ID履歴` をheader-onlyへ変更
 - skills/question-analysis/scripts/unknown_links.py
-- skills/question-analysis/scripts/question_ids.py
+- skills/question-analysis/scripts/question_ids.py（next-id / build-history）
 - Project Context Section 12 / 13が案件の正本ownerであるdefault経路では同tableをheader-onlyへ変更
 - skills/qa-workflow/scripts/project_context_ids.py
 - Project Contextがownerの場合だけnew DEC / ASMの番号をhelperで決定し、意味判断はquestion-analysis / stakeholder側に残す
