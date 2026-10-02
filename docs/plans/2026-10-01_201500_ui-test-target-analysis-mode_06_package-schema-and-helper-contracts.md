@@ -805,7 +805,7 @@ stdin:
 
 `change_mode` は `normal / legacy-migration` の2値です。
 
-normalでは `version_policy` を `default / project` の2値から選びます。既存完成package更新のdefaultではhelperがprevious snapshotのversionから次versionを導出し、README / CHANGELOG / MANIFESTへ同時反映します。projectの場合だけ、案件で明示されたpolicyに基づく `target_version` を必須とし、helperはpackage内一致を検証します。完成済みpackageへ1 byteでも永続変更を加えて再び完成状態として保存する場合、default policyではsemantic / presentationを問わず必ずversionを+1します。in-memory生成結果がprevious packageと完全同一ならno-opとして書込み・version upを行いません。
+normalでは `version_policy` を `default / project` の2値から選びます。既存完成package更新のdefaultではhelperがprevious snapshotのversionからnext version候補を導出しますが、差分確定前にはREADME / CHANGELOG / MANIFESTへ反映しません。projectの場合だけ、案件で明示されたpolicyに基づく `target_version` を必須とします。semantic / presentationを問わず、requested updateを反映した**user-managed / semantic payload**がcurrent packageから変わる場合にだけversionを+1します。Package Version / Previous Package Version、CHANGELOGの新version entry、README controls、MANIFESTのようにversion upやpayload変更から派生するcontrol差分は、変更有無の原因として数えません。provisional payloadがcurrentと同一ならno-opとして書込み・version upを行いません。
 
 legacy-migrationでは `previous_snapshot=null` を要求し、`legacy_source_version` は明示 `vNN` または `legacy-unversioned` を必須とします。明示vNNならtargetを次のvNN、`legacy-unversioned` ならtargetをv00 / Previous=`legacy-unversioned`へ固定します。`version_policy=project` はlegacy-migrationでも案件に明示policyがある場合だけ許可します。`migration_retained_ids[]` と `legacy_lifecycle_events[]` は§14のsemantic mapping結果だけを受け、helperが番号予約・lifecycle生成へ使います。
 
@@ -853,20 +853,21 @@ stable owner allocation / lifecycle contract:
 file / control materialization order:
 
 1. artifact_mode / change_mode / previous_snapshotの組合せを検証する。normal updateではprevious snapshotとcurrent bytesを照合し、staleなら書込みしない。normal create / legacy-migrationでは新しいcurrent-schema target rootがasset初期状態であることを検証する
-2. change_mode / version policyを解決し、target version / Previous Package Versionをin-memory metadataへ設定する
+2. version policyを検証し、normal updateではnext version候補だけを保持する。まだPackage Version / CHANGELOG / README / MANIFESTへ反映しない
 3. legacy-migrationでは `migration_retained_ids[] / legacy_lifecycle_events[]` の形式・duplicate・lifecycleを先に検証して使用済みID集合へ予約する
 4. `keyed_table_updates[]` のうちfile applicability / 案件固有prefix宣言を先にparseし、意味値を変更せず構造検証する
 5. applicabilityに従い条件付き標準fileのtemplateをin-memoryへ追加 / removal予定化し、`extension_file_updates[]` のnew pathをrequest順でbatch allocationして新規extension templateを準備する
 6. stable owner `table_changes[]` をin-memory modelへ適用し、reuse / new IDを割り当て、owner row内の `@draft` referenceを解決する。新規条件付きfile / extension fileのowner rowもこの段階で適用する
 7. remaining `keyed_table_updates[]` のkey / reference内 `@draft` を解決して完成row集合を確定する
 8. normal updateの `retire_ids[]` を検証してin-memory owner modelから除去する。removal予定fileにtracked owner rowが残る場合は対応retire intent不足としてblockedする。legacy-migrationの過去lifecycle eventは `legacy_lifecycle_events[]` だけから扱い、current row削除操作へ流用しない
-9. extension最終集合から00の `案件固有extension file一覧` をcanonical生成する
-10. stable owner / keyed / generated tableをexact Markdownへescape / canonical sortしてserializeし、known sectionだけ置換する。prose updateはexact heading配下のbodyだけを置換し、意味を書き換えない
-11. normalではprevious snapshot + explicit retire intent、legacy-migrationではmigration retained / lifecycle mapping + current owner modelからimpactを生成し、CHANGELOGのtarget version entryを作成して `変更概要 / Stable ID changes / 影響file` を更新する
-12. `build-machine-evidence` 相当処理で09のMachine Entities sectionをcanonical生成・置換する
-13. README controlsをcanonical生成・置換する
-14. MANIFESTを最後に再生成する
-15. normal updateでin-memory結果がprevious packageと完全同一ならno-opを返す。差分がある場合、またはlegacy-migrationではfinal validateを実行し、成功した場合だけpackage filesへ書き出す
+9. extension最終集合から00の `案件固有extension file一覧` をcanonical生成し、stable owner / keyed / generated tableとprose updateをexact Markdownへ反映する
+10. `build-machine-evidence` 相当処理をprovisional current versionのまま実行し、Machine Entities sectionをcanonical生成する
+11. normal updateでは、version metadata・current CHANGELOG new entry・README generated controls・MANIFESTを除いたprovisional payload bytesをcurrent packageと比較する。差分がなければ `changed=false` を返し、change_summaryを適用せず書込みもしない
+12. changed normal update / normal create / legacy-migrationでtarget Package Version / Previous Package Versionを確定する。normal createはv00 / -、legacy-migrationはlegacy source contract、normal updateはStep 2のnext version候補を使う
+13. normal updateではprevious snapshot + explicit retire intent、legacy-migrationではmigration retained / lifecycle mapping + current owner modelからimpactを生成し、CHANGELOGのtarget version entryへ `変更概要 / Stable ID changes / 影響file` を生成する。normal createはv00 baseline entryを生成する
+14. README controlsをcanonical生成・置換する
+15. MANIFESTを最後に再生成する
+16. final validateを実行し、成功した場合だけpackage filesへ書き出す
 
 payload:
 
@@ -882,7 +883,7 @@ payload:
 }
 ```
 
-`changed=false` のno-opでは `allocated_ids=[] / allocated_extension_files=[] / retired_ids=[] / changed_files=[]` とし、`previous_package_version / package_version` はcurrent package値を返します。create / legacy-migrationは成功時 `changed=true` です。
+`changed=false` のno-opでは `allocated_ids=[] / allocated_extension_files=[] / retired_ids=[] / changed_files=[]` とし、`previous_package_version / package_version` はcurrent package値を返します。provisional処理で一時的に割り当てたID / extension pathは保存・予約しません。create / legacy-migrationは成功時 `changed=true` です。
 
 通常のUI target package更新は `materialize` を正本のwrite pathとします。`next-id / impact / render-readme-controls / build-machine-evidence / build-manifest` は同じ内部contractを個別検証・focused useするoperationとして残しますが、Agentがそれらの返却Markdownを手作業で貼り合わせて完成packageを作る経路をcanonical手順にしません。
 
