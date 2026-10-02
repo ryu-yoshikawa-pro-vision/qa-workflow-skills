@@ -85,6 +85,15 @@ stdin / stdout JSON、operation名、failure、size limit、sort順等の正確�
 
 この2 helperはQとUNKの意味的対応、質問文、回答後の正規化先、reuse / newの意味判断を行いません。
 
+question-analysis成果物の更新順は次に固定します。
+
+1. previous artifactがあればその全文を保持し、candidate current artifactでは意味上reuseするQだけ既存IDでcurrent質問tableへ置く
+2. semanticにnewと判断したQごとに `question_ids.py next-id` へprevious artifact + 更新中candidateを渡し、返却Q IDをcurrent質問rowへ即時反映する
+3. 全current質問rowが確定した後、`question_ids.py build-history` へprevious artifact + candidateを渡す
+4. 返却された `question_id_history_markdown` で `質問ID履歴` section全体を置換する
+
+Agent / LLMがpreviousの質問ID履歴を手で転記・unionしません。
+
 ### 1.6 deterministic eval
 
 既存 `skills/question-analysis/evals/deterministic/validator.py` も同じ外部契約を独立に評価します。
