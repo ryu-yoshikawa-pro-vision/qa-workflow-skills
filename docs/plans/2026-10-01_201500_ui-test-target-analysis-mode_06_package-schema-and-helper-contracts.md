@@ -323,7 +323,7 @@ UNKNOWNのlineageは次に固定します。
 `### Machine Entities: spec-analysis`
 
 ```json
-{"schema_version":"entity-state-v1","skill":"spec-analysis","entities":[]}
+{"schema_version":"entity-state-v2","skill":"spec-analysis","entities":[]}
 ```
 
 `entities` は§9のdeterministic bridge結果をそのまま使用します。LLMがMachine Entity wrapper / fingerprintを計算・再構築しません。`expected_entity_identities` はhelper responseに保持しますが、artifactの `Machine Entities` block schemaへ混入させません。`authority_entities.py` が内部返却する `implementation_fingerprint` は本modeのconsumer契約では使用せず、`build-machine-evidence` の統合responseへ公開しません。
@@ -396,7 +396,7 @@ UI target structural:
 
 形式は `PREFIX-001` ～ `PREFIX-999`。
 
-`DEC / ASM` もpackage内で参照される外部ownerのstable IDなので、exact reference validation、CHANGELOG `Stable ID changes`、`impact` の追跡対象に含めます。DECISION / approved ASMの内容または状態変更がUI target packageへ影響する場合、current versionの `Stable ID changes` へ `DEC-xxx / ASM-xxx` を `changed / resolved / retired` として記録し、impact候補へ含めます。
+`DEC / ASM` もpackage内で参照される外部ownerのstable IDなので、exact reference validation、CHANGELOG `Stable ID changes`、`impact` の追跡対象に含めます。v01以降にpackageへ初めて取り込むDEC / ASMは `added`、既に追跡中の同一IDの内容・状態変更は `changed`、current structured modelから外す場合だけ `retired` とします。`resolved` は `UNK-xxx` 専用であり、DEC / ASMへ使用しません。
 
 ### 6.2 ui_target_package.py next-idの採番対象
 
@@ -748,7 +748,7 @@ payload:
   "acceptance_criterion_entities":[],
   "machine_entities":[],
   "expected_entity_identities":[],
-  "machine_entities_block":{"schema_version":"entity-state-v1","skill":"spec-analysis","entities":[]}
+  "machine_entities_block":{"schema_version":"entity-state-v2","skill":"spec-analysis","entities":[]}
 }
 ```
 
@@ -1056,14 +1056,15 @@ tableにはpayload filesだけをcanonical順で列挙します。
 
 規則:
 
+- fresh packageの `v00` はbaselineであり、templateどおり `Stable ID changes` tableを空で開始できる。v00時点でcurrent structured rowに存在するIDはbaseline identityとして扱う
+- v01以降にpackageへ初登場するtracked stable IDは `added`。UI target mode所有IDは `next-id` の返却 `stable_id_change` を使い、外部ownerのDEC / ASMはowner確定IDをpackageへ初めて取り込むversionで `added` とする
+- legacy packageからsemantic identityを維持してcurrent schemaへ持ち込んだtracked stable IDは、SRC / SPEC / INF / UNK / DEC / ASM / structural IDを問わずmigration versionで `migrated` とする
+- 同一identityを維持したまま内容・状態・関係が変わり、current structured modelへ残る場合は `changed`
+- `resolved` はUNKNOWN lineage専用。対象は `UNK-xxx` だけで、09の `現在有効か=No` かつ非空 `解消先ID` と一致させる。DEC / ASMその他のprefixへ `resolved` を使用しない
+- current structured modelからstable ID自体を外す場合は `retired`。DEC / ASMが撤回・置換等でcurrent Authorityから外れても09の分析項目へ履歴rowを残す場合は `changed` とし、row自体をcurrent structured modelから除く場合だけ `retired`
 - 1 version内で同じStable IDを重複させない
 - 1つのStable IDに `added` または `migrated` を記録できるのは履歴全体で最初の1回だけ
-- `next-id` で新規採番したIDは `added` として記録する
-- legacy packageからsemantic identityを維持してcurrent schemaへ持ち込んだIDはmigration versionで `migrated` として記録する
-- UNKNOWN解消は対象 `UNK-xxx` を `resolved` として記録する
-- current viewから削除したstable entityは `retired` として記録する
-- 内容変更のみでidentityを維持したstable entityは `changed`
-- `resolved / retired` 済みIDを別entityの `added / migrated` として再利用しない
+- `resolved / retired` はterminal eventとし、その後に `added / migrated / changed / resolved / retired` を再記録しない
 - `next-id` はcurrent structured rowと全versionのこのtableに現れるStable IDを使用済みIDとして扱う
 
 `### 影響file`
@@ -1076,7 +1077,9 @@ helperは次を検証します。
 - 各version entryに上記3 headingがexactly one存在
 - `Stable ID changes` tableのheader / Change enum / Stable ID形式 / version内duplicate
 - 履歴全体で `added / migrated` が同じStable IDへ複数回現れない
-- `resolved / retired` 後のStable IDが別entityとして再導入されていない
+- `resolved` はUNK prefixだけに現れ、current resolved UNKNOWN rowの `現在有効か=No / 解消先ID` と一致する
+- `resolved / retired` 後に同じStable IDのeventが存在しない
+- v01以降に初登場するDEC / ASMを `added` として追跡でき、既追跡DEC / ASMの状態変更を `changed`、current structured modelからの除去を `retired` として受理する
 - current structured rowとStable ID履歴のID形式が§6.1の追跡可能prefix契約に一致する
 - `next-id` input prefixは§6.2の採番対象だけを許可し、DEC / ASMを拒否する
 
@@ -1096,8 +1099,8 @@ LLMは:
 
 1. legacy packageのcurrent内容とstable IDを読む
 2. 新schemaの00〜09 / domain fileへ意味をmapする
-3. semantic identityが同じ既存SRC / SPEC / INF / UNK / structural IDは可能な範囲でID維持
-4. retained current IDをmigration versionの `Stable ID changes` tableへ `migrated` としてseedする
+3. semantic identityが同じ既存SRC / SPEC / INF / UNK / DEC / ASM / structural IDは、実際の正本ownerを維持したままID維持する
+4. retained current tracked IDをprefixにかかわらずmigration versionの `Stable ID changes` tableへ `migrated` としてseedする
 5. legacy履歴から明示的に確認できるretired / resolved IDは対応する `retired / resolved` rowとしてseedする。legacy資料から確認できない過去IDを推測で作らない
 6. 新しいentityだけnewと判断し、next-idを使う
 7. legacyで未確定だった内容を推測で確定しない
@@ -1198,6 +1201,9 @@ production helperのfilesystem / raw hash / projection / README control renderin
 - project_context_ids.pyのSection 12 / 13 exact table、DEC / ASM kind、duplicate、999 exhaustion
 - Project Contextがownerでない案件ではproject_context_ids.pyを使わず、外部ownerのIDを維持し、owner未採番時にLLM hand-numberingへfallbackしないこと
 - CHANGELOG / impactがDEC / ASMを追跡可能stable IDとして受理しつつ、ui_target_package.py next-idではDEC / ASMを拒否すること
+- fresh v00の空change table、v01以降のDEC / ASM初登場=added、既追跡内容・状態変更=changed、current structured model除去=retiredを区別すること
+- resolvedをUNK以外へ使用するとrejectし、resolved / retired後の後続eventをrejectすること
+- legacy migrationでDEC / ASMを含むretained tracked IDをmigratedとしてseedすること
 - question-analysis output templateのQ tableとProject Context template Section 12 / 13がheader-onlyでplaceholder IDを持たないこと
 - legacy migration後fixtureのvalidate PASS
 
