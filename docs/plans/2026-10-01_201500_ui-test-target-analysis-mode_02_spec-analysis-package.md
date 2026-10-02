@@ -424,7 +424,7 @@ helperが列挙したimpact候補は再確認対象であり、変更必須と�
 - versionが全packageで一致し、default policy利用時の次versionがhelper結果と一致する
 - 07のcurrent UNK ID集合とREADME件数が09からhelperで導出したcurrent UNKNOWN集合 / 件数と一致する
 - CHANGELOGが今回変更を説明できる
-- required coreが全て存在し、03 / 04 / 05 / 08は00の条件付き必須file applicabilityと実file / MANIFESTが一致する
+- required core payloadとrequired control file `MANIFEST.md` が存在し、03 / 04 / 05 / 08は00の条件付き必須file applicabilityと実file / MANIFESTのpayload一覧が一致する
 - MANIFESTのfile order / SHA-256がhelper再計算結果と一致する
 - structured rowのexact stable ID参照がすべて存在し、duplicate structural IDがない
 - 01〜08の期待挙動が09のstable item IDへ追跡できる
