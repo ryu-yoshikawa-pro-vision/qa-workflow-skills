@@ -171,12 +171,13 @@ version更新時は変更ファイルだけではなく、そのversionの完全
 - skills/question-analysis/references/guidance.md
 - skills/question-analysis/assets/output-template.md
 - 新規 skills/question-analysis/scripts/unknown_links.py
+- 新規 skills/question-analysis/scripts/question_ids.py
 - skills/question-analysis/evals/semantic/*
 - skills/question-analysis/evals/deterministic/validator.py
 - skills/question-analysis/evals/output/*
-- unknown_links.py用repository unit test
+- question-analysis helper用repository unit test
 
-目的はUNKNOWNの安定参照、回答後の差分反映、解消済み履歴とcurrent unknownの分離です。既存の質問分類自体は変更しません。
+目的はUNKNOWNの安定参照、回答後の差分反映、解消済み履歴とcurrent unknownの分離です。既存の質問分類自体は変更しません。new Qの意味判断はLLMに残し、Q番号だけSkill-local helperで決定します。
 
 ### shared runtime contract
 
@@ -201,11 +202,14 @@ PR #14確認headには `usability-inspection` / `wcag-conformance-evaluation` �
 
 変更:
 - skills/qa-workflow/references/guidance.md
+- skills/qa-workflow/assets/project-context-template.md
+- 新規 skills/qa-workflow/scripts/project_context_ids.py
 - skills/qa-workflow/evals/deterministic/routing_cases.json
 - skills/qa-workflow/evals/deterministic/routing_candidate_outputs.json
+- project_context_ids.py用repository unit test
 - routing fixtureの固定件数を検証するrepository test / docs current count
 
-「テスト設計前の仕様理解package」はspec-analysisから開始し、未解決事項があればquestion-analysisへ進み、回答反映後spec-analysisへ戻すroutingを追加します。
+「テスト設計前の仕様理解package」はspec-analysisから開始し、未解決事項があればquestion-analysisへ進み、回答反映後spec-analysisへ戻すroutingを追加します。正式DECISION / 承認済みASMへ正規化する場合、意味判断はquestion-analysis / stakeholder側に残し、Project Context正本でnewと確定したID番号だけqa-workflow helperが決定します。
 
 ### repository docs / CI
 
