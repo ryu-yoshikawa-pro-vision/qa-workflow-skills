@@ -239,6 +239,7 @@ repository unit testで次を必須確認します。
 - package root外path拒否
 - package内version一致
 - canonical / structural ID形式・duplicate
+- 00のscope / applicability tableで `関連仕様項目ID` と `根拠 / 備考` が別列であり、stable ID列にはIDだけ、prose列中のIDはreference扱いしないこと
 - structured rowのexact stable ID参照
 - 09のcurrent UNKNOWN集合と07 / README件数の一致
 - MANIFEST file set / order / SHA-256
@@ -254,21 +255,24 @@ repository unit testで次を必須確認します。
 - default policyでREADMEのPackage Version / Previous Package Versionが初回または1 revision差として整合すること
 - legacy migration用next-versionだけが明示 `previous_version` inputを受けること
 - render-readme-controlsがcurrent UNKNOWN件数とpayload file tableのcanonical Markdownを返し、Agentが件数・file順・種別を再構築しないこと
-- next-domain-fileがLLMのslug決定後に10+ fileの次番号とcanonical pathだけを決定すること
+- next-domain-fileがLLMのslug決定後に10+ fileの次番号とcanonical pathだけを決定し、同一更新で複数追加する場合は1件目の00登録 + file作成前に2件目を採番しないこと
 - domain file命名
-- next-idがsemantic identityを判断せず、UI target mode所有の `SRC / SPEC / INF / UNK` + structural prefixについてpackage rootのcurrent structured row + CHANGELOG stable ID履歴から次番号を返し、Agentへknown ID集合を要求しないこと
+- inspectが更新前owner row fingerprint / UNKNOWN state / exact refs / payload hashを含むcanonical `update_snapshot` を返すこと
+- next-idがsemantic identityを判断せず、UI target mode所有の `SRC / SPEC / INF / UNK` + structural prefixについてpackage rootのcurrent structured row + CHANGELOG stable ID履歴 + previous snapshotから次番号を返し、更新途中で消えたprevious IDも再利用しないこと
 - `DEC / ASM` をUI target modeのnext-idが採番しないこと
 - DEC / ASMはCHANGELOG / impactの追跡可能stable IDとして受理し、Project Contextがownerの場合だけproject_context_ids.pyで採番すること
 - Project Context以外の明示ownerをProject Contextへ複製せず、owner未採番時にLLM hand-numberingへfallbackしないこと
-- 同一prefixの複数new IDで、返却IDをstructured rowへ反映してから次のnext-idを呼ぶと重複せず単調に採番されること
-- current viewから消えた過去IDもCHANGELOG履歴に存在する限り再利用しないこと
+- 同一prefixの複数new IDで、同じprevious snapshotを渡しつつ返却IDをstructured rowへ反映してから次のnext-idを呼ぶと重複せず単調に採番されること
+- current viewから消えた過去IDをprevious snapshot / CHANGELOG履歴のどちらかで保持している限り再利用しないこと
 - UNKNOWNのopen / resolved / resolver変更 / same-ID reopen / re-resolveで `現在有効か / 解消先ID` が整合し、resolved状態ではcurrent SPEC / DECISION / 承認済みASMへ閉じること
 - canonical structured Markdownのduplicate heading / table、row列数、escaped pipe、`<br>` referenceを固定parse契約で検証すること
-- impactが最新versionの `Stable ID changes` からchanged ID集合を内部導出し、Agentへchanged ID再入力を要求せず、exact referenceだけから候補fileを返してsemantic変更を勝手に決定しないこと
+- impactがprevious snapshotとcurrent owner row差分から `added / changed / resolved / retired`、changed ID集合、`Stable ID changes` canonical Markdownを生成すること
+- impactの `影響file` がchanged IDのprevious/current owner + exact reference先unionであり、Agentへfile一覧再入力を要求せず、semantic本文変更の要否を勝手に決定しないこと
+- legacy migrationではLLMが確定したretained ID / 明示terminal eventだけを入力に、helperが `migrated / added / resolved / retired` tableを生成すること
 - scope applicability、UI操作scopeのUIOP / US / UC / Behavior / AC hierarchy / closure / current UCの3分類整合
 - 09の「現在有効な仕様根拠」からnormalized Authorityを固定projectionし、`適用範囲` を非空string、`関係` を単一許可値の1要素arrayとして一意にserializeすること
-- build-machine-evidenceがAuthority + current AC Entity、spec-analysis normalized_skill_input、expected identityを決定論生成し、不要な統合implementation_fingerprintを公開しないこと
-- `Machine Entities: spec-analysis` blockがexactly one存在し、helper再生成結果と一致すること
+- build-machine-evidenceがAuthority + current AC Entity、spec-analysis normalized_skill_input、expected identity、shared `render_machine_entities()` 由来のcanonical `machine_entities_markdown` を決定論生成し、不要な統合implementation_fingerprintを公開しないこと
+- `Machine Entities: spec-analysis` blockがexactly one存在し、heading / JSON fence / wrapperを含めhelper再生成Markdownと一致すること
 - 親US / UC / Behavior変更でAC Entity fingerprintが変わること
 - project-evalがexact `projection / files[] / markdown` payloadを返し、内容を変更せずcanonical順に連結すること
 - raw SHA-256はproject-eval outputから再計算せず、validate / repository unit testでraw bytesに対して検証すること
@@ -294,10 +298,11 @@ repository unit testで次を必須確認します。
 
 `project_context_ids.py`:
 - Project Context Section 12 / 13が案件のDEC / ASM正本ownerである場合だけ対象tableをparse
-- semantic reuse / new判断をせず、new確定後の最大値+1を返す
+- next-idはprevious + candidate両Project Contextの全状態rowを使用済み集合とし、semantic reuse / new判断をせずnew確定後の最大値+1を返す
+- validate-historyはprevious DEC / ASM ID集合がcandidateから欠落した場合にrejectし、撤回 / 置換済みIDの削除と再利用を防ぐ
 - malformed / duplicate IDを拒否
 - DEC-999 / ASM-999で `id_space_exhausted`
-- 別ownerが明示されている場合はそのIDをProject Contextへ複製・再採番しない
+- 別ownerが明示されている場合はそのownerのID lifecycleを使い、Project Contextへ複製・再採番しない
 
 QとUNKの意味的同一性、Q / DEC / ASMのsemantic identity、DECISION内容、ASM承認可否、Project Context以外の正本schema解釈は検証しません。別ownerのIDが未確定ならLLM hand-numberingへfallbackせず正本登録をblockedとします。
 
@@ -439,6 +444,7 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - active `skills/spec-analysis/assets/output-template.md`、`skills/test-analysis/assets/output-template.md`、`skills/test-condition-design/assets/output-template.md` の旧手書きMachine Evidence例をversion文字列だけ置換しない
 - runtime Skillのtemplateでは、`render_runtime_input()` / `render_runtime_result()` / `render_machine_entities()` が生成するcanonical blockを正本とし、手書きの `runtime-contract-v1` / `runtime-envelope-v1` / `entity_schema_version` / `dependencies` 擬似schemaを削除する
 - spec-analysis templateでは `authority_entities.py` / UI target modeの `build-machine-evidence` が生成するcanonical `schema_version / model_key / upstream_entity_dependencies / runtime_dependencies` shapeを正本とし、Machine Entity JSONをAgentに手組みさせない
+- shared runtimeへv1 evidenceをcurrent扱いせずidentity / mapping stateだけを決定論投影する `project_v1_cutover` operationを追加し、通常verify / generation経路とは分離する
 
 この時点ではquestion-analysis / qa-workflowは変更しません。
 
@@ -463,8 +469,8 @@ mode単体が成立してからworkflowへ接続します。
 - skills/question-analysis/scripts/unknown_links.py
 - skills/question-analysis/scripts/question_ids.py（next-id / build-history）
 - Project Context Section 12 / 13が案件の正本ownerであるdefault経路では同tableをheader-onlyへ変更
-- skills/qa-workflow/scripts/project_context_ids.py
-- Project Contextがownerの場合だけnew DEC / ASMの番号をhelperで決定し、意味判断はquestion-analysis / stakeholder側に残す
+- skills/qa-workflow/scripts/project_context_ids.py（next-id / validate-history）
+- Project Contextがownerの場合だけnew DEC / ASMの番号をprevious + candidate全状態rowからhelperで決定し、previous ID削除をvalidate-historyで拒否する。意味判断はquestion-analysis / stakeholder側に残す
 - 別の決定事項 / 仮定の正本ownerが明示されている場合はそのownerを維持し、Project Contextへ複製・再採番しない
 - owner側にdeterministic allocatorがなくID未確定ならLLM hand-numberingへfallbackせず正本登録をblockedにする
 - production helper unit / portability test
@@ -484,13 +490,20 @@ mode単体が成立してからworkflowへ接続します。
 - artifact modeでcurrent `spec-analysis / acceptance_criterion` Entityへ依存し、input `authority_refs[]` とAC EntityのAuthority dependency集合をexact一致検証する
 - ACをDisposition upstream typeとして許可し、ownerをspec-analysisへ固定
 - test-requirement-designまで進むworkflowでcurrent ACをTRまたはDispositionへ閉じる
+- AC linkはACだけをclosure済みにし、ACが参照するAuthorityを自動closeしない。Authorityは従来どおりTR `authority_refs[]` またはAuthority Dispositionで独立closureする
+- AC→Authority展開はartifact modeのfreshness dependency用であり、Authority closure集合へ暗黙追加しない
 - TR Entity contentへacceptance_refsを保存
 - artifact modeのTR Entity dependencyへ参照AC Entityと、そのACが参照するcurrent Authority Entity unionを直接保存する。direct modeでは存在しないMachine Entity dependencyを生成しない
 - repository内の `requirement-structure-v1` 固定参照をcurrent v2へ同期
 - shared runtime-v1 / entity-state-v1 evidenceをruntime-v2 / entity-state-v2 current evidenceとして読み替えない
-- cutover後の最初のTRD / TCD / test-case-design等の実行はfull rebuildで行い、v1 previous artifactをpartial rerunへ渡さない
+- cutover後の最初のTRD / TCD / test-case-design等の実行はfull rebuildで行い、v1 previous artifactを通常のpartial rerun / freshness evidenceとして渡さない
+- `project_v1_cutover` でv1 Runtime Input / Resultからgenerator-owned identity / mapping stateを抽出し、TR `tr_id_state`、TCN `tcn_id_state / model_key_state`、materialize `target_mapping_state / semantic_ci_mapping_state / ci_id_state / expected_result_root_state`、TC `tc_id_state` をv2初回normalized inputのprevious stateへ投影する
+- cutoverはschema移行だけとして先に実行し、同時にsemantic redesignを行わない。既存current itemはsame stable IDをreuseし、削除済みID / inactive mapping historyも保持する
+- v2 evidence成立後にのみ通常partial rerunへ戻す
 - AC本文 / 親Behavior / 親UC / 親USのfreshness regressionを追加
+- ACをTRへlinkしても、そのACのAuthorityをTR `authority_refs[]` / Authority Dispositionで別途closeしない場合はAuthority unclosedとなるregressionを追加
 - artifact modeでAC本文・親chain不変のままAuthorityだけ変更しspec-analysisを再生成した後、未再実行TRが直接Authority dependencyによりstaleになるregressionを追加
+- v1→v2 cutoverで内容不変ならTR / TCN / model / CI / TCのstable IDとdeleted / inactive identity historyが不変で、過去IDを再採番しないregressionを追加
 - partial rerunでscope外TRがchanged AC依存のままcurrentにならない regressionを追加
 - TR-OUT-003 / TR-SEM-003を追加
 - existing TR fixtures / runtime / portability / vertical integration testsをv2 schemaへ同期
@@ -510,6 +523,10 @@ mode単体が成立してからworkflowへ接続します。
 - current packageが `ui-target-v1` として識別できること
 - 全helper operationのexact input / output JSON shape、sort順、failure enum / limit / filesystem safety
 - README control section / next-domain-file / Q / DEC / ASM allocator contract
+- 00 scope / applicabilityのstable ref列とprose根拠列の分離
+- 08 repository evidenceのversion間carry-forward / explicit removal契約
+- inspect update_snapshot → next-id / impact → generated Stable ID changes / 影響fileの更新契約
+- build-machine-evidenceのcanonical Machine Entities Markdown section契約
 - scope / file applicability、UI操作scopeのUS / UC / Behavior / AC exact schema / closure / AC-only Machine Entity
 - exact table schema / stable ref / MANIFEST / Authority + AC Machine Entity bridge / normalized_skill_input
 - legacy vNN → current schema migration fixture
@@ -519,7 +536,7 @@ mode単体が成立してからworkflowへ接続します。
 
 - LLMが意味判断すべき項目をhelperが自動決定していないこと
 - scope applicability / US / UC / Behavior / ACの意味分類とAC→TRの意味対応をscriptが決定していないこと
-- helperがcurrent `Stable ID changes` からimpact対象IDを決定論導出し、返すimpactは再確認候補であり変更必須判定ではないこと
+- helperがprevious snapshotとcurrent owner rowからStable ID lifecycle / impact対象ID / 影響fileを決定論生成し、返すimpactは再確認候補であり本文変更必須判定ではないこと
 - normal spec-analysisがmode依存になっていないこと
 - helperがSkill package単体コピーで実行できること
 
