@@ -36,7 +36,7 @@ READMEには自由記述の概要に加え、次の2表をexact heading / exact 
 | Previous Package Version | - |
 | Current UNKNOWN Count | 0 |
 
-`Previous Package Version` は初回なら `-`、継続更新なら直前revisionを記録します。legacy移行時はlegacy側の明示versionを記録できます。
+`Previous Package Version` は初回なら `-`、継続更新なら `next-version` が返した `previous_version` を記録します。default policyでは `Package Version` と1 revision差であることをhelperが検証します。legacy移行時はlegacy側の明示versionまたは `legacy-unversioned` を記録できます。
 
 ### Current payload files
 
@@ -499,7 +499,9 @@ stdin:
 {"operation":"validate","package_root":"<path>"}
 ```
 
-§2〜§6およびfilesystem safetyを検証します。加えて、resolved UNKNOWNの `解消先ID`、`Machine Entities: spec-analysis` blockのexactly-one存在、build-machine-evidence再生成結果との完全一致を検証します。
+§2〜§6およびfilesystem safetyを検証します。default version policyでは `v00 / Previous=-` またはcurrent / previousの1 revision差とpackage内version一致を検証します。加えて、resolved UNKNOWNの `解消先ID`、`Machine Entities: spec-analysis` blockのexactly-one存在、build-machine-evidence再生成結果との完全一致を検証します。
+
+current packageだけから過去の同version内容とのbyte同一性は証明しません。「同一versionを異なる完成内容で上書きしない」は、material update時に内容変更前の `next-version` 実行を必須とする更新手順で保証します。
 
 ### next-version
 
@@ -702,9 +704,13 @@ US / UC / BehaviorをMachine Entity typeへ追加しません。親chainをAC co
 ```json
 {
   "authorities": [{"authority_id":"SPEC-001"}],
-  "acceptance_criteria": [{"ac_id":"AC-001"}]
+  "acceptance_criteria": [
+    {"ac_id":"AC-001","authority_refs":["SPEC-001","DEC-002"]}
+  ]
 }
 ```
+
+`authority_refs[]` はAC / Behavior / UC / US chain全体が参照するcurrent Authority IDのunionであり、helperが重複除去・昇順canonical化します。
 
 Agent / LLMがMarkdownからnormalized inputやexpected Entity一覧を再構築しません。
 
