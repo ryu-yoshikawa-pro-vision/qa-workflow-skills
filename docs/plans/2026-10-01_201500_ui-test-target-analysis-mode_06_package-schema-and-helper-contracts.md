@@ -945,7 +945,8 @@ stdin:
 ```json
 {
   "operation":"next-id",
-  "artifact_markdown":"<question-analysis output>"
+  "previous_artifact_markdown":"<previous question-analysis output or null>",
+  "artifact_markdown":"<candidate current question-analysis output>"
 }
 ```
 
@@ -955,16 +956,17 @@ payload:
 {"next_id":"Q-003"}
 ```
 
-helperはexact `不明点 / 質問一覧` と `質問ID履歴` のQ ID unionを使用済み集合として扱います。
+helperはprevious / current両artifactのexact `不明点 / 質問一覧` と `質問ID履歴` に現れるQ ID unionを使用済み集合として扱います。previous artifactがない初回はnullを許可します。
 
 - Q-xxx形式・各table内duplicateを検証する
 - current質問IDは `質問ID履歴` に含まれていてよい
-- current + historyの既知最大番号+1を返す
+- previous current Q + previous history + current current Q + current historyの既知最大番号+1を返す
 - 使用済みQが0件ならQ-001
 - Q-999使用済みなら `id_space_exhausted`
 - Qの意味的reuse / new、質問文、分類は判断しない
+- Agent / LLMへprevious履歴の事前転記を要求しない
 
-同一runで複数new Qを採番する場合は、返却IDをcandidateのcurrent質問tableへ反映してから次の `next-id` を呼び、同じ番号を再利用しません。
+同一runで複数new Qを採番する場合は、返却IDをcandidateのcurrent質問tableへ反映してから、同じprevious artifactと更新済みcandidateを次の `next-id` へ渡します。
 
 #### build-history
 
@@ -1249,7 +1251,7 @@ production helperのfilesystem / raw hash / projection / README control renderin
 - spec-analysis normalized_skill_input / expected identityがhelper結果から再現できること
 - artifact `Machine Entities: spec-analysis` blockがexactly one存在し、runtime_contract.pyの `extract_machine_blocks(..., "Machine Entities")` で読め、helper再生成結果と完全一致すること
 - unknown_links.pyのexact `operation=validate-links` / payload / top-level issues contract
-- question_ids.pyのheader-only current質問table + `質問ID履歴`、next-id / build-history exact contract、duplicate / Q-999
+- question_ids.pyのheader-only current質問table + `質問ID履歴`、previous + current artifactを読むnext-id / build-history exact contract、duplicate / Q-999
 - `Q-001` 解消でcurrent質問0件になった後の新規質問がQ-002となり、過去Q IDを再利用しないこと
 - project_context_ids.pyのSection 12 / 13 exact table、DEC / ASM kind、duplicate、999 exhaustion
 - Project Contextがownerでない案件ではproject_context_ids.pyを使わず、外部ownerのIDを維持し、owner未採番時にLLM hand-numberingへfallbackしないこと
