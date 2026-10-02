@@ -70,14 +70,14 @@ PR #16で追加する差分:
 
 - Trigger: +0
 - Deterministic: +2（SPEC-OUT-003 / TR-OUT-003）
-- Semantic: +5（spec-analysis +3 / question-analysis +1 / test-requirement-design +1）
+- Semantic: +8（spec-analysis +5 / question-analysis +2 / test-requirement-design +1）
 - qa-workflow routing: +8
 
 したがってPR #16実装後の期待値:
 
 - Trigger queries: 488
 - Deterministic output cases: 46
-- Semantic cases: 160
+- Semantic cases: 163
 - qa-workflow routing fixtures: 69
 
 ただしこれらはStep 0時点の観測baselineです。repository test / CIでは件数を固定値として正本化せず、PR #14で導入されたcurrent repository / manifestからの動的導出を維持します。
