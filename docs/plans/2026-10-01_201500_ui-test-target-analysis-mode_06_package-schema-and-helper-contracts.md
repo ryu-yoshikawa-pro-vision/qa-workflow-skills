@@ -806,7 +806,7 @@ stdin:
 
 `change_mode` は `normal / legacy-migration` の2値です。
 
-normalでは `version_policy` を `default / project` の2値から選びます。既存完成package更新のdefaultではhelperがprevious snapshotのversionからnext version候補を導出しますが、差分確定前にはREADME / CHANGELOG / MANIFESTへ反映しません。projectの場合だけ、案件で明示されたpolicyに基づく `target_version` を必須とします。semantic / presentationを問わず、requested updateを反映した**user-managed / semantic payload**がcurrent packageから変わる場合にだけversionを+1します。Package Version / Previous Package Version、CHANGELOGの新version entry、README controls、MANIFESTのようにversion upやpayload変更から派生するcontrol差分は、変更有無の原因として数えません。provisional payloadがcurrentと同一ならno-opとして書込み・version upを行いません。
+normalでは `version_policy` を `default / project` の2値から選びます。既存完成package更新のdefaultではhelperがprevious snapshotのversionからnext version候補を導出しますが、差分確定前にはREADME / CHANGELOG / MANIFESTへ反映しません。projectの場合だけ、案件で明示されたpolicyに基づく `target_version` を必須とします。semantic / presentationを問わず、requested updateを反映した**user-managed / semantic payload**またはrequested `change_summary` がcurrent packageの対応内容から変わる場合にだけversionを+1します。Package Version / Previous Package Version、CHANGELOGのversion heading / `Stable ID changes` / `影響file`、README generated controls、MANIFESTのように他の変更からhelperが導出するcontrol差分は、変更有無の原因として数えません。provisional payload + requested `change_summary` がcurrentと同一ならno-opとして書込み・version upを行いません。
 
 legacy-migrationでは `previous_snapshot=null` を要求し、`legacy_source_version` は明示 `vNN` または `legacy-unversioned` を必須とします。明示vNNならtargetを次のvNN、`legacy-unversioned` ならtargetをv00 / Previous=`legacy-unversioned`へ固定します。`version_policy=project` はlegacy-migrationでも案件に明示policyがある場合だけ許可します。`migration_retained_ids[]` と `legacy_lifecycle_events[]` は§14のsemantic mapping結果だけを受け、helperが番号予約・lifecycle生成へ使います。
 
@@ -863,7 +863,7 @@ file / control materialization order:
 8. normal updateの `retire_ids[]` を検証してin-memory tracking modelから除去する。removal予定fileにtracked tracking rowが残る場合は対応retire intent不足としてblockedする。legacy-migrationの過去lifecycle eventは `legacy_lifecycle_events[]` だけから扱い、current row削除操作へ流用しない
 9. extension最終集合から00の `案件固有extension file一覧` をcanonical生成し、stable tracking / keyed / generated tableとprose updateをexact Markdownへ反映する
 10. `build-machine-evidence` 相当処理をprovisional current versionのまま実行し、Machine Entities sectionをcanonical生成する
-11. normal updateでは、version metadata・current CHANGELOG new entry・README generated controls・MANIFESTを除いたprovisional payload bytesをcurrent packageと比較する。差分がなければ `changed=false` を返し、change_summaryを適用せず書込みもしない
+11. normal updateでは、version metadata、CHANGELOGのversion heading / generated `Stable ID changes` / generated `影響file`、README generated controls、MANIFESTを除いたprovisional payload bytesと、requested `change_summary` をcurrent packageのpayload / current version `変更概要`へそれぞれ比較する。どちらも同一なら `changed=false` を返して書込みしない。`change_summary` だけが変わる場合もuser-managed changeとして `changed=true` とする
 12. changed normal update / normal create / legacy-migrationでtarget Package Version / Previous Package Versionを確定する。normal createはv00 / -、legacy-migrationはlegacy source contract、normal updateはStep 2のnext version候補を使う
 13. normal updateではprevious snapshot + explicit retire intent、legacy-migrationではmigration retained / lifecycle mapping + current tracking modelからimpactを生成し、CHANGELOGのtarget version entryへ `変更概要 / Stable ID changes / 影響file` を生成する。normal createはv00 baseline entryを生成する
 14. README controlsをcanonical生成・置換する
