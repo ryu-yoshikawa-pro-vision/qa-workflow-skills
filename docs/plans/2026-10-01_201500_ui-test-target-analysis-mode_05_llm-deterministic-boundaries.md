@@ -188,7 +188,7 @@ semantic identity、same-UNK reopen / new UNK等をLLMが判断してowner struc
 
 LLMがCHANGELOG event rowや影響file一覧を手入力しません。ただし `retired` はterminal semantic decisionなので、helperがrow消失から自動判定せずLLMが `retire_ids[]` で明示します。明示なしにprevious tracked rowが消えた場合はblockedします。更新途中でstable ID owner rowを削除しても、allocatorは同じprevious snapshotを使用済みID集合へ含めるため、そのrevision内で過去IDを再利用しません。
 
-legacy migrationではsemantic identity mappingだけをLLMが行い、retained ID / 明示確認できるlifecycle eventを `impact(change_mode=legacy-migration)` へ渡します。helperが `migrated / added / resolved / retired` のtableを生成し、legacy proseからidentityを推測しません。
+legacy migrationではsemantic identity mappingだけをLLMが行い、retained ID / 明示確認できるlifecycle event / semantic rowsを `materialize(change_mode=legacy-migration)` へ渡します。helperがこれらを採番前の使用済み集合へ予約し、new ID、canonical Markdown、`migrated / added / resolved / retired`、README / Machine Entity / MANIFESTまで生成します。focused `impact(change_mode=legacy-migration)` は同じlifecycle生成contractの単体検証用に残し、legacy proseからidentityを推測しません。
 
 この結果は「本文修正が必要」という意味判断ではありません。LLMが再確認対象を漏らさないための候補集合です。
 
