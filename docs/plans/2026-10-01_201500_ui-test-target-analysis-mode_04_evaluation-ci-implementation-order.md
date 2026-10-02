@@ -464,7 +464,8 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - required core / 固定triggerの条件付き必須 / 宣言制extensionを分けたpackage assets
 - variable structured tableはheader-only、固定applicability rowだけ事前配置し、例示stable IDを置かない
 - 09_authority_and_traceability.mdで既存canonical spec-analysis contractを維持
-- skills/spec-analysis/scripts/ui_target_package.py
+- skills/spec-analysis/scripts/ui_target_package.py（inspect / validate / focused helper群 / materialize / project-eval）
+- same package revisionはsingle writerとし、materialize前にinspect snapshotのversion / payload hash一致を確認してstale writeを拒否
 - PR #14後の9 Skill-local `runtime_contract.py` へ `acceptance_criterion` / `acceptance_refs` / spec-analysis expected ACをbyte-identicalに追加し、意味契約変更として `RUNTIME_CONTRACT_VERSION` を `runtime-v1` → `runtime-v2`、`ENTITY_SCHEMA_VERSION` を `entity-state-v1` → `entity-state-v2` へ更新
 - 09から既存authority_entities.pyへ入力できることを確認
 - current ACだけをMachine Entity化し、US / UC / Behaviorをglobal Entity typeへしないことを確認
@@ -473,7 +474,8 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - active `skills/spec-analysis/assets/output-template.md`、`skills/test-analysis/assets/output-template.md`、`skills/test-condition-design/assets/output-template.md` の旧手書きMachine Evidence例をversion文字列だけ置換しない
 - runtime Skillのtemplateでは、`render_runtime_input()` / `render_runtime_result()` / `render_machine_entities()` が生成するcanonical blockを正本とし、手書きの `runtime-contract-v1` / `runtime-envelope-v1` / `entity_schema_version` / `dependencies` 擬似schemaを削除する
 - spec-analysis templateでは `authority_entities.py` / UI target modeの `build-machine-evidence` が生成するcanonical `schema_version / model_key / upstream_entity_dependencies / runtime_dependencies` shapeを正本とし、Machine Entity JSONをAgentに手組みさせない
-- shared runtimeへv1 evidenceをcurrent扱いせずidentity / mapping stateだけを決定論投影する `project_v1_cutover` operationを追加し、通常verify / generation経路とは分離する
+- shared runtime direct CLIへ `project_v1_cutover` operationを追加し、通常verify / generator経路とは分離する。direct dispatcher、supported skill、16 MiB aggregate / 64 KiB artifact string例外、unknown operationをexact contract化する
+- cutover helperはTRD / TCD / TCごとにAgent-side merge不要のcomplete `normalized_runtime_inputs[]` を返し、v1 identity / mapping stateを完成v2 inputへ埋め込む
 
 この時点ではquestion-analysis / qa-workflowは変更しません。
 
@@ -526,16 +528,20 @@ mode単体が成立してからworkflowへ接続します。
 - repository内の `requirement-structure-v1` 固定参照をcurrent v2へ同期
 - shared runtime-v1 / entity-state-v1 evidenceをruntime-v2 / entity-state-v2 current evidenceとして読み替えない
 - cutover後の最初のTRD / TCD / test-case-design等の実行はfull rebuildで行い、v1 previous artifactを通常のpartial rerun / freshness evidenceとして渡さない
-- `project_v1_cutover` でv1 Runtime Input / Resultからgenerator-owned identity / mapping stateを抽出し、TR `tr_id_state`、TCN `tcn_id_state / model_key_state`、materialize `target_mapping_state / semantic_ci_mapping_state / ci_id_state / expected_result_root_state`、TC `tc_id_state` をv2初回normalized inputのprevious stateへ投影する
-- TR `draft_key ↔ tr_id_map`、TCN `draft_key ↔ tcn_id_map`、model `draft_key ↔ model_key_map`、TC `draft_key ↔ tc_id_map` をexact joinし、current draftのreuse IDをhelperが固定projectionする。Agent / LLMにcutover時のreuse ID選択をさせない
-- cutover operationはv1 artifact全文を受けるためverify_runtime_evidenceと同じ16 MiB aggregate transportを使い、draft/map missing / duplicate / mismatchをblockedにする
-- cutoverはschema移行だけとして先に実行し、同時にsemantic redesignを行わない。既存current itemはsame stable IDをreuseし、削除済みID / inactive mapping historyも保持する
+- `project_v1_cutover` はv1 Runtime Input / ResultからTRD / TCD / TCのcomplete `normalized_runtime_inputs[]` を生成し、callerがseed patchを元JSONへmergeする経路を作らない
+- TR `draft_key ↔ tr_id_map`、TCN `draft_key ↔ tcn_id_map`、model `draft_key ↔ model_key_map`、TC `draft_key ↔ tc_id_map` をexact joinし、reuse ID / previous state / full rebuild scopeをhelperが完成inputへ固定projectionする。Agent / LLMにcutover時のreuse ID選択をさせない
+- TCDは既存expected runtime unit builderでroot / model / `artifact:materialize_coverage:<TCN-ID>` 集合を導出し、missing / extra / duplicate / incomplete unitとTCN join不一致をblockedにする
+- cutover direct CLIはv1 artifact全文を受けるため16 MiB aggregate transportとartifact string 64 KiB例外を使い、通常generator stdinは2 MiBのまま維持する
+- canonical sequenceを `v1検出 → spec/test-analysis v2 evidence再生成 → TRD cutover/full rebuild/save → TCD cutover/full rebuild/save → TC cutover/full rebuild/save → downstream v2 evidence再生成 → validate → 通常update解禁` に固定する
+- cutover helper出力だけをfirst v2 generator inputとして使うことで、schema移行とsemantic redesignの同時実行を構造的に禁止する
 - v2 evidence成立後にのみ通常partial rerunへ戻す
 - AC本文 / 親Behavior / 親UC / 親USのfreshness regressionを追加
 - ACをTRへlinkしても、そのACのAuthorityをTR `authority_refs[]` / Authority Dispositionで別途closeしない場合はAuthority unclosedとなるregressionを追加
 - artifact modeでAC本文・親chain不変のままAuthorityだけ変更しspec-analysisを再生成した後、未再実行TRが直接Authority dependencyによりstaleになるregressionを追加
 - v1→v2 cutoverで内容不変ならTR / TCN / model / CI / TCのstable IDとdeleted / inactive identity historyが不変で、過去IDを再採番しないregressionを追加
-- cutoverのdraft_key / *_id_map join不一致、v1以外のsource version、16 MiB超過をblockedにするregressionを追加
+- cutoverのdraft_key / *_id_map join不一致、missing / extra / duplicate runtime unit、v1以外のsource version、16 MiB超過、unknown direct operationをblockedにするregressionを追加
+- 64 KiB超artifact stringはcutover direct CLIで許可し、通常generatorの2 MiB / string制限へ例外を波及させないregressionを追加
+- returned `normalized_runtime_inputs[]` だけでv2 generatorを実行でき、Agent-side field mergeが不要なintegration testを追加
 - partial rerunでscope外TRがchanged AC依存のままcurrentにならない regressionを追加
 - TR-OUT-003 / TR-SEM-003を追加
 - existing TR fixtures / runtime / portability / vertical integration testsをv2 schemaへ同期
@@ -555,9 +561,10 @@ mode単体が成立してからworkflowへ接続します。
 - current packageが `ui-target-v1` として識別できること
 - 全helper operationのexact input / output JSON shape、sort順、failure enum / limit / filesystem safety
 - README control section / next-domain-file / Q / DEC / ASM allocator contract
+- ui-target-v1専用materializeのdraft/reuse/new/@draft/explicit retire、single-writer stale snapshot、canonical table / known section / standard file materialization契約
 - 00 scope / applicabilityのstable ref列とprose根拠列の分離
 - 08 repository evidenceのversion間carry-forward / explicit removal契約
-- inspect update_snapshot → next-id / impact → generated Stable ID changes / 影響fileの更新契約
+- inspect update_snapshot → materialize / focused next-id / impact → explicit retireを含むStable ID changes / 影響fileの更新契約
 - build-machine-evidenceのcanonical Machine Entities Markdown section契約
 - scope / file applicability、UI操作scopeのUS / UC / Behavior / AC exact schema / closure / AC-only Machine Entity
 - exact table schema / stable ref / MANIFEST / Authority + AC Machine Entity bridge / normalized_skill_input
@@ -566,9 +573,10 @@ mode単体が成立してからworkflowへ接続します。
 
 ### Step 7: deterministic / semantic boundary validation
 
-- LLMが意味判断すべき項目をhelperが自動決定していないこと
+- LLMが意味判断すべき項目をhelperが自動決定していないこと。特にsemantic identity、explicit retire、same-UNK/new-UNK、file trigger、extension要否、DEC/ASM ownerをscriptが推測しないこと
 - scope applicability / US / UC / Behavior / ACの意味分類とAC→TRの意味対応をscriptが決定していないこと
-- helperがprevious snapshotとcurrent owner rowからStable ID lifecycle / impact対象ID / 影響fileを決定論生成し、返すimpactは再確認候補であり本文変更必須判定ではないこと
+- helperがprevious snapshotとcurrent tracking row + LLM明示retire intentからStable ID lifecycle / impact対象ID / 影響fileを決定論生成し、row消失だけをretireにせず、返すimpactは再確認候補であり本文変更必須判定ではないこと
+- semantic projectionがcurrent versionの変更概要だけを含み、legacy mapping / UNKNOWN reopen / extension / conditional file / owner判断等のLLM責務がsemantic caseで最低1回評価されること
 - normal spec-analysisがmode依存になっていないこと
 - helperがSkill package単体コピーで実行できること
 
