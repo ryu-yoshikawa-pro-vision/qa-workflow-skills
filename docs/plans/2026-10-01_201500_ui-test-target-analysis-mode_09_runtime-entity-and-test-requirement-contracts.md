@@ -303,7 +303,7 @@ repository regression:
 }
 ```
 
-`authority_refs[]` はAC / Behavior / UC / US chain全体が参照するcurrent Authority IDのunionをhelperが重複除去・昇順canonical化して生成します。Agent / LLMが同じAuthority集合を再構築しません。
+`authority_refs[]` はAC / Behavior / UC / US chain全体のstable refsを09のCurrent Effective Authority集合へ解決したunionです。current SPEC / DECISION / approved ASMだけを残し、INF / UNK / inactive Authorityは除外します。helperが重複除去・昇順canonical化し、current ACでは1件以上を要求します。0件ならACをcurrent Entity化せずUNKNOWNへ戻します。Agent / LLMが同じAuthority集合を再構築しません。
 
 qa-workflow / coverage-analysisへspec-analysis scopeを渡す場合、AgentがMarkdownからこのJSONを再構築しません。helper返却のcanonical `normalized_skill_input` をそのまま使用します。
 
@@ -334,16 +334,29 @@ AC Entity contentには次を固定projectionします。
 - `success_postcondition`
 - `user_stories[]`: `us_id / actor_role / goal`。`us_id`昇順で固定
 - `scope_id`
-- `authority_refs[]`: AC / Behavior / UC / US chain全体が参照するcurrent Authority IDのunionを重複除去して昇順
+- `authority_refs[]`: AC / Behavior / UC / US chain全体のstable refsをCurrent Effective Authorityへ解決し、current SPEC / DECISION / approved ASMだけを残した1件以上のunionを重複除去して昇順
 - `structure_refs[]`: AC / Behavior / UC / US chain全体の関連構造ID unionを重複除去して昇順
 
 これによりAC本文が同じでも、親US / UC / Behaviorの意味変更でAC content fingerprintが変わります。
 
 ### 4.2 dependencies
 
-AC Entityの `upstream_entity_dependencies[]` は、AC / Behavior / UC / US chain全体が参照するcurrent Authority Entity unionへ固定します。
+AC Entityの `upstream_entity_dependencies[]` は、AC / Behavior / UC / US chain全体のstable refsからfilterしたcurrent SPEC / DECISION / approved ASM Authority Entity unionへ固定します。INF / UNKをdependencyへ追加しません。
 
 US / UC / Behaviorをdependency Entityとして追加しません。親chain自体をAC contentへ含めることで、不要なglobal entity typeを増やさずfreshnessを成立させます。
+
+### 3.1 normal spec-analysis handoff adapter
+
+UI target modeでは `build-machine-evidence.normalized_skill_input` が `acceptance_criteria[]` を必ず持ちます。通常の非mode spec-analysisは既存互換のためkey省略を許可しますが、requirement-structure-v2へ渡す時点ではqa-workflow / shared runtimeのdeterministic adapterがv2 shapeへ正規化します。
+
+- spec-analysis normalized inputに `acceptance_criteria` がない場合だけ `acceptance_criteria=[]` を追加する
+- fieldが存在する場合はarray型を要求し、意味を変更しない
+- nonmode由来の既存TR draftに `acceptance_refs` がない場合だけ `acceptance_refs=[]` を追加する
+- fieldが存在する場合はarray型を要求し、既存値を上書きしない
+- adapterはACを生成せず、mode判定を行わない
+- Agent / LLMに空array補完をさせない
+
+このadapter後のshapeだけをrequirement-structure-v2へ渡します。
 
 ## 5. test-requirement-design contract version
 
