@@ -362,7 +362,7 @@ default policyでは `ui_target_package.py next-version` が次versionを導出�
 
 1. LLMが変更されたAuthority / DECISION / ASMを解決し、project policyに従ってmaterial updateかを判断する
 2. default version policyでversion upする場合は、**内容を書き換える前に**既存current packageへ `ui_target_package.py next-version` を `package_root` だけで実行する。返却された `readme_version_rows_markdown` をREADMEの該当2rowへ反映し、`next_version` をCHANGELOGのcurrent version headingへ使用する。Agentがcurrent versionを手で転記しない
-3. LLMが影響するcanonical stable item / UNKを更新する。semantic identityがnewの場合だけ `next-id` を使う。UI target modeがownerの `SRC / SPEC / INF / UNK` とstructural IDはhelperで採番し、DEC / ASMは実際の正本ownerの既存IDを参照する。返却IDを対象structured rowへ反映してから同prefixの次の採番へ進み、返却された `stable_id_change` はcurrent versionのCHANGELOGへ記録する。v01以降にpackageへ初めて取り込む外部ownerのDEC / ASMは `added`、既追跡IDの内容・状態変更は `changed`、current structured modelからID自体を外す場合は `retired` として記録する。`resolved` はUNKNOWN解消専用で、DEC / ASMには使わない。UNKNOWN解消時は元UNKを `現在有効か=No` にし、確定内容を分類に合うnew / reuse stable IDへ接続して `解消先ID` を保持し、対象UNKを `resolved` とする
+3. LLMが影響するcanonical stable item / UNKを更新する。semantic identityがnewの場合だけ `next-id` を使う。UI target modeがownerの `SRC / SPEC / INF / UNK` とstructural IDはhelperで採番し、DEC / ASMは実際の正本ownerの既存IDを参照する。返却IDを対象structured rowへ反映してから同prefixの次の採番へ進み、返却された `stable_id_change` はcurrent versionのCHANGELOGへ記録する。v01以降にpackageへ初めて取り込む外部ownerのDEC / ASMは `added`、既追跡IDの内容・状態変更は `changed`、current structured modelからID自体を外す場合は `retired` として記録する。`resolved` はUNKNOWNをopenからresolvedへ閉じるevent専用で、DEC / ASMには使わない。UNKNOWN解消時は元UNKを `現在有効か=No` にし、確定内容を分類に合うnew / reuse stable IDへ接続して `解消先ID` を保持し、対象UNKを `resolved` とする。後続更新で同じ論点のresolverだけ変わる場合は同じUNKの `解消先ID` を更新して `changed`、解消根拠がなくなり同じ論点をreopenする場合は `現在有効か=Yes / 解消先ID=空` として `changed`、reopen後に再度閉じる場合は再び `resolved` とする。別論点なら旧UNKをresolved historyとして維持してnew UNKを作る
 4. 09_authority_and_traceability.mdのcanonical modelを更新する
 5. `Stable ID changes` tableへ今回のsemantic変更対象IDが揃った後、`ui_target_package.py impact` を `package_root` だけで実行し、helperが導出したchanged IDのexact参照先を再確認候補として列挙する
 6. LLMが候補fileを確認し、意味上変更が必要な01〜08 / domain fileだけを更新する
@@ -402,7 +402,7 @@ helperが列挙したimpact候補は再確認対象であり、変更必須と�
 - MODALとbrowser dialogを分離している
 - 直交する状態を無理に排他STATEへしていない
 - 実装差分を仕様へ上書きしていない
-- current unknownとresolved historyが矛盾しない
+- current unknown / resolved history / same-ID reopenが `現在有効か / 解消先ID` とCHANGELOG event上で矛盾しない
 - 解消済みUNKNOWNを再質問していない
 - versionが全packageで一致し、default policy利用時の次versionがhelper結果と一致する
 - 07のcurrent UNK ID集合とREADME件数が09からhelperで導出したcurrent UNKNOWN集合 / 件数と一致する
@@ -416,7 +416,7 @@ helperが列挙したimpact候補は再確認対象であり、変更必須と�
 - 09のCurrent Effective Authorityが既存spec-analysisのcanonical schemaを維持している
 - 09の「現在有効な仕様根拠」からnormalized Authorityへの固定projectionをhelperが行い、Authority Entityが既存 `authority_entities.py`、current AC Entityが `ui_target_package.py build-machine-evidence` から生成され、spec-analysis normalized_skill_input / expected identity / fingerprintを手入力していない
 - `Machine Entities: spec-analysis` blockがexactly one存在し、helper再生成結果と一致する
-- resolved UNKNOWNの `解消先ID` がcurrent SPEC / DECISION / 承認済みASMへ閉じている
+- resolved UNKNOWNの `解消先ID` がcurrent SPEC / DECISION / 承認済みASMへ閉じ、resolver変更 / same-ID reopen / re-resolveを同じUNK lineageで表現できる
 - new ID採番でAgentが既知ID集合を手組みしていない
 - test requirement / condition / caseを先回りしていない
 - UIで観測不能な内部挙動をUIテスト期待結果として確定していない
