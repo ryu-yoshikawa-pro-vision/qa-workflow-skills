@@ -490,19 +490,42 @@ stdin:
 
 payload:
 
-- package_schema_version
-- package_version
-- previous_package_version
-- payload_files[]
-- file_applicability[]
-- domain_files[]
-- canonical_item_ids[]
-- current_unknown_ids[]
-- resolved_unknown_ids[]
-- current_unknown_count
-- structural_ids[]
-- exact_reference_index[]
-- unresolved_structural_issues[]
+```json
+{
+  "package_schema_version":"ui-target-v1",
+  "package_version":"v15",
+  "previous_package_version":"v14",
+  "payload_files":[
+    {"order":1,"path":"README.md","kind":"core"}
+  ],
+  "file_applicability":[
+    {"path":"03_fields_and_validation.md","status":"required","authority_refs":["SPEC-001"],"unknown_refs":[]}
+  ],
+  "domain_files":[
+    {"order":10,"path":"10_csv-export.md","slug":"csv-export"}
+  ],
+  "canonical_item_ids":["SRC-001","SPEC-001","UNK-001"],
+  "current_unknown_ids":["UNK-001"],
+  "resolved_unknown_ids":["UNK-002"],
+  "current_unknown_count":1,
+  "structural_ids":["PAGE-001","SCOPE-001"],
+  "exact_reference_index":[
+    {"target_id":"SPEC-001","file":"02_behavior_and_business_rules.md","section":"Acceptance Criteria一覧","row_index":1,"column":"関連仕様項目ID"}
+  ],
+  "unresolved_structural_issues":[],
+  "readme_current_unknown_markdown":"- Current UNKNOWN Count: 1"
+}
+```
+
+規則:
+
+- `payload_files[]` はcanonical file order
+- `file_applicability[]` は03 / 04 / 05 / 08の順
+- ID配列はlexicographic昇順
+- `domain_files[]` はorder昇順
+- `exact_reference_index[]` は `target_id / file / section / row_index / column` の順で安定sort
+- `row_index` は対象structured tableのdata rowを1始まりで数える
+- `unresolved_structural_issues[]` は `issue_type / file / section / row_index / column / message` を持ち、存在しない位置はnull
 
 `resolved_unknown_ids` は09で `分類=UNKNOWN` かつ `現在有効か=No` のUNK。
 
@@ -531,7 +554,11 @@ helperがREADMEからcurrent Package Versionを取得します。
 payload:
 
 ```json
-{"previous_version":"v14","next_version":"v15"}
+{
+  "previous_version":"v14",
+  "next_version":"v15",
+  "readme_version_markdown":"- Package Version: v15\n- Previous Package Version: v14"
+}
 ```
 
 Agent / LLMがcurrent packageのversion文字列を抽出して `previous_version` として渡す経路は作りません。
@@ -542,7 +569,7 @@ legacy package migrationで、LLMのsemantic mappingによりlegacy側の明示v
 {"operation":"next-version","source":"legacy-migration","previous_version":"v14"}
 ```
 
-このlegacy inputもpayloadは `previous_version / next_version` を返します。案件固有version policyではnext-versionを使用しません。
+このlegacy inputも同じ3 fieldを返し、`readme_version_markdown` までhelperが生成します。案件固有version policyではnext-versionを使用しません。
 
 ### next-id
 
@@ -571,6 +598,45 @@ semantic identityは判断しません。Agent / LLMが `known_ids[]` を組み�
 
 同一prefixで複数IDを割り当てる場合は、返却された `next_id` を対象structured rowへ反映してから次の `next-id` を呼びます。current versionのCHANGELOGへ返却された `stable_id_change` rowを追加し、validate前に採番履歴を閉じます。
 
+### render-readme-controls
+
+stdin:
+
+```json
+{"operation":"render-readme-controls","package_root":"<path>"}
+```
+
+payload:
+
+```json
+{
+  "current_unknown_markdown":"- Current UNKNOWN Count: 1",
+  "current_payload_files_markdown":"### Current payload files\n\n| 順序 | ファイル | 種別 |\n| ---: | --- | --- |\n| 1 | 00_scope_and_context.md | core |"
+}
+```
+
+READMEのfile listはhashを持たないため、MANIFEST生成より前にこのoperationで確定します。Agent / LLMがUNKNOWN件数、payload file順、種別を再構築しません。
+
+### next-domain-file
+
+stdin:
+
+```json
+{
+  "operation":"next-domain-file",
+  "package_root":"<path>",
+  "slug":"csv-export"
+}
+```
+
+payload:
+
+```json
+{"order":10,"slug":"csv-export","path":"10_csv-export.md"}
+```
+
+slugはlowercase kebab-caseを要求します。helperはsemanticなslug選択を行わず、existing 10+ fileの最大番号+1だけを決定します。
+
 ### build-manifest
 
 stdin:
@@ -579,9 +645,18 @@ stdin:
 {"operation":"build-manifest","package_root":"<path>"}
 ```
 
-payloadへcanonical MANIFEST Markdownとpayload file metadataを返します。
+payload:
 
-LLM / AgentがSHA-256を手計算しません。
+```json
+{
+  "manifest_markdown":"- Package Schema Version: ui-target-v1\n- Package Version: v15\n\n### Package manifest\n...",
+  "files":[
+    {"order":1,"path":"README.md","sha256":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"}
+  ]
+}
+```
+
+`files[]` はcanonical payload order、`sha256` はraw file bytesのlowercase 64 hexです。README controls反映後のbytesをhashし、LLM / AgentがSHA-256を手計算しません。
 
 ### impact
 
@@ -594,7 +669,19 @@ LLM / AgentがSHA-256を手計算しません。
 }
 ```
 
-helperは最新versionのexact `Stable ID changes` tableから `added / changed / resolved / retired / migrated` のStable ID集合を内部導出し、cross-file exact reference indexから `changed_ids[] / affected_files[] / affected_rows[]` を返します。Agent / LLMが同じID集合をJSONへ再構築しません。operation実行前に、そのversionでsemanticに変更したstable IDを同tableへ記録済みであることを更新手順の前提とします。
+helperは最新versionのexact `Stable ID changes` tableから `added / changed / resolved / retired / migrated` のStable ID集合を内部導出し、cross-file exact reference indexから次のpayloadを返します。
+
+```json
+{
+  "changed_ids":["SPEC-001"],
+  "affected_files":["02_behavior_and_business_rules.md"],
+  "affected_rows":[
+    {"changed_id":"SPEC-001","file":"02_behavior_and_business_rules.md","section":"Acceptance Criteria一覧","row_index":1,"column":"関連仕様項目ID"}
+  ]
+}
+```
+
+`changed_ids[]` は昇順、`affected_files[]` はcanonical file order、`affected_rows[]` は `changed_id / file / section / row_index / column` で安定sortします。Agent / LLMが同じID集合をJSONへ再構築しません。operation実行前に、そのversionでsemanticに変更したstable IDを同tableへ記録済みであることを更新手順の前提とします。
 
 legacy migration直後も同じcurrent versionの `Stable ID changes` tableを入力源とします。
 
@@ -612,14 +699,19 @@ stdin:
 
 payload:
 
-- normalized_authorities[]
-- normalized_acceptance_criteria[]
-- normalized_skill_input
-- acceptance_criterion_entities[]
-- machine_entities[]
-- expected_entity_identities[]
-- implementation_fingerprint
-- machine_entities_block（`schema_version` / `skill` / `entities` だけを持つartifact保存用object）
+```json
+{
+  "normalized_authorities":[],
+  "normalized_acceptance_criteria":[],
+  "normalized_skill_input":{"authorities":[],"acceptance_criteria":[]},
+  "acceptance_criterion_entities":[],
+  "machine_entities":[],
+  "expected_entity_identities":[],
+  "machine_entities_block":{"schema_version":"entity-state-v1","skill":"spec-analysis","entities":[]}
+}
+```
+
+各Machine Entity / identity rowのschemaはshared runtime contractを正本とします。配列はentity identityの `skill / entity_type / entity_ref` 順でcanonical sortします。統合responseに独自の `implementation_fingerprint` fieldは持ちません。
 
 AgentがMachine Entity wrapper / content fingerprintを手組みしません。
 
@@ -664,7 +756,19 @@ deterministic:
 - 全payload file
 - MANIFESTを最後にcontrol fileとして追加
 
-各file前へ `<!-- FILE: <relative-path> -->` を付け、内容を変更せず連結します。
+payloadは両projectionで次のexact shapeです。
+
+```json
+{
+  "projection":"semantic",
+  "files":["README.md","00_scope_and_context.md"],
+  "markdown":"<!-- FILE: README.md -->\n..."
+}
+```
+
+`files[]` は実際に連結したrelative pathをcanonical順で持ちます。各file前へ `<!-- FILE: <relative-path> -->` + LFを付け、file textはUTF-8 decode後に内容を変更せず連結します。file末尾LFの有無は保持し、marker挿入以外の正規化を行いません。
+
+raw SHA-256はprojectionから再計算しません。production `validate` / repository unit testがraw bytesでMANIFEST hashを検証し、projected deterministic evalはMANIFEST schema、file集合・順序、SHA-256文字列形式、stable ref等を検証します。
 
 ## 9. deterministic Authority / Acceptance Criterion Machine Entity bridge
 
