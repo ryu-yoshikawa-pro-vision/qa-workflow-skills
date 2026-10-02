@@ -181,7 +181,7 @@ version更新時は変更ファイルだけではなく、そのversionの完全
 ### shared runtime contract
 
 変更:
-- repository内でcurrent shared `runtime_contract.py` を再利用する9 Skill-local copy
+- 既存repository byte-identity契約の対象である7 Skill-local `runtime_contract.py`
   - spec-analysis
   - test-analysis
   - test-requirement-design
@@ -189,14 +189,13 @@ version更新時は変更ファイルだけではなく、そのversionの完全
   - test-case-design
   - coverage-analysis
   - qa-workflow
-  - usability-inspection
-  - wcag-conformance-evaluation
 - `tests/skills/runtime/test_runtime_dispatch.py`
 - `tests/skills/runtime/test_runtime_portability.py`
-- usability-inspection / wcag-conformance-evaluationのruntime contract回帰test
 - requirement-structure contract versionを参照するruntime / fixture / integration tests
 
-9コピーはbyte-identicalを維持し、`acceptance_criterion` Entity type、`acceptance_refs` canonicalization、spec-analysis Authority + AC expected Entity導出を同一内容で追加します。shared runtime envelopeは `runtime-v1` を維持します。Skill固有generatorの責務は変更しません。
+7コピーはbyte-identicalを維持し、`acceptance_criterion` Entity type、`acceptance_refs` canonicalization、spec-analysis Authority + AC expected Entity導出を同一内容で追加します。shared runtime envelopeは `runtime-v1` を維持します。
+
+PR #14確認headには `usability-inspection` / `wcag-conformance-evaluation` に同一blobの `runtime_contract.py` も存在しますが、既存byte-identity契約の対象外であり、PR #16のAC / TR処理経路でも使用しません。PR #16だけを理由にこの2コピーを変更せず、無関係なruntime implementation fingerprintを変化させません。
 
 ### qa-workflow
 
