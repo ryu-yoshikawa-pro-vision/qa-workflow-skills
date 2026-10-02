@@ -134,7 +134,7 @@ current package fileからMANIFEST bodyまたはmachine-readable manifest projec
 
 #### impact
 
-current versionのexact `Stable ID changes` tableから変更対象ID集合をhelper自身が導出し、cross-file exact referenceから再確認候補file / rowを列挙します。Agent / LLMが同じchanged ID集合を手組みしません。
+LLMがsemantic更新時に確定した `added / changed / resolved / retired / migrated` をcurrent versionのexact `Stable ID changes` tableへ先に記録します。その後、helperが同tableから変更対象ID集合を導出し、cross-file exact referenceから再確認候補file / rowを列挙します。Agent / LLMが同じchanged ID集合を別JSONへ手組みしません。
 
 この結果は「修正が必要」という意味判断ではありません。LLMが再確認対象を漏らさないための候補集合です。
 
