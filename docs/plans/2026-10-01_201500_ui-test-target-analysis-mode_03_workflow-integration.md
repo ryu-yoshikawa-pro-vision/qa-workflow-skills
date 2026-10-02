@@ -159,18 +159,20 @@ expected routingからcandidate outputを自動生成せず、既存契約どお
 
 routing fixtureはPR #14後の61件から8件追加して69件になる想定です。実装開始時にStep 0で現在値を再確認し、追加数が変わらなければEVALS.md / docs/PROJECT_CONTEXT.md / routing件数を保持するrepository contractを69へ同期します。READMEにrouting件数を持つ場合のみ同様に更新します。
 
-### 2.6 Project ContextのDEC / ASM採番
+### 2.6 DEC / ASMの正本ownerとdefault Project Context採番
 
-question-analysisが回答を正式 `DECISION` または承認済み `ASM` へ正規化する場合、ID ownerは既存Project Contextの正本一覧です。UI target package側では採番しません。
+question-analysisが回答を正式 `DECISION` または承認済み `ASM` へ正規化する場合、ID ownerは案件で実際に指定されている決定事項 / 仮定の正本です。UI target package側では採番しません。
 
-新規 `skills/qa-workflow/scripts/project_context_ids.py` を追加し、Project Contextの次の固定tableだけを対象に番号決定します。
+Project ContextのSection 12 / 13が正本ownerであるdefault経路では、新規 `skills/qa-workflow/scripts/project_context_ids.py` を使います。
 
 - `## 12. 確定事項（決定事項の正本一覧）` → `DEC-xxx`
 - `## 13. 仮定（仮定の正本一覧）` → `ASM-xxx`
 
-LLMは回答の意味、DECISION / ASMの区別、既存identityのreuse / new、決定内容、関係、影響範囲、ASM承認可否を判断します。newと判断した後の番号だけhelperが既知最大番号+1で返します。
+LLMは回答の意味、DECISION / ASMの区別、既存identityのreuse / new、決定内容、関係、影響範囲、ASM承認可否を判断します。Project Contextがownerの場合、newと判断した後の番号だけhelperが既知最大番号+1で返します。
 
-`skills/qa-workflow/assets/project-context-template.md` のSection 12 / 13はheader-onlyへ変更し、現在の `DEC-001` / `ASM-001` 例示rowを実データとして残しません。
+案件で別の決定事項 / 仮定の正本一覧が明示されている場合はそのownerを維持し、Project Contextへ複製・再採番しません。owner側にdeterministic ID allocatorがあればそれを使い、ownerがIDを確定できない状態ではLLMが番号を推測せず正本登録をblockedとして扱います。任意schema向けgeneric allocatorは追加しません。
+
+`skills/qa-workflow/assets/project-context-template.md` を正本ownerとして使う場合、Section 12 / 13はheader-onlyへ変更し、現在の `DEC-001` / `ASM-001` 例示rowを実データとして残しません。
 
 helperはProject Contextを書き換えず、正本tableをparseして次IDを返すだけです。exact CLI契約は `_06_package-schema-and-helper-contracts.md` を正本とします。
 
@@ -201,7 +203,7 @@ test-requirement-designへ到達した場合は `requirement-structure-v2` を�
 - package templateはassets/ui-test-target-analysis/
 - qa-workflowは必要なSkillへroutingする
 - question-analysisは回答正規化とresume情報を返し、新規Qの番号はquestion_ids.pyで決定する
-- qa-workflowはProject Context正本でnew DEC / ASMが必要な場合だけproject_context_ids.pyで番号を決定する
+- qa-workflowはProject Context Section 12 / 13が実際の正本ownerの場合だけproject_context_ids.pyでnew DEC / ASMの番号を決定する。別ownerが明示されている場合はその正本IDを維持する
 
 AIエージェントは利用環境で提供される通常のSkill読み込み機構に従います。
 
@@ -232,7 +234,7 @@ READMEへ、UIテスト対象分析modeがspec-analysisの条件付きmodeであ
 - qa-workflowのPR #14後22 Skill前提
 - skill-to-skill API不存在の説明
 - question-analysisの分類4種
-- DECISION / ASMの意味判断とProject Context owner
+- DECISION / ASMの意味判断と、案件で明示された決定事項 / 仮定の正本owner
 - test-target-inspectionのlive target currentness契約
 - runtime / artifact graph
 - qa-knowledge lifecycle
@@ -243,7 +245,7 @@ READMEへ、UIテスト対象分析modeがspec-analysisの条件付きmodeであ
 
 - mode requestがspec-analysisへrouteされる
 - 不明点回答後に同じUNKNOWN lineageでspec-analysisへ戻り、question-analysisの関連UNKNOWN IDはSkill-local helperと独立deterministic evalの双方で構造検証される
-- new Q / DEC / ASMのsemantic identityはLLMが判断し、番号決定は各ownerのSkill-local helperで決定論的に行われる
+- new Q / DEC / ASMのsemantic identityはLLMが判断する。Q番号はquestion-analysis helper、Project ContextがDEC / ASM ownerの場合はqa-workflow helper、別ownerの場合はそのownerのdeterministic allocatorで番号を決定し、owner未採番時にLLM hand-numberingへfallbackしない
 - 仕様理解だけの要求でtest-analysisへ勝手に進まず、AC→TR / Disposition closureをpackage単体の完了条件にしない
 - current UIの対象情報観測要求だけtest-target-inspectionへ分岐する
 - 保存済みUI資料のUX評価はusability-evaluation、live usability検査はusability-inspection、formal WCAG適合性評価はwcag-conformance-evaluationへ分岐する
