@@ -186,8 +186,10 @@ skill別 `cutover_seed`:
 ```
 
 - v1 resultの `tr_id_state` を `previous_tr_ids[]` へ投影する
-- v2必須fieldとして `acceptance_criteria=[]`、既存TR draftの `acceptance_refs=[]` を追加するための固定patchを返す
-- current human TR IDと `previous_tr_ids[]` のactive identityを使ってsame IDをreuseし、deleted IDもprevious stateへ残す。内容不変cutoverではnew採番しない
+- v1 Machine Runtime Inputの `test_requirements[].draft_key` とv1 resultの `tr_id_map[]` をexact joinし、各current draftを `identity_action="reuse" / reuse_id=<mapped tr_id>` へ固定projectionする
+- v2必須fieldとして `acceptance_criteria=[]`、各既存TR draftの `acceptance_refs=[]` を追加する
+- draft_key missing / duplicate / map mismatchをblockedとし、内容不変cutoverでLLMにreuse IDを選ばせない
+- deleted IDも `previous_tr_ids[]` へ残し、new採番しない
 
 `test-condition-design`:
 
@@ -208,8 +210,10 @@ skill別 `cutover_seed`:
 ```
 
 - `condition_structure` resultの `tcn_id_state / model_key_state` を `previous_tcn_ids / previous_model_keys` へ投影する
+- v1 Machine Runtime Inputの `test_conditions[].draft_key` とresultの `tcn_id_map[]` をjoinし、各current TCN draftを `identity_action="reuse" / reuse_id=<mapped tcn_id>` へ固定projectionする
+- v1 inputの `models[].draft_key` とresultの `model_key_map[]` をjoinし、各current model draftを `identity_action="reuse" / reuse_model_key=<mapped model_key>` へ固定projectionする
 - TCNごとの `materialize_coverage` resultから `target_mapping_state / semantic_ci_mapping_state / ci_id_state / expected_result_root_state` を、それぞれ `previous_target_id_map / previous_semantic_ci_map / previous_ci_ids / previous_expected_result_roots` へ投影する
-- current TCN / model / semantic CI identityは既存stable identityをreuseし、deleted / inactive mappingを落とさない
+- target / semantic CIは既存mapping stateから同じCI IDを維持する。draft/map mismatchをblockedとし、deleted / inactive mappingを落とさない
 
 `test-case-design`:
 
@@ -218,7 +222,8 @@ skill別 `cutover_seed`:
 ```
 
 - v1 resultの `tc_id_state` を `previous_tc_ids[]` へ投影する
-- current human TC IDとactive previous stateを使ってsame IDをreuseし、deleted IDもprevious stateへ残す
+- v1 Machine Runtime Inputの `test_cases[].draft_key` とv1 resultの `tc_id_map[]` をexact joinし、各current TC draftを `identity_action="reuse" / reuse_id=<mapped tc_id>` へ固定projectionする
+- draft/map mismatchをblockedとし、内容不変cutoverでLLMにreuse IDを選ばせない。deleted IDもprevious stateへ残す
 
 spec-analysis / test-analysisのAuthority / Product Risk等、runtime generatorが採番ownerではないstable IDはhuman artifact側の既存IDをそのまま維持します。coverage-analysis / qa-workflow / usability-inspection / wcag-conformance-evaluationで上記generator-owned stable identity stateを持たないruntimeはidentity cutover seedを作らず、v2 evidenceだけを再生成します。
 
