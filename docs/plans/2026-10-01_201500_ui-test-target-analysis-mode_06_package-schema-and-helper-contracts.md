@@ -622,7 +622,7 @@ fresh v00 / standalone検証では `previous_snapshot=null` を許可します�
 
 通常更新で `previous_snapshot` が与えられた場合、latest `Stable ID changes` と `影響file` が同snapshotから `impact` を再実行した結果とexact一致することも検証します。standalone検証では過去snapshotがないため、CHANGELOGのschema / lifecycle履歴整合だけを検証し、latest差分の再計算は行いません。
 
-current packageだけから過去の同version内容とのbyte同一性は証明しません。「同一versionを異なる完成内容で上書きしない」は、material update時に内容変更前の `next-version` 実行を必須とする更新手順で保証します。
+current packageだけから過去の同version内容とのbyte同一性は証明しません。canonical更新経路では `materialize` がprevious snapshotとの差分を確認し、差分がある完成package保存ではdefault policyのversionを必ず+1します。focused `next-version` operationは同じ導出規則を単独確認するために残します。
 
 ### next-version
 
@@ -734,6 +734,8 @@ stdin:
   "operation":"materialize",
   "package_root":"<path>",
   "previous_snapshot":{"package_version":"v14","tracked_items":[],"exact_reference_index":[],"payload_file_sha256":[]},
+  "version_policy":"default",
+  "target_version":null,
   "change_summary":"<current versionの変更概要本文>",
   "retire_ids":["PAGE-009"],
   "table_changes":[
@@ -768,6 +770,8 @@ stdin:
 }
 ```
 
+`version_policy` は `default / project` の2値です。通常更新で `default` の場合、helperがprevious snapshotのversionから次versionを導出し、README / CHANGELOG / MANIFESTへ同時反映します。`project` の場合だけ、案件で明示されたpolicyに基づく `target_version` を必須とし、helperはpackage内一致を検証します。完成済みpackageへ1 byteでも永続変更を加えて再び完成状態として保存する場合、default policyではsemantic / presentationを問わず必ずversionを+1します。in-memory生成結果がprevious packageと完全同一ならno-opとして書込み・version upを行いません。
+
 table input contract:
 
 - `file / section` は§2〜§5のregistryに存在するexact pairだけを許可する。extension fileは00で宣言済みpathだけを許可する
@@ -787,16 +791,17 @@ table input contract:
 file / control materialization order:
 
 1. previous snapshotとcurrent bytesを照合し、staleなら書込みしない
-2. table changesをin-memory modelへ適用し、new ID / `@draft` referenceを解決する
-3. `retire_ids[]` を検証してin-memory modelから除去する
-4. 00 applicabilityの最終状態に従い、条件付き標準fileをasset templateから作成または除去する。除去対象fileにtracked rowがあれば対応 `retire_ids[]` を必須とする
-5. extension declarationと `extension_file_updates[]` を照合し、宣言済みfileだけ作成 / 更新する
-6. exact Markdown tableをescape / canonical sortしてserializeし、known sectionだけ置換する。prose updateはexact heading配下のbodyだけを置換し、意味を書き換えない
-7. previous snapshotとin-memory current modelからimpactを生成し、CHANGELOGのcurrent `変更概要 / Stable ID changes / 影響file` を更新する
-8. `build-machine-evidence` 相当処理で09のMachine Entities sectionをcanonical生成・置換する
-9. README controlsをcanonical生成・置換する
-10. MANIFESTを最後に再生成する
-11. final validateを実行し、成功した場合だけpackage filesへ書き出す
+2. default / project version policyを解決し、更新が発生する場合のtarget versionをin-memory metadataへ設定する
+3. table changesをin-memory modelへ適用し、new ID / `@draft` referenceを解決する
+4. `retire_ids[]` を検証してin-memory modelから除去する
+5. 00 applicabilityの最終状態に従い、条件付き標準fileをasset templateから作成または除去する。除去対象fileにtracked rowがあれば対応 `retire_ids[]` を必須とする
+6. extension declarationと `extension_file_updates[]` を照合し、宣言済みfileだけ作成 / 更新する
+7. exact Markdown tableをescape / canonical sortしてserializeし、known sectionだけ置換する。prose updateはexact heading配下のbodyだけを置換し、意味を書き換えない
+8. previous snapshotとin-memory current modelからimpactを生成し、CHANGELOGのtarget version entryを作成して `変更概要 / Stable ID changes / 影響file` を更新する
+9. `build-machine-evidence` 相当処理で09のMachine Entities sectionをcanonical生成・置換する
+10. README controlsをcanonical生成・置換する
+11. MANIFESTを最後に再生成する
+12. in-memory結果がprevious packageと完全同一ならno-opを返す。差分がある場合はfinal validateを実行し、成功した場合だけpackage filesへ書き出す
 
 payload:
 
