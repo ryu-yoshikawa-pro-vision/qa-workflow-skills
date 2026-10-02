@@ -181,12 +181,22 @@ version更新時は変更ファイルだけではなく、そのversionの完全
 ### shared runtime contract
 
 変更:
-- spec-analysis / test-analysis / test-requirement-design / test-condition-design / test-case-design / coverage-analysis / qa-workflow の7 Skill-local `scripts/runtime_contract.py`
+- repository内でcurrent shared `runtime_contract.py` を再利用する9 Skill-local copy
+  - spec-analysis
+  - test-analysis
+  - test-requirement-design
+  - test-condition-design
+  - test-case-design
+  - coverage-analysis
+  - qa-workflow
+  - usability-inspection
+  - wcag-conformance-evaluation
 - `tests/skills/runtime/test_runtime_dispatch.py`
 - `tests/skills/runtime/test_runtime_portability.py`
+- usability-inspection / wcag-conformance-evaluationのruntime contract回帰test
 - requirement-structure contract versionを参照するruntime / fixture / integration tests
 
-7コピーはbyte-identicalを維持し、`acceptance_criterion` Entity type、`acceptance_refs` canonicalization、spec-analysis Authority + AC expected Entity導出を同一内容で追加します。shared runtime envelopeは `runtime-v1` を維持します。
+9コピーはbyte-identicalを維持し、`acceptance_criterion` Entity type、`acceptance_refs` canonicalization、spec-analysis Authority + AC expected Entity導出を同一内容で追加します。shared runtime envelopeは `runtime-v1` を維持します。Skill固有generatorの責務は変更しません。
 
 ### qa-workflow
 
@@ -240,7 +250,7 @@ PR #14後のCIは `skills/*/scripts` を動的compileするため、helper compi
 - README / EVALS等の現在値を変更した場合はPR #14後のcurrent repositoryから導出した実データと一致する
 - PR #14のusability / WCAG finding・observation・resultを仕様Authorityへ自動昇格しない
 - 機能scopeごとにUI操作有無を判定し、UI操作ありではUS → UC → Behavior → ACを完全に分析し、情報不足はnot-applicableへ逃げずUNKNOWN / blockedとして残る
-- current ACがTRまたは明示的dispositionへ閉じ、AC / 親Behavior / 親UC / 親US / Authority変更が必要なTR freshnessへ伝播する
+- test-requirement-designまで進む要求では、current ACがTRまたは明示的dispositionへ閉じ、AC / 親Behavior / 親UC / 親US / Authority変更が必要なTR freshnessへ伝播する。仕様理解packageだけを要求された場合は、このclosureをpackage単体の完了条件にしない
 - 標準package fileはrequired core + 固定triggerによる条件付き必須とし、Agentの自由裁量で作成有無を変えない
 - LLMは仕様意味・UI意味・semantic identity判断に集中し、version / hash /参照整合 / UNKNOWN件数 / MANIFEST / file applicability整合 / Machine Entity projection等の定型処理はhelper / validatorへ移る
 - helperがsemantic判断を代替せず、通常spec-analysisの柔軟性を損なわない
