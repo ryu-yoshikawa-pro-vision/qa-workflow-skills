@@ -346,6 +346,13 @@ helperは宣言されたheader名のexact ID参照だけを検証し、proseか�
 
 標準prefix:
 
+canonical spec-analysis item:
+- SRC
+- SPEC
+- INF
+- UNK
+
+UI target structural:
 - SCOPE
 - PAGE
 - STATE
@@ -373,11 +380,13 @@ helperは宣言されたheader名のexact ID参照だけを検証し、proseか�
 
 `next-id` はLLMがnewと判断した後にのみ使用します。Agentから既知ID一覧を受け取らず、helperが `package_root` のcurrent structured rowとCHANGELOGに記録されたexact stable ID tokenを走査し、同prefixの既知最大番号+1を返します。
 
-削除済み・置換済みentityのIDもCHANGELOGへ記録済みである限り再利用しません。stable IDを削除・置換するversionでは、そのIDをCHANGELOGの「変更 / 解消したstable ID」へ必ず記録します。
+削除済み・置換済みentityのIDもCHANGELOGのexact `Stable ID changes` tableへ記録済みである限り再利用しません。stable IDを削除・置換するversionでは、そのIDを同tableへ必ず記録します。
 
 999を使用済みなら自動的に4桁へ拡張せず `id_space_exhausted` でblockedを返します。prefix拡張はschema変更として別途扱います。
 
-SPEC / DEC / INF / UNK / SRC / ASMは既存spec-analysisのID契約を使用します。
+`SRC / SPEC / INF / UNK` は既存spec-analysisの分類・形式契約を維持しつつ、UI target mode内でnewと判断した後の番号決定だけ `next-id` を使用します。
+
+`DEC / ASM` はUI target packageがownerではありません。question-analysis / projectの決定事項・承認済み仮定の正本で採番済みIDを参照し、UI target package側の `next-id` では新規採番しません。
 
 ### 6.1 structured Markdown parse contract
 
@@ -559,17 +568,18 @@ LLM / AgentがSHA-256を手計算しません。
 
 ### impact
 
-stdin:
+通常のcurrent version更新では:
 
 ```json
 {
   "operation":"impact",
-  "package_root":"<path>",
-  "changed_ids":["SPEC-021","RULE-003"]
+  "package_root":"<path>"
 }
 ```
 
-payloadへexact reference indexから `affected_files[] / affected_rows[]` を返します。
+helperは最新versionのexact `Stable ID changes` tableから `added / changed / resolved / retired / migrated` のStable ID集合を内部導出し、cross-file exact reference indexから `changed_ids[] / affected_files[] / affected_rows[]` を返します。Agent / LLMが同じID集合をJSONへ再構築しません。
+
+legacy migration直後も同じcurrent versionの `Stable ID changes` tableを入力源とします。
 
 意味上の修正要否は判断しません。
 
@@ -789,21 +799,25 @@ tableにはpayload filesだけをcanonical順で列挙します。
 | Stable ID | Change |
 | --- | --- |
 
-`Change` は次の4値だけを許可します。
+`Change` は次の5値だけを許可します。
 
 - `added`
 - `changed`
 - `resolved`
 - `retired`
+- `migrated`
 
 規則:
 
 - 1 version内で同じStable IDを重複させない
-- `next-id` で新規採番したIDは `added` として必ず記録する
+- 1つのStable IDに `added` または `migrated` を記録できるのは履歴全体で最初の1回だけ
+- `next-id` で新規採番したIDは `added` として記録する
+- legacy packageからsemantic identityを維持してcurrent schemaへ持ち込んだIDはmigration versionで `migrated` として記録する
 - UNKNOWN解消は対象 `UNK-xxx` を `resolved` として記録する
 - current viewから削除したstable entityは `retired` として記録する
 - 内容変更のみでidentityを維持したstable entityは `changed`
-- `next-id` は全versionのこのtableに現れるStable IDを使用済みIDとして扱う
+- `resolved / retired` 済みIDを別entityの `added / migrated` として再利用しない
+- `next-id` はcurrent structured rowと全versionのこのtableに現れるStable IDを使用済みIDとして扱う
 
 `### 影響file`
 
@@ -814,7 +828,11 @@ helperは次を検証します。
 - 最新version headingがPackage Versionと一致
 - 各version entryに上記3 headingがexactly one存在
 - `Stable ID changes` tableのheader / Change enum / Stable ID形式 / version内duplicate
-- current versionで `next-id` により追加されたIDが `added` rowとして記録されている
+- 履歴全体で `added / migrated` が同じStable IDへ複数回現れない
+- `resolved / retired` 後のStable IDが別entityとして再導入されていない
+- current structured rowとStable ID履歴のID形式がprefix契約に一致する
+
+helperは「そのIDが実際にnext-id operationから返されたか」という実行履歴を推測・検証しません。検証対象はcurrent packageとCHANGELOGに保存された成果物状態です。
 
 変更概要と影響fileの意味内容はLLMが作成します。
 
@@ -830,10 +848,14 @@ LLMは:
 
 1. legacy packageのcurrent内容とstable IDを読む
 2. 新schemaの00〜09 / domain fileへ意味をmapする
-3. semantic identityが同じ既存SPEC / DEC / INF / UNK / PAGE等は可能な範囲でID維持
-4. 新しいentityだけnewと判断し、next-idを使う
-5. legacyで未確定だった内容を推測で確定しない
-6. current packageに不要な履歴はCHANGELOG / migration noteへ残し、current viewへ混ぜない
+3. semantic identityが同じ既存SRC / SPEC / INF / UNK / structural IDは可能な範囲でID維持
+4. retained current IDをmigration versionの `Stable ID changes` tableへ `migrated` としてseedする
+5. legacy履歴から明示的に確認できるretired / resolved IDは対応する `retired / resolved` rowとしてseedする。legacy資料から確認できない過去IDを推測で作らない
+6. 新しいentityだけnewと判断し、next-idを使う
+7. legacyで未確定だった内容を推測で確定しない
+8. current packageに不要な履歴はCHANGELOG / migration noteへ残し、current viewへ混ぜない
+
+DEC / ASMは既存のproject側正本IDを参照し、migrationを理由にUI target packageで再採番しません。
 
 helperは変換後packageだけをvalidateします。
 
