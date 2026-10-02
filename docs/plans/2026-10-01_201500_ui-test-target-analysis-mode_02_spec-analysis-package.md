@@ -369,7 +369,17 @@ default policyでは、完成済みpackageに永続差分を加えて再び完�
 
 ユーザー / projectが別version policyを明示した場合はそちらを優先し、materializeへ `version_policy=project / target_version=<value>` を渡します。default policyで「versionを上げるほど重要か」をLLMへ判断させません。
 
-## 6. 更新契約
+## 6. 作成・更新契約
+
+### 初回作成
+
+1. `skills/spec-analysis/assets/ui-test-target-analysis/` をtarget rootへ展開し、variable tableはheader-only、条件付きfileはapplicability判断前のassetとして保持する
+2. LLMがsource / Authority、scope、UI構造、file trigger、US / UC / Behavior / AC、UNKNOWN、extension要否等のsemantic判断を行う
+3. LLMはstable ID番号や完成Markdown tableを手組みせず、`materialize` 用のsemantic row / prose inputへまとめる。new identityは `identity_action=new / draft_key=<unique>` を使う
+4. `ui_target_package.py materialize` を `artifact_mode=create / change_mode=normal / previous_snapshot=null` で実行する。default policyではv00 / Previous=-を設定し、new ID、条件付きfile、extension file、CHANGELOG、Machine Entities、README controls、MANIFESTを生成する
+5. materialize成功後にsemantic quality gateとdeterministic validateを実行する
+
+### 継続更新
 
 回答や新資料が来た場合:
 
@@ -377,7 +387,7 @@ default policyでは、完成済みpackageに永続差分を加えて再び完�
 2. LLMがAuthority / DECISION / ASM、same-UNK reopen / new UNK、UI構造、US / UC / Behavior / AC、file applicability、extension要否、reuse / new / explicit retire等のsemantic判断を行う。completed Markdown rowやstable ID番号はまだ手書きしない
 3. LLMは変更対象を `materialize` のsemantic inputへまとめる。既存identityは `identity_action=reuse / reuse_id=<ID>`、new identityは `identity_action=new / draft_key=<unique>` とし、新規row間参照は `@draft:<draft_key>` を使う。current modelから意図的に除去するidentityだけ `retire_ids[]` に入れる
 4. 07のUNKNOWN説明、06の矛盾 / resolved説明、CHANGELOGの `変更概要` 等のnarrativeは `prose_updates[] / change_summary` として渡す。stable ID番号、Markdown escape、table separator、CHANGELOG control row、README control、Machine Entity wrapper、MANIFESTはAgentが組み立てない
-5. `ui_target_package.py materialize` を `package_root + previous_snapshot + version_policy + semantic table/prose/file updates + retire_ids[]` で1回実行する。helperがsingle-writer snapshotを確認し、version、new ID、`@draft`解決、canonical table serialization、条件付き標準file作成 / 除去、extension file同期、CHANGELOG controls、Machine Entities section、README controls、MANIFESTを順に生成する
+5. `ui_target_package.py materialize` を `artifact_mode=update + package_root + previous_snapshot + version_policy + semantic table/prose/file updates + retire_ids[]` で1回実行する。helperがsingle-writer snapshotを確認し、version、new ID、`@draft`解決、canonical table serialization、条件付き標準file作成 / 除去、extension file同期、CHANGELOG controls、Machine Entities section、README controls、MANIFESTを順に生成する
 6. `materialize` が `stale_snapshot / state_transition_required / reference_not_found` 等でblockedした場合は書込み済みの中間完成packageを残さず、LLMが意味判断またはinputを修正して再実行する。row消失だけをretire扱いしない
 7. materialize成功後、semantic quality gateでsource / inference / UI分類 / semantic duplicate、file trigger、same-UNK / new UNK、AC→TR意味対応等を確認する
 8. deterministic validate / repository testsでschema、stable ref、version、CHANGELOG lifecycle、Machine Entity、MANIFEST / hashを確認する
@@ -393,10 +403,9 @@ helperが列挙したimpact候補は再確認対象であり、変更必須と�
 
 - domainが標準fileの責務とは独立している
 - 独立したAuthority / rule / flow集合として継続更新する必要がある
-- 00に責務 / 分割理由とLLMが決めたlowercase kebab-case slugを記録する
-- `ui_target_package.py next-domain-file` で次の連番とcanonical file pathを取得し、Agentが10+番号を計算しない
-- 返却pathを00のextension宣言へ登録し、実fileを作成してからREADME / MANIFESTへ反映する
-- 同一更新で複数extensionを追加する場合は、上記materialize後に次の `next-domain-file` を呼び、未作成fileの番号をAgent側だけで予約しない
+- LLMは責務 / 分割理由 / lowercase kebab-case slugを `materialize.extension_file_updates[]` へ渡す
+- canonical create / updateでは `materialize` がexisting 10+ fileの最大番号+1からrequest順に複数extensionをbatch採番し、実fileと00の `案件固有extension file一覧` を同時生成する。Agentが10+番号・宣言rowを計算しない
+- `ui_target_package.py next-domain-file` はfocused確認 / 個別利用用に残すが、通常package完成経路で複数extensionの番号予約に使わない
 - current UNKNOWNのcanonical正本は09、repository statusの正本は08、canonical Authority / traceabilityの正本は09のまま
 - 同じ仕様項目を二重正本にしない
 
