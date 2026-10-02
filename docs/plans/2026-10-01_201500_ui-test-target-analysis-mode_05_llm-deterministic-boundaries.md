@@ -116,6 +116,8 @@ LLMがsemantic identityを判断して `new` と決めた後だけ使用しま�
 - Agent / LLMに`known_ids[]`を手組みさせない
 - CHANGELOG本文のproseからIDを推測せず、exact tableだけを履歴として読む
 - 現在存在しない過去IDもCHANGELOGのstable ID履歴から既知IDとして扱い、別entityへ再割当てしない
+- UI target mode内でnewと判断した `SRC / SPEC / INF / UNK` とstructural IDの番号決定に使用する
+- `DEC / ASM` はquestion-analysis / project側正本がownerであり、本helperで新規採番しない
 - `next-id` で得たIDは、同じprefixの次の `next-id` 呼び出し前に対象structured rowへ反映する
 - helper返却の `stable_id_change` をcurrent versionの `Stable ID changes` tableへ記録し、validate前に履歴を閉じる
 - prefixはmodeで宣言済みのものだけ許可する
@@ -132,7 +134,7 @@ current package fileからMANIFEST bodyまたはmachine-readable manifest projec
 
 #### impact
 
-変更されたstable item ID集合を入力し、cross-file exact referenceから再確認候補file / rowを列挙します。
+current versionのexact `Stable ID changes` tableから変更対象ID集合をhelper自身が導出し、cross-file exact referenceから再確認候補file / rowを列挙します。Agent / LLMが同じchanged ID集合を手組みしません。
 
 この結果は「修正が必要」という意味判断ではありません。LLMが再確認対象を漏らさないための候補集合です。
 
@@ -186,8 +188,15 @@ semantic / deterministic runnerのdirectory対応は追加せず、この固定p
 
 UI target packageでは、人間向け構造化ビューのentityをstable IDで参照できるようにします。
 
-標準prefix:
+UI target modeで `next-id` が番号決定を担当するprefix:
 
+canonical spec-analysis item:
+- SRC-xxx
+- SPEC-xxx
+- INF-xxx
+- UNK-xxx
+
+structural item:
 - SCOPE-xxx
 - PAGE-xxx
 - STATE-xxx
@@ -264,7 +273,9 @@ MANIFESTはcurrent package fileのfile listとSHA-256を持ちます。
 - SHA-256はhelperが計算する
 - Agentがhash値を手入力しない
 
-version変更の要否をpresentationだけの差分まで機械判定しません。案件で「material update」の定義が必要な場合はLLM / project policyが判断し、helperは指定されたversionの整合だけを検証します。
+version変更の要否をpresentationだけの差分まで機械判定しません。案件で「material update」の定義が必要な場合はLLM / project policyが判断します。default policyでmaterial updateと判断した場合は、内容を書き換える前に `next-version` を実行し、返却された `previous_version / next_version` をREADME / CHANGELOGへ反映してから更新します。
+
+「同じversionを別内容で完成版として上書きしない」は更新手順上の契約です。current packageだけを見るvalidatorは過去の同version内容とのbyte比較を行わず、current / previous version metadataの形式・連続性・package内一致を検証します。
 
 ## 8. question-analysis Skill-local helper
 
