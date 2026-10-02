@@ -152,9 +152,18 @@ stdin:
 {
   "operation":"project_v1_cutover",
   "skill":"test-requirement-design",
-  "artifact_markdown":"<runtime-v1 / entity-state-v1 artifact>"
+  "phase":"all",
+  "artifact_markdown":"<runtime-v1 / entity-state-v1 artifact>",
+  "current_v2_artifact_markdown":null
 }
 ```
+
+`phase`:
+
+- test-requirement-design / test-case-design: `all` だけを許可する
+- test-condition-design: `condition-structure / models / test-data-requirements / materialize-coverage` の4値
+
+`current_v2_artifact_markdown` はTCDの2段階目以降だけ必須です。そこまでに実行済みのruntime-v2 Machine Runtime Input / Resultとentity-state-v2 Machine Entitiesを蓄積したpartial artifactを渡します。LLMがresult JSONを再構築しません。
 
 response:
 
@@ -163,6 +172,8 @@ response:
   "valid":true,
   "operation":"project_v1_cutover",
   "skill":"test-requirement-design",
+  "phase":"all",
+  "phase_complete":true,
   "source_runtime_contract_version":"runtime-v1",
   "source_entity_schema_version":"entity-state-v1",
   "normalized_runtime_inputs":[
@@ -177,19 +188,20 @@ response:
 }
 ```
 
-handled failureは `valid=false`、`issues[]` へ既存runtime verifierと同じissue contractで返します。
+handled failureは `valid=false`、`issues[]` へ既存runtime verifierと同じissue contractで返します。cutover固有でsemantic input / target identityがv1とcurrent v2の間で変化した場合は `cutover_semantic_drift`、前phaseのcurrent v2 result不足は `cutover_dependency_incomplete` とします。どちらもblockingです。
 
 #### 共通projection規則
 
-- artifact内のMachine Runtime Input / Result pairがruntime-v1で、Machine Entity blockがentity-state-v1であることを確認する
-- `verify_runtime_evidence` と同じpair extraction / duplicate検出 / expected runtime unit builderを再利用し、missing / extra / incomplete / duplicate unitをblockedにする
+- v1 artifact内のMachine Runtime Input / Result pairがruntime-v1で、Machine Entity blockがentity-state-v1であることを確認する
+- existing pair extraction / duplicate / incomplete pair検出を再利用する。expected unit集合は外部normalized inputを推測再構築せず、TRD / TCはfixed root、TCDは保存済みcondition_structure input/resultとmodel dependencyからcutover専用に導出する
+- `current_v2_artifact_markdown` が必要なphaseではruntime-v2 / entity-state-v2だけを許可し、v1/v2 block混在、duplicate / incomplete current pairをrejectする
 - v1 Machine Entityのfingerprint / freshness / generation fingerprintをv2 current evidenceとしてcarry-forwardしない
-- v1 Machine Runtime Inputに保存済みの**script固有normalized input**だけをsemantic input正本として使用する。Markdown本文をLLMが読み直してJSONを再構築しない
+- v1 Machine Runtime Inputに保存済みのscript固有semantic inputを正本とし、Markdown本文をLLMが読み直してJSONを再構築しない
 - v1 Runtime Resultに保存済みのidentity / mapping stateを、対応scriptのv2 input schemaへhelperが直接埋め込む
-- `normalized_runtime_inputs[]` はcallerがそのまま各v2 generatorの `input` に渡せる完成形とし、caller / Agentがfield mergeしない
+- 返却 `normalized_runtime_inputs[]` は**そのphaseで今すぐ実行可能なunit**についてcallerがそのまま各v2 generatorの `input` に渡せる完成形とし、caller / Agentがfield mergeしない
 - metadata、upstream Entity / runtime dependency、fingerprintは返さない。callerがcurrent v2 Entity / current dispatch結果から既存fixed builderで新規生成する
-- cutoverとsemantic redesignを同じrunで混在させない。v1 normalized semantic inputの意味fieldは変更せず、v2必須の互換fieldとidentity stateだけを追加する
-- `normalized_runtime_inputs[]` は既存dispatch順でcanonical sortし、同じv1 artifactから同じ配列を返す
+- cutoverとsemantic redesignを同じrunで混在させない。stable semantic identity / target_ref / semantic fieldがcurrent v2再実行で変わる場合は自動補正せず `cutover_semantic_drift` で止める
+- `normalized_runtime_inputs[]` は既存dispatch順でcanonical sortする
 
 #### test-requirement-design
 
@@ -210,32 +222,74 @@ v1 inputをrequirement-structure-v2へ変換し、次を含む**完全なnormali
 
 #### test-condition-design
 
-v1 artifactからexpected runtime unit集合を既存fixed builderで導出します。
+TCDはmodel再実行後のcurrent target versionを後段inputへ埋め込む必要があるため、一括projectionしません。4 phaseを順番に呼び、各phaseが**次に実行可能な完成済みinputだけ**を返します。
 
-- rootはexactly 1件の `artifact:condition_structure:all`
-- model runtime unitはv1 expected集合どおり。各unitのscript固有inputをcanonical copyし、runtime-v2 metadataで再実行する
-- active TCNごとに `artifact:materialize_coverage:<TCN-ID>` をexactly 1件要求する
-- materialize unitはruntime_unit_key末尾のTCN IDとinput / result内TCN IDの一致を要求する
-- missing / extra / duplicate materialize unitをblockedにする
+v1 cutover source validation:
 
-`normalized_runtime_inputs[]` にはcondition_structure、各model generator、各materialize_coverageの**完成済みv2 script input**を返します。
+- `artifact:condition_structure:all` をexactly 1 pair要求する
+- condition_structure inputの `models[]` とresultの `active_model_metadata / model_key_state` からcurrent model identity集合を固定する
+- runtime generatorを持つmodelはv1 artifactに対応するmodel pairを要求する。derived child modelはv1 parent resultの `derived_child_inputs[]` にexactly 1件の対応inputがあることを要求する
+- `artifact:test_data_requirements:all` は0または1 pair。存在する場合はinput `requirements[]` が非空であることを要求する
+- condition resultのactive model metadataからmaterialize対象TCN集合を導出し、各TCNに `artifact:materialize_coverage:<TCN-ID>` をexactly 1 pair要求する
+- 上記以外のTCD runtime pairをextraとしてrejectする
 
-`condition_structure` input:
+##### phase: condition-structure
+
+`current_v2_artifact_markdown=null` を要求します。返却は `artifact:condition_structure:all` の1件だけです。
 
 - v1 inputのsemantic fieldを維持
 - resultの `tcn_id_state / model_key_state` を `previous_tcn_ids / previous_model_keys` へ設定
 - input `test_conditions[].draft_key` ↔ result `tcn_id_map[]` をjoinし、current TCN draftをreuseへ固定
 - input `models[].draft_key` ↔ result `model_key_map[]` をjoinし、current model draftをreuseへ固定
-- `tcn_id_state` のactive TCN IDを全件 `update_scope_tcn_ids[]`、`model_key_state` のactive model keyを全件 `update_scope_model_keys[]` へ入れ、first v2 condition_structure runをfull rebuildにする
+- active TCN IDを全件 `update_scope_tcn_ids[]`、active model keyを全件 `update_scope_model_keys[]` へ設定する
+- phase_completeはこのinputを生成できればtrue
 
-`materialize_coverage:<TCN-ID>` input:
+##### phase: models
 
-- v1 script inputのsemantic target / candidate fieldを維持
--同じunitのv1 resultから `target_mapping_state / semantic_ci_mapping_state / ci_id_state / expected_result_root_state` を、それぞれ `previous_target_id_map / previous_semantic_ci_map / previous_ci_ids / previous_expected_result_roots` へ設定
-- deleted / inactive mappingをprevious stateへ残す
-- input / result / runtime_unit_keyのTCN ID不一致をblockedにする
+current v2 condition_structure pairを必須とします。model dependency順に、**まだcurrent v2 resultが存在せず、upstream model resultが揃ったunit**だけを返します。複数ready unitはcanonical runtime_unit_key順で同時返却できます。
 
-model generator inputにはstable identity patchを追加せず、v1のscript固有inputをcanonical copyしてcurrent v2 metadataで再実行します。
+- root model（`derived_from_model_key=null`）は同じmodel_keyのv1 saved script inputをcanonical copyする
+- derived child modelはv1 saved child inputを正本にせず、current v2 parent result `payload.derived_child_inputs[]` のexactly 1件のmatching `child_model_key / model_type` から `input` を使用する
+- current v2 derived child inputとv1 saved child inputをcanonical比較し、意味fieldが変わっていれば `cutover_semantic_drift`
+- current condition resultのactive model key / type / parent TCNとv1 model identity集合が一致しなければ `cutover_semantic_drift`
+- current v2 parent result不足でchildがまだreadyでないこと自体はfailureにせず、そのunitを返さない
+- 未実行modelが残るのにready unitが0件なら `cutover_dependency_incomplete`
+- 全expected model resultがcurrent v2 artifactへ揃った場合だけ `phase_complete=true / normalized_runtime_inputs=[]`
+
+callerは返却model unitをcurrent v2 metadataで実行し、Machine Runtime Input / Resultを`current_v2_artifact_markdown`へ追加して同phaseを繰り返します。
+
+##### phase: test-data-requirements
+
+models phase complete後だけ許可します。
+
+- v1に `artifact:test_data_requirements:all` が無ければ `phase_complete=true / normalized_runtime_inputs=[]`
+- 存在する場合はexactly 1 complete inputを返す
+- v1 input `requirements[]` のrequirement_key / dimension / operator / value等のsemantic fieldを維持する
+- `current_source_targets[]` はcurrent v2 model resultのtargetsから再生成する
+- v1 `requirements[].source_target_versions[]` が空なら空のまま維持する
+- 非空なら各 `target_ref` をcurrent v2 targetへexact解決し、`target_content_fingerprint / generation_fingerprint` をcurrent値へ置換する
+- v1 target_refがcurrent v2 model resultsに存在しない、source_model_keyが変わる、同じtarget_refのtarget content / execution identityがsemanticに変わる場合は `cutover_semantic_drift`
+
+callerは返却inputをcurrent v2 metadataで実行し、存在する場合はTDR result pairをcurrent v2 artifactへ追加します。
+
+##### phase: materialize-coverage
+
+models phase completeかつ、v1にTDR unitがある場合はcurrent v2 TDR result完了後だけ許可します。current condition resultから導出した各materialize対象TCNについて1件のcomplete inputを返します。
+
+各TCN inputを次のように再構築します。
+
+- `active_model_metadata`: current v2 condition_structure resultから当該TCN分を使用
+- `models`: current v2 model resultを既存 `current_model_result_row()` でprojectionしたrowを使用
+- `test_data_requirements`: current v2 TDR result `normalized_requirements[]` から当該TCNのactive model keyをsource_model_keyに持つrowだけを使用。v1にTDR unitが無ければ空
+- `previous_target_id_map / previous_semantic_ci_map / previous_ci_ids / previous_expected_result_roots`: 同じTCNのv1 materialize result stateをそのままprevious stateへ設定
+- `target_annotations`: v1のpriority / expected_result_root / test-data refs等のsemantic fieldを維持し、target_refでcurrent targetへjoinして `target_content_fingerprint / generation_fingerprint` をcurrent値へ置換
+- `target_dispositions`: handling / reason / authority_refs等を維持し、target自身と `covered_by_target_version` のversion fieldをtarget_refでcurrent targetへrebaseする
+- `semantic_coverage_items`: draft_key / item_text / refs / priority / expected root等を維持し、`source_target_versions[]` をcurrent target versionへrebaseする。v1 result `semantic_ci_mapping_state[]` と `(model_key, semantic_content_fingerprint)` で一意joinし、current itemを `identity_action=reuse / reuse_semantic_item_key / reuse_ci_id` へ固定する。0件または複数matchは `cutover_semantic_drift`
+- `merge_groups`: group / target_ref集合を維持し、`target_versions[]` のcontent / generation / execution fingerprintをcurrent targetへrebaseする
+
+target_ref集合・target content identity・merge membership等がv1とcurrent v2で変化した場合は、cutover中にLLMへ補正させず `cutover_semantic_drift` とします。shared runtime version変更だけで意味構造が変わらないことをcutoverの前提にします。
+
+返却inputは既存 `materialize_coverage.py` へそのまま渡せる完全schemaです。全expected TCN inputを返せた場合 `phase_complete=true` とします。
 
 #### test-case-design
 
@@ -258,8 +312,8 @@ PR #14 merge後、既存v1成果物を持つworkflowは次の順だけを許可�
 2. spec-analysis / test-analysisのhuman semantic contentを変更せず、runtime-v2 / entity-state-v2のMachine Entity / runtime evidenceを再生成する
 3. test-requirement-design v1 artifactへ `project_v1_cutover` を実行し、返却されたcomplete `normalized_runtime_inputs[]` をそのままcurrent v2 metadataでdispatchする。`partial_rerun=false / previous_artifact_markdown=null`
 4. v2 TR artifactを保存する
-5. test-condition-design v1 artifactへ `project_v1_cutover` を実行し、返却unitを既存dispatch順でcurrent v2 metadataにより再実行する。current v2 TR Entityをupstreamに使う
-6. v2 TCD artifactを保存する
+5. test-condition-design v1 artifactへ `project_v1_cutover` を `condition-structure → models（必要回数反復）→ test-data-requirements → materialize-coverage` の順で実行し、各phaseが返したcomplete inputだけをcurrent v2 metadataで再実行する。current v2 TR Entityと、そのphaseまでに生成したcurrent v2 TCD Entity / runtime resultをupstreamに使う
+6. 全TCD phase完了後にv2 TCD artifactを保存する
 7. test-case-design v1 artifactへ `project_v1_cutover` を実行し、返却inputをcurrent v2 metadataでfull rebuildする。current v2 TCN / CI等をupstreamに使う
 8. v2 TC artifactを保存する
 9. coverage-analysis / qa-workflow / usability-inspection / wcag-conformance-evaluation等、generator-owned stable identity seedを持たないruntime evidenceをcurrent v2 upstreamから再生成する
@@ -277,7 +331,10 @@ repository regression:
 - deleted TR / TCN / model / CI / TC identityがcutover後も使用済み履歴として保持される
 - inactive target / semantic CI mappingが失われない
 - cutover後のnew identityが過去最大IDを再利用しない
-- returned normalized_runtime_inputsだけでv2 generatorを実行でき、Agent-side mergeを必要としない
+- 各phaseのreturned normalized_runtime_inputsだけで次のv2 generatorを実行でき、Agent-side mergeを必要としない
+- TCDでcurrent v2 model generation fingerprintがv1から変わっても、TDR / materializeのtarget version fieldがcurrent v2 resultへrebaseされる
+- derived child inputはcurrent v2 parent `derived_child_inputs` を使い、v1 saved child inputとのsemantic driftを検出する
+- v1で `identity_action=new` だったsemantic CIもsemantic_ci_mapping_stateへ一意joinして同じCI IDをreuseする
 - v1 Entity fingerprint / generation fingerprintをv2 current evidenceとしてcarry-forwardしない
 
 ## 3. spec-analysis normalized machine input
