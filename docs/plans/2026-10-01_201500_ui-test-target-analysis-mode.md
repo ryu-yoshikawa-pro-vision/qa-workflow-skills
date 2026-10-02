@@ -53,7 +53,7 @@ feat/ui-test-target-analysis-profile
 
 ## 固定方針
 
-LLM / deterministic処理の責務境界は `2026-10-01_201500_ui-test-target-analysis-mode_05_llm-deterministic-boundaries.md` を正本とします。LLMの意味判断をscriptへ移さず、形式・参照・集計・fingerprint等の再現可能な定型処理だけをSkill-local helper / validatorへ移します。
+LLM / deterministic処理の責務境界は `2026-10-01_201500_ui-test-target-analysis-mode_05_llm-deterministic-boundaries.md` を正本とします。LLMの意味判断をscriptへ移さず、形式・参照・集計・fingerprint等の再現可能な定型処理だけをSkill-local helper / validatorへ移します。UI target modeがownerの `SRC / SPEC / INF / UNK` とstructural IDは、semantic identityをLLMが決めた後の番号決定をhelperへ寄せます。DEC / ASMはproject側正本のownerを維持します。
 
 
 ### 1. 新Skillは追加しない
@@ -162,7 +162,7 @@ version更新時は変更ファイルだけではなく、そのversionの完全
 - skills/test-requirement-design/evals/output/*
 - runtime / repository contract tests
 
-目的はcurrent ACをTRまたは明示的dispositionへ閉じ、AC / 親Behavior / 親UC / 親US / Authority変更をTR freshnessへ伝播させることです。TRの責務をACの言い換えへ変更しません。
+目的はcurrent ACをTRまたは明示的dispositionへ閉じ、AC / 親Behavior / 親UC / 親US / Authority変更をTR freshnessへ伝播させることです。Authority変更は、AC再生成後もTRが直接保持するAuthority dependencyでstale判定できるようにします。TRの責務をACの言い換えへ変更しません。
 
 ### question-analysis
 
