@@ -245,6 +245,9 @@ repository unit testで次を必須確認します。
 - README file一覧とMANIFESTの一致
 - CHANGELOG最新version見出しとpackage versionの一致
 - CHANGELOGのexact `Stable ID changes` table、Change enum、version内duplicate
+- fresh v00の空change table、v01以降のDEC / ASM初登場=added、既追跡内容・状態変更=changed、current structured model除去=retired
+- resolvedはUNKだけに許可し、resolved / retired後の後続eventをreject
+- legacy migrationでDEC / ASMを含むretained tracked IDをmigratedとしてseed
 - 履歴全体で同じStable IDへ `added / migrated` を複数回記録できず、`resolved / retired` 後に別entityとして再導入できないこと
 - legacy migrationでretained current IDを `migrated` としてseedし、確認できるretired / resolved履歴だけをseedすること
 - current packageのnext-versionが `package_root` からcurrent versionを内部取得し、Agentへ `previous_version` の転記を要求しないこと
@@ -328,6 +331,14 @@ question-analysis output templateのQ tableはheader-onlyに変更します。Pr
 ## 9. CI
 
 既存workflowを再利用します。
+
+runtime / Machine Entity version cutoverでは、current repository内のactive referenceをexact searchで確認します。
+
+- `runtime-v1` がshared runtime contractを指すcurrent code / Skill文書 / asset / eval fixture / test metadataは `runtime-v2` へ同期する
+- `entity-state-v1` がactive Machine Entity schemaを指すcurrent code / asset / eval fixture / deterministic validatorは `entity-state-v2` へ同期する
+- `docs/history/**` と完了済み旧Planは変更しない
+- `workflow-runtime-v1`、`schema-cases-v1`、`usability-inspection-runtime-v1`、`wcag-em-runtime-v1` 等のgenerator contract identifierはshared runtime versionではないため変更しない
+- 単純な文字列全置換ではなく、上記区分をrepository test / reviewで確認する
 
 今回必須:
 
@@ -415,10 +426,11 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - variable structured tableはheader-only、固定applicability rowだけ事前配置し、例示stable IDを置かない
 - 09_authority_and_traceability.mdで既存canonical spec-analysis contractを維持
 - skills/spec-analysis/scripts/ui_target_package.py
-- 既存repository byte-identity契約の対象である7 Skill-local `runtime_contract.py` へ `acceptance_criterion` / `acceptance_refs` / spec-analysis expected ACをbyte-identicalに追加し、意味契約変更として `RUNTIME_CONTRACT_VERSION` を `runtime-v1` → `runtime-v2` へ更新
+- PR #14後の9 Skill-local `runtime_contract.py` へ `acceptance_criterion` / `acceptance_refs` / spec-analysis expected ACをbyte-identicalに追加し、意味契約変更として `RUNTIME_CONTRACT_VERSION` を `runtime-v1` → `runtime-v2`、`ENTITY_SCHEMA_VERSION` を `entity-state-v1` → `entity-state-v2` へ更新
 - 09から既存authority_entities.pyへ入力できることを確認
 - current ACだけをMachine Entity化し、US / UC / Behaviorをglobal Entity typeへしないことを確認
-- helper unit / portability / runtime contract byte-identity test
+- helper unit / portability / 9-copy runtime contract byte-identity test
+- independent `runtime_validator.py`、active code / Skill文書 / asset / eval fixture / repository testのshared runtime / Machine Entity schema referenceをv2へ同期
 
 この時点ではquestion-analysis / qa-workflowは変更しません。
 
@@ -467,7 +479,8 @@ mode単体が成立してからworkflowへ接続します。
 - TR Entity contentへacceptance_refsを保存
 - artifact modeのTR Entity dependencyへ参照AC Entityと、そのACが参照するcurrent Authority Entity unionを直接保存する。direct modeでは存在しないMachine Entity dependencyを生成しない
 - repository内の `requirement-structure-v1` 固定参照をcurrent v2へ同期
-- shared runtime-v1 evidenceをruntime-v2 current evidenceとして読み替えない
+- shared runtime-v1 / entity-state-v1 evidenceをruntime-v2 / entity-state-v2 current evidenceとして読み替えない
+- cutover後の最初のTRD / TCD / test-case-design等の実行はfull rebuildで行い、v1 previous artifactをpartial rerunへ渡さない
 - AC本文 / 親Behavior / 親UC / 親USのfreshness regressionを追加
 - artifact modeでAC本文・親chain不変のままAuthorityだけ変更しspec-analysisを再生成した後、未再実行TRが直接Authority dependencyによりstaleになるregressionを追加
 - partial rerunでscope外TRがchanged AC依存のままcurrentにならない regressionを追加
@@ -552,7 +565,7 @@ mode単体が成立してからworkflowへ接続します。
 - multi-file packageがproduction helperのevaluation projection経由で既存semantic runnerにより評価可能
 - version / UNKNOWN件数 / stable ref / MANIFEST / SHA-256 / scope / file applicability / behavior hierarchy / current UCの3分類完全性等の定型整合をproduction helperで検証できる
 - test-requirement-designまで進むworkflowではcurrent ACがrequirement-structure-v2でTRまたはDispositionへ閉じ、AC / 親Behavior / 親UC / 親US / Authority変更が関連TR freshnessへ伝播する。仕様理解packageだけの要求ではこのclosureを完了条件にしない
-- 既存repository byte-identity契約の対象である7 Skill-local `runtime_contract.py` がbyte-identicalのままacceptance_criterionを扱える
+- PR #14後の9 Skill-local `runtime_contract.py` がbyte-identicalのままruntime-v2 / entity-state-v2でacceptance_criterionを扱える
 - partial rerunでchanged ACへ依存するscope外TRをcurrent扱いしない
 - spec-analysis / question-analysis production helperがSkill package単体で実行可能
 - test-target-inspectionへのcurrent UI分岐が維持される
