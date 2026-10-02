@@ -17,14 +17,14 @@
 - Authority Entityは既存 `authority_entities.py` を正本とする
 - AC Entityは `ui_target_package.py build-machine-evidence` が決定論生成する
 - Machine Entity wrapper / content fingerprint / expected identity / normalized machine inputをLLMに手組みさせない
-- `acceptance_criterion` / `acceptance_refs` / spec-analysis expected ACの追加はshared runtimeの意味契約変更なので、既存byte-identity対象7コピーを `runtime-v1` から `runtime-v2` へ更新する
+- `acceptance_criterion` / `acceptance_refs` / spec-analysis expected ACの追加はshared runtimeとMachine Entity schemaの意味契約変更なので、PR #14確認headに存在する9コピーを `runtime-v1 / entity-state-v1` から `runtime-v2 / entity-state-v2` へ同期する
 - envelope field shape自体は変更しない
 - test-requirement-designのinput schema変更は `requirement-structure-v2` として明示する
 - v1とv2を同時に処理する分岐runtimeは作らない。旧v1 evidenceはcurrent evidenceとして再利用せず、current inputからv2を再実行する
 
 ## 2. shared runtime_contract.py
 
-PR #16で更新するのは、既存repository byte-identity契約の対象である次の7 Skill-local `runtime_contract.py` です。
+PR #16で更新するのは、PR #14確認headに存在する次の9 Skill-local `runtime_contract.py` です。
 
 - skills/spec-analysis/scripts/runtime_contract.py
 - skills/test-analysis/scripts/runtime_contract.py
@@ -33,10 +33,10 @@ PR #16で更新するのは、既存repository byte-identity契約の対象で�
 - skills/test-case-design/scripts/runtime_contract.py
 - skills/coverage-analysis/scripts/runtime_contract.py
 - skills/qa-workflow/scripts/runtime_contract.py
+- skills/usability-inspection/scripts/runtime_contract.py
+- skills/wcag-conformance-evaluation/scripts/runtime_contract.py
 
-7コピーは同一内容で更新し、1コピーだけの変更は禁止します。
-
-PR #14確認headには `skills/usability-inspection/scripts/runtime_contract.py` と `skills/wcag-conformance-evaluation/scripts/runtime_contract.py` も同一blobで存在しますが、既存byte-identity契約の対象外です。この2 SkillはPR #16のAC / TR処理経路で `acceptance_criterion` / `acceptance_refs` を消費しないため、PR #16では変更しません。
+確認headでは9コピーが同一blobです。PR #16ではMachine Entity schema versionの意味を分岐させないため、9コピーを同一内容で更新し、repository byte-identity testの対象集合も9 Skillへ広げます。1コピーだけの変更は禁止します。
 
 ### 2.1 ALLOWED_ENTITY_TYPES
 
@@ -66,13 +66,34 @@ expected Entityをactual Machine Entity collectionから逆算しません。
 
 spec-analysisはruntime unitを新設しません。expected Entity導出だけをshared runtime contractへ追加します。
 
-### 2.4 runtime-v2へ更新
+### 2.4 runtime-v2 / entity-state-v2へ更新
 
-既存runtime設計では `runtime_contract_version` は意味契約変更時に更新します。今回の `acceptance_criterion` Entity type、`acceptance_refs` / `acceptance_criteria` canonicalization、spec-analysis expected Entity導出追加は意味契約変更なので、更新対象7コピーの `RUNTIME_CONTRACT_VERSION` を `runtime-v1` から `runtime-v2` へ更新します。
+既存runtime設計では `runtime_contract_version` は意味契約変更時に更新し、Machine Entity schemaの意味変更は `entity-state-v1` 自体のversion変更として扱う契約です。今回の `acceptance_criterion` Entity type、`acceptance_refs` / `acceptance_criteria` canonicalization、spec-analysis expected Entity導出追加は両方の意味契約変更に該当します。
 
-envelope field shapeとfreshness algorithmは維持します。v1 / v2を同時解釈するcompatibility branchは追加しません。更新対象7 Skillの旧runtime-v1 evidenceはruntime-v2 current evidenceとして読み替えず、current scriptで再実行・再検証します。runtime implementation fingerprintも既存契約どおり変わります。
+9コピーで次を同時更新します。
 
-PR #14確認headの `usability-inspection` / `wcag-conformance-evaluation` は既存7-copy byte-identity契約外で、PR #16のAC / TR処理経路でも新しい意味契約を消費しません。そのためPR #16だけを理由にこの2コピーを更新しません。Step 0でPR #14 merge後の実装を再確認し、もしこの2 Skillがruntime-v2の意味契約を消費する状態へ変わっていれば、その実装を正本として対象範囲を再評価します。
+- `RUNTIME_CONTRACT_VERSION`: `runtime-v1` → `runtime-v2`
+- `ENTITY_SCHEMA_VERSION`: `entity-state-v1` → `entity-state-v2`
+- `ALLOWED_ENTITY_TYPES`: `acceptance_criterion` を追加
+
+envelope field shapeとfreshness algorithmは維持します。v1 / v2を同時解釈するcompatibility branchは追加しません。旧runtime-v1 / entity-state-v1 evidenceはv2 current evidenceとして読み替えず、current scriptで再実行・再検証します。9コピーのruntime implementation fingerprintも既存契約どおり変わります。
+
+cutover後、旧v1 artifactを `previous_artifact_markdown` としてpartial rerunへ渡しません。TRD / TCD / test-case-designを含む既存runtime Skillは、最初のv2実行を `partial_rerun=false` + `previous_artifact_markdown=null` のfull rebuildとしてcurrent active rowsを再生成します。v2 artifactが成立した後だけ既存partial rerun契約へ戻します。
+
+`runtime-v2` / `entity-state-v2` はshared contractのversionです。generator contractは別契約なので、意味変更のない `workflow-runtime-v1`、`schema-cases-v1`、`usability-inspection-runtime-v1`、`wcag-em-runtime-v1` 等は維持します。
+
+### 2.5 current version reference synchronization
+
+実装時はrepository current fileを検索し、shared runtime / Machine Entity schemaを表すcurrent referenceをv2へ同期します。対象は少なくとも次です。
+
+- `scripts/skills/evals/deterministic/runtime_validator.py`: `entity-state-v2` と `acceptance_criterion`
+- `tests/skills/runtime/*`: metadataの `runtime_contract_version=runtime-v2`、Machine Entity fixtureの `entity-state-v2`
+- PR #14の `tests/skills/evals/deterministic/test_inspection_runtime_contract.py` / `test_wcag_runtime_contract.py`
+- `skills/test-case-design/scripts/case_structure.py` 等、active codeでMachine Entity schema versionを直接比較する箇所
+- current `SKILL.md` / output template / active eval fixture / `EVALS.md` / deterministic `ASSERTIONS.md` でshared runtimeまたはMachine Entity schemaを説明する箇所
+- shared `runtime_contract.py` 内のcurrent contract名を表示するdocstring / error message
+
+`docs/history/**` と完了済み旧Planの履歴記述は書き換えません。また、generator contract identifier内の `-v1` はshared runtime versionではないため、意味変更がない限り更新しません。単純なrepository-wide文字列置換は禁止します。
 
 ## 3. spec-analysis normalized machine input
 
@@ -296,7 +317,7 @@ coverage-analysisの既存traceability graph node typeへACを追加しません
 
 次を更新 / 追加します。
 
-- 既存byte-identity契約の7 Skill-local runtime_contract.py copies byte-identical
+- PR #14後の9 Skill-local runtime_contract.py copies byte-identical
 - `acceptance_criterion` Machine Entity valid / unknown type regression
 - shared canonicalization: `acceptance_refs` / `acceptance_criteria`
 - spec-analysis expected Authority + AC identity
@@ -309,7 +330,8 @@ coverage-analysisの既存traceability graph node typeへACを追加しません
 - AC dependency fingerprint propagation
 - AC本文 / 親chain不変のままAuthority fingerprintだけ変更し、spec-analysisをcurrentへ再生成した後も未再実行TRが直接Authority dependencyによりstaleになる回帰
 - partial rerun stale carry-forward
-- shared runtime-v1 evidenceをruntime-v2 current resultとして扱わない
+- shared runtime-v1 / entity-state-v1 evidenceをruntime-v2 / entity-state-v2 current resultとして扱わない
+- v2 cutover後の最初のpartial-rerun対応Skill実行がfull rebuildであり、v1 previous artifactを受け入れない
 
 ## 15. 対象外
 
@@ -322,8 +344,8 @@ coverage-analysisの既存traceability graph node typeへACを追加しません
 
 ## 16. 完了条件
 
-- 既存byte-identity契約の7 runtime_contract.pyが同一内容でacceptance_criterionを扱える
-- 既存byte-identity対象7コピーがruntime-v2へ同期され、requirement-structure-v2が明示される
+- PR #14後の9 runtime_contract.pyが同一内容でacceptance_criterionを扱える
+- 9コピーがruntime-v2 / entity-state-v2へ同期され、requirement-structure-v2が明示される
 - helperからspec-analysis normalized_skill_inputとAuthority + AC Entityを決定論生成できる
 - qa-workflowがAuthority + ACをexpectedとして内部導出できる
 - test-requirement-designまで進むworkflowではcurrent ACがTRまたはDispositionへ完全に閉じる。仕様理解packageだけの要求ではこのclosureを要求しない
