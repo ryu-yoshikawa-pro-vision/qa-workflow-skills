@@ -556,7 +556,7 @@ unknown operation / unknown top-level field / JSON・table schema不正は `inva
 
 同じpackage revisionの更新はsingle writerとします。複数Agent / processが同じrevisionを並行編集することはPR #16の対象外です。generic CAS / lock serviceは追加しません。
 
-通常更新は必ず `inspect → update_snapshot保持 → materialize` の順で行います。`materialize` は書込み前にsnapshotのPackage Versionと `payload_file_sha256[]` をcurrent packageへ照合し、1 byteでも変化していれば `stale_snapshot` で書込みせずblockedにします。これにより、single writer前提を破る外部変更をsilent overwriteしません。
+通常更新は必ず `inspect → update_snapshot保持 → materialize` の順で行います。`materialize` は書込み前にsnapshotのPackage Version、payload file set / `payload_file_sha256[]`、`MANIFEST.md` raw `manifest_sha256` をcurrent packageへ照合し、file追加・削除または1 byteでも変化していれば `stale_snapshot` で書込みせずblockedにします。これにより、single writer前提を破る外部変更をsilent overwriteしません。
 
 ## 8. ui_target_package.py operations
 
@@ -600,7 +600,8 @@ payload:
     "exact_reference_index":[],
     "payload_file_sha256":[
       {"path":"README.md","sha256":"<lowercase-64-hex>"}
-    ]
+    ],
+    "manifest_sha256":"<lowercase-64-hex>"
   },
   "unresolved_structural_issues":[]
 }
@@ -618,7 +619,7 @@ payload:
 - `update_snapshot` は更新開始前の状態を後続operationへそのまま渡すmachine inputであり、Agent / LLMが編集・再構築しない
 - `tracked_items[]` は§6.1のtracked stable IDをpackage内canonical tracking row単位で1行に正規化し、`stable_id` 昇順。field名は `tracking_file / tracking_section` とし、Authorityの実際の正本ownerを意味しない。DEC / ASMの実ownerがProject Contextや外部正本でも、ここでは09のpackage projection rowをtracking位置として記録する。自由記述ではなくcanonical structured tracking rowの正規化結果から `row_fingerprint` を計算する
 - UNKNOWN rowは `unknown_active=true / false` とcanonical `resolution_refs[]` を保持し、それ以外は `unknown_active=null / resolution_refs=[]`
-- snapshotの `exact_reference_index[]` と `payload_file_sha256[]` はsnapshot時点の値を保持し、retired IDの過去参照先や更新前file集合もimpact算出へ利用できるようにする
+- snapshotの `exact_reference_index[]`、`payload_file_sha256[]`、`manifest_sha256` はsnapshot時点の値を保持する。`payload_file_sha256[]` のpath集合 + `MANIFEST.md` がsnapshot時点のcurrent package file setであり、materializeは更新前にcurrent file set / raw hashを全件照合する。retired IDの過去参照先や更新前file集合はimpact算出にも利用する
 
 `resolved_unknown_ids` は09で `分類=UNKNOWN` かつ `現在有効か=No` のUNK。
 
@@ -748,7 +749,7 @@ stdin:
   "operation":"materialize",
   "package_root":"<path>",
   "artifact_mode":"update",
-  "previous_snapshot":{"package_version":"v14","tracked_items":[],"exact_reference_index":[],"payload_file_sha256":[]},
+  "previous_snapshot":{"package_version":"v14","tracked_items":[],"exact_reference_index":[],"payload_file_sha256":[],"manifest_sha256":"<lowercase-64-hex>"},
   "change_mode":"normal",
   "version_policy":"default",
   "target_version":null,
@@ -1623,7 +1624,7 @@ production helperのfilesystem / raw hash / projection / README control renderin
 - build-manifestがREADME controls反映後のraw bytesをlowercase 64 hex SHA-256でhashすること
 - next-domain-fileのlowercase kebab-case / max+1 / canonical path / id_space_exhausted
 - CHANGELOG `Stable ID changes` exact heading / header / Change enum / duplicate
-- inspectのupdate_snapshotがtracked owner row fingerprint / previous exact refs / payload file hashをcanonical生成すること
+- inspectのupdate_snapshotがtracked tracking-row fingerprint / previous exact refs / payload file set・raw hash / MANIFEST raw hashをcanonical生成すること
 - next-id / materializeが標準prefix + 00宣言済み案件固有prefixについてcurrent structured row + historical stable ID + previous snapshotから使用済みIDを導出し、更新途中でowner rowから消えたIDも再利用しないこと
 - impactがprevious snapshotとcurrent owner row差分からadded / changed / resolvedを導出し、retiredだけは明示retire_idsから生成すること。row消失だけならstate_transition_requiredでblockedすること
 - materializeがdraft_key / identity_action / @draft referenceを解決し、canonical table serialization、条件付き標準file同期、CHANGELOG controls、Machine Entities section、README controls、MANIFESTを1 write pathで生成すること
@@ -1648,9 +1649,9 @@ production helperのfilesystem / raw hash / projection / README control renderin
 - project_context_ids.pyのSection 12 / 13 exact table、previous + candidate unionでのDEC / ASM採番、validate-historyによるprevious ID削除拒否、canonical DEC / ASM namespace、kind / duplicate / 999 exhaustion
 - Project Contextがownerでない案件ではproject_context_ids.pyを使わず、外部ownerのIDを維持し、owner未採番時にLLM hand-numberingへfallbackしないこと
 - CHANGELOG / impactがDEC / ASMを追跡可能stable IDとして受理しつつ、ui_target_package.py next-idではDEC / ASMを拒否すること
-- fresh v00の空change table、v01以降のDEC / ASM初登場=added、既追跡内容・状態変更=changed、current structured model除去=retiredを区別すること
+- fresh v00の空change table、v01以降のDEC / ASM初登場=added、既追跡内容・状態変更=changed、明示 `retire_ids[]` による除去だけ=retiredを区別すること
 - resolvedをUNK以外へ使用するとrejectし、resolved後のchangedによるresolver変更 / reopenと再resolvedを許可し、retired後の後続eventだけをrejectすること
-- legacy migrationでDEC / ASMを含むretained tracked IDをmigratedとしてseedすること
+- legacy migrationでDEC / ASMを含むretained tracked IDをmigratedとして引き継ぎ、resolved / retired lifecycle IDをnew採番前に予約すること
 - question-analysis output templateのcurrent Q table / `質問ID履歴` とProject Context template Section 12 / 13がheader-onlyでplaceholder IDを持たないこと
 - legacy migration後fixtureのvalidate PASS
 
