@@ -97,12 +97,11 @@ resolved-only UNKをquestion-analysisへ先に渡してからreopenする順序�
 
 question-analysis成果物の更新順は次に固定します。
 
-1. previous artifactがあればその全文を保持し、candidate current artifactでは意味上reuseするQだけ既存IDでcurrent質問tableへ置く
-2. semanticにnewと判断したQごとに `question_ids.py next-id` へprevious artifact + 更新中candidateを渡し、返却Q IDをcurrent質問rowへ即時反映する
-3. 全current質問rowが確定した後、`question_ids.py build-history` へprevious artifact + candidateを渡す
-4. 返却された `question_id_history_markdown` で `質問ID履歴` section全体を置換する
+1. LLMがcurrentに残す質問のsemantic identityをreuse / newで判断し、質問文・分類・UNKNOWN対応等の意味fieldを `question_ids.py materialize` inputへ渡す
+2. helperがprevious current Q + previous historyからreuse / new Q IDを解決し、current `不明点 / 質問一覧` と `質問ID履歴` の2 sectionをcanonical生成する
+3. helper返却の `artifact_markdown` をquestion-analysis完成成果物として使用する
 
-Agent / LLMがpreviousの質問ID履歴を手で転記・unionしません。
+通常経路ではAgent / LLMがQ IDをrowへ書き込み、`<br>` escapeやID昇順、previous履歴unionを手作業で組み立てません。`next-id / build-history` はfocused test /個別利用用の同一内部contractとして残します。
 
 ### 1.6 deterministic eval
 
@@ -205,9 +204,9 @@ LLMは回答の意味、DECISION / ASMの区別、既存identityのreuse / new�
 
 `skills/qa-workflow/assets/project-context-template.md` を正本ownerとして使う場合、Section 12 / 13はheader-onlyへ変更し、現在の `DEC-001` / `ASM-001` 例示rowを実データとして残しません。
 
-Project Context ownerの更新では、previous Section 12 / 13に存在したDEC / ASM IDをcandidateから削除しません。更新後に `project_context_ids.py validate-history` を実行し、previous ID集合がcandidateへ全て残ることを決定論検証します。row順、決定内容、状態遷移の意味はhelperで判断しません。
+Project Context ownerの更新では、LLM / stakeholderがreuse / new、決定内容、状態遷移等の意味fieldを `project_context_ids.py materialize` へ渡します。helperがprevious + candidate全状態rowからnew IDを採番し、previous IDを保持したSection 12 / 13をcanonical生成します。`validate-history` はfocused validationとして同じprevious-ID保持契約を独立確認します。row順、決定内容、状態遷移の意味はhelperで判断しません。
 
-helperはProject Contextを書き換えません。exact CLI契約は `_06_package-schema-and-helper-contracts.md` を正本とします。
+exact CLI契約は `_06_package-schema-and-helper-contracts.md` を正本とします。
 
 ### 2.7 downstream machine handoff
 
