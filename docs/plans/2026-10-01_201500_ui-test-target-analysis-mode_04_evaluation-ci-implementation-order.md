@@ -132,7 +132,8 @@ deterministic projection:
 
 - 全payload file
 - MANIFESTを最後にcontrol fileとして追加
-- version / file set / hash / stable ref等のmode contractを1 Markdown上で評価可能にする
+- version / file set / MANIFEST schema / SHA-256文字列形式 / stable ref等のmode contractを1 Markdown上で評価可能にする
+- raw file bytesのSHA-256再計算はprojectionから行わず、production validate / repository unit testで独立検証する
 
 共通:
 
@@ -224,6 +225,8 @@ expected start / resume Skillを明示し、全Skill固定順実行へ回帰し�
 - validate
 - next-version
 - next-id
+- render-readme-controls
+- next-domain-file
 - build-manifest
 - impact
 - build-machine-evidence
@@ -232,6 +235,7 @@ expected start / resume Skillを明示し、全Skill固定順実行へ回帰し�
 repository unit testで次を必須確認します。
 
 - required core / 条件付き必須file applicability / extension file declaration
+- mode assetのvariable tableがheader-onlyで例示stable IDを含まず、固定applicability rowだけ事前配置されること
 - package root外path拒否
 - package内version一致
 - canonical / structural ID形式・duplicate
@@ -246,6 +250,8 @@ repository unit testで次を必須確認します。
 - current packageのnext-versionが `package_root` からcurrent versionを内部取得し、Agentへ `previous_version` の転記を要求しないこと
 - default policyでREADMEのPackage Version / Previous Package Versionが初回または1 revision差として整合すること
 - legacy migration用next-versionだけが明示 `previous_version` inputを受けること
+- render-readme-controlsがcurrent UNKNOWN件数とpayload file tableのcanonical Markdownを返し、Agentが件数・file順・種別を再構築しないこと
+- next-domain-fileがLLMのslug決定後に10+ fileの次番号とcanonical pathだけを決定すること
 - domain file命名
 - next-idがsemantic identityを判断せず、UI target mode所有の `SRC / SPEC / INF / UNK` + structural prefixについてpackage rootのcurrent structured row + CHANGELOG stable ID履歴から次番号を返し、Agentへknown ID集合を要求しないこと
 - `DEC / ASM` をUI target modeのnext-idが採番しないこと
@@ -255,21 +261,39 @@ repository unit testで次を必須確認します。
 - canonical structured Markdownのduplicate heading / table、row列数、escaped pipe、`<br>` referenceを固定parse契約で検証すること
 - impactが最新versionの `Stable ID changes` からchanged ID集合を内部導出し、Agentへchanged ID再入力を要求せず、exact referenceだけから候補fileを返してsemantic変更を勝手に決定しないこと
 - scope applicability、UI操作scopeのUIOP / US / UC / Behavior / AC hierarchy / closure / current UCの3分類整合
-- 09の「現在有効な仕様根拠」からnormalized Authorityを固定projectionし、build-machine-evidenceがAuthority + current AC Entity、spec-analysis normalized_skill_input、expected identityを決定論生成すること
+- 09の「現在有効な仕様根拠」からnormalized Authorityを固定projectionし、`適用範囲` を非空string、`関係` を単一許可値の1要素arrayとして一意にserializeすること
+- build-machine-evidenceがAuthority + current AC Entity、spec-analysis normalized_skill_input、expected identityを決定論生成し、不要な統合implementation_fingerprintを公開しないこと
 - `Machine Entities: spec-analysis` blockがexactly one存在し、helper再生成結果と一致すること
 - 親US / UC / Behavior変更でAC Entity fingerprintが変わること
-- project-evalが内容を変更せずcanonical順に連結すること
+- project-evalがexact `projection / files[] / markdown` payloadを返し、内容を変更せずcanonical順に連結すること
+- raw SHA-256はproject-eval outputから再計算せず、validate / repository unit testでraw bytesに対して検証すること
 
-### 8.2 question-analysis production helper
+### 8.2 question-analysis / Project Context production helper
 
-`skills/question-analysis/scripts/unknown_links.py` を追加し、次を検証します。
+`skills/question-analysis/scripts/unknown_links.py`、`skills/question-analysis/scripts/question_ids.py`、`skills/qa-workflow/scripts/project_context_ids.py` を追加します。
 
+`unknown_links.py`:
+- `operation=validate-links`
 - UNK ID形式
 - current known UNKNOWNへの存在参照
 - 同一Q内duplicate
 - current / resolved集合が入力された場合のresolved-only参照
+- issueをpayloadへ重複保持せず共通top-level `issues[]` だけへ返す
 
-QとUNKの意味的同一性は検証しません。
+`question_ids.py`:
+- new Qの意味判断をせず、header-only template / existing artifactのQ ID最大値+1を返す
+- malformed / duplicate Q IDを拒否
+- Q-999で `id_space_exhausted`
+
+`project_context_ids.py`:
+- Section 12 / 13のDEC / ASM正本tableだけをparse
+- semantic reuse / new判断をせず、new確定後の最大値+1を返す
+- malformed / duplicate IDを拒否
+- DEC-999 / ASM-999で `id_space_exhausted`
+
+QとUNKの意味的同一性、Q / DEC / ASMのsemantic identity、DECISION内容、ASM承認可否は検証しません。
+
+question-analysis output templateのQ tableとProject Context templateのSection 12 / 13はheader-onlyに変更し、Q-001 / DEC-001 / ASM-001のplaceholder rowを置きません。
 
 ### 8.3 deterministic output eval
 
@@ -385,6 +409,7 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - SKILL.mdに目的ベースの条件付きResource導線
 - references/ui-test-target-analysis.md
 - required core / 固定triggerの条件付き必須 / 宣言制extensionを分けたpackage assets
+- variable structured tableはheader-only、固定applicability rowだけ事前配置し、例示stable IDを置かない
 - 09_authority_and_traceability.mdで既存canonical spec-analysis contractを維持
 - skills/spec-analysis/scripts/ui_target_package.py
 - 既存repository byte-identity契約の対象である7 Skill-local `runtime_contract.py` へ `acceptance_criterion` / `acceptance_refs` / spec-analysis expected ACをbyte-identicalに追加
@@ -411,7 +436,9 @@ mode単体が成立してからworkflowへ接続します。
 - stable UNKNOWN参照
 - 回答正規化後のspec-analysis resume
 - output templateの関連UNKNOWN ID
+- `不明点 / 質問一覧` をheader-onlyへ変更
 - skills/question-analysis/scripts/unknown_links.py
+- skills/question-analysis/scripts/question_ids.py
 - production helper unit / portability test
 - deterministic validatorのknown refs / expected mapping
 - 既存output fixture 1件へmapping追加 + false-pass unit test
@@ -438,10 +465,13 @@ mode単体が成立してからworkflowへ接続します。
 - TR-OUT-003 / TR-SEM-003を追加
 - existing TR fixtures / runtime / portability / vertical integration testsをv2 schemaへ同期
 
-### Step 5: qa-workflow routing
+### Step 5: qa-workflow routing / Project Context ID owner
 
 - mode request routing
 - answer resume
+- Project Context Section 12 / 13をheader-onlyへ変更
+- skills/qa-workflow/scripts/project_context_ids.py
+- new DEC / ASMの意味判断はquestion-analysis / stakeholder側に残し、ID番号だけhelperで決定
 - test-target-inspection / usability-evaluation / usability-inspection / wcag-conformance-evaluationとの分岐
 - routing_cases.jsonへ8件追加
 - routing_candidate_outputs.jsonへ対応する独立candidate 8件追加
@@ -450,7 +480,8 @@ mode単体が成立してからworkflowへ接続します。
 ### Step 6: package schema / migration / helper contract validation
 
 - current packageが `ui-target-v1` として識別できること
-- helper CLI JSON contract / failure / limit / filesystem safety
+- 全helper operationのexact input / output JSON shape、sort順、failure enum / limit / filesystem safety
+- README control section / next-domain-file / Q / DEC / ASM allocator contract
 - scope / file applicability、UI操作scopeのUS / UC / Behavior / AC exact schema / closure / AC-only Machine Entity
 - exact table schema / stable ref / MANIFEST / Authority + AC Machine Entity bridge / normalized_skill_input
 - legacy vNN → current schema migration fixture
