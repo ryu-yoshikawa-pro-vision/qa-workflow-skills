@@ -16,14 +16,14 @@ PR #14後の期待観測値:
 - Semantic cases: 155
 - qa-workflow routing fixtures: 61
 
-PR #16後の期待増分:
+PR #16後の現在Plan上の期待増分:
 - Skill: +0
 - Trigger: +0
 - Deterministic: +2
-- Semantic: +5
+- Semantic: +8
 - routing: +8
 
-したがってStep 0時点の期待値は 22 Skill / 488 trigger / 44 deterministic / 155 semantic / 61 routingです。PR #16実装後の期待値は 22 Skill / 488 trigger / 46 deterministic / 160 semantic / 69 routingです。ただしCI / repository testでは固定値を正本化せず、PR #14のcurrent repository / manifestからの動的導出を維持します。
+したがってStep 0時点の期待値は 22 Skill / 488 trigger / 44 deterministic / 155 semantic / 61 routingです。PR #16実装後の現在Plan期待値は 22 Skill / 488 trigger / 46 deterministic / 163 semantic / 69 routingです。ただしcase数を受入条件そのものにはせず、下記LLM responsibility coverageを満たす具体caseを正本とします。CI / repository testでは固定totalではなくPR #14のcurrent repository / manifestから動的導出します。
 
 ## 2. 評価方針
 
@@ -40,79 +40,93 @@ PR #16後の期待増分:
 
 ## 3. spec-analysis semantic eval
 
-現在spec-analysisは2 semantic caseです。
+現在spec-analysisは2 semantic caseです。今回5 caseを追加し、確認head前提では7件とします。case IDは `SPEC-SEM-003` ～ `SPEC-SEM-007` を使用します。
 
-3 caseを追加し、spec-analysisは現在2件から5件へ増やします。case IDは既存命名規則に合わせて `SPEC-SEM-003` ～ `SPEC-SEM-005` を使用します。
-
-### case A: 複数資料からUI target packageを構成
+### SPEC-SEM-003: 複数資料からUI target packageを構成
 
 入力:
-- 複数PAGE
-- same-routeであることが明示されたVIEW / STEP
-- route未確定の別画面候補
-- MODALとbrowser dialog
-- 同時成立可能な直交STATE
-- field validation
-- notification / external interaction
-- Q&A decision
-- 複数の分析対象機能scope（UI操作あり / なし / 未確定を含む）
-- 複数のユーザーUI操作
-- 正常 / 準正常 / 例外のうち、定義あり / なし / 未定義が混在するUse Case
-- repository補助情報と仕様-実装差分
-- 1件以上のUNKNOWN
-- 一部矛盾
+- 複数PAGE / same-route VIEW / STEP / route未確定候補
+- MODAL / browser dialog / PANEL / POPOVER / GLOBAL UI
+- 同時成立可能な複数STATE軸
+- field validation、notification、外部interaction
+- UI操作あり / なし / 未確定scope
+- US / UC / Behavior / AC
+- 正常 / 準正常 / 例外で定義あり / なし / 未定義が混在
+- 一部Behavior identityは既知だが結果未確定
 
 期待:
-- UI target modeを選ぶ
-- SPEC / DECISION / INFERENCE / UNKNOWNを区別
-- 明示same-routeはVIEW / STEPとして扱い、route不明は推測統合しない
-- MODALとbrowser dialogを分離する
-- 直交STATEを無理に排他化しない
-- field / notification / external interactionを仕様上該当する構造化viewへ整理する
-- repository差分を実装状況へ分離
-- scopeごとのUI操作判定を行い、UI操作ありscopeでUI操作母集団を抽出してUS → UC → Behavior → ACの順で分解する
-- UI操作があるのに資料不足の場合はnot-applicableへ逃げずUNKNOWN / blockedへする
-- 各current UCで正常 / 準正常 / 例外を全て検討し、なし / 未定義を区別する
-- blocked UCへ無意味な3分類を生成しない
-- 非操作起点のUI挙動をnot-applicableを理由に落とさない
-- ACで具体値・組合せ・テストケースへ先回りしない
-- canonical stable itemへの追跡を維持する
-- test condition / caseへ進まない
+- semanticなUI構造分類を行い、STATEを直交軸として整理する
+- current ACへ到達するUS / UC / Behaviorは全てcurrentにする
+- 未定義分類では既知current / blocked Behaviorを保持でき、identity自体不明ならBehavior rowを創作しない
+- `なし` はcurrent Authority参照を持つ
+- ACに具体テスト条件へ先回りしない
 
-### case B: repository実装が仕様と違う
+### SPEC-SEM-004: repository実装が仕様と違う
 
-期待:
 - 高Authority仕様を実装に合わせて変更しない
-- spec-implementation gapとして分離
-- 実装をAuthorityへ自動昇格しない
-- 「不具合」と断定する必要がない場合は差分として扱う
+- spec-implementation gapとして分離する
+- repository evidenceをAuthorityへ自動昇格しない
+- 08を後続versionへcarry-forwardする場合、再確認していないcommitをcurrent commitへ更新しない
 
-### case C: versioned package更新
+### SPEC-SEM-005: versioned package更新 / UNKNOWN lifecycle
 
 入力:
 - v03 package
-- 既存UNK
-- 正式回答
+- resolved UNKNOWN
+- resolver失効または置換
 - 新しい資料差分
 
 期待:
-- v04完全版
-- 同じUNK lineage
-- 解消済みをcurrent unknownから除外し、意味上そのUNKNOWNを解消したcurrent Authorityを`解消先ID`へ記録する
-- README / current unknown / changelog / manifestの意味整合
-- 差分だけを最終成果物にしない
+- same論点なら同じUNKをreopenし、別論点ならnew UNK
+- row消失を自動retireとみなさず、retireはsemanticに明示する
+- default policyでは完成package変更をv04として保存する
+- current version `変更概要` が今回のsemantic変更を説明する
 
-semantic rubricへはmode固有の次の観点だけを追加し、既存SPEC criteriaと重複させません。既存SPEC-SEM-001 / 002にも「要求が通常spec-analysisで足りる場合に不要なUI target packageへ昇格しない」回帰観点を適用し、mode追加による過剰出力を防ぎます。
+### SPEC-SEM-006: legacy migration / extension domain
 
-- canonical modelと構造化ビューの追跡性
-- UI構造分類の妥当性
-- implementation status分離
-- versioned package更新の整合
-- resolved UNKNOWNと`解消先ID`の意味的対応
-- scope適用判定の妥当性
-- UI操作scopeのUS / UC / Behavior / AC分解の完全性
-- UI操作がないscopeでの非適用判断の妥当性
-- 非操作起点UI挙動を通常spec-analysisへ残す妥当性
+入力:
+- schema versionなしのlegacy package
+- retained / retired identity
+- 標準fileへ混在させるべきでないCSV domain
+
+期待:
+- legacy/current semantic identity mappingを意味判断する
+- 必要なextension fileと案件固有prefixの意味を判断する
+- 過去retired IDをnew entityへ再利用しない
+- generic migration / generic document frameworkへ拡張しない
+
+### SPEC-SEM-007: file trigger / external owner境界
+
+入力:
+- simple downloadだけのscope
+- export生成 + data transformation + downloadを伴うscope
+- Project Context以外のDEC / ASM正本owner
+
+期待:
+- simple downloadは05のみ
+- export生成 / transformation + user-visible downloadは04 + 05
+- 外部ownerの意味上の正本性を判断するが、canonical Authority IDはDEC-xxx / ASM-xxxを維持し、Jira / ADR等の外部IDをauthority_idへ流用しない
+- extension / conditional fileを必要以上にrequiredにしない
+
+既存SPEC-SEM-001 / 002には「通常spec-analysisで足りる要求をUI target modeへ不要に昇格しない」回帰観点を維持します。
+
+### spec-analysis semantic responsibility coverage
+
+| LLM責務 | semantic case |
+| --- | --- |
+| SPEC / DECISION / INFERENCE / UNKNOWN分類・Authority競合 | 既存SPEC-SEM-001 / 002、SPEC-SEM-003 / 004 |
+| PAGE / STATE / VIEW / MODAL等の意味分類 | SPEC-SEM-003 |
+| scope UI操作有無 / 条件付きfile trigger | SPEC-SEM-003 / 007 |
+| US / UC / Behavior / AC分解と正常 / 準正常 / 例外 | SPEC-SEM-003 |
+| semantic identity reuse / new / explicit retire | SPEC-SEM-005 / 006 |
+| repository差分の意味 | SPEC-SEM-004 |
+| same-UNK reopen / new UNK | SPEC-SEM-005 |
+| legacy semantic mapping | SPEC-SEM-006 |
+| extension file / 案件固有prefixの必要性・意味 | SPEC-SEM-006 |
+| DEC / ASM owner判断 | SPEC-SEM-007 |
+| 04 / 05責務境界 | SPEC-SEM-007 |
+
+repository testは、`05_llm-deterministic-boundaries.md` のLLM responsibility matrixで今回追加・変更した各行が最低1 semantic criterion / caseから参照されることを検証します。case数そのものよりcoverageを正本にします。
 
 ### 複数Markdown packageのevaluation projection
 
@@ -125,8 +139,9 @@ semantic projection:
 - README
 - 00〜09
 - 10+ current domain files
-- CHANGELOG / MANIFESTは除外
-- 過去仕様を含むCHANGELOGをsemantic Judgeへ混ぜない
+- CHANGELOG全体 / MANIFESTは除外
+- current Package VersionのCHANGELOG `変更概要` bodyだけを `CHANGELOG.current_change_summary` control frameとして末尾に追加
+- 過去versionのCHANGELOG、Stable ID changes、影響fileをsemantic Judgeへ混ぜない
 
 deterministic projection:
 
@@ -140,30 +155,33 @@ deterministic projection:
 1. package root外path / symlink / duplicate / missing fileを拒否する
 2. canonical file orderを使用する
 3. 各fileの前に `<!-- FILE: <relative-path> -->` markerを付ける
-4. UTF-8 textをそのまま連結し、内容の要約・意味変換を行わない
-5. projectionは評価用transportであり、production packageやAuthorityを変更しない
+4. semantic change summaryは `<!-- CONTROL: CHANGELOG.current_change_summary -->` markerを使う
+5. UTF-8 textをそのまま連結し、内容の要約・意味変換を行わない
+6. projectionは評価用transportであり、production packageやAuthorityを変更しない
 
 semantic / deterministicで同じprojection helperを使いますが、expected判定は各eval validator / rubricが独立して行い、production helper出力からexpectedを逆算しません。
 
 ## 4. question-analysis semantic eval
 
-1 caseを追加し、question-analysisは現在2件から3件へ増やします。正式回答 / 暫定回答とUNKNOWN lineageを同時に扱うcaseを1件だけ追加します。
+2 caseを追加し、確認head前提ではquestion-analysisを2件から4件へ増やします。
 
-重点:
+### QUESTION-SEM-003: 正式回答 / 暫定回答
 
 - 元UNK IDを保持する
 - 暫定回答を勝手にDECISIONへしない
 - 正式回答後にspec-analysisへ戻す
-- 回答済み論点を再質問しない
-- current unknownとresolved historyを混同しない
+- 回答済み論点を根拠currentの間は再質問しない
 
-question-analysisの既存分類ロジックを変更しないため、trigger datasetは変更しません。関連UNKNOWN IDの意味的対応はsemantic case、形式・既知参照・duplicateはproduction `unknown_links.py`、fixture mappingは独立deterministic validatorで検証します。
+### QUESTION-SEM-004: reopen後の質問 / 別論点
 
-spec-analysis / question-analysisで今回追加するcritical semantic criterionは、各criterionが最低1 semantic caseから参照されることをrepository testで検証します。既存normal spec-analysis caseにもmode非選択回帰を含めます。
+- spec-analysisがsame-ID reopenを先にcurrent UNKNOWNへ戻した場合、そのUNKへ新Qを関連付けられる
+- resolved-only UNKをreopen前にcurrent Qへ関連付けない
+- 別論点としてnew UNKになった場合、旧resolved UNKへ質問を再接続しない
+- Q ID履歴とUNKNOWN semantic identityを混同しない
 
 ## 5. test-requirement-design semantic eval
 
-1 caseを追加し、test-requirement-designはPR #14後の2件から3件へ増やします。case IDは `TR-SEM-003` とします。
+1 caseを追加し、確認head前提ではtest-requirement-designを2件から3件へ増やします。case IDは `TR-SEM-003` とします。
 
 入力:
 - current ACを持つUI target mode成果物
@@ -178,8 +196,10 @@ spec-analysis / question-analysisで今回追加するcritical semantic criterio
 - current ACをTRまたは明示的dispositionへ閉じる
 - ACにない具体条件 / 値 / 組合せをTRへ先回りしない
 - current AC Entityをartifact modeの依存として保持する
+- ACをlinkしただけで参照Authorityをclosure済みと解釈せず、Authority→TRの意味対応は別途LLMが判断する
 
 既存TR-SEM-001 / 002はACなしworkflowの回帰として維持し、`関連AC ID=-` / `acceptance_criteria=[]` で従来責務が変わらないことを確認します。
+
 ## 6. qa-workflow routing eval
 
 既存routing fixtureへmode routing caseを追加します。
