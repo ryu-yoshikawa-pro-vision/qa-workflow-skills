@@ -478,7 +478,7 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - runtime Skillのtemplateでは、`render_runtime_input()` / `render_runtime_result()` / `render_machine_entities()` が生成するcanonical blockを正本とし、手書きの `runtime-contract-v1` / `runtime-envelope-v1` / `entity_schema_version` / `dependencies` 擬似schemaを削除する
 - spec-analysis templateでは `authority_entities.py` / UI target modeの `build-machine-evidence` が生成するcanonical `schema_version / model_key / upstream_entity_dependencies / runtime_dependencies` shapeを正本とし、Machine Entity JSONをAgentに手組みさせない
 - shared runtime direct CLIへ `project_v1_cutover` operationを追加し、通常verify / generator経路とは分離する。direct dispatcher、supported skill、16 MiB aggregate / 64 KiB artifact string例外、unknown operationをexact contract化する
-- cutover helperはTRD / TCD / TCごとにAgent-side merge不要のcomplete `normalized_runtime_inputs[]` を返し、v1 identity / mapping stateを完成v2 inputへ埋め込む
+- cutover helperはTRD / TCではcomplete `normalized_runtime_inputs[]` を一括返却し、TCDでは `condition-structure / models / test-data-requirements / materialize-coverage` の各phaseで次に実行可能なcomplete inputだけを返す。いずれもAgent-side mergeを要求しない
 
 この時点ではquestion-analysis / qa-workflowは変更しません。
 
@@ -531,20 +531,23 @@ mode単体が成立してからworkflowへ接続します。
 - repository内の `requirement-structure-v1` 固定参照をcurrent v2へ同期
 - shared runtime-v1 / entity-state-v1 evidenceをruntime-v2 / entity-state-v2 current evidenceとして読み替えない
 - cutover後の最初のTRD / TCD / test-case-design等の実行はfull rebuildで行い、v1 previous artifactを通常のpartial rerun / freshness evidenceとして渡さない
-- `project_v1_cutover` はv1 Runtime Input / ResultからTRD / TCD / TCのcomplete `normalized_runtime_inputs[]` を生成し、callerがseed patchを元JSONへmergeする経路を作らない
+- `project_v1_cutover` はv1 Runtime Input / ResultからTRD / TCのcomplete input、TCDのphase別complete inputを生成し、callerがseed patchやtarget version fieldを元JSONへmergeする経路を作らない
 - TR `draft_key ↔ tr_id_map`、TCN `draft_key ↔ tcn_id_map`、model `draft_key ↔ model_key_map`、TC `draft_key ↔ tc_id_map` をexact joinし、reuse ID / previous state / full rebuild scopeをhelperが完成inputへ固定projectionする。Agent / LLMにcutover時のreuse ID選択をさせない
-- TCDは既存expected runtime unit builderでroot / model / `artifact:materialize_coverage:<TCN-ID>` 集合を導出し、missing / extra / duplicate / incomplete unitとTCN join不一致をblockedにする
+- TCD cutoverはv1 condition_structure input/resultからmodel / optional test-data-requirements / materialize対象TCNをcutover専用に導出し、`condition-structure → models反復 → test-data-requirements → materialize-coverage` の4 phaseで進める。missing / extra / duplicate / incomplete unitとTCN join不一致をblockedにする
 - cutover direct CLIはv1 artifact全文を受けるため16 MiB aggregate transportとartifact string 64 KiB例外を使い、通常generator stdinは2 MiBのまま維持する
-- canonical sequenceを `v1検出 → spec/test-analysis v2 evidence再生成 → TRD cutover/full rebuild/save → TCD cutover/full rebuild/save → TC cutover/full rebuild/save → downstream v2 evidence再生成 → validate → 通常update解禁` に固定する
+- canonical sequenceを `v1検出 → spec/test-analysis v2 evidence再生成 → TRD cutover/full rebuild/save → TCD condition_structure → model phase反復 → optional TDR → materialize → TCD save → TC cutover/full rebuild/save → downstream v2 evidence再生成 → validate → 通常update解禁` に固定する
 - cutover helper出力だけをfirst v2 generator inputとして使うことで、schema移行とsemantic redesignの同時実行を構造的に禁止する
 - v2 evidence成立後にのみ通常partial rerunへ戻す
 - AC本文 / 親Behavior / 親UC / 親USのfreshness regressionを追加
 - ACをTRへlinkしても、そのACのAuthorityをTR `authority_refs[]` / Authority Dispositionで別途closeしない場合はAuthority unclosedとなるregressionを追加
 - artifact modeでAC本文・親chain不変のままAuthorityだけ変更しspec-analysisを再生成した後、未再実行TRが直接Authority dependencyによりstaleになるregressionを追加
 - v1→v2 cutoverで内容不変ならTR / TCN / model / CI / TCのstable IDとdeleted / inactive identity historyが不変で、過去IDを再採番しないregressionを追加
-- cutoverのdraft_key / *_id_map join不一致、missing / extra / duplicate runtime unit、v1以外のsource version、16 MiB超過、unknown direct operationをblockedにするregressionを追加
+- cutoverのdraft_key / *_id_map join不一致、missing / extra / duplicate runtime unit、TCD phase dependency不足、target / child-input semantic drift、semantic CI mapping ambiguity、v1以外のsource version、16 MiB超過、unknown direct operationをblockedにするregressionを追加
 - 64 KiB超artifact stringはcutover direct CLIで許可し、通常generatorの2 MiB / string制限へ例外を波及させないregressionを追加
-- returned `normalized_runtime_inputs[]` だけでv2 generatorを実行でき、Agent-side field mergeが不要なintegration testを追加
+- 各cutover phaseが返した `normalized_runtime_inputs[]` だけで次のv2 generatorを実行でき、Agent-side field mergeが不要なintegration testを追加
+- TCDでv2 model `generation_fingerprint` がv1から変わってもTDR / materializeのtarget version fieldをcurrent v2 targetへrebaseできること
+- derived child model inputをcurrent v2 parent `derived_child_inputs` から生成し、v1 saved child inputとのsemantic driftをrejectすること
+- v1でnewだったsemantic coverage itemをv1 `semantic_ci_mapping_state`へ一意joinし、cutover後も同じCI IDをreuseすること
 - partial rerunでscope外TRがchanged AC依存のままcurrentにならない regressionを追加
 - TR-OUT-003 / TR-SEM-003を追加
 - existing TR fixtures / runtime / portability / vertical integration testsをv2 schemaへ同期
