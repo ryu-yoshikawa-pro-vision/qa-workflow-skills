@@ -327,7 +327,7 @@ UNKNOWNのlineageは次に固定します。
 {"schema_version":"entity-state-v1","skill":"spec-analysis","entities":[]}
 ```
 
-`entities` は§9のdeterministic bridge結果をそのまま使用します。LLMがMachine Entity wrapper / fingerprintを計算・再構築しません。`expected_entity_identities` や `implementation_fingerprint` はhelper responseには保持しますが、artifactの `Machine Entities` block schemaへ混入させません。
+`entities` は§9のdeterministic bridge結果をそのまま使用します。LLMがMachine Entity wrapper / fingerprintを計算・再構築しません。`expected_entity_identities` はhelper responseに保持しますが、artifactの `Machine Entities` block schemaへ混入させません。`authority_entities.py` が内部返却する `implementation_fingerprint` は本modeのconsumer契約では使用せず、`build-machine-evidence` の統合responseへ公開しません。
 
 ### 5.11 10+ domain files
 
@@ -341,6 +341,19 @@ structured tableを置く場合:
 - primary ID prefixは00の `案件固有構造ID` で宣言する
 
 helperは宣言されたheader名のexact ID参照だけを検証し、proseからIDを推測抽出しません。
+
+### 5.12 asset initialization contract
+
+`skills/spec-analysis/assets/ui-test-target-analysis/` のtemplateは、実データと誤認できる例示IDを置きません。
+
+- variable structured tableはheader / separatorだけを持ち、`PAGE-001` / `SPEC-001` / `AC-001` 等の例示rowを置かない
+- `条件付き必須file applicability` の4rowのようにschema上固定のrowだけ事前配置する
+- READMEのPackage Schema Versionは `ui-target-v1`、初回Package Versionは `v00`、Previous Package Versionは `-` を固定初期値とする
+- READMEのCurrent UNKNOWN Count / Current payload filesはhelper生成結果を貼り付けるcontrol sectionとし、例示値を置かない
+- CHANGELOG初回entryは `## v00` と3つの固定subheading、空の `Stable ID changes` tableを持つ
+- Machine Entities blockはschema上の空blockをtemplateに置けるが、完成packageでは `build-machine-evidence` 再生成結果へ置換しvalidate一致を必須とする
+
+extension fileの必要性とslugはLLMが判断します。連番は `next-domain-file` が決定します。
 
 ## 6. ID rules
 
@@ -405,7 +418,7 @@ production helperは任意Markdownを解釈する汎用parserにしません。�
 
 ### 7.1 基本
 
-`ui_target_package.py` と `unknown_links.py` は次を共通原則とします。
+`ui_target_package.py`、`unknown_links.py`、`question_ids.py`、`project_context_ids.py` は次を共通原則とします。
 
 - Python 3.11標準ライブラリのみ
 - 業務入力はstdinの1 JSON objectだけ
@@ -450,7 +463,7 @@ handled failure:
 }
 ```
 
-issue_typeは少なくとも:
+handled `issue_type` は次のexact enumに固定します。
 
 - invalid_input
 - limit_exceeded
@@ -462,6 +475,8 @@ issue_typeは少なくとも:
 - duplicate_id
 - id_space_exhausted
 - manifest_mismatch
+
+unknown operation / unknown top-level field / JSON・table schema不正は `invalid_input`、packageのcanonical heading / file set / version schema不一致は `package_schema_mismatch`、参照先不存在は `reference_not_found`、ID重複は `duplicate_id`、MANIFESTのfile set / order / SHA差分は `manifest_mismatch` へ固定します。新しいhandled failure種別が実装中に必要になった場合は、実装だけで増やさずこのPlan contractを更新します。
 
 ## 8. ui_target_package.py operations
 
