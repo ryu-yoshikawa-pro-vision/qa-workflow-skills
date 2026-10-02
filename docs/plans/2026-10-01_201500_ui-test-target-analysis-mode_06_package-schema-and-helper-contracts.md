@@ -899,6 +899,9 @@ production helperのfilesystem / hash / projection / next-id / build-machine-evi
 - path traversal / absolute payload path / symlink
 - missing required file
 - invalid schema version
+- current package next-versionの `package_root` 読み取り / legacy migration専用explicit previous_version
+- CHANGELOG `Stable ID changes` exact heading / header / Change enum / duplicate
+- next-idのcurrent structured row + historical stable ID導出、連続採番、retired ID非再利用
 - duplicate canonical heading / table、row列数不一致、escaped pipe / `<br>` reference parse
 - duplicate / unknown stable ref
 - resolved UNKNOWNの `解消先ID` missing / invalid / non-current Authority
@@ -922,7 +925,8 @@ production helperのfilesystem / hash / projection / next-id / build-machine-evi
 - helperのoperation / input / output / failure contractが一意
 - current packageの `Machine Entities: spec-analysis` blockがexactly one存在し、helper再生成結果と一致する
 - resolved UNKNOWNが `解消先ID` でcurrent Authorityへ機械検証可能に閉じる
-- new ID採番時にAgentが既知ID集合を手組みしない
+- current packageの次versionをAgentが転記せずhelperが `package_root` から導出できる
+- new ID採番時にAgentが既知ID集合を手組みせず、CHANGELOG stable ID履歴を含めて過去IDを再利用しない
 - structured tableのheader / ID / ref列が一意
 - scopeごとのUI操作適用判定と条件付き必須fileの存在を機械検証できる
 - UI操作scopeでUIOP / US / UC / Behavior / AC hierarchyと3分類完全性を機械検証できる
