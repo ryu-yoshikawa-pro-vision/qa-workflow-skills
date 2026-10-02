@@ -182,6 +182,8 @@ PR #16では次だけを追加します。
 - test-target-inspection / usability-evaluation / usability-inspection / wcag-conformance-evaluationとの目的境界
 - #14成果物をAuthorityへ自動昇格しない規則
 
+PR #16のshared runtime変更は、既存repository byte-identity契約の対象7コピーだけを `runtime-v1` → `runtime-v2` へ同期します。PR #14確認headの `usability-inspection` / `wcag-conformance-evaluation` はこの7-copy契約外かつAC / TR意味契約のconsumerではないため、PR #16だけを理由にruntime versionを変更しません。Step 0でPR #14 merge後の実装を再確認し、consumer境界が変わっていれば対象範囲を再評価します。
+
 PR #14が追加した以下を複製・変更しません。
 
 - WCAG observation handoff
