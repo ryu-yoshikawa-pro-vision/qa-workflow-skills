@@ -1213,7 +1213,7 @@ production helperのfilesystem / raw hash / projection / README control renderin
 - README metadata / UNKNOWN件数 / payload file tableをAgentが再構築せずcanonical Markdownとして生成できる
 - extension fileの必要性 / slugだけLLMが判断し、連番 / pathはhelperが決定できる
 - new ID採番時にAgentが既知ID集合を手組みせず、CHANGELOG stable ID履歴を含めて過去IDを再利用しない
-- new Q / DEC / ASMのsemantic identityはLLM / stakeholder側に残し、番号だけowner Skill-local helperで決定できる
+- new Q / DEC / ASMのsemantic identityはLLM / stakeholder側に残す。Qはquestion-analysis helper、Project ContextがDEC / ASM ownerの場合はqa-workflow helper、別ownerの場合はそのownerのdeterministic allocatorで番号を決定し、未採番時にLLM hand-numberingへfallbackしない
 - structured tableのheader / ID / ref列が一意
 - scopeごとのUI操作適用判定と条件付き必須fileの存在を機械検証できる
 - UI操作scopeでUIOP / US / UC / Behavior / AC hierarchyと3分類完全性を機械検証できる
