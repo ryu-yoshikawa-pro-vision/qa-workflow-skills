@@ -360,18 +360,18 @@ default policyでは `ui_target_package.py next-version` が次versionを導出�
 
 回答や新資料が来た場合:
 
-1. LLMが変更されたAuthority / DECISION / ASMを解決する
-2. LLMが影響するcanonical stable item / UNKを更新する。UNKNOWN解消時は元UNKを `現在有効か=No` にし、確定内容を分類に合う新stable IDとして追加し、そのIDを `解消先ID` に設定してlineageを保持する
-3. 09_authority_and_traceability.mdのcanonical modelを更新する
-4. `ui_target_package.py impact` でchanged stable IDのexact参照先を再確認候補として列挙する
-5. LLMが候補fileを確認し、意味上変更が必要な01〜08 / domain fileだけを更新する
-6. LLMが07のUNKNOWN本文、06の矛盾 / resolved説明、CHANGELOGの変更理由を更新する
-7. repository確認を実施した場合だけ08を更新する
-8. default version policyならhelperで次versionを導出し、案件固有policyなら指定versionを使用する
+1. LLMが変更されたAuthority / DECISION / ASMを解決し、project policyに従ってmaterial updateかを判断する
+2. default version policyでversion upする場合は、既存current packageへ `ui_target_package.py next-version` を `package_root` だけで実行し、返却された `previous_version / next_version` でREADME / CHANGELOGのcurrent version metadataを更新する。Agentがcurrent versionを手で転記しない
+3. LLMが影響するcanonical stable item / UNKを更新する。semantic identityがnewの場合だけ `next-id` を使い、返却IDを対象structured rowへ反映してから同prefixの次の採番へ進む。返却された `stable_id_change` はcurrent versionのCHANGELOGへ記録する。UNKNOWN解消時は元UNKを `現在有効か=No` にし、確定内容を分類に合うnew / reuse stable IDへ接続して `解消先ID` を保持する
+4. 09_authority_and_traceability.mdのcanonical modelを更新する
+5. `ui_target_package.py impact` でchanged stable IDのexact参照先を再確認候補として列挙する
+6. LLMが候補fileを確認し、意味上変更が必要な01〜08 / domain fileだけを更新する
+7. LLMが07のUNKNOWN本文、06の矛盾 / resolved説明、CHANGELOGの変更概要・stable ID change・影響fileを更新する
+8. repository確認を実施した場合だけ08を更新する
 9. helperでcurrent UNKNOWN ID集合 / 件数を取得し、07 / READMEとの整合を確認する
 10. `ui_target_package.py build-machine-evidence` で09のAuthority Entityとcurrent AC Entity、spec-analysis canonical `normalized_skill_input` を決定論生成する
 11. helperでMANIFEST / SHA-256を生成する
-12. helperのvalidateを実行し、形式・参照・件数・version・file set・hashの決定論違反を解消する
+12. helperのvalidateを実行し、形式・参照・件数・version・CHANGELOG・file set・hashの決定論違反を解消する
 13. semantic quality gateでsource / inference / UI分類 / 意味重複等を最終確認する
 
 helperが列挙したimpact候補は再確認対象であり、変更必須という意味判断ではありません。LLMが仕様意味を判断します。
