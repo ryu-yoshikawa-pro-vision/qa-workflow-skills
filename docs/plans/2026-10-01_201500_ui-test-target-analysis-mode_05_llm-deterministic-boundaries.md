@@ -122,16 +122,15 @@ LLMがsemantic identityを判断して `new` と決めた後だけ使用しま�
 - helper返却の `stable_id_change` をcurrent versionの `Stable ID changes` tableへ記録し、validate前に履歴を閉じる
 - prefixはmodeで宣言済みのものだけ許可する
 
-#### build-manifest
+#### render-readme-controls
 
-current package fileからMANIFEST bodyとREADMEの `Current payload files` canonical tableを生成します。
+READMEの `Package metadata` と `Current payload files` をcanonical Markdownとして生成します。
 
-- MANIFEST自身は自己hash対象にしない
-- SHA-256はfileのraw bytesから計算する
-- file orderはmodeのcanonical orderに従う
-- 条件付き必須fileは00のapplicabilityと一致するものだけ含める
-- extension fileは00へ宣言済みのものだけ含める
-- Agent / LLMがfile順・hash・README file tableを再構築しない
+- Package Schema Version / Package Version / Previous Package VersionはREADME current metadataを使う
+- Current UNKNOWN Countは09のcurrent UNKNOWN集合から導出する
+- Current payload filesはcurrent file setと00 applicability / extension宣言からcanonical orderで導出する
+- Agent / LLMがmetadata table、UNKNOWN件数、payload file順、種別を再構築しない
+- MANIFEST hash計算より前にREADME controlsへ反映する
 
 #### next-domain-file
 
@@ -141,6 +140,17 @@ LLMが「標準fileへ混在させるべきでない独立domainが必要」と�
 - slugの意味は判断しない
 - Agent / LLMに次の連番を計算させない
 - 既存最大番号が999なら自動拡張せず `id_space_exhausted`
+
+#### build-manifest
+
+README controls反映後のcurrent package fileからMANIFEST bodyを生成します。
+
+- MANIFEST自身は自己hash対象にしない
+- SHA-256はfileのraw bytesから計算する
+- file orderはmodeのcanonical orderに従う
+- 条件付き必須fileは00のapplicabilityと一致するものだけ含める
+- extension fileは00へ宣言済みのものだけ含める
+- Agent / LLMがfile順・hashを再構築しない
 
 #### impact
 
