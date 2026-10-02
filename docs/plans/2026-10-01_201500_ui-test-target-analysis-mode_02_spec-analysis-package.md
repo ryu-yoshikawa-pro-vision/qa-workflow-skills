@@ -46,7 +46,7 @@ UI操作の振る舞い分解 / AC traceability:
 
 exact heading / exact table header、package schema version、ID形式、Machine Entity bridge、MANIFEST schemaは `_06_package-schema-and-helper-contracts.md` を正本とし、本Planでは意味責務だけを定義します。
 
-### required core
+### required core payload
 
 - README.md
 - 00_scope_and_context.md
@@ -56,7 +56,12 @@ exact heading / exact table header、package schema version、ID形式、Machine
 - 07_current_unknowns.md
 - 09_authority_and_traceability.md
 - CHANGELOG.md
+
+### required control file
+
 - MANIFEST.md
+
+required package filesは `required core payload + required control file MANIFEST.md` です。MANIFEST自身はpayload / hash対象とREADMEのCurrent payload filesへ含めません。
 
 ### 条件付き必須
 
@@ -65,8 +70,8 @@ exact heading / exact table header、package schema version、ID形式、Machine
 | file | 作成trigger |
 | --- | --- |
 | 03_fields_and_validation.md | 入力・選択・検索・filter・sort・upload等のfield、入力制約、validation、enable/disable条件のいずれかが対象scopeに存在 |
-| 04_flows_and_data.md | 複数step / 画面をまたぐflow、state transitionに必要なI/O、import/export、data transformation、非同期処理flowのいずれかが対象scopeに存在 |
-| 05_notifications_and_external_interactions.md | notification、email、browser dialog、外部画面遷移、外部service連携、外部interactionのいずれかが対象scopeに存在 |
+| 04_flows_and_data.md | 複数step / 画面をまたぐflow、state transitionに必要なI/O、import/export**生成処理**、data transformation、非同期process / state flowのいずれかが対象scopeに存在 |
+| 05_notifications_and_external_interactions.md | notification、email、browser dialog、user-visibleなexport / download delivery、外部画面遷移、外部destination / serviceとのinteractionのいずれかが対象scopeに存在 |
 | 08_repository_implementation_status.md | current packageがrepository / product implementation evidenceを現在保持・利用している |
 
 `00_scope_and_context.md` のfile applicability表に4fileすべての `required / not-applicable / blocked` と根拠を記録します。LLMは資料の意味からtrigger該当性を判断し、helperは宣言と実file / MANIFESTの一致を決定論検証します。
@@ -259,25 +264,30 @@ scopeごとの適用判定は `_08_behavior-decomposition-and-acceptance-traceab
 
 ### 04_flows_and_data.md
 
+責務はprocess / data transformation / state flowです。
+
 - user / business flow
 - process flow
 - data display / data originの仕様上の関係
 - state transitionに必要なinput / output
-- external interactionの入口
+- import / export生成処理、data transformation
+- 非同期process
 
-DB値やAPI responseをUI期待結果としてテストケース化しません。
+単純なdownload / delivery先だけでは04をrequiredにしません。DB値やAPI responseをUI期待結果としてテストケース化しません。
 
 ### 05_notifications_and_external_interactions.md
 
-該当する場合のみ使用します。
+責務はuser-visible delivery / notification / external destination / interactionです。該当する場合のみ使用します。
 
 - in-app notification
 - email
-- export / download
+- export / downloadのdelivery / user-visible result
 - external documentation
 - support / chat
 - external destination
 - recipient / timing / navigation
+
+単純downloadは05のみ、export生成処理やdata transformationを伴ってその結果をdownloadする場合は04 + 05をrequiredにします。外部serviceとの内部data transformationは04、外部destination / user interactionとしての接続は05で扱い、同じ内容を両fileへ重複記載しません。
 
 ### 06_spec_inconsistencies_and_pending.md
 
