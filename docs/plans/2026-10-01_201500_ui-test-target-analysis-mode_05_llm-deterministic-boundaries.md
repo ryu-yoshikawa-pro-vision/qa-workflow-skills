@@ -335,7 +335,7 @@ MANIFESTはcurrent package fileのfile listとSHA-256を持ちます。
 - SHA-256はhelperが計算する
 - Agentがhash値を手入力しない
 
-default policyでは、完成済みpackageのuser-managed / semantic payloadへ永続差分を加えて再び完成状態として保存するならsemantic / presentationを問わずversionを1増分します。version / CHANGELOG新entry / README controls / MANIFEST等の派生control差分はversion up要否の原因に数えず、control生成前のprovisional payloadが同一ならno-opとしてversionを維持します。canonical更新経路では `materialize` が差分確定後にだけ次versionをREADME / CHANGELOG / MANIFESTへ反映します。案件で別version policyが明示されている場合だけそのpolicyを優先します。
+default policyでは、完成済みpackageのuser-managed / semantic payloadへ永続差分を加えて再び完成状態として保存するならsemantic / presentationを問わずversionを1増分します。LLMが入力するcurrent versionの `変更概要` はuser-managed narrativeなので差分に含めます。version metadata、CHANGELOGのversion heading / `Stable ID changes` / `影響file`、README generated controls、MANIFEST等のhelper生成controlはversion up要否の原因に数えません。control生成前のprovisional payload + requested `change_summary` が同一ならno-opとしてversionを維持します。canonical更新経路では `materialize` が差分確定後にだけ次versionをREADME / CHANGELOG / MANIFESTへ反映します。案件で別version policyが明示されている場合だけそのpolicyを優先します。
 
 「同じversionを別内容で完成版として上書きしない」は更新手順上の契約です。current packageだけを見るvalidatorは過去の同version内容とのbyte比較を行わず、current / previous version metadataの形式・連続性・package内一致を検証します。
 
