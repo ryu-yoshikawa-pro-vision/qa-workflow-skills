@@ -411,7 +411,7 @@ UI target structural:
 
 案件固有prefixを含む形式は `PREFIX-001` ～ `PREFIX-999`。
 
-`DEC / ASM` もpackage内で参照される外部ownerのstable IDなので、exact reference validation、CHANGELOG `Stable ID changes`、`impact` の追跡対象に含めます。v01以降にpackageへ初めて取り込むDEC / ASMは `added`、既に追跡中の同一IDの内容・状態変更は `changed`、current structured modelから外す場合だけ `retired` とします。`resolved` は `UNK-xxx` 専用であり、DEC / ASMへ使用しません。
+`DEC / ASM` もpackage内で参照される外部ownerのstable IDなので、exact reference validation、CHANGELOG `Stable ID changes`、`impact` の追跡対象に含めます。v01以降にpackageへ初めて取り込むDEC / ASMは `added`、既に追跡中の同一IDの内容・状態変更は `changed` とします。current structured modelからidentity自体を外す場合でも、`retired` はLLMがexplicit `retire_ids[]` でsemanticに除去を確定したときだけ生成し、row消失から自動推測しません。`resolved` は `UNK-xxx` 専用であり、DEC / ASMへ使用しません。
 
 ### 6.2 ui_target_package.py next-idの採番対象
 
@@ -1425,7 +1425,7 @@ tableにはpayload filesだけをcanonical順で列挙します。
 - `resolved` はUNKNOWN lineage専用。対象は `UNK-xxx` だけで、そのversionでUNKNOWNが `現在有効か=Yes` から `No` へ閉じたことを表す。DEC / ASMその他のprefixへ `resolved` を使用しない
 - resolved UNKNOWNでresolver Authorityだけを変更して `現在有効か=No` を維持する場合、または同じUNKを `現在有効か=Yes / 解消先ID=空` へreopenする場合は `changed` を使う
 - reopen後に同じUNKを再度閉じる場合は再び `resolved` を使用できる
-- current structured modelからstable ID自体を外す場合は `retired`。DEC / ASMが撤回・置換等でcurrent Authorityから外れても09の分析項目へ履歴rowを残す場合は `changed` とし、row自体をcurrent structured modelから除く場合だけ `retired`
+- current structured modelからstable ID自体を外す場合でも、`retired` はLLMがそのidentityをpackage trackingから意図的に除去すると判断し `retire_ids[]` へ明示した場合だけ生成する。DEC / ASMが撤回・置換等でcurrent Authorityから外れても09の分析項目へ履歴rowを残す場合は `changed` とする
 - 1 version内で同じStable IDを重複させない
 - 1つのStable IDに `added` または `migrated` を記録できるのは履歴全体で最初の1回だけ
 - `retired` だけをterminal eventとし、その後に `added / migrated / changed / resolved / retired` を再記録しない
@@ -1447,7 +1447,7 @@ helperは次を検証します。
 - current UNKNOWN rowが `現在有効か=No` の場合はcurrentな `解消先ID`、`Yes` の場合は空 `解消先ID` を要求する
 - resolved後の `changed` によるresolver変更 / reopenと、reopen後の再 `resolved` を許可する
 - `retired` 後に同じStable IDのeventが存在しない
-- v01以降に初登場するDEC / ASMを `added` として追跡でき、既追跡DEC / ASMの状態変更を `changed`、current structured modelからの除去を `retired` として受理する
+- v01以降に初登場するDEC / ASMを `added` として追跡でき、既追跡DEC / ASMの状態変更を `changed`、明示 `retire_ids[]` によるcurrent structured modelからの除去だけを `retired` として受理する
 - current structured rowとStable ID履歴のID形式が§6.1の標準prefixまたは00宣言済み案件固有prefix契約に一致する
 - `next-id / materialize` input prefixは§6.2の採番対象だけを許可し、DEC / ASM / Qを拒否する
 - previous tracked ID消失に明示retire intentがない場合はcompleted packageとして受理しない
