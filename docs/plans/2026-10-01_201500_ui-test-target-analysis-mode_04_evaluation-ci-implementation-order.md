@@ -293,7 +293,7 @@ QとUNKの意味的同一性は検証しません。
 
 既存workflowを再利用します。
 
-最低限:
+今回必須:
 
 - Validate Agent Skills
 - Validate Semantic Output Evals
