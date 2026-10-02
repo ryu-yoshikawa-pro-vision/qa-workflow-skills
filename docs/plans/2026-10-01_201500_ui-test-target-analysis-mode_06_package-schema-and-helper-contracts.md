@@ -1115,6 +1115,12 @@ spec-analysis modeからquestion-analysisへ進む場合、`ui_target_package.py
 ```
 
 `不明点 / 質問一覧` はcurrent未解決質問だけを持ち、`質問ID履歴` はその成果物系列で一度でも使用したQ IDをcurrent / resolvedを問わず保持します。両tableともplaceholder `Q-001` を置きません。
+`不明点 / 質問一覧` のexact headerは次へ固定します。
+
+```markdown
+| ID | 問題 / 質問 | 根拠 | 分類 | 影響範囲 / 成果物 | 関連UNKNOWN ID | Runtime Skill | Runtime Unit Key | Model Key | Target Key | Generation Fingerprint | 回答なしの場合の扱い | 回答後の正規化先 | 再開Skill | 再開対象 / 実行範囲 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+```
 
 #### next-id
 
@@ -1188,6 +1194,61 @@ current artifactに手書きされた既存 `質問ID履歴` は正本入力に�
 
 これにより、回答済みQがcurrent質問一覧から消えても使用済みIDを保持します。`Q-001` 解消後に新規質問が発生した場合、Q-001を再利用せずQ-002を返します。
 
+#### materialize
+
+question-analysisのcurrent Q table / 質問ID履歴を決定論生成します。candidate artifactのその他sectionはそのまま保持します。
+
+stdin:
+
+```json
+{
+  "operation":"materialize",
+  "artifact_mode":"update",
+  "previous_artifact_markdown":"<previous question-analysis output>",
+  "artifact_markdown":"<candidate artifact with narrative sections>",
+  "questions":[
+    {
+      "draft_key":"q-login-role",
+      "identity_action":"new",
+      "reuse_id":null,
+      "cells":{
+        "問題 / 質問":"...",
+        "根拠":"...",
+        "分類":"要確認",
+        "影響範囲 / 成果物":"...",
+        "関連UNKNOWN ID":["UNK-001"],
+        "Runtime Skill":"",
+        "Runtime Unit Key":"",
+        "Model Key":"",
+        "Target Key":"",
+        "Generation Fingerprint":"",
+        "回答なしの場合の扱い":"",
+        "回答後の正規化先":"SPEC",
+        "再開Skill":"spec-analysis",
+        "再開対象 / 実行範囲":""
+      }
+    }
+  ]
+}
+```
+
+- create / updateとprevious必須規則はnext-idと同じ
+- reuse rowは `identity_action=reuse / reuse_id=Q-xxx`、new rowは `identity_action=new / draft_key=<unique>`
+- helperがprevious current Q + previous history + request内reuse/new割当済みQのunionからnew Qを採番する
+- Q tableをID昇順、reference cellをcanonical `<br>` 形式でserializeする
+- 同じrunで生成した全Q IDを含む `質問ID履歴` を生成する
+- candidate artifact内の既存Q table / 質問ID履歴は正本にせず、2 section全体をhelper生成結果で置換する
+- 分類や質問文、UNKNOWNとの意味対応、回答後正規化先の意味は判断しない
+
+payload:
+
+```json
+{
+  "allocated_ids":[{"draft_key":"q-login-role","question_id":"Q-003"}],
+  "artifact_markdown":"<two sections materialized>",
+  "used_question_ids":["Q-001","Q-002","Q-003"]
+}
+```
 ### 10.3 project_context_ids.py
 
 Project ContextのSection 12 / 13が案件の決定事項 / 仮定の正本ownerである場合に使うdefault allocatorです。Project Context ownerではstable ID rowをidentity履歴として保持し、撤回 / 置換済みでもID row自体を削除しません。内容・状態は更新できますが、previous Project Contextに存在したDEC / ASM IDをcandidateから消しません。
@@ -1244,7 +1305,37 @@ payload:
 
 previousが存在する場合、previous Section 12 / 13に存在した全DEC / ASM IDがcandidateにも存在することを要求します。削除されたIDが1件でもあればblockedです。row順は意味を持たず、ID集合で比較します。状態変更・置換先・本文の意味妥当性は検証しません。
 
-LLM / stakeholder側がsemantic identityのreuse / new、DECISION / ASM区分、決定内容、関係、影響範囲、状態遷移の意味、ASM承認可否を判断します。helperはProject Contextを書き換えません。
+#### materialize
+
+Project ContextがDEC / ASMの正本ownerである場合、Section 12 / 13のID割当とcanonical table serializationをhelperへ寄せます。その他sectionはcandidate artifactの内容を保持します。
+
+stdin:
+
+```json
+{
+  "operation":"materialize",
+  "artifact_mode":"update",
+  "previous_artifact_markdown":"<previous Project Context>",
+  "artifact_markdown":"<candidate Project Context narrative>",
+  "decisions":[{"draft_key":"dec-auth","identity_action":"new","reuse_id":null,"cells":{"確定内容":"...","状態":"有効","決定根拠":"...","影響範囲":"...","関係":"独立","関連仕様根拠ID":[],"置換先ID":[],"備考":""}}],
+  "assumptions":[]
+}
+```
+
+- create / updateを区別し、updateではprevious artifact必須
+- new IDはprevious + candidateの全状態rowを使用済み集合として採番する
+- previousに存在したDEC / ASM IDはcandidate結果から削除できない
+- helperがSection 12 / 13をID昇順・canonical escapeでserializeし、2 tableをsection全体として置換する
+- 撤回 / 置換済みrowもidentity historyとして保持する
+- 状態変更、置換関係、決定内容、ASM承認可否の意味はLLM / stakeholderが判断する
+
+payload:
+
+```json
+{"allocated_ids":[{"draft_key":"dec-auth","stable_id":"DEC-003"}],"artifact_markdown":"<Section 12 / 13 materialized>"}
+```
+
+LLM / stakeholder側がsemantic identityのreuse / new、DECISION / ASM区分、決定内容、関係、影響範囲、状態遷移の意味、ASM承認可否を判断します。helperはProject ContextのSection 12 / 13だけを書き換え、その他sectionの意味を変更しません。
 
 案件でProject Contextとは別の決定事項 / 仮定の正本一覧が明示されている場合は、そのownerを維持します。
 
