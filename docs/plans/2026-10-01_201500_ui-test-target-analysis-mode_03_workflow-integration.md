@@ -30,9 +30,11 @@ mode packageのUNKNOWNを、回答反映のたびに再質問・再採番せず�
 - 暫定回答と正式回答を区別する
 - 暫定回答が後で正式DECISIONへ変わっても同じUNKNOWN lineageを使う
 - 「回答が不明」は回答履歴として残してもUNKNOWNは解消しない
-- 正式回答で解消したUNKNOWNはcurrent unknownから除外し、spec-analysisで新しいcurrent Authorityのstable IDを`解消先ID`へ記録する
-- 解消済み事項を再質問しない
-- 新資料で再び競合が発生した場合は旧UNKNOWNを無条件に再openせず、同一論点か新しい競合かを判断する
+- 正式回答で解消したUNKNOWNはcurrent unknownから除外し、spec-analysisでcurrent Authorityのstable IDを`解消先ID`へ記録する
+- 解消済み事項を、根拠がcurrentな間は再質問しない
+- 後続更新で`解消先ID`のAuthorityが置換・失効しても別current Authorityが同じ論点を解消している場合は、同じUNK lineageの`解消先ID`を新しいcurrent Authorityへ更新する
+- 解消根拠がなくなった場合、同一論点か新しい競合かをLLMが判断する。同一論点なら同じUNK IDを`現在有効か=Yes`へ戻して再openし、新しい競合なら旧UNKNOWNをresolved historyとして維持してnew UNKを作る
+- UNKNOWNのopen / resolved / reopenに伴う`現在有効か`、`解消先ID`、CHANGELOG eventの形式整合はdeterministic helperが検証し、同一論点かどうかの意味判断は行わない
 
 ### 1.4 assets/output-template.md
 
@@ -42,7 +44,16 @@ mode packageのUNKNOWNを、回答反映のたびに再質問・再採番せず�
 
 - 関連UNKNOWN ID
 
-`不明点 / 質問一覧` のtemplateはheader-onlyにし、`Q-001` の例示rowを実データとして残しません。新規Qのsemantic identity / reuse判断はLLM、newと決めた後の番号決定は `question_ids.py` が担当します。
+さらに、同じquestion-analysis成果物へmachine-readableな使用済みID台帳を追加します。
+
+```markdown
+## 質問ID履歴
+
+| ID |
+| --- |
+```
+
+`不明点 / 質問一覧` はcurrent未解決質問だけを持ち、templateはheader-onlyにして `Q-001` の例示rowを実データとして残しません。`質問ID履歴` はcurrent / resolvedを問わず、その成果物系列で一度でも使用したQ IDを重複なし昇順で保持します。新規Qのsemantic identity / reuse判断はLLM、newと決めた後の番号決定と履歴union生成は `question_ids.py` が担当します。
 
 spec-analysis由来の論点ならUNK-xxxを記録し、質問単位のQ-xxxと仕様UNKNOWNを追跡できるようにします。mode packageからquestion-analysisへ進む場合は `ui_target_package.py inspect` の `current_unknown_ids[] / resolved_unknown_ids[]` を正規handoffとし、Agentが09から集合を手作業で再構築しません。
 
@@ -66,9 +77,10 @@ stdin / stdout JSON、operation名、failure、size limit、sort順等の正確�
 
 `question_ids.py` は次だけを担当します。
 
-- `不明点 / 質問一覧` のexisting `Q-xxx` をparseする
-- duplicate / malformed IDを拒否する
-- LLMがnew questionと判断した後に既知最大番号+1を返す
+- `不明点 / 質問一覧` と `質問ID履歴` の `Q-xxx` をparseする
+- current質問ID / 使用済み履歴IDのduplicate / malformedを拒否する
+- LLMがnew questionと判断した後、current + historyの既知最大番号+1を返す
+- previous artifactとcandidate current artifactから、previous current Q + previous履歴 + current Qのunionをcanonical `質問ID履歴` tableとして生成する
 - `Q-999` 使用済みなら既存3桁ID契約を勝手に拡張せず `id_space_exhausted` を返す
 
 この2 helperはQとUNKの意味的対応、質問文、回答後の正規化先、reuse / newの意味判断を行いません。
@@ -82,7 +94,7 @@ stdin / stdout JSON、operation名、failure、size limit、sort順等の正確�
 - spec-analysis由来でない質問は関連UNKNOWN ID空欄を許可する
 - 既存Q-xxx、分類、再開Skill、runtime identity等の契約は変更しない
 
-eval validatorはproduction helperをimportしてexpectedを作りません。既存QUESTION output fixtureの少なくとも1件へUNKNOWN mappingを追加し、repository unit testで未知UNK / 誤mappingのfalse-pass regressionを追加します。deterministic output case数を増やす必要はありません。
+eval validatorはproduction helperをimportしてexpectedを作りません。既存QUESTION output fixtureの少なくとも1件へUNKNOWN mappingと`質問ID履歴`を追加し、repository unit testで未知UNK / 誤mappingのfalse-pass regressionを追加します。さらに `Q-001解消 → current質問0件 → 新規質問` で `Q-002` が割り当てられ、Q-001を再利用しない回帰を追加します。deterministic output case数を増やす必要はありません。
 
 ## 2. qa-workflow変更
 
