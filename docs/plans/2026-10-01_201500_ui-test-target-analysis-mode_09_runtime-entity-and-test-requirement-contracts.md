@@ -86,9 +86,13 @@ spec-analysisはruntime unitを新設しません。expected Entity導出だけ�
 ```json
 {
   "authorities": [{"authority_id":"SPEC-001"}],
-  "acceptance_criteria": [{"ac_id":"AC-001"}]
+  "acceptance_criteria": [
+    {"ac_id":"AC-001","authority_refs":["SPEC-001","DEC-002"]}
+  ]
 }
 ```
+
+`authority_refs[]` はAC / Behavior / UC / US chain全体が参照するcurrent Authority IDのunionをhelperが重複除去・昇順canonical化して生成します。Agent / LLMが同じAuthority集合を再構築しません。
 
 qa-workflow / coverage-analysisへspec-analysis scopeを渡す場合、AgentがMarkdownからこのJSONを再構築しません。helper返却のcanonical `normalized_skill_input` をそのまま使用します。
 
@@ -160,10 +164,14 @@ top-level required fields:
 `acceptance_criteria` row:
 
 ```json
-{"ac_id":"AC-001"}
+{"ac_id":"AC-001","authority_refs":["SPEC-001","DEC-002"]}
 ```
 
-ACが存在しないworkflowでもfield自体を省略せず `acceptance_criteria: []` とします。
+`authority_refs[]` はspec-analysis helperが生成したcanonical値をそのまま渡します。
+
+- artifact modeでは、同じ `AC-xxx` Machine Entityの `upstream_entity_dependencies[]` から得られるAuthority identity集合とexact一致を要求する
+- direct modeでは、top-level `authorities[]` のknown ID集合へ存在検証する
+- ACが存在しないworkflowでもfield自体を省略せず `acceptance_criteria: []` とする
 
 各 `test_requirements[]` draftへ `acceptance_refs` を必須追加します。該当ACがない横断的TRは `[]` を使用します。
 
@@ -171,16 +179,19 @@ ACが存在しないworkflowでもfield自体を省略せず `acceptance_criteri
 
 scriptは次を行います。
 
-1. AC ID形式 / duplicateを検証
-2. artifact modeでは `spec-analysis / acceptance_criterion / AC-xxx` current Entityへ完全解決
-3. direct modeではinputのknown AC集合へ存在検証
+1. AC ID形式 / duplicate / `authority_refs[]` を検証
+2. artifact modeでは `spec-analysis / acceptance_criterion / AC-xxx` current Entityへ完全解決し、input `authority_refs[]` がAC EntityのAuthority dependency identity集合とexact一致することを検証
+3. direct modeではinputのknown AC集合とknown Authority集合へ存在検証
 4. TR draftの `acceptance_refs` を検証
 5. linked upstream集合へ `acceptance_criterion` を追加
 6. closure universeへcurrent ACを追加
 7. TR Entity contentへ `acceptance_refs` を保存
-8. TR Entity `upstream_entity_dependencies[]` へcurrent AC Entityを追加
-9. AC linked + disposedの二重扱いを拒否
-10. linkedもdisposedもされないcurrent ACをunclosedとして拒否
+8. TR Entity `upstream_entity_dependencies[]` へ参照current AC Entityを追加
+9. 各参照ACの `authority_refs[]` をunionし、そのcurrent Authority EntityもTR Entity `upstream_entity_dependencies[]` へ直接追加
+10. AC linked + disposedの二重扱いを拒否
+11. linkedもdisposedもされないcurrent ACをunclosedとして拒否
+
+Authority dependencyの展開はID集合・Entity解決だけを行う決定論処理です。どのAuthorityがACを支えるかはspec-analysisでLLMが判断済みであり、test-requirement-design側で意味を再判断しません。
 
 LLMはACとTRの意味上の対応、TRの分割 / 統合を判断します。scriptは対応関係の意味妥当性を決めません。
 
@@ -247,7 +258,7 @@ validatorはAuthority / Product Risk / Acceptance Criteriaをclosure universeと
 | 親Behavior変更、AC本文同じ | AC fingerprint変更 → 関連TR stale |
 | 親UC変更、AC本文同じ | AC fingerprint変更 → 関連TR stale |
 | 親US変更、AC本文同じ | AC fingerprint変更 → 関連TR stale |
-| Authority変更、AC本文同じ | AC stale → 関連TR stale |
+| Authority変更、AC本文・親chain同じ、spec-analysis再実行済み | TRが保持する直接Authority dependency不一致 → 関連TR stale |
 | 無関係UC / AC変更 | 無関係TRはcurrent |
 
 freshness判定アルゴリズム自体は既存 `evaluate_entity_freshness` を再利用し、新しい伝播engineを作りません。
@@ -290,6 +301,7 @@ coverage-analysisの既存traceability graph node typeへACを追加しません
 - AC linked / disposed / unclosed / linked+disposed
 - AC upstream skill/type mismatch
 - AC dependency fingerprint propagation
+- AC本文 / 親chain不変のままAuthority fingerprintだけ変更し、spec-analysisをcurrentへ再生成した後も未再実行TRが直接Authority dependencyによりstaleになる回帰
 - partial rerun stale carry-forward
 - v1 evidenceをv2 current resultとして扱わない
 
