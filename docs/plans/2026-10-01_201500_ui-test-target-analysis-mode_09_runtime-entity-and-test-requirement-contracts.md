@@ -284,7 +284,7 @@ models phase completeかつ、v1にTDR unitがある場合はcurrent v2 TDR resu
 - `previous_target_id_map / previous_semantic_ci_map / previous_ci_ids / previous_expected_result_roots`: 同じTCNのv1 materialize result stateをそのままprevious stateへ設定
 - `target_annotations`: v1のpriority / expected_result_root / test-data refs等のsemantic fieldを維持し、target_refでcurrent targetへjoinして `target_content_fingerprint / generation_fingerprint` をcurrent値へ置換
 - `target_dispositions`: handling / reason / authority_refs等を維持し、target自身と `covered_by_target_version` のversion fieldをtarget_refでcurrent targetへrebaseする
-- `semantic_coverage_items`: draft_key / item_text / refs / priority / expected root等を維持し、`source_target_versions[]` をcurrent target versionへrebaseする。v1 result `semantic_ci_mapping_state[]` と `(model_key, semantic_content_fingerprint)` で一意joinし、current itemを `identity_action=reuse / reuse_semantic_item_key / reuse_ci_id` へ固定する。0件または複数matchは `cutover_semantic_drift`
+- `semantic_coverage_items`: まずv1 saved itemの**v1 `source_target_versions[]` のまま**既存normalization規則でv1 `semantic_content_fingerprint` を再計算し、v1 result `semantic_ci_mapping_state[]` と `(model_key, semantic_content_fingerprint)` で一意joinして `reuse_semantic_item_key / reuse_ci_id` を確定する。その後 `source_target_versions[]` をcurrent v2 target versionへrebaseし、`identity_action=reuse` としてcomplete inputへ入れる。rebase後fingerprintで旧mappingを検索しない。0件または複数matchは `cutover_semantic_drift`
 - `merge_groups`: group / target_ref集合を維持し、`target_versions[]` のcontent / generation / execution fingerprintをcurrent targetへrebaseする
 
 target_ref集合・target content identity・merge membership等がv1とcurrent v2で変化した場合は、cutover中にLLMへ補正させず `cutover_semantic_drift` とします。shared runtime version変更だけで意味構造が変わらないことをcutoverの前提にします。
