@@ -23,7 +23,7 @@ PR #16後の期待増分:
 - Semantic: +5
 - routing: +8
 
-したがってStep 0時点の期待値は 22 Skill / 488 trigger / 46 deterministic / 160 semantic / 69 routingです。ただしCI / repository testでは固定値を正本化せず、PR #14のcurrent repository / manifestからの動的導出を維持します。
+したがってStep 0時点の期待値は 22 Skill / 488 trigger / 44 deterministic / 155 semantic / 61 routingです。PR #16実装後の期待値は 22 Skill / 488 trigger / 46 deterministic / 160 semantic / 69 routingです。ただしCI / repository testでは固定値を正本化せず、PR #14のcurrent repository / manifestからの動的導出を維持します。
 
 ## 2. 評価方針
 
@@ -378,7 +378,7 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - required core / 固定triggerの条件付き必須 / 宣言制extensionを分けたpackage assets
 - 09_authority_and_traceability.mdで既存canonical spec-analysis contractを維持
 - skills/spec-analysis/scripts/ui_target_package.py
-- repository内のcurrent shared runtime 9 Skill-local `runtime_contract.py` へ `acceptance_criterion` / `acceptance_refs` / spec-analysis expected ACをbyte-identicalに追加
+- 既存repository byte-identity契約の対象である7 Skill-local `runtime_contract.py` へ `acceptance_criterion` / `acceptance_refs` / spec-analysis expected ACをbyte-identicalに追加
 - 09から既存authority_entities.pyへ入力できることを確認
 - current ACだけをMachine Entity化し、US / UC / Behaviorをglobal Entity typeへしないことを確認
 - helper unit / portability / runtime contract byte-identity test
@@ -501,7 +501,7 @@ mode単体が成立してからworkflowへ接続します。
 - multi-file packageがproduction helperのevaluation projection経由で既存semantic runnerにより評価可能
 - version / UNKNOWN件数 / stable ref / MANIFEST / SHA-256 / scope / file applicability / behavior hierarchy / current UCの3分類完全性等の定型整合をproduction helperで検証できる
 - test-requirement-designまで進むworkflowではcurrent ACがrequirement-structure-v2でTRまたはDispositionへ閉じ、AC / 親Behavior / 親UC / 親US / Authority変更が関連TR freshnessへ伝播する。仕様理解packageだけの要求ではこのclosureを完了条件にしない
-- repository内のcurrent shared runtime 9 Skill-local `runtime_contract.py` がbyte-identicalのままacceptance_criterionを扱える
+- 既存repository byte-identity契約の対象である7 Skill-local `runtime_contract.py` がbyte-identicalのままacceptance_criterionを扱える
 - partial rerunでchanged ACへ依存するscope外TRをcurrent扱いしない
 - spec-analysis / question-analysis production helperがSkill package単体で実行可能
 - test-target-inspectionへのcurrent UI分岐が維持される
