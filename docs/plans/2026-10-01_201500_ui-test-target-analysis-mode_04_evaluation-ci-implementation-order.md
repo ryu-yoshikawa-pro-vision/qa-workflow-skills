@@ -255,7 +255,7 @@ expected start / resume Skillを明示し、全Skill固定順実行へ回帰し�
 
 repository unit testで次を必須確認します。
 
-- required core / 条件付き必須file applicability / extension file declaration
+- required core payload / required control file MANIFEST / 条件付き必須file applicability / extension file declaration
 - mode assetのvariable tableがheader-onlyで例示stable IDを含まず、固定applicability rowだけ事前配置されること
 - package root外path拒否
 - package内version一致
@@ -281,7 +281,7 @@ repository unit testで次を必須確認します。
 - focused next-domain-fileがLLMのslug決定後に10+ fileの次番号とcanonical pathだけを決定すること。canonical materializeでは `extension_file_updates[]` のrequest順に複数new extensionをbatch採番し、同requestのstable owner row適用前にtemplate / pathを準備し、00の `案件固有extension file一覧` と実fileを同時生成すること
 - extension declaration exact table、domain file命名、duplicate path / slug、reuse時slug変更拒否
 - `materialize` のartifact_mode=create / updateを検証し、normal createはasset初期root + previous_snapshot=nullでv00、normal updateはnon-null snapshot必須、legacy-migrationはcreateだけを許可すること。no-opでは `changed=false`、ID / file allocationとchanged_filesが空でversionを上げないこと
-- inspectが更新前owner row fingerprint / UNKNOWN state / exact refs / payload hashを含むcanonical `update_snapshot` を返すこと
+- inspectが更新前tracking row fingerprint / UNKNOWN state / exact refs / payload / MANIFEST hashを含むcanonical `update_snapshot` を返すこと
 - next-id / materializeがsemantic identityを判断せず、UI target mode所有の `SRC / SPEC / INF / UNK` + standard structural prefix + 00宣言済み案件固有prefixについてcurrent row + CHANGELOG履歴 + previous snapshotから次番号を決め、更新途中で消えたprevious IDも再利用しないこと
 - `DEC / ASM` をUI target modeのnext-idが採番しないこと
 - DEC / ASMはCHANGELOG / impactの追跡可能stable IDとして受理し、Project Contextがownerの場合だけproject_context_ids.pyで採番すること
@@ -464,7 +464,7 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 
 - SKILL.mdに目的ベースの条件付きResource導線
 - references/ui-test-target-analysis.md
-- required core / 固定triggerの条件付き必須 / 宣言制extensionを分けたpackage assets
+- required core payload / required control file MANIFEST / 固定triggerの条件付き必須 / 宣言制extensionを分けたpackage assets
 - variable structured tableはheader-only、固定applicability rowだけ事前配置し、例示stable IDを置かない
 - 09_authority_and_traceability.mdで既存canonical spec-analysis contractを維持
 - skills/spec-analysis/scripts/ui_target_package.py（inspect / validate / focused helper群 / materialize / project-eval）
