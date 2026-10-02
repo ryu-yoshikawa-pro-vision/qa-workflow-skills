@@ -97,7 +97,8 @@ package rootを読み、次をJSONで返します。
 - MANIFESTのfile set / order / SHA-256がcurrent packageと一致
 - READMEのCurrent payload filesがMANIFESTのpayload file listと一致
 - CHANGELOGの最新version見出しがpackage versionと一致
-- Machine Entity blockを持つ場合、Authority + current ACのhelper再生成結果と一致すること
+- `Machine Entities: spec-analysis` blockがexactly one存在し、Authority + current ACのhelper再生成結果と一致すること
+- resolved UNKNOWNの`解消先ID`が存在するcurrent SPEC / DECISION / 承認済みASMを参照すること
 
 意味的な正しさ、Authority優先順位、PAGEかVIEWか等は検証しません。
 
@@ -109,11 +110,11 @@ default version policyを使うpackageだけを対象に、previous versionか�
 
 #### next-id
 
-LLMがsemantic identityを判断して `new` と決めた後だけ使用します。prefixとcurrent / previous packageで既知の同prefix IDを入力し、既知最大番号+1を返します。
+LLMがsemantic identityを判断して `new` と決めた後だけ使用します。Agentから既知ID一覧を受け取らず、package rootからcurrent structured rowとCHANGELOGに記録されたstable IDをhelper自身が収集し、同prefixの既知最大番号+1を返します。
 
 - reuse / newの意味判断は行わない
-- 既存IDを別entityへ再割当てしない
-- previous packageがあるupdateではprevious / current双方の既知IDを考慮する
+- Agent / LLMに`known_ids[]`を手組みさせない
+- 現在存在しない過去IDもCHANGELOGのstable ID履歴から既知IDとして扱い、別entityへ再割当てしない
 - prefixはmodeで宣言済みのものだけ許可する
 
 #### build-manifest
@@ -182,7 +183,7 @@ semantic / deterministic runnerのdirectory対応は追加せず、この固定p
 
 UI target packageでは、人間向け構造化ビューのentityをstable IDで参照できるようにします。
 
-最低限のprefix:
+標準prefix:
 
 - SCOPE-xxx
 - PAGE-xxx
@@ -233,7 +234,8 @@ pure narrativeや説明用sectionへ無理に参照列を追加しません。�
 - UNKNOWN本文・影響・質問内容はLLMが記述する
 - 07に載せるUNK ID集合と件数はhelperで検証する
 - READMEの件数は同じ集合から検証する
-- UNKNOWNが解消した場合、元のUNK rowは削除・再分類せず `現在有効か=No` とし、補足 / 上書き / 置換関係で新しいSPEC / DECISION / 承認済みASM等のstable IDへlineageを残す
+- UNKNOWNが解消した場合、元のUNK rowは削除・再分類せず `現在有効か=No` とし、`解消先ID` で新しいcurrent SPEC / DECISION / 承認済みASMのstable IDへlineageを残す
+- `解消先ID`はLLMが意味上の解消先を決め、helperが形式・存在・current Authority種別だけを検証する
 - 新しい確定内容は分類に合う新しいstable IDで記録する。`UNK-xxx` をDECISIONへ分類変更しない
 - resolved historyの説明はLLMがCHANGELOG / 06へ記載できる
 
