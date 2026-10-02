@@ -158,6 +158,8 @@ UI target modeから後続テスト設計へ進む場合、spec-analysis成果�
 
 qa-workflow / coverage-analysisはshared runtime contractからAuthority + current ACのexpected Entityを内部導出します。
 
+ユーザー要求が仕様理解packageまでならspec-analysisの完了条件で終了し、test-analysis / test-requirement-designを起動しません。この場合、AC→TR / Disposition closureはpackage単体の完了条件ではありません。
+
 test-requirement-designへ到達した場合は `requirement-structure-v2` を使用し、current AC ID集合を `acceptance_criteria[]`、各TRの意味対応を `acceptance_refs[]` として渡します。ACとTRの意味対応はLLMが判断し、ID集合・Entity存在・closure・freshnessはdeterministic runtimeが検証します。
 
 このhandoffの追加はrouting caseを増やしません。既存workflowの選択結果に対するmachine data受け渡し契約です。
@@ -210,7 +212,7 @@ READMEへ、UIテスト対象分析modeがspec-analysisの条件付きmodeであ
 
 - mode requestがspec-analysisへrouteされる
 - 不明点回答後に同じUNKNOWN lineageでspec-analysisへ戻り、question-analysisの関連UNKNOWN IDはSkill-local helperと独立deterministic evalの双方で構造検証される
-- 仕様理解だけの要求でtest-analysisへ勝手に進まない
+- 仕様理解だけの要求でtest-analysisへ勝手に進まず、AC→TR / Disposition closureをpackage単体の完了条件にしない
 - current UIの対象情報観測要求だけtest-target-inspectionへ分岐する
 - 保存済みUI資料のUX評価はusability-evaluation、live usability検査はusability-inspection、formal WCAG適合性評価はwcag-conformance-evaluationへ分岐する
 - modeが既存Agent Skills構造でAIエージェントから利用できる
