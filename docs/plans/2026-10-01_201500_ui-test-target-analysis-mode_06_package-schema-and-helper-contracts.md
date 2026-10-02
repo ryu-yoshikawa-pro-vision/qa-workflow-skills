@@ -734,8 +734,12 @@ stdin:
   "operation":"materialize",
   "package_root":"<path>",
   "previous_snapshot":{"package_version":"v14","tracked_items":[],"exact_reference_index":[],"payload_file_sha256":[]},
+  "change_mode":"normal",
   "version_policy":"default",
   "target_version":null,
+  "legacy_source_version":null,
+  "migration_retained_ids":[],
+  "legacy_terminal_events":[],
   "change_summary":"<current versionの変更概要本文>",
   "retire_ids":["PAGE-009"],
   "table_changes":[
@@ -770,17 +774,21 @@ stdin:
 }
 ```
 
-`version_policy` は `default / project` の2値です。通常更新で `default` の場合、helperがprevious snapshotのversionから次versionを導出し、README / CHANGELOG / MANIFESTへ同時反映します。`project` の場合だけ、案件で明示されたpolicyに基づく `target_version` を必須とし、helperはpackage内一致を検証します。完成済みpackageへ1 byteでも永続変更を加えて再び完成状態として保存する場合、default policyではsemantic / presentationを問わず必ずversionを+1します。in-memory生成結果がprevious packageと完全同一ならno-opとして書込み・version upを行いません。
+`change_mode` は `normal / legacy-migration` の2値です。
+
+normalでは `version_policy` を `default / project` の2値から選びます。既存完成package更新のdefaultではhelperがprevious snapshotのversionから次versionを導出し、README / CHANGELOG / MANIFESTへ同時反映します。projectの場合だけ、案件で明示されたpolicyに基づく `target_version` を必須とし、helperはpackage内一致を検証します。完成済みpackageへ1 byteでも永続変更を加えて再び完成状態として保存する場合、default policyではsemantic / presentationを問わず必ずversionを+1します。in-memory生成結果がprevious packageと完全同一ならno-opとして書込み・version upを行いません。
+
+legacy-migrationでは `previous_snapshot=null` を要求し、`legacy_source_version` は明示 `vNN` または `legacy-unversioned` を必須とします。明示vNNならtargetを次のvNN、`legacy-unversioned` ならtargetをv00 / Previous=`legacy-unversioned`へ固定します。`version_policy=project` はlegacy-migrationでも案件に明示policyがある場合だけ許可します。`migration_retained_ids[]` と `legacy_terminal_events[]` は§14のsemantic mapping結果だけを受け、helperが番号予約・lifecycle生成へ使います。
 
 table input contract:
 
 - `file / section` は§2〜§5のregistryに存在するexact pairだけを許可する。extension fileは00で宣言済みpathだけを許可する
 - `cells` はprimary ID列を除いたexact header名だけを許可する。stable reference列はJSON string array、通常cellはstringで受ける
 - 新規rowは `identity_action=new / reuse_id=null / draft_key=<request内unique>`
-- 既存row更新は `identity_action=reuse / reuse_id=<stable ID>`
+- 既存row更新は `identity_action=reuse / reuse_id=<stable ID>`。normalではprevious snapshot / current packageに存在するIDだけをreuseでき、legacy-migrationでは `migration_retained_ids[]` に含まれるIDだけをreuseできる
 - request内の新規row参照はstable IDの代わりに `@draft:<draft_key>` をreference配列へ指定できる。helperが採番後に解決する
 - standard tableの `primary_prefix` はregistryと完全一致を要求する。10+ domain fileでは00の案件固有prefix宣言と一致する値だけを許可する
-- new IDはcanonical file order → section order → request row orderで割り当てる。同一JSON inputから同じID割当になる
+- new IDはcanonical file order → section order → request row orderで割り当てる。同一JSON inputから同じID割当になる。legacy-migrationでは `migration_retained_ids[]` と `legacy_terminal_events[].stable_id` を採番前の使用済み集合へ必ず含め、current rowに存在しないretired / resolved legacy IDを再利用しない
 - unchanged rowはcurrent packageから保持する。requestにない既存rowを削除しない
 - `retire_ids[]` はLLMが「このsemantic identityをcurrent package modelから意図的に除去する」と判断したIDだけを渡す。row消失だけからhelperがretireを推測しない
 - previous snapshotに存在するIDがmaterialize後modelから消えるのに `retire_ids[]` にない場合は `state_transition_required` で書込み前にblocked
@@ -790,18 +798,19 @@ table input contract:
 
 file / control materialization order:
 
-1. previous snapshotとcurrent bytesを照合し、staleなら書込みしない
-2. default / project version policyを解決し、更新が発生する場合のtarget versionをin-memory metadataへ設定する
-3. table changesをin-memory modelへ適用し、new ID / `@draft` referenceを解決する
-4. `retire_ids[]` を検証してin-memory modelから除去する
-5. 00 applicabilityの最終状態に従い、条件付き標準fileをasset templateから作成または除去する。除去対象fileにtracked rowがあれば対応 `retire_ids[]` を必須とする
-6. extension declarationと `extension_file_updates[]` を照合し、宣言済みfileだけ作成 / 更新する
-7. exact Markdown tableをescape / canonical sortしてserializeし、known sectionだけ置換する。prose updateはexact heading配下のbodyだけを置換し、意味を書き換えない
-8. previous snapshotとin-memory current modelからimpactを生成し、CHANGELOGのtarget version entryを作成して `変更概要 / Stable ID changes / 影響file` を更新する
-9. `build-machine-evidence` 相当処理で09のMachine Entities sectionをcanonical生成・置換する
-10. README controlsをcanonical生成・置換する
-11. MANIFESTを最後に再生成する
-12. in-memory結果がprevious packageと完全同一ならno-opを返す。差分がある場合はfinal validateを実行し、成功した場合だけpackage filesへ書き出す
+1. normal updateではprevious snapshotとcurrent bytesを照合し、staleなら書込みしない。legacy-migrationでは新しいcurrent-schema target rootがasset初期状態であることを検証する
+2. change_mode / version policyを解決し、target version / Previous Package Versionをin-memory metadataへ設定する
+3. legacy-migrationでは `migration_retained_ids[] / legacy_terminal_events[]` の形式・duplicate・lifecycleを先に検証して使用済みID集合へ予約する
+4. table changesをin-memory modelへ適用し、reuse / new ID / `@draft` referenceを解決する
+5. normal updateの `retire_ids[]` を検証してin-memory modelから除去する。legacy-migrationの過去terminal eventは `legacy_terminal_events[]` だけから扱い、current row削除操作へ流用しない
+6. 00 applicabilityの最終状態に従い、条件付き標準fileをasset templateから作成または除去する。normal updateで除去対象fileにtracked rowがあれば対応 `retire_ids[]` を必須とする
+7. extension declarationと `extension_file_updates[]` を照合し、宣言済みfileだけ作成 / 更新する
+8. exact Markdown tableをescape / canonical sortしてserializeし、known sectionだけ置換する。prose updateはexact heading配下のbodyだけを置換し、意味を書き換えない
+9. normalではprevious snapshot + explicit retire intent、legacy-migrationではmigration retained / terminal mapping + current modelからimpactを生成し、CHANGELOGのtarget version entryを作成して `変更概要 / Stable ID changes / 影響file` を更新する
+10. `build-machine-evidence` 相当処理で09のMachine Entities sectionをcanonical生成・置換する
+11. README controlsをcanonical生成・置換する
+12. MANIFESTを最後に再生成する
+13. normal updateでin-memory結果がprevious packageと完全同一ならno-opを返す。差分がある場合、またはlegacy-migrationではfinal validateを実行し、成功した場合だけpackage filesへ書き出す
 
 payload:
 
