@@ -241,15 +241,19 @@ repository unit testで次を必須確認します。
 - README file一覧とMANIFESTの一致
 - CHANGELOG最新version見出しとpackage versionの一致
 - CHANGELOGのexact `Stable ID changes` table、Change enum、version内duplicate
+- 履歴全体で同じStable IDへ `added / migrated` を複数回記録できず、`resolved / retired` 後に別entityとして再導入できないこと
+- legacy migrationでretained current IDを `migrated` としてseedし、確認できるretired / resolved履歴だけをseedすること
 - current packageのnext-versionが `package_root` からcurrent versionを内部取得し、Agentへ `previous_version` の転記を要求しないこと
+- default policyでREADMEのPackage Version / Previous Package Versionが初回または1 revision差として整合すること
 - legacy migration用next-versionだけが明示 `previous_version` inputを受けること
 - domain file命名
-- next-idがsemantic identityを判断せず、new指定後にpackage rootのcurrent structured row + CHANGELOG stable ID履歴から次番号を返し、Agentへknown ID集合を要求しないこと
+- next-idがsemantic identityを判断せず、UI target mode所有の `SRC / SPEC / INF / UNK` + structural prefixについてpackage rootのcurrent structured row + CHANGELOG stable ID履歴から次番号を返し、Agentへknown ID集合を要求しないこと
+- `DEC / ASM` をUI target modeのnext-idが採番しないこと
 - 同一prefixの複数new IDで、返却IDをstructured rowへ反映してから次のnext-idを呼ぶと重複せず単調に採番されること
 - current viewから消えた過去IDもCHANGELOG履歴に存在する限り再利用しないこと
 - resolved UNKNOWNの `解消先ID` がcurrent SPEC / DECISION / 承認済みASMへ閉じること
 - canonical structured Markdownのduplicate heading / table、row列数、escaped pipe、`<br>` referenceを固定parse契約で検証すること
-- impactがexact referenceだけから候補fileを返し、semantic変更を勝手に決定しないこと
+- impactが最新versionの `Stable ID changes` からchanged ID集合を内部導出し、Agentへchanged ID再入力を要求せず、exact referenceだけから候補fileを返してsemantic変更を勝手に決定しないこと
 - scope applicability、UI操作scopeのUIOP / US / UC / Behavior / AC hierarchy / closure / current UCの3分類整合
 - 09の「現在有効な仕様根拠」からnormalized Authorityを固定projectionし、build-machine-evidenceがAuthority + current AC Entity、spec-analysis normalized_skill_input、expected identityを決定論生成すること
 - `Machine Entities: spec-analysis` blockがexactly one存在し、helper再生成結果と一致すること
@@ -418,15 +422,18 @@ mode単体が成立してからworkflowへ接続します。
 - generator contractを `requirement-structure-v1` → `requirement-structure-v2` へ更新
 - output templateへ `関連AC ID` と上流種別 `Acceptance Criteria` を追加
 - guidanceへcurrent AC closure / ACとTRの責務差を追加
-- requirement_structure top-levelへ `acceptance_criteria[]`、TR draftへ `acceptance_refs[]` を必須fieldとして追加
+- requirement_structure top-levelへ `acceptance_criteria[]`（`ac_id / authority_refs[]`）、TR draftへ `acceptance_refs[]` を必須fieldとして追加
+- `acceptance_criteria[].authority_refs[]` はspec-analysis helper結果をそのまま使用し、Agentが再構築しない
 - ACなしworkflowは空arrayで明示し、field省略を許可しない
-- artifact modeでcurrent `spec-analysis / acceptance_criterion` Entityへ依存
+- artifact modeでcurrent `spec-analysis / acceptance_criterion` Entityへ依存し、input `authority_refs[]` とAC EntityのAuthority dependency集合をexact一致検証する
 - ACをDisposition upstream typeとして許可し、ownerをspec-analysisへ固定
 - test-requirement-designまで進むworkflowでcurrent ACをTRまたはDispositionへ閉じる
-- TR Entity content / dependencyへacceptance_refsを保存
+- TR Entity contentへacceptance_refsを保存
+- TR Entity dependencyへ参照AC Entityと、そのACが参照するcurrent Authority Entity unionを直接保存する
 - repository内の `requirement-structure-v1` 固定参照をcurrent v2へ同期
 - v1 evidenceをv2 current evidenceとして読み替えない
-- AC本文 / 親Behavior / 親UC / 親US / Authority変更のfreshness regressionを追加
+- AC本文 / 親Behavior / 親UC / 親USのfreshness regressionを追加
+- AC本文・親chain不変でAuthorityだけ変更しspec-analysisを再生成した後、未再実行TRが直接Authority dependencyによりstaleになるregressionを追加
 - partial rerunでscope外TRがchanged AC依存のままcurrentにならない regressionを追加
 - TR-OUT-003 / TR-SEM-003を追加
 - existing TR fixtures / runtime / portability / vertical integration testsをv2 schemaへ同期
@@ -453,7 +460,7 @@ mode単体が成立してからworkflowへ接続します。
 
 - LLMが意味判断すべき項目をhelperが自動決定していないこと
 - scope applicability / US / UC / Behavior / ACの意味分類とAC→TRの意味対応をscriptが決定していないこと
-- helperが返すimpactは再確認候補であり変更必須判定ではないこと
+- helperがcurrent `Stable ID changes` からimpact対象IDを決定論導出し、返すimpactは再確認候補であり変更必須判定ではないこと
 - normal spec-analysisがmode依存になっていないこと
 - helperがSkill package単体コピーで実行できること
 
@@ -473,6 +480,7 @@ mode単体が成立してからworkflowへ接続します。
 - question-analysis回答反映からspec-analysis package更新までのscenario
 - 複数scopeの適用判定からUI操作→US / UC / Behavior / ACを分析しAC→TRまで追跡するscenario
 - 親Behavior / UC / US変更でAC fingerprintが変わり関連TRがstaleになるscenario
+- AC本文 / 親chain不変のままAuthorityだけ変更しspec-analysisを再生成しても、未再実行TRがstaleになるscenario
 - partial rerunでscope外TRがchanged AC参照によりstaleになるscenario
 - UI操作はあるが仕様不足のためUNKNOWN / blockedへ止めるscenario
 - semantic evaluation projection scenario
