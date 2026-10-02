@@ -286,7 +286,7 @@ repository unit testで次を必須確認します。
 - issueをpayloadへ重複保持せず共通top-level `issues[]` だけへ返す
 
 `question_ids.py`:
-- new Qの意味判断をせず、current `不明点 / 質問一覧` + `質問ID履歴` の使用済みQ ID unionから最大値+1を返す
+- new Qの意味判断をせず、previous + current artifactの `不明点 / 質問一覧` + `質問ID履歴` の使用済みQ ID unionから最大値+1を返し、Agentへprevious履歴の事前転記を要求しない
 - previous artifact + candidate current artifactからcanonical `質問ID履歴` tableを生成し、回答済みQがcurrent一覧から消えてもIDを保持する
 - malformed / duplicate Q IDを拒否
 - Q-999で `id_space_exhausted`
