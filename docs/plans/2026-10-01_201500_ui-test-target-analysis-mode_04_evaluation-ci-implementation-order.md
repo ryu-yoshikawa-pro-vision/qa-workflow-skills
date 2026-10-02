@@ -316,8 +316,9 @@ repository unit testで次を必須確認します。
 - issueをpayloadへ重複保持せず共通top-level `issues[]` だけへ返す
 
 `question_ids.py`:
-- new Qの意味判断をせず、previous + current artifactの `不明点 / 質問一覧` + `質問ID履歴` の使用済みQ ID unionから最大値+1を返し、Agentへprevious履歴の事前転記を要求しない
-- previous artifact + candidate current artifactからcanonical `質問ID履歴` tableを生成し、回答済みQがcurrent一覧から消えてもIDを保持する
+- create / updateを区別し、既存成果物更新でprevious artifact欠落をfail-closedにする
+- next-id / build-historyは `previous current Q + previous history + current current Q` を同じ使用済み集合正本とし、candidate側の既存historyを採番入力へ含めない
+- materializeはLLMが確定したQ semantic rowsからnew IDをbatch allocationし、current Q table + 質問ID履歴をcanonical生成する。AgentがQ ID / `<br>` / row順を手組みしない
 - malformed / duplicate Q IDを拒否
 - Q-999で `id_space_exhausted`
 - `Q-001解消 → current質問0件 → 新規質問` でQ-002となり、Q-001を再利用しない
@@ -325,10 +326,12 @@ repository unit testで次を必須確認します。
 `project_context_ids.py`:
 - Project Context Section 12 / 13が案件のDEC / ASM正本ownerである場合だけ対象tableをparse
 - next-idはprevious + candidate両Project Contextの全状態rowを使用済み集合とし、semantic reuse / new判断をせずnew確定後の最大値+1を返す
+- materializeはdecision / assumption semantic rowsからIDを割り当て、Section 12 / 13をcanonical生成する。AgentがDEC / ASM rowを手組みしない
 - validate-historyはprevious DEC / ASM ID集合がcandidateから欠落した場合にrejectし、撤回 / 置換済みIDの削除と再利用を防ぐ
+- canonical Authority IDは `DEC-xxx / ASM-xxx` に限定し、外部owner固有IDはauthority_idへ流用しない
 - malformed / duplicate IDを拒否
 - DEC-999 / ASM-999で `id_space_exhausted`
-- 別ownerが明示されている場合はそのownerのID lifecycleを使い、Project Contextへ複製・再採番しない
+- 別ownerが明示されている場合はそのownerのcanonical ID lifecycleを使い、Project Contextへ複製・再採番しない
 
 QとUNKの意味的同一性、Q / DEC / ASMのsemantic identity、DECISION内容、ASM承認可否、Project Context以外の正本schema解釈は検証しません。別ownerのIDが未確定ならLLM hand-numberingへfallbackせず正本登録をblockedとします。
 
@@ -395,9 +398,9 @@ runtime / Machine Entity version cutoverでは、current repository内のactive 
   - spec-analysis: 2 → 3
   - test-requirement-design: 2 → 3
   - question-analysis: 2のまま
-- semantic case: 155 → 160
-  - spec-analysis: 2 → 5
-  - question-analysis: 2 → 3
+- semantic case: 155 → 163
+  - spec-analysis: 2 → 7
+  - question-analysis: 2 → 4
   - test-requirement-design: 2 → 3
   - その他Skill: 変更なし
 - qa-workflow routing fixture: 61 → 69
@@ -476,12 +479,12 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 
 ### Step 2: spec-analysis eval
 
-- SPEC-SEM-003～005
-- mode固有rubric差分
+- SPEC-SEM-003～007
+- LLM responsibility coverage表に対応するmode固有rubric差分
 - production ui_target_package.py `project-eval` のsemantic / deterministic両projection unit test
 - `SPEC-OUT-003` package fixtureをdeterministic projectionして既存deterministic runnerへ入力
 - projectionしたpackageを既存semantic runnerへ渡せることを確認
-- semantic countをspec-analysis=5へ同期
+- semantic countをspec-analysis=7へ同期
 - Agent Skills structure validation
 
 mode単体が成立してからworkflowへ接続します。
@@ -493,16 +496,16 @@ mode単体が成立してからworkflowへ接続します。
 - output templateの関連UNKNOWN ID
 - `不明点 / 質問一覧` と `質問ID履歴` をheader-onlyへ変更
 - skills/question-analysis/scripts/unknown_links.py
-- skills/question-analysis/scripts/question_ids.py（next-id / build-history）
+- skills/question-analysis/scripts/question_ids.py（next-id / build-history / materialize）
 - Project Context Section 12 / 13が案件の正本ownerであるdefault経路では同tableをheader-onlyへ変更
-- skills/qa-workflow/scripts/project_context_ids.py（next-id / validate-history）
+- skills/qa-workflow/scripts/project_context_ids.py（next-id / validate-history / materialize）
 - Project Contextがownerの場合だけnew DEC / ASMの番号をprevious + candidate全状態rowからhelperで決定し、previous ID削除をvalidate-historyで拒否する。意味判断はquestion-analysis / stakeholder側に残す
 - 別の決定事項 / 仮定の正本ownerが明示されている場合はそのownerを維持し、Project Contextへ複製・再採番しない
 - owner側にdeterministic allocatorがなくID未確定ならLLM hand-numberingへfallbackせず正本登録をblockedにする
 - production helper unit / portability test
 - deterministic validatorのknown refs / expected mapping
 - 既存output fixture 1件へmapping追加 + false-pass unit test
-- question semantic caseを1件追加し合計3件へ
+- question semantic caseを2件追加し合計4件へ
 
 ### Step 4: test-requirement-design AC traceability / requirement-structure-v2
 
