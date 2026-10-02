@@ -23,7 +23,7 @@
 
 ## 2. shared runtime_contract.py
 
-PR #14確認headには次の9 Skill-local `runtime_contract.py` が存在し、同一blobを使用しています。
+PR #16で更新するのは、既存repository byte-identity契約の対象である次の7 Skill-local `runtime_contract.py` です。
 
 - skills/spec-analysis/scripts/runtime_contract.py
 - skills/test-analysis/scripts/runtime_contract.py
@@ -32,10 +32,10 @@ PR #14確認headには次の9 Skill-local `runtime_contract.py` が存在し、�
 - skills/test-case-design/scripts/runtime_contract.py
 - skills/coverage-analysis/scripts/runtime_contract.py
 - skills/qa-workflow/scripts/runtime_contract.py
-- skills/usability-inspection/scripts/runtime_contract.py
-- skills/wcag-conformance-evaluation/scripts/runtime_contract.py
 
-既存repository byte-identity testはPR #11由来の7コピーだけを対象にしていますが、PR #16では同じ `runtime-v1` helper契約の分岐を残さないためcurrent 9コピーを同一内容で更新し、byte-identity testの対象も9コピーへ拡張します。1コピーだけの変更は禁止します。
+7コピーは同一内容で更新し、1コピーだけの変更は禁止します。
+
+PR #14確認headには `skills/usability-inspection/scripts/runtime_contract.py` と `skills/wcag-conformance-evaluation/scripts/runtime_contract.py` も同一blobで存在しますが、既存byte-identity契約の対象外です。この2 SkillはPR #16のAC / TR処理経路で `acceptance_criterion` / `acceptance_refs` を消費しないため、PR #16では変更しません。
 
 ### 2.1 ALLOWED_ENTITY_TYPES
 
@@ -67,7 +67,7 @@ spec-analysisはruntime unitを新設しません。expected Entity導出だけ�
 
 今回の変更は許可Entity type / canonical projection / expected Entity導出の追加であり、共通envelope shapeやfreshness algorithmを置換しません。そのため `RUNTIME_CONTRACT_VERSION = runtime-v1` を維持します。
 
-ただし9コピーのruntime implementation fingerprintは変わります。既存runtime evidenceを無条件にcurrent扱いせず、既存fingerprint contractどおりcurrent script再実行で再検証します。この安全側invalidatonを回避する特例は追加しません。
+ただし更新対象7コピーのruntime implementation fingerprintは変わります。既存runtime evidenceを無条件にcurrent扱いせず、既存fingerprint contractどおりcurrent script再実行で再検証します。この安全側invalidatonを回避する特例は追加しません。`usability-inspection` / `wcag-conformance-evaluation` のruntime implementation fingerprintはPR #16だけを理由に変更しません。
 
 ## 3. spec-analysis normalized machine input
 
@@ -280,7 +280,7 @@ coverage-analysisの既存traceability graph node typeへACを追加しません
 
 次を更新 / 追加します。
 
-- current shared runtime 9 Skill-local runtime_contract.py copies byte-identical
+- 既存byte-identity契約の7 Skill-local runtime_contract.py copies byte-identical
 - `acceptance_criterion` Machine Entity valid / unknown type regression
 - shared canonicalization: `acceptance_refs` / `acceptance_criteria`
 - spec-analysis expected Authority + AC identity
@@ -304,7 +304,7 @@ coverage-analysisの既存traceability graph node typeへACを追加しません
 
 ## 16. 完了条件
 
-- current shared runtime 9 runtime_contract.pyが同一内容でacceptance_criterionを扱える
+- 既存byte-identity契約の7 runtime_contract.pyが同一内容でacceptance_criterionを扱える
 - runtime-v1を維持しつつrequirement-structure-v2が明示される
 - helperからspec-analysis normalized_skill_inputとAuthority + AC Entityを決定論生成できる
 - qa-workflowがAuthority + ACをexpectedとして内部導出できる
