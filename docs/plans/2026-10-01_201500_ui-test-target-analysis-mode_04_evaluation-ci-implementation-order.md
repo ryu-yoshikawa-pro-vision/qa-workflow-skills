@@ -240,8 +240,13 @@ repository unit testで次を必須確認します。
 - MANIFEST file set / order / SHA-256
 - README file一覧とMANIFESTの一致
 - CHANGELOG最新version見出しとpackage versionの一致
+- CHANGELOGのexact `Stable ID changes` table、Change enum、version内duplicate
+- current packageのnext-versionが `package_root` からcurrent versionを内部取得し、Agentへ `previous_version` の転記を要求しないこと
+- legacy migration用next-versionだけが明示 `previous_version` inputを受けること
 - domain file命名
-- next-idがsemantic identityを判断せず、new指定後にpackage rootから既知IDを内部導出して次番号を返し、Agentへknown ID集合を要求しないこと
+- next-idがsemantic identityを判断せず、new指定後にpackage rootのcurrent structured row + CHANGELOG stable ID履歴から次番号を返し、Agentへknown ID集合を要求しないこと
+- 同一prefixの複数new IDで、返却IDをstructured rowへ反映してから次のnext-idを呼ぶと重複せず単調に採番されること
+- current viewから消えた過去IDもCHANGELOG履歴に存在する限り再利用しないこと
 - resolved UNKNOWNの `解消先ID` がcurrent SPEC / DECISION / 承認済みASMへ閉じること
 - canonical structured Markdownのduplicate heading / table、row列数、escaped pipe、`<br>` referenceを固定parse契約で検証すること
 - impactがexact referenceだけから候補fileを返し、semantic変更を勝手に決定しないこと
@@ -509,4 +514,5 @@ mode単体が成立してからworkflowへ接続します。
 - 実Agent smokeがPASS
 - current repository counts / docsが同期
 - package schema / helper I/O / migration contractが `_06_package-schema-and-helper-contracts.md` と実装で一致
+- current version / new stable ID / MANIFEST / hash等、packageから決定論導出できる値をAgentが手作業で再構築していない
 - 意味判断を固定するrule engine / generic document framework / ZIP runtimeを追加していない
