@@ -733,6 +733,7 @@ stdin:
 {
   "operation":"materialize",
   "package_root":"<path>",
+  "artifact_mode":"update",
   "previous_snapshot":{"package_version":"v14","tracked_items":[],"exact_reference_index":[],"payload_file_sha256":[]},
   "change_mode":"normal",
   "version_policy":"default",
@@ -774,6 +775,8 @@ stdin:
 }
 ```
 
+`artifact_mode` は `create / update` の2値です。normal createではasset初期状態のtarget root + `previous_snapshot=null` を要求し、default policyならPackage Version=v00 / Previous=-で作成します。normal updateでは完成済みcurrent package + non-null previous snapshotを必須とし、snapshot無し更新をfail-closedにします。legacy-migrationは `artifact_mode=create` だけを許可します。
+
 `change_mode` は `normal / legacy-migration` の2値です。
 
 normalでは `version_policy` を `default / project` の2値から選びます。既存完成package更新のdefaultではhelperがprevious snapshotのversionから次versionを導出し、README / CHANGELOG / MANIFESTへ同時反映します。projectの場合だけ、案件で明示されたpolicyに基づく `target_version` を必須とし、helperはpackage内一致を検証します。完成済みpackageへ1 byteでも永続変更を加えて再び完成状態として保存する場合、default policyではsemantic / presentationを問わず必ずversionを+1します。in-memory生成結果がprevious packageと完全同一ならno-opとして書込み・version upを行いません。
@@ -798,7 +801,7 @@ table input contract:
 
 file / control materialization order:
 
-1. normal updateではprevious snapshotとcurrent bytesを照合し、staleなら書込みしない。legacy-migrationでは新しいcurrent-schema target rootがasset初期状態であることを検証する
+1. artifact_mode / change_mode / previous_snapshotの組合せを検証する。normal updateではprevious snapshotとcurrent bytesを照合し、staleなら書込みしない。normal create / legacy-migrationでは新しいcurrent-schema target rootがasset初期状態であることを検証する
 2. change_mode / version policyを解決し、target version / Previous Package Versionをin-memory metadataへ設定する
 3. legacy-migrationでは `migration_retained_ids[] / legacy_lifecycle_events[]` の形式・duplicate・lifecycleを先に検証して使用済みID集合へ予約する
 4. table changesをin-memory modelへ適用し、reuse / new ID / `@draft` referenceを解決する
@@ -1045,7 +1048,7 @@ AC Entity contentは `_08` のcurrent chainから次を固定projectionします
 
 AC / Behavior / UC / US chainの `関連仕様項目ID` にはSPEC / DEC / INF / UNK等が現れ得ますが、AC Entityの `authority_refs[]` / `upstream_entity_dependencies[]` へ投影するのは09のCurrent Effective Authorityに存在するcurrent SPEC / DECISION / approved ASMだけです。INF / UNK、inactive Authority、存在しないIDをMachine Entity dependencyへ入れません。
 
-current ACは、chain全体のstable refsを解決した結果としてcurrent Authorityを1件以上持つことを要求します。current Authorityが0件ならACをcurrent Entity化せず、その不足をUNKNOWNとして親Behaviorへ戻してblockedにします。helperはAuthority集合のfilter / existence / currentnessだけを判定し、どのAuthorityが意味上ACを支えるかはLLMがstructured rowへ記録します。
+current ACは、chain全体のstable refsを解決した結果としてcurrent Authorityを1件以上持つことを要求します。current Authorityが0件なら `build-machine-evidence / validate` は `state_transition_required` でblockedし、AC Entityを生成しません。helper自身はUNKNOWNやblocked Behaviorを生成しません。LLMが不足の意味を判断して既存UNKをreuseするかnew UNKを作り、親Behaviorをblockedへ戻してから再materializeします。helperはAuthority集合のfilter / existence / currentnessだけを判定し、どのAuthorityが意味上ACを支えるかはLLMがstructured rowへ記録します。
 
 US / UC / BehaviorをMachine Entity typeへ追加しません。親chainをAC contentへ含めるため、親意味変更でAC content fingerprintが変わります。
 
@@ -1255,7 +1258,7 @@ payload:
 ```json
 {
   "allocated_ids":[{"draft_key":"q-login-role","question_id":"Q-003"}],
-  "artifact_markdown":"<two sections materialized>",
+  "artifact_markdown":"<full artifact with current Q / 質問ID履歴 materialized>",
   "used_question_ids":["Q-001","Q-002","Q-003"]
 }
 ```
@@ -1342,7 +1345,7 @@ stdin:
 payload:
 
 ```json
-{"allocated_ids":[{"draft_key":"dec-auth","stable_id":"DEC-003"}],"artifact_markdown":"<Section 12 / 13 materialized>"}
+{"allocated_ids":[{"draft_key":"dec-auth","stable_id":"DEC-003"}],"artifact_markdown":"<full Project Context with Section 12 / 13 materialized>"}
 ```
 
 LLM / stakeholder側がsemantic identityのreuse / new、DECISION / ASM区分、決定内容、関係、影響範囲、状態遷移の意味、ASM承認可否を判断します。helperはProject ContextのSection 12 / 13だけを書き換え、その他sectionの意味を変更しません。
