@@ -67,11 +67,13 @@ exact heading / exact table header、package schema version、ID形式、Machine
 | 03_fields_and_validation.md | 入力・選択・検索・filter・sort・upload等のfield、入力制約、validation、enable/disable条件のいずれかが対象scopeに存在 |
 | 04_flows_and_data.md | 複数step / 画面をまたぐflow、state transitionに必要なI/O、import/export、data transformation、非同期処理flowのいずれかが対象scopeに存在 |
 | 05_notifications_and_external_interactions.md | notification、email、browser dialog、外部画面遷移、外部service連携、外部interactionのいずれかが対象scopeに存在 |
-| 08_repository_implementation_status.md | current package versionの分析でrepository / product implementation evidenceを実際に確認・利用した |
+| 08_repository_implementation_status.md | current packageがrepository / product implementation evidenceを現在保持・利用している |
 
 `00_scope_and_context.md` のfile applicability表に4fileすべての `required / not-applicable / blocked` と根拠を記録します。LLMは資料の意味からtrigger該当性を判断し、helperは宣言と実file / MANIFESTの一致を決定論検証します。
 
 情報不足を `not-applicable` にしません。trigger有無を判断できない場合は関連UNKNOWNを作成し、そのfile applicabilityをblockedとしてpackage completionを止めます。
+
+08は「このversionでrepositoryを再確認したか」ではなくcurrent packageの依存有無で判定します。前versionの08を引き続き利用するだけの更新ではfileを削除せず、08に保存済みの基準branch / commit / revisionを維持します。current分析からrepository evidenceを明示的に外した場合だけnot-applicableへ変更します。
 
 ### 案件固有extension file
 
@@ -180,7 +182,6 @@ mode packageでも既存 `assets/output-template.md` のcanonical契約を維持
 
 - package名
 - version
-- generated / updated date
 - 対象
 - 利用情報源
 - authority方針
@@ -201,8 +202,8 @@ READMEを詳細仕様の複製場所にしません。
 - 用語
 - repository実装確認基準がある場合の基準branch / commit
 - 分析上の前提
-- 分析対象機能scope一覧（SCOPE-xxx、対象機能 / 領域、UI操作判定、Behavior Decomposition、関連UNKNOWN ID、根拠）
-- 条件付き必須file applicability（03 / 04 / 05 / 08のrequired / not-applicable / blockedと根拠）
+- 分析対象機能scope一覧（SCOPE-xxx、対象機能 / 領域、UI操作判定、Behavior Decomposition、関連UNKNOWN ID、関連仕様項目ID、根拠 / 備考）
+- 条件付き必須file applicability（03 / 04 / 05 / 08のrequired / not-applicable / blocked、関連仕様項目ID、根拠 / 備考、関連UNKNOWN ID）
 - 案件固有extension fileを使う場合のfile名 / 責務 / 分割理由
 
 ### 01_ui_structure_and_navigation.md
@@ -360,19 +361,20 @@ default policyでは `ui_target_package.py next-version` が次versionを導出�
 
 回答や新資料が来た場合:
 
-1. LLMが変更されたAuthority / DECISION / ASMを解決し、project policyに従ってmaterial updateかを判断する
-2. default version policyでversion upする場合は、**内容を書き換える前に**既存current packageへ `ui_target_package.py next-version` を `package_root` だけで実行する。返却された `readme_version_rows_markdown` をREADMEの該当2rowへ反映し、`next_version` をCHANGELOGのcurrent version headingへ使用する。Agentがcurrent versionを手で転記しない
-3. LLMが影響するcanonical stable item / UNKを更新する。semantic identityがnewの場合だけ `next-id` を使う。UI target modeがownerの `SRC / SPEC / INF / UNK` とstructural IDはhelperで採番し、DEC / ASMは実際の正本ownerの既存IDを参照する。返却IDを対象structured rowへ反映してから同prefixの次の採番へ進み、返却された `stable_id_change` はcurrent versionのCHANGELOGへ記録する。v01以降にpackageへ初めて取り込む外部ownerのDEC / ASMは `added`、既追跡IDの内容・状態変更は `changed`、current structured modelからID自体を外す場合は `retired` として記録する。`resolved` はUNKNOWNをopenからresolvedへ閉じるevent専用で、DEC / ASMには使わない。UNKNOWN解消時は元UNKを `現在有効か=No` にし、確定内容を分類に合うnew / reuse stable IDへ接続して `解消先ID` を保持し、対象UNKを `resolved` とする。後続更新で同じ論点のresolverだけ変わる場合は同じUNKの `解消先ID` を更新して `changed`、解消根拠がなくなり同じ論点をreopenする場合は `現在有効か=Yes / 解消先ID=空` として `changed`、reopen後に再度閉じる場合は再び `resolved` とする。別論点なら旧UNKをresolved historyとして維持してnew UNKを作る
-4. 09_authority_and_traceability.mdのcanonical modelを更新する
-5. `Stable ID changes` tableへ今回のsemantic変更対象IDが揃った後、`ui_target_package.py impact` を `package_root` だけで実行し、helperが導出したchanged IDのexact参照先を再確認候補として列挙する
-6. LLMが候補fileを確認し、意味上変更が必要な01〜08 / domain fileだけを更新する
-7. LLMが07のUNKNOWN本文、06の矛盾 / resolved説明、CHANGELOGの変更概要・影響fileを更新する。Stable ID changesはStep 3で確定済みの集合を維持し、impact後に遡って変更対象IDを追加しない
-8. repository確認を実施した場合だけ08を更新する
-9. `ui_target_package.py render-readme-controls` を実行し、返却された `Package metadata` / `Current payload files` section全体をREADMEへ反映する。UNKNOWN件数・payload file順・種別をAgentが再構築しない
-10. `ui_target_package.py build-machine-evidence` で09のAuthority Entityとcurrent AC Entity、spec-analysis canonical `normalized_skill_input` を決定論生成する
-11. README controlsとMachine Entity block反映後のcurrent packageに対して `ui_target_package.py build-manifest` を実行し、MANIFEST / raw SHA-256を生成する
-12. helperのvalidateを実行し、形式・参照・件数・version・CHANGELOG・file set・hashの決定論違反を解消する
-13. semantic quality gateでsource / inference / UI分類 / 意味重複等を最終確認する
+1. **内容を書き換える前に** `ui_target_package.py inspect` を実行し、返却された `update_snapshot` をこの更新runのprevious stateとしてそのまま保持する。Agent / LLMがsnapshotを編集・再構築しない
+2. LLMが変更されたAuthority / DECISION / ASM、same-UNK reopen / new UNK、structural itemのsemantic identityを解決し、project policyに従ってmaterial updateかを判断する
+3. default version policyでversion upする場合は、既存current packageへ `ui_target_package.py next-version` を `package_root` だけで実行する。返却された `readme_version_rows_markdown` をREADMEの該当2rowへ反映し、`next_version` をCHANGELOGのcurrent version headingへ使用する。Agentがcurrent versionを手で転記しない
+4. LLMは変更対象stable itemの**owner structured row**だけを先に更新する。semantic identityがnewの場合だけ `next-id` を使い、通常更新ではStep 1の `previous_snapshot` を必ず渡す。UI target modeがownerの `SRC / SPEC / INF / UNK` とstructural IDはhelperで採番し、DEC / ASMは実際の正本ownerの既存IDを参照する。返却IDをowner rowへ即時反映してから同prefixの次の採番へ進む
+5. 09_authority_and_traceability.mdを含む変更対象owner rowが確定したら、`ui_target_package.py impact` へ `package_root + previous_snapshot + change_mode=normal` を渡す。helperがprevious/current owner row差分から `Stable ID changes`、changed ID集合、previous/current exact referenceに基づく `影響file` / row候補を生成する
+6. CHANGELOGの `Stable ID changes` と `影響file` section全体をimpact返却Markdownで置換する。LLMはChange値・changed ID集合・影響file一覧を手入力しない
+7. LLMがimpact候補file / rowを確認し、意味上変更が必要な01〜08 / domain fileの非owner view・説明だけを更新する。候補であること自体を変更理由にせず、意味上不要なら本文は変更しない
+8. LLMが07のUNKNOWN本文、06の矛盾 / resolved説明、CHANGELOGの `変更概要` を更新する。`Stable ID changes` / `影響file` は変更概要から逆算して書き換えない
+9. 08をcurrent packageが引き続き保持・利用する場合、今回repositoryを再確認していなくても08を保持し、既存の基準branch / commit / revisionを維持する。新しいrepository evidenceを確認した場合だけ08内容と基準revisionを更新する。current分析からrepository evidenceを外す場合だけnot-applicableへ変更して08を除去する
+10. `ui_target_package.py render-readme-controls` を実行し、返却された `Package metadata` / `Current payload files` section全体をREADMEへ反映する。UNKNOWN件数・payload file順・種別をAgentが再構築しない
+11. `ui_target_package.py build-machine-evidence` で09のAuthority Entityとcurrent AC Entity、spec-analysis canonical `normalized_skill_input`、canonical `machine_entities_markdown` を決定論生成する。09の `### Machine Entities: spec-analysis` section全体を返却Markdownで置換し、Agentがheading / JSON fence / wrapperを組み立てない
+12. README controlsとMachine Entity section反映後のcurrent packageに対して `ui_target_package.py build-manifest` を実行し、MANIFEST / raw SHA-256を生成する
+13. `ui_target_package.py validate` へStep 1の `previous_snapshot` を渡し、形式・参照・件数・version・CHANGELOG lifecycle / 影響file・file set・hashの決定論違反を解消する
+14. semantic quality gateでsource / inference / UI分類 / 意味重複等を最終確認する
 
 helperが列挙したimpact候補は再確認対象であり、変更必須という意味判断ではありません。LLMが仕様意味を判断します。
 
@@ -388,7 +390,8 @@ helperが列挙したimpact候補は再確認対象であり、変更必須と�
 - 独立したAuthority / rule / flow集合として継続更新する必要がある
 - 00に責務 / 分割理由とLLMが決めたlowercase kebab-case slugを記録する
 - `ui_target_package.py next-domain-file` で次の連番とcanonical file pathを取得し、Agentが10+番号を計算しない
-- README / MANIFESTへ登録する
+- 返却pathを00のextension宣言へ登録し、実fileを作成してからREADME / MANIFESTへ反映する
+- 同一更新で複数extensionを追加する場合は、上記materialize後に次の `next-domain-file` を呼び、未作成fileの番号をAgent側だけで予約しない
 - current UNKNOWNのcanonical正本は09、repository statusの正本は08、canonical Authority / traceabilityの正本は09のまま
 - 同じ仕様項目を二重正本にしない
 
