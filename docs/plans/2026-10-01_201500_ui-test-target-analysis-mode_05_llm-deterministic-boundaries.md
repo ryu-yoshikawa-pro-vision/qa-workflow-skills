@@ -178,9 +178,9 @@ README controls反映後のcurrent package fileからMANIFEST bodyを生成し�
 
 #### inspect / impact
 
-通常更新では、内容編集前の `inspect` が `update_snapshot` を生成します。snapshotはtracked stable IDのowner row fingerprint、UNKNOWN state、previous exact reference、payload file hashを保持し、Agent / LLMは編集・再構築しません。
+通常更新では、内容編集前の `inspect` が `update_snapshot` を生成します。snapshotはtracked stable IDのpackage tracking row fingerprint、UNKNOWN state、previous exact reference、payload / MANIFEST hashを保持し、Agent / LLMは編集・再構築しません。
 
-semantic identity、same-UNK reopen / new UNK等をLLMが判断してowner structured rowへ反映した後、`impact` がprevious snapshotとcurrent stateを比較して次を決定論生成します。
+semantic identity、same-UNK reopen / new UNK等をLLMが判断してpackage tracking rowへ反映した後、`impact` がprevious snapshotとcurrent stateを比較して次を決定論生成します。
 
 - `added / changed / resolved` と、LLMが明示した `retire_ids[]` に対する `retired`
 - changed stable ID集合
@@ -188,7 +188,7 @@ semantic identity、same-UNK reopen / new UNK等をLLMが判断してowner struc
 - previous/current owner + exact referenceから導出した再確認候補file / row
 - `影響file` canonical Markdown
 
-LLMがCHANGELOG event rowや影響file一覧を手入力しません。ただし `retired` はterminal semantic decisionなので、helperがrow消失から自動判定せずLLMが `retire_ids[]` で明示します。明示なしにprevious tracked rowが消えた場合はblockedします。更新途中でstable ID owner rowを削除しても、allocatorは同じprevious snapshotを使用済みID集合へ含めるため、そのrevision内で過去IDを再利用しません。
+LLMがCHANGELOG event rowや影響file一覧を手入力しません。ただし `retired` はterminal semantic decisionなので、helperがrow消失から自動判定せずLLMが `retire_ids[]` で明示します。明示なしにprevious tracked rowが消えた場合はblockedします。更新途中でstable ID tracking rowを除去しても、allocatorは同じprevious snapshotを使用済みID集合へ含めるため、そのrevision内で過去IDを再利用しません。
 
 legacy migrationではsemantic identity mappingだけをLLMが行い、retained ID / 明示確認できるlifecycle event / semantic rowsを `materialize(change_mode=legacy-migration)` へ渡します。helperがこれらを採番前の使用済み集合へ予約し、new ID、canonical Markdown、`migrated / added / resolved / retired`、README / Machine Entity / MANIFESTまで生成します。focused `impact(change_mode=legacy-migration)` は同じlifecycle生成contractの単体検証用に残し、legacy proseからidentityを推測しません。
 
