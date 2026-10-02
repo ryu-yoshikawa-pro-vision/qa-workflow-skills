@@ -1563,7 +1563,7 @@ production helperのfilesystem / raw hash / projection / README control renderin
 - required UI operation decompositionのmissing table / parent / closure
 - UCごとの正常 / 準正常 / 例外3分類と定義あり / なし / 未定義整合
 - MANIFEST hash mismatch
-- semantic / deterministic projection差分、exact `projection / files[] / markdown` response、transport separator
+- semantic / deterministic projection差分、exact `projection / files[] / controls[] / markdown` response、current change summary control frame、transport separator
 - projected deterministic evalではraw SHAを再計算せずMANIFEST SHA文字列形式 / file集合 / 順序を評価すること
 - 09 table → normalized Authority固定projectionと既存authority_entities.py結果一致
 - Authority projectionでscopeがtrim済み非空string、relationsが単一許可値の1要素arrayになること
