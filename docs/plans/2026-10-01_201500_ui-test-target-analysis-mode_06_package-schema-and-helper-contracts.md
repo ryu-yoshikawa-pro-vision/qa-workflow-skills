@@ -1098,7 +1098,7 @@ TR-OUT-003はcurrent ACを入力に持ち、AC→TR / disposition closure、unkn
 
 deterministic validatorはproduction helperをimportしてexpectedを生成しません。
 
-production helperのfilesystem / hash / projection / next-id / build-machine-evidence自体はrepository unit testで独立に評価します。
+production helperのfilesystem / raw hash / projection / README control rendering / next-id / next-domain-file / build-machine-evidence自体はrepository unit testで独立に評価します。
 
 ## 16. CI / portability
 
@@ -1106,8 +1106,11 @@ production helperのfilesystem / hash / projection / next-id / build-machine-evi
 
 - `skills/spec-analysis/scripts/ui_target_package.py` compile
 - `skills/question-analysis/scripts/unknown_links.py` compile
+- `skills/question-analysis/scripts/question_ids.py` compile
+- `skills/qa-workflow/scripts/project_context_ids.py` compile
 - spec-analysis package単体コピー + `runtime_contract.py` / `authority_entities.py` / `ui_target_package.py` 実行
-- question-analysis package単体コピー + `unknown_links.py` 実行
+- question-analysis package単体コピー + `unknown_links.py` / `question_ids.py` 実行
+- qa-workflow package単体コピー + `project_context_ids.py` 実行
 - valid minimal JSON fixture
 - unknown top-level field
 - malformed JSON / duplicate key
@@ -1115,7 +1118,10 @@ production helperのfilesystem / hash / projection / next-id / build-machine-evi
 - path traversal / absolute payload path / symlink
 - missing required file
 - invalid schema version
-- current package next-versionの `package_root` 読み取り / legacy migration専用explicit previous_version
+- current package next-versionの `package_root` 読み取り / legacy migration専用explicit previous_version / exact `readme_version_rows_markdown`
+- render-readme-controlsのPackage metadata / Current payload files exact MarkdownとREADME.md自身を含むcanonical file順
+- build-manifestがREADME controls反映後のraw bytesをlowercase 64 hex SHA-256でhashすること
+- next-domain-fileのlowercase kebab-case / max+1 / canonical path / id_space_exhausted
 - CHANGELOG `Stable ID changes` exact heading / header / Change enum / duplicate
 - next-idのcurrent structured row + historical stable ID導出、連続採番、retired ID非再利用
 - duplicate canonical heading / table、row列数不一致、escaped pipe / `<br>` reference parse
@@ -1125,12 +1131,18 @@ production helperのfilesystem / hash / projection / next-id / build-machine-evi
 - required UI operation decompositionのmissing table / parent / closure
 - UCごとの正常 / 準正常 / 例外3分類と定義あり / なし / 未定義整合
 - MANIFEST hash mismatch
-- semantic / deterministic projection差分
+- semantic / deterministic projection差分、exact `projection / files[] / markdown` response、transport separator
+- projected deterministic evalではraw SHAを再計算せずMANIFEST SHA文字列形式 / file集合 / 順序を評価すること
 - 09 table → normalized Authority固定projectionと既存authority_entities.py結果一致
+- Authority projectionでscopeがtrim済み非空string、relationsが単一許可値の1要素arrayになること
 - current AC Entity contentへ親US / UC / Behavior chainが固定projectionされること
 - 親US / UC / Behavior変更でAC fingerprintが変わること
 - spec-analysis normalized_skill_input / expected identityがhelper結果から再現できること
 - artifact `Machine Entities: spec-analysis` blockがexactly one存在し、runtime_contract.pyの `extract_machine_blocks(..., "Machine Entities")` で読め、helper再生成結果と完全一致すること
+- unknown_links.pyのexact `operation=validate-links` / payload / top-level issues contract
+- question_ids.pyのheader-only / existing Q / duplicate / Q-999
+- project_context_ids.pyのSection 12 / 13 exact table、DEC / ASM kind、duplicate、999 exhaustion
+- question-analysis output templateのQ tableとProject Context template Section 12 / 13がheader-onlyでplaceholder IDを持たないこと
 - legacy migration後fixtureのvalidate PASS
 
 新しいGitHub Actions workflowは作りません。PR #14後の既存CIは `skills/*/scripts` を動的compileするため、helper compile目的のworkflow path追加は不要です。repository unit / runtime integration / portability testを既存test discoveryへ追加します。
@@ -1142,7 +1154,10 @@ production helperのfilesystem / hash / projection / next-id / build-machine-evi
 - current packageの `Machine Entities: spec-analysis` blockがexactly one存在し、helper再生成結果と一致する
 - resolved UNKNOWNが `解消先ID` でcurrent Authorityへ機械検証可能に閉じる
 - current packageの次versionをAgentが転記せずhelperが `package_root` から導出できる
+- README metadata / UNKNOWN件数 / payload file tableをAgentが再構築せずcanonical Markdownとして生成できる
+- extension fileの必要性 / slugだけLLMが判断し、連番 / pathはhelperが決定できる
 - new ID採番時にAgentが既知ID集合を手組みせず、CHANGELOG stable ID履歴を含めて過去IDを再利用しない
+- new Q / DEC / ASMのsemantic identityはLLM / stakeholder側に残し、番号だけowner Skill-local helperで決定できる
 - structured tableのheader / ID / ref列が一意
 - scopeごとのUI操作適用判定と条件付き必須fileの存在を機械検証できる
 - UI操作scopeでUIOP / US / UC / Behavior / AC hierarchyと3分類完全性を機械検証できる
