@@ -53,7 +53,7 @@ feat/ui-test-target-analysis-profile
 
 ## 固定方針
 
-LLM / deterministic処理の責務境界は `2026-10-01_201500_ui-test-target-analysis-mode_05_llm-deterministic-boundaries.md` を正本とします。LLMの意味判断をscriptへ移さず、形式・参照・集計・fingerprint等の再現可能な定型処理だけをSkill-local helper / validatorへ移します。UI target modeがownerの `SRC / SPEC / INF / UNK` とstructural IDは、semantic identityをLLMが決めた後の番号決定をhelperへ寄せます。DEC / ASMはproject側正本のownerを維持します。
+LLM / deterministic処理の責務境界は `2026-10-01_201500_ui-test-target-analysis-mode_05_llm-deterministic-boundaries.md` を正本とします。LLMの意味判断をscriptへ移さず、形式・参照・集計・fingerprint等の再現可能な定型処理だけをSkill-local helper / validatorへ移します。UI target modeがownerの `SRC / SPEC / INF / UNK` とstructural IDは、semantic identityをLLMが決めた後の番号決定をhelperへ寄せます。DEC / ASMは案件で実際に指定された正本ownerを維持し、Project Contextがownerの場合だけqa-workflow helperで番号決定します。
 
 
 ### 1. 新Skillは追加しない
@@ -194,7 +194,7 @@ version更新時は変更ファイルだけではなく、そのversionの完全
 - `tests/skills/runtime/test_runtime_portability.py`
 - requirement-structure contract versionを参照するruntime / fixture / integration tests
 
-7コピーはbyte-identicalを維持し、`acceptance_criterion` Entity type、`acceptance_refs` canonicalization、spec-analysis Authority + AC expected Entity導出を同一内容で追加します。shared runtime envelopeは `runtime-v1` を維持します。
+7コピーはbyte-identicalを維持し、`acceptance_criterion` Entity type、`acceptance_refs` canonicalization、spec-analysis Authority + AC expected Entity導出を同一内容で追加します。これはshared runtimeの意味契約変更なので `RUNTIME_CONTRACT_VERSION` を `runtime-v1` から `runtime-v2` へ更新します。envelope field shapeとfreshness algorithmは維持します。
 
 PR #14確認headには `usability-inspection` / `wcag-conformance-evaluation` に同一blobの `runtime_contract.py` も存在しますが、既存byte-identity契約の対象外であり、PR #16のAC / TR処理経路でも使用しません。PR #16だけを理由にこの2コピーを変更せず、無関係なruntime implementation fingerprintを変化させません。
 
