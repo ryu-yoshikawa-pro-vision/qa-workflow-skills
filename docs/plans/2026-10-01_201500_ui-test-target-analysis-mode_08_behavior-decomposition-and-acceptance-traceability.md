@@ -227,11 +227,11 @@ IDへActor、結果分類等のmutable semanticsを埋め込みません。
 - BH-xxx
 - AC-xxx
 
-semantic identityのreuse / new判断はLLMが行います。
+semantic identityのreuse / new / explicit retire判断はLLMが行います。
 
-LLMがnewと判断した後の採番は `ui_target_package.py next-id` を使用します。helperがpackageから既知IDを導出し、Agentは既知ID集合を手組みしません。
+通常package更新では、LLMはstable ID番号をMarkdownへ書かず、既存identityを `identity_action=reuse / reuse_id=<ID>`、new identityを `identity_action=new / draft_key=<key>` として `ui_target_package.py materialize` へ渡します。helperがstandard / 宣言済み案件固有prefixの使用済みIDから採番し、`@draft`参照を解決してcanonical tableを生成します。`next-id` はfocused use / unit test用の同じallocatorとして残します。
 
-分類変更だけでstable IDを再採番しません。
+分類変更だけでstable IDを再採番しません。rowが消えただけでretiredとせず、semantic identityをcurrent modelから意図的に除去する場合だけLLMが `retire_ids[]` を明示します。
 
 ## 10. Authorityとの関係
 
@@ -304,7 +304,9 @@ test-condition-designはTRから問題構造を分析し、仕様 / Risk / 状�
 - current UCだけに正常 / 準正常 / 例外3行が存在すること
 - 定義あり / なし / 未定義の構造整合
 - current Behavior → AC closure
-- current AC → current Authority ref
+- `なし` completeness row → current Authority ref 1件以上
+- current AC chainのBehavior / UC / USがすべてcurrent
+- current AC → current SPEC / DECISION / approved ASM ref 1件以上。INF / UNK / inactive Authorityだけではcurrent ACにしない
 - current / blockedとUNKNOWN参照の整合
 - broken structural ref
 - `Machine Entities: spec-analysis` blockのexactly-one存在とbuild-machine-evidence結果との一致
@@ -324,8 +326,10 @@ semanticでは次を確認します。
 - UI操作母集団がUCへ閉じている
 - US / UC / Behaviorの粒度が過剰統合 / 過剰分割されていない
 - 正常 / 準正常 / 例外を仕様に反して創作していない
-- `なし` と `未定義` を区別している
-- blockedを無理に3分類していない
+- `なし` と `未定義` を区別し、`なし` のAuthority根拠が意味上妥当である
+- Behavior identityが既知だが結果未確定な場合のblocked Behaviorと、identity自体未確定でBehavior rowを作らない場合を区別している
+- `未定義` で既知Behaviorがあっても未解消条件をUNKNOWNとして残している
+- blocked UCを無理に3分類していない
 - ACが具体テストケース / 組合せへ先回りしていない
 - ACがAuthorityから期待結果を創作していない
 - TRがACの単なる言い換えではなく検証責務になっている
