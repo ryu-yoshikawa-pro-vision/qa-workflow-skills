@@ -836,15 +836,18 @@ Agent / LLMがMarkdownからnormalized inputやexpected Entity一覧を再構築
 
 shared runtime contractの `acceptance_criterion` type / expected Entity / requirement-structure-v2連携は `_09_runtime-entity-and-test-requirement-contracts.md` を正本とします。
 
-## 10. unknown_links.py contract
+## 10. question-analysis / Project Context helper contract
+
+### 10.1 unknown_links.py
 
 stdin:
 
 ```json
 {
-  "artifact_markdown": "<question-analysis output>",
-  "current_unknown_ids": ["UNK-001"],
-  "resolved_unknown_ids": ["UNK-002"]
+  "operation":"validate-links",
+  "artifact_markdown":"<question-analysis output>",
+  "current_unknown_ids":["UNK-001"],
+  "resolved_unknown_ids":["UNK-002"]
 }
 ```
 
@@ -852,12 +855,19 @@ helper自身が `不明点 / 質問一覧` の `ID` / `関連UNKNOWN ID` 列をp
 
 payload:
 
-- question_links[]
-- unknown_refs[]
-- issues[]
+```json
+{
+  "question_links":[
+    {"question_id":"Q-001","unknown_ids":["UNK-001"]}
+  ],
+  "unknown_refs":["UNK-001"]
+}
+```
 
-検証:
+規則:
 
+- `question_links[]` はquestion_id昇順
+- 各 `unknown_ids[]` とtop-level `unknown_refs[]` は昇順・重複なし
 - Q-xxx形式
 - UNK-xxx形式
 - `<br>` 区切り
@@ -865,9 +875,69 @@ payload:
 - 同一Q内duplicate
 - resolved-only UNKNOWNのcurrent question参照
 
+issueは§7.2のtop-level `issues[]` だけに返し、payload内へ重複保持しません。
+
 QとUNKの意味的対応はLLM判断です。
 
 spec-analysis modeからquestion-analysisへ進む場合、`ui_target_package.py inspect` が返す `current_unknown_ids[] / resolved_unknown_ids[]` をそのままunknown_links入力へ渡します。Agentが09からID集合を手作業で再構築しません。
+
+### 10.2 question_ids.py
+
+stdin:
+
+```json
+{
+  "operation":"next-id",
+  "artifact_markdown":"<question-analysis output>"
+}
+```
+
+payload:
+
+```json
+{"next_id":"Q-003"}
+```
+
+helperはexact `不明点 / 質問一覧` tableのexisting Q IDだけを読みます。
+
+- Q ID形式・duplicateを検証する
+- Q-001〜Q-999の既知最大番号+1を返す
+- existing Qが0件ならQ-001
+- Q-999使用済みなら `id_space_exhausted`
+- Qの意味的reuse / new、質問文、分類は判断しない
+
+`skills/question-analysis/assets/output-template.md` の `不明点 / 質問一覧` はheader-onlyとし、placeholder `Q-001` を配置しません。
+
+### 10.3 project_context_ids.py
+
+stdin:
+
+```json
+{
+  "operation":"next-id",
+  "artifact_markdown":"<Project Context>",
+  "kind":"decision"
+}
+```
+
+`kind` は `decision / assumption` の2値です。
+
+payload:
+
+```json
+{"kind":"decision","next_id":"DEC-003"}
+```
+
+固定対応:
+
+- `decision` → `## 12. 確定事項（決定事項の正本一覧）` の `ID` 列、prefix `DEC`
+- `assumption` → `## 13. 仮定（仮定の正本一覧）` の `ID` 列、prefix `ASM`
+
+helperは対象tableのexact heading / header、ID形式、duplicateを検証し、既知最大番号+1を返します。existing rowが0件ならDEC-001 / ASM-001、999使用済みなら `id_space_exhausted` です。
+
+LLM / stakeholder側がsemantic identityのreuse / new、DECISION / ASM区分、決定内容、関係、影響範囲、ASM承認可否を判断します。helperはProject Contextを書き換えません。
+
+`skills/qa-workflow/assets/project-context-template.md` のSection 12 / 13はheader-onlyとし、placeholder `DEC-001` / `ASM-001` を配置しません。
 
 ## 11. filesystem safety
 
