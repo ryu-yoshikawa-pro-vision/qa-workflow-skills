@@ -72,7 +72,7 @@ required package filesは `required core payload + required control file MANIFES
 | 03_fields_and_validation.md | 入力・選択・検索・filter・sort・upload等のfield、入力制約、validation、enable/disable条件のいずれかが対象scopeに存在 |
 | 04_flows_and_data.md | 複数step / 画面をまたぐflow、state transitionに必要なI/O、import/export**生成処理**、data transformation、非同期process / state flowのいずれかが対象scopeに存在 |
 | 05_notifications_and_external_interactions.md | notification、email、browser dialog、user-visibleなexport / download delivery、外部画面遷移、外部destination / serviceとのinteractionのいずれかが対象scopeに存在 |
-| 08_repository_implementation_status.md | current packageがrepository / product implementation evidenceを現在保持・利用している |
+| 08_repository_implementation_status.md | current packageがrepository implementation evidenceを現在保持・利用している |
 
 `00_scope_and_context.md` のfile applicability表に4fileすべての `required / not-applicable / blocked` と根拠を記録します。LLMは資料の意味からtrigger該当性を判断し、helperは宣言と実file / MANIFESTの一致を決定論検証します。
 
@@ -310,7 +310,7 @@ scopeごとの適用判定は `_08_behavior-decomposition-and-acceptance-traceab
 
 ### 08_repository_implementation_status.md
 
-current packageがrepository / product implementation evidenceを保持・利用している場合に使用します。
+current packageがrepository implementation evidenceを保持・利用している場合に使用します。live UIの観測結果そのものは`test-target-inspection`の責務であり、08へ直接保存しません。必要な場合は同Skillの成果物を補助Source / evidenceとして参照し、spec-analysisへ戻してAuthorityとの差分を整理します。
 
 - 基準branch / commit / revision
 - 実装確認できた範囲
@@ -367,7 +367,7 @@ default policy:
 
 default policyでは、完成済みpackageのuser-managed / semantic payloadに永続差分を加えて再び完成状態として保存する場合、semantic / presentationを問わず必ず次のvNNへ進めます。LLMが入力するcurrent versionの `変更概要` もuser-managed narrativeとして差分判定に含めます。一方、Package Version / Previous Package Version、CHANGELOGのversion heading・`Stable ID changes`・`影響file`、README generated controls、MANIFESTのようにhelperが他の変更から導出するcontrol差分自体はversion up要否の原因に数えません。user-managed provisional payload + requested `change_summary` が同一のno-opだけversionを維持します。canonical更新経路では `ui_target_package.py materialize` がcontrol生成前に差分を判定し、変更がある場合だけ次versionをREADME / CHANGELOG / MANIFESTへ反映します。`next-version` は同じversion導出規則をfocusedに確認するoperationとして残します。package schema versionはcontent versionと分離し、current schemaは `ui-target-v1` とします。
 
-ユーザー / projectが別version policyを明示した場合はそちらを優先し、materializeへ `version_policy=project / target_version=<value>` を渡します。default policyで「versionを上げるほど重要か」をLLMへ判断させません。
+`ui-target-v1` のversion policyは上記defaultだけを正本とします。案件固有の別version policyはPR #16では扱わず、必要になった場合はpackage schema / helper contractの変更として別途設計します。「versionを上げるほど重要か」をLLMへ判断させません。
 
 ## 6. 作成・更新契約
 
@@ -387,8 +387,8 @@ default policyでは、完成済みpackageのuser-managed / semantic payloadに�
 2. LLMがAuthority / DECISION / ASM、same-UNK reopen / new UNK、UI構造、US / UC / Behavior / AC、file applicability、extension要否、reuse / new / explicit retire等のsemantic判断を行う。completed Markdown rowやstable ID番号はまだ手書きしない
 3. LLMは変更対象を `materialize` のsemantic inputへまとめる。既存identityは `identity_action=reuse / reuse_id=<ID>`、new identityは `identity_action=new / draft_key=<unique>` とし、新規row間参照は `@draft:<draft_key>` を使う。current modelから意図的に除去するidentityだけ `retire_ids[]` に入れる
 4. 07のUNKNOWN説明、06の矛盾 / resolved説明、CHANGELOGの `変更概要` 等のnarrativeは `prose_updates[] / change_summary` として渡す。stable ID番号、Markdown escape、table separator、CHANGELOG control row、README control、Machine Entity wrapper、MANIFESTはAgentが組み立てない
-5. `ui_target_package.py materialize` を `artifact_mode=update + package_root + previous_snapshot + version_policy + semantic table/prose/file updates + retire_ids[]` で1回実行する。helperがsingle-writer snapshotを確認し、version、new ID、`@draft`解決、canonical table serialization、条件付き標準file作成 / 除去、extension file同期、CHANGELOG controls、Machine Entities section、README controls、MANIFESTを順に生成する
-6. `materialize` が `stale_snapshot / state_transition_required / reference_not_found` 等でblockedした場合は書込み済みの中間完成packageを残さず、LLMが意味判断またはinputを修正して再実行する。row消失だけをretire扱いしない
+5. `ui_target_package.py materialize` を `artifact_mode=update + package_root + previous_snapshot + semantic table/prose/file updates + retire_ids[] + extension_file_retirements[]` で1回実行する。同じpackage rootへの呼出しはcallerが直列化する。helperがsnapshotを再確認し、version、new ID、`@draft`解決、canonical table serialization、条件付き標準file作成 / 除去、extension file追加 / 更新 / 廃止、CHANGELOG controls、Machine Entities section、README controls、MANIFESTをstagingへ生成・検証してからpackage単位でcommitする
+6. `materialize` が `stale_snapshot / state_transition_required / reference_not_found / write_commit_failed / write_recovery_failed` 等でblockedした場合は、成功済みとして扱わない。通常のhandled failureでは元packageを復旧・保持し、復旧自体に失敗した場合はstaging / backupを保全してblockedとする。row消失だけをretire扱いしない
 7. materialize成功後、semantic quality gateでsource / inference / UI分類 / semantic duplicate、file trigger、same-UNK / new UNK、AC→TR意味対応等を確認する
 8. deterministic validate / repository testsでschema、stable ref、version、CHANGELOG lifecycle、Machine Entity、MANIFEST / hashを確認する
 helperが列挙したimpact候補は再確認対象であり、変更必須という意味判断ではありません。LLMが仕様意味を判断します。
@@ -404,7 +404,7 @@ helperが列挙したimpact候補は再確認対象であり、変更必須と�
 - domainが標準fileの責務とは独立している
 - 独立したAuthority / rule / flow集合として継続更新する必要がある
 - LLMは責務 / 分割理由 / lowercase kebab-case slugを `materialize.extension_file_updates[]` へ渡す
-- canonical create / updateでは `materialize` がexisting 10+ fileの最大番号+1からrequest順に複数extensionをbatch採番し、実fileと00の `案件固有extension file一覧` を同時生成する。Agentが10+番号・宣言rowを計算しない
+- canonical create / updateでは `materialize` がexisting 10+ fileの最大番号+1からrequest順に複数extensionをbatch採番し、実fileと00の `案件固有extension file一覧` を同時生成する。不要になったcurrent extensionはLLMが`extension_file_retirements[]`へ明示し、helperが参照・tracked row残存を検証したうえで実fileと宣言rowを同時に除去する。Agentが10+番号・宣言rowを計算しない
 - `ui_target_package.py next-domain-file` はfocused確認 / 個別利用用に残すが、通常package完成経路で複数extensionの番号予約に使わない
 - current UNKNOWNのcanonical正本は09、repository statusの正本は08、canonical Authority / traceabilityの正本は09のまま
 - 同じ仕様項目を二重正本にしない
@@ -427,6 +427,8 @@ helperが列挙したimpact候補は再確認対象であり、変更必須と�
 - required core payloadとrequired control file `MANIFEST.md` が存在し、03 / 04 / 05 / 08は00の条件付き必須file applicabilityと実file / MANIFESTのpayload一覧が一致する
 - MANIFESTのfile order / SHA-256がhelper再計算結果と一致する
 - structured rowのexact stable ID参照がすべて存在し、duplicate structural IDがない
+- PAGE→VIEW等、canonical prefixが変わる構造種別変更では旧IDをreuseせず、旧IDのexplicit retire + new IDとする。同じPANEL prefixを共有するPANEL / POPOVER / GLOBAL UI間は、semantic identityが同一とLLMが判断した場合だけreuseできる
+- downstreamへ渡すAuthority / AC Machine Entityは1つのcurrent canonical UI target packageから生成し、複数packageのpackage-local ID集合を同一current Entity collectionへ直接mergeしない
 - 01〜08の期待挙動が09のstable item IDへ追跡できる
 - UI操作scopeのUIOP / US / UC / Behavior / ACが `_08` のclosure contractを満たす
 - current ACがAuthorityへ追跡でき、具体値 / 組合せへ先回りしていない

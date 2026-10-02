@@ -268,4 +268,6 @@ PR #14後のCIは `skills/*/scripts` を動的compileするため、helper compi
 - runtime-v2 / entity-state-v2 cutoverでv1 evidence自体はcurrent扱いせず、内容不変のTR / TCN / model / CI / TC stable identityとdeleted / inactive履歴だけを決定論的に維持できる
 - Project Context ownerのDEC / ASMは撤回 / 置換済みでもID rowを削除せず、previous IDの再利用をhelperが防ぐ
 - current packageがrepository evidenceをcarry-forwardする場合、08の確認revisionを勝手にcurrentへ更新せず保持できる
+- 同じpackage rootへの`materialize`はcallerが直列化し、helperはUTF-8 without BOM / LF / terminal LFのcanonical bytesをstagingへ生成・検証してからpackage単位でcommitする。途中I/O failureで旧版 / 新版が混在した完成packageを残さない
+- package-local stable IDを持つ複数UI target packageのMachine Entity blockを同一current Entity collectionへ直接mergeせず、必要ならspec-analysisで1つのcurrent canonical package / normalized inputへ意味統合してから下流へ渡す
 - helperがsemantic判断を代替せず、通常spec-analysisの柔軟性を損なわない

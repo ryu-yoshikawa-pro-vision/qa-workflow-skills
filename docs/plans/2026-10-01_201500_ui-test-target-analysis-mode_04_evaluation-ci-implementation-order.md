@@ -262,10 +262,13 @@ repository unit testで次を必須確認します。
 - canonical / structural / 00宣言済み案件固有ID形式・duplicate
 - 一度採番に使った案件固有prefix宣言の削除 / 意味変更を拒否すること
 - UI構造の `状態軸` がSTATEでは必須・非STATEでは空であること、`種別` exact enumでPANEL / POPOVER / GLOBAL UIを区別しつつPANEL prefixを共有すること
+- canonical prefixが変わるUI構造種別変更では同じstable IDのreuseを拒否し、旧ID retire + new IDを要求すること。同じPANEL prefix内の再分類はsemantic identityが同一ならreuseを許可すること
 - 00のscope / applicability tableで `関連仕様項目ID` と `根拠 / 備考` が別列であり、stable ID列にはIDだけ、prose列中のIDはreference扱いしないこと
 - structured rowのexact stable ID参照
 - 09のcurrent UNKNOWN集合と07 / README件数の一致
 - MANIFEST file set / order / SHA-256
+- helper所有fileがUTF-8 without BOM / LF / terminal LFのcanonical bytesで保存され、CRLF / BOM / terminal LF不整合をcurrent `ui-target-v1` validateで拒否すること
+- staging packageをfinal validateした後だけpackage単位commitし、commit途中failureで旧版 / 新版が混在しないこと。commit失敗時は旧packageを復旧し、復旧失敗は`write_recovery_failed`でblockedになること
 - README file一覧とMANIFESTの一致
 - CHANGELOG最新version見出しとpackage versionの一致
 - CHANGELOGのexact `Stable ID changes` table、Change enum、version内duplicate
@@ -280,6 +283,7 @@ repository unit testで次を必須確認します。
 - render-readme-controlsがcurrent UNKNOWN件数とpayload file tableのcanonical Markdownを返し、Agentが件数・file順・種別を再構築しないこと
 - focused next-domain-fileがLLMのslug決定後に10+ fileの次番号とcanonical pathだけを決定すること。canonical materializeでは `extension_file_updates[]` のrequest順に複数new extensionをbatch採番し、同requestのstable owner row適用前にtemplate / pathを準備し、00の `案件固有extension file一覧` と実fileを同時生成すること
 - extension declaration exact table、domain file命名、duplicate path / slug、reuse時slug変更拒否
+- `extension_file_retirements[]` はexisting current extensionだけを受理し、残存tracking row / exact referenceがあればblocked、成功時は実fileと00宣言rowを同時に除去すること
 - `materialize` のartifact_mode=create / updateを検証し、normal createはasset初期root + previous_snapshot=nullでv00、normal updateはnon-null snapshot必須、legacy-migrationはcreateだけを許可すること。no-opでは `changed=false`、ID / file allocationとchanged_filesが空でversionを上げないこと
 - inspectが更新前tracking row fingerprint / UNKNOWN state / exact refs / payload / MANIFEST hashを含むcanonical `update_snapshot` を返すこと
 - next-id / materializeがsemantic identityを判断せず、UI target mode所有の `SRC / SPEC / INF / UNK` + standard structural prefix + 00宣言済み案件固有prefixについてcurrent row + CHANGELOG履歴 + previous snapshotから次番号を決め、更新途中で消えたprevious IDも再利用しないこと
@@ -302,6 +306,7 @@ repository unit testで次を必須確認します。
 - build-machine-evidenceがAuthority + current AC Entity、spec-analysis normalized_skill_input、expected identity、shared `render_machine_entities()` 由来のcanonical `machine_entities_markdown` を決定論生成し、不要な統合implementation_fingerprintを公開しないこと
 - AC chain refsからINF / UNK / inactive Authorityを除外し、current SPEC / DECISION / approved ASMだけをauthority_refs / dependencyへ投影すること。current Authorityが0件なら `state_transition_required` でblockedし、helper自身はUNKNOWN / blocked Behaviorを生成しないこと
 - `Machine Entities: spec-analysis` blockがexactly one存在し、heading / JSON fence / wrapperを含めhelper再生成Markdownと一致すること
+- 1つのnormalized spec-analysis handoff / current Entity collectionへ複数UI target packageのpackage-local Machine Entity blockを直接mergeしない契約をrepository testで固定すること
 - 親US / UC / Behavior変更でAC Entity fingerprintが変わること
 - project-evalがexact `projection / files[] / controls[] / markdown` payloadを返し、semantic projectionではcurrent versionの `変更概要` controlだけを追加し、過去CHANGELOG / Stable ID changes / 影響fileを混ぜないこと
 - raw SHA-256はproject-eval outputから再計算せず、validate / repository unit testでraw bytesに対して検証すること
@@ -468,7 +473,10 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - variable structured tableはheader-only、固定applicability rowだけ事前配置し、例示stable IDを置かない
 - 09_authority_and_traceability.mdで既存canonical spec-analysis contractを維持
 - skills/spec-analysis/scripts/ui_target_package.py（inspect / validate / focused helper群 / materialize / project-eval）
-- same package revisionはsingle writerとし、materialize前にinspect snapshotのversion / payload hash一致を確認してstale writeを拒否
+- `prose_updates[]` は既存のexact heading body置換だけを許可し、新規heading作成 / heading削除 / structured・generated section上書きを禁止する
+- extension fileはnew / reuseに加えて明示`extension_file_retirements[]`を持ち、不要になったfileをcanonical write pathから除去できるようにする
+- helper所有fileのcanonical bytesをUTF-8 without BOM / LF / terminal LFへ固定する
+- 同じpackage rootへのmaterializeはcallerが直列化し、snapshotはlock代替ではなくstale検出に使う。helperはcanonical bytesをsibling stagingへ生成・検証し、commit直前にsnapshotを再照合してからpackage単位でcommitする
 - PR #14後の9 Skill-local `runtime_contract.py` へ `acceptance_criterion` / `acceptance_refs` / spec-analysis expected ACをbyte-identicalに追加し、意味契約変更として `RUNTIME_CONTRACT_VERSION` を `runtime-v1` → `runtime-v2`、`ENTITY_SCHEMA_VERSION` を `entity-state-v1` → `entity-state-v2` へ更新
 - 09から既存authority_entities.pyへ入力できることを確認
 - current ACだけをMachine Entity化し、US / UC / Behaviorをglobal Entity typeへしないことを確認
@@ -477,8 +485,6 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - active `skills/spec-analysis/assets/output-template.md`、`skills/test-analysis/assets/output-template.md`、`skills/test-condition-design/assets/output-template.md` の旧手書きMachine Evidence例をversion文字列だけ置換しない
 - runtime Skillのtemplateでは、`render_runtime_input()` / `render_runtime_result()` / `render_machine_entities()` が生成するcanonical blockを正本とし、手書きの `runtime-contract-v1` / `runtime-envelope-v1` / `entity_schema_version` / `dependencies` 擬似schemaを削除する
 - spec-analysis templateでは `authority_entities.py` / UI target modeの `build-machine-evidence` が生成するcanonical `schema_version / model_key / upstream_entity_dependencies / runtime_dependencies` shapeを正本とし、Machine Entity JSONをAgentに手組みさせない
-- shared runtime direct CLIへ `project_v1_cutover` operationを追加し、通常verify / generator経路とは分離する。direct dispatcher、supported skill、16 MiB aggregate / 64 KiB artifact string例外、unknown operationをexact contract化する
-- cutover helperはTRD / TCではcomplete `normalized_runtime_inputs[]` を一括返却し、TCDでは `condition-structure / models / test-data-requirements / materialize-coverage` の各phaseで次に実行可能なcomplete inputだけを返す。いずれもAgent-side mergeを要求しない
 
 この時点ではquestion-analysis / qa-workflowは変更しません。
 
@@ -514,6 +520,7 @@ mode単体が成立してからworkflowへ接続します。
 
 ### Step 4: test-requirement-design AC traceability / requirement-structure-v2
 
+- 新規 `skills/test-requirement-design/scripts/requirement_input_adapter.py` をnormal spec-analysis handoffの正本とし、非mode由来inputに欠ける `acceptance_criteria=[]` / `acceptance_refs=[]` だけを補完する。AC生成・mode判定・既存値上書きは行わない
 - generator contractを `requirement-structure-v1` → `requirement-structure-v2` へ更新
 - output templateへ `関連AC ID` と上流種別 `Acceptance Criteria` を追加
 - guidanceへcurrent AC closure / ACとTRの責務差を追加
@@ -530,6 +537,7 @@ mode単体が成立してからworkflowへ接続します。
 - artifact modeのTR Entity dependencyへ参照AC Entityと、そのACが参照するcurrent Authority Entity unionを直接保存する。direct modeでは存在しないMachine Entity dependencyを生成しない
 - repository内の `requirement-structure-v1` 固定参照をcurrent v2へ同期
 - shared runtime-v1 / entity-state-v1 evidenceをruntime-v2 / entity-state-v2 current evidenceとして読み替えない
+- このStepでshared runtime direct CLIへ `project_v1_cutover` operationを追加し、通常verify / generator経路とは分離する。TRD / TCではcomplete `normalized_runtime_inputs[]`、TCDではphase別の次に実行可能なcomplete inputだけを返し、Agent-side mergeを要求しない
 - cutover後の最初のTRD / TCD / test-case-design等の実行はfull rebuildで行い、v1 previous artifactを通常のpartial rerun / freshness evidenceとして渡さない
 - `project_v1_cutover` はv1 Runtime Input / ResultからTRD / TCのcomplete input、TCDのphase別complete inputを生成し、callerがseed patchやtarget version fieldを元JSONへmergeする経路を作らない
 - TR `draft_key ↔ tr_id_map`、TCN `draft_key ↔ tcn_id_map`、model `draft_key ↔ model_key_map`、TC `draft_key ↔ tc_id_map` をexact joinし、reuse ID / previous state / full rebuild scopeをhelperが完成inputへ固定projectionする。Agent / LLMにcutover時のreuse ID選択をさせない

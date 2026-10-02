@@ -313,5 +313,5 @@ rebase前の旧mainとの差分を正として実装判断しません。
 - #14成果物を仕様Authorityへ自動昇格していない
 - routingで対象理解とUI/UX評価 / live inspection / formal WCAGを区別できる
 - evaluation / CIは#14の動的導出方式を維持している
-- #16固有のexpected増分がDeterministic +2 / Semantic +5 / routing +8で説明できる
+- #16固有のexpected増分がDeterministic +2 / Semantic +8 / routing +8で説明できる
 - shared runtime / Machine Entity / requirement-structure-v2の変更がPR #14後baselineとの差分として明示され、9-copy byte identityへ一意に更新されている

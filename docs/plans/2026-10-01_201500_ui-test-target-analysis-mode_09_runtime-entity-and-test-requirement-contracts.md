@@ -366,13 +366,31 @@ qa-workflow / coverage-analysisへspec-analysis scopeを渡す場合、AgentがM
 
 ### 3.1 normal spec-analysis handoff adapter
 
-UI target modeでは `build-machine-evidence.normalized_skill_input` が `acceptance_criteria[]` を必ず持ちます。通常の非mode spec-analysisは既存互換のためkey省略を許可しますが、requirement-structure-v2へ渡す時点ではqa-workflow / shared runtimeのdeterministic adapterがv2 shapeへ正規化します。
+UI target modeでは `build-machine-evidence.normalized_skill_input` が `acceptance_criteria[]` を必ず持ちます。通常の非mode spec-analysisは既存互換のためkey省略を許可しますが、requirement-structure-v2へ渡す直前の正規化ownerはSkill-local `skills/test-requirement-design/scripts/requirement_input_adapter.py` に固定します。qa-workflow / shared runtimeへ同じ補完処理を複製しません。
 
-- spec-analysis normalized inputに `acceptance_criteria` がない場合だけ `acceptance_criteria=[]` を追加する
+canonical operation:
+
+```json
+{"operation":"adapt-v2","input":{}}
+```
+
+response:
+
+```json
+{"normalized_input":{}}
+```
+
+規則:
+
+- full prospective requirement_structure inputを `input` に受け、`acceptance_criteria` が存在しない場合だけ `acceptance_criteria=[]` を追加する
 - fieldが存在する場合はarray型を要求し、意味を変更しない
-- nonmode由来の既存TR draftに `acceptance_refs` がない場合だけ `acceptance_refs=[]` を追加する
+- `test_requirements[]` の各draftに `acceptance_refs` がない場合だけ `acceptance_refs=[]` を追加する
 - fieldが存在する場合はarray型を要求し、既存値を上書きしない
-- adapterはACを生成せず、mode判定を行わない
+- その他のfieldを追加・削除・並べ替え目的で意味変更しない
+- ACを生成せず、UI target mode判定を行わない
+- qa-workflow / direct callerはいずれもこのhelper結果だけをrequirement-structure-v2へ渡す
+- runtime metadata / input fingerprintはadapter後の`normalized_input`から生成する
+- `requirement_structure.py` 本体はv2 required field欠落をsilent補完せずrejectする
 - Agent / LLMに空array補完をさせない
 
 このadapter後のshapeだけをrequirement-structure-v2へ渡します。
@@ -386,6 +404,8 @@ identity:
 - entity_ref: `AC-xxx`
 
 current ACだけをEntity化します。blocked ACを完成済みcurrent Entityへ変換しません。
+
+Machine Entity identityには`package_ref`を追加しません。1つのcurrent Entity collectionへ投入するspec-analysis Authority / AC Entityは、1つのcurrent canonical UI target package / normalized inputから生成された集合に限定します。複数packageの `SPEC-xxx / AC-xxx` 等をそのまま連結してidentity衝突を解決することはしません。必要な場合はspec-analysisでpackageを意味統合してからMachine Entity化します。
 
 ### 4.1 canonical content
 
@@ -586,6 +606,7 @@ coverage-analysisの既存traceability graph node typeへACを追加しません
 - qa-workflow expected / actual Entity exact match
 - coverage-analysis current Entity parse compatibility
 - requirement-structure-v2 valid / invalid schema
+- requirement_input_adapter.pyが非mode inputの欠落した `acceptance_criteria=[] / acceptance_refs=[]` だけを補完し、既存値を変更せず、requirement_structure.py本体はv2 required field欠落をrejectする
 - AC-001をTRへlinkしても、そのACが参照するSPEC-001をTR authority_refs / Authority Dispositionで別途closeしない場合はSPEC-001 unclosedとなる
 - project_v1_cutoverのskill別projection、runtime-v1 / entity-state-v1以外の入力拒否、内容不変時stable ID保持、deleted / inactive identity history保持
 - AC linked / disposed / unclosed / linked+disposed

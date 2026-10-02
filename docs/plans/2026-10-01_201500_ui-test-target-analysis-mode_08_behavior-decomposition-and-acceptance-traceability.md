@@ -28,9 +28,11 @@ Scope ID:
 | なし | not-applicable | US / UC / Behavior / ACを作らない |
 | 未確定 | blocked | UNKNOWNを作成し、適用可否を推測しない |
 
-UI操作の有無自体はLLMが資料の意味から判断します。上表の対応関係、ID形式、UNKNOWN参照、下位tableの有無はhelperが決定論検証します。
+UI操作の有無自体はLLMが資料の意味から判断します。`Behavior Decomposition` はその結果から `あり → required / なし → not-applicable / 未確定 → blocked` とhelperが決定論生成し、LLMへ別判断として入力させません。ID形式、UNKNOWN参照、下位tableの有無もhelperが決定論検証します。
 
 `資料不足でUS / UC / Behavior / ACを書けない` はnot-applicableの理由になりません。Behavior Decomposition=blockedのscopeでは下位UIOP / US / UC / Behavior / ACを確定済みとして生成せず、関連UNKNOWN解消後にrequired / not-applicableを再判定します。
+
+UI操作と期待結果が一部理解できても、Actor / RoleやGoalがAuthorityから確定できずUser Storyを成立させられない場合は、その影響scopeをblocked + UNKNOWNのままにします。これはUser Storyを仕様にない推測で補完しないための意図した品質基準です。
 
 UI操作には少なくとも次を含みます。
 - button / link / menu / tab等による操作

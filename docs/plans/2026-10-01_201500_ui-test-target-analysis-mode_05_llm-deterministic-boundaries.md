@@ -109,7 +109,7 @@ package rootを読み、次をJSONで返します。
 
 default version policyを使うcurrent `ui-target-v1` packageでは、Agentがcurrent versionを読み取ってhelperへ渡しません。helperが `package_root` からPackage Versionを取得し、`previous_version / next_version` を返します。
 
-mode導入前のlegacy packageをcurrent schemaへ移行する場合だけ、LLMがsemantic mappingで確定した明示versionをlegacy migration用inputとして渡せます。案件固有version policyが明示されている場合はnext-versionを使用せず、そのversion文字列がpackage内で一致することだけvalidateします。
+mode導入前のlegacy packageをcurrent schemaへ移行する場合だけ、LLMがsemantic mappingで確定した明示versionをlegacy migration用inputとして渡せます。current `ui-target-v1` の通常create / updateはdefault `vNN` policyだけを使用し、案件固有version policyはPR #16で扱いません。
 
 #### next-id
 
@@ -154,8 +154,9 @@ focused確認 / 個別利用用operationです。LLMが「標準fileへ混在さ
 - stable IDを採番しないfixed/view tableのfull-replacement `keyed_table_updates[]` と、そのkey / reference内 `@draft` 解決
 - Markdown escape / canonical row order / table serialization
 - known headingへのsection置換
+- `prose_updates[]` は既存exact headingのbodyだけを置換し、新規heading作成 / heading削除 / structured・generated section上書きを行わない
 - file applicabilityを先に解釈した条件付き標準fileのtemplate作成 / 除去
-- new / reuse extension fileの連番batch解決、作成 / 更新、00の `案件固有extension file一覧` canonical生成
+- new / reuse extension fileの連番batch解決、作成 / 更新と、明示`extension_file_retirements[]`による廃止、00の `案件固有extension file一覧` canonical生成
 - explicit `retire_ids[]` のlifecycle検証。row消失だけではretireしない
 - Stable ID changes / 影響file
 - Machine Entities section
@@ -163,7 +164,7 @@ focused確認 / 個別利用用operationです。LLMが「標準fileへ混在さ
 - MANIFEST / hash
 - final validate
 
-汎用Markdown frameworkにはせず、`ui-target-v1` のknown file / heading / table registryだけを扱います。stable owner tableとfixed/view tableのregistryもPlanで固定します。通常更新ではsingle writerとし、inspect snapshotからbytesが変わっていればstaleとして書込みません。差分なしのnormal updateはno-opとしてversionを上げません。
+汎用Markdown frameworkにはせず、`ui-target-v1` のknown file / heading / table registryだけを扱います。stable owner tableとfixed/view tableのregistryもPlanで固定します。同じpackage rootへのmaterializeはcallerが直列化し、inspect snapshotはlock代替ではなくstale検出に使います。helper所有fileはUTF-8 without BOM / LF / terminal LFのcanonical bytesへ固定し、sibling staging packageをfinal validateしてcommit直前にsnapshotを再照合してからpackage単位でcommitします。途中failureでは旧packageを復旧・保持し、差分なしのnormal updateはno-opとしてversionを上げません。
 
 #### build-manifest
 
