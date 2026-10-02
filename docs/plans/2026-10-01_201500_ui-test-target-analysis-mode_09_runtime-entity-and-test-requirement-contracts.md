@@ -124,7 +124,7 @@ runtime Skill:
 spec-analysis:
 
 - 通常Authority Entityは `authority_entities.py` の生成結果を正本とする
-- UI target modeは `ui_target_package.py build-machine-evidence` の `machine_entities_block` を正本とする
+- UI target modeは `ui_target_package.py build-machine-evidence` がshared `render_machine_entities()`で生成する `machine_entities_markdown` を正本とする
 - output templateへ独自のMachine Entity JSON schemaを再定義しない
 
 repository testでは、current active template / fixtureを検索し、Machine Evidence例としてdeprecatedな `entity_schema_version`、単一 `dependencies`、`runtime-contract-v1`、`runtime-envelope-v1` が残っていないことを確認します。Machine Evidence fixtureを保持する場合はv2 `runtime_validator.py` / Skill-local `runtime_contract.py` でparse / validateできるcanonical shapeだけを許可します。
