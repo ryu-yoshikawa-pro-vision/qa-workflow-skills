@@ -1116,7 +1116,8 @@ stdin:
 ```json
 {
   "operation":"next-id",
-  "previous_artifact_markdown":"<previous question-analysis output or null>",
+  "artifact_mode":"create",
+  "previous_artifact_markdown":null,
   "artifact_markdown":"<candidate current question-analysis output>"
 }
 ```
@@ -1127,11 +1128,18 @@ payload:
 {"next_id":"Q-003"}
 ```
 
-helperはprevious / current両artifactのexact `不明点 / 質問一覧` と `質問ID履歴` に現れるQ ID unionを使用済み集合として扱います。previous artifactがない初回はnullを許可します。
+`artifact_mode` は `create / update` の2値です。createではprevious=nullを要求し、updateではprevious artifactを必須とします。既存成果物更新でprevious=nullを渡した場合はfail-closedでblockedします。
+
+helperの使用済み集合は `build-history` と同じ正本へ固定します。
+
+- previous artifactのcurrent `不明点 / 質問一覧` ID
+- previous artifactの `質問ID履歴` ID
+- current artifactのcurrent `不明点 / 質問一覧` ID
+
+candidate current artifactに残っている `質問ID履歴` はnext-idの入力集合へ含めません。古い / 誤ったcandidate historyによる番号skipや `id_space_exhausted` を起こさないためです。
 
 - Q-xxx形式・各table内duplicateを検証する
-- current質問IDは `質問ID履歴` に含まれていてよい
-- previous current Q + previous history + current current Q + current historyの既知最大番号+1を返す
+- 使用済み集合の既知最大番号+1を返す
 - 使用済みQが0件ならQ-001
 - Q-999使用済みなら `id_space_exhausted`
 - Qの意味的reuse / new、質問文、分類は判断しない
@@ -1146,7 +1154,8 @@ stdin:
 ```json
 {
   "operation":"build-history",
-  "previous_artifact_markdown":"<previous question-analysis output or null>",
+  "artifact_mode":"create",
+  "previous_artifact_markdown":null,
   "current_artifact_markdown":"<candidate current question-analysis output>"
 }
 ```
@@ -1159,6 +1168,8 @@ payload:
   "question_id_history_markdown":"## 質問ID履歴\n\n| ID |\n| --- |\n| Q-001 |\n| Q-002 |"
 }
 ```
+
+`artifact_mode` のcreate / updateとprevious必須規則はnext-idと同じです。
 
 helperは次のunionを昇順canonical化します。
 
@@ -1232,8 +1243,9 @@ LLM / stakeholder側がsemantic identityのreuse / new、DECISION / ASM区分、
 
 - Project Contextへ同じDECISION / ASMを複製しない
 - `project_context_ids.py` で別ownerのIDを採番しない
-- ownerが提供するdeterministicなID割当て / ID履歴機構がある場合はそれを使用する
-- ownerが新規IDをまだ確定できない場合、LLMが番号を手計算・推測せず、そのDECISION / ASMの正本登録をblockedとしてownerからIDが返るまでcurrent Authorityへ昇格させない
+- ownerが提供するdeterministicなID割当て / ID履歴機構があり、canonical `DEC-xxx / ASM-xxx` を発行する場合はそれを使用する
+- Jira key / ADR番号等のowner固有IDだけしかない場合、それをcanonical Authority IDへ流用しない。owner側でDEC / ASM IDを確定できるまでcurrent Authority登録をblockedとし、外部IDはsource / evidence metadataとして保持する
+- ownerが新規canonical IDをまだ確定できない場合、LLMが番号を手計算・推測しない
 - PR #16から任意の外部ownerへProject Contextのappend-only規則を強制しない
 - 任意schemaを読むgeneric allocatorはPR #16では作らない
 
