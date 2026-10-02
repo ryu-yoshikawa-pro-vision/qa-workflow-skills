@@ -154,7 +154,7 @@ README controls反映後のcurrent package fileからMANIFEST bodyを生成し�
 
 #### impact
 
-LLMがsemantic更新時に確定した `added / changed / resolved / retired / migrated` をcurrent versionのexact `Stable ID changes` tableへ先に記録します。その後、helperが同tableから変更対象ID集合を導出し、cross-file exact referenceから再確認候補file / rowを列挙します。Agent / LLMが同じchanged ID集合を別JSONへ手組みしません。
+LLMがsemantic更新時に確定したstable ID lifecycle eventをcurrent versionのexact `Stable ID changes` tableへ先に記録します。許可値は `added / changed / resolved / retired / migrated` ですが、`resolved` はUNKNOWN解消専用です。DEC / ASMを含むtracked IDは初登場 `added`、同一identityを維持した内容・状態変更 `changed`、current structured modelからの除去 `retired` とします。その後、helperが同tableから変更対象ID集合を導出し、cross-file exact referenceから再確認候補file / rowを列挙します。Agent / LLMが同じchanged ID集合を別JSONへ手組みしません。
 
 この結果は「修正が必要」という意味判断ではありません。LLMが再確認対象を漏らさないための候補集合です。
 
