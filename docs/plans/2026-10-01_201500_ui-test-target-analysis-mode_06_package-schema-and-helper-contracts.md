@@ -735,7 +735,7 @@ payload:
 
 slugはlowercase kebab-caseを要求します。helperはsemanticなslug選択を行わず、existing 10+ fileの最大番号+1だけを決定します。
 
-同一更新で複数extension fileを追加する場合は、返却pathを00のextension宣言へ登録し、実fileを作成してから次の `next-domain-file` を呼びます。未materializeの返却番号をAgent側だけで予約して複数回呼びません。
+focused `next-domain-file` を単独で連続利用する場合だけ、返却pathを実fileへmaterializeしてから次を呼びます。canonical package create / updateで複数extensionを追加する場合は本operationを逐次利用せず、`materialize.extension_file_updates[]` がrequest順にbatch採番します。
 
 ### materialize
 
