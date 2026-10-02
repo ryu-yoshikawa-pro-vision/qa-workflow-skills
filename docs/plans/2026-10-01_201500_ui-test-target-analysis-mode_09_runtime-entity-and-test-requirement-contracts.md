@@ -238,7 +238,7 @@ validatorはAuthority / Product Risk / Acceptance Criteriaをclosure universeと
 
 ## 11. freshness propagation
 
-最低限、次をrepository runtime testで固定します。
+次をrepository runtime testで固定します。
 
 | 変更 | 期待 |
 | --- | --- |
@@ -278,7 +278,7 @@ coverage-analysisの既存traceability graph node typeへACを追加しません
 
 ## 14. repository tests
 
-少なくとも次を更新 / 追加します。
+次を更新 / 追加します。
 
 - current shared runtime 9 Skill-local runtime_contract.py copies byte-identical
 - `acceptance_criterion` Machine Entity valid / unknown type regression
