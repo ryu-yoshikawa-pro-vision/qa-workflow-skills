@@ -303,8 +303,11 @@ UNKNOWNのlineageは次に固定します。
 - `分類=UNKNOWN` かつ `現在有効か=Yes` → `解消先ID` は空
 - `分類=UNKNOWN` かつ `現在有効か=No` → `解消先ID` は1件以上必須
 - `解消先ID` はcurrentなSPEC / DECISION / 承認済みASMのstable IDだけを許可する
+- 解消済みUNKNOWNでresolver Authorityだけが変わり、同じ論点が引き続き解消済みなら、同じUNK IDを維持して `解消先ID` を新しいcurrent Authorityへ更新する
+- 解消根拠がなくなり、LLMが同じ論点と判断した場合は、同じUNK IDを `現在有効か=Yes`、`解消先ID=空` へ戻してreopenする
+- LLMが別論点と判断した場合は、旧UNKを `現在有効か=No` のresolved historyとして維持し、new UNKを採番する
 - UNKNOWN以外のrowでは `解消先ID` は空
-- どのAuthorityがUNKNOWNを解消したかの意味判断はLLMが行い、helperは形式・存在・currentness・種別だけを検証する
+- 同一論点 / 別論点、どのAuthorityがUNKNOWNを解消したかはLLMが判断し、helperはID・状態・currentness・種別・CHANGELOG eventの構造整合だけを検証する
 
 #### 現在有効な仕様根拠
 
@@ -924,6 +927,19 @@ spec-analysis modeからquestion-analysisへ進む場合、`ui_target_package.py
 
 ### 10.2 question_ids.py
 
+`skills/question-analysis/assets/output-template.md` へ次のexact tableを追加します。
+
+```markdown
+## 質問ID履歴
+
+| ID |
+| --- |
+```
+
+`不明点 / 質問一覧` はcurrent未解決質問だけを持ち、`質問ID履歴` はその成果物系列で一度でも使用したQ IDをcurrent / resolvedを問わず保持します。両tableともplaceholder `Q-001` を置きません。
+
+#### next-id
+
 stdin:
 
 ```json
@@ -939,15 +955,47 @@ payload:
 {"next_id":"Q-003"}
 ```
 
-helperはexact `不明点 / 質問一覧` tableのexisting Q IDだけを読みます。
+helperはexact `不明点 / 質問一覧` と `質問ID履歴` のQ ID unionを使用済み集合として扱います。
 
-- Q ID形式・duplicateを検証する
-- Q-001〜Q-999の既知最大番号+1を返す
-- existing Qが0件ならQ-001
+- Q-xxx形式・各table内duplicateを検証する
+- current質問IDは `質問ID履歴` に含まれていてよい
+- current + historyの既知最大番号+1を返す
+- 使用済みQが0件ならQ-001
 - Q-999使用済みなら `id_space_exhausted`
 - Qの意味的reuse / new、質問文、分類は判断しない
 
-`skills/question-analysis/assets/output-template.md` の `不明点 / 質問一覧` はheader-onlyとし、placeholder `Q-001` を配置しません。
+同一runで複数new Qを採番する場合は、返却IDをcandidateのcurrent質問tableへ反映してから次の `next-id` を呼び、同じ番号を再利用しません。
+
+#### build-history
+
+stdin:
+
+```json
+{
+  "operation":"build-history",
+  "previous_artifact_markdown":"<previous question-analysis output or null>",
+  "current_artifact_markdown":"<candidate current question-analysis output>"
+}
+```
+
+payload:
+
+```json
+{
+  "used_question_ids":["Q-001","Q-002"],
+  "question_id_history_markdown":"## 質問ID履歴\n\n| ID |\n| --- |\n| Q-001 |\n| Q-002 |"
+}
+```
+
+helperは次のunionを昇順canonical化します。
+
+- previous artifactのcurrent `不明点 / 質問一覧` ID
+- previous artifactの `質問ID履歴` ID
+- current artifactのcurrent `不明点 / 質問一覧` ID
+
+current artifactに手書きされた既存 `質問ID履歴` は正本入力にせず、helper返却の `question_id_history_markdown` でsection全体を置換します。previous artifactがない初回はcurrent質問IDだけから履歴を生成します。
+
+これにより、回答済みQがcurrent質問一覧から消えても使用済みIDを保持します。`Q-001` 解消後に新規質問が発生した場合、Q-001を再利用せずQ-002を返します。
 
 ### 10.3 project_context_ids.py
 
@@ -1060,11 +1108,13 @@ tableにはpayload filesだけをcanonical順で列挙します。
 - v01以降にpackageへ初登場するtracked stable IDは `added`。UI target mode所有IDは `next-id` の返却 `stable_id_change` を使い、外部ownerのDEC / ASMはowner確定IDをpackageへ初めて取り込むversionで `added` とする
 - legacy packageからsemantic identityを維持してcurrent schemaへ持ち込んだtracked stable IDは、SRC / SPEC / INF / UNK / DEC / ASM / structural IDを問わずmigration versionで `migrated` とする
 - 同一identityを維持したまま内容・状態・関係が変わり、current structured modelへ残る場合は `changed`
-- `resolved` はUNKNOWN lineage専用。対象は `UNK-xxx` だけで、09の `現在有効か=No` かつ非空 `解消先ID` と一致させる。DEC / ASMその他のprefixへ `resolved` を使用しない
+- `resolved` はUNKNOWN lineage専用。対象は `UNK-xxx` だけで、そのversionでUNKNOWNが `現在有効か=Yes` から `No` へ閉じたことを表す。DEC / ASMその他のprefixへ `resolved` を使用しない
+- resolved UNKNOWNでresolver Authorityだけを変更して `現在有効か=No` を維持する場合、または同じUNKを `現在有効か=Yes / 解消先ID=空` へreopenする場合は `changed` を使う
+- reopen後に同じUNKを再度閉じる場合は再び `resolved` を使用できる
 - current structured modelからstable ID自体を外す場合は `retired`。DEC / ASMが撤回・置換等でcurrent Authorityから外れても09の分析項目へ履歴rowを残す場合は `changed` とし、row自体をcurrent structured modelから除く場合だけ `retired`
 - 1 version内で同じStable IDを重複させない
 - 1つのStable IDに `added` または `migrated` を記録できるのは履歴全体で最初の1回だけ
-- `resolved / retired` はterminal eventとし、その後に `added / migrated / changed / resolved / retired` を再記録しない
+- `retired` だけをterminal eventとし、その後に `added / migrated / changed / resolved / retired` を再記録しない
 - `next-id` はcurrent structured rowと全versionのこのtableに現れるStable IDを使用済みIDとして扱う
 
 `### 影響file`
@@ -1077,8 +1127,10 @@ helperは次を検証します。
 - 各version entryに上記3 headingがexactly one存在
 - `Stable ID changes` tableのheader / Change enum / Stable ID形式 / version内duplicate
 - 履歴全体で `added / migrated` が同じStable IDへ複数回現れない
-- `resolved` はUNK prefixだけに現れ、current resolved UNKNOWN rowの `現在有効か=No / 解消先ID` と一致する
-- `resolved / retired` 後に同じStable IDのeventが存在しない
+- `resolved` はUNK prefixだけに現れ、そのversionでUNKNOWNをresolved状態へ閉じるeventとして扱う
+- current UNKNOWN rowが `現在有効か=No` の場合はcurrentな `解消先ID`、`Yes` の場合は空 `解消先ID` を要求する
+- resolved後の `changed` によるresolver変更 / reopenと、reopen後の再 `resolved` を許可する
+- `retired` 後に同じStable IDのeventが存在しない
 - v01以降に初登場するDEC / ASMを `added` として追跡でき、既追跡DEC / ASMの状態変更を `changed`、current structured modelからの除去を `retired` として受理する
 - current structured rowとStable ID履歴のID形式が§6.1の追跡可能prefix契約に一致する
 - `next-id` input prefixは§6.2の採番対象だけを許可し、DEC / ASMを拒否する
@@ -1183,7 +1235,7 @@ production helperのfilesystem / raw hash / projection / README control renderin
 - next-idのcurrent structured row + historical stable ID導出、連続採番、retired ID非再利用
 - duplicate canonical heading / table、row列数不一致、escaped pipe / `<br>` reference parse
 - duplicate / unknown stable ref
-- resolved UNKNOWNの `解消先ID` missing / invalid / non-current Authority
+- current UNKNOWNの `現在有効か / 解消先ID` 組合せ、resolved UNKNOWNのresolver変更、same-UNK reopen / re-resolve、`解消先ID` missing / invalid / non-current Authority
 - scope applicability / conditional-required file mismatch
 - required UI operation decompositionのmissing table / parent / closure
 - UCごとの正常 / 準正常 / 例外3分類と定義あり / なし / 未定義整合
@@ -1197,14 +1249,15 @@ production helperのfilesystem / raw hash / projection / README control renderin
 - spec-analysis normalized_skill_input / expected identityがhelper結果から再現できること
 - artifact `Machine Entities: spec-analysis` blockがexactly one存在し、runtime_contract.pyの `extract_machine_blocks(..., "Machine Entities")` で読め、helper再生成結果と完全一致すること
 - unknown_links.pyのexact `operation=validate-links` / payload / top-level issues contract
-- question_ids.pyのheader-only / existing Q / duplicate / Q-999
+- question_ids.pyのheader-only current質問table + `質問ID履歴`、next-id / build-history exact contract、duplicate / Q-999
+- `Q-001` 解消でcurrent質問0件になった後の新規質問がQ-002となり、過去Q IDを再利用しないこと
 - project_context_ids.pyのSection 12 / 13 exact table、DEC / ASM kind、duplicate、999 exhaustion
 - Project Contextがownerでない案件ではproject_context_ids.pyを使わず、外部ownerのIDを維持し、owner未採番時にLLM hand-numberingへfallbackしないこと
 - CHANGELOG / impactがDEC / ASMを追跡可能stable IDとして受理しつつ、ui_target_package.py next-idではDEC / ASMを拒否すること
 - fresh v00の空change table、v01以降のDEC / ASM初登場=added、既追跡内容・状態変更=changed、current structured model除去=retiredを区別すること
-- resolvedをUNK以外へ使用するとrejectし、resolved / retired後の後続eventをrejectすること
+- resolvedをUNK以外へ使用するとrejectし、resolved後のchangedによるresolver変更 / reopenと再resolvedを許可し、retired後の後続eventだけをrejectすること
 - legacy migrationでDEC / ASMを含むretained tracked IDをmigratedとしてseedすること
-- question-analysis output templateのQ tableとProject Context template Section 12 / 13がheader-onlyでplaceholder IDを持たないこと
+- question-analysis output templateのcurrent Q table / `質問ID履歴` とProject Context template Section 12 / 13がheader-onlyでplaceholder IDを持たないこと
 - legacy migration後fixtureのvalidate PASS
 
 新しいGitHub Actions workflowは作りません。PR #14後の既存CIは `skills/*/scripts` を動的compileするため、helper compile目的のworkflow path追加は不要です。repository unit / runtime integration / portability testを既存test discoveryへ追加します。
@@ -1214,12 +1267,12 @@ production helperのfilesystem / raw hash / projection / README control renderin
 - current packageを `ui-target-v1` として機械識別できる
 - helperのoperation / input / output / failure contractが一意
 - current packageの `Machine Entities: spec-analysis` blockがexactly one存在し、helper再生成結果と一致する
-- resolved UNKNOWNが `解消先ID` でcurrent Authorityへ機械検証可能に閉じる
+- UNKNOWNがopen / resolved / resolver変更 / same-ID reopen / re-resolveの各状態で `現在有効か / 解消先ID` 契約を満たし、resolved時はcurrent Authorityへ機械検証可能に閉じる
 - current packageの次versionをAgentが転記せずhelperが `package_root` から導出できる
 - README metadata / UNKNOWN件数 / payload file tableをAgentが再構築せずcanonical Markdownとして生成できる
 - extension fileの必要性 / slugだけLLMが判断し、連番 / pathはhelperが決定できる
 - new ID採番時にAgentが既知ID集合を手組みせず、CHANGELOG stable ID履歴を含めて過去IDを再利用しない
-- new Q / DEC / ASMのsemantic identityはLLM / stakeholder側に残す。Qはquestion-analysis helper、Project ContextがDEC / ASM ownerの場合はqa-workflow helper、別ownerの場合はそのownerのdeterministic allocatorで番号を決定し、未採番時にLLM hand-numberingへfallbackしない
+- new Q / DEC / ASMのsemantic identityはLLM / stakeholder側に残す。Qはcurrent + 使用済み履歴からquestion-analysis helperが番号を決定して過去IDを再利用せず、Project ContextがDEC / ASM ownerの場合はqa-workflow helper、別ownerの場合はそのownerのdeterministic allocatorで番号を決定し、未採番時にLLM hand-numberingへfallbackしない
 - structured tableのheader / ID / ref列が一意
 - scopeごとのUI操作適用判定と条件付き必須fileの存在を機械検証できる
 - UI操作scopeでUIOP / US / UC / Behavior / AC hierarchyと3分類完全性を機械検証できる
