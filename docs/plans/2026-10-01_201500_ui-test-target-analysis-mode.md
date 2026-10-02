@@ -177,7 +177,7 @@ version更新時は変更ファイルだけではなく、そのversionの完全
 - skills/question-analysis/evals/output/*
 - question-analysis helper用repository unit test
 
-目的はUNKNOWNの安定参照、回答後の差分反映、解消済み履歴とcurrent unknownの分離です。既存の質問分類自体は変更しません。new Qの意味判断はLLMに残し、Q番号だけSkill-local helperで決定します。
+目的はUNKNOWNの安定参照、回答後の差分反映、解消済み履歴とcurrent unknownの分離です。既存の質問分類自体は変更しません。new Qの意味判断はLLMに残し、Q番号と使用済みQ ID履歴の保持だけSkill-local helperで決定論化します。回答済みQがcurrent一覧から消えても過去Q IDを再利用しません。
 
 ### shared runtime / Machine Entity contract
 
@@ -204,6 +204,8 @@ PR #14確認headに存在する9個のSkill-local `runtime_contract.py` を同�
 `acceptance_criterion` Entity type、`acceptance_refs` canonicalization、spec-analysis Authority + AC expected Entity導出はshared runtime / Machine Entityの意味契約変更です。そのため9コピーをbyte-identicalに揃え、`RUNTIME_CONTRACT_VERSION` を `runtime-v1` → `runtime-v2`、`ENTITY_SCHEMA_VERSION` を `entity-state-v1` → `entity-state-v2` へ更新します。envelope field shapeとfreshness algorithmは維持します。
 
 旧runtime-v1 / entity-state-v1 evidenceをv2 current evidenceとして読み替えません。cutover後の最初の実行はcurrent inputからfull rebuildし、その後だけ既存partial rerun契約を使用します。generator contractは別契約なので、`workflow-runtime-v1`、`schema-cases-v1`、`usability-inspection-runtime-v1`、`wcag-em-runtime-v1`等を意味変更なしにversion upしません。
+
+active Machine Evidence templateはversion文字列だけを置換しません。runtime Skillは `render_runtime_input()` / `render_runtime_result()` / `render_machine_entities()`、spec-analysisは `authority_entities.py` / `build-machine-evidence` の生成結果を正本とし、旧 `entity_schema_version` / `dependencies` / `runtime-contract-v1` / `runtime-envelope-v1` の手書き擬似schemaを削除します。
 
 ### qa-workflow
 
