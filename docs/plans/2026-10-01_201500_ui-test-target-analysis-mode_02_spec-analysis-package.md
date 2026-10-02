@@ -361,16 +361,16 @@ default policyでは `ui_target_package.py next-version` が次versionを導出�
 回答や新資料が来た場合:
 
 1. LLMが変更されたAuthority / DECISION / ASMを解決し、project policyに従ってmaterial updateかを判断する
-2. default version policyでversion upする場合は、**内容を書き換える前に**既存current packageへ `ui_target_package.py next-version` を `package_root` だけで実行する。返却された `previous_version / next_version` を使い、READMEの `Previous Package Version / Package Version` とCHANGELOGのcurrent version headingを更新する。Agentがcurrent versionを手で転記しない
+2. default version policyでversion upする場合は、**内容を書き換える前に**既存current packageへ `ui_target_package.py next-version` を `package_root` だけで実行する。返却された `readme_version_rows_markdown` をREADMEの該当2rowへ反映し、`next_version` をCHANGELOGのcurrent version headingへ使用する。Agentがcurrent versionを手で転記しない
 3. LLMが影響するcanonical stable item / UNKを更新する。semantic identityがnewの場合だけ `next-id` を使う。UI target modeがownerの `SRC / SPEC / INF / UNK` とstructural IDはhelperで採番し、DEC / ASMはproject側正本の既存IDを参照する。返却IDを対象structured rowへ反映してから同prefixの次の採番へ進み、返却された `stable_id_change` はcurrent versionのCHANGELOGへ記録する。既存identityの内容変更は `changed`、UNKNOWN解消は `resolved`、current viewから外すentityは `retired` として、この時点で `Stable ID changes` tableへ記録する。UNKNOWN解消時は元UNKを `現在有効か=No` にし、確定内容を分類に合うnew / reuse stable IDへ接続して `解消先ID` を保持する
 4. 09_authority_and_traceability.mdのcanonical modelを更新する
 5. `Stable ID changes` tableへ今回のsemantic変更対象IDが揃った後、`ui_target_package.py impact` を `package_root` だけで実行し、helperが導出したchanged IDのexact参照先を再確認候補として列挙する
 6. LLMが候補fileを確認し、意味上変更が必要な01〜08 / domain fileだけを更新する
 7. LLMが07のUNKNOWN本文、06の矛盾 / resolved説明、CHANGELOGの変更概要・影響fileを更新する。Stable ID changesはStep 3で確定済みの集合を維持し、impact後に遡って変更対象IDを追加しない
 8. repository確認を実施した場合だけ08を更新する
-9. helperでcurrent UNKNOWN ID集合 / 件数を取得し、07 / READMEとの整合を確認する
+9. `ui_target_package.py render-readme-controls` を実行し、返却された `Package metadata` / `Current payload files` section全体をREADMEへ反映する。UNKNOWN件数・payload file順・種別をAgentが再構築しない
 10. `ui_target_package.py build-machine-evidence` で09のAuthority Entityとcurrent AC Entity、spec-analysis canonical `normalized_skill_input` を決定論生成する
-11. helperでMANIFEST / SHA-256を生成する
+11. README controlsとMachine Entity block反映後のcurrent packageに対して `ui_target_package.py build-manifest` を実行し、MANIFEST / raw SHA-256を生成する
 12. helperのvalidateを実行し、形式・参照・件数・version・CHANGELOG・file set・hashの決定論違反を解消する
 13. semantic quality gateでsource / inference / UI分類 / 意味重複等を最終確認する
 
@@ -386,7 +386,8 @@ helperが列挙したimpact候補は再確認対象であり、変更必須と�
 
 - domainが標準fileの責務とは独立している
 - 独立したAuthority / rule / flow集合として継続更新する必要がある
-- 00にfile名 / 責務 / 分割理由を記録する
+- 00に責務 / 分割理由とLLMが決めたlowercase kebab-case slugを記録する
+- `ui_target_package.py next-domain-file` で次の連番とcanonical file pathを取得し、Agentが10+番号を計算しない
 - README / MANIFESTへ登録する
 - current UNKNOWNのcanonical正本は09、repository statusの正本は08、canonical Authority / traceabilityの正本は09のまま
 - 同じ仕様項目を二重正本にしない
