@@ -700,7 +700,6 @@ payload:
 ```json
 {
   "normalized_authorities":[],
-  "normalized_acceptance_criteria":[],
   "normalized_skill_input":{"authorities":[],"acceptance_criteria":[]},
   "acceptance_criterion_entities":[],
   "machine_entities":[],
@@ -764,7 +763,7 @@ payloadは両projectionで次のexact shapeです。
 }
 ```
 
-`files[]` は実際に連結したrelative pathをcanonical順で持ちます。各file前へ `<!-- FILE: <relative-path> -->` + LFを付け、file textはUTF-8 decode後に内容を変更せず連結します。file末尾LFの有無は保持し、marker挿入以外の正規化を行いません。
+`files[]` は実際に連結したrelative pathをcanonical順で持ちます。各file frameは `<!-- FILE: <relative-path> -->` + LF + UTF-8 decodeしたfile textです。file textがLFで終わらない場合だけ、次のmarkerを独立行にするtransport separatorとしてLFを1文字追加します。このseparatorはsource file内容には含めず、その他の正規化・trim・改行変換を行いません。
 
 raw SHA-256はprojectionから再計算しません。production `validate` / repository unit testがraw bytesでMANIFEST hashを検証し、projected deterministic evalはMANIFEST schema、file集合・順序、SHA-256文字列形式、stable ref等を検証します。
 
@@ -972,7 +971,7 @@ MANIFEST先頭に次を持ちます。
 tableにはpayload filesだけをcanonical順で列挙します。
 
 - MANIFEST自身は含めない
-- SHA-256はraw file bytes
+- SHA-256はraw file bytesのlowercase 64 hex
 - READMEのCurrent payload filesとfile集合 / 順序一致
 - CHANGELOGもpayload / hash対象
 - semantic projectionではCHANGELOGを除外するがMANIFEST上はcurrent package payloadとして保持
