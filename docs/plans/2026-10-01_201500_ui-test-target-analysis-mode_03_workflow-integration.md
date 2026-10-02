@@ -189,13 +189,15 @@ Project ContextのSection 12 / 13が正本ownerであるdefault経路では、�
 - `## 12. 確定事項（決定事項の正本一覧）` → `DEC-xxx`
 - `## 13. 仮定（仮定の正本一覧）` → `ASM-xxx`
 
-LLMは回答の意味、DECISION / ASMの区別、既存identityのreuse / new、決定内容、関係、影響範囲、ASM承認可否を判断します。Project Contextがownerの場合、newと判断した後の番号だけhelperが既知最大番号+1で返します。
+LLMは回答の意味、DECISION / ASMの区別、既存identityのreuse / new、決定内容、関係、影響範囲、ASM承認可否を判断します。Project Contextがownerの場合、newと判断した後の番号だけhelperがprevious + candidate Project Contextの全状態rowから既知最大番号+1で返します。撤回 / 置換済みrowも使用済みID履歴として残し、番号再利用を許可しません。
 
 案件で別の決定事項 / 仮定の正本一覧が明示されている場合はそのownerを維持し、Project Contextへ複製・再採番しません。owner側にdeterministic ID allocatorがあればそれを使い、ownerがIDを確定できない状態ではLLMが番号を推測せず正本登録をblockedとして扱います。任意schema向けgeneric allocatorは追加しません。
 
 `skills/qa-workflow/assets/project-context-template.md` を正本ownerとして使う場合、Section 12 / 13はheader-onlyへ変更し、現在の `DEC-001` / `ASM-001` 例示rowを実データとして残しません。
 
-helperはProject Contextを書き換えず、正本tableをparseして次IDを返すだけです。exact CLI契約は `_06_package-schema-and-helper-contracts.md` を正本とします。
+Project Context ownerの更新では、previous Section 12 / 13に存在したDEC / ASM IDをcandidateから削除しません。更新後に `project_context_ids.py validate-history` を実行し、previous ID集合がcandidateへ全て残ることを決定論検証します。row順、決定内容、状態遷移の意味はhelperで判断しません。
+
+helperはProject Contextを書き換えません。exact CLI契約は `_06_package-schema-and-helper-contracts.md` を正本とします。
 
 ### 2.7 downstream machine handoff
 
@@ -224,7 +226,7 @@ test-requirement-designへ到達した場合は `requirement-structure-v2` を�
 - package templateはassets/ui-test-target-analysis/
 - qa-workflowは必要なSkillへroutingする
 - question-analysisは回答正規化とresume情報を返し、新規Qの番号はquestion_ids.pyで決定する
-- qa-workflowはProject Context Section 12 / 13が実際の正本ownerの場合だけproject_context_ids.pyでnew DEC / ASMの番号を決定する。別ownerが明示されている場合はその正本IDを維持する
+- qa-workflowはProject Context Section 12 / 13が実際の正本ownerの場合だけproject_context_ids.pyでnew DEC / ASMの番号を決定し、previous ID削除をvalidate-historyで拒否する。別ownerが明示されている場合はその正本ID lifecycleを維持する
 
 AIエージェントは利用環境で提供される通常のSkill読み込み機構に従います。
 
