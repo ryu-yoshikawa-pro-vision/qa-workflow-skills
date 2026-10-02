@@ -429,11 +429,11 @@ mode単体が成立してからworkflowへ接続します。
 - ACをDisposition upstream typeとして許可し、ownerをspec-analysisへ固定
 - test-requirement-designまで進むworkflowでcurrent ACをTRまたはDispositionへ閉じる
 - TR Entity contentへacceptance_refsを保存
-- TR Entity dependencyへ参照AC Entityと、そのACが参照するcurrent Authority Entity unionを直接保存する
+- artifact modeのTR Entity dependencyへ参照AC Entityと、そのACが参照するcurrent Authority Entity unionを直接保存する。direct modeでは存在しないMachine Entity dependencyを生成しない
 - repository内の `requirement-structure-v1` 固定参照をcurrent v2へ同期
 - v1 evidenceをv2 current evidenceとして読み替えない
 - AC本文 / 親Behavior / 親UC / 親USのfreshness regressionを追加
-- AC本文・親chain不変でAuthorityだけ変更しspec-analysisを再生成した後、未再実行TRが直接Authority dependencyによりstaleになるregressionを追加
+- artifact modeでAC本文・親chain不変のままAuthorityだけ変更しspec-analysisを再生成した後、未再実行TRが直接Authority dependencyによりstaleになるregressionを追加
 - partial rerunでscope外TRがchanged AC依存のままcurrentにならない regressionを追加
 - TR-OUT-003 / TR-SEM-003を追加
 - existing TR fixtures / runtime / portability / vertical integration testsをv2 schemaへ同期
