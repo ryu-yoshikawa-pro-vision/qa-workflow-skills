@@ -226,7 +226,7 @@ v1 artifactからexpected runtime unit集合を既存fixed builderで導出し�
 - resultの `tcn_id_state / model_key_state` を `previous_tcn_ids / previous_model_keys` へ設定
 - input `test_conditions[].draft_key` ↔ result `tcn_id_map[]` をjoinし、current TCN draftをreuseへ固定
 - input `models[].draft_key` ↔ result `model_key_map[]` をjoinし、current model draftをreuseへ固定
-- all active TCN / modelをfull rebuild scopeへ入れる
+- `tcn_id_state` のactive TCN IDを全件 `update_scope_tcn_ids[]`、`model_key_state` のactive model keyを全件 `update_scope_model_keys[]` へ入れ、first v2 condition_structure runをfull rebuildにする
 
 `materialize_coverage:<TCN-ID>` input:
 
@@ -247,7 +247,7 @@ v1 inputをcase-structureのcurrent schemaへcanonical copyし、次を反映し
 
 - v1 result `tc_id_state` を `previous_tc_ids[]` へ設定
 - v1 input `test_cases[].draft_key` ↔ result `tc_id_map[]` をexact joinし、current TC draftを `identity_action="reuse" / reuse_id=<mapped tc_id>` へ固定
-- all active TCをfull rebuild scopeへ入れる
+- `tc_id_state` のactive TC IDを全件 `update_scope_tc_ids[]` へ入れ、first v2 case_structure runをfull rebuildにする
 - draft_key / map missing / extra / duplicateをblockedにする
 
 #### canonical cutover sequence
