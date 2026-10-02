@@ -98,7 +98,7 @@ PR #16後の期待増分:
 期待:
 - v04完全版
 - 同じUNK lineage
-- 解消済みをcurrent unknownから除外
+- 解消済みをcurrent unknownから除外し、意味上そのUNKNOWNを解消したcurrent Authorityを`解消先ID`へ記録する
 - README / current unknown / changelog / manifestの意味整合
 - 差分だけを最終成果物にしない
 
@@ -108,6 +108,7 @@ semantic rubricへはmode固有の次の観点だけを追加し、既存SPEC cr
 - UI構造分類の妥当性
 - implementation status分離
 - versioned package更新の整合
+- resolved UNKNOWNと`解消先ID`の意味的対応
 - scope適用判定の妥当性
 - UI操作scopeのUS / UC / Behavior / AC分解の完全性
 - UI操作がないscopeでの非適用判断の妥当性
