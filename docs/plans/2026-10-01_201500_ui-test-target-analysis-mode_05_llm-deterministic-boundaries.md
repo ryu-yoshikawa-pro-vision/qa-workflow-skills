@@ -124,13 +124,23 @@ LLMがsemantic identityを判断して `new` と決めた後だけ使用しま�
 
 #### build-manifest
 
-current package fileからMANIFEST bodyまたはmachine-readable manifest projectionを生成します。
+current package fileからMANIFEST bodyとREADMEの `Current payload files` canonical tableを生成します。
 
 - MANIFEST自身は自己hash対象にしない
 - SHA-256はfileのraw bytesから計算する
 - file orderはmodeのcanonical orderに従う
 - 条件付き必須fileは00のapplicabilityと一致するものだけ含める
 - extension fileは00へ宣言済みのものだけ含める
+- Agent / LLMがfile順・hash・README file tableを再構築しない
+
+#### next-domain-file
+
+LLMが「標準fileへ混在させるべきでない独立domainが必要」と判断し、slugを決めた後だけ使用します。helperがexisting `10+` domain file番号の最大値+1を決め、canonical relative pathを返します。
+
+- domain fileが必要かは判断しない
+- slugの意味は判断しない
+- Agent / LLMに次の連番を計算させない
+- 既存最大番号が999なら自動拡張せず `id_space_exhausted`
 
 #### impact
 
@@ -164,6 +174,8 @@ deterministic:
 - MANIFESTを最後にcontrol fileとして追加
 
 共通して各fileの前へ `<!-- FILE: <relative-path> -->` を付け、内容は要約・正規化・書換えしません。package root外path、symlink、duplicate / missing fileを拒否します。
+
+projectionは評価transportです。raw file bytesのSHA-256再計算はproduction `validate` / repository unit testの責務とし、projected deterministic evalではMANIFEST schema、file集合・順序、SHA-256文字列形式、stable ref等を評価します。projectionからraw bytesを復元するframingは追加しません。
 
 semantic / deterministic runnerのdirectory対応は追加せず、この固定projectionを1-file inputとして渡します。
 
@@ -277,29 +289,44 @@ version変更の要否をpresentationだけの差分まで機械判定しませ�
 
 「同じversionを別内容で完成版として上書きしない」は更新手順上の契約です。current packageだけを見るvalidatorは過去の同version内容とのbyte比較を行わず、current / previous version metadataの形式・連続性・package内一致を検証します。
 
-## 8. question-analysis Skill-local helper
+## 8. question-analysis / Project ContextのSkill-local helper
 
 新規:
 
 - skills/question-analysis/scripts/unknown_links.py
+- skills/question-analysis/scripts/question_ids.py
+- skills/qa-workflow/scripts/project_context_ids.py
 
-本helperもPython標準ライブラリだけを使い、question-analysis package単体で実行可能にします。
+いずれもPython標準ライブラリだけを使い、各Skill package単体で実行可能にします。
 
-担当:
+`unknown_links.py` の担当:
 
 - 関連UNKNOWN IDの形式検証
 - current known UNKNOWN集合に対する存在検証
 - Q IDごとのduplicate UNKNOWN参照検出
-- resolved-only UNKNOWNをcurrent questionへ関連付けた場合の検出（current / resolved集合が入力として与えられた場合）
+- resolved-only UNKNOWNをcurrent questionへ関連付けた場合の検出
+
+`question_ids.py` の担当:
+
+- existing `Q-xxx` の形式・duplicate検証
+- LLMがnew questionと決めた後の次番号決定
+
+`project_context_ids.py` の担当:
+
+- Project Context Section 12のexisting `DEC-xxx` とSection 13のexisting `ASM-xxx` の形式・duplicate検証
+- question-analysis / stakeholder判断でnew DECISION / approved ASMと決まった後の次番号決定
 
 担当しない:
 
 - QとUNKが意味的に同一かの判断
+- Q / DEC / ASMのsemantic identity reuse / new判断
 - 質問文生成
 - 回答のSPEC / DECISION / ASM分類
+- DECISIONの内容・関係・影響範囲
+- ASM承認可否
 - 新しいUNKを作るべきかの判断
 
-eval validatorはこのproduction helperと同じ意味契約を独立fixtureで検証し、production helperをimportしてexpectedを作りません。
+各helperのexact operation / input / output / failure contractは `_06_package-schema-and-helper-contracts.md` を正本とします。eval validator / repository testはproduction helperからexpectedを逆算しません。
 
 ## 9. route / PAGE / VIEWの曖昧さ
 
