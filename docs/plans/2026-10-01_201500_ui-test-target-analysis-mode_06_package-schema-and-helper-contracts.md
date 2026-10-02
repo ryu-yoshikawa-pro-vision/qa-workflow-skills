@@ -579,7 +579,7 @@ LLM / AgentがSHA-256を手計算しません。
 }
 ```
 
-helperは最新versionのexact `Stable ID changes` tableから `added / changed / resolved / retired / migrated` のStable ID集合を内部導出し、cross-file exact reference indexから `changed_ids[] / affected_files[] / affected_rows[]` を返します。Agent / LLMが同じID集合をJSONへ再構築しません。
+helperは最新versionのexact `Stable ID changes` tableから `added / changed / resolved / retired / migrated` のStable ID集合を内部導出し、cross-file exact reference indexから `changed_ids[] / affected_files[] / affected_rows[]` を返します。Agent / LLMが同じID集合をJSONへ再構築しません。operation実行前に、そのversionでsemanticに変更したstable IDを同tableへ記録済みであることを更新手順の前提とします。
 
 legacy migration直後も同じcurrent versionの `Stable ID changes` tableを入力源とします。
 
