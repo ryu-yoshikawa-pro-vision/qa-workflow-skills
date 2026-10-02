@@ -294,10 +294,18 @@ not-applicable / blocked scopeはUS / UC / Behavior / ACを確定済みrowとし
 
 #### 分析項目
 
-| 項目ID | カテゴリ | 内容 | 分類 | 情報源 / 正本参照 | 現在有効か | 補足 / 上書き / 置換関係 | 備考 |
-| --- | --- | --- | --- | --- | --- | --- | --- |
+| 項目ID | カテゴリ | 内容 | 分類 | 情報源 / 正本参照 | 現在有効か | 解消先ID | 補足 / 上書き / 置換関係 | 備考 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
 UI target modeでは `現在有効か` を `Yes / No` に固定します。
+
+UNKNOWNのlineageは次に固定します。
+
+- `分類=UNKNOWN` かつ `現在有効か=Yes` → `解消先ID` は空
+- `分類=UNKNOWN` かつ `現在有効か=No` → `解消先ID` は1件以上必須
+- `解消先ID` はcurrentなSPEC / DECISION / 承認済みASMのstable IDだけを許可する
+- UNKNOWN以外のrowでは `解消先ID` は空
+- どのAuthorityがUNKNOWNを解消したかの意味判断はLLMが行い、helperは形式・存在・currentness・種別だけを検証する
 
 #### 現在有効な仕様根拠
 
@@ -363,11 +371,26 @@ helperは宣言されたheader名のexact ID参照だけを検証し、proseか�
 
 形式は `PREFIX-001` ～ `PREFIX-999`。
 
-`next-id` はLLMがnewと判断した後にのみ使用し、current + previousで既知の同prefix最大値+1を返します。
+`next-id` はLLMがnewと判断した後にのみ使用します。Agentから既知ID一覧を受け取らず、helperが `package_root` のcurrent structured rowとCHANGELOGに記録されたexact stable ID tokenを走査し、同prefixの既知最大番号+1を返します。
+
+削除済み・置換済みentityのIDもCHANGELOGへ記録済みである限り再利用しません。stable IDを削除・置換するversionでは、そのIDをCHANGELOGの「変更 / 解消したstable ID」へ必ず記録します。
 
 999を使用済みなら自動的に4桁へ拡張せず `id_space_exhausted` でblockedを返します。prefix拡張はschema変更として別途扱います。
 
 SPEC / DEC / INF / UNK / SRC / ASMは既存spec-analysisのID契約を使用します。
+
+### 6.1 structured Markdown parse contract
+
+production helperは任意Markdownを解釈する汎用parserにしません。§2〜§5で定義したcanonical heading / tableだけを対象に、次の固定規則でparseします。
+
+- canonical structured tableのheadingはexact文字列で1回だけ存在する
+- 同じcanonical heading配下に対象tableが複数ある場合は `package_schema_mismatch`
+- tableはheader / separator / rowの列数一致を要求する
+- cell前後の空白はtrimする
+- literal `|` をcellに含める場合は `\|` とする
+- 複数stable ID参照は `<br>` だけを区切りとして使い、各要素をtrimし、空要素を拒否する
+- prose中に現れたID文字列はstable referenceとして扱わない
+- production helperとdeterministic eval validatorは実装を共有しないが、同じparse fixture corpusで上記契約を検証する
 
 ## 7. helper CLI common contract
 
@@ -467,7 +490,7 @@ stdin:
 {"operation":"validate","package_root":"<path>"}
 ```
 
-§2〜§6およびfilesystem safetyを検証します。
+§2〜§6およびfilesystem safetyを検証します。加えて、resolved UNKNOWNの `解消先ID`、`Machine Entities: spec-analysis` blockのexactly-one存在、build-machine-evidence再生成結果との完全一致を検証します。
 
 ### next-version
 
@@ -488,14 +511,16 @@ stdin:
 ```json
 {
   "operation":"next-id",
-  "prefix":"PAGE",
-  "known_ids":["PAGE-001","PAGE-002"]
+  "package_root":"<path>",
+  "prefix":"PAGE"
 }
 ```
 
+helperはcurrent structured rowとCHANGELOGのexact stable ID tokenから既知ID集合を内部導出します。
+
 payload: `{"next_id":"PAGE-003"}`
 
-semantic identityは判断しません。
+semantic identityは判断しません。Agent / LLMが `known_ids[]` を組み立てる経路は作りません。
 
 ### build-manifest
 
@@ -597,14 +622,27 @@ LLMが09へCurrent Effective Authorityを確定し、02へcurrent US / UC / Beha
 
 ### 9.1 Authority
 
-Authority部分は既存 `authority_entities.py` のnormalized input / builder契約をそのまま再利用します。
+Authority部分は既存 `authority_entities.py` のnormalized input / builder契約をそのまま再利用します。09の「現在有効な仕様根拠」tableから `normalized_authorities[]` への変換はhelper内で次に固定します。
+
+| 09 column | normalized Authority field |
+| --- | --- |
+| 仕様根拠ID | `authority_id` |
+| 種別 | `authority_type` |
+| 現在有効な内容 | `active_content={"text":"<cell>"}` |
+| 適用範囲 | `scope` |
+| 情報源 / 正本一覧 | `source_refs[]` |
+| 関係 | `relations[]` |
+| 関連仕様根拠ID | `related_authority_refs[]` |
 
 規則:
-- 情報源 / 正本一覧と関連仕様根拠IDの複数IDは `<br>` 区切り
+- `現在有効な内容` はtrim後の文字列を `active_content.text` へ入れ、helperが意味的な再要約・再構成をしない
+- `情報源 / 正本一覧` は `SRC-xxx` stable ID参照だけを許可し、複数IDは `<br>` 区切り
+- `関連仕様根拠ID` の複数IDも `<br>` 区切り
+- `source_refs[]` / `relations[]` / `related_authority_refs[]` はtrim・duplicate拒否後に昇順canonical化する
 - 空参照は空array
 - 種別は既存SPEC / DECISION / 承認済みASM
 - INF / UNKNOWNはCurrent Effective Authority inputへ含めない
-- LLMがJSON wrapper、fingerprint、expected identityを再生成しない
+- LLMがnormalized Authority JSON、Machine Entity wrapper、fingerprint、expected identityを再生成しない
 
 ### 9.2 Acceptance Criterion
 
@@ -810,17 +848,19 @@ production helperのfilesystem / hash / projection / next-id / build-machine-evi
 - path traversal / absolute payload path / symlink
 - missing required file
 - invalid schema version
+- duplicate canonical heading / table、row列数不一致、escaped pipe / `<br>` reference parse
 - duplicate / unknown stable ref
+- resolved UNKNOWNの `解消先ID` missing / invalid / non-current Authority
 - scope applicability / conditional-required file mismatch
 - required UI operation decompositionのmissing table / parent / closure
 - UCごとの正常 / 準正常 / 例外3分類と定義あり / なし / 未定義整合
 - MANIFEST hash mismatch
 - semantic / deterministic projection差分
-- build-machine-evidence内のAuthority部分と既存authority_entities.py結果一致
+- 09 table → normalized Authority固定projectionと既存authority_entities.py結果一致
 - current AC Entity contentへ親US / UC / Behavior chainが固定projectionされること
 - 親US / UC / Behavior変更でAC fingerprintが変わること
 - spec-analysis normalized_skill_input / expected identityがhelper結果から再現できること
-- artifact `Machine Entities: spec-analysis` blockがruntime_contract.pyの `extract_machine_blocks(..., "Machine Entities")` で読めること
+- artifact `Machine Entities: spec-analysis` blockがexactly one存在し、runtime_contract.pyの `extract_machine_blocks(..., "Machine Entities")` で読め、helper再生成結果と完全一致すること
 - legacy migration後fixtureのvalidate PASS
 
 新しいGitHub Actions workflowは作りません。PR #14後の既存CIは `skills/*/scripts` を動的compileするため、helper compile目的のworkflow path追加は不要です。repository unit / runtime integration / portability testを既存test discoveryへ追加します。
@@ -829,6 +869,9 @@ production helperのfilesystem / hash / projection / next-id / build-machine-evi
 
 - current packageを `ui-target-v1` として機械識別できる
 - helperのoperation / input / output / failure contractが一意
+- current packageの `Machine Entities: spec-analysis` blockがexactly one存在し、helper再生成結果と一致する
+- resolved UNKNOWNが `解消先ID` でcurrent Authorityへ機械検証可能に閉じる
+- new ID採番時にAgentが既知ID集合を手組みしない
 - structured tableのheader / ID / ref列が一意
 - scopeごとのUI操作適用判定と条件付き必須fileの存在を機械検証できる
 - UI操作scopeでUIOP / US / UC / Behavior / AC hierarchyと3分類完全性を機械検証できる
