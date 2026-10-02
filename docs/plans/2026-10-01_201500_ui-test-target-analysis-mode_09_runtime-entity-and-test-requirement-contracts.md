@@ -186,12 +186,12 @@ scriptは次を行います。
 5. linked upstream集合へ `acceptance_criterion` を追加
 6. closure universeへcurrent ACを追加
 7. TR Entity contentへ `acceptance_refs` を保存
-8. TR Entity `upstream_entity_dependencies[]` へ参照current AC Entityを追加
-9. 各参照ACの `authority_refs[]` をunionし、そのcurrent Authority EntityもTR Entity `upstream_entity_dependencies[]` へ直接追加
+8. artifact modeではTR Entity `upstream_entity_dependencies[]` へ参照current AC Entityを追加する。direct modeではcurrent Machine Entityがないためdependencyを捏造せず、`acceptance_refs[]` をcontentへ保持する
+9. 各参照ACの `authority_refs[]` をunionする。artifact modeでは解決できたcurrent Authority EntityをTR Entity `upstream_entity_dependencies[]` へ直接追加する。direct modeではknown Authority ID検証とcontent保持までとし、Machine Entity dependencyは作らない
 10. AC linked + disposedの二重扱いを拒否
 11. linkedもdisposedもされないcurrent ACをunclosedとして拒否
 
-Authority dependencyの展開はID集合・Entity解決だけを行う決定論処理です。どのAuthorityがACを支えるかはspec-analysisでLLMが判断済みであり、test-requirement-design側で意味を再判断しません。
+Authority dependencyの展開はID集合・Entity解決だけを行う決定論処理です。どのAuthorityがACを支えるかはspec-analysisでLLMが判断済みであり、test-requirement-design側で意味を再判断しません。存在しないMachine Entityをdirect modeでplaceholder生成する経路は追加しません。
 
 LLMはACとTRの意味上の対応、TRの分割 / 統合を判断します。scriptは対応関係の意味妥当性を決めません。
 
@@ -258,7 +258,7 @@ validatorはAuthority / Product Risk / Acceptance Criteriaをclosure universeと
 | 親Behavior変更、AC本文同じ | AC fingerprint変更 → 関連TR stale |
 | 親UC変更、AC本文同じ | AC fingerprint変更 → 関連TR stale |
 | 親US変更、AC本文同じ | AC fingerprint変更 → 関連TR stale |
-| Authority変更、AC本文・親chain同じ、spec-analysis再実行済み | TRが保持する直接Authority dependency不一致 → 関連TR stale |
+| artifact modeでAuthority変更、AC本文・親chain同じ、spec-analysis再実行済み | TRが保持する直接Authority dependency不一致 → 関連TR stale |
 | 無関係UC / AC変更 | 無関係TRはcurrent |
 
 freshness判定アルゴリズム自体は既存 `evaluate_entity_freshness` を再利用し、新しい伝播engineを作りません。
