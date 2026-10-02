@@ -160,7 +160,7 @@ qa-workflow / coverage-analysisはshared runtime contractからAuthority + curre
 
 ユーザー要求が仕様理解packageまでならspec-analysisの完了条件で終了し、test-analysis / test-requirement-designを起動しません。この場合、AC→TR / Disposition closureはpackage単体の完了条件ではありません。
 
-test-requirement-designへ到達した場合は `requirement-structure-v2` を使用し、current AC ID集合を `acceptance_criteria[]`、各TRの意味対応を `acceptance_refs[]` として渡します。ACとTRの意味対応はLLMが判断し、ID集合・Entity存在・closure・freshnessはdeterministic runtimeが検証します。
+test-requirement-designへ到達した場合は `requirement-structure-v2` を使用し、`build-machine-evidence` が返したcurrent ACの `ac_id / authority_refs[]` を `acceptance_criteria[]` としてそのまま渡します。各TRの意味対応だけをLLMが `acceptance_refs[]` として判断し、AC / AuthorityのID集合・Entity存在・dependency展開・closure・freshnessはdeterministic runtimeが検証します。AgentがACからAuthority参照を再構築しません。
 
 このhandoffの追加はrouting caseを増やしません。既存workflowの選択結果に対するmachine data受け渡し契約です。
 ## 3. Agent Skillsとしての利用前提
