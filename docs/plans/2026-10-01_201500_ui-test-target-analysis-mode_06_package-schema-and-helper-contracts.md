@@ -581,7 +581,7 @@ payload:
   "update_snapshot":{
     "package_version":"v15",
     "tracked_items":[
-      {"stable_id":"SPEC-001","owner_file":"09_authority_and_traceability.md","owner_section":"分析項目","row_fingerprint":"<sha256>","unknown_active":null,"resolution_refs":[]}
+      {"stable_id":"SPEC-001","tracking_file":"09_authority_and_traceability.md","tracking_section":"分析項目","row_fingerprint":"<sha256>","unknown_active":null,"resolution_refs":[]}
     ],
     "exact_reference_index":[],
     "payload_file_sha256":[
@@ -602,7 +602,7 @@ payload:
 - `row_index` は対象structured tableのdata rowを1始まりで数える
 - `unresolved_structural_issues[]` は `issue_type / file / section / row_index / column / message` を持ち、存在しない位置はnull
 - `update_snapshot` は更新開始前の状態を後続operationへそのまま渡すmachine inputであり、Agent / LLMが編集・再構築しない
-- `tracked_items[]` は§6.1のtracked stable IDをowner row単位で1行に正規化し、`stable_id` 昇順。自由記述ではなくcanonical structured owner rowの正規化結果から `row_fingerprint` を計算する
+- `tracked_items[]` は§6.1のtracked stable IDをpackage内canonical tracking row単位で1行に正規化し、`stable_id` 昇順。field名は `tracking_file / tracking_section` とし、Authorityの実際の正本ownerを意味しない。DEC / ASMの実ownerがProject Contextや外部正本でも、ここでは09のpackage projection rowをtracking位置として記録する。自由記述ではなくcanonical structured tracking rowの正規化結果から `row_fingerprint` を計算する
 - UNKNOWN rowは `unknown_active=true / false` とcanonical `resolution_refs[]` を保持し、それ以外は `unknown_active=null / resolution_refs=[]`
 - snapshotの `exact_reference_index[]` と `payload_file_sha256[]` はsnapshot時点の値を保持し、retired IDの過去参照先や更新前file集合もimpact算出へ利用できるようにする
 
@@ -882,7 +882,7 @@ payload:
 }
 ```
 
-`affected_files[]` は「実際に本文変更が必要だったfile」ではなく、changed stable IDのprevious/current owner fileとprevious/current exact reference先のunionです。再確認対象を漏らさないための決定論的な影響候補としてcanonical file orderで返し、CHANGELOGの `影響file` もこの定義へ固定します。意味上そのfileを修正すべきかはLLMが判断します。
+`affected_files[]` は「実際に本文変更が必要だったfile」ではなく、changed stable IDのprevious/current package tracking fileとprevious/current exact reference先のunionです。再確認対象を漏らさないための決定論的な影響候補としてcanonical file orderで返し、CHANGELOGの `影響file` もこの定義へ固定します。意味上そのfileを修正すべきかはLLMが判断します。
 
 `stable_id_changes_markdown` と `affected_files_markdown` はsection全体を置換するcanonical Markdownです。Agent / LLMがchanged ID集合・Change値・影響file一覧を再構築しません。
 
