@@ -79,11 +79,21 @@ stdin / stdout JSON、operation名、failure、size limit、sort順等の正確�
 
 - `不明点 / 質問一覧` と `質問ID履歴` の `Q-xxx` をparseする
 - current質問ID / 使用済み履歴IDのduplicate / malformedを拒否する
-- LLMがnew questionと判断した後、previous + current artifactのcurrent Q / 質問ID履歴unionから既知最大番号+1を返す
-- previous artifactとcandidate current artifactから、previous current Q + previous履歴 + current Qのunionをcanonical `質問ID履歴` tableとして生成する
+- create / updateを区別し、既存成果物更新ではprevious artifact欠落をfail-closedにする
+- LLMがnew questionと判断した後、previous current Q + previous履歴 + current Qの共通正本集合から既知最大番号+1を返す。candidate側の既存 `質問ID履歴` は採番入力にしない
+- previous artifactとcandidate current artifactから、同じ正本集合のunionをcanonical `質問ID履歴` tableとして生成する
 - `Q-999` 使用済みなら既存3桁ID契約を勝手に拡張せず `id_space_exhausted` を返す
 
 この2 helperはQとUNKの意味的対応、質問文、回答後の正規化先、reuse / newの意味判断を行いません。
+
+spec-analysisからquestion-analysisへ進む順序は次に固定します。
+
+1. repository / source更新やresolver失効をspec-analysisが先に評価する
+2. LLMがsame-UNK reopenかnew UNKかを判断し、UI target packageのcanonical 09 / 07へ反映する
+3. `ui_target_package.py inspect` を再実行し、更新後の `current_unknown_ids[] / resolved_unknown_ids[]` を取得する
+4. question-analysisはこのcurrent UNKNOWN集合だけを使ってcurrent Qを作る
+
+resolved-only UNKをquestion-analysisへ先に渡してからreopenする順序は禁止します。これにより `unknown_links.py` のresolved-only参照拒否とsame-ID reopenを両立させます。
 
 question-analysis成果物の更新順は次に固定します。
 
