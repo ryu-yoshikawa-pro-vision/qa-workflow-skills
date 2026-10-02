@@ -224,7 +224,7 @@ IDへActor、結果分類等のmutable semanticsを埋め込みません。
 
 semantic identityのreuse / new判断はLLMが行います。
 
-LLMがnewと判断した後の採番は `ui_target_package.py next-id` を使用します。
+LLMがnewと判断した後の採番は `ui_target_package.py next-id` を使用します。helperがpackageから既知IDを導出し、Agentは既知ID集合を手組みしません。
 
 分類変更だけでstable IDを再採番しません。
 
@@ -268,7 +268,7 @@ Acceptance CriteriaはTest Requirementそのものではありません。
 - 1 AC → 複数TR
 - 複数AC → 1 TR（同じ検証責務へ安全に統合できる場合）
 
-current ACは必ず、1件以上のTRまたは明示的dispositionへ閉じます。
+ユーザー要求がtest-requirement-designまで進むworkflowでは、current ACを必ず1件以上のTRまたは明示的dispositionへ閉じます。仕様理解packageだけを要求された場合は、current ACをAuthorityへ追跡しMachine Entity化できれば本工程は完了でき、AC→TR / disposition closureを要求しません。
 
 ACに関係しない横断的TRも許可します。その場合も現在有効なAuthorityへの追跡は必須です。
 
@@ -302,7 +302,7 @@ test-condition-designはTRから問題構造を分析し、仕様 / Risk / 状�
 - current AC → current Authority ref
 - current / blockedとUNKNOWN参照の整合
 - broken structural ref
-- build-machine-evidence結果とartifact Machine Entity blockの一致
+- `Machine Entities: spec-analysis` blockのexactly-one存在とbuild-machine-evidence結果との一致
 
 意味判断は行いません。
 
@@ -397,6 +397,6 @@ legacy UI target packageにUS / UC / Behavior / ACが存在しない場合でも
 - current ACがcurrent Authorityへ追跡できる
 - ACだけが下流handoff用Machine Entityとして決定論生成される
 - US / UC / Behavior変更でも関連AC Entity fingerprintが変わる
-- current ACがTRまたは明示的dispositionへ閉じる
+- test-requirement-designまで進むworkflowではcurrent ACがTRまたは明示的dispositionへ閉じる。仕様理解packageだけの要求ではこのclosureを完了条件にしない
 - factor / value / combinationはtest-condition-designへ残る
 
