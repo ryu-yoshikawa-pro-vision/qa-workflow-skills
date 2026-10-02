@@ -246,10 +246,9 @@ repository unit testで次を必須確認します。
 - CHANGELOG最新version見出しとpackage versionの一致
 - CHANGELOGのexact `Stable ID changes` table、Change enum、version内duplicate
 - fresh v00の空change table、v01以降のDEC / ASM初登場=added、既追跡内容・状態変更=changed、current structured model除去=retired
-- resolvedはUNKだけに許可し、resolved / retired後の後続eventをreject
-- legacy migrationでDEC / ASMを含むretained tracked IDをmigratedとしてseed
-- 履歴全体で同じStable IDへ `added / migrated` を複数回記録できず、`resolved / retired` 後に別entityとして再導入できないこと
-- legacy migrationでretained current IDを `migrated` としてseedし、確認できるretired / resolved履歴だけをseedすること
+- resolvedはUNKだけに許可し、resolved / retiredをterminal eventとして後続eventをreject
+- 履歴全体で同じStable IDへ `added / migrated` を複数回記録できないこと
+- legacy migrationでDEC / ASMを含むretained tracked IDを `migrated` としてseedし、確認できるretired / resolved履歴だけをseedすること
 - current packageのnext-versionが `package_root` からcurrent versionを内部取得し、Agentへ `previous_version` の転記を要求しないこと
 - default policyでREADMEのPackage Version / Previous Package Versionが初回または1 revision差として整合すること
 - legacy migration用next-versionだけが明示 `previous_version` inputを受けること
