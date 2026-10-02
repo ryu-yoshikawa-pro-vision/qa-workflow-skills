@@ -275,7 +275,7 @@ repository unit testで次を必須確認します。
 - 履歴全体で同じStable IDへ `added / migrated` を複数回記録できないこと
 - legacy migrationでDEC / ASMを含むretained tracked IDを `migrated` として引き継ぎ、確認できる `resolved / retired` lifecycle eventだけを受理すること。`retired` だけをterminalとして扱い、materializeが両eventのIDをnew ID採番前の使用済み集合へ予約すること
 - current packageのnext-versionが `package_root` からcurrent versionを内部取得し、Agentへ `previous_version` の転記を要求しないこと
-- default policyでREADMEのPackage Version / Previous Package Versionが初回または1 revision差として整合し、user-managed / semantic payloadへ永続差分を保存する場合はsemantic / presentationを問わず+1となること。version / CHANGELOG新entry / README controls / MANIFESTだけの派生差分を変更原因に数えず、provisional payloadが同一ならno-opでversion維持となること
+- default policyでREADMEのPackage Version / Previous Package Versionが初回または1 revision差として整合し、user-managed / semantic payloadまたはLLM入力のcurrent `変更概要`へ永続差分を保存する場合はsemantic / presentationを問わず+1となること。version metadata / generated `Stable ID changes` / generated `影響file` / README controls / MANIFESTだけの派生差分を変更原因に数えず、provisional payload + requested change_summaryが同一ならno-opでversion維持となること
 - legacy migration用next-versionだけが明示 `previous_version` inputを受けること
 - render-readme-controlsがcurrent UNKNOWN件数とpayload file tableのcanonical Markdownを返し、Agentが件数・file順・種別を再構築しないこと
 - focused next-domain-fileがLLMのslug決定後に10+ fileの次番号とcanonical pathだけを決定すること。canonical materializeでは `extension_file_updates[]` のrequest順に複数new extensionをbatch採番し、同requestのstable owner row適用前にtemplate / pathを準備し、00の `案件固有extension file一覧` と実fileを同時生成すること
@@ -547,7 +547,7 @@ mode単体が成立してからworkflowへ接続します。
 - 各cutover phaseが返した `normalized_runtime_inputs[]` だけで次のv2 generatorを実行でき、Agent-side field mergeが不要なintegration testを追加
 - TCDでv2 model `generation_fingerprint` がv1から変わってもTDR / materializeのtarget version fieldをcurrent v2 targetへrebaseできること
 - derived child model inputをcurrent v2 parent `derived_child_inputs` から生成し、v1 saved child inputとのsemantic driftをrejectすること
-- v1でnewだったsemantic coverage itemをv1 `semantic_ci_mapping_state`へ一意joinし、cutover後も同じCI IDをreuseすること
+- v1でnewだったsemantic coverage itemは、rebase前のv1 source_target_versionsからv1 semantic_content_fingerprintを再計算してv1 `semantic_ci_mapping_state`へ一意joinし、current target versionへrebase後も同じCI IDをreuseすること
 - partial rerunでscope外TRがchanged AC依存のままcurrentにならない regressionを追加
 - TR-OUT-003 / TR-SEM-003を追加
 - existing TR fixtures / runtime / portability / vertical integration testsをv2 schemaへ同期
