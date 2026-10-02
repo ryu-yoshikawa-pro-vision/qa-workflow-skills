@@ -288,14 +288,15 @@ repository unit testで次を必須確認します。
 - Q-999で `id_space_exhausted`
 
 `project_context_ids.py`:
-- Section 12 / 13のDEC / ASM正本tableだけをparse
+- Project Context Section 12 / 13が案件のDEC / ASM正本ownerである場合だけ対象tableをparse
 - semantic reuse / new判断をせず、new確定後の最大値+1を返す
 - malformed / duplicate IDを拒否
 - DEC-999 / ASM-999で `id_space_exhausted`
+- 別ownerが明示されている場合はそのIDをProject Contextへ複製・再採番しない
 
-QとUNKの意味的同一性、Q / DEC / ASMのsemantic identity、DECISION内容、ASM承認可否は検証しません。
+QとUNKの意味的同一性、Q / DEC / ASMのsemantic identity、DECISION内容、ASM承認可否、Project Context以外の正本schema解釈は検証しません。別ownerのIDが未確定ならLLM hand-numberingへfallbackせず正本登録をblockedとします。
 
-question-analysis output templateのQ tableとProject Context templateのSection 12 / 13はheader-onlyに変更し、Q-001 / DEC-001 / ASM-001のplaceholder rowを置きません。
+question-analysis output templateのQ tableはheader-onlyに変更します。Project Contextが正本ownerであるdefault経路ではSection 12 / 13もheader-onlyに変更し、Q-001 / DEC-001 / ASM-001のplaceholder rowを置きません。
 
 ### 8.3 deterministic output eval
 
