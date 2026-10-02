@@ -145,6 +145,22 @@ expected routingからcandidate outputを自動生成せず、既存契約どお
 
 routing fixtureはPR #14後の61件から8件追加して69件になる想定です。実装開始時にStep 0で現在値を再確認し、追加数が変わらなければEVALS.md / docs/PROJECT_CONTEXT.md / routing件数を保持するrepository contractを69へ同期します。READMEにrouting件数を持つ場合のみ同様に更新します。
 
+### 2.6 downstream machine handoff
+
+UI target modeから後続テスト設計へ進む場合、spec-analysis成果物のMachine Entity / normalized inputをAgentがMarkdownから再構築しません。
+
+`ui_target_package.py build-machine-evidence` が返す次を正規handoffとして使用します。
+
+- spec-analysis canonical `normalized_skill_input`
+- Authority Machine Entities
+- current Acceptance Criterion Machine Entities
+- expected entity identities
+
+qa-workflow / coverage-analysisはshared runtime contractからAuthority + current ACのexpected Entityを内部導出します。
+
+test-requirement-designへ到達した場合は `requirement-structure-v2` を使用し、current AC ID集合を `acceptance_criteria[]`、各TRの意味対応を `acceptance_refs[]` として渡します。ACとTRの意味対応はLLMが判断し、ID集合・Entity存在・closure・freshnessはdeterministic runtimeが検証します。
+
+このhandoffの追加はrouting caseを増やしません。既存workflowの選択結果に対するmachine data受け渡し契約です。
 ## 3. Agent Skillsとしての利用前提
 
 今回のmodeは既存Skillと同じAgent Skills構造で提供します。
