@@ -8,7 +8,7 @@
 - 2026-10-01_201500_ui-test-target-analysis-mode_06_package-schema-and-helper-contracts.md
 - 2026-10-01_201500_ui-test-target-analysis-mode_08_behavior-decomposition-and-acceptance-traceability.md
 
-この文書は、Acceptance Criteriaを既存runtime-v1へ接続し、test-requirement-designまでfreshness / closureを維持するためのcross-Skill runtime契約の正本です。
+この文書は、Acceptance Criteriaを既存runtime-v1へ接続し、test-requirement-designまで進むworkflowでfreshness / closureを維持するためのcross-Skill runtime契約の正本です。仕様理解packageだけを要求された場合、Acceptance Criterion Machine Entity生成までは行いますが、test-requirement-designの起動とAC→TR / Disposition closureは完了条件にしません。
 
 ## 1. 固定方針
 
@@ -23,7 +23,7 @@
 
 ## 2. shared runtime_contract.py
 
-PR #14後baselineでは次の7 Skill-local `runtime_contract.py` がbyte-identicalであることをrepository testが保証しています。
+PR #14確認headには次の9 Skill-local `runtime_contract.py` が存在し、同一blobを使用しています。
 
 - skills/spec-analysis/scripts/runtime_contract.py
 - skills/test-analysis/scripts/runtime_contract.py
@@ -32,8 +32,10 @@ PR #14後baselineでは次の7 Skill-local `runtime_contract.py` がbyte-identic
 - skills/test-case-design/scripts/runtime_contract.py
 - skills/coverage-analysis/scripts/runtime_contract.py
 - skills/qa-workflow/scripts/runtime_contract.py
+- skills/usability-inspection/scripts/runtime_contract.py
+- skills/wcag-conformance-evaluation/scripts/runtime_contract.py
 
-PR #16では7コピーを同一内容で更新します。1コピーだけの変更は禁止します。
+既存repository byte-identity testはPR #11由来の7コピーだけを対象にしていますが、PR #16では同じ `runtime-v1` helper契約の分岐を残さないためcurrent 9コピーを同一内容で更新し、byte-identity testの対象も9コピーへ拡張します。1コピーだけの変更は禁止します。
 
 ### 2.1 ALLOWED_ENTITY_TYPES
 
@@ -65,7 +67,7 @@ spec-analysisはruntime unitを新設しません。expected Entity導出だけ�
 
 今回の変更は許可Entity type / canonical projection / expected Entity導出の追加であり、共通envelope shapeやfreshness algorithmを置換しません。そのため `RUNTIME_CONTRACT_VERSION = runtime-v1` を維持します。
 
-ただし7コピーのruntime implementation fingerprintは変わります。既存runtime evidenceを無条件にcurrent扱いせず、既存fingerprint contractどおりcurrent script再実行で再検証します。この安全側invalidatonを回避する特例は追加しません。
+ただし9コピーのruntime implementation fingerprintは変わります。既存runtime evidenceを無条件にcurrent扱いせず、既存fingerprint contractどおりcurrent script再実行で再検証します。この安全側invalidatonを回避する特例は追加しません。
 
 ## 3. spec-analysis normalized machine input
 
@@ -278,7 +280,7 @@ coverage-analysisの既存traceability graph node typeへACを追加しません
 
 少なくとも次を更新 / 追加します。
 
-- 7 Skill-local runtime_contract.py copies byte-identical
+- current shared runtime 9 Skill-local runtime_contract.py copies byte-identical
 - `acceptance_criterion` Machine Entity valid / unknown type regression
 - shared canonicalization: `acceptance_refs` / `acceptance_criteria`
 - spec-analysis expected Authority + AC identity
@@ -302,11 +304,11 @@ coverage-analysisの既存traceability graph node typeへACを追加しません
 
 ## 16. 完了条件
 
-- 7 runtime_contract.pyが同一内容でacceptance_criterionを扱える
+- current shared runtime 9 runtime_contract.pyが同一内容でacceptance_criterionを扱える
 - runtime-v1を維持しつつrequirement-structure-v2が明示される
 - helperからspec-analysis normalized_skill_inputとAuthority + AC Entityを決定論生成できる
 - qa-workflowがAuthority + ACをexpectedとして内部導出できる
-- current ACがTRまたはDispositionへ完全に閉じる
+- test-requirement-designまで進むworkflowではcurrent ACがTRまたはDispositionへ完全に閉じる。仕様理解packageだけの要求ではこのclosureを要求しない
 - AC / 親Behavior / 親UC / 親US / Authority変更が必要なTR freshnessへ伝播する
 - 無関係TRを不必要にstale化しない
 - partial rerunでscope外TRがchanged ACを参照したままcurrentにならない
