@@ -268,8 +268,11 @@ pure narrativeや説明用sectionへ無理に参照列を追加しません。�
 - UNKNOWN本文・影響・質問内容はLLMが記述する
 - 07に載せるUNK ID集合と件数はhelperで検証する
 - READMEの件数は同じ集合から検証する
-- UNKNOWNが解消した場合、元のUNK rowは削除・再分類せず `現在有効か=No` とし、`解消先ID` で新しいcurrent SPEC / DECISION / 承認済みASMのstable IDへlineageを残す
+- UNKNOWNが解消した場合、元のUNK rowは削除・再分類せず `現在有効か=No` とし、`解消先ID` でcurrent SPEC / DECISION / 承認済みASMのstable IDへlineageを残す
 - `解消先ID`はLLMが意味上の解消先を決め、helperが形式・存在・current Authority種別だけを検証する
+- 後続更新で解消先Authorityが変わっても同じ論点が解消済みなら、同じUNK rowの `解消先ID` を新しいcurrent Authorityへ更新する
+- 解消根拠がなくなった場合、同じ論点なら同じUNKを `現在有効か=Yes / 解消先ID=空` へ戻す。別論点なら旧UNKはresolved historyとして維持しnew UNKを作る
+- 同一論点 / 別論点の判断はLLM、`Yes / No` と `解消先ID` の組合せ・CHANGELOG event整合はhelperが担当する
 - 新しい確定内容は分類に合う新しいstable IDで記録する。`UNK-xxx` をDECISIONへ分類変更しない
 - resolved historyの説明はLLMがCHANGELOG / 06へ記載できる
 
@@ -318,8 +321,9 @@ version変更の要否をpresentationだけの差分まで機械判定しませ�
 
 `question_ids.py` の担当:
 
-- existing `Q-xxx` の形式・duplicate検証
-- LLMがnew questionと決めた後の次番号決定
+- current `不明点 / 質問一覧` とmachine-readableな `質問ID履歴` の `Q-xxx` 形式・duplicate検証
+- LLMがnew questionと決めた後、current + historyの使用済みID unionから次番号を決定
+- previous artifactとcandidate current artifactから、過去に一度でも使ったQ IDを落とさないcanonical `質問ID履歴` tableを生成
 
 `project_context_ids.py` の担当:
 
@@ -331,6 +335,7 @@ version変更の要否をpresentationだけの差分まで機械判定しませ�
 
 - QとUNKが意味的に同一かの判断
 - Q / DEC / ASMのsemantic identity reuse / new判断
+- resolved Qをcurrent質問一覧へ残すかどうかの意味判断
 - 質問文生成
 - 回答のSPEC / DECISION / ASM分類
 - DECISIONの内容・関係・影響範囲
