@@ -359,14 +359,16 @@ default policyでは、完成済みpackageのuser-managed / semantic payloadへ�
 `question_ids.py` の担当:
 
 - current `不明点 / 質問一覧` とmachine-readableな `質問ID履歴` の `Q-xxx` 形式・duplicate検証
-- LLMがnew questionと決めた後、current + historyの使用済みID unionから次番号を決定
-- previous artifactとcandidate current artifactから、過去に一度でも使ったQ IDを落とさないcanonical `質問ID履歴` tableを生成
+- create / updateを区別し、既存成果物更新ではprevious artifact欠落をfail-closedにする
+- LLMがnew questionと決めた後、`previous current Q + previous質問ID履歴 + current current Q` の共通使用済み集合から次番号を決定する。candidate側の既存 `質問ID履歴` は採番入力にしない
+- `materialize` でcurrent Q tableとcanonical `質問ID履歴` tableを同時生成し、Agent / LLMがQ ID / row順 / `<br>` serializationを手組みしない
 
 `project_context_ids.py` の担当:
 
 - Project Context Section 12 / 13が実際の正本ownerである場合だけ、existing `DEC-xxx / ASM-xxx` の形式・duplicateを検証
-- question-analysis / stakeholder判断でnew DECISION / approved ASMと決まった後の次番号決定
-- 別ownerが明示されている場合は処理せず、そのownerのIDをProject Contextへ複製・再採番しない
+- question-analysis / stakeholder判断でnew DECISION / approved ASMと決まった後、previous + candidateの全状態rowから次番号を決定する
+- `materialize` でSection 12 / 13をcanonical生成し、`validate-history` でprevious ID削除を拒否する
+- 別ownerが明示されている場合はProject Contextへ複製・再採番せず、そのownerが発行するcanonical `DEC-xxx / ASM-xxx` を使用する。Jira / ADR等のowner固有IDを `authority_id` へ流用しない
 
 担当しない:
 
