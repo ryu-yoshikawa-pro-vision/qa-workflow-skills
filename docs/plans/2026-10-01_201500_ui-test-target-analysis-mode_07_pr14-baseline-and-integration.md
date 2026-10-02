@@ -260,22 +260,31 @@ UIテスト対象分析モード固有のPAGE / STATE / VIEW / MODAL等のIDはs
 
 ### 11.1 shared runtime baseline
 
-PR #14確認headにはSkill-local `runtime_contract.py` が9コピー存在します。
+PR #14確認headにはSkill-local `runtime_contract.py` が9コピー存在し、確認headでは同一blobです。
 
-- PR #11由来の既存repository byte-identity test対象: spec-analysis / test-analysis / test-requirement-design / test-condition-design / test-case-design / coverage-analysis / qa-workflow の7コピー
-- PR #14で追加された再利用copy: usability-inspection / wcag-conformance-evaluation の2コピー
+既存repositoryのbyte-identity契約対象は次の7コピーです。
 
-確認headでは9コピーは同一blobですが、既存 `tests/skills/runtime/test_runtime_dispatch.py` のbyte-identity対象は7コピーだけです。PR #16では同じ `runtime-v1` helper契約をSkillごとに分岐させないため、current shared runtime 9コピーを同期対象へ統一し、repository byte-identity testも9コピーを対象にします。
+- spec-analysis
+- test-analysis
+- test-requirement-design
+- test-condition-design
+- test-case-design
+- coverage-analysis
+- qa-workflow
+
+PR #14で追加された `usability-inspection` / `wcag-conformance-evaluation` の2コピーは、既存 `tests/skills/runtime/test_runtime_dispatch.py` のbyte-identity対象外です。PR #16のAcceptance Criterion / test-requirement-design処理経路でもこの2 SkillはACを消費しないため、PR #16だけを理由に変更しません。
 
 Step 0で次を実測します。
 
-- 9コピーの実path、byte identity、repository testの対象集合
+- repository内の `runtime_contract.py` 実path
+- 上記7コピーのbyte identityとrepository testの対象集合
+- `usability-inspection` / `wcag-conformance-evaluation` がshared byte-identity契約へ新たに参加していないこと
 - `ALLOWED_ENTITY_TYPES` に `acceptance_criterion` がまだ存在しないこと
 - spec-analysis `_expected_entities()` がAuthorityだけを導出するbaselineであること
 - test-requirement-designのgenerator contractが `requirement-structure-v1` であること
 - Disposition upstream typeがAuthority / Product Risk中心のbaselineであること
 
-PR #16はこのbaselineへ `_09_runtime-entity-and-test-requirement-contracts.md` の変更を適用します。#14 merge後mainで上記が既に変わっていた場合、実装を開始せずPlanをcurrent contractへ同期します。
+PR #16は既存7コピーのshared contractへ `_09_runtime-entity-and-test-requirement-contracts.md` の変更を適用します。#14 merge後mainでbyte-identity契約の対象集合自体が変更されていた場合は、実装を開始せずPlanをcurrent contractへ同期します。
 ## 12. rebase / conflict gate
 
 PR #14 merge後、PR #16実装開始前に次を必須確認します。
@@ -287,7 +296,7 @@ PR #14 merge後、PR #16実装開始前に次を必須確認します。
 5. qa-workflow routing fixture数を確認
 6. PR #14のREADME / EVALS / qa-workflow / CI contractがPlan記載と一致すること
 7. spec-analysis / question-analysis / test-target-inspectionが#14後に追加変更されていないこと
-8. 9 runtime_contract.py / requirement_structure.py / qa-workflow expected Entity contractが§11.1 baselineと一致すること
+8. §11.1の7 runtime_contract.py / requirement_structure.py / qa-workflow expected Entity contractがbaselineと一致すること
 9. baselineに差分があれば、本Planを実データへ同期してから実装開始
 
 rebase前の旧mainとの差分を正として実装判断しません。
@@ -302,4 +311,4 @@ rebase前の旧mainとの差分を正として実装判断しません。
 - routingで対象理解とUI/UX評価 / live inspection / formal WCAGを区別できる
 - evaluation / CIは#14の動的導出方式を維持している
 - #16固有のexpected増分がDeterministic +2 / Semantic +5 / routing +8で説明できる
-- shared runtime / requirement-structure-v2の変更がPR #14後baselineとの差分として明示され、current shared runtime 9コピーbyte identityを維持している
+- shared runtime / requirement-structure-v2の変更がPR #14後baselineとの差分として明示され、既存byte-identity契約の7コピーを維持している
