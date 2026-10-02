@@ -723,6 +723,94 @@ slugはlowercase kebab-caseを要求します。helperはsemanticなslug選択�
 
 同一更新で複数extension fileを追加する場合は、返却pathを00のextension宣言へ登録し、実fileを作成してから次の `next-domain-file` を呼びます。未materializeの返却番号をAgent側だけで予約して複数回呼びません。
 
+### materialize
+
+通常のpackage作成 / 更新で使うcanonical write pathです。汎用Markdown engineではなく、§2〜§5で定義した `ui-target-v1` の既知file / heading / table registryだけを扱います。通常更新ではAgentが `next-id → Markdown row手書き → section貼付け` を行わず、本operationがsemantic入力からID割当・escape・sort・table serialization・section置換・標準file同期・control再生成まで実行します。
+
+stdin:
+
+```json
+{
+  "operation":"materialize",
+  "package_root":"<path>",
+  "previous_snapshot":{"package_version":"v14","tracked_items":[],"exact_reference_index":[],"payload_file_sha256":[]},
+  "change_summary":"<current versionの変更概要本文>",
+  "retire_ids":["PAGE-009"],
+  "table_changes":[
+    {
+      "file":"02_behavior_and_business_rules.md",
+      "section":"User Story一覧",
+      "rows":[
+        {
+          "draft_key":"us-login",
+          "identity_action":"new",
+          "reuse_id":null,
+          "primary_prefix":"US",
+          "cells":{
+            "Scope ID":"SCOPE-001",
+            "Actor / Role":"管理者",
+            "Goal":"...",
+            "関連仕様項目ID":["SPEC-001"],
+            "関連構造ID":["PAGE-001"],
+            "状態":"current",
+            "関連UNKNOWN ID":[]
+          }
+        }
+      ]
+    }
+  ],
+  "prose_updates":[
+    {"file":"06_spec_inconsistencies_and_pending.md","section":"<exact heading>","body_markdown":"..."}
+  ],
+  "extension_file_updates":[
+    {"path":"10_csv-export.md","body_markdown":"..."}
+  ]
+}
+```
+
+table input contract:
+
+- `file / section` は§2〜§5のregistryに存在するexact pairだけを許可する。extension fileは00で宣言済みpathだけを許可する
+- `cells` はprimary ID列を除いたexact header名だけを許可する。stable reference列はJSON string array、通常cellはstringで受ける
+- 新規rowは `identity_action=new / reuse_id=null / draft_key=<request内unique>`
+- 既存row更新は `identity_action=reuse / reuse_id=<stable ID>`
+- request内の新規row参照はstable IDの代わりに `@draft:<draft_key>` をreference配列へ指定できる。helperが採番後に解決する
+- standard tableの `primary_prefix` はregistryと完全一致を要求する。10+ domain fileでは00の案件固有prefix宣言と一致する値だけを許可する
+- new IDはcanonical file order → section order → request row orderで割り当てる。同一JSON inputから同じID割当になる
+- unchanged rowはcurrent packageから保持する。requestにない既存rowを削除しない
+- `retire_ids[]` はLLMが「このsemantic identityをcurrent package modelから意図的に除去する」と判断したIDだけを渡す。row消失だけからhelperがretireを推測しない
+- previous snapshotに存在するIDがmaterialize後modelから消えるのに `retire_ids[]` にない場合は `state_transition_required` で書込み前にblocked
+- `retire_ids[]` のIDがcurrent rowへ残る、previous snapshotに存在しない、current exact referenceから参照されたままの場合はblocked
+- UNKNOWN解消はretireではなくrow保持 + resolved、DEC / ASMの撤回 / 置換もlineageを保持する間はrow保持 + changedを使う。canonical itemをretireするのは、そのidentityをpackage trackingから意図的に除去し、必要なlineage / exact referenceが残らないとLLMが判断した場合だけ
+- structural itemは対象UI構造等が意味上current modelから削除された場合にexplicit retireできる
+
+file / control materialization order:
+
+1. previous snapshotとcurrent bytesを照合し、staleなら書込みしない
+2. table changesをin-memory modelへ適用し、new ID / `@draft` referenceを解決する
+3. `retire_ids[]` を検証してin-memory modelから除去する
+4. 00 applicabilityの最終状態に従い、条件付き標準fileをasset templateから作成または除去する。除去対象fileにtracked rowがあれば対応 `retire_ids[]` を必須とする
+5. extension declarationと `extension_file_updates[]` を照合し、宣言済みfileだけ作成 / 更新する
+6. exact Markdown tableをescape / canonical sortしてserializeし、known sectionだけ置換する。prose updateはexact heading配下のbodyだけを置換し、意味を書き換えない
+7. previous snapshotとin-memory current modelからimpactを生成し、CHANGELOGのcurrent `変更概要 / Stable ID changes / 影響file` を更新する
+8. `build-machine-evidence` 相当処理で09のMachine Entities sectionをcanonical生成・置換する
+9. README controlsをcanonical生成・置換する
+10. MANIFESTを最後に再生成する
+11. final validateを実行し、成功した場合だけpackage filesへ書き出す
+
+payload:
+
+```json
+{
+  "allocated_ids":[{"draft_key":"us-login","stable_id":"US-003"}],
+  "retired_ids":["PAGE-009"],
+  "changed_files":["README.md","02_behavior_and_business_rules.md","CHANGELOG.md","MANIFEST.md"],
+  "package_version":"v15"
+}
+```
+
+通常のUI target package更新は `materialize` を正本のwrite pathとします。`next-id / impact / render-readme-controls / build-machine-evidence / build-manifest` は同じ内部contractを個別検証・focused useするoperationとして残しますが、Agentがそれらの返却Markdownを手作業で貼り合わせて完成packageを作る経路をcanonical手順にしません。
+
 ### build-manifest
 
 stdin:
