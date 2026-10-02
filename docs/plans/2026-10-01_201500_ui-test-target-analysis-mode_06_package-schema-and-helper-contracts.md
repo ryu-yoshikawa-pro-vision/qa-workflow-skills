@@ -42,9 +42,8 @@ READMEには自由記述の概要に加え、次の2表をexact heading / exact 
 
 | 順序 | ファイル | 種別 |
 | ---: | --- | --- |
-| 1 | 00_scope_and_context.md | core |
 
-この表はMANIFESTのpayload file listと完全一致させます。
+templateではbodyを空にし、完成packageでは `render-readme-controls` が全payload rowを生成します。この表はREADME.md自身を含むMANIFESTのpayload file listと完全一致させます。
 
 `MANIFEST.md` はcontrol fileのため、このpayload一覧へ含めません。
 
@@ -512,8 +511,7 @@ payload:
   "exact_reference_index":[
     {"target_id":"SPEC-001","file":"02_behavior_and_business_rules.md","section":"Acceptance Criteria一覧","row_index":1,"column":"関連仕様項目ID"}
   ],
-  "unresolved_structural_issues":[],
-  "readme_current_unknown_markdown":"- Current UNKNOWN Count: 1"
+  "unresolved_structural_issues":[]
 }
 ```
 
@@ -557,7 +555,7 @@ payload:
 {
   "previous_version":"v14",
   "next_version":"v15",
-  "readme_version_markdown":"- Package Version: v15\n- Previous Package Version: v14"
+  "readme_version_rows_markdown":"| Package Version | v15 |\n| Previous Package Version | v14 |"
 }
 ```
 
@@ -569,7 +567,7 @@ legacy package migrationで、LLMのsemantic mappingによりlegacy側の明示v
 {"operation":"next-version","source":"legacy-migration","previous_version":"v14"}
 ```
 
-このlegacy inputも同じ3 fieldを返し、`readme_version_markdown` までhelperが生成します。案件固有version policyではnext-versionを使用しません。
+このlegacy inputも同じ3 fieldを返し、`readme_version_rows_markdown` までhelperが生成します。案件固有version policyではnext-versionを使用しません。
 
 ### next-id
 
@@ -610,12 +608,12 @@ payload:
 
 ```json
 {
-  "current_unknown_markdown":"- Current UNKNOWN Count: 1",
-  "current_payload_files_markdown":"### Current payload files\n\n| 順序 | ファイル | 種別 |\n| ---: | --- | --- |\n| 1 | 00_scope_and_context.md | core |"
+  "package_metadata_markdown":"### Package metadata\n\n| 項目 | 値 |\n| --- | --- |\n| Package Schema Version | ui-target-v1 |\n| Package Version | v15 |\n| Previous Package Version | v14 |\n| Current UNKNOWN Count | 1 |",
+  "current_payload_files_markdown":"### Current payload files\n\n| 順序 | ファイル | 種別 |\n| ---: | --- | --- |\n| 1 | README.md | core |\n| 2 | 00_scope_and_context.md | core |"
 }
 ```
 
-READMEのfile listはhashを持たないため、MANIFEST生成より前にこのoperationで確定します。Agent / LLMがUNKNOWN件数、payload file順、種別を再構築しません。
+helperはREADMEのcurrent Package Version / Previous Package Version、09のcurrent UNKNOWN集合、current file setを読み、2 section全体をcanonical Markdownとして返します。READMEのfile listはhashを持たないため、MANIFEST生成より前にこのoperationで確定します。Agent / LLMがmetadata table、UNKNOWN件数、payload file順、種別を再構築しません。
 
 ### next-domain-file
 
