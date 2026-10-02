@@ -498,12 +498,15 @@ mode単体が成立してからworkflowへ接続します。
 - shared runtime-v1 / entity-state-v1 evidenceをruntime-v2 / entity-state-v2 current evidenceとして読み替えない
 - cutover後の最初のTRD / TCD / test-case-design等の実行はfull rebuildで行い、v1 previous artifactを通常のpartial rerun / freshness evidenceとして渡さない
 - `project_v1_cutover` でv1 Runtime Input / Resultからgenerator-owned identity / mapping stateを抽出し、TR `tr_id_state`、TCN `tcn_id_state / model_key_state`、materialize `target_mapping_state / semantic_ci_mapping_state / ci_id_state / expected_result_root_state`、TC `tc_id_state` をv2初回normalized inputのprevious stateへ投影する
+- TR `draft_key ↔ tr_id_map`、TCN `draft_key ↔ tcn_id_map`、model `draft_key ↔ model_key_map`、TC `draft_key ↔ tc_id_map` をexact joinし、current draftのreuse IDをhelperが固定projectionする。Agent / LLMにcutover時のreuse ID選択をさせない
+- cutover operationはv1 artifact全文を受けるためverify_runtime_evidenceと同じ16 MiB aggregate transportを使い、draft/map missing / duplicate / mismatchをblockedにする
 - cutoverはschema移行だけとして先に実行し、同時にsemantic redesignを行わない。既存current itemはsame stable IDをreuseし、削除済みID / inactive mapping historyも保持する
 - v2 evidence成立後にのみ通常partial rerunへ戻す
 - AC本文 / 親Behavior / 親UC / 親USのfreshness regressionを追加
 - ACをTRへlinkしても、そのACのAuthorityをTR `authority_refs[]` / Authority Dispositionで別途closeしない場合はAuthority unclosedとなるregressionを追加
 - artifact modeでAC本文・親chain不変のままAuthorityだけ変更しspec-analysisを再生成した後、未再実行TRが直接Authority dependencyによりstaleになるregressionを追加
 - v1→v2 cutoverで内容不変ならTR / TCN / model / CI / TCのstable IDとdeleted / inactive identity historyが不変で、過去IDを再採番しないregressionを追加
+- cutoverのdraft_key / *_id_map join不一致、v1以外のsource version、16 MiB超過をblockedにするregressionを追加
 - partial rerunでscope外TRがchanged AC依存のままcurrentにならない regressionを追加
 - TR-OUT-003 / TR-SEM-003を追加
 - existing TR fixtures / runtime / portability / vertical integration testsをv2 schemaへ同期
