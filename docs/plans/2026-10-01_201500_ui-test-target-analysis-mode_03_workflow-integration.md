@@ -79,7 +79,7 @@ stdin / stdout JSON、operation名、failure、size limit、sort順等の正確�
 
 - `不明点 / 質問一覧` と `質問ID履歴` の `Q-xxx` をparseする
 - current質問ID / 使用済み履歴IDのduplicate / malformedを拒否する
-- LLMがnew questionと判断した後、current + historyの既知最大番号+1を返す
+- LLMがnew questionと判断した後、previous + current artifactのcurrent Q / 質問ID履歴unionから既知最大番号+1を返す
 - previous artifactとcandidate current artifactから、previous current Q + previous履歴 + current Qのunionをcanonical `質問ID履歴` tableとして生成する
 - `Q-999` 使用済みなら既存3桁ID契約を勝手に拡張せず `id_space_exhausted` を返す
 
