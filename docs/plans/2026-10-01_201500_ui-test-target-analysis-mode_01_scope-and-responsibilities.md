@@ -44,7 +44,7 @@ AIエージェントからの利用方法は既存のAgent Skills構造をその
 | formal WCAG-EM適合性評価 | wcag-conformance-evaluation | #14責務を維持 |
 | repositoryの製品コード事実 | spec-analysisの補助入力 | Authorityへ自動昇格しない。E2E実装分析そのものが必要な場合だけe2e-test-inspectionへroutingする |
 | プロダクトリスク / テスト重点 | test-analysis | 対象外 |
-| Acceptance Criteria → テスト要求の追跡 / closure | test-requirement-design | `requirement-structure-v2`でcurrent ACをTRまたはDispositionへ閉じる |
+| Acceptance Criteria → テスト要求の追跡 / closure | test-requirement-design | test-requirement-designまで進むworkflowで`requirement-structure-v2`によりcurrent ACをTRまたはDispositionへ閉じる。仕様理解package単体の完了条件にはしない |
 | テスト条件 / ケース | 各既存設計Skill | 変更なし |
 | workflow開始 / 再開 / 変更伝播 | qa-workflow | mode routingのみ追加 |
 
