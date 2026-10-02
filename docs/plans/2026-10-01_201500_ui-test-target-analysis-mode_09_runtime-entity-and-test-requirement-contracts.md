@@ -78,7 +78,7 @@ spec-analysisはruntime unitを新設しません。expected Entity導出だけ�
 
 envelope field shapeとfreshness algorithmは維持します。v1 / v2を同時解釈するcompatibility branchは追加しません。旧runtime-v1 / entity-state-v1 evidenceはv2 current evidenceとして読み替えず、current scriptで再実行・再検証します。9コピーのruntime implementation fingerprintも既存契約どおり変わります。
 
-cutover後、旧v1 artifactを通常の `previous_artifact_markdown` としてpartial rerun / freshness検証へ渡しません。TRD / TCD / test-case-designを含む既存runtime Skillは、最初のv2実行を `partial_rerun=false` + `previous_artifact_markdown=null` のfull rebuildとして行います。ただしstable identity / mapping historyを空にせず、§2.7の専用 `project_v1_cutover` でv1 artifactからidentity stateだけを投影してv2 normalized inputへseedします。v2 artifactが成立した後だけ既存partial rerun契約へ戻します。
+cutover後、旧v1 artifactを通常の `previous_artifact_markdown` としてpartial rerun / freshness検証へ渡しません。TRD / TCD / test-case-designを含む既存runtime Skillは、最初のv2実行を `partial_rerun=false` + `previous_artifact_markdown=null` のfull rebuildとして行います。stable identity / mapping historyは§2.7の専用 `project_v1_cutover` がv1 Runtime Input / Resultから各v2 generatorへそのまま渡せるcomplete `normalized_runtime_inputs[]` へ埋め込みます。Agent / LLMがseed patchを元JSONへmergeしません。v2 artifactが成立した後だけ既存partial rerun契約へ戻します。
 
 `runtime-v2` / `entity-state-v2` はshared contractのversionです。generator contractは別契約なので、意味変更のない `workflow-runtime-v1`、`schema-cases-v1`、`usability-inspection-runtime-v1`、`wcag-em-runtime-v1` 等は維持します。
 
