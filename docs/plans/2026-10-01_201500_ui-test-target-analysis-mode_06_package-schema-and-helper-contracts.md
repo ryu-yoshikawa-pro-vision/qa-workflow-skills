@@ -563,8 +563,9 @@ semantic:
 対象:
 
 - README
-- 00〜09
-- 10+ current domain files
+- 00 / 01 / 02 / 06 / 07 / 09
+- 03 / 04 / 05 / 08のうちfile applicability=requiredのcurrent file
+- 10+ current extension files
 
 除外:
 
