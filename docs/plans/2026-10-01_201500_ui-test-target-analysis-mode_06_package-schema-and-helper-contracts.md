@@ -1201,7 +1201,7 @@ tableにはpayload filesだけをcanonical順で列挙します。
 規則:
 
 - fresh packageの `v00` はbaselineであり、templateどおり `Stable ID changes` tableを空で開始できる。v00時点でcurrent structured rowに存在するIDはbaseline identityとして扱う
-- v01以降にpackageへ初登場するtracked stable IDは `added`。UI target mode所有IDは `next-id` の返却 `stable_id_change` を使い、外部ownerのDEC / ASMはowner確定IDをpackageへ初めて取り込むversionで `added` とする
+- v01以降にpackageへ初登場するtracked stable IDは `added`。通常更新では `impact` がprevious snapshot/current state差分から判定する。UI target mode所有IDの `next-id.stable_id_change` は採番確認用であり、CHANGELOG rowの正本にはしない。外部ownerのDEC / ASMもowner確定IDがpackageへ初登場した差分から `added` とする
 - legacy packageからsemantic identityを維持してcurrent schemaへ持ち込んだtracked stable IDは、SRC / SPEC / INF / UNK / DEC / ASM / structural IDを問わずmigration versionで `migrated` とする
 - 同一identityを維持したまま内容・状態・関係が変わり、current structured modelへ残る場合は `changed`
 - `resolved` はUNKNOWN lineage専用。対象は `UNK-xxx` だけで、そのversionでUNKNOWNが `現在有効か=Yes` から `No` へ閉じたことを表す。DEC / ASMその他のprefixへ `resolved` を使用しない
@@ -1211,7 +1211,7 @@ tableにはpayload filesだけをcanonical順で列挙します。
 - 1 version内で同じStable IDを重複させない
 - 1つのStable IDに `added` または `migrated` を記録できるのは履歴全体で最初の1回だけ
 - `retired` だけをterminal eventとし、その後に `added / migrated / changed / resolved / retired` を再記録しない
-- `next-id` はcurrent structured rowと全versionのこのtableに現れるStable IDを使用済みIDとして扱う
+- `next-id` はcurrent structured row、全versionのこのtable、通常更新で渡されたprevious snapshotのStable ID unionを使用済みIDとして扱う
 
 `### 影響file`
 
@@ -1248,11 +1248,12 @@ LLMは:
 1. legacy packageのcurrent内容とstable IDを読む
 2. 新schemaの00〜09 / domain fileへ意味をmapする
 3. semantic identityが同じ既存SRC / SPEC / INF / UNK / DEC / ASM / structural IDは、実際の正本ownerを維持したままID維持する
-4. retained current tracked IDをprefixにかかわらずmigration versionの `Stable ID changes` tableへ `migrated` としてseedする
-5. legacy履歴から明示的に確認できるretired / resolved IDは対応する `retired / resolved` rowとしてseedする。legacy資料から確認できない過去IDを推測で作らない
-6. 新しいentityだけnewと判断し、next-idを使う
-7. legacyで未確定だった内容を推測で確定しない
-8. current packageに不要な履歴はCHANGELOG / migration noteへ残し、current viewへ混ぜない
+4. retained current tracked ID集合と、legacy履歴から明示確認できるretired / resolved IDだけをsemantic mapping結果として確定する
+5. 新しいentityだけnewと判断し、next-idを使う
+6. legacyで未確定だった内容を推測で確定しない
+7. current packageに不要な履歴説明はCHANGELOGの変更概要 / migration noteへ残し、current viewへ混ぜない
+
+canonical current packageを組み立てた後、`impact(change_mode=legacy-migration)` へStep 4の `migration_retained_ids[] / legacy_terminal_events[]` を渡し、helperが `migrated / added / resolved / retired` の `Stable ID changes` と `影響file` sectionを生成します。LLMがCHANGELOG rowを手入力しません。
 
 DEC / ASMは実際の正本ownerの既存IDを参照し、migrationを理由にUI target packageで再採番しません。Project Context以外の明示正本をProject Contextへ複製しません。
 
