@@ -194,14 +194,14 @@ owner mapping:
 - product_risk → test-analysis
 - acceptance_criterion → spec-analysis
 
-ACで許可するhandling:
+ACで許可するhandlingは次の4値に固定します。
 
 - 別テストレベル
 - 残存リスク
 - 対象外
 - ブロック中
 
-`重複` はTRD共通Dispositionとして既存利用を維持できますが、AC closureの通常選択肢として新たに推奨しません。重複扱いを使う場合は既存covered_by_entity契約を満たす必要があります。
+`acceptance_criterion` upstreamに `重複` は許可しません。Authority / Product RiskについてはPR #14後の既存Disposition handling契約を維持します。
 
 人間向け `テスト要求を作らない上流項目` の種別へ `Acceptance Criteria` を追加します。
 
