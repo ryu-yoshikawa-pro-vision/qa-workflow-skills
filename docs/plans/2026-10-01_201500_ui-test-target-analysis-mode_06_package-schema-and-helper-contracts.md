@@ -356,15 +356,21 @@ extension fileの必要性とslugはLLMが判断します。連番は `next-doma
 
 ## 6. ID rules
 
-標準prefix:
+packageがstable reference / CHANGELOG / impactで追跡できる標準prefixと、`ui_target_package.py next-id` が採番できるprefixを分離します。
 
-canonical spec-analysis item:
+### 6.1 packageで追跡できるstable ID
+
+canonical spec-analysis / Authority:
+
 - SRC
 - SPEC
 - INF
 - UNK
+- DEC
+- ASM
 
 UI target structural:
+
 - SCOPE
 - PAGE
 - STATE
@@ -390,6 +396,44 @@ UI target structural:
 
 形式は `PREFIX-001` ～ `PREFIX-999`。
 
+`DEC / ASM` もpackage内で参照される外部ownerのstable IDなので、exact reference validation、CHANGELOG `Stable ID changes`、`impact` の追跡対象に含めます。DECISION / approved ASMの内容または状態変更がUI target packageへ影響する場合、current versionの `Stable ID changes` へ `DEC-xxx / ASM-xxx` を `changed / resolved / retired` として記録し、impact候補へ含めます。
+
+### 6.2 ui_target_package.py next-idの採番対象
+
+`next-id` が番号決定できる標準prefixは次だけです。
+
+canonical spec-analysis item:
+
+- SRC
+- SPEC
+- INF
+- UNK
+
+UI target structural:
+
+- SCOPE
+- PAGE
+- STATE
+- VIEW
+- STEP
+- MODAL
+- BDLG
+- PANEL
+- EXT
+- SHARED
+- FIELD
+- RULE
+- FLOW
+- NOTIFY
+- INTERACT
+- ISSUE
+- IMPL
+- UIOP
+- US
+- UC
+- BH
+- AC
+
 `next-id` はLLMがnewと判断した後にのみ使用します。Agentから既知ID一覧を受け取らず、helperが `package_root` のcurrent structured rowとCHANGELOGに記録されたexact stable ID tokenを走査し、同prefixの既知最大番号+1を返します。
 
 削除済み・置換済みentityのIDもCHANGELOGのexact `Stable ID changes` tableへ記録済みである限り再利用しません。stable IDを削除・置換するversionでは、そのIDを同tableへ必ず記録します。
@@ -398,9 +442,9 @@ UI target structural:
 
 `SRC / SPEC / INF / UNK` は既存spec-analysisの分類・形式契約を維持しつつ、UI target mode内でnewと判断した後の番号決定だけ `next-id` を使用します。
 
-`DEC / ASM` はUI target packageがownerではありません。question-analysis / projectの決定事項・承認済み仮定の正本で採番済みIDを参照し、UI target package側の `next-id` では新規採番しません。
+`DEC / ASM` は追跡対象ですが本helperの採番対象ではありません。実際の決定事項 / 承認済み仮定の正本ownerで採番済みIDを参照し、UI target package側で新規採番・再採番しません。
 
-### 6.1 structured Markdown parse contract
+### 6.3 structured Markdown parse contract
 
 production helperは任意Markdownを解釈する汎用parserにしません。§2〜§5で定義したcanonical heading / tableだけを対象に、次の固定規則でparseします。
 
@@ -907,6 +951,8 @@ helperはexact `不明点 / 質問一覧` tableのexisting Q IDだけを読み�
 
 ### 10.3 project_context_ids.py
 
+Project ContextのSection 12 / 13が案件の決定事項 / 仮定の正本ownerである場合に使うdefault allocatorです。
+
 stdin:
 
 ```json
@@ -934,7 +980,15 @@ helperは対象tableのexact heading / header、ID形式、duplicateを検証し
 
 LLM / stakeholder側がsemantic identityのreuse / new、DECISION / ASM区分、決定内容、関係、影響範囲、ASM承認可否を判断します。helperはProject Contextを書き換えません。
 
-`skills/qa-workflow/assets/project-context-template.md` のSection 12 / 13はheader-onlyとし、placeholder `DEC-001` / `ASM-001` を配置しません。
+案件でProject Contextとは別の決定事項 / 仮定の正本一覧が明示されている場合は、そのownerを維持します。
+
+- Project Contextへ同じDECISION / ASMを複製しない
+- `project_context_ids.py` で別ownerのIDを採番しない
+- ownerが提供するdeterministicなID割当て機構がある場合はそれを使用する
+- ownerが新規IDをまだ確定できない場合、LLMが番号を手計算・推測せず、そのDECISION / ASMの正本登録をblockedとしてownerからIDが返るまでcurrent Authorityへ昇格させない
+- 任意schemaを読むgeneric allocatorはPR #16では作らない
+
+`skills/qa-workflow/assets/project-context-template.md` を正本ownerとして使う場合、Section 12 / 13はheader-onlyとし、placeholder `DEC-001` / `ASM-001` を配置しません。
 
 ## 11. filesystem safety
 
@@ -1023,7 +1077,8 @@ helperは次を検証します。
 - `Stable ID changes` tableのheader / Change enum / Stable ID形式 / version内duplicate
 - 履歴全体で `added / migrated` が同じStable IDへ複数回現れない
 - `resolved / retired` 後のStable IDが別entityとして再導入されていない
-- current structured rowとStable ID履歴のID形式がprefix契約に一致する
+- current structured rowとStable ID履歴のID形式が§6.1の追跡可能prefix契約に一致する
+- `next-id` input prefixは§6.2の採番対象だけを許可し、DEC / ASMを拒否する
 
 helperは「そのIDが実際にnext-id operationから返されたか」という実行履歴を推測・検証しません。検証対象はcurrent packageとCHANGELOGに保存された成果物状態です。
 
@@ -1048,7 +1103,7 @@ LLMは:
 7. legacyで未確定だった内容を推測で確定しない
 8. current packageに不要な履歴はCHANGELOG / migration noteへ残し、current viewへ混ぜない
 
-DEC / ASMは既存のproject側正本IDを参照し、migrationを理由にUI target packageで再採番しません。
+DEC / ASMは実際の正本ownerの既存IDを参照し、migrationを理由にUI target packageで再採番しません。Project Context以外の明示正本をProject Contextへ複製しません。
 
 helperは変換後packageだけをvalidateします。
 
@@ -1141,6 +1196,8 @@ production helperのfilesystem / raw hash / projection / README control renderin
 - unknown_links.pyのexact `operation=validate-links` / payload / top-level issues contract
 - question_ids.pyのheader-only / existing Q / duplicate / Q-999
 - project_context_ids.pyのSection 12 / 13 exact table、DEC / ASM kind、duplicate、999 exhaustion
+- Project Contextがownerでない案件ではproject_context_ids.pyを使わず、外部ownerのIDを維持し、owner未採番時にLLM hand-numberingへfallbackしないこと
+- CHANGELOG / impactがDEC / ASMを追跡可能stable IDとして受理しつつ、ui_target_package.py next-idではDEC / ASMを拒否すること
 - question-analysis output templateのQ tableとProject Context template Section 12 / 13がheader-onlyでplaceholder IDを持たないこと
 - legacy migration後fixtureのvalidate PASS
 
