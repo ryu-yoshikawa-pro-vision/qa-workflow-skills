@@ -119,7 +119,7 @@ pathが資料から確定できない場合は推測せずPATH-TBD等の明示�
 
 同一PAGE上で、契約状態、データ有無、権限、利用上限等により成立する状態。
 
-複数条件が同時成立できる場合は、排他的なSTATE列挙へ無理に押し込まず、契約軸、データ軸、制限軸等の独立状態軸として整理します。
+複数条件が同時成立できる場合は、排他的なSTATE列挙へ無理に押し込まず、契約軸、データ軸、制限軸等の独立状態軸として整理します。各STATE rowは `_06` の `状態軸` 列にその軸を明示し、STATE以外のrowでは同列を空にします。軸名の意味はLLMが資料から判断し、helperは構造整合だけを検証します。
 
 ### VIEW / STEP
 
@@ -145,7 +145,7 @@ MODALへ分類しません。
 
 ### PANEL / POPOVER / GLOBAL UI
 
-global navigation、通知panel、drawer等、独立routeではない共通UI。
+global navigation、通知panel、drawer等、独立routeではない共通UIです。structured schemaの `種別` は `PANEL / POPOVER / GLOBAL UI` の3 exact値を区別し、stable ID prefixは共通して `PANEL-xxx` を使用します。
 
 ### EXTERNAL
 
