@@ -365,7 +365,7 @@ default policy:
 5. 変更後もcurrent versionの全fileを含む完全版を成立させる
 6. 過去versionは履歴でありcurrent仕様の参照前提にしない
 
-default policyでは、完成済みpackageに永続差分を加えて再び完成状態として保存する場合、semantic / presentationを問わず必ず次のvNNへ進めます。差分がないno-opだけversionを維持します。canonical更新経路では `ui_target_package.py materialize` がprevious snapshotとの差分と次versionを決定し、README / CHANGELOG / MANIFESTへ同時反映します。`next-version` は同じversion導出規則をfocusedに確認するoperationとして残します。package schema versionはcontent versionと分離し、current schemaは `ui-target-v1` とします。
+default policyでは、完成済みpackageのuser-managed / semantic payloadに永続差分を加えて再び完成状態として保存する場合、semantic / presentationを問わず必ず次のvNNへ進めます。Package Version、CHANGELOGの新entry、README controls、MANIFESTのようにversion upやpayload変更から派生するcontrol差分自体はversion up要否の原因に数えません。provisional payloadが同一のno-opだけversionを維持します。canonical更新経路では `ui_target_package.py materialize` がcontrol生成前に差分を判定し、変更がある場合だけ次versionをREADME / CHANGELOG / MANIFESTへ反映します。`next-version` は同じversion導出規則をfocusedに確認するoperationとして残します。package schema versionはcontent versionと分離し、current schemaは `ui-target-v1` とします。
 
 ユーザー / projectが別version policyを明示した場合はそちらを優先し、materializeへ `version_policy=project / target_version=<value>` を渡します。default policyで「versionを上げるほど重要か」をLLMへ判断させません。
 
