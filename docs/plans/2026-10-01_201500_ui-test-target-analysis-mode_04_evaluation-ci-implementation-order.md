@@ -217,7 +217,7 @@ expected start / resume Skillを明示し、全Skill固定順実行へ回帰し�
 
 ### 8.1 spec-analysis production helper
 
-`skills/spec-analysis/scripts/ui_target_package.py` を追加し、少なくとも次のoperationを実装します。
+`skills/spec-analysis/scripts/ui_target_package.py` を追加し、次のoperationを実装します。このPlanで定義していないoperationは追加しません。
 
 - inspect
 - validate
@@ -228,7 +228,7 @@ expected start / resume Skillを明示し、全Skill固定順実行へ回帰し�
 - build-machine-evidence
 - project-eval
 
-repository unit testで最低限次を確認します。
+repository unit testで次を必須確認します。
 
 - required core / 条件付き必須file applicability / extension file declaration
 - package root外path拒否
@@ -240,10 +240,13 @@ repository unit testで最低限次を確認します。
 - README file一覧とMANIFESTの一致
 - CHANGELOG最新version見出しとpackage versionの一致
 - domain file命名
-- next-idがsemantic identityを判断せず、new指定後だけ既知ID最大値から次番号を返すこと
+- next-idがsemantic identityを判断せず、new指定後にpackage rootから既知IDを内部導出して次番号を返し、Agentへknown ID集合を要求しないこと
+- resolved UNKNOWNの `解消先ID` がcurrent SPEC / DECISION / 承認済みASMへ閉じること
+- canonical structured Markdownのduplicate heading / table、row列数、escaped pipe、`<br>` referenceを固定parse契約で検証すること
 - impactがexact referenceだけから候補fileを返し、semantic変更を勝手に決定しないこと
 - scope applicability、UI操作scopeのUIOP / US / UC / Behavior / AC hierarchy / closure / current UCの3分類整合
-- build-machine-evidenceがAuthority + current AC Entity、spec-analysis normalized_skill_input、expected identityを決定論生成すること
+- 09の「現在有効な仕様根拠」からnormalized Authorityを固定projectionし、build-machine-evidenceがAuthority + current AC Entity、spec-analysis normalized_skill_input、expected identityを決定論生成すること
+- `Machine Entities: spec-analysis` blockがexactly one存在し、helper再生成結果と一致すること
 - 親US / UC / Behavior変更でAC Entity fingerprintが変わること
 - project-evalが内容を変更せずcanonical順に連結すること
 
@@ -374,7 +377,7 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - required core / 固定triggerの条件付き必須 / 宣言制extensionを分けたpackage assets
 - 09_authority_and_traceability.mdで既存canonical spec-analysis contractを維持
 - skills/spec-analysis/scripts/ui_target_package.py
-- 7 Skill-local runtime_contract.pyへ `acceptance_criterion` / `acceptance_refs` / spec-analysis expected ACをbyte-identicalに追加
+- repository内のcurrent shared runtime 9 Skill-local `runtime_contract.py` へ `acceptance_criterion` / `acceptance_refs` / spec-analysis expected ACをbyte-identicalに追加
 - 09から既存authority_entities.pyへ入力できることを確認
 - current ACだけをMachine Entity化し、US / UC / Behaviorをglobal Entity typeへしないことを確認
 - helper unit / portability / runtime contract byte-identity test
@@ -413,7 +416,7 @@ mode単体が成立してからworkflowへ接続します。
 - ACなしworkflowは空arrayで明示し、field省略を許可しない
 - artifact modeでcurrent `spec-analysis / acceptance_criterion` Entityへ依存
 - ACをDisposition upstream typeとして許可し、ownerをspec-analysisへ固定
-- current ACをTRまたはDispositionへ閉じる
+- test-requirement-designまで進むworkflowでcurrent ACをTRまたはDispositionへ閉じる
 - TR Entity content / dependencyへacceptance_refsを保存
 - repository内の `requirement-structure-v1` 固定参照をcurrent v2へ同期
 - v1 evidenceをv2 current evidenceとして読み替えない
@@ -496,8 +499,8 @@ mode単体が成立してからworkflowへ接続します。
 - qa-workflow routing / resumeと#14の3 Skillとの誤routing境界がrouting case / independent candidateで確認済み
 - multi-file packageがproduction helperのevaluation projection経由で既存semantic runnerにより評価可能
 - version / UNKNOWN件数 / stable ref / MANIFEST / SHA-256 / scope / file applicability / behavior hierarchy / current UCの3分類完全性等の定型整合をproduction helperで検証できる
-- current ACがrequirement-structure-v2でTRまたはDispositionへ閉じ、AC / 親Behavior / 親UC / 親US / Authority変更が関連TR freshnessへ伝播する
-- 7 Skill-local runtime_contract.pyがbyte-identicalのままacceptance_criterionを扱える
+- test-requirement-designまで進むworkflowではcurrent ACがrequirement-structure-v2でTRまたはDispositionへ閉じ、AC / 親Behavior / 親UC / 親US / Authority変更が関連TR freshnessへ伝播する。仕様理解packageだけの要求ではこのclosureを完了条件にしない
+- repository内のcurrent shared runtime 9 Skill-local `runtime_contract.py` がbyte-identicalのままacceptance_criterionを扱える
 - partial rerunでchanged ACへ依存するscope外TRをcurrent扱いしない
 - spec-analysis / question-analysis production helperがSkill package単体で実行可能
 - test-target-inspectionへのcurrent UI分岐が維持される
