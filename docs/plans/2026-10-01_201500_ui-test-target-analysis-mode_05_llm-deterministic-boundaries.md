@@ -63,7 +63,7 @@
 
 ### 3.1 helperが担当するoperation
 
-最低限、次を提供します。operation名は実装時にこの名称で固定します。
+次を提供します。operation名は実装時にこの名称で固定し、このPlanで未定義のoperationは追加しません。
 
 #### inspect
 
