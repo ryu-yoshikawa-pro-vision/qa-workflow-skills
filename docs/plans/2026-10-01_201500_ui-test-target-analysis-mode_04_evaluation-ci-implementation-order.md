@@ -273,13 +273,14 @@ repository unit testで次を必須確認します。
 - resolvedはUNKだけに許可し、resolved後のresolver変更 / same-ID reopenを `changed`、reopen後の再closeを再 `resolved` として許可すること
 - retiredだけをterminal eventとして後続eventをrejectすること
 - 履歴全体で同じStable IDへ `added / migrated` を複数回記録できないこと
-- legacy migrationでDEC / ASMを含むretained tracked IDを `migrated` として引き継ぎ、確認できるretired / resolved履歴だけをterminal eventとして受理すること。materializeがこれらをnew ID採番前の使用済み集合へ予約すること
+- legacy migrationでDEC / ASMを含むretained tracked IDを `migrated` として引き継ぎ、確認できる `resolved / retired` lifecycle eventだけを受理すること。`retired` だけをterminalとして扱い、materializeが両eventのIDをnew ID採番前の使用済み集合へ予約すること
 - current packageのnext-versionが `package_root` からcurrent versionを内部取得し、Agentへ `previous_version` の転記を要求しないこと
 - default policyでREADMEのPackage Version / Previous Package Versionが初回または1 revision差として整合し、完成済みpackageへ永続差分を保存する場合はsemantic / presentationを問わず+1、完全no-opだけversion維持となること
 - legacy migration用next-versionだけが明示 `previous_version` inputを受けること
 - render-readme-controlsがcurrent UNKNOWN件数とpayload file tableのcanonical Markdownを返し、Agentが件数・file順・種別を再構築しないこと
-- next-domain-fileがLLMのslug決定後に10+ fileの次番号とcanonical pathだけを決定し、同一更新で複数追加する場合は1件目の00登録 + file作成前に2件目を採番しないこと
-- domain file命名
+- focused next-domain-fileがLLMのslug決定後に10+ fileの次番号とcanonical pathだけを決定すること。canonical materializeでは `extension_file_updates[]` のrequest順に複数new extensionをbatch採番し、00の `案件固有extension file一覧` と実fileを同時生成すること
+- extension declaration exact table、domain file命名、duplicate path / slug、reuse時slug変更拒否
+- `materialize` のartifact_mode=create / updateを検証し、normal createはasset初期root + previous_snapshot=nullでv00、normal updateはnon-null snapshot必須、legacy-migrationはcreateだけを許可すること
 - inspectが更新前owner row fingerprint / UNKNOWN state / exact refs / payload hashを含むcanonical `update_snapshot` を返すこと
 - next-id / materializeがsemantic identityを判断せず、UI target mode所有の `SRC / SPEC / INF / UNK` + standard structural prefix + 00宣言済み案件固有prefixについてcurrent row + CHANGELOG履歴 + previous snapshotから次番号を決め、更新途中で消えたprevious IDも再利用しないこと
 - `DEC / ASM` をUI target modeのnext-idが採番しないこと
@@ -297,7 +298,7 @@ repository unit testで次を必須確認します。
 - `なし` は関連Behavior / UNKNOWNなし + 理由 + current Authorityの `関連仕様項目ID` 1件以上を要求すること
 - 09の「現在有効な仕様根拠」からnormalized Authorityを固定projectionし、`適用範囲` を非空string、`関係` を単一許可値の1要素arrayとして一意にserializeすること
 - build-machine-evidenceがAuthority + current AC Entity、spec-analysis normalized_skill_input、expected identity、shared `render_machine_entities()` 由来のcanonical `machine_entities_markdown` を決定論生成し、不要な統合implementation_fingerprintを公開しないこと
-- AC chain refsからINF / UNK / inactive Authorityを除外し、current SPEC / DECISION / approved ASMだけをauthority_refs / dependencyへ投影すること。current Authorityが0件ならACをcurrent Entity化しないこと
+- AC chain refsからINF / UNK / inactive Authorityを除外し、current SPEC / DECISION / approved ASMだけをauthority_refs / dependencyへ投影すること。current Authorityが0件なら `state_transition_required` でblockedし、helper自身はUNKNOWN / blocked Behaviorを生成しないこと
 - `Machine Entities: spec-analysis` blockがexactly one存在し、heading / JSON fence / wrapperを含めhelper再生成Markdownと一致すること
 - 親US / UC / Behavior変更でAC Entity fingerprintが変わること
 - project-evalがexact `projection / files[] / controls[] / markdown` payloadを返し、semantic projectionではcurrent versionの `変更概要` controlだけを追加し、過去CHANGELOG / Stable ID changes / 影響fileを混ぜないこと
