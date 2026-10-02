@@ -95,6 +95,42 @@ cutover後、旧v1 artifactを `previous_artifact_markdown` としてpartial rer
 
 `docs/history/**` と完了済み旧Planの履歴記述は書き換えません。また、generator contract identifier内の `-v1` はshared runtime versionではないため、意味変更がない限り更新しません。単純なrepository-wide文字列置換は禁止します。
 
+### 2.6 active Machine Evidence templateのcanonical化
+
+v2同期ではversion文字列だけを置換しません。確認headで少なくとも次のactive templateに、current runtime parser / rendererと一致しない手書き擬似schemaがあります。
+
+- `skills/spec-analysis/assets/output-template.md`
+- `skills/test-analysis/assets/output-template.md`
+- `skills/test-condition-design/assets/output-template.md`
+
+既知の不一致:
+
+- `entity_schema_version` を使用しているが、canonical Entity fieldは `schema_version`
+- `dependencies` を使用しているが、canonical Entity fieldは `upstream_entity_dependencies[] / runtime_dependencies[]`
+- runtime input例が `runtime_contract_version="runtime-contract-v1"` を使用しているが、shared metadata contractは `runtime-v2`
+- runtime result例が `envelope_version="runtime-envelope-v1"` を使用しているが、shared envelope fieldは既存どおり `envelope_version="1"`
+- canonical Machine Entityには `model_key` が必要
+
+実装では、これらの手書きJSON例をv2へ文字列置換して残しません。
+
+runtime Skill:
+
+- `runtime_contract.py::render_runtime_input()`
+- `runtime_contract.py::render_runtime_result()`
+- `runtime_contract.py::render_machine_entities()`
+
+の戻り値をmachine evidence serializationの正本とします。active output templateには、上記helperの戻り値をそのまま配置し、Agent / LLMがJSON fieldを手組みしないことを記載します。helperと重複する固定JSON例は削除します。
+
+spec-analysis:
+
+- 通常Authority Entityは `authority_entities.py` の生成結果を正本とする
+- UI target modeは `ui_target_package.py build-machine-evidence` の `machine_entities_block` を正本とする
+- output templateへ独自のMachine Entity JSON schemaを再定義しない
+
+repository testでは、current active template / fixtureを検索し、Machine Evidence例としてdeprecatedな `entity_schema_version`、単一 `dependencies`、`runtime-contract-v1`、`runtime-envelope-v1` が残っていないことを確認します。Machine Evidence fixtureを保持する場合はv2 `runtime_validator.py` / Skill-local `runtime_contract.py` でparse / validateできるcanonical shapeだけを許可します。
+
+`schema_cases.py` / `flow_paths.py` 等にある「runtime-v1未対応」のようなgenerator対応範囲の説明はshared runtime versionではありません。shared v2への機械置換を行わず、実装時に意味が曖昧なcurrent文言だけを `schema-cases-v1` / `flow-paths-v1` 等の実際のgenerator contract名へ直します。
+
 ## 3. spec-analysis normalized machine input
 
 `ui_target_package.py build-machine-evidence` はMarkdownから次を決定論的に生成します。
@@ -318,6 +354,8 @@ coverage-analysisの既存traceability graph node typeへACを追加しません
 次を更新 / 追加します。
 
 - PR #14後の9 Skill-local runtime_contract.py copies byte-identical
+- active Machine Evidence template / fixtureが手書き擬似schemaを持たず、保持するfixtureはruntime-v2 / entity-state-v2 validatorでparse / validateできる
+- generator contractの `-v1` をshared runtime v2へ誤って置換しない
 - `acceptance_criterion` Machine Entity valid / unknown type regression
 - shared canonicalization: `acceptance_refs` / `acceptance_criteria`
 - spec-analysis expected Authority + AC identity
