@@ -251,6 +251,7 @@ expected start / resume Skillを明示し、全Skill固定順実行へ回帰し�
 - impact
 - build-machine-evidence
 - project-eval
+- materialize
 
 repository unit testで次を必須確認します。
 
@@ -258,7 +259,9 @@ repository unit testで次を必須確認します。
 - mode assetのvariable tableがheader-onlyで例示stable IDを含まず、固定applicability rowだけ事前配置されること
 - package root外path拒否
 - package内version一致
-- canonical / structural ID形式・duplicate
+- canonical / structural / 00宣言済み案件固有ID形式・duplicate
+- 一度採番に使った案件固有prefix宣言の削除 / 意味変更を拒否すること
+- UI構造の `状態軸` がSTATEでは必須・非STATEでは空であること、`種別` exact enumでPANEL / POPOVER / GLOBAL UIを区別しつつPANEL prefixを共有すること
 - 00のscope / applicability tableで `関連仕様項目ID` と `根拠 / 備考` が別列であり、stable ID列にはIDだけ、prose列中のIDはreference扱いしないこと
 - structured rowのexact stable ID参照
 - 09のcurrent UNKNOWN集合と07 / README件数の一致
@@ -266,35 +269,38 @@ repository unit testで次を必須確認します。
 - README file一覧とMANIFESTの一致
 - CHANGELOG最新version見出しとpackage versionの一致
 - CHANGELOGのexact `Stable ID changes` table、Change enum、version内duplicate
-- fresh v00の空change table、v01以降のDEC / ASM初登場=added、既追跡内容・状態変更=changed、current structured model除去=retired
+- fresh v00の空change table、v01以降のDEC / ASM初登場=added、既追跡内容・状態変更=changed、明示 `retire_ids[]` でのみretiredを生成すること
 - resolvedはUNKだけに許可し、resolved後のresolver変更 / same-ID reopenを `changed`、reopen後の再closeを再 `resolved` として許可すること
 - retiredだけをterminal eventとして後続eventをrejectすること
 - 履歴全体で同じStable IDへ `added / migrated` を複数回記録できないこと
 - legacy migrationでDEC / ASMを含むretained tracked IDを `migrated` としてseedし、確認できるretired / resolved履歴だけをseedすること
 - current packageのnext-versionが `package_root` からcurrent versionを内部取得し、Agentへ `previous_version` の転記を要求しないこと
-- default policyでREADMEのPackage Version / Previous Package Versionが初回または1 revision差として整合すること
+- default policyでREADMEのPackage Version / Previous Package Versionが初回または1 revision差として整合し、完成済みpackageへ永続差分を保存する場合はsemantic / presentationを問わず+1、完全no-opだけversion維持となること
 - legacy migration用next-versionだけが明示 `previous_version` inputを受けること
 - render-readme-controlsがcurrent UNKNOWN件数とpayload file tableのcanonical Markdownを返し、Agentが件数・file順・種別を再構築しないこと
 - next-domain-fileがLLMのslug決定後に10+ fileの次番号とcanonical pathだけを決定し、同一更新で複数追加する場合は1件目の00登録 + file作成前に2件目を採番しないこと
 - domain file命名
 - inspectが更新前owner row fingerprint / UNKNOWN state / exact refs / payload hashを含むcanonical `update_snapshot` を返すこと
-- next-idがsemantic identityを判断せず、UI target mode所有の `SRC / SPEC / INF / UNK` + structural prefixについてpackage rootのcurrent structured row + CHANGELOG stable ID履歴 + previous snapshotから次番号を返し、更新途中で消えたprevious IDも再利用しないこと
+- next-id / materializeがsemantic identityを判断せず、UI target mode所有の `SRC / SPEC / INF / UNK` + standard structural prefix + 00宣言済み案件固有prefixについてcurrent row + CHANGELOG履歴 + previous snapshotから次番号を決め、更新途中で消えたprevious IDも再利用しないこと
 - `DEC / ASM` をUI target modeのnext-idが採番しないこと
 - DEC / ASMはCHANGELOG / impactの追跡可能stable IDとして受理し、Project Contextがownerの場合だけproject_context_ids.pyで採番すること
-- Project Context以外の明示ownerをProject Contextへ複製せず、owner未採番時にLLM hand-numberingへfallbackしないこと
-- 同一prefixの複数new IDで、同じprevious snapshotを渡しつつ返却IDをstructured rowへ反映してから次のnext-idを呼ぶと重複せず単調に採番されること
+- Project Context以外の明示ownerをProject Contextへ複製せず、canonical Authority IDは `DEC-xxx / ASM-xxx` を維持し、Jira / ADR等の外部record IDをauthority_idへ流用しないこと。owner未採番時にLLM hand-numberingへfallbackしないこと
+- focused next-idでは同一prefixの複数new IDを重複なく単調採番でき、canonical materializeでは複数new rowを1 request内のcanonical順でbatch allocationしてAgentによる逐次row書込みを不要にすること
 - current viewから消えた過去IDをprevious snapshot / CHANGELOG履歴のどちらかで保持している限り再利用しないこと
 - UNKNOWNのopen / resolved / resolver変更 / same-ID reopen / re-resolveで `現在有効か / 解消先ID` が整合し、resolved状態ではcurrent SPEC / DECISION / 承認済みASMへ閉じること
 - canonical structured Markdownのduplicate heading / table、row列数、escaped pipe、`<br>` referenceを固定parse契約で検証すること
-- impactがprevious snapshotとcurrent owner row差分から `added / changed / resolved / retired`、changed ID集合、`Stable ID changes` canonical Markdownを生成すること
+- impactがprevious snapshotとcurrent tracking row差分から `added / changed / resolved` を生成し、`retired` は明示 `retire_ids[]` だけから生成すること。previous ID消失のみなら `state_transition_required` でblockedすること
 - impactの `影響file` がchanged IDのprevious/current owner + exact reference先unionであり、Agentへfile一覧再入力を要求せず、semantic本文変更の要否を勝手に決定しないこと
 - legacy migrationではLLMが確定したretained ID / 明示terminal eventだけを入力に、helperが `migrated / added / resolved / retired` tableを生成すること
-- scope applicability、UI操作scopeのUIOP / US / UC / Behavior / AC hierarchy / closure / current UCの3分類整合
+- scope applicability、UI操作scopeのUIOP / US / UC / Behavior / AC hierarchy / current AC chain全parent=current / closure / current UCの3分類整合
+- `未定義` で既知current / blocked Behavior IDを0件以上保持できUNKNOWN必須、Behavior identity自体不明ならblocked Behaviorを創作しないこと
+- `なし` は関連Behavior / UNKNOWNなし + 理由 + current Authorityの `関連仕様項目ID` 1件以上を要求すること
 - 09の「現在有効な仕様根拠」からnormalized Authorityを固定projectionし、`適用範囲` を非空string、`関係` を単一許可値の1要素arrayとして一意にserializeすること
 - build-machine-evidenceがAuthority + current AC Entity、spec-analysis normalized_skill_input、expected identity、shared `render_machine_entities()` 由来のcanonical `machine_entities_markdown` を決定論生成し、不要な統合implementation_fingerprintを公開しないこと
+- AC chain refsからINF / UNK / inactive Authorityを除外し、current SPEC / DECISION / approved ASMだけをauthority_refs / dependencyへ投影すること。current Authorityが0件ならACをcurrent Entity化しないこと
 - `Machine Entities: spec-analysis` blockがexactly one存在し、heading / JSON fence / wrapperを含めhelper再生成Markdownと一致すること
 - 親US / UC / Behavior変更でAC Entity fingerprintが変わること
-- project-evalがexact `projection / files[] / markdown` payloadを返し、内容を変更せずcanonical順に連結すること
+- project-evalがexact `projection / files[] / controls[] / markdown` payloadを返し、semantic projectionではcurrent versionの `変更概要` controlだけを追加し、過去CHANGELOG / Stable ID changes / 影響fileを混ぜないこと
 - raw SHA-256はproject-eval outputから再計算せず、validate / repository unit testでraw bytesに対して検証すること
 
 ### 8.2 question-analysis / Project Context production helper
