@@ -1249,11 +1249,13 @@ LLMは:
 2. 新schemaの00〜09 / domain fileへ意味をmapする
 3. semantic identityが同じ既存SRC / SPEC / INF / UNK / DEC / ASM / structural IDは、実際の正本ownerを維持したままID維持する
 4. retained current tracked ID集合と、legacy履歴から明示確認できるretired / resolved IDだけをsemantic mapping結果として確定する
-5. 新しいentityだけnewと判断し、next-idを使う
-6. legacyで未確定だった内容を推測で確定しない
-7. current packageに不要な履歴説明はCHANGELOGの変更概要 / migration noteへ残し、current viewへ混ぜない
+5. **new IDを採番する前に** retained current rowだけをmaterializeしたcurrent packageへ `impact(change_mode=legacy-migration)` を実行し、`migration_retained_ids[] / legacy_terminal_events[]` から暫定 `Stable ID changes` を生成・反映する。これによりcurrent viewに存在しないretired / resolved legacy IDも `next-id` の使用済み集合へ入る
+6. 新しいentityだけnewと判断し、Step 5のCHANGELOGを保持した状態で `next-id` を使う。返却IDをowner rowへ即時反映する
+7. 全new ID materialize後に同じsemantic mapping入力で `impact(change_mode=legacy-migration)` を再実行し、new current IDの `added` を含む最終 `Stable ID changes` / `影響file` sectionへ置換する
+8. legacyで未確定だった内容を推測で確定しない
+9. current packageに不要な履歴説明はCHANGELOGの変更概要 / migration noteへ残し、current viewへ混ぜない
 
-canonical current packageを組み立てた後、`impact(change_mode=legacy-migration)` へStep 4の `migration_retained_ids[] / legacy_terminal_events[]` を渡し、helperが `migrated / added / resolved / retired` の `Stable ID changes` と `影響file` sectionを生成します。LLMがCHANGELOG rowを手入力しません。
+LLMがCHANGELOG rowを手入力しません。暫定impactは採番予約のための同じcanonical operationであり、別registry / counterを追加しません。
 
 DEC / ASMは実際の正本ownerの既存IDを参照し、migrationを理由にUI target packageで再採番しません。Project Context以外の明示正本をProject Contextへ複製しません。
 
