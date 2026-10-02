@@ -260,7 +260,7 @@ QとUNKの意味的同一性は検証しません。
 
 ### 8.3 deterministic output eval
 
-既存spec-analysis / question-analysis validatorへ、production helperとは独立したfixture検証を追加します。
+既存spec-analysis / question-analysis / test-requirement-design validatorへ、production helperとは独立したfixture検証を追加します。
 
 - spec-analysis: UI target packageのcanonical table / stable ref contractを評価
 - question-analysis: known_unknown_ids / expected_related_unknownsを評価
