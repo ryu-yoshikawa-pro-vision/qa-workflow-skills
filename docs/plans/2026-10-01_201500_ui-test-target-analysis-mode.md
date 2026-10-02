@@ -53,7 +53,7 @@ feat/ui-test-target-analysis-profile
 
 ## 固定方針
 
-LLM / deterministic処理の責務境界は `2026-10-01_201500_ui-test-target-analysis-mode_05_llm-deterministic-boundaries.md` を正本とします。LLMの意味判断をscriptへ移さず、形式・参照・集計・fingerprint等の再現可能な定型処理だけをSkill-local helper / validatorへ移します。UI target modeがownerの `SRC / SPEC / INF / UNK` とstructural IDは、semantic identityをLLMが決めた後の番号決定をhelperへ寄せます。DEC / ASMは案件で実際に指定された正本ownerを維持し、Project Contextがownerの場合だけqa-workflow helperで番号決定します。
+LLM / deterministic処理の責務境界は `2026-10-01_201500_ui-test-target-analysis-mode_05_llm-deterministic-boundaries.md` を正本とします。LLMの意味判断をscriptへ移さず、形式・参照・集計・fingerprint等の再現可能な定型処理だけをSkill-local helper / validatorへ移します。UI target modeがownerの `SRC / SPEC / INF / UNK` とstructural IDは、semantic identityをLLMが決めた後の番号決定をhelperへ寄せます。通常更新の `Stable ID changes` / `影響file` は更新前snapshotとcurrent structured stateの差分からhelperが生成し、LLMはCHANGELOGの変更概要だけを記述します。DEC / ASMは案件で実際に指定された正本ownerを維持し、Project Contextがownerの場合だけqa-workflow helperで番号決定とprevious ID削除検証を行います。
 
 
 ### 1. 新Skillは追加しない
@@ -74,7 +74,7 @@ UIテスト設計前の対象理解を継続利用する成果物として残す
 
 modeでは `09_authority_and_traceability.md` をcanonical仕様モデルの正本とし、他ファイルはそのstable IDを参照する構造化ビューとします。SPEC / DECISION / INFERENCE / UNKNOWNやCurrent Effective Authorityを複数ファイルで別々に再定義しません。
 
-Authority Machine Entityは既存 `authority_entities.py`、下流handoff用のcurrent Acceptance Criteria Machine Entityは `ui_target_package.py build-machine-evidence` から決定論生成します。US / UC / Behavior自体はMachine Entity化せず、fingerprint / normalized machine input / expected identityをLLMが手入力しません。
+Authority Machine Entityは既存 `authority_entities.py`、下流handoff用のcurrent Acceptance Criteria Machine Entityは `ui_target_package.py build-machine-evidence` から決定論生成します。`build-machine-evidence` は既存 `render_machine_entities()` を使って `### Machine Entities: spec-analysis` のMarkdown section全体まで返します。US / UC / Behavior自体はMachine Entity化せず、fingerprint / normalized machine input / expected identity / JSON wrapperをLLMが手入力しません。
 
 ### 4. 実装は仕様Authorityではない
 
@@ -203,7 +203,7 @@ PR #14確認headに存在する9個のSkill-local `runtime_contract.py` を同�
 
 `acceptance_criterion` Entity type、`acceptance_refs` canonicalization、spec-analysis Authority + AC expected Entity導出はshared runtime / Machine Entityの意味契約変更です。そのため9コピーをbyte-identicalに揃え、`RUNTIME_CONTRACT_VERSION` を `runtime-v1` → `runtime-v2`、`ENTITY_SCHEMA_VERSION` を `entity-state-v1` → `entity-state-v2` へ更新します。envelope field shapeとfreshness algorithmは維持します。
 
-旧runtime-v1 / entity-state-v1 evidenceをv2 current evidenceとして読み替えません。cutover後の最初の実行はcurrent inputからfull rebuildし、その後だけ既存partial rerun契約を使用します。generator contractは別契約なので、`workflow-runtime-v1`、`schema-cases-v1`、`usability-inspection-runtime-v1`、`wcag-em-runtime-v1`等を意味変更なしにversion upしません。
+旧runtime-v1 / entity-state-v1 evidenceをv2 current evidenceとして読み替えません。shared runtimeの専用 `project_v1_cutover` operationでv1 Runtime Input / Resultからgenerator-owned stable identity / mapping stateだけを決定論投影し、v2初回は `previous_artifact_markdown=null` のfull rebuildで同じTR / TCN / model / CI / TC identityを維持します。v2 artifact成立後だけ既存partial rerun契約へ戻します。generator contractは別契約なので、`workflow-runtime-v1`、`schema-cases-v1`、`usability-inspection-runtime-v1`、`wcag-em-runtime-v1`等を意味変更なしにversion upしません。
 
 active Machine Evidence templateはversion文字列だけを置換しません。runtime Skillは `render_runtime_input()` / `render_runtime_result()` / `render_machine_entities()`、spec-analysisは `authority_entities.py` / `build-machine-evidence` の生成結果を正本とし、旧 `entity_schema_version` / `dependencies` / `runtime-contract-v1` / `runtime-envelope-v1` の手書き擬似schemaを削除します。
 
@@ -218,7 +218,7 @@ active Machine Evidence templateはversion文字列だけを置換しません�
 - project_context_ids.py用repository unit test
 - routing fixtureの固定件数を検証するrepository test / docs current count
 
-「テスト設計前の仕様理解package」はspec-analysisから開始し、未解決事項があればquestion-analysisへ進み、回答反映後spec-analysisへ戻すroutingを追加します。正式DECISION / 承認済みASMへ正規化する場合、意味判断はquestion-analysis / stakeholder側に残します。Project Contextが実際の正本ownerである場合だけnew ID番号をqa-workflow helperが決定し、別ownerが明示されている場合はその正本IDを維持します。
+「テスト設計前の仕様理解package」はspec-analysisから開始し、未解決事項があればquestion-analysisへ進み、回答反映後spec-analysisへ戻すroutingを追加します。正式DECISION / 承認済みASMへ正規化する場合、意味判断はquestion-analysis / stakeholder側に残します。Project Contextが実際の正本ownerである場合だけnew ID番号をqa-workflow helperがprevious + candidate全状態rowから決定し、previous DEC / ASM IDの削除をvalidate-historyで拒否します。別ownerが明示されている場合はその正本ID lifecycleを維持します。
 
 ### repository docs / CI
 
@@ -250,11 +250,11 @@ PR #14後のCIは `skills/*/scripts` を動的compileするため、helper compi
 - UI構造をPAGE / STATE・VIEW・STEP / MODAL / browser dialog / panel / external / sharedへ区別できる
 - 仕様Authorityとrepository implementation statusが混同されない
 - UNKNOWNが安定参照され、回答後に解消済み履歴とcurrent unknownが整合する
-- package更新時にpackage schema version、content version、CHANGELOG、MANIFESTと各ファイルの現在状態が一致する
+- package更新時にpackage schema version、content version、CHANGELOG、MANIFESTと各ファイルの現在状態が一致し、Stable ID lifecycle / 影響fileをLLM手入力に依存しない
 - 通常のspec-analysis出力は従来どおり利用できる
 - test-target-inspectionの責務を侵食しない
 - qa-workflowが最短経路でmodeを選択でき、usability-evaluation / usability-inspection / wcag-conformance-evaluationへ誤routeしない
-- package内のcanonical Authority契約が既存spec-analysisと互換であり、Authority + current AC Machine Entity、spec-analysis normalized_skill_input、expected identityまでLLM手組みなしで接続できる
+- package内のcanonical Authority契約が既存spec-analysisと互換であり、Authority + current AC Machine Entity、spec-analysis normalized_skill_input、expected identity、Machine Entities Markdown sectionまでLLM手組みなしで接続できる
 - 複数Markdown packageを既存semantic runnerへ入力できる一意なevaluation projectionが定義されている
 - modeが既存Agent Skills形式のままAIエージェントから利用できる
 - mode導入前のlegacy / unversioned packageをsemantic mapping + deterministic validationでcurrent schemaへ移行できる
@@ -262,7 +262,10 @@ PR #14後のCIは `skills/*/scripts` を動的compileするため、helper compi
 - README / EVALS等の現在値を変更した場合はPR #14後のcurrent repositoryから導出した実データと一致する
 - PR #14のusability / WCAG finding・observation・resultを仕様Authorityへ自動昇格しない
 - 機能scopeごとにUI操作有無を判定し、UI操作ありではUS → UC → Behavior → ACを完全に分析し、情報不足はnot-applicableへ逃げずUNKNOWN / blockedとして残る
-- test-requirement-designまで進む要求では、current ACがTRまたは明示的dispositionへ閉じ、AC / 親Behavior / 親UC / 親US / Authority変更が必要なTR freshnessへ伝播する。仕様理解packageだけを要求された場合は、このclosureをpackage単体の完了条件にしない
+- test-requirement-designまで進む要求では、current ACがTRまたは明示的dispositionへ閉じる。AC linkはACだけをcloseし、Authorityは従来どおりTR authority_refsまたはAuthority Dispositionで独立closureする。AC / 親Behavior / 親UC / 親US / Authority変更は必要なTR freshnessへ伝播する。仕様理解packageだけを要求された場合は、このclosureをpackage単体の完了条件にしない
 - 標準package fileはrequired core + 固定triggerによる条件付き必須とし、Agentの自由裁量で作成有無を変えない
-- LLMは仕様意味・UI意味・semantic identity判断に集中し、version / hash /参照整合 / UNKNOWN件数 / MANIFEST / file applicability整合 / Machine Entity projection等の定型処理はhelper / validatorへ移る
+- LLMは仕様意味・UI意味・semantic identity判断に集中し、version / hash /参照整合 / UNKNOWN件数 / MANIFEST / file applicability整合 / Stable ID lifecycle / Machine Entity projection・Markdown化等の定型処理はhelper / validatorへ移る
+- runtime-v2 / entity-state-v2 cutoverでv1 evidence自体はcurrent扱いせず、内容不変のTR / TCN / model / CI / TC stable identityとdeleted / inactive履歴だけを決定論的に維持できる
+- Project Context ownerのDEC / ASMは撤回 / 置換済みでもID rowを削除せず、previous IDの再利用をhelperが防ぐ
+- current packageがrepository evidenceをcarry-forwardする場合、08の確認revisionを勝手にcurrentへ更新せず保持できる
 - helperがsemantic判断を代替せず、通常spec-analysisの柔軟性を損なわない
