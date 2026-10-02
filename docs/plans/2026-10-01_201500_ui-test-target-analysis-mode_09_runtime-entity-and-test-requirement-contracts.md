@@ -78,7 +78,7 @@ spec-analysisはruntime unitを新設しません。expected Entity導出だけ�
 
 envelope field shapeとfreshness algorithmは維持します。v1 / v2を同時解釈するcompatibility branchは追加しません。旧runtime-v1 / entity-state-v1 evidenceはv2 current evidenceとして読み替えず、current scriptで再実行・再検証します。9コピーのruntime implementation fingerprintも既存契約どおり変わります。
 
-cutover後、旧v1 artifactを `previous_artifact_markdown` としてpartial rerunへ渡しません。TRD / TCD / test-case-designを含む既存runtime Skillは、最初のv2実行を `partial_rerun=false` + `previous_artifact_markdown=null` のfull rebuildとしてcurrent active rowsを再生成します。v2 artifactが成立した後だけ既存partial rerun契約へ戻します。
+cutover後、旧v1 artifactを通常の `previous_artifact_markdown` としてpartial rerun / freshness検証へ渡しません。TRD / TCD / test-case-designを含む既存runtime Skillは、最初のv2実行を `partial_rerun=false` + `previous_artifact_markdown=null` のfull rebuildとして行います。ただしstable identity / mapping historyを空にせず、§2.7の専用 `project_v1_cutover` でv1 artifactからidentity stateだけを投影してv2 normalized inputへseedします。v2 artifactが成立した後だけ既存partial rerun契約へ戻します。
 
 `runtime-v2` / `entity-state-v2` はshared contractのversionです。generator contractは別契約なので、意味変更のない `workflow-runtime-v1`、`schema-cases-v1`、`usability-inspection-runtime-v1`、`wcag-em-runtime-v1` 等は維持します。
 
@@ -130,6 +130,61 @@ spec-analysis:
 repository testでは、current active template / fixtureを検索し、Machine Evidence例としてdeprecatedな `entity_schema_version`、単一 `dependencies`、`runtime-contract-v1`、`runtime-envelope-v1` が残っていないことを確認します。Machine Evidence fixtureを保持する場合はv2 `runtime_validator.py` / Skill-local `runtime_contract.py` でparse / validateできるcanonical shapeだけを許可します。
 
 `schema_cases.py` / `flow_paths.py` 等にある「runtime-v1未対応」のようなgenerator対応範囲の説明はshared runtime versionではありません。shared v2への機械置換を行わず、実装時に意味が曖昧なcurrent文言だけを `schema-cases-v1` / `flow-paths-v1` 等の実際のgenerator contract名へ直します。
+
+### 2.7 v1 → v2 stable identity cutover
+
+shared `runtime_contract.py` に専用operation `project_v1_cutover` を追加します。これはv1 evidenceをcurrent / freshとして受理するcompatibility runtimeではなく、v2初回full rebuildへ引き継ぐgenerator-owned identity / mapping stateだけを決定論抽出するone-time projectionです。
+
+stdin:
+
+```json
+{
+  "operation":"project_v1_cutover",
+  "skill":"test-requirement-design",
+  "artifact_markdown":"<runtime-v1 / entity-state-v1 artifact>"
+}
+```
+
+共通規則:
+
+- artifact内のMachine Runtime Input / Result pairがruntime-v1であることを確認する
+- v1 Machine Entityのfingerprint / freshnessをv2 current evidenceとして採用しない
+- human-visible current itemのsemantic identityを変更しない
+- deleted / inactive identity historyを落とさない
+- current v1 Runtime Inputに保存済みのnormalized semantic inputと、Runtime Resultに保存済みのidentity / mapping stateだけをcanonical projectionする
+- projection結果をv2初回normalized inputへseedし、通常generationは `partial_rerun=false / previous_artifact_markdown=null` のまま実行する
+- cutoverとsemantic redesignを同じrunで混在させない。cutover後にv2 artifactを成立させてから通常のsemantic updateを行う
+
+skill別payload:
+
+`test-requirement-design`:
+
+- v1 inputのTR draft / Authority / Risk等を維持し、v2必須field `acceptance_criteria=[]` と各既存TR draftの `acceptance_refs=[]` を追加する
+- v1 resultの `tr_id_state` をv2 input `previous_tr_ids[]` へ投影する
+- current TRは既存stable IDを `identity_action=reuse / reuse_id=<same TR ID>` として保持し、deleted IDもprevious stateへ残す
+
+`test-condition-design`:
+
+- `condition_structure` resultの `tcn_id_state / model_key_state` を `previous_tcn_ids / previous_model_keys` へ投影する
+- TCNごとの `materialize_coverage` resultから `target_mapping_state / semantic_ci_mapping_state / ci_id_state / expected_result_root_state` を、それぞれ次回入力の `previous_target_id_map / previous_semantic_ci_map / previous_ci_ids / previous_expected_result_roots` へ投影する
+- current TCN / model / semantic CI identityは既存stable identityをreuseし、deleted / inactive mappingを落とさない
+
+`test-case-design`:
+
+- v1 resultの `tc_id_state` を `previous_tc_ids[]` へ投影する
+- current TCは既存stable IDをreuseし、deleted IDもprevious stateへ残す
+
+spec-analysis / test-analysisのAuthority / Product Risk等、runtime generatorが採番ownerではないstable IDはhuman artifact側の既存IDをそのまま維持します。coverage-analysis / qa-workflow / usability-inspection / wcag-conformance-evaluationで上記generator-owned stable identity stateを持たないruntimeはidentity cutover seedを作らず、v2 evidenceだけを再生成します。
+
+projectionは旧v1 artifactを変更しません。出力はv2 inputへ渡すseed dataであり、Machine Runtime Resultとして保存しません。
+
+repository regression:
+
+- semantic内容不変のcutoverでcurrent TR / TCN / model / CI / TC IDが不変
+- deleted TR / TCN / model / CI / TC identityがcutover後も使用済み履歴として保持される
+- inactive target / semantic CI mappingが失われない
+- cutover後のnew identityが過去最大IDを再利用しない
+- v1 Entity fingerprintをv2 current Entityとしてcarry-forwardしない
 
 ## 3. spec-analysis normalized machine input
 
@@ -252,6 +307,9 @@ scriptは次を行います。
 9. 各参照ACの `authority_refs[]` をunionする。artifact modeでは解決できたcurrent Authority EntityをTR Entity `upstream_entity_dependencies[]` へ直接追加する。direct modeではknown Authority ID検証とcontent保持までとし、Machine Entity dependencyは作らない
 10. AC linked + disposedの二重扱いを拒否
 11. linkedもdisposedもされないcurrent ACをunclosedとして拒否
+12. Authority / Product Risk / Acceptance Criteriaのclosure集合を別々に評価する。TRの `acceptance_refs[]` にACを追加しても、そのACの `authority_refs[]` をAuthority linked集合へ暗黙追加しない
+
+AC linkはACだけをclosureします。Authorityは従来どおりTR draftの `authority_refs[]` に明示linkされるか、Authority Dispositionへ入る必要があります。AC→Authority unionはfreshness dependencyを直接保持するための展開であり、Authority closureを代理しません。
 
 Authority dependencyの展開はID集合・Entity解決だけを行う決定論処理です。どのAuthorityがACを支えるかはspec-analysisでLLMが判断済みであり、test-requirement-design側で意味を再判断しません。存在しないMachine Entityをdirect modeでplaceholder生成する経路は追加しません。
 
@@ -305,7 +363,7 @@ expected keys:
 - `required_linked_acceptance_ids`
 - `expected_dispositions`
 
-validatorはAuthority / Product Risk / Acceptance Criteriaをclosure universeとして扱い、各current ACがlinkedまたはdisposedのどちらか一方へ閉じることを検証します。
+validatorはAuthority / Product Risk / Acceptance Criteriaをそれぞれ独立したclosure集合として扱います。各current ACはlinkedまたはdisposedのどちらか一方へ閉じ、各Authority / Product Riskも従来どおり自身のlinkまたはDispositionで閉じることを検証します。AC linkからAuthority closureを推論しません。
 
 既存TR-OUT-001 / 002はACなしworkflowとして `known_acceptance_criteria=[]` 相当を確認し、従来挙動の回帰に使います。
 
@@ -363,6 +421,8 @@ coverage-analysisの既存traceability graph node typeへACを追加しません
 - qa-workflow expected / actual Entity exact match
 - coverage-analysis current Entity parse compatibility
 - requirement-structure-v2 valid / invalid schema
+- AC-001をTRへlinkしても、そのACが参照するSPEC-001をTR authority_refs / Authority Dispositionで別途closeしない場合はSPEC-001 unclosedとなる
+- project_v1_cutoverのskill別projection、runtime-v1 / entity-state-v1以外の入力拒否、内容不変時stable ID保持、deleted / inactive identity history保持
 - AC linked / disposed / unclosed / linked+disposed
 - AC upstream skill/type mismatch
 - AC dependency fingerprint propagation
