@@ -104,17 +104,20 @@ package rootを読み、次をJSONで返します。
 
 #### next-version
 
-default version policyを使うpackageだけを対象に、previous versionから次のvNNを導出します。
+default version policyを使うcurrent `ui-target-v1` packageでは、Agentがcurrent versionを読み取ってhelperへ渡しません。helperが `package_root` からPackage Versionを取得し、`previous_version / next_version` を返します。
 
-案件固有version policyが明示されている場合はnext-versionを使用せず、そのversion文字列がpackage内で一致することだけvalidateします。
+mode導入前のlegacy packageをcurrent schemaへ移行する場合だけ、LLMがsemantic mappingで確定した明示versionをlegacy migration用inputとして渡せます。案件固有version policyが明示されている場合はnext-versionを使用せず、そのversion文字列がpackage内で一致することだけvalidateします。
 
 #### next-id
 
-LLMがsemantic identityを判断して `new` と決めた後だけ使用します。Agentから既知ID一覧を受け取らず、package rootからcurrent structured rowとCHANGELOGに記録されたstable IDをhelper自身が収集し、同prefixの既知最大番号+1を返します。
+LLMがsemantic identityを判断して `new` と決めた後だけ使用します。Agentから既知ID一覧を受け取らず、helperがpackage rootのcurrent structured rowとCHANGELOG各versionのexact `Stable ID changes` tableから既知IDを収集し、同prefixの既知最大番号+1を返します。
 
 - reuse / newの意味判断は行わない
 - Agent / LLMに`known_ids[]`を手組みさせない
+- CHANGELOG本文のproseからIDを推測せず、exact tableだけを履歴として読む
 - 現在存在しない過去IDもCHANGELOGのstable ID履歴から既知IDとして扱い、別entityへ再割当てしない
+- `next-id` で得たIDは、同じprefixの次の `next-id` 呼び出し前に対象structured rowへ反映する
+- helper返却の `stable_id_change` をcurrent versionの `Stable ID changes` tableへ記録し、validate前に履歴を閉じる
 - prefixはmodeで宣言済みのものだけ許可する
 
 #### build-manifest
