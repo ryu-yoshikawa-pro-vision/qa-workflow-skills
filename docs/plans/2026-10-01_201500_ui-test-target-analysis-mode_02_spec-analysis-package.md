@@ -300,14 +300,16 @@ DB値やAPI responseをUI期待結果としてテストケース化しません�
 
 ### 08_repository_implementation_status.md
 
-repository確認を行った場合のみ使用します。
+current packageがrepository / product implementation evidenceを保持・利用している場合に使用します。
 
-- 基準branch / commit
+- 基準branch / commit / revision
 - 実装確認できた範囲
 - 未実装
 - 仕様-実装差分
 - 実装だけに存在する分岐
 - 実装確認不能理由
+
+前versionからcarry-forwardする場合、再確認していないのに基準revisionをcurrent repositoryへ更新しません。保存済みの確認時点をそのまま保持します。current分析からrepository evidenceを明示的に外した場合だけ08を除去します。
 
 このファイルの内容を仕様本文へ自動昇格させません。
 
