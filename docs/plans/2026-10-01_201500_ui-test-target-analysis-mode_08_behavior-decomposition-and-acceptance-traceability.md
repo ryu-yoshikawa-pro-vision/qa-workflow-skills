@@ -30,7 +30,7 @@ Scope ID:
 
 UI操作の有無自体はLLMが資料の意味から判断します。上表の対応関係、ID形式、UNKNOWN参照、下位tableの有無はhelperが決定論検証します。
 
-`資料不足でUS / UC / Behavior / ACを書けない` はnot-applicableの理由になりません。
+`資料不足でUS / UC / Behavior / ACを書けない` はnot-applicableの理由になりません。Behavior Decomposition=blockedのscopeでは下位UIOP / US / UC / Behavior / ACを確定済みとして生成せず、関連UNKNOWN解消後にrequired / not-applicableを再判定します。
 
 UI操作には少なくとも次を含みます。
 - button / link / menu / tab等による操作
@@ -191,20 +191,18 @@ Acceptance CriteriaはBehaviorが仕様上成立したと判断できる受入�
 
 #### Acceptance Criteria一覧
 
-| AC ID | Behavior ID | Acceptance Criteria | 関連仕様項目ID | 関連構造ID | 状態 | 関連UNKNOWN ID |
-| --- | --- | --- | --- | --- | --- | --- |
+| AC ID | Behavior ID | Acceptance Criteria | 関連仕様項目ID | 関連構造ID |
+| --- | --- | --- | --- | --- |
 
 ID: `AC-001` ～ `AC-999`
 
-状態:
-- current
-- blocked
+AC一覧に記載するrowはcurrentだけです。blocked ACという中間状態は作りません。
 
 規則:
-- current Behaviorは1件以上のcurrent ACを持つ
-- current ACはcurrent Behaviorだけを親に持つ
-- current ACは観測可能な振る舞い / 結果の意味を表す
-- expected behaviorを確定できない場合はACを創作せず、親BehaviorをblockedとしてUNKNOWNへ戻す
+- current Behaviorは1件以上のACを持つ
+- ACはcurrent Behaviorだけを親に持つ
+- ACは観測可能な振る舞い / 結果の意味を表す
+- expected behaviorを確定できない場合はAC rowを作らず、親BehaviorをblockedとしてUNKNOWNへ戻す
 - ACへ境界値一覧、入力値一覧、組合せ表、テストデータ一覧を展開しない
 - 仕様上の特定値そのものが期待挙動の一部である場合は除去しない
 - current ACは1件以上のcurrent Authority itemへ追跡する
@@ -293,14 +291,14 @@ test-condition-designはTRから問題構造を分析し、仕様 / Risk / 状�
 - SCOPE / UIOP / US / UC / BH / AC ID形式・duplicate
 - scope適用判定の許可値と対応関係
 - required scopeのUIOP / US / UC / Behavior / AC table存在
-- not-applicable scopeにUS / UC / Behavior / ACを生成していないこと
+- not-applicable / blocked scopeにUS / UC / Behavior / ACを確定済みとして生成していないこと
 - blocked applicability / rowのUNKNOWN参照
 - UIOP → UC closure
 - US → UC closure
 - UC → Behavior closure
 - current UCだけに正常 / 準正常 / 例外3行が存在すること
 - 定義あり / なし / 未定義の構造整合
-- current Behavior → current AC closure
+- current Behavior → AC closure
 - current AC → current Authority ref
 - current / blockedとUNKNOWN参照の整合
 - broken structural ref
