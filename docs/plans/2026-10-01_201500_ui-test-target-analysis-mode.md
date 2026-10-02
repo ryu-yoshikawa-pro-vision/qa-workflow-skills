@@ -263,7 +263,7 @@ PR #14後のCIは `skills/*/scripts` を動的compileするため、helper compi
 - PR #14のusability / WCAG finding・observation・resultを仕様Authorityへ自動昇格しない
 - 機能scopeごとにUI操作有無を判定し、UI操作ありではUS → UC → Behavior → ACを完全に分析し、情報不足はnot-applicableへ逃げずUNKNOWN / blockedとして残る
 - test-requirement-designまで進む要求では、current ACがTRまたは明示的dispositionへ閉じる。AC linkはACだけをcloseし、Authorityは従来どおりTR authority_refsまたはAuthority Dispositionで独立closureする。AC / 親Behavior / 親UC / 親US / Authority変更は必要なTR freshnessへ伝播する。仕様理解packageだけを要求された場合は、このclosureをpackage単体の完了条件にしない
-- 標準package fileはrequired core + 固定triggerによる条件付き必須とし、Agentの自由裁量で作成有無を変えない
+- 標準package fileはrequired core payload + required control file `MANIFEST.md` + 固定triggerによる条件付き必須とし、Agentの自由裁量で作成有無を変えない
 - LLMは仕様意味・UI意味・semantic identity / explicit retire判断に集中し、version / stable ID / Markdown table・known section・標準file materialization / hash /参照整合 / UNKNOWN件数 / MANIFEST / file applicability整合 / Stable ID lifecycle / Machine Entity projection等の定型処理はhelper / validatorへ移る
 - runtime-v2 / entity-state-v2 cutoverでv1 evidence自体はcurrent扱いせず、内容不変のTR / TCN / model / CI / TC stable identityとdeleted / inactive履歴だけを決定論的に維持できる
 - Project Context ownerのDEC / ASMは撤回 / 置換済みでもID rowを削除せず、previous IDの再利用をhelperが防ぐ
