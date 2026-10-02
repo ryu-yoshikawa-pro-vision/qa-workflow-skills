@@ -274,17 +274,18 @@ PR #14 merge前の既存repository byte-identity testは次の7コピーを対�
 - coverage-analysis
 - qa-workflow
 
-PR #14で追加された `usability-inspection` / `wcag-conformance-evaluation` の2コピーは、既存 `tests/skills/runtime/test_runtime_dispatch.py` のbyte-identity対象外です。PR #16のAcceptance Criterion / test-requirement-design処理経路でもこの2 SkillはACを消費しないため、PR #16だけを理由に変更しません。
+PR #14で追加された `usability-inspection` / `wcag-conformance-evaluation` の2コピーは、既存 `tests/skills/runtime/test_runtime_dispatch.py` のbyte-identity対象外です。ただし確認headでは他7コピーと同じshared Machine Entity schemaを持つ同一blobです。PR #16で `entity-state-v2` へ上げる際に同じschema versionの意味をSkillごとに分岐させないため、この2コピーも他7コピーと同時に更新し、byte-identity testの対象を9コピーへ広げます。
 
 Step 0で次を実測します。
 
 - repository内の `runtime_contract.py` 実path
 - PR #14後9コピーのbyte identityと、既存repository testが7コピーだけを対象にしている事実
-- `usability-inspection` / `wcag-conformance-evaluation` がshared byte-identity契約へ新たに参加していないこと
+- `usability-inspection` / `wcag-conformance-evaluation` がPR #14時点ではbyte-identity test対象外だが、他7コピーと同一blob / 同一 `ENTITY_SCHEMA_VERSION` であること
 - `ALLOWED_ENTITY_TYPES` に `acceptance_criterion` がまだ存在しないこと
 - spec-analysis `_expected_entities()` がAuthorityだけを導出するbaselineであること
 - test-requirement-designのgenerator contractが `requirement-structure-v1` であること
 - Disposition upstream typeがAuthority / Product Risk中心のbaselineであること
+- v1 runtime resultがstable identity cutoverに必要な `tr_id_state / tcn_id_state / model_key_state / target_mapping_state / semantic_ci_mapping_state / ci_id_state / expected_result_root_state / tc_id_state` を保存していること
 
 PR #16はPR #14後に存在する9コピーへ `_09_runtime-entity-and-test-requirement-contracts.md` のruntime-v2 / entity-state-v2変更を適用し、byte-identity testを9コピーへ拡張します。#14 merge後mainでコピー数・内容・consumer境界が確認headから変わっていた場合は、実装を開始せずPlanをcurrent contractへ同期します。
 ## 12. rebase / conflict gate
