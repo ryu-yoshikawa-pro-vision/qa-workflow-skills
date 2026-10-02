@@ -137,12 +137,13 @@ READMEの `Package metadata` と `Current payload files` をcanonical Markdown�
 
 #### next-domain-file
 
-LLMが「標準fileへ混在させるべきでない独立domainが必要」と判断し、slugを決めた後だけ使用します。helperがexisting `10+` domain file番号の最大値+1を決め、canonical relative pathを返します。
+focused確認 / 個別利用用operationです。LLMが「標準fileへ混在させるべきでない独立domainが必要」と判断し、slugを決めた後、existing `10+` domain file番号の最大値+1とcanonical relative pathを返します。
 
 - domain fileが必要かは判断しない
 - slugの意味は判断しない
 - Agent / LLMに次の連番を計算させない
-- 返却pathを00へ登録して実fileを作成してから次の採番を行い、未materializeの番号をAgent側だけで予約しない
+- focused operationを連続利用する場合は返却pathを実fileへmaterializeしてから次を呼び、未materialize番号をAgent側だけで予約しない
+- canonical package create / updateでは `materialize.extension_file_updates[]` が複数new extensionをrequest順にbatch採番し、00のextension宣言tableと実fileを同時生成するため、Agentはnext-domain-fileを逐次呼ばない
 - 既存最大番号が999なら自動拡張せず `id_space_exhausted`
 
 #### materialize
@@ -153,7 +154,7 @@ LLMが「標準fileへ混在させるべきでない独立domainが必要」と�
 - Markdown escape / canonical row order / table serialization
 - known headingへのsection置換
 - 条件付き標準fileのtemplate作成 / 除去
-- 宣言済みextension fileの作成 / 更新
+- new / reuse extension fileの連番解決、作成 / 更新、00の `案件固有extension file一覧` canonical生成
 - explicit `retire_ids[]` のlifecycle検証。row消失だけではretireしない
 - Stable ID changes / 影響file
 - Machine Entities section
