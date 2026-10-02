@@ -520,7 +520,7 @@ mode単体が成立してからworkflowへ接続します。
 - requirement_structure top-levelへ `acceptance_criteria[]`（`ac_id / authority_refs[]`）、TR draftへ `acceptance_refs[]` を必須fieldとして追加
 - `acceptance_criteria[].authority_refs[]` はspec-analysis helper結果をそのまま使用し、Agentが再構築しない
 - ACなしworkflowは空arrayで明示し、field省略を許可しない
-- UI target mode以外の既存spec-analysis normalized inputは `acceptance_criteria` key省略を空集合として許可し、既存Authority expected Entityだけを維持する
+- UI target mode以外の既存spec-analysis normalized inputはupstream互換として `acceptance_criteria` key省略を許可するが、requirement-structure-v2へ渡す直前にdeterministic adapterが必ず `acceptance_criteria=[]` を追加する。既存TR draftも `acceptance_refs` 欠落時だけ `[]` を補完し、v2 generator自体ではfield省略を許可しない
 - artifact modeでcurrent `spec-analysis / acceptance_criterion` Entityへ依存し、input `authority_refs[]` とAC EntityのAuthority dependency集合をexact一致検証する
 - ACをDisposition upstream typeとして許可し、ownerをspec-analysisへ固定
 - test-requirement-designまで進むworkflowでcurrent ACをTRまたはDispositionへ閉じる
