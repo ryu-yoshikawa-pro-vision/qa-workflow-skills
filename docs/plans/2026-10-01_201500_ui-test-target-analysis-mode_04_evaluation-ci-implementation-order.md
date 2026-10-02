@@ -273,7 +273,7 @@ repository unit testで次を必須確認します。
 - resolvedはUNKだけに許可し、resolved後のresolver変更 / same-ID reopenを `changed`、reopen後の再closeを再 `resolved` として許可すること
 - retiredだけをterminal eventとして後続eventをrejectすること
 - 履歴全体で同じStable IDへ `added / migrated` を複数回記録できないこと
-- legacy migrationでDEC / ASMを含むretained tracked IDを `migrated` としてseedし、確認できるretired / resolved履歴だけをseedすること
+- legacy migrationでDEC / ASMを含むretained tracked IDを `migrated` として引き継ぎ、確認できるretired / resolved履歴だけをterminal eventとして受理すること。materializeがこれらをnew ID採番前の使用済み集合へ予約すること
 - current packageのnext-versionが `package_root` からcurrent versionを内部取得し、Agentへ `previous_version` の転記を要求しないこと
 - default policyでREADMEのPackage Version / Previous Package Versionが初回または1 revision差として整合し、完成済みpackageへ永続差分を保存する場合はsemantic / presentationを問わず+1、完全no-opだけversion維持となること
 - legacy migration用next-versionだけが明示 `previous_version` inputを受けること
@@ -291,7 +291,7 @@ repository unit testで次を必須確認します。
 - canonical structured Markdownのduplicate heading / table、row列数、escaped pipe、`<br>` referenceを固定parse契約で検証すること
 - impactがprevious snapshotとcurrent tracking row差分から `added / changed / resolved` を生成し、`retired` は明示 `retire_ids[]` だけから生成すること。previous ID消失のみなら `state_transition_required` でblockedすること
 - impactの `影響file` がchanged IDのprevious/current owner + exact reference先unionであり、Agentへfile一覧再入力を要求せず、semantic本文変更の要否を勝手に決定しないこと
-- legacy migrationではLLMが確定したretained ID / 明示terminal eventだけを入力に、helperが `migrated / added / resolved / retired` tableを生成すること
+- legacy migrationではLLMが確定したretained ID / 明示terminal event / semantic rowsを `materialize(change_mode=legacy-migration)` へ渡し、helperがnew ID採番・canonical Markdown・`migrated / added / resolved / retired`・README / Machine Entity / MANIFESTまで1 write pathで生成すること
 - scope applicability、UI操作scopeのUIOP / US / UC / Behavior / AC hierarchy / current AC chain全parent=current / closure / current UCの3分類整合
 - `未定義` で既知current / blocked Behavior IDを0件以上保持できUNKNOWN必須、Behavior identity自体不明ならblocked Behaviorを創作しないこと
 - `なし` は関連Behavior / UNKNOWNなし + 理由 + current Authorityの `関連仕様項目ID` 1件以上を要求すること
@@ -568,7 +568,7 @@ mode単体が成立してからworkflowへ接続します。
 - build-machine-evidenceのcanonical Machine Entities Markdown section契約
 - scope / file applicability、UI操作scopeのUS / UC / Behavior / AC exact schema / closure / AC-only Machine Entity
 - exact table schema / stable ref / MANIFEST / Authority + AC Machine Entity bridge / normalized_skill_input
-- legacy vNN → current schema migration fixture
+- legacy vNN / unversioned → current schema migration fixture。legacy migrationはempty current-schema target root + single materializeで完成し、暫定CHANGELOGやAgent-side row materializationを要求しないこと
 - legacy progress情報がREADME / qa-workflow / CHANGELOGへ正しく分配されること
 
 ### Step 7: deterministic / semantic boundary validation
