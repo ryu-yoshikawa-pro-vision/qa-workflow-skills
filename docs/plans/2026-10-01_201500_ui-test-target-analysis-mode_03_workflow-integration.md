@@ -30,7 +30,7 @@ mode packageのUNKNOWNを、回答反映のたびに再質問・再採番せず�
 - 暫定回答と正式回答を区別する
 - 暫定回答が後で正式DECISIONへ変わっても同じUNKNOWN lineageを使う
 - 「回答が不明」は回答履歴として残してもUNKNOWNは解消しない
-- 正式回答で解消したUNKNOWNはcurrent unknownから除外する
+- 正式回答で解消したUNKNOWNはcurrent unknownから除外し、spec-analysisで新しいcurrent Authorityのstable IDを`解消先ID`へ記録する
 - 解消済み事項を再質問しない
 - 新資料で再び競合が発生した場合は旧UNKNOWNを無条件に再openせず、同一論点か新しい競合かを判断する
 
