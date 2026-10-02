@@ -307,6 +307,19 @@ repository regression:
 
 qa-workflow / coverage-analysisへspec-analysis scopeを渡す場合、AgentがMarkdownからこのJSONを再構築しません。helper返却のcanonical `normalized_skill_input` をそのまま使用します。
 
+### 3.1 normal spec-analysis handoff adapter
+
+UI target modeでは `build-machine-evidence.normalized_skill_input` が `acceptance_criteria[]` を必ず持ちます。通常の非mode spec-analysisは既存互換のためkey省略を許可しますが、requirement-structure-v2へ渡す時点ではqa-workflow / shared runtimeのdeterministic adapterがv2 shapeへ正規化します。
+
+- spec-analysis normalized inputに `acceptance_criteria` がない場合だけ `acceptance_criteria=[]` を追加する
+- fieldが存在する場合はarray型を要求し、意味を変更しない
+- nonmode由来の既存TR draftに `acceptance_refs` がない場合だけ `acceptance_refs=[]` を追加する
+- fieldが存在する場合はarray型を要求し、既存値を上書きしない
+- adapterはACを生成せず、mode判定を行わない
+- Agent / LLMに空array補完をさせない
+
+このadapter後のshapeだけをrequirement-structure-v2へ渡します。
+
 ## 4. Acceptance Criterion Machine Entity
 
 identity:
@@ -345,18 +358,6 @@ AC Entityの `upstream_entity_dependencies[]` は、AC / Behavior / UC / US chai
 
 US / UC / Behaviorをdependency Entityとして追加しません。親chain自体をAC contentへ含めることで、不要なglobal entity typeを増やさずfreshnessを成立させます。
 
-### 3.1 normal spec-analysis handoff adapter
-
-UI target modeでは `build-machine-evidence.normalized_skill_input` が `acceptance_criteria[]` を必ず持ちます。通常の非mode spec-analysisは既存互換のためkey省略を許可しますが、requirement-structure-v2へ渡す時点ではqa-workflow / shared runtimeのdeterministic adapterがv2 shapeへ正規化します。
-
-- spec-analysis normalized inputに `acceptance_criteria` がない場合だけ `acceptance_criteria=[]` を追加する
-- fieldが存在する場合はarray型を要求し、意味を変更しない
-- nonmode由来の既存TR draftに `acceptance_refs` がない場合だけ `acceptance_refs=[]` を追加する
-- fieldが存在する場合はarray型を要求し、既存値を上書きしない
-- adapterはACを生成せず、mode判定を行わない
-- Agent / LLMに空array補完をさせない
-
-このadapter後のshapeだけをrequirement-structure-v2へ渡します。
 
 ## 5. test-requirement-design contract version
 
