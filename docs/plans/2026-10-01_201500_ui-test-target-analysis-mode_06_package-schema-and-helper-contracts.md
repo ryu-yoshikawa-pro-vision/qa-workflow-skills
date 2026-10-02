@@ -494,15 +494,29 @@ stdin:
 
 ### next-version
 
-stdin:
+current `ui-target-v1` packageをdefault policyで更新する場合:
 
 ```json
-{"operation":"next-version","previous_version":"v14"}
+{"operation":"next-version","package_root":"<path>"}
 ```
 
-payload: `{"next_version":"v15"}`
+helperがREADMEからcurrent Package Versionを取得します。
 
-default vNN policy以外では使用しません。
+payload:
+
+```json
+{"previous_version":"v14","next_version":"v15"}
+```
+
+Agent / LLMがcurrent packageのversion文字列を抽出して `previous_version` として渡す経路は作りません。
+
+legacy package migrationで、LLMのsemantic mappingによりlegacy側の明示versionが確定済みの場合だけ次のexact inputを許可します。
+
+```json
+{"operation":"next-version","source":"legacy-migration","previous_version":"v14"}
+```
+
+このlegacy inputもpayloadは `previous_version / next_version` を返します。案件固有version policyではnext-versionを使用しません。
 
 ### next-id
 
@@ -516,11 +530,20 @@ stdin:
 }
 ```
 
-helperはcurrent structured rowとCHANGELOGのexact stable ID tokenから既知ID集合を内部導出します。
+helperはcurrent structured rowと、CHANGELOG各versionのexact `Stable ID changes` tableから既知ID集合を内部導出します。CHANGELOG本文のproseに現れたID文字列は採番履歴として扱いません。
 
-payload: `{"next_id":"PAGE-003"}`
+payload:
+
+```json
+{
+  "next_id":"PAGE-003",
+  "stable_id_change":{"stable_id":"PAGE-003","change":"added"}
+}
+```
 
 semantic identityは判断しません。Agent / LLMが `known_ids[]` を組み立てる経路は作りません。
+
+同一prefixで複数IDを割り当てる場合は、返却された `next_id` を対象structured rowへ反映してから次の `next-id` を呼びます。current versionのCHANGELOGへ返却された `stable_id_change` rowを追加し、validate前に採番履歴を閉じます。
 
 ### build-manifest
 
@@ -752,20 +775,48 @@ tableにはpayload filesだけをcanonical順で列挙します。
 
 ## 13. CHANGELOG contract
 
-最新versionを先頭に置き、exact heading:
+最新versionを先頭に置き、version headingはexact `## vNN` とします。
 
-`## vNN`
+各version entryは次の順序で持ちます。
 
-各version entryは最低限:
+`### 変更概要`
 
-- 変更概要
-- 変更 / 解消したstable ID
-- 新しいUNKNOWN / 解消したUNKNOWN
-- 影響file
+- 変更理由・意味はLLMが記述する
+- helperは本文からstable IDを抽出しない
 
-説明内容はLLMが作成します。
+`### Stable ID changes`
 
-helperは最新headingがPackage Versionと一致することだけを検証します。
+| Stable ID | Change |
+| --- | --- |
+
+`Change` は次の4値だけを許可します。
+
+- `added`
+- `changed`
+- `resolved`
+- `retired`
+
+規則:
+
+- 1 version内で同じStable IDを重複させない
+- `next-id` で新規採番したIDは `added` として必ず記録する
+- UNKNOWN解消は対象 `UNK-xxx` を `resolved` として記録する
+- current viewから削除したstable entityは `retired` として記録する
+- 内容変更のみでidentityを維持したstable entityは `changed`
+- `next-id` は全versionのこのtableに現れるStable IDを使用済みIDとして扱う
+
+`### 影響file`
+
+影響したrelative pathを箇条書きで記録します。これは人間向け履歴であり、`next-id` の入力には使用しません。
+
+helperは次を検証します。
+
+- 最新version headingがPackage Versionと一致
+- 各version entryに上記3 headingがexactly one存在
+- `Stable ID changes` tableのheader / Change enum / Stable ID形式 / version内duplicate
+- current versionで `next-id` により追加されたIDが `added` rowとして記録されている
+
+変更概要と影響fileの意味内容はLLMが作成します。
 
 ## 14. legacy / unversioned package migration
 
