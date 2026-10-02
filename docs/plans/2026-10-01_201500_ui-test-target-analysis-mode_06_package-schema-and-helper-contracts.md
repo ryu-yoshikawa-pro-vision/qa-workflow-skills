@@ -533,8 +533,16 @@ handled `issue_type` は次のexact enumに固定します。
 - duplicate_id
 - id_space_exhausted
 - manifest_mismatch
+- stale_snapshot
+- state_transition_required
 
-unknown operation / unknown top-level field / JSON・table schema不正は `invalid_input`、packageのcanonical heading / file set / version schema不一致は `package_schema_mismatch`、参照先不存在は `reference_not_found`、ID重複は `duplicate_id`、MANIFESTのfile set / order / SHA差分は `manifest_mismatch` へ固定します。新しいhandled failure種別が実装中に必要になった場合は、実装だけで増やさずこのPlan contractを更新します。
+unknown operation / unknown top-level field / JSON・table schema不正は `invalid_input`、packageのcanonical heading / file set / version schema不一致は `package_schema_mismatch`、参照先不存在は `reference_not_found`、ID重複は `duplicate_id`、MANIFESTのfile set / order / SHA差分は `manifest_mismatch` へ固定します。single-writer前提に反してsnapshot取得後にpackage bytesが変わっていた場合は `stale_snapshot`、previous tracked IDが明示 `retire_ids[]` なしでcurrent modelから消えた場合は `state_transition_required` へ固定します。新しいhandled failure種別が実装中に必要になった場合は、実装だけで増やさずこのPlan contractを更新します。
+
+### 7.3 update concurrency contract
+
+同じpackage revisionの更新はsingle writerとします。複数Agent / processが同じrevisionを並行編集することはPR #16の対象外です。generic CAS / lock serviceは追加しません。
+
+通常更新は必ず `inspect → update_snapshot保持 → materialize` の順で行います。`materialize` は書込み前にsnapshotのPackage Versionと `payload_file_sha256[]` をcurrent packageへ照合し、1 byteでも変化していれば `stale_snapshot` で書込みせずblockedにします。これにより、single writer前提を破る外部変更をsilent overwriteしません。
 
 ## 8. ui_target_package.py operations
 
