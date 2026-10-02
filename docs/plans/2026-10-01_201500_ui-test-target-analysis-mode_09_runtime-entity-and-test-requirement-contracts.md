@@ -145,6 +145,22 @@ stdin:
 }
 ```
 
+response:
+
+```json
+{
+  "valid":true,
+  "operation":"project_v1_cutover",
+  "skill":"test-requirement-design",
+  "source_runtime_contract_version":"runtime-v1",
+  "source_entity_schema_version":"entity-state-v1",
+  "cutover_seed":{},
+  "issues":[]
+}
+```
+
+handled failureは `valid=false`、`issues[]` へ既存runtime verifierと同じissue contractで返します。`project_v1_cutover` はartifact全文を受けるため、`verify_runtime_evidence` と同じaggregate transportとして16 MiB上限を使用し、通常generator stdinの2 MiB上限へ落としません。
+
 共通規則:
 
 - artifact内のMachine Runtime Input / Result pairがruntime-v1であることを確認する
@@ -155,24 +171,54 @@ stdin:
 - projection結果をv2初回normalized inputへseedし、通常generationは `partial_rerun=false / previous_artifact_markdown=null` のまま実行する
 - cutoverとsemantic redesignを同じrunで混在させない。cutover後にv2 artifactを成立させてから通常のsemantic updateを行う
 
-skill別payload:
+skill別 `cutover_seed`:
 
 `test-requirement-design`:
 
-- v1 inputのTR draft / Authority / Risk等を維持し、v2必須field `acceptance_criteria=[]` と各既存TR draftの `acceptance_refs=[]` を追加する
-- v1 resultの `tr_id_state` をv2 input `previous_tr_ids[]` へ投影する
-- current TRは既存stable IDを `identity_action=reuse / reuse_id=<same TR ID>` として保持し、deleted IDもprevious stateへ残す
+```json
+{
+  "previous_tr_ids":[],
+  "normalized_input_patch":{
+    "acceptance_criteria":[],
+    "test_requirement_acceptance_refs_default":[]
+  }
+}
+```
+
+- v1 resultの `tr_id_state` を `previous_tr_ids[]` へ投影する
+- v2必須fieldとして `acceptance_criteria=[]`、既存TR draftの `acceptance_refs=[]` を追加するための固定patchを返す
+- current human TR IDと `previous_tr_ids[]` のactive identityを使ってsame IDをreuseし、deleted IDもprevious stateへ残す。内容不変cutoverではnew採番しない
 
 `test-condition-design`:
 
+```json
+{
+  "previous_tcn_ids":[],
+  "previous_model_keys":[],
+  "materialize_by_tcn":[
+    {
+      "tcn_id":"TCN-001",
+      "previous_target_id_map":[],
+      "previous_semantic_ci_map":[],
+      "previous_ci_ids":[],
+      "previous_expected_result_roots":[]
+    }
+  ]
+}
+```
+
 - `condition_structure` resultの `tcn_id_state / model_key_state` を `previous_tcn_ids / previous_model_keys` へ投影する
-- TCNごとの `materialize_coverage` resultから `target_mapping_state / semantic_ci_mapping_state / ci_id_state / expected_result_root_state` を、それぞれ次回入力の `previous_target_id_map / previous_semantic_ci_map / previous_ci_ids / previous_expected_result_roots` へ投影する
+- TCNごとの `materialize_coverage` resultから `target_mapping_state / semantic_ci_mapping_state / ci_id_state / expected_result_root_state` を、それぞれ `previous_target_id_map / previous_semantic_ci_map / previous_ci_ids / previous_expected_result_roots` へ投影する
 - current TCN / model / semantic CI identityは既存stable identityをreuseし、deleted / inactive mappingを落とさない
 
 `test-case-design`:
 
+```json
+{"previous_tc_ids":[]}
+```
+
 - v1 resultの `tc_id_state` を `previous_tc_ids[]` へ投影する
-- current TCは既存stable IDをreuseし、deleted IDもprevious stateへ残す
+- current human TC IDとactive previous stateを使ってsame IDをreuseし、deleted IDもprevious stateへ残す
 
 spec-analysis / test-analysisのAuthority / Product Risk等、runtime generatorが採番ownerではないstable IDはhuman artifact側の既存IDをそのまま維持します。coverage-analysis / qa-workflow / usability-inspection / wcag-conformance-evaluationで上記generator-owned stable identity stateを持たないruntimeはidentity cutover seedを作らず、v2 evidenceだけを再生成します。
 
