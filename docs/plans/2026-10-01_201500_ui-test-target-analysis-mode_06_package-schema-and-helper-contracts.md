@@ -1454,8 +1454,9 @@ production helperのfilesystem / raw hash / projection / README control renderin
 - next-domain-fileのlowercase kebab-case / max+1 / canonical path / id_space_exhausted
 - CHANGELOG `Stable ID changes` exact heading / header / Change enum / duplicate
 - inspectのupdate_snapshotがtracked owner row fingerprint / previous exact refs / payload file hashをcanonical生成すること
-- next-idがcurrent structured row + historical stable ID + previous snapshotから使用済みIDを導出し、更新途中でowner rowから消えたIDも再利用しないこと
-- impactがprevious snapshotとcurrent owner row差分からadded / changed / resolved / retiredを一意に生成し、Stable ID changes / 影響fileのcanonical Markdownまで返すこと
+- next-id / materializeが標準prefix + 00宣言済み案件固有prefixについてcurrent structured row + historical stable ID + previous snapshotから使用済みIDを導出し、更新途中でowner rowから消えたIDも再利用しないこと
+- impactがprevious snapshotとcurrent owner row差分からadded / changed / resolvedを導出し、retiredだけは明示retire_idsから生成すること。row消失だけならstate_transition_requiredでblockedすること
+- materializeがdraft_key / identity_action / @draft referenceを解決し、canonical table serialization、条件付き標準file同期、CHANGELOG controls、Machine Entities section、README controls、MANIFESTを1 write pathで生成すること
 - duplicate canonical heading / table、row列数不一致、escaped pipe / `<br>` reference parse
 - duplicate / unknown stable ref
 - current UNKNOWNの `現在有効か / 解消先ID` 組合せ、resolved UNKNOWNのresolver変更、same-UNK reopen / re-resolve、`解消先ID` missing / invalid / non-current Authority
@@ -1472,9 +1473,9 @@ production helperのfilesystem / raw hash / projection / README control renderin
 - spec-analysis normalized_skill_input / expected identityがhelper結果から再現できること
 - artifact `Machine Entities: spec-analysis` blockがexactly one存在し、runtime_contract.pyの `extract_machine_blocks(..., "Machine Entities")` で読め、helper再生成結果と完全一致すること
 - unknown_links.pyのexact `operation=validate-links` / payload / top-level issues contract
-- question_ids.pyのheader-only current質問table + `質問ID履歴`、previous + current artifactを読むnext-id / build-history exact contract、duplicate / Q-999
+- question_ids.pyのheader-only current質問table + `質問ID履歴`、create/update fail-closed、previous current Q + previous history + current current Qだけを共通正本にするnext-id / build-history exact contract、duplicate / Q-999
 - `Q-001` 解消でcurrent質問0件になった後の新規質問がQ-002となり、過去Q IDを再利用しないこと
-- project_context_ids.pyのSection 12 / 13 exact table、previous + candidate unionでのDEC / ASM採番、validate-historyによるprevious ID削除拒否、kind / duplicate / 999 exhaustion
+- project_context_ids.pyのSection 12 / 13 exact table、previous + candidate unionでのDEC / ASM採番、validate-historyによるprevious ID削除拒否、canonical DEC / ASM namespace、kind / duplicate / 999 exhaustion
 - Project Contextがownerでない案件ではproject_context_ids.pyを使わず、外部ownerのIDを維持し、owner未採番時にLLM hand-numberingへfallbackしないこと
 - CHANGELOG / impactがDEC / ASMを追跡可能stable IDとして受理しつつ、ui_target_package.py next-idではDEC / ASMを拒否すること
 - fresh v00の空change table、v01以降のDEC / ASM初登場=added、既追跡内容・状態変更=changed、current structured model除去=retiredを区別すること
@@ -1493,10 +1494,11 @@ production helperのfilesystem / raw hash / projection / README control renderin
 - UNKNOWNがopen / resolved / resolver変更 / same-ID reopen / re-resolveの各状態で `現在有効か / 解消先ID` 契約を満たし、resolved時はcurrent Authorityへ機械検証可能に閉じる
 - current packageの次versionをAgentが転記せずhelperが `package_root` から導出できる
 - README metadata / UNKNOWN件数 / payload file tableをAgentが再構築せずcanonical Markdownとして生成できる
-- extension fileの必要性 / slugだけLLMが判断し、連番 / pathはhelperが決定できる。同一更新で複数追加する場合は返却pathの00登録 + file作成後に次を採番する
+- extension fileの必要性 / slug / 案件固有prefixの意味だけLLMが判断し、file連番 / stable ID番号 / 履歴はhelperが決定できる。一度使用した案件固有prefixを再定義しない
 - Machine Entity sectionのheading / JSON fence / wrapperをAgentが組まず、build-machine-evidenceがshared render_machine_entities()由来のcanonical Markdown sectionを返す
 - new ID採番時にAgentが既知ID集合を手組みせず、CHANGELOG stable ID履歴を含めて過去IDを再利用しない
 - new Q / DEC / ASMのsemantic identityはLLM / stakeholder側に残す。Qはcurrent + 使用済み履歴からquestion-analysis helperが番号を決定して過去IDを再利用せず、Project ContextがDEC / ASM ownerの場合はqa-workflow helper、別ownerの場合はそのownerのdeterministic allocatorで番号を決定し、未採番時にLLM hand-numberingへfallbackしない
+- semantic row / proseが決まった後のstable ID割当、Markdown escape、row serialization、known section置換、条件付き標準file作成 / 除去、control section更新をmaterializeが決定論実行し、Agentが完成Markdownを手組みしない
 - structured tableのheader / ID / ref列が一意
 - scopeごとのUI操作適用判定と条件付き必須fileの存在を機械検証できる
 - UI操作scopeでUIOP / US / UC / Behavior / AC hierarchyと3分類完全性を機械検証できる
