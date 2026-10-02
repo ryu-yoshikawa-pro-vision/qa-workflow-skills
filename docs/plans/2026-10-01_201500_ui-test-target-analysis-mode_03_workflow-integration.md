@@ -42,22 +42,36 @@ mode packageのUNKNOWNを、回答反映のたびに再質問・再採番せず�
 
 - 関連UNKNOWN ID
 
+`不明点 / 質問一覧` のtemplateはheader-onlyにし、`Q-001` の例示rowを実データとして残しません。新規Qのsemantic identity / reuse判断はLLM、newと決めた後の番号決定は `question_ids.py` が担当します。
+
 spec-analysis由来の論点ならUNK-xxxを記録し、質問単位のQ-xxxと仕様UNKNOWNを追跡できるようにします。mode packageからquestion-analysisへ進む場合は `ui_target_package.py inspect` の `current_unknown_ids[] / resolved_unknown_ids[]` を正規handoffとし、Agentが09から集合を手作業で再構築しません。
 
 値は空欄または1件以上の `UNK-xxx` とし、複数参照は `<br>` 区切りに固定します。QとUNKが意味的に対応するかはLLMが判断し、`unknown_links.py` は形式・存在・duplicateだけを検証します。新しいUNKNOWN registryは作りません。
 
-### 1.5 Skill-local UNKNOWN helper
+### 1.5 Skill-local deterministic helper
 
-新規 `skills/question-analysis/scripts/unknown_links.py` を追加します。stdin / stdout JSON、failure、size limit等の正確なCLI契約は `_06_package-schema-and-helper-contracts.md` を正本とします。
+新規に次を追加します。
 
-productionで次を決定論的に検証します。
+- `skills/question-analysis/scripts/unknown_links.py`
+- `skills/question-analysis/scripts/question_ids.py`
+
+stdin / stdout JSON、operation名、failure、size limit、sort順等の正確なCLI契約は `_06_package-schema-and-helper-contracts.md` を正本とします。
+
+`unknown_links.py` は次を決定論的に検証します。
 
 - `関連UNKNOWN ID` の非空値が `UNK-xxx` 形式であること
 - current known UNKNOWN集合に参照先が存在すること
 - 同一Q内で同じUNKを重複参照していないこと
 - current / resolved集合が与えられた場合、resolved-only UNKをcurrent questionへ関連付けていないこと
 
-このhelperはQとUNKの意味的対応、質問文、回答後の正規化先を判断しません。
+`question_ids.py` は次だけを担当します。
+
+- `不明点 / 質問一覧` のexisting `Q-xxx` をparseする
+- duplicate / malformed IDを拒否する
+- LLMがnew questionと判断した後に既知最大番号+1を返す
+- `Q-999` 使用済みなら既存3桁ID契約を勝手に拡張せず `id_space_exhausted` を返す
+
+この2 helperはQとUNKの意味的対応、質問文、回答後の正規化先、reuse / newの意味判断を行いません。
 
 ### 1.6 deterministic eval
 
@@ -145,7 +159,22 @@ expected routingからcandidate outputを自動生成せず、既存契約どお
 
 routing fixtureはPR #14後の61件から8件追加して69件になる想定です。実装開始時にStep 0で現在値を再確認し、追加数が変わらなければEVALS.md / docs/PROJECT_CONTEXT.md / routing件数を保持するrepository contractを69へ同期します。READMEにrouting件数を持つ場合のみ同様に更新します。
 
-### 2.6 downstream machine handoff
+### 2.6 Project ContextのDEC / ASM採番
+
+question-analysisが回答を正式 `DECISION` または承認済み `ASM` へ正規化する場合、ID ownerは既存Project Contextの正本一覧です。UI target package側では採番しません。
+
+新規 `skills/qa-workflow/scripts/project_context_ids.py` を追加し、Project Contextの次の固定tableだけを対象に番号決定します。
+
+- `## 12. 確定事項（決定事項の正本一覧）` → `DEC-xxx`
+- `## 13. 仮定（仮定の正本一覧）` → `ASM-xxx`
+
+LLMは回答の意味、DECISION / ASMの区別、既存identityのreuse / new、決定内容、関係、影響範囲、ASM承認可否を判断します。newと判断した後の番号だけhelperが既知最大番号+1で返します。
+
+`skills/qa-workflow/assets/project-context-template.md` のSection 12 / 13はheader-onlyへ変更し、現在の `DEC-001` / `ASM-001` 例示rowを実データとして残しません。
+
+helperはProject Contextを書き換えず、正本tableをparseして次IDを返すだけです。exact CLI契約は `_06_package-schema-and-helper-contracts.md` を正本とします。
+
+### 2.7 downstream machine handoff
 
 UI target modeから後続テスト設計へ進む場合、spec-analysis成果物のMachine Entity / normalized inputをAgentがMarkdownから再構築しません。
 
@@ -171,7 +200,8 @@ test-requirement-designへ到達した場合は `requirement-structure-v2` を�
 - 詳細規則はreferences/ui-test-target-analysis.md
 - package templateはassets/ui-test-target-analysis/
 - qa-workflowは必要なSkillへroutingする
-- question-analysisは回答正規化とresume情報を返す
+- question-analysisは回答正規化とresume情報を返し、新規Qの番号はquestion_ids.pyで決定する
+- qa-workflowはProject Context正本でnew DEC / ASMが必要な場合だけproject_context_ids.pyで番号を決定する
 
 AIエージェントは利用環境で提供される通常のSkill読み込み機構に従います。
 
@@ -202,6 +232,7 @@ READMEへ、UIテスト対象分析modeがspec-analysisの条件付きmodeであ
 - qa-workflowのPR #14後22 Skill前提
 - skill-to-skill API不存在の説明
 - question-analysisの分類4種
+- DECISION / ASMの意味判断とProject Context owner
 - test-target-inspectionのlive target currentness契約
 - runtime / artifact graph
 - qa-knowledge lifecycle
@@ -212,6 +243,7 @@ READMEへ、UIテスト対象分析modeがspec-analysisの条件付きmodeであ
 
 - mode requestがspec-analysisへrouteされる
 - 不明点回答後に同じUNKNOWN lineageでspec-analysisへ戻り、question-analysisの関連UNKNOWN IDはSkill-local helperと独立deterministic evalの双方で構造検証される
+- new Q / DEC / ASMのsemantic identityはLLMが判断し、番号決定は各ownerのSkill-local helperで決定論的に行われる
 - 仕様理解だけの要求でtest-analysisへ勝手に進まず、AC→TR / Disposition closureをpackage単体の完了条件にしない
 - current UIの対象情報観測要求だけtest-target-inspectionへ分岐する
 - 保存済みUI資料のUX評価はusability-evaluation、live usability検査はusability-inspection、formal WCAG適合性評価はwcag-conformance-evaluationへ分岐する
