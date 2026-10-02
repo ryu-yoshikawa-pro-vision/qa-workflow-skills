@@ -115,16 +115,16 @@ AC Entity contentには次を固定projectionします。
 - `trigger`
 - `preconditions`
 - `success_postcondition`
-- `user_stories[]`: `us_id / actor_role / goal`
+- `user_stories[]`: `us_id / actor_role / goal`。`us_id`昇順で固定
 - `scope_id`
-- `authority_refs[]`
-- `structure_refs[]`
+- `authority_refs[]`: AC / Behavior / UC / US chain全体が参照するcurrent Authority IDのunionを重複除去して昇順
+- `structure_refs[]`: AC / Behavior / UC / US chain全体の関連構造ID unionを重複除去して昇順
 
 これによりAC本文が同じでも、親US / UC / Behaviorの意味変更でAC content fingerprintが変わります。
 
 ### 4.2 dependencies
 
-AC Entityの `upstream_entity_dependencies[]` は、AC chainが参照するcurrent Authority Entityへ固定します。
+AC Entityの `upstream_entity_dependencies[]` は、AC / Behavior / UC / US chain全体が参照するcurrent Authority Entity unionへ固定します。
 
 US / UC / Behaviorをdependency Entityとして追加しません。親chain自体をAC contentへ含めることで、不要なglobal entity typeを増やさずfreshnessを成立させます。
 
