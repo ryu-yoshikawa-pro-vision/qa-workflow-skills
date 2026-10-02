@@ -843,7 +843,8 @@ stdin:
   "operation":"impact",
   "package_root":"<path>",
   "previous_snapshot":{"package_version":"v14","tracked_items":[],"exact_reference_index":[],"payload_file_sha256":[]},
-  "change_mode":"normal"
+  "change_mode":"normal",
+  "retire_ids":["PAGE-009"]
 }
 ```
 
@@ -855,10 +856,12 @@ helperはstable ID owner rowのprevious/current差分からlifecycleを決定し
 - UNKが `unknown_active=true → false` → `resolved`
 - resolved UNKのresolver変更、`false → true` のsame-ID reopen → `changed`
 - reopen後の `true → false` → 再び `resolved`
-- previousに存在しcurrent structured modelから消えた → `retired`
+- previousに存在しcurrent structured modelから消え、かつ `retire_ids[]` に明示された → `retired`
+- previousに存在しcurrent structured modelから消えたが `retire_ids[]` にない → `state_transition_required` でblockedし、自動retireしない
+- `retire_ids[]` にあるIDがcurrent modelへ残る / previousに存在しない / exact referenceが残る → blocked
 - previous CHANGELOGですでに `retired` のIDはcurrentへ再導入不可
 
-LLM / Agentが `added / changed / resolved / retired` を手入力しません。semantic identityのreuse / new、same-UNK reopenかnew UNKかはLLMが先に判断し、helperはその結果として成立したstructured stateの差分だけを分類します。
+LLM / Agentが `added / changed / resolved` のevent rowを手入力しません。`retired` の意味判断だけはLLMが行い `retire_ids[]` として明示し、helperが存在・参照・lifecycleを検証してCHANGELOG rowへ変換します。semantic identityのreuse / new、same-UNK reopenかnew UNKかもLLMが先に判断し、helperはその結果として成立したstructured stateと明示retire intentからlifecycleを決定します。
 
 payload:
 
@@ -1315,7 +1318,9 @@ tableにはpayload filesだけをcanonical順で列挙します。
 - 1 version内で同じStable IDを重複させない
 - 1つのStable IDに `added` または `migrated` を記録できるのは履歴全体で最初の1回だけ
 - `retired` だけをterminal eventとし、その後に `added / migrated / changed / resolved / retired` を再記録しない
-- `next-id` はcurrent structured row、全versionのこのtable、通常更新で渡されたprevious snapshotのStable ID unionを使用済みIDとして扱う
+- `retired` は明示 `retire_ids[]` によるsemantic decisionがある場合だけ生成し、row消失から自動推測しない
+- `next-id / materialize` はcurrent structured row、全versionのこのtable、通常更新で渡されたprevious snapshotのStable ID unionを使用済みIDとして扱う
+- 00で一度採番に使った案件固有prefix宣言を削除・別意味へ再定義しない
 
 `### 影響file`
 
@@ -1332,8 +1337,9 @@ helperは次を検証します。
 - resolved後の `changed` によるresolver変更 / reopenと、reopen後の再 `resolved` を許可する
 - `retired` 後に同じStable IDのeventが存在しない
 - v01以降に初登場するDEC / ASMを `added` として追跡でき、既追跡DEC / ASMの状態変更を `changed`、current structured modelからの除去を `retired` として受理する
-- current structured rowとStable ID履歴のID形式が§6.1の追跡可能prefix契約に一致する
-- `next-id` input prefixは§6.2の採番対象だけを許可し、DEC / ASMを拒否する
+- current structured rowとStable ID履歴のID形式が§6.1の標準prefixまたは00宣言済み案件固有prefix契約に一致する
+- `next-id / materialize` input prefixは§6.2の採番対象だけを許可し、DEC / ASM / Qを拒否する
+- previous tracked ID消失に明示retire intentがない場合はcompleted packageとして受理しない
 
 helperは「そのIDが実際にnext-id operationから返されたか」という実行履歴を推測・検証しません。検証対象はcurrent packageとCHANGELOGに保存された成果物状態です。
 
