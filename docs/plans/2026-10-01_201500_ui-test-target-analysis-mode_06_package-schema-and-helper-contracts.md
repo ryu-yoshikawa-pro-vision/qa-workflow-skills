@@ -1028,7 +1028,9 @@ AC Entity contentは `_08` のcurrent chainから次を固定projectionします
 - authority_refs[]
 - structure_refs[]
 
-AC Entity dependencyは参照current Authority Entityへ固定します。
+AC / Behavior / UC / US chainの `関連仕様項目ID` にはSPEC / DEC / INF / UNK等が現れ得ますが、AC Entityの `authority_refs[]` / `upstream_entity_dependencies[]` へ投影するのは09のCurrent Effective Authorityに存在するcurrent SPEC / DECISION / approved ASMだけです。INF / UNK、inactive Authority、存在しないIDをMachine Entity dependencyへ入れません。
+
+current ACは、chain全体のstable refsを解決した結果としてcurrent Authorityを1件以上持つことを要求します。current Authorityが0件ならACをcurrent Entity化せず、その不足をUNKNOWNとして親Behaviorへ戻してblockedにします。helperはAuthority集合のfilter / existence / currentnessだけを判定し、どのAuthorityが意味上ACを支えるかはLLMがstructured rowへ記録します。
 
 US / UC / BehaviorをMachine Entity typeへ追加しません。親chainをAC contentへ含めるため、親意味変更でAC content fingerprintが変わります。
 
@@ -1045,7 +1047,7 @@ US / UC / BehaviorをMachine Entity typeへ追加しません。親chainをAC co
 }
 ```
 
-`authority_refs[]` はAC / Behavior / UC / US chain全体が参照するcurrent Authority IDのunionであり、helperが重複除去・昇順canonical化します。
+`authority_refs[]` はAC / Behavior / UC / US chain全体のstable refsを09のCurrent Effective Authority集合へ解決した結果のunionであり、current SPEC / DECISION / approved ASMだけを残して重複除去・昇順canonical化します。INF / UNKは含めません。current ACでは1件以上必須です。
 
 Agent / LLMがMarkdownからnormalized inputやexpected Entity一覧を再構築しません。
 
