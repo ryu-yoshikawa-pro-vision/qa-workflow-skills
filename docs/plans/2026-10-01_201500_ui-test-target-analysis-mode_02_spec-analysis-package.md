@@ -139,7 +139,7 @@ mode packageでも既存 `assets/output-template.md` のcanonical契約を維持
 - UI構造間の関係は `関連構造ID` で追跡する
 - 複数IDの区切りは `<br>` に固定する
 - exact ID参照の存在・duplicateはui_target_package.pyで検証する
-- semantic identity、reuse / new判断はLLMが行う。LLMがnewと判断した後の次ID算出は `ui_target_package.py next-id` を利用できる
+- semantic identity、reuse / new判断はLLMが行う。LLMがnewと判断した後の次ID算出は `ui_target_package.py next-id` を使用し、Agentが既知ID一覧を組み立てない
 
 ### 正規UI分類
 
@@ -291,7 +291,7 @@ DB値やAPI responseをUI期待結果としてテストケース化しません�
 
 ### 07_current_unknowns.md
 
-09の分析項目で `分類=UNKNOWN` かつ `現在有効か=Yes` のUNKNOWNだけを人間向けに一覧化します。解消済みUNKは09に `現在有効か=No` でlineageを残し、07のcurrent一覧から外します。
+09の分析項目で `分類=UNKNOWN` かつ `現在有効か=Yes` のUNKNOWNだけを人間向けに一覧化します。解消済みUNKは09に `現在有効か=No` と `解消先ID` を残し、07のcurrent一覧から外します。
 
 別節に回答反映済みを残してもよいですが、現在確認対象と解消済みを混ぜません。
 
@@ -361,7 +361,7 @@ default policyでは `ui_target_package.py next-version` が次versionを導出�
 回答や新資料が来た場合:
 
 1. LLMが変更されたAuthority / DECISION / ASMを解決する
-2. LLMが影響するcanonical stable item / UNKを更新する。UNKNOWN解消時は元UNKを `現在有効か=No` にし、確定内容を分類に合う新stable IDとして追加してlineageを保持する
+2. LLMが影響するcanonical stable item / UNKを更新する。UNKNOWN解消時は元UNKを `現在有効か=No` にし、確定内容を分類に合う新stable IDとして追加し、そのIDを `解消先ID` に設定してlineageを保持する
 3. 09_authority_and_traceability.mdのcanonical modelを更新する
 4. `ui_target_package.py impact` でchanged stable IDのexact参照先を再確認候補として列挙する
 5. LLMが候補fileを確認し、意味上変更が必要な01〜08 / domain fileだけを更新する
@@ -413,7 +413,10 @@ helperが列挙したimpact候補は再確認対象であり、変更必須と�
 - UI操作scopeのUIOP / US / UC / Behavior / ACが `_08` のclosure contractを満たす
 - current ACがAuthorityへ追跡でき、具体値 / 組合せへ先回りしていない
 - 09のCurrent Effective Authorityが既存spec-analysisのcanonical schemaを維持している
-- Authority Entityが既存 `authority_entities.py`、current AC Entityが `ui_target_package.py build-machine-evidence` から生成され、spec-analysis normalized_skill_input / expected identity / fingerprintを手入力していない
+- 09の「現在有効な仕様根拠」からnormalized Authorityへの固定projectionをhelperが行い、Authority Entityが既存 `authority_entities.py`、current AC Entityが `ui_target_package.py build-machine-evidence` から生成され、spec-analysis normalized_skill_input / expected identity / fingerprintを手入力していない
+- `Machine Entities: spec-analysis` blockがexactly one存在し、helper再生成結果と一致する
+- resolved UNKNOWNの `解消先ID` がcurrent SPEC / DECISION / 承認済みASMへ閉じている
+- new ID採番でAgentが既知ID集合を手組みしていない
 - test requirement / condition / caseを先回りしていない
 - UIで観測不能な内部挙動をUIテスト期待結果として確定していない
 
