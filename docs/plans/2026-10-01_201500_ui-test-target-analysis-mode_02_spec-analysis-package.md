@@ -355,29 +355,22 @@ default policy:
 5. 変更後もcurrent versionの全fileを含む完全版を成立させる
 6. 過去versionは履歴でありcurrent仕様の参照前提にしない
 
-default policyでは `ui_target_package.py next-version` が次versionを導出します。package schema versionはcontent versionと分離し、current schemaは `ui-target-v1` とします。
+default policyでは、完成済みpackageに永続差分を加えて再び完成状態として保存する場合、semantic / presentationを問わず必ず次のvNNへ進めます。差分がないno-opだけversionを維持します。canonical更新経路では `ui_target_package.py materialize` がprevious snapshotとの差分と次versionを決定し、README / CHANGELOG / MANIFESTへ同時反映します。`next-version` は同じversion導出規則をfocusedに確認するoperationとして残します。package schema versionはcontent versionと分離し、current schemaは `ui-target-v1` とします。
 
-ユーザー / projectが別version policyを明示した場合はそちらを優先し、helperは指定versionのpackage内一致だけを検証します。何をmaterial updateとしてversion upするかの意味判断はproject policyまたはLLMに残し、presentationだけの差分までhelperが自動判定しません。
+ユーザー / projectが別version policyを明示した場合はそちらを優先し、materializeへ `version_policy=project / target_version=<value>` を渡します。default policyで「versionを上げるほど重要か」をLLMへ判断させません。
 
 ## 6. 更新契約
 
 回答や新資料が来た場合:
 
 1. **内容を書き換える前に** `ui_target_package.py inspect` を実行し、返却された `update_snapshot` をこの更新runのprevious stateとしてそのまま保持する。Agent / LLMがsnapshotを編集・再構築しない
-2. LLMが変更されたAuthority / DECISION / ASM、same-UNK reopen / new UNK、structural itemのsemantic identityを解決し、project policyに従ってmaterial updateかを判断する
-3. default version policyでversion upする場合は、既存current packageへ `ui_target_package.py next-version` を `package_root` だけで実行する。返却された `readme_version_rows_markdown` をREADMEの該当2rowへ反映し、`next_version` をCHANGELOGのcurrent version headingへ使用する。Agentがcurrent versionを手で転記しない
-4. LLMは変更対象stable itemの**owner structured row**だけを先に更新する。semantic identityがnewの場合だけ `next-id` を使い、通常更新ではStep 1の `previous_snapshot` を必ず渡す。UI target modeがownerの `SRC / SPEC / INF / UNK` とstructural IDはhelperで採番し、DEC / ASMは実際の正本ownerの既存IDを参照する。返却IDをowner rowへ即時反映してから同prefixの次の採番へ進む
-5. 09_authority_and_traceability.mdを含む変更対象owner rowが確定したら、`ui_target_package.py impact` へ `package_root + previous_snapshot + change_mode=normal` を渡す。helperがprevious/current owner row差分から `Stable ID changes`、changed ID集合、previous/current exact referenceに基づく `影響file` / row候補を生成する
-6. CHANGELOGの `Stable ID changes` と `影響file` section全体をimpact返却Markdownで置換する。LLMはChange値・changed ID集合・影響file一覧を手入力しない
-7. LLMがimpact候補file / rowを確認し、意味上変更が必要な01〜08 / domain fileの非owner view・説明だけを更新する。候補であること自体を変更理由にせず、意味上不要なら本文は変更しない
-8. LLMが07のUNKNOWN本文、06の矛盾 / resolved説明、CHANGELOGの `変更概要` を更新する。`Stable ID changes` / `影響file` は変更概要から逆算して書き換えない
-9. 08をcurrent packageが引き続き保持・利用する場合、今回repositoryを再確認していなくても08を保持し、既存の基準branch / commit / revisionを維持する。新しいrepository evidenceを確認した場合だけ08内容と基準revisionを更新する。current分析からrepository evidenceを外す場合だけnot-applicableへ変更して08を除去する
-10. `ui_target_package.py render-readme-controls` を実行し、返却された `Package metadata` / `Current payload files` section全体をREADMEへ反映する。UNKNOWN件数・payload file順・種別をAgentが再構築しない
-11. `ui_target_package.py build-machine-evidence` で09のAuthority Entityとcurrent AC Entity、spec-analysis canonical `normalized_skill_input`、canonical `machine_entities_markdown` を決定論生成する。09の `### Machine Entities: spec-analysis` section全体を返却Markdownで置換し、Agentがheading / JSON fence / wrapperを組み立てない
-12. README controlsとMachine Entity section反映後のcurrent packageに対して `ui_target_package.py build-manifest` を実行し、MANIFEST / raw SHA-256を生成する
-13. `ui_target_package.py validate` へStep 1の `previous_snapshot` を渡し、形式・参照・件数・version・CHANGELOG lifecycle / 影響file・file set・hashの決定論違反を解消する
-14. semantic quality gateでsource / inference / UI分類 / 意味重複等を最終確認する
-
+2. LLMがAuthority / DECISION / ASM、same-UNK reopen / new UNK、UI構造、US / UC / Behavior / AC、file applicability、extension要否、reuse / new / explicit retire等のsemantic判断を行う。completed Markdown rowやstable ID番号はまだ手書きしない
+3. LLMは変更対象を `materialize` のsemantic inputへまとめる。既存identityは `identity_action=reuse / reuse_id=<ID>`、new identityは `identity_action=new / draft_key=<unique>` とし、新規row間参照は `@draft:<draft_key>` を使う。current modelから意図的に除去するidentityだけ `retire_ids[]` に入れる
+4. 07のUNKNOWN説明、06の矛盾 / resolved説明、CHANGELOGの `変更概要` 等のnarrativeは `prose_updates[] / change_summary` として渡す。stable ID番号、Markdown escape、table separator、CHANGELOG control row、README control、Machine Entity wrapper、MANIFESTはAgentが組み立てない
+5. `ui_target_package.py materialize` を `package_root + previous_snapshot + version_policy + semantic table/prose/file updates + retire_ids[]` で1回実行する。helperがsingle-writer snapshotを確認し、version、new ID、`@draft`解決、canonical table serialization、条件付き標準file作成 / 除去、extension file同期、CHANGELOG controls、Machine Entities section、README controls、MANIFESTを順に生成する
+6. `materialize` が `stale_snapshot / state_transition_required / reference_not_found` 等でblockedした場合は書込み済みの中間完成packageを残さず、LLMが意味判断またはinputを修正して再実行する。row消失だけをretire扱いしない
+7. materialize成功後、semantic quality gateでsource / inference / UI分類 / semantic duplicate、file trigger、same-UNK / new UNK、AC→TR意味対応等を確認する
+8. deterministic validate / repository testsでschema、stable ref、version、CHANGELOG lifecycle、Machine Entity、MANIFEST / hashを確認する
 helperが列挙したimpact候補は再確認対象であり、変更必須という意味判断ではありません。LLMが仕様意味を判断します。
 
 同じ回答を複数ファイルへ機械コピーしません。canonical itemと構造化ビューの追跡を使い、必要な意味だけを反映します。
