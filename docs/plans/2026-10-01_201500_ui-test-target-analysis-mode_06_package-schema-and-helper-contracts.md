@@ -38,6 +38,8 @@ READMEには自由記述の概要に加え、次の2表をexact heading / exact 
 
 `Previous Package Version` は初回なら `-`、継続更新なら `next-version` が返した `previous_version` を記録します。default policyでは `Package Version` と1 revision差であることをhelperが検証します。legacy移行時はlegacy側の明示versionまたは `legacy-unversioned` を記録できます。
 
+上表は完成packageのschema例です。asset templateの `Current UNKNOWN Count` cellは空で置き、初回materialize時にhelperが実際のcurrent UNKNOWN集合から `0` 以上の整数を生成します。完成packageでは空値を許可しません。
+
 ### Current payload files
 
 | 順序 | ファイル | 種別 |
@@ -151,18 +153,20 @@ triggerの意味判断はLLMが行います。helperは4rowの存在、許可値
 mode標準prefix以外を使う場合だけ記載します。
 
 - Prefixは大文字英数字、先頭英字、2〜16文字
-- 標準prefixとの重複禁止
+- 標準prefix / DEC / ASM / Qとの重複禁止
 - helperはこの表に宣言されたprefixだけを案件固有prefixとして許可
-- prefixを追加する意味判断はLLM
+- prefixを追加する意味と名称はLLMが判断する
+- 一度stable ID採番に使ったPrefix rowはidentity historyとして削除・意味変更しない。不要になっても宣言を残し、配下IDのlifecycleをCHANGELOGで追跡する
+- 宣言済み案件固有prefixはstandard structural prefixと同じく `inspect / next-id / materialize / impact / CHANGELOG / validate` の追跡・採番対象へ自動追加する
 
 ### 5.2 01_ui_structure_and_navigation.md
 
 #### UI構造一覧
 
-| 構造ID | 種別 | 名称 | Path / 識別子 | 親構造ID | 関連仕様項目ID | 関連構造ID | 備考 |
-| --- | --- | --- | --- | --- | --- | --- | --- |
+| 構造ID | 種別 | 名称 | 状態軸 | Path / 識別子 | 親構造ID | 関連仕様項目ID | 関連構造ID | 備考 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
-許可する標準種別 / prefix:
+`種別` は次のexact enumだけを許可します。
 
 - PAGE → PAGE-xxx
 - STATE → STATE-xxx
@@ -170,9 +174,13 @@ mode標準prefix以外を使う場合だけ記載します。
 - STEP → STEP-xxx
 - MODAL → MODAL-xxx
 - BROWSER-DIALOG → BDLG-xxx
-- PANEL / POPOVER / GLOBAL UI → PANEL-xxx
+- PANEL → PANEL-xxx
+- POPOVER → PANEL-xxx
+- GLOBAL UI → PANEL-xxx
 - EXTERNAL → EXT-xxx
 - SHARED PAGE → SHARED-xxx
+
+`状態軸` はSTATE rowだけ必須で、契約 / データ / 制限等のsource上の意味に沿った軸名をLLMが記録します。STATE以外では空を要求します。helperは軸名の意味を固定せず、空 / 非空条件とparent / reference整合だけを検証します。
 
 `Path / 識別子` はroute不明時 `PATH-TBD` を許可します。
 
@@ -202,8 +210,8 @@ scope単位のsemantic contractは `_08` を正本とします。structured tabl
 
 #### Use Case振る舞い完全性
 
-| UC ID | 結果分類 | 判定 | 関連Behavior ID | 関連UNKNOWN ID | 理由 / 根拠 |
-| --- | --- | --- | --- | --- | --- |
+| UC ID | 結果分類 | 判定 | 関連Behavior ID | 関連仕様項目ID | 関連UNKNOWN ID | 理由 / 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
 
 #### Acceptance Criteria一覧
 
@@ -363,7 +371,7 @@ extension fileの必要性とslugはLLMが判断します。連番は `next-doma
 
 ## 6. ID rules
 
-packageがstable reference / CHANGELOG / impactで追跡できる標準prefixと、`ui_target_package.py next-id` が採番できるprefixを分離します。
+packageがstable reference / CHANGELOG / impactで追跡できるprefixと、`ui_target_package.py next-id / materialize` が採番できるprefixを分離します。標準prefixに加え、00の `案件固有構造ID` で宣言された案件固有prefixも同じ履歴契約へ参加します。
 
 ### 6.1 packageで追跡できるstable ID
 
@@ -401,13 +409,13 @@ UI target structural:
 - BH
 - AC
 
-形式は `PREFIX-001` ～ `PREFIX-999`。
+案件固有prefixを含む形式は `PREFIX-001` ～ `PREFIX-999`。
 
 `DEC / ASM` もpackage内で参照される外部ownerのstable IDなので、exact reference validation、CHANGELOG `Stable ID changes`、`impact` の追跡対象に含めます。v01以降にpackageへ初めて取り込むDEC / ASMは `added`、既に追跡中の同一IDの内容・状態変更は `changed`、current structured modelから外す場合だけ `retired` とします。`resolved` は `UNK-xxx` 専用であり、DEC / ASMへ使用しません。
 
 ### 6.2 ui_target_package.py next-idの採番対象
 
-`next-id` が番号決定できる標準prefixは次だけです。
+`next-id / materialize` が番号決定できるprefixは、次の標準prefixと、00で宣言済みの案件固有prefixです。
 
 canonical spec-analysis item:
 
@@ -441,7 +449,7 @@ UI target structural:
 - BH
 - AC
 
-`next-id` はLLMがnewと判断した後にのみ使用します。Agentから既知ID一覧を受け取らず、helperが `package_root` のcurrent structured rowとCHANGELOGに記録されたexact stable ID tokenを走査し、同prefixの既知最大番号+1を返します。
+`next-id` はLLMがnewと判断した後にのみ使用します。Agentから既知ID一覧を受け取らず、helperが `package_root` のcurrent structured row、CHANGELOGに記録されたexact stable ID token、previous snapshotを走査し、同prefixの既知最大番号+1を返します。案件固有prefixも同じ処理を使い、LLMが `CSV-001` 等の番号を手計算しません。
 
 削除済み・置換済みentityのIDもCHANGELOGのexact `Stable ID changes` tableへ記録済みである限り再利用しません。stable IDを削除・置換するversionでは、そのIDを同tableへ必ず記録します。
 
@@ -449,7 +457,7 @@ UI target structural:
 
 `SRC / SPEC / INF / UNK` は既存spec-analysisの分類・形式契約を維持しつつ、UI target mode内でnewと判断した後の番号決定だけ `next-id` を使用します。
 
-`DEC / ASM` は追跡対象ですが本helperの採番対象ではありません。実際の決定事項 / 承認済み仮定の正本ownerで採番済みIDを参照し、UI target package側で新規採番・再採番しません。
+`DEC / ASM` は追跡対象ですが本helperの採番対象ではありません。canonical Authority IDは既存spec-analysis契約どおり常に `DEC-xxx / ASM-xxx` とします。Project Context以外のownerを利用する場合も、そのownerがcanonical DEC / ASM IDを発行・保持することを前提とします。Jira issue key、ADR番号、外部DB key等のowner固有識別子を `authority_id` へ直接入れず、source / evidence側の参照metadataとして保持します。canonical DEC / ASM IDを正本ownerから確定できない場合はcurrent Authorityへ昇格させずblockedとします。
 
 ### 6.3 structured Markdown parse contract
 
