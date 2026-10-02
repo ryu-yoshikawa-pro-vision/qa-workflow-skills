@@ -117,7 +117,7 @@ LLMがsemantic identityを判断して `new` と決めた後だけ使用しま�
 - CHANGELOG本文のproseからIDを推測せず、exact tableだけを履歴として読む
 - 現在存在しない過去IDもCHANGELOGのstable ID履歴から既知IDとして扱い、別entityへ再割当てしない
 - UI target mode内でnewと判断した `SRC / SPEC / INF / UNK` とstructural IDの番号決定に使用する
-- `DEC / ASM` はquestion-analysis / project側正本がownerであり、本helperで新規採番しない
+- `DEC / ASM` は案件で実際に指定された決定事項 / 仮定の正本がownerであり、本helperで新規採番しない。Project Contextがownerの場合だけ `project_context_ids.py` を使う
 - `next-id` で得たIDは、同じprefixの次の `next-id` 呼び出し前に対象structured rowへ反映する
 - helper返却の `stable_id_change` をcurrent versionの `Stable ID changes` tableへ記録し、validate前に履歴を閉じる
 - prefixはmodeで宣言済みのものだけ許可する
@@ -323,8 +323,9 @@ version変更の要否をpresentationだけの差分まで機械判定しませ�
 
 `project_context_ids.py` の担当:
 
-- Project Context Section 12のexisting `DEC-xxx` とSection 13のexisting `ASM-xxx` の形式・duplicate検証
+- Project Context Section 12 / 13が実際の正本ownerである場合だけ、existing `DEC-xxx / ASM-xxx` の形式・duplicateを検証
 - question-analysis / stakeholder判断でnew DECISION / approved ASMと決まった後の次番号決定
+- 別ownerが明示されている場合は処理せず、そのownerのIDをProject Contextへ複製・再採番しない
 
 担当しない:
 
@@ -334,7 +335,10 @@ version変更の要否をpresentationだけの差分まで機械判定しませ�
 - 回答のSPEC / DECISION / ASM分類
 - DECISIONの内容・関係・影響範囲
 - ASM承認可否
+- Project Context以外の正本schemaの解釈・採番
 - 新しいUNKを作るべきかの判断
+
+別ownerが明示されていてowner側IDが未確定の場合、LLMが番号を手計算せず正本登録をblockedとして扱います。任意schema向けgeneric allocatorは追加しません。
 
 各helperのexact operation / input / output / failure contractは `_06_package-schema-and-helper-contracts.md` を正本とします。eval validator / repository testはproduction helperからexpectedを逆算しません。
 
