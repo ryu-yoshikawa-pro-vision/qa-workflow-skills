@@ -204,10 +204,10 @@ scope単位のsemantic contractは `_08` を正本とします。structured tabl
 
 #### Acceptance Criteria一覧
 
-| AC ID | Behavior ID | Acceptance Criteria | 関連仕様項目ID | 関連構造ID | 状態 | 関連UNKNOWN ID |
-| --- | --- | --- | --- | --- | --- | --- |
+| AC ID | Behavior ID | Acceptance Criteria | 関連仕様項目ID | 関連構造ID |
+| --- | --- | --- | --- | --- |
 
-not-applicable scopeはUS / UC / Behavior / AC rowを持ちません。blocked scope / rowは `_08` のUNKNOWN contractへ従います。
+not-applicable / blocked scopeはUS / UC / Behavior / ACを確定済みrowとして持ちません。US / UC / Behaviorのblocked rowは `_08` のUNKNOWN contractへ従い、ACにはblocked rowを作りません。
 
 #### ビジネスルール一覧
 
