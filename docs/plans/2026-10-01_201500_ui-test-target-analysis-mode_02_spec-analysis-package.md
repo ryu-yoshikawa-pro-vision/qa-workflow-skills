@@ -139,7 +139,7 @@ mode packageでも既存 `assets/output-template.md` のcanonical契約を維持
 - UI構造間の関係は `関連構造ID` で追跡する
 - 複数IDの区切りは `<br>` に固定する
 - exact ID参照の存在・duplicateはui_target_package.pyで検証する
-- semantic identity、reuse / new判断はLLMが行う。LLMがnewと判断した後の次ID算出は `ui_target_package.py next-id` を使用し、Agentが既知ID一覧を組み立てない
+- semantic identity、reuse / new判断はLLMが行う。UI target mode内でnewと判断した `SRC / SPEC / INF / UNK` とstructural IDの次番号は `ui_target_package.py next-id` を使用し、Agentが既知ID一覧を組み立てない。DEC / ASMはquestion-analysis / project側の正本IDを参照する
 
 ### 正規UI分類
 
@@ -347,7 +347,7 @@ default policy:
 
 1. 初回はv00
 2. vNNの次は1増分したvNN
-3. 同一versionを異なる完成内容で上書きしない
+3. 同一versionを異なる完成内容で上書きしない。これは更新手順上の契約であり、current package単体のvalidateが過去内容との同一性を証明するものではない
 4. README / CHANGELOG / MANIFESTのversionを一致させる
 5. 変更後もcurrent versionの全fileを含む完全版を成立させる
 6. 過去versionは履歴でありcurrent仕様の参照前提にしない
@@ -361,10 +361,10 @@ default policyでは `ui_target_package.py next-version` が次versionを導出�
 回答や新資料が来た場合:
 
 1. LLMが変更されたAuthority / DECISION / ASMを解決し、project policyに従ってmaterial updateかを判断する
-2. default version policyでversion upする場合は、既存current packageへ `ui_target_package.py next-version` を `package_root` だけで実行し、返却された `previous_version / next_version` でREADME / CHANGELOGのcurrent version metadataを更新する。Agentがcurrent versionを手で転記しない
-3. LLMが影響するcanonical stable item / UNKを更新する。semantic identityがnewの場合だけ `next-id` を使い、返却IDを対象structured rowへ反映してから同prefixの次の採番へ進む。返却された `stable_id_change` はcurrent versionのCHANGELOGへ記録する。UNKNOWN解消時は元UNKを `現在有効か=No` にし、確定内容を分類に合うnew / reuse stable IDへ接続して `解消先ID` を保持する
+2. default version policyでversion upする場合は、**内容を書き換える前に**既存current packageへ `ui_target_package.py next-version` を `package_root` だけで実行する。返却された `previous_version / next_version` を使い、READMEの `Previous Package Version / Package Version` とCHANGELOGのcurrent version headingを更新する。Agentがcurrent versionを手で転記しない
+3. LLMが影響するcanonical stable item / UNKを更新する。semantic identityがnewの場合だけ `next-id` を使う。UI target modeがownerの `SRC / SPEC / INF / UNK` とstructural IDはhelperで採番し、DEC / ASMはproject側正本の既存IDを参照する。返却IDを対象structured rowへ反映してから同prefixの次の採番へ進み、返却された `stable_id_change` はcurrent versionのCHANGELOGへ記録する。UNKNOWN解消時は元UNKを `現在有効か=No` にし、確定内容を分類に合うnew / reuse stable IDへ接続して `解消先ID` を保持する
 4. 09_authority_and_traceability.mdのcanonical modelを更新する
-5. `ui_target_package.py impact` でchanged stable IDのexact参照先を再確認候補として列挙する
+5. `ui_target_package.py impact` を `package_root` だけで実行し、current versionの `Stable ID changes` からhelperが導出したchanged IDのexact参照先を再確認候補として列挙する
 6. LLMが候補fileを確認し、意味上変更が必要な01〜08 / domain fileだけを更新する
 7. LLMが07のUNKNOWN本文、06の矛盾 / resolved説明、CHANGELOGの変更概要・stable ID change・影響fileを更新する
 8. repository確認を実施した場合だけ08を更新する
