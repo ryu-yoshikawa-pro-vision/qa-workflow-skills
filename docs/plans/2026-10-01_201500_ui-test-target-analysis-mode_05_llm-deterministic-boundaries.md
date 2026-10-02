@@ -38,11 +38,14 @@
 | 質問がどのUNKNOWNに対応するか | LLM | QとUNKの意味対応を判断する |
 | 仕様回答がどの項目へ影響するか | LLM | scriptが列挙した参照候補を補助情報として使える |
 | ID形式 / duplicate /参照先存在 | deterministic validation | 意味を変えず拒否できる |
+| new stable ID番号 / 案件固有prefix番号 | deterministic helper | semantic identity / prefix意味確定後、標準・宣言済み案件固有prefixを同じallocatorで採番する |
+| explicit retire intent | LLM | row消失を永久廃止と自動解釈しない。identityをcurrent modelから意図的に除去する場合だけretire判断する |
+| Markdown table / known section / standard file materialization | deterministic helper | semantic row / prose確定後のID注入、escape、sort、serialization、file同期をui-target-v1専用materializeで行う |
 | SCOPE applicability / 条件付き必須fileと実fileの一致 | deterministic validation | LLMが意味判定した結果の固定対応を検証する |
 | UIOP→UC / US→UC / UC→BH / BH→AC closure | deterministic validation | semantic relationを決めず、LLMが作った参照の完全性だけ検証する |
 | UCごとの正常 / 準正常 / 例外3分類 | deterministic validation | 各1行、定義あり/なし/未定義の構造整合を検証する |
 | current AC→TR / disposition closure | test-requirement deterministic runtime | ACを無言で落とさない |
-| version形式 / package内version一致 | deterministic helper / validation | default version policy利用時は次versionも導出できる |
+| version形式 / package内version一致 | deterministic helper / validation | default policyでは完成packageへ永続差分を保存するたびsemantic / presentationを問わず次versionへ進める。no-opだけ維持する |
 | required core / 条件付き必須file set | deterministic validation | trigger該当性はLLM、required / not-applicable / blockedと実file / MANIFEST一致はscript |
 | MANIFEST file list / SHA-256 | deterministic helper | package内容から導出し、LLMに計算させない |
 | current UNKNOWN ID集合 / 件数 | deterministic helper | canonical分析項目から導出する。UNKNOWN本文はLLMが作る |
@@ -110,17 +113,17 @@ mode導入前のlegacy packageをcurrent schemaへ移行する場合だけ、LLM
 
 #### next-id
 
-LLMがsemantic identityを判断して `new` と決めた後だけ使用します。Agentから既知ID一覧を受け取らず、helperがpackage rootのcurrent structured rowとCHANGELOG各versionのexact `Stable ID changes` tableから既知IDを収集し、同prefixの既知最大番号+1を返します。
+LLMがsemantic identityを判断して `new` と決めた後だけ使用します。Agentから既知ID一覧を受け取らず、helperがpackage rootのcurrent structured row、CHANGELOG各versionのexact `Stable ID changes` table、previous snapshotから既知IDを収集し、同prefixの既知最大番号+1を返します。標準prefixに加え00宣言済み案件固有prefixも同じallocatorで扱います。
 
 - reuse / newの意味判断は行わない
 - Agent / LLMに`known_ids[]`を手組みさせない
 - CHANGELOG本文のproseからIDを推測せず、exact tableだけを履歴として読む
 - 現在存在しない過去IDもCHANGELOGのstable ID履歴から既知IDとして扱い、別entityへ再割当てしない
-- UI target mode内でnewと判断した `SRC / SPEC / INF / UNK` とstructural IDの番号決定に使用する
-- `DEC / ASM` は案件で実際に指定された決定事項 / 仮定の正本がownerであり、本helperで新規採番しない。Project Contextがownerの場合だけ `project_context_ids.py` を使う
-- `next-id` で得たIDは、同じprefixの次の `next-id` 呼び出し前に対象structured rowへ反映する
-- helper返却の `stable_id_change` をcurrent versionの `Stable ID changes` tableへ記録し、validate前に履歴を閉じる
-- prefixはmodeで宣言済みのものだけ許可する
+- UI target mode内でnewと判断した `SRC / SPEC / INF / UNK`、standard structural ID、00宣言済み案件固有IDの番号決定に使用する
+- `DEC / ASM` は案件で実際に指定された決定事項 / 仮定の正本がownerであり、本helperで新規採番しない。canonical Authority IDは既存契約どおり `DEC-xxx / ASM-xxx` とし、Project Contextがownerの場合だけ `project_context_ids.py` を使う
+- canonical package更新では `materialize` が同じallocatorを内部利用し、AgentがIDをMarkdown rowへ手入力しない
+- helper返却の `stable_id_change` は採番確認用で、CHANGELOG rowはimpact / materializeが生成する
+- prefixは標準または00で宣言済みのものだけ許可する
 
 #### render-readme-controls
 
@@ -142,6 +145,24 @@ LLMが「標準fileへ混在させるべきでない独立domainが必要」と�
 - 返却pathを00へ登録して実fileを作成してから次の採番を行い、未materializeの番号をAgent側だけで予約しない
 - 既存最大番号が999なら自動拡張せず `id_space_exhausted`
 
+#### materialize
+
+通常のUI target package作成 / 更新のwrite pathです。LLMがsemantic row / prose、reuse / new、explicit retire、file trigger、extension要否を決めた後、helperが次をまとめて実行します。
+
+- new ID / `@draft`参照解決
+- Markdown escape / canonical row order / table serialization
+- known headingへのsection置換
+- 条件付き標準fileのtemplate作成 / 除去
+- 宣言済みextension fileの作成 / 更新
+- explicit `retire_ids[]` のlifecycle検証。row消失だけではretireしない
+- Stable ID changes / 影響file
+- Machine Entities section
+- README controls
+- MANIFEST / hash
+- final validate
+
+汎用Markdown frameworkにはせず、`ui-target-v1` のknown file / heading / table registryだけを扱います。通常更新ではsingle writerとし、inspect snapshotからbytesが変わっていればstaleとして書込みません。
+
 #### build-manifest
 
 README controls反映後のcurrent package fileからMANIFEST bodyを生成します。
@@ -159,13 +180,13 @@ README controls反映後のcurrent package fileからMANIFEST bodyを生成し�
 
 semantic identity、same-UNK reopen / new UNK等をLLMが判断してowner structured rowへ反映した後、`impact` がprevious snapshotとcurrent stateを比較して次を決定論生成します。
 
-- `added / changed / resolved / retired`
+- `added / changed / resolved` と、LLMが明示した `retire_ids[]` に対する `retired`
 - changed stable ID集合
 - `Stable ID changes` canonical Markdown
 - previous/current owner + exact referenceから導出した再確認候補file / row
 - `影響file` canonical Markdown
 
-LLMがCHANGELOG lifecycle eventや影響file一覧を手入力しません。更新途中でstable ID owner rowを削除しても、`next-id` は同じprevious snapshotを使用済みID集合へ含めるため、そのrevision内で過去IDを再利用しません。
+LLMがCHANGELOG event rowや影響file一覧を手入力しません。ただし `retired` はterminal semantic decisionなので、helperがrow消失から自動判定せずLLMが `retire_ids[]` で明示します。明示なしにprevious tracked rowが消えた場合はblockedします。更新途中でstable ID owner rowを削除しても、allocatorは同じprevious snapshotを使用済みID集合へ含めるため、そのrevision内で過去IDを再利用しません。
 
 legacy migrationではsemantic identity mappingだけをLLMが行い、retained ID / 明示確認できるterminal eventを `impact(change_mode=legacy-migration)` へ渡します。helperが `migrated / added / resolved / retired` のtableを生成し、legacy proseからidentityを推測しません。
 
@@ -312,7 +333,7 @@ MANIFESTはcurrent package fileのfile listとSHA-256を持ちます。
 - SHA-256はhelperが計算する
 - Agentがhash値を手入力しない
 
-version変更の要否をpresentationだけの差分まで機械判定しません。案件で「material update」の定義が必要な場合はLLM / project policyが判断します。default policyでmaterial updateと判断した場合は、内容を書き換える前に `next-version` を実行し、返却された `previous_version / next_version` をREADME / CHANGELOGへ反映してから更新します。
+default policyでは、完成済みpackageへ永続差分を加えて再び完成状態として保存するならsemantic / presentationを問わずversionを1増分します。差分なしのno-opだけversionを維持します。canonical更新経路では `materialize` がprevious snapshotとの差分から次versionを決定し、README / CHANGELOG / MANIFESTへ同時反映します。案件で別version policyが明示されている場合だけそのpolicyを優先します。
 
 「同じversionを別内容で完成版として上書きしない」は更新手順上の契約です。current packageだけを見るvalidatorは過去の同version内容とのbyte比較を行わず、current / previous version metadataの形式・連続性・package内一致を検証します。
 
