@@ -396,7 +396,7 @@ extension fileの必要性とslugはLLMが判断します。連番は `materiali
 
 ## 6. ID rules
 
-packageがstable reference / CHANGELOG / impactで追跡できるprefixと、`ui_target_package.py next-id / materialize` が採番できるprefixを分離します。標準prefixに加え、00の `案件固有構造ID` で宣言された案件固有prefixも同じ履歴契約へ参加します。
+packageがstable reference / CHANGELOG / lifecycle差分で追跡できるprefixと、`ui_target_package.py materialize` 内部allocatorが採番できるprefixを分離します。標準prefixに加え、00の `案件固有構造ID` で宣言された案件固有prefixも同じ履歴契約へ参加します。
 
 ### 6.1 packageで追跡できるstable ID
 
@@ -1059,11 +1059,9 @@ payload:
 
 ### 10.2 project_context_ids.py
 
-### 10.3 project_context_ids.py
-
 Project ContextのSection 12 / 13が案件の決定事項 / 仮定の正本ownerである場合に使うdefault allocatorです。Project Context ownerではstable ID rowをidentity履歴として保持し、撤回 / 置換済みでもID row自体を削除しません。内容・状態は更新できますが、previous Project Contextに存在したDEC / ASM IDをcandidateから消しません。
 
-#### validate-history#### validate-history
+#### validate-history
 
 stdin:
 
