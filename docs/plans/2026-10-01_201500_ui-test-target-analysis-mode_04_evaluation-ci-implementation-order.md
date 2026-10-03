@@ -60,7 +60,7 @@ PR #16後の現在Plan上の期待増分:
 
 期待:
 - semanticなUI構造分類を行い、STATEを直交軸として整理する
-- UI操作ありと確定したscopeは意味モデル上requiredのまま維持する。影響するUIOP / US / UC / Behaviorがblockedならworkflow readinessではそのscopeだけblockedとする。semantic identity自体が未確定ならstable ID rowを作らず、07のBlocking Scope ID / 関連Fileへ閉じる
+- UI操作ありと確定したscopeは意味モデル上requiredのまま維持する。影響するUIOP / US / UC / Behavior / ACがblockedならworkflow readinessではそのscopeだけblockedとする。ACはsemantic identityが同じならcurrent ↔ blockedでstable IDを維持し、意味上廃止された場合だけretireする。semantic identity自体が未確定ならstable ID rowを作らず、07のBlocking Scope ID / 関連Fileへ閉じる
 - non-blocker UNKNOWNが残るscopeと独立ready scopeを同時に含め、UNKNOWN件数だけで全scopeを止めない
 - Trigger=`あり / required` とcontent incompleteを分離し、FIELD等のidentityが既知ならblocked row + UNKNOWN、identity不明ならblocking UNKNOWNで表す。内容不足を理由にTriggerを未確定へ戻さない
 - inputから識別可能なFIELD / RULE / FLOW / NOTIFY / INTERACTを無言で欠落させない
@@ -316,15 +316,19 @@ repository unit testで次を必須確認します。
 - materialize内部lifecycle builderがsnapshot hash照合後に再parseしたprevious current modelとprovisional tracking row差分から `added / changed / resolved` を生成し、`retired` は明示 `retire_ids[]` だけから生成すること。previous ID消失のみなら `state_transition_required` でblockedすること
 - materialize内部impact builderの `影響file` がchanged IDのprevious/current owner + exact reference先unionであり、Agentへfile一覧再入力を要求せず、semantic本文変更の要否を勝手に決定しないこと
 - legacy migrationではLLMが確定したretained ID / 明示lifecycle event / semantic rowsを `materialize(change_mode=legacy-migration)` へ渡し、helperがnew ID採番・canonical Markdown・`migrated / added / resolved / retired`・README / Machine Entity / MANIFESTまで1 write pathで生成すること
-- scope applicability、UI操作scopeのUIOP / US / UC / Behavior / AC hierarchy / current AC chain全parent=current / closure / current UCの3分類整合。UIOP / US / UC / Behaviorの状態はhelper導出とし、semantic identity未確定時はIDを発行せず07のBlocking Scope IDへ閉じること。UIOP.Scopeは対応UCのderived Scopeとexact一致すること
-- file × Scope ID applicability、blocked UIOP / US / UC / Behavior / RULE / FIELD / FLOW / NOTIFY / INTERACT、UC完全性=`未定義`、07 Blocking Scope IDから `scope_readiness[] / ready_scope_ids[] / blocked_scope_ids[] / complete|partial|blocked` を導出し、non-blocker UNKNOWNが残っても独立scopeをreadyにできること
+- scope applicability、UI操作scopeのUIOP / US / UC / Behavior / AC hierarchy / current AC chain全parent=current / closure / current UCの3分類整合。UIOP / US / UC / Behavior / ACの状態はhelper導出とし、semantic identity未確定時はIDを発行せず07のBlocking Scope IDへ閉じること。UIOP.Scopeは対応UCのderived Scopeとexact一致すること
+- required scope + UIOP 0件 + Blocking UNKNOWNなしをrejectし、required scope + identity未確定Blocking UNKNOWNをvalid/blocked、mapped UIOP → current US / UC → Behavior → current AC closureをreadyとして導出すること
+- current UCで正常 / 準正常 / 例外がすべて `なし` かつBehavior=0件をreadyにせず、`未定義 + UNKNOWN` はvalid/blockedとして扱うこと
+- current Behaviorがblocked ACだけを持つ場合はscope blocked、current AC 1件以上かつblocked ACなしでready条件を満たせること。AC-001 current → blocked → currentで同じstable IDを維持し、explicit retireなしでAC-002を採番しないこと
+- file × Scope ID applicability、blocked UIOP / US / UC / Behavior / AC / RULE / FIELD / FLOW / NOTIFY / INTERACT、UC完全性=`未定義`、07 Blocking Scope IDから `scope_readiness[] / ready_scope_ids[] / blocked_scope_ids[] / complete|partial|blocked` を導出し、non-blocker UNKNOWNが残っても独立scopeをreadyにできること
 - Trigger=`あり`のrequired scopeで内容不足をTrigger=`未確定`へ戻さないこと。identity既知ならblocked domain row、identity不明で0 rowなら07のBlocking Scope ID + 関連Fileによりclosureできること。standard conditional fileの関連Fileは物理file未作成でもstandard registry pathならvalid、extensionはcurrent宣言 + 実file必須とすること
 - `未定義` で既知current / blocked Behavior IDを0件以上保持できUNKNOWN必須、Behavior identity自体不明ならblocked Behaviorを創作しないこと
 - `なし` は関連Behavior / UNKNOWNなし + 理由 + current Authorityの `関連仕様項目ID` 1件以上を要求すること
 - 09の「現在有効な仕様根拠」からnormalized Authorityを固定projectionし、`適用範囲` を非空string、`関係` を単一許可値の1要素arrayとして一意にserializeすること
-- `build-machine-evidence(scope_id=null)` がpackage-global Authority + current AC Entityと `ready_scope_ids[] / blocked_scope_ids[]` を返し、scope別full payloadを重複返却しないこと。`build-machine-evidence(scope_id=S)` は `_06 §9.3` の固定seed / edgeからready scope Sだけのnormalized input / Entity / expected identityを返し、blocked / unknown scope指定をrejectすること。standalone operationはread-onlyでpackage bytes / version / MANIFESTを変更しないこと
-- scope-specific handoffから実際の通常runtime canonical stdinを構成し、2 MiB exactlyは通過、1 byte超過ではruntimeを起動せず `limit_exceeded` になること。helper / workflowがscopeを自動分割しないこと
-- scope A / Bで別Authorityを持つ場合にhandoffが混在せず、明示共有Authorityは両方へ入り、UI操作なしscopeでもscope-owned RULE / FLOW等のAuthorityをACなしでhandoffできること
+- `build-machine-evidence(scope_ids=null)` がpackage-global Authority + current AC Entityと `ready_scope_ids[] / blocked_scope_ids[]` を返し、scope別full payloadを重複返却しないこと。`build-machine-evidence(scope_ids=ready_scope_ids)` は `_06 §9.3` の固定seed / edgeから各ready scopeを内部projectionし、1つのbatch normalized input / Entity / expected identityへunion / dedupeすること。duplicate / blocked / unknown scope指定をrejectし、canonical qa-workflowではcurrent ready_scope_ids全件とのexact一致を要求すること
+- ready SCOPE-001 / SCOPE-002、blocked SCOPE-003で、SCOPE-001→SPEC-001,SPEC-002,AC-001、SCOPE-002→SPEC-002,SPEC-003,AC-002なら、batchがSPEC-001/002/003 + AC-001/002をexactly once含み、SCOPE-003由来rowを含めず、Agent mergeなしで既存 `artifact:*:all` runtimeを1回だけ起動すること
+- batch handoffから実際の通常runtime canonical stdinを構成し、2 MiB exactlyは通過、1 byte超過ではruntimeを起動せず `limit_exceeded` になること。scope別個別run / subset run / silent truncate / auto splitで回避しないこと
+- scope A / Bで別Authorityを持つ場合にbatch内で混在先を誤らず、明示共有Authorityは1件へdedupeされ、UI操作なしscopeでもscope-owned RULE / FLOW等のAuthorityをACなしでhandoffできること
 - UIOP `対象構造ID` はUI構造prefixだけを許可し、domain item prefixをrejectすること。linked domain itemはAC / Behavior / UC / USの `関連構造ID` に明示されたIDだけで、同一PAGE / 同一Scopeから逆引きしないこと
 - AC / Behavior / UC / USの明示domain ref、linked UIOPのUI target、scope、linked domain itemのUI structure refからcurrent SPEC / DECISION / approved ASMをAuthority dependencyへ投影し、linked INFはcontent-only projectionへ入れること。current Authorityが0件なら `state_transition_required` でblockedし、helper自身はUNKNOWN / blocked rowを生成しないこと
 - parent_structure_id missing / self / cycleをrejectすること。artifact modeではancestor・明示linked domain item・linked INF変更でAC/TRがstaleになり、同一PAGEにあるだけで明示参照されないFIELD等の変更ではAC fingerprint / TR freshnessが変わらないこと
@@ -502,7 +506,7 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - envelope shape / freshness algorithmは維持
 - independent `runtime_validator.py`、active code / Skill文書 / asset / fixture / repository testをv2へ同期
 - active Machine Evidenceの手書き擬似schemaを削除し、runtime renderer / authority_entities.py / build-machine-evidence生成結果を正本にする。packageへのMachine Entities section書込みはmaterialize内部だけで行い、standalone build-machine-evidenceはread-onlyとする
-- `ui_target_package.py build-machine-evidence` を実装し、AC / Behavior / UC / USの明示 `関連構造ID` からlinked domain item、linked UIOPの `対象構造ID` と明示UI structure refからstructure + ancestor、linked INFをAC contentへ固定projectionする。同一PAGE / Scope等の逆引きを禁止する。Authorityだけdependency Entityとする。package-global callはready / blocked scope ID indexだけ、scope-specific callは `_06 §9.3` のreachabilityで1 scope handoffだけを生成する
+- `ui_target_package.py build-machine-evidence` を実装し、AC / Behavior / UC / USの明示 `関連構造ID` からlinked domain item、linked UIOPの `対象構造ID` と明示UI structure refからstructure + ancestor、linked INFをAC contentへ固定projectionする。同一PAGE / Scope等の逆引きを禁止する。Authorityだけdependency Entityとする。package-global callはready / blocked scope ID indexだけ、batch callはcurrent ready scope全件を `_06 §9.3` で内部projectionしてAuthority / current AC / Machine Entity / expected identityを1集合へunion / dedupeする
 - generator contractを `requirement-structure-v1 → requirement-structure-v2`。top-level `acceptance_criteria[]` を `{ac_id, authority_refs[]}` のknown semantic AC集合としてraw input必須にし、各TRのsemantic `acceptance_refs[]` も必須とする。UI target packageからTRDへ進むcanonical workflowはartifact modeに固定し、upstream AC Entity集合とのexact一致 + AC/Authority dependency + semantic freshnessを要求する。direct modeはknown ID/closure検証を保証し、実在する参照AC Entityだけdependency化する。AC Entityなしdirect runのAC semantic cross-run freshnessは保証しない
 - current ACをTRまたはDispositionへ閉じ、Authority closureは独立維持する
 - TR EntityへAC EntityとACが参照するcurrent Authority Entity dependencyを保存する
@@ -541,9 +545,9 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 
 ### Step 5: qa-workflow routing
 
-- mode request routing / answer resume。小規模でも継続利用目的ならmodeを優先し、`scope_readiness[] / ready_scope_ids[]` とscope-specific `build-machine-evidence(scope_id=S)` だけでready scopeを後続へ進める。blocked scopeのUNKNOWNをAgentが全件filterしない
+- mode request routing / answer resume。小規模でも継続利用目的ならmodeを優先し、`scope_readiness[] / ready_scope_ids[]` を使ってblocked scopeを除外し、current ready scope全件を `build-machine-evidence(scope_ids=ready_scope_ids)` の1 batchへまとめて後続 `artifact:*:all` runtimeへ進める。blocked scopeのUNKNOWNをAgentが全件filterしない
 - qa-workflow経由のpackage materializeは `claim_mutable_operation()` 成功後にresolved package_rootの `reserve_shared_resource()` を取得し、reservation成功前はwriteしない。成功 / cleanup確認済みhandled failure後は既存conditional release契約でreservationを解放し、claimは通常releaseしない
-- `inspect.ready_scope_ids[]` ごとにscope-specific `build-machine-evidence` を取得し、通常runtime起動前にcanonical stdin 2 MiB上限を検証する。超過scopeはruntime未起動のままblockedにし、自動分割しない
+- batch handoffから通常runtimeのcanonical stdinを1つ構成し、batch全体を2 MiB上限へ検証する。超過時はruntime未起動のままblockedにし、scope別個別run / subset run / auto splitを行わない
 - 継続利用目的を単発規模より優先するmode precedenceをroutingへ反映
 - runtime-v1 downstreamが残る状態でUI target migration済みならblockedにし、Step 2のcutover順へ戻す
 - test-target-inspection / usability-evaluation / usability-inspection / wcag-conformance-evaluationとの分岐
@@ -584,8 +588,10 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - runtime-v1 downstream → Skill-local legacy reader / cutover → UI target migration → AC semantic update → stale downstream rerunのscenario
 - 64 KiB超のv1 artifact Markdownを含むcutover requestが16 MiB以内で成功し、v1 fingerprint改変 / embedded scalar 64 KiB超をrejectするscenario
 - artifact modeでUIOP / UIOP-only Authority / scope / structure ancestor / 明示linked domain item / linked INF / Behavior / UC / US / Authority変更によるTR staleと、同一PAGEにあるだけで未参照のdomain itemを含む無関係package row変更non-stale scenario
-- ready scope A/BのAuthority分離、共有Authorityの両handoff包含、UI操作なしscopeのAuthority handoff、blocked scope handoffなしをscope-specific handoff smokeで確認する
-- package-global build responseがscope full payloadを複製せず、scope-specific runtime requestが2 MiB超の場合にruntime未起動でblockedになるscenario
+- ready scope A/BのAuthority分離、共有Authorityのbatch内dedupe、UI操作なしscopeのAuthority handoff、blocked scope非混入をready-scope batch smokeで確認する。既存 `artifact:analysis_entities:all / artifact:requirement_structure:all` をscopeごとに複数回起動しない
+- package-global build responseがscope full payloadを複製せず、ready-scope batch runtime request全体が2 MiB超の場合にruntime未起動でblockedになるscenario
+- AC-001がcurrent → blocked → currentへ戻ってもstable IDを維持し、blocked期間はAC Entity / TRD handoffから外れ、既存TRがmissing dependency / staleになるscenario
+- required scopeで0 UIOP + blockerなしをreject、0 UIOP + identity未確定Blocking UNKNOWNをpartial/blocked保存、完全なUIOP→US→UC→Behavior→AC closureをreadyにするscenario
 - 同一packageへの異なるoperationが別claimでも同じresource reservationで排他され、cleanup確認後にownerだけがconditional releaseできるscenario
 - process kill相当のorphan staging / backupをpreflight recoveryでき、一意に復旧不能ならfail-closedするscenario
 - deterministic helperが構造エラーを返してもLLMの意味判断を上書きしないscenario

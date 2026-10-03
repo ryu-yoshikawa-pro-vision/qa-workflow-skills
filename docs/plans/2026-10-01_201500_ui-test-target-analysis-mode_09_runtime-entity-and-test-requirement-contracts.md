@@ -289,7 +289,7 @@ expected unitは `artifact:case_structure:all` exactly 1件です。
 
 ## 3. spec-analysis normalized machine input
 
-`ui_target_package.py build-machine-evidence(scope_id=null)` はpackage-global evidenceと `ready_scope_ids[] / blocked_scope_ids[]` を決定論生成し、scope別full handoffを同じresponseへ複製しません。`build-machine-evidence(scope_id=S)` はready scope Sのnormalized input / Machine Entity / expected identityだけを返します。Markdownから次を決定論的に生成します。
+`ui_target_package.py build-machine-evidence(scope_ids=null)` はpackage-global evidenceと `ready_scope_ids[] / blocked_scope_ids[]` を決定論生成し、scope別full handoffを同じresponseへ複製しません。`build-machine-evidence(scope_ids=[...])` は各ready scopeを固定reachabilityで内部projectionし、Authority / current AC / Machine Entity / expected identityをstable identityでunion / dedupeした1つのbatch handoffを返します。canonical qa-workflowでは `scope_ids[]` をcurrent `ready_scope_ids[]` とexact一致させます。Markdownから次を決定論的に生成します。
 
 - normalized Authority rows
 - normalized current AC rows
@@ -310,9 +310,9 @@ expected unitは `artifact:case_structure:all` exactly 1件です。
 }
 ```
 
-`authority_refs[]` は `_06 §9.2` の固定projectionで得たAC / Behavior / UC / US chain、linked UIOP、scope、linked domain item、linked UI structureのstable refsを09のCurrent Effective Authority集合へ解決したunionです。current SPEC / DECISION / approved ASMだけを残し、INF / UNK / inactive Authorityは除外します。helperが重複除去・canonical sortし、current ACでは1件以上を要求します。0件ならhelperはblocking issueを返してAC Entityを生成しません。ACを除去する、親rowをblockedへ変更する、UNKNOWNをreuse / newする等のsemantic transitionはLLMが判断します。Agent / LLMがAuthority集合を再構築しません。
+`authority_refs[]` は `_06 §9.2` の固定projectionで得たAC / Behavior / UC / US chain、linked UIOP、scope、linked domain item、linked UI structureのstable refsを09のCurrent Effective Authority集合へ解決したunionです。current SPEC / DECISION / approved ASMだけを残し、INF / UNK / inactive Authorityは除外します。helperが重複除去・canonical sortし、current ACでは1件以上を要求します。0件ならhelperはblocking issueを返してAC Entityを生成しません。AC semantic identityが同じなら同IDをblockedへ遷移させる、Behavior自体も未確定なら親Behaviorをblockedへ遷移させる、意味上廃止ならexplicit retireする、UNKNOWNをreuse / newする等のsemantic transitionはLLMが判断します。Agent / LLMがAuthority集合を再構築しません。
 
-qa-workflow / test-analysis / coverage-analysisへspec-analysis scopeを渡す場合、AgentがMarkdownからJSONを再構築しません。`inspect.ready_scope_ids[]` から対象Sを選び、`build-machine-evidence(scope_id=S)` のcanonical handoffをそのまま使用します。通常runtime generatorへ接続する場合は実際のcanonical stdinを実行前にbyte計測し、既存2 MiBを超えるscopeはruntimeを起動せずblockedにします。helperが自動分割せず、意味を維持したSCOPE分割はLLM判断です。
+qa-workflow / test-analysis / coverage-analysisへspec-analysis成果物を渡す場合、AgentがMarkdownからJSONを再構築しません。current `inspect.ready_scope_ids[]` 全件を `build-machine-evidence(scope_ids=ready_scope_ids)` へ渡し、helperが1つのcanonical batch handoffを生成します。既存runtime unit `artifact:analysis_entities:all` / `artifact:requirement_structure:all` は維持し、scopeごとの別runtime unitへ分割しません。通常runtime generatorへ接続する場合はbatch handoffから最終canonical stdinを構成した後にbyte計測し、既存2 MiBを超える場合はruntimeを起動せずblockedにします。scope別個別run / subset run / Agent merge / auto splitで回避しません。
 
 ### 3.1 requirement-structure-v2 caller contract
 
@@ -422,7 +422,7 @@ top-level required fields:
 
 既存legacy promotion用 `legacy_tr_ids` の条件付き入力契約は維持します。
 
-`acceptance_criteria[]` は§3.1のexact schemaを使用します。`authority_refs[]` はtop-level `authorities[]` のknown IDへ存在検証します。ACなしworkflowでもkey省略は許可せず `[]` を明示します。
+`acceptance_criteria[]` は§3.1のexact schemaを使用し、**current ACだけ**を含めます。blocked ACはknown current AC集合、Machine Entity、TRD closureの対象外です。`authority_refs[]` はtop-level `authorities[]` のknown IDへ存在検証します。ACなしworkflowでもkey省略は許可せず `[]` を明示します。
 
 各 `test_requirements[]` draftへ `acceptance_refs[]` を必須追加します。該当ACがない横断的TRは `[]` を使用します。`acceptance_refs[]` の意味対応はLLMが判断し、generatorはtop-level known AC集合への存在参照だけを検証します。
 
@@ -513,7 +513,8 @@ UI target packageからtest-requirement-designへ進むcanonical workflowはarti
 | 変更 | artifact modeの期待 |
 | --- | --- |
 | AC本文変更 | 関連TR stale |
-| AC削除 | 関連TR missing dependency / stale |
+| current ACがblockedへ遷移しEntity集合から一時的に外れる | 関連TR missing dependency / stale。AC stable ID自体はretireせず、再current化時に同じIDを使う |
+| ACが意味上廃止されretired | 関連TR missing dependency / stale |
 | linked UIOP変更、AC本文同じ | AC fingerprint変更 → 関連TR stale |
 | 親Behavior変更、AC本文同じ | AC fingerprint変更 → 関連TR stale |
 | 親UC変更、AC本文同じ | AC fingerprint変更 → 関連TR stale |
@@ -559,7 +560,8 @@ coverage-analysisの既存traceability graph node typeへACを追加しません
 - generator contractの `-v1` をshared runtime v2へ誤って置換しない
 - `acceptance_criterion` Machine Entity valid / unknown type regression
 - shared canonicalization: `acceptance_refs` / `acceptance_criteria`
-- spec-analysis expected Authority + AC identity
+- spec-analysis expected Authority + **current ACだけ**のidentity。blocked ACをexpected Entityへ含めない
+- AC-001 current → blocked → currentでstable IDを維持し、blocked期間はAC Entity / `acceptance_criteria[]` から除外、explicit retire時だけterminal retireする回帰
 - 通常の非mode spec-analysis normalized inputで `acceptance_criteria` key省略を空集合として扱い、既存Authority expected Entityだけを維持
 - qa-workflow expected / actual Entity exact match
 - coverage-analysis current Entity parse compatibility
@@ -599,9 +601,9 @@ coverage-analysisの既存traceability graph node typeへACを追加しません
 
 - PR #14後の9 runtime_contract.pyが同一内容でacceptance_criterionを扱える
 - 9コピーがruntime-v2 / entity-state-v2へ同期され、requirement-structure-v2が明示される。TRD / TCD / TC固有cutover projectionはshared runtimeではなく各Skill-local helperにある
-- helperからpackage-global spec-analysis evidence + ready / blocked scope ID indexと、指定ready scope 1件のscope handoffを別responseで決定論生成できる。package-global responseへ全scope handoffを複製しない
-- qa-workflowが `inspect.ready_scope_ids[]` からscope-specific handoffを取得し、そのAuthority + ACだけをexpectedとして使用する。blocked scopeをpackage-global集合からAgentがfilterしない
-- scope handoffから構成する通常runtime canonical stdinが2 MiB以内であることを起動前に検証し、超過scopeをsilent truncate / auto splitしない
+- helperからpackage-global spec-analysis evidence + ready / blocked scope ID indexと、current ready scope全件のcanonical batch handoffを別responseで決定論生成できる。package-global responseへscope別full payloadを複製しない
+- qa-workflowが `inspect.ready_scope_ids[]` 全件をbatch inputにし、Authority / current AC / Machine Entity / expected identityをhelper側でunion / dedupeする。blocked scopeを含めず、Agentがmerge / filterしない
+- batch handoffから構成する既存 `artifact:*:all` runtimeのcanonical stdin全体が2 MiB以内であることを起動前に検証し、超過時は個別scope run / subset run / silent truncate / auto splitで回避しない
 - test-requirement-designまで進むworkflowではcurrent ACがTRまたはDispositionへ完全に閉じる。仕様理解packageだけの要求ではこのclosureを要求しない
 - UI target artifact workflowでは、AC / linked UIOP / scope / 明示linked FIELD-RULE-FLOW-NOTIFY-INTERACT / direct structure + ancestor / linked INF / 親Behavior-UC-US / Authority変更が必要なTR freshnessへ伝播し、無関係package row変更は伝播しない
 - direct modeはknown AC ID / closureを保証し、AC Entity dependencyが無い場合のAC semantic cross-run freshnessを保証対象にしない

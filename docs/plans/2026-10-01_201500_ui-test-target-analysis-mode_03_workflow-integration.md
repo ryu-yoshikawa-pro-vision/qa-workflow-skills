@@ -122,7 +122,7 @@ spec-analysis(UI target mode)
 → 回答正規化後、spec-analysis(UI target mode)を差分更新
 → 独立したready scopeはblocked scopeの回答待ちだけを理由に停止しない
 → ユーザー要求が仕様理解までならcurrent packageを返す
-→ テスト分析も要求されている場合は `inspect.ready_scope_ids[]` を列挙し、各ready scopeについて `build-machine-evidence(scope_id=S)` で1 scope分のhandoffを取得してtest-analysisへ進む。blocked scopeは再開先を保持する
+→ テスト分析も要求されている場合は current `inspect.ready_scope_ids[]` 全件を `build-machine-evidence(scope_ids=ready_scope_ids)` へ渡し、helperが1つのcanonical batch handoffへunion / dedupeしてtest-analysisへ進む。blocked scopeはbatchへ入れず再開先を保持する
 
 ### 2.2 gated mode
 
@@ -211,22 +211,22 @@ exact CLI契約は `_06_package-schema-and-helper-contracts.md` を正本とし�
 
 UI target modeから後続テスト設計へ進む場合、spec-analysis成果物のMachine Entity / normalized inputをAgentがMarkdownから再構築しません。
 
-`ui_target_package.py build-machine-evidence(scope_id=null)` が返すpackage-global evidenceはcanonical package自身のMachine Entity section検証に使い、ready scopeのfull handoffを重複して含めません。下流へは `inspect.ready_scope_ids[]` を正本indexとして、必要なscopeごとに `build-machine-evidence(scope_id=S)` を呼びます。
+`ui_target_package.py build-machine-evidence(scope_ids=null)` が返すpackage-global evidenceはcanonical package自身のMachine Entity section検証に使い、ready scopeのfull handoffを重複して含めません。下流canonical pathでは `inspect.ready_scope_ids[]` 全件を `scope_ids[]` として1回渡し、helperがscopeごとの `_06 §9.3` reachabilityを内部適用した後、1つのbatchへ統合します。
 
-各ready scope handoffは次を持ちます。
+batch handoffは次を持ちます。
 
-- `scope_id`
-- そのscopeに必要なspec-analysis canonical `normalized_skill_input`
-- そのscopeに必要なAuthority / Acceptance Criterion Machine Entities
-- expected entity identities
+- `scope_ids[]`: current `ready_scope_ids[]` とexact一致するcanonical sort済み集合
+- ready scope unionのspec-analysis canonical `normalized_skill_input`
+- ready scope unionのAuthority / current Acceptance Criterion Machine Entities
+- union / dedupe済みexpected entity identities
 
-qa-workflow / test-analysis / coverage-analysisはMarkdownやpackage-global Entity集合をAgent側でfilterせず、scope-specific responseをそのまま使います。scope所属row・明示stable ref・UI構造parentだけを辿るexact reachabilityは `_06 §9.3` を正本とし、名称・同一PAGE・同一Scope・Authority本文から関連を推測しません。blocked scopeはhandoffを持たず、question-analysisへはinspectで導出したblocking UNKNOWNだけを渡します。
+helperはAuthority / AC / Machine Entityをstable identityでdedupeし、共有Authorityを1件へ統合します。同一identityのcanonical contentがscope間で不一致ならfail-closedします。Agent / LLMがscope別payloadをmergeしません。blocked scope由来のAuthority / ACはbatchへ含めません。scope所属row・明示stable ref・UI構造parentだけを辿るexact reachabilityは `_06 §9.3` を正本とし、名称・同一PAGE・同一Scope・Authority本文から関連を推測しません。
 
-通常runtime generatorを起動する直前に、qa-workflowは実際のcanonical stdin JSON bytesを構成して既存2 MiB上限を検査します。超過時はruntimeを起動せずそのscopeの後続実行をblockedとし、helper / workflowが自動でscopeを分割しません。意味を維持した分割が可能かはLLMが判断し、必要ならspec-analysisでSCOPE / 参照を更新して再materializeします。
+既存test-analysis / test-requirement-design runtimeは `artifact:*:all` の1 runtime unitを維持します。qa-workflowはbatch handoffからそのruntimeへ実際に渡すcanonical stdin JSON bytesを構成した後に既存2 MiB上限を検査し、batch全体が超過した場合はruntimeを起動せず後続を`limit_exceeded`でblockedにします。scope単位の個別run、ready scope subsetだけの`:all`実行、Agent merge、silent truncate、auto splitで回避しません。通常runtime上限を変更する場合は別contract変更です。
 
 ユーザー要求が仕様理解packageまでならspec-analysisの完了条件で終了し、test-analysis / test-requirement-designを起動しません。この場合、AC→TR / Disposition closureはpackage単体の完了条件ではありません。
 
-test-requirement-designへ到達した場合は `requirement-structure-v2` を使用します。**UI target packageからのcanonical workflowは `input_mode=artifact`** とし、top-level `acceptance_criteria[]` は `build-machine-evidence.normalized_skill_input.acceptance_criteria[]` をそのままTRD inputへ渡します。AgentがMarkdownから再構築しません。artifact modeではAC Entity集合とのexact一致とAC / Authority dependencyを要求し、AC本文・親chain・linked package item変更のfreshnessを保証します。
+test-requirement-designへ到達した場合は `requirement-structure-v2` を使用します。**UI target packageからのcanonical workflowは `input_mode=artifact`** とし、top-level `acceptance_criteria[]` はready scope batch handoffのcurrent AC集合をそのままTRD inputへ渡します。blocked ACはbatch / `acceptance_criteria[]` / Machine Entity集合へ含めません。AgentがMarkdownから再構築しません。artifact modeではAC Entity集合とのexact一致とAC / Authority dependencyを要求し、AC本文・親chain・linked package item変更のfreshnessを保証します。
 
 direct modeはUI target artifactを使わない独立呼出しとして同じ `acceptance_criteria[]` schemaでknown AC集合を明示できます。各TRの意味対応だけをLLMが `acceptance_refs[]` として判断し、known ID / closureを検証します。参照AC Entityが無いdirect runではAC semantic cross-run freshnessを保証せず、存在しないMachine Entity / fingerprintを合成しません。
 

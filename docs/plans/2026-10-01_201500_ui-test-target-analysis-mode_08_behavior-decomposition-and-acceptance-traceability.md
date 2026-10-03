@@ -32,7 +32,7 @@ UI操作の有無自体はLLMが資料の意味から判断します。`Behavior
 
 `資料不足でUS / UC / Behavior / ACを書けない` はnot-applicableの理由になりません。Behavior Decomposition=blockedのscopeでは下位UIOP / US / UC / Behavior / ACを確定済みとして生成せず、関連UNKNOWN解消後にrequired / not-applicableを再判定します。
 
-UI操作ありと確定したscopeは意味モデル上 `Behavior Decomposition=required` のまま維持します。Actor / Role、Goal、操作対象、結果等の下位情報がAuthorityから確定できない場合は、影響するUIOP / US / UC / Behavior rowを `blocked + 関連UNKNOWN ID` で表現します。ACにはblocked rowを作りません。semantic identity自体を確定できずrowを発行できない場合は、07のCurrent UNKNOWNに `Blocking Scope ID` と `関連File=02_behavior_and_business_rules.md` を明示します。
+UI操作ありと確定したscopeは意味モデル上 `Behavior Decomposition=required` のまま維持します。Actor / Role、Goal、操作対象、結果等の下位情報がAuthorityから確定できない場合は、影響するUIOP / US / UC / Behavior / AC rowを `blocked + 関連UNKNOWN ID` で表現します。ACもsemantic identityが既知なら同じ `AC-xxx` をblockedで保持し、解消後に同IDをcurrentへ戻します。semantic identity自体を確定できずrowを発行できない場合は、07のCurrent UNKNOWNに `Blocking Scope ID` と `関連File=02_behavior_and_business_rules.md` を明示します。
 
 ここで `Behavior Decomposition=required` は適用状態でありworkflow readinessではありません。blocked下位row、identity未確定のblocking UNKNOWN、current UCの `判定=未定義` 等が残る間、そのSCOPEは後続工程に対してblockedです。scope-level `Behavior Decomposition=blocked` はUI操作有無そのものが `未確定` の場合だけです。
 
@@ -105,6 +105,7 @@ blocked rowは「semantic identityまでは確定しているが、完成に必�
 | US | Scope ID、Actor / Role、Goal、関連仕様項目ID。関連UNKNOWN IDは空 | Scope ID、Actor / RoleまたはGoalの少なくとも一方、関連UNKNOWN ID。確定済み関連仕様項目IDは保持 | Actor / RoleまたはGoalの未確定側、関連仕様項目ID | LLMがActor / Goalの組としてUser Story identityを確定できない |
 | UC | 関連US ID、Use Case、Trigger、Success Postcondition、関連仕様項目ID。Preconditionsは該当なしなら空可。関連UNKNOWN IDは空 | 関連US ID、Use Case、関連UNKNOWN ID。Trigger / Preconditions / Success Postcondition / 関連仕様項目IDは確定済み分だけ保持 | Trigger、Preconditions、Success Postcondition、関連仕様項目ID | LLMが親USに対するUse Case identityを確定できない |
 | Behavior | UC ID、結果分類、振る舞い、Postcondition / Result、関連仕様項目ID。関連UNKNOWN IDは空 | current UC ID、結果分類、振る舞い、関連UNKNOWN ID。Postcondition / Result / 関連仕様項目IDは確定済み分だけ保持 | Postcondition / Result、関連仕様項目ID | Behaviorの存在・identity自体を確定できない |
+| AC | Behavior ID、Acceptance Criteria、current SPEC / DECISION / approved ASMの関連仕様項目ID。関連UNKNOWN IDは空 | currentまたはblocked Behavior ID、関連UNKNOWN ID。Acceptance Criteria / 関連仕様項目ID / 関連構造IDは確定済み分だけ保持 | Acceptance Criteria、関連仕様項目ID、関連構造ID | ACの存在・identity自体を確定できない |
 
 `current / mapped` rowの関連仕様項目IDは `_06` のnormative traceability contractに従います。US / UC / Behavior / ACの `関連構造ID` は `_05` のUI構造ID + domain item ID exact prefix集合だけを許可し、ACの意味を制約するdomain itemはLLMがこの明示edgeへ含めます。blocked rowはUNKNOWNが正本であり、未確定fieldを推測して埋めません。UIOP / US / UC / Behaviorの `状態` はこのfield充足と関連UNKNOWNからhelperが生成し、materialize callerは `状態` を送信しません。
 
@@ -182,10 +183,10 @@ ID: `BH-001` から開始し、最低3桁で連番採番する。999の次は100
 
 規則:
 - current Behavior / blocked Behaviorはいずれもcurrent UCだけを親に持つ
-- current Behaviorは1件以上のcurrent ACを持つ
-- Behaviorの存在・semantic identityまでは確定しているが、expected behavior / result等のAC生成に必要な意味が未確定の場合だけblocked Behavior rowを作り、関連UNKNOWN IDを1件以上要求する
+- current Behaviorは1件以上のcurrentまたはblocked ACを持つ。ready scopeではcurrent Behaviorごとにcurrent ACが1件以上あり、blocked ACが残っていないことを要求する
+- Behaviorの意味自体が未確定ならblocked Behavior rowを作る。BehaviorはcurrentだがACのsemantic identityが既知で期待条件だけ一時的に未確定なら、親Behaviorを不要にblockedへ落とさず同じAC IDをblockedで保持できる
 - Behaviorの存在・identity自体をまだ確定できない場合はblocked Behavior rowを作らず、§7の `未定義` + UNKNOWNだけで表す
-- blocked Behaviorはcurrent ACを持たない
+- blocked Behaviorはcurrent ACを持たない。AC semantic identityが既知ならblocked ACを同じIDで保持できる
 - blocked Behaviorをcurrent ACの親にしない
 - Behaviorの `状態` はhelperが必須fieldと関連UNKNOWNから `current / blocked` を導出する
 
@@ -219,19 +220,23 @@ Acceptance CriteriaはBehaviorが仕様上成立したと判断できる受入�
 
 #### Acceptance Criteria一覧
 
-| AC ID | Behavior ID | Acceptance Criteria | 関連仕様項目ID | 関連構造ID |
-| --- | --- | --- | --- | --- |
+| AC ID | Behavior ID | Acceptance Criteria | 関連仕様項目ID | 関連構造ID | 状態 | 関連UNKNOWN ID |
+| --- | --- | --- | --- | --- | --- | --- | --- |
 
 ID: `AC-001` から開始し、最低3桁で連番採番する。999の次は1000
 
-AC一覧に記載するrowはcurrentだけです。blocked ACという中間状態は作りません。
+状態:
+- current
+- blocked
 
 規則:
-- current Behaviorは1件以上のACを持つ
-- ACはcurrent Behaviorだけを親に持つ
-- ACへ到達するBehavior / UC / 関連USはすべてcurrentであることを要求する。blocked rowをcurrent AC chainへ混ぜない
+- current Behaviorは1件以上のcurrentまたはblocked ACを持つ
+- current ACはcurrent Behaviorだけを親に持ち、ACへ到達するBehavior / UC / 関連USはすべてcurrentであることを要求する
+- blocked ACはsemantic identityが既知のACが一時的に確定できない場合だけ使用し、親Behaviorはcurrentまたはblockedを許可する。関連UNKNOWN IDを1件以上持つ
 - ACは観測可能な振る舞い / 結果の意味を表す
-- expected behaviorを確定できない場合はAC rowを作らず、親BehaviorをblockedとしてUNKNOWNへ戻す
+- AC identityが既知でexpected behavior / Authorityだけ不足する場合は同じAC IDをblockedで保持する。解消後は同じIDをcurrentへ戻す
+- AC identity自体を確定できない場合はAC rowを作らず、既知のBehaviorまたはScopeからBlocking UNKNOWNへ閉じる
+- 意味上本当に廃止された場合だけLLMが `retire_ids[]` を明示し、current / blocked切替をretireとして扱わない
 - ACへ境界値一覧、入力値一覧、組合せ表、テストデータ一覧を展開しない
 - 仕様上の特定値そのものが期待挙動の一部である場合は除去しない
 - current ACは1件以上のcurrent Authority itemへ追跡する
@@ -263,7 +268,7 @@ semantic identityのreuse / new / explicit retire判断はLLMが行います。
 
 SCOPE / UIOP / US / UC / Behavior / ACは新しいAuthority種別ではありません。
 
-UIOP / US / UC / Behavior / ACのnormative rowは根拠を空にしません。current rowは `関連仕様項目ID` にcurrent SPEC / DECISION / approved ASM / INFを1件以上持ち、根拠不足で確定できない場合はblocked + `関連UNKNOWN ID` へ閉じます。ACだけはcurrent SPEC / DECISION / approved ASMのAuthorityを1件以上要求し、INFだけではcurrent ACにしません。UNKNOWNは専用の `関連UNKNOWN ID` で追跡し、`関連仕様項目ID` への代用にしません。
+UIOP / US / UC / Behavior / ACのnormative rowは根拠を空にしません。current rowは `関連仕様項目ID` にcurrent SPEC / DECISION / approved ASM / INFを1件以上持ち、根拠不足でsemantic identityが既知なら同じstable IDのblocked row + `関連UNKNOWN ID` へ閉じます。ACだけはcurrent SPEC / DECISION / approved ASMのAuthorityを1件以上要求し、INFだけではcurrent ACにしません。blocked ACはUNKNOWNを必須とし、Machine Entity / `acceptance_criteria[]` 対象外です。UNKNOWNは専用の `関連UNKNOWN ID` で追跡し、`関連仕様項目ID` への代用にしません。
 
 - structured rowを書いたこと自体をSPECへ昇格しない
 - repository実装やlive UIから期待結果を補完しない
@@ -321,7 +326,11 @@ test-condition-designはTRから問題構造を分析し、仕様 / Risk / 状�
 
 - SCOPE / UIOP / US / UC / BH / AC ID形式・duplicate
 - scope適用判定の許可値と対応関係
-- required scopeのUIOP / US / UC / Behavior / AC table存在。required scope内では不足情報をblocked UIOP / US / UC / Behavior + UNKNOWNとして保持できる
+- Behavior Decomposition=required scopeはUIOP rowを1件以上持つか、UIOP identity自体を確定できないBlocking UNKNOWNが当該Scope + `02_behavior_and_business_rules.md` を指す。どちらもなければrejectする
+- current USは1件以上のcurrent / blocked UCへ接続する
+- current UCは正常 / 準正常 / 例外3rowを持ち、少なくとも1分類が `定義あり` でcurrent Behaviorへ到達するか、1分類以上が `未定義 + UNKNOWN` でscope blockedになる。3分類すべて `なし` かつBehavior=0件をreadyにしない
+- current Behaviorは1件以上のcurrent / blocked ACへ接続し、blocked ACが残るscopeをreadyにしない
+- required scope内では不足情報をblocked UIOP / US / UC / Behavior / AC + UNKNOWN、またはidentity未確定のBlocking UNKNOWNとして保持できる
 - not-applicable scope、またはUI操作有無自体が未確定のblocked scopeにUS / UC / Behavior / ACを確定済みとして生成していないこと
 - blocked applicability / rowのUNKNOWN参照
 - UIOP → UC closure
@@ -332,6 +341,8 @@ test-condition-designはTRから問題構造を分析し、仕様 / Risk / 状�
 - current Behavior → AC closure
 - `なし` completeness row → current Authority ref 1件以上
 - current AC chainのBehavior / UC / USがすべてcurrent
+- blocked ACは関連UNKNOWN IDを1件以上持ち、Machine Entity / `acceptance_criteria[]` 対象外であること
+- current ↔ blocked AC state transitionでstable IDを維持し、explicit retireがない限りAC IDを再採番しないこと
 - current AC → current SPEC / DECISION / approved ASM ref 1件以上。INF / UNK / inactive Authorityだけではcurrent ACにしない
 - current / blockedとUNKNOWN参照の整合
 - broken structural ref

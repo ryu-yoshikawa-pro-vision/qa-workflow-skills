@@ -148,7 +148,7 @@ version更新時は変更ファイルだけではなく、そのversionの完全
 - tests/skills/evals/semantic/*
 - UI target package helper用repository unit test
 
-既存 `skills/spec-analysis/scripts/authority_entities.py` はAuthority Entity生成の正本として再利用します。current AC Entity / spec-analysis normalized_skill_input / expected identityは `ui_target_package.py` が生成します。package-global evidenceとscope-specific handoffは別responseにし、通常runtimeへ渡すscope-specific canonical requestは起動前に既存2 MiB上限を検証します。UI target package / helperの16 MiB上限を通常runtimeへ拡張しません。
+既存 `skills/spec-analysis/scripts/authority_entities.py` はAuthority Entity生成の正本として再利用します。current AC Entity / spec-analysis normalized_skill_input / expected identityは `ui_target_package.py` が生成します。package-global evidenceとready scope batch handoffは別responseにし、canonical workflowではcurrent `ready_scope_ids[]` 全件をhelperが決定論的にunion / dedupeして既存 `artifact:*:all` runtimeへ1回で渡します。batch後のcanonical runtime request全体を起動前に既存2 MiB上限へ照合し、UI target package / helperの16 MiB上限を通常runtimeへ拡張しません。
 
 ### test-requirement-design
 
@@ -163,7 +163,7 @@ version更新時は変更ファイルだけではなく、そのversionの完全
 - skills/test-requirement-design/evals/output/*
 - runtime / repository contract tests
 
-目的はcurrent ACをTRまたは明示的dispositionへ閉じることです。AC freshnessへ含めるFIELD / RULE / FLOW / NOTIFY / INTERACTはAC / Behavior / UC / USの `関連構造ID` にLLMが明示したものだけとし、UIOPの `対象構造ID`、同一PAGE / Scope、名称一致からhelperが逆引きしません。ready scope handoffもscope所属row + 明示stable ref + UI構造parentだけを `_06 §9.3` の固定規則で辿ります。package-local itemはAC content fingerprintへ寄与させ、Authorityだけをupstream Entity dependencyにします。repository由来のimplementation-only structureもtarget-model dependencyとしてfreshnessには影響しますが、Authorityへ昇格しません。UI target packageからTRDへ進むcanonical workflowはartifact modeとし、AC / linked UIOP / scope / 明示linked domain item / UI構造ancestor / linked INF / 親Behavior / UC / US / Authority変更をTR freshnessへ伝播させます。direct modeはknown ID / closureを保証し、AC Entityが無い場合のAC semantic cross-run freshnessは保証しません。TRの責務をACの言い換えへ変更しません。
+目的はcurrent ACをTRまたは明示的dispositionへ閉じることです。AC freshnessへ含めるFIELD / RULE / FLOW / NOTIFY / INTERACTはAC / Behavior / UC / USの `関連構造ID` にLLMが明示したものだけとし、UIOPの `対象構造ID`、同一PAGE / Scope、名称一致からhelperが逆引きしません。ready scope handoffはscope所属row + 明示stable ref + UI構造parentだけを `_06 §9.3` の固定規則でscopeごとにprojectionし、canonical downstreamではcurrent `ready_scope_ids[]` 全件を1つのbatchへunion / dedupeします。ACはsemantic identityが同じまま一時的に未確定になった場合、同じ `AC-xxx` を `blocked` で保持して解消後に同IDへ戻し、本当に意味上廃止された場合だけretireします。Machine Entity / TRD handoffにはcurrent ACだけを含めます。package-local itemはAC content fingerprintへ寄与させ、Authorityだけをupstream Entity dependencyにします。repository由来のimplementation-only structureもtarget-model dependencyとしてfreshnessには影響しますが、Authorityへ昇格しません。UI target packageからTRDへ進むcanonical workflowはartifact modeとし、AC / linked UIOP / scope / 明示linked domain item / UI構造ancestor / linked INF / 親Behavior / UC / US / Authority変更をTR freshnessへ伝播させます。direct modeはknown ID / closureを保証し、AC Entityが無い場合のAC semantic cross-run freshnessは保証しません。TRの責務をACの言い換えへ変更しません。
 
 ### question-analysis
 
@@ -258,7 +258,7 @@ PR #14後のCIは `skills/*/scripts` を動的compileするため、helper compi
 - 通常のspec-analysis出力は従来どおり利用できる
 - test-target-inspectionの責務を侵食しない
 - qa-workflowが最短経路でmodeを選択でき、usability-evaluation / usability-inspection / wcag-conformance-evaluationへ誤routeしない
-- package内のcanonical Authority契約が既存spec-analysisと互換であり、Authority + current AC Machine Entity、spec-analysis normalized_skill_input、expected identity、Machine Entities Markdown sectionまでLLM手組みなしで接続できる
+- package内のcanonical Authority契約が既存spec-analysisと互換であり、Authority + current AC Machine Entity、ready scope batch normalized_skill_input、expected identity、Machine Entities Markdown sectionまでLLM手組みなしで接続できる
 - 複数Markdown packageを既存semantic runnerへ入力できる一意なevaluation projectionが定義されている
 - modeが既存Agent Skills形式のままAIエージェントから利用できる
 - mode導入前のlegacy / unversioned packageをsemantic mapping + deterministic validationでcurrent schemaへ移行できる

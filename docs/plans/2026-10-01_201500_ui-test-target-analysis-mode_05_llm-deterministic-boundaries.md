@@ -31,7 +31,7 @@
 | 現在有効なAuthority解決 | LLM | 既存spec-analysis契約を使用する |
 | PAGE / STATE / VIEW / STEP / MODAL等の意味分類 | LLM | UI意味を判断する。scriptは分類結果の形式だけ検証できる |
 | scopeごとのUI操作有無 / file applicability triggerの意味判断 | LLM | 資料の意味から `あり / なし / 未確定` を判断する。Triggerはdomainの存在判定であり、内容不足だけで `未確定` へ戻さない。scriptはfile × Scope IDごとに `required / not-applicable / blocked` を導出する |
-| UI操作抽出 / US / UC / Behavior / ACの意味分解 | LLM | UI操作scopeでは必須工程。資料不足を推測補完しない。semantic identity自体が未確定でrowを作れない場合はblocking UNKNOWNをScopeへ明示する |
+| UI操作抽出 / US / UC / Behavior / ACの意味分解 | LLM | UI操作scopeでは必須工程。資料不足を推測補完しない。semantic identity自体が未確定でrowを作れない場合はblocking UNKNOWNをScopeへ明示する。既存ACのsemantic identityが同じか、意味上廃止してretireするかもLLMが判断する |
 | 正常 / 準正常 / 例外の意味分類 | LLM | scriptは3分類の完全性と許可値だけ検証する |
 | AC→TRの意味対応 / TR分割統合 | LLM | ACの単純言い換えではなく検証責務として判断する |
 | 既存項目と意味的に同一か | LLM | stable IDをreuseする意味判断はLLMが行う |
@@ -44,7 +44,7 @@
 | explicit retire intent | LLM | row消失を永久廃止と自動解釈しない。package-owned identityをcurrent modelから意図的に除去する場合だけretire判断する。DEC / ASMはpackage外ownerなのでpackage側terminal retire対象にしない |
 | Markdown table / known section / standard file materialization | deterministic helper | semantic row / prose確定後のID注入、escape、sort、serialization、file同期をui-target-v1専用materializeで行う |
 | SCOPE applicability / 条件付き必須fileと実fileの一致 | deterministic helper / validation | file × Scope IDの `あり / なし / 未確定` からfile状態を固定導出する。content completenessは別に、blocked domain rowまたは07のBlocking Scope ID + 関連Fileでclosureを検証する |
-| UIOP→UC / US→UC / UC→BH / BH→AC closure | deterministic validation | semantic relationを決めず、LLMが作った参照の完全性だけ検証する。UIOP.Scopeと対応UCからderivedしたScopeの一致も検証する |
+| UIOP→UC / US→UC / UC→BH / BH→AC closure | deterministic validation | semantic relationを決めず、LLMが作った参照の完全性だけ検証する。UIOP.Scopeと対応UCからderivedしたScopeの一致、required scopeの最低row / blocker closure、current UCがBehaviorへ閉じること、current Behaviorがcurrent / blocked ACへ閉じることも検証する |
 | UCごとの正常 / 準正常 / 例外3分類 | deterministic validation | 各1行、定義あり/なし/未定義の構造整合を検証する |
 | current AC→TR / disposition closure | test-requirement deterministic runtime | ACを無言で落とさない |
 | version形式 / package内version一致 | deterministic helper / validation | default policyでは完成packageへ永続差分を保存するたびsemantic / presentationを問わず次versionへ進める。no-opだけ維持する |
@@ -101,9 +101,9 @@ required file、version、ID形式・duplicate、exact reference、UNKNOWN整合
 
 #### build-machine-evidence
 
-09のCurrent Effective Authorityと02のcurrent AC + parent chainからMachine Evidenceを固定projectionします。公開operationはread-onlyで、`scope_id=null` ではpackage-global normalized input / Machine Entityとready scopeのhandoff indexだけを返し、scope別payloadを重複返却しません。`scope_id=<ready SCOPE-ID>` では `_06 §9.3` の固定reachabilityに従う1 scope分のcanonical handoffだけを返します。blocked scopeの詳細handoffは生成しません。packageのMachine Entities sectionを書き換えるのは`materialize`内部だけで、Agent / callerはbuild responseをpackageへ直接書き戻しません。
+09のCurrent Effective Authorityと02のcurrent AC + parent chainからMachine Evidenceを固定projectionします。公開operationはread-onlyで、`scope_ids=null` ではpackage-global normalized input / Machine Entityとready / blocked scope ID indexだけを返します。`scope_ids=[...]` では各scopeを `_06 §9.3` の固定reachabilityで内部projectionした後、Authority / current AC / Machine Entity / expected identityをstable identityでunion / dedupeし、1つのcanonical batch handoffを返します。canonical qa-workflowでは `scope_ids[]` をcurrent `ready_scope_ids[]` とexact一致させ、blocked scopeや一部ready scopeだけを混入・省略しません。Agent / callerがscope handoffをmergeしません。packageのMachine Entities sectionを書き換えるのは`materialize`内部だけです。
 
-UI target package自体のsupported hard limitは16 MiBですが、通常runtime generatorは既存2 MiB上限を維持します。qa-workflowは実際に呼ぶgeneratorの最終canonical requestを実行前にbyte計測し、2 MiB超過ならruntimeを呼ばず`limit_exceeded`としてそのscopeを後続実行blockedにします。helper / workflowはscopeを自動分割しません。意味を維持した分割が可能かはLLMが判断し、可能ならUI target packageのSCOPE /参照をsemantic updateして再materializeします。
+UI target package自体のsupported hard limitは16 MiBですが、通常runtime generatorは既存2 MiB上限を維持します。qa-workflowはbatch handoffから実際に呼ぶ `artifact:*:all` generatorの最終canonical requestを構成した**後**にbyte計測し、batch全体が2 MiBを超える場合はruntimeを起動せず`limit_exceeded`で後続実行をblockedにします。scope単位の個別2 MiB通過をbatch実行可能性として扱わず、helper / workflowがsubset実行や自動分割で回避しません。通常runtime上限変更が必要な場合は別contract変更として扱います。
 
 semantic / deterministic eval用multi-file projectionはproduction helperへ入れず、repository専用 `scripts/skills/evals/ui_target_projection.py` が担当します。既存runnerへ1-file inputを渡すためのrepository test utilityであり、導入先Skill packageへ同梱しません。
 
@@ -167,7 +167,7 @@ IDが意味的に同一か、新IDにすべきかはLLM判断です。helperはI
 
 ## 5. canonical stable reference contract
 
-UIOP / US / UC / Behavior / AC / RULE / FIELD / FLOW / NOTIFY / INTERACTのように期待挙動・制約・ルールを表すnormative rowは根拠を空にしません。current rowは `関連仕様項目ID` にcurrent SPEC / DECISION / approved ASM / INFを1件以上持ちます。根拠不足で確定できない場合はcurrent rowとして成立させず、blocked + `関連UNKNOWN ID` へ閉じます。ACはcurrent Authority 1件以上を要求する `_08 / _09` のより厳しい契約を優先します。PAGE等の純粋な構造row、Repository実装状況、pure narrative / headingは各table固有契約に従います。
+UIOP / US / UC / Behavior / AC / RULE / FIELD / FLOW / NOTIFY / INTERACTのように期待挙動・制約・ルールを表すnormative rowは根拠を空にしません。current rowは `関連仕様項目ID` にcurrent SPEC / DECISION / approved ASM / INFを1件以上持ちます。根拠不足で確定できずsemantic identityが既知なら、同じstable IDを `blocked + 関連UNKNOWN ID` として保持します。ACもこのstate modelへ揃え、current ACだけcurrent Authority 1件以上を要求します。semantic identity自体が未確定ならrowを発行せずBlocking UNKNOWNへ閉じます。本当に意味上廃止された場合だけLLMがexplicit retireします。PAGE等の純粋な構造row、Repository実装状況、pure narrative / headingは各table固有契約に従います。
 
 - `関連仕様項目ID`: current SPEC / DECISION / approved ASM / INF等、09_authority_and_traceability.mdのcanonical item。UNKNOWNは専用の `関連UNKNOWN ID` で追跡する
 - UI構造IDのexact prefix集合: `PAGE / STATE / VIEW / STEP / MODAL / BDLG / PANEL / EXT / SHARED`
