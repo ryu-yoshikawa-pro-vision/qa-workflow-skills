@@ -1,8 +1,8 @@
 # 実Agent評価ランナー実装Plan
 
-このPlanは、既存のAgent Skills評価データセットを使って実Agentから評価対象成果物を生成し、現在の決定論的出力評価・意味評価まで一括で実行できる開発用ランナーを追加するための実装計画です。
+このPlanは、既存のAgent Skills評価データセットを使って実Agentから評価対象成果物を生成し、現在の決定論的出力評価・意味評価まで一括で実行できる開発用ランナーを追加し、その後に固定テスト対象 `qa-training-store` で実Agent統合評価まで行うための実装計画です。
 
-Skill本体の実行基盤は変更しません。Codex、Claude Code等のAgent runtimeは各クライアントへ任せ、今回追加するランナーはリポジトリ開発時の評価だけを担当します。
+Skill本体の実行基盤は変更しません。Codex、Claude Code等のAgent runtimeは各クライアントへ任せ、今回追加するランナーはリポジトリ開発時の評価だけを担当します。固定テスト対象での評価もSkill本体へ対象repo固有処理を入れず、評価側から実行します。
 
 ## 対象ブランチ
 
@@ -42,6 +42,29 @@ PR #11の検証では`codex exec`で評価対象成果物を生成し、既存�
 これにより、Skillを変更した後に同じ評価ケースを実Agentで再実行し、既存評価基準で結果を確認できるようにします。
 
 今回の目的はSkillを自動修正することではありません。Skill改善案の作成・採用判断は別責務とし、まず評価実行を再現可能かつ可能な範囲で自動化します。
+
+## フェーズ構成
+
+### フェーズ1: 既存Eval Inputで実Agent生成を自動化する
+
+本Plan本文の共通ランナーを実装し、既存deterministic / semantic caseを実Agentで生成して現在のgraderへ接続します。
+
+ここでは新しい評価基準を作らず、既存の評価データセットとgraderを再利用します。
+
+### フェーズ2: qa-training-storeを固定テスト対象として評価する
+
+フェーズ1完了後、`ryu-yoshikawa-pro-vision/qa-training-store`を固定revisionで使い、実repoを入力にした分析・設計workflowを評価します。
+
+詳細は [`qa-training-store固定対象の実Agent統合評価Plan`](./2026-10-03_132700_agent-eval-runner_02_qa-training-store-integration-eval.md) を正本とします。
+
+初回対象は次で固定します。
+
+- target repo: `ryu-yoshikawa-pro-vision/qa-training-store`
+- target revision: `84ce165493649550832731a60cf436f8ae29c56b`
+- Platform: Web
+- Feature: Checkout / Payment
+
+フェーズ2は新しい汎用benchmark frameworkを作るものではありません。まず1つの固定repo・固定revision・固定Featureで実行し、追加の抽象化が必要かは実測後に判断します。
 
 ## 現在確認できている不足
 
@@ -467,6 +490,14 @@ repositoryの既存caseを使い、fake Agentで次を自動検証します。
 
 実Agentのsemantic結果が`needs_review` / `fail`になった場合、ランナーが正常に生成・評価・保存できていればランナー実装失敗とは扱いません。ただし結果を無視せず、Skill / Eval Input / Reference / Judgeのどこに原因があるかを別途確認できる状態で報告します。
 
+## フェーズ2: qa-training-store固定対象の統合評価
+
+フェーズ1の実Codex smokeが完了した後、同branch上で `qa-training-store` の固定revisionを対象に実Agent統合評価を実施します。
+
+詳細な対象準備、Checkout / Paymentの評価範囲、既存 `.agents/skills/` との分離、source変更検出、workflow / traceability / semantic評価条件は [`2026-10-03_132700_agent-eval-runner_02_qa-training-store-integration-eval.md`](./2026-10-03_132700_agent-eval-runner_02_qa-training-store-integration-eval.md) に従います。
+
+フェーズ1のランナーは、このフェーズを見越して「入力準備」「Agent execution」「成果物保存」「評価」を分離します。ただし任意repo向けplugin frameworkは作りません。
+
 ## 既存検証
 
 実装後は少なくとも次を実行します。
@@ -506,6 +537,10 @@ git diff --check
 12. 既存評価・runtime・trigger検証を全件実行する
 13. 同branch上で実Codex smoke 4 caseを実行する
 14. 実Codex結果とrunnerの保存物を確認し、runner起因の未達が0件であることを確認する
+15. フェーズ2補助Planに従い、`qa-training-store`固定revisionの使い捨て評価対象を準備する
+16. 対象repo固有のAgent Skill集合を評価条件から除外し、今回の19 SkillだけをAgent-visibleにする
+17. Checkout / PaymentのWeb範囲で実Agent分析・設計workflowを実行し、source無変更、traceability、workflow状態、意味品質を評価する
+18. フェーズ1 / フェーズ2の結果を分離して保存し、runner起因の失敗とSkill品質上の非passを区別して報告する
 
 ## 対象外
 
@@ -528,6 +563,8 @@ git diff --check
 - Codex固有flagのハードコード
 - native Skill trigger観測のクライアント別adapter
 - 新しいサンプルアプリ
+- `qa-training-store`以外を含む複数target repo向けplugin framework
+- フェーズ2初回でのNative / 実ブラウザE2E評価
 
 Skillなし / Skillあり比較やmain / candidate比較は、今回保存するcase単位結果を使って2回のrunを比較すれば手動で実施できます。比較作業が継続的なボトルネックになった場合に、比較専用処理を追加します。
 
@@ -569,5 +606,10 @@ native trigger評価は、Skill activationを観測する方法がAgentクライ
 - `TC-OUT-001`、`TCN-OUT-001`、`TC-SEM-001`、`WF-SEM-003`を実Codexで同branch上から実行し、生成・保存・grader起動・結果集計まで完了する
 - 実Codex smokeでrunner起因の未処理エラーが0件
 - 実Codexの非pass結果がある場合、その結果を隠さず保存・報告できる
+- `qa-training-store`固定revision `84ce165493649550832731a60cf436f8ae29c56b` を対象にフェーズ2初回評価を実行している
+- Checkout / PaymentのWeb範囲で実Agentによる分析・設計workflowが完了し、成果物・workflow・traceability・意味評価結果が保存されている
+- `qa-training-store`のProduct Code、既存Test、規範仕様に許可外変更がない
+- 対象repo既存Skillではなく今回の19 SkillだけをAgent-visibleにした評価条件を記録している
+- フェーズ2のrunner / environment errorとSkill品質上のneeds_review / failを区別している
 - Skill本体の通常実行経路とポータビリティを変更していない
 - `git diff --check`がpassする
