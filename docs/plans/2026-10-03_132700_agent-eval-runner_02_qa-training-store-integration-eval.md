@@ -341,7 +341,14 @@ Evaluator側にtrackedなscenario定義を置き、少なくとも次を固定�
 - Agent-visible Skill集合
 - sanitized targetから除外する評価汚染情報
 - 評価出力root
-- Judgeが参照する規範仕様path
+- Judgeが参照する規範仕様path:
+  - `docs/spec/README.md`
+  - `docs/spec/product-scope.md`
+  - `docs/spec/roles-and-permissions.md`
+  - `docs/spec/state-and-scenarios.md`
+  - `docs/spec/features/checkout-and-payment.md`
+  - `docs/spec/known-deviations.md`
+  - `docs/spec/unresolved-specifications.md`
 - 意味評価criteria
 
 scenario定義と評価要求からfingerprintを算出し、親Planのrun provenanceへ保存します。
@@ -384,7 +391,11 @@ Judgeは評価対象Agentとは別process / 別promptで実行します。
 
 Candidate Outputは回収済みartifactを相対path付きで束ねたEvaluator側の表現とし、Agentの最終stdoutだけを評価対象にしません。
 
-Referenceはscenarioで固定した`docs/spec/README.md`と`docs/spec/features/checkout-and-payment.md`等の規範仕様からEvaluatorが構築します。意味評価criteriaはEvaluator側`rubric.json`を使用し、評価対象Agentへ渡しません。
+Referenceはscenarioで固定した上記7ファイルからEvaluatorが構築します。
+
+`docs/spec/README.md`のOracle優先順位を評価側でも維持し、Feature BR / ACを中心に、Product Scope、Role、State / Scenario、Known Deviation、Unresolvedを必要な補助根拠として扱います。`unresolved-specifications.md`の内容をExpected Behaviorへ昇格しません。
+
+意味評価criteriaはEvaluator側`rubric.json`を使用し、評価対象Agentへ渡しません。
 
 実装は既存の`scripts/skills/evals/semantic/prompt_builder.py`と`scripts/skills/evals/semantic/result.py`の共通処理を再利用します。Skill-local eval IDを前提とする`semantic/run.py` CLIを無理に流用せず、prompt構築・Judge response正規化・rating / verdict契約を共有します。
 
