@@ -32,7 +32,7 @@ UI操作の有無自体はLLMが資料の意味から判断します。`Behavior
 
 `資料不足でUS / UC / Behavior / ACを書けない` はnot-applicableの理由になりません。Behavior Decomposition=blockedのscopeでは下位UIOP / US / UC / Behavior / ACを確定済みとして生成せず、関連UNKNOWN解消後にrequired / not-applicableを再判定します。
 
-UI操作と期待結果が一部理解できても、Actor / RoleやGoalがAuthorityから確定できずUser Storyを成立させられない場合は、その影響scopeをblocked + UNKNOWNのままにします。これはUser Storyを仕様にない推測で補完しないための意図した品質基準です。
+UI操作ありと確定したscopeは `Behavior Decomposition=required` のまま維持します。Actor / Role、Goal、操作対象、結果等の下位情報がAuthorityから確定できない場合はscope全体をblockedへ戻さず、影響するUIOP / US / UC / Behavior rowを `blocked + 関連UNKNOWN ID` で表現します。ACにはblocked rowを作りません。scope-level `blocked` はUI操作有無そのものが `未確定` の場合だけです。
 
 UI操作には少なくとも次を含みます。
 - button / link / menu / tab等による操作
@@ -239,7 +239,7 @@ semantic identityのreuse / new / explicit retire判断はLLMが行います。
 
 SCOPE / UIOP / US / UC / Behavior / ACは新しいAuthority種別ではありません。
 
-各rowは関連仕様項目IDにより09のcurrent SPEC / DECISION / approved ASM、必要に応じINF / UNKへ追跡します。
+UIOP / US / UC / Behavior / ACのnormative rowは根拠を空にしません。current rowは `関連仕様項目ID` にcurrent SPEC / DECISION / approved ASM / INFを1件以上持ち、根拠不足で確定できない場合はblocked + `関連UNKNOWN ID` へ閉じます。ACだけはcurrent SPEC / DECISION / approved ASMのAuthorityを1件以上要求し、INFだけではcurrent ACにしません。UNKNOWNは専用の `関連UNKNOWN ID` で追跡し、`関連仕様項目ID` への代用にしません。
 
 - structured rowを書いたこと自体をSPECへ昇格しない
 - repository実装やlive UIから期待結果を補完しない
@@ -254,9 +254,9 @@ US / UC / Behavior自体はMachine Entity化しません。
 
 下流test-requirement-designへのhandoff pointであるcurrent ACだけを `spec-analysis / acceptance_criterion / AC-xxx` Machine Entityへ決定論変換します。
 
-AC Entityのcanonical contentには、AC自身だけでなくそのACへ到達するcurrent US / UC / Behavior chain、Scope、Authority refs、構造refsを固定projectionします。helper / validatorはcurrent ACへ到達する全parentがcurrentであることを決定論検証します。
+AC Entityのcanonical contentには、AC自身だけでなくそのACへ到達するcurrent US / UC / Behavior chain、Scope、Authority refs、構造refsに加え、**親UCへ接続するcurrent UIOP集合**を固定projectionします。linked UIOPは `対応UC ID` が親UCと一致するcurrent rowを `UIOP ID` 昇順で投影し、`uiop_id / actor_role / target_structure_id / operation` を含めます。helper / validatorはcurrent ACへ到達する全parentがcurrentであることを決定論検証します。
 
-これによりUS / UC / Behaviorの意味変更でもAC Entityのcontent fingerprintが変わり、AC IDや本文が同じでも関連TRをstaleにできます。
+これによりUIOPの操作対象 / 操作内容、US / UC / Behaviorの意味変更でもAC Entityのcontent fingerprintが変わり、AC IDや本文が同じでも関連TRをstaleにできます。UIOP自体をglobal Machine Entity typeへ追加しません。
 
 Authority Entityは既存 `authority_entities.py`、AC Entityは `ui_target_package.py build-machine-evidence` が生成します。Machine Entity wrapper / content fingerprint / expected identityをLLMが手組みしません。
 
@@ -297,8 +297,8 @@ test-condition-designはTRから問題構造を分析し、仕様 / Risk / 状�
 
 - SCOPE / UIOP / US / UC / BH / AC ID形式・duplicate
 - scope適用判定の許可値と対応関係
-- required scopeのUIOP / US / UC / Behavior / AC table存在
-- not-applicable / blocked scopeにUS / UC / Behavior / ACを確定済みとして生成していないこと
+- required scopeのUIOP / US / UC / Behavior / AC table存在。required scope内では不足情報をblocked UIOP / US / UC / Behavior + UNKNOWNとして保持できる
+- not-applicable scope、またはUI操作有無自体が未確定のblocked scopeにUS / UC / Behavior / ACを確定済みとして生成していないこと
 - blocked applicability / rowのUNKNOWN参照
 - UIOP → UC closure
 - US → UC closure
@@ -323,6 +323,7 @@ semanticでは次を確認します。
 
 - UI操作の有無とscope適用判定が妥当
 - UI操作があるのにdecompositionを省略しない
+- UI操作あり + Actor / Goal等不足ではscopeをrequiredのまま維持し、影響下位rowだけをblocked + UNKNOWNにする
 - UI操作がないscopeへUS / UC / Behavior / ACを創作しない
 - 非操作起点のUI挙動をテスト対象外として落としていない
 - UI操作母集団がUCへ閉じている

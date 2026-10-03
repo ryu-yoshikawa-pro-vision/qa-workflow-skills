@@ -194,6 +194,18 @@ Project Context ownerの更新では、LLM / stakeholderがreuse / new、決定�
 
 exact CLI契約は `_06_package-schema-and-helper-contracts.md` を正本とします。
 
+### 2.6a runtime-v1 downstreamが残る場合の順序
+
+既存workflowにruntime-v1のTRD / TCD / TC artifactが存在する場合、UI target packageへのmigrationを先に行いません。順序は次に固定します。
+
+1. v1 downstream artifactを検出したら通常semantic update / partial rerunへ入らない
+2. `_09` のSkill-local cutover helperでTRD → TCD → TCをsemantic不変のままruntime-v2 / entity-state-v2へcutoverする
+3. current v2 downstream baselineがvalidate / freshnessを通過した後に、既存spec-analysis成果物をUI target packageへmigrationしてACを生成する
+4. requirement-structure-v2を通常semantic updateとして再実行し、AC→TR / Dispositionを反映する
+5. AC / Authority変更でstaleになったTCD / TC等を通常workflowで再実行する
+
+`UI target migration済み + runtime-v1 downstreamあり + cutover未完了` の組合せはblockedです。新しいqa-workflow専用wrapperは作らず、既存routing / runtime evidence version確認でこの順序を守ります。既存v1 downstream artifactがない場合は、直接UI target package migrationへ進めます。
+
 ### 2.7 downstream machine handoff
 
 UI target modeから後続テスト設計へ進む場合、spec-analysis成果物のMachine Entity / normalized inputをAgentがMarkdownから再構築しません。

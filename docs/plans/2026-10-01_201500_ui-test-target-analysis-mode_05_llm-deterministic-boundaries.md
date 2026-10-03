@@ -30,7 +30,7 @@
 | SPEC / DECISION / INFERENCE / UNKNOWN分類 | LLM | 情報源・Authority・文脈から判断する |
 | 現在有効なAuthority解決 | LLM | 既存spec-analysis契約を使用する |
 | PAGE / STATE / VIEW / STEP / MODAL等の意味分類 | LLM | UI意味を判断する。scriptは分類結果の形式だけ検証できる |
-| scopeごとのUI操作有無 / file applicability triggerの意味判断 | LLM | 資料の意味から判断する。scriptは宣言後の固定対応とfile存在だけ検証する |
+| scopeごとのUI操作有無 / file applicability triggerの意味判断 | LLM | 資料の意味から `あり / なし / 未確定` を判断する。scriptはそこから `required / not-applicable / blocked` を導出し、file保存規則とcompletion statusを検証する |
 | UI操作抽出 / US / UC / Behavior / ACの意味分解 | LLM | UI操作scopeでは必須工程。資料不足を推測補完しない |
 | 正常 / 準正常 / 例外の意味分類 | LLM | scriptは3分類の完全性と許可値だけ検証する |
 | AC→TRの意味対応 / TR分割統合 | LLM | ACの単純言い換えではなく検証責務として判断する |
@@ -40,15 +40,15 @@
 | 質問がどのUNKNOWNに対応するか | LLM | QとUNKの意味対応を判断する |
 | 仕様回答がどの項目へ影響するか | LLM | scriptが列挙した参照候補を補助情報として使える |
 | ID形式 / duplicate /参照先存在 | deterministic validation | 意味を変えず拒否できる |
-| new stable ID番号 / 案件固有prefix番号 | deterministic helper | semantic identity / prefix意味確定後、標準・宣言済み案件固有prefixを同じallocatorで採番する |
+| new stable ID番号 | deterministic helper | semantic identity確定後、ui-target-v1のstandard prefixをallocatorで採番する。extension独自prefixは追加しない |
 | explicit retire intent | LLM | row消失を永久廃止と自動解釈しない。identityをcurrent modelから意図的に除去する場合だけretire判断する |
 | Markdown table / known section / standard file materialization | deterministic helper | semantic row / prose確定後のID注入、escape、sort、serialization、file同期をui-target-v1専用materializeで行う |
-| SCOPE applicability / 条件付き必須fileと実fileの一致 | deterministic validation | LLMが意味判定した結果の固定対応を検証する |
+| SCOPE applicability / 条件付き必須fileと実fileの一致 | deterministic helper / validation | LLMの `あり / なし / 未確定` から状態を固定導出し、blocked時のcarry-forward、MANIFEST、completion statusを検証する |
 | UIOP→UC / US→UC / UC→BH / BH→AC closure | deterministic validation | semantic relationを決めず、LLMが作った参照の完全性だけ検証する |
 | UCごとの正常 / 準正常 / 例外3分類 | deterministic validation | 各1行、定義あり/なし/未定義の構造整合を検証する |
 | current AC→TR / disposition closure | test-requirement deterministic runtime | ACを無言で落とさない |
 | version形式 / package内version一致 | deterministic helper / validation | default policyでは完成packageへ永続差分を保存するたびsemantic / presentationを問わず次versionへ進める。no-opだけ維持する |
-| required core / 条件付き必須file set | deterministic validation | trigger該当性はLLM、required / not-applicable / blockedと実file / MANIFEST一致はscript |
+| required core / 条件付き必須file set | deterministic helper / validation | trigger該当性だけLLM。状態・create/update時のfile集合・MANIFEST・completion statusはscript |
 | MANIFEST file list / SHA-256 | deterministic helper | package内容から導出し、LLMに計算させない |
 | current UNKNOWN ID集合 / 件数 | deterministic helper | canonical分析項目から導出する。UNKNOWN本文はLLMが作る |
 | cross-file stable ID参照切れ | deterministic validation | exact ID参照だけを検証する |
@@ -72,7 +72,7 @@ production CLIは次の4 operationだけを公開します。
 
 #### inspect
 
-package rootを読み、package version、current file list、file applicability、extension file、canonical ID集合、current / resolved UNKNOWN集合、cross-file stable reference index、更新用snapshotを返します。意味評価は返しません。
+package rootを読み、package version、current file list、file applicability、extension file、canonical ID集合、current / resolved UNKNOWN集合、cross-file stable reference index、`completion_status`、更新用snapshotを返します。意味評価は返しません。
 
 #### validate
 
@@ -86,8 +86,8 @@ required file、version、ID形式・duplicate、exact reference、UNKNOWN整合
 - default vNN version導出
 - `@draft`参照解決
 - Markdown escape / canonical row order / table serialization
-- known heading body置換
-- 条件付き標準file同期
+- asset固定のstandard heading本文置換
+- 条件付き標準fileのTrigger判定→状態導出、create/update同期、completion status算出
 - extension file番号batch allocation、作成 / 更新 / 明示廃止
 - Stable ID lifecycle / 再確認候補file算出
 - README controls
@@ -115,6 +115,7 @@ semantic / deterministic eval用multi-file projectionはproduction helperへ入�
 - PAGE / VIEW等の意味分類
 - scopeのUI操作有無 / 条件付き必須file trigger該当性の意味判断
 - 案件固有extension fileが必要かの判断
+- extension本文の意味生成
 - semantic duplicateの統合
 - Authority競合解消
 - repository差分の意味判断
@@ -125,7 +126,7 @@ semantic / deterministic eval用multi-file projectionはproduction helperへ入�
 
 UI target packageでは、人間向け構造化ビューのentityをstable IDで参照できるようにします。
 
-UI target modeで `next-id` が番号決定を担当するprefix:
+UI target modeで `materialize` 内部allocatorが番号決定を担当するprefix:
 
 canonical spec-analysis item:
 - SRC-xxx
@@ -157,15 +158,16 @@ structural item:
 - BH-xxx
 - AC-xxx
 
-案件固有entity typeが必要な場合はLLMが追加のprefixを勝手に作らず、packageの `00_scope_and_context.md` にある `案件固有構造ID` tableへprefixと意味を宣言してから使用します。helperは宣言済みprefixだけを許可します。
+`ui-target-v1` では案件固有stable ID prefixを追加しません。標準tableで構造化して追跡できない独立domainはextension fileへ説明として分離しますが、extension file自身は新しいstructured ID namespaceを作りません。
 
 IDが意味的に同一か、新IDにすべきかはLLM判断です。helperはIDを自動的に別entityへ再割当てしません。
 
 ## 5. canonical stable reference contract
+## 5. canonical stable reference contract
 
-01〜08のstructured tableで期待挙動・UI構造・ルール・不明点を表すrowは、少なくとも1件のcanonical itemへ根拠付けできる場合 `関連仕様項目ID` を必須とします。UI構造間の親子・遷移・関連を表すrowは、関係先が存在する場合 `関連構造ID` を持ちます。pure narrative / heading /説明専用rowには参照列を強制しません。
+UIOP / US / UC / Behavior / AC / RULE / FIELD / FLOW / NOTIFY / INTERACTのように期待挙動・制約・ルールを表すnormative rowは根拠を空にしません。current rowは `関連仕様項目ID` にcurrent SPEC / DECISION / approved ASM / INFを1件以上持ちます。根拠不足で確定できない場合はcurrent rowとして成立させず、blocked + `関連UNKNOWN ID` へ閉じます。ACはcurrent Authority 1件以上を要求する `_08 / _09` のより厳しい契約を優先します。PAGE等の純粋な構造row、Repository実装状況、pure narrative / headingは各table固有契約に従います。
 
-- `関連仕様項目ID`: SPEC / DEC / INF / UNK等、09_authority_and_traceability.mdのcanonical item
+- `関連仕様項目ID`: current SPEC / DECISION / approved ASM / INF等、09_authority_and_traceability.mdのcanonical item。UNKNOWNは専用の `関連UNKNOWN ID` で追跡する
 - `関連構造ID`: PAGE / STATE / VIEW / MODAL / FIELD / RULE / FLOW等
 
 複数参照の区切りは `<br>` に固定します。
@@ -199,11 +201,13 @@ UI target mode packageは継続更新成果物のためversionを持ちます。
 
 default policy:
 
+- format: `^v[0-9]{2,}$`
 - 初回: v00
-- 次回: v01, v02 ... の1増分
+- 次回: 数値部分を1増分し最低2桁でzero paddingする。v09→v10、v99→v100
+- 上限は設けない
 - 同じversionを別内容で完成版として上書きしない
 
-案件に別version policyがある場合はそちらを優先します。
+`ui-target-v1` はこのdefault policyだけを使用します。案件固有version policyは非対応です。
 
 MANIFESTはcurrent package fileのfile listとSHA-256を持ちます。
 
@@ -254,7 +258,7 @@ Qの次番号計算・使用済み履歴unionは内部関数です。QとUNKが�
 
 各helperのexact operation / input / output / failure contractは `_06_package-schema-and-helper-contracts.md` を正本とします。eval validator / repository testはproduction helperからexpectedを逆算しません。
 
-## 9. route / PAGE / VIEWの曖昧さ## 9. route / PAGE / VIEWの曖昧さ
+## 9. route / PAGE / VIEWの曖昧さ
 
 same-routeであることがAuthorityまたは確認済み実装事実から成立する場合だけVIEW / STEPへ統合します。
 

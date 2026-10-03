@@ -74,9 +74,9 @@ required package filesは `required core payload + required control file MANIFES
 | 05_notifications_and_external_interactions.md | notification、email、browser dialog、user-visibleなexport / download delivery、外部画面遷移、外部destination / serviceとのinteractionのいずれかが対象scopeに存在 |
 | 08_repository_implementation_status.md | current packageがrepository implementation evidenceを現在保持・利用している |
 
-`00_scope_and_context.md` のfile applicability表に4fileすべての `required / not-applicable / blocked` と根拠を記録します。LLMは資料の意味からtrigger該当性を判断し、helperは宣言と実file / MANIFESTの一致を決定論検証します。
+`00_scope_and_context.md` のfile applicability表に4fileすべての `Trigger判定=あり / なし / 未確定`、helperが導出した `required / not-applicable / blocked`、根拠を記録します。LLMは資料の意味からTrigger判定だけを行い、helperが `あり → required / なし → not-applicable / 未確定 → blocked` を決定論導出します。
 
-情報不足を `not-applicable` にしません。trigger有無を判断できない場合は関連UNKNOWNを作成し、そのfile applicabilityをblockedとしてpackage completionを止めます。
+情報不足を `not-applicable` にしません。trigger有無を判断できない場合は関連UNKNOWNを作成し `Trigger判定=未確定` とします。blockedでもschema/reference上正しいpackageは保存でき、workflow completionだけをblockedにします。create時に該当conditional fileは作らず、update時に既存fileがあれば内容を変更せずcarry-forwardします。
 
 08は「このversionでrepositoryを再確認したか」ではなくcurrent packageの依存有無で判定します。前versionの08を引き続き利用するだけの更新ではfileを削除せず、08に保存済みの基準branch / commit / revisionを維持します。current分析からrepository evidenceを明示的に外した場合だけnot-applicableへ変更します。
 
@@ -139,10 +139,10 @@ mode packageでも既存 `assets/output-template.md` のcanonical契約を維持
 
 ### structural ID / traceability
 
-具体的なstandard prefix、案件固有prefix宣言場所、structured table列、`<br>`参照規則は `_06_package-schema-and-helper-contracts.md` を正本とします。
+具体的なstandard prefix、structured table列、`<br>`参照規則は `_06_package-schema-and-helper-contracts.md` を正本とします。`ui-target-v1` では案件固有stable ID prefixを追加しません。
 
 - UI構造・業務ルール・入力項目・フロー等のstructured rowは、`05_llm-deterministic-boundaries.md` のprefix契約に従うstable structural IDを持つ
-- 期待挙動・仕様判断を表すnormative rowは、必要に応じ `関連仕様項目ID` で09のSPEC / DEC / INF / UNKへ追跡する
+- 期待挙動・制約・ルールを表すnormative row（UIOP / US / UC / Behavior / AC / RULE / FIELD / FLOW / NOTIFY / INTERACT）は根拠を空にしない。current rowは `関連仕様項目ID` にcurrent SPEC / DECISION / approved ASM / INFを1件以上持ち、Authority不足で確定できないrowはcurrentにせずblocked + `関連UNKNOWN ID` へ閉じる。ACは `_08 / _09` のより厳しいcurrent Authority契約を優先する。PAGE等の純粋な構造rowとRepository実装状況は各table固有契約に従う
 - UI構造間の関係は `関連構造ID` で追跡する
 - 複数IDの区切りは `<br>` に固定する
 - exact ID参照の存在・duplicateはui_target_package.pyで検証する
@@ -403,8 +403,9 @@ helperが列挙したimpact候補は再確認対象であり、変更必須と�
 
 - domainが標準fileの責務とは独立している
 - 独立したAuthority / rule / flow集合として継続更新する必要がある
-- LLMは責務 / 分割理由 / lowercase kebab-case slugを `materialize.extension_file_updates[]` へ渡す
-- canonical create / updateでは `materialize` がexisting 10+ fileの最大番号+1からrequest順に複数extensionをbatch採番し、実fileと00の `案件固有extension file一覧` を同時生成する。不要になったcurrent extensionはLLMが`extension_file_retirements[]`へ明示し、helperが参照・tracked row残存を検証したうえで実fileと宣言rowを同時に除去する。Agentが10+番号・宣言rowを計算しない
+- LLMは責務 / 分割理由 / lowercase kebab-case slugとextension本文を `materialize.extension_file_updates[]` へ渡す
+- `ui-target-v1` のextension fileは自由記述Markdownだけを持ち、独自structured table / 独自stable ID / custom prefixを定義しない。構造化して追跡する必要があるFIELD / RULE / FLOW等は03〜05または09の既存standard tableへ置き、extension本文からそのstable IDを参照する
+- canonical create / updateでは `materialize` がexisting 10+ fileの最大番号+1からrequest順に複数extensionをbatch採番し、実fileと00の `案件固有extension file一覧` を同時生成する。不要になったcurrent extensionはLLMが`extension_file_retirements[]`へ明示し、helperが残存参照を検証したうえで実fileと宣言rowを同時に除去する。Agentが10+番号・宣言rowを計算しない
 - extension file番号は`materialize`内部でcurrent 10+ file集合からbatch採番し、番号計算だけの公開operationは作らない
 - current UNKNOWNのcanonical正本は09、repository statusの正本は08、canonical Authority / traceabilityの正本は09のまま
 - 同じ仕様項目を二重正本にしない
@@ -442,7 +443,7 @@ helperが列挙したimpact候補は再確認対象であり、変更必須と�
 
 ## 9. legacy package migration
 
-mode導入前の既存仕様理解packageを更新する場合、semantic mappingはLLMが行い、current `ui-target-v1` へ変換後にhelperで検証します。UI操作を含むlegacy packageではUS / UC / Behavior / AC分解もmigration完了条件に含めます。既存stable IDは意味的に同一なら維持し、自動migration engineは作りません。version継続、legacy progress fileの扱い、schema versionなしpackageの判定は `_06_package-schema-and-helper-contracts.md` を正本とします。
+mode導入前の既存仕様理解package、または通常spec-analysisの単一成果物を後から継続利用する必要が生じた場合は、semantic mappingをLLMが行いcurrent `ui-target-v1` へ移行します。UI操作を含む入力ではUS / UC / Behavior / AC分解もmigration完了条件に含めます。既存SRC / SPEC / INF / UNK / DEC / ASM等は意味的に同一なら維持し、自動migration engineは作りません。通常spec-analysis単一成果物はpackage versionを持たないため `legacy-unversioned → v00` として扱います。version継続、legacy progress fileの扱い、schema versionなしpackageの判定は `_06_package-schema-and-helper-contracts.md` を正本とします。
 
 ## 10. file artifact
 

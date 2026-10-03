@@ -17,7 +17,7 @@ LLMが仕様意味を判断し、helperはその判断結果の形式・参照�
 成果物revisionの `vNN` とpackage構造versionを分離します。
 
 - package schema version: `ui-target-v1`
-- package version: `v00`, `v01`, ...
+- package version: `^v[0-9]{2,}$`。初回`v00`、以後は数値部分を1増分し最低2桁でzero paddingする。`v09 → v10`、`v99 → v100`。上限は設けない
 
 READMEとMANIFESTの両方へ `ui-target-v1` を記録し、helperが一致を検証します。
 
@@ -79,7 +79,7 @@ templateではbodyを空にし、完成packageでは `materialize` 内部README 
 - 05_notifications_and_external_interactions.md
 - 08_repository_implementation_status.md
 
-statusがrequiredならfileが必須、not-applicableならfileを作成しません。blockedならpackageを完成扱いしません。
+statusがrequiredならfileが必須、not-applicableならfileを作成しません。blockedは**構造的invalidではありません**。createでは該当fileを作成せず、updateではexisting fileがあればbyte-identicalでcarry-forwardし、payload / MANIFESTへ残します。blocked fileへの `table_changes[] / prose_updates[]` は拒否します。packageは保存・validateできる一方、`completion_status=blocked` としてworkflow completionを止めます。
 
 ### extension payload files
 
@@ -117,7 +117,9 @@ domain fileは `10_<lowercase-kebab-case>.md` 以降の連番とします。同�
 
 ## 5. structured table schemas
 
-自由記述sectionはLLMが対象に合わせて追加できます。ただしhelperが参照整合を検証するstructured tableは以下のexact heading / exact headerを使います。
+standard 00〜09 fileのheading集合は `skills/spec-analysis/assets/ui-test-target-analysis/` のassetに存在するheadingをcanonical registryとします。LLM / Agentはstandard fileへ新しいheadingを追加・rename・削除せず、既存heading配下の本文だけを生成・更新します。標準構造で表現できない独立domainだけを10+ extension fileへ分離します。
+
+helperが参照整合を検証するstructured tableは以下のexact heading / exact headerを使います。
 
 ### 5.1 00_scope_and_context.md
 
@@ -141,33 +143,20 @@ LLMが意味判断するのは `UI操作判定` です。`Behavior Decomposition
 
 #### 条件付き必須file applicability
 
-| ファイル | 状態 | 関連仕様項目ID | 根拠 / 備考 | 関連UNKNOWN ID |
-| --- | --- | --- | --- | --- |
-| 03_fields_and_validation.md | required / not-applicable / blocked |  |  |  |
-| 04_flows_and_data.md | required / not-applicable / blocked |  |  |  |
-| 05_notifications_and_external_interactions.md | required / not-applicable / blocked |  |  |  |
-| 08_repository_implementation_status.md | required / not-applicable / blocked |  |  |  |
+| ファイル | Trigger判定 | 状態 | 関連仕様項目ID | 根拠 / 備考 | 関連UNKNOWN ID |
+| --- | --- | --- | --- | --- | --- |
+| 03_fields_and_validation.md | あり / なし / 未確定 | required / not-applicable / blocked |  |  |  |
+| 04_flows_and_data.md | あり / なし / 未確定 | required / not-applicable / blocked |  |  |  |
+| 05_notifications_and_external_interactions.md | あり / なし / 未確定 | required / not-applicable / blocked |  |  |  |
+| 08_repository_implementation_status.md | あり / なし / 未確定 | required / not-applicable / blocked |  |  |  |
 
-triggerの意味判断はLLMが行います。helperは4rowの存在、許可値、blocked時のUNKNOWN、required / not-applicableと実file / MANIFESTの一致を検証します。
+LLMが意味判断するのは `Trigger判定` だけです。helperが `あり → required / なし → not-applicable / 未確定 → blocked` を導出し、`状態` をLLM / Agent入力として独立指定させません。`未確定` では関連UNKNOWN IDを1件以上必須にします。blocked時のfile carry-forward / MANIFEST / completion statusは§3と§8の契約に従います。
 
 上記2 tableの `関連仕様項目ID` はstable ID参照専用列です。値は空または `<br>` 区切りのexact stable IDだけを許可し、説明文を混在させません。`根拠 / 備考` は自由記述で、helperはそこに現れるID文字列をstable referenceとして扱いません。
 
 `08_repository_implementation_status.md` のapplicabilityは「そのversionでrepositoryを再確認したか」ではなく、current packageがrepository implementation evidenceを現在保持・利用しているかで判定します。前versionの08をcurrent packageが継続利用する場合は `required` のまま保持し、08内の基準branch / commit / revisionを変更しません。current分析からrepository evidenceを明示的に外した場合だけ `not-applicable` とし、08を除去します。
 
-#### 案件固有構造ID
-
-| Prefix | 意味 |
-| --- | --- |
-
-mode標準prefix以外を使う場合だけ記載します。asset templateはheader-onlyとし、説明用の `CSV` 等を初期rowとして配置しません。
-
-- Prefixは大文字英数字、先頭英字、2〜16文字
-- 標準prefix / DEC / ASM / Qとの重複禁止
-- helperはこの表に宣言されたprefixだけを案件固有prefixとして許可
-- prefixを追加する意味と名称はLLMが判断する
-- 一度stable ID採番に使ったPrefix rowはidentity historyとして削除・意味変更しない。不要になっても宣言を残し、配下IDのlifecycleをCHANGELOGで追跡する
-- 宣言済み案件固有prefixはstandard structural prefixと同じく `inspect / materialize / CHANGELOG / validate` の追跡・採番対象へ自動追加する
-
+#### 案件固有extension file一覧
 #### 案件固有extension file一覧
 
 | ファイル | Slug | 責務 | 分割理由 |
@@ -370,17 +359,18 @@ UNKNOWNのlineageは次に固定します。
 
 ### 5.11 10+ domain files
 
-案件固有domain fileは自由な説明sectionを持てます。
+案件固有domain fileは、標準fileの責務へ混在させるべきでない独立domainの**自由記述Markdown**として扱います。
 
-structured tableを置く場合:
+- extension file内にui-target-v1独自のstructured tracking tableを定義しない
+- extension file用のcustom stable ID prefixを追加しない
+- FIELD / RULE / FLOW / NOTIFY / INTERACT等として構造化・追跡する必要がある情報は03〜05または09のstandard tableへ置く
+- extension本文からstable IDを参照してよいが、prose中のIDをhelperがexact referenceとして抽出・検証しない
+- extensionのsemantic内容、必要性、責務、分割理由はLLMが判断する
+- helperはfile名 / slug / declaration / payload order / MANIFEST / create-update-retireだけを決定論管理する
 
-- primary ID列名を `項目ID` に固定する
-- `関連仕様項目ID` を持つ
-- UI構造へ関連する場合 `関連構造ID` を持つ
-- primary ID prefixは00の `案件固有構造ID` で宣言する
+これにより、案件ごとの動的table schema / column registry / custom ID allocatorを追加しません。
 
-helperは宣言されたheader名のexact ID参照だけを検証し、proseからIDを推測抽出しません。
-
+### 5.12 asset initialization contract
 ### 5.12 asset initialization contract
 
 `skills/spec-analysis/assets/ui-test-target-analysis/` のtemplateは、実データと誤認できる例示IDを置きません。
@@ -392,11 +382,11 @@ helperは宣言されたheader名のexact ID参照だけを検証し、proseか�
 - CHANGELOG初回entryは `## v00` と3つの固定subheading、空の `Stable ID changes` tableを持つ
 - Machine Entities blockはschema上の空blockをtemplateに置けるが、完成packageでは `build-machine-evidence` 再生成結果へ置換しvalidate一致を必須とする
 
-extension fileの必要性とslugはLLMが判断します。連番は `materialize` 内部extension allocatorが決定します。
+extension fileの必要性・責務・分割理由・slug・本文はLLMが判断します。連番とfile/control同期は `materialize` 内部extension allocatorが決定します。
 
 ## 6. ID rules
 
-packageがstable reference / CHANGELOG / lifecycle差分で追跡できるprefixと、`ui_target_package.py materialize` 内部allocatorが採番できるprefixを分離します。標準prefixに加え、00の `案件固有構造ID` で宣言された案件固有prefixも同じ履歴契約へ参加します。
+packageがstable reference / CHANGELOG / lifecycle差分で追跡できるstandard prefixと、`ui_target_package.py materialize` 内部allocatorが採番できるprefixを分離します。`ui-target-v1` ではcustom stable ID prefixを追加しません。
 
 ### 6.1 packageで追跡できるstable ID
 
@@ -434,13 +424,11 @@ UI target structural:
 - BH
 - AC
 
-案件固有prefixを含む形式は `PREFIX-001` ～ `PREFIX-999`。
-
 `DEC / ASM` もpackage内で参照される外部ownerのstable IDなので、exact reference validation、CHANGELOG `Stable ID changes`、`impact` の追跡対象に含めます。v01以降にpackageへ初めて取り込むDEC / ASMは `added`、既に追跡中の同一IDの内容・状態変更は `changed` とします。current structured modelからidentity自体を外す場合でも、`retired` はLLMがexplicit `retire_ids[]` でsemanticに除去を確定したときだけ生成し、row消失から自動推測しません。`resolved` は `UNK-xxx` 専用であり、DEC / ASMへ使用しません。
 
 ### 6.2 ui_target_package.py内部allocatorの採番対象
 
-`materialize` 内部allocatorが番号決定できるprefixは、次の標準prefixと、00で宣言済みの案件固有prefixです。
+`materialize` 内部allocatorが番号決定できるprefixは、次のstandard prefixだけです。
 
 canonical spec-analysis item:
 
@@ -474,7 +462,7 @@ UI target structural:
 - BH
 - AC
 
-内部allocatorはLLMがnewと判断したrowだけを対象にします。Agentから既知ID一覧を受け取らず、`materialize` が `package_root` のcurrent structured row、CHANGELOGに記録されたexact stable ID token、previous snapshotを走査し、同prefixの既知最大番号+1をbatch allocationします。案件固有prefixも同じ処理を使い、LLMが `CSV-001` 等の番号を手計算しません。
+内部allocatorはLLMがnewと判断したrowだけを対象にします。Agentから既知ID一覧を受け取らず、`materialize` が `package_root` のcurrent structured row、CHANGELOGに記録されたexact stable ID token、previous snapshotを走査し、同prefixの既知最大番号+1をbatch allocationします。
 
 削除済み・置換済みentityのIDもCHANGELOGのexact `Stable ID changes` tableへ記録済みである限り再利用しません。stable IDを削除・置換するversionでは、そのIDを同tableへ必ず記録します。
 
@@ -527,6 +515,8 @@ production helperは任意Markdownを解釈する汎用parserにしません。�
   "issues": []
 }
 ```
+
+`valid` はschema / reference / filesystem等の**構造的妥当性**を表し、workflow completionとは分離します。`ui_target_package.py inspect / validate / materialize` のpayloadは `completion_status=complete / blocked` を返します。current UNKNOWN、blocked scope / row、blocked conditional fileが1件でもあれば `completion_status=blocked` です。completion blockedだけを理由に `valid=false` へしません。
 
 handled failure:
 
@@ -609,11 +599,12 @@ payload:
   "package_schema_version":"ui-target-v1",
   "package_version":"v15",
   "previous_package_version":"v14",
+  "completion_status":"blocked",
   "payload_files":[
     {"order":1,"path":"README.md","kind":"core"}
   ],
   "file_applicability":[
-    {"path":"03_fields_and_validation.md","status":"required","authority_refs":["SPEC-001"],"unknown_refs":[]}
+    {"path":"03_fields_and_validation.md","trigger":"あり","status":"required","authority_refs":["SPEC-001"],"unknown_refs":[]}
   ],
   "domain_files":[
     {"order":10,"path":"10_csv-export.md","slug":"csv-export"}
@@ -644,7 +635,7 @@ payload:
 規則:
 
 - `payload_files[]` はcanonical file order
-- `file_applicability[]` は03 / 04 / 05 / 08の順
+- `file_applicability[]` は03 / 04 / 05 / 08の順。`trigger` は `あり / なし / 未確定`、`status` はhelper導出結果
 - ID配列はlexicographic昇順
 - `domain_files[]` はorder昇順
 - `exact_reference_index[]` は `target_id / file / section / row_index / column` の順で安定sort
@@ -667,7 +658,7 @@ stdin:
 
 fresh v00 / standalone検証では `previous_snapshot=null` を許可します。通常更新runでは内容編集前の `inspect.payload.update_snapshot` をそのまま渡します。
 
-§2〜§6およびfilesystem safetyを検証します。default version policyでは `v00 / Previous=-` またはcurrent / previousの1 revision差とpackage内version一致を検証します。加えて、resolved UNKNOWNの `解消先ID`、`Machine Entities: spec-analysis` blockのexactly-one存在、build-machine-evidence再生成結果との完全一致を検証します。
+§2〜§6およびfilesystem safetyを検証します。default version policyでは `^v[0-9]{2,}$`、`v00 / Previous=-` またはcurrent / previousの数値1 revision差とpackage内version一致を検証します。加えて、resolved UNKNOWNの `解消先ID`、`Machine Entities: spec-analysis` blockのexactly-one存在、build-machine-evidence再生成結果との完全一致を検証します。schema/referenceが正しければcompletion blocked packageも `valid=true` とし、payloadの `completion_status` で区別します。
 
 通常更新で `previous_snapshot` が与えられた場合、latest `Stable ID changes` と `影響file` が同snapshotからmaterialize内部lifecycle / impact builderで再計算した結果とexact一致することも検証します。standalone検証では過去snapshotがないため、CHANGELOGのschema / lifecycle履歴整合だけを検証し、latest差分の再計算は行いません。
 
@@ -678,7 +669,7 @@ current packageだけから過去の同version内容とのbyte同一性は証明
 次はproduction CLI operationとして公開せず、`materialize` / `validate` が使う内部関数として実装します。
 
 - default vNN version導出
-- standard / 宣言済み案件固有prefixのstable ID batch allocation
+- standard prefixのstable ID batch allocation
 - README metadata / Current payload files生成
 - extension file番号batch allocation
 - MANIFEST file order / SHA-256生成
@@ -686,7 +677,7 @@ current packageだけから過去の同version内容とのbyte同一性は証明
 
 これらはAgent / workflowが単独で呼ぶ用途を持たず、canonical package作成 / 更新の一部です。repository unit testは内部関数または `materialize / validate` の入出力を直接検証し、focused CLI wrapperを作りません。
 
-### materialize### materialize
+### materialize
 
 通常のpackage作成 / 更新で使うcanonical write pathです。汎用Markdown engineではなく、§2〜§5で定義した `ui-target-v1` の既知file / heading / table registryだけを扱います。通常更新ではAgentがstable ID番号や完成Markdown rowを手書きせず、本operationがsemantic入力からID割当・escape・sort・table serialization・section置換・標準file同期・control再生成まで実行します。
 
@@ -732,10 +723,10 @@ stdin:
       "file":"00_scope_and_context.md",
       "section":"条件付き必須file applicability",
       "rows":[
-        {"ファイル":"03_fields_and_validation.md","状態":"required","関連仕様項目ID":["SPEC-001"],"根拠 / 備考":"入力項目あり","関連UNKNOWN ID":[]},
-        {"ファイル":"04_flows_and_data.md","状態":"not-applicable","関連仕様項目ID":[],"根拠 / 備考":"対象flowなし","関連UNKNOWN ID":[]},
-        {"ファイル":"05_notifications_and_external_interactions.md","状態":"not-applicable","関連仕様項目ID":[],"根拠 / 備考":"外部interactionなし","関連UNKNOWN ID":[]},
-        {"ファイル":"08_repository_implementation_status.md","状態":"not-applicable","関連仕様項目ID":[],"根拠 / 備考":"repository evidence未使用","関連UNKNOWN ID":[]}
+        {"ファイル":"03_fields_and_validation.md","Trigger判定":"あり","関連仕様項目ID":["SPEC-001"],"根拠 / 備考":"入力項目あり","関連UNKNOWN ID":[]},
+        {"ファイル":"04_flows_and_data.md","Trigger判定":"なし","関連仕様項目ID":[],"根拠 / 備考":"対象flowなし","関連UNKNOWN ID":[]},
+        {"ファイル":"05_notifications_and_external_interactions.md","Trigger判定":"未確定","関連仕様項目ID":[],"根拠 / 備考":"外部interaction有無が未確定","関連UNKNOWN ID":["UNK-004"]},
+        {"ファイル":"08_repository_implementation_status.md","Trigger判定":"なし","関連仕様項目ID":[],"根拠 / 備考":"repository evidence未使用","関連UNKNOWN ID":[]}
       ]
     }
   ],
@@ -761,28 +752,36 @@ table input contract:
 
 `table_changes[]` はstable IDのpackage tracking tableだけを対象にします。ここでいうtracking table / tracking rowはpackage内でstable ID lifecycleを保持する構造上の位置を意味し、DEC / ASM等の実際の正本ownerを意味しません。
 
-- tracking table: 分析対象機能scope一覧、UI構造一覧、UI操作一覧、User Story一覧、Use Case一覧、Behavior一覧、Acceptance Criteria一覧、ビジネスルール一覧、項目・バリデーション一覧、処理フロー一覧、通知・外部連携一覧、仕様矛盾・保留一覧、Repository実装状況、情報源 / 正本参照一覧、分析項目、10+ domain fileの案件固有stable row
-- `file / section` は§2〜§5のregistryに存在するexact pairだけを許可する。extension fileのstructured table更新は、既存extensionなら宣言済みpath、新規extensionなら同requestの `extension_file_updates[].draft_key` で対象を特定する
+- tracking table: 分析対象機能scope一覧、UI構造一覧、UI操作一覧、User Story一覧、Use Case一覧、Behavior一覧、Acceptance Criteria一覧、ビジネスルール一覧、項目・バリデーション一覧、処理フロー一覧、通知・外部連携一覧、仕様矛盾・保留一覧、Repository実装状況、情報源 / 正本参照一覧、分析項目
+- `file / section` は§2〜§5のstandard registryに存在するexact pairだけを許可する。extension fileは `table_changes[]` の対象にしない
 - `cells` はprimary ID列を除いたexact header名だけを許可する。stable reference列はJSON string array、通常cellはstringで受ける
 - 新規rowは `identity_action=new / reuse_id=null / draft_key=<request内unique>`
 - 既存row更新は `identity_action=reuse / reuse_id=<stable ID>`。normalではprevious snapshot / current packageに存在するIDだけをreuseでき、legacy-migrationでは `migration_retained_ids[]` に含まれるIDだけをreuseできる
 - request内の新規row参照はstable IDの代わりに `@draft:<draft_key>` をreference配列へ指定できる。helperが採番後に解決する
-- standard tableの `primary_prefix` はregistryと完全一致を要求する。10+ domain fileでは00の案件固有prefix宣言と一致する値だけを許可する
+- standard tableの `primary_prefix` はregistryと完全一致を要求する
 
 `keyed_table_updates[]` はstable IDを採番しないview / fixed-key tableの**完成row集合**を対象にし、section単位で全rowを置換します。部分patchは許可しません。exact registryは次です。
 
 | file / section | key | 固定規則 |
 | --- | --- | --- |
-| `00_scope_and_context.md / 条件付き必須file applicability` | `ファイル` | 03 / 04 / 05 / 08の4row exactly。canonical順固定 |
-| `00_scope_and_context.md / 案件固有構造ID` | `Prefix` | semantic declaration。使用済みPrefixの削除 / 意味変更は禁止 |
+| `00_scope_and_context.md / 条件付き必須file applicability` | `ファイル` | 03 / 04 / 05 / 08の4row exactly。callerは `Trigger判定 / 関連仕様項目ID / 根拠 / 備考 / 関連UNKNOWN ID` を渡し、helperが `状態` を生成する。canonical順固定 |
 | `02_behavior_and_business_rules.md / Use Case振る舞い完全性` | `UC ID + 結果分類` | current UCごとに3分類 exactly |
 | `07_current_unknowns.md / Current UNKNOWN一覧` | `UNKNOWN ID` | 09のcurrent UNKNOWN ID集合とexact一致 |
 | `09_authority_and_traceability.md / 現在有効な仕様根拠` | `仕様根拠ID` | LLMが確定したCurrent Effective Authorityだけ。09分析項目のcurrent SPEC / DECISION / approved ASMへ存在参照 |
 | `09_authority_and_traceability.md / 後続Skillへの補足` | `項目` | 項目duplicate禁止。stable refsだけhelper検証 |
 
-`keyed_table_updates[]` のrowはexact header名をJSON keyとして持ち、stable reference列だけstring arrayを受けます。stable IDをkey / referenceとして持つcellでは、同requestのnew tracking rowを `@draft:<draft_key>` で参照できます。helperはstable tracking ID割当後にkey / reference内の `@draft` を解決し、未解決draftをrejectします。helperがcanonical key order / Markdown escape / `<br>` serialization / row sortを行います。view tableからrowが消えてもtracking stable IDのretireとは扱いません。tracking lifecycleは `table_changes[] / retire_ids[]` だけで管理します。
+`keyed_table_updates[]` のrowは原則exact header名をJSON keyとして持ち、stable reference列だけstring arrayを受けます。例外として `条件付き必須file applicability` は `状態` をcaller入力に含めず、helperが `Trigger判定` から生成します。stable IDをkey / referenceとして持つcellでは、同requestのnew tracking rowを `@draft:<draft_key>` で参照できます。helperはstable tracking ID割当後にkey / reference内の `@draft` を解決し、未解決draftをrejectします。helperがcanonical key order / Markdown escape / `<br>` serialization / row sortを行います。view tableからrowが消えてもtracking stable IDのretireとは扱いません。tracking lifecycleは `table_changes[] / retire_ids[]` だけで管理します。
 
 normal updateで `keyed_table_updates[]` にsectionが無い場合、そのsectionはcurrent packageの完成row集合を保持します。normal create / legacy-migrationでは `条件付き必須file applicability` を必須とし、その他view tableは必要な最終集合を明示します。tracking stable row変更により保持したviewが不整合になればfinal validateでblockedし、helperが意味を推測して自動修正しません。
+
+normative traceability contract:
+
+- current UIOP / US / UC / Behavior / RULE / FIELD / FLOW / NOTIFY / INTERACT rowは `関連仕様項目ID` を1件以上要求する
+- current rowの `関連仕様項目ID` はcurrent SPEC / DECISION / approved ASM / INFだけを許可する
+- Authority不足等でnormative内容を確定できない場合はcurrentにせず、tableが許すblocked row + `関連UNKNOWN ID` 1件以上とする
+- UNKNOWNを `関連仕様項目ID` へ入れてblocked根拠を代用しない
+- current ACはさらに§9 / _08の契約どおりcurrent SPEC / DECISION / approved ASM Authorityを1件以上要求し、INFだけではcurrentにしない
+- PAGE / STATE / VIEW等の純粋な構造row、ISSUE、IMPLは上記normative必須規則の対象外で、各table固有schemaに従う
 
 prose input contract:
 
@@ -795,10 +794,11 @@ prose input contract:
 - helperはCRLF / CRをLFへ正規化し、最終file byte contractは§7.4に従う
 extension input contract:
 
-- `extension_file_updates[]` のnew rowは `draft_key` unique、`identity_action=new / path=null`、lowercase kebab-case slug、非空responsibility / split_reasonを要求する。reuseは `identity_action=reuse / path=<existing canonical path>` とし、slugを変更しない
+- `extension_file_updates[]` のnew rowは `draft_key` unique、`identity_action=new / path=null`、lowercase kebab-case slug、非空responsibility / split_reason / body_markdownを要求する。reuseは `identity_action=reuse / path=<existing canonical path>` とし、slugを変更せず、完成extension本文全体を `body_markdown` で渡す
+- extension fileはstructured tracking table / custom stable IDを持たない。`table_changes[] / keyed_table_updates[] / prose_updates[]` でextension内部を部分編集しない
 - `extension_file_retirements[]` はLLMが「そのextension domainをcurrent packageから除去する」と判断したexisting canonical extension pathだけを受ける。duplicate、存在しないpath、同requestでreuse対象のpathを拒否する
-- retirement対象fileにcurrent tracking rowまたは他fileからのexact stable referenceが残る場合は`state_transition_required`でblockedする。必要なrow retire / reference更新を先に同じmaterialize inputへ含める
-- retirement成功時は実fileと00の `案件固有extension file一覧` rowを同じstaging stateから除去する。file order番号自体はstable IDではないため、将来のnew extension採番はその時点のcurrent extension最大番号+1を使用する
+- retirement成功時は実fileと00の `案件固有extension file一覧` rowを同じstaging stateから除去する。extension prose中の意味参照はsemantic review対象であり、helperがproseからID / file参照を推測しない
+- file order番号自体はstable IDではないため、将来のnew extension採番はその時点のcurrent extension最大番号+1を使用する
 - new extension pathはexisting current extension最大番号+1から、request配列順に連続採番する。同じrequest内で複数追加しても空fileによる番号予約を要求しない
 - helperは最終pathを00の `案件固有extension file一覧` へcanonical orderで生成し、Agent / LLMがtable rowを組み立てない
 stable tracking allocation / lifecycle contract:
@@ -816,12 +816,12 @@ file / control materialization order:
 1. artifact_mode / change_mode / previous_snapshotの組合せを検証する。normal updateではprevious snapshotとcurrent bytesを照合し、staleなら書込みしない。normal create / legacy-migrationでは新しいcurrent-schema target rootがasset初期状態であることを検証する
 2. version policyを検証し、normal updateではnext version候補だけを保持する。まだPackage Version / CHANGELOG / README / MANIFESTへ反映しない
 3. legacy-migrationでは `migration_retained_ids[] / legacy_lifecycle_events[]` の形式・duplicate・lifecycleを先に検証して使用済みID集合へ予約する
-4. `keyed_table_updates[]` のうちfile applicability / 案件固有prefix宣言を先にparseし、意味値を変更せず構造検証する
-5. applicabilityに従い条件付き標準fileのtemplateをin-memoryへ追加 / removal予定化し、`extension_file_updates[]` のnew pathをrequest順でbatch allocationして新規extension templateを準備する。`extension_file_retirements[]` はexisting current extensionとして検証しremoval予定化する
-6. stable tracking `table_changes[]` をin-memory modelへ適用し、reuse / new IDを割り当て、tracking row内の `@draft` referenceを解決する。新規条件付きfile / extension fileのtracking rowもこの段階で適用する
+4. `keyed_table_updates[]` のfile applicabilityを先にparseし、`Trigger判定` から状態を導出する
+5. applicabilityに従い条件付き標準fileを処理する。requiredは存在を保証、not-applicableは除去、blockedはcreateなら作成せずupdateならexisting bytesをそのままcarry-forwardする。blocked fileを対象とする内容更新requestはrejectする。続けて `extension_file_updates[]` のnew pathをrequest順でbatch allocationし、`extension_file_retirements[]` をexisting current extensionとして検証する
+6. standard stable tracking `table_changes[]` をin-memory modelへ適用し、reuse / new IDを割り当て、tracking row内の `@draft` referenceを解決する。extension fileはtracking rowを持たない
 7. remaining `keyed_table_updates[]` のkey / reference内 `@draft` を解決して完成row集合を確定する
 8. normal updateの `retire_ids[]` を検証してin-memory tracking modelから除去する。removal予定fileにtracked tracking rowが残る場合は対応retire intent不足としてblockedする。legacy-migrationの過去lifecycle eventは `legacy_lifecycle_events[]` だけから扱い、current row削除操作へ流用しない
-9. extension retirement対象にtracking row / exact referenceが残っていないことを確認してin-memory file集合から除去し、extension最終集合から00の `案件固有extension file一覧` をcanonical生成する。stable tracking / keyed / generated tableとprose updateをexact Markdownへ反映する
+9. extension update / retirementをin-memory file集合へ反映し、extension最終集合から00の `案件固有extension file一覧` をcanonical生成する。standard stable tracking / keyed / generated tableとprose updateをexact Markdownへ反映する
 10. `build-machine-evidence` 相当処理をprovisional current versionのまま実行し、Machine Entities sectionをcanonical生成する
 11. normal updateでは、version metadata、CHANGELOGのversion heading / generated `Stable ID changes` / generated `影響file`、README generated controls、MANIFESTを除いたprovisional payload bytesと、requested `change_summary` をcurrent packageのpayload / current version `変更概要`へそれぞれ比較する。どちらも同一なら `changed=false` を返して書込みしない。`change_summary` だけが変わる場合もuser-managed changeとして `changed=true` とする
 12. changed normal update / normal create / legacy-migrationでtarget Package Version / Previous Package Versionを確定する。normal createはv00 / -、legacy-migrationはlegacy source contract、normal updateはStep 2のnext version候補を使う
@@ -836,6 +836,7 @@ payload:
 ```json
 {
   "changed":true,
+  "completion_status":"blocked",
   "allocated_ids":[{"draft_key":"us-login","stable_id":"US-003"}],
   "allocated_extension_files":[{"draft_key":"domain-csv","path":"10_csv-export.md"}],
   "retired_ids":["PAGE-009"],
@@ -846,7 +847,7 @@ payload:
 }
 ```
 
-`changed=false` のno-opでは `allocated_ids=[] / allocated_extension_files=[] / retired_ids=[] / retired_extension_files=[] / changed_files=[]` とし、`previous_package_version / package_version` はcurrent package値を返します。provisional処理で一時的に割り当てたID / extension pathは保存・予約しません。create / legacy-migrationは成功時 `changed=true` です。
+`changed=false` のno-opでは `allocated_ids=[] / allocated_extension_files=[] / retired_ids=[] / retired_extension_files=[] / changed_files=[]` とし、`previous_package_version / package_version / completion_status` はcurrent package値を返します。provisional処理で一時的に割り当てたID / extension pathは保存・予約しません。create / legacy-migrationは成功時 `changed=true` です。
 
 通常のUI target package更新は `materialize` を唯一のwrite pathとします。採番 / version / README controls / MANIFEST / lifecycle / impactは内部関数とし、production CLIへ公開しません。`build-machine-evidence` だけはmaterialized packageから下流handoffを再生成する独立用途があるためread-only production operationとして残します。
 
@@ -861,7 +862,7 @@ MANIFEST、README controls、Stable ID changes、影響fileは `materialize` 内
 
 内部関数単体または `materialize / validate` 経由でrepository unit testし、これら専用のproduction operationは作りません。
 
-### build-machine-evidence### build-machine-evidence
+### build-machine-evidence
 
 stdin:
 
@@ -869,7 +870,7 @@ stdin:
 {"operation":"build-machine-evidence","package_root":"<path>"}
 ```
 
-§9に従い09からnormalized Authority inputを生成して既存 `authority_entities.py` のbuilderを呼び、02のcurrent ACと親US / UC / Behavior chainからAcceptance Criterion Machine Entityを生成して統合します。
+§9に従い09からnormalized Authority inputを生成して既存 `authority_entities.py` のbuilderを呼び、02のcurrent AC、親UCへ接続するcurrent UIOP集合、親US / UC / Behavior chainからAcceptance Criterion Machine Entityを生成して統合します。
 
 payload:
 
@@ -901,7 +902,7 @@ multi-file packageを既存semantic / deterministic runnerへ渡すためのproj
 
 これはrepository eval harness固有のtransportであり、Skill packageへ同梱しません。
 
-## 9. deterministic Authority / Acceptance Criterion Machine Entity bridge## 9. deterministic Authority / Acceptance Criterion Machine Entity bridge
+## 9. deterministic Authority / Acceptance Criterion Machine Entity bridge
 
 LLMが09へCurrent Effective Authorityを確定し、02へcurrent US / UC / Behavior / ACを確定した後、`build-machine-evidence` がAuthority + current ACを固定変換します。
 
@@ -937,6 +938,7 @@ current ACだけを `spec-analysis / acceptance_criterion / AC-xxx` Entityへ変
 AC Entity contentは `_08` のcurrent chainから次を固定projectionします。
 
 - ac_id / acceptance_criteria
+- linked_ui_operations[] の uiop_id / actor_role / target_structure_id / operation
 - behavior_id / result classification / behavior / postcondition
 - uc_id / use case / trigger / preconditions / success postcondition
 - user_stories[] の us_id / actor_role / goal
@@ -948,7 +950,7 @@ AC / Behavior / UC / US chainの `関連仕様項目ID` にはSPEC / DEC / INF /
 
 current ACは、chain全体のstable refsを解決した結果としてcurrent Authorityを1件以上持つことを要求します。current Authorityが0件なら `build-machine-evidence / validate` は `state_transition_required` でblockedし、AC Entityを生成しません。helper自身はUNKNOWNやblocked Behaviorを生成しません。LLMが不足の意味を判断して既存UNKをreuseするかnew UNKを作り、親Behaviorをblockedへ戻してから再materializeします。helperはAuthority集合のfilter / existence / currentnessだけを判定し、どのAuthorityが意味上ACを支えるかはLLMがstructured rowへ記録します。
 
-US / UC / BehaviorをMachine Entity typeへ追加しません。親chainをAC contentへ含めるため、親意味変更でAC content fingerprintが変わります。
+UIOP / US / UC / BehaviorをMachine Entity typeへ追加しません。linked UIOP + 親chainをAC contentへ含めるため、UI操作または親意味変更でAC content fingerprintが変わります。
 
 ### 9.3 normalized_skill_input
 
@@ -1211,7 +1213,6 @@ tableにはpayload filesだけをcanonical順で列挙します。
 - `retired` だけをterminal eventとし、その後に `added / migrated / changed / resolved / retired` を再記録しない
 - `retired` は明示 `retire_ids[]` によるsemantic decisionがある場合だけ生成し、row消失から自動推測しない
 - `materialize` 内部allocatorはcurrent structured row、全versionのこのtable、通常更新で渡されたprevious snapshotのStable ID unionを使用済みIDとして扱う
-- 00で一度採番に使った案件固有prefix宣言を削除・別意味へ再定義しない
 
 `### 影響file`
 
@@ -1228,7 +1229,7 @@ helperは次を検証します。
 - resolved後の `changed` によるresolver変更 / reopenと、reopen後の再 `resolved` を許可する
 - `retired` 後に同じStable IDのeventが存在しない
 - v01以降に初登場するDEC / ASMを `added` として追跡でき、既追跡DEC / ASMの状態変更を `changed`、明示 `retire_ids[]` によるcurrent structured modelからの除去だけを `retired` として受理する
-- current structured rowとStable ID履歴のID形式が§6.1の標準prefixまたは00宣言済み案件固有prefix契約に一致する
+- current structured rowとStable ID履歴のID形式が§6.1のstandard prefix契約に一致する
 - UI target packageの内部allocatorは§6.2の採番対象だけを許可し、DEC / ASM / Qを拒否する
 - previous tracked ID消失に明示retire intentがない場合はcompleted packageとして受理しない
 
@@ -1238,7 +1239,7 @@ helperは内部allocatorの呼出し履歴を成果物から推測・検証し�
 
 ## 14. legacy / unversioned package migration
 
-今回のmode導入前に作成済みの仕様理解packageを更新対象として受け取れるようにします。
+今回のmode導入前に作成済みの仕様理解packageに加え、通常spec-analysisの単一成果物を後から継続利用する必要が生じた場合もmigration入力として受け取れるようにします。
 
 ### 14.1 migrationの基本
 
@@ -1246,12 +1247,12 @@ schema versionがないpackageを自動変換する汎用migration engineは作�
 
 LLMは:
 
-1. legacy packageのcurrent内容とstable IDを読む
+1. legacy packageまたは通常spec-analysis単一成果物のcurrent内容とstable IDを読む
 2. 新schemaの00〜09 / domain fileへ意味をmapする
 3. semantic identityが同じ既存SRC / SPEC / INF / UNK / DEC / ASM / structural IDは、実際の正本ownerを維持したままID維持する
 4. retained current tracked ID集合と、legacy履歴から明示確認できるretired / resolved IDだけをsemantic mapping結果として確定する
 5. new entity / extension / file applicability / narrativeをsemantic inputとして確定する。new ID番号、Markdown row、CHANGELOG eventはまだ手組みしない
-6. assetから作った空のcurrent-schema target rootへ `materialize(change_mode=legacy-migration)` を1回実行し、`legacy_source_version / migration_retained_ids[] / legacy_lifecycle_events[] / table_changes[] / prose_updates[]` を渡す
+6. assetから作った空のcurrent-schema target rootへ `materialize(change_mode=legacy-migration)` を1回実行し、`legacy_source_version / migration_retained_ids[] / legacy_lifecycle_events[] / table_changes[] / prose_updates[] / extension_file_updates[]` を渡す
 7. helperがretained / terminal IDを採番前に予約し、reuse / new ID割当、Markdown serialization、`migrated / added / resolved / retired`、影響file、Machine Entity、README、MANIFESTまで生成する
 8. legacyで未確定だった内容を推測で確定しない
 9. current packageに不要な履歴説明はCHANGELOGの変更概要 / migration noteへ残し、current viewへ混ぜない
@@ -1264,7 +1265,7 @@ helperは変換後packageだけをvalidateします。
 
 ### 14.2 version
 
-legacy packageに明示 `vNN` がある場合、default policyでは`materialize`内部version builderの結果を新package versionとします。
+legacy packageに明示 `^v[0-9]{2,}$` がある場合、default policyでは`materialize`内部version builderの結果を新package versionとします。通常spec-analysis単一成果物はpackage versionを持たないため `legacy-unversioned` として扱います。
 
 例:
 
@@ -1329,21 +1330,21 @@ production helperのfilesystem / raw hash / README control生成 / internal allo
 - materialize内部version builderのcurrent package読み取り / legacy migration source version / default vNN連続性
 - materialize内部README control builderのPackage metadata / Current payload files exact MarkdownとREADME.md自身を含むcanonical file順
 - materialize内部MANIFEST builderがREADME controls反映後のraw bytesをlowercase 64 hex SHA-256でhashすること
-- materialize内部extension allocatorのlowercase kebab-case / max+1 / canonical path / id_space_exhausted
+- materialize内部extension allocatorのlowercase kebab-case / max+1 / canonical path
 - CHANGELOG `Stable ID changes` exact heading / header / Change enum / duplicate
 - inspectのupdate_snapshotがtracked tracking-row fingerprint / previous exact refs / payload file set・raw hash / MANIFEST raw hashをcanonical生成すること
-- materialize内部stable ID allocatorが標準prefix + 00宣言済み案件固有prefixについてcurrent structured row + historical stable ID + previous snapshotから使用済みIDを導出し、更新途中でtracking rowから消えたIDも再利用しないこと
+- materialize内部stable ID allocatorがstandard prefixについてcurrent structured row + historical stable ID + previous snapshotから使用済みIDを導出し、更新途中でtracking rowから消えたIDも再利用しないこと
 - materialize内部lifecycle builderがprevious snapshotとcurrent tracking row差分からadded / changed / resolvedを導出し、retiredだけは明示retire_idsから生成すること。row消失だけならstate_transition_requiredでblockedすること
 - materializeがdraft_key / identity_action / @draft referenceを解決し、canonical table serialization、条件付き標準file同期、CHANGELOG controls、Machine Entities section、README controls、MANIFESTを1 write pathで生成すること
 - `Behavior Decomposition` をLLM入力として独立指定させず、`UI操作判定` からfixed mappingで生成すること
 - PAGE→VIEW等のprefix変更再分類でreuseをrejectし、explicit retire + new IDを要求すること。同じPANEL prefix内はsemantic identity同一時だけreuseできること
 - `prose_updates[]` が既存prose heading bodyだけを置換し、新規heading / heading削除 / structured・generated section上書きを拒否すること
-- `extension_file_retirements[]` がexisting current extensionだけを受理し、残存tracking row / exact referenceをrejectしたうえで実fileと00宣言rowを同時除去すること
+- `extension_file_retirements[]` がexisting current extensionだけを受理し、実fileと00宣言rowを同時除去すること。extension proseからstable referenceを推測しないこと
 - canonical bytes、sibling staging final validate、commit直前snapshot再照合、package単位commit、write failure rollback / recovery failureをrepository unit / portability testで固定すること
 - duplicate canonical heading / table、row列数不一致、escaped pipe / `<br>` reference parse
 - duplicate / unknown stable ref
 - current UNKNOWNの `現在有効か / 解消先ID` 組合せ、resolved UNKNOWNのresolver変更、same-UNK reopen / re-resolve、`解消先ID` missing / invalid / non-current Authority
-- scope applicability / conditional-required file mismatch
+- scope applicability / conditional file Trigger判定→状態導出 / blocked carry-forward / completion status
 - required UI operation decompositionのmissing table / parent / closure
 - UCごとの正常 / 準正常 / 例外3分類と定義あり / なし / 未定義整合
 - MANIFEST hash mismatch
@@ -1351,8 +1352,8 @@ production helperのfilesystem / raw hash / README control生成 / internal allo
 - projected deterministic evalではraw SHAを再計算せずMANIFEST SHA文字列形式 / file集合 / 順序を評価すること
 - 09 table → normalized Authority固定projectionと既存authority_entities.py結果一致
 - Authority projectionでscopeがtrim済み非空string、relationsが単一許可値の1要素arrayになること
-- current AC Entity contentへ親US / UC / Behavior chainが固定projectionされること
-- 親US / UC / Behavior変更でAC fingerprintが変わること
+- current AC Entity contentへlinked UIOP + 親US / UC / Behavior chainが固定projectionされること
+- linked UIOP / 親US / UC / Behavior変更でAC fingerprintが変わること
 - spec-analysis normalized_skill_input / expected identityがhelper結果から再現できること
 - artifact `Machine Entities: spec-analysis` blockがexactly one存在し、runtime_contract.pyの `extract_machine_blocks(..., "Machine Entities")` で読め、helper再生成結果と完全一致すること
 - question_ids.pyのexact `operation=validate-links` / payload / top-level issues contract
@@ -1378,20 +1379,20 @@ production helperのfilesystem / raw hash / README control生成 / internal allo
 - UNKNOWNがopen / resolved / resolver変更 / same-ID reopen / re-resolveの各状態で `現在有効か / 解消先ID` 契約を満たし、resolved時はcurrent Authorityへ機械検証可能に閉じる
 - current packageの次versionをAgentが転記せずhelperが `package_root` から導出できる
 - README metadata / UNKNOWN件数 / payload file tableをAgentが再構築せずcanonical Markdownとして生成できる
-- extension fileの必要性 / slug / 案件固有prefixの意味だけLLMが判断し、file連番 / stable ID番号 / 履歴はhelperが決定できる。一度使用した案件固有prefixを再定義しない
+- extension fileの必要性 / 責務 / slug / 本文はLLMが判断し、file連番 / 宣言 / README / MANIFEST同期はhelperが決定できる。extension独自structured table / custom stable IDを追加しない
 - Machine Entity sectionのheading / JSON fence / wrapperをAgentが組まず、build-machine-evidenceがshared render_machine_entities()由来のcanonical Markdown sectionを返す
 - new ID採番時にAgentが既知ID集合を手組みせず、CHANGELOG stable ID履歴を含めて過去IDを再利用しない
 - new Q / DEC / ASMのsemantic identityはLLM / stakeholder側に残す。Qはcurrent + 使用済み履歴からquestion-analysis helperが番号を決定して過去IDを再利用せず、Project ContextがDEC / ASM ownerの場合はqa-workflow helper、別ownerの場合はそのownerのdeterministic allocatorで番号を決定し、未採番時にLLM hand-numberingへfallbackしない
 - semantic row / proseが決まった後のstable ID割当、Markdown escape、row serialization、known section置換、条件付き標準file作成 / 除去、control section更新をmaterializeが決定論実行し、Agentが完成Markdownを手組みしない
 - helper所有fileがcanonical bytesでstagingされ、package commit失敗時に旧版 / 新版の混在を完成状態として残さない
 - current extension domainを不要と判断した場合、canonical materialize経路で実fileと00宣言を廃止できる
-- structured tableのheader / ID / ref列が一意
-- scopeごとのUI操作適用判定と条件付き必須fileの存在を機械検証できる
+- standard structured tableのheader / ID / ref列が一意で、standard prose heading集合がasset registryと一致する
+- scopeごとのUI操作適用判定と条件付き必須fileのTrigger判定→状態→file集合、completion statusを機械検証できる
 - UI操作scopeでUIOP / US / UC / Behavior / AC hierarchyと3分類完全性を機械検証できる
 - 09 → Authority Entity、02 → current AC EntityをLLM手組みなしで生成できる
 - spec-analysis → question-analysisへUNKNOWN集合を手作業なしで渡せる
 - semantic projectionへ過去CHANGELOGを混ぜない
 - deterministic projectionでmulti-file contractを評価できる
-- legacy vNN packageを意味を失わずcurrent schemaへ移行できる
+- legacy vNN / unversioned packageと通常spec-analysis単一成果物を意味を失わずcurrent schemaへ移行できる
 - filesystem root外を読まない
 - workflow progressと仕様package progressの正本が混ざらない
