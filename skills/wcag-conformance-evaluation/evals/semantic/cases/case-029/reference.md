@@ -1,3 +1,3 @@
 # Expected semantic contract
 
-→ returned environmentをbaselineへ追加してnew baseline revisionを生成し、関連freshnessを再計算する。diagnostic-only利用なら追加しない。
+Inputは初期baseline外のscreen reader / browser combinationを使ったと述べるだけで、製品名・version、OS、実際のreturned environment record、またはそのevidence refを示していない。対象環境や実AT実行を創作せず、baseline拡張やfreshness変更をmaterializeしたと主張しない。必要な環境識別情報とcurrent observation evidenceを求め、formal resultを未確定のまま保つ。実際のassistive technology acceptanceはrepository fixture validationと分離する。

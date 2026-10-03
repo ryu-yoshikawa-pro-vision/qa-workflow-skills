@@ -41,8 +41,8 @@
 | --- | --- | --- | --- |
 
 ## Additional observation requests
-| Request ref | Requester / field / signature | Status | Result evidence / limitation |
-| --- | --- | --- | --- |
+| Request ref | Requester / field / signature | Observation needed and reason | Status | Result evidence / limitation |
+| --- | --- | --- | --- | --- |
 
 ## Expert evaluation handoff
 | Activity / artifact ref | Read-only evidence and requirement refs | Finding refs |

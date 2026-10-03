@@ -117,8 +117,10 @@ def validate_process_materialization(arguments: dict, result: dict) -> list[str]
                     flattened.append(ref); seen.add(ref)
                 if process_ref not in memberships.setdefault(ref,[]): memberships[ref].append(process_ref)
         expected_rows.append({"process_ref":process_ref,"process_key":draft.get("process_key"),
-            "starting_point_ref":draft.get("starting_point_ref"),"default_sequence_refs":draft.get("default_sequence_refs"),
+            "starting_point_ref":draft.get("starting_point_ref"),"start_condition":draft.get("start_condition"),
+            "default_sequence_refs":draft.get("default_sequence_refs"),
             "critical_branch_sequences":draft.get("critical_branch_sequences"),"sample_refs":flattened,
+            "completion_condition":draft.get("completion_condition"),
             "evidence_refs":sorted(draft.get("evidence_refs",[]))})
         for ref in flattened:
             if ref not in selected and ref not in added: added.append(ref)
@@ -206,6 +208,111 @@ def validate_step_4_3_reconciliation(arguments: dict, result: dict) -> list[str]
         else: expected_status="blocked"
         if result.get("status")!=expected_status: errors.append("step_4_3_selection_status")
     return errors
+
+
+def validate_sample_lineage(arguments: dict, result: dict) -> list[str]:
+    """Independently reconstruct rerun identity closure without production imports."""
+    required={"previous_sample_refs","previous_identity_rows","current_identity_registry",
+              "current_structured_sample_refs"}
+    if (not isinstance(arguments,dict) or not required<=set(arguments)
+            or not isinstance(result,dict)):
+        return ["sample_lineage_input_schema"]
+    previous_refs=arguments["previous_sample_refs"]
+    current_refs=arguments["current_structured_sample_refs"]
+    evidence_refs=arguments.get("current_evidence_refs",[])
+    def valid_refs(values: object, *, allow_empty: bool=True) -> bool:
+        return (isinstance(values,list) and (allow_empty or bool(values))
+                and all(isinstance(value,str) and value.strip() for value in values)
+                and len(values)==len(set(values)))
+    if (not valid_refs(previous_refs) or not valid_refs(current_refs)
+            or not valid_refs(evidence_refs)):
+        return ["sample_lineage_ref_inputs"]
+    registry=arguments["current_identity_registry"]
+    if (not isinstance(registry,dict) or set(registry)!={"samples","draft_to_sample_ref"}
+            or not isinstance(registry["samples"],list) or not isinstance(registry["draft_to_sample_ref"],dict)
+            or not isinstance(arguments["previous_identity_rows"],list)):
+        return ["sample_lineage_identity_input_schema"]
+    current_registry_refs=[row.get("sample_ref") if isinstance(row,dict) else None for row in registry["samples"]]
+    if (any(not isinstance(ref,str) or not ref.strip() for ref in current_registry_refs)
+            or len(current_registry_refs)!=len(set(current_registry_refs))):
+        return ["sample_lineage_identity_input_schema"]
+    fields={"sample_ref","target_ref","state_key","source_locators","identity_fingerprint","source_evidence_refs"}
+    def index(rows: list[dict], selected: set[str]) -> tuple[dict[str,dict],dict[str,str]] | None:
+        by_ref={}; by_identity={}
+        for row in rows:
+            if not isinstance(row,dict) or set(row)!=fields:
+                return None
+            ref=row["sample_ref"]; target=row["target_ref"]; state=row["state_key"]
+            locators=row["source_locators"]; sources=row["source_evidence_refs"]
+            if (not isinstance(ref,str) or not ref.strip() or ref not in selected or ref in by_ref
+                    or not isinstance(target,str) or not target.strip()
+                    or not isinstance(state,str) or not state.strip()
+                    or not valid_refs(locators,allow_empty=False) or not valid_refs(sources)):
+                return None
+            identity_data=json.dumps({"target_ref":target,"state_key":state},ensure_ascii=False,
+                sort_keys=True,separators=(",",":")).encode("utf-8")
+            identity="sha256:"+hashlib.sha256(identity_data).hexdigest()
+            if row["identity_fingerprint"]!=identity or identity in by_identity:
+                return None
+            by_ref[ref]=row; by_identity[identity]=ref
+        return by_ref,by_identity
+    previous_index=index(arguments["previous_identity_rows"],set(previous_refs))
+    current_index=index(registry["samples"],set(current_registry_refs))
+    if previous_index is None or current_index is None:
+        return ["sample_lineage_identity_rows"]
+    current_by_ref,current_by_identity=current_index
+    mapping=registry["draft_to_sample_ref"]
+    if (any(not isinstance(key,str) or not key or not isinstance(ref,str) or ref not in current_by_ref
+            for key,ref in mapping.items()) or set(mapping.values())!=set(current_by_ref)
+            or not set(current_refs)<=set(current_by_ref)):
+        return ["sample_lineage_current_registry"]
+    decisions=arguments.get("replacement_decisions",[])
+    if not isinstance(decisions,list): return ["sample_lineage_replacement_inputs"]
+    decision_by_previous={}
+    for decision in decisions:
+        if (not isinstance(decision,dict)
+                or set(decision)!={"previous_sample_ref","current_sample_ref","reason","evidence_refs"}):
+            return ["sample_lineage_replacement_inputs"]
+        previous_ref=decision["previous_sample_ref"]; current_ref=decision["current_sample_ref"]
+        refs=decision["evidence_refs"]
+        if (not isinstance(previous_ref,str) or previous_ref not in previous_refs
+                or previous_ref not in previous_index[0] or previous_ref in decision_by_previous
+                or not isinstance(current_ref,str) or current_ref not in current_refs
+                or not isinstance(decision["reason"],str) or not decision["reason"].strip()
+                or not valid_refs(refs,allow_empty=False) or not set(refs)<=set(evidence_refs)
+                or previous_index[0][previous_ref]["identity_fingerprint"]==current_by_ref[current_ref]["identity_fingerprint"]):
+            return ["sample_lineage_replacement_inputs"]
+        decision_by_previous[previous_ref]=decision
+    retained=[]; replaced=[]; unavailable=[]; mapped=set()
+    for previous_ref in previous_refs:
+        old=previous_index[0].get(previous_ref)
+        if old is None:
+            unavailable.append({"previous_sample_ref":previous_ref,"reason":"previous-identity-not-supplied"})
+            continue
+        current_ref=current_by_identity.get(old["identity_fingerprint"])
+        decision=decision_by_previous.get(previous_ref)
+        if current_ref in current_refs:
+            if decision is not None or current_ref in mapped:
+                return ["sample_lineage_identity_mapping"]
+            retained.append({"previous_sample_ref":previous_ref,"current_sample_ref":current_ref})
+            mapped.add(current_ref)
+        elif decision is not None:
+            current_ref=decision["current_sample_ref"]
+            if current_ref in mapped: return ["sample_lineage_identity_mapping"]
+            replaced.append({"previous_sample_ref":previous_ref,"current_sample_ref":current_ref,
+                "reason":decision["reason"],"evidence_refs":sorted(decision["evidence_refs"])})
+            mapped.add(current_ref)
+        else:
+            reason=("identity-not-selected-as-current-structured-sample" if current_ref is not None
+                    else "identity-not-present-in-current-identity-registry")
+            unavailable.append({"previous_sample_ref":previous_ref,"reason":reason})
+    expected={"status":"ready","previous_sample_refs":sorted(previous_refs),
+        "current_structured_sample_refs":sorted(current_refs),
+        "retained":sorted(retained,key=lambda row:row["previous_sample_ref"]),
+        "replaced":sorted(replaced,key=lambda row:row["previous_sample_ref"]),
+        "added":sorted(set(current_refs)-mapped),
+        "unavailable":sorted(unavailable,key=lambda row:row["previous_sample_ref"])}
+    return [] if result==expected else ["sample_lineage_contract_mismatch"]
 
 
 def validate_static_assets() -> list[str]:

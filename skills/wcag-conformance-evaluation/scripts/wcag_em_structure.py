@@ -822,7 +822,8 @@ def render_machine_owned_report(data: dict[str,Any]) -> dict[str,Any]:
     required={'evaluation_input','scope_rows','exploration_rows','sampling_procedure','structured_samples','random_sample',
         'complete_processes','criterion_plan','sample_results','comparisons','evaluation_outcomes','handoffs','limitations',
         'report_closure'}
-    optional={'evaluation_specifics','evaluation_statement','conformance_claim','partial_statement','earl_artifact'}
+    optional={'evaluation_specifics','evaluation_statement','conformance_claim','partial_statement','earl_artifact',
+        'sample_lineage'}
     if not isinstance(data,dict) or required-set(data) or set(data)-required-optional:
         raise EvaluationStructureError('report materialization schema mismatch')
     header_fields={'evaluation_ref','revision','evaluator','commissioner','issued_date','evaluation_period','wcag_title',
@@ -831,11 +832,53 @@ def render_machine_owned_report(data: dict[str,Any]) -> dict[str,Any]:
         raise EvaluationStructureError('report evaluation header does not match fixed fields')
     if not isinstance(data['report_closure'],dict) or data['report_closure'].get('status') not in {'complete','blocked'}:
         raise EvaluationStructureError('report closure status is invalid')
+    lineage=data.get('sample_lineage')
+    lineage_rows=[]
+    if lineage is not None:
+        lineage_fields={'status','previous_sample_refs','current_structured_sample_refs','retained','replaced','added','unavailable'}
+        if not isinstance(lineage,dict) or set(lineage)!=lineage_fields or lineage.get('status')!='ready':
+            raise EvaluationStructureError('rerun sample lineage result is invalid')
+        for field in ('previous_sample_refs','current_structured_sample_refs','added'):
+            values=lineage.get(field)
+            if (not isinstance(values,list) or any(not isinstance(value,str) or not value.strip() for value in values)
+                    or len(values)!=len(set(values))):
+                raise EvaluationStructureError('rerun sample lineage refs are invalid')
+        row_contracts={
+            'retained':({'previous_sample_ref','current_sample_ref'},'retained'),
+            'replaced':({'previous_sample_ref','current_sample_ref','reason','evidence_refs'},'replaced'),
+            'unavailable':({'previous_sample_ref','reason'},'unavailable')}
+        for field,(expected,status) in row_contracts.items():
+            values=lineage.get(field)
+            if not isinstance(values,list): raise EvaluationStructureError('rerun sample lineage rows are invalid')
+            for row in values:
+                if not isinstance(row,dict) or set(row)!=expected:
+                    raise EvaluationStructureError('rerun sample lineage row schema mismatch')
+                if (not isinstance(row.get('previous_sample_ref'),str) or not row['previous_sample_ref'].strip()
+                        or (field!='unavailable' and (not isinstance(row.get('current_sample_ref'),str)
+                            or not row['current_sample_ref'].strip()))):
+                    raise EvaluationStructureError('rerun sample lineage row refs are invalid')
+                if field=='replaced' and (not isinstance(row.get('reason'),str) or not row['reason'].strip()
+                        or not isinstance(row.get('evidence_refs'),list) or not row['evidence_refs']):
+                    raise EvaluationStructureError('rerun sample replacement decision lacks provenance')
+                if field=='unavailable' and (not isinstance(row.get('reason'),str) or not row['reason'].strip()):
+                    raise EvaluationStructureError('unavailable rerun sample lacks a reason')
+                lineage_rows.append({'Previous sample ref':row['previous_sample_ref'],
+                    'Lineage status':status,
+                    'Current sample ref':row.get('current_sample_ref'),
+                    'Reason / evidence':(row.get('reason','') + ('; evidence: '+', '.join(row['evidence_refs'])
+                        if field=='replaced' else ''))})
+        for sample_ref in lineage['added']:
+            lineage_rows.append({'Previous sample ref':'','Lineage status':'added',
+                'Current sample ref':sample_ref,'Reason / evidence':''})
     lines=['# WCAG-EM 2.0 Evaluation Report','', '## Evaluation Input','',_field_table(data['evaluation_input']),
         '', '## Step 1: Define evaluation scope','',_report_table(['Scope ref','Area','In scope / outside product / unresolved','Reason','Evidence refs'],data['scope_rows']),
         '', '## Step 2: Explore the target Web product','',_report_table(['Exploration ref','Views / functionality / technology / sample type','Outcome','Evidence / provenance'],data['exploration_rows']),
         '', '## Step 3: Select representative samples','', '### Sampling procedure','',
-        _report_table(['Procedure','Status','Rationale / complete inventory','Candidate provenance / fingerprint'],data['sampling_procedure']),
+        _report_table(['Procedure','Status','Rationale / complete inventory','Candidate provenance / fingerprint'],data['sampling_procedure'])]
+    if lineage is not None:
+        lines.extend(['','### Rerun Sample Lineage','',_report_table(
+            ['Previous sample ref','Lineage status','Current sample ref','Reason / evidence'],lineage_rows)])
+    lines.extend([
         '', '### Structured Sample','',_report_table(['Sample ref','State / locator','Type / technology coverage','Process membership','Rationale'],data['structured_samples']),
         '', '### Random Sample','',_report_table(['Target count','Actual count','Selection method','Status','Exhaustion / blocker'],data['random_sample']),
         '', '### Complete Processes','',_report_table(['Process ref','Ordered sample/action sequence','Completion condition','Evidence refs'],data['complete_processes']),
@@ -844,7 +887,7 @@ def render_machine_owned_report(data: dict[str,Any]) -> dict[str,Any]:
         '', '### Sample Evaluation Results','',_report_table(['Result ref','Sample / variation','Requirement','Criterion evaluation ref','Result','Example refs','Evidence / limitation'],data['sample_results']),
         '', '### Structured / Random Comparison','',_report_table(['Iteration','New content type','New finding group','Action','Added sample refs'],data['comparisons']),
         '', '## Step 5: Report the evaluation findings','', '### Evaluation Outcome','',
-        _report_table(['Requirement / criterion','Outcome','Example refs','Scope / limitation'],data['evaluation_outcomes'])]
+        _report_table(['Requirement / criterion','Outcome','Example refs','Scope / limitation'],data['evaluation_outcomes'])])
     if data.get('evaluation_specifics'):
         lines.extend(['','### Evaluation Specifics (when requested)','',_report_table(
             ['Scope','Archive / evidence ref','Path / settings / actions','Tool / version / method','Confidentiality limitation'],data['evaluation_specifics'])])
@@ -868,7 +911,7 @@ def render_machine_owned_report(data: dict[str,Any]) -> dict[str,Any]:
             'criterion evaluation rows':len(data['criterion_plan']),'sample result rows':len(data['sample_results']),
             'not-satisfied outcomes':sum(row.get('Outcome')=='not-satisfied' for row in data['evaluation_outcomes']),
             'blocked handoffs':sum(row.get('Resume status')=='blocked' for row in data['handoffs']),
-            'report closure':'complete','aggregated score':'not generated'}),
+            'report closure':data['report_closure']['status'],'aggregated score':'not generated'}),
         '', 'No aggregated conformance score is generated. Repository fixtures test methodology implementation and do not establish conformance of an external product.',''])
     markdown='\n'.join(lines)
     accessible=validate_accessible_markdown(markdown)

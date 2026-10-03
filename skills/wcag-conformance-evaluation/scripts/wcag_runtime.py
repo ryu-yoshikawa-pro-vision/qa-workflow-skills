@@ -11,9 +11,10 @@ sys.path.insert(0, str(SCRIPT_DIR))
 from earl_report import serialize_assertions
 from runtime_contract import InvalidInput, reject_unknown, run_cli, static_data_fingerprint
 from sampling import (SamplingError, compare_samples, evaluate_step_4_2_reuse, materialize_processes,
-                      random_target_count, reconcile_sampling_revision, sample_identity_registry,
+                      materialize_sample_lineage, random_target_count, reconcile_sampling_revision, sample_identity_registry,
                       validate_random_selection)
-from wcag_criterion_plan import close_criterion, materialize_plan, materialize_sample_results
+from wcag_criterion_plan import (CriterionPlanError, close_criterion, materialize_plan,
+                                 materialize_sample_results)
 from wcag_em_structure import (close_report, conformance_claim, evaluation_statement,
                                initialize_evaluation, materialize_additional_requirements,
                                materialize_conformance_requirement_results, materialize_variations,
@@ -33,7 +34,7 @@ OPERATIONS = {
     "extend-accessibility-support-baseline",
     "materialize-scope-coverage", "materialize-complete-processes", "evaluate-step-4-2-reuse",
     "reconcile-sampling-revision",
-    "materialize-sample-identities", "validate-sampling-skip", "random-target-count",
+    "materialize-sample-identities", "materialize-sample-lineage", "validate-sampling-skip", "random-target-count",
     "validate-random-selection", "compare-samples", "materialize-criterion-plan",
     "close-criterion", "materialize-sample-results", "close-report", "evaluation-statement",
     "conformance-claim", "statement-of-partial-conformance", "render-machine-owned-report", "serialize-earl",
@@ -72,6 +73,8 @@ def _dispatch(operation: str, args: dict[str, Any]) -> Any:
         return reconcile_sampling_revision(**args)
     if operation == "materialize-sample-identities":
         return sample_identity_registry(args["drafts"])
+    if operation == "materialize-sample-lineage":
+        return materialize_sample_lineage(**args)
     if operation == "validate-sampling-skip":
         return validate_sampling_skip(**args)
     if operation == "random-target-count":
@@ -85,7 +88,16 @@ def _dispatch(operation: str, args: dict[str, Any]) -> Any:
     if operation == "close-criterion":
         return close_criterion(**args)
     if operation == "materialize-sample-results":
-        return materialize_sample_results(**args)
+        current_refs = args.get("current_criterion_evaluation_refs")
+        if (not isinstance(current_refs, list)
+                or any(not isinstance(ref, str) or not ref.strip() for ref in current_refs)
+                or len(current_refs) != len(set(current_refs))):
+            raise InvalidInput("current criterion evaluation refs must be a unique JSON ref array")
+        normalized = {**args, "current_criterion_evaluation_refs": set(current_refs)}
+        try:
+            return materialize_sample_results(**normalized)
+        except CriterionPlanError as exc:
+            raise InvalidInput(str(exc)) from exc
     if operation == "close-report":
         return close_report(**args)
     if operation == "evaluation-statement":

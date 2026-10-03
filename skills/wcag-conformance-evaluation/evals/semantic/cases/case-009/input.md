@@ -1,3 +1,5 @@
 # Case G: complete process
 
 default / critical branch sequenceを含める。
+
+The synthetic finite inventory has these current sample identities: `PROC-G-START` (catalog landing), `PROC-G-ITEM` (available item detail), `PROC-G-CART` (cart review), `PROC-G-CHECKOUT` (checkout form), `PROC-G-CONFIRM` (confirmation), and `PROC-G-OUT-OF-STOCK` (unavailable item detail). Exploration evidence `EVD-CASE-G-EXPLORE` records the supported journey from a public catalog entry to confirmation. The default sequence is catalog landing → available item detail → cart review → checkout form → confirmation. The critical alternative begins at the same catalog landing, follows an unavailable item detail, and returns to the catalog without entering checkout. The process starts when an unauthenticated visitor opens the catalog and ends when a confirmation is displayed or the unavailable item is returned to the catalog. These facts do not assert criterion outcomes; generated process refs and membership must be materialized by the helper.

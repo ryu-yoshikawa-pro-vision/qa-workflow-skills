@@ -14,7 +14,7 @@ SCRIPT = ROOT / "skills/usability-inspection/scripts/inspection_runtime.py"
 def metadata(*, formal: bool = False) -> dict:
     unit = "artifact:inspection_runtime:formal-machine-probe" if formal else "artifact:inspection_runtime:all"
     return {"envelope_version": "1", "skill": "usability-inspection",
-        "runtime_contract_version": "runtime-v1", "generator_contract_version": "usability-inspection-runtime-v1",
+        "runtime_contract_version": "runtime-v1", "generator_contract_version": "usability-inspection-runtime-v2",
         "runtime_unit_key": unit, "model_key": None, "model_type": None,
         "technique_slug": None, "selection_source": None, "selection_key": None,
         "scope_key": "all", "input_mode": "direct", "upstream_entities": [],
@@ -41,6 +41,24 @@ def formal_request() -> dict:
 
 
 class InspectionRuntimeContractTests(unittest.TestCase):
+    def test_authority_threshold_result_deterministically_closes_requirement(self):
+        over = invoke("requirement-result", {"applicability": "applicable", "semantic_result": None,
+            "population_complete": False, "required_checks_complete": False, "evidence_refs": ["OBS-1"],
+            "threshold_result": "over-threshold", "authority_ref": "AUTH-1"})
+        self.assertEqual(over["payload"]["result"]["result"], "not-satisfied")
+        within_incomplete = invoke("requirement-result", {"applicability": "applicable", "semantic_result": None,
+            "population_complete": False, "required_checks_complete": True, "evidence_refs": ["OBS-1"],
+            "threshold_result": "within-threshold", "authority_ref": "AUTH-1"})
+        self.assertEqual(within_incomplete["payload"]["result"]["result"], "undetermined")
+        within_complete = invoke("requirement-result", {"applicability": "applicable", "semantic_result": None,
+            "population_complete": True, "required_checks_complete": True, "evidence_refs": ["OBS-1"],
+            "threshold_result": "within-threshold", "authority_ref": "AUTH-1"})
+        self.assertEqual(within_complete["payload"]["result"]["result"], "satisfied")
+        advisory = invoke("requirement-result", {"applicability": "applicable", "semantic_result": None,
+            "population_complete": True, "required_checks_complete": True, "evidence_refs": ["OBS-1"],
+            "threshold_result": "over-threshold"})
+        self.assertEqual(advisory["runtime_status"], "invalid_input")
+
     def test_general_runtime_fingerprints_only_general_observation_assets(self):
         output = invoke("plan-probes", {"selected_rule_keys": ["2779a5"], "measurement_kinds": [],
             "aspect_keys": [], "target_refs": []})

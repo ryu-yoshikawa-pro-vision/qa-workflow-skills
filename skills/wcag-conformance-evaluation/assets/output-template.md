@@ -26,17 +26,21 @@
 | Procedure | Status | Rationale / complete inventory | Candidate provenance / fingerprint |
 | --- | --- | --- | --- |
 
+### Rerun Sample Lineage (when re-evaluating)
+| Previous sample ref | Lineage status | Current sample ref | Reason / evidence |
+| --- | --- | --- | --- |
+
 ### Structured Sample
 | Sample ref | State / locator | Type / technology coverage | Process membership | Rationale |
 | --- | --- | --- | --- | --- |
 
 ### Random Sample
-| Target count | Actual count | Selection method | Status | Exhaustion / blocker |
-| ---: | ---: | --- | --- | --- |
+| Target count | Actual count | Selection method | Status | Selected sample refs / selector artifact ref | Candidate population fingerprint | Exhaustion / blocker |
+| ---: | ---: | --- | --- | --- | --- | --- |
 
 ### Complete Processes
-| Process ref | Ordered sample/action sequence | Completion condition | Evidence refs |
-| --- | --- | --- | --- |
+| Process ref | Starting sample / condition | Ordered sample/action sequence | Completion condition | Evidence refs |
+| --- | --- | --- | --- | --- |
 
 ## Step 4: Audit the selected sample
 ### Criterion Evaluation Plan

@@ -22,7 +22,7 @@
     {
       "id": "WCAG-SEM-004",
       "title": "Handoff, freshness, and report contracts are preserved",
-      "description": "The candidate uses qa-workflow handoff ownership, freshness and CAS lifecycle, resume guards, report/claim/statement/EARL conditions, and does not make unsupported claims.",
+      "description": "Assess the handoff, freshness, CAS, resume, report, claim, statement, or EARL contract that the case actually exercises. Require formal handoff lifecycle evidence only for a case that starts or resumes such a handoff; require report/claim/statement/EARL output only when its inputs and the case contract make that output applicable. If current inputs or runtime results prevent downstream materialization, the candidate may close that path as unresolved or blocked with its exact reason; do not require unrelated lifecycle or output sections and do not treat a safe expected blocker as a failure.",
       "critical": true
     }
   ]

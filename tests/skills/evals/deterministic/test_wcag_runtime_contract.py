@@ -91,8 +91,9 @@ class WcagRuntimeContractTests(unittest.TestCase):
         body["input"]={"operation":"materialize-complete-processes","arguments":{
             "samples":[{"sample_ref":"SAMPLE-001"},{"sample_ref":"SAMPLE-002"}],
             "selected_sample_refs":["SAMPLE-001"],"process_drafts":[{"process_key":"flow",
-                "starting_point_ref":"SAMPLE-001","default_sequence_refs":["SAMPLE-001","SAMPLE-002"],
-                "critical_branch_sequences":[],"evidence_refs":["E-PROCESS"]}]}}
+                "starting_point_ref":"SAMPLE-001","start_condition":"Visitor opens the landing page.",
+                "default_sequence_refs":["SAMPLE-001","SAMPLE-002"],"critical_branch_sequences":[],
+                "completion_condition":"The destination page is displayed.","evidence_refs":["E-PROCESS"]}]}}
         process=invoke(body)
         self.assertEqual(process["result_status"],"ready")
         self.assertEqual(process["payload"]["result"]["process_added_sample_refs"],["SAMPLE-002"])
@@ -122,6 +123,25 @@ class WcagRuntimeContractTests(unittest.TestCase):
         self.assertEqual(reconciliation["runtime_status"],"ok")
         self.assertEqual(reconciliation["result_status"],"unresolved")
         self.assertEqual(reconciliation["payload"]["result"]["random_selection_required_count"],1)
+
+    def test_runtime_materializes_previous_structured_sample_lineage(self):
+        body=request("A")
+        body["input"]={"operation":"materialize-sample-identities","arguments":{"drafts":[
+            {"draft_key":"new-view","target_ref":"TARGET-NEW","state_key":"default",
+             "locator":"/new","source_evidence_refs":["E-CURRENT"]}]}}
+        current=invoke(body)
+        self.assertEqual(current["result_status"],"ready")
+        registry=current["payload"]["result"]
+        body["input"]={"operation":"materialize-sample-lineage","arguments":{
+            "previous_sample_refs":["STRUCT-OLD"],"previous_identity_rows":[],
+            "current_identity_registry":registry,
+            "current_structured_sample_refs":[registry["samples"][0]["sample_ref"]]}}
+        lineage=invoke(body)
+        self.assertEqual(lineage["runtime_status"],"ok")
+        self.assertEqual(lineage["result_status"],"ready")
+        self.assertEqual(lineage["payload"]["result"]["unavailable"],[
+            {"previous_sample_ref":"STRUCT-OLD","reason":"previous-identity-not-supplied"}])
+        self.assertEqual(lineage["payload"]["result"]["added"],[registry["samples"][0]["sample_ref"]])
 
     def test_formal_baseline_extension_is_revisioned_but_diagnostic_environment_is_not_added(self):
         body = request("A")
@@ -221,6 +241,48 @@ class WcagRuntimeContractTests(unittest.TestCase):
         missing["input"] = body["input"]
         missing_output = invoke(missing)
         self.assertEqual(missing_output["runtime_status"], "invalid_input")
+
+    def test_sample_results_json_boundary_accepts_ref_arrays_and_discards_untrusted_rows(self):
+        close_metadata = metadata()
+        close_metadata["upstream_runtime_units"] = [{"skill": "usability-inspection",
+            "runtime_unit_key": "artifact:inspection_runtime:formal-machine-probe",
+            "generation_fingerprint": "sha256:" + "c" * 64}]
+        closed = invoke({"metadata": close_metadata, "input": close_input()})
+        self.assertEqual(closed["runtime_status"], "ok")
+        criterion_result = closed["payload"]["result"]
+        criterion_ref = criterion_result["criterion_evaluation_ref"]
+
+        body = request("A")
+        body["input"] = {"operation": "materialize-sample-results", "arguments": {
+            "criterion_rows": [criterion_result, {
+                "criterion_evaluation_ref": "LLM-SUPPLIED-ROW",
+                "sample_ref": "SAMPLE-001",
+                "variation_ref": "VAR-001",
+                "criterion_ref": "1.1.1",
+                "execution_status": "complete",
+                "result": "satisfied",
+                "evidence_refs": ["E-UNTRUSTED"],
+            }],
+            "current_criterion_evaluation_refs": [criterion_ref],
+            "sample_kinds": {"SAMPLE-001": "structured"},
+        }}
+        output = invoke(body)
+        self.assertEqual(output["runtime_status"], "ok")
+        self.assertEqual(output["result_status"], "ready")
+        materialized = output["payload"]["result"]
+        self.assertEqual(len(materialized), 1)
+        self.assertEqual(materialized[0]["criterion_evaluation_ref"], criterion_ref)
+        self.assertNotIn("LLM-SUPPLIED-ROW", {row["criterion_evaluation_ref"] for row in materialized})
+
+        body["input"]["arguments"]["current_criterion_evaluation_refs"] = [criterion_ref, criterion_ref]
+        duplicate_refs = invoke(body)
+        self.assertEqual(duplicate_refs["runtime_status"], "invalid_input")
+
+        body["input"]["arguments"]["current_criterion_evaluation_refs"] = []
+        body["input"]["arguments"]["sample_kinds"] = {}
+        untrusted_only = invoke(body)
+        self.assertEqual(untrusted_only["runtime_status"], "ok")
+        self.assertEqual(untrusted_only["payload"]["result"], [])
 
 
 if __name__ == "__main__":

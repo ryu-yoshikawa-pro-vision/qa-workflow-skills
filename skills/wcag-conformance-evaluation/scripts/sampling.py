@@ -51,6 +51,154 @@ def sample_identity_registry(drafts: list[dict[str, Any]]) -> dict[str, Any]:
     return {"samples":rows,"draft_to_sample_ref":by_key}
 
 
+def materialize_sample_lineage(*, previous_sample_refs: list[str],
+        previous_identity_rows: list[dict[str, Any]], current_identity_registry: dict[str, Any],
+        current_structured_sample_refs: list[str],
+        replacement_decisions: list[dict[str, Any]] | None = None,
+        current_evidence_refs: list[str] | None = None) -> dict[str, Any]:
+    """Resolve structured sample refs across a WCAG evaluation revision.
+
+    Identity equality is the existing canonical target/state identity. A changed
+    identity is replaced only when an explicit, evidence-backed semantic
+    decision maps it to a current structured sample; otherwise it remains
+    unavailable. Current refs with no prior mapping are materialized as added.
+    """
+    for label, refs in (("previous", previous_sample_refs),
+                        ("current structured", current_structured_sample_refs)):
+        if (not isinstance(refs, list) or any(not isinstance(ref, str) or not ref.strip() for ref in refs)
+                or len(refs) != len(set(refs))):
+            raise SamplingError(f"{label} sample refs must be unique non-empty refs")
+    if not isinstance(previous_identity_rows, list):
+        raise SamplingError("previous sample identity rows must be an array")
+    evidence_refs = [] if current_evidence_refs is None else current_evidence_refs
+    if (not isinstance(evidence_refs, list)
+            or any(not isinstance(ref, str) or not ref.strip() for ref in evidence_refs)
+            or len(evidence_refs) != len(set(evidence_refs))):
+        raise SamplingError("current evidence refs must be unique non-empty refs")
+    if (not isinstance(current_identity_registry, dict)
+            or set(current_identity_registry) != {"samples", "draft_to_sample_ref"}
+            or not isinstance(current_identity_registry["samples"], list)
+            or not isinstance(current_identity_registry["draft_to_sample_ref"], dict)):
+        raise SamplingError("current sample identity registry schema mismatch")
+
+    identity_fields = {"sample_ref", "target_ref", "state_key", "source_locators",
+                       "identity_fingerprint", "source_evidence_refs"}
+
+    def index_identity_rows(rows: list[dict[str, Any]], label: str) -> tuple[dict[str, dict[str, Any]], dict[str, str]]:
+        by_ref: dict[str, dict[str, Any]] = {}
+        by_identity: dict[str, str] = {}
+        for row in rows:
+            if not isinstance(row, dict) or set(row) != identity_fields:
+                raise SamplingError(f"{label} sample identity row schema mismatch")
+            ref = row["sample_ref"]
+            target = row["target_ref"]
+            state = row["state_key"]
+            if (not isinstance(ref, str) or not ref.strip() or ref in by_ref
+                    or not isinstance(target, str) or not target.strip()
+                    or not isinstance(state, str) or not state.strip()):
+                raise SamplingError(f"{label} sample identity refs and target/state must be unique and non-empty")
+            locators = row["source_locators"]
+            evidence = row["source_evidence_refs"]
+            if (not isinstance(locators, list) or not locators
+                    or any(not isinstance(value, str) or not value.strip() for value in locators)
+                    or len(locators) != len(set(locators))
+                    or not isinstance(evidence, list)
+                    or any(not isinstance(value, str) or not value.strip() for value in evidence)
+                    or len(evidence) != len(set(evidence))):
+                raise SamplingError(f"{label} sample identity provenance is invalid")
+            expected_identity = fingerprint({"target_ref": target, "state_key": state})
+            if row["identity_fingerprint"] != expected_identity or expected_identity in by_identity:
+                raise SamplingError(f"{label} sample identity fingerprint is invalid or duplicated")
+            by_ref[ref] = row
+            by_identity[expected_identity] = ref
+        return by_ref, by_identity
+
+    previous_by_ref, _ = index_identity_rows(previous_identity_rows, "previous")
+    if not set(previous_by_ref) <= set(previous_sample_refs):
+        raise SamplingError("previous identity rows include an unselected sample ref")
+    current_by_ref, current_by_identity = index_identity_rows(
+        current_identity_registry["samples"], "current")
+    if not set(current_structured_sample_refs) <= set(current_by_ref):
+        raise SamplingError("current structured sample refs are not in the current identity registry")
+    for draft_key, sample_ref in current_identity_registry["draft_to_sample_ref"].items():
+        if (not isinstance(draft_key, str) or not draft_key
+                or not isinstance(sample_ref, str) or sample_ref not in current_by_ref):
+            raise SamplingError("current identity draft mapping is invalid")
+    if set(current_identity_registry["draft_to_sample_ref"].values()) != set(current_by_ref):
+        raise SamplingError("current identity draft mapping does not cover every registered sample")
+
+    decisions = [] if replacement_decisions is None else replacement_decisions
+    if not isinstance(decisions, list):
+        raise SamplingError("sample replacement decisions must be an array")
+    decision_by_previous: dict[str, dict[str, Any]] = {}
+    for decision in decisions:
+        if (not isinstance(decision, dict)
+                or set(decision) != {"previous_sample_ref", "current_sample_ref", "reason", "evidence_refs"}):
+            raise SamplingError("sample replacement decision schema mismatch")
+        previous_ref = decision["previous_sample_ref"]
+        current_ref = decision["current_sample_ref"]
+        reason = decision["reason"]
+        evidence = decision["evidence_refs"]
+        if (previous_ref not in previous_sample_refs or previous_ref in decision_by_previous
+                or previous_ref not in previous_by_ref):
+            raise SamplingError("sample replacement decision has an unknown or unresolved previous identity")
+        if (current_ref not in current_structured_sample_refs
+                or not isinstance(reason, str) or not reason.strip()
+                or not isinstance(evidence, list) or not evidence
+                or any(not isinstance(value, str) or not value.strip() for value in evidence)
+                or len(evidence) != len(set(evidence))
+                or not set(evidence) <= set(evidence_refs)):
+            raise SamplingError("sample replacement decision needs a current ref, reason, and unique evidence refs")
+        if previous_by_ref[previous_ref]["identity_fingerprint"] == current_by_ref[current_ref]["identity_fingerprint"]:
+            raise SamplingError("an unchanged canonical sample identity must be retained")
+        decision_by_previous[previous_ref] = decision
+
+    retained: list[dict[str, str]] = []
+    replaced: list[dict[str, Any]] = []
+    unavailable: list[dict[str, Any]] = []
+    mapped_current: set[str] = set()
+    for previous_ref in previous_sample_refs:
+        previous_row = previous_by_ref.get(previous_ref)
+        if previous_row is None:
+            unavailable.append({"previous_sample_ref": previous_ref,
+                                "reason": "previous-identity-not-supplied"})
+            continue
+        identity = previous_row["identity_fingerprint"]
+        exact_current_ref = current_by_identity.get(identity)
+        decision = decision_by_previous.get(previous_ref)
+        if exact_current_ref in current_structured_sample_refs:
+            if decision is not None:
+                raise SamplingError("an unchanged canonical sample identity cannot be replaced")
+            if exact_current_ref in mapped_current:
+                raise SamplingError("current structured sample identity is mapped more than once")
+            retained.append({"previous_sample_ref": previous_ref,
+                             "current_sample_ref": exact_current_ref})
+            mapped_current.add(exact_current_ref)
+        elif decision is not None:
+            current_ref = decision["current_sample_ref"]
+            if current_ref in mapped_current:
+                raise SamplingError("current structured sample identity is mapped more than once")
+            replaced.append({"previous_sample_ref": previous_ref,
+                             "current_sample_ref": current_ref,
+                             "reason": decision["reason"],
+                             "evidence_refs": sorted(decision["evidence_refs"])})
+            mapped_current.add(current_ref)
+        else:
+            reason = ("identity-not-selected-as-current-structured-sample" if exact_current_ref is not None
+                      else "identity-not-present-in-current-identity-registry")
+            unavailable.append({"previous_sample_ref": previous_ref, "reason": reason})
+
+    return {
+        "status": "ready",
+        "previous_sample_refs": sorted(previous_sample_refs),
+        "current_structured_sample_refs": sorted(current_structured_sample_refs),
+        "retained": sorted(retained, key=lambda row: row["previous_sample_ref"]),
+        "replaced": sorted(replaced, key=lambda row: row["previous_sample_ref"]),
+        "added": sorted(set(current_structured_sample_refs) - mapped_current),
+        "unavailable": sorted(unavailable, key=lambda row: row["previous_sample_ref"]),
+    }
+
+
 def random_target_count(structured_count: int) -> int:
     if isinstance(structured_count,bool) or not isinstance(structured_count,int) or structured_count < 0:
         raise SamplingError("structured sample count must be a non-negative integer")
@@ -160,7 +308,8 @@ def materialize_processes(*, samples: list[dict[str, Any]], selected_sample_refs
             or len(selected_sample_refs)!=len(set(selected_sample_refs))
             or not set(selected_sample_refs)<=set(sample_refs)):
         raise SamplingError("selected process sample refs must be unique current inventory refs")
-    expected={"process_key","starting_point_ref","default_sequence_refs","critical_branch_sequences","evidence_refs"}
+    expected={"process_key","starting_point_ref","start_condition","default_sequence_refs",
+        "critical_branch_sequences","completion_condition","evidence_refs"}
     keys=set(); normalized=[]
     for draft in process_drafts:
         if not isinstance(draft,dict) or set(draft)!=expected:
@@ -169,6 +318,9 @@ def materialize_processes(*, samples: list[dict[str, Any]], selected_sample_refs
         if not isinstance(key,str) or not key.strip() or key in keys:
             raise SamplingError("complete process keys must be unique non-empty values")
         keys.add(key)
+        for field in ("start_condition","completion_condition"):
+            if not isinstance(draft[field],str) or not draft[field].strip():
+                raise SamplingError(f"complete process {field} must be a non-empty semantic condition")
         default=draft["default_sequence_refs"]
         branches=draft["critical_branch_sequences"]
         evidence=draft["evidence_refs"]
@@ -197,8 +349,10 @@ def materialize_processes(*, samples: list[dict[str, Any]], selected_sample_refs
                 process_ref=f"PROCESS-{index:03d}"
                 if process_ref not in memberships[ref]: memberships[ref].append(process_ref)
         rows.append({"process_ref":f"PROCESS-{index:03d}","process_key":draft["process_key"],
-            "starting_point_ref":draft["starting_point_ref"],"default_sequence_refs":draft["default_sequence_refs"],
+            "starting_point_ref":draft["starting_point_ref"],"start_condition":draft["start_condition"],
+            "default_sequence_refs":draft["default_sequence_refs"],
             "critical_branch_sequences":draft["critical_branch_sequences"],"sample_refs":ordered,
+            "completion_condition":draft["completion_condition"],
             "evidence_refs":sorted(draft["evidence_refs"])})
         for ref in ordered:
             if ref not in selected and ref not in added: added.append(ref)

@@ -18,7 +18,7 @@ from runtime_contract import InvalidInput, reject_unknown, run_cli, static_data_
 
 SKILL = "usability-inspection"
 GENERATOR = "inspection_runtime"
-GENERATOR_CONTRACT_VERSION = "usability-inspection-runtime-v1"
+GENERATOR_CONTRACT_VERSION = "usability-inspection-runtime-v2"
 SCRIPT_PATH = Path(__file__).resolve()
 ASSETS = PACKAGE / "assets"
 FORMAL_OPERATIONS = {"validate-wcag-machine-probe-request", "normalize-wcag-machine-probe-result"}

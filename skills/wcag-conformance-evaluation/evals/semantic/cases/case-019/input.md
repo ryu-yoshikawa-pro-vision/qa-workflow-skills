@@ -1,3 +1,3 @@
 # Case Q: non-finite random source
 
-crawler / log / search等でtarget全体を有限inventoryにできない。
+The declared synthetic public Web scope is `SCOPE-CASE-Q-PUBLIC`. A finite inventory cannot be established. The accompanying `input-data.json` supplies ten structured sample identity drafts and one result from an external random selector, including its method, scope, activity, provenance evidence, and selected source ref `RANDOM-Q-011`. Use the production identity and sampling helpers to derive the target count and validate the supplied selection. Do not invent or manually select a sample identity, and do not treat the fixture as evidence about an external product.

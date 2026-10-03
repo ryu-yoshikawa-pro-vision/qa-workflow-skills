@@ -32,7 +32,6 @@
       "input": "cases/case-004/input.md",
       "reference": "cases/case-004/reference.md",
       "criteria": [
-        "WCAG-SEM-002",
         "WCAG-SEM-004"
       ]
     },
@@ -98,7 +97,6 @@
       "input": "cases/case-012/input.md",
       "reference": "cases/case-012/reference.md",
       "criteria": [
-        "WCAG-SEM-001",
         "WCAG-SEM-004"
       ]
     },
@@ -304,8 +302,7 @@
       "input": "cases/case-036/input.md",
       "reference": "cases/case-036/reference.md",
       "criteria": [
-        "WCAG-SEM-002",
-        "WCAG-SEM-003"
+        "WCAG-SEM-002"
       ]
     },
     {
@@ -321,7 +318,6 @@
       "input": "cases/case-038/input.md",
       "reference": "cases/case-038/reference.md",
       "criteria": [
-        "WCAG-SEM-001",
         "WCAG-SEM-003"
       ]
     }

@@ -13,7 +13,8 @@ ROOT=Path(__file__).resolve().parents[4]
 SCRIPTS=ROOT/"skills/wcag-conformance-evaluation/scripts"
 sys.path.insert(0,str(SCRIPTS))
 from sampling import (SamplingError, candidate_population_fingerprint, evaluate_step_4_2_reuse,
-                      materialize_processes, reconcile_sampling_revision, select_random_candidates)
+                      materialize_processes, materialize_sample_lineage, reconcile_sampling_revision,
+                      sample_identity_registry, select_random_candidates)
 from wcag_em_structure import (EvaluationStructureError, SCOPE_ROWS, extend_accessibility_support_baseline,
                                materialize_scope_coverage)
 
@@ -101,13 +102,17 @@ class WcagSamplingStepContractTests(unittest.TestCase):
         samples=[{"sample_ref":f"SAMPLE-{i:03d}"} for i in range(1,5)]
         result=materialize_processes(samples=samples,selected_sample_refs=["SAMPLE-001"],process_drafts=[{
             "process_key":"purchase","starting_point_ref":"SAMPLE-001",
+            "start_condition":"Unauthenticated visitor opens the catalog.",
             "default_sequence_refs":["SAMPLE-001","SAMPLE-002"],
             "critical_branch_sequences":[["SAMPLE-002","SAMPLE-003"],["SAMPLE-001","SAMPLE-004"]],
+            "completion_condition":"Confirmation is displayed or the unavailable item returns to the catalog.",
             "evidence_refs":["E-PROCESS"]}])
         process_arguments={"samples":samples,"selected_sample_refs":["SAMPLE-001"],
             "process_drafts":[{"process_key":"purchase","starting_point_ref":"SAMPLE-001",
+                "start_condition":"Unauthenticated visitor opens the catalog.",
                 "default_sequence_refs":["SAMPLE-001","SAMPLE-002"],
                 "critical_branch_sequences":[["SAMPLE-002","SAMPLE-003"],["SAMPLE-001","SAMPLE-004"]],
+                "completion_condition":"Confirmation is displayed or the unavailable item returns to the catalog.",
                 "evidence_refs":["E-PROCESS"]}]}
         self.assertEqual(independent_validator.validate_process_materialization(process_arguments,result),[])
         self.assertEqual(result["status"],"ready")
@@ -117,8 +122,18 @@ class WcagSamplingStepContractTests(unittest.TestCase):
         self.assertEqual(result["selected_sample_refs"],
                          ["SAMPLE-001","SAMPLE-002","SAMPLE-003","SAMPLE-004"])
         self.assertEqual(result["process_sample_memberships"]["SAMPLE-002"],["PROCESS-001"])
+        self.assertEqual(result["processes"][0]["start_condition"],"Unauthenticated visitor opens the catalog.")
+        self.assertEqual(result["processes"][0]["completion_condition"],
+                         "Confirmation is displayed or the unavailable item returns to the catalog.")
         forged={**result,"process_added_sample_refs":["SAMPLE-003"]}
         self.assertNotEqual(independent_validator.validate_process_materialization(process_arguments,forged),[])
+        forged_process={**result,"processes":[{**result["processes"][0],"completion_condition":"Any page is shown."}]}
+        self.assertNotEqual(independent_validator.validate_process_materialization(process_arguments,forged_process),[])
+        missing_condition={**process_arguments,"process_drafts":[{
+            key:value for key,value in process_arguments["process_drafts"][0].items()
+            if key!="completion_condition"}]}
+        with self.assertRaises(SamplingError):
+            materialize_processes(**missing_condition)
 
     def test_step_4_2_reuses_only_current_unchanged_content_with_matching_identity_and_evidence(self):
         items=[]; prior=[]
@@ -193,6 +208,61 @@ class WcagSamplingStepContractTests(unittest.TestCase):
             selection_method="system-random finite inventory selection")
         self.assertEqual(closed["status"],"target-met")
         self.assertEqual(closed["random_sample_refs"],["SAMPLE-012","SAMPLE-013"])
+
+    def test_rerun_sample_lineage_resolves_retained_replaced_added_and_unavailable(self):
+        previous_registry=sample_identity_registry([
+            {"draft_key":"old-a","target_ref":"TARGET-A","state_key":"default",
+             "locator":"/old/a","source_evidence_refs":["E-OLD-A"]},
+            {"draft_key":"old-b","target_ref":"TARGET-B","state_key":"default",
+             "locator":"/old/b","source_evidence_refs":["E-OLD-B"]}])
+        previous_by_target={row["target_ref"]:row for row in previous_registry["samples"]}
+        previous_rows=[{**previous_by_target["TARGET-A"],"sample_ref":"STRUCT-OLD-A"},
+                       {**previous_by_target["TARGET-B"],"sample_ref":"STRUCT-OLD-B"}]
+        current_registry=sample_identity_registry([
+            {"draft_key":"current-a","target_ref":"TARGET-A","state_key":"default",
+             "locator":"/current/a","source_evidence_refs":["E-CURRENT-A"]},
+            {"draft_key":"current-b","target_ref":"TARGET-B","state_key":"refreshed",
+             "locator":"/current/b","source_evidence_refs":["E-CURRENT-B"]},
+            {"draft_key":"current-c","target_ref":"TARGET-C","state_key":"default",
+             "locator":"/current/c","source_evidence_refs":["E-CURRENT-C"]}])
+        current_by_target={row["target_ref"]:row["sample_ref"] for row in current_registry["samples"]}
+        arguments={"previous_sample_refs":["STRUCT-OLD-A","STRUCT-OLD-B","STRUCT-OLD-MISSING"],
+            "previous_identity_rows":previous_rows,"current_identity_registry":current_registry,
+            "current_structured_sample_refs":list(current_by_target.values()),
+            "replacement_decisions":[{"previous_sample_ref":"STRUCT-OLD-B",
+                "current_sample_ref":current_by_target["TARGET-B"],
+                "reason":"The current state has changed and the new structured sample covers it.",
+                "evidence_refs":["E-CURRENT-B"]}],"current_evidence_refs":["E-CURRENT-B"]}
+        result=materialize_sample_lineage(**arguments)
+        self.assertEqual(independent_validator.validate_sample_lineage(arguments,result),[])
+        self.assertEqual(result["retained"],[{"previous_sample_ref":"STRUCT-OLD-A",
+            "current_sample_ref":current_by_target["TARGET-A"]}])
+        self.assertEqual(result["replaced"],[{"previous_sample_ref":"STRUCT-OLD-B",
+            "current_sample_ref":current_by_target["TARGET-B"],
+            "reason":"The current state has changed and the new structured sample covers it.",
+            "evidence_refs":["E-CURRENT-B"]}])
+        self.assertEqual(result["added"],[current_by_target["TARGET-C"]])
+        self.assertEqual(result["unavailable"],[{"previous_sample_ref":"STRUCT-OLD-MISSING",
+            "reason":"previous-identity-not-supplied"}])
+        forged={**result,"added":[]}
+        self.assertIn("sample_lineage_contract_mismatch",
+                      independent_validator.validate_sample_lineage(arguments,forged))
+
+    def test_sample_lineage_replacement_requires_known_evidence_and_never_guesses_old_identity(self):
+        current=sample_identity_registry([{"draft_key":"new","target_ref":"TARGET-NEW",
+            "state_key":"default","locator":"/new","source_evidence_refs":["E-CURRENT"]}])
+        base={"previous_sample_refs":["STRUCT-OLD"],"previous_identity_rows":[],
+            "current_identity_registry":current,
+            "current_structured_sample_refs":[current["samples"][0]["sample_ref"]]}
+        unavailable=materialize_sample_lineage(**base)
+        self.assertEqual(unavailable["unavailable"],[{"previous_sample_ref":"STRUCT-OLD",
+            "reason":"previous-identity-not-supplied"}])
+        self.assertEqual(unavailable["added"],[current["samples"][0]["sample_ref"]])
+        unknown_evidence={**base,"replacement_decisions":[{"previous_sample_ref":"STRUCT-OLD",
+            "current_sample_ref":current["samples"][0]["sample_ref"],"reason":"Changed target",
+            "evidence_refs":["E-NOT-PROVIDED"]}]}
+        with self.assertRaises(SamplingError):
+            materialize_sample_lineage(**unknown_evidence)
 
 
 if __name__=="__main__":

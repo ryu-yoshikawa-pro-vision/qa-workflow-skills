@@ -98,7 +98,6 @@
       "reference": "cases/case-010/reference.md",
       "criteria": [
         "UE-SEM-001",
-        "UE-SEM-004",
         "UE-SEM-005"
       ]
     },

@@ -288,11 +288,23 @@ class WcagReportClosureTests(unittest.TestCase):
         self.assertEqual(output["status"],"generated")
         self.assertEqual(output["accessible_output_closure"],{key:True for key in structure.ACCESSIBLE_OUTPUT_CHECKS})
         markdown=output["machine_owned_markdown"]
+        self.assertIn("| report closure | blocked |",markdown)
         self.assertLess(markdown.index("## Step 1:"),markdown.index("## Step 2:"))
         self.assertLess(markdown.index("## Step 2:"),markdown.index("## Step 3:"))
         self.assertLess(markdown.index("## Step 3:"),markdown.index("## Step 4:"))
         self.assertLess(markdown.index("## Step 4:"),markdown.index("## Step 5:"))
         self.assertIsNone(output["summary"]["aggregated_score"])
+        data["report_closure"]["status"]="complete"
+        data["sample_lineage"]={"status":"ready","previous_sample_refs":["STRUCT-OLD"],
+            "current_structured_sample_refs":["SAMPLE-001"],"retained":[],"replaced":[],
+            "added":["SAMPLE-001"],"unavailable":[{"previous_sample_ref":"STRUCT-OLD",
+                "reason":"previous-identity-not-supplied"}]}
+        complete=structure.render_machine_owned_report(data)
+        self.assertIn("| report closure | complete |",complete["machine_owned_markdown"])
+        self.assertIn("### Rerun Sample Lineage",complete["machine_owned_markdown"])
+        self.assertIn("| STRUCT-OLD | unavailable | - | previous-identity-not-supplied |",
+                      complete["machine_owned_markdown"])
+        self.assertIn("| - | added | SAMPLE-001 | - |",complete["machine_owned_markdown"])
         self.assertEqual(structure.validate_accessible_markdown("# Report\n\n## Section\n\n![ ](image.png)\n")["status"],"blocked")
 
 

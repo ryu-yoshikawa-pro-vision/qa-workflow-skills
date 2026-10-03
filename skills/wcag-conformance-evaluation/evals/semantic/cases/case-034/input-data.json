@@ -1,0 +1,1258 @@
+{
+  "kind": "upstream-current-wcag-claim-input",
+  "version": "2.2",
+  "full_scope_evidence": true,
+  "required_fields": {
+    "claim_date": "2026-10-01",
+    "guideline_title": "Web Content Accessibility Guidelines (WCAG) 2.2",
+    "guideline_version": "2.2",
+    "guideline_uri": "https://www.w3.org/TR/WCAG22/",
+    "conformance_level": "AA",
+    "page_scope": {
+      "description": "Complete synthetic public page scope",
+      "uris": [
+        "https://northstar.example.invalid/",
+        "https://northstar.example.invalid/catalog"
+      ],
+      "scope_expression": null,
+      "includes_subdomains": false
+    },
+    "technologies_relied_upon": [
+      "HTML",
+      "CSS",
+      "JavaScript"
+    ]
+  },
+  "scope_evidence": {
+    "coverage_method": "all-pages-evaluated",
+    "scope_ref": "SCOPE-AF",
+    "scope_population_complete": true,
+    "covered_page_uris": [
+      "https://northstar.example.invalid/",
+      "https://northstar.example.invalid/catalog"
+    ],
+    "claim_level": "AA",
+    "success_criterion_results": [
+      {
+        "criterion_ref": "1.1.1",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-001",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-001"
+        ]
+      },
+      {
+        "criterion_ref": "1.2.1",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-002",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-002"
+        ]
+      },
+      {
+        "criterion_ref": "1.2.2",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-003",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-003"
+        ]
+      },
+      {
+        "criterion_ref": "1.2.3",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-004",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-004"
+        ]
+      },
+      {
+        "criterion_ref": "1.2.4",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-005",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-005"
+        ]
+      },
+      {
+        "criterion_ref": "1.2.5",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-006",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-006"
+        ]
+      },
+      {
+        "criterion_ref": "1.3.1",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-007",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-007"
+        ]
+      },
+      {
+        "criterion_ref": "1.3.2",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-008",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-008"
+        ]
+      },
+      {
+        "criterion_ref": "1.3.3",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-009",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-009"
+        ]
+      },
+      {
+        "criterion_ref": "1.3.4",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-010",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-010"
+        ]
+      },
+      {
+        "criterion_ref": "1.3.5",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-011",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-011"
+        ]
+      },
+      {
+        "criterion_ref": "1.4.1",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-012",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-012"
+        ]
+      },
+      {
+        "criterion_ref": "1.4.2",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-013",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-013"
+        ]
+      },
+      {
+        "criterion_ref": "1.4.3",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-014",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-014"
+        ]
+      },
+      {
+        "criterion_ref": "1.4.4",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-015",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-015"
+        ]
+      },
+      {
+        "criterion_ref": "1.4.5",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-016",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-016"
+        ]
+      },
+      {
+        "criterion_ref": "1.4.10",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-017",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-017"
+        ]
+      },
+      {
+        "criterion_ref": "1.4.11",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-018",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-018"
+        ]
+      },
+      {
+        "criterion_ref": "1.4.12",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-019",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-019"
+        ]
+      },
+      {
+        "criterion_ref": "1.4.13",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-020",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-020"
+        ]
+      },
+      {
+        "criterion_ref": "2.1.1",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-021",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-021"
+        ]
+      },
+      {
+        "criterion_ref": "2.1.2",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-022",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-022"
+        ]
+      },
+      {
+        "criterion_ref": "2.1.4",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-023",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-023"
+        ]
+      },
+      {
+        "criterion_ref": "2.2.1",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-024",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-024"
+        ]
+      },
+      {
+        "criterion_ref": "2.2.2",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-025",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-025"
+        ]
+      },
+      {
+        "criterion_ref": "2.3.1",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-026",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-026"
+        ]
+      },
+      {
+        "criterion_ref": "2.4.1",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-027",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-027"
+        ]
+      },
+      {
+        "criterion_ref": "2.4.2",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-028",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-028"
+        ]
+      },
+      {
+        "criterion_ref": "2.4.3",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-029",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-029"
+        ]
+      },
+      {
+        "criterion_ref": "2.4.4",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-030",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-030"
+        ]
+      },
+      {
+        "criterion_ref": "2.4.5",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-031",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-031"
+        ]
+      },
+      {
+        "criterion_ref": "2.4.6",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-032",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-032"
+        ]
+      },
+      {
+        "criterion_ref": "2.4.7",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-033",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-033"
+        ]
+      },
+      {
+        "criterion_ref": "2.4.11",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-034",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-034"
+        ]
+      },
+      {
+        "criterion_ref": "2.5.1",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-035",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-035"
+        ]
+      },
+      {
+        "criterion_ref": "2.5.2",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-036",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-036"
+        ]
+      },
+      {
+        "criterion_ref": "2.5.3",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-037",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-037"
+        ]
+      },
+      {
+        "criterion_ref": "2.5.4",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-038",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-038"
+        ]
+      },
+      {
+        "criterion_ref": "2.5.7",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-039",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-039"
+        ]
+      },
+      {
+        "criterion_ref": "2.5.8",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-040",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-040"
+        ]
+      },
+      {
+        "criterion_ref": "3.1.1",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-041",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-041"
+        ]
+      },
+      {
+        "criterion_ref": "3.1.2",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-042",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-042"
+        ]
+      },
+      {
+        "criterion_ref": "3.2.1",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-043",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-043"
+        ]
+      },
+      {
+        "criterion_ref": "3.2.2",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-044",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-044"
+        ]
+      },
+      {
+        "criterion_ref": "3.2.3",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-045",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-045"
+        ]
+      },
+      {
+        "criterion_ref": "3.2.4",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-046",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-046"
+        ]
+      },
+      {
+        "criterion_ref": "3.2.6",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-047",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-047"
+        ]
+      },
+      {
+        "criterion_ref": "3.3.1",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-048",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-048"
+        ]
+      },
+      {
+        "criterion_ref": "3.3.2",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-049",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-049"
+        ]
+      },
+      {
+        "criterion_ref": "3.3.3",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-050",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-050"
+        ]
+      },
+      {
+        "criterion_ref": "3.3.4",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-051",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-051"
+        ]
+      },
+      {
+        "criterion_ref": "3.3.7",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-052",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-052"
+        ]
+      },
+      {
+        "criterion_ref": "3.3.8",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-053",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-053"
+        ]
+      },
+      {
+        "criterion_ref": "4.1.2",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-054",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-054"
+        ]
+      },
+      {
+        "criterion_ref": "4.1.3",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-055",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-055"
+        ]
+      },
+      {
+        "criterion_ref": "1.1.1",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-061",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-061"
+        ]
+      },
+      {
+        "criterion_ref": "1.2.1",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-062",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-062"
+        ]
+      },
+      {
+        "criterion_ref": "1.2.2",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-063",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-063"
+        ]
+      },
+      {
+        "criterion_ref": "1.2.3",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-064",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-064"
+        ]
+      },
+      {
+        "criterion_ref": "1.2.4",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-065",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-065"
+        ]
+      },
+      {
+        "criterion_ref": "1.2.5",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-066",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-066"
+        ]
+      },
+      {
+        "criterion_ref": "1.3.1",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-067",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-067"
+        ]
+      },
+      {
+        "criterion_ref": "1.3.2",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-068",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-068"
+        ]
+      },
+      {
+        "criterion_ref": "1.3.3",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-069",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-069"
+        ]
+      },
+      {
+        "criterion_ref": "1.3.4",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-070",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-070"
+        ]
+      },
+      {
+        "criterion_ref": "1.3.5",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-071",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-071"
+        ]
+      },
+      {
+        "criterion_ref": "1.4.1",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-072",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-072"
+        ]
+      },
+      {
+        "criterion_ref": "1.4.2",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-073",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-073"
+        ]
+      },
+      {
+        "criterion_ref": "1.4.3",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-074",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-074"
+        ]
+      },
+      {
+        "criterion_ref": "1.4.4",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-075",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-075"
+        ]
+      },
+      {
+        "criterion_ref": "1.4.5",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-076",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-076"
+        ]
+      },
+      {
+        "criterion_ref": "1.4.10",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-077",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-077"
+        ]
+      },
+      {
+        "criterion_ref": "1.4.11",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-078",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-078"
+        ]
+      },
+      {
+        "criterion_ref": "1.4.12",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-079",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-079"
+        ]
+      },
+      {
+        "criterion_ref": "1.4.13",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-080",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-080"
+        ]
+      },
+      {
+        "criterion_ref": "2.1.1",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-081",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-081"
+        ]
+      },
+      {
+        "criterion_ref": "2.1.2",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-082",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-082"
+        ]
+      },
+      {
+        "criterion_ref": "2.1.4",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-083",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-083"
+        ]
+      },
+      {
+        "criterion_ref": "2.2.1",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-084",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-084"
+        ]
+      },
+      {
+        "criterion_ref": "2.2.2",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-085",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-085"
+        ]
+      },
+      {
+        "criterion_ref": "2.3.1",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-086",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-086"
+        ]
+      },
+      {
+        "criterion_ref": "2.4.1",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-087",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-087"
+        ]
+      },
+      {
+        "criterion_ref": "2.4.2",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-088",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-088"
+        ]
+      },
+      {
+        "criterion_ref": "2.4.3",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-089",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-089"
+        ]
+      },
+      {
+        "criterion_ref": "2.4.4",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-090",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-090"
+        ]
+      },
+      {
+        "criterion_ref": "2.4.5",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-091",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-091"
+        ]
+      },
+      {
+        "criterion_ref": "2.4.6",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-092",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-092"
+        ]
+      },
+      {
+        "criterion_ref": "2.4.7",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-093",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-093"
+        ]
+      },
+      {
+        "criterion_ref": "2.4.11",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-094",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-094"
+        ]
+      },
+      {
+        "criterion_ref": "2.5.1",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-095",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-095"
+        ]
+      },
+      {
+        "criterion_ref": "2.5.2",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-096",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-096"
+        ]
+      },
+      {
+        "criterion_ref": "2.5.3",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-097",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-097"
+        ]
+      },
+      {
+        "criterion_ref": "2.5.4",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-098",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-098"
+        ]
+      },
+      {
+        "criterion_ref": "2.5.7",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-099",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-099"
+        ]
+      },
+      {
+        "criterion_ref": "2.5.8",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-100",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-100"
+        ]
+      },
+      {
+        "criterion_ref": "3.1.1",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-101",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-101"
+        ]
+      },
+      {
+        "criterion_ref": "3.1.2",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-102",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-102"
+        ]
+      },
+      {
+        "criterion_ref": "3.2.1",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-103",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-103"
+        ]
+      },
+      {
+        "criterion_ref": "3.2.2",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-104",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-104"
+        ]
+      },
+      {
+        "criterion_ref": "3.2.3",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-105",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-105"
+        ]
+      },
+      {
+        "criterion_ref": "3.2.4",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-106",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-106"
+        ]
+      },
+      {
+        "criterion_ref": "3.2.6",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-107",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-107"
+        ]
+      },
+      {
+        "criterion_ref": "3.3.1",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-108",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-108"
+        ]
+      },
+      {
+        "criterion_ref": "3.3.2",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-109",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-109"
+        ]
+      },
+      {
+        "criterion_ref": "3.3.3",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-110",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-110"
+        ]
+      },
+      {
+        "criterion_ref": "3.3.4",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-111",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-111"
+        ]
+      },
+      {
+        "criterion_ref": "3.3.7",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-112",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-112"
+        ]
+      },
+      {
+        "criterion_ref": "3.3.8",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-113",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-113"
+        ]
+      },
+      {
+        "criterion_ref": "4.1.2",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-114",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-114"
+        ]
+      },
+      {
+        "criterion_ref": "4.1.3",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-115",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-115"
+        ]
+      }
+    ],
+    "conformance_requirement_results": [
+      {
+        "requirement_key": "conformance-level",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-056",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-056"
+        ]
+      },
+      {
+        "requirement_key": "full-pages",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-057",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-057"
+        ]
+      },
+      {
+        "requirement_key": "complete-processes",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-058",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-058"
+        ]
+      },
+      {
+        "requirement_key": "accessibility-supported-ways",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-059",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-059"
+        ]
+      },
+      {
+        "requirement_key": "non-interference",
+        "page_uri": "https://northstar.example.invalid/",
+        "result_ref": "RESULT-AF-01-060",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-01-060"
+        ]
+      },
+      {
+        "requirement_key": "conformance-level",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-116",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-116"
+        ]
+      },
+      {
+        "requirement_key": "full-pages",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-117",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-117"
+        ]
+      },
+      {
+        "requirement_key": "complete-processes",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-118",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-118"
+        ]
+      },
+      {
+        "requirement_key": "accessibility-supported-ways",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-119",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-119"
+        ]
+      },
+      {
+        "requirement_key": "non-interference",
+        "page_uri": "https://northstar.example.invalid/catalog",
+        "result_ref": "RESULT-AF-02-120",
+        "result": "satisfied",
+        "freshness_status": "current",
+        "evidence_refs": [
+          "EVIDENCE-AF-02-120"
+        ]
+      }
+    ],
+    "complete_process_evidence_refs": [
+      "EVIDENCE-AF-COMPLETE-PROCESS"
+    ],
+    "evidence_refs": [
+      "EVD-CASE-AF-FULL-SCOPE"
+    ]
+  },
+  "third_party_content": {
+    "all_affected_pages_identified": true,
+    "monitoring_possible": true,
+    "repair_window_business_days": 2,
+    "affected_page_refs": [
+      "PAGE-CASE-AF-1",
+      "PAGE-CASE-AF-2"
+    ],
+    "repair_evidence_refs": [
+      "EVD-CASE-AF-REPAIR"
+    ]
+  }
+}

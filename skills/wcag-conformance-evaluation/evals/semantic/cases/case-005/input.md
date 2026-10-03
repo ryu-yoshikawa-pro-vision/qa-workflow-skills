@@ -1,3 +1,9 @@
 # Case D: structured sample
 
 Step 2 explorationを反映したsampleを選ぶ。
+
+This is a synthetic, repository-local methodology fixture, not an external-product result. Evaluation setup: artifact `EVAL-CASE-D`, revision `rev-1`, evaluator `repository maintainer`, date `2026-10-01`, commissioner `repository workflow validation`, target `https://northstar.example.invalid/`, product scope `the finite Northstar demo storefront listed below`, enclosure `the listed public Web views only`, WCAG `2.2` level `AA`, accessibility-support baseline `Chromium on Windows with keyboard and pointer; no assistive-technology claim`, browser baseline `Chromium 149`, role/environment `unauthenticated public visitor in an isolated fixture`, side effects `no persistent writes; local page state only`, cleanup `close the page and discard local state`, period `2026-09-01 through 2026-10-01`.
+
+The Step 2 exploration record `ACT-CASE-D-EXPLORE` is complete for this finite scope and links evidence `EVD-CASE-D-INVENTORY`. Its in-scope inventory contains: `VIEW-CASE-D-HOME` (home, state `home/default`, locator `/`), `VIEW-CASE-D-CATALOG` (product listing, state `catalog/default`, locator `/catalog`), `VIEW-CASE-D-DETAIL` (product detail, state `detail/available`, locator `/items/trail-pack`), and `VIEW-CASE-D-CHECKOUT` (checkout, state `checkout/review`, locator `/checkout`). The product detail and checkout are identified in the exploration notes as distinct interaction/content types; the input does not preselect which views must be structured samples.
+
+Scope evidence `EVD-CASE-D-SCOPE` records that the product has no third-party content, language variants, separately hosted product areas, or authenticated/restricted views in this fixture. The inventory includes the responsive presentation conditions already noted above. These records are synthetic case facts; generated sample refs and membership must come from the current production helper.

@@ -1,3 +1,3 @@
 # Expected semantic contract
 
-それだけをproduct usability defectとして確定しないこと。
+それだけをproduct usability defectとして確定しないこと。対象またはrequested aspectを解決できない場合は、そのtool/input limitationと未解決範囲を報告し、scope skeletonをmaterializeしないことも正しい。

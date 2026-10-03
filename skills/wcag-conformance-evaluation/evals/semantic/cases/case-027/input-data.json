@@ -1,0 +1,119 @@
+{
+  "kind": "upstream-current-formal-results-for-earl",
+  "evaluation_ref": "EVAL-CASE-Y",
+  "evaluation_revision": "rev-1",
+  "version": "2.2",
+  "results": [
+    {
+      "criterion_evaluation_ref": "CRIT-EVAL-CASE-Y-001",
+      "result_ref": "RESULT-CASE-Y-001",
+      "sample_ref": "SAMPLE-CASE-Y-001",
+      "variation_ref": "VAR-CASE-Y-001",
+      "criterion_ref": "1.1.1",
+      "result": "satisfied",
+      "applicable_population": "present",
+      "execution_status": "complete",
+      "freshness_status": "current",
+      "procedure_provenance": [
+        {
+          "procedure_ref": "PROC-CASE-Y-001",
+          "mode": "automatic"
+        }
+      ],
+      "evidence_refs": [
+        "EVD-CASE-Y-1"
+      ]
+    },
+    {
+      "criterion_evaluation_ref": "CRIT-EVAL-CASE-Y-002",
+      "result_ref": "RESULT-CASE-Y-002",
+      "sample_ref": "SAMPLE-CASE-Y-001",
+      "variation_ref": "VAR-CASE-Y-001",
+      "criterion_ref": "1.4.3",
+      "result": "not-satisfied",
+      "applicable_population": "present",
+      "execution_status": "complete",
+      "freshness_status": "current",
+      "procedure_provenance": [
+        {
+          "procedure_ref": "PROC-CASE-Y-002",
+          "mode": "automatic"
+        }
+      ],
+      "evidence_refs": [
+        "EVD-CASE-Y-2"
+      ]
+    },
+    {
+      "criterion_evaluation_ref": "CRIT-EVAL-CASE-Y-003",
+      "result_ref": "RESULT-CASE-Y-003",
+      "sample_ref": "SAMPLE-CASE-Y-001",
+      "variation_ref": "VAR-CASE-Y-001",
+      "criterion_ref": "2.4.7",
+      "result": "undetermined",
+      "applicable_population": "present",
+      "execution_status": "complete",
+      "freshness_status": "current",
+      "procedure_provenance": [
+        {
+          "procedure_ref": "PROC-CASE-Y-003",
+          "mode": "manual"
+        }
+      ],
+      "limitation": "Synthetic manual evidence is unavailable for this criterion.",
+      "evidence_refs": []
+    }
+  ],
+  "evaluator_identity": "EVALUATOR-CASE-Y",
+  "tool_identity": "TOOL-CASE-Y",
+  "sample_identities": {
+    "SAMPLE-CASE-Y-001": "sha256:4cca917df805223b2accaf8c8f2cf8c9272d99f496318a59eab44383df0e50aa"
+  },
+  "variation_identities": {
+    "VAR-CASE-Y-001": "sha256:3f81e8c22af38374fcdaf22619ec3b5452c65bed159d2dbe1e0f669a0db5152e"
+  },
+  "identity_runtime_results": {
+    "sample_identity_registry": {
+      "samples": [
+        {
+          "sample_ref": "SAMPLE-001",
+          "target_ref": "TARGET-CASE-Y",
+          "state_key": "default",
+          "source_locators": [
+            "https://northstar.example.invalid/"
+          ],
+          "identity_fingerprint": "sha256:4cca917df805223b2accaf8c8f2cf8c9272d99f496318a59eab44383df0e50aa",
+          "source_evidence_refs": [
+            "EVD-CASE-Y-SAMPLE"
+          ]
+        }
+      ],
+      "draft_to_sample_ref": {
+        "CASE-Y-SAMPLE-DRAFT": "SAMPLE-001"
+      }
+    },
+    "materialize_variations": [
+      {
+        "variation_ref": "VAR-001",
+        "sample_ref": "SAMPLE-CASE-Y-001",
+        "source_kind": "project-authority",
+        "source_ref": "AUTH-CASE-Y-DESKTOP",
+        "variation_description": "Desktop initial presentation",
+        "presentation_condition": "1280x800 CSS px, en-US",
+        "environment_ref": "ENV-CASE-Y-DESKTOP",
+        "viewport_condition_refs": [
+          "VIEWPORT-CASE-Y-DESKTOP"
+        ],
+        "responsive_condition_refs": [],
+        "identity_fingerprint": "sha256:3f81e8c22af38374fcdaf22619ec3b5452c65bed159d2dbe1e0f669a0db5152e",
+        "required": true,
+        "completeness": "complete",
+        "coverage_status": "required",
+        "evidence_refs": [
+          "EVD-CASE-Y-SAMPLE"
+        ]
+      }
+    ]
+  },
+  "issued_at": "2026-10-01T12:00:00Z"
+}

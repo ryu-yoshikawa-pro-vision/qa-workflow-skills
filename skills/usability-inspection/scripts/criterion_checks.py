@@ -42,7 +42,25 @@ def run_supported_rule(rule_id: str, observations: dict[str, Any]) -> dict[str, 
 
 def requirement_result(*, applicability: str, semantic_result: str | None,
                        population_complete: bool, required_checks_complete: bool,
-                       evidence_refs: list[str]) -> str:
+                       evidence_refs: list[str], threshold_result: str | None = None,
+                       authority_ref: str | None = None) -> str:
+    if threshold_result is not None:
+        if semantic_result is not None:
+            raise RuleContractError("semantic and threshold requirement results are mutually exclusive")
+        if threshold_result not in {"within-threshold", "over-threshold", "threshold-not-defined"}:
+            raise RuleContractError("invalid threshold result")
+        if threshold_result == "threshold-not-defined":
+            if authority_ref:
+                raise RuleContractError("threshold-not-defined cannot carry an Authority ref")
+        elif not isinstance(authority_ref, str) or not authority_ref.strip():
+            raise RuleContractError("threshold comparison requires a project Authority ref")
+        if applicability != "applicable":
+            return "undetermined"
+        if threshold_result == "over-threshold":
+            return "not-satisfied" if evidence_refs else "undetermined"
+        if threshold_result == "within-threshold":
+            return "satisfied" if population_complete and required_checks_complete and evidence_refs else "undetermined"
+        return "undetermined"
     if applicability == "not-applicable":
         return "undetermined"
     if applicability != "applicable":

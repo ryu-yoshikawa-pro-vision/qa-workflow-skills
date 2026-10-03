@@ -32,7 +32,7 @@ Each normalized row carries observed fact, evaluation basis, expected characteri
 
 ## Finding References
 
-Link to the existing PR #13 Finding artifact when follow-up is required. Do not create a Finding for a result marked `問題なし` or `対象外`. The evaluation's `finding_ref` is a cross-reference, not a replacement for the Finding contract.
+When a distinct downstream QA action requires a PR #13 Finding, link the actual ref supplied or created through the existing PR #13 artifact path. Do not use `PR #13`, `PR #13 Finding artifact`, or another contract/type label as a Finding ref, and do not invent an ID. If a required Finding cannot be linked through the existing artifact path, leave the artifact incomplete and report the blocker. An additional-observation link to the current owner is separate from a Finding. Do not create a Finding for a result marked `問題なし` or `対象外`. The evaluation's `finding_ref` is a cross-reference, not a replacement for the Finding contract.
 
 ## Limitations and Handoff
 

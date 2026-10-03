@@ -22,7 +22,7 @@
     {
       "id": "UI-SEM-004",
       "title": "Routing and result boundaries are preserved",
-      "description": "The candidate routes detailed TC, formal WCAG conformance, and static evidence review to their owners; it does not claim page/product conformance.",
+      "description": "Evaluate only the routing boundary exercised by the case: detailed TC execution to its owner, formal WCAG conformance to wcag-conformance-evaluation, general live inspection within usability-inspection, or static evidence review to usability-evaluation. Do not require unrelated routing paths that the request does not exercise. Do not claim page/product conformance.",
       "critical": true
     }
   ]

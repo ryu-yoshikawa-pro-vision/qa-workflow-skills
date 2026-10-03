@@ -1,3 +1,3 @@
 # Expected semantic contract
 
-→ `statement_type=partial` とarea / reasonを生成する。許可reason外または未説明areaがあれば生成しない。
+このcaseが評価する成果物はStep 5.3のpartial Evaluation Statementだけである。指定されたWCAG version / levelとStep 5.3のstatement fieldsを保持し、`statement_type=partial` とarea / reasonを生成する。Statement内に全Success CriterionやConformance Requirementを列挙することは要求しない。Inputはnon-optional methodology requirementsがcompleteであると明示しているため、別の評価reportをcandidate outputへ要求しない。許可reason外または未説明areaがあればStatementを生成しない。
