@@ -4,6 +4,10 @@
 
 フェーズ1の共通ランナーが完成し、既存Eval Inputを使った実Agent生成と既存grader接続が成立してから着手します。
 
+このフェーズの目的は「実repoで一度動かすこと」ではありません。固定したtarget revision、評価要求、Agent / model、Judge条件を使って複数Skillのworkflowを実行し、結果を保存することで、後からSkillを修正しても同じ条件で再評価できる状態を作ることです。
+
+初回評価結果はSkill改善のbaselineとして利用できます。ただし、このフェーズで自動rankingや自動Skill修正は行いません。
+
 ## 対象
 
 - 評価側: `ryu-yoshikawa-pro-vision/qa-workflow-skills`
@@ -127,32 +131,109 @@ qa-workflow completion
 - `qa-workflow-skills`側のrevision
 - Agent commandのversionを取得できる場合はそのversion
 
-`qa-training-store`には既存の`.agents/skills/`があります。これらが`qa-workflow-skills`のroutingへ影響すると評価条件が変わるため、初回評価ではAgent-visibleなSkill集合を明示的に固定します。
+`qa-training-store`には既存の`.agents/skills/`があります。さらに現在の`AGENTS.md`は`feature-plan`、`code-review`、`repair-loop`、`harness-improvement`、`exploratory-qa`等のrepo固有Skillへroutingする契約を持ち、`QA_AGENT.md`も`exploratory-qa`とAgentic QA Harnessを前提にします。
 
-使い捨てcopy上では、元repoの`.agents/skills/`を評価対象から除外し、今回評価する`qa-workflow-skills`の19 SkillだけをAgent-visibleなSkill packageとして配置します。
+これらをそのまま残して`.agents/skills/`だけ除外すると、「利用を要求するSkillが存在しない」矛盾したtargetになります。また、元repo固有Skillが見える状態では今回評価したい19 Skill以外がroutingへ影響します。
 
-ただし、次は残します。
+そのため、初回評価では固定revisionのtracked contentからsanitized targetを作り、Agent-visibleな情報を次のように分けます。
 
-- `AGENTS.md`
+### 除外するもの
+
+- 元repoの`.agents/skills/**`
+- 元`AGENTS.md`
 - `QA_AGENT.md`
-- `docs/PROJECT_CONTEXT.md`
+- 過去runである`.codex/runs/**`
+- 過去Planである`docs/plans/**`
+- 過去検証結果である`docs/reports/**`
+- `training/agentic-qa/instructor/**`
+- target repo自身のSkill評価実装である`scripts/evals/**`と、その評価専用test
+- `qa-workflow-skills`側の`evals/**`、Reference、expected、rubric、grader
+
+過去Plan / report / run、instructor情報、target repo自身のSkill evalは、実際のProduct / Specを理解するために必要な正本ではなく、評価対象Agentへ既存の結論や評価基準を漏らす可能性があるため除外します。
+
+### 残すもの
+
 - `docs/spec/**`
+- `docs/PROJECT_CONTEXT.md`
+- README等の一般的なrepo資料
 - Product Code
-- Test Code
+- 既存Product Test
 - Seed / Test Control
-- その他のrepo固有資料
+- Build / Test設定
+- Checkout / Paymentの理解に必要なその他のtracked Product資料
 
-これらはテスト対象repoの文脈・仕様・実装であり、評価用正解情報ではありません。
+READMEや既存Testは補助情報として参照できますが、期待動作の優先順位は`docs/spec/README.md`のOracle契約に従います。
 
-`qa-workflow-skills`側の`evals/`、reference answer、expected output、graderはテスト対象Agentから見えない状態を維持します。
+### 評価用AGENTS.md
+
+sanitized targetのrootにはEvaluatorが最小の評価用`AGENTS.md`を生成します。元`AGENTS.md`のrepo固有Skill routingはコピーしません。
+
+評価用`AGENTS.md`には、今回の評価に必要な次だけを記載します。
+
+- 対象はCheckout / PaymentのWeb範囲
+- Agent-visibleなSkillはEvaluatorが配置した`qa-workflow-skills`の19 Skillだけ
+- 規範仕様の優先順位は`docs/spec/README.md`に従う
+- Product Code、既存Product Test、規範仕様を変更しない
+- 評価成果物の書込みはEvaluatorが指定した評価出力rootだけに限定する
+- commit / push / PR作成等のGit mutationを行わない
+- Evaluator側のReference / expected / rubric / graderを探索しない
+
+この`AGENTS.md`は評価条件を固定するためのHarness入力であり、製品仕様、期待するテストケース、正解となるQA判断は追加しません。
+
+その上で、今回評価する`qa-workflow-skills`の19 SkillだけをAgent-visibleなSkill packageとして配置します。
 
 ## source変更の扱い
 
-分析・設計評価ではProduct Code、既存Test、規範仕様を変更しません。
+分析・設計評価ではProduct Code、既存Product Test、規範仕様を変更しません。
 
-Agent実行前後で対象repoのsource差分を確認し、許可した評価成果物以外の変更がある場合は実行結果を有効なSkill評価へ昇格しません。
+sanitized target内にEvaluator所有の評価出力root `.qa-eval-output/` を事前作成し、Agentへ書込み可能な永続成果物の保存先として明示します。
 
-評価成果物は対象repoの正規成果物としてcommitせず、親Planの`.agent-eval-runs/`配下へ回収します。
+Agent実行前後でtargetのsource差分を確認し、`.qa-eval-output/**`以外に変更がある場合は実行結果を有効なSkill評価へ昇格しません。
+
+`.qa-eval-output/**`はtargetのProduct成果物ではなく、今回の評価用一時出力です。commitせず、回収後にsanitized targetと一緒に破棄します。
+
+## 複数QA成果物の回収
+
+フェーズ1の単一caseはAgent stdoutを`output.md`として評価できますが、フェーズ2ではspec analysis、test analysis、TR、TCN / CI、TC、coverage、adversarial review、workflow state等の複数成果物を扱います。
+
+そのため、フェーズ2ではstdoutだけを正規成果物として扱いません。
+
+処理を次に固定します。
+
+```text
+sanitized target
+  ↓
+.qa-eval-output/ をEvaluatorが作成
+  ↓
+実Agentが各QA成果物を個別fileとして保存
+  ↓
+Agent終了
+  ↓
+Evaluatorがoutput rootをscan
+  ↓
+path / symlink / sizeを検証
+  ↓
+各fileのSHA-256と相対pathをartifact-manifest.jsonへ記録
+  ↓
+.agent-eval-runs/<run>/target-artifacts/ へcopy
+  ↓
+source差分を確認
+  ↓
+sanitized targetを破棄
+```
+
+Agentの最終stdoutは実行概要として保存できますが、複数Skillの正規評価対象は回収したartifact file群とします。
+
+Evaluatorは成果物内容を独自schemaへ変換しません。各Skillの既存Markdown / runtime evidence契約を維持したままcopyし、`artifact-manifest.json`には少なくとも次だけを保存します。
+
+- relative path
+- file size
+- SHA-256
+- 生成元Skillをfile配置から一意に決められる場合はそのSkill名
+
+symlink、output root外を指すpath、path traversal、許容上限を超えるfileは回収せずrunをexecution errorとします。
+
+workflow state等で保存rootが必要な場合は、Evaluatorが評価用Project Contextへ`.qa-eval-output/`配下のproject-local rootを設定します。既存Skillの保存契約を変えず、評価用の保存先だけを与えます。
 
 ## 評価観点
 
@@ -214,6 +295,29 @@ READMEや既存Testだけを期待動作の最上位根拠へ昇格させない�
 - Checkout仕様に存在しないToast等
 
 対象repoの制約と規範仕様にないものは、必要なら追加調査候補として扱い、現在仕様として確定しません。
+
+## 評価scenarioと比較条件
+
+初回scenario IDは`qa-training-store-checkout-payment-web-v1`とします。
+
+Evaluator側にtrackedなscenario定義を置き、少なくとも次を固定します。
+
+- target repository
+- target revision
+- Platform
+- Feature / scope
+- Agentへ渡す評価要求
+- Agent-visible Skill集合
+- sanitized targetから除外する評価汚染情報
+- 評価出力root
+- Judgeが参照する規範仕様path
+- 意味評価criteria
+
+scenario定義と評価要求からfingerprintを算出し、親Planのrun provenanceへ保存します。
+
+Skill修正前後を比較するときは、target revision、scenario fingerprint、Agent名 / model、Judge条件を一致させます。これらが異なるrunは参考比較には使えても、Skill変更だけの効果として直接比較しません。
+
+scenario定義は現在の`qa-training-store`初回評価を再現するための固定fixtureであり、任意repoを扱うplugin interfaceにはしません。
 
 ## 評価方法
 
@@ -296,17 +400,20 @@ Agent executionは、Eval dataset由来のpromptでも、固定対象repo向けp
 ## 実装・実行順序
 
 1. 親Planのフェーズ1を完了する
-2. `qa-training-store`の固定revision `84ce165493649550832731a60cf436f8ae29c56b` を使い捨てcopyへ準備する
-3. 対象revisionの`docs/spec/README.md`と`docs/spec/features/checkout-and-payment.md`が存在することを確認する
-4. 元repoのAgent Skill集合を評価条件から除外し、候補`qa-workflow-skills` 19 SkillだけをAgent-visibleにする
-5. Checkout / Payment評価要求を固定する
-6. 実Agentを起動し、分析・設計workflowを実行する
-7. Product Code / Test / Specに許可外変更がないことを確認する
-8. 生成成果物を`.agent-eval-runs/`へ回収する
-9. 機械判定可能な契約を既存runtime / deterministic validationで確認する
-10. 独立Judgeで意味品質を評価する
-11. workflow / traceability / semantic結果を同じrunへ保存する
-12. runner起因の失敗とSkill品質上の非passを分離して報告する
+2. trackedな`qa-training-store-checkout-payment-web-v1` scenario定義を確定しfingerprintを算出する
+3. `qa-training-store`の固定revision `84ce165493649550832731a60cf436f8ae29c56b` のtracked contentからsanitized targetを準備する
+4. 対象revisionの`docs/spec/README.md`と`docs/spec/features/checkout-and-payment.md`が存在することを確認する
+5. 元repoのAgent Skill、過去run / Plan / report、instructor情報、target側Skill eval等を除外する
+6. 評価用`AGENTS.md`、`.qa-eval-output/`、必要な評価用Project Contextを作成する
+7. 候補`qa-workflow-skills` 19 SkillだけをAgent-visibleにする
+8. Checkout / Payment評価要求、Agent / model、Judge条件をrun provenanceへ記録する
+9. 実Agentを起動し、分析・設計workflowを実行する
+10. `.qa-eval-output/**`以外のProduct Code / Test / Spec等に変更がないことを確認する
+11. 複数QA成果物をscanし、`artifact-manifest.json`を作成して`.agent-eval-runs/`へ回収する
+12. 機械判定可能な契約を既存runtime / verifierで確認する
+13. 独立Judgeで意味品質を評価する
+14. workflow / traceability / semantic結果とprovenanceを同じrunへ保存する
+15. runner / environment起因の失敗とSkill品質上のnon-passを分離して報告する
 
 ## 完了条件
 
@@ -316,9 +423,13 @@ Agent executionは、Eval dataset由来のpromptでも、固定対象repo向けp
 - source revisionが`84ce165493649550832731a60cf436f8ae29c56b`として固定・記録される
 - 評価対象`qa-workflow-skills` revisionが記録される
 - Agent-visibleなSkill集合が今回の19 Skillへ固定される
-- `qa-workflow-skills`のeval answer / expected / graderをAgentへ公開していない
+- 元`AGENTS.md` / `QA_AGENT.md`によるrepo固有Skill routingが評価対象Agentへ残っていない
+- 過去run / Plan / report、instructor情報、target側Skill eval、`qa-workflow-skills`のReference / expected / rubric / graderが評価対象Agentへ公開されていない
+- 評価用`AGENTS.md`が評価条件だけを持ち、製品仕様や正解QA成果物を追加していない
+- scenario ID / scenario fingerprint、Agent名 / model、Judge条件がrun provenanceへ保存される
 - Checkout / PaymentのWeb範囲で実Agent workflowが最後まで実行される
-- Product Code、既存Test、規範仕様に許可外変更がない
+- Product Code、既存Product Test、規範仕様に許可外変更がない
+- 複数成果物が`.qa-eval-output/`から`.agent-eval-runs/`へ回収され、`artifact-manifest.json`でpath / SHA-256を追跡できる
 - 生成成果物がrun artifactとして保存される
 - workflow結果が保存される
 - traceability / runtimeの機械判定結果が保存される
