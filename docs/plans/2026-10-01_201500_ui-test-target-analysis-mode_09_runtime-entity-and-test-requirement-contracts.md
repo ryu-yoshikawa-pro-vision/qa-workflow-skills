@@ -159,7 +159,7 @@ stdinは1 JSON object、stdoutは1 JSON object + LFです。operationは `cutove
 - TRD / TC: `phase=all` only
 - TCD: `condition-structure / models / test-data-requirements / materialize-coverage`
 - TCDの2 phase目以降だけ `current_v2_artifact_markdown` を要求する
-- aggregate stdinは16 MiB、cutoverの `artifact_markdown / current_v2_artifact_markdown` だけ64 KiB string上限のtransport例外を許可する
+- aggregate stdinは16 MiBを維持する。cutoverのtop-level `artifact_markdown / current_v2_artifact_markdown` は成果物全文transportなので通常の1文字列64 KiB上限を**免除**するが、両artifactを含む実UTF-8 stdin全体には16 MiB上限を適用する。artifactから抽出したMachine Runtime Input / Result / Entity等のJSON fieldには通常の64 KiB string上限を適用する
 - 通常generatorの2 MiB上限 / string上限は変更しない
 - handled failureはexit 0 + `valid=false / issues[]`、unexpected internal errorだけexit 1
 - `cutover_semantic_drift / cutover_dependency_incomplete` はblocking issueとする
@@ -196,7 +196,7 @@ response:
 expected unitは `artifact:requirement_structure:all` exactly 1件です。
 
 - v1 `authorities / risks / test_requirements / dispositions` をsemantic変更せず維持
-- top-level `acceptance_criteria=[]`、各既存TR draftへ `acceptance_refs=[]` を追加
+- 各既存TR draftへ `acceptance_refs=[]` を追加する。current AC集合はv2 invocationのvalidated upstream `acceptance_criterion` Entityからrequirement_structure.pyが導出するため、cutover inputへ複製しない
 - v1 result `tr_id_state` → `previous_tr_ids[]`
 - `draft_key ↔ tr_id_map[]` をexact joinし、current draftを `identity_action=reuse / reuse_id=<TR-ID>` に固定
 - active TRを `update_scope_tr_ids[]` へ全件入れ、first v2 runをfull rebuildにする
@@ -248,16 +248,16 @@ expected unitは `artifact:case_structure:all` exactly 1件です。
 | Skill | v1 artifactの扱い | v2移行方法 | stable identity | 再実行 / 再観測 |
 | --- | --- | --- | --- | --- |
 | spec-analysis | v1 Machine Entity / wrapperは破棄 | current canonical spec-analysis inputからAuthority Entityをv2再生成。UI target migration前は既存semantic rowを変更しない | SPEC / DEC / ASM等のsemantic IDをhuman-readable / canonical inputから維持 | deterministic evidence再生成。version bumpだけを理由に仕様再分析しない |
-| test-analysis | v1 Runtime / Entity evidenceはcurrent扱いしない | 保存済みcurrent semantic inputから既存generatorをfull rerunしてv2 evidenceを再生成 | RISK等のsemantic IDはcurrent normalized inputに存在するIDを維持し、v1 fingerprintをseedにしない | deterministic full rerun。意味再判断は行わない |
+| test-analysis | v1 Runtime / Entity evidenceはcurrent扱いしない | 保存済みartifactのvalidated `Machine Runtime Input.input` をcanonical sourceとして同じgeneratorをfull rerunしv2 evidenceを再生成する。Machine Runtime Inputがmissing / invalidならMarkdownから再構築せず通常test-analysis再実行を要求する | RISK等のsemantic IDは保存済みinput / current artifact上のIDを維持し、v1 fingerprintをseedにしない | valid保存inputがあればdeterministic rerun。無ければ通常Skill rerun |
 | test-requirement-design | v1 resultをprevious artifactへ直接渡さない | `runtime_v1_cutover.py` でcomplete v2 inputを作りfull rebuild | TR ID / inactive・deleted履歴をcutoverで維持 | cutover必須 |
 | test-condition-design | v1 resultをprevious artifactへ直接渡さない | `runtime_v1_cutover.py` の4 phaseでcomplete v2 inputを作りfull rebuild | TCN / model / CI IDと履歴をcutoverで維持 | cutover必須 |
 | test-case-design | v1 resultをprevious artifactへ直接渡さない | `runtime_v1_cutover.py` でcomplete v2 inputを作りfull rebuild | TC ID / inactive・deleted履歴をcutoverで維持 | cutover必須 |
-| coverage-analysis | v1 aggregate evidenceをcarry-forwardしない | current upstream v2 evidenceから`traceability` / verifierをfull rerun | 自Skill Entityをcarry-forwardしない既存契約を維持 | deterministic full rerun |
-| qa-workflow | v1 aggregate evidenceをcarry-forwardしない | 各scope担当Skillのcurrent v2 evidenceを揃えた後、`workflow_runtime.py` / final gateをfull rerun | 自Skill Entityをcarry-forwardしない既存契約を維持 | orchestration evidenceを再生成 |
-| usability-inspection | v1 runtime envelopeをcurrent扱いしない | current semantic observation / evidenceが既存currentness契約を満たす場合はそれを入力にv2 evidenceを再生成 | runtime version bumpだけで新しいproduct identityを作らない | live再観測要否は既存Skillのcurrentness / evidence契約で決め、version bumpだけでは強制しない |
-| wcag-conformance-evaluation | v1 runtime envelopeをcurrent扱いしない | current evaluation input / evidenceからv2 evidenceを再生成 | evaluation / sample等のsemantic identityは既存Skill契約を維持 | live再観測要否はWCAG-EM側のfreshness / sampling / handoff契約で決め、version bumpだけでは強制しない |
+| coverage-analysis | v1 aggregate evidenceをcarry-forwardしない | 保存済みMachine Runtime Inputがvalidならそのsemantic inputを現在のupstream v2 Entityへrebindして`traceability` / verifierをfull rerunする。保存inputが無ければcurrent upstream v2 evidenceから通常Skill契約どおり再生成する | 自Skill Entityをcarry-forwardしない既存契約を維持 | deterministic full rerun |
+| qa-workflow | v1 aggregate evidenceをcarry-forwardしない | 各scope担当Skillのcurrent v2 evidenceを揃え、保存済みMachine Runtime Inputがvalidならそのworkflow semantic inputを再利用して`workflow_runtime.py` / final gateをfull rerunする。保存inputが無ければcurrent workflow state / routing入力から通常契約で再生成する | 自Skill Entityをcarry-forwardしない既存契約を維持 | orchestration evidenceを再生成 |
+| usability-inspection | v1 runtime envelopeをcurrent扱いしない | 保存済みMachine Runtime Inputが存在し既存validator / currentness契約を満たす場合だけそのexact inputからv2 evidenceを再生成する。保存inputが無い / invalidならMarkdownから復元せず、既存Skill契約による通常再実行または必要なlive再観測を行う | runtime version bumpだけで新しいproduct identityを作らない | valid保存inputがある場合はversion bumpだけでlive再観測しない。無い場合は通常Skill判断 |
+| wcag-conformance-evaluation | v1 runtime envelopeをcurrent扱いしない | 保存済みMachine Runtime Inputが存在し既存validator / WCAG-EM currentness契約を満たす場合だけそのexact inputからv2 evidenceを再生成する。保存inputが無い / invalidならreport proseから復元せず、既存sampling / procedure / handoff契約で通常再実行する | evaluation / sample等のsemantic identityは既存Skill契約を維持 | valid保存inputがある場合はversion bumpだけでlive再観測しない。無い場合は通常Skill判断 |
 
-この表にないmigration wrapper / generic converterは追加しません。spec-analysis / test-analysis / coverage-analysis / qa-workflow / inspection系でv1 runtime envelopeからv2 inputを推測変換しません。
+この表にないmigration wrapper / generic converterは追加しません。spec-analysisはcanonical spec成果物、runtime対応Skillはvalidated Machine Runtime Input、workflow系はcurrent workflow stateを正本とし、proseからv2 inputを推測変換しません。PR #14 merge後のStep 0では各Skillの保存input blockが実際に存在・parse可能であることだけを再計測し、存在しない場合は上表の通常rerun経路へ固定します。新しい設計判断はStep 0へ持ち越しません。
 
 #### UI target migrationとの相対順序
 
@@ -312,16 +312,16 @@ qa-workflow / coverage-analysisへspec-analysis scopeを渡す場合、AgentがM
 
 ### 3.1 requirement-structure-v2 caller contract
 
-UI target modeでは `build-machine-evidence.normalized_skill_input` が `acceptance_criteria[]` を必ず持ちます。通常の非mode spec-analysisは既存互換のためupstream成果物上でkey省略を許可しますが、`requirement-structure-v2` のraw generator inputはmodeを問わず次を必須にします。
+`acceptance_refs[]` の意味対応だけをLLM入力に残し、current AC集合の転記・empty default・Authority mergeはAgentに行わせません。
 
-- top-level `acceptance_criteria[]`
-- 各 `test_requirements[]` draftの `acceptance_refs[]`
+- `requirement-structure-v2` raw generator inputはtop-level `acceptance_criteria[]` を持たない
+- `requirement_structure.py` はshared runtime metadataで検証済みのcurrent upstream Machine Entitiesから `skill=spec-analysis / entity_type=acceptance_criterion` を抽出し、current AC集合・Authority dependencyを決定論導出する。該当Entityが0件なら内部集合は空
+- 各 `test_requirements[]` draftの `acceptance_refs[]` は必須で、どのACへ閉じるかは意味判断なのでLLMが明示する。ACなしworkflowでは各draftが空arrayを明示する
+- callerが未知AC IDを `acceptance_refs[]` へ指定した場合はgeneratorがrejectする。AC Entity / Authority Entityの存在・fingerprintはruntime metadataを正本とする
 
-ACが存在しないworkflowではcallerが両方を空arrayで明示します。空array補完だけを担当する `requirement_input_adapter.py` は追加しません。
+旧runtime-v1 / requirement-structure-v1からの初回cutoverは§2.7のtest-requirement-design `runtime_v1_cutover.py` がTRのstable identity / historyとsemantic draftをv2へ変換する。AC集合はcutover helperが複製せず、そのv2 invocationのcurrent upstream Entityから `requirement_structure.py` が導出する。
 
-旧runtime-v1 / requirement-structure-v1からの初回cutoverは§2.7のtest-requirement-design `runtime_v1_cutover.py` がcomplete v2 generator inputを返します。cutover後の通常実行ではAgent / qa-workflow / 導入先projectがv2 schemaどおりcomplete inputを構成します。導入先projectが独自のlegacy保存形式を持つ場合の変換wrapperはこのSkill repoの責務にせず、そのproject / harness側で用意します。
-
-`requirement_structure.py` とshared `run_cli` はfield欠落をsilent補完しません。runtime `input_fingerprint` は実際に渡されたcomplete v2 inputから計算します。これにより、default補完用の別adapterやshared runtime hookを増やしません。
+空array補完だけのadapter、shared runtime hook、project固有legacy wrapperは追加しません。導入先projectが独自保存形式を持つ場合の外部変換はproject / harness側の責務です。runtime `input_fingerprint` はLLM semantic draft + current upstream dependencyをshared runtime contractどおり計算します。
 
 ## 4. Acceptance Criterion Machine Entity
 
@@ -353,16 +353,18 @@ AC Entity contentには次を固定projectionします。
 - `success_postcondition`
 - `user_stories[]`: `us_id / actor_role / goal`。`us_id`昇順で固定
 - `scope`: `scope_id / target / authority_refs[]`。`target` は00の `対象機能 / 領域` をtrimしたcanonical文字列
-- `linked_structures[]`: AC / Behavior / UC / US chainとlinked UIOPが参照するUI構造rowだけを `structure_id` 昇順で `structure_id / type / name / state_axis / path_identifier / parent_structure_id / authority_refs[]` として固定projection
-- `authority_refs[]`: AC / Behavior / UC / US chain、linked UIOP、scope、linked structureのstable refsをCurrent Effective Authorityへ解決し、current SPEC / DECISION / approved ASMだけを残した1件以上のunionを重複除去して昇順
+- `linked_structures[]`: AC / Behavior / UC / US chain、linked UIOP、`linked_domain_items[]` が直接参照するUI構造rowをseedとし、各rowの `parent_structure_id` をrootまで辿ったancestor closureを `structure_id` のcanonical順で固定projectionする。各entryは `structure_id / type / name / state_axis / path_identifier / parent_structure_id / authority_refs[]` を持つ。missing parent / self-parent / cycleはrejectする
+- `linked_domain_items[]`: AC / Behavior / UC / US / linked UIOPの `関連構造ID` から直接参照されるFIELD / RULE / FLOW / NOTIFY / INTERACTだけを固定projectionする。item typeごとにsource tableのsemantic field、scope refs、Authority refs、structure refsをcanonical化し、別itemへ再帰展開しない
+- `linked_inferences[]`: AC chain、linked UIOP、scope、linked structures、linked domain itemsが `関連仕様項目ID` で直接参照するcurrent INF rowを、09 `分析項目` のcanonical row内容で固定projectionする。INFはcontent fingerprintへ寄与するがupstream Entity dependencyにはしない
+- `authority_refs[]`: AC / Behavior / UC / US chain、linked UIOP、scope、linked structures、linked domain itemsのstable refsをCurrent Effective Authorityへ解決し、current SPEC / DECISION / approved ASMだけを残した1件以上のunionを重複除去してcanonical sortする
 
-これによりAC本文が同じでも、linked UIOPの操作対象 / 操作内容 / Authority、scopeの対象意味、実際に参照するPAGE / STATE / VIEW等のcanonical内容、親US / UC / Behaviorの意味変更でAC content fingerprintが変わります。無関係なUI構造rowはprojectionへ入れないためstale化しません。
+これによりAC本文が同じでも、linked UIOPの操作対象 / 操作内容 / Authority、scopeの対象意味、直接参照structureとancestor、linked FIELD / RULE / FLOW / NOTIFY / INTERACT、linked INF、親US / UC / Behaviorの意味変更でAC content fingerprintが変わります。無関係なpackage rowはprojectionへ入れないためstale化しません。repository確認だけで成立したimplementation-only structureもtarget-model dependencyとしてfingerprintへ寄与しますが、Authorityへ昇格しません。
 
 ### 4.2 dependencies
 
-AC Entityの `upstream_entity_dependencies[]` は、AC / Behavior / UC / US chain、linked UIOP、scope、linked structureのstable refsからfilterしたcurrent SPEC / DECISION / approved ASM Authority Entity unionへ固定します。INF / UNKをdependencyへ追加しません。
+AC Entityの `upstream_entity_dependencies[]` は、AC / Behavior / UC / US chain、linked UIOP、scope、linked structures、linked domain itemsのstable refsからfilterしたcurrent SPEC / DECISION / approved ASM Authority Entity unionへ固定します。INF / UNKをdependencyへ追加しません。linked INFはAC contentだけへ含めます。
 
-UIOP / US / UC / Behavior / UI構造をdependency Entity typeとして追加しません。linked UIOP、scope、linked structure、親chainをAC contentへ含め、Authorityだけ既存Entity dependencyへ展開することで、不要なglobal entity typeを増やさずfreshnessを成立させます。
+UIOP / US / UC / Behavior / UI構造 / FIELD / RULE / FLOW / NOTIFY / INTERACT / INFを新しいdependency Entity typeとして追加しません。package-local rowはAC contentへ固定projectionし、Authorityだけ既存Entity dependencyへ展開することで、不要なglobal entity typeを増やさずfreshnessを成立させます。
 
 
 ## 5. test-requirement-design contract version
@@ -384,48 +386,35 @@ top-level required fields:
 
 - `authorities`
 - `risks`
-- `acceptance_criteria`
 - `test_requirements`
 - `dispositions`
 - `previous_tr_ids`
 - `update_scope_tr_ids`
 
-既存legacy promotion用 `legacy_tr_ids` の条件付き入力契約は維持します。
+既存legacy promotion用 `legacy_tr_ids` の条件付き入力契約は維持します。top-level `acceptance_criteria` は持ちません。
 
-`acceptance_criteria` row:
+current Acceptance Criteria集合は `metadata.upstream_entities` のうち `skill=spec-analysis / entity_type=acceptance_criterion` のcurrent Entityからgeneratorが決定論導出します。Entity contentの `ac_id / authority_refs[]` とdependency identityを正本とし、callerがAC一覧やAuthority unionを転記しません。upstream ACが0件ならknown AC集合は空です。
 
-```json
-{"ac_id":"AC-001","authority_refs":["SPEC-001","DEC-002"]}
-```
-
-`authority_refs[]` はspec-analysis helperが生成したcanonical値をそのまま渡します。
-
-- artifact modeでは、同じ `AC-xxx` Machine Entityの `upstream_entity_dependencies[]` から得られるAuthority identity集合とexact一致を要求する
-- direct modeでは、top-level `authorities[]` のknown ID集合へ存在検証する
-- ACが存在しないworkflowでもfield自体を省略せず `acceptance_criteria: []` とする
-
-各 `test_requirements[]` draftへ `acceptance_refs` を必須追加します。該当ACがない横断的TRは `[]` を使用します。
+各 `test_requirements[]` draftへ `acceptance_refs[]` を必須追加します。該当ACがない横断的TRは `[]` を使用します。`acceptance_refs[]` の意味対応はLLMが判断し、generatorはknown AC集合への存在参照だけを検証します。
 
 ## 7. requirement_structure-v2 deterministic processing
 
 scriptは次を行います。
 
-1. AC ID形式 / duplicate / `authority_refs[]` を検証
-2. artifact modeでは `spec-analysis / acceptance_criterion / AC-xxx` current Entityへ完全解決し、input `authority_refs[]` がAC EntityのAuthority dependency identity集合とexact一致することを検証
-3. direct modeではinputのknown AC集合とknown Authority集合へ存在検証
-4. TR draftの `acceptance_refs` を検証
-5. linked upstream集合へ `acceptance_criterion` を追加
-6. closure universeへcurrent ACを追加
-7. TR Entity contentへ `acceptance_refs` を保存
-8. artifact modeではTR Entity `upstream_entity_dependencies[]` へ参照current AC Entityを追加する。direct modeではcurrent Machine Entityがないためdependencyを捏造せず、`acceptance_refs[]` をcontentへ保持する
-9. 各参照ACの `authority_refs[]` をunionする。artifact modeでは解決できたcurrent Authority EntityをTR Entity `upstream_entity_dependencies[]` へ直接追加する。direct modeではknown Authority ID検証とcontent保持までとし、Machine Entity dependencyは作らない
-10. AC linked + disposedの二重扱いを拒否
-11. linkedもdisposedもされないcurrent ACをunclosedとして拒否
-12. Authority / Product Risk / Acceptance Criteriaのclosure集合を別々に評価する。TRの `acceptance_refs[]` にACを追加しても、そのACの `authority_refs[]` をAuthority linked集合へ暗黙追加しない
+1. validated `metadata.upstream_entities` からcurrent Acceptance Criterion Entityを抽出し、AC ID duplicate、skill/type、content上の`ac_id / authority_refs[]`とEntity dependency整合を検証する
+2. `test_requirements[].acceptance_refs[]` をknown AC集合へ存在検証する
+3. linked upstream集合へ参照 `acceptance_criterion` Entityを追加する
+4. closure universeへcurrent ACを追加する
+5. TR Entity contentへ `acceptance_refs[]` を保存する
+6. TR Entity `upstream_entity_dependencies[]` へ参照current AC Entityを追加する
+7. 各参照ACのcurrent Authority dependencyをTR Entity dependencyへ直接追加する
+8. AC linked + disposedの二重扱いを拒否する
+9. linkedもdisposedもされないcurrent ACをunclosedとして拒否する
+10. Authority / Product Risk / Acceptance Criteriaのclosure集合を別々に評価する。TRの `acceptance_refs[]` にACを追加しても、そのACのAuthorityをTR draftの `authority_refs[]` へ暗黙追加しない
 
-AC linkはACだけをclosureします。Authorityは従来どおりTR draftの `authority_refs[]` に明示linkされるか、Authority Dispositionへ入る必要があります。AC→Authority unionはfreshness dependencyを直接保持するための展開であり、Authority closureを代理しません。
+AC linkはACだけをclosureします。Authorityは従来どおりTR draftの `authority_refs[]` に明示linkされるか、Authority Dispositionへ入る必要があります。AC→Authority dependency展開はfreshnessのためであり、Authority closureを代理しません。
 
-Authority dependencyの展開はID集合・Entity解決だけを行う決定論処理です。どのAuthorityがACを支えるかはspec-analysisでLLMが判断済みであり、test-requirement-design側で意味を再判断しません。存在しないMachine Entityをdirect modeでplaceholder生成する経路は追加しません。
+Authority dependencyの展開はcurrent Machine Entity identity / fingerprintだけを使う決定論処理です。どのAuthorityがACを支えるかはspec-analysisで判断済みであり、test-requirement-design側で意味を再判断しません。
 
 LLMはACとTRの意味上の対応、TRの分割 / 統合を判断します。scriptは対応関係の意味妥当性を決めません。
 
@@ -536,7 +525,7 @@ coverage-analysisの既存traceability graph node typeへACを追加しません
 - qa-workflow expected / actual Entity exact match
 - coverage-analysis current Entity parse compatibility
 - requirement-structure-v2 valid / invalid schema
-- requirement-structure-v2がmodeを問わず `acceptance_criteria[] / acceptance_refs[]` をraw input必須とし、ACなしはcallerの明示 `[]`、v1 cutoverはTRD Skill-local helperのcomplete inputで成立すること。field欠落を補うadapter script / shared runtime hookを追加しない
+- requirement-structure-v2がtop-level `acceptance_criteria[]` をcallerへ要求せず、validated upstream Acceptance Criterion Entityからknown AC集合を導出すること。各TRの `acceptance_refs[]` はraw input必須で、ACなしは明示 `[]` とする。default補完adapter / shared runtime hookを追加しない
 - AC-001をTRへlinkしても、そのACが参照するSPEC-001をTR authority_refs / Authority Dispositionで別途closeしない場合はSPEC-001 unclosedとなる
 - TRD / TCD / TC Skill-local runtime_v1_cutover.pyのprojection、runtime-v1 / entity-state-v1以外の入力拒否、内容不変時stable ID保持、deleted / inactive identity history保持
 - AC linked / disposed / unclosed / linked+disposed
@@ -544,8 +533,11 @@ coverage-analysisの既存traceability graph node typeへACを追加しません
 - AC dependency fingerprint propagation
 - linked UIOPの操作内容 / 対象構造変更でAC本文 / 親chainが同じでもAC fingerprintが変わり関連TRがstaleになる回帰
 - linked UIOPだけが参照するAuthority contentを変更し、UIOP本文が同一でもAC Authority dependency / fingerprint変更から関連TRがstaleになる回帰
-- linked structureのPath / 名称 / STATE軸等を同一stable IDのまま変更するとAC fingerprintが変わる回帰
-- ACが参照しない無関係structure変更ではAC / TRがstaleにならない回帰
+- AC chain / UIOP / linked domain itemから直接参照されるstructureと、そのancestor PAGE等のPath / 名称 / STATE軸を同一stable IDのまま変更するとAC fingerprintが変わる回帰
+- linked FIELD / RULE / FLOW / NOTIFY / INTERACTのcanonical内容変更でAC / TRがstaleになる回帰
+- linked INFのcanonical内容変更でAC / TRがstaleになる回帰
+- ACが参照しない無関係structure / domain item / INF変更ではAC / TRがstaleにならない回帰
+- parent_structure_idのmissing / self / cycleをrejectする回帰
 - scopeの対象機能 / 領域またはscope Authority変更でAC fingerprint / dependencyが変わる回帰
 - AC本文 / 親chain不変のままAuthority fingerprintだけ変更し、spec-analysisをcurrentへ再生成した後も未再実行TRが直接Authority dependencyによりstaleになる回帰
 - partial rerun stale carry-forward
@@ -565,10 +557,10 @@ coverage-analysisの既存traceability graph node typeへACを追加しません
 
 - PR #14後の9 runtime_contract.pyが同一内容でacceptance_criterionを扱える
 - 9コピーがruntime-v2 / entity-state-v2へ同期され、requirement-structure-v2が明示される。TRD / TCD / TC固有cutover projectionはshared runtimeではなく各Skill-local helperにある
-- helperからspec-analysis normalized_skill_inputとAuthority + AC Entityを決定論生成できる
-- qa-workflowがAuthority + ACをexpectedとして内部導出できる
+- helperからpackage-global spec-analysis evidenceとready scope別 `ready_scope_handoffs[]` を決定論生成できる
+- qa-workflowがready scope handoffのAuthority + ACだけをexpectedとして使用し、blocked scopeをpackage-global集合からAgentがfilterしない
 - test-requirement-designまで進むworkflowではcurrent ACがTRまたはDispositionへ完全に閉じる。仕様理解packageだけの要求ではこのclosureを要求しない
-- AC / linked UIOP / scope / linked structure / 親Behavior / 親UC / 親US / Authority変更が必要なTR freshnessへ伝播し、無関係structure変更は伝播しない
+- AC / linked UIOP / scope / direct structure + ancestor / linked FIELD-RULE-FLOW-NOTIFY-INTERACT / linked INF / 親Behavior-UC-US / Authority変更が必要なTR freshnessへ伝播し、無関係package row変更は伝播しない
 - 無関係TRを不必要にstale化しない
 - partial rerunでscope外TRがchanged ACを参照したままcurrentにならない
 - existing coverage graphを目的なく拡張していない

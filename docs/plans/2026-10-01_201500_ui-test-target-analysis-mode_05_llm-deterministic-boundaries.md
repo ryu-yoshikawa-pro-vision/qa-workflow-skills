@@ -30,12 +30,12 @@
 | SPEC / DECISION / INFERENCE / UNKNOWN分類 | LLM | 情報源・Authority・文脈から判断する |
 | 現在有効なAuthority解決 | LLM | 既存spec-analysis契約を使用する |
 | PAGE / STATE / VIEW / STEP / MODAL等の意味分類 | LLM | UI意味を判断する。scriptは分類結果の形式だけ検証できる |
-| scopeごとのUI操作有無 / file applicability triggerの意味判断 | LLM | 資料の意味から `あり / なし / 未確定` を判断する。scriptはfile × Scope IDごとに `required / not-applicable / blocked` を導出し、ready / blocked scopeとfile保存規則を検証する。Current UNKNOWN件数だけではblockingを決めない |
-| UI操作抽出 / US / UC / Behavior / ACの意味分解 | LLM | UI操作scopeでは必須工程。資料不足を推測補完しない |
+| scopeごとのUI操作有無 / file applicability triggerの意味判断 | LLM | 資料の意味から `あり / なし / 未確定` を判断する。Triggerはdomainの存在判定であり、内容不足だけで `未確定` へ戻さない。scriptはfile × Scope IDごとに `required / not-applicable / blocked` を導出する |
+| UI操作抽出 / US / UC / Behavior / ACの意味分解 | LLM | UI操作scopeでは必須工程。資料不足を推測補完しない。semantic identity自体が未確定でrowを作れない場合はblocking UNKNOWNをScopeへ明示する |
 | 正常 / 準正常 / 例外の意味分類 | LLM | scriptは3分類の完全性と許可値だけ検証する |
 | AC→TRの意味対応 / TR分割統合 | LLM | ACの単純言い換えではなく検証責務として判断する |
 | 既存項目と意味的に同一か | LLM | stable IDをreuseする意味判断はLLMが行う |
-| repository差分の意味・重要性 | LLM | 実装事実をAuthorityへ自動昇格しない |
+| repository差分の意味・重要性 | LLM | 実装事実をAuthorityへ自動昇格しない。target modelへ採用したimplementation-only structureが変わった場合はfreshness再確認対象になる |
 | 案件固有extension fileが必要か | LLM | 標準fileでは責務が混在する独立domainかを判断する。内容量だけを理由に分割しない |
 | 質問がどのUNKNOWNに対応するか | LLM | QとUNKの意味対応を判断する |
 | 仕様回答がどの項目へ影響するか | LLM | scriptが列挙した参照候補を補助情報として使える |
@@ -43,20 +43,20 @@
 | new stable ID番号 | deterministic helper | semantic identity確定後に採番する。既存SRC / SPEC / INF / UNK等は3桁契約を維持し、新設UI target structural IDは最低3桁・上限なしで採番する。extension独自prefixは追加しない |
 | explicit retire intent | LLM | row消失を永久廃止と自動解釈しない。package-owned identityをcurrent modelから意図的に除去する場合だけretire判断する。DEC / ASMはpackage外ownerなのでpackage側terminal retire対象にしない |
 | Markdown table / known section / standard file materialization | deterministic helper | semantic row / prose確定後のID注入、escape、sort、serialization、file同期をui-target-v1専用materializeで行う |
-| SCOPE applicability / 条件付き必須fileと実fileの一致 | deterministic helper / validation | file × Scope IDの `あり / なし / 未確定` から状態を固定導出し、required scopeのcanonical row存在、blocked scopeのcarry-forward、ready / blocked scope、MANIFESTを検証する |
-| UIOP→UC / US→UC / UC→BH / BH→AC closure | deterministic validation | semantic relationを決めず、LLMが作った参照の完全性だけ検証する |
+| SCOPE applicability / 条件付き必須fileと実fileの一致 | deterministic helper / validation | file × Scope IDの `あり / なし / 未確定` からfile状態を固定導出する。content completenessは別に、blocked domain rowまたは07のBlocking Scope ID + 関連Fileでclosureを検証する |
+| UIOP→UC / US→UC / UC→BH / BH→AC closure | deterministic validation | semantic relationを決めず、LLMが作った参照の完全性だけ検証する。UIOP.Scopeと対応UCからderivedしたScopeの一致も検証する |
 | UCごとの正常 / 準正常 / 例外3分類 | deterministic validation | 各1行、定義あり/なし/未定義の構造整合を検証する |
 | current AC→TR / disposition closure | test-requirement deterministic runtime | ACを無言で落とさない |
 | version形式 / package内version一致 | deterministic helper / validation | default policyでは完成packageへ永続差分を保存するたびsemantic / presentationを問わず次versionへ進める。no-opだけ維持する |
 | required core / 条件付き必須file set | deterministic helper / validation | trigger該当性だけLLM。状態・create/update時のfile集合・MANIFEST・completion statusはscript |
 | MANIFEST file list / SHA-256 | deterministic helper | package内容から導出し、LLMに計算させない |
-| current UNKNOWN ID集合 / 件数 | deterministic helper | canonical分析項目から導出する。UNKNOWN本文とblocking影響範囲はLLM / question-analysisが判断し、UNKNOWNの存在だけではcompletionをblockedにしない |
+| current UNKNOWN ID集合 / 件数 | deterministic helper | canonical分析項目から導出する。UNKNOWN本文、関連Scope、Blocking Scope、関連FileはLLM / question-analysisが判断し、helperがexact参照とscope readinessを集計する。UNKNOWNの存在だけではcompletionをblockedにしない |
 | cross-file stable ID参照切れ | deterministic validation | exact ID参照だけを検証する。extension本文はparseせず、00のextension宣言rowにLLMが明示したfile-level refだけを検証する |
 | changed stable IDの参照file候補 | deterministic helper | exact参照から候補を列挙する。意味上の修正要否はLLM |
 | Authority Machine Entity / fingerprint | 既存deterministic helper | authority_entities.pyを正本とする |
-| Acceptance Criterion Machine Entity / spec-analysis normalized input | deterministic helper | ui_target_package.pyがcurrent AC + parent chainから固定projectionする |
+| Acceptance Criterion Machine Entity / spec-analysis normalized input | deterministic helper | ui_target_package.pyがcurrent AC + parent chain + linked UIOP / scope / direct package item / structure ancestor / linked INFから固定projectionする。Authority以外はcontent fingerprintへ寄与しglobal Entity typeを増やさない |
 | semantic eval用package projection | repository eval utility | package内容を要約・変更せず連結する。Skill production CLIには含めない |
-| semanticな重複・矛盾・不足 | LLM / semantic eval |文字列一致だけで自動統合しない |
+| semanticな重複・矛盾・不足 | LLM / semantic eval | 文字列一致だけで自動統合しない。required domainでは資料から識別可能なFIELD / RULE / FLOW / NOTIFY / INTERACT等を無言で欠落させず、未確定はUNKNOWNへ閉じる |
 
 ## 3. spec-analysis Skill-local helper
 
@@ -72,7 +72,7 @@ production CLIは次の4 operationだけを公開します。
 
 #### inspect
 
-package rootを読み、package version、current file list、file × Scope ID applicability、extension file、canonical ID集合、current / resolved UNKNOWN集合、cross-file stable reference index、`ready_scope_ids[] / blocked_scope_ids[] / completion_status`、更新用snapshotを返します。意味評価は返しません。
+package rootを読み、package version、current file list、file × Scope ID applicability、extension file、canonical ID集合、current / resolved UNKNOWN集合、cross-file stable reference index、`scope_readiness[] / ready_scope_ids[] / blocked_scope_ids[] / completion_status`、更新用snapshotを返します。snapshotはversion / file hash / manifest hashだけを持ち、tracking / reference indexはmaterializeがcurrent packageから再導出します。意味評価は返しません。
 
 #### validate
 
@@ -83,12 +83,12 @@ required file、version、ID形式・duplicate、exact reference、UNKNOWN整合
 通常のUI target package作成 / 更新とlegacy migrationのcanonical write pathです。LLMがsemantic row / prose、reuse / new、explicit retire、file trigger、extension要否を決めた後、helper内部で次をまとめて実行します。
 
 - create / legacy-migrationではSkill-local assetからsibling staging packageを内部初期化する。Agentへasset copyを要求しない
-- current / history / previous snapshotからのstable ID batch allocation
+- snapshot hash一致後にhelper自身が再parseしたcurrent tracking/historyからのstable ID batch allocation
 - default vNN version導出
 - `@draft`参照解決
 - Markdown escape / canonical row order / table serialization
 - asset固定のstandard heading本文置換
-- 条件付き標準fileのfile × Scope ID Trigger判定→状態導出、required scope row存在、create/update同期、ready / blocked scope算出
+- 条件付き標準fileのfile × Scope ID Trigger判定→file状態導出、domain row / blocking UNKNOWN closure、create/update同期、ready / blocked scope算出
 - extension file番号batch allocation、作成 / 更新 / 明示廃止とfile-level stable refの存在検証
 - Stable ID lifecycle / 再確認候補file算出
 - README controls
@@ -101,7 +101,7 @@ required file、version、ID形式・duplicate、exact reference、UNKNOWN整合
 
 #### build-machine-evidence
 
-09のCurrent Effective Authorityと02のcurrent AC + parent US / UC / Behavior chainから、Authority + AC Machine Entity、canonical `normalized_skill_input`、`expected_entity_identities`、`Machine Entities: spec-analysis` Markdown sectionを固定projectionします。これはmaterialized packageからqa-workflow / coverage-analysisへhandoffする独立production用途があるため公開operationとして残します。
+09のCurrent Effective Authorityと02のcurrent AC + parent chainからpackage-global Machine Evidenceを再生成し、あわせて `ready_scope_handoffs[]` をscope別に固定projectionします。linked package item / structure ancestor / INFもAC contentへ含めます。blocked scopeはhandoffを生成しません。これはmaterialized packageからqa-workflow / test-analysis / coverage-analysisへ渡す独立production用途があるため公開operationとして残します。
 
 semantic / deterministic eval用multi-file projectionはproduction helperへ入れず、repository専用 `scripts/skills/evals/ui_target_projection.py` が担当します。既存runnerへ1-file inputを渡すためのrepository test utilityであり、導入先Skill packageへ同梱しません。
 

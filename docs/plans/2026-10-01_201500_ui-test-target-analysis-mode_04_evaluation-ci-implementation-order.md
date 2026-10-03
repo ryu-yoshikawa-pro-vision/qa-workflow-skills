@@ -54,11 +54,16 @@ PR #16後の現在Plan上の期待増分:
 - US / UC / Behavior / AC
 - 正常 / 準正常 / 例外で定義あり / なし / 未定義が混在
 - 一部Behavior identityは既知だが結果未確定
+- 03のfield存在は確定しているがvalidation値だけUNKNOWN
+- 同一scopeに複数FIELD / RULE / FLOW候補があり、一部だけを出すcandidate
+- semantic identity自体が未確定でstable rowを作れないUNKNOWN
 
 期待:
 - semanticなUI構造分類を行い、STATEを直交軸として整理する
-- UI操作ありと確定したscopeはrequiredのまま維持し、Actor / RoleやGoal等が不足する場合は影響するUIOP / US / UC / Behaviorだけをblocked + UNKNOWNにする。semantic identity自体が未確定ならstable ID rowを作らない
+- UI操作ありと確定したscopeは意味モデル上requiredのまま維持する。影響するUIOP / US / UC / Behaviorがblockedならworkflow readinessではそのscopeだけblockedとする。semantic identity自体が未確定ならstable ID rowを作らず、07のBlocking Scope ID / 関連Fileへ閉じる
 - non-blocker UNKNOWNが残るscopeと独立ready scopeを同時に含め、UNKNOWN件数だけで全scopeを止めない
+- Trigger=`あり / required` とcontent incompleteを分離し、FIELD等のidentityが既知ならblocked row + UNKNOWN、identity不明ならblocking UNKNOWNで表す。内容不足を理由にTriggerを未確定へ戻さない
+- inputから識別可能なFIELD / RULE / FLOW / NOTIFY / INTERACTを無言で欠落させない
 - current ACへ到達するUS / UC / Behaviorは全てcurrentにする
 - 未定義分類では既知current / blocked Behaviorを保持でき、identity自体不明ならBehavior rowを創作しない
 - `なし` はcurrent Authority参照を持つ
@@ -69,7 +74,8 @@ PR #16後の現在Plan上の期待増分:
 - 高Authority仕様を実装に合わせて変更しない
 - spec-implementation gapとして分離する
 - repository evidenceをAuthorityへ自動昇格しない
-- 08を後続versionへcarry-forwardする場合、再確認していないcommitをcurrent commitへ更新しない
+- 08を後続versionへcarry-forwardする場合、`Repository確認基準` のbranch / revision / 確認時点を勝手に更新しない
+- repository由来target-model structureはAuthorityへ昇格しないが、structure currentnessの変更はAC/TR freshness再確認へ伝播できる
 
 ### SPEC-SEM-005: versioned package更新 / UNKNOWN lifecycle
 
@@ -123,7 +129,7 @@ PR #16後の現在Plan上の期待増分:
 | --- | --- |
 | SPEC / DECISION / INFERENCE / UNKNOWN分類・Authority競合 | 既存SPEC-SEM-001 / 002、SPEC-SEM-003 / 004 |
 | PAGE / STATE / VIEW / MODAL等の意味分類 | SPEC-SEM-003 |
-| scope UI操作有無 / 条件付きfile trigger | SPEC-SEM-003 / 007 |
+| scope UI操作有無 / 条件付きfile trigger / scope blocker判定 | SPEC-SEM-003 / 007 |
 | US / UC / Behavior / AC分解と正常 / 準正常 / 例外 | SPEC-SEM-003 |
 | semantic identity reuse / new / explicit retire | SPEC-SEM-005 / 006 |
 | repository差分の意味 | SPEC-SEM-004 |
@@ -132,6 +138,8 @@ PR #16後の現在Plan上の期待増分:
 | extension fileの必要性・意味 | SPEC-SEM-006 |
 | DEC / ASM owner判断 | SPEC-SEM-007 |
 | 04 / 05責務境界 | SPEC-SEM-007 |
+| required domainの意味上の母集団網羅 / content incomplete | SPEC-SEM-003 / 007 |
+| repository baseline / implementation-only freshness | SPEC-SEM-004 |
 
 repository testは、`05_llm-deterministic-boundaries.md` のLLM responsibility matrixで今回追加・変更した各行が最低1 semantic criterion / caseから参照されることを検証します。case数そのものよりcoverageを正本にします。
 
@@ -286,31 +294,35 @@ repository unit testで次を必須確認します。
 - extension declaration exact table、domain file命名、duplicate path / slug、reuse時slug変更拒否。extension本文をparseせず、00宣言rowの関連Scope / Authority / structure / UNKNOWN refsだけを存在検証・impact対象にすること
 - `extension_file_retirements[]` はexisting current extensionだけを受理し、成功時は実fileと00宣言rowを同時に除去すること。extension本文を参照解析せず、宣言rowのfile-level stable refはfile削除と同時に除去されること
 - `materialize` のartifact_mode=create / updateを検証し、normal create / legacy-migrationは不存在または空destination + previous_snapshot=nullから内部asset初期化、normal updateはnon-null snapshot必須とすること。no-opでは `changed=false`、ID / file allocationとchanged_filesが空でversionを上げないこと
-- inspectが更新前tracking row fingerprint / UNKNOWN state / exact refs / payload / MANIFEST hashを含むcanonical `update_snapshot` を返すこと
-- materialize内部allocatorがsemantic identityを判断せず、UI target mode所有の `SRC / SPEC / INF / UNK` + standard structural prefixについてcurrent row + CHANGELOG履歴 + previous snapshotから次番号を決め、更新途中で消えたprevious IDも再利用しないこと
+- inspectの `update_snapshot` はpackage version / payload hashes / MANIFEST hashだけを持ち、materializeがhash一致後にcurrent packageを再parseしてtracking / UNKNOWN / exact refsを再導出すること。callerがderived indexを持ち回らない
+- materialize内部allocatorがsemantic identityを判断せず、UI target mode所有の `SRC / SPEC / INF / UNK` + standard structural prefixについて再parseしたcurrent row + CHANGELOG履歴から次番号を決め、更新途中で消えたprevious IDも再利用しないこと
 - UI target package内部allocatorが `DEC / ASM` を採番しないこと
 - DEC / ASMはCHANGELOG / lifecycle差分の追跡可能stable IDとして受理し、Project Contextがownerの場合だけproject_context_ids.pyで採番すること。package scopeから外れるだけではretiredにしないこと
 - Project Context以外の明示ownerをProject Contextへ複製せず、canonical Authority IDは `DEC-xxx / ASM-xxx` を維持し、Jira / ADR等の外部record IDをauthority_idへ流用しないこと。canonical DEC / ASM lifecycleを提供できないownerはPR #16対象外とし、LLM hand-numberingやgeneric mappingへfallbackしないこと
 - materialize内部allocatorが同一prefixの複数new IDを1 request内のcanonical順で重複なくbatch allocationし、keyed viewの `@draft` 参照まで解決してAgentによる逐次row書込みを不要にすること
 - current viewから消えた過去IDをprevious snapshot / CHANGELOG履歴のどちらかで保持している限り再利用しないこと
 - UNKNOWNのopen / resolved / resolver変更 / same-ID reopen / re-resolveで `現在有効か / 解消先ID` が整合し、resolved状態ではcurrent SPEC / DECISION / 承認済みASMへ閉じること
-- canonical structured Markdownのduplicate heading / table、row列数、escaped pipe、`<br>` referenceを固定parse契約で検証すること
+- canonical structured Markdownのduplicate heading / table、row列数、backslash→pipe→LFのtable-cell encode、literal `<br>` scalar拒否、`<br>` referenceを固定parse契約で検証すること
+- stable ID sortがprefix + numeric suffix integerであり、SCOPE-999よりSCOPE-1000が後になること
+- extension filenameが10以上の10進連番 + lowercase kebab slugのexact grammarで、leading zeroを拒否すること
+- completed package rootがcanonical payload + MANIFEST以外のregular file / nested directoryを拒否すること
 - materializeのstable owner `table_changes[]` とfull-replacement `keyed_table_updates[]` を区別し、file applicability / Use Case振る舞い完全性 / Current UNKNOWN / Current Effective Authority / 後続Skill補足のexact key registryを検証すること
 - keyed tableのkey / stable referenceで同requestの `@draft:<draft_key>` を解決でき、未解決draftをrejectすること
-- materialize内部lifecycle builderがprevious snapshotとcurrent tracking row差分から `added / changed / resolved` を生成し、`retired` は明示 `retire_ids[]` だけから生成すること。previous ID消失のみなら `state_transition_required` でblockedすること
+- materialize内部lifecycle builderがsnapshot hash照合後に再parseしたprevious current modelとprovisional tracking row差分から `added / changed / resolved` を生成し、`retired` は明示 `retire_ids[]` だけから生成すること。previous ID消失のみなら `state_transition_required` でblockedすること
 - materialize内部impact builderの `影響file` がchanged IDのprevious/current owner + exact reference先unionであり、Agentへfile一覧再入力を要求せず、semantic本文変更の要否を勝手に決定しないこと
 - legacy migrationではLLMが確定したretained ID / 明示lifecycle event / semantic rowsを `materialize(change_mode=legacy-migration)` へ渡し、helperがnew ID採番・canonical Markdown・`migrated / added / resolved / retired`・README / Machine Entity / MANIFESTまで1 write pathで生成すること
-- scope applicability、UI操作scopeのUIOP / US / UC / Behavior / AC hierarchy / current AC chain全parent=current / closure / current UCの3分類整合。UIOP / US / UC / Behaviorのcurrent / blocked必須fieldとsemantic identity未確定時のID非発行を検証すること
-- file × Scope ID applicabilityから `ready_scope_ids[] / blocked_scope_ids[] / complete|partial|blocked` を導出し、non-blocker UNKNOWNが残っても独立scopeをreadyにできること
-- required scopeごとに03=FIELD / 04=FLOW / 05=NOTIFY|INTERACT / 08=IMPLのcanonical rowが1件以上必要で、空header-only required fileをrejectすること
+- scope applicability、UI操作scopeのUIOP / US / UC / Behavior / AC hierarchy / current AC chain全parent=current / closure / current UCの3分類整合。UIOP / US / UC / Behaviorの状態はhelper導出とし、semantic identity未確定時はIDを発行せず07のBlocking Scope IDへ閉じること。UIOP.Scopeは対応UCのderived Scopeとexact一致すること
+- file × Scope ID applicability、blocked UIOP / US / UC / Behavior / RULE / FIELD / FLOW / NOTIFY / INTERACT、UC完全性=`未定義`、07 Blocking Scope IDから `scope_readiness[] / ready_scope_ids[] / blocked_scope_ids[] / complete|partial|blocked` を導出し、non-blocker UNKNOWNが残っても独立scopeをreadyにできること
+- Trigger=`あり`のrequired scopeで内容不足をTrigger=`未確定`へ戻さないこと。identity既知ならblocked domain row、identity不明で0 rowなら07のBlocking Scope ID + 関連Fileによりclosureできること
 - `未定義` で既知current / blocked Behavior IDを0件以上保持できUNKNOWN必須、Behavior identity自体不明ならblocked Behaviorを創作しないこと
 - `なし` は関連Behavior / UNKNOWNなし + 理由 + current Authorityの `関連仕様項目ID` 1件以上を要求すること
 - 09の「現在有効な仕様根拠」からnormalized Authorityを固定projectionし、`適用範囲` を非空string、`関係` を単一許可値の1要素arrayとして一意にserializeすること
-- build-machine-evidenceがAuthority + current AC Entity、spec-analysis normalized_skill_input、expected identity、shared `render_machine_entities()` 由来のcanonical `machine_entities_markdown` を決定論生成し、不要な統合implementation_fingerprintを公開しないこと
-- AC chain + linked mapped UIOP + scope + linked structure refsからINF / UNK / inactive Authorityを除外し、current SPEC / DECISION / approved ASMだけをauthority_refs / dependencyへ投影すること。current Authorityが0件なら `state_transition_required` でblockedし、helper自身はUNKNOWN / blocked Behaviorを生成しないこと
+- build-machine-evidenceがpackage-global Authority + current AC Entityに加えて `ready_scope_handoffs[]` を決定論生成し、ready scopeだけのnormalized input / Entity / expected identityを返すこと。blocked scopeはhandoffを持たず、qa-workflowがMarkdownをfilterしないこと
+- AC chain + linked mapped UIOP + scope + direct structure + ancestor + linked FIELD/RULE/FLOW/NOTIFY/INTERACT refsからcurrent SPEC / DECISION / approved ASMをAuthority dependencyへ投影し、linked INFはcontent-only projectionへ入れること。current Authorityが0件なら `state_transition_required` でblockedし、helper自身はUNKNOWN / blocked rowを生成しないこと
+- parent_structure_id missing / self / cycleをrejectし、ancestor変更・linked domain item変更・linked INF変更でAC/TRがstale、無関係row変更ではcurrentを維持すること
 - `Machine Entities: spec-analysis` blockがexactly one存在し、heading / JSON fence / wrapperを含めhelper再生成Markdownと一致すること
 - 1つのnormalized spec-analysis handoff / current Entity collectionへ複数UI target packageのpackage-local Machine Entity blockを直接mergeしない契約をrepository testで固定すること
-- linked UIOP本文 / UIOP-only Authority / scope内容 / linked structure内容 / 親US / UC / Behavior変更でAC Entity fingerprintまたはAuthority dependencyが変わり、無関係structure変更では変わらないこと
+- linked UIOP / UIOP-only Authority / scope / direct structure + ancestor / linked FIELD-RULE-FLOW-NOTIFY-INTERACT / linked INF / 親US-UC-Behavior変更でAC Entity fingerprintまたはAuthority dependencyが変わり、無関係package row変更では変わらないこと
 - repository eval専用 `ui_target_projection.py` がsemantic / deterministic projectionを生成し、semantic projectionではcurrent versionの `変更概要` controlだけを追加し、過去CHANGELOG / Stable ID changes / 影響fileを混ぜないこと
 - raw SHA-256はeval projectionから再計算せず、production validate / repository unit testでraw bytesに対して検証すること
 
@@ -319,8 +331,8 @@ repository unit testで次を必須確認します。
 `skills/question-analysis/scripts/question_ids.py` と `skills/qa-workflow/scripts/project_context_ids.py` を追加します。UNKNOWN link検証だけの `unknown_links.py`、採番だけの公開 `next-id` operationは追加しません。
 
 `question_ids.py`:
-- `operation=materialize`: create / updateを区別し、previous current Q + previous history + request内reuse/newからnew Q IDを内部batch allocationしてcurrent Q table + 質問ID履歴をcanonical生成する
-- `operation=validate-links`: UNK ID形式、current known UNKNOWNへの存在参照、同一Q内duplicate、resolved-only参照を検証する
+- `operation=materialize`: create / updateを区別し、previous current Q + previous history + request内reuse/newからnew Q IDを内部batch allocationしてcurrent Q table + 質問ID履歴をcanonical生成し、同じcall内でcurrent / resolved UNKNOWN link validationまで完了する
+- `operation=validate-links`: 既存artifactのstandalone検証用としてUNK ID形式、current known UNKNOWNへの存在参照、同一Q内duplicate、resolved-only参照を検証する
 - candidate側の既存historyを採番正本にせず、Q-001解消後の新規QでQ-001を再利用しない
 - malformed / duplicate Q ID、Q-999 exhaustionをfail-closedにする
 
@@ -462,11 +474,11 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - variable structured tableはheader-onlyで例示stable IDを置かない。file applicabilityもassetへ固定scope rowを事前配置せず、materializeがcurrent Scope IDごとに4row生成する
 - 条件付きfileはfile × Scope IDでLLMの `Trigger判定=あり / なし / 未確定` からhelperが `required / not-applicable / blocked` を導出する
 - Current UNKNOWN件数ではなく明示blocked状態から `ready_scope_ids[] / blocked_scope_ids[]` と `completion_status=complete / partial / blocked` を導出する。blocked scopeがあってもready scopeは後続へ進める
-- required scopeごとに03=FIELD / 04=FLOW / 05=NOTIFY|INTERACT / 08=IMPLのrowを1件以上必須とする
-- skills/spec-analysis/scripts/ui_target_package.pyの `inspect / validate / materialize` と内部allocator / version / README / MANIFEST / lifecycle / impactを実装。create / legacy-migrationはhelper内部でSkill-local assetからstaging初期化する
+- Trigger=`あり`のdomainはrequiredのまま維持する。identity既知ならFIELD / FLOW / NOTIFY|INTERACT等をcurrent / blocked rowで保持し、identity不明なら07のBlocking Scope ID + 関連Fileでclosureする。内容不足をTriggerへ逆流させない
+- skills/spec-analysis/scripts/ui_target_package.pyの `inspect / validate / materialize` と内部allocator / version / README / MANIFEST / lifecycle / impactを実装。create / legacy-migrationはhelper内部でSkill-local assetからstaging初期化し、snapshotはhash identityだけ保持、derived tracking / refsはmaterializeが再parseする
 - `prose_updates[]` はassetに存在するstandard exact heading本文だけを置換する。新規heading作成 / rename / deleteを許可しない
-- canonical bytes、sibling staging、commit直前snapshot再照合、package単位切替 / rollbackを実装
-- normative rowのAuthority / UNKNOWN traceability、scope / Behavior Decomposition、UNKNOWN lifecycle、extension lifecycleをvalidateする
+- canonical table cell encode、complete file set、sibling staging / backup、preflight orphan recovery、commit直前snapshot再照合、package単位切替 / rollbackを実装。qa-workflow経由では既存mutable-operation claimを再利用し、新lock helperは追加しない
+- normative rowのAuthority / UNKNOWN traceability、domain rowのhelper-derived state、Scope / Blocking Scope / 関連File、scope readiness、UIOP→UC scope一致、UNKNOWN lifecycle、extension lifecycle、Repository確認基準をvalidateする
 - versionを `^v[0-9]{2,}$`、数値+1、最低2桁zero padding、上限なしに固定する。新設structural IDも最低3桁・上限なし、既存canonical IDは3桁契約を維持する
 - legacy / unversioned packageに加え、通常spec-analysis単一成果物 → ui-target-v1 migrationを同じsemantic mapping + materialize経路で扱う
 
@@ -481,8 +493,8 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - envelope shape / freshness algorithmは維持
 - independent `runtime_validator.py`、active code / Skill文書 / asset / fixture / repository testをv2へ同期
 - active Machine Evidenceの手書き擬似schemaを削除し、runtime renderer / authority_entities.py / build-machine-evidence生成結果を正本にする
-- `ui_target_package.py build-machine-evidence` を実装し、current AC + state=mappedのlinked UIOP / US / UC / Behavior / Scope / linked structure / AuthorityをAC Entityへ固定projectionする。UIOP / scope / structure固有Authorityもdependency unionへ含める
-- generator contractを `requirement-structure-v1 → requirement-structure-v2`。raw inputでは `acceptance_criteria[] / acceptance_refs[]` を必須とし、ACなしはcallerが明示 `[]` を渡す
+- `ui_target_package.py build-machine-evidence` を実装し、current AC + mapped UIOP / US / UC / Behavior / Scope / linked domain itemを確定し、AC chain / UIOP / linked domain itemが参照するstructure + ancestor / linked INFをAC contentへ固定projectionする。Authorityだけdependency Entityとし、`ready_scope_handoffs[]` を同時生成する
+- generator contractを `requirement-structure-v1 → requirement-structure-v2`。top-level `acceptance_criteria[]` は廃止し、requirement_structure.pyがvalidated upstream acceptance_criterion Entityからknown AC集合を導出する。各TRのsemantic `acceptance_refs[]` だけraw input必須とする
 - current ACをTRまたはDispositionへ閉じ、Authority closureは独立維持する
 - TR EntityへAC EntityとACが参照するcurrent Authority Entity dependencyを保存する
 - shared runtimeへSkill固有migration projectionを入れない。新規 `skills/test-requirement-design/scripts/runtime_v1_cutover.py`、`skills/test-condition-design/scripts/runtime_v1_cutover.py`、`skills/test-case-design/scripts/runtime_v1_cutover.py` がcomplete v2 generator inputを決定論生成する
@@ -491,13 +503,14 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - 内容不変cutoverでTR / TCN / model / CI / TC stable identity、deleted / inactive historyを維持する
 - 既存v1 downstream artifactがある場合は `runtime cutover完了 → UI target package migration / AC生成 → TRD通常semantic update → stale downstream通常再実行` の順に固定し、逆順をblockedにする
 - v1 downstreamがない場合は直接UI target package migration / normal v2 workflowへ進める
-- `_09` の9 Skill処置表どおり、TRD / TCD / TCだけcutover helperを使い、spec-analysis / test-analysis / coverage-analysis / qa-workflow / usability-inspection / wcag-conformance-evaluationは各current input / evidenceからv2を再生成する。version bumpだけを理由にlive再観測を強制しない
-- UIOP / UIOP-only Authority / scope / linked structure / 親Behavior / 親UC / 親US / Authority変更によるAC / TR freshness regressionと、無関係structure変更のnon-stale regressionを追加
+- `_09` の9 Skill処置表どおり、TRD / TCD / TCだけcutover helperを使う。その他はcanonical spec成果物、validated保存Machine Runtime Input、current workflow stateを正本としてv2再生成し、保存inputがないinspection系だけ既存Skillの通常rerun / re-observation経路を使う。proseからinputを再構築しない
+- UIOP / UIOP-only Authority / scope / linked domain item / AC chain・UIOP・domain item由来structure + ancestor / linked INF / 親Behavior-UC-US / Authority変更によるAC / TR freshness regressionと、無関係package row変更のnon-stale regressionを追加
 - shared runtime 9-copy byte-identity、cutover helper portability、v1/v2混在拒否、semantic drift、phase dependency、mapping ambiguityをrepository integration testで固定する
 
 ### Step 3: spec-analysis evaluation
 
-- SPEC-SEM-003〜007を更新し、UI操作あり + Actor/Goal不足、non-blocker UNKNOWNを残したscope部分進行、conditional file未確定、通常spec-analysis→mode migration、外部owner対象外境界を含める
+- SPEC-SEM-003〜007を更新し、UI操作あり + Actor/Goal不足、identity未確定blocking UNKNOWN、non-blocker UNKNOWNを残したscope部分進行、Trigger required + content incomplete、required domainの無言欠落防止、通常spec-analysis→mode migration、外部owner対象外境界を含める
+- canonical write前にsemantic inputをquality gateし、semantic NG candidateをcurrent packageへcommitしない契約をsemantic / integration caseで固定する
 - LLM responsibility coverage表を更新
 - repository eval専用 `scripts/skills/evals/ui_target_projection.py` のsemantic / deterministic projection unit test
 - `SPEC-OUT-003` package fixtureをdeterministic projectionして既存runnerへ入力
@@ -509,14 +522,15 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 
 - stable UNKNOWN参照、回答正規化後のspec-analysis resume
 - `不明点 / 質問一覧` と `質問ID履歴` をheader-onlyへ変更
-- skills/question-analysis/scripts/question_ids.py（materialize / validate-links）
+- skills/question-analysis/scripts/question_ids.py（materialize / validate-links）。materializeはcurrent / resolved UNKNOWN集合を受けてlink validationまで同callで完了する
 - Project Contextが実際のDEC / ASM正本ownerの場合だけ skills/qa-workflow/scripts/project_context_ids.py（materialize / validate-history）を使用
 - 別ownerではProject Contextへ複製・再採番せず、導入先ownerがcanonical `DEC-xxx / ASM-xxx` を供給する。供給できない場合はfail-closedとし、generic external registry / adapterを追加しない
 - helper unit / portability test、deterministic mapping、question semantic caseを追加
 
 ### Step 5: qa-workflow routing
 
-- mode request routing / answer resume。小規模でも継続利用目的ならmodeを優先し、ready scopeだけ後続へ進める
+- mode request routing / answer resume。小規模でも継続利用目的ならmodeを優先し、`scope_readiness[]` と `ready_scope_handoffs[]` だけでready scopeを後続へ進める。blocked scopeのUNKNOWNをAgentが全件filterしない
+- qa-workflow経由のpackage materializeは既存 `claim_mutable_operation()` を開始前に使い、claim失敗時はwriteしない
 - 継続利用目的を単発規模より優先するmode precedenceをroutingへ反映
 - runtime-v1 downstreamが残る状態でUI target migration済みならblockedにし、Step 2のcutover順へ戻す
 - test-target-inspection / usability-evaluation / usability-inspection / wcag-conformance-evaluationとの分岐
@@ -553,9 +567,10 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - question-analysis回答反映 → spec-analysis package更新
 - UI操作あり + Actor/Goal不足でscope=requiredのまま下位rowだけblocked + UNKNOWNになるscenario
 - conditional file trigger未確定のscopeを保持したpackageが`partial`で保存でき、別ready scopeは継続できるscenario
-- required conditional fileがheader-only / 0 canonical rowではvalidate失敗し、LLM判断を未確定 + UNKNOWNへ戻せるscenario
+- required conditional fileでidentity既知itemがblocked + UNKNOWNとして保存でき、identity未確定で0 rowの場合は07のBlocking Scope ID + 関連Fileでscopeをblockedにできるscenario。Triggerはrequiredのまま維持する
 - runtime-v1 downstream → Skill-local cutover → UI target migration → AC semantic update → stale downstream rerunのscenario
-- UIOP / UIOP-only Authority / scope / linked structure / Behavior / UC / US / Authority変更によるTR staleと、無関係structure変更non-stale scenario
+- UIOP / UIOP-only Authority / scope / structure ancestor / linked domain item / linked INF / Behavior / UC / US / Authority変更によるTR staleと、無関係package row変更non-stale scenario
+- process kill相当のorphan staging / backupをpreflight recoveryでき、一意に復旧不能ならfail-closedするscenario
 - deterministic helperが構造エラーを返してもLLMの意味判断を上書きしないscenario
 
 ### Step 10: final review
@@ -581,8 +596,8 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - question-analysisのUNKNOWN lineageがsemantic + production helper + deterministic evalで確認済み
 - qa-workflow routing / resumeと#14の3 Skillとの誤routing境界がrouting case / independent candidateで確認済み
 - multi-file packageがrepository eval専用projection経由で既存semantic runnerにより評価可能
-- version / UNKNOWN件数 / stable ref / MANIFEST / SHA-256 / scope / file applicability / ready・blocked scope / completion status / required conditional row / behavior hierarchy / current UCの3分類完全性等の定型整合をproduction helperで検証できる
-- test-requirement-designまで進むworkflowではcurrent ACがrequirement-structure-v2でTRまたはDispositionへ閉じ、AC / linked UIOP / scope / linked structure / 親Behavior / 親UC / 親US / Authority変更が関連TR freshnessへ伝播し、無関係structure変更は伝播しない。仕様理解packageだけの要求ではこのclosureを完了条件にしない
+- version / UNKNOWN件数 / stable ref / MANIFEST / SHA-256 / complete file set / scope blocker / file applicability / ready・blocked scope / completion status / blocked domain row / Repository確認基準 / behavior hierarchy / current UCの3分類完全性等の定型整合をproduction helperで検証できる
+- test-requirement-designまで進むworkflowではcurrent ACがrequirement-structure-v2でTRまたはDispositionへ閉じ、AC / linked UIOP / scope / direct structure + ancestor / linked FIELD-RULE-FLOW-NOTIFY-INTERACT / linked INF / 親Behavior-UC-US / Authority変更が関連TR freshnessへ伝播し、無関係package row変更は伝播しない。仕様理解packageだけの要求ではこのclosureを完了条件にしない
 - PR #14後の9 Skill-local `runtime_contract.py` がbyte-identicalのままruntime-v2 / entity-state-v2でacceptance_criterionを扱い、TRD / TCD / TC固有cutoverは各Skill-local `runtime_v1_cutover.py` に分離され、残る6 Skillのv1 evidence処置が `_09` の表どおり一意に決まる
 - partial rerunでchanged ACへ依存するscope外TRをcurrent扱いしない
 - spec-analysis / question-analysis production helperがSkill package単体で実行可能

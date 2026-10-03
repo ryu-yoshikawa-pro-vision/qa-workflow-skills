@@ -161,8 +161,11 @@ file materializationは全scope rowを集約して決めます。
 - required=0かつblocked=0 → fileを作成しない / updateでは除去する
 - required=0かつblocked>0 → createでは作成しない。updateではblocked scopeに属する既存rowがあれば保持する
 - requiredとblockedが混在 → fileを保持し、required scopeだけ更新可能。blocked scopeの既存rowは保持する
-- required scopeごとに対応するcanonical tracking rowを1件以上要求する。03はFIELD、04はFLOW、05はNOTIFYまたはINTERACT、08はIMPLを要求する
-- requiredなのに対応rowを確定できない場合、LLMはそのscopeのTrigger判定を未確定 + UNKNOWNへ戻して再materializeする。helperが意味を推測して空fileをvalidにしない
+- Trigger=`あり`はdomainの存在判定であり、内容不足を理由に `未確定` へ戻さない
+- required scopeは、03=FIELD、04=FLOW、05=NOTIFY|INTERACT、08=IMPLについてcurrent / blocked canonical rowを1件以上持つのを原則とする
+- identityまで分かるが内容が未確定ならblocked row + UNKNOWNを使う。identity自体を安全に発行できず0 rowになる場合だけ、07のcurrent UNKNOWNにそのScope IDを `Blocking Scope ID`、該当fileを `関連File` として持つことを要求する
+- 08のrepository observationは `判定=判断不能` をcurrent observationとして保持できる。repository access自体が未確定でscopeを止める場合は07 UNKNOWN + 関連Fileで表す
+- helperはこのclosureを検証するが、FIELD等の意味上の個数や内容を推測生成しない
 上記2 tableの `関連仕様項目ID` はstable ID参照専用列です。値は空または `<br>` 区切りのexact stable IDだけを許可し、説明文を混在させません。`根拠 / 備考` は自由記述で、helperはそこに現れるID文字列をstable referenceとして扱いません。
 
 `08_repository_implementation_status.md` のapplicabilityは「そのversionでrepositoryを再確認したか」ではなく、current packageがrepository implementation evidenceを現在保持・利用しているかで判定します。前versionの08をcurrent packageが継続利用する場合は `required` のまま保持し、08内の基準branch / commit / revisionを変更しません。current分析からrepository evidenceを明示的に外した場合だけ `not-applicable` とし、08を除去します。
@@ -174,7 +177,7 @@ file materializationは全scope rowを集約して決めます。
 
 extension fileを使う場合だけrowを持ち、templateはheader-onlyにします。
 
-- `ファイル` は `10_<slug>.md` 以降のcanonical relative path
+- `ファイル` は `^(?:1[0-9]|[2-9][0-9]+)_[a-z0-9]+(?:-[a-z0-9]+)*\.md$` のroot-level canonical relative path。10, 11, 12...と10進数で連番し、leading zeroを許可しない
 - `Slug` はlowercase kebab-case
 - `責務` と `分割理由`、4種類の関連stable refはLLMが意味判断して記述する
 - `関連Scope ID / 関連仕様項目ID / 関連構造ID / 関連UNKNOWN ID` は空またはexact stable IDの`<br>`区切り。helperが存在参照とduplicateを検証する
@@ -247,8 +250,8 @@ not-applicable / blocked scopeはUS / UC / Behavior / ACを確定済みrowとし
 
 #### ビジネスルール一覧
 
-| ルールID | ルール名 | ルール詳細 | 適用条件 | 関連仕様項目ID | 関連構造ID | 備考 |
-| --- | --- | --- | --- | --- | --- | --- |
+| ルールID | 関連Scope ID | ルール名 | ルール詳細 | 適用条件 | 関連仕様項目ID | 関連構造ID | 状態 | 関連UNKNOWN ID | 備考 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
 標準ID: `RULE-xxx`
 
@@ -256,8 +259,8 @@ not-applicable / blocked scopeはUS / UC / Behavior / ACを確定済みrowとし
 
 #### 項目・バリデーション一覧
 
-| 項目ID | 関連Scope ID | 対象構造ID | ラベル / 名称 | 要素タイプ | 入力 / 表示仕様 | 制約 / バリデーション | 関連仕様項目ID | 備考 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 項目ID | 関連Scope ID | 対象構造ID | ラベル / 名称 | 要素タイプ | 入力 / 表示仕様 | 制約 / バリデーション | 関連仕様項目ID | 状態 | 関連UNKNOWN ID | 備考 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
 標準ID: `FIELD-xxx`
 
@@ -265,8 +268,8 @@ not-applicable / blocked scopeはUS / UC / Behavior / ACを確定済みrowとし
 
 #### 処理フロー一覧
 
-| フローID | 関連Scope ID | 処理名 | トリガー / 操作 | 手順 / 状態遷移 | 結果 | 関連仕様項目ID | 関連構造ID | 備考 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| フローID | 関連Scope ID | 処理名 | トリガー / 操作 | 手順 / 状態遷移 | 結果 | 関連仕様項目ID | 関連構造ID | 状態 | 関連UNKNOWN ID | 備考 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
 標準ID: `FLOW-xxx`
 
@@ -276,8 +279,8 @@ not-applicable / blocked scopeはUS / UC / Behavior / ACを確定済みrowとし
 
 #### 通知・外部連携一覧
 
-| 連携ID | 関連Scope ID | 種別 | 名称 | 発火条件 | 宛先 / 遷移先 | 内容 / 挙動 | 関連仕様項目ID | 関連構造ID | 備考 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 連携ID | 関連Scope ID | 種別 | 名称 | 発火条件 | 宛先 / 遷移先 | 内容 / 挙動 | 関連仕様項目ID | 関連構造ID | 状態 | 関連UNKNOWN ID | 備考 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
 標準ID:
 
@@ -301,21 +304,38 @@ not-applicable / blocked scopeはUS / UC / Behavior / ACを確定済みrowとし
 
 #### Current UNKNOWN一覧
 
-| UNKNOWN ID | 確認事項 | 根拠 | 影響範囲 | 関連構造ID | 次の扱い |
-| --- | --- | --- | --- | --- | --- |
+| UNKNOWN ID | 確認事項 | 根拠 | 影響範囲 | 関連Scope ID | Blocking Scope ID | 関連File | 関連構造ID | 次の扱い |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
 `UNKNOWN ID` は09の `分類=UNKNOWN` かつ `現在有効か=Yes` のUNKだけを許可します。
 
+- `関連Scope ID` は意味上影響するcurrent Scope ID、`Blocking Scope ID` はそのうち後続工程を止めるscopeをLLMが明示する。`Blocking Scope ID` は `関連Scope ID` のsubsetでなければならない
+- `関連File` は影響するstandard / current extension fileのcanonical relative path。空を許可し、helperは存在・duplicateだけを検証する
+- `Blocking Scope ID` が空ならcurrent UNKNOWNでもworkflow blockerではない。UNKNOWN件数だけからscopeをblockedへしない
+- semantic identity自体が未確定でstable rowを発行できない場合は、親scopeを `Blocking Scope ID`、該当domain fileを `関連File` に記録してmachine-readableなblockerとして残す
+- question-analysisへ渡すUNKNOWNは、対象blocked scopeの `Blocking Scope ID` に一致する集合をhelperが返す
+
 ### 5.9 08_repository_implementation_status.md
+
+#### Repository確認基準
+
+| Repository | Branch / Ref | Commit / Revision | 確認時点 | 関連Scope ID | 備考 |
+| --- | --- | --- | --- | --- | --- |
+
+`Repository` はpackage内で1件だけcurrent baselineを持つfixed keyです。normal updateでこのsectionを省略した場合はexisting rowをそのまま保持します。callerが明示的にrowを更新した場合だけrepositoryを再確認したsemantic inputと扱い、helperは値を推測・current branchへ自動追従しません。
 
 #### Repository実装状況
 
-| 実装確認ID | 関連Scope ID | 対象 | 観測事実 | 関連仕様項目ID | 判定 | 証拠 / 参照 | 備考 |
-| --- | --- | --- | --- | --- | --- | --- | --- |
+| 実装確認ID | Repository | 関連Scope ID | 対象 | 観測事実 | 関連仕様項目ID | 判定 | 証拠 / 参照 | 備考 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
 標準ID: `IMPL-xxx`
 
 `判定` は一致 / 差分 / 未実装 / 実装のみ / 判断不能。
+
+- `Repository` は同fileの `Repository確認基準` に存在するexact keyを必須とする
+- carry-forwardするIMPL rowは対応baselineを変更しない。repositoryを再確認した場合だけcallerが `Repository確認基準` と必要なIMPL rowを同じsemantic updateで更新する
+- repository由来の実装事実はAuthorityではない。ただし01のtarget-model structure等へ採用したimplementation-only factが変われば、target-model dependencyとしてAC/TR freshnessの再確認契機にはできる
 
 この判定は仕様とrepository事実を比較したLLMの意味判断であり、helperは許可値と参照存在だけを検証します。
 
@@ -386,7 +406,7 @@ UNKNOWNのlineageは次に固定します。
 `skills/spec-analysis/assets/ui-test-target-analysis/` のtemplateは、実データと誤認できる例示IDを置きません。
 
 - variable structured tableはheader / separatorだけを持ち、`PAGE-001` / `SPEC-001` / `AC-001` 等の例示rowを置かない
-- `条件付き必須file applicability` の4rowのようにschema上固定のrowだけ事前配置する
+- `条件付き必須file applicability` はheader / separatorだけをassetへ置く。Scope IDは実データなので、materializeがcurrent Scope ID × 4fileのrowを生成する
 - READMEのPackage Schema Versionは `ui-target-v1`、初回Package Versionは `v00`、Previous Package Versionは `-` を固定初期値とする
 - READMEのCurrent UNKNOWN Count / Current payload filesはhelper生成結果を貼り付けるcontrol sectionとし、例示値を置かない
 - CHANGELOG初回entryは `## v00` と3つの固定subheading、空の `Stable ID changes` tableを持つ
@@ -529,7 +549,17 @@ production helperは任意Markdownを解釈する汎用parserにしません。�
 - ready / blockedが両方1件以上 → `partial`
 - `ready_scope_ids=[]` かつblockedが1件以上 → `blocked`
 
-blocked scopeは、scope自身の`Behavior Decomposition=blocked`、そのscopeへ到達するblocked UIOP / US / UC / Behavior、またはそのscopeのconditional file applicability=`blocked`のいずれかがあるscopeです。current UNKNOWNの存在だけではblockedにしません。意味上blockerとなるUNKNOWNはLLM / question-analysisが影響対象を判断し、対応するscope / row / applicabilityへ `関連UNKNOWN ID` とblocked状態を明示します。qa-workflowはpackage全体のbinary statusではなく `ready_scope_ids[] / blocked_scope_ids[]` を使って影響範囲だけ停止します。completion状態だけを理由に `valid=false` へしません。
+workflow readinessではSCOPEを原子的な後続進行単位にします。`Behavior Decomposition=required` は意味モデル上の適用状態であり、workflow readinessのreadyを意味しません。
+
+blocked scopeは次のunionです。
+
+- `Behavior Decomposition=blocked` のscope
+- そのscopeに属するblocked UIOP / US / UC / Behavior / RULE / FIELD / FLOW / NOTIFY / INTERACTが1件以上あるscope
+- current UCの `Use Case振る舞い完全性` に `判定=未定義` が1件以上あるscope
+- そのscopeのconditional file applicabilityに `blocked` があるscope
+- 07のcurrent UNKNOWNで `Blocking Scope ID` に明示されたscope
+
+current UNKNOWNの存在だけではblockedにしません。下位rowだけをblockedにするとは、Scopeの `Behavior Decomposition=required` をnot-applicable / blockedへ書き換えない意味です。workflow上はその下位blockerが解消するまで当該scopeを `blocked_scope_ids[]` に入れます。`scope_readiness[].blocking_unknown_ids[]` は、Scope自身・blocked下位row・UC完全性=`未定義`・conditional applicabilityの `関連UNKNOWN ID` と、07でそのscopeを `Blocking Scope ID` に持つcurrent UNKNOWNのunionを重複除去してcanonical sortした集合です。blockerなのにUNKNOWN IDを持たない状態は許可しません。qa-workflowはpackage全体のbinary statusではなくこの結果で影響scopeだけ停止します。completion状態だけを理由に `valid=false` へしません。
 
 handled failure:
 
@@ -570,7 +600,12 @@ unknown operation / unknown top-level field / JSON・table schema不正は `inva
 
 ### 7.3 update concurrency contract
 
-同じ `package_root` への `materialize` はcallerが直列化します。複数Agent / processによる同時 `materialize` はunsupportedであり、snapshot照合をlock / CASの代替として扱いません。PR #16ではgeneric CAS / lock serviceを追加しません。
+同じ `package_root` への `materialize` はsingle writerです。複数Agent / processによる同時 `materialize` はunsupportedであり、snapshot照合をlock / CASの代替として扱いません。PR #16ではgeneric CAS / lock serviceを追加しません。
+
+- qa-workflow経由では、PR #14の既存 `claim_mutable_operation(workflow_state_root, workflow_ref, operation_ref)` 契約をmaterialize開始直前に使用する。owner側に同等のatomic claim / idempotent startがある場合は既存owner contractを優先する
+- `operation_ref` はworkflow_ref、canonical package_root、previous `manifest_sha256`（createは`-`）、canonical semantic input fingerprintからqa-workflowが決定論的に導出する。新しいclaim helperを追加しない
+- claim取得失敗時はmaterializeを開始しない。claim recoveryは既存qa-workflowの `recover_claim` 契約に従う
+- standalone spec-analysisでは外部claim機構を追加せず、callerがsingle writerを保証する前提を明記する
 
 通常更新は必ず `inspect → update_snapshot保持 → materialize` の順で行います。`materialize` はstaging生成前とpackage commit直前の2回、snapshotのPackage Version、payload file set / `payload_file_sha256[]`、`MANIFEST.md` raw `manifest_sha256` をcurrent packageへ照合します。file追加・削除または1 byteでも変化していれば `stale_snapshot` でcommitせずblockedにし、外部変更をsilent overwriteしません。
 
@@ -584,6 +619,14 @@ helperが所有して書き出すcurrent `ui-target-v1` fileは次のbyte contra
 - `body_markdown` / `change_summary` 等のcaller提供textはCRLF / CRだけをLFへ正規化し、それ以外を意味変更目的でtrim / rewriteしない
 - MANIFESTのSHA-256はこの最終canonical bytesに対して計算する
 
+structured Markdown table cellは次のcanonical encodeへ固定します。
+
+- callerのscalar cellはCRLF / CRをLFへ正規化する
+- scalar cellにliteral `<br>` は許可しない。複数行はraw LFで受け、helperが `<br>` へ変換する
+- encode順はbackslashを`\\`へescape、`|`を`\|`へescape、最後にLFを`<br>`へ変換する。stable reference array cellは各IDを検証後、canonical sortして`<br>`でjoinする
+- parserはcanonical outputだけを受理し、ambiguous escape、raw LFを含むtable row、未escape `|` をrejectする
+- prose section本文はtable-cell規則の対象外で、§7.4のfile byte contractだけを適用する
+
 `materialize` はtarget fileをcurrent packageへ順次直接書込みません。
 
 1. current packageと同じparent / filesystem上のsibling staging directoryへ全target fileをcanonical bytesで生成する
@@ -594,6 +637,13 @@ helperが所有して書き出すcurrent `ui-target-v1` fileは次のbyte contra
 6. package切替成功後だけbackupを削除し、`changed=true`の成功responseを返す
 
 この方式は汎用transaction managerではなく、UI target packageのcanonical write pathだけに適用します。実装では標準ライブラリの同一filesystem rename / replaceを使い、採用した方式をrepository portability testで固定します。
+
+process kill等でhelper-owned siblingが残った場合のpreflight recoveryもこのwrite path内で固定します。`package_root=/parent/<name>` に対してstagingは `/parent/.<name>.ui-target-staging`、backupは `/parent/.<name>.ui-target-backup` exactlyとし、任意名をscanしません。
+
+- current package rootがvalidなら、残存staging / backupは前回未cleanupのorphanとして削除してから新しいmaterializeへ進む
+- current rootが不存在でvalid backupが存在する場合はbackupをrootへrestoreし、stagingを削除してから再inspectを要求する
+- createでroot / backupが存在せずstagingだけ残る場合は未commit stagingとして削除できる
+- root不在 + backup不正、rootとbackupのどちらもinvalid、helper-owned siblingが矛盾状態など一意に復旧できない場合は `write_recovery_failed` でfail-closedし、自動promotion / 推測復旧をしない
 
 ## 8. ui_target_package.py operations
 
@@ -615,6 +665,10 @@ payload:
   "completion_status":"partial",
   "ready_scope_ids":["SCOPE-002"],
   "blocked_scope_ids":["SCOPE-001"],
+  "scope_readiness":[
+    {"scope_id":"SCOPE-001","status":"blocked","blocking_unknown_ids":["UNK-004"]},
+    {"scope_id":"SCOPE-002","status":"ready","blocking_unknown_ids":[]}
+  ],
   "payload_files":[
     {"order":1,"path":"README.md","kind":"core"}
   ],
@@ -634,10 +688,6 @@ payload:
   ],
   "update_snapshot":{
     "package_version":"v15",
-    "tracked_items":[
-      {"stable_id":"SPEC-001","tracking_file":"09_authority_and_traceability.md","tracking_section":"分析項目","row_fingerprint":"<sha256>","unknown_active":null,"resolution_refs":[]}
-    ],
-    "exact_reference_index":[],
     "payload_file_sha256":[
       {"path":"README.md","sha256":"<lowercase-64-hex>"}
     ],
@@ -651,15 +701,15 @@ payload:
 
 - `payload_files[]` はcanonical file order
 - `file_applicability[]` は03 / 04 / 05 / 08の順。`trigger` は `あり / なし / 未確定`、`status` はhelper導出結果
-- ID配列はlexicographic昇順
+- stable IDはprefixのlexicographic順 → numeric suffixの整数昇順でcanonical sortする。`SCOPE-999` は `SCOPE-1000` より前になる
 - `domain_files[]` はorder昇順
 - `exact_reference_index[]` は `target_id / file / section / row_index / column` の順で安定sort
 - `row_index` は対象structured tableのdata rowを1始まりで数える
 - `unresolved_structural_issues[]` は `issue_type / file / section / row_index / column / message` を持ち、存在しない位置はnull
-- `update_snapshot` は更新開始前の状態を後続operationへそのまま渡すmachine inputであり、Agent / LLMが編集・再構築しない
-- `tracked_items[]` は§6.1のtracked stable IDをpackage内canonical tracking row単位で1行に正規化し、`stable_id` 昇順。field名は `tracking_file / tracking_section` とし、Authorityの実際の正本ownerを意味しない。DEC / ASMの実ownerがProject Contextや外部正本でも、ここでは09のpackage projection rowをtracking位置として記録する。自由記述ではなくcanonical structured tracking rowの正規化結果から `row_fingerprint` を計算する
-- UNKNOWN rowは `unknown_active=true / false` とcanonical `resolution_refs[]` を保持し、それ以外は `unknown_active=null / resolution_refs=[]`
-- snapshotの `exact_reference_index[]`、`payload_file_sha256[]`、`manifest_sha256` はsnapshot時点の値を保持する。`payload_file_sha256[]` のpath集合 + `MANIFEST.md` がsnapshot時点のcurrent package file setであり、materializeは更新前にcurrent file set / raw hashを全件照合する。retired IDの過去参照先や更新前file集合はimpact算出にも利用する
+- `update_snapshot` はCAS相当の更新前identityだけを持つ。Agent / LLMが編集・再構築しない
+- snapshotから信頼するのは `package_version / payload_file_sha256[] / manifest_sha256` だけとし、`tracked_items[] / exact_reference_index[]` 等のderived情報をcallerに持ち回らせない
+- materializeはsnapshot hash一致を確認した後、current packageを自身で再parseし、tracking row / current UNKNOWN / exact reference index / lifecycle比較元を再導出してin-memory previous modelとして使う
+- `payload_file_sha256[]` のpath集合 + `MANIFEST.md` がsnapshot時点のcurrent package file setであり、materializeはstaging前とcommit直前に全件照合する
 
 `resolved_unknown_ids` は09で `分類=UNKNOWN` かつ `現在有効か=No` のUNK。
 
@@ -703,7 +753,7 @@ stdin:
   "operation":"materialize",
   "package_root":"<path>",
   "artifact_mode":"update",
-  "previous_snapshot":{"package_version":"v14","tracked_items":[],"exact_reference_index":[],"payload_file_sha256":[],"manifest_sha256":"<lowercase-64-hex>"},
+  "previous_snapshot":{"package_version":"v14","payload_file_sha256":[],"manifest_sha256":"<lowercase-64-hex>"},
   "change_mode":"normal",
   "legacy_source_version":null,
   "migration_retained_ids":[],
@@ -719,14 +769,12 @@ stdin:
           "draft_key":"us-login",
           "identity_action":"new",
           "reuse_id":null,
-          "primary_prefix":"US",
           "cells":{
             "Scope ID":"SCOPE-001",
             "Actor / Role":"管理者",
             "Goal":"...",
             "関連仕様項目ID":["SPEC-001"],
             "関連構造ID":["PAGE-001"],
-            "状態":"current",
             "関連UNKNOWN ID":[]
           }
         }
@@ -769,11 +817,11 @@ table input contract:
 
 - tracking table: 分析対象機能scope一覧、UI構造一覧、UI操作一覧、User Story一覧、Use Case一覧、Behavior一覧、Acceptance Criteria一覧、ビジネスルール一覧、項目・バリデーション一覧、処理フロー一覧、通知・外部連携一覧、仕様矛盾・保留一覧、Repository実装状況、情報源 / 正本参照一覧、分析項目
 - `file / section` は§2〜§5のstandard registryに存在するexact pairだけを許可する。extension fileは `table_changes[]` の対象にしない
-- `cells` はprimary ID列を除いたexact header名だけを許可する。stable reference列はJSON string array、通常cellはstringで受ける
+- `cells` はprimary ID列とhelper-owned derived列を除いたexact header名だけを許可する。UIOP / US / UC / Behavior / RULE / FIELD / FLOW / NOTIFY / INTERACTの `状態` はhelper-ownedでcaller inputを拒否する。stable reference列はJSON string array、通常cellはstringで受ける
 - 新規rowは `identity_action=new / reuse_id=null / draft_key=<request内unique>`
 - 既存row更新は `identity_action=reuse / reuse_id=<stable ID>`。normalではprevious snapshot / current packageに存在するIDだけをreuseでき、legacy-migrationでは `migration_retained_ids[]` に含まれるIDだけをreuseできる
 - request内の新規row参照はstable IDの代わりに `@draft:<draft_key>` をreference配列へ指定できる。helperが採番後に解決する
-- standard tableの `primary_prefix` はregistryと完全一致を要求する
+- primary prefixは `file / section` のstandard registryからhelperが導出する。caller inputに `primary_prefix` を持たせない
 
 `keyed_table_updates[]` はstable IDを採番しないview / fixed-key tableの**完成row集合**を対象にし、section単位で全rowを置換します。部分patchは許可しません。exact registryは次です。
 
@@ -781,7 +829,8 @@ table input contract:
 | --- | --- | --- |
 | `00_scope_and_context.md / 条件付き必須file applicability` | `ファイル + Scope ID` | current Scope IDごとに03 / 04 / 05 / 08の4row exactly。callerは `Trigger判定 / 関連仕様項目ID / 根拠 / 備考 / 関連UNKNOWN ID` を渡し、helperが `状態` を生成する。file順→Scope ID昇順でcanonical sort |
 | `02_behavior_and_business_rules.md / Use Case振る舞い完全性` | `UC ID + 結果分類` | current UCごとに3分類 exactly |
-| `07_current_unknowns.md / Current UNKNOWN一覧` | `UNKNOWN ID` | 09のcurrent UNKNOWN ID集合とexact一致 |
+| `07_current_unknowns.md / Current UNKNOWN一覧` | `UNKNOWN ID` | 09のcurrent UNKNOWN ID集合とexact一致。`Blocking Scope ID` は `関連Scope ID` のsubset、`関連File` はcanonical current fileだけを許可する |
+| `08_repository_implementation_status.md / Repository確認基準` | `Repository` | Repository key duplicate禁止。normal updateでsection省略ならexisting baselineを保持し、自動でbranch / revisionを更新しない |
 | `09_authority_and_traceability.md / 現在有効な仕様根拠` | `仕様根拠ID` | LLMが確定したCurrent Effective Authorityだけ。09分析項目のcurrent SPEC / DECISION / approved ASMへ存在参照 |
 | `09_authority_and_traceability.md / 後続Skillへの補足` | `項目` | 項目duplicate禁止。stable refsだけhelper検証 |
 
@@ -791,9 +840,11 @@ normal updateで `keyed_table_updates[]` にsectionが無い場合、そのsecti
 
 normative traceability contract:
 
-- current UIOP / US / UC / Behavior / RULE / FIELD / FLOW / NOTIFY / INTERACT rowは `関連仕様項目ID` を1件以上要求する
+- UIOPの `状態` はhelperが生成する。`関連UNKNOWN ID` が1件以上なら `blocked`、空かつcurrent必須fieldが揃えば `mapped`。US / UC / Behavior / RULE / FIELD / FLOW / NOTIFY / INTERACTは同様に `blocked / current` をhelperが導出する。callerは `状態` を入力しない
+- current / mapped UIOP / US / UC / Behavior / RULE / FIELD / FLOW / NOTIFY / INTERACT rowは `関連仕様項目ID` を1件以上要求する
 - current rowの `関連仕様項目ID` はcurrent SPEC / DECISION / approved ASM / INFだけを許可する
-- Authority不足等でnormative内容を確定できない場合はcurrentにせず、tableが許すblocked row + `関連UNKNOWN ID` 1件以上とする
+- identityは確定しているが内容不足の場合はTriggerや存在判定を書き換えず、blocked row + `関連UNKNOWN ID` 1件以上で表す。identity自体を確定できない場合はstable rowを作らず07のUNKNOWNからscope/file blockerへ閉じる
+- RULE blocked rowは `関連Scope ID / ルール名 / 関連UNKNOWN ID`、FIELDは `関連Scope ID / ラベル / 名称 / 関連UNKNOWN ID`、FLOWは `関連Scope ID / 処理名 / 関連UNKNOWN ID`、NOTIFY / INTERACTは `関連Scope ID / 種別 / 名称 / 関連UNKNOWN ID` を最低限必須とする。その他の意味fieldは確定済み分だけ保持できる
 - UNKNOWNを `関連仕様項目ID` へ入れてblocked根拠を代用しない
 - current ACはさらに§9 / _08の契約どおりcurrent SPEC / DECISION / approved ASM Authorityを1件以上要求し、INFだけではcurrentにしない
 - PAGE / STATE / VIEW等の純粋な構造row、ISSUE、IMPLは上記normative必須規則の対象外で、各table固有schemaに従う
@@ -832,7 +883,7 @@ file / control materialization order:
 2. version policyを検証し、normal updateではnext version候補だけを保持する。まだPackage Version / CHANGELOG / README / MANIFESTへ反映しない
 3. legacy-migrationでは `migration_retained_ids[] / legacy_lifecycle_events[]` の形式・duplicate・lifecycleを先に検証して使用済みID集合へ予約する
 4. `keyed_table_updates[]` のfile × Scope ID applicabilityを先にparseし、`Trigger判定` からscope単位の状態を導出する
-5. applicabilityをfile単位へ集約し、条件付き標準fileを処理する。required scopeのrowは更新可能、blocked scopeだけを参照するexisting rowは保持し、required + blocked scopeを同時参照するrowの変更はrejectする。required scopeごとに03=FIELD / 04=FLOW / 05=NOTIFY|INTERACT / 08=IMPLの対応rowが1件以上あることをfinal validate対象にする。続けて `extension_file_updates[]` のnew pathをrequest順でbatch allocationし、`extension_file_retirements[]` をexisting current extensionとして検証する
+5. applicabilityをfile単位へ集約し、条件付き標準fileを処理する。Trigger=`あり`のrequired scopeは維持し、内容不足をTriggerへ逆流させない。identity確定済みdomain itemはcurrent / blocked rowで、identity未確定なら07のBlocking Scope ID + 関連Fileでclosureする。required + blocked scopeを同時参照するexisting rowの変更は、scope別意味を分離できない場合だけrejectする。続けて `extension_file_updates[]` のnew pathをrequest順でbatch allocationし、`extension_file_retirements[]` をexisting current extensionとして検証する
 6. standard stable tracking `table_changes[]` をin-memory modelへ適用し、reuse / new IDを割り当て、tracking row内の `@draft` referenceを解決する。extension fileはtracking rowを持たない
 7. remaining `keyed_table_updates[]` のkey / reference内 `@draft` を解決して完成row集合を確定する
 8. normal updateの `retire_ids[]` を検証してin-memory tracking modelから除去する。removal予定fileにtracked tracking rowが残る場合は対応retire intent不足としてblockedする。legacy-migrationの過去lifecycle eventは `legacy_lifecycle_events[]` だけから扱い、current row削除操作へ流用しない
@@ -854,6 +905,7 @@ payload:
   "completion_status":"partial",
   "ready_scope_ids":["SCOPE-002"],
   "blocked_scope_ids":["SCOPE-001"],
+  "scope_readiness":[{"scope_id":"SCOPE-001","status":"blocked","blocking_unknown_ids":["UNK-004"]},{"scope_id":"SCOPE-002","status":"ready","blocking_unknown_ids":[]}],
   "allocated_ids":[{"draft_key":"us-login","stable_id":"US-003"}],
   "allocated_extension_files":[{"draft_key":"domain-csv","path":"10_csv-export.md"}],
   "retired_ids":["PAGE-009"],
@@ -864,7 +916,7 @@ payload:
 }
 ```
 
-`changed=false` のno-opでは `allocated_ids=[] / allocated_extension_files=[] / retired_ids=[] / retired_extension_files=[] / changed_files=[]` とし、`previous_package_version / package_version / completion_status / ready_scope_ids[] / blocked_scope_ids[]` はcurrent package値を返します。provisional処理で一時的に割り当てたID / extension pathは保存・予約しません。create / legacy-migrationは成功時 `changed=true` です。
+`changed=false` のno-opでは `allocated_ids=[] / allocated_extension_files=[] / retired_ids=[] / retired_extension_files=[] / changed_files=[]` とし、`previous_package_version / package_version / completion_status / ready_scope_ids[] / blocked_scope_ids[] / scope_readiness[]` はcurrent package値を返します。provisional処理で一時的に割り当てたID / extension pathは保存・予約しません。create / legacy-migrationは成功時 `changed=true` です。
 
 通常のUI target package更新は `materialize` を唯一のwrite pathとします。採番 / version / README controls / MANIFEST / lifecycle / impactは内部関数とし、production CLIへ公開しません。`build-machine-evidence` だけはmaterialized packageから下流handoffを再生成する独立用途があるためread-only production operationとして残します。
 
@@ -873,8 +925,8 @@ payload:
 MANIFEST、README controls、Stable ID changes、影響fileは `materialize` 内部で生成します。
 
 - MANIFEST自身は自己hash対象にせず、canonical file orderの最終raw bytesをSHA-256でhashする
-- Stable ID lifecycleはprevious snapshot / current tracking row / explicit `retire_ids[]` から生成し、row消失だけでretireしない
-- 影響fileはchanged IDのprevious/current tracking file + exact reference先unionとし、本文修正必須という意味判断は行わない
+- Stable ID lifecycleはsnapshot hash一致後にhelperが再parseしたprevious current model / provisional current tracking row / explicit `retire_ids[]` から生成し、row消失だけでretireしない
+- 影響fileはhelperが再導出したprevious/current tracking file + exact reference先unionとし、caller-provided derived indexを信頼しない。本文修正必須という意味判断は行わない
 - legacy migrationではLLMが明示したretained ID / lifecycle eventだけを入力にし、legacy proseからidentityを推測しない
 
 内部関数単体または `materialize / validate` 経由でrepository unit testし、これら専用のproduction operationは作りません。
@@ -887,7 +939,7 @@ stdin:
 {"operation":"build-machine-evidence","package_root":"<path>"}
 ```
 
-§9に従い09からnormalized Authority inputを生成して既存 `authority_entities.py` のbuilderを呼び、02のcurrent AC、親UCへ接続する状態=`mapped`のUIOP集合、親US / UC / Behavior chain、scope、実際に参照するUI構造rowからAcceptance Criterion Machine Entityを生成して統合します。
+§9に従い09からnormalized Authority inputを生成して既存 `authority_entities.py` のbuilderを呼び、02のcurrent AC、親UCへ接続する状態=`mapped`のUIOP集合、親US / UC / Behavior chain、scope、直接参照FIELD / RULE / FLOW / NOTIFY / INTERACTを確定し、AC chain / linked UIOP / linked domain itemが参照するUI構造 + `親構造ID` ancestor closure、関連current INFからAcceptance Criterion Machine Entityを生成して統合します。missing parent / self-parent / cycleはrejectします。
 
 payload:
 
@@ -898,6 +950,14 @@ payload:
   "acceptance_criterion_entities":[],
   "machine_entities":[],
   "expected_entity_identities":[],
+  "ready_scope_handoffs":[
+    {
+      "scope_id":"SCOPE-002",
+      "normalized_skill_input":{"authorities":[],"acceptance_criteria":[]},
+      "machine_entities":[],
+      "expected_entity_identities":[]
+    }
+  ],
   "machine_entities_markdown":"### Machine Entities: spec-analysis\n\n\`\`\`json\n{...}\n\`\`\`\n"
 }
 ```
@@ -960,14 +1020,16 @@ AC Entity contentは `_08` のcurrent chainから次を固定projectionします
 - uc_id / use case / trigger / preconditions / success postcondition
 - user_stories[] の us_id / actor_role / goal
 - scope の scope_id / target / authority_refs[]
-- linked_structures[] の structure_id / type / name / state_axis / path_identifier / parent_structure_id / authority_refs[]
+- linked_structures[] の structure_id / type / name / state_axis / path_identifier / parent_structure_id / authority_refs[]。AC chain / linked UIOP / linked domain itemのdirect structure + parent ancestor closure
+- linked_domain_items[] の item_id / item_type / scope_refs[] / semantic content / authority_refs[] / structure_refs[]。direct FIELD / RULE / FLOW / NOTIFY / INTERACTだけ
+- linked_inferences[] の inf_id / canonical analysis content。direct current INFだけ
 - authority_refs[]
 
-AC / Behavior / UC / US chainに加え、linked UIOP、scope、linked structureの `関連仕様項目ID` をAuthority unionへ含めます。AC Entityの `authority_refs[]` / `upstream_entity_dependencies[]` へ投影するのは09のCurrent Effective Authorityに存在するcurrent SPEC / DECISION / approved ASMだけです。INF / UNK、inactive Authority、存在しないIDをMachine Entity dependencyへ入れません。
+AC / Behavior / UC / US chainに加え、linked UIOP、scope、linked structures、linked domain itemsの `関連仕様項目ID` をAuthority unionへ含めます。AC Entityの `authority_refs[]` / `upstream_entity_dependencies[]` へ投影するのは09のCurrent Effective Authorityに存在するcurrent SPEC / DECISION / approved ASMだけです。linked current INFは `linked_inferences[]` のcontent fingerprintへ寄与させ、Machine Entity dependencyへは入れません。UNK、inactive Authority、存在しないIDもdependencyへ入れません。
 
 current ACは、chain全体のstable refsを解決した結果としてcurrent Authorityを1件以上持つことを要求します。current Authorityが0件なら `build-machine-evidence / validate` は `state_transition_required` でblockedし、AC Entityを生成しません。helper自身はUNKNOWNやblocked Behaviorを生成しません。LLMが不足の意味を判断して既存UNKをreuseするかnew UNKを作り、親Behaviorをblockedへ戻してから再materializeします。helperはAuthority集合のfilter / existence / currentnessだけを判定し、どのAuthorityが意味上ACを支えるかはLLMがstructured rowへ記録します。
 
-UIOP / US / UC / BehaviorをMachine Entity typeへ追加しません。linked UIOP + 親chainをAC contentへ含めるため、UI操作または親意味変更でAC content fingerprintが変わります。
+UIOP / US / UC / Behavior / UI構造 / FIELD / RULE / FLOW / NOTIFY / INTERACT / INFをMachine Entity typeへ追加しません。package-local rowをAC contentへ固定projectionするため、direct structure / ancestor、domain item、INF、UI操作または親意味変更でAC content fingerprintが変わります。repository由来のimplementation-only structureもtarget-model dependencyとしてfingerprintへ寄与しますがAuthorityにはなりません。無関係なpackage rowはprojectionへ含めません。
 
 ### 9.3 normalized_skill_input
 
@@ -982,9 +1044,13 @@ UIOP / US / UC / BehaviorをMachine Entity typeへ追加しません。linked UI
 }
 ```
 
-`authority_refs[]` はAC / Behavior / UC / US chain、linked UIOP、scope、linked structureのstable refsを09のCurrent Effective Authority集合へ解決した結果のunionであり、current SPEC / DECISION / approved ASMだけを残して重複除去・昇順canonical化します。INF / UNKは含めません。current ACでは1件以上必須です。
+`authority_refs[]` はAC / Behavior / UC / US chain、linked UIOP、scope、linked structures、linked domain itemsのstable refsを09のCurrent Effective Authority集合へ解決した結果のunionであり、current SPEC / DECISION / approved ASMだけを残して重複除去・canonical sortします。linked INFはcontent-only projectionなので含めません。UNKも含めません。current ACではAuthorityを1件以上必須とします。
 
 Agent / LLMがMarkdownからnormalized inputやexpected Entity一覧を再構築しません。
+
+`ready_scope_handoffs[]` は `inspect.ready_scope_ids[]` とexact一致し、scope IDのcanonical順です。各entryはそのscopeから到達するcurrent Authority / ACだけを固定projectionします。blocked scopeはhandoffを生成しません。qa-workflow / test-analysisはpackage-global Machine Entity集合をMarkdownからfilterせず、このscope handoffを正規入力として使います。
+
+blocked scopeをquestion-analysisへ送る場合は `inspect.scope_readiness[].blocking_unknown_ids[]` を使い、current UNKNOWN全件をAgentがfilterしません。
 
 shared runtime contractの `acceptance_criterion` type / expected Entity / requirement-structure-v2連携は `_09_runtime-entity-and-test-requirement-contracts.md` を正本とします。
 
@@ -1032,6 +1098,8 @@ stdin:
   "artifact_mode":"update",
   "previous_artifact_markdown":"<previous question-analysis output>",
   "artifact_markdown":"<candidate artifact with narrative sections>",
+  "current_unknown_ids":["UNK-001"],
+  "resolved_unknown_ids":["UNK-002"],
   "questions":[
     {
       "draft_key":"q-login-role",
@@ -1064,6 +1132,8 @@ stdin:
 - Q tableをID昇順、reference cellをcanonical `<br>` 形式でserializeする
 - 同じrunで生成した全Q IDを含む `質問ID履歴` を生成する
 - candidate artifact内の既存Q table / 質問ID履歴は正本にせず、2 section全体をhelper生成結果で置換する
+- `materialize` 自身が生成後artifactへ `validate-links` と同じcurrent / resolved UNKNOWN存在検証を適用し、不存在・resolved-only・同一Q内duplicate参照を含むartifactを成功として返さない
+- `validate-links` operationは既存artifactのstandalone検証用途として残す。canonical write pathでは別operation呼出しをAgentへ要求しない
 - 分類や質問文、UNKNOWNとの意味対応、回答後正規化先の意味は判断しない
 
 payload:
@@ -1158,9 +1228,10 @@ LLM / stakeholder側がsemantic identityのreuse / new、DECISION / ASM区分、
 - `..` によるroot外参照禁止
 - symlink file / symlink directory拒否
 - regular fileだけを読む
+- completed current package root直下にはcanonical payload files + `MANIFEST.md` 以外のregular fileを許可せず、nested directoryも拒否する。helper-owned staging / backupはpackage rootのsiblingなのでpackage file setに含めない
 - UTF-8 strict decode
 - current `ui-target-v1` packageはBOMなしUTF-8、LFのみ、terminal LF exactly oneを要求する。legacy inputはmigration時に§7.4へcanonicalizeする
-- current package全read bytes合計16 MiB以下
+- current package全read bytes合計16 MiB以下。これはUI target packageのsupported hard limitとし、超過時は`limit_exceeded`でfail-closedする。helperが自動分割や複数package化を行わない
 - duplicate normalized relative path拒否
 - case-sensitive canonical filenameを要求
 - filesystem read失敗を意味上のUNKNOWNへ変換せずblocked

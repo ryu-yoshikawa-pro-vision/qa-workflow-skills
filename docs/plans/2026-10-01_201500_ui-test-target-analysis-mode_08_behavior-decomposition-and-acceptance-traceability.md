@@ -32,7 +32,9 @@ UI操作の有無自体はLLMが資料の意味から判断します。`Behavior
 
 `資料不足でUS / UC / Behavior / ACを書けない` はnot-applicableの理由になりません。Behavior Decomposition=blockedのscopeでは下位UIOP / US / UC / Behavior / ACを確定済みとして生成せず、関連UNKNOWN解消後にrequired / not-applicableを再判定します。
 
-UI操作ありと確定したscopeは `Behavior Decomposition=required` のまま維持します。Actor / Role、Goal、操作対象、結果等の下位情報がAuthorityから確定できない場合はscope全体をblockedへ戻さず、影響するUIOP / US / UC / Behavior rowを `blocked + 関連UNKNOWN ID` で表現します。ACにはblocked rowを作りません。scope-level `blocked` はUI操作有無そのものが `未確定` の場合だけです。
+UI操作ありと確定したscopeは意味モデル上 `Behavior Decomposition=required` のまま維持します。Actor / Role、Goal、操作対象、結果等の下位情報がAuthorityから確定できない場合は、影響するUIOP / US / UC / Behavior rowを `blocked + 関連UNKNOWN ID` で表現します。ACにはblocked rowを作りません。semantic identity自体を確定できずrowを発行できない場合は、07のCurrent UNKNOWNに `Blocking Scope ID` と `関連File=02_behavior_and_business_rules.md` を明示します。
+
+ここで `Behavior Decomposition=required` は適用状態でありworkflow readinessではありません。blocked下位row、identity未確定のblocking UNKNOWN、current UCの `判定=未定義` 等が残る間、そのSCOPEは後続工程に対してblockedです。scope-level `Behavior Decomposition=blocked` はUI操作有無そのものが `未確定` の場合だけです。
 
 UI操作には少なくとも次を含みます。
 - button / link / menu / tab等による操作
@@ -86,6 +88,7 @@ ID: `UIOP-001` から開始し、最低3桁で連番採番する。999の次は1
 規則:
 - mapped: **AC freshnessでいうcurrent UIOP**。対応UC IDが1件以上、関連UNKNOWN IDは空
 - blocked: 対応UC IDは空を許可し、関連UNKNOWN IDが1件以上必須
+- `状態` はcaller入力ではなく、helperがfield充足と `関連UNKNOWN ID` から `mapped / blocked` を導出する
 - 既知のUI操作を無言で落とさない
 - 同一操作が複数UCに関係する場合は意味上必要なUCを全て参照する
 - 操作の目的 / 結果をこの表で再定義しない。目的はUS / UC、結果はBehavior / ACを正本とする
@@ -101,7 +104,7 @@ blocked rowは「semantic identityまでは確定しているが、完成に必�
 | UC | 関連US ID、Use Case、Trigger、Success Postcondition、関連仕様項目ID。Preconditionsは該当なしなら空可。関連UNKNOWN IDは空 | 関連US ID、Use Case、関連UNKNOWN ID。Trigger / Preconditions / Success Postcondition / 関連仕様項目IDは確定済み分だけ保持 | Trigger、Preconditions、Success Postcondition、関連仕様項目ID | LLMが親USに対するUse Case identityを確定できない |
 | Behavior | UC ID、結果分類、振る舞い、Postcondition / Result、関連仕様項目ID。関連UNKNOWN IDは空 | current UC ID、結果分類、振る舞い、関連UNKNOWN ID。Postcondition / Result / 関連仕様項目IDは確定済み分だけ保持 | Postcondition / Result、関連仕様項目ID | Behaviorの存在・identity自体を確定できない |
 
-`current / mapped` rowの関連仕様項目IDは `_06` のnormative traceability contractに従います。blocked rowはUNKNOWNが正本であり、未確定fieldを推測して埋めません。
+`current / mapped` rowの関連仕様項目IDは `_06` のnormative traceability contractに従います。blocked rowはUNKNOWNが正本であり、未確定fieldを推測して埋めません。UIOP / US / UC / Behaviorの `状態` はこのfield充足と関連UNKNOWNからhelperが生成し、materialize callerは `状態` を送信しません。
 
 ## 4. User Story
 
@@ -124,6 +127,7 @@ ID: `US-001` から開始し、最低3桁で連番採番する。999の次は100
 - blocked: 確定できない意味を推測せず、関連UNKNOWN IDを1件以上持つ
 - 仕様にないビジネス価値を追加しない
 - current USは1つ以上のcurrentまたはblocked UCへ接続する
+- USの `状態` はhelperがActor / Role、Goal、仕様参照、関連UNKNOWNから `current / blocked` を導出する
 
 独立したValue列は持ちません。仕様に価値・目的の記載がある場合はGoalまたは関連Authorityの意味として保持します。
 
@@ -143,9 +147,11 @@ ID: `UC-001` から開始し、最低3桁で連番採番する。999の次は100
 - 複数USが同じUCを共有する場合はUCを意味なく複製しない
 - 1つのUCが参照するUSは同じScope IDに属する
 - current UCが参照するUSはすべてcurrentである。blocked USをcurrent UCの親にしない
+- UIOPの `Scope ID` は、その `対応UC ID` が参照するUSから決定論導出したScope IDとexact一致する。cross-scope UIOPは許可しない
 - current UCはTrigger / Preconditions / Success Postconditionが後続分析に必要な範囲で確定している
 - current UCはBehavior完全性3分類を持ち、各分類のclosure状態は§7で表す。current Behaviorだけでなく、存在・identityは追跡できるが結果未確定のblocked Behaviorを持てる
 - blocked UCは関連UNKNOWN IDを1件以上持ち、Behavior完全性3分類をまだ生成しない
+- UCの `状態` はhelperが必須fieldと関連UNKNOWNから `current / blocked` を導出する
 - 単なるPAGEとUse Caseを同一視しない
 
 ## 6. Behavior
@@ -179,6 +185,7 @@ ID: `BH-001` から開始し、最低3桁で連番採番する。999の次は100
 - Behaviorの存在・identity自体をまだ確定できない場合はblocked Behavior rowを作らず、§7の `未定義` + UNKNOWNだけで表す
 - blocked Behaviorはcurrent ACを持たない
 - blocked Behaviorをcurrent ACの親にしない
+- Behaviorの `状態` はhelperが必須fieldと関連UNKNOWNから `current / blocked` を導出する
 
 ## 7. 正常 / 準正常 / 例外の完全性確認
 
@@ -248,7 +255,7 @@ semantic identityのreuse / new / explicit retire判断はLLMが行います。
 
 分類変更だけでstable IDを再採番しません。rowが消えただけでretiredとせず、semantic identityをcurrent modelから意図的に除去する場合だけLLMが `retire_ids[]` を明示します。
 
-`SRC / SPEC / INF / UNK / DEC / ASM / Q` 等の既存canonical IDは既存repository契約どおり3桁固定です。PR #16で新設するUI target structural ID（SCOPE / PAGE / STATE / VIEW / STEP / MODAL / BDLG / PANEL / EXT / SHARED / FIELD / RULE / FLOW / NOTIFY / INTERACT / ISSUE / IMPL / UIOP / US / UC / BH / AC）は**最低3桁・上限なし**とし、999の次を1000として採番します。既存canonical IDの1000件超はPR #16の対象外で、既存3桁契約をfail-closedで維持します。
+`SRC / SPEC / INF / UNK / DEC / ASM / Q` 等の既存canonical IDは既存repository契約どおり3桁固定です。PR #16で新設するUI target structural ID（SCOPE / PAGE / STATE / VIEW / STEP / MODAL / BDLG / PANEL / EXT / SHARED / FIELD / RULE / FLOW / NOTIFY / INTERACT / ISSUE / IMPL / UIOP / US / UC / BH / AC）は**最低3桁・上限なし**とし、999の次を1000として採番します。既存canonical IDは1 prefix 999件を**意図したsupported hard limit**として維持し、超過時はfail-closedします。PR #16で既存canonical ID体系全体の桁契約は変更しません。
 
 ## 10. Authorityとの関係
 
@@ -269,9 +276,9 @@ US / UC / Behavior自体はMachine Entity化しません。
 
 下流test-requirement-designへのhandoff pointであるcurrent ACだけを `spec-analysis / acceptance_criterion / AC-xxx` Machine Entityへ決定論変換します。
 
-AC Entityのcanonical contentには、AC自身だけでなくそのACへ到達するcurrent US / UC / Behavior chain、Scope、Authority refs、構造refsに加え、**状態=`mapped` かつ `対応UC ID` が親UCと一致するUIOP集合**を固定projectionします。linked UIOPには `uiop_id / actor_role / target_structure_id / operation / authority_refs[]` を含めます。さらに実際に参照するUI構造rowとscope内容もcanonical projectionし、helper / validatorはcurrent ACへ到達する全parentがcurrentであることを決定論検証します。
+AC Entityのcanonical contentには、AC自身だけでなくそのACへ到達するcurrent US / UC / Behavior chain、Scope、Authority refs、構造refsに加え、**状態=`mapped` かつ `対応UC ID` が親UCと一致するUIOP集合**を固定projectionします。linked UIOPには `uiop_id / actor_role / target_structure_id / operation / authority_refs[]` を含めます。さらに直接参照するFIELD / RULE / FLOW / NOTIFY / INTERACTを確定し、AC chain / linked UIOP / それらdomain itemが直接参照するUI構造rowと、その `親構造ID` をrootまで辿ったancestor closure、関連INF、scope内容をcanonical projectionします。helperはmissing parent / self-parent / cycleをrejectし、current ACへ到達する全parentがcurrentであることを決定論検証します。
 
-これによりUIOPの操作対象 / 操作内容 / Authority、scopeの対象意味、同一stable IDのUI構造内容、US / UC / Behaviorの意味変更でもAC Entityのcontent fingerprintまたはAuthority dependencyが変わり、AC IDや本文が同じでも関連TRをstaleにできます。無関係なUI構造変更はprojectionへ入れません。UIOPやUI構造自体をglobal Machine Entity typeへ追加しません。
+これによりUIOPの操作対象 / 操作内容 / Authority、scopeの対象意味、同一stable IDのUI構造とancestor、linked FIELD / RULE / FLOW / NOTIFY / INTERACT、linked INF、US / UC / Behaviorの意味変更でもAC Entityのcontent fingerprintまたはAuthority dependencyが変わり、AC IDや本文が同じでも関連TRをstaleにできます。無関係なpackage rowはprojectionへ入れません。UIOPやpackage-local item自体をglobal Machine Entity typeへ追加しません。
 
 Authority Entityは既存 `authority_entities.py`、AC Entityは `ui_target_package.py build-machine-evidence` が生成します。Machine Entity wrapper / content fingerprint / expected identityをLLMが手組みしません。
 

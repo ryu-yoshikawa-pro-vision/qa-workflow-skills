@@ -53,7 +53,7 @@ feat/ui-test-target-analysis-profile
 
 ## 固定方針
 
-LLM / deterministic処理の責務境界は `2026-10-01_201500_ui-test-target-analysis-mode_05_llm-deterministic-boundaries.md` を正本とします。LLMの意味判断をscriptへ移さず、形式・参照・集計・fingerprint等の再現可能な定型処理だけをSkill-local helper / validatorへ移します。LLMはsemantic identity、UI分類、file trigger、UNKNOWNの影響scope、extension要否、same-UNK / new-UNK、explicit retire等を判断します。その後の標準stable ID採番、Markdown escape / sort / structured table・known section・標準file materialization、ready / blocked scope導出、Stable ID lifecycle / 影響file、README / Machine Entity / MANIFESTはhelperが決定論実行します。Current UNKNOWNの存在だけでpackage全体を停止しません。DEC / ASMはcanonical `DEC-xxx / ASM-xxx` を維持し、Project Contextがownerの場合だけqa-workflow helperで番号決定・materialize・previous ID削除検証を行います。packageはDEC / ASMをterminal retireしません。
+LLM / deterministic処理の責務境界は `2026-10-01_201500_ui-test-target-analysis-mode_05_llm-deterministic-boundaries.md` を正本とします。LLMの意味判断をscriptへ移さず、形式・参照・集計・fingerprint等の再現可能な定型処理だけをSkill-local helper / validatorへ移します。LLMはsemantic identity、UI分類、file trigger、UNKNOWNの関連Scope / Blocking Scope / 関連File、required domainの意味上の母集団、extension要否、same-UNK / new-UNK、explicit retire等を判断します。その後のstable ID採番、row状態導出、Markdown serialization、scope readiness、scope別machine handoff、Stable ID lifecycle / 影響file、README / Machine Entity / MANIFESTはhelperが決定論実行します。Current UNKNOWNの存在だけでpackage全体を停止せず、semantic quality gateはcanonical write前に実施します。DEC / ASMはcanonical `DEC-xxx / ASM-xxx` を維持し、Project Contextがownerの場合だけqa-workflow helperで番号決定・materialize・previous ID削除検証を行います。packageはDEC / ASMをterminal retireしません。
 
 
 ### 1. 新Skillは追加しない
@@ -163,7 +163,7 @@ version更新時は変更ファイルだけではなく、そのversionの完全
 - skills/test-requirement-design/evals/output/*
 - runtime / repository contract tests
 
-目的はcurrent ACをTRまたは明示的dispositionへ閉じ、AC / linked UIOP / scope / linked UI構造 / 親Behavior / 親UC / 親US / Authority変更をTR freshnessへ伝播させることです。Authority変更は、AC再生成後もTRが直接保持するAuthority dependencyでstale判定できるようにします。TRの責務をACの言い換えへ変更しません。
+目的はcurrent ACをTRまたは明示的dispositionへ閉じ、AC / linked UIOP / scope / direct UI構造とancestor / linked FIELD・RULE・FLOW・NOTIFY・INTERACT / linked INF / 親Behavior / 親UC / 親US / Authority変更をTR freshnessへ伝播させることです。package-local itemはAC content fingerprintへ寄与させ、Authorityだけをupstream Entity dependencyにします。repository由来のimplementation-only structureもtarget-model dependencyとしてfreshnessには影響しますが、Authorityへ昇格しません。TRの責務をACの言い換えへ変更しません。
 
 ### question-analysis
 
@@ -205,7 +205,7 @@ PR #14確認headに存在する9個のSkill-local `runtime_contract.py` を同�
 
 `acceptance_criterion` Entity type、`acceptance_refs` canonicalization、spec-analysis Authority + AC expected Entity導出はshared runtime / Machine Entityの意味契約変更です。そのため9コピーをbyte-identicalに揃え、`RUNTIME_CONTRACT_VERSION` を `runtime-v1` → `runtime-v2`、`ENTITY_SCHEMA_VERSION` を `entity-state-v1` → `entity-state-v2` へ更新します。envelope field shapeとfreshness algorithmは維持します。
 
-旧runtime-v1 / entity-state-v1 evidenceをv2 current evidenceとして読み替えません。shared `runtime_contract.py` はschema / canonicalization / evidence parse / validation / freshness等の共通契約だけを持ち、one-time migrationのSkill固有projectionは持ちません。TRD / TCD / TCのv1→v2変換は各Skill-local `runtime_v1_cutover.py` がv1 Runtime Input / Resultから完成済みv2 generator inputを決定論生成します。qa-workflow用の新しいcutover wrapperは追加せず、既存workflowが `_09` の固定順をオーケストレーションします。既存v1 downstream artifactがある場合はsemantic不変のruntime cutoverを先に完了し、その後UI target package migration / AC生成、requirement-structure-v2の通常semantic update、stale downstream再実行の順に進めます。generator contractは別契約なので、`workflow-runtime-v1`、`schema-cases-v1`、`usability-inspection-runtime-v1`、`wcag-em-runtime-v1`等を意味変更なしにversion upしません。
+旧runtime-v1 / entity-state-v1 evidenceをv2 current evidenceとして読み替えません。shared `runtime_contract.py` はschema / canonicalization / evidence parse / validation / freshness等の共通契約だけを持ち、one-time migrationのSkill固有projectionは持ちません。TRD / TCD / TCのv1→v2変換だけを各Skill-local `runtime_v1_cutover.py` へ置きます。その他のruntime Skillはcanonical spec成果物、validated保存Machine Runtime Input、current workflow stateを正本としてv2 evidenceを再生成し、保存inputがないinspection系だけ既存Skillの通常rerun / re-observationへ戻します。proseからv2 inputを推測再構築しません。qa-workflow用の新しいcutover wrapperは追加せず、既存workflowが `_09` の固定順をオーケストレーションします。既存v1 downstream artifactがある場合はsemantic不変のruntime cutoverを先に完了し、その後UI target package migration / AC生成、requirement-structure-v2の通常semantic update、stale downstream再実行の順に進めます。
 
 active Machine Evidence templateはversion文字列だけを置換しません。runtime Skillは `render_runtime_input()` / `render_runtime_result()` / `render_machine_entities()`、spec-analysisは `authority_entities.py` / `build-machine-evidence` の生成結果を正本とし、旧 `entity_schema_version` / `dependencies` / `runtime-contract-v1` / `runtime-envelope-v1` の手書き擬似schemaを削除します。
 

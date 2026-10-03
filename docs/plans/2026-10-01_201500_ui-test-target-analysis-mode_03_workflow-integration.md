@@ -117,12 +117,12 @@ eval validatorはproduction helperをimportしてexpectedを作りません。�
 基本経路:
 
 spec-analysis(UI target mode)
-→ `ui_target_package.py inspect` の `ready_scope_ids[] / blocked_scope_ids[]` を確認
-→ blocked scopeに関係する未解決論点はquestion-analysisへ渡す
+→ `ui_target_package.py inspect` の `scope_readiness[] / ready_scope_ids[] / blocked_scope_ids[]` を確認
+→ blocked scopeは `scope_readiness[].blocking_unknown_ids[]` だけをquestion-analysisへ渡す。current UNKNOWN全件をAgentがfilterしない
 → 回答正規化後、spec-analysis(UI target mode)を差分更新
 → 独立したready scopeはblocked scopeの回答待ちだけを理由に停止しない
 → ユーザー要求が仕様理解までならcurrent packageを返す
-→ テスト分析も要求されている場合はready scopeだけtest-analysisへ進み、blocked scopeは再開先を保持する
+→ テスト分析も要求されている場合は `build-machine-evidence.ready_scope_handoffs[]` のready scopeだけtest-analysisへ進み、blocked scopeは再開先を保持する
 
 ### 2.2 gated mode
 
@@ -211,23 +211,27 @@ exact CLI契約は `_06_package-schema-and-helper-contracts.md` を正本とし�
 
 UI target modeから後続テスト設計へ進む場合、spec-analysis成果物のMachine Entity / normalized inputをAgentがMarkdownから再構築しません。
 
-`ui_target_package.py build-machine-evidence` が返す次を正規handoffとして使用します。
+`ui_target_package.py build-machine-evidence` が返すpackage-global evidenceはcanonical package自身のMachine Entity section検証に使い、下流scope handoffには `ready_scope_handoffs[]` を正本として使用します。
 
-- spec-analysis canonical `normalized_skill_input`
-- Authority Machine Entities
-- current Acceptance Criterion Machine Entities
+各ready scope handoffは次を持ちます。
+
+- `scope_id`
+- そのscopeに必要なspec-analysis canonical `normalized_skill_input`
+- そのscopeに必要なAuthority / Acceptance Criterion Machine Entities
 - expected entity identities
 
-qa-workflow / coverage-analysisはshared runtime contractからAuthority + current ACのexpected Entityを内部導出します。
+qa-workflow / test-analysis / coverage-analysisはMarkdownやpackage-global Entity集合をAgent側でfilterせず、このscope projectionをそのまま使います。blocked scopeはhandoffを持たず、question-analysisへはinspectで導出したblocking UNKNOWNだけを渡します。
 
 ユーザー要求が仕様理解packageまでならspec-analysisの完了条件で終了し、test-analysis / test-requirement-designを起動しません。この場合、AC→TR / Disposition closureはpackage単体の完了条件ではありません。
 
-test-requirement-designへ到達した場合は `requirement-structure-v2` を使用し、`build-machine-evidence` が返したcurrent ACの `ac_id / authority_refs[]` を `acceptance_criteria[]` としてそのまま渡します。各TRの意味対応だけをLLMが `acceptance_refs[]` として判断し、AC / AuthorityのID集合・Entity存在・dependency展開・closure・freshnessはdeterministic runtimeが検証します。AgentがACからAuthority参照を再構築しません。
+test-requirement-designへ到達した場合は `requirement-structure-v2` を使用します。current AC集合は `requirement_structure.py` がvalidated upstream `acceptance_criterion` Machine Entitiesから決定論導出し、Agent / qa-workflowは `acceptance_criteria[]` を転記しません。各TRの意味対応だけをLLMが `acceptance_refs[]` として判断し、AC / AuthorityのID集合・Entity存在・dependency展開・closure・freshnessはdeterministic runtimeが検証します。
 
 このhandoffの追加はrouting caseを増やしません。既存workflowの選択結果に対するmachine data受け渡し契約です。
 ## 3. Agent Skillsとしての利用前提
 
 今回のmodeは既存Skillと同じAgent Skills構造で提供します。
+
+qa-workflow経由でUI target packageをcreate / updateする場合、`materialize` は既存guidanceのmutable operationとして扱います。owner側のatomic claim / idempotent startが無い場合は既存 `claim_mutable_operation()` を使用し、claim取得前にwriteを開始しません。standalone spec-analysisはsingle writer前提です。新しいlock / claim wrapperは追加しません。
 
 - entry pointはskills/spec-analysis/SKILL.md
 - 詳細規則はreferences/ui-test-target-analysis.md

@@ -76,7 +76,9 @@ required package filesは `required core payload + required control file MANIFES
 
 `00_scope_and_context.md` のfile applicability表は **file × Scope ID** 単位で持ちます。各rowに `Trigger判定=あり / なし / 未確定`、helperが導出した `required / not-applicable / blocked`、根拠、関連UNKNOWNを記録します。LLMは資料の意味からTrigger判定だけを行い、helperが `あり → required / なし → not-applicable / 未確定 → blocked` を決定論導出します。
 
-情報不足を `not-applicable` にしません。trigger有無を判断できないscopeは関連UNKNOWNを作成し `Trigger判定=未確定` とします。current UNKNOWNの存在だけでpackage全体をblockedにせず、明示的にblockedとなったscopeだけを停止します。helperは `ready_scope_ids[] / blocked_scope_ids[]` とpackageの `completion_status=complete / partial / blocked` を決定論導出し、独立して確定したscopeは後続へ進めます。conditional fileは1件以上のrequired scopeがあれば作成し、required scopeごとに対応するcanonical rowを1件以上要求します。blocked scopeの既存rowはupdate時に保持し、create時は生成しません。
+情報不足を `not-applicable` にしません。trigger有無を判断できないscopeは関連UNKNOWNを作成し `Trigger判定=未確定` とします。**Triggerはdomainの存在判定であり、存在は確定しているが内容だけ不足する場合は `あり / required` のまま維持します。**
+
+required domainでidentityまで確定できるFIELD / RULE / FLOW / NOTIFY / INTERACTはblocked row + UNKNOWNで保持します。identity自体を確定できずstable rowを作れない場合は07のCurrent UNKNOWNへ `関連Scope ID / Blocking Scope ID / 関連File` を明示します。current UNKNOWNの存在だけでpackage全体をblockedにせず、helperはこれらのmachine-readable blockerとblocked row / UC完全性 / applicabilityから `ready_scope_ids[] / blocked_scope_ids[]` と `completion_status=complete / partial / blocked` を決定論導出します。
 
 08は「このversionでrepositoryを再確認したか」ではなくcurrent packageの依存有無で判定します。前versionの08を引き続き利用するだけの更新ではfileを削除せず、08に保存済みの基準branch / commit / revisionを維持します。current分析からrepository evidenceを明示的に外した場合だけnot-applicableへ変更します。
 
@@ -289,6 +291,8 @@ scopeごとの適用判定は `_08_behavior-decomposition-and-acceptance-traceab
 
 単純downloadは05のみ、export生成処理やdata transformationを伴ってその結果をdownloadする場合は04 + 05をrequiredにします。外部serviceとの内部data transformationは04、外部destination / user interactionとしての接続は05で扱い、同じ内容を両fileへ重複記載しません。
 
+03 / 04 / 05がrequiredのscopeでは、LLMは入力資料・Authorityから識別できるin-scope FIELD / FLOW / NOTIFY / INTERACTを母集団として確認し、既知itemを無言で欠落させません。identityは分かるが内容不足ならblocked row + UNKNOWN、identity自体が不明なら07のblocking UNKNOWNへ閉じます。helperの「1 row以上」は構造closureであり、意味上の網羅性を代替しません。RULEについても02のbusiness rule母集団で同じ原則を適用します。
+
 ### 06_spec_inconsistencies_and_pending.md
 
 - 資料間矛盾
@@ -306,20 +310,23 @@ scopeごとの適用判定は `_08_behavior-decomposition-and-acceptance-traceab
 
 別節に回答反映済みを残してもよいですが、現在確認対象と解消済みを混ぜません。
 
-各UNKNOWNはstable UNK IDを持ちます。UNKNOWN本文・影響・質問内容はLLMが記述し、07に掲載されるUNK ID集合とREADMEの件数は `ui_target_package.py` が09から導出・検証します。
+各UNKNOWNはstable UNK IDを持ちます。UNKNOWN本文・影響・質問内容に加え、`関連Scope ID / Blocking Scope ID / 関連File` の意味対応をLLMが判断します。helperはscope/fileの存在、subset、duplicateを検証し、07に掲載されるUNK ID集合とREADMEの件数、scope readinessを09 / 07から導出します。
 
 ### 08_repository_implementation_status.md
 
 current packageがrepository implementation evidenceを保持・利用している場合に使用します。live UIの観測結果そのものは`test-target-inspection`の責務であり、08へ直接保存しません。必要な場合は同Skillの成果物を補助Source / evidenceとして参照し、spec-analysisへ戻してAuthorityとの差分を整理します。
 
-- 基準branch / commit / revision
+- `Repository確認基準` table（Repository、Branch / Ref、Commit / Revision、確認時点、関連Scope ID）
+- Repository実装状況の各rowが参照するRepository key
 - 実装確認できた範囲
 - 未実装
 - 仕様-実装差分
 - 実装だけに存在する分岐
 - 実装確認不能理由
 
-前versionからcarry-forwardする場合、再確認していないのに基準revisionをcurrent repositoryへ更新しません。保存済みの確認時点をそのまま保持します。current分析からrepository evidenceを明示的に外した場合だけ08を除去します。
+前versionからcarry-forwardする場合、`Repository確認基準` をそのまま保持し、再確認していないのにbranch / revision / 確認時点をcurrent repositoryへ更新しません。repositoryを再確認したsemantic updateでだけbaselineと必要なIMPL rowを更新します。current分析からrepository evidenceを明示的に外した場合だけ08を除去します。
+
+repository由来の事実はAuthorityへ昇格しません。ただしsame-route判定等で01のtarget modelへ採用したimplementation-only structureはtest target currentnessの一部なので、そのcanonical rowが変わればAC/TR freshnessの再確認契機にします。
 
 このファイルの内容を仕様本文へ自動昇格させません。
 
@@ -375,8 +382,9 @@ default policyでは、完成済みpackageのuser-managed / semantic payloadに�
 
 1. LLMがsource / Authority、scope、UI構造、file trigger、US / UC / Behavior / AC、UNKNOWN、extension要否等のsemantic判断を行う
 2. LLMはstable ID番号や完成Markdown tableを手組みせず、`materialize` 用のsemantic row / prose inputへまとめる。new identityは `identity_action=new / draft_key=<unique>` を使う
-3. `ui_target_package.py materialize` を `artifact_mode=create / change_mode=normal / previous_snapshot=null` で実行する。helper自身がSkill-local `assets/ui-test-target-analysis/` からsibling staging packageを初期化し、default policyのv00 / Previous=-、new ID、条件付きfile、extension file、CHANGELOG、Machine Entities、README controls、MANIFESTを生成してpackage単位でcommitする。Agentがassetをtarget rootへ事前copyしない
-4. materialize成功後にsemantic quality gateとdeterministic validateを実行する
+3. **materialize前にsemantic quality gate**を行い、source / inference / UI分類 / semantic duplicate、domain itemの無言欠落、file trigger、UNKNOWNの影響scope、same-UNK / new UNK、US / UC / Behavior / ACの意味分解を確認する。NGならpackageを書き換えずsemantic inputを修正する
+4. gateを通過したsemantic inputだけを `ui_target_package.py materialize` へ `artifact_mode=create / change_mode=normal / previous_snapshot=null` で渡す。helper自身がSkill-local `assets/ui-test-target-analysis/` からsibling staging packageを初期化し、default policyのv00 / Previous=-、new ID、条件付きfile、extension file、CHANGELOG、Machine Entities、README controls、MANIFESTを生成してpackage単位でcommitする。Agentがassetをtarget rootへ事前copyしない
+5. materialize後はdeterministic validateとread-onlyの成果物確認を行う。semantic NGを検出した場合に、その不合格versionをcurrent packageとして残す運用にはしない
 
 ### 継続更新
 
@@ -386,10 +394,10 @@ default policyでは、完成済みpackageのuser-managed / semantic payloadに�
 2. LLMがAuthority / DECISION / ASM、same-UNK reopen / new UNK、UI構造、US / UC / Behavior / AC、file applicability、extension要否、reuse / new / explicit retire等のsemantic判断を行う。completed Markdown rowやstable ID番号はまだ手書きしない
 3. LLMは変更対象を `materialize` のsemantic inputへまとめる。既存identityは `identity_action=reuse / reuse_id=<ID>`、new identityは `identity_action=new / draft_key=<unique>` とし、新規row間参照は `@draft:<draft_key>` を使う。current modelから意図的に除去するidentityだけ `retire_ids[]` に入れる
 4. 07のUNKNOWN説明、06の矛盾 / resolved説明、CHANGELOGの `変更概要` 等のnarrativeは `prose_updates[] / change_summary` として渡す。stable ID番号、Markdown escape、table separator、CHANGELOG control row、README control、Machine Entity wrapper、MANIFESTはAgentが組み立てない
-5. `ui_target_package.py materialize` を `artifact_mode=update + package_root + previous_snapshot + semantic table/prose/file updates + retire_ids[] + extension_file_retirements[]` で1回実行する。同じpackage rootへの呼出しはcallerが直列化する。helperがsnapshotを再確認し、version、new ID、`@draft`解決、canonical table serialization、条件付き標準file作成 / 除去、extension file追加 / 更新 / 廃止、CHANGELOG controls、Machine Entities section、README controls、MANIFESTをstagingへ生成・検証してからpackage単位でcommitする
-6. `materialize` が `stale_snapshot / state_transition_required / reference_not_found / write_commit_failed / write_recovery_failed` 等でblockedした場合は、成功済みとして扱わない。通常のhandled failureでは元packageを復旧・保持し、復旧自体に失敗した場合はstaging / backupを保全してblockedとする。row消失だけをretire扱いしない
-7. materialize成功後、semantic quality gateでsource / inference / UI分類 / semantic duplicate、file trigger、same-UNK / new UNK、AC→TR意味対応等を確認する
-8. deterministic validate / repository testsでschema、stable ref、version、CHANGELOG lifecycle、Machine Entity、MANIFEST / hashを確認する
+5. **current package + source + proposed semantic inputをmaterialize前にsemantic quality gate**へ通す。domain itemの無言欠落、UNKNOWN blocking範囲、semantic duplicate、file trigger、same-UNK / new UNK等がNGならcurrent packageを変更せずinputを修正する
+6. gateを通過したinputだけを `ui_target_package.py materialize` へ渡す。qa-workflow経由では既存mutable-operation claimを取得し、standaloneではsingle writerを保証する。helperがsnapshot hashを確認後current packageを再parseし、version、ID、canonical serialization、control、Machine Entity、MANIFESTをstagingへ生成・検証してからpackage単位でcommitする
+7. `materialize` が `stale_snapshot / state_transition_required / reference_not_found / write_commit_failed / write_recovery_failed` 等でblockedした場合は成功済みとして扱わない。通常のhandled failureでは元packageを復旧・保持し、復旧不能ならstaging / backupを保全してblockedとする
+8. materialize後はdeterministic validate / repository testsとread-only成果物確認を行う。semantic quality gateをcanonical write後の承認手段として使わない
 helperが列挙したimpact候補は再確認対象であり、変更必須という意味判断ではありません。LLMが仕様意味を判断します。
 
 同じ回答を複数ファイルへ機械コピーしません。canonical itemと構造化ビューの追跡を使い、必要な意味だけを反映します。
