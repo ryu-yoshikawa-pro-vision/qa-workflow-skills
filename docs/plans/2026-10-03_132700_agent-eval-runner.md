@@ -380,6 +380,8 @@ python scripts/skills/evals/agent/run.py \
   --skill test-case-design \
   --eval-id TC-OUT-001 \
   --output-root .agent-eval-runs/run-001 \
+  --agent-name <agent name> \
+  --agent-model <model identifier> \
   --agent-command <agent command argv...>
 ```
 
@@ -391,6 +393,8 @@ python scripts/skills/evals/agent/run.py \
   --skill test-case-design \
   --eval-id TC-SEM-001 \
   --output-root .agent-eval-runs/run-001 \
+  --agent-name <agent name> \
+  --agent-model <model identifier> \
   --agent-command <agent command argv...>
 ```
 
@@ -403,6 +407,8 @@ python scripts/skills/evals/agent/run.py \
   --suite semantic \
   --skill test-case-design \
   --output-root .agent-eval-runs/run-001 \
+  --agent-name <agent name> \
+  --agent-model <model identifier> \
   --agent-command <agent command argv...>
 ```
 
@@ -415,6 +421,8 @@ python scripts/skills/evals/agent/run.py \
   --suite deterministic \
   --skill all \
   --output-root .agent-eval-runs/run-001 \
+  --agent-name <agent name> \
+  --agent-model <model identifier> \
   --agent-command <agent command argv...>
 ```
 
