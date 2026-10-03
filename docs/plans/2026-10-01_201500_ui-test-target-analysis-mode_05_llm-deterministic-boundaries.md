@@ -101,7 +101,7 @@ required file、version、ID形式・duplicate、exact reference、UNKNOWN整合
 
 #### build-machine-evidence
 
-09のCurrent Effective Authorityと02のcurrent AC + parent chainからpackage-global Machine Evidenceを再生成し、あわせて `ready_scope_handoffs[]` をscope別に固定projectionします。linked package item / structure ancestor / INFもAC contentへ含めます。blocked scopeはhandoffを生成しません。これはmaterialized packageからqa-workflow / test-analysis / coverage-analysisへ渡す独立production用途があるため公開operationとして残します。
+09のCurrent Effective Authorityと02のcurrent AC + parent chainからpackage-global Machine Evidenceを再生成し、あわせて `ready_scope_handoffs[]` をscope別に固定projectionします。linked package item / structure ancestor / INFもAC contentへ含めます。blocked scopeはhandoffを生成しません。これはmaterialized packageからqa-workflow / test-analysis / coverage-analysisへ渡す独立production用途があるため公開operationとして残しますが、**read-only**です。packageのMachine Entities sectionを書き換えるのは`materialize`内部だけで、Agent / callerは`build-machine-evidence`の返却Markdownを直接書き戻しません。
 
 semantic / deterministic eval用multi-file projectionはproduction helperへ入れず、repository専用 `scripts/skills/evals/ui_target_projection.py` が担当します。既存runnerへ1-file inputを渡すためのrepository test utilityであり、導入先Skill packageへ同梱しません。
 

@@ -224,7 +224,7 @@ qa-workflow / test-analysis / coverage-analysisはMarkdownやpackage-global Enti
 
 ユーザー要求が仕様理解packageまでならspec-analysisの完了条件で終了し、test-analysis / test-requirement-designを起動しません。この場合、AC→TR / Disposition closureはpackage単体の完了条件ではありません。
 
-test-requirement-designへ到達した場合は `requirement-structure-v2` を使用します。current AC集合は `requirement_structure.py` がvalidated upstream `acceptance_criterion` Machine Entitiesから決定論導出し、Agent / qa-workflowは `acceptance_criteria[]` を転記しません。各TRの意味対応だけをLLMが `acceptance_refs[]` として判断し、AC / AuthorityのID集合・Entity存在・dependency展開・closure・freshnessはdeterministic runtimeが検証します。
+test-requirement-designへ到達した場合は `requirement-structure-v2` を使用します。top-level `acceptance_criteria[]` はsemantic known AC集合として必須です。UI target artifact経路では `build-machine-evidence.normalized_skill_input.acceptance_criteria[]` をそのままTRD inputへ渡し、AgentがMarkdownから再構築しません。direct modeではcallerが同じschemaでknown AC集合を明示します。各TRの意味対応だけをLLMが `acceptance_refs[]` として判断します。artifact modeはAC Entity集合とのexact一致とAC / Authority dependencyを要求し、direct modeはknown ID / closureを検証して存在しないMachine Entity dependencyを生成しません。
 
 このhandoffの追加はrouting caseを増やしません。既存workflowの選択結果に対するmachine data受け渡し契約です。
 ## 3. Agent Skillsとしての利用前提

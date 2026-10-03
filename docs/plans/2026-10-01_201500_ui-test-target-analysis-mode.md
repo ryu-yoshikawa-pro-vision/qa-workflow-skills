@@ -74,7 +74,7 @@ UIテスト設計前の対象理解を継続利用する成果物として残す
 
 modeでは `09_authority_and_traceability.md` をcanonical仕様モデルの正本とし、他ファイルはそのstable IDを参照する構造化ビューとします。SPEC / DECISION / INFERENCE / UNKNOWNやCurrent Effective Authorityを複数ファイルで別々に再定義しません。
 
-Authority Machine Entityは既存 `authority_entities.py`、下流handoff用のcurrent Acceptance Criteria Machine Entityは `ui_target_package.py build-machine-evidence` から決定論生成します。`build-machine-evidence` は既存 `render_machine_entities()` を使って `### Machine Entities: spec-analysis` のMarkdown section全体まで返します。US / UC / Behavior自体はMachine Entity化せず、fingerprint / normalized machine input / expected identity / JSON wrapperをLLMが手入力しません。
+Authority Machine Entityは既存 `authority_entities.py`、下流handoff用のcurrent Acceptance Criteria Machine Entityは `ui_target_package.py build-machine-evidence` から決定論生成します。`build-machine-evidence` は既存 `render_machine_entities()` を使って `### Machine Entities: spec-analysis` のMarkdown section全体までread-onlyで返します。packageへの書込みは`materialize`内部の同一projectionだけが行い、Agent / callerは返却Markdownをpackageへ直接書き戻しません。US / UC / Behavior自体はMachine Entity化せず、fingerprint / normalized machine input / expected identity / JSON wrapperをLLMが手入力しません。
 
 ### 4. 実装は仕様Authorityではない
 
@@ -163,7 +163,7 @@ version更新時は変更ファイルだけではなく、そのversionの完全
 - skills/test-requirement-design/evals/output/*
 - runtime / repository contract tests
 
-目的はcurrent ACをTRまたは明示的dispositionへ閉じ、AC / linked UIOP / scope / direct UI構造とancestor / linked FIELD・RULE・FLOW・NOTIFY・INTERACT / linked INF / 親Behavior / 親UC / 親US / Authority変更をTR freshnessへ伝播させることです。package-local itemはAC content fingerprintへ寄与させ、Authorityだけをupstream Entity dependencyにします。repository由来のimplementation-only structureもtarget-model dependencyとしてfreshnessには影響しますが、Authorityへ昇格しません。TRの責務をACの言い換えへ変更しません。
+目的はcurrent ACをTRまたは明示的dispositionへ閉じ、AC / linked UIOP / scope / direct UI構造とancestor / linked FIELD・RULE・FLOW・NOTIFY・INTERACT / linked INF / 親Behavior / 親UC / 親US / Authority変更をTR freshnessへ伝播させることです。package-local itemはAC content fingerprintへ寄与させ、Authorityだけをupstream Entity dependencyにします。repository由来のimplementation-only structureもtarget-model dependencyとしてfreshnessには影響しますが、Authorityへ昇格しません。`requirement-structure-v2` はtop-level `acceptance_criteria[]` をknown semantic AC集合として必須にし、artifact modeではupstream AC Entityとのexact一致とAC/Authority dependencyを要求、direct modeではknown ID / closure検証を行い存在しないMachine Entity dependencyを合成しません。TRの責務をACの言い換えへ変更しません。
 
 ### question-analysis
 

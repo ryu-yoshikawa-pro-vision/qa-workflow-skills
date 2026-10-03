@@ -196,7 +196,7 @@ response:
 expected unitは `artifact:requirement_structure:all` exactly 1件です。
 
 - v1 `authorities / risks / test_requirements / dispositions` をsemantic変更せず維持
-- 各既存TR draftへ `acceptance_refs=[]` を追加する。current AC集合はv2 invocationのvalidated upstream `acceptance_criterion` Entityからrequirement_structure.pyが導出するため、cutover inputへ複製しない
+- 各既存TR draftへ `acceptance_refs=[]` を追加する。top-level `acceptance_criteria[]` はv2 invocationのcurrent semantic AC集合として必須とし、cutover helperは既存v1 artifactからACを推測生成しない。UI target modeの通常経路では `build-machine-evidence.normalized_skill_input.acceptance_criteria[]` を使用し、ACなしworkflowでは明示 `[]` とする
 - v1 result `tr_id_state` → `previous_tr_ids[]`
 - `draft_key ↔ tr_id_map[]` をexact joinし、current draftを `identity_action=reuse / reuse_id=<TR-ID>` に固定
 - active TRを `update_scope_tr_ids[]` へ全件入れ、first v2 runをfull rebuildにする
@@ -312,17 +312,41 @@ qa-workflow / coverage-analysisへspec-analysis scopeを渡す場合、AgentがM
 
 ### 3.1 requirement-structure-v2 caller contract
 
-`acceptance_refs[]` の意味対応だけをLLM入力に残し、current AC集合の転記・empty default・Authority mergeはAgentに行わせません。
+`acceptance_refs[]` の意味対応だけをLLM判断に残し、known AC集合の取得経路とMachine Entity dependencyの扱いはinput modeごとに固定します。empty default用adapterは追加しません。
 
-- `requirement-structure-v2` raw generator inputはtop-level `acceptance_criteria[]` を持たない
-- `requirement_structure.py` はshared runtime metadataで検証済みのcurrent upstream Machine Entitiesから `skill=spec-analysis / entity_type=acceptance_criterion` を抽出し、current AC集合・Authority dependencyを決定論導出する。該当Entityが0件なら内部集合は空
-- 各 `test_requirements[]` draftの `acceptance_refs[]` は必須で、どのACへ閉じるかは意味判断なのでLLMが明示する。ACなしworkflowでは各draftが空arrayを明示する
-- callerが未知AC IDを `acceptance_refs[]` へ指定した場合はgeneratorがrejectする。AC Entity / Authority Entityの存在・fingerprintはruntime metadataを正本とする
+`requirement-structure-v2` raw generator inputはtop-level `acceptance_criteria[]` を必須とします。schemaはexactに次です。
 
-旧runtime-v1 / requirement-structure-v1からの初回cutoverは§2.7のtest-requirement-design `runtime_v1_cutover.py` がTRのstable identity / historyとsemantic draftをv2へ変換する。AC集合はcutover helperが複製せず、そのv2 invocationのcurrent upstream Entityから `requirement_structure.py` が導出する。
+```json
+{
+  "acceptance_criteria": [
+    {"ac_id":"AC-001","authority_refs":["SPEC-001","DEC-002"]}
+  ]
+}
+```
 
-空array補完だけのadapter、shared runtime hook、project固有legacy wrapperは追加しません。導入先projectが独自保存形式を持つ場合の外部変換はproject / harness側の責務です。runtime `input_fingerprint` はLLM semantic draft + current upstream dependencyをshared runtime contractどおり計算します。
+- `ac_id` はduplicate不可、canonical sortする
+- `authority_refs[]` はduplicate不可で1件以上、top-level `authorities[]` のknown Authority IDだけを許可する
+- ACなしworkflowは `acceptance_criteria=[]` を明示する
+- 各 `test_requirements[]` draftの `acceptance_refs[]` も必須とし、known `acceptance_criteria[].ac_id` への存在参照だけをhelperが検証する
 
+artifact mode:
+
+- `metadata.upstream_entities` にcurrent `spec-analysis / acceptance_criterion` Entityを要求する
+- semantic `acceptance_criteria[]` の `ac_id / authority_refs[]` 集合がupstream AC Entity contentとexact一致することを検証する。Entityに無いAC、semantic inputに無いcurrent ACを許可しない
+- 参照AC EntityをTR dependencyへ追加し、参照ACのcurrent Authority Entity dependencyもfreshness用にTRへ直接追加する
+- AC Entity / Authority Entityを全件解決できない場合はfail-closedする
+
+direct mode:
+
+- `acceptance_criteria[]` 自体をknown current AC集合の正本とし、`acceptance_refs[]` をその集合へ存在検証する
+- upstream AC Entityは必須にしない。存在しないMachine Entityを合成しない
+- `metadata.upstream_entities` に参照AC Entityが実在する場合だけ、そのAC Entity dependencyをTRへ追加できる。利用する実在AC Entityの `ac_id / authority_refs[]` はtop-level semantic `acceptance_criteria[]` の同一AC rowとexact一致を要求する。missing AC Entityはdirect modeではerrorにしない
+- semantic `acceptance_criteria[].authority_refs[]` からAC由来Authority dependencyを合成しない。direct modeのAuthority dependencyは従来どおりTR自身の `authority_refs[]` で実在Entityを解決した範囲だけとする
+- ACの `ac_id / authority_refs[]` はknown-ID検証とclosureのsemantic inputであり、TR Entity contentへは従来どおり各TRの `acceptance_refs[]` を保存する
+
+旧runtime-v1 / requirement-structure-v1からの初回cutoverは§2.7のtest-requirement-design `runtime_v1_cutover.py` がTRのstable identity / historyとsemantic draftをv2へ変換します。AC集合はv1 artifactから推測せず、v2 invocationのcallerが上記contractに従って渡します。UI target artifact経路ではspec-analysis helper返却値をそのまま使用します。
+
+空array補完だけのadapter、shared runtime hook、project固有legacy wrapperは追加しません。導入先projectが独自保存形式を持つ場合の外部変換はproject / harness側の責務です。runtime `input_fingerprint` はraw generator inputとshared runtime metadataから既存契約どおり計算します。
 ## 4. Acceptance Criterion Machine Entity
 
 identity:
@@ -386,38 +410,46 @@ top-level required fields:
 
 - `authorities`
 - `risks`
+- `acceptance_criteria`
 - `test_requirements`
 - `dispositions`
 - `previous_tr_ids`
 - `update_scope_tr_ids`
 
-既存legacy promotion用 `legacy_tr_ids` の条件付き入力契約は維持します。top-level `acceptance_criteria` は持ちません。
+既存legacy promotion用 `legacy_tr_ids` の条件付き入力契約は維持します。
 
-current Acceptance Criteria集合は `metadata.upstream_entities` のうち `skill=spec-analysis / entity_type=acceptance_criterion` のcurrent Entityからgeneratorが決定論導出します。Entity contentの `ac_id / authority_refs[]` とdependency identityを正本とし、callerがAC一覧やAuthority unionを転記しません。upstream ACが0件ならknown AC集合は空です。
+`acceptance_criteria[]` は§3.1のexact schemaを使用します。`authority_refs[]` はtop-level `authorities[]` のknown IDへ存在検証します。ACなしworkflowでもkey省略は許可せず `[]` を明示します。
 
-各 `test_requirements[]` draftへ `acceptance_refs[]` を必須追加します。該当ACがない横断的TRは `[]` を使用します。`acceptance_refs[]` の意味対応はLLMが判断し、generatorはknown AC集合への存在参照だけを検証します。
+各 `test_requirements[]` draftへ `acceptance_refs[]` を必須追加します。該当ACがない横断的TRは `[]` を使用します。`acceptance_refs[]` の意味対応はLLMが判断し、generatorはtop-level known AC集合への存在参照だけを検証します。
 
 ## 7. requirement_structure-v2 deterministic processing
 
-scriptは次を行います。
+共通処理:
 
-1. validated `metadata.upstream_entities` からcurrent Acceptance Criterion Entityを抽出し、AC ID duplicate、skill/type、content上の`ac_id / authority_refs[]`とEntity dependency整合を検証する
-2. `test_requirements[].acceptance_refs[]` をknown AC集合へ存在検証する
-3. linked upstream集合へ参照 `acceptance_criterion` Entityを追加する
-4. closure universeへcurrent ACを追加する
-5. TR Entity contentへ `acceptance_refs[]` を保存する
-6. TR Entity `upstream_entity_dependencies[]` へ参照current AC Entityを追加する
-7. 各参照ACのcurrent Authority dependencyをTR Entity dependencyへ直接追加する
-8. AC linked + disposedの二重扱いを拒否する
-9. linkedもdisposedもされないcurrent ACをunclosedとして拒否する
-10. Authority / Product Risk / Acceptance Criteriaのclosure集合を別々に評価する。TRの `acceptance_refs[]` にACを追加しても、そのACのAuthorityをTR draftの `authority_refs[]` へ暗黙追加しない
+1. `acceptance_criteria[]` のschema / duplicate / canonical orderを検証し、各 `authority_refs[]` をtop-level `authorities[]` へ存在検証する
+2. `test_requirements[].acceptance_refs[]` とAcceptance Criterion Dispositionのrefをknown AC集合へ存在検証する
+3. closure universeへtop-level current ACを追加する
+4. TR Entity contentへ `acceptance_refs[]` を保存する
+5. AC linked + disposedの二重扱いを拒否する
+6. linkedもdisposedもされないcurrent ACをunclosedとして拒否する
+7. Authority / Product Risk / Acceptance Criteriaのclosure集合を別々に評価する。TRの `acceptance_refs[]` にACを追加しても、そのACのAuthorityをTR draftの `authority_refs[]` へ暗黙追加しない
 
-AC linkはACだけをclosureします。Authorityは従来どおりTR draftの `authority_refs[]` に明示linkされるか、Authority Dispositionへ入る必要があります。AC→Authority dependency展開はfreshnessのためであり、Authority closureを代理しません。
+artifact mode追加処理:
 
-Authority dependencyの展開はcurrent Machine Entity identity / fingerprintだけを使う決定論処理です。どのAuthorityがACを支えるかはspec-analysisで判断済みであり、test-requirement-design側で意味を再判断しません。
+8. validated `metadata.upstream_entities` からcurrent Acceptance Criterion Entityを抽出し、top-level `acceptance_criteria[]` と `ac_id / authority_refs[]` がexact一致することを要求する
+9. 各参照AC EntityをTR Entity `upstream_entity_dependencies[]` へ追加する
+10. 各参照ACのcurrent Authority dependencyをTR Entity dependencyへ直接追加する
+11. AC / Authority Entityが不足・不一致ならfail-closedする
+
+direct mode追加処理:
+
+8. upstream AC Entityの存在を必須にしない
+9. 参照AC Entityが `metadata.upstream_entities` に実在する場合だけ、semantic `acceptance_criteria[]` の同一AC rowと `ac_id / authority_refs[]` 一致を検証したうえで、既存 `resolve_entity_dependencies(..., require_all=false)` と同じ方針でAC Entity dependencyへ追加する
+10. top-level `acceptance_criteria[].authority_refs[]` だけを根拠にAC由来Authority dependencyを生成しない。TR自身の `authority_refs[]` による既存direct dependency解決を維持する
+
+AC linkはACだけをclosureします。Authorityは従来どおりTR draftの `authority_refs[]` に明示linkされるか、Authority Dispositionへ入る必要があります。artifact modeのAC→Authority dependency展開はfreshnessのためであり、Authority closureを代理しません。direct modeではこの展開を行いません。
 
 LLMはACとTRの意味上の対応、TRの分割 / 統合を判断します。scriptは対応関係の意味妥当性を決めません。
-
 ## 8. AC disposition
 
 既存共通Disposition schemaを再利用します。新しいDisposition形式は作りません。
@@ -525,7 +557,9 @@ coverage-analysisの既存traceability graph node typeへACを追加しません
 - qa-workflow expected / actual Entity exact match
 - coverage-analysis current Entity parse compatibility
 - requirement-structure-v2 valid / invalid schema
-- requirement-structure-v2がtop-level `acceptance_criteria[]` をcallerへ要求せず、validated upstream Acceptance Criterion Entityからknown AC集合を導出すること。各TRの `acceptance_refs[]` はraw input必須で、ACなしは明示 `[]` とする。default補完adapter / shared runtime hookを追加しない
+- requirement-structure-v2がtop-level `acceptance_criteria[]` をraw input必須とし、各rowの `ac_id / authority_refs[]` と各TRの `acceptance_refs[]` を検証すること。ACなしは `acceptance_criteria=[] / acceptance_refs=[]` を明示し、default補完adapter / shared runtime hookを追加しない
+- artifact modeではsemantic `acceptance_criteria[]` とupstream Acceptance Criterion Entity集合をexact一致させ、AC Entity + AC Authority dependencyをTR freshnessへ追加する回帰
+- direct modeではupstream AC Entityなしでもsemantic `acceptance_criteria[]` をknown ID集合として `acceptance_refs[]` / closureを検証でき、存在しないAC / AC由来Authority Machine Entity dependencyを合成しない回帰。実在AC Entityをdependencyへ使う場合はsemantic rowとの `ac_id / authority_refs[]` 一致を要求すること
 - AC-001をTRへlinkしても、そのACが参照するSPEC-001をTR authority_refs / Authority Dispositionで別途closeしない場合はSPEC-001 unclosedとなる
 - TRD / TCD / TC Skill-local runtime_v1_cutover.pyのprojection、runtime-v1 / entity-state-v1以外の入力拒否、内容不変時stable ID保持、deleted / inactive identity history保持
 - AC linked / disposed / unclosed / linked+disposed

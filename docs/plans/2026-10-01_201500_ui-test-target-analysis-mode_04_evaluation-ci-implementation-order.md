@@ -215,6 +215,8 @@ semantic / deterministicで同じprojection helperを使いますが、expected�
 
 既存TR-SEM-001 / 002はACなしworkflowの回帰として維持し、`関連AC ID=-` / `acceptance_criteria=[]` で従来責務が変わらないことを確認します。
 
+`TR-SEM-003` はartifact modeのAC→TR意味対応を評価します。direct modeとの差はLLMの意味判断ではなくMachine Entity解決契約なので、semantic case数は増やさずStep 2のrepository runtime regressionで固定します。
+
 ## 6. qa-workflow routing eval
 
 既存routing fixtureへmode routing caseを追加します。
@@ -293,14 +295,14 @@ repository unit testで次を必須確認します。
 - materialize内部extension allocatorがLLMのslug決定後にcurrent 10+ fileの次番号をrequest順にbatch採番し、stable owner row適用前にtemplate / pathを準備して00の `案件固有extension file一覧` と実fileを同時生成すること
 - extension declaration exact table、domain file命名、duplicate path / slug、reuse時slug変更拒否。extension本文をparseせず、00宣言rowの関連Scope / Authority / structure / UNKNOWN refsだけを存在検証・impact対象にすること
 - `extension_file_retirements[]` はexisting current extensionだけを受理し、成功時は実fileと00宣言rowを同時に除去すること。extension本文を参照解析せず、宣言rowのfile-level stable refはfile削除と同時に除去されること
-- `materialize` のartifact_mode=create / updateを検証し、normal create / legacy-migrationは不存在または空destination + previous_snapshot=nullから内部asset初期化、normal updateはnon-null snapshot必須とすること。no-opでは `changed=false`、ID / file allocationとchanged_filesが空でversionを上げないこと
+- `materialize` のartifact_mode=create / updateを検証し、normal create / legacy-migrationは不存在または空destination + previous_snapshot=nullから内部asset初期化、normal updateはnon-null hash-only snapshot必須とすること。snapshot一致後にprevious_modelを再parseし、no-opでは `changed=false`、ID / file allocationとchanged_filesが空でversionを上げないこと
 - inspectの `update_snapshot` はpackage version / payload hashes / MANIFEST hashだけを持ち、materializeがhash一致後にcurrent packageを再parseしてtracking / UNKNOWN / exact refsを再導出すること。callerがderived indexを持ち回らない
 - materialize内部allocatorがsemantic identityを判断せず、UI target mode所有の `SRC / SPEC / INF / UNK` + standard structural prefixについて再parseしたcurrent row + CHANGELOG履歴から次番号を決め、更新途中で消えたprevious IDも再利用しないこと
 - UI target package内部allocatorが `DEC / ASM` を採番しないこと
 - DEC / ASMはCHANGELOG / lifecycle差分の追跡可能stable IDとして受理し、Project Contextがownerの場合だけproject_context_ids.pyで採番すること。package scopeから外れるだけではretiredにしないこと
 - Project Context以外の明示ownerをProject Contextへ複製せず、canonical Authority IDは `DEC-xxx / ASM-xxx` を維持し、Jira / ADR等の外部record IDをauthority_idへ流用しないこと。canonical DEC / ASM lifecycleを提供できないownerはPR #16対象外とし、LLM hand-numberingやgeneric mappingへfallbackしないこと
 - materialize内部allocatorが同一prefixの複数new IDを1 request内のcanonical順で重複なくbatch allocationし、keyed viewの `@draft` 参照まで解決してAgentによる逐次row書込みを不要にすること
-- current viewから消えた過去IDをprevious snapshot / CHANGELOG履歴のどちらかで保持している限り再利用しないこと
+- current viewから消えた過去IDを、snapshot一致後に再parseしたprevious current modelまたはCHANGELOG履歴で確認できる限り再利用しないこと。hash-only snapshot自体からStable IDを読み取らない
 - UNKNOWNのopen / resolved / resolver変更 / same-ID reopen / re-resolveで `現在有効か / 解消先ID` が整合し、resolved状態ではcurrent SPEC / DECISION / 承認済みASMへ閉じること
 - canonical structured Markdownのduplicate heading / table、row列数、backslash→pipe→LFのtable-cell encode、literal `<br>` scalar拒否、`<br>` referenceを固定parse契約で検証すること
 - stable ID sortがprefix + numeric suffix integerであり、SCOPE-999よりSCOPE-1000が後になること
@@ -313,11 +315,11 @@ repository unit testで次を必須確認します。
 - legacy migrationではLLMが確定したretained ID / 明示lifecycle event / semantic rowsを `materialize(change_mode=legacy-migration)` へ渡し、helperがnew ID採番・canonical Markdown・`migrated / added / resolved / retired`・README / Machine Entity / MANIFESTまで1 write pathで生成すること
 - scope applicability、UI操作scopeのUIOP / US / UC / Behavior / AC hierarchy / current AC chain全parent=current / closure / current UCの3分類整合。UIOP / US / UC / Behaviorの状態はhelper導出とし、semantic identity未確定時はIDを発行せず07のBlocking Scope IDへ閉じること。UIOP.Scopeは対応UCのderived Scopeとexact一致すること
 - file × Scope ID applicability、blocked UIOP / US / UC / Behavior / RULE / FIELD / FLOW / NOTIFY / INTERACT、UC完全性=`未定義`、07 Blocking Scope IDから `scope_readiness[] / ready_scope_ids[] / blocked_scope_ids[] / complete|partial|blocked` を導出し、non-blocker UNKNOWNが残っても独立scopeをreadyにできること
-- Trigger=`あり`のrequired scopeで内容不足をTrigger=`未確定`へ戻さないこと。identity既知ならblocked domain row、identity不明で0 rowなら07のBlocking Scope ID + 関連Fileによりclosureできること
+- Trigger=`あり`のrequired scopeで内容不足をTrigger=`未確定`へ戻さないこと。identity既知ならblocked domain row、identity不明で0 rowなら07のBlocking Scope ID + 関連Fileによりclosureできること。standard conditional fileの関連Fileは物理file未作成でもstandard registry pathならvalid、extensionはcurrent宣言 + 実file必須とすること
 - `未定義` で既知current / blocked Behavior IDを0件以上保持できUNKNOWN必須、Behavior identity自体不明ならblocked Behaviorを創作しないこと
 - `なし` は関連Behavior / UNKNOWNなし + 理由 + current Authorityの `関連仕様項目ID` 1件以上を要求すること
 - 09の「現在有効な仕様根拠」からnormalized Authorityを固定projectionし、`適用範囲` を非空string、`関係` を単一許可値の1要素arrayとして一意にserializeすること
-- build-machine-evidenceがpackage-global Authority + current AC Entityに加えて `ready_scope_handoffs[]` を決定論生成し、ready scopeだけのnormalized input / Entity / expected identityを返すこと。blocked scopeはhandoffを持たず、qa-workflowがMarkdownをfilterしないこと
+- build-machine-evidenceがpackage-global Authority + current AC Entityに加えて `ready_scope_handoffs[]` を決定論生成し、ready scopeだけのnormalized input / Entity / expected identityを返すこと。blocked scopeはhandoffを持たず、qa-workflowがMarkdownをfilterしないこと。standalone operationはread-onlyでpackage bytes / version / MANIFESTを変更しないこと
 - AC chain + linked mapped UIOP + scope + direct structure + ancestor + linked FIELD/RULE/FLOW/NOTIFY/INTERACT refsからcurrent SPEC / DECISION / approved ASMをAuthority dependencyへ投影し、linked INFはcontent-only projectionへ入れること。current Authorityが0件なら `state_transition_required` でblockedし、helper自身はUNKNOWN / blocked rowを生成しないこと
 - parent_structure_id missing / self / cycleをrejectし、ancestor変更・linked domain item変更・linked INF変更でAC/TRがstale、無関係row変更ではcurrentを維持すること
 - `Machine Entities: spec-analysis` blockがexactly one存在し、heading / JSON fence / wrapperを含めhelper再生成Markdownと一致すること
@@ -492,9 +494,9 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - `RUNTIME_CONTRACT_VERSION: runtime-v1 → runtime-v2`、`ENTITY_SCHEMA_VERSION: entity-state-v1 → entity-state-v2`。v1 validatorが `acceptance_criterion` を受理しないためentity type追加をschema意味変更として扱う
 - envelope shape / freshness algorithmは維持
 - independent `runtime_validator.py`、active code / Skill文書 / asset / fixture / repository testをv2へ同期
-- active Machine Evidenceの手書き擬似schemaを削除し、runtime renderer / authority_entities.py / build-machine-evidence生成結果を正本にする
+- active Machine Evidenceの手書き擬似schemaを削除し、runtime renderer / authority_entities.py / build-machine-evidence生成結果を正本にする。packageへのMachine Entities section書込みはmaterialize内部だけで行い、standalone build-machine-evidenceはread-onlyとする
 - `ui_target_package.py build-machine-evidence` を実装し、current AC + mapped UIOP / US / UC / Behavior / Scope / linked domain itemを確定し、AC chain / UIOP / linked domain itemが参照するstructure + ancestor / linked INFをAC contentへ固定projectionする。Authorityだけdependency Entityとし、`ready_scope_handoffs[]` を同時生成する
-- generator contractを `requirement-structure-v1 → requirement-structure-v2`。top-level `acceptance_criteria[]` は廃止し、requirement_structure.pyがvalidated upstream acceptance_criterion Entityからknown AC集合を導出する。各TRのsemantic `acceptance_refs[]` だけraw input必須とする
+- generator contractを `requirement-structure-v1 → requirement-structure-v2`。top-level `acceptance_criteria[]` を `{ac_id, authority_refs[]}` のknown semantic AC集合としてraw input必須にし、各TRのsemantic `acceptance_refs[]` も必須とする。artifact modeはupstream AC Entity集合とのexact一致 + AC/Authority dependency、direct modeはknown ID/closure検証 + 実在する参照AC Entityだけdependency化に分岐する
 - current ACをTRまたはDispositionへ閉じ、Authority closureは独立維持する
 - TR EntityへAC EntityとACが参照するcurrent Authority Entity dependencyを保存する
 - shared runtimeへSkill固有migration projectionを入れない。新規 `skills/test-requirement-design/scripts/runtime_v1_cutover.py`、`skills/test-condition-design/scripts/runtime_v1_cutover.py`、`skills/test-case-design/scripts/runtime_v1_cutover.py` がcomplete v2 generator inputを決定論生成する
@@ -506,6 +508,8 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - `_09` の9 Skill処置表どおり、TRD / TCD / TCだけcutover helperを使う。その他はcanonical spec成果物、validated保存Machine Runtime Input、current workflow stateを正本としてv2再生成し、保存inputがないinspection系だけ既存Skillの通常rerun / re-observation経路を使う。proseからinputを再構築しない
 - UIOP / UIOP-only Authority / scope / linked domain item / AC chain・UIOP・domain item由来structure + ancestor / linked INF / 親Behavior-UC-US / Authority変更によるAC / TR freshness regressionと、無関係package row変更のnon-stale regressionを追加
 - shared runtime 9-copy byte-identity、cutover helper portability、v1/v2混在拒否、semantic drift、phase dependency、mapping ambiguityをrepository integration testで固定する
+- requirement-structure-v2 artifact回帰: semantic `acceptance_criteria[]` とcurrent upstream AC Entity集合のexact一致、参照AC + AC Authority dependency、missing Entity fail-closedを固定する
+- requirement-structure-v2 direct回帰: upstream AC Entityが0件でもsemantic `acceptance_criteria[]` からknown ID / closureを検証でき、存在しないAC / AC由来Authority Entity dependencyを合成しない。参照AC Entityが実在する場合だけAC dependencyを追加する
 
 ### Step 3: spec-analysis evaluation
 
