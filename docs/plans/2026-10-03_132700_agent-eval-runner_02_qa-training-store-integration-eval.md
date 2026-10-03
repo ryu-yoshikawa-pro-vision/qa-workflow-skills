@@ -123,6 +123,16 @@ qa-workflow completion
 
 固定revisionから使い捨ての評価用copyを作成します。
 
+live runの`--target-root`は、少なくとも次を満たすことをpreflightします。
+
+- Git working treeである
+- HEADがscenarioの固定source revisionと一致する
+- working tree / indexがcleanである
+- Evaluator repo自身ではない
+- output先がtarget root内ではない
+
+sanitized targetはworking treeのfilesystem copyではなく、固定source revisionの**tracked contentだけ**から作ります。これにより、target側のuntracked file、local secret、過去の一時成果物を入力へ混ぜません。
+
 評価用copyでは次を記録します。
 
 - source repository
@@ -230,10 +240,17 @@ Evaluatorは成果物内容を独自schemaへ変換しません。各Skillの既
 - file size
 - SHA-256
 - 生成元Skillをfile配置から一意に決められる場合はそのSkill名
+- runtime-enabled Skillで保存されたverifier request / resultへの相対path
 
 symlink、output root外を指すpath、path traversal、許容上限を超えるfileは回収せずrunをexecution errorとします。
 
 workflow state等で保存rootが必要な場合は、Evaluatorが評価用Project Contextへ`.qa-eval-output/`配下のproject-local rootを設定します。既存Skillの保存契約を変えず、評価用の保存先だけを与えます。
+
+runtime-enabled Skillについては、Agentが最終成果物を完成扱いにする前に実行した既存`verify_runtime_evidence`等の**実際のrequest JSONとresult JSON**を、評価成果物と同じrun配下へ保存させます。Evaluator用にexpected値を作らせるのではなく、Skillが本来実行するproduction verifierの入出力を証拠として残すだけです。
+
+Evaluatorは回収後、そのrequestの`artifact_markdown`だけを回収済みartifact本文へ差し替えたうえで同じproduction verifierを再実行し、保存済みresultとcurrent verifier結果が一致することを確認します。Agentが独自のexpected Entityやfingerprintを手組みした場合は、既存verifierがrejectする契約をそのまま使います。
+
+`qa-workflow`については、Skill-local`verify_runtime_evidence`に加えて、実行時に使用した`workflow_runtime.py`入力 / 結果も保存・再実行対象にします。
 
 ## 評価観点
 
@@ -327,16 +344,23 @@ scenario定義は現在の`qa-training-store`初回評価を再現するため�
 
 ### 機械判定できる部分
 
-既存runtime / deterministic contractを再利用します。
+既存production runtime / verifier契約を再利用します。
 
-- ID / reference
-- required artifact
-- runtime evidence
-- freshness
-- closure
-- workflow state
+対象は少なくとも次です。
 
-新しい同等validatorを作りません。
+- runtime evidenceの欠落 / extra
+- stable ID / reference
+- fingerprint / dependency
+- freshness / currentness
+- Skill-local structure state
+- traceability / closure
+- `qa-workflow`のworkflow state / completion
+
+フェーズ2ではSkill-local eval datasetの`expected.json`を持たないため、dataset専用の`scripts/skills/evals/deterministic/run.py`へ架空のeval IDやexpectedを追加して評価しません。
+
+代わりに、前節で保存したproduction verifier request / resultをEvaluatorが再実行します。これにより、Agentが生成したQA成果物が実行時と同じ既存runtime契約へ現在も適合するかを確認します。
+
+新しい同等validatorやtarget専用runtime schemaは作りません。
 
 ### 意味判断が必要な部分
 
@@ -344,14 +368,13 @@ scenario定義は現在の`qa-training-store`初回評価を再現するため�
 
 Judgeは評価対象Agentとは別process / 別promptで実行します。
 
-初回では独自の総合点を作らず、各評価観点を次で保持します。
+Candidate Outputは回収済みartifactを相対path付きで束ねたEvaluator側の表現とし、Agentの最終stdoutだけを評価対象にしません。
 
-- pass
-- needs_review
-- fail
-- not_evaluable
+Referenceはscenarioで固定した`docs/spec/README.md`と`docs/spec/features/checkout-and-payment.md`等の規範仕様からEvaluatorが構築します。意味評価criteriaはEvaluator側`rubric.json`を使用し、評価対象Agentへ渡しません。
 
-既存semantic evalのrating / verdict契約を再利用できる場合は、その共通処理を使用します。target-specificな意味評価のためだけに同じresult parserやrating計算を複製しません。
+実装は既存の`scripts/skills/evals/semantic/prompt_builder.py`と`scripts/skills/evals/semantic/result.py`の共通処理を再利用します。Skill-local eval IDを前提とする`semantic/run.py` CLIを無理に流用せず、prompt構築・Judge response正規化・rating / verdict契約を共有します。
+
+初回では独自の総合点を作りません。既存semantic評価と同じcriterion rating / evaluable判定から、既存result契約に従ってpass / needs_review / failを導出します。Reference不足で判定できないcriterionは既存契約に従って扱い、target-specificなscore式を追加しません。
 
 ## フェーズ1ランナーへの追加要件
 
@@ -430,6 +453,8 @@ Agent executionは、Eval dataset由来のpromptでも、固定対象repo向けp
 - Checkout / PaymentのWeb範囲で実Agent workflowが最後まで実行される
 - Product Code、既存Product Test、規範仕様に許可外変更がない
 - 複数成果物が`.qa-eval-output/`から`.agent-eval-runs/`へ回収され、`artifact-manifest.json`でpath / SHA-256を追跡できる
+- runtime-enabled Skillのproduction verifier request / resultが保存され、Evaluator側で再実行して一致確認できる
+- `qa-workflow`の`workflow_runtime.py`も保存済み入力から再実行できる
 - 生成成果物がrun artifactとして保存される
 - workflow結果が保存される
 - traceability / runtimeの機械判定結果が保存される
