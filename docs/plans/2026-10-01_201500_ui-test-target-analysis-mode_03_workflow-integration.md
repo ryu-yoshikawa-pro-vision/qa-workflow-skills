@@ -220,11 +220,13 @@ UI target modeから後続テスト設計へ進む場合、spec-analysis成果�
 - そのscopeに必要なAuthority / Acceptance Criterion Machine Entities
 - expected entity identities
 
-qa-workflow / test-analysis / coverage-analysisはMarkdownやpackage-global Entity集合をAgent側でfilterせず、このscope projectionをそのまま使います。blocked scopeはhandoffを持たず、question-analysisへはinspectで導出したblocking UNKNOWNだけを渡します。
+qa-workflow / test-analysis / coverage-analysisはMarkdownやpackage-global Entity集合をAgent側でfilterせず、このscope projectionをそのまま使います。scope所属row・明示stable ref・UI構造parentだけを辿るexact reachabilityは `_06 §9.3` を正本とし、名称・同一PAGE・同一Scope・Authority本文から関連を推測しません。blocked scopeはhandoffを持たず、question-analysisへはinspectで導出したblocking UNKNOWNだけを渡します。
 
 ユーザー要求が仕様理解packageまでならspec-analysisの完了条件で終了し、test-analysis / test-requirement-designを起動しません。この場合、AC→TR / Disposition closureはpackage単体の完了条件ではありません。
 
-test-requirement-designへ到達した場合は `requirement-structure-v2` を使用します。top-level `acceptance_criteria[]` はsemantic known AC集合として必須です。UI target artifact経路では `build-machine-evidence.normalized_skill_input.acceptance_criteria[]` をそのままTRD inputへ渡し、AgentがMarkdownから再構築しません。direct modeではcallerが同じschemaでknown AC集合を明示します。各TRの意味対応だけをLLMが `acceptance_refs[]` として判断します。artifact modeはAC Entity集合とのexact一致とAC / Authority dependencyを要求し、direct modeはknown ID / closureを検証して存在しないMachine Entity dependencyを生成しません。
+test-requirement-designへ到達した場合は `requirement-structure-v2` を使用します。**UI target packageからのcanonical workflowは `input_mode=artifact`** とし、top-level `acceptance_criteria[]` は `build-machine-evidence.normalized_skill_input.acceptance_criteria[]` をそのままTRD inputへ渡します。AgentがMarkdownから再構築しません。artifact modeではAC Entity集合とのexact一致とAC / Authority dependencyを要求し、AC本文・親chain・linked package item変更のfreshnessを保証します。
+
+direct modeはUI target artifactを使わない独立呼出しとして同じ `acceptance_criteria[]` schemaでknown AC集合を明示できます。各TRの意味対応だけをLLMが `acceptance_refs[]` として判断し、known ID / closureを検証します。参照AC Entityが無いdirect runではAC semantic cross-run freshnessを保証せず、存在しないMachine Entity / fingerprintを合成しません。
 
 このhandoffの追加はrouting caseを増やしません。既存workflowの選択結果に対するmachine data受け渡し契約です。
 ## 3. Agent Skillsとしての利用前提

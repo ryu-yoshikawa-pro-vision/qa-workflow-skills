@@ -163,7 +163,7 @@ version更新時は変更ファイルだけではなく、そのversionの完全
 - skills/test-requirement-design/evals/output/*
 - runtime / repository contract tests
 
-目的はcurrent ACをTRまたは明示的dispositionへ閉じ、AC / linked UIOP / scope / direct UI構造とancestor / linked FIELD・RULE・FLOW・NOTIFY・INTERACT / linked INF / 親Behavior / 親UC / 親US / Authority変更をTR freshnessへ伝播させることです。package-local itemはAC content fingerprintへ寄与させ、Authorityだけをupstream Entity dependencyにします。repository由来のimplementation-only structureもtarget-model dependencyとしてfreshnessには影響しますが、Authorityへ昇格しません。`requirement-structure-v2` はtop-level `acceptance_criteria[]` をknown semantic AC集合として必須にし、artifact modeではupstream AC Entityとのexact一致とAC/Authority dependencyを要求、direct modeではknown ID / closure検証を行い存在しないMachine Entity dependencyを合成しません。TRの責務をACの言い換えへ変更しません。
+目的はcurrent ACをTRまたは明示的dispositionへ閉じることです。AC freshnessへ含めるFIELD / RULE / FLOW / NOTIFY / INTERACTはAC / Behavior / UC / USの `関連構造ID` にLLMが明示したものだけとし、UIOPの `対象構造ID`、同一PAGE / Scope、名称一致からhelperが逆引きしません。ready scope handoffもscope所属row + 明示stable ref + UI構造parentだけを `_06 §9.3` の固定規則で辿ります。package-local itemはAC content fingerprintへ寄与させ、Authorityだけをupstream Entity dependencyにします。repository由来のimplementation-only structureもtarget-model dependencyとしてfreshnessには影響しますが、Authorityへ昇格しません。UI target packageからTRDへ進むcanonical workflowはartifact modeとし、AC / linked UIOP / scope / 明示linked domain item / UI構造ancestor / linked INF / 親Behavior / UC / US / Authority変更をTR freshnessへ伝播させます。direct modeはknown ID / closureを保証し、AC Entityが無い場合のAC semantic cross-run freshnessは保証しません。TRの責務をACの言い換えへ変更しません。
 
 ### question-analysis
 
@@ -266,7 +266,7 @@ PR #14後のCIは `skills/*/scripts` を動的compileするため、helper compi
 - README / EVALS等の現在値を変更した場合はPR #14後のcurrent repositoryから導出した実データと一致する
 - PR #14のusability / WCAG finding・observation・resultを仕様Authorityへ自動昇格しない
 - 機能scopeごとにUI操作有無を判定し、UI操作ありではUS → UC → Behavior → ACを完全に分析し、情報不足はnot-applicableへ逃げずUNKNOWN / blockedとして残る
-- test-requirement-designまで進む要求では、current ACがTRまたは明示的dispositionへ閉じる。AC linkはACだけをcloseし、Authorityは従来どおりTR authority_refsまたはAuthority Dispositionで独立closureする。AC / 親Behavior / 親UC / 親US / Authority変更は必要なTR freshnessへ伝播する。仕様理解packageだけを要求された場合は、このclosureをpackage単体の完了条件にしない
+- UI target packageからtest-requirement-designまで進むcanonical artifact workflowでは、current ACがTRまたは明示的dispositionへ閉じる。AC linkはACだけをcloseし、Authorityは従来どおりTR authority_refsまたはAuthority Dispositionで独立closureする。AC / 親Behavior / 親UC / 親US / 明示linked domain item / Authority変更は必要なTR freshnessへ伝播する。direct modeはknown AC ID / closureを保証し、AC Entity dependencyが無い場合のAC semantic cross-run freshnessを完了条件にしない。仕様理解packageだけを要求された場合は、このclosureをpackage単体の完了条件にしない
 - 標準package fileはrequired core payload + required control file `MANIFEST.md` + 固定triggerによる条件付き必須とし、Agentの自由裁量で作成有無を変えない
 - LLMは仕様意味・UI意味・semantic identity / explicit retire判断に集中し、version / stable ID / Markdown table・known section・標準file materialization / hash /参照整合 / UNKNOWN件数 / MANIFEST / file applicability整合 / Stable ID lifecycle / Machine Entity projection等の定型処理はhelper / validatorへ移る
 - runtime-v2 / entity-state-v2 cutoverでv1 evidence自体はcurrent扱いせず、TRD / TCD / TC Skill-local cutover helperにより内容不変のTR / TCN / model / CI / TC stable identityとdeleted / inactive履歴だけを決定論的に維持できる

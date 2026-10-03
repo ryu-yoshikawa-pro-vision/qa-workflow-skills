@@ -88,6 +88,8 @@ ID: `UIOP-001` から開始し、最低3桁で連番採番する。999の次は1
 規則:
 - mapped: **AC freshnessでいうcurrent UIOP**。対応UC IDが1件以上、関連UNKNOWN IDは空
 - blocked: 対応UC IDは空を許可し、関連UNKNOWN IDが1件以上必須
+- `対象構造ID` は `_05` のUI構造ID exact prefix集合だけを許可する。FIELD / RULE / FLOW / NOTIFY / INTERACTを入れず、同一PAGE上のdomain itemをhelperが逆引きしない
+- UIOPからdomain itemへの意味リンクは新しい列を追加せず、必要な場合は親US / UC / Behavior / ACの `関連構造ID` にLLMが明示する
 - `状態` はcaller入力ではなく、helperがfield充足と `関連UNKNOWN ID` から `mapped / blocked` を導出する
 - 既知のUI操作を無言で落とさない
 - 同一操作が複数UCに関係する場合は意味上必要なUCを全て参照する
@@ -104,7 +106,7 @@ blocked rowは「semantic identityまでは確定しているが、完成に必�
 | UC | 関連US ID、Use Case、Trigger、Success Postcondition、関連仕様項目ID。Preconditionsは該当なしなら空可。関連UNKNOWN IDは空 | 関連US ID、Use Case、関連UNKNOWN ID。Trigger / Preconditions / Success Postcondition / 関連仕様項目IDは確定済み分だけ保持 | Trigger、Preconditions、Success Postcondition、関連仕様項目ID | LLMが親USに対するUse Case identityを確定できない |
 | Behavior | UC ID、結果分類、振る舞い、Postcondition / Result、関連仕様項目ID。関連UNKNOWN IDは空 | current UC ID、結果分類、振る舞い、関連UNKNOWN ID。Postcondition / Result / 関連仕様項目IDは確定済み分だけ保持 | Postcondition / Result、関連仕様項目ID | Behaviorの存在・identity自体を確定できない |
 
-`current / mapped` rowの関連仕様項目IDは `_06` のnormative traceability contractに従います。blocked rowはUNKNOWNが正本であり、未確定fieldを推測して埋めません。UIOP / US / UC / Behaviorの `状態` はこのfield充足と関連UNKNOWNからhelperが生成し、materialize callerは `状態` を送信しません。
+`current / mapped` rowの関連仕様項目IDは `_06` のnormative traceability contractに従います。US / UC / Behavior / ACの `関連構造ID` は `_05` のUI構造ID + domain item ID exact prefix集合だけを許可し、ACの意味を制約するdomain itemはLLMがこの明示edgeへ含めます。blocked rowはUNKNOWNが正本であり、未確定fieldを推測して埋めません。UIOP / US / UC / Behaviorの `状態` はこのfield充足と関連UNKNOWNからhelperが生成し、materialize callerは `状態` を送信しません。
 
 ## 4. User Story
 

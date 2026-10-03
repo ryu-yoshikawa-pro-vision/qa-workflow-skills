@@ -168,11 +168,15 @@ IDが意味的に同一か、新IDにすべきかはLLM判断です。helperはI
 UIOP / US / UC / Behavior / AC / RULE / FIELD / FLOW / NOTIFY / INTERACTのように期待挙動・制約・ルールを表すnormative rowは根拠を空にしません。current rowは `関連仕様項目ID` にcurrent SPEC / DECISION / approved ASM / INFを1件以上持ちます。根拠不足で確定できない場合はcurrent rowとして成立させず、blocked + `関連UNKNOWN ID` へ閉じます。ACはcurrent Authority 1件以上を要求する `_08 / _09` のより厳しい契約を優先します。PAGE等の純粋な構造row、Repository実装状況、pure narrative / headingは各table固有契約に従います。
 
 - `関連仕様項目ID`: current SPEC / DECISION / approved ASM / INF等、09_authority_and_traceability.mdのcanonical item。UNKNOWNは専用の `関連UNKNOWN ID` で追跡する
-- `関連構造ID`: PAGE / STATE / VIEW / MODAL / FIELD / RULE / FLOW等
+- UI構造IDのexact prefix集合: `PAGE / STATE / VIEW / STEP / MODAL / BDLG / PANEL / EXT / SHARED`
+- domain item IDのexact prefix集合: `FIELD / RULE / FLOW / NOTIFY / INTERACT`
+- `対象構造ID`: UI構造IDだけを許可する。UIOP / FIELDの操作対象・配置対象を表し、domain item IDを入れない
+- `関連構造ID`: UI構造IDまたはdomain item IDだけを許可する。どのIDを意味上関連付けるかはLLMが判断する
+- AC freshnessでlinked domain itemを導出するseedはUS / UC / Behavior / ACの `関連構造ID` に明示されたdomain item IDだけとする。UIOPの `対象構造ID`、同一PAGE、同一Scope、名称一致、Authority一致からdomain itemを逆引きしない
 
 複数参照の区切りは `<br>` に固定します。
 
-helperはexact ID参照の存在だけを検証します。文章中に偶然現れたIDらしき文字列を参照として抽出しません。
+helperはexact ID参照の存在・許可prefix・parent closureだけを検証します。文章中に偶然現れたIDらしき文字列を参照として抽出せず、名称・Path・同一画面・同一Scope・同一Authorityを根拠に新しい意味edgeを推測しません。semantic quality gateは、ACの意味を制約するdomain item等について必要な明示参照が欠落していないかをLLM評価します。
 
 pure narrativeや説明用sectionへ無理に参照列を追加しません。参照整合を機械判定するtable / structured rowだけを対象にします。
 

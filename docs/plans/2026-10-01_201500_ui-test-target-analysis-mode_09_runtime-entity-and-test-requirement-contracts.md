@@ -306,7 +306,7 @@ expected unitは `artifact:case_structure:all` exactly 1件です。
 }
 ```
 
-`authority_refs[]` はAC / Behavior / UC / US chainに加え、linked UIOP、scope、実際に参照するUI構造rowのstable refsを09のCurrent Effective Authority集合へ解決したunionです。current SPEC / DECISION / approved ASMだけを残し、INF / UNK / inactive Authorityは除外します。helperが重複除去・昇順canonical化し、current ACでは1件以上を要求します。0件ならhelperはblocking issueを返してAC Entityを生成しません。ACを除去する、親rowをblockedへ変更する、UNKNOWNをreuse / newする等のsemantic transitionはLLMが判断します。Agent / LLMがAuthority集合を再構築しません。
+`authority_refs[]` は `_06 §9.2` の固定projectionで得たAC / Behavior / UC / US chain、linked UIOP、scope、linked domain item、linked UI structureのstable refsを09のCurrent Effective Authority集合へ解決したunionです。current SPEC / DECISION / approved ASMだけを残し、INF / UNK / inactive Authorityは除外します。helperが重複除去・canonical sortし、current ACでは1件以上を要求します。0件ならhelperはblocking issueを返してAC Entityを生成しません。ACを除去する、親rowをblockedへ変更する、UNKNOWNをreuse / newする等のsemantic transitionはLLMが判断します。Agent / LLMがAuthority集合を再構築しません。
 
 qa-workflow / coverage-analysisへspec-analysis scopeを渡す場合、AgentがMarkdownからこのJSONを再構築しません。helper返却のcanonical `normalized_skill_input` をそのまま使用します。
 
@@ -377,12 +377,12 @@ AC Entity contentには次を固定projectionします。
 - `success_postcondition`
 - `user_stories[]`: `us_id / actor_role / goal`。`us_id`昇順で固定
 - `scope`: `scope_id / target / authority_refs[]`。`target` は00の `対象機能 / 領域` をtrimしたcanonical文字列
-- `linked_structures[]`: AC / Behavior / UC / US chain、linked UIOP、`linked_domain_items[]` が直接参照するUI構造rowをseedとし、各rowの `parent_structure_id` をrootまで辿ったancestor closureを `structure_id` のcanonical順で固定projectionする。各entryは `structure_id / type / name / state_axis / path_identifier / parent_structure_id / authority_refs[]` を持つ。missing parent / self-parent / cycleはrejectする
-- `linked_domain_items[]`: AC / Behavior / UC / US / linked UIOPの `関連構造ID` から直接参照されるFIELD / RULE / FLOW / NOTIFY / INTERACTだけを固定projectionする。item typeごとにsource tableのsemantic field、scope refs、Authority refs、structure refsをcanonical化し、別itemへ再帰展開しない
+- `linked_domain_items[]`: AC / Behavior / UC / USの `関連構造ID` に明示されたdomain item ID（FIELD / RULE / FLOW / NOTIFY / INTERACT）だけを固定projectionする。linked UIOPの `対象構造ID`、同一PAGE、同一Scope、名称一致、Authority一致からdomain itemを逆引きしない。item typeごとにsource tableのsemantic field、scope refs、Authority refs、structure refsをcanonical化し、別domain itemへ再帰展開しない
+- `linked_structures[]`: AC / Behavior / UC / USの `関連構造ID` に明示されたUI構造ID、linked UIOPの `対象構造ID`、linked domain itemの `対象構造ID / 関連構造ID` に明示されたUI構造IDをseedとし、各rowの `parent_structure_id` をrootまで辿ったancestor closureを `structure_id` のcanonical順で固定projectionする。各entryは `structure_id / type / name / state_axis / path_identifier / parent_structure_id / authority_refs[]` を持つ。missing parent / self-parent / cycleはrejectする
 - `linked_inferences[]`: AC chain、linked UIOP、scope、linked structures、linked domain itemsが `関連仕様項目ID` で直接参照するcurrent INF rowを、09 `分析項目` のcanonical row内容で固定projectionする。INFはcontent fingerprintへ寄与するがupstream Entity dependencyにはしない
 - `authority_refs[]`: AC / Behavior / UC / US chain、linked UIOP、scope、linked structures、linked domain itemsのstable refsをCurrent Effective Authorityへ解決し、current SPEC / DECISION / approved ASMだけを残した1件以上のunionを重複除去してcanonical sortする
 
-これによりAC本文が同じでも、linked UIOPの操作対象 / 操作内容 / Authority、scopeの対象意味、直接参照structureとancestor、linked FIELD / RULE / FLOW / NOTIFY / INTERACT、linked INF、親US / UC / Behaviorの意味変更でAC content fingerprintが変わります。無関係なpackage rowはprojectionへ入れないためstale化しません。repository確認だけで成立したimplementation-only structureもtarget-model dependencyとしてfingerprintへ寄与しますが、Authorityへ昇格しません。
+これによりAC本文が同じでも、linked UIOPの操作対象 / 操作内容 / Authority、scopeの対象意味、**明示参照された**FIELD / RULE / FLOW / NOTIFY / INTERACT、そこから明示されたUI構造とancestor、linked INF、親US / UC / Behaviorの意味変更でAC content fingerprintが変わります。AC chainから明示参照されない同一PAGE / 同一Scopeのdomain itemはprojectionへ入れないため、無関係row変更でstale化しません。repository確認だけで成立したimplementation-only structureもtarget-model dependencyとしてfingerprintへ寄与しますが、Authorityへ昇格しません。
 
 ### 4.2 dependencies
 
@@ -504,9 +504,9 @@ validatorはAuthority / Product Risk / Acceptance Criteriaをそれぞれ独立�
 
 ## 11. freshness propagation
 
-次をrepository runtime testで固定します。
+UI target packageからtest-requirement-designへ進むcanonical workflowはartifact modeを使用し、完全なAC semantic freshness保証はartifact modeの契約とします。次をrepository runtime testで固定します。
 
-| 変更 | 期待 |
+| 変更 | artifact modeの期待 |
 | --- | --- |
 | AC本文変更 | 関連TR stale |
 | AC削除 | 関連TR missing dependency / stale |
@@ -514,14 +514,17 @@ validatorはAuthority / Product Risk / Acceptance Criteriaをそれぞれ独立�
 | 親Behavior変更、AC本文同じ | AC fingerprint変更 → 関連TR stale |
 | 親UC変更、AC本文同じ | AC fingerprint変更 → 関連TR stale |
 | 親US変更、AC本文同じ | AC fingerprint変更 → 関連TR stale |
-| artifact modeでAuthority変更、AC本文・親chain同じ、spec-analysis再実行済み | TRが保持する直接Authority dependency不一致 → 関連TR stale |
-| 無関係UC / AC変更 | 無関係TRはcurrent |
+| linked domain item / linked structure ancestor / linked INF変更 | AC fingerprint変更 → 関連TR stale |
+| Authority変更、AC本文・親chain同じ、spec-analysis再実行済み | TRが保持する直接Authority dependency不一致 → 関連TR stale |
+| 無関係UC / AC / domain item変更 | 無関係TRはcurrent |
+
+direct modeは `acceptance_criteria[]` によるknown ID / closure検証を保証しますが、参照AC Entityが無いrunではAC本文・親chain・linked domain item等のcross-run semantic freshnessを保証しません。参照AC Entityが実在しTR dependencyへ記録された場合は、そのEntityについて既存freshness判定を利用できます。direct mode向けに別fingerprint schemaや新しいfreshness engineは追加しません。
 
 freshness判定アルゴリズム自体は既存 `evaluate_entity_freshness` を再利用し、新しい伝播engineを作りません。
 
 ## 12. partial rerun
 
-TRDの既存partial rerun contractを維持します。
+TRDの既存partial rerun contractを維持します。以下のAC semantic freshness regressionはartifact modeで固定します。direct modeでAC Entity dependencyが無いTRへ同じ保証を要求しません。
 
 必須regression:
 
@@ -559,22 +562,23 @@ coverage-analysisの既存traceability graph node typeへACを追加しません
 - requirement-structure-v2 valid / invalid schema
 - requirement-structure-v2がtop-level `acceptance_criteria[]` をraw input必須とし、各rowの `ac_id / authority_refs[]` と各TRの `acceptance_refs[]` を検証すること。ACなしは `acceptance_criteria=[] / acceptance_refs=[]` を明示し、default補完adapter / shared runtime hookを追加しない
 - artifact modeではsemantic `acceptance_criteria[]` とupstream Acceptance Criterion Entity集合をexact一致させ、AC Entity + AC Authority dependencyをTR freshnessへ追加する回帰
-- direct modeではupstream AC Entityなしでもsemantic `acceptance_criteria[]` をknown ID集合として `acceptance_refs[]` / closureを検証でき、存在しないAC / AC由来Authority Machine Entity dependencyを合成しない回帰。実在AC Entityをdependencyへ使う場合はsemantic rowとの `ac_id / authority_refs[]` 一致を要求すること
+- direct modeではupstream AC Entityなしでもsemantic `acceptance_criteria[]` をknown ID集合として `acceptance_refs[]` / closureを検証でき、存在しないAC / AC由来Authority Machine Entity dependencyを合成しない回帰。AC Entityなしのdirect modeではAC本文 / 親chain変更のcross-run freshnessを保証しないことも契約化する。実在AC Entityをdependencyへ使う場合はsemantic rowとの `ac_id / authority_refs[]` 一致を要求し、そのEntity dependencyについて既存freshnessを利用できること
 - AC-001をTRへlinkしても、そのACが参照するSPEC-001をTR authority_refs / Authority Dispositionで別途closeしない場合はSPEC-001 unclosedとなる
 - TRD / TCD / TC Skill-local runtime_v1_cutover.pyのprojection、runtime-v1 / entity-state-v1以外の入力拒否、内容不変時stable ID保持、deleted / inactive identity history保持
 - AC linked / disposed / unclosed / linked+disposed
 - AC upstream skill/type mismatch
-- AC dependency fingerprint propagation
-- linked UIOPの操作内容 / 対象構造変更でAC本文 / 親chainが同じでもAC fingerprintが変わり関連TRがstaleになる回帰
-- linked UIOPだけが参照するAuthority contentを変更し、UIOP本文が同一でもAC Authority dependency / fingerprint変更から関連TRがstaleになる回帰
-- AC chain / UIOP / linked domain itemから直接参照されるstructureと、そのancestor PAGE等のPath / 名称 / STATE軸を同一stable IDのまま変更するとAC fingerprintが変わる回帰
-- linked FIELD / RULE / FLOW / NOTIFY / INTERACTのcanonical内容変更でAC / TRがstaleになる回帰
-- linked INFのcanonical内容変更でAC / TRがstaleになる回帰
-- ACが参照しない無関係structure / domain item / INF変更ではAC / TRがstaleにならない回帰
+- artifact modeのAC dependency fingerprint propagation
+- artifact modeでlinked UIOPの操作内容 / 対象構造変更によりAC本文 / 親chainが同じでもAC fingerprintが変わり関連TRがstaleになる回帰
+- artifact modeでlinked UIOPだけが参照するAuthority contentを変更し、UIOP本文が同一でもAC Authority dependency / fingerprint変更から関連TRがstaleになる回帰
+- artifact modeでAC / Behavior / UC / USの明示ref、linked UIOP target、linked domain itemから直接参照されるstructureと、そのancestor PAGE等のPath / 名称 / STATE軸を同一stable IDのまま変更するとAC fingerprintが変わる回帰
+- artifact modeでAC chainから明示参照されたFIELD / RULE / FLOW / NOTIFY / INTERACTのcanonical内容変更でAC / TRがstaleになる回帰
+- artifact modeでlinked INFのcanonical内容変更でAC / TRがstaleになる回帰
+- artifact modeで同一PAGE / 同一Scopeに存在してもAC chainから明示参照されないdomain item変更ではAC / TRがstaleにならない回帰
+- artifact modeでACが参照しない無関係structure / INF変更ではAC / TRがstaleにならない回帰
 - parent_structure_idのmissing / self / cycleをrejectする回帰
 - scopeの対象機能 / 領域またはscope Authority変更でAC fingerprint / dependencyが変わる回帰
 - AC本文 / 親chain不変のままAuthority fingerprintだけ変更し、spec-analysisをcurrentへ再生成した後も未再実行TRが直接Authority dependencyによりstaleになる回帰
-- partial rerun stale carry-forward
+- artifact modeのpartial rerun stale carry-forward
 - shared runtime-v1 / entity-state-v1 evidenceをruntime-v2 / entity-state-v2 current resultとして扱わない
 - v2 cutover後の最初のpartial-rerun対応Skill実行がfull rebuildであり、v1 previous artifactを受け入れない
 
@@ -594,7 +598,8 @@ coverage-analysisの既存traceability graph node typeへACを追加しません
 - helperからpackage-global spec-analysis evidenceとready scope別 `ready_scope_handoffs[]` を決定論生成できる
 - qa-workflowがready scope handoffのAuthority + ACだけをexpectedとして使用し、blocked scopeをpackage-global集合からAgentがfilterしない
 - test-requirement-designまで進むworkflowではcurrent ACがTRまたはDispositionへ完全に閉じる。仕様理解packageだけの要求ではこのclosureを要求しない
-- AC / linked UIOP / scope / direct structure + ancestor / linked FIELD-RULE-FLOW-NOTIFY-INTERACT / linked INF / 親Behavior-UC-US / Authority変更が必要なTR freshnessへ伝播し、無関係package row変更は伝播しない
+- UI target artifact workflowでは、AC / linked UIOP / scope / 明示linked FIELD-RULE-FLOW-NOTIFY-INTERACT / direct structure + ancestor / linked INF / 親Behavior-UC-US / Authority変更が必要なTR freshnessへ伝播し、無関係package row変更は伝播しない
+- direct modeはknown AC ID / closureを保証し、AC Entity dependencyが無い場合のAC semantic cross-run freshnessを保証対象にしない
 - 無関係TRを不必要にstale化しない
-- partial rerunでscope外TRがchanged ACを参照したままcurrentにならない
+- artifact modeのpartial rerunでscope外TRがchanged ACを参照したままcurrentにならない
 - existing coverage graphを目的なく拡張していない

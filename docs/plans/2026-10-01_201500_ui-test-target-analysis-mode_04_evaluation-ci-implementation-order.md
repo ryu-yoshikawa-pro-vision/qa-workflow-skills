@@ -64,6 +64,7 @@ PR #16後の現在Plan上の期待増分:
 - non-blocker UNKNOWNが残るscopeと独立ready scopeを同時に含め、UNKNOWN件数だけで全scopeを止めない
 - Trigger=`あり / required` とcontent incompleteを分離し、FIELD等のidentityが既知ならblocked row + UNKNOWN、identity不明ならblocking UNKNOWNで表す。内容不足を理由にTriggerを未確定へ戻さない
 - inputから識別可能なFIELD / RULE / FLOW / NOTIFY / INTERACTを無言で欠落させない
+- AC / Behavior / UC / USの意味を制約するdomain itemは `関連構造ID` に明示し、同一PAGE / 同一Scopeだからという理由でhelperへ逆引きさせない。semanticに必要なedge欠落をquality gateでrejectする
 - current ACへ到達するUS / UC / Behaviorは全てcurrentにする
 - 未定義分類では既知current / blocked Behaviorを保持でき、identity自体不明ならBehavior rowを創作しない
 - `なし` はcurrent Authority参照を持つ
@@ -319,9 +320,11 @@ repository unit testで次を必須確認します。
 - `未定義` で既知current / blocked Behavior IDを0件以上保持できUNKNOWN必須、Behavior identity自体不明ならblocked Behaviorを創作しないこと
 - `なし` は関連Behavior / UNKNOWNなし + 理由 + current Authorityの `関連仕様項目ID` 1件以上を要求すること
 - 09の「現在有効な仕様根拠」からnormalized Authorityを固定projectionし、`適用範囲` を非空string、`関係` を単一許可値の1要素arrayとして一意にserializeすること
-- build-machine-evidenceがpackage-global Authority + current AC Entityに加えて `ready_scope_handoffs[]` を決定論生成し、ready scopeだけのnormalized input / Entity / expected identityを返すこと。blocked scopeはhandoffを持たず、qa-workflowがMarkdownをfilterしないこと。standalone operationはread-onlyでpackage bytes / version / MANIFESTを変更しないこと
-- AC chain + linked mapped UIOP + scope + direct structure + ancestor + linked FIELD/RULE/FLOW/NOTIFY/INTERACT refsからcurrent SPEC / DECISION / approved ASMをAuthority dependencyへ投影し、linked INFはcontent-only projectionへ入れること。current Authorityが0件なら `state_transition_required` でblockedし、helper自身はUNKNOWN / blocked rowを生成しないこと
-- parent_structure_id missing / self / cycleをrejectし、ancestor変更・linked domain item変更・linked INF変更でAC/TRがstale、無関係row変更ではcurrentを維持すること
+- build-machine-evidenceがpackage-global Authority + current AC Entityに加えて `ready_scope_handoffs[]` を `_06 §9.3` の固定seed / edgeだけから決定論生成し、ready scopeだけのnormalized input / Entity / expected identityを返すこと。blocked scopeはhandoffを持たず、qa-workflowがMarkdownをfilterしないこと。standalone operationはread-onlyでpackage bytes / version / MANIFESTを変更しないこと
+- scope A / Bで別Authorityを持つ場合にhandoffが混在せず、明示共有Authorityは両方へ入り、UI操作なしscopeでもscope-owned RULE / FLOW等のAuthorityをACなしでhandoffできること
+- UIOP `対象構造ID` はUI構造prefixだけを許可し、domain item prefixをrejectすること。linked domain itemはAC / Behavior / UC / USの `関連構造ID` に明示されたIDだけで、同一PAGE / 同一Scopeから逆引きしないこと
+- AC / Behavior / UC / USの明示domain ref、linked UIOPのUI target、scope、linked domain itemのUI structure refからcurrent SPEC / DECISION / approved ASMをAuthority dependencyへ投影し、linked INFはcontent-only projectionへ入れること。current Authorityが0件なら `state_transition_required` でblockedし、helper自身はUNKNOWN / blocked rowを生成しないこと
+- parent_structure_id missing / self / cycleをrejectすること。artifact modeではancestor・明示linked domain item・linked INF変更でAC/TRがstaleになり、同一PAGEにあるだけで明示参照されないFIELD等の変更ではAC fingerprint / TR freshnessが変わらないこと
 - `Machine Entities: spec-analysis` blockがexactly one存在し、heading / JSON fence / wrapperを含めhelper再生成Markdownと一致すること
 - 1つのnormalized spec-analysis handoff / current Entity collectionへ複数UI target packageのpackage-local Machine Entity blockを直接mergeしない契約をrepository testで固定すること
 - linked UIOP / UIOP-only Authority / scope / direct structure + ancestor / linked FIELD-RULE-FLOW-NOTIFY-INTERACT / linked INF / 親US-UC-Behavior変更でAC Entity fingerprintまたはAuthority dependencyが変わり、無関係package row変更では変わらないこと
@@ -495,8 +498,8 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - envelope shape / freshness algorithmは維持
 - independent `runtime_validator.py`、active code / Skill文書 / asset / fixture / repository testをv2へ同期
 - active Machine Evidenceの手書き擬似schemaを削除し、runtime renderer / authority_entities.py / build-machine-evidence生成結果を正本にする。packageへのMachine Entities section書込みはmaterialize内部だけで行い、standalone build-machine-evidenceはread-onlyとする
-- `ui_target_package.py build-machine-evidence` を実装し、current AC + mapped UIOP / US / UC / Behavior / Scope / linked domain itemを確定し、AC chain / UIOP / linked domain itemが参照するstructure + ancestor / linked INFをAC contentへ固定projectionする。Authorityだけdependency Entityとし、`ready_scope_handoffs[]` を同時生成する
-- generator contractを `requirement-structure-v1 → requirement-structure-v2`。top-level `acceptance_criteria[]` を `{ac_id, authority_refs[]}` のknown semantic AC集合としてraw input必須にし、各TRのsemantic `acceptance_refs[]` も必須とする。artifact modeはupstream AC Entity集合とのexact一致 + AC/Authority dependency、direct modeはknown ID/closure検証 + 実在する参照AC Entityだけdependency化に分岐する
+- `ui_target_package.py build-machine-evidence` を実装し、AC / Behavior / UC / USの明示 `関連構造ID` からlinked domain item、linked UIOPの `対象構造ID` と明示UI structure refからstructure + ancestor、linked INFをAC contentへ固定projectionする。同一PAGE / Scope等の逆引きを禁止する。Authorityだけdependency Entityとし、`ready_scope_handoffs[]` は `_06 §9.3` のscope reachabilityで同時生成する
+- generator contractを `requirement-structure-v1 → requirement-structure-v2`。top-level `acceptance_criteria[]` を `{ac_id, authority_refs[]}` のknown semantic AC集合としてraw input必須にし、各TRのsemantic `acceptance_refs[]` も必須とする。UI target packageからTRDへ進むcanonical workflowはartifact modeに固定し、upstream AC Entity集合とのexact一致 + AC/Authority dependency + semantic freshnessを要求する。direct modeはknown ID/closure検証を保証し、実在する参照AC Entityだけdependency化する。AC Entityなしdirect runのAC semantic cross-run freshnessは保証しない
 - current ACをTRまたはDispositionへ閉じ、Authority closureは独立維持する
 - TR EntityへAC EntityとACが参照するcurrent Authority Entity dependencyを保存する
 - shared runtimeへSkill固有migration projectionを入れない。新規 `skills/test-requirement-design/scripts/runtime_v1_cutover.py`、`skills/test-condition-design/scripts/runtime_v1_cutover.py`、`skills/test-case-design/scripts/runtime_v1_cutover.py` がcomplete v2 generator inputを決定論生成する
@@ -506,10 +509,10 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - 既存v1 downstream artifactがある場合は `runtime cutover完了 → UI target package migration / AC生成 → TRD通常semantic update → stale downstream通常再実行` の順に固定し、逆順をblockedにする
 - v1 downstreamがない場合は直接UI target package migration / normal v2 workflowへ進める
 - `_09` の9 Skill処置表どおり、TRD / TCD / TCだけcutover helperを使う。その他はcanonical spec成果物、validated保存Machine Runtime Input、current workflow stateを正本としてv2再生成し、保存inputがないinspection系だけ既存Skillの通常rerun / re-observation経路を使う。proseからinputを再構築しない
-- UIOP / UIOP-only Authority / scope / linked domain item / AC chain・UIOP・domain item由来structure + ancestor / linked INF / 親Behavior-UC-US / Authority変更によるAC / TR freshness regressionと、無関係package row変更のnon-stale regressionを追加
+- artifact modeでUIOP / UIOP-only Authority / scope / 明示linked domain item / AC chain・UIOP・domain item由来structure + ancestor / linked INF / 親Behavior-UC-US / Authority変更によるAC / TR freshness regressionを追加し、同一PAGE / Scopeにあるだけで明示参照されないdomain item変更のnon-stale regressionも固定する。direct modeはAC Entityなしでこのsemantic freshnessを要求しない
 - shared runtime 9-copy byte-identity、cutover helper portability、v1/v2混在拒否、semantic drift、phase dependency、mapping ambiguityをrepository integration testで固定する
 - requirement-structure-v2 artifact回帰: semantic `acceptance_criteria[]` とcurrent upstream AC Entity集合のexact一致、参照AC + AC Authority dependency、missing Entity fail-closedを固定する
-- requirement-structure-v2 direct回帰: upstream AC Entityが0件でもsemantic `acceptance_criteria[]` からknown ID / closureを検証でき、存在しないAC / AC由来Authority Entity dependencyを合成しない。参照AC Entityが実在する場合だけAC dependencyを追加する
+- requirement-structure-v2 direct回帰: upstream AC Entityが0件でもsemantic `acceptance_criteria[]` からknown ID / closureを検証でき、存在しないAC / AC由来Authority Entity dependencyを合成しない。AC EntityなしではAC本文 / 親chain変更のcross-run freshnessを保証しない。参照AC Entityが実在する場合だけAC dependencyを追加し、そのdependencyには既存freshnessを適用する
 
 ### Step 3: spec-analysis evaluation
 
@@ -573,7 +576,8 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - conditional file trigger未確定のscopeを保持したpackageが`partial`で保存でき、別ready scopeは継続できるscenario
 - required conditional fileでidentity既知itemがblocked + UNKNOWNとして保存でき、identity未確定で0 rowの場合は07のBlocking Scope ID + 関連Fileでscopeをblockedにできるscenario。Triggerはrequiredのまま維持する
 - runtime-v1 downstream → Skill-local cutover → UI target migration → AC semantic update → stale downstream rerunのscenario
-- UIOP / UIOP-only Authority / scope / structure ancestor / linked domain item / linked INF / Behavior / UC / US / Authority変更によるTR staleと、無関係package row変更non-stale scenario
+- artifact modeでUIOP / UIOP-only Authority / scope / structure ancestor / 明示linked domain item / linked INF / Behavior / UC / US / Authority変更によるTR staleと、同一PAGEにあるだけで未参照のdomain itemを含む無関係package row変更non-stale scenario
+- ready scope A/BのAuthority分離、共有Authorityの両handoff包含、UI操作なしscopeのAuthority handoff、blocked scope handoffなしを同一scope-handoff smokeで確認する
 - process kill相当のorphan staging / backupをpreflight recoveryでき、一意に復旧不能ならfail-closedするscenario
 - deterministic helperが構造エラーを返してもLLMの意味判断を上書きしないscenario
 
@@ -601,9 +605,9 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - qa-workflow routing / resumeと#14の3 Skillとの誤routing境界がrouting case / independent candidateで確認済み
 - multi-file packageがrepository eval専用projection経由で既存semantic runnerにより評価可能
 - version / UNKNOWN件数 / stable ref / MANIFEST / SHA-256 / complete file set / scope blocker / file applicability / ready・blocked scope / completion status / blocked domain row / Repository確認基準 / behavior hierarchy / current UCの3分類完全性等の定型整合をproduction helperで検証できる
-- test-requirement-designまで進むworkflowではcurrent ACがrequirement-structure-v2でTRまたはDispositionへ閉じ、AC / linked UIOP / scope / direct structure + ancestor / linked FIELD-RULE-FLOW-NOTIFY-INTERACT / linked INF / 親Behavior-UC-US / Authority変更が関連TR freshnessへ伝播し、無関係package row変更は伝播しない。仕様理解packageだけの要求ではこのclosureを完了条件にしない
+- UI target packageからtest-requirement-designまで進むcanonical artifact workflowではcurrent ACがrequirement-structure-v2でTRまたはDispositionへ閉じ、AC / linked UIOP / scope / 明示linked FIELD-RULE-FLOW-NOTIFY-INTERACT / direct structure + ancestor / linked INF / 親Behavior-UC-US / Authority変更が関連TR freshnessへ伝播し、無関係package row変更は伝播しない。direct modeはknown ID / closureを保証し、AC Entity dependencyが無い場合のAC semantic cross-run freshnessは完了条件にしない。仕様理解packageだけの要求ではAC→TR closure自体を完了条件にしない
 - PR #14後の9 Skill-local `runtime_contract.py` がbyte-identicalのままruntime-v2 / entity-state-v2でacceptance_criterionを扱い、TRD / TCD / TC固有cutoverは各Skill-local `runtime_v1_cutover.py` に分離され、残る6 Skillのv1 evidence処置が `_09` の表どおり一意に決まる
-- partial rerunでchanged ACへ依存するscope外TRをcurrent扱いしない
+- artifact modeのpartial rerunでchanged ACへ依存するscope外TRをcurrent扱いしない
 - spec-analysis / question-analysis production helperがSkill package単体で実行可能
 - test-target-inspectionへのcurrent UI分岐が維持される
 - existing CI / evalが全PASS

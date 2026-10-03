@@ -124,6 +124,8 @@ standard 00〜09 fileのheading集合は `skills/spec-analysis/assets/ui-test-ta
 
 helperが参照整合を検証するstructured tableは以下のexact heading / exact headerを使います。
 
+stable reference列のprefix契約は `_05 §5` を正本とします。全standard tableの `対象構造ID` はUI構造ID（`PAGE / STATE / VIEW / STEP / MODAL / BDLG / PANEL / EXT / SHARED`）だけを許可します。`関連構造ID` はUI構造IDまたはdomain item ID（`FIELD / RULE / FLOW / NOTIFY / INTERACT`）だけを許可し、helperはprefixで機械的に分類します。名称・Path・同一PAGE / Scope等から参照を補完しません。
+
 ### 5.1 00_scope_and_context.md
 
 #### 分析対象機能scope一覧
@@ -220,6 +222,8 @@ scope単位のsemantic contractは `_08` を正本とします。structured tabl
 
 | 操作ID | Scope ID | Actor / Role | 対象構造ID | 操作 | 関連仕様項目ID | 対応UC ID | 状態 | 関連UNKNOWN ID |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+
+`対象構造ID` は `_05` のUI構造ID exact prefix集合だけを許可します。UIOPはdomain item IDを直接保持せず、操作に意味上関係するFIELD / RULE / FLOW / NOTIFY / INTERACTは親US / UC / Behavior / ACの `関連構造ID` でLLMが明示します。
 
 #### User Story一覧
 
@@ -939,7 +943,7 @@ stdin:
 {"operation":"build-machine-evidence","package_root":"<path>"}
 ```
 
-§9に従い09からnormalized Authority inputを生成して既存 `authority_entities.py` のbuilderを呼び、02のcurrent AC、親UCへ接続する状態=`mapped`のUIOP集合、親US / UC / Behavior chain、scope、直接参照FIELD / RULE / FLOW / NOTIFY / INTERACTを確定し、AC chain / linked UIOP / linked domain itemが参照するUI構造 + `親構造ID` ancestor closure、関連current INFからAcceptance Criterion Machine Entityを生成して統合します。missing parent / self-parent / cycleはrejectします。
+§9に従い09からnormalized Authority inputを生成して既存 `authority_entities.py` のbuilderを呼びます。linked domain itemはcurrent AC / 親Behavior / 親UC / 親USの `関連構造ID` に明示されたdomain item IDだけを対象にし、linked UIOPの `対象構造ID` からdomain itemを逆引きしません。linked UI structureは、同chainの `関連構造ID` にあるUI構造ID、linked UIOPの `対象構造ID`、linked domain itemの `対象構造ID / 関連構造ID` にあるUI構造IDをseedとし、`親構造ID` をrootまで辿ります。domain itemから別domain itemへ再帰展開しません。これらとscope、関連current INFからAcceptance Criterion Machine Entityを生成して統合し、missing parent / self-parent / cycleはrejectします。
 
 payload:
 
@@ -1020,8 +1024,8 @@ AC Entity contentは `_08` のcurrent chainから次を固定projectionします
 - uc_id / use case / trigger / preconditions / success postcondition
 - user_stories[] の us_id / actor_role / goal
 - scope の scope_id / target / authority_refs[]
-- linked_structures[] の structure_id / type / name / state_axis / path_identifier / parent_structure_id / authority_refs[]。AC chain / linked UIOP / linked domain itemのdirect structure + parent ancestor closure
-- linked_domain_items[] の item_id / item_type / scope_refs[] / semantic content / authority_refs[] / structure_refs[]。direct FIELD / RULE / FLOW / NOTIFY / INTERACTだけ
+- linked_structures[] の structure_id / type / name / state_axis / path_identifier / parent_structure_id / authority_refs[]。AC / Behavior / UC / USのUI構造ref + linked UIOPの `対象構造ID` + linked domain itemのUI構造refをseedにしたparent ancestor closure
+- linked_domain_items[] の item_id / item_type / scope_refs[] / semantic content / authority_refs[] / structure_refs[]。AC / Behavior / UC / USの `関連構造ID` に明示されたFIELD / RULE / FLOW / NOTIFY / INTERACTだけ。UIOP targetや同一PAGE / Scopeから逆引きせず、domain item間の再帰展開もしない
 - linked_inferences[] の inf_id / canonical analysis content。direct current INFだけ
 - authority_refs[]
 
@@ -1048,7 +1052,45 @@ UIOP / US / UC / Behavior / UI構造 / FIELD / RULE / FLOW / NOTIFY / INTERACT /
 
 Agent / LLMがMarkdownからnormalized inputやexpected Entity一覧を再構築しません。
 
-`ready_scope_handoffs[]` は `inspect.ready_scope_ids[]` とexact一致し、scope IDのcanonical順です。各entryはそのscopeから到達するcurrent Authority / ACだけを固定projectionします。blocked scopeはhandoffを生成しません。qa-workflow / test-analysisはpackage-global Machine Entity集合をMarkdownからfilterせず、このscope handoffを正規入力として使います。
+`ready_scope_handoffs[]` は `inspect.ready_scope_ids[]` とexact一致し、scope IDのcanonical順です。blocked scopeはhandoffを生成しません。各ready scope `S` のprojectionは次の固定規則だけで生成します。
+
+scope所属seed row:
+
+- `Scope ID=S` のSCOPE row
+- `Scope ID=S` の4件のfile applicability row
+- `Scope ID=S` のmapped UIOP / current US
+- `UC → US → Scope ID=S` で到達するcurrent UC
+- `Behavior → UC → US → Scope ID=S` で到達するcurrent Behavior
+- `AC → Behavior → UC → US → Scope ID=S` で到達するcurrent AC
+- `関連Scope ID` にSを明示するcurrent RULE / FIELD / FLOW / NOTIFY / INTERACT
+- `関連Scope ID` にSを明示するcurrent extension declaration row。extension本文はparseしない
+
+reference traversal:
+
+- seed rowの `関連仕様項目ID` はstable IDとしてのみ読む
+- seed rowの `関連構造ID` は `_05` のexact prefix集合でUI構造IDとdomain item IDへ分離する
+- UIOPの `対象構造ID` はUI構造IDとしてだけ読む
+- domain item IDはseed rowから直接参照されたitemだけを追加する。追加domain itemの `関連構造ID` から別domain itemへ再帰展開しない
+- UI構造IDはseed row、linked UIOP、追加domain itemの明示参照をunionし、その `親構造ID` だけをrootまで辿る
+- extension declarationはrowに明示されたstable refだけを使い、自由記述本文からedgeを抽出しない
+
+Authority projection:
+
+- 上記seed row、直接追加したdomain item、到達したUI構造rowの `関連仕様項目ID` と、scope所属current AC Entityの `authority_refs[]` をunionする
+- 09のCurrent Effective Authorityに存在するcurrent SPEC / DECISION / approved ASMだけを残し、INF / UNK / inactive Authorityはhandoffの `authorities[]` へ入れない
+- 同じAuthorityが複数scopeから明示参照される場合は各scope handoffへ入る
+
+Acceptance Criterion projection:
+
+- `AC → Behavior → UC → US → Scope` のparent chainでSへ到達するcurrent ACだけを `acceptance_criteria[]` / AC Entityへ含める
+- UI操作なしscopeではAC集合が空でもよく、scope row / applicability / domain item / extension declaration / UI構造の明示refから必要Authorityをprojectionする
+
+禁止:
+
+- 09の `適用範囲` 自由記述、名称、Path、同一PAGE、本文類似、Authority共有から新しいedgeを作らない。scope所属は `Scope ID / 関連Scope ID` またはUS→UC→Behavior→ACの明示parent chainだけで決める
+- ACとdomain itemの意味関係をhelperが推測しない。必要なedgeがsemantic inputに無い場合はsemantic quality gate側の不足であり、helperが補完しない
+
+qa-workflow / test-analysisはpackage-global Machine Entity集合をMarkdownからfilterせず、このscope handoffを正規入力として使います。
 
 blocked scopeをquestion-analysisへ送る場合は `inspect.scope_readiness[].blocking_unknown_ids[]` を使い、current UNKNOWN全件をAgentがfilterしません。
 
