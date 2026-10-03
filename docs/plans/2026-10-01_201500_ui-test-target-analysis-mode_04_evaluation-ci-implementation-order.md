@@ -50,12 +50,14 @@ PR #16後の現在Plan上の期待増分:
 - 同時成立可能な複数STATE軸
 - field validation、notification、外部interaction
 - UI操作あり / なし / 未確定scope
+- UI操作ありだがActor / RoleまたはGoalがAuthorityから確定できないscope
 - US / UC / Behavior / AC
 - 正常 / 準正常 / 例外で定義あり / なし / 未定義が混在
 - 一部Behavior identityは既知だが結果未確定
 
 期待:
 - semanticなUI構造分類を行い、STATEを直交軸として整理する
+- UI操作ありと確定したscopeはrequiredのまま維持し、Actor / RoleやGoal等が不足する場合は影響するUIOP / US / UC / Behaviorだけをblocked + UNKNOWNにする
 - current ACへ到達するUS / UC / Behaviorは全てcurrentにする
 - 未定義分類では既知current / blocked Behaviorを保持でき、identity自体不明ならBehavior rowを創作しない
 - `なし` はcurrent Authority参照を持つ
@@ -86,11 +88,13 @@ PR #16後の現在Plan上の期待増分:
 
 入力:
 - schema versionなしのlegacy package
+- 後から継続利用対象になった通常spec-analysis単一成果物
 - retained / retired identity
 - 標準fileへ混在させるべきでないCSV domain
 
 期待:
 - legacy/current semantic identity mappingを意味判断する
+- 通常spec-analysis単一成果物は同一semantic identityを維持し、package versionなし入力として `legacy-unversioned → v00` へmigrationする
 - 必要なextension fileの責務・分割理由を判断する
 - 過去retired IDをnew entityへ再利用しない
 - generic migration / generic document frameworkへ拡張しない
@@ -100,11 +104,13 @@ PR #16後の現在Plan上の期待増分:
 入力:
 - simple downloadだけのscope
 - export生成 + data transformation + downloadを伴うscope
+- conditional file trigger有無をAuthorityから確定できないscope
 - Project Context以外のDEC / ASM正本owner
 
 期待:
 - simple downloadは05のみ
 - export生成 / transformation + user-visible downloadは04 + 05
+- trigger不明をnot-applicableへ落とさず `Trigger判定=未確定` + UNKNOWNとして保持し、helperがblockedを導出できるsemantic inputにする
 - 外部ownerの意味上の正本性を判断するが、canonical Authority IDはDEC-xxx / ASM-xxxを維持し、Jira / ADR等の外部IDをauthority_idへ流用しない
 - extension / conditional fileを必要以上にrequiredにしない
 
