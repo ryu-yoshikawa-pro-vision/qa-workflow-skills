@@ -351,7 +351,7 @@ promptに含めないもの:
 フェーズ2の固定target preparationだけを担当します。
 
 - 指定された`qa-training-store` source revisionのtracked contentだけからsanitized targetを作る
-- target固有Skill、過去run / Plan / report、instructor情報、target側Skill evalを除外する
+- target固有`.agents/**` / `.codex/**`、過去Plan / report、instructor情報、target側Skill evalを除外する
 - 評価用`AGENTS.md`を生成する
 - 19 SkillだけをAgent-visibleに配置する
 - `.qa-eval-output/`と必要な評価用Project Context rootを準備する
@@ -643,7 +643,7 @@ repositoryの既存caseを使い、fake Agentで次を自動検証します。
 外部LLMは起動せず、fake Agentと一時Git repositoryを使って次を検証します。
 
 - source revisionのtracked contentだけからsanitized targetを作る
-- 元`.agents/skills/**`、元`AGENTS.md` / `QA_AGENT.md`、過去run / Plan / report、instructor情報、target側Skill evalをAgent-visible targetへ残さない
+- 元`.agents/**` / `.codex/**`、元`AGENTS.md` / `QA_AGENT.md`、過去Plan / report、instructor情報、target側Skill evalをAgent-visible targetへ残さない
 - 評価用`AGENTS.md`へ製品仕様や正解QA成果物を混ぜない
 - 19 SkillだけをAgent-visibleにする
 - `.qa-eval-output/**`だけを書込み許可範囲として扱う
