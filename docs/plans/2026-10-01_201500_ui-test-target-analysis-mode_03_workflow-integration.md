@@ -222,7 +222,7 @@ batch handoffは次を持ちます。
 
 helperはAuthority / AC / Machine Entityをstable identityでdedupeし、共有Authorityを1件へ統合します。同一identityのcanonical contentがscope間で不一致ならfail-closedします。Agent / LLMがscope別payloadをmergeしません。blocked scope由来のAuthority / ACはbatchへ含めません。scope所属row・明示stable ref・UI構造parentだけを辿るexact reachabilityは `_06 §9.3` を正本とし、名称・同一PAGE・同一Scope・Authority本文から関連を推測しません。
 
-既存test-analysis / test-requirement-design runtimeは `artifact:*:all` の1 runtime unitを維持します。qa-workflowはbatch handoffからそのruntimeへ実際に渡すcanonical stdin JSON bytesを構成した後に既存2 MiB上限を検査し、batch全体が超過した場合はruntimeを起動せず後続を`limit_exceeded`でblockedにします。scope単位の個別run、ready scope subsetだけの`:all`実行、Agent merge、silent truncate、auto splitで回避しません。通常runtime上限を変更する場合は別contract変更です。
+既存test-analysis / test-requirement-design runtimeは `artifact:*:all` の1 runtime unitを維持します。`artifact:analysis_entities:all` と `artifact:requirement_structure:all` はready scope全件を1 requestへ集約するroot unitのため、本PRでaggregate runtimeへ分類し、各entrypointを `run_cli(..., aggregate=True)` とします。qa-workflowはbatch handoffから各root runtimeへ実際に渡すcanonical stdin JSON bytesを構成した後に16 MiB上限を事前検査し、2 MiBを超えても16 MiB以下なら1回の`:all`実行で処理します。16 MiBを超える場合はruntimeを起動せず後続を `limit_exceeded` でblockedにします。scope単位の個別run、ready scope subsetだけの`:all`実行、Agent merge、silent truncate、auto splitで回避しません。その他の通常runtime generatorは既存2 MiB上限を維持します。
 
 ユーザー要求が仕様理解packageまでならspec-analysisの完了条件で終了し、test-analysis / test-requirement-designを起動しません。この場合、AC→TR / Disposition closureはpackage単体の完了条件ではありません。
 

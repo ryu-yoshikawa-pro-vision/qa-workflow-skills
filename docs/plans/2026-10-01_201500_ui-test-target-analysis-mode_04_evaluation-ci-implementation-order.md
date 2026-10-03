@@ -327,7 +327,7 @@ repository unit testで次を必須確認します。
 - 09の「現在有効な仕様根拠」からnormalized Authorityを固定projectionし、`適用範囲` を非空string、`関係` を単一許可値の1要素arrayとして一意にserializeすること
 - `build-machine-evidence(scope_ids=null)` がpackage-global Authority + current AC Entityと `ready_scope_ids[] / blocked_scope_ids[]` を返し、scope別full payloadを重複返却しないこと。`build-machine-evidence(scope_ids=ready_scope_ids)` は `_06 §9.3` の固定seed / edgeから各ready scopeを内部projectionし、1つのbatch normalized input / Entity / expected identityへunion / dedupeすること。duplicate / blocked / unknown scope指定をrejectし、canonical qa-workflowではcurrent ready_scope_ids全件とのexact一致を要求すること
 - ready SCOPE-001 / SCOPE-002、blocked SCOPE-003で、SCOPE-001→SPEC-001,SPEC-002,AC-001、SCOPE-002→SPEC-002,SPEC-003,AC-002なら、batchがSPEC-001/002/003 + AC-001/002をexactly once含み、SCOPE-003由来rowを含めず、Agent mergeなしで既存 `artifact:*:all` runtimeを1回だけ起動すること
-- batch handoffから実際の通常runtime canonical stdinを構成し、2 MiB exactlyは通過、1 byte超過ではruntimeを起動せず `limit_exceeded` になること。scope別個別run / subset run / silent truncate / auto splitで回避しないこと
+- batch handoffから `artifact:analysis_entities:all` / `artifact:requirement_structure:all` のcanonical stdinを構成し、2 MiB + 1 byteでも16 MiB以下なら通過、16 MiB exactlyも通過、1 byte超過ではruntimeを起動せず `limit_exceeded` になること。その他の通常generatorは2 MiB + 1 byteを従来どおりrejectすること。scope別個別run / subset run / silent truncate / auto splitで回避しないこと
 - scope A / Bで別Authorityを持つ場合にbatch内で混在先を誤らず、明示共有Authorityは1件へdedupeされ、UI操作なしscopeでもscope-owned RULE / FLOW等のAuthorityをACなしでhandoffできること
 - UIOP `対象構造ID` はUI構造prefixだけを許可し、domain item prefixをrejectすること。linked domain itemはAC / Behavior / UC / USの `関連構造ID` に明示されたIDだけで、同一PAGE / 同一Scopeから逆引きしないこと
 - AC / Behavior / UC / USの明示domain ref、linked UIOPのUI target、scope、linked domain itemのUI structure refからcurrent SPEC / DECISION / approved ASMをAuthority dependencyへ投影し、linked INFはcontent-only projectionへ入れること。current Authorityが0件なら `state_transition_required` でblockedし、helper自身はUNKNOWN / blocked rowを生成しないこと
@@ -507,18 +507,20 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - independent `runtime_validator.py`、active code / Skill文書 / asset / fixture / repository testをv2へ同期
 - active Machine Evidenceの手書き擬似schemaを削除し、runtime renderer / authority_entities.py / build-machine-evidence生成結果を正本にする。packageへのMachine Entities section書込みはmaterialize内部だけで行い、standalone build-machine-evidenceはread-onlyとする
 - `ui_target_package.py build-machine-evidence` を実装し、AC / Behavior / UC / USの明示 `関連構造ID` からlinked domain item、linked UIOPの `対象構造ID` と明示UI structure refからstructure + ancestor、linked INFをAC contentへ固定projectionする。同一PAGE / Scope等の逆引きを禁止する。Authorityだけdependency Entityとする。package-global callはready / blocked scope ID indexだけ、batch callはcurrent ready scope全件を `_06 §9.3` で内部projectionしてAuthority / current AC / Machine Entity / expected identityを1集合へunion / dedupeする
+- `skills/test-analysis/scripts/analysis_entities.py` / `skills/test-requirement-design/scripts/requirement_structure.py` は既存 `artifact:*:all` runtime unit identityを維持したまま `run_cli(..., aggregate=True)` へ変更し、root input上限を16 MiBにする。transport上限を `input_mode` で分岐するwrapperは追加せず、この2 root unitはdirect / artifactとも同じ16 MiB上限を使う。その他の通常generatorは2 MiBを維持する
 - generator contractを `requirement-structure-v1 → requirement-structure-v2`。top-level `acceptance_criteria[]` を `{ac_id, authority_refs[]}` のknown semantic AC集合としてraw input必須にし、各TRのsemantic `acceptance_refs[]` も必須とする。UI target packageからTRDへ進むcanonical workflowはartifact modeに固定し、upstream AC Entity集合とのexact一致 + AC/Authority dependency + semantic freshnessを要求する。direct modeはknown ID/closure検証を保証し、実在する参照AC Entityだけdependency化する。AC Entityなしdirect runのAC semantic cross-run freshnessは保証しない
 - current ACをTRまたはDispositionへ閉じ、Authority closureは独立維持する
 - TR EntityへAC EntityとACが参照するcurrent Authority Entity dependencyを保存する
 - shared runtimeへSkill固有migration projectionを入れない。新規 `skills/test-requirement-design/scripts/runtime_v1_cutover.py`、`skills/test-condition-design/scripts/runtime_v1_cutover.py`、`skills/test-case-design/scripts/runtime_v1_cutover.py` がcomplete v2 generator inputを決定論生成する
 - 各cutover helperはstdlib + 同Skill current `runtime_contract.py` だけをimportするが、v1 source artifactはhelper内のread-only legacy readerで `runtime-v1 / entity-state-v1` のfrozen schema / fingerprintを検証し、current v2 validatorへv1 Entityを渡さない。通常generatorへfield mergeを要求しない。TRD / TCはall、TCDはcondition-structure → models反復 → test-data-requirements → materialize-coverageのphase契約を持つ
-- cutover外側stdinはhelper固有decoderでaggregate 16 MiBを許可し、top-level artifact Markdownだけ64 KiB string上限を免除する。embedded v1 JSON scalarは通常64 KiB、各v1 runtime JSON blockは旧2 MiB上限で検証する。current `strict_loads()` のverify専用例外を流用せず、通常generator 2 MiB契約も変更しない
+- cutover外側stdinはhelper固有decoderでaggregate 16 MiBを許可し、top-level artifact Markdownだけ64 KiB string上限を免除する。embedded v1 JSON scalarは通常64 KiB、各v1 runtime JSON blockは旧2 MiB上限で検証する。current `strict_loads()` のverify専用例外を流用せず、cutover契約からgenerator上限を変更しない。別途ready-scope root runtime契約として `analysis_entities.py` / `requirement_structure.py` だけaggregate 16 MiBへ変更し、その他の通常generatorは2 MiBを維持する
 - 内容不変cutoverでTR / TCN / model / CI / TC stable identity、deleted / inactive historyを維持する
 - 既存v1 downstream artifactがある場合は `runtime cutover完了 → UI target package migration / AC生成 → TRD通常semantic update → stale downstream通常再実行` の順に固定し、逆順をblockedにする
 - v1 downstreamがない場合は直接UI target package migration / normal v2 workflowへ進める
 - `_09` の9 Skill処置表どおり、TRD / TCD / TCだけcutover helperを使う。その他はcanonical spec成果物、validated保存Machine Runtime Input、current workflow stateを正本としてv2再生成し、保存inputがないinspection系だけ既存Skillの通常rerun / re-observation経路を使う。proseからinputを再構築しない
 - artifact modeでUIOP / UIOP-only Authority / scope / 明示linked domain item / AC chain・UIOP・domain item由来structure + ancestor / linked INF / 親Behavior-UC-US / Authority変更によるAC / TR freshness regressionを追加し、同一PAGE / Scopeにあるだけで明示参照されないdomain item変更のnon-stale regressionも固定する。direct modeはAC Entityなしでこのsemantic freshnessを要求しない
 - shared runtime 9-copy byte-identity、cutover helper portability、v1/v2混在拒否、semantic drift、phase dependency、mapping ambiguityをrepository integration testで固定する
+- `analysis_entities.py` / `requirement_structure.py` のaggregate root regressionとして、2 MiB超〜16 MiB以下のcanonical request成功、16 MiB + 1 byteの `limit_exceeded`、その他の通常generatorで2 MiB + 1 byteが従来どおり `limit_exceeded` になることを固定する
 - legacy readerが改変v1 fingerprint / dependencyをrejectし、64 KiB超のtop-level artifact Markdownは16 MiB以内なら受理、artifact内scalarの64 KiB超はrejectするtransport回帰を固定する
 - requirement-structure-v2 artifact回帰: semantic `acceptance_criteria[]` とcurrent upstream AC Entity集合のexact一致、参照AC + AC Authority dependency、missing Entity fail-closedを固定する
 - requirement-structure-v2 direct回帰: upstream AC Entityが0件でもsemantic `acceptance_criteria[]` からknown ID / closureを検証でき、存在しないAC / AC由来Authority Entity dependencyを合成しない。AC EntityなしではAC本文 / 親chain変更のcross-run freshnessを保証しない。参照AC Entityが実在する場合だけAC dependencyを追加し、そのdependencyには既存freshnessを適用する
@@ -547,7 +549,7 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 
 - mode request routing / answer resume。小規模でも継続利用目的ならmodeを優先し、`scope_readiness[] / ready_scope_ids[]` を使ってblocked scopeを除外し、current ready scope全件を `build-machine-evidence(scope_ids=ready_scope_ids)` の1 batchへまとめて後続 `artifact:*:all` runtimeへ進める。blocked scopeのUNKNOWNをAgentが全件filterしない
 - qa-workflow経由のpackage materializeは `claim_mutable_operation()` 成功後にresolved package_rootの `reserve_shared_resource()` を取得し、reservation成功前はwriteしない。成功 / cleanup確認済みhandled failure後は既存conditional release契約でreservationを解放し、claimは通常releaseしない
-- batch handoffから通常runtimeのcanonical stdinを1つ構成し、batch全体を2 MiB上限へ検証する。超過時はruntime未起動のままblockedにし、scope別個別run / subset run / auto splitを行わない
+- batch handoffから `artifact:analysis_entities:all` / `artifact:requirement_structure:all` のcanonical stdinを1つ構成し、batch全体を16 MiB上限へ検証する。超過時はruntime未起動のままblockedにし、scope別個別run / subset run / auto splitを行わない。その他の通常generatorは2 MiB上限を維持する
 - 継続利用目的を単発規模より優先するmode precedenceをroutingへ反映
 - runtime-v1 downstreamが残る状態でUI target migration済みならblockedにし、Step 2のcutover順へ戻す
 - test-target-inspection / usability-evaluation / usability-inspection / wcag-conformance-evaluationとの分岐
@@ -589,7 +591,7 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - 64 KiB超のv1 artifact Markdownを含むcutover requestが16 MiB以内で成功し、v1 fingerprint改変 / embedded scalar 64 KiB超をrejectするscenario
 - artifact modeでUIOP / UIOP-only Authority / scope / structure ancestor / 明示linked domain item / linked INF / Behavior / UC / US / Authority変更によるTR staleと、同一PAGEにあるだけで未参照のdomain itemを含む無関係package row変更non-stale scenario
 - ready scope A/BのAuthority分離、共有Authorityのbatch内dedupe、UI操作なしscopeのAuthority handoff、blocked scope非混入をready-scope batch smokeで確認する。既存 `artifact:analysis_entities:all / artifact:requirement_structure:all` をscopeごとに複数回起動しない
-- package-global build responseがscope full payloadを複製せず、ready-scope batch runtime request全体が2 MiB超の場合にruntime未起動でblockedになるscenario
+- package-global build responseがscope full payloadを複製せず、ready-scope batch runtime requestが2 MiBを超えても16 MiB未満なら既存 `artifact:analysis_entities:all / artifact:requirement_structure:all` を1回だけ起動して完遂できるscenario。16 MiB exactly / 1 byte超過の境界値はrepository testで固定する
 - AC-001がcurrent → blocked → currentへ戻ってもstable IDを維持し、blocked期間はAC Entity / TRD handoffから外れ、既存TRがmissing dependency / staleになるscenario
 - required scopeで0 UIOP + blockerなしをreject、0 UIOP + identity未確定Blocking UNKNOWNをpartial/blocked保存、完全なUIOP→US→UC→Behavior→AC closureをreadyにするscenario
 - 同一packageへの異なるoperationが別claimでも同じresource reservationで排他され、cleanup確認後にownerだけがconditional releaseできるscenario
@@ -622,6 +624,7 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - version / UNKNOWN件数 / stable ref / MANIFEST / SHA-256 / complete file set / scope blocker / file applicability / ready・blocked scope / completion status / blocked domain row / 0..N Repository確認基準 / behavior hierarchy / current UCの3分類完全性等の定型整合をproduction helperで検証できる
 - UI target packageからtest-requirement-designまで進むcanonical artifact workflowではcurrent ACがrequirement-structure-v2でTRまたはDispositionへ閉じ、AC / linked UIOP / scope / 明示linked FIELD-RULE-FLOW-NOTIFY-INTERACT / direct structure + ancestor / linked INF / 親Behavior-UC-US / Authority変更が関連TR freshnessへ伝播し、無関係package row変更は伝播しない。direct modeはknown ID / closureを保証し、AC Entity dependencyが無い場合のAC semantic cross-run freshnessは完了条件にしない。仕様理解packageだけの要求ではAC→TR closure自体を完了条件にしない
 - PR #14後の9 Skill-local `runtime_contract.py` がbyte-identicalのままruntime-v2 / entity-state-v2でacceptance_criterionを扱い、TRD / TCD / TC固有cutoverは各Skill-local `runtime_v1_cutover.py` に分離され、残る6 Skillのv1 evidence処置が `_09` の表どおり一意に決まる
+- `artifact:analysis_entities:all` / `artifact:requirement_structure:all` がaggregate 16 MiB root runtimeとして動作し、他の通常generatorの2 MiB上限を広げずにready-scope全件batchを1回で処理できる
 - artifact modeのpartial rerunでchanged ACへ依存するscope外TRをcurrent扱いしない
 - spec-analysis / question-analysis production helperがSkill package単体で実行可能
 - test-target-inspectionへのcurrent UI分岐が維持される

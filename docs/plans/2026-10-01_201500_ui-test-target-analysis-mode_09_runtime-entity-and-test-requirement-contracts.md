@@ -162,7 +162,7 @@ stdinは1 JSON object、stdoutは1 JSON object + LFです。operationは `cutove
 - cutover helperの外側stdinはcurrent `runtime_contract.strict_loads()`へそのまま渡さない。各helperのcutover入口がstdlib JSON decoderでduplicate key、depth、container item数等の既存安全制約を維持しつつaggregate 16 MiBを検査する
 - top-level `artifact_markdown / current_v2_artifact_markdown` だけは成果物全文transportとして64 KiB string上限を免除する。その他のtop-level scalarと、artifactから抽出したMachine Runtime Input / Result / Entity等のJSON scalarは通常の64 KiB上限を維持する
 - legacy readerがartifact内から抽出した各v1 JSON blockは、旧通常runtimeが生成可能だった2 MiB aggregate上限内でstrict decodeし、`runtime_contract_version=runtime-v1 / entity_schema_version=entity-state-v1`、Input / Result pair、Entity identity / dependency / stored fingerprintをfrozen v1規則で再検証する
-- current v2 `strict_loads()` の `verify_runtime_evidence` 専用64 KiB exemptionをcutoverへ流用しない。通常generatorの2 MiB上限 / string上限も変更しない
+- current v2 `strict_loads()` の `verify_runtime_evidence` 専用64 KiB exemptionをcutoverへ流用しない。cutover契約自体はgenerator input上限 / string上限を変更しない。ready-scope batchを受ける `artifact:analysis_entities:all` / `artifact:requirement_structure:all` のaggregate 16 MiB化は本節のcutoverとは独立した§3のroot runtime契約として扱う
 - handled failureはexit 0 + `valid=false / issues[]`、unexpected internal errorだけexit 1
 - `cutover_semantic_drift / cutover_dependency_incomplete` はblocking issueとする
 
@@ -277,7 +277,7 @@ expected unitは `artifact:case_structure:all` exactly 1件です。
 #### repository regression
 
 - 3 helperのpackage単体compile / portability
-- 16 MiB accepted / 1 byte超過blocked、通常generator 2 MiB維持
+- cutover外側transportは16 MiB accepted / 1 byte超過blocked。cutover処理によってgenerator上限を変えないことを確認し、別途§3の2 root runtimeだけaggregate 16 MiB、その他の通常generatorは2 MiBを維持する
 - v1以外のsource runtime / entity schema、v1/v2混在、missing / extra / duplicate / incomplete pairをlegacy readerでrejectし、current v2 validatorがv1 sourceを誤ってreject/acceptする経路を持たない
 - top-level artifact stringが64 KiBを超えてもaggregate 16 MiB以内ならcutover入口で受理し、artifact内JSON scalarが64 KiBを超える場合はrejectする回帰
 - frozen v1 fingerprint / dependencyを改変したsource artifactをlegacy readerがrejectする回帰
@@ -312,7 +312,13 @@ expected unitは `artifact:case_structure:all` exactly 1件です。
 
 `authority_refs[]` は `_06 §9.2` の固定projectionで得たAC / Behavior / UC / US chain、linked UIOP、scope、linked domain item、linked UI structureのstable refsを09のCurrent Effective Authority集合へ解決したunionです。current SPEC / DECISION / approved ASMだけを残し、INF / UNK / inactive Authorityは除外します。helperが重複除去・canonical sortし、current ACでは1件以上を要求します。0件ならhelperはblocking issueを返してAC Entityを生成しません。AC semantic identityが同じなら同IDをblockedへ遷移させる、Behavior自体も未確定なら親Behaviorをblockedへ遷移させる、意味上廃止ならexplicit retireする、UNKNOWNをreuse / newする等のsemantic transitionはLLMが判断します。Agent / LLMがAuthority集合を再構築しません。
 
-qa-workflow / test-analysis / coverage-analysisへspec-analysis成果物を渡す場合、AgentがMarkdownからJSONを再構築しません。current `inspect.ready_scope_ids[]` 全件を `build-machine-evidence(scope_ids=ready_scope_ids)` へ渡し、helperが1つのcanonical batch handoffを生成します。既存runtime unit `artifact:analysis_entities:all` / `artifact:requirement_structure:all` は維持し、scopeごとの別runtime unitへ分割しません。通常runtime generatorへ接続する場合はbatch handoffから最終canonical stdinを構成した後にbyte計測し、既存2 MiBを超える場合はruntimeを起動せずblockedにします。scope別個別run / subset run / Agent merge / auto splitで回避しません。
+qa-workflow / test-analysis / coverage-analysisへspec-analysis成果物を渡す場合、AgentがMarkdownからJSONを再構築しません。current `inspect.ready_scope_ids[]` 全件を `build-machine-evidence(scope_ids=ready_scope_ids)` へ渡し、helperが1つのcanonical batch handoffを生成します。既存runtime unit `artifact:analysis_entities:all` / `artifact:requirement_structure:all` は維持し、scopeごとの別runtime unitへ分割しません。
+
+### ready-scope batch root runtime入力上限
+
+`artifact:analysis_entities:all` / `artifact:requirement_structure:all` はready scope全件を1 requestへ集約するroot runtime unitなので、本PRで各entrypointを `run_cli(..., aggregate=True)` へ変更します。最終canonical stdinは2 MiBを超えても16 MiB以下なら処理し、16 MiB + 1 byteは `limit_exceeded` でfail-closedします。この上限はruntime unitのtransport契約としてdirect / artifactの両input modeに共通適用し、mode別のwrapperや例外経路は追加しません。その他の通常generatorは既存2 MiB上限を維持します。
+
+qa-workflowはbatch handoffからroot runtimeの最終canonical stdinを構成した後に同じ16 MiB境界を事前検査します。超過時はruntimeを起動せずblockedにし、scope別個別run / subset run / Agent merge / silent truncate / auto splitで回避しません。`MAX_AGGREGATE_INPUT_BYTES`、depth、1文字列64 KiB、stdout等の既存安全制約を再利用し、新しい分割・merge契約は追加しません。
 
 ### 3.1 requirement-structure-v2 caller contract
 
@@ -603,7 +609,7 @@ coverage-analysisの既存traceability graph node typeへACを追加しません
 - 9コピーがruntime-v2 / entity-state-v2へ同期され、requirement-structure-v2が明示される。TRD / TCD / TC固有cutover projectionはshared runtimeではなく各Skill-local helperにある
 - helperからpackage-global spec-analysis evidence + ready / blocked scope ID indexと、current ready scope全件のcanonical batch handoffを別responseで決定論生成できる。package-global responseへscope別full payloadを複製しない
 - qa-workflowが `inspect.ready_scope_ids[]` 全件をbatch inputにし、Authority / current AC / Machine Entity / expected identityをhelper側でunion / dedupeする。blocked scopeを含めず、Agentがmerge / filterしない
-- batch handoffから構成する既存 `artifact:*:all` runtimeのcanonical stdin全体が2 MiB以内であることを起動前に検証し、超過時は個別scope run / subset run / silent truncate / auto splitで回避しない
+- batch handoffから構成する `artifact:analysis_entities:all` / `artifact:requirement_structure:all` のcanonical stdin全体を16 MiB境界で検証し、2 MiB超〜16 MiB以下を1回のaggregate root runtimeで処理できる。16 MiB超過時は個別scope run / subset run / silent truncate / auto splitで回避しない。その他の通常generatorは2 MiB上限を維持する
 - test-requirement-designまで進むworkflowではcurrent ACがTRまたはDispositionへ完全に閉じる。仕様理解packageだけの要求ではこのclosureを要求しない
 - UI target artifact workflowでは、AC / linked UIOP / scope / 明示linked FIELD-RULE-FLOW-NOTIFY-INTERACT / direct structure + ancestor / linked INF / 親Behavior-UC-US / Authority変更が必要なTR freshnessへ伝播し、無関係package row変更は伝播しない
 - direct modeはknown AC ID / closureを保証し、AC Entity dependencyが無い場合のAC semantic cross-run freshnessを保証対象にしない

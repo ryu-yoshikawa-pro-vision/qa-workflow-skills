@@ -530,7 +530,7 @@ production helperは任意Markdownを解釈する汎用parserにしません。�
 - unexpected internal errorだけexit 1
 - handled errorでstderrへ業務データを出さない
 - unknown top-level fieldを拒否
-- `ui_target_package.py / question_ids.py / project_context_ids.py` のaggregate stdin / stdout上限は本Planのhelper contractとして16 MiB。通常runtime generatorの2 MiB上限とは別契約であり、後続handoffでは§9.3の**ready-scope batch全体**に対する事前検査を行う
+- `ui_target_package.py / question_ids.py / project_context_ids.py` のaggregate stdin / stdout上限は本Planのhelper contractとして16 MiB。後続handoffでは§9.3の**ready-scope batch全体**に対する事前検査を行う。`artifact:analysis_entities:all` / `artifact:requirement_structure:all` は別途 `_09` のroot runtime契約でaggregate 16 MiBとし、その他の通常runtime generatorは2 MiBを維持する
 - JSON duplicate keyを拒否
 
 ### 7.2 common response
@@ -1114,7 +1114,7 @@ Acceptance Criterion projection:
 - 09の `適用範囲` 自由記述、名称、Path、同一PAGE、本文類似、Authority共有から新しいedgeを作らない。scope所属は `Scope ID / 関連Scope ID` またはUS→UC→Behavior→ACの明示parent chainだけで決める
 - ACとdomain itemの意味関係をhelperが推測しない。必要なedgeがsemantic inputに無い場合はsemantic quality gate側の不足であり、helperが補完しない
 
-qa-workflow / test-analysisはpackage-global Machine Entity集合をMarkdownからfilterせず、current `inspect.ready_scope_ids[]` 全件を `build-machine-evidence(scope_ids=ready_scope_ids)` へ渡して1つのcanonical batch handoffを取得します。Authority / AC / Entityのmerge・dedupeをAgentが行いません。batch handoffから対象 `artifact:*:all` generatorへ実際に渡すcanonical stdin JSON bytesを構成した**後**に既存2 MiB上限を事前検査します。batch全体が2 MiBを超える場合はruntimeを起動せず `limit_exceeded` とし、scopeごとの個別run・subset run・silent truncate・auto splitで回避しません。通常runtime上限自体を変更する場合は別contract変更として扱います。
+qa-workflow / test-analysisはpackage-global Machine Entity集合をMarkdownからfilterせず、current `inspect.ready_scope_ids[]` 全件を `build-machine-evidence(scope_ids=ready_scope_ids)` へ渡して1つのcanonical batch handoffを取得します。Authority / AC / Entityのmerge・dedupeをAgentが行いません。batch handoffから `artifact:analysis_entities:all` / `artifact:requirement_structure:all` へ実際に渡すcanonical stdin JSON bytesを構成した**後**に16 MiB上限を事前検査します。2 MiBを超えても16 MiB以下なら1つの`:all` requestとして処理し、16 MiBを超える場合はruntimeを起動せず `limit_exceeded` とします。scopeごとの個別run・subset run・silent truncate・auto splitで回避しません。その他の通常runtime generatorは2 MiB上限を維持します。
 
 blocked scopeをquestion-analysisへ送る場合は `inspect.scope_readiness[].blocking_unknown_ids[]` を使い、current UNKNOWN全件をAgentがfilterしません。
 
@@ -1298,7 +1298,7 @@ LLM / stakeholder側がsemantic identityのreuse / new、DECISION / ASM区分、
 - UTF-8 strict decode
 - current `ui-target-v1` packageはBOMなしUTF-8、LFのみ、terminal LF exactly oneを要求する。legacy inputはmigration時に§7.4へcanonicalizeする
 - current package全read bytes合計16 MiB以下。これはUI target packageのsupported hard limitとし、超過時は`limit_exceeded`でfail-closedする。helperが自動分割や複数package化を行わない
-- `build-machine-evidence` のstdin / stdoutも16 MiB上限を維持する。package-global responseへscope別full handoffを複製しないことで不要な膨張を避ける。`scope_ids=ready_scope_ids` のbatch handoffを通常runtimeへ接続する場合は、batchから構成した最終canonical stdin全体へ別途そのruntimeの2 MiB上限を実行前に検証するため、packageが16 MiB以内であることをdownstream実行可能性の保証にはしない
+- `build-machine-evidence` のstdin / stdoutも16 MiB上限を維持する。package-global responseへscope別full handoffを複製しないことで不要な膨張を避ける。`scope_ids=ready_scope_ids` のbatch handoffを `artifact:analysis_entities:all` / `artifact:requirement_structure:all` へ接続する場合は、batchから構成した最終canonical stdin全体へ別途16 MiB上限を実行前に検証する。package read bytesが16 MiB以内でもruntime metadata等を含む最終requestが16 MiBを超える可能性があるため、package上限だけをdownstream実行可能性の保証にはしない
 - duplicate normalized relative path拒否
 - case-sensitive canonical filenameを要求
 - filesystem read失敗を意味上のUNKNOWNへ変換せずblocked
