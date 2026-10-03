@@ -53,7 +53,7 @@ feat/ui-test-target-analysis-profile
 
 ## 固定方針
 
-LLM / deterministic処理の責務境界は `2026-10-01_201500_ui-test-target-analysis-mode_05_llm-deterministic-boundaries.md` を正本とします。LLMの意味判断をscriptへ移さず、形式・参照・集計・fingerprint等の再現可能な定型処理だけをSkill-local helper / validatorへ移します。LLMはsemantic identity、UI分類、file trigger、extension要否、same-UNK / new-UNK、explicit retire等を判断します。その後の標準stable ID採番、Markdown escape / sort / structured table・known section・標準file materialization、Stable ID lifecycle / 影響file、README / Machine Entity / MANIFESTはhelperが決定論実行します。DEC / ASMはcanonical `DEC-xxx / ASM-xxx` を維持し、Project Contextがownerの場合だけqa-workflow helperで番号決定・materialize・previous ID削除検証を行います。
+LLM / deterministic処理の責務境界は `2026-10-01_201500_ui-test-target-analysis-mode_05_llm-deterministic-boundaries.md` を正本とします。LLMの意味判断をscriptへ移さず、形式・参照・集計・fingerprint等の再現可能な定型処理だけをSkill-local helper / validatorへ移します。LLMはsemantic identity、UI分類、file trigger、UNKNOWNの影響scope、extension要否、same-UNK / new-UNK、explicit retire等を判断します。その後の標準stable ID採番、Markdown escape / sort / structured table・known section・標準file materialization、ready / blocked scope導出、Stable ID lifecycle / 影響file、README / Machine Entity / MANIFESTはhelperが決定論実行します。Current UNKNOWNの存在だけでpackage全体を停止しません。DEC / ASMはcanonical `DEC-xxx / ASM-xxx` を維持し、Project Contextがownerの場合だけqa-workflow helperで番号決定・materialize・previous ID削除検証を行います。packageはDEC / ASMをterminal retireしません。
 
 
 ### 1. 新Skillは追加しない
@@ -163,7 +163,7 @@ version更新時は変更ファイルだけではなく、そのversionの完全
 - skills/test-requirement-design/evals/output/*
 - runtime / repository contract tests
 
-目的はcurrent ACをTRまたは明示的dispositionへ閉じ、AC / 親Behavior / 親UC / 親US / Authority変更をTR freshnessへ伝播させることです。Authority変更は、AC再生成後もTRが直接保持するAuthority dependencyでstale判定できるようにします。TRの責務をACの言い換えへ変更しません。
+目的はcurrent ACをTRまたは明示的dispositionへ閉じ、AC / linked UIOP / scope / linked UI構造 / 親Behavior / 親UC / 親US / Authority変更をTR freshnessへ伝播させることです。Authority変更は、AC再生成後もTRが直接保持するAuthority dependencyでstale判定できるようにします。TRの責務をACの言い換えへ変更しません。
 
 ### question-analysis
 

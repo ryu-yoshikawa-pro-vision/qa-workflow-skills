@@ -117,11 +117,12 @@ eval validatorはproduction helperをimportしてexpectedを作りません。�
 基本経路:
 
 spec-analysis(UI target mode)
-→ unresolvedがあればquestion-analysis
-→ 回答正規化
-→ spec-analysis(UI target mode)差分更新
-→ ユーザー要求が仕様理解までなら完了
-→ テスト分析も要求されている場合だけtest-analysisへ進む
+→ `ui_target_package.py inspect` の `ready_scope_ids[] / blocked_scope_ids[]` を確認
+→ blocked scopeに関係する未解決論点はquestion-analysisへ渡す
+→ 回答正規化後、spec-analysis(UI target mode)を差分更新
+→ 独立したready scopeはblocked scopeの回答待ちだけを理由に停止しない
+→ ユーザー要求が仕様理解までならcurrent packageを返す
+→ テスト分析も要求されている場合はready scopeだけtest-analysisへ進み、blocked scopeは再開先を保持する
 
 ### 2.2 gated mode
 
@@ -164,7 +165,7 @@ expected routingからcandidate outputを自動生成せず、既存契約どお
 
 次の8 caseを追加します。
 
-1. 「テスト設計前に仕様理解を複数Markdownへ整理」→ spec-analysis UIテスト対象分析モード
+1. 「小規模でも今後のテスト設計で継続利用する対象理解を整理」→ spec-analysis UIテスト対象分析モード。単一表に収まる規模でも継続利用目的を優先する
 2. 「既存仕様理解packageへ不明点回答を反映」→ question-analysis解消後spec-analysis mode resume
 3. 「current実画面を見て対象資料を更新」→ test-target-inspection
 4. 「仕様書とrepoを比較して期待仕様を整理」→ spec-analysis mode。repo差分をAuthority化しない
@@ -173,7 +174,7 @@ expected routingからcandidate outputを自動生成せず、既存契約どお
 7. 「live browserで使いやすさ / focus / responsiveを検査」→ usability-inspection
 8. 「WCAG 2.x / level指定でformal適合性評価」→ wcag-conformance-evaluation
 
-routing fixtureはPR #14後の61件から8件追加して69件になる想定です。実装開始時にStep 0で現在値を再確認し、追加数が変わらなければEVALS.md / docs/PROJECT_CONTEXT.md / routing件数を保持するrepository contractを69へ同期します。READMEにrouting件数を持つ場合のみ同様に更新します。
+routing fixtureはPR #14後の61件から8件追加して69件になる想定です。ready / blocked scopeの部分進行はrouting caseのexpected metadataでも固定し、current UNKNOWNが存在するだけで全scopeを停止するcandidateを不正とします。実装開始時にStep 0で現在値を再確認し、追加数が変わらなければEVALS.md / docs/PROJECT_CONTEXT.md / routing件数を保持するrepository contractを69へ同期します。READMEにrouting件数を持つ場合のみ同様に更新します。
 
 ### 2.6 DEC / ASMの正本ownerとdefault Project Context採番
 

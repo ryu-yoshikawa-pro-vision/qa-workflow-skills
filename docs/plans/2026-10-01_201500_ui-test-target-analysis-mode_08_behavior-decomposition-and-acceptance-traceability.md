@@ -254,9 +254,9 @@ US / UC / Behavior自体はMachine Entity化しません。
 
 下流test-requirement-designへのhandoff pointであるcurrent ACだけを `spec-analysis / acceptance_criterion / AC-xxx` Machine Entityへ決定論変換します。
 
-AC Entityのcanonical contentには、AC自身だけでなくそのACへ到達するcurrent US / UC / Behavior chain、Scope、Authority refs、構造refsに加え、**親UCへ接続するcurrent UIOP集合**を固定projectionします。linked UIOPは `対応UC ID` が親UCと一致するcurrent rowを `UIOP ID` 昇順で投影し、`uiop_id / actor_role / target_structure_id / operation` を含めます。helper / validatorはcurrent ACへ到達する全parentがcurrentであることを決定論検証します。
+AC Entityのcanonical contentには、AC自身だけでなくそのACへ到達するcurrent US / UC / Behavior chain、Scope、Authority refs、構造refsに加え、**状態=`mapped` かつ `対応UC ID` が親UCと一致するUIOP集合**を固定projectionします。linked UIOPには `uiop_id / actor_role / target_structure_id / operation / authority_refs[]` を含めます。さらに実際に参照するUI構造rowとscope内容もcanonical projectionし、helper / validatorはcurrent ACへ到達する全parentがcurrentであることを決定論検証します。
 
-これによりUIOPの操作対象 / 操作内容、US / UC / Behaviorの意味変更でもAC Entityのcontent fingerprintが変わり、AC IDや本文が同じでも関連TRをstaleにできます。UIOP自体をglobal Machine Entity typeへ追加しません。
+これによりUIOPの操作対象 / 操作内容 / Authority、scopeの対象意味、同一stable IDのUI構造内容、US / UC / Behaviorの意味変更でもAC Entityのcontent fingerprintまたはAuthority dependencyが変わり、AC IDや本文が同じでも関連TRをstaleにできます。無関係なUI構造変更はprojectionへ入れません。UIOPやUI構造自体をglobal Machine Entity typeへ追加しません。
 
 Authority Entityは既存 `authority_entities.py`、AC Entityは `ui_target_package.py build-machine-evidence` が生成します。Machine Entity wrapper / content fingerprint / expected identityをLLMが手組みしません。
 

@@ -74,9 +74,9 @@ required package filesは `required core payload + required control file MANIFES
 | 05_notifications_and_external_interactions.md | notification、email、browser dialog、user-visibleなexport / download delivery、外部画面遷移、外部destination / serviceとのinteractionのいずれかが対象scopeに存在 |
 | 08_repository_implementation_status.md | current packageがrepository implementation evidenceを現在保持・利用している |
 
-`00_scope_and_context.md` のfile applicability表に4fileすべての `Trigger判定=あり / なし / 未確定`、helperが導出した `required / not-applicable / blocked`、根拠を記録します。LLMは資料の意味からTrigger判定だけを行い、helperが `あり → required / なし → not-applicable / 未確定 → blocked` を決定論導出します。
+`00_scope_and_context.md` のfile applicability表は **file × Scope ID** 単位で持ちます。各rowに `Trigger判定=あり / なし / 未確定`、helperが導出した `required / not-applicable / blocked`、根拠、関連UNKNOWNを記録します。LLMは資料の意味からTrigger判定だけを行い、helperが `あり → required / なし → not-applicable / 未確定 → blocked` を決定論導出します。
 
-情報不足を `not-applicable` にしません。trigger有無を判断できない場合は関連UNKNOWNを作成し `Trigger判定=未確定` とします。blockedでもschema/reference上正しいpackageは保存でき、workflow completionだけをblockedにします。create時に該当conditional fileは作らず、update時に既存fileがあれば内容を変更せずcarry-forwardします。
+情報不足を `not-applicable` にしません。trigger有無を判断できないscopeは関連UNKNOWNを作成し `Trigger判定=未確定` とします。current UNKNOWNの存在だけでpackage全体をblockedにせず、明示的にblockedとなったscopeだけを停止します。helperは `ready_scope_ids[] / blocked_scope_ids[]` とpackageの `completion_status=complete / partial / blocked` を決定論導出し、独立して確定したscopeは後続へ進めます。conditional fileは1件以上のrequired scopeがあれば作成し、required scopeごとに対応するcanonical rowを1件以上要求します。blocked scopeの既存rowはupdate時に保持し、create時は生成しません。
 
 08は「このversionでrepositoryを再確認したか」ではなくcurrent packageの依存有無で判定します。前versionの08を引き続き利用するだけの更新ではfileを削除せず、08に保存済みの基準branch / commit / revisionを維持します。current分析からrepository evidenceを明示的に外した場合だけnot-applicableへ変更します。
 
@@ -89,7 +89,7 @@ required package filesは `required core payload + required control file MANIFES
 - notification / email template群が05では独立管理が必要な規模・Authorityを持つ
 - UI対象機能と別Authorityを持つdomain仕様を同じpackageで追跡する必要がある
 
-extension fileを追加する場合は `00_scope_and_context.md` にfile名・責務・分割理由を記録し、README / MANIFESTへ登録します。
+extension fileを追加する場合は `00_scope_and_context.md` にfile名・責務・分割理由と、file-levelの `関連Scope ID / 関連仕様項目ID / 関連構造ID / 関連UNKNOWN ID` を記録し、README / MANIFESTへ登録します。extension本文は自由記述のままとし、helperは本文中のIDをparseしません。意味上の関連はLLMが明示列へ渡し、helperが存在参照とimpact候補を決定論検証します。
 
 ## 2. SKILL.mdの変更
 
@@ -373,11 +373,10 @@ default policyでは、完成済みpackageのuser-managed / semantic payloadに�
 
 ### 初回作成
 
-1. `skills/spec-analysis/assets/ui-test-target-analysis/` をtarget rootへ展開し、variable tableはheader-only、条件付きfileはapplicability判断前のassetとして保持する
-2. LLMがsource / Authority、scope、UI構造、file trigger、US / UC / Behavior / AC、UNKNOWN、extension要否等のsemantic判断を行う
-3. LLMはstable ID番号や完成Markdown tableを手組みせず、`materialize` 用のsemantic row / prose inputへまとめる。new identityは `identity_action=new / draft_key=<unique>` を使う
-4. `ui_target_package.py materialize` を `artifact_mode=create / change_mode=normal / previous_snapshot=null` で実行する。default policyではv00 / Previous=-を設定し、new ID、条件付きfile、extension file、CHANGELOG、Machine Entities、README controls、MANIFESTを生成する
-5. materialize成功後にsemantic quality gateとdeterministic validateを実行する
+1. LLMがsource / Authority、scope、UI構造、file trigger、US / UC / Behavior / AC、UNKNOWN、extension要否等のsemantic判断を行う
+2. LLMはstable ID番号や完成Markdown tableを手組みせず、`materialize` 用のsemantic row / prose inputへまとめる。new identityは `identity_action=new / draft_key=<unique>` を使う
+3. `ui_target_package.py materialize` を `artifact_mode=create / change_mode=normal / previous_snapshot=null` で実行する。helper自身がSkill-local `assets/ui-test-target-analysis/` からsibling staging packageを初期化し、default policyのv00 / Previous=-、new ID、条件付きfile、extension file、CHANGELOG、Machine Entities、README controls、MANIFESTを生成してpackage単位でcommitする。Agentがassetをtarget rootへ事前copyしない
+4. materialize成功後にsemantic quality gateとdeterministic validateを実行する
 
 ### 継続更新
 
