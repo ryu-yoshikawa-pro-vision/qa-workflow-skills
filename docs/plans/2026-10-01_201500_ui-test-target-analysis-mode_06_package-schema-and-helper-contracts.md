@@ -326,7 +326,7 @@ not-applicable / blocked scopeはUS / UC / Behavior / ACを確定済みrowとし
 | Repository | Branch / Ref | Commit / Revision | 確認時点 | 関連Scope ID | 備考 |
 | --- | --- | --- | --- | --- | --- |
 
-`Repository` はpackage内で1件だけcurrent baselineを持つfixed keyです。normal updateでこのsectionを省略した場合はexisting rowをそのまま保持します。callerが明示的にrowを更新した場合だけrepositoryを再確認したsemantic inputと扱い、helperは値を推測・current branchへ自動追従しません。
+`Repository確認基準` は0..N rowを許可し、`Repository` keyはpackage内uniqueです。normal updateでこのsectionを省略した場合はexisting row集合をそのまま保持します。更新する場合は `keyed_table_updates[]` のfull-replacement契約に従い、再確認したRepository rowだけ値を変更し、未確認Repository rowはprevious modelの値をそのまま含めます。helperは値を推測せず、current branch / revisionへ自動追従しません。
 
 #### Repository実装状況
 
@@ -338,7 +338,7 @@ not-applicable / blocked scopeはUS / UC / Behavior / ACを確定済みrowとし
 `判定` は一致 / 差分 / 未実装 / 実装のみ / 判断不能。
 
 - `Repository` は同fileの `Repository確認基準` に存在するexact keyを必須とする
-- carry-forwardするIMPL rowは対応baselineを変更しない。repositoryを再確認した場合だけcallerが `Repository確認基準` と必要なIMPL rowを同じsemantic updateで更新する
+- carry-forwardするIMPL rowは対応Repository baselineを変更しない。repository Aだけを再確認した場合はAのbaselineと必要なAのIMPL rowだけを意味更新し、B等の未確認baseline / IMPL rowはprevious modelの値を保持する
 - repository由来の実装事実はAuthorityではない。ただし01のtarget-model structure等へ採用したimplementation-only factが変われば、target-model dependencyとしてAC/TR freshnessの再確認契機にはできる
 
 この判定は仕様とrepository事実を比較したLLMの意味判断であり、helperは許可値と参照存在だけを検証します。
@@ -530,7 +530,7 @@ production helperは任意Markdownを解釈する汎用parserにしません。�
 - unexpected internal errorだけexit 1
 - handled errorでstderrへ業務データを出さない
 - unknown top-level fieldを拒否
-- aggregate stdin / stdout上限は既存runtime契約に合わせ16 MiB
+- `ui_target_package.py / question_ids.py / project_context_ids.py` のaggregate stdin / stdout上限は本Planのhelper contractとして16 MiB。通常runtime generatorの2 MiB上限とは別契約であり、後続handoffでは§9.3の事前検査を行う
 - JSON duplicate keyを拒否
 
 ### 7.2 common response
@@ -604,14 +604,19 @@ unknown operation / unknown top-level field / JSON・table schema不正は `inva
 
 ### 7.3 update concurrency contract
 
-同じ `package_root` への `materialize` はsingle writerです。複数Agent / processによる同時 `materialize` はunsupportedであり、snapshot照合をlock / CASの代替として扱いません。PR #16ではgeneric CAS / lock serviceを追加しません。
+同じ `package_root` への `materialize` はsingle writerです。snapshot照合はstale write検出であり、相互排他の代替ではありません。PR #16ではgeneric CAS / lock serviceを追加せず、qa-workflow経由ではPR #14の既存claim + shared resource reservationをそのまま組み合わせます。
 
-- qa-workflow経由では、PR #14の既存 `claim_mutable_operation(workflow_state_root, workflow_ref, operation_ref)` 契約をmaterialize開始直前に使用する。owner側に同等のatomic claim / idempotent startがある場合は既存owner contractを優先する
-- `operation_ref` はworkflow_ref、canonical package_root、previous `manifest_sha256`（createは`-`）、canonical semantic input fingerprintからqa-workflowが決定論的に導出する。新しいclaim helperを追加しない
-- claim取得失敗時はmaterializeを開始しない。claim recoveryは既存qa-workflowの `recover_claim` 契約に従う
-- standalone spec-analysisでは外部claim機構を追加せず、callerがsingle writerを保証する前提を明記する
+- `claim_mutable_operation(workflow_state_root, workflow_ref, operation_ref)` は**同一operationのidempotent start**を担当する。`operation_ref` はworkflow_ref、resolved canonical package_root、previous `manifest_sha256`（createは`-`）、canonical semantic input fingerprintから決定論導出する
+- `reserve_shared_resource(reservation_root, resource_ref, workflow_ref, ...)` は**同一package_rootのsingle-writer排他**を担当する。`resource_ref` は§11でresolveしたcanonical package_rootから `ui-target-package:<resolved-root>` として決定論導出し、semantic input / snapshotを含めない。同じpackageへの異なるoperationでも同じresource_refになる
+- owner側に同等のatomic claim / shared-resource reservationが既にある場合はそのowner contractを優先し、二重reservationを作らない
+- qa-workflowの順序は `operation claim取得 → package reservation取得 → snapshot照合 → materialize開始` に固定する。claimまたはreservation取得失敗時はwrite / staging cleanupを開始しない
+- reservationの `reservation_ref / reservation_revision` はowner workflow stateへ保持する。同じworkflow_refのresumeでは既存reservationをPR #14のexisting external reservation契約で再利用できる。別workflowがreservationをsteal / 上書きしない
+- materializeが成功、またはhandled failure後にroot / staging / backupのcleanupが確認できた場合だけ、owner stateとexpected reservation revisionを検証して既存 `release_shared_resource()` + provider側atomic conditional deleteでreservationを解放する。`write_recovery_failed` 等でcleanupを確認できない場合はreservationを解放せずfail-closedする
+- materialize開始前にreservation取得へ失敗した等、owner executionが `not_started` のままなら既存 `recover_claim()` の条件を満たす場合だけoperation claimを回収できる。materialize開始後 / 成功後のclaimを通常releaseしない。claimは既存どおりidempotency markerとして扱う
+- crash後のreservation recoveryは同じowner workflow_refでowner state / reservation revision / helper-owned sibling cleanupを検証して行う。ownerが `in-progress` または状態を証明できない場合、新しいworkflowが自動解放せずblockedにする
+- standalone spec-analysisではqa-workflow stateを新設せず、callerが同じresolved package_rootへのsingle writerを保証する。snapshotだけを排他として扱わない
 
-通常更新は必ず `inspect → update_snapshot保持 → materialize` の順で行います。`materialize` はstaging生成前とpackage commit直前の2回、snapshotのPackage Version、payload file set / `payload_file_sha256[]`、`MANIFEST.md` raw `manifest_sha256` をcurrent packageへ照合します。file追加・削除または1 byteでも変化していれば `stale_snapshot` でcommitせずblockedにし、外部変更をsilent overwriteしません。
+通常更新は必ず `inspect → update_snapshot保持 → claim / reservation → materialize` の順で行います。`materialize` はstaging生成前とpackage commit直前の2回、snapshotのPackage Version、payload file set / `payload_file_sha256[]`、`MANIFEST.md` raw `manifest_sha256` をcurrent packageへ照合します。file追加・削除または1 byteでも変化していれば `stale_snapshot` でcommitせずblockedにし、外部変更をsilent overwriteしません。
 
 ### 7.4 canonical bytes / package commit
 
@@ -834,7 +839,7 @@ table input contract:
 | `00_scope_and_context.md / 条件付き必須file applicability` | `ファイル + Scope ID` | current Scope IDごとに03 / 04 / 05 / 08の4row exactly。callerは `Trigger判定 / 関連仕様項目ID / 根拠 / 備考 / 関連UNKNOWN ID` を渡し、helperが `状態` を生成する。file順→Scope ID昇順でcanonical sort |
 | `02_behavior_and_business_rules.md / Use Case振る舞い完全性` | `UC ID + 結果分類` | current UCごとに3分類 exactly |
 | `07_current_unknowns.md / Current UNKNOWN一覧` | `UNKNOWN ID` | 09のcurrent UNKNOWN ID集合とexact一致。`Blocking Scope ID` は `関連Scope ID` のsubset。`関連File` はstandard registry pathなら物理file未作成でも許可し、extensionはcurrent宣言 + current実fileを必須とする |
-| `08_repository_implementation_status.md / Repository確認基準` | `Repository` | Repository key duplicate禁止。normal updateでsection省略ならexisting baselineを保持し、自動でbranch / revisionを更新しない |
+| `08_repository_implementation_status.md / Repository確認基準` | `Repository` | 0..N row、Repository key duplicate禁止。normal updateでsection省略ならexisting baseline集合を保持する。full replacementで一部Repositoryだけ再確認する場合、未確認rowはprevious値のまま含め、自動でbranch / revisionを更新しない |
 | `09_authority_and_traceability.md / 現在有効な仕様根拠` | `仕様根拠ID` | LLMが確定したCurrent Effective Authorityだけ。09分析項目のcurrent SPEC / DECISION / approved ASMへ存在参照 |
 | `09_authority_and_traceability.md / 後続Skillへの補足` | `項目` | 項目duplicate禁止。stable refsだけhelper検証 |
 
@@ -940,12 +945,16 @@ MANIFEST、README controls、Stable ID changes、影響fileは `materialize` 内
 stdin:
 
 ```json
-{"operation":"build-machine-evidence","package_root":"<path>"}
+{"operation":"build-machine-evidence","package_root":"<path>","scope_id":null}
 ```
+
+`scope_id` は `null` またはcurrent `SCOPE-xxx` 1件です。unknown / blocked scope IDを指定した場合はblocked responseとし、package-global responseへscope別full payloadを重複埋め込みしません。
 
 §9に従い09からnormalized Authority inputを生成して既存 `authority_entities.py` のbuilderを呼びます。linked domain itemはcurrent AC / 親Behavior / 親UC / 親USの `関連構造ID` に明示されたdomain item IDだけを対象にし、linked UIOPの `対象構造ID` からdomain itemを逆引きしません。linked UI structureは、同chainの `関連構造ID` にあるUI構造ID、linked UIOPの `対象構造ID`、linked domain itemの `対象構造ID / 関連構造ID` にあるUI構造IDをseedとし、`親構造ID` をrootまで辿ります。domain itemから別domain itemへ再帰展開しません。これらとscope、関連current INFからAcceptance Criterion Machine Entityを生成して統合し、missing parent / self-parent / cycleはrejectします。
 
-payload:
+payloadは `scope_id` で分けます。
+
+`scope_id=null`:
 
 ```json
 {
@@ -954,19 +963,26 @@ payload:
   "acceptance_criterion_entities":[],
   "machine_entities":[],
   "expected_entity_identities":[],
-  "ready_scope_handoffs":[
-    {
-      "scope_id":"SCOPE-002",
-      "normalized_skill_input":{"authorities":[],"acceptance_criteria":[]},
-      "machine_entities":[],
-      "expected_entity_identities":[]
-    }
-  ],
+  "ready_scope_ids":["SCOPE-002"],
+  "blocked_scope_ids":["SCOPE-001"],
   "machine_entities_markdown":"### Machine Entities: spec-analysis\n\n\`\`\`json\n{...}\n\`\`\`\n"
 }
 ```
 
-各Machine Entity / identity rowのschemaはshared runtime contractを正本とします。配列はentity identityの `skill / entity_type / entity_ref` 順でcanonical sortします。統合responseに独自の `implementation_fingerprint` fieldは持ちません。
+`scope_id="SCOPE-002"`:
+
+```json
+{
+  "scope_handoff":{
+    "scope_id":"SCOPE-002",
+    "normalized_skill_input":{"authorities":[],"acceptance_criteria":[]},
+    "machine_entities":[],
+    "expected_entity_identities":[]
+  }
+}
+```
+
+各Machine Entity / identity rowのschemaはshared runtime contractを正本とします。配列はentity identityの `skill / entity_type / entity_ref` 順でcanonical sortします。package-global responseはready scopeのIDだけを返し、scope別normalized input / Entityを複製しません。scope-specific responseもpackage-global Machine Entity / Markdownを重複返却しません。統合responseに独自の `implementation_fingerprint` fieldは持ちません。
 
 `machine_entities_markdown` は既存shared `runtime_contract.py::render_machine_entities("spec-analysis", machine_entities)` の戻り値をそのまま使用します。standalone `build-machine-evidence` はread-onlyでありpackageを変更しません。09の `### Machine Entities: spec-analysis` sectionを書き換えるのはcanonical write pathである `materialize` 内部の同一projection処理だけです。Agent / callerがこの返却文字列をpackageへ書き戻しません。
 
@@ -1052,7 +1068,7 @@ UIOP / US / UC / Behavior / UI構造 / FIELD / RULE / FLOW / NOTIFY / INTERACT /
 
 Agent / LLMがMarkdownからnormalized inputやexpected Entity一覧を再構築しません。
 
-`ready_scope_handoffs[]` は `inspect.ready_scope_ids[]` とexact一致し、scope IDのcanonical順です。blocked scopeはhandoffを生成しません。各ready scope `S` のprojectionは次の固定規則だけで生成します。
+`build-machine-evidence(scope_id=S)` は `inspect.ready_scope_ids[]` に含まれるscopeだけを受理し、返す `scope_handoff.scope_id` はSとexact一致します。blocked scopeはhandoffを生成しません。各ready scope `S` のprojectionは次の固定規則だけで生成します。
 
 scope所属seed row:
 
@@ -1090,7 +1106,7 @@ Acceptance Criterion projection:
 - 09の `適用範囲` 自由記述、名称、Path、同一PAGE、本文類似、Authority共有から新しいedgeを作らない。scope所属は `Scope ID / 関連Scope ID` またはUS→UC→Behavior→ACの明示parent chainだけで決める
 - ACとdomain itemの意味関係をhelperが推測しない。必要なedgeがsemantic inputに無い場合はsemantic quality gate側の不足であり、helperが補完しない
 
-qa-workflow / test-analysisはpackage-global Machine Entity集合をMarkdownからfilterせず、このscope handoffを正規入力として使います。
+qa-workflow / test-analysisはpackage-global Machine Entity集合をMarkdownからfilterせず、`inspect.ready_scope_ids[]` を列挙して必要なscopeごとに `build-machine-evidence(scope_id=S)` を呼び、このscope handoffだけを正規入力として使います。handoffを通常runtimeへ渡す前に、そのgeneratorへ実際に渡すcanonical stdin JSON bytesを構成して既存2 MiB上限を事前検査します。2 MiBを超える場合はruntimeを起動せず `limit_exceeded` とし、scopeを自動分割しません。意味を維持したSCOPE分割の可否はLLMが判断し、分割する場合はpackageをsemantic update / rematerializeしてから再handoffします。
 
 blocked scopeをquestion-analysisへ送る場合は `inspect.scope_readiness[].blocking_unknown_ids[]` を使い、current UNKNOWN全件をAgentがfilterしません。
 
@@ -1274,6 +1290,7 @@ LLM / stakeholder側がsemantic identityのreuse / new、DECISION / ASM区分、
 - UTF-8 strict decode
 - current `ui-target-v1` packageはBOMなしUTF-8、LFのみ、terminal LF exactly oneを要求する。legacy inputはmigration時に§7.4へcanonicalizeする
 - current package全read bytes合計16 MiB以下。これはUI target packageのsupported hard limitとし、超過時は`limit_exceeded`でfail-closedする。helperが自動分割や複数package化を行わない
+- `build-machine-evidence` のstdin / stdoutも16 MiB上限を維持する。package-global responseへscope別full handoffを複製しないことで不要な膨張を避ける。`scope_id=S` のhandoffを通常runtimeへ接続する場合は別途そのruntimeの2 MiB stdin上限を実行前に検証するため、packageが16 MiB以内であることをdownstream実行可能性の保証にはしない
 - duplicate normalized relative path拒否
 - case-sensitive canonical filenameを要求
 - filesystem read失敗を意味上のUNKNOWNへ変換せずblocked
@@ -1517,6 +1534,7 @@ production helperのfilesystem / raw hash / README control生成 / internal allo
 - semantic row / proseが決まった後のstable ID割当、Markdown escape、row serialization、known section置換、条件付き標準file作成 / 除去、control section更新をmaterializeが決定論実行し、Agentが完成Markdownを手組みしない
 - helper所有fileがcanonical bytesでstagingされ、package commit失敗時に旧版 / 新版の混在を完成状態として残さない
 - current extension domainを不要と判断した場合、canonical materialize経路で実fileと00宣言を廃止できる。extension本文の自由記述はparseせず、宣言rowのfile-level stable refをimpact / existence検証へ使う
+- 後続QA工程の判断・期待挙動・test design・freshnessに影響する意味情報がextension本文だけに存在しない。該当Authority / FIELD / RULE / FLOW / NOTIFY / INTERACT等はstandard structured row / 09へ正規化されている
 - standard structured tableのheader / ID / ref列が一意で、standard prose heading集合がasset registryと一致する
 - scopeごとのUI操作適用判定と条件付き必須fileのTrigger判定→状態→file集合、completion statusを機械検証できる
 - UI操作scopeでUIOP / US / UC / Behavior / AC hierarchyと3分類完全性を機械検証できる

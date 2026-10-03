@@ -122,7 +122,7 @@ spec-analysis(UI target mode)
 → 回答正規化後、spec-analysis(UI target mode)を差分更新
 → 独立したready scopeはblocked scopeの回答待ちだけを理由に停止しない
 → ユーザー要求が仕様理解までならcurrent packageを返す
-→ テスト分析も要求されている場合は `build-machine-evidence.ready_scope_handoffs[]` のready scopeだけtest-analysisへ進み、blocked scopeは再開先を保持する
+→ テスト分析も要求されている場合は `inspect.ready_scope_ids[]` を列挙し、各ready scopeについて `build-machine-evidence(scope_id=S)` で1 scope分のhandoffを取得してtest-analysisへ進む。blocked scopeは再開先を保持する
 
 ### 2.2 gated mode
 
@@ -211,7 +211,7 @@ exact CLI契約は `_06_package-schema-and-helper-contracts.md` を正本とし�
 
 UI target modeから後続テスト設計へ進む場合、spec-analysis成果物のMachine Entity / normalized inputをAgentがMarkdownから再構築しません。
 
-`ui_target_package.py build-machine-evidence` が返すpackage-global evidenceはcanonical package自身のMachine Entity section検証に使い、下流scope handoffには `ready_scope_handoffs[]` を正本として使用します。
+`ui_target_package.py build-machine-evidence(scope_id=null)` が返すpackage-global evidenceはcanonical package自身のMachine Entity section検証に使い、ready scopeのfull handoffを重複して含めません。下流へは `inspect.ready_scope_ids[]` を正本indexとして、必要なscopeごとに `build-machine-evidence(scope_id=S)` を呼びます。
 
 各ready scope handoffは次を持ちます。
 
@@ -220,7 +220,9 @@ UI target modeから後続テスト設計へ進む場合、spec-analysis成果�
 - そのscopeに必要なAuthority / Acceptance Criterion Machine Entities
 - expected entity identities
 
-qa-workflow / test-analysis / coverage-analysisはMarkdownやpackage-global Entity集合をAgent側でfilterせず、このscope projectionをそのまま使います。scope所属row・明示stable ref・UI構造parentだけを辿るexact reachabilityは `_06 §9.3` を正本とし、名称・同一PAGE・同一Scope・Authority本文から関連を推測しません。blocked scopeはhandoffを持たず、question-analysisへはinspectで導出したblocking UNKNOWNだけを渡します。
+qa-workflow / test-analysis / coverage-analysisはMarkdownやpackage-global Entity集合をAgent側でfilterせず、scope-specific responseをそのまま使います。scope所属row・明示stable ref・UI構造parentだけを辿るexact reachabilityは `_06 §9.3` を正本とし、名称・同一PAGE・同一Scope・Authority本文から関連を推測しません。blocked scopeはhandoffを持たず、question-analysisへはinspectで導出したblocking UNKNOWNだけを渡します。
+
+通常runtime generatorを起動する直前に、qa-workflowは実際のcanonical stdin JSON bytesを構成して既存2 MiB上限を検査します。超過時はruntimeを起動せずそのscopeの後続実行をblockedとし、helper / workflowが自動でscopeを分割しません。意味を維持した分割が可能かはLLMが判断し、必要ならspec-analysisでSCOPE / 参照を更新して再materializeします。
 
 ユーザー要求が仕様理解packageまでならspec-analysisの完了条件で終了し、test-analysis / test-requirement-designを起動しません。この場合、AC→TR / Disposition closureはpackage単体の完了条件ではありません。
 
@@ -233,7 +235,7 @@ direct modeはUI target artifactを使わない独立呼出しとして同じ `a
 
 今回のmodeは既存Skillと同じAgent Skills構造で提供します。
 
-qa-workflow経由でUI target packageをcreate / updateする場合、`materialize` は既存guidanceのmutable operationとして扱います。owner側のatomic claim / idempotent startが無い場合は既存 `claim_mutable_operation()` を使用し、claim取得前にwriteを開始しません。standalone spec-analysisはsingle writer前提です。新しいlock / claim wrapperは追加しません。
+qa-workflow経由でUI target packageをcreate / updateする場合、`materialize` は既存guidanceのmutable operationとして扱います。`claim_mutable_operation()` は同一operationのidempotent start、`reserve_shared_resource()` はresolved package_root単位のsingle-writer排他として既存契約を再利用し、`claim → reservation → snapshot照合 → materialize` の順で開始します。reservation取得失敗時はwriteを開始しません。成功またはcleanup確認済みhandled failureの後だけ既存 `release_shared_resource()` + atomic conditional deleteでreservationを解放し、claimは通常releaseしません。materialize開始前のclaim recoveryだけ既存 `recover_claim()` 契約に従います。standalone spec-analysisはcallerがresolved package_root単位のsingle writerを保証します。新しいlock / claim wrapperは追加しません。
 
 - entry pointはskills/spec-analysis/SKILL.md
 - 詳細規則はreferences/ui-test-target-analysis.md

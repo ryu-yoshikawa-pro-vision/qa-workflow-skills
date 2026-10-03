@@ -141,7 +141,7 @@ one-time migrationはshared `runtime_contract.py` のoperationにしません。
 - `skills/test-condition-design/scripts/runtime_v1_cutover.py`
 - `skills/test-case-design/scripts/runtime_v1_cutover.py`
 
-各helperはPython標準ライブラリ + 同Skillの `runtime_contract.py` だけをimportします。shared runtimeからstrict JSON decode、Machine Runtime Input / Result pair抽出、Machine Entity validation、canonicalization等の共通処理を再利用しますが、generator固有projectionは各helper内に置きます。qa-workflow用のcutover wrapperは追加しません。
+各helperはPython標準ライブラリ + 同Skillのcurrent `runtime_contract.py` だけをimportします。ただし、**v1 source artifactの読取り・schema検証にはcurrent v2 `validate_machine_entity()` / version constantを使用しません。** 各 `runtime_v1_cutover.py` 内にread-only legacy readerを置き、PR #16実装開始時のpre-cutover baselineから `runtime-v1 / entity-state-v1` のrequired field、pair整合、canonical JSON / fingerprint再計算規則だけを固定します。別のgeneric migration moduleは作りません。current `runtime_contract.py` はlegacy readerで検証済みのsemantic dataをv2 generator inputへcanonicalize / validateする段階だけで再利用します。generator固有projectionは各helper内に置き、qa-workflow用のcutover wrapperは追加しません。
 
 #### 共通CLI contract
 
@@ -159,8 +159,10 @@ stdinは1 JSON object、stdoutは1 JSON object + LFです。operationは `cutove
 - TRD / TC: `phase=all` only
 - TCD: `condition-structure / models / test-data-requirements / materialize-coverage`
 - TCDの2 phase目以降だけ `current_v2_artifact_markdown` を要求する
-- aggregate stdinは16 MiBを維持する。cutoverのtop-level `artifact_markdown / current_v2_artifact_markdown` は成果物全文transportなので通常の1文字列64 KiB上限を**免除**するが、両artifactを含む実UTF-8 stdin全体には16 MiB上限を適用する。artifactから抽出したMachine Runtime Input / Result / Entity等のJSON fieldには通常の64 KiB string上限を適用する
-- 通常generatorの2 MiB上限 / string上限は変更しない
+- cutover helperの外側stdinはcurrent `runtime_contract.strict_loads()`へそのまま渡さない。各helperのcutover入口がstdlib JSON decoderでduplicate key、depth、container item数等の既存安全制約を維持しつつaggregate 16 MiBを検査する
+- top-level `artifact_markdown / current_v2_artifact_markdown` だけは成果物全文transportとして64 KiB string上限を免除する。その他のtop-level scalarと、artifactから抽出したMachine Runtime Input / Result / Entity等のJSON scalarは通常の64 KiB上限を維持する
+- legacy readerがartifact内から抽出した各v1 JSON blockは、旧通常runtimeが生成可能だった2 MiB aggregate上限内でstrict decodeし、`runtime_contract_version=runtime-v1 / entity_schema_version=entity-state-v1`、Input / Result pair、Entity identity / dependency / stored fingerprintをfrozen v1規則で再検証する
+- current v2 `strict_loads()` の `verify_runtime_evidence` 専用64 KiB exemptionをcutoverへ流用しない。通常generatorの2 MiB上限 / string上限も変更しない
 - handled failureはexit 0 + `valid=false / issues[]`、unexpected internal errorだけexit 1
 - `cutover_semantic_drift / cutover_dependency_incomplete` はblocking issueとする
 
@@ -276,7 +278,9 @@ expected unitは `artifact:case_structure:all` exactly 1件です。
 
 - 3 helperのpackage単体compile / portability
 - 16 MiB accepted / 1 byte超過blocked、通常generator 2 MiB維持
-- v1以外のsource runtime / entity schema、v1/v2混在、missing / extra / duplicate / incomplete pairをreject
+- v1以外のsource runtime / entity schema、v1/v2混在、missing / extra / duplicate / incomplete pairをlegacy readerでrejectし、current v2 validatorがv1 sourceを誤ってreject/acceptする経路を持たない
+- top-level artifact stringが64 KiBを超えてもaggregate 16 MiB以内ならcutover入口で受理し、artifact内JSON scalarが64 KiBを超える場合はrejectする回帰
+- frozen v1 fingerprint / dependencyを改変したsource artifactをlegacy readerがrejectする回帰
 - 内容不変cutoverでTR / TCN / model / CI / TC IDとdeleted / inactive identity historyを維持
 - 各helper返却inputだけで次のv2 generatorを実行でき、Agent-side merge不要
 - TCD target version rebase、derived child、semantic CI mappingをcurrent v2 resultへ正しく接続
@@ -285,7 +289,7 @@ expected unitは `artifact:case_structure:all` exactly 1件です。
 
 ## 3. spec-analysis normalized machine input
 
-`ui_target_package.py build-machine-evidence` はMarkdownから次を決定論的に生成します。
+`ui_target_package.py build-machine-evidence(scope_id=null)` はpackage-global evidenceと `ready_scope_ids[] / blocked_scope_ids[]` を決定論生成し、scope別full handoffを同じresponseへ複製しません。`build-machine-evidence(scope_id=S)` はready scope Sのnormalized input / Machine Entity / expected identityだけを返します。Markdownから次を決定論的に生成します。
 
 - normalized Authority rows
 - normalized current AC rows
@@ -308,7 +312,7 @@ expected unitは `artifact:case_structure:all` exactly 1件です。
 
 `authority_refs[]` は `_06 §9.2` の固定projectionで得たAC / Behavior / UC / US chain、linked UIOP、scope、linked domain item、linked UI structureのstable refsを09のCurrent Effective Authority集合へ解決したunionです。current SPEC / DECISION / approved ASMだけを残し、INF / UNK / inactive Authorityは除外します。helperが重複除去・canonical sortし、current ACでは1件以上を要求します。0件ならhelperはblocking issueを返してAC Entityを生成しません。ACを除去する、親rowをblockedへ変更する、UNKNOWNをreuse / newする等のsemantic transitionはLLMが判断します。Agent / LLMがAuthority集合を再構築しません。
 
-qa-workflow / coverage-analysisへspec-analysis scopeを渡す場合、AgentがMarkdownからこのJSONを再構築しません。helper返却のcanonical `normalized_skill_input` をそのまま使用します。
+qa-workflow / test-analysis / coverage-analysisへspec-analysis scopeを渡す場合、AgentがMarkdownからJSONを再構築しません。`inspect.ready_scope_ids[]` から対象Sを選び、`build-machine-evidence(scope_id=S)` のcanonical handoffをそのまま使用します。通常runtime generatorへ接続する場合は実際のcanonical stdinを実行前にbyte計測し、既存2 MiBを超えるscopeはruntimeを起動せずblockedにします。helperが自動分割せず、意味を維持したSCOPE分割はLLM判断です。
 
 ### 3.1 requirement-structure-v2 caller contract
 
@@ -595,8 +599,9 @@ coverage-analysisの既存traceability graph node typeへACを追加しません
 
 - PR #14後の9 runtime_contract.pyが同一内容でacceptance_criterionを扱える
 - 9コピーがruntime-v2 / entity-state-v2へ同期され、requirement-structure-v2が明示される。TRD / TCD / TC固有cutover projectionはshared runtimeではなく各Skill-local helperにある
-- helperからpackage-global spec-analysis evidenceとready scope別 `ready_scope_handoffs[]` を決定論生成できる
-- qa-workflowがready scope handoffのAuthority + ACだけをexpectedとして使用し、blocked scopeをpackage-global集合からAgentがfilterしない
+- helperからpackage-global spec-analysis evidence + ready / blocked scope ID indexと、指定ready scope 1件のscope handoffを別responseで決定論生成できる。package-global responseへ全scope handoffを複製しない
+- qa-workflowが `inspect.ready_scope_ids[]` からscope-specific handoffを取得し、そのAuthority + ACだけをexpectedとして使用する。blocked scopeをpackage-global集合からAgentがfilterしない
+- scope handoffから構成する通常runtime canonical stdinが2 MiB以内であることを起動前に検証し、超過scopeをsilent truncate / auto splitしない
 - test-requirement-designまで進むworkflowではcurrent ACがTRまたはDispositionへ完全に閉じる。仕様理解packageだけの要求ではこのclosureを要求しない
 - UI target artifact workflowでは、AC / linked UIOP / scope / 明示linked FIELD-RULE-FLOW-NOTIFY-INTERACT / direct structure + ancestor / linked INF / 親Behavior-UC-US / Authority変更が必要なTR freshnessへ伝播し、無関係package row変更は伝播しない
 - direct modeはknown AC ID / closureを保証し、AC Entity dependencyが無い場合のAC semantic cross-run freshnessを保証対象にしない

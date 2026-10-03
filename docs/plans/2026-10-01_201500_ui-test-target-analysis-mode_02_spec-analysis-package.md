@@ -93,6 +93,8 @@ required domainでidentityまで確定できるFIELD / RULE / FLOW / NOTIFY / IN
 
 extension fileを追加する場合は `00_scope_and_context.md` にfile名・責務・分割理由と、file-levelの `関連Scope ID / 関連仕様項目ID / 関連構造ID / 関連UNKNOWN ID` を記録し、README / MANIFESTへ登録します。extension本文は自由記述のままとし、helperは本文中のIDをparseしません。意味上の関連はLLMが明示列へ渡し、helperが存在参照とimpact候補を決定論検証します。
 
+**後続QA工程の判断・期待挙動・test design・freshnessに影響する意味情報をextension本文だけに保持してはいけません。** Authority / rule / flow / field / notification / interaction等のtest-relevant semanticsは09または対応する03〜05のstandard structured rowへ正規化し、extension本文はそれらの参照・説明・詳細整理として使用します。extension prose自体をfingerprintへ入れてfreshnessを成立させる設計にはしません。
+
 ## 2. SKILL.mdの変更
 
 SKILL.mdには次だけを追加します。
@@ -316,7 +318,7 @@ scopeごとの適用判定は `_08_behavior-decomposition-and-acceptance-traceab
 
 current packageがrepository implementation evidenceを保持・利用している場合に使用します。live UIの観測結果そのものは`test-target-inspection`の責務であり、08へ直接保存しません。必要な場合は同Skillの成果物を補助Source / evidenceとして参照し、spec-analysisへ戻してAuthorityとの差分を整理します。
 
-- `Repository確認基準` table（Repository、Branch / Ref、Commit / Revision、確認時点、関連Scope ID）
+- `Repository確認基準` table（Repository、Branch / Ref、Commit / Revision、確認時点、関連Scope ID）。0..N repositoryを保持でき、Repository keyはpackage内unique
 - Repository実装状況の各rowが参照するRepository key
 - 実装確認できた範囲
 - 未実装
@@ -324,7 +326,7 @@ current packageがrepository implementation evidenceを保持・利用してい�
 - 実装だけに存在する分岐
 - 実装確認不能理由
 
-前versionからcarry-forwardする場合、`Repository確認基準` をそのまま保持し、再確認していないのにbranch / revision / 確認時点をcurrent repositoryへ更新しません。repositoryを再確認したsemantic updateでだけbaselineと必要なIMPL rowを更新します。current分析からrepository evidenceを明示的に外した場合だけ08を除去します。
+前versionからcarry-forwardする場合、各Repository baselineをrepository単位でそのまま保持し、再確認していないRepositoryのbranch / revision / 確認時点を更新しません。repository Aだけを再確認したsemantic updateではAと必要なIMPL rowだけを更新し、B等の未確認baselineは同一値でcarry-forwardします。current分析から全repository evidenceを明示的に外した場合だけ08を除去します。
 
 repository由来の事実はAuthorityへ昇格しません。ただしsame-route判定等で01のtarget modelへ採用したimplementation-only structureはtest target currentnessの一部なので、そのcanonical rowが変わればAC/TR freshnessの再確認契機にします。
 
@@ -394,7 +396,7 @@ default policyでは、完成済みpackageのuser-managed / semantic payloadに�
 2. LLMがAuthority / DECISION / ASM、same-UNK reopen / new UNK、UI構造、US / UC / Behavior / AC、file applicability、extension要否、reuse / new / explicit retire等のsemantic判断を行う。completed Markdown rowやstable ID番号はまだ手書きしない
 3. LLMは変更対象を `materialize` のsemantic inputへまとめる。既存identityは `identity_action=reuse / reuse_id=<ID>`、new identityは `identity_action=new / draft_key=<unique>` とし、新規row間参照は `@draft:<draft_key>` を使う。current modelから意図的に除去するidentityだけ `retire_ids[]` に入れる
 4. 07のUNKNOWN説明、06の矛盾 / resolved説明、CHANGELOGの `変更概要` 等のnarrativeは `prose_updates[] / change_summary` として渡す。stable ID番号、Markdown escape、table separator、CHANGELOG control row、README control、Machine Entity wrapper、MANIFESTはAgentが組み立てない
-5. **current package + source + proposed semantic inputをmaterialize前にsemantic quality gate**へ通す。domain itemの無言欠落、UNKNOWN blocking範囲、semantic duplicate、file trigger、same-UNK / new UNK等がNGならcurrent packageを変更せずinputを修正する
+5. **current package + source + proposed semantic inputをmaterialize前にsemantic quality gate**へ通す。domain itemの無言欠落、UNKNOWN blocking範囲、semantic duplicate、file trigger、same-UNK / new UNKに加え、test-relevant semanticsがextension本文だけに残っていないことを確認する。NGならcurrent packageを変更せずinputを修正する
 6. gateを通過したinputだけを `ui_target_package.py materialize` へ渡す。qa-workflow経由では既存mutable-operation claimを取得し、standaloneではsingle writerを保証する。helperがsnapshot hashを確認後current packageを再parseし、version、ID、canonical serialization、control、Machine Entity、MANIFESTをstagingへ生成・検証してからpackage単位でcommitする
 7. `materialize` が `stale_snapshot / state_transition_required / reference_not_found / write_commit_failed / write_recovery_failed` 等でblockedした場合は成功済みとして扱わない。通常のhandled failureでは元packageを復旧・保持し、復旧不能ならstaging / backupを保全してblockedとする
 8. materialize後はdeterministic validate / repository testsとread-only成果物確認を行う。semantic quality gateをcanonical write後の承認手段として使わない
@@ -411,7 +413,7 @@ helperが列挙したimpact候補は再確認対象であり、変更必須と�
 - domainが標準fileの責務とは独立している
 - 独立したAuthority / rule / flow集合として継続更新する必要がある
 - LLMは責務 / 分割理由 / lowercase kebab-case slugとextension本文を `materialize.extension_file_updates[]` へ渡す
-- `ui-target-v1` のextension fileは自由記述Markdownだけを持ち、独自structured table / 独自stable ID / custom prefixを定義しない。構造化して追跡する必要があるFIELD / RULE / FLOW等は03〜05または09の既存standard tableへ置き、extension本文からそのstable IDを参照する
+- `ui-target-v1` のextension fileは自由記述Markdownだけを持ち、独自structured table / 独自stable ID / custom prefixを定義しない。後続QA工程の判断・期待挙動・test design・freshnessに影響するAuthority / FIELD / RULE / FLOW / NOTIFY / INTERACT等は03〜05または09の既存standard tableへ必ず正規化し、extension本文だけを意味上の正本にしない。extension本文はstandard stable IDを参照して詳細を説明できる
 - canonical create / updateでは `materialize` がexisting 10+ fileの最大番号+1からrequest順に複数extensionをbatch採番し、実fileと00の `案件固有extension file一覧` を同時生成する。不要になったcurrent extensionはLLMが`extension_file_retirements[]`へ明示し、helperが残存参照を検証したうえで実fileと宣言rowを同時に除去する。Agentが10+番号・宣言rowを計算しない
 - extension file番号は`materialize`内部でcurrent 10+ file集合からbatch採番し、番号計算だけの公開operationは作らない
 - current UNKNOWNのcanonical正本は09、repository statusの正本は08、canonical Authority / traceabilityの正本は09のまま

@@ -56,7 +56,7 @@
 | Authority Machine Entity / fingerprint | 既存deterministic helper | authority_entities.pyを正本とする |
 | Acceptance Criterion Machine Entity / spec-analysis normalized input | deterministic helper | ui_target_package.pyがcurrent AC + parent chain + linked UIOP / scope / direct package item / structure ancestor / linked INFから固定projectionする。Authority以外はcontent fingerprintへ寄与しglobal Entity typeを増やさない |
 | semantic eval用package projection | repository eval utility | package内容を要約・変更せず連結する。Skill production CLIには含めない |
-| semanticな重複・矛盾・不足 | LLM / semantic eval | 文字列一致だけで自動統合しない。required domainでは資料から識別可能なFIELD / RULE / FLOW / NOTIFY / INTERACT等を無言で欠落させず、未確定はUNKNOWNへ閉じる |
+| semanticな重複・矛盾・不足 | LLM / semantic eval | 文字列一致だけで自動統合しない。required domainでは資料から識別可能なFIELD / RULE / FLOW / NOTIFY / INTERACT等を無言で欠落させず、未確定はUNKNOWNへ閉じる。後続QA工程へ影響する意味情報をextension proseだけに残さず、standard structured row / 09へ正規化する |
 
 ## 3. spec-analysis Skill-local helper
 
@@ -101,7 +101,9 @@ required file、version、ID形式・duplicate、exact reference、UNKNOWN整合
 
 #### build-machine-evidence
 
-09のCurrent Effective Authorityと02のcurrent AC + parent chainからpackage-global Machine Evidenceを再生成し、あわせて `ready_scope_handoffs[]` をscope別に固定projectionします。linked package item / structure ancestor / INFもAC contentへ含めます。blocked scopeはhandoffを生成しません。これはmaterialized packageからqa-workflow / test-analysis / coverage-analysisへ渡す独立production用途があるため公開operationとして残しますが、**read-only**です。packageのMachine Entities sectionを書き換えるのは`materialize`内部だけで、Agent / callerは`build-machine-evidence`の返却Markdownを直接書き戻しません。
+09のCurrent Effective Authorityと02のcurrent AC + parent chainからMachine Evidenceを固定projectionします。公開operationはread-onlyで、`scope_id=null` ではpackage-global normalized input / Machine Entityとready scopeのhandoff indexだけを返し、scope別payloadを重複返却しません。`scope_id=<ready SCOPE-ID>` では `_06 §9.3` の固定reachabilityに従う1 scope分のcanonical handoffだけを返します。blocked scopeの詳細handoffは生成しません。packageのMachine Entities sectionを書き換えるのは`materialize`内部だけで、Agent / callerはbuild responseをpackageへ直接書き戻しません。
+
+UI target package自体のsupported hard limitは16 MiBですが、通常runtime generatorは既存2 MiB上限を維持します。qa-workflowは実際に呼ぶgeneratorの最終canonical requestを実行前にbyte計測し、2 MiB超過ならruntimeを呼ばず`limit_exceeded`としてそのscopeを後続実行blockedにします。helper / workflowはscopeを自動分割しません。意味を維持した分割が可能かはLLMが判断し、可能ならUI target packageのSCOPE /参照をsemantic updateして再materializeします。
 
 semantic / deterministic eval用multi-file projectionはproduction helperへ入れず、repository専用 `scripts/skills/evals/ui_target_projection.py` が担当します。既存runnerへ1-file inputを渡すためのrepository test utilityであり、導入先Skill packageへ同梱しません。
 
@@ -116,7 +118,7 @@ semantic / deterministic eval用multi-file projectionはproduction helperへ入�
 - PAGE / VIEW等の意味分類
 - scopeのUI操作有無 / 条件付き必須file trigger該当性の意味判断
 - 案件固有extension fileが必要かの判断
-- extension本文の意味生成
+- extension本文の意味生成。ただしtest-relevant semanticsをextension proseだけに残してよいかの判断もLLM責務で、残す場合はstandard modelへ正規化する
 - semantic duplicateの統合
 - Authority競合解消
 - repository差分の意味判断
