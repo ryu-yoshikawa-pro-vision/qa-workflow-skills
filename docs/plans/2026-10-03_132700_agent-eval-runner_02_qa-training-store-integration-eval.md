@@ -190,15 +190,21 @@ sanitized targetのrootにはEvaluatorが最小の評価用`AGENTS.md`を生成�
 
 この`AGENTS.md`は評価条件を固定するためのHarness入力であり、製品仕様、期待するテストケース、正解となるQA判断は追加しません。
 
-その上で、今回評価する`qa-workflow-skills`の19 SkillだけをAgent-visibleなSkill packageとして配置します。
+その上で、今回評価する`qa-workflow-skills`の19 Skillだけをsanitized targetの`.agents/skills/<skill-name>/`へ配置します。配置元は評価対象`qa-workflow-skills` revisionの`skills/<skill-name>/`であり、各Skillの`evals/**`はコピーしません。
+
+フェーズ2のtaskは`qa-workflow`利用を明示するため、このrun自体をnative trigger精度の評価には使いません。`.agents/skills/`へ配置するのは、実際のCodex等で利用するときに近いSkill package形態で複数Skill workflowを実行するためです。
 
 ## source変更の扱い
 
 分析・設計評価ではProduct Code、既存Product Test、規範仕様を変更しません。
 
-sanitized target内にEvaluator所有の評価出力root `.qa-eval-output/` を事前作成し、Agentへ書込み可能な永続成果物の保存先として明示します。
+sanitized targetの構築、評価用`AGENTS.md`、19 Skill、評価用Project Contextの配置が完了した時点を**Agent開始前baseline**とします。
 
-Agent実行前後でtargetのsource差分を確認し、`.qa-eval-output/**`以外に変更がある場合は実行結果を有効なSkill評価へ昇格しません。
+baseline固定のため、sanitized targetでfresh Git repositoryを初期化し、remoteなし・固定の非個人local identityでEvaluator-owned synthetic commitを1件作成します。original Git history / remoteは引き継ぎません。
+
+その後、Evaluator所有の評価出力root `.qa-eval-output/` を作成し、Agentへ書込み可能な永続成果物の保存先として明示します。
+
+Agent終了後はbaseline commitとの差分を確認し、`.qa-eval-output/**`以外に変更がある場合は実行結果を有効なSkill評価へ昇格しません。AgentがGit commitを作成した場合も契約違反として扱います。
 
 `.qa-eval-output/**`はtargetのProduct成果物ではなく、今回の評価用一時出力です。commitせず、回収後にsanitized targetと一緒に破棄します。
 
@@ -427,16 +433,17 @@ Agent executionは、Eval dataset由来のpromptでも、固定対象repo向けp
 3. `qa-training-store`の固定revision `84ce165493649550832731a60cf436f8ae29c56b` のtracked contentからsanitized targetを準備する
 4. 対象revisionの`docs/spec/README.md`と`docs/spec/features/checkout-and-payment.md`が存在することを確認する
 5. 元repoのAgent Skill、過去run / Plan / report、instructor情報、target側Skill eval等を除外する
-6. 評価用`AGENTS.md`、`.qa-eval-output/`、必要な評価用Project Contextを作成する
-7. 候補`qa-workflow-skills` 19 SkillだけをAgent-visibleにする
-8. Checkout / Payment評価要求、Agent / model、Judge条件をrun provenanceへ記録する
-9. 実Agentを起動し、分析・設計workflowを実行する
-10. `.qa-eval-output/**`以外のProduct Code / Test / Spec等に変更がないことを確認する
-11. 複数QA成果物をscanし、`artifact-manifest.json`を作成して`.agent-eval-runs/`へ回収する
-12. 機械判定可能な契約を既存runtime / verifierで確認する
-13. 独立Judgeで意味品質を評価する
-14. workflow / traceability / semantic結果とprovenanceを同じrunへ保存する
-15. runner / environment起因の失敗とSkill品質上のnon-passを分離して報告する
+6. 評価用`AGENTS.md`と必要な評価用Project Contextを作成する
+7. 候補`qa-workflow-skills` 19 Skillを`.agents/skills/`へ配置する
+8. sanitized targetをfresh Git repositoryにし、Evaluator-owned synthetic baseline commitを作成する
+9. `.qa-eval-output/`を作成し、Checkout / Payment評価要求、Agent / model、Judge条件をrun provenanceへ記録する
+10. 実Agentを起動し、分析・設計workflowを実行する
+11. baseline commitとの差分を確認し、`.qa-eval-output/**`以外のProduct Code / Test / Spec等に変更がないこと、追加commitがないことを確認する
+12. 複数QA成果物をscanし、`artifact-manifest.json`を作成して`.agent-eval-runs/`へ回収する
+13. 機械判定可能な契約を既存runtime / verifierで確認する
+14. 独立Judgeで意味品質を評価する
+15. workflow / traceability / semantic結果とprovenanceを同じrunへ保存する
+16. runner / environment起因の失敗とSkill品質上のnon-passを分離して報告する
 
 ## 完了条件
 
@@ -449,6 +456,8 @@ Agent executionは、Eval dataset由来のpromptでも、固定対象repo向けp
 - 元`AGENTS.md` / `QA_AGENT.md`によるrepo固有Skill routingが評価対象Agentへ残っていない
 - 過去run / Plan / report、instructor情報、target側Skill eval、`qa-workflow-skills`のReference / expected / rubric / graderが評価対象Agentへ公開されていない
 - 評価用`AGENTS.md`が評価条件だけを持ち、製品仕様や正解QA成果物を追加していない
+- 評価対象19 Skillが`.agents/skills/`へ配置され、各Skillの`evals/**`が含まれていない
+- Agent開始前のsanitized targetがEvaluator-owned synthetic baseline commitとして固定され、original Git history / remoteを引き継いでいない
 - scenario ID / scenario fingerprint、Agent名 / model、Judge条件がrun provenanceへ保存される
 - Checkout / PaymentのWeb範囲で実Agent workflowが最後まで実行される
 - Product Code、既存Product Test、規範仕様に許可外変更がない
