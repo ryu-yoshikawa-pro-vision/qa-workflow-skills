@@ -163,7 +163,6 @@ structural item:
 IDが意味的に同一か、新IDにすべきかはLLM判断です。helperはIDを自動的に別entityへ再割当てしません。
 
 ## 5. canonical stable reference contract
-## 5. canonical stable reference contract
 
 UIOP / US / UC / Behavior / AC / RULE / FIELD / FLOW / NOTIFY / INTERACTのように期待挙動・制約・ルールを表すnormative rowは根拠を空にしません。current rowは `関連仕様項目ID` にcurrent SPEC / DECISION / approved ASM / INFを1件以上持ちます。根拠不足で確定できない場合はcurrent rowとして成立させず、blocked + `関連UNKNOWN ID` へ閉じます。ACはcurrent Authority 1件以上を要求する `_08 / _09` のより厳しい契約を優先します。PAGE等の純粋な構造row、Repository実装状況、pure narrative / headingは各table固有契約に従います。
 

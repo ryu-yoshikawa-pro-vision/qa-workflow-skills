@@ -266,7 +266,6 @@ expected unitは `artifact:case_structure:all` exactly 1件です。
 - cutover完了後のUI target migration → AC semantic update → downstream stale / rerunを実Agent smokeで確認
 
 ## 3. spec-analysis normalized machine input
-## 3. spec-analysis normalized machine input
 
 `ui_target_package.py build-machine-evidence` はMarkdownから次を決定論的に生成します。
 

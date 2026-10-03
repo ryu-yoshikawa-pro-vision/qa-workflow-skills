@@ -157,7 +157,6 @@ LLMが意味判断するのは `Trigger判定` だけです。helperが `あり 
 `08_repository_implementation_status.md` のapplicabilityは「そのversionでrepositoryを再確認したか」ではなく、current packageがrepository implementation evidenceを現在保持・利用しているかで判定します。前versionの08をcurrent packageが継続利用する場合は `required` のまま保持し、08内の基準branch / commit / revisionを変更しません。current分析からrepository evidenceを明示的に外した場合だけ `not-applicable` とし、08を除去します。
 
 #### 案件固有extension file一覧
-#### 案件固有extension file一覧
 
 | ファイル | Slug | 責務 | 分割理由 |
 | --- | --- | --- | --- |
@@ -370,7 +369,6 @@ UNKNOWNのlineageは次に固定します。
 
 これにより、案件ごとの動的table schema / column registry / custom ID allocatorを追加しません。
 
-### 5.12 asset initialization contract
 ### 5.12 asset initialization contract
 
 `skills/spec-analysis/assets/ui-test-target-analysis/` のtemplateは、実データと誤認できる例示IDを置きません。
