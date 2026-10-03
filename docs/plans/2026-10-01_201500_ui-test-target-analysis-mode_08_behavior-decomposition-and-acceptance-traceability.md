@@ -18,7 +18,7 @@
 behavior decompositionの適用単位はpackage全体ではなく、`00_scope_and_context.md`で確定した分析対象機能scopeです。
 
 Scope ID:
-- `SCOPE-001` ～ `SCOPE-999`
+- `SCOPE-001` から開始し、最低3桁で連番採番する。`SCOPE-999` の次は `SCOPE-1000`
 
 各scopeについて次を判定します。
 
@@ -77,18 +77,31 @@ User Storyへ進む前に、required scopeのUI操作母集団を明示します
 | 操作ID | Scope ID | Actor / Role | 対象構造ID | 操作 | 関連仕様項目ID | 対応UC ID | 状態 | 関連UNKNOWN ID |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
-ID: `UIOP-001` ～ `UIOP-999`
+ID: `UIOP-001` から開始し、最低3桁で連番採番する。999の次は1000
 
 状態:
 - mapped
 - blocked
 
 規則:
-- mapped: 対応UC IDが1件以上、関連UNKNOWN IDは空
+- mapped: **AC freshnessでいうcurrent UIOP**。対応UC IDが1件以上、関連UNKNOWN IDは空
 - blocked: 対応UC IDは空を許可し、関連UNKNOWN IDが1件以上必須
 - 既知のUI操作を無言で落とさない
 - 同一操作が複数UCに関係する場合は意味上必要なUCを全て参照する
 - 操作の目的 / 結果をこの表で再定義しない。目的はUS / UC、結果はBehavior / ACを正本とする
+
+### 3.1 current / blocked rowのfield契約
+
+blocked rowは「semantic identityまでは確定しているが、完成に必要なfieldが未確定」の場合だけstable IDを持ちます。semantic identity自体を確定できない場合はIDを発行せず、親scopeまたは既知の親rowからUNKNOWNへ閉じます。identityの同一性判断はLLM、下記のfield充足はhelperが検証します。
+
+| row | current / mappedで必須 | blockedで必須 | blockedで空を許可 | IDを発行しない条件 |
+| --- | --- | --- | --- | --- |
+| UIOP | Scope ID、Actor / Role、対象構造ID、操作、関連仕様項目ID、対応UC ID。関連UNKNOWN IDは空 | Scope ID、操作、関連UNKNOWN ID。Actor / Role・対象構造ID・対応UC ID・関連仕様項目IDは確定済み分だけ保持 | Actor / Role、対象構造ID、対応UC ID、関連仕様項目ID | LLMがscope内の操作identity自体を区別できない |
+| US | Scope ID、Actor / Role、Goal、関連仕様項目ID。関連UNKNOWN IDは空 | Scope ID、Actor / RoleまたはGoalの少なくとも一方、関連UNKNOWN ID。確定済み関連仕様項目IDは保持 | Actor / RoleまたはGoalの未確定側、関連仕様項目ID | LLMがActor / Goalの組としてUser Story identityを確定できない |
+| UC | 関連US ID、Use Case、Trigger、Success Postcondition、関連仕様項目ID。Preconditionsは該当なしなら空可。関連UNKNOWN IDは空 | 関連US ID、Use Case、関連UNKNOWN ID。Trigger / Preconditions / Success Postcondition / 関連仕様項目IDは確定済み分だけ保持 | Trigger、Preconditions、Success Postcondition、関連仕様項目ID | LLMが親USに対するUse Case identityを確定できない |
+| Behavior | UC ID、結果分類、振る舞い、Postcondition / Result、関連仕様項目ID。関連UNKNOWN IDは空 | current UC ID、結果分類、振る舞い、関連UNKNOWN ID。Postcondition / Result / 関連仕様項目IDは確定済み分だけ保持 | Postcondition / Result、関連仕様項目ID | Behaviorの存在・identity自体を確定できない |
+
+`current / mapped` rowの関連仕様項目IDは `_06` のnormative traceability contractに従います。blocked rowはUNKNOWNが正本であり、未確定fieldを推測して埋めません。
 
 ## 4. User Story
 
@@ -99,7 +112,7 @@ User StoryはUI操作のActorと達成目的を安定化する上位単位です
 | US ID | Scope ID | Actor / Role | Goal | 関連仕様項目ID | 関連構造ID | 状態 | 関連UNKNOWN ID |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 
-ID: `US-001` ～ `US-999`
+ID: `US-001` から開始し、最低3桁で連番採番する。999の次は1000
 
 状態:
 - current
@@ -123,7 +136,7 @@ Use CaseはActorが1つの目的を達成するための意味あるUI利用シ�
 | UC ID | 関連US ID | Use Case | Trigger | Preconditions | Success Postcondition | 関連仕様項目ID | 関連構造ID | 状態 | 関連UNKNOWN ID |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
-ID: `UC-001` ～ `UC-999`
+ID: `UC-001` から開始し、最低3桁で連番採番する。999の次は1000
 
 規則:
 - 関連US IDは1件以上必須
@@ -144,7 +157,7 @@ BehaviorはUse Case内の意味ある振る舞い単位です。
 | Behavior ID | UC ID | 結果分類 | 振る舞い | Postcondition / Result | 関連仕様項目ID | 関連構造ID | 状態 | 関連UNKNOWN ID |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
-ID: `BH-001` ～ `BH-999`
+ID: `BH-001` から開始し、最低3桁で連番採番する。999の次は1000
 
 結果分類:
 - 正常: ユーザーの主目的が仕様どおり達成される振る舞い
@@ -200,7 +213,7 @@ Acceptance CriteriaはBehaviorが仕様上成立したと判断できる受入�
 | AC ID | Behavior ID | Acceptance Criteria | 関連仕様項目ID | 関連構造ID |
 | --- | --- | --- | --- | --- |
 
-ID: `AC-001` ～ `AC-999`
+ID: `AC-001` から開始し、最低3桁で連番採番する。999の次は1000
 
 AC一覧に記載するrowはcurrentだけです。blocked ACという中間状態は作りません。
 
@@ -234,6 +247,8 @@ semantic identityのreuse / new / explicit retire判断はLLMが行います。
 通常package更新では、LLMはstable ID番号をMarkdownへ書かず、既存identityを `identity_action=reuse / reuse_id=<ID>`、new identityを `identity_action=new / draft_key=<key>` として `ui_target_package.py materialize` へ渡します。helperがstandard prefixの使用済みIDから採番し、`@draft`参照を解決してcanonical tableを生成します。採番処理は`materialize`内部allocatorとしてunit testし、focused CLI operationは追加しません。
 
 分類変更だけでstable IDを再採番しません。rowが消えただけでretiredとせず、semantic identityをcurrent modelから意図的に除去する場合だけLLMが `retire_ids[]` を明示します。
+
+`SRC / SPEC / INF / UNK / DEC / ASM / Q` 等の既存canonical IDは既存repository契約どおり3桁固定です。PR #16で新設するUI target structural ID（SCOPE / PAGE / STATE / VIEW / STEP / MODAL / BDLG / PANEL / EXT / SHARED / FIELD / RULE / FLOW / NOTIFY / INTERACT / ISSUE / IMPL / UIOP / US / UC / BH / AC）は**最低3桁・上限なし**とし、999の次を1000として採番します。既存canonical IDの1000件超はPR #16の対象外で、既存3桁契約をfail-closedで維持します。
 
 ## 10. Authorityとの関係
 
