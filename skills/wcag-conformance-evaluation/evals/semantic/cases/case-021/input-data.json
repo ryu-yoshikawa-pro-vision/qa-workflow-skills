@@ -1,0 +1,168 @@
+{
+  "kind": "step-4-3-current-inventory-and-prior-runtime-input",
+  "previous_iteration": {
+    "structured_revision": 1,
+    "structured_sample_refs": [
+      "SAMPLE-002",
+      "SAMPLE-003"
+    ],
+    "random_samples": [
+      {
+        "sample_ref": "RANDOM-S-OLD-1",
+        "freshness_status": "current"
+      }
+    ],
+    "candidate_population_fingerprint": "sha256:762477919720c1d5874ef41c05c40ef8bf63465f3a66f348a6064b87b8cfdeae",
+    "selection_method": "system-random finite inventory selection"
+  },
+  "current_structured_revision": 2,
+  "current_structured_sample_refs": [
+    "SAMPLE-003",
+    "SAMPLE-004"
+  ],
+  "current_candidate_inventory_drafts": [
+    {
+      "draft_key": "current-a",
+      "target_ref": "TARGET-S-A",
+      "state_key": "default",
+      "locator": "https://northstar.example.invalid/target-s-a/default",
+      "source_evidence_refs": [
+        "EVD-CASE-S-REV-2"
+      ]
+    },
+    {
+      "draft_key": "current-b",
+      "target_ref": "TARGET-S-B",
+      "state_key": "default",
+      "locator": "https://northstar.example.invalid/target-s-b/default",
+      "source_evidence_refs": [
+        "EVD-CASE-S-REV-2"
+      ]
+    },
+    {
+      "draft_key": "current-d",
+      "target_ref": "TARGET-S-D",
+      "state_key": "default",
+      "locator": "https://northstar.example.invalid/target-s-d/default",
+      "source_evidence_refs": [
+        "EVD-CASE-S-REV-2"
+      ]
+    },
+    {
+      "draft_key": "current-e",
+      "target_ref": "TARGET-S-E",
+      "state_key": "default",
+      "locator": "https://northstar.example.invalid/target-s-e/default",
+      "source_evidence_refs": [
+        "EVD-CASE-S-REV-2"
+      ]
+    }
+  ],
+  "current_sample_identity_runtime_result": {
+    "samples": [
+      {
+        "sample_ref": "SAMPLE-001",
+        "target_ref": "TARGET-S-E",
+        "state_key": "default",
+        "source_locators": [
+          "https://northstar.example.invalid/target-s-e/default"
+        ],
+        "identity_fingerprint": "sha256:0bce63609bda702c921747111f01b3e2babdec6bad0ed36015cc9287d67771b5",
+        "source_evidence_refs": [
+          "EVD-CASE-S-REV-2"
+        ]
+      },
+      {
+        "sample_ref": "SAMPLE-002",
+        "target_ref": "TARGET-S-D",
+        "state_key": "default",
+        "source_locators": [
+          "https://northstar.example.invalid/target-s-d/default"
+        ],
+        "identity_fingerprint": "sha256:35f2a5e61e6460db15f66ec16c810aff49202a174a7286fec0310a45ef8f2fec",
+        "source_evidence_refs": [
+          "EVD-CASE-S-REV-2"
+        ]
+      },
+      {
+        "sample_ref": "SAMPLE-003",
+        "target_ref": "TARGET-S-A",
+        "state_key": "default",
+        "source_locators": [
+          "https://northstar.example.invalid/target-s-a/default"
+        ],
+        "identity_fingerprint": "sha256:62bdfadba261258f2704d3cec0875621b5b2f40ff9ae70019985bb5895b20abe",
+        "source_evidence_refs": [
+          "EVD-CASE-S-REV-2"
+        ]
+      },
+      {
+        "sample_ref": "SAMPLE-004",
+        "target_ref": "TARGET-S-B",
+        "state_key": "default",
+        "source_locators": [
+          "https://northstar.example.invalid/target-s-b/default"
+        ],
+        "identity_fingerprint": "sha256:e6610a8c8f7475de522bab05a810e48e52f644c49d1f9890946585cea4bf49c9",
+        "source_evidence_refs": [
+          "EVD-CASE-S-REV-2"
+        ]
+      }
+    ],
+    "draft_to_sample_ref": {
+      "current-a": "SAMPLE-003",
+      "current-b": "SAMPLE-004",
+      "current-d": "SAMPLE-002",
+      "current-e": "SAMPLE-001"
+    }
+  },
+  "current_candidates": [
+    {
+      "sample_ref": "SAMPLE-001",
+      "sample_identity": "sha256:0bce63609bda702c921747111f01b3e2babdec6bad0ed36015cc9287d67771b5"
+    },
+    {
+      "sample_ref": "SAMPLE-002",
+      "sample_identity": "sha256:35f2a5e61e6460db15f66ec16c810aff49202a174a7286fec0310a45ef8f2fec"
+    },
+    {
+      "sample_ref": "SAMPLE-003",
+      "sample_identity": "sha256:62bdfadba261258f2704d3cec0875621b5b2f40ff9ae70019985bb5895b20abe"
+    },
+    {
+      "sample_ref": "SAMPLE-004",
+      "sample_identity": "sha256:e6610a8c8f7475de522bab05a810e48e52f644c49d1f9890946585cea4bf49c9"
+    }
+  ],
+  "current_provenance": {
+    "activity_ref": "ACT-CASE-S-SEARCH-REV-2",
+    "revision": 2,
+    "evidence_refs": [
+      "EVD-CASE-S-REV-2"
+    ]
+  },
+  "prior_population_runtime_result": {
+    "candidates": [
+      {
+        "sample_ref": "SAMPLE-001",
+        "sample_identity": "sha256:03f04ae6c6c1cece5f440d31dd51eeccf3530df0b626036841d8e9d0b80c2925"
+      },
+      {
+        "sample_ref": "SAMPLE-002",
+        "sample_identity": "sha256:62bdfadba261258f2704d3cec0875621b5b2f40ff9ae70019985bb5895b20abe"
+      },
+      {
+        "sample_ref": "SAMPLE-003",
+        "sample_identity": "sha256:e6610a8c8f7475de522bab05a810e48e52f644c49d1f9890946585cea4bf49c9"
+      }
+    ],
+    "provenance": {
+      "activity_ref": "ACT-CASE-S-SEARCH-REV-1",
+      "revision": 1,
+      "evidence_refs": [
+        "EVD-CASE-S-REV-1"
+      ]
+    },
+    "candidate_population_fingerprint": "sha256:762477919720c1d5874ef41c05c40ef8bf63465f3a66f348a6064b87b8cfdeae"
+  }
+}

@@ -1,0 +1,5 @@
+# Case S: candidate population changed
+
+Step 4.3後にcandidate inventory / provenanceが変わる。
+
+The prior iteration recorded candidate identities `TARGET-S-A/default`, `TARGET-S-B/default`, and `TARGET-S-C/default` from provenance `ACT-CASE-S-SEARCH-REV-1`; prior random sample `RANDOM-S-OLD-1` was current at that revision. The updated Step 2 acquisition record `ACT-CASE-S-SEARCH-REV-2` has a different complete candidate inventory: `TARGET-S-A/default`, `TARGET-S-B/default`, `TARGET-S-D/default`, and `TARGET-S-E/default`; `TARGET-S-C` is no longer in the current scope and D/E are newly discovered. Evidence refs are `EVD-CASE-S-REV-1` and `EVD-CASE-S-REV-2`. Structured sample revision is now `2`. The old population fingerprint and provenance belong to revision 1; do not treat the prior random selection as a sample from the current population. The accompanying `input-data.json` contains the identity-helper results, exact prior fingerprint input, and current candidate rows/provenance. Use the production reconciliation and random-selection helpers; do not seed or name a replacement sample in advance. These are synthetic fixture facts.

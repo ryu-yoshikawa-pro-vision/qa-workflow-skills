@@ -1,0 +1,20 @@
+captured_from: "http://127.0.0.1:8765/skills/usability-evaluation/evals/output/cases/case-001/dialog-focus-escape.html"
+capture_method: "repository Playwright CLI snapshot"
+page_title: "API token settings fixture"
+viewport_css_px: "1280x720"
+snapshot_after: "Tab sequence moved focus to the background trigger; Escape was pressed"
+fixture_source_identity: "sha256:5719ebe78a17192ec8c6b2169a7761d21df5749c55a88cfd6210798d612906cf"
+screen_capture_identity: "sha256:cd4399f821d353c9f8d99db1f04e587a017f87e4debeecca2049a8d5afe90c3f"
+accessibility_snapshot:
+  - main:
+      - heading: "API token settings"
+      - button: "Create API token [active]"
+      - link: "Token help"
+      - dialog:
+          name: "Remove API token?"
+          description: "Removing this token stops connected integrations. You can create a replacement later."
+          buttons:
+            - "Remove API token"
+limitations:
+  - "This is the browser snapshot exposed by the Playwright CLI, not a screen-reader transcript."
+  - "The snapshot does not establish WCAG conformance."

@@ -1,0 +1,27 @@
+{
+  "aspect_handling": {
+    "purpose-understanding": "対象外",
+    "interaction": "今回評価する",
+    "feedback": "対象外",
+    "error-prevention-recovery": "対象外",
+    "accessibility": "対象外",
+    "visual-integrity": "対象外",
+    "cross-pattern-flow": "対象外"
+  },
+  "reference_catalog": {
+    "REF-0001": ["SRC-012-ITEM-0001"]
+  },
+  "known_refs": {
+    "evidence_refs": ["EV-101", "EV-102", "EV-103"],
+    "project_authority_refs": ["AUTH-101"],
+    "test_rule_result_refs": [],
+    "requirement_check_refs": [],
+    "measurement_refs": [],
+    "finding_refs": [],
+    "scope_refs": ["SCOPE-101"],
+    "target_refs": ["TARGET-101"],
+    "owner_activity_refs": [],
+    "inspection_request_refs": []
+  },
+  "forbidden_output_values": ["Finding: FND-", "TC-FAIL"]
+}

@@ -28,6 +28,7 @@
     "source_dependencies": [],
     "resource_conditions": [],
     "mutable_operation_claims": [],
+    "handoffs": [],
     "unresolved": []
   }
 }
@@ -58,6 +59,9 @@
 | regression-testing | baseline / membership / Run計画 / Run結果更新 / 履歴参照のいずれか | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |  |  |
 | exploratory-testing | exploration / investigation のいずれか | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |  |  |
 | qa-knowledge | triage / create / update / revalidation / lookup / history のいずれか | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |  |  |
+| usability-evaluation |  | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |  |  |
+| usability-inspection | general / scoped / formal-handoff のいずれか | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |  |  |
+| wcag-conformance-evaluation |  | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |  |  |
 
 ## workflow state永続化契約
 
