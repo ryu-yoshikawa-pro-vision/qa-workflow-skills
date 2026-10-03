@@ -25,7 +25,37 @@ PR #11の検証では`codex exec`で評価対象成果物を生成し、既存�
 
 ## 目的
 
-次の一連の処理を、1つの共通経路から再現可能に実行できるようにします。
+### 最終目的
+
+このPlanの最終目的は、`qa-workflow-skills`を変更したときに、単発の手動確認や印象ではなく、**同じ条件で実Agent評価を再実行し、変更前後のSkill品質の改善・悪化・変化なしを根拠付きで確認できる状態を作ること**です。
+
+今回作るものはSkillを実行する新しいAgent runtimeではありません。Codex、Claude Code等が持つAgent runtimeをそのまま使い、`qa-workflow-skills`側にはQA Skillの評価に必要な最小の実行・記録経路だけを追加します。
+
+また、現在すでに存在するdeterministic / semantic / trigger / routing / runtime評価を置き換えません。今回不足している「実Agentで評価対象成果物を生成する前段」と「同じ条件で再評価できる記録」を追加し、既存評価へ接続します。
+
+完成後は、少なくとも次の改善ループを同じ仕組みで繰り返せる状態にします。
+
+```text
+現在のSkill
+  ↓
+固定した評価条件で実Agent実行
+  ↓
+既存評価 + 固定テスト対象評価
+  ↓
+結果と失敗根拠を保存
+  ↓
+Skillを修正
+  ↓
+同じ評価条件で再実行
+  ↓
+変更前後を比較して改善判断
+```
+
+自動A/BランキングやSkillの自動書き換え・自動採用は今回作りません。比較に必要な実行条件と評価結果を保存し、人間または別Agentが同条件のrun同士を比較できる状態までを今回の目的に含めます。
+
+### フェーズ1で実現すること
+
+既存Eval Inputを使い、次の一連の処理を1つの共通経路から再現可能に実行できるようにします。
 
 ```text
 既存Eval Input
@@ -39,9 +69,34 @@ PR #11の検証では`codex exec`で評価対象成果物を生成し、既存�
 ケース別結果と実行全体の結果を保存
 ```
 
-これにより、Skillを変更した後に同じ評価ケースを実Agentで再実行し、既存評価基準で結果を確認できるようにします。
+Skillを変更した後に同じ評価ケースを実Agentで再実行し、既存評価基準で結果を確認できるようにします。
 
-今回の目的はSkillを自動修正することではありません。Skill改善案の作成・採用判断は別責務とし、まず評価実行を再現可能かつ可能な範囲で自動化します。
+### フェーズ2で実現すること
+
+固定revisionの`qa-training-store`を実際のテスト対象として、`qa-workflow-skills`の複数Skillを使う分析・設計workflowを実Agentで動かします。
+
+単一SkillのEval Inputだけでは確認できない、次を評価できる状態にします。
+
+- 実repoから正しい仕様根拠を選べるか
+- `qa-workflow`が必要な工程だけを適切にroutingできるか
+- 複数Skillの成果物chainが追跡可能な状態で閉じるか
+- stable ID / runtime evidence / currentness等の既存契約を維持できるか
+- 規範仕様にない期待動作を追加しないか
+- 同じtarget revisionと評価要求でSkill修正前後を再評価できるか
+
+### このPlanのレビューで維持する前提
+
+今後別セッションでPlanをレビュー・修正する場合も、次はこのPlanの目的上の前提として維持します。
+
+- Agent loop、context管理、sandbox、subagent等はCodex / Claude Code等のruntimeへ任せ、独自Agent runtimeを作らない
+- 既存deterministic / semantic graderを再実装しない
+- Skill本体から評価ランナーへ依存させない
+- Codex固有実装をSkill契約へ入れず、Agent commandは外部から注入する
+- 評価対象AgentへReference / expected / rubric / grader等の評価正解情報を公開しない
+- `qa-training-store`固有処理をSkill本体へ入れない
+- 現在必要な1つの固定targetを評価するためだけに、汎用plugin framework、DB、MCP、LangGraph等を追加しない
+- 自動Skill修正・自動採用は行わず、評価結果から改善候補を作成し、修正後に同条件で再評価できるところまでを対象とする
+- `description`による実Agent上のnative Skill発火評価は、クライアント固有の観測が必要なため今回の出力品質・workflow評価とは分離する。既存trigger datasetは維持し、今回のPlanだけでlive trigger最適化まで達成したとは扱わない
 
 ## フェーズ構成
 
@@ -356,19 +411,48 @@ Judge JSON
                 └── grader.stderr.log
 ```
 
-`result.json`には次を保持します。
+`result.json`には、評価結果に加えて変更前後を同条件で比較できる非秘密のprovenanceを保持します。
+
+最低限、次を保存します。
 
 - suite
 - Skill
-- eval ID
+- eval IDまたはscenario ID
 - attempt番号
+- `qa-workflow-skills`のGit SHA
+- 評価データセットまたはscenario定義のfingerprint
+- 評価入力のfingerprint
+- target repoを使う場合はrepository名とsource revision
+- Agent名
+- Agent model
+- Agent versionを安全に取得できる場合はそのversion
+- semantic評価ではJudgeの実行方式。フェーズ1の既定は「同じAgent commandを別process / 別promptで使用」
 - Agent commandのexit code
 - graderのexit code
 - deterministic statusまたはsemantic verdict
 - 各保存fileの相対path
-- 実行開始時のGit HEADを取得できた場合はそのSHA
+- 実行日時
+
+`--agent-name`と`--agent-model`は実Agent runでcallerが明示し、結果へ保存します。`--agent-version`はcaller指定または安全に取得できる場合だけ保存します。Agent command全文からmodelやversionを推測しません。
+
+評価データセットのfingerprintは、選択caseのEvaluator側入力・期待値 / Reference・rubric等、評価判定に影響する現在内容からEvaluator側で算出します。fingerprintだけをrun結果へ保存し、Reference / expected本文をAgent-visible workspaceへコピーしません。
 
 環境変数、認証情報、token、Agent command全体は保存しません。
+
+### 比較可能性の条件
+
+Skill修正前後を比較するときは、少なくとも次が一致するrunを同条件として扱います。
+
+- target repo / target revision、または同じEval case
+- 評価入力fingerprint
+- 評価データセット / scenario fingerprint
+- Agent名 / model
+- Judge条件
+- 実行回数の扱い
+
+`qa-workflow-skills`のGit SHAだけを比較対象として変えます。条件が異なるrunは結果を保存できますが、Skill変更だけの効果として直接比較しません。
+
+今回、比較結果の自動rankingや独自総合scoreは作りません。保存済みrun同士を人間または別Agentが比較できれば目的を満たします。
 
 `.agent-eval-runs/`は`.gitignore`へ追加し、実Agent出力・ログ・Judge結果を通常commit対象にしません。
 
@@ -606,6 +690,8 @@ native trigger評価は、Skill activationを観測する方法がAgentクライ
 - `TC-OUT-001`、`TCN-OUT-001`、`TC-SEM-001`、`WF-SEM-003`を実Codexで同branch上から実行し、生成・保存・grader起動・結果集計まで完了する
 - 実Codex smokeでrunner起因の未処理エラーが0件
 - 実Codexの非pass結果がある場合、その結果を隠さず保存・報告できる
+- 各live runにSkill revision、評価入力 / scenario fingerprint、Agent名 / model等の比較に必要なprovenanceが保存される
+- Skill修正前後で同じ評価条件を再利用でき、Git SHA以外の条件差を識別できる
 - `qa-training-store`固定revision `84ce165493649550832731a60cf436f8ae29c56b` を対象にフェーズ2初回評価を実行している
 - Checkout / PaymentのWeb範囲で実Agentによる分析・設計workflowが完了し、成果物・workflow・traceability・意味評価結果が保存されている
 - `qa-training-store`のProduct Code、既存Test、規範仕様に許可外変更がない
