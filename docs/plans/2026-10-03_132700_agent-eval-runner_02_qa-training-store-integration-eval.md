@@ -149,15 +149,23 @@ sanitized targetはworking treeのfilesystem copyではなく、固定source rev
 
 ### 除外するもの
 
-- 元repoの`.agents/skills/**`
+- 元repoの`.agents/**`
+- target repo固有のCodex config / hooks / agents / run artifactを含む`.codex/**`
 - 元`AGENTS.md`
 - `QA_AGENT.md`
-- 過去runである`.codex/runs/**`
 - 過去Planである`docs/plans/**`
 - 過去検証結果である`docs/reports/**`
 - `training/agentic-qa/instructor/**`
-- target repo自身のSkill評価実装である`scripts/evals/**`と、その評価専用test
+- target repo自身のSkill評価実装である`scripts/evals/**`
+- target repo自身のSkill / Agent評価専用test:
+  - `tests/repository-contract/skill-semantic-output-evals.test.ts`
+  - `tests/repository-contract/skill-trigger-evals.test.ts`
+  - `tests/repository-contract/skill-workflow-evals.test.ts`
+  - `tests/repository-contract/otel-skill-observer.test.ts`
+  - `tests/repository-contract/validate-skills.test.ts`
 - `qa-workflow-skills`側の`evals/**`、Reference、expected、rubric、grader
+
+target repo固有の`.agents/**` / `.codex/**`は、今回評価するSkill集合やAgent runtime条件を上書き・追加し得るため除外します。
 
 過去Plan / report / run、instructor情報、target repo自身のSkill evalは、実際のProduct / Specを理解するために必要な正本ではなく、評価対象Agentへ既存の結論や評価基準を漏らす可能性があるため除外します。
 
@@ -453,7 +461,7 @@ Agent executionは、Eval dataset由来のpromptでも、固定対象repo向けp
 - source revisionが`84ce165493649550832731a60cf436f8ae29c56b`として固定・記録される
 - 評価対象`qa-workflow-skills` revisionが記録される
 - Agent-visibleなSkill集合が今回の19 Skillへ固定される
-- 元`AGENTS.md` / `QA_AGENT.md`によるrepo固有Skill routingが評価対象Agentへ残っていない
+- 元`.agents/**` / `.codex/**`、`AGENTS.md` / `QA_AGENT.md`によるrepo固有Skill routing・Codex設定・hooks等が評価対象Agentへ残っていない
 - 過去run / Plan / report、instructor情報、target側Skill eval、`qa-workflow-skills`のReference / expected / rubric / graderが評価対象Agentへ公開されていない
 - 評価用`AGENTS.md`が評価条件だけを持ち、製品仕様や正解QA成果物を追加していない
 - 評価対象19 Skillが`.agents/skills/`へ配置され、各Skillの`evals/**`が含まれていない
