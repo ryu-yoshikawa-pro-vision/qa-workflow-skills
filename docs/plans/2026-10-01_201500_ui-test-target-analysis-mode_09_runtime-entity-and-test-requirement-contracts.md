@@ -364,38 +364,20 @@ repository regression:
 
 qa-workflow / coverage-analysisへspec-analysis scopeを渡す場合、AgentがMarkdownからこのJSONを再構築しません。helper返却のcanonical `normalized_skill_input` をそのまま使用します。
 
-### 3.1 normal spec-analysis handoff adapter
+### 3.1 requirement-structure-v2 caller contract
 
-UI target modeでは `build-machine-evidence.normalized_skill_input` が `acceptance_criteria[]` を必ず持ちます。通常の非mode spec-analysisは既存互換のためkey省略を許可しますが、requirement-structure-v2へ渡す直前の正規化ownerはSkill-local `skills/test-requirement-design/scripts/requirement_input_adapter.py` に固定します。qa-workflow / shared runtimeへ同じ補完処理を複製しません。
+UI target modeでは `build-machine-evidence.normalized_skill_input` が `acceptance_criteria[]` を必ず持ちます。通常の非mode spec-analysisは既存互換のためupstream成果物上でkey省略を許可しますが、`requirement-structure-v2` のraw generator inputはmodeを問わず次を必須にします。
 
-canonical operation:
+- top-level `acceptance_criteria[]`
+- 各 `test_requirements[]` draftの `acceptance_refs[]`
 
-```json
-{"operation":"adapt-v2","input":{}}
-```
+ACが存在しないworkflowではcallerが両方を空arrayで明示します。空array補完だけを担当する `requirement_input_adapter.py` は追加しません。
 
-response:
+旧runtime-v1 / requirement-structure-v1からの初回cutoverは§2.7の `project_v1_cutover` がcomplete v2 generator inputを返します。cutover後の通常実行ではAgent / qa-workflow / 導入先projectがv2 schemaどおりcomplete inputを構成します。導入先projectが独自のlegacy保存形式を持つ場合の変換wrapperはこのSkill repoの責務にせず、そのproject / harness側で用意します。
 
-```json
-{"normalized_input":{}}
-```
+`requirement_structure.py` とshared `run_cli` はfield欠落をsilent補完しません。runtime `input_fingerprint` は実際に渡されたcomplete v2 inputから計算します。これにより、default補完用の別adapterやshared runtime hookを増やしません。
 
-規則:
-
-- full prospective requirement_structure inputを `input` に受け、`acceptance_criteria` が存在しない場合だけ `acceptance_criteria=[]` を追加する
-- fieldが存在する場合はarray型を要求し、意味を変更しない
-- `test_requirements[]` の各draftに `acceptance_refs` がない場合だけ `acceptance_refs=[]` を追加する
-- fieldが存在する場合はarray型を要求し、既存値を上書きしない
-- その他のfieldを追加・削除・並べ替え目的で意味変更しない
-- ACを生成せず、UI target mode判定を行わない
-- qa-workflow / direct callerはいずれもこのhelper結果だけをrequirement-structure-v2へ渡す
-- runtime metadata / input fingerprintはadapter後の`normalized_input`から生成する
-- `requirement_structure.py` 本体はv2 required field欠落をsilent補完せずrejectする
-- Agent / LLMに空array補完をさせない
-
-このadapter後のshapeだけをrequirement-structure-v2へ渡します。
-
-## 4. Acceptance Criterion Machine Entity
+## 4. Acceptance Criterion Machine Entity## 4. Acceptance Criterion Machine Entity
 
 identity:
 
@@ -606,7 +588,7 @@ coverage-analysisの既存traceability graph node typeへACを追加しません
 - qa-workflow expected / actual Entity exact match
 - coverage-analysis current Entity parse compatibility
 - requirement-structure-v2 valid / invalid schema
-- requirement_input_adapter.pyが非mode inputの欠落した `acceptance_criteria=[] / acceptance_refs=[]` だけを補完し、既存値を変更せず、requirement_structure.py本体はv2 required field欠落をrejectする
+- requirement-structure-v2がmodeを問わず `acceptance_criteria[] / acceptance_refs[]` をraw input必須とし、ACなしはcallerの明示 `[]`、v1 cutoverはproject_v1_cutoverのcomplete inputで成立すること。field欠落を補うadapter script / shared runtime hookを追加しない
 - AC-001をTRへlinkしても、そのACが参照するSPEC-001をTR authority_refs / Authority Dispositionで別途closeしない場合はSPEC-001 unclosedとなる
 - project_v1_cutoverのskill別projection、runtime-v1 / entity-state-v1以外の入力拒否、内容不変時stable ID保持、deleted / inactive identity history保持
 - AC linked / disposed / unclosed / linked+disposed

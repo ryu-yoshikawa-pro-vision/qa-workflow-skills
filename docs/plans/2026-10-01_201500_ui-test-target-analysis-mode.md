@@ -170,14 +170,13 @@ version更新時は変更ファイルだけではなく、そのversionの完全
 - skills/question-analysis/SKILL.md
 - skills/question-analysis/references/guidance.md
 - skills/question-analysis/assets/output-template.md
-- 新規 skills/question-analysis/scripts/unknown_links.py
 - 新規 skills/question-analysis/scripts/question_ids.py
 - skills/question-analysis/evals/semantic/*
 - skills/question-analysis/evals/deterministic/validator.py
 - skills/question-analysis/evals/output/*
 - question-analysis helper用repository unit test
 
-目的はUNKNOWNの安定参照、回答後の差分反映、解消済み履歴とcurrent unknownの分離です。既存の質問分類自体は変更しません。new Qの意味判断はLLMに残し、Q番号・使用済みQ ID履歴・current Q table serializationはSkill-local helperで決定論化します。既存成果物更新ではprevious artifactを必須とし、回答済みQがcurrent一覧から消えても過去Q IDを再利用しません。
+目的はUNKNOWNの安定参照、回答後の差分反映、解消済み履歴とcurrent unknownの分離です。既存の質問分類自体は変更しません。new QとUNKNOWNの意味対応はLLMに残し、Q番号・使用済みQ ID履歴・current Q table serialization・UNKNOWN参照の形式 / 存在検証は `question_ids.py` にまとめて決定論化します。既存成果物更新ではprevious artifactを必須とし、回答済みQがcurrent一覧から消えても過去Q IDを再利用しません。
 
 ### shared runtime / Machine Entity contract
 
@@ -243,6 +242,8 @@ PR #14後のCIは `skills/*/scripts` を動的compileするため、helper compi
 - test-target-inspectionのbrowser観測契約変更
 - Agent Skills Specificationの独自拡張
 - ZIP専用runtime。archive出力は利用Agentのartifact機能で行い、Skillの正規処理には含めない
+- 導入先project固有のstorage / external API / connector / process起動 / timeout / lock / orchestrationを包むwrapper。Skill repoはQA契約固有の決定論処理だけを持ち、環境固有の接続・実行制御は導入先project / harnessが担当する
+- 既存production scriptへ数行で収まるdefault補完・入力受け渡しだけのadapter script。独立した現在要件を持たない処理は既存scriptへ統合する
 
 ## 成功条件
 
@@ -271,3 +272,4 @@ PR #14後のCIは `skills/*/scripts` を動的compileするため、helper compi
 - 同じpackage rootへの`materialize`はcallerが直列化し、helperはUTF-8 without BOM / LF / terminal LFのcanonical bytesをstagingへ生成・検証してからpackage単位でcommitする。途中I/O failureで旧版 / 新版が混在した完成packageを残さない
 - package-local stable IDを持つ複数UI target packageのMachine Entity blockを同一current Entity collectionへ直接mergeせず、必要ならspec-analysisで1つのcurrent canonical package / normalized inputへ意味統合してから下流へ渡す
 - helperがsemantic判断を代替せず、通常spec-analysisの柔軟性を損なわない
+- production helperの公開CLIは独立した実行用途があるoperationだけに限定し、採番・version計算・MANIFEST生成・impact算出等のmaterialize内部処理をfocused useだけのために公開operation化しない

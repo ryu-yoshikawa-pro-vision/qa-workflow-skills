@@ -231,7 +231,7 @@ IDへActor、結果分類等のmutable semanticsを埋め込みません。
 
 semantic identityのreuse / new / explicit retire判断はLLMが行います。
 
-通常package更新では、LLMはstable ID番号をMarkdownへ書かず、既存identityを `identity_action=reuse / reuse_id=<ID>`、new identityを `identity_action=new / draft_key=<key>` として `ui_target_package.py materialize` へ渡します。helperがstandard / 宣言済み案件固有prefixの使用済みIDから採番し、`@draft`参照を解決してcanonical tableを生成します。`next-id` はfocused use / unit test用の同じallocatorとして残します。
+通常package更新では、LLMはstable ID番号をMarkdownへ書かず、既存identityを `identity_action=reuse / reuse_id=<ID>`、new identityを `identity_action=new / draft_key=<key>` として `ui_target_package.py materialize` へ渡します。helperがstandard / 宣言済み案件固有prefixの使用済みIDから採番し、`@draft`参照を解決してcanonical tableを生成します。採番処理は`materialize`内部allocatorとしてunit testし、focused CLI operationは追加しません。
 
 分類変更だけでstable IDを再採番しません。rowが消えただけでretiredとせず、semantic identityをcurrent modelから意図的に除去する場合だけLLMが `retire_ids[]` を明示します。
 

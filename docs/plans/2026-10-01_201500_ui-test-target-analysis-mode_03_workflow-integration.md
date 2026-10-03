@@ -57,34 +57,20 @@ mode packageのUNKNOWNを、回答反映のたびに再質問・再採番せず�
 
 spec-analysis由来の論点ならUNK-xxxを記録し、質問単位のQ-xxxと仕様UNKNOWNを追跡できるようにします。mode packageからquestion-analysisへ進む場合は `ui_target_package.py inspect` の `current_unknown_ids[] / resolved_unknown_ids[]` を正規handoffとし、Agentが09から集合を手作業で再構築しません。
 
-値は空欄または1件以上の `UNK-xxx` とし、複数参照は `<br>` 区切りに固定します。QとUNKが意味的に対応するかはLLMが判断し、`unknown_links.py` は形式・存在・duplicateだけを検証します。新しいUNKNOWN registryは作りません。
+値は空欄または1件以上の `UNK-xxx` とし、複数参照は `<br>` 区切りに固定します。QとUNKが意味的に対応するかはLLMが判断し、`question_ids.py validate-links` は形式・存在・duplicateだけを検証します。新しいUNKNOWN registryは作りません。
 
 ### 1.5 Skill-local deterministic helper
 
-新規に次を追加します。
-
-- `skills/question-analysis/scripts/unknown_links.py`
-- `skills/question-analysis/scripts/question_ids.py`
+新規に `skills/question-analysis/scripts/question_ids.py` を追加します。UNKNOWN参照検証だけの別wrapperは作りません。
 
 stdin / stdout JSON、operation名、failure、size limit、sort順等の正確なCLI契約は `_06_package-schema-and-helper-contracts.md` を正本とします。
 
-`unknown_links.py` は次を決定論的に検証します。
+公開operationは次の2つだけです。
 
-- `関連UNKNOWN ID` の非空値が `UNK-xxx` 形式であること
-- current known UNKNOWN集合に参照先が存在すること
-- 同一Q内で同じUNKを重複参照していないこと
-- current / resolved集合が与えられた場合、resolved-only UNKをcurrent questionへ関連付けていないこと
+- `materialize`: LLMが確定した質問semantic rowからnew Q IDを内部採番し、current `不明点 / 質問一覧` と `質問ID履歴` を同時生成する
+- `validate-links`: current Q tableの `関連UNKNOWN ID` について、`UNK-xxx`形式、current known UNKNOWNへの存在参照、同一Q内duplicate、resolved-only参照を検証する
 
-`question_ids.py` は次だけを担当します。
-
-- `不明点 / 質問一覧` と `質問ID履歴` の `Q-xxx` をparseする
-- current質問ID / 使用済み履歴IDのduplicate / malformedを拒否する
-- create / updateを区別し、既存成果物更新ではprevious artifact欠落をfail-closedにする
-- LLMがnew questionと判断した後、previous current Q + previous履歴 + current Qの共通正本集合から既知最大番号+1を返す。candidate側の既存 `質問ID履歴` は採番入力にしない
-- previous artifactとcandidate current artifactから、同じ正本集合のunionをcanonical `質問ID履歴` tableとして生成する
-- `Q-999` 使用済みなら既存3桁ID契約を勝手に拡張せず `id_space_exhausted` を返す
-
-この2 helperはQとUNKの意味的対応、質問文、回答後の正規化先、reuse / newの意味判断を行いません。
+Qの次番号計算と質問ID履歴unionは `materialize` 内部関数とし、`next-id / build-history` の公開operationは作りません。QとUNKの意味的対応、質問文、回答後の正規化先、reuse / newの意味判断は行いません。Q-999使用済み時は既存3桁ID契約を勝手に拡張せず `id_space_exhausted` でblockedします。
 
 spec-analysisからquestion-analysisへ進む順序は次に固定します。
 
@@ -93,7 +79,7 @@ spec-analysisからquestion-analysisへ進む順序は次に固定します。
 3. `ui_target_package.py inspect` を再実行し、更新後の `current_unknown_ids[] / resolved_unknown_ids[]` を取得する
 4. question-analysisはこのcurrent UNKNOWN集合だけを使ってcurrent Qを作る
 
-resolved-only UNKをquestion-analysisへ先に渡してからreopenする順序は禁止します。これにより `unknown_links.py` のresolved-only参照拒否とsame-ID reopenを両立させます。
+resolved-only UNKをquestion-analysisへ先に渡してからreopenする順序は禁止します。これにより `question_ids.py validate-links` のresolved-only参照拒否とsame-ID reopenを両立させます。
 
 question-analysis成果物の更新順は次に固定します。
 
@@ -101,7 +87,7 @@ question-analysis成果物の更新順は次に固定します。
 2. helperがprevious current Q + previous historyからreuse / new Q IDを解決し、current `不明点 / 質問一覧` と `質問ID履歴` の2 sectionをcanonical生成する
 3. helper返却の `artifact_markdown` をquestion-analysis完成成果物として使用する
 
-通常経路ではAgent / LLMがQ IDをrowへ書き込み、`<br>` escapeやID昇順、previous履歴unionを手作業で組み立てません。`next-id / build-history` はfocused test /個別利用用の同一内部contractとして残します。
+通常経路ではAgent / LLMがQ IDをrowへ書き込み、`<br>` escapeやID昇順、previous履歴unionを手作業で組み立てません。採番と履歴unionは`materialize`内部関数としてrepository unit testから直接検証し、focused CLI operationは追加しません。
 
 ### 1.6 deterministic eval
 
@@ -204,7 +190,7 @@ LLMは回答の意味、DECISION / ASMの区別、既存identityのreuse / new�
 
 `skills/qa-workflow/assets/project-context-template.md` を正本ownerとして使う場合、Section 12 / 13はheader-onlyへ変更し、現在の `DEC-001` / `ASM-001` 例示rowを実データとして残しません。
 
-Project Context ownerの更新では、LLM / stakeholderがreuse / new、決定内容、状態遷移等の意味fieldを `project_context_ids.py materialize` へ渡します。helperがprevious + candidate全状態rowからnew IDを採番し、previous IDを保持したSection 12 / 13をcanonical生成します。`validate-history` はfocused validationとして同じprevious-ID保持契約を独立確認します。row順、決定内容、状態遷移の意味はhelperで判断しません。
+Project Context ownerの更新では、LLM / stakeholderがreuse / new、決定内容、状態遷移等の意味fieldを `project_context_ids.py materialize` へ渡します。helperがprevious + candidate全状態rowからnew IDを内部採番し、previous IDを保持したSection 12 / 13をcanonical生成します。`validate-history` は既存Project Contextの履歴整合を独立確認するproduction validationとして残します。採番だけの`next-id` operationは追加しません。row順、決定内容、状態遷移の意味はhelperで判断しません。
 
 exact CLI契約は `_06_package-schema-and-helper-contracts.md` を正本とします。
 

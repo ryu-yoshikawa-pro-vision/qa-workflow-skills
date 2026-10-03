@@ -146,7 +146,7 @@ mode packageでも既存 `assets/output-template.md` のcanonical契約を維持
 - UI構造間の関係は `関連構造ID` で追跡する
 - 複数IDの区切りは `<br>` に固定する
 - exact ID参照の存在・duplicateはui_target_package.pyで検証する
-- semantic identity、reuse / new判断はLLMが行う。UI target mode内でnewと判断した `SRC / SPEC / INF / UNK` とstructural IDの次番号は `ui_target_package.py next-id` を使用し、Agentが既知ID一覧を組み立てない。DEC / ASMは案件で実際に指定された正本ownerのIDを参照し、UI target packageでは採番しない。ただしpackage内stable reference / CHANGELOG / impactでは追跡対象に含める
+- semantic identity、reuse / new判断はLLMが行う。UI target mode内でnewと判断した `SRC / SPEC / INF / UNK` とstructural IDの次番号は `ui_target_package.py materialize` 内部allocatorを使用し、Agentが既知ID一覧を組み立てない。DEC / ASMは案件で実際に指定された正本ownerのIDを参照し、UI target packageでは採番しない。ただしpackage内stable reference / CHANGELOG / impactでは追跡対象に含める
 
 ### 正規UI分類
 
@@ -350,7 +350,7 @@ versionごとの差分と、どのUNKNOWN / issue / decisionを反映したか�
 - current package file一覧
 - 各fileのSHA-256
 
-`ui_target_package.py build-manifest` で生成します。MANIFEST自身は自己hash対象にせず、SHA-256はcurrent fileのraw bytesから計算します。Agent / LLMがhashを手入力しません。file orderはREADME → 00〜09 → 10以降のdomain file → CHANGELOGのcanonical順とします。
+`ui_target_package.py materialize` の内部MANIFEST builderで生成します。MANIFEST自身は自己hash対象にせず、SHA-256はcurrent fileのraw bytesから計算します。Agent / LLMがhashを手入力しません。file orderはREADME → 00〜09 → 10以降のdomain file → CHANGELOGのcanonical順とします。
 
 ## 5. version contract
 
@@ -365,7 +365,7 @@ default policy:
 5. 変更後もcurrent versionの全fileを含む完全版を成立させる
 6. 過去versionは履歴でありcurrent仕様の参照前提にしない
 
-default policyでは、完成済みpackageのuser-managed / semantic payloadに永続差分を加えて再び完成状態として保存する場合、semantic / presentationを問わず必ず次のvNNへ進めます。LLMが入力するcurrent versionの `変更概要` もuser-managed narrativeとして差分判定に含めます。一方、Package Version / Previous Package Version、CHANGELOGのversion heading・`Stable ID changes`・`影響file`、README generated controls、MANIFESTのようにhelperが他の変更から導出するcontrol差分自体はversion up要否の原因に数えません。user-managed provisional payload + requested `change_summary` が同一のno-opだけversionを維持します。canonical更新経路では `ui_target_package.py materialize` がcontrol生成前に差分を判定し、変更がある場合だけ次versionをREADME / CHANGELOG / MANIFESTへ反映します。`next-version` は同じversion導出規則をfocusedに確認するoperationとして残します。package schema versionはcontent versionと分離し、current schemaは `ui-target-v1` とします。
+default policyでは、完成済みpackageのuser-managed / semantic payloadに永続差分を加えて再び完成状態として保存する場合、semantic / presentationを問わず必ず次のvNNへ進めます。LLMが入力するcurrent versionの `変更概要` もuser-managed narrativeとして差分判定に含めます。一方、Package Version / Previous Package Version、CHANGELOGのversion heading・`Stable ID changes`・`影響file`、README generated controls、MANIFESTのようにhelperが他の変更から導出するcontrol差分自体はversion up要否の原因に数えません。user-managed provisional payload + requested `change_summary` が同一のno-opだけversionを維持します。canonical更新経路では `ui_target_package.py materialize` がcontrol生成前に差分を判定し、変更がある場合だけ次versionをREADME / CHANGELOG / MANIFESTへ反映します。version導出は`materialize`内部処理とし、focused確認だけの公開operationは作りません。package schema versionはcontent versionと分離し、current schemaは `ui-target-v1` とします。
 
 `ui-target-v1` のversion policyは上記defaultだけを正本とします。案件固有の別version policyはPR #16では扱わず、必要になった場合はpackage schema / helper contractの変更として別途設計します。「versionを上げるほど重要か」をLLMへ判断させません。
 
@@ -405,7 +405,7 @@ helperが列挙したimpact候補は再確認対象であり、変更必須と�
 - 独立したAuthority / rule / flow集合として継続更新する必要がある
 - LLMは責務 / 分割理由 / lowercase kebab-case slugを `materialize.extension_file_updates[]` へ渡す
 - canonical create / updateでは `materialize` がexisting 10+ fileの最大番号+1からrequest順に複数extensionをbatch採番し、実fileと00の `案件固有extension file一覧` を同時生成する。不要になったcurrent extensionはLLMが`extension_file_retirements[]`へ明示し、helperが参照・tracked row残存を検証したうえで実fileと宣言rowを同時に除去する。Agentが10+番号・宣言rowを計算しない
-- `ui_target_package.py next-domain-file` はfocused確認 / 個別利用用に残すが、通常package完成経路で複数extensionの番号予約に使わない
+- extension file番号は`materialize`内部でcurrent 10+ file集合からbatch採番し、番号計算だけの公開operationは作らない
 - current UNKNOWNのcanonical正本は09、repository statusの正本は08、canonical Authority / traceabilityの正本は09のまま
 - 同じ仕様項目を二重正本にしない
 

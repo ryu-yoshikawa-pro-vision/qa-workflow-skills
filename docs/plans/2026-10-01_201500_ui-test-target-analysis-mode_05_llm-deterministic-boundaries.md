@@ -21,6 +21,8 @@
 
 「実装しやすいからscript化する」「validatorで判定できそうだから意味判断まで固定する」は行いません。
 
+また、決定論的であっても独立したproduction実行用途を持たない数行のdefault補完・値転送・別script呼び出しだけのwrapperは追加しません。既存production scriptの責務内で完結する処理はそのscriptへ統合します。storage / external API / connector / process起動 / timeout / lock / orchestration等の導入先project固有処理はSkill repoへ抽象wrapperを置かず、導入先project / harnessが担当します。production CLI operationはAgent / workflowが単独で呼ぶ現在用途があるものだけ公開し、unit testのためだけのfocused operationは内部関数として検証します。
+
 ## 2. 責務マトリクス
 
 | 処理 | 主担当 | 契約 |
@@ -53,7 +55,7 @@
 | changed stable IDの参照file候補 | deterministic helper | exact参照から候補を列挙する。意味上の修正要否はLLM |
 | Authority Machine Entity / fingerprint | 既存deterministic helper | authority_entities.pyを正本とする |
 | Acceptance Criterion Machine Entity / spec-analysis normalized input | deterministic helper | ui_target_package.pyがcurrent AC + parent chainから固定projectionする |
-| semantic eval用package projection | deterministic helper | package内容を要約・変更せず連結する |
+| semantic eval用package projection | repository eval utility | package内容を要約・変更せず連結する。Skill production CLIには含めない |
 | semanticな重複・矛盾・不足 | LLM / semantic eval |文字列一致だけで自動統合しない |
 
 ## 3. spec-analysis Skill-local helper
@@ -66,166 +68,41 @@
 
 ### 3.1 helperが担当するoperation
 
-次を提供します。operation名は実装時にこの名称で固定し、このPlanで未定義のoperationは追加しません。
+production CLIは次の4 operationだけを公開します。
 
 #### inspect
 
-package rootを読み、次をJSONで返します。
-
-- package version
-- current file list
-- required coreのmissing
-- file applicability状態
-- extension domain file list
-- canonical analysis item ID集合
-- current UNKNOWN ID集合
-- current UNKNOWN件数
-- cross-file stable ID reference index
-- unresolved structural issues
-
-意味評価は返しません。
+package rootを読み、package version、current file list、file applicability、extension file、canonical ID集合、current / resolved UNKNOWN集合、cross-file stable reference index、更新用snapshotを返します。意味評価は返しません。
 
 #### validate
 
-次を決定論的に検証します。
-
-- required core fileの存在
-- package root外pathを参照していない
-- package内version表記の一致
-- canonical分析項目IDの形式・重複
-- UI / rule / flow等、modeで定義するstructural IDの形式・重複
-- exact stable ID参照先の存在
-- 07_current_unknownsに含まれるUNK ID集合が09のcurrent UNKNOWN集合と一致
-- READMEのcurrent UNKNOWN件数が09から導出した件数と一致
-- MANIFESTのfile set / order / SHA-256がcurrent packageと一致
-- READMEのCurrent payload filesがMANIFESTのpayload file listと一致
-- CHANGELOGの最新version見出しがpackage versionと一致
-- `Machine Entities: spec-analysis` blockがexactly one存在し、Authority + current ACのhelper再生成結果と一致すること
-- resolved UNKNOWNの`解消先ID`が存在するcurrent SPEC / DECISION / 承認済みASMを参照すること
-
-意味的な正しさ、Authority優先順位、PAGEかVIEWか等は検証しません。
-
-#### next-version
-
-default version policyを使うcurrent `ui-target-v1` packageでは、Agentがcurrent versionを読み取ってhelperへ渡しません。helperが `package_root` からPackage Versionを取得し、`previous_version / next_version` を返します。
-
-mode導入前のlegacy packageをcurrent schemaへ移行する場合だけ、LLMがsemantic mappingで確定した明示versionをlegacy migration用inputとして渡せます。current `ui-target-v1` の通常create / updateはdefault `vNN` policyだけを使用し、案件固有version policyはPR #16で扱いません。
-
-#### next-id
-
-LLMがsemantic identityを判断して `new` と決めた後だけ使用します。Agentから既知ID一覧を受け取らず、helperがpackage rootのcurrent structured row、CHANGELOG各versionのexact `Stable ID changes` table、previous snapshotから既知IDを収集し、同prefixの既知最大番号+1を返します。標準prefixに加え00宣言済み案件固有prefixも同じallocatorで扱います。
-
-- reuse / newの意味判断は行わない
-- Agent / LLMに`known_ids[]`を手組みさせない
-- CHANGELOG本文のproseからIDを推測せず、exact tableだけを履歴として読む
-- 現在存在しない過去IDもCHANGELOGのstable ID履歴から既知IDとして扱い、別entityへ再割当てしない
-- UI target mode内でnewと判断した `SRC / SPEC / INF / UNK`、standard structural ID、00宣言済み案件固有IDの番号決定に使用する
-- `DEC / ASM` は案件で実際に指定された決定事項 / 仮定の正本がownerであり、本helperで新規採番しない。canonical Authority IDは既存契約どおり `DEC-xxx / ASM-xxx` とし、Project Contextがownerの場合だけ `project_context_ids.py` を使う
-- canonical package更新では `materialize` が同じallocatorを内部利用し、AgentがIDをMarkdown rowへ手入力しない
-- helper返却の `stable_id_change` は採番確認用で、CHANGELOG rowはimpact / materializeが生成する
-- prefixは標準または00で宣言済みのものだけ許可する
-
-#### render-readme-controls
-
-READMEの `Package metadata` と `Current payload files` をcanonical Markdownとして生成します。
-
-- Package Schema Version / Package Version / Previous Package VersionはREADME current metadataを使う
-- Current UNKNOWN Countは09のcurrent UNKNOWN集合から導出する
-- Current payload filesはcurrent file setと00 applicability / extension宣言からcanonical orderで導出する
-- Agent / LLMがmetadata table、UNKNOWN件数、payload file順、種別を再構築しない
-- MANIFEST hash計算より前にREADME controlsへ反映する
-
-#### next-domain-file
-
-focused確認 / 個別利用用operationです。LLMが「標準fileへ混在させるべきでない独立domainが必要」と判断し、slugを決めた後、existing `10+` domain file番号の最大値+1とcanonical relative pathを返します。
-
-- domain fileが必要かは判断しない
-- slugの意味は判断しない
-- Agent / LLMに次の連番を計算させない
-- focused operationを連続利用する場合は返却pathを実fileへmaterializeしてから次を呼び、未materialize番号をAgent側だけで予約しない
-- canonical package create / updateでは `materialize.extension_file_updates[]` が複数new extensionをrequest順にbatch採番し、00のextension宣言tableと実fileを同時生成するため、Agentはnext-domain-fileを逐次呼ばない
-- 既存最大番号が999なら自動拡張せず `id_space_exhausted`
+required file、version、ID形式・duplicate、exact reference、UNKNOWN整合、MANIFEST / README controls、CHANGELOG lifecycle、Machine Entities等のcurrent package契約を決定論的に検証します。意味的な正しさ、Authority優先順位、PAGEかVIEWか等は判定しません。
 
 #### materialize
 
-通常のUI target package作成 / 更新のwrite pathです。normal create / updateとlegacy-migrationを明示modeで分けます。LLMがsemantic row / prose、reuse / new、explicit retire、file trigger、extension要否を決めた後、helperが次をまとめて実行します。
+通常のUI target package作成 / 更新とlegacy migrationのcanonical write pathです。LLMがsemantic row / prose、reuse / new、explicit retire、file trigger、extension要否を決めた後、helper内部で次をまとめて実行します。
 
-- stable owner tableのnew ID / `@draft`参照解決
-- stable IDを採番しないfixed/view tableのfull-replacement `keyed_table_updates[]` と、そのkey / reference内 `@draft` 解決
+- current / history / previous snapshotからのstable ID batch allocation
+- default vNN version導出
+- `@draft`参照解決
 - Markdown escape / canonical row order / table serialization
-- known headingへのsection置換
-- `prose_updates[]` は既存exact headingのbodyだけを置換し、新規heading作成 / heading削除 / structured・generated section上書きを行わない
-- file applicabilityを先に解釈した条件付き標準fileのtemplate作成 / 除去
-- new / reuse extension fileの連番batch解決、作成 / 更新と、明示`extension_file_retirements[]`による廃止、00の `案件固有extension file一覧` canonical生成
-- explicit `retire_ids[]` のlifecycle検証。row消失だけではretireしない
-- Stable ID changes / 影響file
-- Machine Entities section
+- known heading body置換
+- 条件付き標準file同期
+- extension file番号batch allocation、作成 / 更新 / 明示廃止
+- Stable ID lifecycle / 再確認候補file算出
 - README controls
-- MANIFEST / hash
+- Machine Entities section
+- MANIFEST / SHA-256
 - final validate
+- staging + package単位commit
 
-汎用Markdown frameworkにはせず、`ui-target-v1` のknown file / heading / table registryだけを扱います。stable owner tableとfixed/view tableのregistryもPlanで固定します。同じpackage rootへのmaterializeはcallerが直列化し、inspect snapshotはlock代替ではなくstale検出に使います。helper所有fileはUTF-8 without BOM / LF / terminal LFのcanonical bytesへ固定し、sibling staging packageをfinal validateしてcommit直前にsnapshotを再照合してからpackage単位でcommitします。途中failureでは旧packageを復旧・保持し、差分なしのnormal updateはno-opとしてversionを上げません。
-
-#### build-manifest
-
-README controls反映後のcurrent package fileからMANIFEST bodyを生成します。
-
-- MANIFEST自身は自己hash対象にしない
-- SHA-256はfileのraw bytesから計算する
-- file orderはmodeのcanonical orderに従う
-- 条件付き必須fileは00のapplicabilityと一致するものだけ含める
-- extension fileは00へ宣言済みのものだけ含める
-- Agent / LLMがfile順・hashを再構築しない
-
-#### inspect / impact
-
-通常更新では、内容編集前の `inspect` が `update_snapshot` を生成します。snapshotはtracked stable IDのpackage tracking row fingerprint、UNKNOWN state、previous exact reference、payload / MANIFEST hashを保持し、Agent / LLMは編集・再構築しません。
-
-semantic identity、same-UNK reopen / new UNK等をLLMが判断してpackage tracking rowへ反映した後、`impact` がprevious snapshotとcurrent stateを比較して次を決定論生成します。
-
-- `added / changed / resolved` と、LLMが明示した `retire_ids[]` に対する `retired`
-- changed stable ID集合
-- `Stable ID changes` canonical Markdown
-- previous/current owner + exact referenceから導出した再確認候補file / row
-- `影響file` canonical Markdown
-
-LLMがCHANGELOG event rowや影響file一覧を手入力しません。ただし `retired` はterminal semantic decisionなので、helperがrow消失から自動判定せずLLMが `retire_ids[]` で明示します。明示なしにprevious tracked rowが消えた場合はblockedします。更新途中でstable ID tracking rowを除去しても、allocatorは同じprevious snapshotを使用済みID集合へ含めるため、そのrevision内で過去IDを再利用しません。
-
-legacy migrationではsemantic identity mappingだけをLLMが行い、retained ID / 明示確認できるlifecycle event / semantic rowsを `materialize(change_mode=legacy-migration)` へ渡します。helperがこれらを採番前の使用済み集合へ予約し、new ID、canonical Markdown、`migrated / added / resolved / retired`、README / Machine Entity / MANIFESTまで生成します。focused `impact(change_mode=legacy-migration)` は同じlifecycle生成contractの単体検証用に残し、legacy proseからidentityを推測しません。
-
-この結果は「本文修正が必要」という意味判断ではありません。LLMが再確認対象を漏らさないための候補集合です。
+これらは`materialize`内部関数としてrepository unit testから直接検証し、`next-version / next-id / render-readme-controls / next-domain-file / build-manifest / impact` のproduction CLI operationは作りません。
 
 #### build-machine-evidence
 
-09のCurrent Effective Authorityと02のcurrent AC + parent US / UC / Behavior chainを固定projectionします。
+09のCurrent Effective Authorityと02のcurrent AC + parent US / UC / Behavior chainから、Authority + AC Machine Entity、canonical `normalized_skill_input`、`expected_entity_identities`、`Machine Entities: spec-analysis` Markdown sectionを固定projectionします。これはmaterialized packageからqa-workflow / coverage-analysisへhandoffする独立production用途があるため公開operationとして残します。
 
-1. Authority rowを既存 `authority_entities.py` builderへ渡す
-2. current ACだけを `acceptance_criterion` Machine Entityへ変換する
-3. AC contentへ親US / UC / Behavior / Scope / Authority / structure refsを固定projectionする
-4. Authority + AC Entityを1つの `Machine Entities: spec-analysis` blockへcanonical順で統合する
-5. 既存shared `render_machine_entities()` を使ってheading + JSON fenceを含むcanonical Markdown sectionまで生成する
-6. qa-workflow / coverage-analysisへ渡すcanonical `normalized_skill_input` と `expected_entity_identities` を同じsourceから生成する
-
-US / UC / Behaviorをglobal Machine Entity typeへしません。何をAuthorityとするか、UI操作やUS / UC / Behavior / ACをどう意味分解するかはLLM判断です。wrapper / content / dependency / fingerprint / normalized machine input / expected identity / Markdown section serializationはhelperが生成します。
-#### project-eval
-
-projection modeを `semantic / deterministic` に固定します。
-
-semantic:
-
-- README / 00〜09 / 10+ current domain files
-- CHANGELOG / MANIFESTは除外
-
-deterministic:
-
-- 全payload file
-- MANIFESTを最後にcontrol fileとして追加
-
-共通して各fileの前へ `<!-- FILE: <relative-path> -->` を付け、内容は要約・正規化・書換えしません。package root外path、symlink、duplicate / missing fileを拒否します。
-
-projectionは評価transportです。raw file bytesのSHA-256再計算はproduction `validate` / repository unit testの責務とし、projected deterministic evalではMANIFEST schema、file集合・順序、SHA-256文字列形式、stable ref等を評価します。projectionからraw bytesを復元するframingは追加しません。
-
-semantic / deterministic runnerのdirectory対応は追加せず、この固定projectionを1-file inputとして渡します。
+semantic / deterministic eval用multi-file projectionはproduction helperへ入れず、repository専用 `scripts/skills/evals/ui_target_projection.py` が担当します。既存runnerへ1-file inputを渡すためのrepository test utilityであり、導入先Skill packageへ同梱しません。
 
 ### 3.2 helperが担当しないこと
 
@@ -336,7 +213,7 @@ MANIFESTはcurrent package fileのfile listとSHA-256を持ちます。
 - SHA-256はhelperが計算する
 - Agentがhash値を手入力しない
 
-default policyでは、完成済みpackageのuser-managed / semantic payloadへ永続差分を加えて再び完成状態として保存するならsemantic / presentationを問わずversionを1増分します。LLMが入力するcurrent versionの `変更概要` はuser-managed narrativeなので差分に含めます。version metadata、CHANGELOGのversion heading / `Stable ID changes` / `影響file`、README generated controls、MANIFEST等のhelper生成controlはversion up要否の原因に数えません。control生成前のprovisional payload + requested `change_summary` が同一ならno-opとしてversionを維持します。canonical更新経路では `materialize` が差分確定後にだけ次versionをREADME / CHANGELOG / MANIFESTへ反映します。案件で別version policyが明示されている場合だけそのpolicyを優先します。
+default policyでは、完成済みpackageのuser-managed / semantic payloadへ永続差分を加えて再び完成状態として保存するならsemantic / presentationを問わずversionを1増分します。LLMが入力するcurrent versionの `変更概要` はuser-managed narrativeなので差分に含めます。version metadata、CHANGELOGのversion heading / `Stable ID changes` / `影響file`、README generated controls、MANIFEST等のhelper生成controlはversion up要否の原因に数えません。control生成前のprovisional payload + requested `change_summary` が同一ならno-opとしてversionを維持します。canonical更新経路では `materialize` が差分確定後にだけ次versionをREADME / CHANGELOG / MANIFESTへ反映します。`ui-target-v1` はdefault vNN policyだけを使用し、案件固有version policyはPR #16で扱いません。
 
 「同じversionを別内容で完成版として上書きしない」は更新手順上の契約です。current packageだけを見るvalidatorは過去の同version内容とのbyte比較を行わず、current / previous version metadataの形式・連続性・package内一致を検証します。
 
@@ -344,32 +221,24 @@ default policyでは、完成済みpackageのuser-managed / semantic payloadへ�
 
 新規:
 
-- skills/question-analysis/scripts/unknown_links.py
 - skills/question-analysis/scripts/question_ids.py
 - skills/qa-workflow/scripts/project_context_ids.py
 
-いずれもPython標準ライブラリだけを使い、各Skill package単体で実行可能にします。
+いずれもPython標準ライブラリだけを使い、各Skill package単体で実行可能にします。UNKNOWN参照だけを検証する別scriptや、採番結果だけを返す公開operationは追加しません。
 
-`unknown_links.py` の担当:
+`question_ids.py` の公開operation:
 
-- 関連UNKNOWN IDの形式検証
-- current known UNKNOWN集合に対する存在検証
-- Q IDごとのduplicate UNKNOWN参照検出
-- resolved-only UNKNOWNをcurrent questionへ関連付けた場合の検出
+- `materialize`: current Q tableと `質問ID履歴` をparseし、LLMがnew questionと決めた後にprevious current Q + previous履歴 + request内current Qからnew Q IDを内部batch allocationして2 sectionをcanonical生成する
+- `validate-links`: `関連UNKNOWN ID` の形式、current known UNKNOWNへの存在、同一Q内duplicate、resolved-only参照を検証する
 
-`question_ids.py` の担当:
+Qの次番号計算・使用済み履歴unionは内部関数です。QとUNKが意味的に同一か、質問文、回答後の正規化先、reuse / newの意味判断は行いません。
 
-- current `不明点 / 質問一覧` とmachine-readableな `質問ID履歴` の `Q-xxx` 形式・duplicate検証
-- create / updateを区別し、既存成果物更新ではprevious artifact欠落をfail-closedにする
-- LLMがnew questionと決めた後、`previous current Q + previous質問ID履歴 + current current Q` の共通使用済み集合から次番号を決定する。candidate側の既存 `質問ID履歴` は採番入力にしない
-- `materialize` でcurrent Q tableとcanonical `質問ID履歴` tableを同時生成し、Agent / LLMがQ ID / row順 / `<br>` serializationを手組みしない
+`project_context_ids.py` の公開operation:
 
-`project_context_ids.py` の担当:
+- `materialize`: Project Context Section 12 / 13が実際のDEC / ASM正本ownerの場合だけ、LLM / stakeholderが確定したsemantic rowsへnew IDを内部batch allocationしてcanonical生成する
+- `validate-history`: previous DEC / ASM ID削除を拒否し、撤回 / 置換済みIDの再利用を防ぐ
 
-- Project Context Section 12 / 13が実際の正本ownerである場合だけ、existing `DEC-xxx / ASM-xxx` の形式・duplicateを検証
-- question-analysis / stakeholder判断でnew DECISION / approved ASMと決まった後、previous + candidateの全状態rowから次番号を決定する
-- `materialize` でSection 12 / 13をcanonical生成し、`validate-history` でprevious ID削除を拒否する
-- 別ownerが明示されている場合はProject Contextへ複製・再採番せず、そのownerが発行するcanonical `DEC-xxx / ASM-xxx` を使用する。Jira / ADR等のowner固有IDを `authority_id` へ流用しない
+別ownerが明示されている場合はProject Contextへ複製・再採番せず、そのownerが発行するcanonical `DEC-xxx / ASM-xxx` を使用します。外部owner用generic allocator / adapterは追加しません。owner側IDが未確定ならLLM hand-numberingへfallbackせず正本登録をblockedとします。
 
 担当しない:
 
@@ -383,11 +252,9 @@ default policyでは、完成済みpackageのuser-managed / semantic payloadへ�
 - Project Context以外の正本schemaの解釈・採番
 - 新しいUNKを作るべきかの判断
 
-別ownerが明示されていてowner側IDが未確定の場合、LLMが番号を手計算せず正本登録をblockedとして扱います。任意schema向けgeneric allocatorは追加しません。
-
 各helperのexact operation / input / output / failure contractは `_06_package-schema-and-helper-contracts.md` を正本とします。eval validator / repository testはproduction helperからexpectedを逆算しません。
 
-## 9. route / PAGE / VIEWの曖昧さ
+## 9. route / PAGE / VIEWの曖昧さ## 9. route / PAGE / VIEWの曖昧さ
 
 same-routeであることがAuthorityまたは確認済み実装事実から成立する場合だけVIEW / STEPへ統合します。
 
