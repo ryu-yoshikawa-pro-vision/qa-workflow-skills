@@ -257,28 +257,46 @@ CIではfake Agent commandを使って、ランナー自体の契約・一時実
 
 実Codex等を使う評価は、開発者が明示的に起動するローカル評価とします。
 
-## 追加する共通ランナー
+## 追加する評価実行コード
 
 ### 配置
 
 ```text
 scripts/skills/evals/agent/
 ├── __init__.py
+├── executor.py
 ├── run.py
 ├── prompt_builder.py
 ├── workspace.py
+├── qa_training_store.py
+├── target_workspace.py
+├── scenarios/
+│   └── qa-training-store-checkout-payment-web-v1/
+│       ├── scenario.json
+│       ├── task.md
+│       └── rubric.json
 ├── README.md
 └── tests/
 ```
 
-責務は次のとおりです。
+`executor.py`だけをフェーズ1 / フェーズ2の共通Agent subprocess境界にします。任意target向けのplugin interfaceは作りません。
+
+### `executor.py`
+
+- 外部Agent commandへUTF-8 promptをstdinで渡す
+- stdout / stderr / exit codeを返す
+- `shell=True`を使わない
+- timeout / process failureを共通のexecution errorへ正規化する
+- Agent SDKやCodex固有flagを持たない
 
 ### `run.py`
 
+既存Eval Inputを扱うフェーズ1の入口です。
+
 - CLI引数解析
-- 評価ケースの選択
-- 一時実行ディレクトリ作成
-- Agent command実行
+- deterministic / semantic評価ケースの選択
+- `workspace.py`によるSkill-only workspace作成
+- `executor.py`でAgent command実行
 - 評価対象成果物保存
 - 既存grader起動
 - ケース別結果保存
@@ -287,7 +305,7 @@ scripts/skills/evals/agent/
 
 ### `prompt_builder.py`
 
-Agentへ渡す生成promptだけを構築します。
+フェーズ1でAgentへ渡す生成promptだけを構築します。
 
 promptに含めるもの:
 
@@ -307,10 +325,48 @@ promptに含めないもの:
 
 ### `workspace.py`
 
+フェーズ1用のSkill-only workspaceを作ります。
+
 - `tempfile`で一時実行ディレクトリを作る
 - 19 Skillの通常実行ファイルをコピーする
 - `evals/`を除外する
 - Agent実行終了後に一時ディレクトリを削除する
+
+### `qa_training_store.py`
+
+フェーズ2の`qa-training-store`固定対象評価だけを担当します。
+
+- tracked scenario `qa-training-store-checkout-payment-web-v1`を読み込む
+- `--target-root`のrevision / clean stateをpreflightする
+- `target_workspace.py`でsanitized targetを作る
+- `executor.py`で実Agentを実行する
+- `.qa-eval-output/`から複数成果物を回収する
+- artifact manifestを作る
+- production runtime / verifierで機械判定できる契約を確認する
+- 既存semantic評価のprompt構築 / result正規化処理を再利用して独立Judgeを実行する
+- provenanceと評価結果を保存する
+
+### `target_workspace.py`
+
+フェーズ2の固定target preparationだけを担当します。
+
+- 指定された`qa-training-store` source revisionのtracked contentだけからsanitized targetを作る
+- target固有Skill、過去run / Plan / report、instructor情報、target側Skill evalを除外する
+- 評価用`AGENTS.md`を生成する
+- 19 SkillだけをAgent-visibleに配置する
+- `.qa-eval-output/`と必要な評価用Project Context rootを準備する
+- Agent終了後にsource差分・symlink / path境界を検証する
+- 回収後にsanitized targetを削除する
+
+### tracked scenario
+
+`scenarios/qa-training-store-checkout-payment-web-v1/`は、フェーズ2初回評価を同条件で再実行するためのEvaluator側fixtureです。
+
+- `scenario.json`: target repo / revision、Platform、Feature、除外対象、参照する規範仕様path等
+- `task.md`: Agentへ渡す固定評価要求
+- `rubric.json`: workflow / 仕様根拠 / 分析設計 / traceability / 根拠のない追加を評価するcriteria
+
+これらはEvaluator側にのみ存在します。`rubric.json`は評価対象Agentへ渡しません。`task.md`には期待するQA成果物の正解を含めません。
 
 新しいsandbox実装は作りません。OS process / filesystem isolationはAgentクライアント側のsandboxを使用します。
 
@@ -369,6 +425,35 @@ python scripts/skills/evals/agent/run.py \
 `--repeat N`を任意指定できるようにし、既定は1とします。
 
 同一caseを複数回実行した場合も独自の平均点は作りません。attemptごとの既存eval結果と、pass / needs_review / fail / execution errorの件数だけを集計します。
+
+### 実Agent metadata
+
+実Agentを起動するcommandでは、`--agent-command`より前に少なくとも次を明示します。
+
+```text
+--agent-name <agent name>
+--agent-model <model identifier>
+```
+
+`--agent-version`は任意です。安全に取得できる場合だけ指定または記録します。
+
+### qa-training-store固定scenario
+
+フェーズ2は同じ`executor.py`を使いますが、既存Eval datasetとは別入口にします。
+
+```bash
+python scripts/skills/evals/agent/qa_training_store.py \
+  --scenario qa-training-store-checkout-payment-web-v1 \
+  --target-root ../qa-training-store-eval-target \
+  --output-root .agent-eval-runs/qa-training-store-baseline \
+  --agent-name <agent name> \
+  --agent-model <model identifier> \
+  --agent-command <agent command argv...>
+```
+
+`--target-root`は指定revisionをcheckoutしたcleanなGit working treeを要求します。Evaluatorはそのworking treeを直接変更せず、指定revisionのtracked contentからsanitized targetを作ります。
+
+この入口は`qa-training-store`の初回scenario専用です。任意repoを動的に登録するplugin機構は作りません。
 
 ## semantic評価時のAgent command
 
@@ -475,9 +560,15 @@ batchは途中1件が失敗しても残りcaseを実行し、最後に全体結�
 ### 新規
 
 - `scripts/skills/evals/agent/__init__.py`
+- `scripts/skills/evals/agent/executor.py`
 - `scripts/skills/evals/agent/run.py`
 - `scripts/skills/evals/agent/prompt_builder.py`
 - `scripts/skills/evals/agent/workspace.py`
+- `scripts/skills/evals/agent/qa_training_store.py`
+- `scripts/skills/evals/agent/target_workspace.py`
+- `scripts/skills/evals/agent/scenarios/qa-training-store-checkout-payment-web-v1/scenario.json`
+- `scripts/skills/evals/agent/scenarios/qa-training-store-checkout-payment-web-v1/task.md`
+- `scripts/skills/evals/agent/scenarios/qa-training-store-checkout-payment-web-v1/rubric.json`
 - `scripts/skills/evals/agent/README.md`
 - `scripts/skills/evals/agent/tests/`
 - `tests/skills/evals/agent/`
@@ -535,8 +626,24 @@ repositoryの既存caseを使い、fake Agentで次を自動検証します。
 2. semantic caseを生成し、既存`semantic/run.py`が実行される
 3. `grade.json`へ既存graderの結果が保存される
 4. batch結果が`result.json`へ集計される
+5. dataset / input fingerprintとAgent metadataが`result.json`へ保存される
 
 テスト用fake Agentは評価対象ケースの正解ロジックを実装しません。ランナーの配線確認に必要な最小固定応答だけを使用します。
+
+### qa-training-store scenario integration test
+
+外部LLMは起動せず、fake Agentと一時Git repositoryを使って次を検証します。
+
+- source revisionのtracked contentだけからsanitized targetを作る
+- 元`.agents/skills/**`、元`AGENTS.md` / `QA_AGENT.md`、過去run / Plan / report、instructor情報、target側Skill evalをAgent-visible targetへ残さない
+- 評価用`AGENTS.md`へ製品仕様や正解QA成果物を混ぜない
+- 19 SkillだけをAgent-visibleにする
+- `.qa-eval-output/**`だけを書込み許可範囲として扱う
+- 複数artifactを回収し、相対path / size / SHA-256をmanifestへ保存する
+- symlink / path traversal / output root外参照をrejectする
+- output root外にsource変更があるrunを有効評価へ昇格しない
+- target revision / scenario fingerprint / Agent metadataをprovenanceへ保存する
+- cleanup後にsanitized targetが残らない
 
 ## このブランチで行う実Agent検証
 
