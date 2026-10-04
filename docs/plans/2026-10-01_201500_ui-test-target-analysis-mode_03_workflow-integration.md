@@ -147,7 +147,7 @@ UI target canonical downstreamではscope ownershipを次へ固定します。
 
 `scope_refs[]` がready / blocked双方を含むcross-scope Entityは、1つのcurrent Entityをscopeごとに部分利用できないため保守的にinactive対象とします。ready側だけで成立する別identityへ分割する必要があるかはLLMが意味判断し、helperが旧Entityの内容やscope_refsを自動縮退させません。
 
-v1 cutover直後のdownstreamにはUI target Scope IDが存在しないため `scope_refs=[]` です。UI target package migration後、最初のTRD→TCD→TC更新では既存active downstreamを全件scope ownership付きv2へ正規化し、current TR / TCN / model / CI / TCが必要な `scope_refs[]` を持つbaselineが成立するまでready/blockedのpartial downstream progressionを開始しません。
+v1 cutover直後のdownstreamにはUI target Scope IDが存在しないため `scope_refs=[]` です。UI target package migration時点で既存active downstreamが1件以上あり、そのscope ownershipが未確立なら、最初のownership normalizationは **全current scopeがreadyの時だけ** 実行します。全scopeを `scope_index[]` に含めたTRD→TCD→TC更新で既存active downstream全件へ `scope_refs[]` を付与し、coverage-analysis / qa-workflowまでcurrentにした後でpartial readinessを有効にします。ownership baseline前に1件でもblocked scopeがある場合は `scope_ownership_baseline_required` でfail-closedし、ready scopeだけへ旧IDを推測割当しません。downstream未作成の新規UI target workflowはこのone-time migration gateを通さず、最初からready scopeだけでpartial progressionできます。
 
 ### 2.2 gated mode
 
