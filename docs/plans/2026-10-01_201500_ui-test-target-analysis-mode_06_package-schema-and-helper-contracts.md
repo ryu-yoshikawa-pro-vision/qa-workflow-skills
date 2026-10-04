@@ -168,6 +168,15 @@ file materializationは全scope rowを集約して決めます。
 - identityまで分かるが内容が未確定ならblocked row + UNKNOWNを使う。identity自体を安全に発行できず0 rowになる場合だけ、07のcurrent UNKNOWNにそのScope IDを `Blocking Scope ID`、該当fileを `関連File` として持つことを要求する
 - 08のrepository observationは `判定=判断不能` をcurrent observationとして保持できる。repository access自体が未確定でscopeを止める場合は07 UNKNOWN + 関連Fileで表す
 - helperはこのclosureを検証するが、FIELD等の意味上の個数や内容を推測生成しない
+
+逆方向整合もdeterministic validationで固定します。
+
+- 03が`not-applicable`のScope IDをFIELD rowの`関連Scope ID`が参照してはならない
+- 04が`not-applicable`のScope IDをFLOW rowの`関連Scope ID`が参照してはならない
+- 05が`not-applicable`のScope IDをNOTIFY / INTERACT rowの`関連Scope ID`が参照してはならない
+- 08が`not-applicable`のScope IDをIMPL rowの`関連Scope ID`が参照してはならない
+- 1 rowが複数Scopeを参照し、その一部だけが該当domainで`not-applicable`でもrejectする。helperはScope参照の除去、row split、identity reuse / retireを推測せず、LLMのsemantic updateへ戻す
+
 上記2 tableの `関連仕様項目ID` はstable ID参照専用列です。値は空または `<br>` 区切りのexact stable IDだけを許可し、説明文を混在させません。`根拠 / 備考` は自由記述で、helperはそこに現れるID文字列をstable referenceとして扱いません。
 
 `08_repository_implementation_status.md` のapplicabilityは「そのversionでrepositoryを再確認したか」ではなく、current packageがrepository implementation evidenceを現在保持・利用しているかで判定します。前versionの08をcurrent packageが継続利用する場合は `required` のまま保持し、08内の基準branch / commit / revisionを変更しません。current分析からrepository evidenceを明示的に外した場合だけ `not-applicable` とし、08を除去します。
@@ -237,7 +246,7 @@ scope単位のsemantic contractは `_08` を正本とします。structured tabl
 
 #### Behavior一覧
 
-| Behavior ID | UC ID | 結果分類 | 振る舞い | Postcondition / Result | 関連仕様項目ID | 関連構造ID | 状態 | 関連UNKNOWN ID |
+| Behavior ID | UC ID | 関連操作ID | 結果分類 | 振る舞い | Postcondition / Result | 関連仕様項目ID | 関連構造ID | 状態 | 関連UNKNOWN ID |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
 #### Use Case振る舞い完全性
@@ -250,7 +259,9 @@ scope単位のsemantic contractは `_08` を正本とします。structured tabl
 | AC ID | Behavior ID | Acceptance Criteria | 関連仕様項目ID | 関連構造ID | 状態 | 関連UNKNOWN ID |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 
-not-applicable、またはUI操作有無自体が未確定のscopeはUS / UC / Behavior / ACを確定済みrowとして持ちません。required scopeではUIOP / US / UC / Behavior / ACが `current / blocked` 相当のstate modelを持てます。ACもsemantic identityが既知なら同じ `AC-xxx` を `blocked + 関連UNKNOWN ID` で保持し、解消後に同IDをcurrentへ戻します。semantic identity自体が未確定ならAC rowを発行せず、07のBlocking UNKNOWNへ閉じます。本当に意味上廃止されたACだけをexplicit retireします。
+not-applicable、またはUI操作有無自体が未確定のscopeはUIOP / US / UC / Behavior / ACを確定済みrowとして持ちません。Behavior Decomposition=`not-applicable`のScope IDをこれらのrowがScopeまたはparent chain経由で参照する状態はdeterministic validationでrejectします。required scopeではUIOP / US / UC / Behavior / ACが `current / blocked` 相当のstate modelを持てます。ACもsemantic identityが既知なら同じ `AC-xxx` を `blocked + 関連UNKNOWN ID` で保持し、解消後に同IDをcurrentへ戻します。semantic identity自体が未確定ならAC rowを発行せず、07のBlocking UNKNOWNへ閉じます。本当に意味上廃止されたACだけをexplicit retireします。
+
+Behaviorの`関連操作ID`はUIOP stable IDの`<br>`区切り参照です。どのUIOPがBehaviorに意味上関係するかはLLMが判断します。current Behaviorは1件以上のmapped UIOPを参照し、各UIOPの`対応UC ID`にそのBehaviorの`UC ID`が含まれ、UIOPのScopeとUC→USから導出したScopeが一致することをhelperが検証します。blocked Behaviorは確定済みの関連操作だけを保持でき、未確定なら空を許可します。blocked UIOPを参照する場合は同じScopeだけを許可し、current Behaviorからblocked UIOPを参照しません。
 
 #### ビジネスルール一覧
 
@@ -862,6 +873,7 @@ normal updateで `keyed_table_updates[]` にsectionが無い場合、そのsecti
 normative traceability contract:
 
 - UIOPの `状態` はhelperが生成する。`関連UNKNOWN ID` が1件以上なら `blocked`、空かつcurrent必須fieldが揃えば `mapped`。US / UC / Behavior / AC / RULE / FIELD / FLOW / NOTIFY / INTERACTも同様に `blocked / current` をhelperが導出する。callerは `状態` を入力しない
+- current Behaviorは`関連操作ID`を1件以上要求する。参照先はmapped UIOPで、UIOPの`対応UC ID`にBehaviorの`UC ID`を含み、UIOP.Scopeと親UCのScopeが一致しなければならない。blocked Behaviorでは確定済み参照だけを保持し、未確定なら空を許可する。helperは意味上の関連性を作らず、存在・state・UC / Scope整合・duplicateだけを検証する
 - current / mapped UIOP / US / UC / Behavior / AC / RULE / FIELD / FLOW / NOTIFY / INTERACT rowは `関連仕様項目ID` を1件以上要求する。current ACはさらにcurrent SPEC / DECISION / approved ASMを1件以上要求し、blocked ACは `関連UNKNOWN ID` を1件以上要求する
 - current rowの `関連仕様項目ID` はcurrent SPEC / DECISION / approved ASM / INFだけを許可する
 - identityは確定しているが内容不足の場合はTriggerや存在判定を書き換えず、blocked row + `関連UNKNOWN ID` 1件以上で表す。identity自体を確定できない場合はstable rowを作らず07のUNKNOWNからscope/file blockerへ閉じる
@@ -1057,7 +1069,7 @@ current ACだけを `spec-analysis / acceptance_criterion / AC-xxx` Entityへ変
 AC Entity contentは `_08` のcurrent chainから次を固定projectionします。
 
 - ac_id / acceptance_criteria
-- linked_ui_operations[] の uiop_id / actor_role / target_structure_id / operation / authority_refs[]
+- linked_ui_operations[] の uiop_id / actor_role / target_structure_id / operation / authority_refs[]。parent Behaviorの`関連操作ID`に明示されたmapped UIOPだけをprojectionし、同じUCに属するだけのUIOPは含めない
 - behavior_id / result classification / behavior / postcondition
 - uc_id / use case / trigger / preconditions / success postcondition
 - user_stories[] の us_id / actor_role / goal

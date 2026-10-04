@@ -30,8 +30,8 @@
 | SPEC / DECISION / INFERENCE / UNKNOWN分類 | LLM | 情報源・Authority・文脈から判断する |
 | 現在有効なAuthority解決 | LLM | 既存spec-analysis契約を使用する |
 | PAGE / STATE / VIEW / STEP / MODAL等の意味分類 | LLM | UI意味を判断する。scriptは分類結果の形式だけ検証できる |
-| scopeごとのUI操作有無 / file applicability triggerの意味判断 | LLM | 資料の意味から `あり / なし / 未確定` を判断する。Triggerはdomainの存在判定であり、内容不足だけで `未確定` へ戻さない。scriptはfile × Scope IDごとに `required / not-applicable / blocked` を導出する |
-| UI操作抽出 / US / UC / Behavior / ACの意味分解 | LLM | UI操作scopeでは必須工程。資料不足を推測補完しない。semantic identity自体が未確定でrowを作れない場合はblocking UNKNOWNをScopeへ明示する。既存ACのsemantic identityが同じか、意味上廃止してretireするかもLLMが判断する |
+| scopeごとのUI操作有無 / file applicability triggerの意味判断 | LLM | 資料の意味から `あり / なし / 未確定` を判断する。Triggerはdomainの存在判定であり、内容不足だけで `未確定` へ戻さない。scriptはfile × Scope IDごとに `required / not-applicable / blocked` を導出し、not-applicable scopeを参照する対応tracking rowが残らない逆方向整合も検証する |
+| UI操作抽出 / US / UC / Behavior / ACの意味分解 | LLM | UI操作scopeでは必須工程。Behaviorごとに意味上関係するUIOPを`関連操作ID`で明示し、同一UC内の全UIOPを自動関連付けしない。資料不足を推測補完しない。semantic identity自体が未確定でrowを作れない場合はblocking UNKNOWNをScopeへ明示する。既存ACのsemantic identityが同じか、意味上廃止してretireするかもLLMが判断する |
 | 正常 / 準正常 / 例外の意味分類 | LLM | scriptは3分類の完全性と許可値だけ検証する |
 | AC→TRの意味対応 / TR分割統合 | LLM | ACの単純言い換えではなく検証責務として判断する |
 | 既存項目と意味的に同一か | LLM | stable IDをreuseする意味判断はLLMが行う |
@@ -43,13 +43,13 @@
 | new stable ID番号 | deterministic helper | semantic identity確定後に採番する。既存SRC / SPEC / INF / UNK等は3桁契約を維持し、新設UI target structural IDは最低3桁・上限なしで採番する。extension独自prefixは追加しない |
 | explicit retire intent | LLM | row消失を永久廃止と自動解釈しない。package-owned identityをcurrent modelから意図的に除去する場合だけretire判断する。DEC / ASMはpackage外ownerなのでpackage側terminal retire対象にしない |
 | Markdown table / known section / standard file materialization | deterministic helper | semantic row / prose確定後のID注入、escape、sort、serialization、file同期をui-target-v1専用materializeで行う |
-| SCOPE applicability / 条件付き必須fileと実fileの一致 | deterministic helper / validation | file × Scope IDの `あり / なし / 未確定` からfile状態を固定導出する。content completenessは別に、blocked domain rowまたは07のBlocking Scope ID + 関連Fileでclosureを検証する |
-| UIOP→UC / US→UC / UC→BH / BH→AC closure | deterministic validation | semantic relationを決めず、LLMが作った参照の完全性だけ検証する。UIOP.Scopeと対応UCからderivedしたScopeの一致、required scopeの最低row / blocker closure、current UCがBehaviorへ閉じること、current Behaviorがcurrent / blocked ACへ閉じることも検証する |
+| SCOPE applicability / 条件付き必須fileと実fileの一致 | deterministic helper / validation | file × Scope IDの `あり / なし / 未確定` からfile状態を固定導出する。content completenessは別に、blocked domain rowまたは07のBlocking Scope ID + 関連Fileでclosureを検証する。03/04/05/08がnot-applicableのScopeを対応FIELD/FLOW/NOTIFY|INTERACT/IMPL rowが参照する状態と、Behavior Decomposition=not-applicableのScopeにUIOP / US / UC / Behavior / ACが残る状態をrejectする |
+| UIOP→UC / US→UC / UC→BH / BH→UIOP / BH→AC closure | deterministic validation | semantic relationを決めず、LLMが作った参照の完全性だけ検証する。UIOP.Scopeと対応UCからderivedしたScopeの一致、current Behaviorの`関連操作ID`がknown mapped UIOPを1件以上参照して同じUC / Scopeへ閉じること、required scopeの最低row / blocker closure、current UCがBehaviorへ閉じること、current Behaviorがcurrent / blocked ACへ閉じることも検証する |
 | UCごとの正常 / 準正常 / 例外3分類 | deterministic validation | 各1行、定義あり/なし/未定義の構造整合を検証する |
 | current AC→TR / disposition closure | test-requirement deterministic runtime | ACを無言で落とさない |
 | TRのscope所属 | LLM | current ready `scope_index[]` とTRの意味から `scope_refs[]` を決める。UI target artifact workflowでは1件以上必要で、blocked scopeをcurrent TRへ割り当てない |
 | TCN / model / CI / TCのscope所属 | deterministic generator | TCNは参照TR、modelは親TCN、CIは親TCN / model、TCは参照TCN / CIの `scope_refs[]` をunion / canonical sortして生成する。LLMに再入力させない |
-| blocked scope由来のdownstream一時非current集合 / last-active履歴 | deterministic qa-workflow helper | `inspect.blocked_scope_ids[]` と前回current TR / TCN / model / CI / TC Entityの `content.scope_refs[]` の積集合から`inactive`対象を固定し、verified previous structure stateからmachine-owned Entity / CI mapping historyを更新する。Authority共有・名称・dependency graphからscope所属を推測しない |
+| blocked scope由来のdownstream一時非current集合 / last-active履歴 | deterministic qa-workflow helper | 同一workflow系列の直前に完成扱いされたruntime-v2 qa-workflow artifactの `artifact:workflow_runtime:all` Machine Runtime Input / Result pairを当時の保存入力に対して検証し、保存済み `current_entities[]` とTRD / TCD / TCの `current_structure_state` をprevious snapshotとして内部抽出する。そのEntity `scope_refs[]` と `inspect.blocked_scope_ids[]` の積集合から`inactive`対象を固定し、machine-owned Entity / CI mapping historyを更新する。Agent / LLM、raw Markdown、current inputでの旧artifact再検証からsnapshotを再構築しない |
 | downstream stable IDのreuse / new / semantic deletion | LLM + deterministic generator | TR / TCN / model / TCのsemantic identity同一かはLLMがlast-active historyを参照して判断する。CIはmaterialize historyからmapping identityを決定論的に復元する。generatorはhelper由来の`active → inactive`、reuseに基づく`inactive → active`、非reuseに基づく`inactive → deleted`を状態契約どおり適用する |
 | version形式 / package内version一致 | deterministic helper / validation | default policyでは完成packageへ永続差分を保存するたびsemantic / presentationを問わず次versionへ進める。no-opだけ維持する |
 | required core / 条件付き必須file set | deterministic helper / validation | trigger該当性だけLLM。状態・create/update時のfile集合・MANIFEST・completion statusはscript |
@@ -58,7 +58,7 @@
 | cross-file stable ID参照切れ | deterministic validation | exact ID参照だけを検証する。extension本文はparseせず、00のextension宣言rowにLLMが明示したfile-level refだけを検証する |
 | changed stable IDの参照file候補 | deterministic helper | exact参照から候補を列挙する。意味上の修正要否はLLM |
 | Authority Machine Entity / fingerprint | 既存deterministic helper | authority_entities.pyを正本とする |
-| Acceptance Criterion Machine Entity / spec-analysis normalized input | deterministic helper | ui_target_package.pyがcurrent AC + parent chain + linked UIOP / scope / direct package item / structure ancestor / linked INFから固定projectionする。Authority以外はcontent fingerprintへ寄与しglobal Entity typeを増やさない |
+| Acceptance Criterion Machine Entity / spec-analysis normalized input | deterministic helper | ui_target_package.pyがcurrent AC + parent chain + parent Behaviorの`関連操作ID`で明示されたlinked UIOP / scope / direct package item / structure ancestor / linked INFから固定projectionする。同一UCにいるだけのUIOPは含めない。Authority以外はcontent fingerprintへ寄与しglobal Entity typeを増やさない |
 | semantic eval用package projection | repository eval utility | package内容を要約・変更せず連結する。Skill production CLIには含めない |
 | semanticな重複・矛盾・不足 | LLM / semantic eval | 文字列一致だけで自動統合しない。required domainでは資料から識別可能なFIELD / RULE / FLOW / NOTIFY / INTERACT等を無言で欠落させず、未確定はUNKNOWNへ閉じる。後続QA工程へ影響する意味情報をextension proseだけに残さず、standard structured row / 09へ正規化する |
 
@@ -182,6 +182,7 @@ UIOP / US / UC / Behavior / AC / RULE / FIELD / FLOW / NOTIFY / INTERACTのよ�
 - domain item IDのexact prefix集合: `FIELD / RULE / FLOW / NOTIFY / INTERACT`
 - `対象構造ID`: UI構造IDだけを許可する。UIOP / FIELDの操作対象・配置対象を表し、domain item IDを入れない
 - `関連構造ID`: UI構造IDまたはdomain item IDだけを許可する。どのIDを意味上関連付けるかはLLMが判断する
+- `関連操作ID`: Behaviorだけが持つUIOP stable ID参照。どのUIOPがそのBehaviorに意味上関係するかはLLMが判断する。current Behaviorでは1件以上を要求し、helperは参照先UIOPの存在、mapped状態、親UC / Scope整合、duplicateだけを検証する
 - AC freshnessでlinked domain itemを導出するseedはUS / UC / Behavior / ACの `関連構造ID` に明示されたdomain item IDだけとする。UIOPの `対象構造ID`、同一PAGE、同一Scope、名称一致、Authority一致からdomain itemを逆引きしない
 
 複数参照の区切りは `<br>` に固定します。

@@ -137,13 +137,14 @@ UI target canonical downstreamではscope ownershipを次へ固定します。
 処理順を次に固定します。
 
 1. `ui_target_package.py inspect` からcurrent `blocked_scope_ids[]` を取得する
-2. qa-workflowは前回current Machine Entity collectionと `blocked_scope_ids[]` を新規 `skills/qa-workflow/scripts/downstream_state.py` へ渡す
-3. helperは前回current TR / TCN / model / CI / TC Entityの `content.scope_refs[]` とblocked Scope ID集合の積集合だけで `active → inactive` 対象を決める。Authority共有、名称、同一PAGE、runtime dependency等からscope所属を推測しない
-4. helperは `inactive_tr_ids[] / inactive_tcn_ids[] / inactive_model_keys[] / inactive_ci_ids[] / inactive_tc_ids[]` に加え、各root runtimeへ保存するmachine-owned `inactive_tr_history[] / inactive_tcn_history[] / inactive_model_history[] / inactive_materialize_history[] / inactive_tc_history[]` をcanonical sortして返す。Agent / LLMはID集合やhistoryを手作業でfilter / 復元しない
-5. TRD / TCD / TCのv2 generatorとTCD current structure stateは該当IDを `active → inactive` へ遷移させ、inactive IDをcurrent Machine Entity / current runtime unit / carry-forward projectionへ含めない。同時に各root payloadへlast-active Entity historyを保存し、TCDはlast successful materializeのCI ID / target mapping / semantic mapping / expected-result-root stateも履歴化する
-6. ready scope全件は従来どおり1 batchでtest-analysis → TRD → TCD → TC → coverage-analysisへ進める。inactive履歴そのものをfreshness blocking issueにしない。package全体の `partial / blocked` はspec-analysisの `scope_readiness[]` で別に保持する
-7. blocked scopeが再びreadyになった場合、inactive IDとmachine-owned last-active historyを再利用候補として保持する。LLMはTR / TCN / model / TCのhistoryをsemantic identity比較に使い、同一なら既存IDをreuseして `active` へ戻す。CIは`inactive_materialize_history[]`からprevious mapping inputを決定論的に復元して同じIDをreuseする。意味が変わった場合は旧inactive IDを `deleted` にしてnew IDを発行する
-8. `deleted` はterminalであり、block解除を理由に復帰させない
+2. previous downstreamが存在する場合、qa-workflowは同一workflow系列の直前に完成扱いされたruntime-v2 qa-workflow artifact全文を取得し、`blocked_scope_ids[]` とともに新規 `skills/qa-workflow/scripts/downstream_state.py` へ渡す。previous artifactが存在しない初回workflowだけはnullを許可する
+3. `downstream_state.py` はprevious artifact内の `qa-workflow::artifact:workflow_runtime:all` Machine Runtime Input / Result pairをcurrent runtime-v2 contractで検証する。保存済みInputの `current_entities[] / current_runtime_units[] / workflow_scopes[].normalized_input / workflow_scopes[].current_structure_state` とResult payloadの整合を当時の保存入力だけで確認し、**新しいspec-analysis inputに対して旧artifactをcurrentか再判定しない**。pair不正・改変・必要なprevious artifact欠落時はfail-closedし、raw Markdown、workflow state、人間向けruntime表から復元しない
+4. helperが検証済みInputからprevious current TR / TCN / model / CI / TC EntityとTRD / TCD / TCのprevious `current_structure_state` を内部抽出し、Entityの `content.scope_refs[]` とblocked Scope ID集合の積集合だけで `active → inactive` 対象を決める。Authority共有、名称、同一PAGE、runtime dependency等からscope所属を推測しない
+5. helperは `inactive_tr_ids[] / inactive_tcn_ids[] / inactive_model_keys[] / inactive_ci_ids[] / inactive_tc_ids[]` に加え、各root runtimeへ保存するmachine-owned `inactive_tr_history[] / inactive_tcn_history[] / inactive_model_history[] / inactive_materialize_history[] / inactive_tc_history[]` をcanonical sortして返す。Agent / LLMはprevious snapshot、ID集合、historyを手作業でfilter / 復元しない
+6. TRD / TCD / TCのv2 generatorとTCD current structure stateは該当IDを `active → inactive` へ遷移させ、inactive IDをcurrent Machine Entity / current runtime unit / carry-forward projectionへ含めない。同時に各root payloadへlast-active Entity historyを保存し、TCDはlast successful materializeのCI ID / target mapping / semantic mapping / expected-result-root stateも履歴化する
+7. ready scope全件は従来どおり1 batchでtest-analysis → TRD → TCD → TC → coverage-analysisへ進める。inactive履歴そのものをfreshness blocking issueにしない。package全体の `partial / blocked` はspec-analysisの `scope_readiness[]` で別に保持する
+8. blocked scopeが再びreadyになった場合、inactive IDとmachine-owned last-active historyを再利用候補として保持する。LLMはTR / TCN / model / TCのhistoryをsemantic identity比較に使い、同一なら既存IDをreuseして `active` へ戻す。CIは`inactive_materialize_history[]`からprevious mapping inputを決定論的に復元して同じIDをreuseする。意味が変わった場合は旧inactive IDを `deleted` にしてnew IDを発行する
+9. `deleted` はterminalであり、block解除を理由に復帰させない
 
 `scope_refs[]` がready / blocked双方を含むcross-scope Entityは、1つのcurrent Entityをscopeごとに部分利用できないため保守的にinactive対象とします。ready側だけで成立する別identityへ分割する必要があるかはLLMが意味判断し、helperが旧Entityの内容やscope_refsを自動縮退させません。
 

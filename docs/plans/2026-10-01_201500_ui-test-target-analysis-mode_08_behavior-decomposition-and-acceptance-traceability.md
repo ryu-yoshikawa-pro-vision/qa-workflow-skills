@@ -25,7 +25,7 @@ Scope ID:
 | UI操作判定 | Behavior Decomposition | 扱い |
 | --- | --- | --- |
 | あり | required | US → UC → Behavior → ACを実施 |
-| なし | not-applicable | US / UC / Behavior / ACを作らない |
+| なし | not-applicable | UIOP / US / UC / Behavior / ACを作らない |
 | 未確定 | blocked | UNKNOWNを作成し、適用可否を推測しない |
 
 UI操作の有無自体はLLMが資料の意味から判断します。`Behavior Decomposition` はその結果から `あり → required / なし → not-applicable / 未確定 → blocked` とhelperが決定論生成し、LLMへ別判断として入力させません。ID形式、UNKNOWN参照、下位tableの有無もhelperが決定論検証します。
@@ -104,7 +104,7 @@ blocked rowは「semantic identityまでは確定しているが、完成に必�
 | UIOP | Scope ID、Actor / Role、対象構造ID、操作、関連仕様項目ID、対応UC ID。関連UNKNOWN IDは空 | Scope ID、操作、関連UNKNOWN ID。Actor / Role・対象構造ID・対応UC ID・関連仕様項目IDは確定済み分だけ保持 | Actor / Role、対象構造ID、対応UC ID、関連仕様項目ID | LLMがscope内の操作identity自体を区別できない |
 | US | Scope ID、Actor / Role、Goal、関連仕様項目ID。関連UNKNOWN IDは空 | Scope ID、Actor / RoleまたはGoalの少なくとも一方、関連UNKNOWN ID。確定済み関連仕様項目IDは保持 | Actor / RoleまたはGoalの未確定側、関連仕様項目ID | LLMがActor / Goalの組としてUser Story identityを確定できない |
 | UC | 関連US ID、Use Case、Trigger、Success Postcondition、関連仕様項目ID。Preconditionsは該当なしなら空可。関連UNKNOWN IDは空 | 関連US ID、Use Case、関連UNKNOWN ID。Trigger / Preconditions / Success Postcondition / 関連仕様項目IDは確定済み分だけ保持 | Trigger、Preconditions、Success Postcondition、関連仕様項目ID | LLMが親USに対するUse Case identityを確定できない |
-| Behavior | UC ID、結果分類、振る舞い、Postcondition / Result、関連仕様項目ID。関連UNKNOWN IDは空 | current UC ID、結果分類、振る舞い、関連UNKNOWN ID。Postcondition / Result / 関連仕様項目IDは確定済み分だけ保持 | Postcondition / Result、関連仕様項目ID | Behaviorの存在・identity自体を確定できない |
+| Behavior | UC ID、関連操作ID1件以上、結果分類、振る舞い、Postcondition / Result、関連仕様項目ID。関連UNKNOWN IDは空 | current UC ID、結果分類、振る舞い、関連UNKNOWN ID。関連操作ID / Postcondition / Result / 関連仕様項目IDは確定済み分だけ保持 | 関連操作ID、Postcondition / Result、関連仕様項目ID | Behaviorの存在・identity自体を確定できない |
 | AC | Behavior ID、Acceptance Criteria、current SPEC / DECISION / approved ASMの関連仕様項目ID。関連UNKNOWN IDは空 | currentまたはblocked Behavior ID、関連UNKNOWN ID。Acceptance Criteria / 関連仕様項目ID / 関連構造IDは確定済み分だけ保持 | Acceptance Criteria、関連仕様項目ID、関連構造ID | ACの存在・identity自体を確定できない |
 
 `current / mapped` rowの関連仕様項目IDは `_06` のnormative traceability contractに従います。US / UC / Behavior / ACの `関連構造ID` は `_05` のUI構造ID + domain item ID exact prefix集合だけを許可し、ACの意味を制約するdomain itemはLLMがこの明示edgeへ含めます。blocked rowはUNKNOWNが正本であり、未確定fieldを推測して埋めません。UIOP / US / UC / Behaviorの `状態` はこのfield充足と関連UNKNOWNからhelperが生成し、materialize callerは `状態` を送信しません。
@@ -163,7 +163,7 @@ BehaviorはUse Case内の意味ある振る舞い単位です。
 
 #### Behavior一覧
 
-| Behavior ID | UC ID | 結果分類 | 振る舞い | Postcondition / Result | 関連仕様項目ID | 関連構造ID | 状態 | 関連UNKNOWN ID |
+| Behavior ID | UC ID | 関連操作ID | 結果分類 | 振る舞い | Postcondition / Result | 関連仕様項目ID | 関連構造ID | 状態 | 関連UNKNOWN ID |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
 ID: `BH-001` から開始し、最低3桁で連番採番する。999の次は1000
@@ -183,6 +183,8 @@ ID: `BH-001` から開始し、最低3桁で連番採番する。999の次は100
 
 規則:
 - current Behavior / blocked Behaviorはいずれもcurrent UCだけを親に持つ
+- current Behaviorは意味上関係するmapped UIOPを`関連操作ID`へ1件以上明示する。各UIOPは同じScopeに属し、`対応UC ID`にそのBehaviorのUC IDを含む。どのUIOPを関連付けるかはLLMが判断し、helperは存在・state・UC / Scope整合だけを検証する
+- blocked Behaviorは確定済みの`関連操作ID`だけを保持でき、関係自体が未確定なら空を許可する。blocked UIOPを参照する場合は同じScopeだけを許可し、current Behaviorからblocked UIOPを参照しない
 - current Behaviorは1件以上のcurrentまたはblocked ACを持つ。ready scopeではcurrent Behaviorごとにcurrent ACが1件以上あり、blocked ACが残っていないことを要求する
 - Behaviorの意味自体が未確定ならblocked Behavior rowを作る。BehaviorはcurrentだがACのsemantic identityが既知で期待条件だけ一時的に未確定なら、親Behaviorを不要にblockedへ落とさず同じAC IDをblockedで保持できる
 - Behaviorの存在・identity自体をまだ確定できない場合はblocked Behavior rowを作らず、§7の `未定義` + UNKNOWNだけで表す
@@ -283,7 +285,7 @@ US / UC / Behavior自体はMachine Entity化しません。
 
 下流test-requirement-designへのhandoff pointであるcurrent ACだけを `spec-analysis / acceptance_criterion / AC-xxx` Machine Entityへ決定論変換します。
 
-AC Entityのcanonical contentには、AC自身だけでなくそのACへ到達するcurrent US / UC / Behavior chain、Scope、Authority refs、構造refsに加え、**状態=`mapped` かつ `対応UC ID` が親UCと一致するUIOP集合**を固定projectionします。linked UIOPには `uiop_id / actor_role / target_structure_id / operation / authority_refs[]` を含めます。さらに直接参照するFIELD / RULE / FLOW / NOTIFY / INTERACTを確定し、AC chain / linked UIOP / それらdomain itemが直接参照するUI構造rowと、その `親構造ID` をrootまで辿ったancestor closure、関連INF、scope内容をcanonical projectionします。helperはmissing parent / self-parent / cycleをrejectし、current ACへ到達する全parentがcurrentであることを決定論検証します。
+AC Entityのcanonical contentには、AC自身だけでなくそのACへ到達するcurrent US / UC / Behavior chain、Scope、Authority refs、構造refsに加え、**parent Behaviorの`関連操作ID`に明示された状態=`mapped`のUIOP集合**を固定projectionします。同じUCに属するだけでBehaviorから参照されないUIOPは含めません。linked UIOPには `uiop_id / actor_role / target_structure_id / operation / authority_refs[]` を含めます。さらに直接参照するFIELD / RULE / FLOW / NOTIFY / INTERACTを確定し、AC chain / linked UIOP / それらdomain itemが直接参照するUI構造rowと、その `親構造ID` をrootまで辿ったancestor closure、関連INF、scope内容をcanonical projectionします。helperはmissing parent / self-parent / cycleをrejectし、current ACへ到達する全parentがcurrentであることを決定論検証します。
 
 これによりUIOPの操作対象 / 操作内容 / Authority、scopeの対象意味、同一stable IDのUI構造とancestor、linked FIELD / RULE / FLOW / NOTIFY / INTERACT、linked INF、US / UC / Behaviorの意味変更でもAC Entityのcontent fingerprintまたはAuthority dependencyが変わり、AC IDや本文が同じでも関連TRをstaleにできます。無関係なpackage rowはprojectionへ入れません。UIOPやpackage-local item自体をglobal Machine Entity typeへ追加しません。
 
@@ -330,8 +332,9 @@ test-condition-designはTRから問題構造を分析し、仕様 / Risk / 状�
 - current USは1件以上のcurrent / blocked UCへ接続する
 - current UCは正常 / 準正常 / 例外3rowを持ち、少なくとも1分類が `定義あり` でcurrent Behaviorへ到達するか、1分類以上が `未定義 + UNKNOWN` でscope blockedになる。3分類すべて `なし` かつBehavior=0件をreadyにしない
 - current Behaviorは1件以上のcurrent / blocked ACへ接続し、blocked ACが残るscopeをreadyにしない
+- current Behaviorは`関連操作ID`を1件以上持ち、全参照先がmapped UIOPで同じUC / Scopeへ閉じる。blocked Behaviorの関連操作参照は確定済み分だけを許可する
 - required scope内では不足情報をblocked UIOP / US / UC / Behavior / AC + UNKNOWN、またはidentity未確定のBlocking UNKNOWNとして保持できる
-- not-applicable scope、またはUI操作有無自体が未確定のblocked scopeにUS / UC / Behavior / ACを確定済みとして生成していないこと
+- not-applicable scope、またはUI操作有無自体が未確定のblocked scopeにUIOP / US / UC / Behavior / ACを確定済みとして生成していないこと
 - blocked applicability / rowのUNKNOWN参照
 - UIOP → UC closure
 - US → UC closure
@@ -362,6 +365,7 @@ semanticでは次を確認します。
 - UI操作がないscopeへUS / UC / Behavior / ACを創作しない
 - 非操作起点のUI挙動をテスト対象外として落としていない
 - UI操作母集団がUCへ閉じている
+- Behaviorの`関連操作ID`が意味上必要なUIOPだけを結び、同一UC内の無関係UIOPを各Behavior / ACへ一律関連付けしていない
 - US / UC / Behaviorの粒度が過剰統合 / 過剰分割されていない
 - 正常 / 準正常 / 例外を仕様に反して創作していない
 - `なし` と `未定義` を区別し、`なし` のAuthority根拠が意味上妥当である
@@ -379,7 +383,7 @@ semanticでは次を確認します。
 
 spec-analysis:
 - SPEC-OUT-003へbehavior decomposition deterministic contractを追加
-- SPEC-SEM-003の複雑UI packageに複数scope、UIOP / US / UC / Behavior / AC、current / blocked、正常 / 準正常 / 例外を含める
+- SPEC-SEM-003の複雑UI packageに複数scope、UIOP / US / UC / Behavior / AC、current / blocked、正常 / 準正常 / 例外を含める。同一UC内に複数UIOP / Behavior / ACを置き、Behaviorの`関連操作ID`が意味上必要なUIOPだけを結ぶことを評価する
 - 既存normal spec-analysis caseでUI操作がない場合にdecompositionを生成しない回帰を確認
 
 test-requirement-design:
@@ -443,6 +447,7 @@ legacy UI target packageにUS / UC / Behavior / ACが存在しない場合でも
 - current UCで正常 / 準正常 / 例外を検討済みと判別できる
 - blocked UCで無意味な3分類を生成しない
 - current Behaviorがcurrent ACへ閉じる
+- current Behaviorが1件以上のmapped UIOPへ`関連操作ID`で閉じ、同一UC内の無関係UIOPをAC Entityへ混入させない
 - current ACがcurrent Authorityへ追跡できる
 - ACだけが下流handoff用Machine Entityとして決定論生成される
 - US / UC / Behavior変更でも関連AC Entity fingerprintが変わる

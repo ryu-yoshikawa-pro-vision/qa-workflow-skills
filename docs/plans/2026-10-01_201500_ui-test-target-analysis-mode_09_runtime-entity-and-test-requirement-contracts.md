@@ -499,7 +499,7 @@ AC Entity contentには次を固定projectionします。
 
 - `ac_id`
 - `acceptance_criteria`
-- `linked_ui_operations[]`: **状態=`mapped`** かつ `対応UC ID` に親UCを含むUIOPを `uiop_id` 昇順で `uiop_id / actor_role / target_structure_id / operation / authority_refs[]` として固定projection
+- `linked_ui_operations[]`: parent Behaviorの`関連操作ID`に明示されたUIOPを解決し、**状態=`mapped`**、同じScope、`対応UC ID`に親UCを含むことを検証したうえで、`uiop_id`昇順に `uiop_id / actor_role / target_structure_id / operation / authority_refs[]` として固定projectionする。同じUCに属するだけで`関連操作ID`にないUIOPは含めない
 - `behavior_id`
 - `behavior_result_classification`
 - `behavior_text`
@@ -632,7 +632,7 @@ LLMはACとTRの意味上の対応、TRの分割 / 統合、TRのscope所属を�
 ### 7.5 shared runtime state / currentness
 
 - shared `runtime_contract.py` のprevious state parser / validatorはTR / TCN / model / CI / TC state rowの `scope_refs[]` を検証する。active stateは対応current Machine Entity contentのscope_refsとexact一致させ、inactive / deletedにはcurrent Entityを要求しない
-- `verify_runtime_evidence.current_structure_state.runtime_results[]` に含まれる各root result payloadを、次runのmachine-owned history入力の唯一の保存元とする。qa-workflow / `downstream_state.py` は未検証artifact本文からhistoryを復元しない
+- `verify_runtime_evidence.current_structure_state.runtime_results[]` に含まれる各root result payloadをmachine-owned historyの保存元とする。次runへ渡す際は、それらを個別artifactから直接読むのではなく、直前に完成扱いされたruntime-v2 qa-workflow artifactの保存済み `workflow_scopes[].current_structure_state` を `downstream_state.py` が上記§12.3の手順で再検証・抽出する。未検証artifact本文やcurrent inputでの旧artifact再検証からhistoryを復元しない
 - activeだけをcurrent Machine Entity / expected Entity / carry-forward projectionへ含める。`inactive_*_history[]` / `inactive_materialize_history[]` はlast-active履歴としてexact schema、identity重複、canonical order、stored fingerprint、対応inactive state row / scope_refsとの整合だけを検証し、current Entity / current runtime / expected Entity / freshnessへ投入しない
 - UI target migration前のv2 baselineは `scope_refs=[]` を許可する。UI target migration後の最初のTRD→TCD→TC更新でcurrent active downstream全件をscope ownership付きに正規化し、active TR / TCN / model / CI / TCに空scope_refsが残る間はpartial readinessを開始しない
 - scope_refsはMachine Entity content fingerprintへ含まれるため、ownership変更は通常のfreshness伝播対象になる
@@ -767,14 +767,11 @@ input:
 ```json
 {
   "blocked_scope_ids":["SCOPE-002"],
-  "previous_machine_entities":[],
-  "previous_structure_states":{
-    "test-requirement-design":{},
-    "test-condition-design":{},
-    "test-case-design":{}
-  }
+  "previous_qa_workflow_artifact_markdown":"<same workflow lineageの直前に完成扱いされたruntime-v2 qa-workflow artifact>"
 }
 ```
+
+previous downstreamが一度も存在しない初回workflowでは `previous_qa_workflow_artifact_markdown=null` を許可します。previous current / inactive downstream stateが存在するrunでnull、欠落、別workflow系列のartifactを許可しません。top-level artifact Markdownはcutover helperと同じ16 MiB aggregate transport / 64 KiB string exemptionを使い、通常generatorの2 MiB上限は変更しません。
 
 output:
 
@@ -796,15 +793,16 @@ output:
 規則:
 
 1. `blocked_scope_ids[]` はcurrent `ui_target_package.py inspect` の値をそのまま使い、Agentが追加・削除しない
-2. `previous_machine_entities[]` は直前のcurrent Entity collectionをshared `validate_entity_collection()` で検証する
-3. `previous_structure_states` は各Skillのcurrent `verify_runtime_evidence.current_structure_state` だけを受け、raw artifactや未検証runtime blockを受けない。root runtime payloadに保存済みの `inactive_*_history[]` / `inactive_materialize_history[]` をここから取得する
-4. previous TR / TCN / model / CI / TC Entityはcanonical `content.scope_refs[]` を必須とし、duplicate / unsorted / non-stringをrejectする。UI target scope ownership baseline成立後に空scope_refsが残るactive downstream Entityは `scope_ownership_unavailable` でfail-closedする
-5. `content.scope_refs[] ∩ blocked_scope_ids[]` が非空のprevious active Entityだけをinactive対象にする。Authority共有、名称、同一PAGE、AC dependency、runtime dependencyからscope所属を推測しない
-6. 新たにinactiveになるTR / TCN / model / TCはprevious current Entity snapshotを対応historyへ追加する。既存inactive historyはidentityでmergeし、内容不一致をsilent overwriteしない
-7. 新たにinactiveになるTCNがprevious current CI / target mapping / semantic mappingを持つ場合、verified TCD `artifact:materialize_coverage:<TCN-ID>` resultから `ci_entities / ci_id_state / target_mapping_state / semantic_ci_mapping_state / expected_result_root_state` を取得して§7.3のhistory entryを生成する。必要なresultが無い場合、またはCI state / mappingが相互不整合なら `inactive_materialize_history_missing` でfail-closedする
-8. `scope_refs[]` がready / blocked双方を含むcross-scope Entityもentity単位でinactiveにする。ready側だけへ自動縮退しない
-9. current packageで初めてblockedになりprevious Entityが存在しないitemはinactive IDを生成しない
-10. outputはstable ID / history identity順でcanonical sort / dedupeする
+2. historical sourceは同一workflow系列の直前に完成扱いされたruntime-v2 qa-workflow artifact exactly 1つだけとする。helperはartifact内の `Machine Runtime Input / Result: qa-workflow::artifact:workflow_runtime:all` pairをexactly one要求し、shared runtimeのpair / fingerprint / contract validationを保存済みInput自身に対して実行する。新しいspec-analysis inputで旧artifactのcurrentnessを再判定しない
+3. 保存済みqa-workflow Inputの `workflow_scopes[] / current_entities[] / current_runtime_units[]` とResult payloadを検証する。Result payloadの `current_entities[]` はInputの `current_entities[]` とexact一致させ、各workflow scopeの `current_structure_state` は同じ保存Input内の `normalized_input / current_entities / current_runtime_units` を使ってshared `validate_current_structure_state()` で再検証する。ここで検証できた `current_entities[]` とtest-requirement-design / test-condition-design / test-case-designの `current_structure_state` だけを内部previous snapshotとする
+4. Agent / LLMは `previous_machine_entities[] / previous_structure_states` を入力しない。raw downstream artifact、個別Runtime Input / Result、人間向けworkflow state / runtime表、current inputに対する旧artifactの `verify_runtime_evidence` 結果からsnapshotを再構築しない。previous artifactが必要なのに欠落・改変・pair不整合ならfail-closedする
+5. previous TR / TCN / model / CI / TC Entityはcanonical `content.scope_refs[]` を必須とし、duplicate / unsorted / non-stringをrejectする。UI target scope ownership baseline成立後に空scope_refsが残るactive downstream Entityは `scope_ownership_unavailable` でfail-closedする
+6. `content.scope_refs[] ∩ blocked_scope_ids[]` が非空のprevious active Entityだけをinactive対象にする。Authority共有、名称、同一PAGE、AC dependency、runtime dependencyからscope所属を推測しない
+7. 新たにinactiveになるTR / TCN / model / TCはprevious current Entity snapshotを対応historyへ追加する。既存inactive historyはidentityでmergeし、内容不一致をsilent overwriteしない
+8. 新たにinactiveになるTCNがprevious current CI / target mapping / semantic mappingを持つ場合、検証済みprevious TCD `current_structure_state.runtime_results[]` の `artifact:materialize_coverage:<TCN-ID>` resultから `ci_entities / ci_id_state / target_mapping_state / semantic_ci_mapping_state / expected_result_root_state` を取得して§7.3のhistory entryを生成する。必要なresultが無い場合、またはCI state / mappingが相互不整合なら `inactive_materialize_history_missing` でfail-closedする
+9. `scope_refs[]` がready / blocked双方を含むcross-scope Entityもentity単位でinactiveにする。ready側だけへ自動縮退しない
+10. current packageで初めてblockedになりprevious Entityが存在しないitemはinactive IDを生成しない
+11. outputはstable ID / history identity順でcanonical sort / dedupeする
 
 qa-workflowはhelper outputを各generator / TCD current structure stateへ直接接続します。
 
@@ -862,6 +860,7 @@ coverage-analysisの既存traceability graph node typeへACを追加しません
 - AC upstream skill/type mismatch
 - artifact modeのAC dependency fingerprint propagation
 - artifact modeでlinked UIOPの操作内容 / 対象構造変更によりAC本文 / 親chainが同じでもAC fingerprintが変わり関連TRがstaleになる回帰
+- 同一UCに複数UIOP / Behavior / ACが存在し、各Behaviorが別の`関連操作ID`を持つ場合、UIOP-Aだけの変更でAC-A / TR-Aだけがstaleになり、Behavior-Bから参照されないUIOP-Aを理由にAC-B / TR-Bをstaleにしない回帰
 - artifact modeでlinked UIOPだけが参照するAuthority contentを変更し、UIOP本文が同一でもAC Authority dependency / fingerprint変更から関連TRがstaleになる回帰
 - artifact modeでAC / Behavior / UC / USの明示ref、linked UIOP target、linked domain itemから直接参照されるstructureと、そのancestor PAGE等のPath / 名称 / STATE軸を同一stable IDのまま変更するとAC fingerprintが変わる回帰
 - artifact modeでAC chainから明示参照されたFIELD / RULE / FLOW / NOTIFY / INTERACTのcanonical内容変更でAC / TRがstaleになる回帰
@@ -869,10 +868,12 @@ coverage-analysisの既存traceability graph node typeへACを追加しません
 - artifact modeで同一PAGE / 同一Scopeに存在してもAC chainから明示参照されないdomain item変更ではAC / TRがstaleにならない回帰
 - artifact modeでACが参照しない無関係structure / INF変更ではAC / TRがstaleにならない回帰
 - parent_structure_idのmissing / self / cycleをrejectする回帰
+- file applicabilityがnot-applicableのScopeを対応FIELD / FLOW / NOTIFY / INTERACT / IMPL rowが参照するpackageと、Behavior Decomposition=not-applicableのScopeにUIOP / US / UC / Behavior / ACが残るpackageをrejectし、ready-scope batchへ残存rowを混入させない回帰
 - scopeの対象機能 / 領域またはscope Authority変更でAC fingerprint / dependencyが変わる回帰
 - AC本文 / 親chain不変のままAuthority fingerprintだけ変更し、spec-analysisをcurrentへ再生成した後も未再実行TRが直接Authority dependencyによりstaleになる回帰
 - artifact modeのpartial rerun stale carry-forward。currentのまま変更されたAC依存TRは従来どおりstaleでblockingになる
 - SCOPE-A/B ready → `scope_index[]` からTR scope_refsをLLMが明示 → TCN / model / CI / TCへ決定論伝播 → Bだけblocked → `blocked_scope_ids[]` とprevious Entity `content.scope_refs[]` の積集合からB所有IDだけinactive → A専用current Entity/runtimeがfreshに完遂 → B再readyでsemantic identity同一なら同じIDをactiveへ復帰、というintegration regression
+- 上記integration regressionのprevious snapshotは直前のruntime-v2 qa-workflow artifactからだけ抽出する。保存済み`artifact:workflow_runtime:all` Input / Result pair、Input `current_entities[]`、各scope `current_structure_state`の改変をrejectし、spec-analysis更新後に旧downstream artifactをcurrent inputで再検証できなくても当時のvalid snapshotを取得できること、必要なprevious qa-workflow artifact欠落時はfail-closedすることを固定する
 - AuthorityをA/Bで共有してもscope_refsがAだけのEntityはinactiveにしない回帰と、scope_refsがA/B双方のcross-scope Entityは保守的にinactiveへ落とす回帰
 - v1 cutover / non-UI-target baselineの `scope_refs=[]` からUI target migrationする際、既存active downstreamがある場合は全scope readyでのみownership baselineを作成し、blocked scopeが残る間は `scope_ownership_baseline_required` でfail-closedする回帰。downstream未作成の新規workflowではpartial readinessを許可する
 - inactive state rowがlast active `scope_refs[]` を保持し、`inactive_*_history[]` がlast-active Entity contentを保持するため、inactive期間を挟んでもre-ready時のsemantic ID reuse候補を失わない回帰
@@ -903,6 +904,6 @@ coverage-analysisの既存traceability graph node typeへACを追加しません
 - UI target artifact workflowでは、AC / linked UIOP / scope / 明示linked FIELD-RULE-FLOW-NOTIFY-INTERACT / direct structure + ancestor / linked INF / 親Behavior-UC-US / Authority変更が必要なTR freshnessへ伝播し、無関係package row変更は伝播しない
 - direct modeはknown AC ID / closureを保証し、AC Entity dependencyが無い場合のAC semantic cross-run freshnessを保証対象にしない
 - 無関係TRを不必要にstale化しない
-- ready→blockedでは `blocked_scope_ids[]` とprevious Entity `scope_refs[]` が交差するTR / TCN / model / CI / TCだけをinactiveとしてcurrent Entity/runtimeから外れ、Authority共有だけでは無関係ready scopeを停止させない。inactive state + root payloadの `inactive_*_history[]` はlast-active ownership / semantic contentを保持し、TCDは `inactive_materialize_history[]` のCI state / mappingも保持するため、再ready時にsemantic identity同一なら同じstable IDへ復帰でき、削除済みCI IDも再利用しない。既存unscoped downstreamのUI target migrationでは全scope readyのone-time ownership baselineを要求し、baseline前にscope所属を推測しない
+- ready→blockedでは、直前のruntime-v2 qa-workflow artifactから検証・抽出したprevious Entity / structure stateだけを根拠に、`blocked_scope_ids[]` とprevious Entity `scope_refs[]` が交差するTR / TCN / model / CI / TCだけをinactiveとしてcurrent Entity/runtimeから外れ、Authority共有だけでは無関係ready scopeを停止させない。inactive state + root payloadの `inactive_*_history[]` はlast-active ownership / semantic contentを保持し、TCDは `inactive_materialize_history[]` のCI state / mappingも保持するため、再ready時にsemantic identity同一なら同じstable IDへ復帰でき、削除済みCI IDも再利用しない。既存unscoped downstreamのUI target migrationでは全scope readyのone-time ownership baselineを要求し、baseline前にscope所属を推測しない
 - artifact modeのpartial rerunでscope外TRがcurrentのままchanged ACを参照したままcurrentにならず、blockedによる一時非currentと通常staleを混同しない
 - existing coverage graphを目的なく拡張していない
