@@ -201,7 +201,7 @@ expected unitは `artifact:requirement_structure:all` exactly 1件です。
 - 各既存TR draftへ `acceptance_refs=[]` を追加する。top-level `acceptance_criteria[]` はv2 invocationのcurrent semantic AC集合として必須とし、cutover helperは既存v1 artifactからACを推測生成しない。UI target modeの通常経路では `build-machine-evidence.normalized_skill_input.acceptance_criteria[]` を使用し、ACなしworkflowでは明示 `[]` とする
 - v1 result `tr_id_state` → `previous_tr_ids[]`
 - `draft_key ↔ tr_id_map[]` をexact joinし、current draftを `identity_action=reuse / reuse_id=<TR-ID>` に固定
-- active TRを `update_scope_tr_ids[]` へ全件入れ、first v2 runをfull rebuildにする
+- active TRを `update_scope_tr_ids[]` へ全件入れ、`inactive_tr_ids=[]` を明示してfirst v2 runをfull rebuildにする
 - missing / extra / duplicate mappingをblockedにする
 
 #### test-condition-design/runtime_v1_cutover.py
@@ -212,7 +212,7 @@ TCDはcurrent v2 model resultを後段へ使うため4 phaseで進めます。
 - v1 condition_structure input/resultをexactly 1 pair要求
 - `tcn_id_state / model_key_state` をprevious stateへ移す
 - TCN / model `draft_key ↔ *_id_map` をexact joinしてreuseへ固定
-- active TCN / modelをfull rebuild scopeへ入れる
+- active TCN / modelをfull rebuild scopeへ入れ、`inactive_tcn_ids=[] / inactive_model_keys=[]` を明示する
 
 `models`:
 - current v2 condition_structure pairを必須とする
@@ -228,7 +228,7 @@ TCDはcurrent v2 model resultを後段へ使うため4 phaseで進めます。
 
 `materialize-coverage`:
 - current v2 condition / model / optional TDR resultからcomplete inputを再構築
-- previous target / semantic CI / CI ID / expected-result-root stateをv1 resultからprevious stateへ維持
+- previous target / semantic CI / CI ID / expected-result-root stateをv1 resultからprevious stateへ維持し、`inactive_ci_ids=[]` を明示する
 - target annotation / disposition / merge groupのsemantic fieldを維持し、version fingerprintだけcurrent targetへrebase
 - semantic coverage itemはv1 source_target_versionsで旧semantic_content_fingerprintを再計算してv1 mappingへ一意joinした後、current target versionへrebaseして同じCI IDをreuseする
 - 0件 / 複数mapping、target集合 / merge membershipのsemantic driftをblockedにする
@@ -240,7 +240,7 @@ expected unitは `artifact:case_structure:all` exactly 1件です。
 - v1 inputのsemantic fieldを維持
 - v1 result `tc_id_state` → `previous_tc_ids[]`
 - `draft_key ↔ tc_id_map[]` をexact joinし、current TC draftをreuseへ固定
-- active TCを `update_scope_tc_ids[]` へ全件入れてfull rebuild
+- active TCを `update_scope_tc_ids[]` へ全件入れ、`inactive_tc_ids=[]` を明示してfull rebuild
 - missing / extra / duplicate mappingをblockedにする
 
 ### 2.8 v1保存evidenceのread-only検証 / projection
@@ -362,9 +362,9 @@ runtime version bumpだけを理由にlive再観測は要求しませんが、�
 | --- | --- | --- | --- | --- |
 | spec-analysis | v1 Machine Entity / wrapperはcurrent扱いしない | `authority_entities.py` の§2.8 frozen projectionでcanonical v1 Authority Entityの`content`だけを検証抽出し、current v2 `build()`でAuthority Entityを再生成する。v1 blockがmissing / invalidならtable/prose parserへfallbackせず通常spec-analysis semantic rerun | SPEC / DEC / ASM等のsemantic IDは検証済みAuthority `content.authority_id`を維持し、v1 fingerprintをseedにしない | valid canonical v1 Authority blockならdeterministic再生成。無ければ通常Skill rerun |
 | test-analysis | v1 Runtime / Entity evidenceはcurrent扱いしない | `runtime_v1_input_reader.py` でv1 pair integrityを検証し、semantic field + saved child runtime inputだけを抽出する。current v2 upstream Entity identity / content fingerprint等のcurrent source契約が一致する場合だけdependent runtime→`analysis_entities`をfull rerunする。v1 rootのmachine-owned result fieldは再利用しない。reader invalid / currentness不一致は通常test-analysis rerun | RISK等のsemantic IDは検証済みsemantic input / current artifact上のIDを維持し、v1 fingerprintをseedにしない | reader valid + current source一致ならdeterministic full rerun。その他は通常Skill rerun |
-| test-requirement-design | v1 resultをprevious artifactへ直接渡さない | `runtime_v1_cutover.py` でcomplete v2 inputを作りfull rebuild | TR ID / inactive・deleted履歴をcutoverで維持 | cutover必須 |
-| test-condition-design | v1 resultをprevious artifactへ直接渡さない | `runtime_v1_cutover.py` の4 phaseでcomplete v2 inputを作りfull rebuild | TCN / model / CI IDと履歴をcutoverで維持 | cutover必須 |
-| test-case-design | v1 resultをprevious artifactへ直接渡さない | `runtime_v1_cutover.py` でcomplete v2 inputを作りfull rebuild | TC ID / inactive・deleted履歴をcutoverで維持 | cutover必須 |
+| test-requirement-design | v1 resultをprevious artifactへ直接渡さない | `runtime_v1_cutover.py` でcomplete v2 inputを作りfull rebuild | TR IDとv1のactive / deleted履歴を維持し、inactiveは空集合から開始 | cutover必須 |
+| test-condition-design | v1 resultをprevious artifactへ直接渡さない | `runtime_v1_cutover.py` の4 phaseでcomplete v2 inputを作りfull rebuild | TCN / model / CI IDとv1のactive / deleted履歴を維持し、inactiveは空集合から開始 | cutover必須 |
+| test-case-design | v1 resultをprevious artifactへ直接渡さない | `runtime_v1_cutover.py` でcomplete v2 inputを作りfull rebuild | TC IDとv1のactive / deleted履歴を維持し、inactiveは空集合から開始 | cutover必須 |
 | coverage-analysis | v1 aggregate evidenceをcarry-forwardしない | 保存v1 Machine Runtime Inputは再利用せず、current upstream v2 Entity / runtime evidenceから通常Skill契約どおり`traceability` / verifierをfull rerunする | 自Skill Entityをcarry-forwardしない既存契約を維持 | current v2 upstreamからdeterministic full rerun |
 | qa-workflow | v1 aggregate evidenceをcarry-forwardしない | 保存v1 Machine Runtime Inputは再利用せず、各scope担当Skillのcurrent v2 evidence + current workflow state / routing inputから`workflow_runtime.py` / final gateを再生成する | 自Skill Entityをcarry-forwardしない既存契約を維持 | current workflow stateからorchestration evidenceを再生成 |
 | usability-inspection | v1 runtime envelopeをcurrent扱いしない | `runtime_v1_input_reader.py` でv1 pair integrityを検証し、既存artifact graph / browser handoff / evidence currentnessが現在も成立する場合だけexact inputからv2 evidenceを再生成する。reader invalid / currentness不明・不一致はMarkdownから復元せず通常再実行または必要なlive再観測 | runtime version bumpだけで新しいproduct identityを作らない | integrity + currentness成立時だけversion bumpによるlive再観測を省略する |
@@ -395,7 +395,7 @@ runtime version bumpだけを理由にlive再観測は要求しませんが、�
 - spec-analysis projectionはcanonical v1 `Machine Entities: spec-analysis` wrapper / Authority Entityだけを受理し、`schema_version`不一致、content fingerprint改変、dependency混入、`authority_id != entity_ref`、duplicateをrejectする。cutover helperはv1以外のsource runtime / entity schema、v1/v2混在、missing / extra / duplicate / incomplete pairをlegacy readerでrejectする。input readerもv1以外、missing / extra / duplicate / incomplete pair、baseline implementation fingerprint不一致をrejectし、current v2 validatorへv1 sourceを渡す経路を持たない
 - top-level artifact stringが64 KiBを超えてもaggregate 16 MiB以内ならcutover入口で受理し、artifact内JSON scalarが64 KiBを超える場合はrejectする回帰
 - frozen v1 input / model / generation fingerprint、dependency、runtime / generator implementation fingerprintを改変したsource artifactをcutover helper / input readerがrejectする回帰
-- 内容不変cutoverでTR / TCN / model / CI / TC IDとdeleted / inactive identity historyを維持
+- 内容不変cutoverでTR / TCN / model / CI / TC IDとv1のactive / deleted identity historyを維持し、v1に存在しない `inactive_*` は空配列から開始する
 - cutover helper返却inputだけで次のv2 generatorを実行でき、Agent-side merge不要。input readerはsemantic inputだけを返し、v2 metadata / dependencyを生成しない
 - test-analysis reader成功後にdependent runtimeをv2 full rerunし、rootのmachine-owned result fieldをcurrent v2 resultから再構築する回帰
 - usability-inspection / wcag-conformance-evaluationはreader validだけでは再利用せず、currentness成立時のみsaved inputでv2再生成し、不成立時は通常rerun / re-observationへ戻る回帰
@@ -759,7 +759,7 @@ coverage-analysisの既存traceability graph node typeへACを追加しません
 - artifact modeではsemantic `acceptance_criteria[]` とupstream Acceptance Criterion Entity集合をexact一致させ、AC Entity + AC Authority dependencyをTR freshnessへ追加する回帰
 - direct modeではupstream AC Entityなしでもsemantic `acceptance_criteria[]` をknown ID集合として `acceptance_refs[]` / closureを検証でき、存在しないAC / AC由来Authority Machine Entity dependencyを合成しない回帰。AC Entityなしのdirect modeではAC本文 / 親chain変更のcross-run freshnessを保証しないことも契約化する。実在AC Entityをdependencyへ使う場合はsemantic rowとの `ac_id / authority_refs[]` 一致を要求し、そのEntity dependencyについて既存freshnessを利用できること
 - AC-001をTRへlinkしても、そのACが参照するSPEC-001をTR authority_refs / Authority Dispositionで別途closeしない場合はSPEC-001 unclosedとなる
-- TRD / TCD / TC Skill-local runtime_v1_cutover.pyのprojection、runtime-v1 / entity-state-v1以外の入力拒否、内容不変時stable ID保持、deleted / inactive identity history保持
+- TRD / TCD / TC Skill-local runtime_v1_cutover.pyのprojection、runtime-v1 / entity-state-v1以外の入力拒否、内容不変時stable IDとv1 active / deleted history保持、初回v2 `inactive_*=[]`
 - AC linked / disposed / unclosed / linked+disposed
 - AC upstream skill/type mismatch
 - artifact modeのAC dependency fingerprint propagation
