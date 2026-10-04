@@ -161,7 +161,7 @@ stdinは1 JSON object、stdoutは1 JSON object + LFです。operationは `cutove
 - TCDの2 phase目以降だけ `current_v2_artifact_markdown` を要求する
 - cutover helperの外側stdinはcurrent `runtime_contract.strict_loads()`へそのまま渡さない。各helperのcutover入口がstdlib JSON decoderでduplicate key、depth、container item数等の既存安全制約を維持しつつaggregate 16 MiBを検査する
 - top-level `artifact_markdown / current_v2_artifact_markdown` だけは成果物全文transportとして64 KiB string上限を免除する。その他のtop-level scalarと、artifactから抽出したMachine Runtime Input / Result / Entity等のJSON scalarは通常の64 KiB上限を維持する
-- legacy readerがartifact内から抽出した各v1 JSON blockは、旧通常runtimeが生成可能だった2 MiB aggregate上限内でstrict decodeし、`runtime_contract_version=runtime-v1 / entity_schema_version=entity-state-v1`、Input / Result pair、Entity identity / dependency / stored fingerprintをfrozen v1規則で再検証する
+- legacy readerがartifact内から抽出した各v1 JSON blockは、旧通常runtimeが生成可能だった2 MiB aggregate上限内でstrict decodeする。Machine Runtime Input / Result metadataは `runtime_contract_version=runtime-v1`、Machine Entities wrapper / individual Entityは `schema_version=entity-state-v1` を要求し、Input / Result pair、Entity identity / dependency / stored fingerprintをfrozen v1規則で再検証する
 - current v2 `strict_loads()` の `verify_runtime_evidence` 専用64 KiB exemptionをcutoverへ流用しない。cutover契約自体はgenerator input上限 / string上限を変更しない。ready-scope batchを受ける `artifact:analysis_entities:all` / `artifact:requirement_structure:all` のaggregate 16 MiB化は本節のcutoverとは独立した§3のroot runtime契約として扱う
 - handled failureはexit 0 + `valid=false / issues[]`、unexpected internal errorだけexit 1
 - `cutover_semantic_drift / cutover_dependency_incomplete` はblocking issueとする
@@ -243,15 +243,34 @@ expected unitは `artifact:case_structure:all` exactly 1件です。
 - active TCを `update_scope_tc_ids[]` へ全件入れてfull rebuild
 - missing / extra / duplicate mappingをblockedにする
 
-### 2.8 v1保存Runtime Inputのread-only検証
+### 2.8 v1保存evidenceのread-only検証 / projection
 
-TRD / TCD / TCの`runtime_v1_cutover.py`はstable identity / historyをv2 inputへprojectionするためのcutover helperです。これとは別に、runtime version変更だけを理由にsemantic再分析やlive再観測を強制しないため、保存済みv1 Runtime Inputを再利用する次の3 Skillだけにread-only readerを追加します。
+TRD / TCD / TCの`runtime_v1_cutover.py`はstable identity / historyをv2 inputへprojectionするためのcutover helperです。spec-analysisはruntime unitを持たないため別fileを追加せず、既存 `authority_entities.py` にcanonical v1 Authority Entityからcurrent v2 Authority Entityへ再生成するread-only migration pathを追加します。さらに、runtime version変更だけを理由にsemantic再分析やlive再観測を強制しないため、保存済みv1 Runtime Inputを再利用する次の3 Skillだけにread-only readerを追加します。
 
 - `skills/test-analysis/scripts/runtime_v1_input_reader.py`
 - `skills/usability-inspection/scripts/runtime_v1_input_reader.py`
 - `skills/wcag-conformance-evaluation/scripts/runtime_v1_input_reader.py`
 
-generic migration module、shared `runtime_contract.py` のv1 compatibility branch、qa-workflow wrapperは追加しません。3 readerはSkill package単体で動作し、v1 evidenceの**integrity検証とsemantic input抽出だけ**を担当します。currentness判定、stable identity migration、v2 metadata生成は担当しません。
+generic migration module、shared `runtime_contract.py` のv1 compatibility branch、qa-workflow wrapperは追加しません。spec-analysis projectionと3 readerはいずれもv1 evidenceの**integrity検証とsemantic data抽出だけ**を担当し、v1 fingerprint / dependency / wrapperをcurrent v2へcarry-forwardしません。
+
+#### spec-analysis Authority v1 projection
+
+`skills/spec-analysis/scripts/authority_entities.py` の既存request `{"authorities":[...]}` とresponse shapeは維持します。migration時だけ、これと排他的なrequestを受けます。
+
+```json
+{"source_artifact_markdown":"<canonical v1 spec-analysis artifact>"}
+```
+
+この経路はexactly one `### Machine Entities: spec-analysis` blockを抽出し、current v2 `validate_machine_entity()` へ渡さず次をfrozen v1規則で検証します。
+
+- wrapperはexact `{schema_version, skill, entities}`、`schema_version=entity-state-v1`、`skill=spec-analysis`
+- individual Entityはv1 canonical exact field setを持ち、`schema_version=entity-state-v1`、`skill=spec-analysis`、`entity_type=authority`、`model_key=null`
+- `content_fingerprint` をv1 canonical JSON規則で再計算して一致する
+- `upstream_entity_dependencies=[]` / `runtime_dependencies=[]`
+- `content` は `authority_entities.py build()` のexact Authority schema `{authority_id, authority_type, active_content, scope, source_refs, relations, related_authority_refs}` を満たし、`content.authority_id == entity_ref`
+- duplicate Authority identityをrejectする
+
+検証成功後はAuthority Entityの`content`だけを`authority_id`順に取り出し、current v2 `build(authorities)` へ渡して新しい `schema_version=entity-state-v2` / content fingerprint / wrapperを生成します。v1 wrapper / Entity fingerprint / dependencyをseedにしません。canonical v1 blockがmissing / invalidならhuman-readable `現在有効な仕様根拠` tableやproseからJSONを推測復元せず、通常spec-analysis semantic rerunへ戻します。
 
 #### reader CLI contract
 
@@ -341,7 +360,7 @@ runtime version bumpだけを理由にlive再観測は要求しませんが、�
 
 | Skill | v1 artifactの扱い | v2移行方法 | stable identity | 再実行 / 再観測 |
 | --- | --- | --- | --- | --- |
-| spec-analysis | v1 Machine Entity / wrapperは破棄 | current canonical spec-analysis inputからAuthority Entityをv2再生成。UI target migration前は既存semantic rowを変更しない | SPEC / DEC / ASM等のsemantic IDをhuman-readable / canonical inputから維持 | deterministic evidence再生成。version bumpだけを理由に仕様再分析しない |
+| spec-analysis | v1 Machine Entity / wrapperはcurrent扱いしない | `authority_entities.py` の§2.8 frozen projectionでcanonical v1 Authority Entityの`content`だけを検証抽出し、current v2 `build()`でAuthority Entityを再生成する。v1 blockがmissing / invalidならtable/prose parserへfallbackせず通常spec-analysis semantic rerun | SPEC / DEC / ASM等のsemantic IDは検証済みAuthority `content.authority_id`を維持し、v1 fingerprintをseedにしない | valid canonical v1 Authority blockならdeterministic再生成。無ければ通常Skill rerun |
 | test-analysis | v1 Runtime / Entity evidenceはcurrent扱いしない | `runtime_v1_input_reader.py` でv1 pair integrityを検証し、semantic field + saved child runtime inputだけを抽出する。current v2 upstream Entity identity / content fingerprint等のcurrent source契約が一致する場合だけdependent runtime→`analysis_entities`をfull rerunする。v1 rootのmachine-owned result fieldは再利用しない。reader invalid / currentness不一致は通常test-analysis rerun | RISK等のsemantic IDは検証済みsemantic input / current artifact上のIDを維持し、v1 fingerprintをseedにしない | reader valid + current source一致ならdeterministic full rerun。その他は通常Skill rerun |
 | test-requirement-design | v1 resultをprevious artifactへ直接渡さない | `runtime_v1_cutover.py` でcomplete v2 inputを作りfull rebuild | TR ID / inactive・deleted履歴をcutoverで維持 | cutover必須 |
 | test-condition-design | v1 resultをprevious artifactへ直接渡さない | `runtime_v1_cutover.py` の4 phaseでcomplete v2 inputを作りfull rebuild | TCN / model / CI IDと履歴をcutoverで維持 | cutover必須 |
@@ -351,26 +370,29 @@ runtime version bumpだけを理由にlive再観測は要求しませんが、�
 | usability-inspection | v1 runtime envelopeをcurrent扱いしない | `runtime_v1_input_reader.py` でv1 pair integrityを検証し、既存artifact graph / browser handoff / evidence currentnessが現在も成立する場合だけexact inputからv2 evidenceを再生成する。reader invalid / currentness不明・不一致はMarkdownから復元せず通常再実行または必要なlive再観測 | runtime version bumpだけで新しいproduct identityを作らない | integrity + currentness成立時だけversion bumpによるlive再観測を省略する |
 | wcag-conformance-evaluation | v1 runtime envelopeをcurrent扱いしない | `runtime_v1_input_reader.py` でv1 pair integrityを検証し、既存sampling / procedure / handoff / evidence freshnessが現在も成立する場合だけexact inputからv2 evidenceを再生成する。reader invalid / currentness不明・不一致はreport proseから復元せず既存WCAG-EM workflowで通常再実行する | evaluation / sample等のsemantic identityは既存Skill契約を維持 | integrity + currentness成立時だけversion bumpによる再観測を省略する |
 
-この表にないmigration wrapper / generic converterは追加しません。spec-analysisはcanonical spec成果物、test-analysis / usability-inspection / wcag-conformance-evaluationは§2.8のread-only readerでintegrity検証済みかつcurrentness条件を満たすsemantic input、coverage-analysisはcurrent upstream v2 evidence、qa-workflowはcurrent workflow state / routing inputを正本とし、proseからv2 inputを推測変換しません。PR #14 merge後のStep 0では3 readerが固定するpre-cutover runtime / generator implementation fingerprintと、保存input blockの存在・parse可能性を実測値へ同期します。存在しない / baseline不一致の場合は上表の通常rerun経路へ固定し、新しい設計判断はStep 0へ持ち越しません。
+この表にないmigration wrapper / generic converterは追加しません。spec-analysisは§2.8でfrozen検証したcanonical v1 Authority content、test-analysis / usability-inspection / wcag-conformance-evaluationはread-only readerでintegrity検証済みかつcurrentness条件を満たすsemantic input、coverage-analysisはcurrent upstream v2 evidence、qa-workflowは全必要current v2 evidenceが揃ったcurrent workflow state / routing inputを正本とし、proseからv2 inputを推測変換しません。PR #14 merge後のStep 0ではspec-analysis v1 Entityのexact baseline field / canonicalizationと、3 readerが固定するpre-cutover runtime / generator implementation fingerprint、保存input blockの存在・parse可能性を実測値へ同期します。存在しない / baseline不一致の場合は上表の通常rerun経路へ固定し、新しい設計判断はStep 0へ持ち越しません。
 
 #### UI target migrationとの相対順序
 
-既存runtime-v1 downstream artifactがあるworkflowでは次の順だけを許可します。
+既存runtime-v1 downstream artifactがあるworkflowでは次の依存順だけを許可します。
 
-1. runtime-v1 downstreamを検出し、通常semantic update / partial rerunを停止
-2. spec-analysisはcanonical inputから、test-analysisは§2.8のreaderでintegrity / current source整合を確認したsemantic inputから、semantic内容を変えずruntime-v2 / entity-state-v2 evidenceを再生成。readerが使えない場合は通常test-analysis rerunでcurrent baselineを作る。coverage-analysis / qa-workflowは保存v1 inputを使わずcurrent v2 upstream / workflow stateから再生成し、usability-inspection / wcag-conformance-evaluationはintegrity + currentness成立時だけ保存inputでv2再生成する
-3. TRD → TCD → TCを上記Skill-local cutover helperでsemantic不変のままv2 full rebuildし、downstream v2 baselineを成立させる
-4. v2 baselineがvalidate / freshnessを通過した後に、legacy / normal spec-analysis成果物をui-target-v1へmigrationしてUS / UC / Behavior / ACを生成
-5. requirement-structure-v2を通常semantic updateとして再実行し、AC→TR / Dispositionを反映
-6. AC / Authority変更でstaleになったTCD / TC / downstream evidenceを通常workflowで再実行
+1. runtime-v1 downstreamを検出し、通常semantic update / partial rerunを停止する
+2. spec-analysisは§2.8のfrozen Authority projectionでv2 Authority Entityを再生成し、projection不可なら通常spec-analysis semantic rerunでcurrent v2 baselineを作る
+3. test-analysisは§2.8 readerでintegrityとcurrent v2 Authority整合を確認してdependent runtime → `analysis_entities` をfull rerunし、reader不可なら通常test-analysis rerunへ戻る
+4. TRD → TCD → TCをSkill-local cutover helperでsemantic不変のままv2 full rebuildする
+5. coverage-analysisをcurrent v2 TR / TCN / CI / TC / runtime evidenceからfull rerunする
+6. workflowで必要なusability-inspection / wcag-conformance-evaluationを各Skillのreader integrity + currentness契約に従ってv2再生成し、必要なら通常rerun / re-observationする
+7. qa-workflowを最後にcurrent v2 Entity / runtime evidence + current workflow state / routing inputからfull rerunし、v2 baselineのvalidate / freshness / final gateを成立させる
+8. v2 baseline成立後にlegacy / normal spec-analysis成果物をui-target-v1へmigrationしてUS / UC / Behavior / ACを生成し、requirement-structure-v2を通常semantic updateとして再実行してAC→TR / Dispositionを反映する
+9. AC / Authority変更でstaleになったTCD → TC → coverage-analysis → qa-workflow等を通常の依存順で再実行する
 
-`UI target migration済み + runtime-v1 downstreamあり + cutover未完了` はblockedです。逆順を許可しません。runtime-v1 downstream artifactが存在しないworkflowだけ、UI target package migrationから直接normal v2 workflowへ進めます。
+`UI target migration済み + runtime-v1 downstreamあり + v2 baseline未成立` はblockedです。逆順を許可しません。runtime-v1 downstream artifactが存在しないworkflowだけ、UI target package migrationから直接normal v2 workflowへ進めます。
 
 #### repository regression
 
-- 3 `runtime_v1_cutover.py` と3 `runtime_v1_input_reader.py` のpackage単体compile / portability
+- `authority_entities.py` v1 Authority projection、3 `runtime_v1_cutover.py`、3 `runtime_v1_input_reader.py` のpackage単体compile / portability
 - cutover外側transportは16 MiB accepted / 1 byte超過blocked。cutover処理によってgenerator上限を変えないことを確認し、別途§3の2 root runtimeだけaggregate 16 MiB、その他の通常generatorは2 MiBを維持する
-- cutover helperはv1以外のsource runtime / entity schema、v1/v2混在、missing / extra / duplicate / incomplete pairをlegacy readerでrejectする。input readerもv1以外、missing / extra / duplicate / incomplete pair、baseline implementation fingerprint不一致をrejectし、current v2 validatorへv1 sourceを渡す経路を持たない
+- spec-analysis projectionはcanonical v1 `Machine Entities: spec-analysis` wrapper / Authority Entityだけを受理し、`schema_version`不一致、content fingerprint改変、dependency混入、`authority_id != entity_ref`、duplicateをrejectする。cutover helperはv1以外のsource runtime / entity schema、v1/v2混在、missing / extra / duplicate / incomplete pairをlegacy readerでrejectする。input readerもv1以外、missing / extra / duplicate / incomplete pair、baseline implementation fingerprint不一致をrejectし、current v2 validatorへv1 sourceを渡す経路を持たない
 - top-level artifact stringが64 KiBを超えてもaggregate 16 MiB以内ならcutover入口で受理し、artifact内JSON scalarが64 KiBを超える場合はrejectする回帰
 - frozen v1 input / model / generation fingerprint、dependency、runtime / generator implementation fingerprintを改変したsource artifactをcutover helper / input readerがrejectする回帰
 - 内容不変cutoverでTR / TCN / model / CI / TC IDとdeleted / inactive identity historyを維持
@@ -380,7 +402,7 @@ runtime version bumpだけを理由にlive再観測は要求しませんが、�
 - coverage-analysis / qa-workflowはvalidな保存v1 inputが存在しても無視し、current upstream v2 evidence / current workflow stateから再生成する回帰
 - TCD target version rebase、derived child、semantic CI mappingをcurrent v2 resultへ正しく接続
 - `UI target migration済み + runtime-v1 downstream + cutover未完了` をintegration testでblocked
-- cutover完了後のUI target migration → AC semantic update → downstream stale / rerunを実Agent smokeで確認
+- spec-analysis/test-analysis v2再生成 → TRD/TCD/TC cutover → coverage-analysis → 必要なinspection/WCAG → qa-workflow final gateの順でv2 baselineが成立し、その後UI target migration → AC semantic update → downstream stale / rerunへ進むことをintegration test / 実Agent smokeで確認
 
 ## 3. spec-analysis normalized machine input
 

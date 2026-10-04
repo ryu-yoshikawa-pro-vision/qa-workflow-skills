@@ -197,15 +197,19 @@ exact CLI契約は `_06_package-schema-and-helper-contracts.md` を正本とし�
 
 ### 2.6a runtime-v1 downstreamが残る場合の順序
 
-既存workflowにruntime-v1のTRD / TCD / TC artifactが存在する場合、UI target packageへのmigrationを先に行いません。順序は次に固定します。
+既存workflowにruntime-v1のdownstream artifactが存在する場合、UI target packageへのmigrationを先に行いません。依存グラフ順を次に固定します。
 
-1. v1 downstream artifactを検出したら通常semantic update / partial rerunへ入らない
-2. `_09` のSkill-local cutover helperでTRD → TCD → TCをsemantic不変のままruntime-v2 / entity-state-v2へcutoverする
-3. current v2 downstream baselineがvalidate / freshnessを通過した後に、既存spec-analysis成果物をUI target packageへmigrationしてACを生成する
-4. requirement-structure-v2を通常semantic updateとして再実行し、AC→TR / Dispositionを反映する
-5. AC / Authority変更でstaleになったTCD / TC等を通常workflowで再実行する
+1. runtime-v1 downstreamを検出したら通常semantic update / partial rerunへ入らない
+2. spec-analysisは `_09` のfrozen v1 Authority projectionでcurrent v2 Authority Entityを再生成する。canonical v1 Authority blockが使えない場合は通常spec-analysis semantic rerunでcurrent baselineを作る
+3. test-analysisは保存v1 inputのintegrity + current v2 Authority整合を確認してdependent runtime → rootをfull rerunする。保存inputを使えない場合は通常test-analysis rerunへ戻る
+4. `_09` のSkill-local cutover helperでTRD → TCD → TCをsemantic不変のままruntime-v2 / entity-state-v2へfull rebuildする
+5. coverage-analysisをcurrent v2 TR / TCN / CI / TC / runtime evidenceからfull rerunする
+6. workflowで必要なusability-inspection / wcag-conformance-evaluationを各Skillのintegrity + currentness契約に従ってv2再生成し、必要な再観測を完了する
+7. qa-workflowを最後にcurrent v2 Entity / runtime evidenceから再生成し、v2 baselineのvalidate / freshness / final gateを成立させる
+8. v2 baseline成立後に既存spec-analysis成果物をUI target packageへmigrationしてACを生成し、requirement-structure-v2を通常semantic updateとして再実行する
+9. AC / Authority変更でstaleになったTCD → TC → coverage-analysis → qa-workflow等を通常の依存順で再実行する
 
-`UI target migration済み + runtime-v1 downstreamあり + cutover未完了` の組合せはblockedです。新しいqa-workflow専用wrapperは作らず、既存routing / runtime evidence version確認でこの順序を守ります。既存v1 downstream artifactがない場合は、直接UI target package migrationへ進めます。
+`UI target migration済み + runtime-v1 downstreamあり + v2 baseline未成立` の組合せはblockedです。新しいqa-workflow専用wrapperは作らず、既存routing / runtime evidence version確認でこの順序を守ります。既存v1 downstream artifactがない場合は、直接UI target package migrationへ進めます。
 
 ### 2.7 downstream machine handoff
 
@@ -235,7 +239,7 @@ direct modeはUI target artifactを使わない独立呼出しとして同じ `a
 
 今回のmodeは既存Skillと同じAgent Skills構造で提供します。
 
-qa-workflow経由でUI target packageをcreate / updateする場合、`materialize` は既存guidanceのmutable operationとして扱います。`claim_mutable_operation()` は同一operationのidempotent start、`reserve_shared_resource()` はresolved package_root単位のsingle-writer排他として既存契約を再利用し、`claim → reservation → snapshot照合 → materialize` の順で開始します。reservation取得失敗時はwriteを開始しません。成功またはcleanup確認済みhandled failureの後だけ既存 `release_shared_resource()` + atomic conditional deleteでreservationを解放し、claimは通常releaseしません。materialize開始前のclaim recoveryだけ既存 `recover_claim()` 契約に従います。standalone spec-analysisはcallerがresolved package_root単位のsingle writerを保証します。新しいlock / claim wrapperは追加しません。
+qa-workflow経由でUI target packageをcreate / updateする場合、`materialize` は既存guidanceのmutable operationとして扱います。ただしこのwrite pathはresolved package_rootそのものを対象にするため、`reserve_shared_resource()` をatomic pre-start single-writer契約として再利用し、`claim_mutable_operation()` は追加で呼びません。順序は `inspect → package reservation取得 → workflow stateへpackage_root / reservation_revision / semantic input fingerprintを条件付き保存 → materialize` とします。reservation取得失敗時はwriteを開始しません。同一workflowのresumeでは保存済みreservationをexisting external reservation契約で再利用し、同じsemantic input fingerprintを確認してcurrent rootを再inspectします。current rootがvalidならfresh snapshotからmaterializeを再実行し、既にcommit済みならno-opになります。root不在 + valid backup等はhelperの固定preflight recoveryで復旧し、矛盾状態はfail-closedします。成功またはcleanup確認済みhandled failureの後だけ既存 `release_shared_resource()` + atomic conditional deleteでreservationを解放します。PR #14のgeneric `claim_mutable_operation()` / `recover_claim()` semanticsは変更しません。standalone spec-analysisはcallerがresolved package_root単位のsingle writerを保証します。新しいlock / claim wrapperは追加しません。
 
 - entry pointはskills/spec-analysis/SKILL.md
 - 詳細規則はreferences/ui-test-target-analysis.md

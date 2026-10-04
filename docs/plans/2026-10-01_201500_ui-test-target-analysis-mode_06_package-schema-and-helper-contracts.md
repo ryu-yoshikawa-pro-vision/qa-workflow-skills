@@ -612,19 +612,19 @@ unknown operation / unknown top-level field / JSON・table schema不正は `inva
 
 ### 7.3 update concurrency contract
 
-同じ `package_root` への `materialize` はsingle writerです。snapshot照合はstale write検出であり、相互排他の代替ではありません。PR #16ではgeneric CAS / lock serviceを追加せず、qa-workflow経由ではPR #14の既存claim + shared resource reservationをそのまま組み合わせます。
+同じ `package_root` への `materialize` はsingle writerです。snapshot照合はstale write検出であり、相互排他の代替ではありません。PR #16ではgeneric CAS / lock serviceを追加しません。UI target package writeはresolved package_rootそのものが共有mutable resourceなので、qa-workflow経由ではPR #14のshared resource reservationを**atomic pre-start single-writer契約**として使い、generic `claim_mutable_operation()` は重ねません。
 
-- `claim_mutable_operation(workflow_state_root, workflow_ref, operation_ref)` は**同一operationのidempotent start**を担当する。`operation_ref` はworkflow_ref、resolved canonical package_root、previous `manifest_sha256`（createは`-`）、canonical semantic input fingerprintから決定論導出する
-- `reserve_shared_resource(reservation_root, resource_ref, workflow_ref, ...)` は**同一package_rootのsingle-writer排他**を担当する。`resource_ref` は§11でresolveしたcanonical package_rootから `ui-target-package:<resolved-root>` として決定論導出し、semantic input / snapshotを含めない。同じpackageへの異なるoperationでも同じresource_refになる
-- owner側に同等のatomic claim / shared-resource reservationが既にある場合はそのowner contractを優先し、二重reservationを作らない
-- qa-workflowの順序は `operation claim取得 → package reservation取得 → snapshot照合 → materialize開始` に固定する。claimまたはreservation取得失敗時はwrite / staging cleanupを開始しない
-- reservationの `reservation_ref / reservation_revision` はowner workflow stateへ保持する。同じworkflow_refのresumeでは既存reservationをPR #14のexisting external reservation契約で再利用できる。別workflowがreservationをsteal / 上書きしない
-- materializeが成功、またはhandled failure後にroot / staging / backupのcleanupが確認できた場合だけ、owner stateとexpected reservation revisionを検証して既存 `release_shared_resource()` + provider側atomic conditional deleteでreservationを解放する。`write_recovery_failed` 等でcleanupを確認できない場合はreservationを解放せずfail-closedする
-- materialize開始前にreservation取得へ失敗した等、owner executionが `not_started` のままなら既存 `recover_claim()` の条件を満たす場合だけoperation claimを回収できる。materialize開始後 / 成功後のclaimを通常releaseしない。claimは既存どおりidempotency markerとして扱う
-- crash後のreservation recoveryは同じowner workflow_refでowner state / reservation revision / helper-owned sibling cleanupを検証して行う。ownerが `in-progress` または状態を証明できない場合、新しいworkflowが自動解放せずblockedにする
+- `reserve_shared_resource(reservation_root, resource_ref, workflow_ref, ...)` の `resource_ref` は§11でresolveしたcanonical package_rootから `ui-target-package:<resolved-root>` として決定論導出し、semantic input / snapshotを含めない。同じpackageへの異なるoperation / sessionでも同じresource_refになる
+- PR #14の `claim_mutable_operation()` はone-shot pre-start claimであり、existing claimをsafe retryとみなさない既存semanticsを維持する。UI target package materializeではこのclaimを呼ばず、他のbrowser / API mutation経路へ影響させない
+- qa-workflowの初回順序は `inspect → package reservation取得 → workflow stateへwrite contextをconditional保存 → materialize開始` に固定する。reservation取得失敗時はwrite / staging cleanupを開始しない
+- workflow stateへ少なくともresolved `package_root`、`reservation_ref / reservation_revision`、materializeへ渡すsemantic inputのcanonical fingerprint、開始時 `update_snapshot`、write state `reserved / in-progress / complete / blocked` を保存する。LLMはこれらを生成・更新しない
+- same-workflow resumeは保存済みworkflow_ref、package_root、reservation revision、semantic input fingerprintが一致する場合だけ許可し、既存reservationをPR #14のexisting external reservation契約で再利用する。別workflowがreservationをsteal / 上書きしない
+- resume時にcurrent rootがvalidならfresh `inspect` を行い、そのsnapshotで同じsemantic requestをmaterializeする。前回commit済みならcanonical no-op判定でwriteせず完了し、未commitなら通常materializeを行う。同じreservationが継続しているため、canonical writerによる第三者更新は介在しない
+- current rootが不存在でvalid backupがある等、helper-owned sibling recoveryが必要な場合は保存済み開始snapshot + 同じsemantic requestでmaterialize preflightへ入り、§7.4の固定規則でrestore / cleanupした後に続行する。root / staging / backupの状態を一意に解釈できない場合は `write_recovery_failed` でfail-closedする
+- materializeが成功、またはhandled failure後にroot / staging / backupのcleanupが確認できた場合だけ、owner stateとexpected reservation revisionを検証して既存 `release_shared_resource()` + provider側atomic conditional deleteでreservationを解放する。`write_recovery_failed` 等でcleanupを確認できない場合はreservationを解放しない
 - standalone spec-analysisではqa-workflow stateを新設せず、callerが同じresolved package_rootへのsingle writerを保証する。snapshotだけを排他として扱わない
 
-通常更新は必ず `inspect → update_snapshot保持 → claim / reservation → materialize` の順で行います。`materialize` はstaging生成前とpackage commit直前の2回、snapshotのPackage Version、payload file set / `payload_file_sha256[]`、`MANIFEST.md` raw `manifest_sha256` をcurrent packageへ照合します。file追加・削除または1 byteでも変化していれば `stale_snapshot` でcommitせずblockedにし、外部変更をsilent overwriteしません。
+通常更新は必ず `inspect → reservation → workflow state保存 → materialize` の順で行います。`materialize` はstaging生成前とpackage commit直前の2回、snapshotのPackage Version、payload file set / `payload_file_sha256[]`、`MANIFEST.md` raw `manifest_sha256` をcurrent packageへ照合します。file追加・削除または1 byteでも変化していれば `stale_snapshot` でcommitせずblockedにし、外部変更をsilent overwriteしません。
 
 ### 7.4 canonical bytes / package commit
 
@@ -658,7 +658,7 @@ structured Markdown table cellは次のcanonical encodeへ固定します。
 process kill等でhelper-owned siblingが残った場合のpreflight recoveryもこのwrite path内で固定します。`package_root=/parent/<name>` に対してstagingは `/parent/.<name>.ui-target-staging`、backupは `/parent/.<name>.ui-target-backup` exactlyとし、任意名をscanしません。
 
 - current package rootがvalidなら、残存staging / backupは前回未cleanupのorphanとして削除してから新しいmaterializeへ進む
-- current rootが不存在でvalid backupが存在する場合はbackupをrootへrestoreし、stagingを削除してから再inspectを要求する
+- current rootが不存在でvalid backupが存在する場合はbackupをrootへrestoreし、stagingを削除する。callerが同一workflow resumeとして保存済み開始snapshotを渡しておりrestore後rootがそのsnapshotとexact一致する場合は同じmaterializeを続行できる。一致しない場合はwriteを開始せず `stale_snapshot` としてfresh inspectを要求する
 - createでroot / backupが存在せずstagingだけ残る場合は未commit stagingとして削除できる
 - root不在 + backup不正、rootとbackupのどちらもinvalid、helper-owned siblingが矛盾状態など一意に復旧できない場合は `write_recovery_failed` でfail-closedし、自動promotion / 推測復旧をしない
 
