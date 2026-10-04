@@ -406,7 +406,7 @@ runtime version bumpだけを理由にlive再観測は要求しませんが、�
 
 ## 3. spec-analysis normalized machine input
 
-`ui_target_package.py build-machine-evidence(scope_ids=null)` はpackage-global evidenceと `ready_scope_ids[] / blocked_scope_ids[]` を決定論生成し、scope別full handoffを同じresponseへ複製しません。`build-machine-evidence(scope_ids=[...])` は各ready scopeを固定reachabilityで内部projectionし、Authority / current AC / Machine Entity / expected identityをstable identityでunion / dedupeした1つのbatch handoffを返します。canonical qa-workflowでは `scope_ids[]` をcurrent `ready_scope_ids[]` とexact一致させます。Markdownから次を決定論的に生成します。
+`ui_target_package.py build-machine-evidence(scope_ids=null)` はpackage-global evidenceと `ready_scope_ids[] / blocked_scope_ids[]`、さらにpartial readiness時のdownstream lifecycle用 `blocked_scope_upstream_identities[]` を決定論生成し、scope別full handoffを同じresponseへ複製しません。`blocked_scope_upstream_identities[]` は `{skill, entity_type, entity_ref}` のidentity-only rowで、(1) blocked scopeに属しsemantic identityが既知のAC IDを `spec-analysis / acceptance_criterion / AC-xxx` として含め、(2) `_06 §9.3` のreachabilityでblocked scopeから到達するcurrent Authorityからready scopeでも到達するAuthorityを差し引いたblocked-only Authority identityを含めます。共有Authority、INF、UNK、UI構造 / domain itemは含めません。blocked ACのMachine Entity bodyは生成せず、identityだけを一時非current判定の起点にします。`build-machine-evidence(scope_ids=[...])` は各ready scopeを固定reachabilityで内部projectionし、Authority / current AC / Machine Entity / expected identityをstable identityでunion / dedupeした1つのbatch handoffを返します。canonical qa-workflowでは `scope_ids[]` をcurrent `ready_scope_ids[]` とexact一致させます。Markdownから次を決定論的に生成します。
 
 - normalized Authority rows
 - normalized current AC rows
@@ -518,18 +518,20 @@ AC Entityの `upstream_entity_dependencies[]` は、AC / Behavior / UC / US chai
 UIOP / US / UC / Behavior / UI構造 / FIELD / RULE / FLOW / NOTIFY / INTERACT / INFを新しいdependency Entity typeとして追加しません。package-local rowはAC contentへ固定projectionし、Authorityだけ既存Entity dependencyへ展開することで、不要なglobal entity typeを増やさずfreshnessを成立させます。
 
 
-## 5. test-requirement-design contract version
+## 5. downstream generator contract version
 
-`requirement_structure.py` はinput schemaを変更するため、generator contractを明示的に次へ更新します。
+本PRではAcceptance Criteria接続に加え、readyだったscopeが一時blockedになった時のstable ID lifecycleをTRD → TCD → TCまで閉じるため、次のgenerator contractを同時に更新します。
 
-- before: `requirement-structure-v1`
-- after: `requirement-structure-v2`
+- `requirement-structure-v1 → requirement-structure-v2`
+- `condition-structure-v1 → condition-structure-v2`
+- `materialize-coverage-v1 → materialize-coverage-v2`
+- `case-structure-v1 → case-structure-v2`
 
 shared runtime contractは `runtime-v2` を使用します。
 
-repository内の固定contract mapping / fixture metadata / portability test / runtime test / vertical integrationで `requirement-structure-v1` を参照している箇所をcurrent v2へ同期します。
+`requirement-structure-v2` はAC schema追加とinactive lifecycle、残り3 generator v2はinactive lifecycleが意味契約変更です。repository内の固定contract mapping / fixture metadata / portability test / runtime test / vertical integrationで各 `-v1` contractを参照している箇所をcurrent v2へ同期します。generator contract versionとshared `runtime-v2` を同一文字列へ揃えません。
 
-旧v1 Machine Runtime Resultをv2 current resultとして読み替えません。再利用が必要な成果物はcurrent normalized inputからv2を再実行します。
+旧v1 Machine Runtime Resultをv2 current resultとして読み替えません。v1 cutover時点では既存 `active / deleted` historyをそのままv2へprojectionし、v1に存在しない `inactive` を推測生成しません。inactiveはv2通常workflowで実際に `ready → blocked` が発生した時だけ作成します。
 
 ## 6. requirement_structure-v2 input
 
@@ -542,8 +544,11 @@ top-level required fields:
 - `dispositions`
 - `previous_tr_ids`
 - `update_scope_tr_ids`
+- `inactive_tr_ids`
 
 既存legacy promotion用 `legacy_tr_ids` の条件付き入力契約は維持します。
+
+`previous_tr_ids[].status` は `active / inactive / deleted` のexact enumとします。`inactive_tr_ids[]` は `downstream_state.py` が導出したprevious `active` TRだけを列挙し、`update_scope_tr_ids[]` と重複させません。`update_scope_tr_ids[]` はprevious `active / inactive` を参照でき、`deleted` は参照できません。inactive TRをLLMがsemantic identity同一としてreuseした場合は同じTR IDを `active` へ戻し、update scopeへ入れたinactive TRをreuseしない場合は `deleted` にします。update scope外のinactive TRはinactiveのまま保持します。new ID allocatorはactive / inactive / deletedをすべて使用済みIDとして扱います。
 
 `acceptance_criteria[]` は§3.1のexact schemaを使用し、**current ACだけ**を含めます。blocked ACはknown current AC集合、Machine Entity、TRD closureの対象外です。`authority_refs[]` はtop-level `authorities[]` のknown IDへ存在検証します。ACなしworkflowでもkey省略は許可せず `[]` を明示します。
 
@@ -650,29 +655,90 @@ direct modeは `acceptance_criteria[]` によるknown ID / closure検証を保�
 
 freshness判定アルゴリズム自体は既存 `evaluate_entity_freshness` を再利用し、新しい伝播engineを作りません。
 
-## 12. partial rerun
+## 12. partial rerun / ready → blocked → ready
 
-TRDの既存partial rerun contractを維持します。以下のAC semantic freshness regressionはartifact modeで固定します。direct modeでAC Entity dependencyが無いTRへ同じ保証を要求しません。
+### 12.1 current upstream変更の既存freshness
 
-必須regression:
+readyのままcurrent AC等の内容が変わるpartial rerunは既存freshness契約を維持します。
 
 1. AC-001へ依存するTR-001が存在
-2. AC-001が変更
+2. AC-001がcurrentのまま変更
 3. TR-001が今回の `update_scope_tr_ids` 外
-4. previous artifactからTR-001をcarry-forward
+4. previous artifactからTR-001をactive carry-forward
 5. carry-forward TRが旧AC fingerprintを保持
 6. current AC Entityとの不一致によりTR-001がstale
 7. workflow completion不可
 
-scope外であることを理由に、changed ACへ依存するTRをcurrent扱いしません。
+scope外であることを理由に、**currentのまま変更された**upstreamへ依存する成果物をcurrent扱いしません。inactive契約はこのfreshness違反を隠すためには使いません。
+
+### 12.2 downstream inactive state
+
+TR / TCN / model / CI / TCのstable ID stateへ次を追加します。
+
+- `active`: current Machine Entity / current runtimeの対象
+- `inactive`: semantic identityは履歴として存続するが、blocked scope等により一時的にcurrent対象外
+- `deleted`: semantic identityが廃止されたterminal state
+
+共通規則:
+
+- `inactive` は `ready → blocked` の一時停止にだけ使い、semantic deletionの代替にしない
+- activeだけをcurrent Machine Entity collection / expected Entity / carry-forward projectionへ含める。inactive / deletedはcurrent Entityへ含めず、inactive自体をmissing dependency / stale issueへ変換しない
+- active / inactive / deletedの全IDをallocatorの使用済み集合へ含め、番号を再利用しない
+- deletedはterminalで、reuse / reactivationを禁止する
+- inactive IDはupdate scope外ならinactiveのまま保持する
+- inactive IDをcurrent semantic draftがreuseし、LLMがsemantic identity同一と判断した場合だけactiveへ戻す
+- inactive IDをupdate scopeへ入れてreuseしない場合はdeletedへ遷移できる。意味が変わったcurrent itemはnew IDを採番する
+- active previous IDをinactiveへ落とす集合はLLMに入力させず、§12.3のhelper出力だけを正本とする
+
+generator / state contract:
+
+- `requirement-structure-v2`: required `inactive_tr_ids[]`、`previous_tr_ids[].status=active|inactive|deleted`
+- `condition-structure-v2`: required `inactive_tcn_ids[] / inactive_model_keys[]`、`previous_tcn_ids[] / previous_model_keys[].status=active|inactive|deleted`
+- `materialize-coverage-v2`: required `inactive_ci_ids[]`、`previous_ci_ids[].status=active|inactive|deleted`。既存 `previous_target_id_map[].mapping_status / previous_semantic_ci_map[].mapping_status=active|inactive` は維持し、scope blockで一時的に外れたmappingをsemantic deletion扱いしない
+- `case-structure-v2`: required `inactive_tc_ids[]`、`previous_tc_ids[].status=active|inactive|deleted`
+- TCDの `current_structure_state.previous_ci_id_state` も3状態を受理する。TCN全体がinactiveで `materialize-coverage` をdispatchしない場合でも、qa-workflowが渡した `inactive_ci_ids[]` をroot current structure stateへ反映してCI ID履歴を失わない
+- `runtime_contract.py::_state_map()` とprevious state validationは3状態へ同期し、current Machine Entity identity集合がactive stateだけとexact一致することを検証する
+
+inactive IDを所有するmodel/TCN向け個別runtime unitはcurrent expected/runtime集合へcarry-forwardしません。mixed ready/inactive状態でも `artifact:*:all` root unitはready/current入力から再生成してcurrentにできます。
+
+### 12.3 blocked scopeからinactive集合を導出するhelper
+
+新規 `skills/qa-workflow/scripts/downstream_state.py` はQA workflow固有のread-only deterministic helperです。generic graph frameworkや新しいfreshness engineにはしません。
+
+inputは `blocked_scope_upstream_identities[]` と直前の `previous_machine_entities[]`、outputは `inactive_tr_ids[] / inactive_tcn_ids[] / inactive_model_keys[] / inactive_ci_ids[] / inactive_tc_ids[]` です。
+
+規則:
+
+1. `blocked_scope_upstream_identities[]` は§3のpackage-global helper出力をそのまま使い、Agentが追加・削除しない
+2. `previous_machine_entities[]` は直前のcurrent Entity collectionをshared `validate_entity_collection()` で検証する
+3. previous Entityの `upstream_entity_dependencies[]` だけを逆向きedgeとして使い、seed identityへ直接・間接に依存するEntityをtransitiveに収集する。名称、Scope文字列、同一PAGE、runtime dependencyからedgeを推測しない
+4. 同じEntityがready側依存も持っていても、blocked seedへのdependencyが1本以上残るprevious Entityはinactive対象とする。依存を外した別current identityとして残せるかはLLMが判断する
+5. traversal中のAuthority / Product Risk等は到達判定には使うが、helper outputへはstable lifecycleを持つTR / TCN / model / CI / TCだけを出す
+6. current packageで初めてblockedになりprevious Entityが存在しないitemはinactive IDを生成しない
+7. 既にinactive / deletedのhistory rowを新しいactive→inactive transitionとして重複出力しない
+8. outputはstable ID順でcanonical sort / dedupeする
+
+qa-workflowはhelper outputを各generator / TCD current structure stateへ直接接続します。
+
+### 12.4 再ready化
+
+blocked scopeがreadyへ戻ると、そのscope由来identityは `blocked_scope_upstream_identities[]` から外れます。inactive IDを自動active化はしません。
+
+- current upstreamからsemantic draftを再作成する
+- LLMがinactive成果物とsemantic identity同一と判断した場合は既存IDをreuseし、generatorがinactive → activeを適用する
+- semantic identityが変わった場合は旧inactive IDをdeletedへ遷移し、new IDを採番する
+- まだblockedな別scope由来inactive IDはupdate scopeへ入れずinactiveのまま保持する
+- current upstreamが不足した状態でinactive IDをactiveへ戻そうとした場合は通常のreference / dependency validationでfail-closedする
+
+この経路により、SCOPE-A/Bが一度readyになった後Bだけblockedになっても、B由来の旧downstream Entityはcurrent freshness判定から外れ、Aのready-scope executionを不要に停止しません。package全体のstatusがpartial / blockedかどうかはspec-analysisの `scope_readiness[]` が引き続き正本です。
 
 ## 13. qa-workflow / coverage-analysis integration
 
-shared `_expected_entities()` がspec-analysis normalized inputからAuthority + AC expected identityを決定論導出します。
+shared `_expected_entities()` がspec-analysis normalized inputからAuthority + AC expected identityを決定論導出します。TRD / TCD / TCのprevious stateではactiveだけをexpected current Entityへ含め、inactive / deletedをextra/missing Entity判定のcurrent universeから除外します。
 
 qa-workflow / coverage-analysisはcurrent Entity collectionへAC Entityが存在してもextra entity扱いしません。
 
-coverage-analysisの既存traceability graph node typeへACを追加しません。AC→TRのmachine traceabilityはTR Entity dependencyとTRD closureで保証し、Authority / Risk / TR / TCN / CI / TCの既存coverage graphを不要に拡張しません。
+coverage-analysisの既存traceability graph node typeへACを追加しません。AC→TRのmachine traceabilityはTR Entity dependencyとTRD closureで保証し、Authority / Risk / TR / TCN / CI / TCの既存coverage graphを不要に拡張しません。inactive TR / TCN / CI / TCはcurrent graph node / current runtime unitへ入れず、blocked scopeの再開情報はspec-analysisのscope readinessとdownstream ID historyで保持します。
 
 ## 14. repository tests
 
@@ -680,7 +746,7 @@ coverage-analysisの既存traceability graph node typeへACを追加しません
 
 - PR #14後の9 Skill-local runtime_contract.py copies byte-identical
 - active Machine Evidence template / fixtureが手書き擬似schemaを持たず、保持するfixtureはruntime-v2 / entity-state-v2 validatorでparse / validateできる
-- generator contractの `-v1` をshared runtime v2へ誤って置換しない
+- generator contractの `-v1` をshared runtime v2へ誤って置換しない。`requirement-structure / condition-structure / materialize-coverage / case-structure` だけは本Planでそれぞれ明示v2へ上げる
 - `acceptance_criterion` Machine Entity valid / unknown type regression
 - shared canonicalization: `acceptance_refs` / `acceptance_criteria`
 - spec-analysis expected Authority + **current ACだけ**のidentity。blocked ACをexpected Entityへ含めない
@@ -707,7 +773,11 @@ coverage-analysisの既存traceability graph node typeへACを追加しません
 - parent_structure_idのmissing / self / cycleをrejectする回帰
 - scopeの対象機能 / 領域またはscope Authority変更でAC fingerprint / dependencyが変わる回帰
 - AC本文 / 親chain不変のままAuthority fingerprintだけ変更し、spec-analysisをcurrentへ再生成した後も未再実行TRが直接Authority dependencyによりstaleになる回帰
-- artifact modeのpartial rerun stale carry-forward
+- artifact modeのpartial rerun stale carry-forward。currentのまま変更されたAC依存TRは従来どおりstaleでblockingになる
+- SCOPE-A/B ready → 両scopeのTR / TCN / model / CI / TC生成 → Bだけblocked → `blocked_scope_upstream_identities[]` + previous Entity graphからB依存IDだけinactive → Aだけのcurrent Entity/runtimeがfreshに完遂 → B再readyでsemantic identity同一なら同じIDをactiveへ復帰、というintegration regression
+- ready / blocked双方から参照される共有AuthorityだけではA側Entityをinactiveにしない回帰と、A/B双方へ依存するdownstream Entityは保守的にinactiveへ落とす回帰
+- inactive IDはcurrent Entity / expected Entity / carry-forward runtimeへ含めず、inactive自体でqa-workflow / coverage-analysisをblockingしない。別のcurrent stale issueは従来どおりblockingする回帰
+- inactive成果物を意味上廃止した場合はdeletedへ遷移し、そのIDを後続new allocation / reuseへ使わない回帰
 - shared runtime-v1 / entity-state-v1 evidenceをruntime-v2 / entity-state-v2 current resultとして扱わない
 - v2 cutover後の最初のpartial-rerun対応Skill実行がfull rebuildであり、v1 previous artifactを受け入れない
 
@@ -723,13 +793,14 @@ coverage-analysisの既存traceability graph node typeへACを追加しません
 ## 16. 完了条件
 
 - PR #14後の9 runtime_contract.pyが同一内容でacceptance_criterionを扱える
-- 9コピーがruntime-v2 / entity-state-v2へ同期され、requirement-structure-v2が明示される。TRD / TCD / TC固有cutover projectionはshared runtimeではなく各Skill-local helperにある
-- helperからpackage-global spec-analysis evidence + ready / blocked scope ID indexと、current ready scope全件のcanonical batch handoffを別responseで決定論生成できる。package-global responseへscope別full payloadを複製しない
+- 9コピーがruntime-v2 / entity-state-v2へ同期され、`requirement-structure-v2 / condition-structure-v2 / materialize-coverage-v2 / case-structure-v2` が明示される。TRD / TCD / TC固有cutover projectionはshared runtimeではなく各Skill-local helperにある
+- helperからpackage-global spec-analysis evidence + ready / blocked scope ID index + `blocked_scope_upstream_identities[]` と、current ready scope全件のcanonical batch handoffを別responseで決定論生成できる。package-global responseへscope別full payloadを複製しない
 - qa-workflowが `inspect.ready_scope_ids[]` 全件をbatch inputにし、Authority / current AC / Machine Entity / expected identityをhelper側でunion / dedupeする。blocked scopeを含めず、Agentがmerge / filterしない
 - batch handoffから構成する `artifact:analysis_entities:all` / `artifact:requirement_structure:all` のcanonical stdin全体を16 MiB境界で検証し、2 MiB超〜16 MiB以下を1回のaggregate root runtimeで処理できる。16 MiB超過時は個別scope run / subset run / silent truncate / auto splitで回避しない。その他の通常generatorは2 MiB上限を維持する
 - test-requirement-designまで進むworkflowではcurrent ACがTRまたはDispositionへ完全に閉じる。仕様理解packageだけの要求ではこのclosureを要求しない
 - UI target artifact workflowでは、AC / linked UIOP / scope / 明示linked FIELD-RULE-FLOW-NOTIFY-INTERACT / direct structure + ancestor / linked INF / 親Behavior-UC-US / Authority変更が必要なTR freshnessへ伝播し、無関係package row変更は伝播しない
 - direct modeはknown AC ID / closureを保証し、AC Entity dependencyが無い場合のAC semantic cross-run freshnessを保証対象にしない
 - 無関係TRを不必要にstale化しない
-- artifact modeのpartial rerunでscope外TRがchanged ACを参照したままcurrentにならない
+- ready→blockedで影響するTR / TCN / model / CI / TCはinactiveとしてcurrent Entity/runtimeから外れ、無関係ready scopeをstale carry-forwardで停止させない。再ready時にsemantic identity同一なら同じIDへactive復帰できる
+- artifact modeのpartial rerunでscope外TRがcurrentのままchanged ACを参照したままcurrentにならず、blockedによる一時非currentと通常staleを混同しない
 - existing coverage graphを目的なく拡張していない
