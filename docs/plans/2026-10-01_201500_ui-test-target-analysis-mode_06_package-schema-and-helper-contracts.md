@@ -605,26 +605,30 @@ handled `issue_type` は次のexact enumに固定します。
 - manifest_mismatch
 - stale_snapshot
 - state_transition_required
+- write_locked
+- write_lock_unavailable
 - write_commit_failed
 - write_recovery_failed
 
-unknown operation / unknown top-level field / JSON・table schema不正は `invalid_input`、packageのcanonical heading / file set / version schema不一致は `package_schema_mismatch`、参照先不存在は `reference_not_found`、ID重複は `duplicate_id`、MANIFESTのfile set / order / SHA差分は `manifest_mismatch` へ固定します。callerが保持したsnapshotとcommit直前のcurrent package bytesが変わっていた場合は `stale_snapshot`、previous tracked IDが明示 `retire_ids[]` なしでcurrent modelから消えた場合は `state_transition_required`、staging検証後のpackage commitに失敗して旧packageを復旧できた場合は `write_commit_failed`、旧packageの復旧自体に失敗した場合は `write_recovery_failed` へ固定します。新しいhandled failure種別が実装中に必要になった場合は、実装だけで増やさずこのPlan contractを更新します。
+unknown operation / unknown top-level field / JSON・table schema不正は `invalid_input`、packageのcanonical heading / file set / version schema不一致は `package_schema_mismatch`、参照先不存在は `reference_not_found`、ID重複は `duplicate_id`、MANIFESTのfile set / order / SHA / receipt差分は `manifest_mismatch` へ固定します。package-local lockが他processに保持されている場合は `write_locked`、実行platform / filesystemで必要なprocess-scoped lock primitiveを安全に使えない場合は `write_lock_unavailable` とし、writeを開始しません。callerが保持したsnapshotとcommit直前のcurrent package bytesが変わっていた場合は `stale_snapshot`、previous tracked IDが明示 `retire_ids[]` なしでcurrent modelから消えた場合は `state_transition_required`、staging検証後のpackage commitに失敗して旧packageを復旧できた場合は `write_commit_failed`、旧packageの復旧自体に失敗した場合は `write_recovery_failed` へ固定します。新しいhandled failure種別が実装中に必要になった場合は、実装だけで増やさずこのPlan contractを更新します。
 
-### 7.3 update concurrency contract
+### 7.3 update concurrency / idempotent replay contract
 
-同じ `package_root` への `materialize` はsingle writerです。snapshot照合はstale write検出であり、相互排他の代替ではありません。PR #16ではgeneric CAS / lock serviceを追加しません。UI target package writeはresolved package_rootそのものが共有mutable resourceなので、qa-workflow経由ではPR #14のshared resource reservationを**atomic pre-start single-writer契約**として使い、generic `claim_mutable_operation()` は重ねません。
+同じ `package_root` への `materialize` はsingle writerです。snapshot照合だけを相互排他として扱わず、PR #14のgeneric claim / shared-resource reservationもこのwrite pathへ流用しません。UI target packageはSkill自身が管理するlocal filesystem packageなので、`ui_target_package.py` がpackage専用の短時間process lockとMANIFEST receiptを所有します。
 
-- `reserve_shared_resource(reservation_root, resource_ref, workflow_ref, ...)` の `resource_ref` は§11でresolveしたcanonical package_rootから `ui-target-package:<resolved-root>` として決定論導出し、semantic input / snapshotを含めない。同じpackageへの異なるoperation / sessionでも同じresource_refになる
-- PR #14の `claim_mutable_operation()` はone-shot pre-start claimであり、existing claimをsafe retryとみなさない既存semanticsを維持する。UI target package materializeではこのclaimを呼ばず、他のbrowser / API mutation経路へ影響させない
-- qa-workflowの初回順序は `inspect → package reservation取得 → workflow stateへwrite contextをconditional保存 → materialize開始` に固定する。reservation取得失敗時はwrite / staging cleanupを開始しない
-- workflow stateへ少なくともresolved `package_root`、`reservation_ref / reservation_revision`、materializeへ渡すsemantic inputのcanonical fingerprint、開始時 `update_snapshot`、write state `reserved / in-progress / complete / blocked` を保存する。LLMはこれらを生成・更新しない
-- same-workflow resumeは保存済みworkflow_ref、package_root、reservation revision、semantic input fingerprintが一致する場合だけ許可し、既存reservationをPR #14のexisting external reservation契約で再利用する。別workflowがreservationをsteal / 上書きしない
-- resume時にcurrent rootがvalidならfresh `inspect` を行い、そのsnapshotで同じsemantic requestをmaterializeする。前回commit済みならcanonical no-op判定でwriteせず完了し、未commitなら通常materializeを行う。同じreservationが継続しているため、canonical writerによる第三者更新は介在しない
-- current rootが不存在でvalid backupがある等、helper-owned sibling recoveryが必要な場合は保存済み開始snapshot + 同じsemantic requestでmaterialize preflightへ入り、§7.4の固定規則でrestore / cleanupした後に続行する。root / staging / backupの状態を一意に解釈できない場合は `write_recovery_failed` でfail-closedする
-- materializeが成功、またはhandled failure後にroot / staging / backupのcleanupが確認できた場合だけ、owner stateとexpected reservation revisionを検証して既存 `release_shared_resource()` + provider側atomic conditional deleteでreservationを解放する。`write_recovery_failed` 等でcleanupを確認できない場合はreservationを解放しない
-- standalone spec-analysisではqa-workflow stateを新設せず、callerが同じresolved package_rootへのsingle writerを保証する。snapshotだけを排他として扱わない
+- lock pathは `package_root=/parent/<name>` に対して `/parent/.<name>.ui-target.lock` exactlyとする。package payload / MANIFEST対象には含めない
+- POSIXではPython標準ライブラリの `fcntl.flock(LOCK_EX | LOCK_NB)`、Windowsでは `msvcrt.locking(..., LK_NBLCK, 1)` でlock fileの先頭byteをnon-blocking exclusive lockする。lock fileはregular fileとして固定pathへ置き、symlink / reparse point等の既存filesystem safety違反をrejectする
+- lock ownershipはfile内容やPID metadataで判定しない。open handleのOS lockだけを正本とし、正常終了 / exception / process killでhandleが閉じれば解放される。lock file自体は残ってよく、stale lock file削除によるowner推測を行わない
+- lock取得競合は `write_locked`、platform / filesystemがこのprocess-scoped lockを安全に提供できない場合は `write_lock_unavailable` としてfail-closedする。network filesystem等でlock semanticsを確認できない保存先を安全と推測しない
+- qa-workflow / standalone callerは `claim_mutable_operation()` / `reserve_shared_resource()` を重ねず、package writeの排他・commit・replay判定を `materialize` に一任する
+- `materialize` は入力schema / text newlineを正規化した後、`operation / package_root` を除くmaterialize request全体をcanonical JSON化し、lowercase SHA-256の `request_fingerprint` を生成する。array orderが契約上意味を持つ `table_changes[].rows[] / extension_file_updates[]` 等は順序を保持し、stable reference array等のcanonical sort対象だけ既存規則で正規化してからhashする
+- changed=trueでcommitするpackageのMANIFESTへ§12の `Last materialize receipt` を生成し、`request_fingerprint`、artifact/change mode、割当ID / extension path、retire結果、changed files、previous/current package versionを保存する。receiptはhelper-owned controlでありversion up要否の原因に数えない
+- lock取得後、current packageがvalidでreceiptの `request_fingerprint` が今回requestと一致する場合は、artifact_mode=create / updateを問わずmutationを再適用せず `replayed=true` で保存済み割当結果を返す。これをsnapshot / create precondition判定より先に行う
+- receiptが一致しないupdateだけ、callerの `previous_snapshot` とcurrent packageを照合する。不一致なら `stale_snapshot`。receiptが一致しないcreateはtargetが不存在または空directoryであることを要求し、既存valid packageを別create requestで上書きしない
+- changed=falseのno-opはpackageへreceiptを書き込まない。同じrequestの再実行は通常のno-op判定をもう一度行っても副作用がない
+- replay対象receiptがlast receiptではなくなっている場合、過去requestを推測して再適用しない。updateはsnapshot mismatch、createは既存targetとしてfail-closedし、current packageから新しいsemantic runを開始する
 
-通常更新は必ず `inspect → reservation → workflow state保存 → materialize` の順で行います。`materialize` はstaging生成前とpackage commit直前の2回、snapshotのPackage Version、payload file set / `payload_file_sha256[]`、`MANIFEST.md` raw `manifest_sha256` をcurrent packageへ照合します。file追加・削除または1 byteでも変化していれば `stale_snapshot` でcommitせずblockedにし、外部変更をsilent overwriteしません。
+この契約により、`commit成功 → response返却前 / caller state更新前にprocess停止` しても、同一request replayではnew Stable ID、new extension、retireを二重適用しません。generic transaction manager / distributed lock / storage adapterは追加しません。
 
 ### 7.4 canonical bytes / package commit
 
@@ -655,10 +659,10 @@ structured Markdown table cellは次のcanonical encodeへ固定します。
 
 この方式は汎用transaction managerではなく、UI target packageのcanonical write pathだけに適用します。実装では標準ライブラリの同一filesystem rename / replaceを使い、採用した方式をrepository portability testで固定します。
 
-process kill等でhelper-owned siblingが残った場合のpreflight recoveryもこのwrite path内で固定します。`package_root=/parent/<name>` に対してstagingは `/parent/.<name>.ui-target-staging`、backupは `/parent/.<name>.ui-target-backup` exactlyとし、任意名をscanしません。
+process kill等でhelper-owned siblingが残った場合のpreflight recoveryもこのwrite path内で固定します。`package_root=/parent/<name>` に対してstagingは `/parent/.<name>.ui-target-staging`、backupは `/parent/.<name>.ui-target-backup` exactlyとし、任意名をscanしません。preflight recoveryは§7.3のprocess lock取得後だけ行います。
 
-- current package rootがvalidなら、残存staging / backupは前回未cleanupのorphanとして削除してから新しいmaterializeへ進む
-- current rootが不存在でvalid backupが存在する場合はbackupをrootへrestoreし、stagingを削除する。callerが同一workflow resumeとして保存済み開始snapshotを渡しておりrestore後rootがそのsnapshotとexact一致する場合は同じmaterializeを続行できる。一致しない場合はwriteを開始せず `stale_snapshot` としてfresh inspectを要求する
+- current package rootがvalidなら、残存staging / backupは前回未cleanupのorphanとして削除する。その後receipt replay判定を行い、一致なら既適用結果を返す
+- current rootが不存在でvalid backupが存在する場合はbackupをrootへrestoreし、stagingを削除する。restore後にreceipt replay判定 / update snapshot判定を通常どおり行い、caller workflow stateをrecovery根拠にしない
 - createでroot / backupが存在せずstagingだけ残る場合は未commit stagingとして削除できる
 - root不在 + backup不正、rootとbackupのどちらもinvalid、helper-owned siblingが矛盾状態など一意に復旧できない場合は `write_recovery_failed` でfail-closedし、自動promotion / 推測復旧をしない
 
@@ -820,7 +824,7 @@ stdin:
 }
 ```
 
-`artifact_mode` は `create / update` の2値です。normal create / legacy-migrationでは `package_root` を**出力先**として扱い、targetは不存在または空directoryだけを許可します。helperがSkill-local `skills/spec-analysis/assets/ui-test-target-analysis/` を読み、同じparent/filesystem上のsibling staging directoryへasset初期状態を内部展開してからsemantic inputをmaterializeします。Agent / callerへasset copyを要求しません。normal updateでは完成済みcurrent package + non-null previous snapshotを必須とし、snapshot無し更新をfail-closedにします。legacy-migrationは `artifact_mode=create` だけを許可します。
+`artifact_mode` は `create / update` の2値です。normal create / legacy-migrationでは `package_root` を**出力先**として扱います。§7.3のlock取得後、同一request receiptがあれば既適用結果を返し、receipt不一致時だけtarget不存在または空directoryを要求します。helperがSkill-local `skills/spec-analysis/assets/ui-test-target-analysis/` を読み、同じparent/filesystem上のsibling staging directoryへasset初期状態を内部展開してからsemantic inputをmaterializeします。Agent / callerへasset copyを要求しません。normal updateでは完成済みcurrent package + non-null previous snapshotを必須としますが、lock取得後のreceipt一致判定をsnapshot比較より先に行います。receipt不一致updateだけsnapshot無しをfail-closedにします。legacy-migrationは `artifact_mode=create` だけを許可します。
 
 `change_mode` は `normal / legacy-migration` の2値です。
 
@@ -877,7 +881,7 @@ prose input contract:
 - helperはCRLF / CRをLFへ正規化し、最終file byte contractは§7.4に従う
 extension input contract:
 
-- `extension_file_updates[]` のnew rowは `draft_key` unique、`identity_action=new / path=null`、lowercase kebab-case slug、非空responsibility / split_reason / body_markdownと `scope_refs[] / authority_refs[] / structure_refs[] / unknown_refs[]` を要求する。reuseも4参照配列の完成値を渡す。意味上の関連はLLMが選び、helperがexact stable ID存在・duplicate・canonical sortを検証する
+- `extension_file_updates[]` のnew rowは `draft_key` unique、`identity_action=new / path=null`、lowercase kebab-case slug、非空responsibility / split_reason / body_markdownと `scope_refs[] / authority_refs[] / structure_refs[] / unknown_refs[]` を要求する。reuseも4参照配列の完成値を渡す。4参照配列では同requestのnew tracking rowを `@draft:<draft_key>` で参照でき、§8のrequest-wide stable draft mapで実IDへ解決してから存在・duplicate・canonical sortを検証する。extension自身のdraft_keyはextension path返却用の別namespaceであり、stable `@draft` 参照先にはしない
 - extension fileはstructured tracking table / custom stable IDを持たない。`table_changes[] / keyed_table_updates[] / prose_updates[]` でextension内部を部分編集しない
 - `extension_file_retirements[]` はLLMが「そのextension domainをcurrent packageから除去する」と判断したexisting canonical extension pathだけを受ける。duplicate、存在しないpath、同requestでreuse対象のpathを拒否する
 - retirement成功時は実fileと00の `案件固有extension file一覧` rowを同じstaging stateから除去する。extension prose中の意味参照はsemantic review対象であり、helperがproseからID / file参照を推測しない
@@ -896,29 +900,35 @@ stable tracking allocation / lifecycle contract:
 
 file / control materialization order:
 
-1. artifact_mode / change_mode / previous_snapshot / package_rootの組合せを検証する。normal updateではhash-only previous snapshotとcurrent bytesを照合し、staleなら書込みしない。一致後にcurrent packageを再parseしてimmutableな `previous_model`（tracking state / UNKNOWN state / exact reference index / current file model）を構築する。normal create / legacy-migrationではtargetが不存在または空directoryであることを確認し、Skill-local assetをsibling staging directoryへ内部展開する。callerがasset初期状態を用意しない
-2. version policyを検証し、normal updateではnext version候補だけを保持する。まだPackage Version / CHANGELOG / README / MANIFESTへ反映しない
-3. legacy-migrationでは `migration_retained_ids[] / legacy_lifecycle_events[]` の形式・duplicate・lifecycleを先に検証して使用済みID集合へ予約する
-4. `keyed_table_updates[]` のfile × Scope ID applicabilityを先にparseし、`Trigger判定` からscope単位の状態を導出する
-5. applicabilityをfile単位へ集約し、条件付き標準fileを処理する。Trigger=`あり`のrequired scopeは維持し、内容不足をTriggerへ逆流させない。identity確定済みdomain itemはcurrent / blocked rowで、identity未確定なら07のBlocking Scope ID + 関連Fileでclosureする。required + blocked scopeを同時参照するexisting rowの変更は、scope別意味を分離できない場合だけrejectする。続けて `extension_file_updates[]` のnew pathをrequest順でbatch allocationし、`extension_file_retirements[]` をexisting current extensionとして検証する
-6. standard stable tracking `table_changes[]` をin-memory modelへ適用し、reuse / new IDを割り当て、tracking row内の `@draft` referenceを解決する。extension fileはtracking rowを持たない
-7. remaining `keyed_table_updates[]` のkey / reference内 `@draft` を解決して完成row集合を確定する
-8. normal updateの `retire_ids[]` を検証してin-memory tracking modelから除去する。removal予定fileにtracked tracking rowが残る場合は対応retire intent不足としてblockedする。legacy-migrationの過去lifecycle eventは `legacy_lifecycle_events[]` だけから扱い、current row削除操作へ流用しない
-9. extension update / retirementをin-memory file集合へ反映し、extension最終集合と明示stable ref配列から00の `案件固有extension file一覧` をcanonical生成する。extension本文はparseしない。standard stable tracking / keyed / generated tableとprose updateをexact Markdownへ反映する
-10. `build-machine-evidence` 相当処理をprovisional current versionのまま実行し、Machine Entities sectionをcanonical生成する
-11. normal updateでは、version metadata、CHANGELOGのversion heading / generated `Stable ID changes` / generated `影響file`、README generated controls、MANIFESTを除いたprovisional payload bytesと、requested `change_summary` をcurrent packageのpayload / current version `変更概要`へそれぞれ比較する。どちらも同一なら `changed=false` を返して書込みしない。`change_summary` だけが変わる場合もuser-managed changeとして `changed=true` とする
-12. changed normal update / normal create / legacy-migrationでtarget Package Version / Previous Package Versionを確定する。normal createはv00 / -、legacy-migrationはlegacy source contract、normal updateはStep 2のnext version候補を使う
-13. normal updateではStep 1で再parseした `previous_model` + provisional current model + explicit retire intent、legacy-migrationではmigration retained / lifecycle mapping + current tracking modelから内部lifecycle / impact builderが差分を生成し、CHANGELOGのtarget version entryへ `変更概要 / Stable ID changes / 影響file` を生成する。normal createはv00 baseline entryを生成する
-14. README controlsをcanonical生成・置換する
-15. MANIFESTを最後に再生成し、§7.4のcanonical bytesへencodeした完成file集合をsibling staging directoryへ書き出す
-16. staging packageに対してfinal validateを実行する
-17. commit直前にprevious snapshotをcurrent packageへ再照合し、§7.4のpackage commitを実行する。全file切替と旧backup cleanupまで成功した場合だけ成功responseを返す
+1. request schema、artifact_mode / change_mode / previous_snapshotの組合せ、path safetyを検証し、text newlineとcanonical sort対象fieldを正規化して `request_fingerprint` を計算する
+2. §7.3のpackage-local process lockを取得し、helper-owned staging / backupのpreflight recoveryを行う。current valid packageのlast receiptが `request_fingerprint` と一致する場合は以降のmutationを行わず保存済み結果を `replayed=true` で返す
+3. receipt不一致の場合、normal updateではhash-only previous snapshotとcurrent bytesを照合してcurrent packageを再parseし、immutableな `previous_model`（tracking state / UNKNOWN state / exact reference index / current file model）を構築する。normal create / legacy-migrationではtargetが不存在または空directoryであることを確認し、Skill-local assetをsibling staging directoryへ内部展開する。callerがasset初期状態を用意しない
+4. version policyを検証し、normal updateではnext version候補だけを保持する。まだPackage Version / CHANGELOG / README / MANIFESTへ反映しない
+5. legacy-migrationでは `migration_retained_ids[] / legacy_lifecycle_events[]` の形式・duplicate・lifecycleを検証して使用済みID集合へ予約する
+6. 全 `table_changes[]` の `identity_action=new` をcanonical file order → section order → request row orderでrequest-wideに仮採番し、stable `draft_key → stable ID` mapを確定する。この時点ではpackage / historyへ保存せず、failure / no-opでは採番を消費しない
+7. tracking row自身、`keyed_table_updates[]` のkey / stable reference、`extension_file_updates[].scope_refs / authority_refs / structure_refs / unknown_refs` にある全 `@draft:<draft_key>` をStep 6のmapで解決する。unknown / duplicate / extension draft namespace参照をrejectする
+8. resolved済み `table_changes[]` をin-memory tracking modelへ適用する。reuse identity、new identity、prefix再分類、既存row保持、explicit retire intentの前提を検証する
+9. resolved済み `keyed_table_updates[]` のfile × Scope ID applicabilityをparseし、`Trigger判定` からscope単位の状態を導出する。applicabilityをfile単位へ集約して条件付き標準file集合を確定する。Trigger=`あり`のrequired scopeは維持し、内容不足をTriggerへ逆流させない。identity確定済みdomain itemはcurrent / blocked row、identity未確定なら07のBlocking Scope ID + 関連Fileでclosureする
+10. `extension_file_updates[]` のnew pathをexisting current extension最大番号+1からrequest順でbatch allocationし、`extension_file_retirements[]` をexisting current extensionとして検証する。Step 7でresolvedしたstable refsを使って00のextension宣言rowを生成する
+11. remaining keyed table full-replacement、extension update / retirement、prose updateをin-memory file集合へ反映する。extension本文はparseしない
+12. normal updateの `retire_ids[]` を検証してin-memory tracking modelから除去する。removal予定fileにtracked tracking rowが残る場合は対応retire intent不足としてblockedする。legacy-migrationの過去lifecycle eventは `legacy_lifecycle_events[]` だけから扱い、current row削除操作へ流用しない
+13. `build-machine-evidence` 相当処理をprovisional current versionのまま実行し、Machine Entities sectionをcanonical生成する
+14. normal updateでは、version metadata、CHANGELOGのversion heading / generated `Stable ID changes` / generated `影響file`、README generated controls、MANIFEST receipt / file tableを除いたprovisional payload bytesと、requested `change_summary` をcurrent packageのpayload / current version `変更概要`へ比較する。どちらも同一なら `changed=false / replayed=false` を返して書込みしない。仮採番したID / extension pathは保存・予約しない
+15. changed normal update / normal create / legacy-migrationでtarget Package Version / Previous Package Versionを確定する。normal createはv00 / -、legacy-migrationはlegacy source contract、normal updateはStep 4のnext version候補を使う
+16. normal updateではStep 3で再parseした `previous_model` + provisional current model + explicit retire intent、legacy-migrationではmigration retained / lifecycle mapping + current tracking modelから内部lifecycle / impact builderが差分を生成し、CHANGELOGのtarget version entryへ `変更概要 / Stable ID changes / 影響file` を生成する。normal createはv00 baseline entryを生成する
+17. README controlsをcanonical生成・置換する
+18. `request_fingerprint` と今回の確定割当 / retire / changed file / version結果から§12 `Last materialize receipt` を生成する
+19. MANIFEST file tableを最後に再生成し、§7.4のcanonical bytesへencodeした完成file集合をsibling staging directoryへ書き出す
+20. staging packageに対してfinal validateを実行する
+21. commit直前にreceipt不一致updateのprevious snapshotをcurrent packageへ再照合し、§7.4のpackage commitを実行する。全file切替と旧backup cleanupまで成功した場合だけ成功responseを返す
 
 payload:
 
 ```json
 {
   "changed":true,
+  "replayed":false,
+  "request_fingerprint":"sha256:<lowercase-64-hex>",
   "completion_status":"partial",
   "ready_scope_ids":["SCOPE-002"],
   "blocked_scope_ids":["SCOPE-001"],
@@ -933,13 +943,13 @@ payload:
 }
 ```
 
-`changed=false` のno-opでは `allocated_ids=[] / allocated_extension_files=[] / retired_ids=[] / retired_extension_files=[] / changed_files=[]` とし、`previous_package_version / package_version / completion_status / ready_scope_ids[] / blocked_scope_ids[] / scope_readiness[]` はcurrent package値を返します。provisional処理で一時的に割り当てたID / extension pathは保存・予約しません。create / legacy-migrationは成功時 `changed=true` です。
+`changed=false` のno-opでは `replayed=false`、`allocated_ids=[] / allocated_extension_files=[] / retired_ids=[] / retired_extension_files=[] / changed_files=[]` とし、`request_fingerprint` と `previous_package_version / package_version / completion_status / ready_scope_ids[] / blocked_scope_ids[] / scope_readiness[]` は今回request / current package値を返します。provisional処理で一時的に割り当てたID / extension pathは保存・予約しません。create / legacy-migrationは初回成功時 `changed=true / replayed=false` です。同一receipt replayではoriginal receiptの `changed / allocated_* / retired_* / changed_files / previous_package_version / package_version` を返し、`replayed=true` とします。
 
 通常のUI target package更新は `materialize` を唯一のwrite pathとします。採番 / version / README controls / MANIFEST / lifecycle / impactは内部関数とし、production CLIへ公開しません。`build-machine-evidence` だけはmaterialized packageから下流handoffを再生成する独立用途があるためread-only production operationとして残します。
 
 ### materialize内部control / lifecycle生成
 
-MANIFEST、README controls、Stable ID changes、影響fileは `materialize` 内部で生成します。
+MANIFEST、Last materialize receipt、README controls、Stable ID changes、影響fileは `materialize` 内部で生成します。
 
 - MANIFEST自身は自己hash対象にせず、canonical file orderの最終raw bytesをSHA-256でhashする
 - Stable ID lifecycleはsnapshot hash一致後にhelperが再parseしたprevious current model / provisional current tracking row / explicit `retire_ids[]` から生成し、row消失だけでretireしない
@@ -1327,6 +1337,36 @@ tableにはpayload filesだけをcanonical順で列挙します。
 - CHANGELOGもpayload / hash対象
 - semantic projectionではCHANGELOGを除外するがMANIFEST上はcurrent package payloadとして保持
 
+file tableの後にexact heading `### Last materialize receipt` とcanonical JSON fenceを1つ持ちます。completed packageではexactly one必須です。
+
+```json
+{
+  "receipt_version":"materialize-receipt-v1",
+  "request_fingerprint":"sha256:<lowercase-64-hex>",
+  "artifact_mode":"update",
+  "change_mode":"normal",
+  "changed":true,
+  "allocated_ids":[{"draft_key":"us-login","stable_id":"US-003"}],
+  "allocated_extension_files":[{"draft_key":"domain-csv","path":"10_csv-export.md"}],
+  "retired_ids":["PAGE-009"],
+  "retired_extension_files":["10_legacy-domain.md"],
+  "changed_files":["README.md","02_behavior_and_business_rules.md","CHANGELOG.md","MANIFEST.md"],
+  "previous_package_version":"v14",
+  "package_version":"v15"
+}
+```
+
+規則:
+
+- receiptはhelper生成controlであり、LLM / Agentは入力・編集しない
+- `request_fingerprint` は§7.3のcanonical materialize request fingerprint
+- `allocated_ids[] / allocated_extension_files[]` はそのcommitで実際に確定したrequest内draft mappingだけを持つ
+- `retired_ids[] / retired_extension_files[] / changed_files[]` は成功responseとexact一致する
+- receipt自体はMANIFEST内にあるためpayload hash対象外。MANIFEST raw hashには当然含まれ、次回 `inspect.update_snapshot.manifest_sha256` へ反映される
+- no-opはpackageを書き換えないためreceiptを更新しない
+- validateはreceipt schema / fingerprint形式 / path / Stable ID形式と、receiptの `package_version` がMANIFEST / README current versionへ一致することを検証する。過去requestのsemantic正当性をreceiptから再判定しない
+- replayはlast receiptとのexact request fingerprint一致だけを使い、過去CHANGELOGからreceiptを推測復元しない
+
 ## 13. CHANGELOG contract
 
 最新versionを先頭に置き、version headingはexact `## vNN` とします。
@@ -1484,14 +1524,17 @@ production helperのfilesystem / raw hash / README control生成 / internal allo
 - invalid schema version
 - materialize内部version builderのcurrent package読み取り / legacy migration source version / default vNN連続性
 - materialize内部README control builderのPackage metadata / Current payload files exact MarkdownとREADME.md自身を含むcanonical file順
-- materialize内部MANIFEST builderがREADME controls反映後のraw bytesをlowercase 64 hex SHA-256でhashすること
+- materialize内部MANIFEST builderがREADME controls反映後のraw bytesをlowercase 64 hex SHA-256でhashし、`Last materialize receipt`をexactly one生成・検証すること
 - materialize内部extension allocatorのlowercase kebab-case / max+1 / canonical path
 - CHANGELOG `Stable ID changes` exact heading / header / Change enum / duplicate
 - inspectのupdate_snapshotが `package_version / payload_file_sha256[] / manifest_sha256` だけをcanonical生成し、tracking row fingerprint / exact reference等のderived stateを含めないこと
 - materializeがsnapshot hash一致後にcurrent packageを再parseして `previous_model` を構築し、stable ID allocatorがprevious structured row + historical Stable ID + provisional current rowから使用済みIDを導出して、更新途中でtracking rowから消えたIDも再利用しないこと
 - materialize内部lifecycle builderが `previous_model` とprovisional current tracking row差分からadded / changed / resolvedを導出し、retiredだけは明示retire_idsから生成すること。row消失だけならstate_transition_requiredでblockedすること
 - `validate(previous_snapshot=...)` はsnapshot hash一致だけを追加検証し、hash-only snapshotからlatest lifecycle / impactを再構築しないこと
+- materializeが全new tracking IDをfile applicability判定前にrequest-wide仮採番し、tracking / keyed table / extension stable refsの`@draft`を先に解決してからscope applicability / file集合を導出すること。failure / no-opで仮採番を消費しないこと
 - materializeがdraft_key / identity_action / @draft referenceを解決し、canonical table serialization、条件付き標準file同期、CHANGELOG controls、Machine Entities section、README controls、MANIFESTを1 write pathで生成すること
+- package-local process lockで同一rootへの2 process同時materializeの一方だけがwriteへ進み、process kill / handle close後はstale owner cleanupなしで次runがlock取得できること。unsupported lock primitiveでは`write_lock_unavailable`、競合中は`write_locked`になること
+- commit後response前crashを模擬し、同一create / update request replayがMANIFEST receiptから同じallocated ID / extension pathを返して二重採番・二重retireせず`replayed=true`になること。異なるrequestはreceipt replayせずcreate existing-target / update stale snapshot契約へ戻ること
 - `Behavior Decomposition` をLLM入力として独立指定させず、`UI操作判定` からfixed mappingで生成すること
 - PAGE→VIEW等のprefix変更再分類でreuseをrejectし、explicit retire + new IDを要求すること。同じPANEL prefix内はsemantic identity同一時だけreuseできること
 - `prose_updates[]` が既存prose heading bodyだけを置換し、新規heading / heading削除 / structured・generated section上書きを拒否すること

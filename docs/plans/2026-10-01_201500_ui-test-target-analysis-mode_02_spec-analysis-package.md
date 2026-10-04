@@ -359,7 +359,7 @@ versionごとの差分と、どのUNKNOWN / issue / decisionを反映したか�
 - current package file一覧
 - 各fileのSHA-256
 
-`ui_target_package.py materialize` の内部MANIFEST builderで生成します。MANIFEST自身は自己hash対象にせず、SHA-256はcurrent fileのraw bytesから計算します。Agent / LLMがhashを手入力しません。file orderはREADME → 00〜09 → 10以降のdomain file → CHANGELOGのcanonical順とします。
+`ui_target_package.py materialize` の内部MANIFEST builderで生成します。MANIFEST自身は自己hash対象にせず、SHA-256はcurrent fileのraw bytesから計算します。Agent / LLMがhashを手入力しません。file orderはREADME → 00〜09 → 10以降のdomain file → CHANGELOGのcanonical順とします。MANIFESTには最後にcommitされたmaterialize requestのfingerprintと、そのrequestで確定したStable ID / extension path等を `_06 §12` のreceiptとして保存し、commit後crashの再実行で同じmutationを二重適用しません。
 
 ## 5. version contract
 
@@ -385,7 +385,7 @@ default policyでは、完成済みpackageのuser-managed / semantic payloadに�
 1. LLMがsource / Authority、scope、UI構造、file trigger、US / UC / Behavior / AC、UNKNOWN、extension要否等のsemantic判断を行う
 2. LLMはstable ID番号や完成Markdown tableを手組みせず、`materialize` 用のsemantic row / prose inputへまとめる。new identityは `identity_action=new / draft_key=<unique>` を使う
 3. **materialize前にsemantic quality gate**を行い、source / inference / UI分類 / semantic duplicate、domain itemの無言欠落、file trigger、UNKNOWNの影響scope、same-UNK / new UNK、US / UC / Behavior / ACの意味分解を確認する。NGならpackageを書き換えずsemantic inputを修正する
-4. gateを通過したsemantic inputだけを `ui_target_package.py materialize` へ `artifact_mode=create / change_mode=normal / previous_snapshot=null` で渡す。helper自身がSkill-local `assets/ui-test-target-analysis/` からsibling staging packageを初期化し、default policyのv00 / Previous=-、new ID、条件付きfile、extension file、CHANGELOG、Machine Entities、README controls、MANIFESTを生成してpackage単位でcommitする。Agentがassetをtarget rootへ事前copyしない
+4. gateを通過したsemantic inputだけを `ui_target_package.py materialize` へ `artifact_mode=create / change_mode=normal / previous_snapshot=null` で渡す。createは事前`inspect`を要求せず、helperがpackage-local process lock取得後にtarget不存在 / 空を確認する。同一create requestが既にcommit済みならMANIFEST receiptから既適用結果を返す。未適用ならSkill-local `assets/ui-test-target-analysis/` からsibling staging packageを初期化し、default policyのv00 / Previous=-、new ID、条件付きfile、extension file、CHANGELOG、Machine Entities、README controls、MANIFESTを生成してpackage単位でcommitする。Agentがassetをtarget rootへ事前copyしない
 5. materialize後はdeterministic validateとread-onlyの成果物確認を行う。semantic NGを検出した場合に、その不合格versionをcurrent packageとして残す運用にはしない
 
 ### 継続更新
@@ -397,7 +397,7 @@ default policyでは、完成済みpackageのuser-managed / semantic payloadに�
 3. LLMは変更対象を `materialize` のsemantic inputへまとめる。既存identityは `identity_action=reuse / reuse_id=<ID>`、new identityは `identity_action=new / draft_key=<unique>` とし、新規row間参照は `@draft:<draft_key>` を使う。current modelから意図的に除去するidentityだけ `retire_ids[]` に入れる
 4. 07のUNKNOWN説明、06の矛盾 / resolved説明、CHANGELOGの `変更概要` 等のnarrativeは `prose_updates[] / change_summary` として渡す。stable ID番号、Markdown escape、table separator、CHANGELOG control row、README control、Machine Entity wrapper、MANIFESTはAgentが組み立てない
 5. **current package + source + proposed semantic inputをmaterialize前にsemantic quality gate**へ通す。domain itemの無言欠落、UNKNOWN blocking範囲、semantic duplicate、file trigger、same-UNK / new UNKに加え、test-relevant semanticsがextension本文だけに残っていないことを確認する。NGならcurrent packageを変更せずinputを修正する
-6. gateを通過したinputだけを `ui_target_package.py materialize` へ渡す。qa-workflow経由では既存mutable-operation claimを取得し、standaloneではsingle writerを保証する。helperがsnapshot hashを確認後current packageを再parseし、version、ID、canonical serialization、control、Machine Entity、MANIFESTをstagingへ生成・検証してからpackage単位でcommitする
+6. gateを通過したinputだけを `ui_target_package.py materialize` へ渡す。qa-workflow / standaloneともhelper自身のpackage-local process lockを使い、PR #14のclaim / reservationをこのwrite pathへ追加しない。helperはlock取得後にMANIFEST receiptを先に確認し、同一requestがcommit済みなら再mutationせず既適用結果を返す。未適用のupdateだけsnapshot hashを確認してcurrent packageを再parseし、version、ID、canonical serialization、control、Machine Entity、MANIFESTをstagingへ生成・検証してからpackage単位でcommitする
 7. `materialize` が `stale_snapshot / state_transition_required / reference_not_found / write_commit_failed / write_recovery_failed` 等でblockedした場合は成功済みとして扱わない。通常のhandled failureでは元packageを復旧・保持し、復旧不能ならstaging / backupを保全してblockedとする
 8. materialize後はdeterministic validate / repository testsとread-only成果物確認を行う。semantic quality gateをcanonical write後の承認手段として使わない
 helperが列挙したimpact候補は再確認対象であり、変更必須という意味判断ではありません。LLMが仕様意味を判断します。
@@ -412,7 +412,7 @@ helperが列挙したimpact候補は再確認対象であり、変更必須と�
 
 - domainが標準fileの責務とは独立している
 - 独立したAuthority / rule / flow集合として継続更新する必要がある
-- LLMは責務 / 分割理由 / lowercase kebab-case slugとextension本文を `materialize.extension_file_updates[]` へ渡す
+- LLMは責務 / 分割理由 / lowercase kebab-case slugとextension本文を `materialize.extension_file_updates[]` へ渡す。`scope_refs / authority_refs / structure_refs / unknown_refs` は同requestで新設するstable rowを `@draft:<draft_key>` で参照できる
 - `ui-target-v1` のextension fileは自由記述Markdownだけを持ち、独自structured table / 独自stable ID / custom prefixを定義しない。後続QA工程の判断・期待挙動・test design・freshnessに影響するAuthority / FIELD / RULE / FLOW / NOTIFY / INTERACT等は03〜05または09の既存standard tableへ必ず正規化し、extension本文だけを意味上の正本にしない。extension本文はstandard stable IDを参照して詳細を説明できる
 - canonical create / updateでは `materialize` がexisting 10+ fileの最大番号+1からrequest順に複数extensionをbatch採番し、実fileと00の `案件固有extension file一覧` を同時生成する。不要になったcurrent extensionはLLMが`extension_file_retirements[]`へ明示し、helperが残存参照を検証したうえで実fileと宣言rowを同時に除去する。Agentが10+番号・宣言rowを計算しない
 - extension file番号は`materialize`内部でcurrent 10+ file集合からbatch採番し、番号計算だけの公開operationは作らない

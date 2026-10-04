@@ -193,7 +193,7 @@ PR #14が追加した以下を複製・変更しません。
 - formal WCAG procedure
 - artifact_graph.pyのhandoff lifecycle
 
-UIテスト対象分析モードはspec-analysis内部modeであるため、新しいworkflow state row / handoff type / claim / reservationを追加しません。
+UIテスト対象分析モードはspec-analysis内部modeであるため、新しいworkflow state row / handoff type / generic claim / shared-resource reservationを追加しません。UI target packageのlocal file writeだけは `ui_target_package.py` がpackage専用process lock + MANIFEST receiptで閉じます。これはPR #14のbrowser / external shared resource向けclaim・reservation・CAS契約を変更・複製するものではなく、local package materializeのsingle-writer / idempotent commitに限定します。
 
 ## 8. CI統合
 

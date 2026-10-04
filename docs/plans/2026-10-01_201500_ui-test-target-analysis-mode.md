@@ -217,14 +217,13 @@ active Machine Evidence templateはversion文字列だけを置換しません�
 変更:
 - skills/qa-workflow/references/guidance.md
 - skills/qa-workflow/assets/project-context-template.md
-- skills/qa-workflow/assets/workflow-state-template.md（UI target package write context: package_root / reservation ref・revision / semantic input fingerprint / start snapshot / write state）
 - 新規 skills/qa-workflow/scripts/project_context_ids.py
 - skills/qa-workflow/evals/deterministic/routing_cases.json
 - skills/qa-workflow/evals/deterministic/routing_candidate_outputs.json
 - project_context_ids.py用repository unit test
 - routing fixtureの固定件数を検証するrepository test / docs current count
 
-「テスト設計前の仕様理解package」はspec-analysisから開始し、未解決事項があればquestion-analysisへ進み、回答反映後spec-analysisへ戻すroutingを追加します。resolver失効時はspec-analysisがsame-UNK reopen / new UNKをcanonical modelへ先に反映してからquestion-analysisへcurrent UNKNOWN集合を渡します。qa-workflow経由のpackage writeでは `reserve_shared_resource()` をresolved package_root単位のatomic pre-start single-writer契約として使い、UI target package materializeには `claim_mutable_operation()` を重ねません。reservation取得後にpackage root / reservation revision / semantic input fingerprintをworkflow stateへ保存し、同一workflowのresumeは同じreservationを再利用してcurrent packageをre-inspectしてからmaterializeします。既存generic claimのone-shot pre-start semanticsは変更しません。成功またはcleanup確認済みhandled failure後だけreservationをconditional releaseします。正式DECISION / 承認済みASMへ正規化する場合、意味判断はquestion-analysis / stakeholder側に残します。Project Contextが実際の正本ownerである場合だけqa-workflow helperがDEC / ASM ID採番とSection 12 / 13 materialize、previous ID削除検証を行います。別ownerでもcanonical Authority IDは `DEC-xxx / ASM-xxx` を維持し、外部record IDをauthority_idへ流用しません。
+「テスト設計前の仕様理解package」はspec-analysisから開始し、未解決事項があればquestion-analysisへ進み、回答反映後spec-analysisへ戻すroutingを追加します。resolver失効時はspec-analysisがsame-UNK reopen / new UNKをcanonical modelへ先に反映してからquestion-analysisへcurrent UNKNOWN集合を渡します。UI target packageのcreate / updateは `ui_target_package.py materialize` がpackage-localのsingle-writer / crash recovery / idempotent replayまで所有します。固定sibling lock fileへOSのprocess-scoped file lockを取得し、commit済みrequestのfingerprintと割当結果をMANIFEST receiptへ保存します。qa-workflow / standalone callerはPR #14の `claim_mutable_operation()` / `reserve_shared_resource()` をこのwrite pathへ重ねません。process kill時はOS lockが解放され、同一requestの再実行はreceipt一致ならmutationを再適用せず既適用結果を返します。正式DECISION / 承認済みASMへ正規化する場合、意味判断はquestion-analysis / stakeholder側に残します。Project Contextが実際の正本ownerである場合だけqa-workflow helperがDEC / ASM ID採番とSection 12 / 13 materialize、previous ID削除検証を行います。別ownerでもcanonical Authority IDは `DEC-xxx / ASM-xxx` を維持し、外部record IDをauthority_idへ流用しません。
 
 ### repository docs / CI
 
@@ -258,7 +257,7 @@ PR #14後のCIは `skills/*/scripts` を動的compileするため、helper compi
 - UI構造をPAGE / STATE・VIEW・STEP / MODAL / browser dialog / panel / external / sharedへ区別できる
 - 仕様Authorityとrepository implementation statusが混同されない
 - UNKNOWNが安定参照され、回答後に解消済み履歴とcurrent unknownが整合する
-- package更新時にpackage schema version、content version、CHANGELOG、MANIFESTと各ファイルの現在状態が一致し、Stable ID lifecycle / 影響fileをLLM手入力に依存しない
+- package更新時にpackage schema version、content version、CHANGELOG、MANIFESTと各ファイルの現在状態が一致し、Stable ID lifecycle / 影響fileをLLM手入力に依存しない。同一materialize requestはMANIFEST receiptで既適用判定でき、commit後crashでもnew ID / extensionを二重採番しない
 - 通常のspec-analysis出力は従来どおり利用できる
 - test-target-inspectionの責務を侵食しない
 - qa-workflowが最短経路でmodeを選択でき、usability-evaluation / usability-inspection / wcag-conformance-evaluationへ誤routeしない
@@ -276,7 +275,7 @@ PR #14後のCIは `skills/*/scripts` を動的compileするため、helper compi
 - runtime-v2 / entity-state-v2 cutoverでv1 evidence自体はcurrent扱いしない。spec-analysisはcanonical v1 Authority Entityをfrozen規則で検証してsemantic contentだけをcurrent `authority_entities.py`へ渡す。TRD / TCD / TCはSkill-local cutover helperで内容不変のTR / TCN / model / CI / TC stable identityとdeleted / inactive履歴を維持し、test-analysis / usability-inspection / wcag-conformance-evaluationはSkill-local read-only v1 input readerでintegrity確認済みsemantic inputだけをv2再実行へ渡す。coverage-analysis / qa-workflowは保存v1 inputを使わず依存元がcurrent v2になった後に再生成する
 - Project Context ownerのDEC / ASMは撤回 / 置換済みでもID rowを削除せず、previous IDの再利用をhelperが防ぐ
 - current packageがrepository evidenceをcarry-forwardする場合、08の確認revisionを勝手にcurrentへ更新せず保持できる
-- 同じpackage rootへの`materialize`はcallerが直列化し、helperはUTF-8 without BOM / LF / terminal LFのcanonical bytesをstagingへ生成・検証してからpackage単位でcommitする。途中I/O failureで旧版 / 新版が混在した完成packageを残さない
+- 同じpackage rootへの`materialize`はhelper自身がpackage-local process lockで直列化し、UTF-8 without BOM / LF / terminal LFのcanonical bytesをstagingへ生成・検証してからpackage単位でcommitする。途中I/O failureで旧版 / 新版が混在した完成packageを残さず、process kill後もlockのstale owner回収を必要としない
 - package-local stable IDを持つ複数UI target packageのMachine Entity blockを同一current Entity collectionへ直接mergeせず、必要ならspec-analysisで1つのcurrent canonical package / normalized inputへ意味統合してから下流へ渡す
 - helperがsemantic判断を代替せず、通常spec-analysisの柔軟性を損なわない
 - production helperの公開CLIは独立した実行用途があるoperationだけに限定し、採番・version計算・MANIFEST生成・impact算出等のmaterialize内部処理をfocused useだけのために公開operation化しない

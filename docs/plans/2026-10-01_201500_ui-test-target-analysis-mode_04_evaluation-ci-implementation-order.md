@@ -489,8 +489,9 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - Trigger=`あり`のdomainはrequiredのまま維持する。identity既知ならFIELD / FLOW / NOTIFY|INTERACT等をcurrent / blocked rowで保持し、identity不明なら07のBlocking Scope ID + 関連Fileでclosureする。内容不足をTriggerへ逆流させない
 - skills/spec-analysis/scripts/ui_target_package.pyの `inspect / validate / materialize` と内部allocator / version / README / MANIFEST / lifecycle / impactを実装。create / legacy-migrationはhelper内部でSkill-local assetからstaging初期化し、snapshotはhash identityだけ保持、derived tracking / refsはmaterializeが再parseする
 - `prose_updates[]` はassetに存在するstandard exact heading本文だけを置換する。新規heading作成 / rename / deleteを許可しない
-- canonical table cell encode、complete file set、sibling staging / backup、preflight orphan recovery、commit直前snapshot再照合、package単位切替 / rollbackを実装。qa-workflow経由のUI target package writeは `reserve_shared_resource()` をresolved package_root単位のatomic pre-start single-writer契約として再利用し、`claim_mutable_operation()` は使わない。generic claim semanticsは変更せず、新lock helperも追加しない
-- reservation ref / revisionをowner stateへ保持し、成功またはcleanup確認済みhandled failure後だけ `release_shared_resource()` + atomic conditional deleteで解放する。write/recovery状態を証明できないcrash ownerのreservationを別workflowがstealしない
+- canonical table cell encode、complete file set、sibling staging / backup、preflight orphan recovery、commit直前snapshot再照合、package単位切替 / rollbackを実装
+- `ui_target_package.py` 内部だけにfixed sibling process lockを追加し、POSIX `fcntl.flock` / Windows `msvcrt.locking` の標準ライブラリ実装で同一packageをsingle writer化する。PR #14のclaim / reservation / CAS helperはpackage writeへ使わず、generic lock serviceも作らない
+- canonical materialize request fingerprintとMANIFEST `Last materialize receipt` を追加し、commit後response前crashでも同一request replayが前回のID / extension割当・retire結果を返してmutationを再適用しない。createは事前inspect不要、updateはreceipt不一致時だけprevious snapshotを要求する
 - normative rowのAuthority / UNKNOWN traceability、domain rowのhelper-derived state、Scope / Blocking Scope / 関連File、scope readiness、UIOP→UC scope一致、UNKNOWN lifecycle、extension lifecycle、Repository確認基準をvalidateする
 - versionを `^v[0-9]{2,}$`、数値+1、最低2桁zero padding、上限なしに固定する。新設structural IDも最低3桁・上限なし、既存canonical IDは3桁契約を維持する
 - legacy / unversioned packageに加え、通常spec-analysis単一成果物 → ui-target-v1 migrationを同じsemantic mapping + materialize経路で扱う
@@ -554,7 +555,7 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 ### Step 5: qa-workflow routing
 
 - mode request routing / answer resume。小規模でも継続利用目的ならmodeを優先し、`scope_readiness[] / ready_scope_ids[]` を使ってblocked scopeを除外し、current ready scope全件を `build-machine-evidence(scope_ids=ready_scope_ids)` の1 batchへまとめて後続 `artifact:*:all` runtimeへ進める。blocked scopeのUNKNOWNをAgentが全件filterしない
-- `skills/qa-workflow/assets/workflow-state-template.md` へUI target package write context（resolved package_root、reservation ref / revision、semantic input fingerprint、開始時snapshot、write state）を追加する。qa-workflow経由のpackage materializeはresolved package_rootの `reserve_shared_resource()` をatomic pre-start single-writer契約として取得し、reservation成功前はwriteしない。UI target package writeでは `claim_mutable_operation()` を呼ばない。同一workflow resumeは同じreservation revision + semantic input fingerprintを確認し、current rootがvalidならfresh inspect snapshotから再実行、root不在 + valid backupならmaterialize preflight recovery後に続行し、矛盾状態はblockedにする。成功 / cleanup確認済みhandled failure後は既存conditional release契約でreservationを解放する
+- qa-workflowはUI target packageのwrite state / reservation rowを追加せず、`ui_target_package.py materialize` のrequest fingerprint / receipt / package-local process lockをそのまま利用する。updateはinspect snapshotを渡し、createはsnapshotなしでmaterializeする。resumeで同一semantic requestを再構成できた場合は同一fingerprint replayを利用し、再構成できない場合はreceiptを根拠に別requestを推測せずspec-analysisのsemantic input再作成へ戻る
 - batch handoffから `artifact:analysis_entities:all` / `artifact:requirement_structure:all` のcanonical stdinを1つ構成し、batch全体を16 MiB上限へ検証する。超過時はruntime未起動のままblockedにし、scope別個別run / subset run / auto splitを行わない。その他の通常generatorは2 MiB上限を維持する
 - 継続利用目的を単発規模より優先するmode precedenceをroutingへ反映
 - runtime-v1 downstreamが残る状態でUI target migration済み、または必要なv2 baselineが未成立ならblockedにし、Step 2の依存順へ戻す
@@ -566,7 +567,7 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - `ui-target-v1` schema、helper I/O、sort、failure enum、filesystem safety
 - standard heading registry、conditional file Trigger判定→状態導出、blocked packageの構造valid / completion blocked分離
 - extension自由記述-only契約、extension create/update/retire、test-relevant semanticsをextension proseだけに残さないsemantic contract
-- stable ref / normative traceability / MANIFEST / Authority + AC Machine Entity bridge
+- request-wide draft allocation / stable ref / normative traceability / MANIFEST receipt / Authority + AC Machine Entity bridge
 - inspect snapshot → materialize → explicit retire lifecycle
 - legacy vNN / unversioned packageとnormal spec-analysis single artifactのmigration fixture
 - package migrationとruntime cutoverの相対順integration test
@@ -600,7 +601,7 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - package-global build responseがscope full payloadを複製せず、ready-scope batch runtime requestが2 MiBを超えても16 MiB未満なら既存 `artifact:analysis_entities:all / artifact:requirement_structure:all` を1回だけ起動して完遂できるscenario。16 MiB exactly / 1 byte超過の境界値はrepository testで固定する
 - AC-001がcurrent → blocked → currentへ戻ってもstable IDを維持し、blocked期間はAC Entity / TRD handoffから外れ、既存TRがmissing dependency / staleになるscenario
 - required scopeで0 UIOP + blockerなしをreject、0 UIOP + identity未確定Blocking UNKNOWNをpartial/blocked保存、完全なUIOP→US→UC→Behavior→AC closureをreadyにするscenario
-- 同一packageへの異なるoperation / sessionが同じresource reservationで排他され、同一workflow crash resumeは保存reservation + semantic input fingerprintを検証してcurrent rootから安全に再開できるscenario。generic `claim_mutable_operation()` をUI target package writeへ使わず、cleanup確認後にownerだけがconditional releaseできることも確認する
+- 同一packageへの2 process materializeがpackage-local OS lockで排他され、commit後response前crash後の同一request replayがMANIFEST receiptから二重new ID / extension / retireなしで完了できるscenario。create replay、update replay、別requestのstale拒否、lock holder process kill後の再取得も確認する
 - process kill相当のorphan staging / backupをpreflight recoveryでき、一意に復旧不能ならfail-closedするscenario
 - deterministic helperが構造エラーを返してもLLMの意味判断を上書きしないscenario
 

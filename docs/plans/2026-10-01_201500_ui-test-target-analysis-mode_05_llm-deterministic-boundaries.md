@@ -49,7 +49,7 @@
 | current AC→TR / disposition closure | test-requirement deterministic runtime | ACを無言で落とさない |
 | version形式 / package内version一致 | deterministic helper / validation | default policyでは完成packageへ永続差分を保存するたびsemantic / presentationを問わず次versionへ進める。no-opだけ維持する |
 | required core / 条件付き必須file set | deterministic helper / validation | trigger該当性だけLLM。状態・create/update時のfile集合・MANIFEST・completion statusはscript |
-| MANIFEST file list / SHA-256 | deterministic helper | package内容から導出し、LLMに計算させない |
+| MANIFEST file list / SHA-256 / materialize receipt | deterministic helper | package内容から導出し、LLMに計算させない。最後にcommitされたrequest fingerprintと割当結果をcontrolとして保持し、同一request replayを二重適用しない |
 | current UNKNOWN ID集合 / 件数 | deterministic helper | canonical分析項目から導出する。UNKNOWN本文、関連Scope、Blocking Scope、関連FileはLLM / question-analysisが判断し、helperがexact参照とscope readinessを集計する。UNKNOWNの存在だけではcompletionをblockedにしない |
 | cross-file stable ID参照切れ | deterministic validation | exact ID参照だけを検証する。extension本文はparseせず、00のextension宣言rowにLLMが明示したfile-level refだけを検証する |
 | changed stable IDの参照file候補 | deterministic helper | exact参照から候補を列挙する。意味上の修正要否はLLM |
@@ -83,9 +83,10 @@ required file、version、ID形式・duplicate、exact reference、UNKNOWN整合
 通常のUI target package作成 / 更新とlegacy migrationのcanonical write pathです。LLMがsemantic row / prose、reuse / new、explicit retire、file trigger、extension要否を決めた後、helper内部で次をまとめて実行します。
 
 - create / legacy-migrationではSkill-local assetからsibling staging packageを内部初期化する。Agentへasset copyを要求しない
-- snapshot hash一致後にhelper自身が再parseしたcurrent tracking/historyからのstable ID batch allocation
+- snapshot hash一致後にhelper自身が再parseしたcurrent tracking/historyから使用済みID集合を作る
+- 全 `table_changes[].identity_action=new` をrequest-wideで仮採番して `draft_key → stable ID` mapを確定する
+- tracking row / keyed table / extension stable refの `@draft` をfile applicability判定より前に解決する
 - default vNN version導出
-- `@draft`参照解決
 - Markdown escape / canonical row order / table serialization
 - asset固定のstandard heading本文置換
 - 条件付き標準fileのfile × Scope ID Trigger判定→file状態導出、domain row / blocking UNKNOWN closure、create/update同期、ready / blocked scope算出
@@ -94,6 +95,9 @@ required file、version、ID形式・duplicate、exact reference、UNKNOWN整合
 - README controls
 - Machine Entities section
 - MANIFEST / SHA-256
+- request fingerprint生成 + MANIFEST receipt生成
+- package-local process file lockによるsingle-writer化。POSIXは`fcntl.flock`、Windowsは`msvcrt.locking`を標準ライブラリで使い、process / handle終了時にlockを解放する
+- 同一request receipt一致時のidempotent replay
 - final validate
 - staging + package単位commit
 
