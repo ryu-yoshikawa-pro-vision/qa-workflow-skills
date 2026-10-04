@@ -993,6 +993,10 @@ payloadは `scope_ids` で分けます。
 {
   "batch_handoff":{
     "scope_ids":["SCOPE-001","SCOPE-002"],
+    "scope_index":[
+      {"scope_id":"SCOPE-001","target":"ログイン","ui_operation":"あり","authority_refs":["SPEC-001"]},
+      {"scope_id":"SCOPE-002","target":"自動更新","ui_operation":"なし","authority_refs":["SPEC-002"]}
+    ],
     "normalized_skill_input":{"authorities":[],"acceptance_criteria":[]},
     "machine_entities":[],
     "expected_entity_identities":[]
@@ -1000,7 +1004,7 @@ payloadは `scope_ids` で分けます。
 }
 ```
 
-helperは各scopeを§9.3の固定reachabilityで内部projectionした後、Authority / current AC / Machine Entity / expected identityをstable identityでunion / dedupeします。同一identityが複数scopeから現れる場合、canonical contentが一致すれば1件へ統合し、不一致ならinternal contract violationとしてfail-closedします。blocked scope由来のrowはbatchへ入りません。各Machine Entity / identity rowのschemaはshared runtime contractを正本とし、配列はentity identityの `skill / entity_type / entity_ref` 順でcanonical sortします。package-global responseはready scopeのIDだけを返し、batch responseはpackage-global Machine Entity / Markdownを重複返却しません。統合responseに独自の `implementation_fingerprint` fieldは持ちません。
+helperは各scopeを§9.3の固定reachabilityで内部projectionした後、Authority / current AC / Machine Entity / expected identityをstable identityでunion / dedupeします。同一identityが複数scopeから現れる場合、canonical contentが一致すれば1件へ統合し、不一致ならinternal contract violationとしてfail-closedします。blocked scope由来のrowはbatchへ入りません。`scope_index[]` はready scopeごとに `scope_id / target / ui_operation / authority_refs[]` を1 row持ち、Scope ID順でcanonical sortします。`target` と `ui_operation` は00のcurrent Scope rowから取得し、`authority_refs[]` はそのscopeの固定reachabilityで解決したcurrent SPEC / DECISION / approved ASMだけを重複除去・canonical sortします。これはtest-analysis / TRDがscope所属を意味判断するためのcompact provenanceであり、full scope payloadを複製しません。各Machine Entity / identity rowのschemaはshared runtime contractを正本とし、配列はentity identityの `skill / entity_type / entity_ref` 順でcanonical sortします。package-global responseはready / blocked scope IDだけを返し、batch responseはpackage-global Machine Entity / Markdownを重複返却しません。統合responseに独自の `implementation_fingerprint` fieldは持ちません。
 
 `machine_entities_markdown` は既存shared `runtime_contract.py::render_machine_entities("spec-analysis", machine_entities)` の戻り値をそのまま使用します。standalone `build-machine-evidence` はread-onlyでありpackageを変更しません。09の `### Machine Entities: spec-analysis` sectionを書き換えるのはcanonical write pathである `materialize` 内部の同一projection処理だけです。Agent / callerがこの返却文字列をpackageへ書き戻しません。
 
