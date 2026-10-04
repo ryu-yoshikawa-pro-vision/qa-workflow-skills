@@ -383,8 +383,9 @@ runtime version bumpだけを理由にlive再観測は要求しませんが、�
 5. coverage-analysisをcurrent v2 TR / TCN / CI / TC / runtime evidenceからfull rerunする
 6. workflowで必要なusability-inspection / wcag-conformance-evaluationを各Skillのreader integrity + currentness契約に従ってv2再生成し、必要なら通常rerun / re-observationする
 7. qa-workflowを最後にcurrent v2 Entity / runtime evidence + current workflow state / routing inputからfull rerunし、v2 baselineのvalidate / freshness / final gateを成立させる
-8. v2 baseline成立後にlegacy / normal spec-analysis成果物をui-target-v1へmigrationしてUS / UC / Behavior / ACを生成し、requirement-structure-v2を通常semantic updateとして再実行してAC→TR / Dispositionを反映する
-9. AC / Authority変更でstaleになったTCD → TC → coverage-analysis → qa-workflow等を通常の依存順で再実行する
+8. v2 baseline成立後にlegacy / normal spec-analysis成果物をui-target-v1へmigrationしてUS / UC / Behavior / ACを生成する
+9. 既存active downstreamが `scope_refs=[]` の場合は、全current scope readyを要求してrequirement-structure-v2 → TCD → TCをscope ownership normalizationとして再実行し、coverage-analysis → qa-workflowまでcurrentにする。blocked scopeが残る場合は `scope_ownership_baseline_required` で停止する
+10. scope ownership baseline成立後、AC / Authority変更でstaleになったdownstreamを通常の依存順で再実行し、以後のready / blocked partial progressionを許可する
 
 `UI target migration済み + runtime-v1 downstreamあり + v2 baseline未成立` はblockedです。逆順を許可しません。runtime-v1 downstream artifactが存在しないworkflowだけ、UI target package migrationから直接normal v2 workflowへ進めます。
 
