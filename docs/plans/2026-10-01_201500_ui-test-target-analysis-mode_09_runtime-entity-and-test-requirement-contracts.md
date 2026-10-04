@@ -802,7 +802,9 @@ blocked Scopeがreadyへ戻ってもinactive IDを自動active化しません。
 
 v1 cutover / non-UI-target v2 baselineではdownstream `scope_refs=[]` を許可しますが、この状態でready/blocked partial progressionは開始しません。
 
-UI target package migration後の最初のsemantic updateでは、既存active TRを全件update scopeへ入れてLLMがcurrent ready `scope_index[]` からTR `scope_refs[]` を付与し、TCD / TCがscope_refsを決定論伝播してcurrent TR / TCN / model / CI / TCすべてのownershipを確立します。coverage-analysis / qa-workflowまで再生成してこのbaselineがcurrentになった後だけ、`downstream_state.py` によるpartial readinessを有効にします。
+UI target package migration時点で既存active downstreamが1件以上あり、scope_refsが空のidentityを含む場合は、**全current scopeがreadyの1回だけ**をownership normalization gateとします。全scopeを含む `scope_index[]` から既存active TR全件へLLMが `scope_refs[]` を付与し、TCD / TCがscope_refsを決定論伝播してcurrent TR / TCN / model / CI / TCすべてのownershipを確立します。coverage-analysis / qa-workflowまで再生成してこのbaselineがcurrentになった後だけ、`downstream_state.py` によるpartial readinessを有効にします。
+
+ownership baseline前に1件でもblocked scopeがある場合は `scope_ownership_baseline_required` でfail-closedします。ready scopeだけへ旧IDを推測割当したり、blocked scope由来と思われる旧IDを一律inactiveへ落としたりしません。downstream未作成の新規UI target workflowはこのone-time gateの対象外で、最初からcurrent ready scopeだけを使ってpartial progressionできます。
 
 ## 13. qa-workflow / coverage-analysis integration
 
@@ -848,7 +850,7 @@ coverage-analysisの既存traceability graph node typeへACを追加しません
 - artifact modeのpartial rerun stale carry-forward。currentのまま変更されたAC依存TRは従来どおりstaleでblockingになる
 - SCOPE-A/B ready → `scope_index[]` からTR scope_refsをLLMが明示 → TCN / model / CI / TCへ決定論伝播 → Bだけblocked → `blocked_scope_ids[]` とprevious Entity `content.scope_refs[]` の積集合からB所有IDだけinactive → A専用current Entity/runtimeがfreshに完遂 → B再readyでsemantic identity同一なら同じIDをactiveへ復帰、というintegration regression
 - AuthorityをA/Bで共有してもscope_refsがAだけのEntityはinactiveにしない回帰と、scope_refsがA/B双方のcross-scope Entityは保守的にinactiveへ落とす回帰
-- v1 cutover / non-UI-target baselineの `scope_refs=[]` からUI target migration後にactive downstream全件をscope ownership付きへ正規化し、baseline成立前のpartial readinessをfail-closedする回帰
+- v1 cutover / non-UI-target baselineの `scope_refs=[]` からUI target migrationする際、既存active downstreamがある場合は全scope readyでのみownership baselineを作成し、blocked scopeが残る間は `scope_ownership_baseline_required` でfail-closedする回帰。downstream未作成の新規workflowではpartial readinessを許可する
 - inactive state rowがlast active `scope_refs[]` を保持し、inactive期間を挟んでもre-ready時のID reuse候補とblocked scope整合を失わない回帰
 - inactive IDはcurrent Entity / expected Entity / carry-forward runtimeへ含めず、inactive自体でqa-workflow / coverage-analysisをblockingしない。別のcurrent stale issueは従来どおりblockingする回帰
 - inactive成果物を意味上廃止した場合はdeletedへ遷移し、そのIDを後続new allocation / reuseへ使わない回帰
@@ -875,6 +877,6 @@ coverage-analysisの既存traceability graph node typeへACを追加しません
 - UI target artifact workflowでは、AC / linked UIOP / scope / 明示linked FIELD-RULE-FLOW-NOTIFY-INTERACT / direct structure + ancestor / linked INF / 親Behavior-UC-US / Authority変更が必要なTR freshnessへ伝播し、無関係package row変更は伝播しない
 - direct modeはknown AC ID / closureを保証し、AC Entity dependencyが無い場合のAC semantic cross-run freshnessを保証対象にしない
 - 無関係TRを不必要にstale化しない
-- ready→blockedでは `blocked_scope_ids[]` とprevious Entity `scope_refs[]` が交差するTR / TCN / model / CI / TCだけをinactiveとしてcurrent Entity/runtimeから外れ、Authority共有だけでは無関係ready scopeを停止させない。inactive stateはlast active scope_refsを保持し、再ready時にsemantic identity同一なら同じIDへactive復帰できる
+- ready→blockedでは `blocked_scope_ids[]` とprevious Entity `scope_refs[]` が交差するTR / TCN / model / CI / TCだけをinactiveとしてcurrent Entity/runtimeから外れ、Authority共有だけでは無関係ready scopeを停止させない。inactive stateはlast active scope_refsを保持し、再ready時にsemantic identity同一なら同じIDへactive復帰できる。既存unscoped downstreamのUI target migrationでは全scope readyのone-time ownership baselineを要求し、baseline前にscope所属を推測しない
 - artifact modeのpartial rerunでscope外TRがcurrentのままchanged ACを参照したままcurrentにならず、blockedによる一時非currentと通常staleを混同しない
 - existing coverage graphを目的なく拡張していない
