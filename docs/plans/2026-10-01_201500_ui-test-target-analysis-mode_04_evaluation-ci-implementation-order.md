@@ -556,7 +556,7 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 
 ### Step 5: qa-workflow routing
 
-- mode request routing / answer resume。小規模でも継続利用目的ならmodeを優先し、`scope_readiness[] / ready_scope_ids[]` を使ってblocked scopeを除外し、current ready scope全件を `build-machine-evidence(scope_ids=ready_scope_ids)` の1 batchへまとめて後続 `artifact:*:all` runtimeへ進める。batchの `scope_index[]` をsemantic scope ownershipの正本としてTRDへ渡す。blocked scopeのUNKNOWNをAgentが全件filterしない。previous downstreamがある場合は `inspect.blocked_scope_ids[]` + previous current Entity collectionを `downstream_state.py` へ渡し、inactive ID集合をgeneratorへそのまま接続する
+- mode request routing / answer resume。小規模でも継続利用目的ならmodeを優先し、`scope_readiness[] / ready_scope_ids[]` を使ってblocked scopeを除外し、current ready scope全件を `build-machine-evidence(scope_ids=ready_scope_ids)` の1 batchへまとめて後続 `artifact:*:all` runtimeへ進める。batchの `scope_index[]` をsemantic scope ownershipの正本としてTRDへ渡す。blocked scopeのUNKNOWNをAgentが全件filterしない。previous downstreamがある場合は `inspect.blocked_scope_ids[]` + previous current Entity collection + verified previous structure stateを `downstream_state.py` へ渡し、inactive ID集合とmachine-owned historyをgeneratorへそのまま接続する
 - qa-workflowはUI target packageのwrite state / reservation rowを追加せず、`ui_target_package.py materialize` のrequest fingerprint / receipt / package-local process lockをそのまま利用する。updateはinspect snapshotを渡し、createはsnapshotなしでmaterializeする。resumeで同一semantic requestを再構成できた場合は同一fingerprint replayを利用し、再構成できない場合はreceiptを根拠に別requestを推測せずspec-analysisのsemantic input再作成へ戻る
 - batch handoffから `artifact:analysis_entities:all` / `artifact:requirement_structure:all` のcanonical stdinを1つ構成し、batch全体を16 MiB上限へ検証する。超過時はruntime未起動のままblockedにし、scope別個別run / subset run / auto splitを行わない。その他の通常generatorは2 MiB上限を維持する
 - 継続利用目的を単発規模より優先するmode precedenceをroutingへ反映
