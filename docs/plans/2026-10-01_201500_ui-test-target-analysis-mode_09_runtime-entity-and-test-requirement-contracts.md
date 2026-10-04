@@ -403,7 +403,7 @@ runtime version bumpだけを理由にlive再観測は要求しませんが、�
 - coverage-analysis / qa-workflowはvalidな保存v1 inputが存在しても無視し、current upstream v2 evidence / current workflow stateから再生成する回帰
 - TCD target version rebase、derived child、semantic CI mappingをcurrent v2 resultへ正しく接続
 - `UI target migration済み + runtime-v1 downstream + v2 baseline未成立` をintegration testでblocked
-- spec-analysis/test-analysis v2再生成 → TRD/TCD/TC cutover → coverage-analysis → 必要なinspection/WCAG → qa-workflow final gateの順でv2 baselineが成立し、その後UI target migration → AC semantic update → downstream stale / rerunへ進むことをintegration test / 実Agent smokeで確認
+- spec-analysis/test-analysis v2再生成 → TRD/TCD/TC cutover → coverage-analysis → 必要なinspection/WCAG → qa-workflow final gateの順でv2 baselineが成立し、その後UI target migration → 既存downstreamがある場合は全scope readyでscope ownership normalization → coverage-analysis / qa-workflow再生成 → partial readiness / downstream rerunへ進むことをintegration test / 実Agent smokeで確認。ownership baseline前にblocked scopeがある場合は `scope_ownership_baseline_required`、downstream未作成ならone-time gate不要
 
 ## 3. spec-analysis normalized machine input
 
