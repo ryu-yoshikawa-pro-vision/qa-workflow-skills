@@ -47,7 +47,9 @@
 | UIOP→UC / US→UC / UC→BH / BH→AC closure | deterministic validation | semantic relationを決めず、LLMが作った参照の完全性だけ検証する。UIOP.Scopeと対応UCからderivedしたScopeの一致、required scopeの最低row / blocker closure、current UCがBehaviorへ閉じること、current Behaviorがcurrent / blocked ACへ閉じることも検証する |
 | UCごとの正常 / 準正常 / 例外3分類 | deterministic validation | 各1行、定義あり/なし/未定義の構造整合を検証する |
 | current AC→TR / disposition closure | test-requirement deterministic runtime | ACを無言で落とさない |
-| blocked scope由来のdownstream一時非current集合 | deterministic qa-workflow helper | current packageのblocked scope上流identityと前回Machine Entity dependency graphからTR / TCN / model / CI / TCを逆向き閉包し、`inactive`対象を固定する。名称・scope名・LLM判断では選ばない |
+| TRのscope所属 | LLM | current ready `scope_index[]` とTRの意味から `scope_refs[]` を決める。UI target artifact workflowでは1件以上必要で、blocked scopeをcurrent TRへ割り当てない |
+| TCN / model / CI / TCのscope所属 | deterministic generator | TCNは参照TR、modelは親TCN、CIは親TCN / model、TCは参照TCN / CIの `scope_refs[]` をunion / canonical sortして生成する。LLMに再入力させない |
+| blocked scope由来のdownstream一時非current集合 | deterministic qa-workflow helper | `inspect.blocked_scope_ids[]` と前回current TR / TCN / model / CI / TC Entityの `content.scope_refs[]` の積集合から`inactive`対象を固定する。Authority共有・名称・dependency graphからscope所属を推測しない |
 | downstream stable IDのreuse / new / semantic deletion | LLM + deterministic generator | semantic identity同一かはLLMが判断する。generatorはhelper由来の`active → inactive`、LLMのreuseに基づく`inactive → active`、非reuseに基づく`inactive → deleted`を状態契約どおり適用する |
 | version形式 / package内version一致 | deterministic helper / validation | default policyでは完成packageへ永続差分を保存するたびsemantic / presentationを問わず次versionへ進める。no-opだけ維持する |
 | required core / 条件付き必須file set | deterministic helper / validation | trigger該当性だけLLM。状態・create/update時のfile集合・MANIFEST・completion statusはscript |
