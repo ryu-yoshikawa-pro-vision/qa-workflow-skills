@@ -295,10 +295,10 @@ repository unit testで次を必須確認します。
 - default policyでREADMEのPackage Version / Previous Package Versionが初回または1 revision差として整合し、user-managed / semantic payloadまたはLLM入力のcurrent `変更概要`へ永続差分を保存する場合はsemantic / presentationを問わず+1となること。version metadata / generated `Stable ID changes` / generated `影響file` / README controls / MANIFESTだけの派生差分を変更原因に数えず、provisional payload + requested change_summaryが同一ならno-opでversion維持となること
 - legacy migrationでは`materialize(change_mode=legacy-migration)`だけが明示legacy source versionを受け、通常更新用version計算と混在しないこと
 - materialize内部README control builderがcurrent UNKNOWN件数、`completion_status`、ready / blocked scope counts、payload file tableをcanonical生成すること。Current UNKNOWN件数だけではcompletionをblockedにしないこと
-- materialize内部extension allocatorがLLMのslug決定後にcurrent 10+ fileの次番号をrequest順にbatch採番し、stable owner row適用前にtemplate / pathを準備して00の `案件固有extension file一覧` と実fileを同時生成すること
+- materialize内部extension allocatorがLLMのslug決定後にcurrent 10+ fileの次番号をrequest順にbatch採番し、request-wide stable draft解決後のfile-level refsを使って00の `案件固有extension file一覧` と実fileを同時生成すること
 - extension declaration exact table、domain file命名、duplicate path / slug、reuse時slug変更拒否。extension本文をparseせず、00宣言rowの関連Scope / Authority / structure / UNKNOWN refsだけを存在検証・impact対象にすること。semantic evalでtest-relevant semanticsがextension proseだけに残っていないことを確認する
 - `extension_file_retirements[]` はexisting current extensionだけを受理し、成功時は実fileと00宣言rowを同時に除去すること。extension本文を参照解析せず、宣言rowのfile-level stable refはfile削除と同時に除去されること
-- `materialize` のartifact_mode=create / updateを検証し、normal create / legacy-migrationは不存在または空destination + previous_snapshot=nullから内部asset初期化、normal updateはnon-null hash-only snapshot必須とすること。snapshot一致後にprevious_modelを再parseし、no-opでは `changed=false`、ID / file allocationとchanged_filesが空でversionを上げないこと
+- `materialize` のartifact_mode=create / updateを検証し、normal create / legacy-migrationはprevious_snapshot=null、normal updateはnon-null hash-only snapshotをrequestとして必須とすること。lock取得後はreceipt一致をcreate target / update snapshot preconditionより先に判定し、receipt不一致createだけ不存在または空destinationから内部asset初期化、receipt不一致updateだけsnapshot照合後にprevious_modelを再parseすること。no-opでは `changed=false / replayed=false`、ID / file allocationとchanged_filesが空でversionを上げないこと
 - inspectの `update_snapshot` はpackage version / payload hashes / MANIFEST hashだけを持ち、materializeがhash一致後にcurrent packageを再parseしてtracking / UNKNOWN / exact refsを再導出すること。callerがderived indexを持ち回らない
 - materialize内部allocatorがsemantic identityを判断せず、UI target mode所有の `SRC / SPEC / INF / UNK` + standard structural prefixについて再parseしたcurrent row + CHANGELOG履歴から次番号を決め、更新途中で消えたprevious IDも再利用しないこと
 - UI target package内部allocatorが `DEC / ASM` を採番しないこと
@@ -312,7 +312,7 @@ repository unit testで次を必須確認します。
 - extension filenameが10以上の10進連番 + lowercase kebab slugのexact grammarで、leading zeroを拒否すること
 - completed package rootがcanonical payload + MANIFEST以外のregular file / nested directoryを拒否すること
 - materializeのstable owner `table_changes[]` とfull-replacement `keyed_table_updates[]` を区別し、file applicability / Use Case振る舞い完全性 / Current UNKNOWN / Current Effective Authority / 後続Skill補足のexact key registryを検証すること
-- keyed tableのkey / stable referenceで同requestの `@draft:<draft_key>` を解決でき、未解決draftをrejectすること
+- keyed tableのkey / stable referenceとextensionの `scope_refs / authority_refs / structure_refs / unknown_refs` で同requestのstable `@draft:<draft_key>` をfile applicability判定前に解決でき、未解決draft / extension draft namespace参照をrejectすること
 - materialize内部lifecycle builderがsnapshot hash照合後に再parseしたprevious current modelとprovisional tracking row差分から `added / changed / resolved` を生成し、`retired` は明示 `retire_ids[]` だけから生成すること。previous ID消失のみなら `state_transition_required` でblockedすること
 - materialize内部impact builderの `影響file` がchanged IDのprevious/current owner + exact reference先unionであり、Agentへfile一覧再入力を要求せず、semantic本文変更の要否を勝手に決定しないこと
 - legacy migrationではLLMが確定したretained ID / 明示lifecycle event / semantic rowsを `materialize(change_mode=legacy-migration)` へ渡し、helperがnew ID採番・canonical Markdown・`migrated / added / resolved / retired`・README / Machine Entity / MANIFESTまで1 write pathで生成すること

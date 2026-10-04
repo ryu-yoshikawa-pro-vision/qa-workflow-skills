@@ -619,7 +619,7 @@ unknown operation / unknown top-level field / JSON・table schema不正は `inva
 - lock pathは `package_root=/parent/<name>` に対して `/parent/.<name>.ui-target.lock` exactlyとする。package payload / MANIFEST対象には含めない
 - POSIXではPython標準ライブラリの `fcntl.flock(LOCK_EX | LOCK_NB)`、Windowsでは `msvcrt.locking(..., LK_NBLCK, 1)` でlock fileの先頭byteをnon-blocking exclusive lockする。lock fileはregular fileとして固定pathへ置き、symlink / reparse point等の既存filesystem safety違反をrejectする
 - lock ownershipはfile内容やPID metadataで判定しない。open handleのOS lockだけを正本とし、正常終了 / exception / process killでhandleが閉じれば解放される。lock file自体は残ってよく、stale lock file削除によるowner推測を行わない
-- lock取得競合は `write_locked`、platform / filesystemがこのprocess-scoped lockを安全に提供できない場合は `write_lock_unavailable` としてfail-closedする。network filesystem等でlock semanticsを確認できない保存先を安全と推測しない
+- lock取得競合は `write_locked`、実行platformで必要なprocess-scoped lock primitiveを利用できない / lock APIが失敗する場合は `write_lock_unavailable` としてfail-closedする。本契約のsingle-writer保証は同一host上のlocal filesystemを対象とし、network / shared filesystemのinter-host排他はPR #16の対象外とする
 - qa-workflow / standalone callerは `claim_mutable_operation()` / `reserve_shared_resource()` を重ねず、package writeの排他・commit・replay判定を `materialize` に一任する
 - `materialize` は入力schema / text newlineを正規化した後、`operation / package_root` を除くmaterialize request全体をcanonical JSON化し、lowercase SHA-256の `request_fingerprint` を生成する。array orderが契約上意味を持つ `table_changes[].rows[] / extension_file_updates[]` 等は順序を保持し、stable reference array等のcanonical sort対象だけ既存規則で正規化してからhashする
 - changed=trueでcommitするpackageのMANIFESTへ§12の `Last materialize receipt` を生成し、`request_fingerprint`、artifact/change mode、割当ID / extension path、retire結果、changed files、previous/current package versionを保存する。receiptはhelper-owned controlでありversion up要否の原因に数えない
@@ -1304,7 +1304,7 @@ LLM / stakeholder側がsemantic identityのreuse / new、DECISION / ASM区分、
 - `..` によるroot外参照禁止
 - symlink file / symlink directory拒否
 - regular fileだけを読む
-- completed current package root直下にはcanonical payload files + `MANIFEST.md` 以外のregular fileを許可せず、nested directoryも拒否する。helper-owned staging / backupはpackage rootのsiblingなのでpackage file setに含めない
+- completed current package root直下にはcanonical payload files + `MANIFEST.md` 以外のregular fileを許可せず、nested directoryも拒否する。helper-owned staging / backup / process lock fileはpackage rootのfixed siblingなのでpackage file setに含めない
 - UTF-8 strict decode
 - current `ui-target-v1` packageはBOMなしUTF-8、LFのみ、terminal LF exactly oneを要求する。legacy inputはmigration時に§7.4へcanonicalizeする
 - current package全read bytes合計16 MiB以下。これはUI target packageのsupported hard limitとし、超過時は`limit_exceeded`でfail-closedする。helperが自動分割や複数package化を行わない
@@ -1313,7 +1313,7 @@ LLM / stakeholder側がsemantic identityのreuse / new、DECISION / ASM区分、
 - case-sensitive canonical filenameを要求
 - filesystem read失敗を意味上のUNKNOWNへ変換せずblocked
 
-network accessは行いません。
+network accessは行いません。package writeのprocess lockは同一host上のlocal filesystemだけをsupported coordination範囲とし、network / shared filesystem向けdistributed lockへ拡張しません。
 
 ## 12. MANIFEST schema
 
