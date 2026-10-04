@@ -641,7 +641,7 @@ UI target packageからtest-requirement-designへ進むcanonical workflowはarti
 | 変更 | artifact modeの期待 |
 | --- | --- |
 | AC本文変更 | 関連TR stale |
-| current ACがblockedへ遷移しEntity集合から一時的に外れる | 関連TR missing dependency / stale。AC stable ID自体はretireせず、再current化時に同じIDを使う |
+| current ACがblockedへ遷移しEntity集合から一時的に外れる | `_09 §12` のblocked-scope dependency closureに含まれる関連TR / downstream stable IDを`inactive`へ遷移し、current freshness対象から外す。AC stable ID自体はretireせず、再current化時にsemantic identity同一なら同じ下流IDも再利用できる |
 | ACが意味上廃止されretired | 関連TR missing dependency / stale |
 | linked UIOP変更、AC本文同じ | AC fingerprint変更 → 関連TR stale |
 | 親Behavior変更、AC本文同じ | AC fingerprint変更 → 関連TR stale |
