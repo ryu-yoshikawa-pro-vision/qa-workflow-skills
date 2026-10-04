@@ -406,7 +406,7 @@ runtime version bumpだけを理由にlive再観測は要求しませんが、�
 
 ## 3. spec-analysis normalized machine input
 
-`ui_target_package.py build-machine-evidence(scope_ids=null)` はpackage-global evidenceと `ready_scope_ids[] / blocked_scope_ids[]`、さらにpartial readiness時のdownstream lifecycle用 `blocked_scope_upstream_identities[]` を決定論生成し、scope別full handoffを同じresponseへ複製しません。`blocked_scope_upstream_identities[]` は `{skill, entity_type, entity_ref}` のidentity-only rowで、(1) blocked scopeに属しsemantic identityが既知のAC IDを `spec-analysis / acceptance_criterion / AC-xxx` として含め、(2) `_06 §9.3` のreachabilityでblocked scopeから到達するcurrent Authorityからready scopeでも到達するAuthorityを差し引いたblocked-only Authority identityを含めます。共有Authority、INF、UNK、UI構造 / domain itemは含めません。blocked ACのMachine Entity bodyは生成せず、identityだけを一時非current判定の起点にします。`build-machine-evidence(scope_ids=[...])` は各ready scopeを固定reachabilityで内部projectionし、Authority / current AC / Machine Entity / expected identityをstable identityでunion / dedupeした1つのbatch handoffを返します。canonical qa-workflowでは `scope_ids[]` をcurrent `ready_scope_ids[]` とexact一致させます。Markdownから次を決定論的に生成します。
+`ui_target_package.py build-machine-evidence(scope_ids=null)` はpackage-global evidenceと `ready_scope_ids[] / blocked_scope_ids[]` を決定論生成し、scope別full handoffを同じresponseへ複製しません。`build-machine-evidence(scope_ids=[...])` は各ready scopeを固定reachabilityで内部projectionし、Authority / current AC / Machine Entity / expected identityをstable identityでunion / dedupeした1つのbatch handoffに加え、ready scopeごとの `scope_id / target / ui_operation / authority_refs[]` を持つcompact `scope_index[]` を返します。canonical qa-workflowでは `scope_ids[]` をcurrent `ready_scope_ids[]` とexact一致させます。blocked scopeのID集合は `inspect.blocked_scope_ids[]` を正本とし、package-global Machine EntityやAuthority dependencyからscope ownershipを逆算しません。Markdownから次を決定論的に生成します。
 
 - normalized Authority rows
 - normalized current AC rows
@@ -429,7 +429,7 @@ runtime version bumpだけを理由にlive再観測は要求しませんが、�
 
 `authority_refs[]` は `_06 §9.2` の固定projectionで得たAC / Behavior / UC / US chain、linked UIOP、scope、linked domain item、linked UI structureのstable refsを09のCurrent Effective Authority集合へ解決したunionです。current SPEC / DECISION / approved ASMだけを残し、INF / UNK / inactive Authorityは除外します。helperが重複除去・canonical sortし、current ACでは1件以上を要求します。0件ならhelperはblocking issueを返してAC Entityを生成しません。AC semantic identityが同じなら同IDをblockedへ遷移させる、Behavior自体も未確定なら親Behaviorをblockedへ遷移させる、意味上廃止ならexplicit retireする、UNKNOWNをreuse / newする等のsemantic transitionはLLMが判断します。Agent / LLMがAuthority集合を再構築しません。
 
-qa-workflow / test-analysis / coverage-analysisへspec-analysis成果物を渡す場合、AgentがMarkdownからJSONを再構築しません。current `inspect.ready_scope_ids[]` 全件を `build-machine-evidence(scope_ids=ready_scope_ids)` へ渡し、helperが1つのcanonical batch handoffを生成します。既存runtime unit `artifact:analysis_entities:all` / `artifact:requirement_structure:all` は維持し、scopeごとの別runtime unitへ分割しません。
+qa-workflow / test-analysis / coverage-analysisへspec-analysis成果物を渡す場合、AgentがMarkdownからJSONを再構築しません。current `inspect.ready_scope_ids[]` 全件を `build-machine-evidence(scope_ids=ready_scope_ids)` へ渡し、helperが1つのcanonical batch handoffと `scope_index[]` を生成します。test-analysis / TRDはscope所属の意味判断にこの `scope_index[]` を使いますが、下流Machine Entityのscope ownershipをAuthority共有や名称から推測しません。既存runtime unit `artifact:analysis_entities:all` / `artifact:requirement_structure:all` は維持し、scopeごとの別runtime unitへ分割しません。
 
 ### ready-scope batch root runtime入力上限
 
@@ -439,22 +439,27 @@ qa-workflowはbatch handoffからroot runtimeの最終canonical stdinを構成�
 
 ### 3.1 requirement-structure-v2 caller contract
 
-`acceptance_refs[]` の意味対応だけをLLM判断に残し、known AC集合の取得経路とMachine Entity dependencyの扱いはinput modeごとに固定します。empty default用adapterは追加しません。
+`acceptance_refs[]` とTRのscope所属の意味判断をLLMに残し、known AC集合・known ready Scope集合・Machine Entity dependencyの扱いはinput modeごとに固定します。empty default用adapterは追加しません。
 
-`requirement-structure-v2` raw generator inputはtop-level `acceptance_criteria[]` を必須とします。schemaはexactに次です。
+`requirement-structure-v2` raw generator inputはtop-level `acceptance_criteria[] / scope_ids[]` を必須とします。
 
 ```json
 {
   "acceptance_criteria": [
     {"ac_id":"AC-001","authority_refs":["SPEC-001","DEC-002"]}
-  ]
+  ],
+  "scope_ids":["SCOPE-001","SCOPE-002"]
 }
 ```
 
 - `ac_id` はduplicate不可、canonical sortする
 - `authority_refs[]` はduplicate不可で1件以上、top-level `authorities[]` のknown Authority IDだけを許可する
+- `scope_ids[]` はduplicate不可・canonical sort済みのknown current Scope ID集合。UI target artifact workflowではcurrent `ready_scope_ids[]` とexact一致させる
 - ACなしworkflowは `acceptance_criteria=[]` を明示する
-- 各 `test_requirements[]` draftの `acceptance_refs[]` も必須とし、known `acceptance_criteria[].ac_id` への存在参照だけをhelperが検証する
+- non-UI-target / migration baselineでは `scope_ids=[]` を許可する
+- 各 `test_requirements[]` draftの `acceptance_refs[] / scope_refs[]` を必須とする。`acceptance_refs[]` はknown `acceptance_criteria[].ac_id`、`scope_refs[]` はknown `scope_ids[]` への存在参照だけをscriptが検証する
+- UI target artifact workflowではcurrent TRの `scope_refs[]` を1件以上必須とする。LLMはbatch `scope_index[]` とTRの意味から所属scopeを決め、blocked Scope IDをcurrent TRへ割り当てない
+- non-UI-target / migration baselineでは `scope_ids=[] / scope_refs=[]` を許可し、scope ownershipを推測生成しない
 
 artifact mode:
 
@@ -469,11 +474,12 @@ direct mode:
 - upstream AC Entityは必須にしない。存在しないMachine Entityを合成しない
 - `metadata.upstream_entities` に参照AC Entityが実在する場合だけ、そのAC Entity dependencyをTRへ追加できる。利用する実在AC Entityの `ac_id / authority_refs[]` はtop-level semantic `acceptance_criteria[]` の同一AC rowとexact一致を要求する。missing AC Entityはdirect modeではerrorにしない
 - semantic `acceptance_criteria[].authority_refs[]` からAC由来Authority dependencyを合成しない。direct modeのAuthority dependencyは従来どおりTR自身の `authority_refs[]` で実在Entityを解決した範囲だけとする
-- ACの `ac_id / authority_refs[]` はknown-ID検証とclosureのsemantic inputであり、TR Entity contentへは従来どおり各TRの `acceptance_refs[]` を保存する
+- ACの `ac_id / authority_refs[]` はknown-ID検証とclosureのsemantic inputであり、TR Entity contentへは各TRの `acceptance_refs[] / scope_refs[]` を保存する
 
-旧runtime-v1 / requirement-structure-v1からの初回cutoverは§2.7のtest-requirement-design `runtime_v1_cutover.py` がTRのstable identity / historyとsemantic draftをv2へ変換します。AC集合はv1 artifactから推測せず、v2 invocationのcallerが上記contractに従って渡します。UI target artifact経路ではspec-analysis helper返却値をそのまま使用します。
+旧runtime-v1 / requirement-structure-v1からの初回cutoverは§2.7のtest-requirement-design `runtime_v1_cutover.py` がTRのstable identity / historyとsemantic draftをv2へ変換します。AC集合はv1 artifactから推測せず、v2 invocationのcallerが上記contractに従って渡します。v1にはUI target Scope IDが無いためcutover出力は `scope_ids=[]`、各TR `scope_refs=[]` とし、UI target migration後の最初のTRD semantic updateでcurrent active TR全件へscope ownershipを付与します。
 
 空array補完だけのadapter、shared runtime hook、project固有legacy wrapperは追加しません。導入先projectが独自保存形式を持つ場合の外部変換はproject / harness側の責務です。runtime `input_fingerprint` はraw generator inputとshared runtime metadataから既存契約どおり計算します。
+
 ## 4. Acceptance Criterion Machine Entity
 
 identity:
@@ -529,7 +535,7 @@ UIOP / US / UC / Behavior / UI構造 / FIELD / RULE / FLOW / NOTIFY / INTERACT /
 
 shared runtime contractは `runtime-v2` を使用します。
 
-`requirement-structure-v2` はAC schema追加とinactive lifecycle、残り3 generator v2はinactive lifecycleが意味契約変更です。repository内の固定contract mapping / fixture metadata / portability test / runtime test / vertical integrationで各 `-v1` contractを参照している箇所をcurrent v2へ同期します。generator contract versionとshared `runtime-v2` を同一文字列へ揃えません。
+`requirement-structure-v2` はAC schema、TR scope ownership、inactive lifecycle、残り3 generator v2はdownstream `scope_refs[]` 伝播とinactive lifecycleが意味契約変更です。repository内の固定contract mapping / fixture metadata / portability test / runtime test / vertical integrationで各 `-v1` contractを参照している箇所をcurrent v2へ同期します。generator contract versionとshared `runtime-v2` を同一文字列へ揃えません。
 
 旧v1 Machine Runtime Resultをv2 current resultとして読み替えません。v1 cutover時点では既存 `active / deleted` historyをそのままv2へprojectionし、v1に存在しない `inactive` を推測生成しません。inactiveはv2通常workflowで実際に `ready → blocked` が発生した時だけ作成します。
 
@@ -540,6 +546,7 @@ top-level required fields:
 - `authorities`
 - `risks`
 - `acceptance_criteria`
+- `scope_ids`
 - `test_requirements`
 - `dispositions`
 - `previous_tr_ids`
@@ -548,40 +555,78 @@ top-level required fields:
 
 既存legacy promotion用 `legacy_tr_ids` の条件付き入力契約は維持します。
 
-`previous_tr_ids[].status` は `active / inactive / deleted` のexact enumとします。`inactive_tr_ids[]` は `downstream_state.py` が導出したprevious `active` TRだけを列挙し、`update_scope_tr_ids[]` と重複させません。`update_scope_tr_ids[]` はprevious `active / inactive` を参照でき、`deleted` は参照できません。inactive TRをLLMがsemantic identity同一としてreuseした場合は同じTR IDを `active` へ戻し、update scopeへ入れたinactive TRをreuseしない場合は `deleted` にします。update scope外のinactive TRはinactiveのまま保持します。new ID allocatorはactive / inactive / deletedをすべて使用済みIDとして扱います。
+`previous_tr_ids[]` はexact `{tr_id,status,scope_refs}` とし、`status` は `active / inactive / deleted` の3値です。`scope_refs[]` は最後にactiveだった時点のcanonical ownershipをinactive / deletedでも保持します。v1 cutover / non-UI-target baselineは `scope_refs=[]`、UI targetのscope ownership baseline成立後はactive / inactive TRで1件以上を要求します。
+
+`inactive_tr_ids[]` は `downstream_state.py` が導出したprevious `active` TRだけを列挙し、`update_scope_tr_ids[]` と重複させません。`update_scope_tr_ids[]` はprevious `active / inactive` を参照でき、`deleted` は参照できません。inactive TRをLLMがsemantic identity同一としてreuseした場合は同じTR IDを `active` へ戻し、そのstate rowの `scope_refs[]` をcurrent draft値へ更新します。update scopeへ入れたinactive TRをreuseしない場合は `deleted` にします。update scope外のinactive TRはstatusと最後の`scope_refs[]`を維持します。new ID allocatorはactive / inactive / deletedをすべて使用済みIDとして扱います。
 
 `acceptance_criteria[]` は§3.1のexact schemaを使用し、**current ACだけ**を含めます。blocked ACはknown current AC集合、Machine Entity、TRD closureの対象外です。`authority_refs[]` はtop-level `authorities[]` のknown IDへ存在検証します。ACなしworkflowでもkey省略は許可せず `[]` を明示します。
 
-各 `test_requirements[]` draftへ `acceptance_refs[]` を必須追加します。該当ACがない横断的TRは `[]` を使用します。`acceptance_refs[]` の意味対応はLLMが判断し、generatorはtop-level known AC集合への存在参照だけを検証します。
+各 `test_requirements[]` draftへ `acceptance_refs[] / scope_refs[]` を必須追加します。該当ACがない横断的TRは `acceptance_refs=[]` を使用します。`acceptance_refs[]` と `scope_refs[]` の意味対応はLLMが判断し、generatorはそれぞれtop-level known AC / Scope集合への存在参照だけを検証します。
 
-## 7. requirement_structure-v2 deterministic processing
+## 7. downstream scope ownership / requirement_structure-v2 deterministic processing
+
+### 7.1 requirement_structure-v2
 
 共通処理:
 
-1. `acceptance_criteria[]` のschema / duplicate / canonical orderを検証し、各 `authority_refs[]` をtop-level `authorities[]` へ存在検証する
+1. `acceptance_criteria[] / scope_ids[]` のschema / duplicate / canonical orderを検証し、各ACの `authority_refs[]` をtop-level `authorities[]` へ存在検証する
 2. `test_requirements[].acceptance_refs[]` とAcceptance Criterion Dispositionのrefをknown AC集合へ存在検証する
-3. closure universeへtop-level current ACを追加する
-4. TR Entity contentへ `acceptance_refs[]` を保存する
-5. AC linked + disposedの二重扱いを拒否する
-6. linkedもdisposedもされないcurrent ACをunclosedとして拒否する
-7. Authority / Product Risk / Acceptance Criteriaのclosure集合を別々に評価する。TRの `acceptance_refs[]` にACを追加しても、そのACのAuthorityをTR draftの `authority_refs[]` へ暗黙追加しない
+3. `test_requirements[].scope_refs[]` をknown `scope_ids[]` のsubsetとしてduplicateなし・canonical sortで検証する。UI target artifact workflowでは各current TRに1件以上を要求する
+4. closure universeへtop-level current ACを追加する
+5. TR Entity contentへ `acceptance_refs[] / scope_refs[]` を保存する
+6. AC linked + disposedの二重扱いを拒否する
+7. linkedもdisposedもされないcurrent ACをunclosedとして拒否する
+8. Authority / Product Risk / Acceptance Criteriaのclosure集合を別々に評価する。TRの `acceptance_refs[]` にACを追加しても、そのACのAuthorityをTR draftの `authority_refs[]` へ暗黙追加しない
+9. `tr_id_state[]` は `{tr_id,status,scope_refs}` を生成し、active / reactivatedはcurrent Entity contentのscope_refsとexact一致、inactive / deletedはlast active scope_refsを保持する
 
 artifact mode追加処理:
 
-8. validated `metadata.upstream_entities` からcurrent Acceptance Criterion Entityを抽出し、top-level `acceptance_criteria[]` と `ac_id / authority_refs[]` がexact一致することを要求する
-9. 各参照AC EntityをTR Entity `upstream_entity_dependencies[]` へ追加する
-10. 各参照ACのcurrent Authority dependencyをTR Entity dependencyへ直接追加する
-11. AC / Authority Entityが不足・不一致ならfail-closedする
+10. validated `metadata.upstream_entities` からcurrent Acceptance Criterion Entityを抽出し、top-level `acceptance_criteria[]` と `ac_id / authority_refs[]` がexact一致することを要求する
+11. 各参照AC EntityをTR Entity `upstream_entity_dependencies[]` へ追加する
+12. 各参照ACのcurrent Authority dependencyをTR Entity dependencyへ直接追加する
+13. AC / Authority Entityが不足・不一致ならfail-closedする
 
 direct mode追加処理:
 
-8. upstream AC Entityの存在を必須にしない
-9. 参照AC Entityが `metadata.upstream_entities` に実在する場合だけ、semantic `acceptance_criteria[]` の同一AC rowと `ac_id / authority_refs[]` 一致を検証したうえで、既存 `resolve_entity_dependencies(..., require_all=false)` と同じ方針でAC Entity dependencyへ追加する
-10. top-level `acceptance_criteria[].authority_refs[]` だけを根拠にAC由来Authority dependencyを生成しない。TR自身の `authority_refs[]` による既存direct dependency解決を維持する
+10. upstream AC Entityの存在を必須にしない
+11. 参照AC Entityが `metadata.upstream_entities` に実在する場合だけ、semantic `acceptance_criteria[]` の同一AC rowと `ac_id / authority_refs[]` 一致を検証したうえで、既存 `resolve_entity_dependencies(..., require_all=false)` と同じ方針でAC Entity dependencyへ追加する
+12. top-level `acceptance_criteria[].authority_refs[]` だけを根拠にAC由来Authority dependencyを生成しない。TR自身の `authority_refs[]` による既存direct dependency解決を維持する
 
 AC linkはACだけをclosureします。Authorityは従来どおりTR draftの `authority_refs[]` に明示linkされるか、Authority Dispositionへ入る必要があります。artifact modeのAC→Authority dependency展開はfreshnessのためであり、Authority closureを代理しません。direct modeではこの展開を行いません。
 
-LLMはACとTRの意味上の対応、TRの分割 / 統合を判断します。scriptは対応関係の意味妥当性を決めません。
+LLMはACとTRの意味上の対応、TRの分割 / 統合、TRのscope所属を判断します。scriptは対応関係の意味妥当性を決めません。
+
+### 7.2 condition-structure-v2
+
+- current `test_requirements[]` rowへTR Entityのcanonical `scope_refs[]` を含め、`tr_id / scope_refs[]` をcurrent TR Entity contentとexact一致させる
+- TCN draft自身にLLM入力のscope fieldは追加しない。各current TCNの `scope_refs[]` は参照する `tr_refs[]` のTR scope_refs unionを重複除去・canonical sortして決定論生成する
+- modelの `scope_refs[]` は親TCNのscope_refsとexact一致させる。derived childも親modelからではなくowner TCNのcurrent scope_refsを使う
+- TCN / model Machine Entity contentへ `scope_refs[]` を保存する
+- `previous_tcn_ids[]` は `{tcn_id,status,scope_refs}`、`previous_model_keys[]` は既存model identity field + `status / scope_refs` を持ち、inactive / deletedでもlast active scope_refsを保持する
+- `inactive_tcn_ids[] / inactive_model_keys[]` はactive previous identityだけをactive→inactiveへ遷移させる。inactive→active reuse時はcurrent upstreamから再導出したscope_refsへ更新する
+
+### 7.3 materialize-coverage-v2
+
+- current model Entity contentの `scope_refs[]` をscope ownershipの正本とし、Agent入力でCI scopeを再指定させない
+- runtime target / semantic CIとも、生成するCI Entity contentの `scope_refs[]` はowner modelのscope_refsとexact一致させる。1つのmaterialize invocation内で複数sourceをmergeする場合は、それらowner model scope_refsのunionをcanonical化する
+- `previous_ci_ids[]` / `ci_id_state[]` はexact `{ci_id,status,scope_refs}` とし、inactive / deletedでもlast active scope_refsを保持する
+- `inactive_ci_ids[]` はactive previous CIだけをactive→inactiveへ遷移させる。既存 `previous_target_id_map[].mapping_status / previous_semantic_ci_map[].mapping_status=active|inactive` は維持し、scope blockをsemantic deletionへ変換しない
+
+### 7.4 case-structure-v2
+
+- current TCN input rowへcurrent TCN Entityの `scope_refs[]` を含め、CI Entity contentの `scope_refs[]` も検証する
+- TC draft自身にLLM入力のscope fieldは追加しない。各current TCの `scope_refs[]` は参照する `tcn_refs[] / ci_refs[]` のscope_refs unionを重複除去・canonical sortして決定論生成する
+- TC Machine Entity contentへ `scope_refs[]` を保存する
+- `previous_tc_ids[] / tc_id_state[]` はexact `{tc_id,status,scope_refs}` とし、inactive / deletedでもlast active scope_refsを保持する
+- `inactive_tc_ids[]` はactive previous TCだけをactive→inactiveへ遷移させ、inactive→active reuse時はcurrent upstreamから再導出したscope_refsへ更新する
+
+### 7.5 shared runtime state / currentness
+
+- shared `runtime_contract.py` のprevious state parser / validatorはTR / TCN / model / CI / TC state rowの `scope_refs[]` を検証する。active stateは対応current Machine Entity contentのscope_refsとexact一致させ、inactive / deletedにはcurrent Entityを要求しない
+- activeだけをcurrent Machine Entity / expected Entity / carry-forward projectionへ含める。inactive / deletedのscope historyをcurrent Entityとして扱わない
+- UI target migration前のv2 baselineは `scope_refs=[]` を許可する。UI target migration後の最初のTRD→TCD→TC更新でcurrent active downstream全件をscope ownership付きに正規化し、active TR / TCN / model / CI / TCに空scope_refsが残る間はpartial readinessを開始しない
+- scope_refsはMachine Entity content fingerprintへ含まれるため、ownership変更は通常のfreshness伝播対象になる
+
 ## 8. AC disposition
 
 既存共通Disposition schemaを再利用します。新しいDisposition形式は作りません。
@@ -641,7 +686,7 @@ UI target packageからtest-requirement-designへ進むcanonical workflowはarti
 | 変更 | artifact modeの期待 |
 | --- | --- |
 | AC本文変更 | 関連TR stale |
-| current ACがblockedへ遷移しEntity集合から一時的に外れる | `_09 §12` のblocked-scope dependency closureに含まれる関連TR / downstream stable IDを`inactive`へ遷移し、current freshness対象から外す。AC stable ID自体はretireせず、再current化時にsemantic identity同一なら同じ下流IDも再利用できる |
+| current ACが属するScopeがblockedへ遷移する | `inspect.blocked_scope_ids[]` とprevious downstream Entity `content.scope_refs[]` の積集合で該当TR / TCN / model / CI / TCを`inactive`へ遷移し、current freshness対象から外す。AC stable ID自体はretireせず、再ready化時にsemantic identity同一なら同じ下流IDも再利用できる |
 | ACが意味上廃止されretired | 関連TR missing dependency / stale |
 | linked UIOP変更、AC本文同じ | AC fingerprint変更 → 関連TR stale |
 | 親Behavior変更、AC本文同じ | AC fingerprint変更 → 関連TR stale |
@@ -673,11 +718,11 @@ scope外であることを理由に、**currentのまま変更された**upstrea
 
 ### 12.2 downstream inactive state
 
-TR / TCN / model / CI / TCのstable ID stateへ次を追加します。
+TR / TCN / model / CI / TCのstable ID stateは次の3値です。
 
 - `active`: current Machine Entity / current runtimeの対象
-- `inactive`: semantic identityは履歴として存続するが、blocked scope等により一時的にcurrent対象外
-- `deleted`: semantic identityが廃止されたterminal state
+- `inactive`: semantic identityとlast active `scope_refs[]` を履歴として保持するが、一時的にcurrent対象外
+- `deleted`: semantic identityが廃止されたterminal state。last active `scope_refs[]` は履歴として保持してよいが再利用しない
 
 共通規則:
 
@@ -685,19 +730,19 @@ TR / TCN / model / CI / TCのstable ID stateへ次を追加します。
 - activeだけをcurrent Machine Entity collection / expected Entity / carry-forward projectionへ含める。inactive / deletedはcurrent Entityへ含めず、inactive自体をmissing dependency / stale issueへ変換しない
 - active / inactive / deletedの全IDをallocatorの使用済み集合へ含め、番号を再利用しない
 - deletedはterminalで、reuse / reactivationを禁止する
-- inactive IDはupdate scope外ならinactiveのまま保持する
-- inactive IDをcurrent semantic draftがreuseし、LLMがsemantic identity同一と判断した場合だけactiveへ戻す
+- inactive state rowはlast active `scope_refs[]` を保持し、update scope外ならstatus / scope_refsを変更しない
+- inactive IDをcurrent semantic draftがreuseし、LLMがsemantic identity同一と判断した場合だけactiveへ戻す。その際scope_refsはcurrent ready scopeから再確定した値へ更新する
 - inactive IDをupdate scopeへ入れてreuseしない場合はdeletedへ遷移できる。意味が変わったcurrent itemはnew IDを採番する
 - active previous IDをinactiveへ落とす集合はLLMに入力させず、§12.3のhelper出力だけを正本とする
 
 generator / state contract:
 
-- `requirement-structure-v2`: required `inactive_tr_ids[]`、`previous_tr_ids[].status=active|inactive|deleted`
-- `condition-structure-v2`: required `inactive_tcn_ids[] / inactive_model_keys[]`、`previous_tcn_ids[] / previous_model_keys[].status=active|inactive|deleted`
-- `materialize-coverage-v2`: required `inactive_ci_ids[]`、`previous_ci_ids[].status=active|inactive|deleted`。既存 `previous_target_id_map[].mapping_status / previous_semantic_ci_map[].mapping_status=active|inactive` は維持し、scope blockで一時的に外れたmappingをsemantic deletion扱いしない
-- `case-structure-v2`: required `inactive_tc_ids[]`、`previous_tc_ids[].status=active|inactive|deleted`
-- TCDの `current_structure_state.previous_ci_id_state` も3状態を受理する。TCN全体がinactiveで `materialize-coverage` をdispatchしない場合でも、qa-workflowが渡した `inactive_ci_ids[]` をroot current structure stateへ反映してCI ID履歴を失わない
-- `runtime_contract.py::_state_map()` とprevious state validationは3状態へ同期し、current Machine Entity identity集合がactive stateだけとexact一致することを検証する
+- `requirement-structure-v2`: required `inactive_tr_ids[]`、`previous_tr_ids[] / tr_id_state[] = {tr_id,status,scope_refs}`
+- `condition-structure-v2`: required `inactive_tcn_ids[] / inactive_model_keys[]`、TCN / model state rowはstatus + scope_refsを保持する
+- `materialize-coverage-v2`: required `inactive_ci_ids[]`、`previous_ci_ids[] / ci_id_state[] = {ci_id,status,scope_refs}`
+- `case-structure-v2`: required `inactive_tc_ids[]`、`previous_tc_ids[] / tc_id_state[] = {tc_id,status,scope_refs}`
+- TCDの `current_structure_state.previous_ci_id_state` も同じ3状態 + scope_refsを保持する。TCN全体がinactiveで `materialize-coverage` をdispatchしない場合でも、root current structure stateへCI historyを残す
+- shared runtime previous state validationはactive stateだけをcurrent Machine Entity identity/content.scope_refsとexact一致させる
 
 inactive IDを所有するmodel/TCN向け個別runtime unitはcurrent expected/runtime集合へcarry-forwardしません。mixed ready/inactive状態でも `artifact:*:all` root unitはready/current入力から再生成してcurrentにできます。
 
@@ -705,32 +750,59 @@ inactive IDを所有するmodel/TCN向け個別runtime unitはcurrent expected/r
 
 新規 `skills/qa-workflow/scripts/downstream_state.py` はQA workflow固有のread-only deterministic helperです。generic graph frameworkや新しいfreshness engineにはしません。
 
-inputは `blocked_scope_upstream_identities[]` と直前の `previous_machine_entities[]`、outputは `inactive_tr_ids[] / inactive_tcn_ids[] / inactive_model_keys[] / inactive_ci_ids[] / inactive_tc_ids[]` です。
+input:
+
+```json
+{
+  "blocked_scope_ids":["SCOPE-002"],
+  "previous_machine_entities":[]
+}
+```
+
+output:
+
+```json
+{
+  "inactive_tr_ids":["TR-002"],
+  "inactive_tcn_ids":["TCN-003"],
+  "inactive_model_keys":["decision-001"],
+  "inactive_ci_ids":["TCN-003-CI01"],
+  "inactive_tc_ids":["TC-004"]
+}
+```
 
 規則:
 
-1. `blocked_scope_upstream_identities[]` は§3のpackage-global helper出力をそのまま使い、Agentが追加・削除しない
+1. `blocked_scope_ids[]` はcurrent `ui_target_package.py inspect` の値をそのまま使い、Agentが追加・削除しない
 2. `previous_machine_entities[]` は直前のcurrent Entity collectionをshared `validate_entity_collection()` で検証する
-3. previous Entityの `upstream_entity_dependencies[]` だけを逆向きedgeとして使い、seed identityへ直接・間接に依存するEntityをtransitiveに収集する。名称、Scope文字列、同一PAGE、runtime dependencyからedgeを推測しない
-4. 同じEntityがready側依存も持っていても、blocked seedへのdependencyが1本以上残るprevious Entityはinactive対象とする。依存を外した別current identityとして残せるかはLLMが判断する
-5. traversal中のAuthority / Product Risk等は到達判定には使うが、helper outputへはstable lifecycleを持つTR / TCN / model / CI / TCだけを出す
+3. previous TR / TCN / model / CI / TC Entityはcanonical `content.scope_refs[]` を必須とし、duplicate / unsorted / non-stringをrejectする。UI target scope ownership baseline成立後に空scope_refsが残るactive downstream Entityは `scope_ownership_unavailable` でfail-closedする
+4. `content.scope_refs[] ∩ blocked_scope_ids[]` が非空のprevious active Entityだけをinactive対象にする。Authority共有、名称、同一PAGE、AC dependency、runtime dependencyからscope所属を推測しない
+5. `scope_refs[]` がready / blocked双方を含むcross-scope Entityもentity単位でinactiveにする。ready側だけへ自動縮退しない
 6. current packageで初めてblockedになりprevious Entityが存在しないitemはinactive IDを生成しない
-7. 既にinactive / deletedのhistory rowを新しいactive→inactive transitionとして重複出力しない
+7. helperはcurrent Entity collectionだけからactive→inactive transitionを列挙し、既にinactive / deletedのhistory rowを新規transitionとして出力しない
 8. outputはstable ID順でcanonical sort / dedupeする
 
 qa-workflowはhelper outputを各generator / TCD current structure stateへ直接接続します。
 
 ### 12.4 再ready化
 
-blocked scopeがreadyへ戻ると、そのscope由来identityは `blocked_scope_upstream_identities[]` から外れます。inactive IDを自動active化はしません。
+blocked Scopeがreadyへ戻ってもinactive IDを自動active化しません。
 
-- current upstreamからsemantic draftを再作成する
-- LLMがinactive成果物とsemantic identity同一と判断した場合は既存IDをreuseし、generatorがinactive → activeを適用する
+- current ready `scope_index[]` とcurrent upstreamからsemantic draftを再作成する
+- LLMはinactive ID stateに保持されたlast active scope ownershipと過去成果物の意味を参照し、semantic identity同一かを判断する
+- semantic identity同一なら既存IDをreuseし、generatorがinactive → activeを適用する。current `scope_refs[]` はready Scope集合のsubsetとして再確定する
 - semantic identityが変わった場合は旧inactive IDをdeletedへ遷移し、new IDを採番する
-- まだblockedな別scope由来inactive IDはupdate scopeへ入れずinactiveのまま保持する
-- current upstreamが不足した状態でinactive IDをactiveへ戻そうとした場合は通常のreference / dependency validationでfail-closedする
+- まだblockedなScopeだけに属するinactive IDはupdate scopeへ入れずinactiveのまま保持する
+- cross-scope inactive Entityをready側だけへ縮退して同じIDをreuseするか、旧IDをdeletedにして分割するかはLLMのsemantic identity判断とする。helperは決めない
+- current upstreamが不足した状態、またはcurrent `scope_refs[]` がknown ready Scope集合へ解決しない状態でinactive IDをactiveへ戻そうとした場合はfail-closedする
 
-この経路により、SCOPE-A/Bが一度readyになった後Bだけblockedになっても、B由来の旧downstream Entityはcurrent freshness判定から外れ、Aのready-scope executionを不要に停止しません。package全体のstatusがpartial / blockedかどうかはspec-analysisの `scope_readiness[]` が引き続き正本です。
+この経路により、SCOPE-A/Bが一度readyになった後Bだけblockedになっても、Bをscope_refsに持つ旧downstream Entityだけがcurrent freshness判定から外れ、A専用Entityのready-scope executionを不要に停止しません。AuthorityをA/Bで共有していてもscope ownershipは変わりません。package全体のstatusがpartial / blockedかどうかはspec-analysisの `scope_readiness[]` が引き続き正本です。
+
+### 12.5 UI target migration後のscope ownership baseline
+
+v1 cutover / non-UI-target v2 baselineではdownstream `scope_refs=[]` を許可しますが、この状態でready/blocked partial progressionは開始しません。
+
+UI target package migration後の最初のsemantic updateでは、既存active TRを全件update scopeへ入れてLLMがcurrent ready `scope_index[]` からTR `scope_refs[]` を付与し、TCD / TCがscope_refsを決定論伝播してcurrent TR / TCN / model / CI / TCすべてのownershipを確立します。coverage-analysis / qa-workflowまで再生成してこのbaselineがcurrentになった後だけ、`downstream_state.py` によるpartial readinessを有効にします。
 
 ## 13. qa-workflow / coverage-analysis integration
 
@@ -738,7 +810,7 @@ shared `_expected_entities()` がspec-analysis normalized inputからAuthority +
 
 qa-workflow / coverage-analysisはcurrent Entity collectionへAC Entityが存在してもextra entity扱いしません。
 
-coverage-analysisの既存traceability graph node typeへACを追加しません。AC→TRのmachine traceabilityはTR Entity dependencyとTRD closureで保証し、Authority / Risk / TR / TCN / CI / TCの既存coverage graphを不要に拡張しません。inactive TR / TCN / CI / TCはcurrent graph node / current runtime unitへ入れず、blocked scopeの再開情報はspec-analysisのscope readinessとdownstream ID historyで保持します。
+coverage-analysisの既存traceability graph node typeへACを追加しません。AC→TRのmachine traceabilityはTR Entity dependencyとTRD closureで保証し、Authority / Risk / TR / TCN / CI / TCの既存coverage graphを不要に拡張しません。inactive TR / TCN / CI / TCはcurrent graph node / current runtime unitへ入れず、blocked scopeの再開情報はspec-analysisのscope readinessとdownstream ID stateのlast active `scope_refs[]` で保持します。
 
 ## 14. repository tests
 
@@ -755,7 +827,7 @@ coverage-analysisの既存traceability graph node typeへACを追加しません
 - qa-workflow expected / actual Entity exact match
 - coverage-analysis current Entity parse compatibility
 - requirement-structure-v2 valid / invalid schema
-- requirement-structure-v2がtop-level `acceptance_criteria[]` をraw input必須とし、各rowの `ac_id / authority_refs[]` と各TRの `acceptance_refs[]` を検証すること。ACなしは `acceptance_criteria=[] / acceptance_refs=[]` を明示し、default補完adapter / shared runtime hookを追加しない
+- requirement-structure-v2がtop-level `acceptance_criteria[] / scope_ids[]` をraw input必須とし、各ACの `ac_id / authority_refs[]` と各TRの `acceptance_refs[] / scope_refs[]` を検証すること。ACなしは `acceptance_criteria=[] / acceptance_refs=[]`、non-UI-target baselineは `scope_ids=[] / scope_refs=[]` を明示し、default補完adapter / shared runtime hookを追加しない
 - artifact modeではsemantic `acceptance_criteria[]` とupstream Acceptance Criterion Entity集合をexact一致させ、AC Entity + AC Authority dependencyをTR freshnessへ追加する回帰
 - direct modeではupstream AC Entityなしでもsemantic `acceptance_criteria[]` をknown ID集合として `acceptance_refs[]` / closureを検証でき、存在しないAC / AC由来Authority Machine Entity dependencyを合成しない回帰。AC Entityなしのdirect modeではAC本文 / 親chain変更のcross-run freshnessを保証しないことも契約化する。実在AC Entityをdependencyへ使う場合はsemantic rowとの `ac_id / authority_refs[]` 一致を要求し、そのEntity dependencyについて既存freshnessを利用できること
 - AC-001をTRへlinkしても、そのACが参照するSPEC-001をTR authority_refs / Authority Dispositionで別途closeしない場合はSPEC-001 unclosedとなる
@@ -774,8 +846,10 @@ coverage-analysisの既存traceability graph node typeへACを追加しません
 - scopeの対象機能 / 領域またはscope Authority変更でAC fingerprint / dependencyが変わる回帰
 - AC本文 / 親chain不変のままAuthority fingerprintだけ変更し、spec-analysisをcurrentへ再生成した後も未再実行TRが直接Authority dependencyによりstaleになる回帰
 - artifact modeのpartial rerun stale carry-forward。currentのまま変更されたAC依存TRは従来どおりstaleでblockingになる
-- SCOPE-A/B ready → 両scopeのTR / TCN / model / CI / TC生成 → Bだけblocked → `blocked_scope_upstream_identities[]` + previous Entity graphからB依存IDだけinactive → Aだけのcurrent Entity/runtimeがfreshに完遂 → B再readyでsemantic identity同一なら同じIDをactiveへ復帰、というintegration regression
-- ready / blocked双方から参照される共有AuthorityだけではA側Entityをinactiveにしない回帰と、A/B双方へ依存するdownstream Entityは保守的にinactiveへ落とす回帰
+- SCOPE-A/B ready → `scope_index[]` からTR scope_refsをLLMが明示 → TCN / model / CI / TCへ決定論伝播 → Bだけblocked → `blocked_scope_ids[]` とprevious Entity `content.scope_refs[]` の積集合からB所有IDだけinactive → A専用current Entity/runtimeがfreshに完遂 → B再readyでsemantic identity同一なら同じIDをactiveへ復帰、というintegration regression
+- AuthorityをA/Bで共有してもscope_refsがAだけのEntityはinactiveにしない回帰と、scope_refsがA/B双方のcross-scope Entityは保守的にinactiveへ落とす回帰
+- v1 cutover / non-UI-target baselineの `scope_refs=[]` からUI target migration後にactive downstream全件をscope ownership付きへ正規化し、baseline成立前のpartial readinessをfail-closedする回帰
+- inactive state rowがlast active `scope_refs[]` を保持し、inactive期間を挟んでもre-ready時のID reuse候補とblocked scope整合を失わない回帰
 - inactive IDはcurrent Entity / expected Entity / carry-forward runtimeへ含めず、inactive自体でqa-workflow / coverage-analysisをblockingしない。別のcurrent stale issueは従来どおりblockingする回帰
 - inactive成果物を意味上廃止した場合はdeletedへ遷移し、そのIDを後続new allocation / reuseへ使わない回帰
 - shared runtime-v1 / entity-state-v1 evidenceをruntime-v2 / entity-state-v2 current resultとして扱わない
@@ -794,13 +868,13 @@ coverage-analysisの既存traceability graph node typeへACを追加しません
 
 - PR #14後の9 runtime_contract.pyが同一内容でacceptance_criterionを扱える
 - 9コピーがruntime-v2 / entity-state-v2へ同期され、`requirement-structure-v2 / condition-structure-v2 / materialize-coverage-v2 / case-structure-v2` が明示される。TRD / TCD / TC固有cutover projectionはshared runtimeではなく各Skill-local helperにある
-- helperからpackage-global spec-analysis evidence + ready / blocked scope ID index + `blocked_scope_upstream_identities[]` と、current ready scope全件のcanonical batch handoffを別responseで決定論生成できる。package-global responseへscope別full payloadを複製しない
-- qa-workflowが `inspect.ready_scope_ids[]` 全件をbatch inputにし、Authority / current AC / Machine Entity / expected identityをhelper側でunion / dedupeする。blocked scopeを含めず、Agentがmerge / filterしない
+- helperからpackage-global spec-analysis evidence + ready / blocked scope ID indexと、current ready scope全件のcanonical batch handoff + compact `scope_index[]` を別responseで決定論生成できる。package-global responseへscope別full payloadを複製しない
+- qa-workflowが `inspect.ready_scope_ids[]` 全件をbatch inputにし、Authority / current AC / Machine Entity / expected identityをhelper側でunion / dedupeする。blocked scopeを含めず、Agentがmerge / filterしない。TR scope_refsはLLMがscope_indexから明示し、TCN / model / CI / TCはgeneratorが上流参照から決定論伝播する
 - batch handoffから構成する `artifact:analysis_entities:all` / `artifact:requirement_structure:all` のcanonical stdin全体を16 MiB境界で検証し、2 MiB超〜16 MiB以下を1回のaggregate root runtimeで処理できる。16 MiB超過時は個別scope run / subset run / silent truncate / auto splitで回避しない。その他の通常generatorは2 MiB上限を維持する
 - test-requirement-designまで進むworkflowではcurrent ACがTRまたはDispositionへ完全に閉じる。仕様理解packageだけの要求ではこのclosureを要求しない
 - UI target artifact workflowでは、AC / linked UIOP / scope / 明示linked FIELD-RULE-FLOW-NOTIFY-INTERACT / direct structure + ancestor / linked INF / 親Behavior-UC-US / Authority変更が必要なTR freshnessへ伝播し、無関係package row変更は伝播しない
 - direct modeはknown AC ID / closureを保証し、AC Entity dependencyが無い場合のAC semantic cross-run freshnessを保証対象にしない
 - 無関係TRを不必要にstale化しない
-- ready→blockedで影響するTR / TCN / model / CI / TCはinactiveとしてcurrent Entity/runtimeから外れ、無関係ready scopeをstale carry-forwardで停止させない。再ready時にsemantic identity同一なら同じIDへactive復帰できる
+- ready→blockedでは `blocked_scope_ids[]` とprevious Entity `scope_refs[]` が交差するTR / TCN / model / CI / TCだけをinactiveとしてcurrent Entity/runtimeから外れ、Authority共有だけでは無関係ready scopeを停止させない。inactive stateはlast active scope_refsを保持し、再ready時にsemantic identity同一なら同じIDへactive復帰できる
 - artifact modeのpartial rerunでscope外TRがcurrentのままchanged ACを参照したままcurrentにならず、blockedによる一時非currentと通常staleを混同しない
 - existing coverage graphを目的なく拡張していない
