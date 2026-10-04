@@ -247,7 +247,7 @@ scope単位のsemantic contractは `_08` を正本とします。structured tabl
 #### Behavior一覧
 
 | Behavior ID | UC ID | 関連操作ID | 結果分類 | 振る舞い | Postcondition / Result | 関連仕様項目ID | 関連構造ID | 状態 | 関連UNKNOWN ID |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
 #### Use Case振る舞い完全性
 
