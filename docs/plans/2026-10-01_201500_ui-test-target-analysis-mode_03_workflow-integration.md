@@ -142,7 +142,7 @@ UI target canonical downstreamではscope ownershipを次へ固定します。
 4. helperは `inactive_tr_ids[] / inactive_tcn_ids[] / inactive_model_keys[] / inactive_ci_ids[] / inactive_tc_ids[]` に加え、各root runtimeへ保存するmachine-owned `inactive_tr_history[] / inactive_tcn_history[] / inactive_model_history[] / inactive_materialize_history[] / inactive_tc_history[]` をcanonical sortして返す。Agent / LLMはID集合やhistoryを手作業でfilter / 復元しない
 5. TRD / TCD / TCのv2 generatorとTCD current structure stateは該当IDを `active → inactive` へ遷移させ、inactive IDをcurrent Machine Entity / current runtime unit / carry-forward projectionへ含めない。同時に各root payloadへlast-active Entity historyを保存し、TCDはlast successful materializeのCI ID / target mapping / semantic mapping / expected-result-root stateも履歴化する
 6. ready scope全件は従来どおり1 batchでtest-analysis → TRD → TCD → TC → coverage-analysisへ進める。inactive履歴そのものをfreshness blocking issueにしない。package全体の `partial / blocked` はspec-analysisの `scope_readiness[]` で別に保持する
-7. blocked scopeが再びreadyになった場合、inactive IDは再利用候補として保持する。LLMがsemantic identity同一と判断したTR等は既存IDをreuseして `active` へ戻す。意味が変わった場合は旧inactive IDを `deleted` にしてnew IDを発行する
+7. blocked scopeが再びreadyになった場合、inactive IDとmachine-owned last-active historyを再利用候補として保持する。LLMはTR / TCN / model / TCのhistoryをsemantic identity比較に使い、同一なら既存IDをreuseして `active` へ戻す。CIは`inactive_materialize_history[]`からprevious mapping inputを決定論的に復元して同じIDをreuseする。意味が変わった場合は旧inactive IDを `deleted` にしてnew IDを発行する
 8. `deleted` はterminalであり、block解除を理由に復帰させない
 
 `scope_refs[]` がready / blocked双方を含むcross-scope Entityは、1つのcurrent Entityをscopeごとに部分利用できないため保守的にinactive対象とします。ready側だけで成立する別identityへ分割する必要があるかはLLMが意味判断し、helperが旧Entityの内容やscope_refsを自動縮退させません。
