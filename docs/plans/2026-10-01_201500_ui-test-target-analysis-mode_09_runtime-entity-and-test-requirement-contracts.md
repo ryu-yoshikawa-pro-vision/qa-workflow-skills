@@ -579,6 +579,7 @@ top-level required fields:
 7. linkedもdisposedもされないcurrent ACをunclosedとして拒否する
 8. Authority / Product Risk / Acceptance Criteriaのclosure集合を別々に評価する。TRの `acceptance_refs[]` にACを追加しても、そのACのAuthorityをTR draftの `authority_refs[]` へ暗黙追加しない
 9. `tr_id_state[]` は `{tr_id,status,scope_refs}` を生成し、active / reactivatedはcurrent Entity contentのscope_refsとexact一致、inactive / deletedはlast active scope_refsを保持する
+10. `inactive_tr_history[]` はinactive TRのlast-active Machine Entity snapshotをidentity順で保持するmachine-owned historyとする。active→inactive時はprevious current TR Entityを追加し、inactive継続時はcanonical bytesを維持し、inactive→active reuseまたはdeleted遷移時は該当snapshotを除去する。history Entityはcurrent Machine Entity / expected Entity / freshness対象へ入れない
 
 artifact mode追加処理:
 
@@ -604,6 +605,7 @@ LLMはACとTRの意味上の対応、TRの分割 / 統合、TRのscope所属を�
 - modelの `scope_refs[]` は親TCNのscope_refsとexact一致させる。derived childも親modelからではなくowner TCNのcurrent scope_refsを使う
 - TCN / model Machine Entity contentへ `scope_refs[]` を保存する
 - `previous_tcn_ids[]` は `{tcn_id,status,scope_refs}`、`previous_model_keys[]` は既存model identity field + `status / scope_refs` を持ち、inactive / deletedでもlast active scope_refsを保持する
+- `inactive_tcn_history[] / inactive_model_history[]` はinactive TCN / modelのlast-active Machine Entity snapshotをmachine-owned historyとして保持する。active→inactive時はprevious current Entityを追加し、inactive継続は保持、reuse / deleted時は該当snapshotを除去する
 - `inactive_tcn_ids[] / inactive_model_keys[]` はactive previous identityだけをactive→inactiveへ遷移させる。inactive→active reuse時はcurrent upstreamから再導出したscope_refsへ更新する
 
 ### 7.3 materialize-coverage-v2
@@ -611,6 +613,10 @@ LLMはACとTRの意味上の対応、TRの分割 / 統合、TRのscope所属を�
 - current model Entity contentの `scope_refs[]` をscope ownershipの正本とし、Agent入力でCI scopeを再指定させない
 - runtime target / semantic CIとも、生成するCI Entity contentの `scope_refs[]` はowner modelのscope_refsとexact一致させる。1つのmaterialize invocation内で複数sourceをmergeする場合は、それらowner model scope_refsのunionをcanonical化する
 - `previous_ci_ids[]` / `ci_id_state[]` はexact `{ci_id,status,scope_refs}` とし、inactive / deletedでもlast active scope_refsを保持する
+- `condition-structure-v2` root payloadへmachine-owned `inactive_materialize_history[]` を追加する。各entryは `tcn_id / ci_entities[] / target_mapping_state[] / semantic_ci_mapping_state[] / expected_result_root_state[]` のexact schemaを持ち、`tcn_id`順でcanonical sortする。`ci_entities[]` はlast-active CI Machine Entity snapshot、残り3配列はlast successful `materialize-coverage-v2` payloadの同名stateだけを保存する
+- active→inactive TCNでprevious current CIまたはmapping stateが存在する場合、`downstream_state.py` はverified previous TCD structure stateから該当materialize resultを読み、`inactive_materialize_history[]` を更新する。raw Markdown / stale runtime resultから復元しない。対応resultが必要なのに欠落・invalidなら `inactive_materialize_history_missing` でfail-closedする
+- reactivated TCNの`materialize-coverage-v2`はcurrent previous materialize resultが無い場合だけmatching history entryを使い、`previous_target_id_map / previous_semantic_ci_map / previous_expected_result_roots / previous_ci_ids` を決定論的に再構成する。historyはcurrent runtime evidenceではなくID mapping seedだけで、generation / freshness / support statusをcarry-forwardしない
+- history entryは同じTCNが再度active→inactiveになった時に最新successful materialize stateで置換する。active中に古いhistoryが残っていてもcurrent materialize resultを常に優先し、terminal deleted TCNではentryを除去する
 - `inactive_ci_ids[]` はactive previous CIだけをactive→inactiveへ遷移させる。既存 `previous_target_id_map[].mapping_status / previous_semantic_ci_map[].mapping_status=active|inactive` は維持し、scope blockをsemantic deletionへ変換しない
 
 ### 7.4 case-structure-v2
@@ -619,12 +625,13 @@ LLMはACとTRの意味上の対応、TRの分割 / 統合、TRのscope所属を�
 - TC draft自身にLLM入力のscope fieldは追加しない。各current TCの `scope_refs[]` は参照する `tcn_refs[] / ci_refs[]` のscope_refs unionを重複除去・canonical sortして決定論生成する
 - TC Machine Entity contentへ `scope_refs[]` を保存する
 - `previous_tc_ids[] / tc_id_state[]` はexact `{tc_id,status,scope_refs}` とし、inactive / deletedでもlast active scope_refsを保持する
+- `inactive_tc_history[]` はinactive TCのlast-active Machine Entity snapshotをmachine-owned historyとして保持する。active→inactive時はprevious current TC Entityを追加し、inactive継続は保持、reuse / deleted時は該当snapshotを除去する
 - `inactive_tc_ids[]` はactive previous TCだけをactive→inactiveへ遷移させ、inactive→active reuse時はcurrent upstreamから再導出したscope_refsへ更新する
 
 ### 7.5 shared runtime state / currentness
 
 - shared `runtime_contract.py` のprevious state parser / validatorはTR / TCN / model / CI / TC state rowの `scope_refs[]` を検証する。active stateは対応current Machine Entity contentのscope_refsとexact一致させ、inactive / deletedにはcurrent Entityを要求しない
-- activeだけをcurrent Machine Entity / expected Entity / carry-forward projectionへ含める。inactive / deletedのscope historyをcurrent Entityとして扱わない
+- activeだけをcurrent Machine Entity / expected Entity / carry-forward projectionへ含める。`inactive_*_history[]` / `inactive_materialize_history[]` はlast-active履歴としてschema・stored fingerprintだけを検証し、current Entity / current runtime / expected Entity / freshnessへ投入しない
 - UI target migration前のv2 baselineは `scope_refs=[]` を許可する。UI target migration後の最初のTRD→TCD→TC更新でcurrent active downstream全件をscope ownership付きに正規化し、active TR / TCN / model / CI / TCに空scope_refsが残る間はpartial readinessを開始しない
 - scope_refsはMachine Entity content fingerprintへ含まれるため、ownership変更は通常のfreshness伝播対象になる
 
@@ -738,11 +745,11 @@ TR / TCN / model / CI / TCのstable ID stateは次の3値です。
 
 generator / state contract:
 
-- `requirement-structure-v2`: required `inactive_tr_ids[]`、`previous_tr_ids[] / tr_id_state[] = {tr_id,status,scope_refs}`
-- `condition-structure-v2`: required `inactive_tcn_ids[] / inactive_model_keys[]`、TCN / model state rowはstatus + scope_refsを保持する
-- `materialize-coverage-v2`: required `inactive_ci_ids[]`、`previous_ci_ids[] / ci_id_state[] = {ci_id,status,scope_refs}`
-- `case-structure-v2`: required `inactive_tc_ids[]`、`previous_tc_ids[] / tc_id_state[] = {tc_id,status,scope_refs}`
-- TCDの `current_structure_state.previous_ci_id_state` も同じ3状態 + scope_refsを保持する。TCN全体がinactiveで `materialize-coverage` をdispatchしない場合でも、root current structure stateへCI historyを残す
+- `requirement-structure-v2`: required `inactive_tr_ids[] / inactive_tr_history[]`、`previous_tr_ids[] / tr_id_state[] = {tr_id,status,scope_refs}`
+- `condition-structure-v2`: required `inactive_tcn_ids[] / inactive_model_keys[] / inactive_tcn_history[] / inactive_model_history[] / inactive_materialize_history[]`、TCN / model state rowはstatus + scope_refsを保持する
+- `materialize-coverage-v2`: required `inactive_ci_ids[]`、`previous_ci_ids[] / ci_id_state[] = {ci_id,status,scope_refs}`。reactivation時は§7.3のhistoryからprevious mapping inputを再構成できる
+- `case-structure-v2`: required `inactive_tc_ids[] / inactive_tc_history[]`、`previous_tc_ids[] / tc_id_state[] = {tc_id,status,scope_refs}`
+- TCDの `current_structure_state.previous_ci_id_state` も同じ3状態 + scope_refsを保持する。TCN全体がinactiveで `materialize-coverage` をdispatchしない場合でも、condition-structure rootの `inactive_materialize_history[]` とCI stateでmapping / ID履歴を残す
 - shared runtime previous state validationはactive stateだけをcurrent Machine Entity identity/content.scope_refsとexact一致させる
 
 inactive IDを所有するmodel/TCN向け個別runtime unitはcurrent expected/runtime集合へcarry-forwardしません。mixed ready/inactive状態でも `artifact:*:all` root unitはready/current入力から再生成してcurrentにできます。
@@ -756,7 +763,12 @@ input:
 ```json
 {
   "blocked_scope_ids":["SCOPE-002"],
-  "previous_machine_entities":[]
+  "previous_machine_entities":[],
+  "previous_structure_states":{
+    "test-requirement-design":{},
+    "test-condition-design":{},
+    "test-case-design":{}
+  }
 }
 ```
 
@@ -768,7 +780,12 @@ output:
   "inactive_tcn_ids":["TCN-003"],
   "inactive_model_keys":["decision-001"],
   "inactive_ci_ids":["TCN-003-CI01"],
-  "inactive_tc_ids":["TC-004"]
+  "inactive_tc_ids":["TC-004"],
+  "inactive_tr_history":[],
+  "inactive_tcn_history":[],
+  "inactive_model_history":[],
+  "inactive_materialize_history":[],
+  "inactive_tc_history":[]
 }
 ```
 
@@ -776,12 +793,14 @@ output:
 
 1. `blocked_scope_ids[]` はcurrent `ui_target_package.py inspect` の値をそのまま使い、Agentが追加・削除しない
 2. `previous_machine_entities[]` は直前のcurrent Entity collectionをshared `validate_entity_collection()` で検証する
-3. previous TR / TCN / model / CI / TC Entityはcanonical `content.scope_refs[]` を必須とし、duplicate / unsorted / non-stringをrejectする。UI target scope ownership baseline成立後に空scope_refsが残るactive downstream Entityは `scope_ownership_unavailable` でfail-closedする
-4. `content.scope_refs[] ∩ blocked_scope_ids[]` が非空のprevious active Entityだけをinactive対象にする。Authority共有、名称、同一PAGE、AC dependency、runtime dependencyからscope所属を推測しない
-5. `scope_refs[]` がready / blocked双方を含むcross-scope Entityもentity単位でinactiveにする。ready側だけへ自動縮退しない
-6. current packageで初めてblockedになりprevious Entityが存在しないitemはinactive IDを生成しない
-7. helperはcurrent Entity collectionだけからactive→inactive transitionを列挙し、既にinactive / deletedのhistory rowを新規transitionとして出力しない
-8. outputはstable ID順でcanonical sort / dedupeする
+3. `previous_structure_states` は各Skillのcurrent `verify_runtime_evidence.current_structure_state` だけを受け、raw artifactや未検証runtime blockを受けない。root runtime payloadに保存済みの `inactive_*_history[]` / `inactive_materialize_history[]` をここから取得する
+4. previous TR / TCN / model / CI / TC Entityはcanonical `content.scope_refs[]` を必須とし、duplicate / unsorted / non-stringをrejectする。UI target scope ownership baseline成立後に空scope_refsが残るactive downstream Entityは `scope_ownership_unavailable` でfail-closedする
+5. `content.scope_refs[] ∩ blocked_scope_ids[]` が非空のprevious active Entityだけをinactive対象にする。Authority共有、名称、同一PAGE、AC dependency、runtime dependencyからscope所属を推測しない
+6. 新たにinactiveになるTR / TCN / model / TCはprevious current Entity snapshotを対応historyへ追加する。既存inactive historyはidentityでmergeし、内容不一致をsilent overwriteしない
+7. 新たにinactiveになるTCNがprevious current CI / target mapping / semantic mappingを持つ場合、verified TCD `artifact:materialize_coverage:<TCN-ID>` resultから§7.3のhistory entryを生成する。必要なresultが無い場合はfail-closedする
+8. `scope_refs[]` がready / blocked双方を含むcross-scope Entityもentity単位でinactiveにする。ready側だけへ自動縮退しない
+9. current packageで初めてblockedになりprevious Entityが存在しないitemはinactive IDを生成しない
+10. outputはstable ID / history identity順でcanonical sort / dedupeする
 
 qa-workflowはhelper outputを各generator / TCD current structure stateへ直接接続します。
 
@@ -790,7 +809,7 @@ qa-workflowはhelper outputを各generator / TCD current structure stateへ直�
 blocked Scopeがreadyへ戻ってもinactive IDを自動active化しません。
 
 - current ready `scope_index[]` とcurrent upstreamからsemantic draftを再作成する
-- LLMはinactive ID stateに保持されたlast active scope ownershipと過去成果物の意味を参照し、semantic identity同一かを判断する
+- LLMはinactive ID stateのlast active scope ownershipと `inactive_tr_history[] / inactive_tcn_history[] / inactive_model_history[] / inactive_tc_history[]` のlast-active contentを参照し、semantic identity同一かを判断する。historyをcurrent evidenceとして扱わない
 - semantic identity同一なら既存IDをreuseし、generatorがinactive → activeを適用する。current `scope_refs[]` はready Scope集合のsubsetとして再確定する
 - semantic identityが変わった場合は旧inactive IDをdeletedへ遷移し、new IDを採番する
 - まだblockedなScopeだけに属するinactive IDはupdate scopeへ入れずinactiveのまま保持する
@@ -852,7 +871,9 @@ coverage-analysisの既存traceability graph node typeへACを追加しません
 - SCOPE-A/B ready → `scope_index[]` からTR scope_refsをLLMが明示 → TCN / model / CI / TCへ決定論伝播 → Bだけblocked → `blocked_scope_ids[]` とprevious Entity `content.scope_refs[]` の積集合からB所有IDだけinactive → A専用current Entity/runtimeがfreshに完遂 → B再readyでsemantic identity同一なら同じIDをactiveへ復帰、というintegration regression
 - AuthorityをA/Bで共有してもscope_refsがAだけのEntityはinactiveにしない回帰と、scope_refsがA/B双方のcross-scope Entityは保守的にinactiveへ落とす回帰
 - v1 cutover / non-UI-target baselineの `scope_refs=[]` からUI target migrationする際、既存active downstreamがある場合は全scope readyでのみownership baselineを作成し、blocked scopeが残る間は `scope_ownership_baseline_required` でfail-closedする回帰。downstream未作成の新規workflowではpartial readinessを許可する
-- inactive state rowがlast active `scope_refs[]` を保持し、inactive期間を挟んでもre-ready時のID reuse候補とblocked scope整合を失わない回帰
+- inactive state rowがlast active `scope_refs[]` を保持し、`inactive_*_history[]` がlast-active Entity contentを保持するため、inactive期間を挟んでもre-ready時のsemantic ID reuse候補を失わない回帰
+- TCN active→inactiveでprevious current `materialize-coverage` の `target_mapping_state / semantic_ci_mapping_state / expected_result_root_state` とCI Entityを `inactive_materialize_history[]` へ保存し、current runtime evidenceからは除外する回帰
+- inactive TCN再ready時、current previous materialize resultが無くてもhistoryからprevious mapping inputを再構成し、同一target / semantic identityへ同じCI IDをreuseできる回帰。history欠落・改変は `inactive_materialize_history_missing` でblocked
 - inactive IDはcurrent Entity / expected Entity / carry-forward runtimeへ含めず、inactive自体でqa-workflow / coverage-analysisをblockingしない。別のcurrent stale issueは従来どおりblockingする回帰
 - inactive成果物を意味上廃止した場合はdeletedへ遷移し、そのIDを後続new allocation / reuseへ使わない回帰
 - shared runtime-v1 / entity-state-v1 evidenceをruntime-v2 / entity-state-v2 current resultとして扱わない
@@ -878,6 +899,6 @@ coverage-analysisの既存traceability graph node typeへACを追加しません
 - UI target artifact workflowでは、AC / linked UIOP / scope / 明示linked FIELD-RULE-FLOW-NOTIFY-INTERACT / direct structure + ancestor / linked INF / 親Behavior-UC-US / Authority変更が必要なTR freshnessへ伝播し、無関係package row変更は伝播しない
 - direct modeはknown AC ID / closureを保証し、AC Entity dependencyが無い場合のAC semantic cross-run freshnessを保証対象にしない
 - 無関係TRを不必要にstale化しない
-- ready→blockedでは `blocked_scope_ids[]` とprevious Entity `scope_refs[]` が交差するTR / TCN / model / CI / TCだけをinactiveとしてcurrent Entity/runtimeから外れ、Authority共有だけでは無関係ready scopeを停止させない。inactive stateはlast active scope_refsを保持し、再ready時にsemantic identity同一なら同じIDへactive復帰できる。既存unscoped downstreamのUI target migrationでは全scope readyのone-time ownership baselineを要求し、baseline前にscope所属を推測しない
+- ready→blockedでは `blocked_scope_ids[]` とprevious Entity `scope_refs[]` が交差するTR / TCN / model / CI / TCだけをinactiveとしてcurrent Entity/runtimeから外れ、Authority共有だけでは無関係ready scopeを停止させない。inactive state + `inactive_*_history[]` はlast-active ownership / semantic contentを保持し、TCDは `inactive_materialize_history[]` でCI mappingも保持するため、再ready時にsemantic identity同一なら同じstable IDへ復帰できる。既存unscoped downstreamのUI target migrationでは全scope readyのone-time ownership baselineを要求し、baseline前にscope所属を推測しない
 - artifact modeのpartial rerunでscope外TRがcurrentのままchanged ACを参照したままcurrentにならず、blockedによる一時非currentと通常staleを混同しない
 - existing coverage graphを目的なく拡張していない
