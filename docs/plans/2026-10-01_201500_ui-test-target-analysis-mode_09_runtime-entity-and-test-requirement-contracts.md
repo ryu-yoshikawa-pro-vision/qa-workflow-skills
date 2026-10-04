@@ -243,30 +243,122 @@ expected unitは `artifact:case_structure:all` exactly 1件です。
 - active TCを `update_scope_tc_ids[]` へ全件入れてfull rebuild
 - missing / extra / duplicate mappingをblockedにする
 
+### 2.8 v1保存Runtime Inputのread-only検証
+
+TRD / TCD / TCの`runtime_v1_cutover.py`はstable identity / historyをv2 inputへprojectionするためのcutover helperです。これとは別に、runtime version変更だけを理由にsemantic再分析やlive再観測を強制しないため、保存済みv1 Runtime Inputを再利用する次の3 Skillだけにread-only readerを追加します。
+
+- `skills/test-analysis/scripts/runtime_v1_input_reader.py`
+- `skills/usability-inspection/scripts/runtime_v1_input_reader.py`
+- `skills/wcag-conformance-evaluation/scripts/runtime_v1_input_reader.py`
+
+generic migration module、shared `runtime_contract.py` のv1 compatibility branch、qa-workflow wrapperは追加しません。3 readerはSkill package単体で動作し、v1 evidenceの**integrity検証とsemantic input抽出だけ**を担当します。currentness判定、stable identity migration、v2 metadata生成は担当しません。
+
+#### reader CLI contract
+
+stdinは1 JSON object、stdoutは1 JSON object + LFです。
+
+```json
+{
+  "operation":"extract-validated-inputs",
+  "artifact_markdown":"<runtime-v1 artifact>"
+}
+```
+
+外側transport / JSON safetyは§2.7のcutover helperと同じくaggregate 16 MiB、top-level `artifact_markdown`だけ64 KiB string上限免除とします。artifactから抽出した各Machine Runtime Input / Result JSON blockは旧v1の2 MiB / 64 KiB / depth等の安全制約で検証します。
+
+成功response:
+
+```json
+{
+  "valid":true,
+  "source_runtime_contract_version":"runtime-v1",
+  "normalized_runtime_inputs":[
+    {
+      "generator":"...",
+      "runtime_unit_key":"artifact:...",
+      "model_key":null,
+      "normalized_input":{}
+    }
+  ],
+  "issues":[]
+}
+```
+
+handled failureはexit 0 + `valid=false / issues[]`、unexpected internal errorだけexit 1とします。
+
+#### frozen v1 integrity規則
+
+PR #14 merge後に#16をlatest mainへrebaseしたStep 0で、pre-cutover baselineの対象Skill `runtime_contract.py` と対象generatorのimplementation fingerprintを実測してreaderの固定期待値 / fixtureへ同期します。これは値の再計測であり、新しい設計判断にはしません。
+
+readerは少なくとも次をfrozen v1規則で検証します。
+
+- Machine Runtime Input / Resultのidentity、missing / extra / duplicate / incomplete pair
+- `envelope_version`、`runtime_contract_version=runtime-v1`、generator contract、runtime unit / model identity
+- input / model / generation fingerprintの再計算一致
+- upstream Entity / runtime dependency schema、duplicate、保存fingerprint
+- pre-cutover baselineのruntime / generator implementation fingerprint
+- runtime resultの固定schemaとInput metadataとのpair整合
+- source artifact中のv1 Machine Entityをv2 current Entityとして受理しない
+
+reader成功は「保存v1 evidenceが当時のbaseline contractに対して改変されていない」ことだけを表します。**currentness=trueを意味しません。** v1 runtime metadata、generation fingerprint、dependency、Machine Entityはresponseへcarry-forwardせず、current v2 dispatchが新規生成します。
+
+#### test-analysis
+
+`test-analysis/runtime_v1_input_reader.py` はcurrent canonical test-analysis artifact内のv1 pairを検証し、LLM所有のsemantic fieldと各runtime unitの保存inputを返します。少なくともroot `artifact:analysis_entities:all` では次をsemantic fieldとして保持します。
+
+- `test_analysis_context`
+- `product_risks`
+- `technique_selections`
+- `change_nodes`
+- `change_edges`
+- `environment_requirements`
+
+v1 root inputの `risk_matrix_results / technique_candidate_results / current_runtime_units` はv2へcarry-forwardしません。current v2 dispatchは保存済みchild inputを使って必要なdependent runtimeをfull rerunし、そのcurrent v2 resultからroot inputのmachine-owned fieldを再構築して `analysis_entities` をfull rerunします。
+
+保存semantic inputを再利用できるのは、v1 metadataに保存されたupstream Entity identity / content fingerprintがcurrent v2 upstream Entityと一致し、その他のcurrent source / reference契約も成立する場合だけです。不一致・missing・reader invalidなら保存inputを使わず通常test-analysis rerunへ戻します。v1 fingerprintをRISK等のstable identity seedには使いません。
+
+#### usability-inspection / wcag-conformance-evaluation
+
+両readerはvalidated v1 pairからexact `Machine Runtime Input.input` だけを返します。reader自身はbrowser observation、sample、procedure、handoff、evidenceのcurrentnessを判定しません。
+
+- `usability-inspection`: 既存artifact graph / browser handoff / evidence / document identity等のcurrentness契約が現在も成立する場合だけ保存inputをcurrent v2 `inspection_runtime.py` へ再投入する。成立を確認できない場合は既存Skill契約の通常rerunまたは必要なlive再観測へ戻る
+- `wcag-conformance-evaluation`: 既存sampling / procedure / handoff / evidence freshness契約が現在も成立する場合だけ保存inputをcurrent v2 `wcag_runtime.py` へ再投入する。成立を確認できない場合は既存WCAG-EM workflowで通常再実行し、必要なbrowser workは既存handoff契約で再観測する
+
+runtime version bumpだけを理由にlive再観測は要求しませんが、旧v1 pairのintegrityだけを根拠にcurrent扱いもしません。
+
+#### coverage-analysis / qa-workflow
+
+この2 Skillにはv1 input readerを追加しません。
+
+- `coverage-analysis`: 保存v1 Machine Runtime Inputを再利用せず、current upstream v2 Entity / runtime evidenceから通常Skill契約どおり`traceability` / verifierをfull rerunする
+- `qa-workflow`: 保存v1 Machine Runtime Inputを再利用せず、各scopeのcurrent v2 evidenceとcurrent workflow state / routing inputから`workflow_runtime.py` / final gateを再生成する
+
+両Skillは自Skillstable identityをv1 resultから維持する必要がなく、既存のcurrent sourceから決定論再生成できるため、legacy readerを追加しません。
+
 #### 9 Skillのruntime-v1 evidence処置
 
-`runtime-v2 / entity-state-v2` へ上げる9 Skillについて、v1 artifactの扱いを次へ固定します。v1 envelope / Entity fingerprintをcurrent扱いせず、必要なstable identityだけを各Skillの正本から維持します。追加cutover helperを作るのはTRD / TCD / TCだけです。
+`runtime-v2 / entity-state-v2` へ上げる9 Skillについて、v1 artifactの扱いを次へ固定します。v1 envelope / Entity fingerprintをcurrent扱いせず、必要なstable identityだけを各Skillの正本から維持します。stable identity / historyをprojectionするcutover helperはTRD / TCD / TCだけに置き、保存v1 semantic inputを再利用するtest-analysis / usability-inspection / wcag-conformance-evaluationだけに§2.8のread-only input readerを置きます。
 
 | Skill | v1 artifactの扱い | v2移行方法 | stable identity | 再実行 / 再観測 |
 | --- | --- | --- | --- | --- |
 | spec-analysis | v1 Machine Entity / wrapperは破棄 | current canonical spec-analysis inputからAuthority Entityをv2再生成。UI target migration前は既存semantic rowを変更しない | SPEC / DEC / ASM等のsemantic IDをhuman-readable / canonical inputから維持 | deterministic evidence再生成。version bumpだけを理由に仕様再分析しない |
-| test-analysis | v1 Runtime / Entity evidenceはcurrent扱いしない | 保存済みartifactのvalidated `Machine Runtime Input.input` をcanonical sourceとして同じgeneratorをfull rerunしv2 evidenceを再生成する。Machine Runtime Inputがmissing / invalidならMarkdownから再構築せず通常test-analysis再実行を要求する | RISK等のsemantic IDは保存済みinput / current artifact上のIDを維持し、v1 fingerprintをseedにしない | valid保存inputがあればdeterministic rerun。無ければ通常Skill rerun |
+| test-analysis | v1 Runtime / Entity evidenceはcurrent扱いしない | `runtime_v1_input_reader.py` でv1 pair integrityを検証し、semantic field + saved child runtime inputだけを抽出する。current v2 upstream Entity identity / content fingerprint等のcurrent source契約が一致する場合だけdependent runtime→`analysis_entities`をfull rerunする。v1 rootのmachine-owned result fieldは再利用しない。reader invalid / currentness不一致は通常test-analysis rerun | RISK等のsemantic IDは検証済みsemantic input / current artifact上のIDを維持し、v1 fingerprintをseedにしない | reader valid + current source一致ならdeterministic full rerun。その他は通常Skill rerun |
 | test-requirement-design | v1 resultをprevious artifactへ直接渡さない | `runtime_v1_cutover.py` でcomplete v2 inputを作りfull rebuild | TR ID / inactive・deleted履歴をcutoverで維持 | cutover必須 |
 | test-condition-design | v1 resultをprevious artifactへ直接渡さない | `runtime_v1_cutover.py` の4 phaseでcomplete v2 inputを作りfull rebuild | TCN / model / CI IDと履歴をcutoverで維持 | cutover必須 |
 | test-case-design | v1 resultをprevious artifactへ直接渡さない | `runtime_v1_cutover.py` でcomplete v2 inputを作りfull rebuild | TC ID / inactive・deleted履歴をcutoverで維持 | cutover必須 |
-| coverage-analysis | v1 aggregate evidenceをcarry-forwardしない | 保存済みMachine Runtime Inputがvalidならそのsemantic inputを現在のupstream v2 Entityへrebindして`traceability` / verifierをfull rerunする。保存inputが無ければcurrent upstream v2 evidenceから通常Skill契約どおり再生成する | 自Skill Entityをcarry-forwardしない既存契約を維持 | deterministic full rerun |
-| qa-workflow | v1 aggregate evidenceをcarry-forwardしない | 各scope担当Skillのcurrent v2 evidenceを揃え、保存済みMachine Runtime Inputがvalidならそのworkflow semantic inputを再利用して`workflow_runtime.py` / final gateをfull rerunする。保存inputが無ければcurrent workflow state / routing入力から通常契約で再生成する | 自Skill Entityをcarry-forwardしない既存契約を維持 | orchestration evidenceを再生成 |
-| usability-inspection | v1 runtime envelopeをcurrent扱いしない | 保存済みMachine Runtime Inputが存在し既存validator / currentness契約を満たす場合だけそのexact inputからv2 evidenceを再生成する。保存inputが無い / invalidならMarkdownから復元せず、既存Skill契約による通常再実行または必要なlive再観測を行う | runtime version bumpだけで新しいproduct identityを作らない | valid保存inputがある場合はversion bumpだけでlive再観測しない。無い場合は通常Skill判断 |
-| wcag-conformance-evaluation | v1 runtime envelopeをcurrent扱いしない | 保存済みMachine Runtime Inputが存在し既存validator / WCAG-EM currentness契約を満たす場合だけそのexact inputからv2 evidenceを再生成する。保存inputが無い / invalidならreport proseから復元せず、既存sampling / procedure / handoff契約で通常再実行する | evaluation / sample等のsemantic identityは既存Skill契約を維持 | valid保存inputがある場合はversion bumpだけでlive再観測しない。無い場合は通常Skill判断 |
+| coverage-analysis | v1 aggregate evidenceをcarry-forwardしない | 保存v1 Machine Runtime Inputは再利用せず、current upstream v2 Entity / runtime evidenceから通常Skill契約どおり`traceability` / verifierをfull rerunする | 自Skill Entityをcarry-forwardしない既存契約を維持 | current v2 upstreamからdeterministic full rerun |
+| qa-workflow | v1 aggregate evidenceをcarry-forwardしない | 保存v1 Machine Runtime Inputは再利用せず、各scope担当Skillのcurrent v2 evidence + current workflow state / routing inputから`workflow_runtime.py` / final gateを再生成する | 自Skill Entityをcarry-forwardしない既存契約を維持 | current workflow stateからorchestration evidenceを再生成 |
+| usability-inspection | v1 runtime envelopeをcurrent扱いしない | `runtime_v1_input_reader.py` でv1 pair integrityを検証し、既存artifact graph / browser handoff / evidence currentnessが現在も成立する場合だけexact inputからv2 evidenceを再生成する。reader invalid / currentness不明・不一致はMarkdownから復元せず通常再実行または必要なlive再観測 | runtime version bumpだけで新しいproduct identityを作らない | integrity + currentness成立時だけversion bumpによるlive再観測を省略する |
+| wcag-conformance-evaluation | v1 runtime envelopeをcurrent扱いしない | `runtime_v1_input_reader.py` でv1 pair integrityを検証し、既存sampling / procedure / handoff / evidence freshnessが現在も成立する場合だけexact inputからv2 evidenceを再生成する。reader invalid / currentness不明・不一致はreport proseから復元せず既存WCAG-EM workflowで通常再実行する | evaluation / sample等のsemantic identityは既存Skill契約を維持 | integrity + currentness成立時だけversion bumpによる再観測を省略する |
 
-この表にないmigration wrapper / generic converterは追加しません。spec-analysisはcanonical spec成果物、runtime対応Skillはvalidated Machine Runtime Input、workflow系はcurrent workflow stateを正本とし、proseからv2 inputを推測変換しません。PR #14 merge後のStep 0では各Skillの保存input blockが実際に存在・parse可能であることだけを再計測し、存在しない場合は上表の通常rerun経路へ固定します。新しい設計判断はStep 0へ持ち越しません。
+この表にないmigration wrapper / generic converterは追加しません。spec-analysisはcanonical spec成果物、test-analysis / usability-inspection / wcag-conformance-evaluationは§2.8のread-only readerでintegrity検証済みかつcurrentness条件を満たすsemantic input、coverage-analysisはcurrent upstream v2 evidence、qa-workflowはcurrent workflow state / routing inputを正本とし、proseからv2 inputを推測変換しません。PR #14 merge後のStep 0では3 readerが固定するpre-cutover runtime / generator implementation fingerprintと、保存input blockの存在・parse可能性を実測値へ同期します。存在しない / baseline不一致の場合は上表の通常rerun経路へ固定し、新しい設計判断はStep 0へ持ち越しません。
 
 #### UI target migrationとの相対順序
 
 既存runtime-v1 downstream artifactがあるworkflowでは次の順だけを許可します。
 
 1. runtime-v1 downstreamを検出し、通常semantic update / partial rerunを停止
-2. spec-analysis / test-analysisのsemantic内容を変えずruntime-v2 / entity-state-v2 evidenceを再生成
+2. spec-analysisはcanonical inputから、test-analysisは§2.8のreaderでintegrity / current source整合を確認したsemantic inputから、semantic内容を変えずruntime-v2 / entity-state-v2 evidenceを再生成。readerが使えない場合は通常test-analysis rerunでcurrent baselineを作る。coverage-analysis / qa-workflowは保存v1 inputを使わずcurrent v2 upstream / workflow stateから再生成し、usability-inspection / wcag-conformance-evaluationはintegrity + currentness成立時だけ保存inputでv2再生成する
 3. TRD → TCD → TCを上記Skill-local cutover helperでsemantic不変のままv2 full rebuildし、downstream v2 baselineを成立させる
 4. v2 baselineがvalidate / freshnessを通過した後に、legacy / normal spec-analysis成果物をui-target-v1へmigrationしてUS / UC / Behavior / ACを生成
 5. requirement-structure-v2を通常semantic updateとして再実行し、AC→TR / Dispositionを反映
@@ -276,13 +368,16 @@ expected unitは `artifact:case_structure:all` exactly 1件です。
 
 #### repository regression
 
-- 3 helperのpackage単体compile / portability
+- 3 `runtime_v1_cutover.py` と3 `runtime_v1_input_reader.py` のpackage単体compile / portability
 - cutover外側transportは16 MiB accepted / 1 byte超過blocked。cutover処理によってgenerator上限を変えないことを確認し、別途§3の2 root runtimeだけaggregate 16 MiB、その他の通常generatorは2 MiBを維持する
-- v1以外のsource runtime / entity schema、v1/v2混在、missing / extra / duplicate / incomplete pairをlegacy readerでrejectし、current v2 validatorがv1 sourceを誤ってreject/acceptする経路を持たない
+- cutover helperはv1以外のsource runtime / entity schema、v1/v2混在、missing / extra / duplicate / incomplete pairをlegacy readerでrejectする。input readerもv1以外、missing / extra / duplicate / incomplete pair、baseline implementation fingerprint不一致をrejectし、current v2 validatorへv1 sourceを渡す経路を持たない
 - top-level artifact stringが64 KiBを超えてもaggregate 16 MiB以内ならcutover入口で受理し、artifact内JSON scalarが64 KiBを超える場合はrejectする回帰
-- frozen v1 fingerprint / dependencyを改変したsource artifactをlegacy readerがrejectする回帰
+- frozen v1 input / model / generation fingerprint、dependency、runtime / generator implementation fingerprintを改変したsource artifactをcutover helper / input readerがrejectする回帰
 - 内容不変cutoverでTR / TCN / model / CI / TC IDとdeleted / inactive identity historyを維持
-- 各helper返却inputだけで次のv2 generatorを実行でき、Agent-side merge不要
+- cutover helper返却inputだけで次のv2 generatorを実行でき、Agent-side merge不要。input readerはsemantic inputだけを返し、v2 metadata / dependencyを生成しない
+- test-analysis reader成功後にdependent runtimeをv2 full rerunし、rootのmachine-owned result fieldをcurrent v2 resultから再構築する回帰
+- usability-inspection / wcag-conformance-evaluationはreader validだけでは再利用せず、currentness成立時のみsaved inputでv2再生成し、不成立時は通常rerun / re-observationへ戻る回帰
+- coverage-analysis / qa-workflowはvalidな保存v1 inputが存在しても無視し、current upstream v2 evidence / current workflow stateから再生成する回帰
 - TCD target version rebase、derived child、semantic CI mappingをcurrent v2 resultへ正しく接続
 - `UI target migration済み + runtime-v1 downstream + cutover未完了` をintegration testでblocked
 - cutover完了後のUI target migration → AC semantic update → downstream stale / rerunを実Agent smokeで確認
