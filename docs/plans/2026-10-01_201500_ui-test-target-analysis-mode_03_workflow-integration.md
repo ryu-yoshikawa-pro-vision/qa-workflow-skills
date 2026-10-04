@@ -140,7 +140,7 @@ UI target canonical downstreamではscope ownershipを次へ固定します。
 2. qa-workflowは前回current Machine Entity collectionと `blocked_scope_ids[]` を新規 `skills/qa-workflow/scripts/downstream_state.py` へ渡す
 3. helperは前回current TR / TCN / model / CI / TC Entityの `content.scope_refs[]` とblocked Scope ID集合の積集合だけで `active → inactive` 対象を決める。Authority共有、名称、同一PAGE、runtime dependency等からscope所属を推測しない
 4. helperは `inactive_tr_ids[] / inactive_tcn_ids[] / inactive_model_keys[] / inactive_ci_ids[] / inactive_tc_ids[]` に加え、各root runtimeへ保存するmachine-owned `inactive_tr_history[] / inactive_tcn_history[] / inactive_model_history[] / inactive_materialize_history[] / inactive_tc_history[]` をcanonical sortして返す。Agent / LLMはID集合やhistoryを手作業でfilter / 復元しない
-5. TRD / TCD / TCのv2 generatorとTCD current structure stateは該当IDを `active → inactive` へ遷移させ、inactive IDをcurrent Machine Entity / current runtime unit / carry-forward projectionへ含めない
+5. TRD / TCD / TCのv2 generatorとTCD current structure stateは該当IDを `active → inactive` へ遷移させ、inactive IDをcurrent Machine Entity / current runtime unit / carry-forward projectionへ含めない。同時に各root payloadへlast-active Entity historyを保存し、TCDはlast successful materializeのCI ID / target mapping / semantic mapping / expected-result-root stateも履歴化する
 6. ready scope全件は従来どおり1 batchでtest-analysis → TRD → TCD → TC → coverage-analysisへ進める。inactive履歴そのものをfreshness blocking issueにしない。package全体の `partial / blocked` はspec-analysisの `scope_readiness[]` で別に保持する
 7. blocked scopeが再びreadyになった場合、inactive IDは再利用候補として保持する。LLMがsemantic identity同一と判断したTR等は既存IDをreuseして `active` へ戻す。意味が変わった場合は旧inactive IDを `deleted` にしてnew IDを発行する
 8. `deleted` はterminalであり、block解除を理由に復帰させない
