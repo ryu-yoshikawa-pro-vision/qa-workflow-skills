@@ -126,22 +126,28 @@ spec-analysis(UI target mode)
 
 ### 2.1a ready → blocked → ready の下流ライフサイクル
 
-既にTR / TCN / model / CI / TCまで生成済みのscopeが一時的にblockedへ遷移した場合、blocked scope由来の旧Machine Entityを通常のactive carry-forwardとして残しません。一方、semantic deletionとして `deleted` にもしません。
+既にTR / TCN / model / CI / TCまで生成済みのscopeが一時的にblockedへ遷移した場合、blocked scopeに属する旧Machine Entityを通常のactive carry-forwardとして残しません。一方、semantic deletionとして `deleted` にもしません。
+
+UI target canonical downstreamではscope ownershipを次へ固定します。
+
+- `build-machine-evidence(scope_ids=ready_scope_ids)` はready scopeのcompact `scope_index[]` を返す
+- TRDのLLMは各current TRへ `scope_refs[]` を明示する。値はcurrent ready `scope_index[].scope_id` のsubsetとし、UI target artifact workflowでは1件以上必須
+- TCNは参照TR、modelは親TCN、CIは親TCN / model、TCは参照TCN / CIから `scope_refs[]` を決定論導出する。Agentが下流scopeを再判断しない
 
 処理順を次に固定します。
 
-1. `ui_target_package.py build-machine-evidence(scope_ids=null)` が、current `ready_scope_ids[] / blocked_scope_ids[]` に加えて `_09 §3` の `blocked_scope_upstream_identities[]` を返す
-2. qa-workflowは前回current Machine Entity collectionと `blocked_scope_upstream_identities[]` を新規 `skills/qa-workflow/scripts/downstream_state.py` へ渡す
-3. helperは前回Entityの `upstream_entity_dependencies[]` を逆向きにだけ辿り、blocked scopeに依存するdownstream Entityを決定論的に閉包する。runtime dependencyだけではinactive判定しない
+1. `ui_target_package.py inspect` からcurrent `blocked_scope_ids[]` を取得する
+2. qa-workflowは前回current Machine Entity collectionと `blocked_scope_ids[]` を新規 `skills/qa-workflow/scripts/downstream_state.py` へ渡す
+3. helperは前回current TR / TCN / model / CI / TC Entityの `content.scope_refs[]` とblocked Scope ID集合の積集合だけで `active → inactive` 対象を決める。Authority共有、名称、同一PAGE、runtime dependency等からscope所属を推測しない
 4. helperは `inactive_tr_ids[] / inactive_tcn_ids[] / inactive_model_keys[] / inactive_ci_ids[] / inactive_tc_ids[]` をcanonical sortして返す。Agent / LLMはこの集合を手作業でfilterしない
 5. TRD / TCD / TCのv2 generatorとTCD current structure stateは該当IDを `active → inactive` へ遷移させ、inactive IDをcurrent Machine Entity / current runtime unit / carry-forward projectionへ含めない
 6. ready scope全件は従来どおり1 batchでtest-analysis → TRD → TCD → TC → coverage-analysisへ進める。inactive履歴そのものをfreshness blocking issueにしない。package全体の `partial / blocked` はspec-analysisの `scope_readiness[]` で別に保持する
-7. blocked scopeが再びreadyになった場合、inactive IDは再利用候補として保持する。LLMがsemantic identity同一と判断した成果物は既存IDをreuseして `active` へ戻す。意味が変わった場合は旧inactive IDを `deleted` にしてnew IDを発行する
+7. blocked scopeが再びreadyになった場合、inactive IDは再利用候補として保持する。LLMがsemantic identity同一と判断したTR等は既存IDをreuseして `active` へ戻す。意味が変わった場合は旧inactive IDを `deleted` にしてnew IDを発行する
 8. `deleted` はterminalであり、block解除を理由に復帰させない
 
-blocked scopeとready scopeの両方から参照されるAuthorityは、それだけを理由にinactive判定の起点にしません。`build-machine-evidence` はblocked scopeだけに到達するAuthorityとblocked scopeのAC stable identityを起点として返します。共有Authorityはready scope側でもcurrentなので起点から除外します。
+`scope_refs[]` がready / blocked双方を含むcross-scope Entityは、1つのcurrent Entityをscopeごとに部分利用できないため保守的にinactive対象とします。ready側だけで成立する別identityへ分割する必要があるかはLLMが意味判断し、helperが旧Entityの内容やscope_refsを自動縮退させません。
 
-同じEntityがready / blocked双方の依存を持つ場合、blocked依存を1件でも持つ前回Entityはinactive対象にします。部分的に依存を外して別identityとして残せるかはLLMのsemantic判断であり、helperが旧Entityを自動縮退させません。
+v1 cutover直後のdownstreamにはUI target Scope IDが存在しないため `scope_refs=[]` です。UI target package migration後、最初のTRD→TCD→TC更新では既存active downstreamを全件scope ownership付きv2へ正規化し、current TR / TCN / model / CI / TCが必要な `scope_refs[]` を持つbaselineが成立するまでready/blockedのpartial downstream progressionを開始しません。
 
 ### 2.2 gated mode
 
