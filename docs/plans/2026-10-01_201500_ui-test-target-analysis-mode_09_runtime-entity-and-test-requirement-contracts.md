@@ -754,6 +754,8 @@ generator / state contract:
 - TCDの `current_structure_state.previous_ci_id_state` も同じ3状態 + scope_refsを保持する。TCN全体がinactiveで `materialize-coverage` をdispatchしない場合でも、condition-structure rootの `inactive_materialize_history[]` とCI stateでmapping / ID履歴を残す
 - shared runtime previous state validationはactive stateだけをcurrent Machine Entity identity/content.scope_refsとexact一致させる
 
+`inactive_*_ids[] / inactive_*_history[] / inactive_materialize_history[]` は各v2 generatorのraw inputに存在するmachine-owned fieldです。canonical qa-workflowでは `downstream_state.py` のvalidated outputをそのまま渡し、LLM / Agentが編集しません。full build、direct mode、またはinactive履歴が存在しないrunでもkey省略はせず空配列を明示します。generatorはcallerが任意に作ったhistoryをcurrent evidenceへ昇格させず、§7.5の検証条件を満たさないhistoryをrejectします。
+
 inactive IDを所有するmodel/TCN向け個別runtime unitはcurrent expected/runtime集合へcarry-forwardしません。mixed ready/inactive状態でも `artifact:*:all` root unitはready/current入力から再生成してcurrentにできます。
 
 ### 12.3 blocked scopeからinactive集合を導出するhelper
