@@ -217,6 +217,7 @@ active Machine Evidence templateはversion文字列だけを置換しません�
 変更:
 - skills/qa-workflow/references/guidance.md
 - skills/qa-workflow/assets/project-context-template.md
+- skills/qa-workflow/assets/workflow-state-template.md（UI target package write context: package_root / reservation ref・revision / semantic input fingerprint / start snapshot / write state）
 - 新規 skills/qa-workflow/scripts/project_context_ids.py
 - skills/qa-workflow/evals/deterministic/routing_cases.json
 - skills/qa-workflow/evals/deterministic/routing_candidate_outputs.json

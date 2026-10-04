@@ -554,10 +554,10 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 ### Step 5: qa-workflow routing
 
 - mode request routing / answer resume。小規模でも継続利用目的ならmodeを優先し、`scope_readiness[] / ready_scope_ids[]` を使ってblocked scopeを除外し、current ready scope全件を `build-machine-evidence(scope_ids=ready_scope_ids)` の1 batchへまとめて後続 `artifact:*:all` runtimeへ進める。blocked scopeのUNKNOWNをAgentが全件filterしない
-- qa-workflow経由のpackage materializeはresolved package_rootの `reserve_shared_resource()` をatomic pre-start single-writer契約として取得し、reservation成功前はwriteしない。UI target package writeでは `claim_mutable_operation()` を呼ばない。同一workflow resumeは同じreservation revision + semantic input fingerprintを確認し、current rootがvalidならfresh inspect snapshotから再実行、root不在 + valid backupならmaterialize preflight recovery後に続行し、矛盾状態はblockedにする。成功 / cleanup確認済みhandled failure後は既存conditional release契約でreservationを解放する
+- `skills/qa-workflow/assets/workflow-state-template.md` へUI target package write context（resolved package_root、reservation ref / revision、semantic input fingerprint、開始時snapshot、write state）を追加する。qa-workflow経由のpackage materializeはresolved package_rootの `reserve_shared_resource()` をatomic pre-start single-writer契約として取得し、reservation成功前はwriteしない。UI target package writeでは `claim_mutable_operation()` を呼ばない。同一workflow resumeは同じreservation revision + semantic input fingerprintを確認し、current rootがvalidならfresh inspect snapshotから再実行、root不在 + valid backupならmaterialize preflight recovery後に続行し、矛盾状態はblockedにする。成功 / cleanup確認済みhandled failure後は既存conditional release契約でreservationを解放する
 - batch handoffから `artifact:analysis_entities:all` / `artifact:requirement_structure:all` のcanonical stdinを1つ構成し、batch全体を16 MiB上限へ検証する。超過時はruntime未起動のままblockedにし、scope別個別run / subset run / auto splitを行わない。その他の通常generatorは2 MiB上限を維持する
 - 継続利用目的を単発規模より優先するmode precedenceをroutingへ反映
-- runtime-v1 downstreamが残る状態でUI target migration済みならblockedにし、Step 2のcutover順へ戻す
+- runtime-v1 downstreamが残る状態でUI target migration済み、または必要なv2 baselineが未成立ならblockedにし、Step 2の依存順へ戻す
 - test-target-inspection / usability-evaluation / usability-inspection / wcag-conformance-evaluationとの分岐
 - routing_cases.json / routing_candidate_outputs.jsonへ8件追加し合計69件へ同期
 

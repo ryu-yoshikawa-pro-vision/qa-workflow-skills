@@ -401,7 +401,7 @@ runtime version bumpだけを理由にlive再観測は要求しませんが、�
 - usability-inspection / wcag-conformance-evaluationはreader validだけでは再利用せず、currentness成立時のみsaved inputでv2再生成し、不成立時は通常rerun / re-observationへ戻る回帰
 - coverage-analysis / qa-workflowはvalidな保存v1 inputが存在しても無視し、current upstream v2 evidence / current workflow stateから再生成する回帰
 - TCD target version rebase、derived child、semantic CI mappingをcurrent v2 resultへ正しく接続
-- `UI target migration済み + runtime-v1 downstream + cutover未完了` をintegration testでblocked
+- `UI target migration済み + runtime-v1 downstream + v2 baseline未成立` をintegration testでblocked
 - spec-analysis/test-analysis v2再生成 → TRD/TCD/TC cutover → coverage-analysis → 必要なinspection/WCAG → qa-workflow final gateの順でv2 baselineが成立し、その後UI target migration → AC semantic update → downstream stale / rerunへ進むことをintegration test / 実Agent smokeで確認
 
 ## 3. spec-analysis normalized machine input
