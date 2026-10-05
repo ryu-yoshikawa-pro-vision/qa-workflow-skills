@@ -372,7 +372,7 @@ runtime version bumpだけを理由にlive再観測は要求しませんが、�
 
 この表にないmigration wrapper / generic converterは追加しません。spec-analysisは§2.8でfrozen検証したcanonical v1 Authority content、test-analysis / usability-inspection / wcag-conformance-evaluationはread-only readerでintegrity検証済みかつcurrentness条件を満たすsemantic input、coverage-analysisはcurrent upstream v2 evidence、qa-workflowは全必要current v2 evidenceが揃ったcurrent workflow state / routing inputを正本とし、proseからv2 inputを推測変換しません。PR #14 merge後のStep 0ではspec-analysis v1 Entityのexact baseline field / canonicalizationと、3 readerが固定するpre-cutover runtime / generator implementation fingerprint、保存input blockの存在・parse可能性を実測値へ同期します。存在しない / baseline不一致の場合は上表の通常rerun経路へ固定し、新しい設計判断はStep 0へ持ち越しません。
 
-#### qa-workflow migration preflight
+### 2.9 qa-workflow migration preflight
 
 新規 `skills/qa-workflow/scripts/migration_preflight.py` を、runtime-v1 → v2 / UI target migration / scope ownership normalizationのnext actionだけを決めるsingle-purpose deterministic helperとして追加します。generic migration engineにはしません。現行 `workflow_runtime.py` はcurrent v2 evidenceのaggregate verifierであり、runtime-v1 artifactが残るpre-runtime段階では正本になれないため、この判定をLLMへ残しません。
 
@@ -438,7 +438,7 @@ inputはmachine-generated observationだけを受けます。
 
 判定優先順位は上記順です。LLMはstatusを上書きしません。handled invalid inputはexit 0 + `valid=false / issues[]`、unexpected internal errorだけexit 1とします。
 
-#### UI target migrationとの相対順序
+### 2.10 UI target migrationとの相対順序
 
 既存runtime-v1 downstream artifactがあるworkflowでは次の依存順だけを許可します。
 
