@@ -672,7 +672,7 @@ LLMはACとTRの意味上の対応、TRの分割 / 統合、TRのscope所属を�
 - modelの `scope_refs[]` は親TCNのscope_refsとexact一致させる。derived childも親modelからではなくowner TCNのcurrent scope_refsを使う
 - TCN / model Machine Entity contentへ `scope_refs[]` を保存する
 - `previous_tcn_ids[]` は `{tcn_id,status,scope_refs}`、`previous_model_keys[]` は既存model identity field + `status / scope_refs` を持ち、state rowのscope_refsはTRと同じくlatest resolved semantic ownershipを保持する。SCOPE removal後にreuseしたinactive TCN / modelは上流resolutionから決定論伝播したresolved scope_refsへ更新し、last-active ownershipはhistory Entity側へ残す
-- `artifact:condition_structure:all` root payloadへ `inactive_tcn_history[] / inactive_model_history[] / inactive_materialize_history[]` を保存する。前2つはinactive TCN / modelのlast-active Machine Entity snapshotをmachine-owned historyとして保持し、active→inactive時はprevious current Entityを追加、inactive継続は保持、reuse / deleted時は該当snapshotを除去する。history Entityはstored fingerprint / identity / state row scope_refsだけを検証しcurrent evidenceへ入れない
+- `artifact:condition_structure:all` root payloadへ `inactive_tcn_history[] / inactive_model_history[] / inactive_materialize_history[]` を保存する。前2つはinactive TCN / modelのlast-active Machine Entity snapshotをmachine-owned historyとして保持し、active→inactive時はprevious current Entityを追加、inactive継続は保持、reuse / deleted時は該当snapshotを除去する。history Entityはstored fingerprint / identityを検証し、通常blockではstate row ownershipと一致、SCOPE removal後のreuseではold last-active ownershipとの差を許可してcurrent evidenceへ入れない
 - `inactive_tcn_ids[] / inactive_model_keys[]` はactive previous identityだけをactive→inactiveへ遷移させる。inactive→active reuse時はcurrent upstreamから再導出したscope_refsへ更新する
 
 ### 7.3 materialize-coverage-v2
@@ -692,7 +692,7 @@ LLMはACとTRの意味上の対応、TRの分割 / 統合、TRのscope所属を�
 - TC draft自身にLLM入力のscope fieldは追加しない。各current TCの `scope_refs[]` は参照する `tcn_refs[] / ci_refs[]` のscope_refs unionを重複除去・canonical sortして決定論生成する
 - TC Machine Entity contentへ `scope_refs[]` を保存する
 - `previous_tc_ids[] / tc_id_state[]` はexact `{tc_id,status,scope_refs}` とし、state rowのscope_refsは参照TCN / CIから導出したlatest resolved semantic ownershipを保持する。last-active TC ownershipは `inactive_tc_history[]` に残す
-- `artifact:case_structure:all` root payloadへ `inactive_tc_history[]` を保存する。inactive TCのlast-active Machine Entity snapshotをmachine-owned historyとして保持し、active→inactive時はprevious current TC Entityを追加、inactive継続は保持、reuse / deleted時は該当snapshotを除去する。stored fingerprint / identity / state row scope_refsだけを検証しcurrent evidenceへ入れない
+- `artifact:case_structure:all` root payloadへ `inactive_tc_history[]` を保存する。inactive TCのlast-active Machine Entity snapshotをmachine-owned historyとして保持し、active→inactive時はprevious current TC Entityを追加、inactive継続は保持、reuse / deleted時は該当snapshotを除去する。stored fingerprint / identityを検証し、SCOPE removal後のreuseではstate rowのlatest ownershipとlast-active snapshotのold ownershipが異なることを許可してcurrent evidenceへ入れない
 - `inactive_tc_ids[]` はactive previous TCだけをactive→inactiveへ遷移させ、inactive→active reuse時はcurrent upstreamから再導出したscope_refsへ更新する
 
 ### 7.5 shared runtime state / currentness
@@ -802,7 +802,7 @@ TR / TCN / model / CI / TCのstable ID stateは次の3値です。
 
 共通規則:
 
-- `inactive` は `ready → blocked` の一時停止にだけ使い、semantic deletionの代替にしない
+- `inactive` はlatest resolved semantic ownershipがcurrent blocked scopeを1件以上含む一時非current状態にだけ使い、semantic deletionの代替にしない。通常の`ready → blocked`に加え、SCOPE removal後のreuseでresolved ownershipがblocked scopeへ残る場合も含む
 - activeだけをcurrent Machine Entity collection / expected Entity / carry-forward projectionへ含める。inactive / deletedはcurrent Entityへ含めず、inactive自体をmissing dependency / stale issueへ変換しない
 - active / inactive / deletedの全IDをallocatorの使用済み集合へ含め、番号を再利用しない
 - deletedはterminalで、reuse / reactivationを禁止する
@@ -848,7 +848,15 @@ input:
   "current_scope_ids":["SCOPE-001","SCOPE-002"],
   "blocked_scope_ids":["SCOPE-002"],
   "previous_qa_workflow_artifact_markdown":"<workflow state bindingが指すexact historical revision>",
-  "scope_removal_resolutions":[]
+  "scope_removal_resolutions":[
+    {
+      "skill":"test-requirement-design",
+      "entity_type":"tr",
+      "entity_ref":"TR-005",
+      "resolution":"reuse",
+      "resolved_scope_refs":["SCOPE-001"]
+    }
+  ]
 }
 ```
 
@@ -894,7 +902,7 @@ stdin:
         "entity_type":"tr",
         "entity_ref":"TR-005",
         "resolved_scope_refs":["SCOPE-001"],
-        "status":"inactive"
+        "status":"active"
       }
     ],
     "requires_semantic_resolution":false,
