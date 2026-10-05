@@ -155,6 +155,14 @@ global navigation、通知panel、drawer等、独立routeではない共通UIで
 
 Intercom、ご利用ガイド、外部サイト等。
 
+### UI構造の分類未確定
+
+UI構造の存在や意味上の対象は識別できても、PAGE / VIEW / STATE / MODAL等の `種別` をAuthorityまたは確認済み事実から安全に確定できない場合は、候補種別を推測して構造IDを発行しません。構造ID prefix自体が分類結果を表すため、`UNKNOWN`種別や仮prefixは追加しません。
+
+未確定期間は既存のUNKNOWNを正本にし、07へ当該論点を残します。少なくとも `関連Scope ID` と `関連File=01_ui_structure_and_navigation.md` を持ち、分類未確定が後続設計を止める場合だけ `Blocking Scope ID` を同じScopeへ設定します。まだ構造IDが存在しないため `関連構造ID` は空です。分類が確定した時点で同じUNKNOWNを解消し、確定した種別のprefixで初めて構造IDを採番します。
+
+既存のtyped UI構造について、その種別を支えていたAuthority / confirmed factが失効して分類自体が未確定へ戻った場合は、根拠のない旧種別をcurrent rowとして残しません。LLMが旧typed IDをexplicit retireし、同じ論点のUNKNOWNをopen / reopenして未確定期間を保持します。再分類後はprefixが同じ場合でもretired IDを復活させずnew IDを発行します。これはPAGE→VIEW等のprefix変更と同じく、typed structural IDのlineageを曖昧にしないためです。
+
 ### SHARED PAGE
 
 共通404等、本機能専用ではないが遷移・権限制御上重要な共通画面。
