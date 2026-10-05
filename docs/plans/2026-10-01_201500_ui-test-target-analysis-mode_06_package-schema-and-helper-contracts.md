@@ -376,6 +376,8 @@ ancestor state propagationの意味契約は `_08 §3.1` を正本とします�
 
 UI target modeでは `現在有効か` を `Yes / No` に固定します。
 
+`分析項目` の `分類` は、spec-analysis自身が意味分類する `SPEC / DECISION / INFERENCE / UNKNOWN` に加え、**外部ownerで承認済みと確定したASMをmirrorするrowだけ** `承認済みASM` を許可します。`承認済みASM` は5つ目のLLM分類ではなく、`ASM-xxx` のowner currentness / approvalをpackageへ追跡可能に投影するための表現です。AIがINFERENCEや未承認の仮定をこの値へ昇格させません。`項目ID` prefixと `分類` は §7.2 のprefix selector contractでexact一致させます。
+
 UNKNOWNのlineageは次に固定します。
 
 - `分類=UNKNOWN` かつ `現在有効か=Yes` → `解消先ID` は空
@@ -816,6 +818,7 @@ stdin:
           "draft_key":"us-login",
           "identity_action":"new",
           "reuse_id":null,
+          "external_id":null,
           "cells":{
             "Scope ID":"SCOPE-001",
             "Actor / Role":"管理者",
@@ -865,12 +868,42 @@ table input contract:
 - tracking table: 分析対象機能scope一覧、UI構造一覧、UI操作一覧、User Story一覧、Use Case一覧、Behavior一覧、Acceptance Criteria一覧、ビジネスルール一覧、項目・バリデーション一覧、処理フロー一覧、通知・外部連携一覧、仕様矛盾・保留一覧、Repository実装状況、情報源 / 正本参照一覧、分析項目
 - `file / section` は§2〜§5のstandard registryに存在するexact pairだけを許可する。extension fileは `table_changes[]` の対象にしない
 - `cells` はprimary ID列とhelper-owned derived列を除いたexact header名だけを許可する。UIOP / US / UC / Behavior / RULE / FIELD / FLOW / NOTIFY / INTERACTの `状態` はhelper-ownedでcaller inputを拒否する。stable reference列はJSON string array、通常cellはstringで受ける
-- 新規rowは `identity_action=new / reuse_id=null / draft_key=<request内unique>`
-- 既存row更新は `identity_action=reuse / reuse_id=<stable ID>`。normalではsnapshot一致後に再parseした `previous_model` に存在するIDだけをreuseでき、legacy-migrationでは `migration_retained_ids[]` に含まれるIDだけをreuseできる
-- request内の新規row参照はstable IDの代わりに `@draft:<draft_key>` をreference配列へ指定できる。helperが採番後に解決する
-- primary prefixは `file / section` のstandard registryからhelperが導出する。caller inputに `primary_prefix` を持たせない
+- row identity fieldは `draft_key / identity_action / reuse_id / external_id / cells` に固定する。`identity_action` は `new / reuse / external` の3値だけを許可する
+- package-owned新規rowは `identity_action=new / draft_key=<request内unique> / reuse_id=null / external_id=null` とし、helperが§7.2のprefix selectorからprefixを導出して採番する
+- 既存row更新は `identity_action=reuse / draft_key=null / reuse_id=<stable ID> / external_id=null`。normalではsnapshot一致後に再parseした `previous_model` に存在するIDだけをreuseでき、legacy-migrationでは `migration_retained_ids[]` に含まれるIDだけをreuseできる
+- packageへ初めて取り込む外部ownerのDEC / ASMだけ `identity_action=external / draft_key=<request内unique> / reuse_id=null / external_id=<owner確定済みDEC-xxx|ASM-xxx>` を許可する。helperは番号を発行せず、ID形式、prefixと`分類`の一致、current request / previous model / historyとのidentity衝突を検証する。normalで既にprevious_modelに同じIDが存在する場合は`external`をrejectし、以後は`reuse`を要求する。`external`をDEC / ASM以外へ使用しない
+- `external_id` はowner-side deterministic allocator / canonical ownerで既に確定したIDだけをcallerが渡す。Project Context ownerでは `project_context_ids.py materialize` 後のIDを使い、別ownerではそのownerが発行したcanonical IDを使う。owner未採番時にLLMが番号を推測して`external`へ渡す経路は許可しない。`ui_target_package.py` はgeneric owner adapterや外部owner currentness verifierを追加せず、package境界では構造・identity整合だけを検証する
+- request内の新規row参照はstable IDの代わりに `@draft:<draft_key>` をreference配列へ指定できる。helperは`new`の採番結果だけでなく`external`の`external_id`も同じrequest-wide draft mapへ登録して解決する
+- caller inputに `primary_prefix` を持たせない。primary prefixは§7.2のexact selector registryからhelperが決定する
 
 `keyed_table_updates[]` はstable IDを採番しないview / fixed-key tableの**完成row集合**を対象にし、section単位で全rowを置換します。部分patchは許可しません。exact registryは次です。
+
+### 7.2 primary prefix selector contract
+
+固定prefixが1つだけのtracking tableは§5のstandard IDをそのまま使います。同一tableに複数prefixが存在する次の3 sectionだけ、既存semantic fieldからhelperがprefixを決定します。LLM / callerはprefix文字列を入力しません。
+
+| file / section | selector | prefix |
+| --- | --- | --- |
+| `01_ui_structure_and_navigation.md / UI構造一覧` | `種別=PAGE` | `PAGE` |
+| 同上 | `種別=STATE` | `STATE` |
+| 同上 | `種別=VIEW` | `VIEW` |
+| 同上 | `種別=STEP` | `STEP` |
+| 同上 | `種別=MODAL` | `MODAL` |
+| 同上 | `種別=BROWSER DIALOG` | `BDLG` |
+| 同上 | `種別=PANEL / POPOVER / GLOBAL UI` | `PANEL` |
+| 同上 | `種別=EXTERNAL` | `EXT` |
+| 同上 | `種別=SHARED` | `SHARED` |
+| `05_notifications_and_external_interactions.md / 通知・外部連携一覧` | `種別=通知` または `メール` | `NOTIFY` |
+| 同上 | `種別=外部連携` または `外部遷移イベント` | `INTERACT` |
+| `09_authority_and_traceability.md / 分析項目` | `分類=SPEC` | `SPEC` |
+| 同上 | `分類=INFERENCE` | `INF` |
+| 同上 | `分類=UNKNOWN` | `UNK` |
+| 同上 | `分類=DECISION` | `DEC`。`new`禁止、初回取込は`external` |
+| 同上 | `分類=承認済みASM` | `ASM`。`new`禁止、初回取込は`external` |
+
+selector fieldがmissing / unknown、ID prefixとselectorが不一致、`new`でDEC / ASMを採番しようとする入力はwrite前にrejectします。PANEL / POPOVER / GLOBAL UIは意味上の種別を保持したまま同じ`PANEL` prefixを共有します。`分析項目`の`承認済みASM`は外部ownerのapproved ASM mirror専用で、spec-analysisの通常4分類を増やすsemantic classifierとして扱いません。
+
+
 
 | file / section | key | 固定規則 |
 | --- | --- | --- |
@@ -878,7 +911,7 @@ table input contract:
 | `02_behavior_and_business_rules.md / Use Case振る舞い完全性` | `UC ID + 結果分類` | current UCごとに3分類 exactly |
 | `07_current_unknowns.md / Current UNKNOWN一覧` | `UNKNOWN ID` | 09のcurrent UNKNOWN ID集合とexact一致。`Blocking Scope ID` は `関連Scope ID` のsubset。`関連File` はstandard registry pathなら物理file未作成でも許可し、extensionはcurrent宣言 + current実fileを必須とする |
 | `08_repository_implementation_status.md / Repository確認基準` | `Repository` | 0..N row、Repository key duplicate禁止。normal updateでsection省略ならexisting baseline集合を保持する。full replacementで一部Repositoryだけ再確認する場合、未確認rowはprevious値のまま含め、自動でbranch / revisionを更新しない |
-| `09_authority_and_traceability.md / 現在有効な仕様根拠` | `仕様根拠ID` | LLMが確定したCurrent Effective Authorityだけ。09分析項目のcurrent SPEC / DECISION / approved ASMへ存在参照 |
+| `09_authority_and_traceability.md / 現在有効な仕様根拠` | `仕様根拠ID` | LLMが確定したCurrent Effective Authorityだけ。09分析項目のcurrent `SPEC / DECISION / 承認済みASM`へ存在参照 |
 | `09_authority_and_traceability.md / 後続Skillへの補足` | `項目` | 項目duplicate禁止。stable refsだけhelper検証 |
 
 `keyed_table_updates[]` のrowは原則exact header名をJSON keyとして持ち、stable reference列だけstring arrayを受けます。例外として `条件付き必須file applicability` は `状態` をcaller入力に含めず、helperが `Trigger判定` から生成します。stable IDをkey / referenceとして持つcellでは、同requestのnew tracking rowを `@draft:<draft_key>` で参照できます。helperはstable tracking ID割当後にkey / reference内の `@draft` を解決し、未解決draftをrejectします。helperがcanonical key order / Markdown escape / `<br>` serialization / row sortを行います。view tableからrowが消えてもtracking stable IDのretireとは扱いません。tracking lifecycleは `table_changes[] / retire_ids[]` だけで管理します。
@@ -1605,6 +1638,9 @@ production helperのfilesystem / raw hash / README control生成 / internal allo
 - project_context_ids.pyのSection 12 / 13 exact table、materialize内部でのDEC / ASM採番、validate-historyによるprevious ID削除拒否、canonical DEC / ASM namespace、kind / duplicate / 999 exhaustion
 - Project Contextがownerでない案件ではproject_context_ids.pyを使わず、外部ownerのIDを維持し、owner未採番時にLLM hand-numberingへfallbackしないこと
 - CHANGELOG / materialize lifecycle builderがDEC / ASMを追跡可能stable IDとして受理しつつ、UI target package内部allocatorではDEC / ASMを拒否すること
+- mixed-prefix tableのselectorを固定し、UI構造の全種別、NOTIFY / INTERACT、SPEC / INF / UNKを同じ`file / section`内でもsemantic fieldから決定論採番できること。selector不明、prefix不一致、caller指定`primary_prefix`をrejectすること
+- owner発行済みDEC / ASMを `identity_action=external` でfresh create / normal updateへ初回導入でき、同requestの`@draft`参照がowner IDへ解決すること。package allocatorがDEC / ASMを採番しないこと、既追跡IDへの`external`再投入をrejectして`reuse`を要求すること
+- `分析項目`でDECは`分類=DECISION`、approved ASMは`分類=承認済みASM`としてowner IDを保持し、未承認ASM / INFERENCEをhelperやLLMが`承認済みASM`へ自動昇格しないこと
 - fresh v00の空change table、v01以降のDEC / ASM初登場=added、既追跡内容・状態・scope変更=changedを区別し、DEC / ASMへのretiredをrejectすること
 - resolvedをUNK以外へ使用するとrejectし、resolved後のchangedによるresolver変更 / reopenと再resolvedを許可し、retired後の後続eventだけをrejectすること
 - legacy migrationでDEC / ASMを含むretained tracked IDをmigratedとして引き継ぐこと。legacy `retired` eventはpackage-owned IDだけを許可し、DEC / ASMの撤回・置換はowner currentnessを保持したchanged/historyとして移行すること。resolved / retired lifecycle IDは許可prefixを検証したうえでnew採番前に予約すること
