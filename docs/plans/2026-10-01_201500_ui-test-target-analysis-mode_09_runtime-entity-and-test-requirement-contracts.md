@@ -251,7 +251,7 @@ TRD / TCD / TCの`runtime_v1_cutover.py`はstable identity / historyをv2 input�
 - `skills/usability-inspection/scripts/runtime_v1_input_reader.py`
 - `skills/wcag-conformance-evaluation/scripts/runtime_v1_input_reader.py`
 
-generic migration module、shared `runtime_contract.py` のv1 compatibility branch、qa-workflow wrapperは追加しません。spec-analysis projectionと3 readerはいずれもv1 evidenceの**integrity検証とsemantic data抽出だけ**を担当し、v1 fingerprint / dependency / wrapperをcurrent v2へcarry-forwardしません。
+generic migration module、shared `runtime_contract.py` のv1 compatibility branch、qa-workflow用の**v1→v2 data conversion wrapper**は追加しません。spec-analysis projectionと3 readerはいずれもv1 evidenceの**integrity検証とsemantic data抽出だけ**を担当し、v1 fingerprint / dependency / wrapperをcurrent v2へcarry-forwardしません。`migration_preflight.py` はartifact変換を行わずnext actionだけを返すため、この禁止対象には含めません。
 
 #### spec-analysis Authority v1 projection
 
@@ -370,7 +370,7 @@ runtime version bumpだけを理由にlive再観測は要求しませんが、�
 | usability-inspection | v1 runtime envelopeをcurrent扱いしない | `runtime_v1_input_reader.py` でv1 pair integrityを検証し、既存artifact graph / browser handoff / evidence currentnessが現在も成立する場合だけexact inputからv2 evidenceを再生成する。reader invalid / currentness不明・不一致はMarkdownから復元せず通常再実行または必要なlive再観測 | runtime version bumpだけで新しいproduct identityを作らない | integrity + currentness成立時だけversion bumpによるlive再観測を省略する |
 | wcag-conformance-evaluation | v1 runtime envelopeをcurrent扱いしない | `runtime_v1_input_reader.py` でv1 pair integrityを検証し、既存sampling / procedure / handoff / evidence freshnessが現在も成立する場合だけexact inputからv2 evidenceを再生成する。reader invalid / currentness不明・不一致はreport proseから復元せず既存WCAG-EM workflowで通常再実行する | evaluation / sample等のsemantic identityは既存Skill契約を維持 | integrity + currentness成立時だけversion bumpによる再観測を省略する |
 
-この表にないmigration wrapper / generic converterは追加しません。spec-analysisは§2.8でfrozen検証したcanonical v1 Authority content、test-analysis / usability-inspection / wcag-conformance-evaluationはread-only readerでintegrity検証済みかつcurrentness条件を満たすsemantic input、coverage-analysisはcurrent upstream v2 evidence、qa-workflowは全必要current v2 evidenceが揃ったcurrent workflow state / routing inputを正本とし、proseからv2 inputを推測変換しません。PR #14 merge後のStep 0ではspec-analysis v1 Entityのexact baseline field / canonicalizationと、3 readerが固定するpre-cutover runtime / generator implementation fingerprint、保存input blockの存在・parse可能性を実測値へ同期します。存在しない / baseline不一致の場合は上表の通常rerun経路へ固定し、新しい設計判断はStep 0へ持ち越しません。
+この表にないSkill固有のv1→v2 data conversion wrapper / generic converterは追加しません。spec-analysisは§2.8でfrozen検証したcanonical v1 Authority content、test-analysis / usability-inspection / wcag-conformance-evaluationはread-only readerでintegrity検証済みかつcurrentness条件を満たすsemantic input、coverage-analysisはcurrent upstream v2 evidence、qa-workflowは全必要current v2 evidenceが揃ったcurrent workflow state / routing inputを正本とし、proseからv2 inputを推測変換しません。PR #14 merge後のStep 0ではspec-analysis v1 Entityのexact baseline field / canonicalizationと、3 readerが固定するpre-cutover runtime / generator implementation fingerprint、保存input blockの存在・parse可能性を実測値へ同期します。存在しない / baseline不一致の場合は上表の通常rerun経路へ固定し、新しい設計判断はStep 0へ持ち越しません。
 
 ### 2.9 qa-workflow migration preflight
 
