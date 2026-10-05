@@ -97,7 +97,7 @@ ID: `UIOP-001` から開始し、最低3桁で連番採番する。999の次は1
 
 ### 3.1 current / blocked rowのfield契約
 
-blocked rowは、semantic identityが確定済みで「自身の完成に必要なfieldが未確定」または「同じidentityのancestorがblocked」の場合に同じstable IDを持ちます。semantic identity自体を確定できない場合はIDを発行せず、親scopeまたは既知の親rowからUNKNOWNへ閉じます。identityの同一性判断はLLM、下記のfield充足とancestor由来effective stateはhelperが検証・導出します。
+blocked rowは、semantic identityが確定済みで「自身の完成に必要なfieldが未確定」または「同じidentityのancestorがblocked」の場合に同じstable IDを持ちます。semantic identity自体を確定できない場合はIDを発行しません。Blocking UNKNOWNの置き場所は階層ごとに固定し、実装者が任意のancestorへ付け替えません。identityの同一性判断はLLM、下記のfield充足・UNKNOWN配置・ancestor由来effective stateはhelperが検証・導出します。
 
 | row | current / mappedで必須 | blockedで必須 | blockedで空を許可 | IDを発行しない条件 |
 | --- | --- | --- | --- | --- |
@@ -108,6 +108,17 @@ blocked rowは、semantic identityが確定済みで「自身の完成に必要�
 | AC | Behavior ID、Acceptance Criteria、current SPEC / DECISION / approved ASMの関連仕様項目ID。関連UNKNOWN IDは空 | currentまたはblocked Behavior ID。自身のblockerがある場合は関連UNKNOWN ID1件以上、ancestor Behavior由来だけのblockedなら空可。Acceptance Criteria / 関連仕様項目ID / 関連構造IDは確定済み分だけ保持 | Acceptance Criteria、関連仕様項目ID、関連構造ID、ancestor由来時の関連UNKNOWN ID | ACの存在・identity自体を確定できない |
 
 `current / mapped` rowの関連仕様項目IDは `_06` のnormative traceability contractに従います。US / UC / Behavior / ACの `関連構造ID` は `_05` のUI構造ID + domain item ID exact prefix集合だけを許可し、ACの意味を制約するdomain itemはLLMがこの明示edgeへ含めます。自身の意味不足でblockedになるrowはUNKNOWNを正本とし、未確定fieldを推測して埋めません。ancestor由来だけのeffective blockedはancestorのUNKNOWNを参照元とし、子rowへ複製しません。`状態` はhelper-ownedで、materialize callerは送信しません。
+
+
+identity未確定時のBlocking UNKNOWN配置を次に固定します。
+
+- UIOP identityを確定できない → 当該ScopeへBlocking UNKNOWNを置き、UIOP rowは作らない
+- User Story identityを確定できない → 当該ScopeへBlocking UNKNOWNを置き、US rowは作らない
+- Use Case identityを確定できない → identityが確定している親USの `関連UNKNOWN ID` へBlocking UNKNOWNを置いてUSをblockedにし、UC rowは作らない。ScopeへだけUNKNOWNを置いてUSをcurrentのまま残さない
+- Behavior identityを確定できない → 親UCがcurrentなら§7の該当結果分類を `未定義 + 関連UNKNOWN ID` とし、Behavior rowは作らない。これはUCをblockedへ落とす理由にせず、scope readinessをblockedにする。親UC自体がblockedなら新しいchild UNKNOWNを追加せず既存ancestor blockerを正本とする
+- Acceptance Criteria identityを確定できない → identityが確定している親Behaviorの `関連UNKNOWN ID` へBlocking UNKNOWNを置いてBehaviorをblockedにし、AC rowは作らない。ScopeへだけUNKNOWNを置いてBehaviorをcurrentのまま残さない
+
+この規則は「最も近い親へ常にUNKNOWNを置く」という一般則ではありません。Behavior identity未確定はUse Case振る舞い完全性が正本であり、他の階層と同じ扱いへ一般化しません。
 
 state導出は次に固定します。
 
@@ -139,7 +150,7 @@ ID: `US-001` から開始し、最低3桁で連番採番する。999の次は100
 - current: Actor / Role、Goal、仕様参照が確定し、関連UNKNOWN IDは空
 - blocked: 確定できない意味を推測せず、関連UNKNOWN IDを1件以上持つ
 - 仕様にないビジネス価値を追加しない
-- current USは1つ以上のcurrentまたはblocked UCへ接続する
+- current USは1つ以上のcurrentまたはblocked UCへ接続する。Use Case identity未確定のBlocking UNKNOWNを自身の `関連UNKNOWN ID` に持つblocked USはUC row 0件を許可する
 - USの `状態` はhelperがActor / Role、Goal、仕様参照、関連UNKNOWNから `current / blocked` を導出する。USはrootなのでancestor由来blockedはない
 
 独立したValue列は持ちません。仕様に価値・目的の記載がある場合はGoalまたは関連Authorityの意味として保持します。
@@ -197,7 +208,7 @@ ID: `BH-001` から開始し、最低3桁で連番採番する。999の次は100
 - blocked Behaviorは確定済みの`関連操作ID`だけを保持でき、関係自体が未確定なら空を許可する。blocked UIOPを参照する場合は同じScopeだけを許可し、current Behaviorからblocked UIOPを参照しない
 - current Behaviorは1件以上のcurrentまたはblocked ACを持つ。ready scopeではcurrent Behaviorごとにcurrent ACが1件以上あり、blocked ACが残っていないことを要求する
 - Behaviorの意味自体が未確定ならblocked Behavior rowを作る。BehaviorはcurrentだがACのsemantic identityが既知で期待条件だけ一時的に未確定なら、親Behaviorを不要にblockedへ落とさず同じAC IDをblockedで保持できる
-- Behaviorの存在・identity自体をまだ確定できない場合はblocked Behavior rowを作らず、§7の `未定義` + UNKNOWNだけで表す
+- Behaviorの存在・identity自体をまだ確定できない場合はblocked Behavior rowを作らず、親UCがcurrentなら§7の該当結果分類を `未定義` + UNKNOWNで表す。親UCがblockedならancestor blockerへ閉じ、新しいBehavior用UNKNOWNを重複生成しない
 - blocked Behaviorはcurrent ACを持たない。AC semantic identityが既知ならblocked ACを同じIDで保持できる
 - blocked Behaviorをcurrent ACの親にしない。親Behaviorがblockedならsemantic identityを維持する既存ACはhelperが同じIDのblockedへ伝播する
 - Behaviorの `状態` はhelperが自身の必須field / 関連UNKNOWNと親UCのeffective stateから導出する
@@ -247,7 +258,7 @@ ID: `AC-001` から開始し、最低3桁で連番採番する。999の次は100
 - blocked ACはsemantic identityが既知のACが一時的にcurrentでなくなる場合に使用し、親Behaviorはcurrentまたはblockedを許可する。AC自身の未確定事項でblockedになる場合は `関連UNKNOWN ID` を1件以上必須とし、ancestor Behavior由来だけでeffective blockedになる場合は空を許可してancestorのUNKNOWNを複製しない
 - ACは観測可能な振る舞い / 結果の意味を表す
 - AC identityが既知でexpected behavior / Authorityだけ不足する場合は同じAC IDをblockedで保持する。解消後は同じIDをcurrentへ戻す
-- AC identity自体を確定できない場合はAC rowを作らず、既知のBehaviorまたはScopeからBlocking UNKNOWNへ閉じる
+- AC identity自体を確定できない場合はAC rowを作らず、identityが確定している親Behaviorの `関連UNKNOWN ID` へBlocking UNKNOWNを置いてBehaviorをblockedにする。ScopeへだけUNKNOWNを置いてcurrent Behavior + AC 0件の状態を残さない
 - 意味上本当に廃止された場合だけLLMが `retire_ids[]` を明示し、current / blocked切替をretireとして扱わない
 - ACへ境界値一覧、入力値一覧、組合せ表、テストデータ一覧を展開しない
 - 仕様上の特定値そのものが期待挙動の一部である場合は除去しない
@@ -339,11 +350,11 @@ test-condition-designはTRから問題構造を分析し、仕様 / Risk / 状�
 - SCOPE / UIOP / US / UC / BH / AC ID形式・duplicate
 - scope適用判定の許可値と対応関係
 - Behavior Decomposition=required scopeはUIOP rowを1件以上持つか、UIOP identity自体を確定できないBlocking UNKNOWNが当該Scope + `02_behavior_and_business_rules.md` を指す。どちらもなければrejectする
-- current USは1件以上のcurrent / blocked UCへ接続する
+- current USは1件以上のcurrent / blocked UCへ接続する。blocked USはUse Case identity未確定を表す自身のBlocking UNKNOWNがあればUC 0件を許可し、current US + UC 0件はrejectする
 - current UCは正常 / 準正常 / 例外3rowを持ち、少なくとも1分類が `定義あり` でcurrent Behaviorへ到達するか、1分類以上が `未定義 + UNKNOWN` でscope blockedになる。3分類すべて `なし` かつBehavior=0件をreadyにしない
-- current Behaviorは1件以上のcurrent / blocked ACへ接続し、blocked ACが残るscopeをreadyにしない
+- current Behaviorは1件以上のcurrent / blocked ACへ接続する。AC identity未確定を表すBlocking UNKNOWNを自身に持つblocked BehaviorはAC 0件を許可し、current Behavior + AC 0件はrejectする。blocked ACが残るscopeをreadyにしない
 - current Behaviorは`関連操作ID`を1件以上持ち、全参照先がmapped UIOPで同じUC / Scopeへ閉じる。blocked Behaviorの関連操作参照は確定済み分だけを許可する
-- required scope内では不足情報をblocked UIOP / US / UC / Behavior / AC + UNKNOWN、またはidentity未確定のBlocking UNKNOWNとして保持できる
+- required scope内では不足情報をblocked UIOP / US / UC / Behavior / AC + UNKNOWN、または上記階層別規則のidentity未確定Blocking UNKNOWNとして保持できる。UC identity未確定をScopeだけへ置く、AC identity未確定をScopeだけへ置く、Behavior identity未確定をblocked Behaviorへ捏造する配置をrejectする
 - not-applicable scope、またはUI操作有無自体が未確定のblocked scopeにUIOP / US / UC / Behavior / ACを確定済みとして生成していないこと
 - blocked applicability / rowのUNKNOWN参照
 - UIOP → UC closure
