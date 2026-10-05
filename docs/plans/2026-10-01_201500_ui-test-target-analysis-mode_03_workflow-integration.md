@@ -143,7 +143,7 @@ previous downstreamのidentityは既存workflow stateへ次のmachine-owned fiel
 }
 ```
 
-初回は`null`です。`workflow_ref`は既存のopaque UUIDをそのまま使い、qa-workflow runtime-v2のMachine Runtime InputとResult payloadにも保存します。qa-workflow artifactがcurrent runtime verificationを通過して保存され、保存先がexact `artifact_revision` のhistorical refetchを提供できることを既存 `artifact_graph.verify_historical_revision()` で確認した後だけ、workflow stateをCAS更新してbindingを差し替えます。blocked / unresolved runでは差し替えません。
+初回は`null`です。`workflow_ref`は既存のopaque UUIDをそのまま使い、qa-workflow runtime-v2のMachine Runtime InputとResult payloadにも保存します。qa-workflow artifactがcurrent runtime verificationを通過して保存され、保存先がexact `artifact_revision` のhistorical refetchを提供できることを既存 `artifact_graph.verify_historical_revision()` で確認した後だけ、workflow stateをCAS更新してbindingを差し替えます。**このCAS成功をdownstream baselineのcommit境界**とします。artifact保存済みでもhistorical refetch / SHA-256 / CASのいずれかに失敗したrunは未commitであり、そのartifactをcurrent canonical baselineや次runのprevious snapshotとして使いません。既存bindingがあれば旧bindingを維持し、初回でbindingがnullならcommitted baseline未成立のままです。blocked / unresolved runでも差し替えません。
 
 処理順を次に固定します。
 
@@ -156,7 +156,7 @@ previous downstreamのidentityは既存workflow stateへ次のmachine-owned fiel
 7. helperが検証済みInputからprevious current TR / TCN / model / CI / TC EntityとTRD / TCD / TCのprevious `current_structure_state` を内部抽出し、Entityの `content.scope_refs[]` とblocked Scope ID集合の積集合だけで `active → inactive` 対象を決める。Authority共有、名称、同一PAGE、runtime dependency等からscope所属を推測しない
 8. helperは `inactive_tr_ids[] / inactive_tcn_ids[] / inactive_model_keys[] / inactive_ci_ids[] / inactive_tc_ids[]` に加え、各root runtimeへ保存するmachine-owned `inactive_tr_history[] / inactive_tcn_history[] / inactive_model_history[] / inactive_materialize_history[] / inactive_tc_history[]` をcanonical sortして返す。Agent / LLMはprevious snapshot、ID集合、historyを手作業でfilter / 復元しない
 9. TRD / TCD / TCのv2 generatorとTCD current structure stateは該当IDを `active → inactive` へ遷移させ、inactive IDをcurrent Machine Entity / current runtime unit / carry-forward projectionへ含めない。同時に各root payloadへlast-active Entity historyを保存し、TCDはlast successful materializeのCI ID / target mapping / semantic mapping / expected-result-root stateも履歴化する
-10. ready scope全件は1 batchでtest-analysis → TRD → TCD → TC → coverage-analysis → qa-workflowへ進める。qa-workflow artifactが `verify_runtime_evidence.valid=true` かつ `payload.can_complete=true` のcurrent evidenceとして保存された時だけ上記bindingを更新する。inactive履歴そのものをfreshness blocking issueにしない
+10. ready scope全件は1 batchでtest-analysis → TRD → TCD → TC → coverage-analysis → qa-workflowへ進める。qa-workflow artifactが `verify_runtime_evidence.valid=true` かつ `payload.can_complete=true` のcurrent evidenceとして保存され、historical refetch / SHA-256確認後のworkflow state CASまで成功した時だけ上記bindingをcommitする。CAS前のartifactは未commitなのでprevious snapshotへ使わない。inactive履歴そのものをfreshness blocking issueにしない
 11. blocked scopeが再びreadyになった場合、inactive IDとmachine-owned last-active historyを再利用候補として保持する。LLMはTR / TCN / model / TCのhistoryをsemantic identity比較に使い、同一なら既存IDをreuseして `active` へ戻す。CIは`inactive_materialize_history[]`からprevious mapping inputを決定論的に復元して同じIDをreuseする。意味が変わった場合は旧inactive IDを `deleted` にしてnew IDを発行する
 12. `deleted` はterminalであり、block解除を理由に復帰させない
 
