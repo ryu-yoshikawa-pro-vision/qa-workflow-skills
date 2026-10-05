@@ -778,6 +778,7 @@ input:
       }
     }
   },
+  "current_scope_ids":["SCOPE-001","SCOPE-002"],
   "blocked_scope_ids":["SCOPE-002"],
   "previous_qa_workflow_artifact_markdown":"<workflow state bindingが指すexact historical revision>"
 }
@@ -790,10 +791,10 @@ CLI契約はこのhelper固有に固定し、単一用途のため `operation` f
 stdin:
 
 - top-levelはJSON object exactly 1件
-- 許可top-level fieldは `workflow_ref / workflow_state_record / blocked_scope_ids / previous_qa_workflow_artifact_markdown` の4つだけ。missing / unknown fieldをrejectする
+- 許可top-level fieldは `workflow_ref / workflow_state_record / current_scope_ids / blocked_scope_ids / previous_qa_workflow_artifact_markdown` の5つだけ。missing / unknown fieldをrejectする
 - duplicate JSON keyをrejectするstrict decoderを使う
 - aggregate stdinは16 MiB以下。通常stringは64 KiB以下とし、top-level `previous_qa_workflow_artifact_markdown` だけ16 MiB aggregate内で64 KiB上限を免除する
-- `workflow_ref` はnon-empty string、`blocked_scope_ids[]` はduplicateなしのknown `SCOPE-xxx` string配列でcanonical sortする。空配列は許可する
+- `workflow_ref` はnon-empty string。`current_scope_ids[]` はcurrent `ui_target_package.py inspect.current_scope_ids[]` とexact一致するduplicateなし・canonical sort済みのknown `SCOPE-xxx` 配列、`blocked_scope_ids[]` は同inspect値とexact一致する `current_scope_ids[]` のsubsetとする。どちらもAgentが再構築せず、`blocked_scope_ids[]` は空配列を許可する
 - `workflow_state_record` は既存workflow state schemaでvalidateし、このhelper固有には `workflow_ref` と `state.last_completed_qa_workflow_artifact` だけを参照する
 - `previous_qa_workflow_artifact_markdown` はstringまたはnull。bindingとのnull / non-null整合は下記規則でvalidateする
 
@@ -808,6 +809,17 @@ stdin:
     "inactive_model_keys":["decision-001"],
     "inactive_ci_ids":["TCN-003-CI01"],
     "inactive_tc_ids":["TC-004"],
+    "removed_scope_ids":["SCOPE-003"],
+    "scope_removal_affected_entities":[
+      {
+        "skill":"test-requirement-design",
+        "entity_type":"tr",
+        "entity_ref":"TR-005",
+        "previous_scope_refs":["SCOPE-001","SCOPE-003"],
+        "removed_scope_refs":["SCOPE-003"]
+      }
+    ],
+    "requires_semantic_resolution":true,
     "inactive_tr_history":[],
     "inactive_tcn_history":[],
     "inactive_model_history":[],
@@ -850,7 +862,7 @@ handled failureはcanonical JSON + terminal LFをstdoutへ1件だけ出力して
 
 規則:
 
-1. `blocked_scope_ids[]` はcurrent `ui_target_package.py inspect` の値をそのまま使い、Agentが追加・削除しない
+1. `current_scope_ids[] / blocked_scope_ids[]` はcurrent `ui_target_package.py inspect` の値をそのまま使い、Agentが追加・削除しない。`blocked_scope_ids[]` は `current_scope_ids[]` のsubsetを要求し、current scope universeから消えたSCOPEをblocked扱いへ読み替えない
 2. `workflow_ref` は既存workflow stateのopaque UUIDをそのまま受けます。新しいlineage IDを作りません。`workflow_state_record.workflow_ref` とexact一致しなければrejectします
 3. `workflow_state_record.state.last_completed_qa_workflow_artifact` はqa-workflowがcurrent artifact保存後にCAS更新したmachine-owned bindingだけを使います。bindingはexact `artifact_ref / artifact_revision / artifact_sha256` を持ち、Agent / LLMが組み立てません。qa-workflowは呼出前に既存 `artifact_graph.verify_historical_revision()` でstored revisionをhistorical refetchできることを確認します
 4. bindingがnullならprevious Markdownもnullだけを許可します。bindingがnon-nullならprevious Markdown必須とし、raw UTF-8 bytesのSHA-256を再計算して `artifact_sha256` とexact一致させます。これにより別artifact / 1世代古いartifact / 改変artifactをrejectします
@@ -860,14 +872,18 @@ handled failureはcanonical JSON + terminal LFをstdoutへ1件だけ出力して
 8. 保存済みqa-workflow Inputの `workflow_scopes[] / current_entities[] / current_runtime_units[]` とResult payloadを検証します。Result payloadの `current_entities[]` はInputとexact一致させ、各workflow scopeの `current_structure_state` は同じ保存Input内の `normalized_input / current_entities / current_runtime_units` を使うfrozen v2 structure-state規則で自己整合を検証します。ここで検証できた `current_entities[]` とTRD / TCD / TCの `current_structure_state` だけをinternal previous snapshotとします
 9. Agent / LLMは `previous_machine_entities[] / previous_structure_states` を入力しません。raw downstream artifact、個別Runtime Input / Result、人間向けruntime表、current inputに対する旧artifactの `verify_runtime_evidence` 結果からsnapshotを再構築しません。workflow state binding / historical revision / pair / integrityのいずれかが確認できなければfail-closedします
 10. previous TR / TCN / model / CI / TC Entityはcanonical `content.scope_refs[]` を必須とし、duplicate / unsorted / non-stringをrejectします。UI target scope ownership baseline成立後に空scope_refsが残るactive downstream Entityは `scope_ownership_unavailable` でfail-closedします
-11. `content.scope_refs[] ∩ blocked_scope_ids[]` が非空のprevious active Entityだけをinactive対象にします。Authority共有、名称、同一PAGE、AC dependency、runtime dependencyからscope所属を推測しません
-12. 新たにinactiveになるTR / TCN / model / TCはprevious current Entity snapshotを対応historyへ追加します。既存inactive historyはidentityでmergeし、内容不一致をsilent overwriteしません
-13. 新たにinactiveになるTCNがprevious current CI / target mapping / semantic mappingを持つ場合、検証済みprevious TCD `current_structure_state.runtime_results[]` の `artifact:materialize_coverage:<TCN-ID>` resultから `ci_entities / ci_id_state / target_mapping_state / semantic_ci_mapping_state / expected_result_root_state` を取得して§7.3のhistory entryを生成します。必要なresultが無い場合、またはCI state / mappingが相互不整合なら `inactive_materialize_history_missing` でfail-closedします
-14. `scope_refs[]` がready / blocked双方を含むcross-scope Entityもentity単位でinactiveにします。ready側だけへ自動縮退しません
-15. current packageで初めてblockedになりprevious Entityが存在しないitemはinactive IDを生成しません
-16. outputはstable ID / history identity順でcanonical sort / dedupeします
+11. 各previous active Entityについて `removed = content.scope_refs[] - current_scope_ids[]` を先に計算します。`removed` が非空ならそのEntityを `scope_removal_affected_entities[]` へ `{skill,entity_type,entity_ref,previous_scope_refs,removed_scope_refs}` で追加し、`removed_scope_ids[]` へunionします。このEntityはblocked由来inactiveへ自動遷移させず、`requires_semantic_resolution=true` とします
+12. `removed` が空のEntityだけ、`content.scope_refs[] ∩ blocked_scope_ids[]` が非空ならinactive対象にします。Authority共有、名称、同一PAGE、AC dependency、runtime dependencyからscope所属を推測しません
+13. scope removal affected Entityは無言carry-forwardを禁止します。TR / TCN / model / TCのownerはcurrent upstreamとlast-active contentからreuse / scope再割当 / split / semantic deletionを判断し、generatorはaffected previous active IDをcurrent `scope_refs[] ⊆ current_scope_ids[]` のactiveとして再生成するかdeletedへ遷移するまで完成扱いしません。CIは解決後のcurrent TCN / model mappingから決定論的にreuse / deletedを導出します。helper自身はscope縮退・split・deleteを決めません
+14. 新たにinactiveになるTR / TCN / model / TCはprevious current Entity snapshotを対応historyへ追加します。既存inactive historyはidentityでmergeし、内容不一致をsilent overwriteしません
+15. 新たにinactiveになるTCNがprevious current CI / target mapping / semantic mappingを持つ場合、検証済みprevious TCD `current_structure_state.runtime_results[]` の `artifact:materialize_coverage:<TCN-ID>` resultから `ci_entities / ci_id_state / target_mapping_state / semantic_ci_mapping_state / expected_result_root_state` を取得して§7.3のhistory entryを生成します。必要なresultが無い場合、またはCI state / mappingが相互不整合なら `inactive_materialize_history_missing` でfail-closedします
+16. `scope_refs[]` がready / blocked双方を含むcross-scope Entityもentity単位でinactiveにします。ready側だけへ自動縮退しません。一方、current scope universeから消えたscopeを含むcross-scope Entityは§11〜13のscope removal semantic resolutionへ回し、inactiveへ逃がしません
+17. current packageで初めてblockedになりprevious Entityが存在しないitemはinactive IDを生成しません
+18. outputはstable ID / history identity順でcanonical sort / dedupeします。`scope_removal_affected_entities[]` は `(skill, entity_type, entity_ref)`、各scope配列はScope IDでcanonical sortします
 
 qa-workflowはhelper outputを各generator / TCD current structure stateへ直接接続します。
+
+`scope_removal_affected_entities[]` がnon-emptyの場合、qa-workflowは通常のready-scope downstreamを開始する前にTRD → TCD → TCの依存順で当該previous IDをupdate scopeへ入れます。全affected IDがactive with current-only scope refsまたはdeletedへ解決されるまでcoverage-analysis / qa-workflow final gateへ進みません。SCOPE rowがcurrent packageから消えたことだけを理由にhelperがsemantic deletionを決めません。
 
 ### 12.4 再ready化
 
@@ -903,7 +919,58 @@ qa-workflow / coverage-analysisはcurrent Entity collectionへAC Entityが存在
 
 UI target downstreamをcompleted baselineとして扱う時だけ、qa-workflowは保存済みworkflow stateの `last_completed_qa_workflow_artifact` を更新します。更新順は `qa-workflow runtime current verification PASS → artifact保存 → artifact_ref/revision取得 → historical refetch availability確認 → raw Markdown SHA-256計算 → workflow state CAS` とします。**workflow state CAS成功をdownstream baselineのcommit境界**とし、CAS成功前に生成・保存されたartifactは未commitです。historical refetch確認、SHA-256確認、state CASのいずれかが失敗したrunはcompleted baselineとして扱わず、そのrunのartifactをcurrent canonical downstream baselineまたは次runのprevious snapshotに使用しません。既存bindingがある場合は旧bindingをcanonical baselineとして維持し、初回でbindingがnullのままならcommitted downstream baselineは未成立です。orphan artifact cleanupや新しいtransaction frameworkは追加しません。`ready_scope_ids=[]` でdownstream runtimeをdispatchしないrun、またはqa-workflow resultがunresolved / blockedのrunではbindingを更新しません。
 
-coverage-analysisの既存traceability graph node typeへACを追加しません。AC→TRのmachine traceabilityはTR Entity dependencyとTRD closureで保証し、Authority / Risk / TR / TCN / CI / TCの既存coverage graphを不要に拡張しません。inactive TR / TCN / CI / TCはcurrent graph node / current runtime unitへ入れず、blocked scopeの再開情報はspec-analysisのscope readinessとdownstream ID stateのlast active `scope_refs[]` で保持します。
+### 13.2 qa-workflow local baseline persistence
+
+PR #14のgeneric `create_workflow_state() / state_update_decision() / verify_historical_revision()` はそのまま維持します。現行local exact-content tokenをnative CASへ読み替えません。本PRでは、UI target downstream baselineに必要なhistory / conditional updateを実際に成立させるため、`skills/qa-workflow/scripts/artifact_graph.py` へqa-workflow専用のlocal single-host pathだけを追加します。generic storage adapter / transaction frameworkは作りません。
+
+supported persistence pathは次の2つです。
+
+1. **local single-host**: 既存Project Context `qa.workflow_state_root` を使い、下記固定layout + process lock + expected revision再確認 + atomic replaceでcommitする
+2. **provider-native**: harnessがexact historical refetchとnative atomic conditional writeを実際に提供する場合だけ既存provider契約を使う
+
+shared / network filesystemをlocal single-host pathとして扱いません。provider-native history / CASが無いshared storageはunsupportedとしてfail-closedします。
+
+local layout:
+
+```text
+<qa.workflow_state_root>/<workflow_ref>.json
+<qa.workflow_state_root>/.<workflow_ref>.workflow-state.lock
+<qa.workflow_state_root>/artifacts/<workflow_ref>/qa-workflow/<lowercase-sha256>.md
+```
+
+local bindingは次へ固定します。
+
+- `artifact_ref = "qa-workflow-local:<workflow_ref>"`
+- `artifact_revision = "sha256:<lowercase-sha256>"`
+- `artifact_sha256 = "<lowercase-sha256>"`
+- snapshot pathは `workflow_ref + artifact_revision` からhelperが導出し、callerがpathを入力しない
+- artifact bytesはcurrent verificationを通ったqa-workflow MarkdownのUTF-8 bytes exactly。snapshotはcontent-addressed immutable fileで、同digest pathが既存ならbytes exact一致を確認してidempotent success、異なればfail-closedする
+
+`artifact_graph.py` へ追加するpublic helperは2つに限定します。
+
+- `commit_qa_workflow_baseline_local(workflow_root, workflow_ref, expected_state_revision, desired_state, artifact_markdown)`
+- `read_qa_workflow_artifact_revision_local(workflow_root, workflow_ref, artifact_ref, artifact_revision)`
+
+commit helperは次を1経路で実行します。
+
+1. `workflow_ref` / fixed path / root境界を検証し、symlink root / state / lock / artifact pathを拒否する
+2. artifact UTF-8 bytesが16 MiB以下であることを確認しSHA-256を計算する
+3. content-addressed snapshotをexisting `create_if_absent()` でimmutable publishし、readback bytes / SHA-256を確認する
+4. fixed sibling lockへPOSIX `fcntl.flock` / Windows `msvcrt.locking` のprocess-scoped exclusive lockを取得する。取得不能 / unsupportedはfail-closedし、別lock serviceを作らない
+5. lock保持中にcurrent state bytesを再読込してexact-content `state_revision` を再計算し、`expected_state_revision` とexact一致を要求する。read-before-lockの比較をconditional update扱いしない
+6. desired stateへcandidate bindingを設定したcanonical JSON bytesをsame-directory temporary fileへwrite + flush + fsyncし、`os.replace` で `<workflow_ref>.json` へ切り替える
+7. replace後にstateをreadbackし、workflow_ref / binding / exact bytesを確認してからcommit成功を返す
+8. process kill後はOS lock解放に依存しstale-lock owner recordを作らない。snapshot作成後state commit前に落ちたorphan snapshotはbindingから参照されないため無視し、自動cleanupを本PRへ追加しない
+9. state replace後response前に落ちたretryでは、lock内でcurrent state bytesが今回のdesired state bytesとexact一致しbindingも同一なら `committed_replay` として成功を返す。それ以外のrevision不一致はconflictにする
+
+このlocal helper経路でのみ、lock内のexpected revision比較 + atomic replaceをconditional state updateとして扱います。既存 `create_workflow_state()` が返す `local_exact_content_token_not_a_cas_condition` の意味は変更しません。provider-native pathでは従来どおりproviderのnative CAS / exact historical refetchを要求します。
+
+historical read helperはbindingから固定pathを導出し、symlinkを拒否してexact bytesを読み、`artifact_revision` とSHA-256を再検証してMarkdownを返します。local pathでは `verify_historical_revision(provider_can_refetch=true)` の能力フラグだけで済ませず、この実refetch成功をcommit前確認と次run読込の両方に使用します。
+
+
+coverage-analysisの既存traceability graph node typeへACを追加しません。
+
+Product Riskは本PRで `scope_refs / active-inactive-deleted` lifecycleへ拡張しません。test-analysisはcurrent ready-scope batchに対してfull rerunし、同じrunのTRDはそのcurrent Product Risk集合だけを入力としてAuthority / Product Risk / AC closureを再評価します。blocked scope由来の旧Riskをcarry-forwardするためのinactive履歴を作らず、Risk集合の変化に伴うTR変更は同じdownstream runで通常のsemantic update / freshnessとして処理します。AC→TRのmachine traceabilityはTR Entity dependencyとTRD closureで保証し、Authority / Risk / TR / TCN / CI / TCの既存coverage graphを不要に拡張しません。inactive TR / TCN / CI / TCはcurrent graph node / current runtime unitへ入れず、blocked scopeの再開情報はspec-analysisのscope readinessとdownstream ID stateのlast active `scope_refs[]` で保持します。
 
 ## 14. repository tests
 
