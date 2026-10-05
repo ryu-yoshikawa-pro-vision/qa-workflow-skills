@@ -157,8 +157,10 @@ stdinは1 JSON object、stdoutは1 JSON object + LFです。operationは `cutove
 ```
 
 - TRD / TC: `phase=all` only
-- TCD: `condition-structure / models / test-data-requirements / materialize-coverage`
-- TCDの2 phase目以降だけ `current_v2_artifact_markdown` を要求する
+- TCD: `condition-structure / models / test-data-requirements / materialize-coverage / resume`
+- TCDのcanonical migration / retryは `phase=resume` を使用する。helperがvalidated v1 sourceと `current_v2_artifact_markdown` に存在するcurrent v2 pairを検証し、固定phase順の最初の未完了phaseを選ぶ。explicit 4 phaseはhelper単体test / 内部dispatchで利用できるが、qa-workflow / Agentがresume phaseを選択しない
+- TCDのexplicit 2 phase目以降は `current_v2_artifact_markdown` を要求する。`phase=resume` は未着手ならnullを許可し、部分完了がある場合はcurrent partial v2 artifactを要求する
+- 各Skillのcutover完了までは入力 `artifact_markdown` のvalidated v1 sourceをimmutable migration sourceとして保持し、partial v2 artifactで置換・削除しない。再開時に同じv1 sourceを解決できない場合は推測復元せずfail-closedする。新しいgeneric migration registry / transaction layerは追加しない
 - cutover helperの外側stdinはcurrent `runtime_contract.strict_loads()`へそのまま渡さない。各helperのcutover入口がstdlib JSON decoderでduplicate key、depth、container item数等の既存安全制約を維持しつつaggregate 16 MiBを検査する
 - top-level `artifact_markdown / current_v2_artifact_markdown` だけは成果物全文transportとして64 KiB string上限を免除する。その他のtop-level scalarと、artifactから抽出したMachine Runtime Input / Result / Entity等のJSON scalarは通常の64 KiB上限を維持する
 - legacy readerがartifact内から抽出した各v1 JSON blockは、旧通常runtimeが生成可能だった2 MiB aggregate上限内でstrict decodeする。Machine Runtime Input / Result metadataは `runtime_contract_version=runtime-v1`、Machine Entities wrapper / individual Entityは `schema_version=entity-state-v1` を要求し、Input / Result pair、Entity identity / dependency / stored fingerprintをfrozen v1規則で再検証する
@@ -207,7 +209,7 @@ expected unitは `artifact:requirement_structure:all` exactly 1件です。
 
 #### test-condition-design/runtime_v1_cutover.py
 
-TCDはcurrent v2 model resultを後段へ使うため4 phaseで進めます。
+TCDはcurrent v2 model resultを後段へ使うため4 phaseで進めます。`phase=resume` では下記順序をhelper自身が検証し、current v2 artifact内で完全に検証済みのphaseを飛ばして最初の未完了phaseを返します。途中の`models`ではexpected model unit集合とcurrent v2 pairを照合し、検証済みunitを保持したまま依存順で未実行のready unitだけを返します。後段phaseのpairだけが存在する、前段pairがinvalid / missing、unknown / duplicate unitがある等の順序違反は自動補正せずblockedにします。
 
 `condition-structure`:
 - v1 condition_structure input/resultをexactly 1 pair要求
@@ -385,6 +387,20 @@ inputはmachine-generated observationだけを受けます。
     {
       "skill":"test-requirement-design",
       "artifact_present":true,
+      "runtime_contract_version":"runtime-v2",
+      "entity_schema_version":"entity-state-v2",
+      "verification_status":"current_valid"
+    },
+    {
+      "skill":"test-condition-design",
+      "artifact_present":true,
+      "runtime_contract_version":"runtime-v2",
+      "entity_schema_version":"entity-state-v2",
+      "verification_status":"cutover_in_progress"
+    },
+    {
+      "skill":"test-case-design",
+      "artifact_present":true,
       "runtime_contract_version":"runtime-v1",
       "entity_schema_version":"entity-state-v1",
       "verification_status":"legacy_valid"
@@ -413,7 +429,9 @@ inputはmachine-generated observationだけを受けます。
 
 入力値はAgentの意味判断で作りません。
 
-- `runtime_inventory[]`: 各Skillのfrozen v1 reader / current v2 verifierが返したschema version / verification結果をexact転記する。未知version、v1/v2混在、verification source欠落をhelperがrejectする
+- `runtime_inventory[]`: 固定cutover順で必要な各Skillについて、frozen v1 reader / current v2 verifier / Skill-local cutover helperが返したschema version / verification結果をexact転記する。core Skillの欠落、未知version、verification source欠落をrejectする。workflow上不要なusability-inspection / wcag-conformance-evaluationは既存deterministic routingで不要と確定した場合だけinventory対象外にする
+- `verification_status` は `legacy_valid / current_valid / cutover_in_progress` を使用する。`cutover_in_progress` はTCDだけで、validated v1 sourceを保持したままcurrent partial v2 artifactがTCD helperのresume検証に通る状態を表す
+- Skill間のruntime-v1 / v2混在は一律rejectしない。§2.10の固定依存順で `current_valid` が先頭から連続し、その直後が `legacy_valid` またはTCDの `cutover_in_progress`、さらに後続が未移行である部分完了だけをvalidなresume stateとする。後続Skillが先行Skillより先に `current_valid` となる順序違反、TCD以外の `cutover_in_progress`、同一Skill artifact内のv1/v2混在はrejectする
 - `v2_baseline`: current qa-workflow `verify_runtime_evidence` の `valid` と `artifact:workflow_runtime:all.payload.can_complete` をexact転記する
 - `ui_target_package`: package未作成なら `present=false`、作成済みなら `ui_target_package.py inspect` の `current_scope_ids[] / ready_scope_ids[] / blocked_scope_ids[]` をexact転記する
 - `active_downstream[]`: current v2 Machine Entity / structure stateのactive TR / TCN / model / CI / TC identityと `scope_refs[]` をdeterministic projectionする。prose / 名称から推測しない
@@ -424,6 +442,10 @@ inputはmachine-generated observationだけを受けます。
 {
   "valid":true,
   "migration_status":"runtime_v2_cutover_required",
+  "cutover_next_action":{
+    "skill":"test-condition-design",
+    "phase":"resume"
+  },
   "blocking_issue":null,
   "issues":[]
 }
@@ -431,13 +453,15 @@ inputはmachine-generated observationだけを受けます。
 
 `migration_status` は次の5値です。
 
-- `runtime_v2_cutover_required`: runtime-v1 downstreamが1件以上あり、current v2 baseline未成立
+- `runtime_v2_cutover_required`: runtime cutover対象に `legacy_valid / cutover_in_progress` が1件以上残り、current v2 baseline未成立
 - `ui_target_migration_required`: current v2 baseline成立済みでUI target package未作成
 - `scope_ownership_normalization_required`: UI target package作成済み、既存active downstreamに `scope_refs=[]` があり、`current_scope_ids[]` が1件以上かつ全current scope ready
 - `scope_ownership_baseline_required`: UI target package作成済み、既存active downstreamに `scope_refs=[]` があり、blocked scopeが1件以上、または `current_scope_ids=[]` でownershipを新規確立する対象Scope自体が無い。これはblocking statusで、`blocking_issue="scope_ownership_baseline_required"`。zero-scopeを理由にunscoped legacy downstreamを一律deletedへ推測しない
 - `partial_progression_ready`: runtime-v1 downstreamが残らずcurrent v2 baseline / 必要なUI target migration / ownership baselineが成立済み、またはdownstream未作成の新規UI target workflow
 
-判定優先順位は上記順です。LLMはstatusを上書きしません。handled invalid inputはexit 0 + `valid=false / issues[]`、unexpected internal errorだけexit 1とします。
+`cutover_next_action` は `migration_status=runtime_v2_cutover_required` の時だけnon-nullとし、固定依存順の最初の未完了Skillを返します。TRD / TCは `phase=all`、TCDは `phase=resume`、その他のSkillは `phase=null` とします。TCDのactual 4 phase判定は `migration_preflight.py` に複製せずSkill-local helperが行います。完了済み `current_valid` Skillはcurrent v2 verifierに再度通る限り再利用し、v1へrollbackしません。
+
+判定優先順位は上記順です。LLMはstatus / `cutover_next_action` を上書きしません。handled invalid inputはexit 0 + `valid=false / issues[]`、unexpected internal errorだけexit 1とします。
 
 ### 2.10 UI target migrationとの相対順序
 
@@ -454,6 +478,8 @@ inputはmachine-generated observationだけを受けます。
 9. 既存active downstreamが `scope_refs=[]` の場合は、全current scope readyを要求してrequirement-structure-v2 → TCD → TCをscope ownership normalizationとして再実行し、coverage-analysis → qa-workflowまでcurrentにする。blocked scopeが残る場合は `scope_ownership_baseline_required` で停止する
 10. scope ownership baseline成立後、AC / Authority変更でstaleになったdownstreamを通常の依存順で再実行し、以後のready / blocked partial progressionを許可する
 
+runtime-v1 → v2 cutover中に停止した場合、1〜7の先頭から連続してcurrent v2 verification済みとなったSkillは再実行せず、最初の未完了Skillから再開します。TCD内部だけは `runtime_v1_cutover.py phase=resume` がcurrent partial v2 artifactを検証し、最初の未完了phaseまたは未実行model unitを返します。対応Skillのcutover完了まではvalidated v1 source artifactをimmutableに保持します。部分完了のv2 artifactはresume evidenceとして利用してよい一方、7のqa-workflow final gateが成立するまではcurrent v2 baselineとは扱わず、8以降へ進めません。依存順に反するv1/v2混在、invalid partial v2 artifact、必要なv1 source欠落はfail-closedし、LLMによるrollback / phase選択 / prose復元を行いません。
+
 `UI target migration済み + runtime-v1 downstreamあり + v2 baseline未成立` はblockedです。逆順を許可しません。runtime-v1 downstream artifactが存在しないworkflowだけ、UI target package migrationから直接normal v2 workflowへ進めます。
 
 #### repository regression
@@ -469,6 +495,8 @@ inputはmachine-generated observationだけを受けます。
 - usability-inspection / wcag-conformance-evaluationはreader validだけでは再利用せず、currentness成立時のみsaved inputでv2再生成し、不成立時は通常rerun / re-observationへ戻る回帰
 - coverage-analysis / qa-workflowはvalidな保存v1 inputが存在しても無視し、current upstream v2 evidence / current workflow stateから再生成する回帰
 - TCD target version rebase、derived child、semantic CI mappingをcurrent v2 resultへ正しく接続
+- `migration_preflight.py` はTRD=current v2 / TCD=cutover_in_progress / TC=legacy v1のような固定順序に沿う部分完了を受理し、`cutover_next_action={skill:test-condition-design,phase:resume}` を返す。TRD=legacy v1のままTCDまたはTCがcurrent v2等の順序違反はrejectする
+- TCD `phase=resume` は未着手、condition-structure完了、models一部完了、models完了、test-data-requirements完了、materialize-coverage完了の各状態を検証し、最初の未完了phase / model unitだけを返す。前段missing / invalid、後段だけ存在、unknown / duplicate unit、v1 source欠落をrejectする
 - `UI target migration済み + runtime-v1 downstream + v2 baseline未成立` をintegration testでblocked
 - spec-analysis/test-analysis v2再生成 → TRD/TCD/TC cutover → coverage-analysis → 必要なinspection/WCAG → qa-workflow final gateの順でv2 baselineが成立し、その後UI target migration → 既存downstreamがある場合は全scope readyでscope ownership normalization → coverage-analysis / qa-workflow再生成 → partial readiness / downstream rerunへ進むことをintegration test / 実Agent smokeで確認。ownership baseline前にblocked scopeがある場合は `scope_ownership_baseline_required`、downstream未作成ならone-time gate不要
 
@@ -1155,7 +1183,7 @@ Product Riskは本PRで `scope_refs / active-inactive-deleted` lifecycleへ拡�
 - 上記integration regressionのprevious snapshotはcurrent `workflow_ref` のworkflow state `last_completed_qa_workflow_artifact` が指すexact historical revisionからだけ抽出する。保存済み`artifact:workflow_runtime:all` Input / Result pair、Input `current_entities[]`、各scope `current_structure_state`の改変をrejectする。旧runtime-v2 implementation fingerprintのartifactでも保存値同士がfrozen v2規則で自己整合すればhistorical readerは受理し、current verifierではstaleになることを分離して確認する。別workflow_ref、1世代古いartifact、artifact SHA不一致、previousありなのにnull、historical refetch不能をfail-closedする
 - AuthorityをA/Bで共有してもscope_refsがAだけのEntityはinactiveにしない回帰と、scope_refsがA/B双方のcross-scope Entityは保守的にinactiveへ落とす回帰
 - v1 cutover / non-UI-target baselineの `scope_refs=[]` からUI target migrationする際、既存active downstreamがある場合は全scope readyでのみownership baselineを作成し、blocked scopeが残る間は `scope_ownership_baseline_required` でfail-closedする回帰。downstream未作成の新規workflowではpartial readinessを許可する
-- `migration_preflight.py` がmachine-generated runtime inventory / current v2 verification / UI target inspect / active downstream stateから5つのmigration statusを決定論生成し、runtime-v1残存時にUI target migrationへ進まないこと、v2 baseline後にUI target migration、unscoped active downstream + blocked scopeでは `scope_ownership_baseline_required`、全scope readyではownership normalization、baseline成立後はpartial progressionを返す回帰
+- `migration_preflight.py` がmachine-generated runtime inventory / current v2 verification / UI target inspect / active downstream stateから5つのmigration statusを決定論生成し、runtime cutover中は固定依存順に沿う部分完了を受理して最初の未完了Skillを`cutover_next_action`へ返す回帰。TCD途中では`phase=resume`へ委譲し、順序違反のv1/v2混在はrejectする。runtime-v1残存時にUI target migrationへ進まないこと、v2 baseline後にUI target migration、unscoped active downstream + blocked scopeでは `scope_ownership_baseline_required`、全scope readyではownership normalization、baseline成立後はpartial progressionを返すことも固定する
 - inactive state rowがlatest resolved semantic ownershipを保持し、`inactive_*_history[]` がlast-active Entity content / old ownershipを保持するため、通常blockとSCOPE removal後blockのどちらでもre-ready時のsemantic ID reuse候補を失わない回帰
 - SCOPE-A/Bのcompleted baseline後にA/Bともblockedとなって`ready_scope_ids=[]`になったrunではbatch handoff / downstream runtime / qa-workflow runtimeを起動せずlast completed bindingを維持し、その後Bだけreadyへ戻ったrunで同bindingからAをinactive、Bをreuse候補として復元できる回帰
 - SCOPE-Aだけのcompleted scope-ownership baselineからAをexplicit retireして `current_scope_ids=[] / ready_scope_ids=[] / blocked_scope_ids=[]` にする回帰。全blocked経路へearly returnせず、historical baselineからactive / inactive TR / TCN / model / CI / TC全件をterminal deletedへ閉じ、current downstream 0件のcoverage-analysis / qa-workflowをcurrent化し、zero-scope terminal baselineへbindingを更新する。previous active downstreamが`scope_refs=[]`の未正規化baselineでは一律削除せず`scope_ownership_unavailable`でfail-closedする
