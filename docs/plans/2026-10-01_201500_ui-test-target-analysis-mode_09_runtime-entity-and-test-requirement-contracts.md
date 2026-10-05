@@ -870,7 +870,15 @@ input:
       "resolved_scope_refs":["SCOPE-001"]
     }
   ],
-  "scope_removal_applied_states":[]
+  "scope_removal_applied_states":[
+    {
+      "skill":"test-requirement-design",
+      "entity_type":"tr",
+      "entity_ref":"TR-005",
+      "status":"active",
+      "scope_refs":["SCOPE-001"]
+    }
+  ]
 }
 ```
 
