@@ -869,16 +869,14 @@ table input contract:
 - `file / section` は§2〜§5のstandard registryに存在するexact pairだけを許可する。extension fileは `table_changes[]` の対象にしない
 - `cells` はprimary ID列とhelper-owned derived列を除いたexact header名だけを許可する。UIOP / US / UC / Behavior / RULE / FIELD / FLOW / NOTIFY / INTERACTの `状態` はhelper-ownedでcaller inputを拒否する。stable reference列はJSON string array、通常cellはstringで受ける
 - row identity fieldは `draft_key / identity_action / reuse_id / external_id / cells` に固定する。`identity_action` は `new / reuse / external` の3値だけを許可する
-- package-owned新規rowは `identity_action=new / draft_key=<request内unique> / reuse_id=null / external_id=null` とし、helperが§7.2のprefix selectorからprefixを導出して採番する
+- package-owned新規rowは `identity_action=new / draft_key=<request内unique> / reuse_id=null / external_id=null` とし、helperが下記primary prefix selector contractからprefixを導出して採番する
 - 既存row更新は `identity_action=reuse / draft_key=null / reuse_id=<stable ID> / external_id=null`。normalではsnapshot一致後に再parseした `previous_model` に存在するIDだけをreuseでき、legacy-migrationでは `migration_retained_ids[]` に含まれるIDだけをreuseできる
 - packageへ初めて取り込む外部ownerのDEC / ASMだけ `identity_action=external / draft_key=<request内unique> / reuse_id=null / external_id=<owner確定済みDEC-xxx|ASM-xxx>` を許可する。helperは番号を発行せず、ID形式、prefixと`分類`の一致、current request / previous model / historyとのidentity衝突を検証する。normalで既にprevious_modelに同じIDが存在する場合は`external`をrejectし、以後は`reuse`を要求する。`external`をDEC / ASM以外へ使用しない
 - `external_id` はowner-side deterministic allocator / canonical ownerで既に確定したIDだけをcallerが渡す。Project Context ownerでは `project_context_ids.py materialize` 後のIDを使い、別ownerではそのownerが発行したcanonical IDを使う。owner未採番時にLLMが番号を推測して`external`へ渡す経路は許可しない。`ui_target_package.py` はgeneric owner adapterや外部owner currentness verifierを追加せず、package境界では構造・identity整合だけを検証する
 - request内の新規row参照はstable IDの代わりに `@draft:<draft_key>` をreference配列へ指定できる。helperは`new`の採番結果だけでなく`external`の`external_id`も同じrequest-wide draft mapへ登録して解決する
-- caller inputに `primary_prefix` を持たせない。primary prefixは§7.2のexact selector registryからhelperが決定する
+- caller inputに `primary_prefix` を持たせない。primary prefixは下記exact selector registryからhelperが決定する
 
-`keyed_table_updates[]` はstable IDを採番しないview / fixed-key tableの**完成row集合**を対象にし、section単位で全rowを置換します。部分patchは許可しません。exact registryは次です。
-
-### 7.2 primary prefix selector contract
+#### primary prefix selector contract
 
 固定prefixが1つだけのtracking tableは§5のstandard IDをそのまま使います。同一tableに複数prefixが存在する次の3 sectionだけ、既存semantic fieldからhelperがprefixを決定します。LLM / callerはprefix文字列を入力しません。
 
@@ -902,6 +900,8 @@ table input contract:
 | 同上 | `分類=承認済みASM` | `ASM`。`new`禁止、初回取込は`external` |
 
 selector fieldがmissing / unknown、ID prefixとselectorが不一致、`new`でDEC / ASMを採番しようとする入力はwrite前にrejectします。PANEL / POPOVER / GLOBAL UIは意味上の種別を保持したまま同じ`PANEL` prefixを共有します。`分析項目`の`承認済みASM`は外部ownerのapproved ASM mirror専用で、spec-analysisの通常4分類を増やすsemantic classifierとして扱いません。
+
+`keyed_table_updates[]` はstable IDを採番しないview / fixed-key tableの**完成row集合**を対象にし、section単位で全rowを置換します。部分patchは許可しません。exact registryは次です。
 
 
 
