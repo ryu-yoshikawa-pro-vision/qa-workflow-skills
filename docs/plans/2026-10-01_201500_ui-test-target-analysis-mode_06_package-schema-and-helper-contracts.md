@@ -259,9 +259,11 @@ scope単位のsemantic contractは `_08` を正本とします。structured tabl
 | AC ID | Behavior ID | Acceptance Criteria | 関連仕様項目ID | 関連構造ID | 状態 | 関連UNKNOWN ID |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 
-not-applicable、またはUI操作有無自体が未確定のscopeはUIOP / US / UC / Behavior / ACを確定済みrowとして持ちません。Behavior Decomposition=`not-applicable`のScope IDをこれらのrowがScopeまたはparent chain経由で参照する状態はdeterministic validationでrejectします。required scopeではUIOP / US / UC / Behavior / ACが `current / blocked` 相当のstate modelを持てます。ACもsemantic identityが既知なら同じ `AC-xxx` を `blocked + 関連UNKNOWN ID` で保持し、解消後に同IDをcurrentへ戻します。semantic identity自体が未確定ならAC rowを発行せず、07のBlocking UNKNOWNへ閉じます。本当に意味上廃止されたACだけをexplicit retireします。
+not-applicable、またはUI操作有無自体が未確定のscopeはUIOP / US / UC / Behavior / ACを確定済みrowとして持ちません。Behavior Decomposition=`not-applicable`のScope IDをこれらのrowがScopeまたはparent chain経由で参照する状態はdeterministic validationでrejectします。required scopeではUIOP / US / UC / Behavior / ACが `current / blocked` 相当のstate modelを持てます。USは自身のfield / UNKNOWNだけでstateを決め、UC / Behavior / ACは自身のblockerに加えてancestor blockedをeffective stateへ決定論伝播します。ancestor由来blockedだけを理由に子へUNKNOWNを複製しません。semantic identityが既知なら同じstable IDをblockedで保持し、ancestor / 自身のblocker解消後に同IDをcurrentへ戻します。semantic identity自体が未確定ならrowを発行せず07のBlocking UNKNOWNへ閉じます。本当に意味上廃止された項目だけをexplicit retireします。
 
 Behaviorの`関連操作ID`はUIOP stable IDの`<br>`区切り参照です。どのUIOPがBehaviorに意味上関係するかはLLMが判断します。current Behaviorは1件以上のmapped UIOPを参照し、各UIOPの`対応UC ID`にそのBehaviorの`UC ID`が含まれ、UIOPのScopeとUC→USから導出したScopeが一致することをhelperが検証します。blocked Behaviorは確定済みの関連操作だけを保持でき、未確定なら空を許可します。blocked UIOPを参照する場合は同じScopeだけを許可し、current Behaviorからblocked UIOPを参照しません。
+
+ancestor state propagationの意味契約は `_08 §3.1` を正本とします。current descendantは全ancestor currentを要求し、blocked descendantはcurrent / blocked ancestorを参照できます。ancestor由来blockedの子は既知semantic fieldとstable IDを保持し、自身に未確定fieldがない限り自身の`関連UNKNOWN ID`を増やしません。
 
 #### ビジネスルール一覧
 
@@ -582,7 +584,7 @@ blocked scopeは次のunionです。
 - そのscopeのconditional file applicabilityに `blocked` があるscope
 - 07のcurrent UNKNOWNで `Blocking Scope ID` に明示されたscope
 
-current UNKNOWNの存在だけではblockedにしません。下位rowだけをblockedにするとは、Scopeの `Behavior Decomposition=required` をnot-applicable / blockedへ書き換えない意味です。workflow上はその下位blockerが解消するまで当該scopeを `blocked_scope_ids[]` に入れます。`scope_readiness[].blocking_unknown_ids[]` は、Scope自身・blocked下位row・UC完全性=`未定義`・conditional applicabilityの `関連UNKNOWN ID` と、07でそのscopeを `Blocking Scope ID` に持つcurrent UNKNOWNのunionを重複除去してcanonical sortした集合です。blockerなのにUNKNOWN IDを持たない状態は許可しません。qa-workflowはpackage全体のbinary statusではなくこの結果で影響scopeだけ停止します。completion状態だけを理由に `valid=false` へしません。
+current UNKNOWNの存在だけではblockedにしません。下位rowだけをblockedにするとは、Scopeの `Behavior Decomposition=required` をnot-applicable / blockedへ書き換えない意味です。workflow上はその下位blockerが解消するまで当該scopeを `blocked_scope_ids[]` に入れます。`scope_readiness[].blocking_unknown_ids[]` は、Scope自身・自身のUNKNOWNでblockedになった下位row・UC完全性=`未定義`・conditional applicabilityの `関連UNKNOWN ID`、07でそのscopeを `Blocking Scope ID` に持つcurrent UNKNOWNに加え、effective blockedを生じさせたancestor chainのUNKNOWN IDをunion / dedupe / canonical sortします。ancestor由来だけのblocked descendant自身へUNKNOWN IDを複製しません。blockerのroot causeへUNKNOWNが存在しない状態は許可しません。qa-workflowはpackage全体のbinary statusではなくこの結果で影響scopeだけ停止します。completion状態だけを理由に `valid=false` へしません。
 
 handled failure:
 
@@ -874,6 +876,8 @@ normative traceability contract:
 
 - UIOPの `状態` はhelperが生成する。`関連UNKNOWN ID` が1件以上なら `blocked`、空かつcurrent必須fieldが揃えば `mapped`。US / UC / Behavior / AC / RULE / FIELD / FLOW / NOTIFY / INTERACTも同様に `blocked / current` をhelperが導出する。callerは `状態` を入力しない
 - current Behaviorは`関連操作ID`を1件以上要求する。参照先はmapped UIOPで、UIOPの`対応UC ID`にBehaviorの`UC ID`を含み、UIOP.Scopeと親UCのScopeが一致しなければならない。blocked Behaviorでは確定済み参照だけを保持し、未確定なら空を許可する。helperは意味上の関連性を作らず、存在・state・UC / Scope整合・duplicateだけを検証する
+- USは自身の必須field / `関連UNKNOWN ID`だけでstateを導出する。UCは参照USのいずれかがblockedならeffective blocked、Behaviorは親UCがblockedならeffective blocked、ACは親Behaviorがblockedならeffective blockedとする。ancestor由来blockedでは子のstable ID / 既知fieldを保持し、ancestor UNKNOWNを子の`関連UNKNOWN ID`へ複製しない
+- descendant自身の必須field不足があるのに自身の`関連UNKNOWN ID`がなく、ancestor blockedだけではその不足を説明できない場合は`state_transition_required`でrejectする。ancestorがcurrentへ戻り、子自身の必須fieldが揃い`関連UNKNOWN ID`が空ならhelperが同じstable IDをcurrentへ戻す
 - current / mapped UIOP / US / UC / Behavior / AC / RULE / FIELD / FLOW / NOTIFY / INTERACT rowは `関連仕様項目ID` を1件以上要求する。current ACはさらにcurrent SPEC / DECISION / approved ASMを1件以上要求し、blocked ACは `関連UNKNOWN ID` を1件以上要求する
 - current rowの `関連仕様項目ID` はcurrent SPEC / DECISION / approved ASM / INFだけを許可する
 - identityは確定しているが内容不足の場合はTriggerや存在判定を書き換えず、blocked row + `関連UNKNOWN ID` 1件以上で表す。identity自体を確定できない場合はstable rowを作らず07のUNKNOWNからscope/file blockerへ閉じる
@@ -978,7 +982,7 @@ stdin:
 {"operation":"build-machine-evidence","package_root":"<path>","scope_ids":null}
 ```
 
-`scope_ids` は `null` またはcurrent ready Scope IDのnon-empty arrayです。duplicate / unknown / blocked scope IDを拒否し、helperがcanonical sortします。canonical qa-workflowでdownstream `artifact:*:all` runtimeへ渡す場合は、`scope_ids[]` が `inspect.ready_scope_ids[]` とexact一致することを要求します。一部ready scopeだけのsubset実行をglobal `:all` artifactの代替にしません。
+`scope_ids` は `null` またはcurrent ready Scope IDのnon-empty arrayです。duplicate / unknown / blocked scope IDを拒否し、helperがcanonical sortします。canonical qa-workflowでdownstream `artifact:*:all` runtimeへ渡す場合は、`ready_scope_ids[]` が1件以上の時だけ `scope_ids[]` を渡し、その集合が `inspect.ready_scope_ids[]` とexact一致することを要求します。`ready_scope_ids=[]` ではこのoperationを空配列で呼ばずdownstream runtimeをdispatchしません。一部ready scopeだけのsubset実行をglobal `:all` artifactの代替にしません。
 
 §9に従い09からnormalized Authority inputを生成して既存 `authority_entities.py` のbuilderを呼びます。linked domain itemはcurrent AC / 親Behavior / 親UC / 親USの `関連構造ID` に明示されたdomain item IDだけを対象にし、linked UIOPの `対象構造ID` からdomain itemを逆引きしません。linked UI structureは、同chainの `関連構造ID` にあるUI構造ID、linked UIOPの `対象構造ID`、linked domain itemの `対象構造ID / 関連構造ID` にあるUI構造IDをseedとし、`親構造ID` をrootまで辿ります。domain itemから別domain itemへ再帰展開しません。これらとscope、関連current INFからAcceptance Criterion Machine Entityを生成して統合し、missing parent / self-parent / cycleはrejectします。
 
@@ -1140,7 +1144,7 @@ Acceptance Criterion projection:
 - 09の `適用範囲` 自由記述、名称、Path、同一PAGE、本文類似、Authority共有から新しいedgeを作らない。scope所属は `Scope ID / 関連Scope ID` またはUS→UC→Behavior→ACの明示parent chainだけで決める
 - ACとdomain itemの意味関係をhelperが推測しない。必要なedgeがsemantic inputに無い場合はsemantic quality gate側の不足であり、helperが補完しない
 
-qa-workflow / test-analysisはpackage-global Machine Entity集合をMarkdownからfilterせず、current `inspect.ready_scope_ids[]` 全件を `build-machine-evidence(scope_ids=ready_scope_ids)` へ渡して1つのcanonical batch handoffを取得します。Authority / AC / Entityのmerge・dedupeをAgentが行いません。batch handoffから `artifact:analysis_entities:all` / `artifact:requirement_structure:all` へ実際に渡すcanonical stdin JSON bytesを構成した**後**に16 MiB上限を事前検査します。2 MiBを超えても16 MiB以下なら1つの`:all` requestとして処理し、16 MiBを超える場合はruntimeを起動せず `limit_exceeded` とします。scopeごとの個別run・subset run・silent truncate・auto splitで回避しません。その他の通常runtime generatorは2 MiB上限を維持します。
+qa-workflow / test-analysisはpackage-global Machine Entity集合をMarkdownからfilterしません。current `inspect.ready_scope_ids[]` が1件以上なら全件を `build-machine-evidence(scope_ids=ready_scope_ids)` へ渡して1つのcanonical batch handoffを取得し、Authority / AC / Entityのmerge・dedupeをAgentが行いません。`ready_scope_ids=[]` ならbatch handoff自体を生成しません。batch handoffから `artifact:analysis_entities:all` / `artifact:requirement_structure:all` へ実際に渡すcanonical stdin JSON bytesを構成した**後**に16 MiB上限を事前検査します。2 MiBを超えても16 MiB以下なら1つの`:all` requestとして処理し、16 MiBを超える場合はruntimeを起動せず `limit_exceeded` とします。scopeごとの個別run・subset run・silent truncate・auto splitで回避しません。その他の通常runtime generatorは2 MiB上限を維持します。
 
 blocked scopeをquestion-analysisへ送る場合は `inspect.scope_readiness[].blocking_unknown_ids[]` を使い、current UNKNOWN全件をAgentがfilterしません。
 
