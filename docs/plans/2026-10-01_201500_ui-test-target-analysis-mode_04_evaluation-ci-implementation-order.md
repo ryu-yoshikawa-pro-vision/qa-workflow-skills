@@ -491,6 +491,8 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - Trigger=`あり`のdomainはrequiredのまま維持する。identity既知ならFIELD / FLOW / NOTIFY|INTERACT等をcurrent / blocked rowで保持し、identity不明なら07のBlocking Scope ID + 関連Fileでclosureする。内容不足をTriggerへ逆流させない
 - UI構造はexact種別を確定できる時だけtyped structural row / IDを作る。分類未確定では07 UNKNOWNへScope / `01_ui_structure_and_navigation.md`を記録し、後続を止める時だけBlocking Scopeとする。既存typed rowの分類根拠失効はexplicit retire + same-UNK open / reopenで扱い、仮種別や汎用structural prefixを追加しない
 - skills/spec-analysis/scripts/ui_target_package.pyの `inspect / validate / materialize` と内部allocator / version / README / MANIFEST / lifecycle / impactを実装。create / legacy-migrationはhelper内部でSkill-local assetからstaging初期化し、snapshotはhash identityだけ保持、derived tracking / refsはmaterializeが再parseする
+- `table_changes[]` のprimary prefix決定を `_06 §7.2` のselector registryへ固定する。固定prefix tableはstandard registry、UI構造は`種別`、通知・外部連携は`種別`、09分析項目は`分類`からhelperがprefixを導出し、callerの`primary_prefix`入力を許可しない
+- packageへ初登場するowner確定済みDEC / ASMは `identity_action=external` で取り込み、package allocatorは番号を発行しない。同requestの`@draft`をowner IDへ解決し、既追跡IDは`reuse`だけを許可する。09分析項目ではDEC=`分類=DECISION`、approved ASM=`分類=承認済みASM`とし、後者をspec-analysis通常分類の追加候補としてLLMに生成させない
 - `prose_updates[]` はassetに存在するstandard exact heading本文だけを置換する。新規heading作成 / rename / deleteを許可しない
 - canonical table cell encode、complete file set、sibling staging / backup、preflight orphan recovery、commit直前snapshot再照合、package単位切替 / rollbackを実装
 - `ui_target_package.py` 内部だけにfixed sibling process lockを追加し、POSIX `fcntl.flock` / Windows `msvcrt.locking` の標準ライブラリ実装で同一packageをsingle writer化する。PR #14のclaim / reservation / CAS helperはpackage writeへ使わず、generic lock serviceも作らない
@@ -516,7 +518,7 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - `authority_entities.py` の既存 `{authorities:[...]}` CLIを維持したまま、legacy移行用の排他的入力 `{source_artifact_markdown:"..."}` を追加する。exactly one `Machine Entities: spec-analysis` v1 blockをfrozen `entity-state-v1` 規則で検証し、各Authority Entityのcanonical `content`だけをcurrent v2 `build()`へ渡す。v1 `content_fingerprint` / dependency / wrapperはcarry-forwardせず、block missing / invalid時はhuman-readable table parserへfallbackせず通常spec-analysis semantic rerunを要求する
 - `ui_target_package.py build-machine-evidence` を実装し、AC / Behavior / UC / USの明示 `関連構造ID` からlinked domain item、linked UIOPの `対象構造ID` と明示UI structure refからstructure + ancestor、linked INFをAC contentへ固定projectionする。同一PAGE / Scope等の逆引きを禁止する。Authorityだけdependency Entityとする。package-global callはready / blocked scope ID indexだけ、batch callはcurrent ready scope全件を `_06 §9.3` で内部projectionしてAuthority / current AC / Machine Entity / expected identityを1集合へunion / dedupeし、ready scopeの `scope_id / target / ui_operation / authority_refs[]` をcompact `scope_index[]` で返す
 - `skills/test-analysis/scripts/analysis_entities.py` / `skills/test-requirement-design/scripts/requirement_structure.py` は既存 `artifact:*:all` runtime unit identityを維持したまま `run_cli(..., aggregate=True)` へ変更し、root input上限を16 MiBにする。transport上限を `input_mode` で分岐するwrapperは追加せず、この2 root unitはdirect / artifactとも同じ16 MiB上限を使う。その他の通常generatorは2 MiBを維持する
-- generator contractを `requirement-structure-v1 → requirement-structure-v2`、`condition-structure-v1 → condition-structure-v2`、`materialize-coverage-v1 → materialize-coverage-v2`、`case-structure-v1 → case-structure-v2` へ更新する。TRDはtop-level `acceptance_criteria[] / scope_ids[]`、各TRのsemantic `acceptance_refs[] / scope_refs[]` を追加し、4 generator共通でstable ID stateへ `inactive` を追加する。TCNは参照TR、modelは親TCN、CIは親TCN / model、TCは参照TCN / CIからscope_refsを決定論伝播する。UI target packageからTRDへ進むcanonical workflowはartifact modeに固定し、upstream AC Entity集合とのexact一致 + AC/Authority dependency + semantic freshnessを要求する。direct / non-UI-target v2 baselineは `scope_ids=[] / scope_refs=[]` を許可する
+- generator contractを `requirement-structure-v1 → requirement-structure-v2`、`condition-structure-v1 → condition-structure-v2`、`materialize-coverage-v1 → materialize-coverage-v2`、`case-structure-v1 → case-structure-v2` へ更新する。TRDはtop-level `acceptance_criteria[] / scope_ids[]`、各TRのsemantic `acceptance_refs[] / scope_refs[]` を追加し、4 generator共通でstable ID stateへ `inactive` を追加する。artifact modeでは各TRの参照AC Entity `content.scope.scope_id` unionを`required_scope_refs[]`としてdeterministicに導出し、TR `scope_refs[]`へ必ず含める。LLMはそれ以外の追加ownershipだけを判断する。TCNは参照TR、modelは親TCN、CIは親TCN / model、TCは参照TCN / CIからscope_refsを決定論伝播する。UI target packageからTRDへ進むcanonical workflowはartifact modeに固定し、upstream AC Entity集合とのexact一致 + AC/Authority dependency + semantic freshnessを要求する。direct / non-UI-target v2 baselineは `scope_ids=[] / scope_refs=[]` を許可する
 - current ACをTRまたはDispositionへ閉じ、Authority closureは独立維持する
 - TR EntityへAC EntityとACが参照するcurrent Authority Entity dependencyを保存する
 - shared runtimeへSkill固有migration projectionを入れない。新規 `skills/test-requirement-design/scripts/runtime_v1_cutover.py`、`skills/test-condition-design/scripts/runtime_v1_cutover.py`、`skills/test-case-design/scripts/runtime_v1_cutover.py` がcomplete v2 generator inputを決定論生成する
@@ -541,7 +543,7 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - coverage-analysis / qa-workflowはvalidなv1保存inputが存在しても再利用せず、それぞれcurrent upstream v2 evidence / current workflow state・routing inputからv2 evidenceを再生成する回帰を固定する
 - `analysis_entities.py` / `requirement_structure.py` のaggregate root regressionとして、2 MiB超〜16 MiB以下のcanonical request成功、16 MiB + 1 byteの `limit_exceeded`、その他の通常generatorで2 MiB + 1 byteが従来どおり `limit_exceeded` になることを固定する
 - legacy readerが改変v1 fingerprint / dependencyをrejectし、64 KiB超のtop-level artifact Markdownは16 MiB以内なら受理、artifact内scalarの64 KiB超はrejectするtransport回帰を固定する
-- requirement-structure-v2 artifact回帰: semantic `acceptance_criteria[]` とcurrent upstream AC Entity集合のexact一致、参照AC + AC Authority dependency、missing Entity fail-closedを固定する
+- requirement-structure-v2 artifact回帰: semantic `acceptance_criteria[]` とcurrent upstream AC Entity集合のexact一致、参照AC + AC Authority dependency、missing Entity fail-closedを固定する。`AC-002.scope=SCOPE-B`を参照するTRからSCOPE-Bを`scope_refs[]`で欠落させる入力をrejectし、AC由来required scopeに加えて別ready ScopeをLLMが追加する入力は許可する
 - requirement-structure-v2 direct回帰: upstream AC Entityが0件でもsemantic `acceptance_criteria[]` からknown ID / closureを検証でき、存在しないAC / AC由来Authority Entity dependencyを合成しない。AC EntityなしではAC本文 / 親chain変更のcross-run freshnessを保証しない。参照AC Entityが実在する場合だけAC dependencyを追加し、そのdependencyには既存freshnessを適用する
 
 ### Step 3: spec-analysis evaluation
@@ -562,6 +564,7 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - skills/question-analysis/scripts/question_ids.py（materialize / validate-links）。materializeはcurrent / resolved UNKNOWN集合を受けてlink validationまで同callで完了する
 - Project Contextが実際のDEC / ASM正本ownerの場合だけ skills/qa-workflow/scripts/project_context_ids.py（materialize / validate-history）を使用
 - 別ownerではProject Contextへ複製・再採番せず、導入先ownerがcanonical `DEC-xxx / ASM-xxx` を供給する。供給できない場合はfail-closedとし、generic external registry / adapterを追加しない
+- ownerで確定したDEC / ASMをUI target packageへ初回反映する時だけ`ui_target_package.py materialize`の`identity_action=external`を使い、以後は`reuse`へ切り替える。Project Context ownerでは`project_context_ids.py materialize`結果、別ownerではそのownerのcanonical IDをそのまま渡し、LLM hand-numberingへ戻さない
 - helper unit / portability test、deterministic mapping、question semantic caseを追加
 
 ### Step 5: qa-workflow routing
@@ -580,6 +583,7 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - standard heading registry、conditional file Trigger判定→状態導出、blocked packageの構造valid / completion blocked分離
 - extension自由記述-only契約、extension create/update/retire、test-relevant semanticsをextension proseだけに残さないsemantic contract
 - request-wide draft allocation / stable ref / normative traceability / MANIFEST receipt / Authority + AC Machine Entity bridge
+- mixed-prefix tableのselector、`identity_action=new / reuse / external`、owner発行済みDEC / ASM初回取込、同request`@draft`解決、`承認済みASM` mirror row、DEC / ASMのpackage allocator拒否を検証する
 - public `inspect / validate / build-machine-evidence / materialize` が同じpackage-local exclusive lockへ参加し、lock取得後に共通preflight recoveryを通してからcommitted rootを読むこと。readerはroot→backup途中やcrash後backup-only状態で一時不存在 / mixed-versionを返さない。materialize内部validator / parserはlock済み内部関数を使って再lockしない
 - inspect snapshot → materialize → explicit retire lifecycle
 - legacy vNN / unversioned packageとnormal spec-analysis single artifactのmigration fixture
@@ -587,7 +591,7 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 
 ### Step 7: deterministic / semantic boundary validation
 
-- semantic identity、explicit retire、same-UNK/new-UNK、file trigger、extension要否、DEC/ASM owner、UI分類、US/UC/Behavior/AC分解、AC→TR対応をscriptが決定していないこと
+- semantic identity、explicit retire、same-UNK/new-UNK、file trigger、extension要否、DEC/ASM owner、UI分類、US/UC/Behavior/AC分解、AC→TR対応をscriptが決定していないこと。一方でmixed-prefixのprefix選択、owner確定済みDEC/ASM IDの非採番取込、参照ACから必須になるTR scope包含は意味判断後の決定論処理としてscript側に残すこと
 - exact UI構造種別を確定できない状態でhelperが仮type / 仮prefixを作らず、LLMがUNKNOWNとして保持すること。known UIOPとUS / UC identity blockerの意味対応もLLMが既存UNKNOWNを選び、helperは参照整合とstate導出だけを担当すること
 - helperはtrigger状態、ID、serialization、file materialization、lifecycle、reference、Machine Entity projectionだけを決定論化すること
 - helperがAuthority不足等を検出した場合はblocked resultだけを返し、AC除去 / Behavior blocked化 / UNKNOWN reuse/new等のsemantic transitionを実行しないこと
@@ -615,6 +619,7 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - ready scope A/BのAuthority分離、共有Authorityのbatch内dedupe、UI操作なしscopeのAuthority handoff、blocked scope非混入をready-scope batch smokeで確認する。既存 `artifact:analysis_entities:all / artifact:requirement_structure:all` をscopeごとに複数回起動しない
 - package-global build responseがscope full payloadを複製せず、ready-scope batch runtime requestが2 MiBを超えても16 MiB未満なら既存 `artifact:analysis_entities:all / artifact:requirement_structure:all` を1回だけ起動して完遂できるscenario。16 MiB exactly / 1 byte超過の境界値はrepository testで固定する
 - SCOPE-A/B readyでTRD→TCD→TCまでscope_refs付きで生成後、Bだけblockedにするscenario。`scope_refs`がBと交差する旧TR / TCN / model / CI / TCだけが`inactive`へ遷移してcurrent Entity/runtimeから外れ、A専用Entityはcurrentのまま後続を完遂する。AuthorityをA/Bで共有していてもscope_refsで正しく分離できること、A/B両方をscope_refsに持つcross-scope Entityは保守的にinactiveになること、B再ready時はlast-active Entity historyとTCD materialize historyからsemantic identity / CI mappingを復元し、同じstable IDへ戻せることを確認する
+- artifact modeで `AC-B → SCOPE-B` を参照するTRに `scope_refs=[SCOPE-A]` だけを与えるnegative scenarioを追加し、required AC scope欠落としてTRDがrejectすることを確認する。`scope_refs=[SCOPE-A,SCOPE-B]` はAへの追加ownershipが意味上妥当なら許可する
 - 上記scenarioではprevious snapshotをcurrent `workflow_ref` のcommit済み `last_completed_qa_workflow_artifact` からだけ復元する。local pathではtemporary directory上へ実際にimmutable revisionを保存・refetchし、保存済みworkflow runtime pair / `current_entities[]` / `current_structure_state`の改変をrejectする。spec-analysis更新後に旧artifactをcurrent inputで再検証して`current_structure_state=null`になることとは独立して、当時のvalid snapshotを抽出できることを確認する。previous artifactが必要なのに欠落する場合はfail-closedする
 - historical integrity regressionとして、旧runtime-v2 implementation fingerprintで生成・current verification PASS済みのqa-workflow artifactは、現行implementation fingerprintが変わった後でもstate binding / stored fingerprint / dependency / Entity / structure stateが自己整合ならhistorical readerで受理する。一方、同artifactをcurrent evidenceとして `verify_runtime_evidence()` へ渡すとstaleになることを確認する
 - workflow binding regressionとして、正しいcurrent `workflow_ref` + latest completed `artifact_ref/revision/sha256`だけを受理し、別workflow artifact、1世代古いartifact、SHA不一致、previous bindingありなのにMarkdown=null、binding=nullなのにMarkdownあり、historical refetch unavailableをrejectする
@@ -625,6 +630,7 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - `UC-001 → BH-001 → AC-001` がcurrentの状態からUCだけにUNKNOWNが発生するscenarioを追加し、LLMがidentity reuseを選んだ場合はhelperがUC / BH / ACを同じIDのままeffective blockedへ伝播し、ancestor由来だけのBH / ACへ新規UNKNOWNを作らず、解消後に同IDでcurrentへ戻すことを確認する
 - child identity未確定の3経路を固定する。UC identity不明では親USへBlocking UNKNOWNを置いてUS blocked + UC 0件、Behavior identity不明ではcurrent UCの該当完全性rowを`未定義 + UNKNOWN` + Behavior 0件、AC identity不明では親BehaviorへBlocking UNKNOWNを置いてBehavior blocked + AC 0件とする。UC/AC identity不明をScopeだけへ置いてparentをcurrentのまま残す状態と、Behavior identity不明をblocked Behavior rowで捏造する状態をrejectする
 - UI構造の存在は識別済みだがPAGE / VIEW分類を確定できないscenarioを追加し、typed row / IDを作らずUNKNOWNで保持、解消時にnew typed ID発行とsame-UNK resolve、既存typed IDの分類根拠失効時はexplicit retire + same-UNK reopenとなることを確認する
+- mixed-prefix materialize scenarioを追加し、同一`UI構造一覧`内のPAGE / VIEW、同一`通知・外部連携一覧`内のNOTIFY / INTERACT、同一`分析項目`内のSPEC / INF / UNKがselector fieldから正しいprefixへ決まり、owner確定済みDEC / ASMは`external`で初回取込・`reuse`で更新されることを確認する。approved ASMは`分類=承認済みASM`で追跡し、package allocatorによるDEC / ASM採番をrejectする
 - known UIOP + US identity unknown、known UIOP + UC identity unknownを追加し、root causeの既存Blocking UNKNOWNをUIOPが参照してsame ID blocked、解消後same ID mappedとなり、UNKNOWNを複製しないことを確認する
 - SCOPE-A/B readyでcompleted baseline作成 → A/Bともblockedで `ready_scope_ids=[]` → downstream runtime無起動 / last completed binding維持 → Bだけreadyへ復帰 → baseline artifactからAだけinactive、Bは同じstable IDで再開、というintegration regressionを追加する
 - SCOPE-A/B readyでcompleted baseline作成後、Bをexplicit retireするscenarioを追加する。previous `scope_refs[]` にBを含むTR / TCN / model / CI / TCを `scope_removal_affected_entities[]` へ抽出し、自動でA-onlyへ縮退しない。ownerがreuse resolutionを返した場合はresolved ownershipからavailability stateをhelperが導出する。特にA+B → B retire + A blocked + C readyでA ownershipへreuseした旧IDをA ownershipのinactiveとして保持し、last-active historyは旧A+B snapshotを維持、C専用downstreamは完遂、A再readyで同IDをactiveへ戻す
