@@ -245,7 +245,7 @@ owner側でnew `DEC-xxx / ASM-xxx` が確定した後、UI target packageへ初�
 
 ### 2.6a runtime-v1 downstreamが残る場合の順序
 
-既存workflowのmigration phaseはAgent / LLMが文章から判断しません。新規 `skills/qa-workflow/scripts/migration_preflight.py` が、保存artifactのruntime / entity schema version、current v2 verification結果、UI target package有無、current active downstreamのscope ownership、`inspect.current_scope_ids[] / ready_scope_ids[] / blocked_scope_ids[]` を構造化入力として受け、§2.6aの次工程を決定論的に返します。入力値の正本とexact I/Oは `_09 §2.9` とし、callerが `runtime-v1が残っている / baseline済み` 等を意味判断でboolean化しません。
+既存workflowのmigration phaseはAgent / LLMが文章から判断しません。新規 `skills/qa-workflow/scripts/migration_preflight.py` が、保存artifactのruntime / entity schema version、current v2 verification結果、UI target package有無、current active downstreamのscope ownership、`inspect.current_scope_ids[] / ready_scope_ids[] / blocked_scope_ids[]` を構造化入力として受け、§2.6aの次工程を決定論的に返します。入力値の正本とexact I/Oは `_09 §2.9` とし、callerが `runtime-v1が残っている / baseline済み` 等を意味判断でboolean化しません。runtime-v1 → v2 cutover中の一時的なv1/v2混在は、下記依存順の先頭からcurrent v2 verification済み工程が連続する場合だけ再開可能とし、順序違反の混在はfail-closedします。
 
 既存workflowにruntime-v1のdownstream artifactが存在する場合、UI target packageへのmigrationを先に行いません。依存グラフ順を次に固定します。
 
@@ -260,7 +260,9 @@ owner側でnew `DEC-xxx / ASM-xxx` が確定した後、UI target packageへ初�
 9. UI target migration時点で既存active downstreamに `scope_refs=[]` が1件以上ある場合は、**全current scope readyの1回だけ**ownership normalizationを行う。全current scopeを `scope_index[]` に含めてrequirement-structure-v2 → TCD → TCを再実行し、current active TR / TCN / model / CI / TC全件へscope ownershipを付与する。1件でもblocked scopeがあれば `scope_ownership_baseline_required` で停止し、ready scopeだけへの旧ID割当を禁止する
 10. ownership normalization後にcoverage-analysis → qa-workflowまでcurrentにしてscope ownership baselineを成立させ、その後だけAC / Authority変更でstaleになったdownstreamを通常の依存順で再実行し、ready / blocked partial progressionを有効にする。既存active downstreamが無い新規UI target workflowでは9〜10のone-time gateを通さず、最初からready scopeだけで進める
 
-`UI target migration済み + runtime-v1 downstreamあり + v2 baseline未成立` の組合せはblockedです。migration順序とnext actionは `migration_preflight.py` の結果を正本とし、LLMがcutover / migration / ownership normalizationの要否を判断しません。
+runtime cutoverが途中で停止した場合、`migration_preflight.py` はcurrent v2 verification済みの先行Skillを再利用し、最初の未完了Skillだけを`cutover_next_action`として返します。完了済みv2 Skillをv1へrollbackしたり、後続Skillを先に進めたりしません。TCDが途中の場合はqa-workflow側で4 phaseの状態を推測せず、Skill-local `runtime_v1_cutover.py` を `phase=resume` で呼び、validated v1 sourceとcurrent partial v2 artifactから `condition-structure → models → test-data-requirements → materialize-coverage` の最初の未完了phaseを決定論的に選びます。対応Skillのcutoverが完了するまでは、そのSkillのvalidated v1 source artifactを置換・削除しません。部分完了状態は再開用evidenceであり、§2.6a 7のqa-workflow final gateが成立するまでv2 baselineとは扱いません。
+
+`UI target migration済み + runtime-v1 downstreamあり + v2 baseline未成立` の組合せはblockedです。migration順序とnext actionは `migration_preflight.py` の結果を正本とし、LLMがcutover / migration / ownership normalizationの要否や再開位置を判断しません。
 
 ### 2.7 downstream machine handoff
 
