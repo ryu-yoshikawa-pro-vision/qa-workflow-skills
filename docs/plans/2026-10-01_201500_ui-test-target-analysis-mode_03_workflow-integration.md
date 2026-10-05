@@ -143,7 +143,7 @@ previous downstreamのidentityは既存workflow stateへ次のmachine-owned fiel
 }
 ```
 
-初回は`null`です。`workflow_ref`は既存のopaque UUIDをそのまま使い、qa-workflow runtime-v2のMachine Runtime InputとResult payloadにも保存します。qa-workflow artifactがcurrent runtime verificationを通過して保存され、保存先がexact `artifact_revision` のhistorical refetchを提供できることを既存 `artifact_graph.verify_historical_revision()` で確認した後だけ、workflow stateをCAS更新してbindingを差し替えます。**このCAS成功をdownstream baselineのcommit境界**とします。artifact保存済みでもhistorical refetch / SHA-256 / CASのいずれかに失敗したrunは未commitであり、そのartifactをcurrent canonical baselineや次runのprevious snapshotとして使いません。既存bindingがあれば旧bindingを維持し、初回でbindingがnullならcommitted baseline未成立のままです。blocked / unresolved runでも差し替えません。
+初回は`null`です。`workflow_ref`は既存のopaque UUIDをそのまま使い、qa-workflow runtime-v2のMachine Runtime InputとResult payloadにも保存します。qa-workflow artifactがcurrent runtime verificationを通過した後、local single-hostでは `_09 §13.2` のimmutable snapshot保存・actual readback・workflow-ref process lock内expected revision再確認・atomic replace、provider-nativeではproviderのartifact保存・exact historical refetch・native CASを実行します。**local locked conditional updateまたはprovider CAS成功をdownstream baselineのcommit境界**とします。artifact snapshotが保存済みでもcommit境界前に失敗したrunは未commitであり、そのartifactをcurrent canonical baselineや次runのprevious snapshotとして使いません。既存bindingがあれば旧bindingを維持し、初回でbindingがnullならcommitted baseline未成立のままです。blocked / unresolved runでも差し替えません。
 
 処理順を次に固定します。
 
