@@ -233,7 +233,7 @@ Acceptance CriteriaはBehaviorが仕様上成立したと判断できる受入�
 #### Acceptance Criteria一覧
 
 | AC ID | Behavior ID | Acceptance Criteria | 関連仕様項目ID | 関連構造ID | 状態 | 関連UNKNOWN ID |
-| --- | --- | --- | --- | --- | --- | --- | --- |
+| --- | --- | --- | --- | --- | --- | --- |
 
 ID: `AC-001` から開始し、最低3桁で連番採番する。999の次は1000
 
