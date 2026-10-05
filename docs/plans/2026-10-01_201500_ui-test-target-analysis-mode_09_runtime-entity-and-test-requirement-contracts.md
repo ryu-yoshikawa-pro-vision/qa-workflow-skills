@@ -623,7 +623,7 @@ top-level required fields:
 
 既存legacy promotion用 `legacy_tr_ids` の条件付き入力契約は維持します。
 
-`previous_tr_ids[]` はexact `{tr_id,status,scope_refs}` とし、`status` は `active / inactive / deleted` の3値です。`scope_refs[]` は最後にactiveだった時点のcanonical ownershipをinactive / deletedでも保持します。v1 cutover / non-UI-target baselineは `scope_refs=[]`、UI targetのscope ownership baseline成立後はactive / inactive TRで1件以上を要求します。
+`previous_tr_ids[]` はexact `{tr_id,status,scope_refs}` とし、`status` は `active / inactive / deleted` の3値です。state rowの `scope_refs[]` は最新の意味上のownershipを保持します。通常のready→blockedではlast-active ownershipと同じですが、SCOPE retire後にLLMが同じidentityをcurrent Scopeへreuseした場合は、Machine Entityを生成できないblocked期間でも解決済み `resolved_scope_refs[]` へ更新します。last-active semantic contentと当時のownershipは `inactive_tr_history[]` のEntity snapshotに別保存します。v1 cutover / non-UI-target baselineは `scope_refs=[]`、UI targetのscope ownership baseline成立後はactive / inactive TRで1件以上を要求します。deletedは最後に解決されたownershipを保持してよく、意味上のownershipが0件になったsemantic deletionでは `[]` を許可します。
 
 `inactive_tr_ids[] / inactive_tr_history[]` はLLM入力ではなく `downstream_state.py` のmachine-owned出力をそのまま渡します。`inactive_tr_ids[]` はprevious `active` TRだけを列挙し、`update_scope_tr_ids[]` と重複させません。`update_scope_tr_ids[]` はprevious `active / inactive` を参照でき、`deleted` は参照できません。inactive TRをLLMがsemantic identity同一としてreuseした場合は同じTR IDを `active` へ戻し、そのstate rowの `scope_refs[]` をcurrent draft値へ更新します。update scopeへ入れたinactive TRをreuseしない場合は `deleted` にします。update scope外のinactive TRはstatusと最後の`scope_refs[]`を維持します。new ID allocatorはactive / inactive / deletedをすべて使用済みIDとして扱います。
 
@@ -645,8 +645,8 @@ top-level required fields:
 6. AC linked + disposedの二重扱いを拒否する
 7. linkedもdisposedもされないcurrent ACをunclosedとして拒否する
 8. Authority / Product Risk / Acceptance Criteriaのclosure集合を別々に評価する。TRの `acceptance_refs[]` にACを追加しても、そのACのAuthorityをTR draftの `authority_refs[]` へ暗黙追加しない
-9. `tr_id_state[]` は `{tr_id,status,scope_refs}` を生成し、active / reactivatedはcurrent Entity contentのscope_refsとexact一致、inactive / deletedはlast active scope_refsを保持する
-10. `artifact:requirement_structure:all` root payloadへ `inactive_tr_history[]` を保存する。inactive TRのlast-active Machine Entity snapshotをidentity順で保持するmachine-owned historyとし、active→inactive時はprevious current TR Entityを追加、inactive継続時はcanonical bytesを維持、inactive→active reuseまたはdeleted遷移時は該当snapshotを除去する。history Entityはshared Entity schema / stored content fingerprint / identityとstate row `scope_refs[]` の一致だけを検証し、current Machine Entity / expected Entity / freshness対象へ入れない
+9. `tr_id_state[]` は `{tr_id,status,scope_refs}` を生成し、active / reactivatedはcurrent Entity contentのscope_refsとexact一致させる。inactiveはlatest resolved semantic ownershipを保持し、通常blockではprevious current scope_refs、SCOPE removal後のreuseではLLMが確定した `resolved_scope_refs[]` を使う。deletedはterminal stateとして最後のresolved ownershipまたは空集合を保持できる
+10. `artifact:requirement_structure:all` root payloadへ `inactive_tr_history[]` を保存する。inactive TRのlast-active Machine Entity snapshotをidentity順で保持するmachine-owned historyとし、active→inactive時はprevious current TR Entityを追加、inactive継続時はlast-active snapshotを維持、inactive→active reuseまたはdeleted遷移時は該当snapshotを除去する。history Entityはshared Entity schema / stored content fingerprint / identityを検証するが、SCOPE removal後のresolved inactiveではstate rowのlatest `scope_refs[]` とlast-active Entityのold `scope_refs[]` が異なることを許可する。historyをcurrent Machine Entity / expected Entity / freshness対象へ入れない
 
 artifact mode追加処理:
 
@@ -671,7 +671,7 @@ LLMはACとTRの意味上の対応、TRの分割 / 統合、TRのscope所属を�
 - TCN draft自身にLLM入力のscope fieldは追加しない。各current TCNの `scope_refs[]` は参照する `tr_refs[]` のTR scope_refs unionを重複除去・canonical sortして決定論生成する
 - modelの `scope_refs[]` は親TCNのscope_refsとexact一致させる。derived childも親modelからではなくowner TCNのcurrent scope_refsを使う
 - TCN / model Machine Entity contentへ `scope_refs[]` を保存する
-- `previous_tcn_ids[]` は `{tcn_id,status,scope_refs}`、`previous_model_keys[]` は既存model identity field + `status / scope_refs` を持ち、inactive / deletedでもlast active scope_refsを保持する
+- `previous_tcn_ids[]` は `{tcn_id,status,scope_refs}`、`previous_model_keys[]` は既存model identity field + `status / scope_refs` を持ち、state rowのscope_refsはTRと同じくlatest resolved semantic ownershipを保持する。SCOPE removal後にreuseしたinactive TCN / modelは上流resolutionから決定論伝播したresolved scope_refsへ更新し、last-active ownershipはhistory Entity側へ残す
 - `artifact:condition_structure:all` root payloadへ `inactive_tcn_history[] / inactive_model_history[] / inactive_materialize_history[]` を保存する。前2つはinactive TCN / modelのlast-active Machine Entity snapshotをmachine-owned historyとして保持し、active→inactive時はprevious current Entityを追加、inactive継続は保持、reuse / deleted時は該当snapshotを除去する。history Entityはstored fingerprint / identity / state row scope_refsだけを検証しcurrent evidenceへ入れない
 - `inactive_tcn_ids[] / inactive_model_keys[]` はactive previous identityだけをactive→inactiveへ遷移させる。inactive→active reuse時はcurrent upstreamから再導出したscope_refsへ更新する
 
@@ -679,7 +679,7 @@ LLMはACとTRの意味上の対応、TRの分割 / 統合、TRのscope所属を�
 
 - current model Entity contentの `scope_refs[]` をscope ownershipの正本とし、Agent入力でCI scopeを再指定させない
 - runtime target / semantic CIとも、生成するCI Entity contentの `scope_refs[]` はowner modelのscope_refsとexact一致させる。1つのmaterialize invocation内で複数sourceをmergeする場合は、それらowner model scope_refsのunionをcanonical化する
-- `previous_ci_ids[]` / `ci_id_state[]` はexact `{ci_id,status,scope_refs}` とし、inactive / deletedでもlast active scope_refsを保持する
+- `previous_ci_ids[]` / `ci_id_state[]` はexact `{ci_id,status,scope_refs}` とし、state rowのscope_refsはowner TCN / modelから伝播したlatest resolved semantic ownershipを保持する。last-active CI ownershipは `inactive_materialize_history[].ci_entities[]` に残す
 - `inactive_materialize_history[]` の各entryは `tcn_id / ci_entities[] / ci_id_state[] / target_mapping_state[] / semantic_ci_mapping_state[] / expected_result_root_state[]` のexact schemaを持ち、`tcn_id`順でcanonical sortする。`ci_entities[]` はlast-active CI Machine Entity snapshot、残り4配列はlast successful `materialize-coverage-v2` payloadの `ci_id_state / target_mapping_state / semantic_ci_mapping_state / expected_result_root_state` をそのままcanonical化して保存する。`ci_id_state[]` にはactive / inactive / deletedをすべて残し、inactive期間中もallocatorの使用済みCI ID集合を失わない
 - active→inactive TCNでprevious current CIまたはmapping stateが存在する場合、`downstream_state.py` はverified previous TCD structure stateから該当materialize resultを読み、`inactive_materialize_history[]` を更新する。raw Markdown / stale runtime resultから復元しない。対応resultが必要なのに欠落・invalidなら `inactive_materialize_history_missing` でfail-closedする
 - reactivated TCNの`materialize-coverage-v2`はcurrent previous materialize resultが無い場合だけmatching history entryを使い、`target_mapping_state → previous_target_id_map`、`semantic_ci_mapping_state → previous_semantic_ci_map`、`expected_result_root_state → previous_expected_result_roots`、`ci_id_state → previous_ci_ids` を決定論的に再構成する。historyはcurrent runtime evidenceではなくID / mapping seedだけで、generation / freshness / support statusをcarry-forwardしない
@@ -691,15 +691,15 @@ LLMはACとTRの意味上の対応、TRの分割 / 統合、TRのscope所属を�
 - current TCN input rowへcurrent TCN Entityの `scope_refs[]` を含め、CI Entity contentの `scope_refs[]` も検証する
 - TC draft自身にLLM入力のscope fieldは追加しない。各current TCの `scope_refs[]` は参照する `tcn_refs[] / ci_refs[]` のscope_refs unionを重複除去・canonical sortして決定論生成する
 - TC Machine Entity contentへ `scope_refs[]` を保存する
-- `previous_tc_ids[] / tc_id_state[]` はexact `{tc_id,status,scope_refs}` とし、inactive / deletedでもlast active scope_refsを保持する
+- `previous_tc_ids[] / tc_id_state[]` はexact `{tc_id,status,scope_refs}` とし、state rowのscope_refsは参照TCN / CIから導出したlatest resolved semantic ownershipを保持する。last-active TC ownershipは `inactive_tc_history[]` に残す
 - `artifact:case_structure:all` root payloadへ `inactive_tc_history[]` を保存する。inactive TCのlast-active Machine Entity snapshotをmachine-owned historyとして保持し、active→inactive時はprevious current TC Entityを追加、inactive継続は保持、reuse / deleted時は該当snapshotを除去する。stored fingerprint / identity / state row scope_refsだけを検証しcurrent evidenceへ入れない
 - `inactive_tc_ids[]` はactive previous TCだけをactive→inactiveへ遷移させ、inactive→active reuse時はcurrent upstreamから再導出したscope_refsへ更新する
 
 ### 7.5 shared runtime state / currentness
 
-- shared `runtime_contract.py` のprevious state parser / validatorはTR / TCN / model / CI / TC state rowの `scope_refs[]` を検証する。active stateは対応current Machine Entity contentのscope_refsとexact一致させ、inactive / deletedにはcurrent Entityを要求しない
+- shared `runtime_contract.py` のprevious state parser / validatorはTR / TCN / model / CI / TC state rowの `scope_refs[]` を検証する。active stateは対応current Machine Entity contentのscope_refsとexact一致させ、inactive / deletedにはcurrent Entityを要求しない。inactive state rowのscope_refsはlatest resolved semantic ownership、`inactive_*_history[]`内Entityはlast-active snapshotなので、SCOPE removal resolution後は両者のscope_refs exact一致を要求しない
 - `verify_runtime_evidence.current_structure_state.runtime_results[]` に含まれる各root result payloadをmachine-owned historyの保存元とする。次runへ渡す際は、それらを個別artifactから直接読むのではなく、直前に完成扱いされたruntime-v2 qa-workflow artifactの保存済み `workflow_scopes[].current_structure_state` を `downstream_state.py` が上記§12.3の手順で再検証・抽出する。未検証artifact本文やcurrent inputでの旧artifact再検証からhistoryを復元しない
-- activeだけをcurrent Machine Entity / expected Entity / carry-forward projectionへ含める。`inactive_*_history[]` / `inactive_materialize_history[]` はlast-active履歴としてexact schema、identity重複、canonical order、stored fingerprint、対応inactive state row / scope_refsとの整合だけを検証し、current Entity / current runtime / expected Entity / freshnessへ投入しない
+- activeだけをcurrent Machine Entity / expected Entity / carry-forward projectionへ含める。`inactive_*_history[]` / `inactive_materialize_history[]` はlast-active履歴としてexact schema、identity重複、canonical order、stored fingerprint、対応inactive identityとの整合を検証する。通常blockではstate row scope_refsとhistory ownershipが一致するが、SCOPE removal後のreuseではstate rowのlatest resolved ownershipとhistoryのlast-active ownershipが異なることを許可し、どちらも独立にcanonical / known ID整合を検証する。historyをcurrent Entity / current runtime / expected Entity / freshnessへ投入しない
 - UI target migration前のv2 baselineは `scope_refs=[]` を許可する。UI target migration後の最初のTRD→TCD→TC更新でcurrent active downstream全件をscope ownership付きに正規化し、active TR / TCN / model / CI / TCに空scope_refsが残る間はpartial readinessを開始しない
 - scope_refsはMachine Entity content fingerprintへ含まれるため、ownership変更は通常のfreshness伝播対象になる
 
