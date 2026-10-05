@@ -560,7 +560,7 @@ production helperは任意Markdownを解釈する汎用parserにしません。�
 }
 ```
 
-`valid` はschema / reference / filesystem等の**構造的妥当性**を表し、workflow completionとは分離します。`ui_target_package.py inspect / validate / materialize` はcurrent Scope ID集合から `ready_scope_ids[] / blocked_scope_ids[]` を返し、次の固定規則で `completion_status` を生成します。
+`valid` はschema / reference / filesystem等の**構造的妥当性**を表し、workflow completionとは分離します。`ui_target_package.py inspect / validate / materialize` はcurrent Scope ID集合から `current_scope_ids[] / ready_scope_ids[] / blocked_scope_ids[]` を返します。`current_scope_ids[]` はcurrent SCOPE row全件のcanonical sortで、`ready_scope_ids[] ∪ blocked_scope_ids[]` とexact一致し、`scope_readiness[].scope_id` 集合ともexact一致させます。次の固定規則で `completion_status` を生成します。
 
 - `blocked_scope_ids=[]` → `complete`
 - ready / blockedが両方1件以上 → `partial`
@@ -571,9 +571,9 @@ workflow readinessではSCOPEを原子的な後続進行単位にします。`Be
 `Behavior Decomposition=required` のscopeは、readiness計算前に次の最低closureを決定論検証します。
 
 - scope内にUIOP rowが1件以上存在する、またはUIOP semantic identity自体を確定できないcurrent UNKNOWNが07で当該scopeを `Blocking Scope ID`、`02_behavior_and_business_rules.md` を `関連File` に持つ
-- current USは1件以上のcurrent / blocked UCへ接続する
+- current USは1件以上のcurrent / blocked UCへ接続する。Use Case identity未確定のBlocking UNKNOWNを自身に持つblocked USはUC 0件を許可する
 - current UCは正常 / 準正常 / 例外3rowを持ち、少なくとも1分類が `定義あり` でcurrent Behaviorへ到達するか、1分類以上が `未定義 + 関連UNKNOWN ID` で当該scopeをblockedにする。3分類すべて `なし` かつBehavior=0件のcurrent UCをreadyにしない
-- current Behaviorは1件以上のcurrent / blocked ACへ接続する。blocked ACが残るscopeはreadyにしない
+- current Behaviorは1件以上のcurrent / blocked ACへ接続する。AC identity未確定のBlocking UNKNOWNを自身に持つblocked BehaviorはAC 0件を許可する。blocked ACが残るscopeはreadyにしない
 - 上記row / blockerのどちらもない欠落はsemantic不足をhelperが推測補完せず `state_transition_required` でfail-closedする
 
 blocked scopeは次のunionです。
@@ -584,7 +584,7 @@ blocked scopeは次のunionです。
 - そのscopeのconditional file applicabilityに `blocked` があるscope
 - 07のcurrent UNKNOWNで `Blocking Scope ID` に明示されたscope
 
-current UNKNOWNの存在だけではblockedにしません。下位rowだけをblockedにするとは、Scopeの `Behavior Decomposition=required` をnot-applicable / blockedへ書き換えない意味です。workflow上はその下位blockerが解消するまで当該scopeを `blocked_scope_ids[]` に入れます。`scope_readiness[].blocking_unknown_ids[]` は、Scope自身・自身のUNKNOWNでblockedになった下位row・UC完全性=`未定義`・conditional applicabilityの `関連UNKNOWN ID`、07でそのscopeを `Blocking Scope ID` に持つcurrent UNKNOWNに加え、effective blockedを生じさせたancestor chainのUNKNOWN IDをunion / dedupe / canonical sortします。ancestor由来だけのblocked descendant自身へUNKNOWN IDを複製しません。blockerのroot causeへUNKNOWNが存在しない状態は許可しません。qa-workflowはpackage全体のbinary statusではなくこの結果で影響scopeだけ停止します。completion状態だけを理由に `valid=false` へしません。
+current UNKNOWNの存在だけではblockedにしません。下位rowだけをblockedにするとは、Scopeの `Behavior Decomposition=required` をnot-applicable / blockedへ書き換えない意味です。 child identity自体が未確定な場合のUNKNOWN配置は `_08 §3.1` の階層別規則を正本とし、UC identity未確定をScopeだけへ置く、AC identity未確定をScopeだけへ置く、Behavior identity未確定をblocked Behavior rowへ捏造する状態を許可しません。workflow上はその下位blockerが解消するまで当該scopeを `blocked_scope_ids[]` に入れます。`scope_readiness[].blocking_unknown_ids[]` は、Scope自身・自身のUNKNOWNでblockedになった下位row・UC完全性=`未定義`・conditional applicabilityの `関連UNKNOWN ID`、07でそのscopeを `Blocking Scope ID` に持つcurrent UNKNOWNに加え、effective blockedを生じさせたancestor chainのUNKNOWN IDをunion / dedupe / canonical sortします。ancestor由来だけのblocked descendant自身へUNKNOWN IDを複製しません。blockerのroot causeへUNKNOWNが存在しない状態は許可しません。qa-workflowはpackage全体のbinary statusではなくこの結果で影響scopeだけ停止します。completion状態だけを理由に `valid=false` へしません。
 
 handled failure:
 
@@ -697,6 +697,7 @@ payload:
   "package_version":"v15",
   "previous_package_version":"v14",
   "completion_status":"partial",
+  "current_scope_ids":["SCOPE-001","SCOPE-002"],
   "ready_scope_ids":["SCOPE-002"],
   "blocked_scope_ids":["SCOPE-001"],
   "scope_readiness":[
@@ -946,6 +947,7 @@ payload:
   "replayed":false,
   "request_fingerprint":"sha256:<lowercase-64-hex>",
   "completion_status":"partial",
+  "current_scope_ids":["SCOPE-001","SCOPE-002"],
   "ready_scope_ids":["SCOPE-002"],
   "blocked_scope_ids":["SCOPE-001"],
   "scope_readiness":[{"scope_id":"SCOPE-001","status":"blocked","blocking_unknown_ids":["UNK-004"]},{"scope_id":"SCOPE-002","status":"ready","blocking_unknown_ids":[]}],
@@ -959,7 +961,7 @@ payload:
 }
 ```
 
-`changed=false` のno-opでは `replayed=false`、`allocated_ids=[] / allocated_extension_files=[] / retired_ids=[] / retired_extension_files=[] / changed_files=[]` とし、`request_fingerprint` と `previous_package_version / package_version / completion_status / ready_scope_ids[] / blocked_scope_ids[] / scope_readiness[]` は今回request / current package値を返します。provisional処理で一時的に割り当てたID / extension pathは保存・予約しません。create / legacy-migrationは初回成功時 `changed=true / replayed=false` です。同一receipt replayではoriginal receiptの `changed / allocated_* / retired_* / changed_files / previous_package_version / package_version` を返し、`replayed=true` とします。
+`changed=false` のno-opでは `replayed=false`、`allocated_ids=[] / allocated_extension_files=[] / retired_ids=[] / retired_extension_files=[] / changed_files=[]` とし、`request_fingerprint` と `previous_package_version / package_version / completion_status / current_scope_ids[] / ready_scope_ids[] / blocked_scope_ids[] / scope_readiness[]` は今回request / current package値を返します。provisional処理で一時的に割り当てたID / extension pathは保存・予約しません。create / legacy-migrationは初回成功時 `changed=true / replayed=false` です。同一receipt replayではoriginal receiptの `changed / allocated_* / retired_* / changed_files / previous_package_version / package_version` を返し、`replayed=true` とします。
 
 通常のUI target package更新は `materialize` を唯一のwrite pathとします。採番 / version / README controls / MANIFEST / lifecycle / impactは内部関数とし、production CLIへ公開しません。`build-machine-evidence` だけはmaterialized packageから下流handoffを再生成する独立用途があるためread-only production operationとして残します。
 
@@ -982,7 +984,7 @@ stdin:
 {"operation":"build-machine-evidence","package_root":"<path>","scope_ids":null}
 ```
 
-`scope_ids` は `null` またはcurrent ready Scope IDのnon-empty arrayです。duplicate / unknown / blocked scope IDを拒否し、helperがcanonical sortします。canonical qa-workflowでdownstream `artifact:*:all` runtimeへ渡す場合は、`ready_scope_ids[]` が1件以上の時だけ `scope_ids[]` を渡し、その集合が `inspect.ready_scope_ids[]` とexact一致することを要求します。`ready_scope_ids=[]` ではこのoperationを空配列で呼ばずdownstream runtimeをdispatchしません。一部ready scopeだけのsubset実行をglobal `:all` artifactの代替にしません。
+`scope_ids` は `null` またはcurrent ready Scope IDのnon-empty arrayです。duplicate / unknown / blocked scope IDを拒否し、helperがcanonical sortします。 `current_scope_ids[]` はread-only outputでcaller入力にはせず、helperがcurrent SCOPE rowから毎回再導出してretired SCOPE IDを含めません。canonical qa-workflowでdownstream `artifact:*:all` runtimeへ渡す場合は、`ready_scope_ids[]` が1件以上の時だけ `scope_ids[]` を渡し、その集合が `inspect.ready_scope_ids[]` とexact一致することを要求します。`ready_scope_ids=[]` ではこのoperationを空配列で呼ばずdownstream runtimeをdispatchしません。一部ready scopeだけのsubset実行をglobal `:all` artifactの代替にしません。
 
 §9に従い09からnormalized Authority inputを生成して既存 `authority_entities.py` のbuilderを呼びます。linked domain itemはcurrent AC / 親Behavior / 親UC / 親USの `関連構造ID` に明示されたdomain item IDだけを対象にし、linked UIOPの `対象構造ID` からdomain itemを逆引きしません。linked UI structureは、同chainの `関連構造ID` にあるUI構造ID、linked UIOPの `対象構造ID`、linked domain itemの `対象構造ID / 関連構造ID` にあるUI構造IDをseedとし、`親構造ID` をrootまで辿ります。domain itemから別domain itemへ再帰展開しません。これらとscope、関連current INFからAcceptance Criterion Machine Entityを生成して統合し、missing parent / self-parent / cycleはrejectします。
 
@@ -997,6 +999,7 @@ payloadは `scope_ids` で分けます。
   "acceptance_criterion_entities":[],
   "machine_entities":[],
   "expected_entity_identities":[],
+  "current_scope_ids":["SCOPE-001","SCOPE-002"],
   "ready_scope_ids":["SCOPE-002"],
   "blocked_scope_ids":["SCOPE-001"],
   "machine_entities_markdown":"### Machine Entities: spec-analysis\n\n\`\`\`json\n{...}\n\`\`\`\n"
