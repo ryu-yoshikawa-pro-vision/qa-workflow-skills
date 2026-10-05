@@ -52,8 +52,9 @@
 | TRのscope所属 | LLM | current ready `scope_index[]` とTRの意味から `scope_refs[]` を決める。UI target artifact workflowでは1件以上必要で、blocked scopeをcurrent TRへ割り当てない |
 | TCN / model / CI / TCのscope所属 | deterministic generator | TCNは参照TR、modelは親TCN、CIは親TCN / model、TCは参照TCN / CIの `scope_refs[]` をunion / canonical sortして生成する。LLMに再入力させない |
 | blocked scope由来のdownstream一時非current集合 / last-active履歴 | deterministic qa-workflow helper | existing `workflow_ref` とworkflow stateの **committed** `last_completed_qa_workflow_artifact` bindingを正本にexact historical artifactを解決する。local single-hostは `_09 §13.2` のimmutable snapshot + locked conditional state update、provider-nativeはactual historical refetch + native CASを使う。qa-workflow runtime Input / Resultへ保存した`workflow_ref`、artifact SHA-256、frozen runtime-v2 historical integrityを検証してprevious `current_entities[]` / TRD-TCD-TC structure stateを抽出する。まずprevious `scope_refs[] - current_scope_ids[]` をSCOPE removal影響として抽出し、removed scopeが無いEntityだけblocked scopeとの積集合でinactive対象とhistoryを固定する。Agent / LLM、raw Markdown、current inputでの旧artifact再検証からsnapshotを再構築しない |
-| current scope universeから消えたSCOPEを参照するdownstream | deterministic impact extraction + owner LLM | helperはaffected TR / TCN / model / CI / TCとremoved Scope IDをexact `scope_refs[]` から抽出するがinactive / deleted / scope縮退を決めない。TRD / TCD / TCのownerがcurrent upstreamに対するreuse / scope再割当 / split / semantic deletionを判断し、generatorは解決前のactive carry-forwardをrejectする |
+| current scope universeから消えたSCOPEを参照するdownstream | deterministic impact extraction + owner LLM + deterministic state derivation | helperはaffected TR / TCN / model / CI / TCとremoved Scope IDをexact `scope_refs[]` から抽出する。owner LLMはreuse時の `resolved_scope_refs[]`、split / semantic deletionを判断するがstatusは決めない。helperはresolved ownershipがall readyならactive、blockedを含めばinactiveを導出し、inactive state rowへlatest resolved ownershipを保存する。last-active ownership / contentはhistoryへ残すため、B retire + A blockedでもA ownershipのinactiveへ解決できる |
 | ready scope 0件時のrouting | deterministic qa-workflow | `ready_scope_ids=[]` のとき `build-machine-evidence(scope_ids=[])` とtest-analysis以降のruntimeを起動せずblockedで終了する。last completed qa-workflow artifact bindingは更新せず、次回ready scopeが生じたrunのhistorical sourceとして維持する |
+| runtime-v1 → v2 / UI target migration phase判定 | deterministic qa-workflow helper | `migration_preflight.py` がmachine-generated runtime version / v2 verification / UI target inspect / active downstream scope ownershipからcutover、UI target migration、scope ownership normalization、`scope_ownership_baseline_required`、partial progressionのnext actionを一意に返す。LLMはmigration要否や順序を判断しない |
 | Product Riskのscope lifecycle | test-analysis full rerun | 本PRではProduct Riskへ `scope_refs / inactive` を追加しない。current ready-scope batchごとにtest-analysisをfull rerunし、同じrunのTRDがcurrent Risk集合をclosure / priority入力として使う。blocked scope由来の旧Riskをcarry-forwardするhistoryは作らない |
 | downstream stable IDのreuse / new / semantic deletion | LLM + deterministic generator | TR / TCN / model / TCのsemantic identity同一かはLLMがlast-active historyを参照して判断する。CIはmaterialize historyからmapping identityを決定論的に復元する。generatorはhelper由来の`active → inactive`、reuseに基づく`inactive → active`、非reuseに基づく`inactive → deleted`を状態契約どおり適用する |
 | version形式 / package内version一致 | deterministic helper / validation | default policyでは完成packageへ永続差分を保存するたびsemantic / presentationを問わず次versionへ進める。no-opだけ維持する |
@@ -111,6 +112,10 @@ required file、version、ID形式・duplicate、exact reference、UNKNOWN整合
 - staging + package単位commit
 
 これらは`materialize`内部関数としてrepository unit testから直接検証し、`next-version / next-id / render-readme-controls / next-domain-file / build-manifest / impact` のproduction CLI operationは作りません。
+
+#### build-machine-evidence#### migration_preflight.py
+
+qa-workflowのpre-runtime routing専用です。runtime-v1 artifactが残る段階では `workflow_runtime.py` 自身をmigration判定に使えないため、`_09 §2.9` のmachine-generated observationだけを入力にnext actionを決定します。semantic migration、stable identity mapping、scope ownershipの意味判断は行いません。generic migration engineや他Skill共通helperへ拡張しません。
 
 #### build-machine-evidence
 
