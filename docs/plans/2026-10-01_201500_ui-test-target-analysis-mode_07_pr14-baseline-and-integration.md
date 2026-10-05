@@ -184,18 +184,26 @@ PR #16では次だけを追加します。
 
 PR #14確認headではSkill-local `runtime_contract.py` が9コピー存在し、同一blobです。PR #16ではMachine Entity schema versionの意味を分岐させないため、この9コピーをshared contractとして `runtime-v1 / entity-state-v1` → `runtime-v2 / entity-state-v2` へ同期し、repository byte-identity testの対象集合も9 Skillへ広げます。
 
-PR #14が追加した以下を複製・変更しません。
+PR #14が追加した以下の意味契約は変更しません。
 
 - WCAG observation handoff
 - browser/session ownership
-- claim / reservation / CAS
+- claim / reservation / provider-native CAS
 - usability-inspection runtime
 - formal WCAG procedure
-- artifact_graph.pyのhandoff lifecycle
+- artifact_graph.pyの既存handoff / claim / reservation lifecycle
 
-UIテスト対象分析モードはspec-analysis内部modeであり、新しいhandoff type / generic claim / shared-resource reservation / artifact registryは追加しません。ただしready→blocked→readyのprevious snapshotを別workflowや古い世代と混同しないため、既存 `workflow_ref` ごとのworkflow stateへmachine-owned `last_completed_qa_workflow_artifact={artifact_ref,artifact_revision,artifact_sha256}` を1 fieldだけ追加します。qa-workflow runtime-v2 input / result payloadにもexisting `workflow_ref`を保存します。bindingは `current verification PASS → artifact保存 → exact historical revision refetch確認 → SHA-256確認 → workflow state CAS成功` まで完了した時だけ更新し、**CAS成功をdownstream baselineのcommit境界**とします。CAS前に保存されたartifactは未commitで、current canonical baselineや次runのprevious snapshotへ使いません。失敗時は旧bindingを維持し、初回binding=nullならcommitted baseline未成立のままです。PR #14の既存workflow state identity / revision / CASと `artifact_graph.verify_historical_revision()` を再利用し、新しいlineage ID、transaction framework、保存基盤は作りません。UI target packageのlocal file writeは引き続き `ui_target_package.py` のpackage専用process lock + MANIFEST receiptで閉じ、browser / external shared resource向けclaim・reservation契約とは分離します。
+ただし、PR #16のready→blocked→readyをlocal実行でも成立させるため、`artifact_graph.py` にはqa-workflow completed baseline専用のlocal single-host historical snapshot / locked conditional state updateを追加します。既存generic `create_workflow_state() / state_update_decision() / verify_historical_revision()` の意味は変更しません。
+
+UIテスト対象分析モードはspec-analysis内部modeであり、新しいhandoff type / generic claim / shared-resource reservation / artifact registryは追加しません。ただしready→blocked→readyのprevious snapshotを別workflowや古い世代と混同しないため、既存 `workflow_ref` ごとのworkflow stateへmachine-owned `last_completed_qa_workflow_artifact={artifact_ref,artifact_revision,artifact_sha256}` を1 fieldだけ追加します。qa-workflow runtime-v2 input / result payloadにもexisting `workflow_ref`を保存します。
+
+provider-native保存では、exact historical refetchとnative atomic conditional writeが実際に提供される場合だけ従来のprovider契約を使います。local single-hostでは既存 `qa.workflow_state_root` の下にcontent-addressed qa-workflow snapshotをimmutable保存し、workflow_ref固定のprocess lock内でcurrent state revisionを再読込・比較した後、same-directory temporary file + fsync + `os.replace` でstateを更新します。このlocked conditional update成功をlocal downstream baselineのcommit境界とします。PR #14の `local_exact_content_token_not_a_cas_condition` をnative CASへ読み替えず、lock外read→無条件writeもCAS扱いしません。shared / network filesystemはlocal pathのsupported対象にせず、provider-native history / CASが無ければfail-closedします。固定layout、binding形式、crash / replay契約は `_09 §13.2` を正本とします。
+
+UI target packageのlocal file writeは引き続き `ui_target_package.py` のpackage専用process lock + MANIFEST receiptで閉じ、qa-workflow baseline state lockとは別責務にします。browser / external shared resource向けclaim・reservation契約も変更しません。新しいlineage ID、generic transaction framework、generic storage adapterは作りません。
 
 ## 8. CI統合
+
+local qa-workflow baseline保存のrepository testはtemporary local rootで実ファイルI/Oを行い、immutable revision refetch、2 process相当のexpected revision競合、state replace後response前retry、snapshot作成後state commit前failureを検証します。`provider_can_refetch=true` 等の能力フラグだけを成功条件にするmockでは代替しません。
 
 PR #14後の `.github/workflows/deterministic-output-evals.yml` はcurrent Skill packageの `skills/*/scripts` を動的探索してcompileします。
 
