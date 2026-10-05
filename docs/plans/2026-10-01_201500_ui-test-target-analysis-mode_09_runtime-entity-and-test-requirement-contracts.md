@@ -506,7 +506,7 @@ qa-workflowはbatch handoffからroot runtimeの最終canonical stdinを構成�
 
 ### 3.1 requirement-structure-v2 caller contract
 
-`acceptance_refs[]` とTRのscope所属の意味判断をLLMに残し、known AC集合・known ready Scope集合・Machine Entity dependencyの扱いはinput modeごとに固定します。empty default用adapterは追加しません。
+`acceptance_refs[]` の意味対応と、AC参照だけでは決まらない追加のTR scope ownershipはLLMに残します。一方、artifact modeでTRが参照したAC自身のScopeはMachine Entityから既に一意に分かるため、そのScopeをTR `scope_refs[]` に必ず含める制約はdeterministicに検証します。known AC集合・known ready Scope集合・Machine Entity dependencyの扱いはinput modeごとに固定し、empty default用adapterは追加しません。
 
 `requirement-structure-v2` raw generator inputはtop-level `acceptance_criteria[] / scope_ids[]` を必須とします。
 
@@ -524,8 +524,8 @@ qa-workflowはbatch handoffからroot runtimeの最終canonical stdinを構成�
 - `scope_ids[]` はduplicate不可・canonical sort済みのknown current Scope ID集合。UI target artifact workflowではcurrent `ready_scope_ids[]` とexact一致させる
 - ACなしworkflowは `acceptance_criteria=[]` を明示する
 - non-UI-target / migration baselineでは `scope_ids=[]` を許可する
-- 各 `test_requirements[]` draftの `acceptance_refs[] / scope_refs[]` を必須とする。`acceptance_refs[]` はknown `acceptance_criteria[].ac_id`、`scope_refs[]` はknown `scope_ids[]` への存在参照だけをscriptが検証する
-- UI target artifact workflowではcurrent TRの `scope_refs[]` を1件以上必須とする。LLMはbatch `scope_index[]` とTRの意味から所属scopeを決め、blocked Scope IDをcurrent TRへ割り当てない
+- 各 `test_requirements[]` draftの `acceptance_refs[] / scope_refs[]` を必須とする。`acceptance_refs[]` はknown `acceptance_criteria[].ac_id`、`scope_refs[]` はknown `scope_ids[]` への存在参照として検証する
+- UI target artifact workflowではcurrent TRの `scope_refs[]` を1件以上必須とする。LLMはbatch `scope_index[]` とTRの意味からAC由来以外の追加ownershipを判断し、blocked Scope IDをcurrent TRへ割り当てない。参照ACから必須になるScopeは下記artifact mode規則でhelperが導出する
 - non-UI-target / migration baselineでは `scope_ids=[] / scope_refs=[]` を許可し、scope ownershipを推測生成しない
 
 artifact mode:
@@ -534,6 +534,8 @@ artifact mode:
 - semantic `acceptance_criteria[]` の `ac_id / authority_refs[]` 集合がupstream AC Entity contentとexact一致することを検証する。Entityに無いAC、semantic inputに無いcurrent ACを許可しない
 - 参照AC EntityをTR dependencyへ追加し、参照ACのcurrent Authority Entity dependencyもfreshness用にTRへ直接追加する
 - AC Entity / Authority Entityを全件解決できない場合はfail-closedする
+- 各TRについて `required_scope_refs = union(content.scope.scope_id of referenced AC Entities)` をhelperが導出し、`required_scope_refs ⊆ test_requirements[].scope_refs[]` を必須とする。`acceptance_refs=[]` ならrequired集合も空。LLMはrequired scopeを削れないが、横断的TR等で意味上必要な追加ready Scopeを `scope_refs[]` へ加えられる
+- 参照AC Entityの `content.scope.scope_id` がtop-level `scope_ids[]` に存在しない、またはblocked / unknown Scopeを指す場合はcurrent artifact mode inputとしてfail-closedする
 
 direct mode:
 
@@ -639,7 +641,7 @@ top-level required fields:
 
 1. `acceptance_criteria[] / scope_ids[]` のschema / duplicate / canonical orderを検証し、各ACの `authority_refs[]` をtop-level `authorities[]` へ存在検証する
 2. `test_requirements[].acceptance_refs[]` とAcceptance Criterion Dispositionのrefをknown AC集合へ存在検証する
-3. `test_requirements[].scope_refs[]` をknown `scope_ids[]` のsubsetとしてduplicateなし・canonical sortで検証する。UI target artifact workflowでは各current TRに1件以上を要求する
+3. `test_requirements[].scope_refs[]` をknown `scope_ids[]` のsubsetとしてduplicateなし・canonical sortで検証する。UI target artifact workflowでは各current TRに1件以上を要求する。artifact modeでは各TRの `acceptance_refs[]` から参照AC Entityの `content.scope.scope_id` unionを `required_scope_refs[]` として決定論生成し、これがTR `scope_refs[]` のsubsetであることを追加検証する
 4. closure universeへtop-level current ACを追加する
 5. TR Entity contentへ `acceptance_refs[] / scope_refs[]` を保存する
 6. AC linked + disposedの二重扱いを拒否する
@@ -663,7 +665,7 @@ direct mode追加処理:
 
 AC linkはACだけをclosureします。Authorityは従来どおりTR draftの `authority_refs[]` に明示linkされるか、Authority Dispositionへ入る必要があります。artifact modeのAC→Authority dependency展開はfreshnessのためであり、Authority closureを代理しません。direct modeではこの展開を行いません。
 
-LLMはACとTRの意味上の対応、TRの分割 / 統合、TRのscope所属を判断します。scriptは対応関係の意味妥当性を決めません。
+LLMはACとTRの意味上の対応、TRの分割 / 統合、AC参照からは導出できない追加scope ownershipを判断します。scriptは対応関係の意味妥当性を決めませんが、artifact modeで参照済みACが持つScopeをTR ownershipから欠落させる入力は機械的に拒否します。
 
 ### 7.2 condition-structure-v2
 
@@ -1078,6 +1080,7 @@ Product Riskは本PRで `scope_refs / active-inactive-deleted` lifecycleへ拡�
 - test-analysisはready-scope batchごとにfull rerunし、Product Riskへ `scope_refs / inactive / history` を追加しない。blocked scope由来Riskをprevious artifactからcarry-forwardせず、同じrunのTRDがcurrent Product Risk集合でclosure / priorityを再評価する回帰
 - requirement-structure-v2 valid / invalid schema
 - requirement-structure-v2がtop-level `acceptance_criteria[] / scope_ids[]` をraw input必須とし、各ACの `ac_id / authority_refs[]` と各TRの `acceptance_refs[] / scope_refs[]` を検証すること。ACなしは `acceptance_criteria=[] / acceptance_refs=[]`、non-UI-target baselineは `scope_ids=[] / scope_refs=[]` を明示し、default補完adapter / shared runtime hookを追加しない
+- artifact modeで `AC-002.content.scope.scope_id=SCOPE-B`、`TR-001.acceptance_refs=[AC-002]` のとき `TR-001.scope_refs` からSCOPE-Bを欠落させる入力をrejectすること。SCOPE-Bに加えて意味上必要なSCOPE-Aを追加する `scope_refs=[SCOPE-A,SCOPE-B]` は許可し、direct modeへAC Entity由来Scopeを強制しないこと
 - artifact modeではsemantic `acceptance_criteria[]` とupstream Acceptance Criterion Entity集合をexact一致させ、AC Entity + AC Authority dependencyをTR freshnessへ追加する回帰
 - direct modeではupstream AC Entityなしでもsemantic `acceptance_criteria[]` をknown ID集合として `acceptance_refs[]` / closureを検証でき、存在しないAC / AC由来Authority Machine Entity dependencyを合成しない回帰。AC Entityなしのdirect modeではAC本文 / 親chain変更のcross-run freshnessを保証しないことも契約化する。実在AC Entityをdependencyへ使う場合はsemantic rowとの `ac_id / authority_refs[]` 一致を要求し、そのEntity dependencyについて既存freshnessを利用できること
 - AC-001をTRへlinkしても、そのACが参照するSPEC-001をTR authority_refs / Authority Dispositionで別途closeしない場合はSPEC-001 unclosedとなる
@@ -1098,7 +1101,7 @@ Product Riskは本PRで `scope_refs / active-inactive-deleted` lifecycleへ拡�
 - scopeの対象機能 / 領域またはscope Authority変更でAC fingerprint / dependencyが変わる回帰
 - AC本文 / 親chain不変のままAuthority fingerprintだけ変更し、spec-analysisをcurrentへ再生成した後も未再実行TRが直接Authority dependencyによりstaleになる回帰
 - artifact modeのpartial rerun stale carry-forward。currentのまま変更されたAC依存TRは従来どおりstaleでblockingになる
-- SCOPE-A/B ready → `scope_index[]` からTR scope_refsをLLMが明示 → TCN / model / CI / TCへ決定論伝播 → Bだけblocked → `blocked_scope_ids[]` とprevious Entity `content.scope_refs[]` の積集合からB所有IDだけinactive → A専用current Entity/runtimeがfreshに完遂 → B再readyでsemantic identity同一なら同じIDをactiveへ復帰、というintegration regression
+- SCOPE-A/B ready → LLMがTRの意味上の追加ownershipを明示しつつ、参照AC由来Scopeはhelperが `required_scope_refs[]` として包含を強制 → TCN / model / CI / TCへscope_refsを決定論伝播 → Bだけblocked → `blocked_scope_ids[]` とprevious Entity `content.scope_refs[]` の積集合からB所有IDだけinactive → A専用current Entity/runtimeがfreshに完遂 → B再readyでsemantic identity同一なら同じIDをactiveへ復帰、というintegration regression
 - 上記integration regressionのprevious snapshotはcurrent `workflow_ref` のworkflow state `last_completed_qa_workflow_artifact` が指すexact historical revisionからだけ抽出する。保存済み`artifact:workflow_runtime:all` Input / Result pair、Input `current_entities[]`、各scope `current_structure_state`の改変をrejectする。旧runtime-v2 implementation fingerprintのartifactでも保存値同士がfrozen v2規則で自己整合すればhistorical readerは受理し、current verifierではstaleになることを分離して確認する。別workflow_ref、1世代古いartifact、artifact SHA不一致、previousありなのにnull、historical refetch不能をfail-closedする
 - AuthorityをA/Bで共有してもscope_refsがAだけのEntityはinactiveにしない回帰と、scope_refsがA/B双方のcross-scope Entityは保守的にinactiveへ落とす回帰
 - v1 cutover / non-UI-target baselineの `scope_refs=[]` からUI target migrationする際、既存active downstreamがある場合は全scope readyでのみownership baselineを作成し、blocked scopeが残る間は `scope_ownership_baseline_required` でfail-closedする回帰。downstream未作成の新規workflowではpartial readinessを許可する
