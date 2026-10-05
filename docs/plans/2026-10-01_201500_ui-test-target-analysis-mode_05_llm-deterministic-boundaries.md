@@ -21,7 +21,7 @@
 
 「実装しやすいからscript化する」「validatorで判定できそうだから意味判断まで固定する」は行いません。
 
-また、決定論的であっても独立したproduction実行用途を持たない数行のdefault補完・値転送・別script呼び出しだけのwrapperは追加しません。既存production scriptの責務内で完結する処理はそのscriptへ統合します。storage / external API / connector / process起動 / timeout / lock / orchestration等の導入先project固有処理はSkill repoへ抽象wrapperを置かず、導入先project / harnessが担当します。production CLI operationはAgent / workflowが単独で呼ぶ現在用途があるものだけ公開し、unit testのためだけのfocused operationは内部関数として検証します。
+また、決定論的であっても独立したproduction実行用途を持たない数行のdefault補完・値転送・別script呼び出しだけのwrapperは追加しません。既存production scriptの責務内で完結する処理はそのscriptへ統合します。external API / connector / 任意storage provider / 汎用process orchestration等の導入先project固有処理はSkill repoへ抽象wrapperを置かず、導入先project / harnessが担当します。一方、qa-workflowが既に所有する `qa.workflow_state_root` のlocal single-host state / completed baselineを正しく保存するための固定path・process lock・immutable snapshot・atomic replaceは今回のworkflow state契約そのものなので `artifact_graph.py` にSkill-local実装します。これをgeneric storage / transaction abstractionへ広げません。production CLI operationはAgent / workflowが単独で呼ぶ現在用途があるものだけ公開し、unit testのためだけのfocused operationは内部関数として検証します。
 
 ## 2. 責務マトリクス
 
@@ -31,7 +31,7 @@
 | 現在有効なAuthority解決 | LLM | 既存spec-analysis契約を使用する |
 | PAGE / STATE / VIEW / STEP / MODAL等の意味分類 | LLM | UI意味を判断する。scriptは分類結果の形式だけ検証できる |
 | scopeごとのUI操作有無 / file applicability triggerの意味判断 | LLM | 資料の意味から `あり / なし / 未確定` を判断する。Triggerはdomainの存在判定であり、内容不足だけで `未確定` へ戻さない。scriptはfile × Scope IDごとに `required / not-applicable / blocked` を導出し、not-applicable scopeを参照する対応tracking rowが残らない逆方向整合も検証する |
-| UI操作抽出 / US / UC / Behavior / ACの意味分解 | LLM | UI操作scopeでは必須工程。Behaviorごとに意味上関係するUIOPを`関連操作ID`で明示し、同一UC内の全UIOPを自動関連付けしない。資料不足を推測補完しない。semantic identity自体が未確定でrowを作れない場合はblocking UNKNOWNをScopeへ明示する。既存ACのsemantic identityが同じか、意味上廃止してretireするかもLLMが判断する |
+| UI操作抽出 / US / UC / Behavior / ACの意味分解 | LLM | UI操作scopeでは必須工程。Behaviorごとに意味上関係するUIOPを`関連操作ID`で明示し、同一UC内の全UIOPを自動関連付けしない。資料不足を推測補完しない。semantic identity自体が未確定な場合は `_08 §3.1` の階層別Blocking UNKNOWN配置に従い、UC identity不明は親US、Behavior identity不明はUse Case振る舞い完全性、AC identity不明は親Behaviorへ閉じる。既存ACのsemantic identityが同じか、意味上廃止してretireするかもLLMが判断する |
 | 正常 / 準正常 / 例外の意味分類 | LLM | scriptは3分類の完全性と許可値だけ検証する |
 | AC→TRの意味対応 / TR分割統合 | LLM | ACの単純言い換えではなく検証責務として判断する |
 | 既存項目と意味的に同一か | LLM | stable IDをreuseする意味判断はLLMが行う |
@@ -46,12 +46,15 @@
 | SCOPE applicability / 条件付き必須fileと実fileの一致 | deterministic helper / validation | file × Scope IDの `あり / なし / 未確定` からfile状態を固定導出する。content completenessは別に、blocked domain rowまたは07のBlocking Scope ID + 関連Fileでclosureを検証する。03/04/05/08がnot-applicableのScopeを対応FIELD/FLOW/NOTIFY|INTERACT/IMPL rowが参照する状態と、Behavior Decomposition=not-applicableのScopeにUIOP / US / UC / Behavior / ACが残る状態をrejectする |
 | UIOP→UC / US→UC / UC→BH / BH→UIOP / BH→AC closure | deterministic validation | semantic relationを決めず、LLMが作った参照の完全性だけ検証する。UIOP.Scopeと対応UCからderivedしたScopeの一致、current Behaviorの`関連操作ID`がknown mapped UIOPを1件以上参照して同じUC / Scopeへ閉じること、required scopeの最低row / blocker closure、current UCがBehaviorへ閉じること、current Behaviorがcurrent / blocked ACへ閉じることも検証する |
 | US / UC / Behavior / ACのeffective current / blocked伝播 | deterministic helper / validation | LLMがsemantic identityをreuseしたtracking rowについて、自身のfield / UNKNOWNだけでなくancestor stateも使ってeffective stateを導出する。UCは参照US、Behaviorは親UC、ACは親Behaviorがblockedなら同じstable IDのままblockedへ落とし、ancestor由来だけを理由に子へUNKNOWNを複製しない。ancestorがcurrentへ戻り子自身にblockerがなければ同IDでcurrentへ戻す |
+| child identity未確定時のUNKNOWN配置 / closure | LLM + deterministic validation | identityを確定できるかはLLM判断。配置は `_08 §3.1` へ固定し、UC identity不明なら親USをblocked + child row 0件、Behavior identity不明ならcurrent UCの完全性rowを`未定義 + UNKNOWN`、AC identity不明なら親Behaviorをblocked + child row 0件とする。helperはScopeだけへ逃がす誤配置やcurrent parent + 必須child 0件をrejectする |
 | UCごとの正常 / 準正常 / 例外3分類 | deterministic validation | 各1行、定義あり/なし/未定義の構造整合を検証する |
 | current AC→TR / disposition closure | test-requirement deterministic runtime | ACを無言で落とさない |
 | TRのscope所属 | LLM | current ready `scope_index[]` とTRの意味から `scope_refs[]` を決める。UI target artifact workflowでは1件以上必要で、blocked scopeをcurrent TRへ割り当てない |
 | TCN / model / CI / TCのscope所属 | deterministic generator | TCNは参照TR、modelは親TCN、CIは親TCN / model、TCは参照TCN / CIの `scope_refs[]` をunion / canonical sortして生成する。LLMに再入力させない |
-| blocked scope由来のdownstream一時非current集合 / last-active履歴 | deterministic qa-workflow helper | existing `workflow_ref` とworkflow stateの **committed** `last_completed_qa_workflow_artifact` bindingを正本にexact historical artifactを解決する。bindingはqa-workflow artifact保存後のhistorical refetch / SHA-256確認 / workflow state CAS成功まで完了した時だけ更新し、CAS前artifactはprevious snapshotへ使わない。qa-workflow runtime Input / Resultへ保存した`workflow_ref`、artifact SHA-256、frozen runtime-v2 historical integrityを検証してprevious `current_entities[]` / TRD-TCD-TC structure stateを抽出する。historical integrityではcurrent on-disk implementation fingerprint一致を要求せずcurrentnessと分離する。そのEntity `scope_refs[]` とcurrent `blocked_scope_ids[]` の積集合からinactive対象とhistoryを固定する。Agent / LLM、raw Markdown、current inputでの旧artifact再検証からsnapshotを再構築しない |
+| blocked scope由来のdownstream一時非current集合 / last-active履歴 | deterministic qa-workflow helper | existing `workflow_ref` とworkflow stateの **committed** `last_completed_qa_workflow_artifact` bindingを正本にexact historical artifactを解決する。local single-hostは `_09 §13.2` のimmutable snapshot + locked conditional state update、provider-nativeはactual historical refetch + native CASを使う。qa-workflow runtime Input / Resultへ保存した`workflow_ref`、artifact SHA-256、frozen runtime-v2 historical integrityを検証してprevious `current_entities[]` / TRD-TCD-TC structure stateを抽出する。まずprevious `scope_refs[] - current_scope_ids[]` をSCOPE removal影響として抽出し、removed scopeが無いEntityだけblocked scopeとの積集合でinactive対象とhistoryを固定する。Agent / LLM、raw Markdown、current inputでの旧artifact再検証からsnapshotを再構築しない |
+| current scope universeから消えたSCOPEを参照するdownstream | deterministic impact extraction + owner LLM | helperはaffected TR / TCN / model / CI / TCとremoved Scope IDをexact `scope_refs[]` から抽出するがinactive / deleted / scope縮退を決めない。TRD / TCD / TCのownerがcurrent upstreamに対するreuse / scope再割当 / split / semantic deletionを判断し、generatorは解決前のactive carry-forwardをrejectする |
 | ready scope 0件時のrouting | deterministic qa-workflow | `ready_scope_ids=[]` のとき `build-machine-evidence(scope_ids=[])` とtest-analysis以降のruntimeを起動せずblockedで終了する。last completed qa-workflow artifact bindingは更新せず、次回ready scopeが生じたrunのhistorical sourceとして維持する |
+| Product Riskのscope lifecycle | test-analysis full rerun | 本PRではProduct Riskへ `scope_refs / inactive` を追加しない。current ready-scope batchごとにtest-analysisをfull rerunし、同じrunのTRDがcurrent Risk集合をclosure / priority入力として使う。blocked scope由来の旧Riskをcarry-forwardするhistoryは作らない |
 | downstream stable IDのreuse / new / semantic deletion | LLM + deterministic generator | TR / TCN / model / TCのsemantic identity同一かはLLMがlast-active historyを参照して判断する。CIはmaterialize historyからmapping identityを決定論的に復元する。generatorはhelper由来の`active → inactive`、reuseに基づく`inactive → active`、非reuseに基づく`inactive → deleted`を状態契約どおり適用する |
 | version形式 / package内version一致 | deterministic helper / validation | default policyでは完成packageへ永続差分を保存するたびsemantic / presentationを問わず次versionへ進める。no-opだけ維持する |
 | required core / 条件付き必須file set | deterministic helper / validation | trigger該当性だけLLM。状態・create/update時のfile集合・MANIFEST・completion statusはscript |
@@ -78,7 +81,7 @@ production CLIは次の4 operationだけを公開します。
 
 #### inspect
 
-package rootを読み、package version、current file list、file × Scope ID applicability、extension file、canonical ID集合、current / resolved UNKNOWN集合、cross-file stable reference index、`scope_readiness[] / ready_scope_ids[] / blocked_scope_ids[] / completion_status`、更新用snapshotを返します。snapshotはversion / file hash / manifest hashだけを持ち、tracking / reference indexはmaterializeがcurrent packageから再導出します。意味評価は返しません。
+package rootを読み、package version、current file list、file × Scope ID applicability、extension file、canonical ID集合、current / resolved UNKNOWN集合、cross-file stable reference index、`scope_readiness[] / current_scope_ids[] / ready_scope_ids[] / blocked_scope_ids[] / completion_status`、更新用snapshotを返します。snapshotはversion / file hash / manifest hashだけを持ち、tracking / reference indexはmaterializeがcurrent packageから再導出します。意味評価は返しません。
 
 #### validate
 
