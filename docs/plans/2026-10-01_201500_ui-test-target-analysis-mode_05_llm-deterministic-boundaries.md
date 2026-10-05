@@ -113,7 +113,7 @@ required file、version、ID形式・duplicate、exact reference、UNKNOWN整合
 
 これらは`materialize`内部関数としてrepository unit testから直接検証し、`next-version / next-id / render-readme-controls / next-domain-file / build-manifest / impact` のproduction CLI operationは作りません。
 
-#### build-machine-evidence#### migration_preflight.py
+#### migration_preflight.py
 
 qa-workflowのpre-runtime routing専用です。runtime-v1 artifactが残る段階では `workflow_runtime.py` 自身をmigration判定に使えないため、`_09 §2.9` のmachine-generated observationだけを入力にnext actionを決定します。semantic migration、stable identity mapping、scope ownershipの意味判断は行いません。generic migration engineや他Skill共通helperへ拡張しません。
 
