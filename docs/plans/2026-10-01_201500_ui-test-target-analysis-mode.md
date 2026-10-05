@@ -257,7 +257,7 @@ PR #14後のCIは `skills/*/scripts` を動的compileするため、helper compi
 - test-target-inspectionのbrowser観測契約変更
 - Agent Skills Specificationの独自拡張
 - ZIP専用runtime。archive出力は利用Agentのartifact機能で行い、Skillの正規処理には含めない
-- 導入先project固有のstorage / external API / connector / process起動 / timeout / lock / orchestrationを包むwrapper。Skill repoはQA契約固有の決定論処理だけを持ち、環境固有の接続・実行制御は導入先project / harnessが担当する
+- 導入先project固有の任意storage provider / external API / connector / process起動 / timeout / 汎用orchestrationを包むwrapper。Skill repoはQA契約固有の決定論処理だけを持つ。ただし既存 `qa.workflow_state_root` のlocal single-host completed baseline保存は今回のqa-workflow state契約そのものなので `artifact_graph.py` に固定実装し、generic storage / transaction abstractionにはしない
 - 既存production scriptへ数行で収まるdefault補完・入力受け渡しだけのadapter script。独立した現在要件を持たない処理は既存scriptへ統合する
 
 ## 成功条件
@@ -279,6 +279,7 @@ PR #14後のCIは `skills/*/scripts` を動的compileするため、helper compi
 - PR #14のusability / WCAG finding・observation・resultを仕様Authorityへ自動昇格しない
 - 機能scopeごとにUI操作有無を判定し、UI操作ありではUS → UC → Behavior → ACを完全に分析する。current Behaviorは意味上関係するUIOPを`関連操作ID`で明示し、同一UC内の無関係UIOPをAC freshnessへ混入させない。情報不足はnot-applicableへ逃げずUNKNOWN / blockedとして残る
 - US / UC / Behavior / ACはLLMがsemantic identityを維持する限り、子自身の意味を再判断せず親のblocked状態をhelperが決定論的に下流へ伝播する。ancestor由来blockedだけを理由に子へ新しいUNKNOWNを作らず、親block解除後に子自身のblockerがなければ同じstable IDのままcurrentへ戻す
+- child identity自体を確定できない場合は階層ごとのBlocking UNKNOWN位置を一意にする。UC identity不明は親USをblocked + UC 0件、Behavior identity不明はcurrent UCの完全性`未定義 + UNKNOWN` + Behavior 0件、AC identity不明は親Behaviorをblocked + AC 0件とし、Scopeへ一律退避しない
 - UI target packageからtest-requirement-designまで進むcanonical artifact workflowでは、current ACがTRまたは明示的dispositionへ閉じる。AC linkはACだけをcloseし、Authorityは従来どおりTR authority_refsまたはAuthority Dispositionで独立closureする。AC / 親Behavior / 親UC / 親US / 明示linked domain item / Authority変更は必要なTR freshnessへ伝播する。direct modeはknown AC ID / closureを保証し、AC Entity dependencyが無い場合のAC semantic cross-run freshnessを完了条件にしない。仕様理解packageだけを要求された場合は、このclosureをpackage単体の完了条件にしない
 - 標準package fileはrequired core payload + required control file `MANIFEST.md` + 固定triggerによる条件付き必須とし、Agentの自由裁量で作成有無を変えない
 - conditional fileまたはBehavior Decompositionが`not-applicable`のscopeを参照する対応tracking rowを残さない。複数scope参照rowの一部だけがnot-applicableになった場合もhelperが参照除去・split・retireを推測せず、矛盾をfail-closedしてLLMのsemantic updateへ戻す
