@@ -91,6 +91,8 @@ ID: `UIOP-001` から開始し、最低3桁で連番採番する。999の次は1
 - `対象構造ID` は `_05` のUI構造ID exact prefix集合だけを許可する。FIELD / RULE / FLOW / NOTIFY / INTERACTを入れず、同一PAGE上のdomain itemをhelperが逆引きしない
 - UIOPからdomain itemへの意味リンクは新しい列を追加せず、必要な場合は親US / UC / Behavior / ACの `関連構造ID` にLLMが明示する
 - `状態` はcaller入力ではなく、helperがfield充足と `関連UNKNOWN ID` から `mapped / blocked` を導出する
+- UIOP identityは確定しているが、対応するUSまたはUCのidentity未確定により `対応UC ID` を完全に確定できない場合は同じUIOP IDをblockedで保持する。原因となっている既存Blocking UNKNOWNを `関連UNKNOWN ID` から参照し、UIOP専用の重複UNKNOWNは作らない。既知の `対応UC ID` が一部ある場合は保持できるが、未解消UNKNOWNが1件以上ある間はmappedにしない
+- 上記で参照するUNKNOWNはcurrentで、UIOPと同じScopeを `Blocking Scope ID` に持ち、`関連File=02_behavior_and_business_rules.md` を含むものに限る。US identity不明でScopeに置いたUNKNOWN、UC identity不明で親USが参照するUNKNOWNのどちらも同じroot causeとしてUIOPから再利用できる
 - 既知のUI操作を無言で落とさない
 - 同一操作が複数UCに関係する場合は意味上必要なUCを全て参照する
 - 操作の目的 / 結果をこの表で再定義しない。目的はUS / UC、結果はBehavior / ACを正本とする
@@ -101,7 +103,7 @@ blocked rowは、semantic identityが確定済みで「自身の完成に必要�
 
 | row | current / mappedで必須 | blockedで必須 | blockedで空を許可 | IDを発行しない条件 |
 | --- | --- | --- | --- | --- |
-| UIOP | Scope ID、Actor / Role、対象構造ID、操作、関連仕様項目ID、対応UC ID。関連UNKNOWN IDは空 | Scope ID、操作、関連UNKNOWN ID。Actor / Role・対象構造ID・対応UC ID・関連仕様項目IDは確定済み分だけ保持 | Actor / Role、対象構造ID、対応UC ID、関連仕様項目ID | LLMがscope内の操作identity自体を区別できない |
+| UIOP | Scope ID、Actor / Role、対象構造ID、操作、関連仕様項目ID、対応UC ID。関連UNKNOWN IDは空 | Scope ID、操作、関連UNKNOWN ID。Actor / Role・対象構造ID・対応UC ID・関連仕様項目IDは確定済み分だけ保持。対応US / UC identity未確定が原因なら既存root Blocking UNKNOWNを参照する | Actor / Role、対象構造ID、対応UC ID、関連仕様項目ID | LLMがscope内の操作identity自体を区別できない |
 | US | Scope ID、Actor / Role、Goal、関連仕様項目ID。関連UNKNOWN IDは空 | Scope ID、Actor / RoleまたはGoalの少なくとも一方、関連UNKNOWN ID。確定済み関連仕様項目IDは保持 | Actor / RoleまたはGoalの未確定側、関連仕様項目ID | LLMがActor / Goalの組としてUser Story identityを確定できない |
 | UC | 関連US ID、Use Case、Trigger、Success Postcondition、関連仕様項目ID。Preconditionsは該当なしなら空可。関連UNKNOWN IDは空 | 関連US ID、Use Case。自身のblockerがある場合は関連UNKNOWN ID1件以上、ancestor US由来だけのblockedなら空可。Trigger / Preconditions / Success Postcondition / 関連仕様項目IDは確定済み分だけ保持 | Trigger、Preconditions、Success Postcondition、関連仕様項目ID、ancestor由来時の関連UNKNOWN ID | LLMが親USに対するUse Case identityを確定できない |
 | Behavior | UC ID、関連操作ID1件以上、結果分類、振る舞い、Postcondition / Result、関連仕様項目ID。関連UNKNOWN IDは空 | currentまたはblocked UC ID、結果分類、振る舞い。自身のblockerがある場合は関連UNKNOWN ID1件以上、ancestor UC由来だけのblockedなら空可。関連操作ID / Postcondition / Result / 関連仕様項目IDは確定済み分だけ保持 | 関連操作ID、Postcondition / Result、関連仕様項目ID、ancestor由来時の関連UNKNOWN ID | Behaviorの存在・identity自体を確定できない |
@@ -113,6 +115,7 @@ blocked rowは、semantic identityが確定済みで「自身の完成に必要�
 identity未確定時のBlocking UNKNOWN配置を次に固定します。
 
 - UIOP identityを確定できない → 当該ScopeへBlocking UNKNOWNを置き、UIOP rowは作らない
+- UIOP identityは確定済みだが対応US / UC identityを確定できない → UIOP rowは同じIDで保持し、対応先を確定できない原因の既存Blocking UNKNOWNを `関連UNKNOWN ID` へ参照してblockedにする。新しいUIOP専用UNKNOWNを作らない。US / UC解消後にUNKNOWN参照を外し、必須fieldが揃えば同じUIOP IDをmappedへ戻す
 - User Story identityを確定できない → 当該ScopeへBlocking UNKNOWNを置き、US rowは作らない
 - Use Case identityを確定できない → identityが確定している親USの `関連UNKNOWN ID` へBlocking UNKNOWNを置いてUSをblockedにし、UC rowは作らない。ScopeへだけUNKNOWNを置いてUSをcurrentのまま残さない
 - Behavior identityを確定できない → 親UCがcurrentなら§7の該当結果分類を `未定義 + 関連UNKNOWN ID` とし、Behavior rowは作らない。これはUCをblockedへ落とす理由にせず、scope readinessをblockedにする。親UC自体がblockedなら新しいchild UNKNOWNを追加せず既存ancestor blockerを正本とする
@@ -123,6 +126,7 @@ identity未確定時のBlocking UNKNOWN配置を次に固定します。
 state導出は次に固定します。
 
 - USは自身の必須field / `関連UNKNOWN ID`だけからcurrent / blockedを導出する
+- UIOPは `関連UNKNOWN ID` が1件以上あればblocked、空かつmapped必須fieldと `対応UC ID` が1件以上揃えばmappedとする。対応US / UC identity blockerを参照している間は、既知UC参照が一部存在してもblockedのままにする
 - UCは自身の必須fieldが揃い自身のUNKNOWNが空でも、参照USのいずれかがblockedなら同じUC IDのままeffective blockedにする
 - Behaviorは自身の必須fieldが揃い自身のUNKNOWNが空でも、親UCがblockedなら同じBehavior IDのままeffective blockedにする
 - ACは自身の必須fieldが揃い自身のUNKNOWNが空でも、親Behaviorがblockedなら同じAC IDのままeffective blockedにする
@@ -207,7 +211,7 @@ ID: `BH-001` から開始し、最低3桁で連番採番する。999の次は100
 - current Behaviorは意味上関係するmapped UIOPを`関連操作ID`へ1件以上明示する。各UIOPは同じScopeに属し、`対応UC ID`にそのBehaviorのUC IDを含む。どのUIOPを関連付けるかはLLMが判断し、helperは存在・state・UC / Scope整合だけを検証する
 - blocked Behaviorは確定済みの`関連操作ID`だけを保持でき、関係自体が未確定なら空を許可する。blocked UIOPを参照する場合は同じScopeだけを許可し、current Behaviorからblocked UIOPを参照しない
 - current Behaviorは1件以上のcurrentまたはblocked ACを持つ。ready scopeではcurrent Behaviorごとにcurrent ACが1件以上あり、blocked ACが残っていないことを要求する
-- Behaviorの意味自体が未確定ならblocked Behavior rowを作る。BehaviorはcurrentだがACのsemantic identityが既知で期待条件だけ一時的に未確定なら、親Behaviorを不要にblockedへ落とさず同じAC IDをblockedで保持できる
+- Behavior identityは確定しているが、`関連操作ID`、Postcondition / Result、関連仕様項目ID等の必須semantic fieldが一時的に未確定なら同じBehavior IDをblocked rowで保持する。BehaviorはcurrentだがACのsemantic identityが既知で期待条件だけ一時的に未確定なら、親Behaviorを不要にblockedへ落とさず同じAC IDをblockedで保持できる
 - Behaviorの存在・identity自体をまだ確定できない場合はblocked Behavior rowを作らず、親UCがcurrentなら§7の該当結果分類を `未定義` + UNKNOWNで表す。親UCがblockedならancestor blockerへ閉じ、新しいBehavior用UNKNOWNを重複生成しない
 - blocked Behaviorはcurrent ACを持たない。AC semantic identityが既知ならblocked ACを同じIDで保持できる
 - blocked Behaviorをcurrent ACの親にしない。親Behaviorがblockedならsemantic identityを維持する既存ACはhelperが同じIDのblockedへ伝播する
@@ -354,6 +358,7 @@ test-condition-designはTRから問題構造を分析し、仕様 / Risk / 状�
 - current UCは正常 / 準正常 / 例外3rowを持ち、少なくとも1分類が `定義あり` でcurrent Behaviorへ到達するか、1分類以上が `未定義 + UNKNOWN` でscope blockedになる。3分類すべて `なし` かつBehavior=0件をreadyにしない
 - current Behaviorは1件以上のcurrent / blocked ACへ接続する。AC identity未確定を表すBlocking UNKNOWNを自身に持つblocked BehaviorはAC 0件を許可し、current Behavior + AC 0件はrejectする。blocked ACが残るscopeをreadyにしない
 - current Behaviorは`関連操作ID`を1件以上持ち、全参照先がmapped UIOPで同じUC / Scopeへ閉じる。blocked Behaviorの関連操作参照は確定済み分だけを許可する
+- blocked UIOPで `対応UC ID` が空または一部だけ確定している場合、`関連UNKNOWN ID` はcurrentかつ同ScopeのBlocking UNKNOWNで `関連File=02_behavior_and_business_rules.md` を含むことを要求する。helperはUNKNOWNの意味的対応を決めないが、US / UC identity blockerとしてLLMが選んだ同じUNKNOWNを再利用できる構造を検証する
 - required scope内では不足情報をblocked UIOP / US / UC / Behavior / AC + UNKNOWN、または上記階層別規則のidentity未確定Blocking UNKNOWNとして保持できる。UC identity未確定をScopeだけへ置く、AC identity未確定をScopeだけへ置く、Behavior identity未確定をblocked Behaviorへ捏造する配置をrejectする
 - not-applicable scope、またはUI操作有無自体が未確定のblocked scopeにUIOP / US / UC / Behavior / ACを確定済みとして生成していないこと
 - blocked applicability / rowのUNKNOWN参照
@@ -391,6 +396,7 @@ semanticでは次を確認します。
 - 正常 / 準正常 / 例外を仕様に反して創作していない
 - `なし` と `未定義` を区別し、`なし` のAuthority根拠が意味上妥当である
 - Behavior identityが既知だが結果未確定な場合のblocked Behaviorと、identity自体未確定でBehavior rowを作らない場合を区別している
+- UIOP identityは既知だがUS identity未確定、またはUC identity未確定のため対応先を確定できない場合に、既存Blocking UNKNOWNを参照したblocked UIOPとして同IDを維持し、解消後に同IDでmappedへ戻している
 - `未定義` で既知Behaviorがあっても未解消条件をUNKNOWNとして残している
 - blocked UCを無理に3分類していない
 - ACが具体テストケース / 組合せへ先回りしていない
@@ -405,6 +411,7 @@ semanticでは次を確認します。
 spec-analysis:
 - SPEC-OUT-003へbehavior decomposition deterministic contractを追加
 - SPEC-SEM-003の複雑UI packageに複数scope、UIOP / US / UC / Behavior / AC、current / blocked、正常 / 準正常 / 例外を含める。同一UC内に複数UIOP / Behavior / ACを置き、Behaviorの`関連操作ID`が意味上必要なUIOPだけを結ぶことを評価する
+- SPEC-OUT-003 / repository regressionへ `known UIOP + US identity unknown`、`known UIOP + UC identity unknown`、UNKNOWN解消後のsame UIOP ID mapped復帰を追加し、原因UNKNOWNの複製を要求しないことを確認する
 - 既存normal spec-analysis caseでUI操作がない場合にdecompositionを生成しない回帰を確認
 
 test-requirement-design:
