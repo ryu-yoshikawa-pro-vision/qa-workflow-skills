@@ -372,6 +372,72 @@ runtime version bumpだけを理由にlive再観測は要求しませんが、�
 
 この表にないmigration wrapper / generic converterは追加しません。spec-analysisは§2.8でfrozen検証したcanonical v1 Authority content、test-analysis / usability-inspection / wcag-conformance-evaluationはread-only readerでintegrity検証済みかつcurrentness条件を満たすsemantic input、coverage-analysisはcurrent upstream v2 evidence、qa-workflowは全必要current v2 evidenceが揃ったcurrent workflow state / routing inputを正本とし、proseからv2 inputを推測変換しません。PR #14 merge後のStep 0ではspec-analysis v1 Entityのexact baseline field / canonicalizationと、3 readerが固定するpre-cutover runtime / generator implementation fingerprint、保存input blockの存在・parse可能性を実測値へ同期します。存在しない / baseline不一致の場合は上表の通常rerun経路へ固定し、新しい設計判断はStep 0へ持ち越しません。
 
+#### qa-workflow migration preflight
+
+新規 `skills/qa-workflow/scripts/migration_preflight.py` を、runtime-v1 → v2 / UI target migration / scope ownership normalizationのnext actionだけを決めるsingle-purpose deterministic helperとして追加します。generic migration engineにはしません。現行 `workflow_runtime.py` はcurrent v2 evidenceのaggregate verifierであり、runtime-v1 artifactが残るpre-runtime段階では正本になれないため、この判定をLLMへ残しません。
+
+inputはmachine-generated observationだけを受けます。
+
+```json
+{
+  "runtime_inventory":[
+    {
+      "skill":"test-requirement-design",
+      "artifact_present":true,
+      "runtime_contract_version":"runtime-v1",
+      "entity_schema_version":"entity-state-v1",
+      "verification_status":"legacy_valid"
+    }
+  ],
+  "v2_baseline":{
+    "qa_workflow_verification_valid":false,
+    "qa_workflow_can_complete":false
+  },
+  "ui_target_package":{
+    "present":false,
+    "current_scope_ids":[],
+    "ready_scope_ids":[],
+    "blocked_scope_ids":[]
+  },
+  "active_downstream":[
+    {
+      "skill":"test-requirement-design",
+      "entity_type":"tr",
+      "entity_ref":"TR-001",
+      "scope_refs":[]
+    }
+  ]
+}
+```
+
+入力値はAgentの意味判断で作りません。
+
+- `runtime_inventory[]`: 各Skillのfrozen v1 reader / current v2 verifierが返したschema version / verification結果をexact転記する。未知version、v1/v2混在、verification source欠落をhelperがrejectする
+- `v2_baseline`: current qa-workflow `verify_runtime_evidence` の `valid` と `artifact:workflow_runtime:all.payload.can_complete` をexact転記する
+- `ui_target_package`: package未作成なら `present=false`、作成済みなら `ui_target_package.py inspect` の `current_scope_ids[] / ready_scope_ids[] / blocked_scope_ids[]` をexact転記する
+- `active_downstream[]`: current v2 Machine Entity / structure stateのactive TR / TCN / model / CI / TC identityと `scope_refs[]` をdeterministic projectionする。prose / 名称から推測しない
+
+成功response:
+
+```json
+{
+  "valid":true,
+  "migration_status":"runtime_v2_cutover_required",
+  "blocking_issue":null,
+  "issues":[]
+}
+```
+
+`migration_status` は次の5値です。
+
+- `runtime_v2_cutover_required`: runtime-v1 downstreamが1件以上あり、current v2 baseline未成立
+- `ui_target_migration_required`: current v2 baseline成立済みでUI target package未作成
+- `scope_ownership_normalization_required`: UI target package作成済み、既存active downstreamに `scope_refs=[]` があり、全current scope ready
+- `scope_ownership_baseline_required`: UI target package作成済み、既存active downstreamに `scope_refs=[]` があり、blocked scopeが1件以上。これはblocking statusで、`blocking_issue="scope_ownership_baseline_required"`
+- `partial_progression_ready`: runtime-v1 downstreamが残らずcurrent v2 baseline / 必要なUI target migration / ownership baselineが成立済み、またはdownstream未作成の新規UI target workflow
+
+判定優先順位は上記順です。LLMはstatusを上書きしません。handled invalid inputはexit 0 + `valid=false / issues[]`、unexpected internal errorだけexit 1とします。
+
 #### UI target migrationとの相対順序
 
 既存runtime-v1 downstream artifactがあるworkflowでは次の依存順だけを許可します。
