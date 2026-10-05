@@ -785,22 +785,68 @@ input:
 
 `workflow_state_record.state` の他fieldは既存workflow state契約のままopaqueとして扱い、helperは `last_completed_qa_workflow_artifact` だけを読みます。初回workflowはこのfieldを `null` とし、その場合だけ `previous_qa_workflow_artifact_markdown=null` を許可します。bindingがnon-nullならMarkdown必須、bindingがnullならMarkdown non-nullを拒否します。top-level artifact Markdownはcutover helperと同じ16 MiB aggregate transport / 64 KiB string exemptionを使い、通常generatorの2 MiB上限は変更しません。
 
-output:
+CLI契約はこのhelper固有に固定し、単一用途のため `operation` field / operation dispatchは追加しません。
+
+stdin:
+
+- top-levelはJSON object exactly 1件
+- 許可top-level fieldは `workflow_ref / workflow_state_record / blocked_scope_ids / previous_qa_workflow_artifact_markdown` の4つだけ。missing / unknown fieldをrejectする
+- duplicate JSON keyをrejectするstrict decoderを使う
+- aggregate stdinは16 MiB以下。通常stringは64 KiB以下とし、top-level `previous_qa_workflow_artifact_markdown` だけ16 MiB aggregate内で64 KiB上限を免除する
+- `workflow_ref` はnon-empty string、`blocked_scope_ids[]` はduplicateなしのknown `SCOPE-xxx` string配列でcanonical sortする。空配列は許可する
+- `workflow_state_record` は既存workflow state schemaでvalidateし、このhelper固有には `workflow_ref` と `state.last_completed_qa_workflow_artifact` だけを参照する
+- `previous_qa_workflow_artifact_markdown` はstringまたはnull。bindingとのnull / non-null整合は下記規則でvalidateする
+
+成功stdout:
 
 ```json
 {
-  "inactive_tr_ids":["TR-002"],
-  "inactive_tcn_ids":["TCN-003"],
-  "inactive_model_keys":["decision-001"],
-  "inactive_ci_ids":["TCN-003-CI01"],
-  "inactive_tc_ids":["TC-004"],
-  "inactive_tr_history":[],
-  "inactive_tcn_history":[],
-  "inactive_model_history":[],
-  "inactive_materialize_history":[],
-  "inactive_tc_history":[]
+  "valid":true,
+  "payload":{
+    "inactive_tr_ids":["TR-002"],
+    "inactive_tcn_ids":["TCN-003"],
+    "inactive_model_keys":["decision-001"],
+    "inactive_ci_ids":["TCN-003-CI01"],
+    "inactive_tc_ids":["TC-004"],
+    "inactive_tr_history":[],
+    "inactive_tcn_history":[],
+    "inactive_model_history":[],
+    "inactive_materialize_history":[],
+    "inactive_tc_history":[]
+  },
+  "issues":[]
 }
 ```
+
+handled failure stdout:
+
+```json
+{
+  "valid":false,
+  "payload":null,
+  "issues":[
+    {
+      "issue_type":"workflow_ref_mismatch",
+      "blocking":true,
+      "message":"..."
+    }
+  ]
+}
+```
+
+handled `issue_type` は次に固定します。
+
+- `invalid_input`: JSON/schema/type/unknown field/duplicate key/ID形式/duplicate/sort等の入力不正
+- `limit_exceeded`: stdin / string上限超過
+- `workflow_ref_mismatch`: current workflow / workflow state / previous qa-workflow runtimeの `workflow_ref` 不一致
+- `historical_artifact_required`: bindingがnon-nullなのにprevious Markdownがnull
+- `historical_artifact_unexpected`: bindingがnullなのにprevious Markdownがnon-null
+- `historical_artifact_hash_mismatch`: previous Markdown SHA-256とbinding不一致
+- `historical_runtime_invalid`: runtime pair / frozen v2 schema / fingerprint / dependency / Entity / structure stateのhistorical integrity不成立
+- `scope_ownership_unavailable`: UI target scope ownership baseline成立後にactive downstreamの `scope_refs[]` が利用不能
+- `inactive_materialize_history_missing`: inactive化対象TCNのlast successful materialize stateを検証済みprevious TCD stateから取得できない
+
+handled failureはcanonical JSON + terminal LFをstdoutへ1件だけ出力してexit 0とします。予期しない実装不具合だけ `issue_type=internal_error / valid=false / payload=null` を可能な範囲でstdoutへ出力してexit 1とします。stderrをmachine contractに使いません。成功payloadの各ID / history配列は下記規則どおりcanonical sort / dedupeし、callerは再整形しません。
 
 規則:
 
@@ -855,7 +901,7 @@ qa-workflow / coverage-analysisはcurrent Entity collectionへAC Entityが存在
 
 `skills/qa-workflow/scripts/workflow_runtime.py` のruntime-v2 normalized inputへrequired `workflow_ref`を追加し、`artifact:workflow_runtime:all` Result payloadにも同じ値をechoします。`workflow_ref`は既存workflow stateのopaque UUIDであり、Machine Entity IDやpackage-local IDへ変換しません。Input / Result不一致はruntime invalidです。
 
-UI target downstreamをcompleted baselineとして扱う時だけ、qa-workflowは保存済みworkflow stateの `last_completed_qa_workflow_artifact` を更新します。更新順は `qa-workflow runtime current verification PASS → artifact保存 → artifact_ref/revision取得 → historical refetch availability確認 → raw Markdown SHA-256計算 → workflow state CAS` とします。途中失敗では旧bindingを維持し、新artifactをlast completedとして扱いません。`ready_scope_ids=[]` でdownstream runtimeをdispatchしないrun、またはqa-workflow resultがunresolved / blockedのrunではbindingを更新しません。
+UI target downstreamをcompleted baselineとして扱う時だけ、qa-workflowは保存済みworkflow stateの `last_completed_qa_workflow_artifact` を更新します。更新順は `qa-workflow runtime current verification PASS → artifact保存 → artifact_ref/revision取得 → historical refetch availability確認 → raw Markdown SHA-256計算 → workflow state CAS` とします。**workflow state CAS成功をdownstream baselineのcommit境界**とし、CAS成功前に生成・保存されたartifactは未commitです。historical refetch確認、SHA-256確認、state CASのいずれかが失敗したrunはcompleted baselineとして扱わず、そのrunのartifactをcurrent canonical downstream baselineまたは次runのprevious snapshotに使用しません。既存bindingがある場合は旧bindingをcanonical baselineとして維持し、初回でbindingがnullのままならcommitted downstream baselineは未成立です。orphan artifact cleanupや新しいtransaction frameworkは追加しません。`ready_scope_ids=[]` でdownstream runtimeをdispatchしないrun、またはqa-workflow resultがunresolved / blockedのrunではbindingを更新しません。
 
 coverage-analysisの既存traceability graph node typeへACを追加しません。AC→TRのmachine traceabilityはTR Entity dependencyとTRD closureで保証し、Authority / Risk / TR / TCN / CI / TCの既存coverage graphを不要に拡張しません。inactive TR / TCN / CI / TCはcurrent graph node / current runtime unitへ入れず、blocked scopeの再開情報はspec-analysisのscope readinessとdownstream ID stateのlast active `scope_refs[]` で保持します。
 
@@ -871,6 +917,7 @@ coverage-analysisの既存traceability graph node typeへACを追加しません
 - spec-analysis expected Authority + **current ACだけ**のidentity。blocked ACをexpected Entityへ含めない
 - AC-001 current → blocked → currentでstable IDを維持し、blocked期間はAC Entity / `acceptance_criteria[]` から除外、explicit retire時だけterminal retireする回帰
 - current UC → blocked UCのancestor state propagation。LLMがUC / Behavior / AC identity reuseを維持した場合、BH / ACは同じstable IDのeffective blockedへ決定論伝播し、ancestor由来だけでは子UNKNOWNを増やさず、UC blocker解消後に同じIDでcurrentへ戻る
+- blocked AC validationは、自身のblockerがあるACだけ `関連UNKNOWN ID` 1件以上を要求し、ancestor Behavior由来だけのeffective blockedでは空を許可する。両経路ともMachine Entity / `acceptance_criteria[]` 対象外であることを固定する
 - 通常の非mode spec-analysis normalized inputで `acceptance_criteria` key省略を空集合として扱い、既存Authority expected Entityだけを維持
 - qa-workflow expected / actual Entity exact match
 - coverage-analysis current Entity parse compatibility
@@ -902,6 +949,8 @@ coverage-analysisの既存traceability graph node typeへACを追加しません
 - v1 cutover / non-UI-target baselineの `scope_refs=[]` からUI target migrationする際、既存active downstreamがある場合は全scope readyでのみownership baselineを作成し、blocked scopeが残る間は `scope_ownership_baseline_required` でfail-closedする回帰。downstream未作成の新規workflowではpartial readinessを許可する
 - inactive state rowがlast active `scope_refs[]` を保持し、`inactive_*_history[]` がlast-active Entity contentを保持するため、inactive期間を挟んでもre-ready時のsemantic ID reuse候補を失わない回帰
 - SCOPE-A/Bのcompleted baseline後にA/Bともblockedとなって`ready_scope_ids=[]`になったrunではbatch handoff / downstream runtime / qa-workflow runtimeを起動せずlast completed bindingを維持し、その後Bだけreadyへ戻ったrunで同bindingからAをinactive、Bをreuse候補として復元できる回帰
+- downstream baseline commit境界 regression: 初回artifact保存後にhistorical refetch確認またはstate CASが失敗した場合はbinding=nullのままでcompleted扱いしない。既存binding=Aの状態でnew artifact B保存後にstate CASが失敗した場合はAがcanonical baselineのままで、Bをprevious snapshotとして使用しない
+- `downstream_state.py` CLI contract regression: duplicate JSON key / unknown top-level field / 16 MiB + 1 byte / top-level artifact Markdown以外の64 KiB + 1 stringをhandled failure + exit 0でrejectし、workflow_ref mismatch / binding-null mismatch / SHA mismatch / historical runtime invalid / scope ownership unavailable / inactive materialize history missingが固定issue typeになる。unexpected internal errorだけexit 1になる
 - TCN active→inactiveでprevious current `materialize-coverage` の `ci_id_state / target_mapping_state / semantic_ci_mapping_state / expected_result_root_state` とCI Entityを `inactive_materialize_history[]` へ保存し、current runtime evidenceからは除外する回帰
 - inactive TCN再ready時、current previous materialize resultが無くてもhistoryの `ci_id_state / mapping state` からprevious inputを再構成し、同一target / semantic identityへ同じCI IDをreuseできる回帰。inactive前にdeletedだったCI IDも使用済みID集合へ残り再採番されないこと、history欠落・改変は `inactive_materialize_history_missing` でblockedになること
 - inactive IDはcurrent Entity / expected Entity / carry-forward runtimeへ含めず、inactive自体でqa-workflow / coverage-analysisをblockingしない。別のcurrent stale issueは従来どおりblockingする回帰
