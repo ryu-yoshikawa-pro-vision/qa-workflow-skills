@@ -570,9 +570,9 @@ production helperは任意Markdownを解釈する汎用parserにしません。�
 
 `valid` はschema / reference / filesystem等の**構造的妥当性**を表し、workflow completionとは分離します。`ui_target_package.py inspect / validate / materialize` はcurrent Scope ID集合から `current_scope_ids[] / ready_scope_ids[] / blocked_scope_ids[]` を返します。`current_scope_ids[]` はcurrent SCOPE row全件のcanonical sortで、`ready_scope_ids[] ∪ blocked_scope_ids[]` とexact一致し、`scope_readiness[].scope_id` 集合ともexact一致させます。次の固定規則で `completion_status` を生成します。
 
-- `blocked_scope_ids=[]` → `complete`
+- `blocked_scope_ids=[]` → `complete`。`current_scope_ids=[] / ready_scope_ids=[] / blocked_scope_ids=[]` もpackage自体はvalidな`complete`であり、全SCOPE retire後のdownstream terminal cleanup要否はpackage statusではなく `_03 §2.1 / _09 §12.3a` のqa-workflow routingが判定する
 - ready / blockedが両方1件以上 → `partial`
-- `ready_scope_ids=[]` かつblockedが1件以上 → `blocked`
+- `current_scope_ids[]` がnon-empty、`ready_scope_ids=[]` かつblockedが1件以上 → `blocked`
 
 workflow readinessではSCOPEを原子的な後続進行単位にします。`Behavior Decomposition=required` は意味モデル上の適用状態であり、workflow readinessのreadyを意味しません。
 
@@ -1036,7 +1036,7 @@ stdin:
 {"operation":"build-machine-evidence","package_root":"<path>","scope_ids":null}
 ```
 
-`scope_ids` は `null` またはcurrent ready Scope IDのnon-empty arrayです。duplicate / unknown / blocked scope IDを拒否し、helperがcanonical sortします。 `current_scope_ids[]` はread-only outputでcaller入力にはせず、helperがcurrent SCOPE rowから毎回再導出してretired SCOPE IDを含めません。canonical qa-workflowでdownstream `artifact:*:all` runtimeへ渡す場合は、`ready_scope_ids[]` が1件以上の時だけ `scope_ids[]` を渡し、その集合が `inspect.ready_scope_ids[]` とexact一致することを要求します。`ready_scope_ids=[]` ではこのoperationを空配列で呼ばずdownstream runtimeをdispatchしません。一部ready scopeだけのsubset実行をglobal `:all` artifactの代替にしません。
+`scope_ids` は `null` またはcurrent ready Scope IDのnon-empty arrayです。duplicate / unknown / blocked scope IDを拒否し、helperがcanonical sortします。 `current_scope_ids[]` はread-only outputでcaller入力にはせず、helperがcurrent SCOPE rowから毎回再導出してretired SCOPE IDを含めません。canonical qa-workflowでdownstream `artifact:*:all` runtimeへ渡す場合は、`ready_scope_ids[]` が1件以上の時だけ `scope_ids[]` を渡し、その集合が `inspect.ready_scope_ids[]` とexact一致することを要求します。`ready_scope_ids=[]` ではこのoperationを空配列で呼びません。`current_scope_ids[]` non-emptyの全blocked時はdownstream runtimeをdispatchせず、`current_scope_ids=[]` のzero-scope terminal時はbatch handoffを使わず `_09 §12.3a` のdeletion-only downstream pathへ進みます。一部ready scopeだけのsubset実行をglobal `:all` artifactの代替にしません。
 
 §9に従い09からnormalized Authority inputを生成して既存 `authority_entities.py` のbuilderを呼びます。linked domain itemはcurrent AC / 親Behavior / 親UC / 親USの `関連構造ID` に明示されたdomain item IDだけを対象にし、linked UIOPの `対象構造ID` からdomain itemを逆引きしません。linked UI structureは、同chainの `関連構造ID` にあるUI構造ID、linked UIOPの `対象構造ID`、linked domain itemの `対象構造ID / 関連構造ID` にあるUI構造IDをseedとし、`親構造ID` をrootまで辿ります。domain itemから別domain itemへ再帰展開しません。これらとscope、関連current INFからAcceptance Criterion Machine Entityを生成して統合し、missing parent / self-parent / cycleはrejectします。
 
@@ -1199,7 +1199,7 @@ Acceptance Criterion projection:
 - 09の `適用範囲` 自由記述、名称、Path、同一PAGE、本文類似、Authority共有から新しいedgeを作らない。scope所属は `Scope ID / 関連Scope ID` またはUS→UC→Behavior→ACの明示parent chainだけで決める
 - ACとdomain itemの意味関係をhelperが推測しない。必要なedgeがsemantic inputに無い場合はsemantic quality gate側の不足であり、helperが補完しない
 
-qa-workflow / test-analysisはpackage-global Machine Entity集合をMarkdownからfilterしません。current `inspect.ready_scope_ids[]` が1件以上なら全件を `build-machine-evidence(scope_ids=ready_scope_ids)` へ渡して1つのcanonical batch handoffを取得し、Authority / AC / Entityのmerge・dedupeをAgentが行いません。`ready_scope_ids=[]` ならbatch handoff自体を生成しません。batch handoffから `artifact:analysis_entities:all` / `artifact:requirement_structure:all` へ実際に渡すcanonical stdin JSON bytesを構成した**後**に16 MiB上限を事前検査します。2 MiBを超えても16 MiB以下なら1つの`:all` requestとして処理し、16 MiBを超える場合はruntimeを起動せず `limit_exceeded` とします。scopeごとの個別run・subset run・silent truncate・auto splitで回避しません。その他の通常runtime generatorは2 MiB上限を維持します。
+qa-workflow / test-analysisはpackage-global Machine Entity集合をMarkdownからfilterしません。current `inspect.ready_scope_ids[]` が1件以上なら全件を `build-machine-evidence(scope_ids=ready_scope_ids)` へ渡して1つのcanonical batch handoffを取得し、Authority / AC / Entityのmerge・dedupeをAgentが行いません。`ready_scope_ids=[]` ならbatch handoff自体を生成しません。`current_scope_ids=[]` のzero-scope terminal cleanupはbatch handoffを作らずqa-workflowのhistorical state pathで処理します。batch handoffから `artifact:analysis_entities:all` / `artifact:requirement_structure:all` へ実際に渡すcanonical stdin JSON bytesを構成した**後**に16 MiB上限を事前検査します。2 MiBを超えても16 MiB以下なら1つの`:all` requestとして処理し、16 MiBを超える場合はruntimeを起動せず `limit_exceeded` とします。scopeごとの個別run・subset run・silent truncate・auto splitで回避しません。その他の通常runtime generatorは2 MiB上限を維持します。
 
 blocked scopeをquestion-analysisへ送る場合は `inspect.scope_readiness[].blocking_unknown_ids[]` を使い、current UNKNOWN全件をAgentがfilterしません。
 
