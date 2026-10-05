@@ -308,6 +308,8 @@ ancestor state propagationの意味契約は `_08 §3.1` を正本とします�
 - 通知 / メール → NOTIFY-xxx
 - 外部連携 / 外部遷移イベント → INTERACT-xxx
 
+`種別` は `通知 / メール / 外部連携 / 外部遷移イベント` の4 exact値だけを許可します。
+
 外部画面そのものは01の `EXT-xxx` がownerであり、05では `関連構造ID` から参照します。
 
 ### 5.7 06_spec_inconsistencies_and_pending.md
@@ -887,10 +889,12 @@ table input contract:
 | 同上 | `種別=VIEW` | `VIEW` |
 | 同上 | `種別=STEP` | `STEP` |
 | 同上 | `種別=MODAL` | `MODAL` |
-| 同上 | `種別=BROWSER DIALOG` | `BDLG` |
-| 同上 | `種別=PANEL / POPOVER / GLOBAL UI` | `PANEL` |
+| 同上 | `種別=BROWSER-DIALOG` | `BDLG` |
+| 同上 | `種別=PANEL` | `PANEL` |
+| 同上 | `種別=POPOVER` | `PANEL` |
+| 同上 | `種別=GLOBAL UI` | `PANEL` |
 | 同上 | `種別=EXTERNAL` | `EXT` |
-| 同上 | `種別=SHARED` | `SHARED` |
+| 同上 | `種別=SHARED PAGE` | `SHARED` |
 | `05_notifications_and_external_interactions.md / 通知・外部連携一覧` | `種別=通知` または `メール` | `NOTIFY` |
 | 同上 | `種別=外部連携` または `外部遷移イベント` | `INTERACT` |
 | `09_authority_and_traceability.md / 分析項目` | `分類=SPEC` | `SPEC` |
