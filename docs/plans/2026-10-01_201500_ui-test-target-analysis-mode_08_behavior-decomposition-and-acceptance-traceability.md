@@ -244,7 +244,7 @@ ID: `AC-001` から開始し、最低3桁で連番採番する。999の次は100
 規則:
 - current Behaviorは1件以上のcurrentまたはblocked ACを持つ
 - current ACはcurrent Behaviorだけを親に持ち、ACへ到達するBehavior / UC / 関連USはすべてcurrentであることを要求する
-- blocked ACはsemantic identityが既知のACが一時的に確定できない場合だけ使用し、親Behaviorはcurrentまたはblockedを許可する。関連UNKNOWN IDを1件以上持つ
+- blocked ACはsemantic identityが既知のACが一時的にcurrentでなくなる場合に使用し、親Behaviorはcurrentまたはblockedを許可する。AC自身の未確定事項でblockedになる場合は `関連UNKNOWN ID` を1件以上必須とし、ancestor Behavior由来だけでeffective blockedになる場合は空を許可してancestorのUNKNOWNを複製しない
 - ACは観測可能な振る舞い / 結果の意味を表す
 - AC identityが既知でexpected behavior / Authorityだけ不足する場合は同じAC IDをblockedで保持する。解消後は同じIDをcurrentへ戻す
 - AC identity自体を確定できない場合はAC rowを作らず、既知のBehaviorまたはScopeからBlocking UNKNOWNへ閉じる
@@ -354,7 +354,7 @@ test-condition-designはTRから問題構造を分析し、仕様 / Risk / 状�
 - current Behavior → AC closure
 - `なし` completeness row → current Authority ref 1件以上
 - current AC chainのBehavior / UC / USがすべてcurrent
-- blocked ACは関連UNKNOWN IDを1件以上持ち、Machine Entity / `acceptance_criteria[]` 対象外であること
+- blocked ACが自身のblockerを持つ場合は `関連UNKNOWN ID` を1件以上要求し、ancestor Behavior由来だけのeffective blockedでは空を許可してancestorのUNKNOWNを複製しないこと。いずれのblocked ACもMachine Entity / `acceptance_criteria[]` 対象外であること
 - current ↔ blocked AC state transitionでstable IDを維持し、explicit retireがない限りAC IDを再採番しないこと
 - current AC → current SPEC / DECISION / approved ASM ref 1件以上。INF / UNK / inactive Authorityだけではcurrent ACにしない
 - current / blockedとUNKNOWN参照の整合
