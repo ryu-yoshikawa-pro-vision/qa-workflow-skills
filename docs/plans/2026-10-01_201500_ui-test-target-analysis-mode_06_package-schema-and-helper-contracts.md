@@ -329,7 +329,7 @@ ancestor state propagationの意味契約は `_08 §3.1` を正本とします�
 - `関連Scope ID` は意味上影響するcurrent Scope ID、`Blocking Scope ID` はそのうち後続工程を止めるscopeをLLMが明示する。`Blocking Scope ID` は `関連Scope ID` のsubsetでなければならない
 - `関連File` は影響するcanonical relative path。standard 00〜09はstandard file registryに存在するpathなら、conditional applicabilityによりそのversionで未materializeでも参照を許可する。extensionはcurrent `案件固有extension file一覧` に宣言され、実fileも存在するpathだけを許可する。空を許可し、helperはこの識別子妥当性とduplicateを検証する
 - `Blocking Scope ID` が空ならcurrent UNKNOWNでもworkflow blockerではない。UNKNOWN件数だけからscopeをblockedへしない
-- semantic identity自体が未確定でstable rowを発行できない場合は、親scopeを `Blocking Scope ID`、該当domain fileを `関連File` に記録してmachine-readableなblockerとして残す
+- semantic identity自体が未確定でstable rowを発行できない場合も、07のUNKNOWN rowには影響scopeを `関連Scope ID / Blocking Scope ID`、該当domain fileを `関連File` に記録してmachine-readableなblockerとして残す。02内でどの親row / 完全性rowがそのUNKNOWNを参照するかは `_08 §3.1` の階層別規則を正本とし、Scopeへの記録だけでchild closureを満たした扱いにしない
 - question-analysisへ渡すUNKNOWNは、対象blocked scopeの `Blocking Scope ID` に一致する集合をhelperが返す
 
 ### 5.9 08_repository_implementation_status.md
