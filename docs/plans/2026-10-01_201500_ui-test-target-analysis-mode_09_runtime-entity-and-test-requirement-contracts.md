@@ -896,8 +896,11 @@ stdin:
         "skill":"test-requirement-design",
         "entity_type":"tr",
         "entity_ref":"TR-005",
+        "previous_status":"active",
         "previous_scope_refs":["SCOPE-001","SCOPE-003"],
-        "removed_scope_refs":["SCOPE-003"]
+        "removed_scope_refs":["SCOPE-003"],
+        "last_active_content":{"tr_id":"TR-005","scope_refs":["SCOPE-001","SCOPE-003"]},
+        "last_active_content_fingerprint":"<lowercase-64-hex>"
       }
     ],
     "scope_removal_state_transitions":[
@@ -909,7 +912,10 @@ stdin:
         "status":"active"
       }
     ],
+    "scope_removal_pending_applications":[],
+    "zero_scope_terminal":false,
     "requires_semantic_resolution":false,
+    "requires_materialization":false,
     "inactive_tr_history":[],
     "inactive_tcn_history":[],
     "inactive_model_history":[],
@@ -947,6 +953,7 @@ handled `issue_type` は次に固定します。
 - `historical_runtime_invalid`: runtime pair / frozen v2 schema / fingerprint / dependency / Entity / structure stateのhistorical integrity不成立
 - `scope_ownership_unavailable`: UI target scope ownership baseline成立後にactive downstreamの `scope_refs[]` が利用不能
 - `inactive_materialize_history_missing`: inactive化対象TCNのlast successful materialize stateを検証済みprevious TCD stateから取得できない
+- `scope_removal_history_missing`: scope removal対象のinactive semantic ownerについて、validated previous structure stateからlast-active Entity snapshotを一意に取得できない
 
 handled failureはcanonical JSON + terminal LFをstdoutへ1件だけ出力してexit 0とします。予期しない実装不具合だけ `issue_type=internal_error / valid=false / payload=null` を可能な範囲でstdoutへ出力してexit 1とします。stderrをmachine contractに使いません。成功payloadの各ID / history配列は下記規則どおりcanonical sort / dedupeし、callerは再整形しません。
 
@@ -962,18 +969,22 @@ handled failureはcanonical JSON + terminal LFをstdoutへ1件だけ出力して
 8. 保存済みqa-workflow Inputの `workflow_scopes[] / current_entities[] / current_runtime_units[]` とResult payloadを検証します。Result payloadの `current_entities[]` はInputとexact一致させ、各workflow scopeの `current_structure_state` は同じ保存Input内の `normalized_input / current_entities / current_runtime_units` を使うfrozen v2 structure-state規則で自己整合を検証します。ここで検証できた `current_entities[]` とTRD / TCD / TCの `current_structure_state` だけをinternal previous snapshotとします
 9. Agent / LLMは `previous_machine_entities[] / previous_structure_states` を入力しません。raw downstream artifact、個別Runtime Input / Result、人間向けruntime表、current inputに対する旧artifactの `verify_runtime_evidence` 結果からsnapshotを再構築しません。workflow state binding / historical revision / pair / integrityのいずれかが確認できなければfail-closedします
 10. previous TR / TCN / model / CI / TC Entityはcanonical `content.scope_refs[]` を必須とし、duplicate / unsorted / non-stringをrejectします。UI target scope ownership baseline成立後に空scope_refsが残るactive downstream Entityは `scope_ownership_unavailable` でfail-closedします
-11. 各previous active Entityについて `removed = content.scope_refs[] - current_scope_ids[]` を先に計算します。`removed` が非空ならそのEntityを `scope_removal_affected_entities[]` へ `{skill,entity_type,entity_ref,previous_scope_refs,removed_scope_refs}` で追加し、`removed_scope_ids[]` へunionします。このEntityはblocked由来inactiveへ自動遷移させず、`requires_semantic_resolution=true` とします
-12. `removed` が空のEntityだけ、`content.scope_refs[] ∩ blocked_scope_ids[]` が非空ならinactive対象にします。Authority共有、名称、同一PAGE、AC dependency、runtime dependencyからscope所属を推測しません
-13. scope removal affected Entityは無言carry-forwardを禁止します。TR / TCN / model / TCのownerはcurrent upstreamとlast-active contentからreuse / scope再割当 / split / semantic deletionを判断し、`scope_removal_resolutions[]` へ記録します。helperは `reuse` のresolved scope refsが全てreadyなら`active`、1件以上blockedなら`inactive`を決定論導出し `scope_removal_state_transitions[]` へ返します。`deleted` はterminal deleted、`split` はold identityをowner generatorのreplacement materialize対象へ回し、replacementが成立するまでそのold identityのresolution完了扱いにしません。helper自身はscope縮退・split・deleteの意味判断をしません。CIは解決後のcurrent TCN / model ownershipとmappingから決定論伝播します
-14. 新たにinactiveになるTR / TCN / model / TCはprevious current Entity snapshotを対応historyへ追加します。既存inactive historyはidentityでmergeし、内容不一致をsilent overwriteしません
-15. 新たにinactiveになるTCNがprevious current CI / target mapping / semantic mappingを持つ場合、検証済みprevious TCD `current_structure_state.runtime_results[]` の `artifact:materialize_coverage:<TCN-ID>` resultから `ci_entities / ci_id_state / target_mapping_state / semantic_ci_mapping_state / expected_result_root_state` を取得して§7.3のhistory entryを生成します。必要なresultが無い場合、またはCI state / mappingが相互不整合なら `inactive_materialize_history_missing` でfail-closedします
-16. `scope_refs[]` がready / blocked双方を含むcross-scope Entityもentity単位でinactiveにします。ready側だけへ自動縮退しません。一方、current scope universeから消えたscopeを含むcross-scope Entityは§11〜13のscope removal semantic resolutionへ回し、inactiveへ逃がしません
-17. current packageで初めてblockedになりprevious Entityが存在しないitemはinactive IDを生成しません
-18. outputはstable ID / history identity順でcanonical sort / dedupeします。`scope_removal_affected_entities[] / scope_removal_state_transitions[]` は `(skill, entity_type, entity_ref)`、`scope_removal_resolutions[]` 内のscope refsと各scope配列はScope IDでcanonical sortします
+11. previous semantic ownerの`active / inactive` state rowを対象に `previous_scope_refs[] - current_scope_ids[]` を先に計算します。active ownerのlast-active contentはprevious current Machine Entity、inactive ownerはvalidated `inactive_*_history[]` のMachine Entity snapshotから取得します。inactive ownerのhistoryがmissing / identity不一致なら `scope_removal_history_missing` でfail-closedします。removedが非空なら `scope_removal_affected_entities[]` へ `{skill,entity_type,entity_ref,previous_status,previous_scope_refs,removed_scope_refs,last_active_content,last_active_content_fingerprint}` を追加し、`removed_scope_ids[]` へunionします。LLMはこのcanonical snapshotを使い、raw historical Markdownや個別historyを再filterしません
+12. removedが空のprevious active Entityだけ、`content.scope_refs[] ∩ blocked_scope_ids[]` が非空なら通常のinactive対象にします。Authority共有、名称、同一PAGE、AC dependency、runtime dependencyからscope所属を推測しません。previous inactive Entityは既にinactiveなので通常block集合へ重複追加しません
+13. `current_scope_ids[]` がnon-emptyのscope removalでは、TR / TCN / model / TCのowner LLMがcurrent upstreamとhelper出力のlast-active contentから `reuse / semantic deletion` を判断し `scope_removal_resolutions[]` へ記録します。reuseの`resolved_scope_refs[]`がall readyならactive、blockedを1件以上含めばinactiveをhelperが導出します。意味上のsplitは旧identity=`deleted` + replacement=`new` draftとしてowner generatorの通常semantic updateで表し、helper専用split stateを作りません。CIはsemantic resolutionを持たず、解決後のTCN / model ownershipとmappingから決定論伝播します
+14. semantic resolution rowが揃ってもgenerator適用前は `requires_materialization=true` とし、`scope_removal_pending_applications[]` にexpected `{skill,entity_type,entity_ref,status,scope_refs}` を返します。owner generator実行後、qa-workflowはvalidated current root resultのstate rowだけから `scope_removal_applied_states[]` をprojectしてhelperを再実行します。expected transitionとapplied stateがexact一致したidentityだけ適用済みとし、不一致 / 欠落をresolution完了扱いにしません。`requires_semantic_resolution=false` かつ `requires_materialization=false` の時だけscope removal解決済みです
+15. `current_scope_ids=[]` では全current Scope retireのterminal pathとし、scope ownership baseline成立済みprevious stateの全non-deleted TR / TCN / model / CI / TCをscope removal対象にします。reuseは非空resolved scopeを作れないため禁止し、semantic ownerへLLM resolutionを要求せずhelperがterminal `deleted / scope_refs=[]` transitionを決定論生成します。CIもTCD previous state / materialize historyからterminal deletedへ導出します。active downstreamに`scope_refs=[]`が残る未正規化baselineはownershipを証明できないため `scope_ownership_unavailable` でfail-closedし、一律削除しません
+16. 新たにinactiveになるTR / TCN / model / TCはprevious current Entity snapshotを対応historyへ追加します。既存inactive historyはidentityでmergeし、内容不一致をsilent overwriteしません。deletedへ適用済みになったidentityのinactive historyはcurrent history集合から除去します
+17. 新たにinactiveになるTCNがprevious current CI / target mapping / semantic mappingを持つ場合、検証済みprevious TCD `current_structure_state.runtime_results[]` の `artifact:materialize_coverage:<TCN-ID>` resultから `ci_entities / ci_id_state / target_mapping_state / semantic_ci_mapping_state / expected_result_root_state` を取得して§7.3のhistory entryを生成します。必要なresultが無い場合、またはCI state / mappingが相互不整合なら `inactive_materialize_history_missing` でfail-closedします。zero-scope terminalでは同じvalidated stateをCI terminal deletion seedに使います
+18. `scope_refs[]` がready / blocked双方を含むcross-scope Entityもentity単位でinactiveにします。ready側だけへ自動縮退しません。一方、current scope universeから消えたscopeを含むcross-scope Entityは§11〜15のscope removal経路へ回し、通常block inactiveへ逃がしません
+19. current packageで初めてblockedになりprevious Entityが存在しないitemはinactive IDを生成しません
+20. outputはstable ID / history identity順でcanonical sort / dedupeします。`scope_removal_affected_entities[] / scope_removal_state_transitions[] / scope_removal_pending_applications[]` は `(skill, entity_type, entity_ref)`、resolution / applied state内のscope refsと各scope配列はScope IDでcanonical sortします。affected rowの`last_active_content`はcanonical JSON objectのまま返し、16 MiB aggregate output上限を超える場合は`limit_exceeded`でfail-closedします
 
 qa-workflowはhelper outputを各generator / TCD current structure stateへ直接接続します。
 
-`scope_removal_affected_entities[]` がnon-emptyの場合、qa-workflowはowner LLMへaffected previous identity / last-active content / current scope universeを渡し、semantic resolution後に同じ `downstream_state.py` を `scope_removal_resolutions[]` 付きで再実行します。`reuse`されたidentityはresolved ownershipがreadyならactive、blockedを含むならinactiveとしてstate transitionをgeneratorへ渡します。したがってSCOPE-A/Bの旧identityをAへreuseし、AがblockedでもA ownershipのinactiveとして解決済みにでき、無関係なready scopeの通常downstreamを止めません。`deleted`またはmaterialize済み`split`も解決済みです。semantic resolution自体が未入力のaffected identityだけ `requires_semantic_resolution=true` とし、SCOPE row消失だけを理由にhelperが意味判断しません。
+`scope_removal_affected_entities[]` がnon-emptyかつ `current_scope_ids[]` がnon-emptyの場合、qa-workflowは各affected semantic ownerについてhelperが返した `last_active_content / last_active_content_fingerprint` とcurrent upstreamをowner LLMへ渡します。semantic resolution後にhelperをresolution rows付きで再実行してplanned transitionを得て、owner generatorへ適用します。generator適用後はvalidated current stateから `scope_removal_applied_states[]` をprojectionして3回目のhelper checkを行い、`requires_semantic_resolution=false / requires_materialization=false` をfinal gate条件にします。意味上のsplitはold identityをdeleted resolutionにし、replacementを通常new draftとして同じowner updateでmaterializeします。専用split lineageをhelperへ追加しません。
+
+`current_scope_ids=[]` ではowner LLMへscope再割当を問い合わせず、§15のterminal deletion transitionをgeneratorへ適用して同じapplied-state checkを行います。これによりzero-scopeでもprevious active / inactive downstreamを無言carry-forwardせず、全terminal stateがcurrent generator resultへ反映されたことを機械確認できます。
 
 ### 12.4 再ready化
 
