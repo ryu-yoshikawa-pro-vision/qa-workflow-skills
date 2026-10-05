@@ -122,7 +122,7 @@ spec-analysis(UI target mode)
 → 回答正規化後、spec-analysis(UI target mode)を差分更新
 → 独立したready scopeはblocked scopeの回答待ちだけを理由に停止しない
 → ユーザー要求が仕様理解までならcurrent packageを返す
-→ テスト分析も要求されている場合は current `inspect.ready_scope_ids[]` 全件を `build-machine-evidence(scope_ids=ready_scope_ids)` へ渡し、helperが1つのcanonical batch handoffへunion / dedupeしてtest-analysisへ進む。blocked scopeはbatchへ入れず再開先を保持する
+→ テスト分析も要求されている場合、`ready_scope_ids[]` が1件以上なら全件を `build-machine-evidence(scope_ids=ready_scope_ids)` へ渡し、helperが1つのcanonical batch handoffへunion / dedupeしてtest-analysisへ進む。`ready_scope_ids=[]` なら空batchを作らずtest-analysis以降をdispatchせず、workflowをblockedとして回答待ち / resume先だけ保持する
 
 ### 2.1a ready → blocked → ready の下流ライフサイクル
 
@@ -133,20 +133,36 @@ UI target canonical downstreamではscope ownershipを次へ固定します。
 - `build-machine-evidence(scope_ids=ready_scope_ids)` はready scopeのcompact `scope_index[]` を返す
 - TRDのLLMは各current TRへ `scope_refs[]` を明示する。値はcurrent ready `scope_index[].scope_id` のsubsetとし、UI target artifact workflowでは1件以上必須
 - TCNは参照TR、modelは親TCN、CIは親TCN / model、TCは参照TCN / CIから `scope_refs[]` を決定論導出する。Agentが下流scopeを再判断しない
+previous downstreamのidentityは既存workflow stateへ次のmachine-owned fieldを1件だけ追加して固定します。新しいregistry / handoff typeは作りません。
+
+```json
+"last_completed_qa_workflow_artifact": {
+  "artifact_ref":"...",
+  "artifact_revision":"...",
+  "artifact_sha256":"<lowercase-64-hex>"
+}
+```
+
+初回は`null`です。`workflow_ref`は既存のopaque UUIDをそのまま使い、qa-workflow runtime-v2のMachine Runtime InputとResult payloadにも保存します。qa-workflow artifactがcurrent runtime verificationを通過して保存され、保存先がexact `artifact_revision` のhistorical refetchを提供できることを既存 `artifact_graph.verify_historical_revision()` で確認した後だけ、workflow stateをCAS更新してbindingを差し替えます。blocked / unresolved runでは差し替えません。
 
 処理順を次に固定します。
 
-1. `ui_target_package.py inspect` からcurrent `blocked_scope_ids[]` を取得する
-2. previous downstreamが存在する場合、qa-workflowは同一workflow系列の直前に完成扱いされたruntime-v2 qa-workflow artifact全文を取得し、`blocked_scope_ids[]` とともに新規 `skills/qa-workflow/scripts/downstream_state.py` へ渡す。previous artifactが存在しない初回workflowだけはnullを許可する
-3. `downstream_state.py` はprevious artifact内の `qa-workflow::artifact:workflow_runtime:all` Machine Runtime Input / Result pairをcurrent runtime-v2 contractで検証する。保存済みInputの `current_entities[] / current_runtime_units[] / workflow_scopes[].normalized_input / workflow_scopes[].current_structure_state` とResult payloadの整合を当時の保存入力だけで確認し、**新しいspec-analysis inputに対して旧artifactをcurrentか再判定しない**。pair不正・改変・必要なprevious artifact欠落時はfail-closedし、raw Markdown、workflow state、人間向けruntime表から復元しない
-4. helperが検証済みInputからprevious current TR / TCN / model / CI / TC EntityとTRD / TCD / TCのprevious `current_structure_state` を内部抽出し、Entityの `content.scope_refs[]` とblocked Scope ID集合の積集合だけで `active → inactive` 対象を決める。Authority共有、名称、同一PAGE、runtime dependency等からscope所属を推測しない
-5. helperは `inactive_tr_ids[] / inactive_tcn_ids[] / inactive_model_keys[] / inactive_ci_ids[] / inactive_tc_ids[]` に加え、各root runtimeへ保存するmachine-owned `inactive_tr_history[] / inactive_tcn_history[] / inactive_model_history[] / inactive_materialize_history[] / inactive_tc_history[]` をcanonical sortして返す。Agent / LLMはprevious snapshot、ID集合、historyを手作業でfilter / 復元しない
-6. TRD / TCD / TCのv2 generatorとTCD current structure stateは該当IDを `active → inactive` へ遷移させ、inactive IDをcurrent Machine Entity / current runtime unit / carry-forward projectionへ含めない。同時に各root payloadへlast-active Entity historyを保存し、TCDはlast successful materializeのCI ID / target mapping / semantic mapping / expected-result-root stateも履歴化する
-7. ready scope全件は従来どおり1 batchでtest-analysis → TRD → TCD → TC → coverage-analysisへ進める。inactive履歴そのものをfreshness blocking issueにしない。package全体の `partial / blocked` はspec-analysisの `scope_readiness[]` で別に保持する
-8. blocked scopeが再びreadyになった場合、inactive IDとmachine-owned last-active historyを再利用候補として保持する。LLMはTR / TCN / model / TCのhistoryをsemantic identity比較に使い、同一なら既存IDをreuseして `active` へ戻す。CIは`inactive_materialize_history[]`からprevious mapping inputを決定論的に復元して同じIDをreuseする。意味が変わった場合は旧inactive IDを `deleted` にしてnew IDを発行する
-9. `deleted` はterminalであり、block解除を理由に復帰させない
+1. `ui_target_package.py inspect` からcurrent `ready_scope_ids[] / blocked_scope_ids[]` を取得する
+2. `ready_scope_ids=[]` なら `build-machine-evidence(scope_ids=[])` を呼ばず、test-analysis / TRD / TCD / TC / coverage-analysis / qa-workflow runtimeをdispatchしない。workflow stateはblockedを保持し、`last_completed_qa_workflow_artifact` は更新しない
+3. ready scopeが1件以上あり、workflow stateの `last_completed_qa_workflow_artifact` がnon-nullなら、qa-workflowは保存された `artifact_ref / artifact_revision` を使ってexact historical revisionをrefetchする。providerがhistorical refetchを提供しない、refetch不能、raw Markdown SHA-256がstateの `artifact_sha256` と一致しない場合はfail-closedする
+4. qa-workflowはcurrent `workflow_ref`、current workflow state record、`blocked_scope_ids[]`、refetch済みprevious qa-workflow Markdownを `skills/qa-workflow/scripts/downstream_state.py` へ渡す。state bindingがnullならMarkdownもnullだけを許可し、bindingがnon-nullならMarkdown必須とする
+5. `downstream_state.py` はstate envelopeの `workflow_ref`、previous qa-workflow Machine Runtime Input内の `workflow_ref`、current `workflow_ref` のexact一致を要求する。別workflow artifact、1世代古いartifact、binding不一致、previousありなのにnullをrejectする
+6. helperはqa-workflow root pairを**historical integrity用のfrozen runtime-v2規則**で検証する。保存Input / Result schema、pair identity、input / model / generation fingerprint、dependency、Machine Entity content fingerprint、保存済み `current_runtime_units[]` と `workflow_scopes[].current_structure_state` の自己整合を検証するが、保存された `runtime_implementation_fingerprint / generator_implementation_fingerprint` と現在disk上の実装fingerprint一致は要求しない。historical integrity PASSをcurrent / freshとは扱わない
+7. helperが検証済みInputからprevious current TR / TCN / model / CI / TC EntityとTRD / TCD / TCのprevious `current_structure_state` を内部抽出し、Entityの `content.scope_refs[]` とblocked Scope ID集合の積集合だけで `active → inactive` 対象を決める。Authority共有、名称、同一PAGE、runtime dependency等からscope所属を推測しない
+8. helperは `inactive_tr_ids[] / inactive_tcn_ids[] / inactive_model_keys[] / inactive_ci_ids[] / inactive_tc_ids[]` に加え、各root runtimeへ保存するmachine-owned `inactive_tr_history[] / inactive_tcn_history[] / inactive_model_history[] / inactive_materialize_history[] / inactive_tc_history[]` をcanonical sortして返す。Agent / LLMはprevious snapshot、ID集合、historyを手作業でfilter / 復元しない
+9. TRD / TCD / TCのv2 generatorとTCD current structure stateは該当IDを `active → inactive` へ遷移させ、inactive IDをcurrent Machine Entity / current runtime unit / carry-forward projectionへ含めない。同時に各root payloadへlast-active Entity historyを保存し、TCDはlast successful materializeのCI ID / target mapping / semantic mapping / expected-result-root stateも履歴化する
+10. ready scope全件は1 batchでtest-analysis → TRD → TCD → TC → coverage-analysis → qa-workflowへ進める。current qa-workflow artifactがcomplete / currentとして保存された時だけ上記bindingを更新する。inactive履歴そのものをfreshness blocking issueにしない
+11. blocked scopeが再びreadyになった場合、inactive IDとmachine-owned last-active historyを再利用候補として保持する。LLMはTR / TCN / model / TCのhistoryをsemantic identity比較に使い、同一なら既存IDをreuseして `active` へ戻す。CIは`inactive_materialize_history[]`からprevious mapping inputを決定論的に復元して同じIDをreuseする。意味が変わった場合は旧inactive IDを `deleted` にしてnew IDを発行する
+12. `deleted` はterminalであり、block解除を理由に復帰させない
 
 `scope_refs[]` がready / blocked双方を含むcross-scope Entityは、1つのcurrent Entityをscopeごとに部分利用できないため保守的にinactive対象とします。ready側だけで成立する別identityへ分割する必要があるかはLLMが意味判断し、helperが旧Entityの内容やscope_refsを自動縮退させません。
+
+全scopeがblockedの期間は新しいdownstream runtime artifactを作らないため、その期間の一時状態を別snapshotへ永続化しません。後で1件以上のscopeがreadyへ戻った最初のdownstream runで、変更されていない `last_completed_qa_workflow_artifact` とその時点のcurrent `blocked_scope_ids[]` からinactive集合を再導出します。
 
 v1 cutover直後のdownstreamにはUI target Scope IDが存在しないため `scope_refs=[]` です。UI target package migration時点で既存active downstreamが1件以上あり、そのscope ownershipが未確立なら、最初のownership normalizationは **全current scopeがreadyの時だけ** 実行します。全scopeを `scope_index[]` に含めたTRD→TCD→TC更新で既存active downstream全件へ `scope_refs[]` を付与し、coverage-analysis / qa-workflowまでcurrentにした後でpartial readinessを有効にします。ownership baseline前に1件でもblocked scopeがある場合は `scope_ownership_baseline_required` でfail-closedし、ready scopeだけへ旧IDを推測割当しません。downstream未作成の新規UI target workflowはこのone-time migration gateを通さず、最初からready scopeだけでpartial progressionできます。
 
