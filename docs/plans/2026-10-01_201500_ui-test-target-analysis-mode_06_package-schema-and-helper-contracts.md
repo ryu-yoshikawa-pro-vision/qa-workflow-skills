@@ -221,7 +221,11 @@ extension fileを使う場合だけrowを持ち、templateはheader-onlyにし�
 
 `Path / 識別子` はroute不明時 `PATH-TBD` を許可します。
 
+UI構造rowはexact `種別` を確定できる場合だけ作成します。構造の存在・意味上の対象は識別できてもPAGE / VIEW / STATE等の分類自体を安全に確定できない場合は、`UNKNOWN`種別、仮prefix、仮のtyped rowを作りません。07のCurrent UNKNOWNへ同論点を保持し、`関連Scope ID` と `関連File=01_ui_structure_and_navigation.md` を必須にします。後続設計を止める場合だけ同Scopeを `Blocking Scope ID` にし、未発行なので `関連構造ID` は空です。分類解消後に同じUNKNOWNをresolveし、そのmaterialize requestで確定種別のnew structural IDを採番します。
+
 UI構造の `種別` 変更でcanonical prefixが変わる場合（例: PAGE → VIEW）は、同じstable IDのreuseを禁止します。LLMが再分類を確定した後、旧IDを `retire_ids[]` へ明示し、新しいprefixでnew IDを採番します。PANEL / POPOVER / GLOBAL UIのように同じPANEL prefixを共有する種別間は、semantic identityが同一とLLMが判断した場合だけ同じIDをreuseできます。
+
+既存typed UI構造の分類根拠が失効してexact `種別` を確定できない状態へ戻る場合も、根拠のない旧typed rowをcurrentとして残しません。LLMは旧IDを `retire_ids[]` へ明示し、同じ論点のUNKNOWNをopen / reopenします。再分類後はretired IDを復活させず、prefixが以前と同じでもnew IDを採番します。helperは分類未確定という意味自体を推測せず、explicit retire、UNKNOWN参照、retired ID再利用禁止の既存lifecycleだけを決定論的に強制します。
 
 ### 5.3 02_behavior_and_business_rules.md
 
@@ -890,6 +894,7 @@ normative traceability contract:
 - current / mapped UIOP / US / UC / Behavior / AC / RULE / FIELD / FLOW / NOTIFY / INTERACT rowは `関連仕様項目ID` を1件以上要求する。current ACはさらにcurrent SPEC / DECISION / approved ASMを1件以上要求する。blocked ACが自身の不足でblockedなら `関連UNKNOWN ID` を1件以上要求し、ancestor由来だけのeffective blockedなら自身の `関連UNKNOWN ID` は空を許可する
 - current rowの `関連仕様項目ID` はcurrent SPEC / DECISION / approved ASM / INFだけを許可する
 - identityは確定しているが内容不足の場合はTriggerや存在判定を書き換えず、blocked row + `関連UNKNOWN ID` 1件以上で表す。identity自体を確定できない場合はstable rowを作らず07のUNKNOWNからscope/file blockerへ閉じる
+- UI構造だけはID prefixが `種別` を含むため、構造の意味上の対象が識別できてもexact種別が未確定ならstable rowを作らない。07 UNKNOWNは `関連File=01_ui_structure_and_navigation.md` と影響Scopeを持ち、helperはUI構造tableへ `UNKNOWN`種別・仮prefix・未許可prefixを受理しない。既存typed rowを分類未確定へ戻す場合はsame requestのexplicit retireを要求し、retired IDの再利用を拒否する
 - RULE blocked rowは `関連Scope ID / ルール名 / 関連UNKNOWN ID`、FIELDは `関連Scope ID / ラベル / 名称 / 関連UNKNOWN ID`、FLOWは `関連Scope ID / 処理名 / 関連UNKNOWN ID`、NOTIFY / INTERACTは `関連Scope ID / 種別 / 名称 / 関連UNKNOWN ID` を最低限必須とする。その他の意味fieldは確定済み分だけ保持できる
 - UNKNOWNを `関連仕様項目ID` へ入れてblocked根拠を代用しない
 - current ACはさらに§9 / _08の契約どおりcurrent SPEC / DECISION / approved ASM Authorityを1件以上要求し、INFだけではcurrentにしない
@@ -1572,6 +1577,8 @@ production helperのfilesystem / raw hash / README control生成 / internal allo
 - commit後response前crashを模擬し、同一create / update request replayがMANIFEST receiptから同じallocated ID / extension pathを返して二重採番・二重retireせず`replayed=true`になること。異なるrequestはreceipt replayせずcreate existing-target / update stale snapshot契約へ戻ること
 - `Behavior Decomposition` をLLM入力として独立指定させず、`UI操作判定` からfixed mappingで生成すること
 - PAGE→VIEW等のprefix変更再分類でreuseをrejectし、explicit retire + new IDを要求すること。同じPANEL prefix内はsemantic identity同一時だけreuseできること
+- new UI構造の存在は判明しているがPAGE / VIEW等のexact種別が未確定なfixtureではUI構造IDを採番せず、07 UNKNOWNだけでpackageをvalidに保持できること。`種別=UNKNOWN`、`STRUCT-xxx`等の仮prefix、未許可prefixをrejectすること
+- 既存 `PAGE-xxx` の分類根拠が失効した更新では、same-UNK open / reopen + explicit retireによりtyped rowをcurrentから外し、分類解消後は同じPAGEへ戻る場合でもretired IDをreuseせずnew IDを採番すること
 - `prose_updates[]` が既存prose heading bodyだけを置換し、新規heading / heading削除 / structured・generated section上書きを拒否すること
 - `extension_file_retirements[]` がexisting current extensionだけを受理し、実fileと00宣言rowを同時除去すること。extension proseからstable referenceを推測しないこと
 - canonical bytes、sibling staging final validate、commit直前snapshot再照合、package単位commit、write failure rollback / recovery failureをrepository unit / portability testで固定すること
@@ -1581,6 +1588,7 @@ production helperのfilesystem / raw hash / README control生成 / internal allo
 - scope applicability / conditional file Trigger判定→状態導出 / blocked carry-forward / completion status
 - required UI operation decompositionのmissing table / parent / closure
 - Behavior Decomposition=required scopeについて、UIOP 1件以上またはidentity未確定を示すBlocking UNKNOWN、current US→UC、current UC→Behavior / 未定義UNKNOWN、current Behavior→current / blocked ACの最低closure。row / blockerのどちらもない欠落はrejectすること
+- known UIOPが対応US / UC identity未確定のため `対応UC ID` を完成できない場合、原因となる既存Blocking UNKNOWNを `関連UNKNOWN ID` へ参照して同じUIOP IDをblockedで保持できること。UNKNOWNはcurrentで同Scopeをblockし `関連File=02_behavior_and_business_rules.md` を含むことを要求し、別のUIOP専用UNKNOWNを必須にしないこと。解消後は同IDでmappedへ戻れること
 - UCごとの正常 / 準正常 / 例外3分類と定義あり / なし / 未定義整合。3分類すべて `なし` かつBehavior=0件のcurrent UCをreadyにしない
 - MANIFEST hash mismatch
 - repository eval utilityのsemantic / deterministic projection差分、current change summary control frame、transport separator
