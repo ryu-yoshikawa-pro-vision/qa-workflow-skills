@@ -189,6 +189,7 @@ response:
 - v1 Machine Runtime Inputに保存済みのscript固有semantic inputを正本とし、Markdown本文をLLMが読み直してJSONを再構築しない
 - v1 Runtime Resultに保存済みのidentity / mapping stateをv2 generator inputのprevious state / reuse fieldへ決定論projectionする
 - 返却inputはそのままgeneratorへ渡せるcomplete shapeとし、caller / Agentへfield mergeを要求しない
+- PR #16でv2 generatorへ追加するmachine-owned `zero_scope_terminal` はv1 cutover / direct / non-UI-target baselineでは必ず`false`を明示する。legacy artifactからこのflagを推測しない
 - runtime metadata / dependency fingerprintは返却せず、current v2 dispatchが既存builderで新規生成する
 - stable semantic identity / target_ref / semantic fieldがcutover中に変わる場合は自動補正せず `cutover_semantic_drift`
 - cutoverとsemantic redesignを同じrunで混在させない
