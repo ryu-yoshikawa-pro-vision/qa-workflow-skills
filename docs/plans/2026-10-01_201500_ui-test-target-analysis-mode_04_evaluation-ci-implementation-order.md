@@ -491,7 +491,7 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - Trigger=`あり`のdomainはrequiredのまま維持する。identity既知ならFIELD / FLOW / NOTIFY|INTERACT等をcurrent / blocked rowで保持し、identity不明なら07のBlocking Scope ID + 関連Fileでclosureする。内容不足をTriggerへ逆流させない
 - UI構造はexact種別を確定できる時だけtyped structural row / IDを作る。分類未確定では07 UNKNOWNへScope / `01_ui_structure_and_navigation.md`を記録し、後続を止める時だけBlocking Scopeとする。既存typed rowの分類根拠失効はexplicit retire + same-UNK open / reopenで扱い、仮種別や汎用structural prefixを追加しない
 - skills/spec-analysis/scripts/ui_target_package.pyの `inspect / validate / materialize` と内部allocator / version / README / MANIFEST / lifecycle / impactを実装。create / legacy-migrationはhelper内部でSkill-local assetからstaging初期化し、snapshotはhash identityだけ保持、derived tracking / refsはmaterializeが再parseする
-- `table_changes[]` のprimary prefix決定を `_06 §7.2` のselector registryへ固定する。固定prefix tableはstandard registry、UI構造は`種別`、通知・外部連携は`種別`、09分析項目は`分類`からhelperがprefixを導出し、callerの`primary_prefix`入力を許可しない
+- `table_changes[]` のprimary prefix決定を `_06` のmaterialize内 `primary prefix selector contract` へ固定する。固定prefix tableはstandard registry、UI構造は`種別`、通知・外部連携は`種別`、09分析項目は`分類`からhelperがprefixを導出し、callerの`primary_prefix`入力を許可しない
 - packageへ初登場するowner確定済みDEC / ASMは `identity_action=external` で取り込み、package allocatorは番号を発行しない。同requestの`@draft`をowner IDへ解決し、既追跡IDは`reuse`だけを許可する。09分析項目ではDEC=`分類=DECISION`、approved ASM=`分類=承認済みASM`とし、後者をspec-analysis通常分類の追加候補としてLLMに生成させない
 - `prose_updates[]` はassetに存在するstandard exact heading本文だけを置換する。新規heading作成 / rename / deleteを許可しない
 - canonical table cell encode、complete file set、sibling staging / backup、preflight orphan recovery、commit直前snapshot再照合、package単位切替 / rollbackを実装
