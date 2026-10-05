@@ -60,7 +60,7 @@ PR #16後の現在Plan上の期待増分:
 
 期待:
 - semanticなUI構造分類を行い、STATEを直交軸として整理する
-- UI操作ありと確定したscopeは意味モデル上requiredのまま維持する。影響するUIOP / US / UC / Behavior / ACがblockedならworkflow readinessではそのscopeだけblockedとする。ACはsemantic identityが同じならcurrent ↔ blockedでstable IDを維持し、意味上廃止された場合だけretireする。semantic identity自体が未確定ならstable ID rowを作らず、07のBlocking Scope ID / 関連Fileへ閉じる
+- UI操作ありと確定したscopeは意味モデル上requiredのまま維持する。影響するUIOP / US / UC / Behavior / ACがblockedならworkflow readinessではそのscopeだけblockedとする。ACはsemantic identityが同じならcurrent ↔ blockedでstable IDを維持し、意味上廃止された場合だけretireする。semantic identity自体が未確定ならstable ID rowを作らず、07へBlocking UNKNOWNを記録したうえで `_08 §3.1` の階層別配置に従う。UCは親US、BehaviorはUse Case振る舞い完全性、ACは親Behaviorへclosureし、Scopeだけへ一律退避しない
 - non-blocker UNKNOWNが残るscopeと独立ready scopeを同時に含め、UNKNOWN件数だけで全scopeを止めない
 - Trigger=`あり / required` とcontent incompleteを分離し、FIELD等のidentityが既知ならblocked row + UNKNOWN、identity不明ならblocking UNKNOWNで表す。内容不足を理由にTriggerを未確定へ戻さない
 - inputから識別可能なFIELD / RULE / FLOW / NOTIFY / INTERACTを無言で欠落させない
