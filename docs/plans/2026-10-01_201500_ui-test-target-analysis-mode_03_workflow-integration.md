@@ -239,6 +239,8 @@ Project Context ownerの更新では、LLM / stakeholderがreuse / new、決定�
 
 exact CLI契約は `_06_package-schema-and-helper-contracts.md` を正本とします。
 
+owner側でnew `DEC-xxx / ASM-xxx` が確定した後、UI target packageへ初めて取り込むmaterialize requestでは `_06` の `identity_action=external` を使用します。package helperはその番号を再採番せず、DECは09分析項目の `分類=DECISION`、approved ASMは `分類=承認済みASM` として追跡します。既にpackageで追跡中の同一IDは以後 `reuse` を使用します。`承認済みASM` はowner approvalをmirrorする表現であり、spec-analysisが通常の `SPEC / DECISION / INFERENCE / UNKNOWN` 分類から新たに生成する分類ではありません。
+
 ### 2.6a runtime-v1 downstreamが残る場合の順序
 
 既存workflowのmigration phaseはAgent / LLMが文章から判断しません。新規 `skills/qa-workflow/scripts/migration_preflight.py` が、保存artifactのruntime / entity schema version、current v2 verification結果、UI target package有無、current active downstreamのscope ownership、`inspect.current_scope_ids[] / ready_scope_ids[] / blocked_scope_ids[]` を構造化入力として受け、§2.6aの次工程を決定論的に返します。入力値の正本とexact I/Oは `_09 §2.9` とし、callerが `runtime-v1が残っている / baseline済み` 等を意味判断でboolean化しません。
