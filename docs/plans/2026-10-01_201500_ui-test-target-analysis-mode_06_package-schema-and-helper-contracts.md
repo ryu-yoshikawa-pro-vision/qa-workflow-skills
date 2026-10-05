@@ -257,7 +257,7 @@ scope単位のsemantic contractは `_08` を正本とします。structured tabl
 #### Acceptance Criteria一覧
 
 | AC ID | Behavior ID | Acceptance Criteria | 関連仕様項目ID | 関連構造ID | 状態 | 関連UNKNOWN ID |
-| --- | --- | --- | --- | --- | --- | --- | --- |
+| --- | --- | --- | --- | --- | --- | --- |
 
 not-applicable、またはUI操作有無自体が未確定のscopeはUIOP / US / UC / Behavior / ACを確定済みrowとして持ちません。Behavior Decomposition=`not-applicable`のScope IDをこれらのrowがScopeまたはparent chain経由で参照する状態はdeterministic validationでrejectします。required scopeではUIOP / US / UC / Behavior / ACが `current / blocked` 相当のstate modelを持てます。USは自身のfield / UNKNOWNだけでstateを決め、UC / Behavior / ACは自身のblockerに加えてancestor blockedをeffective stateへ決定論伝播します。ancestor由来blockedだけを理由に子へUNKNOWNを複製しません。semantic identityが既知なら同じstable IDをblockedで保持し、ancestor / 自身のblocker解消後に同IDをcurrentへ戻します。semantic identity自体が未確定ならrowを発行せず07のBlocking UNKNOWNへ閉じます。本当に意味上廃止された項目だけをexplicit retireします。
 
@@ -344,7 +344,7 @@ ancestor state propagationの意味契約は `_08 §3.1` を正本とします�
 #### Repository実装状況
 
 | 実装確認ID | Repository | 関連Scope ID | 対象 | 観測事実 | 関連仕様項目ID | 判定 | 証拠 / 参照 | 備考 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
 標準ID: `IMPL-xxx`
 
