@@ -407,7 +407,7 @@ runtime version bumpだけを理由にlive再観測は要求しませんが、�
 
 ## 3. spec-analysis normalized machine input
 
-`ui_target_package.py build-machine-evidence(scope_ids=null)` はpackage-global evidenceと `ready_scope_ids[] / blocked_scope_ids[]` を決定論生成し、scope別full handoffを同じresponseへ複製しません。`build-machine-evidence(scope_ids=[...])` は各ready scopeを固定reachabilityで内部projectionし、Authority / current AC / Machine Entity / expected identityをstable identityでunion / dedupeした1つのbatch handoffに加え、ready scopeごとの `scope_id / target / ui_operation / authority_refs[]` を持つcompact `scope_index[]` を返します。canonical qa-workflowでは `scope_ids[]` をcurrent `ready_scope_ids[]` とexact一致させます。blocked scopeのID集合は `inspect.blocked_scope_ids[]` を正本とし、package-global Machine EntityやAuthority dependencyからscope ownershipを逆算しません。Markdownから次を決定論的に生成します。
+`ui_target_package.py build-machine-evidence(scope_ids=null)` はpackage-global evidenceと `ready_scope_ids[] / blocked_scope_ids[]` を決定論生成し、scope別full handoffを同じresponseへ複製しません。`build-machine-evidence(scope_ids=[...])` は各ready scopeを固定reachabilityで内部projectionし、Authority / current AC / Machine Entity / expected identityをstable identityでunion / dedupeした1つのbatch handoffに加え、ready scopeごとの `scope_id / target / ui_operation / authority_refs[]` を持つcompact `scope_index[]` を返します。canonical qa-workflowでは `ready_scope_ids[]` が1件以上の時だけ `scope_ids[]` を渡しcurrent ready集合とexact一致させます。`ready_scope_ids=[]` では空配列batchを生成しません。blocked scopeのID集合は `inspect.blocked_scope_ids[]` を正本とし、package-global Machine EntityやAuthority dependencyからscope ownershipを逆算しません。Markdownから次を決定論的に生成します。
 
 - normalized Authority rows
 - normalized current AC rows
@@ -430,7 +430,7 @@ runtime version bumpだけを理由にlive再観測は要求しませんが、�
 
 `authority_refs[]` は `_06 §9.2` の固定projectionで得たAC / Behavior / UC / US chain、linked UIOP、scope、linked domain item、linked UI structureのstable refsを09のCurrent Effective Authority集合へ解決したunionです。current SPEC / DECISION / approved ASMだけを残し、INF / UNK / inactive Authorityは除外します。helperが重複除去・canonical sortし、current ACでは1件以上を要求します。0件ならhelperはblocking issueを返してAC Entityを生成しません。AC semantic identityが同じなら同IDをblockedへ遷移させる、Behavior自体も未確定なら親Behaviorをblockedへ遷移させる、意味上廃止ならexplicit retireする、UNKNOWNをreuse / newする等のsemantic transitionはLLMが判断します。Agent / LLMがAuthority集合を再構築しません。
 
-qa-workflow / test-analysis / coverage-analysisへspec-analysis成果物を渡す場合、AgentがMarkdownからJSONを再構築しません。current `inspect.ready_scope_ids[]` 全件を `build-machine-evidence(scope_ids=ready_scope_ids)` へ渡し、helperが1つのcanonical batch handoffと `scope_index[]` を生成します。test-analysis / TRDはscope所属の意味判断にこの `scope_index[]` を使いますが、下流Machine Entityのscope ownershipをAuthority共有や名称から推測しません。既存runtime unit `artifact:analysis_entities:all` / `artifact:requirement_structure:all` は維持し、scopeごとの別runtime unitへ分割しません。
+qa-workflow / test-analysis / coverage-analysisへspec-analysis成果物を渡す場合、AgentがMarkdownからJSONを再構築しません。current `inspect.ready_scope_ids[]` が1件以上なら全件を `build-machine-evidence(scope_ids=ready_scope_ids)` へ渡し、helperが1つのcanonical batch handoffと `scope_index[]` を生成します。`ready_scope_ids=[]` ではbatch handoffを生成せず後続runtimeをdispatchしません。test-analysis / TRDはscope所属の意味判断にこの `scope_index[]` を使いますが、下流Machine Entityのscope ownershipをAuthority共有や名称から推測しません。既存runtime unit `artifact:analysis_entities:all` / `artifact:requirement_structure:all` は維持し、scopeごとの別runtime unitへ分割しません。
 
 ### ready-scope batch root runtime入力上限
 
