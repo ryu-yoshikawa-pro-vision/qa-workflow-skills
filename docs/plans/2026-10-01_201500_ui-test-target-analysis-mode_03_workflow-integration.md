@@ -162,7 +162,7 @@ previous downstreamのidentityは既存workflow stateへ次のmachine-owned fiel
 
 `scope_refs[]` がready / blocked双方を含むcross-scope Entityは、1つのcurrent Entityをscopeごとに部分利用できないため保守的にinactive対象とします。ready側だけで成立する別identityへ分割する必要があるかはLLMが意味判断し、helperが旧Entityの内容やscope_refsを自動縮退させません。
 
-SCOPE自体がcurrent packageからretireされた場合はblockedと区別します。previous active Entityがretired SCOPEを `scope_refs[]` に持つなら無言carry-forwardせずscope removal semantic resolutionへ回します。B-onlyでもhelperは自動deletedにせず、A+Bのcross-scope EntityをAだけへ縮退するか、splitするか、旧IDをdeletedにするかも各ownerのLLM判断に残します。
+SCOPE自体がcurrent packageからretireされた場合はblockedと区別します。previous active Entityがretired SCOPEを `scope_refs[]` に持つなら無言carry-forwardせずscope removal semantic resolutionへ回します。owner LLMは旧identityの意味上のcurrent ownershipをcurrent Scope ID集合だけで `resolved_scope_refs[]` として確定するか、semantic deletion / splitを判断します。reuseされたidentityのavailability stateはhelper / generatorが `resolved_scope_refs[]` とcurrent ready / blocked集合から決定し、全ref readyなら`active`、1件以上blockedなら`inactive`とします。したがってA+BからB retire、A blockedなら、意味上Aへreuseすると判断した旧IDは`scope_refs=[A]`のinactiveとして保持でき、無関係なready scopeを停止させません。helperはA+BをAへ自動縮退せず、LLMのownership判断後のstateだけを決定論化します。
 
 全scopeがblockedの期間は新しいdownstream runtime artifactを作らないため、その期間の一時状態を別snapshotへ永続化しません。後で1件以上のscopeがreadyへ戻った最初のdownstream runで、変更されていない `last_completed_qa_workflow_artifact` とその時点のcurrent `blocked_scope_ids[]` からinactive集合を再導出します。
 
@@ -241,6 +241,8 @@ exact CLI契約は `_06_package-schema-and-helper-contracts.md` を正本とし�
 
 ### 2.6a runtime-v1 downstreamが残る場合の順序
 
+既存workflowのmigration phaseはAgent / LLMが文章から判断しません。新規 `skills/qa-workflow/scripts/migration_preflight.py` が、保存artifactのruntime / entity schema version、current v2 verification結果、UI target package有無、current active downstreamのscope ownership、`inspect.current_scope_ids[] / ready_scope_ids[] / blocked_scope_ids[]` を構造化入力として受け、§2.6aの次工程を決定論的に返します。入力値の正本とexact I/Oは `_09 §2.9` とし、callerが `runtime-v1が残っている / baseline済み` 等を意味判断でboolean化しません。
+
 既存workflowにruntime-v1のdownstream artifactが存在する場合、UI target packageへのmigrationを先に行いません。依存グラフ順を次に固定します。
 
 1. runtime-v1 downstreamを検出したら通常semantic update / partial rerunへ入らない
@@ -250,10 +252,11 @@ exact CLI契約は `_06_package-schema-and-helper-contracts.md` を正本とし�
 5. coverage-analysisをcurrent v2 TR / TCN / CI / TC / runtime evidenceからfull rerunする
 6. workflowで必要なusability-inspection / wcag-conformance-evaluationを各Skillのintegrity + currentness契約に従ってv2再生成し、必要な再観測を完了する
 7. qa-workflowを最後にcurrent v2 Entity / runtime evidenceから再生成し、v2 baselineのvalidate / freshness / final gateを成立させる
-8. v2 baseline成立後に既存spec-analysis成果物をUI target packageへmigrationしてACを生成し、requirement-structure-v2を通常semantic updateとして再実行する
-9. AC / Authority変更でstaleになったTCD → TC → coverage-analysis → qa-workflow等を通常の依存順で再実行する
+8. v2 baseline成立後に既存spec-analysis成果物をUI target packageへmigrationしてUS / UC / Behavior / ACを生成する
+9. UI target migration時点で既存active downstreamに `scope_refs=[]` が1件以上ある場合は、**全current scope readyの1回だけ**ownership normalizationを行う。全current scopeを `scope_index[]` に含めてrequirement-structure-v2 → TCD → TCを再実行し、current active TR / TCN / model / CI / TC全件へscope ownershipを付与する。1件でもblocked scopeがあれば `scope_ownership_baseline_required` で停止し、ready scopeだけへの旧ID割当を禁止する
+10. ownership normalization後にcoverage-analysis → qa-workflowまでcurrentにしてscope ownership baselineを成立させ、その後だけAC / Authority変更でstaleになったdownstreamを通常の依存順で再実行し、ready / blocked partial progressionを有効にする。既存active downstreamが無い新規UI target workflowでは9〜10のone-time gateを通さず、最初からready scopeだけで進める
 
-`UI target migration済み + runtime-v1 downstreamあり + v2 baseline未成立` の組合せはblockedです。新しいqa-workflow専用wrapperは作らず、既存routing / runtime evidence version確認でこの順序を守ります。既存v1 downstream artifactがない場合は、直接UI target package migrationへ進めます。
+`UI target migration済み + runtime-v1 downstreamあり + v2 baseline未成立` の組合せはblockedです。migration順序とnext actionは `migration_preflight.py` の結果を正本とし、LLMがcutover / migration / ownership normalizationの要否を判断しません。
 
 ### 2.7 downstream machine handoff
 
@@ -323,7 +326,7 @@ READMEへ、UIテスト対象分析modeがspec-analysisの条件付きmodeであ
 - question-analysisの分類4種
 - DECISION / ASMの意味判断と、案件で明示された決定事項 / 仮定の正本owner
 - test-target-inspectionのlive target currentness契約
-- runtime / artifact graph
+- PR #16で明示したruntime-v2 / entity-state-v2 transition、downstream scope lifecycle、qa-workflow completed baseline persistence以外の既存runtime / artifact graph責務・freshness原則
 - qa-knowledge lifecycle
 - Regression / Exploration routing
 - E2E Skill群
