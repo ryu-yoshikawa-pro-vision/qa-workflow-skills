@@ -622,18 +622,23 @@ top-level required fields:
 - `update_scope_tr_ids`
 - `inactive_tr_ids`
 - `inactive_tr_history`
+- `zero_scope_terminal`
 
 既存legacy promotion用 `legacy_tr_ids` の条件付き入力契約は維持します。
 
 `previous_tr_ids[]` はexact `{tr_id,status,scope_refs}` とし、`status` は `active / inactive / deleted` の3値です。state rowの `scope_refs[]` は最新の意味上のownershipを保持します。通常のready→blockedではlast-active ownershipと同じですが、SCOPE retire後にLLMが同じidentityをcurrent Scopeへreuseした場合は、Machine Entityを生成できないblocked期間でも解決済み `resolved_scope_refs[]` へ更新します。last-active semantic contentと当時のownershipは `inactive_tr_history[]` のEntity snapshotに別保存します。v1 cutover / non-UI-target baselineは `scope_refs=[]`、UI targetのscope ownership baseline成立後はactive / inactive TRで1件以上を要求します。deletedは最後に解決されたownershipを保持してよく、意味上のownershipが0件になったsemantic deletionでは `[]` を許可します。
 
-`inactive_tr_ids[] / inactive_tr_history[]` はLLM入力ではなく `downstream_state.py` のmachine-owned出力をそのまま渡します。`inactive_tr_ids[]` はprevious `active` TRだけを列挙し、`update_scope_tr_ids[]` と重複させません。`update_scope_tr_ids[]` はprevious `active / inactive` を参照でき、`deleted` は参照できません。inactive TRをLLMがsemantic identity同一としてreuseした場合は同じTR IDを `active` へ戻し、そのstate rowの `scope_refs[]` をcurrent draft値へ更新します。update scopeへ入れたinactive TRをreuseしない場合は `deleted` にします。update scope外のinactive TRはstatusと最後の`scope_refs[]`を維持します。new ID allocatorはactive / inactive / deletedをすべて使用済みIDとして扱います。
+`inactive_tr_ids[] / inactive_tr_history[]` はLLM入力ではなく `downstream_state.py` のmachine-owned出力をそのまま渡します。`zero_scope_terminal` はrequired booleanで通常runはfalseです。trueを許可するのは `_03 §2.1 / §12.3a` の全SCOPE retire terminal pathだけで、`scope_ids=[] / acceptance_criteria=[] / test_requirements=[] / dispositions=[] / authorities=[] / risks=[]` を要求します。new / reuse TR draftを禁止し、previous active / inactive TRをupdate scopeへ全件入れてterminal deletedへ閉じます。
+
+`inactive_tr_ids[]` はprevious `active` TRだけを列挙し、`update_scope_tr_ids[]` と重複させません。`update_scope_tr_ids[]` はprevious `active / inactive` を参照でき、`deleted` は参照できません。inactive TRをLLMがsemantic identity同一としてreuseした場合は同じTR IDを `active` へ戻し、そのstate rowの `scope_refs[]` をcurrent draft値へ更新します。update scopeへ入れたinactive TRをreuseしない場合は `deleted` にします。update scope外のinactive TRはstatusと最後の`scope_refs[]`を維持します。new ID allocatorはactive / inactive / deletedをすべて使用済みIDとして扱います。
 
 `acceptance_criteria[]` は§3.1のexact schemaを使用し、**current ACだけ**を含めます。blocked ACはknown current AC集合、Machine Entity、TRD closureの対象外です。`authority_refs[]` はtop-level `authorities[]` のknown IDへ存在検証します。ACなしworkflowでもkey省略は許可せず `[]` を明示します。
 
 各 `test_requirements[]` draftへ `acceptance_refs[] / scope_refs[]` を必須追加します。該当ACがない横断的TRは `acceptance_refs=[]` を使用します。`acceptance_refs[]` と `scope_refs[]` の意味対応はLLMが判断し、generatorはそれぞれtop-level known AC / Scope集合への存在参照だけを検証します。
 
 ## 7. downstream scope ownership / requirement_structure-v2 deterministic processing
+
+`condition-structure-v2 / materialize-coverage-v2 / case-structure-v2` にもrequired machine-owned `zero_scope_terminal` booleanを追加します。normal / migration / partial progressionはfalse、§12.3aだけtrueです。true時はsemantic current rowを新規生成せず、validated previous stateをdeletion-onlyに閉じるためだけに使用します。Agent / LLMがtrueを指定せず、qa-workflow routingがcurrent inspect結果と`downstream_state.py.zero_scope_terminal`から設定します。
 
 ### 7.1 requirement_structure-v2
 
@@ -669,6 +674,8 @@ LLMはACとTRの意味上の対応、TRの分割 / 統合、AC参照からは導
 
 ### 7.2 condition-structure-v2
 
+zero-scope terminalではcurrent `test_requirements / test_conditions / models` を空にし、previous active / inactive TCN / model全件をupdate scopeへ入れてdeletedにします。new / reuse draft、model runtime dispatch、test-data semantic生成は行いません。validated previous materialize stateは後続`materialize-coverage-v2(zero_scope_terminal=true)`のterminal CI cleanupへ渡します。
+
 - current `test_requirements[]` rowへTR Entityのcanonical `scope_refs[]` を含め、`tr_id / scope_refs[]` をcurrent TR Entity contentとexact一致させる
 - TCN draft自身にLLM入力のscope fieldは追加しない。各current TCNの `scope_refs[]` は参照する `tr_refs[]` のTR scope_refs unionを重複除去・canonical sortして決定論生成する
 - modelの `scope_refs[]` は親TCNのscope_refsとexact一致させる。derived childも親modelからではなくowner TCNのcurrent scope_refsを使う
@@ -678,6 +685,8 @@ LLMはACとTRの意味上の対応、TRの分割 / 統合、AC参照からは導
 - `inactive_tcn_ids[] / inactive_model_keys[]` はactive previous identityだけをactive→inactiveへ遷移させる。inactive→active reuse時はcurrent upstreamから再導出したscope_refsへ更新する
 
 ### 7.3 materialize-coverage-v2
+
+zero-scope terminalではcurrent target / semantic coverage item / model ownerを空にし、validated previous current materialize resultまたは`inactive_materialize_history[]`をprevious mapping seedとして使用します。previous active / inactive CI全件を`deleted / scope_refs=[]`へ遷移させ、current `target_mapping_state / semantic_ci_mapping_state / expected_result_root_state` は空、terminal `ci_id_state`だけをID再利用防止用に保持します。new CI allocation / target materializeは行いません。
 
 - current model Entity contentの `scope_refs[]` をscope ownershipの正本とし、Agent入力でCI scopeを再指定させない
 - runtime target / semantic CIとも、生成するCI Entity contentの `scope_refs[]` はowner modelのscope_refsとexact一致させる。1つのmaterialize invocation内で複数sourceをmergeする場合は、それらowner model scope_refsのunionをcanonical化する
@@ -689,6 +698,8 @@ LLMはACとTRの意味上の対応、TRの分割 / 統合、AC参照からは導
 - `inactive_ci_ids[]` はactive previous CIだけをactive→inactiveへ遷移させる。既存 `previous_target_id_map[].mapping_status / previous_semantic_ci_map[].mapping_status=active|inactive` は維持し、scope blockをsemantic deletionへ変換しない
 
 ### 7.4 case-structure-v2
+
+zero-scope terminalではcurrent `test_conditions / coverage_items / environment_requirements / test_data_requirements / test_cases / dispositions` を空にし、previous active / inactive TC全件をupdate scopeへ入れて`deleted / scope_refs=[]`へ遷移させます。new / reuse TC draftを禁止し、`inactive_tc_history[]`を空へ閉じます。
 
 - current TCN input rowへcurrent TCN Entityの `scope_refs[]` を含め、CI Entity contentの `scope_refs[]` も検証する
 - TC draft自身にLLM入力のscope fieldは追加しない。各current TCの `scope_refs[]` は参照する `tcn_refs[] / ci_refs[]` のscope_refs unionを重複除去・canonical sortして決定論生成する
@@ -1035,7 +1046,7 @@ qa-workflow / coverage-analysisはcurrent Entity collectionへAC Entityが存在
 
 `skills/qa-workflow/scripts/workflow_runtime.py` のruntime-v2 normalized inputへrequired `workflow_ref`を追加し、`artifact:workflow_runtime:all` Result payloadにも同じ値をechoします。`workflow_ref`は既存workflow stateのopaque UUIDであり、Machine Entity IDやpackage-local IDへ変換しません。Input / Result不一致はruntime invalidです。
 
-UI target downstreamをcompleted baselineとして扱う時だけ、qa-workflowは保存済みworkflow stateの `last_completed_qa_workflow_artifact` を更新します。provider-native pathは `qa-workflow runtime current verification PASS → provider artifact保存 → exact historical refetch / SHA-256確認 → native workflow state CAS`、local single-host pathは `qa-workflow runtime current verification PASS → immutable local snapshot保存 / readback → workflow-ref process lock → expected state revision再確認 → atomic replace / readback` とします。**provider CASまたはlocal locked conditional update成功をdownstream baselineのcommit境界**とし、それ以前に生成・保存されたartifactは未commitです。途中失敗では既存bindingをcanonical baselineとして維持し、初回binding=nullならcommitted downstream baseline未成立のままです。orphan local snapshot cleanupや新しいgeneric transaction frameworkは追加しません。`ready_scope_ids=[]` でdownstream runtimeをdispatchしないrun、またはqa-workflow resultがunresolved / blockedのrunではbindingを更新しません。
+UI target downstreamをcompleted baselineとして扱う時だけ、qa-workflowは保存済みworkflow stateの `last_completed_qa_workflow_artifact` を更新します。provider-native pathは `qa-workflow runtime current verification PASS → provider artifact保存 → exact historical refetch / SHA-256確認 → native workflow state CAS`、local single-host pathは `qa-workflow runtime current verification PASS → immutable local snapshot保存 / readback → workflow-ref process lock → expected state revision再確認 → atomic replace / readback` とします。**provider CASまたはlocal locked conditional update成功をdownstream baselineのcommit境界**とし、それ以前に生成・保存されたartifactは未commitです。途中失敗では既存bindingをcanonical baselineとして維持し、初回binding=nullならcommitted downstream baseline未成立のままです。orphan local snapshot cleanupや新しいgeneric transaction frameworkは追加しません。`current_scope_ids[]` non-emptyかつ `ready_scope_ids=[]` の全blocked run、またはqa-workflow resultがunresolved / blockedのrunではbindingを更新しません。`current_scope_ids=[]` のzero-scope terminal pathは§12.3aどおりdeletion-only downstream + qa-workflow current verificationを完遂するためこの例外ではなく、PASS後にterminal baselineへbindingを更新します。
 
 ### 13.2 qa-workflow local baseline persistence
 
@@ -1138,11 +1149,16 @@ Product Riskは本PRで `scope_refs / active-inactive-deleted` lifecycleへ拡�
 - `migration_preflight.py` がmachine-generated runtime inventory / current v2 verification / UI target inspect / active downstream stateから5つのmigration statusを決定論生成し、runtime-v1残存時にUI target migrationへ進まないこと、v2 baseline後にUI target migration、unscoped active downstream + blocked scopeでは `scope_ownership_baseline_required`、全scope readyではownership normalization、baseline成立後はpartial progressionを返す回帰
 - inactive state rowがlatest resolved semantic ownershipを保持し、`inactive_*_history[]` がlast-active Entity content / old ownershipを保持するため、通常blockとSCOPE removal後blockのどちらでもre-ready時のsemantic ID reuse候補を失わない回帰
 - SCOPE-A/Bのcompleted baseline後にA/Bともblockedとなって`ready_scope_ids=[]`になったrunではbatch handoff / downstream runtime / qa-workflow runtimeを起動せずlast completed bindingを維持し、その後Bだけreadyへ戻ったrunで同bindingからAをinactive、Bをreuse候補として復元できる回帰
+- SCOPE-Aだけのcompleted scope-ownership baselineからAをexplicit retireして `current_scope_ids=[] / ready_scope_ids=[] / blocked_scope_ids=[]` にする回帰。全blocked経路へearly returnせず、historical baselineからactive / inactive TR / TCN / model / CI / TC全件をterminal deletedへ閉じ、current downstream 0件のcoverage-analysis / qa-workflowをcurrent化し、zero-scope terminal baselineへbindingを更新する。previous active downstreamが`scope_refs=[]`の未正規化baselineでは一律削除せず`scope_ownership_unavailable`でfail-closedする
+- previous binding=nullかつcurrent Scope 0件の新規packageはdeletion-only runtimeを起動せずcompleteで終了できる回帰
 - downstream baseline commit境界 regression: 初回artifact保存後にhistorical refetch確認またはstate CASが失敗した場合はbinding=nullのままでcompleted扱いしない。既存binding=Aの状態でnew artifact B保存後にstate CASが失敗した場合はAがcanonical baselineのままで、Bをprevious snapshotとして使用しない
 - local baseline persistence regression: temporary `qa.workflow_state_root` でbaseline Aを実ファイルcommitし、content-addressed A revisionをcommit後もexact refetchできることを確認する。同じexpected state revisionから競合する2更新では一方だけ成功し他方はconflict、snapshot保存後state commit前failureでは旧binding維持、state replace後response前retryではdesired state exact一致により`committed_replay`、symlink root / path・unsupported lockはfail-closedとする
 - `downstream_state.py` CLI contract regression: duplicate JSON key / unknown top-level field / 16 MiB + 1 byte / top-level artifact Markdown以外の64 KiB + 1 stringをhandled failure + exit 0でrejectし、workflow_ref mismatch / binding-null mismatch / SHA mismatch / historical runtime invalid / scope ownership unavailable / inactive materialize history missingが固定issue typeになる。unexpected internal errorだけexit 1になる
 - `downstream_state.py` は `current_scope_ids[]` をcurrent inspect値とexact一致で受け、previous active Entityの `scope_refs[] - current_scope_ids[]` が非空なら `removed_scope_ids[] / scope_removal_affected_entities[] / requires_semantic_resolution=true` を返す。removed scopeをblockedへ読み替えたり自動inactive / deletedにしない
 - 同じaffected inputへ `scope_removal_resolutions[]` を付けて再実行し、reuse resolutionのresolved ownershipがall readyならactive、blockedを含めばinactive、deletedならterminal deletedを返す。LLMがstatusを指定できないこと、unknown / retired scopeをresolved_scope_refsへ入れたresolutionをrejectする回帰
+- affected semantic ownerの`scope_removal_affected_entities[]`にverified `last_active_content / last_active_content_fingerprint`が含まれ、activeはprevious current Entity、inactiveはvalidated inactive historyから得られること。inactive history欠落は`scope_removal_history_missing`でfail-closedし、Agentがraw historical artifactから内容を復元しない回帰
+- resolution rowsだけを渡した2nd passでは`requires_materialization=true / scope_removal_pending_applications[]`が残り、generator適用後のvalidated stateからprojectした`scope_removal_applied_states[]`がexpected transitionとexact一致した3rd passだけ`requires_materialization=false`になる回帰。不一致・欠落をresolution完了扱いにしない
+- semantic splitを`resolution=split`として受理せず、旧identityの`deleted` resolution + replacementの通常`new` draftとしてmaterializeする回帰。split lineage / replacement registryを新設しない
 - TCN active→inactiveでprevious current `materialize-coverage` の `ci_id_state / target_mapping_state / semantic_ci_mapping_state / expected_result_root_state` とCI Entityを `inactive_materialize_history[]` へ保存し、current runtime evidenceからは除外する回帰
 - SCOPE-A/B baseline後にBをexplicit retireし、B-only / A+B ownershipのprevious TR / TCN / model / CI / TCをscope removal affectedとして抽出する。TRD / TCD / TC ownerがcurrent upstreamに対するreuse / scope再割当 / split / semantic deletionを解決するまでactive carry-forward / final gateを拒否し、A+B EntityをhelperがA-onlyへ自動縮退しない回帰
 - A+B ownershipのprevious TRを持つ状態でB retire + A blocked + C readyとし、owner LLMが旧TRをAへreuseするresolutionを返した場合、helperが `resolved_scope_refs=[A] / status=inactive` を導出してstate rowをA ownershipへ更新し、last-active historyは旧A+B Entity snapshotを保持する。C専用downstreamは通常どおり完遂し、A再ready時に同じTR IDをA ownershipでactiveへ戻せる回帰
