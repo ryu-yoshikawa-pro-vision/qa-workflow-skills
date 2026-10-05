@@ -277,6 +277,7 @@ repository unit testで次を必須確認します。
 - canonical / structural ID形式・duplicate。既存SRC / SPEC / INF / UNK等は3桁固定、PR #16新設structural IDは最低3桁で999→1000を許可すること
 - UI構造の `状態軸` がSTATEでは必須・非STATEでは空であること、`種別` exact enumでPANEL / POPOVER / GLOBAL UIを区別しつつPANEL prefixを共有すること
 - canonical prefixが変わるUI構造種別変更では同じstable IDのreuseを拒否し、旧ID retire + new IDを要求すること。同じPANEL prefix内の再分類はsemantic identityが同一ならreuseを許可すること
+- UI構造の存在は識別できるがPAGE / VIEW等のexact種別が未確定なcaseでは、仮typed row / `UNKNOWN`種別 / 仮prefixを作らず07 UNKNOWNだけを保持すること。分類解消後に初めてtyped IDを採番し、既存typed IDの分類根拠失効ではexplicit retire + same-UNK open / reopen後、再分類時にretired IDをreuseしないこと
 - 00のscope / applicability tableで `関連仕様項目ID` と `根拠 / 備考` が別列であり、stable ID列にはIDだけ、prose列中のIDはreference扱いしないこと。applicabilityはcurrent Scope IDごとに4file exactlyを持つこと
 - structured rowのexact stable ID参照
 - 09のcurrent UNKNOWN集合と07 / README件数の一致
@@ -317,6 +318,7 @@ repository unit testで次を必須確認します。
 - materialize内部impact builderの `影響file` がchanged IDのprevious/current owner + exact reference先unionであり、Agentへfile一覧再入力を要求せず、semantic本文変更の要否を勝手に決定しないこと
 - legacy migrationではLLMが確定したretained ID / 明示lifecycle event / semantic rowsを `materialize(change_mode=legacy-migration)` へ渡し、helperがnew ID採番・canonical Markdown・`migrated / added / resolved / retired`・README / Machine Entity / MANIFESTまで1 write pathで生成すること
 - scope applicability、UI操作scopeのUIOP / US / UC / Behavior / AC hierarchy / current AC chain全parent=current / closure / current UCの3分類整合。UIOP / US / UC / Behavior / ACの状態はhelper導出とし、semantic identity未確定時はIDを発行せず07のBlocking Scope IDへ閉じること。UIOP.Scopeは対応UCのderived Scopeとexact一致すること
+- known UIOPでUS / UC identity未確定により対応先を完成できない場合、既存の同Scope Blocking UNKNOWNを `関連UNKNOWN ID` に再利用してsame UIOP IDをblockedで保持し、原因UNKNOWN解消後にsame IDをmappedへ戻せること。blocked UIOPに専用UNKNOWNの新規作成を強制しないこと
 - required scope + UIOP 0件 + Blocking UNKNOWNなしをrejectし、required scope + identity未確定Blocking UNKNOWNをvalid/blocked、mapped UIOP → current US / UC → Behavior → current AC closureをreadyとして導出すること
 - current UCで正常 / 準正常 / 例外がすべて `なし` かつBehavior=0件をreadyにせず、`未定義 + UNKNOWN` はvalid/blockedとして扱うこと
 - current Behaviorがblocked ACだけを持つ場合はscope blocked、current AC 1件以上かつblocked ACなしでready条件を満たせること。AC-001 current → blocked → currentで同じstable IDを維持し、explicit retireなしでAC-002を採番しないこと
@@ -487,6 +489,7 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - 条件付きfileはfile × Scope IDでLLMの `Trigger判定=あり / なし / 未確定` からhelperが `required / not-applicable / blocked` を導出する
 - Current UNKNOWN件数ではなく明示blocked状態から `ready_scope_ids[] / blocked_scope_ids[]` と `completion_status=complete / partial / blocked` を導出する。blocked scopeがあってもready scopeは後続へ進める
 - Trigger=`あり`のdomainはrequiredのまま維持する。identity既知ならFIELD / FLOW / NOTIFY|INTERACT等をcurrent / blocked rowで保持し、identity不明なら07のBlocking Scope ID + 関連Fileでclosureする。内容不足をTriggerへ逆流させない
+- UI構造はexact種別を確定できる時だけtyped structural row / IDを作る。分類未確定では07 UNKNOWNへScope / `01_ui_structure_and_navigation.md`を記録し、後続を止める時だけBlocking Scopeとする。既存typed rowの分類根拠失効はexplicit retire + same-UNK open / reopenで扱い、仮種別や汎用structural prefixを追加しない
 - skills/spec-analysis/scripts/ui_target_package.pyの `inspect / validate / materialize` と内部allocator / version / README / MANIFEST / lifecycle / impactを実装。create / legacy-migrationはhelper内部でSkill-local assetからstaging初期化し、snapshotはhash identityだけ保持、derived tracking / refsはmaterializeが再parseする
 - `prose_updates[]` はassetに存在するstandard exact heading本文だけを置換する。新規heading作成 / rename / deleteを許可しない
 - canonical table cell encode、complete file set、sibling staging / backup、preflight orphan recovery、commit直前snapshot再照合、package単位切替 / rollbackを実装
@@ -495,6 +498,7 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - normative rowのAuthority / UNKNOWN traceability、domain rowのhelper-derived state、Scope / Blocking Scope / 関連File、scope readiness、UIOP→UC scope一致、UNKNOWN lifecycle、extension lifecycle、Repository確認基準をvalidateする
 - applicabilityの逆方向整合をvalidateする。03/04/05/08が`not-applicable`のScopeを対応FIELD/FLOW/NOTIFY|INTERACT/IMPL rowが参照する状態、またはBehavior Decomposition=`not-applicable`のScopeにUIOP / US / UC / Behavior / ACが残る状態をrejectする。helperはScope参照除去・row split・retireを自動推測しない
 - BehaviorへLLM明示の`関連操作ID`を追加し、current Behaviorは1件以上のmapped UIOPへ接続する。helperはUIOP存在・Scope・親UC整合だけを検証し、AC Entityのlinked UIOPはparent Behaviorの`関連操作ID`からだけprojectionする
+- UIOP identityが既知でもUS / UC identity blockerで `対応UC ID` が未確定なら、原因となる既存Blocking UNKNOWNをUIOP自身から参照してblocked stateを維持する。helperはUNKNOWNのcurrent / same-Scope Blocking / 関連File整合を検証し、解消後はsame UIOP IDをmappedへ戻す
 - versionを `^v[0-9]{2,}$`、数値+1、最低2桁zero padding、上限なしに固定する。新設structural IDも最低3桁・上限なし、既存canonical IDは3桁契約を維持する
 - legacy / unversioned packageに加え、通常spec-analysis単一成果物 → ui-target-v1 migrationを同じsemantic mapping + materialize経路で扱う
 
@@ -542,7 +546,7 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 
 ### Step 3: spec-analysis evaluation
 
-- SPEC-SEM-003〜007を更新し、UI操作あり + Actor/Goal不足、identity未確定blocking UNKNOWN、non-blocker UNKNOWNを残したscope部分進行、Trigger required + content incomplete、required domainの無言欠落防止、通常spec-analysis→mode migration、外部owner対象外境界を含める
+- SPEC-SEM-003〜007を更新し、UI操作あり + Actor/Goal不足、identity未確定blocking UNKNOWN、UI構造の存在は既知だがPAGE / VIEW等の分類未確定、known UIOP + US / UC identity blocker、non-blocker UNKNOWNを残したscope部分進行、Trigger required + content incomplete、required domainの無言欠落防止、通常spec-analysis→mode migration、外部owner対象外境界を含める
 - canonical write前にsemantic inputをquality gateし、semantic NG candidateをcurrent packageへcommitしない契約をsemantic / integration caseで固定する
 - LLM responsibility coverage表を更新
 - repository eval専用 `scripts/skills/evals/ui_target_projection.py` のsemantic / deterministic projection unit test
@@ -584,6 +588,7 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 ### Step 7: deterministic / semantic boundary validation
 
 - semantic identity、explicit retire、same-UNK/new-UNK、file trigger、extension要否、DEC/ASM owner、UI分類、US/UC/Behavior/AC分解、AC→TR対応をscriptが決定していないこと
+- exact UI構造種別を確定できない状態でhelperが仮type / 仮prefixを作らず、LLMがUNKNOWNとして保持すること。known UIOPとUS / UC identity blockerの意味対応もLLMが既存UNKNOWNを選び、helperは参照整合とstate導出だけを担当すること
 - helperはtrigger状態、ID、serialization、file materialization、lifecycle、reference、Machine Entity projectionだけを決定論化すること
 - helperがAuthority不足等を検出した場合はblocked resultだけを返し、AC除去 / Behavior blocked化 / UNKNOWN reuse/new等のsemantic transitionを実行しないこと
 - normal spec-analysisがmode依存になっていないこと
@@ -619,6 +624,8 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - SCOPE-Aの03がrequired、SCOPE-Bの03がnot-applicableで03 file自体は残るpackageに、SCOPE-Bを参照するFIELDを残したnegative scenarioを追加する。同様に04/05/08とBehavior Decomposition not-applicableのUIOP / US / UC / Behavior / AC残存をrejectする
 - `UC-001 → BH-001 → AC-001` がcurrentの状態からUCだけにUNKNOWNが発生するscenarioを追加し、LLMがidentity reuseを選んだ場合はhelperがUC / BH / ACを同じIDのままeffective blockedへ伝播し、ancestor由来だけのBH / ACへ新規UNKNOWNを作らず、解消後に同IDでcurrentへ戻すことを確認する
 - child identity未確定の3経路を固定する。UC identity不明では親USへBlocking UNKNOWNを置いてUS blocked + UC 0件、Behavior identity不明ではcurrent UCの該当完全性rowを`未定義 + UNKNOWN` + Behavior 0件、AC identity不明では親BehaviorへBlocking UNKNOWNを置いてBehavior blocked + AC 0件とする。UC/AC identity不明をScopeだけへ置いてparentをcurrentのまま残す状態と、Behavior identity不明をblocked Behavior rowで捏造する状態をrejectする
+- UI構造の存在は識別済みだがPAGE / VIEW分類を確定できないscenarioを追加し、typed row / IDを作らずUNKNOWNで保持、解消時にnew typed ID発行とsame-UNK resolve、既存typed IDの分類根拠失効時はexplicit retire + same-UNK reopenとなることを確認する
+- known UIOP + US identity unknown、known UIOP + UC identity unknownを追加し、root causeの既存Blocking UNKNOWNをUIOPが参照してsame ID blocked、解消後same ID mappedとなり、UNKNOWNを複製しないことを確認する
 - SCOPE-A/B readyでcompleted baseline作成 → A/Bともblockedで `ready_scope_ids=[]` → downstream runtime無起動 / last completed binding維持 → Bだけreadyへ復帰 → baseline artifactからAだけinactive、Bは同じstable IDで再開、というintegration regressionを追加する
 - SCOPE-A/B readyでcompleted baseline作成後、Bをexplicit retireするscenarioを追加する。previous `scope_refs[]` にBを含むTR / TCN / model / CI / TCを `scope_removal_affected_entities[]` へ抽出し、自動でA-onlyへ縮退しない。ownerがreuse resolutionを返した場合はresolved ownershipからavailability stateをhelperが導出する。特にA+B → B retire + A blocked + C readyでA ownershipへreuseした旧IDをA ownershipのinactiveとして保持し、last-active historyは旧A+B snapshotを維持、C専用downstreamは完遂、A再readyで同IDをactiveへ戻す
 - readyのまま内容だけ変更されたACは従来どおりscope外carry-forward TRをstaleにし、`inactive`経路でfreshness違反を隠さないscenario。inactive中に意味上廃止された成果物は`deleted`へ遷移し、再利用しない。inactive前にdeletedだったCI IDも `inactive_materialize_history[].ci_id_state[]` へ残り、再ready後のallocatorが再利用しないことを確認する
@@ -644,7 +651,7 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - 新Skill追加なし
 - mode assets / referenceが存在
 - normal spec-analysisとmodeの選択境界が明確
-- UI構造分類が定義済み
+- UI構造のexact分類が確定済み、または分類未確定項目が仮typed IDを持たずUNKNOWNへ閉じている
 - versioned complete package契約が定義済み
 - package内にcanonical Authority / traceability正本があり、Authority + current ACだけを既存Machine Entity契約へ閉じる
 - UNKNOWN answer lifecycleが定義済み
