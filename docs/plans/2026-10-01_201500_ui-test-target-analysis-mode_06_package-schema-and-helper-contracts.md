@@ -874,11 +874,11 @@ normal updateで `keyed_table_updates[]` にsectionが無い場合、そのsecti
 
 normative traceability contract:
 
-- UIOPの `状態` はhelperが生成する。`関連UNKNOWN ID` が1件以上なら `blocked`、空かつcurrent必須fieldが揃えば `mapped`。US / UC / Behavior / AC / RULE / FIELD / FLOW / NOTIFY / INTERACTも同様に `blocked / current` をhelperが導出する。callerは `状態` を入力しない
+- UIOP / US / RULE / FIELD / FLOW / NOTIFY / INTERACTの `状態` は自身の必須fieldと `関連UNKNOWN ID` からhelperが導出する。UC / Behavior / ACはそれに加えて§5.3 / `_08 §3.1` のancestor state propagationを適用してeffective `blocked / current` を導出する。callerは `状態` を入力しない
 - current Behaviorは`関連操作ID`を1件以上要求する。参照先はmapped UIOPで、UIOPの`対応UC ID`にBehaviorの`UC ID`を含み、UIOP.Scopeと親UCのScopeが一致しなければならない。blocked Behaviorでは確定済み参照だけを保持し、未確定なら空を許可する。helperは意味上の関連性を作らず、存在・state・UC / Scope整合・duplicateだけを検証する
 - USは自身の必須field / `関連UNKNOWN ID`だけでstateを導出する。UCは参照USのいずれかがblockedならeffective blocked、Behaviorは親UCがblockedならeffective blocked、ACは親Behaviorがblockedならeffective blockedとする。ancestor由来blockedでは子のstable ID / 既知fieldを保持し、ancestor UNKNOWNを子の`関連UNKNOWN ID`へ複製しない
 - descendant自身の必須field不足があるのに自身の`関連UNKNOWN ID`がなく、ancestor blockedだけではその不足を説明できない場合は`state_transition_required`でrejectする。ancestorがcurrentへ戻り、子自身の必須fieldが揃い`関連UNKNOWN ID`が空ならhelperが同じstable IDをcurrentへ戻す
-- current / mapped UIOP / US / UC / Behavior / AC / RULE / FIELD / FLOW / NOTIFY / INTERACT rowは `関連仕様項目ID` を1件以上要求する。current ACはさらにcurrent SPEC / DECISION / approved ASMを1件以上要求し、blocked ACは `関連UNKNOWN ID` を1件以上要求する
+- current / mapped UIOP / US / UC / Behavior / AC / RULE / FIELD / FLOW / NOTIFY / INTERACT rowは `関連仕様項目ID` を1件以上要求する。current ACはさらにcurrent SPEC / DECISION / approved ASMを1件以上要求する。blocked ACが自身の不足でblockedなら `関連UNKNOWN ID` を1件以上要求し、ancestor由来だけのeffective blockedなら自身の `関連UNKNOWN ID` は空を許可する
 - current rowの `関連仕様項目ID` はcurrent SPEC / DECISION / approved ASM / INFだけを許可する
 - identityは確定しているが内容不足の場合はTriggerや存在判定を書き換えず、blocked row + `関連UNKNOWN ID` 1件以上で表す。identity自体を確定できない場合はstable rowを作らず07のUNKNOWNからscope/file blockerへ閉じる
 - RULE blocked rowは `関連Scope ID / ルール名 / 関連UNKNOWN ID`、FIELDは `関連Scope ID / ラベル / 名称 / 関連UNKNOWN ID`、FLOWは `関連Scope ID / 処理名 / 関連UNKNOWN ID`、NOTIFY / INTERACTは `関連Scope ID / 種別 / 名称 / 関連UNKNOWN ID` を最低限必須とする。その他の意味fieldは確定済み分だけ保持できる
