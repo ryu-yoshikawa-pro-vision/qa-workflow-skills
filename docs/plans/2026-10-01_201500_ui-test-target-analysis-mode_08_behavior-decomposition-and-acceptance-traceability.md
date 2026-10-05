@@ -97,17 +97,27 @@ ID: `UIOP-001` から開始し、最低3桁で連番採番する。999の次は1
 
 ### 3.1 current / blocked rowのfield契約
 
-blocked rowは「semantic identityまでは確定しているが、完成に必要なfieldが未確定」の場合だけstable IDを持ちます。semantic identity自体を確定できない場合はIDを発行せず、親scopeまたは既知の親rowからUNKNOWNへ閉じます。identityの同一性判断はLLM、下記のfield充足はhelperが検証します。
+blocked rowは、semantic identityが確定済みで「自身の完成に必要なfieldが未確定」または「同じidentityのancestorがblocked」の場合に同じstable IDを持ちます。semantic identity自体を確定できない場合はIDを発行せず、親scopeまたは既知の親rowからUNKNOWNへ閉じます。identityの同一性判断はLLM、下記のfield充足とancestor由来effective stateはhelperが検証・導出します。
 
 | row | current / mappedで必須 | blockedで必須 | blockedで空を許可 | IDを発行しない条件 |
 | --- | --- | --- | --- | --- |
 | UIOP | Scope ID、Actor / Role、対象構造ID、操作、関連仕様項目ID、対応UC ID。関連UNKNOWN IDは空 | Scope ID、操作、関連UNKNOWN ID。Actor / Role・対象構造ID・対応UC ID・関連仕様項目IDは確定済み分だけ保持 | Actor / Role、対象構造ID、対応UC ID、関連仕様項目ID | LLMがscope内の操作identity自体を区別できない |
 | US | Scope ID、Actor / Role、Goal、関連仕様項目ID。関連UNKNOWN IDは空 | Scope ID、Actor / RoleまたはGoalの少なくとも一方、関連UNKNOWN ID。確定済み関連仕様項目IDは保持 | Actor / RoleまたはGoalの未確定側、関連仕様項目ID | LLMがActor / Goalの組としてUser Story identityを確定できない |
-| UC | 関連US ID、Use Case、Trigger、Success Postcondition、関連仕様項目ID。Preconditionsは該当なしなら空可。関連UNKNOWN IDは空 | 関連US ID、Use Case、関連UNKNOWN ID。Trigger / Preconditions / Success Postcondition / 関連仕様項目IDは確定済み分だけ保持 | Trigger、Preconditions、Success Postcondition、関連仕様項目ID | LLMが親USに対するUse Case identityを確定できない |
-| Behavior | UC ID、関連操作ID1件以上、結果分類、振る舞い、Postcondition / Result、関連仕様項目ID。関連UNKNOWN IDは空 | current UC ID、結果分類、振る舞い、関連UNKNOWN ID。関連操作ID / Postcondition / Result / 関連仕様項目IDは確定済み分だけ保持 | 関連操作ID、Postcondition / Result、関連仕様項目ID | Behaviorの存在・identity自体を確定できない |
-| AC | Behavior ID、Acceptance Criteria、current SPEC / DECISION / approved ASMの関連仕様項目ID。関連UNKNOWN IDは空 | currentまたはblocked Behavior ID、関連UNKNOWN ID。Acceptance Criteria / 関連仕様項目ID / 関連構造IDは確定済み分だけ保持 | Acceptance Criteria、関連仕様項目ID、関連構造ID | ACの存在・identity自体を確定できない |
+| UC | 関連US ID、Use Case、Trigger、Success Postcondition、関連仕様項目ID。Preconditionsは該当なしなら空可。関連UNKNOWN IDは空 | 関連US ID、Use Case。自身のblockerがある場合は関連UNKNOWN ID1件以上、ancestor US由来だけのblockedなら空可。Trigger / Preconditions / Success Postcondition / 関連仕様項目IDは確定済み分だけ保持 | Trigger、Preconditions、Success Postcondition、関連仕様項目ID、ancestor由来時の関連UNKNOWN ID | LLMが親USに対するUse Case identityを確定できない |
+| Behavior | UC ID、関連操作ID1件以上、結果分類、振る舞い、Postcondition / Result、関連仕様項目ID。関連UNKNOWN IDは空 | currentまたはblocked UC ID、結果分類、振る舞い。自身のblockerがある場合は関連UNKNOWN ID1件以上、ancestor UC由来だけのblockedなら空可。関連操作ID / Postcondition / Result / 関連仕様項目IDは確定済み分だけ保持 | 関連操作ID、Postcondition / Result、関連仕様項目ID、ancestor由来時の関連UNKNOWN ID | Behaviorの存在・identity自体を確定できない |
+| AC | Behavior ID、Acceptance Criteria、current SPEC / DECISION / approved ASMの関連仕様項目ID。関連UNKNOWN IDは空 | currentまたはblocked Behavior ID。自身のblockerがある場合は関連UNKNOWN ID1件以上、ancestor Behavior由来だけのblockedなら空可。Acceptance Criteria / 関連仕様項目ID / 関連構造IDは確定済み分だけ保持 | Acceptance Criteria、関連仕様項目ID、関連構造ID、ancestor由来時の関連UNKNOWN ID | ACの存在・identity自体を確定できない |
 
 `current / mapped` rowの関連仕様項目IDは `_06` のnormative traceability contractに従います。US / UC / Behavior / ACの `関連構造ID` は `_05` のUI構造ID + domain item ID exact prefix集合だけを許可し、ACの意味を制約するdomain itemはLLMがこの明示edgeへ含めます。blocked rowはUNKNOWNが正本であり、未確定fieldを推測して埋めません。UIOP / US / UC / Behaviorの `状態` はこのfield充足と関連UNKNOWNからhelperが生成し、materialize callerは `状態` を送信しません。
+
+state導出は次に固定します。
+
+- USは自身の必須field / `関連UNKNOWN ID`だけからcurrent / blockedを導出する
+- UCは自身の必須fieldが揃い自身のUNKNOWNが空でも、参照USのいずれかがblockedなら同じUC IDのままeffective blockedにする
+- Behaviorは自身の必須fieldが揃い自身のUNKNOWNが空でも、親UCがblockedなら同じBehavior IDのままeffective blockedにする
+- ACは自身の必須fieldが揃い自身のUNKNOWNが空でも、親Behaviorがblockedなら同じAC IDのままeffective blockedにする
+- ancestor由来blockedだけを理由に子rowへancestorのUNKNOWN IDを複製しない。子自身の不足がある場合だけ子自身の`関連UNKNOWN ID`を要求する
+- ancestorがcurrentへ戻り、子自身の必須fieldが揃い`関連UNKNOWN ID`が空ならhelperが同じstable IDをcurrentへ戻す
+- current descendantは全ancestor currentを要求する
 
 ## 4. User Story
 
@@ -153,7 +163,7 @@ ID: `UC-001` から開始し、最低3桁で連番採番する。999の次は100
 - UIOPの `Scope ID` は、その `対応UC ID` が参照するUSから決定論導出したScope IDとexact一致する。cross-scope UIOPは許可しない
 - current UCはTrigger / Preconditions / Success Postconditionが後続分析に必要な範囲で確定している
 - current UCはBehavior完全性3分類を持ち、各分類のclosure状態は§7で表す。current Behaviorだけでなく、存在・identityは追跡できるが結果未確定のblocked Behaviorを持てる
-- blocked UCは関連UNKNOWN IDを1件以上持ち、Behavior完全性3分類をまだ生成しない
+- blocked UCは自身のblockerがある場合は関連UNKNOWN IDを1件以上持つ。参照USのblockedだけでeffective blockedになった場合は自身の関連UNKNOWN IDを要求しない。blocked UCではBehavior完全性3分類をcurrent viewとして生成しない
 - UCの `状態` はhelperが必須fieldと関連UNKNOWNから `current / blocked` を導出する
 - 単なるPAGEとUse Caseを同一視しない
 
@@ -182,14 +192,14 @@ ID: `BH-001` から開始し、最低3桁で連番採番する。999の次は100
 - blocked
 
 規則:
-- current Behavior / blocked Behaviorはいずれもcurrent UCだけを親に持つ
+- current Behaviorはcurrent UCだけを親に持つ。blocked Behaviorはcurrentまたはblocked UCを親にでき、親UCのblockedだけが原因なら自身の関連UNKNOWN IDは空でよい
 - current Behaviorは意味上関係するmapped UIOPを`関連操作ID`へ1件以上明示する。各UIOPは同じScopeに属し、`対応UC ID`にそのBehaviorのUC IDを含む。どのUIOPを関連付けるかはLLMが判断し、helperは存在・state・UC / Scope整合だけを検証する
 - blocked Behaviorは確定済みの`関連操作ID`だけを保持でき、関係自体が未確定なら空を許可する。blocked UIOPを参照する場合は同じScopeだけを許可し、current Behaviorからblocked UIOPを参照しない
 - current Behaviorは1件以上のcurrentまたはblocked ACを持つ。ready scopeではcurrent Behaviorごとにcurrent ACが1件以上あり、blocked ACが残っていないことを要求する
 - Behaviorの意味自体が未確定ならblocked Behavior rowを作る。BehaviorはcurrentだがACのsemantic identityが既知で期待条件だけ一時的に未確定なら、親Behaviorを不要にblockedへ落とさず同じAC IDをblockedで保持できる
 - Behaviorの存在・identity自体をまだ確定できない場合はblocked Behavior rowを作らず、§7の `未定義` + UNKNOWNだけで表す
 - blocked Behaviorはcurrent ACを持たない。AC semantic identityが既知ならblocked ACを同じIDで保持できる
-- blocked Behaviorをcurrent ACの親にしない
+- blocked Behaviorをcurrent ACの親にしない。親Behaviorがblockedならsemantic identityを維持する既存ACはhelperが同じIDのblockedへ伝播する
 - Behaviorの `状態` はhelperが必須fieldと関連UNKNOWNから `current / blocked` を導出する
 
 ## 7. 正常 / 準正常 / 例外の完全性確認
@@ -448,6 +458,7 @@ legacy UI target packageにUS / UC / Behavior / ACが存在しない場合でも
 - blocked UCで無意味な3分類を生成しない
 - current Behaviorがcurrent ACへ閉じる
 - current Behaviorが1件以上のmapped UIOPへ`関連操作ID`で閉じ、同一UC内の無関係UIOPをAC Entityへ混入させない
+- current UC / Behavior / ACのchainで上位だけにUNKNOWNが発生した場合、semantic identityが同じ下位rowを無断retireせずeffective blockedへ伝播し、UNKNOWN解消後に同じstable IDでcurrentへ復帰できる
 - current ACがcurrent Authorityへ追跡できる
 - ACだけが下流handoff用Machine Entityとして決定論生成される
 - US / UC / Behavior変更でも関連AC Entity fingerprintが変わる
