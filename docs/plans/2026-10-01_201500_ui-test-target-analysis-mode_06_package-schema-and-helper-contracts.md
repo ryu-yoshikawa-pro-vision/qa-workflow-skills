@@ -1633,6 +1633,8 @@ production helperのfilesystem / raw hash / README control生成 / internal allo
 - standard structured tableのheader / ID / ref列が一意で、standard prose heading集合がasset registryと一致する
 - scopeごとのUI操作適用判定と条件付き必須fileのTrigger判定→状態→file集合、completion statusを機械検証できる
 - UI操作scopeでUIOP / US / UC / Behavior / AC hierarchyと3分類完全性を機械検証できる
+- UI構造のexact種別未確定時は仮typed structural row / IDを作らずUNKNOWNで保持し、分類確定後にのみ確定prefixでIDを採番できる。既存typed IDの分類根拠失効ではexplicit retire + same-UNK open / reopenを経てretired IDを再利用しない
+- known UIOPがUS / UC identity blockerにより対応先未確定でも同じUIOP IDをblockedで保持し、同Scopeの既存Blocking UNKNOWNを再利用して解消後にsame IDでmappedへ戻せる
 - 09 → Authority Entity、02 → current AC EntityをLLM手組みなしで生成できる
 - spec-analysis → question-analysisへUNKNOWN集合を手作業なしで渡せる
 - semantic projectionへ過去CHANGELOGを混ぜない
