@@ -226,7 +226,7 @@ READMEを詳細仕様の複製場所にしません。
 - panel / external / shared UI
 - navigation / entry / exit
 
-same-routeであることがAuthorityまたは確認済み事実から成立する場合はstep / viewを別PAGEへしません。routeが不明な場合は `PATH-TBD` を許可し、操作フローだけからsame-routeを推測しません。PAGE / VIEW分類自体が後続設計へ影響する場合はUNKNOWNとして保持します。
+same-routeであることがAuthorityまたは確認済み事実から成立する場合はstep / viewを別PAGEへしません。routeが不明な場合は `PATH-TBD` を許可し、操作フローだけからsame-routeを推測しません。UI構造の存在は識別できてもPAGE / VIEW等の分類自体を安全に確定できない場合は、仮の `種別` や構造IDを発行せず、07のUNKNOWNで `関連Scope ID / 関連File=01_ui_structure_and_navigation.md` を保持します。後続設計を止める場合だけ同Scopeを `Blocking Scope ID` にします。分類解消後に同じUNKNOWNをresolveし、確定種別のprefixで初めて構造IDを採番します。既存typed rowの分類根拠が失効した場合は旧IDをcurrentのまま残さずexplicit retire + same-UNK open / reopenとし、再分類後はnew IDを発行します。
 
 ### 02_behavior_and_business_rules.md
 
