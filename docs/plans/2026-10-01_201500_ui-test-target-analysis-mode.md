@@ -53,7 +53,7 @@ feat/ui-test-target-analysis-profile
 
 ## 固定方針
 
-LLM / deterministic処理の責務境界は `2026-10-01_201500_ui-test-target-analysis-mode_05_llm-deterministic-boundaries.md` を正本とします。LLMの意味判断をscriptへ移さず、形式・参照・集計・fingerprint等の再現可能な定型処理だけをSkill-local helper / validatorへ移します。LLMはsemantic identity、UI分類、file trigger、UNKNOWNの関連Scope / Blocking Scope / 関連File、required domainの意味上の母集団、Behaviorごとの関連UI操作、extension要否、same-UNK / new-UNK、explicit retire等を判断します。その後のstable ID採番、row状態導出、Markdown serialization、scope readiness、not-applicableとscope-owned rowの逆方向整合、scope別machine handoff、Stable ID lifecycle / 影響file、README / Machine Entity / MANIFESTはhelperが決定論実行します。後続QA工程へ影響する意味情報をextension proseだけに残さず、standard structured row / 09へ正規化します。Current UNKNOWNの存在だけでpackage全体を停止せず、semantic quality gateはcanonical write前に実施します。Repository baselineは0..N件を扱い、未再確認repositoryを自動更新しません。DEC / ASMはcanonical `DEC-xxx / ASM-xxx` を維持し、Project Contextがownerの場合だけqa-workflow helperで番号決定・materialize・previous ID削除検証を行います。packageはDEC / ASMをterminal retireしません。
+LLM / deterministic処理の責務境界は `2026-10-01_201500_ui-test-target-analysis-mode_05_llm-deterministic-boundaries.md` を正本とします。LLMの意味判断をscriptへ移さず、形式・参照・集計・fingerprint等の再現可能な定型処理だけをSkill-local helper / validatorへ移します。LLMはsemantic identity、UI分類、分類未確定時のUNKNOWN、file trigger、UNKNOWNの関連Scope / Blocking Scope / 関連File、required domainの意味上の母集団、Behaviorごとの関連UI操作、known UIOPがUS / UC identity blockerをどの既存UNKNOWNへ閉じるか、extension要否、same-UNK / new-UNK、explicit retire等を判断します。その後のstable ID採番、row状態導出、Markdown serialization、scope readiness、not-applicableとscope-owned rowの逆方向整合、scope別machine handoff、Stable ID lifecycle / 影響file、README / Machine Entity / MANIFESTはhelperが決定論実行します。後続QA工程へ影響する意味情報をextension proseだけに残さず、standard structured row / 09へ正規化します。Current UNKNOWNの存在だけでpackage全体を停止せず、semantic quality gateはcanonical write前に実施します。Repository baselineは0..N件を扱い、未再確認repositoryを自動更新しません。DEC / ASMはcanonical `DEC-xxx / ASM-xxx` を維持し、Project Contextがownerの場合だけqa-workflow helperで番号決定・materialize・previous ID削除検証を行います。packageはDEC / ASMをterminal retireしません。
 
 
 ### 1. 新Skillは追加しない
@@ -266,7 +266,7 @@ PR #14後のCIは `skills/*/scripts` を動的compileするため、helper compi
 ## 成功条件
 
 - 新Skillなしで今回の責務をspec-analysisへ収められる
-- UI構造をPAGE / STATE・VIEW・STEP / MODAL / browser dialog / panel / external / sharedへ区別できる
+- UI構造をPAGE / STATE・VIEW・STEP / MODAL / browser dialog / panel / external / sharedへ区別できる。exact分類を安全に確定できない構造は仮typed IDを発行せずUNKNOWNへ閉じ、分類解消後に初めてtyped structural IDを採番できる
 - 仕様Authorityとrepository implementation statusが混同されない
 - UNKNOWNが安定参照され、回答後に解消済み履歴とcurrent unknownが整合する
 - package更新時にpackage schema version、content version、CHANGELOG、MANIFESTと各ファイルの現在状態が一致し、Stable ID lifecycle / 影響fileをLLM手入力に依存しない。同一materialize requestはMANIFEST receiptで既適用判定でき、commit後crashでもnew ID / extensionを二重採番しない
@@ -283,6 +283,7 @@ PR #14後のCIは `skills/*/scripts` を動的compileするため、helper compi
 - README / EVALS等の現在値を変更した場合はPR #14後のcurrent repositoryから導出した実データと一致する
 - PR #14のusability / WCAG finding・observation・resultを仕様Authorityへ自動昇格しない
 - 機能scopeごとにUI操作有無を判定し、UI操作ありではUS → UC → Behavior → ACを完全に分析する。current Behaviorは意味上関係するUIOPを`関連操作ID`で明示し、同一UC内の無関係UIOPをAC freshnessへ混入させない。情報不足はnot-applicableへ逃げずUNKNOWN / blockedとして残る
+- known UIOPで対応US / UC identityが未確定な場合、同じroot Blocking UNKNOWNをUIOPの `関連UNKNOWN ID` から再利用し、same UIOP IDをblockedで保持できる。原因解消後は同IDでmappedへ戻り、UIOP専用UNKNOWNを重複生成しない
 - US / UC / Behavior / ACはLLMがsemantic identityを維持する限り、子自身の意味を再判断せず親のblocked状態をhelperが決定論的に下流へ伝播する。ancestor由来blockedだけを理由に子へ新しいUNKNOWNを作らず、親block解除後に子自身のblockerがなければ同じstable IDのままcurrentへ戻す
 - SCOPE retire後にsame identityのcurrent ownershipをLLMが再解決し、そのownershipがblockedならscriptがlatest resolved scope_refsを持つinactiveへ遷移できる。last-active historyは旧ownershipを保持し、無関係ready scopeを停止させない
 - child identity自体を確定できない場合は階層ごとのBlocking UNKNOWN位置を一意にする。UC identity不明は親USをblocked + UC 0件、Behavior identity不明はcurrent UCの完全性`未定義 + UNKNOWN` + Behavior 0件、AC identity不明は親Behaviorをblocked + AC 0件とし、Scopeへ一律退避しない
@@ -297,7 +298,7 @@ PR #14後のCIは `skills/*/scripts` を動的compileするため、helper compi
 - SCOPE自体をexplicit retireした場合は、previous active Entityの `scope_refs[]` がcurrent scope universe外を参照する状態を無言carry-forwardしない。helperはaffected Entityを決定論抽出し、owner LLMがreuse / scope再割当 / split / semantic deletionを解決するまでactive継続・final gateを許可しない
 - local single-hostでは実ファイルのimmutable qa-workflow revisionを保存・exact refetchでき、workflow-ref process lock内のexpected revision比較 + atomic replaceでcompleted baseline bindingをcommitできる。shared/network storageはprovider-native history / CAS無しではunsupportedとする
 - `ready_scope_ids=[]` では `build-machine-evidence(scope_ids=[])` やtest-analysis以降のruntimeを起動せずworkflowをblockedで保持する。最後にcommit済みのqa-workflow artifact bindingは更新せず、後続scopeが再readyになった時のhistorical sourceとしてだけ使う。root payloadの `inactive_*_history[]` がlast-active semantic contentを、TCDの `inactive_materialize_history[]` がCI ID / mapping履歴を保持するため、無関係なready scopeは継続しつつblock解除後にsemantic identityが同じ成果物を同じIDで`active`へ戻せる。inactive前にdeletedだったCI IDも再採番しない。既存active downstreamが `scope_refs=[]` の状態でUI targetへmigrationする場合だけ、全scopeが一度readyな状態でactive downstream全件へscope ownershipを付与してbaselineを作るまでpartial readinessを開始しない。downstream未作成の新規workflowはこのone-time gateの対象外
-- 同じpackage rootへの`materialize`はhelper自身がpackage-local process lockで直列化し、UTF-8 without BOM / LF / terminal LFのcanonical bytesをstagingへ生成・検証してからpackage単位でcommitする。途中I/O failureで旧版 / 新版が混在した完成packageを残さず、process kill後もlockのstale owner回収を必要としない
+- 同じpackage rootへの`inspect / validate / build-machine-evidence / materialize`はhelper自身が同じpackage-local exclusive process lockへ参加し、lock取得後に共通preflight recoveryを通す。materializeはUTF-8 without BOM / LF / terminal LFのcanonical bytesをstagingへ生成・検証してからpackage単位でcommitし、readerはcommit途中のroot一時不存在や旧版 / 新版混在を観測しない。途中I/O failureで混在した完成packageを残さず、process kill後もlockのstale owner回収を必要としない
 - package-local stable IDを持つ複数UI target packageのMachine Entity blockを同一current Entity collectionへ直接mergeせず、必要ならspec-analysisで1つのcurrent canonical package / normalized inputへ意味統合してから下流へ渡す
 - helperがsemantic判断を代替せず、通常spec-analysisの柔軟性を損なわない
 - production helperの公開CLIは独立した実行用途があるoperationだけに限定し、採番・version計算・MANIFEST生成・impact算出等のmaterialize内部処理をfocused useだけのために公開operation化しない
