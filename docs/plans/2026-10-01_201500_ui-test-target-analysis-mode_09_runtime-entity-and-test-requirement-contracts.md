@@ -432,8 +432,8 @@ inputはmachine-generated observationだけを受けます。
 
 - `runtime_v2_cutover_required`: runtime-v1 downstreamが1件以上あり、current v2 baseline未成立
 - `ui_target_migration_required`: current v2 baseline成立済みでUI target package未作成
-- `scope_ownership_normalization_required`: UI target package作成済み、既存active downstreamに `scope_refs=[]` があり、全current scope ready
-- `scope_ownership_baseline_required`: UI target package作成済み、既存active downstreamに `scope_refs=[]` があり、blocked scopeが1件以上。これはblocking statusで、`blocking_issue="scope_ownership_baseline_required"`
+- `scope_ownership_normalization_required`: UI target package作成済み、既存active downstreamに `scope_refs=[]` があり、`current_scope_ids[]` が1件以上かつ全current scope ready
+- `scope_ownership_baseline_required`: UI target package作成済み、既存active downstreamに `scope_refs=[]` があり、blocked scopeが1件以上、または `current_scope_ids=[]` でownershipを新規確立する対象Scope自体が無い。これはblocking statusで、`blocking_issue="scope_ownership_baseline_required"`。zero-scopeを理由にunscoped legacy downstreamを一律deletedへ推測しない
 - `partial_progression_ready`: runtime-v1 downstreamが残らずcurrent v2 baseline / 必要なUI target migration / ownership baselineが成立済み、またはdownstream未作成の新規UI target workflow
 
 判定優先順位は上記順です。LLMはstatusを上書きしません。handled invalid inputはexit 0 + `valid=false / issues[]`、unexpected internal errorだけexit 1とします。
@@ -858,7 +858,8 @@ input:
       "resolution":"reuse",
       "resolved_scope_refs":["SCOPE-001"]
     }
-  ]
+  ],
+  "scope_removal_applied_states":[]
 }
 ```
 
@@ -869,13 +870,14 @@ CLI契約はこのhelper固有に固定し、単一用途のため `operation` f
 stdin:
 
 - top-levelはJSON object exactly 1件
-- 許可top-level fieldは `workflow_ref / workflow_state_record / current_scope_ids / blocked_scope_ids / previous_qa_workflow_artifact_markdown / scope_removal_resolutions` の6つだけ。missing / unknown fieldをrejectする。初回impact extractionでは `scope_removal_resolutions=[]` を渡し、LLM resolution後は同じhelperへresolution rowsを渡して再実行する
+- 許可top-level fieldは `workflow_ref / workflow_state_record / current_scope_ids / blocked_scope_ids / previous_qa_workflow_artifact_markdown / scope_removal_resolutions / scope_removal_applied_states` の7つだけ。missing / unknown fieldをrejectする。初回impact extractionでは両配列を空、LLM resolution後はresolution rowsだけ、owner generator materialize後のcompletion checkではvalidated generator resultからqa-workflowがdeterministic projectionしたapplied state rowsも渡して同じhelperを再実行する
 - duplicate JSON keyをrejectするstrict decoderを使う
 - aggregate stdinは16 MiB以下。通常stringは64 KiB以下とし、top-level `previous_qa_workflow_artifact_markdown` だけ16 MiB aggregate内で64 KiB上限を免除する
-- `workflow_ref` はnon-empty string。`current_scope_ids[]` はcurrent `ui_target_package.py inspect.current_scope_ids[]` とexact一致するduplicateなし・canonical sort済みのknown `SCOPE-xxx` 配列、`blocked_scope_ids[]` は同inspect値とexact一致する `current_scope_ids[]` のsubsetとする。どちらもAgentが再構築せず、`blocked_scope_ids[]` は空配列を許可する
+- `workflow_ref` はnon-empty string。`current_scope_ids[]` はcurrent `ui_target_package.py inspect.current_scope_ids[]` とexact一致するduplicateなし・canonical sort済みのknown `SCOPE-xxx` 配列、`blocked_scope_ids[]` は同inspect値とexact一致する `current_scope_ids[]` のsubsetとする。どちらもAgentが再構築せず、**両方とも空配列を許可する**。`current_scope_ids=[]` は全current Scope retireのterminal caseであり、`current_scope_ids` non-empty + `ready_scope_ids=[]` の全blocked caseと同一扱いにしない
 - `workflow_state_record` は既存workflow state schemaでvalidateし、このhelper固有には `workflow_ref` と `state.last_completed_qa_workflow_artifact` だけを参照する
 - `previous_qa_workflow_artifact_markdown` はstringまたはnull。bindingとのnull / non-null整合は下記規則でvalidateする
-- `scope_removal_resolutions[]` はLLMがsemantic判断したaffected previous identityだけを持つ。exact `{skill,entity_type,entity_ref,resolution,resolved_scope_refs}` とし、`resolution` は `reuse / deleted / split`。`reuse` はnon-empty `resolved_scope_refs[] ⊆ current_scope_ids[]` 必須、`deleted` は `resolved_scope_refs=[]`、`split` はold identityのreplacementをowner generatorでmaterializeする意味で `resolved_scope_refs=[]` とする。helperはresolutionの意味妥当性を判断しない
+- `scope_removal_resolutions[]` はLLMがsemantic判断したaffected semantic owner identityだけを持つ。exact `{skill,entity_type,entity_ref,resolution,resolved_scope_refs}` とし、`resolution` は `reuse / deleted` の2値だけにする。`reuse` はnon-empty `resolved_scope_refs[] ⊆ current_scope_ids[]` 必須、`deleted` は `resolved_scope_refs=[]`。意味上のsplitはhelper専用stateにせず、LLMが旧identityを`deleted`と判断し、replacementを同じowner generatorの通常`new` draftとしてmaterializeする。replacement lineageを後続機械処理が利用しないため、split receipt / graph / replacement registryは追加しない。helperはresolutionの意味妥当性を判断しない
+- `scope_removal_applied_states[]` はLLM入力ではなく、TRD / TCD / TCのcurrent validated root resultからqa-workflowがprojectionする。exact `{skill,entity_type,entity_ref,status,scope_refs}` とし、対象はscope-removal resolutionを持つTR / TCN / model / TCだけ。`status` は `active / inactive / deleted`。初回impact / semantic decision段階は空配列、generator適用後だけ入力する。raw artifact本文やLLM申告から作らない
 
 成功stdout:
 
