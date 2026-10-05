@@ -438,6 +438,7 @@ helperが列挙したimpact候補は再確認対象であり、変更必須と�
 - MANIFESTのfile order / SHA-256がhelper再計算結果と一致する
 - structured rowのexact stable ID参照がすべて存在し、duplicate structural IDがない
 - PAGE→VIEW等、canonical prefixが変わる構造種別変更では旧IDをreuseせず、旧IDのexplicit retire + new IDとする。同じPANEL prefixを共有するPANEL / POPOVER / GLOBAL UI間は、semantic identityが同一とLLMが判断した場合だけreuseできる
+- UI構造のexact種別が未確定な項目を仮PAGE / VIEW等として構造一覧へ置かず、07 UNKNOWNで保持している。既存typed IDの分類根拠失効では旧IDをcurrentのまま残さずexplicit retire + same-UNK open / reopenとなり、再分類時にretired IDを復活させない
 - downstreamへ渡すAuthority / AC Machine Entityは1つのcurrent canonical UI target packageから生成し、複数packageのpackage-local ID集合を同一current Entity collectionへ直接mergeしない
 - 01〜08の期待挙動が09のstable item IDへ追跡できる
 - UI操作scopeのUIOP / US / UC / Behavior / ACが `_08` のclosure contractを満たす
