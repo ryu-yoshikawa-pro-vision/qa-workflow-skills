@@ -687,8 +687,6 @@ process kill等でhelper-owned siblingが残った場合のpreflight recoveryは
 
 ### inspect
 
-stdin:### inspect
-
 public operationは§7.3のpackage lock + preflight recovery完了後にcommitted rootを1回parseしてpayload / update snapshotを生成します。lock外でfileを段階的に読み直しません。
 
 stdin:
@@ -755,8 +753,6 @@ payload:
 - `payload_file_sha256[]` のpath集合 + `MANIFEST.md` がsnapshot時点のcurrent package file setであり、materializeはstaging前とcommit直前に全件照合する
 
 `resolved_unknown_ids` は09で `分類=UNKNOWN` かつ `現在有効か=No` のUNK。
-
-### validate
 
 ### validate
 
@@ -987,8 +983,6 @@ MANIFEST、Last materialize receipt、README controls、Stable ID changes、影�
 - legacy migrationではLLMが明示したretained ID / lifecycle eventだけを入力にし、legacy proseからidentityを推測しない
 
 内部関数単体または `materialize / validate` 経由でrepository unit testし、これら専用のproduction operationは作りません。
-
-### build-machine-evidence
 
 ### build-machine-evidence
 
