@@ -625,15 +625,19 @@ handled `issue_type` は次のexact enumに固定します。
 
 unknown operation / unknown top-level field / JSON・table schema不正は `invalid_input`、packageのcanonical heading / file set / version schema不一致は `package_schema_mismatch`、参照先不存在は `reference_not_found`、ID重複は `duplicate_id`、MANIFESTのfile set / order / SHA / receipt差分は `manifest_mismatch` へ固定します。package-local lockが他processに保持されている場合は `write_locked`、実行platform / filesystemで必要なprocess-scoped lock primitiveを安全に使えない場合は `write_lock_unavailable` とし、writeを開始しません。callerが保持したsnapshotとcommit直前のcurrent package bytesが変わっていた場合は `stale_snapshot`、previous tracked IDが明示 `retire_ids[]` なしでcurrent modelから消えた場合は `state_transition_required`、staging検証後のpackage commitに失敗して旧packageを復旧できた場合は `write_commit_failed`、旧packageの復旧自体に失敗した場合は `write_recovery_failed` へ固定します。新しいhandled failure種別が実装中に必要になった場合は、実装だけで増やさずこのPlan contractを更新します。
 
-### 7.3 update concurrency / idempotent replay contract
+### 7.3 package concurrency / idempotent replay contract
 
-同じ `package_root` への `materialize` はsingle writerです。snapshot照合だけを相互排他として扱わず、PR #14のgeneric claim / shared-resource reservationもこのwrite pathへ流用しません。UI target packageはSkill自身が管理するlocal filesystem packageなので、`ui_target_package.py` がpackage専用の短時間process lockとMANIFEST receiptを所有します。
+同じ `package_root` に対する**全production operation**は、committed packageを読む前に同じpackage-local process lockへ参加します。対象は `inspect / validate / build-machine-evidence / materialize` です。lockをread/write別体系へ分けず、現在の短時間exclusive lockを共用してmixed-version readとcommit途中の一時不存在を防ぎます。snapshot照合だけを相互排他として扱わず、PR #14のgeneric claim / shared-resource reservationもこのpathへ流用しません。UI target packageはSkill自身が管理するlocal filesystem packageなので、`ui_target_package.py` がpackage専用lock、preflight recovery、MANIFEST receiptを所有します。
 
 - lock pathは `package_root=/parent/<name>` に対して `/parent/.<name>.ui-target.lock` exactlyとする。package payload / MANIFEST対象には含めない
 - POSIXではPython標準ライブラリの `fcntl.flock(LOCK_EX | LOCK_NB)`、Windowsでは `msvcrt.locking(..., LK_NBLCK, 1)` でlock fileの先頭byteをnon-blocking exclusive lockする。lock fileはregular fileとして固定pathへ置き、symlink / reparse point等の既存filesystem safety違反をrejectする
 - lock ownershipはfile内容やPID metadataで判定しない。open handleのOS lockだけを正本とし、正常終了 / exception / process killでhandleが閉じれば解放される。lock file自体は残ってよく、stale lock file削除によるowner推測を行わない
 - lock取得競合は `write_locked`、実行platformで必要なprocess-scoped lock primitiveを利用できない / lock APIが失敗する場合は `write_lock_unavailable` としてfail-closedする。本契約のsingle-writer保証は同一host上のlocal filesystemを対象とし、network / shared filesystemのinter-host排他はPR #16の対象外とする
+- `write_locked / write_lock_unavailable` の既存issue type名はPlan変更を広げないためread operationでも共用する。意味はpackage lock競合 / package lock利用不能であり、read operationだからlock無しでfallbackしない
 - qa-workflow / standalone callerは `claim_mutable_operation()` / `reserve_shared_resource()` を重ねず、package writeの排他・commit・replay判定を `materialize` に一任する
+- public `inspect / validate / build-machine-evidence` はlock取得後、§7.4と同じpreflight recoveryを実行してからcommitted `package_root` を読む。`root`不在 + valid backupならreader自身がbackupをrootへrestoreしてから読む。current rootがvalidならhelper-owned orphan staging / backupをcleanupしてから読む。復旧不能なら `write_recovery_failed` でfail-closedする
+- readerが行えるfilesystem mutationはhelper-owned recovery / cleanupだけで、committed packageのsemantic contentやversionを変更しない。read operation成功後のpackage bytesはlock取得時に確定した1つのcommitted versionだけから読む
+- `materialize` もlock取得直後に同じpreflight recoveryを通し、その後のcurrent package parse / receipt replay / snapshot照合 / staging / commitをlock保持中に完了する。内部parser / validator / Machine Evidence builderはlock済み内部関数として呼び、同processでlockを再取得しない
 - `materialize` は入力schema / text newlineを正規化した後、`operation / package_root` を除くmaterialize request全体をcanonical JSON化し、lowercase SHA-256の `request_fingerprint` を生成する。array orderが契約上意味を持つ `table_changes[].rows[] / extension_file_updates[]` 等は順序を保持し、stable reference array等のcanonical sort対象だけ既存規則で正規化してからhashする
 - changed=trueでcommitするpackageのMANIFESTへ§12の `Last materialize receipt` を生成し、`request_fingerprint`、artifact/change mode、割当ID / extension path、retire結果、changed files、previous/current package versionを保存する。receiptはhelper-owned controlでありversion up要否の原因に数えない
 - lock取得後、current packageがvalidでreceiptの `request_fingerprint` が今回requestと一致する場合は、artifact_mode=create / updateを問わずmutationを再適用せず `replayed=true` で保存済み割当結果を返す。これをsnapshot / create precondition判定より先に行う
@@ -672,7 +676,7 @@ structured Markdown table cellは次のcanonical encodeへ固定します。
 
 この方式は汎用transaction managerではなく、UI target packageのcanonical write pathだけに適用します。実装では標準ライブラリの同一filesystem rename / replaceを使い、採用した方式をrepository portability testで固定します。
 
-process kill等でhelper-owned siblingが残った場合のpreflight recoveryもこのwrite path内で固定します。`package_root=/parent/<name>` に対してstagingは `/parent/.<name>.ui-target-staging`、backupは `/parent/.<name>.ui-target-backup` exactlyとし、任意名をscanしません。preflight recoveryは§7.3のprocess lock取得後だけ行います。
+process kill等でhelper-owned siblingが残った場合のpreflight recoveryは全production operationで共通化します。`package_root=/parent/<name>` に対してstagingは `/parent/.<name>.ui-target-staging`、backupは `/parent/.<name>.ui-target-backup` exactlyとし、任意名をscanしません。preflight recoveryは§7.3のprocess lock取得後だけ行い、public readerもrecovery完了前にpackage fileを読みません。
 
 - current package rootがvalidなら、残存staging / backupは前回未cleanupのorphanとして削除する。その後receipt replay判定を行い、一致なら既適用結果を返す
 - current rootが不存在でvalid backupが存在する場合はbackupをrootへrestoreし、stagingを削除する。restore後にreceipt replay判定 / update snapshot判定を通常どおり行い、caller workflow stateをrecovery根拠にしない
@@ -682,6 +686,10 @@ process kill等でhelper-owned siblingが残った場合のpreflight recoveryも
 ## 8. ui_target_package.py operations
 
 ### inspect
+
+stdin:### inspect
+
+public operationは§7.3のpackage lock + preflight recovery完了後にcommitted rootを1回parseしてpayload / update snapshotを生成します。lock外でfileを段階的に読み直しません。
 
 stdin:
 
@@ -749,6 +757,10 @@ payload:
 `resolved_unknown_ids` は09で `分類=UNKNOWN` かつ `現在有効か=No` のUNK。
 
 ### validate
+
+### validate
+
+public operationは§7.3のpackage lock + preflight recovery完了後にcommitted rootを検証します。`materialize`内部のstaging final validateはlock済み内部関数を使い、public `validate` を再帰的に起動しません。
 
 stdin:
 
@@ -977,6 +989,10 @@ MANIFEST、Last materialize receipt、README controls、Stable ID changes、影�
 内部関数単体または `materialize / validate` 経由でrepository unit testし、これら専用のproduction operationは作りません。
 
 ### build-machine-evidence
+
+### build-machine-evidence
+
+public operationは§7.3のpackage lock + preflight recovery完了後にcommitted rootを1回parseし、その同一modelからpackage-global / ready-scope projectionを生成します。operation途中でcurrent rootを再openして別versionを混在させません。
 
 stdin:
 
@@ -1557,6 +1573,8 @@ production helperのfilesystem / raw hash / README control生成 / internal allo
 - materializeが全new tracking IDをfile applicability判定前にrequest-wide仮採番し、tracking / keyed table / extension stable refsの`@draft`を先に解決してからscope applicability / file集合を導出すること。failure / no-opで仮採番を消費しないこと
 - materializeがdraft_key / identity_action / @draft referenceを解決し、canonical table serialization、条件付き標準file同期、CHANGELOG controls、Machine Entities section、README controls、MANIFESTを1 write pathで生成すること
 - package-local process lockで同一rootへの2 process同時materializeの一方だけがwriteへ進み、process kill / handle close後はstale owner cleanupなしで次runがlock取得できること。unsupported lock primitiveでは`write_lock_unavailable`、競合中は`write_locked`になること
+- `materialize` が `root → backup` を完了して `staging → root` 前に停止した状態で、次の最初のoperationが `inspect / validate / build-machine-evidence` のいずれでもlock取得後にbackupをrootへrestoreし、最後のcommitted packageだけを返せること
+- materialize commitと `inspect / build-machine-evidence` を競合実行し、readerがcommit前versionまたはcommit後versionのどちらか一方だけを完全に読み、root不存在や旧/new file混在を観測しないこと。reader同士も同じexclusive package lockを使うため、read/write lock用の別実装は追加しない
 - commit後response前crashを模擬し、同一create / update request replayがMANIFEST receiptから同じallocated ID / extension pathを返して二重採番・二重retireせず`replayed=true`になること。異なるrequestはreceipt replayせずcreate existing-target / update stale snapshot契約へ戻ること
 - `Behavior Decomposition` をLLM入力として独立指定させず、`UI操作判定` からfixed mappingで生成すること
 - PAGE→VIEW等のprefix変更再分類でreuseをrejectし、explicit retire + new IDを要求すること。同じPANEL prefix内はsemantic identity同一時だけreuseできること
