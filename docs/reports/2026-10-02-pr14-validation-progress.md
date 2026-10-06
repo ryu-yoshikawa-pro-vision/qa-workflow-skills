@@ -95,6 +95,15 @@ External URL、実アカウント、外部実製品、特定assistive technology
 - このcheckpointの成果物は状況記録の追記とGit blockerの証拠化まで。次に必要な操作はstale `.git/index.lock` の許可された解消で、その後に明示pathのみstage、通常commit / push、新PR headのCI確認を行うこと。PR headの新CIはまだ開始されていない。
 - Progress: checkpoint整理・report追記は完了。commit / pushはstale index lockのため未完了。PR #14 Plan検証全体も未完了。
 
+## 2026-10-06 23:34 JST — push / current-head CI確認
+
+- user解消後のlock不在を確認し、PR対象69 path（tracked 65 + 新規4）をstage。`.gitignore`およびuser-owned untracked fileは除外。通常pre-commit hook成功後、commit `584c9a2d71d0e04bb65c9a54df4498bdd9c3827f` (`feat: extend canonical WCAG inspection evidence`) を作成。
+- `git push origin HEAD:refs/heads/feat/usability-evaluation-skill` 成功。PR #14はopenのまま、最新headは `584c9a2d71d0e04bb65c9a54df4498bdd9c3827f`。merge / force pushなし。
+- 最新headでGitHub Actions 3件すべてsuccess: `Validate Agent Skills` run `37479869163`、`Validate Deterministic Output Evals` run `37479869104`、`Validate Semantic Output Evals` run `37479869359`。Deterministic runではcompile、repository deterministic tests、runtime tests、semantic dataset/runtime validationの全stepがsuccess。表示されたNode.js 20 / Ubuntu runner移行noticeはwarningでありfailureではない。
+- 通常pre-commit hookもexit 0。current 23 Skillの`skills-ref validate`、semantic dataset 22 Skill / 155 case validation、shared deterministic 12 tests、repository deterministic 246 tests、trigger contract 1 test、runtime 271 testsを含む。Windows symlink権限が必要なsemantic testはskip扱いで、hook全体は成功。
+- Push済みCIはrepository validator / dataset / test gatesの結果であり、Semantic LLM Judge 83 case、実Agent trigger 180 executions、holdout 24 executions、canonical real Agent/browser全経路の完了証拠ではない。Run011のformal report closureは引き続き`partial-blocked`。
+- PR #14 repository implementation Planは未完了。Semantic / Trigger / Holdout / canonical browser残経路およびそれらのcurrent-tree evidenceを継続する。
+
 ### 2026-10-06 23:28 JST — user-cleared lock / staging recovery
 
 - ユーザーが `.git/index.lock` を削除した後に状態を再取得し、lock不在、local / origin PR head `5f97b59f393525486b34e92fca769e13caebe8bc`、staged path 0件を確認。
