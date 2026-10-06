@@ -36,7 +36,7 @@ def read_json(path: Path) -> dict:
 
 def sample(ref: str, digit: str) -> dict:
     return {"sample_ref": ref, "identity_fingerprint": "sha256:" + digit * 64,
-            "target_identity": "target-" + ref}
+            "target_identity": "http://127.0.0.1:4173/?sample=" + ref.lower()}
 
 
 def variation(sample_ref: str, ref: str, digit: str) -> dict:
@@ -80,6 +80,10 @@ class WcagRequirementAndSamplingTests(unittest.TestCase):
                              "procedure_execution_ref", "sample_ref", "variation_ref",
                              "requirement_ref", "currentness_dependency", "required_browser_capability"}
                             <= set(probe["required_request_fields"]))
+        for procedure in procedure_catalog:
+            contract = procedure.get("result_contract", {})
+            if contract.get("contract_kind") == "typed-machine-probe-results":
+                self.assertIn("incomplete", contract["allowed_statuses"])
 
     def test_random_sampling_boundaries_and_expected_blocked_are_distinct(self):
         for structured_count, expected in ((0, 0), (1, 1), (9, 1), (10, 1), (11, 2)):
@@ -106,16 +110,21 @@ class WcagRequirementAndSamplingTests(unittest.TestCase):
     def test_sample_identity_uses_state_not_navigation_route(self):
         drafts = [
             {"draft_key": "route-a", "target_ref": "TARGET-1", "state_key": "details-open",
-             "locator": "/item/1#open", "source_evidence_refs": ["BROWSER-1"]},
+             "locator": "/item/1#open", "target_identity": "https://fixture.test/item/1#open",
+             "source_evidence_refs": ["BROWSER-1"]},
             {"draft_key": "route-b", "target_ref": "TARGET-1", "state_key": "details-open",
-             "locator": "/item/1?via=menu", "source_evidence_refs": ["BROWSER-2"]},
+             "locator": "/item/1?via=menu", "target_identity": "https://fixture.test/item/1?via=menu",
+             "source_evidence_refs": ["BROWSER-2"]},
             {"draft_key": "state-b", "target_ref": "TARGET-1", "state_key": "details-closed",
-             "locator": "/item/1", "source_evidence_refs": ["BROWSER-3"]},
+             "locator": "/item/1", "target_identity": "https://fixture.test/item/1",
+             "source_evidence_refs": ["BROWSER-3"]},
         ]
         registry = sampling.sample_identity_registry(drafts)
         self.assertEqual(registry["draft_to_sample_ref"]["route-a"], registry["draft_to_sample_ref"]["route-b"])
         self.assertNotEqual(registry["draft_to_sample_ref"]["route-a"], registry["draft_to_sample_ref"]["state-b"])
         self.assertEqual(len(registry["samples"]), 2)
+        open_sample = next(row for row in registry["samples"] if row["state_key"] == "details-open")
+        self.assertEqual(open_sample["target_identity"], "https://fixture.test/item/1#open")
 
     def test_criterion_plan_materializes_only_each_samples_required_variations(self):
         plan = criterion_plan.materialize_plan(wcag_version="2.2", level="A",
@@ -137,6 +146,17 @@ class WcagRequirementAndSamplingTests(unittest.TestCase):
                                                                separators=(",", ":")).encode("utf-8")).hexdigest()
             self.assertEqual(request["request_signature"], expected)
             self.assertEqual(request["currentness_dependency"]["sample_identity_fingerprint"], "sha256:" + ("a" if request["sample_ref"] == "SAMPLE-001" else "b") * 64)
+            expected_ref = request["sample_ref"]
+            expected_digit = "a" if expected_ref == "SAMPLE-001" else "b"
+            self.assertEqual(request["target_identity"], sample(expected_ref, expected_digit)["target_identity"])
+        with self.assertRaises(criterion_plan.CriterionPlanError):
+            criterion_plan.materialize_plan(wcag_version="2.2", level="A",
+                samples=[{"sample_ref": "SAMPLE-001", "identity_fingerprint": "sha256:" + "a" * 64}],
+                variations=[variation("SAMPLE-001", "VAR-001", "c")])
+        with self.assertRaises(criterion_plan.CriterionPlanError):
+            criterion_plan.materialize_plan(wcag_version="2.2", level="A",
+                samples=[{**sample("SAMPLE-001", "a"), "target_identity": "SAMPLE-001"}],
+                variations=[variation("SAMPLE-001", "VAR-001", "c")])
         with self.assertRaises(criterion_plan.CriterionPlanError):
             criterion_plan.materialize_plan(wcag_version="2.2", level="A", samples=[sample("SAMPLE-001", "a")],
                 variations=[variation("SAMPLE-999", "VAR-001", "c")])

@@ -20,6 +20,7 @@ from wcag_em_structure import (close_report, conformance_claim, evaluation_state
                                materialize_conformance_requirement_results, materialize_variations,
                                close_conforming_alternate_version, render_machine_owned_report, statement_of_partial_conformance,
                                validate_sampling_skip, extend_accessibility_support_baseline, materialize_scope_coverage,
+                               allocate_observation_handoff_ref,
                                EvaluationStructureError)
 
 
@@ -30,6 +31,7 @@ SCRIPT_PATH = Path(__file__).resolve()
 ASSETS = SCRIPT_DIR.parent / "assets"
 OPERATIONS = {
     "initialize-evaluation", "materialize-additional-requirements", "materialize-variations",
+    "allocate-observation-handoff-ref",
     "close-conforming-alternate-version", "materialize-conformance-requirement-results",
     "extend-accessibility-support-baseline",
     "materialize-scope-coverage", "materialize-complete-processes", "evaluate-step-4-2-reuse",
@@ -55,6 +57,8 @@ def _dispatch(operation: str, args: dict[str, Any]) -> Any:
         return initialize_evaluation(args)
     if operation == "materialize-additional-requirements":
         return materialize_additional_requirements(args["drafts"])
+    if operation == "allocate-observation-handoff-ref":
+        return allocate_observation_handoff_ref(args.get("existing_handoffs"))
     if operation == "materialize-variations":
         return materialize_variations(args["samples"], args["drafts"])
     if operation == "close-conforming-alternate-version":

@@ -8,4 +8,4 @@ For this semantic fixture only, the stable references for the reported note are:
 - Evidence: `EVIDENCE-CASE-006-EXPLORATION-NOTE` (the single exploratory-testing note described above).
 - Existing PR #13 Finding, if a distinct corrective action is actually required: `FINDING-CASE-006`.
 
-These are synthetic, case-local identifiers. The Finding is available for cross-reference only; it does not establish a defect, require follow-up, or support claims about frequency or user impact beyond the reported note.
+These are synthetic, case-local identifiers.

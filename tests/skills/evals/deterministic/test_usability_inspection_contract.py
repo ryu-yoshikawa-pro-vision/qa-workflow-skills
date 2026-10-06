@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 from pathlib import Path
+import re
 import sys
 import unittest
 
@@ -75,12 +76,27 @@ class InspectionStructureTests(unittest.TestCase):
 
 
 class ObservationContractTests(unittest.TestCase):
-    def test_catalog_has_exact_sixteen_fields_eight_timing_predicates_and_formal_probe_inventory(self):
+    def test_every_formal_machine_catalog_key_has_one_package_fixed_dispatch(self):
+        catalog = json.loads((INSPECTION / "assets/wcag-machine-probe-catalog.json").read_text(encoding="utf-8"))
+        source = (INSPECTION / "scripts/fixed_wcag_machine_probes.js").read_text(encoding="utf-8")
+        catalog_keys = {row["machine_probe_key"] for row in catalog["probes"]}
+        fixed_set = re.search(r"const fixedProbeKeys = new Set\(\[(.*?)\]\);", source, re.DOTALL)
+        self.assertIsNotNone(fixed_set)
+        fixed_keys = set(re.findall(r'"(mp-[a-z0-9-]+)"', fixed_set.group(1)))
+        self.assertEqual(fixed_keys, catalog_keys)
+        explicit_branches = set(re.findall(
+            r'(?:case|request\.machine_probe_key ===)\s*"(mp-[a-z0-9-]+)"', source))
+        specialized = re.search(r"const specializedProbeKeys = new Set\(\[(.*?)\]\);", source, re.DOTALL)
+        self.assertIsNotNone(specialized)
+        explicit_branches.update(re.findall(r'"(mp-[a-z0-9-]+)"', specialized.group(1)))
+        self.assertEqual(explicit_branches, catalog_keys)
+
+    def test_catalog_has_exact_seventeen_fields_eight_timing_predicates_and_formal_probe_inventory(self):
         browser_catalog = json.loads((INSPECTION / "assets/browser-observation-catalog.json").read_text(encoding="utf-8"))
         formal_catalog = json.loads((INSPECTION / "assets/wcag-machine-probe-catalog.json").read_text(encoding="utf-8"))
         observation.validate_catalog(browser_catalog)
         self.assertEqual(set(observation.FORMAL_PROBES), {row["machine_probe_key"] for row in formal_catalog["probes"]})
-        self.assertEqual(len(observation.OBSERVATION_FIELDS), 16)
+        self.assertEqual(len(observation.OBSERVATION_FIELDS), 17)
         self.assertEqual(len(observation.PREDICATES), 8)
 
     def test_target_parent_resolution_population_fingerprint_and_session_currentness(self):
@@ -124,6 +140,11 @@ class ObservationContractTests(unittest.TestCase):
         plan = observation.plan_probes(selected_rule_keys=["97a4e1"], measurement_kinds=["interaction-timing"],
                                        aspect_keys=["accessibility"], target_refs=["TARGET-001"])
         self.assertEqual(plan["required_observation_fields"], ["accessibility.semantics", "focus.state", "interaction.timing"])
+        semantics_probe = next(row for row in plan["probes"] if row["observation_field"] == "accessibility.semantics")
+        self.assertEqual(semantics_probe["required_result_fields"], [
+            "role", "accessible_name", "description", "states", "host_element", "host_type",
+            "included_in_accessibility_tree", "programmatically_hidden", "status",
+        ])
         self.assertTrue(next(row for row in plan["probes"] if row["observation_field"] == "interaction.timing")["predicate_key_required"])
         geometry = next(row for row in observation.plan_probes(selected_rule_keys=[], measurement_kinds=["geometry"],
                                                                aspect_keys=[], target_refs=["TARGET-001"])["probes"]
@@ -134,6 +155,46 @@ class ObservationContractTests(unittest.TestCase):
             "evidence_refs": ["E-1"],
         }, current_document_identity="doc-1")
         self.assertEqual(normalized["status"], "ok")
+        semantics_probe = next(row for row in plan["probes"] if row["observation_field"] == "accessibility.semantics")
+        semantics_value = {"role": "button", "accessible_name": "Save", "description": None,
+                           "states": {}, "host_element": "html:button", "host_type": None,
+                           "included_in_accessibility_tree": True, "programmatically_hidden": False,
+                           "status": "ok"}
+        semantics = observation.normalize_probe_result(semantics_probe, {
+            "probe_key": "accessibility-semantics", "document_identity": "doc-1", "status": "ok",
+            "value": semantics_value, "evidence_refs": ["E-SEMANTICS-1"],
+        }, current_document_identity="doc-1")
+        self.assertEqual(semantics["value"]["host_element"], "html:button")
+        with self.assertRaises(observation.ObservationContractError):
+            observation.normalize_probe_result(semantics_probe, {
+                "probe_key": "accessibility-semantics", "document_identity": "doc-1", "status": "ok",
+                "value": {key: value for key, value in semantics_value.items()
+                          if key != "included_in_accessibility_tree"}, "evidence_refs": ["E-SEMANTICS-1"],
+            }, current_document_identity="doc-1")
+        title_probe = next(row for row in observation.plan_probes(
+            selected_rule_keys=["2779a5"], measurement_kinds=[], aspect_keys=[], target_refs=[]
+        )["probes"] if row["observation_field"] == "document.title")
+        self.assertEqual(title_probe["probe_key"], "document-title")
+        title_value = {"is_html_document": True, "has_html_title_descendant": True,
+                       "first_title_children_are_text": True, "has_non_whitespace_text": True,
+                       "status": "ok", "limitation": None}
+        normalized_title = observation.normalize_probe_result(title_probe, {
+            "probe_key": "document-title", "document_identity": "doc-1", "status": "ok",
+            "value": title_value, "evidence_refs": ["E-DOCUMENT-TITLE-1"],
+        }, current_document_identity="doc-1")
+        self.assertEqual(normalized_title["value"], title_value)
+        invalid_title_values = (
+            {**title_value, "raw_title_text": "secret title"},
+            {**title_value, "has_non_whitespace_text": "yes"},
+            {key: value for key, value in title_value.items() if key != "first_title_children_are_text"},
+        )
+        for invalid_title in invalid_title_values:
+            with self.subTest(invalid_title=invalid_title):
+                with self.assertRaises(observation.ObservationContractError):
+                    observation.normalize_probe_result(title_probe, {
+                        "probe_key": "document-title", "document_identity": "doc-1", "status": "ok",
+                        "value": invalid_title, "evidence_refs": ["E-DOCUMENT-TITLE-1"],
+                    }, current_document_identity="doc-1")
         exact_geometry_values = runtime_contract.strict_loads(json.dumps({
             "x_css_px": 1.25, "y_css_px": 2, "width_css_px": 100.5, "height_css_px": 20,
         }))
@@ -309,7 +370,8 @@ class ObservationContractTests(unittest.TestCase):
     def test_formal_request_signature_is_bound_to_machine_probe_and_identity(self):
         plan = criterion_plan.materialize_plan(
             wcag_version="2.0", level="A",
-            samples=[{"sample_ref": "SAMPLE-1", "identity_fingerprint": "sha256:" + "a" * 64}],
+            samples=[{"sample_ref": "SAMPLE-1", "identity_fingerprint": "sha256:" + "a" * 64,
+                      "target_identity": "http://127.0.0.1:4173/"}],
             variations=[{"sample_ref": "SAMPLE-1", "variation_ref": "VAR-1", "identity_fingerprint": "sha256:" + "b" * 64}],
         )
         request = plan["requests"][0]
@@ -342,9 +404,133 @@ class DeterministicMeasurementTests(unittest.TestCase):
                                                            start_event_observed=True, end_predicate_observed=True)["status"],
                          "measurement-unavailable")
         self.assertEqual(checks.SUPPORTED_RULES.keys(), {"2779a5", "97a4e1", "23a2a8"})
-        self.assertEqual(checks.run_supported_rule("2779a5", {"document.title": "Home"})["outcome"], "passed")
+
+        def title_rule(title, refs=("EV-DOCUMENT-TITLE-1",)):
+            return checks.run_supported_rule("2779a5", {
+                "document.title": title, "evidence_refs": list(refs)})
+
+        valid_title = {"is_html_document": True, "has_html_title_descendant": True,
+                       "first_title_children_are_text": True, "has_non_whitespace_text": True, "status": "ok"}
+        self.assertEqual(title_rule(valid_title)["outcome"], "passed")
+        self.assertEqual(title_rule({**valid_title, "has_non_whitespace_text": False})["outcome"], "failed")
+        self.assertEqual(title_rule({**valid_title, "has_html_title_descendant": False,
+                                     "first_title_children_are_text": False,
+                                     "has_non_whitespace_text": False})["outcome"], "failed")
+        self.assertEqual(title_rule({**valid_title, "first_title_children_are_text": False})["outcome"], "failed")
+        self.assertEqual(title_rule({**valid_title, "is_html_document": False})["outcome"], "inapplicable")
+        self.assertEqual(title_rule({**valid_title, "status": "incomplete"})["outcome"], "cantTell")
+        self.assertEqual(title_rule(valid_title, refs=())["outcome"], "cantTell")
+        self.assertEqual(checks.run_supported_rule("2779a5", {"document.title": None,
+                                                               "evidence_refs": ["EV-DOCUMENT-1"]})["outcome"],
+                         "cantTell")
         with self.assertRaises(checks.RuleContractError):
             checks.run_supported_rule("unknown", {})
+
+    def test_act_button_rule_uses_complete_population_and_host_applicability(self):
+        catalog = json.loads((INSPECTION / "assets/test-rule-catalog.json").read_text(encoding="utf-8"))
+        rule = next(row for row in catalog["rules"] if row["rule_id"] == "97a4e1")
+        self.assertEqual(rule["source_uri"], "https://www.w3.org/WAI/standards-guidelines/act/rules/97a4e1/")
+        self.assertEqual(rule["act_rules_format_version"], "1.1")
+        self.assertEqual(rule["mapped_success_criteria"], ["4.1.2"])
+
+        def target(role, name, host_element="button", host_type=None, included=True):
+            return {"role": role, "accessible_name": name,
+                    "host_element": host_element if ":" in host_element else f"html:{host_element}",
+                    "host_type": host_type, "included_in_accessibility_tree": included,
+                    "programmatically_hidden": False, "status": "ok",
+                    "evidence_refs": [f"EV-{role}-{name or 'empty'}"]}
+
+        examples = [
+            {"id": "passed-text", "observations": {"population_complete": True,
+                "buttons": [target("button", "My button")]}, "expected": "passed"},
+            {"id": "passed-input-submit", "observations": {"population_complete": True,
+                "buttons": [target("button", "Submit", "input", "submit")]}, "expected": "passed"},
+            {"id": "passed-aria-label", "observations": {"population_complete": True,
+                "buttons": [target("button", "My button", "span")]}, "expected": "passed"},
+            {"id": "passed-role-button", "observations": {"population_complete": True,
+                "buttons": [target("button", "My button", "span")]}, "expected": "passed"},
+            {"id": "passed-disabled", "observations": {"population_complete": True,
+                "buttons": [target("button", "Delete")]}, "expected": "passed"},
+            {"id": "passed-offscreen", "observations": {"population_complete": True,
+                "buttons": [target("button", "Save")]}, "expected": "passed"},
+            {"id": "passed-input-reset-default", "observations": {"population_complete": True,
+                "buttons": [target("button", "Reset", "input", "reset")]}, "expected": "passed"},
+            {"id": "failed-empty", "observations": {"population_complete": True,
+                "buttons": [target("button", "")]}, "expected": "failed"},
+            {"id": "failed-value-attribute", "observations": {"population_complete": True,
+                "buttons": [target("button", "")]}, "expected": "failed"},
+            {"id": "failed-role-button", "observations": {"population_complete": True,
+                "buttons": [target("button", "", "span")]}, "expected": "failed"},
+            {"id": "failed-offscreen", "observations": {"population_complete": True,
+                "buttons": [target("button", "")]}, "expected": "failed"},
+            {"id": "failed-presentational-focusable", "observations": {"population_complete": True,
+                "buttons": [target("button", "", "button")]}, "expected": "failed"},
+            {"id": "inapplicable-image-input", "observations": {"population_complete": True,
+                "buttons": [target("button", "Download", "input", "image")]}, "expected": "inapplicable"},
+            {"id": "inapplicable-hidden", "observations": {"population_complete": True,
+                "buttons": [target("button", "", included=False)]}, "expected": "inapplicable"},
+            {"id": "inapplicable-link-role", "observations": {"population_complete": True,
+                "buttons": [target("link", "take me somewhere")]}, "expected": "inapplicable"},
+            {"id": "inapplicable-presentational-disabled", "observations": {"population_complete": True,
+                "buttons": [target("none", "", included=False)]}, "expected": "inapplicable"},
+            {"id": "inapplicable-no-buttons", "observations": {"population_complete": True,
+                "buttons": [], "evidence_refs": ["EV-POPULATION-EMPTY"]}, "expected": "inapplicable"},
+            {"id": "incomplete-population", "observations": {"population_complete": False,
+                "buttons": []}, "expected": "cantTell"},
+            {"id": "missing-host-data", "observations": {"population_complete": True,
+                "buttons": [{"role": "button", "accessible_name": "Save"}]}, "expected": "cantTell"},
+        ]
+        for example in examples:
+            with self.subTest(example=example["id"]):
+                result = checks.run_supported_rule("97a4e1", example["observations"])
+                self.assertEqual(result["outcome"], example["expected"])
+                self.assertEqual(result["criterion_ref"], "4.1.2")
+
+    def test_act_image_rule_matches_official_pass_fail_and_inapplicable_examples(self):
+        catalog = json.loads((INSPECTION / "assets/test-rule-catalog.json").read_text(encoding="utf-8"))
+        rule = next(row for row in catalog["rules"] if row["rule_id"] == "23a2a8")
+        self.assertEqual(rule["source_uri"], "https://www.w3.org/WAI/standards-guidelines/act/rules/23a2a8/")
+        self.assertEqual(rule["act_rules_format_version"], "1.1")
+        self.assertEqual(rule["mapped_success_criteria"], ["1.1.1"])
+
+        # W3C official examples exercise applicability, expectation, and role
+        # exceptions; these source cases are not golden candidate answers.
+        def image(role, name, host_element="html:img", hidden=False):
+            return {"role": role, "accessible_name": name, "host_element": host_element,
+                    "host_type": None, "included_in_accessibility_tree": role not in {"none", "presentation"},
+                    "programmatically_hidden": hidden, "status": "ok", "evidence_refs": [f"EV-IMG-{role}-{name or 'empty'}"]}
+
+        def subject(items, expected):
+            return {"population_complete": True, "images": items,
+                    "evidence_refs": ["EV-IMAGE-POPULATION"], "expected": expected}
+
+        official_examples = [
+            {"id": "passed-1", **subject([image("img", "W3C logo")], "passed")},
+            {"id": "passed-2", **subject([image("img", "W3C logo", "html:div")], "passed")},
+            {"id": "passed-3", **subject([image("img", "W3C logo", "html:div")], "passed")},
+            {"id": "passed-4", **subject([image("img", "W3C logo")], "passed")},
+            {"id": "passed-5", **subject([image("presentation", "")], "passed")},
+            {"id": "passed-6", **subject([image("presentation", "")], "passed")},
+            {"id": "passed-7", **subject([image("none", "")], "passed")},
+            {"id": "passed-8", **subject([image("presentation", "")], "passed")},
+            {"id": "failed-1", **subject([image("img", "")], "failed")},
+            {"id": "failed-2", **subject([image("img", "", "html:div")], "failed")},
+            {"id": "failed-3", **subject([image("img", "")], "failed")},
+            {"id": "failed-4", **subject([image("img", "")], "failed")},
+            {"id": "failed-5", **subject([image("img", "")], "failed")},
+            {"id": "inapplicable-1", **subject([image("graphics-document", "", "svg:svg")], "inapplicable")},
+            {"id": "inapplicable-2", **subject([image("img", "", "html:div", hidden=True)], "inapplicable")},
+            {"id": "inapplicable-3", **subject([image("img", "", hidden=True)], "inapplicable")},
+            {"id": "inapplicable-4", **subject([image("img", "", hidden=True)], "inapplicable")},
+            {"id": "inapplicable-5", **subject([image("img", "", hidden=True)], "inapplicable")},
+            {"id": "inapplicable-no-images", **subject([], "inapplicable")},
+        ]
+        for example in official_examples:
+            with self.subTest(example=example["id"]):
+                result = checks.run_supported_rule("23a2a8", {key: value for key, value in example.items()
+                                                               if key not in {"id", "expected"}})
+                self.assertEqual(result["outcome"], example["expected"])
+                self.assertEqual(result["criterion_ref"], "1.1.1")
 
 
 if __name__ == "__main__":

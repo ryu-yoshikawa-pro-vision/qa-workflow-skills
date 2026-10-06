@@ -68,7 +68,7 @@ supported WCAG 2.0 / 2.1 / 2.2の全Success Criterionで `procedure_keys` を1�
 - `source_item_refs`
 - `applicable_criterion_refs`
 - `required_capabilities`
-- `required_observation_fields`。semantic/manual追加観測で `_05g` の16 canonical fieldを使う場合
+- `required_observation_fields`。semantic/manual追加観測で `_05g` の17 canonical fieldを使う場合
 - `required_machine_probe_keys`。machine procedureで `_05j` のfixed probeを使う場合
 - `required_input_refs`
 - `machine_dispatch_key`。execution kindがmachineの場合だけ必須

@@ -14,6 +14,7 @@ ADDITIONAL_REQUIREMENT_STEPS=set(REPORT_STEPS)|{"5.1","5.2","5.3","5.4","5.5"}
 ACCESSIBLE_OUTPUT_CHECKS=("heading_hierarchy","table_headers","image_text_descriptions",
                           "color_independent_state","descriptive_link_text")
 PARTIAL_REASONS={"third-party-content","lack-of-accessibility-support-for-languages"}
+_HANDOFF_REF = re.compile(r"^HANDOFF-(\d{3,})$")
 
 
 class EvaluationStructureError(ValueError):
@@ -40,8 +41,28 @@ def initialize_evaluation(inputs: dict[str, Any]) -> dict[str, Any]:
             'input_fingerprint':fingerprint(inputs),'scope_coverage':[{'scope_ref':f'SCOPE-{i:03d}','scope_key':key,
               'decision':'unresolved','reason':None,'evidence_refs':[]} for i,key in enumerate(SCOPE_ROWS,1)],
             'accessibility_support_baseline':{'revision':1,'entries':inputs['accessibility_support_baseline']},
-            'additional_requirements':[],'sampling':{'procedure_status':'unresolved','selected_sample_refs':[]},
+            'additional_requirements':[],'handoffs':[],'sampling':{'procedure_status':'unresolved','selected_sample_refs':[]},
             'complete_processes':[],'criterion_plan':[],'sample_results':[],'report_status':'not-started'}
+
+
+def allocate_observation_handoff_ref(existing_handoffs: list[dict[str, Any]]) -> dict[str, Any]:
+    """Allocate the next monotonic, artifact-local WCAG observation handoff ref."""
+    if not isinstance(existing_handoffs, list):
+        raise EvaluationStructureError('handoffs must be an array')
+    seen: set[str] = set()
+    highest = 0
+    for row in existing_handoffs:
+        if not isinstance(row, dict):
+            raise EvaluationStructureError('handoff row must be an object')
+        handoff_ref = row.get('handoff_ref')
+        match = _HANDOFF_REF.fullmatch(handoff_ref) if isinstance(handoff_ref, str) else None
+        if match is None:
+            raise EvaluationStructureError('handoff ref is invalid')
+        if handoff_ref in seen:
+            raise EvaluationStructureError('handoff ref is duplicate')
+        seen.add(handoff_ref)
+        highest = max(highest, int(match.group(1)))
+    return {'handoff_ref': f'HANDOFF-{highest + 1:03d}', 'existing_handoff_count': len(seen)}
 
 
 def materialize_scope_coverage(drafts: list[dict[str, Any]]) -> dict[str, Any]:
@@ -818,6 +839,22 @@ def _field_table(fields: dict[str,Any]) -> str:
     return _report_table(['Field','Value'],[{'Field':key,'Value':fields[key]} for key in sorted(fields)])
 
 
+def _random_sample_report_rows(rows: list[dict[str,Any]]) -> list[dict[str,Any]]:
+    columns={'Target count','Actual count','Selection method','Selected sample refs','Status','Exhaustion / blocker'}
+    if not isinstance(rows,list):
+        raise EvaluationStructureError('random sample report rows must be a list')
+    output=[]
+    for row in rows:
+        if not isinstance(row,dict) or set(row)!=columns:
+            raise EvaluationStructureError('random sample report row does not match fixed fields')
+        refs=row['Selected sample refs']
+        if (not isinstance(refs,list) or any(not isinstance(ref,str) or not ref.strip() for ref in refs)
+                or len(refs)!=len(set(refs))):
+            raise EvaluationStructureError('random sample selected refs must be unique non-empty strings')
+        output.append({**row,'Selected sample refs':', '.join(refs) if refs else 'None selected'})
+    return output
+
+
 def render_machine_owned_report(data: dict[str,Any]) -> dict[str,Any]:
     required={'evaluation_input','scope_rows','exploration_rows','sampling_procedure','structured_samples','random_sample',
         'complete_processes','criterion_plan','sample_results','comparisons','evaluation_outcomes','handoffs','limitations',
@@ -880,7 +917,9 @@ def render_machine_owned_report(data: dict[str,Any]) -> dict[str,Any]:
             ['Previous sample ref','Lineage status','Current sample ref','Reason / evidence'],lineage_rows)])
     lines.extend([
         '', '### Structured Sample','',_report_table(['Sample ref','State / locator','Type / technology coverage','Process membership','Rationale'],data['structured_samples']),
-        '', '### Random Sample','',_report_table(['Target count','Actual count','Selection method','Status','Exhaustion / blocker'],data['random_sample']),
+        '', '### Random Sample','',_report_table(
+            ['Target count','Actual count','Selection method','Selected sample refs','Status','Exhaustion / blocker'],
+            _random_sample_report_rows(data['random_sample'])),
         '', '### Complete Processes','',_report_table(['Process ref','Ordered sample/action sequence','Completion condition','Evidence refs'],data['complete_processes']),
         '', '## Step 4: Audit the selected sample','', '### Criterion Evaluation Plan','',
         _report_table(['Evaluation ref','Sample / variation / process','Criterion','Procedure closure','Population','Execution status','Result','Evidence / limitation'],data['criterion_plan']),
@@ -891,7 +930,7 @@ def render_machine_owned_report(data: dict[str,Any]) -> dict[str,Any]:
     if data.get('evaluation_specifics'):
         lines.extend(['','### Evaluation Specifics (when requested)','',_report_table(
             ['Scope','Archive / evidence ref','Path / settings / actions','Tool / version / method','Confidentiality limitation'],data['evaluation_specifics'])])
-    for key,title in (('evaluation_statement','Evaluation Statement (WCAG 2.2 only, when eligible)'),
+    for key,title in (('evaluation_statement','Evaluation Statement (Step 5.3 status)'),
                       ('conformance_claim','WCAG Conformance Claim (when eligible)'),
                       ('partial_statement','Statement of Partial Conformance (when eligible)')):
         if data.get(key) is not None: lines.extend(['','### '+title,'',_field_table(data[key])])

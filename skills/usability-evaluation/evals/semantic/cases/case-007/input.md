@@ -8,4 +8,4 @@ For this semantic fixture only, the stable references for the already-described 
 - Evidence: `EVIDENCE-CASE-007-SCREENSHOTS` (the saved account-page screenshots described above).
 - Existing PR #13 Finding, if a distinct corrective action is required: `FINDING-CASE-007`.
 
-These are synthetic, case-local identifiers. The Finding is available for cross-reference only; its presence does not require a Finding or establish a WCAG failure.
+These are synthetic, case-local identifiers.

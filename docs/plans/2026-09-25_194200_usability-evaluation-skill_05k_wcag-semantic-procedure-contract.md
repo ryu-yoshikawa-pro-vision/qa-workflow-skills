@@ -138,7 +138,7 @@ LLMは次を変更しません。
 
 ## 6. 追加観測
 
-追加観測が必要な場合、semantic procedureは `_05g` の16 canonical observation fieldとfixed predicateから表現できるdraftだけを返します。
+追加観測が必要な場合、semantic procedureは `_05g` の17 canonical observation fieldとfixed predicateから表現できるdraftだけを返します。
 
 - existing fieldで取得可能 → observation requestへmaterialize
 - same request identity + same evidence fingerprint → `no-progress`
@@ -297,7 +297,7 @@ validatorは次を独立確認します。
 - `_05i` の4 AT procedureと `procedure_applicability_contracts[]` のdecision key / source clause / allowed evidence roleが1対1で一致
 - AT applicability contractが `assistive-technology-result` またはfinal semantic resultへ依存していない
 - machine-only decisionをsemantic pointへ重複させていない
-- allowed additional observation fieldが `_05g` の16 keyの部分集合
+- allowed additional observation fieldが `_05g` の17 keyの部分集合
 - forbidden shortcutがrequired common guardを含む
 - 4.1.1 version / technology rule
 - asset canonical hash / approved hash一致

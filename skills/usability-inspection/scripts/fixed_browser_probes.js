@@ -205,6 +205,99 @@ async page => {
     return { conditions, issues, viewport: { width_css_px: innerWidth, height_css_px: innerHeight } };
   });
 
+  if (request.probe_key === "document-location") {
+    try {
+      const safeLocation = await page.evaluate(rawUrl => {
+        let parsedUrl;
+        try { parsedUrl = new URL(rawUrl); }
+        catch { return { safe_url: null, status: "unavailable", limitation: "current page URL could not be safely parsed" }; }
+        if (parsedUrl.username || parsedUrl.password || parsedUrl.search || parsedUrl.hash) {
+          return { safe_url: null, status: "unavailable",
+            limitation: "URL userinfo, query, or fragment may contain sensitive or meaning-bearing data and was not retained" };
+        }
+        if (!/^https?:$/.test(parsedUrl.protocol) || parsedUrl.origin === "null") {
+          return { safe_url: null, status: "unavailable", limitation: "current page URL scheme cannot be safely retained" };
+        }
+        return { safe_url: `${parsedUrl.origin}${parsedUrl.pathname}`, status: "ok", limitation: null };
+      }, page.url());
+      if (safeLocation.status !== "ok")
+        return failure(request.probe_key, safeLocation.status, safeLocation.limitation);
+      return { probe_key: request.probe_key, document_identity: identity, status: "ok",
+        value: { safe_url: safeLocation.safe_url, status: safeLocation.status, limitation: safeLocation.limitation }, evidence_refs: refs };
+    } catch (error) {
+      return failure(request.probe_key, "unavailable", `current page URL could not be safely observed: ${String(error?.message || error)}`);
+    }
+  }
+
+  if (request.probe_key === "document-title") {
+    try {
+      const value = await page.evaluate(() => {
+        const htmlNamespace = "http://www.w3.org/1999/xhtml";
+        const root = document.documentElement;
+        const isHtmlDocument = root?.namespaceURI === htmlNamespace && root?.localName === "html";
+        if (!isHtmlDocument) {
+          return { is_html_document: false, has_html_title_descendant: false,
+            first_title_children_are_text: false, has_non_whitespace_text: false, status: "ok", limitation: null };
+        }
+        const titles = Array.from(document.getElementsByTagNameNS(htmlNamespace, "title"));
+        const first = titles[0] || null;
+        const childNodes = first ? Array.from(first.childNodes) : [];
+        const childrenAreText = childNodes.length > 0 && childNodes.every(node => node.nodeType === Node.TEXT_NODE);
+        const hasNonWhitespaceText = childNodes.some(node => node.nodeType === Node.TEXT_NODE
+          && /\P{White_Space}/u.test(node.data));
+        return { is_html_document: true, has_html_title_descendant: first !== null,
+          first_title_children_are_text: childrenAreText,
+          has_non_whitespace_text: hasNonWhitespaceText,
+          status: "ok", limitation: null };
+      });
+      return { probe_key: request.probe_key, document_identity: identity, status: "ok", value, evidence_refs: refs };
+    } catch (error) {
+      return failure(request.probe_key, "incomplete", `document title could not be safely evaluated: ${String(error?.message || error)}`);
+    }
+  }
+
+  if (request.probe_key === "navigation-timing" || request.probe_key === "paint-timing") {
+    try {
+      const observation = await page.evaluate(probeKey => {
+        if (probeKey === "navigation-timing") {
+          const entries = performance.getEntriesByType("navigation");
+          const entry = entries.length === 1 ? entries[0] : null;
+          if (!entry) return { status: "unavailable", entries: [] };
+          const fields = [
+            "startTime", "duration", "unloadEventStart", "unloadEventEnd", "redirectStart", "redirectEnd",
+            "fetchStart", "domainLookupStart", "domainLookupEnd", "connectStart", "connectEnd",
+            "secureConnectionStart", "requestStart", "responseStart", "responseEnd", "domInteractive",
+            "domContentLoadedEventStart", "domContentLoadedEventEnd", "domComplete", "loadEventStart", "loadEventEnd",
+          ];
+          const value = { entry_type: "navigation" };
+          for (const field of fields) {
+            const candidate = entry[field];
+            value[field.replace(/[A-Z]/g, match => `_${match.toLowerCase()}`)] =
+              typeof candidate === "number" && Number.isFinite(candidate) ? candidate : null;
+          }
+          return { status: "ok", entries: [value] };
+        }
+
+        const entries = performance.getEntriesByType("paint")
+          .filter(entry => entry.name === "first-contentful-paint");
+        const value = entries
+          .filter(entry => Number.isFinite(entry.startTime) && Number.isFinite(entry.duration))
+          .map(entry => ({ entry_type: "paint", name: "first-contentful-paint",
+            start_time: entry.startTime, duration: entry.duration }));
+        return { status: value.length === 1 ? "ok" : "unavailable", entries: value };
+      }, request.probe_key);
+      const value = { entries: observation.entries, status: observation.status };
+      if (observation.status !== "ok") {
+        return failure(request.probe_key, "unavailable",
+          request.probe_key === "paint-timing" ? "First Contentful Paint entry is unavailable in the current page session"
+            : "one unique Navigation Timing entry is unavailable", value);
+      }
+      return { probe_key: request.probe_key, document_identity: identity, status: "ok", value, evidence_refs: refs };
+    } catch (error) {
+      return failure(request.probe_key, "unavailable", `fixed performance timing probe failed: ${String(error?.message || error)}`);
+    }
+  }
+
   if (request.probe_key === "responsive-conditions") {
     try {
       const observed = await collectResponsiveConditions();

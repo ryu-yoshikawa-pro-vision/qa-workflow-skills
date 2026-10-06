@@ -168,7 +168,7 @@ current mainへmerge済みのPR #12 browser実行基盤を再利用します。s
 - `observation_contract.py plan` が生成したfixed requestをcurrent browser経路で実行し、normalize結果をruntimeへ戻す
 - rendered UI / screenshot observation
 - DOM / accessibility observation
-- canonical observation field inventory全16 keyのexactly-one probe mapping
+- canonical observation field inventory全17 keyのexactly-one probe mapping。`2779a5` は独立した `document.title` fixed probeでtitle要件に必要なboolean factsを取得する
 - current document locationは `page.url()`
 - target-local rendered textは `locator.innerText()`、control valueは `locator.inputValue()`、selected valueはselectedOptionsの `{value,label}` 配列
 - viewport / geometry

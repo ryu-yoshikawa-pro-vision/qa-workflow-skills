@@ -2,6 +2,8 @@
 
 Step 5.1 report closure tracks each Step 1–4 outcome, every not-satisfied conformance requirement and Success Criterion example, any requested all-occurrence coverage, and accessible report output. Do not collapse results into an aggregate score.
 
+The Random Sample section preserves the target and actual counts, selection method, exact selected sample refs from the machine selector, selection status, and exhaustion or blocked reason. When no sample was selected, render `None selected` and retain the helper's closure status and evidence.
+
 Step 5.2 Evaluation Specifics is optional and stores safe archive/evidence refs, path, settings/actions, tool/browser/AT versions, and method at the correct evaluation/sample/check scope. Do not store passwords, tokens, cookies, storage state, or unnecessary personal data.
 
 Step 5.3 Evaluation Statement is WCAG 2.2 only. Full requires every nonoptional methodology requirement, every selected sample at target level, and owner commitment. Partial additionally requires every nonconforming area to be explained by third-party content or lack of accessibility support for languages. WCAG 2.0 and 2.1 reports do not include this Evaluation Statement.

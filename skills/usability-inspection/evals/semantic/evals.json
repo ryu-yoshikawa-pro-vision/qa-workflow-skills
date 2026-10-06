@@ -214,6 +214,7 @@
       "input": "cases/case-024/input.md",
       "reference": "cases/case-024/reference.md",
       "criteria": [
+        "UI-SEM-002",
         "UI-SEM-003"
       ]
     },

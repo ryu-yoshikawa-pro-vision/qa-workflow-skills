@@ -164,7 +164,7 @@ status:
 
 ## 4. create
 
-1. formal helperがhandoff ref、origin、resume operation、expected集合、必要なら `retry_of_handoff_ref` をmaterializeする。
+1. formal helperが現在のartifact-local `handoffs[]` を入力に `allocate-observation-handoff-ref` を実行し、単調増加するhandoff refを生成する。その後、origin、resume operation、expected集合、必要なら `retry_of_handoff_ref` をmaterializeする。LLMはhandoff refを作成・採番しない。
 2. qa-workflow helperがhandoff identity / operation refを導出する。
 3. current stateとstorage-provided `state_revision` を読む。
 4. origin currentness、duplicate identity conflict、retry lineageを検証する。

@@ -307,6 +307,34 @@ class WcagReportClosureTests(unittest.TestCase):
         self.assertIn("| - | added | SAMPLE-001 | - |",complete["machine_owned_markdown"])
         self.assertEqual(structure.validate_accessible_markdown("# Report\n\n## Section\n\n![ ](image.png)\n")["status"],"blocked")
 
+    def test_report_renderer_preserves_machine_selected_random_sample_refs(self):
+        data={"evaluation_input":{"evaluation_ref":"WCAG-EVAL-1","revision":"r1","evaluator":"person-ref",
+            "commissioner":"self-evaluation","issued_date":"2026-09-28","evaluation_period":"2026-09-28",
+            "wcag_title":"Web Content Accessibility Guidelines (WCAG) 2.2","wcag_version":"2.2",
+            "wcag_uri":"https://www.w3.org/TR/WCAG22/","conformance_level":"AA","product_scope":"fixture",
+            "project_authority_refs":[],"release_gate":None,"previous_evaluation_ref":None},
+            "scope_rows":[],"exploration_rows":[],"sampling_procedure":[],"structured_samples":[],
+            "random_sample":[{"Target count":2,"Actual count":2,"Selection method":"system-random",
+                "Selected sample refs":["SAMPLE-004","SAMPLE-002"],"Status":"target-met","Exhaustion / blocker":"-"}],
+            "complete_processes":[],"criterion_plan":[],"sample_results":[],"comparisons":[],
+            "evaluation_outcomes":[],"handoffs":[],"limitations":[],"report_closure":{"status":"blocked"},
+            "evaluation_statement":{"status":"blocked","reason":"statement-conditions-not-met"}}
+        output=structure.render_machine_owned_report(data)
+        markdown=output["machine_owned_markdown"]
+        self.assertIn("| Selected sample refs |",markdown)
+        self.assertIn("| 2 | 2 | system-random | SAMPLE-004, SAMPLE-002 | target-met | - |",markdown)
+        self.assertIn("### Evaluation Statement (Step 5.3 status)",markdown)
+        self.assertIn("| reason | statement-conditions-not-met |",markdown)
+
+        data["random_sample"][0].update({"Actual count":0,"Selected sample refs":[],
+            "Status":"exhausted-no-new-view","Exhaustion / blocker":"EVD-INVENTORY"})
+        exhausted=structure.render_machine_owned_report(data)["machine_owned_markdown"]
+        self.assertIn("| 2 | 0 | system-random | None selected | exhausted-no-new-view | EVD-INVENTORY |",exhausted)
+
+        data["random_sample"][0]["Selected sample refs"]=["SAMPLE-004","SAMPLE-004"]
+        with self.assertRaises(structure.EvaluationStructureError):
+            structure.render_machine_owned_report(data)
+
 
 if __name__ == "__main__":
     unittest.main()

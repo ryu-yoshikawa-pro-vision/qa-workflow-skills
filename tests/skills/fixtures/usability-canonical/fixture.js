@@ -9,8 +9,13 @@
   const currentView = document.querySelector("#current-view");
   const journeyStatus = document.querySelector("#journey-status");
   const product = document.querySelector("#product");
+  const textScale = document.querySelector("#text-scale");
+  const textScaleValue = document.querySelector("#text-scale-value");
+  const responsiveLayout = window.matchMedia("(max-width: 48rem)");
 
-  if (params.get("alternate") === "1") document.body.classList.add("alternate-presentation");
+  if (params.get("alternate") === "1" || params.get("view") === "alternate") {
+    document.body.classList.add("alternate-presentation");
+  }
 
   function show(view, announcement) {
     state.view = view;
@@ -66,7 +71,12 @@
     journeyStatus.textContent = "Trail pack added through the search route.";
   });
   document.querySelector("#product-search").addEventListener("input", (event) => {
-    const found = "trail pack".includes(event.target.value.trim().toLowerCase());
+    const query = event.target.value.trim();
+    if (!query) {
+      document.querySelector("#search-status").textContent = "Enter a product name to filter the fixture list.";
+      return;
+    }
+    const found = "trail pack".includes(query.toLowerCase());
     document.querySelector("#search-status").textContent = found ? "Trail pack is available." : "No matching fixture product.";
   });
   document.querySelector("#continue-checkout").addEventListener("click", () => show("details", "Delivery details opened."));
@@ -91,11 +101,25 @@
     product.dataset.theme = enabled ? "high-contrast" : "standard";
     event.currentTarget.setAttribute("aria-pressed", String(enabled));
   });
-  document.querySelector("#text-scale").addEventListener("input", (event) => {
-    const percent = Number(event.target.value);
-    document.body.style.setProperty("--text-scale", String(percent / 100));
-    document.querySelector("#text-scale-value").textContent = `${percent}%`;
-  });
+  function applyTextScale() {
+    const setting = Number(textScale.value);
+    const renderedPercent = responsiveLayout.matches
+      ? Math.min(200, 100 + (setting - 100) * 2)
+      : setting;
+    document.body.style.setProperty("--text-scale", String(renderedPercent / 100));
+    textScaleValue.textContent = `${setting} setting; ${renderedPercent}% rendered`;
+    textScale.setAttribute("aria-valuetext", `${renderedPercent}% rendered text scale`);
+  }
+
+  function syncTextScaleRange() {
+    textScale.max = responsiveLayout.matches ? "150" : "200";
+    if (Number(textScale.value) > Number(textScale.max)) textScale.value = textScale.max;
+    applyTextScale();
+  }
+
+  textScale.addEventListener("input", applyTextScale);
+  responsiveLayout.addEventListener("change", syncTextScaleRange);
+  syncTextScaleRange();
 
   renderCart();
   show(initialView);

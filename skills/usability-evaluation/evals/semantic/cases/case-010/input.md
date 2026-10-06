@@ -9,4 +9,4 @@ For this semantic fixture only, the stable references for the already-described 
 - Evidence: `EVIDENCE-CASE-010-STATE-A` and `EVIDENCE-CASE-010-STATE-B` (the saved states, selected-control values, and confirmation summary described above).
 - Existing PR #13 Finding, if a distinct corrective action is required: `FINDING-CASE-010`.
 
-These are synthetic, case-local identifiers. No public reference directly applies; do not add one or turn the mismatch into a standards violation.
+These are synthetic, case-local identifiers.

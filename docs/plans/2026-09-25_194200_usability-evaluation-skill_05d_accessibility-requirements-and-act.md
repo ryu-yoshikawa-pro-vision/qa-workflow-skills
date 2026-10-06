@@ -159,7 +159,9 @@ ACT RulesはWCAG / ARIA testing methodのinformative sourceとして使用しま
 | `97a4e1` | Button has non-empty accessible name | WCAG 4.1.2 | automatic |
 | `23a2a8` | Image has non-empty accessible name | WCAG 1.1.1 | automatic |
 
-この3件は `test-rule-catalog.json` へsource status / ACT Rules Format version / required observation fields / implementation dispatch keyを固定し、`criterion_checks.py` が明示dispatchします。
+この3件は `test-rule-catalog.json` へsource status / ACT Rules Format version / required observation fields / implementation dispatch keyを固定し、`criterion_checks.py` が明示dispatchします。`2779a5` は `_05g` の独立 `document.title` fixed probeを使います。HTML root、最初のHTML title descendantの存在、その直接child nodeがtext-onlyか、非空白textを含むかというboolean事実だけを取得し、raw title本文やgeneral DOM treeは保存しません。title構造をfixed probeで完了観測できない場合は `cantTell` とします。
+
+`2779a5` のapplicability / expectationはW3C ruleのDOM Tree input aspectに従います。完全観測したrootがHTMLでない場合は `inapplicable`、HTML rootにHTML title descendantがない場合または最初のtitleの直接childがtext-onlyでなく非空白textを含まない場合は `failed`、最初のtitleの直接childがtext nodeのみで少なくとも1つ非空白textを含む場合は `passed` とします。
 
 上記以外のACT Ruleは今回のsupported implementationとして扱いません。これは対応するWCAG Success Criterionを評価しないという意味ではありません。formal評価では `_05h_wcag-criterion-evaluation-contract.md` のcriterion evaluation planで全required Success Criterionを別経路も含めて閉じます。
 

@@ -16,6 +16,7 @@ OBSERVATION_FIELDS = {
     "element.geometry": "element-geometry",
     "element.state": "element-state",
     "document.location": "document-location",
+    "document.title": "document-title",
     "element.rendered-text": "element-content",
     "element.control-value": "element-content",
     "element.selected-values": "element-content",
@@ -45,6 +46,16 @@ FORMAL_STATUSES = {"ok", "unsupported", "unavailable", "incomplete", "blocked"}
 LIMITATION_CODES = {
     "background-not-machine-resolvable", "focus-indicator-not-machine-resolvable",
     "text-scaling-mechanism-not-machine-executable", "text-scaling-state-not-machine-readable",
+}
+PARTIAL_FORMAL_OBSERVATION_REASONS = {
+    "paired-orientation-not-materialized",
+    "declared-flow-not-materialized",
+    "target-not-materialized",
+    "trigger-not-materialized",
+    "error-scenario-not-materialized",
+    "pointer-action-not-materialized",
+    "page-set-not-materialized",
+    "prior-control-observation-not-materialized",
 }
 PREDICATES = {
     "element-visible": {"target_ref"},
@@ -102,6 +113,199 @@ def _decimal_number(value: Any) -> Decimal | None:
     except (InvalidOperation, TypeError, ValueError):
         return None
     return number if number.is_finite() else None
+
+
+def _decimal_text(value: Any, *, positive: bool = False) -> Decimal | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        number = Decimal(value)
+    except (InvalidOperation, TypeError, ValueError):
+        return None
+    if not number.is_finite() or (positive and number <= 0):
+        return None
+    return number
+
+
+def _decimal_string(value: Decimal) -> str:
+    return format(value.normalize(), "f")
+
+
+def _normalize_resize_text_value(value: Any, *, current_document_identity: str,
+                                 require_complete: bool) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise ObservationContractError("Resize Text result value must be an object")
+    _exact_fields(value, {"schema", "resize_mechanism", "control", "mechanism_state_sequence",
+                          "text_population_complete", "mechanism_state_sequence_complete", "cleanup"})
+    if value["schema"] != "wcag-resize-text-observation-v1" or value["resize_mechanism"] not in {
+        "user-agent-full-page-zoom", "user-agent-text-only-resize", "author-provided-resize-control"
+    }:
+        raise ObservationContractError("Resize Text schema or mechanism is outside the finite contract")
+    control = value["control"]
+    if not isinstance(control, dict):
+        raise ObservationContractError("Resize Text control identity must be an object")
+    _exact_fields(control, {"target_ref", "role", "accessible_name", "input_type", "minimum_value",
+                            "maximum_value", "step_value", "baseline_value"})
+    if (not isinstance(control["target_ref"], str) or not control["target_ref"].startswith("accessible-control:")
+            or control["role"] != "slider" or control["accessible_name"] != "Text size"
+            or control["input_type"] != "range"):
+        raise ObservationContractError("Resize Text control is not the fixed accessible range control")
+    minimum = _decimal_text(control["minimum_value"])
+    maximum = _decimal_text(control["maximum_value"])
+    step = _decimal_text(control["step_value"], positive=True)
+    baseline_value = _decimal_text(control["baseline_value"])
+    if minimum is None or maximum is None or step is None or baseline_value is None or not minimum <= baseline_value <= maximum:
+        raise ObservationContractError("Resize Text range bounds or baseline value are invalid")
+    if not isinstance(value["text_population_complete"], bool) or not isinstance(value["mechanism_state_sequence_complete"], bool):
+        raise ObservationContractError("Resize Text completeness fields must be booleans")
+    sequence = value["mechanism_state_sequence"]
+    if not isinstance(sequence, list) or not 2 <= len(sequence) <= 101:
+        raise ObservationContractError("Resize Text requires a bounded baseline and state sequence")
+
+    baseline_refs: set[str] = set()
+    baseline_sizes: dict[str, Decimal] = {}
+    baseline_controls: dict[str, bool] = {}
+    normalized_states: list[dict[str, Any]] = []
+    prior_control_value: Decimal | None = None
+    for index, state in enumerate(sequence):
+        if not isinstance(state, dict):
+            raise ObservationContractError("Resize Text state must be an object")
+        _exact_fields(state, {"state_index", "control_value", "document_identity", "viewport", "overflow",
+                              "text_candidates", "interactive_controls", "population_complete",
+                              "unmeasurable_target_refs", "unsupported_visible_canvas", "inaccessible_visible_frame",
+                              "content_loss_refs", "newly_clipped_target_refs", "newly_obscured_target_refs",
+                              "functionality_loss_refs"})
+        if (state["state_index"] != index or isinstance(state["state_index"], bool)
+                or state["document_identity"] != current_document_identity
+                or not isinstance(state["population_complete"], bool)
+                or not isinstance(state["unsupported_visible_canvas"], bool)
+                or not isinstance(state["inaccessible_visible_frame"], bool)):
+            raise ObservationContractError("Resize Text state identity or completeness is invalid")
+        current_control_value = _decimal_text(state["control_value"])
+        if current_control_value is None or not minimum <= current_control_value <= maximum:
+            raise ObservationContractError("Resize Text state control value must be a finite decimal string")
+        if index == 0:
+            if current_control_value != baseline_value:
+                raise ObservationContractError("Resize Text state sequence does not begin at its baseline value")
+        elif prior_control_value is None or current_control_value <= prior_control_value or (current_control_value - prior_control_value) % step != 0:
+            raise ObservationContractError("Resize Text state sequence must advance through the fixed control step")
+        prior_control_value = current_control_value
+
+        viewport = state["viewport"]
+        overflow = state["overflow"]
+        if not isinstance(viewport, dict) or set(viewport) != {"width_css_px", "height_css_px"}:
+            raise ObservationContractError("Resize Text viewport measurement is invalid")
+        if any((number := _decimal_number(viewport[key])) is None or number <= 0 for key in viewport):
+            raise ObservationContractError("Resize Text viewport dimensions must be positive finite numbers")
+        if not isinstance(overflow, dict) or set(overflow) != {"scroll_width_css_px", "client_width_css_px",
+                                                               "scroll_height_css_px", "client_height_css_px"}:
+            raise ObservationContractError("Resize Text overflow measurement is invalid")
+        if any((number := _decimal_number(overflow[key])) is None or number < 0 for key in overflow):
+            raise ObservationContractError("Resize Text overflow dimensions must be non-negative finite numbers")
+
+        candidates = state["text_candidates"]
+        if not isinstance(candidates, list) or not candidates:
+            raise ObservationContractError("Resize Text state requires rendered text candidates")
+        normalized_candidates: list[dict[str, Any]] = []
+        state_refs: set[str] = set()
+        for candidate in candidates:
+            if not isinstance(candidate, dict):
+                raise ObservationContractError("Resize Text candidate must be an object")
+            _exact_fields(candidate, {"target_ref", "present", "used_font_size_css_px", "rects", "clipped", "obscured"})
+            ref = candidate["target_ref"]
+            if (not isinstance(ref, str) or not ref.startswith(("dom-text:", "dom-control:", "dom-element:"))
+                    or len(ref) > 2048 or ref in state_refs or not isinstance(candidate["present"], bool)):
+                raise ObservationContractError("Resize Text candidate identity is invalid or duplicated")
+            state_refs.add(ref)
+            font_size = _decimal_text(candidate["used_font_size_css_px"], positive=True)
+            if (not isinstance(candidate["clipped"], bool) or not isinstance(candidate["obscured"], bool)
+                    or (candidate["present"] and font_size is None)
+                    or (not candidate["present"] and (font_size is not None or candidate["clipped"] or candidate["obscured"]))):
+                raise ObservationContractError("Resize Text candidate font metric or loss evidence is invalid")
+            rects = candidate["rects"]
+            if not isinstance(rects, list) or (candidate["present"] and not rects) or (not candidate["present"] and rects):
+                raise ObservationContractError("Resize Text candidate requires visible geometry evidence")
+            normalized_rects: list[dict[str, Any]] = []
+            for rect in rects:
+                if not isinstance(rect, dict) or set(rect) != {"left", "top", "width", "height"}:
+                    raise ObservationContractError("Resize Text candidate rectangle schema is invalid")
+                values = {key: _decimal_number(rect[key]) for key in ("left", "top", "width", "height")}
+                if any(number is None for number in values.values()) or values["width"] <= 0 or values["height"] <= 0:
+                    raise ObservationContractError("Resize Text candidate rectangle values are invalid")
+                normalized_rects.append({key: rect[key] for key in ("left", "top", "width", "height")})
+            if index == 0:
+                if not candidate["present"]:
+                    raise ObservationContractError("Resize Text baseline candidate must be present")
+                baseline_sizes[ref] = font_size
+            elif ref not in baseline_sizes:
+                if require_complete:
+                    raise ObservationContractError("Resize Text candidate population changed after baseline")
+            base_size = baseline_sizes.get(ref)
+            ratio = None if base_size is None or font_size is None else font_size / base_size
+            ratio_text = None if ratio is None else _decimal_string(ratio.quantize(Decimal("0.00000001")))
+            normalized_candidates.append({"target_ref": ref,
+                "baseline_used_font_size_css_px": None if base_size is None else _decimal_string(base_size),
+                "current_used_font_size_css_px": None if font_size is None else _decimal_string(font_size),
+                "rendered_scale_ratio": ratio_text, "rects": normalized_rects,
+                "present": candidate["present"], "clipped": candidate["clipped"], "obscured": candidate["obscured"]})
+        if index == 0:
+            baseline_refs = state_refs
+        elif state_refs != baseline_refs and require_complete:
+            raise ObservationContractError("Resize Text text population is not stable across states")
+
+        controls = state["interactive_controls"]
+        if not isinstance(controls, list):
+            raise ObservationContractError("Resize Text interactive controls evidence must be an array")
+        normalized_controls: list[dict[str, Any]] = []
+        current_controls: dict[str, bool] = {}
+        for item in controls:
+            if (not isinstance(item, dict) or set(item) != {"target_ref", "role", "enabled"}
+                    or not isinstance(item["target_ref"], str) or not item["target_ref"].startswith("dom-control:")
+                    or not isinstance(item["role"], str) or not item["role"].strip()
+                    or not isinstance(item["enabled"], bool) or item["target_ref"] in current_controls):
+                raise ObservationContractError("Resize Text interactive control evidence is invalid")
+            current_controls[item["target_ref"]] = item["enabled"]
+            normalized_controls.append(dict(item))
+        if index == 0:
+            baseline_controls = current_controls
+        for loss_field in ("unmeasurable_target_refs", "content_loss_refs", "newly_clipped_target_refs",
+                           "newly_obscured_target_refs", "functionality_loss_refs"):
+            refs = state[loss_field]
+            if (not isinstance(refs, list) or any(not isinstance(ref, str) or not ref.strip() for ref in refs)
+                    or len(refs) != len(set(refs))):
+                raise ObservationContractError(f"Resize Text {loss_field} must contain unique non-empty refs")
+        if any(ref not in baseline_refs for ref in state["content_loss_refs"] + state["newly_clipped_target_refs"]
+               + state["newly_obscured_target_refs"]):
+            raise ObservationContractError("Resize Text loss evidence references an unknown baseline candidate")
+        if any(ref not in baseline_controls for ref in state["functionality_loss_refs"]):
+            raise ObservationContractError("Resize Text functionality loss references an unknown baseline control")
+        normalized_states.append({**state, "text_candidates": normalized_candidates,
+                                  "interactive_controls": normalized_controls})
+
+    cleanup = value["cleanup"]
+    if not isinstance(cleanup, dict):
+        raise ObservationContractError("Resize Text cleanup evidence must be an object")
+    _exact_fields(cleanup, {"status", "baseline_control_value", "current_control_value"})
+    cleanup_baseline = _decimal_text(cleanup["baseline_control_value"])
+    cleanup_current = _decimal_text(cleanup["current_control_value"])
+    cleanup_ok = (cleanup["status"] == "restored" and cleanup_baseline == baseline_value
+                  and cleanup_current == baseline_value)
+    complete = (value["text_population_complete"] is True and all(state["population_complete"] is True
+                and not state["unmeasurable_target_refs"] and not state["unsupported_visible_canvas"]
+                and not state["inaccessible_visible_frame"] for state in sequence)
+                and all(set(row["target_ref"] for row in state["text_candidates"]) == baseline_refs
+                        for state in sequence))
+    final_candidates = normalized_states[-1]["text_candidates"]
+    reached_target = bool(final_candidates) and all(candidate["present"]
+        and candidate["rendered_scale_ratio"] is not None
+        and Decimal(candidate["rendered_scale_ratio"]) >= Decimal("2") for candidate in final_candidates)
+    sequence_complete = (value["mechanism_state_sequence_complete"] is True
+                         and (reached_target or prior_control_value == maximum))
+    if require_complete and (not complete or not sequence_complete or not cleanup_ok):
+        raise ObservationContractError("successful Resize Text result lacks complete population, state, or cleanup evidence")
+    return {**value, "control": dict(control), "mechanism_state_sequence": normalized_states,
+            "text_population_complete": complete, "mechanism_state_sequence_complete": sequence_complete,
+            "cleanup": {**cleanup, "status": "restored" if cleanup_ok else "unverified"}}
 
 
 def validate_predicate(predicate: dict[str, Any]) -> dict[str, Any]:
@@ -227,7 +431,7 @@ def normalize_target_resolution(target: dict[str, Any], resolution: dict[str, An
 def plan_probes(*, selected_rule_keys: list[str], measurement_kinds: list[str],
                 aspect_keys: list[str], target_refs: list[str] | None = None) -> dict[str, Any]:
     rules = {
-        "2779a5": {"document.location"},
+        "2779a5": {"document.title"},
         "97a4e1": {"accessibility.semantics"},
         "23a2a8": {"accessibility.semantics"},
     }
@@ -262,7 +466,7 @@ def plan_probes(*, selected_rule_keys: list[str], measurement_kinds: list[str],
     for index, field in enumerate(sorted(fields), 1):
         row = {"probe_ref": f"PROBE-{index:03d}", "observation_field": field,
                "probe_key": OBSERVATION_FIELDS[field],
-               "target_refs": list(target_refs or []) if OBSERVATION_FIELDS[field] not in {"viewport-state", "document-location", "navigation-timing", "paint-timing", "responsive-conditions"} else [],
+               "target_refs": list(target_refs or []) if OBSERVATION_FIELDS[field] not in {"viewport-state", "document-location", "document-title", "navigation-timing", "paint-timing", "responsive-conditions"} else [],
                "required_result_fields": _required_result_fields(field)}
         if field == "interaction.timing":
             row["clock_domain"] = "same-page-performance-now"
@@ -278,9 +482,12 @@ def _required_result_fields(field: str) -> list[str]:
         "element.geometry": ["x_css_px", "y_css_px", "width_css_px", "height_css_px"],
         "element.state": ["visible", "enabled", "checked", "selected", "expanded"],
         "document.location": ["safe_url", "status", "limitation"],
+        "document.title": ["is_html_document", "has_html_title_descendant", "first_title_children_are_text",
+                           "has_non_whitespace_text", "status", "limitation"],
         "element.rendered-text": ["raw_text", "status"], "element.control-value": ["raw_value", "status"],
         "element.selected-values": ["selected_options", "status"],
-        "accessibility.semantics": ["role", "accessible_name", "description", "states", "status"],
+        "accessibility.semantics": ["role", "accessible_name", "description", "states", "host_element",
+                                    "host_type", "included_in_accessibility_tree", "programmatically_hidden", "status"],
         "focus.state": ["active_target_ref", "focusable", "focus_visible", "status"],
         "computed-style.properties": ["properties", "status"],
         "responsive.conditions": ["conditions", "complete", "status"],
@@ -528,15 +735,35 @@ def normalize_probe_result(probe: dict[str, Any], result: dict[str, Any], *, cur
             raise ObservationContractError("formal evidence_refs must be a string array")
         if result["status"] == "ok" and not isinstance(result.get("value"), dict):
             raise ObservationContractError("successful formal probe requires a typed value object")
+        if result["status"] == "incomplete" and result.get("limitation_code") is None:
+            value = result.get("value")
+            completeness = value.get("observation_completeness") if isinstance(value, dict) else None
+            if (not isinstance(completeness, dict) or set(completeness) != {"state", "reason"}
+                    or completeness.get("state") != "partial"
+                    or completeness.get("reason") not in PARTIAL_FORMAL_OBSERVATION_REASONS):
+                raise ObservationContractError("incomplete formal observation requires a typed partial result reason")
         if result["status"] in {"unsupported", "unavailable", "incomplete", "blocked"}:
             if not isinstance(result.get("limitation"), str) or not result["limitation"].strip():
                 raise ObservationContractError("non-success formal probe requires a limitation")
         if result["current_document_identity"] != current_document_identity:
-            result = {**result, "status": "incomplete", "limitation_code": None, "limitation": "stale_document"}
+            result = {**result, "status": "blocked", "limitation_code": None, "limitation": "stale_document"}
         code = result.get("limitation_code")
         if code is not None and code not in LIMITATION_CODES:
             raise ObservationContractError("unknown formal limitation code")
-        return {**result, "normalized": True,
+        limitation_status = {
+            "background-not-machine-resolvable": "unavailable",
+            "focus-indicator-not-machine-resolvable": "incomplete",
+            "text-scaling-mechanism-not-machine-executable": "unsupported",
+            "text-scaling-state-not-machine-readable": "unavailable",
+        }
+        if code is not None and limitation_status[code] != result["status"]:
+            raise ObservationContractError("formal limitation code does not match its fixed machine status")
+        normalized_result = dict(result)
+        if result["machine_probe_key"] == "mp-resize-text-run" and "value" in result:
+            normalized_result["value"] = _normalize_resize_text_value(
+                result["value"], current_document_identity=current_document_identity,
+                require_complete=result["status"] == "ok")
+        return {**normalized_result, "normalized": True,
                 "input_fingerprint": fingerprint({k: formal_request[k] for k in sorted(formal_request) if k != "request_signature"})}
 
     if result.get("probe_key") != probe["probe_key"] or result.get("document_identity") != current_document_identity:
@@ -554,6 +781,11 @@ def normalize_probe_result(probe: dict[str, Any], result: dict[str, Any], *, cur
     if not isinstance(evidence_refs, list) or any(not isinstance(ref, str) or not ref.strip() for ref in evidence_refs):
         raise ObservationContractError("evidence refs must be non-empty strings")
     value = result.get("value", {})
+    if probe["observation_field"] == "document.location" and result.get("status") == "ok":
+        if (set(value) != {"safe_url", "status", "limitation"}
+                or not isinstance(value["safe_url"], str) or not value["safe_url"].strip()
+                or value["status"] != "ok" or value["limitation"] is not None):
+            raise ObservationContractError("safe document location values are invalid")
     if probe["observation_field"] == "responsive.boundaries" and result.get("status") == "ok":
         value = _normalize_responsive_boundaries(value)
     if probe["observation_field"] == "responsive.conditions" and result.get("status") == "ok":
@@ -564,6 +796,25 @@ def normalize_probe_result(probe: dict[str, Any], result: dict[str, Any], *, cur
         for name in ("x_css_px", "y_css_px", "width_css_px", "height_css_px"):
             if _decimal_number(value[name]) is None:
                 raise ObservationContractError("geometry values must be numeric CSS px")
+    if probe["observation_field"] == "document.title" and result.get("status") == "ok":
+        if (set(value) != {"is_html_document", "has_html_title_descendant", "first_title_children_are_text",
+                           "has_non_whitespace_text", "status", "limitation"}
+                or value["status"] != "ok" or value["limitation"] is not None
+                or any(not isinstance(value[field], bool) for field in (
+                    "is_html_document", "has_html_title_descendant", "first_title_children_are_text",
+                    "has_non_whitespace_text"))):
+            raise ObservationContractError("fixed document-title observation values are invalid")
+    if probe["observation_field"] == "accessibility.semantics" and result.get("status") == "ok":
+        if (not isinstance(value["role"], str) or not value["role"].strip()
+                or not isinstance(value["accessible_name"], str)
+                or (value["description"] is not None and not isinstance(value["description"], str))
+                or not isinstance(value["states"], dict)
+                or not isinstance(value["host_element"], str) or not value["host_element"].strip()
+                or (value["host_type"] is not None and not isinstance(value["host_type"], str))
+                or not isinstance(value["included_in_accessibility_tree"], bool)
+                or not isinstance(value["programmatically_hidden"], bool)
+                or value["status"] != "ok"):
+            raise ObservationContractError("accessibility semantics applicability values are invalid")
     return {"observation_field": probe["observation_field"], "probe_ref": probe["probe_ref"],
             "probe_key": probe["probe_key"], "document_identity": current_document_identity,
             "status": result["status"], "value": value if result["status"] == "ok" else None,
@@ -714,7 +965,7 @@ def validate_catalog(catalog: dict[str, Any]) -> None:
         for field in row.get("provided_observation_fields", []):
             owners.setdefault(field, []).append(key)
     if set(owners) != set(OBSERVATION_FIELDS) or any(len(v) != 1 for v in owners.values()):
-        raise ObservationContractError("each of the 16 canonical observation fields must have exactly one probe owner")
+        raise ObservationContractError(f"each of the {len(OBSERVATION_FIELDS)} canonical observation fields must have exactly one probe owner")
     timing = catalog.get("interaction_timing_contract")
     if not isinstance(timing, dict) or timing.get("clock_domain") != "same-page-performance-now":
         raise ObservationContractError("interaction timing clock domain must be fixed")

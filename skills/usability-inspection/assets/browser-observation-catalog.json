@@ -13,6 +13,10 @@
       "required_result_fields": [
         "accessible_name",
         "description",
+        "host_element",
+        "host_type",
+        "included_in_accessibility_tree",
+        "programmatically_hidden",
         "role",
         "states",
         "status"
@@ -46,7 +50,7 @@
     },
     {
       "probe_key": "document-location",
-      "execution_kind": "playwright-native",
+      "execution_kind": "fixed-page-evaluate",
       "provided_observation_fields": [
         "document.location"
       ],
@@ -60,8 +64,30 @@
       "unit": "as-defined-per-field",
       "clock_domain": null,
       "required_browser_capability": "document-location",
-      "sensitive_data_handling": "minimize; never persist secrets",
+      "sensitive_data_handling": "sanitize page.url under the existing evidence contract; this field contains no title data",
       "fixed_dispatch_key": "document-location"
+    },
+    {
+      "probe_key": "document-title",
+      "execution_kind": "fixed-page-evaluate",
+      "provided_observation_fields": [
+        "document.title"
+      ],
+      "required_request_fields": [],
+      "required_result_fields": [
+        "first_title_children_are_text",
+        "has_html_title_descendant",
+        "has_non_whitespace_text",
+        "is_html_document",
+        "limitation",
+        "status"
+      ],
+      "value_type": "structured",
+      "unit": "as-defined-per-field",
+      "clock_domain": null,
+      "required_browser_capability": "document-title",
+      "sensitive_data_handling": "return fixed boolean title facts only; never persist raw document.title text",
+      "fixed_dispatch_key": "document-title"
     },
     {
       "probe_key": "element-content",

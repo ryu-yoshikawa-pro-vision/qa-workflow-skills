@@ -4,12 +4,16 @@ from __future__ import annotations
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
+from runtime_contract import ExactNumber
+
 
 class MeasurementError(ValueError):
     pass
 
 
 def _d(value: Any) -> Decimal:
+    if isinstance(value, ExactNumber):
+        value = value.text()
     if isinstance(value, bool) or not isinstance(value, (int, float, str, Decimal)):
         raise MeasurementError("numeric browser value required")
     try:

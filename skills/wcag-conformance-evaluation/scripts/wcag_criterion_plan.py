@@ -4,6 +4,7 @@ import json
 import re
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 from runtime_contract import static_data_fingerprint
 from wcag_requirements import ASSETS, load_catalog, resolve_target
 
@@ -76,6 +77,16 @@ def materialize_plan(*, wcag_version: str | None, level: str | None,
     if not variations: raise CriterionPlanError('selected samples require a closed presentation-variation inventory')
     if any(not isinstance(row.get('sample_ref'), str) or not row['sample_ref'].strip() for row in samples):
         raise CriterionPlanError('sample refs are required')
+    for row in samples:
+        identity = row.get('target_identity')
+        try:
+            parsed_identity = urlsplit(identity) if isinstance(identity, str) else None
+        except ValueError:
+            parsed_identity = None
+        if (parsed_identity is None or parsed_identity.scheme not in {'http', 'https'}
+                or not parsed_identity.netloc or parsed_identity.username is not None
+                or parsed_identity.password is not None):
+            raise CriterionPlanError('each canonical sample requires its exact current HTTP(S) document identity')
     if any(not isinstance(row.get('variation_ref'), str) or not row['variation_ref'].strip() for row in variations):
         raise CriterionPlanError('variation refs are required')
     fingerprint_re = re.compile(r'^sha256:[0-9a-f]{64}$')
@@ -120,7 +131,7 @@ def materialize_plan(*, wcag_version: str | None, level: str | None,
                     if procedure is None: raise CriterionPlanError(f'procedure key absent from finite catalog: {key}')
                     execution_sequence+=1
                     execution_ref=f'PROC-EXEC-{execution_sequence:06d}'
-                    request_ref=None
+                    request_refs=[]
                     if procedure['procedure_kind']=='machine':
                         for probe_key in procedure['machine_probe_keys']:
                             req={'request_kind':'wcag-machine-probe','observation_request_ref':f'WCAG-OBS-{len(requests)+1:06d}',
@@ -130,16 +141,16 @@ def materialize_plan(*, wcag_version: str | None, level: str | None,
                                  'requirement_ref':criterion['criterion_ref'],
                                  'currentness_dependency':{'sample_identity_fingerprint':sample.get('identity_fingerprint'),
                                                            'variation_identity_fingerprint':variation.get('identity_fingerprint')},
-                                 'target_identity':sample.get('target_identity',sample['sample_ref']),
+                                  'target_identity':sample['target_identity'],
                                  'required_browser_capability':probe_key}
-                            request_ref=req['observation_request_ref']
+                            request_refs.append(req['observation_request_ref'])
                             signature=json.dumps(req,ensure_ascii=False,sort_keys=True,separators=(',',':'))
                             import hashlib
                             req['request_signature']='sha256:'+hashlib.sha256(signature.encode('utf-8')).hexdigest()
                             requests.append(req)
                     execution_refs.append({'procedure_execution_ref':execution_ref,'procedure_key':key,
                                            'procedure_kind':procedure['procedure_kind'],'applicability_mode':procedure['applicability_mode'],
-                                           'status':'pending','result':None,'observation_request_refs':[request_ref] if request_ref else [],
+                                           'status':'pending','result':None,'observation_request_refs':request_refs,
                                            'evidence_refs':[]})
                 rows.append({'criterion_evaluation_ref':evaluation_ref,'sample_ref':sample['sample_ref'],
                              'variation_ref':variation['variation_ref'],'process_ref':(process_memberships or {}).get(sample['sample_ref']),

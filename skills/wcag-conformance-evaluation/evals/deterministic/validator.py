@@ -1,6 +1,7 @@
 from __future__ import annotations
 import hashlib, json, math, re
 from pathlib import Path
+from urllib.parse import urlsplit
 from scripts.skills.evals.deterministic.result import EvalResult
 
 BASE=Path(__file__).resolve().parents[2]/'assets'
@@ -224,6 +225,12 @@ def validate_sample_lineage(arguments: dict, result: dict) -> list[str]:
         return (isinstance(values,list) and (allow_empty or bool(values))
                 and all(isinstance(value,str) and value.strip() for value in values)
                 and len(values)==len(set(values)))
+    def valid_document_identity(value: object) -> bool:
+        if not isinstance(value,str) or not value.strip(): return False
+        try: parsed=urlsplit(value)
+        except ValueError: return False
+        return (parsed.scheme in {"http","https"} and bool(parsed.netloc)
+                and parsed.username is None and parsed.password is None)
     if (not valid_refs(previous_refs) or not valid_refs(current_refs)
             or not valid_refs(evidence_refs)):
         return ["sample_lineage_ref_inputs"]
@@ -236,7 +243,8 @@ def validate_sample_lineage(arguments: dict, result: dict) -> list[str]:
     if (any(not isinstance(ref,str) or not ref.strip() for ref in current_registry_refs)
             or len(current_registry_refs)!=len(set(current_registry_refs))):
         return ["sample_lineage_identity_input_schema"]
-    fields={"sample_ref","target_ref","state_key","source_locators","identity_fingerprint","source_evidence_refs"}
+    fields={"sample_ref","target_ref","state_key","source_locators","target_identity",
+            "identity_fingerprint","source_evidence_refs"}
     def index(rows: list[dict], selected: set[str]) -> tuple[dict[str,dict],dict[str,str]] | None:
         by_ref={}; by_identity={}
         for row in rows:
@@ -247,6 +255,7 @@ def validate_sample_lineage(arguments: dict, result: dict) -> list[str]:
             if (not isinstance(ref,str) or not ref.strip() or ref not in selected or ref in by_ref
                     or not isinstance(target,str) or not target.strip()
                     or not isinstance(state,str) or not state.strip()
+                    or not valid_document_identity(row["target_identity"])
                     or not valid_refs(locators,allow_empty=False) or not valid_refs(sources)):
                 return None
             identity_data=json.dumps({"target_ref":target,"state_key":state},ensure_ascii=False,

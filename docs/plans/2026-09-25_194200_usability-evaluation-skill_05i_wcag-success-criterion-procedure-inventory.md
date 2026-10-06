@@ -120,7 +120,7 @@ selected versionの全required Success Criterionへ、必ず1件のcriterion-spe
 | `m-timer-inventory` | 2.2.1, 2.2.3, 2.2.6 | UIに現れるtime limit / timeout / countdown candidateとcurrent machine-readable duration / notification stateを取得する。 |
 | `m-ui-purpose-metadata` | 1.3.6 | UI component / icon / regionのprogrammatic purpose関連metadataを取得する。 |
 
-machine procedureが必要とするbrowser値は `_05j_wcag-machine-browser-observation-contract.md` のfinite machine probeだけを使います。machine key → probe key mappingは `wcag-evaluation-procedure-catalog.json` に固定し、`wcag_criterion_plan.py` がrequired probe集合を導出します。LLMがprocedureごとにfield / probeを手で列挙しません。semantic/manual判断から追加観測が必要な場合だけ `_05g` の16 canonical observation fieldを使います。
+machine procedureが必要とするbrowser値は `_05j_wcag-machine-browser-observation-contract.md` のfinite machine probeだけを使います。machine key → probe key mappingは `wcag-evaluation-procedure-catalog.json` に固定し、`wcag_criterion_plan.py` がrequired probe集合を導出します。LLMがprocedureごとにfield / probeを手で列挙しません。semantic/manual判断から追加観測が必要な場合だけ `_05g` の17 canonical observation fieldを使います。
 
 ## 4. manual / assistive technology / external evidence割当
 

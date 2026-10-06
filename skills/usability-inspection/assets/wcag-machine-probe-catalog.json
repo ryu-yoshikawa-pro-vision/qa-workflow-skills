@@ -293,7 +293,7 @@
       "target_currentness": "typed-target-or-population-identity",
       "sensitive_data_handling": "minimum necessary; redact secrets",
       "fixed_dispatch_key": "mp-document-title",
-      "observation_description": "document title raw value、存在、current document identity"
+      "observation_description": "document title presence, first child node type, non-whitespace predicate, and current document identity; raw title text is not retained"
     },
     {
       "machine_probe_key": "mp-error-scenario-run",

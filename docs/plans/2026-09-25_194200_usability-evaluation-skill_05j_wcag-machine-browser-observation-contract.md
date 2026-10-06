@@ -4,7 +4,7 @@
 
 本ファイルは `wcag-conformance-evaluation` のmachine procedureがbrowserから必要とする固定観測を、`usability-inspection` が実行できる有限contractとして定義します。
 
-`_05g_usability-inspection-browser-observation-contract.md` の16 canonical observation fieldはsemantic layerが追加evidenceを必要とした場合に選択できるinterfaceです。本ファイルのmachine probeはformal WCAG machine procedure専用です。
+`_05g_usability-inspection-browser-observation-contract.md` の17 canonical observation fieldはsemantic layerが追加evidenceを必要とした場合に選択できるinterfaceです。本ファイルのmachine probeはformal WCAG machine procedure専用です。
 
 - `wcag-conformance-evaluation` の `wcag_criterion_plan.py` が自packageのprocedure catalogからrequired machine probe keyを導出し、typed observation requestをmaterializeする
 - LLMはmachine probe keyを選択・省略・追加しない
@@ -58,7 +58,7 @@ catalogのcanonical JSON SHA-256は、`request_kind=wcag-machine-probe` を1件�
 
 | machine probe key | 固定取得内容 |
 | --- | --- |
-| `mp-document-title` | document title raw value、存在、current document identity |
+| `mp-document-title` | document titleの存在・先頭child node種別・非空白predicate、current document identity。raw title textは保存しない |
 | `mp-document-language` | document elementのlanguage metadata |
 | `mp-part-language-inventory` | current scope内のpart-level language metadata、target ref |
 | `mp-purpose-metadata` | autocomplete、role、purpose関連のallowlisted programmatic metadata |
@@ -195,9 +195,11 @@ Text Spacing等、W3Cの評価手順自体がauthor style overrideを要求す�
 
 ## 5. identity / status
 
-formal Skillがmaterializeするmachine probe requestは対象に応じて `target_ref`、`population_ref + population_revision + identity_fingerprint`、`sample_ref + variation_ref + current document identity`、process / action refのいずれかを持ちます。LLM supplied selectorを受けません。inspection側はこのidentity inputをlocal target registry / current browser stateへ解決し、requestに存在しないprocedure意味を補完しません。
+formal Skillがmaterializeするmachine probe requestは対象に応じて `target_ref`、`population_ref + population_revision + identity_fingerprint`、`sample_ref + variation_ref + current document identity`、process / action refのいずれかを持ちます。sample requestの `target_identity` はそのsample stateでbrowserが実際に観測した完全なHTTP(S) document URLとし、製品root URLやsample refで代用しません。SPA routeのpath/queryが異なる場合はexact URLを保持し、同一URL内の異なるin-memory stateはsample identity fingerprintで区別します。sample helperは観測済みURLのうちcanonicalな代表routeを決定論的に保持しますが、sample identityは引き続きtarget + stateで定義します。LLM supplied selectorを受けません。inspection側はこのidentity inputをlocal target registry / current browser stateへ解決し、requestに存在しないprocedure意味を補完しません。
 
 result statusは `ok / unsupported / unavailable / incomplete / blocked` です。`unsupported` はcurrent browser / tool capabilityがrequired operationを提供しない場合だけに使い、既知標準の未実装を隠す用途には使いません。
+
+current document identityとtyped requestが一致し、固定probeが型付きの部分観測値と有限の `observation_completeness.reason` を返した `incomplete` は、観測実行の失敗ではなくsemantic/manual closureへ渡す部分evidenceです。runtimeはこれを `ready + partial` として保持し、criterionをsatisfiedへ自動変換しません。formal procedureは部分evidenceを検討し、追加観測で閉じるか、根拠を記録して `undetermined` に閉じます。部分観測値・理由がない `incomplete`、stale document、request不一致、browser action未完了、cleanup失敗は引き続きblockedです。catalogued `limitation_code` は定義済みconditional manual fallbackだけを起動し、この部分evidence分類とは別です。
 
 manual fallback activationへ使う `limitation_code` は次の有限値だけを許可します。
 

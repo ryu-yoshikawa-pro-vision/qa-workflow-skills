@@ -38,7 +38,8 @@ def metadata() -> dict:
 def request(level: str) -> dict:
     return {"metadata": metadata(), "input": {"operation": "materialize-criterion-plan", "arguments": {
         "wcag_version": "2.0", "level": level,
-        "samples": [{"sample_ref": "SAMPLE-001", "identity_fingerprint": "sha256:" + "a" * 64}],
+        "samples": [{"sample_ref": "SAMPLE-001", "identity_fingerprint": "sha256:" + "a" * 64,
+                     "target_identity": "http://127.0.0.1:4173/"}],
         "variations": [{"sample_ref": "SAMPLE-001", "variation_ref": "VAR-001",
                         "identity_fingerprint": "sha256:" + "b" * 64}]}}}
 
@@ -47,7 +48,8 @@ def close_input() -> dict:
     sys.path.insert(0, str(SCRIPT.parent))
     import wcag_criterion_plan
     plan = wcag_criterion_plan.materialize_plan(wcag_version="2.0", level="A",
-        samples=[{"sample_ref": "SAMPLE-001", "identity_fingerprint": "sha256:" + "a" * 64}],
+        samples=[{"sample_ref": "SAMPLE-001", "identity_fingerprint": "sha256:" + "a" * 64,
+                  "target_identity": "http://127.0.0.1:4173/"}],
         variations=[{"sample_ref": "SAMPLE-001", "variation_ref": "VAR-001",
                      "identity_fingerprint": "sha256:" + "b" * 64}])
     criterion = next(row for row in plan["criteria"] if row["criterion_ref"] == "1.1.1")
@@ -77,6 +79,27 @@ def invoke(body: dict) -> dict:
 
 
 class WcagRuntimeContractTests(unittest.TestCase):
+    def test_runtime_allocates_monotonic_artifact_local_handoff_refs(self):
+        body = request("A")
+        body["input"] = {"operation": "allocate-observation-handoff-ref", "arguments": {
+            "existing_handoffs": []}}
+        first = invoke(body)
+        self.assertEqual(first["runtime_status"], "ok")
+        self.assertEqual(first["payload"]["result"]["handoff_ref"], "HANDOFF-001")
+
+        body["input"]["arguments"]["existing_handoffs"] = [
+            {"handoff_ref": "HANDOFF-001", "status": "closed"},
+            {"handoff_ref": "HANDOFF-003", "status": "closed"},
+        ]
+        after_gap = invoke(body)
+        self.assertEqual(after_gap["payload"]["result"]["handoff_ref"], "HANDOFF-004")
+
+        for rows in ([{"handoff_ref": "HANDOFF-001"}, {"handoff_ref": "HANDOFF-001"}],
+                     [{"handoff_ref": "HANDOFF-x"}], [None]):
+            body["input"]["arguments"]["existing_handoffs"] = rows
+            invalid = invoke(body)
+            self.assertEqual(invalid["runtime_status"], "invalid_input")
+
     def test_runtime_exposes_scope_process_reuse_and_step_4_3_contracts(self):
         body=request("A")
         body["input"]={"operation":"materialize-scope-coverage","arguments":{"drafts":[
@@ -128,7 +151,8 @@ class WcagRuntimeContractTests(unittest.TestCase):
         body=request("A")
         body["input"]={"operation":"materialize-sample-identities","arguments":{"drafts":[
             {"draft_key":"new-view","target_ref":"TARGET-NEW","state_key":"default",
-             "locator":"/new","source_evidence_refs":["E-CURRENT"]}]}}
+             "locator":"/new","target_identity":"https://fixture.test/new",
+             "source_evidence_refs":["E-CURRENT"]}]}}
         current=invoke(body)
         self.assertEqual(current["result_status"],"ready")
         registry=current["payload"]["result"]
@@ -210,6 +234,25 @@ class WcagRuntimeContractTests(unittest.TestCase):
         self.assertEqual(payload["wcag_version"], "2.0")
         self.assertEqual(payload["level"], "A")
         self.assertEqual(len(payload["criteria"]), payload["expected_row_count"])
+
+    def test_multi_probe_procedure_rows_retain_every_fixed_request(self):
+        body = request("AAA")
+        body["input"]["arguments"].update({"wcag_version": "2.2"})
+        output = invoke(body)
+        self.assertEqual(output["runtime_status"], "ok")
+        plan = output["payload"]["result"]
+        expected = {
+            "1.4.11": ["mp-target-geometry", "mp-computed-color-context"],
+            "2.4.13": ["mp-focus-appearance-evidence", "mp-target-geometry", "mp-computed-color-context"],
+        }
+        for criterion_ref, probe_keys in expected.items():
+            criterion = next(row for row in plan["criteria"] if row["criterion_ref"] == criterion_ref)
+            machine = next(row for row in criterion["procedure_executions"] if row["procedure_kind"] == "machine")
+            requests = {row["observation_request_ref"]: row for row in plan["requests"]}
+            linked_requests = [requests[ref] for ref in machine["observation_request_refs"]]
+            self.assertEqual(sorted(row["machine_probe_key"] for row in linked_requests), sorted(probe_keys))
+            self.assertEqual({row["procedure_execution_ref"] for row in linked_requests},
+                             {machine["procedure_execution_ref"]})
 
     def test_runtime_generation_changes_make_saved_formal_result_stale(self):
         saved = invoke(request("A"))

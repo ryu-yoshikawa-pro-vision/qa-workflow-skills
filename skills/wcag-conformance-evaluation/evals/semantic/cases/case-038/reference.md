@@ -1,6 +1,6 @@
 # Expected semantic contract
 
-This case is limited to the production helper's rejection of a caller-supplied `satisfied` result without a current criterion-evaluation ref, complete procedure closure, or evidence. Preserve the helper's rejection and do not emit a final sample result from the untrusted direct value. The case does not request a report or test materialization of the full versioned Success Criterion / Conformance Requirement sets; those unrelated outputs are not required here.
+This case is limited to the production helper's rejection of a caller-supplied `satisfied` result without a current criterion-evaluation ref, complete procedure closure, or evidence. Preserve the declared WCAG `2.2` level `AA` target, keep the bypass result untrusted, and do not emit a final sample result from it. The case does not request a report or test materialization of the full versioned Success Criterion / Conformance Requirement sets; those unrelated outputs are not required here.
 
 ## 11. 完了条件
 

@@ -104,16 +104,40 @@ def handler(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, 
     except (KeyError, TypeError, ValueError) as exc:
         raise InvalidInput(f"inspection operation contract rejected input: {exc}") from exc
     state = output.get("status") if isinstance(output, dict) else None
+    completeness = output.get("value", {}).get("observation_completeness") if isinstance(output, dict) and isinstance(output.get("value"), dict) else None
+    partial_observation = (isinstance(completeness, dict) and completeness.get("state") == "partial"
+                           and completeness.get("reason") in observation_contract.PARTIAL_FORMAL_OBSERVATION_REASONS)
     if operation == "normalize-target-resolution" and state != "unique":
         result_status, support_status = "unresolved", "partial"
+    elif (operation == "normalize-wcag-machine-probe-result"
+          and state in {"unsupported", "unavailable", "incomplete"}
+          and output.get("limitation_code") in observation_contract.LIMITATION_CODES):
+        # A catalogued machine limitation is a completed observation. The formal
+        # procedure owner decides whether its conditional manual fallback closes.
+        result_status, support_status = "ready", "supported"
+    elif (operation == "normalize-wcag-machine-probe-result" and state == "incomplete"
+          and partial_observation):
+        # A current, typed partial observation is evidence for semantic closure,
+        # not a machine failure or a WCAG failure. The formal owner must preserve
+        # its limitation and close the criterion as undetermined or re-observe.
+        result_status, support_status = "ready", "partial"
+    elif operation == "normalize-wcag-machine-probe-result" and state in {
+        "blocked", "unsupported", "unavailable", "incomplete"
+    }:
+        result_status, support_status = "blocked", "unsupported"
     elif state in {"blocked", "unsupported"}:
         result_status, support_status = "blocked", "unsupported"
     elif state in {"requested", "in-progress", "stale", "ambiguous", "missing", "no-progress"}:
         result_status, support_status = "unresolved", "partial"
     else:
         result_status, support_status = "ready", "supported"
-    issues = [] if result_status == "ready" else [{"issue_type": "inspection_operation_not_closed", "blocking": True,
-        "operation": operation, "status": state or result_status}]
+    partial_result = (operation == "normalize-wcag-machine-probe-result" and state == "incomplete"
+                      and result_status == "ready" and support_status == "partial" and partial_observation)
+    issues = ([{"issue_type": "wcag_machine_observation_incomplete", "blocking": False,
+                "operation": operation, "status": state,
+                "reason": completeness["reason"]}]
+              if partial_result else [] if result_status == "ready" else [{"issue_type": "inspection_operation_not_closed", "blocking": True,
+        "operation": operation, "status": state or result_status}])
     return {"runtime_status": "ok", "support_status": support_status, "result_status": result_status,
             "runtime_required": True, "deterministic_generated": True, "static_data_versions": _static_versions(formal=formal),
             "payload": {"operation": operation, "result": output}, "issues": issues}

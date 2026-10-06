@@ -73,3 +73,30 @@ External URL、実アカウント、外部実製品、特定assistive technology
 - 検証: Git for Windowsの`bash -n .husky/pre-commit`が成功。hook相当の一括実行がexit 0。`skills-ref`はcurrent 23 Skillすべて成功、semantic datasetは22 Skill / 155 case。Shared deterministic 12件、repository deterministic 229件、shared semantic 27件（Windows symlink権限によるskip 2件）、repository semantic 4件、trigger 1件、runtime 271件が成功。Python compile checksも成功。
 - `.husky/pre-commit`自体はignored local overlayであり、tracked repository / PRには含めない。Repository-owned sourceの変更ではなく、今後の通常commitに使うローカル実行経路の修正。
 - Semantic実Agent評価は停止時点で41/83件（PASS 30 / `needs_review` 7 / fail 4 / `not_evaluable` 0）。残42件とnon-PASS原因分類、Trigger、holdout、canonical real Agent/browser E2Eは未完了。hook検証の成功はこれらの完了を意味しない。
+
+## 2026-10-06 16:37 JST — 現状整理 / push checkpoint
+
+- Git状態を再取得: branch `feat/usability-evaluation-skill`、local HEAD `5f97b59f393525486b34e92fca769e13caebe8bc`、`origin/feat/usability-evaluation-skill` とPR #14 headも同じSHA、`origin/main` は `dec3f7c764db2869dc24eb3d6f154712a6677068`。mainとの差分はahead 312 / behind 0。PRはopen。
+- report追記前の作業状態: PR関連のtracked変更64ファイル、PR関連untracked追加4ファイル。ユーザー所有のuntracked `3b77866a0b52347ce6201959f97492f197a61365` は今回のcommit対象から除外。`.gitignore` は今回変更・stage・commitしていない。既存作業を破棄・stashしていない。
+- report追記前の実装tree fingerprint: `8bf37219f1430d05b967b742e5ef105ac73cb8a5eeb91e9a15cfbb37e204dfd7`。算出契約は相対path順に `path + NUL + raw SHA256(file bytes) + LF` を連結してSHA256化。1015ファイルを含み、`.gitignore`と4件のPR用untracked追加を含む。自己参照を避けるため本reportとユーザー所有untrackedファイルは除外した。
+- `.codex/config.toml` のmodelは `gpt-6-luna`。このcheckpointでmodel override / subagentは使っていない。fresh formal focus handoff用Codex CLIは `Selected model is at capacity. Please try a different model.` を返し、workflow artifact作成・browser開始前に終了した。別modelへのfallbackはしていない。
+- fixture server `http://127.0.0.1:4173/` はHTTP 200。listenerはPID 89320で、指定されたfixture directoryから起動済み。PID 28964にも同じserver command lineが残るがport listenerではないため、どちらも停止・再起動していない。今回確認したPlaywright sessionはclose commandまで記録済み。OS上には通常のChrome processが複数存在する。
+- Run011のformal AA observation handoffではtest-only SQLite providerを使い、state create → pending CAS → operation claim → reservation acquire / provider revision → in-progress CAS → browser開始 → immutable observation return → cleanup → conditional release → close-ready → closed CAS / reread → `may_resume=true` → formal resumeまで実際に到達。7/7 expected observationはcurrent、handoff時点のunresolved expected observationは0、reservationはprovider revision 2でrelease、workflowはrevision 6でclosed。
+- Run011のreportは6 sample outcome（2 satisfied / 1 not-satisfied / 3 undetermined）を含むが、評価closureは `partial-blocked`。fixture populationが未観測でStep 4.3 / sampling-skipを閉じられず、full conformance claimも生成していない。EARLは6 assertionでindependent validator PASS、human-readable reportとのcoverage差分0、同一normalized inputの2回renderがbyte一致。これはfixture orchestration / report serializationの証拠であり、canonical happy path全体のunresolved blocked=0や外部製品の適合証拠ではない。
+- Run011のworkspaceにはGit metadataがなく、そのmanifest内のrequested implementation SHA / fingerprintは独立検証されていない。別のAAA focus handoffは修正前normalizerのTypeErrorでretiredし、close_ready=false / may_resume=false。raw fixed-probe resultをcurrent production normalizerへ再投入した後の出力は `runtime=ok`, `ready/supported`, issues 0で、catalogued `focus-indicator-not-machine-resolvable` を保持した。これは旧workflowを更新・再開した証拠ではない。fresh owner handoffは上記CLI capacity errorで未実施。
+- 追加の実Chromium経路では、`/?view=alternate` の表示差と、searchからTrail packを追加してcartへ移動するlocal DOM flowを確認。記録はignored `output/pr14-validation-tools/canonical-additional-routes-20261006/`。固定probeのmanual fallback、full Step 4.3 closure、および `_06c` の全必須経路を完了した扱いにはしない。
+- 修正: catalogued incomplete focus limitationがproduction normalizerでTypeErrorになる不具合を修正し、typed partialとの扱いを分離。focused regressionとcanonical fixtureを含む `python -m unittest tests.skills.evals.deterministic.test_canonical_usability_fixture tests.skills.evals.deterministic.test_inspection_runtime_contract` は17 tests PASS。`git diff --check` もPASS。
+- Semantic: current final treeに対する有効な83件の最終Judge結果は揃っていない。過去のpartial runや別treeの結果を最終証拠へ流用しない。Trigger 60 query ×3とholdout 8 query ×3もcurrent treeでは未完了。
+- canonical E2E: saved evidence、全live inspection、manual fallback、complete Step 4.3、sample/resampling全条件、fresh post-fix focus handoffを含む全体完了は未確認。Run011のhandoff lifecycleとEARL成功だけでcanonical gateを閉じない。
+- 標準検証 / CI: current working treeでは上記focused testsと`git diff --check`のみ確認。前回PR head `5f97b59f393525486b34e92fca769e13caebe8bc` に対しては `Validate Agent Skills`、`Validate Deterministic Output Evals`、`Validate Semantic Output Evals` がすべてsuccessだが、今回の変更を含む新headのCI証拠ではない。push後に新headを確認する。
+- External acceptance（外部URL、実アカウント、実製品、特定assistive technology等）はrepository fixture検証から分離し、未実施でもrepository implementation未達件数へ含めない。
+- Plan状態: Semantic、Trigger、holdout、canonical E2E全条件、current treeに対する標準検証 / CIに未確認項目が残る。Plan未達件数は完了条件ごとの再照合前のため未確定であり、PR #14 repository implementationを完了扱いにしない。
+- Git write blocker: stage前に `.git/index.lock` が既に存在し、通常の `git add -- $paths` が `fatal: Unable to create '.../.git/index.lock': File exists.` で失敗した。lockは0 byte、作成/更新時刻は2026-10-04 19:28、調査時に稼働中のGit processは見つからなかった。lockを削除・移動・迂回していない。`git status`でPR変更は引き続きunstaged、cached pathは0件、HEADも変化なしと確認。通常commit / pushは未実施。
+- このcheckpointの成果物は状況記録の追記とGit blockerの証拠化まで。次に必要な操作はstale `.git/index.lock` の許可された解消で、その後に明示pathのみstage、通常commit / push、新PR headのCI確認を行うこと。PR headの新CIはまだ開始されていない。
+- Progress: checkpoint整理・report追記は完了。commit / pushはstale index lockのため未完了。PR #14 Plan検証全体も未完了。
+
+### 2026-10-06 23:28 JST — user-cleared lock / staging recovery
+
+- ユーザーが `.git/index.lock` を削除した後に状態を再取得し、lock不在、local / origin PR head `5f97b59f393525486b34e92fca769e13caebe8bc`、staged path 0件を確認。
+- PR対象の変更を明示path配列でstage。合計69 path（tracked変更65、PR用新規4）。`.gitignore` とユーザー所有のuntracked hash fileはいずれもstage対象外。`git diff --cached --check` PASS。
+- 次に通常pre-commit hook付きcommitと通常pushを行う。結果は後続記録に追記する。

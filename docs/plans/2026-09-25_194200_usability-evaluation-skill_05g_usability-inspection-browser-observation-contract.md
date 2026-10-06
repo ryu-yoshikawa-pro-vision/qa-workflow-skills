@@ -57,7 +57,8 @@ semantic layerが追加evidence取得のために指定できるobservation fiel
 | `viewport.metrics` | `viewport-state` | なし | viewport width/height、scroll x/y、document scroll width/height、device scale factor |
 | `element.geometry` | `element-geometry` | `target_ref` | x/y/width/height CSS px、取得不能理由 |
 | `element.state` | `element-state` | `target_ref` | visible、enabled/disabled、checked、selected、expanded等のfixed state object |
-| `document.location` | `document-location` | なし | current page URLのsafe value / limitation |
+| `document.location` | `document-location` | なし | `page.url()` のsafe value / limitation |
+| `document.title` | `document-title` | なし | HTML applicability、最初のHTML title descendantの有無、直接child nodeがtext-onlyか、非空白textを含むかのboolean facts。raw title本文は保持しない |
 | `element.rendered-text` | `element-content` | `target_ref` | Playwright `locator.innerText()` の返却値 |
 | `element.control-value` | `element-content` | `target_ref` | Playwright `locator.inputValue()` の返却値 |
 | `element.selected-values` | `element-content` | `target_ref` | selected optionをDOM順で `{value,label}` 配列化した値 |
@@ -71,7 +72,7 @@ semantic layerが追加evidence取得のために指定できるobservation fiel
 | `interaction.timing` | `interaction-timing` | fixed predicate payload | same-page clockのstart/end/elapsedとpredicate result |
 | `screenshot.image` | `screenshot` | viewport / target / state context | evidence ref |
 
-`browser-observation-catalog.json` の `provided_observation_fields` はこの16-key inventoryの部分集合だけを持ち、全fieldはちょうど1つのprobeへ解決します。unknown key、alias、自然言語field名を受け付けません。これら16 keyはsemantic追加観測interfaceです。WCAG machine procedure内部の固定probe inventoryとは別契約で、LLMへmachine probe keyを返させません。
+`browser-observation-catalog.json` の `provided_observation_fields` はこの17-key inventoryの部分集合だけを持ち、全fieldはちょうど1つのprobeへ解決します。unknown key、alias、自然言語field名を受け付けません。これら17 keyはsemantic追加観測interfaceです。WCAG machine procedure内部の固定probe inventoryとは別契約で、LLMへmachine probe keyを返させません。
 
 ## 3. observation lifecycle
 
@@ -223,6 +224,16 @@ canonical observation field:
 - `document.location`
 
 current document URLはPlaywright `page.url()` のcurrent valueを取得します。observation layerで独自URL正規化をしません。永続化前にPR #12のevidence安全契約へ従い、secret / token等を含み得るquery / fragmentを無条件に保存しません。sanitizationで意味判断に必要な部分を保持できない場合は、値を捏造・無断保存せず `unavailable / limitation` とします。
+
+### `document-title`
+
+canonical observation field:
+
+- `document.title`
+
+`scripts/fixed_browser_probes.js` の独立package-owned fixed dispatchが、HTML root applicability、HTML namespace内で最初のtitle descendantの有無、その直接child nodeが1つ以上のtext nodeのみか、直接text nodeのいずれかがUnicode `White_Space`以外を含むかをboolean factsとして返します。raw title本文、属性、general DOM treeは返しません。title elementを完全に評価できない場合は `incomplete / limitation` とします。任意selector、自由記述JavaScript、AgentによるDOM推測を使いません。
+
+このfixed observationはW3C ACT `2779a5` のapplicability / expectationに必要な事実を限定して取得します。最初のHTML title descendantを使い、直接child nodeがtext nodeだけで、少なくとも1つの直接text nodeがUnicode `White_Space`以外を含む場合にexpectationを満たします。HTML rootの不在は `inapplicable`、HTML rootでtitle descendantがない場合、childrenがtext-onlyでない場合、または非空白textがない場合は `failed` です。
 
 ### `element-content`
 
@@ -479,8 +490,8 @@ tool failureやprobe unavailableをproduct defect / usability issueへ自動変�
 - viewport / element geometry schema
 - `document.location` のfixed probe / sensitive URL handling
 - `element.rendered-text / element.control-value / element.selected-values` のtarget-local fixed probe
-- canonical observation field inventory全16 key → exactly-one probe mapping
-- `document.location` は `page.url()`、`element.rendered-text` は `locator.innerText()`、`element.control-value` は `locator.inputValue()`、`element.selected-values` はselectedOptions `{value,label}` を使用
+- canonical observation field inventory全17 key → exactly-one probe mapping
+- `document.location` はURL専用、`document.title` はACT `2779a5`に必要な限定boolean facts専用とし、`element.rendered-text` は `locator.innerText()`、`element.control-value` は `locator.inputValue()`、`element.selected-values` はselectedOptions `{value,label}` を使用
 - semantic additional observation draft → OBSREQ ref / requester kind / field → probe mapping / state basis identity / evidence fingerprint
 - same request identity + same evidence fingerprint → no-progress
 - unknown observation field → unsupported。自然言語からprobeを推論しない
@@ -510,7 +521,7 @@ tool failureやprobe unavailableをproduct defect / usability issueへ自動変�
 - locator matchingをPlaywright documented semantics + exact matchingへ固定し、独自曖昧matchingを作らない
 - machine-population-indexをrevision / fingerprintなしで再利用しない
 - fixed probe payload / normalizationをSkill-local scriptが所有
-- semantic追加観測用canonical observation field inventoryを本ファイルの16 keyへ固定し、catalogでexactly-one fixed probeへ解決する。semantic layerはfield keyを選べるがscriptは自然言語からprobeを推論しない。formal WCAG machine procedureの固定browser入力は `_05j` を正本とする
+- semantic追加観測用canonical observation field inventoryを本ファイルの17 keyへ固定し、catalogでexactly-one fixed probeへ解決する。semantic layerはfield keyを選べるがscriptは自然言語からprobeを推論しない。formal WCAG machine procedureの固定browser入力は `_05j` を正本とする
 - semantic additional observation requestをOBSREQ ref / identity / evidence fingerprint付きでmaterializeし、no-progressを機械判定する
 - final artifactに `planned` requestを残さず、completed / unsupported / no-progress / blockedのいずれかへ閉じる
 - document location / rendered text / control value / selected value等、business flowの意味判断に必要でmachine取得可能な値をfixed probeで取得する
