@@ -342,7 +342,7 @@ prefix_rule(
 
 `gh auth status --show-token`はoption位置を任意に解析する独自parserを追加しません。`gh auth` family全体が`prompt`であり、直接tokenを出力する`gh auth token`は`forbidden`です。これを「すべてのtoken出力variantを永久禁止した」とは扱いません。
 
-force push、hard reset、commit amend等は永久禁止にしません。`git push` / `git reset` / `git commit`のfamily-level `prompt`でユーザー承認へ送り、protected branch上ではPreToolUseのcontextual denyを優先します。
+force push、hard reset、commit amendは永久禁止にしません。`git push` / `git reset` / `git commit`のfamily-level `prompt`でユーザー承認へ送り、protected branch上ではPreToolUseのcontextual denyを優先します。
 
 CIでは固定版Codex CLI自身の`codex execpolicy check --rules ...`で、rules fileへ埋め込んだ`match` / `not_match`のload-time検証に加え、各ruleから少なくとも1つの`prompt` / `forbidden`代表caseと、read-only boundaryの代表caseを実行します。
 
