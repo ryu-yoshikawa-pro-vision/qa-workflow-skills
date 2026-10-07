@@ -108,7 +108,7 @@ prefix_rule(
     decision = "prompt",
     justification = "Repository autolink mutations require explicit user approval.",
     match = [
-        "gh repo autolink create --key-prefix TICKET- --url-template https://example.invalid/TICKET-<num>",
+        "gh repo autolink create TICKET- https://example.invalid/TICKET-<num>",
         "gh repo autolink delete 123",
     ],
     not_match = [
