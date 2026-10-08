@@ -247,7 +247,7 @@ sanitized target
   ↓
 .qa-eval-output/ をEvaluatorが作成
   ↓
-実Agentが各QA成果物を個別fileとして保存
+実Agentが各QA成果物を個別fileとして保存し、artifact-index.jsonへ登録
   ↓
 Agent終了
   ↓
@@ -255,7 +255,7 @@ Evaluatorがoutput rootをscan
   ↓
 path / symlink / sizeを検証
   ↓
-QA成果物・runtime証拠・runner内部ファイルに分類
+登録済みindexとrouting / 既存Skill出力契約を検証してQA成果物・runtime証拠・runner内部ファイルに分類
   ↓
 各fileのSHA-256と相対path・分類をartifact-manifest.jsonへ記録
   ↓
@@ -274,10 +274,24 @@ Evaluatorは成果物内容を独自schemaへ変換しません。各Skillの既
 - file size
 - SHA-256
 - 正規Skill名（workflowで生成元が特定できないものは未確認として記録し、推測しない）
-- fileの分類（`qa_artifact` / `runtime_evidence` / `runner_internal`）と分類根拠。`qa_artifact`にはroutingに基づく期待工程・成果物種類の対応を記録する
+- fileの分類（`qa_artifact` / `runtime_evidence` / `runner_internal`）と分類根拠。`qa_artifact`には検証済み`artifact-index.json`の登録行、routingに基づく期待工程・成果物種類を紐付ける
 - runtime対象かどうか、および既存Skill契約から必要と判定したverifier request / resultとEvaluator再実行resultへの相対path
 - 各artifactのSHA-256と結び付いたverifier対象artifactの相対path。対応するrequest / resultがないときはnullと欠落理由
 
+### 評価用QA成果物の登録契約
+
+各Skillの既存Markdown本文・runtime保存契約は変えず、フェーズ2だけでAgentに**最小の評価用登録ファイル**`.qa-eval-output/artifact-index.json`を保存させる。root objectは`schema_version=1`と`artifacts[]`のみで、各行に次のキーを必須とする。
+
+```json
+{ "schema_version": 1, "artifacts": [ { "skill": "test-case-design", "kind": "test-case", "scope": "checkout-payment-web", "artifact_id": "tc-design-01", "path": "design/test-case-design/tc-01.md" } ] }
+```
+
+- `skill`は配置済み19 Skillの正規名、`kind`は対象Skillの既存出力契約からEvaluator scenarioに固定した成果物種類、`scope`は今回要求・routingで確定した対象 / 実行範囲、`artifact_id`は同一attempt内で一意の非空ASCII識別子、`path`は`.qa-eval-output/`基準の正規化relative pathとする。上例は形式を示すものであり、すべてのTCが固定の名前になるという意味ではない。
+- evaluatorはscenarioに保持する**既存Skill出力契約から導いた`skill -> kind`許可集合**と登録情報を照合する。`artifact_id`・`path`の重複、同一fileの二重登録、未知のSkill / kind / scope、出力root外path、symlink、file不存在、runtime / internal fileへの参照、cross-attempt参照を拒否する。同じSkillで複数成果物があっても`artifact_id`とpathが別なら許可する。file hash・sizeはEvaluatorが現物から算出し、Agentの申告SHAを信用しない。
+- EvaluatorはAgentの登録行だけからworkflow routingや必須成果物集合を決めない。固定評価要求と実際のrouting / blocked情報から**必要成果物の種類とscope**を照合し、登録済み成果物を対応付ける。分類の裏付けは登録情報とfile実在・許可集合・workflow整合の組合せであり、filenameやMarkdown見出しの推測ではない。Agentの登録はSkillを実使用した証拠とは扱わない。
+- `artifact-index.json`の欠落・schema不正・登録漏れ・分類不能は**`artifact_classification_unverified`（Evaluatorが評価入力を確定できない状態）**として記録する。file自体の存在確認と分類不能を分け、必要なQA成果物が実際に未生成と独立確認できた場合のみSkill品質の非passとする。分類不能なfileを黙って`runner_internal`へ変換して『欠落』扱いしない。schemaが誤りでも収集可能な原fileと診断情報は保存する。分類を補うためのLLM推測・自由なpath走査による自動判定は追加しない。
+
+Evaluatorが作る`artifact-manifest.json`は検証済みindexの各登録をpath・size・SHA-256・runtime証拠との関係へ正規化した結果であり、**Agentの自己申告indexとは別物**である。`artifact-index.json`そのものは`runner_internal`として回収し、Judgeへ正規QA成果物として渡さない。JudgeのQA成果物集合を確定できないattemptは完了PASSにしないが、既に評価可能なsemantic criterionは記録する。
 ### Judge投入対象と内部証拠の境界
 
 `.qa-eval-output/`の全fileは安全なpath・size・hashを検査して**回収とmanifest記録**を行うが、Judgeへ渡すCandidate Outputは次の規則で選ぶ。拡張子やフォルダ名だけで正規QA成果物を推定しない。
@@ -289,7 +303,7 @@ Evaluatorは成果物内容を独自schemaへ変換しません。各Skillの既
 | `runner_internal` | `final-message.md`、Codex診断記録、launcher状態、capture記録等の評価実行情報 | 投入しない |
 
 - `.qa-eval-output/.runtime-evidence/**`と`.qa-eval-output/final-message.md`は**常にQA成果物から除外**する。評価用`.qa-eval-tools/**`もQA成果物ではない。`qa-workflow`のworkflow stateは機械判定用とし、Judgeには成果物上の工程・参照関係を評価させる。内部stateやverifier JSONを成果物内容の代用品にしない。
-- `qa_artifact`はscenarioの要求と実際のroutingから期待される成果物単位を確定し、manifestに記録したSkill名・相対path・SHA-256・成果物種類と照合したものに限る。分類不能なfileはQA成果物へ昇格せず`runner_internal`として回収するが、必須成果物欠落を補わない。
+- `qa_artifact`はscenarioの要求と実際のroutingから期待される成果物単位を確定し、manifestに記録したSkill名・相対path・SHA-256・成果物種類と照合したものに限る。分類不能なfileはQA成果物へ昇格せず、`artifact_classification_unverified`として回収し、未生成と断定しない。必須成果物欠落も補わない。
 - Judgeへ渡す際は、要求から確定した**工程順**、同工程なら**Skill名と正規化relative path昇順**で並べ、各本文にrelative path / Skill / 種類を付ける。Evaluatorが勝手に要約・補完しない。必須QA成果物が欠落した場合は`missing: <required-kind>`と機械的に明示し、stdout / runtime証拠で埋めない。Judge入力全体の選択manifest、file順序、内容fingerprintを保存して比較条件を固定する。
 - 対象外の内部fileにだけ重要情報があっても、QA成果物がその内容を表現していなければ意味評価で救済しない。QA成果物の欠落は独立した機械判定でnon-passとして保存する。
 
