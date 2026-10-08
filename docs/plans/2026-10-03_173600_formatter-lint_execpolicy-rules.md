@@ -6,7 +6,7 @@
 
 Main Planではexecpolicyの目的、Hookとの責務分離、実装順序、検証、完了条件を管理します。このファイルでは実装時に判断を残さないため、Codex 0.160.0の`prefix_rule`へ落とすpattern / decision / `match` / `not_match`だけを具体化します。
 
-Windows実行名はすべてのGit / ghルールで`git` / `git.exe`、`gh` / `gh.exe`をunionで扱います。GitHub CLI公式helpで確認した組み込みaliasのうち、今回のmutation ruleに対応する`gh pr create` / `new`、`pr checkout` / `co`、`issue create` / `new`、`repo create` / `new`、`repo autolink create` / `new`、`secret delete` / `remove`、`variable delete` / `remove`を両実行名で扱います。従来の`gh skill` / `skills`、`gh agent-task` / `agent-tasks` / `agent` / `agents`、`gh release create` / `new`も維持します。
+Windows実行名はすべてのGit / ghルールで`git` / `git.exe`、`gh` / `gh.exe`をunionで扱います。GitHub CLI公式helpで確認した組み込みaliasのうち、今回のmutation ruleに対応する`gh pr create` / `new`、`pr checkout` / `co`、`issue create` / `new`、`repo create` / `new`、`repo autolink create` / `new`、`secret delete` / `remove`、`variable delete` / `remove`を両実行名で扱います。さらに`gh skill install` / `add`（`gh skills`形式も含む）、`gh attestation` / `at`の公式組み込みaliasも対応する既存`prompt` ruleへ含めます。従来の`gh agent-task` / `agent-tasks` / `agent` / `agents`、`gh release create` / `new`も維持します。
 
 このファイルにないGit / GitHub CLIの将来subcommandを推測で追加しません。公式仕様または実際の必要性を確認し、Main Planとこのファイルを同じ変更で更新します。
 
@@ -159,10 +159,10 @@ prefix_rule(
 )
 
 prefix_rule(
-    pattern = [["gh", "gh.exe"], ["skill", "skills"], ["publish", "install", "update"]],
+    pattern = [["gh", "gh.exe"], ["skill", "skills"], ["publish", "install", "add", "update"]],
     decision = "prompt",
     justification = "Publishing creates a release; installing and updating write local files.",
-    match = ["gh skill publish --tag v1", "gh skills publish --tag v1", "gh.exe skill publish --tag v1", "gh skill install owner/repo skill", "gh skill update --all"],
+    match = ["gh skill publish --tag v1", "gh skills publish --tag v1", "gh.exe skill publish --tag v1", "gh skill install owner/repo skill", "gh skill add owner/repo skill", "gh.exe skill add owner/repo skill", "gh skills add owner/repo skill", "gh.exe skills add owner/repo skill", "gh skill update --all"],
     not_match = ["gh skill list", "gh skills preview owner/repo skill", "gh skill search test"],
 )
 
@@ -285,7 +285,7 @@ prefix_rule(
 )
 
 prefix_rule(
-    pattern = [["gh", "gh.exe"], ["auth", "codespace", "gist", "org", "project", "ssh-key", "gpg-key", "extension", "alias", "config", "attestation"]],
+    pattern = [["gh", "gh.exe"], ["auth", "codespace", "gist", "org", "project", "ssh-key", "gpg-key", "extension", "alias", "config", "attestation", "at"]],
     decision = "prompt",
     justification = "These less-common GitHub CLI families can mutate remote, authentication, extension, or local state; prompt the whole family instead of maintaining a subcommand parser.",
     match = [
@@ -293,6 +293,8 @@ prefix_rule(
         "gh gist list",
         "gh project list",
         "gh attestation verify artifact.bin --owner example",
+        "gh at download owner/repo --name artifact",
+        "gh.exe at download owner/repo --name artifact",
     ],
     not_match = [
         "gh status",
@@ -319,7 +321,7 @@ prefix_rule(
 )
 ```
 
-GitHub CLIのmutation-only列挙は、実装時点で確認済みのGitHub CLI公式helpに存在する上記subcommandとその組み込みaliasを今回の正本とします。`pr co` / `new`、`issue new`、`repo new`、`repo autolink new`、`secret remove`、`variable remove`は正規名と同じ`prompt`対象です。user-definedな`gh alias`をすべて展開するparserは追加しません。今後CLIに追加されるsubcommandやaliasを自動的に含めず、更新が必要な場合は公式helpを確認して既存ruleと`match` / `not_match`を同じ変更で更新します。
+GitHub CLIのmutation-only列挙は、実装時点で確認済みのGitHub CLI公式helpに存在する上記subcommandとその組み込みaliasを今回の正本とします。`pr co` / `new`、`issue new`、`repo new`、`repo autolink new`、`secret remove`、`variable remove`は正規名と同じ`prompt`対象です。user-definedな`gh alias`をすべて展開するparserは追加しません。今後CLIに追加されるsubcommandやaliasを自動的に含めず、更新が必要な場合は公式helpを確認して既存ruleと`match` / `not_match`を同じ変更で更新します。`gh skill add` / `gh skills add`は`install`と同じ`prompt`、`gh at`は`attestation`と同じfamily-level `prompt`を維持します。読み取り系`gh skill list` / `gh skill preview`の非一致は維持し、`gh at`のread-only subcommandまで承認対象となる点は既存の`attestation`と同じ方針として許容します。
 
 `gh pr` / `issue` / `repo` / `workflow` / `run` / `release` / `secret` / `variable` / `cache` / `label`は通常開発でread操作を使うためmutation subcommandだけをpromptにします。それ以外の上記less-common familyは、read / mutationを細かく分離する必要性が今回ないためfamily全体をpromptにします。この差を独自parserで埋めません。
 
@@ -420,7 +422,7 @@ CIでは固定版Codex CLI自身の`codex execpolicy check --rules ...`で、rul
 - `git reset HEAD~1` / `git rm *.md` / `gh pr create --body "$BODY"`の拒否と、引用済みの`git reset 'HEAD~1'` / `git rm '*.md'` / `gh pr create --body-file body.md`がそれぞれ既存rulesの`prompt` / `forbidden`へ到達することを、実Git / remote mutationなしで確認すること
 - 新規GitHub CLI操作と別名の代表例、およびMain Plan記載のtoken表示Hook denyを別途検証すること
 - GitHub CLIのmutation-only集合を変更する場合は、実装時点の公式help referenceで正規subcommandと組み込みaliasを再確認すること
-- 今回追加した7種類のaliasについて、`gh` / `gh.exe`の両方が既存ruleの`prompt`に一致すること。`gh pr co 123 --force`は一時Git repositoryで承認要求後に取消し、HEAD / ref / index / working treeが不変であることを確認する。実際のPR checkoutやsecret・variable削除は実行しない
+- 今回追加した7種類のaliasに加え、`gh skill add` / `gh skills add` / `gh at`について、`gh` / `gh.exe`の両方が既存ruleの`prompt`に一致すること。`gh skill list` / `gh skills preview`等は既存どおりmutation-only `prompt`に一致しないこと。`gh pr co 123 --force`は一時Git repositoryで承認要求後に取消し、HEAD / ref / index / working treeが不変であることを確認する。実際のPR checkoutやsecret・variable削除は実行しない
 - read-only commandを無承認に戻すためだけの独自option parserを追加しないこと
 - rule追加を理由にGit / GitHub CLI全体のsecurity frameworkへ拡張しないこと
 
@@ -428,6 +430,8 @@ CIでは固定版Codex CLI自身の`codex execpolicy check --rules ...`で、rul
 
 - Codex execpolicy: https://github.com/openai/codex/blob/rust-v0.160.0/codex-rs/execpolicy/README.md
 - GitHub CLI command reference: https://cli.github.com/manual/gh_help_reference
+- GitHub CLI skill install / add alias: https://cli.github.com/manual/gh_skill_install
+- GitHub CLI attestation / at alias: https://cli.github.com/manual/gh_attestation
 - GitHub CLI skill publish: https://cli.github.com/manual/gh_skill_publish
 - GitHub CLI agent-task: https://cli.github.com/manual/gh_agent-task
 - GitHub CLI discussion: https://cli.github.com/manual/gh_discussion
