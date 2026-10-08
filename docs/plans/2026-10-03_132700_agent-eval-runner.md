@@ -264,10 +264,16 @@ CIではfake Agent commandを使って、ランナー自体の契約・一時実
 1. Evaluator側の`HEAD`、working tree・indexがcleanであることをlive runのpreflightで検証し、Evaluator SHAを保存する。dirty状態では実行しない。
 2. `--skill-revision`で指したGit commitのtracked contentを`git archive`等で取得し、19 Skillの`SKILL.md` / `references/**` / `scripts/**` / `assets/**`だけを配置する。未コミット変更、候補側`evals/**`、Evaluatorのworking treeのSkillを混ぜない。
 3. 配置した各Skill fileの相対path / size / SHA-256からmanifestとSkill package fingerprintを生成し、指定Git treeとの一致を検証する。存在しないcommitや不一致はAgent実行前のerrorにする。
-4. deterministic graderは固定Evaluator側`scripts/skills/evals/deterministic/run.py`と`skills/*/evals/deterministic/validator.py`を使用する。semantic grader、Reference、rubric、Judge prompt / response正規化、および独立判定に使うproduction verifierも固定Evaluator側の実装を使う。
+4. deterministic / semantic grader、Reference、rubric、Judge prompt / response正規化は固定Evaluator側を使用する。ただし、runtime実装の鮮度判定は候補revision由来の信頼済みsourceを参照する。固定版production verifierを候補成果物へそのまま適用して実装fingerprint差をFAILへ変換しない。
 5. Evaluator SHA、graderの内容fingerprint、dataset / rubric / Referenceのfingerprintをprovenanceへ保存する。候補Skill側のeval実装を採点側へimportしない。
 
-Skill-local verifierはSkill本体にも含まれるため、Agentが候補版で実行したinput / resultも実行証拠として保存する。**独立した評価では固定Evaluator版verifierを再実行**し、候補版だけの`valid=true`を採点に使わない。固定版と候補成果物の契約が互換でなく判定不能なら`evaluator_incompatible`として比較不可にする。
+Skill-local verifierはSkill本体にも含まれる。runtimeの再実行と共通の品質判定を次のように分ける。
+
+- **候補実装の鮮度・正当性**：EvaluatorがAgentの作業ツリーから独立して展開した、指定Skill revisionの信頼済みsourceを使い、そのrevisionのproduction verifier / generatorで実際のrequestを再実行する。保存結果との対応、実装fingerprint、generation、`valid`、`current_structure_state`を確認する。候補側のverifierが無効な結果を完成扱いした場合は品質の問題とする。
+- **固定基準の採点**：deterministic / semanticのgrader、expected / rubric / Reference、判定ルールは固定Evaluator revisionを使う。既存`deterministic/runtime_validator.py`の`_source_paths()`は現在Evaluator側`REPO_ROOT`へ固定されているため、このランナーの呼び出しに限り「評価対象source root」を安全に渡す最小の引数経路を追加する。`run.py`からruntime assertionへ明示的に伝播し、**graderのコードとassertionの意味は固定したまま、実装由来のfingerprint / generator version / static-dataの照合先だけを候補の信頼済みsourceへ切り替える**。従来のgrader CLIは引数省略で従来動作を維持し、一般Skill validatorのimport先・eval datasetは変更しない。Agentが編集できるworkspaceをsource rootに指定しない。
+- **契約非互換**：両revisionで共通に判定できるcriteriaを評価し、schema / 機械契約が実際に互換でない部分だけを`evaluator_incompatible`として扱う。単なるimplementation fingerprint相違は非互換理由にならない。`evaluator_incompatible`を品質FAILへ読み替えず、共通部分のsemantic評価まで破棄しない。出力契約が変わり固定graderで評価できない場合は、両revisionを処理できる共通Evaluatorへ更新後、**旧版・新版の両方をそのEvaluatorで新規に実行・再採点**する。過去の別Evaluator評価を混ぜない。互換adapterの汎用基盤は今回作らない。
+
+候補のverifierで合格しただけで品質PASSにはしない。固定graderの検出結果と独立Judge、候補のproduction verifier整合性をそれぞれ保持する。
 
 main / candidate比較は、**同じEvaluator checkoutを起動したまま**`--skill-revision`だけを変更して2 runを生成する。checkout全体を入れ替えてgraderが変わる方式を採らない。
 
@@ -318,7 +324,7 @@ Live CLIへ`--execution-profile <path/to/execution-profile.json>`を必須追加
     "network_policy": "<Judge実行時の外部アクセス条件>",
     "skill_roots": [],
     "global_config": "<disabledまたは非秘密の固定設定fingerprint>",
-    "tools": []
+    "tools": [],
     "mcp_servers": [],
     "external_instructions": "<noneまたは固定指示のfingerprint>"
   },
@@ -343,14 +349,32 @@ Live CLIへ`--execution-profile <path/to/execution-profile.json>`を必須追加
 
 EvaluatorとAgentの間に、ディレクトリ分割だけでなく**OS等による実効読み取り禁止境界**を設ける。Agent subprocessの`cwd`だけでは成立しない。
 
-- Agentが利用できるファイル・mount・tool / MCP・ネットワーク経路に、Evaluator原本のexpected、Reference、rubric、grader、結果、元target checkoutを公開しない。既存OSアクセス権、隔離コンテナ・VM等で制限し、独自sandboxは実装しない。
+- Agentが利用できるファイル・mount・tool / MCPにはEvaluator原本のexpected、Reference、rubric、grader、結果、元target checkoutを公開しない。Linuxの隔離コンテナを今回の実Codex smokeの標準構成とし、独自sandboxは実装しない。外部ネットワーク経由で公開評価資料を取得できる可能性は、ファイル隔離だけでは排除できないため、次節のネットワーク・tool条件を別途確認する。
 - user/global指示・設定・Skill・MCPを固定された評価条件以外から混入させない。認証情報は必要最小限の別経路で渡し、provenanceに書かない。
 - preflightではEvaluator-only領域の**非秘密sentinel**を、Agentと同一権限・mount・tool構成から読めないことを確認する。fake Agentはrunnerの失敗時動作を検査し、実Codex smokeでは実際の読み取り拒否と余分な設定の混入防止を確認する。
 - 拒否境界や実効設定を確認できないrunは`isolation_unverified`として保持しても、比較可能な品質評価にはしない。stderr等は秘密混入を想定し、出力上限・安全化を行い、安全なログとして保存できない生内容は保存しない。
 
+### 実Codex smokeで使用する固定実行構成
+
+今回、**Linux Docker Engine上の使い捨て非特権コンテナ**を実Codex smokeの基準環境とする。Windowsから実施するときはDocker Desktop / WSL2等でLinuxコンテナを起動できることを前提条件とする。Dockerを使用できない環境ではfake Agentによるrunner testまでは実行できるが、実Codex評価の完了とはしない。ほかのAgentにも同等の外部argv契約を使うが、隔離と実効条件を確認できたとみなすのはこのCodex実行構成だけとする。
+
+1. ホストで固定Evaluator checkoutを開き、Evaluator-owned領域で候補Skill tracked contentと（フェーズ2では）sanitized targetを準備する。Dockerの**bind mountは使い捨てAgent-visible workspace一箇所だけ**（読み書き可）と、別途用意した一時`CODEX_HOME`ディレクトリに限定する。Evaluator checkout・採点資料・元target checkout・Docker socket・ホストhomeはmountしない。`--privileged`、host PID、host filesystem mountを使わない。
+2. Codex CLIとPythonが入った固定バージョンのLinux imageを使用し、image digest、Codex CLI version、Python versionをrunへ記録する。`docker run --rm -i --read-only --cap-drop=ALL --security-opt=no-new-privileges`を基本に、`--workdir /workspace`、`--tmpfs /tmp`等の一時書込み領域、`--mount type=bind,src=<Agent-visible workspace>,dst=/workspace`、`--mount type=bind,src=<使い捨てCODEX_HOME>,dst=/codex-home`、`-e CODEX_HOME=/codex-home`を指定する。必要なUID/GIDと書込み権限は作業用ディレクトリへ限定し、出力以外の差分は既存baseline検査で拒否する。実行中コンテナへEvaluator資料を`docker cp`しない。
+3. 認証は既存Codexのログイン情報を使い捨て`CODEX_HOME`へ**起動前に必要最小限で複製**する。ホストの本来の`~/.codex`はmountしない。秘密内容・そのhash・container内の生環境変数は永続保存しない。認証情報がAgent側プロセスから参照可能である制約を認識し、信頼できない入力へ広く公開しない。API keyを使う場合も同様に限定し、明示的な承認なく認証方式を変更しない。
+4. コンテナ内の`config.toml`は評価専用の最小値に固定する。`model`、`model_reasoning_effort`、`sandbox_mode`、`approval_policy`を明示し、既定のMCP server / plugins / 追加Skill / user-global指示・memory / web検索などの評価外入力は使用可能な範囲で無効化する。実効CLI引数と非秘密設定のhashを照合し、未確認の項目は`unverified`にする。必要な19 Skillはworkspace側にだけ配置する。Codex CLIが当該設定を無視・拒否したら比較可能として起動しない。
+5. Agent用コンテナから外部公開評価資料を取得できるtool / MCP / web検索を無効化する。**モデルAPIの通信自体は必要**なので、ネットワーク全遮断とはしない。利用環境でCodex接続に必要な宛先だけを許可できるネットワーク制御（既存egress firewall / proxy等）がある場合はその構成・確認結果を固定する。制御できない場合は公開repository資料へのネットワークアクセスが残るため、隔離を全面証明したとは記録しない。この制約は失敗を隠さず`isolation_unverified`とし、有効な直接比較から除く。
+6. ホストEvaluator-onlyの非秘密sentinelをAgentにmountしない。**Agentと同じコンテナ権限のOSコマンド**で該当host-only pathの読み取り不能を確認し、同時にDocker container inspect相当でmount集合・権限・image digestを確認する。LLMによる「見えない」という返答は証拠にならない。意図的にsentinelを追加mountしたnegative fixtureではpreflight失敗を確認する。
+7. 評価用の最小launcher（`scripts/skills/evals/agent/tools/codex_docker_launcher.py`）はDocker CLIへ`subprocess`のargvで接続し、stdin promptをそのまま`codex exec ... -`へ渡す。`--json`のJSONL stdoutを収集し、`--output-last-message`で得た最終応答だけを共通executorへstdoutとして返す。containerで作成した`.qa-eval-output/`内の一時message fileを回収し、元JSONLからコマンド実行などの**非秘密の事実だけ**を安全化してprovenanceへ保存する。launcherはsmoke用だけであり、共通`executor.py`やSkill PackageにCodex固有SDKを追加しない。JSONL全量を無条件に永続化しない。
+8. JudgeはAgentコンテナ**外のEvaluator側**で、生成とは独立したprocess / sessionを使って起動する。Evaluator資料はJudgeにのみ与える。Judge実行環境の固定model・CLI・設定・Reference hashを別に記録し、生成コンテナの一時認証・workspaceを無条件に共有しない。
+
+`docker version`、イメージ起動、コンテナ内`codex --version` / 認証可否、Python実行、Codex応答、JSONL出力・Skill読取観測、read-denial、必要な通信の成功を**実Agent smokeで確認**してから`verified`へ進める。環境未構築・ネットワーク制御未確認なら比較可能なlive評価を完了したとは報告しない。image digest・model ID・実効設定は実行時に取得して固定し、未確認の値をPlanへ作り込まない。
+
+
 ### 10. Skillの実使用を確認できた範囲で記録する
 
-Skill pathをpromptで指定しても実際に`SKILL.md`等を読んだ証拠にはならない。Agentクライアントのtrace / tool log等で読み取りを観測できた場合のみ、Skill名・file path・証拠相対pathを`observed`として記録し、それ以外は`unverified`とする。観測不能なSkillについても生成成果物の品質判定は保持するが、結果の変化をSkill修正の効果と断言しない。native `description` trigger精度の評価や専用adapterの追加はしない。
+Skill pathをpromptで指定しても実際に`SKILL.md`等を読んだ証拠にはならない。共通ランナーは`observed` / `unverified`を保存する。実Codex smokeでは**`codex exec --json`の`item.started` / `item.completed`にある`command_execution`等**から、指定commitのSkill pathを読む実際のtool操作を確認し、参照したSkill名・path・対象commitと安全化した証拠を対応付ける。Native injectionの内部挙動を「読んだ」と推測せず、ログが読取りを示さないときは`unverified`とする。
+
+**成果物の評価成立**はAgent成果物とgrader / Judgeが採点可能なこと、**Skill修正の効果を検証できたとする条件**はこれに加えて、比較した両attemptで変更対象Skillの読み取りが`observed`となることを要求する。読み取りが観測できても品質変化の因果関係を統計的に証明したとは扱わない。読取り未観測の結果を破棄せず、Skill改善判断についてだけ「未確認」にする。native `description` trigger精度や汎用Agent trace adapterは今回追加しない。
 
 ## 追加する評価実行コード
 
@@ -694,6 +718,7 @@ batchは途中1件が失敗しても残りcaseを実行し、最後に全体結�
 - `scripts/skills/evals/agent/scenarios/qa-training-store-checkout-payment-web-v1/scenario.json`
 - `scripts/skills/evals/agent/scenarios/qa-training-store-checkout-payment-web-v1/task.md`
 - `scripts/skills/evals/agent/scenarios/qa-training-store-checkout-payment-web-v1/rubric.json`
+- `scripts/skills/evals/agent/tools/codex_docker_launcher.py`（手動の実Codex smoke専用。共通executorからは外部argvとして呼ぶ）
 - `scripts/skills/evals/agent/README.md`
 - `scripts/skills/evals/agent/tests/`
 - `tests/skills/evals/agent/`
@@ -735,6 +760,9 @@ fake Agent subprocessを使って少なくとも次を検証します。
 - `--agent-command`後続argvを順序どおり渡す
 - batchで1件失敗しても残りcaseを継続する
 - `--repeat`でattemptを独立保存する
+- 候補runtime実装のfingerprintと候補sourceを照合し、固定Evaluator側実装fingerprintへ誤照合しない。既存graderの通常CLIは従来の評価動作を維持する
+- 入出力証拠の欠落をSkill品質failにせず`evidence_unverified`と分類する。実際の`valid=false`とは区別する
+- 正常・重要欠落・根拠のない動作を含む評価専用fixtureを使い、semantic Judgeの判定方向と根拠を確認する
 - 異なるSkill revisionを同じ固定graderで採点し、比較条件が異なる結果は`not_comparable`にする
 - 秘密を含み得るargv・環境変数・生ログがprovenanceに残らない
 
@@ -780,6 +808,13 @@ repositoryの既存caseを使い、fake Agentで次を自動検証します。
 - `valid=false`同士の再実行一致をPASSにしない。`workflow_runtime.py`の実行成功とcompletionを区別する
 - 元repoの`docs/PROJECT_CONTEXT.md`等をAgent-visible環境から読み取れないことを実環境の隔離検証で確認する
 - cleanup後にsanitized targetが残らない
+
+### 品質差を検出できることの受入検証
+
+固定Evaluator・rubric・Referenceを使い、(1)規範仕様に根拠を持つ正常なQA成果物、(2)Checkout / Paymentの重要なBR / AC・境界条件を意図的に欠落させた成果物、(3)根拠のない動作を追加した成果物を**Evaluator-only fixture**として採点する。期待方向は正常例がpass、重要欠落・捏造例が該当critical criterionで低評価または`needs_review` / `fail`となり、その根拠が規範Referenceに追跡できることとする。既存semantic prompt builder / normalizerは利用するが、Judgeの文章が存在するだけで成功にしない。結果が期待方向と異なればrubric / criteriaを修正し、同じ固定条件でfixtureとbaseline / candidate両方を再実行する。恣意的な「総合点」は導入しない。
+
+deterministicではruntime実装だけを変更した候補（payload / schema / 結果意味は同一）を用い、旧Evaluator graderの固定assertionで**候補sourceと整合するfingerprint**を受け入れつつ、改ざんされたfingerprintと不正なpayloadは検出することを確認する。互換性のないfixtureでは該当機械criteriaだけ`evaluator_incompatible`となり、意味品質の判定を失わないことも検証する。同一Skill / model / inputの`--repeat`で結果の揺れを個別attemptに残し、差を無条件に改善と呼ばないことを検証する。
+
 
 ### 追加の比較・隔離検証
 
@@ -939,11 +974,14 @@ native trigger評価は、Skill activationを観測する方法がAgentクライ
 - fake Agentを使うrunner unit / integration testがpassする
 - 既存deterministic / runtime / semantic / trigger testがpassする
 - 通常GitHub Actionsで外部LLMを呼ばない
+- Linux Docker上の実Codex smokeで、image / CLI / 認証・最低限のnetwork・Evaluator-only領域の読み取り拒否・非秘密実行profileを検証している
 - `TC-OUT-001`、`TCN-OUT-001`、`TC-SEM-001`、`WF-SEM-003`を実Codexで同branch上から実行し、生成・保存・grader起動・結果集計まで完了する
 - 実Codex smokeでrunner起因の未処理エラーが0件
 - 実Codexの非pass結果がある場合、その結果を隠さず保存・報告できる
 - 各live runにSkill revision、評価入力 / scenario fingerprint、Agent名 / model等の比較に必要なprovenanceが保存される
-- 2つの実runでEvaluator・入力・Judge・実効Agent profile・隔離・repeatの一致を確認し、異なるSkill package revisionだけを比較する。Skill使用が未観測なら効果の帰属を未確認と明示する
+- 2つの実runでEvaluator・入力・Judge・実効Agent profile・隔離・repeatの一致を確認し、異なるSkill package revisionだけを比較する。変更対象Skillの読取りを双方で実Codex JSONLから確認できない場合は改善効果の検証未成立とする
+- 同一Evaluatorで正常・重要欠落・捏造のQA成果物を判別できた根拠とrepeatの揺れを保存する
+- 互換なruntime implementation更新がfingerprint相違だけを理由に非passとならず、真の契約非互換を個別criteriaへ区分できる
 - `qa-training-store`固定revision `84ce165493649550832731a60cf436f8ae29c56b` を対象にフェーズ2初回評価と独立したrepeat試行を実行している
 - Checkout / PaymentのWeb範囲で実Agentによる分析・設計workflowが完了し、成果物・workflow・traceability・意味評価結果が保存されている
 - `qa-training-store`のProduct Code、既存Test、規範仕様に許可外変更がない
