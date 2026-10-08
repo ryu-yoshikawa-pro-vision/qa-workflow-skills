@@ -6,7 +6,7 @@
 
 Main Planではexecpolicyの目的、Hookとの責務分離、実装順序、検証、完了条件を管理します。このファイルでは実装時に判断を残さないため、Codex 0.160.0の`prefix_rule`へ落とすpattern / decision / `match` / `not_match`だけを具体化します。
 
-Windows実行名はすべてのGit / ghルールで`git` / `git.exe`、`gh` / `gh.exe`をunionで扱います。`gh skill` / `skills`、`gh agent-task` / `agent-tasks` / `agent` / `agents`、`gh release create` / `new`も既知aliasとして含めます。
+Windows実行名はすべてのGit / ghルールで`git` / `git.exe`、`gh` / `gh.exe`をunionで扱います。GitHub CLI公式helpで確認した組み込みaliasのうち、今回のmutation ruleに対応する`gh pr create` / `new`、`pr checkout` / `co`、`issue create` / `new`、`repo create` / `new`、`repo autolink create` / `new`、`secret delete` / `remove`、`variable delete` / `remove`を両実行名で扱います。従来の`gh skill` / `skills`、`gh agent-task` / `agent-tasks` / `agent` / `agents`、`gh release create` / `new`も維持します。
 
 このファイルにないGit / GitHub CLIの将来subcommandを推測で追加しません。公式仕様または実際の必要性を確認し、Main Planとこのファイルを同じ変更で更新します。
 
@@ -68,7 +68,7 @@ prefix_rule(
 )
 
 prefix_rule(
-    pattern = [["gh", "gh.exe"], "pr", ["create", "checkout", "close", "comment", "edit", "lock", "merge", "ready", "reopen", "revert", "review", "unlock", "update-branch"]],
+    pattern = [["gh", "gh.exe"], "pr", ["create", "new", "checkout", "co", "close", "comment", "edit", "lock", "merge", "ready", "reopen", "revert", "review", "unlock", "update-branch"]],
     decision = "prompt",
     justification = "Pull request mutations and local checkout require explicit user approval.",
     match = [
@@ -77,6 +77,10 @@ prefix_rule(
         "gh pr merge 123",
         "gh pr merge 123 -R owner/repo",
         "gh pr checkout 123",
+        "gh pr new --title test --body test",
+        "gh.exe pr new --title test --body test",
+        "gh pr co 123 --force",
+        "gh.exe pr co 123 --force",
     ],
     not_match = [
         "gh pr list",
@@ -90,11 +94,13 @@ prefix_rule(
 )
 
 prefix_rule(
-    pattern = [["gh", "gh.exe"], "issue", ["create", "close", "comment", "delete", "develop", "edit", "lock", "pin", "reopen", "transfer", "unlock", "unpin"]],
+    pattern = [["gh", "gh.exe"], "issue", ["create", "new", "close", "comment", "delete", "develop", "edit", "lock", "pin", "reopen", "transfer", "unlock", "unpin"]],
     decision = "prompt",
     justification = "Issue mutations and development-branch creation require explicit user approval.",
     match = [
         "gh issue create --title test --body test",
+        "gh issue new --title test --body test",
+        "gh.exe issue new --title test --body test",
         "gh issue close 123",
         "gh issue develop 123",
     ],
@@ -106,11 +112,13 @@ prefix_rule(
 )
 
 prefix_rule(
-    pattern = [["gh", "gh.exe"], "repo", ["archive", "clone", "create", "delete", "edit", "fork", "read-file", "rename", "set-default", "unarchive"]],
+    pattern = [["gh", "gh.exe"], "repo", ["archive", "clone", "create", "new", "delete", "edit", "fork", "read-file", "rename", "set-default", "unarchive"]],
     decision = "prompt",
     justification = "Repository mutations and repository-local file writes require explicit user approval.",
     match = [
         "gh repo create example",
+        "gh repo new example --private",
+        "gh.exe repo new example --private",
         "gh repo clone owner/repo",
         "gh repo read-file README.md --output README.copy.md",
         "gh repo rename new-name",
@@ -123,11 +131,13 @@ prefix_rule(
 )
 
 prefix_rule(
-    pattern = [["gh", "gh.exe"], "repo", "autolink", ["create", "delete"]],
+    pattern = [["gh", "gh.exe"], "repo", "autolink", ["create", "new", "delete"]],
     decision = "prompt",
     justification = "Repository autolink mutations require explicit user approval.",
     match = [
         "gh repo autolink create TICKET- https://example.invalid/TICKET-<num>",
+        "gh repo autolink new TICKET- https://example.invalid/TICKET-<num>",
+        "gh.exe repo autolink new TICKET- https://example.invalid/TICKET-<num>",
         "gh repo autolink delete 123",
     ],
     not_match = [
@@ -219,12 +229,14 @@ prefix_rule(
 )
 
 prefix_rule(
-    pattern = [["gh", "gh.exe"], "secret", ["delete", "set"]],
+    pattern = [["gh", "gh.exe"], "secret", ["delete", "remove", "set"]],
     decision = "prompt",
     justification = "Secret mutations require explicit user approval.",
     match = [
         "gh secret set TOKEN --body value",
         "gh secret delete TOKEN",
+        "gh secret remove TOKEN",
+        "gh.exe secret remove TOKEN",
     ],
     not_match = [
         "gh secret list",
@@ -232,12 +244,14 @@ prefix_rule(
 )
 
 prefix_rule(
-    pattern = [["gh", "gh.exe"], "variable", ["delete", "set"]],
+    pattern = [["gh", "gh.exe"], "variable", ["delete", "remove", "set"]],
     decision = "prompt",
     justification = "Variable mutations require explicit user approval.",
     match = [
         "gh variable set NAME --body value",
         "gh variable delete NAME",
+        "gh variable remove NAME",
+        "gh.exe variable remove NAME",
     ],
     not_match = [
         "gh variable get NAME",
@@ -305,7 +319,7 @@ prefix_rule(
 )
 ```
 
-GitHub CLIのmutation-only列挙は、実装時点で確認済みのGitHub CLI help referenceに存在する上記subcommandを今回の正本とします。将来GitHub CLIへ新しいsubcommandが追加されても自動的にこの集合へ含めません。別変更で公式helpを確認し、ruleと`match` / `not_match`を更新します。
+GitHub CLIのmutation-only列挙は、実装時点で確認済みのGitHub CLI公式helpに存在する上記subcommandとその組み込みaliasを今回の正本とします。`pr co` / `new`、`issue new`、`repo new`、`repo autolink new`、`secret remove`、`variable remove`は正規名と同じ`prompt`対象です。user-definedな`gh alias`をすべて展開するparserは追加しません。今後CLIに追加されるsubcommandやaliasを自動的に含めず、更新が必要な場合は公式helpを確認して既存ruleと`match` / `not_match`を同じ変更で更新します。
 
 `gh pr` / `issue` / `repo` / `workflow` / `run` / `release` / `secret` / `variable` / `cache` / `label`は通常開発でread操作を使うためmutation subcommandだけをpromptにします。それ以外の上記less-common familyは、read / mutationを細かく分離する必要性が今回ないためfamily全体をpromptにします。この差を独自parserで埋めません。
 
@@ -405,7 +419,8 @@ CIでは固定版Codex CLI自身の`codex execpolicy check --rules ...`で、rul
 - 正規prefixのexecpolicy承認と、先行オプションおよびshell解析に失敗する展開引数による非対応形式のPreToolUse実行前denyをMain PlanのPOSIX / Windows contract testおよびfresh runtime受入で別々に確認すること
 - `git reset HEAD~1` / `git rm *.md` / `gh pr create --body "$BODY"`の拒否と、引用済みの`git reset 'HEAD~1'` / `git rm '*.md'` / `gh pr create --body-file body.md`がそれぞれ既存rulesの`prompt` / `forbidden`へ到達することを、実Git / remote mutationなしで確認すること
 - 新規GitHub CLI操作と別名の代表例、およびMain Plan記載のtoken表示Hook denyを別途検証すること
-- GitHub CLIのmutation-only集合を変更する場合は、実装時点の公式help referenceでsubcommandを再確認すること
+- GitHub CLIのmutation-only集合を変更する場合は、実装時点の公式help referenceで正規subcommandと組み込みaliasを再確認すること
+- 今回追加した7種類のaliasについて、`gh` / `gh.exe`の両方が既存ruleの`prompt`に一致すること。`gh pr co 123 --force`は一時Git repositoryで承認要求後に取消し、HEAD / ref / index / working treeが不変であることを確認する。実際のPR checkoutやsecret・variable削除は実行しない
 - read-only commandを無承認に戻すためだけの独自option parserを追加しないこと
 - rule追加を理由にGit / GitHub CLI全体のsecurity frameworkへ拡張しないこと
 
@@ -417,6 +432,10 @@ CIでは固定版Codex CLI自身の`codex execpolicy check --rules ...`で、rul
 - GitHub CLI agent-task: https://cli.github.com/manual/gh_agent-task
 - GitHub CLI discussion: https://cli.github.com/manual/gh_discussion
 - GitHub CLI auth status: https://cli.github.com/manual/gh_auth_status
+- GitHub CLI alias（PR作成・切替）: https://cli.github.com/manual/gh_pr_create / https://cli.github.com/manual/gh_pr_checkout
+- GitHub CLI alias（Issue / repository作成）: https://cli.github.com/manual/gh_issue_create / https://cli.github.com/manual/gh_repo_create
+- GitHub CLI alias（autolink作成）: https://cli.github.com/manual/gh_repo_autolink_create
+- GitHub CLI alias（secret / variable削除）: https://cli.github.com/manual/gh_secret_delete / https://cli.github.com/manual/gh_variable_delete
 - GitHub CLI `gh pr`: https://cli.github.com/manual/gh_pr
 - GitHub CLI `gh issue`: https://cli.github.com/manual/gh_issue
 - GitHub CLI `gh repo`: https://cli.github.com/manual/gh_repo
