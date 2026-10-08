@@ -282,6 +282,16 @@ Skill-local verifierはSkill本体にも含まれる。runtimeの再実行と共
 
 この候補再実行は**鮮度と結果再現の検証**であり、固定品質判定の代わりではない。候補が`valid=true`を返しても、固定Evaluatorの共通機械判定・意味Judgeの基準を満たさなければPASSにしない。候補sourceを隔離実行できない環境ではrunner / environment errorとして残し、Skill品質FAILへ変換しない。
 
+### フェーズ2で固定する共通機械判定
+
+フェーズ2はcase固有`expected.json`がないため、既存の`deterministic/run.py`を架空eval IDで起動しない。代わりに**固定Evaluator内の**`scripts/skills/evals/agent/common_runtime_checks.py`が、回収した成果物本文・artifact manifest・保存request / result・workflow runtime resultを、候補verifierの`valid`とは独立して検査する。
+
+- JSON fenceの厳格解析、Runtime Input / Resultの一致、Machine Entity構造と重複、input / model / generation / upstream依存fingerprintの再計算、entity / runtime間dependencyの整合は、固定Evaluatorの`deterministic/runtime_validator.py`にある純粋なparser・assertionを再利用または必要な部分を共通関数へ切り出す。`expected.json`に依存した固定caseのexact期待Entity集合検査は流用しない。
+- stable ID一意性、Authority / TR / TCN / CI / TC間の参照、孤立・逆向き・重複edge、coverage / closureは、固定Evaluator側の`skills/coverage-analysis/scripts/traceability.py`のgraph検査・規範を、候補sourceをimportせず再利用する。保存normalized inputと回収した同一attemptのMachine Entity / graph根拠を照合する。固定targetの`BR-CHECKOUT-001..003` / `AC-CHECKOUT-001..003`をEvaluator scenarioから固定し、Agentの入力省略で検証対象が狭まらないようにする。正当にblockedな箇所は未完了として保存し、存在しないtest caseは捏造しない。
+- expected runtime unit / entity集合の導出は固定scenario scope・既存Skill契約・保存済み正規入力・実際のroutingを突き合わせて行う。routing自己申告だけで母集団を縮小せず、routing不足も判定に残す。必要な入力がなく判定不能なら`evidence_unverified`または`evaluator_incompatible`として検証済みPASSにしない。
+- **候補verifierは生成・鮮度の照合にのみ使う。** 候補`valid=true`だが固定検査FAILなら、具体的な共通assertionを機械品質の非passとする。候補`valid=false`で固定検査PASSでも候補側の契約失敗を隠して全体PASSにはせず、双方の結果を保存する。schemaの意味が異なり共通判定不能な部分は`evaluator_incompatible`とし、必要なら両revision対応の固定Evaluatorで両方を新規実行する。
+
+新しいproduction verifier、全Skill専用parser、独自graph engineは作らない。`common_runtime_checks.py`は共通不変条件の呼出しと結果集計のみを持ち、候補sourceの検証ロジックへ委譲しない。受入テストでは正常baseline、runtime fingerprintのみ変更した候補、`valid=true`を常に返すよう弱体化した候補、重複stable ID・未解決参照・欠けた必須edgeを持つ不正成果物を確認する。弱体化候補が`valid=true`でも固定機械判定FAILになることを要求する。
 main / candidate比較は、**同じEvaluator checkoutを起動したまま**`--skill-revision`だけを変更して2 runを生成する。checkout全体を入れ替えてgraderが変わる方式を採らない。
 
 ### 8. Agent / Judgeの実効実行条件を固定する
