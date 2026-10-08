@@ -280,15 +280,33 @@ Evaluatorは成果物内容を独自schemaへ変換しません。各Skillの既
 
 ### 評価用QA成果物の登録契約
 
-各Skillの既存Markdown本文・runtime保存契約は変えず、フェーズ2だけでAgentに**最小の評価用登録ファイル**`.qa-eval-output/artifact-index.json`を保存させる。root objectは`schema_version=1`と`artifacts[]`のみで、各行に次のキーを必須とする。
+各Skillの既存Markdown本文・runtime保存契約は変えず、フェーズ2だけでAgentに**最小の評価用登録ファイル**`.qa-eval-output/artifact-index.json`を保存させる。root objectは`schema_version=1`、`artifacts[]`、`routing[]`の3キーとする。`artifacts[]`は実在成果物、`routing[]`はAgentが各工程について行った判断を記録する。両方は自己申告であり、Evaluatorが独立して検証する。
 
 ```json
-{ "schema_version": 1, "artifacts": [ { "skill": "test-case-design", "kind": "test-case", "scope": "checkout-payment-web", "artifact_id": "tc-design-01", "path": "design/test-case-design/tc-01.md" } ] }
+{
+  "schema_version": 1,
+  "artifacts": [
+    {"skill":"test-case-design","kind":"test-case","scope":"checkout-payment-web","artifact_id":"tc-design-01","path":"design/test-case-design/tc-01.md"}
+  ],
+  "routing": [
+    {"skill":"test-case-design","scope":"checkout-payment-web","status":"executed","reason":"test-condition-designの結果から詳細TCを作成","artifact_ids":["tc-design-01"]}
+  ]
+}
 ```
 
 - `skill`は配置済み19 Skillの正規名、`kind`は対象Skillの既存出力契約からEvaluator scenarioに固定した成果物種類、`scope`は今回要求・routingで確定した対象 / 実行範囲、`artifact_id`は同一attempt内で一意の非空ASCII識別子、`path`は`.qa-eval-output/`基準の正規化relative pathとする。上例は形式を示すものであり、すべてのTCが固定の名前になるという意味ではない。
 - evaluatorはscenarioに保持する**既存Skill出力契約から導いた`skill -> kind`許可集合**と登録情報を照合する。`artifact_id`・`path`の重複、同一fileの二重登録、未知のSkill / kind / scope、出力root外path、symlink、file不存在、runtime / internal fileへの参照、cross-attempt参照を拒否する。同じSkillで複数成果物があっても`artifact_id`とpathが別なら許可する。file hash・sizeはEvaluatorが現物から算出し、Agentの申告SHAを信用しない。
-- EvaluatorはAgentの登録行だけからworkflow routingや必須成果物集合を決めない。固定評価要求と実際のrouting / blocked情報から**必要成果物の種類とscope**を照合し、登録済み成果物を対応付ける。分類の裏付けは登録情報とfile実在・許可集合・workflow整合の組合せであり、filenameやMarkdown見出しの推測ではない。Agentの登録はSkillを実使用した証拠とは扱わない。
+### routing判断と必須成果物の判定
+
+`routing[]`の各行は`skill` / `scope` / `status` / `reason` / `artifact_ids[]`を必須とする。`status`は`executed`、`reused`、`skipped`、`blocked`、`incomplete`のいずれかとする。Skill名は正規名、scopeは今回の要求から定めた正規値、reasonは空でない文字列、artifact_idsは上記artifactsのID（重複なし）とする。`executed`では生成した成果物のIDを紐付ける。`reused`では同一attemptで実体・鮮度・元の生成者を検証できる成果物への参照だけ許す。`skipped` / `blocked` / `incomplete`では対応scopeと理由を残し、完了を偽装しない。`qa-workflow`自体の最終判断は最終stdout / workflow runtimeを対応証拠とするため、`artifact_ids=[]`でもよい。
+
+- 固定scenarioには、要求結果として**仕様根拠の整理、テスト分析、TR、TCN / CI、TC、カバレッジ確認、反証レビュー、最終workflow判断**の8種類と対応する正規担当Skill / scopeを定義する。`question-analysis`は実際に不明点・矛盾を解消する必要がある場合だけ要求する。E2E実装・実行や全19 Skillを常時必須にしない。これらの結果を作る順序・必要性の細部は既存`qa-workflow` / 工程Skill契約に従う。
+- Evaluatorは固定scenarioの要求結果を起点に、各結果の存在を確認し、`routing[]`を照合する。明示されていない必須工程の行、重複`(skill, scope)`、未知status、不正ID参照、`executed`なのに実ファイルなし、`reused`だが信頼可能な既存成果物なしを検出する。`routing[]`が空でもAgentの省略判断を正しいと仮定しない。
+- `skipped` / `blocked` / `incomplete`は無条件に正当化しない。省略・blocked理由が固定要求や既存Skillの条件付きrouting規則と矛盾する場合はrouting品質の非passとする。機械的に判定できない理由は`QTS-SEM-001/002`の固定Judgeへuntrustedな自己申告として渡し、根拠不足なら`needs_review` / 未完了とし、成功扱いしない。
+- `artifact-index.json`自体の欠落・構文不正・routing登録不備は`evidence_unverified`（`reason=routing_record`または`artifact_classification`）として記録する。**QA成果物ファイルが実際に未生成**であることを独立確認できた場合や、必須工程を根拠なく省略したことが確認できた場合に限り品質non-passとし、単なる登録不備を成果物未生成と混同しない。
+- 回収したrouting記録・Evaluator照合結果・最終回答・workflow runtime要約を同じattemptの証拠として結び付ける。routing記録はQA成果物に昇格させず、Judge入力では`QTS-SEM-001/002`の専用区分にのみ使用する。新たな汎用workflow engineやSkill本体の保存契約変更は行わない。
+
+- EvaluatorはAgentの登録行だけからworkflow routingや必須成果物集合を決めない。上記の**固定scenarioの要求結果**から必要成果物の種類・scopeを先に確定し、申告された`routing[]` / blocked理由と照合して登録済み成果物を対応付ける。分類の裏付けは登録情報とfile実在・許可集合・workflow整合の組合せであり、filenameやMarkdown見出しの推測ではない。Agentの登録はSkillを実使用した証拠とは扱わない。
 - `artifact-index.json`の欠落・schema不正・登録漏れ・分類不能は**`evidence_unverified`（`reason=artifact_classification`。Evaluatorが評価入力を確定できない状態）**として記録する。file自体の存在確認と分類不能を分け、必要なQA成果物が実際に未生成と独立確認できた場合のみSkill品質の非passとする。分類不能なfileを黙って`runner_internal`へ変換して『欠落』扱いしない。schemaが誤りでも収集可能な原fileと診断情報は保存する。分類を補うためのLLM推測・自由なpath走査による自動判定は追加しない。
 
 Evaluatorが作る`artifact-manifest.json`は検証済みindexの各登録をpath・size・SHA-256・runtime証拠との関係へ正規化した結果であり、**Agentの自己申告indexとは別物**である。`artifact-index.json`そのものは`runner_internal`として回収し、Judgeへ正規QA成果物として渡さない。JudgeのQA成果物集合を確定できないattemptは完了PASSにしないが、既に評価可能なsemantic criterionは記録する。
@@ -334,7 +352,7 @@ Evaluatorはsanitized target生成時に、正解情報を含まない最小の�
 ラッパーは評価用のプロセス入出力transportだけを担い、runtime検証アルゴリズムを再実装しない。標準ライブラリで実装し、CIのfake Agentでfile記録・再試行・欠落・不正なrequest・symlink / path traversal・atomic書込み失敗を検証する。実Codexでは記録済みJSONと`--json` tool traceの実行イベントを照合する。
 ### 成果物とproduction verifierの対応・判定
 
-EvaluatorはAgentが作成したartifactだけを見て、必要な成果物や証拠が揃っていると推測しません。評価要求と`qa-workflow`による実際のrouting（対象scope・スキップ・blocked・完了状態）から、今回必要な成果物集合を導出します。routing自体が不足・矛盾するときは、期待工程を独自の固定9工程へ置換せず、workflowの品質不足として記録します。
+EvaluatorはAgentが作成したartifactだけを見て、必要な成果物や証拠が揃っていると推測しません。**固定scenarioの要求結果と既存Skillの担当契約**から必須成果物の種類・scopeを確定し、申告された`routing[]`、実成果物、最終stdout / runtime状態と照合します。自己申告だけで母集団を縮小しません。条件付きSkillの省略理由は固定ルールまたは`QTS-SEM-001/002`で検証し、根拠不足は完了と扱いません。全19 Skillを固定順で実行させることもしません。
 
 - runtime-enabled Skillの各成果物について、同一attempt内で`Skill名 + artifact相対path + SHA-256 + request / result / invocation path`を対応させる。重複path・他attemptの証拠を拒否する。`qa-workflow`は`verify_runtime_evidence`と`workflow_runtime.py`のinput / resultを別々に集め、片方が欠落した場合はその観測状態を残す。
 - Evaluatorのrequest置換は`artifact_markdown`のみとする。normalized input、previous artifact、scope、expected Entity等を都合よく修正しない。参照された依存成果物の所在とhashも同一attemptで照合する。
@@ -512,7 +530,7 @@ ratingの共通尺度は既存`semantic/prompt_builder.py`に従う。`4`は要�
 
 フェーズ2のCLIもフェーズ1と同じ`--repeat N`（既定1）を受け付け、**attemptごとにfreshなsanitized target・synthetic baseline commit・実Agent session・成果物回収・verifier再実行・Judge呼び出し**を行います。1回目の生成物を2回目へ持ち込まず、attempt番号と結果を別保存します。集計は各attemptの既存`pass / needs_review / fail / execution error`件数と根拠だけとし、独自総合点や統計的な有意差判定は作りません。
 
-Evaluatorは配置した19 SkillのGit tree / SHA-256と生成promptへの明示指定を**Skill投入条件として検証**する。Agent側のtool logやJSONLから`SKILL.md`読取が分かれば別途`observed`として記録し、分からなければ`unverified`とする。native injectionではOSコマンドログに現れないため、`unverified`だけで成果物品質の直接比較を無効にしない。ただしSkill修正が差分を生んだという因果関係は断定しない。これはnative `description` triggerの精度評価ではない。
+Evaluatorは19 SkillのGit tree / SHA-256とprompt指定を投入条件として検証し、Agentの`SKILL.md`読取 / 適用に関するtraceは別に`observed` / `unverified`として残す。native injectionはOSコマンドに現れないことがあるため、未観測だけで**成果物品質比較**を無効にしない。ただし**Skill改修の効果判断**では、変更されかつ`routing[]`で対象になったSkillについて双方のrunに使用証拠が必要。観測できなければ成果物差だけ報告しSkill効果は判断不能とする。複数Skillの個別寄与も断定しない。native `description` trigger評価ではない。
 
 異なるSkill revision間の直接比較は、**Evaluator SHA・grader / production verifier / rubric / Reference SHA・target SHA・scenario / input fingerprint・Agent / Judge実効設定・隔離条件・繰り返し条件**が一致し、比較対象Skill packageの内容だけが異なる場合に限ります。観測できないmodel/backend更新や使用状況は制約として明記し、原因をSkill差分だけに帰属させません。
 
@@ -570,12 +588,12 @@ Agent executionは、Eval dataset由来のpromptでも、固定対象repo向けp
 6. 元`docs/PROJECT_CONTEXT.md`を除外し、正規stable keyを持つ評価用`AGENTS.md`と評価用`docs/PROJECT_CONTEXT.md`を生成・検証する
 7. 候補`qa-workflow-skills` 19 Skillを`.agents/skills/`へ配置する
 8. sanitized targetをfresh Git repositoryにし、Evaluator-owned synthetic baseline commitを作成する
-9. `.qa-eval-output/`を作成し、Checkout / Payment評価要求、評価用`artifact-index.json`登録契約、Agent / model、Judgeの独立Docker profileとtimeout条件をrun provenanceへ記録する
+9. `.qa-eval-output/`を作成し、Checkout / Payment評価要求、`artifact-index.json`の`artifacts[]` / `routing[]`契約、Agentの必須`timeout_seconds` / Judgeの独立Docker profile・timeout条件をrun provenanceへ記録する
 10. 各repeatの新規target / Agent sessionで実Agentを起動し、分析・設計workflowを実行する。使用証拠の観測可否を記録する
 11. 読み取り専用mountでProduct Code / Test / Spec / Skill / 評価用設定の書込みを拒否したことを検証し、終了後にtracked / untracked / ignoredを含むbaselineとの差分・追加commitを確認する
-12. `artifact-index.json`を既存Skill出力種類・routing・実fileと照合し、QA成果物・runtime証拠・runner内部fileを分類した`artifact-manifest.json`を作成する。分類不能を未生成と区別し、`.agent-eval-runs/`へ回収する
-13. workflow routingと成果物集合を照合し、捕捉済みartifact・request / result / invocationを対応付ける。候補tracked source版verifierをネットワークなしの別Docker内で再実行し、固定Evaluatorの`common_runtime_checks.py`で独立機械判定する
-14. 正規QA成果物と、`QTS-SEM-001/002`専用の最終stdout / 機械判定要約を別区分で固定Judgeに渡し、既存prompt builder / normalizerで意味評価する。Judgeのtimeout・子孫終了・追加tool排除を確認する
+12. 固定scenarioの要求結果を基準に`artifact-index.json`の`routing[]`・`artifacts[]`を既存Skill条件と実fileに照合する。QA成果物・runtime証拠・内部fileを分類した`artifact-manifest.json`を作り、routing登録不足・分類不能と実際の未生成を区別して回収する
+13. 固定要求とrouting判断・成果物を照合し、条件付き省略の正当性を検証して、捕捉済みartifact・request / result / invocationを対応付ける。候補tracked source版verifierをネットワークなしの別Docker内で再実行し、固定Evaluatorの`common_runtime_checks.py`で独立機械判定する
+14. 正規QA成果物と、`QTS-SEM-001/002`専用の`routing[]`・最終stdout・機械判定要約を別区分で固定Judgeに渡し、既存prompt builder / normalizerで意味評価する。Judgeのtimeout・子孫終了・追加tool排除を確認する
 15. workflow / traceability / semantic結果とprovenanceを同じrunへ保存する
 16. runner / environment起因の失敗、Skill品質上のnon-pass、`evidence_unverified`、隔離・実効設定未確認、部分的Evaluator非互換を分けて報告する。必須証拠が未確認ならsemantic passでもattempt `needs_review` / exit 1、Runner障害ならexit 2とする。Skillの内部使用ログだけが`unverified`なら成果物品質比較を妨げない
 
@@ -595,7 +613,7 @@ Agent executionは、Eval dataset由来のpromptでも、固定対象repo向けp
 - scenario ID / scenario fingerprint、Evaluator / Skill revision、実効Agent / Judge profileと検証状態、隔離条件、Judge Reference fingerprintがrun provenanceへ保存される
 - Checkout / PaymentのWeb範囲で実Agent workflowが最後まで実行され、`--repeat`各attemptの独立した評価結果が保存される
 - Product Code、既存Product Test、規範仕様、配置Skillと評価用設定を実行中読み取り専用mountで保護し、権限拒否を確認する。終了後の照合ではignored / untracked fileも許可外変更を見逃さない
-- `artifact-index.json`のskill / kind / scope / artifact_id / relative pathをEvaluatorが既存Skill契約・routing・実fileと照合し、重複・欠落・cross-attempt混入を検出できる。`artifact-manifest.json`でSkill名 / path / SHA-256 / runtime証拠との一意対応と3分類を追跡し、未生成と分類不能を区別できる。Judgeの正規QA成果物部分には`qa_artifact`のみを固定順で使う
+- `artifact-index.json`の`routing[]`（skill / scope / status / reason / artifact_ids）と`artifacts[]`（skill / kind / scope / artifact_id / path）をEvaluatorが固定scenario・既存Skill契約・実fileと照合し、必須行欠落・不正な省略・blocked / incomplete・重複・cross-attempt混入を識別できる。`artifact-manifest.json`でSkill名 / path / SHA-256 / runtime証拠との一意対応と3分類を追跡し、未生成と分類不能を区別できる。Judgeの正規QA成果物部分には`qa_artifact`のみを固定順で使う
 - 評価用capture CLIで実際のproduction verifier request bytes / result bytes / exit codeを保存し、候補sourceを読み取り専用・ネットワーク遮断の別Dockerで独立再実行できる。固定Evaluatorの`common_runtime_checks.py`は候補`valid`に依存せず、不正ID・依存・graph・completionを検出でき、実装fingerprintだけの互換差は許容する
 - runtime実装だけが変わり機械契約は互換な2 revisionを正常に比較できる。schema非互換は該当する項目だけ`evaluator_incompatible`として記録し、固定Judgeの意味評価を残す
 - verifier証拠の欠落を`evidence_unverified`とし、未観測のverifier未実行をSkill品質FAILと断定しない。capture実装自体のエラーはrunner / environment errorへ分類する
