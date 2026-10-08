@@ -22,19 +22,28 @@ Codex 0.160.0のexecpolicyはargvのexact prefix matchingであり、pattern要�
 
 ```starlark
 prefix_rule(
-    pattern = [["git", "git.exe"], ["commit", "merge", "rebase", "pull", "push", "fetch", "reset", "am", "cherry-pick", "revert"]],
+    pattern = [["git", "git.exe"], ["commit", "merge", "rebase", "pull", "push", "fetch", "reset", "am", "cherry-pick", "revert", "restore", "checkout", "switch"]],
     decision = "prompt",
-    justification = "High-impact Git operations require explicit user approval.",
+    justification = "High-impact Git operations, including commands that can discard uncommitted changes, require explicit user approval.",
     match = [
         "git commit -m test",
         "git.exe commit -m test",
         "git push origin feature",
         "git.exe push origin feature",
         "git reset HEAD~1",
+        "git restore .",
+        "git.exe restore .",
+        "git checkout -- .",
+        "git.exe checkout -- .",
+        "git switch --discard-changes feature/other",
+        "git.exe switch --discard-changes feature/other",
+        "git switch -c feature/new-work",
+        "git.exe switch feature/existing-work",
     ],
     not_match = [
         "git status",
         "git diff --stat",
+        "git add sample.txt",
         "git -c user.name=test push origin feature",
         "git --no-pager reset --hard",
     ],
@@ -300,7 +309,7 @@ GitHub CLIのmutation-only列挙は、実装時点で確認済みのGitHub CLI h
 
 `gh pr` / `issue` / `repo` / `workflow` / `run` / `release` / `secret` / `variable` / `cache` / `label`は通常開発でread操作を使うためmutation subcommandだけをpromptにします。それ以外の上記less-common familyは、read / mutationを細かく分離する必要性が今回ないためfamily全体をpromptにします。この差を独自parserで埋めません。
 
-Gitでは`branch` / `tag` / `config` / `remote` / `worktree` / `stash`のread-only formまでprompt対象になることを明示的に許容します。execpolicyのprefix制約下でoption parserを追加して無承認read-onlyへ戻すより、ユーザー承認を優先します。
+Gitでは`branch` / `tag` / `config` / `remote` / `worktree` / `stash`のread-only formまでprompt対象になることを明示的に許容します。`restore` / `checkout` / `switch`も破棄optionの有無によらずfamily-level `prompt`とし、protected branchからの限定的な安全な`switch`もPreToolUseの許可後にユーザー承認を要求します。execpolicyのprefix制約下でoption parserを追加して無承認操作を区別するより、ユーザー承認を優先します。
 
 #### `30-destructive-forbidden.rules`
 
@@ -381,7 +390,7 @@ prefix_rule(
 
 `gh auth token` / `gh.exe auth token`は`forbidden`です。`gh auth status --show-token` / `-t`と`gh.exe`経路（`--json hosts`との組合せを含む）はrepository-owned PreToolUse Hookで実行前denyとします。`gh auth status`単体は既存の`gh auth` family-level `prompt`を維持します。Hookでは`auth status`の既知フラグ`--show-token` / `-t`と`--show-token=...`だけを扱い、CLI全体やnested shellを再帰解析しません。あらゆる認証情報露出経路の遮断を保証するものではありません。
 
-force push、hard reset、commit amendは永久禁止にしません。`git push` / `git reset` / `git commit`のfamily-level `prompt`でユーザー承認へ送り、protected branch上ではPreToolUseのcontextual denyを優先します。
+force push、hard reset、commit amendは永久禁止にしません。`git push` / `git reset` / `git commit`のfamily-level `prompt`でユーザー承認へ送り、protected branch上ではPreToolUseのcontextual denyを優先します。`restore` / `checkout` / `switch`は未commit変更の破棄を防ぐため同じ既存ruleの`prompt`に含め、protected branchからの安全な`switch`はHook通過とexecpolicy承認の両方を必要とします。
 
 CIでは固定版Codex CLI自身の`codex execpolicy check --rules ...`で、rules fileへ埋め込んだ`match` / `not_match`のload-time検証に加え、各ruleから少なくとも1つの`prompt` / `forbidden`代表caseと、read-only boundaryの代表caseを実行します。
 
@@ -392,6 +401,7 @@ CIでは固定版Codex CLI自身の`codex execpolicy check --rules ...`で、rul
 - Main Planの「承認境界」「実装順序」「検証」「完了条件」と矛盾しないこと
 - Codex 0.160.0の`codex execpolicy check`で全ruleがloadでき、各`match` / `not_match`がPASSすること
 - `git` / `git.exe`、`gh` / `gh.exe`で代表`prompt` / `forbidden`が一致すること
+- `git restore .`、`git checkout -- .`、`git switch --discard-changes feature/other`と、それぞれの`.exe`形式、安全な`git switch -c feature/new-work` / `git switch feature/existing-work`がすべて`prompt`になること。実Codexでは一時Git repositoryを使用し、破棄操作の承認を取り消して未commit変更が保持されること
 - 正規prefixのexecpolicy承認と、先行オプションによる非対応形式のPreToolUse実行前denyをMain PlanのPOSIX / Windows contract testおよびfresh runtime受入で別々に確認すること
 - 新規GitHub CLI操作と別名の代表例、およびMain Plan記載のtoken表示Hook denyを別途検証すること
 - GitHub CLIのmutation-only集合を変更する場合は、実装時点の公式help referenceでsubcommandを再確認すること
