@@ -424,6 +424,7 @@ Evaluator側にtrackedなscenario定義を置き、少なくとも次を固定�
   - `docs/spec/state-and-scenarios.md`
   - `docs/spec/ui-ux-contract.md`
   - `docs/spec/features/checkout-and-payment.md`
+  - `docs/spec/features/authentication.md`（`AC-CHECKOUT-001`の再Login復帰に必要なSession・Role・Return先だけを評価対象にする）
   - `docs/spec/features/cart.md`
   - `docs/spec/features/orders.md`
   - `docs/spec/features/admin-inventory.md`
@@ -445,24 +446,16 @@ scenario定義は現在の`qa-training-store`初回評価を再現するため�
 
 ### 機械判定できる部分
 
-既存production runtime / verifier契約を再利用します。
+**候補Skillのproduction verifier再実行と、固定Evaluatorの共通機械判定を別の処理経路とする。** フェーズ2にはSkill-local eval datasetの`expected.json`がないため、`deterministic/run.py`へ架空eval IDを追加しない。
 
-対象は少なくとも次です。
+1. Agent実行時には既存Skillの`runtime_contract.py` / `workflow_runtime.py`呼び出しを`verifier_capture.py`で記録し、実際に使われたrequest・result・終了コードを回収する。
+2. Evaluatorは親Planで指定した**別Dockerコンテナ**に候補Git tree由来のsourceを読み取り専用mountして同じrequestを再実行する。Evaluator checkoutやReferenceはmountしない。再実行は候補の鮮度・再現性の確認であり、その`valid`を固定品質基準へ代入しない。
+3. **固定Evaluator**の`common_runtime_checks.py`が、回収済みartifact・同一attemptのnormalized input・Runtime Input / Result・Machine Entityを入力として固定schemaと依存・参照・graphの不変条件を検査する。再利用元は固定Evaluatorの`deterministic/runtime_validator.py`の純粋なparser / fingerprint assertionと、固定した`coverage-analysis/scripts/traceability.py`のgraph / closure規則である。候補コードをEvaluator process内でimportせず、候補`valid`を条件分岐に使わない。
+4. 検査項目は、Runtime Input / Result pairのschema・identity・fingerprint再計算、runtime unit / Machine Entityの重複・欠落、stable ID一意性、既存Entity / unitへの依存参照、Authority → TR → TCN → CI → TCの到達・孤立・重複edge、coverage / 未閉鎖、`qa-workflow`の必要scopeと`can_complete`の整合とする。TCNからCIを経る場合と既存契約上の許容edgeは既存fixed graph validatorに従う。`current_structure_state`は保存値と実際のEntity / runtime状態との一致を固定基準で確認する。
+5. フェーズ2の必須範囲はEvaluator側scenarioに固定した`BR-CHECKOUT-001..003`と`AC-CHECKOUT-001..003`および実際のworkflow routingとの照合で決める。Agentがnormalized inputに重要Authorityや工程を記載しなかっただけで期待集合を縮小しない。scope不足・証拠不足・正当なblockedは区別し、未完了を成功にしない。
+6. 候補`valid=true`なのに固定検査FAILなら**機械品質非pass**を記録し、候補が緩くなった可能性を差分として示す。候補`valid=false`だが固定検査PASSでも候補側契約を満たさない結果として非passを残す。判定不能なschema差だけ`evaluator_incompatible`とし、両revision共通Evaluatorを更新した場合は両方新規評価する。全共通検査がPASSし、かつ必要なproduction verifier証拠と完了状態を確認できた場合のみruntimeを検証済みPASSとする。
 
-- runtime evidenceの欠落 / extra
-- stable ID / reference
-- fingerprint / dependency
-- freshness / currentness
-- Skill-local structure state
-- traceability / closure
-- `qa-workflow`のworkflow state / completion
-
-フェーズ2ではSkill-local eval datasetの`expected.json`を持たないため、dataset専用の`scripts/skills/evals/deterministic/run.py`へ架空のeval IDやexpectedを追加して評価しません。
-
-代わりに、Evaluatorが捕捉した本番verifier request / resultと、候補sourceを固定した独立再実行を確認します。候補実装自身の鮮度と、固定graderの共通品質criteriaを別々に報告することで、source fingerprint更新だけでstaleになった評価を誤判定しません。取得できない実行証拠は`evidence_unverified`で区分し、データが足りない評価項目だけ判定保留にします。
-
-新しい同等validatorやtarget専用runtime schemaは作りません。
-
+新しいproduction verifierや同等の汎用graph engineは作らない。既存固定コードから抽出・再利用するのは上記不変条件であり、Candidate側の`valid`に依存する判定は共通Evaluator側に置かない。回帰テストでは`valid=true`を常時返すよう弱体化した候補、重複ID、存在しないedge先、欠落した必須link、runtime fingerprintのみ差し替えた互換候補を作り、候補の自己判定とは独立した検出と正常差分の許容を確認する。
 ### 意味判断が必要な部分
 
 独立Judgeを使い、固定revisionの規範仕様と上記評価観点を根拠に評価します。
@@ -490,7 +483,7 @@ Referenceはscenarioで固定した上記規範・補助文書からEvaluatorが
 | `QTS-SEM-001` | true | `qa-workflow`のrouting。要求に必要な分析・設計工程が選択され、不要なE2E実装・実行へ逸脱しない（`qa-workflow/SKILL.md`、固定の評価要求） | 必要な主要工程を根拠なくスキップし、最終QA成果物の意味品質が成立しない |
 | `QTS-SEM-002` | true | workflowの完了判断。未閉鎖・blocked・未完成を完成扱いしない（`qa-workflow/SKILL.md`、正規QA成果物） | 必須の分析・設計成果物がない、または重大な未解決を隠して完了を宣言する |
 | `QTS-SEM-003` | true | Oracle選択と規範の優先順位（`docs/spec/README.md`、`product-scope.md`、`roles-and-permissions.md`） | README / 実装観察 / Unresolvedを正式な期待動作へ昇格し、重大な誤ったテスト期待値を作る |
-| `QTS-SEM-004` | true | Checkout Sessionの再開・置換・24時間期限切れ・再ログイン復帰（`BR-CHECKOUT-001` / `AC-CHECKOUT-001`、`state-and-scenarios.md`） | 同じCart / Versionの再開、Version変更時の置換、期限切れのいずれかを欠落させ、主要なテスト条件が成立しない |
+| `QTS-SEM-004` | true | Checkout Sessionの再開・置換・24時間期限切れ・再ログイン復帰（`BR-CHECKOUT-001` / `AC-CHECKOUT-001`、`state-and-scenarios.md`、`features/authentication.md`のSession・Role・Return先） | 同じCart / Versionの再開、Version変更時の置換、期限切れのいずれかを欠落させ、主要なテスト条件が成立しない |
 | `QTS-SEM-005` | true | Order確定直前のCart Version / 価格再検証と差戻し（`BR-CHECKOUT-002` / `AC-CHECKOUT-002`、`features/cart.md`） | stale Cartまたは価格不一致でもOrder / Paymentを作ってよいとする、または両方の差戻し境界を欠落させる |
 | `QTS-SEM-006` | true | Mock Payment成功・明確失敗時のOrder / Inventory / History整合（`BR-CHECKOUT-003` / `AC-CHECKOUT-003`、`features/orders.md`、`features/admin-inventory.md`） | TEST-SUCCESS以外で在庫を減らす、成功時のOrder paid・在庫減算を欠く、明確失敗で在庫を変える、購入と在庫履歴の整合を無視する |
 | `QTS-SEM-007` | true | processing中のresume・retry / cancel禁止と最終在庫不足（`BR-CHECKOUT-003` / `AC-CHECKOUT-003`、`state-and-scenarios.md`） | processing中の再試行・Cancelを許容する、processing再開または最終在庫不足の重要境界を欠落させる |
