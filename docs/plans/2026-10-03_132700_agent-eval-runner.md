@@ -270,10 +270,17 @@ CIではfake Agent commandを使って、ランナー自体の契約・一時実
 Skill-local verifierはSkill本体にも含まれる。runtimeの再実行と共通の品質判定を次のように分ける。
 
 - **候補実装の鮮度・正当性**：EvaluatorがAgentの作業ツリーから独立して展開した、指定Skill revisionの信頼済みsourceを使い、そのrevisionのproduction verifier / generatorで実際のrequestを再実行する。保存結果との対応、実装fingerprint、generation、`valid`、`current_structure_state`を確認する。候補側のverifierが無効な結果を完成扱いした場合は品質の問題とする。
-- **固定基準の採点**：deterministic / semanticのgrader、expected / rubric / Reference、判定ルールは固定Evaluator revisionを使う。既存`deterministic/runtime_validator.py`の`_source_paths()`は現在Evaluator側`REPO_ROOT`へ固定されているため、`deterministic/run.py`へ任意の`--runtime-source-root`を追加し、`grade()` → `validate_runtime_evidence()` → `_assert_runtime_pair()` → `_source_paths()`へそのpathを明示的に渡す。指定時はEvaluatorが作成した**候補Git tree由来の信頼済みsource root**に一致することをrunner側で検証する。引数省略時は従来のEvaluator側`REPO_ROOT`を使用し、既存CLI・テストの動作を維持する。`run.py`からruntime assertionへ明示的に伝播し、**graderのコードとassertionの意味は固定したまま、実装由来のfingerprint / generator version / static-dataの照合先だけを候補の信頼済みsourceへ切り替える**。従来のgrader CLIは引数省略で従来動作を維持し、一般Skill validatorのimport先・eval datasetは変更しない。Agentが編集できるworkspaceをsource rootに指定しない。
+- **固定基準の採点**：deterministic / semanticのgrader、expected / rubric / Reference、判定ルールは固定Evaluator revisionを使う。フェーズ2の共通機械判定も固定Evaluatorに置き、候補verifierの`valid`や候補generatorの`can_complete`をそれ単体で合否の根拠にしない。既存`deterministic/runtime_validator.py`の`_source_paths()`は現在Evaluator側`REPO_ROOT`へ固定されているため、`deterministic/run.py`へ任意の`--runtime-source-root`を追加し、`grade()` → `validate_runtime_evidence()` → `_assert_runtime_pair()` → `_source_paths()`へそのpathを明示的に渡す。指定時はEvaluatorが作成した**候補Git tree由来の信頼済みsource root**に一致することをrunner側で検証する。引数省略時は従来のEvaluator側`REPO_ROOT`を使用し、既存CLI・テストの動作を維持する。`run.py`からruntime assertionへ明示的に伝播し、**graderのコードとassertionの意味は固定したまま、実装由来のfingerprint / generator version / static-dataの照合先だけを候補の信頼済みsourceへ切り替える**。従来のgrader CLIは引数省略で従来動作を維持し、一般Skill validatorのimport先・eval datasetは変更しない。Agentが編集できるworkspaceをsource rootに指定しない。
 - **契約非互換**：両revisionで共通に判定できるcriteriaを評価し、schema / 機械契約が実際に互換でない部分だけを`evaluator_incompatible`として扱う。単なるimplementation fingerprint相違は非互換理由にならない。`evaluator_incompatible`を品質FAILへ読み替えず、共通部分のsemantic評価まで破棄しない。出力契約が変わり固定graderで評価できない場合は、両revisionを処理できる共通Evaluatorへ更新後、**旧版・新版の両方をそのEvaluatorで新規に実行・再採点**する。過去の別Evaluator評価を混ぜない。互換adapterの汎用基盤は今回作らない。
 
-候補verifier / generatorの独立再実行は、Agentに見えるworkspaceとは別の信頼済み候補Git treeを使い、Evaluator側のReference / rubricを読ませない隔離済みprocessで行う。候補sourceを実行できない環境では品質FAILへ変換せずrunner / environment errorとして残す。候補のverifierで合格しただけで品質PASSにはしない。固定graderの検出結果と独立Judge、候補のproduction verifier整合性をそれぞれ保持する。
+候補verifier / generatorの独立再実行は、Agentに見えるworkspaceとは別の指定Git treeを使い、**Evaluator本体のprocess内ではimportも実行もしない**。候補のtracked contentも実行可能コードであり、Git SHAによる出自確認は安全性の証明ではない。既存のDocker方式を使用し、次の固定経路にする。
+
+1. Evaluatorが候補revisionの`scripts/**`だけを信頼済みGit objectから別ディレクトリへ展開し、Agent-visible workspaceの改変から切り離す。実行前の相対path・size・SHA-256 manifestを固定する。
+2. `codex_docker_launcher.py`と同じDocker実行基盤・固定imageで、**Python-only検証用の別コンテナ**を`--read-only --cap-drop=ALL --security-opt=no-new-privileges --network none`で起動する。候補sourceは`readonly` bind mount、requestはEvaluatorが検証した固定byte列をstdinから渡し、書込み可能なのは`/tmp`のtmpfsのみとする。Evaluator checkout、grader、rubric、Reference、認証情報、Docker socket、元target、Agent用`CODEX_HOME`をmountしない。
+3. 検証対象の候補`runtime_contract.py` / generator / `workflow_runtime.py`を決まったargv・cwdで直接起動し、stdoutのJSON、終了コード・制限時間、必要なstderr診断をEvaluator側で安全化して回収する。任意のPython module import、自由なshell command、ネットワーク通信を許可しない。stdin / stdoutのsource SHA・request SHA・result SHAをprovenanceへ紐付ける。
+4. Docker mount・network・UID・認証情報非公開・source write-denialを実行前に確認し、候補sourceからEvaluator-only sentinelを読み取れないnegative testを用意する。timeout時はコンテナを終了・削除し、そのattemptをrunner / environment errorとする。候補sourceが独自に`valid=false`を返す場合はエラーとして隠さず、その判定を保持する。
+
+この候補再実行は**鮮度と結果再現の検証**であり、固定品質判定の代わりではない。候補が`valid=true`を返しても、固定Evaluatorの共通機械判定・意味Judgeの基準を満たさなければPASSにしない。候補sourceを隔離実行できない環境ではrunner / environment errorとして残し、Skill品質FAILへ変換しない。
 
 main / candidate比較は、**同じEvaluator checkoutを起動したまま**`--skill-revision`だけを変更して2 runを生成する。checkout全体を入れ替えてgraderが変わる方式を採らない。
 
@@ -730,6 +737,7 @@ batchは途中1件が失敗しても残りcaseを実行し、最後に全体結�
 - `scripts/skills/evals/agent/scenarios/qa-training-store-checkout-payment-web-v1/rubric.json`
 - `scripts/skills/evals/agent/tools/codex_docker_launcher.py`（手動の実Codex smoke専用。共通executorからは外部argvとして呼ぶ）
 - `scripts/skills/evals/agent/verifier_capture.py`（フェーズ2に配置する評価専用stdin / stdout記録用。Skill本体を変更しない）
+- `scripts/skills/evals/agent/common_runtime_checks.py`（フェーズ2の固定Evaluator共通機械契約。既存validatorの純粋な検査部品を再利用し、候補の`valid`から独立して判定）
 - `scripts/skills/evals/agent/README.md`
 - `scripts/skills/evals/agent/tests/`
 - `tests/skills/evals/agent/`
