@@ -543,4 +543,4 @@ Agent executionは、Eval dataset由来のpromptでも、固定対象repo向けp
 - baseline / candidateの自動ランキング
 - 外部LLMを使う通常CI
 
-実行系Skillの評価、A/B比較、複数target repo対応は、この固定対象で実際に不足が確認された後に追加します。
+実行系Skillの実環境評価、baseline / candidateの自動ランキング、複数target repo対応は今回追加しません。保存済みrunの条件照合と人間または別Agentによる比較は、今回の実装範囲に含みます。
