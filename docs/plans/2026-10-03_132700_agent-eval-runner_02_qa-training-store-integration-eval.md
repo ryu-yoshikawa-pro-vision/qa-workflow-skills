@@ -192,7 +192,7 @@ sanitized targetのrootにはEvaluatorが最小の評価用`AGENTS.md`を生成�
 - Agent-visibleなSkillはEvaluatorが配置した`qa-workflow-skills`の19 Skillだけ
 - 規範仕様の優先順位は`docs/spec/README.md`に従う
 - Product Code、既存Product Test、規範仕様を変更しない
-- 評価成果物の書込みはEvaluatorが指定した評価出力rootだけに限定する
+- 評価成果物の書込みはEvaluatorが指定した`.qa-eval-output/`だけに限定する（source / Skill / 評価用設定はDockerで書込み禁止）
 - commit / push / PR作成等のGit mutationを行わない
 - Evaluator側のReference / expected / rubric / graderを探索しない
 
@@ -214,9 +214,9 @@ sanitized targetのrootにはEvaluatorが最小の評価用`AGENTS.md`を生成�
 sanitized targetは単なるファイルコピーであり、`cwd`の変更だけではEvaluator側Reference / rubricや元targetの秘密情報への読み取りを禁止できません。
 
 - Agent subprocessはsanitized targetを`cwd`にして起動する。評価側の原本・grader・Judge資料・採点結果・元target checkoutを、Agentがアクセス可能なファイルシステム、追加のtool / MCP / mount、ネットワーク経路から隔離する。
-- OS権限・分離コンテナ等、既存Agent runtimeを補完する実行環境の強制境界を使用する。read-only sandboxは「書込み不可」であって「Evaluator側が読めない」保証ではない。Runnerで独自sandboxを実装しない。
+- 親PlanのLinux Docker構成を使用し、Evaluator原本の非mountによる読み取り隔離を維持する。target workspace全体を**読み取り専用mount**にし、`.qa-eval-output/`に重ねるattempt専用mountだけを書込み可能にする。Codex自身のread-only sandboxはホスト側Evaluator隔離の代わりにしない。独自sandboxは実装しない。
 - 同じ権限・mount・tool構成で、Evaluator側に置いた**非秘密の検証用sentinel**の読み取り拒否と、意図しないuser/global Skill・指示・MCPの混入がないことを実Agent smokeで確認し、根拠をrunへ記録する。fake Agentではrunnerの権限分離配線とfail-closeを検証するが、それだけで実Codexの分離成立を証明したとはしない。
-- これらを確認できない実行は`isolation_unverified`として保持できても、比較に使える有効な品質評価へ昇格しない。認証に必要な秘密をログ・provenanceに記録しない。judgeはEvaluator側の別processとして、Agent-visible targetの隔離境界の外で起動する。
+- ローカルEvaluator資料のread-denial、source / Skillのwrite-denial、余分なSkill / MCP / web検索の無効化を確認できないrunは`isolation_unverified`として比較から除外する。モデルAPI通信に必要な外部アクセス可能性だけが残る場合は、profileへ条件・残留リスクを記録し、その理由だけで比較不可にしない。秘密情報はログ・provenanceへ記録しない。JudgeはAgentコンテナ外のEvaluator側で、親Planの独立した`judge.command_argv`と固定cwdで起動する。
 
 ## source変更の扱い
 
@@ -226,9 +226,11 @@ sanitized targetの構築、評価用`AGENTS.md`、19 Skill、評価用Project C
 
 baseline固定のため、sanitized targetでfresh Git repositoryを初期化し、remoteなし・固定の非個人local identityでEvaluator-owned synthetic commitを1件作成します。original Git history / remoteは引き継ぎません。
 
-その後、Evaluator所有の評価出力root `.qa-eval-output/` を作成し、Agentへ書込み可能な永続成果物の保存先として明示します。
+その後、Evaluatorはsanitized targetの`.qa-eval-output/`を空のmount pointとして作成し、別のattempt専用ホストディレクトリをその位置へ書込み可能mountとして重ねます。Agentへの永続書込み先はこの出力rootだけに固定し、sourceへの書込みを許可しません。
 
-Agent終了後はbaseline commitとの差分を確認し、`.qa-eval-output/**`以外に変更がある場合は実行結果を有効なSkill評価へ昇格しません。外部へ書込み可能なmountやGit remoteがないことをpreflightで確認し、アクセス権限を指示文だけで代替しません。AgentがGit commitを作成した場合も契約違反として扱います。
+Agent実行前に、baseline commitのあるsanitized targetをDocker内で**読み取り専用**にmountします。`.qa-eval-output/`は事前に作成したmount pointへattempt専用の書込み可能rootを重ね、`/tmp`と一時`CODEX_HOME`以外の書込みを禁止します。評価用`AGENTS.md`、`docs/PROJECT_CONTEXT.md`、製品Code / Test / Spec、配置Skill、`.git/`も読み取り専用です。Agentの指示遵守や終了後の差分確認だけに不変性を依存させません。実行中に書いて元へ戻す操作もOS側で拒否します。
+
+終了後はsynthetic baseline commitとのGit差分に加え、Agent-visible workspaceに存在する**tracked / untracked / ignored fileすべて**のrelative path・size・SHA-256・symlinkを開始前manifestと照合します。Gitの`.gitignore`にある`dist/`、`output/`、`test-results/`などを差分検査から除外せず、許可外の追加・変更・削除を検出します。`.qa-eval-output/`の内容は別の成果物回収処理で検証します。許可外変更、Git commit、Git remoteや想定外の書込みmountがあれば有効なSkill比較へ昇格せず、runに根拠を保存します。
 
 `.qa-eval-output/**`はtargetのProduct成果物ではなく、今回の評価用一時出力です。commitせず、回収後にsanitized targetと一緒に破棄します。
 
