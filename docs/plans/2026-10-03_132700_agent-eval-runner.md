@@ -363,7 +363,7 @@ Live CLIへ`--execution-profile <path/to/execution-profile.json>`を必須追加
 
 `<...>`は説明用の占位記号であり、live実行時には実値に置き換える。不明な実効項目は架空の固定値で埋めず、`null`とし`verification.status=unverified`を記録する。`verification.status=verified`を必須とする直接比較では、nullの実効必須項目は許可しない。`verification.status=verified`は自己申告では成立しない。Evaluatorは証拠fileの存在、読み取り拒否probeの結果、非秘密のCLI設定情報との照合を行い、**必須のローカル隔離・起動条件**に不明・不一致があれば`unverified` / `not_comparable`とする。許可済みのモデルAPI通信が残ることのみで`unverified`にはしない。`evaluator_read_blocked=true`も強制境界の代わりにならない。
 
-相対pathはEvaluator-owned出力rootを基準に正規化する。profileをSHA-256へ含めるときは、認証やOS絶対pathを除いた上記の正規比較項目だけを固定順序で正規化する。profileが異なるが実効条件は同じと推測して自動同一視しない。Judgeで同じAgent launcherを再利用する場合でも、Generator側とは独立のprofile欄と検証が必要となる。
+相対pathはEvaluator-owned出力rootを基準に正規化する。profileをSHA-256へ含めるときは、認証やOS絶対pathを除いた上記の正規比較項目だけを固定順序で正規化する。profileが異なるが実効条件は同じと推測して自動同一視しない。実Codex Judgeは生成側とは別コンテナ・別`CODEX_HOME`・別launcher設定に固定し、Judge固有の実効profileを検証する。
 
 ### 9. 正解情報の読み取り隔離を確認する
 
@@ -498,8 +498,8 @@ promptに含めないもの:
 - `--target-root`のrevision / clean state、Evaluator / Skill revisionとprofile / 隔離条件をpreflightする
 - `target_workspace.py`でsanitized targetを作る
 - `executor.py`で実Agentを実行する
-- `.qa-eval-output/`の全fileを回収し、`qa_artifact` / `runtime_evidence` / `runner_internal`に分類する
-- artifact manifestに分類・Skill / path / hash・Judgeへの投入対象と固定順序を記録する。Judgeに渡すのは`qa_artifact`のみとし、verifier証拠・`final-message.md`・workflow内部stateは投入しない
+- `.qa-eval-output/`の全fileを回収し、Agent作成`artifact-index.json`をscenarioのSkill / kind / scope契約・routing・実fileと照合する。`qa_artifact` / `runtime_evidence` / `runner_internal`に分類し、分類不能は`evidence_unverified`として記録する
+- artifact manifestに分類・Skill / path / hash・Judgeへの投入対象と固定順序を記録する。JudgeのQA成果物部分は`qa_artifact`のみとし、最終stdoutのrouting / 完了宣言と固定機械判定要約は`QTS-SEM-001/002`に限って別証拠として渡す。verifierの生JSONは渡さない
 - captureで得た候補側production verifier証拠を候補の信頼済みtracked sourceで独立再実行し、固定Evaluatorの機械・意味評価と分離して成果物対応・completionを判定する
 - 既存semantic評価のprompt構築 / result正規化処理を再利用して独立Judgeを実行する
 - provenanceと評価結果を保存する
@@ -829,7 +829,7 @@ fake Agent subprocessを使って少なくとも次を検証します。
 repositoryの既存caseを使い、fake Agentで次を自動検証します。
 
 1. deterministic caseを生成し、既存`deterministic/run.py`が実行される
-2. semantic caseを生成し、既存`semantic/run.py`が実行される
+2. semantic caseを生成し、既存`semantic/prompt_builder.py`と`semantic/result.py`の処理が固定Evaluatorから呼ばれ、Judgeは独立argv・cwd・実効設定で起動する。既存`semantic/run.py` CLIは起動せず、そのCLIのstdin / stdout / 判定契約を再利用する
 3. `grade.json`へ既存graderの結果が保存される。semanticは生成側と異なるJudge argv・cwdで起動し、Reference / rubricを含むJudge promptを生成Agentに送らない。Judgeのinvalid JSON / non-zero / timeoutを生成Skill品質failに変換しない
 4. batch結果が`result.json`へ集計される
 5. dataset / input fingerprintとAgent metadataが`result.json`へ保存される
@@ -847,14 +847,14 @@ repositoryの既存caseを使い、fake Agentで次を自動検証します。
 - 評価用`AGENTS.md`へ製品仕様や正解QA成果物を混ぜない
 - 19 SkillだけをAgent-visibleにする。user/global追加Skill・指示・MCPが有効なrunは比較可能として扱わない
 - 親workspaceとSkill packageを実行中読み取り専用mountにし、`.qa-eval-output/**`だけを書込み可能mountにする。sourceを変更して元へ戻す操作も権限で拒否する
-- 複数artifactを回収し、相対path / size / SHA-256をmanifestへ保存する
+- fake Agentが`artifact-index.json`を保存し、Evaluatorが`skill / kind / scope / artifact_id / path`をfile・routing・既存Skill契約と照合して相対path / size / SHA-256をmanifestへ保存する。登録なし・重複・同一Skill複数成果物・誤ったscope・cross-attempt・分類不能をテストする
 - symlink / path traversal / output root外参照をrejectする
 - output root外にsource変更があるrunを有効評価へ昇格しない。Gitのignored / untrackedを含む全相対pathの許可外新規fileを検出し、`.gitignore`の隠蔽で見逃さない
 - target revision / scenario fingerprint / Skill・Evaluator revision / Judge Reference fingerprint / Agent・Judge profileをprovenanceへ保存する
 - artifact / verifier request / result / rerun resultの一意対応、欠落・参照差し替えを検出する
-- artifact分類により`.runtime-evidence/**`・`final-message.md`・workflow stateをJudge入力から除外し、正規QA成果物の順序とhashを固定する。必須成果物欠落を内部fileで補わない
+- artifact分類により`.runtime-evidence/**`・workflow stateを正規QA成果物から除外し、正規QA成果物の順序とhashを固定する。`final-message.md`のrouting・完了判断と固定機械検証の要約は`QTS-SEM-001/002`専用の別入力とし、他のcriteriaや必須QA成果物欠落を補わない。最終stdoutのみ完了宣言があるfixtureも判定する
 - フェーズ2の`QTS-SEM-001..010`をrubricにID / critical / Reference対応ごとに固定し、正常・Payment整合違反・仕様外動作のfixtureの判定を確認する
-- `valid=false`同士の再実行一致をPASSにしない。`workflow_runtime.py`の実行成功とcompletionを区別する
+- `valid=false`同士の再実行一致をPASSにしない。`workflow_runtime.py`の実行成功とcompletionを区別する。候補verifierだけを弱体化して`valid=true`を返すrevisionでも、固定Evaluatorが不正なID・参照・graph・closureをFAILにする
 - 元repoの`docs/PROJECT_CONTEXT.md`等をAgent-visible環境から読み取れないことを実環境の隔離検証で確認し、Agent-visibleなProduct Spec / Skill packageへのwrite-denialを検証する
 - cleanup後にsanitized targetが残らない
 
@@ -1028,7 +1028,7 @@ native trigger評価は、Skill activationを観測する方法がAgentクライ
 - 実Codex smokeでrunner起因の未処理エラーが0件
 - 実Codexの非pass結果がある場合、その結果を隠さず保存・報告できる
 - 各live runにSkill revision、評価入力 / scenario fingerprint、Agent名 / model等の比較に必要なprovenanceが保存される
-- 2つの実runでEvaluator・入力・Judge・実効Agent profile・隔離・repeatの一致を確認し、異なるSkill package revisionだけを比較する。変更対象Skillの読取りを双方で実Codex JSONLから確認できない場合は改善効果の検証未成立とする
+- 2つの実runでEvaluator・入力・Judge・実効Agent profile・隔離・repeatの一致を確認し、異なるSkill package revisionだけを比較する。Skill配置とSHA検証を必須とするが、内部読取の`unverified`だけでは成果物品質比較を無効にせず、変更の因果関係を断定しない
 - 同一Evaluatorで正常・重要欠落・捏造のQA成果物を判別できた根拠とrepeatの揺れを保存する
 - 互換なruntime implementation更新がfingerprint相違だけを理由に非passとならず、真の契約非互換を個別criteriaへ区分できる
 - `qa-training-store`固定revision `84ce165493649550832731a60cf436f8ae29c56b` を対象にフェーズ2初回評価と独立したrepeat試行を実行している
@@ -1036,6 +1036,6 @@ native trigger評価は、Skill activationを観測する方法がAgentクライ
 - `qa-training-store`のProduct Code、既存Test、規範仕様に許可外変更がない
 - 対象repo既存Skillではなく今回の19 SkillだけをAgent-visibleにし、元`PROJECT_CONTEXT.md`を最小評価用内容へ置換した条件を記録している
 - フェーズ2のrunner / environment error、Skill品質のneeds_review / fail、実行証拠の`evidence_unverified`、`valid=false`、比較不可・部分的Evaluator非互換を区別している
-- フェーズ2のJudgeにはmanifestで確認した`qa_artifact`だけを固定順序で渡し、`QTS-SEM-001..010`を固定rubricで評価できる
+- フェーズ2のJudgeにはmanifestで確認した`qa_artifact`を固定順序で渡し、最終stdoutと固定機械検査の完了要約を別証拠として`QTS-SEM-001/002`に限って渡す。`QTS-SEM-001..010`を固定rubricで評価できる
 - Skill本体の通常実行経路とポータビリティを変更していない
 - `git diff --check`がpassする
