@@ -255,7 +255,9 @@ Evaluatorがoutput rootをscan
   ↓
 path / symlink / sizeを検証
   ↓
-各fileのSHA-256と相対pathをartifact-manifest.jsonへ記録
+QA成果物・runtime証拠・runner内部ファイルに分類
+  ↓
+各fileのSHA-256と相対path・分類をartifact-manifest.jsonへ記録
   ↓
 .agent-eval-runs/<run>/target-artifacts/ へcopy
   ↓
@@ -272,8 +274,24 @@ Evaluatorは成果物内容を独自schemaへ変換しません。各Skillの既
 - file size
 - SHA-256
 - 正規Skill名（workflowで生成元が特定できないものは未確認として記録し、推測しない）
+- fileの分類（`qa_artifact` / `runtime_evidence` / `runner_internal`）と分類根拠。`qa_artifact`にはroutingに基づく期待工程・成果物種類の対応を記録する
 - runtime対象かどうか、および既存Skill契約から必要と判定したverifier request / resultとEvaluator再実行resultへの相対path
 - 各artifactのSHA-256と結び付いたverifier対象artifactの相対path。対応するrequest / resultがないときはnullと欠落理由
+
+### Judge投入対象と内部証拠の境界
+
+`.qa-eval-output/`の全fileは安全なpath・size・hashを検査して**回収とmanifest記録**を行うが、Judgeへ渡すCandidate Outputは次の規則で選ぶ。拡張子やフォルダ名だけで正規QA成果物を推定しない。
+
+| 分類 | 対象 | Judgeへの投入 |
+|---|---|---|
+| `qa_artifact` | routingが要求した仕様分析、テスト分析、TR、TCN / CI、TC、coverage、adversarial review等の成果物。正規Skill名・生成目的・artifact pathが確定したもの | 対象とする |
+| `runtime_evidence` | `.runtime-evidence/**`のrequest / result / invocation、production verifierの入力・出力、workflow state等の機械検証用データ | 原則投入しない。runtime判定へ使用する |
+| `runner_internal` | `final-message.md`、Codex診断記録、launcher状態、capture記録等の評価実行情報 | 投入しない |
+
+- `.qa-eval-output/.runtime-evidence/**`と`.qa-eval-output/final-message.md`は**常にQA成果物から除外**する。評価用`.qa-eval-tools/**`もQA成果物ではない。`qa-workflow`のworkflow stateは機械判定用とし、Judgeには成果物上の工程・参照関係を評価させる。内部stateやverifier JSONを成果物内容の代用品にしない。
+- `qa_artifact`はscenarioの要求と実際のroutingから期待される成果物単位を確定し、manifestに記録したSkill名・相対path・SHA-256・成果物種類と照合したものに限る。分類不能なfileはQA成果物へ昇格せず`runner_internal`として回収するが、必須成果物欠落を補わない。
+- Judgeへ渡す際は、要求から確定した**工程順**、同工程なら**Skill名と正規化relative path昇順**で並べ、各本文にrelative path / Skill / 種類を付ける。Evaluatorが勝手に要約・補完しない。必須QA成果物が欠落した場合は`missing: <required-kind>`と機械的に明示し、stdout / runtime証拠で埋めない。Judge入力全体の選択manifest、file順序、内容fingerprintを保存して比較条件を固定する。
+- 対象外の内部fileにだけ重要情報があっても、QA成果物がその内容を表現していなければ意味評価で救済しない。QA成果物の欠落は独立した機械判定でnon-passとして保存する。
 
 symlink、output root外を指すpath、path traversal、許容上限を超えるfileは回収せずrunをexecution errorとします。
 
@@ -437,7 +455,7 @@ scenario定義は現在の`qa-training-store`初回評価を再現するため�
 
 Judgeは評価対象Agentとは別process / 別promptで実行します。
 
-Candidate Outputは回収済みartifactを相対path付きで束ねたEvaluator側の表現とし、Agentの最終stdoutだけを評価対象にしません。
+Candidate Outputは前節のmanifestで`qa_artifact`と確認したfileだけを固定順で束ねたEvaluator側の表現とし、必須QA成果物欠落は明示します。`runtime_evidence`、`runner_internal`、最終stdoutを代用品として混入させません。
 
 Referenceはscenarioで固定した上記規範・補助文書からEvaluatorが構築します。対象scope内でUIのキーボード操作・エラー表示・次Actionを採点するときは`ui-ux-contract.md`、Order Snapshot / Historyは`features/orders.md`、Cart再検証は`features/cart.md`、在庫減算履歴は`features/admin-inventory.md`の該当箇所を含めます。低レベルのRoute / Seed Scenario ID / Test ID等をcriteriaとして判定するときは、各Featureが指すExecutable Canonical Sources（固定target revisionのCode / Config）をEvaluator側Referenceに追加し、そのpathと内容fingerprintをscenarioに固定します。採点しない低レベル値のためにコード全体を無条件投入しません。
 
@@ -513,8 +531,8 @@ Agent executionは、Eval dataset由来のpromptでも、固定対象repo向けp
 8. sanitized targetをfresh Git repositoryにし、Evaluator-owned synthetic baseline commitを作成する
 9. `.qa-eval-output/`を作成し、Checkout / Payment評価要求、Agent / model、Judge条件をrun provenanceへ記録する
 10. 各repeatの新規target / Agent sessionで実Agentを起動し、分析・設計workflowを実行する。使用証拠の観測可否を記録する
-11. baseline commitとの差分を確認し、`.qa-eval-output/**`以外のProduct Code / Test / Spec等に変更がないこと、追加commitがないことを確認する
-12. 複数QA成果物をscanし、`artifact-manifest.json`を作成して`.agent-eval-runs/`へ回収する
+11. 読み取り専用mountでProduct Code / Test / Spec / Skill / 評価用設定の書込みを拒否したことを検証し、終了後にtracked / untracked / ignoredを含むbaselineとの差分・追加commitを確認する
+12. 出力rootをscanしてQA成果物・runtime証拠・runner内部fileを分類した`artifact-manifest.json`を作成し、`.agent-eval-runs/`へ回収する。Judge対象は`qa_artifact`のみとする
 13. workflow routingと成果物集合を照合し、捕捉済みartifact・request / result / invocationを対応付け、候補tracked source版production verifierの独立再実行と固定Evaluatorの品質採点を分離する
 14. 固定した規範Reference / rubricで独立Judgeによる意味品質をattemptごとに評価する
 15. workflow / traceability / semantic結果とprovenanceを同じrunへ保存する
@@ -535,8 +553,8 @@ Agent executionは、Eval dataset由来のpromptでも、固定対象repo向けp
 - Agent開始前のsanitized targetがEvaluator-owned synthetic baseline commitとして固定され、original Git history / remoteを引き継いでいない
 - scenario ID / scenario fingerprint、Evaluator / Skill revision、実効Agent / Judge profileと検証状態、隔離条件、Judge Reference fingerprintがrun provenanceへ保存される
 - Checkout / PaymentのWeb範囲で実Agent workflowが最後まで実行され、`--repeat`各attemptの独立した評価結果が保存される
-- Product Code、既存Product Test、規範仕様に許可外変更がない
-- 複数成果物が`.qa-eval-output/`から`.agent-eval-runs/`へ回収され、`artifact-manifest.json`でSkill名 / path / SHA-256 / verifier証拠との一意対応を追跡できる
+- Product Code、既存Product Test、規範仕様、配置Skillと評価用設定を実行中読み取り専用mountで保護し、権限拒否を確認する。終了後の照合ではignored / untracked fileも許可外変更を見逃さない
+- 複数成果物が`.qa-eval-output/`から`.agent-eval-runs/`へ回収され、`artifact-manifest.json`でSkill名 / path / SHA-256 / verifier証拠との一意対応と3分類を追跡できる。Judge入力には`qa_artifact`のみを固定順で使用し、内部記録やmissing出力をQA成果物と誤認しない
 - 評価用capture CLIで実際のproduction verifier request bytes / result bytes / exit codeを一意対応で保存し、候補revisionの信頼済みsource版で独立再実行できる。固定graderのsource照合は候補sourceを参照し、`valid=false`をPASSにしない
 - runtime実装だけが変わり機械契約は互換な2 revisionを正常に比較できる。schema非互換は該当する項目だけ`evaluator_incompatible`として記録し、固定Judgeの意味評価を残す
 - verifier証拠の欠落を`evidence_unverified`とし、未観測のverifier未実行をSkill品質FAILと断定しない。capture実装自体のエラーはrunner / environment errorへ分類する
