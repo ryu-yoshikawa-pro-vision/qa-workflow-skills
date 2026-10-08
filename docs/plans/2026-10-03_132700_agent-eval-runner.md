@@ -208,13 +208,13 @@ OpenAI公式のCodex eval例でも、`codex exec`は自動実行向けに最終�
 
 これは`description`による自動発火を評価するものではありません。
 
-既存のtrigger datasetと、実Agent上でのnative Skill発火評価は別契約として維持します。AgentクライアントごとのSkill読み込み観測を今回の共通ランナーへ混ぜません。
+既存のtrigger datasetと、実Agent上でのnative Skill発火評価は別契約として維持します。クライアント別のnative trigger検出adapterは追加せず、利用可能なtraceに記録されたSkillファイルの読み取り事実だけを補助的に保存します。
 
 ### 4. 評価用正解情報をAgentから隔離する
 
 各Agent実行前に一時実行ディレクトリを作成します。
 
-一時実行ディレクトリへは、現在branchの19 Skillから通常実行に必要なファイルだけをコピーします。
+一時実行ディレクトリへは、指定した`--skill-revision`のGit treeに存在する19 Skillから、通常実行に必要なファイルだけをコピーします。
 
 コピー対象:
 
@@ -285,6 +285,54 @@ Live CLIへ`--execution-profile <path/to/execution-profile.json>`を必須追加
 `--agent-name` / `--agent-model`とprofileの宣言を照合し、実際のlauncher / CLIで観測できる設定と矛盾した場合は停止する。汎用subprocessだけでuser/global config等を完全に解析できると仮定しない。profileの自己申告だけで`verified`にせず、確認根拠がなければ結果は保存しても`not_comparable`とする。比較対象runではprofileの非秘密fingerprintと実効設定検証結果を一致させる。
 
 環境変数、secret実値、認証用argv、設定ファイルの秘密は保存もhash化もしない。生argvに秘密を含めず、Agent別SDKや新たなAgent config parserは作らない。Judgeは生成とは別process / 別prompt / 別sessionで起動する。フェーズ1で同じAgent commandをJudgeに使う場合もJudge側の実効条件を独立して記録する。
+
+### execution-profile.jsonの最小契約
+
+`--execution-profile`はEvaluatorが事前に確定したUTF-8 JSON objectを読み取り、少なくとも以下のキーと型を検証する。ランナーは任意Agentのconfigを自動発見する新しいadapterを持たない。
+
+```json
+{
+  "schema_version": 1,
+  "agent": {
+    "name": "codex",
+    "model": "<実際に固定したmodel ID>",
+    "cli_version": "<CLIで確認したversion>",
+    "reasoning_effort": "<固定した推論設定>",
+    "launch_options": ["<認証情報を含まない実行オプション>"],
+    "sandbox_policy": "<固定した実効sandbox>",
+    "approval_policy": "<固定した承認設定>",
+    "network_policy": "<固定した外部アクセス条件>",
+    "tools": ["<利用可能なtool名>"],
+    "mcp_servers": [],
+    "skill_roots": ["<Evaluatorが配置したSkill root>"],
+    "external_instructions": "<noneまたは非秘密の固定指示のfingerprint>",
+    "global_config": "<disabledまたは非秘密の固定設定fingerprint>"
+  },
+  "judge": {
+    "model": "<実効Judge model ID>",
+    "cli_version": "<Judge実行commandのversion>",
+    "reasoning_effort": "<固定した推論設定>",
+    "launch_options": ["<非秘密の起動オプション>"],
+    "tools": [],
+    "mcp_servers": [],
+    "external_instructions": "<noneまたは固定指示のfingerprint>"
+  },
+  "isolation": {
+    "method": "<OSまたは既存実行環境の境界>",
+    "agent_read_roots": ["<候補Agentから読めるroot>"],
+    "evaluator_read_blocked": true
+  },
+  "verification": {
+    "status": "verified",
+    "method": "<実効設定・アクセス境界の検証方法>",
+    "evidence_path": "<Evaluator側非秘密証拠の相対path>"
+  }
+}
+```
+
+`<...>`は説明用の占位記号であり、live実行時には実値に置き換える。`verification.status=verified`は自己申告では成立しない。Evaluatorは証拠fileの存在、読み取り拒否probeの結果、非秘密のCLI設定情報との照合を行い、不明・不一致があれば`unverified` / `not_comparable`とする。`evaluator_read_blocked=true`も強制境界の代わりにならない。
+
+相対pathはEvaluator-owned出力rootを基準に正規化する。profileをSHA-256へ含めるときは、認証やOS絶対pathを除いた上記の正規比較項目だけを固定順序で正規化する。profileが異なるが実効条件は同じと推測して自動同一視しない。Judgeで同じAgent launcherを再利用する場合でも、Generator側とは独立のprofile欄と検証が必要となる。
 
 ### 9. 正解情報の読み取り隔離を確認する
 
@@ -552,9 +600,9 @@ Judge JSON
         └── <eval-id>/
             └── attempt-01/
                 ├── output.md
-                ├── agent.stderr.log
+                ├── agent.stderr.log（安全化できる場合のみ）
                 ├── grade.json
-                └── grader.stderr.log
+                └── grader.stderr.log（安全化できる場合のみ）
 ```
 
 `result.json`には、評価結果に加えて変更前後を同条件で比較できる非秘密のprovenanceを保持します。
@@ -880,7 +928,7 @@ native trigger評価は、Skill activationを観測する方法がAgentクライ
 - 一時実行ディレクトリに19 Skillの通常実行ファイルが存在する
 - 実Agent commandを特定プロバイダーへ固定していない
 - `shell=True`を使用していない
-- Agent出力、stderr、grader結果、全体結果を保存できる
+- Agent出力、grader結果、全体結果を保存でき、stderrは安全化できる場合のみ保存し、除外した場合は理由を記録できる
 - 認証情報や環境変数を結果fileへ保存していない
 - `.agent-eval-runs/`がgit管理対象外になっている
 - fake Agentを使うrunner unit / integration testがpassする
