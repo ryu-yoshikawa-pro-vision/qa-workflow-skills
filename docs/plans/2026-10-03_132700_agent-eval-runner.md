@@ -325,6 +325,7 @@ Live CLIへ`--execution-profile <path/to/execution-profile.json>`を必須追加
     "model": "<実効Judge model ID>",
     "command_argv": ["<Judge専用launcher>", "<秘密を含まない固定argv>"],
     "cwd": "evaluator-judge-workspace",
+    "timeout_seconds": 600,
     "cli_version": "<Judge実行commandのversion>",
     "reasoning_effort": "<固定した推論設定>",
     "launch_options": ["<非秘密の起動オプション>"],
@@ -398,10 +399,12 @@ docker run --rm -i --read-only --cap-drop=ALL --security-opt=no-new-privileges
 
 ### 10. Skillの実使用を確認できた範囲で記録する
 
-Skill pathをpromptで指定しても実際に`SKILL.md`等を読んだ証拠にはならない。共通ランナーは`observed` / `unverified`を保存する。実Codex smokeでは**`codex exec --json`の`item.started` / `item.completed`にある`command_execution`等**から、指定commitのSkill pathを読む実際のtool操作を確認し、参照したSkill名・path・対象commitと安全化した証拠を対応付ける。Native injectionの内部挙動を「読んだ」と推測せず、ログが読取りを示さないときは`unverified`とする。
+明示的Skill使用を要求する今回の評価では、次の**二つの事実を別々に記録**する。
 
-**成果物の評価成立**はAgent成果物とgrader / Judgeが採点可能なこと、**Skill修正の効果を検証できたとする条件**はこれに加えて、比較した両attemptで変更対象Skillの読み取りが`observed`となることを要求する。読み取りが観測できても品質変化の因果関係を統計的に証明したとは扱わない。読取り未観測の結果を破棄せず、Skill改善判断についてだけ「未確認」にする。native `description` trigger精度や汎用Agent trace adapterは今回追加しない。
+- **評価条件へのSkill投入**：指定Git SHAのtracked contentを配置し、file manifest・SHA-256を照合したこと、生成promptが対象Skill名・pathを指定したことをEvaluatorが独立確認する。これは比較成立の必須条件とする。
+- **Agent内部での実使用観測**：`codex exec --json`の`command_execution`等で`SKILL.md`を読む操作を確認できたときだけ`observed`、確認できなければ`unverified`とし、取得元の非秘密log・pathを記録する。native Skill injectionではOSコマンド読取ログに出ないことがある。`command_execution`の欠落をSkill未使用の証明にしない。
 
+**両attemptでのSkill読取`observed`は品質比較の必須条件としない**。両方で投入したSkill SHAとその他比較条件が検証済みなら、成果物の品質差を比較可能とする。ただし内部観測ができないrunは「指定Skillを投入した条件での成果物品質差」であり、Skill改修が差分の原因と確定したとは書かない。native `description` trigger精度を今回評価したともしない。Native Skill専用の観測基盤・汎用Agent adapterは追加しない。
 ## 追加する評価実行コード
 
 ### 配置
@@ -667,7 +670,7 @@ Judge側の独立model / CLI version / 推論・tool・MCP・指示・設定 / �
 - Agent名
 - Agent model
 - Agent / Judgeの非秘密実効設定profile fingerprintと検証結果、隔離preflight結果、Tool / MCP / user-global指示の扱い
-- 対象Skillの実使用観測（`observed` / `unverified`）と根拠path
+- Skill投入の検証済みrevision・file hashと、内部実使用の観測（`observed` / `unverified`）・根拠pathを別々に保存する
 - Agent versionを安全に取得できる場合はそのversion
 - semantic評価ではJudge専用command・cwd・実効profile・その確認結果
 - Agent commandのexit code
