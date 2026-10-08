@@ -722,8 +722,16 @@ Skill修正前後を比較するときは、少なくとも次が一致するrun
 
 ### 判定結果と比較可否の分離
 
-既存graderの`pass / needs_review / fail`、Agent / Judge / grader実行エラー、`evidence_unverified`、`isolation_unverified` / `not_comparable` / `evaluator_incompatible`を別々に保存する。必須QA成果物の欠落、verifier未実行が信頼できるtool traceで確定した場合、`valid=false`を完成扱いした場合はSkill品質の非passとする。**実行したか不明でrequest / result・traceだけが欠落した場合は`evidence_unverified`とし、該当するruntime観点を検証済みPASSにしないがSkill品質failへ転記しない**。capture / I/O / 独立再実行がEvaluator側で失敗したらrunner / environment errorとする。比較不可の結果も診断目的で保存する。
+既存graderの`pass / needs_review / fail`、Agent / Judge / grader実行エラー、`evidence_unverified`、`isolation_unverified` / `not_comparable` / `evaluator_incompatible`を別々に保存する。必須QA成果物の実際の未生成、verifier未実行が信頼できるtool traceで確定した場合、`valid=false`を完成扱いした場合、固定機械判定の重大な失敗はSkill品質の非passとする。**request / result・trace欠落だけで未実行か判断できない場合**や、成果物が実在するが登録・分類不能な場合は`evidence_unverified`として理由を記録し、Skill品質failへ転記しない。
 
+attemptの結果は**品質結果（semantic / deterministic / fixed machine）・証拠検証・比較可能性**を別軸で保持し、外部へ返す`attempt_status`を次の規則で導出する。
+
+- `pass`：適用される全品質基準がpass、必須QA成果物の識別・production verifier / fixed machineの必要証拠・workflow最終判断が検証済みであり、採点と証拠検証が最後まで完了している場合のみ。フェーズ1のケースにフェーズ2固有の必須成果物を要求しない。
+- `needs_review`：semantic等はpassでも、必須runtime証拠の`evidence_unverified`、QA成果物登録の分類不能、final response証拠欠落、`evaluator_incompatible`により必要な品質観点が未検証である場合。または通常の品質`needs_review`の場合。既に確定したsemanticのpassは保管するが、attempt全体を検証済みpassとしない。
+- `fail`：確認済みの品質判定がfailの場合。ただし証拠取得の欠落・Evaluator内部I/O失敗だけからfailを作らない。
+- `execution error`：Runner準備・Judge実行・capture処理・候補verifier隔離実行・Evaluator I/Oの失敗等で評価を正常に実施できない場合。既存CLIと同じexit code 2へ対応する。agentが正常に証拠を保存しなかった可能性と、Runner自身の記録処理失敗は診断理由で区別する。
+
+直接比較の可否は`attempt_status`とは独立に、固定Evaluator / Skill投入 / target / Agent / Judge条件とOS隔離などの一致で判断する。特に内部Skill読取が`unverified`でも成果物の品質比較は可能だが、Skill修正が原因だとは確定しない。証拠未確認のattemptを「全観点の検証済み改善」とは報告しない。
 Run同士の比較成立確認は**2つの保存済みrunの共通条件の照合**で行い、ファイル名や同じmodel名だけから同条件と判断しない。repeatの各attemptと対象Skill使用観測の状態も比較表示に残す。
 
 ## exit code
@@ -731,9 +739,9 @@ Run同士の比較成立確認は**2つの保存済みrunの共通条件の照�
 既存評価ランタイムと意味を揃えます。
 
 ```text
-0: 選択した全attemptがpass
-1: 評価自体は完了したがneeds_review / failが1件以上
-2: dataset / workspace / Agent execution / grader execution等の実行エラー
+0: 選択した全attemptが検証済みpass（品質・必須証拠がすべて成立）
+1: 評価処理は完了したがneeds_review / failが1件以上、または必須証拠未確認・部分的Evaluator非互換で検証済みpassにできない
+2: dataset / workspace / Agent / Judge / grader / capture / 隔離再実行等の実行エラー
 ```
 
 Agent commandがnon-zeroの場合、そのattemptではgraderを実行せずexecution errorとして記録します。
@@ -800,7 +808,7 @@ fake Agent subprocessを使って少なくとも次を検証します。
 - `--repeat`でattemptを独立保存する
 - 候補runtime実装のfingerprintと候補sourceを照合し、固定Evaluator側実装fingerprintへ誤照合しない。既存graderの通常CLIは従来の評価動作を維持する
 - フェーズ1 semanticでは生成用Docker launcherをJudgeとして誤使用せず、profileに定義された独立Judge commandへUTF-8 Judge promptを渡す。Judge JSON不正・非0終了・timeoutを実行エラーとして区別する
-- 入出力証拠の欠落をSkill品質failにせず`evidence_unverified`と分類する。実際の`valid=false`とは区別する
+- 入出力証拠の欠落をSkill品質failにせず`evidence_unverified`と分類する。実際の`valid=false`と区別する。semantic passでも必須runtime / artifact分類・workflow判断の証拠が欠ければattemptが`needs_review`・exit 1となり、Runner障害ならexit 2となる
 - 正常・重要欠落・根拠のない動作を含む評価専用fixtureを使い、semantic Judgeの判定方向と根拠を確認する
 - 異なるSkill revisionを同じ固定graderで採点し、比較条件が異なる結果は`not_comparable`にする
 - 秘密を含み得るargv・環境変数・生ログがprovenanceに残らない
