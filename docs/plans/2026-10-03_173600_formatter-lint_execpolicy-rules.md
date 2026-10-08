@@ -14,7 +14,7 @@ Windows実行名はすべてのGit / ghルールで`git` / `git.exe`、`gh` / `g
 
 `.codex/rules/`はHookの代替ではなく、Hook failure時にも高影響操作を無承認で通しにくくする承認境界として使います。通常のread-only command用`allow` ruleは追加しません。
 
-Codex 0.160.0のexecpolicyはargvのexact prefix matchingであり、pattern要素のunionと`match` / `not_match`を使えます。サブコマンドより前にオプションが入るGit / GitHub CLI形式はprefixに一致しないため、Main Plan「CLIの対応形式とprefix判定」に従ってPreToolUseでdenyします。rule未一致だけを拒否済みの証拠として扱いません。実装者判断を残さないため、今回追加するruleの**pattern / decision / representative match / boundary not_matchをこの節の正本**とします。`match` / `not_match`はrules file自身のload-time testとして同じ内容を保持します。
+Codex 0.160.0のexecpolicyはargvのexact prefix matchingであり、pattern要素のunionと`match` / `not_match`を使えます。サブコマンドより前にオプションが入るGit / GitHub CLI形式はprefixに一致しないため、Main Plan「CLIの対応形式とprefix判定」に従ってPreToolUseでdenyします。また、未引用の`HEAD~1` / `*.md`や変数展開を含むshell commandは、execpolicyが内部のGit / ghを抽出できず、元のshell呼出し全体で判定される場合があります。Main Plan「shell解析に失敗する引数の扱い」に従い、既知の非対応形式をHookでdenyします。rule未一致だけを拒否済みの証拠として扱いません。実装者判断を残さないため、今回追加するruleの**pattern / decision / representative match / boundary not_matchをこの節の正本**とします。`match` / `not_match`はrules file自身のload-time testとして同じ内容を保持します。これらは分解済みargvに対するprefix照合の検証であり、`bash -lc "cd ... && git reset HEAD~1"`等の完全なshell commandをCodexが正しく分解した証拠にはなりません。
 
 #### `20-risky-prompt.rules`
 
@@ -392,7 +392,7 @@ prefix_rule(
 
 force push、hard reset、commit amendは永久禁止にしません。`git push` / `git reset` / `git commit`のfamily-level `prompt`でユーザー承認へ送り、protected branch上ではPreToolUseのcontextual denyを優先します。`restore` / `checkout` / `switch`は未commit変更の破棄を防ぐため同じ既存ruleの`prompt`に含め、protected branchからの安全な`switch`はHook通過とexecpolicy承認の両方を必要とします。
 
-CIでは固定版Codex CLI自身の`codex execpolicy check --rules ...`で、rules fileへ埋め込んだ`match` / `not_match`のload-time検証に加え、各ruleから少なくとも1つの`prompt` / `forbidden`代表caseと、read-only boundaryの代表caseを実行します。
+CIでは固定版Codex CLI自身の`codex execpolicy check --rules ...`で、rules fileへ埋め込んだ`match` / `not_match`のload-time検証に加え、各ruleから少なくとも1つの`prompt` / `forbidden`代表caseと、read-only boundaryの代表caseを実行します。完全なshell commandでの展開構文・quoting・分解失敗時fallbackはexecpolicyのargv単体testでは確認できないため、Main PlanのHook contract testとPOSIX / Windowsのfresh Codex runtime受入を正本とします。
 
 このrule集合は今回のrepository開発workflowで使うGit / GitHub CLI / local shell commandを対象にしたguardrailです。Git / GitHub CLIの全subcommand・全option・将来versionの新commandをrepository独自policy engineで再実装しません。
 
@@ -402,7 +402,8 @@ CIでは固定版Codex CLI自身の`codex execpolicy check --rules ...`で、rul
 - Codex 0.160.0の`codex execpolicy check`で全ruleがloadでき、各`match` / `not_match`がPASSすること
 - `git` / `git.exe`、`gh` / `gh.exe`で代表`prompt` / `forbidden`が一致すること
 - `git restore .`、`git checkout -- .`、`git switch --discard-changes feature/other`と、それぞれの`.exe`形式、安全な`git switch -c feature/new-work` / `git switch feature/existing-work`がすべて`prompt`になること。実Codexでは一時Git repositoryを使用し、破棄操作の承認を取り消して未commit変更が保持されること
-- 正規prefixのexecpolicy承認と、先行オプションによる非対応形式のPreToolUse実行前denyをMain PlanのPOSIX / Windows contract testおよびfresh runtime受入で別々に確認すること
+- 正規prefixのexecpolicy承認と、先行オプションおよびshell解析に失敗する展開引数による非対応形式のPreToolUse実行前denyをMain PlanのPOSIX / Windows contract testおよびfresh runtime受入で別々に確認すること
+- `git reset HEAD~1` / `git rm *.md` / `gh pr create --body "$BODY"`の拒否と、引用済みの`git reset 'HEAD~1'` / `git rm '*.md'` / `gh pr create --body-file body.md`がそれぞれ既存rulesの`prompt` / `forbidden`へ到達することを、実Git / remote mutationなしで確認すること
 - 新規GitHub CLI操作と別名の代表例、およびMain Plan記載のtoken表示Hook denyを別途検証すること
 - GitHub CLIのmutation-only集合を変更する場合は、実装時点の公式help referenceでsubcommandを再確認すること
 - read-only commandを無承認に戻すためだけの独自option parserを追加しないこと
