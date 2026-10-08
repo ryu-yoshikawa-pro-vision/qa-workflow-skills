@@ -1,3 +1,5 @@
+// The existing Playwright CLI evaluates this file as a parenthesized function expression.
+// prettier-ignore
 async (page) => {
   const requestSlot = "__usabilityInspectionFixedProbeRequest";
   const currentDocumentIdentity = await page.evaluate(async () => {
@@ -537,16 +539,13 @@ async (page) => {
           });
           continue;
         }
-        const featureCount = (
-          row.raw_condition.match(
-            /(?:min|max)-(?:width|height)|\b(?:width|height|inline-size|block-size)\s*(?:<=|>=|<|>|:)/gi,
-          ) || []
-        ).length;
-        if (featureCount !== 1 || /,|\bor\b/i.test(row.raw_condition)) {
+        const monotonicMediaQuery =
+          /^(?:(?:all|screen)\s+and\s+)?\(\s*(?:min|max)-(?:width|height)\s*:\s*[^()\s,]+\s*\)$/i;
+        if (!monotonicMediaQuery.test(row.raw_condition)) {
           closures.push({
             condition_ref: row.condition_ref,
             status: "incomplete",
-            reason: "condition branches cannot be separated as one monotonic axis",
+            reason: "condition is not a supported single min/max viewport media feature",
           });
           incomplete = true;
           continue;
@@ -682,7 +681,17 @@ async (page) => {
           status: incomplete ? "incomplete" : "ok",
         },
         ...(incomplete
-          ? { limitation: "one or more responsive size conditions could not be closed" }
+          ? {
+              limitation: (() => {
+                const firstIncomplete = closures.find((row) => row.status === "incomplete");
+                const firstIssue = inventory.issues[0];
+                if (firstIncomplete)
+                  return `${firstIncomplete.condition_ref}: ${firstIncomplete.reason}`;
+                if (firstIssue)
+                  return `${firstIssue.source_ref || "CSS source"}: ${firstIssue.reason}`;
+                return "one or more responsive size conditions could not be closed";
+              })(),
+            }
           : {}),
         evidence_refs: refs,
       };
@@ -1104,4 +1113,4 @@ async (page) => {
     "unsupported",
     "probe key is outside this Skill's fixed browser dispatch",
   );
-};
+}

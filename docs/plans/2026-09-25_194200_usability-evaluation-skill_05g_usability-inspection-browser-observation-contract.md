@@ -296,7 +296,7 @@ size query以外のstyle query / scroll-state queryは数値boundaryへ変換し
 
 ### `responsive-boundaries`
 
-`responsive.conditions` のうち、現在match状態を正確に取得できるsize conditionだけについて、numeric transitionをCSS pxへmaterializeします。現行の標準browser APIで評価可能な `@media` は対象にできます。`@container` はmatch状態を取得できないためbinary searchを行わず、`not-executable` closureにします。
+`responsive.conditions` のうち、現在match状態を正確に取得できるsize conditionだけについて、numeric transitionをCSS pxへmaterializeします。numeric boundary探索の対象は、単一のviewport軸に対する単純な `min-width` / `max-width` / `min-height` / `max-height` media featureに限ります。この形ではbrowser評価結果が探索軸に対して単調であることを保証できます。範囲条件、完全一致、複合条件、comma branch、その他のmedia expressionは、少数のviewport点が同じ結果でも境界なしと判断せず、`incomplete` と理由を保持します。`no-numeric-transition` は、上記の単調条件について探索範囲全体にtransitionがないと判断できた場合だけ使います。`@container` はmatch状態を取得できないためbinary searchを行わず、`not-executable` closureにします。
 
 media size condition:
 
@@ -462,7 +462,7 @@ probe result status:
 - `incomplete`
 - `blocked`
 
-`unsupported` はcurrent browser/tool capabilityに機能がない場合、`unavailable` は対象状態や必要eventを取得できない場合、`incomplete` は一部source / boundary / population completenessを閉じられない場合です。
+`unsupported` はcurrent browser/tool capabilityに機能がない場合、`unavailable` は対象状態や必要eventを取得できない場合、`incomplete` は一部source / boundary / population completenessを閉じられない場合です。一般観測normalizerでは、有効な `ok` だけを `ready / supported` にします。`incomplete` は `unresolved / partial` とblocking issueを保持し、`unavailable` は `blocked / unsupported` とblocking issueを保持します。両方とも元のstatus / limitationをpayloadへ残し、観測失敗をproduct defectやWCAG不適合へ変換しません。formal WCAGのtyped partialとcatalogued manual limitationは、formal machine result固有の既存closure契約に従います。
 
 tool failureやprobe unavailableをproduct defect / usability issueへ自動変換しません。
 

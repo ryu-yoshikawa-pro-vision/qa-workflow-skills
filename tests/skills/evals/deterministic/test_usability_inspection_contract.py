@@ -271,6 +271,22 @@ class ObservationContractTests(unittest.TestCase):
         with self.assertRaises(observation.ObservationContractError):
             observation.normalize_probe_result(probe, inconsistent, current_document_identity=DOCUMENT_IDENTITY_A)
 
+    def test_responsive_boundaries_only_search_supported_monotonic_media_conditions(self):
+        probe = (INSPECTION / "scripts" / "fixed_browser_probes.js").read_text(encoding="utf-8")
+        monotonic_check = probe.index("monotonicMediaQuery.test(row.raw_condition)")
+        no_transition = probe.index('status: "no-numeric-transition"')
+        self.assertIn(
+            r"/^(?:(?:all|screen)\s+and\s+)?\(\s*(?:min|max)-(?:width|height)\s*:\s*[^()\s,]+\s*\)$/i",
+            probe,
+        )
+        self.assertLess(monotonic_check, no_transition)
+        self.assertIn("condition is not a supported single min/max viewport media feature", probe)
+        self.assertNotIn("const featureCount", probe)
+        self.assertIn('row.query_kind === "container-scroll-state"', probe)
+        self.assertIn('executionStatus = "not-executable"', probe)
+        self.assertIn("await page.setViewportSize(original)", probe)
+        self.assertIn("original viewport restoration could not be verified", probe)
+
     def test_responsive_condition_inventory_is_typed_and_closed(self):
         probe = next(row for row in observation.plan_probes(
             selected_rule_keys=[], measurement_kinds=["responsive"], aspect_keys=[]

@@ -127,7 +127,10 @@ class CanonicalUsabilityFixtureTests(unittest.TestCase):
         self.assertIn("context.fillText", unreadable_scale)
         self.assertNotIn("transform:", unreadable_scale)
         for condition in ("@container (min-width: 400px)", "@container style(--variant: promoted)",
-                          "@container shared-card (min-width: 250px)", "@media (max-width: 600px)"):
+                          "@container shared-card (min-width: 250px)", "@media (min-width: 600px)",
+                          "@media (max-width: 600px)", "@media (400px < width < 600px)",
+                          "@media (width: 500px)",
+                          "@media (min-width: 400px) and (max-width: 600px)"):
             with self.subTest(condition=condition):
                 self.assertIn(condition, container_queries)
         self.assertEqual(container_queries.count("#same-value"), 2)

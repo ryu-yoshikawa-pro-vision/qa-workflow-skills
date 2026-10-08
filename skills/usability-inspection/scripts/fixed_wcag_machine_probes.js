@@ -1,3 +1,5 @@
+// The existing Playwright CLI evaluates this file as a parenthesized function expression.
+// prettier-ignore
 async (page) => {
   const requestSlot = "__usabilityInspectionFixedWcagProbeRequest";
   const currentDocumentIdentity = async () =>
@@ -2047,4 +2049,4 @@ async (page) => {
     evidence_refs: evidenceRefs,
     value,
   };
-};
+}

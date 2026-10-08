@@ -375,3 +375,61 @@ formal reportはfixture全体をclosureしていない。変更後confirmation s
 - implementation commit `3a694dae31b818c22d1f8a02bfefe64fbbd02051`を通常commitし、PR branchへ通常pushした。pre-commitはofficial validator、repository deterministic / semantic / Trigger / runtime suiteを通過。push後のPR headは同SHAで、`Validate Agent Skills` run `37771940172`、`Validate Deterministic Output Evals` run `37771940250`、`Validate Semantic Output Evals` run `37771940185`はいずれもsuccess。
 - PR本文を更新し、WebCrypto secure-context制限、HTTP時のfail-closed結果、今回のfocused / standard validation、最新headのCIを反映した。titleは既存の実装PR titleを維持。
 - 検証対象implementationは`35f596f`から上記tracked変更を加えたtree。外部product conformanceの証拠ではない。全量Semantic Judge、Trigger 180、Holdout 24、fixture全WCAG closureは今回実行していない。
+
+## 2026-10-08 JST — normal observation / non-monotonic media query修正と最新HMAC formal handoff
+
+### 作業開始状態
+
+- branch `feat/usability-evaluation-skill`、local HEAD / PR #14 remote head `51b7fef8e926523acfb439f6b5576aa624cdd021`、`origin/main=dec3f7c764db2869dc24eb3d6f154712a6677068`。`origin/main...HEAD` はahead 321 / behind 0。PRはopen。
+- 開始時点でstaged / unstaged tracked変更なし。作業後のtracked差分は本節に記す9ファイルのみ。ユーザー所有untracked `3b77866a0b52347ce6201959f97492f197a61365`は保持し、`.gitignore`、ignored overlay、既存Run Artifactは変更しない。
+- fixture server `http://127.0.0.1:4173/`は稼働中で再起動せず利用した。Playwright pageはE2E終了後にclose済み。Browser tabs APIは`about:blank`のみを返した。OS process enumerationはアクセス拒否となったため、他processがないとは断定しない。
+- 対象PR head `51b7fef`の作業開始前Actionsは3件successだった。これは今回の修正後headのCI証拠には流用しない。
+
+### 修正1 — 通常観測status
+
+- 原因: `inspection_runtime.handler()`はformal machine resultの`incomplete` / `unavailable`を分岐していたが、一般`normalize-observation-probe-result`ではこれらがdefaultの`ready / supported`へ落ちていた。normalizerは観測値を`None`にするため、データ欠落と正常完了が矛盾していた。
+- 修正: 一般観測の`incomplete`を`unresolved / partial`、`unavailable`を`blocked / unsupported`へ分類し、blocking `inspection_operation_not_closed` issueを保持する。元status・limitationはpayloadに残し、観測valueは捏造しない。`unsupported` / `blocked`とformal WCAG固有のtyped partial / catalogued manual fallback分岐は維持した。
+- 回帰test `test_general_observation_statuses_do_not_promote_unfinished_probes_to_ready`はproduction runtime入口で`ok / incomplete / unavailable / unsupported / blocked`を確認し、ready、issues、payload status/value、limitationを検証する。
+
+### 修正2 — responsive boundary
+
+- 原因: 固定viewport点のmatchが同じだったとき、範囲・完全一致・複合media queryでも`no-numeric-transition`になり得た。これらはmatchが探索軸に対して単調とは限らない。
+- 修正: binary search対象を単一の`min-width` / `max-width` / `min-height` / `max-height` media featureに限定。range / exact / compound / comma branch / その他の式は`incomplete`と理由で保持し、少数点から境界なしと推論しない。単純な`@media`はmatchMediaとneighboring before / transition / after確認を維持し、`@container`は`not-executable`のまま。元viewportの復元確認も維持。
+- canonical fixtureに単純min-width、range、exact width、compound widthのmedia ruleとsentinelを追加。contract testは許可condition、incomplete closure、container not-executable、viewport cleanupを確認する。
+- `_05g`とPlaywright observation referenceを更新し、実装が探索する有限条件と`no-numeric-transition`の適用範囲を明記した。
+
+### 最新実装のfixed browser probe / formal handoff E2E
+
+- 既存Playwright Chromium sessionでfixture entry `http://127.0.0.1:4173/`を開いた。package-owned `fixed_browser_probes.js`でbrowser発行HMAC document identityを取得し、production `sampling.sample_identity_registry()`、`wcag_em_structure.materialize_variations()`、`wcag_criterion_plan.materialize_plan()`からWCAG 2.2 AA / SC 2.4.2 / `mp-document-title` requestをmaterializeした。production inspection runtimeでrequestをvalidateした。raw URLをrequest/sample/resultに保存していない。
+- `fixed_wcag_machine_probes.js`の`mp-document-title`をrequest slot経由で実行。request `target_identity`とbrowser `current_document_identity`が一致、probe status `ok`、document-titleの固定predicateを取得。production `normalize-wcag-machine-probe-result`は`ready / supported`、issuesなし、currentness currentを返した。
+- cleanup前のSQLite test provider上の順序: state create revision 1 → pending CAS revision 2 → operation claim → browser-session reservation provider revision 1 → in-progress CAS revision 3 → fixed browser observation → immutable `OBS-RESULT-001` (result revision `b33db9ac…`) → returned CAS revision 4 → browser page close → provider-native conditional release `released` (reservation revision 2) → release-state CAS revision 5 → close-ready → closed CAS revision 6 → DB re-read revision 6/status `closed` → `may_resume=true`。
+- resume後はproduction `wcag_runtime`でcriterion `CRIT-EVAL-000028`を再materializeしcurrent machine resultを消費した。未観測の他procedureを完了扱いせず、criterionを`in-progress` / runtime `unresolved`のまま維持した。これは意図したfail-closed状態で、fixture全体のconformance / report closureではない。代表handoff lifecycleに未解決blockedはなく、WCAG全体適合とは主張しない。
+- Browser E2E raw evidenceはignored `output/pr14-final-review-51b7/`に保存: `formal-request.json`, `formal-probe-result.json`, `formal-normalized-observation.json`, `formal-handoff-preprobe.json`, `formal-handoff-e2e.json`, `formal-handoff.sqlite`。Responsive browser evidenceは`browser-responsive-probe.json`, `responsive-runtime-normalizer.json`, `browser-viewport-restore.json`。`browser-viewport-cleanup.json`はfixed catalog外のkeyによるため証拠に含めない。
+- Responsive fixed probeのChromium実結果: `(max-width:600px)`は600/601/602でtrue/false/false、`(min-width:600px)`は599/600/601でfalse/true/true。range / exact / compoundは`incomplete`、全container queryは`not-executable`。production normalizerは`unresolved / partial`、blocking issueあり、status / limitation維持、valueなしを返した。original viewportは1280×800へ復元。
+- Fixed probe fileはPlaywright CLI `--filename`形式の親括弧評価でも構文解析できるよう、最上位arrow function expressionのterminal semicolonだけを除き、package-owned logicは変更していない。`node --check`とPrettier checkは2 probe filesともpass。
+- 一度、成功したformal probe後にartifact保存用としてfixed fileをrequest再割当なしで再呼出しし、probe resultが見つからなかった。この再呼出しはE2E証拠から除外し、保存済みの最初の成功応答のみをresultとして使用した。hand-off lifecycleやSQLite stateはその後production helperで検証済み。
+
+### 検証結果
+
+- Focused deterministic suite (`test_inspection_runtime_contract`, `test_usability_inspection_contract`, `test_canonical_usability_fixture`, `test_wcag_formal_contract`, `test_wcag_handoff_contract`): **62 PASS**。
+- official `skills-ref validate`: `PYTHONUTF8=1`で**22 Skill packages PASS**。既定cp932での初回は日本語Skill READMEのdecode errorとなったため、過去と同じUTF-8環境変数で再実行した結果を採用。
+- Semantic dataset validator: **22 Skills / 155 cases PASS**。shared semantic tests **27 PASS / 2 Windows symlink-privilege SKIP**、repository semantic tests **4 PASS**。
+- shared deterministic tests **12 PASS**、repository deterministic tests **252 PASS**、trigger contract **1 PASS**、runtime tests **271 PASS**。
+- Python compile: **17 roots**（13 current Skill runtime packagesと4 deterministic / semantic script/test roots）PASS。Node syntax: **2 fixed probe files PASS**。Prettier: **2 fixed probe JS + canonical HTML PASS**。
+- Markdown lint: repository configのglob指定により通常invocationが全627 Markdownを選択し、既存882 issue / 157 filesを報告した。変更ファイルに範囲を絞る`markdownlint-cli2 --no-globs`はPlanとPlaywright referenceの**2 files / 0 issue PASS**。全repo lint issueの修正は今回範囲外。
+- `git diff --check`: PASS。
+- Semantic Judge 83、Trigger 180、Holdout 24、formal WCAG全fixture closureは指示どおり実行していない。
+
+### 変更対象
+
+- `docs/plans/2026-09-25_194200_usability-evaluation-skill_05g_usability-inspection-browser-observation-contract.md`
+- `skills/usability-inspection/references/playwright-observation.md`
+- `skills/usability-inspection/scripts/fixed_browser_probes.js`
+- `skills/usability-inspection/scripts/fixed_wcag_machine_probes.js`
+- `skills/usability-inspection/scripts/inspection_runtime.py`
+- `tests/skills/evals/deterministic/test_canonical_usability_fixture.py`
+- `tests/skills/evals/deterministic/test_inspection_runtime_contract.py`
+- `tests/skills/evals/deterministic/test_usability_inspection_contract.py`
+- `tests/skills/fixtures/usability-canonical/container-query-cases.html`
+
+- Progress: 80% (8/10)。Next: 対象9ファイルと本reportだけを明示stageして通常commit / pushし、最新head Actions、PR本文、final checkpointを確認する。ユーザー所有untracked hash fileはstageしない。

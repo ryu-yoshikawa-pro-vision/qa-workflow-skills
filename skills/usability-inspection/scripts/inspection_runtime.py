@@ -125,6 +125,13 @@ def handler(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, 
         "blocked", "unsupported", "unavailable", "incomplete"
     }:
         result_status, support_status = "blocked", "unsupported"
+    elif state == "incomplete":
+        # A general probe that did not finish is not a completed observation.
+        # Keep its limitation in the payload and prevent downstream closure.
+        result_status, support_status = "unresolved", "partial"
+    elif state == "unavailable":
+        # The required observation could not be obtained; do not infer a result.
+        result_status, support_status = "blocked", "unsupported"
     elif state in {"blocked", "unsupported"}:
         result_status, support_status = "blocked", "unsupported"
     elif state in {"requested", "in-progress", "stale", "ambiguous", "missing", "no-progress"}:

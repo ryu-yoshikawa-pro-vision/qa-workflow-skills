@@ -38,6 +38,26 @@
           border-width: 2px;
         }
       }
+      @media (min-width: 600px) {
+        #media-min-sentinel {
+          outline-width: 1px;
+        }
+      }
+      @media (400px < width < 600px) {
+        #media-range-sentinel {
+          outline-style: dashed;
+        }
+      }
+      @media (width: 500px) {
+        #media-exact-sentinel {
+          outline-style: dotted;
+        }
+      }
+      @media (min-width: 400px) and (max-width: 600px) {
+        #media-compound-sentinel {
+          text-decoration-line: underline;
+        }
+      }
     </style>
   </head>
   <body>
@@ -48,5 +68,9 @@
       <div class="named-container container"><span class="shared-target">two</span></div>
     </main>
     <div id="media-sentinel">media query target</div>
+    <div id="media-min-sentinel">monotonic minimum-width target</div>
+    <div id="media-range-sentinel">non-monotonic range target</div>
+    <div id="media-exact-sentinel">single-width exact-match target</div>
+    <div id="media-compound-sentinel">compound width target</div>
   </body>
 </html>

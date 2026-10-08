@@ -121,6 +121,51 @@ class InspectionRuntimeContractTests(unittest.TestCase):
         self.assertEqual(output["payload"]["result"]["probes"][0]["probe_key"], "document-title")
         self.assertIn("has_non_whitespace_text", output["payload"]["result"]["probes"][0]["required_result_fields"])
 
+    def test_general_observation_statuses_do_not_promote_unfinished_probes_to_ready(self):
+        planned = invoke("plan-probes", {"selected_rule_keys": ["2779a5"], "measurement_kinds": [],
+            "aspect_keys": [], "target_refs": []})
+        probe = planned["payload"]["result"]["probes"][0]
+        value = {
+            "is_html_document": True, "has_html_title_descendant": True,
+            "first_title_children_are_text": True, "has_non_whitespace_text": True,
+            "status": "ok", "limitation": None,
+        }
+        expected = {
+            "ok": ("ready", "supported", False),
+            "incomplete": ("unresolved", "partial", True),
+            "unavailable": ("blocked", "unsupported", True),
+            "unsupported": ("blocked", "unsupported", True),
+            "blocked": ("blocked", "unsupported", True),
+        }
+
+        for status, (result_status, support_status, blocking) in expected.items():
+            with self.subTest(status=status):
+                result = {
+                    "probe_key": probe["probe_key"], "document_identity": DOCUMENT_IDENTITY_A,
+                    "status": status, "limitation": None if status == "ok" else f"synthetic {status} limitation",
+                    "evidence_refs": ["E-OBS-1"],
+                }
+                if status == "ok":
+                    result["value"] = value
+                normalized = invoke("normalize-observation-probe-result", {
+                    "probe": probe, "result": result,
+                    "current_document_identity": DOCUMENT_IDENTITY_A,
+                })
+
+                self.assertEqual(normalized["runtime_status"], "ok")
+                self.assertEqual(normalized["result_status"], result_status)
+                self.assertEqual(normalized["support_status"], support_status)
+                self.assertEqual(bool(normalized["issues"]), blocking)
+                if blocking:
+                    self.assertTrue(normalized["issues"][0]["blocking"])
+                    self.assertEqual(normalized["issues"][0]["status"], status)
+                    self.assertEqual(normalized["payload"]["result"]["status"], status)
+                    self.assertIsNone(normalized["payload"]["result"]["value"])
+                    self.assertEqual(normalized["payload"]["result"]["limitation"], result["limitation"])
+                else:
+                    self.assertEqual(normalized["issues"], [])
+                    self.assertEqual(normalized["payload"]["result"]["value"], value)
+
     def test_formal_runtime_validates_typed_request_and_fingerprints_probe_catalog(self):
         request = formal_request()
         output = invoke("validate-wcag-machine-probe-request", {"request": request}, formal=True)
