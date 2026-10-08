@@ -275,3 +275,22 @@ formal reportはfixture全体をclosureしていない。変更後confirmation s
 | formal report fail-closed / Step 5.3 guard / EARL subset | production helper + independent validator | `outputs/REPORT.md`, `earl.jsonld`, `earl-validation.json`, `earl-repeat.jsonld` | PASS。formal whole-scope closure is intentionally blocked; not a conformance pass |
 | description変更対象3 query + clear negative boundary | real Agent Skill-read telemetry | `output/pr14-validation-tools/trigger-targeted-20261008/` | PASS。15/15 normal runs、5/5 query threshold達成 |
 | current PR head CI | GitHub Actions | push後に確認する | pending |
+
+## 2026-10-08 JST — 実装commit pushとcurrent-head CI
+
+- 対象branch `feat/usability-evaluation-skill`で通常commit `4aafd1a7e72b308d8966f803f492783304eb7d85` (`feat: PR14の評価責務と検証ゲートを整合`)を作成し、通常pushした。force push / hook bypassなし。commitはPR #14対象11 fileだけで、`.gitignore`とユーザー所有untracked `3b77866a0b52347ce6201959f97492f197a61365`を含まない。
+- 実装・Plan tree fingerprintは`e558e861067cd2231485727091edef70593072441c954f2e781f2fffdd66fd98`（progress reportを除外するrepository helper方式）。implementation commit `4aafd1a`の時点で`origin/main`との差はahead 315 / behind 0。
+- `4aafd1a`のGitHub Actionsは3件すべてsuccess: `Validate Agent Skills` run `37708225326`、`Validate Deterministic Output Evals` run `37708225467`、`Validate Semantic Output Evals` run `37708225299`。各runのhead SHAは`4aafd1a7e72b308d8966f803f492783304eb7d85`。Deterministic workflowはcompile、shared / repository deterministic tests、runtime unit / integration tests、semantic dataset / runtime validationを実行しsuccess。
+- 通常commit hookもsuccess。22 Skill `skills-ref validate`、semantic dataset 22 Skill / 155 case、shared deterministic 12、repository deterministic 246、shared semantic 27（Windows symlink privilege skip 2）、repository semantic 4、trigger contract 1、runtime 271 testsを確認。
+- 変更後のfocused Markdown lintは8 file / 0 issue。global markdownlintはrepository設定の`globs`により627 fileを走査して885 issue / 158 fileを報告する。今回更新したprogress reportの既存3件（過去行のtable pipe / blank-line）を含むbaseline文書問題で、追記箇所にissueは報告されていない。
+- 次にPR title / bodyを実装状態へ更新し、検証記録とworking Planの完了checkpointを通常のreport-only commitとしてpushする。そのreport-only headについてもActionsを再確認してから最終完了判定する。
+
+## 2026-10-08 JST — 更新後Planの最終突合（implementation commit）
+
+- PR #14 titleを`feat: UI/UX評価・ユーザビリティ検査・WCAG適合評価Skillを追加`へ、bodyを実装・検証済み内容へ更新した。`このPRはPlanのみです`の旧記述を削除し、17-key observation、ACT `2779a5`、代表Agent / browser経路、formal CAS / reservation / cleanup / resume、fail-closed report / EARL、targeted Trigger、repository tests / CIを反映した。
+- 対象implementation commit / 当時のPR headは`4aafd1a7e72b308d8966f803f492783304eb7d85`、tree fingerprint `e558e861067cd2231485727091edef70593072441c954f2e781f2fffdd66fd98`。commit後のcurrent-head GitHub Actions 3件（run `37708225326` / `37708225467` / `37708225299`）はすべてsuccess。
+- `_06` / `_06a` / `_06b` / `_06c`とroot Planの更新後completion gateを証拠へ対応付けた。standard validation / dataset、3 Skill smoke、saved evidence、代表live inspection、formal handoff / CAS / reservation / cleanup / closed-state reread / `may_resume` / resume、fail-closed report、Step 5.3 guard、EARL subset、targeted TriggerはPASS。
+- PR #17のSemantic 83 case全量実Agent candidate / grader接続 / batch / repeat / revision比較は継続評価として移管し、現時点でPR #17がPlan-onlyであることを明記した。native trigger全量統計とholdoutは別継続課題、fixture全WCAG closureもPR #14 gate外。external acceptanceもrepository fixture gateから分離した。
+- `PR #14 repository implementation Plan未達: 0件`（更新後のPlan、implementation commit `4aafd1a`に限る）。これはSemantic 83、Trigger 180、Holdout 24、fixture全WCAG closureの完了を意味しない。これらは更新後のPlanでPR #14の必須gateから外した。
+- このfinal report / working Plan更新はimplementationコードを変更しないreport-only follow-upであり、current report-only headをpushした後も3 Actionsを確認する。最終head CIのrun結果はPR checksで確認して報告する。
+- Progress: 100% (6/6)。
