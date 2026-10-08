@@ -415,7 +415,7 @@ Evaluator側にtrackedなscenario定義を置き、少なくとも次を固定�
   - `docs/spec/features/admin-inventory.md`
   - `docs/spec/known-deviations.md`
   - `docs/spec/unresolved-specifications.md`
-- 意味評価criteria
+- 意味評価criteria（上記`QTS-SEM-001..010`、固定した`critical`とReference対応）
 
 scenario定義と評価要求からfingerprintを算出し、親Planのrun provenanceへ保存します。
 
@@ -466,6 +466,32 @@ Referenceはscenarioで固定した上記規範・補助文書からEvaluatorが
 実装は既存の`scripts/skills/evals/semantic/prompt_builder.py`と`scripts/skills/evals/semantic/result.py`の共通処理を再利用します。Skill-local eval IDを前提とする`semantic/run.py` CLIを無理に流用せず、prompt構築・Judge response正規化・rating / verdict契約を共有します。
 
 初回では独自の総合点を作りません。既存semantic評価と同じcriterion rating / evaluable判定から、既存result契約に従ってpass / needs_review / failを導出します。Reference不足で判定できないcriterionは既存契約に従って扱い、target-specificなscore式を追加しません。
+
+### 初回scenarioのsemantic rubric契約
+
+`scripts/skills/evals/agent/scenarios/qa-training-store-checkout-payment-web-v1/rubric.json`には、以下の**10件をID昇順で固定**して登録する。既存`semantic/loader.py`のcriterion形式（`id` / `title` / `description` / `critical`）を使い、下表の対象・重大条件・規範根拠を`description`へ反映する。rubricの項目追加・critical変更はEvaluator revision変更として扱い、旧・新Skillの両方を同じ新Evaluatorで再評価しない限り直接比較しない。
+
+| ID | critical | 評価対象と規範根拠 | rating 1となる重大な条件 |
+|---|---|---|---|
+| `QTS-SEM-001` | true | `qa-workflow`のrouting。要求に必要な分析・設計工程が選択され、不要なE2E実装・実行へ逸脱しない（`qa-workflow/SKILL.md`、固定の評価要求） | 必要な主要工程を根拠なくスキップし、最終QA成果物の意味品質が成立しない |
+| `QTS-SEM-002` | true | workflowの完了判断。未閉鎖・blocked・未完成を完成扱いしない（`qa-workflow/SKILL.md`、正規QA成果物） | 必須の分析・設計成果物がない、または重大な未解決を隠して完了を宣言する |
+| `QTS-SEM-003` | true | Oracle選択と規範の優先順位（`docs/spec/README.md`、`product-scope.md`、`roles-and-permissions.md`） | README / 実装観察 / Unresolvedを正式な期待動作へ昇格し、重大な誤ったテスト期待値を作る |
+| `QTS-SEM-004` | true | Checkout Sessionの再開・置換・24時間期限切れ・再ログイン復帰（`BR-CHECKOUT-001` / `AC-CHECKOUT-001`、`state-and-scenarios.md`） | 同じCart / Versionの再開、Version変更時の置換、期限切れのいずれかを欠落させ、主要なテスト条件が成立しない |
+| `QTS-SEM-005` | true | Order確定直前のCart Version / 価格再検証と差戻し（`BR-CHECKOUT-002` / `AC-CHECKOUT-002`、`features/cart.md`） | stale Cartまたは価格不一致でもOrder / Paymentを作ってよいとする、または両方の差戻し境界を欠落させる |
+| `QTS-SEM-006` | true | Mock Payment成功・明確失敗時のOrder / Inventory / History整合（`BR-CHECKOUT-003` / `AC-CHECKOUT-003`、`features/orders.md`、`features/admin-inventory.md`） | TEST-SUCCESS以外で在庫を減らす、成功時のOrder paid・在庫減算を欠く、明確失敗で在庫を変える、購入と在庫履歴の整合を無視する |
+| `QTS-SEM-007` | true | processing中のresume・retry / cancel禁止と最終在庫不足（`BR-CHECKOUT-003` / `AC-CHECKOUT-003`、`state-and-scenarios.md`） | processing中の再試行・Cancelを許容する、processing再開または最終在庫不足の重要境界を欠落させる |
+| `QTS-SEM-008` | false | 分析結果からテスト条件・ケースへの具体化、開始条件・操作・観測可能な期待値（`test-analysis` / `test-condition-design` / `test-case-design`のSkill契約、上記BR / AC） | ケースが実行不能で、必要な入力・操作・PASS/FAIL条件を複数の重要ケースで特定できない |
+| `QTS-SEM-009` | true | Authority → TR → TCN → Coverage Item → TCの意味的な対応と未閉鎖の扱い（各Skill契約、生成した正規QA成果物） | 重要な仕様根拠とテストが対応しない、下流成果物が別要求を根拠にする、重大な未閉鎖を根拠なく解消したと扱う |
+| `QTS-SEM-010` | true | 仕様にない挙動を確定した期待値へしない（`product-scope.md`、`checkout-and-payment.md`、`known-deviations.md`、`unresolved-specifications.md`） | 外部Payment API、実provider、Server-side認可、Backend通信、存在しないToast等を現行の確定仕様として追加する |
+
+ratingの共通尺度は既存`semantic/prompt_builder.py`に従う。`4`は要求を明確に満たす、`3`は軽微な改善余地のみ、`2`は実質的な不足・要確認、`1`は上表の重大欠落・誤りに該当する。各criterionで**欠落や誤りが局所的か、主要な要件を損なうか**を理由とQA成果物の具体的evidenceに基づいて区別する。重要な条件の部分欠落でも、上表のrating 1条件に達しないならrating 2とし、説明の好みでは下げない。
+
+- `critical=true`のrating 1は既存`result.py`により全体`fail`。非criticalのrating 1やrating 2は`needs_review`となる。新しい点数式や独自の重み付けを作らない。
+- **Candidate Outputに必須成果物・記述がないこと**は通常`evaluable=true`で評価する。該当根拠が欠落していることをevidenceへ記録し、単に記述されていないことを理由に`evaluable=false`へ逃がさない。
+- `evaluable=false`を許すのは、適切に投入したReferenceにも規範根拠が存在せず、特定criterionを評価不能な場合のみ。Reference file自体の欠落・破損やscenario対応ミスはJudgeの`not_evaluable`ではなくEvaluator preparation errorにする。`evaluable=false`が残ったrunはそのcriterionの検証済みPASSではなく`needs_review`として扱う。
+- `QTS-SEM-001`・`002`・`009`の意味評価は正規QA成果物から確認できる範囲に限定する。必要なruntime証拠・completion・stable IDの機械検証は既存verifierへ任せ、Judgeへ非公開の内部JSONを渡さない。
+
+受入用fixtureも固定する。(1)正常例は全criterionでrating 3以上、(2)Payment成功と失敗の整合を意図的に壊した例は`QTS-SEM-006`がrating 1、(3)外部決済APIを確定仕様として追加した例は`QTS-SEM-010`がrating 1となることを確認する。後2件は全体`fail`となる想定とし、Judgeの判定が異なる場合は判定根拠を調べる。判定が揺れる場合は比較可能な品質判断が成立したと偽らず、rubric / Reference修正と両revisionの再評価を行う。
 
 ### 試行・使用証拠・比較可否
 
@@ -562,7 +588,7 @@ Agent executionは、Eval dataset由来のpromptでも、固定対象repo向けp
 - 生成成果物がrun artifactとして保存される
 - workflow結果と、実Codex JSONLから観測した変更対象Skillの読取り証拠（または`unverified`）が保存され、成果物の品質評価とSkill変更効果の検証成立を区別できる
 - traceability / runtimeの機械判定結果が保存される
-- 独立Judgeの意味評価結果が保存され、正常・重要欠落・仕様にない動作を加えたfixtureを固定基準で採点した結果と根拠から品質差の検出を検証している
+- `QTS-SEM-001..010`の固定criterion ID / critical / Reference対応により独立Judgeの結果を保存し、正常例・Payment整合違反例・仕様外動作混入例を判別できることを採点根拠付きで検証している
 - runner / environment errorとSkill品質のneeds_review / failを区別できる
 - 非pass結果を隠さず保存・報告できる
 - 比較条件が異なるrunと、隔離・実効設定が未確認のrunをSkill変更のみの直接比較に使わない
@@ -576,7 +602,7 @@ schemaやEntity表現が変更され、既存Evaluatorでは判定不能な場�
 
 ### Judgeの検出能力の受入検証
 
-固定target revisionと規範Referenceに基づき、重要なBR / ACを満たすQA成果物と、(1)Checkout / Paymentの重要な条件の欠落、(2)仕様にない期待動作の混入を持つEvaluator-only QA成果物の3種類を準備する。共通rubric / Judgeでそれぞれ採点し、異常例が対応criterionで適切に非passまたは要確認になり、理由がReferenceに結び付くことを確認する。判定に失敗した場合はrubric / Referenceを修正し、同じEvaluatorで双方のrunを再評価する。repeat結果の揺れは個別attemptで確認し、改善・悪化を単発結果だけで断定しない。
+固定target revisionに対し、上記rubricに定めた正常例・`QTS-SEM-006`違反例・`QTS-SEM-010`違反例をEvaluator-only fixtureとして準備する。各criterion IDの`critical` / rating / Reference根拠を確認し、正常例は全criteria rating 3以上、違反例は指定criterionでrating 1・全体failとなることを確認する。判定に失敗した場合はrubric / Referenceを修正し、同じEvaluatorで双方のrunを再評価する。repeat結果の揺れは個別attemptで確認し、改善・悪化を単発結果だけで断定しない。
 
 
 ## このフェーズで追加しないもの
