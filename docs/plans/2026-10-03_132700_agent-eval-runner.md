@@ -270,7 +270,7 @@ CIではfake Agent commandを使って、ランナー自体の契約・一時実
 Skill-local verifierはSkill本体にも含まれる。runtimeの再実行と共通の品質判定を次のように分ける。
 
 - **候補実装の鮮度・正当性**：EvaluatorがAgentの作業ツリーから独立して展開した、指定Skill revisionの信頼済みsourceを使い、そのrevisionのproduction verifier / generatorで実際のrequestを再実行する。保存結果との対応、実装fingerprint、generation、`valid`、`current_structure_state`を確認する。候補側のverifierが無効な結果を完成扱いした場合は品質の問題とする。
-- **固定基準の採点**：deterministic / semanticのgrader、expected / rubric / Reference、判定ルールは固定Evaluator revisionを使う。既存`deterministic/runtime_validator.py`の`_source_paths()`は現在Evaluator側`REPO_ROOT`へ固定されているため、このランナーの呼び出しに限り「評価対象source root」を安全に渡す最小の引数経路を追加する。`run.py`からruntime assertionへ明示的に伝播し、**graderのコードとassertionの意味は固定したまま、実装由来のfingerprint / generator version / static-dataの照合先だけを候補の信頼済みsourceへ切り替える**。従来のgrader CLIは引数省略で従来動作を維持し、一般Skill validatorのimport先・eval datasetは変更しない。Agentが編集できるworkspaceをsource rootに指定しない。
+- **固定基準の採点**：deterministic / semanticのgrader、expected / rubric / Reference、判定ルールは固定Evaluator revisionを使う。既存`deterministic/runtime_validator.py`の`_source_paths()`は現在Evaluator側`REPO_ROOT`へ固定されているため、`deterministic/run.py`へ任意の`--runtime-source-root`を追加し、`grade()` → `validate_runtime_evidence()` → `_assert_runtime_pair()` → `_source_paths()`へそのpathを明示的に渡す。指定時はEvaluatorが作成した**候補Git tree由来の信頼済みsource root**に一致することをrunner側で検証する。引数省略時は従来のEvaluator側`REPO_ROOT`を使用し、既存CLI・テストの動作を維持する。`run.py`からruntime assertionへ明示的に伝播し、**graderのコードとassertionの意味は固定したまま、実装由来のfingerprint / generator version / static-dataの照合先だけを候補の信頼済みsourceへ切り替える**。従来のgrader CLIは引数省略で従来動作を維持し、一般Skill validatorのimport先・eval datasetは変更しない。Agentが編集できるworkspaceをsource rootに指定しない。
 - **契約非互換**：両revisionで共通に判定できるcriteriaを評価し、schema / 機械契約が実際に互換でない部分だけを`evaluator_incompatible`として扱う。単なるimplementation fingerprint相違は非互換理由にならない。`evaluator_incompatible`を品質FAILへ読み替えず、共通部分のsemantic評価まで破棄しない。出力契約が変わり固定graderで評価できない場合は、両revisionを処理できる共通Evaluatorへ更新後、**旧版・新版の両方をそのEvaluatorで新規に実行・再採点**する。過去の別Evaluator評価を混ぜない。互換adapterの汎用基盤は今回作らない。
 
 候補のverifierで合格しただけで品質PASSにはしない。固定graderの検出結果と独立Judge、候補のproduction verifier整合性をそれぞれ保持する。
@@ -461,13 +461,13 @@ promptに含めないもの:
 - `executor.py`で実Agentを実行する
 - `.qa-eval-output/`から複数成果物を回収する
 - artifact manifestを作る
-- 候補側production runtime証拠と固定Evaluator側verifierの独立判定、成果物との対応・completionを確認する
+- captureで得た候補側production verifier証拠を候補の信頼済みtracked sourceで独立再実行し、固定Evaluatorの機械・意味評価と分離して成果物対応・completionを判定する
 - 既存semantic評価のprompt構築 / result正規化処理を再利用して独立Judgeを実行する
 - provenanceと評価結果を保存する
 
 ### `target_workspace.py`
 
-フェーズ2の固定target preparationだけを担当します。
+フェーズ2の固定target preparationだけを担当します。`verifier_capture.py`をsanitized targetの`.qa-eval-tools/`へ配置し、生成する評価用`AGENTS.md`へその利用方法を記載します。
 
 - 指定された`qa-training-store` source revisionのtracked contentだけからsanitized targetを作る
 - target固有`.agents/**` / `.codex/**`、過去Plan / report、instructor情報、target側Skill evalを除外する
@@ -487,7 +487,7 @@ promptに含めないもの:
 
 これらはEvaluator側にのみ存在します。`rubric.json`は評価対象Agentへ渡しません。`task.md`には期待するQA成果物の正解を含めません。
 
-新しいsandbox実装は作りません。OS process / filesystem isolationはAgentクライアント側のsandboxを使用します。
+独自sandboxは実装せず、実Codex smokeのファイルアクセス隔離は先述したLinux Docker構成に統一します。Codex自身のsandbox設定はその内側で固定し、ホストとの読み取り禁止境界の代わりとしません。
 
 ## CLI契約
 
@@ -719,6 +719,7 @@ batchは途中1件が失敗しても残りcaseを実行し、最後に全体結�
 - `scripts/skills/evals/agent/scenarios/qa-training-store-checkout-payment-web-v1/task.md`
 - `scripts/skills/evals/agent/scenarios/qa-training-store-checkout-payment-web-v1/rubric.json`
 - `scripts/skills/evals/agent/tools/codex_docker_launcher.py`（手動の実Codex smoke専用。共通executorからは外部argvとして呼ぶ）
+- `scripts/skills/evals/agent/verifier_capture.py`（フェーズ2に配置する評価専用stdin / stdout記録用。Skill本体を変更しない）
 - `scripts/skills/evals/agent/README.md`
 - `scripts/skills/evals/agent/tests/`
 - `tests/skills/evals/agent/`
@@ -754,7 +755,7 @@ fake Agent subprocessを使って少なくとも次を検証します。
 - 対象Skill名とSkill pathがpromptへ含まれる
 - Reference / expected / rubricがpromptへ含まれない
 - Agent stdoutを`output.md`へUTF-8で保存する
-- Agent stderrを診断ログとして保存する
+- Agent stderrを安全化できる場合のみ診断ログとして保存し、拒否した場合は理由を記録する
 - non-zero exitをexecution errorとして扱う
 - `shell=True`を使用しない
 - `--agent-command`後続argvを順序どおり渡す
@@ -956,7 +957,7 @@ native trigger評価は、Skill activationを観測する方法がAgentクライ
 次をすべて満たしたら、この実装を完了とします。
 
 - 固定Evaluatorのclean checkoutから異なるSkill revisionを選択でき、候補Git treeの配置内容とmanifestが一致する
-- 候補Skillのevalを独立判定に使わず、grader / Judge / verifierを同一Evaluator revisionへ固定できる
+- 候補Skillのevalを採点へ混入させず、grader・Judge / Referenceを固定Evaluatorに統一し、候補のproduction verifierは候補の信頼済みsourceで再実行できる
 - Agent / Judgeの非秘密実効profile・隔離結果を確認できないrunを比較可能としない
 - 実Agent評価ランナーが追加されている
 - 単一deterministic caseを「実Agent生成 → 既存grader」まで1 commandで実行できる
@@ -986,6 +987,6 @@ native trigger評価は、Skill activationを観測する方法がAgentクライ
 - Checkout / PaymentのWeb範囲で実Agentによる分析・設計workflowが完了し、成果物・workflow・traceability・意味評価結果が保存されている
 - `qa-training-store`のProduct Code、既存Test、規範仕様に許可外変更がない
 - 対象repo既存Skillではなく今回の19 SkillだけをAgent-visibleにし、元`PROJECT_CONTEXT.md`を最小評価用内容へ置換した条件を記録している
-- フェーズ2のrunner / environment errorとSkill品質上のneeds_review / fail、`valid=false`、比較不可・Evaluator非互換を区別している
+- フェーズ2のrunner / environment error、Skill品質のneeds_review / fail、実行証拠の`evidence_unverified`、`valid=false`、比較不可・部分的Evaluator非互換を区別している
 - Skill本体の通常実行経路とポータビリティを変更していない
 - `git diff --check`がpassする
