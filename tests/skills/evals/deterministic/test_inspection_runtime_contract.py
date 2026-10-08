@@ -152,6 +152,28 @@ class InspectionRuntimeContractTests(unittest.TestCase):
             "current_document_identity": DOCUMENT_IDENTITY_A, "formal": True})
         self.assertEqual(injected["runtime_status"], "invalid_input")
 
+    def test_unavailable_webcrypto_stays_blocked_without_fabricating_document_identity(self):
+        request = formal_request()
+        identity_fields = ("observation_request_ref", "request_signature", "criterion_evaluation_ref",
+            "procedure_execution_ref", "machine_probe_key", "sample_ref", "variation_ref", "process_ref",
+            "requirement_ref", "target_identity", "currentness_dependency")
+        limitation = "browser cannot create an in-memory keyed current-document identity"
+        result = {**{field: request[field] for field in identity_fields}, "status": "blocked",
+            "current_document_identity": None, "evidence_refs": [], "limitation": limitation}
+
+        normalized = invoke("normalize-wcag-machine-probe-result", {"request": request, "result": result,
+            "current_document_identity": None}, formal=True)
+        self.assertEqual(normalized["runtime_status"], "ok")
+        self.assertEqual(normalized["result_status"], "blocked")
+        self.assertEqual(normalized["payload"]["result"]["status"], "blocked")
+        self.assertIsNone(normalized["payload"]["result"]["current_document_identity"])
+        self.assertNotIn("value", normalized["payload"]["result"])
+
+        forged = {**result, "status": "ok", "value": {}}
+        rejected = invoke("normalize-wcag-machine-probe-result", {"request": request, "result": forged,
+            "current_document_identity": None}, formal=True)
+        self.assertEqual(rejected["runtime_status"], "invalid_input")
+
     def test_resize_text_machine_observation_preserves_content_loss_without_inference(self):
         request = formal_request()
         result = resize_text_result(request, disappeared_final=True)

@@ -59,6 +59,9 @@ PARTIAL_FORMAL_OBSERVATION_REASONS = {
     "page-set-not-materialized",
     "prior-control-observation-not-materialized",
 }
+FORMAL_DOCUMENT_IDENTITY_UNAVAILABLE = (
+    "browser cannot create an in-memory keyed current-document identity"
+)
 PREDICATES = {
     "element-visible": {"target_ref"},
     "element-hidden": {"target_ref"},
@@ -727,7 +730,19 @@ def normalize_probe_result(probe: dict[str, Any], result: dict[str, Any], *, cur
         for field in identity_fields:
             if result[field] != formal_request[field]:
                 raise ObservationContractError(f"formal result currentness identity mismatch: {field}")
-        if not is_document_identity_token(result["current_document_identity"]):
+        identity_unavailable = (
+            result["current_document_identity"] is None and current_document_identity is None
+        )
+        if identity_unavailable:
+            if (result["status"] != "blocked"
+                    or result.get("limitation") != FORMAL_DOCUMENT_IDENTITY_UNAVAILABLE
+                    or result.get("limitation_code") is not None
+                    or "value" in result
+                    or result.get("evidence_refs") != []):
+                raise ObservationContractError(
+                    "missing current-document identity is only valid for the fixed fail-closed WebCrypto limitation"
+                )
+        elif not is_document_identity_token(result["current_document_identity"]):
             raise ObservationContractError("formal result requires an opaque current-document identity token")
         evidence_refs = result.get("evidence_refs")
         if not isinstance(evidence_refs, list) or any(not isinstance(ref, str) or not ref.strip() for ref in evidence_refs):
@@ -744,7 +759,8 @@ def normalize_probe_result(probe: dict[str, Any], result: dict[str, Any], *, cur
         if result["status"] in {"unsupported", "unavailable", "incomplete", "blocked"}:
             if not isinstance(result.get("limitation"), str) or not result["limitation"].strip():
                 raise ObservationContractError("non-success formal probe requires a limitation")
-        if result["current_document_identity"] != current_document_identity:
+        if (not identity_unavailable
+                and result["current_document_identity"] != current_document_identity):
             result = {**result, "status": "blocked", "limitation_code": None, "limitation": "stale_document"}
         code = result.get("limitation_code")
         if code is not None and code not in LIMITATION_CODES:

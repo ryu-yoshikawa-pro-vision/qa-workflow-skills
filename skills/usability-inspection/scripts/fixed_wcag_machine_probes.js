@@ -153,7 +153,10 @@ async (page) => {
   ) {
     return failure("blocked", "typed fixed WCAG machine probe request is invalid");
   }
-  if (!initialDocumentIdentity || initialDocumentIdentity !== request.target_identity) {
+  if (!initialDocumentIdentity) {
+    return failure("blocked", "browser cannot create an in-memory keyed current-document identity");
+  }
+  if (initialDocumentIdentity !== request.target_identity) {
     return failure("blocked", "typed WCAG machine probe request is stale for the current document");
   }
 

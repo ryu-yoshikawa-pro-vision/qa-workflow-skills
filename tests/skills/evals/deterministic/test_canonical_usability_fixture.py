@@ -54,6 +54,15 @@ class CanonicalUsabilityFixtureTests(unittest.TestCase):
         self.assertEqual(next(row for row in rules["rules"] if row["rule_id"] == "2779a5")["required_observation_fields"], ["document.title"])
         self.assertIn("never persist raw document.title text", title_probe["sensitive_data_handling"])
 
+    def test_formal_probe_distinguishes_unavailable_identity_from_stale_document(self):
+        probe = (ROOT / "skills" / "usability-inspection" / "scripts" / "fixed_wcag_machine_probes.js").read_text(encoding="utf-8")
+        unavailable_check = probe.index("if (!initialDocumentIdentity) {")
+        stale_check = probe.index("if (initialDocumentIdentity !== request.target_identity)")
+
+        self.assertLess(unavailable_check, stale_check)
+        self.assertIn('"browser cannot create an in-memory keyed current-document identity"', probe)
+        self.assertIn('"typed WCAG machine probe request is stale for the current document"', probe)
+
     def test_container_query_states_are_never_inferred_from_computed_style(self):
         probe = (ROOT / "skills" / "usability-inspection" / "scripts" / "fixed_browser_probes.js").read_text(encoding="utf-8")
         contract = (ROOT / "skills" / "usability-inspection" / "scripts" / "observation_contract.py").read_text(encoding="utf-8")
