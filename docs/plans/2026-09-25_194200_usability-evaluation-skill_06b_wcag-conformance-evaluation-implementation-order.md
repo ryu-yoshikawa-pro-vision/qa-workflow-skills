@@ -4,6 +4,15 @@
 
 本ファイルは `wcag-conformance-evaluation` の実装順と完了条件を固定します。
 
+## PR #14 validation scope amendment（2026-10-08）
+
+root Planの「PR #14 / PR #17 評価責務の追補」を優先します。WCAG version / level、WCAG-EM、procedure、sample、report / EARL、fail-closedの意味上の契約は変更しません。
+
+- `_05f` / `_05h` の全semantic caseはdatasetとrepository contract testに保持し、全caseの実Agent candidate / Judge評価はPR #17の継続評価へ移管します。PR #14ではsemantic dataset validation、deterministic / runtime / repository semantic tests、および最低1件のreal-Agent smokeを行います。
+- `wcag-conformance-evaluation` descriptionを変更した`WCAG-TR-TRA-002`を3回fresh実行します。明確に隣接する既存negative boundaryがある場合だけ各3回追加し、Skill-read eventと`EVALS.md` thresholdで判定します。full native trigger統計・holdoutはPR #14 gateではなく、PR #17にも含めません。
+- repository fixtureの全criterion / procedure resultを埋めることはcompletion gateではありません。current result不足時は部分結果とmissing evidence / procedure resultを明示したままreport closureを`blocked`で保つpartial-blocked状態とし、Step 5.3のrequired input不足時はStatementを生成せず、与えられたcurrent formal resultからEARLを生成・独立検証することをfail-closed gateとします。
+- browser E2Eは代表formal handoff lifecycleを1経路確認し、finite inventory、全version / SC / procedure permutation、集合演算とclosure boundaryの全組合せはdeterministic testsをownerとします。
+
 ## 1. 実装開始条件
 
 - PR #11 merge済みcurrent runtime確認
@@ -322,7 +331,7 @@ latest mainを基準に、
 
 ### trigger
 
-formal WCAG要求 / general accessibility要求の境界を含めます。
+formal WCAG要求 / general accessibility要求の境界をdatasetに保持し、dataset contract testsで検証します。current PR #14の実Agent trigger gateはdescriptionを変更した`WCAG-TR-TRA-002`と直接関係する既存negative boundaryだけです。各queryを3回、Skill-read eventで判定し、`EVALS.md` thresholdを使います。full native trigger統計は独立した継続評価であり、PR #17の出力品質評価にも含めません。
 
 ### deterministic
 
@@ -379,11 +388,13 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 
 ### semantic
 
-`_05f` Case A〜Z、Case C2、Case AA〜AFに加え、`_05h` のsemantic追加観測 / no-progress / 別usability concern routing fixtureを実Judgeで確認します。
+`_05f` Case A〜Z、Case C2、Case AA〜AFと`_05h` のsemantic追加観測 / no-progress / 別usability concern routing fixtureをsemantic dataset・contract testsに保持します。repository dataset validator / testsで全件構造を検証し、全caseの実Agent candidate / JudgeはPR #17へ移管します。
 
 ### real Agent / browser
 
-`_06c_canonical-live-validation.md` のrepository-controlled canonical fixtureで、formal direct trigger → observation handoff → qa-workflow → usability-inspection → formal Skill resume → reportまでのWCAG-EM E2Eを実行します。
+`_06c_canonical-live-validation.md` のrepository-controlled fixtureで、最低1件のreal-Agent smokeと代表的なformal direct request → scope/sample → observation handoff → `qa-workflow` → `usability-inspection` → formal resume → report / EARL経路を通します。successful representative handoffではSQLite CAS、reservation、browser observation、cleanup、closed state reread、`may_resume`を確認します。
+
+fixture全体のStep 4.2 / Step 5.1を埋めることは要求しません。未取得のcurrent resultをcompleteへ昇格せず、missing evidence / procedure resultを明記し、部分結果を保持してreport closureを`blocked`とするpartial-blocked状態、`owner_commitment_ref`等Step 5.3 required input不足時のStatement非生成、および提供されたcurrent result subsetでEARL renderer / independent validatorが正しく動くことを確認します。EARL subset validationはformal evaluation全体のclosureとは扱いません。
 
 外部実対象・実アカウント・特定assistive technologyを必要とするacceptanceは別ゲートです。それらが提供されていないことだけでrepository implementationを未完了にしません。
 
@@ -428,6 +439,7 @@ formal WCAG要求 / general accessibility要求の境界を含めます。
 - Step 5.4 aggregated scoreは目的外として生成しない
 - requirements / sampling / structure helperでmachine-owned fieldをmaterializeし、Agentがfinal refs / expected集合 / derived status / countを手作成しない
 - independent deterministic validator
-- trigger / deterministic / semantic PASS
-- `_06c_canonical-live-validation.md` のrepository-controlled canonical Web E2E PASS
-- repository-controlled validationのblocked 0。外部acceptance未実施は別statusとして記録し、このblocked件数へ含めない
+- semantic dataset validation、deterministic / runtime / repository semantic tests PASS
+- description変更対象のtargeted trigger regression PASS。full native trigger statistics / holdoutは本PR gateではなく、PR #17にも含めない
+- `_06c_canonical-live-validation.md` の代表repository-controlled formal Web E2Eとfail-closed report / EARL path PASS
+- representative happy-path handoffでunresolved blocked 0。部分fixture reportの正しい`partial-blocked`状態とexpected safety blockedは区別する。外部acceptanceは別statusとして記録する

@@ -446,3 +446,28 @@ Agentは index.md から現在の対象に必要なreferenceだけを追加で�
 81. 固定上位観点、reference、procedure、semantic caseは最低coverageであり、LLMが宣言済みscope内で発見できる懸念の上限にはしない。複数component / state / interactionの組合せで初めて現れる問題や既存catalogへ直接一致しない懸念も、観測事実・判断理由・関連scopeを示して追加evaluation draftとして扱える。target / origin / side-effect等のscope自体を暗黙拡張しない。
 82. semantic判断に追加evidenceが必要な場合、LLMは関連scope / evaluation / procedure、対象state、必要な観測内容、理由を判断し、既存catalogで表現できる場合はcanonical observation field / fixed predicate keyを選択して追加観測draftを返せる。browser ownerは既存のuser-facing interactionで必要stateへ到達し、`observation_contract.py` が有限key、request ref、probe、schema、安全条件、重複 / no-progressを検証する。scriptが自由記述からprobeを推論しない。既存contractで安全に取得できない場合はad hoc JavaScriptやhidden implementation情報へ逃げず `判定不能 / undetermined / blocked` へ閉じる。
 83. user goal / business outcome / business ruleがproject Authority、仕様、validated TC等から明示されている場合、LLMは複数step・stateを横断して「観測されたflowがその目的を理解・達成できる形になっているか」を意味的に評価できる。business logic自体の仕様上のPASS / FAIL、expected resultの確定、Product RiskやTC ownershipは既存のtest-analysis / test-condition-design / test-case-design / test-executionへ残し、Skillがbusiness ruleを創作しない。
+
+## PR #14 / PR #17 評価責務の追補（2026-10-08）
+
+この追補は3 Skillの意味上の契約、schema、runtime、validator、reference責務を変更しません。変更するのはPR #14完了時に要求する実Agent評価の量と証拠ownerです。以前の実装順Planにある「全semantic caseを実Judge」「全量trigger統計」「fixture全体のWCAG result closure」をPR #14のcompletion gateとしていた記述は、この追補と各実装順Planの更新後のゲートへ置き換えます。
+
+### PR #14: Skill実装と代表経路
+
+PR #14のrepository implementation gateは次のとおりです。
+
+- official Skill validation、semantic dataset validation、deterministic / runtime / repository semantic tests、trigger contract tests、compile、`git diff --check`、およびcurrent PR headのrepository CIをPASSする。
+- `usability-evaluation`、`usability-inspection`、`wcag-conformance-evaluation`それぞれについて、現在のSkillと必要な入力を使う最低1件の実Agent smokeを確認する。
+- 保存済みtest-target-inspection / test-execution evidenceのread-only評価、`usability-inspection`の代表live browser経路、formal WCAGの代表handoff経路を確認する。WCAG handoffではtest-only SQLite CAS、reservation、browser observation、cleanup、closed stateの再読込、`may_resume`、resume、reportとEARL生成経路を確認する。
+- formal reportでは不足したevidence / procedure resultを明示し、未確認行をcompleteへ昇格しない。部分結果が残りreport closureが`blocked`となるpartial-blocked状態、Step 5.3 required input不足時のStatement非生成、与えられたcurrent resultに対するEARL renderer / independent validatorを確認する。
+- descriptionを変更したquery `UE-TR-TRA-004`、`UE-TR-VAL-006`、`WCAG-TR-TRA-002`を、それぞれcurrent descriptionで独立context 3回実行する。Skill-read eventで発火を判定し、runner failureを分母へ含めない。positiveは`trigger_rate > 0.5`、追加確認する明確なnegative boundaryは`trigger_rate < 0.5`を満たす。
+- deterministic testsが所有するfinite inventory、集合演算、schema、version・procedure・criterion組合せ等をreal browserで重複網羅しない。既存canonical evidenceはruntime / helper / fixtureのhashが一致する経路に限り、証拠ownerと範囲を明記して再利用できる。
+
+PR #14では、Semantic 83 caseの全件real-Agent candidate / Judge、全queryのnative trigger統計、holdout 8 query × 3回、repository fixtureの全WCAG criterion / procedure closureをcompletion gateにしません。semantic datasetの全件構造・contract validationは引き続きPR #14標準検証に含みます。
+
+### PR #17: 反復可能な全量実Agent品質評価
+
+PR #17（`feat/agent-eval-runner`）は、既存Eval Inputからの実Agent candidate生成、既存deterministic / semantic graderへの接続、Skill単位batch、all-Skill batch、repeat、Skill revision間比較、およびSemantic case全量・反復評価を継続評価として担当します。PR #17はnative Skill trigger評価を含みません。PR #17で実装済みと見なさず、そのPlanの実装・検証に委ねます。
+
+native trigger全量・反復評価はPR #17外の独立した継続評価課題として残します。PR #14ではdescription変更に対応する前記targeted regressionだけを実施します。`EVALS.md`の全repositoryを対象とする標準trigger methodologyとthresholdは変更しません。
+
+外部URL、実アカウント、production data、顧客固有Authority、特定assistive technologyを必要とするacceptanceはrepository implementation gateから分離し、fixture結果を外部製品のWCAG適合証拠として扱いません。

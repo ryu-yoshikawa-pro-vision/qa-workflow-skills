@@ -6,6 +6,16 @@
 
 目的は、実装完了条件を外部URL、実アカウント、secret、特定の顧客環境、利用可否が不定なassistive technologyへ依存させず、同時に「実browser経路を未検証のまま完成」ともしないことです。
 
+## PR #14 validation scope amendment（2026-10-08）
+
+root Planの「PR #14 / PR #17 評価責務の追補」を優先します。本書のbrowser / WCAG behavior contractは維持しますが、その全組合せをreal Agent / browserで埋めることはPR #14 completion gateではありません。
+
+- deterministic validator / testが正確に所有できるfinite inventory、schema、version / criterion / procedure permutation、集合演算、状態遷移、missing / duplicate / overlap、report guardはrepository testsで確認します。browserで同じ組合せを繰り返しません。
+- PR #14では各Skillの最低1件の実Agent smoke、保存済みevidenceからのread-only評価、`usability-inspection`のtaskless / task-flowを含む代表live browser経路、formal WCAGの代表handoff / resume / report / EARL経路を確認します。
+- formal WCAGではfixture全体のStep 4.2 / Step 5.1 result closureを要求しません。意図的な不足を埋めず、missing resultを明示し、部分結果を保持してreport closureを`blocked`とするpartial-blocked状態、Step 5.3 required field不足時のStatement非生成というfail-closed behaviorを確認します。EARLは与えられたcurrent formal result subsetを対象に生成・独立検証し、全評価のclosureとは扱いません。
+- 既存canonical browser evidenceは、実際に用いたruntime / helper / fixtureのhashが現在と一致する範囲で再利用できます。descriptor変更の影響は対象trigger regressionで別途確認し、旧tree evidenceをcurrent implementationの全ゲートPASSへ拡張しません。
+- PR #17は全semantic caseの実Agent candidate生成と既存grader接続・反復評価を担当します。native trigger全量評価はPR #17へ移管しません。
+
 ## 1. 完了状態を分離する
 
 ### repository implementation
@@ -72,6 +82,8 @@ performance値そのものを安定した製品SLOとしてfixtureへ持ち込�
 current Playwright versionやPR #12 / #13 merge後のbrowser contractが変わった場合はcurrent implementationを正本にしてこの値を確定します。Plan内で存在しないAPIや固定versionを創作しません。
 
 ## 4. Skill別canonical E2E
+
+以下の項目は対象behaviorと証拠ownerを定義します。finite / deterministicな契約の証拠ownerは該当repository testです。各行を全て個別のbrowser runにするのではなく、PR #14のbrowser gateは代表経路でlive I/O境界を確認し、組合せ網羅はdeterministic testsで確認します。
 
 ### usability-evaluation
 
@@ -213,17 +225,18 @@ repository implementationの完了条件:
 - canonical fixtureと起動条件がrepositoryから一意に特定できる
 - fixtureの初期化 / cleanupが再現可能
 - external secret / user dataを必須にしない
-- 3 Skillの対象canonical E2EがPASS
+- 3 Skillそれぞれの最低1件の実Agent smokeがPASS。`usability-inspection`ではtaskなし / task-flowの代表live browser経路を含める。保存済みtest-target-inspection / test-execution evidenceから`usability-evaluation`へ渡す代表read-only経路を確認する
 - formal direct triggerからoriginating evaluation / revision / resume operationを保持して `qa-workflow → usability-inspection → formal Skill resume` をPASS
 - `_04c` handoff stateをcanonical E2Eのtest-only SQLite providerで実CAS更新し、external reservationのacquire / releaseをprovider revision付きで通し、composite operation identity、claim / reservation lifecycle、expected observation集合とcurrent valid returned result集合、origin revision / cleanup / lineage / releaseがcurrentになり、closed CAS後の再読込まで完了するまでresumeしないことをPASS。claimはcurrent local create-if-absent契約を維持し、recovery成功を要求しない。production local filesystemがCAS可能になったとは扱わない
-- `_05g` fixed probe request / normalize契約をbrowser E2EでPASSし、Agentのad hoc JavaScript / raw値手計算を必要としない
-- fixed coverage外の複合的懸念、semantic追加観測、Authority付きbusiness outcomeの3ケースをsemantic / browser E2EでPASSし、機械化がLLMのscope内意味判断を抑制しないことを確認する
+- `_05g` fixed probe request / normalize契約をrepository testsで検証し、代表browser E2Eでpackage-owned fixed probeの実I/Oを確認する。Agentのad hoc JavaScript / raw値手計算を必要としない
+- fixed coverage外の複合的懸念、semantic追加観測、Authority付きbusiness outcomeはdataset / semantic contract testsで保持し、PR #14では代表Agent smokeとlive追加観測またはAuthority付きoutcomeの代表経路で、LLMのscope内意味判断とscript-owned materializationの境界を確認する。全semantic caseの実Agent JudgeはPR #17へ移管する
 - evidence safety / side-effect / browser ownershipをPASS
-- repository標準のdeterministic / semantic / routing / Skill validationをPASS
+- repository標準deterministic / runtime / semantic dataset / repository semantic / trigger contract / Skill validationをPASSし、description変更対象のtargeted trigger regressionをPASS。native trigger全量統計・holdoutはPR #14 gateではない
 - WCAG 2.0 / 2.1 / 2.2 requirement catalogのcanonical hash再計算と承認済みhash contract testをdeterministic validationでPASS
 - version切替、unsupported / unresolved / out-of-scope分離、4.1.1 version / technology rule、scope coverage row、presentation variation / Full Pages closure、baseline extension、finite procedure catalog、procedure applicability / external evidence optional applicability / conditional manual fallback、formal typed machine probe request / cross-package probe catalog整合、inspection→formal `upstream_runtime_units` freshness、Resize Text machine / manual path、`_05k` semantic contract coverage、criterion plan→final result linkage、applicable population none guard、repeat-evaluation retained / replaced / added lineage、random `target-met / exhausted-no-new-view / blocked` 分離、non-finite random selection guard、candidate population変更時のreselection、Conforming Alternate Version条件、Non-Interference固定SC集合、Step 5.1 example coverage / accessible output、Step 5.3 Evaluation Statementの2.2-only guard、version別Claim URI / third-party 2-business-day guard、`_05l` EARL JSON-LD `inapplicable` を含む全mapping / serializationはdeterministic / semantic evalでPASS
-- browser E2EではStep 1.4 additional requirementのsample / report反映、sampling used / skipped、sample identity、Conforming Alternate Versionのfull-page grouping、Step 4.2 unchanged-result reuse、same-population Step 4.3再sampling、freshness付きobservation handoff / resume、safe Evaluation Specifics handoff、EARL assertionとのresult一致をPASS
-- canonical happy-path fixtureで未解決blockedが0。安全性を確認する負系fixtureのexpected `blocked` は未解決blockedへ数えない
+- browser E2Eでは代表的なStep 1.4 additional requirement、sample / report反映、live observation、handoff / resume、Step 4.3からreportへの経路を確認する。sampling used / skipped、sample identity、Conforming Alternate Version grouping、Step 4.2 reuse適格性、Step 4.3集合演算、safe Evaluation Specifics、全EARL mappingの網羅はdeterministic testsをownerとし、browserで重複網羅しない
+- representative happy-path handoffは未解決blocked 0。formal report fixtureに必要evidence / procedure resultが不足する場合、正しい`partial-blocked`はfail-closed成功でありhappy-path handoff blockedとは数えない。安全性negative fixtureのexpected `blocked`は別集計とする
+- fail-closed formal report: required current resultの欠落を明示し、部分結果とreport closure `blocked`（partial-blocked）を維持して未観測をcompleteにしない。Step 5.3 required field不足時にEvaluation Statementを非生成とする。要求されたStep 5.5では入力subsetに対するEARL renderer / independent validatorを実行し、human-readable reportとのassertion coverageを照合する。これらはfixture全体のconformance closureを意味しない
 
 external acceptance:
 

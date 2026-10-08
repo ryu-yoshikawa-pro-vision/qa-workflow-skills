@@ -4,6 +4,15 @@
 
 本ファイルは `usability-evaluation` の実装順序と完了条件です。
 
+## PR #14 validation scope amendment（2026-10-08）
+
+root Planの「PR #14 / PR #17 評価責務の追補」を優先します。以下はsemantic責務、評価criterion、runtime契約を変更せず、completion gateの実行範囲と証拠ownerを定めます。
+
+- semantic cases全件のdataset / schema validation、既存deterministic runtime契約、およびrepository semantic testsはPR #14で実施します。
+- Planで定義した全semantic caseのreal-Agent candidate生成 + 実Judge評価はPR #17の継続評価責務です。PR #14では`usability-evaluation`を含む3 Skillごとに最低1件のcurrent-Skill実Agent smokeを行い、全case評価の代替とは扱いません。
+- 全量native trigger統計とholdoutはPR #14 gateから分離します。変更descriptionに直接対応する`UE-TR-TRA-004`、`UE-TR-VAL-006`、`WCAG-TR-TRA-002`を各3回、Skill-read eventで判定し、runner failureを分母から除外して`EVALS.md`のthresholdを適用します。positiveは`trigger_rate > 0.5`、descriptionが明確に隣接するnegative boundaryは`trigger_rate < 0.5`を満たします。native trigger全量評価はPR #17に移しません。
+- canonical browserは代表的な保存済みevidence / live inspection / formal handoffを検証し、finite combinationや集合演算の全境界はdeterministic testsをownerとします。
+
 `usability-inspection` の実装順序は `_06a_usability-inspection-implementation-order.md` を正本とします。
 
 本ファイルの完了だけではPR全体の後続実装完了とは扱いません。
@@ -280,7 +289,7 @@ test-target-inspection / test-executionの既存evidenceは、UI / UX評価が�
 Skill件数・query件数は実装開始時の正本から再計算し、現在Plan記載値をハードコードしません。
 ## 14. trigger eval
 
-既存repository標準件数を維持します。
+repository標準のquery datasetとtrigger contract testを維持します。completion gateでのreal-Agent trigger評価は、今回descriptionを変更した3 queryを各3回実行し、他Skillの誤発火を含むSkill-read eventを記録します。runner failureは分母へ含めません。positiveは`EVALS.md`の`trigger_rate > 0.5`、追加する明確な隣接negative boundaryは`trigger_rate < 0.5`を満たす必要があります。全train / validation queryとholdoutの統計評価はPR #14 gateではなく、native trigger継続評価です。PR #17のscopeには含めません。
 
 境界を重点的に含めます。
 
@@ -387,7 +396,7 @@ UI patternを含むtest-condition-design
 
 ## 16. semantic eval
 
-以下のcaseをすべて用意し、実Judgeで評価します。
+以下のcaseをsemantic datasetにすべて保持し、それぞれの意味契約を既存dataset validator / repository semantic testsで検証します。全caseの実Agent candidate生成・実Judge評価はPR #17の継続評価責務です。PR #14では次節の代表Agent smokeを行い、全件のsemantic品質判定とは扱いません。
 
 ### Case A: Dialog
 
@@ -468,7 +477,9 @@ usability-evaluationはflow全体の意味的不整合を評価できるが、bu
 
 dataset構造検証だけで実装完了にしません。
 
-既存semantic runner + 実Judgeを使い、Planで定義した全semantic caseのcandidate outputを生成・評価します。
+`usability-evaluation`のcurrent Skill、case input、および必要なcurrent runtime resultを使う実Agent smokeを最低1件行います。candidate生成Agentにreference / rubric / Judge結果を渡さず、Skill-read eventと生成物を確認します。これは全caseの意味品質を判定するsemantic Judgeとは区別します。
+
+Planで定義した全semantic caseのcandidate outputを既存graderへ接続して実Agent評価する反復可能なgateはPR #17へ移管します。PR #14ではsemantic dataset validation、既存deterministic / semantic repository tests、代表smokeを維持し、case数を減らしたsemantic contractへ変更しません。
 
 実AgentがSkillを正しく発火し、root index → sub-index → 必要referenceの順で読み、無関係なreferenceを一括読込しないことも確認します。
 
@@ -524,8 +535,8 @@ dataset構造検証だけで実装完了にしません。
 - skills-ref validate PASS
 - qa-workflow routing tests PASS
 - README / EVALS / repository Skill一覧整合
-- Planで定義した全semantic caseを実Judgeで確認
-- `_06c_canonical-live-validation.md` のrepository-controlled fixtureでcanonical Agent trigger、browser evidence連携、live Web inspection E2EをPASS
+- semantic dataset全件の構造検証、repository semantic tests、および3 Skillごとの最低1件のreal-Agent smokeをPASS。Semantic全件の実Agent candidate / JudgeはPR #17の継続評価でありPR #14 gateではない
+- `_06c_canonical-live-validation.md` のrepository-controlled fixtureで各Skillの代表Agent smoke、browser evidence連携、live Web inspectionの代表E2EをPASSし、今回変更したdescription queryのtargeted trigger regressionをPASS。全native trigger統計は別継続評価とする
 - TC PASS / FAILとUI / UX評価項目を分離し、追加QA活動が必要な評価項目だけFindingへ昇格することを確認
 - test-analysis統合でProduct Riskの識別・評価・採点owner境界を確認
 - test-condition-design統合で一般UI guidanceを製品期待結果へ昇格せず、検証観点候補の採否owner境界を確認

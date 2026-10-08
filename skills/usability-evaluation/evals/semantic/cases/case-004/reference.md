@@ -1,3 +1,5 @@
 # Semantic contract: Pattern applicability is uncertain
 
 Appearance alone does not establish an accordion as the right pattern. The comparison goal may require simultaneously visible choices; assess content and task semantics before applying accordion advice. Do not treat APG/USWDS guidance as binding or assert a defect without enough evidence. Mark the pattern reference not applicable or judgment unresolved with a reason.
+
+For source identity and position checks, the current package catalog maps `SRC-001-ITEM-0002` to USWDS Accordion component guidance (`advisory`) and `SRC-012-ITEM-0003` to the WAI-ARIA APG Accordion Pattern — About This Pattern (`informative`), both in `REF-0016`. Neither is a project Authority unless the project explicitly adopts it. A candidate may cite these as distinct source context while leaving pattern applicability unresolved because the input does not establish the content/interaction model. It must not infer that the target is an accordion, promote either source to a binding requirement, or assert a defect from the screenshot summary.

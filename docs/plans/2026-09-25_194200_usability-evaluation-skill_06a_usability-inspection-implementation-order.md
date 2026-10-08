@@ -1,5 +1,14 @@
 # UI/UX評価・ユーザビリティ検査Skill追加Plan
 
+## PR #14 validation scope amendment（2026-10-08）
+
+root Planの「PR #14 / PR #17 評価責務の追補」を優先します。以下はinspectionのsemantic判断、browser ownership、observation・safety契約を変更せず、評価の実行範囲と証拠ownerを定めます。
+
+- Case A〜AG全件はsemantic dataset・criterion coverageとして保持し、PR #14のdataset validator / repository testsで構造と契約を検証します。全caseの実Agent candidate / semantic Judge評価はPR #17の継続評価責務です。
+- PR #14では最低1件のreal-Agent smokeに加え、taskなしとtask / flowありの代表live browser inspection、immutable evidenceから`usability-evaluation`へ渡す代表経路を確認します。
+- 17 canonical observation fieldのexact inventory、exactly-one mapping、resolver・responsive・timing・measurementの有限組合せはdeterministic testsがownerです。browserで全fieldや全組合せを再現しません。
+- native triggerの全量統計はPR #14 completion gateではありません。`EVALS.md`のdataset contractを維持し、今回の3件の対象queryはdescriptionを変更したSkillに限って `_06` / `_06b` の指定に従い各3回評価します。全量native trigger評価はPR #17へ移管しません。
+
 ## 1. 実装開始条件
 
 `usability-inspection` の実装は、次を確認してから開始します。
@@ -416,7 +425,7 @@ repository標準件数に合わせます。
 
 ### semantic
 
-`_05a_usability-inspection-package-and-evaluation.md` §7のCase A〜AGをすべて含めます。
+`_05a_usability-inspection-package-and-evaluation.md` §7のCase A〜AGをsemantic datasetにすべて含め、repository validator / semantic contract testsで全件構造とcriteriaを検証します。全caseの実Agent candidate / JudgeはPR #17の継続評価です。
 
 ### real Agent
 
@@ -494,7 +503,7 @@ repository標準件数に合わせます。
 - FindingがPR #13契約へ接続する
 - human usability studyを実施したと偽らない
 - test-target-inspection / test-execution / exploratory-testingと責務重複しない
-- trigger / deterministic / semantic eval PASS
+- deterministic / runtime / semantic dataset・repository contract tests PASS。real-Agent smokeとtaskなし / taskありの代表live browser経路をPASS。full semantic Judgeとnative trigger全量評価はPR #14 gateではない
 - repository validation PASS
 - README / EVALS / Skill一覧整合
 - git diff --check PASS
@@ -519,8 +528,8 @@ repository標準件数に合わせます。
 - supported ACT RuleはACT Rules Format 1.1 §4.14.1 consistency fixtureをPASS
 - `_05e_performance-measurement.md` のdirect measurement / external Core Web Vitals source境界を閉じる
 - general inspectionの全上位観点をclosure
-- Case A〜AGをすべてPASS
-- `_06c_canonical-live-validation.md` のrepository-controlled canonical live Web E2EをPASS
+- Case A〜AG全件をdatasetへ保持し、schema / structure / repository semantic contract validationをPASS。全caseのsemantic Judge結果はPR #17へ移管
+- `_06c_canonical-live-validation.md` の代表repository-controlled live Web E2EをPASS
 
 ## 21. 対象外
 

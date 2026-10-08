@@ -104,8 +104,174 @@ External URL、実アカウント、外部実製品、特定assistive technology
 - Push済みCIはrepository validator / dataset / test gatesの結果であり、Semantic LLM Judge 83 case、実Agent trigger 180 executions、holdout 24 executions、canonical real Agent/browser全経路の完了証拠ではない。Run011のformal report closureは引き続き`partial-blocked`。
 - PR #14 repository implementation Planは未完了。Semantic / Trigger / Holdout / canonical browser残経路およびそれらのcurrent-tree evidenceを継続する。
 
+## 2026-10-07 JST — current baseline / Plan completion evidence map
+
+- Git baseline: branch `feat/usability-evaluation-skill`; local HEAD / `origin/feat/usability-evaluation-skill` / PR #14 head `585f7a540d354ca827ee24afc0d2e8efd85ab739`; implementation commit `584c9a2d71d0e04bb65c9a54df4498bdd9c3827f`; `origin/main=dec3f7c764db2869dc24eb3d6f154712a6677068`; ahead 314 / behind 0. Tracked tree is clean; only user-owned untracked `3b77866a0b52347ce6201959f97492f197a61365` remains. `.gitignore` is unchanged.
+- Implementation fingerprint: `8bf37219f1430d05b967b742e5ef105ac73cb8a5eeb91e9a15cfbb37e204dfd7`, using `sha256(sorted relative path + NUL + raw SHA256(file bytes) + LF)`, 1,015 tracked files with this report excluded. PR head `585f7a5` changes the report only after the implementation commit.
+- Runtime state: `.codex/config.toml` selects `gpt-6-luna`; no model override or subagent is used. Canonical fixture server `http://127.0.0.1:4173/` is running. An older isolated Playwright CLI daemon remains under `output/pr14-current-tree-ec799`; it is not treated as an active current-tree proof or shared with another Skill.
+- CI baseline: the three required Actions were successful on PR head `585f7a540d354ca827ee24afc0d2e8efd85ab739` (Agent Skills, Deterministic Output Evals, Semantic Output Evals). The pushed pre-commit validation also passed current Skill validation, semantic dataset validation, deterministic, trigger contract, and runtime tests; this is repository validation, not live-agent semantic / trigger / canonical proof.
+
+### Plan completion condition → evidence map (initial current-baseline audit)
+
+| Plan item | Current state | Evidence owner | Existing evidence | Re-run / gap | Next action |
+|---|---|---|---|---|---|
+| `_06` §19–20: source/reference catalog, capability coverage, helper-backed structure, deterministic contracts, routing and repository integration | Implemented; repository validator/CI pass is available. Source/corpus and deterministic contracts are owned by existing validators/tests; this does not satisfy the real-agent conditions in the same section. | deterministic test / repository CI | Commit `584c9a2`; latest-head Actions above; pushed hook validation recorded above; older reference-catalog validation is retained only where source and helper hashes match current. | Re-run final standard suite after all gates; inspect exact source/corpus validators before final PASS. | Keep the semantic judge and live evidence rows separate; do not infer those from CI. |
+| `_06` §17 / §19: all `usability-evaluation` semantic cases and read-only saved/live evidence integration | Semantic 12/12 current-tree final verdicts absent. Existing saved-evidence agent runs use earlier tree labels; reusability depends on per-package/input/runtime hash check. | Semantic Judge / real Agent / browser E2E | Historical candidate/Judge output exists under ignored `output/p14/sem`; Run008/009 contain prior Agent evidence. No final result is counted from those paths yet. | Re-run all 12 cases unless exact candidate-input/package/runtime identity and no expectation leakage are proven. Refresh saved TTI, test-execution and live immutable evidence paths if the producer/consumer package changed. | Audit candidate eligibility case-by-case, then generate/Judge current-tree candidates. |
+| `_06a` §19–20: inspection runtime/schema, all Case A–AG semantics, taskless and task/flow real inspection, safety and read-only handoff | Deterministic source includes the 17-key contract, `document.title` ACT probe and focus-limitation normalizer fix; current CI passed. Full real-Agent/browser closure is incomplete. | deterministic test / Semantic Judge / real Agent / browser E2E | Commit `584c9a2`; Run011 workspace manifest has 291/293 package/file rows matching current source after `.agents/skills/`→`skills/` mapping; `inspection_runtime.py` is the one mismatched production file and has a post-fix focused 17-test pass. Earlier UI runs are labeled tree `3fe3d4…`. | Run011's separate AAA focus retry is retired and must be freshly handed off. Re-run representative taskless/task-flow, typed fixed-probe, manual fallback and immutable handoff paths after checking the affected file hashes. Semantic 33 cases remain open. | Reuse only static/current source matches; generate new owner evidence for the changed normalizer and remaining real paths. |
+| `_06b` §14: formal WCAG procedure/sample/handoff, Step 4.2/4.3, report and EARL | Deterministic catalogs/runtime and report tests are present and latest repository validation passed. Run011 reached CAS/reservation/cleanup/closed-state reread/`may_resume=true`/resume and rendered a six-assertion EARL artifact, but report status is `partial-blocked` (2 satisfied, 1 not-satisfied, 3 undetermined); full sample population and Step 4.3 closure did not pass. | deterministic test / Semantic Judge / real Agent / browser E2E | Run011 `run-manifest.json` records implementation `5f97b59…` and workspace fingerprint `672fd2…`; translated workspace hash audit matches 291 of 293 rows against current package files, with the old `inspection_runtime.py` hash and missing copied `playwright-cli.config.json`. Independent EARL validator, zero report coverage delta and byte-identical repeated render are documented in the historical report. | Do not promote Run011 to canonical happy-path PASS. Fresh current-source formal run must close sample/process/Step 4.3 and final report; WCAG 38 semantic cases remain open. | Use a new handoff identity and the existing test-only SQLite provider; retain Run011 only for the unaffected CAS / EARL subcontracts. |
+| `_06c` §4–6: all three canonical Skill paths, browser ownership/freshness/cleanup, formal handoff, resume/report/EARL and happy-path unresolved `blocked=0` | Overall canonical gate is incomplete. The fixture server is available; some earlier Agent/Chromium routes exist, but their manifests identify `5f97b59…`/`3fe3d4…`, not this implementation tree. | real Agent / browser E2E | Run008/009 old-tree saved-evidence/additional-observation paths; Run011 partial formal path; current-tree `document.title` / fixture assertions are covered by deterministic tests. | Refresh only live paths whose agent/producer/consumer/helper content changed; fresh current-tree formal happy path is still required. Do not treat Run011 `main_happy_path_unresolved_observations=0` as whole-evaluation unresolved-blocked=0. | Complete the representative canonical live paths, including a fresh formal closure to Step 5 and EARL. |
+| `_06` / `_06a` / `_06b` semantic datasets | Current dataset counts are 12 + 33 + 38 = 83. No set of 83 valid final-tree Judge verdicts is present. | Semantic Judge | Dataset validator and old candidate/Judge attempts exist; old verdicts are not final-tree evidence. | All 83 require current final implementation identity; preserve frozen criteria/reference. | Finish canonical and regression first, freeze implementation/eval contract, then run each Skill batch. |
+| `EVALS.md` direct Trigger train/validation | 60 queries × 3 = 180 current-tree independent executions not established. | Trigger / real Agent | Historical routing diagnostics and previous false-positive notes exist; none is accepted as current-final proof. | Re-run 180 with all repository Skills available and skill-read events; verify `US-TR-TRA-005` and `WC-TR-TRA-012`. | Run only after semantic-affecting changes are frozen. |
+| `EVALS.md` holdout | 8 queries × 3 = 24 current-tree executions not established. | Holdout / real Agent | Prior holdout on another tree is not reusable after Skill/routing changes. | Fresh independent-context executions and threshold check required. | Run after Trigger description/routing freeze. |
+| External acceptance | Outside repository implementation gate. | external acceptance | No external product/account/production/AT inputs were supplied. | Not counted as repository implementation unmet. | Report separately; do not infer external WCAG conformance from fixture results. |
+
+- Initial Plan unmet count remains undetermined until each grouped condition above is closed and the final Plan reconciliation is performed. The current supported conclusion is that repository implementation is not yet Plan-complete.
+
 ### 2026-10-06 23:28 JST — user-cleared lock / staging recovery
 
 - ユーザーが `.git/index.lock` を削除した後に状態を再取得し、lock不在、local / origin PR head `5f97b59f393525486b34e92fca769e13caebe8bc`、staged path 0件を確認。
 - PR対象の変更を明示path配列でstage。合計69 path（tracked変更65、PR用新規4）。`.gitignore` とユーザー所有のuntracked hash fileはいずれもstage対象外。`git diff --cached --check` PASS。
 - 次に通常pre-commit hook付きcommitと通常pushを行う。結果は後続記録に追記する。
+
+### 2026-10-07 JST — current-tree real-browser inspection continuation
+
+- Implementation identity is unchanged: commit `584c9a2d71d0e04bb65c9a54df4498bdd9c3827f`, PR/report head `585f7a540d354ca827ee24afc0d2e8efd85ab739`, tree fingerprint `8bf37219f1430d05b967b742e5ef105ac73cb8a5eeb91e9a15cfbb37e204dfd7` using the path + NUL + raw-file-SHA256 + LF rule documented above. The current fixture and browser package are unchanged.
+- Fresh Chromium evidence on the current implementation tree: taskless overview at 1280×800 and Search → query `Trail pack` → Add → Cart, where the live state showed Cart count 1 and a single Trail pack list item. The fixture is unauthenticated, `en-US`, and local DOM state only. Session closed; CLI session list was empty; fixture server stayed HTTP 200.
+- ACT 2779a5 current-tree check used production `plan_probes` to create the `document.title` request, `fixed_browser_probes.js` for browser observation, `normalize_probe_result` for normalization, and `run_supported_rule` for closure. `/` returned `passed`; `/title-empty.html` returned `failed`. Only finite title predicates were retained; raw title text was not stored.
+- Current-run inspection `scope_skeleton` / `close_scope`: taskless general rows closed with 5 `判定不能` and 2 `問題なし`; scoped task/flow rows closed with 3 `問題なし`; both `issues=[]`. The bounded Search → Cart evidence was materialized with `evaluation_structure.py`; three evaluations and no Findings were returned. `qa-workflow` runtime aggregation returned `runtime_status=ok`, `result_status=ready`, `can_complete=true`, `issues=[]`; independent runtime evidence validator passed 30/30 assertions.
+- Evidence directory: ignored `output/pr14-validation-tools/canonical-final-8bf372/usability-inspection/`. It contains current-run snapshots, desktop screenshot, raw/normalized fixed-probe outputs, criterion result, closure result, evaluation input/candidate/result, and workflow runtime input/result. Saved test-target-inspection and test-execution → evaluation routes are recorded separately under the same ignored `canonical-final-8bf372` directory.
+- Run011 reuse decision: its formal whole-report status remains `partial-blocked`, and its implementation commit/tree (`5f97b59…` / `672fd270…`) differs from this baseline. Its verified CAS/reservation/release/reread/`may_resume=true` order and six-assertion EARL are reusable only as historical subcontracts; they do not satisfy current-tree formal completion. No whole-formal PASS is claimed.
+- Not established in this checkpoint: current-tree responsive variation, complete manual procedure closure, current-tree formal happy path through report/EARL, Semantic 83, Trigger 180, Holdout 24, and final repository verification. No implementation or evaluation-contract file was changed.
+
+### 2026-10-07 JST — responsive inspection and isolated semantic smoke
+
+- Responsive real-browser evidence now supplements the prior taskless / task-flow inspection: existing Playwright CLI Chromium captured 1280×800 and 390×844 fixture states. The package-owned fixed responsive probe returned complete condition inventory and numeric boundaries at 703 px inline-size and 769 px width; the three nonnumeric presentation variations were kept separate. Production `normalize_probe_result` and `inspection_structure.close_scope` closed the bounded responsive row without issues. This is fixture evidence only and is not SC 1.4.4 text scaling.
+- ACT 2779a5 remains current-tree verified: `document.title` is a distinct fixed probe; `/` passed and `/title-empty.html` failed through the production criterion runner. The saved taskless and task-flow scope closures both report `issues=[]`.
+- One fresh current-tree semantic case, `UE-SEM-A`, is now validly evaluated: candidate SHA-256 `f30754a4eb45318c2629d6f6465425f463bc1b1becc8c4543417cfd550f0a0c2`; semantic runner verdict `pass`. The candidate Agent ran with the configured `gpt-6-luna` model and no model override. Its isolated workspace contained the current Skill package (with `evals/` excluded), current case input and only agent-generated helper input plus production-helper output; no eval reference, rubric, expected answer or Judge output was present. The deterministic `evaluation_structure.py` helper was run from the repository process after the Agent sandbox could not execute the host Python binary, and the final Agent used that exact generated section.
+- Judge isolation smoke passed. `scripts/skills/evals/semantic/run.py` supplied the Evaluation Instructions, Rubric, Eval Input, Reference, Candidate Output and JSON Contract through stdin. The Judge ran in a repository-external temporary cwd with a minimal TOML selecting `gpt-6-luna`, user config ignored, read-only sandbox, no MCP/plugin config, and no tool-call events. The runner emitted a valid JSON result with verdict `pass`; candidate, normalized Judge JSON, event log, exact argv and execution manifest are under ignored `output/pr14-validation-tools/semantic-final-8bf372/UE-SEM-A/`.
+- A strict historical-candidate audit found no fully eligible candidate among the current repository's 155 semantic cases when requiring current package-file hashes, exact current input hash, successful candidate artifact and matching configured model. Thus none of the requested 83 can yet be counted from old attempts; `UE-SEM-A` is the first valid final-tree result. This audit does not certify the remaining candidates.
+- Current-tree evidence directory for live inspection remains ignored `output/pr14-validation-tools/canonical-final-8bf372/usability-inspection/`. No tracked implementation, fixture or evaluation-contract file changed. Formal WCAG happy-path closure, remaining 82 semantic cases, Trigger 180, Holdout 24 and final repository validation remain open.
+
+### 2026-10-07 JST — semantic contract freeze audit
+
+- Read the current `evals.json`, `rubric.json`, `input.md`, and `reference.md` for `UE-SEM-J`, `UI-SEM-X`, `UI-SEM-AD`, `WCAG-SEM-J`, `WCAG-SEM-C2`, `WCAG-SEM-AH`, and `WCAG-SEM-AJ`, and compared their criteria to the current rubric descriptions and referenced Plan responsibilities.
+- `UI-SEM-X` currently includes `UI-SEM-002` (browser ownership, side-effect scope, secret handling, cleanup, no-progress) and `UI-SEM-003`; its input is explicitly intake-only and its reference requires treating the sensitive-data statement as input-reported, stopping before browser access without persisting raw sensitive content. The safety criterion is evaluable and remains included.
+- `WCAG-SEM-J` currently includes `WCAG-SEM-001` and `WCAG-SEM-004`; its input explicitly names WCAG 2.2 / AA, and its reference is limited to the partial Evaluation Statement. The version/level criterion remains included.
+- `UE-SEM-J` retains `UE-SEM-001/002/005` for evidence, reference applicability, and finding/additional-observation boundaries. `UI-SEM-AD` retains `UI-SEM-003` for supported ACT catalog identity and not inventing an unspecified rule. `WCAG-SEM-C2/AH/AJ` retain only the criteria their references say those fixtures exercise; unrelated full version-set/report requirements are excluded by the case contracts.
+- No evaluation-contract changes were made. This audit found no basis to restore further criteria or alter inputs/references. Freeze the current semantic dataset for the final 83-case run after canonical E2E closes; do not change it to accommodate candidate verdicts.
+
+### 2026-10-07 JST — Plan完了条件と証拠の暫定対応表
+
+対象implementationは`584c9a2d71d0e04bb65c9a54df4498bdd9c3827f`、report-only PR headは`585f7a540d354ca827ee24afc0d2e8efd85ab739`、implementation tree fingerprintは`8bf37219f1430d05b967b742e5ef105ac73cb8a5eeb91e9a15cfbb37e204dfd7`。以下はPlan項目を減らさず、責務ごとの証拠ownerと現時点の状態を対応付けたもの。canonical formal実行後に同じ表を最終結果で更新する。
+
+| Plan項目 | 証拠owner | 現在の証拠 / 状態 | 再実行・不足 |
+| --- | --- | --- | --- |
+| 3 Skillのschema、fixed IDs / fields、deterministic closure、freshness、runtime、handoff契約 | deterministic tests / repository CI | implementation SHA `584c9a2`; pre-commit検証で23 Skill、semantic dataset 22 Skill / 155 cases、repository deterministic 246、runtime 271、trigger contract、compileが成功。Windows symlink依存skipは既知。PR head `585f7a5` の3 GitHub Actionsもsuccess。 | implementationは変更されていないため再実行不要。final report commit後は最新PR headのActions確認が必要。 |
+| usability-evaluation / inspection / WCAGの全semantic case | Semantic Judge | current treeで有効なのは`UE-SEM-A` 1/83 PASS。評価契約freeze auditは完了し、criteria/reference/input/rubric変更なし。 | canonical E2Eの完了後、残82 caseを含む83件を隔離Judgeで揃える。 |
+| 新3 Skill train / validation trigger routing | Trigger評価 | current final treeに対する正規60 queryの証拠なし。 | 全Skillを使う同一Agent clientで60×3=180正常実行、Skill-read eventでthresholdを判定する。 |
+| holdout routing | Holdout評価 | current final treeに対する有効な8 queryの証拠なし。 | Trigger確定後、独立8×3=24正常実行。 |
+| saved test-target-inspection / test-execution evidence → usability-evaluation | real Agent | `canonical-final-8bf372` 下にcurrent-treeの保存済みevidence評価経路を記録済み。 | current tree hash / evaluation候補との対応を最終証跡へ明記する。 |
+| taskless / task-flow live usability-inspection、およびinspection evidence → usability-evaluation | real Agent + browser E2E | Chromiumでtasklessとflow経路、immutable evidence、evaluation handoffのproduction validator結果を取得。responsive 1280×800 / 390×844も記録済み。 | 同じ実装treeとevidence hashを再確認して最終記録へ転記する。 |
+| fixed observation inventory / exactly-one mapping / ACT 2779a5 | deterministic tests + representative browser E2E | 17-key canonical field inventoryはdeterministic検証済み。`document.title`独立probeで`/`はpassed、`/title-empty.html`はfailed。 | evidence metadataを現implementation hashへ照合。追加の全field live反復は行わない。 |
+| SC 1.4.4 desktop / responsive fixed-probe path | representative browser E2E + production WCAG runtime | desktop `VAR-001`とresponsive `VAR-002`でauthor-provided resize control、baseline、2.0× rendered text、lossなし、baseline cleanupを確認し、normalized resultはcomplete/satisfied。 | 現tree一致が確認済みなら再利用。viewport resize / deviceScaleFactor等は代替にしない。 |
+| WCAG formal scope / sample / observation handoff / immutable return / freshness / cleanup / CAS / reservation / resume | real Agent + browser E2E + test-only SQLite CAS provider | formal runでstate create→pending CAS→claim→reservation/provider revision→in-progress CAS→browser→immutable result→freshness→cleanup→conditional release→close-ready→closed CAS→state reread→`may_resume=true`→resumeを実行。5/5 result current、release済み、handoff unresolved blocked 0。 | orchestrator順序のsubcontract証拠は再利用。これはreport全体のhappy-path completionを意味しない。 |
+| Step 4.2 unchanged/current再利用とchanged/unknown再評価 | deterministic tests + representative formal browser E2E | unchanged/currentの再利用候補は記録。interaction後のchanged stateの最終closureは正式reportで未完了。 | current final closureで両方を照合。 |
+| Step 4.3 resampling / sample lineage / population / overlap / top-up / reselection / complete process | deterministic tests + representative formal browser E2E | production selection helpersを用いたstructured/random selection・target再計算・overlap除去・reselection経路を実行した記録あり。 | complete processとformal report closureのcurrent参照関係を再確認する。集合演算自体はdeterministic testsをownerとする。 |
+| sampling used / skipped、additional evaluation requirement | deterministic tests + representative formal browser E2E | sampling used/skipped helper経路と`ADDREQ-001` applied、artifact-local evidence refsを記録。 | formal closureとの参照整合を確認する。 |
+| machine limitation → manual procedure → evidence / limitation → criterion closure | semantic/manual evaluation + representative browser E2E | gradient/background、canvas text、UA zoomのmachine limitationを適切に`undetermined`へ正規化。focus-indicator limitationとapplicable manual procedureのclosureは未確認。 | `/manual-limitations.html`、`/ua-text-scaling-manual.html`、`/text-scale-unreadable.html`の不足経路を確認。 |
+| Step 5.1 outcome closure / Step 5.2 specifics / Step 5.3 Evaluation Statement / Step 5.5 EARL | formal production runtime + independent validator | report/EARL production pathは実行。4 assertionsでindependent validation PASS、coverage差分0、2回render byte一致。Evaluation Statementはowner commitment ref不足で生成されず、Step 5.1は385行中4 closure / 381 missing、report status blocked。 | **formal completion未達**。current evidenceから各required criterion rowを正しく閉じ、applicable report/EARLを再生成・再検証する。根拠なしの結果やAuthorityは追加しない。 |
+| canonical happy path unresolved blocked = 0 | real Agent/browser E2E + final report closure | handoff単体ではunresolved blocked 0。formal report全体はStep 5.1 incompleteのためblocked。 | final report closureを完了してから全体値を数える。expected negative safety blockedは別集計。 |
+| 外部実製品 / account / URL / assistive technology acceptance | external acceptance | repository fixtureでは実施していない。外部適合は主張しない。 | repository implementation未達から分離。 |
+
+#### 暫定判定
+
+- current implementationのdeterministic/runtime/CI契約は成功済みだが、canonical formal report closureはまだPASSではない。特にStep 5.1の381行欠落、Step 4.2 changed-state closure、manual fallbackのfocus経路、Step 5.3 owner commitment依存を未達として保持する。
+- formal handoff単体、EARLの4 assertion検証、既存fixed-probeの部分証拠を、formal全体完了や外部製品適合の証拠へ拡張しない。
+- Semantic / Trigger / Holdoutはcanonical E2Eが閉じてから実施する。criteria変更をJudge verdictへ合わせて行わない。
+
+## 2026-10-08 JST — PR #14 / PR #17 評価責務分担とtargeted validation
+
+### 方針・Plan変更
+
+- PR #14の長時間全量評価は再開していない。Semantic 83 case、Trigger 60 query × 3、Holdout 8 query × 3、fixture全体のWCAG criterion / procedure closureは新しいPR #14 completion gateから外した。semantic dataset全件のvalidator / repository contract testsは維持する。
+- root Plan、`_06`、`_06a`、`_06b`、`_06c`を更新し、PR #14を3 Skill実装・標準検証・代表Agent/browser経路・fail-closed behavior・description targeted triggerに限定した。deterministic testsが所有するfinite combinationをbrowserで重複網羅しない。
+- PR #17（head `570cf16c43985b3417204abde531229278cb32c9`、open）は、既存Eval Inputからの実Agent candidate生成、既存deterministic / semantic grader、Skill単位 / all-Skill batch、repeat、Skill revision間比較、およびSemantic case全量・反復評価の継続評価責務としてPlanへ明記した。PR #17は現時点でPlan-onlyであり、評価runnerの実装・評価完了を意味しない。
+- native Skill triggerの全量・反復評価とholdoutはPR #17へ移していない。別の継続評価課題として残し、PR #14では今回変更したdescriptionのtargeted regressionだけを必須とする。`EVALS.md`の全体評価契約は変更していない。
+- `case-004/reference.md`はinputとcatalog上のUSWDS accordion guidance（advisory）およびWAI-ARIA APG accordion pattern（informative）のsource identityを正確に区別する追記。直接適用が確定したとはせず、見た目だけでpatternや問題を断定しない契約であり、期待candidateを漏らさない。
+- `case-012/reference.md`はinputで明示された`AUTH-15`と既存Finding refを保持し、根拠のないindividual/team ownerを捏造せず未解決にする追記。両reference差分ともinput / catalogから導出される契約clarificationであり、過去Judgeを通すためのcriteria削除・rubric緩和ではない。Input、rubric、eval criteriaは変更していない。
+
+### Git / implementation identity
+
+- branch `feat/usability-evaluation-skill`、開始時HEAD / PR #14 head `585f7a540d354ca827ee24afc0d2e8efd85ab739`。`origin/main=dec3f7c764db2869dc24eb3d6f154712a6677068`、ahead 314 / behind 0。
+- commit前の変更はPR #14対象11 pathのみ明示stageした。`.gitignore`は変更・stageしていない。`3b77866a0b52347ce6201959f97492f197a61365`はユーザー所有untrackedとして未stageのまま保持する。ignored `output/` / `.codex/runs/`はcommit対象外。
+- 変更反映後、progress reportを除外する既存`tree_fingerprint.py`でcurrent implementation/documentation tree fingerprintを`e558e861067cd2231485727091edef70593072441c954f2e781f2fffdd66fd98`と算出。基準実装commitは`584c9a2d71d0e04bb65c9a54df4498bdd9c3827f`、そのcanonical evidence tree fingerprintは`8bf37219f1430d05b967b742e5ef105ac73cb8a5eeb91e9a15cfbb37e204dfd7`。
+- baseline以降の本変更はPlan / report、`usability-evaluation`と`wcag-conformance-evaluation`のfrontmatter description、case-004 / case-012 referenceに限定。runtime/helper/fixtureと`usability-inspection` bodyに差分がないことを`git diff 584c9a2 -- ...`で確認した。したがって旧treeのbrowser / runtime証拠はこれらの不変経路に限って再利用し、current tree全体のPASSとは扱わない。description変更の影響はcurrent Skill packageを使うtargeted triggerで別確認した。
+
+### description変更のTrigger回帰
+
+全22 repository Skill packageを同一Agent clientで利用可能にした一時workspaceから、各queryを独立Codex実行で3回評価した。`.codex/config.toml`の`gpt-6-luna`を使用し、`--model` overrideなし。判定はanswer内容ではなく`codex.skill.injected` Skill-read event。各runのcommand、event、stdout/result、validityはignored `output/pr14-validation-tools/trigger-targeted-20261008/` に保存した。workspace manifestのpackage tree fingerprintは`8a8e85594376d954f95f9f75153164c503f7eeace02cd3814ca38a60ba1ea9ef`、description tree fingerprintは`6f4dd73c36039fb6eaa1878b1e6b28392a7163468ced4b59e9bcb45cb49f8b77`。
+
+| Query | 期待 | Skill-read | trigger_rate | 結果 |
+| --- | --- | ---: | ---: | --- |
+| `UE-TR-TRA-004` | usability-evaluation | 2/3 | 0.667 | PASS（> 0.5） |
+| `UE-TR-VAL-006` | usability-evaluation | 2/3 | 0.667 | PASS（> 0.5） |
+| `WCAG-TR-TRA-002` | wcag-conformance-evaluation | 3/3 | 1.000 | PASS（> 0.5） |
+| `UE-TR-TRA-005`（明確な隣接negative） | 新3 Skillは不要 | 0/3 | 0.000 | PASS（< 0.5）。test-executionのみ発火したrunあり |
+| `WCAG-TR-TRA-006`（情報要求のみ） | wcag-conformance-evaluationは不要 | 0/3 | 0.000 | PASS（< 0.5） |
+
+計15/15正常Agent実行、runner failure 0、全対象3回完了。`UE-TR-TRA-004`の1回目はSkill-read eventがなく0回として保守的に計上した。60 query全量統計と24回holdoutは行っていない。
+
+### 再利用したrepresentative Agent / browser evidence
+
+根拠artifactはignored `output/pr14-validation-tools/canonical-final-8bf372/`。当該artifactはimplementation `584c9a2d71d0e04bb65c9a54df4498bdd9c3827f` / tree `8bf37219f1430d05b967b742e5ef105ac73cb8a5eeb91e9a15cfbb37e204dfd7`で生成され、current staged tree `e558e861...`と同一treeではない。再利用するのはhash一致を確認した不変runtime/helper/fixture pathだけである。
+
+| PR #14 gate | Evidence / 確認範囲 | 結果と制限 |
+| --- | --- | --- |
+| `test-target-inspection → usability-evaluation` | `tti-root-002/evaluation-candidate.md`, `evaluation-result.json` | 実Agentの保存済みevidence read-only評価。現description変更はtargeted Triggerで補完確認 |
+| `test-execution → usability-evaluation` | `test-execution/run-manifest.json`, `evaluation-candidate.md` | manifestで実Agent、`usability-evaluation/SKILL.md` read event、cleanup、PASSを確認。fixture / artifact hashをmanifestへ保存 |
+| taskless / task-flow `usability-inspection` | `usability-inspection/USABILITY-INSPECTION.md`、taskless / search / query / cart snapshots、`runtime-evidence-validation.json` | Chromium実browser、tasklessとflow、immutable evidence、inspection→evaluation handoff、responsive 1280×800 / 390×844の代表pathを再利用。inspection packageはbaseline後に未変更 |
+| live inspection → `usability-evaluation` | `usability-inspection/usability-evaluation-candidate.md` / `usability-evaluation-result.json` | browser操作ownerはinspection、評価は保存されたimmutable evidenceからread-onlyで実行 |
+| fixed `document.title` / ACT `2779a5` | `document-title.raw.json`, `document-title.normalized.json`, `title-empty.*`, `test_canonical_usability_fixture` | `/` titleあり、`/title-empty.html` whitespace / empty titleのpositive / negative。`document.location` URL専用。deterministic suiteと代表Chromium evidenceを再利用 |
+| formal WCAG representative handoff | `formal-agent-run-01/final-manifest.json`, `RUN-SUMMARY.md`, `outputs/order-proof.json` | direct formal requestからscope/sample、`qa-workflow`、`usability-inspection`、immutable result、freshness、cleanup、formal resumeまで実Agent / Chromiumで完了 |
+
+formal happy pathはtest-only SQLite providerでstate revision create 1 → pending 2 → in-progress 3 → close-ready 4 → closed 5、closed後の再読込、`may_resume=true`、その後のformal resumeを記録。browser / fixtureのreservationをprovider revision付きで取得し、browser開始後にimmutable observationを返し、cleanup後reverse orderでconditional release。`order-proof.json`はsequence proven、happy-path unresolved blocked `0`。別のnegative safety path 1件はunsafe release条件で期待どおりblocked。
+
+formal reportはfixture全体をclosureしていない。変更後confirmation stateのStep 4.2は55 required rows未closure、Step 5.1は385 rows中4 current / 381 missing、main typed procedure request 427件中423件にcurrent resultなし。これらをcompleteへ昇格せず、missing evidence / procedure rowsを示しreport closureを`blocked`のまま保持した。これは更新Plan上のfail-closed成功（部分結果を保持するpartial-blocked）であり、WCAG conformance完了ではない。Step 5.3は`owner_commitment_ref`不足でfull / partial guardがblockedとなりStatementを生成しなかった。Step 5.5 EARLは入力された4 current assertion subsetに対して生成、production / independent validator PASS、human-readable reportとの差分0、2回render byte一致（`earl_repeated_render_byte_identical=true`）。
+
+### Repository validation
+
+| 検証 | 結果 |
+| --- | --- |
+| official `skills-ref validate` | 22 Skill packages PASS。Windows標準shellの既定CP932で行った初回はUnicode decode error。repository hookと同じ`PYTHONUTF8=1`で再実行しPASS |
+| semantic dataset validator | 22 Skill / 155 case PASS |
+| shared deterministic tests / repository deterministic tests | 12 PASS / 246 PASS |
+| shared semantic runtime tests / repository semantic tests | 27 PASS・2 SKIP（WinError 1314でWindows symlink権限なし） / 4 PASS |
+| trigger contract / runtime tests | 1 PASS / 271 PASS |
+| Python compile | `python -m compileall -q skills scripts tests/skills` PASS。PowerShellでshell globをPythonへ直接渡した誤った初回compile commandはPASS根拠に使わない |
+| WCAG report closure / EARL focused tests | 13 PASS / 5 PASS |
+| `git diff --cached --check` / text quality | PASS / PASS（changed Markdown 11件） |
+| focused Markdown lint | `markdownlint-cli2 --no-globs`でnew split Plan、`_06a` / `_06b` / `_06c`、Skill、referenceの8 fileが0 issue。通常のglobal globsは627 Markdown fileをlintし885 issue / 158 fileとなる（過去からのbaseline文書を含む）。 |
+
+検証ログはignored `output/pr14-validation-tools/plan-split-validation-20261008/`。`npm run validate:skills`はignored local `AGENTS.md`が存在しない`docs/reference/run-artifacts.md`を参照して失敗。`pnpm run`はignored local `pnpm-workspace.yaml`の`packages field missing or empty`でscript起動前に失敗する。いずれもtracked repositoryのvalidator/test failureではなく、overlayを変更していない。normal pre-commit hookはこのignored overlay修正や迂回を使わず、repository標準Python validationを実行する。
+
+### 更新後のgate状況
+
+- PASS: 責務分担をroot / `_06` / `_06a` / `_06b` / `_06c`で統一、Semantic reference差分の根拠分類、3 query targeted positive regressionと2つの明確なnegative boundary、dataset / deterministic / runtime / Skill validation、代表保存済みevidence・live inspection・formal handoff・fail-closed report / EARL evidence。
+- 継続評価としてPR #17へ指定（PR #17現headはPlan-only）: 3 Skill semantic case全量のAgent candidate + deterministic / semantic grader接続、Skill / all-Skill batch、repeat、revision比較。PR #17が実装・評価を完了したとは報告しない。
+- PR #14およびPR #17の外で継続: native Skill trigger全量統計とholdout。PR #14の更新gateでは未達に数えない。
+- 外部acceptance: external URL / account / production product・data / customer Authority / specific assistive technology。fixture結果は外部conformanceの証拠にしない。
+- このcheckpoint時点のPR #14 repository gate未完了項目: commit / normal push、PR title/body更新、push後の最新PR head 3 Actions確認。従ってここでは完成判定しない。
+- Progress: 83% (5/6)。Next: normal commit / push、PR metadata更新、最新PR head Actions確認、更新Planへ最終対応付け。
+
+#### 更新後Planの証拠対応
+
+| 更新後の必須項目 | 証拠owner | 根拠 | 判定 |
+| --- | --- | --- | --- |
+| repository Skill / semantic dataset / deterministic / semantic / trigger contract / runtime validation | repository validator・tests | 上記validation表、`output/pr14-validation-tools/plan-split-validation-20261008/` | PASS。2件はWindows symlink privilege skip |
+| 3 SkillそれぞれのAgent smoke | real Agent | UE saved-evidence候補とcurrent description Skill-read runs、inspection live Agent artifact、formal WCAG Agent handoff | PASS。description変更によるrouting差はtargeted Triggerでcurrent packageを確認 |
+| saved TTI / TE evidenceからread-only usability-evaluation | real Agent | `tti-root-002/`と`test-execution/`配下のcandidate、result、run manifest | PASS。旧tree由来のため不変body / runtime / artifact経路に範囲限定 |
+| taskless / task-flowの代表live usability-inspectionとimmutable handoff | real Agent + browser | `usability-inspection/`配下snapshot、`USABILITY-INSPECTION.md`、runtime validation | PASS。taskless / flow、desktop / responsive代表path |
+| representative formal handoff lifecycle | real Agent + browser + test-only SQLite provider | `formal-agent-run-01/outputs/order-proof.json`、`final-manifest.json` | PASS。CAS、reservation / conditional release、observation、cleanup、closed reread、`may_resume`, resume。handoff unresolved blocked 0 |
+| formal report fail-closed / Step 5.3 guard / EARL subset | production helper + independent validator | `outputs/REPORT.md`, `earl.jsonld`, `earl-validation.json`, `earl-repeat.jsonld` | PASS。formal whole-scope closure is intentionally blocked; not a conformance pass |
+| description変更対象3 query + clear negative boundary | real Agent Skill-read telemetry | `output/pr14-validation-tools/trigger-targeted-20261008/` | PASS。15/15 normal runs、5/5 query threshold達成 |
+| current PR head CI | GitHub Actions | push後に確認する | pending |

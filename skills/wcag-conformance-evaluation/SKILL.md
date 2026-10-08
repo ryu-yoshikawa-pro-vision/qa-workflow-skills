@@ -1,6 +1,6 @@
 ---
 name: wcag-conformance-evaluation
-description: Do not trigger for informational questions that only summarize WCAG/WCAG-EM requirements or procedures, request a checklist, or list Evaluation Statement, Conformance Claim, or Statement of Partial Conformance fields; those terms alone are not a product assessment request. Use only for an explicit request to formally assess a Web product's WCAG conformance under WCAG 2.0, 2.1, or 2.2 and WCAG-EM 2.0, even when the target, version, or level is missing; identify missing required inputs before proceeding. Coordinate product scope, sampling, procedures, results, and formal report. General live accessibility inspection belongs to usability-inspection; saved UI evidence review belongs to usability-evaluation.
+description: Use when a user explicitly asks whether a Web product or site formally conforms to WCAG 2.0, 2.1, or 2.2 at a stated or unstated level, including “does this product conform to WCAG 2.1 A?”; perform WCAG-EM 2.0 even when the user does not name that method. Ask for a missing target, version, or level. Do not trigger for informational summaries, checklists, or requests only to list Evaluation Statement, Conformance Claim, or Statement of Partial Conformance fields. Coordinate scope, sampling, procedures, results, and formal report. General live accessibility inspection routes to usability-inspection; saved UI evidence review routes to usability-evaluation.
 ---
 
 # Formal WCAG-EM evaluation
