@@ -277,21 +277,36 @@ symlink、output root外を指すpath、path traversal、許容上限を超え�
 
 workflow state等で保存rootが必要な場合は、Evaluatorが評価用Project Contextへ`.qa-eval-output/`配下のproject-local rootを設定します。既存Skillの保存契約を変えず、評価用の保存先だけを与えます。
 
-runtime-enabled Skillについては、Agentが最終成果物を完成扱いにする前に実行した既存`verify_runtime_evidence`等の**実際のrequest JSONとresult JSON**を、評価成果物と同じrun配下へ保存させます。Evaluator用にexpected値を作らせるのではなく、Skillが本来実行するproduction verifierの入出力を証拠として残すだけです。
+runtime-enabled Skillは既存Skillの指示に従って`verify_runtime_evidence`等を実行します。**request / resultを別のJSON fileとして残すことは既存Skillの義務ではない**ため、記録経路はEvaluator側が提供します。Agentの説明文や実行後に作成された自己申告JSONを実際の実行証拠とみなしません。具体的な経路は次節に固定します。
 
-Evaluatorは回収後、そのrequestの`artifact_markdown`だけを回収済みartifact本文へ差し替え、**固定Evaluator revisionに属するproduction verifier**で独立に再実行します。Agent実行中の候補Skill版verifier結果は実行証拠として保存しますが、候補版だけの判定を比較の採点基準には使いません。固定版と互換である場合は保存済みresultとの差と、`valid`および`current_structure_state`の内容を区別して確認します。固定版と契約が互換でなく判定できない場合は`evaluator_incompatible`として比較不可にし、Skill品質のFAILへ変換しません。Agentが独自のexpected Entityやfingerprintを手組みした場合は、既存verifierがrejectする契約をそのまま使います。
+Evaluatorは回収後、候補Skill revisionの**信頼済みGit tracked content**に含まれるproduction verifier / generatorをAgentとは独立した評価側processで再実行します。保存requestの`artifact_markdown`だけを回収済みartifact本文へ差し替え、その他のnormalized input / scope / previous artifact等は変更しません。入力・生成結果のfingerprint、`valid`、`current_structure_state`、runtime unitと実際の候補sourceとの整合性を確認します。出力の機械構造とtraceabilityを比較するgrader・Judgeのcriteriaは固定Evaluatorを使い、必要なsource照合だけ候補tracked sourceに向けます。
+
+既存`runtime_contract.py`の`_validate_runtime_pair()`は実行側`runtime_contract.py`およびgenerator sourceのhashと比較して`stale_runtime_implementation` / `stale_generator_implementation`を発生させます。そのため**固定Evaluator版production verifierを別revisionの成果物へそのまま適用しません**。固定grader側でruntime sourceを参照する処理も親Planの最小`source-root`指定に従い、候補の信頼済みsourceから照合します。これはfingerprint照合の無効化ではなく、鮮度判定の参照元を正しく固定する修正です。
+
+両revisionで共通評価できないschema / 機械契約の部分は`evaluator_incompatible`として比較不可にし、意味品質を一律に無効とはしません。旧・新両方を受け付けるEvaluatorが必要なら、それを固定したうえで**両Skill revisionを同条件で再実行・再採点**します。候補のverifierが`valid=true`を返すだけでは品質PASSとはしません。Agentが独自のexpected Entity / fingerprintを手組みした場合は既存verifierの拒否契約を維持します。
 
 `qa-workflow`については、Skill-local`verify_runtime_evidence`に加えて、実行時に使用した`workflow_runtime.py`入力 / 結果も保存・再実行対象にします。
 
+### 評価用のverifier入出力取得経路
+
+Evaluatorはsanitized target生成時に、正解情報を含まない最小の評価用CLIラッパー`scripts/skills/evals/agent/verifier_capture.py`を`.qa-eval-tools/verifier_capture.py`として配置し、synthetic baselineへ含める。このコードは評価専用であり、19 Skillの`SKILL.md`やproduction verifier本体を変更しない。評価用`AGENTS.md`とpromptには、実行時のproduction verifier / `workflow_runtime.py`を呼ぶ場合、次の経路を使うことだけを明示する。
+
+1. Agentは既存Skill契約に必要なrequest JSONを`.qa-eval-output/.runtime-evidence/<skill>/<artifact-id>/<invocation-id>/request.json`へUTF-8として書く。`artifact-id`は同一attempt内の成果物相対pathのSHA-256で識別し、`invocation-id`は1回の試行内で一意とし、retryも別IDを使う。artifact pathとの対応をEvaluator manifestに保存する。request fileに秘密を含めない。
+2. Agentは`python .qa-eval-tools/verifier_capture.py --skill <skill> --operation verify|workflow-runtime --request <request.json> --record <invocation-dir>`を実行する。ラッパーは`--skill`とoperationを許可済みのSkill-local script pathへ写像し、任意command / 任意pathを実行しない。`request.json`の**保存済みbytesそのものを**対象CLIのstdinへ渡す。対象scriptを候補Skill workspace内から呼び、stdout bytesを`result.json`、stderrを安全化した診断、exit code / request・result SHA-256を`invocation.json`へ記録する。正常終了時も`valid=false`を維持する。入出力と実行metadataの保存は一時fileからatomicに確定し、不完全なrecordを成功扱いしない。
+3. `workflow_runtime.py`はruntime input envelopeを同じ方法で送信し、戻りのruntime result envelopeをそのまま保存する。`verify_runtime_evidence`の`valid`と`workflow_runtime.py`の`payload.can_complete`は別々に判定する。
+4. ラッパーは記録完了後に結果をAgentへ返し、Agentは既存Skill契約どおり結果を参照して最終成果物を確定する。これによりAgentが前もってファイルを作っただけでは`invocation.json`が成立しない。ただしAgent-visible fileの自己改ざんを防ぐ暗号的監査機構ではないため、Evaluatorはbaseline差分、request / result hash、候補revisionからの独立再実行で整合性を確認する。
+5. 実行後にEvaluatorは`invocation.json`を含むrecordをmanifestへ回収する。request / result / exit codeの実記録が欠落・破損した場合は`evidence_unverified`に分類する。成果物が存在し、他のgraderで採点できる場合はその判定を残すが、verifierを実行しなかったという事実が観測されない限り**Skillの品質FAILへ転記しない**。
+
+ラッパーは評価用のプロセス入出力transportだけを担い、runtime検証アルゴリズムを再実装しない。標準ライブラリで実装し、CIのfake Agentでfile記録・再試行・欠落・不正なrequest・symlink / path traversal・atomic書込み失敗を検証する。実Codexでは記録済みJSONと`--json` tool traceの実行イベントを照合する。
 ### 成果物とproduction verifierの対応・判定
 
 EvaluatorはAgentが作成したartifactだけを見て、必要な成果物や証拠が揃っていると推測しません。評価要求と`qa-workflow`による実際のrouting（対象scope・スキップ・blocked・完了状態）から、今回必要な成果物集合を導出します。routing自体が不足・矛盾するときは、期待工程を独自の固定9工程へ置換せず、workflowの品質不足として記録します。
 
-- runtime-enabled Skillの各成果物について、同一attempt内で`Skill名 + artifact相対path + SHA-256 + request path + result path`を一意に対応させる。requestの参照先が異なるartifact、重複path、他attemptの証拠は拒否する。`qa-workflow`は`verify_runtime_evidence`と`workflow_runtime.py`の双方のinput / resultを別の証拠として要求する。
+- runtime-enabled Skillの各成果物について、同一attempt内で`Skill名 + artifact相対path + SHA-256 + request / result / invocation path`を対応させる。重複path・他attemptの証拠を拒否する。`qa-workflow`は`verify_runtime_evidence`と`workflow_runtime.py`のinput / resultを別々に集め、片方が欠落した場合はその観測状態を残す。
 - Evaluatorのrequest置換は`artifact_markdown`のみとする。normalized input、previous artifact、scope、expected Entity等を都合よく修正しない。参照された依存成果物の所在とhashも同一attemptで照合する。
 - production verifierが終了コード0でも`valid=false`なら、**契約適合した成果物とは判定しない**。`valid=true`、期待される`current_structure_state`、必要なworkflow completionをそれぞれ判定し、`workflow_runtime.py`のプロセス成功だけでworkflow完了としない。
 - 正当な`blocked` / `incomplete` / `unresolved`は証拠として保存する。ただし今回の評価要求を完了したという判定とは区別する。仕様根拠不足で止まるべきケースは意味評価で妥当性を判定する。
-- Agentが必須成果物やrequest / resultを生成しなかった場合、実行基盤が正常なら`Skill品質のnon-pass`として記録する。Evaluator自身のpreparation不良、再実行不能、I/O障害、解析不能な実行結果は`runner/environment error`として別記する。既存verifierの判定ロジックは再実装しない。
+- 必須のQA成果物が生成されなかった場合は、実行基盤が正常ならSkill品質上の非passとする。一方、**verifierのrequest / resultやtraceだけが欠落した場合は`evidence_unverified`として品質判定と分離**する。明示的なtool trace等からverifier未実行が確定した場合と、単に証拠が取得できなかった場合を混同しない。`valid=false`を完成扱いした事実が確認できた場合はSkill品質の非passとする。Evaluator側のpreparation / capture / I/O / 独立再実行障害は`runner/environment error`に区分し、Skill品質へ転嫁しない。既存verifierの判定ロジックは再実装しない。
 
 ## 評価観点
 
@@ -410,7 +425,7 @@ scenario定義は現在の`qa-training-store`初回評価を再現するため�
 
 フェーズ2ではSkill-local eval datasetの`expected.json`を持たないため、dataset専用の`scripts/skills/evals/deterministic/run.py`へ架空のeval IDやexpectedを追加して評価しません。
 
-代わりに、前節で保存したproduction verifier request / resultをEvaluatorが再実行します。これにより、Agentが生成したQA成果物が実行時と同じ既存runtime契約へ現在も適合するかを確認します。
+代わりに、Evaluatorが捕捉した本番verifier request / resultと、候補sourceを固定した独立再実行を確認します。候補実装自身の鮮度と、固定graderの共通品質criteriaを別々に報告することで、source fingerprint更新だけでstaleになった評価を誤判定しません。取得できない実行証拠は`evidence_unverified`で区分し、データが足りない評価項目だけ判定保留にします。
 
 新しい同等validatorやtarget専用runtime schemaは作りません。
 
@@ -498,10 +513,10 @@ Agent executionは、Eval dataset由来のpromptでも、固定対象repo向けp
 10. 各repeatの新規target / Agent sessionで実Agentを起動し、分析・設計workflowを実行する。使用証拠の観測可否を記録する
 11. baseline commitとの差分を確認し、`.qa-eval-output/**`以外のProduct Code / Test / Spec等に変更がないこと、追加commitがないことを確認する
 12. 複数QA成果物をscanし、`artifact-manifest.json`を作成して`.agent-eval-runs/`へ回収する
-13. workflow routingと成果物集合を照合し、各artifact・request / resultを一意対応付け、固定Evaluator版runtime / verifierで独立判定する
+13. workflow routingと成果物集合を照合し、捕捉済みartifact・request / result / invocationを対応付け、候補tracked source版production verifierの独立再実行と固定Evaluatorの品質採点を分離する
 14. 固定した規範Reference / rubricで独立Judgeによる意味品質をattemptごとに評価する
 15. workflow / traceability / semantic結果とprovenanceを同じrunへ保存する
-16. runner / environment起因の失敗とSkill品質上のnon-pass、隔離・設定・使用確認が未検証のrun、Evaluator互換性不一致を分離して報告する
+16. runner / environment起因の失敗、Skill品質上のnon-pass、verifier`evidence_unverified`、隔離・設定・Skill使用確認が未検証のrun、部分的なEvaluator非互換を分離して報告する
 
 ## 完了条件
 
@@ -520,16 +535,29 @@ Agent executionは、Eval dataset由来のpromptでも、固定対象repo向けp
 - Checkout / PaymentのWeb範囲で実Agent workflowが最後まで実行され、`--repeat`各attemptの独立した評価結果が保存される
 - Product Code、既存Product Test、規範仕様に許可外変更がない
 - 複数成果物が`.qa-eval-output/`から`.agent-eval-runs/`へ回収され、`artifact-manifest.json`でSkill名 / path / SHA-256 / verifier証拠との一意対応を追跡できる
-- runtime-enabled Skillのproduction verifier request / resultが保存され、固定Evaluator版で独立再実行して`valid` / currentness / completionを判定できる。`valid=false`同士の一致をPASSにしない
+- 評価用capture CLIで実際のproduction verifier request bytes / result bytes / exit codeを一意対応で保存し、候補revisionの信頼済みsource版で独立再実行できる。固定graderのsource照合は候補sourceを参照し、`valid=false`をPASSにしない
+- runtime実装だけが変わり機械契約は互換な2 revisionを正常に比較できる。schema非互換は該当する項目だけ`evaluator_incompatible`として記録し、固定Judgeの意味評価を残す
+- verifier証拠の欠落を`evidence_unverified`とし、未観測のverifier未実行をSkill品質FAILと断定しない。capture実装自体のエラーはrunner / environment errorへ分類する
 - `qa-workflow`の`workflow_runtime.py`も保存済み入力から再実行できる
 - 生成成果物がrun artifactとして保存される
-- workflow結果と、観測可能なSkill使用証拠（または`unverified`）が保存される
+- workflow結果と、実Codex JSONLから観測した変更対象Skillの読取り証拠（または`unverified`）が保存され、成果物の品質評価とSkill変更効果の検証成立を区別できる
 - traceability / runtimeの機械判定結果が保存される
-- 独立Judgeの意味評価結果が保存される
+- 独立Judgeの意味評価結果が保存され、正常・重要欠落・仕様にない動作を加えたfixtureを固定基準で採点した結果と根拠から品質差の検出を検証している
 - runner / environment errorとSkill品質のneeds_review / failを区別できる
 - 非pass結果を隠さず保存・報告できる
 - 比較条件が異なるrunと、隔離・実効設定が未確認のrunをSkill変更のみの直接比較に使わない
 - target-specific評価のためにSkill本体へ`qa-training-store`固有処理を追加していない
+
+### runtime契約を変更した候補の比較
+
+候補Skillの`runtime_contract.py` / generatorに変更がある場合も、正常なimplementation fingerprint差だけで機械評価をFAILにしない。候補verifier自身の鮮度照合に失敗した場合はその実行の問題として記録し、共通品質graderの評価とは別に扱う。
+
+schemaやEntity表現が変更され、既存Evaluatorでは判定不能な場合は該当criteriaのみ比較不可にする。必要ならEvaluatorを両revision対応へ更新し、Evaluator SHA・rubric・Referenceを固定して旧版と新版を**両方新規実行・再採点**する。変更前の旧採点結果だけを流用しない。新たなschemaの自動変換・汎用互換性frameworkは実装しない。
+
+### Judgeの検出能力の受入検証
+
+固定target revisionと規範Referenceに基づき、重要なBR / ACを満たすQA成果物と、(1)Checkout / Paymentの重要な条件の欠落、(2)仕様にない期待動作の混入を持つEvaluator-only QA成果物の3種類を準備する。共通rubric / Judgeでそれぞれ採点し、異常例が対応criterionで適切に非passまたは要確認になり、理由がReferenceに結び付くことを確認する。判定に失敗した場合はrubric / Referenceを修正し、同じEvaluatorで双方のrunを再評価する。repeat結果の揺れは個別attemptで確認し、改善・悪化を単発結果だけで断定しない。
+
 
 ## このフェーズで追加しないもの
 
