@@ -313,7 +313,12 @@ Live CLIへ`--execution-profile <path/to/execution-profile.json>`を必須追加
     "cli_version": "<Judge実行commandのversion>",
     "reasoning_effort": "<固定した推論設定>",
     "launch_options": ["<非秘密の起動オプション>"],
-    "tools": [],
+    "sandbox_policy": "<Judge実行時のsandbox>",
+    "approval_policy": "<Judge実行時の承認設定>",
+    "network_policy": "<Judge実行時の外部アクセス条件>",
+    "skill_roots": [],
+    "global_config": "<disabledまたは非秘密の固定設定fingerprint>",
+    "tools": []
     "mcp_servers": [],
     "external_instructions": "<noneまたは固定指示のfingerprint>"
   },
@@ -330,7 +335,7 @@ Live CLIへ`--execution-profile <path/to/execution-profile.json>`を必須追加
 }
 ```
 
-`<...>`は説明用の占位記号であり、live実行時には実値に置き換える。`verification.status=verified`は自己申告では成立しない。Evaluatorは証拠fileの存在、読み取り拒否probeの結果、非秘密のCLI設定情報との照合を行い、不明・不一致があれば`unverified` / `not_comparable`とする。`evaluator_read_blocked=true`も強制境界の代わりにならない。
+`<...>`は説明用の占位記号であり、live実行時には実値に置き換える。不明な実効項目は架空の固定値で埋めず、`null`とし`verification.status=unverified`を記録する。`verification.status=verified`を必須とする直接比較では、nullの実効必須項目は許可しない。`verification.status=verified`は自己申告では成立しない。Evaluatorは証拠fileの存在、読み取り拒否probeの結果、非秘密のCLI設定情報との照合を行い、不明・不一致があれば`unverified` / `not_comparable`とする。`evaluator_read_blocked=true`も強制境界の代わりにならない。
 
 相対pathはEvaluator-owned出力rootを基準に正規化する。profileをSHA-256へ含めるときは、認証やOS絶対pathを除いた上記の正規比較項目だけを固定順序で正規化する。profileが異なるが実効条件は同じと推測して自動同一視しない。Judgeで同じAgent launcherを再利用する場合でも、Generator側とは独立のprofile欄と検証が必要となる。
 
