@@ -6,6 +6,8 @@
 
 Main Planではexecpolicyの目的、Hookとの責務分離、実装順序、検証、完了条件を管理します。このファイルでは実装時に判断を残さないため、Codex 0.160.0の`prefix_rule`へ落とすpattern / decision / `match` / `not_match`だけを具体化します。
 
+Windows実行名はすべてのGit / ghルールで`git` / `git.exe`、`gh` / `gh.exe`をunionで扱います。`gh skill` / `skills`、`gh agent-task` / `agent-tasks` / `agent` / `agents`、`gh release create` / `new`も既知aliasとして含めます。
+
 このファイルにないGit / GitHub CLIの将来subcommandを推測で追加しません。公式仕様または実際の必要性を確認し、Main Planとこのファイルを同じ変更で更新します。
 
 ### execpolicy rules
@@ -20,12 +22,14 @@ Codex 0.160.0のexecpolicyはargvのexact prefix matchingであり、pattern要�
 
 ```starlark
 prefix_rule(
-    pattern = ["git", ["commit", "merge", "rebase", "pull", "push", "fetch", "reset", "am", "cherry-pick", "revert"]],
+    pattern = [["git", "git.exe"], ["commit", "merge", "rebase", "pull", "push", "fetch", "reset", "am", "cherry-pick", "revert"]],
     decision = "prompt",
     justification = "High-impact Git operations require explicit user approval.",
     match = [
         "git commit -m test",
+        "git.exe commit -m test",
         "git push origin feature",
+        "git.exe push origin feature",
         "git reset HEAD~1",
     ],
     not_match = [
@@ -35,7 +39,7 @@ prefix_rule(
 )
 
 prefix_rule(
-    pattern = ["git", ["branch", "tag", "config", "remote", "worktree", "stash"]],
+    pattern = [["git", "git.exe"], ["branch", "tag", "config", "remote", "worktree", "stash"]],
     decision = "prompt",
     justification = "These Git families mix read-only and state-changing forms; prompt the family instead of adding an option parser.",
     match = [
@@ -53,11 +57,12 @@ prefix_rule(
 )
 
 prefix_rule(
-    pattern = ["gh", "pr", ["create", "checkout", "close", "comment", "edit", "lock", "merge", "ready", "reopen", "revert", "review", "unlock", "update-branch"]],
+    pattern = [["gh", "gh.exe"], "pr", ["create", "checkout", "close", "comment", "edit", "lock", "merge", "ready", "reopen", "revert", "review", "unlock", "update-branch"]],
     decision = "prompt",
     justification = "Pull request mutations and local checkout require explicit user approval.",
     match = [
         "gh pr create --fill",
+        "gh.exe pr create --fill",
         "gh pr merge 123",
         "gh pr checkout 123",
     ],
@@ -71,7 +76,7 @@ prefix_rule(
 )
 
 prefix_rule(
-    pattern = ["gh", "issue", ["create", "close", "comment", "delete", "develop", "edit", "lock", "pin", "reopen", "transfer", "unlock", "unpin"]],
+    pattern = [["gh", "gh.exe"], "issue", ["create", "close", "comment", "delete", "develop", "edit", "lock", "pin", "reopen", "transfer", "unlock", "unpin"]],
     decision = "prompt",
     justification = "Issue mutations and development-branch creation require explicit user approval.",
     match = [
@@ -87,7 +92,7 @@ prefix_rule(
 )
 
 prefix_rule(
-    pattern = ["gh", "repo", ["archive", "clone", "create", "delete", "edit", "fork", "read-file", "rename", "set-default", "unarchive"]],
+    pattern = [["gh", "gh.exe"], "repo", ["archive", "clone", "create", "delete", "edit", "fork", "read-file", "rename", "set-default", "unarchive"]],
     decision = "prompt",
     justification = "Repository mutations and repository-local file writes require explicit user approval.",
     match = [
@@ -104,7 +109,7 @@ prefix_rule(
 )
 
 prefix_rule(
-    pattern = ["gh", "repo", "autolink", ["create", "delete"]],
+    pattern = [["gh", "gh.exe"], "repo", "autolink", ["create", "delete"]],
     decision = "prompt",
     justification = "Repository autolink mutations require explicit user approval.",
     match = [
@@ -117,7 +122,7 @@ prefix_rule(
 )
 
 prefix_rule(
-    pattern = ["gh", "repo", "deploy-key", ["add", "delete"]],
+    pattern = [["gh", "gh.exe"], "repo", "deploy-key", ["add", "delete"]],
     decision = "prompt",
     justification = "Deploy-key mutations require explicit user approval.",
     match = [
@@ -130,7 +135,31 @@ prefix_rule(
 )
 
 prefix_rule(
-    pattern = ["gh", "workflow", ["disable", "enable", "run"]],
+    pattern = [["gh", "gh.exe"], ["skill", "skills"], ["publish", "install", "update"]],
+    decision = "prompt",
+    justification = "Publishing creates a release; installing and updating write local files.",
+    match = ["gh skill publish --tag v1", "gh skills publish --tag v1", "gh.exe skill publish --tag v1", "gh skill install owner/repo skill", "gh skill update --all"],
+    not_match = ["gh skill list", "gh skills preview owner/repo skill", "gh skill search test"],
+)
+
+prefix_rule(
+    pattern = [["gh", "gh.exe"], ["agent-task", "agent-tasks", "agent", "agents"], "create"],
+    decision = "prompt",
+    justification = "Creating remote agent tasks requires approval, including aliases.",
+    match = ["gh agent-task create task", "gh agent-tasks create task", "gh agent create task", "gh agents create task", "gh.exe agent-task create task"],
+    not_match = ["gh agent-task list", "gh agents view 123"],
+)
+
+prefix_rule(
+    pattern = [["gh", "gh.exe"], "discussion", ["create", "comment", "edit"]],
+    decision = "prompt",
+    justification = "Creating and changing discussions or comments requires approval.",
+    match = ["gh discussion create --title Test --body Text --category General", "gh discussion comment 123 --body Text", "gh discussion comment 123 --delete", "gh discussion edit 123 --title New", "gh.exe discussion create --title Test --body Text --category General"],
+    not_match = ["gh discussion list", "gh discussion view 123"],
+)
+
+prefix_rule(
+    pattern = [["gh", "gh.exe"], "workflow", ["disable", "enable", "run"]],
     decision = "prompt",
     justification = "Workflow state changes and manual runs require explicit user approval.",
     match = [
@@ -144,7 +173,7 @@ prefix_rule(
 )
 
 prefix_rule(
-    pattern = ["gh", "run", ["cancel", "delete", "download", "rerun"]],
+    pattern = [["gh", "gh.exe"], "run", ["cancel", "delete", "download", "rerun"]],
     decision = "prompt",
     justification = "Workflow-run mutations and artifact downloads require explicit user approval.",
     match = [
@@ -159,11 +188,12 @@ prefix_rule(
 )
 
 prefix_rule(
-    pattern = ["gh", "release", ["create", "delete", "delete-asset", "download", "edit", "upload"]],
+    pattern = [["gh", "gh.exe"], "release", ["create", "new", "delete", "delete-asset", "download", "edit", "upload"]],
     decision = "prompt",
     justification = "Release mutations and downloads require explicit user approval.",
     match = [
         "gh release create v1",
+        "gh release new v1",
         "gh release upload v1 artifact.zip",
         "gh release download v1",
     ],
@@ -175,7 +205,7 @@ prefix_rule(
 )
 
 prefix_rule(
-    pattern = ["gh", "secret", ["delete", "set"]],
+    pattern = [["gh", "gh.exe"], "secret", ["delete", "set"]],
     decision = "prompt",
     justification = "Secret mutations require explicit user approval.",
     match = [
@@ -188,7 +218,7 @@ prefix_rule(
 )
 
 prefix_rule(
-    pattern = ["gh", "variable", ["delete", "set"]],
+    pattern = [["gh", "gh.exe"], "variable", ["delete", "set"]],
     decision = "prompt",
     justification = "Variable mutations require explicit user approval.",
     match = [
@@ -202,7 +232,7 @@ prefix_rule(
 )
 
 prefix_rule(
-    pattern = ["gh", "cache", "delete"],
+    pattern = [["gh", "gh.exe"], "cache", "delete"],
     decision = "prompt",
     justification = "Cache deletion requires explicit user approval.",
     match = [
@@ -214,7 +244,7 @@ prefix_rule(
 )
 
 prefix_rule(
-    pattern = ["gh", "label", ["clone", "create", "delete", "edit"]],
+    pattern = [["gh", "gh.exe"], "label", ["clone", "create", "delete", "edit"]],
     decision = "prompt",
     justification = "Label mutations require explicit user approval.",
     match = [
@@ -227,7 +257,7 @@ prefix_rule(
 )
 
 prefix_rule(
-    pattern = ["gh", ["auth", "codespace", "gist", "org", "project", "ssh-key", "gpg-key", "extension", "alias", "config", "attestation"]],
+    pattern = [["gh", "gh.exe"], ["auth", "codespace", "gist", "org", "project", "ssh-key", "gpg-key", "extension", "alias", "config", "attestation"]],
     decision = "prompt",
     justification = "These less-common GitHub CLI families can mutate remote, authentication, extension, or local state; prompt the whole family instead of maintaining a subcommand parser.",
     match = [
@@ -273,11 +303,12 @@ Gitでは`branch` / `tag` / `config` / `remote` / `worktree` / `stash`のread-on
 
 ```starlark
 prefix_rule(
-    pattern = ["gh", "api"],
+    pattern = [["gh", "gh.exe"], "api"],
     decision = "forbidden",
     justification = "Direct GitHub API access is outside this repository harness. Use a supported gh subcommand instead.",
     match = [
         "gh api /repos/owner/repo/issues",
+        "gh.exe api /repos/owner/repo/issues",
     ],
     not_match = [
         "gh pr view 123",
@@ -285,7 +316,7 @@ prefix_rule(
 )
 
 prefix_rule(
-    pattern = ["gh", "repo", "sync"],
+    pattern = [["gh", "gh.exe"], "repo", "sync"],
     decision = "forbidden",
     justification = "Repository sync can update branches outside the supported development flow. Use explicit Git operations with approval instead.",
     match = [
@@ -297,11 +328,12 @@ prefix_rule(
 )
 
 prefix_rule(
-    pattern = ["gh", "auth", "token"],
+    pattern = [["gh", "gh.exe"], "auth", "token"],
     decision = "forbidden",
     justification = "Do not print authentication tokens. Use gh auth status without token output.",
     match = [
         "gh auth token",
+        "gh.exe auth token",
     ],
     not_match = [
         "gh auth status",
@@ -309,13 +341,15 @@ prefix_rule(
 )
 
 prefix_rule(
-    pattern = ["git", ["clean", "rm", "update-ref"]],
+    pattern = [["git", "git.exe"], ["clean", "rm", "update-ref"]],
     decision = "forbidden",
     justification = "These Git deletion or ref-update families are outside the supported autonomous workflow.",
     match = [
         "git clean -fd",
+        "git.exe clean -fd",
         "git rm file.txt",
         "git update-ref -d refs/heads/old",
+        "git.exe update-ref -d refs/heads/old",
     ],
     not_match = [
         "git status",
@@ -340,7 +374,7 @@ prefix_rule(
 )
 ```
 
-`gh auth status --show-token`はoption位置を任意に解析する独自parserを追加しません。`gh auth` family全体が`prompt`であり、直接tokenを出力する`gh auth token`は`forbidden`です。これを「すべてのtoken出力variantを永久禁止した」とは扱いません。
+`gh auth token` / `gh.exe auth token`は`forbidden`です。`gh auth status --show-token` / `-t`と`gh.exe`経路（`--json hosts`との組合せを含む）はrepository-owned PreToolUse Hookで実行前denyとします。`gh auth status`単体は既存の`gh auth` family-level `prompt`を維持します。Hookでは`auth status`の既知フラグ`--show-token` / `-t`と`--show-token=...`だけを扱い、CLI全体やnested shellを再帰解析しません。あらゆる認証情報露出経路の遮断を保証するものではありません。
 
 force push、hard reset、commit amendは永久禁止にしません。`git push` / `git reset` / `git commit`のfamily-level `prompt`でユーザー承認へ送り、protected branch上ではPreToolUseのcontextual denyを優先します。
 
@@ -352,6 +386,8 @@ CIでは固定版Codex CLI自身の`codex execpolicy check --rules ...`で、rul
 
 - Main Planの「承認境界」「実装順序」「検証」「完了条件」と矛盾しないこと
 - Codex 0.160.0の`codex execpolicy check`で全ruleがloadでき、各`match` / `not_match`がPASSすること
+- `git` / `git.exe`、`gh` / `gh.exe`で代表`prompt` / `forbidden`が一致すること
+- 新規GitHub CLI操作と別名の代表例、およびMain Plan記載のtoken表示Hook denyを別途検証すること
 - GitHub CLIのmutation-only集合を変更する場合は、実装時点の公式help referenceでsubcommandを再確認すること
 - read-only commandを無承認に戻すためだけの独自option parserを追加しないこと
 - rule追加を理由にGit / GitHub CLI全体のsecurity frameworkへ拡張しないこと
@@ -360,6 +396,10 @@ CIでは固定版Codex CLI自身の`codex execpolicy check --rules ...`で、rul
 
 - Codex execpolicy: https://github.com/openai/codex/blob/rust-v0.160.0/codex-rs/execpolicy/README.md
 - GitHub CLI command reference: https://cli.github.com/manual/gh_help_reference
+- GitHub CLI skill publish: https://cli.github.com/manual/gh_skill_publish
+- GitHub CLI agent-task: https://cli.github.com/manual/gh_agent-task
+- GitHub CLI discussion: https://cli.github.com/manual/gh_discussion
+- GitHub CLI auth status: https://cli.github.com/manual/gh_auth_status
 - GitHub CLI `gh pr`: https://cli.github.com/manual/gh_pr
 - GitHub CLI `gh issue`: https://cli.github.com/manual/gh_issue
 - GitHub CLI `gh repo`: https://cli.github.com/manual/gh_repo
