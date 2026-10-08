@@ -14,7 +14,7 @@ Windows実行名はすべてのGit / ghルールで`git` / `git.exe`、`gh` / `g
 
 `.codex/rules/`はHookの代替ではなく、Hook failure時にも高影響操作を無承認で通しにくくする承認境界として使います。通常のread-only command用`allow` ruleは追加しません。
 
-Codex 0.160.0のexecpolicyはargvのexact prefix matchingであり、pattern要素のunionと`match` / `not_match`を使えます。実装者判断を残さないため、今回追加するruleの**pattern / decision / representative match / boundary not_matchをこの節の正本**とします。`match` / `not_match`はrules file自身のload-time testとして同じ内容を保持します。
+Codex 0.160.0のexecpolicyはargvのexact prefix matchingであり、pattern要素のunionと`match` / `not_match`を使えます。サブコマンドより前にオプションが入るGit / GitHub CLI形式はprefixに一致しないため、Main Plan「CLIの対応形式とprefix判定」に従ってPreToolUseでdenyします。rule未一致だけを拒否済みの証拠として扱いません。実装者判断を残さないため、今回追加するruleの**pattern / decision / representative match / boundary not_matchをこの節の正本**とします。`match` / `not_match`はrules file自身のload-time testとして同じ内容を保持します。
 
 #### `20-risky-prompt.rules`
 
@@ -35,6 +35,8 @@ prefix_rule(
     not_match = [
         "git status",
         "git diff --stat",
+        "git -c user.name=test push origin feature",
+        "git --no-pager reset --hard",
     ],
 )
 
@@ -64,6 +66,7 @@ prefix_rule(
         "gh pr create --fill",
         "gh.exe pr create --fill",
         "gh pr merge 123",
+        "gh pr merge 123 -R owner/repo",
         "gh pr checkout 123",
     ],
     not_match = [
@@ -72,6 +75,8 @@ prefix_rule(
         "gh pr checks 123",
         "gh pr diff 123",
         "gh pr view 123",
+        "gh pr -R owner/repo merge 123",
+        "gh -R owner/repo pr merge 123",
     ],
 )
 
@@ -387,6 +392,7 @@ CIでは固定版Codex CLI自身の`codex execpolicy check --rules ...`で、rul
 - Main Planの「承認境界」「実装順序」「検証」「完了条件」と矛盾しないこと
 - Codex 0.160.0の`codex execpolicy check`で全ruleがloadでき、各`match` / `not_match`がPASSすること
 - `git` / `git.exe`、`gh` / `gh.exe`で代表`prompt` / `forbidden`が一致すること
+- 正規prefixのexecpolicy承認と、先行オプションによる非対応形式のPreToolUse実行前denyをMain PlanのPOSIX / Windows contract testおよびfresh runtime受入で別々に確認すること
 - 新規GitHub CLI操作と別名の代表例、およびMain Plan記載のtoken表示Hook denyを別途検証すること
 - GitHub CLIのmutation-only集合を変更する場合は、実装時点の公式help referenceでsubcommandを再確認すること
 - read-only commandを無承認に戻すためだけの独自option parserを追加しないこと
