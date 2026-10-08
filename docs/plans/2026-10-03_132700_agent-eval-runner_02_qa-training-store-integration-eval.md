@@ -526,7 +526,7 @@ ratingの共通尺度は既存`semantic/prompt_builder.py`に従う。`4`は要�
 - `evaluable=false`を許すのは、適切に投入したReferenceにも規範根拠が存在せず、特定criterionを評価不能な場合のみ。Reference file自体の欠落・破損やscenario対応ミスはJudgeの`not_evaluable`ではなくEvaluator preparation errorにする。`evaluable=false`が残ったrunはそのcriterionの検証済みPASSではなく`needs_review`として扱う。
 - `QTS-SEM-001/002`側のJudgeだけが正規QA成果物に加えて`routing[]`の申告・最終stdoutのrouting / 完了宣言と固定機械判定要約を参照する。`QTS-SEM-003..010`側のJudgeは正規QA成果物と必須成果物欠落表示だけを受け取り、`QTS-SEM-009`もそこから判断する。必要なruntime証拠・completion・stable IDの実検証は固定Evaluatorへ任せ、Judgeへ内部JSON本文を渡さない。
 
-受入用fixtureも固定する。(1)正常例は全criterionでrating 3以上、(2)Payment成功と失敗の整合を意図的に壊した例は`QTS-SEM-006`がrating 1、(3)外部決済APIを確定仕様として追加した例は`QTS-SEM-010`がrating 1となることを確認する。後2件は全体`fail`となる想定とし、Judgeの判定が異なる場合は判定根拠を調べる。判定が揺れる場合は比較可能な品質判断が成立したと偽らず、rubric / Reference修正と両revisionの再評価を行う。
+受入用fixtureには、(1)正常例（全criterionでrating 3以上）、(2)Payment成功・失敗の整合違反（`QTS-SEM-006`がrating 1）、(3)仕様にない外部決済APIの確定（`QTS-SEM-010`がrating 1）を含める。さらに**未検証のcritical criterion（`001/002/003/004/005/007/009`）を各1件の代表的な重大違反例で検証する**。期待するratingは各criterionの既存rubric上の重大条件から定め、人間が規範Referenceと違反根拠を確認する。重大違反例は該当criterionでrating 1・全体`fail`を期待し、Judgeが判定できない・判定が揺れる場合は検証済みと扱わず根拠を調査する。`QTS-SEM-008`は`critical=false`なので今回の7件の追加対象には含めず、既存の通常評価対象として維持する。
 
 ### 試行・使用証拠・比較可否
 
@@ -623,7 +623,7 @@ Agent executionは、Eval dataset由来のpromptでも、固定対象repo向けp
 - 生成成果物がrun artifactとして保存される
 - workflow結果と、Skill package投入の検証済み証拠および変更対象Skillの内部読取観測（`observed` / `unverified`）を独立して保存する。内部観測不能でも同じ条件での**成果物品質比較**はできるが、**Skill改修効果**は判断不能とする。複数attemptで結果が矛盾する場合も改善・悪化・変化なしと断定しない
 - traceability / runtimeの機械判定結果が保存される
-- `QTS-SEM-001..010`の固定criterion ID / critical / Reference対応により独立Judgeを検証する。`QTS-SEM-001/002`と`QTS-SEM-003..010`を**別prompt・別process**で採点し、後者には`routing[]`・最終stdout・機械判定要約が一切含まれないことを検査する。2応答のID集合と結合後の全10件を検証し、誤ID・重複・一方のtimeout / 不正応答では全体PASSにしない。正常例・Payment整合違反例・仕様外動作例の判別根拠を保存する
+- `QTS-SEM-001..010`の固定criterion ID / critical / Reference対応により独立Judgeを検証する。`QTS-SEM-001/002`と`QTS-SEM-003..010`を**別prompt・別process**で採点し、後者には`routing[]`・最終stdout・機械判定要約が一切含まれないことを検査する。2応答のID集合と結合後の全10件を検証し、誤ID・重複・一方のtimeout / 不正応答では全体PASSにしない。正常例・Payment整合違反例・仕様外動作例に加え、**未検証のcritical 7件それぞれの重大違反例**で期待rating・Reference根拠・Judge evidenceを確認する
 - runner / environment errorとSkill品質のneeds_review / failを区別できる
 - 非pass結果を隠さず保存・報告できる
 - 比較条件が異なるrunと、隔離・実効設定が未確認のrunをSkill変更のみの直接比較に使わない。`agent.timeout_seconds`も一致条件とし、`--repeat 1`の結果だけでLLM品質改善の傾向を断定しない
@@ -637,7 +637,24 @@ schemaやEntity表現が変更され、既存Evaluatorでは判定不能な場�
 
 ### Judgeの検出能力の受入検証
 
-固定target revisionに対し、上記rubricに定めた正常例・`QTS-SEM-006`違反例・`QTS-SEM-010`違反例をEvaluator-only fixtureとして準備する。**正規QA成果物のPayment失敗条件だけを誤らせ、最終回答に正しい説明を記載するfixture**でも、成果物Judgeが`QTS-SEM-006`を高評価で救済しないことを確認する。各criterion IDの`critical` / rating / Reference根拠を確認し、正常例は全criteria rating 3以上、違反例は指定criterionでrating 1・全体failとなることを確認する。判定に失敗した場合はrubric / Referenceを修正し、同じEvaluatorで双方のrunを再評価する。repeat結果の揺れは個別attemptで確認し、改善・悪化を単発結果だけで断定しない。
+固定target revisionの正常なQA成果物を基準に、**Evaluator-only fixture**でJudgeの検出能力を確認する。従来の正常例、`QTS-SEM-006`のPayment整合違反例、`QTS-SEM-010`の仕様外動作例を維持し、未検証の**critical 7件**に対する代表的な重大違反例を追加する。
+
+| 対象criterion | 重大違反fixtureで変更する内容 |
+|---|---|
+| `QTS-SEM-001` | 必須の分析・設計工程を、要求に反する根拠のない理由でroutingから除外し、workflowの意味的な成立を損なう |
+| `QTS-SEM-002` | 重要な未解決・未閉鎖事項が残るのに、最終回答でworkflow完了と宣言する |
+| `QTS-SEM-003` | `unresolved-specifications.md`等の未確定事項を正式なOracleへ昇格させ、重大な誤期待値を作る |
+| `QTS-SEM-004` | Checkout Sessionの再開・置換・24時間期限切れのうち、主要な条件を誤るか重要なテスト条件を欠落させる |
+| `QTS-SEM-005` | stale Cart Versionまたは価格不一致でも、Order / Paymentを確定してよいとする |
+| `QTS-SEM-007` | Payment processing中のretry / cancel禁止やresume条件に反する操作を許容する |
+| `QTS-SEM-009` | IDとedgeは形式上正しいまま、Authorityと下流TCを**別の要求の意味**で結び付け、重大なtraceability不整合を発生させる |
+
+- 正常例を基礎に**対象の誤りだけ**を加える。入力は実際のAgent-visible targetへ配置せず、Evaluatorだけが参照する。各fixtureに対象criterion、変更箇所、期待rating、期待evidence、規範Referenceの該当箇所とその根拠を保存する。期待判定はJudgeに作らせず、Checkout / Payment仕様とSkill契約を理解した**人間が確認**する。
+- `001/002`ではworkflow Judgeへ、`003/004/005/007/009`ではQA成果物Judgeへ、該当入力区分の違反だけを渡す。既存の**2系統のJudge入力分離・全10件統合判定**の契約は維持する。各fixtureの意味評価では対象criterionを含むJudge呼び出しを中心に実行でき、配線・統合の検証まで目的なく両Judgeを毎回起動する必要はない。
+- 重大違反fixtureは、**形式的なID欠落やmachine-onlyな失敗を加えただけの例にしない**。Judgeが意味上の違反を判別できる内容にする。`001/002`ではrouting判断・最終宣言と規範 / 正規成果物の矛盾を確認し、`009`では固定機械判定が構造上PASSし得る状態の意味的な誤対応を確認する。
+- 正常fixtureは全criterionがrating 3以上、重大違反fixtureは**対象critical criterionがrating 1**、全体の期待判定は既存`result.py`により`fail`とする。`evaluable=false`やrating 2 / 3で重大な違反を救済した結果は受入成功としない。`QTS-SEM-008`（noncritical）の違反fixtureはこの拡充の対象外とし、通常の評価は継続する。
+- **最終回答だけが正しく、正規QA成果物のPayment失敗条件が誤っているfixture**でも、`QTS-SEM-006`の成果物Judgeが最終回答で救済されないことを確認する。各fixtureで実際のJudge rating / reason / evidenceを記録し、人間確認済みの根拠と照合する。Judgeの判定が一致しない・繰り返しで重要判定が揺れる場合は、判定根拠とrubric / Referenceを調査して受入を保留する。
+- fixtureの読込み、対象criterionへの配線、結果正規化・統合は**外部LLMを呼ばないfake Judge / fake Agentの通常CI**で確認する。実際のJudgeの意味判別は既存の**実Codex smoke / Judge受入検証**で確認する。必要な修正でJudge prompt・rubric・Reference等のEvaluator基準を変更した場合は新Evaluator revisionとして固定し、旧・新Skillを同一条件で再評価する。自動Judge校正・学習基盤、新規採点式、DB、常時LLM CIは追加しない。
 
 
 ## このフェーズで追加しないもの
