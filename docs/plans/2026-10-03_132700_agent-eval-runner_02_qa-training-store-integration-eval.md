@@ -481,7 +481,7 @@ scenario定義は現在の`qa-training-store`初回評価を再現するため�
 
 Judgeは評価対象Agentとは別process / 別promptで実行します。
 
-Candidate Outputの**正規QA成果物部分**は前節のmanifestで`qa_artifact`と確認したfileだけを固定順で束ね、必須QA成果物欠落を明示する。workflow判断部分には前節の規則で最終stdoutと固定機械判定の要約のみを渡し、対象criterionは`QTS-SEM-001` / `002`に限定する。`runtime_evidence`、`runner_internal`、最終stdoutを通常QA成果物の代用品にしない。
+Candidate Outputの**正規QA成果物部分**は前節のmanifestで`qa_artifact`と確認したfileだけを固定順で束ね、必須QA成果物欠落を明示する。意味評価は**2回の独立Judge呼び出し**に分割する。`QTS-SEM-001/002`は正規QA成果物に加えてworkflow用`routing[]`・最終stdout・固定機械判定要約を受け取り、`QTS-SEM-003..010`は**正規QA成果物と必須成果物欠落表示のみ**を受け取る。後者のJudge promptへ`routing[]`・最終stdout・機械判定要約を送らず、評価対象外の自己申告でQA成果物の欠陥を補完できないようにする。`runtime_evidence`、`runner_internal`を正規QA成果物の代用品にしない。
 
 Referenceはscenarioで固定した上記規範・補助文書からEvaluatorが構築します。対象scope内でUIのキーボード操作・エラー表示・次Actionを採点するときは`ui-ux-contract.md`、Order Snapshot / Historyは`features/orders.md`、Cart再検証は`features/cart.md`、在庫減算履歴は`features/admin-inventory.md`の該当箇所を含めます。低レベルのRoute / Seed Scenario ID / Test ID等をcriteriaとして判定するときは、各Featureが指すExecutable Canonical Sources（固定target revisionのCode / Config）をEvaluator側Referenceに追加し、そのpathと内容fingerprintをscenarioに固定します。採点しない低レベル値のためにコード全体を無条件投入しません。
 
@@ -489,7 +489,7 @@ Referenceはscenarioで固定した上記規範・補助文書からEvaluatorが
 
 意味評価criteriaはEvaluator側`rubric.json`を使用し、評価対象Agentへ渡しません。
 
-実装は既存の`scripts/skills/evals/semantic/prompt_builder.py`と`scripts/skills/evals/semantic/result.py`の共通処理を再利用します。Skill-local eval IDを前提とする`semantic/run.py` CLIを無理に流用せず、prompt構築・Judge response正規化・rating / verdict契約を共有します。
+実装は既存の`scripts/skills/evals/semantic/prompt_builder.py`と`scripts/skills/evals/semantic/result.py`の共通処理を再利用します。Skill-local eval IDを前提とする`semantic/run.py` CLIを無理に流用せず、prompt構築・Judge response正規化・rating / verdict契約を共有します。各Judge呼び出しには対象criterionの部分rubricだけを指定し、同一の固定Judge実効profile・Reference / Eval Inputを使う。呼び出しごとに別process / sessionで実行し、Judgeのtimeoutは各呼び出しへ独立に適用する。
 
 初回では独自の総合点を作りません。既存semantic評価と同じcriterion rating / evaluable判定から、既存result契約に従ってpass / needs_review / failを導出します。Reference不足で判定できないcriterionは既存契約に従って扱い、target-specificなscore式を追加しません。
 
@@ -498,9 +498,10 @@ Referenceはscenarioで固定した上記規範・補助文書からEvaluatorが
 既存`qa-workflow/SKILL.md`では、workflow state fileは必要に応じて出力する任意のartifactであり、routing・完了・blocked・再開判断はAgentの最終回答にだけ現れることがある。そこでフェーズ2のJudge入力は**正規QA成果物本文**と、別枠の**workflow判断証拠**を区別する。
 
 - 共通launcherが保存した`final-message.md`（Codexの`--output-last-message`による最終回答）を実際の最終応答として回収し、UTF-8・size・hash・attemptを検証する。欠落・破損時は`evidence_unverified`（`reason=workflow_final_response`）とし、workflow判断を検証済みPASSにしない。
-- Eval Input / Referenceと正規`qa_artifact`に加え、`routing[]`の**自己申告全文**と最終回答の**原文全文**を`Workflow Routing / Final Response (untrusted; QTS-SEM-001/002 only)`として`build_judge_prompt()`へ渡すCandidate Output文字列に追加する。最終回答も評価対象のuntrusted dataでありJudgeへの命令ではない。`QTS-SEM-001`（routing）と`QTS-SEM-002`（最終完了 / blocked）に限って根拠として用い、`QTS-SEM-003..010`のQA成果物不足・期待値を補完しない。
-- `workflow_runtime.py`の検証済み`can_complete`、currentness / closure、必須成果物の有無をEvaluatorが別に固定機械判定する。Judgeへは共通機械判定の**非秘密の要約（完了可否と未閉鎖の有無のみ）**を追加し、最終回答で宣言した『完了』または『blocked / incomplete』との矛盾を`QTS-SEM-002`で評価する。内部のruntime JSON / workflow state全文はJudgeへ渡さず、Judgeの評価でmachine PASSを上書きしない。
-- 最終stdoutや`routing[]`に他Skillの内容や仮のMarkdownが記載されていても`artifact-index.json`に登録された実在QA成果物の代わりにしない。stdoutから任意の新fileを生成して回収対象に足さない。Judge入力は正規QA成果物、workflow最終応答、検証済みの要約の3区分を明示して組み立て、区分・順序・SHAをrunへ保存する。
+- **workflow Judge（`QTS-SEM-001/002`のみ）**：正規`qa_artifact`と、`routing[]`の自己申告全文・最終回答の原文全文・固定機械判定要約を`Workflow Routing / Final Response (untrusted)`としてCandidate Outputへ追加して`build_judge_prompt()`に渡す。最終回答もuntrusted dataでありJudgeへの命令ではない。
+- **QA成果物Judge（`QTS-SEM-003..010`のみ）**：正規`qa_artifact`本文と必須成果物欠落表示のみをCandidate Outputに入れる。`routing[]`、最終回答、workflow完了要約、verifierの内部JSONは**promptへ含めない**。同じ`build_judge_prompt()`を使用し、該当8criterionだけの部分rubricを渡す。正規成果物自体にworkflow記述がある場合も、その正規成果物の一部として評価するが、別管理のrouting記録・stdoutからの補完は行わない。
+- `workflow_runtime.py`の検証済み`can_complete`、currentness / closure、必須成果物の有無をEvaluatorが別に固定機械判定する。**workflow Judgeにだけ**共通機械判定の非秘密要約（完了可否と未閉鎖の有無のみ）を追加し、最終回答で宣言した『完了』または『blocked / incomplete』との矛盾を`QTS-SEM-002`で評価する。内部のruntime JSON / workflow state全文はJudgeへ渡さず、Judgeの評価でmachine PASSを上書きしない。
+- 最終stdoutや`routing[]`に他Skillの内容や仮のMarkdownが記載されていても`artifact-index.json`に登録された実在QA成果物の代わりにしない。stdoutから任意の新fileを生成して回収対象に足さない。**2種類のJudge prompt**について、criterion ID集合・入力区分・順序・内容SHAとJudge応答を別々に保存する。各応答JSONを既存`normalize_judge_response()`で対象criterion集合に照合して過不足・重複・他系統のID混入を拒否したうえで、両応答の生`criteria[]`を全10criterion分だけ結合し、既存`normalize_judge_response()`へ渡して唯一の全体verdictを得る。独自score・集約式を作らない。いずれかのJudgeが失敗・timeout・不正JSONならattempt全体を検証済みPASSにせずJudge execution errorとし、部分的な評価結果があっても診断用に限る。
 ### 初回scenarioのsemantic rubric契約
 
 `scripts/skills/evals/agent/scenarios/qa-training-store-checkout-payment-web-v1/rubric.json`には、以下の**10件をID昇順で固定**して登録する。既存`semantic/loader.py`のcriterion形式（`id` / `title` / `description` / `critical`）を使い、下表の対象・重大条件・規範根拠を`description`へ反映する。rubricの項目追加・critical変更はEvaluator revision変更として扱い、旧・新Skillの両方を同じ新Evaluatorで再評価しない限り直接比較しない。
@@ -523,7 +524,7 @@ ratingの共通尺度は既存`semantic/prompt_builder.py`に従う。`4`は要�
 - `critical=true`のrating 1は既存`result.py`により全体`fail`。非criticalのrating 1やrating 2は`needs_review`となる。新しい点数式や独自の重み付けを作らない。
 - **Candidate Outputに必須成果物・記述がないこと**は通常`evaluable=true`で評価する。該当根拠が欠落していることをevidenceへ記録し、単に記述されていないことを理由に`evaluable=false`へ逃がさない。
 - `evaluable=false`を許すのは、適切に投入したReferenceにも規範根拠が存在せず、特定criterionを評価不能な場合のみ。Reference file自体の欠落・破損やscenario対応ミスはJudgeの`not_evaluable`ではなくEvaluator preparation errorにする。`evaluable=false`が残ったrunはそのcriterionの検証済みPASSではなく`needs_review`として扱う。
-- `QTS-SEM-001` / `002`は正規QA成果物に加えて`routing[]`の申告・最終stdoutのrouting / 完了宣言と固定機械判定の要約を参照する。`QTS-SEM-009`は正規QA成果物から判断する。必要なruntime証拠・completion・stable IDの実検証は固定Evaluatorへ任せ、Judgeへ内部JSON本文を渡さない。
+- `QTS-SEM-001/002`側のJudgeだけが正規QA成果物に加えて`routing[]`の申告・最終stdoutのrouting / 完了宣言と固定機械判定要約を参照する。`QTS-SEM-003..010`側のJudgeは正規QA成果物と必須成果物欠落表示だけを受け取り、`QTS-SEM-009`もそこから判断する。必要なruntime証拠・completion・stable IDの実検証は固定Evaluatorへ任せ、Judgeへ内部JSON本文を渡さない。
 
 受入用fixtureも固定する。(1)正常例は全criterionでrating 3以上、(2)Payment成功と失敗の整合を意図的に壊した例は`QTS-SEM-006`がrating 1、(3)外部決済APIを確定仕様として追加した例は`QTS-SEM-010`がrating 1となることを確認する。後2件は全体`fail`となる想定とし、Judgeの判定が異なる場合は判定根拠を調べる。判定が揺れる場合は比較可能な品質判断が成立したと偽らず、rubric / Reference修正と両revisionの再評価を行う。
 
@@ -533,7 +534,7 @@ ratingの共通尺度は既存`semantic/prompt_builder.py`に従う。`4`は要�
 
 Evaluatorは19 SkillのGit tree / SHA-256とprompt指定を投入条件として検証し、Agentの`SKILL.md`読取 / 適用に関するtraceは別に`observed` / `unverified`として残す。native injectionはOSコマンドに現れないことがあるため、未観測だけで**成果物品質比較**を無効にしない。ただし**Skill改修の効果判断**では、変更されかつ`routing[]`で対象になったSkillについて双方のrunに使用証拠が必要。観測できなければ成果物差だけ報告しSkill効果は判断不能とする。複数Skillの個別寄与も断定しない。native `description` trigger評価ではない。
 
-異なるSkill revision間の直接比較は、**Evaluator SHA・grader / production verifier / rubric / Reference SHA・target SHA・scenario / input fingerprint・Agent / Judge実効設定・隔離条件・繰り返し条件**が一致し、比較対象Skill packageの内容だけが異なる場合に限ります。観測できないmodel/backend更新や使用状況は制約として明記し、原因をSkill差分だけに帰属させません。
+異なるSkill revision間の直接比較では、**固定Evaluator SHA・grader / 固定共通機械判定・2系統のJudge入力構築規則・rubric / Reference SHA・target SHA・scenario / input fingerprint・Agent / Judge実効設定・隔離条件・繰り返し条件**の一致を必須とする。一方、**候補Skill package内のproduction verifier / generator / assetsのSHAは一致を要求しない**。候補revisionごとのsource fingerprintをprovenanceへ保存し、候補それぞれのsourceで隔離再実行して鮮度・結果再現性を検証する。互換な実装変更は比較可能とし、schema / 機械契約が固定Evaluatorと非互換な部分のみ`evaluator_incompatible`とする。観測できないmodel/backend更新や使用状況は制約として明記し、原因をSkill差分だけに帰属させない。
 
 ## フェーズ1ランナーへの追加要件
 
@@ -594,7 +595,7 @@ Agent executionは、Eval dataset由来のpromptでも、固定対象repo向けp
 11. 読み取り専用mountでProduct Code / Test / Spec / Skill / 評価用設定の書込みを拒否したことを検証し、終了後にtracked / untracked / ignoredを含むbaselineとの差分・追加commitを確認する
 12. 固定scenarioの要求結果を基準に`artifact-index.json`の`routing[]`・`artifacts[]`を既存Skill条件と実fileに照合する。QA成果物・runtime証拠・内部fileを分類した`artifact-manifest.json`を作り、routing登録不足・分類不能と実際の未生成を区別して回収する
 13. 固定要求とrouting判断・成果物を照合し、条件付き省略の正当性を検証して、捕捉済みartifact・request / result / invocationを対応付ける。候補tracked source版verifierをネットワークなしの別Docker内で再実行し、固定Evaluatorの`common_runtime_checks.py`で独立機械判定する
-14. 正規QA成果物と、`QTS-SEM-001/002`専用の`routing[]`・最終stdout・機械判定要約を別区分で固定Judgeに渡し、既存prompt builder / normalizerで意味評価する。Judgeのtimeout・子孫終了・追加tool排除を確認する
+14. 固定Judgeを**2回独立に実行**する。`QTS-SEM-001/002`には正規QA成果物・`routing[]`・最終stdout・機械判定要約、`QTS-SEM-003..010`には正規QA成果物のみ（欠落表示を含む）を渡す。各Judge応答を対応criterion集合で検証し、結合結果を既存normalizerで全体判定する。各呼び出しのtimeout・子孫終了・追加tool排除を確認する
 15. workflow / traceability / semantic結果とprovenanceを同じrunへ保存する
 16. runner / environment起因の失敗、Skill品質上のnon-pass、`evidence_unverified`、隔離・実効設定未確認、部分的Evaluator非互換を分けて報告する。必須証拠が未確認ならsemantic passでもattempt `needs_review` / exit 1、Runner障害ならexit 2とする。Skillの内部使用ログだけが`unverified`なら成果物品質比較を妨げない
 
@@ -616,13 +617,13 @@ Agent executionは、Eval dataset由来のpromptでも、固定対象repo向けp
 - Product Code、既存Product Test、規範仕様、配置Skillと評価用設定を実行中読み取り専用mountで保護し、権限拒否を確認する。終了後の照合ではignored / untracked fileも許可外変更を見逃さない
 - `artifact-index.json`の`routing[]`（skill / scope / status / reason / artifact_ids）と`artifacts[]`（skill / kind / scope / artifact_id / path）をEvaluatorが固定scenario・既存Skill契約・実fileと照合し、必須行欠落・不正な省略・blocked / incomplete・重複・cross-attempt混入を識別できる。fake Agentの`executed` / `reused` / `skipped` / `blocked` / `incomplete`、条件付き`question-analysis`、登録漏れと実際の未生成を検証する。`artifact-manifest.json`でSkill名 / path / SHA-256 / runtime証拠との一意対応と3分類を追跡し、未生成と分類不能を区別できる。Judgeの正規QA成果物部分には`qa_artifact`のみを固定順で使う
 - 評価用capture CLIで実際のproduction verifier request bytes / result bytes / exit codeを保存し、候補sourceを読み取り専用・ネットワーク遮断の別Dockerで独立再実行できる。固定Evaluatorの`common_runtime_checks.py`は候補`valid`に依存せず、不正ID・依存・graph・completionを検出でき、実装fingerprintだけの互換差は許容する
-- runtime実装だけが変わり機械契約は互換な2 revisionを正常に比較できる。schema非互換は該当する項目だけ`evaluator_incompatible`として記録し、固定Judgeの意味評価を残す
+- runtime実装または候補production verifierのSHAだけが変わり、schema・機械契約は互換な2 revisionを**比較器が`not_comparable`にしない**。候補sourceごとに鮮度と再現性を確認し、schema非互換は該当する項目だけ`evaluator_incompatible`として記録して固定Judgeの意味評価を残す
 - verifier証拠の欠落を`evidence_unverified`とし、未観測のverifier未実行をSkill品質FAILと断定しない。capture実装自体のエラーはrunner / environment errorへ分類する
 - `qa-workflow`の`workflow_runtime.py`も保存済み入力から再実行できる
 - 生成成果物がrun artifactとして保存される
 - workflow結果と、Skill package投入の検証済み証拠および変更対象Skillの内部読取観測（`observed` / `unverified`）を独立して保存する。内部観測不能でも同じ条件での**成果物品質比較**はできるが、**Skill改修効果**は判断不能とする。複数attemptで結果が矛盾する場合も改善・悪化・変化なしと断定しない
 - traceability / runtimeの機械判定結果が保存される
-- `QTS-SEM-001..010`の固定criterion ID / critical / Reference対応により独立Judgeを検証する。`QTS-SEM-001/002`では最終stdoutのrouting・完了宣言を別証拠として扱い、固定機械判定の完了可否と照合できる。正常例・Payment整合違反例・仕様外動作例の判別根拠を保存する
+- `QTS-SEM-001..010`の固定criterion ID / critical / Reference対応により独立Judgeを検証する。`QTS-SEM-001/002`と`QTS-SEM-003..010`を**別prompt・別process**で採点し、後者には`routing[]`・最終stdout・機械判定要約が一切含まれないことを検査する。2応答のID集合と結合後の全10件を検証し、誤ID・重複・一方のtimeout / 不正応答では全体PASSにしない。正常例・Payment整合違反例・仕様外動作例の判別根拠を保存する
 - runner / environment errorとSkill品質のneeds_review / failを区別できる
 - 非pass結果を隠さず保存・報告できる
 - 比較条件が異なるrunと、隔離・実効設定が未確認のrunをSkill変更のみの直接比較に使わない。`agent.timeout_seconds`も一致条件とし、`--repeat 1`の結果だけでLLM品質改善の傾向を断定しない
@@ -636,7 +637,7 @@ schemaやEntity表現が変更され、既存Evaluatorでは判定不能な場�
 
 ### Judgeの検出能力の受入検証
 
-固定target revisionに対し、上記rubricに定めた正常例・`QTS-SEM-006`違反例・`QTS-SEM-010`違反例をEvaluator-only fixtureとして準備する。各criterion IDの`critical` / rating / Reference根拠を確認し、正常例は全criteria rating 3以上、違反例は指定criterionでrating 1・全体failとなることを確認する。判定に失敗した場合はrubric / Referenceを修正し、同じEvaluatorで双方のrunを再評価する。repeat結果の揺れは個別attemptで確認し、改善・悪化を単発結果だけで断定しない。
+固定target revisionに対し、上記rubricに定めた正常例・`QTS-SEM-006`違反例・`QTS-SEM-010`違反例をEvaluator-only fixtureとして準備する。**正規QA成果物のPayment失敗条件だけを誤らせ、最終回答に正しい説明を記載するfixture**でも、成果物Judgeが`QTS-SEM-006`を高評価で救済しないことを確認する。各criterion IDの`critical` / rating / Reference根拠を確認し、正常例は全criteria rating 3以上、違反例は指定criterionでrating 1・全体failとなることを確認する。判定に失敗した場合はrubric / Referenceを修正し、同じEvaluatorで双方のrunを再評価する。repeat結果の揺れは個別attemptで確認し、改善・悪化を単発結果だけで断定しない。
 
 
 ## このフェーズで追加しないもの
