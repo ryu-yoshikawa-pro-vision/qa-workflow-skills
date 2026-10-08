@@ -505,7 +505,7 @@ promptに含めないもの:
 - `.qa-eval-output/`の全fileを回収し、Agent作成`artifact-index.json`の`routing[]`（Skill / scope / status / reason / artifact_ids）と`artifacts[]`（Skill / kind / scope / artifact_id / path）を固定scenarioの要求結果・既存Skill契約・実fileと照合する。自己申告だけで必須成果物集合を縮小せず、分類不能・routing記録不足と実際の未生成を区別する
 - artifact manifestに分類・Skill / path / hash・Judgeへの投入対象と固定順序を記録する。JudgeのQA成果物部分は`qa_artifact`のみとし、`routing[]`・最終stdoutのrouting / 完了宣言・固定機械判定要約は`QTS-SEM-001/002`に限って別証拠として渡す。verifierの生JSONは渡さない
 - captureで得た候補側production verifier証拠を候補の信頼済みtracked sourceで独立再実行し、固定Evaluatorの機械・意味評価と分離して成果物対応・completionを判定する
-- 既存semantic評価のprompt構築 / result正規化処理を再利用して独立Judgeを実行する
+- 既存semantic評価のprompt構築 / result正規化処理を再利用して独立Judgeを実行する。フェーズ2は`QTS-SEM-001/002`と`QTS-SEM-003..010`を**異なるCandidate Outputの2回のJudge呼び出し**へ分離し、後者へ`routing[]`・最終stdout・機械判定要約を渡さない。各応答を該当criterion集合で検証し、全10件を結合して既存`normalize_judge_response()`で最終判定する
 - provenanceと評価結果を保存する
 
 ### `target_workspace.py`
@@ -642,18 +642,20 @@ v1では生成AgentをCLI末尾の`--agent-command <argv...>`で起動し、Judg
 
 JudgeのcwdはEvaluatorが作成する`evaluator-judge-workspace`に固定する。固定Evaluator版`build_judge_prompt()`で構築したEval Input / Reference / rubric / Candidate OutputをUTF-8 stdinで渡し、stdoutには既存`semantic/result.py`が解釈できるJudge JSONだけを返す。`judge.timeout_seconds`は正の整数で、初回Codex Judgeの既定は600秒とする。終了コード非0・timeout・JSON不正はJudge execution errorにし、生成Skillの品質FAILへ変換しない。
 
-**新ランナーの両フェーズは、既存`semantic/run.py`をsubprocessとして起動しない。** 固定Evaluatorの`build_judge_prompt()`と`normalize_judge_response()`を直接再利用し、共通`executor.py`がJudge subprocessのstdin・stdout・timeoutと終了を管理する。Linux / POSIXでは`start_new_session=True`でprocess groupを作り、timeout時にgroup全体へTERM・必要ならKILLする。Windowsでは子孫を含むprocess treeを`taskkill /T /F`等のOS機能で終了する。Docker Judgeの場合はlauncherが実行中コンテナを`docker rm -f`で終了・削除する。終了確認、出力サイズ制限、安全化を行い、エラーattemptを保存して次caseを継続する（共通環境自体が実行不能なら停止）。既存の単独用`semantic/run.py`は変更せず、Judgeコマンドのstdin / JSON stdout / result正規化契約を共有する。
+**新ランナーの両フェーズは、既存`semantic/run.py`をsubprocessとして起動しない。** 固定Evaluatorの`build_judge_prompt()`と`normalize_judge_response()`を直接再利用し、共通`executor.py`がJudge subprocessのstdin・stdout・timeoutと終了を管理する。フェーズ1は従来どおり各semantic caseを1回採点する。フェーズ2では同じ固定Judge profile / `judge.command_argv`を使いつつ、`QTS-SEM-001/002`と`QTS-SEM-003..010`を**独立した2回のJudge呼び出し**とし、後者のCandidate Outputには検証済み`qa_artifact`本文と必須成果物欠落表示だけを渡す。`routing[]`・`final-message.md`・固定機械判定要約は`001/002`側だけに渡し、rubricも各呼び出しの対象criterionだけを含める。Linux / POSIXでは`start_new_session=True`でprocess groupを作り、timeout時にgroup全体へTERM・必要ならKILLする。Windowsでは子孫を含むprocess treeを`taskkill /T /F`等のOS機能で終了する。Docker Judgeの場合はlauncherが実行中コンテナを`docker rm -f`で終了・削除する。終了確認、出力サイズ制限、安全化を行い、エラーattemptを保存して次caseを継続する（共通環境自体が実行不能なら停止）。既存の単独用`semantic/run.py`は変更せず、Judgeコマンドのstdin / JSON stdout / result正規化契約を共有する。
 
 実Codex smokeのJudgeは**生成Agentとは別の使い捨てDockerコンテナ**に固定する。生成側とは別の一時`CODEX_HOME`に、秘密を含まない固定`config.toml`と必要最小限の認証だけを配置する。固定image digest、Codex CLI version、model ID、推論設定、tool / MCP、sandbox / approval、web検索の無効化をpreflightで照合する。Judgeコンテナにはsanitized target・Agent側workspace・Agent側`CODEX_HOME`・Evaluator checkout・Docker socketをmountせず、stdinで受け取るJudge promptだけを評価入力とする。Judge側に必要な`/tmp`等の一時領域を用意し、モデルAPI以外のtoolは評価に使用しない。Judge専用launcherは`codex exec --json`の進行ログを分離し、最終Judge JSONだけを共通executorのstdoutへ返す。生成launcherと同一のargvやcontainerを流用しない。
 
 Judgeの非秘密command fingerprint、image / CLI / model / 推論設定、実効tool / MCP・指示の確認根拠、stdout変換、timeout / cleanup結果をprovenanceへ記録する。Judgeの追加Skill・外部指示・MCP等を確実に排除したと確認できないrunは`unverified`として直接比較しない。非公開のprovider-side model更新は確認済み設定と区別して制約として記録する。別モデルを使うときは`judge.command_argv`を含むprofileを明示的に変更し、条件の異なるrunは直接比較しない。
+
+フェーズ2は各Judge応答のJSONを対象criterion ID集合で別々に`normalize_judge_response()`へ通し、余分・不足・重複したcriterionを拒否する。両応答の生`criteria[]`を固定順に結合したJSONを**全10criterionの`normalize_judge_response()`へ1回渡して**唯一の最終verdictを導出する。部分結果のverdictを別の総合点や独自集計式で混ぜない。どちらかのJudgeに非0終了・timeout・JSON不正・criterion集合不一致があれば全体の意味評価は検証済みPASSとせずJudge execution errorに分類し、得られた途中結果は診断用に限って保存する。両方のprompt / response、投入した成果物manifest、各入力区分・SHA-256、判定をattemptへ記録する。Judge timeoutは呼び出しごとに適用し、独立session / processを使う。
 
 既存`semantic/run.py --judge-command`のstdin・stdoutと`result.py`の正規化を再利用し、独自の採点frameworkは追加しない。保存済み成果物だけの再採点には既存`semantic/run.py`を引き続き使用できる。
 生成とJudgeの実行は次の独立した経路に固定する。
 
 ```text
 生成: CLI --agent-command → Docker内Agent → output.md / QA成果物
-採点: EvaluatorでJudge prompt生成 → profile.judge.command_argv（Evaluator側cwd） → Judge JSON → 既存result.py
+採点: フェーズ1は既存semantic caseを1回Judge評価。フェーズ2はworkflow(001/002)・QA成果物(003..010)の各Judge prompt生成 → 各々profile.judge.command_argv（独立process / session） → criterion集合を個別検証 → 10件を結合 → 既存result.pyで全体判定
 ```
 
 ## 結果保存
@@ -682,7 +684,8 @@ Judgeの非秘密command fingerprint、image / CLI / model / 推論設定、実�
 - eval IDまたはscenario ID
 - attempt番号
 - 評価対象`qa-workflow-skills` Skill commit SHAと配置したSkill package fingerprint
-- 評価基準であるEvaluator commit SHAとgrader / verifier / Judge prompt・dataset / rubric / Referenceのfingerprint
+- 評価基準であるEvaluator commit SHAと固定grader / 固定共通機械判定 / Judge prompt・dataset / rubric / Referenceのfingerprint。フェーズ2のJudgeは2系統それぞれのprompt / response・criterion集合・入力hashも別々に記録する
+- 候補Skill revision由来のproduction verifier / generator・assetsのfingerprint（候補ごとの鮮度 / 再現性の照合用。固定graderのfingerprintとは別項目）
 - 評価データセットまたはscenario定義のfingerprint
 - 評価入力のfingerprint
 - target repoを使う場合はrepository名とsource revision
@@ -713,12 +716,12 @@ Skill修正前後を比較するときは、少なくとも次が一致するrun
 - 評価入力fingerprint
 - 評価データセット / scenario fingerprint
 - Agent名 / modelと検証済み実効実行profile（推論設定、CLI version、tools / MCP / 指示、sandbox等）
-- 評価側Evaluator SHA・grader / verifier / Judge prompt・rubric / Reference fingerprint
+- 評価側Evaluator SHA・固定grader / 共通機械判定 / Judge prompt・rubric / Reference fingerprint（フェーズ2は2系統のJudge入力構築規則を含む）
 - Judge実効条件とその検証結果
 - 情報隔離の成立条件と検証結果
 - 実行回数の扱い
 
-比較対象として変えるのはSkill packageのrevisionとその内容fingerprintだけです。EvaluatorのSHAと採点基準は変えません。いずれかの設定が違う、未検証、またはSkill packageが同一なら、Skill変更による改善・悪化とは断定しません。provider側の隠れたmodel更新やSkill読み取りが観測不能な場合も限界を明記します。
+比較対象として変えるのはSkill packageのrevisionとその内容fingerprintだけです。**候補側production verifier / generator / assetsはSkill packageの一部なので、そのSHAの差は許容する**。候補ごとに同revision由来sourceで隔離再実行して鮮度・再現性を確認し、固定Evaluatorの採点規則と混同しない。候補のschema / 機械契約が固定Evaluatorと互換でない場合に限り該当部分を`evaluator_incompatible`とする。EvaluatorのSHAと採点基準は変えません。いずれかの設定が違う、未検証、またはSkill packageが同一なら、Skill変更による改善・悪化とは断定しません。provider側の隠れたmodel更新やSkill読み取りが観測不能な場合も限界を明記します。
 
 今回、比較結果の自動rankingや独自総合scoreは作りません。保存済みrunを人間または別Agentが以下の規則で比較できれば目的を満たします。
 
@@ -867,7 +870,7 @@ repositoryの既存caseを使い、fake Agentで次を自動検証します。
 - output root外にsource変更があるrunを有効評価へ昇格しない。Gitのignored / untrackedを含む全相対pathの許可外新規fileを検出し、`.gitignore`の隠蔽で見逃さない
 - target revision / scenario fingerprint / Skill・Evaluator revision / Judge Reference fingerprint / Agent・Judge profileをprovenanceへ保存する
 - artifact / verifier request / result / rerun resultの一意対応、欠落・参照差し替えを検出する
-- artifact分類により`.runtime-evidence/**`・workflow stateを正規QA成果物から除外し、正規QA成果物の順序とhashを固定する。`routing[]`・`final-message.md`のrouting / 完了判断と固定機械検証の要約は`QTS-SEM-001/002`専用の別入力とし、他のcriteriaや必須QA成果物欠落を補わない。最終stdoutのみ完了宣言があるfixtureも判定する
+- artifact分類により`.runtime-evidence/**`・workflow stateを正規QA成果物から除外し、正規QA成果物の順序とhashを固定する。`QTS-SEM-001/002`用Judgeだけに`routing[]`・`final-message.md`・固定機械判定要約を渡し、`QTS-SEM-003..010`用Judge promptには**これらの専用情報を一切含めない**。後者の正規QA成果物にPayment失敗条件を欠落させ、最終回答に正解を書いたfixtureでも`QTS-SEM-006`が救済されないことを検証する。2応答のcriterion ID重複・欠落・入れ替えを検出し、既存`normalize_judge_response()`で最終判定する。片方だけJudge timeout / 不正JSONになった場合も全体PASSにしない。最終stdoutのみ完了宣言があるfixtureも判定する
 - フェーズ2の`QTS-SEM-001..010`をrubricにID / critical / Reference対応ごとに固定し、正常・Payment整合違反・仕様外動作のfixtureの判定を確認する
 - `valid=false`同士の再実行一致をPASSにしない。`workflow_runtime.py`の実行成功とcompletionを区別する。候補verifierだけを弱体化して`valid=true`を返すrevisionでも、固定Evaluatorが不正なID・参照・graph・closureをFAILにする
 - 元repoの`docs/PROJECT_CONTEXT.md`等をAgent-visible環境から読み取れないことを実環境の隔離検証で確認し、Agent-visibleなProduct Spec / Skill packageへのwrite-denialを検証する
@@ -882,7 +885,7 @@ deterministicではruntime実装だけを変更した候補（payload / schema /
 
 ### 追加の比較・隔離検証
 
-fake Agentで、指定候補SHAの内容と配置manifestの一致、Evaluatorと候補の分離、Judge / grader固定、profile不一致時の拒否、必要な隔離証拠がないrunの比較不可、異なる2つの保存runの比較条件判定を検証する。候補generatorの隔離再実行では`scripts/**` / `assets/**`を同revisionから検証して配置し、`ui_pattern_candidates.py`の正常実行・静的データ欠落時の環境エラー分類を確認する。変更されたSkill packageと同一packageの別Git SHAを区別し、後者を改善検出実績に数えない。
+fake Agentで、指定候補SHAの内容と配置manifestの一致、Evaluatorと候補の分離、Judge / grader固定、profile不一致時の拒否、必要な隔離証拠がないrunの比較不可、異なる2つの保存runの比較条件判定を検証する。**候補production verifierだけ内容SHAが異なりschema・結果意味が互換な2 revisionは比較可能**とし、共通graderやrubricが異なれば比較不可、schemaが非互換なら該当criteriaのみ`evaluator_incompatible`となることを確認する。候補generatorの隔離再実行では`scripts/**` / `assets/**`を同revisionから検証して配置し、`ui_pattern_candidates.py`の正常実行・静的データ欠落時の環境エラー分類を確認する。変更されたSkill packageと同一packageの別Git SHAを区別し、後者を改善検出実績に数えない。
 
 live Codexでは、実効設定の確認とEvaluator-onlyの非秘密sentinel読み取り拒否を含めて検証する。2つの異なるSkill package revisionを同じEvaluator / dataset / profileで実行して比較可能なprovenanceを保存する。実Agentが意図するSkillを読み取ったか観測できない場合はその制約を報告し、成功扱いしない。
 
@@ -1051,6 +1054,7 @@ native trigger評価は、Skill activationを観測する方法がAgentクライ
 - `qa-training-store`のProduct Code、既存Test、規範仕様に許可外変更がない
 - 対象repo既存Skillではなく今回の19 SkillだけをAgent-visibleにし、元`PROJECT_CONTEXT.md`を最小評価用内容へ置換した条件を記録している
 - フェーズ2のrunner / environment error、Skill品質のneeds_review / fail、実行証拠の`evidence_unverified`、`valid=false`、比較不可・部分的Evaluator非互換を区別している
-- フェーズ2のJudgeにはmanifestで確認した`qa_artifact`を固定順序で渡し、最終stdoutと固定機械検査の完了要約を別証拠として`QTS-SEM-001/002`に限って渡す。`QTS-SEM-001..010`を固定rubricで評価できる
+- フェーズ2のJudgeは固定rubricを`QTS-SEM-001/002`と`QTS-SEM-003..010`へ分割して別々に実行し、後者へ`routing[]`・最終stdout・固定機械判定要約を渡さない。各応答のcriterion集合を検証後、統合して既存result正規化で全10件を判定し、部分失敗を全体PASSにしない
+- 候補production verifier / generatorのSHAだけが変わりschema・機械契約が互換なら、同じ固定Evaluatorでrunの直接比較を妨げない
 - Skill本体の通常実行経路とポータビリティを変更していない
 - `git diff --check`がpassする
