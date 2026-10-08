@@ -350,3 +350,14 @@ formal reportはfixture全体をclosureしていない。変更後confirmation s
 - 最終実装head後にSemantic Judge 83、Trigger 180、Holdout 24、fixture全WCAG closureは再実行していない。更新後Planのgate範囲と既存PR #14 / PR #17責務分担を維持する。旧head d8bdf38のCI successは今回の変更後headのCI根拠には使わない。
 - commit / normal push、PR bodyへの今回の2件追記、最新PR headの3 Actions確認はpending。commit後の最新headでCI確認してから本節を最終更新する。
 - Progress: 90% (9/10)。Next: repository pre-commitを通して通常commit / push、PR body・この記録を確定し、current-head CIを確認する。
+
+## 2026-10-08 JST — 最終レビュー指摘2件の完了checkpoint
+
+- 上記のpending記述はこのcheckpointで更新する。修正commitは`062e2bb41734880b7a0a4e1b82e04d3da482b8fe`、PR #14 branchへ通常push済み。configured pre-commitを迂回せず実行し、repository標準検証がすべてsuccessした。
+- commit対象は今回の2指摘に関係する23 implementation / test / fixture pathsと本reportの追記だけ。ユーザー所有の`.gitignore`と`3b77866a0b52347ce6201959f97492f197a61365`は変更・stage・commitしていない。ignored local overlayやbrowser artifactもcommitしていない。
+- 修正後のPR #14 headは`062e2bb41734880b7a0a4e1b82e04d3da482b8fe`。このSHAに対してGitHub Actionsはすべてsuccess: `Validate Agent Skills` run `37732224560`、`Validate Deterministic Output Evals` run `37732224563`、`Validate Semantic Output Evals` run `37732224561`。
+- PR本文を更新し、URL privacy / SPA identity、container queryの`not-executable`扱い、focused/browser regression、現在のdeterministic件数248、今回全量評価を再実行していないことを追記した。PR titleは既に実装PRの日本語titleであったため変更なし。
+- Browser回帰はrepository fixtureと既存Playwright経路で実施。CSSOMがcontainer query current-match APIを提供しないため、container query判定は安全に`not-executable`へ閉じる。`@media`は`matchMedia()`で判定でき、既存のboundary経路を維持する。公式仕様確認: [CSS Conditional Rules Level 5](https://drafts.csswg.org/css-conditional/#the-csscontainerrule-interface), [MDN CSSContainerRule](https://developer.mozilla.org/en-US/docs/Web/API/CSSContainerRule)。
+- Semantic Judge 83件、Trigger 180回、Holdout 24回、fixture全WCAG closureは今回の指示どおり再実行していない。これらを今回の検証成功と記載していない。既存のPR #14 / #17責務分担を維持する。
+- `PR #14 repository implementation Plan未達: 0件`（責務移管後Planと今回の修正対象に限る）。fixture全体のformal reportはfail-closedのまま扱い、外部製品のWCAG適合は主張しない。
+- Progress: 100% (10/10)。
