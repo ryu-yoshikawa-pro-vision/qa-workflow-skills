@@ -506,7 +506,7 @@ promptに含めないもの:
 
 ### `target_workspace.py`
 
-フェーズ2の固定target preparationだけを担当します。`verifier_capture.py`をsanitized targetの`.qa-eval-tools/`へ配置し、生成する評価用`AGENTS.md`へその利用方法を記載します。
+フェーズ2の固定target preparationだけを担当します。`verifier_capture.py`をsanitized targetの`.qa-eval-tools/`へ配置し、生成する評価用`AGENTS.md`へその利用方法と`artifact-index.json`の最小登録契約を記載します。QA成果物の期待本文やrubric・模範回答は記載しません。
 
 - 指定された`qa-training-store` source revisionのtracked contentだけからsanitized targetを作る
 - target固有`.agents/**` / `.codex/**`、過去Plan / report、instructor情報、target側Skill evalを除外する
