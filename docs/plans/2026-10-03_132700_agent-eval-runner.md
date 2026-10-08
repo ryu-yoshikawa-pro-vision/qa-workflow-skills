@@ -286,7 +286,7 @@ Live CLIへ`--execution-profile <path/to/execution-profile.json>`を必須追加
 - `schema_version`、Agent名・model・CLI version、推論設定、実行オプション、sandbox / approval / networkの方針
 - Agentが利用できるSkill・tool・MCPの集合、user/globalの設定・指示の扱い、読み取り可能なmount・ファイル範囲、隔離方式
 - 候補Agentと独立Judgeそれぞれの非秘密の起動設定fingerprint、Judge model / version / 推論・tool・指示条件
-- 実効設定の照合方法、根拠への相対path、検証状態（`verified`または`unverified`）。提供側のmodel更新等を確認できなければ不確実性として記載する。
+- 実効設定の照合方法、根拠への相対path、検証状態（`verified`または`unverified`）。提供側のmodel更新等を確認できなければ不確実性として記載する。許可済みのモデルAPI通信で残る外部アクセス可能性は実行条件・制約として保存し、それ自体を必須隔離の検証失敗とはしない。
 
 `--agent-name` / `--agent-model`とprofileの宣言を照合し、実際のlauncher / CLIで観測できる設定と矛盾した場合は停止する。汎用subprocessだけでuser/global config等を完全に解析できると仮定しない。profileの自己申告だけで`verified`にせず、確認根拠がなければ結果は保存しても`not_comparable`とする。比較対象runではprofileの非秘密fingerprintと実効設定検証結果を一致させる。
 
@@ -343,7 +343,7 @@ Live CLIへ`--execution-profile <path/to/execution-profile.json>`を必須追加
 }
 ```
 
-`<...>`は説明用の占位記号であり、live実行時には実値に置き換える。不明な実効項目は架空の固定値で埋めず、`null`とし`verification.status=unverified`を記録する。`verification.status=verified`を必須とする直接比較では、nullの実効必須項目は許可しない。`verification.status=verified`は自己申告では成立しない。Evaluatorは証拠fileの存在、読み取り拒否probeの結果、非秘密のCLI設定情報との照合を行い、不明・不一致があれば`unverified` / `not_comparable`とする。`evaluator_read_blocked=true`も強制境界の代わりにならない。
+`<...>`は説明用の占位記号であり、live実行時には実値に置き換える。不明な実効項目は架空の固定値で埋めず、`null`とし`verification.status=unverified`を記録する。`verification.status=verified`を必須とする直接比較では、nullの実効必須項目は許可しない。`verification.status=verified`は自己申告では成立しない。Evaluatorは証拠fileの存在、読み取り拒否probeの結果、非秘密のCLI設定情報との照合を行い、**必須のローカル隔離・起動条件**に不明・不一致があれば`unverified` / `not_comparable`とする。許可済みのモデルAPI通信が残ることのみで`unverified`にはしない。`evaluator_read_blocked=true`も強制境界の代わりにならない。
 
 相対pathはEvaluator-owned出力rootを基準に正規化する。profileをSHA-256へ含めるときは、認証やOS絶対pathを除いた上記の正規比較項目だけを固定順序で正規化する。profileが異なるが実効条件は同じと推測して自動同一視しない。Judgeで同じAgent launcherを再利用する場合でも、Generator側とは独立のprofile欄と検証が必要となる。
 
@@ -354,17 +354,17 @@ EvaluatorとAgentの間に、ディレクトリ分割だけでなく**OS等に�
 - Agentが利用できるファイル・mount・tool / MCPにはEvaluator原本のexpected、Reference、rubric、grader、結果、元target checkoutを公開しない。Linuxの隔離コンテナを今回の実Codex smokeの標準構成とし、独自sandboxは実装しない。外部ネットワーク経由で公開評価資料を取得できる可能性は、ファイル隔離だけでは排除できないため、次節のネットワーク・tool条件を別途確認する。
 - user/global指示・設定・Skill・MCPを固定された評価条件以外から混入させない。認証情報は必要最小限の別経路で渡し、provenanceに書かない。
 - preflightではEvaluator-only領域の**非秘密sentinel**を、Agentと同一権限・mount・tool構成から読めないことを確認する。fake Agentはrunnerの失敗時動作を検査し、実Codex smokeでは実際の読み取り拒否と余分な設定の混入防止を確認する。
-- 拒否境界や実効設定を確認できないrunは`isolation_unverified`として保持しても、比較可能な品質評価にはしない。stderr等は秘密混入を想定し、出力上限・安全化を行い、安全なログとして保存できない生内容は保存しない。
+- Evaluator原本のOS境界、許可mount、意図しないSkill / MCP / web検索の無効化など**必須条件**を確認できないrunは`isolation_unverified`として保持しても、比較可能な品質評価にはしない。許可したモデルAPI通信の残留アクセス可能性は別途記録し、それだけで比較不可としない。stderr等は秘密混入を想定し、出力上限・安全化を行い、安全なログとして保存できない生内容は保存しない。
 
 ### 実Codex smokeで使用する固定実行構成
 
 今回、**Linux Docker Engine上の使い捨て非特権コンテナ**を実Codex smokeの基準環境とする。Windowsから実施するときはDocker Desktop / WSL2等でLinuxコンテナを起動できることを前提条件とする。Dockerを使用できない環境ではfake Agentによるrunner testまでは実行できるが、実Codex評価の完了とはしない。ほかのAgentにも同等の外部argv契約を使うが、隔離と実効条件を確認できたとみなすのはこのCodex実行構成だけとする。
 
-1. ホストで固定Evaluator checkoutを開き、Evaluator-owned領域で候補Skill tracked contentと（フェーズ2では）sanitized targetを準備する。Dockerの**bind mountは使い捨てAgent-visible workspace一箇所だけ**（読み書き可）と、別途用意した一時`CODEX_HOME`ディレクトリに限定する。Evaluator checkout・採点資料・元target checkout・Docker socket・ホストhomeはmountしない。`--privileged`、host PID、host filesystem mountを使わない。
-2. Codex CLIとPythonが入った固定バージョンのLinux imageを使用し、image digest、Codex CLI version、Python versionをrunへ記録する。`docker run --rm -i --read-only --cap-drop=ALL --security-opt=no-new-privileges`を基本に、`--workdir /workspace`、`--tmpfs /tmp`等の一時書込み領域、`--mount type=bind,src=<Agent-visible workspace>,dst=/workspace`、`--mount type=bind,src=<使い捨てCODEX_HOME>,dst=/codex-home`、`-e CODEX_HOME=/codex-home`を指定する。必要なUID/GIDと書込み権限は作業用ディレクトリへ限定し、出力以外の差分は既存baseline検査で拒否する。実行中コンテナへEvaluator資料を`docker cp`しない。
+1. ホストで固定Evaluator checkoutを開き、Evaluator-owned領域で候補Skill tracked contentと（フェーズ2では）sanitized targetを準備する。bind mountは、使い捨てAgent-visible workspace（**読み取り専用**）、その配下の`.qa-eval-output/`へ重ねるattempt専用**書込み可能**出力root、一時`CODEX_HOME`の3箇所に限定する。Evaluator checkout・採点資料・元target checkout・Docker socket・ホストhomeはmountしない。`--privileged`、host PID、host filesystem mountを使わない。
+2. Codex CLIとPythonが入った固定バージョンのLinux imageを使用し、image digest、Codex CLI version、Python versionをrunへ記録する。`docker run --rm -i --read-only --cap-drop=ALL --security-opt=no-new-privileges`を基本に、`--workdir /workspace`、`--tmpfs /tmp`等の一時書込み領域、`--mount type=bind,src=<Agent-visible workspace>,dst=/workspace,readonly`、`--mount type=bind,src=<attempt専用出力root>,dst=/workspace/.qa-eval-output`、`--mount type=bind,src=<使い捨てCODEX_HOME>,dst=/codex-home`、`-e CODEX_HOME=/codex-home`を指定する。workspaceの`.qa-eval-output/`を事前に作成し、その位置だけ書込み可能mountで覆う。必要なUID/GIDと書込み権限は出力root、最小`CODEX_HOME`、`/tmp`に限定する。source・Skill・評価用設定への書込みはmountで拒否し、post-run差分検査は補助として残す。実行中コンテナへEvaluator資料を`docker cp`しない。
 3. 認証は既存Codexのログイン情報を使い捨て`CODEX_HOME`へ**起動前に必要最小限で複製**する。ホストの本来の`~/.codex`はmountしない。秘密内容・そのhash・container内の生環境変数は永続保存しない。認証情報がAgent側プロセスから参照可能である制約を認識し、信頼できない入力へ広く公開しない。API keyを使う場合も同様に限定し、明示的な承認なく認証方式を変更しない。
 4. コンテナ内の`config.toml`は評価専用の最小値に固定する。`model`、`model_reasoning_effort`、`sandbox_mode`、`approval_policy`を明示し、既定のMCP server / plugins / 追加Skill / user-global指示・memory / web検索などの評価外入力は使用可能な範囲で無効化する。実効CLI引数と非秘密設定のhashを照合し、未確認の項目は`unverified`にする。必要な19 Skillはworkspace側にだけ配置する。Codex CLIが当該設定を無視・拒否したら比較可能として起動しない。
-5. Agent用コンテナから外部公開評価資料を取得できるtool / MCP / web検索を無効化する。**モデルAPIの通信自体は必要**なので、ネットワーク全遮断とはしない。利用環境でCodex接続に必要な宛先だけを許可できるネットワーク制御（既存egress firewall / proxy等）がある場合はその構成・確認結果を固定する。制御できない場合は公開repository資料へのネットワークアクセスが残るため、隔離を全面証明したとは記録しない。この制約は失敗を隠さず`isolation_unverified`とし、有効な直接比較から除く。
+5. Agentのweb検索・外部資料取得tool / MCPと余分なSkillを無効化し、実効設定と許可toolを照合する。**モデルAPI通信は許可**し、コンテナのネットワーク方式、web機能、既存egress制御の有無を非秘密profileへ記録する。利用可能なproxy / firewallで宛先制限を行う場合はその設定を固定するが、専用egress環境は必須としない。モデルAPI通信を通じて残る外部アクセス可能性は評価の制約として報告し、それだけで`isolation_unverified` / `not_comparable`にはしない。意図しないweb検索・外部資料取得が観測されたrun、必要なtool / MCP設定を確認できないrunは比較不可とする。
 6. ホストEvaluator-onlyの非秘密sentinelをAgentにmountしない。**Agentと同じコンテナ権限のOSコマンド**で該当host-only pathの読み取り不能を確認し、同時にDocker container inspect相当でmount集合・権限・image digestを確認する。LLMによる「見えない」という返答は証拠にならない。意図的にsentinelを追加mountしたnegative fixtureではpreflight失敗を確認する。
 7. 評価用の最小launcher（`scripts/skills/evals/agent/tools/codex_docker_launcher.py`）はDocker CLIへ`subprocess`のargvで接続し、stdin promptをそのまま`codex exec ... -`へ渡す。`--json`のJSONL stdoutを収集し、`--output-last-message`で得た最終応答だけを共通executorへstdoutとして返す。containerで作成した`.qa-eval-output/`内の一時message fileを回収し、元JSONLからコマンド実行などの**非秘密の事実だけ**を安全化してprovenanceへ保存する。launcherはsmoke用だけであり、共通`executor.py`やSkill PackageにCodex固有SDKを追加しない。JSONL全量を無条件に永続化しない。
 8. JudgeはAgentコンテナ**外のEvaluator側**で、生成とは独立したprocess / sessionを使って起動する。Evaluator資料はJudgeにのみ与える。Judge実行環境の固定model・CLI・設定・Reference hashを別に記録し、生成コンテナの一時認証・workspaceを無条件に共有しない。
@@ -374,7 +374,8 @@ EvaluatorとAgentの間に、ディレクトリ分割だけでなく**OS等に�
 ```text
 docker run --rm -i --read-only --cap-drop=ALL --security-opt=no-new-privileges
   --workdir /workspace --tmpfs /tmp
-  --mount type=bind,src=<sanitized-workspace>,dst=/workspace
+  --mount type=bind,src=<sanitized-workspace>,dst=/workspace,readonly
+  --mount type=bind,src=<attempt-output-root>,dst=/workspace/.qa-eval-output
   --mount type=bind,src=<temporary-codex-home>,dst=/codex-home
   -e CODEX_HOME=/codex-home
   <pinned-image-digest>
@@ -385,7 +386,7 @@ docker run --rm -i --read-only --cap-drop=ALL --security-opt=no-new-privileges
 
 上記はargvの構成例であり、shellに貼り付ける逐語的な完成コマンドではない。実際のDocker / Codex CLI引数は`docker run --help`と`codex exec --help`で検証する。フェーズ1の非Git workspaceでは、CodexがGit rootを要求する場合にのみ、そのCLIで確認した`--skip-git-repo-check`相当の正規optionをlauncher側から追加する。ホストでEvaluatorを動かすJudgeはこのコンテナへmountしない。
 
-`docker version`、イメージ起動、コンテナ内`codex --version` / 認証可否、Python実行、Codex応答、JSONL出力・Skill読取観測、read-denial、必要な通信の成功を**実Agent smokeで確認**してから`verified`へ進める。環境未構築・ネットワーク制御未確認なら比較可能なlive評価を完了したとは報告しない。image digest・model ID・実効設定は実行時に取得して固定し、未確認の値をPlanへ作り込まない。
+`docker version`、イメージ起動、コンテナ内`codex --version` / 認証可否、Python実行、Codex応答、JSONL出力・Skill読取観測、read-denial、source書込み拒否、必要なモデルAPI通信を**実Agent smokeで確認**してから`verified`へ進める。環境未構築・必須のローカル隔離条件未確認なら比較可能なlive評価を完了したとは報告しない。外部egress制御を行えない場合は残留リスクとして記録する。image digest・model ID・実効設定は実行時に取得して固定し、未確認の値をPlanへ作り込まない。
 
 
 ### 10. Skillの実使用を確認できた範囲で記録する
@@ -492,7 +493,7 @@ promptに含めないもの:
 - 評価用`AGENTS.md`と、元repoの運用指示を含まない評価用`docs/PROJECT_CONTEXT.md`を生成する
 - 19 SkillだけをAgent-visibleに配置する
 - `.qa-eval-output/`と必要な評価用Project Context rootを準備する
-- Agent終了後にsource差分・symlink / path境界を検証する
+- 実行前にsource・配置Skill・評価用設定を読み取り専用にし、`.qa-eval-output/`だけを書き込み可能にする。終了後はtracked / untracked / ignoredを含む許可外の差分・symlink / path境界を検証する
 - 回収後にsanitized targetを削除する
 
 ### tracked scenario
@@ -809,14 +810,14 @@ repositoryの既存caseを使い、fake Agentで次を自動検証します。
 - 元`.agents/**` / `.codex/**`、元`AGENTS.md` / `QA_AGENT.md`、過去Plan / report、instructor情報、target側Skill evalをAgent-visible targetへ残さない
 - 評価用`AGENTS.md`へ製品仕様や正解QA成果物を混ぜない
 - 19 SkillだけをAgent-visibleにする。user/global追加Skill・指示・MCPが有効なrunは比較可能として扱わない
-- `.qa-eval-output/**`だけを書込み許可範囲として扱う
+- 親workspaceとSkill packageを実行中読み取り専用mountにし、`.qa-eval-output/**`だけを書込み可能mountにする。sourceを変更して元へ戻す操作も権限で拒否する
 - 複数artifactを回収し、相対path / size / SHA-256をmanifestへ保存する
 - symlink / path traversal / output root外参照をrejectする
-- output root外にsource変更があるrunを有効評価へ昇格しない
+- output root外にsource変更があるrunを有効評価へ昇格しない。Gitのignored / untrackedを含む全相対pathの許可外新規fileを検出し、`.gitignore`の隠蔽で見逃さない
 - target revision / scenario fingerprint / Skill・Evaluator revision / Judge Reference fingerprint / Agent・Judge profileをprovenanceへ保存する
 - artifact / verifier request / result / rerun resultの一意対応、欠落・参照差し替えを検出する
 - `valid=false`同士の再実行一致をPASSにしない。`workflow_runtime.py`の実行成功とcompletionを区別する
-- 元repoの`docs/PROJECT_CONTEXT.md`等をAgent-visible環境から読み取れないことを実環境の隔離検証で確認する
+- 元repoの`docs/PROJECT_CONTEXT.md`等をAgent-visible環境から読み取れないことを実環境の隔離検証で確認し、Agent-visibleなProduct Spec / Skill packageへのwrite-denialを検証する
 - cleanup後にsanitized targetが残らない
 
 ### 品質差を検出できることの受入検証
@@ -974,7 +975,7 @@ native trigger評価は、Skill activationを観測する方法がAgentクライ
 - Skill単位batchを実行できる
 - `--skill all`を明示した場合だけ全case batchを実行できる
 - `--repeat`で同一caseを複数回独立実行できる
-- AgentへReference / expected / rubric / validatorを公開しない一時実行ディレクトリと、読み取り禁止が実証された隔離境界を使用する
+- AgentへReference / expected / rubric / validatorを公開しない一時実行ディレクトリと、読み取り禁止が実証された隔離境界を使用する。Product Code / Test / Spec / Skillを実行中読み取り専用にし、出力root以外への書込みを拒否する
 - 一時実行ディレクトリに19 Skillの通常実行ファイルが存在する
 - 実Agent commandを特定プロバイダーへ固定していない
 - `shell=True`を使用していない
