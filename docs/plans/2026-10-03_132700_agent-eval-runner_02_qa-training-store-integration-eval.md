@@ -512,7 +512,7 @@ ratingの共通尺度は既存`semantic/prompt_builder.py`に従う。`4`は要�
 
 フェーズ2のCLIもフェーズ1と同じ`--repeat N`（既定1）を受け付け、**attemptごとにfreshなsanitized target・synthetic baseline commit・実Agent session・成果物回収・verifier再実行・Judge呼び出し**を行います。1回目の生成物を2回目へ持ち込まず、attempt番号と結果を別保存します。集計は各attemptの既存`pass / needs_review / fail / execution error`件数と根拠だけとし、独自総合点や統計的な有意差判定は作りません。
 
-利用したSkillについて、Agent clientのtrace・tool log等で実際の`SKILL.md`や参照ファイルの読み取りを観測できた場合はSkill名・証拠fileの相対path・観測結果を保存します。観測不能なものは`unverified`とし、配置・promptでの指示だけを`used`の証明にしません。観測不能なSkillの変更効果を確定したとは扱いませんが、生成成果物そのものの品質判定は保存できます。これはnative description triggerの精度評価ではありません。
+Evaluatorは配置した19 SkillのGit tree / SHA-256と生成promptへの明示指定を**Skill投入条件として検証**する。Agent側のtool logやJSONLから`SKILL.md`読取が分かれば別途`observed`として記録し、分からなければ`unverified`とする。native injectionではOSコマンドログに現れないため、`unverified`だけで成果物品質の直接比較を無効にしない。ただしSkill修正が差分を生んだという因果関係は断定しない。これはnative `description` triggerの精度評価ではない。
 
 異なるSkill revision間の直接比較は、**Evaluator SHA・grader / production verifier / rubric / Reference SHA・target SHA・scenario / input fingerprint・Agent / Judge実効設定・隔離条件・繰り返し条件**が一致し、比較対象Skill packageの内容だけが異なる場合に限ります。観測できないmodel/backend更新や使用状況は制約として明記し、原因をSkill差分だけに帰属させません。
 
@@ -570,14 +570,14 @@ Agent executionは、Eval dataset由来のpromptでも、固定対象repo向けp
 6. 元`docs/PROJECT_CONTEXT.md`を除外し、正規stable keyを持つ評価用`AGENTS.md`と評価用`docs/PROJECT_CONTEXT.md`を生成・検証する
 7. 候補`qa-workflow-skills` 19 Skillを`.agents/skills/`へ配置する
 8. sanitized targetをfresh Git repositoryにし、Evaluator-owned synthetic baseline commitを作成する
-9. `.qa-eval-output/`を作成し、Checkout / Payment評価要求、Agent / model、Judge条件をrun provenanceへ記録する
+9. `.qa-eval-output/`を作成し、Checkout / Payment評価要求、評価用`artifact-index.json`登録契約、Agent / model、Judgeの独立Docker profileとtimeout条件をrun provenanceへ記録する
 10. 各repeatの新規target / Agent sessionで実Agentを起動し、分析・設計workflowを実行する。使用証拠の観測可否を記録する
 11. 読み取り専用mountでProduct Code / Test / Spec / Skill / 評価用設定の書込みを拒否したことを検証し、終了後にtracked / untracked / ignoredを含むbaselineとの差分・追加commitを確認する
-12. 出力rootをscanしてQA成果物・runtime証拠・runner内部fileを分類した`artifact-manifest.json`を作成し、`.agent-eval-runs/`へ回収する。Judge対象は`qa_artifact`のみとする
-13. workflow routingと成果物集合を照合し、捕捉済みartifact・request / result / invocationを対応付け、候補tracked source版production verifierの独立再実行と固定Evaluatorの品質採点を分離する
-14. 固定した規範Reference / rubricで独立Judgeによる意味品質をattemptごとに評価する
+12. `artifact-index.json`を既存Skill出力種類・routing・実fileと照合し、QA成果物・runtime証拠・runner内部fileを分類した`artifact-manifest.json`を作成する。分類不能を未生成と区別し、`.agent-eval-runs/`へ回収する
+13. workflow routingと成果物集合を照合し、捕捉済みartifact・request / result / invocationを対応付ける。候補tracked source版verifierをネットワークなしの別Docker内で再実行し、固定Evaluatorの`common_runtime_checks.py`で独立機械判定する
+14. 正規QA成果物と、`QTS-SEM-001/002`専用の最終stdout / 機械判定要約を別区分で固定Judgeに渡し、既存prompt builder / normalizerで意味評価する。Judgeのtimeout・子孫終了・追加tool排除を確認する
 15. workflow / traceability / semantic結果とprovenanceを同じrunへ保存する
-16. runner / environment起因の失敗、Skill品質上のnon-pass、verifier`evidence_unverified`、隔離・設定・Skill使用確認が未検証のrun、部分的なEvaluator非互換を分離して報告する
+16. runner / environment起因の失敗、Skill品質上のnon-pass、`evidence_unverified`、隔離・実効設定未確認、部分的Evaluator非互換を分けて報告する。必須証拠が未確認ならsemantic passでもattempt `needs_review` / exit 1、Runner障害ならexit 2とする。Skillの内部使用ログだけが`unverified`なら成果物品質比較を妨げない
 
 ## 完了条件
 
@@ -595,15 +595,15 @@ Agent executionは、Eval dataset由来のpromptでも、固定対象repo向けp
 - scenario ID / scenario fingerprint、Evaluator / Skill revision、実効Agent / Judge profileと検証状態、隔離条件、Judge Reference fingerprintがrun provenanceへ保存される
 - Checkout / PaymentのWeb範囲で実Agent workflowが最後まで実行され、`--repeat`各attemptの独立した評価結果が保存される
 - Product Code、既存Product Test、規範仕様、配置Skillと評価用設定を実行中読み取り専用mountで保護し、権限拒否を確認する。終了後の照合ではignored / untracked fileも許可外変更を見逃さない
-- 複数成果物が`.qa-eval-output/`から`.agent-eval-runs/`へ回収され、`artifact-manifest.json`でSkill名 / path / SHA-256 / verifier証拠との一意対応と3分類を追跡できる。Judge入力には`qa_artifact`のみを固定順で使用し、内部記録やmissing出力をQA成果物と誤認しない
-- 評価用capture CLIで実際のproduction verifier request bytes / result bytes / exit codeを一意対応で保存し、候補revisionの信頼済みsource版で独立再実行できる。固定graderのsource照合は候補sourceを参照し、`valid=false`をPASSにしない
+- `artifact-index.json`のskill / kind / scope / artifact_id / relative pathをEvaluatorが既存Skill契約・routing・実fileと照合し、重複・欠落・cross-attempt混入を検出できる。`artifact-manifest.json`でSkill名 / path / SHA-256 / runtime証拠との一意対応と3分類を追跡し、未生成と分類不能を区別できる。Judgeの正規QA成果物部分には`qa_artifact`のみを固定順で使う
+- 評価用capture CLIで実際のproduction verifier request bytes / result bytes / exit codeを保存し、候補sourceを読み取り専用・ネットワーク遮断の別Dockerで独立再実行できる。固定Evaluatorの`common_runtime_checks.py`は候補`valid`に依存せず、不正ID・依存・graph・completionを検出でき、実装fingerprintだけの互換差は許容する
 - runtime実装だけが変わり機械契約は互換な2 revisionを正常に比較できる。schema非互換は該当する項目だけ`evaluator_incompatible`として記録し、固定Judgeの意味評価を残す
 - verifier証拠の欠落を`evidence_unverified`とし、未観測のverifier未実行をSkill品質FAILと断定しない。capture実装自体のエラーはrunner / environment errorへ分類する
 - `qa-workflow`の`workflow_runtime.py`も保存済み入力から再実行できる
 - 生成成果物がrun artifactとして保存される
-- workflow結果と、実Codex JSONLから観測した変更対象Skillの読取り証拠（または`unverified`）が保存され、成果物の品質評価とSkill変更効果の検証成立を区別できる
+- workflow結果と、Skill package投入の検証済み証拠および変更対象Skillの内部読取観測（`observed` / `unverified`）を独立して保存する。内部観測不能でも同じ条件での成果物品質比較はでき、修正起因とは断定しない
 - traceability / runtimeの機械判定結果が保存される
-- `QTS-SEM-001..010`の固定criterion ID / critical / Reference対応により独立Judgeの結果を保存し、正常例・Payment整合違反例・仕様外動作混入例を判別できることを採点根拠付きで検証している
+- `QTS-SEM-001..010`の固定criterion ID / critical / Reference対応により独立Judgeを検証する。`QTS-SEM-001/002`では最終stdoutのrouting・完了宣言を別証拠として扱い、固定機械判定の完了可否と照合できる。正常例・Payment整合違反例・仕様外動作例の判別根拠を保存する
 - runner / environment errorとSkill品質のneeds_review / failを区別できる
 - 非pass結果を隠さず保存・報告できる
 - 比較条件が異なるrunと、隔離・実効設定が未確認のrunをSkill変更のみの直接比較に使わない
