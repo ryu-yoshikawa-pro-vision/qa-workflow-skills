@@ -275,9 +275,9 @@ Skill-local verifierはSkill本体にも含まれる。runtimeの再実行と共
 
 候補verifier / generatorの独立再実行は、Agentに見えるworkspaceとは別の指定Git treeを使い、**Evaluator本体のprocess内ではimportも実行もしない**。候補のtracked contentも実行可能コードであり、Git SHAによる出自確認は安全性の証明ではない。既存のDocker方式を使用し、次の固定経路にする。
 
-1. Evaluatorが候補revisionの`scripts/**`だけを信頼済みGit objectから別ディレクトリへ展開し、Agent-visible workspaceの改変から切り離す。実行前の相対path・size・SHA-256 manifestを固定する。
-2. `codex_docker_launcher.py`と同じDocker実行基盤・固定imageで、**Python-only検証用の別コンテナ**を`--read-only --cap-drop=ALL --security-opt=no-new-privileges --network none`で起動する。候補sourceは`readonly` bind mount、requestはEvaluatorが検証した固定byte列をstdinから渡し、書込み可能なのは`/tmp`のtmpfsのみとする。Evaluator checkout、grader、rubric、Reference、認証情報、Docker socket、元target、Agent用`CODEX_HOME`をmountしない。
-3. 検証対象の候補`runtime_contract.py` / generator / `workflow_runtime.py`を決まったargv・cwdで直接起動し、stdoutのJSON、終了コード・制限時間、必要なstderr診断をEvaluator側で安全化して回収する。任意のPython module import、自由なshell command、ネットワーク通信を許可しない。stdin / stdoutのsource SHA・request SHA・result SHAをprovenanceへ紐付ける。
+1. Evaluatorは候補revisionの**各Skillの`scripts/**`と`assets/**`を元の`skills/<skill>/`相対配置のまま**Git objectから別ディレクトリへ展開する。generatorが参照する同revisionの静的データを含め、相対path・size・SHA-256 manifestを両方検証する。Agent-visible workspaceからの取得や候補側`evals/**`の混入は認めない。必要なsource・静的データが欠落した場合は再実行環境の準備エラーでありSkill品質FAILではない。
+2. `codex_docker_launcher.py`と同じDocker実行基盤・固定imageで、**Python-only検証用の別コンテナ**を`--read-only --cap-drop=ALL --security-opt=no-new-privileges --network none`で起動する。候補sourceと同revisionの`assets/**`は`readonly` bind mountし、requestはEvaluatorが検証した固定byte列をstdinから渡す。書込み可能なのは`/tmp`のtmpfsのみとする。Evaluator checkout、grader、rubric、Reference、認証情報、Docker socket、元target、Agent用`CODEX_HOME`をmountしない。
+3. 候補`runtime_contract.py` / generator / `workflow_runtime.py`を元Skillの相対pathが解決できるcwdと固定argvで直接起動し、stdoutのJSON、終了コード・制限時間、stderr診断をEvaluator側で安全化して回収する。`test-condition-design/scripts/ui_pattern_candidates.py`が`../assets/ui-pattern-catalog.json`を読み込めることを隔離再実行の回帰テストで確認する。任意のPython module import、自由なshell command、ネットワーク通信を許可しない。stdin / stdoutのsource SHA・request SHA・result SHAをprovenanceへ紐付ける。
 4. Docker mount・network・UID・認証情報非公開・source write-denialを実行前に確認し、候補sourceからEvaluator-only sentinelを読み取れないnegative testを用意する。timeout時はコンテナを終了・削除し、そのattemptをrunner / environment errorとする。候補sourceが独自に`valid=false`を返す場合はエラーとして隠さず、その判定を保持する。
 
 この候補再実行は**鮮度と結果再現の検証**であり、固定品質判定の代わりではない。候補が`valid=true`を返しても、固定Evaluatorの共通機械判定・意味Judgeの基準を満たさなければPASSにしない。候補sourceを隔離実行できない環境ではrunner / environment errorとして残し、Skill品質FAILへ変換しない。
@@ -319,6 +319,7 @@ Live CLIへ`--execution-profile <path/to/execution-profile.json>`を必須追加
   "agent": {
     "name": "codex",
     "model": "<実際に固定したmodel ID>",
+    "timeout_seconds": 3600,
     "cli_version": "<CLIで確認したversion>",
     "reasoning_effort": "<固定した推論設定>",
     "launch_options": ["<認証情報を含まない実行オプション>"],
@@ -360,6 +361,8 @@ Live CLIへ`--execution-profile <path/to/execution-profile.json>`を必須追加
   }
 }
 ```
+
+上記`agent.timeout_seconds: 3600`はJSON例であり既定値ではない。live実行では`agent.timeout_seconds`を必須の正の整数として明示し、フェーズ1・2の共通`executor.py`がAgent起動開始から適用する。timeout値はprovenanceと比較条件に含め、Runnerが勝手に別の値へ置換しない。timeout時は子孫processと実行中Dockerコンテナを終了・回収してAgent execution error（exit code 2）とし、Skill品質FAILにはしない。後続caseを実行できるbatchでは続行する。
 
 `<...>`は説明用の占位記号であり、live実行時には実値に置き換える。不明な実効項目は架空の固定値で埋めず、`null`とし`verification.status=unverified`を記録する。`verification.status=verified`を必須とする直接比較では、nullの実効必須項目は許可しない。`verification.status=verified`は自己申告では成立しない。Evaluatorは証拠fileの存在、読み取り拒否probeの結果、非秘密のCLI設定情報との照合を行い、**必須のローカル隔離・起動条件**に不明・不一致があれば`unverified` / `not_comparable`とする。許可済みのモデルAPI通信が残ることのみで`unverified`にはしない。`evaluator_read_blocked=true`も強制境界の代わりにならない。
 
@@ -411,10 +414,10 @@ docker run --rm -i --read-only --cap-drop=ALL --security-opt=no-new-privileges
 
 明示的Skill使用を要求する今回の評価では、次の**二つの事実を別々に記録**する。
 
-- **評価条件へのSkill投入**：指定Git SHAのtracked contentを配置し、file manifest・SHA-256を照合したこと、生成promptが対象Skill名・pathを指定したことをEvaluatorが独立確認する。これは比較成立の必須条件とする。
+- **評価条件へのSkill投入**：指定Git SHAのtracked contentを配置し、file manifest・SHA-256を照合したこと、生成promptが対象Skill名・pathを指定したことをEvaluatorが独立確認する。これは成果物品質比較の必須条件であって、実使用を証明しない。
 - **Agent内部での実使用観測**：`codex exec --json`の`command_execution`等で`SKILL.md`を読む操作を確認できたときだけ`observed`、確認できなければ`unverified`とし、取得元の非秘密log・pathを記録する。native Skill injectionではOSコマンド読取ログに出ないことがある。`command_execution`の欠落をSkill未使用の証明にしない。
 
-**両attemptでのSkill読取`observed`は品質比較の必須条件としない**。両方で投入したSkill SHAとその他比較条件が検証済みなら、成果物の品質差を比較可能とする。ただし内部観測ができないrunは「指定Skillを投入した条件での成果物品質差」であり、Skill改修が差分の原因と確定したとは書かない。native `description` trigger精度を今回評価したともしない。Native Skill専用の観測基盤・汎用Agent adapterは追加しない。
+**両attemptでのSkill読取`observed`は成果物品質比較の必須条件としない**。両方で投入したSkill SHAと比較条件を検証できれば成果物品質を比較できる。ただし**Skill改修そのものの改善・悪化・変化なしを判断するには別の証拠が必要**。フェーズ1では変更対象Skill、フェーズ2では変更されたSkillのうちrouting対象のSkillについて、比較する両revisionでファイルの読取・適用を裏付ける実行証拠を要求する。未観測なら成果物差は報告できるがSkill改修効果は`判断不能`とする。複数Skill同時変更の個別寄与や観測済みSkillと結果の因果関係は断定しない。native `description` trigger精度を今回評価したともしない。Native Skill専用の観測基盤・汎用Agent adapterは追加しない。
 ## 追加する評価実行コード
 
 ### 配置
@@ -444,7 +447,8 @@ scripts/skills/evals/agent/
 - 外部Agent commandへUTF-8 promptをstdinで渡し、Agent-visible workspaceを`cwd`に固定する
 - stdout / stderr / exit codeを返す
 - `shell=True`を使わない
-- timeout / process failureを共通のexecution errorへ正規化する
+- Agentにはprofileの`agent.timeout_seconds`（必須の正の整数）、Judgeには`judge.timeout_seconds`を独立に適用し、timeout / process failureをexecution errorへ正規化する
+- timeout時はPOSIX process group / Windows process treeの子孫とDocker launcherが起動したcontainerを終了・回収し、後続batchへ進む
 - Agent SDKやCodex固有flagを持たない
 
 ### `run.py`
@@ -716,9 +720,19 @@ Skill修正前後を比較するときは、少なくとも次が一致するrun
 
 比較対象として変えるのはSkill packageのrevisionとその内容fingerprintだけです。EvaluatorのSHAと採点基準は変えません。いずれかの設定が違う、未検証、またはSkill packageが同一なら、Skill変更による改善・悪化とは断定しません。provider側の隠れたmodel更新やSkill読み取りが観測不能な場合も限界を明記します。
 
-今回、比較結果の自動rankingや独自総合scoreは作りません。保存済みrun同士を人間または別Agentが比較できれば目的を満たします。
+今回、比較結果の自動rankingや独自総合scoreは作りません。保存済みrunを人間または別Agentが以下の規則で比較できれば目的を満たします。
 
 `.agent-eval-runs/`は`.gitignore`へ追加し、実Agent出力・ログ・Judge結果を通常commit対象にしません。
+
+### 保存済み結果の比較・改善判断
+
+新しい自動判定器や統計検定は作らず、保存済み結果を人間または別Agentが判断する手順を固定する。
+
+1. 同じEvaluator・target / Eval Input・Agent / Judge modelと実効profile・`agent.timeout_seconds` / `judge.timeout_seconds`・隔離・repeat条件を満たすrunのみ並べる。各criterionのrating・根拠、固定機械判定、execution error、evidence未確認、Skill使用観測を区別して表示する。
+2. `--repeat 1`は配線確認・個別問題検出用に許可する。LLM品質の改善・悪化・変化なしの傾向を判断する際は、**両revisionを同じ条件でそれぞれ2attempt以上**実行し、すべての個別結果を確認する。比較前に回数を決め、attempt番号を同じ乱数条件の対として扱わない。2回で判断できる保証はなく、ばらつきが残れば判断不能とする。
+3. **改善**：重要criterionまたは機械品質の向上が比較したattempt群で一貫し、他の重要観点に明確な悪化がない。**悪化**：重要観点の低下が一貫している。**変化なし**：確認した観点で実質的な差が検出されない（品質が同一である証明ではない）。**判断不能**：結果が相反する、改善と悪化が重要観点で混在する、証拠・比較条件が不足する、またはSkill改修の判断に必要な実使用が観測できない。
+4. 成果物品質の差と**Skill改修効果**は別に結論を書く。Skill改修効果として上記三分類を採用するには、フェーズ1は変更対象Skill、フェーズ2はroutingされた変更対象Skillについて、双方のrunで読取・適用に関する実行証拠が必要。観測不能なら成果物比較は残すがSkill改修効果は判断不能。使用証拠があっても厳密な因果関係や統計的有意差を主張しない。
+5. 判断には対象criterion、両revisionのattempt件数と結果・証拠・矛盾点を明示する。多数決やPASS数だけで自動的に改善・悪化へ分類しない。
 
 ### 判定結果と比較可否の分離
 
@@ -794,7 +808,8 @@ batchは途中1件が失敗しても残りcaseを実行し、最後に全体結�
 fake Agent subprocessを使って少なくとも次を検証します。
 
 - 固定Evaluator SHAと候補Skill SHAを独立に指定でき、dirty Evaluatorを拒否し、候補Git treeから実ファイルを選択する
-- execution profileの必須項目・宣言と実効設定の不一致・検証不能時の比較不可を確認する
+- execution profileの必須項目（`agent.timeout_seconds`と`judge.timeout_seconds`は正の整数）・実効設定との不一致・検証不能時の比較不可を確認する
+- fake Agentの無応答・子孫process残存を制限時間で停止し、containerを回収してexecution errorへ分類する。batch後続処理を継続し、Agent timeout値の違うrunは同条件として比較しない
 - Evaluator-only sentinelのread-denial preflightをfake Agentで検証し、`cwd`変更だけでは合格させない
 - Eval Inputがstdin promptへ含まれる
 - 対象Skill名とSkill pathがpromptへ含まれる
