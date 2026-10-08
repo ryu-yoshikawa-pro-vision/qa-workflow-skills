@@ -4,9 +4,9 @@
 
 フェーズ1の共通ランナーが完成し、既存Eval Inputを使った実Agent生成と既存grader接続が成立してから着手します。
 
-このフェーズの目的は「実repoで一度動かすこと」ではありません。固定したtarget revision、評価要求、Agent / model、Judge条件を使って複数Skillのworkflowを実行し、結果を保存することで、後からSkillを修正しても同じ条件で再評価できる状態を作ることです。
+このフェーズの目的は「実repoで一度動かすこと」ではありません。固定したtarget revision、評価要求、Agent / model、Judge条件を使って複数Skillのworkflowを実行し、結果を保存し、**実際に発見した品質問題に対してSkillを修正して同条件で再評価し、改善効果を検証する**ことまで含みます。初回評価はbaselineとし、改修前後の証拠を別々に保持します。
 
-初回評価結果はSkill改善のbaselineとして利用できます。ただし、このフェーズで自動rankingや自動Skill修正は行いません。比較対象は明示的に使用を要求したSkillによる**分析・設計workflowの成果物品質**です。19 Skillすべての実環境動作、native trigger精度、ブラウザE2Eの品質まで保証したとは扱いません。
+初回評価結果はSkill改善のbaselineとして利用します。ただし、**実際の改修は人間または別Agentがランナー外で行い**、このフェーズで自動rankingや自動Skill修正は行いません。比較対象は明示的に使用を要求したSkillによる**分析・設計workflowの成果物品質**です。19 Skillすべての実環境動作、native trigger精度、ブラウザE2Eの品質まで保証したとは扱いません。
 
 ## 対象
 
@@ -598,6 +598,9 @@ Agent executionは、Eval dataset由来のpromptでも、固定対象repo向けp
 14. 固定Judgeを**2回独立に実行**する。`QTS-SEM-001/002`には正規QA成果物・`routing[]`・最終stdout・機械判定要約、`QTS-SEM-003..010`には正規QA成果物のみ（欠落表示を含む）を渡す。各Judge応答を対応criterion集合で検証し、結合結果を既存normalizerで全体判定する。各呼び出しのtimeout・子孫終了・追加tool排除を確認する
 15. workflow / traceability / semantic結果とprovenanceを同じrunへ保存する
 16. runner / environment起因の失敗、Skill品質上のnon-pass、`evidence_unverified`、隔離・実効設定未確認、部分的Evaluator非互換を分けて報告する。必須証拠が未確認ならsemantic passでもattempt `needs_review` / exit 1、Runner障害ならexit 2とする。Skillの内部使用ログだけが`unverified`なら成果物品質比較を妨げない
+17. **初回runの実QA成果物**から、固定仕様・rubricで確認でき、該当Skillの修正によって改善できる品質問題を1件以上選ぶ。**Evaluator-onlyの人工的な違反fixture、故意に劣化させたSkill、Judge誤判定や実行環境問題は対象にしない**。修正前Skillを同条件で2attempt以上評価し、問題と根拠を確定する
+18. 親Plan「実際のSkill改善と再評価の受入検証」に従い、**別のローカルworktree / branchで該当Skillのみ最小修正してcommit**し、候補revisionを記録する。固定target / Evaluator / scenario / Judge条件は変更しない。候補変更を本PRへ自動採用・pushしない
+19. 変更後の候補Skillで同条件の実Agent評価を2attempt以上実行し、各criterion・固定機械品質・runtime証拠・Skillの実使用・他の重要観点の回帰を比較する。人間が原成果物と規範Referenceで実質的改善を確認できたときのみ改善実証済みとする。確認できなければ**改善実証は未達**として証拠と理由を報告する
 
 ## 完了条件
 
@@ -622,6 +625,7 @@ Agent executionは、Eval dataset由来のpromptでも、固定対象repo向けp
 - `qa-workflow`の`workflow_runtime.py`も保存済み入力から再実行できる
 - 生成成果物がrun artifactとして保存される
 - workflow結果と、Skill package投入の検証済み証拠および変更対象Skillの内部読取観測（`observed` / `unverified`）を独立して保存する。内部観測不能でも同じ条件での**成果物品質比較**はできるが、**Skill改修効果**は判断不能とする。複数attemptで結果が矛盾する場合も改善・悪化・変化なしと断定しない
+- **フェーズ2の実際の品質問題を根拠にSkillを1件以上修正した候補revision**について、baseline / candidateを各2attempt以上で同条件評価し、特定の重要criterionまたは機械品質の実質的改善・重要観点に回帰がないこと・Skill実使用証拠を確認できる。改善が確認できない場合は、ランナー機能の成立と**実改善の実証未達**を区別して報告し、実証済みとは扱わない
 - traceability / runtimeの機械判定結果が保存される
 - `QTS-SEM-001..010`の固定criterion ID / critical / Reference対応により独立Judgeを検証する。`QTS-SEM-001/002`と`QTS-SEM-003..010`を**別prompt・別process**で採点し、後者には`routing[]`・最終stdout・機械判定要約が一切含まれないことを検査する。2応答のID集合と結合後の全10件を検証し、誤ID・重複・一方のtimeout / 不正応答では全体PASSにしない。正常例・Payment整合違反例・仕様外動作例に加え、**未検証のcritical 7件それぞれの重大違反例**で期待rating・Reference根拠・Judge evidenceを確認する
 - runner / environment errorとSkill品質のneeds_review / failを区別できる
@@ -656,6 +660,8 @@ schemaやEntity表現が変更され、既存Evaluatorでは判定不能な場�
 - **最終回答だけが正しく、正規QA成果物のPayment失敗条件が誤っているfixture**でも、`QTS-SEM-006`の成果物Judgeが最終回答で救済されないことを確認する。各fixtureで実際のJudge rating / reason / evidenceを記録し、人間確認済みの根拠と照合する。Judgeの判定が一致しない・繰り返しで重要判定が揺れる場合は、判定根拠とrubric / Referenceを調査して受入を保留する。
 - fixtureの読込み、対象criterionへの配線、結果正規化・統合は**外部LLMを呼ばないfake Judge / fake Agentの通常CI**で確認する。実際のJudgeの意味判別は既存の**実Codex smoke / Judge受入検証**で確認する。必要な修正でJudge prompt・rubric・Reference等のEvaluator基準を変更した場合は新Evaluator revisionとして固定し、旧・新Skillを同一条件で再評価する。自動Judge校正・学習基盤、新規採点式、DB、常時LLM CIは追加しない。
 
+
+実際のSkill修正・再評価の詳細な手順と判定条件は、親Planの「実際のSkill改善と再評価の受入検証」を正本とする。新規の自動Skill修正処理、改善結果の自動採用、採点基準の緩和は追加しない。
 
 ## このフェーズで追加しないもの
 
