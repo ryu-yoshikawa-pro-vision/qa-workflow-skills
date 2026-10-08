@@ -108,7 +108,7 @@ def valid_input() -> dict:
                 "target_draft_key": None,
                 "state_description": "dialog open after invocation",
                 "state_basis_refs": ["STATE-001"],
-                "current_document_identity": "https://example.test/settings",
+                "current_document_identity": "hmac-sha256:" + "a" * 64,
                 "observation_field_key": "element.rendered-text",
                 "predicate_key": None,
                 "predicate_payload": None,

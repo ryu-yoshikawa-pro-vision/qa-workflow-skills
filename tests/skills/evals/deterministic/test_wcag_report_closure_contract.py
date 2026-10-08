@@ -294,6 +294,19 @@ class WcagReportClosureTests(unittest.TestCase):
         self.assertLess(markdown.index("## Step 3:"),markdown.index("## Step 4:"))
         self.assertLess(markdown.index("## Step 4:"),markdown.index("## Step 5:"))
         self.assertIsNone(output["summary"]["aggregated_score"])
+        document_identity="hmac-sha256:"+"a"*64
+        data["structured_samples"]=[{"Sample ref":"SAMPLE-001","State":"checkout-review",
+            "Document identity":document_identity,"Type / technology coverage":"HTML",
+            "Process membership":"PROCESS-001","Rationale":"representative process state"}]
+        safe_sample_report=structure.render_machine_owned_report(data)["machine_owned_markdown"]
+        self.assertIn(document_identity,safe_sample_report)
+        self.assertNotIn("fixture.test",safe_sample_report)
+        with self.assertRaises(structure.EvaluationStructureError) as error:
+            structure.render_machine_owned_report({**data,"structured_samples":[{
+                "Sample ref":"SAMPLE-001","State":"checkout-review","Document identity":document_identity,
+                "Type / technology coverage":"HTML","Process membership":"PROCESS-001",
+                "Rationale":"representative process state","Locator":"/session/SENSITIVE_TEST_VALUE"}]})
+        self.assertNotIn("SENSITIVE_TEST_VALUE",str(error.exception))
         data["report_closure"]["status"]="complete"
         data["sample_lineage"]={"status":"ready","previous_sample_refs":["STRUCT-OLD"],
             "current_structured_sample_refs":["SAMPLE-001"],"retained":[],"replaced":[],

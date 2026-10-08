@@ -57,7 +57,7 @@ semantic layerが追加evidence取得のために指定できるobservation fiel
 | `viewport.metrics` | `viewport-state` | なし | viewport width/height、scroll x/y、document scroll width/height、device scale factor |
 | `element.geometry` | `element-geometry` | `target_ref` | x/y/width/height CSS px、取得不能理由 |
 | `element.state` | `element-state` | `target_ref` | visible、enabled/disabled、checked、selected、expanded等のfixed state object |
-| `document.location` | `document-location` | なし | `page.url()` のsafe value / limitation |
+| `document.location` | `document-location` | なし | URLのschemeのみを残したredacted value / limitation。current document identityは非extractable keyで計算したopaque token |
 | `document.title` | `document-title` | なし | HTML applicability、最初のHTML title descendantの有無、直接child nodeがtext-onlyか、非空白textを含むかのboolean facts。raw title本文は保持しない |
 | `element.rendered-text` | `element-content` | `target_ref` | Playwright `locator.innerText()` の返却値 |
 | `element.control-value` | `element-content` | `target_ref` | Playwright `locator.inputValue()` の返却値 |
@@ -223,7 +223,7 @@ canonical observation field:
 
 - `document.location`
 
-current document URLはPlaywright `page.url()` のcurrent valueを取得します。observation layerで独自URL正規化をしません。永続化前にPR #12のevidence安全契約へ従い、secret / token等を含み得るquery / fragmentを無条件に保存しません。sanitizationで意味判断に必要な部分を保持できない場合は、値を捏造・無断保存せず `unavailable / limitation` とします。
+browser ownerは `location.href` をbrowser page内だけで読み、documentごとに生成した非extractable WebCrypto HMAC keyで署名した `hmac-sha256:<hex>` tokenをcurrent document identityとして返します。keyとraw URLはpage memoryから出しません。path、query、fragment、hostの差異はtokenで区別し、raw URLやkeyはrequest、result、evidence、logへ保存しません。WebCryptoが使えない場合はidentityを生成せず、安全に `unavailable / limitation` で閉じます。`document.location.safe_url` は `http(s)://[redacted]` のみを保持します。
 
 ### `document-title`
 
@@ -290,13 +290,13 @@ current documentで有効になり得るresponsive / conditional presentation条
 - execution reason
 - evidence refs
 
-既知の標準構文を、Plan側のparserが理解できないことだけを理由に `unsupported` にしません。browserがそのconditionを受理・評価できる場合はbrowser評価を使用します。browser / Playwright経路自体が必要capabilityを持たない場合だけ `unsupported` とします。
+`@media` はbrowserの `matchMedia()` で評価します。CSSOMの `CSSContainerRule` はcondition text / nameを示しますが、標準の現在match状態APIを提供しないため、`@container` のsize / style / scroll-state queryでは `current_match_state: null`、`execution_status: not-executable` と理由を記録します。宣言値とcomputed styleの文字列比較や、viewport寸法をcontainer寸法とみなす推定はmatch判定に使いません。condition inventory自体は維持し、実行可能な `@media` の観測を無効化しません。
 
 size query以外のstyle query / scroll-state queryは数値boundaryへ変換しません。presentation variation conditionとして保持し、既存user-facing interactionまたは安全なenvironment操作でrequired stateを作れる場合だけ実行します。required stateを安全に作れない場合は `not-executable` です。
 
 ### `responsive-boundaries`
 
-`responsive.conditions` のうちsize conditionについて、browser評価で観測できるnumeric transitionをCSS pxへmaterializeします。
+`responsive.conditions` のうち、現在match状態を正確に取得できるsize conditionだけについて、numeric transitionをCSS pxへmaterializeします。現行の標準browser APIで評価可能な `@media` は対象にできます。`@container` はmatch状態を取得できないためbinary searchを行わず、`not-executable` closureにします。
 
 media size condition:
 
@@ -309,18 +309,15 @@ media size condition:
 
 container size condition:
 
-- CSSOMとcomputed `container-name / container-type` からquery containerを一意に解決する
-- `px / em / rem / viewport-relative / container-relative length / calc()` 等はbrowserのcomputed / used valueと実際のquery match変化を正本にし、固定16px等で換算しない
-- `cqw / cqh / cqi / cqb / cqmin / cqmax` を既知なのに未対応として落とさない
-- viewport resizeまたは既存user-facing interactionでquery container sizeを安全に変化させられる場合、condition matchとcontainer geometryを同じiterationで取得してtransition CSS pxを導出する
-- testのためだけにDOM / stylesheetへstyle属性、class、custom propertyを注入しない
-- current product behaviorからrequired transitionを安全に作れない場合、condition inventoryは保持して `not-executable / incomplete` とする
+- CSSOMからcondition text、name、対象候補をinventory化する
+- CSS declaration / computed styleの一致やviewport寸法からcurrent matchを推測しない
+- 標準browser APIでcondition matchを正確に取得できないため、current matchはnull、execution statusは `not-executable` とし、理由を保持する
+- container geometryとviewport geometryを同一視せず、未評価conditionへbinary searchを実行しない
 
 custom property / math function:
 
-- `calc()` / `min()` / `max()` / `clamp()` 等のmath functionはbrowserがconditionを評価できる限り、文字列parserで拒否しない
-- `var()` やstyle query custom propertyはsource textの手計算をしない。computed value / condition matchをbrowserから取得できる場合だけmachine evidenceとして使用する
-- unresolved custom property、invalid at computed-value time、browser capability不足は理由付き状態へ閉じる
+- `@media` conditionは `matchMedia()` に全体を渡してbrowserのevaluation semanticsを使う
+- `@container` style / math / custom propertyはcomputed styleからcondition成立を推定せず、current standard APIで取得できない場合は理由付き `not-executable` とする
 
 boundary row:
 
@@ -329,7 +326,6 @@ boundary row:
 - axis
 - before / transition / after CSS px
 - browser match state
-- query container geometry（container sizeの場合）
 - derivation method
 - detection status: `normalized / incomplete / unsupported`
 - execution status: `executable / not-executable`
@@ -496,14 +492,14 @@ tool failureやprobe unavailableをproduct defect / usability issueへ自動変�
 - same request identity + same evidence fingerprint → no-progress
 - unknown observation field → unsupported。自然言語からprobeを推論しない
 - geometry machine calculation
-- media / container size conditionのbrowser evaluationとnumeric transition
+- `@media` match evaluationとnumeric transition、`@container` conditionのno-inference / not-executable closure
 - `px / em / rem / viewport-relative / container-relative / calc()` を含むsize queryを独自換算せずbrowser match transitionで評価
 - `var()` 等を含むconditionはsource textから展開せず、browserが有効に評価できる場合だけ採用
 - media compound condition / comma branch identityを保持
 - container query container identity / geometryとtransitionの対応
 - style / scroll-state queryを非数値responsive conditionとして保持
 - browser capability不足 → unsupported、safe state作成不能 → not-executable / incomplete
-- boundary normalizedだがstateを実現できない → not-executable / incomplete
+- unexecutable container condition → `not-executable` closure。viewport boundaryは生成しない
 - complete responsive condition inventory → numeric boundaryまたはstate別closure
 - accessibility semanticsをrequirement resultへ自動昇格しない
 - 8種fixed end predicate schema

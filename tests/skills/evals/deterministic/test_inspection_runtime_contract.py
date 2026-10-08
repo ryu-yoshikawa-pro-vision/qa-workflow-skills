@@ -9,6 +9,8 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[4]
 SCRIPT = ROOT / "skills/usability-inspection/scripts/inspection_runtime.py"
+DOCUMENT_IDENTITY_A = "hmac-sha256:" + "a" * 64
+DOCUMENT_IDENTITY_B = "hmac-sha256:" + "b" * 64
 
 
 def metadata(*, formal: bool = False) -> dict:
@@ -35,7 +37,7 @@ def formal_request(probe_key: str = "mp-resize-text-run", *, level: str = "AA") 
     import wcag_criterion_plan
     plan = wcag_criterion_plan.materialize_plan(wcag_version="2.2", level=level,
         samples=[{"sample_ref": "SAMPLE-001", "identity_fingerprint": "sha256:" + "a" * 64,
-                  "target_identity": "http://127.0.0.1:4173/"}],
+                  "target_identity": DOCUMENT_IDENTITY_A}],
         variations=[{"sample_ref": "SAMPLE-001", "variation_ref": "VAR-001",
                      "identity_fingerprint": "sha256:" + "b" * 64}])
     return next(request for request in plan["requests"] if request["machine_probe_key"] == probe_key)
@@ -147,7 +149,7 @@ class InspectionRuntimeContractTests(unittest.TestCase):
             "current_document_identity": request["target_identity"]}, formal=True)
         self.assertEqual(rejected["runtime_status"], "invalid_input")
         injected = invoke("normalize-observation-probe-result", {"probe": {}, "result": {},
-            "current_document_identity": "doc-1", "formal": True})
+            "current_document_identity": DOCUMENT_IDENTITY_A, "formal": True})
         self.assertEqual(injected["runtime_status"], "invalid_input")
 
     def test_resize_text_machine_observation_preserves_content_loss_without_inference(self):
@@ -207,7 +209,7 @@ class InspectionRuntimeContractTests(unittest.TestCase):
         self.assertEqual(normalized["payload"]["result"]["status"], "incomplete")
 
         stale = invoke("normalize-wcag-machine-probe-result", {"request": request,
-            "result": {**partial, "current_document_identity": "http://127.0.0.1:4173/other"},
+            "result": {**partial, "current_document_identity": DOCUMENT_IDENTITY_B},
             "current_document_identity": request["target_identity"]}, formal=True)
         self.assertEqual(stale["result_status"], "blocked")
         self.assertEqual(stale["payload"]["result"]["status"], "blocked")

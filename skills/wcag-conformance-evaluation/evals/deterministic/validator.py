@@ -1,7 +1,7 @@
 from __future__ import annotations
 import hashlib, json, math, re
 from pathlib import Path
-from urllib.parse import urlsplit
+import re
 from scripts.skills.evals.deterministic.result import EvalResult
 
 BASE=Path(__file__).resolve().parents[2]/'assets'
@@ -226,11 +226,7 @@ def validate_sample_lineage(arguments: dict, result: dict) -> list[str]:
                 and all(isinstance(value,str) and value.strip() for value in values)
                 and len(values)==len(set(values)))
     def valid_document_identity(value: object) -> bool:
-        if not isinstance(value,str) or not value.strip(): return False
-        try: parsed=urlsplit(value)
-        except ValueError: return False
-        return (parsed.scheme in {"http","https"} and bool(parsed.netloc)
-                and parsed.username is None and parsed.password is None)
+        return isinstance(value,str) and re.fullmatch(r"hmac-sha256:[0-9a-f]{64}", value) is not None
     if (not valid_refs(previous_refs) or not valid_refs(current_refs)
             or not valid_refs(evidence_refs)):
         return ["sample_lineage_ref_inputs"]
@@ -256,9 +252,13 @@ def validate_sample_lineage(arguments: dict, result: dict) -> list[str]:
                     or not isinstance(target,str) or not target.strip()
                     or not isinstance(state,str) or not state.strip()
                     or not valid_document_identity(row["target_identity"])
-                    or not valid_refs(locators,allow_empty=False) or not valid_refs(sources)):
+                    or not valid_refs(locators,allow_empty=False)
+                    or any(not valid_document_identity(value) for value in locators)
+                    or row["target_identity"] not in locators
+                    or not valid_refs(sources)):
                 return None
-            identity_data=json.dumps({"target_ref":target,"state_key":state},ensure_ascii=False,
+            identity_data=json.dumps({"target_ref":target,"state_key":state,
+                "document_identity":row["target_identity"]},ensure_ascii=False,
                 sort_keys=True,separators=(",",":")).encode("utf-8")
             identity="sha256:"+hashlib.sha256(identity_data).hexdigest()
             if row["identity_fingerprint"]!=identity or identity in by_identity:

@@ -31,8 +31,10 @@
 | --- | --- | --- | --- |
 
 ### Structured Sample
-| Sample ref | State / locator | Type / technology coverage | Process membership | Rationale |
-| --- | --- | --- | --- | --- |
+| Sample ref | State | Document identity | Type / technology coverage | Process membership | Rationale |
+| --- | --- | --- | --- | --- | --- |
+
+`Document identity` is the browser-issued opaque `hmac-sha256:<hex>` token. Do not place a URL or navigation locator in the report.
 
 ### Random Sample
 | Target count | Actual count | Selection method | Status | Selected sample refs / selector artifact ref | Candidate population fingerprint | Exhaustion / blocker |

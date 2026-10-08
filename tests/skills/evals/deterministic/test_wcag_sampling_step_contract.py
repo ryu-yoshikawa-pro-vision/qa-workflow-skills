@@ -212,19 +212,19 @@ class WcagSamplingStepContractTests(unittest.TestCase):
     def test_rerun_sample_lineage_resolves_retained_replaced_added_and_unavailable(self):
         previous_registry=sample_identity_registry([
             {"draft_key":"old-a","target_ref":"TARGET-A","state_key":"default",
-             "locator":"/old/a","target_identity":"https://fixture.test/old/a","source_evidence_refs":["E-OLD-A"]},
+             "target_identity":"hmac-sha256:"+"a"*64,"source_evidence_refs":["E-OLD-A"]},
             {"draft_key":"old-b","target_ref":"TARGET-B","state_key":"default",
-             "locator":"/old/b","target_identity":"https://fixture.test/old/b","source_evidence_refs":["E-OLD-B"]}])
+             "target_identity":"hmac-sha256:"+"b"*64,"source_evidence_refs":["E-OLD-B"]}])
         previous_by_target={row["target_ref"]:row for row in previous_registry["samples"]}
         previous_rows=[{**previous_by_target["TARGET-A"],"sample_ref":"STRUCT-OLD-A"},
                        {**previous_by_target["TARGET-B"],"sample_ref":"STRUCT-OLD-B"}]
         current_registry=sample_identity_registry([
             {"draft_key":"current-a","target_ref":"TARGET-A","state_key":"default",
-             "locator":"/current/a","target_identity":"https://fixture.test/current/a","source_evidence_refs":["E-CURRENT-A"]},
+             "target_identity":"hmac-sha256:"+"a"*64,"source_evidence_refs":["E-CURRENT-A"]},
             {"draft_key":"current-b","target_ref":"TARGET-B","state_key":"refreshed",
-             "locator":"/current/b","target_identity":"https://fixture.test/current/b","source_evidence_refs":["E-CURRENT-B"]},
+             "target_identity":"hmac-sha256:"+"c"*64,"source_evidence_refs":["E-CURRENT-B"]},
             {"draft_key":"current-c","target_ref":"TARGET-C","state_key":"default",
-             "locator":"/current/c","target_identity":"https://fixture.test/current/c","source_evidence_refs":["E-CURRENT-C"]}])
+             "target_identity":"hmac-sha256:"+"d"*64,"source_evidence_refs":["E-CURRENT-C"]}])
         current_by_target={row["target_ref"]:row["sample_ref"] for row in current_registry["samples"]}
         arguments={"previous_sample_refs":["STRUCT-OLD-A","STRUCT-OLD-B","STRUCT-OLD-MISSING"],
             "previous_identity_rows":previous_rows,"current_identity_registry":current_registry,
@@ -250,7 +250,7 @@ class WcagSamplingStepContractTests(unittest.TestCase):
 
     def test_sample_lineage_replacement_requires_known_evidence_and_never_guesses_old_identity(self):
         current=sample_identity_registry([{"draft_key":"new","target_ref":"TARGET-NEW",
-            "state_key":"default","locator":"/new","target_identity":"https://fixture.test/new",
+            "state_key":"default","target_identity":"hmac-sha256:"+"a"*64,
             "source_evidence_refs":["E-CURRENT"]}])
         base={"previous_sample_refs":["STRUCT-OLD"],"previous_identity_rows":[],
             "current_identity_registry":current,

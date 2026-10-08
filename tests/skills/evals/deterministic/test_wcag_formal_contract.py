@@ -12,6 +12,8 @@ ROOT = Path(__file__).resolve().parents[4]
 WCAG = ROOT / "skills/wcag-conformance-evaluation"
 INSPECTION = ROOT / "skills/usability-inspection"
 sys.path.insert(0, str(WCAG / "scripts"))
+DOCUMENT_IDENTITY_A = "hmac-sha256:" + "a" * 64
+DOCUMENT_IDENTITY_B = "hmac-sha256:" + "b" * 64
 
 
 def load(name: str, path: Path):
@@ -36,7 +38,7 @@ def read_json(path: Path) -> dict:
 
 def sample(ref: str, digit: str) -> dict:
     return {"sample_ref": ref, "identity_fingerprint": "sha256:" + digit * 64,
-            "target_identity": "http://127.0.0.1:4173/?sample=" + ref.lower()}
+            "target_identity": "hmac-sha256:" + digit * 64}
 
 
 def variation(sample_ref: str, ref: str, digit: str) -> dict:
@@ -107,24 +109,51 @@ class WcagRequirementAndSamplingTests(unittest.TestCase):
             em_structure.validate_sampling_skip(complete_inventory=False, inventory_refs=["S1"],
                 all_in_scope_selected=["S1"], rationale="")
 
-    def test_sample_identity_uses_state_not_navigation_route(self):
+    def test_sample_identity_preserves_route_and_in_memory_state_without_url_values(self):
         drafts = [
             {"draft_key": "route-a", "target_ref": "TARGET-1", "state_key": "details-open",
-             "locator": "/item/1#open", "target_identity": "https://fixture.test/item/1#open",
+             "target_identity": DOCUMENT_IDENTITY_A,
              "source_evidence_refs": ["BROWSER-1"]},
             {"draft_key": "route-b", "target_ref": "TARGET-1", "state_key": "details-open",
-             "locator": "/item/1?via=menu", "target_identity": "https://fixture.test/item/1?via=menu",
+             "target_identity": DOCUMENT_IDENTITY_B,
              "source_evidence_refs": ["BROWSER-2"]},
             {"draft_key": "state-b", "target_ref": "TARGET-1", "state_key": "details-closed",
-             "locator": "/item/1", "target_identity": "https://fixture.test/item/1",
+             "target_identity": DOCUMENT_IDENTITY_A,
              "source_evidence_refs": ["BROWSER-3"]},
+            {"draft_key": "same-route-alternate-locator", "target_ref": "TARGET-1", "state_key": "details-open",
+             "target_identity": DOCUMENT_IDENTITY_A,
+             "source_evidence_refs": ["BROWSER-4"]},
         ]
         registry = sampling.sample_identity_registry(drafts)
-        self.assertEqual(registry["draft_to_sample_ref"]["route-a"], registry["draft_to_sample_ref"]["route-b"])
+        self.assertNotEqual(registry["draft_to_sample_ref"]["route-a"], registry["draft_to_sample_ref"]["route-b"])
         self.assertNotEqual(registry["draft_to_sample_ref"]["route-a"], registry["draft_to_sample_ref"]["state-b"])
-        self.assertEqual(len(registry["samples"]), 2)
-        open_sample = next(row for row in registry["samples"] if row["state_key"] == "details-open")
-        self.assertEqual(open_sample["target_identity"], "https://fixture.test/item/1#open")
+        self.assertEqual(registry["draft_to_sample_ref"]["route-a"],
+                         registry["draft_to_sample_ref"]["same-route-alternate-locator"])
+        self.assertEqual(len(registry["samples"]), 3)
+        self.assertTrue(all(row["target_identity"].startswith("hmac-sha256:") for row in registry["samples"]))
+        self.assertTrue(all(row["source_locators"] == [row["target_identity"]] for row in registry["samples"]))
+        self.assertNotIn("fixture.test", json.dumps(registry))
+        self.assertNotIn("SENSITIVE_TEST_VALUE", json.dumps(registry))
+
+        with self.assertRaises(sampling.SamplingError) as error:
+            sampling.sample_identity_registry([{**drafts[0],
+                "target_identity": "https://fixture.test/callback?code=SENSITIVE_TEST_VALUE"}])
+        self.assertNotIn("SENSITIVE_TEST_VALUE", str(error.exception))
+        with self.assertRaises(sampling.SamplingError) as error:
+            sampling.sample_identity_registry([{**drafts[0], "locator": "/session/SENSITIVE_TEST_VALUE"}])
+        self.assertNotIn("SENSITIVE_TEST_VALUE", str(error.exception))
+
+        unsafe_row = {"sample_ref": "SAMPLE-001", "target_ref": "TARGET-1", "state_key": "details-open",
+                      "source_locators": ["https://fixture.test/session/SENSITIVE_TEST_VALUE"],
+                      "target_identity": DOCUMENT_IDENTITY_A,
+                      "identity_fingerprint": sampling.fingerprint({"target_ref": "TARGET-1",
+                          "state_key": "details-open", "document_identity": DOCUMENT_IDENTITY_A}),
+                      "source_evidence_refs": ["BROWSER-1"]}
+        with self.assertRaises(sampling.SamplingError) as error:
+            sampling.materialize_sample_lineage(previous_sample_refs=["SAMPLE-001"],
+                previous_identity_rows=[unsafe_row], current_identity_registry={"samples": [], "draft_to_sample_ref": {}},
+                current_structured_sample_refs=[])
+        self.assertNotIn("SENSITIVE_TEST_VALUE", str(error.exception))
 
     def test_criterion_plan_materializes_only_each_samples_required_variations(self):
         plan = criterion_plan.materialize_plan(wcag_version="2.2", level="A",

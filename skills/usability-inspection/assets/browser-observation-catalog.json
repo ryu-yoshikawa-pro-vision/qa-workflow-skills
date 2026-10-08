@@ -4,12 +4,8 @@
     {
       "probe_key": "accessibility-semantics",
       "execution_kind": "playwright-native",
-      "provided_observation_fields": [
-        "accessibility.semantics"
-      ],
-      "required_request_fields": [
-        "target_ref"
-      ],
+      "provided_observation_fields": ["accessibility.semantics"],
+      "required_request_fields": ["target_ref"],
       "required_result_fields": [
         "accessible_name",
         "description",
@@ -31,16 +27,9 @@
     {
       "probe_key": "computed-style",
       "execution_kind": "playwright-native",
-      "provided_observation_fields": [
-        "computed-style.properties"
-      ],
-      "required_request_fields": [
-        "target_ref"
-      ],
-      "required_result_fields": [
-        "properties",
-        "status"
-      ],
+      "provided_observation_fields": ["computed-style.properties"],
+      "required_request_fields": ["target_ref"],
+      "required_result_fields": ["properties", "status"],
       "value_type": "structured",
       "unit": "as-defined-per-field",
       "clock_domain": null,
@@ -51,28 +40,20 @@
     {
       "probe_key": "document-location",
       "execution_kind": "fixed-page-evaluate",
-      "provided_observation_fields": [
-        "document.location"
-      ],
+      "provided_observation_fields": ["document.location"],
       "required_request_fields": [],
-      "required_result_fields": [
-        "limitation",
-        "safe_url",
-        "status"
-      ],
+      "required_result_fields": ["limitation", "safe_url", "status"],
       "value_type": "structured",
       "unit": "as-defined-per-field",
       "clock_domain": null,
       "required_browser_capability": "document-location",
-      "sensitive_data_handling": "sanitize page.url under the existing evidence contract; this field contains no title data",
+      "sensitive_data_handling": "return only the redacted HTTP(S) scheme marker; expose complete current-document identity only as an in-memory keyed HMAC token; never persist raw URL or key",
       "fixed_dispatch_key": "document-location"
     },
     {
       "probe_key": "document-title",
       "execution_kind": "fixed-page-evaluate",
-      "provided_observation_fields": [
-        "document.title"
-      ],
+      "provided_observation_fields": ["document.title"],
       "required_request_fields": [],
       "required_result_fields": [
         "first_title_children_are_text",
@@ -97,15 +78,8 @@
         "element.rendered-text",
         "element.selected-values"
       ],
-      "required_request_fields": [
-        "target_ref"
-      ],
-      "required_result_fields": [
-        "raw_text",
-        "raw_value",
-        "selected_options",
-        "status"
-      ],
+      "required_request_fields": ["target_ref"],
+      "required_result_fields": ["raw_text", "raw_value", "selected_options", "status"],
       "value_type": "structured",
       "unit": "as-defined-per-field",
       "clock_domain": null,
@@ -116,18 +90,9 @@
     {
       "probe_key": "element-geometry",
       "execution_kind": "playwright-native",
-      "provided_observation_fields": [
-        "element.geometry"
-      ],
-      "required_request_fields": [
-        "target_ref"
-      ],
-      "required_result_fields": [
-        "height_css_px",
-        "width_css_px",
-        "x_css_px",
-        "y_css_px"
-      ],
+      "provided_observation_fields": ["element.geometry"],
+      "required_request_fields": ["target_ref"],
+      "required_result_fields": ["height_css_px", "width_css_px", "x_css_px", "y_css_px"],
       "value_type": "structured",
       "unit": "as-defined-per-field",
       "clock_domain": null,
@@ -138,19 +103,9 @@
     {
       "probe_key": "element-state",
       "execution_kind": "playwright-native",
-      "provided_observation_fields": [
-        "element.state"
-      ],
-      "required_request_fields": [
-        "target_ref"
-      ],
-      "required_result_fields": [
-        "checked",
-        "enabled",
-        "expanded",
-        "selected",
-        "visible"
-      ],
+      "provided_observation_fields": ["element.state"],
+      "required_request_fields": ["target_ref"],
+      "required_result_fields": ["checked", "enabled", "expanded", "selected", "visible"],
       "value_type": "structured",
       "unit": "as-defined-per-field",
       "clock_domain": null,
@@ -161,18 +116,9 @@
     {
       "probe_key": "focus-state",
       "execution_kind": "playwright-native",
-      "provided_observation_fields": [
-        "focus.state"
-      ],
-      "required_request_fields": [
-        "target_ref"
-      ],
-      "required_result_fields": [
-        "active_target_ref",
-        "focus_visible",
-        "focusable",
-        "status"
-      ],
+      "provided_observation_fields": ["focus.state"],
+      "required_request_fields": ["target_ref"],
+      "required_result_fields": ["active_target_ref", "focus_visible", "focusable", "status"],
       "value_type": "structured",
       "unit": "as-defined-per-field",
       "clock_domain": null,
@@ -183,9 +129,7 @@
     {
       "probe_key": "interaction-timing",
       "execution_kind": "fixed-page-evaluate",
-      "provided_observation_fields": [
-        "interaction.timing"
-      ],
+      "provided_observation_fields": ["interaction.timing"],
       "required_request_fields": [],
       "required_result_fields": [
         "clock_domain",
@@ -205,14 +149,9 @@
     {
       "probe_key": "navigation-timing",
       "execution_kind": "playwright-native",
-      "provided_observation_fields": [
-        "navigation.timing"
-      ],
+      "provided_observation_fields": ["navigation.timing"],
       "required_request_fields": [],
-      "required_result_fields": [
-        "entries",
-        "status"
-      ],
+      "required_result_fields": ["entries", "status"],
       "value_type": "structured",
       "unit": "as-defined-per-field",
       "clock_domain": null,
@@ -223,14 +162,9 @@
     {
       "probe_key": "paint-timing",
       "execution_kind": "playwright-native",
-      "provided_observation_fields": [
-        "paint.timing"
-      ],
+      "provided_observation_fields": ["paint.timing"],
       "required_request_fields": [],
-      "required_result_fields": [
-        "entries",
-        "status"
-      ],
+      "required_result_fields": ["entries", "status"],
       "value_type": "structured",
       "unit": "as-defined-per-field",
       "clock_domain": null,
@@ -241,15 +175,9 @@
     {
       "probe_key": "responsive-boundaries",
       "execution_kind": "fixed-page-evaluate",
-      "provided_observation_fields": [
-        "responsive.boundaries"
-      ],
+      "provided_observation_fields": ["responsive.boundaries"],
       "required_request_fields": [],
-      "required_result_fields": [
-        "boundaries",
-        "complete",
-        "status"
-      ],
+      "required_result_fields": ["boundaries", "complete", "status"],
       "value_type": "structured",
       "unit": "as-defined-per-field",
       "clock_domain": null,
@@ -260,15 +188,9 @@
     {
       "probe_key": "responsive-conditions",
       "execution_kind": "fixed-page-evaluate",
-      "provided_observation_fields": [
-        "responsive.conditions"
-      ],
+      "provided_observation_fields": ["responsive.conditions"],
       "required_request_fields": [],
-      "required_result_fields": [
-        "complete",
-        "conditions",
-        "status"
-      ],
+      "required_result_fields": ["complete", "conditions", "status"],
       "value_type": "structured",
       "unit": "as-defined-per-field",
       "clock_domain": null,
@@ -279,15 +201,9 @@
     {
       "probe_key": "screenshot",
       "execution_kind": "playwright-native",
-      "provided_observation_fields": [
-        "screenshot.image"
-      ],
+      "provided_observation_fields": ["screenshot.image"],
       "required_request_fields": [],
-      "required_result_fields": [
-        "evidence_ref",
-        "status",
-        "viewport"
-      ],
+      "required_result_fields": ["evidence_ref", "status", "viewport"],
       "value_type": "structured",
       "unit": "as-defined-per-field",
       "clock_domain": null,
@@ -298,9 +214,7 @@
     {
       "probe_key": "viewport-state",
       "execution_kind": "playwright-native",
-      "provided_observation_fields": [
-        "viewport.metrics"
-      ],
+      "provided_observation_fields": ["viewport.metrics"],
       "required_request_fields": [],
       "required_result_fields": [
         "scroll_height_css_px",
@@ -323,64 +237,42 @@
     "predicates": [
       {
         "predicate_key": "aria-state-equals",
-        "required_fields": [
-          "expected_value",
-          "state_name",
-          "target_ref"
-        ],
+        "required_fields": ["expected_value", "state_name", "target_ref"],
         "optional_fields": []
       },
       {
         "predicate_key": "attribute-equals",
-        "required_fields": [
-          "attribute_name",
-          "expected_value",
-          "target_ref"
-        ],
+        "required_fields": ["attribute_name", "expected_value", "target_ref"],
         "optional_fields": []
       },
       {
         "predicate_key": "element-disabled",
-        "required_fields": [
-          "target_ref"
-        ],
+        "required_fields": ["target_ref"],
         "optional_fields": []
       },
       {
         "predicate_key": "element-enabled",
-        "required_fields": [
-          "target_ref"
-        ],
+        "required_fields": ["target_ref"],
         "optional_fields": []
       },
       {
         "predicate_key": "element-hidden",
-        "required_fields": [
-          "target_ref"
-        ],
+        "required_fields": ["target_ref"],
         "optional_fields": []
       },
       {
         "predicate_key": "element-visible",
-        "required_fields": [
-          "target_ref"
-        ],
+        "required_fields": ["target_ref"],
         "optional_fields": []
       },
       {
         "predicate_key": "text-present",
-        "required_fields": [
-          "expected_text"
-        ],
-        "optional_fields": [
-          "within_target_ref"
-        ]
+        "required_fields": ["expected_text"],
+        "optional_fields": ["within_target_ref"]
       },
       {
         "predicate_key": "url-changed",
-        "required_fields": [
-          "baseline_url"
-        ],
+        "required_fields": ["baseline_url"],
         "optional_fields": []
       }
     ],

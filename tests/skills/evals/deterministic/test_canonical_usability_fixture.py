@@ -26,24 +26,58 @@ class CanonicalUsabilityFixtureTests(unittest.TestCase):
         self.assertIn('"Enter a product name to filter the fixture list."', script)
         self.assertIn('"trail pack".includes(query.toLowerCase())', script)
 
-    def test_document_location_is_url_only_and_document_title_is_a_separate_fixed_probe(self):
+    def test_document_location_uses_opaque_identity_and_redacted_value_with_title_separate(self):
         probe = (ROOT / "skills" / "usability-inspection" / "scripts" / "fixed_browser_probes.js").read_text(encoding="utf-8")
         observation = (ROOT / "skills" / "usability-inspection" / "scripts" / "observation_contract.py").read_text(encoding="utf-8")
         catalog = json.loads((ROOT / "skills" / "usability-inspection" / "assets" / "browser-observation-catalog.json").read_text(encoding="utf-8"))
         rules = json.loads((ROOT / "skills" / "usability-inspection" / "assets" / "test-rule-catalog.json").read_text(encoding="utf-8"))
 
-        self.assertIn("}, page.url());", probe)
-        self.assertIn("new URL(rawUrl)", probe)
-        for sensitive_component in ("parsedUrl.username", "parsedUrl.password", "parsedUrl.search", "parsedUrl.hash"):
-            with self.subTest(component=sensitive_component):
-                self.assertIn(sensitive_component, probe)
-        self.assertIn("safe_url: `${parsedUrl.origin}${parsedUrl.pathname}`", probe)
+        location_start = probe.index('if (request.probe_key === "document-location")')
+        title_start = probe.index('if (request.probe_key === "document-title")', location_start)
+        location_probe = probe[location_start:title_start]
+        self.assertIn("Symbol.for(\"qa-workflow-skills.document-identity-key.v1\")", probe)
+        self.assertIn("crypto.subtle.sign(", probe)
+        self.assertIn('"HMAC"', probe)
+        self.assertIn("new TextEncoder().encode(location.href)", probe)
+        self.assertIn('return { safe_url: `${protocol}//[redacted]`', location_probe)
+        self.assertNotIn("parsedUrl.origin", location_probe)
+        self.assertNotIn("parsedUrl.pathname", location_probe)
+        self.assertNotIn("parsedUrl.search", location_probe)
+        self.assertNotIn("parsedUrl.hash", location_probe)
+        self.assertIn('value["safe_url"] not in {"http://[redacted]", "https://[redacted]"}', observation)
         self.assertIn('"document.location": ["safe_url", "status", "limitation"]', observation)
         self.assertIn('"document.title": "document-title"', observation)
+        location_catalog_probe = next(row for row in catalog["probes"] if row["probe_key"] == "document-location")
+        self.assertIn("in-memory keyed HMAC token", location_catalog_probe["sensitive_data_handling"])
         title_probe = next(row for row in catalog["probes"] if row["probe_key"] == "document-title")
         self.assertEqual(title_probe["provided_observation_fields"], ["document.title"])
         self.assertEqual(next(row for row in rules["rules"] if row["rule_id"] == "2779a5")["required_observation_fields"], ["document.title"])
         self.assertIn("never persist raw document.title text", title_probe["sensitive_data_handling"])
+
+    def test_container_query_states_are_never_inferred_from_computed_style(self):
+        probe = (ROOT / "skills" / "usability-inspection" / "scripts" / "fixed_browser_probes.js").read_text(encoding="utf-8")
+        contract = (ROOT / "skills" / "usability-inspection" / "scripts" / "observation_contract.py").read_text(encoding="utf-8")
+        browser_reference = (ROOT / "skills" / "usability-inspection" / "references" / "playwright-observation.md").read_text(encoding="utf-8")
+        self.assertNotIn("computedEffect", probe)
+        self.assertNotIn("actual === expected", probe)
+        self.assertIn('currentMatch = null;', probe)
+        self.assertIn('executionStatus = "not-executable";', probe)
+        self.assertIn('window.matchMedia(rule.conditionText).matches', probe)
+        self.assertIn('standard browser APIs do not expose the current @container match state', probe)
+        self.assertIn('if (row.execution_status !== "executable")', probe)
+        self.assertIn("match: null", probe)
+        self.assertIn('axis not in {"width", "height"}', contract)
+        self.assertIn("@container` rules", browser_reference)
+
+    def test_formal_link_inventory_retains_only_non_sensitive_link_context(self):
+        probe = (ROOT / "skills" / "usability-inspection" / "scripts" / "fixed_wcag_machine_probes.js").read_text(encoding="utf-8")
+        start = probe.index('case "mp-link-inventory"')
+        end = probe.index('case "mp-structure-inventory"', start)
+        link_probe = probe[start:end]
+        for allowed in ("safe_target", "has_query", "has_fragment", "path_segment_count", "rendered_text", "accessible_name"):
+            self.assertIn(allowed, link_probe)
+        for forbidden in ("target.href", "target.pathname,", "target.search,", "target.hash,", "href: element.getAttribute"):
+            self.assertNotIn(forbidden, link_probe)
 
     def test_environment_and_safe_fixture_contract_are_repository_owned(self):
         readme = (FIXTURE / "README.md").read_text(encoding="utf-8")
@@ -54,6 +88,7 @@ class CanonicalUsabilityFixtureTests(unittest.TestCase):
         empty_title = (FIXTURE / "title-empty.html").read_text(encoding="utf-8")
         ua_fallback = (FIXTURE / "ua-text-scaling-manual.html").read_text(encoding="utf-8")
         unreadable_scale = (FIXTURE / "text-scale-unreadable.html").read_text(encoding="utf-8")
+        container_queries = (FIXTURE / "container-query-cases.html").read_text(encoding="utf-8")
 
         for contract in ("python -m http.server 4173", "1280 × 800", "390 × 844", "unauthenticated", "reload resets"):
             with self.subTest(contract=contract):
@@ -82,6 +117,12 @@ class CanonicalUsabilityFixtureTests(unittest.TestCase):
         self.assertIn("canvas.getContext(\"2d\")", unreadable_scale)
         self.assertIn("context.fillText", unreadable_scale)
         self.assertNotIn("transform:", unreadable_scale)
+        for condition in ("@container (min-width: 400px)", "@container style(--variant: promoted)",
+                          "@container shared-card (min-width: 250px)", "@media (max-width: 600px)"):
+            with self.subTest(condition=condition):
+                self.assertIn(condition, container_queries)
+        self.assertEqual(container_queries.count("#same-value"), 2)
+        self.assertRegex(container_queries, r"#same-value\s*\{\s*color:\s*red;\s*\}")
         for forbidden in ("fetch(", "XMLHttpRequest", "localStorage", "sessionStorage"):
             with self.subTest(forbidden=forbidden):
                 self.assertNotIn(forbidden, script)

@@ -11,6 +11,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[4]
 SCRIPT = ROOT / "skills/wcag-conformance-evaluation/scripts/wcag_runtime.py"
 RUNTIME = ROOT / "skills/wcag-conformance-evaluation/scripts/runtime_contract.py"
+DOCUMENT_IDENTITY = "hmac-sha256:" + "a" * 64
 
 
 def load_runtime():
@@ -39,7 +40,7 @@ def request(level: str) -> dict:
     return {"metadata": metadata(), "input": {"operation": "materialize-criterion-plan", "arguments": {
         "wcag_version": "2.0", "level": level,
         "samples": [{"sample_ref": "SAMPLE-001", "identity_fingerprint": "sha256:" + "a" * 64,
-                     "target_identity": "http://127.0.0.1:4173/"}],
+                     "target_identity": DOCUMENT_IDENTITY}],
         "variations": [{"sample_ref": "SAMPLE-001", "variation_ref": "VAR-001",
                         "identity_fingerprint": "sha256:" + "b" * 64}]}}}
 
@@ -49,7 +50,7 @@ def close_input() -> dict:
     import wcag_criterion_plan
     plan = wcag_criterion_plan.materialize_plan(wcag_version="2.0", level="A",
         samples=[{"sample_ref": "SAMPLE-001", "identity_fingerprint": "sha256:" + "a" * 64,
-                  "target_identity": "http://127.0.0.1:4173/"}],
+                  "target_identity": DOCUMENT_IDENTITY}],
         variations=[{"sample_ref": "SAMPLE-001", "variation_ref": "VAR-001",
                      "identity_fingerprint": "sha256:" + "b" * 64}])
     criterion = next(row for row in plan["criteria"] if row["criterion_ref"] == "1.1.1")
@@ -151,7 +152,7 @@ class WcagRuntimeContractTests(unittest.TestCase):
         body=request("A")
         body["input"]={"operation":"materialize-sample-identities","arguments":{"drafts":[
             {"draft_key":"new-view","target_ref":"TARGET-NEW","state_key":"default",
-             "locator":"/new","target_identity":"https://fixture.test/new",
+             "target_identity":"hmac-sha256:"+"a"*64,
              "source_evidence_refs":["E-CURRENT"]}]}}
         current=invoke(body)
         self.assertEqual(current["result_status"],"ready")

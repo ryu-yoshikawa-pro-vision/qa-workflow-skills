@@ -302,3 +302,51 @@ formal reportはfixture全体をclosureしていない。変更後confirmation s
 - final report-only tree fingerprintは`b3f5a8203a33f0eb28c45d50b611ee91fab5293e1fe343ef2b40376858b67420`。PR bodyは実装・責務分担・targeted regression・current-head CIを記載するよう更新済み。merge / force push / branch削除 / PR closeは行わない。
 - 更新後Planのrepository implementation未達は0件。PR #17のSemantic全量反復評価、別継続課題であるnative trigger全量評価 / holdout、外部acceptanceはPR #14未達に含めない。formal fixture全体の不足resultは`blocked`のまま保持し、WCAG conformance successと主張しない。
 - この記録自体がreport-onlyのためimplementation証拠の範囲は変わらない。最終report commit後のActionsもcurrent PR headで確認してチャット最終報告へ記載する。
+
+## 2026-10-08 JST — 最終レビュー指摘2件の修正
+
+### Git / 対象範囲
+
+- 作業開始時のbranchはfeat/usability-evaluation-skill、local / PR remote headはd8bdf38a918c33ed2c4636be3171e89ab5142f15、origin/mainはdec3f7c764db2869dc24eb3d6f154712a6677068。ahead / behindは314 / 0。開始時にstaged / unstagedのユーザー変更はなく、ユーザー所有untracked 3b77866a0b52347ce6201959f97492f197a61365はそのまま未stageで保持した。
+- review修正は23 pathだけstageした。ユーザー所有.gitignore、output/、.playwright-mcp/、.codex/runs/、ユーザー所有hashファイルはcommit対象外。report追記前のcurrent implementation tree fingerprintは5984089f2011bb1bdbbb39e61032efc71b3f6cd965d920b8446f03f06925334d。計算方法は既存tree_fingerprint.py（progress reportを除外し、indexのtracked path内容をhash）を使用。
+- 既存JS probe / JSON catalogはrepository基準時点でPrettier非準拠だった。staged quality scriptのPrettier契約に合わせ、修正対象の同じファイル内を整形した。formatter以外の実装変更は以下2件に限定した。
+
+### 1. formal WCAG URL identity / privacy
+
+- browser ownerは現在のlocation.href全体（path、query、fragmentを含む）から、browser document内だけに保持する非extractableランダム鍵のHMAC-SHA-256 tokenを生成する。probe request、normalized result、currentness、sample identityへはopaque tokenだけを渡し、raw URLは戻り値・diagnostic・例外文へ出さない。document.location.safe_urlはscheme付きredacted markerだけを返す。
+- sampling.pyはdraftのnavigation locatorをregistryへ転記しない。sample lineage / criterion plan / WCAG report validatorはopaque identity tokenを要求する。query / fragmentを含むdocument差はcurrentness tokenで保持し、同一URL内state差は既存state identity fingerprintで区別する。
+- mp-link-inventoryはsame-origin / external-origin等の分類、query / fragment有無、path segment数、表示文字列等のlink-purpose contextだけを保持し、URL、path、query値、fragmentを保存しない。URL parse errorにも入力値を含めない。
+- 回帰testは、query / fragment route identity差、同一stateと別stateのsample fingerprint、raw locator拒否、synthetic confidential valueのregistry / error非出力、redacted normalized location、link inventoryの許可field限定、formal runtime / handoff currentnessを確認する。
+
+### 2. container queryの条件判定
+
+- CSS宣言とcomputed styleの文字列比較を条件成立判定から削除した。@mediaはmatchMedia(conditionText)で評価する。@containerはCSSOM inventoryだけを報告し、current_match_state=null、execution_status=not-executableと理由を保持する。responsive-boundariesは実行可能な@mediaだけを探索し、未評価container queryへbinary searchを実行しない。viewport復元を検証し、失敗時は正常完了にしない。
+- browser observation contractはcontainer queryのnumeric boundary結果を拒否し、@media結果は引き続き受理する。新fixtureには、条件不成立でも別rule由来のcomputed colorが宣言値と同じになるcase、style query、同名複数container、named size query、@mediaを用意した。
+- 公式CSSOM資料はCSSContainerRuleのcondition text / condition fieldsを規定する一方、現在のmatch stateを返すinstance methodを示していない。ChromiumでもCSSContainerRule.matchesは存在しなかった。参照: [CSS Conditional Rules Module Level 5](https://drafts.csswg.org/css-conditional/#the-csscontainerrule-interface), [MDN CSSContainerRule](https://developer.mozilla.org/en-US/docs/Web/API/CSSContainerRule)。
+
+### Browser / focused test evidence
+
+- 既に稼働していたfixture serverの<http://127.0.0.1:4173/container-query-cases.html>を既存Playwright browserで確認し、serverの再起動はしていない。viewport 929 × 935でcontainer幅は500px、390 × 844で312pxとなり、400px query条件の実成立状態が変わる一方、対象のcomputed colorは両方rgb(255, 0, 0)だった。これはstyle値一致だけでは状態を判定できないことを再現した。両状態でCSSOMはCSSContainerRule.matchesを提供せず、mobile時のmatchMedia("(max-width: 600px)").matchesはtrue。viewportを929 × 935へ復元し、Playwright pageを閉じた。consoleの唯一のerrorはfixture faviconの404で、probe挙動とは無関係。
+- Browser確認はfixtureとブラウザのquery / computed-style / CSSOM挙動を検証した。production fixed probeのnot-executable dispatchとschemaはdeterministic testで確認した。危険なserver launchやPlaywright server側任意code実行は使用していない。
+- focused formal/privacy/responsive suite: **95 tests PASS**。保存値・error経路には架空の合成fixture値だけを使用し、値そのものはこのreportへ記載しない。
+
+### Current source validation
+
+| 検証 | 結果 |
+| --- | --- |
+| official skills-ref validate | 22 Skill packages PASS（PYTHONUTF8=1） |
+| semantic dataset validator | 22 Skill / 155 cases PASS |
+| shared deterministic / repository deterministic | 12 PASS / 248 PASS |
+| runtime tests | 271 PASS |
+| shared semantic / repository semantic | 27 PASS・2 SKIP（Windows symlink privilege） / 4 PASS |
+| trigger contract | 1 PASS |
+| Python compile / Node syntax | PASS / 2 probe files PASS |
+| Prettier | 2 probe JS、catalog JSON、新fixture HTML PASS |
+| focused Markdown lint / text quality | 5 files・0 issue / 6 changed Markdown files PASS |
+| git diff --check | PASS |
+
+- 変更中のoutput templateは修正前baselineもMarkdown lint 44件で、今回も同数。進捗reportの既存3件を含む広いMarkdown lintは47件を報告したが、5つの今回対象Plan / Skill / READMEは0件で、追記箇所に新規issueはなかった。
+- 補助script node scripts/pre-commit-quality-check.mjsは未実行完了。scriptがimportするeslint packageがlocal node_modulesになく、package.jsonにも宣言がないため起動時に失敗した。現在のconfigured pre-commit hookはrepository Python validator / testを実行し、この補助scriptは呼び出さない。hookは迂回せず通常commitで確認する。
+- 最終実装head後にSemantic Judge 83、Trigger 180、Holdout 24、fixture全WCAG closureは再実行していない。更新後Planのgate範囲と既存PR #14 / PR #17責務分担を維持する。旧head d8bdf38のCI successは今回の変更後headのCI根拠には使わない。
+- commit / normal push、PR bodyへの今回の2件追記、最新PR headの3 Actions確認はpending。commit後の最新headでCI確認してから本節を最終更新する。
+- Progress: 90% (9/10)。Next: repository pre-commitを通して通常commit / push、PR body・この記録を確定し、current-head CIを確認する。

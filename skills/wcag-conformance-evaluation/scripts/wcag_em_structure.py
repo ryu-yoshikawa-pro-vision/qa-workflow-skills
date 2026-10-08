@@ -15,6 +15,7 @@ ACCESSIBLE_OUTPUT_CHECKS=("heading_hierarchy","table_headers","image_text_descri
                           "color_independent_state","descriptive_link_text")
 PARTIAL_REASONS={"third-party-content","lack-of-accessibility-support-for-languages"}
 _HANDOFF_REF = re.compile(r"^HANDOFF-(\d{3,})$")
+_DOCUMENT_IDENTITY = re.compile(r"^hmac-sha256:[0-9a-f]{64}$")
 
 
 class EvaluationStructureError(ValueError):
@@ -867,6 +868,20 @@ def render_machine_owned_report(data: dict[str,Any]) -> dict[str,Any]:
         'wcag_version','wcag_uri','conformance_level','product_scope','project_authority_refs','release_gate','previous_evaluation_ref'}
     if not isinstance(data['evaluation_input'],dict) or set(data['evaluation_input'])!=header_fields:
         raise EvaluationStructureError('report evaluation header does not match fixed fields')
+    structured_sample_fields={'Sample ref','State','Document identity','Type / technology coverage',
+        'Process membership','Rationale'}
+    structured_samples=data['structured_samples']
+    if not isinstance(structured_samples,list):
+        raise EvaluationStructureError('structured sample report rows must be an array')
+    for row in structured_samples:
+        if (not isinstance(row,dict) or set(row)!=structured_sample_fields
+                or not isinstance(row.get('Sample ref'),str) or not row['Sample ref'].strip()
+                or not isinstance(row.get('State'),str) or not row['State'].strip()
+                or not isinstance(row.get('Document identity'),str)
+                or not _DOCUMENT_IDENTITY.fullmatch(row['Document identity'])
+                or any(not isinstance(row.get(field),str) for field in
+                    ('Type / technology coverage','Process membership','Rationale'))):
+            raise EvaluationStructureError('structured sample rows require state and opaque document identity; raw locators are not accepted')
     if not isinstance(data['report_closure'],dict) or data['report_closure'].get('status') not in {'complete','blocked'}:
         raise EvaluationStructureError('report closure status is invalid')
     lineage=data.get('sample_lineage')
@@ -916,7 +931,7 @@ def render_machine_owned_report(data: dict[str,Any]) -> dict[str,Any]:
         lines.extend(['','### Rerun Sample Lineage','',_report_table(
             ['Previous sample ref','Lineage status','Current sample ref','Reason / evidence'],lineage_rows)])
     lines.extend([
-        '', '### Structured Sample','',_report_table(['Sample ref','State / locator','Type / technology coverage','Process membership','Rationale'],data['structured_samples']),
+        '', '### Structured Sample','',_report_table(['Sample ref','State','Document identity','Type / technology coverage','Process membership','Rationale'],structured_samples),
         '', '### Random Sample','',_report_table(
             ['Target count','Actual count','Selection method','Selected sample refs','Status','Exhaustion / blocker'],
             _random_sample_report_rows(data['random_sample'])),

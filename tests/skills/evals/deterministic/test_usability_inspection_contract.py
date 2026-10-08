@@ -40,6 +40,8 @@ runtime_contract = load_registered("usability_inspection_runtime_contract_for_ob
 measurement = load("usability_inspection_measurements", INSPECTION / "scripts/measurement.py")
 checks = load("usability_inspection_criterion_checks", INSPECTION / "scripts/criterion_checks.py")
 criterion_plan = load("wcag_criterion_plan_for_inspection_test", WCAG / "scripts/wcag_criterion_plan.py")
+DOCUMENT_IDENTITY_A = "hmac-sha256:" + "a" * 64
+DOCUMENT_IDENTITY_B = "hmac-sha256:" + "b" * 64
 
 
 class InspectionStructureTests(unittest.TestCase):
@@ -69,7 +71,7 @@ class InspectionStructureTests(unittest.TestCase):
         request = {"request_kind": "wcag-machine-probe", "observation_request_ref": "REQ-001",
                    "request_signature": "sig", "machine_probe_key": "mp-document-title",
                    "currentness_dependency": {"sample_identity_fingerprint": "sha256:abc"},
-                   "target_identity": "SAMPLE-001"}
+                   "target_identity": DOCUMENT_IDENTITY_A}
         self.assertEqual(structure.validate_formal_handoff(request)["request_ref"], "REQ-001")
         with self.assertRaises(structure.InspectionContractError):
             structure.validate_formal_handoff({**request, "request_kind": "arbitrary-probe"})
@@ -113,27 +115,27 @@ class ObservationContractTests(unittest.TestCase):
                                   "identity_fingerprint": "sha256:item"}},
             {"draft_target_key": "session", "scope_ref": "SCOPE-001", "semantic_label": "current target",
              "discovery_evidence_refs": ["E-4"], "resolver_kind": "current-session-ref",
-             "resolver_payload": {"session_target_ref": "TARGET-X", "document_identity": "doc-1"}},
+             "resolver_payload": {"session_target_ref": "TARGET-X", "document_identity": DOCUMENT_IDENTITY_A}},
         ]
-        result = observation.materialize_targets(drafts, document_identity="doc-1", population_revisions={
+        result = observation.materialize_targets(drafts, document_identity=DOCUMENT_IDENTITY_A, population_revisions={
             "POP-1": {"population_revision": "p1", "identity_fingerprint": "sha256:item"}
         })
         self.assertEqual(result["targets"][1]["resolver_payload"]["within_target_ref"], "TARGET-001")
         self.assertEqual(result["targets"][2]["resolution_status"], "current")
-        population_changed = observation.materialize_targets(drafts[2:3], document_identity="doc-1",
+        population_changed = observation.materialize_targets(drafts[2:3], document_identity=DOCUMENT_IDENTITY_A,
             population_revisions={"POP-1": {"population_revision": "p2", "identity_fingerprint": "sha256:item"}})
         self.assertEqual(population_changed["targets"][0]["resolution_status"], "stale")
         unique = observation.normalize_target_resolution(result["targets"][0], {
-            "target_ref": "TARGET-001", "match_count": 1, "current_document_identity": "doc-1"
-        }, current_document_identity="doc-1")
+            "target_ref": "TARGET-001", "match_count": 1, "current_document_identity": DOCUMENT_IDENTITY_A
+        }, current_document_identity=DOCUMENT_IDENTITY_A)
         self.assertEqual(unique["status"], "unique")
         ambiguous = observation.normalize_target_resolution(result["targets"][0], {
-            "target_ref": "TARGET-001", "match_count": 2, "current_document_identity": "doc-1"
-        }, current_document_identity="doc-1")
+            "target_ref": "TARGET-001", "match_count": 2, "current_document_identity": DOCUMENT_IDENTITY_A
+        }, current_document_identity=DOCUMENT_IDENTITY_A)
         self.assertEqual(ambiguous["status"], "ambiguous")
         session_stale = observation.normalize_target_resolution(result["targets"][3], {
-            "target_ref": "TARGET-004", "match_count": 1, "current_document_identity": "doc-2"
-        }, current_document_identity="doc-2")
+            "target_ref": "TARGET-004", "match_count": 1, "current_document_identity": DOCUMENT_IDENTITY_B
+        }, current_document_identity=DOCUMENT_IDENTITY_B)
         self.assertEqual(session_stale["status"], "stale")
 
     def test_fixed_probe_planning_and_normalization_reject_bad_values(self):
@@ -150,10 +152,10 @@ class ObservationContractTests(unittest.TestCase):
                                                                aspect_keys=[], target_refs=["TARGET-001"])["probes"]
                         if row["observation_field"] == "element.geometry")
         normalized = observation.normalize_probe_result(geometry, {
-            "probe_key": "element-geometry", "document_identity": "doc-1", "status": "ok",
+            "probe_key": "element-geometry", "document_identity": DOCUMENT_IDENTITY_A, "status": "ok",
             "value": {"x_css_px": 1.5, "y_css_px": 2, "width_css_px": 100, "height_css_px": 20},
             "evidence_refs": ["E-1"],
-        }, current_document_identity="doc-1")
+        }, current_document_identity=DOCUMENT_IDENTITY_A)
         self.assertEqual(normalized["status"], "ok")
         semantics_probe = next(row for row in plan["probes"] if row["observation_field"] == "accessibility.semantics")
         semantics_value = {"role": "button", "accessible_name": "Save", "description": None,
@@ -161,16 +163,16 @@ class ObservationContractTests(unittest.TestCase):
                            "included_in_accessibility_tree": True, "programmatically_hidden": False,
                            "status": "ok"}
         semantics = observation.normalize_probe_result(semantics_probe, {
-            "probe_key": "accessibility-semantics", "document_identity": "doc-1", "status": "ok",
+            "probe_key": "accessibility-semantics", "document_identity": DOCUMENT_IDENTITY_A, "status": "ok",
             "value": semantics_value, "evidence_refs": ["E-SEMANTICS-1"],
-        }, current_document_identity="doc-1")
+        }, current_document_identity=DOCUMENT_IDENTITY_A)
         self.assertEqual(semantics["value"]["host_element"], "html:button")
         with self.assertRaises(observation.ObservationContractError):
             observation.normalize_probe_result(semantics_probe, {
-                "probe_key": "accessibility-semantics", "document_identity": "doc-1", "status": "ok",
+                "probe_key": "accessibility-semantics", "document_identity": DOCUMENT_IDENTITY_A, "status": "ok",
                 "value": {key: value for key, value in semantics_value.items()
                           if key != "included_in_accessibility_tree"}, "evidence_refs": ["E-SEMANTICS-1"],
-            }, current_document_identity="doc-1")
+            }, current_document_identity=DOCUMENT_IDENTITY_A)
         title_probe = next(row for row in observation.plan_probes(
             selected_rule_keys=["2779a5"], measurement_kinds=[], aspect_keys=[], target_refs=[]
         )["probes"] if row["observation_field"] == "document.title")
@@ -179,9 +181,9 @@ class ObservationContractTests(unittest.TestCase):
                        "first_title_children_are_text": True, "has_non_whitespace_text": True,
                        "status": "ok", "limitation": None}
         normalized_title = observation.normalize_probe_result(title_probe, {
-            "probe_key": "document-title", "document_identity": "doc-1", "status": "ok",
+            "probe_key": "document-title", "document_identity": DOCUMENT_IDENTITY_A, "status": "ok",
             "value": title_value, "evidence_refs": ["E-DOCUMENT-TITLE-1"],
-        }, current_document_identity="doc-1")
+        }, current_document_identity=DOCUMENT_IDENTITY_A)
         self.assertEqual(normalized_title["value"], title_value)
         invalid_title_values = (
             {**title_value, "raw_title_text": "secret title"},
@@ -192,23 +194,23 @@ class ObservationContractTests(unittest.TestCase):
             with self.subTest(invalid_title=invalid_title):
                 with self.assertRaises(observation.ObservationContractError):
                     observation.normalize_probe_result(title_probe, {
-                        "probe_key": "document-title", "document_identity": "doc-1", "status": "ok",
+                        "probe_key": "document-title", "document_identity": DOCUMENT_IDENTITY_A, "status": "ok",
                         "value": invalid_title, "evidence_refs": ["E-DOCUMENT-TITLE-1"],
-                    }, current_document_identity="doc-1")
+                    }, current_document_identity=DOCUMENT_IDENTITY_A)
         exact_geometry_values = runtime_contract.strict_loads(json.dumps({
             "x_css_px": 1.25, "y_css_px": 2, "width_css_px": 100.5, "height_css_px": 20,
         }))
         exact_geometry = observation.normalize_probe_result(geometry, {
-            "probe_key": "element-geometry", "document_identity": "doc-1", "status": "ok",
+            "probe_key": "element-geometry", "document_identity": DOCUMENT_IDENTITY_A, "status": "ok",
             "value": exact_geometry_values,
             "evidence_refs": ["E-1"],
-        }, current_document_identity="doc-1")
+        }, current_document_identity=DOCUMENT_IDENTITY_A)
         self.assertEqual(exact_geometry["value"]["width_css_px"].text(), "100.5")
         with self.assertRaises(observation.ObservationContractError):
             observation.normalize_probe_result(geometry, {
-                "probe_key": "element-geometry", "document_identity": "doc-1", "status": "ok",
+                "probe_key": "element-geometry", "document_identity": DOCUMENT_IDENTITY_A, "status": "ok",
                 "value": {"x_css_px": float("nan"), "y_css_px": 2, "width_css_px": 100, "height_css_px": 20},
-            }, current_document_identity="doc-1")
+            }, current_document_identity=DOCUMENT_IDENTITY_A)
 
     def test_responsive_boundaries_require_verified_rows_and_materialize_canonical_refs(self):
         probe = next(row for row in observation.plan_probes(
@@ -223,11 +225,11 @@ class ObservationContractTests(unittest.TestCase):
             "execution_status": "executable", "evidence_ref": "E-2",
         }
         payload = {
-            "probe_key": "responsive-boundaries", "document_identity": "doc-1", "status": "ok",
+            "probe_key": "responsive-boundaries", "document_identity": DOCUMENT_IDENTITY_A, "status": "ok",
             "value": {"boundaries": [base, {**base, "evidence_ref": "E-1"}], "complete": True, "status": "ok"},
             "evidence_refs": ["E-2", "E-1"],
         }
-        normalized = observation.normalize_probe_result(probe, payload, current_document_identity="doc-1")
+        normalized = observation.normalize_probe_result(probe, payload, current_document_identity=DOCUMENT_IDENTITY_A)
         self.assertEqual(normalized["value"]["boundaries"], [{
             "boundary_ref": "BOUNDARY-001", "condition_ref": "COND-003", "axis": "width",
             "before_viewport_css_px": 768, "transition_viewport_css_px": 769,
@@ -244,68 +246,73 @@ class ObservationContractTests(unittest.TestCase):
              "reason": "style query is retained as a presentation variation"},
             {"condition_ref": "COND-005", "status": "no-numeric-transition",
              "reason": "browser evaluation found no transition in the finite viewport range"},
+            {"condition_ref": "COND-006", "status": "not-executable",
+             "reason": "standard browser APIs do not expose the current @container match state"},
         ], "complete": True, "status": "ok"}}
-        closed = observation.normalize_probe_result(probe, no_numeric_boundary, current_document_identity="doc-1")
+        closed = observation.normalize_probe_result(probe, no_numeric_boundary, current_document_identity=DOCUMENT_IDENTITY_A)
         self.assertEqual([row["status"] for row in closed["value"]["closures"]],
-                         ["non-numeric-presentation-variation", "no-numeric-transition"])
+                         ["non-numeric-presentation-variation", "no-numeric-transition", "not-executable"])
 
-        exact_container_boundary = {**base, "axis": "inline-size",
-                                    "container_width_css_px": runtime_contract.strict_loads("[670.5,671.25,672.75]")}
-        exact_boundary_result = observation.normalize_probe_result(probe, {
-            "probe_key": "responsive-boundaries", "document_identity": "doc-1", "status": "ok",
-            "value": {"boundaries": [exact_container_boundary], "complete": True, "status": "ok"},
-            "evidence_refs": ["E-2"],
-        }, current_document_identity="doc-1")
-        self.assertEqual(exact_boundary_result["value"]["boundaries"][0]["container_width_css_px"][1].text(),
-                         "671.25")
+        unexecutable_container_boundary = {**base, "axis": "inline-size",
+            "container_width_css_px": runtime_contract.strict_loads("[670.5,671.25,672.75]")}
+        with self.assertRaises(observation.ObservationContractError):
+            observation.normalize_probe_result(probe, {
+                "probe_key": "responsive-boundaries", "document_identity": DOCUMENT_IDENTITY_A, "status": "ok",
+                "value": {"boundaries": [unexecutable_container_boundary], "complete": True, "status": "ok"},
+                "evidence_refs": ["E-2"],
+            }, current_document_identity=DOCUMENT_IDENTITY_A)
 
         malformed = {**payload, "value": {"boundaries": [{}], "complete": True, "status": "ok"}}
         with self.assertRaises(observation.ObservationContractError):
-            observation.normalize_probe_result(probe, malformed, current_document_identity="doc-1")
+            observation.normalize_probe_result(probe, malformed, current_document_identity=DOCUMENT_IDENTITY_A)
         inconsistent = {**payload, "value": {"boundaries": [
             {**base, "match_states": [True, True, False]}
         ], "complete": True, "status": "ok"}}
         with self.assertRaises(observation.ObservationContractError):
-            observation.normalize_probe_result(probe, inconsistent, current_document_identity="doc-1")
+            observation.normalize_probe_result(probe, inconsistent, current_document_identity=DOCUMENT_IDENTITY_A)
 
     def test_responsive_condition_inventory_is_typed_and_closed(self):
         probe = next(row for row in observation.plan_probes(
             selected_rule_keys=[], measurement_kinds=["responsive"], aspect_keys=[]
         )["probes"] if row["observation_field"] == "responsive.conditions")
         condition = {
-            "condition_ref": "COND-001", "source_ref": "CSS-SOURCE-001", "query_kind": "container-style",
-            "raw_condition": "style(--contrast: high)", "query_container_name": "product-layout",
-            "query_container_type": "inline-size", "query_container_identity": "main:nth-of-type(1)",
-            "axis": None, "feature": None, "browser_capability": "available",
-            "evaluation_method": "browser computed value of the queried container custom property",
-            "current_match_state": False, "execution_status": "executable", "execution_reason": None,
+            "condition_ref": "COND-001", "source_ref": "CSS-SOURCE-001", "query_kind": "media",
+            "raw_condition": "(max-width: 48rem)", "query_container_name": None,
+            "query_container_type": None, "query_container_identity": None,
+            "axis": "width", "feature": "max-width", "browser_capability": "available",
+            "evaluation_method": "browser matchMedia evaluation of the complete CSSOM condition",
+            "current_match_state": True, "execution_status": "executable", "execution_reason": None,
             "evidence_refs": ["E-1"],
         }
         raw = {"conditions": [condition], "complete": True, "status": "ok", "issues": [],
                "viewport": {"width_css_px": 1280, "height_css_px": 800}}
         normalized = observation.normalize_probe_result({**probe, "probe_ref": "PROBE-001"}, {
-            "probe_key": "responsive-conditions", "document_identity": "doc-1", "status": "ok",
+            "probe_key": "responsive-conditions", "document_identity": DOCUMENT_IDENTITY_A, "status": "ok",
             "value": raw, "evidence_refs": ["E-1"],
-        }, current_document_identity="doc-1")
-        self.assertEqual(normalized["value"]["conditions"][0]["query_kind"], "container-style")
+        }, current_document_identity=DOCUMENT_IDENTITY_A)
+        self.assertEqual(normalized["value"]["conditions"][0]["query_kind"], "media")
         self.assertEqual(normalized["value"]["viewport"]["width_css_px"], 1280)
 
-        unexecutable = {**condition, "condition_ref": "COND-002", "browser_capability": "unavailable",
+        unexecutable = {**condition, "condition_ref": "COND-002", "query_kind": "container-size",
+                        "raw_condition": "(min-width: 400px)", "query_container_name": None,
+                        "query_container_type": "inline-size", "query_container_identity": "main:nth-of-type(1)",
+                        "axis": "inline-size", "feature": "min-width", "browser_capability": "unavailable",
+                        "evaluation_method": "CSSOM inventory only; no standard current container-query match-state API",
                         "current_match_state": None, "execution_status": "not-executable",
-                        "execution_reason": "required safe state is not available in this session"}
+                        "execution_reason": "standard browser APIs do not expose the current @container match state"}
         complete_inventory = observation.normalize_probe_result({**probe, "probe_ref": "PROBE-001"}, {
-            "probe_key": "responsive-conditions", "document_identity": "doc-1", "status": "ok",
+            "probe_key": "responsive-conditions", "document_identity": DOCUMENT_IDENTITY_A, "status": "ok",
             "value": {**raw, "conditions": [unexecutable]}, "evidence_refs": ["E-1"],
-        }, current_document_identity="doc-1")
+        }, current_document_identity=DOCUMENT_IDENTITY_A)
         self.assertTrue(complete_inventory["value"]["complete"])
         self.assertEqual(complete_inventory["value"]["conditions"][0]["execution_status"], "not-executable")
 
         malformed = {**raw, "conditions": [{**condition, "execution_status": "ready"}]}
         with self.assertRaises(observation.ObservationContractError):
             observation.normalize_probe_result({**probe, "probe_ref": "PROBE-001"}, {
-                "probe_key": "responsive-conditions", "document_identity": "doc-1", "status": "ok",
+                "probe_key": "responsive-conditions", "document_identity": DOCUMENT_IDENTITY_A, "status": "ok",
                 "value": malformed, "evidence_refs": ["E-1"],
-            }, current_document_identity="doc-1")
+            }, current_document_identity=DOCUMENT_IDENTITY_A)
 
     def test_interaction_timing_requires_same_page_clock_and_consistent_elapsed_value(self):
         probe = next(row for row in observation.plan_probes(
@@ -315,24 +322,24 @@ class ObservationContractTests(unittest.TestCase):
                  "predicate_result": {"predicate_key": "text-present", "matched": True},
                  "clock_domain": "same-page-performance-now", "status": "ok"}
         normalized = observation.normalize_probe_result({**probe, "probe_ref": "PROBE-001"}, {
-            "probe_key": "interaction-timing", "document_identity": "doc-1", "status": "ok",
+            "probe_key": "interaction-timing", "document_identity": DOCUMENT_IDENTITY_A, "status": "ok",
             "value": valid, "evidence_refs": ["E-1"],
-        }, current_document_identity="doc-1")
+        }, current_document_identity=DOCUMENT_IDENTITY_A)
         self.assertEqual(normalized["value"]["elapsed_ms"], 32.5)
         exact_timing = runtime_contract.strict_loads(json.dumps({
             **valid, "start_ms": 6579656.700000018, "end_ms": 6579672.800000012,
             "elapsed_ms": 16.099999994039536,
         }))
         exact_normalized = observation.normalize_probe_result({**probe, "probe_ref": "PROBE-001"}, {
-            "probe_key": "interaction-timing", "document_identity": "doc-1", "status": "ok",
+            "probe_key": "interaction-timing", "document_identity": DOCUMENT_IDENTITY_A, "status": "ok",
             "value": exact_timing, "evidence_refs": ["E-1"],
-        }, current_document_identity="doc-1")
+        }, current_document_identity=DOCUMENT_IDENTITY_A)
         self.assertEqual(exact_normalized["value"]["elapsed_ms"].text(), "16.099999994039536")
         with self.assertRaises(observation.ObservationContractError):
             observation.normalize_probe_result({**probe, "probe_ref": "PROBE-001"}, {
-                "probe_key": "interaction-timing", "document_identity": "doc-1", "status": "ok",
+                "probe_key": "interaction-timing", "document_identity": DOCUMENT_IDENTITY_A, "status": "ok",
                 "value": {**valid, "elapsed_ms": 40}, "evidence_refs": ["E-1"],
-            }, current_document_identity="doc-1")
+            }, current_document_identity=DOCUMENT_IDENTITY_A)
 
     def test_fixed_predicates_reject_unknown_code_and_browser_owned_baseline(self):
         observation.validate_predicate({"predicate_key": "text-present", "expected_text": "Saved",
@@ -350,7 +357,7 @@ class ObservationContractTests(unittest.TestCase):
         draft = {"request_draft_key": "obs-1", "requester_kind": "wcag-procedure",
                  "requester_identity": {"criterion_evaluation_ref": "CRIT-1", "procedure_execution_ref": "PROC-1"},
                  "scope_ref": "SCOPE-001", "target_ref": "TARGET-001", "state_description": "Save button",
-                 "state_basis_refs": ["ACTION-1"], "current_document_identity": "doc-1",
+                 "state_basis_refs": ["ACTION-1"], "current_document_identity": DOCUMENT_IDENTITY_A,
                  "observation_field": "element.state", "predicate": None, "reason": "Need post-action enabled state",
                  "current_evidence_refs": ["E-1"]}
         request = observation.materialize_additional(draft, prior_requests=[])
@@ -371,7 +378,7 @@ class ObservationContractTests(unittest.TestCase):
         plan = criterion_plan.materialize_plan(
             wcag_version="2.0", level="A",
             samples=[{"sample_ref": "SAMPLE-1", "identity_fingerprint": "sha256:" + "a" * 64,
-                      "target_identity": "http://127.0.0.1:4173/"}],
+                      "target_identity": DOCUMENT_IDENTITY_A}],
             variations=[{"sample_ref": "SAMPLE-1", "variation_ref": "VAR-1", "identity_fingerprint": "sha256:" + "b" * 64}],
         )
         request = plan["requests"][0]
@@ -381,15 +388,15 @@ class ObservationContractTests(unittest.TestCase):
                       "observation_request_ref", "request_signature", "criterion_evaluation_ref",
                       "procedure_execution_ref", "machine_probe_key", "sample_ref", "variation_ref",
                       "process_ref", "requirement_ref", "target_identity", "currentness_dependency")},
-                  "status": "ok", "current_document_identity": "doc-1", "evidence_refs": ["E-1"], "value": {}}
-        self.assertTrue(observation.normalize_probe_result({}, result, current_document_identity="doc-1",
+                  "status": "ok", "current_document_identity": DOCUMENT_IDENTITY_A, "evidence_refs": ["E-1"], "value": {}}
+        self.assertTrue(observation.normalize_probe_result({}, result, current_document_identity=DOCUMENT_IDENTITY_A,
                                                            formal=True, formal_request=request)["normalized"])
         tampered = {**request, "target_identity": "other"}
         with self.assertRaises(observation.ObservationContractError):
             observation.validate_formal_probe_request(tampered)
         with self.assertRaises(observation.ObservationContractError):
             observation.normalize_probe_result({}, {**result, "machine_probe_key": "mp-viewport-state"},
-                                               current_document_identity="doc-1", formal=True, formal_request=request)
+                                               current_document_identity=DOCUMENT_IDENTITY_A, formal=True, formal_request=request)
 
 
 class DeterministicMeasurementTests(unittest.TestCase):

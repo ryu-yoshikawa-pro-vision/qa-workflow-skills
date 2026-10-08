@@ -4,7 +4,6 @@ import json
 import re
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit
 from runtime_contract import static_data_fingerprint
 from wcag_requirements import ASSETS, load_catalog, resolve_target
 
@@ -79,14 +78,8 @@ def materialize_plan(*, wcag_version: str | None, level: str | None,
         raise CriterionPlanError('sample refs are required')
     for row in samples:
         identity = row.get('target_identity')
-        try:
-            parsed_identity = urlsplit(identity) if isinstance(identity, str) else None
-        except ValueError:
-            parsed_identity = None
-        if (parsed_identity is None or parsed_identity.scheme not in {'http', 'https'}
-                or not parsed_identity.netloc or parsed_identity.username is not None
-                or parsed_identity.password is not None):
-            raise CriterionPlanError('each canonical sample requires its exact current HTTP(S) document identity')
+        if not isinstance(identity, str) or not re.fullmatch(r'hmac-sha256:[0-9a-f]{64}', identity):
+            raise CriterionPlanError('each canonical sample requires an opaque current-document identity token')
     if any(not isinstance(row.get('variation_ref'), str) or not row['variation_ref'].strip() for row in variations):
         raise CriterionPlanError('variation refs are required')
     fingerprint_re = re.compile(r'^sha256:[0-9a-f]{64}$')

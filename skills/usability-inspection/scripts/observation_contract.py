@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -43,6 +44,7 @@ FORMAL_PROBES = {
     "mp-text-spacing-run", "mp-control-value-history", "mp-multipage-signature", "mp-audio-autoplay-run",
 }
 FORMAL_STATUSES = {"ok", "unsupported", "unavailable", "incomplete", "blocked"}
+DOCUMENT_IDENTITY_PATTERN = re.compile(r"^hmac-sha256:[0-9a-f]{64}$")
 LIMITATION_CODES = {
     "background-not-machine-resolvable", "focus-indicator-not-machine-resolvable",
     "text-scaling-mechanism-not-machine-executable", "text-scaling-state-not-machine-readable",
@@ -87,6 +89,10 @@ def canonical_json(value: Any) -> bytes:
 
 def fingerprint(value: Any) -> str:
     return "sha256:" + hashlib.sha256(canonical_json(value)).hexdigest()
+
+
+def is_document_identity_token(value: Any) -> bool:
+    return isinstance(value, str) and DOCUMENT_IDENTITY_PATTERN.fullmatch(value) is not None
 
 
 def _exact_fields(value: dict[str, Any], required: set[str], optional: set[str] = set()) -> None:
@@ -351,7 +357,8 @@ def validate_resolver(kind: str, payload: dict[str, Any]) -> None:
             raise ObservationContractError("population resolver identity fields are required")
     elif kind == "current-session-ref":
         _exact_fields(payload, {"session_target_ref", "document_identity"})
-        if not all(isinstance(payload[k], str) and payload[k] for k in payload):
+        if (not isinstance(payload["session_target_ref"], str) or not payload["session_target_ref"].strip()
+                or not is_document_identity_token(payload["document_identity"])):
             raise ObservationContractError("session resolver identity fields are required")
     else:
         raise ObservationContractError("unknown resolver kind")
@@ -359,6 +366,8 @@ def validate_resolver(kind: str, payload: dict[str, Any]) -> None:
 
 def materialize_targets(drafts: list[dict[str, Any]], *, document_identity: str,
                         population_revisions: dict[str, Any] | None = None) -> dict[str, Any]:
+    if not is_document_identity_token(document_identity):
+        raise ObservationContractError("target materialization requires an opaque current-document identity token")
     target_refs: dict[str, str] = {}
     rows = []
     for i, draft in enumerate(drafts, 1):
@@ -410,6 +419,9 @@ def normalize_target_resolution(target: dict[str, Any], resolution: dict[str, An
     count = resolution["match_count"]
     if not isinstance(count, int) or isinstance(count, bool) or count < 0:
         raise ObservationContractError("target match count must be a non-negative integer")
+    if (not is_document_identity_token(current_document_identity)
+            or not is_document_identity_token(resolution["current_document_identity"])):
+        raise ObservationContractError("target resolution requires opaque current-document identity tokens")
     stale = resolution["current_document_identity"] != current_document_identity
     payload = target.get("resolver_payload", {})
     if target.get("resolver_kind") == "machine-population-index":
@@ -515,7 +527,7 @@ def _normalize_responsive_boundaries(value: Any) -> dict[str, Any]:
         "after_viewport_css_px", "match_states", "raw_condition", "derivation_method",
         "execution_status",
     }
-    optional = {"container_width_css_px", "container_height_css_px", "evidence_ref", "evidence_refs"}
+    optional = {"evidence_ref", "evidence_refs"}
     by_identity: dict[tuple[str, str, int], dict[str, Any]] = {}
     for row in value["boundaries"]:
         if not isinstance(row, dict):
@@ -525,7 +537,7 @@ def _normalize_responsive_boundaries(value: Any) -> dict[str, Any]:
                    for name in ("condition_ref", "raw_condition", "derivation_method")):
             raise ObservationContractError("responsive boundary identity and derivation fields must be non-empty strings")
         axis = row["axis"]
-        if axis not in {"width", "height", "inline-size", "block-size"}:
+        if axis not in {"width", "height"}:
             raise ObservationContractError("responsive boundary axis is not supported by the fixed contract")
         before, transition, after = (
             row["before_viewport_css_px"], row["transition_viewport_css_px"], row["after_viewport_css_px"]
@@ -542,16 +554,6 @@ def _normalize_responsive_boundaries(value: Any) -> dict[str, Any]:
             raise ObservationContractError("responsive boundary must retain a verified before/transition/after match sequence")
         if row["execution_status"] not in {"executable", "not-executable"}:
             raise ObservationContractError("responsive boundary execution status is invalid")
-        if axis in {"inline-size", "block-size"}:
-            geometry_field = "container_width_css_px" if axis == "inline-size" else "container_height_css_px"
-            geometry = row.get(geometry_field)
-            if (not isinstance(geometry, list) or len(geometry) != 3
-                    or any((number_value := _decimal_number(number)) is None or number_value < 0
-                           for number in geometry)):
-                raise ObservationContractError("container boundary must retain its three query-container measurements")
-        elif "container_width_css_px" in row or "container_height_css_px" in row:
-            raise ObservationContractError("viewport boundary cannot carry query-container measurements")
-
         refs: list[str] = []
         if "evidence_ref" in row:
             refs.append(row["evidence_ref"])
@@ -575,9 +577,6 @@ def _normalize_responsive_boundaries(value: Any) -> dict[str, Any]:
             "execution_status": row["execution_status"],
             "evidence_refs": sorted(set(refs)),
         }
-        for name in ("container_width_css_px", "container_height_css_px"):
-            if name in row:
-                normalized[name] = row[name]
         identity = (row["condition_ref"], axis, transition)
         existing = by_identity.get(identity)
         if existing is not None:
@@ -728,8 +727,8 @@ def normalize_probe_result(probe: dict[str, Any], result: dict[str, Any], *, cur
         for field in identity_fields:
             if result[field] != formal_request[field]:
                 raise ObservationContractError(f"formal result currentness identity mismatch: {field}")
-        if not isinstance(result["current_document_identity"], str) or not result["current_document_identity"].strip():
-            raise ObservationContractError("formal result requires current document identity")
+        if not is_document_identity_token(result["current_document_identity"]):
+            raise ObservationContractError("formal result requires an opaque current-document identity token")
         evidence_refs = result.get("evidence_refs")
         if not isinstance(evidence_refs, list) or any(not isinstance(ref, str) or not ref.strip() for ref in evidence_refs):
             raise ObservationContractError("formal evidence_refs must be a string array")
@@ -766,6 +765,9 @@ def normalize_probe_result(probe: dict[str, Any], result: dict[str, Any], *, cur
         return {**normalized_result, "normalized": True,
                 "input_fingerprint": fingerprint({k: formal_request[k] for k in sorted(formal_request) if k != "request_signature"})}
 
+    if (not is_document_identity_token(current_document_identity)
+            or not is_document_identity_token(result.get("document_identity"))):
+        raise ObservationContractError("probe requires opaque current-document identity tokens")
     if result.get("probe_key") != probe["probe_key"] or result.get("document_identity") != current_document_identity:
         raise ObservationContractError("probe identity mismatch or stale document")
     if result.get("status") not in {"ok", "unavailable", "unsupported", "incomplete", "blocked"}:
@@ -783,9 +785,9 @@ def normalize_probe_result(probe: dict[str, Any], result: dict[str, Any], *, cur
     value = result.get("value", {})
     if probe["observation_field"] == "document.location" and result.get("status") == "ok":
         if (set(value) != {"safe_url", "status", "limitation"}
-                or not isinstance(value["safe_url"], str) or not value["safe_url"].strip()
+                or value["safe_url"] not in {"http://[redacted]", "https://[redacted]"}
                 or value["status"] != "ok" or value["limitation"] is not None):
-            raise ObservationContractError("safe document location values are invalid")
+            raise ObservationContractError("document location must contain only a redacted HTTP(S) scheme marker")
     if probe["observation_field"] == "responsive.boundaries" and result.get("status") == "ok":
         value = _normalize_responsive_boundaries(value)
     if probe["observation_field"] == "responsive.conditions" and result.get("status") == "ok":
@@ -836,12 +838,17 @@ def validate_formal_probe_request(request: dict[str, Any]) -> dict[str, Any]:
         raise ObservationContractError("required browser capability does not match fixed probe")
     if not all(isinstance(request[field], str) and request[field].strip() for field in
                ("observation_request_ref", "criterion_evaluation_ref", "procedure_execution_ref", "sample_ref",
-                "variation_ref", "requirement_ref", "target_identity")):
+                "variation_ref", "requirement_ref")) or not is_document_identity_token(request["target_identity"]):
         raise ObservationContractError("formal typed request identity fields must be non-empty strings")
     if request["process_ref"] is not None and (not isinstance(request["process_ref"], str) or not request["process_ref"].strip()):
         raise ObservationContractError("formal process ref must be a non-empty string or null")
     if not isinstance(request["currentness_dependency"], dict) or not request["currentness_dependency"]:
         raise ObservationContractError("formal currentness dependency must be a non-empty object")
+    dependency = request["currentness_dependency"]
+    if (set(dependency) != {"sample_identity_fingerprint", "variation_identity_fingerprint"}
+            or any(not isinstance(value, str) or not re.fullmatch(r"sha256:[0-9a-f]{64}", value)
+                   for value in dependency.values())):
+        raise ObservationContractError("formal currentness dependency must contain only canonical sample and variation fingerprints")
     expected = fingerprint({key: value for key, value in request.items() if key != "request_signature"})
     if request["request_signature"] != expected:
         raise ObservationContractError("formal request signature mismatch")
@@ -863,8 +870,8 @@ def materialize_additional(draft: dict[str, Any], *, prior_requests: list[dict[s
         raise ObservationContractError("request draft key is required")
     if any(row.get("request_draft_key") == draft["request_draft_key"] for row in prior_requests):
         raise ObservationContractError("duplicate request draft key")
-    if not isinstance(draft["current_document_identity"], str) or not draft["current_document_identity"].strip():
-        raise ObservationContractError("current document identity is required")
+    if not is_document_identity_token(draft["current_document_identity"]):
+        raise ObservationContractError("additional request requires an opaque current-document identity token")
     target_required = draft["observation_field"] in {
         "element.geometry", "element.state", "element.rendered-text", "element.control-value",
         "element.selected-values", "accessibility.semantics", "focus.state", "computed-style.properties",

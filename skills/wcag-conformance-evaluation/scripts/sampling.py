@@ -4,7 +4,6 @@ import hashlib, json, math
 import random
 import re
 from typing import Any
-from urllib.parse import urlsplit
 
 
 class SamplingError(ValueError):
@@ -19,38 +18,34 @@ def fingerprint(value: Any) -> str:
     return "sha256:" + hashlib.sha256(canonical_json(value)).hexdigest()
 
 
+DOCUMENT_IDENTITY_PATTERN = re.compile(r"^hmac-sha256:[0-9a-f]{64}$")
+
+
 def is_current_document_identity(value: Any) -> bool:
-    if not isinstance(value, str) or not value.strip():
-        return False
-    try:
-        parsed = urlsplit(value)
-    except ValueError:
-        return False
-    return (parsed.scheme in {"http", "https"} and bool(parsed.netloc)
-            and parsed.username is None and parsed.password is None)
+    """Accept only an opaque browser-issued current-document identity token."""
+    return isinstance(value, str) and DOCUMENT_IDENTITY_PATTERN.fullmatch(value) is not None
 
 
 def sample_identity_registry(drafts: list[dict[str, Any]]) -> dict[str, Any]:
     by_key={}; grouped={}
     for draft in drafts:
-        required={"draft_key","target_ref","state_key","locator","target_identity","source_evidence_refs"}
+        required={"draft_key","target_ref","state_key","target_identity","source_evidence_refs"}
         if set(draft)!=required: raise SamplingError("sample draft schema mismatch")
         key=draft["draft_key"]
         if not isinstance(key,str) or not key or key in by_key: raise SamplingError("sample draft keys must be unique")
-        if any(not isinstance(draft[field],str) or not draft[field].strip() for field in ("target_ref","state_key","locator")):
-            raise SamplingError("sample target, canonical state, and source locator are required")
+        if any(not isinstance(draft[field],str) or not draft[field].strip() for field in ("target_ref","state_key")):
+            raise SamplingError("sample target and canonical state are required")
         if not is_current_document_identity(draft["target_identity"]):
-            raise SamplingError("sample draft requires the exact current HTTP(S) document identity")
+            raise SamplingError("sample draft requires an opaque current-document identity token")
         evidence=draft["source_evidence_refs"]
         if not isinstance(evidence,list) or any(not isinstance(ref,str) or not ref.strip() for ref in evidence):
             raise SamplingError("sample source evidence refs must be non-empty strings")
-        # A locator is an access path. The target and observed state establish
-        # sample identity, so another route to that same state does not create
-        # a second sample.
-        identity=fingerprint({"target_ref":draft["target_ref"],"state_key":draft["state_key"]})
+        # The opaque browser identity distinguishes exact routes without
+        # persisting their URL or the supplied navigation locator.
+        identity=fingerprint({"target_ref":draft["target_ref"],"state_key":draft["state_key"],
+                              "document_identity":draft["target_identity"]})
         group=grouped.setdefault(identity,{"target_ref":draft["target_ref"],"state_key":draft["state_key"],
-            "locators":set(),"target_identities":set(),"source_evidence_refs":set(),"draft_keys":[]})
-        group["locators"].add(draft["locator"])
+            "target_identities":set(),"source_evidence_refs":set(),"draft_keys":[]})
         group["target_identities"].add(draft["target_identity"])
         group["source_evidence_refs"].update(evidence)
         group["draft_keys"].append(key)
@@ -60,7 +55,7 @@ def sample_identity_registry(drafts: list[dict[str, Any]]) -> dict[str, Any]:
         ref=f"SAMPLE-{len(rows)+1:03d}"
         identity_to_ref[identity]=ref
         rows.append({"sample_ref":ref,"target_ref":group["target_ref"],"state_key":group["state_key"],
-            "source_locators":sorted(group["locators"]),
+            "source_locators":sorted(group["target_identities"]),
             "target_identity":sorted(group["target_identities"])[0],"identity_fingerprint":identity,
             "source_evidence_refs":sorted(group["source_evidence_refs"])})
     by_key={key:identity_to_ref[identity] for key,identity in by_key.items()}
@@ -74,8 +69,8 @@ def materialize_sample_lineage(*, previous_sample_refs: list[str],
         current_evidence_refs: list[str] | None = None) -> dict[str, Any]:
     """Resolve structured sample refs across a WCAG evaluation revision.
 
-    Identity equality is the existing canonical target/state identity. A changed
-    identity is replaced only when an explicit, evidence-backed semantic
+    Identity equality includes the browser-issued opaque document identity and
+    canonical target/state identity. A changed identity is replaced only when an explicit, evidence-backed semantic
     decision maps it to a current structured sample; otherwise it remains
     unavailable. Current refs with no prior mapping are materialized as added.
     """
@@ -117,13 +112,15 @@ def materialize_sample_lineage(*, previous_sample_refs: list[str],
             locators = row["source_locators"]
             evidence = row["source_evidence_refs"]
             if (not isinstance(locators, list) or not locators
-                    or any(not isinstance(value, str) or not value.strip() for value in locators)
+                    or any(not is_current_document_identity(value) for value in locators)
+                    or row["target_identity"] not in locators
                     or len(locators) != len(set(locators))
                     or not isinstance(evidence, list)
                     or any(not isinstance(value, str) or not value.strip() for value in evidence)
                     or len(evidence) != len(set(evidence))):
                 raise SamplingError(f"{label} sample identity provenance is invalid")
-            expected_identity = fingerprint({"target_ref": target, "state_key": state})
+            expected_identity = fingerprint({"target_ref": target, "state_key": state,
+                                             "document_identity": row["target_identity"]})
             if row["identity_fingerprint"] != expected_identity or expected_identity in by_identity:
                 raise SamplingError(f"{label} sample identity fingerprint is invalid or duplicated")
             by_ref[ref] = row
