@@ -626,10 +626,15 @@ python scripts/skills/evals/agent/qa_training_store.py \
 
 v1では生成AgentをCLI末尾の`--agent-command <argv...>`で起動し、Judgeは`--execution-profile`の`judge.command_argv`に定義した**独立したargv**で起動する。`judge.command_argv`は1個以上の非秘密文字列からなる配列で、`shell=True`は使わない。semantic runで欠落・空配列なら事前検証で停止する。deterministic runではJudgeを起動しない。
 
-JudgeのcwdはEvaluatorが作成する`evaluator-judge-workspace`に固定する。固定Evaluator版`build_judge_prompt()`で構築したEval Input / Reference / rubric / Candidate OutputをUTF-8 stdinで渡し、stdoutには既存`semantic/result.py`が解釈できるJudge JSONだけを返す。終了コード非0、timeout、JSON不正はJudge実行エラーにし、生成Skillの不合格には変換しない。JudgeにはAgentコンテナのcwd、mount、`CODEX_HOME`を渡さず、生成用Docker launcherも再利用しない。
+JudgeのcwdはEvaluatorが作成する`evaluator-judge-workspace`に固定する。固定Evaluator版`build_judge_prompt()`で構築したEval Input / Reference / rubric / Candidate OutputをUTF-8 stdinで渡し、stdoutには既存`semantic/result.py`が解釈できるJudge JSONだけを返す。`judge.timeout_seconds`は正の整数で、初回Codex Judgeの既定は600秒とする。終了コード非0・timeout・JSON不正はJudge execution errorにし、生成Skillの品質FAILへ変換しない。
 
-Judge側の独立model / CLI version / 推論・tool・MCP・指示・設定 / 非秘密command fingerprintをprofileとprovenanceへ保存する。CodexをJudgeにする場合はEvaluator専用の外部launcherでJSONL進行ログを除外し、最終Judge JSONだけstdoutに返す。既存`semantic/run.py --judge-command`のstdin・stdout契約と`result.py`の正規化を再利用し、Judge専用frameworkは作らない。保存済み成果物だけの再採点には既存`semantic/run.py`を引き続き使用可能とする。
+**新ランナーの両フェーズは、既存`semantic/run.py`をsubprocessとして起動しない。** 固定Evaluatorの`build_judge_prompt()`と`normalize_judge_response()`を直接再利用し、共通`executor.py`がJudge subprocessのstdin・stdout・timeoutと終了を管理する。Linux / POSIXでは`start_new_session=True`でprocess groupを作り、timeout時にgroup全体へTERM・必要ならKILLする。Windowsでは子孫を含むprocess treeを`taskkill /T /F`等のOS機能で終了する。Docker Judgeの場合はlauncherが実行中コンテナを`docker rm -f`で終了・削除する。終了確認、出力サイズ制限、安全化を行い、エラーattemptを保存して次caseを継続する（共通環境自体が実行不能なら停止）。既存の単独用`semantic/run.py`は変更せず、Judgeコマンドのstdin / JSON stdout / result正規化契約を共有する。
 
+実Codex smokeのJudgeは**生成Agentとは別の使い捨てDockerコンテナ**に固定する。生成側とは別の一時`CODEX_HOME`に、秘密を含まない固定`config.toml`と必要最小限の認証だけを配置する。固定image digest、Codex CLI version、model ID、推論設定、tool / MCP、sandbox / approval、web検索の無効化をpreflightで照合する。Judgeコンテナにはsanitized target・Agent側workspace・Agent側`CODEX_HOME`・Evaluator checkout・Docker socketをmountせず、stdinで受け取るJudge promptだけを評価入力とする。Judge側に必要な`/tmp`等の一時領域を用意し、モデルAPI以外のtoolは評価に使用しない。Judge専用launcherは`codex exec --json`の進行ログを分離し、最終Judge JSONだけを共通executorのstdoutへ返す。生成launcherと同一のargvやcontainerを流用しない。
+
+Judgeの非秘密command fingerprint、image / CLI / model / 推論設定、実効tool / MCP・指示の確認根拠、stdout変換、timeout / cleanup結果をprovenanceへ記録する。Judgeの追加Skill・外部指示・MCP等を確実に排除したと確認できないrunは`unverified`として直接比較しない。非公開のprovider-side model更新は確認済み設定と区別して制約として記録する。別モデルを使うときは`judge.command_argv`を含むprofileを明示的に変更し、条件の異なるrunは直接比較しない。
+
+既存`semantic/run.py --judge-command`のstdin・stdoutと`result.py`の正規化を再利用し、独自の採点frameworkは追加しない。保存済み成果物だけの再採点には既存`semantic/run.py`を引き続き使用できる。
 生成とJudgeの実行は次の独立した経路に固定する。
 
 ```text
@@ -674,6 +679,7 @@ Judge側の独立model / CLI version / 推論・tool・MCP・指示・設定 / �
 - Agent versionを安全に取得できる場合はそのversion
 - semantic評価ではJudge専用command・cwd・実効profile・その確認結果
 - Agent commandのexit code
+- Judge commandのexit code・timeout / process tree cleanup状況（semantic時）
 - graderのexit code
 - deterministic statusまたはsemantic verdict
 - 各保存fileの相対path
@@ -922,7 +928,7 @@ git diff --check
 4. `prompt_builder.py`で生成prompt契約を実装し、Reference / expected / rubricを渡さないtestを追加する
 5. `run.py`へ単一caseのAgent subprocess実行と成果物保存を実装する
 6. deterministic単一caseを既存graderへ接続する
-7. semantic単一caseを固定Evaluator側graderへ接続し、生成用`--agent-command`とprofileの`judge.command_argv`を**別process・別cwd・別設定**で起動する。JudgeにはReferenceを渡すが生成Agentへ公開せず、両stageの実効設定を記録する
+7. semantic単一caseを固定Evaluator側graderへ接続し、生成用`--agent-command`とprofileの`judge.command_argv`を**別process・別cwd・別Docker環境**で起動する。共通`executor.py`がtimeout時に子孫process / containerを停止し、Judge errorを別軸で保存する。両stageの実効設定を記録する
 8. Skill単位batch、`--skill all`、`--repeat`、結果集計、exit codeと、Evaluator固定・Skill SHA・実効設定profile・隔離preflightによる比較可否判定を追加する
 9. fake Agentを使った共通unit / repository integration testを完成させる
 10. `.gitignore`、`EVALS.md`、`README.md`、`PROJECT_CONTEXT.md`を現在実装へ同期する
