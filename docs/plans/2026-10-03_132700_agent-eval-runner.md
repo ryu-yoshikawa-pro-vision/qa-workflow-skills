@@ -290,7 +290,7 @@ Live CLIへ`--execution-profile <path/to/execution-profile.json>`を必須追加
 
 `--agent-name` / `--agent-model`とprofileの宣言を照合し、実際のlauncher / CLIで観測できる設定と矛盾した場合は停止する。汎用subprocessだけでuser/global config等を完全に解析できると仮定しない。profileの自己申告だけで`verified`にせず、確認根拠がなければ結果は保存しても`not_comparable`とする。比較対象runではprofileの非秘密fingerprintと実効設定検証結果を一致させる。
 
-環境変数、secret実値、認証用argv、設定ファイルの秘密は保存もhash化もしない。生argvに秘密を含めず、Agent別SDKや新たなAgent config parserは作らない。Judgeは生成とは別process / 別prompt / 別sessionで起動する。フェーズ1で同じAgent commandをJudgeに使う場合もJudge側の実効条件を独立して記録する。
+環境変数、secret実値、認証用argv、設定ファイルの秘密は保存もhash化もしない。生argvに秘密を含めず、Agent別SDKや新たなAgent config parserは作らない。Judgeは生成とは別process / 別prompt / 別sessionで起動する。生成Agentの起動argvはJudgeへ流用しない。Judgeの独立argv・cwd・model・実効設定を記録する。
 
 ### execution-profile.jsonの最小契約
 
@@ -316,6 +316,8 @@ Live CLIへ`--execution-profile <path/to/execution-profile.json>`を必須追加
   },
   "judge": {
     "model": "<実効Judge model ID>",
+    "command_argv": ["<Judge専用launcher>", "<秘密を含まない固定argv>"],
+    "cwd": "evaluator-judge-workspace",
     "cli_version": "<Judge実行commandのversion>",
     "reasoning_effort": "<固定した推論設定>",
     "launch_options": ["<非秘密の起動オプション>"],
@@ -611,27 +613,18 @@ python scripts/skills/evals/agent/qa_training_store.py \
 
 ## semantic評価時のAgent command
 
-v1では、生成に使用した`--agent-command`を、別プロセス・別promptでsemantic Judgeにも使用します。ただしJudgeはEvaluator側で実行し、Agent-visible workspaceの権限・cwd・設定を無条件に継承させません。生成とJudgeの実効条件をprofile内で分け、Judgeに渡すReference / rubricが生成側に読めないことを確認します。
+v1では生成AgentをCLI末尾の`--agent-command <argv...>`で起動し、Judgeは`--execution-profile`の`judge.command_argv`に定義した**独立したargv**で起動する。`judge.command_argv`は1個以上の非秘密文字列からなる配列で、`shell=True`は使わない。semantic runで欠落・空配列なら事前検証で停止する。deterministic runではJudgeを起動しない。
 
-処理は次の2回の独立実行です。
+JudgeのcwdはEvaluatorが作成する`evaluator-judge-workspace`に固定する。固定Evaluator版`build_judge_prompt()`で構築したEval Input / Reference / rubric / Candidate OutputをUTF-8 stdinで渡し、stdoutには既存`semantic/result.py`が解釈できるJudge JSONだけを返す。終了コード非0、timeout、JSON不正はJudge実行エラーにし、生成Skillの不合格には変換しない。JudgeにはAgentコンテナのcwd、mount、`CODEX_HOME`を渡さず、生成用Docker launcherも再利用しない。
+
+Judge側の独立model / CLI version / 推論・tool・MCP・指示・設定 / 非秘密command fingerprintをprofileとprovenanceへ保存する。CodexをJudgeにする場合はEvaluator専用の外部launcherでJSONL進行ログを除外し、最終Judge JSONだけstdoutに返す。既存`semantic/run.py --judge-command`のstdin・stdout契約と`result.py`の正規化を再利用し、Judge専用frameworkは作らない。保存済み成果物だけの再採点には既存`semantic/run.py`を引き続き使用可能とする。
+
+生成とJudgeの実行は次の独立した経路に固定する。
 
 ```text
-Agent invocation 1
-  Eval Input + target Skill
-  ↓
-評価対象成果物
-
-Agent invocation 2
-  既存semantic Judge prompt
-  ↓
-Judge JSON
+生成: CLI --agent-command → Docker内Agent → output.md / QA成果物
+採点: EvaluatorでJudge prompt生成 → profile.judge.command_argv（Evaluator側cwd） → Judge JSON → 既存result.py
 ```
-
-生成側へReference / Rubricを渡しません。
-
-別モデル・別commandをJudgeに使用したい場合は、保存済み成果物に対して既存`scripts/skills/evals/semantic/run.py --judge-command ...`を直接実行できます。
-
-今回のランナーに、2種類の任意commandを同時指定する新しい設定形式は追加しません。実際に別Judgeの一括実行が必要になった場合に追加を検討します。
 
 ## 結果保存
 
@@ -668,7 +661,7 @@ Judge JSON
 - Agent / Judgeの非秘密実効設定profile fingerprintと検証結果、隔離preflight結果、Tool / MCP / user-global指示の扱い
 - 対象Skillの実使用観測（`observed` / `unverified`）と根拠path
 - Agent versionを安全に取得できる場合はそのversion
-- semantic評価ではJudgeの実行方式。フェーズ1の既定は「同じAgent commandを別process / 別promptで使用」
+- semantic評価ではJudge専用command・cwd・実効profile・その確認結果
 - Agent commandのexit code
 - graderのexit code
 - deterministic statusまたはsemantic verdict
@@ -702,7 +695,7 @@ Skill修正前後を比較するときは、少なくとも次が一致するrun
 
 ### 判定結果と比較可否の分離
 
-既存graderの`pass / needs_review / fail`、Agent / grader execution error、および今回の`isolation_unverified` / `not_comparable` / `evaluator_incompatible`は別の軸で記録する。比較不可のrunも診断目的で保存できるが、品質の`pass`を意味しない。フェーズ2の必須artifact・verifier証拠の欠落はAgent処理が正常終了したならSkill品質の非passに分類し、Evaluator自身のpreparation失敗・I/O失敗とは区別する。
+既存graderの`pass / needs_review / fail`、Agent / Judge / grader実行エラー、`evidence_unverified`、`isolation_unverified` / `not_comparable` / `evaluator_incompatible`を別々に保存する。必須QA成果物の欠落、verifier未実行が信頼できるtool traceで確定した場合、`valid=false`を完成扱いした場合はSkill品質の非passとする。**実行したか不明でrequest / result・traceだけが欠落した場合は`evidence_unverified`とし、該当するruntime観点を検証済みPASSにしないがSkill品質failへ転記しない**。capture / I/O / 独立再実行がEvaluator側で失敗したらrunner / environment errorとする。比較不可の結果も診断目的で保存する。
 
 Run同士の比較成立確認は**2つの保存済みrunの共通条件の照合**で行い、ファイル名や同じmodel名だけから同条件と判断しない。repeatの各attemptと対象Skill使用観測の状態も比較表示に残す。
 
@@ -800,7 +793,7 @@ repositoryの既存caseを使い、fake Agentで次を自動検証します。
 
 1. deterministic caseを生成し、既存`deterministic/run.py`が実行される
 2. semantic caseを生成し、既存`semantic/run.py`が実行される
-3. `grade.json`へ既存graderの結果が保存される
+3. `grade.json`へ既存graderの結果が保存される。semanticは生成側と異なるJudge argv・cwdで起動し、Reference / rubricを含むJudge promptを生成Agentに送らない。Judgeのinvalid JSON / non-zero / timeoutを生成Skill品質failに変換しない
 4. batch結果が`result.json`へ集計される
 5. dataset / input fingerprintとAgent metadataが`result.json`へ保存される
 
@@ -974,7 +967,7 @@ native trigger評価は、Skill activationを観測する方法がAgentクライ
 
 - 固定Evaluatorのclean checkoutから異なるSkill revisionを選択でき、候補Git treeの配置内容とmanifestが一致する
 - 候補Skillのevalを採点へ混入させず、grader・Judge / Referenceを固定Evaluatorに統一し、候補のproduction verifierは候補の信頼済みsourceで再実行できる
-- Agent / Judgeの非秘密実効profile・隔離結果を確認できないrunを比較可能としない
+- 生成Agent / Judgeが独立argv・cwd・非秘密実効profileを使い、必須のローカル隔離条件を確認できないrunを比較可能としない
 - 実Agent評価ランナーが追加されている
 - 単一deterministic caseを「実Agent生成 → 既存grader」まで1 commandで実行できる
 - 単一semantic caseを「実Agent生成 → 独立Judge → 既存semantic判定」まで1 commandで実行できる
