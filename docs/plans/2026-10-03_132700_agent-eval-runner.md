@@ -779,7 +779,7 @@ batchは途中1件が失敗しても残りcaseを実行し、最後に全体結�
 - `scripts/skills/evals/agent/tools/codex_docker_launcher.py`（手動の実Codex smoke専用。共通executorからは外部argvとして呼ぶ）
 - `scripts/skills/evals/agent/verifier_capture.py`（フェーズ2に配置する評価専用stdin / stdout記録用。Skill本体を変更しない）
 - `scripts/skills/evals/agent/common_runtime_checks.py`（フェーズ2の固定Evaluator共通機械契約。既存validatorの純粋な検査部品を再利用し、候補の`valid`から独立して判定）
-- `scripts/skills/evals/agent/README.md`
+- `scripts/skills/evals/agent/README.md`（実行profile、`artifact-index.json`の`routing[]` / `artifacts[]`、成果物品質比較とSkill改修効果の判断規則、未確認時の報告方法を記載）
 - `scripts/skills/evals/agent/tests/`
 - `tests/skills/evals/agent/`
 
@@ -825,7 +825,7 @@ fake Agent subprocessを使って少なくとも次を検証します。
 - フェーズ1 semanticでは生成用Docker launcherをJudgeとして誤使用せず、profileに定義された独立Judge commandへUTF-8 Judge promptを渡す。Judge JSON不正・非0終了・timeoutを実行エラーとして区別する
 - 入出力証拠の欠落をSkill品質failにせず`evidence_unverified`と分類する。実際の`valid=false`と区別する。semantic passでも必須runtime / artifact分類・workflow判断の証拠が欠ければattemptが`needs_review`・exit 1となり、Runner障害ならexit 2となる
 - 正常・重要欠落・根拠のない動作を含む評価専用fixtureを使い、semantic Judgeの判定方向と根拠を確認する
-- 異なるSkill revisionを同じ固定graderで採点し、比較条件が異なる結果は`not_comparable`にする
+- 異なるSkill revisionを同じ固定graderで採点し、比較条件が異なる結果は`not_comparable`にする。比較条件一致・成果物品質差・変更対象Skillの使用証拠の有無を別々に報告し、単発の結果・相反する複数attempt・未使用観測ではSkill改修効果を確定しない
 - 秘密を含み得るargv・環境変数・生ログがprovenanceに残らない
 
 ### 一時実行ディレクトリtest
