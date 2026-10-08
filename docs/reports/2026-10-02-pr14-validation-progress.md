@@ -433,3 +433,17 @@ formal reportはfixture全体をclosureしていない。変更後confirmation s
 - `tests/skills/fixtures/usability-canonical/container-query-cases.html`
 
 - Progress: 80% (8/10)。Next: 対象9ファイルと本reportだけを明示stageして通常commit / pushし、最新head Actions、PR本文、final checkpointを確認する。ユーザー所有untracked hash fileはstageしない。
+
+## 2026-10-08 JST — 最終レビュー指摘2件・実装head検証結果
+
+- 実装修正commit: `f74814e61eb2f9c235b219606a45c075838e0cd3`。実装tree: `c71422e766a2f707f6860645bf55b9be1dae7966`。対象PR branchへ明示refspecを使った通常pushで反映済み。push後PR headも同SHA。
+- 通常観測runtimeは`incomplete → unresolved / partial`、`unavailable → blocked / unsupported`とし、blocking issue、元status / limitationを保持する。値を生成せず、formal WCAGのtyped partial・manual fallback分岐を維持した。
+- responsive境界探索は単一の`min/max-width/height`条件だけをbinary search対象とする。range / exact / compound等は`incomplete`で理由を保持し、`no-numeric-transition`と誤判定しない。単純`@media`、`@container not-executable`、viewport復元は維持した。
+- 最新HMAC実装による代表formal browser handoffはHTTP canonical fixture上で完了。SQLite test-only providerにてcreate rev1、pending CAS rev2、claim、reservation acquire rev1、in-progress CAS rev3、immutable observation、returned CAS rev4、browser cleanup、provider conditional release rev2、release CAS rev5、close-ready、closed CAS rev6、closed reread、`may_resume=true`、formal resumeを確認した。request / current document HMAC identityは一致。raw URLは保存していない。
+- resume後は実際に観測した1 procedure resultだけがcurrentとして処理され、未観測procedureが残るcriterionは`in-progress / unresolved`のまま。代表handoff lifecycleのblockedは0だが、fixture全体のWCAG評価・report closureではない。外部製品のWCAG conformanceを主張しない。
+- Focused tests **62 PASS**。Repository / pre-commit: official `skills-ref` **22 Skill PASS**、semantic dataset **22 Skill / 155 case PASS**、shared deterministic **12 PASS**、repository deterministic **252 PASS**、shared semantic **27 PASS / 2 Windows symlink-privilege SKIP**、repository semantic **4 PASS**、trigger contract **1 PASS**、runtime **271 PASS**、Python compile / Node syntax / Prettier / targeted Markdown lint / `git diff --check` PASS。全repository Markdown lintの既存issueは今回対象外で、変更対象Markdown lintはPASS。
+- GitHub Actionsは実装PR head `f74814e61eb2f9c235b219606a45c075838e0cd3`に対して3件すべてsuccess: `Validate Agent Skills` run `37789823810`、`Validate Deterministic Output Evals` run `37789823878`、`Validate Semantic Output Evals` run `37789823877`。
+- Semantic Judge 83、Trigger 180、Holdout 24、formal WCAG全fixture closureは依頼どおり実行していない。PR #14 / #17責務分担を維持し、これらの未実施を今回の検証結果として偽っていない。PR本文にも修正・代表handoff・検証範囲・fail-closed結果を追記する。
+- このcheckpoint以降に行うreport-only commitでは実装treeを変更しない。push後はreport-onlyの最新headにもCIを実行し、その結果を最終報告に記録する。
+- `PR #14 repository implementation Plan未達: 0件`（責務移管後のPR #14 gateおよび本指示の修正・代表E2E範囲）。
+- Progress: 100% (10/10)。
