@@ -273,7 +273,7 @@ Skill-local verifierはSkill本体にも含まれる。runtimeの再実行と共
 - **固定基準の採点**：deterministic / semanticのgrader、expected / rubric / Reference、判定ルールは固定Evaluator revisionを使う。既存`deterministic/runtime_validator.py`の`_source_paths()`は現在Evaluator側`REPO_ROOT`へ固定されているため、`deterministic/run.py`へ任意の`--runtime-source-root`を追加し、`grade()` → `validate_runtime_evidence()` → `_assert_runtime_pair()` → `_source_paths()`へそのpathを明示的に渡す。指定時はEvaluatorが作成した**候補Git tree由来の信頼済みsource root**に一致することをrunner側で検証する。引数省略時は従来のEvaluator側`REPO_ROOT`を使用し、既存CLI・テストの動作を維持する。`run.py`からruntime assertionへ明示的に伝播し、**graderのコードとassertionの意味は固定したまま、実装由来のfingerprint / generator version / static-dataの照合先だけを候補の信頼済みsourceへ切り替える**。従来のgrader CLIは引数省略で従来動作を維持し、一般Skill validatorのimport先・eval datasetは変更しない。Agentが編集できるworkspaceをsource rootに指定しない。
 - **契約非互換**：両revisionで共通に判定できるcriteriaを評価し、schema / 機械契約が実際に互換でない部分だけを`evaluator_incompatible`として扱う。単なるimplementation fingerprint相違は非互換理由にならない。`evaluator_incompatible`を品質FAILへ読み替えず、共通部分のsemantic評価まで破棄しない。出力契約が変わり固定graderで評価できない場合は、両revisionを処理できる共通Evaluatorへ更新後、**旧版・新版の両方をそのEvaluatorで新規に実行・再採点**する。過去の別Evaluator評価を混ぜない。互換adapterの汎用基盤は今回作らない。
 
-候補のverifierで合格しただけで品質PASSにはしない。固定graderの検出結果と独立Judge、候補のproduction verifier整合性をそれぞれ保持する。
+候補verifier / generatorの独立再実行は、Agentに見えるworkspaceとは別の信頼済み候補Git treeを使い、Evaluator側のReference / rubricを読ませない隔離済みprocessで行う。候補sourceを実行できない環境では品質FAILへ変換せずrunner / environment errorとして残す。候補のverifierで合格しただけで品質PASSにはしない。固定graderの検出結果と独立Judge、候補のproduction verifier整合性をそれぞれ保持する。
 
 main / candidate比較は、**同じEvaluator checkoutを起動したまま**`--skill-revision`だけを変更して2 runを生成する。checkout全体を入れ替えてgraderが変わる方式を採らない。
 
@@ -366,6 +366,22 @@ EvaluatorとAgentの間に、ディレクトリ分割だけでなく**OS等に�
 6. ホストEvaluator-onlyの非秘密sentinelをAgentにmountしない。**Agentと同じコンテナ権限のOSコマンド**で該当host-only pathの読み取り不能を確認し、同時にDocker container inspect相当でmount集合・権限・image digestを確認する。LLMによる「見えない」という返答は証拠にならない。意図的にsentinelを追加mountしたnegative fixtureではpreflight失敗を確認する。
 7. 評価用の最小launcher（`scripts/skills/evals/agent/tools/codex_docker_launcher.py`）はDocker CLIへ`subprocess`のargvで接続し、stdin promptをそのまま`codex exec ... -`へ渡す。`--json`のJSONL stdoutを収集し、`--output-last-message`で得た最終応答だけを共通executorへstdoutとして返す。containerで作成した`.qa-eval-output/`内の一時message fileを回収し、元JSONLからコマンド実行などの**非秘密の事実だけ**を安全化してprovenanceへ保存する。launcherはsmoke用だけであり、共通`executor.py`やSkill PackageにCodex固有SDKを追加しない。JSONL全量を無条件に永続化しない。
 8. JudgeはAgentコンテナ**外のEvaluator側**で、生成とは独立したprocess / sessionを使って起動する。Evaluator資料はJudgeにのみ与える。Judge実行環境の固定model・CLI・設定・Reference hashを別に記録し、生成コンテナの一時認証・workspaceを無条件に共有しない。
+
+コンテナ起動時の概形は次とし、`<...>`は起動前に固定・検証した値へ置き換える。実装する`codex_docker_launcher.py`がDockerへこれと等価なargvを渡し、利用者に毎回shell手順を組み立てさせない。
+
+```text
+docker run --rm -i --read-only --cap-drop=ALL --security-opt=no-new-privileges
+  --workdir /workspace --tmpfs /tmp
+  --mount type=bind,src=<sanitized-workspace>,dst=/workspace
+  --mount type=bind,src=<temporary-codex-home>,dst=/codex-home
+  -e CODEX_HOME=/codex-home
+  <pinned-image-digest>
+  codex exec --json --model <model-id> --sandbox workspace-write
+    --ask-for-approval never --config model_reasoning_effort=<fixed-effort>
+    --output-last-message /workspace/.qa-eval-output/final-message.md -
+```
+
+上記はargvの構成例であり、shellに貼り付ける逐語的な完成コマンドではない。実際のDocker / Codex CLI引数は`docker run --help`と`codex exec --help`で検証する。フェーズ1の非Git workspaceでは、CodexがGit rootを要求する場合にのみ、そのCLIで確認した`--skip-git-repo-check`相当の正規optionをlauncher側から追加する。ホストでEvaluatorを動かすJudgeはこのコンテナへmountしない。
 
 `docker version`、イメージ起動、コンテナ内`codex --version` / 認証可否、Python実行、Codex応答、JSONL出力・Skill読取観測、read-denial、必要な通信の成功を**実Agent smokeで確認**してから`verified`へ進める。環境未構築・ネットワーク制御未確認なら比較可能なlive評価を完了したとは報告しない。image digest・model ID・実効設定は実行時に取得して固定し、未確認の値をPlanへ作り込まない。
 
