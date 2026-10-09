@@ -8,7 +8,7 @@ from typing import Any
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
-from earl_report import serialize_assertions
+from earl_report import EarlError, serialize_assertions
 from runtime_contract import InvalidInput, reject_unknown, run_cli, static_data_fingerprint
 from sampling import (SamplingError, compare_samples, evaluate_step_4_2_reuse, materialize_processes,
                       materialize_sample_lineage, random_target_count, reconcile_sampling_revision, sample_identity_registry,
@@ -138,7 +138,7 @@ def handler(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, 
         raise InvalidInput("formal static data must not duplicate the inspection machine-probe hash")
     try:
         output = _dispatch(operation, arguments)
-    except (EvaluationStructureError, SamplingError) as exc:
+    except (CriterionPlanError, EarlError, EvaluationStructureError, SamplingError) as exc:
         raise InvalidInput(str(exc)) from exc
     if operation == "close-criterion":
         status = output.get("execution_status")
@@ -150,9 +150,11 @@ def handler(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, 
                        "extend-accessibility-support-baseline", "materialize-scope-coverage",
                        "materialize-complete-processes", "evaluate-step-4-2-reuse", "reconcile-sampling-revision"}:
         status = output.get("status")
+    elif operation in {"evaluation-statement", "conformance-claim", "statement-of-partial-conformance"}:
+        status = output.get("status")
     else:
         status = None
-    if status in {"unsupported", "unresolved", "blocked", "in-progress", "selection-required", "selection-incomplete"}:
+    if status in {"unsupported", "unresolved", "blocked", "in-progress", "selection-required", "selection-incomplete", "not-generated"}:
         result_status = "blocked" if status in {"blocked", "unsupported"} else "unresolved"
         support_status = "partial" if result_status == "unresolved" else "unsupported"
     else:

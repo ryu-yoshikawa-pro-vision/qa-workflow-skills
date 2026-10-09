@@ -115,6 +115,10 @@ def serialize_assertions(*, evaluation_ref: str, evaluation_revision: str, versi
     subject_ids: set[str] = set()
     date_value = _issued_date(issued_at)
     for result in results:
+        if (result.get("evaluation_ref") != evaluation_ref
+                or result.get("evaluation_revision") != evaluation_revision
+                or result.get("freshness_status") != "current"):
+            raise EarlError("EARL result must be current for the supplied evaluation revision")
         status = result.get("result")
         population = result.get("applicable_population")
         execution = result.get("execution_status")

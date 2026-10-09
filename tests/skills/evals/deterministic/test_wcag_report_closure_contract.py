@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[4]
 SCRIPT_DIR = ROOT / "skills/wcag-conformance-evaluation/scripts"
 sys.path.insert(0, str(SCRIPT_DIR))
 import wcag_em_structure as structure
+import wcag_criterion_plan as criterion_plan
 from wcag_requirements import load_catalog
 
 
@@ -107,18 +108,39 @@ class WcagStatementAndClaimTests(unittest.TestCase):
             "all_samples_conform": True, "owner_commitment_ref": "OWNER-COMMIT", "product_scope": "scope-ref",
             "technologies": ["HTML", "CSS"], "baseline_ref": "BASELINE-1", "issued_date": "2026-09-28",
             "level": "AA", "scope_ref": "SCOPE-1"}
-        full = structure.evaluation_statement(**args)
+        self.assertEqual(structure.evaluation_statement(**args)["status"], "blocked")
+        report_args = WcagReportClosureTests().closure_inputs()
+        report_args["sample_results"] = [{**row, "result":"satisfied"} for row in report_args["sample_results"]]
+        closure = structure.close_report(**report_args)
+        result_fixture = WcagConformanceRequirementTests().fixture(level="AA")
+        formal_results = structure.materialize_conformance_requirement_results(**result_fixture)
+        full = structure.evaluation_statement(**args, report_closure=closure,
+            formal_conformance_results=formal_results)
         self.assertEqual((full["status"], full["statement_type"], full["conformance_level"]), ("generated", "full", "AA"))
+        missing_sample = {**formal_results, "sample_results_count":formal_results["sample_results_count"] - 1}
+        self.assertEqual(structure.evaluation_statement(**args, report_closure=closure,
+            formal_conformance_results=missing_sample)["status"], "blocked")
+        self.assertEqual(structure.evaluation_statement(**{**args, "owner_commitment_ref":None},
+            report_closure=closure, formal_conformance_results=formal_results)["status"], "blocked")
         self.assertEqual(structure.evaluation_statement(**{**args, "version": "2.1"})["status"], "not-generated")
-        partial = structure.evaluation_statement(**{**args, "status": "partial", "all_samples_conform": False,
-            "nonconforming_areas": [{"area_ref": "AREA-1", "description": "uncontrolled comments",
+        failing_fixture = WcagConformanceRequirementTests().fixture(level="AA", fail_criterion="1.1.1")
+        partial_results = structure.materialize_conformance_requirement_results(**failing_fixture)
+        partial_report_args = WcagReportClosureTests().closure_inputs()
+        partial_report_args["sample_results"][0]["result"] = "not-satisfied"
+        partial_report_args["sample_results"][0]["unmet_example_refs"] = ["EX-1"]
+        partial_report_args["example_coverage"] = {"1.1.1":["EX-1"]}
+        partial_closure = structure.close_report(**partial_report_args)
+        partial = structure.evaluation_statement(**{**args, "status": "partial", "all_samples_conform": False},
+            report_closure=partial_closure, formal_conformance_results=partial_results,
+            nonconforming_areas=[{"area_ref": "AREA-1", "description": "uncontrolled comments",
                 "reason": "third-party-content", "outside_author_control": True, "user_identifiable": True,
-                "rest_conforms": True, "evidence_refs": ["E-AREA"]}]})
+                "rest_conforms": True, "evidence_refs": ["E-AREA"]}])
         self.assertEqual(partial["status"], "generated")
-        unsafe = structure.evaluation_statement(**{**args, "status": "partial", "all_samples_conform": False,
-            "nonconforming_areas": [{"area_ref": "AREA-1", "description": "uncontrolled comments",
+        unsafe = structure.evaluation_statement(**{**args, "status": "partial", "all_samples_conform": False},
+            report_closure=partial_closure, formal_conformance_results=partial_results,
+            nonconforming_areas=[{"area_ref": "AREA-1", "description": "uncontrolled comments",
                 "reason": "third-party-content", "outside_author_control": False, "user_identifiable": True,
-                "rest_conforms": True, "evidence_refs": ["E-AREA"]}]})
+                "rest_conforms": True, "evidence_refs": ["E-AREA"]}])
         self.assertEqual(unsafe["status"], "blocked")
 
     def test_partial_conformance_statement_has_fixed_canonical_language_and_evidence(self):
@@ -153,9 +175,25 @@ class WcagStatementAndClaimTests(unittest.TestCase):
         self.assertEqual(structure.conformance_claim(version="2.2", full_scope_evidence=True, required_fields=fields,
             scope_evidence=wrong_page)["status"], "not-generated")
         assurance = {**scope_evidence, "coverage_method": "assurance-process",
-            "complete_process_evidence_refs": ["PROCESS-COVERAGE-1"]}
+            "complete_process_evidence_refs": ["PROCESS-COVERAGE-1"],
+            "evidence_refs": ["E-SCOPE", "PROCESS-COVERAGE-1"]}
         self.assertEqual(structure.conformance_claim(version="2.2", full_scope_evidence=True,
             required_fields=fields, scope_evidence=assurance)["status"], "generated")
+        pages = fields["page_scope"]["uris"]
+        expression_fields = {**fields, "page_scope": {**fields["page_scope"], "uris": [],
+            "scope_expression":"https://fixture.invalid/**"}}
+        partial_expression = {**scope_evidence, "covered_page_uris":[pages[0]]}
+        partial_expression["success_criterion_results"] = [row for row in scope_evidence["success_criterion_results"]
+            if row["page_uri"] == pages[0]]
+        partial_expression["conformance_requirement_results"] = [row for row in scope_evidence["conformance_requirement_results"]
+            if row["page_uri"] == pages[0]]
+        self.assertEqual(structure.conformance_claim(version="2.2", full_scope_evidence=True,
+            required_fields=expression_fields, scope_evidence=partial_expression)["status"], "not-generated")
+        assured_expression = {**partial_expression, "coverage_method":"assurance-process",
+            "complete_process_evidence_refs":["PROCESS-COVERAGE-1"],
+            "evidence_refs":["E-SCOPE", "PROCESS-COVERAGE-1"]}
+        self.assertEqual(structure.conformance_claim(version="2.2", full_scope_evidence=True,
+            required_fields=expression_fields, scope_evidence=assured_expression)["status"], "generated")
         third_party = {"all_affected_pages_identified": True, "affected_page_refs": ["PAGE-3"],
             "monitoring_possible": True, "repair_window_business_days": 2, "repair_evidence_refs": ["E-REPAIR"]}
         self.assertEqual(structure.conformance_claim(version="2.2", full_scope_evidence=True, required_fields=fields,
@@ -166,15 +204,24 @@ class WcagStatementAndClaimTests(unittest.TestCase):
 
 
 class WcagConformanceRequirementTests(unittest.TestCase):
-    def fixture(self, *, fail_criterion: str | None = None, variation_complete: bool = True,
+    def fixture(self, *, version: str = "2.2", level: str = "A", fail_criterion: str | None = None, variation_complete: bool = True,
                 supported_usage: list[str] | None = None, process_complete: bool = True):
-        version,level="2.2","A"
         catalog=load_catalog(version)
         target=structure.resolve_target(version,level)
         criteria=target["required_success_criteria"]
-        results=[{"sample_result_ref":f"WCAG-RES-{index:03d}","sample_ref":"S1","variation_ref":"V1",
+        canonical_plan=criterion_plan.materialize_plan(wcag_version=version, level=level,
+            samples=[{"sample_ref":"S1", "identity_fingerprint":"sha256:" + "a" * 64,
+                "target_identity":"hmac-sha256:" + "a" * 64}],
+            variations=[{"sample_ref":"S1", "variation_ref":"V1",
+                "identity_fingerprint":"sha256:" + "b" * 64}],
+            process_memberships={"S1":"PROC-1"} if process_complete else {},
+            evaluation_ref="WCAG-EVAL-17", evaluation_revision="rev-9")
+        evaluation_ref_by_criterion={row["criterion_ref"]:row["criterion_evaluation_ref"]
+            for row in canonical_plan["criteria"]}
+        results=[{"sample_result_ref":f"WCAG-RES-{index:03d}","evaluation_ref":"WCAG-EVAL-17",
+            "evaluation_revision":"rev-9","sample_ref":"S1","variation_ref":"V1",
             "sample_kind":"structured","process_ref":"PROC-1" if process_complete else None,
-            "requirement_ref":criterion,"criterion_evaluation_ref":f"CRIT-{criterion}",
+            "requirement_ref":criterion,"criterion_evaluation_ref":evaluation_ref_by_criterion[criterion],
             "result":"not-satisfied" if criterion==fail_criterion else "satisfied","freshness_status":"current",
             "observation_refs":[],"test_rule_result_refs":[],"evidence_refs":[f"E-{criterion}"],
             "unmet_example_refs":[f"EX-{criterion}"] if criterion==fail_criterion else [],"limitation":None}
@@ -190,7 +237,8 @@ class WcagConformanceRequirementTests(unittest.TestCase):
         return {"version":version,"level":level,"samples":samples,"variations":variations,"sample_results":results,
             "complete_processes":processes,"process_inventory_complete":True if process_complete else False,
             "process_inventory_evidence_refs":["E-PROCESS"] if process_complete else [],
-            "accessibility_support_baseline":baseline}
+            "accessibility_support_baseline":baseline,"evaluation_ref":"WCAG-EVAL-17",
+            "evaluation_revision":"rev-9"}
 
     def run_closure(self, case, alternates=None):
         return structure.materialize_conformance_requirement_results(**case,alternate_version_results=alternates or [])
@@ -248,15 +296,30 @@ class WcagConformanceRequirementTests(unittest.TestCase):
 
 
 class WcagReportClosureTests(unittest.TestCase):
-    def closure_inputs(self):
+    def closure_inputs(self, *, sample_kind="structured", process_ref=None):
         steps = {step: "complete" for step in structure.REPORT_STEPS}
         steps.update({"1.4": "not-applicable", "3.2": "not-applicable", "4.3": "not-applicable"})
         accessible = {key: True for key in structure.ACCESSIBLE_OUTPUT_CHECKS}
+        sample = {"sample_ref":"SAMPLE-001", "sample_kind":sample_kind,
+            "identity_fingerprint":"sha256:" + "a" * 64,
+            "target_identity":"hmac-sha256:" + "a" * 64}
+        plan = criterion_plan.materialize_plan(wcag_version="2.2", level="AA", samples=[sample],
+            variations=[{"sample_ref":"SAMPLE-001", "variation_ref":"VAR-001",
+                "identity_fingerprint":"sha256:" + "b" * 64}],
+            process_memberships={"SAMPLE-001":process_ref} if process_ref else {},
+            evaluation_ref="WCAG-EVAL-17", evaluation_revision="rev-9")
+        results = [{"sample_result_ref":f"WCAG-RES-{index:03d}",
+            "evaluation_ref":"WCAG-EVAL-17", "evaluation_revision":"rev-9",
+            "sample_ref":"SAMPLE-001", "variation_ref":"VAR-001", "sample_kind":sample_kind,
+            "process_ref":process_ref, "criterion_evaluation_ref":row["criterion_evaluation_ref"],
+            "requirement_ref":row["criterion_ref"],
+            "result":"not-satisfied" if row["criterion_ref"]=="1.1.1" else "satisfied",
+            "freshness_status":"current"} for index,row in enumerate(plan["criteria"],1)]
         return {"required_steps": [step for step in structure.REPORT_STEPS if steps[step] == "complete"],
             "step_outcomes": steps,
-            "sample_results": [{"sample_result_ref": "WCAG-RES-001", "criterion_evaluation_ref": "CRIT-EVAL-1",
-                "requirement_ref": "1.1.1", "result": "not-satisfied", "freshness_status": "current"}],
-            "required_criterion_evaluation_refs": ["CRIT-EVAL-1"],
+            "sample_results": results,
+            "required_criterion_evaluation_refs": [row["criterion_evaluation_ref"] for row in plan["criteria"]],
+            "canonical_criterion_plan": plan,
             "example_coverage": {"1.1.1": ["EXAMPLE-1"]}, "accessible_output_closure": accessible}
 
     def closure(self):
@@ -299,7 +362,7 @@ class WcagReportClosureTests(unittest.TestCase):
         args["sample_results"] = []
         result = structure.close_report(**args)
         self.assertEqual(result["status"], "blocked")
-        self.assertEqual(result["missing_sample_result_refs"], ["CRIT-EVAL-1"])
+        self.assertEqual(result["missing_sample_result_refs"], args["required_criterion_evaluation_refs"])
 
     def test_undetermined_or_stale_sample_result_cannot_close_report(self):
         for update in ({"result": "undetermined"}, {"freshness_status": "stale"}):
@@ -308,7 +371,7 @@ class WcagReportClosureTests(unittest.TestCase):
                 args["sample_results"] = [{**args["sample_results"][0], **update}]
                 result = structure.close_report(**args)
                 self.assertEqual(result["status"], "blocked")
-                self.assertEqual(result["incomplete_sample_results"], ["CRIT-EVAL-1"])
+                self.assertEqual(result["incomplete_sample_results"], [args["sample_results"][0]["criterion_evaluation_ref"]])
 
     def test_step_4_2_not_applicable_does_not_skip_required_step_4_1_results(self):
         args = self.closure_inputs()
@@ -318,11 +381,15 @@ class WcagReportClosureTests(unittest.TestCase):
         args["required_criterion_evaluation_refs"] = None
         missing = structure.close_report(**args)
         self.assertEqual(missing["status"], "blocked")
-        self.assertTrue(missing["sample_result_scope_missing"])
+        self.assertFalse(missing["sample_result_scope_missing"])
+        self.assertEqual(missing["missing_sample_result_refs"], args["canonical_criterion_plan"]["criteria"] and
+                         [row["criterion_evaluation_ref"] for row in args["canonical_criterion_plan"]["criteria"]])
 
-        args["sample_results"] = [{"sample_result_ref": "WCAG-RES-001", "criterion_evaluation_ref": "CRIT-EVAL-1",
-            "requirement_ref": "1.1.1", "result": "not-satisfied", "freshness_status": "current"}]
-        args["required_criterion_evaluation_refs"] = ["CRIT-EVAL-1"]
+        complete_args = self.closure_inputs()
+        complete_args["required_steps"] = args["required_steps"]
+        complete_args["step_outcomes"]["4.2"] = "not-applicable"
+        complete_args["required_steps"] = [step for step in complete_args["required_steps"] if step != "4.2"]
+        args = complete_args
         complete = structure.close_report(**args)
         self.assertEqual(complete["status"], "complete")
 
@@ -334,47 +401,69 @@ class WcagReportClosureTests(unittest.TestCase):
         args["required_criterion_evaluation_refs"] = None
         result = structure.close_report(**args)
         self.assertEqual(result["status"], "blocked")
-        self.assertTrue(result["sample_result_scope_missing"])
+        self.assertFalse(result["sample_result_scope_missing"])
+        self.assertTrue(result["missing_sample_result_refs"])
 
-        args["step_outcomes"]["4.1"] = "not-applicable"
-        args["sample_results"] = []
-        args["required_criterion_evaluation_refs"] = []
         selected_without_evaluation = structure.close_report(**args)
         self.assertEqual(selected_without_evaluation["status"], "blocked")
-        self.assertTrue(selected_without_evaluation["sample_result_scope_missing"])
+        self.assertTrue(selected_without_evaluation["missing_sample_result_refs"])
 
     def test_step_4_1_not_applicable_keeps_step_4_2_current_results_valid(self):
-        args = self.closure_inputs()
+        args = self.closure_inputs(sample_kind="process-added", process_ref="PROC-1")
         args["required_steps"] = [step for step in args["required_steps"] if step != "4.1"]
         args["step_outcomes"]["4.1"] = "not-applicable"
-        args["sample_results"][0]["sample_kind"] = "process-added"
-        args["sample_results"][0]["process_ref"] = "PROC-1"
         result = structure.close_report(**args)
         self.assertEqual(result["status"], "complete")
 
     def test_no_selected_sample_allows_step_4_1_and_4_2_not_applicable(self):
         args = self.closure_inputs()
-        args["required_steps"] = [step for step in args["required_steps"] if step not in {"3.3", "4.1", "4.2"}]
-        args["step_outcomes"].update({"3.3": "not-applicable", "4.1": "not-applicable", "4.2": "not-applicable"})
+        args["required_steps"] = [step for step in args["required_steps"]
+                                  if step not in {"3.1", "3.2", "3.3", "4.1", "4.2"}]
+        args["step_outcomes"].update({"3.1": "not-applicable", "3.2": "not-applicable",
+            "3.3": "not-applicable", "4.1": "not-applicable", "4.2": "not-applicable"})
         args["sample_results"] = []
         args["required_criterion_evaluation_refs"] = []
+        args["canonical_criterion_plan"] = None
         result = structure.close_report(**args)
         self.assertEqual(result["status"], "complete")
         self.assertFalse(result["sample_result_scope_missing"])
 
     def test_sample_result_refs_must_match_current_criterion_plan_without_duplicates(self):
         args = self.closure_inputs()
-        args["sample_results"].append({"sample_result_ref": "WCAG-RES-002",
-            "criterion_evaluation_ref": "CRIT-UNEXPECTED", "requirement_ref": "1.2.1",
-            "result": "satisfied", "freshness_status": "current"})
+        args["sample_results"].append({**args["sample_results"][0], "sample_result_ref":"WCAG-RES-EXTRA",
+            "criterion_evaluation_ref": "CRIT-UNEXPECTED", "requirement_ref": "1.2.1"})
         unexpected = structure.close_report(**args)
         self.assertEqual(unexpected["status"], "blocked")
         self.assertEqual(unexpected["unexpected_sample_result_refs"], ["CRIT-UNEXPECTED"])
 
-        args["sample_results"][1]["criterion_evaluation_ref"] = "CRIT-EVAL-1"
+        args["sample_results"][-1]["criterion_evaluation_ref"] = args["sample_results"][0]["criterion_evaluation_ref"]
         duplicate = structure.close_report(**args)
         self.assertEqual(duplicate["status"], "blocked")
         self.assertIn("duplicate_criterion_evaluation_ref", duplicate["invalid_sample_results"])
+
+        args = self.closure_inputs()
+        declared = args["required_criterion_evaluation_refs"]
+        args["required_criterion_evaluation_refs"] = [declared[0], declared[0], *declared[1:]]
+        with self.assertRaises(structure.EvaluationStructureError):
+            structure.close_report(**args)
+
+    def test_shrinking_declared_refs_and_actual_results_does_not_shrink_the_canonical_plan(self):
+        args = self.closure_inputs()
+        first = args["sample_results"][0]
+        args["sample_results"] = [first]
+        args["required_criterion_evaluation_refs"] = [first["criterion_evaluation_ref"]]
+        result = structure.close_report(**args)
+        self.assertEqual(result["status"], "blocked")
+        self.assertTrue(result["declared_criterion_scope_mismatch"])
+        self.assertTrue(result["missing_sample_result_refs"])
+
+    def test_truncated_criterion_plan_does_not_become_a_new_canonical_scope(self):
+        args = self.closure_inputs()
+        args["canonical_criterion_plan"]["criteria"].pop()
+        result = structure.close_report(**args)
+        self.assertEqual(result["status"], "blocked")
+        self.assertTrue(result["canonical_criterion_plan_error"])
+        self.assertTrue(result["sample_result_scope_missing"])
 
     def test_report_renderer_uses_fixed_order_and_derives_accessible_output_checks(self):
         data={"evaluation_input":{"evaluation_ref":"WCAG-EVAL-1","revision":"r1","evaluator":"person-ref",

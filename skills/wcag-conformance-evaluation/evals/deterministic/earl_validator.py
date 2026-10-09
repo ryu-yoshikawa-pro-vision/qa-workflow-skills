@@ -52,7 +52,11 @@ def _test_uri(catalog: dict[str, Any], result: dict[str, Any]) -> str | None:
     return allowed.get(ref)
 
 
-def _outcome(result: dict[str, Any]) -> str | None:
+def _outcome(result: dict[str, Any], *, evaluation_ref: str, evaluation_revision: str) -> str | None:
+    if (result.get("evaluation_ref") != evaluation_ref
+            or result.get("evaluation_revision") != evaluation_revision
+            or result.get("freshness_status") != "current"):
+        return None
     value, population = result.get("result"), result.get("applicable_population")
     if value == "untested":
         return "earl:untested" if result.get("execution_status") == "not-run" and result.get("explicit_untested") is True else None
@@ -162,8 +166,13 @@ def validate_bytes(raw: bytes, *, version: str, evaluation_ref: str, evaluation_
     expected_assertor = _stable_iri("assertor", {"evaluator_identity": evaluator_identity,
         "tool_identity": tool_identity, "evaluation_revision": evaluation_revision})
     for result in results:
+        if (result.get("evaluation_ref") != evaluation_ref
+                or result.get("evaluation_revision") != evaluation_revision
+                or result.get("freshness_status") != "current"):
+            errors.append("normalized_result_not_current")
+            continue
         test = _test_uri(catalog, result)
-        outcome = _outcome(result)
+        outcome = _outcome(result,evaluation_ref=evaluation_ref,evaluation_revision=evaluation_revision)
         item_ref = result.get("criterion_evaluation_ref") or result.get("requirement_evaluation_ref")
         result_ref = result.get("result_ref") or result.get("sample_result_ref")
         sample_ref, variation_ref = result.get("sample_ref"), result.get("variation_ref")

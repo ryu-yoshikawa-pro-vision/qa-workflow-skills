@@ -88,8 +88,19 @@ class WcagRequirementAndSamplingTests(unittest.TestCase):
                 self.assertIn("incomplete", contract["allowed_statuses"])
 
     def test_random_sampling_boundaries_and_expected_blocked_are_distinct(self):
-        for structured_count, expected in ((0, 0), (1, 1), (9, 1), (10, 1), (11, 2)):
+        for structured_count, expected in ((0, 0), (1, 1), (3, 1), (9, 1), (10, 1), (11, 2)):
             self.assertEqual(sampling.random_target_count(structured_count), expected)
+            if expected:
+                with self.assertRaises(sampling.SamplingError):
+                    sampling.validate_random_selection(
+                        structured_refs=[f"S{index}" for index in range(structured_count)],
+                        selected_refs=[], target_count=expected - 1, complete_inventory=False,
+                        selection_method="finite-random")
+                accepted = sampling.validate_random_selection(
+                    structured_refs=[f"S{index}" for index in range(structured_count)],
+                    selected_refs=[f"R{index}" for index in range(expected)], target_count=expected,
+                    complete_inventory=False, selection_method="finite-random")
+                self.assertEqual(accepted["selection_status"], "target-met")
         target_met = sampling.validate_random_selection(structured_refs=["S1"], selected_refs=["R1"],
             target_count=1, complete_inventory=False, selection_method="finite-random")
         self.assertEqual(target_met["selection_status"], "target-met")
@@ -194,7 +205,8 @@ class WcagRequirementAndSamplingTests(unittest.TestCase):
 class WcagProcedureClosureTests(unittest.TestCase):
     def plan_row(self, criterion_ref: str, version: str = "2.2", level: str = "A") -> dict:
         plan = criterion_plan.materialize_plan(wcag_version=version, level=level,
-            samples=[sample("SAMPLE-001", "a")], variations=[variation("SAMPLE-001", "VAR-001", "b")])
+            samples=[sample("SAMPLE-001", "a")], variations=[variation("SAMPLE-001", "VAR-001", "b")],
+            evaluation_ref="WCAG-EVAL-17", evaluation_revision="rev-9")
         return next(row for row in plan["criteria"] if row["criterion_ref"] == criterion_ref)
 
     @staticmethod
@@ -297,6 +309,14 @@ class WcagProcedureClosureTests(unittest.TestCase):
             evidence_refs=["E-POP"])
         self.assertEqual((closed["execution_status"], closed["result"], closed["limitation"]),
                          ("complete", "undetermined", "violation_evidence_missing"))
+
+    def test_required_procedure_rows_cannot_be_removed_from_canonical_criterion(self):
+        row = self.plan_row("1.1.1")
+        row["procedure_executions"] = [execution for execution in row["procedure_executions"]
+                                       if execution["procedure_kind"] != "machine"]
+        with self.assertRaisesRegex(criterion_plan.CriterionPlanError, "execution set differs"):
+            criterion_plan.close_criterion(row, procedure_results={}, applicable_population="present",
+                semantic_result="satisfied", reason="semantic-only completion attempt", evidence_refs=["E-POP"])
 
     def test_at_applicability_unknown_blocks_final_semantic_and_environment_failure_is_blocked(self):
         row = self.plan_row("1.3.1")

@@ -445,3 +445,12 @@ fixture全体のStep 4.2 / Step 5.1を埋めることは要求しません。未
 - description変更対象のtargeted trigger regression PASS。full native trigger statistics / holdoutは本PR gateではなく、PR #17にも含めない
 - `_06c_canonical-live-validation.md` の代表repository-controlled formal Web E2Eとfail-closed report / EARL path PASS
 - representative happy-path handoffでunresolved blocked 0。部分fixture reportの正しい`partial-blocked`状態とexpected safety blockedは区別する。外部acceptanceは別statusとして記録する
+
+## 16. Canonical closure and formal output guards (2026-10-09)
+
+- `close_criterion()`は入力procedure rowsをversioned Success Criterion requirement assetとfinite procedure catalogのprocedure key集合へ照合し、欠落・余剰・重複を拒否する。applicability判定、manual fallback、AT、external evidenceの既存条件は維持する。
+- `validate_random_selection()`とfinite selectorは`target_count == random_target_count(current_structured_count)`を検証する。partial candidate inventory、exhaustion、sampling skip、population changeの既存status境界は維持する。
+- `close-report`の全件性の正本は`materialize_plan()`の完全なcurrent outputである。final closureでplanを再materializeし、宣言ref集合と実結果の双方をplanへ照合する。partial result materializationは許容し、missing / extra / duplicate / stale / unknown / undetermined resultが残るreportはcompleteにしない。
+- Step 5.3はcompleteなreport closureと同一evaluation revision / target / exact criterion ref setのformal conformance resultsを要求する。full statementには全sampleとconformance requirementのcurrent satisfied結果、owner commitmentを要求し、partial statementにはcurrent nonconformance evidenceを要求する。
+- EARLは各結果のevaluation ref / revisionと`freshness_status=current`を要求してからpassed / failedを出力する。明示的untested、cantTell、inapplicable mappingと固定serializationは維持する。
+- all-pages-evaluated Claimで非列挙`scope_expression`を全件評価済みと扱わない。既存assurance-process経路はcomplete-process evidence refsがevidence setに含まれる場合に維持する。

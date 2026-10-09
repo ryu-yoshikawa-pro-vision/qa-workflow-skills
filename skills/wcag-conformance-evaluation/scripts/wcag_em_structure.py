@@ -6,6 +6,7 @@ import re
 from typing import Any
 from wcag_requirements import load_catalog, resolve_target
 from sampling import fingerprint, random_target_count, sample_identity_registry, validate_random_selection, compare_samples
+from wcag_criterion_plan import CriterionPlanError, validate_materialized_plan
 
 SCOPE_ROWS=("third-party-content","language-versions","responsive-device-variations","separately-hosted-product-areas","authenticated-restricted-views")
 REPORT_STEPS=("1.1","1.2","1.3","1.4","2.1","2.2","2.3","2.4","2.5",
@@ -320,7 +321,12 @@ def close_conforming_alternate_version(*, version: str, level: str, primary_samp
 def materialize_conformance_requirement_results(*, version: str, level: str, samples: list[dict[str,Any]],
         variations: list[dict[str,Any]], sample_results: list[dict[str,Any]], complete_processes: list[dict[str,Any]],
         process_inventory_complete: bool, process_inventory_evidence_refs: list[str],
-        accessibility_support_baseline: dict[str,Any], alternate_version_results: list[dict[str,Any]] | None = None) -> dict[str,Any]:
+        accessibility_support_baseline: dict[str,Any], alternate_version_results: list[dict[str,Any]] | None = None,
+        evaluation_ref: str | None = None, evaluation_revision: str | None = None) -> dict[str,Any]:
+    if ((evaluation_ref is None) != (evaluation_revision is None)
+            or any(value is not None and (not isinstance(value,str) or not value.strip())
+                   for value in (evaluation_ref,evaluation_revision))):
+        raise EvaluationStructureError('evaluation ref and revision must be provided together')
     target=resolve_target(version,level)
     if target['status']!='supported': return {'status':target['status'],'results':[],'reason':target['reason']}
     catalog=load_catalog(version)
@@ -354,12 +360,17 @@ def materialize_conformance_requirement_results(*, version: str, level: str, sam
     if any(not rows for rows in variation_by_sample.values()):
         raise EvaluationStructureError('each sample requires a presentation variation inventory')
     sample_result_index={}; duplicate_result_keys=set(); result_refs=set(); criterion_refs=set()
-    result_fields={'sample_result_ref','sample_ref','variation_ref','sample_kind','process_ref','requirement_ref',
+    result_fields={'sample_result_ref','evaluation_ref','evaluation_revision','sample_ref','variation_ref','sample_kind','process_ref','requirement_ref',
         'criterion_evaluation_ref','result','observation_refs','test_rule_result_refs','evidence_refs',
         'unmet_example_refs','freshness_status','limitation'}
     for row in sample_results:
         if not isinstance(row,dict) or set(row)!=result_fields:
             raise EvaluationStructureError('sample evaluation result schema mismatch')
+        if (not isinstance(row.get('evaluation_ref'),str) or not row['evaluation_ref'].strip()
+                or not isinstance(row.get('evaluation_revision'),str) or not row['evaluation_revision'].strip()
+                or (evaluation_ref is not None and row['evaluation_ref']!=evaluation_ref)
+                or (evaluation_revision is not None and row['evaluation_revision']!=evaluation_revision)):
+            raise EvaluationStructureError('sample evaluation result does not belong to the current evaluation revision')
         key=(row.get('sample_ref'),row.get('variation_ref'),row.get('requirement_ref'))
         if key in sample_result_index: duplicate_result_keys.add(key)
         for field,seen in (('sample_result_ref',result_refs),('criterion_evaluation_ref',criterion_refs)):
@@ -384,6 +395,12 @@ def materialize_conformance_requirement_results(*, version: str, level: str, sam
             raise EvaluationStructureError('current conclusive sample result requires evidence refs')
         sample_result_index[key]=row
     if duplicate_result_keys: raise EvaluationStructureError('duplicate current sample Success Criterion result')
+    evaluation_identities={(row['evaluation_ref'],row['evaluation_revision']) for row in sample_results}
+    if len(evaluation_identities)>1: raise EvaluationStructureError('sample results mix evaluation revisions')
+    if evaluation_identities:
+        result_evaluation_ref,result_evaluation_revision=next(iter(evaluation_identities))
+    else:
+        result_evaluation_ref,result_evaluation_revision=evaluation_ref,evaluation_revision
     required_result_keys={(sample_ref,variation['variation_ref'],criterion_ref)
         for sample_ref,variation_rows in variation_by_sample.items() for variation in variation_rows
         for criterion_ref in required_sc}
@@ -508,7 +525,9 @@ def materialize_conformance_requirement_results(*, version: str, level: str, sam
             'success_criterion_refs':sorted(non_interference) if key=='non-interference' else sorted(required_sc) if key=='conformance-level' else [],
             'evidence_refs':sorted(evidence),'limitation':None if values[key]=='satisfied' else 'required current conformance evidence is incomplete or not satisfied'})
     return {'status':'ready' if all(row['result'] in {'satisfied','not-satisfied'} for row in result_rows) else 'unresolved',
-            'target_version':version,'target_level':level,'sample_results_count':len(sample_results),
+            'target_version':version,'target_level':level,'evaluation_ref':result_evaluation_ref,
+            'evaluation_revision':result_evaluation_revision,'criterion_evaluation_refs':sorted(criterion_refs),
+            'sample_results_count':len(sample_results),
             'expected_sample_criterion_rows':len(required_result_keys),'missing_sample_criterion_rows':[
                 {'sample_ref':s,'variation_ref':v,'criterion_ref':c} for s,v,c in sorted(missing_keys)],
             'stale_sample_criterion_rows':[{'sample_ref':s,'variation_ref':v,'criterion_ref':c}
@@ -520,7 +539,9 @@ def materialize_conformance_requirement_results(*, version: str, level: str, sam
 def evaluation_statement(*, version: str, status: str, all_methodology_complete: bool, all_samples_conform: bool,
                          owner_commitment_ref: str | None, product_scope: str, technologies: list[str], baseline_ref: str,
                          issued_date: str | None = None, level: str | None = None, scope_ref: str | None = None,
-                         nonconforming_areas: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+                         nonconforming_areas: list[dict[str, Any]] | None = None,
+                         report_closure: dict[str, Any] | None = None,
+                         formal_conformance_results: dict[str, Any] | None = None) -> dict[str, Any]:
     if version!='2.2': return {'status':'not-generated','reason':'wcag-em-2-step-5.3-is-wcag-2.2-only'}
     catalog=load_catalog(version)
     contract=catalog['evaluation_statement_contract']
@@ -543,13 +564,24 @@ def evaluation_statement(*, version: str, status: str, all_methodology_complete:
         return {'status':'blocked','reason':'statement-version-metadata-mismatch'}
     if not all_methodology_complete or not owner_commitment_ref:
         return {'status':'blocked','reason':'methodology-or-owner-commitment-incomplete'}
+    if not _statement_evaluation_evidence_is_current(report_closure,formal_conformance_results,
+                                                      version=version,level=level):
+        return {'status':'blocked','reason':'current-report-and-conformance-results-required'}
     common={'issued_date':issued_date,'wcag_title':required['wcag_title'],'wcag_uri':required['wcag_uri'],
             'conformance_level':level,'product_scope':product_scope,'scope_ref':scope_ref,
             'technologies_relied_upon':sorted(set(technologies)),
             'accessibility_support_baseline_ref':baseline_ref,'owner_commitment_ref':owner_commitment_ref}
-    if status=='full' and all_samples_conform:
+    sample_results=formal_conformance_results['sample_conformance_results']
+    requirement_results=formal_conformance_results['results']
+    all_current_samples_conform=all(row['result']=='satisfied' for row in sample_results)
+    all_current_requirements_conform=all(row['result']=='satisfied' for row in requirement_results)
+    if status=='full' and all_samples_conform and all_current_samples_conform and all_current_requirements_conform:
         return {'status':'generated','statement_type':'full',**common}
+    if status=='full':
+        return {'status':'blocked','reason':'full-statement-requires-current-conformance-for-every-sample'}
     if status=='partial' and nonconforming_areas is not None:
+        if all_samples_conform or all_current_samples_conform or all_current_requirements_conform:
+            return {'status':'blocked','reason':'partial-statement-requires-current-nonconforming-results'}
         if not isinstance(nonconforming_areas,list) or not nonconforming_areas:
             return {'status':'blocked','reason':'partial-statement-requires-nonconforming-areas'}
         normalized=[]; seen=set()
@@ -581,6 +613,42 @@ def evaluation_statement(*, version: str, status: str, all_methodology_complete:
                                   {'language_refs':sorted(set(languages)),'support_gap_refs':sorted(set(support_refs))})
         return {'status':'generated','statement_type':'partial',**common,'nonconforming_areas':normalized}
     return {'status':'blocked','reason':'statement-conditions-not-met'}
+
+
+def _statement_evaluation_evidence_is_current(report_closure: Any, formal_results: Any, *,
+                                               version: str, level: str | None) -> bool:
+    if (not isinstance(report_closure,dict) or report_closure.get('status')!='complete'
+            or not isinstance(formal_results,dict) or formal_results.get('status')!='ready'):
+        return False
+    evaluation_ref=report_closure.get('evaluation_ref')
+    revision=report_closure.get('evaluation_revision')
+    if (not isinstance(evaluation_ref,str) or not evaluation_ref.strip()
+            or not isinstance(revision,str) or not revision.strip()
+            or formal_results.get('evaluation_ref')!=evaluation_ref
+            or formal_results.get('evaluation_revision')!=revision
+            or report_closure.get('wcag_version')!=version or report_closure.get('level')!=level
+            or formal_results.get('target_version')!=version or formal_results.get('target_level')!=level):
+        return False
+    plan_refs=report_closure.get('criterion_evaluation_refs')
+    result_refs=formal_results.get('criterion_evaluation_refs')
+    if (not isinstance(plan_refs,list) or not plan_refs
+            or any(not isinstance(ref,str) or not ref.strip() for ref in plan_refs)
+            or len(plan_refs)!=len(set(plan_refs)) or result_refs!=plan_refs):
+        return False
+    expected_count=formal_results.get('expected_sample_criterion_rows')
+    if (isinstance(expected_count,bool) or not isinstance(expected_count,int)
+            or expected_count!=len(plan_refs) or formal_results.get('sample_results_count')!=expected_count
+            or formal_results.get('missing_sample_criterion_rows')
+            or formal_results.get('stale_sample_criterion_rows')):
+        return False
+    samples=formal_results.get('sample_conformance_results')
+    requirements=formal_results.get('results')
+    if (not isinstance(samples,list) or not samples or not isinstance(requirements,list) or not requirements
+            or any(not isinstance(row,dict) or row.get('result') not in {'satisfied','not-satisfied'} for row in samples)
+            or any(not isinstance(row,dict) or row.get('result') not in {'satisfied','not-satisfied'} for row in requirements)
+            or len({row.get('sample_ref') for row in samples})!=len(samples)):
+        return False
+    return True
 
 
 def conformance_claim(*, version: str, full_scope_evidence: bool, required_fields: dict[str, Any],
@@ -651,11 +719,14 @@ def _validate_claim_scope_evidence(scope_evidence: Any, page_scope: Any, contrac
     if scope_evidence['coverage_method']=='all-pages-evaluated':
         if not isinstance(page_scope,dict) or not covered: return False
         if page_scope.get('uris') and set(covered)!=set(page_scope['uris']): return False
-        if not page_scope.get('uris') and not (isinstance(page_scope.get('scope_expression'),str) and page_scope['scope_expression'].strip()): return False
+        # A free-form expression cannot be enumerated here. Without an exact
+        # URI inventory, all-pages-evaluated would assert unverified coverage.
+        if not page_scope.get('uris'): return False
     else:
         if not _nonempty_refs(scope_evidence.get('complete_process_evidence_refs')) or not isinstance(page_scope,dict): return False
         if page_scope.get('uris') and set(covered)!=set(page_scope['uris']): return False
         if not page_scope.get('uris') and not (isinstance(page_scope.get('scope_expression'),str) and page_scope['scope_expression'].strip()): return False
+        if not set(scope_evidence['complete_process_evidence_refs'])<=set(scope_evidence['evidence_refs']): return False
     sc_rows=scope_evidence.get('success_criterion_results')
     if not isinstance(sc_rows,list) or not sc_rows: return False
     expected={row['criterion_ref'] for row in load_catalog(contract['guideline_version'])['success_criteria']
@@ -735,6 +806,7 @@ def statement_of_partial_conformance(*, version: str, level: str, statement_type
 
 def close_report(*, required_steps: list[str], step_outcomes: dict[str, str], sample_results: list[dict[str, Any]],
                  example_coverage: dict[str, list[str]], required_criterion_evaluation_refs: list[str] | None = None,
+                 canonical_criterion_plan: dict[str, Any] | None = None,
                  all_occurrence_requirements: dict[str, list[str]] | None = None,
                  accessible_output_closure: dict[str, bool] | None = None) -> dict[str, Any]:
     if (not isinstance(required_steps, list) or not required_steps
@@ -754,7 +826,31 @@ def close_report(*, required_steps: list[str], step_outcomes: dict[str, str], sa
     missing_steps=sorted(set(REPORT_STEPS)-set(step_outcomes))
     open_steps=sorted(step for step,status in step_outcomes.items() if status not in {'complete','not-applicable'})
     incomplete_required_steps=sorted(step for step in required_steps if step_outcomes.get(step) != 'complete')
+    canonical_plan_error=None
+    canonical_plan_refs=[]
+    canonical_rows_by_ref={}
+    canonical_samples_by_ref={}
+    evaluation_ref=None
+    evaluation_revision=None
+    if canonical_criterion_plan is not None:
+        try:
+            canonical_plan_refs=validate_materialized_plan(canonical_criterion_plan)
+            if (not isinstance(canonical_criterion_plan.get('evaluation_ref'),str)
+                    or not canonical_criterion_plan['evaluation_ref'].strip()
+                    or not isinstance(canonical_criterion_plan.get('evaluation_revision'),str)
+                    or not canonical_criterion_plan['evaluation_revision'].strip()):
+                raise CriterionPlanError('current criterion plan requires evaluation identity and revision')
+            evaluation_ref=canonical_criterion_plan['evaluation_ref']
+            evaluation_revision=canonical_criterion_plan['evaluation_revision']
+            canonical_rows_by_ref={row['criterion_evaluation_ref']:row for row in canonical_criterion_plan['criteria']}
+            canonical_samples_by_ref={row['sample_ref']:row for row in canonical_criterion_plan['plan_basis']['samples']}
+        except (CriterionPlanError, KeyError, TypeError) as exc:
+            canonical_plan_error=str(exc) or 'canonical criterion plan is invalid'
+            canonical_plan_refs=[]
+            canonical_rows_by_ref={}
+            canonical_samples_by_ref={}
     sample_result_refs=[]
+    sample_result_identity_refs=[]
     invalid_sample_results=[]
     incomplete_sample_results=[]
     unsatisfied=set()
@@ -767,27 +863,43 @@ def close_report(*, required_steps: list[str], step_outcomes: dict[str, str], sa
             invalid_sample_results.append(str(index))
             continue
         sample_result_refs.append(row['criterion_evaluation_ref'])
+        sample_result_identity_refs.append(row.get('sample_result_ref'))
         if row['result'] == 'not-satisfied': unsatisfied.add(row['requirement_ref'])
         if row['result'] == 'undetermined' or row['freshness_status'] != 'current':
             incomplete_sample_results.append(row['criterion_evaluation_ref'])
+        if canonical_criterion_plan is not None:
+            canonical_row=canonical_rows_by_ref.get(row['criterion_evaluation_ref'])
+            canonical_sample=canonical_samples_by_ref.get(row.get('sample_ref'))
+            if (canonical_row is None or row.get('evaluation_ref')!=evaluation_ref
+                    or row.get('evaluation_revision')!=evaluation_revision
+                    or row.get('sample_ref')!=canonical_row.get('sample_ref')
+                    or row.get('variation_ref')!=canonical_row.get('variation_ref')
+                    or row.get('requirement_ref')!=canonical_row.get('criterion_ref')
+                    or (canonical_sample is not None and canonical_sample.get('sample_kind') is not None
+                        and row.get('sample_kind')!=canonical_sample.get('sample_kind'))
+                    or row.get('process_ref')!=canonical_row.get('process_ref')):
+                invalid_sample_results.append(f'non_current_plan_identity:{row["criterion_evaluation_ref"]}')
+    if any(not isinstance(ref,str) or not ref.strip() for ref in sample_result_identity_refs):
+        invalid_sample_results.append('sample_result_ref_missing')
+    if len(sample_result_identity_refs)!=len(set(sample_result_identity_refs)):
+        invalid_sample_results.append('duplicate_sample_result_ref')
     if len(sample_result_refs) != len(set(sample_result_refs)):
         invalid_sample_results.append('duplicate_criterion_evaluation_ref')
 
-    expected_refs = required_criterion_evaluation_refs
     missing_sample_result_refs=[]
     unexpected_sample_result_refs=[]
-    sample_selection_completed = step_outcomes.get('3.3') == 'complete'
+    sample_selection_completed = any(step_outcomes.get(step)=='complete' for step in ('3.1','3.2','3.3'))
     criterion_evaluation_required = (
         '4.1' in required_steps or '4.2' in required_steps
         or step_outcomes.get('4.1') == 'complete' or step_outcomes.get('4.2') == 'complete'
-        or sample_selection_completed or bool(sample_results)
+        or sample_selection_completed or bool(sample_results) or canonical_criterion_plan is not None
     )
-    sample_result_scope_missing = criterion_evaluation_required and not expected_refs
-    if expected_refs is None:
-        sample_result_scope_missing = sample_result_scope_missing or criterion_evaluation_required
-    else:
-        missing_sample_result_refs=sorted(set(expected_refs)-set(sample_result_refs))
-        unexpected_sample_result_refs=sorted(set(sample_result_refs)-set(expected_refs))
+    sample_result_scope_missing = criterion_evaluation_required and (canonical_criterion_plan is None or canonical_plan_error is not None)
+    expected_refs=canonical_plan_refs if canonical_criterion_plan is not None and canonical_plan_error is None else []
+    declared_scope_mismatch=(required_criterion_evaluation_refs is not None
+                             and set(required_criterion_evaluation_refs)!=set(expected_refs))
+    missing_sample_result_refs=sorted(set(expected_refs)-set(sample_result_refs))
+    unexpected_sample_result_refs=sorted(set(sample_result_refs)-set(expected_refs))
     unsatisfied=sorted(unsatisfied)
     missing_examples=sorted(req for req in unsatisfied if not _nonempty_refs(example_coverage.get(req)))
     missing_occurrences=[]
@@ -801,13 +913,19 @@ def close_report(*, required_steps: list[str], step_outcomes: dict[str, str], sa
         accessible_missing=sorted(key for key,value in accessible_output_closure.items() if value is not True)
     complete=(not missing_steps and not open_steps and not incomplete_required_steps and not invalid_sample_results
               and not incomplete_sample_results and not missing_sample_result_refs and not unexpected_sample_result_refs
-              and not sample_result_scope_missing and not missing_examples and not missing_occurrences
+              and not sample_result_scope_missing and not declared_scope_mismatch and not missing_examples and not missing_occurrences
               and not accessible_missing)
     return {'status':'complete' if complete else 'blocked','missing_step_outcomes':missing_steps,
             'open_steps':open_steps,'incomplete_required_steps':incomplete_required_steps,
             'invalid_sample_results':sorted(set(invalid_sample_results)),
             'incomplete_sample_results':sorted(incomplete_sample_results),
             'sample_result_scope_missing':sample_result_scope_missing,
+            'canonical_criterion_plan_error':canonical_plan_error,
+            'declared_criterion_scope_mismatch':declared_scope_mismatch,
+            'evaluation_ref':evaluation_ref,'evaluation_revision':evaluation_revision,
+            'wcag_version':canonical_criterion_plan.get('wcag_version') if canonical_plan_error is None and canonical_criterion_plan else None,
+            'level':canonical_criterion_plan.get('level') if canonical_plan_error is None and canonical_criterion_plan else None,
+            'criterion_evaluation_refs':sorted(expected_refs),
             'missing_sample_result_refs':missing_sample_result_refs,
             'unexpected_sample_result_refs':unexpected_sample_result_refs,
             'not_satisfied_requirements_without_example':missing_examples,

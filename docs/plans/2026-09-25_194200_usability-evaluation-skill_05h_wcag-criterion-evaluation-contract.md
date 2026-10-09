@@ -470,3 +470,9 @@ production `wcag_criterion_plan.py` と別実装で少なくとも次を検証�
 - required evidence不足を推測で埋めない
 - supported ACT Ruleがないcriterionも評価対象から落とさない
 - sample / variation resultとcriterion plan coverageをdeterministic validatorが独立検証する
+
+## 14. Final closure integrity (2026-10-09)
+
+- `close_criterion()`はcriterion行のprocedure key集合をversioned requirement asset / finite procedure catalogから再照合する。呼び出し側がmachine、manual、AT、external-evidence procedure行を削除・追加・重複してもcriterionをcompleteにできない。procedure applicability自体は既存契約どおり個別に判定する。
+- `materialize_plan()`は対象version / level、canonical sample identity、variation identity、process membership、evaluation ref / revisionをbasisとして記録する。`close-report`はこのoutputを再materializeしてplan rowと結果集合を照合し、必要criterion refを呼び出し側の申告配列から導出しない。
+- `materialize_sample_results()`で部分実行・再実行は維持する。全件性・currentness・sample / variation / criterion対応を必須にするのはreportをcompleteへ閉じる境界である。

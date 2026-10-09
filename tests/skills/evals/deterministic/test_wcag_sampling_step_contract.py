@@ -77,25 +77,28 @@ class WcagSamplingStepContractTests(unittest.TestCase):
 
     def test_finite_random_selector_uses_unique_non_overlapping_refs_without_a_fixed_seed(self):
         result=select_random_candidates(candidates=inventory(),structured_refs=["SAMPLE-001","SAMPLE-002"],
-            target_count=5,excluded_refs=["SAMPLE-003"])
+            target_count=1,excluded_refs=["SAMPLE-003"])
         self.assertEqual(result["selection_status"],"target-met")
-        self.assertEqual(len(result["selected_sample_refs"]),5)
-        self.assertEqual(len(set(result["selected_sample_refs"])),5)
+        self.assertEqual(len(result["selected_sample_refs"]),1)
+        self.assertEqual(len(set(result["selected_sample_refs"])),1)
         self.assertFalse({"SAMPLE-001","SAMPLE-002","SAMPLE-003"}&set(result["selected_sample_refs"]))
         self.assertFalse(result["fixed_seed_used"])
-        short=select_random_candidates(candidates=inventory(3),structured_refs=["SAMPLE-001"],target_count=5)
+        short=select_random_candidates(candidates=inventory(1),structured_refs=["SAMPLE-001"],target_count=1)
         self.assertEqual(short["selection_status"],"selection-incomplete")
+        with self.assertRaises(SamplingError):
+            select_random_candidates(candidates=inventory(),structured_refs=["SAMPLE-001","SAMPLE-002"],
+                target_count=2)
 
     def test_non_deterministic_random_selection_production_cli(self):
         script=SCRIPTS/"select_random_samples.py"
         completed=subprocess.run([sys.executable,str(script)],input=json.dumps({
             "candidates":inventory(12),"structured_refs":["SAMPLE-001","SAMPLE-002"],
-            "target_count":2,"excluded_refs":["SAMPLE-003"]}),text=True,cwd=ROOT,
+            "target_count":1,"excluded_refs":["SAMPLE-003"]}),text=True,cwd=ROOT,
             capture_output=True,check=False)
         self.assertEqual(completed.returncode,0,completed.stderr)
         result=json.loads(completed.stdout)
         self.assertEqual(result["selection_status"],"target-met")
-        self.assertEqual(len(result["selected_sample_refs"]),2)
+        self.assertEqual(len(result["selected_sample_refs"]),1)
         self.assertFalse({"SAMPLE-001","SAMPLE-002","SAMPLE-003"}&set(result["selected_sample_refs"]))
 
     def test_process_sequences_derive_union_membership_and_process_added_samples(self):

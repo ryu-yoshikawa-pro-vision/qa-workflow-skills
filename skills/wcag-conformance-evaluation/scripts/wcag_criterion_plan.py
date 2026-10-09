@@ -68,7 +68,12 @@ def load_procedure_catalog(assets_dir: Path = ASSETS) -> dict[str, Any]:
 def materialize_plan(*, wcag_version: str | None, level: str | None,
                      samples: list[dict[str, Any]], variations: list[dict[str, Any]],
                      process_memberships: dict[str,str] | None = None,
+                     evaluation_ref: str | None = None, evaluation_revision: str | None = None,
                      assets_dir: Path = ASSETS) -> dict[str, Any]:
+    if ((evaluation_ref is None) != (evaluation_revision is None)
+            or any(value is not None and (not isinstance(value, str) or not value.strip())
+                   for value in (evaluation_ref, evaluation_revision))):
+        raise CriterionPlanError('evaluation ref and revision must be provided together')
     target=resolve_target(wcag_version,level,assets_dir=assets_dir)
     if target['status']!='supported':
         return {'status':target['status'],'reason':target['reason'],'criteria':[],'requests':[]}
@@ -117,7 +122,7 @@ def materialize_plan(*, wcag_version: str | None, level: str | None,
         for variation in variations_by_sample[sample['sample_ref']]:
             for criterion in criterion_rows:
                 row_index=len(rows)+1
-                evaluation_ref=f'CRIT-EVAL-{row_index:06d}'
+                criterion_evaluation_ref=f'CRIT-EVAL-{row_index:06d}'
                 execution_refs=[]
                 for key in criterion['procedure_keys']:
                     procedure=proc_by_key.get(key)
@@ -128,7 +133,7 @@ def materialize_plan(*, wcag_version: str | None, level: str | None,
                     if procedure['procedure_kind']=='machine':
                         for probe_key in procedure['machine_probe_keys']:
                             req={'request_kind':'wcag-machine-probe','observation_request_ref':f'WCAG-OBS-{len(requests)+1:06d}',
-                                 'criterion_evaluation_ref':evaluation_ref,'procedure_execution_ref':execution_ref,
+                                 'criterion_evaluation_ref':criterion_evaluation_ref,'procedure_execution_ref':execution_ref,
                                  'machine_probe_key':probe_key,'sample_ref':sample['sample_ref'],'variation_ref':variation['variation_ref'],
                                  'process_ref':(process_memberships or {}).get(sample['sample_ref']),
                                  'requirement_ref':criterion['criterion_ref'],
@@ -145,16 +150,44 @@ def materialize_plan(*, wcag_version: str | None, level: str | None,
                                            'procedure_kind':procedure['procedure_kind'],'applicability_mode':procedure['applicability_mode'],
                                            'status':'pending','result':None,'observation_request_refs':request_refs,
                                            'evidence_refs':[]})
-                rows.append({'criterion_evaluation_ref':evaluation_ref,'sample_ref':sample['sample_ref'],
+                rows.append({'criterion_evaluation_ref':criterion_evaluation_ref,'evaluation_ref':evaluation_ref,
+                             'evaluation_revision':evaluation_revision,'wcag_version':wcag_version,
+                             'sample_ref':sample['sample_ref'],
                              'variation_ref':variation['variation_ref'],'process_ref':(process_memberships or {}).get(sample['sample_ref']),
                              'criterion_ref':criterion['criterion_ref'],'level':criterion['level'],'procedure_executions':execution_refs,
                              'applicable_population':'unknown','execution_status':'pending','result':None,
                              'observation_refs':[],'measurement_refs':[],'act_rule_result_refs':[],'semantic_refs':[],
                              'manual_refs':[],'assistive_technology_refs':[],'external_evidence_refs':[],'limitation':None})
-    return {'status':'ready','wcag_version':wcag_version,'level':level,'catalog_fingerprint':target['catalog_fingerprint'],
+    plan_basis={'wcag_version':wcag_version,'level':level,
+        'samples':[{'sample_ref':row['sample_ref'],'identity_fingerprint':row['identity_fingerprint'],
+                    'target_identity':row['target_identity'],
+                    **({'sample_kind':row['sample_kind']} if 'sample_kind' in row else {})} for row in samples],
+        'variations':[{'sample_ref':row['sample_ref'],'variation_ref':row['variation_ref'],
+                       'identity_fingerprint':row['identity_fingerprint']} for row in variations],
+        'process_memberships':dict(process_memberships or {}),
+        'evaluation_ref':evaluation_ref,'evaluation_revision':evaluation_revision}
+    return {'status':'ready','wcag_version':wcag_version,'level':level,'evaluation_ref':evaluation_ref,
+            'evaluation_revision':evaluation_revision,'catalog_fingerprint':target['catalog_fingerprint'],
             'procedure_catalog_fingerprint':static_data_fingerprint(assets_dir/'wcag-evaluation-procedure-catalog.json'),
             'expected_row_count':sum(len(variations_by_sample[sample['sample_ref']]) for sample in samples)*len(target['required_success_criteria']),
-            'criteria':rows,'requests':requests}
+            'criteria':rows,'requests':requests,'plan_basis':plan_basis}
+
+
+def validate_materialized_plan(plan: dict[str, Any]) -> list[str]:
+    """Rebuild the exact finite plan from its recorded canonical source inputs."""
+    if not isinstance(plan, dict) or not isinstance(plan.get('plan_basis'), dict):
+        raise CriterionPlanError('canonical criterion plan source inputs are required')
+    basis=plan['plan_basis']
+    expected_fields={'wcag_version','level','samples','variations','process_memberships','evaluation_ref','evaluation_revision'}
+    if set(basis)!=expected_fields:
+        raise CriterionPlanError('canonical criterion plan source schema is invalid')
+    expected=materialize_plan(**basis)
+    if plan!=expected:
+        raise CriterionPlanError('canonical criterion plan does not match its versioned materialization')
+    refs=[row['criterion_evaluation_ref'] for row in plan['criteria']]
+    if len(refs)!=len(set(refs)):
+        raise CriterionPlanError('canonical criterion plan evaluation refs are duplicated')
+    return refs
 
 
 def resolve_external_evidence_candidates(candidates: list[dict[str, Any]], *, allowed_source_ids: set[str],
@@ -210,19 +243,47 @@ def close_criterion(result: dict[str, Any], *, procedure_results: dict[str, dict
         raise CriterionPlanError('criterion evidence refs must be non-empty strings')
     if len(evidence_refs)!=len(set(evidence_refs)):
         raise CriterionPlanError('criterion evidence refs must be unique')
+    version=result.get('wcag_version')
+    level=result.get('level')
+    target=resolve_target(version,level)
+    if target.get('status')!='supported' or result.get('criterion_ref') not in set(target.get('required_success_criteria',[])):
+        raise CriterionPlanError('criterion result is outside its versioned target plan')
+    versioned_criterion=next((row for row in load_catalog(version)['success_criteria']
+                              if row['criterion_ref']==result.get('criterion_ref')),None)
+    if versioned_criterion is None:
+        raise CriterionPlanError('criterion result is absent from the current versioned catalog')
+    procedure_executions=result.get('procedure_executions')
+    if not isinstance(procedure_executions,list):
+        raise CriterionPlanError('criterion procedure execution rows are required')
+    expected_procedure_keys=versioned_criterion.get('procedure_keys')
+    actual_procedure_keys=[row.get('procedure_key') for row in procedure_executions if isinstance(row,dict)]
+    if (len(actual_procedure_keys)!=len(procedure_executions)
+            or len(actual_procedure_keys)!=len(set(actual_procedure_keys))
+            or set(actual_procedure_keys)!=set(expected_procedure_keys or [])):
+        raise CriterionPlanError('criterion procedure execution set differs from the current versioned plan')
     population_evidence_refs=population_evidence_refs or []
     violation_evidence_refs=violation_evidence_refs or []
     if any(not isinstance(ref,str) or not ref.strip() for ref in population_evidence_refs+violation_evidence_refs):
         raise CriterionPlanError('population and violation evidence refs must be non-empty strings')
     procedures=load_procedure_catalog()['procedures']
     procedure_by_key={row['procedure_key']:row for row in procedures}
-    execution_by_key={row['procedure_key']:row for row in result['procedure_executions']}
-    expected_execution_refs={row['procedure_execution_ref'] for row in result['procedure_executions']}
+    expected_execution_refs=set()
+    for execution in procedure_executions:
+        key=execution['procedure_key']
+        spec=procedure_by_key.get(key)
+        execution_ref=execution.get('procedure_execution_ref')
+        if (spec is None or not isinstance(execution_ref,str) or not execution_ref.strip()
+                or execution.get('procedure_kind')!=spec['procedure_kind']
+                or execution.get('applicability_mode')!=spec['applicability_mode']
+                or execution_ref in expected_execution_refs):
+            raise CriterionPlanError('criterion procedure execution identity or catalog mapping is invalid')
+        expected_execution_refs.add(execution_ref)
     if set(procedure_results)-expected_execution_refs:
         raise CriterionPlanError('procedure result contains a non-current execution reference')
+    execution_by_key={execution['procedure_key']:execution for execution in procedure_executions}
     normalized=[]; unresolved=[]; blocked=[]; current_evidence=set(evidence_refs)
     external_evidence_candidates=external_evidence_candidates or []
-    for execution in result['procedure_executions']:
+    for execution in procedure_executions:
         execution_ref=execution['procedure_execution_ref']
         spec=procedure_by_key.get(execution['procedure_key'])
         if spec is None: raise CriterionPlanError(f"unregistered procedure: {execution['procedure_key']}")
@@ -384,10 +445,16 @@ def materialize_sample_results(criterion_rows: list[dict[str, Any]], *, current_
     results=[]
     current_rows=sorted((rows_by_ref[ref] for ref in current_criterion_evaluation_refs),
                         key=lambda row:(row['sample_ref'],row['variation_ref'],row['criterion_ref'],row['criterion_evaluation_ref']))
+    evaluation_identities={(row.get('evaluation_ref'),row.get('evaluation_revision')) for row in current_rows}
+    if current_rows and (len(evaluation_identities)!=1 or any(
+            not isinstance(value,str) or not value.strip() for value in next(iter(evaluation_identities)))):
+        raise CriterionPlanError('current criterion rows must share an evaluation ref and revision')
     for row in current_rows:
         if row.get('execution_status')!='complete' or row.get('result') not in {'satisfied','not-satisfied','undetermined'}:
             continue
-        results.append({'sample_result_ref':f'WCAG-RES-{len(results)+1:03d}','sample_ref':row['sample_ref'],
+        results.append({'sample_result_ref':f'WCAG-RES-{len(results)+1:03d}',
+                        'evaluation_ref':row['evaluation_ref'],'evaluation_revision':row['evaluation_revision'],
+                        'sample_ref':row['sample_ref'],
                         'variation_ref':row['variation_ref'],'sample_kind':sample_kinds[row['sample_ref']],
                         'process_ref':row.get('process_ref'),'requirement_ref':row['criterion_ref'],
                         'criterion_evaluation_ref':row['criterion_evaluation_ref'],'result':row['result'],

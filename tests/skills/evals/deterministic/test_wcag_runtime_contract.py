@@ -54,7 +54,8 @@ def close_input() -> dict:
         samples=[{"sample_ref": "SAMPLE-001", "identity_fingerprint": "sha256:" + "a" * 64,
                   "target_identity": DOCUMENT_IDENTITY}],
         variations=[{"sample_ref": "SAMPLE-001", "variation_ref": "VAR-001",
-                     "identity_fingerprint": "sha256:" + "b" * 64}])
+                     "identity_fingerprint": "sha256:" + "b" * 64}],
+        evaluation_ref="WCAG-EVAL-17", evaluation_revision="rev-9")
     criterion = next(row for row in plan["criteria"] if row["criterion_ref"] == "1.1.1")
     procedure_results = {}
     machine_evidence = []
@@ -73,6 +74,29 @@ def close_input() -> dict:
         "reason": "required current procedure evidence supports this fixture judgment", "evidence_refs": ["E-POP"]}}
 
 
+def close_report_args(*, sample_kind: str = "structured", process_ref: str | None = None) -> dict:
+    import wcag_criterion_plan
+    sample = {"sample_ref":"SAMPLE-001", "sample_kind":sample_kind,
+        "identity_fingerprint":"sha256:" + "a" * 64, "target_identity":DOCUMENT_IDENTITY}
+    plan = wcag_criterion_plan.materialize_plan(wcag_version="2.0", level="A", samples=[sample],
+        variations=[{"sample_ref":"SAMPLE-001", "variation_ref":"VAR-001",
+            "identity_fingerprint":"sha256:" + "b" * 64}],
+        process_memberships={"SAMPLE-001":process_ref} if process_ref else {},
+        evaluation_ref="WCAG-EVAL-17", evaluation_revision="rev-9")
+    rows = [{"sample_result_ref":f"WCAG-RES-{index:03d}", "evaluation_ref":"WCAG-EVAL-17",
+        "evaluation_revision":"rev-9", "sample_ref":"SAMPLE-001", "variation_ref":"VAR-001",
+        "sample_kind":sample_kind, "process_ref":process_ref,
+        "criterion_evaluation_ref":row["criterion_evaluation_ref"], "requirement_ref":row["criterion_ref"],
+        "result":"satisfied", "freshness_status":"current"} for index,row in enumerate(plan["criteria"],1)]
+    outcomes = {step:"complete" for step in wcag_em_structure.REPORT_STEPS}
+    outcomes.update({"1.4":"not-applicable", "3.2":"not-applicable", "4.3":"not-applicable"})
+    return {"required_steps":[step for step,status in outcomes.items() if status=="complete"],
+        "step_outcomes":outcomes, "sample_results":rows,
+        "required_criterion_evaluation_refs":[row["criterion_evaluation_ref"] for row in plan["criteria"]],
+        "canonical_criterion_plan":plan, "example_coverage":{},
+        "accessible_output_closure":{key:True for key in wcag_em_structure.ACCESSIBLE_OUTPUT_CHECKS}}
+
+
 def invoke(body: dict) -> dict:
     result = subprocess.run([sys.executable, str(SCRIPT)], input=json.dumps(body), text=True,
         cwd=ROOT, capture_output=True, check=False)
@@ -82,9 +106,55 @@ def invoke(body: dict) -> dict:
 
 
 class WcagRuntimeContractTests(unittest.TestCase):
+    def test_runtime_rejects_a_criterion_plan_with_required_machine_procedures_removed(self):
+        body = request("A")
+        close = close_input()
+        args = close["arguments"]
+        executions = args["result"]["procedure_executions"]
+        removed = [row for row in executions if row["procedure_kind"] == "machine"]
+        args["result"]["procedure_executions"] = [row for row in executions if row["procedure_kind"] != "machine"]
+        for row in removed:
+            args["procedure_results"].pop(row["procedure_execution_ref"], None)
+        body["input"] = close
+        result = invoke(body)
+        self.assertEqual(result["runtime_status"], "invalid_input")
+        self.assertIn("execution set differs", result["issues"][0]["message"])
+
+    def test_runtime_keeps_unfinished_statement_claim_and_random_selection_unresolved(self):
+        body = request("A")
+        body["input"] = {"operation":"evaluation-statement", "arguments":{
+            "version":"2.2", "status":"full", "all_methodology_complete":True,
+            "all_samples_conform":True, "owner_commitment_ref":"OWNER-1", "product_scope":"SCOPE-1",
+            "technologies":["HTML"], "baseline_ref":"BASELINE-1", "issued_date":"2026-10-09",
+            "level":"AA", "scope_ref":"SCOPE-1"}}
+        statement = invoke(body)
+        self.assertEqual(statement["payload"]["result"]["status"], "blocked")
+        self.assertEqual(statement["result_status"], "blocked")
+
+        body["input"] = {"operation":"conformance-claim", "arguments":{
+            "version":"2.2", "full_scope_evidence":True, "required_fields":{}, "scope_evidence":None}}
+        claim = invoke(body)
+        self.assertEqual(claim["payload"]["result"]["status"], "not-generated")
+        self.assertEqual(claim["result_status"], "unresolved")
+
+        body["input"] = {"operation":"validate-random-selection", "arguments":{
+            "structured_refs":["S1","S2","S3"], "selected_refs":[], "target_count":0,
+            "complete_inventory":False, "selection_method":"finite-random"}}
+        random = invoke(body)
+        self.assertEqual(random["runtime_status"], "invalid_input")
+
+    def test_runtime_rejects_stale_earl_result_before_serialization(self):
+        body = request("A")
+        body["input"] = {"operation":"serialize-earl", "arguments":{
+            "evaluation_ref":"WCAG-EVAL-1", "evaluation_revision":"rev-2", "version":"2.2",
+            "results":[{"evaluation_ref":"WCAG-EVAL-1", "evaluation_revision":"rev-1",
+                "freshness_status":"stale", "result":"satisfied"}],
+            "evaluator_identity":"qa-agent", "tool_identity":"qa-workflow-skills",
+            "sample_identities":{}, "variation_identities":{}}}
+        output = invoke(body)
+        self.assertEqual(output["runtime_status"], "invalid_input")
+
     def test_close_report_runtime_keeps_required_steps_and_results_fail_closed(self):
-        outcomes = {step: "complete" for step in wcag_em_structure.REPORT_STEPS}
-        outcomes.update({"1.4": "not-applicable", "3.2": "not-applicable", "4.3": "not-applicable"})
         accessible = {key: True for key in wcag_em_structure.ACCESSIBLE_OUTPUT_CHECKS}
         args = {
             "required_steps": list(wcag_em_structure.REPORT_STEPS),
@@ -102,54 +172,58 @@ class WcagRuntimeContractTests(unittest.TestCase):
         self.assertEqual(forged["payload"]["result"]["incomplete_required_steps"],
                          list(wcag_em_structure.REPORT_STEPS))
 
-        args["required_steps"] = [step for step in wcag_em_structure.REPORT_STEPS
-                                  if outcomes[step] == "complete"]
-        args["step_outcomes"] = outcomes
-        args["sample_results"] = [{"sample_result_ref": "WCAG-RES-1",
-            "criterion_evaluation_ref": "CE-1", "requirement_ref": "1.1.1",
-            "result": "satisfied", "freshness_status": "current"}]
-        args["required_criterion_evaluation_refs"] = ["CE-1"]
+        args.update(close_report_args())
+        body["input"]["arguments"] = args
         valid_not_applicable = invoke(body)
         self.assertEqual(valid_not_applicable["runtime_status"], "ok")
         self.assertEqual(valid_not_applicable["payload"]["result"]["status"], "complete")
 
     def test_close_report_runtime_does_not_let_step_4_2_na_skip_step_4_1_results(self):
-        accessible = {key: True for key in wcag_em_structure.ACCESSIBLE_OUTPUT_CHECKS}
-        outcomes = {step: "complete" for step in wcag_em_structure.REPORT_STEPS}
-        outcomes.update({"1.4": "not-applicable", "3.2": "not-applicable", "4.2": "not-applicable",
-                         "4.3": "not-applicable"})
-        args = {
-            "required_steps": [step for step in wcag_em_structure.REPORT_STEPS
-                               if outcomes[step] == "complete" and step != "4.1"],
-            "step_outcomes": outcomes,
-            "sample_results": [],
-            "required_criterion_evaluation_refs": None,
-            "example_coverage": {},
-            "accessible_output_closure": accessible,
-        }
+        args = close_report_args()
+        args["required_steps"] = [step for step in args["required_steps"] if step != "4.1"]
+        args["step_outcomes"]["4.2"] = "not-applicable"
+        args["required_steps"] = [step for step in args["required_steps"] if step != "4.2"]
+        args["sample_results"] = []
+        args["required_criterion_evaluation_refs"] = None
         body = request("A")
         body["input"] = {"operation": "close-report", "arguments": args}
         blocked = invoke(body)
         self.assertEqual(blocked["runtime_status"], "ok")
         self.assertEqual(blocked["result_status"], "blocked")
         self.assertEqual(blocked["payload"]["result"]["status"], "blocked")
-        self.assertTrue(blocked["payload"]["result"]["sample_result_scope_missing"])
+        self.assertFalse(blocked["payload"]["result"]["sample_result_scope_missing"])
+        self.assertTrue(blocked["payload"]["result"]["missing_sample_result_refs"])
 
-        args["sample_results"] = [{"sample_result_ref": "WCAG-RES-1",
-            "criterion_evaluation_ref": "CE-1", "requirement_ref": "1.1.1",
-            "result": "satisfied", "freshness_status": "current"}]
-        args["required_criterion_evaluation_refs"] = ["CE-1"]
+        narrowed = close_report_args()
+        narrowed["required_steps"] = args["required_steps"]
+        narrowed["step_outcomes"]["4.2"] = "not-applicable"
+        narrowed["required_steps"] = [step for step in narrowed["required_steps"] if step != "4.2"]
+        narrowed["sample_results"] = [narrowed["sample_results"][0]]
+        narrowed["required_criterion_evaluation_refs"] = [narrowed["sample_results"][0]["criterion_evaluation_ref"]]
+        body["input"]["arguments"] = narrowed
+        narrowed_result = invoke(body)
+        self.assertEqual(narrowed_result["payload"]["result"]["status"], "blocked")
+        self.assertTrue(narrowed_result["payload"]["result"]["declared_criterion_scope_mismatch"])
+        self.assertTrue(narrowed_result["payload"]["result"]["missing_sample_result_refs"])
+
+        complete_args = close_report_args()
+        complete_args["required_steps"] = args["required_steps"]
+        complete_args["step_outcomes"]["4.2"] = "not-applicable"
+        complete_args["required_steps"] = [step for step in complete_args["required_steps"] if step != "4.2"]
+        args = complete_args
+        body["input"]["arguments"] = args
         complete = invoke(body)
         self.assertEqual(complete["runtime_status"], "ok")
         self.assertEqual(complete["result_status"], "ready")
         self.assertEqual(complete["payload"]["result"]["status"], "complete")
 
+        args = close_report_args(sample_kind="process-added", process_ref="PROC-1")
         args["step_outcomes"]["4.1"] = "not-applicable"
+        args["required_steps"] = [step for step in args["required_steps"] if step != "4.1"]
         args["step_outcomes"]["4.2"] = "complete"
-        args["required_steps"] = [step for step in wcag_em_structure.REPORT_STEPS
-                                   if args["step_outcomes"].get(step) == "complete" and step != "4.1"]
-        args["sample_results"][0]["process_ref"] = "PROC-1"
-        args["sample_results"][0]["sample_kind"] = "process-added"
+        if "4.2" not in args["required_steps"]:
+            args["required_steps"].append("4.2")
+        body["input"]["arguments"] = args
         process_complete = invoke(body)
         self.assertEqual(process_complete["runtime_status"], "ok")
         self.assertEqual(process_complete["result_status"], "ready")

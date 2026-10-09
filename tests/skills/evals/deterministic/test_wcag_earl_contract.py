@@ -30,14 +30,17 @@ def formal_results() -> list[dict]:
     return [
         {"criterion_ref": "1.1.1", "criterion_evaluation_ref": "CRIT-EVAL-000001",
          "result_ref": "SAMPLE-RESULT-000001", "sample_ref": "SAMPLE-001", "variation_ref": "VAR-001",
+         "evaluation_ref":"WCAG-EVAL-001", "evaluation_revision":"rev-7", "freshness_status":"current",
          "result": "satisfied", "applicable_population": "present", "execution_status": "complete",
          "procedure_provenance": [{"mode": "automatic"}, {"mode": "manual"}]},
         {"criterion_ref": "3.3.7", "criterion_evaluation_ref": "CRIT-EVAL-000002",
          "result_ref": "SAMPLE-RESULT-000002", "sample_ref": "SAMPLE-001", "variation_ref": "VAR-001",
+         "evaluation_ref":"WCAG-EVAL-001", "evaluation_revision":"rev-7", "freshness_status":"current",
          "result": "satisfied", "applicable_population": "none", "execution_status": "complete",
          "procedure_provenance": [{"mode": "manual"}]},
         {"criterion_ref": "2.4.11", "criterion_evaluation_ref": "CRIT-EVAL-000003",
          "result_ref": "SAMPLE-RESULT-000003", "sample_ref": "SAMPLE-002", "variation_ref": "VAR-002",
+         "evaluation_ref":"WCAG-EVAL-001", "evaluation_revision":"rev-7", "freshness_status":"current",
          "result": "untested", "execution_status": "not-run", "explicit_untested": True,
          "procedure_provenance": []},
     ]
@@ -113,6 +116,15 @@ class EarlSerializationContractTests(unittest.TestCase):
         unknown = [{**formal_results()[0], "procedure_provenance": [{"mode": "invented"}]}]
         with self.assertRaises(renderer.EarlError):
             render(unknown)
+
+    def test_stale_or_wrong_revision_results_cannot_become_current_earl_outcomes(self):
+        for changed in ({"freshness_status":"stale"}, {"evaluation_revision":"rev-6"}):
+            for outcome in ("satisfied", "not-satisfied"):
+                row = {**formal_results()[0], **changed, "result":outcome}
+                with self.subTest(changed=changed, outcome=outcome):
+                    with self.assertRaises(renderer.EarlError):
+                        render([row])
+                    self.assertIn("normalized_result_not_current", self.validate(render(), [row]))
 
 
 if __name__ == "__main__":

@@ -236,6 +236,9 @@ def validate_random_selection(*, structured_refs: list[str], selected_refs: list
         raise SamplingError("structured/random selections must be arrays of non-empty refs")
     if isinstance(target_count,bool) or not isinstance(target_count,int) or target_count < 0:
         raise SamplingError("random target count must be a non-negative integer")
+    expected_target_count=random_target_count(len(structured_refs))
+    if target_count!=expected_target_count:
+        raise SamplingError("random target count differs from the WCAG-EM structured-sample target")
     if not isinstance(complete_inventory,bool):
         raise SamplingError("complete inventory must be boolean")
     if len(structured_refs)!=len(set(structured_refs)) or len(selected_refs)!=len(set(selected_refs)):
@@ -293,6 +296,9 @@ def select_random_candidates(*, candidates: list[dict[str, Any]], structured_ref
         raise SamplingError("structured refs must be unique")
     if isinstance(target_count,bool) or not isinstance(target_count,int) or target_count<0:
         raise SamplingError("random target count must be a non-negative integer")
+    expected_target_count=random_target_count(len(structured_refs))
+    if target_count!=expected_target_count:
+        raise SamplingError("random target count differs from the WCAG-EM structured-sample target")
     excluded_refs=excluded_refs or []
     if not isinstance(excluded_refs,list) or any(not isinstance(ref,str) or not ref.strip() for ref in excluded_refs):
         raise SamplingError("excluded refs must be non-empty refs")
