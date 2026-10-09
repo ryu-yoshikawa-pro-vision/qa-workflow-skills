@@ -649,3 +649,12 @@ formal reportはfixture全体をclosureしていない。変更後confirmation s
 - repo-wide `npm run format:check`は137ファイルで失敗し、既存のJSON / fixture / evalファイル等も対象になった。repo-wide `npm run lint:markdown`も882 issue / 157ファイルで失敗したため、今回変更した3 Markdownを`markdownlint-cli2 --no-globs`で個別確認し0 issueを確認した。既存ファイルを一括整形・修正していない。
 - runtime operation envelopeのgeneration fingerprintは各call inputを含む。`close_report()`では別配列間の一致ではなくcanonical plan objectを再materializeして内容・全rowを検査する。WCAG runtimeには外部artifact storeを直接queryするreaderはなく、選定scopeの正本はworkflowが保存・再提示するcurrentな`materialize_plan()` artifactである。このhelper単体は外部artifact storeの参照先を再読込してplan originを認証しないため、report closureへはその保存済みcurrent plan outputを渡す契約とした。一部欠落したplanまたはref/resultだけを渡す経路はblocked。
 - 実装変更を記録した最終REPORT更新・PR本文更新・通常commit / push・push後最新headの3 Actions確認はこの追記後に実施する。前head CIは今回の結果へ流用しない。
+
+### 2026-10-09 JST — 最終commit / push / 現行head CI
+
+- 上記15 tracked filesを通常stageし、標準pre-commit hookを迂回せずcommit `00c3f7b75b8a4101d7d44090a817e982ce32825e`を作成した。hookはsuccessし、repository deterministic 277、runtime 271、shared deterministic 12、repository semantic 4、shared semantic 27（Windows symlink privilegeによる2 skip）、trigger contract 1が通過した。official `skills-ref validate`は22/22、semantic datasetは22 Skill / 155 case。focused WCAG contract 68 testsも通過した。
+- `feat/usability-evaluation-skill`へ通常fast-forward pushした。push直前のPR / remote headは`54b36f03a9fe9ddcd6d470b41238f0c7035891bf`で一致し、push後headは`00c3f7b75b8a4101d7d44090a817e982ce32825e`。`origin/main=dec3f7c764db2869dc24eb3d6f154712a6677068`。force push、`--no-verify`、safe.directory / Git設定、ACL、hook迂回は使っていない。
+- push後の同一head Actionsは`Validate Agent Skills` run `37934042407` success、`Validate Semantic Output Evals` run `37934042451` success、`Validate Deterministic Output Evals` run `37934042506` success。3件すべてhead `00c3f7b75b8a4101d7d44090a817e982ce32825e`に対する結果。
+- 現在も`.pr14-formal-probe-1791501932895.json`とユーザー所有の`3b77866a0b52347ce6201959f97492f197a61365`は未追跡のまま保持し、今回のcommitへ含めていない。`.gitignore`、ignored overlay、既存Run Artifactは変更していない。
+- `close_report()`はcurrent canonical plan artifactの完全なcriterion row集合とsample result集合を照合する。runtimeには選定scopeの正本を外部storeから再読込するreaderがないため、workflowが保存・再提示するcurrent `materialize_plan()` outputが正本となる。この外部artifact-store origin再読込は未実装・未検証であり、新しいstore / CAS基盤は追加していない。
+- この更新時点のreportは実装commitとそのActionsを記録する。以下のPR metadata更新はheadを変えない。PR本文には同じ最新headの3 Actions結果と全量評価を今回実施していない範囲を反映する。
