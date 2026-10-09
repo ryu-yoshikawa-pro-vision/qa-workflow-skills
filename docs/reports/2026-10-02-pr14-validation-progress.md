@@ -559,3 +559,9 @@ formal reportはfixture全体をclosureしていない。変更後confirmation s
 - commit前の最終品質検証も成功: Prettier `--check`（7ファイル）、changed Markdownlint（5ファイル / 0 issue）、text quality（changed Markdown 5ファイル）、`git diff --check`。
 - implementation head `c6055154bbe930a2178bb6a2f9c5f4d563d8a40c`のGitHub Actionsは3件success: Validate Agent Skills run `37905744610`; Validate Deterministic Output Evals run `37905744592`; Validate Semantic Output Evals run `37905744660`。
 - PR本文は既存の実装記述を保持し、今回の8指摘・検証範囲・最新head CIへの追記を次のfinal checkpointで反映する。PR本文はcode treeを変更しない。report-only変更を通常commit/pushした場合は、そのpushで更新されたPR headのCIも別途確認する。
+
+### PR本文・最終head CI同期（2026-10-09 JST）
+
+- PR本文は日本語で更新済み。8件の再判定と修正、87 focused tests、repository standard counts、PR #17 Semantic全量移管 / native Trigger継続課題の分離を記載し、PR本文のhead/run IDsが過去値のままでないことを確認した。
+- report-only commit / push後のPR head `bc354a386e3714ee2404a09a5d96711971d45db1`に対し、`Validate Agent Skills` run `37906399279`、`Validate Deterministic Output Evals` run `37906399357`、`Validate Semantic Output Evals` run `37906399419`がすべてsuccess。
+- この追記を含む最終report-only commit / pushが新headを作るため、その最新headで3 Actionsを再確認し、PR本文のhead/run記載を最後に同期する。実装ファイルは既に実装commit `c6055154bbe930a2178bb6a2f9c5f4d563d8a40c`で固定済み。
