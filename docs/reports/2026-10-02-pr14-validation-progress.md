@@ -503,7 +503,6 @@ formal reportはfixture全体をclosureしていない。変更後confirmation s
 
 ### 残作業
 
-- 変更を明示pathだけstageし、通常commit / 通常pushする。
-- PR #14本文を最新実装と今回の検証範囲へ更新する。
-- push後の最新headで`Validate Agent Skills`、`Validate Deterministic Output Evals`、`Validate Semantic Output Evals`を確認する。
-- 最終PR head、commit SHA、CI状態を記録する。現時点では実装変更・検証記録はlocal working tree上にあり、最新PR headのCI証拠にはしていない。
+- 実装commit `053f70094a5ed0cf13186e599d7a8c46d290c580`を作成した。19 tracked pathsのみ明示stageし、`git commit`を通常実行した。pre-commit hookはofficial `skills-ref`、semantic dataset validation、shared/repository deterministic、shared/repository semantic、trigger contract、runtimeを再実行し、すべてPASS（shared semanticはWindows symlink privilegeによる2 SKIP）。
+- 実装commit後のbranchは`feat/usability-evaluation-skill`、local HEADは上記SHA、remoteは1 commit behind。`origin/main`との差はahead 324 / behind 0。ユーザー所有untrackedファイルと一時probe JSONはstage対象外。
+- 次は通常pushし、PR #14本文を最新実装と今回の検証範囲に更新する。その後、push後の最新PR headで`Validate Agent Skills`、`Validate Deterministic Output Evals`、`Validate Semantic Output Evals`を確認して最終状態を追記する。

@@ -64,7 +64,8 @@
   - [x] 原因を確認したprobe・文書・fixture・テストだけを変更。新しい依存関係、ARIA計算、Shadow DOM crawler、browser frameworkは追加していない。
   - [x] 実Chromiumで固定probe結果を確認し、formal production normalizerを経由させた。57 focused contract testではなく、該当5 suite計67件がPASSした。
 - [x] repository標準検証: official `skills-ref` 22 packages、semantic dataset 22 Skills / 155 cases、shared deterministic 12、repository deterministic 257、shared semantic 27 PASS / 2 Windows symlink SKIP、repository semantic 4、trigger contract 1、runtime 271、Python compile 17 roots、Node syntax 2 files、Prettier 12 files、changed Markdown lint 6 files / 0 issue、text lint 6 files、`git diff --check`がPASS。`npm run validate:skills`はignored local overlayの`AGENTS.md`が参照する未存在`docs/reference/run-artifacts.md`で失敗した。overlayは変更しない。
-- [ ] 通常commit / push、最新PR head CI、PR本文更新、最終Plan突合。Git読み取りは通常の権限付きcommandで成功。これらの外部・Git lifecycle確認はまだ未実施。
+- [x] 対象19 tracked pathsを明示stageし、通常commit `053f70094a5ed0cf13186e599d7a8c46d290c580`を作成。pre-commit hook内のskills-ref、semantic dataset、shared/repository deterministic、semantic、trigger、runtime validationがPASS。
+- [ ] 通常push、PR本文更新、push後の最新PR head CI、最終Plan突合。
 
 ## 10. 実装・ツール選択の記録
 
