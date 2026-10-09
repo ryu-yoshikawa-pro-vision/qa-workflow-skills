@@ -196,6 +196,12 @@ Project Contextの`qa.workflow_state_root`はworkflowごとのpersisted stateと
 4. workflow snapshotで記録した`used_fields`だけを`compare_used_context`でcurrentness比較します。Project Context全体revision差だけで未使用fieldをstaleにしません。
 5. 必要なfixed-root scanは`scan_fixed_root`を使い、scan failure / truncationをcomplete扱いしません。state更新前は`state_update_decision`でnative atomic conditional write capabilityをgateします。
 
+### WCAG formal evaluation state
+
+WCAG canonical Plan provenanceとreport完了には、`register-wcag-evaluation-plan`、`read-wcag-evaluation-state`、`finalize-wcag-report` operationを使います。これらは既存の`qa.workflow_state_root`から場所を解決し、`artifact_graph.py`のlocal SQLite providerでcurrent WCAG評価情報を読み書きします。対応範囲は単一ホストlocal filesystemです。network filesystem、複数host、未設定root、DB破損、transaction / lock failureではblockedとします。
+
+登録は既存WCAG evaluation ownerが確定した評価入力、scope決定とevidence refs、selected sample / variation / processおよびsource artifact refsを引き継ぎます。caller提供Planだけから正本を作らず、同じevaluation revisionの対象縮小を拒否します。SQLite state revisionはWCAG evaluation revisionとは別です。WCAG `close-report`が返すのはunresolved candidateであり、QA workflowはcurrent record・Plan・結果集合を照合し、期待SQLite revisionでCAS更新した後に別connectionから再読込して初めて完了を返します。これは既存のgeneric workflow / handoff CASを置き換えず、SQLite recordの存在だけでowner承認を証明しません。
+
 ### mutable operation開始直前
 
 1. owner execution contractに同一operation identity向けatomic pre-start claimまたはidempotent startがあるか確認し、ある場合はowner contractを利用します。

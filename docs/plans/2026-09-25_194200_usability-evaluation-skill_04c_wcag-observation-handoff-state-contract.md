@@ -20,13 +20,13 @@ production helperが実際に扱うpersisted documentは次です。
 
 `state_revision` は保存先 / read結果が返すconditional write tokenであり、このdocument内へ複製しません。
 
-current mainの `workflow-state-template.md` は既にproduction helperと同じ `workflow_ref / schema_version / state` envelopeへ同期済みです。PR #14で既存template shapeを再修正しません。今回の追加は既存 `schema_version="1"` の `state` payloadへ `handoffs` を追加するadditive extensionだけとし、outer envelopeを変更しません。別state version、store、lock service、queue、汎用orchestration frameworkは追加しません。
+current mainの `workflow-state-template.md` は既にproduction helperと同じ `workflow_ref / schema_version / state` envelopeへ同期済みです。PR #14でouter envelopeを変更しません。formal handoffでは既存 `schema_version="1"` の `state` payloadへ `handoffs` を追加するadditive extensionです。canonical WCAG evaluation provenanceのための例外的な単一host SQLite providerは、下記の「PR #14 WCAG評価正本に限る単一ホストSQLite例外」で限定します。別state version、handoff向けproduction store、lock service、queue、汎用orchestration frameworkは追加しません。
 
 既存の `claim_mutable_operation()`、`recover_claim()`、`reserve_shared_resource()`、`release_shared_resource()` を再利用します。
 
 ### canonical E2Eで使うtest-only CAS provider
 
-current `artifact_graph.py` のlocal filesystem経路はinitial create-if-absentまでを提供し、`state_revision` はCAS conditionではありません。したがってrepository-controlled canonical E2Eでhandoffを `pending → in-progress → returned → closed` まで通すために、test harnessだけで使う `tests/skills/evals/deterministic/wcag_handoff_cas_provider.py` を追加します。
+formal handoffに対するcurrent `artifact_graph.py` のgeneric local filesystem経路はinitial create-if-absentまでを提供し、`state_revision` はCAS conditionではありません。したがってrepository-controlled canonical E2Eでhandoffを `pending → in-progress → returned → closed` まで通すために、test harnessだけで使う `tests/skills/evals/deterministic/wcag_handoff_cas_provider.py` を追加します。
 
 このproviderはPython標準ライブラリの `sqlite3` だけを使い、一時DB内で次を提供します。
 
@@ -42,7 +42,19 @@ provider revisionはtest provider内部の単調増加revisionまたは同等の
 
 canonical E2EではSQLite reservationを既存 `reserve_shared_resource()` のexternal reservation経路へ渡します。そのためPR #14では同helperへoptional `external_reservation_revision` を1引数だけ追加し、`external_reservation + external_reservation_acquired=true` の場合は非空revisionを必須としてreturned reservation rowへそのまま保持します。project-local reservation経路、claim path、public storage abstractionは変更しません。正常release時は既存 `release_shared_resource()` がowner / expected revision / cleanupを検証して `conditional_release_required` を返した後、test providerがそのexpected revisionで実releaseします。
 
-このproviderはcanonical E2E / deterministic test専用です。production Skill package、Project Context、routingへSQLite adapterやgeneric storage interfaceを追加しません。`artifact_graph.py` の変更は上記external reservation revisionの伝播だけです。productionでは従来どおりworkflow state / external reservationの保存先がnative atomic conditional write / releaseを提供する場合だけ更新・解放を実行し、提供しない場合はfail-closedにします。
+このproviderはcanonical E2E / deterministic test専用です。handoff state / reservation用途ではproduction providerとして使いません。別途追加されたWCAG evaluation state用production SQLite providerとは異なる責務・実装です。
+
+### PR #14 WCAG評価正本に限る単一ホストSQLite例外
+
+PR #14のcanonical WCAG Plan provenanceを満たすため、`qa-workflow/scripts/artifact_graph.py`へPython標準ライブラリ`sqlite3`を使うproduction workflow-state providerを追加します。この例外は、同一ホストのローカルfilesystem上で`qa.workflow_state_root`を共有するWCAG評価状態に限ります。ネットワークfilesystem、複数host、分散実行、root未設定、DB破損、lock / transaction保証不能はfail-closedです。既存test-only `wcag_handoff_cas_provider.py`はproductionからimportせず、handoff予約にも流用しません。
+
+SQLiteは既存の`workflow_ref / schema_version / state` envelopeをそのまま格納し、provider revisionだけをenvelope外で管理します。WCAG評価refごとのstate payloadは初期化済みversion / level、scope fingerprintと根拠ref、selected sample identity、variation、process membership、source artifact ref / revision、canonical plan fingerprint / criterion identities、report進行状態を保持します。raw URL、secret、DOM text、product scope本文は保存しません。評価開始・scope決定の既存owner入力と証拠を確認せず、DB recordの存在を承認の証明として扱いません。
+
+登録時に同じevaluation ref / evaluation revisionの確定済み対象集合を変更できません。正当な対象変更は新しいevaluation revisionとして登録し、planとreport closureをリセットします。selectionが確定する前のcandidateはcanonical stateにしません。finalized plan後の集合変更は既存freshness / 再評価契約に従います。
+
+`wcag-conformance-evaluation`は既存の`initialize_evaluation()`、`materialize_plan()`、`close_report()`を用いて意味的なPlan・結果を検証します。正式な`close-report`は`qa-workflow` owner APIからSQLite上のcurrent stateとprovider revisionを再取得し、canonical plan / current result集合を照合します。closure成功後は同じprovider revisionを条件とするtransaction内CASを行い、別connectionで再読込して完了状態を確認します。保存先未設定、正本不在、Plan不一致、stale result、CAS競合または再読込失敗では正式完了にしません。純粋な`close_report()` helperの内部整合性結果だけではworkflow完了を意味しません。
+
+このproviderが保証するのは、単一hostのSQLite transactionにおける保存・current revision・条件付き更新・再読込です。SQLite DBを直接書き換える権限を持つ実行者への暗号学的真正性、ネットワークfilesystemや複数hostの競合安全性は保証しません。
 
 `claim_mutable_operation()` はcurrent mainどおりlocal filesystem create-if-absentを使い、test-only SQLite providerへ移しません。current local claim storageにはnative atomic conditional releaseがないため、`recover_claim()` の成功をcanonical E2Eの要件にしません。pre-start failureでclaim release能力がない場合は `atomic_claim_release_unavailable` で安全にblockedとなることを負系fixtureで確認します。normal completionではstarted claimを履歴として残す既存契約のため、この制約はhappy-path closureを妨げません。
 

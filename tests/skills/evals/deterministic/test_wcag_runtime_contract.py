@@ -5,11 +5,13 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 import unittest
 
 
 ROOT = Path(__file__).resolve().parents[4]
 SCRIPT = ROOT / "skills/wcag-conformance-evaluation/scripts/wcag_runtime.py"
+WORKFLOW_SCRIPT = ROOT / "skills/qa-workflow/scripts/workflow_runtime.py"
 RUNTIME = ROOT / "skills/wcag-conformance-evaluation/scripts/runtime_contract.py"
 DOCUMENT_IDENTITY = "hmac-sha256:" + "a" * 64
 
@@ -74,11 +76,12 @@ def close_input() -> dict:
         "reason": "required current procedure evidence supports this fixture judgment", "evidence_refs": ["E-POP"]}}
 
 
-def close_report_args(*, sample_kind: str = "structured", process_ref: str | None = None) -> dict:
+def close_report_args(*, sample_kind: str = "structured", process_ref: str | None = None,
+                      version: str = "2.0", level: str = "A") -> dict:
     import wcag_criterion_plan
     sample = {"sample_ref":"SAMPLE-001", "sample_kind":sample_kind,
         "identity_fingerprint":"sha256:" + "a" * 64, "target_identity":DOCUMENT_IDENTITY}
-    plan = wcag_criterion_plan.materialize_plan(wcag_version="2.0", level="A", samples=[sample],
+    plan = wcag_criterion_plan.materialize_plan(wcag_version=version, level=level, samples=[sample],
         variations=[{"sample_ref":"SAMPLE-001", "variation_ref":"VAR-001",
             "identity_fingerprint":"sha256:" + "b" * 64}],
         process_memberships={"SAMPLE-001":process_ref} if process_ref else {},
@@ -99,6 +102,23 @@ def close_report_args(*, sample_kind: str = "structured", process_ref: str | Non
 
 def invoke(body: dict) -> dict:
     result = subprocess.run([sys.executable, str(SCRIPT)], input=json.dumps(body), text=True,
+        cwd=ROOT, capture_output=True, check=False)
+    if result.returncode not in {0, 1}:
+        raise AssertionError(result.stdout + result.stderr)
+    return json.loads(result.stdout)
+
+
+def workflow_metadata(*, reference_refs: list[str], upstream_runtime_units: list[dict] | None = None) -> dict:
+    return {"envelope_version": "1", "skill": "qa-workflow", "runtime_contract_version": "runtime-v1",
+        "generator_contract_version": "workflow-runtime-v1", "runtime_unit_key": "artifact:workflow_runtime:all",
+        "model_key": None, "model_type": None, "technique_slug": None, "selection_source": None,
+        "selection_key": None, "scope_key": "all", "input_mode": "artifact", "upstream_entities": [],
+        "upstream_runtime_units": upstream_runtime_units or [], "static_data_versions": {},
+        "authority_refs": [], "reference_refs": reference_refs}
+
+
+def invoke_workflow(body: dict) -> dict:
+    result = subprocess.run([sys.executable, str(WORKFLOW_SCRIPT)], input=json.dumps(body), text=True,
         cwd=ROOT, capture_output=True, check=False)
     if result.returncode not in {0, 1}:
         raise AssertionError(result.stdout + result.stderr)
@@ -130,6 +150,22 @@ class WcagRuntimeContractTests(unittest.TestCase):
         statement = invoke(body)
         self.assertEqual(statement["payload"]["result"]["status"], "blocked")
         self.assertEqual(statement["result_status"], "blocked")
+
+        body["input"]["arguments"].update({
+            "report_closure": {"status": "complete", "evaluation_ref": "WCAG-EVAL-1",
+                "evaluation_revision": "rev-1", "wcag_version": "2.2", "level": "AA",
+                "criterion_evaluation_refs": ["CRIT-EVAL-1"]},
+            "formal_conformance_results": {"status": "ready", "evaluation_ref": "WCAG-EVAL-1",
+                "evaluation_revision": "rev-1", "target_version": "2.2", "target_level": "AA",
+                "criterion_evaluation_refs": ["CRIT-EVAL-1"], "expected_sample_criterion_rows": 1,
+                "sample_results_count": 1, "missing_sample_criterion_rows": [], "stale_sample_criterion_rows": [],
+                "sample_conformance_results": [{"sample_ref": "SAMPLE-1", "result": "satisfied"}],
+                "results": [{"requirement_ref": "conformance-level", "result": "satisfied"}]},
+        })
+        fabricated = invoke(body)
+        self.assertEqual(fabricated["payload"]["result"]["status"], "blocked")
+        self.assertEqual(fabricated["payload"]["result"]["reason"], "current_saved_wcag_report_required")
+        self.assertEqual(fabricated["result_status"], "blocked")
 
         body["input"] = {"operation":"conformance-claim", "arguments":{
             "version":"2.2", "full_scope_evidence":True, "required_fields":{}, "scope_evidence":None}}
@@ -169,14 +205,14 @@ class WcagRuntimeContractTests(unittest.TestCase):
         forged = invoke(body)
         self.assertEqual(forged["runtime_status"], "ok")
         self.assertEqual(forged["payload"]["result"]["status"], "blocked")
-        self.assertEqual(forged["payload"]["result"]["incomplete_required_steps"],
-                         list(wcag_em_structure.REPORT_STEPS))
+        self.assertEqual(forged["payload"]["result"]["reason"], "current_saved_wcag_evaluation_required")
 
         args.update(close_report_args())
         body["input"]["arguments"] = args
         valid_not_applicable = invoke(body)
         self.assertEqual(valid_not_applicable["runtime_status"], "ok")
-        self.assertEqual(valid_not_applicable["payload"]["result"]["status"], "complete")
+        self.assertEqual(valid_not_applicable["result_status"], "blocked")
+        self.assertEqual(valid_not_applicable["payload"]["result"]["status"], "blocked")
 
     def test_close_report_runtime_does_not_let_step_4_2_na_skip_step_4_1_results(self):
         args = close_report_args()
@@ -191,8 +227,7 @@ class WcagRuntimeContractTests(unittest.TestCase):
         self.assertEqual(blocked["runtime_status"], "ok")
         self.assertEqual(blocked["result_status"], "blocked")
         self.assertEqual(blocked["payload"]["result"]["status"], "blocked")
-        self.assertFalse(blocked["payload"]["result"]["sample_result_scope_missing"])
-        self.assertTrue(blocked["payload"]["result"]["missing_sample_result_refs"])
+        self.assertEqual(blocked["payload"]["result"]["reason"], "current_saved_wcag_evaluation_required")
 
         narrowed = close_report_args()
         narrowed["required_steps"] = args["required_steps"]
@@ -203,8 +238,7 @@ class WcagRuntimeContractTests(unittest.TestCase):
         body["input"]["arguments"] = narrowed
         narrowed_result = invoke(body)
         self.assertEqual(narrowed_result["payload"]["result"]["status"], "blocked")
-        self.assertTrue(narrowed_result["payload"]["result"]["declared_criterion_scope_mismatch"])
-        self.assertTrue(narrowed_result["payload"]["result"]["missing_sample_result_refs"])
+        self.assertEqual(narrowed_result["payload"]["result"]["reason"], "current_saved_wcag_evaluation_required")
 
         complete_args = close_report_args()
         complete_args["required_steps"] = args["required_steps"]
@@ -214,8 +248,8 @@ class WcagRuntimeContractTests(unittest.TestCase):
         body["input"]["arguments"] = args
         complete = invoke(body)
         self.assertEqual(complete["runtime_status"], "ok")
-        self.assertEqual(complete["result_status"], "ready")
-        self.assertEqual(complete["payload"]["result"]["status"], "complete")
+        self.assertEqual(complete["result_status"], "blocked")
+        self.assertEqual(complete["payload"]["result"]["reason"], "current_saved_wcag_evaluation_required")
 
         args = close_report_args(sample_kind="process-added", process_ref="PROC-1")
         args["step_outcomes"]["4.1"] = "not-applicable"
@@ -226,8 +260,119 @@ class WcagRuntimeContractTests(unittest.TestCase):
         body["input"]["arguments"] = args
         process_complete = invoke(body)
         self.assertEqual(process_complete["runtime_status"], "ok")
-        self.assertEqual(process_complete["result_status"], "ready")
-        self.assertEqual(process_complete["payload"]["result"]["status"], "complete")
+        self.assertEqual(process_complete["result_status"], "blocked")
+        self.assertEqual(process_complete["payload"]["result"]["reason"], "current_saved_wcag_evaluation_required")
+
+    def test_saved_current_wcag_plan_closes_only_after_qa_workflow_cas_and_reread(self):
+        import uuid
+        workflow_ref = str(uuid.uuid4())
+        with tempfile.TemporaryDirectory() as temp:
+            state_root = Path(temp) / "qa-state"
+            project_context = (
+                "# Project Context\n\n"
+                "<!-- qa-context-field:start key=qa.workflow_state_root type=path -->\n"
+                f"{state_root}\n"
+                "<!-- qa-context-field:end -->\n"
+            )
+            context_refs = ["PROJECT-CONTEXT-17"]
+            close_args = close_report_args(version="2.2", level="AA")
+            plan = close_args["canonical_criterion_plan"]
+            evaluation_inputs = {
+                "artifact_ref": "WCAG-EVAL-17", "artifact_revision": "rev-9",
+                "evaluator": "EVALUATOR-17", "evaluation_date": "2026-10-10",
+                "live_web_target": "https://fixture.invalid/", "commissioner": "COMMISSIONER-17",
+                "wcag_version": "2.2", "level": "AA", "product_scope": "fixture product",
+                "product_enclosure": "PRODUCT-SCOPE-17", "accessibility_support_baseline": ["BASELINE-17"],
+                "browser_user_agent_baseline": ["BROWSER-17"], "role_permission_environment": ["ENV-17"],
+                "side_effect_scope": "fixture only", "cleanup_scope": "reset fixture",
+                "evaluation_period": "2026-10-10",
+            }
+            initialization = wcag_em_structure.initialize_evaluation(evaluation_inputs)
+            scope_coverage = wcag_em_structure.materialize_scope_coverage([
+                {"scope_key": key, "decision": "out-of-product", "reason": "not present in fixture",
+                 "evidence_refs": [f"E-SCOPE-{index}"]}
+                for index, key in enumerate(wcag_em_structure.SCOPE_ROWS, 1)
+            ])
+            source_artifacts = [
+                {"artifact_ref": "WCAG-EVAL-17", "artifact_revision": "rev-9", "purpose": "evaluation"},
+                {"artifact_ref": "PRODUCT-SCOPE-17", "artifact_revision": "scope-r1", "purpose": "scope"},
+                {"artifact_ref": "SAMPLE-SET-17", "artifact_revision": "samples-r1", "purpose": "sample-selection"},
+                {"artifact_ref": "VARIATION-SET-17", "artifact_revision": "variation-r1", "purpose": "variation"},
+            ]
+            registration = invoke_workflow({
+                "metadata": workflow_metadata(reference_refs=context_refs),
+                "input": {"operation": "register-wcag-evaluation-plan", "arguments": {
+                    "workflow_ref": workflow_ref, "project_context": project_context,
+                    "project_context_ref": context_refs[0], "evaluation_initialization": initialization,
+                    "evaluation_inputs": evaluation_inputs, "product_scope_ref": "PRODUCT-SCOPE-17",
+                    "scope_coverage": scope_coverage, "source_artifacts": source_artifacts,
+                    "canonical_criterion_plan": plan,
+                }},
+            })
+            self.assertEqual(registration["result_status"], "ready", registration["issues"])
+            self.assertEqual(registration["payload"]["result"]["status"], "registered")
+
+            read = invoke_workflow({
+                "metadata": workflow_metadata(reference_refs=context_refs),
+                "input": {"operation": "read-wcag-evaluation-state", "arguments": {
+                    "workflow_ref": workflow_ref, "project_context": project_context,
+                    "project_context_ref": context_refs[0], "evaluation_ref": "WCAG-EVAL-17",
+                    "evaluation_revision": "rev-9",
+                }},
+            })
+            self.assertEqual(read["result_status"], "ready", read["issues"])
+            saved_read = read["payload"]["result"]
+            self.assertEqual(saved_read["evaluation"]["level"], "AA")
+            self.assertEqual(saved_read["provider_revision"], "sqlite:2")
+
+            wcag_metadata = metadata()
+            wcag_metadata["upstream_runtime_units"] = [{"skill": "qa-workflow",
+                "runtime_unit_key": "artifact:workflow_runtime:all",
+                "generation_fingerprint": read["generation_fingerprint"]}]
+            narrowed_args = close_report_args(version="2.2", level="A")
+            narrowed_args.update({"workflow_ref": workflow_ref, "evaluation_ref": "WCAG-EVAL-17",
+                "evaluation_revision": "rev-9", "saved_workflow_state_runtime_result": read})
+            narrowed = invoke({"metadata": wcag_metadata,
+                "input": {"operation": "close-report", "arguments": narrowed_args}})
+            self.assertNotEqual(narrowed["result_status"], "ready", narrowed)
+            self.assertEqual(narrowed["payload"]["result"]["status"], "conflict")
+
+            close_args.update({"workflow_ref": workflow_ref, "evaluation_ref": "WCAG-EVAL-17",
+                "evaluation_revision": "rev-9", "saved_workflow_state_runtime_result": read})
+            wcag_close = invoke({"metadata": wcag_metadata,
+                "input": {"operation": "close-report", "arguments": close_args}})
+            self.assertEqual(wcag_close["runtime_status"], "ok")
+            self.assertEqual(wcag_close["result_status"], "unresolved", wcag_close)
+            self.assertEqual(wcag_close["payload"]["result"]["status"], "pending-persistence")
+
+            finalized = invoke_workflow({
+                "metadata": workflow_metadata(reference_refs=context_refs, upstream_runtime_units=[{
+                    "skill": "wcag-conformance-evaluation", "runtime_unit_key": "artifact:wcag_runtime:all",
+                    "generation_fingerprint": wcag_close["generation_fingerprint"],
+                }]),
+                "input": {"operation": "finalize-wcag-report", "arguments": {
+                    "workflow_ref": workflow_ref, "project_context": project_context,
+                    "project_context_ref": context_refs[0], "expected_provider_revision": saved_read["provider_revision"],
+                    "evaluation_ref": "WCAG-EVAL-17", "evaluation_revision": "rev-9",
+                    "canonical_criterion_plan": plan, "sample_results": close_args["sample_results"],
+                    "wcag_runtime_result": wcag_close,
+                }},
+            })
+            self.assertEqual(finalized["result_status"], "ready", finalized["issues"])
+            self.assertEqual(finalized["payload"]["result"]["status"], "complete")
+            self.assertEqual(finalized["payload"]["result"]["provider_revision"], "sqlite:3")
+
+            reread = invoke_workflow({
+                "metadata": workflow_metadata(reference_refs=context_refs),
+                "input": {"operation": "read-wcag-evaluation-state", "arguments": {
+                    "workflow_ref": workflow_ref, "project_context": project_context,
+                    "project_context_ref": context_refs[0], "evaluation_ref": "WCAG-EVAL-17",
+                    "evaluation_revision": "rev-9",
+                }},
+            })
+            self.assertEqual(reread["result_status"], "ready")
+            self.assertEqual(reread["payload"]["result"]["evaluation"]["report_status"], "complete")
+            self.assertEqual(reread["payload"]["result"]["provider_revision"], "sqlite:3")
 
     def test_runtime_allocates_monotonic_artifact_local_handoff_refs(self):
         body = request("A")

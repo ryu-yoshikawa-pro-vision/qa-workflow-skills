@@ -34,7 +34,7 @@
 }
 ```
 
-`artifact_graph.py`が保存するrecordは`workflow_ref` / `schema_version` / caller提供の`state`からなるenvelopeです。helperはenvelopeとworkflow identityを扱いますが、`state`内部のfield schemaは検証しません。このtemplateにないobjective / scope / produced refs等の固定fieldを、現在helperにない契約として追加しません。
+`artifact_graph.py`が保存するrecordは`workflow_ref` / `schema_version` / caller提供の`state`からなるenvelopeです。汎用helperはenvelopeとworkflow identityを扱いますが、`state`内部のfield schemaは検証しません。このtemplateにないobjective / scope / produced refs等の固定fieldを、現在helperにない契約として追加しません。WCAG formal evaluation stateだけは、下記の限定された追加契約を使用します。
 
 `state_revision`は保存record内のfieldではありません。helperがcreate / read結果のmetadataとして返すexact-content tokenで、local token自体はCAS条件になりません。更新を保存済みとして扱うには、保存先のnative atomic conditional writeへexpected revisionを渡せる必要があります。read後の比較と無条件writeをCAS扱いしません。Project Context全体revisionはprovenanceとして記録できますが、currentnessは利用したstable keyだけを比較します。
 
@@ -70,6 +70,14 @@
 - state自身のrevisionを保存先のatomic conditional writeへ渡せない場合、更新を保存済みとして扱いません。
 - 同じworkflowのmutable operationはstate更新だけで二重開始を防げません。owner側のatomic pre-start claim / idempotent startがない場合、`qa.workflow_state_root/claims/<workflow_ref + operation_refのcanonical identity digest>.json`へatomic pre-start claimを作成します。claim targetはhelperが導出し、別claim rootをProject Contextへ追加しません。claimを取得できなければ開始をblockします。
 - shared resource reservationは既存の外部reservationを優先します。project-local reservationはatomic create-if-absentとlifecycleを閉じるnative atomic conditional releaseの両方がある場合だけ取得します。どちらかがない保存先では予約を作らず、状態を安全に確認できないreservation recoveryもblockします。rootは既存の`qa.reservation_root`を使います。
+
+## WCAG formal evaluation stateの単一ホスト例外
+
+PR #14のWCAG formal report provenanceには、既存の`qa.workflow_state_root`を使う`artifact_graph.py`内のPython標準`sqlite3` providerを使用します。これはWCAG評価状態の登録・読込・report完了専用であり、generic workflow CAS、handoff reservation、claimの代替ではありません。対応範囲は同一ホストのlocal filesystemだけです。root未設定、network / multi-host filesystem、DB破損、lock / transaction保証不能では処理をblockします。
+
+既存envelopeは変更せず、`state.wcag_evaluations`へevaluation ref/revision、WCAG version/level、scopeと根拠ref、selected sample identity、variation、process membership、source artifact ref/revision、canonical Plan identity、report進行状態を保存します。raw URL、secret、DOM text、scope本文、評価 narrativeは保存しません。state provider revisionはWCAG evaluation revisionとは別にSQLite内で単調管理します。
+
+WCAG runtimeの`close-report`は保存済みcurrent recordとPlan/result集合を照合したclosure candidateを`unresolved`で返します。QA workflowが保存先revisionを条件にCAS更新し、別connectionで再読込してreport完了を確かめた後だけ正式な`ready`を返します。SQLite recordの存在はユーザー承認の証明ではなく、登録は既存owner入力・scope根拠・source refsを確認できるworkflow経路から行います。既存のtest-only `wcag_handoff_cas_provider.py`はproductionでは使用しません。
 
 ## runtime状態（runtime dispatch時だけ表示）
 

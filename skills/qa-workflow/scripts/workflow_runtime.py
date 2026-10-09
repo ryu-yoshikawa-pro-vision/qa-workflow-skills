@@ -26,12 +26,138 @@ from runtime_contract import (
     validate_unsupported_item_closures,
     validate_entity_collection,
 )
+import artifact_graph
 
 
 SKILL = "qa-workflow"
 GENERATOR = "workflow_runtime"
 GENERATOR_CONTRACT_VERSION = "workflow-runtime-v1"
 SCRIPT_PATH = Path(__file__).resolve()
+_WCAG_STATE_OPERATIONS = {
+    "register-wcag-evaluation-plan", "read-wcag-evaluation-state", "finalize-wcag-report",
+}
+
+
+def _current_project_context(args: dict[str, Any], metadata: dict[str, Any]) -> dict[str, Any]:
+    try:
+        return artifact_graph.workflow_state_context_from_project_context(
+            args["project_context"], args["project_context_ref"], metadata["reference_refs"]
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise InvalidInput("current Project Context state-root source is required") from exc
+
+
+def _wcag_state_operation(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, Any]:
+    reject_unknown(input_value, {"operation", "arguments"})
+    operation = input_value.get("operation")
+    args = input_value.get("arguments")
+    if operation not in _WCAG_STATE_OPERATIONS or not isinstance(args, dict):
+        raise InvalidInput("qa-workflow WCAG state operation is invalid")
+    context = _current_project_context(args, metadata)
+    root = context["workflow_state_root"]
+    common_context = {
+        "project_context_ref": context["project_context_ref"],
+        "project_context_revision": context["project_context_revision"],
+        "project_context_fingerprint": context["project_context_fingerprint"],
+        "workflow_state_root_content_identity": context["workflow_state_root_content_identity"],
+    }
+    if operation == "register-wcag-evaluation-plan":
+        reject_unknown(args, {"workflow_ref", "project_context", "project_context_ref",
+                             "evaluation_initialization", "evaluation_inputs", "product_scope_ref", "scope_coverage",
+                             "source_artifacts", "canonical_criterion_plan"}, {"previous_evaluation_revision"})
+        result = artifact_graph.register_wcag_evaluation_plan(
+            root, args["workflow_ref"], evaluation_initialization=args["evaluation_initialization"],
+            evaluation_inputs=args["evaluation_inputs"],
+            product_scope_ref=args["product_scope_ref"], scope_coverage=args["scope_coverage"],
+            source_artifacts=args["source_artifacts"], canonical_criterion_plan=args["canonical_criterion_plan"],
+            previous_evaluation_revision=args.get("previous_evaluation_revision"), **common_context,
+        )
+    elif operation == "read-wcag-evaluation-state":
+        reject_unknown(args, {"workflow_ref", "project_context", "project_context_ref",
+                             "evaluation_ref", "evaluation_revision"})
+        result = artifact_graph.read_wcag_evaluation_state(
+            root, args["workflow_ref"], args["evaluation_ref"],
+            evaluation_revision=args["evaluation_revision"], **common_context,
+        )
+    else:
+        reject_unknown(args, {"workflow_ref", "project_context", "project_context_ref",
+                             "expected_provider_revision", "evaluation_ref",
+                             "evaluation_revision", "canonical_criterion_plan", "sample_results",
+                             "wcag_runtime_result"})
+        candidate = _verified_wcag_closure_candidate(args["wcag_runtime_result"], metadata)
+        if candidate is None:
+            result = {"status": "blocked", "reason": "current_wcag_closure_runtime_result_required"}
+        else:
+            saved = artifact_graph.read_wcag_evaluation_state(
+                root, args["workflow_ref"], args["evaluation_ref"],
+                evaluation_revision=args["evaluation_revision"], **common_context,
+            )
+            if (saved.get("status") != "current"
+                    or saved.get("provider_revision") != args["expected_provider_revision"]):
+                result = {"status": "conflict", "reason": "wcag_evaluation_state_changed_before_report_close"}
+            else:
+                plan_check = artifact_graph.validate_wcag_plan_against_state(
+                    saved["evaluation"], args["canonical_criterion_plan"]
+                )
+                try:
+                    result_summary = artifact_graph._wcag_report_result_summary(
+                        saved["evaluation"], args["sample_results"]
+                    )
+                except (KeyError, TypeError, ValueError):
+                    result_summary = None
+                candidate_matches = (
+                    plan_check.get("status") == "current"
+                    and candidate.get("workflow_ref") == args["workflow_ref"]
+                    and candidate.get("evaluation_ref") == args["evaluation_ref"]
+                    and candidate.get("evaluation_revision") == args["evaluation_revision"]
+                    and candidate.get("provider_revision") == args["expected_provider_revision"]
+                    and candidate.get("canonical_plan_fingerprint") == saved["evaluation"].get("canonical_plan_fingerprint")
+                    and result_summary is not None
+                    and candidate.get("results_fingerprint") == result_summary.get("fingerprint")
+                    and candidate.get("criterion_evaluation_refs") == saved["evaluation"].get("criterion_evaluation_refs")
+                )
+                if not candidate_matches:
+                    result = {"status": "blocked", "reason": "wcag_closure_candidate_identity_mismatch"}
+                else:
+                    result = artifact_graph.finalize_wcag_report(
+                        root, args["workflow_ref"], expected_provider_revision=args["expected_provider_revision"],
+                        evaluation_ref=args["evaluation_ref"], evaluation_revision=args["evaluation_revision"],
+                        canonical_criterion_plan=args["canonical_criterion_plan"], sample_results=args["sample_results"],
+                        closure_status=candidate["closure_status"], **common_context,
+                    )
+    status = result.get("status")
+    result_status = "ready" if status in {"registered", "current", "complete"} else "blocked" if status in {"blocked", "conflict"} else "unresolved"
+    return {
+        "runtime_status": "ok", "support_status": "supported" if result_status == "ready" else "partial",
+        "result_status": result_status, "runtime_required": True, "deterministic_generated": True,
+        "payload": {"operation": operation, "result": result},
+        "issues": [] if result_status == "ready" else [{"issue_type": "wcag_state_operation_not_closed",
+            "blocking": True, "operation": operation, "reason": result.get("reason", status)}],
+    }
+
+
+def _verified_wcag_closure_candidate(runtime_result: Any, metadata: dict[str, Any]) -> dict[str, Any] | None:
+    if not isinstance(runtime_result, dict):
+        return None
+    required = {"skill", "runtime_unit_key", "generation_fingerprint", "runtime_status", "result_status", "payload"}
+    if not required.issubset(runtime_result):
+        return None
+    dependencies = [row for row in metadata.get("upstream_runtime_units", [])
+                    if row.get("skill") == "wcag-conformance-evaluation"
+                    and row.get("runtime_unit_key") == "artifact:wcag_runtime:all"]
+    if (runtime_result.get("skill") != "wcag-conformance-evaluation"
+            or runtime_result.get("runtime_unit_key") != "artifact:wcag_runtime:all"
+            or runtime_result.get("runtime_status") != "ok"
+            or runtime_result.get("result_status") != "unresolved"
+            or len(dependencies) != 1
+            or dependencies[0].get("generation_fingerprint") != runtime_result.get("generation_fingerprint")):
+        return None
+    payload = runtime_result.get("payload")
+    candidate = payload.get("result") if isinstance(payload, dict) and payload.get("operation") == "close-report" else None
+    if (not isinstance(candidate, dict) or candidate.get("status") != "pending-persistence"
+            or candidate.get("closure_status") != "complete"):
+        return None
+    return candidate
 
 
 def _scope_rows(value: Any) -> list[dict[str, Any]]:
@@ -257,6 +383,8 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
 def handler(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, Any]:
     if metadata["model_key"] is not None or metadata["runtime_unit_key"] != "artifact:workflow_runtime:all" or metadata["scope_key"] != "all":
         raise InvalidInput("workflow_runtimeのruntime metadataが不正です")
+    if isinstance(input_value, dict) and input_value.get("operation") in _WCAG_STATE_OPERATIONS:
+        return _wcag_state_operation(input_value, metadata)
     return _build(input_value, metadata)
 
 
