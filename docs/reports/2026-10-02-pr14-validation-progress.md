@@ -679,3 +679,27 @@ formal reportはfixture全体をclosureしていない。変更後confirmation s
 - `_06b` Planに「Planの内部整合性」と「保存済みcanonical scopeとの出所確認」を分離し、後者を未達と明記した。production code・依存関係・workflow state schemaは変更していない。実装可能な正本readerが既存契約に存在しないため、この指示への完了判定は引き続き**未達1件**。PR本文にも同じ制約を反映し、修正済みとは記載しない。
 
 PR #14 repository implementation Plan未達: 1件
+
+### 2026-10-10 JST — canonical Plan provenance owner境界の再確認
+
+- 作業開始時: branch `feat/usability-evaluation-skill`、local HEAD / remote PR head `7d7f9873a726b8b98a706ebe9ae9cd71f4e65e53`、`origin/main=dec3f7c764db2869dc24eb3d6f154712a6677068`。開始時のtracked worktreeはclean。未追跡 `.pr14-formal-probe-1791501932895.json` とユーザー所有 `3b77866a0b52347ce6201959f97492f197a61365` は維持し、`.gitignore`・ignored overlayを変更していない。
+- 修正前再現: 2.2 AA fixture planの`plan_basis.level`をAへ変えて正規materializationし、縮小後planに一致するsample result/ref集合を渡すと、`close_report()`直接呼び出しは`complete`。同じ入力を`wcag_runtime.py`の`close-report` operationへ通すと`runtime_status=ok / result_status=ready / closure=complete`。evaluation ref/revisionを変えない縮小を現headでも再現した。
+- 正本owner境界: WCAG evaluation helperはinitialization/selection/planを決定論的に生成するが永続化しない。WCAG runtimeの`close-report`はhelperへdispatchし、workflow stateを読まない。qa-workflowは汎用envelopeのcreate/read、exact-content token、CAS要否判定を提供する。state templateはgeneric payloadでWCAG意味schemaを持たない。
+- 正本の信頼性: 一時ディレクトリで`create_workflow_state()`へ任意のWCAG payloadを渡すと作成され、`read_workflow_state()`は`current`として同じpayloadを返した。revision kindは`local_exact_content_token_not_a_cas_condition`。native CAS capabilityなしの`state_update_decision()`は`blocked / atomic_conditional_write_unavailable`を返した。したがって、読取token単独では呼出元やsemantic sourceを認証せず、既存production writerもない。
+- provider確認: tracked code/docsではproduction conditional state writerまたはWCAG canonical evaluation readerを確認できない。`SQLiteHandoffCASProvider`はtest-only。既存`test_wcag_handoff_contract.py` 12 testsと`test_qa_artifact_graph_skills.py` 36 testsはPASSしたが、これらはtest-only handoff CAS / generic graph契約の証拠であり、production WCAG provenance経路の証拠ではない。
+- focused WCAG tests: `test_wcag_report_closure_contract.py` 22 tests PASS、`test_wcag_runtime_contract.py` 16 tests PASS。既存の内部完全性・正常経路はPASSする一方、上記真正性再現も成立するため、provenance不具合を解決した結果とは扱わない。
+- **実装判断:** ユーザー指示は新規production store/CAS/frameworkを禁止し、入力側作成のverified/hashを真正性として認めない。現行repositoryには利用できるproduction providerもWCAG正本readerもない。test-only SQLiteをproduction接続へ流用する、ローカルhashをCAS扱いする、または全入力を無条件blockedにする修正は採用しなかった。よって有効なproduction正常経路を実装・検証できず、今回のコード修正は未完了である。
+- 完了に必要な外部能力: qa-workflow ownerが承認済みevaluation ref/revision、WCAG version/level、scope/evidence refs、選定sample/variation/process集合とsource artifact対応を信頼できる保存先へ結び付けて保存し、現行内容を独立再取得できること。更新が必要ならnative atomic conditional writeをexpected storage revisionで実施し、書込後に再読込できること。test providerは回帰テストに限る。
+- 検証範囲: Semantic 83、Trigger 180、Holdout 24、全fixture WCAG closureは実行していない。production source/providerがないため、sample/variation/process単位の正本縮小拒否、新revision更新、read failure/CAS raceをproduction runtimeで検証できない。
+- `docs/plans/2026-09-25_194200_usability-evaluation-skill_06b_wcag-conformance-evaluation-implementation-order.md`に本番provider/owner readerの不在と未達を追記した。Planの完了条件は緩和していない。production code・依存関係・PR #17評価基盤は変更していない。
+- 判定: canonical Plan provenance gateは引き続き未達1件。`PR #14 repository implementation Plan未達: 1件`。
+
+### 2026-10-10 JST — provenance確認と影響範囲の検証結果
+
+- 追加のfocused tests: `test_wcag_formal_contract.py` 12 PASS、`test_wcag_sampling_step_contract.py` 12 PASS。sampling testの直接script起動はrepository rootをimport pathに含めず失敗したため、CIと同じ`python -m unittest discover`で再実行しPASS。`test_wcag_handoff_contract.py` 12 PASS、`test_qa_artifact_graph_skills.py` 36 PASS。
+- repository標準相当: shared deterministic 12 PASS、repository deterministic 277 PASS、repository runtime 271 PASS、semantic dataset validator 22 Skill / 155 case PASS、対象qa-workflow/WCAG scriptsのPython compile PASS。
+- Official validator: system Pythonの既定cp932での初回`skills-ref validate`はUnicodeDecodeError。CI実行環境に合わせて一時process環境の`PYTHONUTF8=1`で再実行し、23 SkillsすべてPASS。永続環境設定は変更していない。
+- 文書品質: 変更した`_06b` Planと本reportはPrettier PASS、markdownlint 0 issue、`git diff --check` PASS。`git diff --check`はCRLF正規化に関する警告のみを出した。
+- Run Artifact制約: active `.codex/runs/20261010-000547-JST`のPLAN/TASKS/REPORTを書き換えるパッチはpath reparse-pointとして拒否された。`.codex/runs`はユーザー保護対象のignored overlayであり、代替経路で変更・迂回していない。検証記録は追跡対象の本reportへ保存する。
+- 当初PR head `7d7f9873a726b8b98a706ebe9ae9cd71f4e65e53`のActionsは3件successだった。次の通常pushでheadが変わるため、この成功を最終headの証拠として流用せず、push後に再取得する。
+- 全量Semantic Judge 83、Trigger 180、Holdout 24、WCAG全fixture closureは実施していない。本件のproduction source/providerがないため、productionにおける正当なrevision更新、provider read failure、CAS競合からのclose-report拒否、sample/variation/process真正性照合は検証できない。test-only SQLite handoff suiteのPASSはproduction provenance経路のPASSではない。
