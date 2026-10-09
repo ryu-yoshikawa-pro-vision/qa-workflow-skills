@@ -65,7 +65,9 @@
   - [x] 実Chromiumで固定probe結果を確認し、formal production normalizerを経由させた。57 focused contract testではなく、該当5 suite計67件がPASSした。
 - [x] repository標準検証: official `skills-ref` 22 packages、semantic dataset 22 Skills / 155 cases、shared deterministic 12、repository deterministic 257、shared semantic 27 PASS / 2 Windows symlink SKIP、repository semantic 4、trigger contract 1、runtime 271、Python compile 17 roots、Node syntax 2 files、Prettier 12 files、changed Markdown lint 6 files / 0 issue、text lint 6 files、`git diff --check`がPASS。`npm run validate:skills`はignored local overlayの`AGENTS.md`が参照する未存在`docs/reference/run-artifacts.md`で失敗した。overlayは変更しない。
 - [x] 対象19 tracked pathsを明示stageし、通常commit `053f70094a5ed0cf13186e599d7a8c46d290c580`を作成。pre-commit hook内のskills-ref、semantic dataset、shared/repository deterministic、semantic、trigger、runtime validationがPASS。
-- [ ] 通常push、PR本文更新、push後の最新PR head CI、最終Plan突合。
+- [x] report-only commit `3bb1806922271ab31334473d36bc9717870b6097`を作成し、対象PR branchへ通常push。PR head `3bb1806922271ab31334473d36bc9717870b6097`のAgent Skills / Deterministic Output Evals / Semantic Output Evals CIがsuccess。
+- [x] PR本文を今回の変更、検証範囲、PR #17との責務分担、外部受入境界へ更新。更新時head `3bb1806922271ab31334473d36bc9717870b6097`の3 Actions successも確認済み。
+- [x] report / Planのみを更新する最終checkpointを作成し、同じ実装commit `053f70094a5ed0cf13186e599d7a8c46d290c580`を維持。次の通常push後はreport-onlyの最新head CIを再確認し、そのSHA / run結果をPR本文と最終報告へ反映する。
 
 ## 10. 実装・ツール選択の記録
 

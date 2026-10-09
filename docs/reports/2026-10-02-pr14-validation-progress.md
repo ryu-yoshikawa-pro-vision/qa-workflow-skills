@@ -505,4 +505,7 @@ formal reportはfixture全体をclosureしていない。変更後confirmation s
 
 - 実装commit `053f70094a5ed0cf13186e599d7a8c46d290c580`を作成した。19 tracked pathsのみ明示stageし、`git commit`を通常実行した。pre-commit hookはofficial `skills-ref`、semantic dataset validation、shared/repository deterministic、shared/repository semantic、trigger contract、runtimeを再実行し、すべてPASS（shared semanticはWindows symlink privilegeによる2 SKIP）。
 - 実装commit後のbranchは`feat/usability-evaluation-skill`、local HEADは上記SHA、remoteは1 commit behind。`origin/main`との差はahead 324 / behind 0。ユーザー所有untrackedファイルと一時probe JSONはstage対象外。
-- 次は通常pushし、PR #14本文を最新実装と今回の検証範囲に更新する。その後、push後の最新PR headで`Validate Agent Skills`、`Validate Deterministic Output Evals`、`Validate Semantic Output Evals`を確認して最終状態を追記する。
+- report-only commit `3bb1806922271ab31334473d36bc9717870b6097`を作成し、通常pushした。push後のPR headは同SHA、branchは`origin/feat/usability-evaluation-skill`と一致。`origin/main`との差はahead 325 / behind 0。
+- head `3bb1806922271ab31334473d36bc9717870b6097`のGitHub Actionsは3件すべてsuccess: `Validate Agent Skills` run `37863658512`、`Validate Deterministic Output Evals` run `37863658515`、`Validate Semantic Output Evals` run `37863658506`。
+- PR #14本文を実装済み内容へ更新した。17-field observation、今回のPlaywright API優先修正、representative browser/formal経路、repository検証、PR #17へのSemantic全量評価移管、native Trigger全量評価との境界、外部acceptanceの分離を反映した。更新時headは`3bb1806922271ab31334473d36bc9717870b6097`。
+- この最終記録変更はreport / Planだけであり、implementation treeは`053f70094a5ed0cf13186e599d7a8c46d290c580`から変更していない。明示的にこの2文書だけをstageしてreport-only commit / 通常pushし、その結果の新headでCIを確認する。新headのCI run IDsとPR body上のhead記載は、最終応答で報告する。
