@@ -626,3 +626,12 @@ formal reportはfixture全体をclosureしていない。変更後confirmation s
 - 修正後のfocused testを再実行: report closure 20 PASS、WCAG runtime 13 PASS。CI正規手順と同じsuiteでshared deterministic 12 PASS、repository deterministic 270 PASS、repository runtime 271 PASS。Python compileとsemantic dataset validator（22 Skill / 155 case）もPASS。
 - `.github/workflows/validate-skills.yml`がofficial `skills-ref`をpinned Git URLからinstallして全Skillへ適用する正規経路であることを確認した。ローカルCLIは利用可能なcommandとして確認できていないため、修正後headの`Validate Agent Skills` Actionsをその公式検証の結果として確認する。修正前headのCI結果は修正後の証拠に流用しない。
 - 残作業は対象6ファイルの最終Markdown/text check、対象のみstage、通常pre-commit付きcommit/push、PR本文更新、最新headの3 Actions確認。
+
+### 2026-10-09 JST — commit / push / CI checkpoint
+
+- repository owner identity `mycomputer\sella`から通常Gitを使用。変更6ファイルだけをstageし、通常pre-commitを有効にしたcommit `444af10bbed85cdd989517ec9cfaaae3720459e1`を作成、PR branchへ通常pushした。`--no-verify`、force push、Git config / safe.directory変更は行っていない。
+- commit時のpre-commit一式がsuccess。修正後の再実行はfocused 33 tests、shared deterministic 12、repository deterministic 270、runtime 271、dataset 22 Skills / 155 cases PASS。shared semanticは27 PASS / Windows symlink privilegeによる2 SKIP、repository semantic 4 PASS、trigger contract 1 PASSもhook出力で成功。Python compile、Prettier、Markdownlint、text quality、`git diff --check`もPASS。
+- official `skills-ref`の訂正記録: owner identityのPython 3.11.5環境には`skills-ref` 0.1.0 CLIが存在した。通常起動はWindows cp932 decodeで失敗したため、`PYTHONUTF8=1`を付けてCIと同じ`skills-ref validate`を22 Skillへ実行し、22/22 PASS。Git安全設定とは無関係のPython encoding指定のみ使用。CI workflowもpinned `skills-ref`をinstallして同じvalidateを実施する。
+- 初回owner identity外からの`Get-Command skills-ref`がCLIを見つけなかったため、直前checkpointに「ローカルCLI未確認」と記録していた。この記録は上記のowner identity検証で解消・訂正した。
+- pushed implementation / report head `444af10bbed85cdd989517ec9cfaaae3720459e1`のGitHub Actionsは3件success: `Validate Agent Skills` run `37915674940`、`Validate Deterministic Output Evals` run `37915674938`、`Validate Semantic Output Evals` run `37915674950`。
+- PR headは`444af10bbed85cdd989517ec9cfaaae3720459e1`。PR本文の今回分追記と最終head CI確認は、次のfinal checkpointで同期する。tracked working treeはcleanで、`.pr14-formal-probe-1791501932895.json`および`3b77866a0b52347ce6201959f97492f197a61365`は未追跡のまま保持し、`.gitignore`に変更なし。
