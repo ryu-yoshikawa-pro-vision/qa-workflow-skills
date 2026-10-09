@@ -450,7 +450,8 @@ fixture全体のStep 4.2 / Step 5.1を埋めることは要求しません。未
 
 - `close_criterion()`は入力procedure rowsをversioned Success Criterion requirement assetとfinite procedure catalogのprocedure key集合へ照合し、欠落・余剰・重複を拒否する。applicability判定、manual fallback、AT、external evidenceの既存条件は維持する。
 - `validate_random_selection()`とfinite selectorは`target_count == random_target_count(current_structured_count)`を検証する。partial candidate inventory、exhaustion、sampling skip、population changeの既存status境界は維持する。
-- `close-report`の全件性の正本は`materialize_plan()`の完全なcurrent outputである。final closureでplanを再materializeし、宣言ref集合と実結果の双方をplanへ照合する。partial result materializationは許容し、missing / extra / duplicate / stale / unknown / undetermined resultが残るreportはcompleteにしない。
+- `close-report`は、渡されたbasisから`materialize_plan()`を再実行し、Plan内部の全件性と結果集合を照合する。この照合は入力Planの内部整合性を保証するが、basisが保存済みの現行evaluation / scope / sample selectionに由来することまでは証明しない。partial result materializationは許容し、missing / extra / duplicate / stale / unknown / undetermined resultが残るreportはcompleteにしない。
+- 正式なreport completionには、信頼できる保存先からevaluation ref / revision、WCAG version / level、承認済みscope、選定済みsample / variation / process集合を独立に取得し、Planと結果の出所・現行性を照合する必要がある。現在の汎用workflow-state readerとWCAG `close-report` runtime dispatchにはこの正本読込・照合経路がないため、このprovenance条件は未達であり、内部整合性のみを根拠にPlan provenanceをPASSとしてはならない。新しいstore / CASを追加せずに既存APIで取得可能になった場合に限り、この条件を閉じる。
 - Step 5.3はcompleteなreport closureと同一evaluation revision / target / exact criterion ref setのformal conformance resultsを要求する。full statementには全sampleとconformance requirementのcurrent satisfied結果、owner commitmentを要求し、partial statementにはcurrent nonconformance evidenceを要求する。
 - EARLは各結果のevaluation ref / revisionと`freshness_status=current`を要求してからpassed / failedを出力する。明示的untested、cantTell、inapplicable mappingと固定serializationは維持する。
 - all-pages-evaluated Claimで非列挙`scope_expression`を全件評価済みと扱わない。既存assurance-process経路はcomplete-process evidence refsがevidence setに含まれる場合に維持する。
