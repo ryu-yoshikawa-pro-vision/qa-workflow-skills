@@ -1345,19 +1345,49 @@ class SQLiteWcagWorkflowStateTests(unittest.TestCase):
                     "criterion_evaluation_ref": criterion["criterion_evaluation_ref"],
                     "evaluation_ref": "WCAG-EVAL-001", "evaluation_revision": "rev-7",
                     "sample_ref": criterion["sample_ref"], "variation_ref": criterion["variation_ref"],
+                    "sample_kind": next(sample["sample_kind"] for sample in plan["plan_basis"]["samples"]
+                                        if sample["sample_ref"] == criterion["sample_ref"]),
                     "process_ref": criterion["process_ref"], "requirement_ref": criterion["criterion_ref"],
                     "result": "satisfied", "freshness_status": "current"})
-            complete = workflow.finalize_wcag_report(
+            step_outcomes = {step: "complete" for step in self.structure.REPORT_STEPS}
+            step_outcomes.update({"1.4": "not-applicable", "3.2": "not-applicable", "4.3": "not-applicable"})
+            closure_inputs = {
+                "required_steps": [step for step, status in step_outcomes.items() if status == "complete"],
+                "step_outcomes": step_outcomes,
+                "example_coverage": {},
+                "required_criterion_evaluation_refs": [row["criterion_evaluation_ref"] for row in plan["criteria"]],
+                "accessible_output_closure": {key: True for key in self.structure.ACCESSIBLE_OUTPUT_CHECKS},
+            }
+            incomplete_closure_inputs = {**closure_inputs,
+                "step_outcomes": {**step_outcomes, "4.1": "incomplete"}}
+            unverified = workflow.finalize_wcag_report(
                 root, workflow_ref, expected_provider_revision=current["provider_revision"],
                 evaluation_ref="WCAG-EVAL-001", evaluation_revision="rev-7",
                 canonical_criterion_plan=plan, sample_results=rows, closure_status="complete", **self.context,
             )
-            self.assertEqual(complete["status"], "complete")
+            self.assertEqual(unverified["status"], "blocked")
+            self.assertEqual(unverified["reason"], "wcag_em_report_closure_inputs_required")
+            incomplete = workflow.finalize_wcag_report(
+                root, workflow_ref, expected_provider_revision=current["provider_revision"],
+                evaluation_ref="WCAG-EVAL-001", evaluation_revision="rev-7",
+                canonical_criterion_plan=plan, sample_results=rows,
+                report_closure_inputs=incomplete_closure_inputs, closure_status="complete", **self.context,
+            )
+            self.assertEqual(incomplete["status"], "blocked")
+            self.assertEqual(incomplete["reason"], "wcag_em_report_closure_not_complete")
+            complete = workflow.finalize_wcag_report(
+                root, workflow_ref, expected_provider_revision=current["provider_revision"],
+                evaluation_ref="WCAG-EVAL-001", evaluation_revision="rev-7",
+                canonical_criterion_plan=plan, sample_results=rows,
+                report_closure_inputs=closure_inputs, closure_status="complete", **self.context,
+            )
+            self.assertEqual(complete["status"], "complete", complete)
             self.assertEqual(complete["provider_revision"], "sqlite:3")
             concurrent_close = workflow.finalize_wcag_report(
                 root, workflow_ref, expected_provider_revision=current["provider_revision"],
                 evaluation_ref="WCAG-EVAL-001", evaluation_revision="rev-7",
-                canonical_criterion_plan=plan, sample_results=rows, closure_status="complete", **self.context,
+                canonical_criterion_plan=plan, sample_results=rows,
+                report_closure_inputs=closure_inputs, closure_status="complete", **self.context,
             )
             self.assertEqual(concurrent_close["status"], "conflict")
             persisted = workflow.read_wcag_evaluation_state(
@@ -1369,7 +1399,9 @@ class SQLiteWcagWorkflowStateTests(unittest.TestCase):
             rejected = workflow.finalize_wcag_report(
                 root, workflow_ref, expected_provider_revision=persisted["provider_revision"],
                 evaluation_ref="WCAG-EVAL-001", evaluation_revision="rev-7",
-                canonical_criterion_plan=plan, sample_results=stale, closure_status="complete", **self.context,
+                canonical_criterion_plan=plan, sample_results=stale,
+                report_closure_inputs=closure_inputs,
+                closure_status="complete", **self.context,
             )
             self.assertNotEqual(rejected["status"], "complete")
 

@@ -84,7 +84,7 @@ def _wcag_state_operation(input_value: dict[str, Any], metadata: dict[str, Any])
                              "expected_provider_revision", "evaluation_ref",
                              "evaluation_revision", "canonical_criterion_plan", "sample_results",
                              "wcag_runtime_result"})
-        candidate = _verified_wcag_closure_candidate(args["wcag_runtime_result"], metadata)
+        candidate = _wcag_closure_candidate(args.get("wcag_runtime_result"), metadata)
         if candidate is None:
             result = {"status": "blocked", "reason": "current_wcag_closure_runtime_result_required"}
         else:
@@ -123,6 +123,7 @@ def _wcag_state_operation(input_value: dict[str, Any], metadata: dict[str, Any])
                         root, args["workflow_ref"], expected_provider_revision=args["expected_provider_revision"],
                         evaluation_ref=args["evaluation_ref"], evaluation_revision=args["evaluation_revision"],
                         canonical_criterion_plan=args["canonical_criterion_plan"], sample_results=args["sample_results"],
+                        report_closure_inputs=candidate.get("report_closure_inputs"),
                         closure_status=candidate["closure_status"], **common_context,
                     )
     status = result.get("status")
@@ -136,7 +137,8 @@ def _wcag_state_operation(input_value: dict[str, Any], metadata: dict[str, Any])
     }
 
 
-def _verified_wcag_closure_candidate(runtime_result: Any, metadata: dict[str, Any]) -> dict[str, Any] | None:
+def _wcag_closure_candidate(runtime_result: Any, metadata: dict[str, Any]) -> dict[str, Any] | None:
+    """Pair a pending result to its declared runtime dependency; this is not closure proof."""
     if not isinstance(runtime_result, dict):
         return None
     required = {"skill", "runtime_unit_key", "generation_fingerprint", "runtime_status", "result_status", "payload"}

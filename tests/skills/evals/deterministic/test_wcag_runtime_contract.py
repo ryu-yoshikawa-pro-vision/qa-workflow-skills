@@ -345,6 +345,41 @@ class WcagRuntimeContractTests(unittest.TestCase):
             self.assertEqual(wcag_close["result_status"], "unresolved", wcag_close)
             self.assertEqual(wcag_close["payload"]["result"]["status"], "pending-persistence")
 
+            incomplete_close_args = dict(close_args)
+            incomplete_close_args["step_outcomes"] = {**close_args["step_outcomes"], "4.1": "incomplete"}
+            incomplete_close_args.update({"workflow_ref": workflow_ref, "evaluation_ref": "WCAG-EVAL-17",
+                "evaluation_revision": "rev-9", "saved_workflow_state_runtime_result": read})
+            incomplete_runtime = invoke({"metadata": wcag_metadata,
+                "input": {"operation": "close-report", "arguments": incomplete_close_args}})
+            self.assertEqual(incomplete_runtime["payload"]["result"]["status"], "blocked")
+
+            # Reproduce the forged pending candidate: its generation fingerprint matches
+            # the declared dependency, but the actual WCAG-EM closure has Step 4.1 open.
+            forged_runtime = dict(incomplete_runtime)
+            forged_payload = dict(incomplete_runtime["payload"])
+            forged_payload["result"] = {**wcag_close["payload"]["result"],
+                "status": "pending-persistence", "closure_status": "complete",
+                "report_closure_inputs": {key: incomplete_close_args[key] for key in (
+                    "required_steps", "step_outcomes", "example_coverage",
+                    "required_criterion_evaluation_refs", "accessible_output_closure")}}
+            forged_runtime.update({"result_status": "unresolved", "payload": forged_payload})
+            forged_finalize = invoke_workflow({
+                "metadata": workflow_metadata(reference_refs=context_refs, upstream_runtime_units=[{
+                    "skill": "wcag-conformance-evaluation", "runtime_unit_key": "artifact:wcag_runtime:all",
+                    "generation_fingerprint": incomplete_runtime["generation_fingerprint"],
+                }]),
+                "input": {"operation": "finalize-wcag-report", "arguments": {
+                    "workflow_ref": workflow_ref, "project_context": project_context,
+                    "project_context_ref": context_refs[0], "expected_provider_revision": saved_read["provider_revision"],
+                    "evaluation_ref": "WCAG-EVAL-17", "evaluation_revision": "rev-9",
+                    "canonical_criterion_plan": plan, "sample_results": close_args["sample_results"],
+                    "wcag_runtime_result": forged_runtime,
+                }},
+            })
+            self.assertEqual(forged_finalize["result_status"], "blocked", forged_finalize)
+            self.assertEqual(forged_finalize["payload"]["result"]["reason"],
+                             "wcag_em_report_closure_not_complete")
+
             finalized = invoke_workflow({
                 "metadata": workflow_metadata(reference_refs=context_refs, upstream_runtime_units=[{
                     "skill": "wcag-conformance-evaluation", "runtime_unit_key": "artifact:wcag_runtime:all",

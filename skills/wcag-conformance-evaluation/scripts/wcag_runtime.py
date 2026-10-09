@@ -203,6 +203,9 @@ def _close_report_with_saved_state(args: dict[str, Any], metadata: dict[str, Any
         "canonical_plan_fingerprint": evaluation["canonical_plan_fingerprint"],
         "results_fingerprint": result_summary["fingerprint"],
         "criterion_evaluation_refs": expected_refs,
+        "report_closure_inputs": {key: args[key] for key in (
+            "required_steps", "step_outcomes", "example_coverage", "required_criterion_evaluation_refs",
+            "all_occurrence_requirements", "accessible_output_closure") if key in args},
     }
 
 

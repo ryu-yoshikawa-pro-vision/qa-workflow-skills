@@ -8,11 +8,13 @@ perform them atomically; this module never simulates CAS with read-then-write.
 from __future__ import annotations
 
 import hashlib
+import importlib
 import json
 import os
 from pathlib import Path
 import re
 import sqlite3
+import sys
 import tempfile
 import uuid
 from contextlib import closing
@@ -1144,13 +1146,58 @@ def _wcag_report_result_summary(evaluation: dict[str, Any], sample_results: Any)
     return {"results": summary, "fingerprint": "sha256:" + content_identity(summary)}
 
 
+def _verify_wcag_em_report_closure(evaluation: dict[str, Any], canonical_criterion_plan: dict[str, Any],
+                                   sample_results: list[dict[str, Any]],
+                                   report_closure_inputs: Any) -> dict[str, Any]:
+    """Re-run the WCAG Skill's closure over candidate step data and owner-verified plan/results."""
+    if not isinstance(report_closure_inputs, dict):
+        return {"status": "blocked", "reason": "wcag_em_report_closure_inputs_required"}
+    required = {"required_steps", "step_outcomes", "example_coverage"}
+    allowed = required | {"required_criterion_evaluation_refs", "all_occurrence_requirements",
+                          "accessible_output_closure"}
+    if not required.issubset(report_closure_inputs) or set(report_closure_inputs) - allowed:
+        return {"status": "blocked", "reason": "wcag_em_report_closure_inputs_invalid"}
+    report_closure_arguments = {**report_closure_inputs, "sample_results": sample_results,
+                                "canonical_criterion_plan": canonical_criterion_plan}
+
+    scripts = Path(__file__).resolve().parents[2] / "wcag-conformance-evaluation" / "scripts"
+    module_path = scripts / "wcag_em_structure.py"
+    if not module_path.is_file():
+        return {"status": "blocked", "reason": "wcag_em_closure_helper_unavailable"}
+    module_name = "wcag_em_structure"
+    existing = sys.modules.get(module_name)
+    existing_path = getattr(existing, "__file__", None)
+    if existing_path is not None and Path(existing_path).resolve() != module_path.resolve():
+        return {"status": "blocked", "reason": "wcag_em_closure_helper_identity_mismatch"}
+    script_path = str(scripts)
+    added_path = script_path not in sys.path
+    if added_path:
+        sys.path.insert(0, script_path)
+    try:
+        structure = importlib.import_module(module_name)
+        closure = structure.close_report(**report_closure_arguments)
+    except (AttributeError, ImportError, KeyError, OSError, TypeError, ValueError):
+        return {"status": "blocked", "reason": "wcag_em_report_closure_verification_failed"}
+    finally:
+        if added_path:
+            try:
+                sys.path.remove(script_path)
+            except ValueError:
+                pass
+    if not isinstance(closure, dict) or closure.get("status") != "complete":
+        return {"status": "blocked", "reason": "wcag_em_report_closure_not_complete",
+                "closure_status": closure.get("status") if isinstance(closure, dict) else None}
+    return {"status": "complete"}
+
+
 def finalize_wcag_report(workflow_root: str | Path, workflow_ref: str, *, expected_provider_revision: str,
                          evaluation_ref: str, evaluation_revision: str, canonical_criterion_plan: dict[str, Any],
-                         sample_results: list[dict[str, Any]], closure_status: str,
+                         sample_results: list[dict[str, Any]], report_closure_inputs: dict[str, Any] | None = None,
+                         closure_status: str,
                          project_context_ref: str, project_context_revision: str,
                          project_context_fingerprint: str,
                          workflow_state_root_content_identity: str) -> dict[str, Any]:
-    """Persist report completion only for a current, fully matched canonical result set."""
+    """Persist completion after matching results and independently re-running WCAG-EM closure."""
     if closure_status != "complete":
         return {"status": "blocked", "reason": "wcag_report_closure_not_complete"}
     current = read_sqlite_workflow_state(workflow_root, workflow_ref, expected_revision=expected_provider_revision)
@@ -1171,6 +1218,12 @@ def finalize_wcag_report(workflow_root: str | Path, workflow_ref: str, *, expect
         result_summary = _wcag_report_result_summary(evaluation["evaluation"], sample_results)
     except (KeyError, TypeError, ValueError):
         return {"status": "blocked", "reason": "wcag_report_result_set_incomplete_or_stale"}
+    closure_check = _verify_wcag_em_report_closure(
+        evaluation["evaluation"], canonical_criterion_plan, sample_results, report_closure_inputs,
+    )
+    if closure_check.get("status") != "complete":
+        return {"status": "blocked", "reason": closure_check.get("reason", "wcag_em_report_closure_not_complete"),
+                "closure_status": closure_check.get("closure_status")}
     report_fingerprint = "sha256:" + content_identity({
         "evaluation_ref": evaluation_ref,
         "evaluation_revision": evaluation_revision,

@@ -200,7 +200,7 @@ Project Contextの`qa.workflow_state_root`はworkflowごとのpersisted stateと
 
 WCAG canonical Plan provenanceとreport完了には、`register-wcag-evaluation-plan`、`read-wcag-evaluation-state`、`finalize-wcag-report` operationを使います。これらは既存の`qa.workflow_state_root`から場所を解決し、`artifact_graph.py`のlocal SQLite providerでcurrent WCAG評価情報を読み書きします。対応範囲は単一ホストlocal filesystemです。network filesystem、複数host、未設定root、DB破損、transaction / lock failureではblockedとします。
 
-登録は既存WCAG evaluation ownerが確定した評価入力、scope決定とevidence refs、selected sample / variation / processおよびsource artifact refsを引き継ぎます。caller提供Planだけから正本を作らず、同じevaluation revisionの対象縮小を拒否します。SQLite state revisionはWCAG evaluation revisionとは別です。WCAG `close-report`が返すのはunresolved candidateであり、QA workflowはcurrent record・Plan・結果集合を照合し、期待SQLite revisionでCAS更新した後に別connectionから再読込して初めて完了を返します。これは既存のgeneric workflow / handoff CASを置き換えず、SQLite recordの存在だけでowner承認を証明しません。
+登録は既存WCAG evaluation ownerが確定した評価入力、scope決定とevidence refs、selected sample / variation / processおよびsource artifact refsを引き継ぎます。caller提供Planだけから正本を作らず、同じevaluation revisionの対象縮小を拒否します。SQLite state revisionはWCAG evaluation revisionとは別です。WCAG `close-report`が返すのはunresolved candidateであり、generation fingerprint一致だけではclosure証明になりません。candidateに含まれる有限な工程入力を、QA workflowはcurrent recordから取得したPlan・結果に結合し、既存`close_report()`を再実行してWCAG-EM工程とaccessible outputのcomplete状態を確認します。その後、期待SQLite revisionでCAS更新し、別connectionから再読込して初めて完了を返します。これは既存のgeneric workflow / handoff CASを置き換えず、SQLite recordの存在だけでowner承認を証明しません。
 
 ### mutable operation開始直前
 
