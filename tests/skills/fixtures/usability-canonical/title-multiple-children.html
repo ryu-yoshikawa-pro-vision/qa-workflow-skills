@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>First title text</title>
+    <title>Second title text</title>
+    <script>
+      const firstTitle = document.getElementsByTagName("title")[0];
+      firstTitle.append(document.createElement("span"));
+    </script>
+  </head>
+  <body>
+    <main>
+      <h1>Multiple title fixture</h1>
+    </main>
+    <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <title>SVG title is not the page title</title>
+    </svg>
+  </body>
+</html>

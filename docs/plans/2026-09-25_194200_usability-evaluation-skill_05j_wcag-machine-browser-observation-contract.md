@@ -199,6 +199,8 @@ formal Skillがmaterializeするmachine probe requestは対象に応じて `targ
 
 result statusは `ok / unsupported / unavailable / incomplete / blocked` です。`unsupported` はcurrent browser / tool capabilityがrequired operationを提供しない場合だけに使い、既知標準の未実装を隠す用途には使いません。
 
+固定probeの要素母集団は既存PlaywrightのLocatorで解決し、accessible role / nameが必要な場合は対象Locatorに対するbrowser-computed accessibility projectionを使います。`getByRole()`はtarget resolverであり、任意要素の構造化アクセシビリティ一覧ではありません。snapshot全体や推測したARIA計算は保存しません。`mp-component-semantics`はACT 97a4e1に必要なrole・tree inclusion・name presenceを保持し、不要なraw name textは返しません。Locatorの可視性、DOM存在、accessibility-tree inclusion、actionability、visual renderingを別の事実として扱います。Locatorはopen Shadow DOMを探索し、target refはshadow host/rootの境界を含めます。closed Shadow DOMとframe内部は暗黙に探索範囲へ追加せず、明示scopeで必要だが正確に観測できない場合は `incomplete` とします。LocatorでテキストノードやRange矩形を得られない固定測定では、対象rootを限定したブラウザ標準の`TreeWalker` / `Range`を使えますが、一般目的のDOM crawlerやAccessible Name Computationは作成しません。
+
 current document identityとtyped requestが一致し、固定probeが型付きの部分観測値と有限の `observation_completeness.reason` を返した `incomplete` は、観測実行の失敗ではなくsemantic/manual closureへ渡す部分evidenceです。runtimeはこれを `ready + partial` として保持し、criterionをsatisfiedへ自動変換しません。formal procedureは部分evidenceを検討し、追加観測で閉じるか、根拠を記録して `undetermined` に閉じます。部分観測値・理由がない `incomplete`、stale document、request不一致、browser action未完了、cleanup失敗は引き続きblockedです。catalogued `limitation_code` は定義済みconditional manual fallbackだけを起動し、この部分evidence分類とは別です。
 
 manual fallback activationへ使う `limitation_code` は次の有限値だけを許可します。

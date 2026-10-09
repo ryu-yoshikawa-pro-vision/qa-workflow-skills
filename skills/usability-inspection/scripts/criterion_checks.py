@@ -58,11 +58,13 @@ def run_supported_rule(rule_id: str, observations: dict[str, Any]) -> dict[str, 
             refs.extend(item_refs)
             included = item.get("included_in_accessibility_tree")
             role = item.get("role")
+            name_present = item.get("accessible_name_present")
             host_element = item.get("host_element")
             host_type = item.get("host_type")
             if (item.get("status") != "ok" or not isinstance(included, bool)
                     or not isinstance(item.get("programmatically_hidden"), bool)
-                    or not isinstance(role, str) or not role.strip()
+                    or (included and (not isinstance(role, str) or not role.strip()))
+                    or (not included and (role is not None or name_present is not None))
                     or not isinstance(host_element, str) or not host_element.strip()
                     or (host_element.casefold() == "html:input"
                         and (not isinstance(host_type, str) or not host_type.strip()))):
@@ -72,13 +74,12 @@ def run_supported_rule(rule_id: str, observations: dict[str, Any]) -> dict[str, 
                 continue
             if host_element.casefold() == "html:input" and host_type.casefold() == "image":
                 continue
-            name = item.get("accessible_name")
-            if not isinstance(name, str):
+            if not isinstance(name_present, bool):
                 return {"rule_id": rule_id, "outcome": "cantTell", "criterion_ref": rule["criterion"],
                         "evidence_refs": sorted(set(refs))}
-            applicable_buttons.append(name)
+            applicable_buttons.append(name_present)
         outcome = ("inapplicable" if not applicable_buttons
-                   else "passed" if all(name.strip() for name in applicable_buttons) else "failed")
+                   else "passed" if all(applicable_buttons) else "failed")
     else:
         images = observations.get("images")
         refs = observations.get("evidence_refs", [])

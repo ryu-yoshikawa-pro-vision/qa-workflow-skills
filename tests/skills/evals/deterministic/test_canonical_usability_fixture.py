@@ -186,13 +186,102 @@ class CanonicalUsabilityFixtureTests(unittest.TestCase):
 
     def test_formal_title_probe_keeps_only_safe_title_predicates(self):
         probe = (ROOT / "skills" / "usability-inspection" / "scripts" / "fixed_wcag_machine_probes.js").read_text(encoding="utf-8")
+        ordinary_probe = (ROOT / "skills" / "usability-inspection" / "scripts" / "fixed_browser_probes.js").read_text(encoding="utf-8")
         title_start = probe.index('case "mp-document-title"')
         title_end = probe.index('case "mp-document-language"', title_start)
         title_probe = probe[title_start:title_end]
         self.assertIn("has_title_element", title_probe)
         self.assertIn("first_title_children_are_text", title_probe)
         self.assertIn("has_non_whitespace_text", title_probe)
+        self.assertIn('getElementsByTagNameNS(htmlNamespace, "title")', title_probe)
+        self.assertIn('document.contentType?.toLowerCase()', title_probe)
+        self.assertIn('document.documentElement?.localName === "html"', title_probe)
+        self.assertIn("titleElement.childNodes.length > 0", title_probe)
+        self.assertIn("Array.from(titleElement.childNodes).every", title_probe)
+        self.assertIn(r"/\P{White_Space}/u", title_probe)
+        self.assertNotIn('document.querySelector("title")', title_probe)
         self.assertNotIn("title: safeText", title_probe)
+        ordinary_title_start = ordinary_probe.index('if (request.probe_key === "document-title")')
+        ordinary_title_end = ordinary_probe.index('if (request.probe_key === "navigation-timing"', ordinary_title_start)
+        ordinary_title_probe = ordinary_probe[ordinary_title_start:ordinary_title_end]
+        self.assertIn('document.contentType?.toLowerCase()', ordinary_title_probe)
+        self.assertIn('getElementsByTagNameNS(htmlNamespace, "title")', ordinary_title_probe)
+
+        multiple = (FIXTURE / "title-multiple-children.html").read_text(encoding="utf-8")
+        non_html = (FIXTURE / "title-non-html.xml").read_text(encoding="utf-8")
+        self.assertIn("<title>First title text</title>", multiple)
+        self.assertIn("<title>Second title text</title>", multiple)
+        self.assertIn('firstTitle.append(document.createElement("span"))', multiple)
+        self.assertIn('xmlns="urn:qa-workflow-skills:fixture"', non_html)
+
+    def test_formal_target_geometry_uses_locator_visibility_geometry_and_shadow_safe_refs(self):
+        probe = (ROOT / "skills" / "usability-inspection" / "scripts" / "fixed_wcag_machine_probes.js").read_text(encoding="utf-8")
+        start = probe.index('if (request.machine_probe_key === "mp-target-geometry")')
+        end = probe.index('if (request.machine_probe_key === "mp-focus-appearance-evidence")', start)
+        geometry = probe[start:end]
+        self.assertIn("page.locator(selector)", geometry)
+        self.assertIn("target.isVisible()", geometry)
+        self.assertIn("target.boundingBox()", geometry)
+        self.assertIn("target.ariaSnapshotJSON", geometry)
+        self.assertIn("included_in_accessibility_tree", geometry)
+        self.assertIn('"::shadow"', probe)
+        self.assertNotIn("querySelectorAll", geometry)
+        self.assertNotIn("Number(style.opacity) > 0", geometry)
+
+    def test_formal_component_probe_uses_browser_accessible_name_presence_only(self):
+        probe = (ROOT / "skills" / "usability-inspection" / "scripts" / "fixed_wcag_machine_probes.js").read_text(encoding="utf-8")
+        start = probe.index('case "mp-component-semantics"')
+        end = probe.index('case "mp-status-candidate-inventory"', start)
+        component = probe[start:end]
+        self.assertIn("role: roleOf(element)", component)
+        self.assertIn("accessible_name_present: accessibilityTreeIncludes(element)", component)
+        self.assertIn("? accessibleNamePresent(element)", component)
+        self.assertIn("included_in_accessibility_tree: accessibilityTreeIncludes(element)", component)
+        self.assertIn("element instanceof HTMLInputElement", component)
+        self.assertIn("? element.type", component)
+        self.assertIn('if (request.machine_probe_key !== "mp-component-semantics")', probe)
+        self.assertNotIn("accessible_name:", component)
+
+    def test_focus_probe_uses_real_tab_sequence_and_closes_limit_or_restore_failure(self):
+        probe = (ROOT / "skills" / "usability-inspection" / "scripts" / "fixed_wcag_machine_probes.js").read_text(encoding="utf-8")
+        start = probe.index("const captureFocusSequence = async")
+        end = probe.index("\n  };\n\n  if (", start)
+        focus = probe[start:end]
+        for contract in ("page.keyboard.press(\"Tab\")", "cycle_kind", "limitReached", "finally",
+                         "originalFocus.evaluate", "window.scrollTo(position.x, position.y)",
+                         "focus-observation-limit-reached", "focus-loop-detected",
+                         "focus-cycle-not-complete", "focus-left-document", "focus-target-removed"):
+            with self.subTest(contract=contract):
+                self.assertIn(contract, focus)
+        self.assertNotIn("querySelectorAll", focus)
+
+    def test_formal_observations_use_playwright_semantics_and_shadow_safe_refs(self):
+        probe = (ROOT / "skills" / "usability-inspection" / "scripts" / "fixed_wcag_machine_probes.js").read_text(encoding="utf-8")
+        fixture = (FIXTURE / "playwright-observation-cases.html").read_text(encoding="utf-8")
+
+        for contract in ("page.locator(selector)", "ariaSnapshotJSON({ depth: 0", "item.isVisible()", "item.isEnabled()",
+                         "accessibility_tree_includes_element", "focus-observation-limit-reached",
+                         "focus-loop-detected", '"::shadow"'):
+            with self.subTest(contract=contract):
+                self.assertIn(contract, probe)
+        self.assertIn("locator.evaluateAll", probe)
+        text_probe = probe[probe.index('case "mp-text-presentation-values"'):probe.index('case "mp-viewport-state"')]
+        self.assertIn('allVisible("*")', text_probe)
+        self.assertNotIn('createTreeWalker(document.body', text_probe)
+        self.assertIn('page.locator("body *").evaluateAll', probe)
+        self.assertIn("const textOf = (element) => safeText(element?.innerText || \"\")", probe)
+        self.assertNotIn("const roleOf = (element) =>\n          element.getAttribute(\"role\")", probe)
+        for element_id in ("submit-input", "image-input", "aria-hidden-child", "aria-label-button",
+                           "labelledby-button", "empty-name-button", "synthetic-secret-name",
+                           "synthetic-secret-value", "opacity-zero", "display-none",
+                           "visibility-hidden", "aria-hidden-button", "viewport-outside",
+                           "disabled-button", "aria-disabled-checkbox", "focus-trap", "remove-on-tab",
+                           "host-a", "host-b"):
+            with self.subTest(element_id=element_id):
+                self.assertIn(f'id="{element_id}"', fixture)
+        self.assertIn('focusTrap.dataset.trap === "true"', fixture)
+        self.assertIn('removeOnTab.dataset.removeOnTab === "true"', fixture)
+        self.assertIn("button[data-focus-bound]", fixture)
 
 
 if __name__ == "__main__":

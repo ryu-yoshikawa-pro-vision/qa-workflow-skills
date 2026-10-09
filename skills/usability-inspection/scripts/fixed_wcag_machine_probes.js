@@ -171,154 +171,272 @@ async (page) => {
     ...(observation.limitation ? { limitation: observation.limitation } : {}),
     ...(observation.limitation_code ? { limitation_code: observation.limitation_code } : {}),
   });
+  const interactiveSelector =
+    "a[href],button,input,select,textarea,[role='button'],[role='link'],[role='checkbox'],[role='radio'],[role='slider'],[tabindex]:not([tabindex='-1'])";
 
-  const captureFocusSequence = async (maxSteps) => {
-    const originalFocus = await page.evaluateHandle(() => document.activeElement);
+  const elementPathFor = (element) => {
+    const parts = [];
+    let current = element;
+    while (current && current.nodeType === Node.ELEMENT_NODE) {
+      const parent = current.parentElement;
+      const peers = parent
+        ? Array.from(parent.children).filter((peer) => peer.tagName === current.tagName)
+        : [current];
+      parts.unshift(
+        current.tagName.toLowerCase() + ":nth-of-type(" + (peers.indexOf(current) + 1) + ")",
+      );
+      const root = current.getRootNode();
+      if (parent) {
+        current = parent;
+      } else if (root instanceof ShadowRoot) {
+        parts.unshift("::shadow");
+        current = root.host;
+      } else {
+        current = null;
+      }
+    }
+    return parts.join(" > ");
+  };
+
+  const captureFocusSequence = async (maxSteps, singleTarget = false) => {
+    const focusedLocators = page.locator(":focus");
+    const originalFocus = await focusedLocators
+      .last()
+      .elementHandle()
+      .catch(() => page.evaluateHandle(() => document.activeElement));
     const originalScroll = await page.evaluate(() => ({ x: scrollX, y: scrollY }));
     const sequence = [];
-    const seen = new Set();
+    const seen = new Map();
     let cycleDetected = false;
+    let cycleStartIndex = null;
+    let cycleKind = null;
+    let limitReached = false;
+    let focusLeftDocument = false;
+    let focusTargetRemoved = false;
     let captureError = null;
+    const limit = Math.min(Math.max(1, maxSteps), 64);
     try {
-      const focusableCount = await page.evaluate(() => {
-        const selector = "a[href],button,input,select,textarea,[tabindex]:not([tabindex='-1'])";
-        return Array.from(document.querySelectorAll(selector)).filter((element) => {
-          const style = getComputedStyle(element);
-          const rect = element.getBoundingClientRect();
-          return (
-            !element.disabled &&
-            style.display !== "none" &&
-            style.visibility !== "hidden" &&
-            rect.width > 0 &&
-            rect.height > 0
-          );
-        }).length;
-      });
-      const limit = Math.min(Math.max(1, maxSteps), Math.max(1, focusableCount + 1), 64);
       for (let index = 0; index < limit; index++) {
+        const previousFocus = await page.locator(":focus").last().elementHandle().catch(() => null);
         await page.keyboard.press("Tab");
-        const row = await page.evaluate(() => {
-          const element = document.activeElement;
-          if (!element || element === document.body || element === document.documentElement) {
-            return {
-              target_ref: null,
-              role: "document",
-              tag_name: "body",
-              visible: true,
-              rect_css_px: null,
-              outline_style: null,
-              outline_width: null,
-              outline_color: null,
-              border: null,
-              background_color: null,
-              background_image_present: false,
-              box_shadow_layer_count: 0,
-              fixed_overlay_overlap_refs: [],
-            };
+        if (previousFocus) {
+          try {
+            if (!(await previousFocus.evaluate((element) => element.isConnected))) {
+              focusTargetRemoved = true;
+              break;
+            }
+          } catch {
+            focusTargetRemoved = true;
+            break;
+          } finally {
+            await previousFocus.dispose().catch(() => {});
           }
-          const pathFor = (node) => {
-            const parts = [];
-            let current = node;
-            while (current && current.nodeType === Node.ELEMENT_NODE) {
-              const parent = current.parentElement;
-              const peers = parent
-                ? Array.from(parent.children).filter((peer) => peer.tagName === current.tagName)
-                : [current];
-              parts.push(
-                current.tagName.toLowerCase() +
-                  ":nth-of-type(" +
-                  (peers.indexOf(current) + 1) +
-                  ")",
-              );
-              current = parent;
-            }
-            return parts.reverse().join(" > ");
-          };
-          const rect = element.getBoundingClientRect();
-          const style = getComputedStyle(element);
-          const splitShadows = (value) => {
-            let depth = 0;
-            let count = value && value !== "none" ? 1 : 0;
-            for (const character of value || "") {
-              if (character === "(") depth += 1;
-              else if (character === ")") depth = Math.max(0, depth - 1);
-              else if (character === "," && depth === 0) count += 1;
-            }
-            return count;
-          };
-          const overlays = Array.from(document.querySelectorAll("body *"))
-            .filter((candidate) => {
-              if (candidate === element || candidate.contains(element)) return false;
-              const candidateStyle = getComputedStyle(candidate);
-              if (
-                !["fixed", "sticky"].includes(candidateStyle.position) ||
-                candidateStyle.display === "none" ||
-                candidateStyle.visibility === "hidden" ||
-                Number(candidateStyle.opacity) <= 0
-              )
-                return false;
-              const overlayRect = candidate.getBoundingClientRect();
-              return (
-                overlayRect.width > 0 &&
-                overlayRect.height > 0 &&
-                overlayRect.left < rect.right &&
-                overlayRect.right > rect.left &&
-                overlayRect.top < rect.bottom &&
-                overlayRect.bottom > rect.top
-              );
-            })
-            .slice(0, 20)
-            .map((candidate) => "dom-overlay:" + pathFor(candidate));
-          return {
-            target_ref: "focused-element:" + pathFor(element),
-            role: element.getAttribute("role") || element.tagName.toLowerCase(),
-            tag_name: element.tagName.toLowerCase(),
-            visible:
-              style.display !== "none" &&
-              style.visibility !== "hidden" &&
-              rect.width > 0 &&
-              rect.height > 0,
-            rect_css_px: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
-            outline_style: style.outlineStyle,
-            outline_width: style.outlineWidth,
-            outline_color: style.outlineColor,
-            border: {
-              width: style.borderWidth,
-              style: style.borderStyle,
-              color: style.borderColor,
-              radius: style.borderRadius,
-            },
-            background_color: style.backgroundColor,
-            background_image_present: style.backgroundImage !== "none",
-            box_shadow_layer_count: splitShadows(style.boxShadow),
-            fixed_overlay_overlap_refs: overlays,
-          };
-        });
-        if (row.target_ref && seen.has(row.target_ref)) {
-          cycleDetected = true;
+        }
+        const activeLocators = page.locator(":focus");
+        const activeCount = await activeLocators.count();
+        if (activeCount === 0) {
+          focusLeftDocument = true;
+          sequence.push({
+            state_index: sequence.length,
+            target_ref: null,
+            role: null,
+            tag_name: "document",
+            visible: true,
+            rect_css_px: null,
+            outline_style: null,
+            outline_width: null,
+            outline_color: null,
+            border: null,
+            background_color: null,
+            background_image_present: false,
+            box_shadow_layer_count: 0,
+            fixed_overlay_overlap_refs: [],
+          });
           break;
         }
-        if (row.target_ref) seen.add(row.target_ref);
-        sequence.push({ state_index: sequence.length, ...row });
-        if (row.target_ref === null) break;
+        const focused = activeLocators.last();
+        const isDocumentFocus = await focused.evaluate(
+          (element) => element === document.body || element === document.documentElement,
+        );
+        if (isDocumentFocus) {
+          focusLeftDocument = true;
+          sequence.push({
+            state_index: sequence.length,
+            target_ref: null,
+            role: null,
+            tag_name: "document",
+            visible: true,
+            rect_css_px: null,
+            outline_style: null,
+            outline_width: null,
+            outline_color: null,
+            border: null,
+            background_color: null,
+            background_image_present: false,
+            box_shadow_layer_count: 0,
+            fixed_overlay_overlap_refs: [],
+          });
+          break;
+        }
+        const targetPath = await focused.evaluate(elementPathFor);
+        const targetRef = "focused-element:" + targetPath;
+        if (seen.has(targetRef)) {
+          cycleDetected = true;
+          cycleStartIndex = seen.get(targetRef);
+          cycleKind = cycleStartIndex === 0 && sequence.length > 1 ? "returns-to-start" : "focus-loop";
+          break;
+        }
+        const semanticTree = await focused.ariaSnapshotJSON({ depth: 0, timeout: 1000 });
+        if (
+          !Array.isArray(semanticTree) ||
+          semanticTree.length > 1 ||
+          (semanticTree.length === 1 && typeof semanticTree[0]?.role !== "string")
+        ) {
+          captureError = "focused target accessibility role could not be confirmed";
+          break;
+        }
+        const role = semanticTree.length === 1 ? semanticTree[0].role : null;
+        const visible = await focused.isVisible();
+        const box = await focused.boundingBox();
+        const style = await focused.evaluate((element) => {
+          const computed = getComputedStyle(element);
+          return {
+            tag_name: element.tagName.toLowerCase(),
+            outline_style: computed.outlineStyle,
+            outline_width: computed.outlineWidth,
+            outline_color: computed.outlineColor,
+            border: {
+              width: computed.borderWidth,
+              style: computed.borderStyle,
+              color: computed.borderColor,
+              radius: computed.borderRadius,
+            },
+            background_color: computed.backgroundColor,
+            background_image_present: computed.backgroundImage !== "none",
+            box_shadow: computed.boxShadow,
+          };
+        });
+        const overlays = await page.locator("body *").evaluateAll(
+          (elements, target) => {
+            const pathFor = (element) => {
+              const parts = [];
+              let current = element;
+              while (current && current.nodeType === Node.ELEMENT_NODE) {
+                const parent = current.parentElement;
+                const peers = parent
+                  ? Array.from(parent.children).filter((peer) => peer.tagName === current.tagName)
+                  : [current];
+                parts.unshift(
+                  current.tagName.toLowerCase() + ":nth-of-type(" + (peers.indexOf(current) + 1) + ")",
+                );
+                const root = current.getRootNode();
+                if (parent) {
+                  current = parent;
+                } else if (root instanceof ShadowRoot) {
+                  parts.unshift("::shadow");
+                  current = root.host;
+                } else {
+                  current = null;
+                }
+              }
+              return parts.join(" > ");
+            };
+            const rect = target.rect;
+            if (!rect) return [];
+            return elements
+              .filter((candidate) => {
+                const candidatePath = pathFor(candidate);
+                if (
+                  candidatePath === target.path ||
+                  target.path.startsWith(candidatePath + " > ")
+                ) return false;
+                const style = getComputedStyle(candidate);
+                if (!["fixed", "sticky"].includes(style.position) ||
+                    style.display === "none" ||
+                    style.visibility === "hidden" ||
+                    style.visibility === "collapse") return false;
+                const overlayRect = candidate.getBoundingClientRect();
+                return overlayRect.width > 0 && overlayRect.height > 0 &&
+                  overlayRect.left < rect.x + rect.width &&
+                  overlayRect.right > rect.x &&
+                  overlayRect.top < rect.y + rect.height &&
+                  overlayRect.bottom > rect.y;
+              })
+              .slice(0, 20)
+              .map((candidate) => "dom-overlay:" + pathFor(candidate));
+          },
+          { path: targetPath, rect: box },
+        );
+        const shadows = style.box_shadow;
+        let shadowDepth = 0;
+        let shadowCount = shadows && shadows !== "none" ? 1 : 0;
+        for (const character of shadows || "") {
+          if (character === "(") shadowDepth += 1;
+          else if (character === ")") shadowDepth = Math.max(0, shadowDepth - 1);
+          else if (character === "," && shadowDepth === 0) shadowCount += 1;
+        }
+        seen.set(targetRef, sequence.length);
+        sequence.push({
+          state_index: sequence.length,
+          target_ref: targetRef,
+          role,
+          tag_name: style.tag_name,
+          visible,
+          rect_css_px: box,
+          outline_style: style.outline_style,
+          outline_width: style.outline_width,
+          outline_color: style.outline_color,
+          border: style.border,
+          background_color: style.background_color,
+          background_image_present: style.background_image_present,
+          box_shadow_layer_count: shadowCount,
+          fixed_overlay_overlap_refs: overlays,
+        });
+        if (singleTarget) break;
       }
-    } catch (error) {
+      limitReached = !singleTarget && !cycleDetected && sequence.length >= limit &&
+        sequence.at(-1)?.target_ref !== null;
+    } catch {
       captureError = "fixed keyboard focus sequence could not be captured";
     } finally {
       try {
         await originalFocus.evaluate((element) => {
-          if (element && element.isConnected && typeof element.focus === "function")
-            element.focus();
+          if (element && element.isConnected && typeof element.focus === "function") element.focus();
+          let active = document.activeElement;
+          while (active?.shadowRoot?.activeElement) active = active.shadowRoot.activeElement;
+          if (active !== element) throw new Error("focus restoration did not match");
         });
         await page.evaluate((position) => window.scrollTo(position.x, position.y), originalScroll);
+        const restoredScroll = await page.evaluate(() => ({ x: scrollX, y: scrollY }));
+        if (restoredScroll.x !== originalScroll.x || restoredScroll.y !== originalScroll.y)
+          throw new Error("scroll restoration did not match");
       } catch {
-        captureError = captureError || "focus restoration could not be verified";
+        captureError = captureError || "focus or scroll restoration could not be verified";
       }
       await originalFocus.dispose().catch(() => {});
     }
+    const partialReason = focusTargetRemoved
+      ? "focus-target-removed"
+      : focusLeftDocument
+        ? "focus-left-document"
+        : limitReached
+      ? "focus-observation-limit-reached"
+      : cycleDetected
+        ? cycleKind === "returns-to-start"
+          ? "focus-cycle-not-complete"
+          : "focus-loop-detected"
+        : null;
     return {
       sequence,
       cycle_detected: cycleDetected,
+      cycle_start_index: cycleStartIndex,
+      cycle_kind: cycleKind,
+      limit_reached: limitReached,
+      focus_left_document: focusLeftDocument,
+      focus_target_removed: focusTargetRemoved,
+      ...(partialReason
+        ? { observation_completeness: { state: "partial", reason: partialReason } }
+        : {}),
       capture_error: captureError,
       restored_focus: captureError === null,
     };
@@ -343,7 +461,13 @@ async (page) => {
         : {}),
     };
     if (request.machine_probe_key === "mp-focus-sequence-run" && trace.capture_error === null) {
-      return resultFor({ status: "ok", value });
+      return resultFor({
+        status: trace.observation_completeness ? "incomplete" : "ok",
+        value,
+        ...(trace.observation_completeness
+          ? { limitation: "the fixed keyboard focus observation reached its documented limit or detected a focus loop" }
+          : {}),
+      });
     }
     if (
       request.machine_probe_key === "mp-keyboard-functionality-run" &&
@@ -364,7 +488,7 @@ async (page) => {
   }
 
   if (request.machine_probe_key === "mp-focus-obscuring-geometry") {
-    const trace = await captureFocusSequence(1);
+    const trace = await captureFocusSequence(1, true);
     if (
       trace.capture_error !== null ||
       trace.sequence.length === 0 ||
@@ -400,12 +524,10 @@ async (page) => {
           horizontal_css_px: Math.max(0, document.documentElement.scrollWidth - innerWidth),
           vertical_css_px: Math.max(0, document.documentElement.scrollHeight - innerHeight),
         },
-        control_count: document.querySelectorAll(
-          "a[href],button,input,select,textarea,[role='button'],[role='link']",
-        ).length,
       }),
       styleId,
     );
+    baseline.control_count = await page.locator(interactiveSelector).count();
     if (baseline.style_collision) {
       return resultFor({
         status: "blocked",
@@ -424,7 +546,7 @@ async (page) => {
       await styleHandle.evaluate((element, id) => {
         element.id = id;
       }, styleId);
-      after = await page.evaluate(() => {
+      after = await page.locator("body *").evaluateAll((elements) => {
         const clipped = [];
         const pathFor = (element) => {
           const parts = [];
@@ -434,14 +556,22 @@ async (page) => {
             const peers = parent
               ? Array.from(parent.children).filter((peer) => peer.tagName === current.tagName)
               : [current];
-            parts.push(
+            parts.unshift(
               current.tagName.toLowerCase() + ":nth-of-type(" + (peers.indexOf(current) + 1) + ")",
             );
-            current = parent;
+            const root = current.getRootNode();
+            if (parent) {
+              current = parent;
+            } else if (root instanceof ShadowRoot) {
+              parts.unshift("::shadow");
+              current = root.host;
+            } else {
+              current = null;
+            }
           }
-          return parts.reverse().join(" > ");
+          return parts.join(" > ");
         };
-        for (const element of Array.from(document.querySelectorAll("body *"))) {
+        for (const element of elements) {
           const style = getComputedStyle(element);
           const rect = element.getBoundingClientRect();
           if (
@@ -470,9 +600,6 @@ async (page) => {
             vertical_css_px: Math.max(0, document.documentElement.scrollHeight - innerHeight),
           },
           clipped_targets: clipped.slice(0, 100),
-          control_count: document.querySelectorAll(
-            "a[href],button,input,select,textarea,[role='button'],[role='link']",
-          ).length,
           applied_values: {
             line_height: "1.5",
             letter_spacing: "0.12em",
@@ -481,6 +608,7 @@ async (page) => {
           },
         };
       });
+      after.control_count = await page.locator(interactiveSelector).count();
     } catch {
       cleanupError = "fixed text-spacing observation could not be completed";
     } finally {
@@ -519,16 +647,190 @@ async (page) => {
     });
   }
 
+  const locatorSelectorsByProbe = {
+    "mp-document-title": [],
+    "mp-document-language": [],
+    "mp-part-language-inventory": ["[lang],[xml\\:lang]"],
+    "mp-purpose-metadata": [interactiveSelector],
+    "mp-nontext-content-inventory": [
+      "img,svg,canvas,object,embed,iframe,video,audio,input[type='image'],[role='img']",
+    ],
+    "mp-media-inventory": ["audio,video"],
+    "mp-moving-updating-inventory": [
+      "marquee,blink,[aria-live],svg animate,svg animateMotion,svg animateTransform",
+      "*",
+    ],
+    "mp-timer-inventory": [
+      "time,meter,progress,[role='timer'],[role='progressbar'],[role='countdown']",
+      "meta[http-equiv='refresh' i]",
+    ],
+    "mp-shortcut-inventory": ["[accesskey]"],
+    "mp-form-control-inventory": [
+      "input,select,textarea,button,[role='checkbox'],[role='radio'],[role='slider'],[role='switch']",
+    ],
+    "mp-heading-label-inventory": ["h1,h2,h3,h4,h5,h6,[role='heading']", "label"],
+    "mp-link-inventory": ["a[href],[role='link']"],
+    "mp-structure-inventory": [
+      "main,nav,header,footer,aside,section,article,form,fieldset,ul,ol,dl,table,thead,tbody,tr,th,td,h1,h2,h3,h4,h5,h6,[role='main'],[role='navigation'],[role='list'],[role='table'],[role='row'],[role='cell'],[role='columnheader']",
+    ],
+    "mp-sequence-inventory": [
+      "main,nav,header,footer,h1,h2,h3,h4,h5,h6,a[href],button,input,select,textarea,[role='button'],[role='link'],[tabindex]:not([tabindex='-1'])",
+    ],
+    "mp-component-semantics": [interactiveSelector],
+    "mp-status-candidate-inventory": ["[role='status'],[role='alert'],[aria-live]"],
+    "mp-neighbor-geometry": [interactiveSelector],
+    "mp-text-presentation-values": ["*"],
+    "mp-viewport-state": [],
+    "mp-reflow-run": ["*"],
+    "mp-orientation-run": [],
+    "mp-audio-autoplay-run": ["audio,video"],
+    "mp-control-value-history": [interactiveSelector],
+    "mp-multipage-signature": [interactiveSelector],
+    "mp-hover-focus-content-run": [interactiveSelector],
+    "mp-change-trigger-run": [interactiveSelector],
+    "mp-pointer-interaction-run": [interactiveSelector],
+    "mp-error-scenario-run": ["form"],
+  };
+  const semanticProbeKeys = new Set([
+    "mp-purpose-metadata",
+    "mp-nontext-content-inventory",
+    "mp-moving-updating-inventory",
+    "mp-timer-inventory",
+    "mp-shortcut-inventory",
+    "mp-form-control-inventory",
+    "mp-heading-label-inventory",
+    "mp-link-inventory",
+    "mp-structure-inventory",
+    "mp-sequence-inventory",
+    "mp-component-semantics",
+    "mp-status-candidate-inventory",
+    "mp-neighbor-geometry",
+    "mp-control-value-history",
+    "mp-multipage-signature",
+    "mp-hover-focus-content-run",
+    "mp-change-trigger-run",
+    "mp-pointer-interaction-run",
+  ]);
+  const locatorRegistrySymbol = "qa-workflow-skills.fixed-wcag-locator-observations.v1";
+  const pathsForLocatorElements = (elements) =>
+    elements.map((element) => {
+      const parts = [];
+      let current = element;
+      while (current && current.nodeType === Node.ELEMENT_NODE) {
+        const parent = current.parentElement;
+        const peers = parent
+          ? Array.from(parent.children).filter((peer) => peer.tagName === current.tagName)
+          : [current];
+        parts.unshift(
+          current.tagName.toLowerCase() + ":nth-of-type(" + (peers.indexOf(current) + 1) + ")",
+        );
+        const root = current.getRootNode();
+        if (parent) {
+          current = parent;
+        } else if (root instanceof ShadowRoot) {
+          parts.unshift("::shadow");
+          current = root.host;
+        } else {
+          current = null;
+        }
+      }
+      return parts.join(" > ");
+    });
   const specializedProbeKeys = new Set([
     "mp-resize-text-run",
     "mp-computed-color-context",
     "mp-focus-appearance-evidence",
     "mp-target-geometry",
   ]);
-  const catalogued = specializedProbeKeys.has(request.machine_probe_key)
-    ? null
-    : await page.evaluate((key) => {
+  let catalogued = null;
+  const locatorSelectors = locatorSelectorsByProbe[request.machine_probe_key];
+  if (!specializedProbeKeys.has(request.machine_probe_key) && locatorSelectors) {
+    try {
+      await page.evaluate((slot) => {
+        Object.defineProperty(window, Symbol.for(slot), {
+          configurable: true,
+          value: { elements: new Map(), metadata: new WeakMap() },
+        });
+      }, locatorRegistrySymbol);
+      const needsAccessibility = (selector) =>
+        semanticProbeKeys.has(request.machine_probe_key) &&
+        !(request.machine_probe_key === "mp-moving-updating-inventory" && selector === "*");
+      for (const selector of new Set(locatorSelectors)) {
+        const locator = page.locator(selector);
+        const paths = await locator.evaluateAll(pathsForLocatorElements);
+        await locator.evaluateAll(
+          (elements, args) => {
+            const registry = window[Symbol.for(args.slot)];
+            if (!registry) throw new Error("fixed locator registry unavailable");
+            registry.elements.set(args.selector, elements);
+          },
+          { slot: locatorRegistrySymbol, selector },
+        );
+        const metadata = [];
+        for (let index = 0; index < paths.length; index += 1) {
+          const item = locator.nth(index);
+          const record = { path: paths[index], visible: await item.isVisible() };
+          if (needsAccessibility(selector)) {
+            record.enabled = await item.isEnabled();
+            const snapshot = await item.ariaSnapshotJSON({ depth: 0, timeout: 1000 });
+            if (!Array.isArray(snapshot) || snapshot.length > 1) {
+              throw new Error("fixed accessibility projection is ambiguous");
+            }
+            if (snapshot.length === 1) {
+              const node = snapshot[0];
+              if (!node || typeof node.role !== "string") {
+                throw new Error("fixed accessibility role unavailable");
+              }
+              record.accessibility_tree_includes_element = true;
+              record.accessible_role = node.role;
+              record.accessible_name_present =
+                typeof node.name === "string" && node.name.trim().length > 0;
+              if (request.machine_probe_key !== "mp-component-semantics") {
+                record.accessible_name = typeof node.name === "string" ? node.name : "";
+              }
+            } else {
+              record.accessibility_tree_includes_element = false;
+              record.accessible_role = null;
+              record.accessible_name_present = null;
+              if (request.machine_probe_key !== "mp-component-semantics") {
+                record.accessible_name = null;
+              }
+            }
+          }
+          metadata.push(record);
+        }
+        const currentPaths = await locator.evaluateAll(pathsForLocatorElements);
+        if (
+          currentPaths.length !== paths.length ||
+          currentPaths.some((path, index) => path !== paths[index])
+        ) {
+          throw new Error("fixed locator population changed during observation");
+        }
+        await page.evaluate(
+          ({ slot, selector: query, rows }) => {
+            const registry = window[Symbol.for(slot)];
+            const elements = registry?.elements.get(query);
+            if (!Array.isArray(elements) || elements.length !== rows.length) {
+              throw new Error("fixed locator metadata could not be matched");
+            }
+            elements.forEach((element, index) => registry.metadata.set(element, rows[index]));
+          },
+          { slot: locatorRegistrySymbol, selector, rows: metadata },
+        );
+      }
+      catalogued = await page.evaluate(({ key, slot, interactive }) => {
+        const registry = window[Symbol.for(slot)];
+        const observationFor = (element) => registry?.metadata.get(element) || null;
+        const located = (selector) => {
+          const elements = registry?.elements.get(selector);
+          if (!Array.isArray(elements)) throw new Error("fixed locator selector was not materialized");
+          return elements;
+        };
+        const allVisible = (selector) =>
+          located(selector).filter((element) => observationFor(element)?.visible === true);
         const pathFor = (element) => {
+          const observedPath = observationFor(element)?.path;
+          if (typeof observedPath === "string") return observedPath;
           const parts = [];
           let current = element;
           while (current && current.nodeType === Node.ELEMENT_NODE) {
@@ -536,21 +838,27 @@ async (page) => {
             const peers = parent
               ? Array.from(parent.children).filter((peer) => peer.tagName === current.tagName)
               : [current];
-            parts.push(
+            parts.unshift(
               current.tagName.toLowerCase() + ":nth-of-type(" + (peers.indexOf(current) + 1) + ")",
             );
-            current = parent;
+            const root = current.getRootNode();
+            if (parent) current = parent;
+            else if (root instanceof ShadowRoot) {
+              parts.unshift("::shadow");
+              current = root.host;
+            } else current = null;
           }
-          return parts.reverse().join(" > ");
+          return parts.join(" > ");
         };
         const visible = (element) => {
+          const observation = observationFor(element);
+          if (observation) return observation.visible;
           const style = getComputedStyle(element);
           const rect = element.getBoundingClientRect();
           return (
             style.display !== "none" &&
             style.visibility !== "hidden" &&
             style.visibility !== "collapse" &&
-            Number(style.opacity) > 0 &&
             rect.width > 0 &&
             rect.height > 0
           );
@@ -566,15 +874,14 @@ async (page) => {
             )
             .replace(/\b(?:\d[ -]?){9,}\d\b/gu, "[redacted-number]")
             .slice(0, limit);
-        const textOf = (element) => safeText(element?.innerText || element?.textContent || "");
+        const textOf = (element) => safeText(element?.innerText || "");
         const refOf = (element, prefix = "dom-target") => prefix + ":" + pathFor(element);
-        const allVisible = (selector) =>
-          Array.from(document.querySelectorAll(selector)).filter(visible);
-        const interactiveSelector =
-          "a[href],button,input,select,textarea,[role='button'],[role='link'],[role='checkbox'],[role='radio'],[role='slider'],[tabindex]:not([tabindex='-1'])";
-        const interactive = allVisible(interactiveSelector);
+        const interactiveElements = () => allVisible(interactive);
         const statesOf = (element) => ({
-          disabled: Boolean(element.disabled || element.getAttribute("aria-disabled") === "true"),
+          disabled:
+            typeof observationFor(element)?.enabled === "boolean"
+              ? !observationFor(element).enabled
+              : Boolean(element.disabled || element.getAttribute("aria-disabled") === "true"),
           required: Boolean(element.required || element.getAttribute("aria-required") === "true"),
           invalid:
             element.getAttribute("aria-invalid") === "true" ||
@@ -585,41 +892,31 @@ async (page) => {
           pressed: element.getAttribute("aria-pressed"),
           current: element.getAttribute("aria-current"),
         });
-        const roleOf = (element) =>
-          element.getAttribute("role") ||
-          {
-            A: "link",
-            BUTTON: "button",
-            INPUT:
-              element.type === "checkbox"
-                ? "checkbox"
-                : element.type === "radio"
-                  ? "radio"
-                  : element.type === "range"
-                    ? "slider"
-                    : "textbox",
-            SELECT: "combobox",
-            TEXTAREA: "textbox",
-            IMG: "img",
-          }[element.tagName] ||
-          element.tagName.toLowerCase();
+        const roleOf = (element) => observationFor(element)?.accessible_role ?? null;
         const accessibleName = (element) => {
-          const aria = element.getAttribute("aria-label");
-          if (aria) return safeText(aria);
-          const ids = (element.getAttribute("aria-labelledby") || "").split(/\s+/u).filter(Boolean);
-          if (ids.length)
-            return safeText(
-              ids
-                .map((id) => document.getElementById(id))
-                .filter(Boolean)
-                .map(textOf)
-                .join(" "),
-            );
-          if (element.labels && element.labels.length)
-            return safeText(Array.from(element.labels).map(textOf).join(" "));
-          return safeText(
-            element.getAttribute("alt") || element.getAttribute("title") || textOf(element),
-          );
+          const name = observationFor(element)?.accessible_name;
+          return typeof name === "string" ? safeText(name) : null;
+        };
+        const accessibleNamePresent = (element) => {
+          const observation = observationFor(element);
+          if (typeof observation?.accessible_name_present === "boolean") {
+            return observation.accessible_name_present;
+          }
+          const name = observation?.accessible_name;
+          return typeof name === "string" && safeText(name).trim().length > 0;
+        };
+        const accessibilityTreeIncludes = (element) =>
+          observationFor(element)?.accessibility_tree_includes_element === true;
+        const composedParent = (element) =>
+          element.parentElement ||
+          (element.getRootNode() instanceof ShadowRoot ? element.getRootNode().host : null);
+        const hasComposedAncestor = (element, selector) => {
+          let current = element;
+          while (current) {
+            if (current.matches(selector)) return true;
+            current = composedParent(current);
+          }
+          return false;
         };
         const rectOf = (element) => {
           const rect = element.getBoundingClientRect();
@@ -635,18 +932,32 @@ async (page) => {
         const value = (payload) => ({ schema: "wcag-" + key.slice(3) + "-v1", ...payload });
         switch (key) {
           case "mp-document-title": {
-            const titleElement = document.querySelector("title");
-            const titleText = titleElement?.textContent || "";
+            const htmlNamespace = "http://www.w3.org/1999/xhtml";
+    const htmlContentType = ["text/html", "application/xhtml+xml"].includes(
+      document.contentType?.toLowerCase(),
+    );
+    const isHtmlDocument =
+      htmlContentType &&
+      document.documentElement?.namespaceURI === htmlNamespace &&
+      document.documentElement?.localName === "html";
+            const titleElement = isHtmlDocument
+              ? Array.from(document.getElementsByTagNameNS(htmlNamespace, "title"))[0] || null
+              : null;
+            const firstTitleChildrenAreText = Boolean(
+              titleElement &&
+                titleElement.childNodes.length > 0 &&
+                Array.from(titleElement.childNodes).every((node) => node.nodeType === Node.TEXT_NODE),
+            );
+            const hasNonWhitespaceText = Boolean(
+              titleElement && /\P{White_Space}/u.test(titleElement.textContent || ""),
+            );
             return {
               status: "ok",
               value: value({
-                is_html_document:
-                  document.documentElement?.namespaceURI === "http://www.w3.org/1999/xhtml",
+                is_html_document: isHtmlDocument,
                 has_title_element: Boolean(titleElement),
-                first_title_children_are_text: Boolean(
-                  titleElement && titleElement.firstChild?.nodeType === Node.TEXT_NODE,
-                ),
-                has_non_whitespace_text: Boolean(titleText.trim()),
+                first_title_children_are_text: firstTitleChildrenAreText,
+                has_non_whitespace_text: hasNonWhitespaceText,
               }),
             };
           }
@@ -680,7 +991,7 @@ async (page) => {
             return {
               status: "ok",
               value: value({
-                controls: interactive.map((element) => ({
+                controls: interactiveElements().map((element) => ({
                   target_ref: refOf(element),
                   role: roleOf(element),
                   type: element.getAttribute("type"),
@@ -712,7 +1023,7 @@ async (page) => {
             };
           }
           case "mp-media-inventory": {
-            const media = Array.from(document.querySelectorAll("audio,video"));
+            const media = allVisible("audio,video");
             return {
               status: "ok",
               value: value({
@@ -759,7 +1070,6 @@ async (page) => {
                 moving.push({
                   target_ref: refOf(element),
                   tag_name: element.tagName.toLowerCase(),
-                  role: roleOf(element),
                   aria_live: element.getAttribute("aria-live"),
                   aria_atomic: element.getAttribute("aria-atomic"),
                   animation_name: style.animationName,
@@ -785,7 +1095,7 @@ async (page) => {
               aria_live: element.getAttribute("aria-live"),
               aria_label_present: element.hasAttribute("aria-label"),
             }));
-            const refresh = document.querySelector("meta[http-equiv='refresh' i]");
+            const refresh = located("meta[http-equiv='refresh' i]")[0] || null;
             return {
               status: "ok",
               value: value({ candidates: timers, document_refresh_present: Boolean(refresh) }),
@@ -818,6 +1128,7 @@ async (page) => {
                   type: element.getAttribute("type"),
                   role: roleOf(element),
                   accessible_name: accessibleName(element),
+                  included_in_accessibility_tree: accessibilityTreeIncludes(element),
                   label_count: element.labels ? element.labels.length : 0,
                   required: Boolean(
                     element.required || element.getAttribute("aria-required") === "true",
@@ -928,17 +1239,24 @@ async (page) => {
             return {
               status: "ok",
               value: value({
-                components: interactive.map((element) => ({
+                components: interactiveElements().map((element) => ({
                   target_ref: refOf(element),
                   tag_name: element.tagName.toLowerCase(),
                   role: roleOf(element),
-                  accessible_name: accessibleName(element),
+                  accessible_name_present: accessibilityTreeIncludes(element)
+                    ? accessibleNamePresent(element)
+                    : null,
                   description_present: Boolean(element.getAttribute("aria-describedby")),
                   states: statesOf(element),
-                  host_type: element.getAttribute("type"),
-                  included_in_accessibility_tree: !element.closest("[aria-hidden='true'],[inert]"),
-                  programmatically_hidden:
-                    element.closest("[aria-hidden='true'],[hidden],[inert]") !== null,
+                  host_type:
+                    element instanceof HTMLInputElement
+                      ? element.type
+                      : element.getAttribute("type"),
+                  included_in_accessibility_tree: accessibilityTreeIncludes(element),
+                  programmatically_hidden: hasComposedAncestor(
+                    element,
+                    "[aria-hidden='true'],[hidden],[inert]",
+                  ),
                 })),
               }),
             };
@@ -960,7 +1278,7 @@ async (page) => {
               }),
             };
           case "mp-neighbor-geometry": {
-            const targets = interactive
+            const targets = interactiveElements()
               .filter((element) => {
                 const rect = element.getBoundingClientRect();
                 return rect.width > 0 && rect.height > 0;
@@ -1012,22 +1330,15 @@ async (page) => {
             return { status: "ok", value: value({ targets, neighboring_pairs: pairs }) };
           }
           case "mp-text-presentation-values": {
-            const owners = new Set();
-            const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-            let node;
-            while ((node = walker.nextNode())) {
-              if (
-                node.nodeValue &&
-                /\S/u.test(node.nodeValue) &&
-                node.parentElement &&
-                visible(node.parentElement)
-              )
-                owners.add(node.parentElement);
-            }
+            const owners = allVisible("*").filter((element) =>
+              Array.from(element.childNodes).some(
+                (node) => node.nodeType === Node.TEXT_NODE && /\S/u.test(node.nodeValue || ""),
+              ),
+            );
             return {
               status: "ok",
               value: value({
-                targets: Array.from(owners)
+                targets: owners
                   .slice(0, 500)
                   .map((element) => {
                     const style = getComputedStyle(element),
@@ -1116,7 +1427,7 @@ async (page) => {
                 "the fixed request identifies one current variation but does not provide a paired alternate-orientation sample identity",
             };
           case "mp-audio-autoplay-run": {
-            const audio = Array.from(document.querySelectorAll("audio,video"));
+            const audio = allVisible("audio,video");
             if (audio.length === 0) {
               return {
                 status: "ok",
@@ -1157,7 +1468,7 @@ async (page) => {
                   state: "partial",
                   reason: "prior-control-observation-not-materialized",
                 },
-                controls: interactive
+                controls: interactiveElements()
                   .filter(
                     (element) =>
                       ["checkbox", "radio", "range"].includes(element.type) ||
@@ -1181,7 +1492,7 @@ async (page) => {
                 current_page_signature: {
                   title_present: Boolean(document.title.trim()),
                   language_present: Boolean(document.documentElement?.lang),
-                  controls: interactive.map((element) => ({
+                controls: interactiveElements().map((element) => ({
                     target_ref: refOf(element),
                     role: roleOf(element),
                     accessible_name: accessibleName(element),
@@ -1198,7 +1509,7 @@ async (page) => {
               status: "incomplete",
               value: value({
                 observation_completeness: { state: "partial", reason: "target-not-materialized" },
-                candidate_targets: interactive.map((element) => ({
+                candidate_targets: interactiveElements().map((element) => ({
                   target_ref: refOf(element),
                   role: roleOf(element),
                   accessible_name: accessibleName(element),
@@ -1214,7 +1525,7 @@ async (page) => {
               status: "incomplete",
               value: value({
                 observation_completeness: { state: "partial", reason: "trigger-not-materialized" },
-                candidate_targets: interactive
+                candidate_targets: interactiveElements()
                   .filter((element) =>
                     ["input", "select", "textarea"].includes(element.tagName.toLowerCase()),
                   )
@@ -1236,7 +1547,7 @@ async (page) => {
                   state: "partial",
                   reason: "error-scenario-not-materialized",
                 },
-                form_candidates: Array.from(document.forms).map((form) => ({
+                form_candidates: allVisible("form").map((form) => ({
                   target_ref: refOf(form, "dom-form"),
                   control_refs: Array.from(form.elements)
                     .filter((element) => element instanceof HTMLElement)
@@ -1263,7 +1574,7 @@ async (page) => {
                   state: "partial",
                   reason: "pointer-action-not-materialized",
                 },
-                candidate_targets: interactive.map((element) => ({
+                candidate_targets: interactiveElements().map((element) => ({
                   target_ref: refOf(element),
                   role: roleOf(element),
                   accessible_name: accessibleName(element),
@@ -1281,14 +1592,33 @@ async (page) => {
               limitation: "fixed WCAG machine probe key is not dispatched by this package",
             };
         }
-      }, request.machine_probe_key);
+      }, { key: request.machine_probe_key, slot: locatorRegistrySymbol, interactive: interactiveSelector });
+    } catch {
+      catalogued = {
+        status: "blocked",
+        limitation:
+          "the fixed Playwright locator or browser accessibility projection could not be matched to a stable target population",
+      };
+    } finally {
+      await page
+        .evaluate((slot) => {
+          delete window[Symbol.for(slot)];
+        }, locatorRegistrySymbol)
+        .catch(() => {});
+    }
+  } else if (!specializedProbeKeys.has(request.machine_probe_key)) {
+    catalogued = {
+      status: "blocked",
+      limitation: "fixed WCAG machine probe key is not dispatched by this package",
+    };
+  }
 
   if (catalogued?.status === "ok") return resultFor(catalogued);
   if (catalogued?.status === "incomplete") return resultFor(catalogued);
   if (catalogued?.status === "blocked") return resultFor(catalogued);
 
   if (request.machine_probe_key === "mp-computed-color-context") {
-    const context = await page.evaluate(() => {
+    const context = await page.locator("body *").evaluateAll((locatedElements) => {
       const pathFor = (element) => {
         const parts = [];
         let current = element;
@@ -1297,10 +1627,26 @@ async (page) => {
           const peers = parent
             ? Array.from(parent.children).filter((peer) => peer.tagName === current.tagName)
             : [current];
-          parts.push(`${current.tagName.toLowerCase()}:nth-of-type(${peers.indexOf(current) + 1})`);
-          current = parent;
+          parts.unshift(`${current.tagName.toLowerCase()}:nth-of-type(${peers.indexOf(current) + 1})`);
+          const root = current.getRootNode();
+          if (parent) current = parent;
+          else if (root instanceof ShadowRoot) {
+            parts.unshift("::shadow");
+            current = root.host;
+          } else current = null;
         }
-        return parts.reverse().join(" > ");
+        return parts.join(" > ");
+      };
+      const composedParent = (element) =>
+        element.parentElement ||
+        (element.getRootNode() instanceof ShadowRoot ? element.getRootNode().host : null);
+      const composedContains = (ancestor, descendant) => {
+        let current = descendant;
+        while (current) {
+          if (current === ancestor) return true;
+          current = composedParent(current);
+        }
+        return false;
       };
       const rendered = (element) => {
         const style = getComputedStyle(element);
@@ -1313,12 +1659,15 @@ async (page) => {
         );
       };
       const owners = new Set();
-      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-      let textNode;
-      while ((textNode = walker.nextNode())) {
-        const owner = textNode.parentElement;
-        if (textNode.nodeValue && /\S/u.test(textNode.nodeValue) && owner && rendered(owner))
-          owners.add(owner);
+      for (const element of locatedElements) {
+        if (
+          Array.from(element.childNodes).some(
+            (node) => node.nodeType === Node.TEXT_NODE && /\S/u.test(node.nodeValue || ""),
+          ) &&
+          rendered(element)
+        ) {
+          owners.add(element);
+        }
       }
       const reasons = new Set();
       const affectedTargets = new Set();
@@ -1364,7 +1713,7 @@ async (page) => {
             inspectStyle(pseudoStyle, targetRef);
           }
           if (current === document.documentElement) break;
-          current = current.parentElement;
+          current = composedParent(current);
         }
         if (computedSamples.length < 500) {
           const borderColors = {};
@@ -1431,62 +1780,82 @@ async (page) => {
   }
 
   if (request.machine_probe_key === "mp-target-geometry") {
-    const targets = await page.evaluate(() => {
-      const pathFor = (element) => {
-        const parts = [];
-        let current = element;
-        while (current && current.nodeType === Node.ELEMENT_NODE) {
-          const parent = current.parentElement;
-          const peers = parent
-            ? Array.from(parent.children).filter((peer) => peer.tagName === current.tagName)
-            : [current];
-          parts.push(`${current.tagName.toLowerCase()}:nth-of-type(${peers.indexOf(current) + 1})`);
-          current = parent;
-        }
-        return parts.reverse().join(" > ");
-      };
-      const selector =
-        "a[href],button,input,select,textarea,[role='button'],[role='link'],[role='slider'],img,svg,canvas,video,iframe";
-      return Array.from(document.querySelectorAll(selector))
-        .filter((element) => {
-          const style = getComputedStyle(element);
-          const rect = element.getBoundingClientRect();
-          return (
-            style.display !== "none" &&
-            style.visibility !== "hidden" &&
-            style.visibility !== "collapse" &&
-            Number(style.opacity) > 0 &&
-            rect.width > 0 &&
-            rect.height > 0
-          );
-        })
-        .map((element) => {
-          const rect = element.getBoundingClientRect();
-          return {
-            target_ref: `dom-target:${pathFor(element)}`,
-            tag_name: element.tagName.toLowerCase(),
-            role: element.getAttribute("role"),
-            focused: element === document.activeElement,
-            geometry_css_px: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
-          };
-        })
-        .sort((left, right) =>
-          left.target_ref < right.target_ref ? -1 : left.target_ref > right.target_ref ? 1 : 0,
-        );
+    const selector =
+      "a[href],button,input,select,textarea,[role='button'],[role='link'],[role='slider'],img,svg,canvas,video,iframe";
+    const locator = page.locator(selector);
+    const targets = [];
+    const targetRefs = new Set();
+    const partialGeometryValue = (reason) => ({
+      schema: "wcag-target-geometry-v1",
+      observation_completeness: { state: "partial", reason },
+      targets,
     });
-    if (!Array.isArray(targets) || targets.length === 0) {
+    try {
+      const initialCount = await locator.count();
+      for (let index = 0; index < initialCount; index += 1) {
+        const target = locator.nth(index);
+        if (!(await target.isVisible())) continue;
+        const rect = await target.boundingBox();
+        if (!rect) {
+          return resultFor({
+            status: "incomplete",
+            value: partialGeometryValue("target-not-materialized"),
+            limitation: "Playwright could not resolve geometry for a visible target",
+          });
+        }
+        const snapshot = await target.ariaSnapshotJSON({ depth: 0, timeout: 1000 });
+        if (!Array.isArray(snapshot) || snapshot.length > 1) {
+          return resultFor({
+            status: "incomplete",
+            value: partialGeometryValue("target-not-materialized"),
+            limitation: "Playwright could not resolve one accessibility-tree projection for a target",
+          });
+        }
+        const targetRef = `dom-target:${await target.evaluate(elementPathFor)}`;
+        if (targetRefs.has(targetRef)) {
+          return resultFor({
+            status: "incomplete",
+            value: partialGeometryValue("target-not-materialized"),
+            limitation: "the fixed geometry probe could not uniquely identify each target",
+          });
+        }
+        targetRefs.add(targetRef);
+        targets.push({
+          target_ref: targetRef,
+          tag_name: await target.evaluate((element) => element.tagName.toLowerCase()),
+          role:
+            snapshot.length === 1 && typeof snapshot[0]?.role === "string"
+              ? snapshot[0].role
+              : null,
+          included_in_accessibility_tree: snapshot.length === 1,
+          focused: await target.evaluate((element) => element.matches(":focus")),
+          geometry_css_px: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+        });
+      }
+      if ((await locator.count()) !== initialCount) {
+        return resultFor({
+          status: "incomplete",
+          value: partialGeometryValue("population-changed-during-observation"),
+          limitation: "the target population changed during geometry observation",
+        });
+      }
+    } catch {
+      return resultFor({
+        status: "incomplete",
+        value: partialGeometryValue("target-not-materialized"),
+        limitation: "Playwright could not complete the fixed target geometry observation",
+      });
+    }
+    if (targets.length === 0) {
       return failure(
         "blocked",
         "the fixed geometry probe could not establish visible target geometry",
       );
     }
-    return {
-      ...identity,
-      status: "ok",
-      current_document_identity: await currentDocumentIdentity(),
-      evidence_refs: evidenceRefs,
-      value: { schema: "wcag-target-geometry-v1", targets },
-    };
+    targets.sort((left, right) =>
+      left.target_ref < right.target_ref ? -1 : left.target_ref > right.target_ref ? 1 : 0,
+    );
+    return resultFor({ status: "ok", value: { schema: "wcag-target-geometry-v1", targets } });
   }
 
   if (request.machine_probe_key === "mp-focus-appearance-evidence") {
@@ -1573,8 +1942,9 @@ async (page) => {
     return failure("blocked", "the fixed Text size range has invalid or non-progressing bounds");
   }
 
-  const captureState = async () =>
-    page.evaluate(async () => {
+  const captureState = async () => {
+    const locator = page.locator("body *");
+    const state = await locator.evaluateAll(async (locatedElements) => {
       const elementPath = (element) => {
         const parts = [];
         let current = element;
@@ -1583,12 +1953,28 @@ async (page) => {
           const sameTag = parent
             ? Array.from(parent.children).filter((item) => item.tagName === current.tagName)
             : [current];
-          parts.push(
+          parts.unshift(
             `${current.tagName.toLowerCase()}:nth-of-type(${sameTag.indexOf(current) + 1})`,
           );
-          current = parent;
+          const root = current.getRootNode();
+          if (parent) current = parent;
+          else if (root instanceof ShadowRoot) {
+            parts.unshift("::shadow");
+            current = root.host;
+          } else current = null;
         }
-        return parts.reverse().join(" > ");
+        return parts.join(" > ");
+      };
+      const composedParent = (element) =>
+        element.parentElement ||
+        (element.getRootNode() instanceof ShadowRoot ? element.getRootNode().host : null);
+      const composedContains = (ancestor, descendant) => {
+        let current = descendant;
+        while (current) {
+          if (current === ancestor) return true;
+          current = composedParent(current);
+        }
+        return false;
       };
       const rendered = (element) => {
         const style = getComputedStyle(element);
@@ -1611,9 +1997,15 @@ async (page) => {
       };
       const candidates = [];
       const unsupportedRoots = [];
-      const roots = [{ root: document.body, prefix: "" }];
-      for (let rootIndex = 0; rootIndex < roots.length; rootIndex++) {
-        const { root, prefix } = roots[rootIndex];
+      const roots = [document.body];
+      const seenRoots = new Set([document]);
+      for (const element of locatedElements) {
+        if (element.shadowRoot && !seenRoots.has(element.shadowRoot)) {
+          seenRoots.add(element.shadowRoot);
+          roots.push(element.shadowRoot);
+        }
+      }
+      for (const root of roots) {
         const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
         let textNode;
         let textIndex = 0;
@@ -1634,7 +2026,7 @@ async (page) => {
               height: rect.height,
             }));
           if (!rects.length) continue;
-          const targetRef = `dom-text:${prefix}${elementPath(owner)}/text[${textIndex}]`;
+          const targetRef = `dom-text:${elementPath(owner)}/text[${textIndex}]`;
           const size = /^\d+(?:\.\d+)?px$/.test(style.fontSize)
             ? style.fontSize.slice(0, -2)
             : null;
@@ -1659,7 +2051,7 @@ async (page) => {
               )
                 clipped = true;
             }
-            ancestor = ancestor.parentElement;
+            ancestor = composedParent(ancestor);
           }
           const obscured = rects.some((rect) => {
             const left = Math.max(0, rect.left);
@@ -1671,7 +2063,7 @@ async (page) => {
               left + (right - left) / 2,
               top + (bottom - top) / 2,
             );
-            return !hit || (hit !== owner && !owner.contains(hit) && !hit.contains(owner));
+            return !hit || (!composedContains(owner, hit) && !composedContains(hit, owner));
           });
           candidates.push({
             target_ref: targetRef,
@@ -1682,19 +2074,15 @@ async (page) => {
             obscured,
           });
         }
-        const elements = root.querySelectorAll ? Array.from(root.querySelectorAll("*")) : [];
-        for (const element of elements) {
-          if (element.shadowRoot)
-            roots.push({ root: element.shadowRoot, prefix: `shadow(${elementPath(element)}) > ` });
-        }
       }
 
       const controls = [];
-      for (const { root, prefix } of roots) {
-        const elements = root.querySelectorAll ? Array.from(root.querySelectorAll("*")) : [];
+      for (const root of roots) {
+        const rootNode = root === document.body ? document : root;
+        const elements = locatedElements.filter((element) => element.getRootNode() === rootNode);
         for (const element of elements) {
           if (!rendered(element)) continue;
-          const path = `${prefix}${elementPath(element)}`;
+          const path = elementPath(element);
           const elementRef = `dom-element:${path}`;
           for (const pseudo of ["::before", "::after"]) {
             const pseudoStyle = getComputedStyle(element, pseudo);
@@ -1741,21 +2129,12 @@ async (page) => {
                 obscured: false,
               });
           }
-          const role =
-            element.tagName.toLowerCase() === "a"
-              ? "link"
-              : element.tagName.toLowerCase() === "button"
-                ? "button"
-                : element instanceof HTMLInputElement && element.type === "range"
-                  ? "slider"
-                  : element.tagName.toLowerCase();
           const isInteractive = element.matches(
             "a[href],button,input,select,textarea,[role='button'],[role='link'],[role='slider']",
           );
           if (isInteractive)
             controls.push({
               target_ref: `dom-control:${path}`,
-              role,
               enabled:
                 element.disabled !== true && element.getAttribute("aria-disabled") !== "true",
             });
@@ -1769,13 +2148,11 @@ async (page) => {
         scroll_height_css_px: document.documentElement.scrollHeight,
         client_height_css_px: document.documentElement.clientHeight,
       };
-      const unsupportedVisibleCanvas = roots.some(({ root }) =>
-        Array.from(root.querySelectorAll?.("canvas") || []).some((element) => rendered(element)),
+      const unsupportedVisibleCanvas = locatedElements.some(
+        (element) => element.matches("canvas") && rendered(element),
       );
-      const visibleFrame = roots.some(({ root }) =>
-        Array.from(root.querySelectorAll?.("iframe,frame") || []).some((element) =>
-          rendered(element),
-        ),
+      const visibleFrame = locatedElements.some(
+        (element) => element.matches("iframe,frame") && rendered(element),
       );
       const ids = new Set();
       let unique = true;
@@ -1833,6 +2210,46 @@ async (page) => {
         inaccessible_visible_frame: visibleFrame,
       };
     });
+    const resizeControlSelector =
+      "a[href],button,input,select,textarea,[role='button'],[role='link'],[role='slider']";
+    const controlLocator = page.locator(resizeControlSelector);
+    const controlPaths = await controlLocator.evaluateAll(pathsForLocatorElements);
+    const controlPathsByRef = new Map(
+      controlPaths.map((path, index) => [`dom-control:${path}`, index]),
+    );
+    const controlsByRef = new Map(state.interactive_controls.map((row) => [row.target_ref, row]));
+    const confirmedControls = [];
+    const unmeasurableControls = [];
+    for (const [targetRef, row] of controlsByRef) {
+      const index = controlPathsByRef.get(targetRef);
+      const snapshot =
+        index === undefined
+          ? null
+          : await controlLocator.nth(index).ariaSnapshotJSON({ depth: 0, timeout: 1000 });
+      if (!Array.isArray(snapshot) || snapshot.length !== 1 || typeof snapshot[0]?.role !== "string") {
+        unmeasurableControls.push(targetRef);
+        continue;
+      }
+      confirmedControls.push({ ...row, role: snapshot[0].role });
+      controlsByRef.delete(targetRef);
+    }
+    unmeasurableControls.push(...controlsByRef.keys());
+    const currentControlPaths = await controlLocator.evaluateAll(pathsForLocatorElements);
+    if (
+      currentControlPaths.length !== controlPaths.length ||
+      currentControlPaths.some((path, index) => path !== controlPaths[index])
+    ) {
+      unmeasurableControls.push("dom-control:population-changed-during-observation");
+    }
+    state.interactive_controls = confirmedControls.sort((left, right) =>
+      left.target_ref < right.target_ref ? -1 : left.target_ref > right.target_ref ? 1 : 0,
+    );
+    state.unmeasurable_target_refs = [
+      ...new Set([...state.unmeasurable_target_refs, ...unmeasurableControls]),
+    ].sort();
+    state.population_complete = state.population_complete && unmeasurableControls.length === 0;
+    return state;
+  };
 
   const sequence = [];
   const baselineRefs = new Set();

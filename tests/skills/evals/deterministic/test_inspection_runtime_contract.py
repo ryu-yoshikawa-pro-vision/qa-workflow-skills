@@ -281,6 +281,34 @@ class InspectionRuntimeContractTests(unittest.TestCase):
         self.assertEqual(stale["result_status"], "blocked")
         self.assertEqual(stale["payload"]["result"]["status"], "blocked")
 
+    def test_focus_limit_and_population_change_remain_typed_partial_evidence(self):
+        for probe_key, reason in (
+            ("mp-focus-sequence-run", "focus-observation-limit-reached"),
+            ("mp-focus-sequence-run", "focus-loop-detected"),
+            ("mp-focus-sequence-run", "focus-cycle-not-complete"),
+            ("mp-focus-sequence-run", "focus-left-document"),
+            ("mp-focus-sequence-run", "focus-target-removed"),
+            ("mp-target-geometry", "population-changed-during-observation"),
+        ):
+            request = formal_request(probe_key)
+            identity_fields = ("observation_request_ref", "request_signature", "criterion_evaluation_ref",
+                "procedure_execution_ref", "machine_probe_key", "sample_ref", "variation_ref", "process_ref",
+                "requirement_ref", "target_identity", "currentness_dependency")
+            partial = {field: request[field] for field in identity_fields}
+            partial.update({"status": "incomplete", "current_document_identity": request["target_identity"],
+                "evidence_refs": ["WCAG-PARTIAL-001"], "limitation": "bounded observation was not complete",
+                "value": {"schema": "wcag-bounded-observation-v1",
+                    "observation_completeness": {"state": "partial", "reason": reason}}})
+            with self.subTest(probe_key=probe_key, reason=reason):
+                normalized = invoke("normalize-wcag-machine-probe-result", {"request": request,
+                    "result": partial, "current_document_identity": request["target_identity"]}, formal=True)
+                self.assertEqual(normalized["runtime_status"], "ok")
+                self.assertEqual(normalized["result_status"], "ready")
+                self.assertEqual(normalized["support_status"], "partial")
+                self.assertEqual(normalized["payload"]["result"]["status"], "incomplete")
+                self.assertEqual(normalized["issues"][0]["reason"], reason)
+                self.assertFalse(normalized["issues"][0]["blocking"])
+
     def test_catalogued_incomplete_focus_limitation_closes_for_manual_fallback(self):
         request = formal_request("mp-focus-appearance-evidence", level="AAA")
         identity_fields = ("observation_request_ref", "request_signature", "criterion_evaluation_ref",

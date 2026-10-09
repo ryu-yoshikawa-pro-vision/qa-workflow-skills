@@ -339,7 +339,11 @@ async (page) => {
       const value = await page.evaluate(() => {
         const htmlNamespace = "http://www.w3.org/1999/xhtml";
         const root = document.documentElement;
-        const isHtmlDocument = root?.namespaceURI === htmlNamespace && root?.localName === "html";
+        const htmlContentType = ["text/html", "application/xhtml+xml"].includes(
+          document.contentType?.toLowerCase(),
+        );
+        const isHtmlDocument =
+          htmlContentType && root?.namespaceURI === htmlNamespace && root?.localName === "html";
         if (!isHtmlDocument) {
           return {
             is_html_document: false,

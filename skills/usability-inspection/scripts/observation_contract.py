@@ -58,6 +58,12 @@ PARTIAL_FORMAL_OBSERVATION_REASONS = {
     "pointer-action-not-materialized",
     "page-set-not-materialized",
     "prior-control-observation-not-materialized",
+    "focus-observation-limit-reached",
+    "focus-loop-detected",
+    "focus-cycle-not-complete",
+    "focus-left-document",
+    "focus-target-removed",
+    "population-changed-during-observation",
 }
 FORMAL_DOCUMENT_IDENTITY_UNAVAILABLE = (
     "browser cannot create an in-memory keyed current-document identity"

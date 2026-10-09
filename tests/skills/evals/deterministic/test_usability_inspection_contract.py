@@ -457,7 +457,8 @@ class DeterministicMeasurementTests(unittest.TestCase):
         self.assertEqual(rule["mapped_success_criteria"], ["4.1.2"])
 
         def target(role, name, host_element="button", host_type=None, included=True):
-            return {"role": role, "accessible_name": name,
+            return {"role": role if included else None,
+                    "accessible_name_present": bool(name.strip()) if included else None,
                     "host_element": host_element if ":" in host_element else f"html:{host_element}",
                     "host_type": host_type, "included_in_accessibility_tree": included,
                     "programmatically_hidden": False, "status": "ok",
@@ -468,6 +469,8 @@ class DeterministicMeasurementTests(unittest.TestCase):
                 "buttons": [target("button", "My button")]}, "expected": "passed"},
             {"id": "passed-input-submit", "observations": {"population_complete": True,
                 "buttons": [target("button", "Submit", "input", "submit")]}, "expected": "passed"},
+            {"id": "input-with-implicit-text-type-is-non-applicable", "observations": {"population_complete": True,
+                "buttons": [target("textbox", "Email address", "input", "text")]}, "expected": "inapplicable"},
             {"id": "passed-aria-label", "observations": {"population_complete": True,
                 "buttons": [target("button", "My button", "span")]}, "expected": "passed"},
             {"id": "passed-role-button", "observations": {"population_complete": True,

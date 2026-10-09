@@ -447,3 +447,63 @@ formal reportはfixture全体をclosureしていない。変更後confirmation s
 - このcheckpoint以降に行うreport-only commitでは実装treeを変更しない。push後はreport-onlyの最新headにもCIを実行し、その結果を最終報告に記録する。
 - `PR #14 repository implementation Plan未達: 0件`（責務移管後のPR #14 gateおよび本指示の修正・代表E2E範囲）。
 - Progress: 100% (10/10)。
+
+## 2026-10-09 JST — Playwright標準API優先・最終レビュー修正
+
+### Git / 作業対象
+
+- 対象branch: `feat/usability-evaluation-skill`。
+- 実装開始時のlocal HEAD / PR branch remote head: `ebee4278060a4423c3d11d5afbe99ab94cc2cc38`。`origin/main`: `dec3f7c764db2869dc24eb3d6f154712a6677068`。mainとの差はahead 323 / behind 0。
+- 検証中は全変更をunstagedのまま保持した。今回明示stageするtracked対象は、本節の検証記録、README、既存`_05j` Plan、今回追加した修復Plan、`usability-inspection` Skill/reference/probe/runtime、関連catalog/test/fixtureのみ。
+- ユーザー所有の未追跡`3b77866a0b52347ce6201959f97492f197a61365`、`.gitignore`、ignored overlay、既存Run Artifactを変更していない。rootにある今回生成のテスト専用結果JSONと同ユーザーファイルはcommit対象から除外する。
+
+### 既存APIと変更内容
+
+| 対象 | 対応 | 採用API / 保持理由 |
+|---|---|---|
+| ロール・名前・AX tree inclusion | 独自のrole/name推定を固定formal component probeから除去し、ブラウザ計算結果の有限predicateを使用。空nameと取得不能を分ける。raw AX snapshotや任意のnameをformal component resultへ保存しない。 | 実行確認したPlaywright `Locator.ariaSnapshotJSON()`、`getByRole()`。MCPはPlaywright package semverを公開していない。`ariaSnapshotJSON()`はPlaywright 1.63以降で利用可能。 |
+| Shadow DOM / target ref | `querySelectorAll()`によるformal inventoryをPlaywright locator列挙へ変更。open/nested rootのhost境界をrefへ含め、重複refや不完全なpopulationを成功扱いしない。closed rootは推測で探索しない。 | Playwright Locatorのopen Shadow DOM探索を再利用。generic crawlerや新DOM identity frameworkは追加しない。 |
+| 可視性・状態・geometry | Playwright visible/enabled/geometryを取得し、DOM存在、AX tree包含、操作可能性、視覚描画を別の事実として保持。`opacity:0`だけでvisible対象から除外しない。 | `locator.isVisible()`、`locator.isEnabled()`、`locator.boundingBox()`。CSS観測が契約上必要な箇所はブラウザ標準APIを保持。 |
+| Keyboard/focus | DOM候補数から順序やフォーカス可能数を推定せず、実際のTab移動を観測。循環、上限、対象削除、復元失敗を分け、元focus/scrollを検証する。 | 既存Playwright `page.keyboard`とLocator。任意のfocusability計算器は追加しない。 |
+| HTML page title | formal probeを通常probeと整合。HTML/XHTML文書、HTML namespaceの最初の`title`、全child nodeの条件、Unicode whitespaceを確認し、raw titleを保存しない。 | 既存固定probe契約を利用。SVG titleのみ、複数title、non-text child、非HTML XMLをfixtureで確認。 |
+| データ保護 | 新しい正規表現を追加して任意PIIを完全秘匿できるとは主張しない。formal component resultでは必要なname-presence predicateだけ保存。契約上必要な他のtext fieldは既存の限定schema/保存境界に残し、snapshot/DOM全体を出力しない。 | 任意個人情報を完全に自動識別する汎用機構は追加しない。HMAC identity、request currentness、evidence refsを保持。 |
+| ACT input既定type | type属性が省略された`input`は`getAttribute('type') == null`だが`HTMLInputElement.type == 'text'`。ACT処理が入力型を欠落扱いしていたため、標準propertyを使うよう修正。 | HTMLInputElementのブラウザ標準`type` property。回帰test追加。 |
+
+### 実ブラウザ / production経路
+
+- 既存fixture serverとPlaywright Chromiumを再利用。ブラウザはChromium `154.0.8037.95`。current browser ownerで`Locator.ariaSnapshotJSON()`、`getByRole()`、`isVisible()`、`isEnabled()`、`boundingBox()`、`page.keyboard`が利用できることを実行確認した。packageの正確なPlaywright semverはBrowser MCPから取得できず、そこは未確認として扱う。
+- synthetic fixtureでsubmit/image inputの暗黙button role、`aria-label` / `aria-labelledby`、`aria-hidden`、空name、visibilityとenabledの差、open nested Shadow DOMの一意ref、focus cycle/limit/removal、titleのHTML namespace / first-title / child node / Unicode whitespace / SVG / XMLを確認した。
+- current fixed `mp-component-semantics`と`mp-document-title`の実ブラウザ結果をproduction observation normalizer/runtimeとACT procedure consumerへ渡した。HMAC document identity currentnessは一致し、raw fixture secretは出力されない。component fixtureは意図的にempty-name controlを含むためACT resultは`failed`、タイトルfixtureのACT resultは`passed`。これはprobe chainのsynthetic結果であり、外部製品の適合主張ではない。
+- deterministic test `test_formal_component_probe_uses_browser_accessible_name_presence_only`等でdefault `input.type`の扱いも固定した。既存のformal request、evidence refs、CAS/reservation/resumeやSemantic/Trigger routingは変更していない。
+
+### 検証結果
+
+| 検証 | 結果 |
+|---|---|
+| Canonical fixture focused suite | 14 PASS |
+| Repository deterministic | 257 PASS |
+| Shared deterministic | 12 PASS |
+| Runtime | 271 PASS |
+| Shared semantic | 27 PASS / Windows symlink privilegeによる2 SKIP |
+| Repository semantic | 4 PASS |
+| Trigger dataset contract | 1 PASS |
+| Semantic dataset validator | 22 Skill / 155 cases |
+| official `skills-ref validate` | 22 / 22 PASS |
+| Python compile | 現在のSkill scriptとdeterministic/semantic test 17 root PASS |
+| Node syntax | 変更したfixed probe 2 files PASS |
+| Prettier | 設定済みparserの変更ファイル PASS。設定がXML parserを持たないため`.xml` fixtureは対象外とし、実ブラウザで読み込みを確認 |
+| changed-file Markdownlint | 6 files / 0 issue |
+| text quality | 変更Markdown 6 files PASS |
+| `git diff --check` | PASS |
+
+- `npm run validate:skills`はignored local `AGENTS.md` overlayのリンク先`docs/reference/run-artifacts.md`が存在しないため失敗した。ユーザー指示に従いoverlayも参照先も変更していない。official `skills-ref`、dataset validator、CI相当のtestsは個別実行でPASS。
+- `skills-ref`の最初の起動は子processの既定cp932 decodeで失敗した。`PYTHONUTF8=1`を設定してofficial validatorを再実行し22 SkillすべてPASS。これはtest failureではない。
+- axe-coreは比較したが、repositoryに`axe-core` / `@axe-core/playwright`は導入されておらず、ACT rule verdictだけではtyped request/current HMAC/target refs/evidence refs/immutable resultのformal contractを置き換えられないため、依存追加・置換はしない。比較資料: [axe-core rule descriptions](https://github.com/dequelabs/axe-core/blob/develop/doc/rule-descriptions.md)、[ACT test convention](https://github.com/dequelabs/axe-core/blob/develop/test/act-rules/README.md)。
+- Semantic Judge 83、Trigger 180、Holdout 24、全fixture WCAG closureはPR #14 / PR #17の責務分担を維持し今回実行していない。
+
+### 残作業
+
+- 変更を明示pathだけstageし、通常commit / 通常pushする。
+- PR #14本文を最新実装と今回の検証範囲へ更新する。
+- push後の最新headで`Validate Agent Skills`、`Validate Deterministic Output Evals`、`Validate Semantic Output Evals`を確認する。
+- 最終PR head、commit SHA、CI状態を記録する。現時点では実装変更・検証記録はlocal working tree上にあり、最新PR headのCI証拠にはしていない。

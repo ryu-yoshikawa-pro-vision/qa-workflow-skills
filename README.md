@@ -32,6 +32,12 @@ skills/
 
 各Skillは`skills/<skill-name>/SKILL.md`を持つ独立Skillです。`qa-workflow`も1 Skillとして扱います。
 
+## 開発原則: 既存ツールと標準機能を優先
+
+変更前に、既存機能で解決できるか、リポジトリ内の処理を再利用できるか、言語標準、browser / platform / framework / SDK、導入済みライブラリ、信頼できる既存ライブラリの順で確認します。それでも現在の要件を満たせない場合だけ、満たせない具体的な契約を説明したうえで必要最小限の独自実装を追加します。同等以上の正確性、安全性、互換性、保守性、検証可能性を保ち、取得できない情報を推測値で埋めず、完了条件に必要な情報が不足するときは未確定・未完了として扱います。
+
+既存ライブラリの導入は自動的に選ばず、必要機能との適合、重複、ライセンス、保守状況、互換性、セキュリティ、CI / 実行環境への影響を確認します。独自実装を避けること自体は目的にしません。テスト技法、成果物ID / traceability、revision / CAS / reservation、state transition、schema validation、WCAG procedure / applicability、WCAG-EM sampling、EARL変換、security boundary、data protection、regression testなど、プロジェクト固有の決定論的契約は、代替ツールがあるだけでは削除しません。
+
 | Skill | 責務 |
 | --- | --- |
 | `qa-workflow` | 開始点、再利用、ルーティング、ブロック中、再開、変更伝播、完了 |

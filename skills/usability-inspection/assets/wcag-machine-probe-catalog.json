@@ -123,9 +123,9 @@
       "unit": "as-defined-per-probe",
       "required_browser_capability": "mp-component-semantics",
       "target_currentness": "typed-target-or-population-identity",
-      "sensitive_data_handling": "minimum necessary; redact secrets",
+      "sensitive_data_handling": "minimum necessary; accessibility name presence is sufficient for this probe; do not persist raw snapshots",
       "fixed_dispatch_key": "mp-component-semantics",
-      "observation_description": "name / role / value / state / propertyの必要最小projection"
+      "observation_description": "browser-computed role / accessibility-tree inclusion / accessible-name presence and allowlisted state properties"
     },
     {
       "machine_probe_key": "mp-computed-color-context",
