@@ -310,14 +310,71 @@ class WcagReportClosureTests(unittest.TestCase):
                 self.assertEqual(result["status"], "blocked")
                 self.assertEqual(result["incomplete_sample_results"], ["CRIT-EVAL-1"])
 
-    def test_not_applicable_step_and_empty_results_remain_valid_when_step_is_not_required(self):
+    def test_step_4_2_not_applicable_does_not_skip_required_step_4_1_results(self):
         args = self.closure_inputs()
         args["required_steps"] = [step for step in args["required_steps"] if step not in {"4.2"}]
         args["step_outcomes"]["4.2"] = "not-applicable"
         args["sample_results"] = []
         args["required_criterion_evaluation_refs"] = None
+        missing = structure.close_report(**args)
+        self.assertEqual(missing["status"], "blocked")
+        self.assertTrue(missing["sample_result_scope_missing"])
+
+        args["sample_results"] = [{"sample_result_ref": "WCAG-RES-001", "criterion_evaluation_ref": "CRIT-EVAL-1",
+            "requirement_ref": "1.1.1", "result": "not-satisfied", "freshness_status": "current"}]
+        args["required_criterion_evaluation_refs"] = ["CRIT-EVAL-1"]
+        complete = structure.close_report(**args)
+        self.assertEqual(complete["status"], "complete")
+
+    def test_step_4_1_result_requirement_cannot_be_removed_with_required_steps(self):
+        args = self.closure_inputs()
+        args["required_steps"] = [step for step in args["required_steps"] if step not in {"4.1", "4.2"}]
+        args["step_outcomes"]["4.2"] = "not-applicable"
+        args["sample_results"] = []
+        args["required_criterion_evaluation_refs"] = None
+        result = structure.close_report(**args)
+        self.assertEqual(result["status"], "blocked")
+        self.assertTrue(result["sample_result_scope_missing"])
+
+        args["step_outcomes"]["4.1"] = "not-applicable"
+        args["sample_results"] = []
+        args["required_criterion_evaluation_refs"] = []
+        selected_without_evaluation = structure.close_report(**args)
+        self.assertEqual(selected_without_evaluation["status"], "blocked")
+        self.assertTrue(selected_without_evaluation["sample_result_scope_missing"])
+
+    def test_step_4_1_not_applicable_keeps_step_4_2_current_results_valid(self):
+        args = self.closure_inputs()
+        args["required_steps"] = [step for step in args["required_steps"] if step != "4.1"]
+        args["step_outcomes"]["4.1"] = "not-applicable"
+        args["sample_results"][0]["sample_kind"] = "process-added"
+        args["sample_results"][0]["process_ref"] = "PROC-1"
         result = structure.close_report(**args)
         self.assertEqual(result["status"], "complete")
+
+    def test_no_selected_sample_allows_step_4_1_and_4_2_not_applicable(self):
+        args = self.closure_inputs()
+        args["required_steps"] = [step for step in args["required_steps"] if step not in {"3.3", "4.1", "4.2"}]
+        args["step_outcomes"].update({"3.3": "not-applicable", "4.1": "not-applicable", "4.2": "not-applicable"})
+        args["sample_results"] = []
+        args["required_criterion_evaluation_refs"] = []
+        result = structure.close_report(**args)
+        self.assertEqual(result["status"], "complete")
+        self.assertFalse(result["sample_result_scope_missing"])
+
+    def test_sample_result_refs_must_match_current_criterion_plan_without_duplicates(self):
+        args = self.closure_inputs()
+        args["sample_results"].append({"sample_result_ref": "WCAG-RES-002",
+            "criterion_evaluation_ref": "CRIT-UNEXPECTED", "requirement_ref": "1.2.1",
+            "result": "satisfied", "freshness_status": "current"})
+        unexpected = structure.close_report(**args)
+        self.assertEqual(unexpected["status"], "blocked")
+        self.assertEqual(unexpected["unexpected_sample_result_refs"], ["CRIT-UNEXPECTED"])
+
+        args["sample_results"][1]["criterion_evaluation_ref"] = "CRIT-EVAL-1"
+        duplicate = structure.close_report(**args)
+        self.assertEqual(duplicate["status"], "blocked")
+        self.assertIn("duplicate_criterion_evaluation_ref", duplicate["invalid_sample_results"])
 
     def test_report_renderer_uses_fixed_order_and_derives_accessible_output_checks(self):
         data={"evaluation_input":{"evaluation_ref":"WCAG-EVAL-1","revision":"r1","evaluator":"person-ref",

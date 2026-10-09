@@ -565,3 +565,64 @@ formal reportはfixture全体をclosureしていない。変更後confirmation s
 - PR本文は日本語で更新済み。8件の再判定と修正、87 focused tests、repository standard counts、PR #17 Semantic全量移管 / native Trigger継続課題の分離を記載し、PR本文のhead/run IDsが過去値のままでないことを確認した。
 - report-only commit / push後のPR head `bc354a386e3714ee2404a09a5d96711971d45db1`に対し、`Validate Agent Skills` run `37906399279`、`Validate Deterministic Output Evals` run `37906399357`、`Validate Semantic Output Evals` run `37906399419`がすべてsuccess。
 - この追記を含む最終report-only commit / pushが新headを作るため、その最新headで3 Actionsを再確認し、PR本文のhead/run記載を最後に同期する。実装ファイルは既に実装commit `c6055154bbe930a2178bb6a2f9c5f4d563d8a40c`で固定済み。
+
+## 2026-10-09 JST — WCAG report closureのStep 4.1結果欠落修正
+
+### 再現と原因
+
+- 作業対象としてPR #14 head `b2cc4ceafad443cd2475c8a3165dd3b75160fe8d`をGitHubから再確認。PRはopen / mergeable、baseは`main`、`origin/main`相当のbase SHAは`dec3f7c764db2869dc24eb3d6f154712a6677068`。このheadに対する既存GitHub Actions 3件はsuccess（Agent Skills run `37907116527`、Deterministic Output Evals run `37907116440`、Semantic Output Evals run `37907116667`）。これらは修正前headの証拠。
+- 既存のhead `b2cc4ce...`にある`close_report()`実装を取得し、その関数だけを実モジュール上で呼び出したところ、Step 4.1=`complete`、Step 4.2=`not-applicable`、required stepsに4.1のみ、`sample_results=[]`、`required_criterion_evaluation_refs=None`で`complete`になった。同じ入力を既存`wcag_runtime.handler`の`close-report` dispatchへ通しても`runtime_status=ok` / `result_status=ready` / `close_status=complete`となることを再現した。
+- 根本原因は、4.1/4.2の評価結果scopeが未指定であることを、Step 4.2がrequiredでない場合に必ず不足として扱わず、4.1の完了済み結果がないままreport closureを許した点。W3C WCAG-EM 2.0では4.1（選定初期sample）と4.2（complete process内のsample）は別の評価工程であるため、4.2のN/Aは4.1の結果を免除しない。
+
+### 修正
+
+- `wcag_em_structure.close_report()`で、4.1/4.2のいずれかがrequiredまたはcomplete、Step 3.3のsample selectionがcomplete、または結果行が存在する場合はcriterion result scopeが必要であることを確認する。評価scopeが必要なのに期待refが未指定・空なら既存の`blocked`結果を返す。Step 3.1/3.2だけがcompleteでStep 3.3および4.1/4.2がN/Aの空対象は過剰に拒否しない。
+- 既存の`required_criterion_evaluation_refs`集合比較と、`materialize_sample_results()`が生成するcurrent result / freshness検証は再利用。欠落・想定外・stale・unknown・`undetermined`の既存closure判定を維持し、新status・依存・report管理基盤は追加していない。
+- 4.2をrequired stepsから除外しても4.1がcompleteなら結果scope不足でblockedにする。Step 4.1が正当にN/AでStep 4.2にcurrent resultがある正常経路、両4.1/4.2がN/Aでsample selectionもなく評価対象がない経路は従来どおり許容する。
+- `wcag_runtime.py`は既存dispatchで`close_report()`を呼ぶため変更なし。reporting contractと`_06b` PlanにStep 4.1/4.2の区別とclosure条件を反映した。
+
+### focused / repository検証
+
+| 検証 | 結果 |
+|---|---|
+| 修正前helper + runtime再現 | 両経路とも誤ってcomplete / readyを返すことを確認 |
+| `test_wcag_report_closure_contract.py` | 20 PASS |
+| `test_wcag_runtime_contract.py` | 13 PASS |
+| repository deterministic | 270 PASS |
+| shared deterministic | 12 PASS |
+| runtime | 271 PASS |
+| semantic dataset validator | 22 Skill / 155 case |
+| shared semantic | 27 PASS / Windows symlink privilegeによる2 SKIP |
+| repository semantic | 4 PASS |
+| trigger contract | 1 PASS |
+| Python compile | WCAG runtime / deterministic test roots、および13 Skill runtime packages PASS |
+| Prettier | 変更したMarkdown 3 files PASS |
+| changed-file Markdownlint | reporting contract / `_06b` / report 3 files、0 issue |
+| text quality | 変更Markdown 3 files PASS |
+| `git diff --check` | Git安全制約により未実行。下記参照 |
+| official `skills-ref validate` | CLIがPATHにない。ネットワーク依存のinstallは行わず、修正後headのActionsでも未確認 |
+
+- 変更対象Markdown 2 filesに対するMarkdownlintは`--no-globs`を付けて実行し、0 issue。引数指定なしの全repository lintは628 files / 157 filesに882件の既存issueを検出したため、全repoの既存状態を今回の差分へ帰属させていない。
+- 変更対象6ファイルの末尾空白を直接検査し、検出なし。これはGitの`diff --check`の代替とはせず、同コマンドの未実施状態を維持する。
+- Python compile、テストはローカルPython 3.11を使用。shared semanticの2件はsymlink作成に必要なWindows権限がなく、テストが明示的にskipした。
+- 新しいbrowser fixture / Playwright実行は不要との今回指示に従い実施していない。前回の8件のbrowser regressionは再実行していない。
+- 今回はSemantic Judge 83、Trigger 180、Holdout 24、fixture全WCAG closureを実施していない。
+
+### Git / PR / CI blocker
+
+- ローカルGitコマンドはrepository ownerと実行identityの不一致による`detected dubious ownership`で拒否された。`git -c safe.directory=...`による再試行もPreToolUse G10により「runtime Git configuration or environment overrides are forbidden」と拒否された。別のhook/Git設定回避は行わない。
+- そのためcurrent local `git status` / staged状態 / diff-checkを取得できず、変更のstage、commit、push、PR本文更新を実行していない。PR head `b2cc4ce...`の成功Actionsは修正前headの結果であり、今回の変更のCI証拠ではない。
+- `pnpm exec`のmarkdownlint / Prettier起動はignored local overlayに由来する`packages field missing or empty`で失敗したため、既存`node_modules/.bin`のCLIを直接起動した。hook・overlayは変更していない。
+- scripts/new-run.ps1は実行ポリシーで拒否され、既存Run Artifactの手動作成もsandboxに拒否されたため、この作業の新規Run Artifactは作成できなかった。既存Runおよびユーザー所有ファイルを変更していない。
+- 次の必須工程は、repository所有権 / G10が許可する通常Git操作を利用可能な環境からstatus/diffを確認し、変更対象だけ通常commit・push、PR本文更新、最新PR headの3 Actionsを確認すること。これが完了するまでPR上の修正は未反映として扱う。
+
+### 2026-10-09 JST — owner identityで残作業を再開
+
+- 所有者をWindows ACLと`WindowsIdentity`で照合した。通常シェルは`MYCOMPUTER\CodexSandboxOffline`、元repositoryと`.git`のownerは`MYCOMPUTER\sella`。`safe.directory`、Git config、ACLは変更していない。
+- repository owner identity `mycomputer\sella`で通常のGitを実行できることを確認したため、別checkoutへの変更ファイル移行は不要だった。元のworking treeをそのまま使用し、ユーザー所有の未追跡ファイルを移動・変更していない。
+- PR / remote head / local HEADは`b2cc4ceafad443cd2475c8a3165dd3b75160fe8d`、branchは`feat/usability-evaluation-skill`、`origin/main=dec3f7c764db2869dc24eb3d6f154712a6677068`、ahead 330 / behind 0。
+- `git status`では今回のtracked変更6ファイルだけを確認。未追跡の`.pr14-formal-probe-1791501932895.json`とユーザー所有の`3b77866a0b52347ce6201959f97492f197a61365`は保持し、stage対象外。`.gitignore`とignored overlayは変更なし。
+- owner identityから`git diff --check`がexit 0。差分は既に記録したclose_report Step 4.1 scope、direct/runtime回帰test、reporting contract、`_06b`、進捗記録のみ。
+- 修正後のfocused testを再実行: report closure 20 PASS、WCAG runtime 13 PASS。CI正規手順と同じsuiteでshared deterministic 12 PASS、repository deterministic 270 PASS、repository runtime 271 PASS。Python compileとsemantic dataset validator（22 Skill / 155 case）もPASS。
+- `.github/workflows/validate-skills.yml`がofficial `skills-ref`をpinned Git URLからinstallして全Skillへ適用する正規経路であることを確認した。ローカルCLIは利用可能なcommandとして確認できていないため、修正後headの`Validate Agent Skills` Actionsをその公式検証の結果として確認する。修正前headのCI結果は修正後の証拠に流用しない。
+- 残作業は対象6ファイルの最終Markdown/text check、対象のみstage、通常pre-commit付きcommit/push、PR本文更新、最新headの3 Actions確認。

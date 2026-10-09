@@ -776,10 +776,15 @@ def close_report(*, required_steps: list[str], step_outcomes: dict[str, str], sa
     expected_refs = required_criterion_evaluation_refs
     missing_sample_result_refs=[]
     unexpected_sample_result_refs=[]
-    sample_result_scope_missing = '4.2' in required_steps and not expected_refs
+    sample_selection_completed = step_outcomes.get('3.3') == 'complete'
+    criterion_evaluation_required = (
+        '4.1' in required_steps or '4.2' in required_steps
+        or step_outcomes.get('4.1') == 'complete' or step_outcomes.get('4.2') == 'complete'
+        or sample_selection_completed or bool(sample_results)
+    )
+    sample_result_scope_missing = criterion_evaluation_required and not expected_refs
     if expected_refs is None:
-        if '4.2' in required_steps:
-            sample_result_scope_missing = True
+        sample_result_scope_missing = sample_result_scope_missing or criterion_evaluation_required
     else:
         missing_sample_result_refs=sorted(set(expected_refs)-set(sample_result_refs))
         unexpected_sample_result_refs=sorted(set(sample_result_refs)-set(expected_refs))
