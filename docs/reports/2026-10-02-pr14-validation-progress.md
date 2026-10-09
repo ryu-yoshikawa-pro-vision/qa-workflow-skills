@@ -658,3 +658,11 @@ formal reportはfixture全体をclosureしていない。変更後confirmation s
 - 現在も`.pr14-formal-probe-1791501932895.json`とユーザー所有の`3b77866a0b52347ce6201959f97492f197a61365`は未追跡のまま保持し、今回のcommitへ含めていない。`.gitignore`、ignored overlay、既存Run Artifactは変更していない。
 - `close_report()`はcurrent canonical plan artifactの完全なcriterion row集合とsample result集合を照合する。runtimeには選定scopeの正本を外部storeから再読込するreaderがないため、workflowが保存・再提示するcurrent `materialize_plan()` outputが正本となる。この外部artifact-store origin再読込は未実装・未検証であり、新しいstore / CAS基盤は追加していない。
 - この更新時点のreportは実装commitとそのActionsを記録する。以下のPR metadata更新はheadを変えない。PR本文には同じ最新headの3 Actions結果と全量評価を今回実施していない範囲を反映する。
+
+### 2026-10-09 JST — canonical Plan provenanceの追加確認
+
+- `close_report()`とruntime dispatchに対し、修正後head `ee0d47ae4912386a339233834eda6835f9771d18`で追加確認した。WCAG 2.2 AAのfixture入力を出発点に、同じ`evaluation_ref` / `evaluation_revision`を保持したままWCAG 2.2 AのPlanを再materializeし、そのPlanに一致する必要ref・current結果を渡すと、directと`wcag_runtime._dispatch("close-report", ...)`の両方が`complete`を返した。
+- 根本境界: `validate_materialized_plan()`は渡された`plan_basis`から全criterion rowを再生成し、内部整合性・row完全性を確認するが、現在保存されているevaluation / sample-selection artifactからそのbasisを独立に再取得・照合しない。`wcag_runtime`にはWCAG Plan用のupstream entity / artifact readerがない。自己申告fingerprintを追加するだけではこの問題を解決しない。
+- したがって、縮小されたPlan objectを同時に再生成して渡すケースについては、現在のコードだけで既存評価scopeの真正性を保証できない。reportは渡されたPlan内の完了性を確認できるが、以前保存されたcurrent Planと同一であることまでは独立に証明しない。この境界を解消するには、信頼できる既存workflow/artifact sourceからcurrent evaluation・selection・planを供給しruntimeがそのref/content/revisionを検証する入力契約が必要。今回、禁止範囲の新規store/CASを追加していない。
+- それ以外の5論点と、canonical Plan artifactを維持したまま必要ref/resultだけを縮小する再現ケースは修正・検証済み。未解決の必要集合provenance条件は1件として数える。PR本文と最新head CIの結果をこの記録の後で更新する。
+- 判定: `PR #14 repository implementation Plan未達: 1件`。このprovenance条件が解消されるまで、本PRを今回の指示に対してPlan完了とは判定しない。
