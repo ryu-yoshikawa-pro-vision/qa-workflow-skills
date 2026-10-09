@@ -298,6 +298,8 @@ semantic layerはcontent type / Findingのartifact-local grouping keyだけを�
 
 Step 5.1に従い、Step 1〜4のrequired outcomeをreportへ記録します。各 `not-satisfied` Conformance Requirement / Success Criterionへ最低1exampleを対応付け、Step 1.4でall-occurrence reportingを要求した場合は全occurrence closureも検証します。human-readable report / Evaluation Statement / accompanying documentationは、本Skillが所有する形式についてheading / table header / image text description / color-independent status / meaningful link textを満たします。
 
+`close-report`は、適用可能性処理から導出した空でない`required_steps`について各outcomeが`complete`であることを確認します。`not-applicable`はrequired stepを閉じる値ではありません。Step 4.2がrequiredなら、現在のcriterion planから得た`required_criterion_evaluation_refs`とsample resultの集合が一致し、全resultがcurrentかつ`satisfied` / `not-satisfied`であることを確認します。期待refなし、欠落・余分なref、`undetermined` / stale / unknown resultがあればreport closureを`blocked`に保ちます。Step 4.2が適用外の場合はrequired listから外し、既存step applicability契約の根拠に従ってoutcomeを`not-applicable`とします。`close-report`はscopeやprocedureの適用性を独自に再判定せず、全scope / variation / criterion結果の作成には既存のownerを使います。
+
 Step 5.2 Evaluation Specificsは要求・合意があるcaseでsample archive ref、path / settings / actions、tool / browser / AT / software / methodを記録し、secretや不要PIIを保存しません。
 
 Evaluation Statementはtarget WCAG 2.2だけでfull / partial /生成不可を分け、`_05f_wcag-conformance-evaluation-package-and-runtime.md` のStep 5.3 contractを閉じます。WCAG 2.0 / 2.1のformal evaluationではStep 5.1 reportを生成しますが、Step 5.3 Evaluation Statementは生成しません。

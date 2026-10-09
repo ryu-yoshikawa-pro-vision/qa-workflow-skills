@@ -1,6 +1,6 @@
 # Reporting Contract
 
-Step 5.1 report closure tracks each Step 1–4 outcome, every not-satisfied conformance requirement and Success Criterion example, any requested all-occurrence coverage, and accessible report output. Do not collapse results into an aggregate score.
+Step 5.1 report closure tracks each Step 1–4 outcome, every not-satisfied conformance requirement and Success Criterion example, any requested all-occurrence coverage, and accessible report output. Do not collapse results into an aggregate score. Derive a non-empty `required_steps` list from current applicability decisions; each listed step must be `complete`, while `not-applicable` is only for a step excluded by those decisions. When Step 4.2 is required, pass the exact current `criterion_evaluation_ref` set from the criterion plan as `required_criterion_evaluation_refs`; `close-report` blocks missing/extra results and any `undetermined`, stale, or unknown result.
 
 The Random Sample section preserves the target and actual counts, selection method, exact selected sample refs from the machine selector, selection status, and exhaustion or blocked reason. When no sample was selected, render `None selected` and retain the helper's closure status and evidence.
 

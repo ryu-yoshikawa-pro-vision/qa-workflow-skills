@@ -64,6 +64,14 @@ PARTIAL_FORMAL_OBSERVATION_REASONS = {
     "focus-left-document",
     "focus-target-removed",
     "population-changed-during-observation",
+    "probe-result-limit-reached",
+    "media-playback-origin-not-instrumented",
+    "text-spacing-override-not-applied",
+}
+PARTIAL_CANDIDATE_NAME_FREE_PROBES = {
+    "mp-hover-focus-content-run",
+    "mp-multipage-signature",
+    "mp-pointer-interaction-run",
 }
 FORMAL_DOCUMENT_IDENTITY_UNAVAILABLE = (
     "browser cannot create an in-memory keyed current-document identity"
@@ -762,6 +770,21 @@ def normalize_probe_result(probe: dict[str, Any], result: dict[str, Any], *, cur
                     or completeness.get("state") != "partial"
                     or completeness.get("reason") not in PARTIAL_FORMAL_OBSERVATION_REASONS):
                 raise ObservationContractError("incomplete formal observation requires a typed partial result reason")
+        if result["machine_probe_key"] in PARTIAL_CANDIDATE_NAME_FREE_PROBES:
+            value = result.get("value")
+            if result["machine_probe_key"] == "mp-multipage-signature" and isinstance(value, dict):
+                page_signature = value.get("current_page_signature")
+                candidate_rows = page_signature.get("controls") if isinstance(page_signature, dict) else None
+            else:
+                candidate_rows = value.get("candidate_targets") if isinstance(value, dict) else None
+            if (result["status"] == "incomplete"
+                    and candidate_rows is not None
+                    and (not isinstance(candidate_rows, list)
+                         or any(not isinstance(row, dict) or "accessible_name" in row
+                                for row in candidate_rows))):
+                raise ObservationContractError(
+                    "partial formal candidate summaries must omit accessible-name text"
+                )
         if result["status"] in {"unsupported", "unavailable", "incomplete", "blocked"}:
             if not isinstance(result.get("limitation"), str) or not result["limitation"].strip():
                 raise ObservationContractError("non-success formal probe requires a limitation")

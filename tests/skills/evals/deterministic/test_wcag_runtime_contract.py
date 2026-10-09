@@ -25,6 +25,8 @@ def load_runtime():
 
 
 runtime_contract = load_runtime()
+sys.path.insert(0, str(SCRIPT.parent))
+import wcag_em_structure
 
 
 def metadata() -> dict:
@@ -80,6 +82,37 @@ def invoke(body: dict) -> dict:
 
 
 class WcagRuntimeContractTests(unittest.TestCase):
+    def test_close_report_runtime_keeps_required_steps_and_results_fail_closed(self):
+        outcomes = {step: "complete" for step in wcag_em_structure.REPORT_STEPS}
+        outcomes.update({"1.4": "not-applicable", "3.2": "not-applicable", "4.3": "not-applicable"})
+        accessible = {key: True for key in wcag_em_structure.ACCESSIBLE_OUTPUT_CHECKS}
+        args = {
+            "required_steps": list(wcag_em_structure.REPORT_STEPS),
+            "step_outcomes": {step: "not-applicable" for step in wcag_em_structure.REPORT_STEPS},
+            "sample_results": [],
+            "required_criterion_evaluation_refs": [],
+            "example_coverage": {},
+            "accessible_output_closure": accessible,
+        }
+        body = request("A")
+        body["input"] = {"operation": "close-report", "arguments": args}
+        forged = invoke(body)
+        self.assertEqual(forged["runtime_status"], "ok")
+        self.assertEqual(forged["payload"]["result"]["status"], "blocked")
+        self.assertEqual(forged["payload"]["result"]["incomplete_required_steps"],
+                         list(wcag_em_structure.REPORT_STEPS))
+
+        args["required_steps"] = [step for step in wcag_em_structure.REPORT_STEPS
+                                  if outcomes[step] == "complete"]
+        args["step_outcomes"] = outcomes
+        args["sample_results"] = [{"sample_result_ref": "WCAG-RES-1",
+            "criterion_evaluation_ref": "CE-1", "requirement_ref": "1.1.1",
+            "result": "satisfied", "freshness_status": "current"}]
+        args["required_criterion_evaluation_refs"] = ["CE-1"]
+        valid_not_applicable = invoke(body)
+        self.assertEqual(valid_not_applicable["runtime_status"], "ok")
+        self.assertEqual(valid_not_applicable["payload"]["result"]["status"], "complete")
+
     def test_runtime_allocates_monotonic_artifact_local_handoff_refs(self):
         body = request("A")
         body["input"] = {"operation": "allocate-observation-handoff-ref", "arguments": {

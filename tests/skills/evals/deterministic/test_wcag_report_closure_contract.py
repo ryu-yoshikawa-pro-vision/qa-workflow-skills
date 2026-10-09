@@ -248,13 +248,19 @@ class WcagConformanceRequirementTests(unittest.TestCase):
 
 
 class WcagReportClosureTests(unittest.TestCase):
-    def closure(self):
+    def closure_inputs(self):
         steps = {step: "complete" for step in structure.REPORT_STEPS}
         steps.update({"1.4": "not-applicable", "3.2": "not-applicable", "4.3": "not-applicable"})
         accessible = {key: True for key in structure.ACCESSIBLE_OUTPUT_CHECKS}
-        return structure.close_report(required_steps=list(structure.REPORT_STEPS), step_outcomes=steps,
-            sample_results=[{"requirement_ref": "1.1.1", "result": "not-satisfied"}],
-            example_coverage={"1.1.1": ["EXAMPLE-1"]}, accessible_output_closure=accessible)
+        return {"required_steps": [step for step in structure.REPORT_STEPS if steps[step] == "complete"],
+            "step_outcomes": steps,
+            "sample_results": [{"sample_result_ref": "WCAG-RES-001", "criterion_evaluation_ref": "CRIT-EVAL-1",
+                "requirement_ref": "1.1.1", "result": "not-satisfied", "freshness_status": "current"}],
+            "required_criterion_evaluation_refs": ["CRIT-EVAL-1"],
+            "example_coverage": {"1.1.1": ["EXAMPLE-1"]}, "accessible_output_closure": accessible}
+
+    def closure(self):
+        return structure.close_report(**self.closure_inputs())
 
     def test_step_5_1_requires_all_fixed_step_outcomes_examples_and_accessible_output_closure(self):
         result = self.closure()
@@ -264,7 +270,9 @@ class WcagReportClosureTests(unittest.TestCase):
         missing["accessible_output_closure"].pop("table_headers", None)
         blocked = structure.close_report(required_steps=list(structure.REPORT_STEPS),
             step_outcomes={key:value for key,value in {step:"complete" for step in structure.REPORT_STEPS}.items() if key!="4.2"},
-            sample_results=[{"requirement_ref":"1.1.1","result":"not-satisfied"}], example_coverage={},
+            sample_results=[{"sample_result_ref":"WCAG-RES-001", "criterion_evaluation_ref":"CRIT-EVAL-1",
+                "requirement_ref":"1.1.1","result":"not-satisfied", "freshness_status":"current"}],
+            required_criterion_evaluation_refs=["CRIT-EVAL-1"], example_coverage={},
             accessible_output_closure={key:True for key in structure.ACCESSIBLE_OUTPUT_CHECKS})
         self.assertEqual(blocked["status"], "blocked")
         self.assertIn("4.2", blocked["missing_step_outcomes"])
@@ -274,6 +282,42 @@ class WcagReportClosureTests(unittest.TestCase):
             accessible_output_closure={key:True for key in structure.ACCESSIBLE_OUTPUT_CHECKS if key!="table_headers"})
         self.assertEqual(no_accessibility["status"], "blocked")
         self.assertIn("table_headers", no_accessibility["accessible_output_missing_checks"])
+
+    def test_required_steps_cannot_be_not_applicable_and_empty_results_do_not_close_step_4_2(self):
+        all_not_applicable = {step: "not-applicable" for step in structure.REPORT_STEPS}
+        result = structure.close_report(required_steps=list(structure.REPORT_STEPS),
+            step_outcomes=all_not_applicable, sample_results=[], required_criterion_evaluation_refs=[],
+            example_coverage={}, accessible_output_closure={key: True for key in structure.ACCESSIBLE_OUTPUT_CHECKS})
+        self.assertEqual(result["status"], "blocked")
+        self.assertEqual(result["incomplete_required_steps"], list(structure.REPORT_STEPS))
+        with self.assertRaises(structure.EvaluationStructureError):
+            structure.close_report(required_steps=[], step_outcomes=all_not_applicable,
+                sample_results=[], required_criterion_evaluation_refs=[], example_coverage={},
+                accessible_output_closure={key: True for key in structure.ACCESSIBLE_OUTPUT_CHECKS})
+
+        args = self.closure_inputs()
+        args["sample_results"] = []
+        result = structure.close_report(**args)
+        self.assertEqual(result["status"], "blocked")
+        self.assertEqual(result["missing_sample_result_refs"], ["CRIT-EVAL-1"])
+
+    def test_undetermined_or_stale_sample_result_cannot_close_report(self):
+        for update in ({"result": "undetermined"}, {"freshness_status": "stale"}):
+            with self.subTest(update=update):
+                args = self.closure_inputs()
+                args["sample_results"] = [{**args["sample_results"][0], **update}]
+                result = structure.close_report(**args)
+                self.assertEqual(result["status"], "blocked")
+                self.assertEqual(result["incomplete_sample_results"], ["CRIT-EVAL-1"])
+
+    def test_not_applicable_step_and_empty_results_remain_valid_when_step_is_not_required(self):
+        args = self.closure_inputs()
+        args["required_steps"] = [step for step in args["required_steps"] if step not in {"4.2"}]
+        args["step_outcomes"]["4.2"] = "not-applicable"
+        args["sample_results"] = []
+        args["required_criterion_evaluation_refs"] = None
+        result = structure.close_report(**args)
+        self.assertEqual(result["status"], "complete")
 
     def test_report_renderer_uses_fixed_order_and_derives_accessible_output_checks(self):
         data={"evaluation_input":{"evaluation_ref":"WCAG-EVAL-1","revision":"r1","evaluator":"person-ref",

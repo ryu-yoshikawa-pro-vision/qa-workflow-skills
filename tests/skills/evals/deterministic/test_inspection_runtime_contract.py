@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 import subprocess
@@ -41,6 +42,19 @@ def formal_request(probe_key: str = "mp-resize-text-run", *, level: str = "AA") 
         variations=[{"sample_ref": "SAMPLE-001", "variation_ref": "VAR-001",
                      "identity_fingerprint": "sha256:" + "b" * 64}])
     return next(request for request in plan["requests"] if request["machine_probe_key"] == probe_key)
+
+
+def formal_request_for_contract(probe_key: str) -> dict:
+    try:
+        return formal_request(probe_key)
+    except StopIteration:
+        request = formal_request("mp-moving-updating-inventory")
+        request["machine_probe_key"] = probe_key
+        request["required_browser_capability"] = probe_key
+        unsigned = {key: value for key, value in request.items() if key != "request_signature"}
+        canonical = json.dumps(unsigned, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        request["request_signature"] = "sha256:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+        return request
 
 
 def resize_text_result(request: dict, *, disappeared_final: bool = False) -> dict:
@@ -289,8 +303,15 @@ class InspectionRuntimeContractTests(unittest.TestCase):
             ("mp-focus-sequence-run", "focus-left-document"),
             ("mp-focus-sequence-run", "focus-target-removed"),
             ("mp-target-geometry", "population-changed-during-observation"),
+            ("mp-audio-autoplay-run", "media-playback-origin-not-instrumented"),
+            ("mp-moving-updating-inventory", "probe-result-limit-reached"),
+            ("mp-neighbor-geometry", "probe-result-limit-reached"),
+            ("mp-text-presentation-values", "probe-result-limit-reached"),
+            ("mp-computed-color-context", "probe-result-limit-reached"),
+            ("mp-reflow-run", "probe-result-limit-reached"),
+            ("mp-text-spacing-run", "text-spacing-override-not-applied"),
         ):
-            request = formal_request(probe_key)
+            request = formal_request_for_contract(probe_key)
             identity_fields = ("observation_request_ref", "request_signature", "criterion_evaluation_ref",
                 "procedure_execution_ref", "machine_probe_key", "sample_ref", "variation_ref", "process_ref",
                 "requirement_ref", "target_identity", "currentness_dependency")
@@ -340,6 +361,58 @@ class InspectionRuntimeContractTests(unittest.TestCase):
         normalized = invoke("normalize-wcag-machine-probe-result", {"request": request, "result": partial,
             "current_document_identity": request["target_identity"]}, formal=True)
         self.assertEqual(normalized["runtime_status"], "invalid_input")
+
+    def test_partial_candidate_summaries_reject_accessible_name_text(self):
+        marker = "ZXQ_PRIVATE_LABEL_UNMATCHED_9f17c3b1d204"
+        cases = (
+            ("mp-hover-focus-content-run", "target-not-materialized",
+             {"schema": "wcag-hover-focus-content-run-v1", "candidate_targets": [
+                 {"target_ref": "dom-target:body > button:nth-of-type(1)", "role": "button",
+                  "accessible_name_present": True, "focused": False}], "transition_observed": False}),
+            ("mp-pointer-interaction-run", "pointer-action-not-materialized",
+             {"schema": "wcag-pointer-interaction-run-v1", "candidate_targets": [
+                 {"target_ref": "dom-target:body > button:nth-of-type(1)", "role": "button",
+                  "accessible_name_present": True, "draggable": False, "input_type": None}],
+              "pointer_action_executed": False}),
+            ("mp-multipage-signature", "page-set-not-materialized",
+             {"schema": "wcag-multipage-signature-v1", "current_page_signature": {
+                 "title_present": True, "language_present": True, "controls": [
+                     {"target_ref": "dom-target:body > button:nth-of-type(1)", "role": "button",
+                      "accessible_name_present": True, "has_help_relationship": False}]},
+              "selected_page_set_available": False}),
+        )
+        identity_fields = ("observation_request_ref", "request_signature", "criterion_evaluation_ref",
+            "procedure_execution_ref", "machine_probe_key", "sample_ref", "variation_ref", "process_ref",
+            "requirement_ref", "target_identity", "currentness_dependency")
+
+        for probe_key, reason, value in cases:
+            request = formal_request(probe_key)
+            value["observation_completeness"] = {"state": "partial", "reason": reason}
+            candidate_rows = (value["current_page_signature"]["controls"] if probe_key == "mp-multipage-signature"
+                              else value["candidate_targets"])
+            candidate_rows[0]["accessible_name"] = marker
+            result = {field: request[field] for field in identity_fields}
+            result.update({"status": "incomplete", "current_document_identity": request["target_identity"],
+                "evidence_refs": ["WCAG-PARTIAL-NAME-001"], "limitation": "candidate identity only",
+                "value": value})
+
+            rejected = invoke("normalize-wcag-machine-probe-result", {"request": request, "result": result,
+                "current_document_identity": request["target_identity"]}, formal=True)
+            self.assertEqual(rejected["runtime_status"], "invalid_input")
+            self.assertNotIn(marker, json.dumps(rejected))
+
+            del candidate_rows[0]["accessible_name"]
+            normalized = invoke("normalize-wcag-machine-probe-result", {"request": request, "result": result,
+                "current_document_identity": request["target_identity"]}, formal=True)
+            self.assertEqual(normalized["runtime_status"], "ok")
+            self.assertEqual(normalized["result_status"], "ready")
+            self.assertEqual(normalized["support_status"], "partial")
+            self.assertNotIn(marker, json.dumps(normalized))
+            normalized_value = normalized["payload"]["result"]["value"]
+            normalized_rows = (normalized_value["current_page_signature"]["controls"]
+                               if probe_key == "mp-multipage-signature"
+                               else normalized_value["candidate_targets"])
+            self.assertTrue(all("accessible_name" not in row for row in normalized_rows))
 
 
 if __name__ == "__main__":

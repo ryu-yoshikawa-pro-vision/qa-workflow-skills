@@ -233,10 +233,14 @@ class CanonicalUsabilityFixtureTests(unittest.TestCase):
         start = probe.index('case "mp-component-semantics"')
         end = probe.index('case "mp-status-candidate-inventory"', start)
         component = probe[start:end]
+        population = probe[probe.index("const allVisibleOrInAccessibilityTree = (selector) =>"):start]
         self.assertIn("role: roleOf(element)", component)
         self.assertIn("accessible_name_present: accessibilityTreeIncludes(element)", component)
         self.assertIn("? accessibleNamePresent(element)", component)
         self.assertIn("included_in_accessibility_tree: accessibilityTreeIncludes(element)", component)
+        self.assertIn("observation?.visible === true", population)
+        self.assertIn("observation?.accessibility_tree_includes_element === true", population)
+        self.assertIn("const interactiveElements = () => allVisibleOrInAccessibilityTree(interactive)", population)
         self.assertIn("element instanceof HTMLInputElement", component)
         self.assertIn("? element.type", component)
         self.assertIn('if (request.machine_probe_key !== "mp-component-semantics")', probe)
@@ -282,6 +286,60 @@ class CanonicalUsabilityFixtureTests(unittest.TestCase):
         self.assertIn('focusTrap.dataset.trap === "true"', fixture)
         self.assertIn('removeOnTab.dataset.removeOnTab === "true"', fixture)
         self.assertIn("button[data-focus-bound]", fixture)
+
+    def test_review_probe_fixture_covers_population_caps_roles_media_and_shadow_text_spacing(self):
+        fixture = (FIXTURE / "review-probe-cases.html").read_text(encoding="utf-8")
+        probe = (ROOT / "skills" / "usability-inspection" / "scripts" / "fixed_wcag_machine_probes.js").read_text(encoding="utf-8")
+        for role in ("role=\"switch\"", "role=\"tab\"", "role=\"menuitem\"", "role=\"checkbox\"",
+                     "role=\"radio\"", "role=\"slider\"", "role=\"combobox\"", "role=\"listbox\"",
+                     "role=\"textbox\"", "role=\"searchbox\"", "role=\"spinbutton\""):
+            with self.subTest(role=role):
+                self.assertIn(role, fixture)
+        for case in ('requestedCount("pairs", 33)', 'requestedCount("live", 201)',
+                     'requestedCount("overflow", 201)', 'requestedCount("text", 501)',
+                     'requestedCount("clip", 101)', 'mode: "open"', "display: none",
+                     'width: 1px; height: 1px; animation: review-pulse 1s infinite',
+                     "overflow-target", "clip-target"):
+            with self.subTest(case=case):
+                self.assertIn(case, fixture)
+        self.assertIn("new Set(allVisible(", probe)
+        self.assertIn('located("audio,video")', probe)
+        self.assertIn('reason: "probe-result-limit-reached"', probe)
+        self.assertIn('reason: "media-playback-origin-not-instrumented"', probe)
+        for role in ("switch", "tab", "menuitem", "combobox", "listbox", "textbox", "searchbox", "spinbutton"):
+            with self.subTest(interactive_role=role):
+                self.assertIn(f"[role='{role}']", probe[: probe.index("const elementPathFor")])
+        geometry_start = probe.index('if (request.machine_probe_key === "mp-target-geometry")')
+        geometry_end = probe.index('if (request.machine_probe_key === "mp-focus-appearance-evidence")', geometry_start)
+        for role in ("switch", "tab", "menuitem", "checkbox", "radio", "combobox", "listbox"):
+            with self.subTest(geometry_role=role):
+                self.assertIn(f"[role='{role}']", probe[geometry_start:geometry_end])
+        history_start = probe.index('case "mp-control-value-history"')
+        history_end = probe.index('case "mp-multipage-signature"', history_start)
+        self.assertIn('"switch"', probe[history_start:history_end])
+        self.assertIn("aria_checked", probe[history_start:history_end])
+        self.assertIn('root.appendChild(style)', probe)
+        self.assertIn("override_mismatch_count", probe)
+        self.assertIn('style[${styleMarker}]', probe)
+
+    def test_incomplete_candidate_inventories_keep_name_presence_without_name_text(self):
+        probe = (ROOT / "skills" / "usability-inspection" / "scripts" / "fixed_wcag_machine_probes.js").read_text(encoding="utf-8")
+        for key, end_key in (("mp-multipage-signature", "mp-hover-focus-content-run"),
+                             ("mp-hover-focus-content-run", "mp-change-trigger-run"),
+                             ("mp-pointer-interaction-run", "default:")):
+            with self.subTest(probe=key):
+                start = probe.index(f'case "{key}"')
+                end = probe.index(f'case "{end_key}"' if end_key != "default:" else "default:", start)
+                result = probe[start:end]
+                self.assertIn("accessible_name_present", result)
+                self.assertNotIn("accessible_name:", result)
+
+    def test_formal_partial_reason_enum_includes_bounded_probe_and_audio_limits(self):
+        contract = (ROOT / "skills" / "usability-inspection" / "scripts" / "observation_contract.py").read_text(encoding="utf-8")
+        for reason in ("probe-result-limit-reached", "media-playback-origin-not-instrumented",
+                       "text-spacing-override-not-applied"):
+            with self.subTest(reason=reason):
+                self.assertIn(f'"{reason}"', contract)
 
 
 if __name__ == "__main__":

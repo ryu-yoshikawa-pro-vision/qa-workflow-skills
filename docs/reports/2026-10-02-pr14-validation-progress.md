@@ -516,3 +516,37 @@ formal reportはfixture全体をclosureしていない。変更後confirmation s
 - fresh accessibility snapshotのref `f41e30`にある「上限確認 1」ボタンをPlaywright Locator clickでfocusし、実際の`Shift+Tab`を2回送信した。snapshotではhost-bがactiveとなり、hostに対する限定`Locator.evaluate()`で`host-b → x-observation-nested → A`を得た。2回目の逆移動がnested open Shadow DOM内のlinkへ到達したことを確認した。
 - これはfixture上の逆方向keyboard traversal確認であり、全サイト・全複合widgetのfocus順を保証するものではない。production fixed probe / runtime codeは変更していない。
 - 追加検証はブラウザ操作と読み取りだけ。今回の結果をtracked reportへ記録した後も、実装対象SHAは`053f70094a5ed0cf13186e599d7a8c46d290c580`のまま。report-only commit後は新headのCIを再確認し、PR本文へ最終head / run IDを反映する。
+
+## 2026-10-09 JST — 複数モデルレビュー8指摘の統合修正
+
+### Git / PR checkpoint
+
+- 作業開始時に改めて取得したbranchは`feat/usability-evaluation-skill`、local HEAD / PR head / `origin/feat/usability-evaluation-skill`は`3018f5beb94df17a2367ba9387f60333d234038c`。`origin/main=dec3f7c764db2869dc24eb3d6f154712a6677068`、ahead 327 / behind 0、PRはopen / mergeable、baseは`main`。
+- 作業開始時のheadに対する`Validate Agent Skills`、`Validate Deterministic Output Evals`、`Validate Semantic Output Evals`はsuccess。過去headのCIを今回の変更の検証とは扱わない。
+- Git status再取得によりstaged fileなし、変更tracked file 11件、今回追加したfixture 1件を確認。未追跡の`3b77866a0b52347ce6201959f97492f197a61365`と`.pr14-formal-probe-1791501932895.json`は保持しており、stage / commit対象外。`.gitignore`、ignored local overlay、既存Run Artifact、PR #17責務分担に変更なし。
+
+### 8指摘の結果
+
+| 指摘 | 再確認・原因 | 修正 | 実ブラウザ / runtime証拠 |
+|---|---|---|---|
+| 観測件数の上限 | 固定配列上限を超えたとき、母集団が切り詰められているのに`ok`となるprobeがあった。moving候補には同一要素が複数探索経路から入る可能性もあった。 | moving 200、neighbor 500、text presentation 500、reflow 200、computed-color 500、text-spacing clipped targets 100の返却上限を維持。総数 / 返却数を分け、完全母集団が必要なprobeでは超過時にpartial reason `probe-result-limit-reached`で`incomplete`。moving candidatesはDOM identityの`Set`で重複排除。computed-colorは既存`rendered_text_owner_count`を全数とし、computed sample数を区別。 | Production probe Chromium実測: moving 199/200 `ok`、201→200 returned + `incomplete`; neighbor 499/500 `ok`、501→500 + `incomplete`; text presentation 499/500 `ok`、501 partial; computed color 500 complete、501 partial; reflow 199/200 complete、201 partial; text-spacing 99/100 `ok`、101→100 + `incomplete`。 |
+| ARIA component探索 | fixed selectorsにswitch/tab/menuitem等がなく、またvisibilityだけで対象を絞るため、ARIA component populationから落ちる可能性があった。 | 目的別の既存selectorを拡張し、component/form候補はPlaywright visibilityまたはbrowser accessibility tree inclusionを利用。新しいrole/name計算器や全probe共通の巨大selectorは作っていない。 | Chromiumでcomponent 53、form 51、purpose 53を確認し、switch/tab/menuitem/checkbox/radio等を含む。全target ref一意。小規模production `mp-component-semantics`結果を実`normalize-wcag-machine-probe-result` / runtimeへ通し、`currentness_matches=true`、6 components、`ready/supported`、issues 0。 |
+| 非表示media | visible-onlyの`allVisible("audio,video")`は表示されないaudio/videoを母集団から除外していた。 | media inventoryはLocatorで存在を列挙し、visible状態とは別に記録。autoplay属性や現在のpaused状態から過去のpage-load再生開始を推定せず、開始条件を観測できないrunは部分結果。 | Chromiumで4 mediaを取得しhidden 3件を保持。autoplay runは`incomplete` / `media-playback-origin-not-instrumented`、候補数4。 |
+| Shadow DOM target ref | ShadowRoot直下の`parentElement=null`経路で同tag兄弟の集合が要素自身だけとなり、ordinal refが衝突し得た。 | 既存path builderがShadowRootの`children`から同tag順位を計算し、host境界をpathに保持するよう修正。 | ChromiumでShadowRoot直下の同tag兄弟、異なるhost、nested rootおよび通常DOMを実行し、refの一意性を確認。 |
+| partial結果のアクセシブル名 | page set / pointer action等が未確定のpartial候補に任意name本文を保存していた。redaction regexで任意文字列の秘匿は保証できない。 | `mp-multipage-signature`、`mp-hover-focus-content-run`、`mp-pointer-interaction-run`はname本文を除き、`accessible_name_present`だけ保持。production normalizerは対象3 probeのpartial candidate rowにname本文があれば拒否。 | fixtureの架空任意ラベルを実probeで実行。partial result、normalizer出力、runtime payloadに本文が残らず、name-presenceを保持することを確認。 |
+| audio incomplete schema | audio runが`incomplete`を返す際、一部経路でnormalizer必須のpartial reasonがなかった。 | 既存finite enumへ`media-playback-origin-not-instrumented`を追加し、取得済みの有限情報を保ちながらnormalizer/runtimeでpartialとして閉じる。 | 候補4件のproduction probeをnormalizerへ渡し`ready/partial`へ保持。候補なしの場合も過去再生有無は断定しない契約をPlanに明記。 |
+| Text SpacingのShadow DOM | documentへのstyle追加だけではopen shadow rootのstyleが変わらないが、対象Locatorはroot内も列挙する。 | 同じ固定CSSを観測済みopen Shadow Rootへ限定挿入し、text ownerに対するcomputed valuesを検証。適用不一致はincomplete、cleanup確認失敗はblocked。closed rootとscope外frameは拡張対象外。 | Chromiumでopen root 4件、override mismatch 0、cleanup `restored`。99 / 100 / 101 clipped targetで境界を確認。101件は返却100件・`incomplete`。 |
+| `close_report()`の完了条件 | 修正前にrequired 15 stepを全てN/A、`sample_results=[]`、empty example coverage、accessible checks all trueとして`complete`を再現。 | 空/重複/未知`required_steps`を拒否し、required step outcomeは`complete`のみ許容。Step 4.2 required時はcriterion planのexpected ref集合と現在結果の完全一致を要求。欠落・余分・重複、undetermined/stale/unknownはblocked。required外の適法N/Aは維持。 | direct helperと既存`wcag_runtime.handler`経路の双方で全N/A + empty resultsが`blocked`。criterion ref不足・stale・undeterminedもblocked。正常current resultと適法N/Aの組合せは`complete`。 |
+
+### focused / repository検証
+
+- focused: `test_canonical_usability_fixture.py` 17 PASS、`test_usability_inspection_contract.py` 17 PASS、`test_inspection_runtime_contract.py` 14 PASS、`test_wcag_formal_contract.py` 11 PASS、`test_wcag_report_closure_contract.py` 16 PASS、`test_wcag_runtime_contract.py` 12 PASS（合計87 PASS）。
+- repository standard: official `skills-ref validate` 22/22 PASS; semantic dataset validator 22 Skill / 155 case; shared deterministic 12 PASS; repository deterministic 265 PASS; shared semantic 27 PASS / Windows symlink privilegeによる2 SKIP; repository semantic 4 PASS; trigger contract 1 PASS; runtime 271 PASS; Python compile 39 roots PASS; changed JS Node syntax PASS。
+- 変更対象のPrettier、Markdown lint、text quality、`git diff --check`は、report/Planを含む最終文書変更後にも再実行し記録する。`npm run validate:skills`のignored `AGENTS.md`参照先不在は既知overlay問題として分離し、overlayを修正しない。
+- semantic全量83、Trigger 180、Holdout 24、WCAG fixture全criteria/procedure closureは今回実施していない。native Trigger全量評価はPR #17ではなく別の継続評価課題のまま。
+
+### 実装範囲と残作業
+
+- 変更: fixed WCAG probes、observation partial-result contract、formal report closure helper、既存reporting contract / `_05j` / `_06b`、関連deterministic/runtime tests、新synthetic fixture、task Planと本report。新依存なし。Skill description/routing、CAS/reservation、HMAC方式、PR #17 evaluatorは変更なし。
+- Planの詳細な8件突合と各根拠は[修復Plan](../plans/2026-10-09_063800_pr14-playwright-observation-review-repair.md)のSection 12に保存。
+- 次: 最終Markdown/format/text/diff checks後、対象tracked filesのみを通常stage/commit/pushする。PR本文へ今回の8指摘と正確な検証範囲を追記し、push後の最新PR headに対し3 Actions successを再取得する。mergeは行わない。

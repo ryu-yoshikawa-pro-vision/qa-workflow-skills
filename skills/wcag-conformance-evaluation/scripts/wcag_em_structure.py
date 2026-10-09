@@ -734,13 +734,56 @@ def statement_of_partial_conformance(*, version: str, level: str, statement_type
 
 
 def close_report(*, required_steps: list[str], step_outcomes: dict[str, str], sample_results: list[dict[str, Any]],
-                 example_coverage: dict[str, list[str]], all_occurrence_requirements: dict[str, list[str]] | None = None,
+                 example_coverage: dict[str, list[str]], required_criterion_evaluation_refs: list[str] | None = None,
+                 all_occurrence_requirements: dict[str, list[str]] | None = None,
                  accessible_output_closure: dict[str, bool] | None = None) -> dict[str, Any]:
-    if set(required_steps)-set(REPORT_STEPS) or set(step_outcomes)-set(REPORT_STEPS):
+    if (not isinstance(required_steps, list) or not required_steps
+            or any(not isinstance(step, str) for step in required_steps)
+            or len(required_steps) != len(set(required_steps))
+            or set(required_steps)-set(REPORT_STEPS) or not isinstance(step_outcomes, dict)
+            or set(step_outcomes)-set(REPORT_STEPS)):
         raise EvaluationStructureError('report step key outside fixed WCAG-EM step inventory')
+    if not isinstance(sample_results, list):
+        raise EvaluationStructureError('sample results must be a list')
+    if required_criterion_evaluation_refs is not None and (
+            not isinstance(required_criterion_evaluation_refs, list)
+            or any(not isinstance(ref, str) or not ref.strip() for ref in required_criterion_evaluation_refs)
+            or len(required_criterion_evaluation_refs) != len(set(required_criterion_evaluation_refs))):
+        raise EvaluationStructureError('required criterion evaluation refs must be unique non-empty refs')
+
     missing_steps=sorted(set(REPORT_STEPS)-set(step_outcomes))
     open_steps=sorted(step for step,status in step_outcomes.items() if status not in {'complete','not-applicable'})
-    unsatisfied=sorted({r['requirement_ref'] for r in sample_results if r.get('result')=='not-satisfied'})
+    incomplete_required_steps=sorted(step for step in required_steps if step_outcomes.get(step) != 'complete')
+    sample_result_refs=[]
+    invalid_sample_results=[]
+    incomplete_sample_results=[]
+    unsatisfied=set()
+    for index,row in enumerate(sample_results):
+        if (not isinstance(row, dict) or not isinstance(row.get('criterion_evaluation_ref'), str)
+                or not row.get('criterion_evaluation_ref','').strip()
+                or not isinstance(row.get('requirement_ref'), str) or not row.get('requirement_ref','').strip()
+                or row.get('result') not in {'satisfied','not-satisfied','undetermined'}
+                or row.get('freshness_status') not in {'current','stale','unknown'}):
+            invalid_sample_results.append(str(index))
+            continue
+        sample_result_refs.append(row['criterion_evaluation_ref'])
+        if row['result'] == 'not-satisfied': unsatisfied.add(row['requirement_ref'])
+        if row['result'] == 'undetermined' or row['freshness_status'] != 'current':
+            incomplete_sample_results.append(row['criterion_evaluation_ref'])
+    if len(sample_result_refs) != len(set(sample_result_refs)):
+        invalid_sample_results.append('duplicate_criterion_evaluation_ref')
+
+    expected_refs = required_criterion_evaluation_refs
+    missing_sample_result_refs=[]
+    unexpected_sample_result_refs=[]
+    sample_result_scope_missing = '4.2' in required_steps and not expected_refs
+    if expected_refs is None:
+        if '4.2' in required_steps:
+            sample_result_scope_missing = True
+    else:
+        missing_sample_result_refs=sorted(set(expected_refs)-set(sample_result_refs))
+        unexpected_sample_result_refs=sorted(set(sample_result_refs)-set(expected_refs))
+    unsatisfied=sorted(unsatisfied)
     missing_examples=sorted(req for req in unsatisfied if not _nonempty_refs(example_coverage.get(req)))
     missing_occurrences=[]
     for req, expected in (all_occurrence_requirements or {}).items():
@@ -751,9 +794,18 @@ def close_report(*, required_steps: list[str], step_outcomes: dict[str, str], sa
         accessible_missing=list(ACCESSIBLE_OUTPUT_CHECKS)
     else:
         accessible_missing=sorted(key for key,value in accessible_output_closure.items() if value is not True)
-    complete=not missing_steps and not open_steps and not missing_examples and not missing_occurrences and not accessible_missing
+    complete=(not missing_steps and not open_steps and not incomplete_required_steps and not invalid_sample_results
+              and not incomplete_sample_results and not missing_sample_result_refs and not unexpected_sample_result_refs
+              and not sample_result_scope_missing and not missing_examples and not missing_occurrences
+              and not accessible_missing)
     return {'status':'complete' if complete else 'blocked','missing_step_outcomes':missing_steps,
-            'open_steps':open_steps,'not_satisfied_requirements_without_example':missing_examples,
+            'open_steps':open_steps,'incomplete_required_steps':incomplete_required_steps,
+            'invalid_sample_results':sorted(set(invalid_sample_results)),
+            'incomplete_sample_results':sorted(incomplete_sample_results),
+            'sample_result_scope_missing':sample_result_scope_missing,
+            'missing_sample_result_refs':missing_sample_result_refs,
+            'unexpected_sample_result_refs':unexpected_sample_result_refs,
+            'not_satisfied_requirements_without_example':missing_examples,
             'all_occurrence_gaps':sorted(missing_occurrences),'accessible_output_missing_checks':accessible_missing,
             'accessible_output_closure':accessible_output_closure if not accessible_missing else None,'aggregated_score':None}
 

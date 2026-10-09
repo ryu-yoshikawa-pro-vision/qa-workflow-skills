@@ -172,20 +172,21 @@ async (page) => {
     ...(observation.limitation_code ? { limitation_code: observation.limitation_code } : {}),
   });
   const interactiveSelector =
-    "a[href],button,input,select,textarea,[role='button'],[role='link'],[role='checkbox'],[role='radio'],[role='slider'],[tabindex]:not([tabindex='-1'])";
+    "a[href],button,input,select,textarea,[role='button'],[role='link'],[role='checkbox'],[role='radio'],[role='slider'],[role='switch'],[role='tab'],[role='menuitem'],[role='menuitemcheckbox'],[role='menuitemradio'],[role='option'],[role='combobox'],[role='listbox'],[role='textbox'],[role='searchbox'],[role='spinbutton'],[tabindex]:not([tabindex='-1'])";
 
   const elementPathFor = (element) => {
     const parts = [];
     let current = element;
     while (current && current.nodeType === Node.ELEMENT_NODE) {
       const parent = current.parentElement;
-      const peers = parent
-        ? Array.from(parent.children).filter((peer) => peer.tagName === current.tagName)
+      const root = current.getRootNode();
+      const siblingContainer = parent || (root instanceof ShadowRoot ? root : null);
+      const peers = siblingContainer
+        ? Array.from(siblingContainer.children).filter((peer) => peer.tagName === current.tagName)
         : [current];
       parts.unshift(
         current.tagName.toLowerCase() + ":nth-of-type(" + (peers.indexOf(current) + 1) + ")",
       );
-      const root = current.getRootNode();
       if (parent) {
         current = parent;
       } else if (root instanceof ShadowRoot) {
@@ -323,13 +324,16 @@ async (page) => {
               let current = element;
               while (current && current.nodeType === Node.ELEMENT_NODE) {
                 const parent = current.parentElement;
-                const peers = parent
-                  ? Array.from(parent.children).filter((peer) => peer.tagName === current.tagName)
+                const root = current.getRootNode();
+                const siblingContainer = parent || (root instanceof ShadowRoot ? root : null);
+                const peers = siblingContainer
+                  ? Array.from(siblingContainer.children).filter(
+                      (peer) => peer.tagName === current.tagName,
+                    )
                   : [current];
                 parts.unshift(
                   current.tagName.toLowerCase() + ":nth-of-type(" + (peers.indexOf(current) + 1) + ")",
                 );
-                const root = current.getRootNode();
                 if (parent) {
                   current = parent;
                 } else if (root instanceof ShadowRoot) {
@@ -516,6 +520,10 @@ async (page) => {
 
   if (request.machine_probe_key === "mp-text-spacing-run") {
     const styleId = "__qa_fixed_wcag_text_spacing_probe";
+    const styleMarker = "data-qa-fixed-wcag-text-spacing-probe";
+    const styleText =
+      "* { line-height: 1.5 !important; letter-spacing: 0.12em !important; word-spacing: 0.16em !important; }" +
+      "p { margin-block-end: 2em !important; }";
     const baseline = await page.evaluate(
       (id) => ({
         style_collision: Boolean(document.getElementById(id)),
@@ -528,6 +536,8 @@ async (page) => {
       styleId,
     );
     baseline.control_count = await page.locator(interactiveSelector).count();
+    baseline.style_collision =
+      baseline.style_collision || (await page.locator(`style[${styleMarker}]`).count()) > 0;
     if (baseline.style_collision) {
       return resultFor({
         status: "blocked",
@@ -538,28 +548,42 @@ async (page) => {
     let after = null;
     let cleanupError = null;
     try {
-      styleHandle = await page.addStyleTag({
-        content:
-          "* { line-height: 1.5 !important; letter-spacing: 0.12em !important; word-spacing: 0.16em !important; }" +
-          "p { margin-block-end: 2em !important; }",
-      });
+      styleHandle = await page.addStyleTag({ content: styleText });
       await styleHandle.evaluate((element, id) => {
         element.id = id;
+        element.setAttribute("data-qa-fixed-wcag-text-spacing-probe", "");
       }, styleId);
-      after = await page.locator("body *").evaluateAll((elements) => {
+      const shadowRootCount = await page.locator("body *").evaluateAll((elements, args) => {
+        const roots = new Set();
+        for (const element of elements) {
+          const root = element.getRootNode();
+          if (root instanceof ShadowRoot) roots.add(root);
+        }
+        for (const root of roots) {
+          const style = root.ownerDocument.createElement("style");
+          style.setAttribute(args.marker, "");
+          style.textContent = args.css;
+          root.appendChild(style);
+        }
+        return roots.size;
+      }, { marker: styleMarker, css: styleText });
+      after = await page.locator("body *").evaluateAll((elements, args) => {
         const clipped = [];
+        let visibleTextOwnerCount = 0;
+        let overrideMismatchCount = 0;
         const pathFor = (element) => {
           const parts = [];
           let current = element;
           while (current && current.nodeType === Node.ELEMENT_NODE) {
             const parent = current.parentElement;
-            const peers = parent
-              ? Array.from(parent.children).filter((peer) => peer.tagName === current.tagName)
+            const root = current.getRootNode();
+            const siblingContainer = parent || (root instanceof ShadowRoot ? root : null);
+            const peers = siblingContainer
+              ? Array.from(siblingContainer.children).filter((peer) => peer.tagName === current.tagName)
               : [current];
             parts.unshift(
               current.tagName.toLowerCase() + ":nth-of-type(" + (peers.indexOf(current) + 1) + ")",
             );
-            const root = current.getRootNode();
             if (parent) {
               current = parent;
             } else if (root instanceof ShadowRoot) {
@@ -581,6 +605,33 @@ async (page) => {
             rect.height <= 0
           )
             continue;
+          const hasDirectText = Array.from(element.childNodes).some(
+            (node) => node.nodeType === Node.TEXT_NODE && /\S/u.test(node.nodeValue || ""),
+          );
+          if (hasDirectText) {
+            visibleTextOwnerCount += 1;
+            const fontSize = Number.parseFloat(style.fontSize);
+            const lineHeight = Number.parseFloat(style.lineHeight);
+            const letterSpacing = Number.parseFloat(style.letterSpacing);
+            const wordSpacing = Number.parseFloat(style.wordSpacing);
+            if (
+              !Number.isFinite(fontSize) ||
+              !Number.isFinite(lineHeight) ||
+              !Number.isFinite(letterSpacing) ||
+              !Number.isFinite(wordSpacing) ||
+              Math.abs(lineHeight - fontSize * 1.5) > 0.5 ||
+              Math.abs(letterSpacing - fontSize * 0.12) > 0.5 ||
+              Math.abs(wordSpacing - fontSize * 0.16) > 0.5
+            ) {
+              overrideMismatchCount += 1;
+            }
+          }
+          if (
+            element.tagName.toLowerCase() === "p" &&
+            Math.abs(Number.parseFloat(style.marginBlockEnd) - Number.parseFloat(style.fontSize) * 2) > 0.5
+          ) {
+            overrideMismatchCount += 1;
+          }
           const overflowX =
             ["hidden", "clip"].includes(style.overflowX) &&
             (element.scrollWidth > element.clientWidth + 1 || rect.right > innerWidth + 1);
@@ -599,6 +650,11 @@ async (page) => {
             horizontal_css_px: Math.max(0, document.documentElement.scrollWidth - innerWidth),
             vertical_css_px: Math.max(0, document.documentElement.scrollHeight - innerHeight),
           },
+          open_shadow_root_count: args.shadowRootCount,
+          visible_text_owner_count: visibleTextOwnerCount,
+          override_mismatch_count: overrideMismatchCount,
+          clipped_target_count: clipped.length,
+          returned_clipped_target_count: Math.min(clipped.length, 100),
           clipped_targets: clipped.slice(0, 100),
           applied_values: {
             line_height: "1.5",
@@ -607,27 +663,32 @@ async (page) => {
             paragraph_spacing: "2em",
           },
         };
-      });
+      }, { shadowRootCount });
       after.control_count = await page.locator(interactiveSelector).count();
     } catch {
       cleanupError = "fixed text-spacing observation could not be completed";
     } finally {
+      try {
+        await page.locator(`style[${styleMarker}]`).evaluateAll((styles) => {
+          styles.forEach((element) => element.remove());
+        });
+        if ((await page.locator(`style[${styleMarker}]`).count()) > 0) {
+          cleanupError = cleanupError || "fixed text-spacing override remained after cleanup";
+        }
+      } catch {
+        cleanupError = cleanupError || "fixed text-spacing cleanup could not be verified";
+      }
       if (styleHandle) {
         try {
-          await styleHandle.evaluate((element) => element.remove());
+          await styleHandle.dispose();
         } catch {
           cleanupError = cleanupError || "fixed style cleanup could not be verified";
         }
-        await styleHandle.dispose().catch(() => {});
       }
     }
     if (cleanupError === null) {
-      const markerRemains = await page.evaluate(
-        (id) => Boolean(document.getElementById(id)),
-        styleId,
-      );
-      if (markerRemains)
-        cleanupError = "fixed text-spacing override remained in the document after cleanup";
+      const markerRemains = await page.locator(`style#${styleId}`).count();
+      if (markerRemains > 0) cleanupError = "fixed text-spacing override remained in the document after cleanup";
     }
     if (!after || cleanupError !== null) {
       return resultFor({
@@ -639,6 +700,32 @@ async (page) => {
           cleanup: cleanupError === null ? "not-required" : "unverified",
         },
         limitation: cleanupError || "the fixed text-spacing observation did not return a result",
+      });
+    }
+    if (after.override_mismatch_count > 0 || after.visible_text_owner_count === 0) {
+      return resultFor({
+        status: "incomplete",
+        value: {
+          schema: "wcag-text-spacing-v1",
+          observation_completeness: { state: "partial", reason: "text-spacing-override-not-applied" },
+          baseline,
+          after,
+          cleanup: { status: "restored" },
+        },
+        limitation: "the requested text-spacing values could not be verified on the observed text population",
+      });
+    }
+    if (after.clipped_target_count > 100) {
+      return resultFor({
+        status: "incomplete",
+        value: {
+          schema: "wcag-text-spacing-v1",
+          observation_completeness: { state: "partial", reason: "probe-result-limit-reached" },
+          baseline,
+          after,
+          cleanup: { status: "restored" },
+        },
+        limitation: "the clipped-target list exceeded its fixed result limit",
       });
     }
     return resultFor({
@@ -666,7 +753,7 @@ async (page) => {
     ],
     "mp-shortcut-inventory": ["[accesskey]"],
     "mp-form-control-inventory": [
-      "input,select,textarea,button,[role='checkbox'],[role='radio'],[role='slider'],[role='switch']",
+      "input,select,textarea,button,[role='checkbox'],[role='radio'],[role='slider'],[role='switch'],[role='combobox'],[role='listbox'],[role='textbox'],[role='searchbox'],[role='spinbutton']",
     ],
     "mp-heading-label-inventory": ["h1,h2,h3,h4,h5,h6,[role='heading']", "label"],
     "mp-link-inventory": ["a[href],[role='link']"],
@@ -674,7 +761,7 @@ async (page) => {
       "main,nav,header,footer,aside,section,article,form,fieldset,ul,ol,dl,table,thead,tbody,tr,th,td,h1,h2,h3,h4,h5,h6,[role='main'],[role='navigation'],[role='list'],[role='table'],[role='row'],[role='cell'],[role='columnheader']",
     ],
     "mp-sequence-inventory": [
-      "main,nav,header,footer,h1,h2,h3,h4,h5,h6,a[href],button,input,select,textarea,[role='button'],[role='link'],[tabindex]:not([tabindex='-1'])",
+      "main,nav,header,footer,h1,h2,h3,h4,h5,h6," + interactiveSelector,
     ],
     "mp-component-semantics": [interactiveSelector],
     "mp-status-candidate-inventory": ["[role='status'],[role='alert'],[aria-live]"],
@@ -718,13 +805,14 @@ async (page) => {
       let current = element;
       while (current && current.nodeType === Node.ELEMENT_NODE) {
         const parent = current.parentElement;
-        const peers = parent
-          ? Array.from(parent.children).filter((peer) => peer.tagName === current.tagName)
+        const root = current.getRootNode();
+        const siblingContainer = parent || (root instanceof ShadowRoot ? root : null);
+        const peers = siblingContainer
+          ? Array.from(siblingContainer.children).filter((peer) => peer.tagName === current.tagName)
           : [current];
         parts.unshift(
           current.tagName.toLowerCase() + ":nth-of-type(" + (peers.indexOf(current) + 1) + ")",
         );
-        const root = current.getRootNode();
         if (parent) {
           current = parent;
         } else if (root instanceof ShadowRoot) {
@@ -828,6 +916,14 @@ async (page) => {
         };
         const allVisible = (selector) =>
           located(selector).filter((element) => observationFor(element)?.visible === true);
+        const allVisibleOrInAccessibilityTree = (selector) =>
+          located(selector).filter((element) => {
+            const observation = observationFor(element);
+            return (
+              observation?.visible === true ||
+              observation?.accessibility_tree_includes_element === true
+            );
+          });
         const pathFor = (element) => {
           const observedPath = observationFor(element)?.path;
           if (typeof observedPath === "string") return observedPath;
@@ -835,13 +931,16 @@ async (page) => {
           let current = element;
           while (current && current.nodeType === Node.ELEMENT_NODE) {
             const parent = current.parentElement;
-            const peers = parent
-              ? Array.from(parent.children).filter((peer) => peer.tagName === current.tagName)
+            const root = current.getRootNode();
+            const siblingContainer = parent || (root instanceof ShadowRoot ? root : null);
+            const peers = siblingContainer
+              ? Array.from(siblingContainer.children).filter(
+                  (peer) => peer.tagName === current.tagName,
+                )
               : [current];
             parts.unshift(
               current.tagName.toLowerCase() + ":nth-of-type(" + (peers.indexOf(current) + 1) + ")",
             );
-            const root = current.getRootNode();
             if (parent) current = parent;
             else if (root instanceof ShadowRoot) {
               parts.unshift("::shadow");
@@ -876,7 +975,7 @@ async (page) => {
             .slice(0, limit);
         const textOf = (element) => safeText(element?.innerText || "");
         const refOf = (element, prefix = "dom-target") => prefix + ":" + pathFor(element);
-        const interactiveElements = () => allVisible(interactive);
+        const interactiveElements = () => allVisibleOrInAccessibilityTree(interactive);
         const statesOf = (element) => ({
           disabled:
             typeof observationFor(element)?.enabled === "boolean"
@@ -1023,7 +1122,7 @@ async (page) => {
             };
           }
           case "mp-media-inventory": {
-            const media = allVisible("audio,video");
+            const media = located("audio,video");
             return {
               status: "ok",
               value: value({
@@ -1049,36 +1148,46 @@ async (page) => {
             };
           }
           case "mp-moving-updating-inventory": {
-            const moving = allVisible(
+            const movingElements = new Set(allVisible(
               "marquee,blink,[aria-live],svg animate,svg animateMotion,svg animateTransform",
-            ).map((element) => ({
-              target_ref: refOf(element),
-              tag_name: element.tagName.toLowerCase(),
-              role: roleOf(element),
-              aria_live: element.getAttribute("aria-live"),
-              aria_atomic: element.getAttribute("aria-atomic"),
-              animation_name: getComputedStyle(element).animationName,
-              animation_duration: getComputedStyle(element).animationDuration,
-              paused_control_present: Boolean(element.querySelector("button,[role='button']")),
-            }));
+            ));
             for (const element of allVisible("*")) {
               const style = getComputedStyle(element);
               if (
                 style.animationName !== "none" ||
                 style.animationDuration.split(",").some((item) => parseFloat(item) > 0)
               ) {
-                moving.push({
-                  target_ref: refOf(element),
-                  tag_name: element.tagName.toLowerCase(),
-                  aria_live: element.getAttribute("aria-live"),
-                  aria_atomic: element.getAttribute("aria-atomic"),
-                  animation_name: style.animationName,
-                  animation_duration: style.animationDuration,
-                  paused_control_present: Boolean(element.querySelector("button,[role='button']")),
-                });
+                movingElements.add(element);
               }
             }
-            return { status: "ok", value: value({ candidates: moving.slice(0, 200) }) };
+            const candidates = Array.from(movingElements, (element) => {
+              const style = getComputedStyle(element);
+              return {
+                target_ref: refOf(element),
+                tag_name: element.tagName.toLowerCase(),
+                role: roleOf(element),
+                aria_live: element.getAttribute("aria-live"),
+                aria_atomic: element.getAttribute("aria-atomic"),
+                animation_name: style.animationName,
+                animation_duration: style.animationDuration,
+                paused_control_present: Boolean(element.querySelector("button,[role='button']")),
+              };
+            });
+            const resultValue = value({
+              candidate_count: candidates.length,
+              returned_candidate_count: Math.min(candidates.length, 200),
+              candidates: candidates.slice(0, 200),
+              ...(candidates.length > 200
+                ? { observation_completeness: { state: "partial", reason: "probe-result-limit-reached" } }
+                : {}),
+            });
+            return candidates.length > 200
+              ? {
+                  status: "incomplete",
+                  value: resultValue,
+                  limitation: "the moving-content candidate list exceeded its fixed result limit",
+                }
+              : { status: "ok", value: resultValue };
           }
           case "mp-timer-inventory": {
             const timers = allVisible(
@@ -1120,8 +1229,8 @@ async (page) => {
             return {
               status: "ok",
               value: value({
-                controls: allVisible(
-                  "input,select,textarea,button,[role='checkbox'],[role='radio'],[role='slider'],[role='switch']",
+                controls: allVisibleOrInAccessibilityTree(
+                  "input,select,textarea,button,[role='checkbox'],[role='radio'],[role='slider'],[role='switch'],[role='combobox'],[role='listbox'],[role='textbox'],[role='searchbox'],[role='spinbutton']",
                 ).map((element) => ({
                   target_ref: refOf(element),
                   tag_name: element.tagName.toLowerCase(),
@@ -1289,6 +1398,8 @@ async (page) => {
                 geometry_css_px: rectOf(element),
               }));
             const pairs = [];
+            let neighboringPairCount = 0;
+            let resultLimitReached = false;
             for (let index = 0; index < targets.length; index++) {
               const first = targets[index];
               for (let nextIndex = index + 1; nextIndex < targets.length; nextIndex++) {
@@ -1316,18 +1427,39 @@ async (page) => {
                   verticalGap <= 48 &&
                   (overlapX > 0 || overlapY > 0 || horizontalGap < 48 || verticalGap < 48)
                 ) {
-                  pairs.push({
-                    first_target_ref: first.target_ref,
-                    second_target_ref: second.target_ref,
-                    horizontal_gap_css_px: horizontalGap,
-                    vertical_gap_css_px: verticalGap,
-                  });
-                  if (pairs.length >= 500) break;
+                  neighboringPairCount += 1;
+                  if (pairs.length < 500) {
+                    pairs.push({
+                      first_target_ref: first.target_ref,
+                      second_target_ref: second.target_ref,
+                      horizontal_gap_css_px: horizontalGap,
+                      vertical_gap_css_px: verticalGap,
+                    });
+                  } else {
+                    resultLimitReached = true;
+                    break;
+                  }
                 }
               }
-              if (pairs.length >= 500) break;
+              if (resultLimitReached) break;
             }
-            return { status: "ok", value: value({ targets, neighboring_pairs: pairs }) };
+            const resultValue = value({
+              targets,
+              neighboring_pairs: pairs,
+              neighboring_pair_count_lower_bound: neighboringPairCount,
+              neighboring_pair_count_complete: !resultLimitReached,
+              returned_pair_count: pairs.length,
+              ...(resultLimitReached
+                ? { observation_completeness: { state: "partial", reason: "probe-result-limit-reached" } }
+                : {}),
+            });
+            return resultLimitReached
+              ? {
+                  status: "incomplete",
+                  value: resultValue,
+                  limitation: "the neighboring-pair result exceeded its fixed limit",
+                }
+              : { status: "ok", value: resultValue };
           }
           case "mp-text-presentation-values": {
             const owners = allVisible("*").filter((element) =>
@@ -1335,12 +1467,7 @@ async (page) => {
                 (node) => node.nodeType === Node.TEXT_NODE && /\S/u.test(node.nodeValue || ""),
               ),
             );
-            return {
-              status: "ok",
-              value: value({
-                targets: owners
-                  .slice(0, 500)
-                  .map((element) => {
+            const targets = owners.slice(0, 500).map((element) => {
                     const style = getComputedStyle(element),
                       rect = element.getBoundingClientRect();
                     return {
@@ -1354,9 +1481,22 @@ async (page) => {
                       overflow_wrap: style.overflowWrap,
                       width_css_px: rect.width,
                     };
-                  }),
-              }),
-            };
+                  });
+            const resultValue = value({
+              text_owner_count: owners.length,
+              returned_target_count: targets.length,
+              targets,
+              ...(owners.length > 500
+                ? { observation_completeness: { state: "partial", reason: "probe-result-limit-reached" } }
+                : {}),
+            });
+            return owners.length > 500
+              ? {
+                  status: "incomplete",
+                  value: resultValue,
+                  limitation: "the text-presentation target list exceeded its fixed result limit",
+                }
+              : { status: "ok", value: resultValue };
           }
           case "mp-viewport-state":
             return {
@@ -1378,7 +1518,7 @@ async (page) => {
               }),
             };
           case "mp-reflow-run": {
-            const overflowTargets = allVisible("*")
+            const allOverflowTargets = allVisible("*")
               .filter((element) => {
                 const rect = element.getBoundingClientRect();
                 return (
@@ -1388,25 +1528,33 @@ async (page) => {
                     getComputedStyle(element).overflowX === "clip") &&
                     element.scrollWidth > element.clientWidth + 1)
                 );
-              })
-              .slice(0, 200)
-              .map((element) => ({
+              });
+            const overflowTargets = allOverflowTargets.slice(0, 200).map((element) => ({
                 target_ref: refOf(element),
                 geometry_css_px: rectOf(element),
                 scroll_width_css_px: element.scrollWidth,
                 client_width_css_px: element.clientWidth,
               }));
-            return {
-              status: "ok",
-              value: value({
+            const resultValue = value({
                 required_viewport_css_px: { width: innerWidth, height: innerHeight },
                 document_overflow_css_px: Math.max(
                   0,
                   document.documentElement.scrollWidth - innerWidth,
                 ),
+                overflow_target_count: allOverflowTargets.length,
+                returned_overflow_target_count: overflowTargets.length,
                 overflow_targets: overflowTargets,
-              }),
-            };
+                ...(allOverflowTargets.length > 200
+                  ? { observation_completeness: { state: "partial", reason: "probe-result-limit-reached" } }
+                  : {}),
+              });
+            return allOverflowTargets.length > 200
+              ? {
+                  status: "incomplete",
+                  value: resultValue,
+                  limitation: "the reflow overflow-target list exceeded its fixed result limit",
+                }
+              : { status: "ok", value: resultValue };
           }
           case "mp-orientation-run":
             return {
@@ -1427,20 +1575,14 @@ async (page) => {
                 "the fixed request identifies one current variation but does not provide a paired alternate-orientation sample identity",
             };
           case "mp-audio-autoplay-run": {
-            const audio = allVisible("audio,video");
-            if (audio.length === 0) {
-              return {
-                status: "ok",
-                value: value({
-                  candidates: [],
-                  observed_after_page_load: true,
-                  playback_start_origin_instrumented: false,
-                }),
-              };
-            }
+            const audio = located("audio,video");
             return {
               status: "incomplete",
               value: value({
+                observation_completeness: {
+                  state: "partial",
+                  reason: "media-playback-origin-not-instrumented",
+                },
                 candidates: audio.map((element) => ({
                   target_ref: refOf(element),
                   media_type: element.tagName.toLowerCase(),
@@ -1455,6 +1597,7 @@ async (page) => {
                 })),
                 observed_after_page_load: true,
                 playback_start_origin_instrumented: false,
+                media_candidate_count: audio.length,
               }),
               limitation:
                 "the fixed current-page observation does not instrument media playback origin or time from document load",
@@ -1469,16 +1612,40 @@ async (page) => {
                   reason: "prior-control-observation-not-materialized",
                 },
                 controls: interactiveElements()
-                  .filter(
-                    (element) =>
-                      ["checkbox", "radio", "range"].includes(element.type) ||
-                      element.tagName === "SELECT",
-                  )
-                  .map((element) => ({
-                    target_ref: refOf(element),
-                    role: roleOf(element),
-                    state: statesOf(element),
-                  })),
+                .filter(
+                  (element) =>
+                    ["checkbox", "radio", "range"].includes(element.type) ||
+                    element.tagName === "SELECT" ||
+                    [
+                      "checkbox",
+                      "radio",
+                      "switch",
+                      "slider",
+                      "spinbutton",
+                      "combobox",
+                      "listbox",
+                      "option",
+                      "textbox",
+                      "searchbox",
+                    ].includes(roleOf(element)),
+                )
+                .map((element) => ({
+                  target_ref: refOf(element),
+                  role: roleOf(element),
+                  state: {
+                    ...statesOf(element),
+                    aria_checked: ["true", "false", "mixed"].includes(
+                      element.getAttribute("aria-checked"),
+                    )
+                      ? element.getAttribute("aria-checked")
+                      : null,
+                    aria_selected: ["true", "false"].includes(
+                      element.getAttribute("aria-selected"),
+                    )
+                      ? element.getAttribute("aria-selected")
+                      : null,
+                  },
+                })),
                 previous_value_state_available: false,
               }),
               limitation:
@@ -1495,7 +1662,9 @@ async (page) => {
                 controls: interactiveElements().map((element) => ({
                     target_ref: refOf(element),
                     role: roleOf(element),
-                    accessible_name: accessibleName(element),
+                    accessible_name_present: accessibilityTreeIncludes(element)
+                      ? accessibleNamePresent(element)
+                      : null,
                     has_help_relationship: Boolean(element.getAttribute("aria-describedby")),
                   })),
                 },
@@ -1512,7 +1681,9 @@ async (page) => {
                 candidate_targets: interactiveElements().map((element) => ({
                   target_ref: refOf(element),
                   role: roleOf(element),
-                  accessible_name: accessibleName(element),
+                  accessible_name_present: accessibilityTreeIncludes(element)
+                    ? accessibleNamePresent(element)
+                    : null,
                   focused: element === document.activeElement,
                 })),
                 transition_observed: false,
@@ -1577,7 +1748,9 @@ async (page) => {
                 candidate_targets: interactiveElements().map((element) => ({
                   target_ref: refOf(element),
                   role: roleOf(element),
-                  accessible_name: accessibleName(element),
+                  accessible_name_present: accessibilityTreeIncludes(element)
+                    ? accessibleNamePresent(element)
+                    : null,
                   draggable: element.draggable,
                   input_type: element instanceof HTMLInputElement ? element.type : null,
                 })),
@@ -1624,11 +1797,12 @@ async (page) => {
         let current = element;
         while (current && current.nodeType === Node.ELEMENT_NODE) {
           const parent = current.parentElement;
-          const peers = parent
-            ? Array.from(parent.children).filter((peer) => peer.tagName === current.tagName)
+          const root = current.getRootNode();
+          const siblingContainer = parent || (root instanceof ShadowRoot ? root : null);
+          const peers = siblingContainer
+            ? Array.from(siblingContainer.children).filter((peer) => peer.tagName === current.tagName)
             : [current];
           parts.unshift(`${current.tagName.toLowerCase()}:nth-of-type(${peers.indexOf(current) + 1})`);
-          const root = current.getRootNode();
           if (parent) current = parent;
           else if (root instanceof ShadowRoot) {
             parts.unshift("::shadow");
@@ -1735,6 +1909,8 @@ async (page) => {
       }
       return {
         rendered_text_owner_count: owners.size,
+        computed_sample_count: computedSamples.length,
+        computed_samples_complete: computedSamples.length === owners.size,
         unresolvable_background_kinds: [...reasons].sort(),
         affected_target_count: affectedTargets.size,
         computed_samples: computedSamples,
@@ -1755,6 +1931,8 @@ async (page) => {
         value: {
           schema: "wcag-computed-color-context-v1",
           rendered_text_owner_count: context.rendered_text_owner_count,
+          computed_sample_count: context.computed_sample_count,
+          computed_samples_complete: context.computed_samples_complete,
           unresolvable_background_kinds: context.unresolvable_background_kinds,
           affected_target_count: context.affected_target_count,
           computed_samples: context.computed_samples,
@@ -1764,24 +1942,37 @@ async (page) => {
         limitation_code: "background-not-machine-resolvable",
       };
     }
+    const resultValue = {
+      schema: "wcag-computed-color-context-v1",
+      rendered_text_owner_count: context.rendered_text_owner_count,
+      computed_sample_count: context.computed_sample_count,
+      computed_samples_complete: context.computed_samples_complete,
+      unresolvable_background_kinds: [],
+      affected_target_count: 0,
+      computed_samples: context.computed_samples,
+    };
+    if (!context.computed_samples_complete) {
+      return resultFor({
+        status: "incomplete",
+        value: {
+          ...resultValue,
+          observation_completeness: { state: "partial", reason: "probe-result-limit-reached" },
+        },
+        limitation: "the computed text-style sample list exceeded its fixed result limit",
+      });
+    }
     return {
       ...identity,
       status: "ok",
       current_document_identity: await currentDocumentIdentity(),
       evidence_refs: evidenceRefs,
-      value: {
-        schema: "wcag-computed-color-context-v1",
-        rendered_text_owner_count: context.rendered_text_owner_count,
-        unresolvable_background_kinds: [],
-        affected_target_count: 0,
-        computed_samples: context.computed_samples,
-      },
+      value: resultValue,
     };
   }
 
   if (request.machine_probe_key === "mp-target-geometry") {
     const selector =
-      "a[href],button,input,select,textarea,[role='button'],[role='link'],[role='slider'],img,svg,canvas,video,iframe";
+      "a[href],button,input,select,textarea,[role='button'],[role='link'],[role='checkbox'],[role='radio'],[role='slider'],[role='switch'],[role='tab'],[role='menuitem'],[role='menuitemcheckbox'],[role='menuitemradio'],[role='option'],[role='combobox'],[role='listbox'],[role='textbox'],[role='searchbox'],[role='spinbutton'],img,svg,canvas,video,iframe";
     const locator = page.locator(selector);
     const targets = [];
     const targetRefs = new Set();
@@ -1950,13 +2141,14 @@ async (page) => {
         let current = element;
         while (current && current.nodeType === Node.ELEMENT_NODE) {
           const parent = current.parentElement;
-          const sameTag = parent
-            ? Array.from(parent.children).filter((item) => item.tagName === current.tagName)
+          const root = current.getRootNode();
+          const siblingContainer = parent || (root instanceof ShadowRoot ? root : null);
+          const sameTag = siblingContainer
+            ? Array.from(siblingContainer.children).filter((item) => item.tagName === current.tagName)
             : [current];
           parts.unshift(
             `${current.tagName.toLowerCase()}:nth-of-type(${sameTag.indexOf(current) + 1})`,
           );
-          const root = current.getRootNode();
           if (parent) current = parent;
           else if (root instanceof ShadowRoot) {
             parts.unshift("::shadow");
