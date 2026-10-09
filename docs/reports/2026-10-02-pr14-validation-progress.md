@@ -550,3 +550,12 @@ formal reportはfixture全体をclosureしていない。変更後confirmation s
 - 変更: fixed WCAG probes、observation partial-result contract、formal report closure helper、既存reporting contract / `_05j` / `_06b`、関連deterministic/runtime tests、新synthetic fixture、task Planと本report。新依存なし。Skill description/routing、CAS/reservation、HMAC方式、PR #17 evaluatorは変更なし。
 - Planの詳細な8件突合と各根拠は[修復Plan](../plans/2026-10-09_063800_pr14-playwright-observation-review-repair.md)のSection 12に保存。
 - 次: 最終Markdown/format/text/diff checks後、対象tracked filesのみを通常stage/commit/pushする。PR本文へ今回の8指摘と正確な検証範囲を追記し、push後の最新PR headに対し3 Actions successを再取得する。mergeは行わない。
+
+### Push後のimplementation checkpoint
+
+- 実装・Plan・tests・fixture・この検証記録のcheckpointを、通常commit `c6055154bbe930a2178bb6a2f9c5f4d563d8a40c` (`fix: preserve WCAG observation completeness`) として作成し、通常pushした。実装tree fingerprint: `0649860c83604a69238b1a80763000b715e7b38a`。
+- push後PR headとremote tracking branchは`c6055154bbe930a2178bb6a2f9c5f4d563d8a40c`。`origin/main=dec3f7c764db2869dc24eb3d6f154712a6677068`に対しahead 328 / behind 0。working treeにtracked変更なし。`.gitignore`を含むユーザー所有データと2つの既存untracked filesは保持。
+- 通常pre-commit hookが成功。official Skill validation、semantic dataset 22/155、shared/repository deterministic、shared/repository semantic、trigger contract、runtime 271を含む全hook checksが完了し、failureなし。Windows symlink privilegeによるshared semantic 2件skipは前記のとおり。
+- commit前の最終品質検証も成功: Prettier `--check`（7ファイル）、changed Markdownlint（5ファイル / 0 issue）、text quality（changed Markdown 5ファイル）、`git diff --check`。
+- implementation head `c6055154bbe930a2178bb6a2f9c5f4d563d8a40c`のGitHub Actionsは3件success: Validate Agent Skills run `37905744610`; Validate Deterministic Output Evals run `37905744592`; Validate Semantic Output Evals run `37905744660`。
+- PR本文は既存の実装記述を保持し、今回の8指摘・検証範囲・最新head CIへの追記を次のfinal checkpointで反映する。PR本文はcode treeを変更しない。report-only変更を通常commit/pushした場合は、そのpushで更新されたPR headのCIも別途確認する。

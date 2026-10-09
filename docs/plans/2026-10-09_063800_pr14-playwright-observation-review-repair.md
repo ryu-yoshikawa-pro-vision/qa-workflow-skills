@@ -166,6 +166,14 @@
 - 通常commit/push、PR本文追記、最終head取得を行い、最終headで3 CI successを確認してからSHAとworking treeを本節へ追記する。
 - Mergeは行わない。
 
+## 13. Push済み実装checkpoint（2026-10-09 JST）
+
+- commit `c6055154bbe930a2178bb6a2f9c5f4d563d8a40c` を通常commit / push済み。commit tree fingerprintは`0649860c83604a69238b1a80763000b715e7b38a`。
+- PR #14最新headは同SHA。mainに対しahead 328 / behind 0。tracked working treeはclean。既存untracked user file 2件は変更せず未stage。
+- 通常pre-commit hookの全checksがsuccess。focused 87 tests、repository deterministic 265、shared deterministic 12、runtime 271、semantic dataset 22 Skill / 155 cases、shared semantic 27 pass / Windows symlink privilege 2 skip、repository semantic 4、trigger contract 1、official skills-ref 22/22、compile 39 roots、Prettier / Markdownlint / text quality / diff checkがsuccess。
+- push済みheadのActions: `Validate Agent Skills` run `37905744610` success、`Validate Deterministic Output Evals` run `37905744592` success、`Validate Semantic Output Evals` run `37905744660` success。
+- 残作業は検証記録のみの追記commit/push、PR本文への今回の8指摘と最終head CI記載、およびそれらがheadを更新した場合の最終head Actions確認。全量Semantic/Trigger/Holdout/WCAG closureは行わない。mergeはしない。
+
 ### 初期Evidence（修復前）
 
 - GitHubの現行PR情報ではhead `3018f5beb94df17a2367ba9387f60333d234038c`、base `main` (`dec3f7c764db2869dc24eb3d6f154712a6677068`)、PR open / mergeable、inline review threads 0件。headの3 CIはsuccess。
