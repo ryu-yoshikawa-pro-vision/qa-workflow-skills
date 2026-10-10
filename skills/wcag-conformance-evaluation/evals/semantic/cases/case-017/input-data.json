@@ -1,0 +1,184 @@
+{
+  "kind": "complete-finite-inventory-and-step-4-2-input",
+  "sample_identity_runtime_result": {
+    "samples": [
+      {
+        "sample_ref": "SAMPLE-001",
+        "target_ref": "TARGET-O-CHECKOUT",
+        "state_key": "confirmation",
+        "source_locators": [
+          "https://northstar.example.invalid/target-o-checkout/confirmation"
+        ],
+        "identity_fingerprint": "sha256:0d9537d87305b0349a788751f8d57f3cf7bb48d0a36275d87870fa5299186a22",
+        "source_evidence_refs": [
+          "EVD-CASE-O-COMPLETE-INVENTORY"
+        ]
+      },
+      {
+        "sample_ref": "SAMPLE-002",
+        "target_ref": "TARGET-O-HOME",
+        "state_key": "home",
+        "source_locators": [
+          "https://northstar.example.invalid/target-o-home/home"
+        ],
+        "identity_fingerprint": "sha256:2baea10c772c43f00f34599ba1f40e7772572ed7da5e24de21d00366dbeb6488",
+        "source_evidence_refs": [
+          "EVD-CASE-O-COMPLETE-INVENTORY"
+        ]
+      },
+      {
+        "sample_ref": "SAMPLE-003",
+        "target_ref": "TARGET-O-CHECKOUT",
+        "state_key": "review",
+        "source_locators": [
+          "https://northstar.example.invalid/target-o-checkout/review"
+        ],
+        "identity_fingerprint": "sha256:87e628cd5adb1e30d4744edaa1f96ee892fbbbd83781462612bc55a7b46d5426",
+        "source_evidence_refs": [
+          "EVD-CASE-O-COMPLETE-INVENTORY"
+        ]
+      },
+      {
+        "sample_ref": "SAMPLE-004",
+        "target_ref": "TARGET-O-CATALOG",
+        "state_key": "default",
+        "source_locators": [
+          "https://northstar.example.invalid/target-o-catalog/default"
+        ],
+        "identity_fingerprint": "sha256:c3f5351998f1a97c723bf43ba68a542198067c79daa35f0ffcfc47c288e278f4",
+        "source_evidence_refs": [
+          "EVD-CASE-O-COMPLETE-INVENTORY"
+        ]
+      }
+    ],
+    "draft_to_sample_ref": {
+      "home": "SAMPLE-002",
+      "catalog": "SAMPLE-004",
+      "checkout": "SAMPLE-003",
+      "confirmation": "SAMPLE-001"
+    }
+  },
+  "samples": [
+    {
+      "sample_ref": "SAMPLE-001",
+      "target_ref": "TARGET-O-CHECKOUT",
+      "state_key": "confirmation",
+      "source_locators": [
+        "https://northstar.example.invalid/target-o-checkout/confirmation"
+      ],
+      "identity_fingerprint": "sha256:0d9537d87305b0349a788751f8d57f3cf7bb48d0a36275d87870fa5299186a22",
+      "source_evidence_refs": [
+        "EVD-CASE-O-COMPLETE-INVENTORY"
+      ]
+    },
+    {
+      "sample_ref": "SAMPLE-002",
+      "target_ref": "TARGET-O-HOME",
+      "state_key": "home",
+      "source_locators": [
+        "https://northstar.example.invalid/target-o-home/home"
+      ],
+      "identity_fingerprint": "sha256:2baea10c772c43f00f34599ba1f40e7772572ed7da5e24de21d00366dbeb6488",
+      "source_evidence_refs": [
+        "EVD-CASE-O-COMPLETE-INVENTORY"
+      ]
+    },
+    {
+      "sample_ref": "SAMPLE-003",
+      "target_ref": "TARGET-O-CHECKOUT",
+      "state_key": "review",
+      "source_locators": [
+        "https://northstar.example.invalid/target-o-checkout/review"
+      ],
+      "identity_fingerprint": "sha256:87e628cd5adb1e30d4744edaa1f96ee892fbbbd83781462612bc55a7b46d5426",
+      "source_evidence_refs": [
+        "EVD-CASE-O-COMPLETE-INVENTORY"
+      ]
+    },
+    {
+      "sample_ref": "SAMPLE-004",
+      "target_ref": "TARGET-O-CATALOG",
+      "state_key": "default",
+      "source_locators": [
+        "https://northstar.example.invalid/target-o-catalog/default"
+      ],
+      "identity_fingerprint": "sha256:c3f5351998f1a97c723bf43ba68a542198067c79daa35f0ffcfc47c288e278f4",
+      "source_evidence_refs": [
+        "EVD-CASE-O-COMPLETE-INVENTORY"
+      ]
+    }
+  ],
+  "inventory_refs": [
+    "SAMPLE-001",
+    "SAMPLE-002",
+    "SAMPLE-003",
+    "SAMPLE-004"
+  ],
+  "all_in_scope_selected_refs": [
+    "SAMPLE-001",
+    "SAMPLE-002",
+    "SAMPLE-003",
+    "SAMPLE-004"
+  ],
+  "process_source_facts": {
+    "process_key": "default-checkout",
+    "starting_point_ref": "SAMPLE-002",
+    "start_condition": "An unauthenticated visitor opens the public home page and chooses the catalog.",
+    "default_sequence_refs": [
+      "SAMPLE-002",
+      "SAMPLE-004",
+      "SAMPLE-003",
+      "SAMPLE-001"
+    ],
+    "critical_branch_sequences": [],
+    "completion_condition": "The checkout confirmation state is displayed after the visitor confirms the order.",
+    "evidence_refs": [
+      "EVD-CASE-O-DEFAULT-CHECKOUT-PROCESS"
+    ]
+  },
+  "step_4_2_evaluation_items": [
+    {
+      "item_ref": "ITEM-CASE-O-HOME",
+      "item_kind": "unchanged-content",
+      "identity_fingerprint": "sha256:2baea10c772c43f00f34599ba1f40e7772572ed7da5e24de21d00366dbeb6488",
+      "evidence_fingerprint": "sha256:a762990774baa976cda1e14ceb73aa1240dfc1893a59879289c449343c0f6dc2"
+    },
+    {
+      "item_ref": "ITEM-CASE-O-CATALOG",
+      "item_kind": "unchanged-content",
+      "identity_fingerprint": "sha256:c3f5351998f1a97c723bf43ba68a542198067c79daa35f0ffcfc47c288e278f4",
+      "evidence_fingerprint": "sha256:a762990774baa976cda1e14ceb73aa1240dfc1893a59879289c449343c0f6dc2"
+    },
+    {
+      "item_ref": "ITEM-CASE-O-CHECKOUT-INTERACTION",
+      "item_kind": "interaction",
+      "identity_fingerprint": null,
+      "evidence_fingerprint": null
+    },
+    {
+      "item_ref": "ITEM-CASE-O-CHECKOUT-CONFIRMATION",
+      "item_kind": "interaction",
+      "identity_fingerprint": null,
+      "evidence_fingerprint": null
+    }
+  ],
+  "step_4_2_existing_results": [
+    {
+      "item_ref": "ITEM-CASE-O-HOME",
+      "result_ref": "RESULT-CASE-O-HOME",
+      "identity_fingerprint": "sha256:2baea10c772c43f00f34599ba1f40e7772572ed7da5e24de21d00366dbeb6488",
+      "evidence_fingerprint": "sha256:a762990774baa976cda1e14ceb73aa1240dfc1893a59879289c449343c0f6dc2",
+      "freshness_status": "current"
+    },
+    {
+      "item_ref": "ITEM-CASE-O-CATALOG",
+      "result_ref": "RESULT-CASE-O-CATALOG",
+      "identity_fingerprint": "sha256:c3f5351998f1a97c723bf43ba68a542198067c79daa35f0ffcfc47c288e278f4",
+      "evidence_fingerprint": "sha256:a762990774baa976cda1e14ceb73aa1240dfc1893a59879289c449343c0f6dc2",
+      "freshness_status": "current"
+    }
+  ],
+  "inventory_activity_ref": "ACT-CASE-O-INVENTORY",
+  "inventory_evidence_ref": "EVD-CASE-O-COMPLETE-INVENTORY",
+  "process_evidence_ref": "EVD-CASE-O-DEFAULT-CHECKOUT-PROCESS"
+}

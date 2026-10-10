@@ -1090,7 +1090,7 @@ class WorkflowArtifactGraphTests(unittest.TestCase):
             self.assertEqual(workflow.release_shared_resource(current_workflow_ref=owner_ref, expected_workflow_ref=owner_ref, expected_reservation_revision=reservation["reservation_revision"], current_reservation_revision=reservation["reservation_revision"], native_atomic_conditional_release=False, owner_state_verified=True, owner_execution_state="complete", cleanup_confirmed=True)["status"], "blocked")
             self.assertEqual(workflow.release_shared_resource(current_workflow_ref="other", expected_workflow_ref=owner_ref, expected_reservation_revision=reservation["reservation_revision"], current_reservation_revision=reservation["reservation_revision"], native_atomic_conditional_release=True, owner_state_verified=True, owner_execution_state="complete", cleanup_confirmed=True)["reason"], "reservation_owner_mismatch")
             self.assertEqual(workflow.reserve_shared_resource(reservation_root, "resource:isolation", workflow_ref, native_atomic_conditional_release=False, isolated=True)["status"], "not_required")
-            external = workflow.reserve_shared_resource(reservation_root, "resource:external", workflow_ref, native_atomic_conditional_release=False, external_reservation="external:reservation-1", external_reservation_acquired=True)
+            external = workflow.reserve_shared_resource(reservation_root, "resource:external", workflow_ref, native_atomic_conditional_release=False, external_reservation="external:reservation-1", external_reservation_acquired=True, external_reservation_revision="provider:revision-1")
             self.assertEqual(external["status"], "reserved")
             self.assertEqual(external["provider"], "existing_external_reservation")
 
@@ -1141,6 +1141,247 @@ class WorkflowArtifactGraphTests(unittest.TestCase):
         self.assertIn("qa.workflow_state_root/claims/", workflow_template)
         self.assertIn("qa.reservation_root", workflow_template)
         self.assertNotIn("qa.claim_root", project_template)
+
+
+class SQLiteWcagWorkflowStateTests(unittest.TestCase):
+    def setUp(self):
+        self.wcag_scripts = REPO_ROOT / "skills" / "wcag-conformance-evaluation" / "scripts"
+        sys.path.insert(0, str(self.wcag_scripts))
+        import wcag_em_structure
+        import wcag_criterion_plan
+        self.structure = wcag_em_structure
+        self.criterion_plan = wcag_criterion_plan
+        self.context = {
+            "project_context_ref": "PROJECT-CONTEXT-001",
+            "project_context_revision": "c" * 64,
+            "project_context_fingerprint": "sha256:" + "d" * 64,
+            "workflow_state_root_content_identity": "e" * 64,
+        }
+
+    def evaluation(self, *, revision="rev-7", level="AA"):
+        inputs = {
+            "artifact_ref": "WCAG-EVAL-001", "artifact_revision": revision,
+            "evaluator": "EVALUATOR-001", "evaluation_date": "2026-10-10",
+            "live_web_target": "https://fixture.test/", "commissioner": "COMMISSIONER-001",
+            "wcag_version": "2.2", "level": level, "product_scope": "Fixture product",
+            "product_enclosure": "PRODUCT-SCOPE-001", "accessibility_support_baseline": ["BASELINE-1"],
+            "browser_user_agent_baseline": ["BROWSER-1"], "role_permission_environment": ["ENV-1"],
+            "side_effect_scope": "fixture only", "cleanup_scope": "reset fixture",
+            "evaluation_period": "2026-10-10",
+        }
+        initialization = self.structure.initialize_evaluation(inputs)
+        scope = self.structure.materialize_scope_coverage([
+            {"scope_key": key, "decision": "out-of-product", "reason": "not present in fixture",
+             "evidence_refs": [f"E-SCOPE-{index}"]}
+            for index, key in enumerate(self.structure.SCOPE_ROWS, 1)
+        ])
+        samples = [
+            {"sample_ref": "SAMPLE-001", "sample_kind": "structured",
+             "identity_fingerprint": "sha256:" + "a" * 64,
+             "target_identity": "hmac-sha256:" + "1" * 64},
+            {"sample_ref": "SAMPLE-002", "sample_kind": "random",
+             "identity_fingerprint": "sha256:" + "b" * 64,
+             "target_identity": "hmac-sha256:" + "2" * 64},
+        ]
+        variations = [
+            {"sample_ref": "SAMPLE-001", "variation_ref": "VAR-001",
+             "identity_fingerprint": "sha256:" + "3" * 64},
+            {"sample_ref": "SAMPLE-001", "variation_ref": "VAR-002",
+             "identity_fingerprint": "sha256:" + "4" * 64},
+            {"sample_ref": "SAMPLE-002", "variation_ref": "VAR-003",
+             "identity_fingerprint": "sha256:" + "5" * 64},
+        ]
+        memberships = {"SAMPLE-001": "PROCESS-001"}
+        plan = self.criterion_plan.materialize_plan(
+            wcag_version="2.2", level=level, samples=samples, variations=variations,
+            process_memberships=memberships, evaluation_ref="WCAG-EVAL-001", evaluation_revision=revision,
+        )
+        sources = [
+            {"artifact_ref": "WCAG-EVAL-001", "artifact_revision": revision, "purpose": "evaluation"},
+            {"artifact_ref": "PRODUCT-SCOPE-001", "artifact_revision": "scope-r1", "purpose": "scope"},
+            {"artifact_ref": "SAMPLE-SELECTION-001", "artifact_revision": "samples-r1", "purpose": "sample-selection"},
+            {"artifact_ref": "VARIATION-SET-001", "artifact_revision": "variation-r1", "purpose": "variation"},
+            {"artifact_ref": "PROCESS-001", "artifact_revision": "process-r1", "purpose": "process"},
+        ]
+        return inputs, initialization, scope, sources, plan
+
+    def register(self, root: Path, workflow_ref: str, *, revision="rev-7", level="AA", context=None,
+                 previous_revision=None, sources_override=None, plan_override=None):
+        inputs, initialization, scope, sources, plan = self.evaluation(revision=revision, level=level)
+        return workflow.register_wcag_evaluation_plan(
+            root, workflow_ref, evaluation_initialization=initialization, evaluation_inputs=inputs,
+            product_scope_ref="PRODUCT-SCOPE-001", scope_coverage=scope,
+            source_artifacts=sources_override or sources, canonical_criterion_plan=plan_override or plan,
+            previous_evaluation_revision=previous_revision, **(context or self.context),
+        ), (inputs, initialization, scope, sources, plan)
+
+    def test_sqlite_provider_uses_atomic_revision_compare_and_reread(self):
+        import threading
+        workflow_ref = workflow.new_workflow_ref()
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "states"
+            created = workflow.create_sqlite_workflow_state(root, workflow_ref, {"overall_state": "実行中"})
+            self.assertEqual(created["status"], "created")
+            self.assertEqual(created["state_revision"], "sqlite:1")
+            barrier = threading.Barrier(2)
+
+            def update(value):
+                barrier.wait()
+                return workflow.conditional_write_sqlite_workflow_state(
+                    root, workflow_ref, created["state_revision"], {"overall_state": value}
+                )
+
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                outcomes = list(executor.map(update, ("完了", "部分完了")))
+            self.assertEqual(sum(row["status"] == "written" for row in outcomes), 1)
+            self.assertEqual(sum(row["status"] == "conflict" for row in outcomes), 1)
+            reread = workflow.read_sqlite_workflow_state(root, workflow_ref)
+            self.assertEqual(reread["status"], "current")
+            self.assertEqual(reread["state_revision"], "sqlite:2")
+            self.assertIn(reread["state"]["overall_state"], {"完了", "部分完了"})
+
+    def test_wcag_canonical_plan_is_immutable_per_revision_and_context(self):
+        workflow_ref = workflow.new_workflow_ref()
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "states"
+            registered, data = self.register(root, workflow_ref)
+            self.assertEqual(registered["status"], "registered")
+            inputs, initialization, scope, sources, plan = data
+            # A lower level at the same evaluation revision is internally valid but conflicts with the saved plan.
+            narrowed_inputs, narrowed_init, narrowed_scope, narrowed_sources, narrowed_plan = self.evaluation(level="A")
+            narrowed = workflow.register_wcag_evaluation_plan(
+                root, workflow_ref, evaluation_initialization=narrowed_init,
+                evaluation_inputs=narrowed_inputs, product_scope_ref="PRODUCT-SCOPE-001",
+                scope_coverage=narrowed_scope, source_artifacts=narrowed_sources,
+                canonical_criterion_plan=narrowed_plan, **self.context,
+            )
+            self.assertEqual(narrowed["status"], "conflict")
+
+            # A changed selected-sample set cannot be re-registered under the same revision.
+            one_sample_plan = self.criterion_plan.materialize_plan(
+                wcag_version="2.2", level="AA", samples=plan["plan_basis"]["samples"][:1],
+                variations=plan["plan_basis"]["variations"][:2],
+                process_memberships={"SAMPLE-001": "PROCESS-001"},
+                evaluation_ref="WCAG-EVAL-001", evaluation_revision="rev-7",
+            )
+            shrunk = workflow.register_wcag_evaluation_plan(
+                root, workflow_ref, evaluation_initialization=initialization, evaluation_inputs=inputs,
+                product_scope_ref="PRODUCT-SCOPE-001", scope_coverage=scope, source_artifacts=sources,
+                canonical_criterion_plan=one_sample_plan, **self.context,
+            )
+            self.assertEqual(shrunk["status"], "conflict")
+
+            variation_shrunk_plan = self.criterion_plan.materialize_plan(
+                wcag_version="2.2", level="AA", samples=plan["plan_basis"]["samples"],
+                variations=[row for row in plan["plan_basis"]["variations"] if row["variation_ref"] != "VAR-002"],
+                process_memberships={"SAMPLE-001": "PROCESS-001"},
+                evaluation_ref="WCAG-EVAL-001", evaluation_revision="rev-7",
+            )
+            variation_shrunk = workflow.register_wcag_evaluation_plan(
+                root, workflow_ref, evaluation_initialization=initialization, evaluation_inputs=inputs,
+                product_scope_ref="PRODUCT-SCOPE-001", scope_coverage=scope, source_artifacts=sources,
+                canonical_criterion_plan=variation_shrunk_plan, **self.context,
+            )
+            self.assertEqual(variation_shrunk["status"], "conflict")
+
+            membership_changed_plan = self.criterion_plan.materialize_plan(
+                wcag_version="2.2", level="AA", samples=plan["plan_basis"]["samples"],
+                variations=plan["plan_basis"]["variations"],
+                process_memberships={"SAMPLE-002": "PROCESS-001"},
+                evaluation_ref="WCAG-EVAL-001", evaluation_revision="rev-7",
+            )
+            membership_changed = workflow.register_wcag_evaluation_plan(
+                root, workflow_ref, evaluation_initialization=initialization, evaluation_inputs=inputs,
+                product_scope_ref="PRODUCT-SCOPE-001", scope_coverage=scope, source_artifacts=sources,
+                canonical_criterion_plan=membership_changed_plan, **self.context,
+            )
+            self.assertEqual(membership_changed["status"], "conflict")
+
+            other_workflow = workflow.read_wcag_evaluation_state(
+                root, workflow.new_workflow_ref(), "WCAG-EVAL-001", evaluation_revision="rev-7", **self.context,
+            )
+            self.assertEqual(other_workflow["status"], "blocked")
+
+            changed_context = {**self.context, "workflow_state_root_content_identity": "f" * 64}
+            conflict = workflow.read_wcag_evaluation_state(
+                root, workflow_ref, "WCAG-EVAL-001", evaluation_revision="rev-7", **changed_context,
+            )
+            self.assertEqual(conflict["status"], "conflict")
+
+            # A proper revision transition records the prior evaluation revision and can change the level.
+            next_inputs, next_init, next_scope, next_sources, next_plan = self.evaluation(revision="rev-8", level="A")
+            revision_update = workflow.register_wcag_evaluation_plan(
+                root, workflow_ref, evaluation_initialization=next_init, evaluation_inputs=next_inputs,
+                product_scope_ref="PRODUCT-SCOPE-001", scope_coverage=next_scope,
+                source_artifacts=next_sources, canonical_criterion_plan=next_plan,
+                previous_evaluation_revision="rev-7", **self.context,
+            )
+            self.assertEqual(revision_update["status"], "registered")
+            self.assertEqual(workflow.read_wcag_evaluation_state(
+                root, workflow_ref, "WCAG-EVAL-001", evaluation_revision="rev-7", **self.context,
+            )["status"], "conflict")
+
+    def test_wcag_report_requires_persisted_owner_runtime_result(self):
+        workflow_ref = workflow.new_workflow_ref()
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "states"
+            registered, data = self.register(root, workflow_ref)
+            self.assertEqual(registered["status"], "registered")
+            _inputs, _initialization, _scope, _sources, plan = data
+            current = workflow.read_wcag_evaluation_state(
+                root, workflow_ref, "WCAG-EVAL-001", evaluation_revision="rev-7", **self.context,
+            )
+            self.assertEqual(current["status"], "current")
+            missing = workflow.finalize_wcag_report(
+                root, workflow_ref, expected_provider_revision=current["provider_revision"],
+                evaluation_ref="WCAG-EVAL-001", evaluation_revision="rev-7",
+                canonical_criterion_plan=plan, sample_results=[], runtime_execution_ref="WCAG-RUN-missing",
+                **self.context,
+            )
+            self.assertEqual(missing["status"], "blocked")
+
+            rows = []
+            for index, criterion in enumerate(plan["criteria"], 1):
+                rows.append({"sample_result_ref": f"WCAG-RES-{index:03d}",
+                    "criterion_evaluation_ref": criterion["criterion_evaluation_ref"],
+                    "evaluation_ref": "WCAG-EVAL-001", "evaluation_revision": "rev-7",
+                    "sample_ref": criterion["sample_ref"], "variation_ref": criterion["variation_ref"],
+                    "sample_kind": next(sample["sample_kind"] for sample in plan["plan_basis"]["samples"]
+                                        if sample["sample_ref"] == criterion["sample_ref"]),
+                    "process_ref": criterion["process_ref"], "requirement_ref": criterion["criterion_ref"],
+                    "result": "satisfied", "freshness_status": "current"})
+            unverified = workflow.finalize_wcag_report(
+                root, workflow_ref, expected_provider_revision=current["provider_revision"],
+                evaluation_ref="WCAG-EVAL-001", evaluation_revision="rev-7",
+                canonical_criterion_plan=plan, sample_results=rows,
+                runtime_execution_ref="WCAG-RUN-not-recorded", **self.context,
+            )
+            self.assertEqual(unverified["status"], "blocked")
+            self.assertEqual(unverified["reason"], "current_wcag_runtime_execution_required")
+            persisted = workflow.read_wcag_evaluation_state(
+                root, workflow_ref, "WCAG-EVAL-001", evaluation_revision="rev-7", **self.context,
+            )
+            self.assertEqual(persisted["evaluation"]["report_status"], "open")
+            self.assertEqual(persisted["evaluation"]["report_runtime_executions"], [])
+            stale = [dict(row, evaluation_revision="rev-6") for row in rows]
+            rejected = workflow.finalize_wcag_report(
+                root, workflow_ref, expected_provider_revision=persisted["provider_revision"],
+                evaluation_ref="WCAG-EVAL-001", evaluation_revision="rev-7",
+                canonical_criterion_plan=plan, sample_results=stale,
+                runtime_execution_ref="WCAG-RUN-not-recorded", **self.context,
+            )
+            self.assertNotEqual(rejected["status"], "complete")
+
+    def test_wcag_sqlite_provider_blocks_corrupt_database_and_git_worktree_path(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "states"
+            database = root / "workflow-state.sqlite3"
+            root.mkdir()
+            database.write_bytes(b"not a sqlite database")
+            result = workflow.read_sqlite_workflow_state(root, workflow.new_workflow_ref())
+            self.assertEqual(result["status"], "blocked")
+        result = workflow.create_sqlite_workflow_state(REPO_ROOT / "output", workflow.new_workflow_ref(), {})
+        self.assertEqual(result["status"], "blocked")
 
 
 class StandaloneSkillPortabilityTests(unittest.TestCase):

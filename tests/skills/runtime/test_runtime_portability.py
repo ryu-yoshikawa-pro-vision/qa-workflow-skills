@@ -85,8 +85,9 @@ class RuntimePortabilityTests(unittest.TestCase):
                         names = [node.module.split(".", 1)[0]]
                     else:
                         continue
+                    skill_allowed = allowed | ({"artifact_graph"} if skill == "qa-workflow" and path.name == "workflow_runtime.py" else set())
                     for name in names:
-                        self.assertIn(name, allowed, f"{path}: {name}")
+                        self.assertIn(name, skill_allowed, f"{path}: {name}")
 
     def test_each_skill_package_runs_representative_runtime_from_single_copy(self) -> None:
         for skill, script_name, fixture_name, runtime_unit in REPRESENTATIVES:

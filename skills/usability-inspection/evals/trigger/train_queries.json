@@ -1,0 +1,50 @@
+[
+  {
+    "query": "この画面の使いやすさを、現在のブラウザで操作して確認して。",
+    "should_trigger": true
+  },
+  {
+    "query": "画面幅を変えて配置崩れと主要操作を実際に観測して。",
+    "should_trigger": true
+  },
+  {
+    "query": "キーボード操作でfocus順とdialogの閉じ方を検査して。",
+    "should_trigger": true
+  },
+  {
+    "query": "登録フォームのエラー表示と修正操作をlive UIで確認して。",
+    "should_trigger": true
+  },
+  {
+    "query": "保存済みPlaywright observation JSONのschemaだけをdeterministic validatorで検証して。",
+    "should_trigger": false
+  },
+  {
+    "query": "ユーザー指定の検索flowを実操作し、状態遷移とfeedbackを記録して。",
+    "should_trigger": true
+  },
+  {
+    "query": "このiPhone向け画面を画像とFigmaだけからデザインレビューして。",
+    "should_trigger": false
+  },
+  {
+    "query": "操作後のfeedbackまでの時間を同一browser clockで測って。",
+    "should_trigger": true
+  },
+  {
+    "query": "この画像に写ったDialogをheuristic/referenceに照らして評価して。",
+    "should_trigger": false
+  },
+  {
+    "query": "保存済みFigmaと仕様だけを使ってUIの認知負荷を評価して。",
+    "should_trigger": false
+  },
+  {
+    "query": "詳細テストケースの全stepを実行してPASS/FAILを決めて。",
+    "should_trigger": false
+  },
+  {
+    "query": "WCAG 2.2 AAへ製品全体が適合するかWCAG-EMで評価して。",
+    "should_trigger": false
+  }
+]

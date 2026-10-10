@@ -1,6 +1,6 @@
-# QAテスト分析・設計・Regression・Exploration・知識管理・E2Eワークフロー Agent Skills
+# QAテスト分析・設計・UI/UX評価・WCAG・Regression・Exploration・知識管理・E2Eワークフロー Agent Skills
 
-新規・変更機能のQA成果物作成を中心に、Regression baseline / Run履歴、Charterに沿った探索・Investigation、QA knowledge lifecycle、要求されたPlaywright E2E実装・実行・分析・報告を成果物ベースで扱うAgent Skills群です。
+新規・変更機能のQA成果物作成を中心に、UI/UX評価、live usability inspection、WCAG-EM 2.0適合性評価、Regression baseline / Run履歴、Charterに沿った探索・Investigation、QA knowledge lifecycle、要求されたPlaywright E2E実装・実行・分析・報告を成果物ベースで扱うAgent Skills群です。
 
 ## Skill構成
 
@@ -24,10 +24,19 @@ skills/
 ├── test-execution/
 ├── regression-testing/
 ├── exploratory-testing/
-└── qa-knowledge/
+├── qa-knowledge/
+├── usability-evaluation/
+├── usability-inspection/
+└── wcag-conformance-evaluation/
 ```
 
 各Skillは`skills/<skill-name>/SKILL.md`を持つ独立Skillです。`qa-workflow`も1 Skillとして扱います。
+
+## 開発原則: 既存ツールと標準機能を優先
+
+変更前に、既存機能で解決できるか、リポジトリ内の処理を再利用できるか、言語標準、browser / platform / framework / SDK、導入済みライブラリ、信頼できる既存ライブラリの順で確認します。それでも現在の要件を満たせない場合だけ、満たせない具体的な契約を説明したうえで必要最小限の独自実装を追加します。同等以上の正確性、安全性、互換性、保守性、検証可能性を保ち、取得できない情報を推測値で埋めず、完了条件に必要な情報が不足するときは未確定・未完了として扱います。
+
+既存ライブラリの導入は自動的に選ばず、必要機能との適合、重複、ライセンス、保守状況、互換性、セキュリティ、CI / 実行環境への影響を確認します。独自実装を避けること自体は目的にしません。テスト技法、成果物ID / traceability、revision / CAS / reservation、state transition、schema validation、WCAG procedure / applicability、WCAG-EM sampling、EARL変換、security boundary、data protection、regression testなど、プロジェクト固有の決定論的契約は、代替ツールがあるだけでは削除しません。
 
 | Skill | 責務 |
 | --- | --- |
@@ -50,6 +59,9 @@ skills/
 | `regression-testing` | Regression baseline / membership / Run selection / Activity / history |
 | `exploratory-testing` | Charterベースのexplorationとowner不明hypothesisのinvestigation |
 | `qa-knowledge` | QA knowledge candidate triage / entry lifecycle / lookup |
+| `usability-evaluation` | 保存済みevidence・画面資料をreferenceと照合する意味上のUI/UX評価。browserを操作しない |
+| `usability-inspection` | 既存Playwright経路でlive Web UIを観測し、fixed probe・measurement・general accessibilityを扱う |
+| `wcag-conformance-evaluation` | WCAG-EM 2.0に沿ったWCAG 2.0 / 2.1 / 2.2のformal evaluation、sampling、report、claim、EARL |
 
 ## テスト分析・設計フロー
 
@@ -109,7 +121,7 @@ flowchart TB
 
 ### E2E要求時の条件分岐
 
-全19 Skillを常に通すわけではありません。要求成果物と有効な既存成果物に応じ、必要な依存だけを実行します。
+すべてのSkillを常に通すわけではありません。要求成果物と有効な既存成果物に応じ、必要な依存だけを実行します。
 
 currentな実対象情報の確認が必要な場合だけ`test-target-inspection`を使い、設計前には必要な設計Skillへ戻します。詳細TCをAIが今回runとして実行する要求は`test-execution`へ進めます。repoへ残すPlaywright E2Eのinspection・実装・既存runner実行は既存の`e2e-test-inspection`、`e2e-test-implementation`、`e2e-test-execution`が担当します。
 
@@ -285,11 +297,11 @@ runtimeのためにLLMの意味判断をPythonへ複製せず、unsupported subs
 
 ### 発火評価
 
-19 Skillの選択精度を評価します。正規モードは19 Skill同時利用、単独・限定Skillは診断モードです。`test-analysis` / `test-condition-design`はtrain 24件・validation 20件、その他17 Skillはtrain 12件・validation 8件で、合計428 queryです。repo内データセット検証と実Agentクライアント上の実発火評価は別物です。
+repositoryにあるすべてのSkillの選択精度を評価します。正規モードは全Skill同時利用、単独・限定Skillは診断モードです。datasetの件数は各Skillのtrain / validationファイルから導出します。repo内データセット検証と実Agentクライアント上の実発火評価は別物です。
 
 ### 決定論的出力評価
 
-19 Skillの正規出力について、ID、参照整合、必須フィールド、リスクマトリクス、成果物閉鎖、Pairwise、レビュー / ワークフロー、E2Eの対象・raw fact・primary / attempt・cleanup不変条件、Regression baseline / route execution、Exploratory lifecycle、QA knowledge currentness / CAS条件など、意味解釈なしで判定できる契約を評価します。現行deterministic output datasetは38ケースです。
+各Skillの正規出力について、責務に対応したID、参照整合、必須フィールド、closure、freshness、handoff、reportなど、意味解釈なしで判定できる契約を評価します。評価件数は各Skillのmanifestから導出します。
 
 - `known_*`: フィクスチャ側で既知の参照集合。Skill自身が出力内で生成するEntityの扱いは各Skill契約に従う。キー未指定なら対応する参照検査を行わない。
 - `required_*`: 出力に実際に存在しなければならないEntity / 値。
@@ -317,7 +329,7 @@ Agent実行と評価対象出力の生成は決定論的 / 意味評価ランタ
 
 ## qa-workflowのランタイム前提
 
-同一のAgentクライアント上で19 Skillすべてが利用可能で、Agentが必要なSkillを追加で読み込み / 利用できる環境を前提とします。Agent Skills Specificationが共通Skill-to-Skill APIを保証するとは扱いません。
+同一のAgentクライアント上でrepositoryの全Skillが利用可能で、Agentが必要なSkillを追加で読み込み / 利用できる環境を前提とします。Agent Skills Specificationが共通Skill-to-Skill APIを保証するとは扱いません。
 
 ## 検証
 
