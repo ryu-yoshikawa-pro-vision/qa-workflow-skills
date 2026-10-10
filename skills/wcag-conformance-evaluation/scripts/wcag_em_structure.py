@@ -648,7 +648,13 @@ def _statement_evaluation_evidence_is_current(report_closure: Any, formal_result
             or any(not isinstance(row,dict) or row.get('result') not in {'satisfied','not-satisfied'} for row in requirements)
             or len({row.get('sample_ref') for row in samples})!=len(samples)):
         return False
-    return True
+    requirement_refs=[row.get('requirement_ref') for row in requirements]
+    if any(not isinstance(ref,str) or not ref.strip() for ref in requirement_refs):
+        return False
+    required_requirement_refs={row['requirement_key']
+        for row in load_catalog(version)['conformance_requirements']}
+    return (len(requirement_refs)==len(set(requirement_refs))
+            and set(requirement_refs)==required_requirement_refs)
 
 
 def conformance_claim(*, version: str, full_scope_evidence: bool, required_fields: dict[str, Any],

@@ -143,6 +143,47 @@ class WcagStatementAndClaimTests(unittest.TestCase):
                 "rest_conforms": True, "evidence_refs": ["E-AREA"]}])
         self.assertEqual(unsafe["status"], "blocked")
 
+    def test_evaluation_statement_requires_exact_catalog_conformance_requirement_set(self):
+        args = {"version": "2.2", "status": "full", "all_methodology_complete": True,
+            "all_samples_conform": True, "owner_commitment_ref": "OWNER-COMMIT", "product_scope": "scope-ref",
+            "technologies": ["HTML", "CSS"], "baseline_ref": "BASELINE-1", "issued_date": "2026-09-28",
+            "level": "AA", "scope_ref": "SCOPE-1"}
+        report_args = WcagReportClosureTests().closure_inputs()
+        report_args["sample_results"] = [{**row, "result": "satisfied"} for row in report_args["sample_results"]]
+        closure = structure.close_report(**report_args)
+        formal_results = structure.materialize_conformance_requirement_results(
+            **WcagConformanceRequirementTests().fixture(level="AA"))
+        required_refs = {row["requirement_key"]
+            for row in load_catalog("2.2")["conformance_requirements"]}
+        actual_refs = [row["requirement_ref"] for row in formal_results["results"]]
+        self.assertEqual(set(actual_refs), required_refs)
+        self.assertEqual(len(actual_refs), len(required_refs))
+        self.assertEqual(structure.evaluation_statement(**args, report_closure=closure,
+            formal_conformance_results=formal_results)["status"], "generated")
+
+        missing = [row for row in formal_results["results"]
+            if row["requirement_ref"] != "non-interference"]
+        duplicate_with_missing = [*missing, dict(missing[0])]
+        cases = {
+            "missing": missing,
+            "duplicate plus missing at same count": duplicate_with_missing,
+            "unknown extra": [*formal_results["results"],
+                {"requirement_ref": "not-in-catalog", "result": "satisfied"}],
+            "empty ref": [{**formal_results["results"][0], "requirement_ref": ""},
+                *formal_results["results"][1:]],
+            "null ref": [{**formal_results["results"][0], "requirement_ref": None},
+                *formal_results["results"][1:]],
+            "missing ref field": [{key: value for key, value in formal_results["results"][0].items()
+                if key != "requirement_ref"}, *formal_results["results"][1:]],
+        }
+        for label, rows in cases.items():
+            with self.subTest(case=label):
+                evidence = {**formal_results, "results": rows}
+                self.assertFalse(structure._statement_evaluation_evidence_is_current(
+                    closure, evidence, version="2.2", level="AA"))
+                self.assertEqual(structure.evaluation_statement(**args, report_closure=closure,
+                    formal_conformance_results=evidence)["status"], "blocked")
+
     def test_partial_conformance_statement_has_fixed_canonical_language_and_evidence(self):
         case = structure.statement_of_partial_conformance(version="2.2", level="AA", statement_type="third-party-content",
             parts_or_languages=[{"part_ref": "PART-1", "description": "uncontrolled comments",

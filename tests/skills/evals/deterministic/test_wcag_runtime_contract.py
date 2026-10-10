@@ -69,7 +69,8 @@ def statement_evidence(evaluation: dict) -> dict:
             "sample_results_count": len(refs), "missing_sample_criterion_rows": [],
             "stale_sample_criterion_rows": [],
             "sample_conformance_results": [{"sample_ref": "SAMPLE-17", "result": "satisfied"}],
-            "results": [{"requirement_ref": "conformance-level", "result": "satisfied"}]},
+            "results": [{"requirement_ref": row["requirement_key"], "result": "satisfied"}
+                for row in wcag_em_structure.load_catalog(version)["conformance_requirements"]]},
     }
 
 
@@ -220,7 +221,8 @@ class WcagRuntimeContractTests(unittest.TestCase):
                 "criterion_evaluation_refs": ["CRIT-EVAL-1"], "expected_sample_criterion_rows": 1,
                 "sample_results_count": 1, "missing_sample_criterion_rows": [], "stale_sample_criterion_rows": [],
                 "sample_conformance_results": [{"sample_ref": "SAMPLE-1", "result": "satisfied"}],
-                "results": [{"requirement_ref": "conformance-level", "result": "satisfied"}]},
+                "results": [{"requirement_ref": row["requirement_key"], "result": "satisfied"}
+                    for row in wcag_em_structure.load_catalog("2.2")["conformance_requirements"]]},
         })
         fabricated = invoke(body)
         self.assertEqual(fabricated["payload"]["result"]["status"], "blocked")
@@ -564,6 +566,27 @@ class WcagRuntimeContractTests(unittest.TestCase):
             self.assertEqual(current_statement["runtime_status"], "ok", current_statement)
             self.assertEqual(current_statement["result_status"], "ready", current_statement)
             self.assertEqual(current_statement["payload"]["result"]["status"], "generated")
+
+            requirements = statement_args["formal_conformance_results"]["results"]
+            missing = [row for row in requirements if row["requirement_ref"] != "non-interference"]
+            malformed_results = {
+                "missing": missing,
+                "duplicate plus missing at same count": [*missing, dict(missing[0])],
+                "unknown extra": [*requirements, {"requirement_ref": "not-in-catalog", "result": "satisfied"}],
+                "empty ref": [{**requirements[0], "requirement_ref": ""}, *requirements[1:]],
+                "null ref": [{**requirements[0], "requirement_ref": None}, *requirements[1:]],
+                "missing ref field": [{key: value for key, value in requirements[0].items()
+                    if key != "requirement_ref"}, *requirements[1:]],
+            }
+            for label, rows in malformed_results.items():
+                with self.subTest(statement_requirement_case=label):
+                    arguments = {**statement_args, "formal_conformance_results": {
+                        **statement_args["formal_conformance_results"], "results": rows}}
+                    rejected = invoke({"metadata": statement_metadata,
+                        "input": {"operation": "evaluation-statement", "arguments": arguments}})
+                    self.assertEqual(rejected["runtime_status"], "ok", rejected)
+                    self.assertEqual(rejected["result_status"], "blocked", rejected)
+                    self.assertEqual(rejected["payload"]["result"]["status"], "blocked", rejected)
 
     def test_runtime_dependency_freshness_checks_full_current_result_fingerprint(self):
         upstream = invoke(request("A"))
