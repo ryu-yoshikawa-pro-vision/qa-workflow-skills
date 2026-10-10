@@ -762,3 +762,12 @@ PR #14 repository implementation Plan未達: 1件
 - 同一headのGitHub Actionsはすべてsuccess: `Validate Agent Skills` run `38037201318`、`Validate Deterministic Output Evals` run `38037201277`、`Validate Semantic Output Evals` run `38037201270`。
 - 修正差分はqa-workflow/WCAG runtime、関連contract test、Skill/Plan/validation reportの9 tracked files。mergeは行っていない。
 - 検証記録だけのcommitをpushした後も、更新後headの3 Actionsを再確認する。
+
+## 2026-10-10 JST — Evaluation Statementの適合要件結果全件性
+
+- 再現: WCAG 2.2 catalogの5 requirementのうち、conformance-levelだけを渡しても、従来の_statement_evaluation_evidence_is_current()は非空かつ有効な結果行として受理し、Full Evaluation Statementをgeneratedにできた。
+- 修正: load_catalog(version)から必要なrequirement_key集合を導出し、resultsが非空で、各requirement_refが非空文字列かつ重複せず、対象版catalogの集合と完全一致することを検証する。Fullの全件satisfied要件とPartialの正当なnot-satisfied要件は、全件性とは別に維持する。
+- 回帰: catalog由来の全5件でFullを生成し、欠落・同数の重複と欠落・catalog外ref・空/NULL/欠落refをdirect helperとruntime経由でblockedにすることを確認した。既存Partial正常系もfocused suite内で維持された。
+- 修正前の負系はdirectとruntimeの両方で失敗し、実装後のfocused WCAG report closure/runtime/formal testsは53 PASS。repository deterministic 284 PASS、runtime 271 PASS、shared deterministic 12 PASS、shared semantic 27 PASS / Windows symlink privilegeによる2 SKIP、repository semantic 4 PASS、Trigger contract 1 PASS。Semantic datasetは22 Skills / 155 cases、official skills-ref validateは22 Skill PASS、Python compileallとgit diff --checkもPASS。
+- Markdownlint / Prettier / text-quality CLIはこのcloneのrepository設定にも実行環境にも存在しないため実行していない。Skill validatorとCIに定義された検証、およびMarkdown差分の目視確認を行った。
+- 実装commit 6984870acd6762a312c6397184f5b73417759e8aのActionsはValidate Agent Skills 38059501478、Validate Deterministic Output Evals 38059501482、Validate Semantic Output Evals 38059501511がすべてsuccess。以降のreport-only commitがあれば、その最終headのActionsはPR本文に記録する。
