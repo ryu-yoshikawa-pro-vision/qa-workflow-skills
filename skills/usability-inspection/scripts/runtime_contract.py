@@ -926,16 +926,30 @@ def compare_entity_dependencies(entity: dict[str, Any], current_entities: dict[t
     return "current"
 
 
+def _valid_runtime_dependency(dependency: Any) -> bool:
+    required = {"skill", "runtime_unit_key", "generation_fingerprint"}
+    if not isinstance(dependency, dict) or frozenset(dependency) not in {
+        frozenset(required), frozenset(required | {"result_fingerprint"}),
+    }:
+        return False
+    return "result_fingerprint" not in dependency or bool(
+        FULL_DIGEST_RE.fullmatch(str(dependency["result_fingerprint"]))
+    )
+
+
 def compare_runtime_dependencies(runtime_unit: dict[str, Any], current_runtime_units: dict[tuple[str, str], dict[str, Any]]) -> str:
     dependencies = runtime_unit.get("upstream_runtime_units", [])
     if not isinstance(dependencies, list):
         raise InvalidInput("upstream_runtime_units schemaが不正です")
     for dependency in dependencies:
-        if not isinstance(dependency, dict) or set(dependency) != {"skill", "runtime_unit_key", "generation_fingerprint"}:
+        if not _valid_runtime_dependency(dependency):
             raise InvalidInput("runtime dependency schemaが不正です")
         key = (dependency["skill"], dependency["runtime_unit_key"])
         current = current_runtime_units.get(key)
-        if current is None or current.get("generation_fingerprint") != dependency["generation_fingerprint"]:
+        if (current is None
+                or current.get("generation_fingerprint") != dependency["generation_fingerprint"]
+                or ("result_fingerprint" in dependency
+                    and current.get("result_fingerprint") != dependency["result_fingerprint"])):
             return "stale"
     return "current"
 
@@ -1037,7 +1051,7 @@ def validate_runtime_dependency_graph(rows: list[dict[str, Any]]) -> None:
             raise InvalidInput("runtime dependency graph listが不正です")
         seen: set[tuple[str, str]] = set()
         for dependency in dependencies:
-            if not isinstance(dependency, dict) or set(dependency) != {"skill", "runtime_unit_key", "generation_fingerprint"}:
+            if not _valid_runtime_dependency(dependency):
                 raise InvalidInput("runtime dependency graph schemaが不正です")
             dependency_key = (dependency["skill"], dependency["runtime_unit_key"])
             if not all(isinstance(value, str) for value in dependency_key) or dependency_key in seen:
@@ -1118,7 +1132,7 @@ def evaluate_runtime_unit_freshness(
                 stale = True
                 reasons.append({"reason_code": "upstream_entity_stale", "dependency": list(entity_key)})
         for dependency in row.get("upstream_runtime_units", []):
-            if not isinstance(dependency, dict) or set(dependency) != {"skill", "runtime_unit_key", "generation_fingerprint"}:
+            if not _valid_runtime_dependency(dependency):
                 raise InvalidInput("runtime upstream_runtime_units schemaが不正です")
             runtime_key = (dependency["skill"], dependency["runtime_unit_key"])
             current = current_runtime.get(runtime_key)
@@ -1128,6 +1142,10 @@ def evaluate_runtime_unit_freshness(
             elif current.get("generation_fingerprint") != dependency["generation_fingerprint"]:
                 stale = True
                 reasons.append({"reason_code": "runtime_generation_mismatch", "dependency": list(runtime_key)})
+            elif ("result_fingerprint" in dependency
+                    and current.get("result_fingerprint") != dependency["result_fingerprint"]):
+                stale = True
+                reasons.append({"reason_code": "runtime_result_mismatch", "dependency": list(runtime_key)})
             elif current.get("freshness_status") == "stale":
                 stale = True
                 reasons.append({"reason_code": "runtime_dependency_stale", "dependency": list(runtime_key)})
@@ -3592,7 +3610,8 @@ def _validate_metadata(metadata: Any, *, skill: str) -> dict[str, Any]:
         raise InvalidInput("upstream_runtime_unitsが不正です")
     upstream_runtime_keys: set[tuple[str, str]] = set()
     for row in metadata["upstream_runtime_units"]:
-        if not isinstance(row, dict) or set(row) != {"skill", "runtime_unit_key", "generation_fingerprint"} or not FULL_DIGEST_RE.fullmatch(str(row["generation_fingerprint"])):
+        if (not _valid_runtime_dependency(row)
+                or not FULL_DIGEST_RE.fullmatch(str(row["generation_fingerprint"]))):
             raise InvalidInput("upstream_runtime_unitsのschemaが不正です")
         dependency_key = (row["skill"], row["runtime_unit_key"])
         if not all(isinstance(value, str) for value in dependency_key) or dependency_key in upstream_runtime_keys:

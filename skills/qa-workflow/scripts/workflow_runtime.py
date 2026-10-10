@@ -22,6 +22,7 @@ from runtime_contract import (
     entity_identity,
     reject_unknown,
     run_cli,
+    runtime_unit_row,
     validate_current_structure_state,
     validate_unsupported_item_closures,
     validate_entity_collection,
@@ -138,7 +139,7 @@ def _wcag_state_operation(input_value: dict[str, Any], metadata: dict[str, Any])
 
 
 def _wcag_closure_candidate(runtime_result: Any, metadata: dict[str, Any]) -> dict[str, Any] | None:
-    """Pair a pending result to its declared runtime dependency; this is not closure proof."""
+    """Bind a pending result to its declared current runtime result dependency."""
     if not isinstance(runtime_result, dict):
         return None
     required = {"skill", "runtime_unit_key", "generation_fingerprint", "runtime_status", "result_status", "payload"}
@@ -147,12 +148,17 @@ def _wcag_closure_candidate(runtime_result: Any, metadata: dict[str, Any]) -> di
     dependencies = [row for row in metadata.get("upstream_runtime_units", [])
                     if row.get("skill") == "wcag-conformance-evaluation"
                     and row.get("runtime_unit_key") == "artifact:wcag_runtime:all"]
+    try:
+        result_fingerprint = runtime_unit_row(runtime_result)["result_fingerprint"]
+    except (InvalidInput, KeyError, TypeError, ValueError):
+        return None
     if (runtime_result.get("skill") != "wcag-conformance-evaluation"
             or runtime_result.get("runtime_unit_key") != "artifact:wcag_runtime:all"
             or runtime_result.get("runtime_status") != "ok"
             or runtime_result.get("result_status") != "unresolved"
             or len(dependencies) != 1
-            or dependencies[0].get("generation_fingerprint") != runtime_result.get("generation_fingerprint")):
+            or dependencies[0].get("generation_fingerprint") != runtime_result.get("generation_fingerprint")
+            or dependencies[0].get("result_fingerprint") != result_fingerprint):
         return None
     payload = runtime_result.get("payload")
     candidate = payload.get("result") if isinstance(payload, dict) and payload.get("operation") == "close-report" else None
