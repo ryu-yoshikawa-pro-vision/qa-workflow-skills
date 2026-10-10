@@ -634,7 +634,7 @@ Agent executionは、Eval dataset由来のpromptでも、固定対象repo向けp
 - runner / environment errorとSkill品質のneeds_review / failを区別できる
 - 非pass結果を隠さず保存・報告できる
 - 比較条件が異なるrunと、隔離・実効設定が未確認のrunをSkill変更のみの直接比較に使わない。`agent.timeout_seconds`も一致条件とし、`--repeat 1`の結果だけでLLM品質改善の傾向を断定しない
-- target-specific評価のためにSkill本体へ`qa-training-store`固有処理を追加していない
+- target-specific評価のために汎用Skill本体へ`qa-training-store`固有の期待値・scenario ID・個別業務ルールを追加していない。修正に使っていない既存別caseの回帰と関連Skill契約テストは改善Planに従って別途検証する
 
 ### runtime契約を変更した候補の比較
 

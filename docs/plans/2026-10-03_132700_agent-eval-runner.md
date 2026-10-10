@@ -99,7 +99,7 @@ Skillを変更した後に同じ評価ケースを実Agentで再実行し、既�
 - Skill本体から評価ランナーへ依存させない
 - Codex固有実装をSkill契約へ入れず、Agent commandは外部から注入する
 - 評価対象AgentへReference / expected / rubric / grader等の評価正解情報を公開しない
-- `qa-training-store`固有処理をSkill本体へ入れない
+- `qa-training-store`固有処理を汎用Skill本体へ入れない。案件固有の規範仕様は評価入力・Referenceとして使い、Skill修正は汎用的な判断・実行手順へ反映する。修正に使っていない既存の別caseで回帰を確認し、不足なら汎用性未確認としてレビュー待ちにする
 - 現在必要な1つの固定targetを評価するためだけに、汎用plugin framework、DB、MCP、LangGraph等を追加しない
 - AIがJudge基準・正解データの候補を作成・改善できる一方、規範仕様と確認済み期待判定は勝手に変更しない。検証済みJudgeの該当criterionだけをSkill自動修正の根拠にする
 - 十分な再現性・根拠・変更範囲・検証条件を満たしたSkill問題だけ、隔離したAgentが修正して同条件で再評価する。原因不明・証拠不足・高リスク案件はレビュー待ちに保存し、自動採用・push・PR作成・mergeは行わない
@@ -1114,6 +1114,6 @@ native trigger評価は、Skill activationを観測する方法がAgentクライ
 - 候補production verifier / generatorのSHAだけが変わりschema・機械契約が互換なら、同じ固定Evaluatorでrunの直接比較を妨げない
 - レビュー待ちが独立案件を停止させず、依存する案件だけを待機させ、全残案件がブロックされたら停止する。処理上限・停止理由・未処理案件・依存先を保存し、明示的な別runで安全に再開できる
 - `--analyze-only`で分析・レビュー待ちのみを生成でき、根拠不足・高リスク・非互換・Judge揺れ・実行エラーを自動修正せずレビュー待ちに分けられる。修正許可をLLMの自己申告だけで判断しない
-- 修正Agentは隔離したSkill packageの許可pathだけを変更し、固定Evaluator・target・元branchを不変に保ち、修正試行は1回で停止する。改善が確認された差分・候補revision・検証結果を保存するが自動採用しない
+- 修正Agentは隔離したSkill packageの許可pathだけを変更し、固定Evaluator・target・元branchを不変に保ち、修正試行は1回で停止する。対象案件の改善だけでなく、既存の未使用別caseの回帰と関連Skill契約テストを確認した候補を検証済みとして保存し、汎用性未確認・回帰がある候補はレビュー待ちにする。改善候補は自動採用しない
 - ランナー導入のためにSkill本体の通常実行経路とポータビリティを変更していない。別revisionでの**受入用Skill改善**は既存契約・ポータビリティを維持し、関連テストで確認している
 - `git diff --check`がpassする
