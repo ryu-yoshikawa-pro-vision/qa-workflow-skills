@@ -1,8 +1,8 @@
 # 実Agent評価ランナー実装Plan
 
-このPlanは、既存のAgent Skills評価データセットを使って実Agentから評価対象成果物を生成し、現在の決定論的出力評価・意味評価まで一括で実行できる開発用ランナーを追加し、その後に固定テスト対象 `qa-training-store` で実Agent統合評価まで行うための実装計画です。
+このPlanは、既存のAgent Skills評価データセットを使って実Agentから成果物を生成・採点し、結果の自動分析、根拠が十分なSkill修正、同条件での再評価、レビュー待ちへの振分けまで一括して実行できる開発用の評価・改善基盤を追加する実装計画です。固定テスト対象 `qa-training-store` での統合評価も含みます。改善工程の詳細は[自動分析・修正・再評価Plan](./2026-10-03_132700_agent-eval-runner_03_analysis-and-improvement.md)を正本とします。
 
-Skill本体の実行基盤は変更しません。Codex、Claude Code等のAgent runtimeは各クライアントへ任せ、今回追加するランナーはリポジトリ開発時の評価だけを担当します。固定テスト対象での評価もSkill本体へ対象repo固有処理を入れず、評価側から実行します。
+Skill本体の実行基盤は変更しません。Codex、Claude Code等のAgent runtimeは各クライアントへ任せ、今回追加する評価・改善基盤はリポジトリ開発時の評価と、その結果に基づく隔離されたSkill修正・再評価だけを担当します。固定テスト対象での評価もSkill本体へ対象repo固有処理を入れず、評価側から実行します。
 
 ## 対象ブランチ
 
@@ -27,11 +27,11 @@ PR #11の検証では`codex exec`で評価対象成果物を生成し、既存�
 
 ### 最終目的
 
-このPlanの最終目的は、`qa-workflow-skills`を変更したときに、単発の手動確認や印象ではなく、**同じ条件で実Agent評価を再実行し、変更前後のSkill品質の改善・悪化・変化なしを根拠付きで確認できる状態を作ること**です。
+このPlanの最終目的は、`qa-workflow-skills`の実Agent評価結果を**自動分析し、根拠が十分で安全に限定できるSkill起因の問題をAgentが修正・再評価して、改善が確認された候補を保存すること**です。原因不明・根拠不足・高リスク・改善未確認の案件はレビュー待ちに分けます。変更前後は同じEvaluatorと実行条件で比較し、検証済み候補でも採用は人間が決めます。
 
 今回作るものはSkillを実行する新しいAgent runtimeではありません。Codex、Claude Code等が持つAgent runtimeをそのまま使い、`qa-workflow-skills`側にはQA Skillの評価に必要な最小の実行・記録経路だけを追加します。
 
-また、現在すでに存在するdeterministic / semantic / trigger / routing / runtime評価を置き換えません。今回不足している「実Agentで評価対象成果物を生成する前段」と「同じ条件で再評価できる記録」を追加し、既存評価へ接続します。
+また、現在すでに存在するdeterministic / semantic / trigger / routing / runtime評価を置き換えません。実Agent生成・評価・保存に加え、結果の分析と限定した修正・再評価を既存評価へ接続します。native triggerの実Agent評価は引き続き対象外です。
 
 完成後は、少なくとも次の改善ループを同じ仕組みで繰り返せる状態にします。
 
@@ -44,14 +44,18 @@ PR #11の検証では`codex exec`で評価対象成果物を生成し、既存�
   ↓
 結果と失敗根拠を保存
   ↓
-Skillを修正
+分析Agentが問題原因を分析
   ↓
-同じ評価条件で再実行
-  ↓
-変更前後を比較して改善判断
+機械的に自動修正可否を判定
+  ├─ 根拠不足・不明・高リスク → レビュー待ちとして保存
+  └─ 条件成立 → 修正Agentが隔離環境でSkillを修正
+                        ↓
+                 同じ評価条件で再実行・比較
+                        ├─ 改善確認 → 検証済み修正候補を保存
+                        └─ 未改善・回帰 → レビュー待ちとして保存
 ```
 
-自動A/BランキングやSkillの自動書き換え・自動採用は今回作りません。比較に必要な実行条件と評価結果を保存し、人間または別Agentが**条件の一致を検証できたrun同士**を比較できる状態を作ります。加えて、**実際の評価で発見した品質問題に対してSkillを1件以上修正し、同条件で再評価して改善の成立を検証する**ところまで実装受入に含めます。比較機能の成立と、改善効果が確認できたことは別に報告します。対象は明示的なSkill利用による既存Eval Inputの出力品質と、固定repo上の分析・設計workflow品質です。リポジトリ内の全Skillの実環境動作、ブラウザE2E、native Skill trigger精度まで測定できたとは扱いません。
+自動分析と、機械的な条件で許可された限定的なSkill修正・再評価は今回の実装範囲です。LLMの自称確信度では自動修正を許可しません。自動A/Bランキング、Skillの無制限な書換え、自動採用・push・PR作成・mergeは行いません。比較条件と根拠を保存し、**実際の品質問題に対する自動修正・改善実証**を受入検証します。実証できなければ分析・評価基盤の成立と改善実証の未達を分けて報告します。対象は明示的なSkill利用による既存Eval Inputの出力品質と、固定repo上の分析・設計workflow品質です。リポジトリ内の全Skillの実環境動作、ブラウザE2E、native Skill trigger精度まで測定できたとは扱いません。
 
 ### フェーズ1で実現すること
 
@@ -95,8 +99,12 @@ Skillを変更した後に同じ評価ケースを実Agentで再実行し、既�
 - 評価対象AgentへReference / expected / rubric / grader等の評価正解情報を公開しない
 - `qa-training-store`固有処理をSkill本体へ入れない
 - 現在必要な1つの固定targetを評価するためだけに、汎用plugin framework、DB、MCP、LangGraph等を追加しない
-- 自動Skill修正・自動採用は行わない。ただし受入検証では、評価結果を根拠に人間または別Agentが実際のSkillを限定的に修正し、同条件で再評価して改善効果を検証する
+- 十分な再現性・根拠・変更範囲・検証条件を満たしたSkill問題だけ、隔離したAgentが修正して同条件で再評価する。原因不明・証拠不足・高リスク案件はレビュー待ちに保存し、自動採用・push・PR作成・mergeは行わない
 - `description`による実Agent上のnative Skill発火評価は、クライアント固有の観測が必要なため今回の出力品質・workflow評価とは分離する。既存trigger datasetは維持し、今回のPlanだけでlive trigger最適化まで達成したとは扱わない
+
+### フェーズ3: 評価結果の自動分析・限定修正・再評価
+
+フェーズ1・2の実Agent評価結果を分析Agentが読み、修正可否条件を機械的に検査します。条件を満たすSkill単独の問題は修正Agentが隔離環境で最小修正し、関連テストと固定Evaluatorによる再評価で確認します。条件不足・高リスク・改善未確認の案件はレビュー待ちとして根拠付きで保存します。詳細は[自動分析・修正・再評価Plan](./2026-10-03_132700_agent-eval-runner_03_analysis-and-improvement.md)を正本とします。フェーズ1の共通ランナー実装を待たず、分析・振分けのfake Agentテストを並行して開発できます。
 
 ## フェーズ構成
 
@@ -142,7 +150,11 @@ PR #14で追加された3 Skillのsemantic caseも、固定Evaluator revisionに
 
 同じSkillを繰り返し改善する場合、この手作業が評価の再現性と実行量の妨げになります。
 
-### 3. 評価対象Agentから評価用正解情報を隔離する共通処理がない
+### 3. 評価結果から原因を分析して修正・再評価する共通処理がない
+
+現Planの既存評価は合否・理由を出力しますが、Skill起因かどうかの切り分け、修正可否判定、隔離した候補の修正と再評価、レビュー待ちの整理は自動化されていません。評価結果の収集だけで改善が自動的に進むとは扱いません。
+
+### 4. 評価対象Agentから評価用正解情報を隔離する共通処理がない
 
 `skills/<skill>/evals/`には次が存在します。
 
@@ -424,6 +436,9 @@ docker run --rm -i --read-only --cap-drop=ALL --security-opt=no-new-privileges
 **両attemptでのSkill読取`observed`は成果物品質比較の必須条件としない**。両方で投入したSkill SHAと比較条件を検証できれば成果物品質を比較できる。ただし**Skill改修そのものの改善・悪化・変化なしを判断するには別の証拠が必要**。フェーズ1では変更対象Skill、フェーズ2では変更されたSkillのうちrouting対象のSkillについて、比較する両revisionでファイルの読取・適用を裏付ける実行証拠を要求する。未観測なら成果物差は報告できるがSkill改修効果は`判断不能`とする。複数Skill同時変更の個別寄与や観測済みSkillと結果の因果関係は断定しない。native `description` trigger精度を今回評価したともしない。Native Skill専用の観測基盤・汎用Agent adapterは追加しない。
 ## 追加する評価実行コード
 
+評価結果の分析・限定修正の入口は`scripts/skills/evals/agent/improve.py`に分離し、既存`executor.py`と固定Evaluatorの`run.py`を再利用します。分析Agent・修正Agentを採点基準の保管領域から隔離し、許可条件・変更範囲・1回の修正上限・レビュー待ち保存は[改善Plan](./2026-10-03_132700_agent-eval-runner_03_analysis-and-improvement.md)に従います。
+
+
 ### 配置
 
 ```text
@@ -664,6 +679,8 @@ Judgeの非秘密command fingerprint、image / CLI / model / 推論設定、実�
 
 ## 結果保存
 
+既存の評価run成果物は変更しません。改善工程は同じ`--output-root`配下の`improvement/`に`analysis.json`・`analysis.md`、検証済み候補と`review-pending/`、修正・再評価結果を別保存します。分析Agentによる原判定の上書きは禁止します。
+
 `--output-root`配下へ、少なくとも次を保存します。
 
 ```text
@@ -733,7 +750,7 @@ Skill修正前後を比較するときは、少なくとも次が一致するrun
 
 ### 保存済み結果の比較・改善判断
 
-新しい自動判定器や統計検定は作らず、保存済み結果を人間または別Agentが判断する手順を固定する。
+新しい独自スコアや統計検定は作りません。既存の比較条件・criterion別結果・証拠を機械的に照合し、改善の成否を検証します。分析Agentは原因仮説・修正案を作成しますが、自動修正に進むかどうかは[改善Plan](./2026-10-03_132700_agent-eval-runner_03_analysis-and-improvement.md)の全条件で決めます。未確認・矛盾・再評価失敗はレビュー待ちに残します。
 
 1. 同じEvaluator・target / Eval Input・Agent / Judge modelと実効profile・`agent.timeout_seconds` / `judge.timeout_seconds`・隔離・repeat条件を満たすrunのみ並べる。各criterionのrating・根拠、固定機械判定、execution error、evidence未確認、Skill使用観測を区別して表示する。
 2. `--repeat 1`は配線確認・個別問題検出用に許可する。LLM品質の改善・悪化・変化なしの傾向を判断する際は、**両revisionを同じ条件でそれぞれ2attempt以上**実行し、すべての個別結果を確認する。比較前に回数を決め、attempt番号を同じ乱数条件の対として扱わない。2回で判断できる保証はなく、ばらつきが残れば判断不能とする。
@@ -776,6 +793,7 @@ batchは途中1件が失敗しても残りcaseを実行し、最後に全体結�
 - `scripts/skills/evals/agent/__init__.py`
 - `scripts/skills/evals/agent/executor.py`
 - `scripts/skills/evals/agent/run.py`
+- `scripts/skills/evals/agent/improve.py`（保存済み評価結果の分析、修正可否判定、隔離修正、再評価、レビュー待ち保存）
 - `scripts/skills/evals/agent/prompt_builder.py`
 - `scripts/skills/evals/agent/workspace.py`
 - `scripts/skills/evals/agent/qa_training_store.py`
@@ -809,6 +827,8 @@ batchは途中1件が失敗しても残りcaseを実行し、最後に全体結�
 `semantic-output-evals.yml`へ外部LLM実行は追加しません。
 
 ## テスト
+
+自動分析・修正可否・安全な隔離変更・レビュー待ち・再評価のfake Agentテストと、実Agentによる1件の修正受入検証を追加します。詳細と正常・拒否・未改善ケースは[改善Plan](./2026-10-03_132700_agent-eval-runner_03_analysis-and-improvement.md)を参照してください。通常CIで外部LLMは起動しません。
 
 ### 共通ランナーunit test
 
@@ -941,11 +961,11 @@ live Codexでは、実効設定の確認とEvaluator-onlyの非秘密sentinel読
 
 ## 実際のSkill改善と再評価の受入検証
 
-共通ランナーとフェーズ2の固定scenarioが動作した後、**実Agentが生成したQA成果物の品質を改善できるか**を1件以上実証する。既存の2 revisionの比較や、意図的に不正を混入したEvaluator-only fixtureの判別だけでは、この受入検証を満たしたことにしない。これは評価ランナーに自動Skill修正機能を追加する要件ではなく、完成した評価基盤を使用した実際の改善作業である。
+共通ランナーとフェーズ2の固定scenarioが動作した後、**実Agentが生成したQA成果物の品質を改善できるか**を1件以上実証する。既存の2 revisionの比較や、意図的に不正を混入したEvaluator-only fixtureの判別だけでは、この受入検証を満たしたことにしない。今回は、この受入検証を自動分析・許可判定・隔離修正・再評価の機能検証としても使用する。採用・push・mergeは自動化しない。
 
-1. **実際の問題を選ぶ**：フェーズ2の固定Checkout / Payment scenarioの実Agent baselineから、固定grader / Referenceと原成果物で裏付けられた**修正可能なSkill起因の品質問題**を1件選ぶ。選定対象とするcriterion・違反根拠・該当Skill・実行条件を記録し、人間がその判断を確認する。Agentの単発のばらつき、Judgeの誤判定、証拠欠落、Evaluator / 実行環境の障害だけをSkill欠陥と見なさない。**わざと壊したSkill・人工的に劣化させたbaseline・Evaluator-only fixtureを改善実証の対象にしない**。
+1. **実際の問題を選ぶ**：フェーズ2の固定Checkout / Payment scenarioの実Agent baselineから、固定grader / Referenceと原成果物で裏付けられた**修正可能なSkill起因の品質問題**を分析Agentが選ぶ。対象criterion・違反根拠・該当Skill・実行条件を保存し、機械的な許可条件で自動修正可能か判定する。判定不能な場合はレビュー待ちにする。Agentの単発のばらつき、Judgeの誤判定、証拠欠落、Evaluator / 実行環境の障害だけをSkill欠陥と見なさない。**わざと壊したSkill・人工的に劣化させたbaseline・Evaluator-only fixtureを改善実証の対象にしない**。
 2. **baselineを確定する**：修正前Skill revisionを40文字Git SHAと内容fingerprintで特定し、同じ固定Evaluator / datasetまたはscenario / target / Agent・Judge実効profile / 隔離条件で**2attempt以上**評価する。改善対象に選んだ失敗が再現せず、品質問題と認められない場合は改善実証に使わない。実行結果・原成果物・Judge evidenceと機械判定・Skill使用証拠を保存する。
-3. **Skillだけを修正する**：人間または別Agentが、判明した原因に対して**該当Skillの`SKILL.md` / `references/**` / `scripts/**` / `assets/**`の必要な箇所だけ**を修正する。変更内容と根拠、既存Skillの契約 / portability / 関連テストへの影響を確認する。実行用の固定Evaluator checkout、rubric、Reference、grader、target revision、scenario、Agent / Judge設定を改善効果が出るように変更しない。評価対象の候補は**PR #17の実装branchとは別のローカルworktree / branchでcommitして、独立した候補Git SHAを作る**。改善候補をこのPRへ自動取り込み・push・採用しない。
+3. **Skillだけを修正する**：機械的な自動修正条件が全て成立する場合は隔離した修正Agentが、成立しない場合はレビュー待ちとし、人間の判断後に、判明した原因に対して**該当Skillの`SKILL.md` / `references/**` / `scripts/**` / `assets/**`の必要な箇所だけ**を修正する。変更内容と根拠、既存Skillの契約 / portability / 関連テストへの影響を確認する。実行用の固定Evaluator checkout、rubric、Reference、grader、target revision、scenario、Agent / Judge設定を改善効果が出るように変更しない。評価対象の候補は**PR #17の実装branchとは別のローカルworktree / branchでcommitして、独立した候補Git SHAを作る**。改善候補をこのPRへ自動取り込み・push・採用しない。
 4. **同条件で再評価する**：変更後の候補revisionについて同じ固定条件で**2attempt以上**の実Agent評価を実施する。変更前後は候補Skill revision以外の比較条件を一致させ、両revisionのSkill使用観測・個別criterion ratingと根拠・固定機械判定・runtime証拠・実行エラーを比較する。候補sourceの実装fingerprint差だけでFAILにせず、互換性が失われたcriterionを品質改善に数えない。Evaluator基準の不具合が見つかり改訂を要するときは、**修正後の単一Evaluatorでbaseline / candidate双方を最初から再実行**する。
 5. **改善成立を確認する**：対象とした重要criterionまたは固定機械品質について、複数attemptの評価・原成果物・規範根拠から**一貫した実質的な向上**が確認でき、他の重要criterionや既存契約に明確な回帰がなく、修正対象Skillの実使用証拠が両revisionにある場合のみ「Skill改善を実証」と報告する。PASS件数だけ、Judgeによる印象評価、総合点、1回の偶然のPASSでは実証しない。修正後の通常Skillテストと必要な回帰テストも実施する。使用証拠・評価結果が不十分または矛盾する場合は、成果物品質の比較とSkill改修効果を分けて「判断不能」と記録する。
 6. **未達を隠さない**：初回に改善が認められなければ原因を確認し、既存の受入検証範囲で有効な問題・修正候補があるなら再検証する。実際に改善を確認できない、または修正可能な実問題が見つからない場合は**「ランナー・比較機能は検証済み／実Skill改善の実証は未達」**として、対象run、試した変更、根拠、障害と残課題を明記する。架空の失敗や基準緩和で達成扱いにしない。
@@ -977,6 +997,8 @@ git diff --check
 
 ## 実装順序
 
+共通ランナーとフェーズ2の評価を成立させた後、保存済みrunを使った`improve.py`の分析・振分け、修正Agentの隔離実行、関連テスト・同条件再評価を追加します。分析・修正を行うときもEvaluatorとtargetの固定境界を変更しません。
+
 1. branch開始時点が基準`main`から意図しない差分を持たないことを確認する
 2. 固定Evaluator checkoutのclean状態・grader / Judge条件を確定し、候補Skill revisionのtracked contentから一時実行ディレクトリを作る
 3. workspaceと実効OS境界のread-denial、余分なuser / global設定・Skill / MCPを排除するpreflightを定義し、fake Agentで失敗時の分類を固定する
@@ -1001,8 +1023,8 @@ git diff --check
 今回追加しません。
 
 - 新しいAgent Skill
-- Skill自動修正
-- Skill変更候補の自動採用
+- Skillの無制限な自動修正・原因不明案件の自動修正
+- Skill変更候補の自動採用・push・PR作成・merge
 - 自動branch作成 / commit / PR作成
 - Skillなし / Skillありの自動A/B比較
 - mainとbranchの自動ランキング
@@ -1066,7 +1088,7 @@ native trigger評価は、Skill activationを観測する方法がAgentクライ
 - 実Codexの非pass結果がある場合、その結果を隠さず保存・報告できる
 - 各live runにSkill revision、評価入力 / scenario fingerprint、Agent名 / model等の比較に必要なprovenanceが保存される
 - 2つの実runでEvaluator・入力・Judge・`agent.timeout_seconds`を含む実効Agent profile・隔離・repeatを照合する。成果物品質の比較とSkill改修の効果判断は別々に記録し、改修効果は変更対象Skillの使用証拠と複数attemptの一貫した根拠がある場合だけ判断する。未観測・矛盾する場合は判断不能とし、厳密な因果証明は主張しない
-- **実際のSkill欠陥をbaseline評価から1件以上特定し、該当Skillを別の候補revisionで修正して同条件で再評価する受入検証**を実施している。比較する各revisionを2attempt以上評価し、重要品質の改善・回帰・使用証拠を原成果物と固定Referenceから確認できる。改善が確認できない場合は未達として記録し、実改善の証拠なしにPlan全体の改善実証を完了扱いしない
+- **自動分析・機械的な修正可否判定・レビュー待ち保存が成立し、条件に合致する実際のSkill欠陥をbaseline評価から1件以上特定して、隔離した修正Agentが候補revisionを作り、同条件で再評価する受入検証**を実施している。比較する各revisionを2attempt以上評価し、重要品質の改善・回帰・使用証拠を原成果物と固定Referenceから確認できる。改善が確認できない場合は未達として記録し、実改善の証拠なしにPlan全体の改善実証を完了扱いしない
 - 同一Evaluatorで正常・重要欠落・捏造のQA成果物を判別できた根拠とrepeatの揺れを保存する
 - 互換なruntime implementation更新がfingerprint相違だけを理由に非passとならず、真の契約非互換を個別criteriaへ区分できる
 - `qa-training-store`固定revision `84ce165493649550832731a60cf436f8ae29c56b` を対象にフェーズ2初回評価と独立したrepeat試行を実行している
@@ -1076,5 +1098,7 @@ native trigger評価は、Skill activationを観測する方法がAgentクライ
 - フェーズ2のrunner / environment error、Skill品質のneeds_review / fail、実行証拠の`evidence_unverified`、`valid=false`、比較不可・部分的Evaluator非互換を区別している
 - フェーズ2のJudgeは固定rubricを`QTS-SEM-001/002`と`QTS-SEM-003..010`へ分割して別々に実行し、後者へ`routing[]`・最終stdout・固定機械判定要約を渡さない。各応答のcriterion集合を検証後、統合して既存result正規化で全10件を判定し、部分失敗を全体PASSにしない
 - 候補production verifier / generatorのSHAだけが変わりschema・機械契約が互換なら、同じ固定Evaluatorでrunの直接比較を妨げない
+- `--analyze-only`で分析・レビュー待ちのみを生成でき、根拠不足・高リスク・非互換・Judge揺れ・実行エラーを自動修正せずレビュー待ちに分けられる。修正許可をLLMの自己申告だけで判断しない
+- 修正Agentは隔離したSkill packageの許可pathだけを変更し、固定Evaluator・target・元branchを不変に保ち、修正試行は1回で停止する。改善が確認された差分・候補revision・検証結果を保存するが自動採用しない
 - ランナー導入のためにSkill本体の通常実行経路とポータビリティを変更していない。別revisionでの**受入用Skill改善**は既存契約・ポータビリティを維持し、関連テストで確認している
 - `git diff --check`がpassする
