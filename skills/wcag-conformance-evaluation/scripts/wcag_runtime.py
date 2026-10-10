@@ -194,7 +194,9 @@ def _close_report_with_saved_state(args: dict[str, Any], metadata: dict[str, Any
                                        "saved_workflow_state_runtime_result"}}
     report = close_report(**report_arguments)
     if report.get("status") != "complete":
-        return report
+        return {**report, "report_closure_inputs": {key: args[key] for key in (
+            "required_steps", "step_outcomes", "example_coverage", "required_criterion_evaluation_refs",
+            "all_occurrence_requirements", "accessible_output_closure") if key in args}}
     return {
         "status": "pending-persistence", "closure_status": "complete",
         "workflow_ref": saved["workflow_ref"], "evaluation_ref": saved["evaluation_ref"],
@@ -222,8 +224,23 @@ def _evaluation_statement_with_saved_report(args: dict[str, Any], metadata: dict
         return {"status": "blocked", "reason": "current_saved_wcag_report_required"}
     evaluation = saved["evaluation"]
     criterion_refs = evaluation.get("criterion_evaluation_refs")
+    runtime_ref = evaluation.get("report_runtime_execution_ref")
+    runtime_execution = next((row for row in evaluation.get("report_runtime_executions", [])
+                              if isinstance(row, dict) and row.get("runtime_execution_ref") == runtime_ref), None)
+    runtime_result = runtime_execution.get("runtime_result") if isinstance(runtime_execution, dict) else None
+    runtime_payload = runtime_result.get("payload") if isinstance(runtime_result, dict) else None
+    runtime_candidate = runtime_payload.get("result") if isinstance(runtime_payload, dict) else None
     if (evaluation.get("report_status") != "complete"
             or evaluation.get("report_fingerprint") is None
+            or not runtime_ref
+            or evaluation.get("current_report_runtime_execution_ref") != runtime_ref
+            or not isinstance(runtime_result, dict)
+            or runtime_result.get("runtime_status") != "ok"
+            or runtime_result.get("result_status") != "unresolved"
+            or not isinstance(runtime_candidate, dict)
+            or runtime_candidate.get("status") != "pending-persistence"
+            or runtime_candidate.get("closure_status") != "complete"
+            or runtime_execution.get("result_fingerprint") != _stable_fingerprint(runtime_result)
             or evaluation.get("wcag_version") != args.get("version")
             or evaluation.get("level") != args.get("level")
             or closure.get("status") != "complete"

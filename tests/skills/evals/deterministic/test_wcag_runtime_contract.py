@@ -363,90 +363,71 @@ class WcagRuntimeContractTests(unittest.TestCase):
             incomplete_runtime = invoke({"metadata": wcag_metadata,
                 "input": {"operation": "close-report", "arguments": incomplete_close_args}})
             self.assertEqual(incomplete_runtime["payload"]["result"]["status"], "blocked")
-            incomplete_dependency = {
-                "skill": "wcag-conformance-evaluation",
-                "runtime_unit_key": "artifact:wcag_runtime:all",
-                "generation_fingerprint": incomplete_runtime["generation_fingerprint"],
-                "result_fingerprint": result_fingerprint(incomplete_runtime),
-            }
+            closure_keys = ("required_steps", "step_outcomes", "example_coverage",
+                            "required_criterion_evaluation_refs", "accessible_output_closure")
+            incomplete_closure_inputs = {key: incomplete_close_args[key] for key in closure_keys}
 
-            # Case A: the real current WCAG runtime result carries an incomplete
-            # Step 4.1 outcome and cannot be persisted as a closed report.
+            # Case A: qa-workflow itself runs the official WCAG runtime with the
+            # incomplete Step 4.1 input, then stores that exact blocked result.
             incomplete_finalize = invoke_workflow({
-                "metadata": workflow_metadata(reference_refs=context_refs,
-                    upstream_runtime_units=[incomplete_dependency]),
+                "metadata": workflow_metadata(reference_refs=context_refs),
                 "input": {"operation": "finalize-wcag-report", "arguments": {
                     "workflow_ref": workflow_ref, "project_context": project_context,
                     "project_context_ref": context_refs[0], "expected_provider_revision": saved_read["provider_revision"],
                     "evaluation_ref": "WCAG-EVAL-17", "evaluation_revision": "rev-9",
                     "canonical_criterion_plan": plan, "sample_results": close_args["sample_results"],
-                    "wcag_runtime_result": incomplete_runtime,
+                    "report_closure_inputs": incomplete_closure_inputs,
                 }},
             })
             self.assertEqual(incomplete_finalize["result_status"], "blocked", incomplete_finalize)
-
-
-            # An envelope carrying this exact candidate is still rejected when
-            # the owner reruns close_report() against its actual incomplete step input.
-            forged_runtime = dict(incomplete_runtime)
-            forged_payload = dict(incomplete_runtime["payload"])
-            forged_payload["result"] = {**wcag_close["payload"]["result"],
-                "status": "pending-persistence", "closure_status": "complete",
-                "report_closure_inputs": {key: incomplete_close_args[key] for key in (
-                    "required_steps", "step_outcomes", "example_coverage",
-                    "required_criterion_evaluation_refs", "accessible_output_closure")}}
-            forged_runtime.update({"result_status": "unresolved", "payload": forged_payload})
-            forged_finalize = invoke_workflow({
-                "metadata": workflow_metadata(reference_refs=context_refs,
-                    upstream_runtime_units=[{
-                        **incomplete_dependency,
-                        "result_fingerprint": result_fingerprint(forged_runtime),
-                    }]),
-                "input": {"operation": "finalize-wcag-report", "arguments": {
+            self.assertEqual(incomplete_finalize["payload"]["result"]["status"], "blocked")
+            after_incomplete = invoke_workflow({
+                "metadata": workflow_metadata(reference_refs=context_refs),
+                "input": {"operation": "read-wcag-evaluation-state", "arguments": {
                     "workflow_ref": workflow_ref, "project_context": project_context,
-                    "project_context_ref": context_refs[0], "expected_provider_revision": saved_read["provider_revision"],
-                    "evaluation_ref": "WCAG-EVAL-17", "evaluation_revision": "rev-9",
-                    "canonical_criterion_plan": plan, "sample_results": close_args["sample_results"],
-                    "wcag_runtime_result": forged_runtime,
+                    "project_context_ref": context_refs[0], "evaluation_ref": "WCAG-EVAL-17",
+                    "evaluation_revision": "rev-9",
                 }},
             })
-            self.assertEqual(forged_finalize["result_status"], "blocked", forged_finalize)
-            self.assertEqual(forged_finalize["payload"]["result"]["reason"],
-                             "wcag_em_report_closure_not_complete")
+            after_incomplete_state = after_incomplete["payload"]["result"]
+            self.assertEqual(after_incomplete_state["evaluation"]["report_status"], "open")
+            self.assertEqual(len(after_incomplete_state["evaluation"]["report_runtime_executions"]), 1)
+            incomplete_run = after_incomplete_state["evaluation"]["report_runtime_executions"][0]
+            self.assertEqual(incomplete_run["runtime_result"]["result_status"], "blocked")
+            self.assertEqual(incomplete_run["runtime_result"]["payload"]["result"]["report_closure_inputs"]["step_outcomes"]["4.1"], "incomplete")
 
-            # Reproduce simultaneous candidate and step-input tampering. The
-            # envelope still identifies the actual incomplete invocation, while
-            # the caller replaces its payload with a pending candidate and marks
-            # Step 4.1 complete.
-            forged_complete_inputs = {key: incomplete_close_args[key] for key in (
-                "required_steps", "step_outcomes", "example_coverage",
-                "required_criterion_evaluation_refs", "accessible_output_closure")}
+            # Case B: candidate and upstream metadata are forged together after
+            # the incomplete run. The owner operation no longer accepts a caller
+            # supplied runtime envelope, so it cannot be made into current proof.
+            forged_complete_inputs = {key: incomplete_close_args[key] for key in closure_keys}
             forged_complete_inputs["step_outcomes"] = {
                 **forged_complete_inputs["step_outcomes"], "4.1": "complete"}
             forged_complete_runtime = dict(incomplete_runtime)
             forged_complete_payload = dict(incomplete_runtime["payload"])
             forged_complete_payload["result"] = {
-                **wcag_close["payload"]["result"],
-                "report_closure_inputs": forged_complete_inputs,
+                **wcag_close["payload"]["result"], "report_closure_inputs": forged_complete_inputs,
             }
-            forged_complete_runtime.update({
-                "result_status": "unresolved", "payload": forged_complete_payload,
-            })
-            forged_complete_finalize = invoke_workflow({
+            forged_complete_runtime.update({"result_status": "unresolved", "payload": forged_complete_payload})
+            forged_complete_dependency = {
+                "skill": "wcag-conformance-evaluation",
+                "runtime_unit_key": "artifact:wcag_runtime:all",
+                "generation_fingerprint": forged_complete_runtime["generation_fingerprint"],
+                "result_fingerprint": result_fingerprint(forged_complete_runtime),
+            }
+            forged_finalize = invoke_workflow({
                 "metadata": workflow_metadata(reference_refs=context_refs,
-                    upstream_runtime_units=[incomplete_dependency]),
+                    upstream_runtime_units=[forged_complete_dependency]),
                 "input": {"operation": "finalize-wcag-report", "arguments": {
                     "workflow_ref": workflow_ref, "project_context": project_context,
-                    "project_context_ref": context_refs[0], "expected_provider_revision": saved_read["provider_revision"],
+                    "project_context_ref": context_refs[0],
+                    "expected_provider_revision": after_incomplete_state["provider_revision"],
                     "evaluation_ref": "WCAG-EVAL-17", "evaluation_revision": "rev-9",
                     "canonical_criterion_plan": plan, "sample_results": close_args["sample_results"],
+                    "report_closure_inputs": forged_complete_inputs,
                     "wcag_runtime_result": forged_complete_runtime,
                 }},
             })
-            self.assertEqual(forged_complete_finalize["result_status"], "blocked", forged_complete_finalize)
-            self.assertEqual(forged_complete_finalize["payload"]["result"]["reason"],
-                             "current_wcag_closure_runtime_result_required")
-
+            self.assertNotEqual(forged_finalize["result_status"], "ready", forged_finalize)
             unchanged = invoke_workflow({
                 "metadata": workflow_metadata(reference_refs=context_refs),
                 "input": {"operation": "read-wcag-evaluation-state", "arguments": {
@@ -455,28 +436,28 @@ class WcagRuntimeContractTests(unittest.TestCase):
                     "evaluation_revision": "rev-9",
                 }},
             })
-            self.assertEqual(unchanged["payload"]["result"]["evaluation"]["report_status"], "open")
-            self.assertEqual(unchanged["payload"]["result"]["provider_revision"], "sqlite:2")
+            unchanged_state = unchanged["payload"]["result"]
+            self.assertEqual(unchanged_state["evaluation"]["report_status"], "open")
+            self.assertEqual(unchanged_state["provider_revision"], after_incomplete_state["provider_revision"])
+            self.assertEqual(len(unchanged_state["evaluation"]["report_runtime_executions"]), 1)
 
+            # Case C: the official owner-invoked runtime result is stored, reread,
+            # matched to the saved plan/results, then closed with a second CAS.
+            complete_closure_inputs = {key: close_args[key] for key in closure_keys}
             finalized = invoke_workflow({
-                "metadata": workflow_metadata(reference_refs=context_refs, upstream_runtime_units=[{
-                    "skill": "wcag-conformance-evaluation",
-                    "runtime_unit_key": "artifact:wcag_runtime:all",
-                    "generation_fingerprint": wcag_close["generation_fingerprint"],
-                    "result_fingerprint": result_fingerprint(wcag_close),
-                }]),
+                "metadata": workflow_metadata(reference_refs=context_refs,
+                    upstream_runtime_units=[forged_complete_dependency]),
                 "input": {"operation": "finalize-wcag-report", "arguments": {
                     "workflow_ref": workflow_ref, "project_context": project_context,
-                    "project_context_ref": context_refs[0], "expected_provider_revision": saved_read["provider_revision"],
+                    "project_context_ref": context_refs[0],
+                    "expected_provider_revision": unchanged_state["provider_revision"],
                     "evaluation_ref": "WCAG-EVAL-17", "evaluation_revision": "rev-9",
                     "canonical_criterion_plan": plan, "sample_results": close_args["sample_results"],
-                    "wcag_runtime_result": wcag_close,
+                    "report_closure_inputs": complete_closure_inputs,
                 }},
             })
-            self.assertEqual(finalized["result_status"], "ready", finalized["issues"])
+            self.assertEqual(finalized["result_status"], "ready", finalized)
             self.assertEqual(finalized["payload"]["result"]["status"], "complete")
-            self.assertEqual(finalized["payload"]["result"]["provider_revision"], "sqlite:3")
-
             reread = invoke_workflow({
                 "metadata": workflow_metadata(reference_refs=context_refs),
                 "input": {"operation": "read-wcag-evaluation-state", "arguments": {
@@ -485,9 +466,18 @@ class WcagRuntimeContractTests(unittest.TestCase):
                     "evaluation_revision": "rev-9",
                 }},
             })
-            self.assertEqual(reread["result_status"], "ready")
-            self.assertEqual(reread["payload"]["result"]["evaluation"]["report_status"], "complete")
-            self.assertEqual(reread["payload"]["result"]["provider_revision"], "sqlite:3")
+            final_state = reread["payload"]["result"]
+            final_evaluation = final_state["evaluation"]
+            self.assertEqual(final_evaluation["report_status"], "complete")
+            self.assertEqual(final_state["provider_revision"], finalized["payload"]["result"]["provider_revision"])
+            self.assertEqual(len(final_evaluation["report_runtime_executions"]), 2)
+            current_run = final_evaluation["report_runtime_executions"][-1]
+            self.assertEqual(final_evaluation["current_report_runtime_execution_ref"], current_run["runtime_execution_ref"])
+            self.assertEqual(final_evaluation["report_runtime_execution_ref"], current_run["runtime_execution_ref"])
+            self.assertEqual(current_run["runtime_result"]["payload"]["result"]["status"], "pending-persistence")
+            self.assertEqual(current_run["runtime_result"]["payload"]["result"]["report_closure_inputs"]["step_outcomes"]["4.1"], "complete")
+            self.assertEqual(current_run["result_fingerprint"], result_fingerprint(current_run["runtime_result"]))
+            self.assertEqual(current_run["source_provider_revision"], after_incomplete_state["provider_revision"])
 
     def test_runtime_dependency_freshness_checks_full_current_result_fingerprint(self):
         upstream = invoke(request("A"))

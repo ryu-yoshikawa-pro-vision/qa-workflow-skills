@@ -738,3 +738,20 @@ PR #14 repository implementation Plan未達: 1件
 - 残存再現: ケースA由来のincomplete resultについてcandidate status、closure status、Step 4.1 outcomeをcompleteへ同時改変し、dependency metadataの`result_fingerprint`も改変envelopeに合わせて直接`workflow_runtime.py`へ渡すと、`finalize-wcag-report`は`ready / complete`を返し、SQLite revision `sqlite:3`へ完了を保存した。よって、candidateだけを改変しcurrent dependencyを維持するケースは拒否できるが、呼び出し元がmetadataも自己作成する境界では正式完了を偽装でき、現時点ではmerge blockerである。
 - 必要な依存条件: ownerがCAS前にMachine Runtimeの保存済みcurrent result rowを独立取得し、そのrowにcandidate envelopeの`result_fingerprint`が一致することを確認する、既存Artifact参照または同等の信頼済み読込契約が必要。現在のProject Context / SQLite evaluation recordはそのrowのrefと読込APIを提供していない。自己申告fingerprint、`verified` flag、同じ入力からの再hashでは補えない。新しいstoreやCAS frameworkは追加せず、信頼できるcurrent result artifactの取得契約がないため今回この1点は未解決とする。
 - 保証範囲: Machine Runtime freshnessのresult fingerprint比較、candidate-only tampering拒否、正常なcurrent candidateのSQLite CAS / independent rereadは確認済み。ただしowner側でMachine Runtime current rowを独立取得するまで、自己申告metadataとの一致は真正性の証明ではない。SQLite provider、CAS、WCAG-EM closure helperは再設計していない。
+
+## 2026-10-10 JST — owner実行済みWCAG Runtimeの保存と正式完了
+
+- **修正前の再現:** 正規のincomplete Step 4.1 runtime envelopeに対し、candidateを`pending-persistence / complete`へ差し替え、`step_outcomes["4.1"]`も`complete`へ変更し、`result_fingerprint`を再計算した`metadata.upstream_runtime_units`とともにQA workflowへ渡すと、同時偽装でも`ready / complete`がSQLiteへ保存されることをruntime contract testで再現した。既存のPlan/result照合と`close_report()`再実行は維持されていたが、再実行の工程入力もcandidate payloadから取っていた。
+- **修正:** `workflow_runtime.py`の`finalize-wcag-report`はcallerのruntime envelopeを受け付けなくなった。QA ownerが公式`workflow_runtime.py`で現行stateを再読込し、公式`wcag_runtime.py close-report` CLIを内部実行する。そのchild runtime resultと有限なWCAG-EM closure入力は、evaluation ref/revision、source provider revision、input/generation/result fingerprint、current Plan/results fingerprint、生成run refを含め、同じ既存SQLite state内にnative CASで追記する。独立readback後、current runを再検証し、保存されたruntime closure inputで`close_report()`を再実行し、別CAS・readback後だけreportをcompleteにする。incomplete結果は記録されるがreportはopenのまま。再実行は新refで履歴に残る。新しいprovider/依存関係は追加していない。
+- **ケースA:** ownerがStep 4.1=`incomplete`を持つ正式WCAG Runtimeを実行・保存し、operationはblocked、再読込後のSQLite report statusはopen、runtime historyには実際のincomplete入力が格納される。
+- **ケースB:** candidateと外部metadataを同時に改変し、偽装した`wcag_runtime_result`を`finalize-wcag-report`へ渡しても、runtime input schemaが拒否する。metadataは完了根拠として参照されない。SQLite provider revisionとreport statusはケースA後の値（open）のまま。
+- **ケースC:** 完了工程入力を与えるとQA ownerが公式WCAG Runtimeを実行し、その正規結果をrun ref付きでCAS保存・再読込し、同じ結果のPlan/current result全件照合後、reportを別CASでcompleteにする。再読込後もreportはcomplete、current/completion runtime refは一致し、保存fingerprintは既存`runtime_unit_row()`のresult fingerprintと一致する。
+- **回帰:** `test_saved_current_wcag_plan_closes_only_after_qa_workflow_cas_and_reread`と`test_wcag_report_requires_persisted_owner_runtime_result`でA/B/C、DB open状態、run history/ref、fingerprint、CAS/readbackを検証する。runtime child processはUTF-8を明示してWindows既定CP932のdecode問題を避ける。
+- **保証範囲:** 実行後のcandidate・metadata改ざんはowner境界で使われず、正式完了にはowner実行結果のCAS保存とreadbackが必要。評価ownerが実行前に与える意味上のStep判断は既存WCAG責務であり、SQLiteは特権DB編集や分散hostへの暗号学的保護を主張しない。
+- focused結果、repository標準検証、commit/push、最終PR head CIは下記へ確定後に記録する。
+
+- focused WCAG runtime / report closure / QA artifact graph: 56 PASS。Repository deterministic: 283 PASS。Repository runtime: 271 PASS。Shared deterministic: 12 PASS。
+- Semantic dataset validator: 22 Skill / 155 case。Shared semantic: 27 PASS / 2 SKIP（Windows symlink privilege）。Repository semantic: 4 PASS。Trigger contract: 1 PASS。Official `skills-ref validate`: 23 Skill PASS（`PYTHONUTF8=1`）。
+- Python compile PASS。変更Markdown 4件のPrettier、対象限定Markdownlint（0 issue）、既存text quality scannerによるbaseline比較（4 files、0 new violations）、owner cloneでの`git diff --check` PASS。初回`skills-ref`はWindows CP932 decode errorとなったため、UTF-8 process設定で再実行して成功した。
+- repository deterministic/runtimeを含むWindows symlink privilege由来のskipはshared semanticの2件のみ。無関係な全量Semantic Judge、Trigger実行、Holdout、formal fixture closureは実行していない。
+- commit / pushおよび最終PR headの3 GitHub Actions確認はこれから実施する。最終CI結果は同じheadの確認後に追記する。

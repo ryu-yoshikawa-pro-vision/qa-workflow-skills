@@ -893,6 +893,9 @@ def _build_wcag_evaluation_record(*, evaluation_initialization: dict[str, Any], 
         "report_fingerprint": None,
         "report_result_refs": [],
         "report_criterion_evaluation_refs": [],
+        "report_runtime_executions": [],
+        "current_report_runtime_execution_ref": None,
+        "report_runtime_execution_ref": None,
     }
     return record
 
@@ -1071,7 +1074,7 @@ def read_wcag_evaluation_state(workflow_root: str | Path, workflow_ref: str, eva
             ("project_context_fingerprint", project_context_fingerprint),
             ("workflow_state_root_content_identity", workflow_state_root_content_identity))):
         return {"status": "conflict", "reason": "workflow_project_context_changed"}
-    required = {"evaluation_ref", "evaluation_revision", "wcag_version", "level", "initialization_fingerprint",
+    legacy_required = {"evaluation_ref", "evaluation_revision", "wcag_version", "level", "initialization_fingerprint",
                 "evaluator_ref", "commissioner_ref", "product_enclosure_ref",
                 "project_context_ref", "project_context_revision", "project_context_fingerprint",
                 "workflow_state_root_content_identity",
@@ -1080,6 +1083,12 @@ def read_wcag_evaluation_state(workflow_root: str | Path, workflow_ref: str, eva
                 "canonical_plan_fingerprint", "criterion_rows", "criterion_evaluation_refs",
                 "previous_evaluation_revision", "record_status", "report_status", "report_fingerprint",
                 "report_result_refs", "report_criterion_evaluation_refs"}
+    runtime_fields = {"report_runtime_executions", "current_report_runtime_execution_ref",
+                      "report_runtime_execution_ref"}
+    if set(record) == legacy_required:
+        record = {**record, "report_runtime_executions": [],
+                  "current_report_runtime_execution_ref": None, "report_runtime_execution_ref": None}
+    required = legacy_required | runtime_fields
     if set(record) != required or record.get("record_status") != "plan-finalized":
         return {"status": "blocked", "reason": "wcag_evaluation_state_corrupt"}
     if (not isinstance(record.get("canonical_plan_fingerprint"), str)
@@ -1087,6 +1096,39 @@ def read_wcag_evaluation_state(workflow_root: str | Path, workflow_ref: str, eva
             or not isinstance(record.get("criterion_rows"), list)
             or not isinstance(record.get("criterion_evaluation_refs"), list)):
         return {"status": "blocked", "reason": "wcag_evaluation_state_corrupt"}
+    executions = record.get("report_runtime_executions")
+    if not isinstance(executions, list):
+        return {"status": "blocked", "reason": "wcag_evaluation_state_corrupt"}
+    execution_refs = [row.get("runtime_execution_ref") for row in executions if isinstance(row, dict)]
+    execution_fields = {"runtime_execution_ref", "workflow_ref", "evaluation_ref", "evaluation_revision",
+                        "source_provider_revision", "input_fingerprint", "generation_fingerprint",
+                        "result_fingerprint", "canonical_plan_fingerprint", "results_fingerprint", "runtime_result"}
+    if (len(execution_refs) != len(executions) or len(execution_refs) != len(set(execution_refs))
+            or any(not _safe_stored_ref(ref) for ref in execution_refs)
+            or (record.get("current_report_runtime_execution_ref") is not None
+                and record.get("current_report_runtime_execution_ref") not in execution_refs)
+            or (record.get("report_runtime_execution_ref") is not None
+                and record.get("report_runtime_execution_ref") not in execution_refs)
+            or (execution_refs and record.get("current_report_runtime_execution_ref") != execution_refs[-1])
+            or (record.get("report_status") == "complete"
+                and record.get("report_runtime_execution_ref") not in execution_refs)
+            or (record.get("report_status") == "open" and record.get("report_runtime_execution_ref") is not None)):
+        return {"status": "blocked", "reason": "wcag_evaluation_state_corrupt"}
+    for row in executions:
+        runtime_result = row.get("runtime_result")
+        if (set(row) != execution_fields
+                or row.get("workflow_ref") != state_result.get("workflow_ref")
+                or row.get("evaluation_ref") != evaluation_ref
+                or row.get("evaluation_revision") != record.get("evaluation_revision")
+                or not _safe_stored_ref(row.get("source_provider_revision"))
+                or not isinstance(runtime_result, dict)
+                or row.get("input_fingerprint") != runtime_result.get("input_fingerprint")
+                or row.get("generation_fingerprint") != runtime_result.get("generation_fingerprint")
+                or row.get("result_fingerprint") != _wcag_runtime_result_fingerprint(runtime_result)
+                or row.get("canonical_plan_fingerprint") != record.get("canonical_plan_fingerprint")
+                or not isinstance(row.get("results_fingerprint"), str)
+                or not _SHA256_REF.fullmatch(row["results_fingerprint"])):
+            return {"status": "blocked", "reason": "wcag_evaluation_state_corrupt"}
     return {"status": "current", "evaluation_ref": evaluation_ref,
             "evaluation_revision": record["evaluation_revision"], "evaluation": record,
             "provider_revision": state_result["state_revision"], "workflow_ref": state_result["workflow_ref"]}
@@ -1146,12 +1188,159 @@ def _wcag_report_result_summary(evaluation: dict[str, Any], sample_results: Any)
     return {"results": summary, "fingerprint": "sha256:" + content_identity(summary)}
 
 
+def _wcag_runtime_result_fingerprint(runtime_result: dict[str, Any]) -> str:
+    return "sha256:" + content_identity(runtime_result)
+
+
+def _record_wcag_report_runtime_execution(workflow_root: str | Path, workflow_ref: str, *,
+                                         expected_provider_revision: str, evaluation_ref: str,
+                                         evaluation_revision: str, canonical_criterion_plan: dict[str, Any],
+                                         sample_results: list[dict[str, Any]],
+                                         saved_workflow_state_runtime_result: dict[str, Any],
+                                         wcag_runtime_result: dict[str, Any],
+                                         project_context_ref: str, project_context_revision: str,
+                                         project_context_fingerprint: str,
+                                         workflow_state_root_content_identity: str) -> dict[str, Any]:
+    """Persist only the result produced by the owner-invoked WCAG runtime."""
+    current = read_sqlite_workflow_state(workflow_root, workflow_ref,
+                                         expected_revision=expected_provider_revision)
+    if current.get("status") != "current":
+        return {"status": current.get("status", "blocked"),
+                "reason": current.get("reason", "workflow_state_revision_changed")}
+    evaluation = read_wcag_evaluation_state(
+        workflow_root, workflow_ref, evaluation_ref, evaluation_revision=evaluation_revision,
+        project_context_ref=project_context_ref, project_context_revision=project_context_revision,
+        project_context_fingerprint=project_context_fingerprint,
+        workflow_state_root_content_identity=workflow_state_root_content_identity,
+    )
+    if evaluation.get("status") != "current" or evaluation.get("provider_revision") != expected_provider_revision:
+        return {"status": "conflict", "reason": "wcag_evaluation_state_changed_before_runtime_record"}
+    if evaluation["evaluation"].get("report_status") != "open":
+        return {"status": "blocked", "reason": "wcag_report_not_open"}
+    plan_check = validate_wcag_plan_against_state(evaluation["evaluation"], canonical_criterion_plan)
+    if plan_check.get("status") != "current":
+        return {"status": plan_check.get("status", "blocked"),
+                "reason": plan_check.get("reason", "canonical_wcag_plan_invalid")}
+    try:
+        result_summary = _wcag_report_result_summary(evaluation["evaluation"], sample_results)
+    except (KeyError, TypeError, ValueError):
+        return {"status": "blocked", "reason": "wcag_report_result_set_incomplete_or_stale"}
+
+    saved_payload = saved_workflow_state_runtime_result.get("payload") if isinstance(saved_workflow_state_runtime_result, dict) else None
+    saved_read = saved_payload.get("result") if isinstance(saved_payload, dict) else None
+    runtime_payload = wcag_runtime_result.get("payload") if isinstance(wcag_runtime_result, dict) else None
+    runtime_result = runtime_payload.get("result") if isinstance(runtime_payload, dict) else None
+    runtime_dependency_rows = wcag_runtime_result.get("upstream_runtime_units") if isinstance(wcag_runtime_result, dict) else None
+    expected_saved_fingerprint = (_wcag_runtime_result_fingerprint(saved_workflow_state_runtime_result)
+                                  if isinstance(saved_workflow_state_runtime_result, dict) else None)
+    matching_dependencies = [row for row in runtime_dependency_rows or []
+                             if isinstance(row, dict)
+                             and row.get("skill") == "qa-workflow"
+                             and row.get("runtime_unit_key") == "artifact:workflow_runtime:all"]
+    if (not isinstance(saved_read, dict) or saved_read.get("status") != "current"
+            or saved_read.get("workflow_ref") != workflow_ref
+            or saved_read.get("evaluation_ref") != evaluation_ref
+            or saved_read.get("evaluation_revision") != evaluation_revision
+            or saved_read.get("provider_revision") != expected_provider_revision
+            or wcag_runtime_result.get("skill") != "wcag-conformance-evaluation"
+            or wcag_runtime_result.get("runtime_unit_key") != "artifact:wcag_runtime:all"
+            or wcag_runtime_result.get("runtime_status") != "ok"
+            or wcag_runtime_result.get("result_status") not in {"blocked", "unresolved"}
+            or wcag_runtime_result.get("deterministic_generated") is not True
+            or not isinstance(wcag_runtime_result.get("input_fingerprint"), str)
+            or not _SHA256_REF.fullmatch(wcag_runtime_result["input_fingerprint"])
+            or not isinstance(wcag_runtime_result.get("generation_fingerprint"), str)
+            or not _SHA256_REF.fullmatch(wcag_runtime_result["generation_fingerprint"])
+            or len(matching_dependencies) != 1
+            or matching_dependencies[0].get("generation_fingerprint") != saved_workflow_state_runtime_result.get("generation_fingerprint")
+            or matching_dependencies[0].get("result_fingerprint") != expected_saved_fingerprint
+            or not isinstance(runtime_result, dict)
+            or runtime_payload.get("operation") != "close-report"
+            or runtime_result.get("status") not in {"blocked", "pending-persistence"}
+            or not isinstance(runtime_result.get("report_closure_inputs"), dict)):
+        return {"status": "blocked", "reason": "owner_wcag_runtime_result_invalid"}
+
+    if runtime_result.get("status") == "pending-persistence":
+        if (wcag_runtime_result.get("result_status") != "unresolved"
+                or runtime_result.get("closure_status") != "complete"
+                or runtime_result.get("workflow_ref") != workflow_ref
+                or runtime_result.get("evaluation_ref") != evaluation_ref
+                or runtime_result.get("evaluation_revision") != evaluation_revision
+                or runtime_result.get("provider_revision") != expected_provider_revision
+                or runtime_result.get("canonical_plan_fingerprint") != evaluation["evaluation"].get("canonical_plan_fingerprint")
+                or runtime_result.get("results_fingerprint") != result_summary.get("fingerprint")
+                or runtime_result.get("criterion_evaluation_refs") != evaluation["evaluation"].get("criterion_evaluation_refs")):
+            return {"status": "blocked", "reason": "owner_wcag_runtime_candidate_mismatch"}
+    elif wcag_runtime_result.get("result_status") != "blocked" or runtime_result.get("closure_status") == "complete":
+        return {"status": "blocked", "reason": "owner_wcag_runtime_status_mismatch"}
+
+    run_ref = "WCAG-RUN-" + uuid.uuid4().hex
+    runtime_fingerprint = _wcag_runtime_result_fingerprint(wcag_runtime_result)
+    run = {
+        "runtime_execution_ref": run_ref,
+        "workflow_ref": workflow_ref,
+        "evaluation_ref": evaluation_ref,
+        "evaluation_revision": evaluation_revision,
+        "source_provider_revision": expected_provider_revision,
+        "input_fingerprint": wcag_runtime_result["input_fingerprint"],
+        "generation_fingerprint": wcag_runtime_result["generation_fingerprint"],
+        "result_fingerprint": runtime_fingerprint,
+        "canonical_plan_fingerprint": evaluation["evaluation"]["canonical_plan_fingerprint"],
+        "results_fingerprint": result_summary["fingerprint"],
+        "runtime_result": wcag_runtime_result,
+    }
+    state = current["state"]
+    record = dict(state["wcag_evaluations"][evaluation_ref])
+    record.setdefault("report_runtime_executions", [])
+    record.setdefault("current_report_runtime_execution_ref", None)
+    record.setdefault("report_runtime_execution_ref", None)
+    record["report_runtime_executions"] = [*record["report_runtime_executions"], run]
+    record["current_report_runtime_execution_ref"] = run_ref
+    state["wcag_evaluations"][evaluation_ref] = record
+    written = conditional_write_sqlite_workflow_state(workflow_root, workflow_ref,
+                                                      expected_provider_revision, state)
+    if written.get("status") != "written":
+        return {"status": written.get("status", "blocked"),
+                "reason": written.get("reason", "wcag_runtime_record_conditional_write_failed")}
+    reread = read_wcag_evaluation_state(
+        workflow_root, workflow_ref, evaluation_ref, evaluation_revision=evaluation_revision,
+        project_context_ref=project_context_ref, project_context_revision=project_context_revision,
+        project_context_fingerprint=project_context_fingerprint,
+        workflow_state_root_content_identity=workflow_state_root_content_identity,
+    )
+    stored = next((row for row in reread.get("evaluation", {}).get("report_runtime_executions", [])
+                   if isinstance(row, dict) and row.get("runtime_execution_ref") == run_ref), None)
+    if (reread.get("status") != "current" or reread.get("provider_revision") != written.get("state_revision")
+            or reread.get("evaluation", {}).get("current_report_runtime_execution_ref") != run_ref
+            or stored != run):
+        return {"status": "blocked", "reason": "wcag_runtime_record_reread_failed"}
+    return {"status": "recorded", "runtime_execution_ref": run_ref,
+            "provider_revision": reread["provider_revision"],
+            "runtime_result_status": wcag_runtime_result["result_status"],
+            "result_fingerprint": runtime_fingerprint}
+
+
 def _verify_wcag_em_report_closure(evaluation: dict[str, Any], canonical_criterion_plan: dict[str, Any],
                                    sample_results: list[dict[str, Any]],
-                                   report_closure_inputs: Any) -> dict[str, Any]:
-    """Re-run the WCAG Skill's closure over candidate step data and owner-verified plan/results."""
+                                   runtime_execution: dict[str, Any] | None) -> dict[str, Any]:
+    """Re-run the WCAG Skill's closure using the persisted owner runtime result."""
+    runtime_result = runtime_execution.get("runtime_result") if isinstance(runtime_execution, dict) else None
+    payload = runtime_result.get("payload") if isinstance(runtime_result, dict) else None
+    candidate = payload.get("result") if isinstance(payload, dict) else None
+    report_closure_inputs = candidate.get("report_closure_inputs") if isinstance(candidate, dict) else None
     if not isinstance(report_closure_inputs, dict):
-        return {"status": "blocked", "reason": "wcag_em_report_closure_inputs_required"}
+        return {"status": "blocked", "reason": "current_saved_wcag_runtime_execution_required"}
+    if (runtime_result.get("skill") != "wcag-conformance-evaluation"
+            or runtime_result.get("runtime_unit_key") != "artifact:wcag_runtime:all"
+            or runtime_result.get("runtime_status") != "ok"
+            or runtime_result.get("result_status") != "unresolved"
+            or candidate.get("status") != "pending-persistence"
+            or candidate.get("closure_status") != "complete"
+            or runtime_execution.get("result_fingerprint") != _wcag_runtime_result_fingerprint(runtime_result)
+            or runtime_execution.get("input_fingerprint") != runtime_result.get("input_fingerprint")
+            or runtime_execution.get("generation_fingerprint") != runtime_result.get("generation_fingerprint")
+            or runtime_execution.get("canonical_plan_fingerprint") != evaluation.get("canonical_plan_fingerprint")):
+        return {"status": "blocked", "reason": "current_saved_wcag_runtime_execution_invalid"}
     required = {"required_steps", "step_outcomes", "example_coverage"}
     allowed = required | {"required_criterion_evaluation_refs", "all_occurrence_requirements",
                           "accessible_output_closure"}
@@ -1192,14 +1381,13 @@ def _verify_wcag_em_report_closure(evaluation: dict[str, Any], canonical_criteri
 
 def finalize_wcag_report(workflow_root: str | Path, workflow_ref: str, *, expected_provider_revision: str,
                          evaluation_ref: str, evaluation_revision: str, canonical_criterion_plan: dict[str, Any],
-                         sample_results: list[dict[str, Any]], report_closure_inputs: dict[str, Any] | None = None,
-                         closure_status: str,
+                         sample_results: list[dict[str, Any]], runtime_execution_ref: str,
                          project_context_ref: str, project_context_revision: str,
                          project_context_fingerprint: str,
                          workflow_state_root_content_identity: str) -> dict[str, Any]:
-    """Persist completion after matching results and independently re-running WCAG-EM closure."""
-    if closure_status != "complete":
-        return {"status": "blocked", "reason": "wcag_report_closure_not_complete"}
+    """Persist completion only from the current owner-executed WCAG runtime result."""
+    if not _safe_stored_ref(runtime_execution_ref):
+        return {"status": "blocked", "reason": "wcag_runtime_execution_ref_required"}
     current = read_sqlite_workflow_state(workflow_root, workflow_ref, expected_revision=expected_provider_revision)
     if current.get("status") != "current":
         return {"status": current.get("status", "blocked"), "reason": current.get("reason", "workflow_state_revision_changed")}
@@ -1218,8 +1406,35 @@ def finalize_wcag_report(workflow_root: str | Path, workflow_ref: str, *, expect
         result_summary = _wcag_report_result_summary(evaluation["evaluation"], sample_results)
     except (KeyError, TypeError, ValueError):
         return {"status": "blocked", "reason": "wcag_report_result_set_incomplete_or_stale"}
+    evaluation_record = evaluation["evaluation"]
+    executions = evaluation_record.get("report_runtime_executions", [])
+    runtime_execution = next((row for row in executions if isinstance(row, dict)
+                              and row.get("runtime_execution_ref") == runtime_execution_ref), None)
+    source_revision_number = (_provider_revision_number(runtime_execution.get("source_provider_revision"))
+                              if runtime_execution else None)
+    current_revision_number = _provider_revision_number(expected_provider_revision)
+    if (runtime_execution is None
+            or evaluation_record.get("current_report_runtime_execution_ref") != runtime_execution_ref
+            or runtime_execution.get("workflow_ref") != workflow_ref
+            or runtime_execution.get("evaluation_ref") != evaluation_ref
+            or runtime_execution.get("evaluation_revision") != evaluation_revision
+            or source_revision_number is None or current_revision_number != source_revision_number + 1
+            or runtime_execution.get("canonical_plan_fingerprint") != evaluation_record.get("canonical_plan_fingerprint")
+            or runtime_execution.get("results_fingerprint") != result_summary.get("fingerprint")):
+        return {"status": "blocked", "reason": "current_wcag_runtime_execution_required"}
+    runtime_payload = runtime_execution.get("runtime_result", {}).get("payload")
+    candidate = runtime_payload.get("result") if isinstance(runtime_payload, dict) else None
+    if (not isinstance(candidate, dict)
+            or candidate.get("workflow_ref") != workflow_ref
+            or candidate.get("evaluation_ref") != evaluation_ref
+            or candidate.get("evaluation_revision") != evaluation_revision
+            or candidate.get("provider_revision") != runtime_execution.get("source_provider_revision")
+            or candidate.get("canonical_plan_fingerprint") != evaluation_record.get("canonical_plan_fingerprint")
+            or candidate.get("results_fingerprint") != result_summary.get("fingerprint")
+            or candidate.get("criterion_evaluation_refs") != evaluation_record.get("criterion_evaluation_refs")):
+        return {"status": "blocked", "reason": "current_wcag_runtime_candidate_mismatch"}
     closure_check = _verify_wcag_em_report_closure(
-        evaluation["evaluation"], canonical_criterion_plan, sample_results, report_closure_inputs,
+        evaluation_record, canonical_criterion_plan, sample_results, runtime_execution,
     )
     if closure_check.get("status") != "complete":
         return {"status": "blocked", "reason": closure_check.get("reason", "wcag_em_report_closure_not_complete"),
@@ -1227,16 +1442,20 @@ def finalize_wcag_report(workflow_root: str | Path, workflow_ref: str, *, expect
     report_fingerprint = "sha256:" + content_identity({
         "evaluation_ref": evaluation_ref,
         "evaluation_revision": evaluation_revision,
-        "canonical_plan_fingerprint": evaluation["evaluation"]["canonical_plan_fingerprint"],
+        "canonical_plan_fingerprint": evaluation_record["canonical_plan_fingerprint"],
         "results_fingerprint": result_summary["fingerprint"],
+        "runtime_execution_ref": runtime_execution_ref,
+        "runtime_result_fingerprint": runtime_execution["result_fingerprint"],
     })
     state = current["state"]
     record = state["wcag_evaluations"][evaluation_ref]
     if record.get("report_status") == "complete":
-        if record.get("report_fingerprint") == report_fingerprint:
+        if (record.get("report_fingerprint") == report_fingerprint
+                and record.get("report_runtime_execution_ref") == runtime_execution_ref):
             return {"status": "complete", "provider_revision": expected_provider_revision,
                     "evaluation_ref": evaluation_ref, "evaluation_revision": evaluation_revision,
-                    "report_fingerprint": report_fingerprint, "idempotent": True}
+                    "report_fingerprint": report_fingerprint, "runtime_execution_ref": runtime_execution_ref,
+                    "idempotent": True}
         return {"status": "conflict", "reason": "completed_wcag_report_is_immutable"}
     if record.get("report_status") != "open":
         return {"status": "blocked", "reason": "wcag_report_state_invalid"}
@@ -1244,6 +1463,7 @@ def finalize_wcag_report(workflow_root: str | Path, workflow_ref: str, *, expect
     record["report_fingerprint"] = report_fingerprint
     record["report_result_refs"] = [row["sample_result_ref"] for row in result_summary["results"]]
     record["report_criterion_evaluation_refs"] = [row["criterion_evaluation_ref"] for row in result_summary["results"]]
+    record["report_runtime_execution_ref"] = runtime_execution_ref
     # Keep the saved record finite: no result narrative, DOM text, URL, or semantic prose is persisted.
     state["wcag_evaluations"][evaluation_ref] = record
     written = conditional_write_sqlite_workflow_state(workflow_root, workflow_ref,
@@ -1259,12 +1479,14 @@ def finalize_wcag_report(workflow_root: str | Path, workflow_ref: str, *, expect
                                         workflow_state_root_content_identity=workflow_state_root_content_identity)
     verified = reread.get("status") == "current" and reread.get("evaluation", {}).get("report_status") == "complete"
     verified = verified and reread.get("evaluation", {}).get("report_fingerprint") == report_fingerprint
+    verified = verified and reread.get("evaluation", {}).get("report_runtime_execution_ref") == runtime_execution_ref
     verified = verified and reread.get("provider_revision") == written.get("state_revision")
     if not verified:
         return {"status": "blocked", "reason": "wcag_report_close_reread_failed"}
     return {"status": "complete", "provider_revision": reread["provider_revision"],
             "evaluation_ref": evaluation_ref, "evaluation_revision": evaluation_revision,
-            "report_fingerprint": report_fingerprint, "idempotent": False}
+            "report_fingerprint": report_fingerprint, "runtime_execution_ref": runtime_execution_ref,
+            "idempotent": False}
 
 
 def _claim_path(workflow_state_root: str | Path, workflow_ref: str, operation_ref: str) -> Path:
