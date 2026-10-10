@@ -469,6 +469,7 @@ Python unavailable時はsupport判定自体を実行できないため、runtime
 `ok`、`invalid_input`、`unsupported`、`limit_exceeded`は終了code 0とします。`internal_error`は可能なら構造化envelopeを返して終了code 1、envelope自体を生成できない障害も終了code 1とします。Agent側は終了codeだけでroutingせずstdout envelopeをparseします。stderrは人間向け診断だけに使い、入力全文、secret、tokenを出しません。
 
 `unsupported`はmodel全体が対応subset外であることをruntimeが確認した正常なfallback経路です。`partial`は独立して処理できるsupported部分を生成し、unsupported部分を`unsupported_items[]`として残します。Agent側でsupport判定を再実装せず、runtime対象modelをsupport判定前に省略することを禁止します。
+
 ### 3.4 構造化された未解決事項
 
 `issues`は次のfieldを持ちます。
@@ -567,6 +568,7 @@ artifact全体scriptでは`model_fingerprint=null`です。ただし`input_finge
 `runtime_contract_version` / `generator_contract_version`は意味契約変更時に更新します。bug fixや内部refactorで意味契約を変えない場合も実装fingerprintが変わるため旧machine evidenceを同一生成条件として再利用しません。探索順、tie-break、Coverage、target key等の契約自体を変える場合は実装fingerprintだけで済ませず対応contract versionも更新します。
 
 generatorが返すtarget集合とCoverage計算は純粋な決定論処理です。target → CI ID等のID維持はstateful materialize処理であり、同じgenerator結果、`target_annotations / target_dispositions / merge_groups`、`previous_target_id_map / previous_ci_ids / previous_expected_result_roots`から同じmappingとID状態を得ることを保証します。
+
 ### 4.2 静的参照データ
 
 generator結果に影響する静的データはversionを持ちます。
@@ -742,7 +744,8 @@ structure / materialize / generator等がEntity状態を機械的に成立させ
 
 modelは実際に消費したEntityを`upstream_entities`へ1件ずつ保持し、runtimeがcanonical `content`から`content_fingerprint`を計算します。`skill + entity_type + entity_ref`が同じEntityの`content_fingerprint`だけを比較し、不一致となったEntityを参照するmodelだけを`要再検証`へ戻します。無関係なEntity変更ではmodelをstaleにしません。
 
-他runtime結果を直接利用したunitは`upstream_runtime_units`も`(skill, runtime_unit_key)`で比較します。保存した`generation_fingerprint`と現在の上流runtime unitが一致しなければ下流unitをstaleとし、その下流へも依存関係に従って伝播します。参照先が存在しない場合はstale + blocker、同じ`(skill, runtime_unit_key)`が重複する場合またはruntime dependency graphにcycleがある場合は`invalid_input`です。LLMはこのfingerprint比較を手計算しません。
+他runtime結果を直接利用したunitは`upstream_runtime_units`も`(skill, runtime_unit_key)`で比較します。保存した`generation_fingerprint`と現在の上流runtime unitが一致しなければ下流unitをstaleとし、その下流へも依存関係に従って伝播します。参照先が存在しない場合はstale + blocker、同じ`(skill, runtime_unit_key)`が重複する場合またはruntime dependency graphにcycleがある場合は`invalid_input`です。呼び出し元が上流result envelope全体への依存も固定する必要がある場合は、依存rowへ任意の`result_fingerprint`（full SHA-256）を含められます。このfieldがあるrowは、freshness評価で現在のruntime rowの`result_fingerprint`も照合し、不一致をstaleとして伝播します。従来の3-field dependency rowは引き続きgeneration単位の依存として扱います。LLMはこれらのfingerprint比較を手計算しません。
+
 ## 5. 値・順序・tie-break
 
 ### 5.1 typed value

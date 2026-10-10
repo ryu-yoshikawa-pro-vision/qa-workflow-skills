@@ -1,0 +1,50 @@
+[
+  {
+    "query": "WCAG 2.2 AAへの適合性をWCAG-EM 2.0に沿って評価し、reportを作って。",
+    "should_trigger": true
+  },
+  {
+    "query": "この製品がWCAG 2.1 Aに適合しているか正式評価して。",
+    "should_trigger": true
+  },
+  {
+    "query": "このDialogのaccessibilityを一般的に検査して。",
+    "should_trigger": false
+  },
+  {
+    "query": "指定されたWCAG versionとlevelで全体scopeをsamplingして適合評価して。",
+    "should_trigger": true
+  },
+  {
+    "query": "WCAGに適合しているか確認して。",
+    "should_trigger": true
+  },
+  {
+    "query": "WCAG 2.2のSuccess Criteria一覧を教えて。製品の適合性は評価しないで。",
+    "should_trigger": false
+  },
+  {
+    "query": "画面の使いやすさを現在のbrowserで検査して。",
+    "should_trigger": false
+  },
+  {
+    "query": "formal accessibility evaluationのEvaluation StatementとEARL JSON-LDを生成して。",
+    "should_trigger": true
+  },
+  {
+    "query": "ボタンのaccessible nameだけを確認して。",
+    "should_trigger": false
+  },
+  {
+    "query": "WCAG-EM Step 1からStep 5まで正式評価を実施して。",
+    "should_trigger": true
+  },
+  {
+    "query": "保存済みscreenshotを一般heuristicでレビューして。",
+    "should_trigger": false
+  },
+  {
+    "query": "WCAG-EM 2.0の評価手順を要約して。対象製品は評価しないで。",
+    "should_trigger": false
+  }
+]

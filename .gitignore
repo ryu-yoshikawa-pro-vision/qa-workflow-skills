@@ -2,6 +2,10 @@
 __pycache__/
 *.py[cod]
 *$py.class
+
+# Local Playwright session artifacts
+/.playwright-cli/
+/.playwright-mcp/
 .agents
 .codex
 AGENTS.md
@@ -11,3 +15,21 @@ CODE_REVIEW.md
 MIGRATION.md
 PLANS.md
 SECURITY.md
+output/*
+.husky
+/examples/
+node_modules
+/scripts/
+tests/contracts/*
+tests/repository-contract/*
+codex-project.toml
+package.json
+pnpm-lock.yaml
+pnpm-workspace.yaml
+QA_AGENT.md
+.markdownlint-cli2.jsonc
+.prettierignore
+.prettierrc.json
+.textlintrc.json
+.editorconfig
+.artifacts

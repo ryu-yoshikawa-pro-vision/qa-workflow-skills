@@ -34,6 +34,10 @@ runtimeの`can_complete`はオーケストレーションの要約であり、�
 
 persisted workflowのProject Context stable key parse / 必須key検証 / used-field currentness、workflow stateのcanonical path / 初回create、fixed-root scan、state CAS capability gate、mutable operation pre-start claim、shared resource reservationは、Resourcesに記載した`artifact_graph.py` production helperで実行します。これらの処理結果をAgentの意味判断や手計算で置き換えません。
 
+WCAG formal report provenanceでは、`workflow_runtime.py`の`register-wcag-evaluation-plan` / `read-wcag-evaluation-state` / `finalize-wcag-report`を使います。これは既存`qa.workflow_state_root`配下のPython `sqlite3` providerを使う単一ホストlocal filesystem限定のstate operationです。評価refごとのcurrent revision、WCAG target、scope evidence refs、selected sample / variation / process、source refs、canonical Planとreport状態を保存します。generic JSON state / handoff / reservation providerには拡張せず、network filesystem・複数host・state root未設定・provider failureではblockします。保存済みrecordは承認の代替にならず、既存evaluation ownerの入力・scope根拠を確認して登録します。
+
+`finalize-wcag-report`は呼び出し側の`wcag_runtime_result`や`upstream_runtime_units`を完了証拠として受け取りません。QA workflow ownerがcurrent evaluation stateを正式なQA runtimeで再読込し、同じ保存済みPlan・current results・提示されたWCAG-EM工程入力で公式`wcag_runtime.py close-report`を内部実行します。ownerはそのruntime envelopeと有限なclosure入力を生成した実行ref付きで既存SQLite stateへCAS保存し、独立再読込後に保存されたcurrent runを使ってclosureを再検証します。必須工程・accessible output・結果集合がcompleteの場合だけ、別のnative conditional writeと独立再読込でreportを完了します。再実行は新しいrefとなり過去実行を上書きしません。偽造した候補やmetadataの同時入力はfinalize schemaで拒否され、metadata自体は証明に使いません。評価ownerが実行前に与える意味上の工程判断は引き続きWCAG評価責務であり、SQLiteは特権DB writerや分散環境に対する暗号学的真正性を保証しません。WCAG evaluation revisionとSQLite provider revisionは別々に扱います。handoff用のtest-only SQLite providerは引き続きproductionで使いません。
+
 helperの必須処理が入力不足・実行不能・保存先能力不足で失敗した場合、影響するscopeを`incomplete` / `unresolved` / `blocked`として閉じます。LLM fallbackで保存、CAS、claim、reservationを成立したことにしません。
 
 ## インターフェース
@@ -64,10 +68,13 @@ helperの必須処理が入力不足・実行不能・保存先能力不足で�
 | Regression baseline / membership / Run / Activity | `regression-testing` |
 | Charterに沿ったExploration / Investigation | `exploratory-testing` |
 | 継続QA knowledgeのtriage / lifecycle / lookup | `qa-knowledge` |
+| referenceや既存evidenceに基づくUI / UX評価 | `usability-evaluation` |
+| live Web UIの操作・観測・ユーザビリティ検査 | `usability-inspection` |
+| WCAG-EM 2.0によるformal WCAG conformance evaluation | `wcag-conformance-evaluation` |
 
 ## ランタイム前提
 
-本Skillは、同一のAgentクライアント上で19 Skillすべてが利用可能で、Agentが必要なSkillを追加で読み込み / 利用できる環境を前提とします。これはAgent Skills Specificationが共通Skill-to-Skill APIを保証しているという意味ではありません。
+本Skillは、同一のAgentクライアント上でrepositoryの全Skillが利用可能で、Agentが必要なSkillを追加で読み込み / 利用できる環境を前提とします。これはAgent Skills Specificationが共通Skill-to-Skill APIを保証しているという意味ではありません。
 
 ## リソース
 

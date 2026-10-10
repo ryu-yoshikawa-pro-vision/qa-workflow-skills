@@ -1,0 +1,6409 @@
+{
+  "schema_version": "1",
+  "source_plan": "_05i_wcag-success-criterion-procedure-inventory.md",
+  "procedures": [
+    {
+      "procedure_key": "at-wcag-1.3.1",
+      "procedure_kind": "assistive-technology",
+      "applicability_mode": "semantic",
+      "applicability_decision_key": "at-applicability-wcag-1.3.1",
+      "required_evidence_kind": "assistive-technology-evidence",
+      "applicable_criterion_refs": [
+        "1.3.1"
+      ],
+      "required_capabilities": [
+        "assistive-technology"
+      ],
+      "required_input_refs": [
+        "pre-execution-applicability-decision",
+        "accessibility-support-baseline",
+        "selected-at-environment"
+      ],
+      "result_contract": {
+        "contract_kind": "assistive-technology-result",
+        "required_fields": [
+          "applicability",
+          "applicability_decision_ref",
+          "at_environment",
+          "result",
+          "evidence_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined",
+          null
+        ],
+        "not_applicable_result": null,
+        "unknown_prevents_final_semantic": true
+      },
+      "completion_evidence": [
+        "pre-execution-applicability-decision",
+        "at-result-when-applicable"
+      ],
+      "limitation_behavior": "Applicability unknown prevents final semantic execution; an applicable but unavailable AT environment is blocked."
+    },
+    {
+      "procedure_key": "at-wcag-1.3.2",
+      "procedure_kind": "assistive-technology",
+      "applicability_mode": "semantic",
+      "applicability_decision_key": "at-applicability-wcag-1.3.2",
+      "required_evidence_kind": "assistive-technology-evidence",
+      "applicable_criterion_refs": [
+        "1.3.2"
+      ],
+      "required_capabilities": [
+        "assistive-technology"
+      ],
+      "required_input_refs": [
+        "pre-execution-applicability-decision",
+        "accessibility-support-baseline",
+        "selected-at-environment"
+      ],
+      "result_contract": {
+        "contract_kind": "assistive-technology-result",
+        "required_fields": [
+          "applicability",
+          "applicability_decision_ref",
+          "at_environment",
+          "result",
+          "evidence_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined",
+          null
+        ],
+        "not_applicable_result": null,
+        "unknown_prevents_final_semantic": true
+      },
+      "completion_evidence": [
+        "pre-execution-applicability-decision",
+        "at-result-when-applicable"
+      ],
+      "limitation_behavior": "Applicability unknown prevents final semantic execution; an applicable but unavailable AT environment is blocked."
+    },
+    {
+      "procedure_key": "at-wcag-4.1.2",
+      "procedure_kind": "assistive-technology",
+      "applicability_mode": "semantic",
+      "applicability_decision_key": "at-applicability-wcag-4.1.2",
+      "required_evidence_kind": "assistive-technology-evidence",
+      "applicable_criterion_refs": [
+        "4.1.2"
+      ],
+      "required_capabilities": [
+        "assistive-technology"
+      ],
+      "required_input_refs": [
+        "pre-execution-applicability-decision",
+        "accessibility-support-baseline",
+        "selected-at-environment"
+      ],
+      "result_contract": {
+        "contract_kind": "assistive-technology-result",
+        "required_fields": [
+          "applicability",
+          "applicability_decision_ref",
+          "at_environment",
+          "result",
+          "evidence_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined",
+          null
+        ],
+        "not_applicable_result": null,
+        "unknown_prevents_final_semantic": true
+      },
+      "completion_evidence": [
+        "pre-execution-applicability-decision",
+        "at-result-when-applicable"
+      ],
+      "limitation_behavior": "Applicability unknown prevents final semantic execution; an applicable but unavailable AT environment is blocked."
+    },
+    {
+      "procedure_key": "at-wcag-4.1.3",
+      "procedure_kind": "assistive-technology",
+      "applicability_mode": "semantic",
+      "applicability_decision_key": "at-applicability-wcag-4.1.3",
+      "required_evidence_kind": "assistive-technology-evidence",
+      "applicable_criterion_refs": [
+        "4.1.3"
+      ],
+      "required_capabilities": [
+        "assistive-technology"
+      ],
+      "required_input_refs": [
+        "pre-execution-applicability-decision",
+        "accessibility-support-baseline",
+        "selected-at-environment"
+      ],
+      "result_contract": {
+        "contract_kind": "assistive-technology-result",
+        "required_fields": [
+          "applicability",
+          "applicability_decision_ref",
+          "at_environment",
+          "result",
+          "evidence_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined",
+          null
+        ],
+        "not_applicable_result": null,
+        "unknown_prevents_final_semantic": true
+      },
+      "completion_evidence": [
+        "pre-execution-applicability-decision",
+        "at-result-when-applicable"
+      ],
+      "limitation_behavior": "Applicability unknown prevents final semantic execution; an applicable but unavailable AT environment is blocked."
+    },
+    {
+      "procedure_key": "external-wcag-2.3.1",
+      "procedure_kind": "external-evidence",
+      "applicability_mode": "external-evidence-available",
+      "required_evidence_kind": "external-evidence",
+      "external_evidence_allowed": true,
+      "applicable_criterion_refs": [
+        "2.3.1"
+      ],
+      "required_capabilities": [
+        "current-external-evidence-registry"
+      ],
+      "required_input_refs": [
+        "external-evidence-candidate-inventory",
+        "source-revision-registry",
+        "environment-fingerprint",
+        "scope-fingerprint"
+      ],
+      "result_contract": {
+        "contract_kind": "optional-external-evidence",
+        "required_fields": [
+          "candidate_refs",
+          "current_evidence_refs",
+          "rejected_candidates",
+          "evidence_refs"
+        ],
+        "no_current_evidence_applicability": "not-applicable",
+        "candidate_currentness_fields": [
+          "source_revision",
+          "environment_fingerprint",
+          "scope_fingerprint",
+          "freshness_status"
+        ]
+      },
+      "completion_evidence": [
+        "deterministic-current-scope-match-or-rejection-trace"
+      ],
+      "limitation_behavior": "No current scope-matching evidence is not-applicable with rejection traceability and does not block other procedures."
+    },
+    {
+      "procedure_key": "external-wcag-2.3.2",
+      "procedure_kind": "external-evidence",
+      "applicability_mode": "external-evidence-available",
+      "required_evidence_kind": "external-evidence",
+      "external_evidence_allowed": true,
+      "applicable_criterion_refs": [
+        "2.3.2"
+      ],
+      "required_capabilities": [
+        "current-external-evidence-registry"
+      ],
+      "required_input_refs": [
+        "external-evidence-candidate-inventory",
+        "source-revision-registry",
+        "environment-fingerprint",
+        "scope-fingerprint"
+      ],
+      "result_contract": {
+        "contract_kind": "optional-external-evidence",
+        "required_fields": [
+          "candidate_refs",
+          "current_evidence_refs",
+          "rejected_candidates",
+          "evidence_refs"
+        ],
+        "no_current_evidence_applicability": "not-applicable",
+        "candidate_currentness_fields": [
+          "source_revision",
+          "environment_fingerprint",
+          "scope_fingerprint",
+          "freshness_status"
+        ]
+      },
+      "completion_evidence": [
+        "deterministic-current-scope-match-or-rejection-trace"
+      ],
+      "limitation_behavior": "No current scope-matching evidence is not-applicable with rejection traceability and does not block other procedures."
+    },
+    {
+      "procedure_key": "external-wcag-3.1.5",
+      "procedure_kind": "external-evidence",
+      "applicability_mode": "external-evidence-available",
+      "required_evidence_kind": "external-evidence",
+      "external_evidence_allowed": true,
+      "applicable_criterion_refs": [
+        "3.1.5"
+      ],
+      "required_capabilities": [
+        "current-external-evidence-registry"
+      ],
+      "required_input_refs": [
+        "external-evidence-candidate-inventory",
+        "source-revision-registry",
+        "environment-fingerprint",
+        "scope-fingerprint"
+      ],
+      "result_contract": {
+        "contract_kind": "optional-external-evidence",
+        "required_fields": [
+          "candidate_refs",
+          "current_evidence_refs",
+          "rejected_candidates",
+          "evidence_refs"
+        ],
+        "no_current_evidence_applicability": "not-applicable",
+        "candidate_currentness_fields": [
+          "source_revision",
+          "environment_fingerprint",
+          "scope_fingerprint",
+          "freshness_status"
+        ]
+      },
+      "completion_evidence": [
+        "deterministic-current-scope-match-or-rejection-trace"
+      ],
+      "limitation_behavior": "No current scope-matching evidence is not-applicable with rejection traceability and does not block other procedures."
+    },
+    {
+      "procedure_key": "m-accessible-name",
+      "procedure_kind": "machine",
+      "applicability_mode": "always",
+      "machine_probe_keys": [
+        "mp-nontext-content-inventory",
+        "mp-component-semantics"
+      ],
+      "dispatch_key": "accessible-name",
+      "applicable_criterion_refs": [
+        "1.1.1"
+      ],
+      "required_capabilities": [
+        "mp-component-semantics",
+        "mp-nontext-content-inventory"
+      ],
+      "required_input_refs": [
+        "machine-probe:mp-nontext-content-inventory",
+        "machine-probe:mp-component-semantics"
+      ],
+      "result_contract": {
+        "contract_kind": "typed-machine-probe-results",
+        "required_machine_probe_keys": [
+          "mp-nontext-content-inventory",
+          "mp-component-semantics"
+        ],
+        "required_fields": [
+          "machine_probe_key",
+          "status",
+          "evidence_refs",
+          "value"
+        ],
+        "allowed_statuses": [
+          "ok",
+          "unsupported",
+          "incomplete",
+          "blocked"
+        ],
+        "limitation_codes": []
+      },
+      "completion_evidence": [
+        "current-typed-machine-probe-results"
+      ],
+      "limitation_behavior": "A valid observed machine limitation completes this procedure with a catalogued limitation code; unavailable or malformed observation is blocked."
+    },
+    {
+      "procedure_key": "m-audio-autoplay",
+      "procedure_kind": "machine",
+      "applicability_mode": "always",
+      "machine_probe_keys": [
+        "mp-media-inventory",
+        "mp-audio-autoplay-run"
+      ],
+      "dispatch_key": "audio-autoplay",
+      "applicable_criterion_refs": [
+        "1.4.2"
+      ],
+      "required_capabilities": [
+        "mp-audio-autoplay-run",
+        "mp-media-inventory"
+      ],
+      "required_input_refs": [
+        "machine-probe:mp-media-inventory",
+        "machine-probe:mp-audio-autoplay-run"
+      ],
+      "result_contract": {
+        "contract_kind": "typed-machine-probe-results",
+        "required_machine_probe_keys": [
+          "mp-media-inventory",
+          "mp-audio-autoplay-run"
+        ],
+        "required_fields": [
+          "machine_probe_key",
+          "status",
+          "evidence_refs",
+          "value"
+        ],
+        "allowed_statuses": [
+          "ok",
+          "unsupported",
+          "incomplete",
+          "blocked"
+        ],
+        "limitation_codes": []
+      },
+      "completion_evidence": [
+        "current-typed-machine-probe-results"
+      ],
+      "limitation_behavior": "A valid observed machine limitation completes this procedure with a catalogued limitation code; unavailable or malformed observation is blocked."
+    },
+    {
+      "procedure_key": "m-change-trigger-run",
+      "procedure_kind": "machine",
+      "applicability_mode": "always",
+      "machine_probe_keys": [
+        "mp-change-trigger-run"
+      ],
+      "dispatch_key": "change-trigger-run",
+      "applicable_criterion_refs": [
+        "3.2.1",
+        "3.2.2",
+        "3.2.5"
+      ],
+      "required_capabilities": [
+        "mp-change-trigger-run"
+      ],
+      "required_input_refs": [
+        "machine-probe:mp-change-trigger-run"
+      ],
+      "result_contract": {
+        "contract_kind": "typed-machine-probe-results",
+        "required_machine_probe_keys": [
+          "mp-change-trigger-run"
+        ],
+        "required_fields": [
+          "machine_probe_key",
+          "status",
+          "evidence_refs",
+          "value"
+        ],
+        "allowed_statuses": [
+          "ok",
+          "unsupported",
+          "incomplete",
+          "blocked"
+        ],
+        "limitation_codes": []
+      },
+      "completion_evidence": [
+        "current-typed-machine-probe-results"
+      ],
+      "limitation_behavior": "A valid observed machine limitation completes this procedure with a catalogued limitation code; unavailable or malformed observation is blocked."
+    },
+    {
+      "procedure_key": "m-control-value-compare",
+      "procedure_kind": "machine",
+      "applicability_mode": "always",
+      "machine_probe_keys": [
+        "mp-control-value-history"
+      ],
+      "dispatch_key": "control-value-compare",
+      "applicable_criterion_refs": [
+        "3.3.7"
+      ],
+      "required_capabilities": [
+        "mp-control-value-history"
+      ],
+      "required_input_refs": [
+        "machine-probe:mp-control-value-history"
+      ],
+      "result_contract": {
+        "contract_kind": "typed-machine-probe-results",
+        "required_machine_probe_keys": [
+          "mp-control-value-history"
+        ],
+        "required_fields": [
+          "machine_probe_key",
+          "status",
+          "evidence_refs",
+          "value"
+        ],
+        "allowed_statuses": [
+          "ok",
+          "unsupported",
+          "incomplete",
+          "blocked"
+        ],
+        "limitation_codes": []
+      },
+      "completion_evidence": [
+        "current-typed-machine-probe-results"
+      ],
+      "limitation_behavior": "A valid observed machine limitation completes this procedure with a catalogued limitation code; unavailable or malformed observation is blocked."
+    },
+    {
+      "procedure_key": "m-dom-sequence",
+      "procedure_kind": "machine",
+      "applicability_mode": "always",
+      "machine_probe_keys": [
+        "mp-sequence-inventory"
+      ],
+      "dispatch_key": "dom-sequence",
+      "applicable_criterion_refs": [
+        "1.3.2"
+      ],
+      "required_capabilities": [
+        "mp-sequence-inventory"
+      ],
+      "required_input_refs": [
+        "machine-probe:mp-sequence-inventory"
+      ],
+      "result_contract": {
+        "contract_kind": "typed-machine-probe-results",
+        "required_machine_probe_keys": [
+          "mp-sequence-inventory"
+        ],
+        "required_fields": [
+          "machine_probe_key",
+          "status",
+          "evidence_refs",
+          "value"
+        ],
+        "allowed_statuses": [
+          "ok",
+          "unsupported",
+          "incomplete",
+          "blocked"
+        ],
+        "limitation_codes": []
+      },
+      "completion_evidence": [
+        "current-typed-machine-probe-results"
+      ],
+      "limitation_behavior": "A valid observed machine limitation completes this procedure with a catalogued limitation code; unavailable or malformed observation is blocked."
+    },
+    {
+      "procedure_key": "m-error-state",
+      "procedure_kind": "machine",
+      "applicability_mode": "always",
+      "machine_probe_keys": [
+        "mp-form-control-inventory",
+        "mp-error-scenario-run"
+      ],
+      "dispatch_key": "error-state",
+      "applicable_criterion_refs": [
+        "3.3.1",
+        "3.3.3"
+      ],
+      "required_capabilities": [
+        "mp-error-scenario-run",
+        "mp-form-control-inventory"
+      ],
+      "required_input_refs": [
+        "machine-probe:mp-form-control-inventory",
+        "machine-probe:mp-error-scenario-run"
+      ],
+      "result_contract": {
+        "contract_kind": "typed-machine-probe-results",
+        "required_machine_probe_keys": [
+          "mp-form-control-inventory",
+          "mp-error-scenario-run"
+        ],
+        "required_fields": [
+          "machine_probe_key",
+          "status",
+          "evidence_refs",
+          "value"
+        ],
+        "allowed_statuses": [
+          "ok",
+          "unsupported",
+          "incomplete",
+          "blocked"
+        ],
+        "limitation_codes": []
+      },
+      "completion_evidence": [
+        "current-typed-machine-probe-results"
+      ],
+      "limitation_behavior": "A valid observed machine limitation completes this procedure with a catalogued limitation code; unavailable or malformed observation is blocked."
+    },
+    {
+      "procedure_key": "m-focus-appearance",
+      "procedure_kind": "machine",
+      "applicability_mode": "always",
+      "machine_probe_keys": [
+        "mp-focus-appearance-evidence",
+        "mp-target-geometry",
+        "mp-computed-color-context"
+      ],
+      "dispatch_key": "focus-appearance",
+      "applicable_criterion_refs": [
+        "2.4.13"
+      ],
+      "required_capabilities": [
+        "mp-computed-color-context",
+        "mp-focus-appearance-evidence",
+        "mp-target-geometry"
+      ],
+      "required_input_refs": [
+        "machine-probe:mp-focus-appearance-evidence",
+        "machine-probe:mp-target-geometry",
+        "machine-probe:mp-computed-color-context"
+      ],
+      "result_contract": {
+        "contract_kind": "typed-machine-probe-results",
+        "required_machine_probe_keys": [
+          "mp-focus-appearance-evidence",
+          "mp-target-geometry",
+          "mp-computed-color-context"
+        ],
+        "required_fields": [
+          "machine_probe_key",
+          "status",
+          "evidence_refs",
+          "value"
+        ],
+        "allowed_statuses": [
+          "ok",
+          "unsupported",
+          "incomplete",
+          "blocked"
+        ],
+        "limitation_codes": [
+          "focus-indicator-not-machine-resolvable"
+        ]
+      },
+      "completion_evidence": [
+        "current-typed-machine-probe-results"
+      ],
+      "limitation_behavior": "A valid observed machine limitation completes this procedure with a catalogued limitation code; unavailable or malformed observation is blocked."
+    },
+    {
+      "procedure_key": "m-focus-obscured",
+      "procedure_kind": "machine",
+      "applicability_mode": "always",
+      "machine_probe_keys": [
+        "mp-focus-obscuring-geometry"
+      ],
+      "dispatch_key": "focus-obscured",
+      "applicable_criterion_refs": [
+        "2.4.11",
+        "2.4.12"
+      ],
+      "required_capabilities": [
+        "mp-focus-obscuring-geometry"
+      ],
+      "required_input_refs": [
+        "machine-probe:mp-focus-obscuring-geometry"
+      ],
+      "result_contract": {
+        "contract_kind": "typed-machine-probe-results",
+        "required_machine_probe_keys": [
+          "mp-focus-obscuring-geometry"
+        ],
+        "required_fields": [
+          "machine_probe_key",
+          "status",
+          "evidence_refs",
+          "value"
+        ],
+        "allowed_statuses": [
+          "ok",
+          "unsupported",
+          "incomplete",
+          "blocked"
+        ],
+        "limitation_codes": []
+      },
+      "completion_evidence": [
+        "current-typed-machine-probe-results"
+      ],
+      "limitation_behavior": "A valid observed machine limitation completes this procedure with a catalogued limitation code; unavailable or malformed observation is blocked."
+    },
+    {
+      "procedure_key": "m-focus-order",
+      "procedure_kind": "machine",
+      "applicability_mode": "always",
+      "machine_probe_keys": [
+        "mp-focus-sequence-run"
+      ],
+      "dispatch_key": "focus-order",
+      "applicable_criterion_refs": [
+        "2.4.3",
+        "2.4.7"
+      ],
+      "required_capabilities": [
+        "mp-focus-sequence-run"
+      ],
+      "required_input_refs": [
+        "machine-probe:mp-focus-sequence-run"
+      ],
+      "result_contract": {
+        "contract_kind": "typed-machine-probe-results",
+        "required_machine_probe_keys": [
+          "mp-focus-sequence-run"
+        ],
+        "required_fields": [
+          "machine_probe_key",
+          "status",
+          "evidence_refs",
+          "value"
+        ],
+        "allowed_statuses": [
+          "ok",
+          "unsupported",
+          "incomplete",
+          "blocked"
+        ],
+        "limitation_codes": []
+      },
+      "completion_evidence": [
+        "current-typed-machine-probe-results"
+      ],
+      "limitation_behavior": "A valid observed machine limitation completes this procedure with a catalogued limitation code; unavailable or malformed observation is blocked."
+    },
+    {
+      "procedure_key": "m-form-labels",
+      "procedure_kind": "machine",
+      "applicability_mode": "always",
+      "machine_probe_keys": [
+        "mp-form-control-inventory"
+      ],
+      "dispatch_key": "form-labels",
+      "applicable_criterion_refs": [
+        "3.3.2"
+      ],
+      "required_capabilities": [
+        "mp-form-control-inventory"
+      ],
+      "required_input_refs": [
+        "machine-probe:mp-form-control-inventory"
+      ],
+      "result_contract": {
+        "contract_kind": "typed-machine-probe-results",
+        "required_machine_probe_keys": [
+          "mp-form-control-inventory"
+        ],
+        "required_fields": [
+          "machine_probe_key",
+          "status",
+          "evidence_refs",
+          "value"
+        ],
+        "allowed_statuses": [
+          "ok",
+          "unsupported",
+          "incomplete",
+          "blocked"
+        ],
+        "limitation_codes": []
+      },
+      "completion_evidence": [
+        "current-typed-machine-probe-results"
+      ],
+      "limitation_behavior": "A valid observed machine limitation completes this procedure with a catalogued limitation code; unavailable or malformed observation is blocked."
+    },
+    {
+      "procedure_key": "m-form-purpose-metadata",
+      "procedure_kind": "machine",
+      "applicability_mode": "always",
+      "machine_probe_keys": [
+        "mp-form-control-inventory",
+        "mp-purpose-metadata"
+      ],
+      "dispatch_key": "form-purpose-metadata",
+      "applicable_criterion_refs": [
+        "1.3.5"
+      ],
+      "required_capabilities": [
+        "mp-form-control-inventory",
+        "mp-purpose-metadata"
+      ],
+      "required_input_refs": [
+        "machine-probe:mp-form-control-inventory",
+        "machine-probe:mp-purpose-metadata"
+      ],
+      "result_contract": {
+        "contract_kind": "typed-machine-probe-results",
+        "required_machine_probe_keys": [
+          "mp-form-control-inventory",
+          "mp-purpose-metadata"
+        ],
+        "required_fields": [
+          "machine_probe_key",
+          "status",
+          "evidence_refs",
+          "value"
+        ],
+        "allowed_statuses": [
+          "ok",
+          "unsupported",
+          "incomplete",
+          "blocked"
+        ],
+        "limitation_codes": []
+      },
+      "completion_evidence": [
+        "current-typed-machine-probe-results"
+      ],
+      "limitation_behavior": "A valid observed machine limitation completes this procedure with a catalogued limitation code; unavailable or malformed observation is blocked."
+    },
+    {
+      "procedure_key": "m-heading-label-inventory",
+      "procedure_kind": "machine",
+      "applicability_mode": "always",
+      "machine_probe_keys": [
+        "mp-heading-label-inventory"
+      ],
+      "dispatch_key": "heading-label-inventory",
+      "applicable_criterion_refs": [
+        "2.4.10",
+        "2.4.6"
+      ],
+      "required_capabilities": [
+        "mp-heading-label-inventory"
+      ],
+      "required_input_refs": [
+        "machine-probe:mp-heading-label-inventory"
+      ],
+      "result_contract": {
+        "contract_kind": "typed-machine-probe-results",
+        "required_machine_probe_keys": [
+          "mp-heading-label-inventory"
+        ],
+        "required_fields": [
+          "machine_probe_key",
+          "status",
+          "evidence_refs",
+          "value"
+        ],
+        "allowed_statuses": [
+          "ok",
+          "unsupported",
+          "incomplete",
+          "blocked"
+        ],
+        "limitation_codes": []
+      },
+      "completion_evidence": [
+        "current-typed-machine-probe-results"
+      ],
+      "limitation_behavior": "A valid observed machine limitation completes this procedure with a catalogued limitation code; unavailable or malformed observation is blocked."
+    },
+    {
+      "procedure_key": "m-hover-focus-content",
+      "procedure_kind": "machine",
+      "applicability_mode": "always",
+      "machine_probe_keys": [
+        "mp-hover-focus-content-run"
+      ],
+      "dispatch_key": "hover-focus-content",
+      "applicable_criterion_refs": [
+        "1.4.13"
+      ],
+      "required_capabilities": [
+        "mp-hover-focus-content-run"
+      ],
+      "required_input_refs": [
+        "machine-probe:mp-hover-focus-content-run"
+      ],
+      "result_contract": {
+        "contract_kind": "typed-machine-probe-results",
+        "required_machine_probe_keys": [
+          "mp-hover-focus-content-run"
+        ],
+        "required_fields": [
+          "machine_probe_key",
+          "status",
+          "evidence_refs",
+          "value"
+        ],
+        "allowed_statuses": [
+          "ok",
+          "unsupported",
+          "incomplete",
+          "blocked"
+        ],
+        "limitation_codes": []
+      },
+      "completion_evidence": [
+        "current-typed-machine-probe-results"
+      ],
+      "limitation_behavior": "A valid observed machine limitation completes this procedure with a catalogued limitation code; unavailable or malformed observation is blocked."
+    },
+    {
+      "procedure_key": "m-image-text-inventory",
+      "procedure_kind": "machine",
+      "applicability_mode": "always",
+      "machine_probe_keys": [
+        "mp-nontext-content-inventory"
+      ],
+      "dispatch_key": "image-text-inventory",
+      "applicable_criterion_refs": [
+        "1.4.5",
+        "1.4.9"
+      ],
+      "required_capabilities": [
+        "mp-nontext-content-inventory"
+      ],
+      "required_input_refs": [
+        "machine-probe:mp-nontext-content-inventory"
+      ],
+      "result_contract": {
+        "contract_kind": "typed-machine-probe-results",
+        "required_machine_probe_keys": [
+          "mp-nontext-content-inventory"
+        ],
+        "required_fields": [
+          "machine_probe_key",
+          "status",
+          "evidence_refs",
+          "value"
+        ],
+        "allowed_statuses": [
+          "ok",
+          "unsupported",
+          "incomplete",
+          "blocked"
+        ],
+        "limitation_codes": []
+      },
+      "completion_evidence": [
+        "current-typed-machine-probe-results"
+      ],
+      "limitation_behavior": "A valid observed machine limitation completes this procedure with a catalogued limitation code; unavailable or malformed observation is blocked."
+    },
+    {
+      "procedure_key": "m-keyboard-run",
+      "procedure_kind": "machine",
+      "applicability_mode": "always",
+      "machine_probe_keys": [
+        "mp-keyboard-functionality-run",
+        "mp-focus-sequence-run"
+      ],
+      "dispatch_key": "keyboard-run",
+      "applicable_criterion_refs": [
+        "2.1.1",
+        "2.1.2",
+        "2.1.3"
+      ],
+      "required_capabilities": [
+        "mp-focus-sequence-run",
+        "mp-keyboard-functionality-run"
+      ],
+      "required_input_refs": [
+        "machine-probe:mp-keyboard-functionality-run",
+        "machine-probe:mp-focus-sequence-run"
+      ],
+      "result_contract": {
+        "contract_kind": "typed-machine-probe-results",
+        "required_machine_probe_keys": [
+          "mp-keyboard-functionality-run",
+          "mp-focus-sequence-run"
+        ],
+        "required_fields": [
+          "machine_probe_key",
+          "status",
+          "evidence_refs",
+          "value"
+        ],
+        "allowed_statuses": [
+          "ok",
+          "unsupported",
+          "incomplete",
+          "blocked"
+        ],
+        "limitation_codes": []
+      },
+      "completion_evidence": [
+        "current-typed-machine-probe-results"
+      ],
+      "limitation_behavior": "A valid observed machine limitation completes this procedure with a catalogued limitation code; unavailable or malformed observation is blocked."
+    },
+    {
+      "procedure_key": "m-label-name",
+      "procedure_kind": "machine",
+      "applicability_mode": "always",
+      "machine_probe_keys": [
+        "mp-form-control-inventory",
+        "mp-component-semantics"
+      ],
+      "dispatch_key": "label-name",
+      "applicable_criterion_refs": [
+        "2.5.3"
+      ],
+      "required_capabilities": [
+        "mp-component-semantics",
+        "mp-form-control-inventory"
+      ],
+      "required_input_refs": [
+        "machine-probe:mp-form-control-inventory",
+        "machine-probe:mp-component-semantics"
+      ],
+      "result_contract": {
+        "contract_kind": "typed-machine-probe-results",
+        "required_machine_probe_keys": [
+          "mp-form-control-inventory",
+          "mp-component-semantics"
+        ],
+        "required_fields": [
+          "machine_probe_key",
+          "status",
+          "evidence_refs",
+          "value"
+        ],
+        "allowed_statuses": [
+          "ok",
+          "unsupported",
+          "incomplete",
+          "blocked"
+        ],
+        "limitation_codes": []
+      },
+      "completion_evidence": [
+        "current-typed-machine-probe-results"
+      ],
+      "limitation_behavior": "A valid observed machine limitation completes this procedure with a catalogued limitation code; unavailable or malformed observation is blocked."
+    },
+    {
+      "procedure_key": "m-language-page",
+      "procedure_kind": "machine",
+      "applicability_mode": "always",
+      "machine_probe_keys": [
+        "mp-document-language"
+      ],
+      "dispatch_key": "language-page",
+      "applicable_criterion_refs": [
+        "3.1.1"
+      ],
+      "required_capabilities": [
+        "mp-document-language"
+      ],
+      "required_input_refs": [
+        "machine-probe:mp-document-language"
+      ],
+      "result_contract": {
+        "contract_kind": "typed-machine-probe-results",
+        "required_machine_probe_keys": [
+          "mp-document-language"
+        ],
+        "required_fields": [
+          "machine_probe_key",
+          "status",
+          "evidence_refs",
+          "value"
+        ],
+        "allowed_statuses": [
+          "ok",
+          "unsupported",
+          "incomplete",
+          "blocked"
+        ],
+        "limitation_codes": []
+      },
+      "completion_evidence": [
+        "current-typed-machine-probe-results"
+      ],
+      "limitation_behavior": "A valid observed machine limitation completes this procedure with a catalogued limitation code; unavailable or malformed observation is blocked."
+    },
+    {
+      "procedure_key": "m-language-parts",
+      "procedure_kind": "machine",
+      "applicability_mode": "always",
+      "machine_probe_keys": [
+        "mp-part-language-inventory"
+      ],
+      "dispatch_key": "language-parts",
+      "applicable_criterion_refs": [
+        "3.1.2"
+      ],
+      "required_capabilities": [
+        "mp-part-language-inventory"
+      ],
+      "required_input_refs": [
+        "machine-probe:mp-part-language-inventory"
+      ],
+      "result_contract": {
+        "contract_kind": "typed-machine-probe-results",
+        "required_machine_probe_keys": [
+          "mp-part-language-inventory"
+        ],
+        "required_fields": [
+          "machine_probe_key",
+          "status",
+          "evidence_refs",
+          "value"
+        ],
+        "allowed_statuses": [
+          "ok",
+          "unsupported",
+          "incomplete",
+          "blocked"
+        ],
+        "limitation_codes": []
+      },
+      "completion_evidence": [
+        "current-typed-machine-probe-results"
+      ],
+      "limitation_behavior": "A valid observed machine limitation completes this procedure with a catalogued limitation code; unavailable or malformed observation is blocked."
+    },
+    {
+      "procedure_key": "m-link-inventory",
+      "procedure_kind": "machine",
+      "applicability_mode": "always",
+      "machine_probe_keys": [
+        "mp-link-inventory"
+      ],
+      "dispatch_key": "link-inventory",
+      "applicable_criterion_refs": [
+        "2.4.4",
+        "2.4.9"
+      ],
+      "required_capabilities": [
+        "mp-link-inventory"
+      ],
+      "required_input_refs": [
+        "machine-probe:mp-link-inventory"
+      ],
+      "result_contract": {
+        "contract_kind": "typed-machine-probe-results",
+        "required_machine_probe_keys": [
+          "mp-link-inventory"
+        ],
+        "required_fields": [
+          "machine_probe_key",
+          "status",
+          "evidence_refs",
+          "value"
+        ],
+        "allowed_statuses": [
+          "ok",
+          "unsupported",
+          "incomplete",
+          "blocked"
+        ],
+        "limitation_codes": []
+      },
+      "completion_evidence": [
+        "current-typed-machine-probe-results"
+      ],
+      "limitation_behavior": "A valid observed machine limitation completes this procedure with a catalogued limitation code; unavailable or malformed observation is blocked."
+    },
+    {
+      "procedure_key": "m-media-inventory",
+      "procedure_kind": "machine",
+      "applicability_mode": "always",
+      "machine_probe_keys": [
+        "mp-media-inventory"
+      ],
+      "dispatch_key": "media-inventory",
+      "applicable_criterion_refs": [
+        "1.2.1",
+        "1.2.2",
+        "1.2.3",
+        "1.2.4",
+        "1.2.5",
+        "1.2.6",
+        "1.2.7",
+        "1.2.8",
+        "1.2.9",
+        "1.4.7"
+      ],
+      "required_capabilities": [
+        "mp-media-inventory"
+      ],
+      "required_input_refs": [
+        "machine-probe:mp-media-inventory"
+      ],
+      "result_contract": {
+        "contract_kind": "typed-machine-probe-results",
+        "required_machine_probe_keys": [
+          "mp-media-inventory"
+        ],
+        "required_fields": [
+          "machine_probe_key",
+          "status",
+          "evidence_refs",
+          "value"
+        ],
+        "allowed_statuses": [
+          "ok",
+          "unsupported",
+          "incomplete",
+          "blocked"
+        ],
+        "limitation_codes": []
+      },
+      "completion_evidence": [
+        "current-typed-machine-probe-results"
+      ],
+      "limitation_behavior": "A valid observed machine limitation completes this procedure with a catalogued limitation code; unavailable or malformed observation is blocked."
+    },
+    {
+      "procedure_key": "m-moving-content-inventory",
+      "procedure_kind": "machine",
+      "applicability_mode": "always",
+      "machine_probe_keys": [
+        "mp-moving-updating-inventory"
+      ],
+      "dispatch_key": "moving-content-inventory",
+      "applicable_criterion_refs": [
+        "2.2.2"
+      ],
+      "required_capabilities": [
+        "mp-moving-updating-inventory"
+      ],
+      "required_input_refs": [
+        "machine-probe:mp-moving-updating-inventory"
+      ],
+      "result_contract": {
+        "contract_kind": "typed-machine-probe-results",
+        "required_machine_probe_keys": [
+          "mp-moving-updating-inventory"
+        ],
+        "required_fields": [
+          "machine_probe_key",
+          "status",
+          "evidence_refs",
+          "value"
+        ],
+        "allowed_statuses": [
+          "ok",
+          "unsupported",
+          "incomplete",
+          "blocked"
+        ],
+        "limitation_codes": []
+      },
+      "completion_evidence": [
+        "current-typed-machine-probe-results"
+      ],
+      "limitation_behavior": "A valid observed machine limitation completes this procedure with a catalogued limitation code; unavailable or malformed observation is blocked."
+    },
+    {
+      "procedure_key": "m-multipage-controls",
+      "procedure_kind": "machine",
+      "applicability_mode": "always",
+      "machine_probe_keys": [
+        "mp-multipage-signature"
+      ],
+      "dispatch_key": "multipage-controls",
+      "applicable_criterion_refs": [
+        "3.2.4"
+      ],
+      "required_capabilities": [
+        "mp-multipage-signature"
+      ],
+      "required_input_refs": [
+        "machine-probe:mp-multipage-signature"
+      ],
+      "result_contract": {
+        "contract_kind": "typed-machine-probe-results",
+        "required_machine_probe_keys": [
+          "mp-multipage-signature"
+        ],
+        "required_fields": [
+          "machine_probe_key",
+          "status",
+          "evidence_refs",
+          "value"
+        ],
+        "allowed_statuses": [
+          "ok",
+          "unsupported",
+          "incomplete",
+          "blocked"
+        ],
+        "limitation_codes": []
+      },
+      "completion_evidence": [
+        "current-typed-machine-probe-results"
+      ],
+      "limitation_behavior": "A valid observed machine limitation completes this procedure with a catalogued limitation code; unavailable or malformed observation is blocked."
+    },
+    {
+      "procedure_key": "m-multipage-help",
+      "procedure_kind": "machine",
+      "applicability_mode": "always",
+      "machine_probe_keys": [
+        "mp-multipage-signature"
+      ],
+      "dispatch_key": "multipage-help",
+      "applicable_criterion_refs": [
+        "3.2.6"
+      ],
+      "required_capabilities": [
+        "mp-multipage-signature"
+      ],
+      "required_input_refs": [
+        "machine-probe:mp-multipage-signature"
+      ],
+      "result_contract": {
+        "contract_kind": "typed-machine-probe-results",
+        "required_machine_probe_keys": [
+          "mp-multipage-signature"
+        ],
+        "required_fields": [
+          "machine_probe_key",
+          "status",
+          "evidence_refs",
+          "value"
+        ],
+        "allowed_statuses": [
+          "ok",
+          "unsupported",
+          "incomplete",
+          "blocked"
+        ],
+        "limitation_codes": []
+      },
+      "completion_evidence": [
+        "current-typed-machine-probe-results"
+      ],
+      "limitation_behavior": "A valid observed machine limitation completes this procedure with a catalogued limitation code; unavailable or malformed observation is blocked."
+    },
+    {
+      "procedure_key": "m-multipage-structure",
+      "procedure_kind": "machine",
+      "applicability_mode": "always",
+      "machine_probe_keys": [
+        "mp-multipage-signature"
+      ],
+      "dispatch_key": "multipage-structure",
+      "applicable_criterion_refs": [
+        "3.2.3"
+      ],
+      "required_capabilities": [
+        "mp-multipage-signature"
+      ],
+      "required_input_refs": [
+        "machine-probe:mp-multipage-signature"
+      ],
+      "result_contract": {
+        "contract_kind": "typed-machine-probe-results",
+        "required_machine_probe_keys": [
+          "mp-multipage-signature"
+        ],
+        "required_fields": [
+          "machine_probe_key",
+          "status",
+          "evidence_refs",
+          "value"
+        ],
+        "allowed_statuses": [
+          "ok",
+          "unsupported",
+          "incomplete",
+          "blocked"
+        ],
+        "limitation_codes": []
+      },
+      "completion_evidence": [
+        "current-typed-machine-probe-results"
+      ],
+      "limitation_behavior": "A valid observed machine limitation completes this procedure with a catalogued limitation code; unavailable or malformed observation is blocked."
+    },
+    {
+      "procedure_key": "m-name-role-value",
+      "procedure_kind": "machine",
+      "applicability_mode": "always",
+      "machine_probe_keys": [
+        "mp-component-semantics"
+      ],
+      "dispatch_key": "name-role-value",
+      "applicable_criterion_refs": [
+        "4.1.2"
+      ],
+      "required_capabilities": [
+        "mp-component-semantics"
+      ],
+      "required_input_refs": [
+        "machine-probe:mp-component-semantics"
+      ],
+      "result_contract": {
+        "contract_kind": "typed-machine-probe-results",
+        "required_machine_probe_keys": [
+          "mp-component-semantics"
+        ],
+        "required_fields": [
+          "machine_probe_key",
+          "status",
+          "evidence_refs",
+          "value"
+        ],
+        "allowed_statuses": [
+          "ok",
+          "unsupported",
+          "incomplete",
+          "blocked"
+        ],
+        "limitation_codes": []
+      },
+      "completion_evidence": [
+        "current-typed-machine-probe-results"
+      ],
+      "limitation_behavior": "A valid observed machine limitation completes this procedure with a catalogued limitation code; unavailable or malformed observation is blocked."
+    },
+    {
+      "procedure_key": "m-nontext-contrast",
+      "procedure_kind": "machine",
+      "applicability_mode": "always",
+      "machine_probe_keys": [
+        "mp-target-geometry",
+        "mp-computed-color-context"
+      ],
+      "dispatch_key": "nontext-contrast",
+      "applicable_criterion_refs": [
+        "1.4.11"
+      ],
+      "required_capabilities": [
+        "mp-computed-color-context",
+        "mp-target-geometry"
+      ],
+      "required_input_refs": [
+        "machine-probe:mp-target-geometry",
+        "machine-probe:mp-computed-color-context"
+      ],
+      "result_contract": {
+        "contract_kind": "typed-machine-probe-results",
+        "required_machine_probe_keys": [
+          "mp-target-geometry",
+          "mp-computed-color-context"
+        ],
+        "required_fields": [
+          "machine_probe_key",
+          "status",
+          "evidence_refs",
+          "value"
+        ],
+        "allowed_statuses": [
+          "ok",
+          "unsupported",
+          "incomplete",
+          "blocked"
+        ],
+        "limitation_codes": [
+          "background-not-machine-resolvable"
+        ]
+      },
+      "completion_evidence": [
+        "current-typed-machine-probe-results"
+      ],
+      "limitation_behavior": "A valid observed machine limitation completes this procedure with a catalogued limitation code; unavailable or malformed observation is blocked."
+    },
+    {
+      "procedure_key": "m-nontext-inventory",
+      "procedure_kind": "machine",
+      "applicability_mode": "always",
+      "machine_probe_keys": [
+        "mp-nontext-content-inventory"
+      ],
+      "dispatch_key": "nontext-inventory",
+      "applicable_criterion_refs": [
+        "1.1.1"
+      ],
+      "required_capabilities": [
+        "mp-nontext-content-inventory"
+      ],
+      "required_input_refs": [
+        "machine-probe:mp-nontext-content-inventory"
+      ],
+      "result_contract": {
+        "contract_kind": "typed-machine-probe-results",
+        "required_machine_probe_keys": [
+          "mp-nontext-content-inventory"
+        ],
+        "required_fields": [
+          "machine_probe_key",
+          "status",
+          "evidence_refs",
+          "value"
+        ],
+        "allowed_statuses": [
+          "ok",
+          "unsupported",
+          "incomplete",
+          "blocked"
+        ],
+        "limitation_codes": []
+      },
+      "completion_evidence": [
+        "current-typed-machine-probe-results"
+      ],
+      "limitation_behavior": "A valid observed machine limitation completes this procedure with a catalogued limitation code; unavailable or malformed observation is blocked."
+    },
+    {
+      "procedure_key": "m-orientation-run",
+      "procedure_kind": "machine",
+      "applicability_mode": "always",
+      "machine_probe_keys": [
+        "mp-orientation-run"
+      ],
+      "dispatch_key": "orientation-run",
+      "applicable_criterion_refs": [
+        "1.3.4"
+      ],
+      "required_capabilities": [
+        "mp-orientation-run"
+      ],
+      "required_input_refs": [
+        "machine-probe:mp-orientation-run"
+      ],
+      "result_contract": {
+        "contract_kind": "typed-machine-probe-results",
+        "required_machine_probe_keys": [
+          "mp-orientation-run"
+        ],
+        "required_fields": [
+          "machine_probe_key",
+          "status",
+          "evidence_refs",
+          "value"
+        ],
+        "allowed_statuses": [
+          "ok",
+          "unsupported",
+          "incomplete",
+          "blocked"
+        ],
+        "limitation_codes": []
+      },
+      "completion_evidence": [
+        "current-typed-machine-probe-results"
+      ],
+      "limitation_behavior": "A valid observed machine limitation completes this procedure with a catalogued limitation code; unavailable or malformed observation is blocked."
+    },
+    {
+      "procedure_key": "m-page-title",
+      "procedure_kind": "machine",
+      "applicability_mode": "always",
+      "machine_probe_keys": [
+        "mp-document-title"
+      ],
+      "dispatch_key": "page-title",
+      "applicable_criterion_refs": [
+        "2.4.2"
+      ],
+      "required_capabilities": [
+        "mp-document-title"
+      ],
+      "required_input_refs": [
+        "machine-probe:mp-document-title"
+      ],
+      "result_contract": {
+        "contract_kind": "typed-machine-probe-results",
+        "required_machine_probe_keys": [
+          "mp-document-title"
+        ],
+        "required_fields": [
+          "machine_probe_key",
+          "status",
+          "evidence_refs",
+          "value"
+        ],
+        "allowed_statuses": [
+          "ok",
+          "unsupported",
+          "incomplete",
+          "blocked"
+        ],
+        "limitation_codes": []
+      },
+      "completion_evidence": [
+        "current-typed-machine-probe-results"
+      ],
+      "limitation_behavior": "A valid observed machine limitation completes this procedure with a catalogued limitation code; unavailable or malformed observation is blocked."
+    },
+    {
+      "procedure_key": "m-parsing-version-rule",
+      "procedure_kind": "machine",
+      "applicability_mode": "always",
+      "machine_probe_keys": [],
+      "dispatch_key": "parsing-version-rule",
+      "applicable_criterion_refs": [
+        "4.1.1"
+      ],
+      "required_capabilities": [
+        "wcag-versioned-normative-rule"
+      ],
+      "required_input_refs": [
+        "wcag-versioned-content-technology"
+      ],
+      "result_contract": {
+        "contract_kind": "versioned-technology-rule",
+        "required_fields": [
+          "wcag_version",
+          "content_technology",
+          "rule_decision",
+          "evidence_refs"
+        ],
+        "allowed_rule_decisions": [
+          "removed-wcag-2.2",
+          "always-satisfied-html-xml",
+          "evaluate-normative-rule"
+        ],
+        "limitation_codes": []
+      },
+      "completion_evidence": [
+        "versioned-technology-rule-result"
+      ],
+      "limitation_behavior": "A valid observed machine limitation completes this procedure with a catalogued limitation code; unavailable or malformed observation is blocked."
+    },
+    {
+      "procedure_key": "m-pointer-run",
+      "procedure_kind": "machine",
+      "applicability_mode": "always",
+      "machine_probe_keys": [
+        "mp-pointer-interaction-run"
+      ],
+      "dispatch_key": "pointer-run",
+      "applicable_criterion_refs": [
+        "2.5.1",
+        "2.5.2",
+        "2.5.7"
+      ],
+      "required_capabilities": [
+        "mp-pointer-interaction-run"
+      ],
+      "required_input_refs": [
+        "machine-probe:mp-pointer-interaction-run"
+      ],
+      "result_contract": {
+        "contract_kind": "typed-machine-probe-results",
+        "required_machine_probe_keys": [
+          "mp-pointer-interaction-run"
+        ],
+        "required_fields": [
+          "machine_probe_key",
+          "status",
+          "evidence_refs",
+          "value"
+        ],
+        "allowed_statuses": [
+          "ok",
+          "unsupported",
+          "incomplete",
+          "blocked"
+        ],
+        "limitation_codes": []
+      },
+      "completion_evidence": [
+        "current-typed-machine-probe-results"
+      ],
+      "limitation_behavior": "A valid observed machine limitation completes this procedure with a catalogued limitation code; unavailable or malformed observation is blocked."
+    },
+    {
+      "procedure_key": "m-reflow",
+      "procedure_kind": "machine",
+      "applicability_mode": "always",
+      "machine_probe_keys": [
+        "mp-reflow-run",
+        "mp-viewport-state"
+      ],
+      "dispatch_key": "reflow",
+      "applicable_criterion_refs": [
+        "1.4.10"
+      ],
+      "required_capabilities": [
+        "mp-reflow-run",
+        "mp-viewport-state"
+      ],
+      "required_input_refs": [
+        "machine-probe:mp-reflow-run",
+        "machine-probe:mp-viewport-state"
+      ],
+      "result_contract": {
+        "contract_kind": "typed-machine-probe-results",
+        "required_machine_probe_keys": [
+          "mp-reflow-run",
+          "mp-viewport-state"
+        ],
+        "required_fields": [
+          "machine_probe_key",
+          "status",
+          "evidence_refs",
+          "value"
+        ],
+        "allowed_statuses": [
+          "ok",
+          "unsupported",
+          "incomplete",
+          "blocked"
+        ],
+        "limitation_codes": []
+      },
+      "completion_evidence": [
+        "current-typed-machine-probe-results"
+      ],
+      "limitation_behavior": "A valid observed machine limitation completes this procedure with a catalogued limitation code; unavailable or malformed observation is blocked."
+    },
+    {
+      "procedure_key": "m-resize-text",
+      "procedure_kind": "machine",
+      "applicability_mode": "always",
+      "machine_probe_keys": [
+        "mp-resize-text-run"
+      ],
+      "dispatch_key": "resize-text",
+      "applicable_criterion_refs": [
+        "1.4.4"
+      ],
+      "required_capabilities": [
+        "mp-resize-text-run"
+      ],
+      "required_input_refs": [
+        "machine-probe:mp-resize-text-run"
+      ],
+      "result_contract": {
+        "contract_kind": "typed-machine-probe-results",
+        "required_machine_probe_keys": [
+          "mp-resize-text-run"
+        ],
+        "required_fields": [
+          "machine_probe_key",
+          "status",
+          "evidence_refs",
+          "value"
+        ],
+        "allowed_statuses": [
+          "ok",
+          "unsupported",
+          "incomplete",
+          "blocked"
+        ],
+        "limitation_codes": [
+          "text-scaling-mechanism-not-machine-executable",
+          "text-scaling-state-not-machine-readable"
+        ]
+      },
+      "completion_evidence": [
+        "current-typed-machine-probe-results"
+      ],
+      "limitation_behavior": "A valid observed machine limitation completes this procedure with a catalogued limitation code; unavailable or malformed observation is blocked."
+    },
+    {
+      "procedure_key": "m-shortcut-inventory",
+      "procedure_kind": "machine",
+      "applicability_mode": "always",
+      "machine_probe_keys": [
+        "mp-shortcut-inventory"
+      ],
+      "dispatch_key": "shortcut-inventory",
+      "applicable_criterion_refs": [
+        "2.1.4"
+      ],
+      "required_capabilities": [
+        "mp-shortcut-inventory"
+      ],
+      "required_input_refs": [
+        "machine-probe:mp-shortcut-inventory"
+      ],
+      "result_contract": {
+        "contract_kind": "typed-machine-probe-results",
+        "required_machine_probe_keys": [
+          "mp-shortcut-inventory"
+        ],
+        "required_fields": [
+          "machine_probe_key",
+          "status",
+          "evidence_refs",
+          "value"
+        ],
+        "allowed_statuses": [
+          "ok",
+          "unsupported",
+          "incomplete",
+          "blocked"
+        ],
+        "limitation_codes": []
+      },
+      "completion_evidence": [
+        "current-typed-machine-probe-results"
+      ],
+      "limitation_behavior": "A valid observed machine limitation completes this procedure with a catalogued limitation code; unavailable or malformed observation is blocked."
+    },
+    {
+      "procedure_key": "m-status-semantics",
+      "procedure_kind": "machine",
+      "applicability_mode": "always",
+      "machine_probe_keys": [
+        "mp-status-candidate-inventory",
+        "mp-component-semantics"
+      ],
+      "dispatch_key": "status-semantics",
+      "applicable_criterion_refs": [
+        "4.1.3"
+      ],
+      "required_capabilities": [
+        "mp-component-semantics",
+        "mp-status-candidate-inventory"
+      ],
+      "required_input_refs": [
+        "machine-probe:mp-status-candidate-inventory",
+        "machine-probe:mp-component-semantics"
+      ],
+      "result_contract": {
+        "contract_kind": "typed-machine-probe-results",
+        "required_machine_probe_keys": [
+          "mp-status-candidate-inventory",
+          "mp-component-semantics"
+        ],
+        "required_fields": [
+          "machine_probe_key",
+          "status",
+          "evidence_refs",
+          "value"
+        ],
+        "allowed_statuses": [
+          "ok",
+          "unsupported",
+          "incomplete",
+          "blocked"
+        ],
+        "limitation_codes": []
+      },
+      "completion_evidence": [
+        "current-typed-machine-probe-results"
+      ],
+      "limitation_behavior": "A valid observed machine limitation completes this procedure with a catalogued limitation code; unavailable or malformed observation is blocked."
+    },
+    {
+      "procedure_key": "m-structure-snapshot",
+      "procedure_kind": "machine",
+      "applicability_mode": "always",
+      "machine_probe_keys": [
+        "mp-structure-inventory"
+      ],
+      "dispatch_key": "structure-snapshot",
+      "applicable_criterion_refs": [
+        "1.3.1",
+        "2.4.1"
+      ],
+      "required_capabilities": [
+        "mp-structure-inventory"
+      ],
+      "required_input_refs": [
+        "machine-probe:mp-structure-inventory"
+      ],
+      "result_contract": {
+        "contract_kind": "typed-machine-probe-results",
+        "required_machine_probe_keys": [
+          "mp-structure-inventory"
+        ],
+        "required_fields": [
+          "machine_probe_key",
+          "status",
+          "evidence_refs",
+          "value"
+        ],
+        "allowed_statuses": [
+          "ok",
+          "unsupported",
+          "incomplete",
+          "blocked"
+        ],
+        "limitation_codes": []
+      },
+      "completion_evidence": [
+        "current-typed-machine-probe-results"
+      ],
+      "limitation_behavior": "A valid observed machine limitation completes this procedure with a catalogued limitation code; unavailable or malformed observation is blocked."
+    },
+    {
+      "procedure_key": "m-target-size",
+      "procedure_kind": "machine",
+      "applicability_mode": "always",
+      "machine_probe_keys": [
+        "mp-target-geometry",
+        "mp-neighbor-geometry"
+      ],
+      "dispatch_key": "target-size",
+      "applicable_criterion_refs": [
+        "2.5.5",
+        "2.5.8"
+      ],
+      "required_capabilities": [
+        "mp-neighbor-geometry",
+        "mp-target-geometry"
+      ],
+      "required_input_refs": [
+        "machine-probe:mp-target-geometry",
+        "machine-probe:mp-neighbor-geometry"
+      ],
+      "result_contract": {
+        "contract_kind": "typed-machine-probe-results",
+        "required_machine_probe_keys": [
+          "mp-target-geometry",
+          "mp-neighbor-geometry"
+        ],
+        "required_fields": [
+          "machine_probe_key",
+          "status",
+          "evidence_refs",
+          "value"
+        ],
+        "allowed_statuses": [
+          "ok",
+          "unsupported",
+          "incomplete",
+          "blocked"
+        ],
+        "limitation_codes": []
+      },
+      "completion_evidence": [
+        "current-typed-machine-probe-results"
+      ],
+      "limitation_behavior": "A valid observed machine limitation completes this procedure with a catalogued limitation code; unavailable or malformed observation is blocked."
+    },
+    {
+      "procedure_key": "m-text-contrast",
+      "procedure_kind": "machine",
+      "applicability_mode": "always",
+      "machine_probe_keys": [
+        "mp-computed-color-context"
+      ],
+      "dispatch_key": "text-contrast",
+      "applicable_criterion_refs": [
+        "1.4.3",
+        "1.4.6"
+      ],
+      "required_capabilities": [
+        "mp-computed-color-context"
+      ],
+      "required_input_refs": [
+        "machine-probe:mp-computed-color-context"
+      ],
+      "result_contract": {
+        "contract_kind": "typed-machine-probe-results",
+        "required_machine_probe_keys": [
+          "mp-computed-color-context"
+        ],
+        "required_fields": [
+          "machine_probe_key",
+          "status",
+          "evidence_refs",
+          "value"
+        ],
+        "allowed_statuses": [
+          "ok",
+          "unsupported",
+          "incomplete",
+          "blocked"
+        ],
+        "limitation_codes": [
+          "background-not-machine-resolvable"
+        ]
+      },
+      "completion_evidence": [
+        "current-typed-machine-probe-results"
+      ],
+      "limitation_behavior": "A valid observed machine limitation completes this procedure with a catalogued limitation code; unavailable or malformed observation is blocked."
+    },
+    {
+      "procedure_key": "m-text-presentation",
+      "procedure_kind": "machine",
+      "applicability_mode": "always",
+      "machine_probe_keys": [
+        "mp-text-presentation-values",
+        "mp-computed-color-context"
+      ],
+      "dispatch_key": "text-presentation",
+      "applicable_criterion_refs": [
+        "1.4.8"
+      ],
+      "required_capabilities": [
+        "mp-computed-color-context",
+        "mp-text-presentation-values"
+      ],
+      "required_input_refs": [
+        "machine-probe:mp-text-presentation-values",
+        "machine-probe:mp-computed-color-context"
+      ],
+      "result_contract": {
+        "contract_kind": "typed-machine-probe-results",
+        "required_machine_probe_keys": [
+          "mp-text-presentation-values",
+          "mp-computed-color-context"
+        ],
+        "required_fields": [
+          "machine_probe_key",
+          "status",
+          "evidence_refs",
+          "value"
+        ],
+        "allowed_statuses": [
+          "ok",
+          "unsupported",
+          "incomplete",
+          "blocked"
+        ],
+        "limitation_codes": []
+      },
+      "completion_evidence": [
+        "current-typed-machine-probe-results"
+      ],
+      "limitation_behavior": "A valid observed machine limitation completes this procedure with a catalogued limitation code; unavailable or malformed observation is blocked."
+    },
+    {
+      "procedure_key": "m-text-spacing",
+      "procedure_kind": "machine",
+      "applicability_mode": "always",
+      "machine_probe_keys": [
+        "mp-text-spacing-run"
+      ],
+      "dispatch_key": "text-spacing",
+      "applicable_criterion_refs": [
+        "1.4.12"
+      ],
+      "required_capabilities": [
+        "mp-text-spacing-run"
+      ],
+      "required_input_refs": [
+        "machine-probe:mp-text-spacing-run"
+      ],
+      "result_contract": {
+        "contract_kind": "typed-machine-probe-results",
+        "required_machine_probe_keys": [
+          "mp-text-spacing-run"
+        ],
+        "required_fields": [
+          "machine_probe_key",
+          "status",
+          "evidence_refs",
+          "value"
+        ],
+        "allowed_statuses": [
+          "ok",
+          "unsupported",
+          "incomplete",
+          "blocked"
+        ],
+        "limitation_codes": []
+      },
+      "completion_evidence": [
+        "current-typed-machine-probe-results"
+      ],
+      "limitation_behavior": "A valid observed machine limitation completes this procedure with a catalogued limitation code; unavailable or malformed observation is blocked."
+    },
+    {
+      "procedure_key": "m-timer-inventory",
+      "procedure_kind": "machine",
+      "applicability_mode": "always",
+      "machine_probe_keys": [
+        "mp-timer-inventory"
+      ],
+      "dispatch_key": "timer-inventory",
+      "applicable_criterion_refs": [
+        "2.2.1",
+        "2.2.3",
+        "2.2.6"
+      ],
+      "required_capabilities": [
+        "mp-timer-inventory"
+      ],
+      "required_input_refs": [
+        "machine-probe:mp-timer-inventory"
+      ],
+      "result_contract": {
+        "contract_kind": "typed-machine-probe-results",
+        "required_machine_probe_keys": [
+          "mp-timer-inventory"
+        ],
+        "required_fields": [
+          "machine_probe_key",
+          "status",
+          "evidence_refs",
+          "value"
+        ],
+        "allowed_statuses": [
+          "ok",
+          "unsupported",
+          "incomplete",
+          "blocked"
+        ],
+        "limitation_codes": []
+      },
+      "completion_evidence": [
+        "current-typed-machine-probe-results"
+      ],
+      "limitation_behavior": "A valid observed machine limitation completes this procedure with a catalogued limitation code; unavailable or malformed observation is blocked."
+    },
+    {
+      "procedure_key": "m-ui-purpose-metadata",
+      "procedure_kind": "machine",
+      "applicability_mode": "always",
+      "machine_probe_keys": [
+        "mp-purpose-metadata",
+        "mp-component-semantics"
+      ],
+      "dispatch_key": "ui-purpose-metadata",
+      "applicable_criterion_refs": [
+        "1.3.6"
+      ],
+      "required_capabilities": [
+        "mp-component-semantics",
+        "mp-purpose-metadata"
+      ],
+      "required_input_refs": [
+        "machine-probe:mp-purpose-metadata",
+        "machine-probe:mp-component-semantics"
+      ],
+      "result_contract": {
+        "contract_kind": "typed-machine-probe-results",
+        "required_machine_probe_keys": [
+          "mp-purpose-metadata",
+          "mp-component-semantics"
+        ],
+        "required_fields": [
+          "machine_probe_key",
+          "status",
+          "evidence_refs",
+          "value"
+        ],
+        "allowed_statuses": [
+          "ok",
+          "unsupported",
+          "incomplete",
+          "blocked"
+        ],
+        "limitation_codes": []
+      },
+      "completion_evidence": [
+        "current-typed-machine-probe-results"
+      ],
+      "limitation_behavior": "A valid observed machine limitation completes this procedure with a catalogued limitation code; unavailable or malformed observation is blocked."
+    },
+    {
+      "procedure_key": "manual-wcag-1.4.11",
+      "procedure_kind": "manual",
+      "applicability_mode": "machine-limitation",
+      "activation_source_procedure_key": "m-nontext-contrast",
+      "activation_limitation_codes": [
+        "background-not-machine-resolvable"
+      ],
+      "required_evidence_kind": "manual-evidence",
+      "applicable_criterion_refs": [
+        "1.4.11"
+      ],
+      "required_capabilities": [
+        "human-review"
+      ],
+      "required_input_refs": [
+        "fixed-manual-procedure-contract",
+        "current-evaluation-evidence"
+      ],
+      "result_contract": {
+        "contract_kind": "manual-procedure-result",
+        "required_fields": [
+          "target_refs",
+          "procedure",
+          "observations",
+          "result",
+          "evidence_refs",
+          "judgment_reason"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "fixed-manual-procedure-evidence"
+      ],
+      "limitation_behavior": "Missing manual evidence is undetermined; unavailable evaluator capability is blocked."
+    },
+    {
+      "procedure_key": "manual-wcag-1.4.3",
+      "procedure_kind": "manual",
+      "applicability_mode": "machine-limitation",
+      "activation_source_procedure_key": "m-text-contrast",
+      "activation_limitation_codes": [
+        "background-not-machine-resolvable"
+      ],
+      "required_evidence_kind": "manual-evidence",
+      "applicable_criterion_refs": [
+        "1.4.3"
+      ],
+      "required_capabilities": [
+        "human-review"
+      ],
+      "required_input_refs": [
+        "fixed-manual-procedure-contract",
+        "current-evaluation-evidence"
+      ],
+      "result_contract": {
+        "contract_kind": "manual-procedure-result",
+        "required_fields": [
+          "target_refs",
+          "procedure",
+          "observations",
+          "result",
+          "evidence_refs",
+          "judgment_reason"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "fixed-manual-procedure-evidence"
+      ],
+      "limitation_behavior": "Missing manual evidence is undetermined; unavailable evaluator capability is blocked."
+    },
+    {
+      "procedure_key": "manual-wcag-1.4.4",
+      "procedure_kind": "manual",
+      "applicability_mode": "machine-limitation",
+      "activation_source_procedure_key": "m-resize-text",
+      "activation_limitation_codes": [
+        "text-scaling-mechanism-not-machine-executable",
+        "text-scaling-state-not-machine-readable"
+      ],
+      "required_evidence_kind": "manual-evidence",
+      "applicable_criterion_refs": [
+        "1.4.4"
+      ],
+      "required_capabilities": [
+        "human-review"
+      ],
+      "required_input_refs": [
+        "fixed-manual-procedure-contract",
+        "current-evaluation-evidence"
+      ],
+      "result_contract": {
+        "contract_kind": "manual-procedure-result",
+        "required_fields": [
+          "target_refs",
+          "procedure",
+          "observations",
+          "result",
+          "evidence_refs",
+          "judgment_reason"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "fixed-manual-procedure-evidence"
+      ],
+      "limitation_behavior": "Missing manual evidence is undetermined; unavailable evaluator capability is blocked."
+    },
+    {
+      "procedure_key": "manual-wcag-1.4.6",
+      "procedure_kind": "manual",
+      "applicability_mode": "machine-limitation",
+      "activation_source_procedure_key": "m-text-contrast",
+      "activation_limitation_codes": [
+        "background-not-machine-resolvable"
+      ],
+      "required_evidence_kind": "manual-evidence",
+      "applicable_criterion_refs": [
+        "1.4.6"
+      ],
+      "required_capabilities": [
+        "human-review"
+      ],
+      "required_input_refs": [
+        "fixed-manual-procedure-contract",
+        "current-evaluation-evidence"
+      ],
+      "result_contract": {
+        "contract_kind": "manual-procedure-result",
+        "required_fields": [
+          "target_refs",
+          "procedure",
+          "observations",
+          "result",
+          "evidence_refs",
+          "judgment_reason"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "fixed-manual-procedure-evidence"
+      ],
+      "limitation_behavior": "Missing manual evidence is undetermined; unavailable evaluator capability is blocked."
+    },
+    {
+      "procedure_key": "manual-wcag-2.4.13",
+      "procedure_kind": "manual",
+      "applicability_mode": "machine-limitation",
+      "activation_source_procedure_key": "m-focus-appearance",
+      "activation_limitation_codes": [
+        "focus-indicator-not-machine-resolvable"
+      ],
+      "required_evidence_kind": "manual-evidence",
+      "applicable_criterion_refs": [
+        "2.4.13"
+      ],
+      "required_capabilities": [
+        "human-review"
+      ],
+      "required_input_refs": [
+        "fixed-manual-procedure-contract",
+        "current-evaluation-evidence"
+      ],
+      "result_contract": {
+        "contract_kind": "manual-procedure-result",
+        "required_fields": [
+          "target_refs",
+          "procedure",
+          "observations",
+          "result",
+          "evidence_refs",
+          "judgment_reason"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "fixed-manual-procedure-evidence"
+      ],
+      "limitation_behavior": "Missing manual evidence is undetermined; unavailable evaluator capability is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-1.1.1",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-1.1.1",
+      "applicable_criterion_refs": [
+        "1.1.1"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-1.2.1",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-1.2.1",
+      "applicable_criterion_refs": [
+        "1.2.1"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-1.2.2",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-1.2.2",
+      "applicable_criterion_refs": [
+        "1.2.2"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-1.2.3",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-1.2.3",
+      "applicable_criterion_refs": [
+        "1.2.3"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-1.2.4",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-1.2.4",
+      "applicable_criterion_refs": [
+        "1.2.4"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-1.2.5",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-1.2.5",
+      "applicable_criterion_refs": [
+        "1.2.5"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-1.2.6",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-1.2.6",
+      "applicable_criterion_refs": [
+        "1.2.6"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-1.2.7",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-1.2.7",
+      "applicable_criterion_refs": [
+        "1.2.7"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-1.2.8",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-1.2.8",
+      "applicable_criterion_refs": [
+        "1.2.8"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-1.2.9",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-1.2.9",
+      "applicable_criterion_refs": [
+        "1.2.9"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-1.3.1",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-1.3.1",
+      "applicable_criterion_refs": [
+        "1.3.1"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-1.3.2",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-1.3.2",
+      "applicable_criterion_refs": [
+        "1.3.2"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-1.3.3",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-1.3.3",
+      "applicable_criterion_refs": [
+        "1.3.3"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-1.3.4",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-1.3.4",
+      "applicable_criterion_refs": [
+        "1.3.4"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-1.3.5",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-1.3.5",
+      "applicable_criterion_refs": [
+        "1.3.5"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-1.3.6",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-1.3.6",
+      "applicable_criterion_refs": [
+        "1.3.6"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-1.4.1",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-1.4.1",
+      "applicable_criterion_refs": [
+        "1.4.1"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-1.4.10",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-1.4.10",
+      "applicable_criterion_refs": [
+        "1.4.10"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-1.4.11",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-1.4.11",
+      "applicable_criterion_refs": [
+        "1.4.11"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-1.4.12",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-1.4.12",
+      "applicable_criterion_refs": [
+        "1.4.12"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-1.4.13",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-1.4.13",
+      "applicable_criterion_refs": [
+        "1.4.13"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-1.4.2",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-1.4.2",
+      "applicable_criterion_refs": [
+        "1.4.2"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-1.4.3",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-1.4.3",
+      "applicable_criterion_refs": [
+        "1.4.3"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-1.4.4",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-1.4.4",
+      "applicable_criterion_refs": [
+        "1.4.4"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-1.4.5",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-1.4.5",
+      "applicable_criterion_refs": [
+        "1.4.5"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-1.4.6",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-1.4.6",
+      "applicable_criterion_refs": [
+        "1.4.6"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-1.4.7",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-1.4.7",
+      "applicable_criterion_refs": [
+        "1.4.7"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-1.4.8",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-1.4.8",
+      "applicable_criterion_refs": [
+        "1.4.8"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-1.4.9",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-1.4.9",
+      "applicable_criterion_refs": [
+        "1.4.9"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-2.1.1",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-2.1.1",
+      "applicable_criterion_refs": [
+        "2.1.1"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-2.1.2",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-2.1.2",
+      "applicable_criterion_refs": [
+        "2.1.2"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-2.1.3",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-2.1.3",
+      "applicable_criterion_refs": [
+        "2.1.3"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-2.1.4",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-2.1.4",
+      "applicable_criterion_refs": [
+        "2.1.4"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-2.2.1",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-2.2.1",
+      "applicable_criterion_refs": [
+        "2.2.1"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-2.2.2",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-2.2.2",
+      "applicable_criterion_refs": [
+        "2.2.2"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-2.2.3",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-2.2.3",
+      "applicable_criterion_refs": [
+        "2.2.3"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-2.2.4",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-2.2.4",
+      "applicable_criterion_refs": [
+        "2.2.4"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-2.2.5",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-2.2.5",
+      "applicable_criterion_refs": [
+        "2.2.5"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-2.2.6",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-2.2.6",
+      "applicable_criterion_refs": [
+        "2.2.6"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-2.3.1",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-2.3.1",
+      "applicable_criterion_refs": [
+        "2.3.1"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-2.3.2",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-2.3.2",
+      "applicable_criterion_refs": [
+        "2.3.2"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-2.3.3",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-2.3.3",
+      "applicable_criterion_refs": [
+        "2.3.3"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-2.4.1",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-2.4.1",
+      "applicable_criterion_refs": [
+        "2.4.1"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-2.4.10",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-2.4.10",
+      "applicable_criterion_refs": [
+        "2.4.10"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-2.4.11",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-2.4.11",
+      "applicable_criterion_refs": [
+        "2.4.11"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-2.4.12",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-2.4.12",
+      "applicable_criterion_refs": [
+        "2.4.12"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-2.4.13",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-2.4.13",
+      "applicable_criterion_refs": [
+        "2.4.13"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-2.4.2",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-2.4.2",
+      "applicable_criterion_refs": [
+        "2.4.2"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-2.4.3",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-2.4.3",
+      "applicable_criterion_refs": [
+        "2.4.3"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-2.4.4",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-2.4.4",
+      "applicable_criterion_refs": [
+        "2.4.4"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-2.4.5",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-2.4.5",
+      "applicable_criterion_refs": [
+        "2.4.5"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-2.4.6",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-2.4.6",
+      "applicable_criterion_refs": [
+        "2.4.6"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-2.4.7",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-2.4.7",
+      "applicable_criterion_refs": [
+        "2.4.7"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-2.4.8",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-2.4.8",
+      "applicable_criterion_refs": [
+        "2.4.8"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-2.4.9",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-2.4.9",
+      "applicable_criterion_refs": [
+        "2.4.9"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-2.5.1",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-2.5.1",
+      "applicable_criterion_refs": [
+        "2.5.1"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-2.5.2",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-2.5.2",
+      "applicable_criterion_refs": [
+        "2.5.2"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-2.5.3",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-2.5.3",
+      "applicable_criterion_refs": [
+        "2.5.3"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-2.5.4",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-2.5.4",
+      "applicable_criterion_refs": [
+        "2.5.4"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-2.5.5",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-2.5.5",
+      "applicable_criterion_refs": [
+        "2.5.5"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-2.5.6",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-2.5.6",
+      "applicable_criterion_refs": [
+        "2.5.6"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-2.5.7",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-2.5.7",
+      "applicable_criterion_refs": [
+        "2.5.7"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-2.5.8",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-2.5.8",
+      "applicable_criterion_refs": [
+        "2.5.8"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-3.1.1",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-3.1.1",
+      "applicable_criterion_refs": [
+        "3.1.1"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-3.1.2",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-3.1.2",
+      "applicable_criterion_refs": [
+        "3.1.2"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-3.1.3",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-3.1.3",
+      "applicable_criterion_refs": [
+        "3.1.3"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-3.1.4",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-3.1.4",
+      "applicable_criterion_refs": [
+        "3.1.4"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-3.1.5",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-3.1.5",
+      "applicable_criterion_refs": [
+        "3.1.5"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-3.1.6",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-3.1.6",
+      "applicable_criterion_refs": [
+        "3.1.6"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-3.2.1",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-3.2.1",
+      "applicable_criterion_refs": [
+        "3.2.1"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-3.2.2",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-3.2.2",
+      "applicable_criterion_refs": [
+        "3.2.2"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-3.2.3",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-3.2.3",
+      "applicable_criterion_refs": [
+        "3.2.3"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-3.2.4",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-3.2.4",
+      "applicable_criterion_refs": [
+        "3.2.4"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-3.2.5",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-3.2.5",
+      "applicable_criterion_refs": [
+        "3.2.5"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-3.2.6",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-3.2.6",
+      "applicable_criterion_refs": [
+        "3.2.6"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-3.3.1",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-3.3.1",
+      "applicable_criterion_refs": [
+        "3.3.1"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-3.3.2",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-3.3.2",
+      "applicable_criterion_refs": [
+        "3.3.2"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-3.3.3",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-3.3.3",
+      "applicable_criterion_refs": [
+        "3.3.3"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-3.3.4",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-3.3.4",
+      "applicable_criterion_refs": [
+        "3.3.4"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-3.3.5",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-3.3.5",
+      "applicable_criterion_refs": [
+        "3.3.5"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-3.3.6",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-3.3.6",
+      "applicable_criterion_refs": [
+        "3.3.6"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-3.3.7",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-3.3.7",
+      "applicable_criterion_refs": [
+        "3.3.7"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-3.3.8",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-3.3.8",
+      "applicable_criterion_refs": [
+        "3.3.8"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-3.3.9",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-3.3.9",
+      "applicable_criterion_refs": [
+        "3.3.9"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-4.1.1",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-4.1.1",
+      "applicable_criterion_refs": [
+        "4.1.1"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-4.1.2",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-4.1.2",
+      "applicable_criterion_refs": [
+        "4.1.2"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    },
+    {
+      "procedure_key": "s-wcag-4.1.3",
+      "procedure_kind": "semantic",
+      "applicability_mode": "always",
+      "semantic_decision_key": "s-wcag-4.1.3",
+      "applicable_criterion_refs": [
+        "4.1.3"
+      ],
+      "required_capabilities": [
+        "semantic-judgment"
+      ],
+      "required_input_refs": [
+        "versioned-wcag-semantic-contract",
+        "current-applicable-procedure-results",
+        "accessibility-support-baseline"
+      ],
+      "result_contract": {
+        "contract_kind": "wcag-semantic-decision",
+        "required_fields": [
+          "applicability",
+          "exception_decisions",
+          "evaluation_point_decisions",
+          "result",
+          "judgment_reason",
+          "evidence_refs",
+          "uncertainty",
+          "limitation",
+          "additional_observation_request_refs"
+        ],
+        "allowed_applicability": [
+          "applicable",
+          "not-applicable",
+          "unknown"
+        ],
+        "allowed_results": [
+          "satisfied",
+          "not-satisfied",
+          "undetermined"
+        ],
+        "missing_evidence_result": "undetermined"
+      },
+      "completion_evidence": [
+        "all-required-semantic-evaluation-points",
+        "normative-evidence-refs"
+      ],
+      "limitation_behavior": "Missing evidence remains undetermined; an unresolved required capability or environment is blocked."
+    }
+  ]
+}

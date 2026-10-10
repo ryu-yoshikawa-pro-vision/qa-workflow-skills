@@ -1,0 +1,135 @@
+{
+  "kind": "external-random-selection-source-input",
+  "finite_inventory_complete": false,
+  "scope": {
+    "scope_ref": "SCOPE-CASE-Q-PUBLIC",
+    "description": "Declared synthetic public Web product scope; no finite list of all target/state identities can be established.",
+    "evidence_refs": [
+      "EVD-CASE-Q-SCOPE"
+    ]
+  },
+  "structured_sample_source_refs": [
+    "STRUCT-Q-001",
+    "STRUCT-Q-002",
+    "STRUCT-Q-003",
+    "STRUCT-Q-004",
+    "STRUCT-Q-005",
+    "STRUCT-Q-006",
+    "STRUCT-Q-007",
+    "STRUCT-Q-008",
+    "STRUCT-Q-009",
+    "STRUCT-Q-010"
+  ],
+  "identity_drafts": [
+    {
+      "draft_key": "STRUCT-Q-001",
+      "target_ref": "TARGET-Q-001",
+      "state_key": "default",
+      "locator": "https://northstar.example.invalid/target-q-001/default",
+      "source_evidence_refs": [
+        "EVD-CASE-Q-EXTERNAL-SELECTOR"
+      ]
+    },
+    {
+      "draft_key": "STRUCT-Q-002",
+      "target_ref": "TARGET-Q-002",
+      "state_key": "default",
+      "locator": "https://northstar.example.invalid/target-q-002/default",
+      "source_evidence_refs": [
+        "EVD-CASE-Q-EXTERNAL-SELECTOR"
+      ]
+    },
+    {
+      "draft_key": "STRUCT-Q-003",
+      "target_ref": "TARGET-Q-003",
+      "state_key": "default",
+      "locator": "https://northstar.example.invalid/target-q-003/default",
+      "source_evidence_refs": [
+        "EVD-CASE-Q-EXTERNAL-SELECTOR"
+      ]
+    },
+    {
+      "draft_key": "STRUCT-Q-004",
+      "target_ref": "TARGET-Q-004",
+      "state_key": "default",
+      "locator": "https://northstar.example.invalid/target-q-004/default",
+      "source_evidence_refs": [
+        "EVD-CASE-Q-EXTERNAL-SELECTOR"
+      ]
+    },
+    {
+      "draft_key": "STRUCT-Q-005",
+      "target_ref": "TARGET-Q-005",
+      "state_key": "default",
+      "locator": "https://northstar.example.invalid/target-q-005/default",
+      "source_evidence_refs": [
+        "EVD-CASE-Q-EXTERNAL-SELECTOR"
+      ]
+    },
+    {
+      "draft_key": "STRUCT-Q-006",
+      "target_ref": "TARGET-Q-006",
+      "state_key": "default",
+      "locator": "https://northstar.example.invalid/target-q-006/default",
+      "source_evidence_refs": [
+        "EVD-CASE-Q-EXTERNAL-SELECTOR"
+      ]
+    },
+    {
+      "draft_key": "STRUCT-Q-007",
+      "target_ref": "TARGET-Q-007",
+      "state_key": "default",
+      "locator": "https://northstar.example.invalid/target-q-007/default",
+      "source_evidence_refs": [
+        "EVD-CASE-Q-EXTERNAL-SELECTOR"
+      ]
+    },
+    {
+      "draft_key": "STRUCT-Q-008",
+      "target_ref": "TARGET-Q-008",
+      "state_key": "default",
+      "locator": "https://northstar.example.invalid/target-q-008/default",
+      "source_evidence_refs": [
+        "EVD-CASE-Q-EXTERNAL-SELECTOR"
+      ]
+    },
+    {
+      "draft_key": "STRUCT-Q-009",
+      "target_ref": "TARGET-Q-009",
+      "state_key": "default",
+      "locator": "https://northstar.example.invalid/target-q-009/default",
+      "source_evidence_refs": [
+        "EVD-CASE-Q-EXTERNAL-SELECTOR"
+      ]
+    },
+    {
+      "draft_key": "STRUCT-Q-010",
+      "target_ref": "TARGET-Q-010",
+      "state_key": "default",
+      "locator": "https://northstar.example.invalid/target-q-010/default",
+      "source_evidence_refs": [
+        "EVD-CASE-Q-EXTERNAL-SELECTOR"
+      ]
+    },
+    {
+      "draft_key": "RANDOM-Q-011",
+      "target_ref": "TARGET-Q-011",
+      "state_key": "default",
+      "locator": "https://northstar.example.invalid/target-q-011/default",
+      "source_evidence_refs": [
+        "EVD-CASE-Q-EXTERNAL-SELECTOR"
+      ]
+    }
+  ],
+  "external_selection_result": {
+    "selected_source_ref": "RANDOM-Q-011",
+    "selection_activity_ref": "ACT-CASE-Q-EXTERNAL-RANDOM",
+    "tool": "synthetic audited external random selector",
+    "method": "Select one target/state from the declared product scope without enumerating a finite inventory.",
+    "candidate_scope_ref": "SCOPE-CASE-Q-PUBLIC",
+    "provenance_evidence_refs": [
+      "EVD-CASE-Q-EXTERNAL-SELECTOR"
+    ],
+    "completed_at": "2026-10-01"
+  }
+}

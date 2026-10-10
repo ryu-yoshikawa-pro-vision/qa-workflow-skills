@@ -21,6 +21,9 @@ CANONICAL_SKILLS = {
     "regression-testing",
     "exploratory-testing",
     "qa-knowledge",
+    "usability-evaluation",
+    "usability-inspection",
+    "wcag-conformance-evaluation",
     "coverage-analysis",
     "adversarial-review",
     "e2e-test-inspection",
@@ -39,6 +42,7 @@ MULTI_USE_SKILL_TARGETS = {
     "regression-testing": {"baseline / membership", "Run計画", "Run結果更新", "履歴参照"},
     "exploratory-testing": {"exploration", "investigation"},
     "qa-knowledge": {"triage", "create / update", "revalidation", "lookup / history"},
+    "usability-inspection": {"general", "scoped", "formal-handoff"},
 }
 
 PRIORITIES = {"高", "中", "低"}
