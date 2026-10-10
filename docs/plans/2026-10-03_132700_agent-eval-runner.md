@@ -102,10 +102,6 @@ Skillを変更した後に同じ評価ケースを実Agentで再実行し、既�
 - 十分な再現性・根拠・変更範囲・検証条件を満たしたSkill問題だけ、隔離したAgentが修正して同条件で再評価する。原因不明・証拠不足・高リスク案件はレビュー待ちに保存し、自動採用・push・PR作成・mergeは行わない
 - `description`による実Agent上のnative Skill発火評価は、クライアント固有の観測が必要なため今回の出力品質・workflow評価とは分離する。既存trigger datasetは維持し、今回のPlanだけでlive trigger最適化まで達成したとは扱わない
 
-### フェーズ3: 評価結果の自動分析・限定修正・再評価
-
-フェーズ1・2の実Agent評価結果を分析Agentが読み、修正可否条件を機械的に検査します。条件を満たすSkill単独の問題は修正Agentが隔離環境で最小修正し、関連テストと固定Evaluatorによる再評価で確認します。条件不足・高リスク・改善未確認の案件はレビュー待ちとして根拠付きで保存します。詳細は[自動分析・修正・再評価Plan](./2026-10-03_132700_agent-eval-runner_03_analysis-and-improvement.md)を正本とします。フェーズ1の共通ランナー実装を待たず、分析・振分けのfake Agentテストを並行して開発できます。
-
 ## フェーズ構成
 
 ### フェーズ1: 既存Eval Inputで実Agent生成を自動化する
@@ -130,6 +126,10 @@ PR #14で追加された3 Skillのsemantic caseも、固定Evaluator revisionに
 - Feature: Checkout / Payment
 
 フェーズ2は新しい汎用benchmark frameworkを作るものではありません。まず1つの固定repo・固定revision・固定Featureで実行し、追加の抽象化が必要かは実測後に判断します。
+
+### フェーズ3: 評価結果の自動分析・限定修正・再評価
+
+フェーズ1・2の実Agent評価結果を分析Agentが読み、修正可否条件を機械的に検査します。条件を満たすSkill単独の問題は修正Agentが隔離環境で最小修正し、関連テストと固定Evaluatorによる再評価で確認します。条件不足・高リスク・改善未確認の案件はレビュー待ちとして根拠付きで保存します。詳細は[自動分析・修正・再評価Plan](./2026-10-03_132700_agent-eval-runner_03_analysis-and-improvement.md)を正本とします。フェーズ1の共通ランナー実装を待たず、分析・振分けのfake Agentテストを並行して開発できます。
 
 ## 現在確認できている不足
 
@@ -744,7 +744,7 @@ Skill修正前後を比較するときは、少なくとも次が一致するrun
 
 比較対象として変えるのはSkill packageのrevisionとその内容fingerprintだけです。Skill数の増減自体は比較を一律に拒否する理由にせず、同じ固定Evaluatorと同じcaseが両revisionで評価できる範囲のみを比較します。一方のrevisionに存在しないSkill / caseや固定Evaluatorに評価caseがないSkillは未評価として明示し、その部分を改善・悪化・変化なしと判定しません。Skillの不存在はschema / 機械契約の`evaluator_incompatible`とは区別します。共通評価caseがない場合、当該比較は`not_comparable`です。**候補側production verifier / generator / assetsはSkill packageの一部なので、そのSHAの差は許容する**。候補ごとに同revision由来sourceで隔離再実行して鮮度・再現性を確認し、固定Evaluatorの採点規則と混同しない。候補のschema / 機械契約が固定Evaluatorと互換でない場合に限り該当部分を`evaluator_incompatible`とする。EvaluatorのSHAと採点基準は変えません。いずれかの設定が違う、未検証、またはSkill packageが同一なら、Skill変更による改善・悪化とは断定しません。provider側の隠れたmodel更新やSkill読み取りが観測不能な場合も限界を明記します。
 
-今回、比較結果の自動rankingや独自総合scoreは作りません。保存済みrunを人間または別Agentが以下の規則で比較できれば目的を満たします。
+今回、比較結果の自動rankingや独自総合scoreは作りません。以下の比較規則を改善処理が照合し、根拠付きの候補結果を保存します。自動判定が成立しない案件は人間のレビュー待ちにします。
 
 `.agent-eval-runs/`は`.gitignore`へ追加し、実Agent出力・ログ・Judge結果を通常commit対象にしません。
 
@@ -965,7 +965,7 @@ live Codexでは、実効設定の確認とEvaluator-onlyの非秘密sentinel読
 
 1. **実際の問題を選ぶ**：フェーズ2の固定Checkout / Payment scenarioの実Agent baselineから、固定grader / Referenceと原成果物で裏付けられた**修正可能なSkill起因の品質問題**を分析Agentが選ぶ。対象criterion・違反根拠・該当Skill・実行条件を保存し、機械的な許可条件で自動修正可能か判定する。判定不能な場合はレビュー待ちにする。Agentの単発のばらつき、Judgeの誤判定、証拠欠落、Evaluator / 実行環境の障害だけをSkill欠陥と見なさない。**わざと壊したSkill・人工的に劣化させたbaseline・Evaluator-only fixtureを改善実証の対象にしない**。
 2. **baselineを確定する**：修正前Skill revisionを40文字Git SHAと内容fingerprintで特定し、同じ固定Evaluator / datasetまたはscenario / target / Agent・Judge実効profile / 隔離条件で**2attempt以上**評価する。改善対象に選んだ失敗が再現せず、品質問題と認められない場合は改善実証に使わない。実行結果・原成果物・Judge evidenceと機械判定・Skill使用証拠を保存する。
-3. **Skillだけを修正する**：機械的な自動修正条件が全て成立する場合は隔離した修正Agentが、成立しない場合はレビュー待ちとし、人間の判断後に、判明した原因に対して**該当Skillの`SKILL.md` / `references/**` / `scripts/**` / `assets/**`の必要な箇所だけ**を修正する。変更内容と根拠、既存Skillの契約 / portability / 関連テストへの影響を確認する。実行用の固定Evaluator checkout、rubric、Reference、grader、target revision、scenario、Agent / Judge設定を改善効果が出るように変更しない。評価対象の候補は**PR #17の実装branchとは別のローカルworktree / branchでcommitして、独立した候補Git SHAを作る**。改善候補をこのPRへ自動取り込み・push・採用しない。
+3. **Skillだけを修正する**：自動修正条件が全て成立する場合、隔離した修正Agentが**該当Skillの`SKILL.md` / `references/**` / `scripts/**` / `assets/**`の必要な箇所だけ**を変更する。成立しない場合は実装せずレビュー待ちへ分け、人間の判断に委ねる。変更内容と根拠、既存Skillの契約 / portability / 関連テストへの影響を確認する。実行用の固定Evaluator checkout、rubric、Reference、grader、target revision、scenario、Agent / Judge設定を改善効果が出るように変更しない。評価対象の候補は**PR #17の実装branchとは別のローカルworktree / branchでcommitして、独立した候補Git SHAを作る**。改善候補をこのPRへ自動取り込み・push・採用しない。
 4. **同条件で再評価する**：変更後の候補revisionについて同じ固定条件で**2attempt以上**の実Agent評価を実施する。変更前後は候補Skill revision以外の比較条件を一致させ、両revisionのSkill使用観測・個別criterion ratingと根拠・固定機械判定・runtime証拠・実行エラーを比較する。候補sourceの実装fingerprint差だけでFAILにせず、互換性が失われたcriterionを品質改善に数えない。Evaluator基準の不具合が見つかり改訂を要するときは、**修正後の単一Evaluatorでbaseline / candidate双方を最初から再実行**する。
 5. **改善成立を確認する**：対象とした重要criterionまたは固定機械品質について、複数attemptの評価・原成果物・規範根拠から**一貫した実質的な向上**が確認でき、他の重要criterionや既存契約に明確な回帰がなく、修正対象Skillの実使用証拠が両revisionにある場合のみ「Skill改善を実証」と報告する。PASS件数だけ、Judgeによる印象評価、総合点、1回の偶然のPASSでは実証しない。修正後の通常Skillテストと必要な回帰テストも実施する。使用証拠・評価結果が不十分または矛盾する場合は、成果物品質の比較とSkill改修効果を分けて「判断不能」と記録する。
 6. **未達を隠さない**：初回に改善が認められなければ原因を確認し、既存の受入検証範囲で有効な問題・修正候補があるなら再検証する。実際に改善を確認できない、または修正可能な実問題が見つからない場合は**「ランナー・比較機能は検証済み／実Skill改善の実証は未達」**として、対象run、試した変更、根拠、障害と残課題を明記する。架空の失敗や基準緩和で達成扱いにしない。

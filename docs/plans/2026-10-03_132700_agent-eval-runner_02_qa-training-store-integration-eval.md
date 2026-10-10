@@ -663,7 +663,7 @@ schemaやEntity表現が変更され、既存Evaluatorでは判定不能な場�
 - fixtureの読込み、対象criterionへの配線、結果正規化・統合は**外部LLMを呼ばないfake Judge / fake Agentの通常CI**で確認する。実際のJudgeの意味判別は既存の**実Codex smoke / Judge受入検証**で確認する。必要な修正でJudge prompt・rubric・Reference等のEvaluator基準を変更した場合は新Evaluator revisionとして固定し、旧・新Skillを同一条件で再評価する。自動Judge校正・学習基盤、新規採点式、DB、常時LLM CIは追加しない。
 
 
-実際のSkill修正・再評価の詳細な手順と判定条件は、親Planの「実際のSkill改善と再評価の受入検証」を正本とする。新規の自動Skill修正処理、改善結果の自動採用、採点基準の緩和は追加しない。
+実際のSkill修正・再評価の詳細な手順と判定条件は、親Planの「実際のSkill改善と再評価の受入検証」および改善Planを正本とする。根拠が十分な案件の隔離修正と再評価は自動化するが、改善結果の自動採用、採点基準の緩和は行わない。
 
 ## このフェーズで追加しないもの
 
