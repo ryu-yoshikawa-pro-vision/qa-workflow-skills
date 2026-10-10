@@ -629,6 +629,7 @@ Agent executionは、Eval dataset由来のpromptでも、固定対象repo向けp
 - workflow結果と、Skill package投入の検証済み証拠および変更対象Skillの内部読取観測（`observed` / `unverified`）を独立して保存する。内部観測不能でも同じ条件での**成果物品質比較**はできるが、**Skill改修効果**は判断不能とする。複数attemptで結果が矛盾する場合も改善・悪化・変化なしと断定しない
 - **フェーズ2の実際の品質問題を分析Agentが分析し、機械的な許可条件を満たす案件について修正AgentがSkillを1件以上修正した候補revision**について、baseline / candidateを各2attempt以上で同条件評価し、特定の重要criterionまたは機械品質の実質的改善・重要観点に回帰がないこと・Skill実使用証拠を確認できる。改善が確認できない場合は、ランナー機能の成立と**実改善の実証未達**を区別して報告し、実証済みとは扱わない
 - traceability / runtimeの機械判定結果が保存される
+- Judge評価用の正解データをAIが作成・修正提案できる一方、確認済みの期待判定を変更するには独立の確認が必要である。未検証criterionのJudge判定から自動Skill修正を開始しない
 - `QTS-SEM-001..010`の固定criterion ID / critical / Reference対応により独立Judgeを検証する。`QTS-SEM-001/002`と`QTS-SEM-003..010`を**別prompt・別process**で採点し、後者には`routing[]`・最終stdout・機械判定要約が一切含まれないことを検査する。2応答のID集合と結合後の全10件を検証し、誤ID・重複・一方のtimeout / 不正応答では全体PASSにしない。正常例・Payment整合違反例・仕様外動作例に加え、**未検証のcritical 7件それぞれの重大違反例**で期待rating・Reference根拠・Judge evidenceを確認する
 - runner / environment errorとSkill品質のneeds_review / failを区別できる
 - 非pass結果を隠さず保存・報告できる
@@ -643,6 +644,8 @@ schemaやEntity表現が変更され、既存Evaluatorでは判定不能な場�
 
 ### Judgeの検出能力の受入検証
 
+Judge基準・正解データの作成と継続改善の詳細は[Judge評価・改善Plan](./2026-10-03_132700_agent-eval-runner_04_judge-evaluation-and-improvement.md)を正本とする。フェーズ2のfixtureは確認済み事例として再利用し、調整用と独立検証用の役割を区別する。Judgeの該当criterionが未検証なら、Skillの品質結果は保存してもSkill自動修正へ進めずレビュー待ちにする。
+
 固定target revisionの正常なQA成果物を基準に、**Evaluator-only fixture**でJudgeの検出能力を確認する。従来の正常例、`QTS-SEM-006`のPayment整合違反例、`QTS-SEM-010`の仕様外動作例を維持し、未検証の**critical 7件**に対する代表的な重大違反例を追加する。
 
 | 対象criterion | 重大違反fixtureで変更する内容 |
@@ -655,11 +658,12 @@ schemaやEntity表現が変更され、既存Evaluatorでは判定不能な場�
 | `QTS-SEM-007` | Payment processing中のretry / cancel禁止やresume条件に反する操作を許容する |
 | `QTS-SEM-009` | IDとedgeは形式上正しいまま、Authorityと下流TCを**別の要求の意味**で結び付け、重大なtraceability不整合を発生させる |
 
-- 正常例を基礎に**対象の誤りだけ**を加える。入力は実際のAgent-visible targetへ配置せず、Evaluatorだけが参照する。各fixtureに対象criterion、変更箇所、期待rating、期待evidence、規範Referenceの該当箇所とその根拠を保存する。期待判定はJudgeに作らせず、Checkout / Payment仕様とSkill契約を理解した**人間が確認**する。
+- 正常例を基礎に**対象の誤りだけ**を加える。入力は実際のAgent-visible targetへ配置せず、Evaluatorだけが参照する。各fixtureに対象criterion、変更箇所、期待rating、期待evidence、規範Referenceの該当箇所とその根拠を保存する。**Agentはfixture・期待判定・rubric / Referenceの初期案や改善案を作ってよい**。ただし期待判定を正解として使うには、人間による規範仕様・Skill契約との照合、または当該事実を直接確定できる決定論的検証が必要であり、Judge自身の判定を正解にしない。
 - `001/002`ではworkflow Judgeへ、`003/004/005/007/009`ではQA成果物Judgeへ、該当入力区分の違反だけを渡す。既存の**2系統のJudge入力分離・全10件統合判定**の契約は維持する。各fixtureの意味評価では対象criterionを含むJudge呼び出しを中心に実行でき、配線・統合の検証まで目的なく両Judgeを毎回起動する必要はない。
 - 重大違反fixtureは、**形式的なID欠落やmachine-onlyな失敗を加えただけの例にしない**。Judgeが意味上の違反を判別できる内容にする。`001/002`ではrouting判断・最終宣言と規範 / 正規成果物の矛盾を確認し、`009`では固定機械判定が構造上PASSし得る状態の意味的な誤対応を確認する。
 - 正常fixtureは全criterionがrating 3以上、重大違反fixtureは**対象critical criterionがrating 1**、全体の期待判定は既存`result.py`により`fail`とする。`evaluable=false`やrating 2 / 3で重大な違反を救済した結果は受入成功としない。`QTS-SEM-008`（noncritical）の違反fixtureはこの拡充の対象外とし、通常の評価は継続する。
 - **最終回答だけが正しく、正規QA成果物のPayment失敗条件が誤っているfixture**でも、`QTS-SEM-006`の成果物Judgeが最終回答で救済されないことを確認する。各fixtureで実際のJudge rating / reason / evidenceを記録し、人間確認済みの根拠と照合する。Judgeの判定が一致しない・繰り返しで重要判定が揺れる場合は、判定根拠とrubric / Referenceを調査して受入を保留する。
+- AIが作成したJudge基準・fixture・期待判定の候補は、確認済みの正解データと混同せず、根拠と確認状態を記録する。Judge改善時は独立検証用事例でも回帰がないかを確認し、人間が正式採用する
 - fixtureの読込み、対象criterionへの配線、結果正規化・統合は**外部LLMを呼ばないfake Judge / fake Agentの通常CI**で確認する。実際のJudgeの意味判別は既存の**実Codex smoke / Judge受入検証**で確認する。必要な修正でJudge prompt・rubric・Reference等のEvaluator基準を変更した場合は新Evaluator revisionとして固定し、旧・新Skillを同一条件で再評価する。自動Judge校正・学習基盤、新規採点式、DB、常時LLM CIは追加しない。
 
 

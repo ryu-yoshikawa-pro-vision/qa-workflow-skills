@@ -27,11 +27,11 @@ PR #11の検証では`codex exec`で評価対象成果物を生成し、既存�
 
 ### 最終目的
 
-このPlanの最終目的は、`qa-workflow-skills`の実Agent評価結果を**自動分析し、根拠が十分で安全に限定できるSkill起因の問題をAgentが修正・再評価して、改善が確認された候補を保存すること**です。原因不明・根拠不足・高リスク・改善未確認の案件はレビュー待ちに分けます。変更前後は同じEvaluatorと実行条件で比較し、検証済み候補でも採用は人間が決めます。
+このPlanの最終目的は、**SkillとJudgeの双方を評価・継続改善できること**です。AIが評価基準・正解データの候補を初期作成・改善し、独立に検証したJudgeでSkill品質を評価します。その結果を自動分析し、根拠が十分で安全に限定できるSkill起因の問題だけをAgentが修正・再評価して、改善が確認された候補を保存します。原因不明・根拠不足・高リスク・改善未確認の案件はレビュー待ちに分けます。変更前後は同じEvaluatorと実行条件で比較し、検証済み候補でも採用は人間が決めます。
 
 今回作るものはSkillを実行する新しいAgent runtimeではありません。Codex、Claude Code等が持つAgent runtimeをそのまま使い、`qa-workflow-skills`側にはQA Skillの評価に必要な最小の実行・記録経路だけを追加します。
 
-また、現在すでに存在するdeterministic / semantic / trigger / routing / runtime評価を置き換えません。実Agent生成・評価・保存に加え、結果の分析と限定した修正・再評価を既存評価へ接続します。native triggerの実Agent評価は引き続き対象外です。
+また、現在すでに存在するdeterministic / semantic / trigger / routing / runtime評価を置き換えません。Judge自体の検証・改善は既存rubric・Reference・fixtureを活用し、正解データの確定とJudge候補の採用は人間または独立した決定論的な根拠を必要とします。実Agent生成・評価・保存に加え、結果の分析と限定した修正・再評価を既存評価へ接続します。native triggerの実Agent評価は引き続き対象外です。
 
 完成後は、少なくとも次の改善ループを同じ仕組みで繰り返せる状態にします。
 
@@ -39,6 +39,8 @@ PR #11の検証では`codex exec`で評価対象成果物を生成し、既存�
 現在のSkill
   ↓
 固定した評価条件で実Agent実行
+  ↓
+確認済み正解データでJudgeを検証
   ↓
 既存評価 + 固定テスト対象評価
   ↓
@@ -99,6 +101,7 @@ Skillを変更した後に同じ評価ケースを実Agentで再実行し、既�
 - 評価対象AgentへReference / expected / rubric / grader等の評価正解情報を公開しない
 - `qa-training-store`固有処理をSkill本体へ入れない
 - 現在必要な1つの固定targetを評価するためだけに、汎用plugin framework、DB、MCP、LangGraph等を追加しない
+- AIがJudge基準・正解データの候補を作成・改善できる一方、規範仕様と確認済み期待判定は勝手に変更しない。検証済みJudgeの該当criterionだけをSkill自動修正の根拠にする
 - 十分な再現性・根拠・変更範囲・検証条件を満たしたSkill問題だけ、隔離したAgentが修正して同条件で再評価する。原因不明・証拠不足・高リスク案件はレビュー待ちに保存し、自動採用・push・PR作成・mergeは行わない
 - `description`による実Agent上のnative Skill発火評価は、クライアント固有の観測が必要なため今回の出力品質・workflow評価とは分離する。既存trigger datasetは維持し、今回のPlanだけでlive trigger最適化まで達成したとは扱わない
 
@@ -126,6 +129,10 @@ PR #14で追加された3 Skillのsemantic caseも、固定Evaluator revisionに
 - Feature: Checkout / Payment
 
 フェーズ2は新しい汎用benchmark frameworkを作るものではありません。まず1つの固定repo・固定revision・固定Featureで実行し、追加の抽象化が必要かは実測後に判断します。
+
+### フェーズ横断: Judgeの独立評価・改善
+
+評価基準・正解データの初期案・改善案はAIが作成します。人間または決定論的な根拠で確認済みの評価事例を使いJudgeを検証し、未検証のcriterionを根拠にSkillを自動修正しないようにします。Judge改善の候補は調整に使わなかった独立検証用事例でも確認し、採用は人間が判断します。詳細は[Judge評価・改善Plan](./2026-10-03_132700_agent-eval-runner_04_judge-evaluation-and-improvement.md)を正本とします。これはフェーズ1・2の評価とフェーズ3のSkill改善可否に適用する条件です。
 
 ### フェーズ3: 評価結果の自動分析・限定修正・再評価
 
@@ -679,6 +686,9 @@ Judgeの非秘密command fingerprint、image / CLI / model / 推論設定、実�
 
 ## 結果保存
 
+Judgeの検証結果は改善用判定と分けて`judge-validation/`に保存します。正解データの状態とEvaluator / Judge profileのfingerprintを記録し、未検証ならSkill自動修正の許可に使いません。[Judge評価・改善Plan](./2026-10-03_132700_agent-eval-runner_04_judge-evaluation-and-improvement.md)参照。
+
+
 既存の評価run成果物は変更しません。改善工程は同じ`--output-root`配下の`improvement/`に`analysis.json`・`analysis.md`、検証済み候補と`review-pending/`、修正・再評価結果を別保存します。分析Agentによる原判定の上書きは禁止します。
 
 `--output-root`配下へ、少なくとも次を保存します。
@@ -794,6 +804,7 @@ batchは途中1件が失敗しても残りcaseを実行し、最後に全体結�
 - `scripts/skills/evals/agent/executor.py`
 - `scripts/skills/evals/agent/run.py`
 - `scripts/skills/evals/agent/improve.py`（保存済み評価結果の分析、修正可否判定、隔離修正、再評価、レビュー待ち保存）
+- `scripts/skills/evals/agent/judge_validation.py`（Judgeの独立検証・改善案作成・再検証・レビュー待ち保存）
 - `scripts/skills/evals/agent/prompt_builder.py`
 - `scripts/skills/evals/agent/workspace.py`
 - `scripts/skills/evals/agent/qa_training_store.py`
@@ -827,6 +838,8 @@ batchは途中1件が失敗しても残りcaseを実行し、最後に全体結�
 `semantic-output-evals.yml`へ外部LLM実行は追加しません。
 
 ## テスト
+
+Judge正解データの承認状態、重大欠陥の見逃し、正常例の誤検出、判定の揺れ、Judge改善候補の独立検証、未検証criterionによるSkill自動修正の拒否を確認します。詳細は[Judge評価・改善Plan](./2026-10-03_132700_agent-eval-runner_04_judge-evaluation-and-improvement.md)に従います。
 
 自動分析・修正可否・安全な隔離変更・レビュー待ち・再評価のfake Agentテストと、実Agentによる1件の修正受入検証を追加します。詳細と正常・拒否・未改善ケースは[改善Plan](./2026-10-03_132700_agent-eval-runner_03_analysis-and-improvement.md)を参照してください。通常CIで外部LLMは起動しません。
 
@@ -997,7 +1010,7 @@ git diff --check
 
 ## 実装順序
 
-共通ランナーとフェーズ2の評価を成立させた後、保存済みrunを使った`improve.py`の分析・振分け、修正Agentの隔離実行、関連テスト・同条件再評価を追加します。分析・修正を行うときもEvaluatorとtargetの固定境界を変更しません。
+共通ランナーとフェーズ2の評価を成立させ、Judgeの独立検証が成立したcriterionから、保存済みrunを使った`improve.py`の分析・振分け、修正Agentの隔離実行、関連テスト・同条件再評価を追加します。分析・修正を行うときもEvaluatorとtargetの固定境界を変更しません。
 
 1. branch開始時点が基準`main`から意図しない差分を持たないことを確認する
 2. 固定Evaluator checkoutのclean状態・grader / Judge条件を確定し、候補Skill revisionのtracked contentから一時実行ディレクトリを作る
@@ -1088,6 +1101,7 @@ native trigger評価は、Skill activationを観測する方法がAgentクライ
 - 実Codexの非pass結果がある場合、その結果を隠さず保存・報告できる
 - 各live runにSkill revision、評価入力 / scenario fingerprint、Agent名 / model等の比較に必要なprovenanceが保存される
 - 2つの実runでEvaluator・入力・Judge・`agent.timeout_seconds`を含む実効Agent profile・隔離・repeatを照合する。成果物品質の比較とSkill改修の効果判断は別々に記録し、改修効果は変更対象Skillの使用証拠と複数attemptの一貫した根拠がある場合だけ判断する。未観測・矛盾する場合は判断不能とし、厳密な因果証明は主張しない
+- **AIが評価基準と正解事例の候補を作成でき、確認済み事例と未確認候補を分離してJudgeを独立検証し、不一致・失効・基準不足のcriterionからSkill自動修正を開始しない**。Judge改善の候補を調整用・独立検証用事例の双方で確認し、採用を人間に留保できる
 - **自動分析・機械的な修正可否判定・レビュー待ち保存が成立し、条件に合致する実際のSkill欠陥をbaseline評価から1件以上特定して、隔離した修正Agentが候補revisionを作り、同条件で再評価する受入検証**を実施している。比較する各revisionを2attempt以上評価し、重要品質の改善・回帰・使用証拠を原成果物と固定Referenceから確認できる。改善が確認できない場合は未達として記録し、実改善の証拠なしにPlan全体の改善実証を完了扱いしない
 - 同一Evaluatorで正常・重要欠落・捏造のQA成果物を判別できた根拠とrepeatの揺れを保存する
 - 互換なruntime implementation更新がfingerprint相違だけを理由に非passとならず、真の契約非互換を個別criteriaへ区分できる
