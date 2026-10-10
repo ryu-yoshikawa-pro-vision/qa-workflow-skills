@@ -105,6 +105,7 @@
 固定`qa-training-store`のCheckout / Paymentは実務に近い**評価入力**であり、その案件の正解をSkill本体へ埋め込むための学習資料ではない。評価時は案件固有の規範仕様・業務ルール・期待動作をReferenceや評価対象repoから取得してよいが、Skill修正では**仕様から必要な条件を導出する手順・判断・汎用的な検証処理**を優先する。
 
 - 修正Agentは差分の各変更について、根拠となる既存Skill契約・失敗criterionと、**案件非依存の理由**を示す。`qa-training-store`の画面名、特定の決済状態、期限、金額、scenario ID、期待結果の丸暗記を、対象案件専用Skillでもない汎用Skillの指示・scriptへ追加して失敗を隠す変更は認めない。もともと案件固有・ドメイン固有であると明示されたSkillの要件まで、機械的に一般化しない。
+- **修正候補を生成する前**に、修正・原因分析に使用するcaseと独立した回帰確認に使用する既存の別caseを、case IDとEval Input fingerprintで固定する。別caseの入力・expected・事例別失敗根拠を分析Agent / 修正Agentへ渡さず、候補差分を固定した後にEvaluator側で確認する。独立検証の事例別結果を修正Agentへ繰り返し開示し、同じ候補を再調整させない。独立性が失われた場合は未使用の別caseで再評価するかレビュー待ちとする。公開caseのモデル事前学習への混入まで防げたとは主張しない。
 - 固定シナリオの改善と、汎用Skillの回帰確認は**別の根拠**として記録する。修正に使ったケースではbaseline / candidateを同条件で比較し、別に、**修正案の作成・原因分析へ投入していない既存の関連Eval Input**があれば、その別caseについても同じ固定Evaluator・入力・実行条件でbaselineとcandidateをそれぞれ実Agent評価し、修正前から存在した不合格を新たな回帰と混同せず差分を確認する。対象Skillの既存deterministic / semantic / workflow・runtime契約テストは影響範囲に応じて実行し、重要なcriterionの悪化・既存契約の後退を確認する。
 - 修正前から存在する別caseを回帰確認に使い、特定案件で使うReferenceの値を別caseへ強制しない。別caseの採点基準・入力は候補修正に合わせて変更しない。未使用の別caseがない、Agent実行条件を揃えられない、重要結果が揺れる場合は**汎用性を確認できていない**と記録してレビュー待ちにする。固定シナリオだけで改善したことを、Skill全体の品質改善や他案件への適用性の証明として報告しない。
 - 別のtarget repo・新規サンプルアプリ・全Skillに共通する大型ベンチマークはこのPlanの必須条件にしない。既存評価ケースが不足している事実はレビュー待ちに残し、実際の別案件への適用を保証するときにはその案件で検証する。Judgeの正解データについても、[Judge評価・改善Plan](./2026-10-03_132700_agent-eval-runner_04_judge-evaluation-and-improvement.md)の独立検証用事例を維持する。
@@ -133,7 +134,7 @@
 - Agentが差分を作った後に、許可path、対象Skillの単一性、不正なリンク・ファイル境界、既存契約の検証結果を確認します。意味上の契約後退を機械検証だけで否定できない場合はレビュー待ちにします。違反した候補の差分は元branchに反映せず、診断情報を保存します。
 - **1案件の同じ候補に対する自動修正は1回**とし、別案件は依存関係と全体上限を照合して続行します。無限修正ループを作りません。Agent timeout・最大変更範囲・使用する実行profileはrun開始時に固定します。修正失敗時の繰返しはユーザーが別runとして明示的に起動します。
 - 必要な関連Skillテスト、既存deterministic / semantic / runtime検査、ポータビリティ確認を行います。加えて、[案件固有の評価とSkillの汎用性](#案件固有の評価とskillの汎用性)に従い修正に使っていない別caseでも回帰を確認します。必要な検証を実行できない場合は自動改善済みにしません。
-- 候補SkillのGit revisionとfile hashを独立して固定した後、**元の固定Evaluator・target・入力・Agent / Judge profile・隔離条件**でbaseline / candidateを各2attempt以上評価します。必要なSkill使用証拠がない場合、Skill修正が原因の改善とは断定しません。
+- 候補SkillのGit revisionとfile hashを独立して固定した後、**元の固定Evaluator・target・入力・Agent / Judge profile・隔離条件**でbaseline / candidateを各2attempt以上評価します。2attemptは最低限の再現確認であり、統計的な安定性を証明しません。重要判定が揺れた場合は全attemptを保存してレビュー待ちにし、追加の成功試行や多数決で矛盾を帳消しにしません。追加試行は既存`--repeat`と実行上限内で原因調査に限り、baseline / candidateの条件を揃えて記録します。必要なSkill使用証拠がない場合、Skill修正が原因の改善とは断定しません。
 - 重要なcriterionまたは機械品質に一貫した実質的な改善があり、他の重要観点・既存契約の回帰がなく、比較条件が揃い、上記検証が全て成立する場合だけ、候補を検証済みとします。修正Agentの「直った」という説明だけでは判断しません。
 - 評価基準を変える必要が出た場合は修正候補を自動採用しません。固定Evaluatorを改訂するかはレビュー待ちとし、必要なら両Skill revisionを新Evaluatorで改めて評価します。
 - 候補は再現可能なpatch・候補revision・テスト結果・比較結果とともに保存し、元のbaselineを変更しません。検証済みでもmain / PRへ自動取り込みません。
@@ -174,8 +175,9 @@ improvement/
 - 変更許可範囲外、Evaluator / expected / rubric / target変更、テスト無効化・基準緩和は拒否する
 - 修正Agentのtimeout・異常終了・許可外差分でも元Evaluator・target・作業ツリーを変更しない
 - 候補のテスト失敗、再評価未改善、回帰、結果の揺れ、使用証拠不足、既存の別caseでの汎用性未確認は改善済みにせずレビュー待ちに残す
-- 汎用Skillへ固定案件の期待値を直接埋め込んだ候補を拒否し、同一案件の改善・未使用の別caseの回帰・既存契約テストを別々に記録する
+- 汎用Skillへ固定案件の期待値を直接埋め込んだ候補を拒否し、同一案件の改善・候補生成前に固定した未使用別caseの回帰・既存契約テストを別々に記録する。独立検証用の入力・期待判定・事例別結果が修正Agentへ漏れた場合は独立検証済みとして扱わない
 - 別caseが修正前からfailでも、それだけでcandidateの回帰とはしない。baseline / candidateの同条件比較で新たな悪化を判定し、別case不足・比較不能・重大な悪化があれば検証済み候補としない
+- 重要criterionの判定が複数attemptで矛盾した場合、追加PASSや多数決で改善済みとはせず、全試行と診断を保存してレビュー待ちにする
 - 全条件成立時はpatch・候補revision・関連テスト・baseline / candidateのrepeat比較が保存され、元runが不変
 - `--analyze-only`は実ファイルを書き換えず分析・レビュー待ちだけ生成する
 - レビュー待ちAが独立案件Bを止めず、Aに依存するCは停止する。残案件がA・Cのみなら全体停止し、判断済みの別runで再開できる
@@ -184,3 +186,11 @@ improvement/
 - native trigger・自動push / PR・merge・外部LLM CIは実行されない
 
 実Codex smokeでは、実際の評価結果から分析のみの経路と、**確認済みのSkill起因問題1件に対する自動修正・同条件の再評価**まで実行します。適格な実問題を特定できず自動修正できなかった場合は、分析・振分け機能の成立と自動改善実証の未達を別々に報告します。合格させるための人工的なbaseline劣化やJudge基準緩和は行いません。
+
+## 研究根拠と採用判断
+
+- [SkillsBench (2026)](https://arxiv.org/abs/2602.12670)、[SWE-Skills-Bench (2026)](https://arxiv.org/abs/2603.15401)：Skillの効果はタスク依存で、逆効果も起こり得る → 案件固有の期待値をSkillへ埋め込まず、未使用caseで回帰確認する。Skillなし／ありの自動比較は本Planの必須対象にしない。
+- [τ-bench (2024)](https://arxiv.org/abs/2406.12045)：Agentの反復試行による安定性の評価 → 2attemptを最低限の再現確認として扱い、揺れを隠さない。
+- [OpenAIのSWE-bench Verifiedに関する調査 (2026)](https://openai.com/index/why-we-no-longer-evaluate-swe-bench-verified/)：正しい解を拒否する評価と評価情報の汚染 → 独立事例を隔離し、正解データ自体の問題は[Judge評価・改善Plan](./2026-10-03_132700_agent-eval-runner_04_judge-evaluation-and-improvement.md)で再審査する。
+
+論文の効果量や実験上の試行回数を、このPlanの保証値・閾値に転用しない。
