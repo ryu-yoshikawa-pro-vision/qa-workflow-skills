@@ -664,7 +664,7 @@ Judge基準・正解データの作成と継続改善の詳細は[Judge評価・
 - 正常fixtureは全criterionがrating 3以上、重大違反fixtureは**対象critical criterionがrating 1**、全体の期待判定は既存`result.py`により`fail`とする。`evaluable=false`やrating 2 / 3で重大な違反を救済した結果は受入成功としない。`QTS-SEM-008`（noncritical）の違反fixtureはこの拡充の対象外とし、通常の評価は継続する。
 - **最終回答だけが正しく、正規QA成果物のPayment失敗条件が誤っているfixture**でも、`QTS-SEM-006`の成果物Judgeが最終回答で救済されないことを確認する。各fixtureで実際のJudge rating / reason / evidenceを記録し、人間確認済みの根拠と照合する。Judgeの判定が一致しない・繰り返しで重要判定が揺れる場合は、判定根拠とrubric / Referenceを調査して受入を保留する。
 - AIが作成したJudge基準・fixture・期待判定の候補は、確認済みの正解データと混同せず、根拠と確認状態を記録する。Judge改善時は独立検証用事例でも回帰がないかを確認し、人間が正式採用する
-- fixtureの読込み、対象criterionへの配線、結果正規化・統合は**外部LLMを呼ばないfake Judge / fake Agentの通常CI**で確認する。実際のJudgeの意味判別は既存の**実Codex smoke / Judge受入検証**で確認する。必要な修正でJudge prompt・rubric・Reference等のEvaluator基準を変更した場合は新Evaluator revisionとして固定し、旧・新Skillを同一条件で再評価する。自動Judge校正・学習基盤、新規採点式、DB、常時LLM CIは追加しない。
+- fixtureの読込み、対象criterionへの配線、結果正規化・統合は**外部LLMを呼ばないfake Judge / fake Agentの通常CI**で確認する。実際のJudgeの意味判別は既存の**実Codex smoke / Judge受入検証**で確認する。必要な修正でJudge prompt・rubric・Reference等のEvaluator基準を変更した場合は新Evaluator revisionとして固定し、旧・新Skillを同一条件で再評価する。Judgeの自動採用・自動学習基盤、新規採点式、DB、常時LLM CIは追加しない。Judgeの検証と改善候補の作成・再検証はJudge評価・改善Planで扱う。
 
 
 実際のSkill修正・再評価の詳細な手順と判定条件は、親Planの「実際のSkill改善と再評価の受入検証」および改善Planを正本とする。根拠が十分な案件の隔離修正と再評価は自動化するが、改善結果の自動採用、採点基準の緩和は行わない。
