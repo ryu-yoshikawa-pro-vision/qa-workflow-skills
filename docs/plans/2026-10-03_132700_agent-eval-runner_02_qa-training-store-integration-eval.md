@@ -6,7 +6,7 @@
 
 このフェーズの目的は「実repoで一度動かすこと」ではありません。固定したtarget revision、評価要求、Agent / model、Judge条件を使って複数Skillのworkflowを実行し、結果を保存し、**実際に発見した品質問題に対してSkillを修正して同条件で再評価し、改善効果を検証する**ことまで含みます。初回評価はbaselineとし、改修前後の証拠を別々に保持します。
 
-初回評価結果はSkill改善のbaselineとして利用します。ただし、**実際の改修は人間または別Agentがランナー外で行い**、このフェーズで自動rankingや自動Skill修正は行いません。比較対象は明示的に使用を要求したSkillによる**分析・設計workflowの成果物品質**です。19 Skillすべての実環境動作、native trigger精度、ブラウザE2Eの品質まで保証したとは扱いません。
+初回評価結果はSkill改善のbaselineとして利用します。ただし、**実際の改修は人間または別Agentがランナー外で行い**、このフェーズで自動rankingや自動Skill修正は行いません。比較対象は明示的に使用を要求したSkillによる**分析・設計workflowの成果物品質**です。リポジトリ内の全Skillの実環境動作、native trigger精度、ブラウザE2Eの品質まで保証したとは扱いません。
 
 ## 対象
 
@@ -143,7 +143,7 @@ sanitized targetはworking treeのfilesystem copyではなく、固定source rev
 
 `qa-training-store`には既存の`.agents/skills/`があります。さらに現在の`AGENTS.md`は`feature-plan`、`code-review`、`repair-loop`、`harness-improvement`、`exploratory-qa`等のrepo固有Skillへroutingする契約を持ち、`QA_AGENT.md`も`exploratory-qa`とAgentic QA Harnessを前提にします。
 
-これらをそのまま残して`.agents/skills/`だけ除外すると、「利用を要求するSkillが存在しない」矛盾したtargetになります。また、元repo固有Skillが見える状態では今回評価したい19 Skill以外がroutingへ影響します。
+これらをそのまま残して`.agents/skills/`だけ除外すると、「利用を要求するSkillが存在しない」矛盾したtargetになります。また、元repo固有Skillが見える状態では候補revisionから取得したSkill集合以外がroutingへ影響します。
 
 そのため、初回評価では固定revisionのtracked contentからsanitized targetを作り、Agent-visibleな情報を次のように分けます。
 
@@ -189,7 +189,7 @@ sanitized targetのrootにはEvaluatorが最小の評価用`AGENTS.md`を生成�
 評価用`AGENTS.md`には、今回の評価に必要な次だけを記載します。
 
 - 対象はCheckout / PaymentのWeb範囲
-- Agent-visibleなSkillはEvaluatorが配置した`qa-workflow-skills`の19 Skillだけ
+- Agent-visibleなSkillはEvaluatorが配置した`qa-workflow-skills`の候補revisionから取得したSkill集合だけ
 - 規範仕様の優先順位は`docs/spec/README.md`に従う
 - Product Code、既存Product Test、規範仕様を変更しない
 - 評価成果物の書込みはEvaluatorが指定した`.qa-eval-output/`だけに限定する（source / Skill / 評価用設定はDockerで書込み禁止）
@@ -206,7 +206,7 @@ sanitized targetのrootにはEvaluatorが最小の評価用`AGENTS.md`を生成�
 - 元repoの`feature-plan`、`.codex/runs/`、hooks、元Skill発火経路、過去の結果を参照させない。生成したファイルはAgent開始前baselineへ含める。
 - 実際の`artifact_graph.py`のProject Context parse / 必須key検証と、評価用rootの解決に通ることをfake Agent testで確認する。検証に失敗した場合はAgentを起動しない。
 
-その上で、今回評価する`qa-workflow-skills`の19 Skillだけをsanitized targetの`.agents/skills/<skill-name>/`へ配置します。配置元は評価対象`qa-workflow-skills` revisionの`skills/<skill-name>/`であり、各Skillの`evals/**`はコピーしません。
+その上で、今回評価する`qa-workflow-skills`の候補revisionから取得したSkill集合だけをsanitized targetの`.agents/skills/<skill-name>/`へ配置します。配置元は評価対象`qa-workflow-skills` revisionの`skills/<skill-name>/`であり、各Skillの`evals/**`はコピーしません。固定scenarioはSkillの名前や件数を固定せず、候補revisionから取得した実際の集合をrunのmanifestへ記録します。要求成果物の担当Skillが候補revisionに存在しない場合は、該当成果物を補完せず、評価不能な範囲を明示します。必須成果物の欠落を無条件に許容するわけではありません。
 
 フェーズ2のtaskは`qa-workflow`利用を明示するため、このrun自体をnative trigger精度の評価には使いません。`.agents/skills/`へ配置するのは、実際のCodex等で利用するときに近いSkill package形態で複数Skill workflowを実行するためです。
 
@@ -223,7 +223,7 @@ sanitized targetは単なるファイルコピーであり、`cwd`の変更だ�
 
 分析・設計評価ではProduct Code、既存Product Test、規範仕様を変更しません。
 
-sanitized targetの構築、評価用`AGENTS.md`、19 Skill、評価用Project Contextの配置が完了した時点を**Agent開始前baseline**とします。
+sanitized targetの構築、評価用`AGENTS.md`、候補revisionから取得したSkill集合、評価用Project Contextの配置が完了した時点を**Agent開始前baseline**とします。
 
 baseline固定のため、sanitized targetでfresh Git repositoryを初期化し、remoteなし・固定の非個人local identityでEvaluator-owned synthetic commitを1件作成します。original Git history / remoteは引き継ぎません。
 
@@ -295,13 +295,13 @@ Evaluatorは成果物内容を独自schemaへ変換しません。各Skillの既
 }
 ```
 
-- `skill`は配置済み19 Skillの正規名、`kind`は対象Skillの既存出力契約からEvaluator scenarioに固定した成果物種類、`scope`は今回要求・routingで確定した対象 / 実行範囲、`artifact_id`は同一attempt内で一意の非空ASCII識別子、`path`は`.qa-eval-output/`基準の正規化relative pathとする。上例は形式を示すものであり、すべてのTCが固定の名前になるという意味ではない。
+- `skill`は配置済みSkill集合に含まれる正規名、`kind`は対象Skillの既存出力契約からEvaluator scenarioに固定した成果物種類、`scope`は今回要求・routingで確定した対象 / 実行範囲、`artifact_id`は同一attempt内で一意の非空ASCII識別子、`path`は`.qa-eval-output/`基準の正規化relative pathとする。上例は形式を示すものであり、すべてのTCが固定の名前になるという意味ではない。
 - evaluatorはscenarioに保持する**既存Skill出力契約から導いた`skill -> kind`許可集合**と登録情報を照合する。`artifact_id`・`path`の重複、同一fileの二重登録、未知のSkill / kind / scope、出力root外path、symlink、file不存在、runtime / internal fileへの参照、cross-attempt参照を拒否する。同じSkillで複数成果物があっても`artifact_id`とpathが別なら許可する。file hash・sizeはEvaluatorが現物から算出し、Agentの申告SHAを信用しない。
 ### routing判断と必須成果物の判定
 
 `routing[]`の各行は`skill` / `scope` / `status` / `reason` / `artifact_ids[]`を必須とする。`status`は`executed`、`reused`、`skipped`、`blocked`、`incomplete`のいずれかとする。Skill名は正規名、scopeは今回の要求から定めた正規値、reasonは空でない文字列、artifact_idsは上記artifactsのID（重複なし）とする。`executed`では生成した成果物のIDを紐付ける。`reused`では同一attemptで実体・鮮度・元の生成者を検証できる成果物への参照だけ許す。`skipped` / `blocked` / `incomplete`では対応scopeと理由を残し、完了を偽装しない。`qa-workflow`自体の最終判断は最終stdout / workflow runtimeを対応証拠とするため、`artifact_ids=[]`でもよい。
 
-- 固定scenarioには、要求結果として**仕様根拠の整理、テスト分析、TR、TCN / CI、TC、カバレッジ確認、反証レビュー、最終workflow判断**の8種類と対応する正規担当Skill / scopeを定義する。`question-analysis`は実際に不明点・矛盾を解消する必要がある場合だけ要求する。E2E実装・実行や全19 Skillを常時必須にしない。これらの結果を作る順序・必要性の細部は既存`qa-workflow` / 工程Skill契約に従う。
+- 固定scenarioには、要求結果として**仕様根拠の整理、テスト分析、TR、TCN / CI、TC、カバレッジ確認、反証レビュー、最終workflow判断**の8種類と対応する正規担当Skill / scopeを定義する。`question-analysis`は実際に不明点・矛盾を解消する必要がある場合だけ要求する。E2E実装・実行や全Skillを常時必須にしない。これらの結果を作る順序・必要性の細部は既存`qa-workflow` / 工程Skill契約に従う。
 - Evaluatorは固定scenarioの要求結果を起点に、各結果の存在を確認し、`routing[]`を照合する。明示されていない必須工程の行、重複`(skill, scope)`、未知status、不正ID参照、`executed`なのに実ファイルなし、`reused`だが信頼可能な既存成果物なしを検出する。`routing[]`が空でもAgentの省略判断を正しいと仮定しない。
 - `skipped` / `blocked` / `incomplete`は無条件に正当化しない。省略・blocked理由が固定要求や既存Skillの条件付きrouting規則と矛盾する場合はrouting品質の非passとする。機械的に判定できない理由は`QTS-SEM-001/002`の固定Judgeへuntrustedな自己申告として渡し、根拠不足なら`needs_review` / 未完了とし、成功扱いしない。
 - `artifact-index.json`自体の欠落・構文不正・routing登録不備は`evidence_unverified`（`reason=routing_record`または`artifact_classification`）として記録する。**QA成果物ファイルが実際に未生成**であることを独立確認できた場合や、必須工程を根拠なく省略したことが確認できた場合に限り品質non-passとし、単なる登録不備を成果物未生成と混同しない。
@@ -342,7 +342,7 @@ Evaluatorは回収後、候補Skill revisionの**信頼済みGit tracked content
 
 ### 評価用のverifier入出力取得経路
 
-Evaluatorはsanitized target生成時に、正解情報を含まない最小の評価用CLIラッパー`scripts/skills/evals/agent/verifier_capture.py`を`.qa-eval-tools/verifier_capture.py`として配置し、synthetic baselineへ含める。このコードは評価専用であり、19 Skillの`SKILL.md`やproduction verifier本体を変更しない。評価用`AGENTS.md`とpromptには、実行時のproduction verifier / `workflow_runtime.py`を呼ぶ場合、次の経路を使うことだけを明示する。
+Evaluatorはsanitized target生成時に、正解情報を含まない最小の評価用CLIラッパー`scripts/skills/evals/agent/verifier_capture.py`を`.qa-eval-tools/verifier_capture.py`として配置し、synthetic baselineへ含める。このコードは評価専用であり、候補Skillの`SKILL.md`やproduction verifier本体を変更しない。評価用`AGENTS.md`とpromptには、実行時のproduction verifier / `workflow_runtime.py`を呼ぶ場合、次の経路を使うことだけを明示する。
 
 1. Agentは既存Skill契約に必要なrequest JSONを`.qa-eval-output/.runtime-evidence/<skill>/<artifact-id>/<invocation-id>/request.json`へUTF-8として書く。`artifact-id`は同一attempt内の成果物相対pathのSHA-256で識別し、`invocation-id`は1回の試行内で一意とし、retryも別IDを使う。artifact pathとの対応をEvaluator manifestに保存する。request fileに秘密を含めない。
 2. Agentは`python .qa-eval-tools/verifier_capture.py --skill <skill> --operation verify|workflow-runtime --request <request.json> --record <invocation-dir>`を実行する。ラッパーは`--skill`とoperationを許可済みのSkill-local script pathへ写像し、任意command / 任意pathを実行しない。`request.json`の**保存済みbytesそのものを**対象CLIのstdinへ渡す。対象scriptを候補Skill workspace内から呼び、stdout bytesを`result.json`、stderrを安全化した診断、exit code / request・result SHA-256を`invocation.json`へ記録する。正常終了時も`valid=false`を維持する。入出力と実行metadataの保存は一時fileからatomicに確定し、不完全なrecordを成功扱いしない。
@@ -353,7 +353,7 @@ Evaluatorはsanitized target生成時に、正解情報を含まない最小の�
 ラッパーは評価用のプロセス入出力transportだけを担い、runtime検証アルゴリズムを再実装しない。標準ライブラリで実装し、CIのfake Agentでfile記録・再試行・欠落・不正なrequest・symlink / path traversal・atomic書込み失敗を検証する。実Codexでは記録済みJSONと`--json` tool traceの実行イベントを照合する。
 ### 成果物とproduction verifierの対応・判定
 
-EvaluatorはAgentが作成したartifactだけを見て、必要な成果物や証拠が揃っていると推測しません。**固定scenarioの要求結果と既存Skillの担当契約**から必須成果物の種類・scopeを確定し、申告された`routing[]`、実成果物、最終stdout / runtime状態と照合します。自己申告だけで母集団を縮小しません。条件付きSkillの省略理由は固定ルールまたは`QTS-SEM-001/002`で検証し、根拠不足は完了と扱いません。全19 Skillを固定順で実行させることもしません。
+EvaluatorはAgentが作成したartifactだけを見て、必要な成果物や証拠が揃っていると推測しません。**固定scenarioの要求結果と既存Skillの担当契約**から必須成果物の種類・scopeを確定し、申告された`routing[]`、実成果物、最終stdout / runtime状態と照合します。自己申告だけで母集団を縮小しません。条件付きSkillの省略理由は固定ルールまたは`QTS-SEM-001/002`で検証し、根拠不足は完了と扱いません。全Skillを固定順で実行させることもしません。
 
 - runtime-enabled Skillの各成果物について、同一attempt内で`Skill名 + artifact相対path + SHA-256 + request / result / invocation path`を対応させる。重複path・他attemptの証拠を拒否する。`qa-workflow`は`verify_runtime_evidence`と`workflow_runtime.py`のinput / resultを別々に集め、片方が欠落した場合はその観測状態を残す。
 - Evaluatorのrequest置換は`artifact_markdown`のみとする。normalized input、previous artifact、scope、expected Entity等を都合よく修正しない。参照された依存成果物の所在とhashも同一attemptで照合する。
@@ -433,7 +433,7 @@ Evaluator側にtrackedなscenario定義を置き、少なくとも次を固定�
 - Platform
 - Feature / scope
 - Agentへ渡す評価要求
-- Agent-visible Skill集合
+- Agent-visible Skill集合の導出規則（指定`--skill-revision`のGit treeにあるtracked `skills/<skill>/SKILL.md`から取得し、runごとのmanifestで固定する）
 - sanitized targetから除外する評価汚染情報
 - 評価出力root
 - Judgeが参照する規範仕様path:
@@ -532,9 +532,9 @@ ratingの共通尺度は既存`semantic/prompt_builder.py`に従う。`4`は要�
 
 フェーズ2のCLIもフェーズ1と同じ`--repeat N`（既定1）を受け付け、**attemptごとにfreshなsanitized target・synthetic baseline commit・実Agent session・成果物回収・verifier再実行・Judge呼び出し**を行います。1回目の生成物を2回目へ持ち込まず、attempt番号と結果を別保存します。集計は各attemptの既存`pass / needs_review / fail / execution error`件数と根拠だけとし、独自総合点や統計的な有意差判定は作りません。
 
-Evaluatorは19 SkillのGit tree / SHA-256とprompt指定を投入条件として検証し、Agentの`SKILL.md`読取 / 適用に関するtraceは別に`observed` / `unverified`として残す。native injectionはOSコマンドに現れないことがあるため、未観測だけで**成果物品質比較**を無効にしない。ただし**Skill改修の効果判断**では、変更されかつ`routing[]`で対象になったSkillについて双方のrunに使用証拠が必要。観測できなければ成果物差だけ報告しSkill効果は判断不能とする。複数Skillの個別寄与も断定しない。native `description` trigger評価ではない。
+Evaluatorは候補revisionのSkill集合・ファイルSHA-256とprompt指定を投入条件として検証し、Agentの`SKILL.md`読取 / 適用に関するtraceは別に`observed` / `unverified`として残す。native injectionはOSコマンドに現れないことがあるため、未観測だけで**成果物品質比較**を無効にしない。ただし**Skill改修の効果判断**では、変更されかつ`routing[]`で対象になったSkillについて双方のrunに使用証拠が必要。観測できなければ成果物差だけ報告しSkill効果は判断不能とする。複数Skillの個別寄与も断定しない。native `description` trigger評価ではない。
 
-異なるSkill revision間の直接比較では、**固定Evaluator SHA・grader / 固定共通機械判定・2系統のJudge入力構築規則・rubric / Reference SHA・target SHA・scenario / input fingerprint・Agent / Judge実効設定・隔離条件・繰り返し条件**の一致を必須とする。一方、**候補Skill package内のproduction verifier / generator / assetsのSHAは一致を要求しない**。候補revisionごとのsource fingerprintをprovenanceへ保存し、候補それぞれのsourceで隔離再実行して鮮度・結果再現性を検証する。互換な実装変更は比較可能とし、schema / 機械契約が固定Evaluatorと非互換な部分のみ`evaluator_incompatible`とする。観測できないmodel/backend更新や使用状況は制約として明記し、原因をSkill差分だけに帰属させない。
+異なるSkill revision間の直接比較では、**固定Evaluator SHA・grader / 固定共通機械判定・2系統のJudge入力構築規則・rubric / Reference SHA・target SHA・scenario / input fingerprint・Agent / Judge実効設定・隔離条件・繰り返し条件**の一致を必須とする。Skill数が異なる場合でも両revisionで評価可能な共通成果物・criterionは比較対象に残す。片方に必要なSkillが存在しない工程は未評価範囲として明示し、品質FAILや`evaluator_incompatible`へ読み替えない。固定scenarioの必須成果物が揃わず完了できない場合は、比較可能な部分とworkflow全体の未完了を区別して報告する。一方、**候補Skill package内のproduction verifier / generator / assetsのSHAは一致を要求しない**。候補revisionごとのsource fingerprintをprovenanceへ保存し、候補それぞれのsourceで隔離再実行して鮮度・結果再現性を検証する。互換な実装変更は比較可能とし、schema / 機械契約が固定Evaluatorと非互換な部分のみ`evaluator_incompatible`とする。観測できないmodel/backend更新や使用状況は制約として明記し、原因をSkill差分だけに帰属させない。
 
 ## フェーズ1ランナーへの追加要件
 
@@ -588,7 +588,7 @@ Agent executionは、Eval dataset由来のpromptでも、固定対象repo向けp
 4. 対象revisionの`docs/spec/README.md`と`docs/spec/features/checkout-and-payment.md`が存在することを確認する
 5. 元repoのAgent Skill、過去run / Plan / report、instructor情報、target側Skill eval等を除外する
 6. 元`docs/PROJECT_CONTEXT.md`を除外し、正規stable keyを持つ評価用`AGENTS.md`と評価用`docs/PROJECT_CONTEXT.md`を生成・検証する
-7. 候補`qa-workflow-skills` 19 Skillを`.agents/skills/`へ配置する
+7. 候補`qa-workflow-skills` revisionのSkill集合を`.agents/skills/`へ配置する
 8. sanitized targetをfresh Git repositoryにし、Evaluator-owned synthetic baseline commitを作成する
 9. `.qa-eval-output/`を作成し、Checkout / Payment評価要求、`artifact-index.json`の`artifacts[]` / `routing[]`契約、Agentの必須`timeout_seconds` / Judgeの独立Docker profile・timeout条件をrun provenanceへ記録する
 10. 各repeatの新規target / Agent sessionで実Agentを起動し、分析・設計workflowを実行する。使用証拠の観測可否を記録する
@@ -609,11 +609,11 @@ Agent executionは、Eval dataset由来のpromptでも、固定対象repo向けp
 - テスト対象が`qa-training-store`であることをrun結果から特定できる
 - source revisionが`84ce165493649550832731a60cf436f8ae29c56b`として固定・記録される
 - 評価対象`qa-workflow-skills` revisionが記録される
-- Agent-visibleなSkill集合が今回の19 Skillへ固定され、その他のuser/global Skill・指示・MCPの混入がない条件を検証・記録する
+- Agent-visibleなSkill集合が候補revisionから検出したSkill集合に限定され、その他のuser/global Skill・指示・MCPの混入がない条件を検証・記録する
 - 元`.agents/**` / `.codex/**`、`AGENTS.md` / `QA_AGENT.md`によるrepo固有Skill routing・Codex設定・hooks等が評価対象Agentへ残っていない
 - 過去run / Plan / report、instructor情報、元`docs/PROJECT_CONTEXT.md`、target側Skill eval、`qa-workflow-skills`のReference / expected / rubric / graderが評価対象Agentへ公開されていないことをアクセス制御と実Agentで確認する
 - 評価用`AGENTS.md`と`docs/PROJECT_CONTEXT.md`が評価条件と必要なstable keyだけを持ち、製品仕様や正解QA成果物を追加せず、既存Project Context parserが受け付ける
-- 評価対象19 Skillが`.agents/skills/`へ配置され、各Skillの`evals/**`が含まれていない
+- 候補revisionの全Skillが`.agents/skills/`へ配置され、各Skillの`evals/**`が含まれていない
 - Agent開始前のsanitized targetがEvaluator-owned synthetic baseline commitとして固定され、original Git history / remoteを引き継いでいない
 - scenario ID / scenario fingerprint、Evaluator / Skill revision、実効Agent / Judge profileと検証状態、隔離条件、Judge Reference fingerprintがrun provenanceへ保存される
 - Checkout / PaymentのWeb範囲で実Agent workflowが最後まで実行され、`--repeat`各attemptの独立した評価結果が保存される

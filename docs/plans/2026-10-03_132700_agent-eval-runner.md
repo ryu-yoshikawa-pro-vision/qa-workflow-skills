@@ -51,7 +51,7 @@ Skillを修正
 変更前後を比較して改善判断
 ```
 
-自動A/BランキングやSkillの自動書き換え・自動採用は今回作りません。比較に必要な実行条件と評価結果を保存し、人間または別Agentが**条件の一致を検証できたrun同士**を比較できる状態を作ります。加えて、**実際の評価で発見した品質問題に対してSkillを1件以上修正し、同条件で再評価して改善の成立を検証する**ところまで実装受入に含めます。比較機能の成立と、改善効果が確認できたことは別に報告します。対象は明示的なSkill利用による既存Eval Inputの出力品質と、固定repo上の分析・設計workflow品質です。19 Skillすべての実環境動作、ブラウザE2E、native Skill trigger精度まで測定できたとは扱いません。
+自動A/BランキングやSkillの自動書き換え・自動採用は今回作りません。比較に必要な実行条件と評価結果を保存し、人間または別Agentが**条件の一致を検証できたrun同士**を比較できる状態を作ります。加えて、**実際の評価で発見した品質問題に対してSkillを1件以上修正し、同条件で再評価して改善の成立を検証する**ところまで実装受入に含めます。比較機能の成立と、改善効果が確認できたことは別に報告します。対象は明示的なSkill利用による既存Eval Inputの出力品質と、固定repo上の分析・設計workflow品質です。リポジトリ内の全Skillの実環境動作、ブラウザE2E、native Skill trigger精度まで測定できたとは扱いません。
 
 ### フェーズ1で実現すること
 
@@ -105,6 +105,8 @@ Skillを変更した後に同じ評価ケースを実Agentで再実行し、既�
 本Plan本文の共通ランナーを実装し、既存deterministic / semantic caseを実Agentで生成して現在のgraderへ接続します。
 
 ここでは新しい評価基準を作らず、既存の評価データセットとgraderを再利用します。
+
+PR #14で追加された3 Skillのsemantic caseも、固定Evaluator revisionに評価caseが存在する場合は同じ実Agent生成・Judge評価経路で扱います。PR #14から移管された83 caseの全量実Agent反復評価はPR #17の評価範囲に含めます。ただし実際のcase集合と件数は実行時の固定Evaluatorのmanifestから取得し、83件という過去の観測値をランナーの固定条件にはしません。PR #14のマージを共通ランナー実装の前提にはしません。
 
 ### フェーズ2: qa-training-storeを固定テスト対象として評価する
 
@@ -214,7 +216,7 @@ OpenAI公式のCodex eval例でも、`codex exec`は自動実行向けに最終�
 
 各Agent実行前に一時実行ディレクトリを作成します。
 
-一時実行ディレクトリへは、指定した`--skill-revision`のGit treeに存在する19 Skillから、通常実行に必要なファイルだけをコピーします。
+一時実行ディレクトリへは、指定した`--skill-revision`のGit treeのtracked `skills/<skill>/SKILL.md`から検出したSkill集合から、通常実行に必要なファイルだけをコピーします。
 
 コピー対象:
 
@@ -234,7 +236,7 @@ docs/**
 .git/**
 ```
 
-19 Skillすべての通常Skill Packageを配置し、`qa-workflow`等が他Skill名を前提にする場合も通常構成を維持します。配置元はworking treeではなく、明示した`--skill-revision`のGit treeのtracked contentだけとします。
+検出したSkill集合すべての通常Skill Packageを配置し、`qa-workflow`等が他Skill名を前提にする場合も通常構成を維持します。配置元はworking treeではなく、明示した`--skill-revision`のGit treeのtracked contentだけとします。Skill名・件数を固定せず、検出したSkill名を昇順に並べ、各Skill packageのpath・SHA-256とともにmanifestへ保存します。候補revisionに存在しないSkillを補完したり、Evaluator側のSkill packageを追加したりしません。
 
 Eval Inputはファイルとして一時実行ディレクトリへコピーせず、生成promptへ埋め込みます。
 
@@ -262,10 +264,12 @@ CIではfake Agent commandを使って、ランナー自体の契約・一時実
 ランナーと既存graderは**固定Evaluator revision**のcleanなcheckoutから実行する。評価対象のSkill packageだけは別の`--skill-revision <40文字Git SHA>`で選択する。
 
 1. Evaluator側の`HEAD`、working tree・indexがcleanであることをlive runのpreflightで検証し、Evaluator SHAを保存する。dirty状態では実行しない。
-2. `--skill-revision`で指したGit commitのtracked contentを`git archive`等で取得し、19 Skillの`SKILL.md` / `references/**` / `scripts/**` / `assets/**`だけを配置する。未コミット変更、候補側`evals/**`、Evaluatorのworking treeのSkillを混ぜない。
+2. `--skill-revision`で指したGit commitのtracked contentを`git archive`等で取得し、検出したSkillの`SKILL.md` / `references/**` / `scripts/**` / `assets/**`だけを配置する。未コミット変更、候補側`evals/**`、Evaluatorのworking treeのSkillを混ぜない。
 3. 配置した各Skill fileの相対path / size / SHA-256からmanifestとSkill package fingerprintを生成し、指定Git treeとの一致を検証する。存在しないcommitや不一致はAgent実行前のerrorにする。
 4. deterministic / semantic grader、Reference、rubric、Judge prompt / response正規化は固定Evaluator側を使用する。ただし、runtime実装の鮮度判定は候補revision由来の信頼済みsourceを参照する。固定版production verifierを候補成果物へそのまま適用して実装fingerprint差をFAILへ変換しない。
 5. Evaluator SHA、graderの内容fingerprint、dataset / rubric / Referenceのfingerprintをprovenanceへ保存する。候補Skill側のeval実装を採点側へimportしない。
+
+評価可能なcaseは固定Evaluatorのdataset / manifestにあるcaseと、候補revisionに存在するSkillの対応で確定します。`--skill <name>`の明示指定で候補Skillが存在しなければpreflight errorとします。`--skill all`では両方に存在するcaseだけを実行し、Evaluator側にcaseがあっても候補Skillが存在しないもの、候補SkillがあってもEvaluator側にcaseがないものを、それぞれ理由付きで結果の評価対象範囲へ記録します。どちらもPASS / FAILとして捏造せず、未実行を全件PASSとみなしません。Skill名やcase数をコードへ固定しません。
 
 Skill-local verifierはSkill本体にも含まれる。runtimeの再実行と共通の品質判定を次のように分ける。
 
@@ -384,7 +388,7 @@ EvaluatorとAgentの間に、ディレクトリ分割だけでなく**OS等に�
 1. ホストで固定Evaluator checkoutを開き、Evaluator-owned領域で候補Skill tracked contentと（フェーズ2では）sanitized targetを準備する。bind mountは、使い捨てAgent-visible workspace（**読み取り専用**）、その配下の`.qa-eval-output/`へ重ねるattempt専用**書込み可能**出力root、一時`CODEX_HOME`の3箇所に限定する。Evaluator checkout・採点資料・元target checkout・Docker socket・ホストhomeはmountしない。`--privileged`、host PID、host filesystem mountを使わない。
 2. Codex CLIとPythonが入った固定バージョンのLinux imageを使用し、image digest、Codex CLI version、Python versionをrunへ記録する。`docker run --rm -i --read-only --cap-drop=ALL --security-opt=no-new-privileges`を基本に、`--workdir /workspace`、`--tmpfs /tmp`等の一時書込み領域、`--mount type=bind,src=<Agent-visible workspace>,dst=/workspace,readonly`、`--mount type=bind,src=<attempt専用出力root>,dst=/workspace/.qa-eval-output`、`--mount type=bind,src=<使い捨てCODEX_HOME>,dst=/codex-home`、`-e CODEX_HOME=/codex-home`を指定する。workspaceの`.qa-eval-output/`を事前に作成し、その位置だけ書込み可能mountで覆う。必要なUID/GIDと書込み権限は出力root、最小`CODEX_HOME`、`/tmp`に限定する。source・Skill・評価用設定への書込みはmountで拒否し、post-run差分検査は補助として残す。実行中コンテナへEvaluator資料を`docker cp`しない。
 3. 認証は既存Codexのログイン情報を使い捨て`CODEX_HOME`へ**起動前に必要最小限で複製**する。ホストの本来の`~/.codex`はmountしない。秘密内容・そのhash・container内の生環境変数は永続保存しない。認証情報がAgent側プロセスから参照可能である制約を認識し、信頼できない入力へ広く公開しない。API keyを使う場合も同様に限定し、明示的な承認なく認証方式を変更しない。
-4. コンテナ内の`config.toml`は評価専用の最小値に固定する。`model`、`model_reasoning_effort`、`sandbox_mode`、`approval_policy`を明示し、既定のMCP server / plugins / 追加Skill / user-global指示・memory / web検索などの評価外入力は使用可能な範囲で無効化する。実効CLI引数と非秘密設定のhashを照合し、未確認の項目は`unverified`にする。必要な19 Skillはworkspace側にだけ配置する。Codex CLIが当該設定を無視・拒否したら比較可能として起動しない。
+4. コンテナ内の`config.toml`は評価専用の最小値に固定する。`model`、`model_reasoning_effort`、`sandbox_mode`、`approval_policy`を明示し、既定のMCP server / plugins / 追加Skill / user-global指示・memory / web検索などの評価外入力は使用可能な範囲で無効化する。実効CLI引数と非秘密設定のhashを照合し、未確認の項目は`unverified`にする。候補revisionから検出したSkill集合はworkspace側にだけ配置する。Codex CLIが当該設定を無視・拒否したら比較可能として起動しない。
 5. Agentのweb検索・外部資料取得tool / MCPと余分なSkillを無効化し、実効設定と許可toolを照合する。**モデルAPI通信は許可**し、コンテナのネットワーク方式、web機能、既存egress制御の有無を非秘密profileへ記録する。利用可能なproxy / firewallで宛先制限を行う場合はその設定を固定するが、専用egress環境は必須としない。モデルAPI通信を通じて残る外部アクセス可能性は評価の制約として報告し、それだけで`isolation_unverified` / `not_comparable`にはしない。意図しないweb検索・外部資料取得が観測されたrun、必要なtool / MCP設定を確認できないrunは比較不可とする。
 6. ホストEvaluator-onlyの非秘密sentinelをAgentにmountしない。**Agentと同じコンテナ権限のOSコマンド**で該当host-only pathの読み取り不能を確認し、同時にDocker container inspect相当でmount集合・権限・image digestを確認する。LLMによる「見えない」という返答は証拠にならない。意図的にsentinelを追加mountしたnegative fixtureではpreflight失敗を確認する。
 7. 評価用の最小launcher（`scripts/skills/evals/agent/tools/codex_docker_launcher.py`）はDocker CLIへ`subprocess`のargvで接続し、stdin promptをそのまま`codex exec ... -`へ渡す。`--json`のJSONL stdoutを収集し、`--output-last-message`で得た最終応答だけを共通executorへstdoutとして返す。containerで作成した`.qa-eval-output/`内の一時message fileを回収し、元JSONLからコマンド実行などの**非秘密の事実だけ**を安全化してprovenanceへ保存する。launcherはsmoke用だけであり、共通`executor.py`やSkill PackageにCodex固有SDKを追加しない。JSONL全量を無条件に永続化しない。
@@ -490,7 +494,7 @@ promptに含めないもの:
 フェーズ1用のSkill-only workspaceを作ります。
 
 - `tempfile`で一時実行ディレクトリを作る
-- 候補Skill commitのtracked contentから19 Skillの通常実行ファイルだけをコピーし、内容manifestを照合する
+- 候補Skill commitのtracked contentから検出したSkill集合の通常実行ファイルだけをコピーし、内容manifestを照合する
 - `evals/`を除外する
 - Agent実行終了後に一時ディレクトリを削除する
 
@@ -515,7 +519,7 @@ promptに含めないもの:
 - 指定された`qa-training-store` source revisionのtracked contentだけからsanitized targetを作る
 - target固有`.agents/**` / `.codex/**`、過去Plan / report、instructor情報、target側Skill evalを除外する
 - 評価用`AGENTS.md`と、元repoの運用指示を含まない評価用`docs/PROJECT_CONTEXT.md`を生成する
-- 19 SkillだけをAgent-visibleに配置する
+- 候補revisionから検出したSkill集合だけをAgent-visibleに配置する
 - `.qa-eval-output/`と必要な評価用Project Context rootを準備する
 - 実行前にsource・配置Skill・評価用設定を読み取り専用にし、`.qa-eval-output/`だけを書き込み可能にする。終了後はtracked / untracked / ignoredを含む許可外の差分・symlink / path境界を検証する
 - 回収後にsanitized targetを削除する
@@ -596,7 +600,7 @@ python scripts/skills/evals/agent/run.py \
   --agent-command <agent command argv...>
 ```
 
-`--skill all`は明示指定時だけ許可します。既定で全38 / 72 caseを外部LLMへ送信しません。
+`--skill all`は明示指定時だけ許可します。既定で全caseを外部LLMへ送信しません。対象caseは固定Evaluatorのmanifestと候補revisionのSkill集合の対応から取得し、未評価Skill / caseは理由付きで結果に残します。
 
 ### 複数回実行
 
@@ -683,7 +687,7 @@ Judgeの非秘密command fingerprint、image / CLI / model / 推論設定、実�
 - Skill
 - eval IDまたはscenario ID
 - attempt番号
-- 評価対象`qa-workflow-skills` Skill commit SHAと配置したSkill package fingerprint
+- 評価対象`qa-workflow-skills` Skill commit SHA、候補revisionから検出したSkill名集合、配置したSkill package fingerprint、固定Evaluatorの評価case集合との対応（対象・対象外とその理由）
 - 評価基準であるEvaluator commit SHAと固定grader / 固定共通機械判定 / Judge prompt・dataset / rubric / Referenceのfingerprint。フェーズ2のJudgeは2系統それぞれのprompt / response・criterion集合・入力hashも別々に記録する
 - 候補Skill revision由来のproduction verifier / generator・assetsのfingerprint（候補ごとの鮮度 / 再現性の照合用。固定graderのfingerprintとは別項目）
 - 評価データセットまたはscenario定義のfingerprint
@@ -721,7 +725,7 @@ Skill修正前後を比較するときは、少なくとも次が一致するrun
 - 情報隔離の成立条件と検証結果
 - 実行回数の扱い
 
-比較対象として変えるのはSkill packageのrevisionとその内容fingerprintだけです。**候補側production verifier / generator / assetsはSkill packageの一部なので、そのSHAの差は許容する**。候補ごとに同revision由来sourceで隔離再実行して鮮度・再現性を確認し、固定Evaluatorの採点規則と混同しない。候補のschema / 機械契約が固定Evaluatorと互換でない場合に限り該当部分を`evaluator_incompatible`とする。EvaluatorのSHAと採点基準は変えません。いずれかの設定が違う、未検証、またはSkill packageが同一なら、Skill変更による改善・悪化とは断定しません。provider側の隠れたmodel更新やSkill読み取りが観測不能な場合も限界を明記します。
+比較対象として変えるのはSkill packageのrevisionとその内容fingerprintだけです。Skill数の増減自体は比較を一律に拒否する理由にせず、同じ固定Evaluatorと同じcaseが両revisionで評価できる範囲のみを比較します。一方のrevisionに存在しないSkill / caseや固定Evaluatorに評価caseがないSkillは未評価として明示し、その部分を改善・悪化・変化なしと判定しません。Skillの不存在はschema / 機械契約の`evaluator_incompatible`とは区別します。共通評価caseがない場合、当該比較は`not_comparable`です。**候補側production verifier / generator / assetsはSkill packageの一部なので、そのSHAの差は許容する**。候補ごとに同revision由来sourceで隔離再実行して鮮度・再現性を確認し、固定Evaluatorの採点規則と混同しない。候補のschema / 機械契約が固定Evaluatorと互換でない場合に限り該当部分を`evaluator_incompatible`とする。EvaluatorのSHAと採点基準は変えません。いずれかの設定が違う、未検証、またはSkill packageが同一なら、Skill変更による改善・悪化とは断定しません。provider側の隠れたmodel更新やSkill読み取りが観測不能な場合も限界を明記します。
 
 今回、比較結果の自動rankingや独自総合scoreは作りません。保存済みrunを人間または別Agentが以下の規則で比較できれば目的を満たします。
 
@@ -833,9 +837,11 @@ fake Agent subprocessを使って少なくとも次を検証します。
 
 ### 一時実行ディレクトリtest
 
-- 指定SHAのtracked fileだけがmanifestと一致し、dirty working treeのSkillが混入しない
-- 19 Skillの`SKILL.md`が存在する
+- 指定SHAのtracked fileだけがmanifestと一致し、dirty working treeのSkillが混入しない。Skill集合は候補Git tree内のtracked `skills/<skill>/SKILL.md`から導出され、固定件数や固定リストに依存しない
+- 候補revisionから検出した全Skillの`SKILL.md`が存在し、配置manifestと一致する
 - `references/` / `scripts/` / `assets/`が存在する場合はコピーされる
+- 候補revisionにSkillが追加・削除された場合も、検出した集合だけが配置される。固定Evaluatorのcaseが候補に存在しないSkillを要求する場合は未評価と記録し、単独`--skill`指定ならpreflight errorとする
+- 候補Skillに対応するEvaluator caseがない場合は未評価と記録し、評価実行済みと扱わない
 - どのSkillにも`evals/`が存在しない
 - `scripts/skills/evals/`が存在しない
 - `docs/`、`.git/`が存在しない
@@ -863,7 +869,7 @@ repositoryの既存caseを使い、fake Agentで次を自動検証します。
 - フェーズ2の各`--repeat`で新規target / Agent session / Judgeを作り、前attemptの成果物を再利用しない
 - 元`.agents/**` / `.codex/**`、元`AGENTS.md` / `QA_AGENT.md`、過去Plan / report、instructor情報、target側Skill evalをAgent-visible targetへ残さない
 - 評価用`AGENTS.md`へ製品仕様や正解QA成果物を混ぜない
-- 19 SkillだけをAgent-visibleにする。user/global追加Skill・指示・MCPが有効なrunは比較可能として扱わない
+- 候補revisionから検出したSkill集合だけをAgent-visibleにする。user/global追加Skill・指示・MCPが有効なrunは比較可能として扱わない
 - 親workspaceとSkill packageを実行中読み取り専用mountにし、`.qa-eval-output/**`だけを書込み可能mountにする。sourceを変更して元へ戻す操作も権限で拒否する
 - fake Agentの`artifact-index.json`に`routing[]`・`artifacts[]`を保存し、Evaluatorが固定scenarioの要求結果・既存Skill条件・実fileと照合する。必須工程のrouting行なし、根拠のない`skipped`、妥当な`blocked` / `incomplete`、optionalな`question-analysis`、生成済みファイルの未登録、重複・誤scope・cross-attemptをそれぞれ検証し、単なる登録欠落を未生成と扱わない
 - symlink / path traversal / output root外参照をrejectする
@@ -986,7 +992,7 @@ git diff --check
 13. 同branch上で実Codex smoke 4 caseを実行する
 14. 実Codex結果とrunnerの保存物を確認し、runner起因の未達が0件であることを確認する
 15. フェーズ2補助Planに従い、`qa-training-store`固定revisionから元Project Contextを除いた使い捨て評価対象を準備し、評価用`AGENTS.md`とProject Contextを生成する
-16. 対象repo固有のAgent Skill集合を評価条件から除外し、今回の19 SkillだけをAgent-visibleにする
+16. 対象repo固有のAgent Skill集合を評価条件から除外し、候補revisionから検出したSkill集合だけをAgent-visibleにする
 17. Checkout / PaymentのWeb範囲で実Agent分析・設計workflowをattemptごとに実行し、source無変更、runtime証拠と成果物の対応、traceability、workflow状態、固定Referenceでの意味品質を評価する
 18. フェーズ1 / フェーズ2の結果を分離して保存し、runner起因の失敗とSkill品質上の非passを区別して報告する
 
@@ -1042,10 +1048,10 @@ native trigger評価は、Skill activationを観測する方法がAgentクライ
 - 単一deterministic caseを「実Agent生成 → 既存grader」まで1 commandで実行できる
 - 単一semantic caseを「実Agent生成 → 独立Judge → 既存semantic判定」まで1 commandで実行できる
 - Skill単位batchを実行できる
-- `--skill all`を明示した場合だけ全case batchを実行できる
+- `--skill all`を明示した場合だけ固定Evaluatorと候補Skill集合に共通する全case batchを実行でき、対象外のSkill / caseは理由付きで記録する
 - `--repeat`で同一caseを複数回独立実行できる
 - AgentへReference / expected / rubric / validatorを公開しない一時実行ディレクトリと、読み取り禁止が実証された隔離境界を使用する。Product Code / Test / Spec / Skillを実行中読み取り専用にし、出力root以外への書込みを拒否する
-- 一時実行ディレクトリに19 Skillの通常実行ファイルが存在する
+- 一時実行ディレクトリに候補revisionから検出したSkill集合の通常実行ファイルが存在し、Skill集合の増減を固定件数のassertionなしで検証できる
 - 実Agent commandを特定プロバイダーへ固定していない
 - `shell=True`を使用していない
 - Agent出力、grader結果、全体結果を保存でき、stderrは安全化できる場合のみ保存し、除外した場合は理由を記録できる
@@ -1066,7 +1072,7 @@ native trigger評価は、Skill activationを観測する方法がAgentクライ
 - `qa-training-store`固定revision `84ce165493649550832731a60cf436f8ae29c56b` を対象にフェーズ2初回評価と独立したrepeat試行を実行している
 - Checkout / PaymentのWeb範囲で実Agentによる分析・設計workflowが完了し、成果物・workflow・traceability・意味評価結果が保存されている
 - `qa-training-store`のProduct Code、既存Test、規範仕様に許可外変更がない
-- 対象repo既存Skillではなく今回の19 SkillだけをAgent-visibleにし、元`PROJECT_CONTEXT.md`を最小評価用内容へ置換した条件を記録している
+- 対象repo既存Skillではなく候補revisionから検出したSkill集合だけをAgent-visibleにし、元`PROJECT_CONTEXT.md`を最小評価用内容へ置換した条件を記録している
 - フェーズ2のrunner / environment error、Skill品質のneeds_review / fail、実行証拠の`evidence_unverified`、`valid=false`、比較不可・部分的Evaluator非互換を区別している
 - フェーズ2のJudgeは固定rubricを`QTS-SEM-001/002`と`QTS-SEM-003..010`へ分割して別々に実行し、後者へ`routing[]`・最終stdout・固定機械判定要約を渡さない。各応答のcriterion集合を検証後、統合して既存result正規化で全10件を判定し、部分失敗を全体PASSにしない
 - 候補production verifier / generatorのSHAだけが変わりschema・機械契約が互換なら、同じ固定Evaluatorでrunの直接比較を妨げない
