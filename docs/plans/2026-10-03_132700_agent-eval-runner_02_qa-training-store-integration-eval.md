@@ -644,7 +644,7 @@ schemaやEntity表現が変更され、既存Evaluatorでは判定不能な場�
 
 ### Judgeの検出能力の受入検証
 
-Judge基準・正解データの作成と継続改善の詳細は[Judge評価・改善Plan](./2026-10-03_132700_agent-eval-runner_04_judge-evaluation-and-improvement.md)を正本とする。フェーズ2のfixtureは確認済み事例として再利用し、調整用と独立検証用の役割を区別する。Judgeの該当criterionが未検証なら、Skillの品質結果は保存してもSkill自動修正へ進めずレビュー待ちにする。
+Judge基準・正解データの作成・再審査と継続改善の詳細は[Judge評価・改善Plan](./2026-10-03_132700_agent-eval-runner_04_judge-evaluation-and-improvement.md)を正本とする。フェーズ2のfixtureは確認済み事例として再利用し、調整用と独立検証用の役割を候補生成前に固定・分離する。正しい別解を不当にfailとするfixture等は自動緩和せず再審査へ回す。Judgeの該当criterionが未検証なら、Skillの品質結果は保存してもSkill自動修正へ進めずレビュー待ちにする。
 
 固定target revisionの正常なQA成果物を基準に、**Evaluator-only fixture**でJudgeの検出能力を確認する。従来の正常例、`QTS-SEM-006`のPayment整合違反例、`QTS-SEM-010`の仕様外動作例を維持し、未検証の**critical 7件**に対する代表的な重大違反例を追加する。
 
