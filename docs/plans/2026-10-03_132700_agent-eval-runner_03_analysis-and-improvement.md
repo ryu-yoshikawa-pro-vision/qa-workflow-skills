@@ -102,7 +102,7 @@ Judgeの独立検証状態を照合
 固定`qa-training-store`のCheckout / Paymentは実務に近い**評価入力**であり、その案件の正解をSkill本体へ埋め込むための学習資料ではない。評価時は案件固有の規範仕様・業務ルール・期待動作をReferenceや評価対象repoから取得してよいが、Skill修正では**仕様から必要な条件を導出する手順・判断・汎用的な検証処理**を優先する。
 
 - 修正Agentは差分の各変更について、根拠となる既存Skill契約・失敗criterionと、**案件非依存の理由**を示す。`qa-training-store`の画面名、特定の決済状態、期限、金額、scenario ID、期待結果の丸暗記を、対象案件専用Skillでもない汎用Skillの指示・scriptへ追加して失敗を隠す変更は認めない。もともと案件固有・ドメイン固有であると明示されたSkillの要件まで、機械的に一般化しない。
-- 固定シナリオの改善と、汎用Skillの回帰確認は**別の根拠**として記録する。修正に使ったケースではbaseline / candidateを同条件で比較し、別に、**修正案の作成・原因分析へ投入していない既存の関連Eval Input**があれば、同じ固定Evaluatorで候補を実Agent評価する。対象Skillの既存deterministic / semantic / workflow・runtime契約テストは影響範囲に応じて実行し、重要なcriterionの悪化・既存契約の後退を確認する。
+- 固定シナリオの改善と、汎用Skillの回帰確認は**別の根拠**として記録する。修正に使ったケースではbaseline / candidateを同条件で比較し、別に、**修正案の作成・原因分析へ投入していない既存の関連Eval Input**があれば、その別caseについても同じ固定Evaluator・入力・実行条件でbaselineとcandidateをそれぞれ実Agent評価し、修正前から存在した不合格を新たな回帰と混同せず差分を確認する。対象Skillの既存deterministic / semantic / workflow・runtime契約テストは影響範囲に応じて実行し、重要なcriterionの悪化・既存契約の後退を確認する。
 - 修正前から存在する別caseを回帰確認に使い、特定案件で使うReferenceの値を別caseへ強制しない。別caseの採点基準・入力は候補修正に合わせて変更しない。未使用の別caseがない、Agent実行条件を揃えられない、重要結果が揺れる場合は**汎用性を確認できていない**と記録してレビュー待ちにする。固定シナリオだけで改善したことを、Skill全体の品質改善や他案件への適用性の証明として報告しない。
 - 別のtarget repo・新規サンプルアプリ・全Skillに共通する大型ベンチマークはこのPlanの必須条件にしない。既存評価ケースが不足している事実はレビュー待ちに残し、実際の別案件への適用を保証するときにはその案件で検証する。Judgeの正解データについても、[Judge評価・改善Plan](./2026-10-03_132700_agent-eval-runner_04_judge-evaluation-and-improvement.md)の独立検証用事例を維持する。
 
@@ -172,6 +172,7 @@ improvement/
 - 修正Agentのtimeout・異常終了・許可外差分でも元Evaluator・target・作業ツリーを変更しない
 - 候補のテスト失敗、再評価未改善、回帰、結果の揺れ、使用証拠不足、既存の別caseでの汎用性未確認は改善済みにせずレビュー待ちに残す
 - 汎用Skillへ固定案件の期待値を直接埋め込んだ候補を拒否し、同一案件の改善・未使用の別caseの回帰・既存契約テストを別々に記録する
+- 別caseが修正前からfailでも、それだけでcandidateの回帰とはしない。baseline / candidateの同条件比較で新たな悪化を判定し、別case不足・比較不能・重大な悪化があれば検証済み候補としない
 - 全条件成立時はpatch・候補revision・関連テスト・baseline / candidateのrepeat比較が保存され、元runが不変
 - `--analyze-only`は実ファイルを書き換えず分析・レビュー待ちだけ生成する
 - レビュー待ちAが独立案件Bを止めず、Aに依存するCは停止する。残案件がA・Cのみなら全体停止し、判断済みの別runで再開できる
