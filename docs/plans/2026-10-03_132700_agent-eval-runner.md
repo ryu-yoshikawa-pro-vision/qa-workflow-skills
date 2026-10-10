@@ -40,7 +40,7 @@ PR #11の検証では`codex exec`で評価対象成果物を生成し、既存�
   ↓
 固定した評価条件で実Agent実行
   ↓
-確認済み正解データでJudgeを検証
+意味評価で使うJudgeを確認済み正解データで検証
   ↓
 既存評価 + 固定テスト対象評価
   ↓
@@ -686,7 +686,7 @@ Judgeの非秘密command fingerprint、image / CLI / model / 推論設定、実�
 
 ## 結果保存
 
-Judgeの検証結果は改善用判定と分けて`judge-validation/`に保存します。正解データの状態とEvaluator / Judge profileのfingerprintを記録し、未検証ならSkill自動修正の許可に使いません。[Judge評価・改善Plan](./2026-10-03_132700_agent-eval-runner_04_judge-evaluation-and-improvement.md)参照。
+Judgeの検証結果は改善用判定と分けて`judge-validation/`に保存します。正解データの状態とEvaluator / Judge profileのfingerprintを記録し、**未検証の意味評価criterion**をSkill自動修正の根拠に使いません。決定論的評価だけに依存する修正は、固定grader・expectedの検証を条件として独立に継続できます。[Judge評価・改善Plan](./2026-10-03_132700_agent-eval-runner_04_judge-evaluation-and-improvement.md)参照。
 
 
 既存の評価run成果物は変更しません。改善工程は同じ`--output-root`配下の`improvement/`に`analysis.json`・`analysis.md`、検証済み候補と`review-pending/`、修正・再評価結果を別保存します。分析Agentによる原判定の上書きは禁止します。
@@ -839,7 +839,7 @@ batchは途中1件が失敗しても残りcaseを実行し、最後に全体結�
 
 ## テスト
 
-Judge正解データの承認状態、重大欠陥の見逃し、正常例の誤検出、判定の揺れ、Judge改善候補の独立検証、未検証criterionによるSkill自動修正の拒否を確認します。詳細は[Judge評価・改善Plan](./2026-10-03_132700_agent-eval-runner_04_judge-evaluation-and-improvement.md)に従います。
+Judge正解データの承認状態、重大欠陥の見逃し、正常例の誤検出、判定の揺れ、Judge改善候補の独立検証、未検証の**意味評価criterionに依存する**Skill自動修正の拒否を確認します。決定論的評価だけの修正にJudge検証を要求しない回帰テストも追加します。詳細は[Judge評価・改善Plan](./2026-10-03_132700_agent-eval-runner_04_judge-evaluation-and-improvement.md)に従います。
 
 自動分析・修正可否・安全な隔離変更・レビュー待ち・再評価のfake Agentテストと、実Agentによる1件の修正受入検証を追加します。詳細と正常・拒否・未改善ケースは[改善Plan](./2026-10-03_132700_agent-eval-runner_03_analysis-and-improvement.md)を参照してください。通常CIで外部LLMは起動しません。
 
@@ -1101,7 +1101,7 @@ native trigger評価は、Skill activationを観測する方法がAgentクライ
 - 実Codexの非pass結果がある場合、その結果を隠さず保存・報告できる
 - 各live runにSkill revision、評価入力 / scenario fingerprint、Agent名 / model等の比較に必要なprovenanceが保存される
 - 2つの実runでEvaluator・入力・Judge・`agent.timeout_seconds`を含む実効Agent profile・隔離・repeatを照合する。成果物品質の比較とSkill改修の効果判断は別々に記録し、改修効果は変更対象Skillの使用証拠と複数attemptの一貫した根拠がある場合だけ判断する。未観測・矛盾する場合は判断不能とし、厳密な因果証明は主張しない
-- **AIが評価基準と正解事例の候補を作成でき、確認済み事例と未確認候補を分離してJudgeを独立検証し、不一致・失効・基準不足のcriterionからSkill自動修正を開始しない**。Judge改善の候補を調整用・独立検証用事例の双方で確認し、採用を人間に留保できる
+- **AIが評価基準と正解事例の候補を作成でき、確認済み事例と未確認候補を分離してJudgeを独立検証し、不一致・失効・基準不足の意味評価criterionに依存するSkill自動修正を開始しない**。決定論的評価だけに依存する独立案件は、既存の固定graderと期待結果の検証が成立すればJudge検証不足で停止しない。Judge改善の候補を調整用・独立検証用事例の双方で確認し、採用を人間に留保できる
 - **自動分析・機械的な修正可否判定・レビュー待ち保存が成立し、条件に合致する実際のSkill欠陥をbaseline評価から1件以上特定して、隔離した修正Agentが候補revisionを作り、同条件で再評価する受入検証**を実施している。比較する各revisionを2attempt以上評価し、重要品質の改善・回帰・使用証拠を原成果物と固定Referenceから確認できる。改善が確認できない場合は未達として記録し、実改善の証拠なしにPlan全体の改善実証を完了扱いしない
 - 同一Evaluatorで正常・重要欠落・捏造のQA成果物を判別できた根拠とrepeatの揺れを保存する
 - 互換なruntime implementation更新がfingerprint相違だけを理由に非passとならず、真の契約非互換を個別criteriaへ区分できる
