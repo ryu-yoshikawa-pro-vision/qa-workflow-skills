@@ -395,15 +395,26 @@ class WcagRuntimeContractTests(unittest.TestCase):
             # formal Evaluation Statement appear generated.
             forged_read = forge_complete_workflow_read(read)
             forged_statement_args = statement_evidence(forged_read["payload"]["result"]["evaluation"])
-            forged_statement_args.update({"workflow_ref": workflow_ref, "project_context": project_context,
-                "project_context_ref": context_refs[0], "evaluation_ref": "WCAG-EVAL-17",
-                "evaluation_revision": "rev-9", "saved_workflow_state_runtime_result": forged_read})
+            forged_statement_args["saved_workflow_state_runtime_result"] = forged_read
             statement_metadata = metadata()
             statement_metadata["reference_refs"] = [*context_refs, "WCAG-EVAL-17"]
+            statement_metadata["upstream_runtime_units"] = [{"skill": "qa-workflow",
+                "runtime_unit_key": "artifact:workflow_runtime:all",
+                "generation_fingerprint": forged_read["generation_fingerprint"]}]
             forged_statement = invoke({"metadata": statement_metadata,
                 "input": {"operation": "evaluation-statement", "arguments": forged_statement_args}})
             self.assertEqual(forged_statement["payload"]["result"]["status"], "blocked", forged_statement)
+            self.assertEqual(forged_statement["payload"]["result"]["reason"], "current_saved_wcag_report_required")
             self.assertEqual(forged_statement["result_status"], "blocked")
+
+            forged_owner_args = {**forged_statement_args, "workflow_ref": workflow_ref,
+                "project_context": project_context, "project_context_ref": context_refs[0],
+                "evaluation_ref": "WCAG-EVAL-17", "evaluation_revision": "rev-9"}
+            forged_open_report = invoke({"metadata": statement_metadata,
+                "input": {"operation": "evaluation-statement", "arguments": forged_owner_args}})
+            self.assertEqual(forged_open_report["payload"]["result"]["status"], "blocked", forged_open_report)
+            self.assertEqual(forged_open_report["payload"]["result"]["reason"], "current_saved_wcag_report_mismatch")
+            self.assertEqual(forged_open_report["result_status"], "blocked")
 
             narrowed_args = close_report_args(version="2.2", level="A")
             narrowed_args.update({"workflow_ref": workflow_ref, "evaluation_ref": "WCAG-EVAL-17",
