@@ -4,6 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 import hashlib
 import json
+import subprocess
 import sys
 from typing import Any
 
@@ -211,13 +212,77 @@ def _close_report_with_saved_state(args: dict[str, Any], metadata: dict[str, Any
     }
 
 
+def _read_current_workflow_evaluation(args: dict[str, Any], metadata: dict[str, Any]) -> dict[str, Any] | None:
+    workflow_ref = args.get("workflow_ref")
+    evaluation_ref = args.get("evaluation_ref")
+    evaluation_revision = args.get("evaluation_revision")
+    project_context = args.get("project_context")
+    project_context_ref = args.get("project_context_ref")
+    references = metadata.get("reference_refs")
+    if (not isinstance(workflow_ref, str) or not workflow_ref.strip()
+            or not isinstance(evaluation_ref, str) or not evaluation_ref.strip()
+            or not isinstance(evaluation_revision, str) or not evaluation_revision.strip()
+            or not isinstance(project_context, str) or not project_context.strip()
+            or not isinstance(project_context_ref, str)
+            or not isinstance(references, list) or project_context_ref not in references):
+        return None
+
+    workflow_runtime = SCRIPT_PATH.parents[3] / "skills" / "qa-workflow" / "scripts" / "workflow_runtime.py"
+    if not workflow_runtime.is_file():
+        return None
+    request = {
+        "metadata": {
+            "envelope_version": "1", "skill": "qa-workflow",
+            "runtime_contract_version": "runtime-v1",
+            "generator_contract_version": "workflow-runtime-v1",
+            "runtime_unit_key": "artifact:workflow_runtime:all", "model_key": None,
+            "model_type": None, "technique_slug": None, "selection_source": None,
+            "selection_key": None, "scope_key": "all", "input_mode": "artifact",
+            "upstream_entities": [], "upstream_runtime_units": [], "static_data_versions": {},
+            "authority_refs": [], "reference_refs": [project_context_ref],
+        },
+        "input": {"operation": "read-wcag-evaluation-state", "arguments": {
+            "workflow_ref": workflow_ref, "project_context": project_context,
+            "project_context_ref": project_context_ref, "evaluation_ref": evaluation_ref,
+            "evaluation_revision": evaluation_revision,
+        }},
+    }
+    try:
+        completed = subprocess.run(
+            [sys.executable, str(workflow_runtime)], input=json.dumps(request, ensure_ascii=False),
+            text=True, encoding="utf-8", capture_output=True, check=False, timeout=60,
+        )
+        if completed.returncode not in {0, 1}:
+            return None
+        envelope = json.loads(completed.stdout)
+    except (OSError, subprocess.SubprocessError, UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError):
+        return None
+    payload = envelope.get("payload") if isinstance(envelope, dict) else None
+    result = payload.get("result") if isinstance(payload, dict) else None
+    evaluation = result.get("evaluation") if isinstance(result, dict) else None
+    if (not isinstance(envelope, dict) or envelope.get("skill") != "qa-workflow"
+            or envelope.get("runtime_unit_key") != "artifact:workflow_runtime:all"
+            or envelope.get("runtime_status") != "ok" or envelope.get("result_status") != "ready"
+            or not isinstance(payload, dict) or payload.get("operation") != "read-wcag-evaluation-state"
+            or not isinstance(result, dict) or result.get("status") != "current"
+            or result.get("workflow_ref") != workflow_ref or result.get("evaluation_ref") != evaluation_ref
+            or result.get("evaluation_revision") != evaluation_revision
+            or not isinstance(result.get("provider_revision"), str)
+            or not isinstance(evaluation, dict)
+            or evaluation.get("evaluation_ref") != evaluation_ref
+            or evaluation.get("evaluation_revision") != evaluation_revision):
+        return None
+    return result
+
+
 def _evaluation_statement_with_saved_report(args: dict[str, Any], metadata: dict[str, Any]) -> dict[str, Any]:
-    statement_args = {key: value for key, value in args.items()
-                      if key != "saved_workflow_state_runtime_result"}
+    owner_lookup_fields = {"workflow_ref", "project_context", "project_context_ref",
+                           "evaluation_ref", "evaluation_revision", "saved_workflow_state_runtime_result"}
+    statement_args = {key: value for key, value in args.items() if key not in owner_lookup_fields}
     statement = evaluation_statement(**statement_args)
     if statement.get("status") != "generated":
         return statement
-    saved = _saved_workflow_evaluation(args, metadata)
+    saved = _read_current_workflow_evaluation(args, metadata)
     closure = args.get("report_closure")
     formal = args.get("formal_conformance_results")
     if saved is None or not isinstance(closure, dict) or not isinstance(formal, dict):

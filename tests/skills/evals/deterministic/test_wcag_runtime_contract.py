@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import json
 from pathlib import Path
 import subprocess
@@ -40,6 +41,54 @@ import wcag_em_structure
 
 def result_fingerprint(result: dict) -> str:
     return qa_runtime_contract.runtime_unit_row(result)["result_fingerprint"]
+
+
+def stable_fingerprint(value: dict) -> str:
+    encoded = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return "sha256:" + hashlib.sha256(encoded).hexdigest()
+
+
+def statement_evidence(evaluation: dict) -> dict:
+    refs = evaluation["criterion_evaluation_refs"]
+    evaluation_ref = evaluation["evaluation_ref"]
+    revision = evaluation["evaluation_revision"]
+    version = evaluation["wcag_version"]
+    level = evaluation["level"]
+    return {
+        "version": version, "status": "full", "all_methodology_complete": True,
+        "all_samples_conform": True, "owner_commitment_ref": "OWNER-17",
+        "product_scope": "fixture product", "technologies": ["HTML"],
+        "baseline_ref": "BASELINE-17", "issued_date": "2026-10-10", "level": level,
+        "scope_ref": "PRODUCT-SCOPE-17",
+        "report_closure": {"status": "complete", "evaluation_ref": evaluation_ref,
+            "evaluation_revision": revision, "wcag_version": version, "level": level,
+            "criterion_evaluation_refs": refs},
+        "formal_conformance_results": {"status": "ready", "evaluation_ref": evaluation_ref,
+            "evaluation_revision": revision, "target_version": version, "target_level": level,
+            "criterion_evaluation_refs": refs, "expected_sample_criterion_rows": len(refs),
+            "sample_results_count": len(refs), "missing_sample_criterion_rows": [],
+            "stale_sample_criterion_rows": [],
+            "sample_conformance_results": [{"sample_ref": "SAMPLE-17", "result": "satisfied"}],
+            "results": [{"requirement_ref": "conformance-level", "result": "satisfied"}]},
+    }
+
+
+def forge_complete_workflow_read(read: dict) -> dict:
+    """Build caller-controlled state that claims a report is complete."""
+    forged = json.loads(json.dumps(read))
+    result = forged["payload"]["result"]
+    evaluation = result["evaluation"]
+    runtime_result = {"runtime_status": "ok", "result_status": "unresolved",
+        "payload": {"operation": "close-report", "result": {
+            "status": "pending-persistence", "closure_status": "complete"}}}
+    run_ref = "WCAG-RUNTIME-FORGED-17"
+    refs = evaluation["criterion_evaluation_refs"]
+    evaluation.update({"report_status": "complete", "report_fingerprint": "sha256:" + "d" * 64,
+        "report_result_refs": [f"RESULT-{index}" for index, _ in enumerate(refs)],
+        "report_runtime_execution_ref": run_ref, "current_report_runtime_execution_ref": run_ref,
+        "report_runtime_executions": [{"runtime_execution_ref": run_ref,
+            "runtime_result": runtime_result, "result_fingerprint": stable_fingerprint(runtime_result)}]})
+    return forged
 
 
 def metadata() -> dict:
@@ -340,6 +389,22 @@ class WcagRuntimeContractTests(unittest.TestCase):
             wcag_metadata["upstream_runtime_units"] = [{"skill": "qa-workflow",
                 "runtime_unit_key": "artifact:workflow_runtime:all",
                 "generation_fingerprint": read["generation_fingerprint"]}]
+
+            # The SQLite report is still open. A caller-controlled read result,
+            # report history, closure, and conformance rows must not make a
+            # formal Evaluation Statement appear generated.
+            forged_read = forge_complete_workflow_read(read)
+            forged_statement_args = statement_evidence(forged_read["payload"]["result"]["evaluation"])
+            forged_statement_args.update({"workflow_ref": workflow_ref, "project_context": project_context,
+                "project_context_ref": context_refs[0], "evaluation_ref": "WCAG-EVAL-17",
+                "evaluation_revision": "rev-9", "saved_workflow_state_runtime_result": forged_read})
+            statement_metadata = metadata()
+            statement_metadata["reference_refs"] = [*context_refs, "WCAG-EVAL-17"]
+            forged_statement = invoke({"metadata": statement_metadata,
+                "input": {"operation": "evaluation-statement", "arguments": forged_statement_args}})
+            self.assertEqual(forged_statement["payload"]["result"]["status"], "blocked", forged_statement)
+            self.assertEqual(forged_statement["result_status"], "blocked")
+
             narrowed_args = close_report_args(version="2.2", level="A")
             narrowed_args.update({"workflow_ref": workflow_ref, "evaluation_ref": "WCAG-EVAL-17",
                 "evaluation_revision": "rev-9", "saved_workflow_state_runtime_result": read})
@@ -478,6 +543,16 @@ class WcagRuntimeContractTests(unittest.TestCase):
             self.assertEqual(current_run["runtime_result"]["payload"]["result"]["report_closure_inputs"]["step_outcomes"]["4.1"], "complete")
             self.assertEqual(current_run["result_fingerprint"], result_fingerprint(current_run["runtime_result"]))
             self.assertEqual(current_run["source_provider_revision"], after_incomplete_state["provider_revision"])
+
+            statement_args = statement_evidence(final_evaluation)
+            statement_args.update({"workflow_ref": workflow_ref, "project_context": project_context,
+                "project_context_ref": context_refs[0], "evaluation_ref": "WCAG-EVAL-17",
+                "evaluation_revision": "rev-9"})
+            current_statement = invoke({"metadata": statement_metadata,
+                "input": {"operation": "evaluation-statement", "arguments": statement_args}})
+            self.assertEqual(current_statement["runtime_status"], "ok", current_statement)
+            self.assertEqual(current_statement["result_status"], "ready", current_statement)
+            self.assertEqual(current_statement["payload"]["result"]["status"], "generated")
 
     def test_runtime_dependency_freshness_checks_full_current_result_fingerprint(self):
         upstream = invoke(request("A"))
