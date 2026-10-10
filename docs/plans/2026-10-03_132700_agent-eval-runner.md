@@ -33,7 +33,7 @@ PR #11の検証では`codex exec`で評価対象成果物を生成し、既存�
 
 また、現在すでに存在するdeterministic / semantic / trigger / routing / runtime評価を置き換えません。Judge自体の検証・改善は既存rubric・Reference・fixtureを活用し、正解データの確定とJudge候補の採用は人間または独立した決定論的な根拠を必要とします。実Agent生成・評価・保存に加え、結果の分析と限定した修正・再評価を既存評価へ接続します。native triggerの実Agent評価は引き続き対象外です。
 
-完成後は、少なくとも次の改善ループを同じ仕組みで繰り返せる状態にします。
+完成後は、少なくとも次の改善ループを同じ仕組みで繰り返せる状態にします。レビュー待ちは依存する案件だけを止め、他の改善が可能なら実行上限まで処理します。全残案件がレビュー待ちに依存する場合や共有実行条件が成立しない場合は全体を停止し、判断・再開の根拠を保存します。
 
 ```text
 現在のSkill
@@ -136,7 +136,7 @@ PR #14で追加された3 Skillのsemantic caseも、固定Evaluator revisionに
 
 ### フェーズ3: 評価結果の自動分析・限定修正・再評価
 
-フェーズ1・2の実Agent評価結果を分析Agentが読み、修正可否条件を機械的に検査します。条件を満たすSkill単独の問題は修正Agentが隔離環境で最小修正し、関連テストと固定Evaluatorによる再評価で確認します。条件不足・高リスク・改善未確認の案件はレビュー待ちとして根拠付きで保存します。詳細は[自動分析・修正・再評価Plan](./2026-10-03_132700_agent-eval-runner_03_analysis-and-improvement.md)を正本とします。フェーズ1の共通ランナー実装を待たず、分析・振分けのfake Agentテストを並行して開発できます。
+フェーズ1・2の実Agent評価結果を分析Agentが読み、修正可否条件を機械的に検査します。複数案件の依存関係を確認し、レビュー待ちが独立案件を止めない継続処理と、全残案件がブロックされる場合の全体停止・明示的再開を含みます。条件を満たすSkill単独の問題は修正Agentが隔離環境で最小修正し、関連テストと固定Evaluatorによる再評価で確認します。条件不足・高リスク・改善未確認の案件はレビュー待ちとして根拠付きで保存します。詳細は[自動分析・修正・再評価Plan](./2026-10-03_132700_agent-eval-runner_03_analysis-and-improvement.md)を正本とします。フェーズ1の共通ランナー実装を待たず、分析・振分けのfake Agentテストを並行して開発できます。
 
 ## 現在確認できている不足
 
@@ -1010,7 +1010,7 @@ git diff --check
 
 ## 実装順序
 
-共通ランナーとフェーズ2の評価を成立させ、Judgeの独立検証が成立したcriterionから、保存済みrunを使った`improve.py`の分析・振分け、修正Agentの隔離実行、関連テスト・同条件再評価を追加します。分析・修正を行うときもEvaluatorとtargetの固定境界を変更しません。
+共通ランナーとフェーズ2の評価を成立させ、Judgeの独立検証が成立したcriterionから、保存済みrunを使った`improve.py`の分析・振分け、修正Agentの隔離実行、関連テスト・同条件再評価を追加します。レビュー待ちと独立案件の関係を判定して処理を継続し、処理可能案件がなくなれば停止して理由を保存します。分析・修正を行うときもEvaluatorとtargetの固定境界を変更しません。
 
 1. branch開始時点が基準`main`から意図しない差分を持たないことを確認する
 2. 固定Evaluator checkoutのclean状態・grader / Judge条件を確定し、候補Skill revisionのtracked contentから一時実行ディレクトリを作る
@@ -1112,6 +1112,7 @@ native trigger評価は、Skill activationを観測する方法がAgentクライ
 - フェーズ2のrunner / environment error、Skill品質のneeds_review / fail、実行証拠の`evidence_unverified`、`valid=false`、比較不可・部分的Evaluator非互換を区別している
 - フェーズ2のJudgeは固定rubricを`QTS-SEM-001/002`と`QTS-SEM-003..010`へ分割して別々に実行し、後者へ`routing[]`・最終stdout・固定機械判定要約を渡さない。各応答のcriterion集合を検証後、統合して既存result正規化で全10件を判定し、部分失敗を全体PASSにしない
 - 候補production verifier / generatorのSHAだけが変わりschema・機械契約が互換なら、同じ固定Evaluatorでrunの直接比較を妨げない
+- レビュー待ちが独立案件を停止させず、依存する案件だけを待機させ、全残案件がブロックされたら停止する。処理上限・停止理由・未処理案件・依存先を保存し、明示的な別runで安全に再開できる
 - `--analyze-only`で分析・レビュー待ちのみを生成でき、根拠不足・高リスク・非互換・Judge揺れ・実行エラーを自動修正せずレビュー待ちに分けられる。修正許可をLLMの自己申告だけで判断しない
 - 修正Agentは隔離したSkill packageの許可pathだけを変更し、固定Evaluator・target・元branchを不変に保ち、修正試行は1回で停止する。改善が確認された差分・候補revision・検証結果を保存するが自動採用しない
 - ランナー導入のためにSkill本体の通常実行経路とポータビリティを変更していない。別revisionでの**受入用Skill改善**は既存契約・ポータビリティを維持し、関連テストで確認している
