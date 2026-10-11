@@ -53,7 +53,7 @@ SkillとJudgeをそれぞれ独立に検証・改善する。**Judge自身の判
 ## 保存・実装境界
 
 - 確認済み正解データの正本はEvaluator-onlyのGit管理fixture / manifestでrevision固定する。候補は原本と分離する。データの承認・失効・更新理由を記録する。
-- 出力rootの`judge-validation/result.json`へEvaluator / Judge / 正解データのfingerprint、criterion別の検証可否、不一致根拠を保存する。`judge-validation/proposals/`へ変更候補、`judge-validation/review-pending/`へ不明点・要確認・判断理由を保存する。秘密や安全化できない生ログを保存しない。
+- 出力rootの`judge-validation/result.json`へEvaluator / Judge / 正解データのfingerprint、criterion別の検証可否、不一致根拠を保存する。`judge-validation/proposals/`へ変更候補、`judge-validation/review-pending/`へ不明点・要確認・判断理由を保存する。**Judge改善候補の成功・失敗・判断不能も試行別に、変更差分・根拠・評価に使った事例ID・反復結果・停止理由・実効profile・参照先を記録する。** 独立検証用の事例別正解・結果は改善Agentへ返さず、Evaluator側の記録へ分離する。候補用の一時領域を設けた場合、必要な記録・復元用の安全な差分を確定した後にその一時領域だけを削除する。保存・cleanupに失敗した場合は事実を記録し、改善済みとしない。秘密や安全化できない生ログを保存しない。
 - 新規の最小入口`scripts/skills/evals/agent/judge_validation.py`を置く。既存Judge subprocess・executorとsemantic normalizerを再利用して検証と候補作成を行い、`improve.py`が検証済み結果を参照する。改善Agentへの入力は調整用事例と安全化された判定根拠に限定し、独立検証用の期待判定・根拠を渡さない。
 - 正解データの変更権限とJudge改善案の作成権限を分離する。独立検証用の入力・期待判定・事例別結果を改善Agentのworkspace・prompt・診断に渡さず、Evaluator-only領域の読取拒否をnegative testで確認する。公開資料のモデル事前学習への混入まで防げたと主張しない。Judge候補の自動push、PR作成、merge、自動採用、自動学習はしない。通常CIで外部LLMを呼ばない。
 
