@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import unittest
+from pathlib import Path
 
-from scripts.skills.evals.semantic.loader import load_semantic_skill
 from test_repository_structure import CANONICAL_SKILLS
 
+from scripts.skills.evals.semantic.loader import load_semantic_skill
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 SKILLS_ROOT = REPO_ROOT / "skills"
+
 
 class SemanticDatasetTests(unittest.TestCase):
     def test_repository_semantic_datasets_are_complete(self):
@@ -18,25 +19,49 @@ class SemanticDatasetTests(unittest.TestCase):
             with self.subTest(skill=skill):
                 dataset = load_semantic_skill(skill, SKILLS_ROOT)
                 self.assertEqual(dataset["skill"], skill)
-                manifest = json.loads((SKILLS_ROOT / skill / "evals" / "semantic" / "evals.json").read_text(encoding="utf-8"))
+                manifest = json.loads(
+                    (
+                        SKILLS_ROOT / skill / "evals" / "semantic" / "evals.json"
+                    ).read_text(encoding="utf-8")
+                )
                 self.assertEqual(len(dataset["cases"]), len(manifest["cases"]))
-                self.assertEqual(len(dataset["criteria"]), len(dataset["criteria_by_id"]))
-                self.assertEqual(len({case["id"] for case in dataset["cases"]}), len(manifest["cases"]))
+                self.assertEqual(
+                    len(dataset["criteria"]), len(dataset["criteria_by_id"])
+                )
+                self.assertEqual(
+                    len({case["id"] for case in dataset["cases"]}),
+                    len(manifest["cases"]),
+                )
 
                 for case in dataset["cases"]:
                     self.assertTrue(case["input_text"].strip())
                     self.assertTrue(case["reference_text"].strip())
                     self.assertTrue(case["criteria"])
-                    self.assertTrue(set(case["criteria"]) <= set(dataset["criteria_by_id"]))
-                if skill in {"test-target-inspection", "test-execution", "regression-testing", "exploratory-testing", "qa-knowledge"}:
-                    critical_ids = {criterion["id"] for criterion in dataset["criteria"] if criterion["critical"]}
+                    self.assertTrue(
+                        set(case["criteria"]) <= set(dataset["criteria_by_id"])
+                    )
+                if skill in {
+                    "test-target-inspection",
+                    "test-execution",
+                    "regression-testing",
+                    "exploratory-testing",
+                    "qa-knowledge",
+                }:
+                    critical_ids = {
+                        criterion["id"]
+                        for criterion in dataset["criteria"]
+                        if criterion["critical"]
+                    }
                     covered_ids = {
                         criterion_id
                         for case in dataset["cases"]
                         for criterion_id in case["criteria"]
                     }
                     missing_critical_ids = sorted(critical_ids - covered_ids)
-                    self.assertFalse(missing_critical_ids, f"critical criteria without semantic case coverage: {missing_critical_ids}")
+                    self.assertFalse(
+                        missing_critical_ids,
+                        f"critical criteria without semantic case coverage: {missing_critical_ids}",
+                    )
                 total_cases += len(dataset["cases"])
 
         actual_total = sum(

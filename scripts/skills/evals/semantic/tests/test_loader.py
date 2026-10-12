@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import tempfile
 import unittest
+from pathlib import Path
 
-from scripts.skills.evals.semantic.loader import SemanticDatasetError, load_semantic_skill
+from scripts.skills.evals.semantic.loader import (
+    SemanticDatasetError,
+    load_semantic_skill,
+)
 
 
 class SemanticLoaderTests(unittest.TestCase):
@@ -49,7 +52,9 @@ class SemanticLoaderTests(unittest.TestCase):
             encoding="utf-8",
         )
         (case / "input.md").write_text("# Input\n事実A", encoding="utf-8")
-        (case / "reference.md").write_text("# Reference\n事実Aを基準とする", encoding="utf-8")
+        (case / "reference.md").write_text(
+            "# Reference\n事実Aを基準とする", encoding="utf-8"
+        )
         return skills_root
 
     def set_case_path(self, skills_root: Path, field: str, value: str) -> None:
@@ -102,7 +107,10 @@ class SemanticLoaderTests(unittest.TestCase):
         for filename in ("input.md", "reference.md"):
             with self.subTest(filename=filename), tempfile.TemporaryDirectory() as tmp:
                 skills_root = self.make_fixture(Path(tmp))
-                (skills_root / f"example-skill/evals/semantic/cases/case-001/{filename}").unlink()
+                (
+                    skills_root
+                    / f"example-skill/evals/semantic/cases/case-001/{filename}"
+                ).unlink()
                 with self.assertRaises(FileNotFoundError):
                     load_semantic_skill("example-skill", skills_root)
 
@@ -157,7 +165,9 @@ class SemanticLoaderTests(unittest.TestCase):
             outside_case = tmp_path / "outside-cases" / "case-001"
             outside_case.mkdir(parents=True)
             (outside_case / "input.md").write_text("outside input", encoding="utf-8")
-            (outside_case / "reference.md").write_text("outside reference", encoding="utf-8")
+            (outside_case / "reference.md").write_text(
+                "outside reference", encoding="utf-8"
+            )
             try:
                 cases.symlink_to(tmp_path / "outside-cases", target_is_directory=True)
             except (OSError, NotImplementedError) as exc:

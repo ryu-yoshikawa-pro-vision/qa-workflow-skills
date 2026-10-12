@@ -1,4 +1,5 @@
 """Test-only SQLite provider for the canonical WCAG handoff E2E contract."""
+
 from __future__ import annotations
 
 import json
@@ -36,17 +37,24 @@ class SQLiteHandoffCASProvider:
 
     @staticmethod
     def _encode(value: dict[str, Any]) -> str:
-        return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        return json.dumps(
+            value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        )
 
     def create_state(self, workflow_ref: str, state: dict[str, Any]) -> dict[str, Any]:
         with closing(self._connect()) as connection:
             connection.execute("BEGIN IMMEDIATE")
             row = connection.execute(
-                "SELECT payload, revision FROM workflow_state WHERE workflow_ref=?", (workflow_ref,)
+                "SELECT payload, revision FROM workflow_state WHERE workflow_ref=?",
+                (workflow_ref,),
             ).fetchone()
             if row:
                 connection.execute("COMMIT")
-                return {"status": "exists", "state": json.loads(row[0]), "revision": row[1]}
+                return {
+                    "status": "exists",
+                    "state": json.loads(row[0]),
+                    "revision": row[1],
+                }
             connection.execute(
                 "INSERT INTO workflow_state(workflow_ref,payload,revision) VALUES(?,?,1)",
                 (workflow_ref, self._encode(state)),
@@ -57,14 +65,16 @@ class SQLiteHandoffCASProvider:
     def read_state(self, workflow_ref: str) -> dict[str, Any] | None:
         with closing(self._connect()) as connection:
             row = connection.execute(
-                "SELECT payload, revision FROM workflow_state WHERE workflow_ref=?", (workflow_ref,)
+                "SELECT payload, revision FROM workflow_state WHERE workflow_ref=?",
+                (workflow_ref,),
             ).fetchone()
         if not row:
             return None
         return {"state": json.loads(row[0]), "revision": row[1]}
 
-    def compare_and_set_state(self, workflow_ref: str, expected_revision: int,
-                              state: dict[str, Any]) -> dict[str, Any]:
+    def compare_and_set_state(
+        self, workflow_ref: str, expected_revision: int, state: dict[str, Any]
+    ) -> dict[str, Any]:
         with closing(self._connect()) as connection:
             connection.execute("BEGIN IMMEDIATE")
             cursor = connection.execute(
@@ -75,13 +85,23 @@ class SQLiteHandoffCASProvider:
             if cursor.rowcount != 1:
                 connection.execute("ROLLBACK")
                 current = connection.execute(
-                    "SELECT revision FROM workflow_state WHERE workflow_ref=?", (workflow_ref,)
+                    "SELECT revision FROM workflow_state WHERE workflow_ref=?",
+                    (workflow_ref,),
                 ).fetchone()
-                return {"status": "conflict", "current_revision": current[0] if current else None}
+                return {
+                    "status": "conflict",
+                    "current_revision": current[0] if current else None,
+                }
             connection.execute("COMMIT")
-            return {"status": "written", "revision": expected_revision + 1, "state": state}
+            return {
+                "status": "written",
+                "revision": expected_revision + 1,
+                "state": state,
+            }
 
-    def acquire_reservation(self, resource_ref: str, workflow_ref: str) -> dict[str, Any]:
+    def acquire_reservation(
+        self, resource_ref: str, workflow_ref: str
+    ) -> dict[str, Any]:
         with closing(self._connect()) as connection:
             connection.execute("BEGIN IMMEDIATE")
             row = connection.execute(
@@ -90,7 +110,11 @@ class SQLiteHandoffCASProvider:
             ).fetchone()
             if row and row[2] == "reserved":
                 connection.execute("COMMIT")
-                return {"status": "conflict", "owner_workflow_ref": row[0], "revision": row[1]}
+                return {
+                    "status": "conflict",
+                    "owner_workflow_ref": row[0],
+                    "revision": row[1],
+                }
             revision = (row[1] + 1) if row else 1
             connection.execute(
                 "INSERT INTO reservations(resource_ref,owner_workflow_ref,revision,status) VALUES(?,?,?,?) "
@@ -99,11 +123,16 @@ class SQLiteHandoffCASProvider:
                 (resource_ref, workflow_ref, revision, "reserved"),
             )
             connection.execute("COMMIT")
-        return {"status": "reserved", "reservation_ref": f"sqlite:{resource_ref}",
-                "owner_workflow_ref": workflow_ref, "revision": revision}
+        return {
+            "status": "reserved",
+            "reservation_ref": f"sqlite:{resource_ref}",
+            "owner_workflow_ref": workflow_ref,
+            "revision": revision,
+        }
 
-    def release_reservation(self, resource_ref: str, workflow_ref: str,
-                            expected_revision: int) -> dict[str, Any]:
+    def release_reservation(
+        self, resource_ref: str, workflow_ref: str, expected_revision: int
+    ) -> dict[str, Any]:
         with closing(self._connect()) as connection:
             connection.execute("BEGIN IMMEDIATE")
             row = connection.execute(

@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import subprocess
 import sys
 import unittest
-
+from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-RUNTIME_CONTRACT = REPO_ROOT / "skills" / "test-condition-design" / "scripts" / "runtime_contract.py"
+RUNTIME_CONTRACT = (
+    REPO_ROOT / "skills" / "test-condition-design" / "scripts" / "runtime_contract.py"
+)
 AGGREGATE_LIMIT = 16 * 1024 * 1024
 
 
@@ -28,7 +29,9 @@ def _raw_request(
         "previous_artifact_markdown": previous,
         "partial_rerun": partial,
     }
-    return json.dumps(request, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    return json.dumps(request, ensure_ascii=False, separators=(",", ":")).encode(
+        "utf-8"
+    )
 
 
 def _boundary_raw(extra: int) -> bytes:
@@ -59,7 +62,9 @@ class RuntimeAggregateLimitTests(unittest.TestCase):
         raw = _boundary_raw(0)
         self.assertEqual(len(raw), AGGREGATE_LIMIT)
         result = self._run(raw)
-        self.assertNotIn("limit_exceeded", {issue.get("issue_type") for issue in result["issues"]})
+        self.assertNotIn(
+            "limit_exceeded", {issue.get("issue_type") for issue in result["issues"]}
+        )
 
     def test_one_byte_over_aggregate_boundary_is_blocked(self) -> None:
         raw = _boundary_raw(1)
@@ -71,13 +76,17 @@ class RuntimeAggregateLimitTests(unittest.TestCase):
         raw = _raw_request("x" * (64 * 1024 + 1))
         self.assertLess(len(raw), AGGREGATE_LIMIT)
         result = self._run(raw)
-        self.assertNotIn("limit_exceeded", {issue.get("issue_type") for issue in result["issues"]})
+        self.assertNotIn(
+            "limit_exceeded", {issue.get("issue_type") for issue in result["issues"]}
+        )
 
     def test_large_previous_artifact_is_not_subject_to_string_limit(self) -> None:
         raw = _raw_request("", previous="x" * (64 * 1024 + 1), partial=True)
         self.assertLess(len(raw), AGGREGATE_LIMIT)
         result = self._run(raw)
-        self.assertNotIn("limit_exceeded", {issue.get("issue_type") for issue in result["issues"]})
+        self.assertNotIn(
+            "limit_exceeded", {issue.get("issue_type") for issue in result["issues"]}
+        )
 
     def test_normalized_input_string_limit_remains_in_force(self) -> None:
         raw = _raw_request("small", {"large": "x" * (64 * 1024 + 1)})
@@ -85,7 +94,9 @@ class RuntimeAggregateLimitTests(unittest.TestCase):
         self.assertEqual(result["issues"][0]["issue_type"], "limit_exceeded")
 
     def test_nested_artifact_named_string_is_not_exempt(self) -> None:
-        raw = _raw_request("small", {"nested": {"artifact_markdown": "x" * (64 * 1024 + 1)}})
+        raw = _raw_request(
+            "small", {"nested": {"artifact_markdown": "x" * (64 * 1024 + 1)}}
+        )
         result = self._run(raw)
         self.assertEqual(result["issues"][0]["issue_type"], "limit_exceeded")
 
@@ -107,7 +118,13 @@ class RuntimeAggregateLimitTests(unittest.TestCase):
         self.assertEqual(result["issues"][0]["issue_type"], "limit_exceeded")
 
     def test_normal_generator_string_limit_remains_in_force(self) -> None:
-        generator = REPO_ROOT / "skills" / "test-condition-design" / "scripts" / "equivalence_partitions.py"
+        generator = (
+            REPO_ROOT
+            / "skills"
+            / "test-condition-design"
+            / "scripts"
+            / "equivalence_partitions.py"
+        )
         raw = json.dumps(
             {"metadata": {}, "input": {"large": "x" * (64 * 1024 + 1)}},
             ensure_ascii=False,

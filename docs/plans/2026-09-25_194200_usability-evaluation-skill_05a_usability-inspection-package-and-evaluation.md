@@ -4,7 +4,7 @@
 
 実装構成:
 
-~~~text
+```text
 skills/usability-inspection/
 ├── SKILL.md
 ├── references/
@@ -37,7 +37,7 @@ skills/usability-inspection/
         ├── rubric.json
         ├── evals.json
         └── cases/
-~~~
+```
 
 browser automation framework、performance measurement service、RUM serviceはpackage内へ新設しません。`scripts/` はbrowserを所有せず、browser ownerが取得したmachine-readable resultのrequest / schema検証・正規化、構造化・計算・対応済みtest rule判定だけを行います。browser observationの詳細契約は `_05g_usability-inspection-browser-observation-contract.md`、runtime全体は `_05b_usability-inspection-deterministic-runtime.md` を正本とします。
 

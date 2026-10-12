@@ -6,12 +6,12 @@
 
 `usability-evaluation` とは責務を分けます。
 
-| Skill | 主責務 | 実対象の能動操作 | 主な根拠 |
-| --- | --- | --- | --- |
-| `usability-evaluation` | UI pattern / principle / standard / Design System知識からUI / UX上の意味を評価 | 所有しない | reference knowledge + evidence |
-| `usability-inspection` | live Web UIを操作・観測し、客観的事実・測定値・適用可能な標準判定を取得 | 所有する | live observation / measurement + applicable criteria |
-| `test-target-inspection` | currentなテスト対象情報を収集・管理 | 必要範囲で行う | current target state |
-| `test-execution` | 定義済み詳細TCを実行し期待結果と比較 | 行う | TC expected result |
+| Skill                    | 主責務                                                                         | 実対象の能動操作 | 主な根拠                                             |
+| ------------------------ | ------------------------------------------------------------------------------ | ---------------- | ---------------------------------------------------- |
+| `usability-evaluation`   | UI pattern / principle / standard / Design System知識からUI / UX上の意味を評価 | 所有しない       | reference knowledge + evidence                       |
+| `usability-inspection`   | live Web UIを操作・観測し、客観的事実・測定値・適用可能な標準判定を取得        | 所有する         | live observation / measurement + applicable criteria |
+| `test-target-inspection` | currentなテスト対象情報を収集・管理                                            | 必要範囲で行う   | current target state                                 |
+| `test-execution`         | 定義済み詳細TCを実行し期待結果と比較                                           | 行う             | TC expected result                                   |
 
 `test-target-inspection` / `test-execution` は本Skillの代替ではありません。
 

@@ -1,6 +1,6 @@
 // The existing Playwright CLI evaluates this file as a parenthesized function expression.
 // prettier-ignore
-async (page) => {
+(async (page) => {
   const requestSlot = "__usabilityInspectionFixedWcagProbeRequest";
   const currentDocumentIdentity = async () =>
     page.evaluate(async () => {
@@ -25,9 +25,7 @@ async (page) => {
           key,
           new TextEncoder().encode(location.href),
         );
-        const hex = Array.from(new Uint8Array(signature), (byte) =>
-          byte.toString(16).padStart(2, "0"),
-        ).join("");
+        const hex = Array.from(new Uint8Array(signature), (byte) => byte.toString(16).padStart(2, "0")).join("");
         return `hmac-sha256:${hex}`;
       } catch {
         return null;
@@ -75,22 +73,22 @@ async (page) => {
   const evidenceRefs = [];
   const identity = isObject(request)
     ? Object.fromEntries(
-        identityFields.map((key) => [
-          key,
-          key === "target_identity" && !identityPattern.test(request[key] || "")
-            ? null
-            : key === "currentness_dependency" &&
-                (!isObject(request[key]) ||
-                  Object.keys(request[key]).sort().join("\u0000") !==
-                    ["sample_identity_fingerprint", "variation_identity_fingerprint"]
-                      .sort()
-                      .join("\u0000") ||
-                  !fingerprintPattern.test(request[key].sample_identity_fingerprint || "") ||
-                  !fingerprintPattern.test(request[key].variation_identity_fingerprint || ""))
-              ? null
-              : request[key],
-        ]),
-      )
+      identityFields.map((key) => [
+        key,
+        key === "target_identity" && !identityPattern.test(request[key] || "")
+          ? null
+          : key === "currentness_dependency"
+              && (!isObject(request[key])
+                || Object.keys(request[key]).sort().join("\u0000")
+                  !== ["sample_identity_fingerprint", "variation_identity_fingerprint"]
+                    .sort()
+                    .join("\u0000")
+                || !fingerprintPattern.test(request[key].sample_identity_fingerprint || "")
+                || !fingerprintPattern.test(request[key].variation_identity_fingerprint || ""))
+          ? null
+          : request[key],
+      ]),
+    )
     : {};
   const fixedProbeKeys = new Set([
     "mp-audio-autoplay-run",
@@ -140,18 +138,18 @@ async (page) => {
   });
 
   if (
-    !isObject(request) ||
-    Object.keys(request).sort().join("\u0000") !== requestFields.join("\u0000") ||
-    request.request_kind !== "wcag-machine-probe" ||
-    !fixedProbeKeys.has(request.machine_probe_key) ||
-    request.required_browser_capability !== request.machine_probe_key ||
-    identityFields.some((key) => !Object.prototype.hasOwnProperty.call(request, key)) ||
-    !identityPattern.test(request.target_identity || "") ||
-    !isObject(request.currentness_dependency) ||
-    Object.keys(request.currentness_dependency).sort().join("\u0000") !==
-      ["sample_identity_fingerprint", "variation_identity_fingerprint"].sort().join("\u0000") ||
-    !fingerprintPattern.test(request.currentness_dependency.sample_identity_fingerprint || "") ||
-    !fingerprintPattern.test(request.currentness_dependency.variation_identity_fingerprint || "")
+    !isObject(request)
+    || Object.keys(request).sort().join("\u0000") !== requestFields.join("\u0000")
+    || request.request_kind !== "wcag-machine-probe"
+    || !fixedProbeKeys.has(request.machine_probe_key)
+    || request.required_browser_capability !== request.machine_probe_key
+    || identityFields.some((key) => !Object.prototype.hasOwnProperty.call(request, key))
+    || !identityPattern.test(request.target_identity || "")
+    || !isObject(request.currentness_dependency)
+    || Object.keys(request.currentness_dependency).sort().join("\u0000")
+      !== ["sample_identity_fingerprint", "variation_identity_fingerprint"].sort().join("\u0000")
+    || !fingerprintPattern.test(request.currentness_dependency.sample_identity_fingerprint || "")
+    || !fingerprintPattern.test(request.currentness_dependency.variation_identity_fingerprint || "")
   ) {
     return failure("blocked", "typed fixed WCAG machine probe request is invalid");
   }
@@ -289,9 +287,9 @@ async (page) => {
         }
         const semanticTree = await focused.ariaSnapshotJSON({ depth: 0, timeout: 1000 });
         if (
-          !Array.isArray(semanticTree) ||
-          semanticTree.length > 1 ||
-          (semanticTree.length === 1 && typeof semanticTree[0]?.role !== "string")
+          !Array.isArray(semanticTree)
+          || semanticTree.length > 1
+          || (semanticTree.length === 1 && typeof semanticTree[0]?.role !== "string")
         ) {
           captureError = "focused target accessibility role could not be confirmed";
           break;
@@ -328,8 +326,8 @@ async (page) => {
                 const siblingContainer = parent || (root instanceof ShadowRoot ? root : null);
                 const peers = siblingContainer
                   ? Array.from(siblingContainer.children).filter(
-                      (peer) => peer.tagName === current.tagName,
-                    )
+                    (peer) => peer.tagName === current.tagName,
+                  )
                   : [current];
                 parts.unshift(
                   current.tagName.toLowerCase() + ":nth-of-type(" + (peers.indexOf(current) + 1) + ")",
@@ -351,20 +349,22 @@ async (page) => {
               .filter((candidate) => {
                 const candidatePath = pathFor(candidate);
                 if (
-                  candidatePath === target.path ||
-                  target.path.startsWith(candidatePath + " > ")
+                  candidatePath === target.path
+                  || target.path.startsWith(candidatePath + " > ")
                 ) return false;
                 const style = getComputedStyle(candidate);
-                if (!["fixed", "sticky"].includes(style.position) ||
-                    style.display === "none" ||
-                    style.visibility === "hidden" ||
-                    style.visibility === "collapse") return false;
+                if (
+                  !["fixed", "sticky"].includes(style.position)
+                  || style.display === "none"
+                  || style.visibility === "hidden"
+                  || style.visibility === "collapse"
+                ) return false;
                 const overlayRect = candidate.getBoundingClientRect();
-                return overlayRect.width > 0 && overlayRect.height > 0 &&
-                  overlayRect.left < rect.x + rect.width &&
-                  overlayRect.right > rect.x &&
-                  overlayRect.top < rect.y + rect.height &&
-                  overlayRect.bottom > rect.y;
+                return overlayRect.width > 0 && overlayRect.height > 0
+                  && overlayRect.left < rect.x + rect.width
+                  && overlayRect.right > rect.x
+                  && overlayRect.top < rect.y + rect.height
+                  && overlayRect.bottom > rect.y;
               })
               .slice(0, 20)
               .map((candidate) => "dom-overlay:" + pathFor(candidate));
@@ -398,8 +398,8 @@ async (page) => {
         });
         if (singleTarget) break;
       }
-      limitReached = !singleTarget && !cycleDetected && sequence.length >= limit &&
-        sequence.at(-1)?.target_ref !== null;
+      limitReached = !singleTarget && !cycleDetected && sequence.length >= limit
+        && sequence.at(-1)?.target_ref !== null;
     } catch {
       captureError = "fixed keyboard focus sequence could not be captured";
     } finally {
@@ -412,8 +412,9 @@ async (page) => {
         });
         await page.evaluate((position) => window.scrollTo(position.x, position.y), originalScroll);
         const restoredScroll = await page.evaluate(() => ({ x: scrollX, y: scrollY }));
-        if (restoredScroll.x !== originalScroll.x || restoredScroll.y !== originalScroll.y)
+        if (restoredScroll.x !== originalScroll.x || restoredScroll.y !== originalScroll.y) {
           throw new Error("scroll restoration did not match");
+        }
       } catch {
         captureError = captureError || "focus or scroll restoration could not be verified";
       }
@@ -422,14 +423,14 @@ async (page) => {
     const partialReason = focusTargetRemoved
       ? "focus-target-removed"
       : focusLeftDocument
-        ? "focus-left-document"
-        : limitReached
+      ? "focus-left-document"
+      : limitReached
       ? "focus-observation-limit-reached"
       : cycleDetected
-        ? cycleKind === "returns-to-start"
-          ? "focus-cycle-not-complete"
-          : "focus-loop-detected"
-        : null;
+      ? cycleKind === "returns-to-start"
+        ? "focus-cycle-not-complete"
+        : "focus-loop-detected"
+      : null;
     return {
       sequence,
       cycle_detected: cycleDetected,
@@ -447,8 +448,8 @@ async (page) => {
   };
 
   if (
-    request.machine_probe_key === "mp-focus-sequence-run" ||
-    request.machine_probe_key === "mp-keyboard-functionality-run"
+    request.machine_probe_key === "mp-focus-sequence-run"
+    || request.machine_probe_key === "mp-keyboard-functionality-run"
   ) {
     const trace = await captureFocusSequence(64);
     const value = {
@@ -456,12 +457,12 @@ async (page) => {
       ...trace,
       ...(request.machine_probe_key === "mp-keyboard-functionality-run"
         ? {
-            declared_flow_outcome: null,
-            observation_completeness: {
-              state: "partial",
-              reason: "declared-flow-not-materialized",
-            },
-          }
+          declared_flow_outcome: null,
+          observation_completeness: {
+            state: "partial",
+            reason: "declared-flow-not-materialized",
+          },
+        }
         : {}),
     };
     if (request.machine_probe_key === "mp-focus-sequence-run" && trace.capture_error === null) {
@@ -474,8 +475,8 @@ async (page) => {
       });
     }
     if (
-      request.machine_probe_key === "mp-keyboard-functionality-run" &&
-      trace.capture_error === null
+      request.machine_probe_key === "mp-keyboard-functionality-run"
+      && trace.capture_error === null
     ) {
       return resultFor({
         status: "incomplete",
@@ -494,15 +495,14 @@ async (page) => {
   if (request.machine_probe_key === "mp-focus-obscuring-geometry") {
     const trace = await captureFocusSequence(1, true);
     if (
-      trace.capture_error !== null ||
-      trace.sequence.length === 0 ||
-      trace.sequence[0].target_ref === null
+      trace.capture_error !== null
+      || trace.sequence.length === 0
+      || trace.sequence[0].target_ref === null
     ) {
       return resultFor({
         status: "blocked",
         value: { schema: "wcag-focus-obscuring-geometry-v1", ...trace },
-        limitation:
-          trace.capture_error || "fixed keyboard operation did not resolve a focusable target",
+        limitation: trace.capture_error || "fixed keyboard operation did not resolve a focusable target",
       });
     }
     return resultFor({
@@ -522,8 +522,8 @@ async (page) => {
     const styleId = "__qa_fixed_wcag_text_spacing_probe";
     const styleMarker = "data-qa-fixed-wcag-text-spacing-probe";
     const styleText =
-      "* { line-height: 1.5 !important; letter-spacing: 0.12em !important; word-spacing: 0.16em !important; }" +
-      "p { margin-block-end: 2em !important; }";
+      "* { line-height: 1.5 !important; letter-spacing: 0.12em !important; word-spacing: 0.16em !important; }"
+      + "p { margin-block-end: 2em !important; }";
     const baseline = await page.evaluate(
       (id) => ({
         style_collision: Boolean(document.getElementById(id)),
@@ -536,8 +536,7 @@ async (page) => {
       styleId,
     );
     baseline.control_count = await page.locator(interactiveSelector).count();
-    baseline.style_collision =
-      baseline.style_collision || (await page.locator(`style[${styleMarker}]`).count()) > 0;
+    baseline.style_collision = baseline.style_collision || (await page.locator(`style[${styleMarker}]`).count()) > 0;
     if (baseline.style_collision) {
       return resultFor({
         status: "blocked",
@@ -599,12 +598,13 @@ async (page) => {
           const style = getComputedStyle(element);
           const rect = element.getBoundingClientRect();
           if (
-            style.display === "none" ||
-            style.visibility === "hidden" ||
-            rect.width <= 0 ||
-            rect.height <= 0
-          )
+            style.display === "none"
+            || style.visibility === "hidden"
+            || rect.width <= 0
+            || rect.height <= 0
+          ) {
             continue;
+          }
           const hasDirectText = Array.from(element.childNodes).some(
             (node) => node.nodeType === Node.TEXT_NODE && /\S/u.test(node.nodeValue || ""),
           );
@@ -615,35 +615,34 @@ async (page) => {
             const letterSpacing = Number.parseFloat(style.letterSpacing);
             const wordSpacing = Number.parseFloat(style.wordSpacing);
             if (
-              !Number.isFinite(fontSize) ||
-              !Number.isFinite(lineHeight) ||
-              !Number.isFinite(letterSpacing) ||
-              !Number.isFinite(wordSpacing) ||
-              Math.abs(lineHeight - fontSize * 1.5) > 0.5 ||
-              Math.abs(letterSpacing - fontSize * 0.12) > 0.5 ||
-              Math.abs(wordSpacing - fontSize * 0.16) > 0.5
+              !Number.isFinite(fontSize)
+              || !Number.isFinite(lineHeight)
+              || !Number.isFinite(letterSpacing)
+              || !Number.isFinite(wordSpacing)
+              || Math.abs(lineHeight - fontSize * 1.5) > 0.5
+              || Math.abs(letterSpacing - fontSize * 0.12) > 0.5
+              || Math.abs(wordSpacing - fontSize * 0.16) > 0.5
             ) {
               overrideMismatchCount += 1;
             }
           }
           if (
-            element.tagName.toLowerCase() === "p" &&
-            Math.abs(Number.parseFloat(style.marginBlockEnd) - Number.parseFloat(style.fontSize) * 2) > 0.5
+            element.tagName.toLowerCase() === "p"
+            && Math.abs(Number.parseFloat(style.marginBlockEnd) - Number.parseFloat(style.fontSize) * 2) > 0.5
           ) {
             overrideMismatchCount += 1;
           }
-          const overflowX =
-            ["hidden", "clip"].includes(style.overflowX) &&
-            (element.scrollWidth > element.clientWidth + 1 || rect.right > innerWidth + 1);
-          const overflowY =
-            ["hidden", "clip"].includes(style.overflowY) &&
-            (element.scrollHeight > element.clientHeight + 1 || rect.bottom > innerHeight + 1);
-          if (overflowX || overflowY)
+          const overflowX = ["hidden", "clip"].includes(style.overflowX)
+            && (element.scrollWidth > element.clientWidth + 1 || rect.right > innerWidth + 1);
+          const overflowY = ["hidden", "clip"].includes(style.overflowY)
+            && (element.scrollHeight > element.clientHeight + 1 || rect.bottom > innerHeight + 1);
+          if (overflowX || overflowY) {
             clipped.push({
               target_ref: "dom-text-spacing:" + pathFor(element),
               horizontal: overflowX,
               vertical: overflowY,
             });
+          }
         }
         return {
           document_overflow: {
@@ -841,8 +840,8 @@ async (page) => {
         });
       }, locatorRegistrySymbol);
       const needsAccessibility = (selector) =>
-        semanticProbeKeys.has(request.machine_probe_key) &&
-        !(request.machine_probe_key === "mp-moving-updating-inventory" && selector === "*");
+        semanticProbeKeys.has(request.machine_probe_key)
+        && !(request.machine_probe_key === "mp-moving-updating-inventory" && selector === "*");
       for (const selector of new Set(locatorSelectors)) {
         const locator = page.locator(selector);
         const paths = await locator.evaluateAll(pathsForLocatorElements);
@@ -871,8 +870,7 @@ async (page) => {
               }
               record.accessibility_tree_includes_element = true;
               record.accessible_role = node.role;
-              record.accessible_name_present =
-                typeof node.name === "string" && node.name.trim().length > 0;
+              record.accessible_name_present = typeof node.name === "string" && node.name.trim().length > 0;
               if (request.machine_probe_key !== "mp-component-semantics") {
                 record.accessible_name = typeof node.name === "string" ? node.name : "";
               }
@@ -889,8 +887,8 @@ async (page) => {
         }
         const currentPaths = await locator.evaluateAll(pathsForLocatorElements);
         if (
-          currentPaths.length !== paths.length ||
-          currentPaths.some((path, index) => path !== paths[index])
+          currentPaths.length !== paths.length
+          || currentPaths.some((path, index) => path !== paths[index])
         ) {
           throw new Error("fixed locator population changed during observation");
         }
@@ -920,8 +918,8 @@ async (page) => {
           located(selector).filter((element) => {
             const observation = observationFor(element);
             return (
-              observation?.visible === true ||
-              observation?.accessibility_tree_includes_element === true
+              observation?.visible === true
+              || observation?.accessibility_tree_includes_element === true
             );
           });
         const pathFor = (element) => {
@@ -935,8 +933,8 @@ async (page) => {
             const siblingContainer = parent || (root instanceof ShadowRoot ? root : null);
             const peers = siblingContainer
               ? Array.from(siblingContainer.children).filter(
-                  (peer) => peer.tagName === current.tagName,
-                )
+                (peer) => peer.tagName === current.tagName,
+              )
               : [current];
             parts.unshift(
               current.tagName.toLowerCase() + ":nth-of-type(" + (peers.indexOf(current) + 1) + ")",
@@ -955,11 +953,11 @@ async (page) => {
           const style = getComputedStyle(element);
           const rect = element.getBoundingClientRect();
           return (
-            style.display !== "none" &&
-            style.visibility !== "hidden" &&
-            style.visibility !== "collapse" &&
-            rect.width > 0 &&
-            rect.height > 0
+            style.display !== "none"
+            && style.visibility !== "hidden"
+            && style.visibility !== "collapse"
+            && rect.width > 0
+            && rect.height > 0
           );
         };
         const safeText = (value, limit = 180) =>
@@ -977,14 +975,12 @@ async (page) => {
         const refOf = (element, prefix = "dom-target") => prefix + ":" + pathFor(element);
         const interactiveElements = () => allVisibleOrInAccessibilityTree(interactive);
         const statesOf = (element) => ({
-          disabled:
-            typeof observationFor(element)?.enabled === "boolean"
-              ? !observationFor(element).enabled
-              : Boolean(element.disabled || element.getAttribute("aria-disabled") === "true"),
+          disabled: typeof observationFor(element)?.enabled === "boolean"
+            ? !observationFor(element).enabled
+            : Boolean(element.disabled || element.getAttribute("aria-disabled") === "true"),
           required: Boolean(element.required || element.getAttribute("aria-required") === "true"),
-          invalid:
-            element.getAttribute("aria-invalid") === "true" ||
-            (element.validity ? !element.validity.valid : false),
+          invalid: element.getAttribute("aria-invalid") === "true"
+            || (element.validity ? !element.validity.valid : false),
           expanded: element.getAttribute("aria-expanded"),
           checked: typeof element.checked === "boolean" ? element.checked : null,
           selected: typeof element.selected === "boolean" ? element.selected : null,
@@ -1007,8 +1003,8 @@ async (page) => {
         const accessibilityTreeIncludes = (element) =>
           observationFor(element)?.accessibility_tree_includes_element === true;
         const composedParent = (element) =>
-          element.parentElement ||
-          (element.getRootNode() instanceof ShadowRoot ? element.getRootNode().host : null);
+          element.parentElement
+          || (element.getRootNode() instanceof ShadowRoot ? element.getRootNode().host : null);
         const hasComposedAncestor = (element, selector) => {
           let current = element;
           while (current) {
@@ -1032,20 +1028,19 @@ async (page) => {
         switch (key) {
           case "mp-document-title": {
             const htmlNamespace = "http://www.w3.org/1999/xhtml";
-    const htmlContentType = ["text/html", "application/xhtml+xml"].includes(
-      document.contentType?.toLowerCase(),
-    );
-    const isHtmlDocument =
-      htmlContentType &&
-      document.documentElement?.namespaceURI === htmlNamespace &&
-      document.documentElement?.localName === "html";
+            const htmlContentType = ["text/html", "application/xhtml+xml"].includes(
+              document.contentType?.toLowerCase(),
+            );
+            const isHtmlDocument = htmlContentType
+              && document.documentElement?.namespaceURI === htmlNamespace
+              && document.documentElement?.localName === "html";
             const titleElement = isHtmlDocument
               ? Array.from(document.getElementsByTagNameNS(htmlNamespace, "title"))[0] || null
               : null;
             const firstTitleChildrenAreText = Boolean(
-              titleElement &&
-                titleElement.childNodes.length > 0 &&
-                Array.from(titleElement.childNodes).every((node) => node.nodeType === Node.TEXT_NODE),
+              titleElement
+                && titleElement.childNodes.length > 0
+                && Array.from(titleElement.childNodes).every((node) => node.nodeType === Node.TEXT_NODE),
             );
             const hasNonWhitespaceText = Boolean(
               titleElement && /\P{White_Space}/u.test(titleElement.textContent || ""),
@@ -1067,8 +1062,8 @@ async (page) => {
                 lang: document.documentElement?.getAttribute("lang") || null,
                 xml_lang: document.documentElement?.getAttribute("xml:lang") || null,
                 has_language_metadata: Boolean(
-                  document.documentElement?.getAttribute("lang") ||
-                  document.documentElement?.getAttribute("xml:lang"),
+                  document.documentElement?.getAttribute("lang")
+                    || document.documentElement?.getAttribute("xml:lang"),
                 ),
               }),
             };
@@ -1154,8 +1149,8 @@ async (page) => {
             for (const element of allVisible("*")) {
               const style = getComputedStyle(element);
               if (
-                style.animationName !== "none" ||
-                style.animationDuration.split(",").some((item) => parseFloat(item) > 0)
+                style.animationName !== "none"
+                || style.animationDuration.split(",").some((item) => parseFloat(item) > 0)
               ) {
                 movingElements.add(element);
               }
@@ -1183,10 +1178,10 @@ async (page) => {
             });
             return candidates.length > 200
               ? {
-                  status: "incomplete",
-                  value: resultValue,
-                  limitation: "the moving-content candidate list exceeded its fixed result limit",
-                }
+                status: "incomplete",
+                value: resultValue,
+                limitation: "the moving-content candidate list exceeded its fixed result limit",
+              }
               : { status: "ok", value: resultValue };
           }
           case "mp-timer-inventory": {
@@ -1218,9 +1213,8 @@ async (page) => {
                   target_ref: refOf(element),
                   role: roleOf(element),
                   key_length: Array.from(element.accessKey || "").length,
-                  key_is_single_printable_character:
-                    Array.from(element.accessKey || "").length === 1 &&
-                    !/[\u0000-\u001f\u007f]/u.test(element.accessKey),
+                  key_is_single_printable_character: Array.from(element.accessKey || "").length === 1
+                    && !/[\u0000-\u001f\u007f]/u.test(element.accessKey),
                   accessible_name_present: Boolean(accessibleName(element)),
                 })),
               }),
@@ -1262,8 +1256,7 @@ async (page) => {
               value: value({
                 headings: allVisible("h1,h2,h3,h4,h5,h6,[role='heading']").map((element) => ({
                   target_ref: refOf(element),
-                  level:
-                    Number(element.getAttribute("aria-level") || element.tagName.slice(1)) || null,
+                  level: Number(element.getAttribute("aria-level") || element.tagName.slice(1)) || null,
                   rendered_text: textOf(element),
                   accessible_name: accessibleName(element),
                 })),
@@ -1289,8 +1282,8 @@ async (page) => {
                     safeTarget = !["http:", "https:"].includes(target.protocol)
                       ? "non-http"
                       : target.origin === location.origin
-                        ? "same-origin"
-                        : "external-origin";
+                      ? "same-origin"
+                      : "external-origin";
                     hasQuery = target.search.length > 0;
                     hasFragment = target.hash.length > 0;
                     pathSegmentCount = target.pathname.split("/").filter(Boolean).length;
@@ -1307,8 +1300,8 @@ async (page) => {
                     accessible_name: accessibleName(element),
                     role: roleOf(element),
                     has_programmatic_context: Boolean(
-                      element.getAttribute("aria-describedby") ||
-                      element.closest("nav,main,header,footer"),
+                      element.getAttribute("aria-describedby")
+                        || element.closest("nav,main,header,footer"),
                     ),
                   };
                 }),
@@ -1357,10 +1350,9 @@ async (page) => {
                     : null,
                   description_present: Boolean(element.getAttribute("aria-describedby")),
                   states: statesOf(element),
-                  host_type:
-                    element instanceof HTMLInputElement
-                      ? element.type
-                      : element.getAttribute("type"),
+                  host_type: element instanceof HTMLInputElement
+                    ? element.type
+                    : element.getAttribute("type"),
                   included_in_accessibility_tree: accessibilityTreeIncludes(element),
                   programmatically_hidden: hasComposedAncestor(
                     element,
@@ -1423,9 +1415,9 @@ async (page) => {
                   Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y),
                 );
                 if (
-                  horizontalGap <= 48 &&
-                  verticalGap <= 48 &&
-                  (overlapX > 0 || overlapY > 0 || horizontalGap < 48 || verticalGap < 48)
+                  horizontalGap <= 48
+                  && verticalGap <= 48
+                  && (overlapX > 0 || overlapY > 0 || horizontalGap < 48 || verticalGap < 48)
                 ) {
                   neighboringPairCount += 1;
                   if (pairs.length < 500) {
@@ -1455,33 +1447,33 @@ async (page) => {
             });
             return resultLimitReached
               ? {
-                  status: "incomplete",
-                  value: resultValue,
-                  limitation: "the neighboring-pair result exceeded its fixed limit",
-                }
+                status: "incomplete",
+                value: resultValue,
+                limitation: "the neighboring-pair result exceeded its fixed limit",
+              }
               : { status: "ok", value: resultValue };
           }
           case "mp-text-presentation-values": {
             const owners = allVisible("*").filter((element) =>
               Array.from(element.childNodes).some(
                 (node) => node.nodeType === Node.TEXT_NODE && /\S/u.test(node.nodeValue || ""),
-              ),
+              )
             );
             const targets = owners.slice(0, 500).map((element) => {
-                    const style = getComputedStyle(element),
-                      rect = element.getBoundingClientRect();
-                    return {
-                      target_ref: refOf(element, "dom-text-owner"),
-                      font_size_css: style.fontSize,
-                      line_height_css: style.lineHeight,
-                      letter_spacing_css: style.letterSpacing,
-                      word_spacing_css: style.wordSpacing,
-                      text_align: style.textAlign,
-                      white_space: style.whiteSpace,
-                      overflow_wrap: style.overflowWrap,
-                      width_css_px: rect.width,
-                    };
-                  });
+              const style = getComputedStyle(element),
+                rect = element.getBoundingClientRect();
+              return {
+                target_ref: refOf(element, "dom-text-owner"),
+                font_size_css: style.fontSize,
+                line_height_css: style.lineHeight,
+                letter_spacing_css: style.letterSpacing,
+                word_spacing_css: style.wordSpacing,
+                text_align: style.textAlign,
+                white_space: style.whiteSpace,
+                overflow_wrap: style.overflowWrap,
+                width_css_px: rect.width,
+              };
+            });
             const resultValue = value({
               text_owner_count: owners.length,
               returned_target_count: targets.length,
@@ -1492,10 +1484,10 @@ async (page) => {
             });
             return owners.length > 500
               ? {
-                  status: "incomplete",
-                  value: resultValue,
-                  limitation: "the text-presentation target list exceeded its fixed result limit",
-                }
+                status: "incomplete",
+                value: resultValue,
+                limitation: "the text-presentation target list exceeded its fixed result limit",
+              }
               : { status: "ok", value: resultValue };
           }
           case "mp-viewport-state":
@@ -1522,38 +1514,38 @@ async (page) => {
               .filter((element) => {
                 const rect = element.getBoundingClientRect();
                 return (
-                  rect.right > innerWidth + 1 ||
-                  rect.left < -1 ||
-                  ((getComputedStyle(element).overflowX === "hidden" ||
-                    getComputedStyle(element).overflowX === "clip") &&
-                    element.scrollWidth > element.clientWidth + 1)
+                  rect.right > innerWidth + 1
+                  || rect.left < -1
+                  || ((getComputedStyle(element).overflowX === "hidden"
+                    || getComputedStyle(element).overflowX === "clip")
+                    && element.scrollWidth > element.clientWidth + 1)
                 );
               });
             const overflowTargets = allOverflowTargets.slice(0, 200).map((element) => ({
-                target_ref: refOf(element),
-                geometry_css_px: rectOf(element),
-                scroll_width_css_px: element.scrollWidth,
-                client_width_css_px: element.clientWidth,
-              }));
+              target_ref: refOf(element),
+              geometry_css_px: rectOf(element),
+              scroll_width_css_px: element.scrollWidth,
+              client_width_css_px: element.clientWidth,
+            }));
             const resultValue = value({
-                required_viewport_css_px: { width: innerWidth, height: innerHeight },
-                document_overflow_css_px: Math.max(
-                  0,
-                  document.documentElement.scrollWidth - innerWidth,
-                ),
-                overflow_target_count: allOverflowTargets.length,
-                returned_overflow_target_count: overflowTargets.length,
-                overflow_targets: overflowTargets,
-                ...(allOverflowTargets.length > 200
-                  ? { observation_completeness: { state: "partial", reason: "probe-result-limit-reached" } }
-                  : {}),
-              });
+              required_viewport_css_px: { width: innerWidth, height: innerHeight },
+              document_overflow_css_px: Math.max(
+                0,
+                document.documentElement.scrollWidth - innerWidth,
+              ),
+              overflow_target_count: allOverflowTargets.length,
+              returned_overflow_target_count: overflowTargets.length,
+              overflow_targets: overflowTargets,
+              ...(allOverflowTargets.length > 200
+                ? { observation_completeness: { state: "partial", reason: "probe-result-limit-reached" } }
+                : {}),
+            });
             return allOverflowTargets.length > 200
               ? {
-                  status: "incomplete",
-                  value: resultValue,
-                  limitation: "the reflow overflow-target list exceeded its fixed result limit",
-                }
+                status: "incomplete",
+                value: resultValue,
+                limitation: "the reflow overflow-target list exceeded its fixed result limit",
+              }
               : { status: "ok", value: resultValue };
           }
           case "mp-orientation-run":
@@ -1565,9 +1557,8 @@ async (page) => {
                   reason: "paired-orientation-not-materialized",
                 },
                 current_viewport_css_px: { width: innerWidth, height: innerHeight },
-                current_orientation:
-                  screen.orientation?.type ||
-                  (innerWidth >= innerHeight ? "landscape-primary" : "portrait-primary"),
+                current_orientation: screen.orientation?.type
+                  || (innerWidth >= innerHeight ? "landscape-primary" : "portrait-primary"),
                 overflow_css_px: Math.max(0, document.documentElement.scrollWidth - innerWidth),
                 paired_orientation_observed: false,
               }),
@@ -1612,44 +1603,43 @@ async (page) => {
                   reason: "prior-control-observation-not-materialized",
                 },
                 controls: interactiveElements()
-                .filter(
-                  (element) =>
-                    ["checkbox", "radio", "range"].includes(element.type) ||
-                    element.tagName === "SELECT" ||
-                    [
-                      "checkbox",
-                      "radio",
-                      "switch",
-                      "slider",
-                      "spinbutton",
-                      "combobox",
-                      "listbox",
-                      "option",
-                      "textbox",
-                      "searchbox",
-                    ].includes(roleOf(element)),
-                )
-                .map((element) => ({
-                  target_ref: refOf(element),
-                  role: roleOf(element),
-                  state: {
-                    ...statesOf(element),
-                    aria_checked: ["true", "false", "mixed"].includes(
-                      element.getAttribute("aria-checked"),
-                    )
-                      ? element.getAttribute("aria-checked")
-                      : null,
-                    aria_selected: ["true", "false"].includes(
-                      element.getAttribute("aria-selected"),
-                    )
-                      ? element.getAttribute("aria-selected")
-                      : null,
-                  },
-                })),
+                  .filter(
+                    (element) =>
+                      ["checkbox", "radio", "range"].includes(element.type)
+                      || element.tagName === "SELECT"
+                      || [
+                        "checkbox",
+                        "radio",
+                        "switch",
+                        "slider",
+                        "spinbutton",
+                        "combobox",
+                        "listbox",
+                        "option",
+                        "textbox",
+                        "searchbox",
+                      ].includes(roleOf(element)),
+                  )
+                  .map((element) => ({
+                    target_ref: refOf(element),
+                    role: roleOf(element),
+                    state: {
+                      ...statesOf(element),
+                      aria_checked: ["true", "false", "mixed"].includes(
+                          element.getAttribute("aria-checked"),
+                        )
+                        ? element.getAttribute("aria-checked")
+                        : null,
+                      aria_selected: ["true", "false"].includes(
+                          element.getAttribute("aria-selected"),
+                        )
+                        ? element.getAttribute("aria-selected")
+                        : null,
+                    },
+                  })),
                 previous_value_state_available: false,
               }),
-              limitation:
-                "the typed request does not include a prior control-state observation reference",
+              limitation: "the typed request does not include a prior control-state observation reference",
             };
           case "mp-multipage-signature":
             return {
@@ -1659,7 +1649,7 @@ async (page) => {
                 current_page_signature: {
                   title_present: Boolean(document.title.trim()),
                   language_present: Boolean(document.documentElement?.lang),
-                controls: interactiveElements().map((element) => ({
+                  controls: interactiveElements().map((element) => ({
                     target_ref: refOf(element),
                     role: roleOf(element),
                     accessible_name_present: accessibilityTreeIncludes(element)
@@ -1697,9 +1687,7 @@ async (page) => {
               value: value({
                 observation_completeness: { state: "partial", reason: "trigger-not-materialized" },
                 candidate_targets: interactiveElements()
-                  .filter((element) =>
-                    ["input", "select", "textarea"].includes(element.tagName.toLowerCase()),
-                  )
+                  .filter((element) => ["input", "select", "textarea"].includes(element.tagName.toLowerCase()))
                   .map((element) => ({
                     target_ref: refOf(element),
                     role: roleOf(element),
@@ -1707,8 +1695,7 @@ async (page) => {
                   })),
                 transition_observed: false,
               }),
-              limitation:
-                "the typed request does not identify a declared focus, input, or request trigger to execute",
+              limitation: "the typed request does not identify a declared focus, input, or request trigger to execute",
             };
           case "mp-error-scenario-run":
             return {
@@ -1726,9 +1713,9 @@ async (page) => {
                   native_invalid_control_count: Array.from(form.elements)
                     .filter(
                       (element) =>
-                        element instanceof HTMLInputElement ||
-                        element instanceof HTMLSelectElement ||
-                        element instanceof HTMLTextAreaElement,
+                        element instanceof HTMLInputElement
+                        || element instanceof HTMLSelectElement
+                        || element instanceof HTMLTextAreaElement,
                     )
                     .filter((element) => !element.checkValidity()).length,
                 })),
@@ -1812,8 +1799,8 @@ async (page) => {
         return parts.join(" > ");
       };
       const composedParent = (element) =>
-        element.parentElement ||
-        (element.getRootNode() instanceof ShadowRoot ? element.getRootNode().host : null);
+        element.parentElement
+        || (element.getRootNode() instanceof ShadowRoot ? element.getRootNode().host : null);
       const composedContains = (ancestor, descendant) => {
         let current = descendant;
         while (current) {
@@ -1825,11 +1812,11 @@ async (page) => {
       const rendered = (element) => {
         const style = getComputedStyle(element);
         return (
-          style.display !== "none" &&
-          style.visibility !== "hidden" &&
-          style.visibility !== "collapse" &&
-          Number(style.opacity) > 0 &&
-          element.getClientRects().length > 0
+          style.display !== "none"
+          && style.visibility !== "hidden"
+          && style.visibility !== "collapse"
+          && Number(style.opacity) > 0
+          && element.getClientRects().length > 0
         );
       };
       const owners = new Set();
@@ -1837,8 +1824,8 @@ async (page) => {
         if (
           Array.from(element.childNodes).some(
             (node) => node.nodeType === Node.TEXT_NODE && /\S/u.test(node.nodeValue || ""),
-          ) &&
-          rendered(element)
+          )
+          && rendered(element)
         ) {
           owners.add(element);
         }
@@ -1866,8 +1853,8 @@ async (page) => {
           const style = getComputedStyle(current);
           inspectStyle(style, targetRef);
           if (
-            style.backgroundColor !== "rgba(0, 0, 0, 0)" ||
-            (style.backgroundImage && style.backgroundImage !== "none")
+            style.backgroundColor !== "rgba(0, 0, 0, 0)"
+            || (style.backgroundImage && style.backgroundImage !== "none")
           ) {
             backgroundLayers.push({
               target_ref: "dom-background:" + pathFor(current),
@@ -1880,10 +1867,11 @@ async (page) => {
           for (const pseudo of ["::before", "::after"]) {
             const pseudoStyle = getComputedStyle(current, pseudo);
             if (
-              !pseudoStyle.content ||
-              ["none", "normal", '""', "''"].includes(pseudoStyle.content)
-            )
+              !pseudoStyle.content
+              || ["none", "normal", "\"\"", "''"].includes(pseudoStyle.content)
+            ) {
               continue;
+            }
             inspectStyle(pseudoStyle, targetRef);
           }
           if (current === document.documentElement) break;
@@ -2014,10 +2002,9 @@ async (page) => {
         targets.push({
           target_ref: targetRef,
           tag_name: await target.evaluate((element) => element.tagName.toLowerCase()),
-          role:
-            snapshot.length === 1 && typeof snapshot[0]?.role === "string"
-              ? snapshot[0].role
-              : null,
+          role: snapshot.length === 1 && typeof snapshot[0]?.role === "string"
+            ? snapshot[0].role
+            : null,
           included_in_accessibility_tree: snapshot.length === 1,
           focused: await target.evaluate((element) => element.matches(":focus")),
           geometry_css_px: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
@@ -2043,9 +2030,7 @@ async (page) => {
         "the fixed geometry probe could not establish visible target geometry",
       );
     }
-    targets.sort((left, right) =>
-      left.target_ref < right.target_ref ? -1 : left.target_ref > right.target_ref ? 1 : 0,
-    );
+    targets.sort((left, right) => left.target_ref < right.target_ref ? -1 : left.target_ref > right.target_ref ? 1 : 0);
     return resultFor({ status: "ok", value: { schema: "wcag-target-geometry-v1", targets } });
   }
 
@@ -2059,19 +2044,18 @@ async (page) => {
       visual_screenshot_required: true,
     };
     if (
-      trace.capture_error !== null ||
-      !focus ||
-      focus.target_ref === null ||
-      !focus.rect_css_px ||
-      focus.rect_css_px.width <= 0 ||
-      focus.rect_css_px.height <= 0
+      trace.capture_error !== null
+      || !focus
+      || focus.target_ref === null
+      || !focus.rect_css_px
+      || focus.rect_css_px.width <= 0
+      || focus.rect_css_px.height <= 0
     ) {
       return resultFor({
         status: "blocked",
         value,
-        limitation:
-          trace.capture_error ||
-          "the fixed keyboard focus probe did not resolve one visible focused target",
+        limitation: trace.capture_error
+          || "the fixed keyboard focus probe did not resolve one visible focused target",
       });
     }
     if (focus.box_shadow_layer_count > 1 || focus.background_image_present) {
@@ -2116,19 +2100,18 @@ async (page) => {
       baseline_value: element.value,
     };
   });
-  const decimal = (value) =>
-    typeof value === "string" && /^\d+(?:\.\d+)?$/.test(value) ? Number(value) : Number.NaN;
+  const decimal = (value) => typeof value === "string" && /^\d+(?:\.\d+)?$/.test(value) ? Number(value) : Number.NaN;
   if (
-    !control ||
-    ![
+    !control
+    || ![
       control.minimum_value,
       control.maximum_value,
       control.step_value,
       control.baseline_value,
-    ].every((value) => Number.isFinite(decimal(value))) ||
-    decimal(control.step_value) <= 0 ||
-    decimal(control.minimum_value) > decimal(control.baseline_value) ||
-    decimal(control.baseline_value) >= decimal(control.maximum_value)
+    ].every((value) => Number.isFinite(decimal(value)))
+    || decimal(control.step_value) <= 0
+    || decimal(control.minimum_value) > decimal(control.baseline_value)
+    || decimal(control.baseline_value) >= decimal(control.maximum_value)
   ) {
     return failure("blocked", "the fixed Text size range has invalid or non-progressing bounds");
   }
@@ -2158,8 +2141,8 @@ async (page) => {
         return parts.join(" > ");
       };
       const composedParent = (element) =>
-        element.parentElement ||
-        (element.getRootNode() instanceof ShadowRoot ? element.getRootNode().host : null);
+        element.parentElement
+        || (element.getRootNode() instanceof ShadowRoot ? element.getRootNode().host : null);
       const composedContains = (ancestor, descendant) => {
         let current = descendant;
         while (current) {
@@ -2171,11 +2154,11 @@ async (page) => {
       const rendered = (element) => {
         const style = getComputedStyle(element);
         return (
-          style.display !== "none" &&
-          style.visibility !== "hidden" &&
-          style.visibility !== "collapse" &&
-          Number(style.opacity) > 0 &&
-          element.getClientRects().length > 0
+          style.display !== "none"
+          && style.visibility !== "hidden"
+          && style.visibility !== "collapse"
+          && Number(style.opacity) > 0
+          && element.getClientRects().length > 0
         );
       };
       const contentBox = (element) => {
@@ -2228,20 +2211,21 @@ async (page) => {
           while (ancestor && ancestor.nodeType === Node.ELEMENT_NODE) {
             const ancestorStyle = getComputedStyle(ancestor);
             if (
-              ["hidden", "clip"].includes(ancestorStyle.overflowX) ||
-              ["hidden", "clip"].includes(ancestorStyle.overflowY)
+              ["hidden", "clip"].includes(ancestorStyle.overflowX)
+              || ["hidden", "clip"].includes(ancestorStyle.overflowY)
             ) {
               const box = contentBox(ancestor);
               if (
                 rects.some(
                   (rect) =>
-                    rect.left < box.left - 0.5 ||
-                    rect.top < box.top - 0.5 ||
-                    rect.left + rect.width > box.right + 0.5 ||
-                    rect.top + rect.height > box.bottom + 0.5,
+                    rect.left < box.left - 0.5
+                    || rect.top < box.top - 0.5
+                    || rect.left + rect.width > box.right + 0.5
+                    || rect.top + rect.height > box.bottom + 0.5,
                 )
-              )
+              ) {
                 clipped = true;
+              }
             }
             ancestor = composedParent(ancestor);
           }
@@ -2278,14 +2262,15 @@ async (page) => {
           const elementRef = `dom-element:${path}`;
           for (const pseudo of ["::before", "::after"]) {
             const pseudoStyle = getComputedStyle(element, pseudo);
-            if (["none", "normal", '""', "''"].includes(pseudoStyle.content)) continue;
+            if (["none", "normal", "\"\"", "''"].includes(pseudoStyle.content)) continue;
             const size = /^\d+(?:\.\d+)?px$/.test(pseudoStyle.fontSize)
               ? pseudoStyle.fontSize.slice(0, -2)
               : null;
-            if (size === null || !(Number(size) > 0))
+            if (size === null || !(Number(size) > 0)) {
               unsupportedRoots.push(`${elementRef}${pseudo}`);
+            }
             const rect = element.getBoundingClientRect();
-            if (rect.width > 0 && rect.height > 0)
+            if (rect.width > 0 && rect.height > 0) {
               candidates.push({
                 target_ref: `${elementRef}${pseudo}`,
                 present: true,
@@ -2294,15 +2279,15 @@ async (page) => {
                 clipped: false,
                 obscured: false,
               });
+            }
           }
 
           const style = getComputedStyle(element);
           const inputType = element instanceof HTMLInputElement ? element.type : null;
-          const isTextControl =
-            element instanceof HTMLTextAreaElement ||
-            element instanceof HTMLSelectElement ||
-            (element instanceof HTMLInputElement &&
-              !["checkbox", "color", "file", "hidden", "image", "radio", "range"].includes(
+          const isTextControl = element instanceof HTMLTextAreaElement
+            || element instanceof HTMLSelectElement
+            || (element instanceof HTMLInputElement
+              && !["checkbox", "color", "file", "hidden", "image", "radio", "range"].includes(
                 inputType,
               ));
           if (isTextControl) {
@@ -2311,7 +2296,7 @@ async (page) => {
               : null;
             const rect = element.getBoundingClientRect();
             if (size === null || !(Number(size) > 0)) unsupportedRoots.push(`dom-control:${path}`);
-            if (rect.width > 0 && rect.height > 0)
+            if (rect.width > 0 && rect.height > 0) {
               candidates.push({
                 target_ref: `dom-control:${path}`,
                 present: true,
@@ -2320,16 +2305,17 @@ async (page) => {
                 clipped: false,
                 obscured: false,
               });
+            }
           }
           const isInteractive = element.matches(
             "a[href],button,input,select,textarea,[role='button'],[role='link'],[role='slider']",
           );
-          if (isInteractive)
+          if (isInteractive) {
             controls.push({
               target_ref: `dom-control:${path}`,
-              enabled:
-                element.disabled !== true && element.getAttribute("aria-disabled") !== "true",
+              enabled: element.disabled !== true && element.getAttribute("aria-disabled") !== "true",
             });
+          }
         }
       }
 
@@ -2373,9 +2359,7 @@ async (page) => {
             await keyPromise,
             new TextEncoder().encode(location.href),
           );
-          const hex = Array.from(new Uint8Array(signature), (byte) =>
-            byte.toString(16).padStart(2, "0"),
-          ).join("");
+          const hex = Array.from(new Uint8Array(signature), (byte) => byte.toString(16).padStart(2, "0")).join("");
           documentIdentity = `hmac-sha256:${hex}`;
         }
       } catch {
@@ -2386,24 +2370,22 @@ async (page) => {
         viewport,
         overflow,
         text_candidates: candidates.sort((left, right) =>
-          left.target_ref < right.target_ref ? -1 : left.target_ref > right.target_ref ? 1 : 0,
+          left.target_ref < right.target_ref ? -1 : left.target_ref > right.target_ref ? 1 : 0
         ),
         interactive_controls: controls.sort((left, right) =>
-          left.target_ref < right.target_ref ? -1 : left.target_ref > right.target_ref ? 1 : 0,
+          left.target_ref < right.target_ref ? -1 : left.target_ref > right.target_ref ? 1 : 0
         ),
-        population_complete:
-          unique &&
-          candidates.length > 0 &&
-          unsupportedRoots.length === 0 &&
-          !unsupportedVisibleCanvas &&
-          !visibleFrame,
+        population_complete: unique
+          && candidates.length > 0
+          && unsupportedRoots.length === 0
+          && !unsupportedVisibleCanvas
+          && !visibleFrame,
         unmeasurable_target_refs: unsupportedRoots.sort(),
         unsupported_visible_canvas: unsupportedVisibleCanvas,
         inaccessible_visible_frame: visibleFrame,
       };
     });
-    const resizeControlSelector =
-      "a[href],button,input,select,textarea,[role='button'],[role='link'],[role='slider']";
+    const resizeControlSelector = "a[href],button,input,select,textarea,[role='button'],[role='link'],[role='slider']";
     const controlLocator = page.locator(resizeControlSelector);
     const controlPaths = await controlLocator.evaluateAll(pathsForLocatorElements);
     const controlPathsByRef = new Map(
@@ -2414,10 +2396,9 @@ async (page) => {
     const unmeasurableControls = [];
     for (const [targetRef, row] of controlsByRef) {
       const index = controlPathsByRef.get(targetRef);
-      const snapshot =
-        index === undefined
-          ? null
-          : await controlLocator.nth(index).ariaSnapshotJSON({ depth: 0, timeout: 1000 });
+      const snapshot = index === undefined
+        ? null
+        : await controlLocator.nth(index).ariaSnapshotJSON({ depth: 0, timeout: 1000 });
       if (!Array.isArray(snapshot) || snapshot.length !== 1 || typeof snapshot[0]?.role !== "string") {
         unmeasurableControls.push(targetRef);
         continue;
@@ -2428,13 +2409,13 @@ async (page) => {
     unmeasurableControls.push(...controlsByRef.keys());
     const currentControlPaths = await controlLocator.evaluateAll(pathsForLocatorElements);
     if (
-      currentControlPaths.length !== controlPaths.length ||
-      currentControlPaths.some((path, index) => path !== controlPaths[index])
+      currentControlPaths.length !== controlPaths.length
+      || currentControlPaths.some((path, index) => path !== controlPaths[index])
     ) {
       unmeasurableControls.push("dom-control:population-changed-during-observation");
     }
     state.interactive_controls = confirmedControls.sort((left, right) =>
-      left.target_ref < right.target_ref ? -1 : left.target_ref > right.target_ref ? 1 : 0,
+      left.target_ref < right.target_ref ? -1 : left.target_ref > right.target_ref ? 1 : 0
     );
     state.unmeasurable_target_refs = [
       ...new Set([...state.unmeasurable_target_refs, ...unmeasurableControls]),
@@ -2452,8 +2433,8 @@ async (page) => {
   try {
     const baseline = await captureState();
     if (
-      baseline.document_identity !== request.target_identity ||
-      baseline.text_candidates.length === 0
+      baseline.document_identity !== request.target_identity
+      || baseline.text_candidates.length === 0
     ) {
       return failure(
         "blocked",
@@ -2487,8 +2468,7 @@ async (page) => {
       await page.waitForTimeout(40);
       const nextControlValue = await slider.inputValue();
       if (nextControlValue === currentControlValue) {
-        captureFailure =
-          "the fixed author resize control did not advance through its keyboard operation";
+        captureFailure = "the fixed author resize control did not advance through its keyboard operation";
         break;
       }
       const captured = await captureState();
@@ -2510,9 +2490,7 @@ async (page) => {
           clipped: false,
           obscured: false,
         })),
-      ].sort((left, right) =>
-        left.target_ref < right.target_ref ? -1 : left.target_ref > right.target_ref ? 1 : 0,
-      );
+      ].sort((left, right) => left.target_ref < right.target_ref ? -1 : left.target_ref > right.target_ref ? 1 : 0);
       const previous = sequence[sequence.length - 1];
       const previousControls = new Map(
         previous.interactive_controls.map((row) => [row.target_ref, row.enabled]),
@@ -2552,13 +2530,13 @@ async (page) => {
       const baselineByRef = new Map(
         sequence[0].text_candidates.map((row) => [row.target_ref, row.used_font_size_css_px]),
       );
-      const reachedTarget =
-        populationComplete &&
-        sequence[sequence.length - 1].text_candidates.length === baselineRefs.size &&
-        sequence[sequence.length - 1].text_candidates.every((row) => {
+      const reachedTarget = populationComplete
+        && sequence[sequence.length - 1].text_candidates.length === baselineRefs.size
+        && sequence[sequence.length - 1].text_candidates.every((row) => {
           const base = baselineByRef.get(row.target_ref);
-          if (!row.present || base === undefined || row.used_font_size_css_px === null)
+          if (!row.present || base === undefined || row.used_font_size_css_px === null) {
             return false;
+          }
           const parse = (text) => {
             const [whole, fraction = ""] = text.split(".");
             return { value: BigInt(whole + fraction), scale: fraction.length };
@@ -2566,8 +2544,8 @@ async (page) => {
           const current = parse(row.used_font_size_css_px);
           const baselineSize = parse(base);
           return (
-            current.value * 10n ** BigInt(baselineSize.scale) >=
-            2n * baselineSize.value * 10n ** BigInt(current.scale)
+            current.value * 10n ** BigInt(baselineSize.scale)
+              >= 2n * baselineSize.value * 10n ** BigInt(current.scale)
           );
         });
       if (reachedTarget || decimal(nextControlValue) >= decimal(control.maximum_value)) {
@@ -2575,8 +2553,9 @@ async (page) => {
         break;
       }
     }
-    if (!stateSequenceComplete && captureFailure === null)
+    if (!stateSequenceComplete && captureFailure === null) {
       captureFailure = "the fixed resize state sequence exceeded its bounded step count";
+    }
   } catch {
     captureFailure = "fixed Resize Text observation could not be completed";
   } finally {
@@ -2589,9 +2568,9 @@ async (page) => {
         if (next === current) break;
         current = next;
       }
-      if (current !== restoreValue)
-        captureFailure =
-          captureFailure || "the resize control did not restore its baseline state during cleanup";
+      if (current !== restoreValue) {
+        captureFailure = captureFailure || "the resize control did not restore its baseline state during cleanup";
+      }
     } catch {
       captureFailure = captureFailure || "resize control cleanup could not be verified";
     }
@@ -2616,12 +2595,12 @@ async (page) => {
   );
   const inaccessibleFrame = sequence.some((row) => row.inaccessible_visible_frame);
   if (
-    captureFailure === null &&
-    stateSequenceComplete &&
-    unreadableTextState &&
-    !inaccessibleFrame &&
-    value.cleanup.status === "restored" &&
-    value.cleanup.current_control_value === restoreValue
+    captureFailure === null
+    && stateSequenceComplete
+    && unreadableTextState
+    && !inaccessibleFrame
+    && value.cleanup.status === "restored"
+    && value.cleanup.current_control_value === restoreValue
   ) {
     return {
       ...resultIdentity,
@@ -2635,11 +2614,11 @@ async (page) => {
     };
   }
   if (
-    captureFailure !== null ||
-    !populationComplete ||
-    !stateSequenceComplete ||
-    value.cleanup.status !== "restored" ||
-    value.cleanup.current_control_value !== restoreValue
+    captureFailure !== null
+    || !populationComplete
+    || !stateSequenceComplete
+    || value.cleanup.status !== "restored"
+    || value.cleanup.current_control_value !== restoreValue
   ) {
     return {
       ...resultIdentity,
@@ -2647,8 +2626,7 @@ async (page) => {
       current_document_identity: await currentDocumentIdentity(),
       evidence_refs: evidenceRefs,
       value,
-      limitation:
-        captureFailure || "the fixed text population or mechanism state sequence is incomplete",
+      limitation: captureFailure || "the fixed text population or mechanism state sequence is incomplete",
     };
   }
   return {
@@ -2658,4 +2636,4 @@ async (page) => {
     evidence_refs: evidenceRefs,
     value,
   };
-}
+});

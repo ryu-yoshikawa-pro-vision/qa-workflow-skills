@@ -1,0 +1,48 @@
+sandbox_mode = "workspace-write"
+approval_policy = { granular = { sandbox_approval = true, rules = true, mcp_elicitations = false, request_permissions = false, skill_approval = false } }
+approvals_reviewer = "user"
+allow_login_shell = false
+
+[sandbox_workspace_write]
+network_access = true
+writable_roots = []
+
+[shell_environment_policy]
+inherit = "core"
+
+[features]
+hooks = true
+multi_agent = true
+code_mode = false
+code_mode_only = false
+unified_exec = true
+unified_exec_tty = false
+
+[agents]
+max_concurrent_threads_per_session = 3
+
+[agents.code_researcher]
+description = "Read-only investigation of code, contracts, dependencies, tests, and CI before implementation."
+config_file = "agents/code_researcher.toml"
+
+[agents.implementation_worker]
+description = "Scoped implementation of Parent-approved changes without Git mutation, deletion, rename, or scope expansion."
+config_file = "agents/implementation_worker.toml"
+
+[agents.test_investigator]
+description = "Read-only investigation of tests, evaluations, CI failures, flaky candidates, and missing coverage."
+config_file = "agents/test_investigator.toml"
+
+[agents.quality_gate_runner]
+description = "Validation-only execution of Parent-specified commands without source edits, dependency installation, or Git mutation."
+config_file = "agents/quality_gate_runner.toml"
+
+[[hooks.PreToolUse]]
+matcher = "^Bash$"
+
+[[hooks.PreToolUse.hooks]]
+type = "command"
+command = "repo_root=\"$(git rev-parse --show-toplevel 2>/dev/null)\" && node \"$repo_root/.codex/hooks/pre_tool_use_policy.mjs\""
+command_windows = "powershell.exe -NoProfile -NonInteractive -EncodedCommand JABQAHIAbwBnAHIAZQBzAHMAUAByAGUAZgBlAHIAZQBuAGMAZQAgAD0AIAAnAFMAaQBsAGUAbgB0AGwAeQBDAG8AbgB0AGkAbgB1AGUAJwAKACQAcgBvAG8AdABPAHUAdABwAHUAdAAgAD0AIABAACgAJgAgAGcAaQB0ACAAcgBlAHYALQBwAGEAcgBzAGUAIAAtAC0AcwBoAG8AdwAtAHQAbwBwAGwAZQB2AGUAbAAgADIAPgAkAG4AdQBsAGwAKQAKACQAZwBpAHQARQB4AGkAdAAgAD0AIAAkAEwAQQBTAFQARQBYAEkAVABDAE8ARABFAAoAaQBmACAAKAAkAGcAaQB0AEUAeABpAHQAIAAtAG4AZQAgADAAIAAtAG8AcgAgACQAcgBvAG8AdABPAHUAdABwAHUAdAAuAEMAbwB1AG4AdAAgAC0AZQBxACAAMAAgAC0AbwByACAAWwBzAHQAcgBpAG4AZwBdADoAOgBJAHMATgB1AGwAbABPAHIAVwBoAGkAdABlAFMAcABhAGMAZQAoAFsAcwB0AHIAaQBuAGcAXQAkAHIAbwBvAHQATwB1AHQAcAB1AHQAWwAwAF0AKQApACAAewAgAFsAQwBvAG4AcwBvAGwAZQBdADoAOgBFAHIAcgBvAHIALgBXAHIAaQB0AGUATABpAG4AZQAoACcAUAByAGUAVABvAG8AbABVAHMAZQAgAFcAaQBuAGQAbwB3AHMAIABsAGEAdQBuAGMAaABlAHIAOgAgAHUAbgBhAGIAbABlACAAdABvACAAcgBlAHMAbwBsAHYAZQAgAHIAZQBwAG8AcwBpAHQAbwByAHkAIAByAG8AbwB0ACAAZgByAG8AbQAgAGMAdwBkACcAKQA7ACAAZQB4AGkAdAAgADIAIAB9AAoAJAByAG8AbwB0ACAAPQAgAFsAUwB5AHMAdABlAG0ALgBJAE8ALgBQAGEAdABoAF0AOgA6AEcAZQB0AEYAdQBsAGwAUABhAHQAaAAoACgAWwBzAHQAcgBpAG4AZwBdACQAcgBvAG8AdABPAHUAdABwAHUAdABbADAAXQApAC4AVAByAGkAbQAoACkAKQAKAGkAZgAgACgALQBuAG8AdAAgACgAVABlAHMAdAAtAFAAYQB0AGgAIAAtAEwAaQB0AGUAcgBhAGwAUABhAHQAaAAgACQAcgBvAG8AdAAgAC0AUABhAHQAaABUAHkAcABlACAAQwBvAG4AdABhAGkAbgBlAHIAKQApACAAewAgAFsAQwBvAG4AcwBvAGwAZQBdADoAOgBFAHIAcgBvAHIALgBXAHIAaQB0AGUATABpAG4AZQAoACcAUAByAGUAVABvAG8AbABVAHMAZQAgAFcAaQBuAGQAbwB3AHMAIABsAGEAdQBuAGMAaABlAHIAOgAgAHIAZQBzAG8AbAB2AGUAZAAgAHIAZQBwAG8AcwBpAHQAbwByAHkAIAByAG8AbwB0ACAAZABvAGUAcwAgAG4AbwB0ACAAZQB4AGkAcwB0ACcAKQA7ACAAZQB4AGkAdAAgADIAIAB9AAoAUwBlAHQALQBMAG8AYwBhAHQAaQBvAG4AIAAtAEwAaQB0AGUAcgBhAGwAUABhAHQAaAAgACQAcgBvAG8AdAAgAC0ARQByAHIAbwByAEEAYwB0AGkAbwBuACAAUwB0AG8AcAAKACQAbABhAHUAbgBjAGgAZQByACAAPQAgAEoAbwBpAG4ALQBQAGEAdABoACAAJAByAG8AbwB0ACAAJwAuAGMAbwBkAGUAeABcAGgAbwBvAGsAcwBcAHAAcgBlAF8AdABvAG8AbABfAHUAcwBlAF8AcABvAGwAaQBjAHkAXwB3AGkAbgBkAG8AdwBzAC4AcABzADEAJwAKAGkAZgAgACgALQBuAG8AdAAgACgAVABlAHMAdAAtAFAAYQB0AGgAIAAtAEwAaQB0AGUAcgBhAGwAUABhAHQAaAAgACQAbABhAHUAbgBjAGgAZQByACAALQBQAGEAdABoAFQAeQBwAGUAIABMAGUAYQBmACkAKQAgAHsAIABlAHgAaQB0ACAAMgAgAH0ACgAkAHMAbwB1AHIAYwBlACAAPQAgAFsAUwB5AHMAdABlAG0ALgBJAE8ALgBGAGkAbABlAF0AOgA6AFIAZQBhAGQAQQBsAGwAVABlAHgAdAAoACQAbABhAHUAbgBjAGgAZQByACkACgAmACAAKABbAHMAYwByAGkAcAB0AGIAbABvAGMAawBdADoAOgBDAHIAZQBhAHQAZQAoACQAcwBvAHUAcgBjAGUAKQApAAoAZQB4AGkAdAAgACQATABBAFMAVABFAFgASQBUAEMATwBEAEUA"
+timeout = 15
+statusMessage = "Checking repository command policy"

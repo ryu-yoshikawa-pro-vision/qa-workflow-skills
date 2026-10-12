@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from pathlib import Path
 import unittest
+from pathlib import Path
 
-from scripts.skills.evals.deterministic.loader import discover_output_eval_skills, load_validators
-
+from scripts.skills.evals.deterministic.loader import (
+    discover_output_eval_skills,
+    load_validators,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 SKILLS_ROOT = REPO_ROOT / "skills"

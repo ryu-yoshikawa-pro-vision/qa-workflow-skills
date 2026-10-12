@@ -1,6 +1,6 @@
 // The existing Playwright CLI evaluates this file as a parenthesized function expression.
 // prettier-ignore
-async (page) => {
+(async (page) => {
   const requestSlot = "__usabilityInspectionFixedProbeRequest";
   const currentDocumentIdentity = await page.evaluate(async () => {
     try {
@@ -22,9 +22,7 @@ async (page) => {
         key,
         new TextEncoder().encode(location.href),
       );
-      const hex = Array.from(new Uint8Array(signature), (byte) =>
-        byte.toString(16).padStart(2, "0"),
-      ).join("");
+      const hex = Array.from(new Uint8Array(signature), (byte) => byte.toString(16).padStart(2, "0")).join("");
       return `hmac-sha256:${hex}`;
     } catch {
       return null;
@@ -43,10 +41,9 @@ async (page) => {
       ? [...new Set(value)].sort()
       : null;
   const identityPattern = /^hmac-sha256:[0-9a-f]{64}$/u;
-  const identity =
-    object(request) && identityPattern.test(request.document_identity || "")
-      ? request.document_identity
-      : null;
+  const identity = object(request) && identityPattern.test(request.document_identity || "")
+    ? request.document_identity
+    : null;
   const refs = object(request) ? evidenceRefs(request.evidence_refs) : null;
   const failure = (probeKey, status, limitation, value = null) => ({
     probe_key: probeKey,
@@ -61,11 +58,11 @@ async (page) => {
     return currentDocumentIdentity
       ? { probe_key: "document-identity", document_identity: currentDocumentIdentity, status: "ok" }
       : {
-          probe_key: "document-identity",
-          document_identity: null,
-          status: "unavailable",
-          limitation: "browser cannot create an in-memory keyed current-document identity",
-        };
+        probe_key: "document-identity",
+        document_identity: null,
+        status: "unavailable",
+        limitation: "browser cannot create an in-memory keyed current-document identity",
+      };
   }
   if (!currentDocumentIdentity) {
     return failure(
@@ -153,9 +150,8 @@ async (page) => {
             const style = getComputedStyle(current);
             const type = style.containerType || "normal";
             const names = (style.containerName || "").trim().split(/\s+/).filter(Boolean);
-            const eligible =
-              type !== "normal" &&
-              (queryName.length === 0 || queryName.some((name) => names.includes(name)));
+            const eligible = type !== "normal"
+              && (queryName.length === 0 || queryName.some((name) => names.includes(name)));
             if (eligible) {
               const identity = pathFor(current);
               containers.set(identity, {
@@ -172,12 +168,12 @@ async (page) => {
       };
       const describe = (rule, rootIndex, sheetIndex, rulePath, sourceRef) => {
         const constructorName = rule?.constructor?.name || "";
-        if (constructorName !== "CSSMediaRule" && constructorName !== "CSSContainerRule")
+        if (constructorName !== "CSSMediaRule" && constructorName !== "CSSContainerRule") {
           return null;
-        const raw =
-          constructorName === "CSSMediaRule"
-            ? rule.conditionText || rule.media?.mediaText || ""
-            : rule.conditionText || rule.containerQuery || "";
+        }
+        const raw = constructorName === "CSSMediaRule"
+          ? rule.conditionText || rule.media?.mediaText || ""
+          : rule.conditionText || rule.containerQuery || "";
         const kind = constructorName === "CSSMediaRule" ? "media" : queryKind(rule);
         const matchName = raw.match(
           /(?:min|max)-(?:width|height)|\b(?:width|height|inline-size|block-size)\b/i,
@@ -201,12 +197,10 @@ async (page) => {
           queryContainers = resolved.containers;
           currentMatch = null;
           executionStatus = "not-executable";
-          method =
-            "CSSOM condition inventory only; no standard current container-query match-state API";
-          executionReason =
-            queryContainers.length === 1
-              ? "the browser exposes the @container condition but no standard API reports whether it currently matches"
-              : "the query container is not unique and no standard API reports the current @container match state";
+          method = "CSSOM condition inventory only; no standard current container-query match-state API";
+          executionReason = queryContainers.length === 1
+            ? "the browser exposes the @container condition but no standard API reports whether it currently matches"
+            : "the query container is not unique and no standard API reports the current @container match state";
         }
         return {
           source_ref: sourceRef,
@@ -217,30 +211,27 @@ async (page) => {
           raw_condition: raw,
           query_container_name: kind === "media" ? null : rule.containerName || null,
           query_container_type: queryContainers[0]?.type || null,
-          query_container_identity:
-            queryContainers
-              .map((item) => item.identity)
-              .sort()
-              .join(" | ") || null,
-          axis:
-            kind === "media"
-              ? feature?.includes("width")
-                ? "width"
-                : feature?.includes("height")
-                  ? "height"
-                  : null
-              : feature?.includes("width") || feature === "inline-size"
-                ? "inline-size"
-                : feature?.includes("height") || feature === "block-size"
-                  ? "block-size"
-                  : null,
+          query_container_identity: queryContainers
+            .map((item) => item.identity)
+            .sort()
+            .join(" | ") || null,
+          axis: kind === "media"
+            ? feature?.includes("width")
+              ? "width"
+              : feature?.includes("height")
+              ? "height"
+              : null
+            : feature?.includes("width") || feature === "inline-size"
+            ? "inline-size"
+            : feature?.includes("height") || feature === "block-size"
+            ? "block-size"
+            : null,
           feature,
-          browser_capability:
-            kind === "media"
-              ? typeof window.matchMedia === "function"
-                ? "available"
-                : "unavailable"
-              : "unavailable",
+          browser_capability: kind === "media"
+            ? typeof window.matchMedia === "function"
+              ? "available"
+              : "unavailable"
+            : "unavailable",
           evaluation_method: method,
           current_match_state: currentMatch,
           execution_status: executionStatus,
@@ -312,8 +303,9 @@ async (page) => {
         }
         return { safe_url: `${protocol}//[redacted]`, status: "ok", limitation: null };
       });
-      if (safeLocation.status !== "ok")
+      if (safeLocation.status !== "ok") {
         return failure(request.probe_key, safeLocation.status, safeLocation.limitation);
+      }
       return {
         probe_key: request.probe_key,
         document_identity: identity,
@@ -342,8 +334,7 @@ async (page) => {
         const htmlContentType = ["text/html", "application/xhtml+xml"].includes(
           document.contentType?.toLowerCase(),
         );
-        const isHtmlDocument =
-          htmlContentType && root?.namespaceURI === htmlNamespace && root?.localName === "html";
+        const isHtmlDocument = htmlContentType && root?.namespaceURI === htmlNamespace && root?.localName === "html";
         if (!isHtmlDocument) {
           return {
             is_html_document: false,
@@ -357,8 +348,7 @@ async (page) => {
         const titles = Array.from(document.getElementsByTagNameNS(htmlNamespace, "title"));
         const first = titles[0] || null;
         const childNodes = first ? Array.from(first.childNodes) : [];
-        const childrenAreText =
-          childNodes.length > 0 && childNodes.every((node) => node.nodeType === Node.TEXT_NODE);
+        const childrenAreText = childNodes.length > 0 && childNodes.every((node) => node.nodeType === Node.TEXT_NODE);
         const hasNonWhitespaceText = childNodes.some(
           (node) => node.nodeType === Node.TEXT_NODE && /\P{White_Space}/u.test(node.data),
         );
@@ -497,9 +487,8 @@ async (page) => {
         ...(complete
           ? {}
           : {
-              limitation:
-                "responsive condition inventory contains an unreadable or unexecutable source",
-            }),
+            limitation: "responsive condition inventory contains an unreadable or unexecutable source",
+          }),
         evidence_refs: refs,
       };
     } catch (error) {
@@ -532,9 +521,9 @@ async (page) => {
           continue;
         }
         if (
-          row.query_kind === "container-style" ||
-          row.query_kind === "container-scroll-state" ||
-          !row.axis
+          row.query_kind === "container-style"
+          || row.query_kind === "container-scroll-state"
+          || !row.axis
         ) {
           closures.push({
             condition_ref: row.condition_ref,
@@ -606,8 +595,7 @@ async (page) => {
           closures.push({
             condition_ref: row.condition_ref,
             status: "incomplete",
-            reason:
-              leftResult.limitation || rightResult.limitation || "browser evaluation unavailable",
+            reason: leftResult.limitation || rightResult.limitation || "browser evaluation unavailable",
           });
           incomplete = true;
           continue;
@@ -619,8 +607,7 @@ async (page) => {
             closures.push({
               condition_ref: row.condition_ref,
               status: "incomplete",
-              reason:
-                "condition is non-monotonic or has multiple transitions in the supported range",
+              reason: "condition is non-monotonic or has multiple transitions in the supported range",
             });
             incomplete = true;
           } else {
@@ -647,9 +634,9 @@ async (page) => {
         const transitionResult = await observeAt(transition);
         const afterResult = await observeAt(after);
         if (
-          [beforeResult, transitionResult, afterResult].some((result) => result.match === null) ||
-          beforeResult.match === transitionResult.match ||
-          transitionResult.match !== afterResult.match
+          [beforeResult, transitionResult, afterResult].some((result) => result.match === null)
+          || beforeResult.match === transitionResult.match
+          || transitionResult.match !== afterResult.match
         ) {
           closures.push({
             condition_ref: row.condition_ref,
@@ -667,8 +654,7 @@ async (page) => {
           after_viewport_css_px: after,
           match_states: [beforeResult.match, transitionResult.match, afterResult.match],
           raw_condition: row.raw_condition,
-          derivation_method:
-            "browser-evaluated fixed binary search with neighboring CSS px verification",
+          derivation_method: "browser-evaluated fixed binary search with neighboring CSS px verification",
           execution_status: "executable",
           evidence_refs: refs,
         };
@@ -686,16 +672,18 @@ async (page) => {
         },
         ...(incomplete
           ? {
-              limitation: (() => {
-                const firstIncomplete = closures.find((row) => row.status === "incomplete");
-                const firstIssue = inventory.issues[0];
-                if (firstIncomplete)
-                  return `${firstIncomplete.condition_ref}: ${firstIncomplete.reason}`;
-                if (firstIssue)
-                  return `${firstIssue.source_ref || "CSS source"}: ${firstIssue.reason}`;
-                return "one or more responsive size conditions could not be closed";
-              })(),
-            }
+            limitation: (() => {
+              const firstIncomplete = closures.find((row) => row.status === "incomplete");
+              const firstIssue = inventory.issues[0];
+              if (firstIncomplete) {
+                return `${firstIncomplete.condition_ref}: ${firstIncomplete.reason}`;
+              }
+              if (firstIssue) {
+                return `${firstIssue.source_ref || "CSS source"}: ${firstIssue.reason}`;
+              }
+              return "one or more responsive size conditions could not be closed";
+            })(),
+          }
           : {}),
         evidence_refs: refs,
       };
@@ -705,12 +693,13 @@ async (page) => {
       try {
         await page.setViewportSize(original);
         const restored = page.viewportSize();
-        if (!restored || restored.width !== original.width || restored.height !== original.height)
+        if (!restored || restored.width !== original.width || restored.height !== original.height) {
           return failure(
             request.probe_key,
             "incomplete",
             "original viewport restoration could not be verified",
           );
+        }
       } catch {
         return failure(
           request.probe_key,
@@ -744,15 +733,15 @@ async (page) => {
       "aria-selected",
     ]);
     if (
-      !object(request.target_resolver) ||
-      !object(request.target_resolver.payload) ||
-      !object(request.action) ||
-      !allowedActions.has(request.action.kind) ||
-      !allowedStartEvents.has(request.start_event) ||
-      !object(request.predicate) ||
-      !Number.isInteger(request.timeout_ms) ||
-      request.timeout_ms < 1 ||
-      request.timeout_ms > 120000
+      !object(request.target_resolver)
+      || !object(request.target_resolver.payload)
+      || !object(request.action)
+      || !allowedActions.has(request.action.kind)
+      || !allowedStartEvents.has(request.start_event)
+      || !object(request.predicate)
+      || !Number.isInteger(request.timeout_ms)
+      || request.timeout_ms < 1
+      || request.timeout_ms > 120000
     ) {
       return failure(
         request.probe_key,
@@ -761,34 +750,40 @@ async (page) => {
       );
     }
     const makeLocator = (scope, descriptor) => {
-      if (!object(descriptor) || !object(descriptor.payload))
+      if (!object(descriptor) || !object(descriptor.payload)) {
         throw new Error("target resolver is invalid");
+      }
       const { kind, payload } = descriptor;
-      if (kind === "role-name" && nonEmpty(payload.role) && nonEmpty(payload.name))
+      if (kind === "role-name" && nonEmpty(payload.role) && nonEmpty(payload.name)) {
         return scope.getByRole(payload.role, { name: payload.name, exact: true });
-      if (kind === "label" && nonEmpty(payload.label_text))
+      }
+      if (kind === "label" && nonEmpty(payload.label_text)) {
         return scope.getByLabel(payload.label_text, { exact: true });
-      if (kind === "visible-text" && nonEmpty(payload.text))
+      }
+      if (kind === "visible-text" && nonEmpty(payload.text)) {
         return scope.getByText(payload.text, { exact: true });
+      }
       throw new Error(
         "fixed interaction probe supports only exact role/name, label, and visible-text resolvers",
       );
     };
     const targetRef = request.target_ref;
-    if (!nonEmpty(targetRef))
+    if (!nonEmpty(targetRef)) {
       return failure(request.probe_key, "blocked", "interaction timing target ref is missing");
+    }
     let target;
     try {
       target = makeLocator(page, request.target_resolver);
     } catch {
       return failure(request.probe_key, "unsupported", "the fixed target resolver is unsupported");
     }
-    if ((await target.count()) !== 1 || !(await target.isVisible()) || !(await target.isEnabled()))
+    if ((await target.count()) !== 1 || !(await target.isVisible()) || !(await target.isEnabled())) {
       return failure(
         request.probe_key,
         "unavailable",
         "interaction target is not unique, visible, and enabled",
       );
+    }
 
     let textScopeLocator = page;
     const getPredicateLocator = (predicate) => {
@@ -811,15 +806,15 @@ async (page) => {
           "aria-state-equals",
         ].includes(key)
       ) {
-        const descriptor =
-          request.resolved_targets?.[predicate.target_ref] ||
-          (predicate.target_ref === targetRef ? request.target_resolver : null);
+        const descriptor = request.resolved_targets?.[predicate.target_ref]
+          || (predicate.target_ref === targetRef ? request.target_resolver : null);
         if (!descriptor) throw new Error("predicate target ref has no current resolver");
         if (
-          (key === "attribute-equals" && !allowedAttributes.has(predicate.attribute_name)) ||
-          (key === "aria-state-equals" && !allowedAriaStates.has(predicate.state_name))
-        )
+          (key === "attribute-equals" && !allowedAttributes.has(predicate.attribute_name))
+          || (key === "aria-state-equals" && !allowedAriaStates.has(predicate.state_name))
+        ) {
           throw new Error("predicate property is outside the fixed allowlist");
+        }
         return makeLocator(page, descriptor);
       }
       if (key === "url-changed" && predicate.baseline_url === "capture-at-arm") return null;
@@ -827,26 +822,33 @@ async (page) => {
     };
     const predicateSatisfied = async (predicate, locator, baselineUrl) => {
       const key = predicate.predicate_key;
-      if (key === "text-present")
+      if (key === "text-present") {
         return (await locator.count()) > 0 && (await locator.first().isVisible());
-      if (key === "element-visible")
+      }
+      if (key === "element-visible") {
         return (await locator.count()) === 1 && (await locator.isVisible());
-      if (key === "element-hidden")
+      }
+      if (key === "element-hidden") {
         return (await locator.count()) === 0 || (await locator.isHidden());
-      if (key === "element-enabled")
+      }
+      if (key === "element-enabled") {
         return (await locator.count()) === 1 && (await locator.isEnabled());
-      if (key === "element-disabled")
+      }
+      if (key === "element-disabled") {
         return (await locator.count()) === 1 && (await locator.isDisabled());
-      if (key === "attribute-equals")
+      }
+      if (key === "attribute-equals") {
         return (
-          (await locator.count()) === 1 &&
-          (await locator.getAttribute(predicate.attribute_name)) === predicate.expected_value
+          (await locator.count()) === 1
+          && (await locator.getAttribute(predicate.attribute_name)) === predicate.expected_value
         );
-      if (key === "aria-state-equals")
+      }
+      if (key === "aria-state-equals") {
         return (
-          (await locator.count()) === 1 &&
-          (await locator.getAttribute(predicate.state_name)) === predicate.expected_value
+          (await locator.count()) === 1
+          && (await locator.getAttribute(predicate.state_name)) === predicate.expected_value
         );
+      }
       if (key === "url-changed") return page.url() !== baselineUrl;
       return false;
     };
@@ -858,27 +860,30 @@ async (page) => {
       return failure(request.probe_key, "blocked", "the fixed end-state predicate is invalid");
     }
     const baselineUrl = page.url();
-    if (await predicateSatisfied(predicate, predicateLocator, baselineUrl))
+    if (await predicateSatisfied(predicate, predicateLocator, baselineUrl)) {
       return failure(request.probe_key, "blocked", "preexisting-end-state");
+    }
 
     let predicateElement = null;
     let textScopeElement = null;
     if (predicateLocator !== null && predicate.predicate_key !== "text-present") {
-      if ((await predicateLocator.count()) !== 1)
+      if ((await predicateLocator.count()) !== 1) {
         return failure(
           request.probe_key,
           "unavailable",
           "fixed predicate target is not uniquely resolvable before action",
         );
+      }
       predicateElement = await predicateLocator.elementHandle();
     }
     if (predicate.predicate_key === "text-present" && predicate.within_target_ref) {
-      if ((await textScopeLocator.count()) !== 1)
+      if ((await textScopeLocator.count()) !== 1) {
         return failure(
           request.probe_key,
           "unavailable",
           "fixed text predicate scope is not uniquely resolvable before action",
         );
+      }
       textScopeElement = await textScopeLocator.elementHandle();
     }
 
@@ -902,11 +907,12 @@ async (page) => {
         const slot = "__usabilityInspectionInteractionTiming";
         const listener = (event) => {
           if (
-            event.type !== eventName ||
-            !event.composedPath().includes(inputTarget) ||
-            state.start_ms !== null
-          )
+            event.type !== eventName
+            || !event.composedPath().includes(inputTarget)
+            || state.start_ms !== null
+          ) {
             return;
+          }
           state.start_ms = performance.now();
           state.event_name = event.type;
         };
@@ -914,16 +920,16 @@ async (page) => {
           if (!element || !element.isConnected) return false;
           const style = getComputedStyle(element);
           return (
-            style.display !== "none" &&
-            style.visibility !== "hidden" &&
-            element.getClientRects().length > 0
+            style.display !== "none"
+            && style.visibility !== "hidden"
+            && element.getClientRects().length > 0
           );
         };
         const disabled = (element) =>
-          !element ||
-          !element.isConnected ||
-          element.matches(":disabled") ||
-          element.getAttribute("aria-disabled") === "true";
+          !element
+          || !element.isConnected
+          || element.matches(":disabled")
+          || element.getAttribute("aria-disabled") === "true";
         const normalizeText = (value) =>
           String(value || "")
             .replace(/\s+/g, " ")
@@ -936,8 +942,8 @@ async (page) => {
             const expected = normalizeText(endPredicate.expected_text);
             return Array.from(root.querySelectorAll("*")).some(
               (element) =>
-                visible(element) &&
-                normalizeText(element.innerText || element.textContent) === expected,
+                visible(element)
+                && normalizeText(element.innerText || element.textContent) === expected,
             );
           }
           if (key === "url-changed") return location.href !== initialUrl;
@@ -947,12 +953,14 @@ async (page) => {
           if (key === "element-hidden") return !visible(element);
           if (key === "element-enabled") return !disabled(element);
           if (key === "element-disabled") return disabled(element);
-          if (key === "attribute-equals")
+          if (key === "attribute-equals") {
             return (
               element.getAttribute(endPredicate.attribute_name) === endPredicate.expected_value
             );
-          if (key === "aria-state-equals")
+          }
+          if (key === "aria-state-equals") {
             return element.getAttribute(endPredicate.state_name) === endPredicate.expected_value;
+          }
           return false;
         };
         let observer;
@@ -1024,15 +1032,15 @@ async (page) => {
     let actionError = null;
     try {
       if (request.action.kind === "click") await target.click();
-      else if (request.action.kind === "fill" && typeof request.action.value === "string")
+      else if (request.action.kind === "fill" && typeof request.action.value === "string") {
         await target.fill(request.action.value);
-      else if (request.action.kind === "press" && nonEmpty(request.action.key))
+      } else if (request.action.kind === "press" && nonEmpty(request.action.key)) {
         await target.press(request.action.key);
-      else if (request.action.kind === "check") await target.check();
+      } else if (request.action.kind === "check") await target.check();
       else if (request.action.kind === "uncheck") await target.uncheck();
-      else if (request.action.kind === "select-option" && typeof request.action.value === "string")
+      else if (request.action.kind === "select-option" && typeof request.action.value === "string") {
         await target.selectOption(request.action.value);
-      else throw new Error("action payload does not match the fixed action kind");
+      } else throw new Error("action payload does not match the fixed action kind");
     } catch {
       actionError = "the fixed browser action failed";
     }
@@ -1064,38 +1072,41 @@ async (page) => {
       )
       .then((handle) => handle.jsonValue())
       .catch(() => null);
-    if (!endState)
+    if (!endState) {
       return failure(
         request.probe_key,
         "unavailable",
         "measurement-unavailable: browser clock watcher did not close",
       );
+    }
     await page.evaluate(() => {
       const record = window.__usabilityInspectionInteractionTiming;
       if (!record) return;
       record.cleanup();
       delete window.__usabilityInspectionInteractionTiming;
     });
-    if (endState.end_ms === null)
+    if (endState.end_ms === null) {
       return failure(
         request.probe_key,
         "unavailable",
         endState.limitation || "timeout: fixed end predicate was not observed",
       );
+    }
     const startMs = endState.start_ms;
     const endMs = endState.end_ms;
     if (
-      startMs === null ||
-      typeof endMs !== "number" ||
-      !Number.isFinite(startMs) ||
-      !Number.isFinite(endMs) ||
-      endMs < startMs
-    )
+      startMs === null
+      || typeof endMs !== "number"
+      || !Number.isFinite(startMs)
+      || !Number.isFinite(endMs)
+      || endMs < startMs
+    ) {
       return failure(
         request.probe_key,
         "unavailable",
         "same-page clock timestamps could not be verified",
       );
+    }
     return {
       probe_key: request.probe_key,
       document_identity: identity,
@@ -1117,4 +1128,4 @@ async (page) => {
     "unsupported",
     "probe key is outside this Skill's fixed browser dispatch",
   );
-}
+});

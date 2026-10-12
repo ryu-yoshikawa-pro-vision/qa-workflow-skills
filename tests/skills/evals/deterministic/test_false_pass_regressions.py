@@ -4,12 +4,13 @@ import unittest
 
 from scripts.skills.evals.deterministic.loader import load_validators
 
-
 VALIDATORS = load_validators()
 
 
 class FalsePassRegressionTests(unittest.TestCase):
-    def assert_fails(self, skill: str, text: str, expected: dict, assertion_id: str) -> None:
+    def assert_fails(
+        self, skill: str, text: str, expected: dict, assertion_id: str
+    ) -> None:
         result = VALIDATORS[skill](text, expected, "REGRESSION").to_dict()
         failed = {a["id"] for a in result["assertions"] if a["status"] == "fail"}
         self.assertIn(assertion_id, failed, result)
@@ -130,8 +131,15 @@ class FalsePassRegressionTests(unittest.TestCase):
         self.assert_fails("spec-analysis", "# 仕様分析\n", {}, "SPEC-D012")
 
     def test_required_entity_missing(self):
-        text = self._risk_base().replace("| RISK-001 | 誤保存 | SPEC-001 / CHG-001 | 4 | 2 | 高 | 保存処理の変更 |\n", "")
-        expected = {"required_risks": {"RISK-001": {"impact": 4, "likelihood": 2, "risk_level": "高"}}}
+        text = self._risk_base().replace(
+            "| RISK-001 | 誤保存 | SPEC-001 / CHG-001 | 4 | 2 | 高 | 保存処理の変更 |\n",
+            "",
+        )
+        expected = {
+            "required_risks": {
+                "RISK-001": {"impact": 4, "likelihood": 2, "risk_level": "高"}
+            }
+        }
         self.assert_fails("test-analysis", text, expected, "RISK-D011")
 
     def test_expected_missing_vs_explicit_empty_set(self):
@@ -142,9 +150,24 @@ class FalsePassRegressionTests(unittest.TestCase):
     def test_spec_current_authority_rejects_inf_unk_and_type_mismatch(self):
         base = self._spec_base()
         cases = [
-            (base.replace("SPEC-001 | 保存できる | SPEC", "INF-001 | 推論 | INFERENCE").replace("SPEC-001 | SPEC | 保存できる", "INF-001 | SPEC | 推論"), {"known_authorities": ["INF-001"]}),
-            (base.replace("SPEC-001 | 保存できる | SPEC", "UNK-001 | 不明 | UNKNOWN").replace("SPEC-001 | SPEC | 保存できる", "UNK-001 | SPEC | 不明"), {"known_authorities": ["UNK-001"]}),
-            (base.replace("SPEC-001 | SPEC | 保存できる", "SPEC-001 | DECISION | 保存できる"), {}),
+            (
+                base.replace(
+                    "SPEC-001 | 保存できる | SPEC", "INF-001 | 推論 | INFERENCE"
+                ).replace("SPEC-001 | SPEC | 保存できる", "INF-001 | SPEC | 推論"),
+                {"known_authorities": ["INF-001"]},
+            ),
+            (
+                base.replace(
+                    "SPEC-001 | 保存できる | SPEC", "UNK-001 | 不明 | UNKNOWN"
+                ).replace("SPEC-001 | SPEC | 保存できる", "UNK-001 | SPEC | 不明"),
+                {"known_authorities": ["UNK-001"]},
+            ),
+            (
+                base.replace(
+                    "SPEC-001 | SPEC | 保存できる", "SPEC-001 | DECISION | 保存できる"
+                ),
+                {},
+            ),
         ]
         for text, expected in cases:
             with self.subTest(text=text[:40]):
@@ -153,10 +176,30 @@ class FalsePassRegressionTests(unittest.TestCase):
     def test_spec_required_fields_and_source_integrity(self):
         base = self._spec_base()
         cases = [
-            (base.replace("| SPEC-001 | 保存できる | SPEC |", "| SPEC-001 |  | SPEC |"), "SPEC-D014"),
-            (base.replace("| SPEC-001 | SPEC | 保存できる |", "| SPEC-001 | SPEC |  |"), "SPEC-D015"),
-            (base.replace("| SRC-001 | 要件書 |", "| BAD-001 | 要件書 |").replace("SRC-001 |", "BAD-001 |"), "SPEC-D017"),
-            (base.replace("| SRC-001 | 要件書 |", "| SRC-001 | 要件書 |\n| SRC-001 | 設計書 |"), "SPEC-D018"),
+            (
+                base.replace(
+                    "| SPEC-001 | 保存できる | SPEC |", "| SPEC-001 |  | SPEC |"
+                ),
+                "SPEC-D014",
+            ),
+            (
+                base.replace(
+                    "| SPEC-001 | SPEC | 保存できる |", "| SPEC-001 | SPEC |  |"
+                ),
+                "SPEC-D015",
+            ),
+            (
+                base.replace("| SRC-001 | 要件書 |", "| BAD-001 | 要件書 |").replace(
+                    "SRC-001 |", "BAD-001 |"
+                ),
+                "SPEC-D017",
+            ),
+            (
+                base.replace(
+                    "| SRC-001 | 要件書 |", "| SRC-001 | 要件書 |\n| SRC-001 | 設計書 |"
+                ),
+                "SPEC-D018",
+            ),
             (base.replace("| SRC-001 | 要件書 |", "| SRC-001 |  |"), "SPEC-D016"),
         ]
         for text, assertion_id in cases:
@@ -165,51 +208,118 @@ class FalsePassRegressionTests(unittest.TestCase):
 
     def test_approved_assumptions_use_list_semantics(self):
         text = self._question_base()
-        valid = {"approved_assumptions": ["ASM-001"], "required_approved_assumptions": ["ASM-001"]}
+        valid = {
+            "approved_assumptions": ["ASM-001"],
+            "required_approved_assumptions": ["ASM-001"],
+        }
         self.assert_passes("question-analysis", text, valid)
-        self.assert_fails("question-analysis", text, {"approved_assumptions": ["ASM-999"]}, "QUESTION-D009")
-        missing = text.replace("| タイムゾーンはJST | 承認済み | ステークホルダー承認 | 日時表示 | ASM-001 |\n", "")
+        self.assert_fails(
+            "question-analysis",
+            text,
+            {"approved_assumptions": ["ASM-999"]},
+            "QUESTION-D009",
+        )
+        missing = text.replace(
+            "| タイムゾーンはJST | 承認済み | ステークホルダー承認 | 日時表示 | ASM-001 |\n",
+            "",
+        )
         self.assert_fails("question-analysis", missing, valid, "QUESTION-D015")
 
-        spec = self._spec_base().replace("| SPEC-001 | SPEC | 保存できる | 保存画面 | SRC-001 | 独立 | |", "| ASM-001 | 承認済みASM | JSTを使う | 日時表示 | SRC-001 | 独立 | |")
-        self.assert_passes("spec-analysis", spec, {"known_authorities": ["ASM-001"], "approved_assumptions": ["ASM-001"]})
-        self.assert_fails("spec-analysis", spec, {"known_authorities": ["ASM-001"], "approved_assumptions": []}, "SPEC-D013")
+        spec = self._spec_base().replace(
+            "| SPEC-001 | SPEC | 保存できる | 保存画面 | SRC-001 | 独立 | |",
+            "| ASM-001 | 承認済みASM | JSTを使う | 日時表示 | SRC-001 | 独立 | |",
+        )
+        self.assert_passes(
+            "spec-analysis",
+            spec,
+            {"known_authorities": ["ASM-001"], "approved_assumptions": ["ASM-001"]},
+        )
+        self.assert_fails(
+            "spec-analysis",
+            spec,
+            {"known_authorities": ["ASM-001"], "approved_assumptions": []},
+            "SPEC-D013",
+        )
 
     def test_question_required_fields_and_blocked_scope(self):
         base = self._question_base()
         for old, new, aid in [
             ("保存条件を確認する", "", "QUESTION-D012"),
             ("仕様に記載なし", "", "QUESTION-D012"),
-            ("| Q-001 | テスト要求 | 保存条件の決定 |", "| Q-001 |  | 保存条件の決定 |", "QUESTION-D013"),
+            (
+                "| Q-001 | テスト要求 | 保存条件の決定 |",
+                "| Q-001 |  | 保存条件の決定 |",
+                "QUESTION-D013",
+            ),
         ]:
             with self.subTest(assertion_id=aid):
-                self.assert_fails("question-analysis", base.replace(old, new), {"approved_assumptions": ["ASM-001"]}, aid)
+                self.assert_fails(
+                    "question-analysis",
+                    base.replace(old, new),
+                    {"approved_assumptions": ["ASM-001"]},
+                    aid,
+                )
 
     def test_question_fixture_normalization(self):
         expected = {"expected_normalizations": {"Q-001": "未確定"}}
-        matching = self._question_base().replace("| DECISION | spec-analysis |", "| 未確定 | spec-analysis |")
+        matching = self._question_base().replace(
+            "| DECISION | spec-analysis |", "| 未確定 | spec-analysis |"
+        )
         self.assert_passes("question-analysis", matching, expected)
-        self.assert_fails("question-analysis", self._question_base(), expected, "QUESTION-D016")
+        self.assert_fails(
+            "question-analysis", self._question_base(), expected, "QUESTION-D016"
+        )
         self.assert_passes("question-analysis", self._question_base(), {})
 
     def test_required_technique_and_testability(self):
         base = self._risk_base()
-        expected = {"required_techniques": ["状態遷移"], "required_testability": {"操作可能か": "可", "観測可能か": "可", "合否判定可能か": "可"}}
+        expected = {
+            "required_techniques": ["状態遷移"],
+            "required_testability": {
+                "操作可能か": "可",
+                "観測可能か": "可",
+                "合否判定可能か": "可",
+            },
+        }
         self.assert_passes("test-analysis", base, expected)
-        no_technique = base.replace("| 状態遷移 | 保存状態 | 状態変化を確認するため |\n", "")
+        no_technique = base.replace(
+            "| 状態遷移 | 保存状態 | 状態変化を確認するため |\n", ""
+        )
         self.assert_fails("test-analysis", no_technique, expected, "RISK-D014")
-        no_testability = base.replace("| 保存 | 可 | 可 | 可 | システムテスト | 現在レベル |\n", "")
+        no_testability = base.replace(
+            "| 保存 | 可 | 可 | 可 | システムテスト | 現在レベル |\n", ""
+        )
         self.assert_fails("test-analysis", no_testability, expected, "RISK-D015")
         mismatch = base.replace("| 保存 | 可 | 可 | 可 |", "| 保存 | 可 | 不可 | 可 |")
         self.assert_fails("test-analysis", mismatch, expected, "RISK-D015")
 
     def test_technique_and_testability_required_fields(self):
         base = self._risk_base()
-        self.assert_fails("test-analysis", base.replace("| 状態遷移 | 保存状態 | 状態変化を確認するため |", "| 状態遷移 |  | 状態変化を確認するため |"), {}, "RISK-D012")
-        self.assert_fails("test-analysis", base.replace("| 保存 | 可 | 可 | 可 | システムテスト |", "| 保存 | 可 | 可 | 可 |  |"), {}, "RISK-D013")
+        self.assert_fails(
+            "test-analysis",
+            base.replace(
+                "| 状態遷移 | 保存状態 | 状態変化を確認するため |",
+                "| 状態遷移 |  | 状態変化を確認するため |",
+            ),
+            {},
+            "RISK-D012",
+        )
+        self.assert_fails(
+            "test-analysis",
+            base.replace(
+                "| 保存 | 可 | 可 | 可 | システムテスト |", "| 保存 | 可 | 可 | 可 |  |"
+            ),
+            {},
+            "RISK-D013",
+        )
 
     def test_pairwise_invalid_generated_combinations(self):
-        for combo, assertion_id in [("A=0; B=0; Foo=x", "TCN-D018"), ("A=2; B=0", "TCN-D019"), ("A=1; B=1", "TCN-D020"), ("A=0", "TCN-D021")]:
+        for combo, assertion_id in [
+            ("A=0; B=0; Foo=x", "TCN-D018"),
+            ("A=2; B=0", "TCN-D019"),
+            ("A=1; B=1", "TCN-D020"),
+            ("A=0", "TCN-D021"),
+        ]:
             with self.subTest(combo=combo):
                 text, expected = self._pairwise_base(combo)
                 self.assert_fails("test-condition-design", text, expected, assertion_id)
@@ -270,13 +380,23 @@ class FalsePassRegressionTests(unittest.TestCase):
             },
         }
         self.assert_passes("test-condition-design", text, expected)
-        missing = text.replace("| TCN-001-CI04 | Role=member; Browser=Edge; Flag=on |\n", "")
+        missing = text.replace(
+            "| TCN-001-CI04 | Role=member; Browser=Edge; Flag=on |\n", ""
+        )
         self.assert_fails("test-condition-design", missing, expected, "TCN-D015")
 
     def test_pairwise_generated_coverage_item_integrity(self):
         text, expected = self._pairwise_base()
-        self.assert_fails("test-condition-design", text.replace("| TCN-001-CI01 | A=0; B=0 |", "| TCN-001-CI99 | A=0; B=0 |"), expected, "TCN-D026")
-        duplicate = text.replace("| TCN-001-CI01 | A=0; B=0 |", "| TCN-001-CI01 | A=0; B=0 |\n| TCN-001-CI01 | A=1; B=0 |")
+        self.assert_fails(
+            "test-condition-design",
+            text.replace("| TCN-001-CI01 | A=0; B=0 |", "| TCN-001-CI99 | A=0; B=0 |"),
+            expected,
+            "TCN-D026",
+        )
+        duplicate = text.replace(
+            "| TCN-001-CI01 | A=0; B=0 |",
+            "| TCN-001-CI01 | A=0; B=0 |\n| TCN-001-CI01 | A=1; B=0 |",
+        )
         self.assert_fails("test-condition-design", duplicate, expected, "TCN-D027")
 
     def test_pairwise_invalid_tokens_and_duplicate_factors(self):
@@ -293,7 +413,9 @@ class FalsePassRegressionTests(unittest.TestCase):
 | draft | publish | published | TCN-999-CI99 |
 """
         expected.pop("pairwise")
-        expected["required_transitions"] = [{"from": "draft", "event": "publish", "to": "published"}]
+        expected["required_transitions"] = [
+            {"from": "draft", "event": "publish", "to": "published"}
+        ]
         self.assert_fails("test-condition-design", text, expected, "TCN-D016")
 
     def test_disposition_targets_must_exist_when_fixture_sets_are_present(self):
@@ -307,7 +429,12 @@ class FalsePassRegressionTests(unittest.TestCase):
 | --- | --- | --- | --- |
 | SPEC-999 | 仕様根拠 | 対象外 | スコープ外 |
 """
-        self.assert_fails("test-requirement-design", tr, {"known_authorities": ["SPEC-001"], "known_product_risks": ["RISK-001"]}, "TR-D013")
+        self.assert_fails(
+            "test-requirement-design",
+            tr,
+            {"known_authorities": ["SPEC-001"], "known_product_risks": ["RISK-001"]},
+            "TR-D013",
+        )
 
         risk_disposition = """# TR
 ## テスト要求一覧
@@ -319,12 +446,25 @@ class FalsePassRegressionTests(unittest.TestCase):
 | --- | --- | --- | --- |
 | RISK-001 | プロダクトリスク | 対象外 | スコープ外 |
 """
-        risk_expected = {"known_authorities": ["SPEC-001"], "product_risk_levels": {"RISK-001": "高"}}
+        risk_expected = {
+            "known_authorities": ["SPEC-001"],
+            "product_risk_levels": {"RISK-001": "高"},
+        }
         self.assert_passes("test-requirement-design", risk_disposition, risk_expected)
-        self.assert_fails("test-requirement-design", risk_disposition.replace("| RISK-001 | プロダクトリスク |", "| RISK-999 | プロダクトリスク |"), risk_expected, "TR-D013")
+        self.assert_fails(
+            "test-requirement-design",
+            risk_disposition.replace(
+                "| RISK-001 | プロダクトリスク |", "| RISK-999 | プロダクトリスク |"
+            ),
+            risk_expected,
+            "TR-D013",
+        )
 
         tcn, expected = self._pairwise_base()
-        tcn = tcn.replace("| --- | --- | --- |\n## テスト観点", "| --- | --- | --- |\n| TR-999 | 対象外 | 理由 |\n## テスト観点")
+        tcn = tcn.replace(
+            "| --- | --- | --- |\n## テスト観点",
+            "| --- | --- | --- |\n| TR-999 | 対象外 | 理由 |\n## テスト観点",
+        )
         self.assert_fails("test-condition-design", tcn, expected, "TCN-D029")
 
         tc = """# TC
@@ -337,7 +477,12 @@ class FalsePassRegressionTests(unittest.TestCase):
 | --- | --- | --- | --- |
 | TCN-999-CI99 | カバレッジ項目 | 対象外 | スコープ外 |
 """
-        tc_expected = {"known_test_conditions": ["TCN-001"], "known_coverage_items": ["TCN-001-CI01"], "known_test_requirements": ["TR-001"], "known_authorities": ["SPEC-001"]}
+        tc_expected = {
+            "known_test_conditions": ["TCN-001"],
+            "known_coverage_items": ["TCN-001-CI01"],
+            "known_test_requirements": ["TR-001"],
+            "known_authorities": ["SPEC-001"],
+        }
         self.assert_fails("test-case-design", tc, tc_expected, "TC-D014")
 
     def test_fixture_required_tr_links_and_dispositions(self):
@@ -364,9 +509,24 @@ class FalsePassRegressionTests(unittest.TestCase):
             "| SPEC-002 | 仕様根拠 | 対象外 | 今回の対象外 |",
             "| SPEC-002 | 仕様根拠 | 対象外 | 今回の対象外 |\n| RISK-002 | プロダクトリスク | 対象外 | 今回の対象外 |",
         )
-        self.assert_fails("test-requirement-design", risk_as_disposition, expected, "TR-D014")
-        self.assert_fails("test-requirement-design", text.replace("| SPEC-002 | 仕様根拠 | 対象外 | 今回の対象外 |\n", ""), expected, "TR-D015")
-        self.assert_fails("test-requirement-design", text.replace("| SPEC-002 | 仕様根拠 | 対象外 |", "| SPEC-002 | 仕様根拠 | 残存リスク |"), expected, "TR-D015")
+        self.assert_fails(
+            "test-requirement-design", risk_as_disposition, expected, "TR-D014"
+        )
+        self.assert_fails(
+            "test-requirement-design",
+            text.replace("| SPEC-002 | 仕様根拠 | 対象外 | 今回の対象外 |\n", ""),
+            expected,
+            "TR-D015",
+        )
+        self.assert_fails(
+            "test-requirement-design",
+            text.replace(
+                "| SPEC-002 | 仕様根拠 | 対象外 |",
+                "| SPEC-002 | 仕様根拠 | 残存リスク |",
+            ),
+            expected,
+            "TR-D015",
+        )
 
     def test_fixture_numbered_authority_mapping(self):
         text = """# TC
@@ -385,15 +545,25 @@ class FalsePassRegressionTests(unittest.TestCase):
             "coverage_closure_ids": ["TCN-001-CI01", "TCN-001-CI02"],
             "known_authorities": ["SPEC-001", "DEC-001"],
             "coverage_item_priorities": {"TCN-001-CI01": "中", "TCN-001-CI02": "高"},
-            "expected_numbered_authorities": {"TC-001": {"1": ["SPEC-001"], "2": ["DEC-001"]}},
+            "expected_numbered_authorities": {
+                "TC-001": {"1": ["SPEC-001"], "2": ["DEC-001"]}
+            },
         }
         self.assert_passes("test-case-design", text, expected)
 
-        unnumbered = text.replace("期待結果1: 保存済み表示; 期待結果2: 編集不可表示", "保存済み表示; 編集不可表示").replace("期待結果1→SPEC-001; 期待結果2→DEC-001", "SPEC-001; DEC-001")
+        unnumbered = text.replace(
+            "期待結果1: 保存済み表示; 期待結果2: 編集不可表示",
+            "保存済み表示; 編集不可表示",
+        ).replace("期待結果1→SPEC-001; 期待結果2→DEC-001", "SPEC-001; DEC-001")
         self.assert_fails("test-case-design", unnumbered, expected, "TC-D011")
-        reversed_mapping = text.replace("期待結果1→SPEC-001; 期待結果2→DEC-001", "期待結果1→DEC-001; 期待結果2→SPEC-001")
+        reversed_mapping = text.replace(
+            "期待結果1→SPEC-001; 期待結果2→DEC-001",
+            "期待結果1→DEC-001; 期待結果2→SPEC-001",
+        )
         self.assert_fails("test-case-design", reversed_mapping, expected, "TC-D011")
-        missing_second = text.replace("期待結果1→SPEC-001; 期待結果2→DEC-001", "期待結果1→SPEC-001")
+        missing_second = text.replace(
+            "期待結果1→SPEC-001; 期待結果2→DEC-001", "期待結果1→SPEC-001"
+        )
         self.assert_fails("test-case-design", missing_second, expected, "TC-D011")
 
     def test_coverage_expected_fix_target_must_exist(self):
@@ -403,19 +573,55 @@ class FalsePassRegressionTests(unittest.TestCase):
 | --- | --- | --- | --- | --- | --- |
 | TR | TR-001 | TCN | TCN-001 | 網羅済み | test-condition-design |
 """
-        self.assert_fails("coverage-analysis", text, {"expected_fix_skills": {"TCN-001-CI01": "test-condition-design"}}, "COV-D005")
+        self.assert_fails(
+            "coverage-analysis",
+            text,
+            {"expected_fix_skills": {"TCN-001-CI01": "test-condition-design"}},
+            "COV-D005",
+        )
 
     def test_major_residual_acceptance_must_match_fixture_approval(self):
-        text = self._review_base().replace("| 修正済み | |", "| 残存リスクとして受容 | APR-999 |")
-        self.assert_fails("adversarial-review", text, {"known_artifact_ids": ["TC-001"], "approved_risk_acceptances": {"REV-001": "APR-001"}}, "REV-D008")
+        text = self._review_base().replace(
+            "| 修正済み | |", "| 残存リスクとして受容 | APR-999 |"
+        )
+        self.assert_fails(
+            "adversarial-review",
+            text,
+            {
+                "known_artifact_ids": ["TC-001"],
+                "approved_risk_acceptances": {"REV-001": "APR-001"},
+            },
+            "REV-D008",
+        )
 
     def test_adversarial_repair_targets_and_summary_contract(self):
         expected = {"known_artifact_ids": ["TC-001"]}
-        self.assert_passes("adversarial-review", self._review_base("test-case-design"), expected)
-        self.assert_passes("adversarial-review", self._review_base("案件コンテキスト / 仕様決定"), expected)
-        self.assert_fails("adversarial-review", self._review_base("unknown-target"), expected, "REV-D006")
-        self.assert_fails("adversarial-review", self._review_base().replace("| 提案 | 0 |", "| unknown | 0 |"), expected, "REV-D013")
-        self.assert_fails("adversarial-review", self._review_base().replace("| 軽微 | 0 |", "| 重大 | 0 |"), expected, "REV-D014")
+        self.assert_passes(
+            "adversarial-review", self._review_base("test-case-design"), expected
+        )
+        self.assert_passes(
+            "adversarial-review",
+            self._review_base("案件コンテキスト / 仕様決定"),
+            expected,
+        )
+        self.assert_fails(
+            "adversarial-review",
+            self._review_base("unknown-target"),
+            expected,
+            "REV-D006",
+        )
+        self.assert_fails(
+            "adversarial-review",
+            self._review_base().replace("| 提案 | 0 |", "| unknown | 0 |"),
+            expected,
+            "REV-D013",
+        )
+        self.assert_fails(
+            "adversarial-review",
+            self._review_base().replace("| 軽微 | 0 |", "| 重大 | 0 |"),
+            expected,
+            "REV-D014",
+        )
 
     def test_adversarial_fixture_expected_attributes(self):
         expected = {
@@ -432,17 +638,39 @@ class FalsePassRegressionTests(unittest.TestCase):
         base = self._review_base()
         self.assert_passes("adversarial-review", base, expected)
 
-        severity_mismatch = base.replace("| 重大 | 1 |", "| 重大 | 0 |").replace("| 軽微 | 0 |", "| 軽微 | 1 |").replace("| REV-001 | 重大 |", "| REV-001 | 軽微 |")
+        severity_mismatch = (
+            base.replace("| 重大 | 1 |", "| 重大 | 0 |")
+            .replace("| 軽微 | 0 |", "| 軽微 | 1 |")
+            .replace("| REV-001 | 重大 |", "| REV-001 | 軽微 |")
+        )
         self.assert_fails("adversarial-review", severity_mismatch, expected, "REV-D010")
-        self.assert_fails("adversarial-review", self._review_base("spec-analysis"), expected, "REV-D010")
+        self.assert_fails(
+            "adversarial-review",
+            self._review_base("spec-analysis"),
+            expected,
+            "REV-D010",
+        )
 
-        optional_expected = {"known_artifact_ids": ["TC-001"], "expected_defects": [{"target_id": "TC-001", "contains": "仕様根拠"}]}
-        optional_text = self._review_base("spec-analysis").replace("| 重大 | 1 |", "| 重大 | 0 |").replace("| 軽微 | 0 |", "| 軽微 | 1 |").replace("| REV-001 | 重大 |", "| REV-001 | 軽微 |")
+        optional_expected = {
+            "known_artifact_ids": ["TC-001"],
+            "expected_defects": [{"target_id": "TC-001", "contains": "仕様根拠"}],
+        }
+        optional_text = (
+            self._review_base("spec-analysis")
+            .replace("| 重大 | 1 |", "| 重大 | 0 |")
+            .replace("| 軽微 | 0 |", "| 軽微 | 1 |")
+            .replace("| REV-001 | 重大 |", "| REV-001 | 軽微 |")
+        )
         self.assert_passes("adversarial-review", optional_text, optional_expected)
 
     def test_adversarial_finding_required_fields(self):
-        text = self._review_base().replace("| REV-001 | 重大 | TC-001 | 根拠が不足 | 仕様根拠参照なし | 合否判定不能 | 根拠を追加 | test-case-design |", "| REV-001 | 重大 | TC-001 |  |  |  | 根拠を追加 |  |")
-        self.assert_fails("adversarial-review", text, {"known_artifact_ids": ["TC-001"]}, "REV-D012")
+        text = self._review_base().replace(
+            "| REV-001 | 重大 | TC-001 | 根拠が不足 | 仕様根拠参照なし | 合否判定不能 | 根拠を追加 | test-case-design |",
+            "| REV-001 | 重大 | TC-001 |  |  |  | 根拠を追加 |  |",
+        )
+        self.assert_fails(
+            "adversarial-review", text, {"known_artifact_ids": ["TC-001"]}, "REV-D012"
+        )
 
     def test_workflow_state_invariants_and_duplicate_skill(self):
         def workflow(overall: str, rows: str) -> str:
@@ -451,10 +679,31 @@ class FalsePassRegressionTests(unittest.TestCase):
 | --- | --- | --- | --- | --- |
 {rows}
 """
-        self.assert_fails("qa-workflow", workflow("完了", "| test-case-design |  | 実行中 | v1 | |"), {}, "WF-D004")
-        self.assert_fails("qa-workflow", workflow("部分完了（ブロック中あり）", "| test-case-design |  | 完了 | v1 | |"), {}, "WF-D010")
-        self.assert_fails("qa-workflow", workflow("ブロック中", "| test-case-design |  | 完了 | v1 | |"), {}, "WF-D011")
-        duplicate = workflow("実行中", "| test-case-design |  | 実行中 | v1 | |\n| test-case-design |  | 完了 | v1 | |")
+
+        self.assert_fails(
+            "qa-workflow",
+            workflow("完了", "| test-case-design |  | 実行中 | v1 | |"),
+            {},
+            "WF-D004",
+        )
+        self.assert_fails(
+            "qa-workflow",
+            workflow(
+                "部分完了（ブロック中あり）", "| test-case-design |  | 完了 | v1 | |"
+            ),
+            {},
+            "WF-D010",
+        )
+        self.assert_fails(
+            "qa-workflow",
+            workflow("ブロック中", "| test-case-design |  | 完了 | v1 | |"),
+            {},
+            "WF-D011",
+        )
+        duplicate = workflow(
+            "実行中",
+            "| test-case-design |  | 実行中 | v1 | |\n| test-case-design |  | 完了 | v1 | |",
+        )
         self.assert_fails("qa-workflow", duplicate, {}, "WF-D012")
 
     def test_workflow_fixture_expected_states(self):
@@ -462,7 +711,12 @@ class FalsePassRegressionTests(unittest.TestCase):
             "expected_start_skill": "test-analysis",
             "expected_start_target": "テスト分析",
             "expected_final_skill": "test-case-design",
-            "expected_skills": ["test-analysis", "test-requirement-design", "test-condition-design", "test-case-design"],
+            "expected_skills": [
+                "test-analysis",
+                "test-requirement-design",
+                "test-condition-design",
+                "test-case-design",
+            ],
             "expected_overall_state": "部分完了（ブロック中あり）",
             "expected_skill_states": {
                 "test-analysis": "ブロック中",
@@ -492,10 +746,28 @@ class FalsePassRegressionTests(unittest.TestCase):
 | test-case-design |  | {tc_state} | TC | |
 """
 
-        self.assert_passes("qa-workflow", workflow("部分完了（ブロック中あり）", "ブロック中"), expected)
-        self.assert_fails("qa-workflow", workflow("完了", "ブロック中"), expected, "WF-D013")
-        self.assert_fails("qa-workflow", workflow("部分完了（ブロック中あり）", "完了"), expected, "WF-D014")
-        self.assert_fails("qa-workflow", workflow("部分完了（ブロック中あり）", "ブロック中", tcn_state="ブロック中"), expected, "WF-D014")
+        self.assert_passes(
+            "qa-workflow",
+            workflow("部分完了（ブロック中あり）", "ブロック中"),
+            expected,
+        )
+        self.assert_fails(
+            "qa-workflow", workflow("完了", "ブロック中"), expected, "WF-D013"
+        )
+        self.assert_fails(
+            "qa-workflow",
+            workflow("部分完了（ブロック中あり）", "完了"),
+            expected,
+            "WF-D014",
+        )
+        self.assert_fails(
+            "qa-workflow",
+            workflow(
+                "部分完了（ブロック中あり）", "ブロック中", tcn_state="ブロック中"
+            ),
+            expected,
+            "WF-D014",
+        )
 
     def test_test_case_priority_override_requires_reason(self):
         base = """# TC
@@ -507,9 +779,19 @@ class FalsePassRegressionTests(unittest.TestCase):
 | 上流ID | 種別 | 扱い | 理由 / 根拠 |
 | --- | --- | --- | --- |
 """
-        expected = {"known_test_conditions": ["TCN-001"], "known_coverage_items": ["TCN-001-CI01"], "known_test_requirements": ["TR-001"], "known_authorities": ["SPEC-001"], "coverage_item_priorities": {"TCN-001-CI01": "高"}}
+        expected = {
+            "known_test_conditions": ["TCN-001"],
+            "known_coverage_items": ["TCN-001-CI01"],
+            "known_test_requirements": ["TR-001"],
+            "known_authorities": ["SPEC-001"],
+            "coverage_item_priorities": {"TCN-001-CI01": "高"},
+        }
         self.assert_fails("test-case-design", base.format(note=""), expected, "TC-D010")
-        self.assert_passes("test-case-design", base.format(note="低リスクの補助確認として優先度を下げる"), expected)
+        self.assert_passes(
+            "test-case-design",
+            base.format(note="低リスクの補助確認として優先度を下げる"),
+            expected,
+        )
 
 
 if __name__ == "__main__":

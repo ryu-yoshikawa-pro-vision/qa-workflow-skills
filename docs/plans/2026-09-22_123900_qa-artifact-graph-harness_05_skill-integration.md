@@ -10,21 +10,21 @@ PR #13ではuser-facing Skillを3件追加します。
 
 既存の新規・改修Skillは責務を維持します。
 
-| Skill / runtime | PR #13での位置づけ |
-| --- | --- |
-| PR #11 Machine Entity / traceability | identity / lifecycle / impact / freshnessの正本 |
-| `test-analysis` | 新規・改修の変更影響候補 / Product Risk / test objective / test scope |
-| `test-case-design` | current logical TC |
-| `coverage-analysis` | 指定された成果物の意味上coverage検証 |
-| `regression-testing` | Regression baseline / membership / Run計画 / Activity / history |
-| `test-target-inspection` | currentな実対象情報 / UI / 既知範囲のふるまい収集 |
-| `test-execution` | manual相当execution / result / evidence。既存TCの修正確認にも再利用 |
-| `e2e-test-implementation` | E2E testware |
-| `e2e-test-execution` | E2E execution / result / evidence。既存E2Eの修正確認にも再利用 |
-| `e2e-test-result-analysis` | E2E failure分析 |
-| `exploratory-testing` | Exploration / 仮説駆動Investigation |
-| `qa-knowledge` | 継続QA knowledgeのtriage / lifecycle / lookup |
-| `qa-workflow` | 複合workflowのrouting / common workflow state / blocked / resume |
+| Skill / runtime                      | PR #13での位置づけ                                                    |
+| ------------------------------------ | --------------------------------------------------------------------- |
+| PR #11 Machine Entity / traceability | identity / lifecycle / impact / freshnessの正本                       |
+| `test-analysis`                      | 新規・改修の変更影響候補 / Product Risk / test objective / test scope |
+| `test-case-design`                   | current logical TC                                                    |
+| `coverage-analysis`                  | 指定された成果物の意味上coverage検証                                  |
+| `regression-testing`                 | Regression baseline / membership / Run計画 / Activity / history       |
+| `test-target-inspection`             | currentな実対象情報 / UI / 既知範囲のふるまい収集                     |
+| `test-execution`                     | manual相当execution / result / evidence。既存TCの修正確認にも再利用   |
+| `e2e-test-implementation`            | E2E testware                                                          |
+| `e2e-test-execution`                 | E2E execution / result / evidence。既存E2Eの修正確認にも再利用        |
+| `e2e-test-result-analysis`           | E2E failure分析                                                       |
+| `exploratory-testing`                | Exploration / 仮説駆動Investigation                                   |
+| `qa-knowledge`                       | 継続QA knowledgeのtriage / lifecycle / lookup                         |
+| `qa-workflow`                        | 複合workflowのrouting / common workflow state / blocked / resume      |
 
 ## 2. 既存の新規・改修Skill
 
@@ -390,4 +390,3 @@ cleanupは自workflowが所有または予約したresource範囲だけを対象
 異常終了時はreservationを自動expiryしません。recoveryではcurrent reservation revision、owner workflow / Activity / Session、必要cleanupを再確認し、owner状態不明またはcleanup未確認では自動releaseせず明示的確認へblockします。recoveryのstate更新もCASします。
 
 自動expiry付きlease、distributed lock service、environment managerは追加しません。
-

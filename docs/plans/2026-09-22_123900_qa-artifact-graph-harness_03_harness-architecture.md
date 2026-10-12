@@ -8,14 +8,14 @@ user-facingな意味判断は`regression-testing` / `exploratory-testing` / `qa-
 
 `script化`とPR #11型のpersisted runtime unit化は同義にしません。
 
-| 処理 | 配置 |
-| --- | --- |
-| PR #11のMachine Entity / fingerprint / dependency / freshnessで解ける処理 | PR #11 runtimeを再利用し、PR #13で再実装しない |
+| 処理                                                                                                                                       | 配置                                                       |
+| ------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------- |
+| PR #11のMachine Entity / fingerprint / dependency / freshnessで解ける処理                                                                  | PR #11 runtimeを再利用し、PR #13で再実装しない             |
 | sort / filter / deduplicate、snapshot、batch / resume、completeness、ref / path解決、projection、currentness比較等、実行時に必要な機械処理 | owner Skillまたは`qa-workflow`のproduction script / helper |
-| 保存済みartifactのschema / invariant / ref整合 | deterministic validator |
-| create-if-absent、atomic conditional write、reservation acquire / release等のatomicity | Step 0で確定した保存先のnative primitive |
-| membership、selected Regression、residual risk、Charter妥当性、Finding分類、knowledge semantic identity等 | owner Skillの意味判断 |
-| source / backend実装がPR #11 / #12 merge後でないと確定しない処理 | Step 0で既存実装を確認して配置を確定 |
+| 保存済みartifactのschema / invariant / ref整合                                                                                             | deterministic validator                                    |
+| create-if-absent、atomic conditional write、reservation acquire / release等のatomicity                                                     | Step 0で確定した保存先のnative primitive                   |
+| membership、selected Regression、residual risk、Charter妥当性、Finding分類、knowledge semantic identity等                                  | owner Skillの意味判断                                      |
+| source / backend実装がPR #11 / #12 merge後でないと確定しない処理                                                                           | Step 0で既存実装を確認して配置を確定                       |
 
 PR #11型のpersisted runtime unitを新設するのは、少なくとも次をすべて満たす場合に限定します。
 
@@ -345,4 +345,3 @@ test user / tenant / test data / external account等の共有mutable resourceは
 - 別workflowのresourceをcleanupしていない
 
 自動expiry付きlease、distributed lock service、environment managerは追加しません。
-

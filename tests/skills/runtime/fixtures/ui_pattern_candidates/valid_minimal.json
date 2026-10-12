@@ -1,1 +1,1 @@
-{"pattern":"input-text","attributes":{"type":"text","required":true}}
+{ "pattern": "input-text", "attributes": { "type": "text", "required": true } }

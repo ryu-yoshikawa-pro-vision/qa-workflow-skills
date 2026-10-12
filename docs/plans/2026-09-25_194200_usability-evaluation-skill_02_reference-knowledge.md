@@ -177,7 +177,7 @@ source数の多数決や、発行元の固定ランキングだけで「正解�
 
 各pattern / principleは可能な範囲で次を持ちます。
 
-~~~text
+```text
 ID
 名称
 別名 / 関連用語
@@ -210,7 +210,7 @@ source items:
   - source status / maturity（formal / proposed / draft / stable等、sourceが持つ場合）
   - 適用条件
 source確認日
-~~~
+```
 
 sourceに存在しない項目を推測補完しません。
 
@@ -234,11 +234,12 @@ reference entryの `ID` はusability-evaluation package内だけのappend-only�
 - 同じ意味のentryを更新する場合は既存IDを維持し、意味上別entryへ分割する場合は新しいIDを付ける
 
 このIDはSkill package内のreference追跡用であり、新しい全QA共通identityやMachine Entityにはしません。
+
 ## 7. reference構造
 
 実装構成:
 
-~~~text
+```text
 skills/usability-evaluation/
 ├── SKILL.md
 ├── references/
@@ -287,7 +288,7 @@ skills/usability-evaluation/
 │       ├── material.md
 │       ├── shopify-polaris.md
 │       └── sociomedia.md
-~~~
+```
 
 reference fileの分割単位はruntime契約に含めません。1 pattern = 1 fileを機械的に強制せず、意味上同じentryのsource provenanceを分断しない範囲で分割できます。
 
@@ -297,7 +298,7 @@ SKILL.mdから最初に読むreferenceは `references/index.md` だけにしま�
 
 情報量が大きくなるため、root indexへ全pattern名・全aliasを平置きしません。
 
-~~~text
+```text
 SKILL.md
   ↓
 references/index.md
@@ -307,7 +308,7 @@ references/index.md
   │    └→ WCAG / APG
   └→ platforms/index.md
        └→ Design System / HIG別reference
-~~~
+```
 
 root indexには次だけを持たせます。
 

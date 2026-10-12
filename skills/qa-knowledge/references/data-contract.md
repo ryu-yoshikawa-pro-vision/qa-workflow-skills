@@ -2,19 +2,28 @@
 
 ```json
 {
-  "schema_version":"1",
-  "entry_ref":"KN-<sha256(identity-json)>",
-  "identity":{"kind":"test_environment","scope_refs":["project:checkout"],"subject":"staging-job-delay"},
-  "kind":"test_environment",
-  "content":"Staging job status may lag for several minutes; query authoritative completion state before deciding the test result.",
-  "scope_refs":["project:checkout"],
-  "applicability":{"environment":["staging"],"version":"all versions of this configuration"},
-  "provenance":[{"ref":"activity:ACT-1","revision":"opaque-token"}],
-  "currentness_dependencies":[{"ref":"config:job-status","revision":"opaque-token"}],
-  "last_verified":{"at":"","condition":""},
-  "state":"有効",
-  "replacement_ref":null,
-  "related_qa_refs":[]
+  "schema_version": "1",
+  "entry_ref": "KN-<sha256(identity-json)>",
+  "identity": {
+    "kind": "test_environment",
+    "scope_refs": ["project:checkout"],
+    "subject": "staging-job-delay"
+  },
+  "kind": "test_environment",
+  "content": "Staging job status may lag for several minutes; query authoritative completion state before deciding the test result.",
+  "scope_refs": ["project:checkout"],
+  "applicability": {
+    "environment": ["staging"],
+    "version": "all versions of this configuration"
+  },
+  "provenance": [{ "ref": "activity:ACT-1", "revision": "opaque-token" }],
+  "currentness_dependencies": [
+    { "ref": "config:job-status", "revision": "opaque-token" }
+  ],
+  "last_verified": { "at": "", "condition": "" },
+  "state": "有効",
+  "replacement_ref": null,
+  "related_qa_refs": []
 }
 ```
 

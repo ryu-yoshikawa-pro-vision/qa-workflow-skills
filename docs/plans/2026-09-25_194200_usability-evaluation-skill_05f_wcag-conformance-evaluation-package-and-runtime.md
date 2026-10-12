@@ -412,6 +412,7 @@ Step 5.2 / 5.3 / 5.5はoptional methodology requirementですが、本Skillの�
 追加評価要件がreportへ必要なfield / occurrence / sectionを要求する場合は、canonical report上で目的内情報として `applied / blocked` へ閉じます。別formatへの変換が必要ならcanonical field / refをdownstream ownerへ渡し、評価内容を欠落させたまま「format非対応」でout-of-scopeにはしません。
 
 未知templateのためにgeneric renderer / plugin frameworkを作りません。
+
 ### Evaluation Specifics
 
 Step 5.2を記録する場合、次をglobal / sample / individual checkの適切なscopeへ保持できます。

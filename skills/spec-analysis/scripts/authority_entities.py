@@ -6,14 +6,14 @@ path used to turn normalized Authority rows into machine evidence.
 
 from __future__ import annotations
 
-from pathlib import Path
 import sys
+from pathlib import Path
 
 from runtime_contract import (
     ENTITY_SCHEMA_VERSION,
-    InvalidInput,
     MAX_AGGREGATE_INPUT_BYTES,
     MAX_STDOUT_BYTES,
+    InvalidInput,
     LimitExceeded,
     RuntimeErrorBase,
     canonical_json_bytes,
@@ -25,7 +25,6 @@ from runtime_contract import (
     reject_unknown,
     strict_loads,
 )
-
 
 SCRIPT_PATH = Path(__file__).resolve()
 
@@ -39,20 +38,34 @@ def build(authorities: object) -> dict:
             raise InvalidInput(f"authorities[{index}]はobjectである必要があります")
         reject_unknown(
             row,
-            {"authority_id", "authority_type", "active_content", "scope", "source_refs", "relations", "related_authority_refs"},
+            {
+                "authority_id",
+                "authority_type",
+                "active_content",
+                "scope",
+                "source_refs",
+                "relations",
+                "related_authority_refs",
+            },
         )
-        authority_id = ensure_nonempty_string(row["authority_id"], f"authorities[{index}].authority_id")
+        authority_id = ensure_nonempty_string(
+            row["authority_id"], f"authorities[{index}].authority_id"
+        )
         if authority_id in seen:
             raise InvalidInput(f"authority_idが重複しています: {authority_id}")
         seen.add(authority_id)
         if not isinstance(row["authority_type"], str) or not row["authority_type"]:
             raise InvalidInput(f"authorities[{index}].authority_typeが不正です")
         if not isinstance(row["active_content"], dict):
-            raise InvalidInput(f"authorities[{index}].active_contentはobjectである必要があります")
+            raise InvalidInput(
+                f"authorities[{index}].active_contentはobjectである必要があります"
+            )
         if not isinstance(row["scope"], (str, dict, type(None))):
             raise InvalidInput(f"authorities[{index}].scopeが不正です")
         for field in ("source_refs", "relations", "related_authority_refs"):
-            if not isinstance(row[field], list) or not all(isinstance(value, str) for value in row[field]):
+            if not isinstance(row[field], list) or not all(
+                isinstance(value, str) for value in row[field]
+            ):
                 raise InvalidInput(f"authorities[{index}].{field}が不正です")
         content = canonicalize(
             {
@@ -65,14 +78,20 @@ def build(authorities: object) -> dict:
                 "related_authority_refs": row["related_authority_refs"],
             }
         )
-        entities.append(make_machine_entity("spec-analysis", "authority", authority_id, content))
+        entities.append(
+            make_machine_entity("spec-analysis", "authority", authority_id, content)
+        )
     entities.sort(key=lambda entity: entity["entity_ref"])
     return {
         "schema_version": ENTITY_SCHEMA_VERSION,
         "skill": "spec-analysis",
         "entities": entities,
         "expected_entity_identities": [
-            {"skill": "spec-analysis", "entity_type": "authority", "entity_ref": entity["entity_ref"]}
+            {
+                "skill": "spec-analysis",
+                "entity_type": "authority",
+                "entity_ref": entity["entity_ref"],
+            }
             for entity in entities
         ],
         "implementation_fingerprint": implementation_fingerprint(SCRIPT_PATH),
@@ -95,7 +114,15 @@ def main() -> int:
         sys.stdout.buffer.write(encoded)
         return 0
     except RuntimeErrorBase as exc:
-        error = {"valid": False, "status": "blocked", "issues": [{"issue_type": exc.issue_type, "blocking": True, "message": exc.message}], "entities": [], "expected_entity_identities": []}
+        error = {
+            "valid": False,
+            "status": "blocked",
+            "issues": [
+                {"issue_type": exc.issue_type, "blocking": True, "message": exc.message}
+            ],
+            "entities": [],
+            "expected_entity_identities": [],
+        }
         encoded = canonical_json_bytes(error) + b"\n"
         if len(encoded) <= MAX_STDOUT_BYTES:
             sys.stdout.buffer.write(encoded)

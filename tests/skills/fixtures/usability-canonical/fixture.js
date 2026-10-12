@@ -64,7 +64,10 @@
       journeyStatus.textContent = `${button.dataset.add} added to the local fixture cart.`;
     });
   }
-  document.querySelector("#start-journey").addEventListener("click", () => show("cart", "Checkout started. Shared page content remains unchanged."));
+  document.querySelector("#start-journey").addEventListener(
+    "click",
+    () => show("cart", "Checkout started. Shared page content remains unchanged."),
+  );
   document.querySelector("#search-add").addEventListener("click", () => {
     state.cart.push("Trail pack");
     renderCart();
@@ -77,15 +80,21 @@
       return;
     }
     const found = "trail pack".includes(query.toLowerCase());
-    document.querySelector("#search-status").textContent = found ? "Trail pack is available." : "No matching fixture product.";
+    document.querySelector("#search-status").textContent = found
+      ? "Trail pack is available."
+      : "No matching fixture product.";
   });
-  document.querySelector("#continue-checkout").addEventListener("click", () => show("details", "Delivery details opened."));
+  document.querySelector("#continue-checkout").addEventListener(
+    "click",
+    () => show("details", "Delivery details opened."),
+  );
   document.querySelector("#delivery-method").addEventListener("change", (event) => {
     state.delivery = event.target.value;
     document.querySelector("#delivery-summary").textContent = state.delivery;
   });
   document.querySelector("#place-order").addEventListener("click", () => {
-    document.querySelector("#order-outcome").textContent = `The local fixture completed the journey with ${state.delivery} delivery. No order was sent.`;
+    document.querySelector("#order-outcome").textContent =
+      `The local fixture completed the journey with ${state.delivery} delivery. No order was sent.`;
     show("confirmation", "Journey complete. No external order was submitted.");
   });
   document.querySelector("#reset-journey").addEventListener("click", () => {

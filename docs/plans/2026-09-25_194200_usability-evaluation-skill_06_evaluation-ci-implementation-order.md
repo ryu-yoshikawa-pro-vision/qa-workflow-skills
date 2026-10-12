@@ -287,6 +287,7 @@ test-target-inspection / test-executionの既存evidenceは、UI / UX評価が�
 - repository tests
 
 Skill件数・query件数は実装開始時の正本から再計算し、現在Plan記載値をハードコードしません。
+
 ## 14. trigger eval
 
 repository標準のquery datasetとtrigger contract testを維持します。completion gateでのreal-Agent trigger評価は、今回descriptionを変更した3 queryを各3回実行し、他Skillの誤発火を含むSkill-read eventを記録します。runner failureは分母へ含めません。positiveは`EVALS.md`の`trigger_rate > 0.5`、追加する明確な隣接negative boundaryは`trigger_rate < 0.5`を満たす必要があります。全train / validation queryとholdoutの統計評価はPR #14 gateではなく、native trigger継続評価です。PR #17のscopeには含めません。
@@ -312,7 +313,7 @@ negative例:
 
 boundary caseとして次を追加します。
 
-~~~text
+```text
 ユーザー要求: usabilityを確認して
 live targetを実際に操作する意図あり
 → usability-inspection
@@ -327,13 +328,13 @@ live browserでviewportを変えて実操作・観測
 
 ユーザー要求: このscreenshotの表示崩れを評価して
 → usability-evaluation
-~~~
+```
 
 曖昧queryを文字列だけでusability-evaluationへ固定しません。
 
 別途workflow統合caseとして、少なくとも次を追加します。
 
-~~~text
+```text
 ユーザー要求: TCを実行
 → usability-evaluationは発火せず、test-executionだけで完了
 
@@ -342,7 +343,7 @@ live browserでviewportを変えて実操作・観測
 → 明示されたUI / UX評価scopeに対してusability-evaluationがread-only評価
 → TCの仕様上PASS / FAILとUI / UX評価項目を分離
 → follow-upが必要な評価項目だけFindingを作る
-~~~
+```
 
 `test-target-inspection` はstandalone / qa-workflow経由の両経路をそれぞれ確認します。
 
@@ -350,21 +351,21 @@ Regression統合では、Regression scopeにUI / UX評価が含まれないTCに
 
 test-analysis統合では、少なくとも次を確認します。
 
-~~~text
+```text
 UI中心のtest-analysis
 → usability-evaluationがuser goal / pattern / failure mode候補 / 観測候補を返す
 → Product Riskの識別・impact / likelihood / score確定はtest-analysisだけが担当
 → usability-evaluationがrisk scoreを出さない
-~~~
+```
 
 test-condition-design統合では、少なくとも次を確認します。
 
-~~~text
+```text
 UI patternを含むtest-condition-design
 → usability-evaluationがinteraction / state / accessibility / responsive等の検証観点候補を返す
 → 一般guidanceだけを製品期待結果へ昇格しない
 → current test requirement / Authority / Product Risk / scopeに基づく採否はtest-condition-designが担当
-~~~
+```
 
 ## 15. deterministic eval
 

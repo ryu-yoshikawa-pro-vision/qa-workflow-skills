@@ -48,27 +48,27 @@ Agent Skills Specificationは共通Skill-to-Skill呼び出しAPIを規定しま�
 
 ## 工程固有ロジックの正本
 
-| 工程固有ロジック | 担当Skill |
-| --- | --- |
-| 現在有効な仕様根拠の解決 | `spec-analysis` |
-| 不明点分類 / 回答正規化 | `question-analysis` |
-| プロダクトリスク / リスクマトリクス / 設計深度 | `test-analysis` |
-| テスト要求粒度 / 上流閉鎖 | `test-requirement-design` |
-| カバレッジ基準 / カバレッジ項目 / テスト技法 | `test-condition-design` |
-| 詳細テストケース / 期待結果の根拠の具体化 | `test-case-design` |
-| 生きたテスト対象のUI情報・ふるまい収集 / 管理 | `test-target-inspection` |
-| AIによる詳細TC実行・期待結果比較・結果記録 | `test-execution` |
-| カバレッジ / 閉鎖性 / ギャップ | `coverage-analysis` |
-| 独立レビュー / 重大度 | `adversarial-review` |
-| E2E対象、repo / 実対象の事実、実装可能性、安全条件 | `e2e-test-inspection` |
-| Playwright E2Eコード変更、静的 / 軽量検証 | `e2e-test-implementation` |
-| 実行安全確認、準備、Playwright実行、構造化結果、cleanup | `e2e-test-execution` |
-| 実行事実からの原因分析、追加証拠要求、修正routing | `e2e-test-result-analysis` |
-| 検証済み結果の人間向け報告 | `e2e-test-reporting` |
-| Regression baseline / membership / Run selection / Activity | `regression-testing` |
-| Charterに沿った探索・owner不明hypothesisの実対象調査 | `exploratory-testing` |
-| QA knowledge candidate triage / entry lifecycle / lookup | `qa-knowledge` |
-| ルーティング / ブロック中 / 再開 / 変更伝播 / 完了 | `qa-workflow` |
+| 工程固有ロジック                                            | 担当Skill                  |
+| ----------------------------------------------------------- | -------------------------- |
+| 現在有効な仕様根拠の解決                                    | `spec-analysis`            |
+| 不明点分類 / 回答正規化                                     | `question-analysis`        |
+| プロダクトリスク / リスクマトリクス / 設計深度              | `test-analysis`            |
+| テスト要求粒度 / 上流閉鎖                                   | `test-requirement-design`  |
+| カバレッジ基準 / カバレッジ項目 / テスト技法                | `test-condition-design`    |
+| 詳細テストケース / 期待結果の根拠の具体化                   | `test-case-design`         |
+| 生きたテスト対象のUI情報・ふるまい収集 / 管理               | `test-target-inspection`   |
+| AIによる詳細TC実行・期待結果比較・結果記録                  | `test-execution`           |
+| カバレッジ / 閉鎖性 / ギャップ                              | `coverage-analysis`        |
+| 独立レビュー / 重大度                                       | `adversarial-review`       |
+| E2E対象、repo / 実対象の事実、実装可能性、安全条件          | `e2e-test-inspection`      |
+| Playwright E2Eコード変更、静的 / 軽量検証                   | `e2e-test-implementation`  |
+| 実行安全確認、準備、Playwright実行、構造化結果、cleanup     | `e2e-test-execution`       |
+| 実行事実からの原因分析、追加証拠要求、修正routing           | `e2e-test-result-analysis` |
+| 検証済み結果の人間向け報告                                  | `e2e-test-reporting`       |
+| Regression baseline / membership / Run selection / Activity | `regression-testing`       |
+| Charterに沿った探索・owner不明hypothesisの実対象調査        | `exploratory-testing`      |
+| QA knowledge candidate triage / entry lifecycle / lookup    | `qa-knowledge`             |
+| ルーティング / ブロック中 / 再開 / 変更伝播 / 完了          | `qa-workflow`              |
 
 ### 現在有効な仕様根拠への依存
 
@@ -130,21 +130,21 @@ currentな画面名称・到達方法・操作可能性・観測可能性が必�
 
 状態表の一意性はSkill名ではなく`(Skill, 対象 / 実行範囲)`で判定します。複数用途Skillの正規対象は次です。
 
-| Skill | 正規対象 / 実行範囲 |
-| --- | --- |
-| `test-analysis` | `テスト分析` / `E2E対象選定` |
-| `coverage-analysis` | `テスト設計` / `TC → E2E実装` / `E2E実装 → 実行結果` |
-| `adversarial-review` | `テスト設計成果物` / `E2E実装` |
+| Skill                | 正規対象 / 実行範囲                                  |
+| -------------------- | ---------------------------------------------------- |
+| `test-analysis`      | `テスト分析` / `E2E対象選定`                         |
+| `coverage-analysis`  | `テスト設計` / `TC → E2E実装` / `E2E実装 → 実行結果` |
+| `adversarial-review` | `テスト設計成果物` / `E2E実装`                       |
 
 単一用途Skillの対象欄は空欄にできます。開始Skill、最終Skill、`question-analysis`回答後の再開Skillが複数用途Skillなら対象 / 実行範囲も必須です。
 
 追加した複数用途Skillの正規対象:
 
-| Skill | 正規対象 / 実行範囲 |
-| --- | --- |
-| `regression-testing` | `baseline / membership` / `Run計画` / `Run結果更新` / `履歴参照` |
-| `exploratory-testing` | `exploration` / `investigation` |
-| `qa-knowledge` | `triage` / `create / update` / `revalidation` / `lookup / history` |
+| Skill                 | 正規対象 / 実行範囲                                                |
+| --------------------- | ------------------------------------------------------------------ |
+| `regression-testing`  | `baseline / membership` / `Run計画` / `Run結果更新` / `履歴参照`   |
+| `exploratory-testing` | `exploration` / `investigation`                                    |
+| `qa-knowledge`        | `triage` / `create / update` / `revalidation` / `lookup / history` |
 
 単独baseline、Regression membership、Run計画、履歴参照だけなら`regression-testing`から開始できます。manual / E2E実行まで要求されたRegressionは`qa-workflow`が全体を追跡し、`regression-testing`と既存execution Skillを接続します。変更影響候補 / Product Riskは`test-analysis`、Regression Run selectionは`regression-testing`の責務です。
 

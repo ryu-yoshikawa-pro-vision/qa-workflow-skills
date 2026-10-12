@@ -1,6 +1,7 @@
 # 決定論的Assertion一覧
 
 ## qa-workflow
+
 - `WF-D001` ワークフロー全体状態の許可値
 - `WF-D002` Skill名が正規Skill名
 - `WF-D003` Skill状態の許可値
@@ -24,6 +25,7 @@
 - `WF-D021` fixtureに基づくruntime状態projection
 
 ## spec-analysis
+
 - `SPEC-D001` 分析項目ID形式
 - `SPEC-D002` IDと分類整合
 - `SPEC-D003` ID一意性
@@ -44,6 +46,7 @@
 - `SPEC-D018` SRC ID一意性
 
 ## question-analysis
+
 - `QUESTION-D001` Q ID形式
 - `QUESTION-D002` Q ID一意性
 - `QUESTION-D003` 分類の許可値
@@ -66,6 +69,7 @@
 - `QUESTION-D020` 質問一覧とブロック中範囲のruntime identity整合
 
 ## test-analysis
+
 - `RISK-D001` RISK ID形式
 - `RISK-D002` ID一意性
 - `RISK-D003` プロダクトリスク必須フィールド
@@ -85,6 +89,7 @@
 - `RISK-D017` E2E対象選定の技術非依存フィールド
 
 ## test-requirement-design
+
 - `TR-D001` TR ID形式
 - `TR-D002` ID一意性
 - `TR-D003` 仕様根拠参照
@@ -102,6 +107,7 @@
 - `TR-D015` フィクスチャに基づく上流項目の扱い
 
 ## test-condition-design
+
 - `TCN-D001` TCN ID形式
 - `TCN-D002` CI ID形式
 - `TCN-D003` TCN ID一意性
@@ -133,6 +139,7 @@
 - `TCN-D029` テスト要求の扱い対象IDとフィクスチャ既知集合の整合
 
 ## test-case-design
+
 - `TC-D001` TC ID形式
 - `TC-D002` ID一意性
 - `TC-D003` 優先度
@@ -151,6 +158,7 @@
 - `TC-W002` 他ケース依存らしき記述WARNING
 
 ## coverage-analysis
+
 - `COV-D001` グラフ外の未知ID
 - `COV-D002` 独立再計算したギャップの認識
 - `COV-D003` 下流不存在をブロック中へ誤分類しない
@@ -166,6 +174,7 @@
 - `COV-D013` 指定されたModel Keyのstable形式
 
 ## adversarial-review
+
 - `REV-D001` REV ID形式
 - `REV-D002` ID一意性
 - `REV-D003` 重大度
@@ -184,6 +193,7 @@
 - `REV-D016` E2E実装参照の安定性 / 期待値整合
 
 ## e2e-test-inspection
+
 - `E2E-INSP-D001` 必須inspectionテーブル
 - `E2E-INSP-D002` TC扱いの許可値
 - `E2E-INSP-D003` TC ID形式
@@ -202,6 +212,7 @@
 - `E2E-INSP-D016` 実装 / 実行に影響する事実・確認元・影響
 
 ## e2e-test-implementation
+
 - `E2E-IMPL-D001` 必須実装テーブル
 - `E2E-IMPL-D002` TC扱いの許可値
 - `E2E-IMPL-D003` TC ID形式
@@ -225,6 +236,7 @@
 - `E2E-IMPL-D022` 全対象block時に実装済み変更 / PASSを残さない
 
 ## e2e-test-execution
+
 - `E2E-EXEC-D001` 必須実行テーブル
 - `E2E-EXEC-D002` effective settingsの必須フィールド
 - `E2E-EXEC-D003` run statusのraw factと必須run項目
@@ -261,6 +273,7 @@
 - `E2E-EXEC-D036` primary attemptとresolved TestCaseのfile / title / project / repeatEachIndex整合
 
 ## e2e-test-result-analysis
+
 - `E2E-AN-D001` 必須分析テーブル
 - `E2E-AN-D002` 実行事実・参照・cleanupの保持
 - `E2E-AN-D003` 判定状態の許可値
@@ -278,6 +291,7 @@
 - `E2E-AN-D015` 判定対象が宣言済みの実行結果参照に含まれる
 
 ## e2e-test-reporting
+
 - `E2E-REPORT-D001` 必須報告テーブル
 - `E2E-REPORT-D002` environment必須フィールド
 - `E2E-REPORT-D003` run raw factの確認元 / 区分
@@ -301,6 +315,7 @@
 - `E2E-REPORT-D021` resolved primaryからlogical primaryへの逆参照
 
 ## regression-testing
+
 - `REG-D001` 正規JSON artifactが一つだけ整形式で存在する
 - `REG-D002` artifact typeがbaseline / run / activityのいずれか
 - `REG-D003` Baseline completeとdiscovery・lifecycle・解決済みmembership根拠および期待current TC populationの整合
@@ -320,6 +335,7 @@
 - `REG-D017` Baselineがtemplateのschema / identity / list fieldとcomplete時の未解決refなしを満たす
 
 ## exploratory-testing
+
 - `EXP-D001` Session artifactが一つだけ整形式で存在する
 - `EXP-D002` modeとCharter必須項目が揃う
 - `EXP-D003` investigationをsymptomまたはhypothesisから開始
@@ -330,6 +346,7 @@
 - `EXP-D008` fixtureのunsafe / unavailable条件をblock
 
 ## qa-knowledge
+
 - `KN-D001` knowledge decision / entry artifactの整形式
 - `KN-D002` owner routingまたはqa-knowledge正規lifecycleへの一致
 - `KN-D003` structured semantic identityからentry_refを決定論的に解決し、entryなしのrouting / lookup outcomeを許可
@@ -361,6 +378,7 @@
 - `RT-D015` expected root / Entity集合をactual出力から推測しない独立validator
 
 ## test-target-inspection
+
 - `TTI-D001` 必須セクション・確認情報項目とMarkdown表構造
 - `TTI-D002` 対象 / 要素 / 状態キーの一意性
 - `TTI-D003` 新規成果物キー形式
@@ -378,6 +396,7 @@
 - `TTI-D015` fixtureで必須の対象・要素・状態キー
 
 ## test-execution
+
 - `TEX-D001` 必須実行報告・表構造
 - `TEX-D002` snapshot内の成果物ローカルtest_case_ref整合
 - `TEX-D003` 実行前YAMLのyaml.safe_load構造、step_ref / action必須値・step参照

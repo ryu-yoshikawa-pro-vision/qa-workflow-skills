@@ -51,7 +51,7 @@ PR #11のcurrent実装に同じhelperが存在する場合、その契約を `us
 
 処理順は次で固定します。
 
-~~~text
+```text
 ユーザー要求 / project Authority / current target context
         ↓
 LLM: raw requestを正規aspect keyへmappingし、target-specific applicability / criterion exception / follow-up要否等のsemantic decisionだけを返す
@@ -91,7 +91,7 @@ usability-evaluation
 runtime / validatorで構造を再検査
         ↓
 最終成果物
-~~~
+```
 
 scriptは自然言語のUI、screenshot、仕様本文を直接解釈しません。
 
@@ -101,7 +101,7 @@ browserから取得できるDOM属性、accessibility属性、bounding box、vie
 
 実装構成:
 
-~~~text
+```text
 skills/usability-inspection/
 ├── scripts/
 │   ├── runtime_contract.py
@@ -115,7 +115,7 @@ skills/usability-inspection/
 │   ├── browser-observation-catalog.json
 │   └── wcag-machine-probe-catalog.json
 └── ...
-~~~
+```
 
 ### runtime_contract.py
 
@@ -231,6 +231,7 @@ browser I/O前後のmachine contractを担当します。詳細は `_05g_usabili
 - interaction timingでは8種fixed predicateごとのpayload schemaとsame-page `performance.now()` clockを要求
 
 `observation_contract.py` 自身はbrowserを起動・操作しません。Agentはscriptがmaterializeしたfixed requestをcurrent PR #12 browser経路へ渡し、resultをscriptへ戻します。semantic additional observationで必要stateへの到達方法はbrowser ownerがuser-facing interactionとして判断しますが、観測field / predicate / probe実装はfixed contractから外しません。
+
 ### measurement.py
 
 #### Input
@@ -496,28 +497,28 @@ Playwright version差を吸収する独自browser wrapper frameworkは作りま�
 
 ## 10. deterministic化するもの / しないもの
 
-| 処理 | runtime script |
-| --- | --- |
-| inspection modeからfixed scope row skeleton・ref採番・row順序 | 必須 |
-| selected rule / measurement / scopeからfixed probe request集合導出 | 必須 |
-| browser target registry / resolver / currentness / uniqueness | 必須 |
-| browser probe result schema / unit / capability正規化 | 必須 |
-| schema / cross-reference | 必須 |
-| selected ruleからrequired observation field集合導出 | 必須 |
-| scope closure集計 | 必須 |
-| elapsed / target-size / contrast-ratio / viewport-overflow計算 | 必須 |
-| threshold比較 | 必須 |
-| supported ACT Rule / project ruleで完全にmachine-decidableなcheck | 対応checkでは必須 |
-| target size等のraw geometry取得後の数値計算 | 必須 |
-| criterion applicabilityで意味判断が必要 | LLM / manual |
-| WCAG exceptionで意味判断が必要 | LLM / manual |
-| screenshotの表示崩れ判断 | LLM / image evaluation |
-| UI pattern同定 | usability-evaluation |
-| heuristic評価 | usability-evaluation |
-| user impact推定 | usability-evaluation |
-| follow-upが必要かの意味判断 | LLM / workflow |
-| status + follow_up_requiredからFinding作成要否導出 | 必須 |
-| machine-owned structured section materialize | 必須 |
+| 処理                                                               | runtime script         |
+| ------------------------------------------------------------------ | ---------------------- |
+| inspection modeからfixed scope row skeleton・ref採番・row順序      | 必須                   |
+| selected rule / measurement / scopeからfixed probe request集合導出 | 必須                   |
+| browser target registry / resolver / currentness / uniqueness      | 必須                   |
+| browser probe result schema / unit / capability正規化              | 必須                   |
+| schema / cross-reference                                           | 必須                   |
+| selected ruleからrequired observation field集合導出                | 必須                   |
+| scope closure集計                                                  | 必須                   |
+| elapsed / target-size / contrast-ratio / viewport-overflow計算     | 必須                   |
+| threshold比較                                                      | 必須                   |
+| supported ACT Rule / project ruleで完全にmachine-decidableなcheck  | 対応checkでは必須      |
+| target size等のraw geometry取得後の数値計算                        | 必須                   |
+| criterion applicabilityで意味判断が必要                            | LLM / manual           |
+| WCAG exceptionで意味判断が必要                                     | LLM / manual           |
+| screenshotの表示崩れ判断                                           | LLM / image evaluation |
+| UI pattern同定                                                     | usability-evaluation   |
+| heuristic評価                                                      | usability-evaluation   |
+| user impact推定                                                    | usability-evaluation   |
+| follow-upが必要かの意味判断                                        | LLM / workflow         |
+| status + follow_up_requiredからFinding作成要否導出                 | 必須                   |
+| machine-owned structured section materialize                       | 必須                   |
 
 ## 11. runtimeとvalidatorの分離
 

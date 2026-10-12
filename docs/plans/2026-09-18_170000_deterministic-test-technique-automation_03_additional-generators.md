@@ -23,12 +23,12 @@ fork / join regionは曖昧に導出せず、次を正規化入力として明�
 
 ```json
 {
-  "region_key":"RG-001",
-  "fork_node_key":"F1",
-  "join_node_key":"J1",
-  "branches":[
-    {"branch_key":"BR-001","edge_keys":["E1","E2"]},
-    {"branch_key":"BR-002","edge_keys":["E3"]}
+  "region_key": "RG-001",
+  "fork_node_key": "F1",
+  "join_node_key": "J1",
+  "branches": [
+    { "branch_key": "BR-001", "edge_keys": ["E1", "E2"] },
+    { "branch_key": "BR-002", "edge_keys": ["E3"] }
   ]
 }
 ```
@@ -46,13 +46,13 @@ simple loopは次を明示します。
 
 ```json
 {
-  "loop_key":"LP-001",
-  "entry_node_key":"N1",
-  "edge_keys":["E10","E11"],
-  "exit_edge_keys":["E12"],
-  "typical_iterations":3,
-  "maximum_iterations":10,
-  "authority_refs":["SPEC-020"]
+  "loop_key": "LP-001",
+  "entry_node_key": "N1",
+  "edge_keys": ["E10", "E11"],
+  "exit_edge_keys": ["E12"],
+  "typical_iterations": 3,
+  "maximum_iterations": 10,
+  "authority_refs": ["SPEC-020"]
 }
 ```
 
@@ -122,9 +122,9 @@ consistency:
   "entity_key": "customer",
   "kind": "lifecycle",
   "steps": [
-    {"function_key":"create_customer","operation":"C"},
-    {"function_key":"read_customer","operation":"R"},
-    {"function_key":"delete_customer","operation":"D"}
+    { "function_key": "create_customer", "operation": "C" },
+    { "function_key": "read_customer", "operation": "R" },
+    { "function_key": "delete_customer", "operation": "D" }
   ],
   "authority_refs": ["SPEC-001"]
 }
@@ -138,6 +138,7 @@ consistency:
 - sequence target keyは`crud:seq:<sequence_key>`
 
 `coverage_summary`は`completeness`と`consistency`を別々に返し、両方completeでのみCRUD modelをcompleteとします。未処置missing operationまたはconsistency sequence未正規化があれば`result_status=unresolved`とし、completenessだけで「CRUD Testing完了」と表現しません。
+
 ## 12. Cause-Effect Graph
 
 ### `cause_effect.py`
@@ -279,9 +280,9 @@ HTML `number`のstepはHTML Standardのstep semanticsへ合わせます。
 
 ```json
 {
-  "operator":"grid",
-  "base":{"type":"decimal","value":"0"},
-  "step":{"type":"decimal","value":"0.5"}
+  "operator": "grid",
+  "base": { "type": "decimal", "value": "0" },
+  "step": { "type": "decimal", "value": "0.5" }
 }
 ```
 
@@ -390,11 +391,11 @@ bounded integerの固定vectorもPlan上で固定します。
 
 ```json
 {
-  "type":"uniform_finite",
-  "values":[
-    {"type":"integer","value":1},
-    {"type":"integer","value":2},
-    {"type":"integer","value":3}
+  "type": "uniform_finite",
+  "values": [
+    { "type": "integer", "value": 1 },
+    { "type": "integer", "value": 2 },
+    { "type": "integer", "value": 3 }
   ]
 }
 ```
@@ -402,17 +403,17 @@ bounded integerの固定vectorもPlan上で固定します。
 - `values`は1件以上、canonical typed valueとして重複不可
 
 ```json
-{"type":"uniform_integer","minimum":0,"maximum":10}
+{ "type": "uniform_integer", "minimum": 0, "maximum": 10 }
 ```
 
 - minimum / maximumはinclusive integer、`minimum <= maximum`、domain size `maximum - minimum + 1 <= 2^32`
 
 ```json
 {
-  "type":"categorical",
-  "entries":[
-    {"value":{"type":"string","value":"A"},"weight":3},
-    {"value":{"type":"string","value":"B"},"weight":1}
+  "type": "categorical",
+  "entries": [
+    { "value": { "type": "string", "value": "A" }, "weight": 3 },
+    { "value": { "type": "string", "value": "B" }, "weight": 1 }
   ]
 }
 ```
@@ -430,6 +431,7 @@ uniform finite / categoricalでは宣言順をsample indexへ使います。weig
 Random Testingには一般的なCoverage 100%を定義しません。`completion_summary`は`required_case_count = case_count`、`generated_case_count`、`complete = generated_case_count == required_case_count`を返します。本Planのruntimeでは時間依存の終了条件を使わず、件数で正規化された場合だけ機械生成します。
 
 Random Testingのoracleは生成しません。
+
 ## 18. Metamorphic Testing
 
 ### `metamorphic.py`
@@ -443,17 +445,24 @@ LLMがmetamorphic relationを定義した後を処理します。複数follow-up
   "relation_key": "MR-001",
   "relation_label": "金額を増やしても合計は減少しない",
   "source_inputs": [
-    {"source_id":"SRC-001","value":{"amount":{"type":"decimal","value":"10"}}}
+    {
+      "source_id": "SRC-001",
+      "value": { "amount": { "type": "decimal", "value": "10" } }
+    }
   ],
   "follow_ups": [
     {
-      "follow_up_key":"FU-001",
-      "transforms":[
-        {"op":"add_decimal","path":"$.amount","operand":"1"}
+      "follow_up_key": "FU-001",
+      "transforms": [
+        { "op": "add_decimal", "path": "$.amount", "operand": "1" }
       ]
     }
   ],
-  "expected_relation": {"op":"monotonic_non_decreasing","output_path":"$.total","output_kind":"decimal"},
+  "expected_relation": {
+    "op": "monotonic_non_decreasing",
+    "output_path": "$.total",
+    "output_kind": "decimal"
+  },
   "authority_refs": ["SPEC-001"]
 }
 ```

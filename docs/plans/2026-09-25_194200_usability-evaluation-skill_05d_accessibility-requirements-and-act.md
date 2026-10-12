@@ -65,6 +65,7 @@ browserがrole / accessible name / description / stateを返したことはmachi
 HTML-AAM等のuser-agent mapping sourceをauthor requirementそのものとして扱いません。projectが特定browser / accessibility API mappingをAuthorityとして採用する場合だけ、そのAuthorityを別に記録します。
 
 formal WCAG evaluationで必要なrequirement universeは引き続き `_05f` のversioned static catalogが正本です。
+
 ## 2. requirement result
 
 明確なstandard / project binding requirementのresultは、
@@ -153,11 +154,11 @@ ACT RulesはWCAG / ARIA testing methodのinformative sourceとして使用しま
 
 今回のbrowser observation契約でapplicability / expectationを忠実に実装でき、公式exampleを使ったACT Rules Format 1.1 consistency確認まで閉じられるautomatic ruleは次の3件に固定します。
 
-| Rule ID | Rule | 主なmapping | execution mode |
-| --- | --- | --- | --- |
-| `2779a5` | HTML page has non-empty title | WCAG 2.4.2 | automatic |
-| `97a4e1` | Button has non-empty accessible name | WCAG 4.1.2 | automatic |
-| `23a2a8` | Image has non-empty accessible name | WCAG 1.1.1 | automatic |
+| Rule ID  | Rule                                 | 主なmapping | execution mode |
+| -------- | ------------------------------------ | ----------- | -------------- |
+| `2779a5` | HTML page has non-empty title        | WCAG 2.4.2  | automatic      |
+| `97a4e1` | Button has non-empty accessible name | WCAG 4.1.2  | automatic      |
+| `23a2a8` | Image has non-empty accessible name  | WCAG 1.1.1  | automatic      |
 
 この3件は `test-rule-catalog.json` へsource status / ACT Rules Format version / required observation fields / implementation dispatch keyを固定し、`criterion_checks.py` が明示dispatchします。`2779a5` は `_05g` の独立 `document.title` fixed probeを使います。HTML root、最初のHTML title descendantの存在、その直接child nodeがtext-onlyか、非空白textを含むかというboolean事実だけを取得し、raw title本文やgeneral DOM treeは保存しません。title構造をfixed probeで完了観測できない場合は `cantTell` とします。
 

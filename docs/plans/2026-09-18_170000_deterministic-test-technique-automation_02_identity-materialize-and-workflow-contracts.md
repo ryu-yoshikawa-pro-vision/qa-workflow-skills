@@ -82,12 +82,12 @@ generator内の`target_key`はmodel内で安定させます。異なるmodel間�
 ```json
 [
   {
-    "target_ref":"sha256:...",
-    "model_key":"bva-001",
-    "target_key":"bva:age-lower:AT",
-    "target_content_fingerprint":"sha256:...",
-    "ci_id":"TCN-001-CI01",
-    "mapping_status":"active"
+    "target_ref": "sha256:...",
+    "model_key": "bva-001",
+    "target_key": "bva:age-lower:AT",
+    "target_content_fingerprint": "sha256:...",
+    "ci_id": "TCN-001-CI01",
+    "mapping_status": "active"
   }
 ]
 ```
@@ -101,7 +101,7 @@ generator内の`target_key`はmodel内で安定させます。異なるmodel間�
 - previous mappingの`target_ref`をmodel_key / target_keyから再計算し、不一致を拒否する
 - 同一`target_ref`が複数CIへ割り当てられる場合、親TCN不一致、merge group外で同一CIへ複数target_refが割り当てられる場合は`invalid_input`
 - 同一CIへ複数target_refを割り当てるのは、同一`merge_group`で明示されたtargetだけ許可する。mappingはtarget_refごとに1行保持し、同じ`ci_id`を共有できる
-merge / unmerge / target追加削除 / CI↔Dispositionの詳細な状態遷移は§7.2.2を正本とします。
+  merge / unmerge / target追加削除 / CI↔Dispositionの詳細な状態遷移は§7.2.2を正本とします。
 
 ### 7.2.1 ID状態の永続化
 
@@ -130,6 +130,7 @@ CIは§7.2.2のtarget mapping状態遷移を優先し、同sectionで明示し�
 - deleted CI番号を別targetへ再利用しない
 
 `previous_target_id_map[]`はactive mappingだけでなく`mapping_status=active|inactive`、直近`ci_id`、その判断時点の`target_content_fingerprint`を保持し、Disposition中のtargetも過去mappingを失いません。`ci_id`は完全形式`TCN-\d{3}-CI\d{2,}`を保持し、同一TCN内の採番比較ではsuffix `CI\d{2,}`の数値部分だけを使用します。
+
 ### 7.3 upsert
 
 再実行はappendではなくstable keyでupsertします。
@@ -359,12 +360,12 @@ Machine Entityのfreshnessは`runtime_contract.py`の共通関数で計算しま
 
 ```json
 {
-  "skill":"test-case-design",
-  "entity_type":"tc",
-  "entity_ref":"TC-001",
-  "model_key":null,
-  "freshness_status":"current",
-  "stale_reasons":[]
+  "skill": "test-case-design",
+  "entity_type": "tc",
+  "entity_ref": "TC-001",
+  "model_key": null,
+  "freshness_status": "current",
+  "stale_reasons": []
 }
 ```
 

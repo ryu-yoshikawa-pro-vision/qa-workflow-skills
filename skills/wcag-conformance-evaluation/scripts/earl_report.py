@@ -1,14 +1,14 @@
 """Deterministic EARL 1.0 / JSON-LD 1.1 sidecar serialization."""
+
 from __future__ import annotations
 
-from datetime import datetime
 import hashlib
 import json
 import re
+from datetime import datetime
 from typing import Any
 
 from wcag_requirements import load_catalog
-
 
 CONTEXT = {
     "earl": "http://www.w3.org/ns/earl#",
@@ -29,7 +29,9 @@ class EarlError(ValueError):
 
 
 def canonical_json(value: Any) -> bytes:
-    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return json.dumps(
+        value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
 
 
 def stable_iri(kind: str, identity: dict[str, Any]) -> str:
@@ -56,7 +58,12 @@ def _mode_from_provenance(result: dict[str, Any]) -> str:
             values.add("earl:semiAuto")
         elif value in {"undisclosed", "earl:undisclosed"}:
             values.add("earl:undisclosed")
-        elif value in {"unknown", "unknownMode", "external-evidence", "earl:unknownMode"}:
+        elif value in {
+            "unknown",
+            "unknownMode",
+            "external-evidence",
+            "earl:unknownMode",
+        }:
             values.add("earl:unknownMode")
         else:
             raise EarlError(f"unknown procedure provenance mode: {value}")
@@ -67,11 +74,19 @@ def _test_uri(catalog: dict[str, Any], result: dict[str, Any]) -> str:
     requirement = result.get("requirement_ref") or result.get("criterion_ref")
     if not isinstance(requirement, str) or not requirement:
         raise EarlError("formal requirement ref is required")
-    criteria = {row["criterion_ref"]: row["canonical_uri"] for row in catalog["success_criteria"]}
-    requirements = {row["requirement_key"]: row["canonical_uri"] for row in catalog["conformance_requirements"]}
+    criteria = {
+        row["criterion_ref"]: row["canonical_uri"]
+        for row in catalog["success_criteria"]
+    }
+    requirements = {
+        row["requirement_key"]: row["canonical_uri"]
+        for row in catalog["conformance_requirements"]
+    }
     uri = criteria.get(requirement) or requirements.get(requirement)
     if uri is None:
-        raise EarlError(f"requirement is not in the selected WCAG version: {requirement}")
+        raise EarlError(
+            f"requirement is not in the selected WCAG version: {requirement}"
+        )
     return uri
 
 
@@ -97,28 +112,54 @@ def _ordered_node(node: dict[str, Any]) -> dict[str, Any]:
     return ordered
 
 
-def serialize_assertions(*, evaluation_ref: str, evaluation_revision: str, version: str,
-                         results: list[dict[str, Any]], evaluator_identity: str,
-                         tool_identity: str, sample_identities: dict[str, str],
-                         variation_identities: dict[str, str], issued_at: str | None = None) -> bytes:
+def serialize_assertions(
+    *,
+    evaluation_ref: str,
+    evaluation_revision: str,
+    version: str,
+    results: list[dict[str, Any]],
+    evaluator_identity: str,
+    tool_identity: str,
+    sample_identities: dict[str, str],
+    variation_identities: dict[str, str],
+    issued_at: str | None = None,
+) -> bytes:
     """Render one EARL Assertion/TestResult pair for every closed formal result."""
-    if not all(isinstance(value, str) and value.strip() for value in
-               (evaluation_ref, evaluation_revision, evaluator_identity, tool_identity)):
-        raise EarlError("evaluation, revision, evaluator, and tool identities are required")
+    if not all(
+        isinstance(value, str) and value.strip()
+        for value in (
+            evaluation_ref,
+            evaluation_revision,
+            evaluator_identity,
+            tool_identity,
+        )
+    ):
+        raise EarlError(
+            "evaluation, revision, evaluator, and tool identities are required"
+        )
     catalog = load_catalog(version)
-    assertor_identity = {"evaluator_identity": evaluator_identity, "tool_identity": tool_identity,
-                         "evaluation_revision": evaluation_revision}
+    assertor_identity = {
+        "evaluator_identity": evaluator_identity,
+        "tool_identity": tool_identity,
+        "evaluation_revision": evaluation_revision,
+    }
     assertor_id = stable_iri("assertor", assertor_identity)
-    graph: list[dict[str, Any]] = [{"@id": assertor_id, "@type": ["earl:Assertor", "earl:Software"]}]
+    graph: list[dict[str, Any]] = [
+        {"@id": assertor_id, "@type": ["earl:Assertor", "earl:Software"]}
+    ]
     result_refs: set[str] = set()
     assertion_ids: set[str] = set()
     subject_ids: set[str] = set()
     date_value = _issued_date(issued_at)
     for result in results:
-        if (result.get("evaluation_ref") != evaluation_ref
-                or result.get("evaluation_revision") != evaluation_revision
-                or result.get("freshness_status") != "current"):
-            raise EarlError("EARL result must be current for the supplied evaluation revision")
+        if (
+            result.get("evaluation_ref") != evaluation_ref
+            or result.get("evaluation_revision") != evaluation_revision
+            or result.get("freshness_status") != "current"
+        ):
+            raise EarlError(
+                "EARL result must be current for the supplied evaluation revision"
+            )
         status = result.get("result")
         population = result.get("applicable_population")
         execution = result.get("execution_status")
@@ -128,54 +169,104 @@ def serialize_assertions(*, evaluation_ref: str, evaluation_revision: str, versi
                 raise EarlError("earl:untested requires an explicit not-run result")
             outcome = "earl:untested"
         else:
-            if status not in OUTCOMES or population not in {"present", "none", "unknown"} or execution != "complete":
+            if (
+                status not in OUTCOMES
+                or population not in {"present", "none", "unknown"}
+                or execution != "complete"
+            ):
                 raise EarlError("EARL requires a closed current criterion result")
             if population == "unknown" and status != "undetermined":
-                raise EarlError("unknown population cannot be serialized as passed or failed")
+                raise EarlError(
+                    "unknown population cannot be serialized as passed or failed"
+                )
             if population == "none":
                 if status != "satisfied":
-                    raise EarlError("complete empty Success Criterion population must remain satisfied in the report")
+                    raise EarlError(
+                        "complete empty Success Criterion population must remain satisfied in the report"
+                    )
                 outcome = "earl:inapplicable"
             else:
                 outcome = OUTCOMES[status]
-        evaluation_item_ref = result.get("criterion_evaluation_ref") or result.get("requirement_evaluation_ref")
+        evaluation_item_ref = result.get("criterion_evaluation_ref") or result.get(
+            "requirement_evaluation_ref"
+        )
         result_ref = result.get("result_ref") or result.get("sample_result_ref")
         sample_ref = result.get("sample_ref")
         variation_ref = result.get("variation_ref")
-        if not all(isinstance(value, str) and value.strip() for value in
-                   (evaluation_item_ref, result_ref, sample_ref, variation_ref)):
-            raise EarlError("result, sample, variation, and evaluation refs are required")
+        if not all(
+            isinstance(value, str) and value.strip()
+            for value in (evaluation_item_ref, result_ref, sample_ref, variation_ref)
+        ):
+            raise EarlError(
+                "result, sample, variation, and evaluation refs are required"
+            )
         if result_ref in result_refs:
             raise EarlError("duplicate formal result identity")
         result_refs.add(result_ref)
         sample_identity = sample_identities.get(sample_ref)
         variation_identity = variation_identities.get(variation_ref)
-        if not isinstance(sample_identity, str) or not FINGERPRINT.fullmatch(sample_identity) or not isinstance(variation_identity, str) or not FINGERPRINT.fullmatch(variation_identity):
-            raise EarlError("canonical sample and presentation variation identities are required")
-        subject_id = stable_iri("subject", {"evaluation_ref": evaluation_ref,
-            "sample_identity": sample_identity, "variation_identity": variation_identity})
+        if (
+            not isinstance(sample_identity, str)
+            or not FINGERPRINT.fullmatch(sample_identity)
+            or not isinstance(variation_identity, str)
+            or not FINGERPRINT.fullmatch(variation_identity)
+        ):
+            raise EarlError(
+                "canonical sample and presentation variation identities are required"
+            )
+        subject_id = stable_iri(
+            "subject",
+            {
+                "evaluation_ref": evaluation_ref,
+                "sample_identity": sample_identity,
+                "variation_identity": variation_identity,
+            },
+        )
         if subject_id not in subject_ids:
             graph.append({"@id": subject_id, "@type": "earl:TestSubject"})
             subject_ids.add(subject_id)
         test_uri = _test_uri(catalog, result)
-        assertion_identity = {"evaluation_ref": evaluation_ref, "evaluation_revision": evaluation_revision,
-                              "subject_iri": subject_id, "test_uri": test_uri,
-                              "result_identity": {"evaluation_item_ref": evaluation_item_ref, "result_ref": result_ref}}
+        assertion_identity = {
+            "evaluation_ref": evaluation_ref,
+            "evaluation_revision": evaluation_revision,
+            "subject_iri": subject_id,
+            "test_uri": test_uri,
+            "result_identity": {
+                "evaluation_item_ref": evaluation_item_ref,
+                "result_ref": result_ref,
+            },
+        }
         assertion_id = stable_iri("assertion", assertion_identity)
-        result_id = stable_iri("result", {"assertion_identity": assertion_identity,
-                                           "evaluation_item_ref": evaluation_item_ref, "result_ref": result_ref})
+        result_id = stable_iri(
+            "result",
+            {
+                "assertion_identity": assertion_identity,
+                "evaluation_item_ref": evaluation_item_ref,
+                "result_ref": result_ref,
+            },
+        )
         if assertion_id in assertion_ids:
             raise EarlError("duplicate EARL assertion identity")
         assertion_ids.add(assertion_id)
-        result_node: dict[str, Any] = {"@id": result_id, "@type": "earl:TestResult",
-                                       "earl:outcome": {"@id": outcome}}
+        result_node: dict[str, Any] = {
+            "@id": result_id,
+            "@type": "earl:TestResult",
+            "earl:outcome": {"@id": outcome},
+        }
         if date_value is not None:
             result_node["dct:date"] = date_value
         graph.append(result_node)
-        graph.append({"@id": assertion_id, "@type": "earl:Assertion",
-                      "earl:assertedBy": {"@id": assertor_id}, "earl:subject": {"@id": subject_id},
-                      "earl:test": {"@id": test_uri}, "earl:result": {"@id": result_id},
-                      "earl:mode": {"@id": _mode_from_provenance(result)}})
+        graph.append(
+            {
+                "@id": assertion_id,
+                "@type": "earl:Assertion",
+                "earl:assertedBy": {"@id": assertor_id},
+                "earl:subject": {"@id": subject_id},
+                "earl:test": {"@id": test_uri},
+                "earl:result": {"@id": result_id},
+                "earl:mode": {"@id": _mode_from_provenance(result)},
+            }
+        )
     graph = [_ordered_node(node) for node in graph]
     graph.sort(key=lambda node: node["@id"])
     document = {"@context": CONTEXT, "@graph": graph}

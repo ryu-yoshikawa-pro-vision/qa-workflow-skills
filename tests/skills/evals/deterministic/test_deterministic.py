@@ -4,7 +4,6 @@ import unittest
 
 from scripts.skills.evals.deterministic.loader import load_validators
 
-
 VALIDATORS = load_validators()
 
 
@@ -13,7 +12,9 @@ class DeterministicValidatorTests(unittest.TestCase):
         result = VALIDATORS[skill](text, expected, "UNIT").to_dict()
         self.assertEqual(result["status"], "pass", result)
 
-    def assert_fails(self, skill: str, text: str, expected: dict, assertion_id: str) -> None:
+    def assert_fails(
+        self, skill: str, text: str, expected: dict, assertion_id: str
+    ) -> None:
         result = VALIDATORS[skill](text, expected, "UNIT").to_dict()
         failed = {a["id"] for a in result["assertions"] if a["status"] == "fail"}
         self.assertIn(assertion_id, failed, result)
@@ -34,7 +35,10 @@ class DeterministicValidatorTests(unittest.TestCase):
 | SPEC-001 | SPEC | 保存できる | 設定 | SRC-001 | 独立 | |
 """
         self.assert_pass("spec-analysis", valid, {"known_authorities": []})
-        invalid = valid.replace("| SPEC-001 | 保存 | 保存できる | SPEC | SRC-001 | Yes | 独立 | - |", "| SPEC-001 | 保存 | 保存できる | SPEC | SRC-001 | Yes | 独立 | - |\n| SPEC-001 | 保存2 | 保存できる | SPEC | SRC-001 | Yes | 独立 | - |")
+        invalid = valid.replace(
+            "| SPEC-001 | 保存 | 保存できる | SPEC | SRC-001 | Yes | 独立 | - |",
+            "| SPEC-001 | 保存 | 保存できる | SPEC | SRC-001 | Yes | 独立 | - |\n| SPEC-001 | 保存2 | 保存できる | SPEC | SRC-001 | Yes | 独立 | - |",
+        )
         self.assert_fails("spec-analysis", invalid, {}, "SPEC-D003")
 
     def test_question_analysis_valid_and_missing_blocked(self):
@@ -51,9 +55,16 @@ class DeterministicValidatorTests(unittest.TestCase):
 | --- | --- | --- | --- |
 | Q-001 | TC | 仕様決定 | test-case-design |
 """
-        self.assert_pass("question-analysis", valid, {"require_blocked_for_blockers": True})
+        self.assert_pass(
+            "question-analysis", valid, {"require_blocked_for_blockers": True}
+        )
         invalid = valid.replace("| Q-001 | TC | 仕様決定 | test-case-design |", "")
-        self.assert_fails("question-analysis", invalid, {"require_blocked_for_blockers": True}, "QUESTION-D006")
+        self.assert_fails(
+            "question-analysis",
+            invalid,
+            {"require_blocked_for_blockers": True},
+            "QUESTION-D006",
+        )
 
     def test_test_analysis_risk_matrix(self):
         valid = """# テスト分析
@@ -72,7 +83,9 @@ class DeterministicValidatorTests(unittest.TestCase):
 """
         self.assert_pass("test-analysis", valid, {"known_authorities": ["SPEC-001"]})
         invalid = valid.replace("| 4 | 2 | 高 |", "| 4 | 2 | 中 |")
-        self.assert_fails("test-analysis", invalid, {"known_authorities": ["SPEC-001"]}, "RISK-D005")
+        self.assert_fails(
+            "test-analysis", invalid, {"known_authorities": ["SPEC-001"]}, "RISK-D005"
+        )
 
     def test_test_requirement_valid_and_unknown_reference(self):
         valid = """# TR
@@ -84,7 +97,11 @@ class DeterministicValidatorTests(unittest.TestCase):
 | 上流ID | 種別 | 扱い | 理由 / 根拠 |
 | --- | --- | --- | --- |
 """
-        exp = {"known_authorities":["SPEC-001"],"known_product_risks":["RISK-001"],"product_risk_levels":{"RISK-001":"高"}}
+        exp = {
+            "known_authorities": ["SPEC-001"],
+            "known_product_risks": ["RISK-001"],
+            "product_risk_levels": {"RISK-001": "高"},
+        }
         self.assert_pass("test-requirement-design", valid, exp)
         invalid = valid.replace("SPEC-001", "SPEC-999")
         self.assert_fails("test-requirement-design", invalid, exp, "TR-D003")
@@ -125,13 +142,22 @@ class DeterministicValidatorTests(unittest.TestCase):
 | TCN-001-CI03 | A=1; B=0; C=1 | |
 | TCN-001-CI04 | A=1; B=1; C=0 | |
 """
-        exp={"known_test_requirements":["TR-001"],"known_authorities":["SPEC-001"],"known_product_risks":["RISK-001"],"pairwise":{"factors":{"A":["0","1"],"B":["0","1"],"C":["0","1"]},"forbidden_constraints":[],"require_pairwise":True}}
-        self.assert_pass("test-condition-design",base,exp)
-        invalid=base.replace("| TCN-001-CI04 | A=1; B=1; C=0 | |","")
-        self.assert_fails("test-condition-design",invalid,exp,"TCN-D015")
+        exp = {
+            "known_test_requirements": ["TR-001"],
+            "known_authorities": ["SPEC-001"],
+            "known_product_risks": ["RISK-001"],
+            "pairwise": {
+                "factors": {"A": ["0", "1"], "B": ["0", "1"], "C": ["0", "1"]},
+                "forbidden_constraints": [],
+                "require_pairwise": True,
+            },
+        }
+        self.assert_pass("test-condition-design", base, exp)
+        invalid = base.replace("| TCN-001-CI04 | A=1; B=1; C=0 | |", "")
+        self.assert_fails("test-condition-design", invalid, exp, "TCN-D015")
 
     def test_test_case_valid_and_unclosed_coverage(self):
-        valid="""# TC
+        valid = """# TC
 ## テストケース一覧
 | テストケースID | タイトル / 目的 | 関連観点ID | 関連カバレッジ項目ID | 関連テスト要求ID | 優先度 | 前提条件 | テストデータ | 実施手順 | 期待結果 | 期待結果の根拠 | 事後状態 / 後処理 | 備考 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -140,14 +166,36 @@ class DeterministicValidatorTests(unittest.TestCase):
 | 上流ID | 種別 | 扱い | 理由 / 根拠 |
 | --- | --- | --- | --- |
 """
-        exp={"known_test_requirements":["TR-001"],"known_test_conditions":["TCN-001"],"known_coverage_items":["TCN-001-CI01"],"coverage_closure_ids":["TCN-001-CI01"],"known_authorities":["SPEC-001"],"coverage_item_priorities":{"TCN-001-CI01":"高"}}
-        self.assert_pass("test-case-design",valid,exp)
-        bad=dict(exp); bad["known_coverage_items"]=["TCN-001-CI01","TCN-001-CI02"]; bad["coverage_closure_ids"]=["TCN-001-CI01","TCN-001-CI02"]
-        self.assert_fails("test-case-design",valid,bad,"TC-D007")
+        exp = {
+            "known_test_requirements": ["TR-001"],
+            "known_test_conditions": ["TCN-001"],
+            "known_coverage_items": ["TCN-001-CI01"],
+            "coverage_closure_ids": ["TCN-001-CI01"],
+            "known_authorities": ["SPEC-001"],
+            "coverage_item_priorities": {"TCN-001-CI01": "高"},
+        }
+        self.assert_pass("test-case-design", valid, exp)
+        bad = dict(exp)
+        bad["known_coverage_items"] = ["TCN-001-CI01", "TCN-001-CI02"]
+        bad["coverage_closure_ids"] = ["TCN-001-CI01", "TCN-001-CI02"]
+        self.assert_fails("test-case-design", valid, bad, "TC-D007")
 
     def test_coverage_analysis_valid_and_missed_gap(self):
-        graph={"node_types":{"SPEC-001":"Authority","TR-001":"TR","TCN-001":"TCN","TCN-001-CI01":"CI"},"edges":[["SPEC-001","TR-001"],["TR-001","TCN-001"],["TCN-001","TCN-001-CI01"]],"dispositions":{}}
-        valid="""# Coverage
+        graph = {
+            "node_types": {
+                "SPEC-001": "Authority",
+                "TR-001": "TR",
+                "TCN-001": "TCN",
+                "TCN-001-CI01": "CI",
+            },
+            "edges": [
+                ["SPEC-001", "TR-001"],
+                ["TR-001", "TCN-001"],
+                ["TCN-001", "TCN-001-CI01"],
+            ],
+            "dispositions": {},
+        }
+        valid = """# Coverage
 ## 仕様根拠 / プロダクトリスクの閉鎖状況
 | 上流ID | 種別 | 接続先テスト要求 / 扱い | 状態 | 根拠 / ギャップ |
 | --- | --- | --- | --- | --- |
@@ -161,12 +209,23 @@ class DeterministicValidatorTests(unittest.TestCase):
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | CI | TCN-001-CI01 | TC | なし | 未網羅 | | テストケースなし | ケース化 | test-condition-design |
 """
-        self.assert_pass("coverage-analysis",valid,{"graph":graph,"expected_fix_skills":{"TCN-001-CI01":"test-condition-design"}})
-        invalid=valid.replace("未閉鎖 ギャップ","閉鎖").replace("未網羅","網羅済み").replace("テストケースなし","問題なし")
-        self.assert_fails("coverage-analysis",invalid,{"graph":graph},"COV-D002")
+        self.assert_pass(
+            "coverage-analysis",
+            valid,
+            {
+                "graph": graph,
+                "expected_fix_skills": {"TCN-001-CI01": "test-condition-design"},
+            },
+        )
+        invalid = (
+            valid.replace("未閉鎖 ギャップ", "閉鎖")
+            .replace("未網羅", "網羅済み")
+            .replace("テストケースなし", "問題なし")
+        )
+        self.assert_fails("coverage-analysis", invalid, {"graph": graph}, "COV-D002")
 
     def test_adversarial_review_valid_and_fatal_residual(self):
-        valid="""# Review
+        valid = """# Review
 ## 指摘概要
 | 重要度 | 件数 |
 | --- | ---: |
@@ -179,13 +238,21 @@ class DeterministicValidatorTests(unittest.TestCase):
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | REV-001 | 重大 | TC-001 | 仕様根拠参照不明 | 仕様根拠 | 期待結果の根拠不明 | 修正 | test-case-design | 修正済み | |
 """
-        exp={"known_artifact_ids":["TC-001"],"expected_defects":[{"target_id":"TC-001","contains":"仕様根拠"}]}
-        self.assert_pass("adversarial-review",valid,exp)
-        invalid=valid.replace("| 致命的 | 0 |","| 致命的 | 1 |").replace("| 重大 | 1 |","| 重大 | 0 |").replace("| REV-001 | 重大 |","| REV-001 | 致命的 |").replace("| 修正済み |","| 残存リスクとして受容 |")
-        self.assert_fails("adversarial-review",invalid,exp,"REV-D007")
+        exp = {
+            "known_artifact_ids": ["TC-001"],
+            "expected_defects": [{"target_id": "TC-001", "contains": "仕様根拠"}],
+        }
+        self.assert_pass("adversarial-review", valid, exp)
+        invalid = (
+            valid.replace("| 致命的 | 0 |", "| 致命的 | 1 |")
+            .replace("| 重大 | 1 |", "| 重大 | 0 |")
+            .replace("| REV-001 | 重大 |", "| REV-001 | 致命的 |")
+            .replace("| 修正済み |", "| 残存リスクとして受容 |")
+        )
+        self.assert_fails("adversarial-review", invalid, exp, "REV-D007")
 
     def test_workflow_valid_and_complete_with_blocked(self):
-        valid="""# Workflow
+        valid = """# Workflow
 - ワークフロー全体状態: 実行中
 - 開始Skill: test-case-design
 - 最終Skill: test-case-design
@@ -193,10 +260,16 @@ class DeterministicValidatorTests(unittest.TestCase):
 | --- | --- | --- | --- | --- |
 | test-case-design |  | 実行中 | TC | |
 """
-        exp={"expected_start_skill":"test-case-design","expected_final_skill":"test-case-design","expected_skills":["test-case-design"]}
-        self.assert_pass("qa-workflow",valid,exp)
-        invalid=valid.replace("ワークフロー全体状態: 実行中","ワークフロー全体状態: 完了").replace("| test-case-design | 実行中 |","| test-case-design | ブロック中 |")
-        self.assert_fails("qa-workflow",invalid,exp,"WF-D004")
+        exp = {
+            "expected_start_skill": "test-case-design",
+            "expected_final_skill": "test-case-design",
+            "expected_skills": ["test-case-design"],
+        }
+        self.assert_pass("qa-workflow", valid, exp)
+        invalid = valid.replace(
+            "ワークフロー全体状態: 実行中", "ワークフロー全体状態: 完了"
+        ).replace("| test-case-design | 実行中 |", "| test-case-design | ブロック中 |")
+        self.assert_fails("qa-workflow", invalid, exp, "WF-D004")
 
 
 if __name__ == "__main__":

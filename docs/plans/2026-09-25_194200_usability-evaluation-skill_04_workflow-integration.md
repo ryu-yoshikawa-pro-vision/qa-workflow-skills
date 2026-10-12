@@ -112,7 +112,7 @@ backend-onlyの分析・設計へ無条件に起動しません。
 
 ### データフロー
 
-~~~text
+```text
 仕様 / design / project context
         ↓
 usability-evaluation
@@ -125,7 +125,7 @@ failure mode候補
 test-analysis
         ↓
 Product Risk / test focus / depth
-~~~
+```
 
 usability-evaluationはrisk scoreを付けません。
 
@@ -164,13 +164,13 @@ UI / UX評価が別scopeとして選定された場合、test-target-inspection�
 
 を再利用します。
 
-~~~text
+```text
 test-target-inspection
         ↓
 current observation artifact
         ├→ 通常の後続QA利用
         └→ usability-evaluation
-~~~
+```
 
 usability-evaluationのためだけに同じ画面を再scanすることを既定にしません。
 
@@ -180,7 +180,7 @@ usability-evaluationのためだけに同じ画面を再scanすることを既�
 
 UI / UX評価が別scopeとして明示的に選定され、TC実行中に各meaningful UI stateの証拠を取得できる場合、その証拠をusability-evaluationへ渡します。TC実行だけを理由に自動接続しません。
 
-~~~text
+```text
 test-execution
   ↓ before / after / intermediate state
   ├→ TC expected result comparison
@@ -189,7 +189,7 @@ test-execution
       UI / UX評価項目
        ↓ follow-upが必要な場合だけ
       Finding
-~~~
+```
 
 ### browser所有
 
@@ -248,13 +248,13 @@ Regressionではregression-testingが確定したUI / UX評価scopeだけを接�
 - selected TCでUI / UX評価が必要と選定される
 - 過去のUX Findingに対する再確認がRegression対象へ入っている
 
-~~~text
+```text
 通常のtest-execution
 → UI / UX評価が明示的に選定された場合だけevidenceを再利用
 
 regression-testing配下のtest-execution
 → regression-testingが確定したUI / UX評価scopeだけevidenceを再利用
-~~~
+```
 
 Regression membership / Run selection / UI / UX評価scopeの確定はregression-testingの責務を維持します。
 

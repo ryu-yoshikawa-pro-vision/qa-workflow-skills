@@ -2,13 +2,13 @@
 
 ## Owner routing first
 
-| Candidate | Owner |
-| --- | --- |
-| 期待挙動 / specification | `spec-analysis` |
-| 新規Product Risk / test focus | `test-analysis` |
-| current UI / accessible name / live behavior | `test-target-inspection` |
-| TR / TCN / CI / TCにformalizeする判断 | 該当design Skill |
-| execution failure原因 | 該当analysis Skill |
+| Candidate                                                 | Owner                    |
+| --------------------------------------------------------- | ------------------------ |
+| 期待挙動 / specification                                  | `spec-analysis`          |
+| 新規Product Risk / test focus                             | `test-analysis`          |
+| current UI / accessible name / live behavior              | `test-target-inspection` |
+| TR / TCN / CI / TCにformalizeする判断                     | 該当design Skill         |
+| execution failure原因                                     | 該当analysis Skill       |
 | 既存ownerへ自然に置けず、複数workflowに継続再利用する知識 | `qa-knowledge` entry候補 |
 
 Finding / Observationの存在だけでentryを作りません。source、scope、適用environment / version、currentness dependency、再利用価値、existing entryとのidentity関係を確認できない場合はcandidateを元artifact / Follow-upに残します。

@@ -309,15 +309,15 @@ candidate queryが`complete=false`の場合、candidateだけでscopeを狭め�
 
 ## 17. 責務
 
-| 処理 | 担当 |
-| --- | --- |
-| 新規・改修の変更影響候補 / Product Risk | `test-analysis` |
-| TC設計 | `test-case-design` |
-| design traceability / impact / freshness | PR #11 runtime |
-| Regression baseline / membership / Run selection / Activity | `regression-testing` |
-| Regression対象範囲のcoverage検証 | `coverage-analysis` |
-| TC → E2E実装coverage検証 | `coverage-analysis` |
-| workflow orchestration | `qa-workflow` |
-| manual相当実行・既存TCの修正確認 | `test-execution` |
-| E2E実行 | `e2e-test-execution` |
-| E2E failure分析 | `e2e-test-result-analysis` |
+| 処理                                                        | 担当                       |
+| ----------------------------------------------------------- | -------------------------- |
+| 新規・改修の変更影響候補 / Product Risk                     | `test-analysis`            |
+| TC設計                                                      | `test-case-design`         |
+| design traceability / impact / freshness                    | PR #11 runtime             |
+| Regression baseline / membership / Run selection / Activity | `regression-testing`       |
+| Regression対象範囲のcoverage検証                            | `coverage-analysis`        |
+| TC → E2E実装coverage検証                                    | `coverage-analysis`        |
+| workflow orchestration                                      | `qa-workflow`              |
+| manual相当実行・既存TCの修正確認                            | `test-execution`           |
+| E2E実行                                                     | `e2e-test-execution`       |
+| E2E failure分析                                             | `e2e-test-result-analysis` |

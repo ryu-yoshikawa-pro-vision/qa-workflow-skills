@@ -10,10 +10,10 @@
   "kind": "test_environment",
   "content": "",
   "scope_refs": [],
-  "applicability": {"environment": [], "version": ""},
+  "applicability": { "environment": [], "version": "" },
   "provenance": [],
   "currentness_dependencies": [],
-  "last_verified": {"at": "", "condition": ""},
+  "last_verified": { "at": "", "condition": "" },
   "state": "要再検証",
   "replacement_ref": null,
   "related_qa_refs": []
