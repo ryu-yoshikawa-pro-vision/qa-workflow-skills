@@ -97,6 +97,7 @@ class ExecpolicyCliTests(unittest.TestCase):
             ("git", "switch", "-c", "feature/new-work"),
             ("git.exe", "switch", "feature/existing-work"),
             ("git", "branch"),
+            ("git.exe", "branch", "-D", "feature/existing-work"),
             ("git.exe", "stash", "push"),
         )
         for command in cases:

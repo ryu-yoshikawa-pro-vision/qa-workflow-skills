@@ -153,10 +153,25 @@ class HookTests(unittest.TestCase):
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
+        self.assert_hook_allows("git branch -vv")
         for command in (
             self.posix_prefix + "git commit -m test",
             self.posix_prefix + "git reset 'HEAD~1'",
             self.ps_prefix + "git.exe push origin feature",
+            self.posix_prefix + "git branch -v -D feature/foo",
+            self.posix_prefix + "git branch -d feature/foo",
+            self.posix_prefix + "git branch -vv -m main renamed-main",
+            self.posix_prefix + "git branch -M main renamed-main",
+            self.posix_prefix + "git branch -c main copied-main",
+            self.posix_prefix + "git branch -C main copied-main",
+            self.posix_prefix + "git branch -v --delete feature/foo",
+            self.posix_prefix + "git branch --move main renamed-main",
+            self.posix_prefix + "git branch --copy main copied-main",
+            self.posix_prefix + "git branch --list -D feature/foo",
+            self.posix_prefix + "git branch --force main HEAD",
+            self.posix_prefix + "git branch --set-upstream-to=origin/main",
+            self.posix_prefix + "git branch --unset-upstream",
+            self.posix_prefix + "git branch --edit-description",
         ):
             with self.subTest(command=command):
                 self.assert_denied(command, "protected branch")
@@ -174,6 +189,71 @@ class HookTests(unittest.TestCase):
             self.posix_prefix + "git switch -c feature/new origin/main",
             self.posix_prefix + "git switch feature/existing --track",
             self.ps_prefix + "git.exe switch -c feature/new --track",
+        ):
+            with self.subTest(command=command):
+                self.assert_denied(command)
+
+    def test_branch_listing_requires_a_read_only_argument_sequence(self) -> None:
+        for command in (
+            "git branch",
+            "git branch -v",
+            "git branch -vv",
+            "git branch --list",
+            "git branch --show-current",
+            "git branch -a",
+            "git branch -r",
+            "git branch --all",
+            "git branch --remotes",
+            "git branch --merged",
+            "git branch --merged=HEAD",
+            "git branch --no-merged",
+            "git branch --no-merged=HEAD",
+            "git branch --contains HEAD",
+            "git branch --contains=HEAD",
+            "git branch --points-at HEAD",
+            "git branch --sort=refname",
+            "git branch --format='%(refname)'",
+            "git branch --list feature/existing",
+            "git branch --list -- -D",
+        ):
+            with self.subTest(command=command):
+                self.assert_hook_allows(command)
+
+    def test_feature_branch_mutations_reach_execpolicy_only_with_canonical_root(
+        self,
+    ) -> None:
+        subprocess.run(["git", "switch", "feature/existing"], cwd=self.repo, check=True)
+        for command in (
+            self.posix_prefix + "git branch -v -D main",
+            self.posix_prefix + "git branch -vv -m main renamed-main",
+            self.posix_prefix + "git branch -f main HEAD",
+        ):
+            with self.subTest(command=command):
+                self.assert_denied(command, "protected branch")
+
+        for command in (
+            self.posix_prefix + "git branch -d feature/target",
+            self.posix_prefix + "git branch -D feature/target",
+            self.posix_prefix + "git branch -m feature/target feature/renamed",
+            self.posix_prefix + "git branch -M feature/target feature/renamed-force",
+            self.posix_prefix + "git branch -c feature/target feature/copied",
+            self.posix_prefix + "git branch -C feature/target feature/copied-force",
+            self.posix_prefix + "git branch -f feature/target main",
+            self.posix_prefix
+            + "git branch --set-upstream-to=origin/main feature/existing",
+            self.posix_prefix + "git branch --unset-upstream",
+            self.posix_prefix + "git branch --edit-description feature/existing",
+            self.posix_prefix + "git branch -v",
+        ):
+            with self.subTest(command=command):
+                self.assert_hook_allows(command)
+
+        for command in (
+            "git branch -d feature/target",
+            "git branch -D feature/target",
+            "git branch --set-upstream-to=origin/main feature/existing",
+            "git branch --unset-upstream",
+            "git branch --edit-description feature/existing",
         ):
             with self.subTest(command=command):
                 self.assert_denied(command)

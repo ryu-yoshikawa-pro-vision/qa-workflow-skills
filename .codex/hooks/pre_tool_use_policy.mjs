@@ -280,13 +280,7 @@ function readOnlyGit(name, args) {
   if (["diff", "log", "show"].includes(op)) {
     return !a.some(x => x === "--output" || x.startsWith("--output=") || x === "--ext-diff" || x === "--textconv");
   }
-  if (op === "branch") {
-    return a.length === 0
-      || a.some(x =>
-        ["--list", "-l", "--show-current", "-a", "-r", "-v", "-vv", "--all", "--remotes", "--merged", "--no-merged"]
-          .includes(x)
-      );
-  }
+  if (op === "branch") return readOnlyBranch(args);
   if (op === "tag") return a.length === 0 || a.includes("--list") || a.includes("-l");
   if (op === "config") {
     return a.some(x =>
@@ -301,6 +295,74 @@ function readOnlyGit(name, args) {
   if (op === "worktree") return a[0] === "list";
   if (op === "stash") return ["list", "show"].includes(a[0]);
   return false;
+}
+function readOnlyBranch(args) {
+  if (args.length === 0) return true;
+  // Unknown options and branch names are mutations unless --list makes them patterns.
+  let listOnly = false, endOfOptions = false;
+  const listingOptions = new Set([
+    "-a",
+    "--all",
+    "-r",
+    "--remotes",
+    "-v",
+    "-vv",
+    "--verbose",
+    "--show-current",
+    "--merged",
+    "--no-merged",
+    "--contains",
+    "--no-contains",
+    "--points-at",
+    "--forked",
+    "--format",
+    "--sort",
+    "--color",
+    "--no-color",
+    "--column",
+    "--no-column",
+    "--ignore-case",
+    "-i",
+    "--omit-empty",
+    "--no-abbrev",
+    "-l",
+    "--list",
+  ]);
+  const optionalCommitOptions = new Set(["--merged", "--no-merged", "--contains", "--no-contains"]);
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i], value = arg.value, option = value.toLowerCase();
+    if (arg.dynamic) return false;
+    if (endOfOptions) continue;
+    if (option === "--") {
+      if (!listOnly) return false;
+      endOfOptions = true;
+      continue;
+    }
+    if (option === "-l" || option === "--list") {
+      listOnly = true;
+      continue;
+    }
+    if (listingOptions.has(option)) {
+      if (option === "--format" || option === "--points-at" || option === "--forked") {
+        const valueArg = args[i + 1];
+        if (!valueArg || valueArg.dynamic || valueArg.value.startsWith("-")) return false;
+        i += 1;
+      } else if (optionalCommitOptions.has(option)) {
+        const valueArg = args[i + 1];
+        if (valueArg && !valueArg.value.startsWith("-")) {
+          if (valueArg.dynamic) return false;
+          i += 1;
+        }
+      }
+      continue;
+    }
+    if (
+      /^--(?:format|sort|abbrev|color|column|merged|no-merged|contains|no-contains|points-at|forked)=/i.test(value)
+    ) continue;
+    if (option.startsWith("-")) return false;
+    if (!listOnly) return false;
+  }
+  return true;
 }
 function protectedPushTarget(args, branches) {
   const positional = [];
@@ -343,12 +405,16 @@ function safeProtectedSwitch(args, root, context) {
   return create ? !branchExists(root, name.value) : branchExists(root, name.value);
 }
 function branchTargetMutation(args, context) {
-  if (
-    !args.some(x =>
-      ["-d", "-D", "-m", "-M", "-c", "-C", "--delete", "--move", "--copy"].includes(x.value.toLowerCase())
-    )
-  ) return false;
-  return args.some(x => !x.dynamic && context.protectedBranches.has(x.value.replace(/^refs\/heads\//, "")));
+  const values = args.map(x => x.value.toLowerCase());
+  const refMutation = values.some(x =>
+    ["-d", "-D", "-m", "-M", "-c", "-C", "--delete", "--move", "--copy"].includes(x)
+  );
+  if (refMutation) {
+    return args.some(x => !x.dynamic && context.protectedBranches.has(x.value.replace(/^refs\/heads\//, "")));
+  }
+  if (!values.some(x => x === "-f" || x === "--force")) return false;
+  const branch = args.find(x => !x.dynamic && !x.value.startsWith("-"));
+  return Boolean(branch && context.protectedBranches.has(branch.value.replace(/^refs\/heads\//, "")));
 }
 function evaluateGit(tokens, canonical, root) {
   if (tokens.length < 2) return { decision: null, mutation: false };
@@ -387,7 +453,7 @@ function evaluateGit(tokens, canonical, root) {
     return { decision: deny("An explicit push to a protected branch is blocked."), mutation: true };
   }
   if (sub === "branch" && branchTargetMutation(args, context)) {
-    return { decision: deny("Deleting or renaming a protected branch is blocked."), mutation: true };
+    return { decision: deny("Changing a protected branch ref is blocked."), mutation: true };
   }
   if (context.protectedBranches.has(context.current)) {
     if (sub === "switch" && safeProtectedSwitch(args, root, context)) return { decision: null, mutation: true };
