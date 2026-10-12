@@ -12,8 +12,8 @@
 - file delete、rename、moveは、ユーザーが明示した対象範囲だけで行います。
 - formatter、lint、関連test、CI契約を完了前に確認します。完了判定に使う独立validationは個別に実行・判定し、複数commandをまとめたaggregate exit codeだけでPASSにしません。
 - Codex 0.160.0 primary profileではfeatures.unified_exec = true、unified_exec_tty = falseを使います。POSIX positive smokeの失敗だけを理由にfallbackへ切り替えず、Plan所定の比較と再受入条件に従います。
-- 原則としてstate-changing Gitは、Codex versionがcodex-cli 0.160.0と完全一致し、実際のtool modeに応じたrepository-owned Bash PreToolUseとexecpolicyのruntime受入がPASSした環境でのみ実行します。Direct modeではdirect exec_command、Code Mode / CodeModeOnlyではnested tools.exec_command()を確認します。未検証またはFAILのmodeでは実行しません。canonical repository rootへの移動とdirectなGit commandを同一command内に含めるPlan所定の形式を使います。
-- ただし、PR #18の`chore/formatter-lint` branchでは、Main Planの中間checkpoint条件を満たす場合に限り、明示的に選んだPR対象ファイルのstage、中間commit、同branchへの通常pushを許可します。この例外は今回のPRのレビュー用中間成果物だけを対象とし、他のbranchや作業へ適用しません。必須runtime受入を省略したまま最終完了とする根拠にはしません。Plan変更の理由は、ローカルにPython 3.11および必要な対話runtime環境がなく、CIとGitHubレビューで検証を進めるためです。Hook、execpolicy、sandbox、通常の承認は引き続き有効であり、これらの拒否を迂回しません。
+- state-changing Gitは、ユーザーが明示した作業範囲とPlanが許可する場合だけ実行します。原則としてCodex CLI `0.160.0`と実際のtool modeに応じたrepository-owned `PreToolUse` / execpolicyのruntime受入を確認します。Direct modeではdirect `exec_command`、Code Mode / CodeModeOnlyではnested `tools.exec_command()`を対象にします。PR #18の改訂Planでは、CLI version不一致やruntime受入を実施できないことは未検証として記録し、実装完了や明示依頼済みのcommit / 通常pushをそれだけで停止しません。これはruntime受入済みを意味しません。Hook、execpolicy、sandbox、protected branch保護の拒否は常に維持し、拒否を迂回しません。state-changing Gitはcanonical repository rootへの移動とdirectなGit commandを同一command内に含めるPlan所定の形式を使います。
+- PR #18の`chore/formatter-lint` branchでは、今回の明示依頼に基づき、改訂Main Planの検証・差分確認を満たした後、選択した対象ファイルのstage、commit、同branchへの通常pushを許可します。この例外はPR #18だけに適用し、他のbranchや作業へ広げません。`git add -A`、force push、merge、branch削除、権限拒否の迂回は禁止です。
 - runtime受入はcodex --no-daemon --strict-configのembedded / non-shared runtimeに限ります。managed/shared app-serverを検証済み扱いしません。
 - Codexのdisconnect / reconnect、recovered queue、別session由来と疑われるapprovalやoutputが出た場合は承認せず、新しいfresh sessionで作業状態を再確認します。
 - root AGENTS.mdはCodex標準のcompact復元へ委ねます。独自SessionStart Hookや重複する指示再注入を追加しません。

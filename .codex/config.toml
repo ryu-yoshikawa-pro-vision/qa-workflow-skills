@@ -1,6 +1,6 @@
 sandbox_mode = "workspace-write"
 approval_policy = { granular = { sandbox_approval = true, rules = true, mcp_elicitations = false, request_permissions = false, skill_approval = false } }
-approvals_reviewer = "user"
+approvals_reviewer = "auto_review"
 allow_login_shell = false
 
 [sandbox_workspace_write]

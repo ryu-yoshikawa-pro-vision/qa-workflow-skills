@@ -24,11 +24,11 @@ execpolicy prefixは分解済みargvへ照合します。subcommandより前にg
 
 ## 承認モード
 
-通常運用では、ユーザーがCodex UIの`Approve for me`を選び、自動レビューによる承認処理を利用できます。execpolicyの`prompt`は承認要求を意味しますが、常にユーザー本人による承認を保証しません。`Approve for me`では個々の要求が自動レビューによって処理される場合があります。
+通常運用ではCodex UIの`Approve for me`を使い、`.codex/config.toml`でも`approvals_reviewer = "auto_review"`を設定します。OpenAIの[公式config reference](https://developers.openai.com/ja-JP/docs/config-file/config-reference)では`user` / `auto_review`が有効値として定義されています。`auto_review`は承認要求のreviewerを指定する設定で、sandboxやgranular approvalの値は変えません。
 
-この設定は実行権限や作業範囲を広げません。`PreToolUse`のdeny、execpolicyの`forbidden`、sandbox制約を維持し、`Approve for me`を理由にGit安全ゲートを省略しません。実repositoryへのcommit / push等は、ユーザーが依頼した権限とMain Planの完了条件を満たした場合に限ります。
+この設定は実行権限や作業範囲を広げません。`PreToolUse`のdeny、execpolicyの`forbidden`、sandbox制約を維持し、`Approve for me`を理由にGit安全境界を省略しません。実repositoryへのcommit / push等は、ユーザーが依頼した範囲と適用Planに従います。
 
-承認画面の表示、取消し、取消し後の状態不変をruntime受入する場合は、Codex UIの`/permissions`で`Ask for approval`を選びます。画面を確認した後は承認せずcancel / denyします。`Approve for me`でcommandが完了しても、ユーザー本人の承認を確認した証拠にはしません。受入記録には実効承認モードを含め、手動受入後は`Approve for me`へ戻してかまいません。`.codex/config.toml`の`approvals_reviewer = "user"`はこの手動受入の基準設定として維持できます。
+PR #18では`Ask for approval`への切替、ユーザー本人による承認・取消し、取消し後の状態不変を必須runtime検証にしません。`prompt` / `forbidden`の期待分類はrules、contract tests、利用可能な`codex execpolicy check`で確認し、`Approve for me`で危険commandを実行して表示だけを試しません。これは実runtimeの承認UIを検証したことを意味しません。
 
 ## Hookが受け付けるcommand形式
 
@@ -66,18 +66,18 @@ Repository Hookが実行されるには、project trustとCodex CLIによるHook
 
 Windowsのquote-free `command_windows` payloadはtrusted repository内のlauncher sourceを読み込み、script blockとして実行します。PowerShell 5.1の`Restricted` policyでも必要なtransportを動作させるためです。launcherはrepository-local sourceのままtransport-onlyに保ち、通常ユーザーcommandを`Invoke-Expression`で評価しません。
 
-runtime受入は`codex-cli 0.160.0`完全一致を確認した後、`codex --no-daemon --strict-config`のfresh embedded / non-shared sessionで実施します。managed/shared app-serverのcross-session isolationを保証範囲に含めません。guardrail negative probeより先に、POSIX / Windowsでexit code 0と`codex-runtime-smoke` markerを返すharmless positive commandを確認します。Code Mode / CodeModeOnlyではnested `tools.exec_command()`がHookを実際に通ることを別途確認します.
+Codex CLI `0.160.0`はruntime qualificationの対象です。実runtime受入を行う場合はversion完全一致と`codex --no-daemon --strict-config`のembedded / non-shared sessionを確認し、managed/shared app-serverを受入済みと扱いません。現在のCLI versionやsession条件が異なる、または取得できない場合はその範囲を未検証とし、`0.160.0` runtime受入済みとは記載しません。PR #18では実行可能な安全確認だけを行い、この未検証だけで実装完了を停止しません。
 
-Primary profileは`unified_exec = true` / `unified_exec_tty = false`です。これを使用するときは、通常文字列`write_stdin`でPreToolUseを迂回できないこともruntime acceptanceに含めます。#51175の同一version・同一environment・同一tool mode比較条件を満たしたときだけ、Planどおり`unified_exec = false`へfallbackできます。その場合`unified_exec_tty`および`write_stdin`前提の検査を残しません。fallbackでもcommand、Hook、execpolicy、approval、protected branch、compactの再検証がPASSしなければ受入はblockedです。
+Primary profileは`unified_exec = true` / `unified_exec_tty = false`です。#51175のfallback比較は、Plan所定の同一version・同一environment・同一tool modeのsupported runtimeでpositive smokeが実際にFAILした場合だけ適用します。PR #18ではPOSIX runtimeを利用できない場合にfallbackを試さず、その範囲を未検証と記録します。
 
-承認UIのprobeは安全な一時repositoryやdummy commandを使い、表示だけ確認して承認せずcancelします。reset / restore / checkout / switch discard、PR checkout、secret / variable変更、実remote push、token表示を実行しません。`git restore .`等のcancel後に一時repositoryのHEAD / refs / index / working treeが不変であることを確認します。
+PR #18では承認UIのprobe、手動cancel、破棄操作の状態不変確認、一時repository作成を行いません。破壊commandや実remote mutationも実行せず、既存contract testsと利用可能なexecpolicy分類確認を使います。
 
 ## Compact後のrepository指示
 
-独自`SessionStart` Hookや全文重複注入でなく、Codex標準のproject instruction復元を使います。fresh trusted runtimeで、rootおよびnested directoryから手動compact、turn前およびturn途中の自動compact後に、root `AGENTS.md`の先頭・中間・末尾の既知契約が実際のmodel-visible inputに含まれることを確認します。返答文面のみで推定せず、可能なrollout / model input根拠を確認します。指示の欠落、不要な重複、trustや`project_doc_max_bytes`による未読込みを確認できない場合は受入をPASSにしません。
+独自`SessionStart` Hookや全文重複注入でなく、Codex標準のproject instruction復元を使います。このPRでは自動compactを強制せず、取得できない内部model input / rolloutの直接検査を完了条件にしません。保持をruntime確認していない場合は未検証と記録し、確認済みと主張しません。
 
 4 custom agentのrole記述は行動契約です。agentのrole固有read-only等を独立したhard sandbox境界として説明しません。
 
 ## Validationの証拠
 
-CIのcontract test、固定版CLIの`execpolicy check`、公式`skills-ref` validationは静的構造と回帰を検査します。これらはfresh Codex runtime acceptanceを代替しません。特にargvだけの`execpolicy check`は完全なPOSIX / Windows shell commandの分解、Hook dispatch、approval UI、compact後のmodel inputを証明しません。Planに列挙されたruntime acceptanceが利用できない、または失敗した場合は未達・blockedとして記録し、静的test成功と混同しません。
+CIのcontract test、利用可能な固定版CLIの`execpolicy check`、公式`skills-ref` validationは静的構造と回帰を検査します。これらはfresh Codex runtime acceptanceを代替せず、PR #18でもそのように記載しません。特にargvだけの`execpolicy check`は完全なPOSIX / Windows shell commandの分解やHook dispatchを証明しません。実runtimeを利用できない、または対象versionと一致しない場合はその範囲を未検証とし、他の完了条件を満たしていればそれだけを理由に実装完了を止めません。実行したruntime検証で不具合を確認した場合はFAILとして修正します。

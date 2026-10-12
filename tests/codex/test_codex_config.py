@@ -24,6 +24,7 @@ class CodexConfigTests(unittest.TestCase):
 
     def test_granular_approval_and_primary_profile_contract(self) -> None:
         self.assertEqual(self.config["sandbox_mode"], "workspace-write")
+        self.assertEqual(self.config["approvals_reviewer"], "auto_review")
         self.assertEqual(
             self.config["approval_policy"],
             {
