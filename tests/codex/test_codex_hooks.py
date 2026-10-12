@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import tempfile
@@ -60,9 +61,15 @@ class HookTests(unittest.TestCase):
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
-        self.posix_root = str(self.repo)
+        reported_root = subprocess.check_output(
+            ["git", "rev-parse", "--show-toplevel"],
+            cwd=self.repo,
+            text=True,
+            encoding="utf-8",
+        ).strip()
+        self.posix_root = os.path.normpath(reported_root)
         self.posix_prefix = f"cd '{self.posix_root}' && "
-        self.ps_root = str(self.repo).replace("'", "''")
+        self.ps_root = self.posix_root.replace("'", "''")
         self.ps_prefix = (
             f"Set-Location -LiteralPath '{self.ps_root}' -ErrorAction Stop; "
         )
