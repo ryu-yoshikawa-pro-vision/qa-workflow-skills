@@ -347,6 +347,12 @@ rebase前の旧mainとの差分を正として実装判断しません。
 - Deterministic Output run #1315はruntime unit / integrationを含めsuccess。Semantic Output run #1280、Agent Skills run #1316、Code Quality run #10もsuccess。
 - このCIはPR merge-commit `d9cc250a1fa887c19fe1aee850964b50ebae44ea`で実行されたcurrent PR headの検証で、fresh embedded non-shared Codex runtime acceptance全体を意味しない。
 
+### 2026-10-13 Plan更新commitのCI再確認
+
+- Plan状態のみを追記したPR head `557bc10c351d518818e0ac9db86201ff6c4c3260`でも、latest five CI workflowsがすべてsuccess。Code Quality #11、Deterministic Output #1316、Semantic Output #1281、Agent Skills #1317、Codex Harness #11。
+- Codex HarnessはLinux / Windowsとも`@openai/codex@latest`の実version `codex-cli 0.162.1`を記録し、各36件成功（LinuxはWindows-only test 8件skip）。
+- Deterministic Outputのruntime unit / integration、Agent Skills specification / repository structure、Semantic Output dataset / repository validationもsuccess。Plan更新commitで実装コードは変更していない。
+
 ## 13. 完了条件
 
 - PR #14 merge後mainから実装されている
