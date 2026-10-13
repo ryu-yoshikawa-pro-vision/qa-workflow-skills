@@ -340,6 +340,13 @@ rebase前の旧mainとの差分を正として実装判断しません。
 - Codex Harnessは特定version pinなしで`@openai/codex@latest`を導入し、実行versionを記録する。local Codex Harnessは現在のinstalled `codex-cli 0.162.0-alpha.17.2`で36件を通過した。これはこのruntimeで実施したHarness結果であり、fresh non-shared runtime acceptance全体の代替ではない。
 - current worktreeで追加したTCD v1 cutoverとscope history回帰を含むruntime suiteは339件、deterministic repository suiteは290件、semantic datasetは22 Skill / 163 case。詳細な継続検証とPlan Step状態は `_04 §11.1` を参照する。
 
+### 2026-10-13 push後のcurrent-head CI
+
+- PR #16 current headは`f45ef4741c2759178c4eab1f1c68b9da12e677ff`。通常push後にGitHub上でhead反映を確認した。
+- Codex Harness、Code Quality、Deterministic Output、Semantic Output、Agent Skillsの全5 workflowがsuccess。Codex Harness run #10はLinux / Windows両jobで`@openai/codex@latest`から`codex-cli 0.162.1`を記録し、各36件成功した（LinuxはWindows-only test 8件skip）。
+- Deterministic Output run #1315はruntime unit / integrationを含めsuccess。Semantic Output run #1280、Agent Skills run #1316、Code Quality run #10もsuccess。
+- このCIはPR merge-commit `d9cc250a1fa887c19fe1aee850964b50ebae44ea`で実行されたcurrent PR headの検証で、fresh embedded non-shared Codex runtime acceptance全体を意味しない。
+
 ## 13. 完了条件
 
 - PR #14 merge後mainから実装されている
