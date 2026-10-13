@@ -15,7 +15,7 @@ python scripts/format_tracked.py format
 python scripts/format_tracked.py check
 ```
 
-Codex開発ハーネスとexecpolicyはCodex CLI `0.160.0`向けです。静的contractは次で確認できます。実runtime受入の条件と保証範囲は[`docs/reference/codex-safety-harness.md`](docs/reference/codex-safety-harness.md)を参照してください。
+Codex開発ハーネスとexecpolicyは特定のCodex CLI versionに固定していません。Codex Harness CIはnpmの`latest` stable tagからCLIを導入し、使用versionを記録したうえで実CLIの機能と安全contractを検証します。静的contractは次で確認できます。実runtime受入の条件と保証範囲は[`docs/reference/codex-safety-harness.md`](docs/reference/codex-safety-harness.md)を参照してください。
 
 ```bash
 codex --version
@@ -139,6 +139,8 @@ flowchart TB
 ```
 
 修正が必要な場合は最も早い責任工程へ、ブロック解除後は回答に応じた再開先工程へルーティングします。上流変更時は影響する範囲だけを担当工程へ戻します。
+
+今後のテスト設計で継続利用するUI仕様理解packageは、`spec-analysis`のUIテスト対象分析modeで作成します。仕様理解だけが要求された場合はそこで終了し、テスト設計を自動開始しません。不明点への回答は`question-analysis`で扱った後、`spec-analysis`へ戻してpackageへ反映します。current live UIの観測、保存済み画面資料のUI/UX評価、live usability inspection、formal WCAG評価は、それぞれ既存の`test-target-inspection`、`usability-evaluation`、`usability-inspection`、`wcag-conformance-evaluation`が担当します。
 
 ### E2E要求時の条件分岐
 
