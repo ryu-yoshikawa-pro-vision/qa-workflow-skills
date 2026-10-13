@@ -1,0 +1,3 @@
+# Case AE: fixed coverage外の複合的な懸念
+
+general inspectionの固定観点と既知checkはすべて実行できたが、filter変更とpagination、または複数stateの組合せで初めて意味的不整合が確認できる。

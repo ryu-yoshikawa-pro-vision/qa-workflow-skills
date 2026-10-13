@@ -1,0 +1,765 @@
+{
+  "schema_version": "1",
+  "wcag_version": "2.0",
+  "source": {
+    "source_id": "SRC-WCAG-2.0",
+    "canonical_uri": "https://www.w3.org/TR/WCAG20/",
+    "checked_at": "2026-09-28"
+  },
+  "success_criteria": [
+    {
+      "criterion_ref": "1.1.1",
+      "title": "Non-text Content",
+      "level": "A",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#text-equiv-all",
+      "procedure_keys": [
+        "m-accessible-name",
+        "m-nontext-inventory",
+        "s-wcag-1.1.1"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "1.2.1",
+      "title": "Audio-only and Video-only (Prerecorded)",
+      "level": "A",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#media-equiv-av-only-alt",
+      "procedure_keys": [
+        "m-media-inventory",
+        "s-wcag-1.2.1"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "1.2.2",
+      "title": "Captions (Prerecorded)",
+      "level": "A",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#media-equiv-captions",
+      "procedure_keys": [
+        "m-media-inventory",
+        "s-wcag-1.2.2"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "1.2.3",
+      "title": "Audio Description or Media Alternative (Prerecorded)",
+      "level": "A",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#media-equiv-audio-desc",
+      "procedure_keys": [
+        "m-media-inventory",
+        "s-wcag-1.2.3"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "1.2.4",
+      "title": "Captions (Live)",
+      "level": "AA",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#media-equiv-real-time-captions",
+      "procedure_keys": [
+        "m-media-inventory",
+        "s-wcag-1.2.4"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "1.2.5",
+      "title": "Audio Description (Prerecorded)",
+      "level": "AA",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#media-equiv-audio-desc-only",
+      "procedure_keys": [
+        "m-media-inventory",
+        "s-wcag-1.2.5"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "1.2.6",
+      "title": "Sign Language (Prerecorded)",
+      "level": "AAA",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#media-equiv-sign",
+      "procedure_keys": [
+        "m-media-inventory",
+        "s-wcag-1.2.6"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "1.2.7",
+      "title": "Extended Audio Description  (Prerecorded)",
+      "level": "AAA",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#media-equiv-extended-ad",
+      "procedure_keys": [
+        "m-media-inventory",
+        "s-wcag-1.2.7"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "1.2.8",
+      "title": "Media Alternative (Prerecorded)",
+      "level": "AAA",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#media-equiv-text-doc",
+      "procedure_keys": [
+        "m-media-inventory",
+        "s-wcag-1.2.8"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "1.2.9",
+      "title": "Audio-only (Live)",
+      "level": "AAA",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#media-equiv-live-audio-only",
+      "procedure_keys": [
+        "m-media-inventory",
+        "s-wcag-1.2.9"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "1.3.1",
+      "title": "Info and Relationships",
+      "level": "A",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#content-structure-separation-programmatic",
+      "procedure_keys": [
+        "at-wcag-1.3.1",
+        "m-structure-snapshot",
+        "s-wcag-1.3.1"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "1.3.2",
+      "title": "Meaningful Sequence",
+      "level": "A",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#content-structure-separation-sequence",
+      "procedure_keys": [
+        "at-wcag-1.3.2",
+        "m-dom-sequence",
+        "s-wcag-1.3.2"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "1.3.3",
+      "title": "Sensory Characteristics",
+      "level": "A",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#content-structure-separation-understanding",
+      "procedure_keys": [
+        "s-wcag-1.3.3"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "1.4.1",
+      "title": "Use of Color",
+      "level": "A",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#visual-audio-contrast-without-color",
+      "procedure_keys": [
+        "s-wcag-1.4.1"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "1.4.2",
+      "title": "Audio Control",
+      "level": "A",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#visual-audio-contrast-dis-audio",
+      "procedure_keys": [
+        "m-audio-autoplay",
+        "s-wcag-1.4.2"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "1.4.3",
+      "title": "Contrast (Minimum)",
+      "level": "AA",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#visual-audio-contrast-contrast",
+      "procedure_keys": [
+        "m-text-contrast",
+        "manual-wcag-1.4.3",
+        "s-wcag-1.4.3"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "1.4.4",
+      "title": "Resize text",
+      "level": "AA",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#visual-audio-contrast-scale",
+      "procedure_keys": [
+        "m-resize-text",
+        "manual-wcag-1.4.4",
+        "s-wcag-1.4.4"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "1.4.5",
+      "title": "Images of Text",
+      "level": "AA",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#visual-audio-contrast-text-presentation",
+      "procedure_keys": [
+        "m-image-text-inventory",
+        "s-wcag-1.4.5"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "1.4.6",
+      "title": "Contrast (Enhanced)",
+      "level": "AAA",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#visual-audio-contrast7",
+      "procedure_keys": [
+        "m-text-contrast",
+        "manual-wcag-1.4.6",
+        "s-wcag-1.4.6"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "1.4.7",
+      "title": "Low or No Background Audio",
+      "level": "AAA",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#visual-audio-contrast-noaudio",
+      "procedure_keys": [
+        "m-media-inventory",
+        "s-wcag-1.4.7"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "1.4.8",
+      "title": "Visual Presentation",
+      "level": "AAA",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#visual-audio-contrast-visual-presentation",
+      "procedure_keys": [
+        "m-text-presentation",
+        "s-wcag-1.4.8"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "1.4.9",
+      "title": "Images of Text (No Exception)",
+      "level": "AAA",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#visual-audio-contrast-text-images",
+      "procedure_keys": [
+        "m-image-text-inventory",
+        "s-wcag-1.4.9"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "2.1.1",
+      "title": "Keyboard",
+      "level": "A",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#keyboard-operation-keyboard-operable",
+      "procedure_keys": [
+        "m-keyboard-run",
+        "s-wcag-2.1.1"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "2.1.2",
+      "title": "No Keyboard Trap",
+      "level": "A",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#keyboard-operation-trapping",
+      "procedure_keys": [
+        "m-keyboard-run",
+        "s-wcag-2.1.2"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "2.1.3",
+      "title": "Keyboard (No Exception)",
+      "level": "AAA",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#keyboard-operation-all-funcs",
+      "procedure_keys": [
+        "m-keyboard-run",
+        "s-wcag-2.1.3"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "2.2.1",
+      "title": "Timing Adjustable",
+      "level": "A",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#time-limits-required-behaviors",
+      "procedure_keys": [
+        "m-timer-inventory",
+        "s-wcag-2.2.1"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "2.2.2",
+      "title": "Pause, Stop, Hide",
+      "level": "A",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#time-limits-pause",
+      "procedure_keys": [
+        "m-moving-content-inventory",
+        "s-wcag-2.2.2"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "2.2.3",
+      "title": "No Timing",
+      "level": "AAA",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#time-limits-no-exceptions",
+      "procedure_keys": [
+        "m-timer-inventory",
+        "s-wcag-2.2.3"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "2.2.4",
+      "title": "Interruptions",
+      "level": "AAA",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#time-limits-postponed",
+      "procedure_keys": [
+        "s-wcag-2.2.4"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "2.2.5",
+      "title": "Re-authenticating",
+      "level": "AAA",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#time-limits-server-timeout",
+      "procedure_keys": [
+        "s-wcag-2.2.5"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "2.3.1",
+      "title": "Three Flashes or Below Threshold",
+      "level": "A",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#seizure-does-not-violate",
+      "procedure_keys": [
+        "external-wcag-2.3.1",
+        "s-wcag-2.3.1"
+      ],
+      "external_evidence_allowed": true
+    },
+    {
+      "criterion_ref": "2.3.2",
+      "title": "Three Flashes",
+      "level": "AAA",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#seizure-three-times",
+      "procedure_keys": [
+        "external-wcag-2.3.2",
+        "s-wcag-2.3.2"
+      ],
+      "external_evidence_allowed": true
+    },
+    {
+      "criterion_ref": "2.4.1",
+      "title": "Bypass Blocks",
+      "level": "A",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#navigation-mechanisms-skip",
+      "procedure_keys": [
+        "m-structure-snapshot",
+        "s-wcag-2.4.1"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "2.4.2",
+      "title": "Page Titled",
+      "level": "A",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#navigation-mechanisms-title",
+      "procedure_keys": [
+        "m-page-title",
+        "s-wcag-2.4.2"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "2.4.3",
+      "title": "Focus Order",
+      "level": "A",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#navigation-mechanisms-focus-order",
+      "procedure_keys": [
+        "m-focus-order",
+        "s-wcag-2.4.3"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "2.4.4",
+      "title": "Link Purpose (In Context)",
+      "level": "A",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#navigation-mechanisms-refs",
+      "procedure_keys": [
+        "m-link-inventory",
+        "s-wcag-2.4.4"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "2.4.5",
+      "title": "Multiple Ways",
+      "level": "AA",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#navigation-mechanisms-mult-loc",
+      "procedure_keys": [
+        "s-wcag-2.4.5"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "2.4.6",
+      "title": "Headings and Labels",
+      "level": "AA",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#navigation-mechanisms-descriptive",
+      "procedure_keys": [
+        "m-heading-label-inventory",
+        "s-wcag-2.4.6"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "2.4.7",
+      "title": "Focus Visible",
+      "level": "AA",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#navigation-mechanisms-focus-visible",
+      "procedure_keys": [
+        "m-focus-order",
+        "s-wcag-2.4.7"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "2.4.8",
+      "title": "Location",
+      "level": "AAA",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#navigation-mechanisms-location",
+      "procedure_keys": [
+        "s-wcag-2.4.8"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "2.4.9",
+      "title": "Link Purpose (Link Only)",
+      "level": "AAA",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#navigation-mechanisms-link",
+      "procedure_keys": [
+        "m-link-inventory",
+        "s-wcag-2.4.9"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "2.4.10",
+      "title": "Section Headings",
+      "level": "AAA",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#navigation-mechanisms-headings",
+      "procedure_keys": [
+        "m-heading-label-inventory",
+        "s-wcag-2.4.10"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "3.1.1",
+      "title": "Language of Page",
+      "level": "A",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#meaning-doc-lang-id",
+      "procedure_keys": [
+        "m-language-page",
+        "s-wcag-3.1.1"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "3.1.2",
+      "title": "Language of Parts",
+      "level": "AA",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#meaning-other-lang-id",
+      "procedure_keys": [
+        "m-language-parts",
+        "s-wcag-3.1.2"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "3.1.3",
+      "title": "Unusual Words",
+      "level": "AAA",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#meaning-idioms",
+      "procedure_keys": [
+        "s-wcag-3.1.3"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "3.1.4",
+      "title": "Abbreviations",
+      "level": "AAA",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#meaning-located",
+      "procedure_keys": [
+        "s-wcag-3.1.4"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "3.1.5",
+      "title": "Reading Level",
+      "level": "AAA",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#meaning-supplements",
+      "procedure_keys": [
+        "external-wcag-3.1.5",
+        "s-wcag-3.1.5"
+      ],
+      "external_evidence_allowed": true
+    },
+    {
+      "criterion_ref": "3.1.6",
+      "title": "Pronunciation",
+      "level": "AAA",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#meaning-pronunciation",
+      "procedure_keys": [
+        "s-wcag-3.1.6"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "3.2.1",
+      "title": "On Focus",
+      "level": "A",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#consistent-behavior-receive-focus",
+      "procedure_keys": [
+        "m-change-trigger-run",
+        "s-wcag-3.2.1"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "3.2.2",
+      "title": "On Input",
+      "level": "A",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#consistent-behavior-unpredictable-change",
+      "procedure_keys": [
+        "m-change-trigger-run",
+        "s-wcag-3.2.2"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "3.2.3",
+      "title": "Consistent Navigation",
+      "level": "AA",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#consistent-behavior-consistent-locations",
+      "procedure_keys": [
+        "m-multipage-structure",
+        "s-wcag-3.2.3"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "3.2.4",
+      "title": "Consistent Identification",
+      "level": "AA",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#consistent-behavior-consistent-functionality",
+      "procedure_keys": [
+        "m-multipage-controls",
+        "s-wcag-3.2.4"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "3.2.5",
+      "title": "Change on Request",
+      "level": "AAA",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#consistent-behavior-no-extreme-changes-context",
+      "procedure_keys": [
+        "m-change-trigger-run",
+        "s-wcag-3.2.5"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "3.3.1",
+      "title": "Error Identification",
+      "level": "A",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#minimize-error-identified",
+      "procedure_keys": [
+        "m-error-state",
+        "s-wcag-3.3.1"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "3.3.2",
+      "title": "Labels or Instructions",
+      "level": "A",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#minimize-error-cues",
+      "procedure_keys": [
+        "m-form-labels",
+        "s-wcag-3.3.2"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "3.3.3",
+      "title": "Error Suggestion",
+      "level": "AA",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#minimize-error-suggestions",
+      "procedure_keys": [
+        "m-error-state",
+        "s-wcag-3.3.3"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "3.3.4",
+      "title": "Error Prevention (Legal, Financial, Data)",
+      "level": "AA",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#minimize-error-reversible",
+      "procedure_keys": [
+        "s-wcag-3.3.4"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "3.3.5",
+      "title": "Help",
+      "level": "AAA",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#minimize-error-context-help",
+      "procedure_keys": [
+        "s-wcag-3.3.5"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "3.3.6",
+      "title": "Error Prevention (All)",
+      "level": "AAA",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#minimize-error-reversible-all",
+      "procedure_keys": [
+        "s-wcag-3.3.6"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "4.1.1",
+      "title": "Parsing",
+      "level": "A",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#ensure-compat-parses",
+      "procedure_keys": [
+        "m-parsing-version-rule",
+        "s-wcag-4.1.1"
+      ],
+      "external_evidence_allowed": false
+    },
+    {
+      "criterion_ref": "4.1.2",
+      "title": "Name, Role, Value",
+      "level": "A",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#ensure-compat-rsv",
+      "procedure_keys": [
+        "at-wcag-4.1.2",
+        "m-name-role-value",
+        "s-wcag-4.1.2"
+      ],
+      "external_evidence_allowed": false
+    }
+  ],
+  "conformance_requirements": [
+    {
+      "requirement_key": "conformance-level",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#conformance-reqs",
+      "metadata": {
+        "selection": "target-level"
+      }
+    },
+    {
+      "requirement_key": "full-pages",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#conformance-reqs",
+      "metadata": {
+        "required_variation_closure": true
+      }
+    },
+    {
+      "requirement_key": "complete-processes",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#conformance-reqs",
+      "metadata": {
+        "complete_process_closure": true
+      }
+    },
+    {
+      "requirement_key": "accessibility-supported-ways",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#conformance-reqs",
+      "metadata": {
+        "accessibility_support_baseline_required": true
+      }
+    },
+    {
+      "requirement_key": "non-interference",
+      "canonical_uri": "https://www.w3.org/TR/WCAG20/#conformance-reqs",
+      "metadata": {
+        "success_criterion_refs": [
+          "1.4.2",
+          "2.1.2",
+          "2.2.2",
+          "2.3.1"
+        ]
+      }
+    }
+  ],
+  "conforming_alternate_version_contract": {
+    "required_condition_keys": [
+      "same-information",
+      "same-functionality",
+      "same-human-language",
+      "currentness",
+      "reachability-alternative"
+    ]
+  },
+  "claim_contract": {
+    "guideline_title": "Web Content Accessibility Guidelines (WCAG) 2.0",
+    "guideline_version": "2.0",
+    "guideline_uri": "https://www.w3.org/TR/WCAG20/",
+    "third_party_repair_window_business_days": 2,
+    "required_fields": [
+      "claim_date",
+      "guideline_title",
+      "guideline_version",
+      "guideline_uri",
+      "conformance_level",
+      "page_scope",
+      "technologies_relied_upon"
+    ],
+    "optional_fields": [
+      "additional_accessibility_information",
+      "user_agents",
+      "assistive_technologies",
+      "not_relied_upon_technologies"
+    ]
+  },
+  "evaluation_statement_contract": {
+    "enabled": false
+  },
+  "statement_of_partial_conformance_contract": {
+    "types": [
+      "third-party-content",
+      "language"
+    ],
+    "canonical_uri": "https://www.w3.org/TR/WCAG20/",
+    "required_fields": [
+      "statement_type",
+      "scope",
+      "reason",
+      "supporting_evidence_refs"
+    ]
+  }
+}

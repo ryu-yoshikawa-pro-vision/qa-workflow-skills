@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>API token settings fixture</title>
+  <style>
+    :root { color-scheme: light; font: 16px/1.5 system-ui, sans-serif; color: #182230; background: #f4f6fa; }
+    body { margin: 0; min-height: 100vh; }
+    main { width: min(64rem, calc(100% - 3rem)); margin: 4rem auto; }
+    h1 { font-size: 2rem; margin: 0 0 1rem; }
+    button, a { font: inherit; }
+    button { border: 1px solid #64748b; border-radius: .3rem; padding: .65rem 1rem; background: white; color: #182230; }
+    a { margin-left: 1rem; color: #174ea6; }
+    .veil { position: fixed; inset: 0; display: grid; place-items: center; padding: 1.5rem; background: #f4f6fa; }
+    [role="dialog"] { box-sizing: border-box; width: min(32rem, 100%); padding: 1.5rem; border: 1px solid #8b95a5; border-radius: .5rem; background: white; box-shadow: 0 1rem 3rem rgb(24 34 48 / 18%); }
+    [role="dialog"] h2 { margin: 0 0 .75rem; font-size: 1.4rem; }
+    [role="dialog"] p { margin: 0 0 1.5rem; }
+    button:focus-visible, a:focus-visible { outline: 3px solid #1668dc; outline-offset: 3px; }
+    .danger { background: #a61b1b; border-color: #a61b1b; color: white; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>API token settings</h1>
+    <p>Manage tokens used by connected integrations.</p>
+    <button id="create-token" type="button">Create API token</button>
+    <a href="#help">Token help</a>
+    <div class="veil">
+      <section role="dialog" aria-modal="true" aria-labelledby="dialog-title" aria-describedby="dialog-description">
+        <h2 id="dialog-title">Remove API token?</h2>
+        <p id="dialog-description">Removing this token stops connected integrations. You can create a replacement later.</p>
+        <button class="danger" id="remove-token" type="button">Remove API token</button>
+      </section>
+    </div>
+  </main>
+  <script>
+    document.getElementById("remove-token").focus();
+  </script>
+</body>
+</html>

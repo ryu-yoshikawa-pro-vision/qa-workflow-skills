@@ -1,0 +1,34 @@
+[
+  {
+    "query": "WCAG 2.0 Level Aで全productを正式評価して。",
+    "should_trigger": true
+  },
+  {
+    "query": "WCAG 2.2 AAへ適合するか、全target scopeのsample評価とreportを行って。",
+    "should_trigger": true
+  },
+  {
+    "query": "form error textが分かりやすいか見て。",
+    "should_trigger": false
+  },
+  {
+    "query": "「WCAGに適合」の要求だがversionが未指定。正式評価のInput不足を特定して。",
+    "should_trigger": true
+  },
+  {
+    "query": "ARIA dialogのrole/name/stateをlive UIから確認して。",
+    "should_trigger": false
+  },
+  {
+    "query": "WCAG 2.1で要求されたSuccess Criteriaを静的catalogから漏れなく評価して。",
+    "should_trigger": true
+  },
+  {
+    "query": "サイト全体のLighthouse performanceだけを測って。",
+    "should_trigger": false
+  },
+  {
+    "query": "WCAG 2.0 AAのConformance Claimに必要な項目を一覧化して。製品評価は不要。",
+    "should_trigger": false
+  }
+]

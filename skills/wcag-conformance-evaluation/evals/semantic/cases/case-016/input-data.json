@@ -1,0 +1,1128 @@
+{
+  "kind": "synthetic-prior-wcag-result-snapshot",
+  "evaluation_ref": "EVAL-CASE-N-PRIOR",
+  "target": {
+    "wcag_version": "2.2",
+    "level": "AA"
+  },
+  "samples": [
+    {
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "sample_kind": "structured",
+      "target_ref": "TARGET-CASE-N-001",
+      "state_key": "default",
+      "locator": "https://northstar.example.invalid/case-n",
+      "identity_fingerprint": "sha256:3a07c08455a7f8c2f89b52dc0046483951d642b535215d15bb3c56fa095aff9b",
+      "source_evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ]
+    }
+  ],
+  "variations": [
+    {
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "required": true,
+      "completeness": "complete",
+      "coverage_status": "evaluated",
+      "identity_fingerprint": "sha256:c3b16508f5e003644da20f316fb2d85dae6c1db22dfe384f6ea367d876a6f982",
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ]
+    }
+  ],
+  "sample_results": [
+    {
+      "sample_result_ref": "WCAG-RES-N-001",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "1.1.1",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-001",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-001"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-002",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "1.2.1",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-002",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-002"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-003",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "1.2.2",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-003",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-003"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-004",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "1.2.3",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-004",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-004"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-005",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "1.2.4",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-005",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-005"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-006",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "1.2.5",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-006",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-006"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-007",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "1.3.1",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-007",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-007"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-008",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "1.3.2",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-008",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-008"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-009",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "1.3.3",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-009",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-009"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-010",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "1.3.4",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-010",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-010"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-011",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "1.3.5",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-011",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-011"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-012",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "1.4.1",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-012",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-012"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-013",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "1.4.2",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-013",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-013"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-014",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "1.4.4",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-014",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-014"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-015",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "1.4.5",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-015",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-015"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-016",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "1.4.10",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-016",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-016"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-017",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "1.4.11",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-017",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-017"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-018",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "1.4.12",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-018",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-018"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-019",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "1.4.13",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-019",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-019"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-020",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "2.1.1",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-020",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-020"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-021",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "2.1.2",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-021",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-021"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-022",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "2.1.4",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-022",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-022"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-023",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "2.2.1",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-023",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-023"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-024",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "2.2.2",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-024",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-024"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-025",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "2.3.1",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-025",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-025"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-026",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "2.4.1",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-026",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-026"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-027",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "2.4.2",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-027",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-027"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-028",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "2.4.3",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-028",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-028"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-029",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "2.4.4",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-029",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-029"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-030",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "2.4.5",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-030",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-030"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-031",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "2.4.6",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-031",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-031"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-032",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "2.4.7",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-032",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-032"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-033",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "2.4.11",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-033",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-033"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-034",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "2.5.1",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-034",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-034"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-035",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "2.5.2",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-035",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-035"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-036",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "2.5.3",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-036",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-036"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-037",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "2.5.4",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-037",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-037"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-038",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "2.5.7",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-038",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-038"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-039",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "2.5.8",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-039",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-039"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-040",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "3.1.1",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-040",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-040"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-041",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "3.1.2",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-041",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-041"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-042",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "3.2.1",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-042",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-042"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-043",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "3.2.2",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-043",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-043"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-044",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "3.2.3",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-044",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-044"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-045",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "3.2.4",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-045",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-045"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-046",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "3.2.6",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-046",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-046"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-047",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "3.3.1",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-047",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-047"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-048",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "3.3.2",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-048",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-048"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-049",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "3.3.3",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-049",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-049"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-050",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "3.3.4",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-050",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-050"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-051",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "3.3.7",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-051",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-051"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-052",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "3.3.8",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-052",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-052"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-053",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "4.1.2",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-053",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-053"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    },
+    {
+      "sample_result_ref": "WCAG-RES-N-054",
+      "sample_ref": "SAMPLE-CASE-N-001",
+      "variation_ref": "VAR-CASE-N-001",
+      "sample_kind": "structured",
+      "process_ref": null,
+      "requirement_ref": "4.1.3",
+      "criterion_evaluation_ref": "CRIT-EVAL-N-054",
+      "result": "satisfied",
+      "observation_refs": [
+        "OBS-N-054"
+      ],
+      "test_rule_result_refs": [],
+      "evidence_refs": [
+        "EVD-CASE-N-CURRENT"
+      ],
+      "unmet_example_refs": [],
+      "freshness_status": "current",
+      "limitation": null
+    }
+  ],
+  "complete_processes": [],
+  "process_inventory_complete": false,
+  "process_inventory_evidence_refs": [],
+  "accessibility_support_baseline": {
+    "baseline_ref": "BASELINE-CASE-N-CHROMIUM",
+    "status": "blocked",
+    "required_usage_refs": [
+      "USAGE-CASE-N-CHROMIUM"
+    ],
+    "supported_usage_refs": [],
+    "evidence_refs": []
+  }
+}

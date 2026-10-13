@@ -22,20 +22,20 @@ Step 0の確認でPlanの責務境界を変える必要はありませんでし�
 
 ## Plan Step状況
 
-| Step | 状況 | 実装・検証 |
-| --- | --- | --- |
-| 0. PR #11 / #12再判定 | 完了 | 上記の通り、既存契約と保存先能力を確認。 |
-| 1. Skill / vocabulary | 完了 | Regression / Exploratory / QA Knowledgeの3 Skill、owner境界、`qa-workflow` routingを追加。 |
-| 2. knowledge / concurrency | 完了 | stable semantic identity、atomic create-if-absent、native CAS要求、workflow state、pre-start claim、resource reservationを追加。primitiveがない更新・解放はblock。 |
-| 3. baseline / currentness | 完了 | owner-resolved TC snapshot、revision、lifecycle、complete性、currentnessを分離。 |
-| 4. Regression Run plan | 完了 | full / selected scope、membership、batch / resume、routeと補助testware境界を追加。 |
-| 5. execution / Activity | 完了 | actual start、source result、blocked / unexecuted、Activity historyを分離。 |
-| 6. 修正確認 / FAIL feedback | 完了 | 既存execution Skillへの修正確認routing、owner analysis、別目的Regressionを定義。専用artifact / Skillは追加せず。 |
-| 7. Exploratory Testing | 完了 | exploration / investigation、Charter、Observation / Finding、side-effect、cleanup、resume契約を追加。 |
-| 8. integrated QA cycle | 完了 | 61 routing fixtureと既存E2E / manual execution契約を回帰確認。 |
-| 9. semantic実評価 | 完了 | 実Agent candidate 7件を既存semantic runner + 実Judgeで評価。全7件pass。 |
-| 10. relation index gate | 完了 | direct refsとfixed-root deterministic scanで要求を満たすためrelation indexを追加せず。 |
-| 11. overall regression | 完了 | PR #11 / #12 runtime・Skill validator・semantic / trigger / deterministic suitesを実行。 |
+| Step                        | 状況 | 実装・検証                                                                                                                                                         |
+| --------------------------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 0. PR #11 / #12再判定       | 完了 | 上記の通り、既存契約と保存先能力を確認。                                                                                                                           |
+| 1. Skill / vocabulary       | 完了 | Regression / Exploratory / QA Knowledgeの3 Skill、owner境界、`qa-workflow` routingを追加。                                                                         |
+| 2. knowledge / concurrency  | 完了 | stable semantic identity、atomic create-if-absent、native CAS要求、workflow state、pre-start claim、resource reservationを追加。primitiveがない更新・解放はblock。 |
+| 3. baseline / currentness   | 完了 | owner-resolved TC snapshot、revision、lifecycle、complete性、currentnessを分離。                                                                                   |
+| 4. Regression Run plan      | 完了 | full / selected scope、membership、batch / resume、routeと補助testware境界を追加。                                                                                 |
+| 5. execution / Activity     | 完了 | actual start、source result、blocked / unexecuted、Activity historyを分離。                                                                                        |
+| 6. 修正確認 / FAIL feedback | 完了 | 既存execution Skillへの修正確認routing、owner analysis、別目的Regressionを定義。専用artifact / Skillは追加せず。                                                   |
+| 7. Exploratory Testing      | 完了 | exploration / investigation、Charter、Observation / Finding、side-effect、cleanup、resume契約を追加。                                                              |
+| 8. integrated QA cycle      | 完了 | 61 routing fixtureと既存E2E / manual execution契約を回帰確認。                                                                                                     |
+| 9. semantic実評価           | 完了 | 実Agent candidate 7件を既存semantic runner + 実Judgeで評価。全7件pass。                                                                                            |
+| 10. relation index gate     | 完了 | direct refsとfixed-root deterministic scanで要求を満たすためrelation indexを追加せず。                                                                             |
+| 11. overall regression      | 完了 | PR #11 / #12 runtime・Skill validator・semantic / trigger / deterministic suitesを実行。                                                                           |
 
 ## 主要変更と検証範囲
 
@@ -47,20 +47,20 @@ Step 0の確認でPlanの責務境界を変える必要はありませんでし�
 
 ## 実行した検証
 
-| コマンド / 検証 | 結果 |
-| --- | --- |
-| `skills-ref validate`を全19 Skillへ実行（`PYTHONUTF8=1`） | 19/19 valid |
-| deterministic output eval構造gate | 38 cases / 19 Skill pass |
-| CI repository structure相当のtrigger検証 | 19 Skill / 428 query、split・positive/negative counts pass |
-| `python scripts/skills/evals/semantic/validate.py` | 19 Skill / 72 cases |
-| `python -m unittest discover -s scripts/skills/evals/deterministic/tests -q` | 12 tests pass |
-| `python -m unittest discover -s tests/skills/evals/deterministic -q` | 111 tests pass |
-| `python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -q` | 271 tests pass（PR #11 / #12 runtime regression含む） |
-| `python -m unittest discover -s scripts/skills/evals/semantic/tests -q` | 27 tests pass、2 symlink testsはWindows privilege不足でskip |
-| `python -m unittest discover -s tests/skills/evals/semantic -q` | 4 tests pass |
-| `python -m unittest discover -s tests/skills/evals/trigger -q` | 1 test pass |
-| deterministic grader / validator / production helper `compileall` | 19 Skill validatorおよび対象production helper pass |
-| `pnpm run diagnose:hooks`（qa-training-storeのworkspace hook） | `WARN=0 ERROR=0` |
+| コマンド / 検証                                                              | 結果                                                        |
+| ---------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `skills-ref validate`を全19 Skillへ実行（`PYTHONUTF8=1`）                    | 19/19 valid                                                 |
+| deterministic output eval構造gate                                            | 38 cases / 19 Skill pass                                    |
+| CI repository structure相当のtrigger検証                                     | 19 Skill / 428 query、split・positive/negative counts pass  |
+| `python scripts/skills/evals/semantic/validate.py`                           | 19 Skill / 72 cases                                         |
+| `python -m unittest discover -s scripts/skills/evals/deterministic/tests -q` | 12 tests pass                                               |
+| `python -m unittest discover -s tests/skills/evals/deterministic -q`         | 111 tests pass                                              |
+| `python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -q`      | 271 tests pass（PR #11 / #12 runtime regression含む）       |
+| `python -m unittest discover -s scripts/skills/evals/semantic/tests -q`      | 27 tests pass、2 symlink testsはWindows privilege不足でskip |
+| `python -m unittest discover -s tests/skills/evals/semantic -q`              | 4 tests pass                                                |
+| `python -m unittest discover -s tests/skills/evals/trigger -q`               | 1 test pass                                                 |
+| deterministic grader / validator / production helper `compileall`            | 19 Skill validatorおよび対象production helper pass          |
+| `pnpm run diagnose:hooks`（qa-training-storeのworkspace hook）               | `WARN=0 ERROR=0`                                            |
 
 GitHub ActionsはPR branch push後に実行し、この記録作成時点では未確認です。PR headのCI確認とPR本文への結果記録を残作業とします。
 
@@ -68,15 +68,15 @@ GitHub ActionsはPR branch push後に実行し、この記録作成時点では�
 
 Codex CLIでSKILL / reference / Eval Inputだけを与えてcandidate outputを生成し、`scripts/skills/evals/semantic/run.py`と実Judgeで評価しました。Eval Referenceはcandidate生成には渡していません。
 
-| Skill / case | Verdict | Criterion結果 |
-| --- | --- | --- |
-| `regression-testing / REG-SEM-003` | pass | 2 pass（rating 4, 4） |
-| `regression-testing / REG-SEM-004` | pass | 1 pass（rating 4） |
-| `regression-testing / REG-SEM-005` | pass | 1 pass（rating 4） |
-| `exploratory-testing / EXP-SEM-002` | pass | 1 pass（rating 3） |
-| `exploratory-testing / EXP-SEM-003` | pass | 1 pass（rating 3） |
-| `qa-knowledge / KN-SEM-001` | pass | 1 pass（rating 4） |
-| `qa-knowledge / KN-SEM-006` | pass | 2 pass（rating 4, 4） |
+| Skill / case                        | Verdict | Criterion結果         |
+| ----------------------------------- | ------- | --------------------- |
+| `regression-testing / REG-SEM-003`  | pass    | 2 pass（rating 4, 4） |
+| `regression-testing / REG-SEM-004`  | pass    | 1 pass（rating 4）    |
+| `regression-testing / REG-SEM-005`  | pass    | 1 pass（rating 4）    |
+| `exploratory-testing / EXP-SEM-002` | pass    | 1 pass（rating 3）    |
+| `exploratory-testing / EXP-SEM-003` | pass    | 1 pass（rating 3）    |
+| `qa-knowledge / KN-SEM-001`         | pass    | 1 pass（rating 4）    |
+| `qa-knowledge / KN-SEM-006`         | pass    | 2 pass（rating 4, 4） |
 
 candidateとjudge result JSONは各Skillの`evals/semantic/candidate_outputs/`に保存しています。初期試行ではRegressionのresidual-risk feedbackとFAIL feedbackが`needs_review`でした。再評価で見つけたEval Input / Reference間のtraceabilityと周辺Regression要求の不足をinputへ明示し、Skillの不足していた出力指示を補ってから再生成・再評価し、最終caseはいずれもpassです。初期候補とjudge結果も同じ場所に保持しています。
 
@@ -112,20 +112,20 @@ candidateとjudge result JSONは各Skillの`evals/semantic/candidate_outputs/`�
 
 ### 最終検証
 
-| コマンド / 検証 | 結果 |
-| --- | --- |
-| focused deterministic: `python -m unittest discover -s tests/skills/evals/deterministic -p 'test_qa_artifact_graph_skills.py' -v` | 26 tests pass |
-| deterministic: `python -m unittest discover -s tests/skills/evals/deterministic -v` | 114 tests pass |
-| runtime: `python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v` | 271 tests pass |
-| shared deterministic: `python -m unittest discover -s scripts/skills/evals/deterministic/tests -v` | 12 tests pass |
-| `python scripts/skills/evals/semantic/validate.py` | 19 Skills / 72 cases pass |
-| semantic runner tests: `python -m unittest discover -s scripts/skills/evals/semantic/tests -v` | 27 pass、2 Windows symlink privilege skips |
-| repository semantic: `python -m unittest discover -s tests/skills/evals/semantic -v` | 4 tests pass |
-| trigger: `python -m unittest discover -s tests/skills/evals/trigger -v` | 1 test pass |
-| `skills-ref validate`（19 Skill） | 19/19 valid |
-| CIと同じ対象群でのPython `compileall` | pass |
-| `git diff --check` | pass |
-| 影響caseの実Agent candidate + 既存semantic runner + 実Judge（`REG-SEM-004`のみ） | pass、rating 4。結果確定済みFAILと未開始blocked routeを区別し、source resultを保持 |
+| コマンド / 検証                                                                                                                   | 結果                                                                               |
+| --------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| focused deterministic: `python -m unittest discover -s tests/skills/evals/deterministic -p 'test_qa_artifact_graph_skills.py' -v` | 26 tests pass                                                                      |
+| deterministic: `python -m unittest discover -s tests/skills/evals/deterministic -v`                                               | 114 tests pass                                                                     |
+| runtime: `python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v`                                                  | 271 tests pass                                                                     |
+| shared deterministic: `python -m unittest discover -s scripts/skills/evals/deterministic/tests -v`                                | 12 tests pass                                                                      |
+| `python scripts/skills/evals/semantic/validate.py`                                                                                | 19 Skills / 72 cases pass                                                          |
+| semantic runner tests: `python -m unittest discover -s scripts/skills/evals/semantic/tests -v`                                    | 27 pass、2 Windows symlink privilege skips                                         |
+| repository semantic: `python -m unittest discover -s tests/skills/evals/semantic -v`                                              | 4 tests pass                                                                       |
+| trigger: `python -m unittest discover -s tests/skills/evals/trigger -v`                                                           | 1 test pass                                                                        |
+| `skills-ref validate`（19 Skill）                                                                                                 | 19/19 valid                                                                        |
+| CIと同じ対象群でのPython `compileall`                                                                                             | pass                                                                               |
+| `git diff --check`                                                                                                                | pass                                                                               |
+| 影響caseの実Agent candidate + 既存semantic runner + 実Judge（`REG-SEM-004`のみ）                                                  | pass、rating 4。結果確定済みFAILと未開始blocked routeを区別し、source resultを保持 |
 
 修正commit `081b6ad07aaf952412453c9b37d26696f32e3220` に対するGitHub Actions 3件はすべてsuccessです: [Validate Agent Skills](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/36295746716)、[Validate Deterministic Output Evals](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/36295746695)、[Validate Semantic Output Evals](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/36295746709)。PR #13の最終headの状態は[PR checks](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/13)で確認します。
 

@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Playwright observation cases</title>
+    <style>
+      body {
+        font: 16px sans-serif;
+      }
+      #opacity-zero {
+        opacity: 0;
+      }
+      #display-none {
+        display: none;
+      }
+      #visibility-hidden {
+        visibility: hidden;
+      }
+      #viewport-outside {
+        position: absolute;
+        left: -10000px;
+      }
+      button[data-focus-bound] {
+        display: block;
+        margin-block: 0.25rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Playwright observation cases</h1>
+      <input id="submit-input" type="submit" value="送信" />
+      <input id="image-input" type="image" alt="画像を送信" />
+      <button id="aria-hidden-child"><span aria-hidden="true">削除しない秘密語</span></button>
+      <button id="aria-label-button" aria-label="保存">ignored child</button>
+      <button id="labelledby-button" aria-labelledby="save-label"></button>
+      <span id="save-label">保存する</span>
+      <button id="empty-name-button" aria-label=""></button>
+      <button id="synthetic-secret-name" aria-label="synthetic-secret-value-7f39"></button>
+      <label for="given-name">氏名</label>
+      <input id="given-name" />
+      <input id="synthetic-secret-value" value="synthetic-secret-value-7f39" />
+
+      <button id="opacity-zero">透過したボタン</button>
+      <button id="display-none">非表示ボタン</button>
+      <button id="visibility-hidden">不可視ボタン</button>
+      <button id="aria-hidden-button" aria-hidden="true">AX tree外のボタン</button>
+      <button id="viewport-outside">画面外のボタン</button>
+      <button id="disabled-button" disabled>無効なボタン</button>
+      <div
+        id="aria-disabled-checkbox"
+        role="checkbox"
+        aria-checked="true"
+        aria-disabled="true"
+        tabindex="0"
+      >
+        ARIA無効チェックボックス
+      </div>
+      <button id="focus-trap">フォーカストラップ</button>
+      <button id="remove-on-tab">Tabで削除されるボタン</button>
+
+      <x-observation-host id="host-a"></x-observation-host>
+      <x-observation-host id="host-b"></x-observation-host>
+    </main>
+    <script>
+      customElements.define(
+        "x-observation-nested",
+        class extends HTMLElement {
+          connectedCallback() {
+            if (this.shadowRoot) return;
+            const root = this.attachShadow({ mode: "open" });
+            root.innerHTML = '<a href="#nested">入れ子リンク</a><input aria-label="入れ子入力" />';
+          }
+        },
+      );
+      customElements.define(
+        "x-observation-host",
+        class extends HTMLElement {
+          connectedCallback() {
+            if (this.shadowRoot) return;
+            const root = this.attachShadow({ mode: "open" });
+            root.innerHTML =
+              "<button>影DOMボタン</button><x-observation-nested></x-observation-nested>";
+          }
+        },
+      );
+      const focusTrap = document.querySelector("#focus-trap");
+      focusTrap.addEventListener("keydown", (event) => {
+        if (event.key === "Tab" && focusTrap.dataset.trap === "true") {
+          event.preventDefault();
+          focusTrap.focus();
+        }
+      });
+      const removeOnTab = document.querySelector("#remove-on-tab");
+      removeOnTab.addEventListener("keydown", (event) => {
+        if (event.key === "Tab" && removeOnTab.dataset.removeOnTab === "true") {
+          event.currentTarget.remove();
+        }
+      });
+      for (let index = 0; index < 66; index += 1) {
+        const button = document.createElement("button");
+        button.textContent = `上限確認 ${index + 1}`;
+        button.dataset.focusBound = String(index + 1);
+        document.querySelector("main").append(button);
+      }
+    </script>
+  </body>
+</html>

@@ -222,4 +222,3 @@ knowledge entryのexisting updateはtarget entry artifact自身のexpected revis
 new knowledge identityの作成では、identity判定に使用したcompleteなknowledge snapshotとpublishを結び付けます。同一semantic identityが同じcreate targetへ収束する保存方式を使える場合はatomic create-if-absentを使用し、それがない場合はnamespace / branch snapshotのexpected revision付きpublishを使用します。snapshot変更を検出した場合はcurrent rootを再読込し、identity判定からやり直します。同一semantic identityのcurrent entryを複数残すことを許可しません。
 
 global mutable counter、central manifest、汎用transaction manager、Graph DBはこの競合制御のために追加しません。
-

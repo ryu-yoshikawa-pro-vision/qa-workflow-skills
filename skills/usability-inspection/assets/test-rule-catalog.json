@@ -1,0 +1,50 @@
+{
+  "schema_version": "1",
+  "rules": [
+    {
+      "rule_id": "2779a5",
+      "name": "HTML page has non-empty title",
+      "source_status": "formal",
+      "source_uri": "https://www.w3.org/WAI/standards-guidelines/act/rules/2779a5/",
+      "act_rules_format_version": "1.1",
+      "required_observation_fields": [
+        "document.title"
+      ],
+      "implementation_dispatch_key": "non_empty_page_title",
+      "execution_mode": "automatic",
+      "mapped_success_criteria": [
+        "2.4.2"
+      ]
+    },
+    {
+      "rule_id": "97a4e1",
+      "name": "Button has non-empty accessible name",
+      "source_status": "formal",
+      "source_uri": "https://www.w3.org/WAI/standards-guidelines/act/rules/97a4e1/",
+      "act_rules_format_version": "1.1",
+      "required_observation_fields": [
+        "accessibility.semantics"
+      ],
+      "implementation_dispatch_key": "button_accessible_name",
+      "execution_mode": "automatic",
+      "mapped_success_criteria": [
+        "4.1.2"
+      ]
+    },
+    {
+      "rule_id": "23a2a8",
+      "name": "Image has non-empty accessible name",
+      "source_status": "formal",
+      "source_uri": "https://www.w3.org/WAI/standards-guidelines/act/rules/23a2a8/",
+      "act_rules_format_version": "1.1",
+      "required_observation_fields": [
+        "accessibility.semantics"
+      ],
+      "implementation_dispatch_key": "image_accessible_name",
+      "execution_mode": "automatic",
+      "mapped_success_criteria": [
+        "1.1.1"
+      ]
+    }
+  ]
+}

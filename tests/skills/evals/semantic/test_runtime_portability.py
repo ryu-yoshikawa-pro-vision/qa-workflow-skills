@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
-
+from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 SKILL = "test-case-design"
@@ -39,10 +38,14 @@ class SemanticRuntimePortabilityTests(unittest.TestCase):
                 [SKILL],
             )
             self.assertFalse((temp_root / "scripts" / "__init__.py").exists())
-            self.assertFalse((temp_root / "scripts" / "skills" / "__init__.py").exists())
+            self.assertFalse(
+                (temp_root / "scripts" / "skills" / "__init__.py").exists()
+            )
 
             candidate = temp_root / "candidate.md"
-            candidate.write_text("# Test Case\n保存操作と一覧反映を具体的に検証する。", encoding="utf-8")
+            candidate.write_text(
+                "# Test Case\n保存操作と一覧反映を具体的に検証する。", encoding="utf-8"
+            )
 
             judge = temp_root / "fake_judge.py"
             response = {

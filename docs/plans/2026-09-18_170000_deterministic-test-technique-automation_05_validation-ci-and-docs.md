@@ -94,6 +94,7 @@ runtime issueへの回答を再開する場合は、回答を正規化modelへ�
 - runtime unit単位の`要再検証` / ブロック中
 - runtime未実行 / unsupportedとQA成果物状態の分離
 - legacy成果物の昇格
+
 ### output eval fixture schema
 
 runtime対応Skillの`evals/output/cases/*/expected.json`では、既存fieldに加えて必要なcaseだけ次の`runtime_contract` objectを持てるようにします。Machine Entityを持つSkillではruntime有無にかかわらず`machine_entities` objectも使用できます。
@@ -102,21 +103,43 @@ runtime対応Skillの`evals/output/cases/*/expected.json`では、既存fieldに
 {
   "machine_entities": {
     "expected_entities": [
-      {"skill":"test-condition-design","entity_type":"tcn","entity_ref":"TCN-001"},
-      {"skill":"test-condition-design","entity_type":"ci","entity_ref":"TCN-001-CI01"}
+      {
+        "skill": "test-condition-design",
+        "entity_type": "tcn",
+        "entity_ref": "TCN-001"
+      },
+      {
+        "skill": "test-condition-design",
+        "entity_type": "ci",
+        "entity_ref": "TCN-001-CI01"
+      }
     ],
     "expected_stale_entities": []
   },
   "runtime_contract": {
     "expected_runtime_units": [
-      {"skill":"test-condition-design","runtime_unit_key":"artifact:condition_structure:all"},
-      {"skill":"test-condition-design","runtime_unit_key":"model:comb-001"},
-      {"skill":"test-condition-design","runtime_unit_key":"artifact:materialize_coverage:TCN-001"}
+      {
+        "skill": "test-condition-design",
+        "runtime_unit_key": "artifact:condition_structure:all"
+      },
+      {
+        "skill": "test-condition-design",
+        "runtime_unit_key": "model:comb-001"
+      },
+      {
+        "skill": "test-condition-design",
+        "runtime_unit_key": "artifact:materialize_coverage:TCN-001"
+      }
     ],
     "expected_skill": "test-condition-design",
     "expected_runtime_unit_key": "model:comb-001",
     "upstream_entities": [
-      {"skill":"spec-analysis","entity_type":"authority","entity_ref":"SPEC-001","content_fingerprint":"sha256:..."}
+      {
+        "skill": "spec-analysis",
+        "entity_type": "authority",
+        "entity_ref": "SPEC-001",
+        "content_fingerprint": "sha256:..."
+      }
     ],
     "expected_target_keys": [],
     "expected_support_status": "supported",
@@ -144,6 +167,7 @@ runtime対応Skillの`evals/output/cases/*/expected.json`では、既存fieldに
 - upstream Entity差分caseでは無関係Entityの変更が対象modelをstaleにしないことを確認する
 - upstream runtime差分caseでは直接依存unitだけがstaleになり、依存していないmodelへ伝播しないことを確認する
 - implementation fingerprintはruntime / generator sourceから独立再計算し、fixtureの文字列を盲信しない
+
 ## 7. semantic eval
 
 維持・追加する主な確認:
@@ -174,13 +198,13 @@ Plan完了時は、`test-analysis / test-condition-design / test-case-design / a
 
 semantic dataset件数は次で固定します。
 
-| Skill | case数 |
-| --- | ---: |
-| `test-analysis` | 7 |
-| `test-condition-design` | 14 |
-| `adversarial-review` | 8 |
-| その他11 Skill（`test-case-design`を含む） | 各2 |
-| repository合計 | 51 |
+| Skill                                      | case数 |
+| ------------------------------------------ | -----: |
+| `test-analysis`                            |      7 |
+| `test-condition-design`                    |     14 |
+| `adversarial-review`                       |      8 |
+| その他11 Skill（`test-case-design`を含む） |    各2 |
+| repository合計                             |     51 |
 
 - `test-analysis`: 既存2 caseを維持し、Domain / CRUD / Random / Metamorphic / Syntax-Basedの採用判断を主対象とする5 caseを追加する
 - `test-condition-design`: 既存2 caseを維持し、Domain / CRUD / Random / Metamorphic / Syntax-Basedに加え、Decision Table / Cause-Effect、Classification Tree / combinatorial strength、Round-trip / n-switch、flow、schema / OpenAPI、UI pattern、test data / environment、merge / Coverage範囲の意味判断を各caseで最低1回検証できるよう合計14 caseへする。1 caseで複数責務を検証してよいが、各責務とcase IDの対応表を`EVALS.md`へ記録する
@@ -197,16 +221,17 @@ semantic dataset件数は次で固定します。
 - CRUD completenessだけでconsistencyも完了したと断定する
 - Syntax-Based Testingのmutation candidateをAuthorityなしで製品上invalidと断定する
 - 新規技法のexpected resultをAuthorityなしで創作する
+
 ### 発火評価
 
 既存queryは削除せず、新規技法5種の責務境界を追加します。件数は次で固定します。
 
-| Skill | train | validation |
-| --- | ---: | ---: |
-| `test-analysis` | 24（positive 12 / negative 12） | 20（positive 10 / negative 10） |
+| Skill                   |                           train |                      validation |
+| ----------------------- | ------------------------------: | ------------------------------: |
+| `test-analysis`         | 24（positive 12 / negative 12） | 20（positive 10 / negative 10） |
 | `test-condition-design` | 24（positive 12 / negative 12） | 20（positive 10 / negative 10） |
-| その他12 Skill | 各12（6 / 6） | 各8（4 / 4） |
-| repository合計 | 192 | 136 |
+| その他12 Skill          |                   各12（6 / 6） |                    各8（4 / 4） |
+| repository合計          |                             192 |                             136 |
 
 repository全体は328 queryです。
 
@@ -220,6 +245,7 @@ repository全体は328 queryです。
 さらに`test-analysis` / `test-condition-design`の各datasetへ、それぞれ「技法とは何か説明して」という説明依頼negativeを1件と、既存責務の一般positiveを1件追加してbalanceを維持します。その他12 Skillの件数は変更しません。train / validation間のquery重複は禁止します。
 
 `.github/workflows/validate-skills.yml`は上表のSkill別exact count、positive / negative exact count、repository合計328を検証します。`EVALS.md`へ新規query IDと責務境界の対応を記録します。
+
 ## 8. qa-workflow統合評価
 
 次の9シナリオをE2E fixture / smokeとして検証します。

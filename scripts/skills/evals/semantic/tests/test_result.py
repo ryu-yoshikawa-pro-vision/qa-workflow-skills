@@ -3,12 +3,24 @@ from __future__ import annotations
 import json
 import unittest
 
-from scripts.skills.evals.semantic.result import JudgeResponseError, normalize_judge_response
-
+from scripts.skills.evals.semantic.result import (
+    JudgeResponseError,
+    normalize_judge_response,
+)
 
 CRITERIA = {
-    "SEM-EX-001": {"id": "SEM-EX-001", "title": "Critical", "description": "d", "critical": True},
-    "SEM-EX-002": {"id": "SEM-EX-002", "title": "Non critical", "description": "d", "critical": False},
+    "SEM-EX-001": {
+        "id": "SEM-EX-001",
+        "title": "Critical",
+        "description": "d",
+        "critical": True,
+    },
+    "SEM-EX-002": {
+        "id": "SEM-EX-002",
+        "title": "Non critical",
+        "description": "d",
+        "critical": False,
+    },
 }
 
 
@@ -16,13 +28,20 @@ def response(items: list[dict]) -> str:
     return json.dumps({"criteria": items}, ensure_ascii=False)
 
 
-def item(criterion_id: str, rating: int | None = 4, evaluable: bool = True, evidence: list[str] | None = None) -> dict:
+def item(
+    criterion_id: str,
+    rating: int | None = 4,
+    evaluable: bool = True,
+    evidence: list[str] | None = None,
+) -> dict:
     return {
         "id": criterion_id,
         "evaluable": evaluable,
         "rating": rating,
         "reason": "具体的な根拠がある",
-        "evidence": ["候補成果物の記述"] if evidence is None and evaluable else (evidence or []),
+        "evidence": ["候補成果物の記述"]
+        if evidence is None and evaluable
+        else (evidence or []),
     }
 
 
@@ -58,28 +77,42 @@ class SemanticResultTests(unittest.TestCase):
 
     def test_not_evaluable_requires_null_rating(self):
         with self.assertRaises(JudgeResponseError):
-            self.normalize(response([item("SEM-EX-001", 3, False, []), item("SEM-EX-002")]))
+            self.normalize(
+                response([item("SEM-EX-001", 3, False, []), item("SEM-EX-002")])
+            )
 
     def test_evaluable_requires_evidence(self):
         with self.assertRaises(JudgeResponseError):
-            self.normalize(response([item("SEM-EX-001", 4, True, []), item("SEM-EX-002")]))
+            self.normalize(
+                response([item("SEM-EX-001", 4, True, []), item("SEM-EX-002")])
+            )
 
     def test_rating_three_and_four_pass(self):
-        result = self.normalize(response([item("SEM-EX-001", 4), item("SEM-EX-002", 3)]))
+        result = self.normalize(
+            response([item("SEM-EX-001", 4), item("SEM-EX-002", 3)])
+        )
         self.assertEqual(result["verdict"], "pass")
-        self.assertEqual([entry["status"] for entry in result["criteria"]], ["pass", "pass"])
+        self.assertEqual(
+            [entry["status"] for entry in result["criteria"]], ["pass", "pass"]
+        )
 
     def test_rating_two_needs_review(self):
-        result = self.normalize(response([item("SEM-EX-001", 4), item("SEM-EX-002", 2)]))
+        result = self.normalize(
+            response([item("SEM-EX-001", 4), item("SEM-EX-002", 2)])
+        )
         self.assertEqual(result["verdict"], "needs_review")
         self.assertEqual(result["criteria"][1]["status"], "needs_review")
 
     def test_non_critical_rating_one_needs_review(self):
-        result = self.normalize(response([item("SEM-EX-001", 4), item("SEM-EX-002", 1)]))
+        result = self.normalize(
+            response([item("SEM-EX-001", 4), item("SEM-EX-002", 1)])
+        )
         self.assertEqual(result["verdict"], "needs_review")
 
     def test_critical_rating_one_fails(self):
-        result = self.normalize(response([item("SEM-EX-001", 1), item("SEM-EX-002", 4)]))
+        result = self.normalize(
+            response([item("SEM-EX-001", 1), item("SEM-EX-002", 4)])
+        )
         self.assertEqual(result["verdict"], "fail")
 
     def test_not_evaluable_needs_review(self):

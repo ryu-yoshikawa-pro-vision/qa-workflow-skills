@@ -22,13 +22,13 @@ description: 新規機能・変更機能・指定対象機能について、変�
 
 入力はSkill-localの`runtime_contract.py`が厳格に検証し、runtime結果はMachine Runtime Input / ResultとMachine Entityへ保存します。runtimeはPython 3.11標準ライブラリだけで動作し、stdinのJSON objectを受け、stdoutへ1つのJSON envelopeだけを返します。CLI引数、入力ファイル、環境変数による業務入力、外部ネットワーク、タイムアウト制御には依存しません。
 
-| model_type | runtime_unit_key | 主な入力 / 出力 |
-| --- | --- | --- |
-| 通常の分析 | `analysis_entities` | リスク・重点・技法候補のMachine Entity |
-| リスクマトリクス | `risk_matrix` | リスク評価と深度の決定結果 |
-| 技法候補 | `technique_candidates:<selection_key>` | 選択技法候補と選択根拠 |
-| 変更影響 | `change_impact` | 変更・依存・回帰影響 |
-| 環境要件 | `environment_requirements` | 操作・観測・準備要件 |
+| model_type       | runtime_unit_key                       | 主な入力 / 出力                        |
+| ---------------- | -------------------------------------- | -------------------------------------- |
+| 通常の分析       | `analysis_entities`                    | リスク・重点・技法候補のMachine Entity |
+| リスクマトリクス | `risk_matrix`                          | リスク評価と深度の決定結果             |
+| 技法候補         | `technique_candidates:<selection_key>` | 選択技法候補と選択根拠                 |
+| 変更影響         | `change_impact`                        | 変更・依存・回帰影響                   |
+| 環境要件         | `environment_requirements`             | 操作・観測・準備要件                   |
 
 `analysis_entities.py`へ渡すtest-analysis contextでは、本文の引用ではなく、判断で実際に参照したEntity identityを`authority_refs[]`（Authorityの`entity_ref`）と`risk_refs[]`（Product Riskの`risk_id`）へ明示します。配列は重複なし・canonical順にし、`residual_risks[]`等の自然言語fieldから参照を推測せず、fingerprintを入力しません。artifact modeではAuthorityをcurrent Machine Entityへ解決します。direct modeでも各Authority refを渡されたcurrent Machine Entityへ解決し、存在しないAuthority Entityを生成・推測しません。Riskは同一invocationで生成されたEntityへ解決されます。unknown refは正常完了にしません。
 

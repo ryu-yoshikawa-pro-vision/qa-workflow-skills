@@ -225,7 +225,6 @@ negative:
 - ownerなし仮説駆動だけInvestigation
 - Investigationで別runtime / schemaを作らない
 
-
 ### 継続QA知識
 
 - Finding / Observationを無条件にcurrent knowledgeへ昇格しない

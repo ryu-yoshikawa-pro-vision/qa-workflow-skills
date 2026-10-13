@@ -1,0 +1,298 @@
+prefix_rule(
+    pattern = [["git", "git.exe"], ["commit", "merge", "rebase", "pull", "push", "fetch", "reset", "am", "cherry-pick", "revert", "restore", "checkout", "switch"]],
+    decision = "prompt",
+    justification = "High-impact Git operations, including commands that can discard uncommitted changes, require explicit user approval.",
+    match = [
+        "git commit -m test",
+        "git.exe commit -m test",
+        "git push origin feature",
+        "git.exe push origin feature",
+        "git reset HEAD~1",
+        "git restore .",
+        "git.exe restore .",
+        "git checkout -- .",
+        "git.exe checkout -- .",
+        "git switch --discard-changes feature/other",
+        "git.exe switch --discard-changes feature/other",
+        "git switch -c feature/new-work",
+        "git.exe switch feature/existing-work",
+    ],
+    not_match = [
+        "git status",
+        "git diff --stat",
+        "git add sample.txt",
+        "git -c user.name=test push origin feature",
+        "git --no-pager reset --hard",
+    ],
+)
+
+prefix_rule(
+    pattern = [["git", "git.exe"], ["branch", "tag", "config", "remote", "worktree", "stash"]],
+    decision = "prompt",
+    justification = "These Git families mix read-only and state-changing forms; prompt the family instead of adding an option parser.",
+    match = [
+        "git branch",
+        "git tag v1",
+        "git config user.name test",
+        "git remote set-url origin https://example.invalid/repo.git",
+        "git worktree add ../tmp feature",
+        "git stash push",
+    ],
+    not_match = [
+        "git status",
+        "git rev-parse --show-toplevel",
+    ],
+)
+
+prefix_rule(
+    pattern = [["gh", "gh.exe"], "pr", ["create", "new", "checkout", "co", "close", "comment", "edit", "lock", "merge", "ready", "reopen", "revert", "review", "unlock", "update-branch"]],
+    decision = "prompt",
+    justification = "Pull request mutations and local checkout require explicit user approval.",
+    match = [
+        "gh pr create --fill",
+        "gh.exe pr create --fill",
+        "gh pr merge 123",
+        "gh pr merge 123 -R owner/repo",
+        "gh pr checkout 123",
+        "gh pr new --title test --body test",
+        "gh.exe pr new --title test --body test",
+        "gh pr co 123 --force",
+        "gh.exe pr co 123 --force",
+    ],
+    not_match = [
+        "gh pr list",
+        "gh pr status",
+        "gh pr checks 123",
+        "gh pr diff 123",
+        "gh pr view 123",
+        "gh pr -R owner/repo merge 123",
+        "gh -R owner/repo pr merge 123",
+    ],
+)
+
+prefix_rule(
+    pattern = [["gh", "gh.exe"], "issue", ["create", "new", "close", "comment", "delete", "develop", "edit", "lock", "pin", "reopen", "transfer", "unlock", "unpin"]],
+    decision = "prompt",
+    justification = "Issue mutations and development-branch creation require explicit user approval.",
+    match = [
+        "gh issue create --title test --body test",
+        "gh issue new --title test --body test",
+        "gh.exe issue new --title test --body test",
+        "gh issue close 123",
+        "gh issue develop 123",
+    ],
+    not_match = [
+        "gh issue list",
+        "gh issue status",
+        "gh issue view 123",
+    ],
+)
+
+prefix_rule(
+    pattern = [["gh", "gh.exe"], "repo", ["archive", "clone", "create", "new", "delete", "edit", "fork", "read-file", "rename", "set-default", "unarchive"]],
+    decision = "prompt",
+    justification = "Repository mutations and repository-local file writes require explicit user approval.",
+    match = [
+        "gh repo create example",
+        "gh repo new example --private",
+        "gh.exe repo new example --private",
+        "gh repo clone owner/repo",
+        "gh repo read-file README.md --output README.copy.md",
+        "gh repo rename new-name",
+    ],
+    not_match = [
+        "gh repo list",
+        "gh repo view owner/repo",
+        "gh repo read-dir .",
+    ],
+)
+
+prefix_rule(
+    pattern = [["gh", "gh.exe"], "repo", "autolink", ["create", "new", "delete"]],
+    decision = "prompt",
+    justification = "Repository autolink mutations require explicit user approval.",
+    match = [
+        "gh repo autolink create TICKET- https://example.invalid/TICKET-<num>",
+        "gh repo autolink new TICKET- https://example.invalid/TICKET-<num>",
+        "gh.exe repo autolink new TICKET- https://example.invalid/TICKET-<num>",
+        "gh repo autolink delete 123",
+    ],
+    not_match = [
+        "gh repo autolink list",
+    ],
+)
+
+prefix_rule(
+    pattern = [["gh", "gh.exe"], "repo", "deploy-key", ["add", "delete"]],
+    decision = "prompt",
+    justification = "Deploy-key mutations require explicit user approval.",
+    match = [
+        "gh repo deploy-key add key.pub --title test",
+        "gh repo deploy-key delete 123",
+    ],
+    not_match = [
+        "gh repo deploy-key list",
+    ],
+)
+
+prefix_rule(
+    pattern = [["gh", "gh.exe"], ["skill", "skills"], ["publish", "install", "add", "update"]],
+    decision = "prompt",
+    justification = "Publishing creates a release; installing and updating write local files.",
+    match = ["gh skill publish --tag v1", "gh skills publish --tag v1", "gh.exe skill publish --tag v1", "gh skill install owner/repo skill", "gh skill add owner/repo skill", "gh.exe skill add owner/repo skill", "gh skills add owner/repo skill", "gh.exe skills add owner/repo skill", "gh skill update --all"],
+    not_match = ["gh skill list", "gh skills preview owner/repo skill", "gh skill search test"],
+)
+
+prefix_rule(
+    pattern = [["gh", "gh.exe"], ["agent-task", "agent-tasks", "agent", "agents"], "create"],
+    decision = "prompt",
+    justification = "Creating remote agent tasks requires approval, including aliases.",
+    match = ["gh agent-task create task", "gh agent-tasks create task", "gh agent create task", "gh agents create task", "gh.exe agent-task create task"],
+    not_match = ["gh agent-task list", "gh agents view 123"],
+)
+
+prefix_rule(
+    pattern = [["gh", "gh.exe"], "discussion", ["create", "comment", "edit"]],
+    decision = "prompt",
+    justification = "Creating and changing discussions or comments requires approval.",
+    match = ["gh discussion create --title Test --body Text --category General", "gh discussion comment 123 --body Text", "gh discussion comment 123 --delete", "gh discussion edit 123 --title New", "gh.exe discussion create --title Test --body Text --category General"],
+    not_match = ["gh discussion list", "gh discussion view 123"],
+)
+
+prefix_rule(
+    pattern = [["gh", "gh.exe"], "workflow", ["disable", "enable", "run"]],
+    decision = "prompt",
+    justification = "Workflow state changes and manual runs require explicit user approval.",
+    match = [
+        "gh workflow disable ci.yml",
+        "gh workflow run ci.yml",
+    ],
+    not_match = [
+        "gh workflow list",
+        "gh workflow view ci.yml",
+    ],
+)
+
+prefix_rule(
+    pattern = [["gh", "gh.exe"], "run", ["cancel", "delete", "download", "rerun"]],
+    decision = "prompt",
+    justification = "Workflow-run mutations and artifact downloads require explicit user approval.",
+    match = [
+        "gh run cancel 123",
+        "gh run download 123",
+    ],
+    not_match = [
+        "gh run list",
+        "gh run view 123",
+        "gh run watch 123",
+    ],
+)
+
+prefix_rule(
+    pattern = [["gh", "gh.exe"], "release", ["create", "new", "delete", "delete-asset", "download", "edit", "upload"]],
+    decision = "prompt",
+    justification = "Release mutations and downloads require explicit user approval.",
+    match = [
+        "gh release create v1",
+        "gh release new v1",
+        "gh release upload v1 artifact.zip",
+        "gh release download v1",
+    ],
+    not_match = [
+        "gh release list",
+        "gh release view v1",
+        "gh release verify v1",
+    ],
+)
+
+prefix_rule(
+    pattern = [["gh", "gh.exe"], "secret", ["delete", "remove", "set"]],
+    decision = "prompt",
+    justification = "Secret mutations require explicit user approval.",
+    match = [
+        "gh secret set TOKEN --body value",
+        "gh secret delete TOKEN",
+        "gh secret remove TOKEN",
+        "gh.exe secret remove TOKEN",
+    ],
+    not_match = [
+        "gh secret list",
+    ],
+)
+
+prefix_rule(
+    pattern = [["gh", "gh.exe"], "variable", ["delete", "remove", "set"]],
+    decision = "prompt",
+    justification = "Variable mutations require explicit user approval.",
+    match = [
+        "gh variable set NAME --body value",
+        "gh variable delete NAME",
+        "gh variable remove NAME",
+        "gh.exe variable remove NAME",
+    ],
+    not_match = [
+        "gh variable get NAME",
+        "gh variable list",
+    ],
+)
+
+prefix_rule(
+    pattern = [["gh", "gh.exe"], "cache", "delete"],
+    decision = "prompt",
+    justification = "Cache deletion requires explicit user approval.",
+    match = [
+        "gh cache delete --all",
+    ],
+    not_match = [
+        "gh cache list",
+    ],
+)
+
+prefix_rule(
+    pattern = [["gh", "gh.exe"], "label", ["clone", "create", "delete", "edit"]],
+    decision = "prompt",
+    justification = "Label mutations require explicit user approval.",
+    match = [
+        "gh label create bug",
+        "gh label edit bug --name defect",
+    ],
+    not_match = [
+        "gh label list",
+    ],
+)
+
+prefix_rule(
+    pattern = [["gh", "gh.exe"], ["auth", "codespace", "gist", "org", "project", "ssh-key", "gpg-key", "extension", "alias", "config", "attestation", "at"]],
+    decision = "prompt",
+    justification = "These less-common GitHub CLI families can mutate remote, authentication, extension, or local state; prompt the whole family instead of maintaining a subcommand parser.",
+    match = [
+        "gh auth status",
+        "gh gist list",
+        "gh project list",
+        "gh attestation verify artifact.bin --owner example",
+        "gh at download owner/repo --name artifact",
+        "gh.exe at download owner/repo --name artifact",
+    ],
+    not_match = [
+        "gh status",
+        "gh search prs test",
+        "gh ruleset list",
+        "gh browse --no-browser",
+    ],
+)
+
+prefix_rule(
+    pattern = [["curl", "wget", "Invoke-WebRequest", "iwr", "Invoke-RestMethod", "irm", "rsync", "robocopy", "mv", "move", "Move-Item", "mi", "Rename-Item", "ren", "rni"]],
+    decision = "prompt",
+    justification = "Network transfer, synchronization, move, and rename commands require explicit user approval in this harness.",
+    match = [
+        "curl https://example.com",
+        "rsync -a src/ dst/",
+        "Move-Item a.txt b.txt",
+        "mv a.txt b.txt",
+    ],
+    not_match = [
+        "git status",
+        "python -m unittest",
+    ],
+)

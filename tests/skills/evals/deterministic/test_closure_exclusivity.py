@@ -4,14 +4,19 @@ import unittest
 
 from scripts.skills.evals.deterministic.loader import load_validators
 
-
 VALIDATORS = load_validators()
 
 
 class ClosureExclusivityRegressionTests(unittest.TestCase):
-    def assert_fails(self, skill: str, text: str, expected: dict, assertion_id: str) -> None:
+    def assert_fails(
+        self, skill: str, text: str, expected: dict, assertion_id: str
+    ) -> None:
         result = VALIDATORS[skill](text, expected, "CLOSURE-EXCLUSIVITY").to_dict()
-        failed = {assertion["id"] for assertion in result["assertions"] if assertion["status"] == "fail"}
+        failed = {
+            assertion["id"]
+            for assertion in result["assertions"]
+            if assertion["status"] == "fail"
+        }
         self.assertIn(assertion_id, failed, result)
 
     def test_test_requirement_cannot_link_and_dispose_same_upstream(self) -> None:

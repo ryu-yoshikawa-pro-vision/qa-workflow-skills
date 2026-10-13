@@ -1,6 +1,27 @@
-# QAテスト分析・設計・Regression・Exploration・知識管理・E2Eワークフロー Agent Skills
+# QAテスト分析・設計・UI/UX評価・WCAG・Regression・Exploration・知識管理・E2Eワークフロー Agent Skills
 
-新規・変更機能のQA成果物作成を中心に、Regression baseline / Run履歴、Charterに沿った探索・Investigation、QA knowledge lifecycle、要求されたPlaywright E2E実装・実行・分析・報告を成果物ベースで扱うAgent Skills群です。
+新規・変更機能のQA成果物作成を中心に、UI/UX評価、live usability inspection、WCAG-EM 2.0適合性評価、Regression baseline / Run履歴、Charterに沿った探索・Investigation、QA knowledge lifecycle、要求されたPlaywright E2E実装・実行・分析・報告を成果物ベースで扱うAgent Skills群です。
+
+## Formatter / lintとCodex開発ハーネス
+
+開発時はRuff `0.16.8`とdprint `0.55.2`を使用します。通常のformat / lint入口はGit tracked fileを対象にする共通scriptです。
+
+```bash
+ruff --version
+dprint --version
+python scripts/format_tracked.py ruff-check
+python scripts/format_tracked.py import-fix
+python scripts/format_tracked.py format
+python scripts/format_tracked.py check
+```
+
+Codex開発ハーネスとexecpolicyはCodex CLI `0.160.0`向けです。静的contractは次で確認できます。実runtime受入の条件と保証範囲は[`docs/reference/codex-safety-harness.md`](docs/reference/codex-safety-harness.md)を参照してください。
+
+```bash
+codex --version
+python -m unittest discover -s tests/codex -p 'test_*.py' -v
+node --check .codex/hooks/pre_tool_use_policy.mjs
+```
 
 ## Skill構成
 
@@ -24,32 +45,44 @@ skills/
 ├── test-execution/
 ├── regression-testing/
 ├── exploratory-testing/
-└── qa-knowledge/
+├── qa-knowledge/
+├── usability-evaluation/
+├── usability-inspection/
+└── wcag-conformance-evaluation/
 ```
 
 各Skillは`skills/<skill-name>/SKILL.md`を持つ独立Skillです。`qa-workflow`も1 Skillとして扱います。
 
-| Skill | 責務 |
-| --- | --- |
-| `qa-workflow` | 開始点、再利用、ルーティング、ブロック中、再開、変更伝播、完了 |
-| `spec-analysis` | 仕様分類 / 現在有効な仕様根拠 |
-| `question-analysis` | 未解決事項分類 / 仮定 / 回答正規化 |
-| `test-analysis` | プロダクトリスク / 重点 / 深度 |
-| `test-requirement-design` | テスト要求としての検証責務 |
-| `test-condition-design` | テスト条件 / カバレッジ基準 / カバレッジ項目 |
-| `test-case-design` | 詳細テストケース / 期待結果の根拠の具体化 |
-| `coverage-analysis` | カバレッジ / 閉鎖性 / ギャップ |
-| `adversarial-review` | 独立レビュー / 重大度 |
-| `e2e-test-inspection` | E2E対象、repo / 実対象の事実、実装可能性、安全条件 |
-| `e2e-test-implementation` | 確認済み対象のPlaywright E2E実装と静的 / 軽量検証 |
-| `e2e-test-execution` | 実行安全確認、準備、Playwright実行、構造化結果、cleanup |
-| `e2e-test-result-analysis` | 実行事実の原因分析、追加証拠、修正routing |
-| `e2e-test-reporting` | 検証済み実行・分析結果の人間向け報告 |
-| `test-target-inspection` | 生きた実対象のUI情報・ふるまい確認とテスト対象資料管理 |
-| `test-execution` | 詳細TCの今回run、観測・比較、構造化結果とcleanup |
-| `regression-testing` | Regression baseline / membership / Run selection / Activity / history |
-| `exploratory-testing` | Charterベースのexplorationとowner不明hypothesisのinvestigation |
-| `qa-knowledge` | QA knowledge candidate triage / entry lifecycle / lookup |
+## 開発原則: 既存ツールと標準機能を優先
+
+変更前に、既存機能で解決できるか、リポジトリ内の処理を再利用できるか、言語標準、browser / platform / framework / SDK、導入済みライブラリ、信頼できる既存ライブラリの順で確認します。それでも現在の要件を満たせない場合だけ、満たせない具体的な契約を説明したうえで必要最小限の独自実装を追加します。同等以上の正確性、安全性、互換性、保守性、検証可能性を保ち、取得できない情報を推測値で埋めず、完了条件に必要な情報が不足するときは未確定・未完了として扱います。
+
+既存ライブラリの導入は自動的に選ばず、必要機能との適合、重複、ライセンス、保守状況、互換性、セキュリティ、CI / 実行環境への影響を確認します。独自実装を避けること自体は目的にしません。テスト技法、成果物ID / traceability、revision / CAS / reservation、state transition、schema validation、WCAG procedure / applicability、WCAG-EM sampling、EARL変換、security boundary、data protection、regression testなど、プロジェクト固有の決定論的契約は、代替ツールがあるだけでは削除しません。
+
+| Skill                         | 責務                                                                                           |
+| ----------------------------- | ---------------------------------------------------------------------------------------------- |
+| `qa-workflow`                 | 開始点、再利用、ルーティング、ブロック中、再開、変更伝播、完了                                 |
+| `spec-analysis`               | 仕様分類 / 現在有効な仕様根拠                                                                  |
+| `question-analysis`           | 未解決事項分類 / 仮定 / 回答正規化                                                             |
+| `test-analysis`               | プロダクトリスク / 重点 / 深度                                                                 |
+| `test-requirement-design`     | テスト要求としての検証責務                                                                     |
+| `test-condition-design`       | テスト条件 / カバレッジ基準 / カバレッジ項目                                                   |
+| `test-case-design`            | 詳細テストケース / 期待結果の根拠の具体化                                                      |
+| `coverage-analysis`           | カバレッジ / 閉鎖性 / ギャップ                                                                 |
+| `adversarial-review`          | 独立レビュー / 重大度                                                                          |
+| `e2e-test-inspection`         | E2E対象、repo / 実対象の事実、実装可能性、安全条件                                             |
+| `e2e-test-implementation`     | 確認済み対象のPlaywright E2E実装と静的 / 軽量検証                                              |
+| `e2e-test-execution`          | 実行安全確認、準備、Playwright実行、構造化結果、cleanup                                        |
+| `e2e-test-result-analysis`    | 実行事実の原因分析、追加証拠、修正routing                                                      |
+| `e2e-test-reporting`          | 検証済み実行・分析結果の人間向け報告                                                           |
+| `test-target-inspection`      | 生きた実対象のUI情報・ふるまい確認とテスト対象資料管理                                         |
+| `test-execution`              | 詳細TCの今回run、観測・比較、構造化結果とcleanup                                               |
+| `regression-testing`          | Regression baseline / membership / Run selection / Activity / history                          |
+| `exploratory-testing`         | Charterベースのexplorationとowner不明hypothesisのinvestigation                                 |
+| `qa-knowledge`                | QA knowledge candidate triage / entry lifecycle / lookup                                       |
+| `usability-evaluation`        | 保存済みevidence・画面資料をreferenceと照合する意味上のUI/UX評価。browserを操作しない          |
+| `usability-inspection`        | 既存Playwright経路でlive Web UIを観測し、fixed probe・measurement・general accessibilityを扱う |
+| `wcag-conformance-evaluation` | WCAG-EM 2.0に沿ったWCAG 2.0 / 2.1 / 2.2のformal evaluation、sampling、report、claim、EARL      |
 
 ## テスト分析・設計フロー
 
@@ -109,7 +142,7 @@ flowchart TB
 
 ### E2E要求時の条件分岐
 
-全19 Skillを常に通すわけではありません。要求成果物と有効な既存成果物に応じ、必要な依存だけを実行します。
+すべてのSkillを常に通すわけではありません。要求成果物と有効な既存成果物に応じ、必要な依存だけを実行します。
 
 currentな実対象情報の確認が必要な場合だけ`test-target-inspection`を使い、設計前には必要な設計Skillへ戻します。詳細TCをAIが今回runとして実行する要求は`test-execution`へ進めます。repoへ残すPlaywright E2Eのinspection・実装・既存runner実行は既存の`e2e-test-inspection`、`e2e-test-implementation`、`e2e-test-execution`が担当します。
 
@@ -143,18 +176,18 @@ e2e-test-execution
 
 `qa-workflow`は独立した前後工程ではなく、開始工程の決定から既存成果物の再利用、ブロック中・再開・ルーティング・変更伝播・`要再検証`・修正ルーティング・完了判定までワークフロー全体を横断して管理します。
 
-| # | 工程 | 実際にやること | 主な成果物 | 対応Skill |
-| --- | --- | --- | --- | --- |
-| 1 | 対象・スコープ確認 | 対象とする機能・挙動・範囲を確認し、要求成果物と利用可能な既存成果物から必要な開始工程を決める | 対象範囲の確認結果、開始 / 再開先、ワークフロー状態 | `qa-workflow` |
-| 2 | 仕様整理・仕様分析 | Figma、要件書、Q&A、リポジトリ、リリース資料などを確認し、現在有効な仕様と根拠を整理する | 現在有効な仕様根拠、仕様分析 | `spec-analysis` |
-| 3 | 不明点・矛盾整理 | 仕様やQA成果物の不足・矛盾・曖昧さを整理し、ブロック中範囲、継続可否、回答後の再開先を決める | ブロッカー、要確認、仮定可能事項、再開先 | `question-analysis` |
-| 4 | テスト分析 | 変更影響とプロダクトリスクを分析し、何をなぜどの深さでテストするかを決める | プロダクトリスク、テスト重点、テストレベル、観測方法 | `test-analysis` |
-| 5 | テスト要求設計 | 現在有効な仕様根拠とプロダクトリスクから、何を検証・保証すべきかを定義する | テスト要求 | `test-requirement-design` |
-| 6 | テスト観点・条件設計 | テスト要求を、どの条件・観点・組合せで検証するかへ展開する | テスト条件、カバレッジ基準、カバレッジ項目 | `test-condition-design` |
-| 7 | テストケース設計 | 第三者が単独で実施し、PASS / FAILを判断できる具体的な前提条件・手順・期待結果へ落とし込む | 詳細テストケース | `test-case-design` |
-| 8 | 網羅性・追跡性確認 | 仕様根拠からテストケースまでの意味上のつながり、カバレッジ基準充足、未カバー・重複・根拠不足を確認する | カバレッジ分析、ギャップ、残存リスク | `coverage-analysis` |
-| 9 | 反証レビュー | 成果物を独立レビューし、誤り・抜け・過剰・根拠不足・追跡性欠陥を重大度付きで検出する | 反証レビュー結果 | `adversarial-review` |
-| 10 | 修正ルーティング・完了判断 | 指摘を最も早い責任工程へルーティングし、影響範囲だけが担当Skillで修正・再検証されるよう制御し、ブロック中 / 要再検証を含むワークフロー全体状態を判定する | 完了 / 部分完了（ブロック中あり） / ブロック中 | `qa-workflow` |
+| #  | 工程                       | 実際にやること                                                                                                                                           | 主な成果物                                           | 対応Skill                 |
+| -- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- | ------------------------- |
+| 1  | 対象・スコープ確認         | 対象とする機能・挙動・範囲を確認し、要求成果物と利用可能な既存成果物から必要な開始工程を決める                                                           | 対象範囲の確認結果、開始 / 再開先、ワークフロー状態  | `qa-workflow`             |
+| 2  | 仕様整理・仕様分析         | Figma、要件書、Q&A、リポジトリ、リリース資料などを確認し、現在有効な仕様と根拠を整理する                                                                 | 現在有効な仕様根拠、仕様分析                         | `spec-analysis`           |
+| 3  | 不明点・矛盾整理           | 仕様やQA成果物の不足・矛盾・曖昧さを整理し、ブロック中範囲、継続可否、回答後の再開先を決める                                                             | ブロッカー、要確認、仮定可能事項、再開先             | `question-analysis`       |
+| 4  | テスト分析                 | 変更影響とプロダクトリスクを分析し、何をなぜどの深さでテストするかを決める                                                                               | プロダクトリスク、テスト重点、テストレベル、観測方法 | `test-analysis`           |
+| 5  | テスト要求設計             | 現在有効な仕様根拠とプロダクトリスクから、何を検証・保証すべきかを定義する                                                                               | テスト要求                                           | `test-requirement-design` |
+| 6  | テスト観点・条件設計       | テスト要求を、どの条件・観点・組合せで検証するかへ展開する                                                                                               | テスト条件、カバレッジ基準、カバレッジ項目           | `test-condition-design`   |
+| 7  | テストケース設計           | 第三者が単独で実施し、PASS / FAILを判断できる具体的な前提条件・手順・期待結果へ落とし込む                                                                | 詳細テストケース                                     | `test-case-design`        |
+| 8  | 網羅性・追跡性確認         | 仕様根拠からテストケースまでの意味上のつながり、カバレッジ基準充足、未カバー・重複・根拠不足を確認する                                                   | カバレッジ分析、ギャップ、残存リスク                 | `coverage-analysis`       |
+| 9  | 反証レビュー               | 成果物を独立レビューし、誤り・抜け・過剰・根拠不足・追跡性欠陥を重大度付きで検出する                                                                     | 反証レビュー結果                                     | `adversarial-review`      |
+| 10 | 修正ルーティング・完了判断 | 指摘を最も早い責任工程へルーティングし、影響範囲だけが担当Skillで修正・再検証されるよう制御し、ブロック中 / 要再検証を含むワークフロー全体状態を判定する | 完了 / 部分完了（ブロック中あり） / ブロック中       | `qa-workflow`             |
 
 ## 成果物チェーン
 
@@ -178,27 +211,27 @@ e2e-test-execution
 
 工程固有ルールは担当Skillを正本とし、`qa-workflow`やレビューSkillへ詳細アルゴリズムを複製しません。
 
-| 工程固有ロジック | 正本 |
-| --- | --- |
-| 現在有効な仕様根拠 / SPEC・DECISION・ASM | `spec-analysis` |
-| 不明点 / 仮定 | `question-analysis` |
-| プロダクトリスク | `test-analysis` |
-| テスト要求 | `test-requirement-design` |
-| カバレッジ基準 / カバレッジ項目 / テスト技法 | `test-condition-design` |
-| 詳細テストケース / 期待結果の根拠 | `test-case-design` |
-| 生きたテスト対象のUI情報・ふるまい収集 / 管理 | `test-target-inspection` |
-| AIによる詳細TC実行・期待結果比較・結果記録 | `test-execution` |
-| カバレッジ / ギャップ | `coverage-analysis` |
-| 独立レビュー / 重大度 | `adversarial-review` |
-| E2E対象、repo / 実対象の事実、実装可能性、安全条件 | `e2e-test-inspection` |
-| Playwright E2Eコード変更、静的 / 軽量検証 | `e2e-test-implementation` |
-| 実行安全確認、準備、Playwright実行、構造化結果、cleanup | `e2e-test-execution` |
-| 実行事実からの原因分析、追加証拠要求、修正routing | `e2e-test-result-analysis` |
-| 検証済み結果の人間向け報告 | `e2e-test-reporting` |
-| Regression baseline / membership / Run selection / Activity | `regression-testing` |
-| Charterに沿った探索・owner不明hypothesisの実対象調査 | `exploratory-testing` |
-| QA knowledge candidate triage / entry lifecycle / lookup | `qa-knowledge` |
-| ルーティング / ブロック中 / 再開 / ワークフロー完了 | `qa-workflow` |
+| 工程固有ロジック                                            | 正本                       |
+| ----------------------------------------------------------- | -------------------------- |
+| 現在有効な仕様根拠 / SPEC・DECISION・ASM                    | `spec-analysis`            |
+| 不明点 / 仮定                                               | `question-analysis`        |
+| プロダクトリスク                                            | `test-analysis`            |
+| テスト要求                                                  | `test-requirement-design`  |
+| カバレッジ基準 / カバレッジ項目 / テスト技法                | `test-condition-design`    |
+| 詳細テストケース / 期待結果の根拠                           | `test-case-design`         |
+| 生きたテスト対象のUI情報・ふるまい収集 / 管理               | `test-target-inspection`   |
+| AIによる詳細TC実行・期待結果比較・結果記録                  | `test-execution`           |
+| カバレッジ / ギャップ                                       | `coverage-analysis`        |
+| 独立レビュー / 重大度                                       | `adversarial-review`       |
+| E2E対象、repo / 実対象の事実、実装可能性、安全条件          | `e2e-test-inspection`      |
+| Playwright E2Eコード変更、静的 / 軽量検証                   | `e2e-test-implementation`  |
+| 実行安全確認、準備、Playwright実行、構造化結果、cleanup     | `e2e-test-execution`       |
+| 実行事実からの原因分析、追加証拠要求、修正routing           | `e2e-test-result-analysis` |
+| 検証済み結果の人間向け報告                                  | `e2e-test-reporting`       |
+| Regression baseline / membership / Run selection / Activity | `regression-testing`       |
+| Charterに沿った探索・owner不明hypothesisの実対象調査        | `exploratory-testing`      |
+| QA knowledge candidate triage / entry lifecycle / lookup    | `qa-knowledge`             |
+| ルーティング / ブロック中 / 再開 / ワークフロー完了         | `qa-workflow`              |
 
 ## 段階的開示
 
@@ -285,11 +318,11 @@ runtimeのためにLLMの意味判断をPythonへ複製せず、unsupported subs
 
 ### 発火評価
 
-19 Skillの選択精度を評価します。正規モードは19 Skill同時利用、単独・限定Skillは診断モードです。`test-analysis` / `test-condition-design`はtrain 24件・validation 20件、その他17 Skillはtrain 12件・validation 8件で、合計428 queryです。repo内データセット検証と実Agentクライアント上の実発火評価は別物です。
+repositoryにあるすべてのSkillの選択精度を評価します。正規モードは全Skill同時利用、単独・限定Skillは診断モードです。datasetの件数は各Skillのtrain / validationファイルから導出します。repo内データセット検証と実Agentクライアント上の実発火評価は別物です。
 
 ### 決定論的出力評価
 
-19 Skillの正規出力について、ID、参照整合、必須フィールド、リスクマトリクス、成果物閉鎖、Pairwise、レビュー / ワークフロー、E2Eの対象・raw fact・primary / attempt・cleanup不変条件、Regression baseline / route execution、Exploratory lifecycle、QA knowledge currentness / CAS条件など、意味解釈なしで判定できる契約を評価します。現行deterministic output datasetは38ケースです。
+各Skillの正規出力について、責務に対応したID、参照整合、必須フィールド、closure、freshness、handoff、reportなど、意味解釈なしで判定できる契約を評価します。評価件数は各Skillのmanifestから導出します。
 
 - `known_*`: フィクスチャ側で既知の参照集合。Skill自身が出力内で生成するEntityの扱いは各Skill契約に従う。キー未指定なら対応する参照検査を行わない。
 - `required_*`: 出力に実際に存在しなければならないEntity / 値。
@@ -317,7 +350,7 @@ Agent実行と評価対象出力の生成は決定論的 / 意味評価ランタ
 
 ## qa-workflowのランタイム前提
 
-同一のAgentクライアント上で19 Skillすべてが利用可能で、Agentが必要なSkillを追加で読み込み / 利用できる環境を前提とします。Agent Skills Specificationが共通Skill-to-Skill APIを保証するとは扱いません。
+同一のAgentクライアント上でrepositoryの全Skillが利用可能で、Agentが必要なSkillを追加で読み込み / 利用できる環境を前提とします。Agent Skills Specificationが共通Skill-to-Skill APIを保証するとは扱いません。
 
 ## 検証
 

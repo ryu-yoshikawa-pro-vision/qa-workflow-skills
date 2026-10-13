@@ -31,23 +31,23 @@ generator系scriptの`payload`は次を基本形とします。
 
 model generatorはtargetごとに`materializable=true|false`を返します。`materializable=true`では`execution`必須、`false`では`execution=null / execution_fingerprint=null`です。
 
-| generator | materialize | canonical `execution` |
-| --- | --- | --- |
-| `equivalence_partitions.py` | yes | `{set:{key,label}, partition:{key,label}, representative}` |
-| `bva.py` | yes | `{boundary:{key,label}, position, value}` |
-| `domain_testing.py` | yes | `{partition:{key,label}, border:{key,label}, point_kind, coordinates:[{dimension_key,label,value}]}` |
-| `decision_table.py` | yes | `{conditions:[{condition_key,label,value}], actions:[{action_key,label,value}]}` |
-| `combinatorial.py` | yes | `{row_ref, assignments:[{factor_key,label,value}]}` |
-| `classification_tree.py` | no | adapter専用。child `comb` modelだけをCI化 |
-| `state_transition.py` | yes | `{initial_state_key, initial_state_label, reset_key, reset_execution, setup_prefix, coverage_sequence, attempted_transition}`。state / transition / resetの実行意味を内包する |
-| `flow_paths.py` | mode依存 | node / edge / bounded-path / simple-loopは`{initial_node_key, initial_node_label, target_node, edge_sequence}`。node / edgeの実行意味を内包する。fork-join branchはsemantic Coverage Itemへ閉じる |
-| `crud_matrix.py` | yes | operation=`{entity_key, entity_label, function_key, function_label, operation}`、sequence=`{entity_key, entity_label, sequence_key, steps}`。stepsへfunction labelを含める |
-| `cause_effect.py` | no | adapter専用。child `decision` modelだけをCI化 |
-| `grammar_cases.py` | yes | `{input_label, input_text, production_key_sequence, mutation_key}` |
-| `schema_cases.py` | no | adapter専用 |
-| `ui_pattern_candidates.py` | no | 一般確認候補であり直接CI化しない |
-| `random_testing.py` | yes | `{input_label, case_index, generated_value}` |
-| `metamorphic.py` | yes | `{relation_key, relation_label, source_id, source_input, follow_up_key, follow_up_input, expected_relation}` |
+| generator                   | materialize | canonical `execution`                                                                                                                                                                             |
+| --------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `equivalence_partitions.py` | yes         | `{set:{key,label}, partition:{key,label}, representative}`                                                                                                                                        |
+| `bva.py`                    | yes         | `{boundary:{key,label}, position, value}`                                                                                                                                                         |
+| `domain_testing.py`         | yes         | `{partition:{key,label}, border:{key,label}, point_kind, coordinates:[{dimension_key,label,value}]}`                                                                                              |
+| `decision_table.py`         | yes         | `{conditions:[{condition_key,label,value}], actions:[{action_key,label,value}]}`                                                                                                                  |
+| `combinatorial.py`          | yes         | `{row_ref, assignments:[{factor_key,label,value}]}`                                                                                                                                               |
+| `classification_tree.py`    | no          | adapter専用。child `comb` modelだけをCI化                                                                                                                                                         |
+| `state_transition.py`       | yes         | `{initial_state_key, initial_state_label, reset_key, reset_execution, setup_prefix, coverage_sequence, attempted_transition}`。state / transition / resetの実行意味を内包する                     |
+| `flow_paths.py`             | mode依存    | node / edge / bounded-path / simple-loopは`{initial_node_key, initial_node_label, target_node, edge_sequence}`。node / edgeの実行意味を内包する。fork-join branchはsemantic Coverage Itemへ閉じる |
+| `crud_matrix.py`            | yes         | operation=`{entity_key, entity_label, function_key, function_label, operation}`、sequence=`{entity_key, entity_label, sequence_key, steps}`。stepsへfunction labelを含める                        |
+| `cause_effect.py`           | no          | adapter専用。child `decision` modelだけをCI化                                                                                                                                                     |
+| `grammar_cases.py`          | yes         | `{input_label, input_text, production_key_sequence, mutation_key}`                                                                                                                                |
+| `schema_cases.py`           | no          | adapter専用                                                                                                                                                                                       |
+| `ui_pattern_candidates.py`  | no          | 一般確認候補であり直接CI化しない                                                                                                                                                                  |
+| `random_testing.py`         | yes         | `{input_label, case_index, generated_value}`                                                                                                                                                      |
+| `metamorphic.py`            | yes         | `{relation_key, relation_label, source_id, source_input, follow_up_key, follow_up_input, expected_relation}`                                                                                      |
 
 `materializable=false`でも正規Coverage基準上必要なtargetは、current target versionを保持したsemantic Coverage Itemまたは既存Skillで許可されたDispositionへ閉じるまで完了させません。adapter / diagnostic専用targetはこのclosure対象外です。`execution`はstable keyの解決を下流へ要求せず、`test-case-design`がgenerator内部modelを読み直さなくても入力対象・条件・操作・期待関係を理解できるmachine meaningを持たせます。
 
@@ -71,8 +71,8 @@ model generatorはtargetごとに`materializable=true|false`を返します。`m
 {
   "scheme_key": "customer-risk-v1",
   "dimensions": {
-    "impact": [1,2,3,4,5],
-    "likelihood": [1,2,3]
+    "impact": [1, 2, 3, 4, 5],
+    "likelihood": [1, 2, 3]
   },
   "matrix": {
     "1,1": "L1"
@@ -116,20 +116,20 @@ signal:
 
 signalから候補技法へのmappingは次で固定します。
 
-| signal | `true`時の候補 |
-| --- | --- |
-| `ordered_domain` | `境界値分析` |
-| `explicit_boundaries` | `境界値分析` |
-| `equivalence_classes` | `同値分割` |
-| `multiple_discrete_conditions` | `デシジョンテーブル` |
-| `stateful` | `状態遷移` |
-| `multiple_factors` | `Pairwise / 組合せ` |
-| `explicit_flow` | `シナリオ / ユースケース` |
-| `multi_variable_domain` | `Domain Testing` |
-| `crud_model` | `CRUD Testing` |
-| `operational_profile` | `Random Testing` |
-| `metamorphic_relation` | `Metamorphic Testing` |
-| `grammar_model` | `Syntax-Based Testing` |
+| signal                         | `true`時の候補            |
+| ------------------------------ | ------------------------- |
+| `ordered_domain`               | `境界値分析`              |
+| `explicit_boundaries`          | `境界値分析`              |
+| `equivalence_classes`          | `同値分割`                |
+| `multiple_discrete_conditions` | `デシジョンテーブル`      |
+| `stateful`                     | `状態遷移`                |
+| `multiple_factors`             | `Pairwise / 組合せ`       |
+| `explicit_flow`                | `シナリオ / ユースケース` |
+| `multi_variable_domain`        | `Domain Testing`          |
+| `crud_model`                   | `CRUD Testing`            |
+| `operational_profile`          | `Random Testing`          |
+| `metamorphic_relation`         | `Metamorphic Testing`     |
+| `grammar_model`                | `Syntax-Based Testing`    |
 
 複数signalが`true`の場合は候補集合のunionを返し、上表の順で安定sortします。`false`は候補を追加せず、`null`は`undetermined_signals`へ入れます。
 
@@ -208,6 +208,7 @@ LLMがpartition setとpartitionの意味を正規化した後を処理します�
 - target keyは`bva:<boundary_key>:AT|OTHER|BELOW|ABOVE`。modeで不要なpositionは生成しない
 
 生成値がdomainで表現不能、date/datetime演算がoverflow、stepが0以下の場合は`invalid_input`とし、別のstepを推測しません。
+
 ## 5. Domain Testing
 
 ### `domain_testing.py`
@@ -225,14 +226,14 @@ partition:
   "partition_key": "P1",
   "label": "購入金額と保有ポイントの有効領域",
   "dimensions": [
-    {"dimension_key":"x","label":"購入金額"},
-    {"dimension_key":"y","label":"保有ポイント"}
+    { "dimension_key": "x", "label": "購入金額" },
+    { "dimension_key": "y", "label": "保有ポイント" }
   ],
   "expression": {
     "op": "and",
     "args": [
-      {"op":"border_ref","border_key":"B1"},
-      {"op":"border_ref","border_key":"B2"}
+      { "op": "border_ref", "border_key": "B1" },
+      { "op": "border_ref", "border_key": "B2" }
     ]
   },
   "authority_refs": ["SPEC-001"]
@@ -249,10 +250,10 @@ border:
   "label": "購入金額 + 2×保有ポイント <= 10",
   "partition_key": "P1",
   "relation": "<=",
-  "coefficients": {"x": "1", "y": "2"},
+  "coefficients": { "x": "1", "y": "2" },
   "constant": "-10",
   "pivot_key": "x",
-  "anchor": {"y": {"type":"decimal","value":"3"}},
+  "anchor": { "y": { "type": "decimal", "value": "3" } },
   "pivot_step": "1",
   "authority_refs": ["SPEC-001"]
 }
@@ -272,7 +273,7 @@ border:
 - OFF_NEG / OFF_POS = borderの両側の最隣接点
 - target keyは`domain:<partition_key>:<border_key>:ON|OFF_NEG|OFF_POS`
 
-`!=`: 
+`!=`:
 
 - OFF = border上
 - ON_NEG / ON_POS = borderの両側の最隣接点
@@ -294,6 +295,7 @@ border:
 coefficient、constant、anchor、pivot stepは有限decimalをexact rationalへ変換し、border座標計算はPython `fractions.Fraction`相当の有理数演算で行います。pivot border valueを求める途中でbinary floatや`Decimal` context roundingを使用しません。最終値がintegerまたは有限decimalとしてexactに表現できる場合だけtyped valueへ変換します。既約分母が2と5以外の素因数を持つ等、対応typed valueへexact変換できないrequired pointは`unrepresentable_point`としてunsupported itemへ出し、丸めたON / OFF pointを生成しません。
 
 border valueまたは必要な隣接点がrepresentableでない、pivot coefficientが0、anchor不足、step不明、partition全体の所属条件を満たせない場合は推測しません。LLMがoverride pointを明示する場合も、scriptがpartition全体の所属とstep距離をexact arithmeticで検証し、規則に一致しなければ`invalid_input`とします。
+
 ## 6. Decision Table
 
 ### `decision_table.py`
@@ -377,7 +379,7 @@ mode:
 {
   "global_strength": 2,
   "subsets": [
-    {"factor_keys": ["role","plan","region"], "strength": 3}
+    { "factor_keys": ["role", "plan", "region"], "strength": 3 }
   ]
 }
 ```
@@ -475,10 +477,10 @@ canonical execution:
   "setup_prefix": [],
   "coverage_sequence": [
     {
-      "transition_key":"T-001",
-      "from":{"state_key":"draft","label":"下書き"},
-      "event":"publish",
-      "to":{"state_key":"published","label":"公開済み"}
+      "transition_key": "T-001",
+      "from": { "state_key": "draft", "label": "下書き" },
+      "event": "publish",
+      "to": { "state_key": "published", "label": "公開済み" }
     }
   ],
   "attempted_transition": null

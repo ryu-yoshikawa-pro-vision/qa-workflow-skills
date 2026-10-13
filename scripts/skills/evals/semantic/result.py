@@ -21,11 +21,14 @@ def _criterion_status(*, evaluable: bool, rating: int | None) -> str:
 
 
 def _overall_verdict(criteria: list[dict[str, Any]]) -> str:
-    if any(item["critical"] and item["rating"] == 1 for item in criteria if item["rating"] is not None):
+    if any(
+        item["critical"] and item["rating"] == 1
+        for item in criteria
+        if item["rating"] is not None
+    ):
         return "fail"
     if any(
-        item["status"] in {"needs_review", "fail", "not_evaluable"}
-        for item in criteria
+        item["status"] in {"needs_review", "fail", "not_evaluable"} for item in criteria
     ):
         return "needs_review"
     return "pass"
@@ -45,7 +48,9 @@ def normalize_judge_response(
         raise JudgeResponseError(f"judge response must be JSON only: {exc}") from exc
 
     if not isinstance(payload, dict) or set(payload) != {"criteria"}:
-        raise JudgeResponseError("judge response must be an object containing only criteria")
+        raise JudgeResponseError(
+            "judge response must be an object containing only criteria"
+        )
     raw_criteria = payload["criteria"]
     if not isinstance(raw_criteria, list):
         raise JudgeResponseError("criteria must be an array")
@@ -75,24 +80,42 @@ def normalize_judge_response(
 
         rating = raw["rating"]
         if evaluable:
-            if isinstance(rating, bool) or not isinstance(rating, int) or rating not in {1, 2, 3, 4}:
-                raise JudgeResponseError(f"{criterion_id}.rating must be an integer from 1 to 4")
+            if (
+                isinstance(rating, bool)
+                or not isinstance(rating, int)
+                or rating not in {1, 2, 3, 4}
+            ):
+                raise JudgeResponseError(
+                    f"{criterion_id}.rating must be an integer from 1 to 4"
+                )
         elif rating is not None:
-            raise JudgeResponseError(f"{criterion_id}.rating must be null when evaluable=false")
+            raise JudgeResponseError(
+                f"{criterion_id}.rating must be null when evaluable=false"
+            )
 
         reason = raw["reason"]
         if not isinstance(reason, str) or not reason.strip():
-            raise JudgeResponseError(f"{criterion_id}.reason must be a non-empty string")
+            raise JudgeResponseError(
+                f"{criterion_id}.reason must be a non-empty string"
+            )
 
         evidence = raw["evidence"]
-        if not isinstance(evidence, list) or any(not isinstance(item, str) for item in evidence):
+        if not isinstance(evidence, list) or any(
+            not isinstance(item, str) for item in evidence
+        ):
             raise JudgeResponseError(f"{criterion_id}.evidence must be a string array")
         if evaluable and any(not item.strip() for item in evidence):
-            raise JudgeResponseError(f"{criterion_id}.evidence must contain non-empty strings")
+            raise JudgeResponseError(
+                f"{criterion_id}.evidence must contain non-empty strings"
+            )
         if evaluable and not evidence:
-            raise JudgeResponseError(f"{criterion_id}.evidence must contain at least one item when evaluable=true")
+            raise JudgeResponseError(
+                f"{criterion_id}.evidence must contain at least one item when evaluable=true"
+            )
         if not evaluable and evidence:
-            raise JudgeResponseError(f"{criterion_id}.evidence must be empty when evaluable=false")
+            raise JudgeResponseError(
+                f"{criterion_id}.evidence must be empty when evaluable=false"
+            )
 
         rubric = criteria_by_id[criterion_id]
         normalized.append(
@@ -111,9 +134,13 @@ def normalize_judge_response(
     if missing:
         raise JudgeResponseError(f"missing criterion response: {sorted(missing)}")
     if len(seen) != len(requested_criteria):
-        raise JudgeResponseError("criterion response count does not match requested criteria")
+        raise JudgeResponseError(
+            "criterion response count does not match requested criteria"
+        )
 
-    order = {criterion_id: index for index, criterion_id in enumerate(requested_criteria)}
+    order = {
+        criterion_id: index for index, criterion_id in enumerate(requested_criteria)
+    }
     normalized.sort(key=lambda item: order[item["id"]])
 
     summary = {

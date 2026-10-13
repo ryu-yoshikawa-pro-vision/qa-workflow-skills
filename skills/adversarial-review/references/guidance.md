@@ -36,16 +36,16 @@ QA成果物を肯定するためではなく、誤り・抜け・過剰・根拠
 
 ## 工程固有ロジックの参照先
 
-| 対象 | 詳細判断の正本 |
-| --- | --- |
-| 現在有効な仕様根拠 / 仕様分類 | `spec-analysis` |
-| 不明点 / 仮定 / 回答正規化 | `question-analysis` |
-| プロダクトリスク | `test-analysis` |
-| テスト要求 | `test-requirement-design` |
-| カバレッジ基準 / カバレッジ項目 / 技法 | `test-condition-design` |
-| 詳細テストケース / 期待結果の根拠 | `test-case-design` |
-| カバレッジ / ギャップ | `coverage-analysis` |
-| 重大度 / 独立レビュー処置 | `adversarial-review` |
+| 対象                                   | 詳細判断の正本            |
+| -------------------------------------- | ------------------------- |
+| 現在有効な仕様根拠 / 仕様分類          | `spec-analysis`           |
+| 不明点 / 仮定 / 回答正規化             | `question-analysis`       |
+| プロダクトリスク                       | `test-analysis`           |
+| テスト要求                             | `test-requirement-design` |
+| カバレッジ基準 / カバレッジ項目 / 技法 | `test-condition-design`   |
+| 詳細テストケース / 期待結果の根拠      | `test-case-design`        |
+| カバレッジ / ギャップ                  | `coverage-analysis`       |
+| 重大度 / 独立レビュー処置              | `adversarial-review`      |
 
 本Skillのプローブは「どこを疑うか」を示します。担当Skillの詳細アルゴリズムを別の正本として複製しません。
 

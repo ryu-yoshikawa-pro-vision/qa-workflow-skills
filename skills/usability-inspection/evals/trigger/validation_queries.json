@@ -1,0 +1,34 @@
+[
+  {
+    "query": "このWeb画面を開いて、操作・focus・feedbackを検査して。",
+    "should_trigger": true
+  },
+  {
+    "query": "touch-capable browser contextでtap可能性を調べて。",
+    "should_trigger": true
+  },
+  {
+    "query": "保存済みscreenshotに対するvisual hierarchy評価をして。",
+    "should_trigger": false
+  },
+  {
+    "query": "ユーザーテスト参加者の成功率を測定して。",
+    "should_trigger": false
+  },
+  {
+    "query": "画面の操作に関係するWCAG criterionをgeneral inspectionして。",
+    "should_trigger": true
+  },
+  {
+    "query": "TC-001の期待結果を確認し合否を報告して。",
+    "should_trigger": false
+  },
+  {
+    "query": "画像しかないmobile mockupを評価して。",
+    "should_trigger": false
+  },
+  {
+    "query": "buttonの面積と周囲spacingをlive targetで測って。",
+    "should_trigger": true
+  }
+]

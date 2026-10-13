@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import re
 from collections import defaultdict
 from itertools import combinations, product
-import re
 from typing import Iterable, Mapping, Sequence
 
 from .markdown_parser import MarkdownTable
@@ -21,6 +21,9 @@ CANONICAL_SKILLS = {
     "regression-testing",
     "exploratory-testing",
     "qa-knowledge",
+    "usability-evaluation",
+    "usability-inspection",
+    "wcag-conformance-evaluation",
     "coverage-analysis",
     "adversarial-review",
     "e2e-test-inspection",
@@ -36,9 +39,15 @@ MULTI_USE_SKILL_TARGETS = {
     "test-analysis": {"テスト分析", "E2E対象選定"},
     "coverage-analysis": {"テスト設計", "TC → E2E実装", "E2E実装 → 実行結果"},
     "adversarial-review": {"テスト設計成果物", "E2E実装"},
-    "regression-testing": {"baseline / membership", "Run計画", "Run結果更新", "履歴参照"},
+    "regression-testing": {
+        "baseline / membership",
+        "Run計画",
+        "Run結果更新",
+        "履歴参照",
+    },
     "exploratory-testing": {"exploration", "investigation"},
     "qa-knowledge": {"triage", "create / update", "revalidation", "lookup / history"},
+    "usability-inspection": {"general", "scoped", "formal-handoff"},
 }
 
 PRIORITIES = {"高", "中", "低"}
@@ -80,7 +89,9 @@ def ids_in(value: str) -> list[str]:
     return ALL_ID_RE.findall(value or "")
 
 
-def nonempty_rows(table: MarkdownTable | None, key: str | None = None) -> list[dict[str, str]]:
+def nonempty_rows(
+    table: MarkdownTable | None, key: str | None = None
+) -> list[dict[str, str]]:
     if table is None:
         return []
     if key is None:
@@ -88,27 +99,62 @@ def nonempty_rows(table: MarkdownTable | None, key: str | None = None) -> list[d
     return [r for r in table.rows if clean(r.get(key, ""))]
 
 
-def add_duplicate_assertion(result: EvalResult, assertion_id: str, values: Sequence[str], label: str) -> None:
+def add_duplicate_assertion(
+    result: EvalResult, assertion_id: str, values: Sequence[str], label: str
+) -> None:
     counts: dict[str, int] = defaultdict(int)
     for value in values:
         if value:
             counts[value] += 1
     dupes = sorted(v for v, c in counts.items() if c > 1)
-    result.add(assertion_id, not dupes, f"{label}が一意であること", evidence={"duplicates": dupes} if dupes else None)
+    result.add(
+        assertion_id,
+        not dupes,
+        f"{label}が一意であること",
+        evidence={"duplicates": dupes} if dupes else None,
+    )
 
 
-def add_allowed_assertion(result: EvalResult, assertion_id: str, values: Iterable[str], allowed: set[str], label: str) -> None:
+def add_allowed_assertion(
+    result: EvalResult,
+    assertion_id: str,
+    values: Iterable[str],
+    allowed: set[str],
+    label: str,
+) -> None:
     invalid = sorted({clean(v) for v in values if clean(v) and clean(v) not in allowed})
-    result.add(assertion_id, not invalid, f"{label}が許可値を使用していること", evidence={"invalid": invalid, "allowed": sorted(allowed)} if invalid else None)
+    result.add(
+        assertion_id,
+        not invalid,
+        f"{label}が許可値を使用していること",
+        evidence={"invalid": invalid, "allowed": sorted(allowed)} if invalid else None,
+    )
 
 
-def add_required_fields_assertion(result: EvalResult, assertion_id: str, rows: Sequence[Mapping[str, str]], fields: Sequence[str], row_id_field: str, label: str) -> None:
+def add_required_fields_assertion(
+    result: EvalResult,
+    assertion_id: str,
+    rows: Sequence[Mapping[str, str]],
+    fields: Sequence[str],
+    row_id_field: str,
+    label: str,
+) -> None:
     missing = []
     for row in rows:
         missing_fields = [field for field in fields if not clean(row.get(field, ""))]
         if missing_fields:
-            missing.append({"row": clean(row.get(row_id_field, "")) or "<unknown>", "fields": missing_fields})
-    result.add(assertion_id, not missing, f"{label}の必須項目が存在すること", evidence=missing or None)
+            missing.append(
+                {
+                    "row": clean(row.get(row_id_field, "")) or "<unknown>",
+                    "fields": missing_fields,
+                }
+            )
+    result.add(
+        assertion_id,
+        not missing,
+        f"{label}の必須項目が存在すること",
+        evidence=missing or None,
+    )
 
 
 def compute_graph_gaps(graph: Mapping) -> set[str]:
@@ -135,15 +181,26 @@ def compute_graph_gaps(graph: Mapping) -> set[str]:
     return gaps
 
 
-def assignment_forbidden(assignment: Mapping[str, str], forbidden_constraints: Sequence[Mapping[str, str]]) -> bool:
-    return any(all(assignment.get(k) == v for k, v in constraint.items()) for constraint in forbidden_constraints)
+def assignment_forbidden(
+    assignment: Mapping[str, str], forbidden_constraints: Sequence[Mapping[str, str]]
+) -> bool:
+    return any(
+        all(assignment.get(k) == v for k, v in constraint.items())
+        for constraint in forbidden_constraints
+    )
 
 
-def feasible_pairs(factors: Mapping[str, Sequence[str]], forbidden_constraints: Sequence[Mapping[str, str]]) -> set[tuple[str, str, str, str]]:
+def feasible_pairs(
+    factors: Mapping[str, Sequence[str]],
+    forbidden_constraints: Sequence[Mapping[str, str]],
+) -> set[tuple[str, str, str, str]]:
     names = sorted(factors)
     valid_assignments = [
         assignment
-        for assignment in (dict(zip(names, values)) for values in product(*(factors[name] for name in names)))
+        for assignment in (
+            dict(zip(names, values))
+            for values in product(*(factors[name] for name in names))
+        )
         if not assignment_forbidden(assignment, forbidden_constraints)
     ]
     feasible: set[tuple[str, str, str, str]] = set()
@@ -153,7 +210,9 @@ def feasible_pairs(factors: Mapping[str, Sequence[str]], forbidden_constraints: 
     return feasible
 
 
-def covered_pairs(combinations_: Sequence[Mapping[str, str]]) -> set[tuple[str, str, str, str]]:
+def covered_pairs(
+    combinations_: Sequence[Mapping[str, str]],
+) -> set[tuple[str, str, str, str]]:
     covered: set[tuple[str, str, str, str]] = set()
     for combo in combinations_:
         names = sorted(combo)

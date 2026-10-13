@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Text scaling with unreadable state fixture</title>
+  <style>
+    body { margin: 2rem; color: #18212b; font: 16px/1.5 Arial, sans-serif; }
+    label { display: block; margin-block: 1rem; }
+    canvas { display: block; width: 42rem; max-width: 100%; height: 8rem; border: 1px solid #52606d; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Canvas text scaling</h1>
+    <p>The author control redraws the same visible text at larger canvas font sizes. The fixed browser probe can operate the control, but the canvas text's used font size is not exposed as a DOM metric.</p>
+    <label for="canvas-text-size">Text size</label>
+    <input id="canvas-text-size" type="range" min="100" max="200" step="50" value="100">
+    <output id="canvas-text-size-value" for="canvas-text-size">100%</output>
+    <canvas id="canvas-text" role="img" aria-label="Text sample drawn on canvas"></canvas>
+  </main>
+  <script>
+    const control = document.getElementById("canvas-text-size");
+    const value = document.getElementById("canvas-text-size-value");
+    const canvas = document.getElementById("canvas-text");
+    const context = canvas.getContext("2d");
+    const render = () => {
+      const scale = Number(control.value) / 100;
+      value.value = `${control.value}%`;
+      value.textContent = `${control.value}%`;
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      context.fillStyle = "#18212b";
+      context.font = `${16 * scale}px Arial`;
+      context.fillText("Text grows through the author control.", 12, 44);
+    };
+    control.addEventListener("input", render);
+    render();
+  </script>
+</body>
+</html>
