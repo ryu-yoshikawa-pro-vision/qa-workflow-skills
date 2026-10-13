@@ -685,7 +685,7 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - [ ] Step 5: qa-workflow routing / resume / scope readiness統合
 - [ ] Step 6: package schema・migration・helper contract validation
 - [ ] Step 7: deterministic / semantic責務境界の検証
-- [x] Step 8: cross-repository validation（2026-10-13再実行: runtime 316 passed / 2 Windows symlink privilege skips、deterministic 302 passed、semantic dataset validation 22 Skill / 163 cases、semantic tests 35 passed / 2 Windows symlink privilege skips、routing 1 passed、Codex Harness 36 passed、formatter / Ruff / diff check passed。外部Semantic Judgeは含まない）
+- [x] Step 8: cross-repository validation（2026-10-13再実行: runtime 316 passed / 2 Windows symlink privilege skips、deterministic 302 passed、semantic dataset validation 22 Skill / 163 cases、semantic tests 35 passed / 2 Windows symlink privilege skips、routing 1 passed、Codex Harness 36 passed、formatter / Ruff / diff check passed。push後回帰確認: deterministic repository tests 290 passed、projection repository tests 13 passed / 1 Windows symlink privilege skip、実packageのsemantic / deterministic projection CLIと標準formatter / Ruff passed。UTF-8 stdout / Windows cp932 subprocess testも修正してpass。外部Semantic Judgeは含まない）
 - [ ] Step 9: 実Agent smoke（spec-analysis packageの1シナリオは成功。migration、routing、resume、scope lifecycle等の残りのPlan scenarioは未実施）
 - [ ] Step 10: final review
 
