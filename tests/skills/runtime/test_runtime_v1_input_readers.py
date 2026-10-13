@@ -4,6 +4,7 @@ import hashlib
 import json
 import subprocess
 import sys
+import unittest
 from pathlib import Path
 from typing import Any
 
@@ -155,7 +156,7 @@ def _run_reader(skill: str, artifact: str) -> dict[str, Any]:
     return json.loads(completed.stdout)
 
 
-def test_each_reader_accepts_integral_v1_pair_and_returns_saved_input() -> None:
+def _test_each_reader_accepts_integral_v1_pair_and_returns_saved_input() -> None:
     for skill in _GENERATORS:
         result = _run_reader(skill, _artifact(skill))
         assert result["valid"] is True
@@ -168,7 +169,7 @@ def test_each_reader_accepts_integral_v1_pair_and_returns_saved_input() -> None:
         assert result["normalized_runtime_inputs"][0]["normalized_input"]
 
 
-def test_readers_fail_closed_for_changed_fingerprint_or_missing_pair() -> None:
+def _test_readers_fail_closed_for_changed_fingerprint_or_missing_pair() -> None:
     for skill in _GENERATORS:
         tampered = _run_reader(skill, _artifact(skill, corrupt_result=True))
         assert tampered["valid"] is False
@@ -176,3 +177,11 @@ def test_readers_fail_closed_for_changed_fingerprint_or_missing_pair() -> None:
         missing_pair = _run_reader(skill, "")
         assert missing_pair["valid"] is False
         assert missing_pair["issues"][0]["issue_type"] == "invalid_input"
+
+
+class TestRuntimeV1InputReaders(unittest.TestCase):
+    def test_each_reader_accepts_integral_v1_pair_and_returns_saved_input(self) -> None:
+        _test_each_reader_accepts_integral_v1_pair_and_returns_saved_input()
+
+    def test_readers_fail_closed_for_changed_fingerprint_or_missing_pair(self) -> None:
+        _test_readers_fail_closed_for_changed_fingerprint_or_missing_pair()

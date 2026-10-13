@@ -679,17 +679,27 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 
 - [x] Step 0: PR #14後の最新main統合とcurrent repository baselineを確認。既存merge commitに最新mainが含まれるためrebaseは行わず、418 commitの公開履歴を書き換えない。実測値と確認した契約は `_07 §12` の2026-10-13結果を参照。
 - [x] Step 1: UI target package schema / materialize基盤
-- [ ] Step 2: runtime-v2 / entity-state-v2 transition、AC bridge、generator v2、migration runtime
+- [x] Step 2: runtime-v2 / entity-state-v2 transition、AC bridge、generator v2、migration runtime。2026-10-13継続確認: 3 cutover helper / 3 input reader、downstream scope/history、migration preflightとzero-scope pathを実装・runtime suiteで再検証済み。詳細は本節末の追補を参照。
 - [ ] Step 3: spec-analysis semantic / deterministic evaluation
 - [x] Step 4: question-analysis UNKNOWN lifecycle / DEC・ASM owner helper
-- [ ] Step 5: qa-workflow routing / resume / scope readiness統合
-- [ ] Step 6: package schema・migration・helper contract validation
+- [x] Step 5: qa-workflow routing / resume / scope readiness統合。69 routing fixture、partial / historical / retired / zero-scope経路を再検証済み。詳細は本節末の追補を参照。
+- [x] Step 6: package schema・migration・helper contract validation。package runtime、migration preflight、projectionの再検証を完了。詳細は本節末の追補を参照。
 - [ ] Step 7: deterministic / semantic責務境界の検証
-- [x] Step 8: cross-repository validation（2026-10-13再実行: runtime 316 passed / 2 Windows symlink privilege skips、deterministic 302 passed、semantic dataset validation 22 Skill / 163 cases、semantic tests 35 passed / 2 Windows symlink privilege skips、routing 1 passed、Codex Harness 36 passed、formatter / Ruff / diff check passed。push後回帰確認: deterministic repository tests 290 passed、projection repository tests 13 passed / 1 Windows symlink privilege skip、実packageのsemantic / deterministic projection CLIと標準formatter / Ruff passed。UTF-8 stdout / Windows cp932 subprocess testも修正してpass。外部Semantic Judgeは含まない）
+- [ ] Step 8: cross-repository validation（既存記録: runtime 316 passed / 2 Windows symlink privilege skips、deterministic 302 passed、semantic dataset validation 22 Skill / 163 cases、semantic tests 35 passed / 2 Windows symlink privilege skips、routing 1 passed、Codex Harness 36 passed、formatter / Ruff / diff check passed。push後回帰確認: deterministic repository tests 290 passed、projection repository tests 13 passed / 1 Windows symlink privilege skip、実packageのsemantic / deterministic projection CLIと標準formatter / Ruff passed。UTF-8 stdout / Windows cp932 subprocess testも修正してpass。外部Semantic Judgeは含まない。2026-10-13継続作業のlocal test / formatter / Ruff / diff checkは成功。push後latest-head CIは未実施のため完了判定を保留）
 - [ ] Step 9: 実Agent smoke（spec-analysis packageの1シナリオは成功。migration、routing、resume、scope lifecycle等の残りのPlan scenarioは未実施）
-- [ ] Step 10: final review
+- [x] Step 10: final review（2026-10-13継続差分についてPlan / runtime boundary / qa-workflow分担 / safety contract / package assetを確認。actionable findingなし。標準formatter / Ruff、staged diff check、runtime / eval回帰は通過。Semantic Judgeと残りのreal Agent scenarioは未検証として保持）
 
 2026-10-13時点でStep 2は未完了です。3つの`runtime_v1_input_reader.py`、TRD / TC cutover helper、関連runtime contractは存在しますが、`skills/test-condition-design/scripts/runtime_v1_cutover.py`が未実装で、TCDの4 phase / `resume` / partial model unit検証を完了していません。このためTCD cutoverを含むStep 2、migration preflightからfinal gateまでのStep 5、および依存する全体完了条件を満たしていません。Step 3 / 7もSemantic Judgeによる意味評価が未実施のため完了扱いにしません。
+
+### 2026-10-13 継続作業結果
+
+- Step 2: `skills/test-condition-design/scripts/runtime_v1_cutover.py`とTCD cutover回帰testを追加し、condition-structure / models / test-data-requirements / materialize-coverageのphase、`resume`、partial model unit、frozen v1 integrityを検証した。既存TRD / TC cutoverと3つのread-only input readerを含むruntime suiteは339件成功、Windows symlink privilegeによるskipは2件。
+- Step 5: qa-workflow routing、migration preflight、historical / inactive ownership、scope removal適用確認、all-blocked保持、zero-scope terminal pathを含むruntime・repository regressionを再実行した。routing fixture 69件とcase / candidate identityの同期、8つのUI target routing boundaryを専用test 2件で確認した。
+- Step 6: UI target package runtime、legacy / normal spec-analysis migration、Machine Entity projection、MANIFEST / filesystem契約、repository projectionをruntime・deterministic・semantic repository testsで再検証した。実Agent packageの`SPEC-OUT-003` deterministic evaluationは21/21 PASS。
+- Step 3 / 7: deterministic boundary testsは通過したが、Semantic Judge呼び出しは外部APIへの評価対象送信がauto-reviewで拒否されたため未実施。別経路では再試行せず、意味評価のPASSとは扱わない。
+- Step 8: current retestはruntime 339 passed / 2 Windows symlink privilege skips、deterministic shared 12 passed、deterministic repository 290 passed、semantic dataset 22 Skill / 163 cases、semantic shared 27 passed / 2 Windows symlink privilege skips、semantic repository 13 passed / 1 Windows symlink privilege skip、routing 2 passed、Codex Harness 36 passed（installed `codex-cli 0.162.0-alpha.17.2`）。`python scripts/format_tracked.py check`は207 tracked targetsでPASS。official `skills-ref`はlocal未導入のためpush後CIで検証し、latest-head CI待ち。
+- Step 9: real AgentはUI target packageを1 scenario生成し、blocked UNKNOWNを保持したpartial package、Authority 2件 / current AC 3件のMachine Entity evidence、`SPEC-OUT-003` 21/21 PASSを確認した。migration、routing、resume、複数scope lifecycle等の残りのPlan scenarioは未実施。
+- Step 10: 最終差分・安全契約レビューを実施し、continuation差分にactionable findingがないことを確認した。`format_tracked.py check`と`git diff --cached --check`は成功。Semantic Judge・残りのAgent scenarioはレビュー結果と分離して未完了とする。
 
 ## 12. 完了条件
 

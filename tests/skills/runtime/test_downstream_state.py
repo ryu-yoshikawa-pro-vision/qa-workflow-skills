@@ -5,11 +5,99 @@ import importlib.util
 import json
 import subprocess
 import sys
+import unittest
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = ROOT / "skills" / "qa-workflow" / "scripts" / "downstream_state.py"
 WORKFLOW_REF = "11111111-1111-4111-8111-111111111111"
+_SPEC = importlib.util.spec_from_file_location("downstream_state_under_test", SCRIPT)
+assert _SPEC is not None and _SPEC.loader is not None
+sys.path.insert(0, str(SCRIPT.parent))
+downstream_state = importlib.util.module_from_spec(_SPEC)
+_SPEC.loader.exec_module(downstream_state)
+
+
+def _scoped_downstream_input() -> dict[str, Any]:
+    scopes = ["SCOPE-001", "SCOPE-002"]
+    tcn = {
+        "skill": "test-condition-design",
+        "entity_type": "tcn",
+        "entity_ref": "TCN-001",
+        "content": {"tcn_id": "TCN-001", "scope_refs": scopes},
+    }
+    model = {
+        "skill": "test-condition-design",
+        "entity_type": "model",
+        "entity_ref": "ep-001",
+        "content": {
+            "model_key": "ep-001",
+            "model_type": "ep",
+            "technique_slug": "ep",
+            "parent_tcn_id": "TCN-001",
+            "scope_refs": scopes,
+        },
+    }
+    ci = {
+        "skill": "test-condition-design",
+        "entity_type": "ci",
+        "entity_ref": "TCN-001-CI01",
+        "content": {
+            "ci_id": "TCN-001-CI01",
+            "tcn_id": "TCN-001",
+            "model_key": "ep-001",
+            "scope_refs": scopes,
+        },
+    }
+    tcn_state = [{"tcn_id": "TCN-001", "status": "active", "scope_refs": scopes}]
+    model_state = [{"model_key": "ep-001", "status": "active", "scope_refs": scopes}]
+    ci_state = [{"ci_id": "TCN-001-CI01", "status": "active", "scope_refs": scopes}]
+    materialize_history = {
+        "tcn_id": "TCN-001",
+        "ci_entities": [ci],
+        "ci_id_state": ci_state,
+        "target_mapping_state": [],
+        "semantic_ci_mapping_state": [],
+        "expected_result_root_state": [],
+    }
+    return {
+        "current_entities": [tcn, model, ci],
+        "workflow_scopes": [
+            {
+                "skill": "test-condition-design",
+                "current_structure_state": {
+                    "runtime_results": [
+                        {
+                            "identity": "test-condition-design::artifact:condition_structure:all",
+                            "result": {
+                                "runtime_unit_key": "artifact:condition_structure:all",
+                                "payload": {
+                                    "tcn_id_state": tcn_state,
+                                    "model_key_state": model_state,
+                                    "inactive_materialize_history": [
+                                        materialize_history
+                                    ],
+                                },
+                            },
+                        }
+                    ],
+                    "carry_forward_entities": [],
+                    "previous_ci_id_state": ci_state,
+                },
+            }
+        ],
+    }
+
+
+def _resolution(entity_type: str, entity_ref: str) -> dict[str, object]:
+    return {
+        "skill": "test-condition-design",
+        "entity_type": entity_type,
+        "entity_ref": entity_ref,
+        "resolution": "reuse",
+        "resolved_scope_refs": ["SCOPE-001"],
+    }
 
 
 def _request(**overrides: object) -> dict[str, object]:
@@ -43,7 +131,7 @@ def _run(payload: str) -> tuple[int, dict[str, object]]:
     return completed.returncode, json.loads(completed.stdout)
 
 
-def test_unbound_first_run_returns_empty_canonical_state() -> None:
+def _test_unbound_first_run_returns_empty_canonical_state() -> None:
     code, result = _run(json.dumps(_request()))
     assert code == 0
     assert result["valid"] is True
@@ -52,7 +140,7 @@ def test_unbound_first_run_returns_empty_canonical_state() -> None:
     assert result["payload"]["requires_materialization"] is False
 
 
-def test_binding_null_and_markdown_are_rejected() -> None:
+def _test_binding_null_and_markdown_are_rejected() -> None:
     code, result = _run(json.dumps(_request(previous_qa_workflow_artifact_markdown="")))
     assert code == 0, result
     assert result["valid"] is False
@@ -60,7 +148,7 @@ def test_binding_null_and_markdown_are_rejected() -> None:
     assert result["issues"][0]["issue_type"] == "historical_artifact_unexpected"
 
 
-def test_workflow_ref_and_current_scope_partition_contracts_are_enforced() -> None:
+def _test_workflow_ref_and_current_scope_partition_contracts_are_enforced() -> None:
     bad_state = {
         "workflow_ref": "22222222-2222-4222-8222-222222222222",
         "schema_version": "1",
@@ -81,7 +169,7 @@ def test_workflow_ref_and_current_scope_partition_contracts_are_enforced() -> No
     assert result["issues"][0]["issue_type"] == "invalid_input"
 
 
-def test_duplicate_json_key_is_handled_as_invalid_input() -> None:
+def _test_duplicate_json_key_is_handled_as_invalid_input() -> None:
     code, result = _run(
         '{"workflow_ref":"x","workflow_ref":"y","workflow_state_record":{},'
         '"current_scope_ids":[],"blocked_scope_ids":[],'
@@ -93,7 +181,7 @@ def test_duplicate_json_key_is_handled_as_invalid_input() -> None:
     assert result["issues"][0]["issue_type"] == "invalid_input"
 
 
-def test_historical_v2_pair_is_checked_before_unscoped_active_state_fails_closed() -> (
+def _test_historical_v2_pair_is_checked_before_unscoped_active_state_fails_closed() -> (
     None
 ):
     workflow_test_path = (
@@ -181,3 +269,134 @@ def test_historical_v2_pair_is_checked_before_unscoped_active_state_fails_closed
     assert code == 0, result
     assert result["valid"] is False
     assert result["issues"][0]["issue_type"] == "scope_ownership_unavailable", result
+
+
+class TestDownstreamState(unittest.TestCase):
+    def test_unbound_first_run_returns_empty_canonical_state(self) -> None:
+        _test_unbound_first_run_returns_empty_canonical_state()
+
+    def test_binding_null_and_markdown_are_rejected(self) -> None:
+        _test_binding_null_and_markdown_are_rejected()
+
+    def test_workflow_ref_and_current_scope_partition_contracts_are_enforced(
+        self,
+    ) -> None:
+        _test_workflow_ref_and_current_scope_partition_contracts_are_enforced()
+
+    def test_duplicate_json_key_is_handled_as_invalid_input(self) -> None:
+        _test_duplicate_json_key_is_handled_as_invalid_input()
+
+    def test_historical_v2_pair_is_checked_before_unscoped_active_state_fails_closed(
+        self,
+    ) -> None:
+        _test_historical_v2_pair_is_checked_before_unscoped_active_state_fails_closed()
+
+    def test_blocked_scope_projects_inactive_identity_and_materialize_history(
+        self,
+    ) -> None:
+        result = downstream_state._scope_impact(
+            _scoped_downstream_input(),
+            ["SCOPE-001", "SCOPE-002"],
+            ["SCOPE-002"],
+            [],
+            [],
+        )
+        self.assertEqual(result["inactive_tcn_ids"], ["TCN-001"])
+        self.assertEqual(result["inactive_model_keys"], ["ep-001"])
+        self.assertEqual(result["inactive_ci_ids"], ["TCN-001-CI01"])
+        self.assertEqual(
+            result["inactive_materialize_history"],
+            _scoped_downstream_input()["workflow_scopes"][0]["current_structure_state"][
+                "runtime_results"
+            ][0]["result"]["payload"]["inactive_materialize_history"],
+        )
+
+    def test_blocked_scope_fails_closed_when_materialize_history_is_missing(
+        self,
+    ) -> None:
+        source = _scoped_downstream_input()
+        source["workflow_scopes"][0]["current_structure_state"]["runtime_results"][0][
+            "result"
+        ]["payload"]["inactive_materialize_history"] = []
+        with self.assertRaisesRegex(
+            downstream_state.InvalidInput, "inactive materialize history is missing"
+        ):
+            downstream_state._scope_impact(
+                source,
+                ["SCOPE-001", "SCOPE-002"],
+                ["SCOPE-002"],
+                [],
+                [],
+            )
+
+    def test_retired_scope_resolution_waits_for_applied_state_and_zero_scope_deletes(
+        self,
+    ) -> None:
+        source = _scoped_downstream_input()
+        resolutions = [
+            _resolution("tcn", "TCN-001"),
+            _resolution("model", "ep-001"),
+        ]
+        pending = downstream_state._scope_impact(
+            source, ["SCOPE-001"], [], resolutions, []
+        )
+        self.assertEqual(pending["removed_scope_ids"], ["SCOPE-002"])
+        self.assertEqual(
+            pending["scope_removal_affected_entities"][0]["last_active_content"][
+                "scope_refs"
+            ],
+            ["SCOPE-001", "SCOPE-002"],
+        )
+        self.assertEqual(
+            pending["scope_removal_state_transitions"],
+            [
+                {
+                    "skill": "test-condition-design",
+                    "entity_type": "ci",
+                    "entity_ref": "TCN-001-CI01",
+                    "resolved_scope_refs": ["SCOPE-001"],
+                    "status": "active",
+                },
+                {
+                    "skill": "test-condition-design",
+                    "entity_type": "model",
+                    "entity_ref": "ep-001",
+                    "resolved_scope_refs": ["SCOPE-001"],
+                    "status": "active",
+                },
+                {
+                    "skill": "test-condition-design",
+                    "entity_type": "tcn",
+                    "entity_ref": "TCN-001",
+                    "resolved_scope_refs": ["SCOPE-001"],
+                    "status": "active",
+                },
+            ],
+        )
+        self.assertIs(pending["requires_semantic_resolution"], False)
+        self.assertIs(pending["requires_materialization"], True)
+
+        applied = [
+            {
+                "skill": row["skill"],
+                "entity_type": row["entity_type"],
+                "entity_ref": row["entity_ref"],
+                "status": row["status"],
+                "scope_refs": row["resolved_scope_refs"],
+            }
+            for row in pending["scope_removal_state_transitions"]
+        ]
+        complete = downstream_state._scope_impact(
+            source, ["SCOPE-001"], [], resolutions, applied
+        )
+        self.assertIs(complete["requires_materialization"], False)
+
+        terminal = downstream_state._scope_impact(source, [], [], [], [])
+        self.assertIs(terminal["zero_scope_terminal"], True)
+        self.assertEqual(terminal["inactive_tcn_ids"], [])
+        self.assertEqual(terminal["inactive_model_keys"], [])
+        self.assertEqual(terminal["inactive_ci_ids"], [])
+        self.assertEqual(
+            {row["status"] for row in terminal["scope_removal_state_transitions"]},
+            {"deleted"},
+        )

@@ -332,6 +332,14 @@ rebase前の旧mainとの差分を正として実装判断しません。
 - `docs/PROJECT_CONTEXT.md`はPR #14前の19 Skill / 428 trigger / 38 deterministic / 72 semantic記述が残っていたため、Step 0でcurrent baselineへ同期する。
 - latest mainにはPR #18のformatter / lint / Codex harnessが含まれる。以降の編集・検証ではそのcurrent repository契約も適用する。
 
+### 2026-10-13 実装継続時の状態再確認
+
+- PR #16はopenで、GitHub上のcurrent headは`d5dca79b996b6aee73423245a43d645d1bcbd50d`、baseは`main`の`dcabbb218cf79f6920f5c8303e60140ab9c15f23`。local branch `feat/ui-test-target-analysis-profile`も同じheadで、Plan作成後の既存実装差分を保持している。
+- PR #14後のmain baselineは引き続き`dcabbb218cf79f6920f5c8303e60140ab9c15f23`。current branchはこのmainを含むためrebaseを行わず、force pushなしで同branchへ通常pushする。
+- PR #16 head `d5dca79` のGitHub ActionsではCode Quality、Codex Harness、Semantic Output、Agent Skillsが成功し、Deterministic Outputだけが失敗した。runnerは`.gitignore`で無視されたspec-analysis `CHANGELOG.md` package assetの欠落を報告したため、assetを明示的に再includeするignore例外とasset自体を追加した。
+- Codex Harnessは特定version pinなしで`@openai/codex@latest`を導入し、実行versionを記録する。local Codex Harnessは現在のinstalled `codex-cli 0.162.0-alpha.17.2`で36件を通過した。これはこのruntimeで実施したHarness結果であり、fresh non-shared runtime acceptance全体の代替ではない。
+- current worktreeで追加したTCD v1 cutoverとscope history回帰を含むruntime suiteは339件、deterministic repository suiteは290件、semantic datasetは22 Skill / 163 case。詳細な継続検証とPlan Step状態は `_04 §11.1` を参照する。
+
 ## 13. 完了条件
 
 - PR #14 merge後mainから実装されている

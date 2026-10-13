@@ -221,7 +221,7 @@ def materialize_request(ep: dict, *, previous: dict | None = None) -> dict:
     }
 
 
-def test_data_output(
+def build_test_data_output(
     ep: dict,
     requirements: list[dict],
     *,
@@ -573,7 +573,7 @@ class MaterializeRuntimeTests(unittest.TestCase):
             "SPEC-001",
             {"authority_id": "SPEC-001", "text": "current authority"},
         )
-        tdr = test_data_output(
+        tdr = build_test_data_output(
             ep,
             [
                 {
@@ -730,7 +730,7 @@ class MaterializeRuntimeTests(unittest.TestCase):
             for model_key, source in (("ep-001", ep_a), ("ep-002", ep_b))
             for target in source["payload"]["targets"]
         ]
-        tdr = test_data_output(
+        tdr = build_test_data_output(
             ep_a,
             [
                 {
@@ -1098,7 +1098,7 @@ class MaterializeRuntimeTests(unittest.TestCase):
                 "value": {"type": "string", "value": "admin"},
             },
         ]
-        produced = test_data_output(ep, requirements)
+        produced = build_test_data_output(ep, requirements)
         self.assertEqual(produced["runtime_status"], "ok")
         target_map = {
             target["target_ref"]: {
@@ -1157,7 +1157,7 @@ class MaterializeRuntimeTests(unittest.TestCase):
                     "value": {"type": "string", "value": value},
                 }
             )
-        produced = test_data_output(ep, requirements)
+        produced = build_test_data_output(ep, requirements)
         self.assertEqual(produced["runtime_status"], "ok")
         self.assertEqual(produced["result_status"], "ready")
 

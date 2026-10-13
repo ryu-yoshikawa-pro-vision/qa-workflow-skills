@@ -80,4 +80,4 @@ PR #18では承認UIのprobe、手動cancel、破棄操作の状態不変確認�
 
 ## Validationの証拠
 
-CIのcontract test、利用可能な固定版CLIの`execpolicy check`、公式`skills-ref` validationは静的構造と回帰を検査します。これらはfresh Codex runtime acceptanceを代替せず、PR #18でもそのように記載しません。特にargvだけの`execpolicy check`は完全なPOSIX / Windows shell commandの分解やHook dispatchを証明しません。実runtimeを利用できない、または対象versionと一致しない場合はその範囲を未検証とし、他の完了条件を満たしていればそれだけを理由に実装完了を止めません。実行したruntime検証で不具合を確認した場合はFAILとして修正します。
+CIのcontract test、実行環境にインストールされたCodex CLIの`execpolicy check`、公式`skills-ref` validationは静的構造と回帰を検査します。Codex Harnessは使用versionを記録し、version一致ではなく利用可能なCLI機能と安全contractを検証します。これらはfresh Codex runtime acceptanceを代替せず、PR #18でもそのように記載しません。特にargvだけの`execpolicy check`は完全なPOSIX / Windows shell commandの分解やHook dispatchを証明しません。必要なCLI機能を利用できない、挙動が変わった、またはsession条件を確認できない場合は、その機能・範囲を未検証または互換性問題として記録します。他の完了条件を満たしていれば、version番号だけを理由に実装完了を止めません。実行したruntime検証で不具合を確認した場合はFAILとして修正します。

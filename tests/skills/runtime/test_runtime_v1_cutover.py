@@ -4,6 +4,7 @@ import hashlib
 import json
 import subprocess
 import sys
+import unittest
 from pathlib import Path
 from typing import Any
 
@@ -148,7 +149,7 @@ def _run(artifact: str) -> tuple[int, dict[str, Any]]:
     return completed.returncode, json.loads(completed.stdout)
 
 
-def test_trd_cutover_projects_exact_v1_map_into_complete_v2_input() -> None:
+def _test_trd_cutover_projects_exact_v1_map_into_complete_v2_input() -> None:
     code, response = _run(_artifact())
     assert code == 0
     assert response["valid"] is True
@@ -165,8 +166,16 @@ def test_trd_cutover_projects_exact_v1_map_into_complete_v2_input() -> None:
     assert normalized["zero_scope_terminal"] is False
 
 
-def test_trd_cutover_fails_closed_on_v1_fingerprint_drift() -> None:
+def _test_trd_cutover_fails_closed_on_v1_fingerprint_drift() -> None:
     code, response = _run(_artifact(tamper_result=True))
     assert code == 0
     assert response["valid"] is False
     assert response["issues"][0]["blocking"] is True
+
+
+class TestRuntimeV1Cutover(unittest.TestCase):
+    def test_trd_cutover_projects_exact_v1_map_into_complete_v2_input(self) -> None:
+        _test_trd_cutover_projects_exact_v1_map_into_complete_v2_input()
+
+    def test_trd_cutover_fails_closed_on_v1_fingerprint_drift(self) -> None:
+        _test_trd_cutover_fails_closed_on_v1_fingerprint_drift()
