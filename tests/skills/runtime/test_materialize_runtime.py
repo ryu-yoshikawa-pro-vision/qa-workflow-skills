@@ -55,6 +55,7 @@ def current_model_content(model_key: str = "ep-001") -> dict:
         "model_key": model_key,
         "model_type": "ep",
         "parent_tcn_id": "TCN-001",
+        "scope_refs": [],
         "selection_key": f"SEL-{model_key[-3:]}",
         "selection_source": "analysis",
         "status": "active",
@@ -66,7 +67,7 @@ def ep_metadata(model_key: str = "ep-001") -> dict:
     return {
         "envelope_version": "1",
         "skill": "test-condition-design",
-        "runtime_contract_version": "runtime-v1",
+        "runtime_contract_version": "runtime-v2",
         "generator_contract_version": "equivalence-partitions-v1",
         "runtime_unit_key": f"model:{model_key}",
         "model_key": model_key,
@@ -88,8 +89,8 @@ def materialize_metadata() -> dict:
     return {
         "envelope_version": "1",
         "skill": "test-condition-design",
-        "runtime_contract_version": "runtime-v1",
-        "generator_contract_version": "materialize-coverage-v1",
+        "runtime_contract_version": "runtime-v2",
+        "generator_contract_version": "materialize-coverage-v2",
         "runtime_unit_key": "artifact:materialize_coverage:TCN-001",
         "model_key": None,
         "model_type": None,
@@ -103,7 +104,7 @@ def materialize_metadata() -> dict:
                 "skill": "test-condition-design",
                 "entity_type": "tcn",
                 "entity_ref": "TCN-001",
-                "content": {"tcn_id": "TCN-001"},
+                "content": {"tcn_id": "TCN-001", "scope_refs": []},
             },
             {
                 "skill": "test-condition-design",
@@ -200,6 +201,7 @@ def materialize_request(ep: dict, *, previous: dict | None = None) -> dict:
                     "technique_slug": "ep",
                     "parent_tcn_id": "TCN-001",
                     "content_fingerprint": digest(current_model_content()),
+                    "scope_refs": [],
                 }
             ],
             "models": [model_result],
@@ -212,6 +214,9 @@ def materialize_request(ep: dict, *, previous: dict | None = None) -> dict:
             "previous_ci_ids": previous.get("ci_id_state", []),
             "previous_expected_result_roots": [],
             "merge_groups": [],
+            "inactive_ci_ids": [],
+            "inactive_materialize_history": [],
+            "zero_scope_terminal": False,
         },
     }
 
@@ -257,7 +262,7 @@ def test_data_output(
     metadata = {
         "envelope_version": "1",
         "skill": "test-condition-design",
-        "runtime_contract_version": "runtime-v1",
+        "runtime_contract_version": "runtime-v2",
         "generator_contract_version": "test-data-requirements-v1",
         "runtime_unit_key": "artifact:test_data_requirements:all",
         "model_key": None,
@@ -296,6 +301,150 @@ def model_result_for(ep: dict, model_key: str) -> dict:
 
 
 class MaterializeRuntimeTests(unittest.TestCase):
+    def test_model_scope_reaches_ci_and_inactive_history_reactivates_same_ids(
+        self,
+    ) -> None:
+        ep = ep_result()
+        request = materialize_request(ep)
+        model_content = current_model_content() | {"scope_refs": ["SCOPE-001"]}
+        request["metadata"]["upstream_entities"] = [
+            {
+                "skill": "test-condition-design",
+                "entity_type": "tcn",
+                "entity_ref": "TCN-001",
+                "content": {"tcn_id": "TCN-001", "scope_refs": ["SCOPE-001"]},
+            },
+            {
+                "skill": "test-condition-design",
+                "entity_type": "model",
+                "entity_ref": "ep-001",
+                "content": model_content,
+            },
+        ]
+        request["input"]["active_model_metadata"][0]["scope_refs"] = ["SCOPE-001"]
+        request["input"]["active_model_metadata"][0]["content_fingerprint"] = digest(
+            model_content
+        )
+        first = run_script(MATERIALIZE_SCRIPT, request)
+        self.assertEqual(first["runtime_status"], "ok", first)
+        ci_ids = [row["ci_id"] for row in first["payload"]["ci_id_state"]]
+        self.assertTrue(ci_ids)
+        self.assertTrue(
+            all(
+                row["scope_refs"] == ["SCOPE-001"]
+                for row in first["payload"]["ci_id_state"]
+            )
+        )
+        self.assertTrue(
+            all(
+                entity["content"]["scope_refs"] == ["SCOPE-001"]
+                for entity in first["payload"]["entities"]
+            )
+        )
+        history = {
+            "tcn_id": "TCN-001",
+            "ci_entities": first["payload"]["entities"],
+            "ci_id_state": first["payload"]["ci_id_state"],
+            "target_mapping_state": first["payload"]["target_mapping_state"],
+            "semantic_ci_mapping_state": first["payload"]["semantic_ci_mapping_state"],
+            "expected_result_root_state": first["payload"][
+                "expected_result_root_state"
+            ],
+        }
+
+        inactive_request = materialize_request(ep)
+        inactive_request["metadata"]["upstream_entities"] = request["metadata"][
+            "upstream_entities"
+        ]
+        inactive_request["input"].update(
+            {
+                "active_model_metadata": [],
+                "models": [],
+                "target_annotations": [],
+                "previous_ci_ids": [],
+                "previous_target_id_map": [],
+                "previous_semantic_ci_map": [],
+                "previous_expected_result_roots": [],
+                "inactive_ci_ids": ci_ids,
+                "inactive_materialize_history": [history],
+            }
+        )
+        inactive_request["input"]["semantic_coverage_items"] = []
+        inactive = run_script(MATERIALIZE_SCRIPT, inactive_request)
+        self.assertEqual(inactive["runtime_status"], "ok", inactive)
+        self.assertEqual(
+            {
+                row["ci_id"]
+                for row in inactive["payload"]["ci_id_state"]
+                if row["status"] == "inactive"
+            },
+            set(ci_ids),
+        )
+
+        reactivation_request = materialize_request(ep)
+        reactivation_request["metadata"]["upstream_entities"] = request["metadata"][
+            "upstream_entities"
+        ]
+        reactivation_request["input"]["active_model_metadata"][0]["scope_refs"] = [
+            "SCOPE-001"
+        ]
+        reactivation_request["input"]["active_model_metadata"][0][
+            "content_fingerprint"
+        ] = digest(model_content)
+        reactivation_request["input"]["inactive_materialize_history"] = [history]
+        reactivated = run_script(MATERIALIZE_SCRIPT, reactivation_request)
+        self.assertEqual(reactivated["runtime_status"], "ok", reactivated)
+        self.assertEqual(
+            {
+                row["ci_id"]
+                for row in reactivated["payload"]["ci_id_state"]
+                if row["status"] == "active"
+            },
+            set(ci_ids),
+        )
+
+    def test_zero_scope_terminal_deletes_inactive_ci_and_clears_mapping(self) -> None:
+        ep = ep_result()
+        first = run_script(MATERIALIZE_SCRIPT, materialize_request(ep))
+        history = {
+            "tcn_id": "TCN-001",
+            "ci_entities": first["payload"]["entities"],
+            "ci_id_state": first["payload"]["ci_id_state"],
+            "target_mapping_state": first["payload"]["target_mapping_state"],
+            "semantic_ci_mapping_state": first["payload"]["semantic_ci_mapping_state"],
+            "expected_result_root_state": first["payload"][
+                "expected_result_root_state"
+            ],
+        }
+        request = materialize_request(ep)
+        request["input"].update(
+            {
+                "active_model_metadata": [],
+                "models": [],
+                "semantic_coverage_items": [],
+                "target_annotations": [],
+                "target_dispositions": [],
+                "test_data_requirements": [],
+                "merge_groups": [],
+                "previous_target_id_map": [],
+                "previous_semantic_ci_map": [],
+                "previous_ci_ids": [],
+                "previous_expected_result_roots": [],
+                "inactive_materialize_history": [history],
+                "zero_scope_terminal": True,
+            }
+        )
+        result = run_script(MATERIALIZE_SCRIPT, request)
+        self.assertEqual(result["runtime_status"], "ok", result)
+        self.assertEqual(result["payload"]["target_mapping_state"], [])
+        self.assertTrue(
+            all(
+                row["status"] == "deleted" and row["scope_refs"] == []
+                for row in result["payload"]["ci_id_state"]
+            )
+        )
+        self.assertEqual(result["payload"]["entities"], [])
+
     def test_targets_materialize_to_stable_ci_and_machine_entity(self) -> None:
         ep = ep_result()
         result = run_script(MATERIALIZE_SCRIPT, materialize_request(ep))
@@ -489,7 +638,7 @@ class MaterializeRuntimeTests(unittest.TestCase):
             },
             {
                 ("test-condition-design", "tcn", "TCN-001"): digest(
-                    {"tcn_id": "TCN-001"}
+                    {"tcn_id": "TCN-001", "scope_refs": []}
                 ),
                 ("test-condition-design", "model", "ep-001"): digest(
                     current_model_content()
@@ -560,7 +709,10 @@ class MaterializeRuntimeTests(unittest.TestCase):
             model_key="ep-002",
         )
         tcn = materialize_runtime.make_machine_entity(
-            "test-condition-design", "tcn", "TCN-001", {"tcn_id": "TCN-001"}
+            "test-condition-design",
+            "tcn",
+            "TCN-001",
+            {"tcn_id": "TCN-001", "scope_refs": []},
         )
         authority = materialize_runtime.make_machine_entity(
             "spec-analysis",
@@ -654,6 +806,7 @@ class MaterializeRuntimeTests(unittest.TestCase):
                 "technique_slug": "ep",
                 "parent_tcn_id": "TCN-001",
                 "content_fingerprint": entity["content_fingerprint"],
+                "scope_refs": entity["content"].get("scope_refs", []),
             }
             for key, entity in (("ep-001", model_a), ("ep-002", model_b))
         ]

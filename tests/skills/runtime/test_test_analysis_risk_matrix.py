@@ -14,7 +14,7 @@ def metadata() -> dict:
     return {
         "envelope_version": "1",
         "skill": "test-analysis",
-        "runtime_contract_version": "runtime-v1",
+        "runtime_contract_version": "runtime-v2",
         "generator_contract_version": "risk-matrix-v1",
         "runtime_unit_key": "artifact:risk_matrix:all",
         "model_key": None,

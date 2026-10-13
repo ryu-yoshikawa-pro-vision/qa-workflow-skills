@@ -4,6 +4,7 @@
 2026-10-01_201500_ui-test-target-analysis-mode.md
 
 関連Plan:
+
 - 2026-10-01_201500_ui-test-target-analysis-mode_02_spec-analysis-package.md
 - 2026-10-01_201500_ui-test-target-analysis-mode_05_llm-deterministic-boundaries.md
 - 2026-10-01_201500_ui-test-target-analysis-mode_06_package-schema-and-helper-contracts.md
@@ -18,15 +19,16 @@
 behavior decompositionの適用単位はpackage全体ではなく、`00_scope_and_context.md`で確定した分析対象機能scopeです。
 
 Scope ID:
+
 - `SCOPE-001` から開始し、最低3桁で連番採番する。`SCOPE-999` の次は `SCOPE-1000`
 
 各scopeについて次を判定します。
 
-| UI操作判定 | Behavior Decomposition | 扱い |
-| --- | --- | --- |
-| あり | required | US → UC → Behavior → ACを実施 |
-| なし | not-applicable | UIOP / US / UC / Behavior / ACを作らない |
-| 未確定 | blocked | UNKNOWNを作成し、適用可否を推測しない |
+| UI操作判定 | Behavior Decomposition | 扱い                                     |
+| ---------- | ---------------------- | ---------------------------------------- |
+| あり       | required               | US → UC → Behavior → ACを実施            |
+| なし       | not-applicable         | UIOP / US / UC / Behavior / ACを作らない |
+| 未確定     | blocked                | UNKNOWNを作成し、適用可否を推測しない    |
 
 UI操作の有無自体はLLMが資料の意味から判断します。`Behavior Decomposition` はその結果から `あり → required / なし → not-applicable / 未確定 → blocked` とhelperが決定論生成し、LLMへ別判断として入力させません。ID形式、UNKNOWN参照、下位tableの有無もhelperが決定論検証します。
 
@@ -37,6 +39,7 @@ UI操作ありと確定したscopeは意味モデル上 `Behavior Decomposition=
 ここで `Behavior Decomposition=required` は適用状態でありworkflow readinessではありません。blocked下位row、identity未確定のblocking UNKNOWN、current UCの `判定=未定義` 等が残る間、そのSCOPEは後続工程に対してblockedです。scope-level `Behavior Decomposition=blocked` はUI操作有無そのものが `未確定` の場合だけです。
 
 UI操作には少なくとも次を含みます。
+
 - button / link / menu / tab等による操作
 - form入力 / 選択 / submit
 - modal / dialog内操作
@@ -77,15 +80,17 @@ User Storyへ進む前に、required scopeのUI操作母集団を明示します
 #### UI操作一覧
 
 | 操作ID | Scope ID | Actor / Role | 対象構造ID | 操作 | 関連仕様項目ID | 対応UC ID | 状態 | 関連UNKNOWN ID |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ------ | -------- | ------------ | ---------- | ---- | -------------- | --------- | ---- | -------------- |
 
 ID: `UIOP-001` から開始し、最低3桁で連番採番する。999の次は1000
 
 状態:
+
 - mapped
 - blocked
 
 規則:
+
 - mapped: **AC freshnessでいうcurrent UIOP**。対応UC IDが1件以上、関連UNKNOWN IDは空
 - blocked: 対応UC IDは空を許可し、関連UNKNOWN IDが1件以上必須
 - `対象構造ID` は `_05` のUI構造ID exact prefix集合だけを許可する。FIELD / RULE / FLOW / NOTIFY / INTERACTを入れず、同一PAGE上のdomain itemをhelperが逆引きしない
@@ -101,16 +106,15 @@ ID: `UIOP-001` から開始し、最低3桁で連番採番する。999の次は1
 
 blocked rowは、semantic identityが確定済みで「自身の完成に必要なfieldが未確定」または「同じidentityのancestorがblocked」の場合に同じstable IDを持ちます。semantic identity自体を確定できない場合はIDを発行しません。Blocking UNKNOWNの置き場所は階層ごとに固定し、実装者が任意のancestorへ付け替えません。identityの同一性判断はLLM、下記のfield充足・UNKNOWN配置・ancestor由来effective stateはhelperが検証・導出します。
 
-| row | current / mappedで必須 | blockedで必須 | blockedで空を許可 | IDを発行しない条件 |
-| --- | --- | --- | --- | --- |
-| UIOP | Scope ID、Actor / Role、対象構造ID、操作、関連仕様項目ID、対応UC ID。関連UNKNOWN IDは空 | Scope ID、操作、関連UNKNOWN ID。Actor / Role・対象構造ID・対応UC ID・関連仕様項目IDは確定済み分だけ保持。対応US / UC identity未確定が原因なら既存root Blocking UNKNOWNを参照する | Actor / Role、対象構造ID、対応UC ID、関連仕様項目ID | LLMがscope内の操作identity自体を区別できない |
-| US | Scope ID、Actor / Role、Goal、関連仕様項目ID。関連UNKNOWN IDは空 | Scope ID、Actor / RoleまたはGoalの少なくとも一方、関連UNKNOWN ID。確定済み関連仕様項目IDは保持 | Actor / RoleまたはGoalの未確定側、関連仕様項目ID | LLMがActor / Goalの組としてUser Story identityを確定できない |
-| UC | 関連US ID、Use Case、Trigger、Success Postcondition、関連仕様項目ID。Preconditionsは該当なしなら空可。関連UNKNOWN IDは空 | 関連US ID、Use Case。自身のblockerがある場合は関連UNKNOWN ID1件以上、ancestor US由来だけのblockedなら空可。Trigger / Preconditions / Success Postcondition / 関連仕様項目IDは確定済み分だけ保持 | Trigger、Preconditions、Success Postcondition、関連仕様項目ID、ancestor由来時の関連UNKNOWN ID | LLMが親USに対するUse Case identityを確定できない |
-| Behavior | UC ID、関連操作ID1件以上、結果分類、振る舞い、Postcondition / Result、関連仕様項目ID。関連UNKNOWN IDは空 | currentまたはblocked UC ID、結果分類、振る舞い。自身のblockerがある場合は関連UNKNOWN ID1件以上、ancestor UC由来だけのblockedなら空可。関連操作ID / Postcondition / Result / 関連仕様項目IDは確定済み分だけ保持 | 関連操作ID、Postcondition / Result、関連仕様項目ID、ancestor由来時の関連UNKNOWN ID | Behaviorの存在・identity自体を確定できない |
-| AC | Behavior ID、Acceptance Criteria、current SPEC / DECISION / approved ASMの関連仕様項目ID。関連UNKNOWN IDは空 | currentまたはblocked Behavior ID。自身のblockerがある場合は関連UNKNOWN ID1件以上、ancestor Behavior由来だけのblockedなら空可。Acceptance Criteria / 関連仕様項目ID / 関連構造IDは確定済み分だけ保持 | Acceptance Criteria、関連仕様項目ID、関連構造ID、ancestor由来時の関連UNKNOWN ID | ACの存在・identity自体を確定できない |
+| row      | current / mappedで必須                                                                                                   | blockedで必須                                                                                                                                                                                                  | blockedで空を許可                                                                             | IDを発行しない条件                                           |
+| -------- | ------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| UIOP     | Scope ID、Actor / Role、対象構造ID、操作、関連仕様項目ID、対応UC ID。関連UNKNOWN IDは空                                  | Scope ID、操作、関連UNKNOWN ID。Actor / Role・対象構造ID・対応UC ID・関連仕様項目IDは確定済み分だけ保持。対応US / UC identity未確定が原因なら既存root Blocking UNKNOWNを参照する                               | Actor / Role、対象構造ID、対応UC ID、関連仕様項目ID                                           | LLMがscope内の操作identity自体を区別できない                 |
+| US       | Scope ID、Actor / Role、Goal、関連仕様項目ID。関連UNKNOWN IDは空                                                         | Scope ID、Actor / RoleまたはGoalの少なくとも一方、関連UNKNOWN ID。確定済み関連仕様項目IDは保持                                                                                                                 | Actor / RoleまたはGoalの未確定側、関連仕様項目ID                                              | LLMがActor / Goalの組としてUser Story identityを確定できない |
+| UC       | 関連US ID、Use Case、Trigger、Success Postcondition、関連仕様項目ID。Preconditionsは該当なしなら空可。関連UNKNOWN IDは空 | 関連US ID、Use Case。自身のblockerがある場合は関連UNKNOWN ID1件以上、ancestor US由来だけのblockedなら空可。Trigger / Preconditions / Success Postcondition / 関連仕様項目IDは確定済み分だけ保持                | Trigger、Preconditions、Success Postcondition、関連仕様項目ID、ancestor由来時の関連UNKNOWN ID | LLMが親USに対するUse Case identityを確定できない             |
+| Behavior | UC ID、関連操作ID1件以上、結果分類、振る舞い、Postcondition / Result、関連仕様項目ID。関連UNKNOWN IDは空                 | currentまたはblocked UC ID、結果分類、振る舞い。自身のblockerがある場合は関連UNKNOWN ID1件以上、ancestor UC由来だけのblockedなら空可。関連操作ID / Postcondition / Result / 関連仕様項目IDは確定済み分だけ保持 | 関連操作ID、Postcondition / Result、関連仕様項目ID、ancestor由来時の関連UNKNOWN ID            | Behaviorの存在・identity自体を確定できない                   |
+| AC       | Behavior ID、Acceptance Criteria、current SPEC / DECISION / approved ASMの関連仕様項目ID。関連UNKNOWN IDは空             | currentまたはblocked Behavior ID。自身のblockerがある場合は関連UNKNOWN ID1件以上、ancestor Behavior由来だけのblockedなら空可。Acceptance Criteria / 関連仕様項目ID / 関連構造IDは確定済み分だけ保持            | Acceptance Criteria、関連仕様項目ID、関連構造ID、ancestor由来時の関連UNKNOWN ID               | ACの存在・identity自体を確定できない                         |
 
 `current / mapped` rowの関連仕様項目IDは `_06` のnormative traceability contractに従います。US / UC / Behavior / ACの `関連構造ID` は `_05` のUI構造ID + domain item ID exact prefix集合だけを許可し、ACの意味を制約するdomain itemはLLMがこの明示edgeへ含めます。自身の意味不足でblockedになるrowはUNKNOWNを正本とし、未確定fieldを推測して埋めません。ancestor由来だけのeffective blockedはancestorのUNKNOWNを参照元とし、子rowへ複製しません。`状態` はhelper-ownedで、materialize callerは送信しません。
-
 
 identity未確定時のBlocking UNKNOWN配置を次に固定します。
 
@@ -141,15 +145,17 @@ User StoryはUI操作のActorと達成目的を安定化する上位単位です
 #### User Story一覧
 
 | US ID | Scope ID | Actor / Role | Goal | 関連仕様項目ID | 関連構造ID | 状態 | 関連UNKNOWN ID |
-| --- | --- | --- | --- | --- | --- | --- | --- |
+| ----- | -------- | ------------ | ---- | -------------- | ---------- | ---- | -------------- |
 
 ID: `US-001` から開始し、最低3桁で連番採番する。999の次は1000
 
 状態:
+
 - current
 - blocked
 
 規則:
+
 - required scopeではUser Story一覧を必須とする
 - current: Actor / Role、Goal、仕様参照が確定し、関連UNKNOWN IDは空
 - blocked: 確定できない意味を推測せず、関連UNKNOWN IDを1件以上持つ
@@ -166,11 +172,12 @@ Use CaseはActorが1つの目的を達成するための意味あるUI利用シ�
 #### Use Case一覧
 
 | UC ID | 関連US ID | Use Case | Trigger | Preconditions | Success Postcondition | 関連仕様項目ID | 関連構造ID | 状態 | 関連UNKNOWN ID |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ----- | --------- | -------- | ------- | ------------- | --------------------- | -------------- | ---------- | ---- | -------------- |
 
 ID: `UC-001` から開始し、最低3桁で連番採番する。999の次は1000
 
 規則:
+
 - 関連US IDは1件以上必須
 - 複数USが同じUCを共有する場合はUCを意味なく複製しない
 - 1つのUCが参照するUSは同じScope IDに属する
@@ -189,11 +196,12 @@ BehaviorはUse Case内の意味ある振る舞い単位です。
 #### Behavior一覧
 
 | Behavior ID | UC ID | 関連操作ID | 結果分類 | 振る舞い | Postcondition / Result | 関連仕様項目ID | 関連構造ID | 状態 | 関連UNKNOWN ID |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ----------- | ----- | ---------- | -------- | -------- | ---------------------- | -------------- | ---------- | ---- | -------------- |
 
 ID: `BH-001` から開始し、最低3桁で連番採番する。999の次は1000
 
 結果分類:
+
 - 正常: ユーザーの主目的が仕様どおり達成される振る舞い
 - 準正常: 入力、権限、業務条件、状態等の仕様上想定された条件により通常成功とは異なるが、製品が制御された結果を返す振る舞い
 - 例外: システム、外部連携、環境等の異常・失敗条件により通常処理を完了できず、仕様上定義されたエラー / 回復結果となる振る舞い
@@ -203,10 +211,12 @@ ID: `BH-001` から開始し、最低3桁で連番採番する。999の次は100
 別の「基本 / 代替 / 例外」分類軸は導入しません。必要なflow差はBehavior自体の意味として分離します。
 
 状態:
+
 - current
 - blocked
 
 規則:
+
 - current Behaviorはcurrent UCだけを親に持つ。blocked Behaviorはcurrentまたはblocked UCを親にでき、親UCのblockedだけが原因なら自身の関連UNKNOWN IDは空でよい
 - current Behaviorは意味上関係するmapped UIOPを`関連操作ID`へ1件以上明示する。各UIOPは同じScopeに属し、`対応UC ID`にそのBehaviorのUC IDを含む。どのUIOPを関連付けるかはLLMが判断し、helperは存在・state・UC / Scope整合だけを検証する
 - blocked Behaviorは確定済みの`関連操作ID`だけを保持でき、関係自体が未確定なら空を許可する。blocked UIOPを参照する場合は同じScopeだけを許可し、current Behaviorからblocked UIOPを参照しない
@@ -224,14 +234,16 @@ ID: `BH-001` から開始し、最低3桁で連番採番する。999の次は100
 #### Use Case振る舞い完全性
 
 | UC ID | 結果分類 | 判定 | 関連Behavior ID | 関連仕様項目ID | 関連UNKNOWN ID | 理由 / 根拠 |
-| --- | --- | --- | --- | --- | --- | --- |
+| ----- | -------- | ---- | --------------- | -------------- | -------------- | ----------- |
 
 判定:
+
 - 定義あり
 - なし
 - 未定義
 
 deterministic contract:
+
 - current UCについて正常 / 準正常 / 例外が各1行存在する
 - blocked UCについてこの表のrowを生成しない
 - `定義あり` → 関連Behavior IDが1件以上で、すべてcurrent Behavior。関連UNKNOWN IDは空
@@ -248,15 +260,17 @@ Acceptance CriteriaはBehaviorが仕様上成立したと判断できる受入�
 #### Acceptance Criteria一覧
 
 | AC ID | Behavior ID | Acceptance Criteria | 関連仕様項目ID | 関連構造ID | 状態 | 関連UNKNOWN ID |
-| --- | --- | --- | --- | --- | --- | --- |
+| ----- | ----------- | ------------------- | -------------- | ---------- | ---- | -------------- |
 
 ID: `AC-001` から開始し、最低3桁で連番採番する。999の次は1000
 
 状態:
+
 - current
 - blocked
 
 規則:
+
 - current Behaviorは1件以上のcurrentまたはblocked ACを持つ
 - current ACはcurrent Behaviorだけを親に持ち、ACへ到達するBehavior / UC / 関連USはすべてcurrentであることを要求する
 - blocked ACはsemantic identityが既知のACが一時的にcurrentでなくなる場合に使用し、親Behaviorはcurrentまたはblockedを許可する。AC自身の未確定事項でblockedになる場合は `関連UNKNOWN ID` を1件以上必須とし、ancestor Behavior由来だけでeffective blockedになる場合は空を許可してancestorのUNKNOWNを複製しない
@@ -276,6 +290,7 @@ ID: `AC-001` から開始し、最低3桁で連番採番する。999の次は100
 IDへActor、結果分類等のmutable semanticsを埋め込みません。
 
 使用:
+
 - SCOPE-xxx
 - UIOP-xxx
 - US-xxx
@@ -328,6 +343,7 @@ Acceptance CriteriaはTest Requirementそのものではありません。
 1:1を強制しません。
 
 許可:
+
 - 1 AC → 複数TR
 - 複数AC → 1 TR（同じ検証責務へ安全に統合できる場合）
 
@@ -409,12 +425,14 @@ semanticでは次を確認します。
 既存caseを壊さず、新契約を専用caseで評価します。
 
 spec-analysis:
+
 - SPEC-OUT-003へbehavior decomposition deterministic contractを追加
 - SPEC-SEM-003の複雑UI packageに複数scope、UIOP / US / UC / Behavior / AC、current / blocked、正常 / 準正常 / 例外を含める。同一UC内に複数UIOP / Behavior / ACを置き、Behaviorの`関連操作ID`が意味上必要なUIOPだけを結ぶことを評価する
 - SPEC-OUT-003 / repository regressionへ `known UIOP + US identity unknown`、`known UIOP + UC identity unknown`、UNKNOWN解消後のsame UIOP ID mapped復帰を追加し、原因UNKNOWNの複製を要求しないことを確認する
 - 既存normal spec-analysis caseでUI操作がない場合にdecompositionを生成しない回帰を確認
 
 test-requirement-design:
+
 - TR-OUT-003を追加
   - known current AC
   - linked AC
@@ -428,6 +446,7 @@ test-requirement-design:
   - 複数AC統合 / 1AC複数TRを意味に応じて扱う
 
 PR #14後baselineからPR #16全体の現在Plan増分:
+
 - Skill: +0
 - Trigger: +0
 - Deterministic output: +2
@@ -440,6 +459,7 @@ PR #14後baselineからPR #16全体の現在Plan増分:
 - qa-workflow routing: +8
 
 PR #14 baselineが22 Skill / 488 trigger / 44 deterministic / 155 semantic / 61 routingなら、PR #16後の現在Plan期待値は:
+
 - 22 Skill
 - 488 trigger
 - 46 deterministic
@@ -482,4 +502,3 @@ legacy UI target packageにUS / UC / Behavior / ACが存在しない場合でも
 - US / UC / Behavior変更でも関連AC Entity fingerprintが変わる
 - test-requirement-designまで進むworkflowではcurrent ACがTRまたは明示的dispositionへ閉じる。仕様理解packageだけの要求ではこのclosureを完了条件にしない
 - factor / value / combinationはtest-condition-designへ残る
-

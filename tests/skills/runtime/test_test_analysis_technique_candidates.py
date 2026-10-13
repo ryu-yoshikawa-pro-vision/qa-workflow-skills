@@ -28,7 +28,7 @@ def metadata(key: str = "selection-001") -> dict:
     return {
         "envelope_version": "1",
         "skill": "test-analysis",
-        "runtime_contract_version": "runtime-v1",
+        "runtime_contract_version": "runtime-v2",
         "generator_contract_version": "technique-candidates-v1",
         "runtime_unit_key": f"artifact:technique_candidates:{key}",
         "model_key": None,

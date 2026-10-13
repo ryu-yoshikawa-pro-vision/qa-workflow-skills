@@ -73,6 +73,14 @@
 
 共通の扱いの意味は`qa-workflow`、要求化固有の判断は本Skillを正本とします。
 
+### Acceptance Criteria
+
+UIテスト対象分析packageを入力として使うartifact modeでは、各テスト要求に意味上対応するcurrent Acceptance CriteriaのIDを`関連AC ID`へ明示します。ACの文章をそのまま言い換えるだけでなく、保証する検証責務へ変換し、1件のACから複数要求を作る場合や複数ACを1要求へまとめる場合は責務の同一性を根拠に判断します。ACと要求の1対1対応は強制しません。
+
+対象内の各current ACは、いずれかのテスト要求へ接続するか、`Acceptance Criteria`種別で`テスト要求を作らない上流項目`へ明示して閉じます。ACをリンクしても、関連Authorityへの検証責務が閉じたとはみなしません。現在有効な仕様根拠は要求の根拠として別途リンクするか、Authority Dispositionへ閉じます。ACにない具体条件、値、組合せを要求へ先回りして追加しません。
+
+direct modeまたはACなしの従来workflowでは、`関連AC ID`を`-`とし、既存のAuthority / Product Risk closureを維持します。UI target artifact modeではcurrent AC Entityを上流依存として保持し、親Behavior・UC・USおよびACが明示するUI操作・関連構造の変更を対象TRのfreshnessへ伝播させます。
+
 ## 分割・統合の判断
 
 1つにまとめてよいのは、守るべき製品挙動、現在有効な仕様根拠、失敗時の意味、テストレベルが同じ検証責務として扱える場合です。
@@ -121,6 +129,7 @@
 ## 品質ゲート
 
 - 各テスト要求が現在有効な仕様根拠へ追跡できる
+- artifact modeではcurrent Acceptance Criteriaが要求または明示Dispositionへ閉じ、AC linkをAuthority closureと混同しない
 - 対象内の各仕様根拠がテスト要求または明示した扱いへ閉じている
 - 対象内の各プロダクトリスクがテスト要求または明示した扱いへ閉じている
 - 上流記載の単なる言い換えではなく検証責務になっている

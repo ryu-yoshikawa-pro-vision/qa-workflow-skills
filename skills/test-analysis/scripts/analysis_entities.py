@@ -758,5 +758,6 @@ if __name__ == "__main__":
             generator=GENERATOR,
             generator_contract_version=GENERATOR_CONTRACT_VERSION,
             generator_path=SCRIPT_PATH,
+            aggregate=True,
         )
     )

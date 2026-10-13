@@ -20,7 +20,7 @@ def metadata(static_data_versions=None) -> dict:
     return {
         "envelope_version": "1",
         "skill": "test-condition-design",
-        "runtime_contract_version": "runtime-v1",
+        "runtime_contract_version": "runtime-v2",
         "generator_contract_version": "ui-pattern-candidates-v1",
         "runtime_unit_key": "model:ui-001",
         "model_key": "ui-001",

@@ -20,7 +20,7 @@ def metadata() -> dict:
     return {
         "envelope_version": "1",
         "skill": "test-condition-design",
-        "runtime_contract_version": "runtime-v1",
+        "runtime_contract_version": "runtime-v2",
         "generator_contract_version": "classification-tree-v1",
         "runtime_unit_key": "model:classification-001",
         "model_key": "classification-001",

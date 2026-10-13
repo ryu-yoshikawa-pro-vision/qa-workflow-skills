@@ -36,6 +36,30 @@
       "title": "推測抑制",
       "description": "明示されていない内容をSPEC / DECISIONとして確定していないか。",
       "critical": true
+    },
+    {
+      "id": "SEM-SPEC-007",
+      "title": "UI振る舞い分解とUNKNOWN closure",
+      "description": "UI操作、US / UC / Behavior / AC、構造・domain itemを意味上必要な粒度で分解し、未確定事項を影響階層へ閉じているか。",
+      "critical": true
+    },
+    {
+      "id": "SEM-SPEC-008",
+      "title": "stable identityとpackage lifecycle",
+      "description": "同一identityの再開、別論点の新規ID、明示retire、version更新とlegacy migrationを整合して扱っているか。",
+      "critical": true
+    },
+    {
+      "id": "SEM-SPEC-009",
+      "title": "repository evidenceとAuthority owner境界",
+      "description": "repository事実を仕様Authorityへ昇格せず、複数Repository baselineとcanonical DEC / ASM ownerを保持しているか。",
+      "critical": true
+    },
+    {
+      "id": "SEM-SPEC-010",
+      "title": "conditional file trigger",
+      "description": "ファイル機能の適用条件を意味に沿って区別し、未確定triggerをUNKNOWNへ閉じているか。",
+      "critical": true
     }
   ]
 }

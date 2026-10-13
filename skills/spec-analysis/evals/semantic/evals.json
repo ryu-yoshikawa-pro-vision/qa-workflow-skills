@@ -12,6 +12,36 @@
       "input": "cases/case-002/input.md",
       "reference": "cases/case-002/reference.md",
       "criteria": ["SEM-SPEC-001", "SEM-SPEC-002", "SEM-SPEC-004", "SEM-SPEC-006"]
+    },
+    {
+      "id": "SPEC-SEM-003",
+      "input": "cases/case-003/input.md",
+      "reference": "cases/case-003/reference.md",
+      "criteria": ["SEM-SPEC-001", "SEM-SPEC-002", "SEM-SPEC-005", "SEM-SPEC-006", "SEM-SPEC-007", "SEM-SPEC-010"]
+    },
+    {
+      "id": "SPEC-SEM-004",
+      "input": "cases/case-004/input.md",
+      "reference": "cases/case-004/reference.md",
+      "criteria": ["SEM-SPEC-001", "SEM-SPEC-003", "SEM-SPEC-004", "SEM-SPEC-009"]
+    },
+    {
+      "id": "SPEC-SEM-005",
+      "input": "cases/case-005/input.md",
+      "reference": "cases/case-005/reference.md",
+      "criteria": ["SEM-SPEC-001", "SEM-SPEC-006", "SEM-SPEC-007", "SEM-SPEC-008"]
+    },
+    {
+      "id": "SPEC-SEM-006",
+      "input": "cases/case-006/input.md",
+      "reference": "cases/case-006/reference.md",
+      "criteria": ["SEM-SPEC-001", "SEM-SPEC-005", "SEM-SPEC-008", "SEM-SPEC-009"]
+    },
+    {
+      "id": "SPEC-SEM-007",
+      "input": "cases/case-007/input.md",
+      "reference": "cases/case-007/reference.md",
+      "criteria": ["SEM-SPEC-001", "SEM-SPEC-002", "SEM-SPEC-006", "SEM-SPEC-009", "SEM-SPEC-010"]
     }
   ]
 }

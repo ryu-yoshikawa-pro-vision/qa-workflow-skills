@@ -78,6 +78,8 @@ Agent Skills Specificationは共通Skill-to-Skill呼び出しAPIを規定しま�
 
 `qa-workflow`自身は、SPEC / DECISION / ASMの優先関係、バージョン選択、情報源優先順位、仕様根拠の競合解消を行いません。
 
+Project ContextのSection 12 / 13が案件の決定事項・仮定の正本ownerである場合、DEC / ASMのstable IDと履歴は`project_context_ids.py`でmaterialize / validate-historyします。別の正本ownerが明示されている場合はProject Contextへ複製・再採番しません。runtime-v1からの移行順序、UI target package migration、scope ownership normalizationの次工程は`migration_preflight.py`のstatusと`cutover_next_action`を正本とし、Agentがartifact versionやscope readinessから再判断しません。
+
 ### その他の工程固有ロジックへの依存
 
 - プロダクトリスクの採点が必要 → `test-analysis`
@@ -140,11 +142,12 @@ currentな画面名称・到達方法・操作可能性・観測可能性が必�
 
 追加した複数用途Skillの正規対象:
 
-| Skill                 | 正規対象 / 実行範囲                                                |
-| --------------------- | ------------------------------------------------------------------ |
-| `regression-testing`  | `baseline / membership` / `Run計画` / `Run結果更新` / `履歴参照`   |
-| `exploratory-testing` | `exploration` / `investigation`                                    |
-| `qa-knowledge`        | `triage` / `create / update` / `revalidation` / `lookup / history` |
+| Skill                  | 正規対象 / 実行範囲                                                |
+| ---------------------- | ------------------------------------------------------------------ |
+| `regression-testing`   | `baseline / membership` / `Run計画` / `Run結果更新` / `履歴参照`   |
+| `exploratory-testing`  | `exploration` / `investigation`                                    |
+| `qa-knowledge`         | `triage` / `create / update` / `revalidation` / `lookup / history` |
+| `usability-inspection` | `general` / `scoped` / `formal-handoff`                            |
 
 単独baseline、Regression membership、Run計画、履歴参照だけなら`regression-testing`から開始できます。manual / E2E実行まで要求されたRegressionは`qa-workflow`が全体を追跡し、`regression-testing`と既存execution Skillを接続します。変更影響候補 / Product Riskは`test-analysis`、Regression Run selectionは`regression-testing`の責務です。
 
@@ -195,6 +198,17 @@ Project Contextの`qa.workflow_state_root`はworkflowごとのpersisted stateと
 3. persisted workflowのresumeでは`canonical_state_path` / `read_workflow_state`でstateをcanonical pathから取得します。初回保存は`create_workflow_state`のatomic create-if-absent結果を確認します。
 4. workflow snapshotで記録した`used_fields`だけを`compare_used_context`でcurrentness比較します。Project Context全体revision差だけで未使用fieldをstaleにしません。
 5. 必要なfixed-root scanは`scan_fixed_root`を使い、scan failure / truncationをcomplete扱いしません。state更新前は`state_update_decision`でnative atomic conditional write capabilityをgateします。
+
+### UIテスト対象分析
+
+今後のテスト設計で継続利用するUI仕様理解packageを作る要求は、`spec-analysis`のUIテスト対象分析modeから開始します。単一表に収まる小規模な対象でも、継続利用・更新する目的があればmodeを選びます。package作成や仕様理解だけが要求されている場合、`test-analysis`以降へ自動進行しません。
+
+- packageに未解決事項があり回答整理も要求された場合は`question-analysis`へ進みます。正式回答は対応するUNKNOWN IDを保持して記録し、`spec-analysis`へ戻ってcurrent UNKNOWNとpackageを更新してから後続を再開します。暫定回答を正式なDECISIONへ昇格しません。
+- packageが既にあり、不明点への回答を反映する要求は、`question-analysis`の解消処理後に`spec-analysis` modeをresumeします。回答済み論点は根拠がcurrentな間は再質問しません。
+- repository調査は補助入力として`spec-analysis`のRepository確認へ記録します。repository factを仕様Authorityへ昇格したり、implementation gapを仕様変更として扱ったりしません。
+- current live UIの表示・到達性・実画面状態を観測する要求は`test-target-inspection`へ進みます。repositoryを読むだけの調査はこのSkillへrouteしません。
+- 保存済みFigma / screenshot等の画面資料をbrowser操作なしでUI/UX評価する要求は`usability-evaluation`へ進みます。live browserで使用性、focus、responsiveを観測する要求は`usability-inspection`へ進みます。WCAG 2.xと適合レベルを指定したformal評価は`wcag-conformance-evaluation`へ進みます。
+- UI仕様理解packageが完成しても、テスト設計が不要ならそこで終了します。ready scopeとblocked scopeが混在する場合、packageの`scope_readiness[].blocking_unknown_ids[]`だけを`question-analysis`へ渡し、独立してreadyなscopeの進行をUNKNOWN総数だけで停止しません。
 
 ### WCAG formal evaluation state
 

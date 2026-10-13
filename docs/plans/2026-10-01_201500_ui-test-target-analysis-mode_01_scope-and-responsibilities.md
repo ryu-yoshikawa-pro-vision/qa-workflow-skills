@@ -25,28 +25,28 @@ AIエージェントからの利用方法は既存のAgent Skills構造をその
 
 ## 2. 責務表
 
-| 内容 | owner | 今回の変更 |
-| --- | --- | --- |
-| 現在有効な仕様根拠 | spec-analysis | 既存維持 |
-| SPEC / DECISION / INFERENCE / UNKNOWN分類 | spec-analysis | 既存維持 |
-| UI構造の仕様上の分類 | spec-analysis | modeへ追加 |
-| UI操作母集団 / User Story / Use Case / Behavior / Acceptance Criteria | spec-analysis | UI操作scopeでは必須分析としてmodeへ追加 |
-| 複数Markdown仕様理解package | spec-analysis | modeへ追加 |
-| mode導入前のlegacy package migration | spec-analysis | semantic mappingはLLM、current schema validationはhelper |
-| canonical仕様モデル / Current Effective Authority / Authority Machine Entity | spec-analysis | 既存契約を維持し、package内の単一正本へ配置 |
-| Acceptance Criterion Machine Entity | spec-analysis | current ACだけを下流handoff用Entityとして決定論生成。US / UC / Behaviorはstructured modelのまま |
-| 不明点のブロック分類 | question-analysis | 既存維持 |
-| 回答のSPEC / DECISION / ASM正規化 | question-analysis | 安定UNKNOWN参照を補強 |
-| packageへの回答反映 | spec-analysis | question-analysisの正規化結果を入力に更新 |
-| 生きた実画面のcurrent観測 | test-target-inspection | 変更なし |
-| 保存済みFigma / screenshot / evidenceのUI/UX意味評価 | usability-evaluation | #14責務を維持 |
-| live browserでの使いやすさ / focus / responsive / feedback検査 | usability-inspection | #14責務を維持 |
-| formal WCAG-EM適合性評価 | wcag-conformance-evaluation | #14責務を維持 |
-| repositoryの製品コード事実 | spec-analysisの補助入力 | Authorityへ自動昇格しない。E2E実装分析そのものが必要な場合だけe2e-test-inspectionへroutingする |
-| プロダクトリスク / テスト重点 | test-analysis | 対象外 |
-| Acceptance Criteria → テスト要求の追跡 / closure | test-requirement-design | test-requirement-designまで進むworkflowで`requirement-structure-v2`によりcurrent ACをTRまたはDispositionへ閉じる。仕様理解package単体の完了条件にはしない |
-| テスト条件 / ケース | 各既存設計Skill | 変更なし |
-| workflow開始 / 再開 / 変更伝播 | qa-workflow | mode routingのみ追加 |
+| 内容                                                                         | owner                       | 今回の変更                                                                                                                                                |
+| ---------------------------------------------------------------------------- | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 現在有効な仕様根拠                                                           | spec-analysis               | 既存維持                                                                                                                                                  |
+| SPEC / DECISION / INFERENCE / UNKNOWN分類                                    | spec-analysis               | 既存維持                                                                                                                                                  |
+| UI構造の仕様上の分類                                                         | spec-analysis               | modeへ追加                                                                                                                                                |
+| UI操作母集団 / User Story / Use Case / Behavior / Acceptance Criteria        | spec-analysis               | UI操作scopeでは必須分析としてmodeへ追加                                                                                                                   |
+| 複数Markdown仕様理解package                                                  | spec-analysis               | modeへ追加                                                                                                                                                |
+| mode導入前のlegacy package migration                                         | spec-analysis               | semantic mappingはLLM、current schema validationはhelper                                                                                                  |
+| canonical仕様モデル / Current Effective Authority / Authority Machine Entity | spec-analysis               | 既存契約を維持し、package内の単一正本へ配置                                                                                                               |
+| Acceptance Criterion Machine Entity                                          | spec-analysis               | current ACだけを下流handoff用Entityとして決定論生成。US / UC / Behaviorはstructured modelのまま                                                           |
+| 不明点のブロック分類                                                         | question-analysis           | 既存維持                                                                                                                                                  |
+| 回答のSPEC / DECISION / ASM正規化                                            | question-analysis           | 安定UNKNOWN参照を補強                                                                                                                                     |
+| packageへの回答反映                                                          | spec-analysis               | question-analysisの正規化結果を入力に更新                                                                                                                 |
+| 生きた実画面のcurrent観測                                                    | test-target-inspection      | 変更なし                                                                                                                                                  |
+| 保存済みFigma / screenshot / evidenceのUI/UX意味評価                         | usability-evaluation        | #14責務を維持                                                                                                                                             |
+| live browserでの使いやすさ / focus / responsive / feedback検査               | usability-inspection        | #14責務を維持                                                                                                                                             |
+| formal WCAG-EM適合性評価                                                     | wcag-conformance-evaluation | #14責務を維持                                                                                                                                             |
+| repositoryの製品コード事実                                                   | spec-analysisの補助入力     | Authorityへ自動昇格しない。E2E実装分析そのものが必要な場合だけe2e-test-inspectionへroutingする                                                            |
+| プロダクトリスク / テスト重点                                                | test-analysis               | 対象外                                                                                                                                                    |
+| Acceptance Criteria → テスト要求の追跡 / closure                             | test-requirement-design     | test-requirement-designまで進むworkflowで`requirement-structure-v2`によりcurrent ACをTRまたはDispositionへ閉じる。仕様理解package単体の完了条件にはしない |
+| テスト条件 / ケース                                                          | 各既存設計Skill             | 変更なし                                                                                                                                                  |
+| workflow開始 / 再開 / 変更伝播                                               | qa-workflow                 | mode routingのみ追加                                                                                                                                      |
 
 ## 3. PR #14 Skillとの境界
 
@@ -130,6 +130,7 @@ pathが資料から確定できない場合は推測せずPATH-TBD等の明示�
 同一route内で操作や処理成功により切り替わる表示段階。
 
 例:
+
 - 入力 → 確認
 - 発行フォーム → 発行完了
 

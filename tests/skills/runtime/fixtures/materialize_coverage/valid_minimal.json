@@ -6,7 +6,8 @@
       "model_type": "ep",
       "technique_slug": "ep",
       "parent_tcn_id": "TCN-001",
-      "content_fingerprint": "sha256:f4577695891d492ab7ed1828b59f12873f70f12b943267795f547d82930b5d5b"
+      "scope_refs": [],
+      "content_fingerprint": "sha256:346943989645cd7186dd73872d0b1522dbfb017608dce2eae43f00b8291bf357"
     }
   ],
   "models": [
@@ -37,6 +38,9 @@
   "previous_target_id_map": [],
   "previous_semantic_ci_map": [],
   "previous_ci_ids": [],
+  "inactive_ci_ids": [],
+  "inactive_materialize_history": [],
   "previous_expected_result_roots": [],
-  "merge_groups": []
+  "merge_groups": [],
+  "zero_scope_terminal": false
 }

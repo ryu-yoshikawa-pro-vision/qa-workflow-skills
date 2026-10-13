@@ -169,3 +169,11 @@
 5. 最終確認後も本Skill自身の契約違反が残り、既存の停止条件・ブロック中・ルーティングに該当しない場合は、2回目の自動修正を行わず、その成果物を契約適合済み・完成済みとして扱わない。現在残っている契約上の制約だけを明示する
 
 未解決事項の分類や仮定の承認状態を自己検証の名目で変更しません。既存の`ブロック中`定義を未解消ローカル違反へ広げません。自己検証の実行経緯、修正回数、修正前状態、PASS / FAIL等の評価ログは通常成果物へ出力せず、現在有効な状態と未解消の契約上の制約だけを返します。
+
+# 安定質問IDと仕様UNKNOWNの参照
+
+currentの質問一覧は未解決の質問だけを保持し、使用済みQ IDは`質問ID履歴`へ残します。前回の質問一覧にないQ IDを新しい質問へ再利用しません。質問の意味が同じか、既存質問を再利用するか、新しい質問にするかはLLMが判断します。new質問の番号、質問一覧の整形、ID履歴の更新は`question_ids.py materialize`に渡します。
+
+spec-analysis由来の質問には関連する`UNK-xxx`を明示します。UI target packageから継続する場合は`ui_target_package.py inspect`が返すcurrent / resolved UNKNOWN IDとScope readinessをhandoffとして使用します。resolved-only UNKNOWNは、spec-analysisが同じIDをreopenしてcurrent集合へ戻す前に質問へ関連付けません。QとUNKの意味対応はLLMが判断し、`question_ids.py`は形式・存在・重複だけを検証します。
+
+current質問表を更新する場合はprevious artifactを保持したまま`question_ids.py materialize`へcurrent semantic rowsを渡し、返された全artifactを使用します。Q ID履歴やQ番号を手作業で再構成しません。

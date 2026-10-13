@@ -709,5 +709,71 @@
       "exploratory-testing": "exploration"
     },
     "overall": "実行中"
+  },
+  {
+    "id": "WF-UI-TARGET-001",
+    "input_conditions": "テスト設計へ進まず、複数資料の対象理解を継続更新できるUIテスト対象分析packageだけを作る",
+    "start": "spec-analysis",
+    "final": "spec-analysis",
+    "skills": ["spec-analysis"],
+    "overall": "実行中"
+  },
+  {
+    "id": "WF-UI-TARGET-002",
+    "input_conditions": "UIテスト対象分析packageを作り、未解決UNKNOWNをquestion-analysisへ回す",
+    "start": "spec-analysis",
+    "final": "question-analysis",
+    "skills": ["spec-analysis", "question-analysis"],
+    "states": { "question-analysis": "ブロック中" },
+    "overall": "部分完了（ブロック中あり）"
+  },
+  {
+    "id": "WF-UI-TARGET-003",
+    "input_conditions": "回答済みUNKNOWNを正規化して既存UIテスト対象分析packageへ反映する",
+    "start": "question-analysis",
+    "final": "spec-analysis",
+    "skills": ["question-analysis", "spec-analysis"],
+    "overall": "実行中"
+  },
+  {
+    "id": "WF-UI-TARGET-004",
+    "input_conditions": "現在の実画面を開いて表示名と到達可否を観測する",
+    "start": "test-target-inspection",
+    "final": "test-target-inspection",
+    "skills": ["test-target-inspection"],
+    "overall": "実行中"
+  },
+  {
+    "id": "WF-UI-TARGET-005",
+    "input_conditions": "対象理解packageの作成だけを完了しテスト分析やテスト設計へは進まない",
+    "start": "spec-analysis",
+    "final": "spec-analysis",
+    "skills": ["spec-analysis"],
+    "overall": "実行中"
+  },
+  {
+    "id": "WF-UI-TARGET-006",
+    "input_conditions": "保存済みFigmaとscreenshotのevidenceからUI/UXを評価する",
+    "start": "usability-evaluation",
+    "final": "usability-evaluation",
+    "skills": ["usability-evaluation"],
+    "overall": "実行中"
+  },
+  {
+    "id": "WF-UI-TARGET-007",
+    "input_conditions": "live browserでユーザーフローを操作してusability inspectionを実施する",
+    "start": "usability-inspection",
+    "final": "usability-inspection",
+    "skills": ["usability-inspection"],
+    "overall": "実行中",
+    "targets": { "usability-inspection": "general" }
+  },
+  {
+    "id": "WF-UI-TARGET-008",
+    "input_conditions": "対象ページのWCAG-EM 2.0 formal conformance evaluationを行う",
+    "start": "wcag-conformance-evaluation",
+    "final": "wcag-conformance-evaluation",
+    "skills": ["wcag-conformance-evaluation"],
+    "overall": "実行中"
   }
 ]

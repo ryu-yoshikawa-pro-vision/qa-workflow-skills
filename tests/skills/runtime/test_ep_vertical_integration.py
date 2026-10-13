@@ -84,8 +84,8 @@ def condition_metadata() -> dict:
     return {
         "envelope_version": "1",
         "skill": "test-condition-design",
-        "runtime_contract_version": "runtime-v1",
-        "generator_contract_version": "condition-structure-v1",
+        "runtime_contract_version": "runtime-v2",
+        "generator_contract_version": "condition-structure-v2",
         "runtime_unit_key": "artifact:condition_structure:all",
         "model_key": None,
         "model_type": None,
@@ -105,7 +105,13 @@ def condition_metadata() -> dict:
 def condition_input() -> dict:
     return {
         "test_requirements": [
-            {"tr_id": "TR-001", "priority": 1, "authority_refs": [], "risk_refs": []}
+            {
+                "tr_id": "TR-001",
+                "priority": 1,
+                "authority_refs": [],
+                "risk_refs": [],
+                "scope_refs": [],
+            }
         ],
         "technique_selections": [
             {
@@ -149,6 +155,12 @@ def condition_input() -> dict:
         "previous_model_keys": [],
         "update_scope_tcn_ids": [],
         "update_scope_model_keys": [],
+        "inactive_tcn_ids": [],
+        "inactive_model_keys": [],
+        "inactive_tcn_history": [],
+        "inactive_model_history": [],
+        "inactive_materialize_history": [],
+        "zero_scope_terminal": False,
     }
 
 
@@ -156,7 +168,7 @@ def ep_metadata() -> dict:
     return {
         "envelope_version": "1",
         "skill": "test-condition-design",
-        "runtime_contract_version": "runtime-v1",
+        "runtime_contract_version": "runtime-v2",
         "generator_contract_version": "equivalence-partitions-v1",
         "runtime_unit_key": "model:ep-001",
         "model_key": "ep-001",
@@ -213,7 +225,7 @@ def workflow_metadata() -> dict:
     return {
         "envelope_version": "1",
         "skill": "qa-workflow",
-        "runtime_contract_version": "runtime-v1",
+        "runtime_contract_version": "runtime-v2",
         "generator_contract_version": "workflow-runtime-v1",
         "runtime_unit_key": "artifact:workflow_runtime:all",
         "model_key": None,
@@ -238,7 +250,7 @@ class EpVerticalIntegrationTests(unittest.TestCase):
         schema_metadata = {
             "envelope_version": "1",
             "skill": "test-condition-design",
-            "runtime_contract_version": "runtime-v1",
+            "runtime_contract_version": "runtime-v2",
             "generator_contract_version": "schema-cases-v1",
             "runtime_unit_key": "model:schema-001",
             "model_key": "schema-001",
@@ -284,6 +296,7 @@ class EpVerticalIntegrationTests(unittest.TestCase):
                 "condition": "schema-derived checkout fields",
                 "category": None,
                 "technique_slugs": [],
+                "scope_refs": [],
                 "coverage_criterion": "schema constraints",
                 "authority_refs": [],
                 "risk_refs": [],
@@ -301,6 +314,7 @@ class EpVerticalIntegrationTests(unittest.TestCase):
                 "model_type": "schema",
                 "technique_slug": None,
                 "parent_tcn_id": "TCN-001",
+                "scope_refs": [],
                 "selection_key": None,
                 "selection_source": None,
                 "derived_from_model_key": None,
@@ -319,7 +333,7 @@ class EpVerticalIntegrationTests(unittest.TestCase):
         tdr_metadata = {
             "envelope_version": "1",
             "skill": "test-condition-design",
-            "runtime_contract_version": "runtime-v1",
+            "runtime_contract_version": "runtime-v2",
             "generator_contract_version": "test-data-requirements-v1",
             "runtime_unit_key": "artifact:test_data_requirements:all",
             "model_key": None,
@@ -396,8 +410,8 @@ class EpVerticalIntegrationTests(unittest.TestCase):
         materialize_metadata = {
             "envelope_version": "1",
             "skill": "test-condition-design",
-            "runtime_contract_version": "runtime-v1",
-            "generator_contract_version": "materialize-coverage-v1",
+            "runtime_contract_version": "runtime-v2",
+            "generator_contract_version": "materialize-coverage-v2",
             "runtime_unit_key": "artifact:materialize_coverage:TCN-001",
             "model_key": None,
             "model_type": None,
@@ -444,6 +458,7 @@ class EpVerticalIntegrationTests(unittest.TestCase):
                             "model_type": "schema",
                             "technique_slug": None,
                             "parent_tcn_id": "TCN-001",
+                            "scope_refs": [],
                             "content_fingerprint": model["content_fingerprint"],
                         }
                     ],
@@ -455,8 +470,11 @@ class EpVerticalIntegrationTests(unittest.TestCase):
                     "previous_target_id_map": [],
                     "previous_semantic_ci_map": [],
                     "previous_ci_ids": [],
+                    "inactive_ci_ids": [],
+                    "inactive_materialize_history": [],
                     "previous_expected_result_roots": [],
                     "merge_groups": [],
+                    "zero_scope_terminal": False,
                 },
             },
         )
@@ -470,8 +488,8 @@ class EpVerticalIntegrationTests(unittest.TestCase):
                 "metadata": {
                     "envelope_version": "1",
                     "skill": "test-requirement-design",
-                    "runtime_contract_version": "runtime-v1",
-                    "generator_contract_version": "requirement-structure-v1",
+                    "runtime_contract_version": "runtime-v2",
+                    "generator_contract_version": "requirement-structure-v2",
                     "runtime_unit_key": "artifact:requirement_structure:all",
                     "model_key": None,
                     "model_type": None,
@@ -489,6 +507,8 @@ class EpVerticalIntegrationTests(unittest.TestCase):
                 "input": {
                     "authorities": [],
                     "risks": [],
+                    "acceptance_criteria": [],
+                    "scope_ids": [],
                     "test_requirements": [
                         {
                             "draft_key": "checkout",
@@ -497,6 +517,8 @@ class EpVerticalIntegrationTests(unittest.TestCase):
                             "text": "checkout completes",
                             "authority_refs": [],
                             "risk_refs": [],
+                            "acceptance_refs": [],
+                            "scope_refs": [],
                             "priority": "中",
                             "priority_override_reason": None,
                             "test_level": "system",
@@ -506,6 +528,9 @@ class EpVerticalIntegrationTests(unittest.TestCase):
                     "dispositions": [],
                     "previous_tr_ids": [],
                     "update_scope_tr_ids": [],
+                    "inactive_tr_ids": [],
+                    "inactive_tr_history": [],
+                    "zero_scope_terminal": False,
                 },
             },
         )
@@ -547,7 +572,7 @@ class EpVerticalIntegrationTests(unittest.TestCase):
         tdr_metadata = {
             "envelope_version": "1",
             "skill": "test-condition-design",
-            "runtime_contract_version": "runtime-v1",
+            "runtime_contract_version": "runtime-v2",
             "generator_contract_version": "test-data-requirements-v1",
             "runtime_unit_key": "artifact:test_data_requirements:all",
             "model_key": None,
@@ -612,8 +637,8 @@ class EpVerticalIntegrationTests(unittest.TestCase):
         materialize_meta = {
             "envelope_version": "1",
             "skill": "test-condition-design",
-            "runtime_contract_version": "runtime-v1",
-            "generator_contract_version": "materialize-coverage-v1",
+            "runtime_contract_version": "runtime-v2",
+            "generator_contract_version": "materialize-coverage-v2",
             "runtime_unit_key": "artifact:materialize_coverage:TCN-001",
             "model_key": None,
             "model_type": None,
@@ -680,8 +705,11 @@ class EpVerticalIntegrationTests(unittest.TestCase):
             "previous_target_id_map": [],
             "previous_semantic_ci_map": [],
             "previous_ci_ids": [],
+            "inactive_ci_ids": [],
+            "inactive_materialize_history": [],
             "previous_expected_result_roots": [],
             "merge_groups": [],
+            "zero_scope_terminal": False,
         }
         materialize = run_script(
             MATERIALIZE_SCRIPT,
@@ -731,8 +759,8 @@ class EpVerticalIntegrationTests(unittest.TestCase):
         case_metadata = {
             "envelope_version": "1",
             "skill": "test-case-design",
-            "runtime_contract_version": "runtime-v1",
-            "generator_contract_version": "case-structure-v1",
+            "runtime_contract_version": "runtime-v2",
+            "generator_contract_version": "case-structure-v2",
             "runtime_unit_key": "artifact:case_structure:all",
             "model_key": None,
             "model_type": None,
@@ -770,7 +798,12 @@ class EpVerticalIntegrationTests(unittest.TestCase):
         ]
         case_input = {
             "test_conditions": [
-                {"tcn_id": "TCN-001", "tr_refs": ["TR-001"], "priority": "中"}
+                {
+                    "tcn_id": "TCN-001",
+                    "tr_refs": ["TR-001"],
+                    "priority": "中",
+                    "scope_refs": [],
+                }
             ],
             "coverage_items": [row["content"] for row in ci_entities],
             "environment_requirements": [],
@@ -804,6 +837,9 @@ class EpVerticalIntegrationTests(unittest.TestCase):
             "dispositions": [],
             "previous_tc_ids": [],
             "update_scope_tc_ids": [],
+            "inactive_tc_ids": [],
+            "inactive_tc_history": [],
+            "zero_scope_terminal": False,
         }
         case_result = run_script(
             CASE_SCRIPT, {"metadata": case_metadata, "input": case_input}
@@ -914,6 +950,7 @@ class EpVerticalIntegrationTests(unittest.TestCase):
             runtime.runtime_unit_row(materialize, materialize=materialize["payload"]),
         ]
         workflow_input = {
+            "workflow_ref": "00000000-0000-4000-8000-000000000016",
             "workflow_scopes": [
                 {
                     "skill": "test-condition-design",
@@ -941,8 +978,8 @@ class EpVerticalIntegrationTests(unittest.TestCase):
         requirement_metadata = {
             "envelope_version": "1",
             "skill": "test-requirement-design",
-            "runtime_contract_version": "runtime-v1",
-            "generator_contract_version": "requirement-structure-v1",
+            "runtime_contract_version": "runtime-v2",
+            "generator_contract_version": "requirement-structure-v2",
             "runtime_unit_key": "artifact:requirement_structure:all",
             "model_key": None,
             "model_type": None,
@@ -960,9 +997,14 @@ class EpVerticalIntegrationTests(unittest.TestCase):
         requirement_input = {
             "authorities": [],
             "risks": [],
+            "acceptance_criteria": [],
+            "scope_ids": [],
             "dispositions": [],
             "previous_tr_ids": [],
             "update_scope_tr_ids": [],
+            "inactive_tr_ids": [],
+            "inactive_tr_history": [],
+            "zero_scope_terminal": False,
             "test_requirements": [
                 {
                     "draft_key": f"requirement-{number:03d}",
@@ -971,6 +1013,8 @@ class EpVerticalIntegrationTests(unittest.TestCase):
                     "text": f"Requirement {number}",
                     "authority_refs": [],
                     "risk_refs": [],
+                    "acceptance_refs": [],
+                    "scope_refs": [],
                     "priority": "中",
                     "priority_override_reason": None,
                     "test_level": "system",
@@ -1090,12 +1134,14 @@ class EpVerticalIntegrationTests(unittest.TestCase):
                         "priority": 1,
                         "authority_refs": [],
                         "risk_refs": [],
+                        "scope_refs": [],
                     },
                     {
                         "tr_id": "TR-002",
                         "priority": 1,
                         "authority_refs": [],
                         "risk_refs": [],
+                        "scope_refs": [],
                     },
                     *(
                         []
@@ -1106,6 +1152,7 @@ class EpVerticalIntegrationTests(unittest.TestCase):
                                 "priority": 1,
                                 "authority_refs": [],
                                 "risk_refs": [],
+                                "scope_refs": [],
                             }
                         ]
                     ),
@@ -1125,6 +1172,12 @@ class EpVerticalIntegrationTests(unittest.TestCase):
                 "previous_model_keys": model_state or [],
                 "update_scope_tcn_ids": ["TCN-001"] if partial else [],
                 "update_scope_model_keys": ["ep-001"] if partial else [],
+                "inactive_tcn_ids": [],
+                "inactive_model_keys": [],
+                "inactive_tcn_history": [],
+                "inactive_model_history": [],
+                "inactive_materialize_history": [],
+                "zero_scope_terminal": False,
             }
 
         def condition_run(value: dict) -> tuple[dict, dict]:
@@ -1155,7 +1208,7 @@ class EpVerticalIntegrationTests(unittest.TestCase):
             metadata = {
                 "envelope_version": "1",
                 "skill": "test-condition-design",
-                "runtime_contract_version": "runtime-v1",
+                "runtime_contract_version": "runtime-v2",
                 "generator_contract_version": "test-data-requirements-v1",
                 "runtime_unit_key": "artifact:test_data_requirements:all",
                 "model_key": None,
@@ -1250,8 +1303,8 @@ class EpVerticalIntegrationTests(unittest.TestCase):
             metadata = {
                 "envelope_version": "1",
                 "skill": "test-condition-design",
-                "runtime_contract_version": "runtime-v1",
-                "generator_contract_version": "materialize-coverage-v1",
+                "runtime_contract_version": "runtime-v2",
+                "generator_contract_version": "materialize-coverage-v2",
                 "runtime_unit_key": f"artifact:materialize_coverage:{tcn_id}",
                 "model_key": None,
                 "model_type": None,
@@ -1344,10 +1397,13 @@ class EpVerticalIntegrationTests(unittest.TestCase):
                     "semantic_ci_mapping_state", []
                 ),
                 "previous_ci_ids": previous_payload.get("ci_id_state", []),
+                "inactive_ci_ids": [],
+                "inactive_materialize_history": [],
                 "previous_expected_result_roots": previous_payload.get(
                     "expected_result_root_state", []
                 ),
                 "merge_groups": [],
+                "zero_scope_terminal": False,
             }
             return (
                 metadata,
@@ -1580,8 +1636,8 @@ class EpVerticalIntegrationTests(unittest.TestCase):
         extra_metadata = {
             "envelope_version": "1",
             "skill": "test-condition-design",
-            "runtime_contract_version": "runtime-v1",
-            "generator_contract_version": "materialize-coverage-v1",
+            "runtime_contract_version": "runtime-v2",
+            "generator_contract_version": "materialize-coverage-v2",
             "runtime_unit_key": "artifact:materialize_coverage:TCN-003",
             "model_key": None,
             "model_type": None,
@@ -1607,8 +1663,11 @@ class EpVerticalIntegrationTests(unittest.TestCase):
             "previous_target_id_map": [],
             "previous_semantic_ci_map": [],
             "previous_ci_ids": [],
+            "inactive_ci_ids": [],
+            "inactive_materialize_history": [],
             "previous_expected_result_roots": [],
             "merge_groups": [],
+            "zero_scope_terminal": False,
         }
         extra_result = run_script(
             MATERIALIZE_SCRIPT, {"metadata": extra_metadata, "input": extra_input}
@@ -1819,7 +1878,11 @@ class EpVerticalIntegrationTests(unittest.TestCase):
         self.assertEqual(
             partial_checked["current_structure_state"]["previous_ci_id_state"],
             [
-                {"ci_id": row["ci_id"], "status": row["status"]}
+                {
+                    "ci_id": row["ci_id"],
+                    "status": row["status"],
+                    "scope_refs": row["scope_refs"],
+                }
                 for tcn_id in ("TCN-001", "TCN-002")
                 for row in materialize_values[tcn_id][2]["payload"]["ci_id_state"]
             ],
@@ -1865,6 +1928,7 @@ class EpVerticalIntegrationTests(unittest.TestCase):
                     "priority": 1,
                     "authority_refs": [],
                     "risk_refs": [],
+                    "scope_refs": [],
                 }
             ],
             "technique_selections": [
@@ -1912,6 +1976,12 @@ class EpVerticalIntegrationTests(unittest.TestCase):
             "previous_model_keys": [],
             "update_scope_tcn_ids": [],
             "update_scope_model_keys": [],
+            "inactive_tcn_ids": [],
+            "inactive_model_keys": [],
+            "inactive_tcn_history": [],
+            "inactive_model_history": [],
+            "inactive_materialize_history": [],
+            "zero_scope_terminal": False,
         }
         condition = run_script(
             CONDITION_SCRIPT,
@@ -1941,8 +2011,8 @@ class EpVerticalIntegrationTests(unittest.TestCase):
             metadata = {
                 "envelope_version": "1",
                 "skill": "test-condition-design",
-                "runtime_contract_version": "runtime-v1",
-                "generator_contract_version": "materialize-coverage-v1",
+                "runtime_contract_version": "runtime-v2",
+                "generator_contract_version": "materialize-coverage-v2",
                 "runtime_unit_key": f"artifact:materialize_coverage:{tcn_id}",
                 "model_key": None,
                 "model_type": None,
@@ -2000,8 +2070,11 @@ class EpVerticalIntegrationTests(unittest.TestCase):
                     "previous_target_id_map": [],
                     "previous_semantic_ci_map": [],
                     "previous_ci_ids": [],
+                    "inactive_ci_ids": [],
+                    "inactive_materialize_history": [],
                     "previous_expected_result_roots": [],
                     "merge_groups": [],
+                    "zero_scope_terminal": False,
                 },
             }
 
@@ -2164,6 +2237,7 @@ class EpVerticalIntegrationTests(unittest.TestCase):
             ],
         }
         workflow_input = {
+            "workflow_ref": "00000000-0000-4000-8000-000000000016",
             "workflow_scopes": [
                 {
                     "skill": "test-condition-design",

@@ -33,7 +33,7 @@ def _artifact() -> str:
     metadata = {
         "envelope_version": "1",
         "skill": "test-condition-design",
-        "runtime_contract_version": "runtime-v1",
+        "runtime_contract_version": "runtime-v2",
         "generator_contract_version": "equivalence-partitions-v1",
         "runtime_unit_key": "model:ep-001",
         "model_key": "ep-001",
@@ -72,7 +72,7 @@ def _artifact() -> str:
     result = json.loads(completed.stdout)
     entity_content = {"value": "stable"}
     entity = {
-        "schema_version": "entity-state-v1",
+        "schema_version": "entity-state-v2",
         "skill": "test-condition-design",
         "entity_type": "model",
         "entity_ref": "ep-001",
@@ -104,7 +104,7 @@ def _artifact() -> str:
             "",
             fence(
                 {
-                    "schema_version": "entity-state-v1",
+                    "schema_version": "entity-state-v2",
                     "skill": "test-condition-design",
                     "entities": [entity],
                 }

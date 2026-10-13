@@ -25,8 +25,8 @@ def metadata() -> dict:
     return {
         "envelope_version": "1",
         "skill": "test-case-design",
-        "runtime_contract_version": "runtime-v1",
-        "generator_contract_version": "case-structure-v1",
+        "runtime_contract_version": "runtime-v2",
+        "generator_contract_version": "case-structure-v2",
         "runtime_unit_key": "artifact:case_structure:all",
         "model_key": None,
         "model_type": None,
@@ -62,7 +62,12 @@ def run(value: dict, *, meta: dict | None = None) -> dict:
 def valid_input() -> dict:
     return {
         "test_conditions": [
-            {"tcn_id": "TCN-001", "tr_refs": ["TR-001"], "priority": "中"}
+            {
+                "tcn_id": "TCN-001",
+                "tr_refs": ["TR-001"],
+                "priority": "中",
+                "scope_refs": [],
+            }
         ],
         "coverage_items": [
             {
@@ -77,6 +82,7 @@ def valid_input() -> dict:
                 "semantic_item_text": None,
                 "semantic_source_targets": [],
                 "test_data_requirement_refs": ["data:role"],
+                "scope_refs": [],
             }
         ],
         "environment_requirements": [
@@ -129,10 +135,99 @@ def valid_input() -> dict:
         "dispositions": [],
         "previous_tc_ids": [],
         "update_scope_tc_ids": [],
+        "inactive_tc_ids": [],
+        "inactive_tc_history": [],
+        "zero_scope_terminal": False,
     }
 
 
 class CaseStructureRuntimeTests(unittest.TestCase):
+    def test_case_scope_is_derived_from_tcn_and_ci_and_inactive_id_reactivates(
+        self,
+    ) -> None:
+        value = valid_input()
+        value["test_conditions"][0]["scope_refs"] = ["SCOPE-001"]
+        value["coverage_items"][0]["scope_refs"] = ["SCOPE-001"]
+        first = run(value)
+        self.assertEqual(first["runtime_status"], "ok", first)
+        entity = next(
+            row for row in first["payload"]["entities"] if row["entity_type"] == "tc"
+        )
+        self.assertEqual(entity["content"]["scope_refs"], ["SCOPE-001"])
+        self.assertEqual(
+            first["payload"]["tc_id_state"][0]["scope_refs"], ["SCOPE-001"]
+        )
+
+        blocked_value = valid_input()
+        blocked_value.update(
+            {
+                "test_conditions": [],
+                "coverage_items": [],
+                "environment_requirements": [],
+                "test_data_requirements": [],
+                "test_cases": [],
+                "previous_tc_ids": first["payload"]["tc_id_state"],
+                "inactive_tc_ids": ["TC-001"],
+                "inactive_tc_history": [entity],
+            }
+        )
+        blocked = run(blocked_value)
+        self.assertEqual(blocked["runtime_status"], "ok", blocked)
+        self.assertEqual(blocked["payload"]["tc_id_state"][0]["status"], "inactive")
+        self.assertEqual(blocked["payload"]["entities"], [])
+
+        active_value = valid_input()
+        active_value["test_conditions"][0]["scope_refs"] = ["SCOPE-001"]
+        active_value["coverage_items"][0]["scope_refs"] = ["SCOPE-001"]
+        active_value["test_cases"][0].update(
+            {"identity_action": "reuse", "reuse_id": "TC-001"}
+        )
+        active_value.update(
+            {
+                "previous_tc_ids": blocked["payload"]["tc_id_state"],
+                "update_scope_tc_ids": ["TC-001"],
+                "inactive_tc_history": blocked["payload"]["inactive_tc_history"],
+            }
+        )
+        reactivated = run(active_value)
+        self.assertEqual(reactivated["runtime_status"], "ok", reactivated)
+        self.assertEqual(reactivated["payload"]["tc_id_map"][0]["tc_id"], "TC-001")
+        self.assertEqual(reactivated["payload"]["inactive_tc_history"], [])
+
+    def test_zero_scope_terminal_deletes_previous_inactive_tc(self) -> None:
+        value = valid_input()
+        entity = runtime.make_machine_entity(
+            "test-case-design",
+            "tc",
+            "TC-001",
+            {"tc_id": "TC-001", "scope_refs": ["SCOPE-001"]},
+        )
+        value.update(
+            {
+                "test_conditions": [],
+                "coverage_items": [],
+                "environment_requirements": [],
+                "test_data_requirements": [],
+                "test_cases": [],
+                "previous_tc_ids": [
+                    {
+                        "tc_id": "TC-001",
+                        "status": "inactive",
+                        "scope_refs": ["SCOPE-001"],
+                    }
+                ],
+                "update_scope_tc_ids": ["TC-001"],
+                "inactive_tc_history": [entity],
+                "zero_scope_terminal": True,
+            }
+        )
+        result = run(value)
+        self.assertEqual(result["runtime_status"], "ok", result)
+        self.assertEqual(result["payload"]["tc_id_state"][0]["status"], "deleted")
+        self.assertEqual(result["payload"]["tc_id_state"][0]["scope_refs"], [])
+        self.assertEqual(result["payload"]["entities"], [])
+        self.assertEqual(result["payload"]["inactive_tc_history"], [])
+
     def test_ci_machine_content_is_materialized_to_stable_tc(self) -> None:
         result = run(valid_input())
         self.assertEqual(result["runtime_status"], "ok")
@@ -154,13 +249,18 @@ class CaseStructureRuntimeTests(unittest.TestCase):
                 "test-requirement-design",
                 "tr",
                 "TR-001",
-                {"text": "checkout completes"},
+                {"text": "checkout completes", "scope_refs": []},
             ),
             runtime.make_machine_entity(
                 "test-condition-design",
                 "tcn",
                 "TCN-001",
-                {"tcn_id": "TCN-001", "tr_refs": ["TR-001"], "priority": 2},
+                {
+                    "tcn_id": "TCN-001",
+                    "tr_refs": ["TR-001"],
+                    "priority": 2,
+                    "scope_refs": [],
+                },
             ),
             runtime.make_machine_entity(
                 "test-analysis",
@@ -366,8 +466,8 @@ class CaseStructureRuntimeTests(unittest.TestCase):
     def test_scope_reuse_and_deleted_state_are_deterministic(self) -> None:
         value = valid_input()
         value["previous_tc_ids"] = [
-            {"tc_id": "TC-001", "status": "active"},
-            {"tc_id": "TC-002", "status": "deleted"},
+            {"tc_id": "TC-001", "status": "active", "scope_refs": []},
+            {"tc_id": "TC-002", "status": "deleted", "scope_refs": []},
         ]
         value["update_scope_tc_ids"] = ["TC-001"]
         value["test_cases"][0]["identity_action"] = "reuse"
@@ -377,8 +477,8 @@ class CaseStructureRuntimeTests(unittest.TestCase):
         self.assertEqual(
             result["payload"]["tc_id_state"],
             [
-                {"tc_id": "TC-001", "status": "active"},
-                {"tc_id": "TC-002", "status": "deleted"},
+                {"tc_id": "TC-001", "status": "active", "scope_refs": []},
+                {"tc_id": "TC-002", "status": "deleted", "scope_refs": []},
             ],
         )
 
@@ -409,6 +509,7 @@ class CaseStructureRuntimeTests(unittest.TestCase):
                 "semantic_item_text": None,
                 "semantic_source_targets": [],
                 "test_data_requirement_refs": ["data:role-other"],
+                "scope_refs": [],
             }
         )
         value["test_cases"][0]["ci_refs"].append("TCN-001-CI02")

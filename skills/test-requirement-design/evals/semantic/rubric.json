@@ -30,6 +30,12 @@
       "title": "過剰要求抑制",
       "description": "AuthorityやRiskに根拠のない要求を作っていないか。",
       "critical": true
+    },
+    {
+      "id": "SEM-TR-006",
+      "title": "Acceptance Criteria traceability",
+      "description": "current ACから検証責務を導き、AC / Authority closureを個別に保ち、本文にない条件を先回りしていないか。",
+      "critical": true
     }
   ]
 }

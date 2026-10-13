@@ -68,16 +68,4 @@
 
 ## Machine Entity（機械証拠）
 
-```json
-{
-  "entity_schema_version": "entity-state-v1",
-  "skill": "spec-analysis",
-  "entity_type": "authority",
-  "entity_ref": "authority:<stable-ref>",
-  "content": {},
-  "content_fingerprint": "sha256:<64 hex>",
-  "dependencies": []
-}
-```
-
-仕様本文の表とMachine Entityは同じstable IDを参照し、Entityのfingerprintを手入力で差し替えません。本SkillにはMachine Runtime Resultはありません。
+`authority_entities.py`または`ui_target_package.py build-machine-evidence`が返す`Machine Entities: spec-analysis`ブロックをそのまま配置します。Machine Entityのschema、fingerprint、dependencyを手組みしません。本SkillにはMachine Runtime Input / Resultはありません。

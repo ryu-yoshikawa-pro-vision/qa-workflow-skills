@@ -72,13 +72,6 @@
 
 ## Machine Runtime / Entity / Target mapping（機械証拠）
 
-```text
-<!-- Machine Runtime Input: test-condition-design -->
-{ "skill": "test-condition-design", "runtime_contract_version": "runtime-contract-v1", "input": {} }
-<!-- Machine Runtime Result: test-condition-design / <runtime_unit_key> -->
-{ "envelope_version": "runtime-envelope-v1", "runtime_unit_key": "<runtime_unit_key>", "model_key": "<model-key>", "input_fingerprint": "sha256:<64 hex>", "generation_fingerprint": "sha256:<64 hex>", "runtime_status": "ok", "result_status": "ready", "freshness_status": "current", "payload": {} }
-<!-- Machine Entities: test-condition-design -->
-[{ "entity_schema_version": "entity-state-v1", "skill": "test-condition-design", "entity_type": "condition", "entity_ref": "condition:<stable-ref>", "content": {}, "content_fingerprint": "sha256:<64 hex>", "dependencies": [] }]
-```
+`runtime_contract.py::render_runtime_input()`、`render_runtime_result()`、`render_machine_entities()`の戻り値をそのまま配置します。runtime-v2 / entity-state-v2のevidenceを手組みせず、generator結果の状態だけを人間向け記述へ反映します。
 
 targetの`target_ref`、`target_content_fingerprint`、execution、CI ID、mapping status、test-data requirementは同じModel Keyとstable IDで追跡します。stale / legacy / unsupported / semantic coverage不足をcompleteへ置き換えません。

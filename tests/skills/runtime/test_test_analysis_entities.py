@@ -34,7 +34,7 @@ def metadata(
     return {
         "envelope_version": "1",
         "skill": "test-analysis",
-        "runtime_contract_version": "runtime-v1",
+        "runtime_contract_version": "runtime-v2",
         "generator_contract_version": "analysis-entities-v1",
         "runtime_unit_key": "artifact:analysis_entities:all",
         "model_key": None,
@@ -97,7 +97,7 @@ def environment_metadata() -> dict:
     return {
         "envelope_version": "1",
         "skill": "test-analysis",
-        "runtime_contract_version": "runtime-v1",
+        "runtime_contract_version": "runtime-v2",
         "generator_contract_version": "environment-requirements-v1",
         "runtime_unit_key": "artifact:environment_requirements:all",
         "model_key": None,
@@ -885,7 +885,7 @@ class AnalysisEntityRuntimeTests(unittest.TestCase):
         workflow_metadata = {
             "envelope_version": "1",
             "skill": "qa-workflow",
-            "runtime_contract_version": "runtime-v1",
+            "runtime_contract_version": "runtime-v2",
             "generator_contract_version": "workflow-runtime-v1",
             "runtime_unit_key": "artifact:workflow_runtime:all",
             "model_key": None,
@@ -909,6 +909,7 @@ class AnalysisEntityRuntimeTests(unittest.TestCase):
             WORKFLOW_SCRIPT,
             workflow_metadata,
             {
+                "workflow_ref": "00000000-0000-4000-8000-000000000016",
                 "workflow_scopes": [
                     {
                         "skill": "test-analysis",

@@ -55,7 +55,6 @@ feat/ui-test-target-analysis-profile
 
 LLM / deterministic処理の責務境界は `2026-10-01_201500_ui-test-target-analysis-mode_05_llm-deterministic-boundaries.md` を正本とします。LLMの意味判断をscriptへ移さず、形式・参照・集計・fingerprint等の再現可能な定型処理だけをSkill-local helper / validatorへ移します。LLMはsemantic identity、UI分類、分類未確定時のUNKNOWN、file trigger、UNKNOWNの関連Scope / Blocking Scope / 関連File、required domainの意味上の母集団、Behaviorごとの関連UI操作、known UIOPがUS / UC identity blockerをどの既存UNKNOWNへ閉じるか、extension要否、same-UNK / new-UNK、explicit retire等を判断します。その後のstable ID採番、mixed-prefix tableのprefix selector、row状態導出、Markdown serialization、scope readiness、not-applicableとscope-owned rowの逆方向整合、scope別machine handoff、Stable ID lifecycle / 影響file、README / Machine Entity / MANIFESTはhelperが決定論実行します。後続QA工程へ影響する意味情報をextension proseだけに残さず、standard structured row / 09へ正規化します。Current UNKNOWNの存在だけでpackage全体を停止せず、semantic quality gateはcanonical write前に実施します。Repository baselineは0..N件を扱い、未再確認repositoryを自動更新しません。DEC / ASMはcanonical `DEC-xxx / ASM-xxx` を維持し、Project Contextがownerの場合だけqa-workflow helperで番号決定・materialize・previous ID削除検証を行います。ownerで確定済みDEC / ASMをpackageへ初めて取り込む時だけ`identity_action=external`を使い、package allocatorでは採番しません。packageはDEC / ASMをterminal retireしません。
 
-
 ### 1. 新Skillは追加しない
 
 UIテスト対象分析はspec-analysisの条件付き出力モードとして実装します。
@@ -137,6 +136,7 @@ version更新時は変更ファイルだけではなく、そのversionの完全
 ### spec-analysis
 
 変更:
+
 - skills/spec-analysis/SKILL.md
 - skills/spec-analysis/references/guidance.md
 - 新規 skills/spec-analysis/references/ui-test-target-analysis.md
@@ -153,6 +153,7 @@ version更新時は変更ファイルだけではなく、そのversionの完全
 ### test-requirement-design
 
 変更:
+
 - skills/test-requirement-design/SKILL.md
 - skills/test-requirement-design/references/guidance.md
 - skills/test-requirement-design/assets/output-template.md
@@ -168,6 +169,7 @@ version更新時は変更ファイルだけではなく、そのversionの完全
 ### question-analysis
 
 変更:
+
 - skills/question-analysis/SKILL.md
 - skills/question-analysis/references/guidance.md
 - skills/question-analysis/assets/output-template.md
@@ -194,6 +196,7 @@ PR #14確認headに存在する9個のSkill-local `runtime_contract.py` を同�
 - wcag-conformance-evaluation
 
 変更:
+
 - 上記9個の `runtime_contract.py`
 - `tests/skills/runtime/test_runtime_dispatch.py`
 - `tests/skills/runtime/test_runtime_portability.py`
@@ -227,6 +230,7 @@ active Machine Evidence templateはversion文字列だけを置換しません�
 ### qa-workflow
 
 変更:
+
 - skills/qa-workflow/references/guidance.md
 - skills/qa-workflow/assets/project-context-template.md
 - 新規 skills/qa-workflow/scripts/project_context_ids.py
@@ -242,6 +246,7 @@ active Machine Evidence templateはversion文字列だけを置換しません�
 PR #14後のREADME / EVALS / PROJECT_CONTEXT / CIを編集baselineにします。
 
 変更:
+
 - README.md: mode導線と#14 Skillとの目的境界を必要最小限に追記
 - EVALS.md: PR #16固有の評価差分だけ追記
 - docs/PROJECT_CONTEXT.md: current状態を持つ場合だけ同期

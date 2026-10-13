@@ -67,12 +67,12 @@ required package filesは `required core payload + required control file MANIFES
 
 次のtriggerが1件でも成立した場合は必ず作成します。成立しない場合は作成しません。
 
-| file | 作成trigger |
-| --- | --- |
-| 03_fields_and_validation.md | 入力・選択・検索・filter・sort・upload等のfield、入力制約、validation、enable/disable条件のいずれかが対象scopeに存在 |
-| 04_flows_and_data.md | 複数step / 画面をまたぐflow、state transitionに必要なI/O、import/export**生成処理**、data transformation、非同期process / state flowのいずれかが対象scopeに存在 |
+| file                                          | 作成trigger                                                                                                                                                      |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 03_fields_and_validation.md                   | 入力・選択・検索・filter・sort・upload等のfield、入力制約、validation、enable/disable条件のいずれかが対象scopeに存在                                             |
+| 04_flows_and_data.md                          | 複数step / 画面をまたぐflow、state transitionに必要なI/O、import/export**生成処理**、data transformation、非同期process / state flowのいずれかが対象scopeに存在  |
 | 05_notifications_and_external_interactions.md | notification、email、browser dialog、user-visibleなexport / download delivery、外部画面遷移、外部destination / serviceとのinteractionのいずれかが対象scopeに存在 |
-| 08_repository_implementation_status.md | current packageがrepository implementation evidenceを現在保持・利用している |
+| 08_repository_implementation_status.md        | current packageがrepository implementation evidenceを現在保持・利用している                                                                                      |
 
 `00_scope_and_context.md` のfile applicability表は **file × Scope ID** 単位で持ちます。各rowに `Trigger判定=あり / なし / 未確定`、helperが導出した `required / not-applicable / blocked`、根拠、関連UNKNOWNを記録します。LLMは資料の意味からTrigger判定だけを行い、helperが `あり → required / なし → not-applicable / 未確定 → blocked` を決定論導出します。
 
@@ -87,6 +87,7 @@ required domainでidentityまで確定できるFIELD / RULE / FLOW / NOTIFY / IN
 標準fileへ入れると責務を混在させる独立domainが存在する場合だけ追加を許可します。単に内容量が多い、好みで分けたい、Markdownを細かくしたいという理由では追加しません。
 
 許可例:
+
 - CSV / export仕様が独立したAuthority / flow / rule集合を持つ
 - notification / email template群が05では独立管理が必要な規模・Authorityを持つ
 - UI対象機能と別Authorityを持つdomain仕様を同じpackageで追跡する必要がある
@@ -400,7 +401,7 @@ default policyでは、完成済みpackageのuser-managed / semantic payloadに�
 6. gateを通過したinputだけを `ui_target_package.py materialize` へ渡す。qa-workflow / standaloneともhelper自身のpackage-local process lockを使い、PR #14のclaim / reservationをこのwrite pathへ追加しない。helperはlock取得後にMANIFEST receiptを先に確認し、同一requestがcommit済みなら再mutationせず既適用結果を返す。未適用のupdateだけsnapshot hashを確認してcurrent packageを再parseし、version、ID、canonical serialization、control、Machine Entity、MANIFESTをstagingへ生成・検証してからpackage単位でcommitする
 7. `materialize` が `stale_snapshot / state_transition_required / reference_not_found / write_commit_failed / write_recovery_failed` 等でblockedした場合は成功済みとして扱わない。通常のhandled failureでは元packageを復旧・保持し、復旧不能ならstaging / backupを保全してblockedとする
 8. materialize後はdeterministic validate / repository testsとread-only成果物確認を行う。semantic quality gateをcanonical write後の承認手段として使わない
-helperが列挙したimpact候補は再確認対象であり、変更必須という意味判断ではありません。LLMが仕様意味を判断します。
+   helperが列挙したimpact候補は再確認対象であり、変更必須という意味判断ではありません。LLMが仕様意味を判断します。
 
 同じ回答を複数ファイルへ機械コピーしません。canonical itemと構造化ビューの追跡を使い、必要な意味だけを反映します。
 

@@ -30,6 +30,12 @@
       "title": "質問の意思決定可能性",
       "description": "質問が回答者にとって具体的で、回答後の判断が進む形になっているか。",
       "critical": false
+    },
+    {
+      "id": "SEM-QUESTION-006",
+      "title": "UNKNOWN / Q identity lifecycle",
+      "description": "current UNKNOWNとresolved historyを区別し、Q ID履歴とUNKNOWNのsemantic identityを混同せずに質問を関連付けているか。",
+      "critical": true
     }
   ]
 }

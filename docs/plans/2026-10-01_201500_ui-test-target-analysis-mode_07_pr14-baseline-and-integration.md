@@ -6,6 +6,7 @@
 この文書は、PR #16をPR #14マージ後のrepositoryへ実装するためのbaseline、依存関係、routing境界、評価・CI統合の正本です。
 
 対象:
+
 - PR #14: `feat/usability-evaluation-skill`
 - PR #16: `feat/ui-test-target-analysis-profile`
 
@@ -59,12 +60,12 @@ PR #14後のcurrent repositoryで期待する観測値:
 
 PR #14が追加する3 Skill:
 
-| Skill | Trigger | Deterministic | Semantic |
-| --- | ---: | ---: | ---: |
-| usability-evaluation | 20 | 2 | 12 |
-| usability-inspection | 20 | 2 | 33 |
-| wcag-conformance-evaluation | 20 | 2 | 38 |
-| 追加合計 | 60 | 6 | 83 |
+| Skill                       | Trigger | Deterministic | Semantic |
+| --------------------------- | ------: | ------------: | -------: |
+| usability-evaluation        |      20 |             2 |       12 |
+| usability-inspection        |      20 |             2 |       33 |
+| wcag-conformance-evaluation |      20 |             2 |       38 |
+| 追加合計                    |      60 |             6 |       83 |
 
 PR #16で追加する差分:
 
@@ -93,11 +94,13 @@ PR #14 merge後に他PRがmainへ入って値が変わっていた場合、実�
 UIテスト対象分析モードと入力資料が重なる場合がありますが、目的で分けます。
 
 UIテスト対象分析モード:
+
 - 現在有効な仕様・UI構造・状態・業務ルール・UNKNOWNを整理する
 - 後続テスト設計で再利用する対象理解packageを作る
 - UI/UX品質の良し悪しを評価すること自体は目的ではない
 
 usability-evaluation:
+
 - 保存済みUI資料 / evidenceを使ってUI/UX上の懸念・適合性・heuristic上の意味評価を行う
 - spec-analysisのcanonical Authorityを作るSkillではない
 
@@ -148,6 +151,7 @@ UIテスト対象分析モードがformal WCAG評価やclaimを代替しませ�
 4. 正規化されたSPEC / DECISION / approved ASMだけをspec-analysis canonical Authorityへ反映する
 
 例外:
+
 - project contextでformal WCAG requirement自体がAuthorityとして明示されている場合、そのrequirementはAuthorityとして扱える
 - WCAG評価結果そのものをproduct仕様へ自動変換することはしない
 
@@ -156,6 +160,7 @@ UIテスト対象分析モードがformal WCAG評価やclaimを代替しませ�
 PR #14の61 routing fixturesをbaselineに、PR #16では8 caseを追加して69件を想定します。
 
 既存5 case:
+
 1. 対象理解packageだけ欲しい → spec-analysis mode
 2. 回答反映後にpackage更新 → question-analysis → spec-analysis mode
 3. current live target情報だけ必要 → test-target-inspection
@@ -243,17 +248,20 @@ PR #14後の内容を編集baselineにします。
 PR #16で追加するのは:
 
 README:
+
 - spec-analysisに条件付きUIテスト対象分析モードがあること
 - 新Skillではないこと
 - usability-evaluation等との目的境界を必要最小限に記載
 
 EVALS:
+
 - SPEC-OUT-003
 - spec-analysis / question-analysis semantic差分
 - qa-workflow routing 8件追加
 - multi-file projection / helper評価境界
 
 PROJECT_CONTEXT:
+
 - current repository状態を保持している場合だけmode / helper / current evaluation観測値を同期
 
 PR #14のUI/UX / WCAG説明を再記述・置換しません。
@@ -296,6 +304,7 @@ Step 0で次を実測します。
 - v1 runtime resultがstable identity cutoverに必要な `tr_id_state / tcn_id_state / model_key_state / target_mapping_state / semantic_ci_mapping_state / ci_id_state / expected_result_root_state / tc_id_state` を保存していること
 
 PR #16はPR #14後に存在する9コピーへ `_09_runtime-entity-and-test-requirement-contracts.md` のruntime-v2 / entity-state-v2変更を適用し、byte-identity testを9コピーへ拡張します。#14 merge後mainでコピー数・内容・consumer境界が確認headから変わっていた場合は、実装を開始せずPlanをcurrent contractへ同期します。
+
 ## 12. rebase / conflict gate
 
 PR #14 merge後、PR #16実装開始前に次を必須確認します。
@@ -311,6 +320,17 @@ PR #14 merge後、PR #16実装開始前に次を必須確認します。
 9. baselineに差分があれば、本Planを実データへ同期してから実装開始
 
 rebase前の旧mainとの差分を正として実装判断しません。
+
+### 2026-10-13 Step 0実施結果
+
+- PR #16はopen、headは`e90d59966b86c8e1634e5fe8be66c54299719a67`、baseは`main`の`dcabbb218cf79f6920f5c8303e60140ab9c15f23`。GitHub上の最新main commitも同SHAで、local `origin/main`と一致する。
+- PR #16のlocal HEADは最新mainを親に持つ既存merge commitであり、`origin/main`との差分は0 commit。したがって最新main統合は完了済み。
+- Plan記載のrebaseは実行しない。現在のPR headには418 commitがあり、rebaseは公開済み履歴の書換えとforce pushを要する。ユーザーのforce push禁止を守り、最新mainを既に含むmerge履歴を維持する。
+- current repositoryからの再計測値は22 Skill / 488 trigger / 44 deterministic / 155 semantic / 61 routingで、PlanのPR #14後baselineと一致。PR #16後の予定増分も変更不要。
+- current repositoryには`runtime_contract.py`が9コピーあり、SHA-256は全て一致する。既存`test_runtime_dispatch.py`のbyte identity対象は7 Skillのみである。
+- shared runtime / Entity baselineは`runtime-v1` / `entity-state-v1`で、`acceptance_criterion`はallowed Entity typesにない。`spec-analysis`はAuthority Entityを生成し、Requirement generatorは`requirement-structure-v1`。Disposition upstreamはAuthority / Product Riskに限定される。既存のTR / TCN / model / CI / TC stable ID stateはv1のactive / deleted履歴を持つ。
+- `docs/PROJECT_CONTEXT.md`はPR #14前の19 Skill / 428 trigger / 38 deterministic / 72 semantic記述が残っていたため、Step 0でcurrent baselineへ同期する。
+- latest mainにはPR #18のformatter / lint / Codex harnessが含まれる。以降の編集・検証ではそのcurrent repository契約も適用する。
 
 ## 13. 完了条件
 

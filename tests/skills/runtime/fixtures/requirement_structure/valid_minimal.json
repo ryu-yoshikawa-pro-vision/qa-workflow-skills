@@ -1,8 +1,13 @@
 {
   "authorities": [],
   "risks": [],
+  "acceptance_criteria": [],
+  "scope_ids": [],
   "test_requirements": [],
   "dispositions": [],
   "previous_tr_ids": [],
-  "update_scope_tr_ids": []
+  "update_scope_tr_ids": [],
+  "inactive_tr_ids": [],
+  "inactive_tr_history": [],
+  "zero_scope_terminal": false
 }

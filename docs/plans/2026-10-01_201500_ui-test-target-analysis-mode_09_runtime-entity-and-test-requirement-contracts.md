@@ -4,6 +4,7 @@
 2026-10-01_201500_ui-test-target-analysis-mode.md
 
 関連Plan:
+
 - 2026-10-01_201500_ui-test-target-analysis-mode_05_llm-deterministic-boundaries.md
 - 2026-10-01_201500_ui-test-target-analysis-mode_06_package-schema-and-helper-contracts.md
 - 2026-10-01_201500_ui-test-target-analysis-mode_08_behavior-decomposition-and-acceptance-traceability.md
@@ -149,10 +150,10 @@ stdinは1 JSON object、stdoutは1 JSON object + LFです。operationは `cutove
 
 ```json
 {
-  "operation":"cutover",
-  "phase":"all",
-  "artifact_markdown":"<runtime-v1 / entity-state-v1 artifact>",
-  "current_v2_artifact_markdown":null
+  "operation": "cutover",
+  "phase": "all",
+  "artifact_markdown": "<runtime-v1 / entity-state-v1 artifact>",
+  "current_v2_artifact_markdown": null
 }
 ```
 
@@ -172,15 +173,20 @@ response:
 
 ```json
 {
-  "valid":true,
-  "phase":"all",
-  "phase_complete":true,
-  "source_runtime_contract_version":"runtime-v1",
-  "source_entity_schema_version":"entity-state-v1",
-  "normalized_runtime_inputs":[
-    {"generator":"requirement_structure","runtime_unit_key":"artifact:requirement_structure:all","model_key":null,"normalized_input":{}}
+  "valid": true,
+  "phase": "all",
+  "phase_complete": true,
+  "source_runtime_contract_version": "runtime-v1",
+  "source_entity_schema_version": "entity-state-v1",
+  "normalized_runtime_inputs": [
+    {
+      "generator": "requirement_structure",
+      "runtime_unit_key": "artifact:requirement_structure:all",
+      "model_key": null,
+      "normalized_input": {}
+    }
   ],
-  "issues":[]
+  "issues": []
 }
 ```
 
@@ -212,12 +218,14 @@ expected unitは `artifact:requirement_structure:all` exactly 1件です。
 TCDはcurrent v2 model resultを後段へ使うため4 phaseで進めます。`phase=resume` では下記順序をhelper自身が検証し、current v2 artifact内で完全に検証済みのphaseを飛ばして最初の未完了phaseを返します。途中の`models`ではexpected model unit集合とcurrent v2 pairを照合し、検証済みunitを保持したまま依存順で未実行のready unitだけを返します。後段phaseのpairだけが存在する、前段pairがinvalid / missing、unknown / duplicate unitがある等の順序違反は自動補正せずblockedにします。
 
 `condition-structure`:
+
 - v1 condition_structure input/resultをexactly 1 pair要求
 - `tcn_id_state / model_key_state` をprevious stateへ移す
 - TCN / model `draft_key ↔ *_id_map` をexact joinしてreuseへ固定
 - active TCN / modelをfull rebuild scopeへ入れ、`inactive_tcn_ids=[] / inactive_model_keys=[]` を明示する
 
 `models`:
+
 - current v2 condition_structure pairを必須とする
 - root modelはv1 saved inputをcanonical copy
 - derived childはcurrent v2 parent resultの `derived_child_inputs[]` から生成し、v1 saved child inputとのsemantic driftを検出
@@ -225,11 +233,13 @@ TCDはcurrent v2 model resultを後段へ使うため4 phaseで進めます。`p
 - 未実行modelが残るのにready unitが0件なら `cutover_dependency_incomplete`
 
 `test-data-requirements`:
+
 - v1 TDR unitがなければempty completion
 - 存在時はsemantic fieldを維持し、target version fieldだけcurrent v2 model resultへrebase
 - target_ref / source_model_key / execution identityのsemantic driftをblockedにする
 
 `materialize-coverage`:
+
 - current v2 condition / model / optional TDR resultからcomplete inputを再構築
 - previous target / semantic CI / CI ID / expected-result-root stateをv1 resultからprevious stateへ維持し、`inactive_ci_ids=[]` を明示する
 - target annotation / disposition / merge groupのsemantic fieldを維持し、version fingerprintだけcurrent targetへrebase
@@ -261,7 +271,7 @@ generic migration module、shared `runtime_contract.py` のv1 compatibility bran
 `skills/spec-analysis/scripts/authority_entities.py` の既存request `{"authorities":[...]}` とresponse shapeは維持します。migration時だけ、これと排他的なrequestを受けます。
 
 ```json
-{"source_artifact_markdown":"<canonical v1 spec-analysis artifact>"}
+{ "source_artifact_markdown": "<canonical v1 spec-analysis artifact>" }
 ```
 
 この経路はexactly one `### Machine Entities: spec-analysis` blockを抽出し、current v2 `validate_machine_entity()` へ渡さず次をfrozen v1規則で検証します。
@@ -281,8 +291,8 @@ stdinは1 JSON object、stdoutは1 JSON object + LFです。
 
 ```json
 {
-  "operation":"extract-validated-inputs",
-  "artifact_markdown":"<runtime-v1 artifact>"
+  "operation": "extract-validated-inputs",
+  "artifact_markdown": "<runtime-v1 artifact>"
 }
 ```
 
@@ -292,17 +302,17 @@ stdinは1 JSON object、stdoutは1 JSON object + LFです。
 
 ```json
 {
-  "valid":true,
-  "source_runtime_contract_version":"runtime-v1",
-  "normalized_runtime_inputs":[
+  "valid": true,
+  "source_runtime_contract_version": "runtime-v1",
+  "normalized_runtime_inputs": [
     {
-      "generator":"...",
-      "runtime_unit_key":"artifact:...",
-      "model_key":null,
-      "normalized_input":{}
+      "generator": "...",
+      "runtime_unit_key": "artifact:...",
+      "model_key": null,
+      "normalized_input": {}
     }
   ],
-  "issues":[]
+  "issues": []
 }
 ```
 
@@ -361,17 +371,17 @@ runtime version bumpだけを理由にlive再観測は要求しませんが、�
 
 `runtime-v2 / entity-state-v2` へ上げる9 Skillについて、v1 artifactの扱いを次へ固定します。v1 envelope / Entity fingerprintをcurrent扱いせず、必要なstable identityだけを各Skillの正本から維持します。stable identity / historyをprojectionするcutover helperはTRD / TCD / TCだけに置き、保存v1 semantic inputを再利用するtest-analysis / usability-inspection / wcag-conformance-evaluationだけに§2.8のread-only input readerを置きます。
 
-| Skill | v1 artifactの扱い | v2移行方法 | stable identity | 再実行 / 再観測 |
-| --- | --- | --- | --- | --- |
-| spec-analysis | v1 Machine Entity / wrapperはcurrent扱いしない | `authority_entities.py` の§2.8 frozen projectionでcanonical v1 Authority Entityの`content`だけを検証抽出し、current v2 `build()`でAuthority Entityを再生成する。v1 blockがmissing / invalidならtable/prose parserへfallbackせず通常spec-analysis semantic rerun | SPEC / DEC / ASM等のsemantic IDは検証済みAuthority `content.authority_id`を維持し、v1 fingerprintをseedにしない | valid canonical v1 Authority blockならdeterministic再生成。無ければ通常Skill rerun |
-| test-analysis | v1 Runtime / Entity evidenceはcurrent扱いしない | `runtime_v1_input_reader.py` でv1 pair integrityを検証し、semantic field + saved child runtime inputだけを抽出する。current v2 upstream Entity identity / content fingerprint等のcurrent source契約が一致する場合だけdependent runtime→`analysis_entities`をfull rerunする。v1 rootのmachine-owned result fieldは再利用しない。reader invalid / currentness不一致は通常test-analysis rerun | RISK等のsemantic IDは検証済みsemantic input / current artifact上のIDを維持し、v1 fingerprintをseedにしない | reader valid + current source一致ならdeterministic full rerun。その他は通常Skill rerun |
-| test-requirement-design | v1 resultをprevious artifactへ直接渡さない | `runtime_v1_cutover.py` でcomplete v2 inputを作りfull rebuild | TR IDとv1のactive / deleted履歴を維持し、inactiveは空集合から開始 | cutover必須 |
-| test-condition-design | v1 resultをprevious artifactへ直接渡さない | `runtime_v1_cutover.py` の4 phaseでcomplete v2 inputを作りfull rebuild | TCN / model / CI IDとv1のactive / deleted履歴を維持し、inactiveは空集合から開始 | cutover必須 |
-| test-case-design | v1 resultをprevious artifactへ直接渡さない | `runtime_v1_cutover.py` でcomplete v2 inputを作りfull rebuild | TC IDとv1のactive / deleted履歴を維持し、inactiveは空集合から開始 | cutover必須 |
-| coverage-analysis | v1 aggregate evidenceをcarry-forwardしない | 保存v1 Machine Runtime Inputは再利用せず、current upstream v2 Entity / runtime evidenceから通常Skill契約どおり`traceability` / verifierをfull rerunする | 自Skill Entityをcarry-forwardしない既存契約を維持 | current v2 upstreamからdeterministic full rerun |
-| qa-workflow | v1 aggregate evidenceをcarry-forwardしない | 保存v1 Machine Runtime Inputは再利用せず、各scope担当Skillのcurrent v2 evidence + current workflow state / routing inputから`workflow_runtime.py` / final gateを再生成する | 自Skill Entityをcarry-forwardしない既存契約を維持 | current workflow stateからorchestration evidenceを再生成 |
-| usability-inspection | v1 runtime envelopeをcurrent扱いしない | `runtime_v1_input_reader.py` でv1 pair integrityを検証し、既存artifact graph / browser handoff / evidence currentnessが現在も成立する場合だけexact inputからv2 evidenceを再生成する。reader invalid / currentness不明・不一致はMarkdownから復元せず通常再実行または必要なlive再観測 | runtime version bumpだけで新しいproduct identityを作らない | integrity + currentness成立時だけversion bumpによるlive再観測を省略する |
-| wcag-conformance-evaluation | v1 runtime envelopeをcurrent扱いしない | `runtime_v1_input_reader.py` でv1 pair integrityを検証し、既存sampling / procedure / handoff / evidence freshnessが現在も成立する場合だけexact inputからv2 evidenceを再生成する。reader invalid / currentness不明・不一致はreport proseから復元せず既存WCAG-EM workflowで通常再実行する | evaluation / sample等のsemantic identityは既存Skill契約を維持 | integrity + currentness成立時だけversion bumpによる再観測を省略する |
+| Skill                       | v1 artifactの扱い                               | v2移行方法                                                                                                                                                                                                                                                                                                                                                                                 | stable identity                                                                                                 | 再実行 / 再観測                                                                        |
+| --------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| spec-analysis               | v1 Machine Entity / wrapperはcurrent扱いしない  | `authority_entities.py` の§2.8 frozen projectionでcanonical v1 Authority Entityの`content`だけを検証抽出し、current v2 `build()`でAuthority Entityを再生成する。v1 blockがmissing / invalidならtable/prose parserへfallbackせず通常spec-analysis semantic rerun                                                                                                                            | SPEC / DEC / ASM等のsemantic IDは検証済みAuthority `content.authority_id`を維持し、v1 fingerprintをseedにしない | valid canonical v1 Authority blockならdeterministic再生成。無ければ通常Skill rerun     |
+| test-analysis               | v1 Runtime / Entity evidenceはcurrent扱いしない | `runtime_v1_input_reader.py` でv1 pair integrityを検証し、semantic field + saved child runtime inputだけを抽出する。current v2 upstream Entity identity / content fingerprint等のcurrent source契約が一致する場合だけdependent runtime→`analysis_entities`をfull rerunする。v1 rootのmachine-owned result fieldは再利用しない。reader invalid / currentness不一致は通常test-analysis rerun | RISK等のsemantic IDは検証済みsemantic input / current artifact上のIDを維持し、v1 fingerprintをseedにしない      | reader valid + current source一致ならdeterministic full rerun。その他は通常Skill rerun |
+| test-requirement-design     | v1 resultをprevious artifactへ直接渡さない      | `runtime_v1_cutover.py` でcomplete v2 inputを作りfull rebuild                                                                                                                                                                                                                                                                                                                              | TR IDとv1のactive / deleted履歴を維持し、inactiveは空集合から開始                                               | cutover必須                                                                            |
+| test-condition-design       | v1 resultをprevious artifactへ直接渡さない      | `runtime_v1_cutover.py` の4 phaseでcomplete v2 inputを作りfull rebuild                                                                                                                                                                                                                                                                                                                     | TCN / model / CI IDとv1のactive / deleted履歴を維持し、inactiveは空集合から開始                                 | cutover必須                                                                            |
+| test-case-design            | v1 resultをprevious artifactへ直接渡さない      | `runtime_v1_cutover.py` でcomplete v2 inputを作りfull rebuild                                                                                                                                                                                                                                                                                                                              | TC IDとv1のactive / deleted履歴を維持し、inactiveは空集合から開始                                               | cutover必須                                                                            |
+| coverage-analysis           | v1 aggregate evidenceをcarry-forwardしない      | 保存v1 Machine Runtime Inputは再利用せず、current upstream v2 Entity / runtime evidenceから通常Skill契約どおり`traceability` / verifierをfull rerunする                                                                                                                                                                                                                                    | 自Skill Entityをcarry-forwardしない既存契約を維持                                                               | current v2 upstreamからdeterministic full rerun                                        |
+| qa-workflow                 | v1 aggregate evidenceをcarry-forwardしない      | 保存v1 Machine Runtime Inputは再利用せず、各scope担当Skillのcurrent v2 evidence + current workflow state / routing inputから`workflow_runtime.py` / final gateを再生成する                                                                                                                                                                                                                 | 自Skill Entityをcarry-forwardしない既存契約を維持                                                               | current workflow stateからorchestration evidenceを再生成                               |
+| usability-inspection        | v1 runtime envelopeをcurrent扱いしない          | `runtime_v1_input_reader.py` でv1 pair integrityを検証し、既存artifact graph / browser handoff / evidence currentnessが現在も成立する場合だけexact inputからv2 evidenceを再生成する。reader invalid / currentness不明・不一致はMarkdownから復元せず通常再実行または必要なlive再観測                                                                                                        | runtime version bumpだけで新しいproduct identityを作らない                                                      | integrity + currentness成立時だけversion bumpによるlive再観測を省略する                |
+| wcag-conformance-evaluation | v1 runtime envelopeをcurrent扱いしない          | `runtime_v1_input_reader.py` でv1 pair integrityを検証し、既存sampling / procedure / handoff / evidence freshnessが現在も成立する場合だけexact inputからv2 evidenceを再生成する。reader invalid / currentness不明・不一致はreport proseから復元せず既存WCAG-EM workflowで通常再実行する                                                                                                    | evaluation / sample等のsemantic identityは既存Skill契約を維持                                                   | integrity + currentness成立時だけversion bumpによる再観測を省略する                    |
 
 この表にないSkill固有のv1→v2 data conversion wrapper / generic converterは追加しません。spec-analysisは§2.8でfrozen検証したcanonical v1 Authority content、test-analysis / usability-inspection / wcag-conformance-evaluationはread-only readerでintegrity検証済みかつcurrentness条件を満たすsemantic input、coverage-analysisはcurrent upstream v2 evidence、qa-workflowは全必要current v2 evidenceが揃ったcurrent workflow state / routing inputを正本とし、proseからv2 inputを推測変換しません。PR #14 merge後のStep 0ではspec-analysis v1 Entityのexact baseline field / canonicalizationと、3 readerが固定するpre-cutover runtime / generator implementation fingerprint、保存input blockの存在・parse可能性を実測値へ同期します。存在しない / baseline不一致の場合は上表の通常rerun経路へ固定し、新しい設計判断はStep 0へ持ち越しません。
 
@@ -383,45 +393,45 @@ inputはmachine-generated observationだけを受けます。
 
 ```json
 {
-  "runtime_inventory":[
+  "runtime_inventory": [
     {
-      "skill":"test-requirement-design",
-      "artifact_present":true,
-      "runtime_contract_version":"runtime-v2",
-      "entity_schema_version":"entity-state-v2",
-      "verification_status":"current_valid"
+      "skill": "test-requirement-design",
+      "artifact_present": true,
+      "runtime_contract_version": "runtime-v2",
+      "entity_schema_version": "entity-state-v2",
+      "verification_status": "current_valid"
     },
     {
-      "skill":"test-condition-design",
-      "artifact_present":true,
-      "runtime_contract_version":"runtime-v2",
-      "entity_schema_version":"entity-state-v2",
-      "verification_status":"cutover_in_progress"
+      "skill": "test-condition-design",
+      "artifact_present": true,
+      "runtime_contract_version": "runtime-v2",
+      "entity_schema_version": "entity-state-v2",
+      "verification_status": "cutover_in_progress"
     },
     {
-      "skill":"test-case-design",
-      "artifact_present":true,
-      "runtime_contract_version":"runtime-v1",
-      "entity_schema_version":"entity-state-v1",
-      "verification_status":"legacy_valid"
+      "skill": "test-case-design",
+      "artifact_present": true,
+      "runtime_contract_version": "runtime-v1",
+      "entity_schema_version": "entity-state-v1",
+      "verification_status": "legacy_valid"
     }
   ],
-  "v2_baseline":{
-    "qa_workflow_verification_valid":false,
-    "qa_workflow_can_complete":false
+  "v2_baseline": {
+    "qa_workflow_verification_valid": false,
+    "qa_workflow_can_complete": false
   },
-  "ui_target_package":{
-    "present":false,
-    "current_scope_ids":[],
-    "ready_scope_ids":[],
-    "blocked_scope_ids":[]
+  "ui_target_package": {
+    "present": false,
+    "current_scope_ids": [],
+    "ready_scope_ids": [],
+    "blocked_scope_ids": []
   },
-  "active_downstream":[
+  "active_downstream": [
     {
-      "skill":"test-requirement-design",
-      "entity_type":"tr",
-      "entity_ref":"TR-001",
-      "scope_refs":[]
+      "skill": "test-requirement-design",
+      "entity_type": "tr",
+      "entity_ref": "TR-001",
+      "scope_refs": []
     }
   ]
 }
@@ -440,14 +450,14 @@ inputはmachine-generated observationだけを受けます。
 
 ```json
 {
-  "valid":true,
-  "migration_status":"runtime_v2_cutover_required",
-  "cutover_next_action":{
-    "skill":"test-condition-design",
-    "phase":"resume"
+  "valid": true,
+  "migration_status": "runtime_v2_cutover_required",
+  "cutover_next_action": {
+    "skill": "test-condition-design",
+    "phase": "resume"
   },
-  "blocking_issue":null,
-  "issues":[]
+  "blocking_issue": null,
+  "issues": []
 }
 ```
 
@@ -516,9 +526,9 @@ runtime-v1 → v2 cutover中に停止した場合、1〜7の先頭から連続�
 
 ```json
 {
-  "authorities": [{"authority_id":"SPEC-001"}],
+  "authorities": [{ "authority_id": "SPEC-001" }],
   "acceptance_criteria": [
-    {"ac_id":"AC-001","authority_refs":["SPEC-001","DEC-002"]}
+    { "ac_id": "AC-001", "authority_refs": ["SPEC-001", "DEC-002"] }
   ]
 }
 ```
@@ -542,9 +552,9 @@ qa-workflowはbatch handoffからroot runtimeの最終canonical stdinを構成�
 ```json
 {
   "acceptance_criteria": [
-    {"ac_id":"AC-001","authority_refs":["SPEC-001","DEC-002"]}
+    { "ac_id": "AC-001", "authority_refs": ["SPEC-001", "DEC-002"] }
   ],
-  "scope_ids":["SCOPE-001","SCOPE-002"]
+  "scope_ids": ["SCOPE-001", "SCOPE-002"]
 }
 ```
 
@@ -620,7 +630,6 @@ AC Entity contentには次を固定projectionします。
 AC Entityの `upstream_entity_dependencies[]` は、AC / Behavior / UC / US chain、linked UIOP、scope、linked structures、linked domain itemsのstable refsからfilterしたcurrent SPEC / DECISION / approved ASM Authority Entity unionへ固定します。INF / UNKをdependencyへ追加しません。linked INFはAC contentだけへ含めます。
 
 UIOP / US / UC / Behavior / UI構造 / FIELD / RULE / FLOW / NOTIFY / INTERACT / INFを新しいdependency Entity typeとして追加しません。package-local rowはAC contentへ固定projectionし、Authorityだけ既存Entity dependencyへ展開することで、不要なglobal entity typeを増やさずfreshnessを成立させます。
-
 
 ## 5. downstream generator contract version
 
@@ -773,7 +782,7 @@ ACで許可するhandlingは次の4値に固定します。
 `テスト要求一覧`:
 
 | テスト要求ID | 関連AC ID | テスト要求 | 現在有効な仕様根拠 | 関連プロダクトリスク | 優先度 | テストレベル / 観測方法 | 備考 |
-| --- | --- | --- | --- | --- | --- | --- | --- |
+| ------------ | --------- | ---------- | ------------------ | -------------------- | ------ | ----------------------- | ---- |
 
 ACが存在しないworkflowでは `関連AC ID` を `-` とします。
 
@@ -801,18 +810,18 @@ validatorはAuthority / Product Risk / Acceptance Criteriaをそれぞれ独立�
 
 UI target packageからtest-requirement-designへ進むcanonical workflowはartifact modeを使用し、完全なAC semantic freshness保証はartifact modeの契約とします。次をrepository runtime testで固定します。
 
-| 変更 | artifact modeの期待 |
-| --- | --- |
-| AC本文変更 | 関連TR stale |
-| current ACが属するScopeがblockedへ遷移する | `inspect.blocked_scope_ids[]` とprevious downstream Entity `content.scope_refs[]` の積集合で該当TR / TCN / model / CI / TCを`inactive`へ遷移し、current freshness対象から外す。AC stable ID自体はretireせず、再ready化時にsemantic identity同一なら同じ下流IDも再利用できる |
-| ACが意味上廃止されretired | 関連TR missing dependency / stale |
-| linked UIOP変更、AC本文同じ | AC fingerprint変更 → 関連TR stale |
-| 親Behavior変更、AC本文同じ | AC fingerprint変更 → 関連TR stale |
-| 親UC変更、AC本文同じ | AC fingerprint変更 → 関連TR stale |
-| 親US変更、AC本文同じ | AC fingerprint変更 → 関連TR stale |
-| linked domain item / linked structure ancestor / linked INF変更 | AC fingerprint変更 → 関連TR stale |
-| Authority変更、AC本文・親chain同じ、spec-analysis再実行済み | TRが保持する直接Authority dependency不一致 → 関連TR stale |
-| 無関係UC / AC / domain item変更 | 無関係TRはcurrent |
+| 変更                                                            | artifact modeの期待                                                                                                                                                                                                                                                         |
+| --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AC本文変更                                                      | 関連TR stale                                                                                                                                                                                                                                                                |
+| current ACが属するScopeがblockedへ遷移する                      | `inspect.blocked_scope_ids[]` とprevious downstream Entity `content.scope_refs[]` の積集合で該当TR / TCN / model / CI / TCを`inactive`へ遷移し、current freshness対象から外す。AC stable ID自体はretireせず、再ready化時にsemantic identity同一なら同じ下流IDも再利用できる |
+| ACが意味上廃止されretired                                       | 関連TR missing dependency / stale                                                                                                                                                                                                                                           |
+| linked UIOP変更、AC本文同じ                                     | AC fingerprint変更 → 関連TR stale                                                                                                                                                                                                                                           |
+| 親Behavior変更、AC本文同じ                                      | AC fingerprint変更 → 関連TR stale                                                                                                                                                                                                                                           |
+| 親UC変更、AC本文同じ                                            | AC fingerprint変更 → 関連TR stale                                                                                                                                                                                                                                           |
+| 親US変更、AC本文同じ                                            | AC fingerprint変更 → 関連TR stale                                                                                                                                                                                                                                           |
+| linked domain item / linked structure ancestor / linked INF変更 | AC fingerprint変更 → 関連TR stale                                                                                                                                                                                                                                           |
+| Authority変更、AC本文・親chain同じ、spec-analysis再実行済み     | TRが保持する直接Authority dependency不一致 → 関連TR stale                                                                                                                                                                                                                   |
+| 無関係UC / AC / domain item変更                                 | 無関係TRはcurrent                                                                                                                                                                                                                                                           |
 
 direct modeは `acceptance_criteria[]` によるknown ID / closure検証を保証しますが、参照AC Entityが無いrunではAC本文・親chain・linked domain item等のcross-run semantic freshnessを保証しません。参照AC Entityが実在しTR dependencyへ記録された場合は、そのEntityについて既存freshness判定を利用できます。direct mode向けに別fingerprint schemaや新しいfreshness engineは追加しません。
 
@@ -875,37 +884,37 @@ input:
 
 ```json
 {
-  "workflow_ref":"<existing opaque UUID>",
-  "workflow_state_record":{
-    "workflow_ref":"<same opaque UUID>",
-    "schema_version":"1",
-    "state":{
-      "last_completed_qa_workflow_artifact":{
-        "artifact_ref":"...",
-        "artifact_revision":"...",
-        "artifact_sha256":"<lowercase-64-hex>"
+  "workflow_ref": "<existing opaque UUID>",
+  "workflow_state_record": {
+    "workflow_ref": "<same opaque UUID>",
+    "schema_version": "1",
+    "state": {
+      "last_completed_qa_workflow_artifact": {
+        "artifact_ref": "...",
+        "artifact_revision": "...",
+        "artifact_sha256": "<lowercase-64-hex>"
       }
     }
   },
-  "current_scope_ids":["SCOPE-001","SCOPE-002"],
-  "blocked_scope_ids":["SCOPE-002"],
-  "previous_qa_workflow_artifact_markdown":"<workflow state bindingが指すexact historical revision>",
-  "scope_removal_resolutions":[
+  "current_scope_ids": ["SCOPE-001", "SCOPE-002"],
+  "blocked_scope_ids": ["SCOPE-002"],
+  "previous_qa_workflow_artifact_markdown": "<workflow state bindingが指すexact historical revision>",
+  "scope_removal_resolutions": [
     {
-      "skill":"test-requirement-design",
-      "entity_type":"tr",
-      "entity_ref":"TR-005",
-      "resolution":"reuse",
-      "resolved_scope_refs":["SCOPE-001"]
+      "skill": "test-requirement-design",
+      "entity_type": "tr",
+      "entity_ref": "TR-005",
+      "resolution": "reuse",
+      "resolved_scope_refs": ["SCOPE-001"]
     }
   ],
-  "scope_removal_applied_states":[
+  "scope_removal_applied_states": [
     {
-      "skill":"test-requirement-design",
-      "entity_type":"tr",
-      "entity_ref":"TR-005",
-      "status":"active",
-      "scope_refs":["SCOPE-001"]
+      "skill": "test-requirement-design",
+      "entity_type": "tr",
+      "entity_ref": "TR-005",
+      "status": "active",
+      "scope_refs": ["SCOPE-001"]
     }
   ]
 }
@@ -931,46 +940,49 @@ stdin:
 
 ```json
 {
-  "valid":true,
-  "payload":{
-    "inactive_tr_ids":["TR-002"],
-    "inactive_tcn_ids":["TCN-003"],
-    "inactive_model_keys":["decision-001"],
-    "inactive_ci_ids":["TCN-003-CI01"],
-    "inactive_tc_ids":["TC-004"],
-    "removed_scope_ids":["SCOPE-003"],
-    "scope_removal_affected_entities":[
+  "valid": true,
+  "payload": {
+    "inactive_tr_ids": ["TR-002"],
+    "inactive_tcn_ids": ["TCN-003"],
+    "inactive_model_keys": ["decision-001"],
+    "inactive_ci_ids": ["TCN-003-CI01"],
+    "inactive_tc_ids": ["TC-004"],
+    "removed_scope_ids": ["SCOPE-003"],
+    "scope_removal_affected_entities": [
       {
-        "skill":"test-requirement-design",
-        "entity_type":"tr",
-        "entity_ref":"TR-005",
-        "previous_status":"active",
-        "previous_scope_refs":["SCOPE-001","SCOPE-003"],
-        "removed_scope_refs":["SCOPE-003"],
-        "last_active_content":{"tr_id":"TR-005","scope_refs":["SCOPE-001","SCOPE-003"]},
-        "last_active_content_fingerprint":"<lowercase-64-hex>"
+        "skill": "test-requirement-design",
+        "entity_type": "tr",
+        "entity_ref": "TR-005",
+        "previous_status": "active",
+        "previous_scope_refs": ["SCOPE-001", "SCOPE-003"],
+        "removed_scope_refs": ["SCOPE-003"],
+        "last_active_content": {
+          "tr_id": "TR-005",
+          "scope_refs": ["SCOPE-001", "SCOPE-003"]
+        },
+        "last_active_content_fingerprint": "<lowercase-64-hex>"
       }
     ],
-    "scope_removal_state_transitions":[
+    "scope_removal_state_transitions": [
       {
-        "skill":"test-requirement-design",
-        "entity_type":"tr",
-        "entity_ref":"TR-005",
-        "resolved_scope_refs":["SCOPE-001"],
-        "status":"active"
+        "skill": "test-requirement-design",
+        "entity_type": "tr",
+        "entity_ref": "TR-005",
+        "resolved_scope_refs": ["SCOPE-001"],
+        "status": "active"
       }
     ],
-    "scope_removal_pending_applications":[],
-    "zero_scope_terminal":false,
-    "requires_semantic_resolution":false,
-    "requires_materialization":false,
-    "inactive_tr_history":[],
-    "inactive_tcn_history":[],
-    "inactive_model_history":[],
-    "inactive_materialize_history":[],
-    "inactive_tc_history":[]
+    "scope_removal_pending_applications": [],
+    "zero_scope_terminal": false,
+    "requires_semantic_resolution": false,
+    "requires_materialization": false,
+    "inactive_tr_history": [],
+    "inactive_tcn_history": [],
+    "inactive_model_history": [],
+    "inactive_materialize_history": [],
+    "inactive_tc_history": []
   },
-  "issues":[]
+  "issues": []
 }
 ```
 
@@ -978,13 +990,13 @@ handled failure stdout:
 
 ```json
 {
-  "valid":false,
-  "payload":null,
-  "issues":[
+  "valid": false,
+  "payload": null,
+  "issues": [
     {
-      "issue_type":"workflow_ref_mismatch",
-      "blocking":true,
-      "message":"..."
+      "issue_type": "workflow_ref_mismatch",
+      "blocking": true,
+      "message": "..."
     }
   ]
 }
@@ -1035,6 +1047,7 @@ qa-workflowはhelper outputを各generator / TCD current structure stateへ直�
 `current_scope_ids=[]` ではowner LLMへscope再割当を問い合わせず、§15のterminal deletion transitionをgeneratorへ適用して同じapplied-state checkを行います。これによりzero-scopeでもprevious active / inactive downstreamを無言carry-forwardせず、全terminal stateがcurrent generator resultへ反映されたことを機械確認できます。
 
 ### 12.4 再ready化
+
 ### 12.3a 全SCOPE retireのzero-scope terminalization
 
 `current_scope_ids=[] / ready_scope_ids=[] / blocked_scope_ids=[]` はpackage上のvalidな `complete` 状態ですが、previous committed downstreamがある場合は「全scope blocked」と同じno-dispatch経路へ入りません。UI target scope ownership baseline成立済みのprevious artifactを正本に、次のterminalizationを行います。
@@ -1051,7 +1064,6 @@ qa-workflowはhelper outputを各generator / TCD current structure stateへ直�
 10. previous bindingがnullでdownstream baseline自体が無いzero-scope packageは削除対象が無いため2〜9を実行せずcompleteで終了できる。逆にprevious active downstreamに `scope_refs=[]` が残るownership未確立状態では、どの旧成果物がretired Scope由来か証明できないため `scope_ownership_unavailable` でfail-closedする
 
 このpathのためにzero-length batch handoff、empty test-analysis run、generic tombstone store、新しいworkflow state schemaは追加しません。
-
 
 blocked Scopeがreadyへ戻ってもinactive IDを自動active化しません。
 
@@ -1132,7 +1144,6 @@ commit helperは次を1経路で実行します。
 このlocal helper経路でのみ、lock内のexpected revision比較 + atomic replaceをconditional state updateとして扱います。既存 `create_workflow_state()` が返す `local_exact_content_token_not_a_cas_condition` の意味は変更しません。provider-native pathでは従来どおりproviderのnative CAS / exact historical refetchを要求します。
 
 historical read helperはbindingから固定pathを導出し、symlinkを拒否してexact bytesを読み、`artifact_revision` とSHA-256を再検証してMarkdownを返します。local pathでは `verify_historical_revision(provider_can_refetch=true)` の能力フラグだけで済ませず、この実refetch成功をcommit前確認と次run読込の両方に使用します。
-
 
 coverage-analysisの既存traceability graph node typeへACを追加しません。
 

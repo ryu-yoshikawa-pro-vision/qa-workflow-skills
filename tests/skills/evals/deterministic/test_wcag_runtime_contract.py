@@ -141,7 +141,7 @@ def metadata() -> dict:
     return {
         "envelope_version": "1",
         "skill": "wcag-conformance-evaluation",
-        "runtime_contract_version": "runtime-v1",
+        "runtime_contract_version": "runtime-v2",
         "generator_contract_version": "wcag-em-runtime-v1",
         "runtime_unit_key": "artifact:wcag_runtime:all",
         "model_key": None,
@@ -335,7 +335,7 @@ def workflow_metadata(
     return {
         "envelope_version": "1",
         "skill": "qa-workflow",
-        "runtime_contract_version": "runtime-v1",
+        "runtime_contract_version": "runtime-v2",
         "generator_contract_version": "workflow-runtime-v1",
         "runtime_unit_key": "artifact:workflow_runtime:all",
         "model_key": None,

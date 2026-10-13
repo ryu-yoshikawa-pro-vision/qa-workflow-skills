@@ -10,6 +10,7 @@
 実装・評価はPR #14 merge後のlatest mainをbaselineとします。詳細は `_07_pr14-baseline-and-integration.md` を正本とします。
 
 PR #14後の期待観測値:
+
 - Skill: 22
 - Trigger queries: 488
 - Deterministic output cases: 44
@@ -17,6 +18,7 @@ PR #14後の期待観測値:
 - qa-workflow routing fixtures: 61
 
 PR #16後の現在Plan上の期待増分:
+
 - Skill: +0
 - Trigger: +0
 - Deterministic: +2
@@ -45,6 +47,7 @@ PR #16後の現在Plan上の期待増分:
 ### SPEC-SEM-003: 複数資料からUI target packageを構成
 
 入力:
+
 - 複数PAGE / same-route VIEW / STEP / route未確定候補
 - MODAL / browser dialog / PANEL / POPOVER / GLOBAL UI
 - 同時成立可能な複数STATE軸
@@ -59,6 +62,7 @@ PR #16後の現在Plan上の期待増分:
 - semantic identity自体が未確定でstable rowを作れないUNKNOWN
 
 期待:
+
 - semanticなUI構造分類を行い、STATEを直交軸として整理する
 - UI操作ありと確定したscopeは意味モデル上requiredのまま維持する。影響するUIOP / US / UC / Behavior / ACがblockedならworkflow readinessではそのscopeだけblockedとする。ACはsemantic identityが同じならcurrent ↔ blockedでstable IDを維持し、意味上廃止された場合だけretireする。semantic identity自体が未確定ならstable ID rowを作らず、07へBlocking UNKNOWNを記録したうえで `_08 §3.1` の階層別配置に従う。UCは親US、BehaviorはUse Case振る舞い完全性、ACは親Behaviorへclosureし、Scopeだけへ一律退避しない
 - non-blocker UNKNOWNが残るscopeと独立ready scopeを同時に含め、UNKNOWN件数だけで全scopeを止めない
@@ -82,12 +86,14 @@ PR #16後の現在Plan上の期待増分:
 ### SPEC-SEM-005: versioned package更新 / UNKNOWN lifecycle
 
 入力:
+
 - v03 package
 - resolved UNKNOWN
 - resolver失効または置換
 - 新しい資料差分
 
 期待:
+
 - same論点なら同じUNKをreopenし、別論点ならnew UNK
 - row消失を自動retireとみなさず、retireはsemanticに明示する
 - default policyでは完成package変更をv04として保存する
@@ -96,12 +102,14 @@ PR #16後の現在Plan上の期待増分:
 ### SPEC-SEM-006: legacy migration / extension domain
 
 入力:
+
 - schema versionなしのlegacy package
 - 後から継続利用対象になった通常spec-analysis単一成果物
 - retained / retired identity
 - 標準fileへ混在させるべきでないCSV domain
 
 期待:
+
 - legacy/current semantic identity mappingを意味判断する
 - 通常spec-analysis単一成果物は同一semantic identityを維持し、package versionなし入力として `legacy-unversioned → v00` へmigrationする
 - 必要なextension fileの責務・分割理由とfile-levelの関連Scope / Authority / structure / UNKNOWN refsを判断する
@@ -112,12 +120,14 @@ PR #16後の現在Plan上の期待増分:
 ### SPEC-SEM-007: file trigger / external owner境界
 
 入力:
+
 - simple downloadだけのscope
 - export生成 + data transformation + downloadを伴うscope
 - conditional file trigger有無をAuthorityから確定できないscope
 - Project Context以外のDEC / ASM正本owner
 
 期待:
+
 - simple downloadは05のみ
 - export生成 / transformation + user-visible downloadは04 + 05
 - trigger不明をnot-applicableへ落とさず `Trigger判定=未確定` + UNKNOWNとして保持し、helperがblockedを導出できるsemantic inputにする
@@ -128,21 +138,21 @@ PR #16後の現在Plan上の期待増分:
 
 ### spec-analysis semantic responsibility coverage
 
-| LLM責務 | semantic case |
-| --- | --- |
-| SPEC / DECISION / INFERENCE / UNKNOWN分類・Authority競合 | 既存SPEC-SEM-001 / 002、SPEC-SEM-003 / 004 |
-| PAGE / STATE / VIEW / MODAL等の意味分類 | SPEC-SEM-003 |
-| scope UI操作有無 / 条件付きfile trigger / scope blocker判定 | SPEC-SEM-003 / 007 |
-| US / UC / Behavior / AC分解と正常 / 準正常 / 例外 | SPEC-SEM-003 |
-| semantic identity reuse / new / explicit retire | SPEC-SEM-005 / 006 |
-| repository差分の意味 | SPEC-SEM-004 |
-| same-UNK reopen / new UNK | SPEC-SEM-005 |
-| legacy semantic mapping | SPEC-SEM-006 |
-| extension fileの必要性・意味 | SPEC-SEM-006 |
-| DEC / ASM owner判断 | SPEC-SEM-007 |
-| 04 / 05責務境界 | SPEC-SEM-007 |
-| required domainの意味上の母集団網羅 / content incomplete | SPEC-SEM-003 / 007 |
-| repository baseline / implementation-only freshness | SPEC-SEM-004 |
+| LLM責務                                                     | semantic case                              |
+| ----------------------------------------------------------- | ------------------------------------------ |
+| SPEC / DECISION / INFERENCE / UNKNOWN分類・Authority競合    | 既存SPEC-SEM-001 / 002、SPEC-SEM-003 / 004 |
+| PAGE / STATE / VIEW / MODAL等の意味分類                     | SPEC-SEM-003                               |
+| scope UI操作有無 / 条件付きfile trigger / scope blocker判定 | SPEC-SEM-003 / 007                         |
+| US / UC / Behavior / AC分解と正常 / 準正常 / 例外           | SPEC-SEM-003                               |
+| semantic identity reuse / new / explicit retire             | SPEC-SEM-005 / 006                         |
+| repository差分の意味                                        | SPEC-SEM-004                               |
+| same-UNK reopen / new UNK                                   | SPEC-SEM-005                               |
+| legacy semantic mapping                                     | SPEC-SEM-006                               |
+| extension fileの必要性・意味                                | SPEC-SEM-006                               |
+| DEC / ASM owner判断                                         | SPEC-SEM-007                               |
+| 04 / 05責務境界                                             | SPEC-SEM-007                               |
+| required domainの意味上の母集団網羅 / content incomplete    | SPEC-SEM-003 / 007                         |
+| repository baseline / implementation-only freshness         | SPEC-SEM-004                               |
 
 repository testは、`05_llm-deterministic-boundaries.md` のLLM responsibility matrixで今回追加・変更した各行が最低1 semantic criterion / caseから参照されることを検証します。case数そのものよりcoverageを正本にします。
 
@@ -202,12 +212,14 @@ semantic / deterministicで同じprojection helperを使いますが、expected�
 1 caseを追加し、確認head前提ではtest-requirement-designを2件から3件へ増やします。case IDは `TR-SEM-003` とします。
 
 入力:
+
 - current ACを持つUI target mode成果物
 - 1 ACから複数の検証責務が必要な例
 - 複数ACを1つの検証責務へ統合できる例
 - dispositionへ送るAC
 
 期待:
+
 - `関連AC ID` を追跡する
 - ACの文章をそのままTRへ言い換えず、「何を検証・保証するか」へ変換する
 - ACとTRの1:1対応を強制しない
@@ -345,12 +357,14 @@ repository unit testで次を必須確認します。
 `skills/question-analysis/scripts/question_ids.py` と `skills/qa-workflow/scripts/project_context_ids.py` を追加します。UNKNOWN link検証だけの `unknown_links.py`、採番だけの公開 `next-id` operationは追加しません。
 
 `question_ids.py`:
+
 - `operation=materialize`: create / updateを区別し、previous current Q + previous history + request内reuse/newからnew Q IDを内部batch allocationしてcurrent Q table + 質問ID履歴をcanonical生成し、同じcall内でcurrent / resolved UNKNOWN link validationまで完了する
 - `operation=validate-links`: 既存artifactのstandalone検証用としてUNK ID形式、current known UNKNOWNへの存在参照、同一Q内duplicate、resolved-only参照を検証する
 - candidate側の既存historyを採番正本にせず、Q-001解消後の新規QでQ-001を再利用しない
 - malformed / duplicate Q ID、Q-999 exhaustionをfail-closedにする
 
 `project_context_ids.py`:
+
 - `operation=materialize`: Project Context Section 12 / 13がDEC / ASM正本ownerの場合だけ、previous + candidate全状態rowからnew IDを内部batch allocationしてcanonical tableを生成する
 - `operation=validate-history`: previous DEC / ASM ID集合の欠落をrejectし、撤回 / 置換済みIDの削除と再利用を防ぐ
 - canonical Authority IDは `DEC-xxx / ASM-xxx` に限定し、外部owner固有IDをauthority_idへ流用しない
@@ -435,7 +449,6 @@ Step 0でmainの現在値を再確認し、上記差分がそのまま適用可�
 - README.mdは件数またはmode説明を実際に持つ箇所だけ更新
 - PR #14後の `.github/workflows/deterministic-output-evals.yml` は `skills/*/scripts` を動的compileするため、helper compile目的のSkill固有workflow editは行わない
 
-
 歴史文書の過去値は変更しません。
 
 ## 10. 実Agent smoke
@@ -443,6 +456,7 @@ Step 0でmainの現在値を再確認し、上記差分がそのまま適用可�
 実装完了前に少なくとも1回、実Agentクライアント相当で次を確認します。
 
 入力:
+
 - 複数の仕様根拠
 - 1件以上の正式decision
 - 1件以上のUNKNOWN
@@ -450,6 +464,7 @@ Step 0でmainの現在値を再確認し、上記差分がそのまま適用可�
 - 「テスト設計へ進まず対象理解packageまで」の要求
 
 確認:
+
 - 通常の小規模spec-analysis要求ではmodeへ不要に昇格しない
 - UI target用途ではspec-analysis modeを選択する
 - mode referenceを読む
@@ -659,6 +674,23 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - shared runtimeがTRD / TCD / TC固有migration schemaを保持していない
 - 特定AI製品固有のtool / connector / bootstrapをSkill契約へ入れていない
 - 実装時に参照すべき正本fileが一意に分かる
+
+## 11.1 実装チェックリスト
+
+- [x] Step 0: PR #14後の最新main統合とcurrent repository baselineを確認。既存merge commitに最新mainが含まれるためrebaseは行わず、418 commitの公開履歴を書き換えない。実測値と確認した契約は `_07 §12` の2026-10-13結果を参照。
+- [x] Step 1: UI target package schema / materialize基盤
+- [ ] Step 2: runtime-v2 / entity-state-v2 transition、AC bridge、generator v2、migration runtime
+- [ ] Step 3: spec-analysis semantic / deterministic evaluation
+- [x] Step 4: question-analysis UNKNOWN lifecycle / DEC・ASM owner helper
+- [ ] Step 5: qa-workflow routing / resume / scope readiness統合
+- [ ] Step 6: package schema・migration・helper contract validation
+- [ ] Step 7: deterministic / semantic責務境界の検証
+- [x] Step 8: cross-repository validation（2026-10-13再実行: runtime 316 passed / 2 Windows symlink privilege skips、deterministic 302 passed、semantic dataset validation 22 Skill / 163 cases、semantic tests 35 passed / 2 Windows symlink privilege skips、routing 1 passed、Codex Harness 36 passed、formatter / Ruff / diff check passed。外部Semantic Judgeは含まない）
+- [ ] Step 9: 実Agent smoke（spec-analysis packageの1シナリオは成功。migration、routing、resume、scope lifecycle等の残りのPlan scenarioは未実施）
+- [ ] Step 10: final review
+
+2026-10-13時点でStep 2は未完了です。3つの`runtime_v1_input_reader.py`、TRD / TC cutover helper、関連runtime contractは存在しますが、`skills/test-condition-design/scripts/runtime_v1_cutover.py`が未実装で、TCDの4 phase / `resume` / partial model unit検証を完了していません。このためTCD cutoverを含むStep 2、migration preflightからfinal gateまでのStep 5、および依存する全体完了条件を満たしていません。Step 3 / 7もSemantic Judgeによる意味評価が未実施のため完了扱いにしません。
+
 ## 12. 完了条件
 
 - 新Skill追加なし

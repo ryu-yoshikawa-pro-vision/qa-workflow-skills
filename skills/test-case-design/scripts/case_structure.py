@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import Any
 
 from runtime_contract import (
+    ENTITY_SCHEMA_VERSION,
+    SCOPE_ID_RE,
     TC_ID_RE,
     InvalidInput,
     UnsupportedInput,
@@ -28,7 +30,7 @@ from runtime_contract import (
 
 SKILL = "test-case-design"
 GENERATOR = "case_structure"
-GENERATOR_CONTRACT_VERSION = "case-structure-v1"
+GENERATOR_CONTRACT_VERSION = "case-structure-v2"
 SCRIPT_PATH = Path(__file__).resolve()
 TC_RE = re.compile(r"^TC-(\d{3})$")
 HANDLINGS = {"対象外", "別テストレベル", "残存リスク", "ブロック中", "重複"}
@@ -44,17 +46,24 @@ def _tc_id(value: Any, name: str = "tc_id") -> str:
 def _refs(value: Any, name: str) -> list[str]:
     if (
         not isinstance(value, list)
-        or len(set(value)) != len(value)
         or not all(isinstance(item, str) and item for item in value)
+        or len(set(value)) != len(value)
     ):
         raise InvalidInput(f"{name}が不正です")
     return sorted(value)
 
 
+def _scope_refs(value: Any, name: str) -> list[str]:
+    refs = _refs(value, name)
+    if any(SCOPE_ID_RE.fullmatch(ref) is None for ref in refs):
+        raise InvalidInput(f"{name}に不正なScope IDがあります")
+    return refs
+
+
 def _normalize_current_rows(rows: Any, *, kind: str) -> dict[str, dict[str, Any]]:
     result: dict[str, dict[str, Any]] = {}
     for index, row in enumerate(ensure_list(rows, kind)):
-        if isinstance(row, dict) and row.get("schema_version") == "entity-state-v1":
+        if isinstance(row, dict) and row.get("schema_version") == ENTITY_SCHEMA_VERSION:
             entity = validate_machine_entity(row)
             if entity["entity_type"] != kind:
                 raise InvalidInput(f"{kind} Machine Entity typeが不一致です")
@@ -108,6 +117,7 @@ def _validate_ci_entities(ci_map: dict[str, dict[str, Any]]) -> None:
         "semantic_item_text",
         "semantic_source_targets",
         "test_data_requirement_refs",
+        "scope_refs",
     }
     for ci_id, entity in ci_map.items():
         content = entity["content"]
@@ -127,6 +137,7 @@ def _validate_ci_entities(ci_map: dict[str, dict[str, Any]]) -> None:
             set(content["test_data_requirement_refs"])
         ) != len(content["test_data_requirement_refs"]):
             raise InvalidInput(f"CI {ci_id}のtest_data_requirement_refsが不正です")
+        _scope_refs(content["scope_refs"], f"CI {ci_id}.scope_refs")
         if content["source_kind"] == "runtime_target":
             if (
                 not isinstance(content["execution"], dict)
@@ -155,7 +166,7 @@ def _normalize_tcn(rows: Any) -> dict[str, dict[str, Any]]:
     for index, row in enumerate(ensure_list(rows, "test_conditions")):
         if not isinstance(row, dict):
             raise InvalidInput(f"test_conditions[{index}]が不正です")
-        reject_unknown(row, {"tcn_id", "tr_refs", "priority"})
+        reject_unknown(row, {"tcn_id", "tr_refs", "priority", "scope_refs"})
         tcn_id = row["tcn_id"]
         if (
             not isinstance(tcn_id, str)
@@ -167,6 +178,7 @@ def _normalize_tcn(rows: Any) -> dict[str, dict[str, Any]]:
             {
                 "tcn_id": tcn_id,
                 "tr_refs": _refs(row["tr_refs"], "TCN tr_refs"),
+                "scope_refs": _scope_refs(row["scope_refs"], "TCN scope_refs"),
                 "priority": row["priority"],
             }
         )
@@ -344,7 +356,7 @@ def _current_machine_entities(
         for row in ensure_list(input_value[field], field):
             if (
                 not isinstance(row, dict)
-                or row.get("schema_version") != "entity-state-v1"
+                or row.get("schema_version") != ENTITY_SCHEMA_VERSION
             ):
                 continue
             entity = validate_machine_entity(row)
@@ -473,6 +485,9 @@ def generate(input_value: dict, metadata: dict) -> dict:
         "dispositions",
         "previous_tc_ids",
         "update_scope_tc_ids",
+        "inactive_tc_ids",
+        "inactive_tc_history",
+        "zero_scope_terminal",
     }
     reject_unknown(input_value, required, {"legacy_tc_ids"})
     current_entities = _current_machine_entities(metadata, input_value)
@@ -485,33 +500,109 @@ def generate(input_value: dict, metadata: dict) -> dict:
     data_map = _normalize_current_rows(
         input_value["test_data_requirements"], kind="test_data_requirement"
     )
+    current_tcn_entities = {
+        row["entity_ref"]: row
+        for row in current_entities
+        if row["skill"] == "test-condition-design" and row["entity_type"] == "tcn"
+    }
+    if metadata["input_mode"] == "artifact" and set(current_tcn_entities) != set(
+        tcn_map
+    ):
+        raise InvalidInput(
+            "artifact mode current TCN Entityとtest_conditionsが一致しません"
+        )
+    for tcn_id, row in tcn_map.items():
+        entity = current_tcn_entities.get(tcn_id)
+        if entity is not None and (
+            entity["content"].get("tr_refs") != row["tr_refs"]
+            or entity["content"].get("scope_refs") != row["scope_refs"]
+        ):
+            raise InvalidInput(
+                "test_conditions scope_refsがcurrent TCN Entityと一致しません"
+            )
+    for ci_id, entity in ci_map.items():
+        tcn_id = entity["content"].get("tcn_id")
+        if (
+            tcn_id in tcn_map
+            and entity["content"].get("scope_refs") != tcn_map[tcn_id]["scope_refs"]
+        ):
+            raise InvalidInput("CI scope_refsがparent TCNと一致しません")
     previous_raw = ensure_list(input_value["previous_tc_ids"], "previous_tc_ids")
-    previous_status: dict[str, str] = {}
+    previous_rows: dict[str, dict[str, Any]] = {}
     for row in previous_raw:
         if (
             not isinstance(row, dict)
-            or set(row) != {"tc_id", "status"}
-            or row["status"] not in {"active", "deleted"}
+            or set(row) != {"tc_id", "status", "scope_refs"}
+            or not isinstance(row.get("status"), str)
+            or row["status"] not in {"active", "inactive", "deleted"}
         ):
             raise InvalidInput("previous_tc_idsが不正です")
         tc_id = _tc_id(row["tc_id"])
-        if tc_id in previous_status:
+        scope_refs = _scope_refs(row["scope_refs"], "previous_tc_ids.scope_refs")
+        if tc_id in previous_rows:
             raise InvalidInput("previous_tc_idsが重複しています")
-        previous_status[tc_id] = row["status"]
+        previous_rows[tc_id] = {
+            "tc_id": tc_id,
+            "status": row["status"],
+            "scope_refs": scope_refs,
+        }
+    previous_status = {ref: row["status"] for ref, row in previous_rows.items()}
     legacy_ids = input_value.get("legacy_tc_ids")
     if legacy_ids is not None:
         if metadata["input_mode"] != "direct" or previous_status:
             raise InvalidInput("legacy_tc_idsはdirectかつ空previousでのみ使用できます")
         seeded = seed_legacy_ids(legacy_ids, TC_ID_RE, "legacy_tc_ids")
-        previous_status = {row["id"]: row["status"] for row in seeded}
+        previous_rows = {
+            row["id"]: {"tc_id": row["id"], "status": row["status"], "scope_refs": []}
+            for row in seeded
+        }
+        previous_status = {ref: row["status"] for ref, row in previous_rows.items()}
+    inactive_tc_ids = set(_refs(input_value["inactive_tc_ids"], "inactive_tc_ids"))
+    if any(TC_RE.fullmatch(ref) is None for ref in inactive_tc_ids):
+        raise InvalidInput("inactive_tc_idsが不正です")
+    if not isinstance(input_value["zero_scope_terminal"], bool):
+        raise InvalidInput("zero_scope_terminalはbooleanである必要があります")
+    zero_scope_terminal = input_value["zero_scope_terminal"]
+    inactive_history: dict[str, dict[str, Any]] = {}
+    history_order = []
+    for raw_entity in ensure_list(
+        input_value["inactive_tc_history"], "inactive_tc_history"
+    ):
+        entity = validate_machine_entity(raw_entity, expected_skill=SKILL)
+        tc_id = entity["entity_ref"]
+        scope_refs = entity["content"].get("scope_refs")
+        if (
+            entity["entity_type"] != "tc"
+            or entity["content"].get("tc_id") != tc_id
+            or tc_id in inactive_history
+            or not isinstance(scope_refs, list)
+        ):
+            raise InvalidInput("inactive_tc_history Entityが不正です")
+        _scope_refs(scope_refs, "inactive_tc_history.scope_refs")
+        inactive_history[tc_id] = entity
+        history_order.append(tc_id)
+    if history_order != sorted(history_order):
+        raise InvalidInput("inactive_tc_historyはtc_id順である必要があります")
     update_scope = _refs(input_value["update_scope_tc_ids"], "update_scope_tc_ids")
     if any(
-        tc_id not in previous_status or previous_status[tc_id] != "active"
+        tc_id not in previous_status
+        or previous_status[tc_id] not in {"active", "inactive"}
         for tc_id in update_scope
     ):
         raise InvalidInput(
-            "update_scope_tc_idsはprevious active TCだけを列挙する必要があります"
+            "update_scope_tc_idsはprevious active / inactive TCだけを列挙する必要があります"
         )
+    if set(update_scope) & inactive_tc_ids or any(
+        previous_status.get(tc_id) != "active" for tc_id in inactive_tc_ids
+    ):
+        raise InvalidInput(
+            "inactive_tc_idsはupdate scope外のactive previous TCだけを指定できます"
+        )
+    expected_history_ids = {
+        ref for ref, row in previous_rows.items() if row["status"] == "inactive"
+    } | inactive_tc_ids
+    if set(inactive_history) != expected_history_ids:
+        raise InvalidInput("inactive_tc_historyがprevious inactive stateと一致しません")
     drafts: list[dict[str, Any]] = []
     seen_drafts: set[str] = set()
     for row in ensure_list(input_value["test_cases"], "test_cases"):
@@ -521,17 +612,95 @@ def generate(input_value: dict, metadata: dict) -> dict:
         seen_drafts.add(draft["draft_key"])
         drafts.append(draft)
     drafts.sort(key=lambda row: row["draft_key"])
+    if zero_scope_terminal and (
+        tcn_map
+        or ci_map
+        or env_map
+        or data_map
+        or drafts
+        or input_value["dispositions"]
+        or inactive_tc_ids
+        or set(update_scope)
+        != {
+            ref
+            for ref, row in previous_rows.items()
+            if row["status"] in {"active", "inactive"}
+        }
+    ):
+        raise InvalidInput(
+            "zero_scope_terminalはcurrent inputを空にして全previous active / inactive TCを閉じる場合だけ許可されます"
+        )
+    if zero_scope_terminal and (
+        tcn_map
+        or ci_map
+        or env_map
+        or data_map
+        or drafts
+        or input_value["dispositions"]
+        or inactive_tc_ids
+        or set(update_scope)
+        != {
+            ref
+            for ref, row in previous_rows.items()
+            if row["status"] in {"active", "inactive"}
+        }
+    ):
+        raise InvalidInput(
+            "zero_scope_terminalはcurrent inputを空にして全previous active / inactive TCを閉じる場合だけ許可されます"
+        )
+    current_tcn_entities = {
+        row["entity_ref"]: row
+        for row in current_entities
+        if row["skill"] == "test-condition-design" and row["entity_type"] == "tcn"
+    }
+    if metadata["input_mode"] == "artifact" and set(current_tcn_entities) != set(
+        tcn_map
+    ):
+        raise InvalidInput(
+            "artifact mode current TCN Entityとtest_conditionsが一致しません"
+        )
+    for tcn_id, row in tcn_map.items():
+        entity = current_tcn_entities.get(tcn_id)
+        if entity is not None and (
+            entity["content"].get("scope_refs") != row["scope_refs"]
+            or entity["content"].get("tr_refs") != row["tr_refs"]
+        ):
+            raise InvalidInput(
+                "test_conditions.scope_refsがcurrent TCN Entityと一致しません"
+            )
+    for ci_id, entity in ci_map.items():
+        tcn_id = entity["content"].get("tcn_id")
+        if (
+            tcn_id in tcn_map
+            and entity["content"].get("scope_refs") != tcn_map[tcn_id]["scope_refs"]
+        ):
+            raise InvalidInput("CI scope_refsがparent TCNと一致しません")
     reused: set[str] = set()
     tc_id_map: list[dict[str, Any]] = []
     assignments: dict[str, str] = {}
     used_ids = set(previous_status)
+    current_scope_by_draft = {
+        draft["draft_key"]: sorted(
+            {
+                scope_ref
+                for ref in draft["tcn_refs"]
+                for scope_ref in tcn_map[ref]["scope_refs"]
+            }
+            | {
+                scope_ref
+                for ref in draft["ci_refs"]
+                for scope_ref in ci_map[ref]["content"]["scope_refs"]
+            }
+        )
+        for draft in drafts
+    }
     for draft in drafts:
         if draft["identity_action"] == "reuse":
             tc_id = draft["reuse_id"]
             if (
                 tc_id not in update_scope
                 or tc_id in reused
-                or previous_status.get(tc_id) != "active"
+                or previous_status.get(tc_id) not in {"active", "inactive"}
             ):
                 raise InvalidInput(
                     "test case reuse_idがscope / active stateと不一致です"
@@ -549,11 +718,18 @@ def generate(input_value: dict, metadata: dict) -> dict:
             }
         )
     tc_state = dict(previous_status)
+    tc_scopes = {ref: row["scope_refs"] for ref, row in previous_rows.items()}
     for tc_id in update_scope:
         if tc_id not in reused:
             tc_state[tc_id] = "deleted"
+            if zero_scope_terminal:
+                tc_scopes[tc_id] = []
+    for tc_id in inactive_tc_ids:
+        tc_state[tc_id] = "inactive"
     for tc_id in assignments.values():
         tc_state[tc_id] = "active"
+    for tc_id in inactive_tc_ids:
+        tc_state[tc_id] = "inactive"
     violations: list[dict[str, Any]] = []
     for draft in drafts:
         referenced_priorities = [
@@ -613,7 +789,13 @@ def generate(input_value: dict, metadata: dict) -> dict:
             current_entities,
             require_all=metadata["input_mode"] == "artifact",
         )
-        content = {**draft, "tc_id": tc_id, "status": "active"}
+        content = {
+            **draft,
+            "tc_id": tc_id,
+            "scope_refs": current_scope_by_draft[draft["draft_key"]],
+            "status": "active",
+        }
+        tc_scopes[tc_id] = content["scope_refs"]
         entities.append(
             make_machine_entity(
                 SKILL,
@@ -664,8 +846,17 @@ def generate(input_value: dict, metadata: dict) -> dict:
             "dispositions": [row for row, _deps in disposition_rows],
             "tc_id_map": tc_id_map,
             "tc_id_state": [
-                {"tc_id": tc_id, "status": status}
+                {
+                    "tc_id": tc_id,
+                    "status": status,
+                    "scope_refs": tc_scopes.get(tc_id, []),
+                }
                 for tc_id, status in sorted(tc_state.items())
+            ],
+            "inactive_tc_history": [
+                inactive_history[tc_id]
+                for tc_id in sorted(tc_state)
+                if tc_state[tc_id] == "inactive"
             ],
             "violations": violations,
             "entities": sorted(

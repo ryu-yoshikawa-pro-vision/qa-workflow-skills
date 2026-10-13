@@ -20,6 +20,22 @@ runtime = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = runtime
 SPEC.loader.exec_module(runtime)
 
+# Stateful IDs in entity-state-v2 always carry scope ownership, including the
+# explicit empty ownership used by direct, non-UI workflows.
+_make_machine_entity = runtime.make_machine_entity
+
+
+def _make_v2_machine_entity(
+    skill: str, entity_type: str, entity_ref: str, content: dict, **kwargs: object
+) -> dict:
+    if entity_type in {"tr", "tcn", "model", "ci", "tc"}:
+        content = {**content}
+        content.setdefault("scope_refs", [])
+    return _make_machine_entity(skill, entity_type, entity_ref, content, **kwargs)
+
+
+runtime.make_machine_entity = _make_v2_machine_entity
+
 
 class StrictJsonTests(unittest.TestCase):
     def test_rejects_duplicate_keys_and_non_finite_values(self) -> None:
@@ -145,6 +161,49 @@ class CanonicalAndFingerprintTests(unittest.TestCase):
             normalized["authority_refs"], ["SPEC-001", "SPEC-001", "SPEC-002"]
         )
         self.assertEqual(normalized["risk_refs"], ["R-001", "R-001", "R-002"])
+
+    def test_acceptance_refs_and_acceptance_records_are_canonical(self) -> None:
+        normalized = runtime.canonicalize(
+            {
+                "acceptance_refs": ["AC-002", "AC-001", "AC-001"],
+                "acceptance_criteria": [
+                    {"ac_id": "AC-002", "authority_refs": ["SPEC-002"]},
+                    {"ac_id": "AC-001", "authority_refs": ["SPEC-001"]},
+                ],
+            }
+        )
+        self.assertEqual(normalized["acceptance_refs"], ["AC-001", "AC-001", "AC-002"])
+        self.assertEqual(
+            [row["ac_id"] for row in normalized["acceptance_criteria"]],
+            ["AC-001", "AC-002"],
+        )
+
+    def test_spec_analysis_expected_entities_include_acceptance_criteria(self) -> None:
+        expected = runtime._expected_entities(
+            "spec-analysis",
+            {
+                "authorities": [{"authority_id": "SPEC-001"}],
+                "acceptance_criteria": [
+                    {"ac_id": "AC-001", "authority_refs": ["SPEC-001"]}
+                ],
+            },
+        )
+        self.assertCountEqual(
+            expected,
+            [
+                {
+                    "skill": "spec-analysis",
+                    "entity_type": "authority",
+                    "entity_ref": "SPEC-001",
+                },
+                {
+                    "skill": "spec-analysis",
+                    "entity_type": "acceptance_criterion",
+                    "entity_ref": "AC-001",
+                },
+            ],
+        )
+        self.assertIn("acceptance_criterion", runtime.ALLOWED_ENTITY_TYPES)
 
     def test_lf_normalized_implementation_fingerprint(self) -> None:
         import tempfile
@@ -332,15 +391,15 @@ class EntityAndEvidenceTests(unittest.TestCase):
                 "artifact:materialize_coverage:TCN-001": "materialize_coverage",
             }[unit]
             generator_contract_version = {
-                "condition_structure": "condition-structure-v1",
+                "condition_structure": "condition-structure-v2",
                 "equivalence_partitions": "equivalence-partitions-v1",
-                "materialize_coverage": "materialize-coverage-v1",
+                "materialize_coverage": "materialize-coverage-v2",
             }[generator]
             model_type = "ep" if model_key else None
             metadata = {
                 "envelope_version": "1",
                 "skill": "test-condition-design",
-                "runtime_contract_version": "runtime-v1",
+                "runtime_contract_version": "runtime-v2",
                 "generator_contract_version": generator_contract_version,
                 "runtime_unit_key": unit,
                 "model_key": model_key,
@@ -382,7 +441,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
                 generator=generator,
                 input_fp=input_fp,
                 model_fp=model_fp,
-                runtime_contract_version="runtime-v1",
+                runtime_contract_version="runtime-v2",
                 generator_contract_version=generator_contract_version,
                 runtime_impl_fp=runtime_fp,
                 generator_impl_fp=generator_fp,
@@ -392,7 +451,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
             result = {
                 "envelope_version": "1",
                 "skill": "test-condition-design",
-                "runtime_contract_version": "runtime-v1",
+                "runtime_contract_version": "runtime-v2",
                 "generator_contract_version": generator_contract_version,
                 "generator": generator,
                 "runtime_unit_key": unit,
@@ -419,6 +478,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
                                 "model_type": "ep",
                                 "technique_slug": "ep",
                                 "parent_tcn_id": "TCN-001",
+                                "scope_refs": [],
                                 "content_fingerprint": "sha256:" + "a" * 64,
                             }
                         ],
@@ -514,7 +574,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
     ) -> tuple[dict, dict]:
         current_context = context or {
             "runtime_contract_version": runtime.RUNTIME_CONTRACT_VERSION,
-            "generator_contract_version": "condition-structure-v1",
+            "generator_contract_version": "condition-structure-v2",
             "runtime_implementation_fingerprint": runtime.implementation_fingerprint(
                 RUNTIME_PATH
             ),
@@ -609,8 +669,8 @@ class EntityAndEvidenceTests(unittest.TestCase):
         entity, current_runtime = self._scoped_entity()
         runtime_key = ("test-condition-design", "artifact:condition_structure:all")
         for field, changed_value in (
-            ("runtime_contract_version", "runtime-v2"),
-            ("generator_contract_version", "condition-structure-v2"),
+            ("runtime_contract_version", "runtime-v1"),
+            ("generator_contract_version", "condition-structure-v3"),
             ("runtime_implementation_fingerprint", "sha256:" + "3" * 64),
             ("generator_implementation_fingerprint", "sha256:" + "4" * 64),
             ("static_data_versions", {"schema_catalog": "v2"}),
@@ -697,7 +757,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
         )
         requirement_context = {
             "runtime_contract_version": runtime.RUNTIME_CONTRACT_VERSION,
-            "generator_contract_version": "requirement-structure-v1",
+            "generator_contract_version": "requirement-structure-v2",
             "runtime_implementation_fingerprint": runtime.implementation_fingerprint(
                 RUNTIME_PATH
             ),
@@ -726,7 +786,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
 
         condition_context = {
             "runtime_contract_version": runtime.RUNTIME_CONTRACT_VERSION,
-            "generator_contract_version": "condition-structure-v1",
+            "generator_contract_version": "condition-structure-v2",
             "runtime_implementation_fingerprint": runtime.implementation_fingerprint(
                 RUNTIME_PATH
             ),
@@ -830,7 +890,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
 
         changed_producer = {
             **current_condition_runtime,
-            "generator_contract_version": "condition-structure-v2",
+            "generator_contract_version": "condition-structure-v3",
         }
         own_generation_mismatch = runtime.evaluate_entity_freshness(
             [carry, requirement],
@@ -971,7 +1031,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
             "result_status": "ready",
             "runtime_required": True,
             "deterministic_generated": True,
-            "runtime_contract_version": "runtime-v1",
+            "runtime_contract_version": "runtime-v2",
             "runtime_implementation_fingerprint": "sha256:" + "4" * 64,
             "generator_implementation_fingerprint": "sha256:" + "5" * 64,
             "static_data_versions": {},
@@ -1265,6 +1325,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
                 "model_type": "ep",
                 "technique_slug": "ep",
                 "parent_tcn_id": "TCN-001",
+                "scope_refs": [],
                 "content_fingerprint": "sha256:" + "1" * 64,
             },
             {
@@ -1272,6 +1333,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
                 "model_type": "bva",
                 "technique_slug": "bva",
                 "parent_tcn_id": "TCN-001",
+                "scope_refs": [],
                 "content_fingerprint": "sha256:" + "2" * 64,
             },
             {
@@ -1279,6 +1341,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
                 "model_type": "error-guessing",
                 "technique_slug": "error-guessing",
                 "parent_tcn_id": "TCN-002",
+                "scope_refs": [],
                 "content_fingerprint": "sha256:" + "3" * 64,
             },
             {
@@ -1286,6 +1349,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
                 "model_type": "schema",
                 "technique_slug": None,
                 "parent_tcn_id": "TCN-003",
+                "scope_refs": [],
                 "content_fingerprint": "sha256:" + "4" * 64,
             },
         ]
@@ -1511,7 +1575,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
             "envelope_version": "1",
             "skill": "test-condition-design",
             "runtime_contract_version": runtime.RUNTIME_CONTRACT_VERSION,
-            "generator_contract_version": "materialize-coverage-v1",
+            "generator_contract_version": "materialize-coverage-v2",
             "generator": "materialize_coverage",
             "runtime_unit_key": "artifact:materialize_coverage:TCN-001",
             "model_key": None,
@@ -1537,6 +1601,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
             "model_type": "ep",
             "technique_slug": "ep",
             "parent_tcn_id": "TCN-001",
+            "scope_refs": [],
             "content_fingerprint": "sha256:" + "5" * 64,
         }
         condition_artifact = self._structure_artifact(
@@ -1621,10 +1686,16 @@ class EntityAndEvidenceTests(unittest.TestCase):
         generator_fp: str | None = None,
         result_entities: list[dict] | None = None,
     ) -> str:
+        for row in normalized.get("previous_tr_ids", []):
+            if isinstance(row, dict):
+                row.setdefault("scope_refs", [])
+        for row in state:
+            if isinstance(row, dict):
+                row.setdefault("scope_refs", [])
         skill = "test-requirement-design"
         unit = "artifact:requirement_structure:all"
         generator = "requirement_structure"
-        generator_contract_version = "requirement-structure-v1"
+        generator_contract_version = "requirement-structure-v2"
         generator_path = (
             REPO_ROOT / "skills" / skill / "scripts" / "requirement_structure.py"
         )
@@ -1719,16 +1790,33 @@ class EntityAndEvidenceTests(unittest.TestCase):
         result_entities: list[dict] | None = None,
         extra_blocks: list[str] | None = None,
     ) -> str:
+        state_fields_by_skill = {
+            "test-condition-design": (
+                "previous_tcn_ids",
+                "previous_model_keys",
+                "previous_ci_ids",
+            ),
+            "test-case-design": ("previous_tc_ids",),
+        }
+        for field in state_fields_by_skill[skill]:
+            for row in normalized.get(field, []):
+                if isinstance(row, dict):
+                    row.setdefault("scope_refs", [])
+        for field, rows in state_payload.items():
+            if field.endswith("_state") and isinstance(rows, list):
+                for row in rows:
+                    if isinstance(row, dict) and "status" in row:
+                        row.setdefault("scope_refs", [])
         generator, unit, version = {
             "test-condition-design": (
                 "condition_structure",
                 "artifact:condition_structure:all",
-                "condition-structure-v1",
+                "condition-structure-v2",
             ),
             "test-case-design": (
                 "case_structure",
                 "artifact:case_structure:all",
-                "case-structure-v1",
+                "case-structure-v2",
             ),
         }[skill]
         runtime_path = REPO_ROOT / "skills" / skill / "scripts" / "runtime_contract.py"
@@ -1781,6 +1869,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
                     "model_type": row["content"].get("model_type"),
                     "technique_slug": row["content"].get("technique_slug"),
                     "parent_tcn_id": row["content"].get("parent_tcn_id"),
+                    "scope_refs": row["content"].get("scope_refs", []),
                     "content_fingerprint": row["content_fingerprint"],
                 }
                 for row in selected_result_entities
@@ -1823,6 +1912,11 @@ class EntityAndEvidenceTests(unittest.TestCase):
         self, generator: str, unit: str, version: str, payload: dict
     ) -> str:
         skill = "test-condition-design"
+        for field, rows in payload.items():
+            if field.endswith("_state") and isinstance(rows, list):
+                for row in rows:
+                    if isinstance(row, dict) and "status" in row:
+                        row.setdefault("scope_refs", [])
         generator_path = REPO_ROOT / "skills" / skill / "scripts" / f"{generator}.py"
         runtime_impl_fp = runtime.implementation_fingerprint(RUNTIME_PATH)
         generator_impl_fp = runtime.implementation_fingerprint(generator_path)
@@ -1901,6 +1995,19 @@ class EntityAndEvidenceTests(unittest.TestCase):
     def test_partial_rerun_carries_scope_out_tcn_model_ci_tdr_and_dispositions(
         self,
     ) -> None:
+        def model_state(ref: str, parent_tcn_id: str, status: str) -> dict:
+            return {
+                "model_key": ref,
+                "model_type": "ep",
+                "technique_slug": "ep",
+                "parent_tcn_id": parent_tcn_id,
+                "selection_source": "user",
+                "selection_key": None,
+                "derived_from_model_key": None,
+                "status": status,
+                "scope_refs": [],
+            }
+
         tcn_one = runtime.make_machine_entity(
             "test-condition-design", "tcn", "TCN-001", {"tcn_id": "TCN-001"}
         )
@@ -2006,11 +2113,12 @@ class EntityAndEvidenceTests(unittest.TestCase):
         ]
         previous_state = {
             "tcn_id_state": [
-                {"tcn_id": ref, "status": "active"} for ref in ("TCN-001", "TCN-002")
+                {"tcn_id": ref, "status": "active", "scope_refs": []}
+                for ref in ("TCN-001", "TCN-002")
             ],
             "model_key_state": [
-                {"model_key": ref, "model_type": "ep", "status": "active"}
-                for ref in ("ep-001", "ep-002")
+                model_state("ep-001", "TCN-001", "active"),
+                model_state("ep-002", "TCN-002", "active"),
             ],
         }
         normalized = {
@@ -2021,7 +2129,9 @@ class EntityAndEvidenceTests(unittest.TestCase):
             "ci_ids": [],
             "previous_tcn_ids": previous_state["tcn_id_state"],
             "previous_model_keys": previous_state["model_key_state"],
-            "previous_ci_ids": [{"ci_id": "TCN-001-CI01", "status": "active"}],
+            "previous_ci_ids": [
+                {"ci_id": "TCN-001-CI01", "status": "active", "scope_refs": []}
+            ],
             "update_scope_tcn_ids": ["TCN-001"],
             "update_scope_model_keys": ["ep-001"],
             "upstream_entities": [
@@ -2050,7 +2160,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
                 self._artifact_runtime_pair(
                     "materialize_coverage",
                     "artifact:materialize_coverage:TCN-001",
-                    "materialize-coverage-v1",
+                    "materialize-coverage-v2",
                     {
                         "ci_id_state": [{"ci_id": "TCN-001-CI01", "status": "active"}],
                         "entities": [ci_one],
@@ -2059,7 +2169,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
                 self._artifact_runtime_pair(
                     "materialize_coverage",
                     "artifact:materialize_coverage:TCN-002",
-                    "materialize-coverage-v1",
+                    "materialize-coverage-v2",
                     {
                         "ci_id_state": [{"ci_id": "TCN-002-CI01", "status": "active"}],
                         "entities": [ci_two],
@@ -2079,12 +2189,12 @@ class EntityAndEvidenceTests(unittest.TestCase):
         previous = previous_root
         current_state = {
             "tcn_id_state": [
-                {"tcn_id": "TCN-001", "status": "deleted"},
-                {"tcn_id": "TCN-002", "status": "active"},
+                {"tcn_id": "TCN-001", "status": "deleted", "scope_refs": []},
+                {"tcn_id": "TCN-002", "status": "active", "scope_refs": []},
             ],
             "model_key_state": [
-                {"model_key": "ep-001", "model_type": "ep", "status": "deleted"},
-                {"model_key": "ep-002", "model_type": "ep", "status": "active"},
+                model_state("ep-001", "TCN-001", "deleted"),
+                model_state("ep-002", "TCN-002", "active"),
             ],
         }
         carry = [tcn_two, model_two, ci_two, tdr_two, tr_disposition]
@@ -2113,8 +2223,8 @@ class EntityAndEvidenceTests(unittest.TestCase):
         self.assertEqual(
             checked["current_structure_state"]["previous_ci_id_state"],
             [
-                {"ci_id": "TCN-001-CI01", "status": "active"},
-                {"ci_id": "TCN-002-CI01", "status": "active"},
+                {"ci_id": "TCN-001-CI01", "status": "active", "scope_refs": []},
+                {"ci_id": "TCN-002-CI01", "status": "active", "scope_refs": []},
             ],
         )
         expected = {
@@ -2161,6 +2271,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
         workflow_request = {
             "metadata": workflow_metadata(),
             "input": {
+                "workflow_ref": "00000000-0000-4000-8000-000000000016",
                 "workflow_scopes": [
                     {
                         "skill": "test-condition-design",
@@ -2297,7 +2408,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
                 self._artifact_runtime_pair(
                     "materialize_coverage",
                     "artifact:materialize_coverage:TCN-001",
-                    "materialize-coverage-v1",
+                    "materialize-coverage-v2",
                     {
                         "ci_id_state": [{"ci_id": "TCN-002-CI01", "status": "active"}],
                         "entities": [ci_two],
@@ -2306,7 +2417,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
                 self._artifact_runtime_pair(
                     "materialize_coverage",
                     "artifact:materialize_coverage:TCN-002",
-                    "materialize-coverage-v1",
+                    "materialize-coverage-v2",
                     {
                         "ci_id_state": [{"ci_id": "TCN-002-CI01", "status": "active"}],
                         "entities": [ci_two],
@@ -2466,18 +2577,31 @@ class EntityAndEvidenceTests(unittest.TestCase):
         )
         self.assertTrue(deleted_without_previous["valid"], deleted_without_previous)
 
+        def condition_model_state(ref: str, parent_tcn_id: str, status: str) -> dict:
+            return {
+                "model_key": ref,
+                "model_type": "ep",
+                "technique_slug": "ep",
+                "parent_tcn_id": parent_tcn_id,
+                "selection_source": "user",
+                "selection_key": None,
+                "derived_from_model_key": None,
+                "status": status,
+                "scope_refs": [],
+            }
+
         condition_normalized = {
             "tcn_id": "TCN-001",
             "test_conditions": [],
             "models": [],
             "ci_ids": [],
             "previous_tcn_ids": [
-                {"tcn_id": "TCN-001", "status": "active"},
-                {"tcn_id": "TCN-002", "status": "active"},
+                {"tcn_id": "TCN-001", "status": "active", "scope_refs": []},
+                {"tcn_id": "TCN-002", "status": "active", "scope_refs": []},
             ],
             "previous_model_keys": [
-                {"model_key": "ep-001", "model_type": "ep", "status": "active"},
-                {"model_key": "ep-002", "model_type": "ep", "status": "active"},
+                condition_model_state("ep-001", "TCN-001", "active"),
+                condition_model_state("ep-002", "TCN-002", "active"),
             ],
             "previous_ci_ids": [],
             "update_scope_tcn_ids": ["TCN-001"],
@@ -2489,12 +2613,12 @@ class EntityAndEvidenceTests(unittest.TestCase):
             [],
             {
                 "tcn_id_state": [
-                    {"tcn_id": "TCN-001", "status": "deleted"},
-                    {"tcn_id": "TCN-002", "status": "active"},
+                    {"tcn_id": "TCN-001", "status": "deleted", "scope_refs": []},
+                    {"tcn_id": "TCN-002", "status": "active", "scope_refs": []},
                 ],
                 "model_key_state": [
-                    {"model_key": "ep-001", "model_type": "ep", "status": "deleted"},
-                    {"model_key": "ep-002", "model_type": "ep", "status": "active"},
+                    condition_model_state("ep-001", "TCN-001", "deleted"),
+                    condition_model_state("ep-002", "TCN-002", "active"),
                 ],
             },
             result_entities=[],
@@ -3128,7 +3252,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
                 "TR-001",
                 {
                     "runtime_contract_version": runtime.RUNTIME_CONTRACT_VERSION,
-                    "generator_contract_version": "requirement-structure-v1",
+                    "generator_contract_version": "requirement-structure-v2",
                     "runtime_implementation_fingerprint": runtime.implementation_fingerprint(
                         RUNTIME_PATH
                     ),
@@ -3147,7 +3271,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
                 "TR-002",
                 {
                     "runtime_contract_version": runtime.RUNTIME_CONTRACT_VERSION,
-                    "generator_contract_version": "requirement-structure-v1",
+                    "generator_contract_version": "requirement-structure-v2",
                     "runtime_implementation_fingerprint": runtime.implementation_fingerprint(
                         RUNTIME_PATH
                     ),
@@ -3347,7 +3471,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
         old_generator_fp = "sha256:" + "2" * 64
         old_context = {
             "runtime_contract_version": runtime.RUNTIME_CONTRACT_VERSION,
-            "generator_contract_version": "requirement-structure-v1",
+            "generator_contract_version": "requirement-structure-v2",
             "runtime_implementation_fingerprint": runtime.implementation_fingerprint(
                 RUNTIME_PATH
             ),
@@ -3417,7 +3541,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
         )
         runtime_context = {
             "runtime_contract_version": runtime.RUNTIME_CONTRACT_VERSION,
-            "generator_contract_version": "requirement-structure-v1",
+            "generator_contract_version": "requirement-structure-v2",
             "runtime_implementation_fingerprint": runtime.implementation_fingerprint(
                 RUNTIME_PATH
             ),
@@ -3845,7 +3969,7 @@ class DependencyAndAdapterValidationTests(unittest.TestCase):
         metadata = {
             "envelope_version": "1",
             "skill": "test-condition-design",
-            "runtime_contract_version": "runtime-v1",
+            "runtime_contract_version": "runtime-v2",
             "generator_contract_version": "test-generator-v1",
             "runtime_unit_key": "artifact:test_generator:all",
             "model_key": None,
@@ -3865,7 +3989,7 @@ class DependencyAndAdapterValidationTests(unittest.TestCase):
         result = {
             "envelope_version": "1",
             "skill": "test-condition-design",
-            "runtime_contract_version": "runtime-v1",
+            "runtime_contract_version": "runtime-v2",
             "generator_contract_version": "test-generator-v1",
             "generator": "test_generator",
             "runtime_unit_key": "artifact:test_generator:all",

@@ -80,7 +80,7 @@ runtime対応Skillは、正規化されたMachine Runtime Input、Machine Runtim
 
 - Skill-local helperの同一内容、Python 3.11標準ライブラリのみのimport、stdin / stdoutの厳格なCLI契約
 - runtime unitのinput/result pair、duplicate / missing / extra、status projection、runtime required、deterministic generated
-- `entity-state-v1`のidentity、content fingerprint、dependency、missing / extra / duplicate
+- `entity-state-v2`のidentity、content fingerprint、dependency、missing / extra / duplicate
 - stable target ref、execution、target content fingerprint、freshness、stale伝播、dependency graphの重複 / cycle
 - Markdownのruntime round-trip、aggregate input/output limit、独立validatorのfalse-pass防止
 
@@ -287,28 +287,31 @@ Skillごとのsemantic case数と合計は各`evals.json`から導出します�
 
 現在の意味評価で扱う拡張責務とcase対応は次のとおりです。
 
-| Skill                         | 責務                                                                              | Case ID                                                                                  |
-| ----------------------------- | --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `test-analysis`               | Domain Testing採用                                                                | `RISK-SEM-003`                                                                           |
-| `test-analysis`               | CRUD Testing採用                                                                  | `RISK-SEM-004`                                                                           |
-| `test-analysis`               | Random Testing採用                                                                | `RISK-SEM-005`                                                                           |
-| `test-analysis`               | Metamorphic Testing採用                                                           | `RISK-SEM-006`                                                                           |
-| `test-analysis`               | Syntax-Based Testing採用                                                          | `RISK-SEM-007`                                                                           |
-| `test-condition-design`       | Domain / CRUD / Random / Metamorphic / Syntax                                     | `TCN-SEM-003`, `TCN-SEM-004`, `TCN-SEM-005`, `TCN-SEM-006`                               |
-| `test-condition-design`       | Decision / Cause-Effect、classification / combination                             | `TCN-SEM-007`, `TCN-SEM-008`                                                             |
-| `test-condition-design`       | state / flow / schema / UI                                                        | `TCN-SEM-009`, `TCN-SEM-010`, `TCN-SEM-011`                                              |
-| `test-condition-design`       | test data / merge / disposition                                                   | `TCN-SEM-012`, `TCN-SEM-013`, `TCN-SEM-014`                                              |
-| `test-case-design`            | canonical CI Machine Entityからの具体TC展開、環境・test data、Authority限定Oracle | `TC-SEM-001`                                                                             |
-| `adversarial-review`          | 新技法の6誤用                                                                     | `REV-SEM-003`, `REV-SEM-004`, `REV-SEM-005`, `REV-SEM-006`, `REV-SEM-007`, `REV-SEM-008` |
-| `test-target-inspection`      | 実対象currentness、条件・鮮度、snapshot、視覚・副作用・secret境界                 | `TTI-SEM-001`, `TTI-SEM-002`                                                             |
-| `test-execution`              | snapshot追跡、実行前YAML、Playwright順序、結果・secret・cleanup                   | `TEX-SEM-001`, `TEX-SEM-002`                                                             |
-| `qa-workflow`                 | 対象確認・今回runと永続E2Eのrouting境界                                           | `WF-SEM-003`                                                                             |
-| `regression-testing`          | baseline currentness / Run scope / actual start / FAIL feedback                   | `REG-SEM-001` ～ `REG-SEM-006`                                                           |
-| `exploratory-testing`         | Charter / Observation・Finding / cleanup / resume                                 | `EXP-SEM-001` ～ `EXP-SEM-004`                                                           |
-| `qa-knowledge`                | candidate triage / currentness / CAS / identity lifecycle                         | `KN-SEM-001` ～ `KN-SEM-006`                                                             |
-| `usability-evaluation`        | reference/evidenceに基づくUI/UX意味評価と追加観測境界                             | `UE-SEM-001` ～ `UE-SEM-012`                                                             |
-| `usability-inspection`        | live observation、scope、fixed probe、measurement、安全境界                       | `UI-SEM-001` ～ `UI-SEM-033`                                                             |
-| `wcag-conformance-evaluation` | WCAG-EM procedure、sample、handoff、formal report、EARL                           | `WCAG-SEM-001` ～ `WCAG-SEM-038`                                                         |
+| Skill                         | 責務                                                                                      | Case ID                                                                                  |
+| ----------------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `test-analysis`               | Domain Testing採用                                                                        | `RISK-SEM-003`                                                                           |
+| `test-analysis`               | CRUD Testing採用                                                                          | `RISK-SEM-004`                                                                           |
+| `test-analysis`               | Random Testing採用                                                                        | `RISK-SEM-005`                                                                           |
+| `test-analysis`               | Metamorphic Testing採用                                                                   | `RISK-SEM-006`                                                                           |
+| `test-analysis`               | Syntax-Based Testing採用                                                                  | `RISK-SEM-007`                                                                           |
+| `test-condition-design`       | Domain / CRUD / Random / Metamorphic / Syntax                                             | `TCN-SEM-003`, `TCN-SEM-004`, `TCN-SEM-005`, `TCN-SEM-006`                               |
+| `test-condition-design`       | Decision / Cause-Effect、classification / combination                                     | `TCN-SEM-007`, `TCN-SEM-008`                                                             |
+| `test-condition-design`       | state / flow / schema / UI                                                                | `TCN-SEM-009`, `TCN-SEM-010`, `TCN-SEM-011`                                              |
+| `test-condition-design`       | test data / merge / disposition                                                           | `TCN-SEM-012`, `TCN-SEM-013`, `TCN-SEM-014`                                              |
+| `test-case-design`            | canonical CI Machine Entityからの具体TC展開、環境・test data、Authority限定Oracle         | `TC-SEM-001`                                                                             |
+| `adversarial-review`          | 新技法の6誤用                                                                             | `REV-SEM-003`, `REV-SEM-004`, `REV-SEM-005`, `REV-SEM-006`, `REV-SEM-007`, `REV-SEM-008` |
+| `test-target-inspection`      | 実対象currentness、条件・鮮度、snapshot、視覚・副作用・secret境界                         | `TTI-SEM-001`, `TTI-SEM-002`                                                             |
+| `test-execution`              | snapshot追跡、実行前YAML、Playwright順序、結果・secret・cleanup                           | `TEX-SEM-001`, `TEX-SEM-002`                                                             |
+| `qa-workflow`                 | 対象確認・今回runと永続E2Eのrouting境界                                                   | `WF-SEM-003`                                                                             |
+| `regression-testing`          | baseline currentness / Run scope / actual start / FAIL feedback                           | `REG-SEM-001` ～ `REG-SEM-006`                                                           |
+| `exploratory-testing`         | Charter / Observation・Finding / cleanup / resume                                         | `EXP-SEM-001` ～ `EXP-SEM-004`                                                           |
+| `qa-knowledge`                | candidate triage / currentness / CAS / identity lifecycle                                 | `KN-SEM-001` ～ `KN-SEM-006`                                                             |
+| `usability-evaluation`        | reference/evidenceに基づくUI/UX意味評価と追加観測境界                                     | `UE-SEM-001` ～ `UE-SEM-012`                                                             |
+| `usability-inspection`        | live observation、scope、fixed probe、measurement、安全境界                               | `UI-SEM-001` ～ `UI-SEM-033`                                                             |
+| `wcag-conformance-evaluation` | WCAG-EM procedure、sample、handoff、formal report、EARL                                   | `WCAG-SEM-001` ～ `WCAG-SEM-038`                                                         |
+| `spec-analysis`               | UI対象・US / UC / Behavior / AC分解、UNKNOWN lifecycle、Repository / owner / file trigger | `SPEC-SEM-003`, `SPEC-SEM-004`, `SPEC-SEM-005`, `SPEC-SEM-006`, `SPEC-SEM-007`           |
+| `question-analysis`           | 暫定回答、same-UNKNOWN reopen、Q / UNKNOWN identity lifecycle                             | `QUESTION-SEM-003`, `QUESTION-SEM-004`                                                   |
+| `test-requirement-design`     | UI target artifact modeのAC→検証責務、Authority独立closure                                | `TR-SEM-003`                                                                             |
 
 `rubric.json`の評価基準は`id`, `title`, `description`, `critical`を持ちます。重み付きスコアは持ちません。
 
@@ -450,6 +453,10 @@ scripts/skills/evals/
 
 決定論的な`qa-workflow` validatorは、開始・省略・再利用・ブロック・再開・修正routing、対象 / 実行範囲付き状態、TCあり / TCなし経路の成果物整合を評価します。実Agentクライアント上のSkill読み込み・遷移・実runtime操作は、利用可能なクライアント環境がある場合に限って別途評価し、dataset検証を実Agent発火PASSとは扱いません。
 
-61件のrouting fixture（PR #11 / #12後の47件にPR #13で14件を追加）は、入力条件と独立した期待routingを`skills/qa-workflow/evals/deterministic/routing_cases.json`へ、検証対象のcandidate outputを`routing_candidate_outputs.json`へ分離して保持します。リポジトリ決定論的テストではcandidateを期待routingから生成せず、`regression-testing` / `exploratory-testing` / `qa-knowledge`のrouting境界、Regression / Exploration / knowledge間、既存E2E / execution間の誤route回帰を検証します。
+69件のrouting fixture（PR #14後の61件へUI対象分析modeの8件を追加）は、入力条件と独立した期待routingを`skills/qa-workflow/evals/deterministic/routing_cases.json`へ、検証対象のcandidate outputを`routing_candidate_outputs.json`へ分離して保持します。リポジトリ決定論的テストではcandidateを期待routingから生成せず、UI仕様理解・回答後resume・実対象観測・保存画面評価・live usability・formal WCAGの開始Skillと停止境界を固定します。
+
+PR #16では決定論的output evalを44件から46件へ、semantic evalを155件から163件へ増やします。`SPEC-OUT-003`はrepository専用[`scripts/skills/evals/ui_target_projection.py`](scripts/skills/evals/ui_target_projection.py)で複数Markdown packageを一fileへ投影し、canonical file marker / stable ID / tableを検証します。`TR-OUT-003`はcurrent Acceptance Criteria、Authority、Product Riskの各closureを独立して検証します。raw SHA-256の再計算はprojectionで行わず、production validatorとrepository unit testで確認します。
+
+追加したrouting caseは`WF-UI-TARGET-001`、`WF-UI-TARGET-002`、`WF-UI-TARGET-003`、`WF-UI-TARGET-004`、`WF-UI-TARGET-005`、`WF-UI-TARGET-006`、`WF-UI-TARGET-007`、`WF-UI-TARGET-008`です。
 
 Agent Skills Specificationは共通Skill-to-Skill APIを規定しません。特定クライアントとの互換性はE2Eで確認します。

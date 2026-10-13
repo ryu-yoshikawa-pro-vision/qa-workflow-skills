@@ -2726,8 +2726,8 @@ class E2EContractTests(unittest.TestCase):
         )
         cases = json.loads(cases_path.read_text(encoding="utf-8"))
         candidates = json.loads(candidates_path.read_text(encoding="utf-8"))
-        self.assertEqual(len(cases), 61)
-        self.assertEqual(len(candidates), 61)
+        self.assertEqual(len(cases), 69)
+        self.assertEqual(len(candidates), 69)
         self.assertEqual(
             {case["id"] for case in cases},
             {candidate["id"] for candidate in candidates},
@@ -2798,6 +2798,48 @@ class E2EContractTests(unittest.TestCase):
             },
             expected_test_routes,
         )
+        expected_ui_target_routes = {
+            "WF-UI-TARGET-001": ("spec-analysis", "spec-analysis", ["spec-analysis"]),
+            "WF-UI-TARGET-002": (
+                "spec-analysis",
+                "question-analysis",
+                ["spec-analysis", "question-analysis"],
+            ),
+            "WF-UI-TARGET-003": (
+                "question-analysis",
+                "spec-analysis",
+                ["question-analysis", "spec-analysis"],
+            ),
+            "WF-UI-TARGET-004": (
+                "test-target-inspection",
+                "test-target-inspection",
+                ["test-target-inspection"],
+            ),
+            "WF-UI-TARGET-005": ("spec-analysis", "spec-analysis", ["spec-analysis"]),
+            "WF-UI-TARGET-006": (
+                "usability-evaluation",
+                "usability-evaluation",
+                ["usability-evaluation"],
+            ),
+            "WF-UI-TARGET-007": (
+                "usability-inspection",
+                "usability-inspection",
+                ["usability-inspection"],
+            ),
+            "WF-UI-TARGET-008": (
+                "wcag-conformance-evaluation",
+                "wcag-conformance-evaluation",
+                ["wcag-conformance-evaluation"],
+            ),
+        }
+        self.assertEqual(
+            {
+                case["id"]: (case["start"], case["final"], case["skills"])
+                for case in cases
+                if case["id"].startswith("WF-UI-TARGET-")
+            },
+            expected_ui_target_routes,
+        )
         default_targets = {
             "test-analysis": "テスト分析",
             "coverage-analysis": "テスト設計",
@@ -2805,6 +2847,7 @@ class E2EContractTests(unittest.TestCase):
             "regression-testing": "baseline / membership",
             "exploratory-testing": "exploration",
             "qa-knowledge": "triage",
+            "usability-inspection": "general",
         }
         multi_use = set(default_targets)
         cases_by_id = {case["id"]: case for case in cases}

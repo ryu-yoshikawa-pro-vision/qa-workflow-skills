@@ -50,7 +50,7 @@ mode packageのUNKNOWNを、回答反映のたびに再質問・再採番せず�
 ## 質問ID履歴
 
 | ID |
-| --- |
+| -- |
 ```
 
 `不明点 / 質問一覧` はcurrent未解決質問だけを持ち、templateはheader-onlyにして `Q-001` の例示rowを実データとして残しません。`質問ID履歴` はcurrent / resolvedを問わず、その成果物系列で一度でも使用したQ IDを重複なし昇順で保持します。新規Qのsemantic identity / reuse判断はLLM、newと決めた後の番号決定と履歴union生成は `question_ids.py` が担当します。
@@ -133,7 +133,7 @@ UI target canonical downstreamではscope ownershipを次へ固定します。
 - `build-machine-evidence(scope_ids=ready_scope_ids)` はready scopeのcompact `scope_index[]` を返す
 - TRDのLLMは各current TRへ `scope_refs[]` を明示する。値はcurrent ready `scope_index[].scope_id` のsubsetとし、UI target artifact workflowでは1件以上必須
 - TCNは参照TR、modelは親TCN、CIは親TCN / model、TCは参照TCN / CIから `scope_refs[]` を決定論導出する。Agentが下流scopeを再判断しない
-previous downstreamのidentityは既存workflow stateへ次のmachine-owned fieldを1件だけ追加して固定します。新しいregistry / handoff typeは作りません。
+  previous downstreamのidentityは既存workflow stateへ次のmachine-owned fieldを1件だけ追加して固定します。新しいregistry / handoff typeは作りません。
 
 ```json
 "last_completed_qa_workflow_artifact": {
@@ -288,6 +288,7 @@ test-requirement-designへ到達した場合は `requirement-structure-v2` を�
 direct modeはUI target artifactを使わない独立呼出しとして同じ `acceptance_criteria[]` schemaでknown AC集合を明示できます。各TRの意味対応だけをLLMが `acceptance_refs[]` として判断し、known ID / closureを検証します。参照AC Entityが無いdirect runではAC semantic cross-run freshnessを保証せず、存在しないMachine Entity / fingerprintを合成しません。
 
 このhandoffの追加はrouting caseを増やしません。既存workflowの選択結果に対するmachine data受け渡し契約です。
+
 ## 3. Agent Skillsとしての利用前提
 
 今回のmodeは既存Skillと同じAgent Skills構造で提供します。

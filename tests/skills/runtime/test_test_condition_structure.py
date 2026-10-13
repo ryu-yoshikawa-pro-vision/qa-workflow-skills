@@ -17,7 +17,7 @@ def current_sources():
             "test-requirement-design",
             "tr",
             "TR-001",
-            {"tr_id": "TR-001", "text": "current TR"},
+            {"tr_id": "TR-001", "text": "current TR", "scope_refs": []},
         ),
         runtime.make_machine_entity(
             "spec-analysis",
@@ -56,6 +56,138 @@ def request_for(value: dict, source_entities: list[dict]) -> dict:
 
 
 class ConditionStructureRuntimeTests(unittest.TestCase):
+    def test_scope_ownership_propagates_and_inactive_identity_reactivates(self) -> None:
+        value = condition_input()
+        value["test_requirements"][0]["scope_refs"] = ["SCOPE-001"]
+        first = run_script(
+            CONDITION_SCRIPT, {"metadata": condition_metadata(), "input": value}
+        )
+        self.assertEqual(first["runtime_status"], "ok", first)
+        tcn = next(
+            row for row in first["payload"]["entities"] if row["entity_type"] == "tcn"
+        )
+        model = next(
+            row for row in first["payload"]["entities"] if row["entity_type"] == "model"
+        )
+        self.assertEqual(tcn["content"]["scope_refs"], ["SCOPE-001"])
+        self.assertEqual(model["content"]["scope_refs"], ["SCOPE-001"])
+        self.assertEqual(
+            first["payload"]["tcn_id_state"][0]["scope_refs"], ["SCOPE-001"]
+        )
+
+        blocked_value = condition_input()
+        blocked_value.update(
+            {
+                "test_requirements": [],
+                "technique_selections": [],
+                "test_conditions": [],
+                "models": [],
+                "previous_tcn_ids": first["payload"]["tcn_id_state"],
+                "previous_model_keys": first["payload"]["model_key_state"],
+                "inactive_tcn_ids": ["TCN-001"],
+                "inactive_model_keys": ["ep-001"],
+                "inactive_tcn_history": [tcn],
+                "inactive_model_history": [model],
+            }
+        )
+        blocked = run_script(
+            CONDITION_SCRIPT,
+            {"metadata": condition_metadata(), "input": blocked_value},
+        )
+        self.assertEqual(blocked["runtime_status"], "ok", blocked)
+        self.assertEqual(blocked["payload"]["tcn_id_state"][0]["status"], "inactive")
+        self.assertEqual(blocked["payload"]["model_key_state"][0]["status"], "inactive")
+        self.assertEqual(blocked["payload"]["entities"], [])
+        self.assertEqual(len(blocked["payload"]["inactive_tcn_history"]), 1)
+
+        active_value = condition_input()
+        active_value["test_requirements"][0]["scope_refs"] = ["SCOPE-001"]
+        active_value["test_conditions"][0].update(
+            {"identity_action": "reuse", "reuse_id": "TCN-001"}
+        )
+        active_value["models"][0].update(
+            {"identity_action": "reuse", "reuse_model_key": "ep-001"}
+        )
+        active_value.update(
+            {
+                "previous_tcn_ids": blocked["payload"]["tcn_id_state"],
+                "previous_model_keys": blocked["payload"]["model_key_state"],
+                "update_scope_tcn_ids": ["TCN-001"],
+                "update_scope_model_keys": ["ep-001"],
+                "inactive_tcn_history": blocked["payload"]["inactive_tcn_history"],
+                "inactive_model_history": blocked["payload"]["inactive_model_history"],
+            }
+        )
+        reactivated = run_script(
+            CONDITION_SCRIPT,
+            {"metadata": condition_metadata(), "input": active_value},
+        )
+        self.assertEqual(reactivated["runtime_status"], "ok", reactivated)
+        self.assertEqual(reactivated["payload"]["tcn_id_map"][0]["tcn_id"], "TCN-001")
+        self.assertEqual(reactivated["payload"]["inactive_tcn_history"], [])
+
+    def test_zero_scope_terminal_closes_inactive_ids_without_current_entities(
+        self,
+    ) -> None:
+        value = condition_input()
+        value.update(
+            {
+                "test_requirements": [],
+                "technique_selections": [],
+                "test_conditions": [],
+                "models": [],
+                "previous_tcn_ids": [
+                    {
+                        "tcn_id": "TCN-001",
+                        "status": "inactive",
+                        "scope_refs": ["SCOPE-001"],
+                    }
+                ],
+                "previous_model_keys": [
+                    {
+                        "model_key": "ep-001",
+                        "model_type": "ep",
+                        "technique_slug": "ep",
+                        "parent_tcn_id": "TCN-001",
+                        "selection_source": "user",
+                        "selection_key": None,
+                        "derived_from_model_key": None,
+                        "status": "inactive",
+                        "scope_refs": ["SCOPE-001"],
+                    }
+                ],
+                "update_scope_tcn_ids": ["TCN-001"],
+                "update_scope_model_keys": ["ep-001"],
+                "inactive_tcn_history": [],
+                "inactive_model_history": [],
+                "zero_scope_terminal": True,
+            }
+        )
+        # A terminal run still validates and carries the last active snapshots as input.
+        tcn = runtime.make_machine_entity(
+            "test-condition-design",
+            "tcn",
+            "TCN-001",
+            {"tcn_id": "TCN-001", "scope_refs": ["SCOPE-001"]},
+        )
+        model = runtime.make_machine_entity(
+            "test-condition-design",
+            "model",
+            "ep-001",
+            {"model_key": "ep-001", "scope_refs": ["SCOPE-001"]},
+            model_key="ep-001",
+        )
+        value["inactive_tcn_history"] = [tcn]
+        value["inactive_model_history"] = [model]
+        result = run_script(
+            CONDITION_SCRIPT, {"metadata": condition_metadata(), "input": value}
+        )
+        self.assertEqual(result["runtime_status"], "ok", result)
+        self.assertEqual(result["payload"]["tcn_id_state"][0]["status"], "deleted")
+        self.assertEqual(result["payload"]["model_key_state"][0]["status"], "deleted")
+        self.assertEqual(result["payload"]["entities"], [])
+        self.assertEqual(result["payload"]["inactive_tcn_history"], [])
+
     def test_condition_structure_assigns_stable_tcn_and_model_state(self) -> None:
         value = condition_input()
         value["models"][0]["selection_source"] = "user"
@@ -112,7 +244,7 @@ class ConditionStructureRuntimeTests(unittest.TestCase):
             "test-requirement-design",
             "tr",
             "TR-002",
-            {"tr_id": "TR-002", "text": "covered by existing TR"},
+            {"tr_id": "TR-002", "text": "covered by existing TR", "scope_refs": []},
         )
         sources.append(second_tr)
         value = condition_input()

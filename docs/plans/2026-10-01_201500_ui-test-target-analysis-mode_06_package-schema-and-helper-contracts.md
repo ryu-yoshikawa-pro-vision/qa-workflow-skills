@@ -4,6 +4,7 @@
 2026-10-01_201500_ui-test-target-analysis-mode.md
 
 関連Plan:
+
 - 2026-10-01_201500_ui-test-target-analysis-mode_02_spec-analysis-package.md
 - 2026-10-01_201500_ui-test-target-analysis-mode_05_llm-deterministic-boundaries.md
 - 2026-10-01_201500_ui-test-target-analysis-mode_09_runtime-entity-and-test-requirement-contracts.md
@@ -37,15 +38,15 @@ READMEには自由記述の概要に加え、次の2表をexact heading / exact 
 
 ### Package metadata
 
-| 項目 | 値 |
-| --- | --- |
-| Package Schema Version | ui-target-v1 |
-| Package Version | v00 |
-| Previous Package Version | - |
-| Current UNKNOWN Count | 0 |
-| Completion Status | complete |
-| Ready Scope Count | 1 |
-| Blocked Scope Count | 0 |
+| 項目                     | 値           |
+| ------------------------ | ------------ |
+| Package Schema Version   | ui-target-v1 |
+| Package Version          | v00          |
+| Previous Package Version | -            |
+| Current UNKNOWN Count    | 0            |
+| Completion Status        | complete     |
+| Ready Scope Count        | 1            |
+| Blocked Scope Count      | 0            |
 
 `Previous Package Version` は初回なら `-`、継続更新なら `materialize` 内部version builderがcurrent package / previous snapshotから導出した `previous_version` を記録します。default policyでは `Package Version` と1 revision差であることをhelperが検証します。legacy移行時はlegacy側の明示versionまたは `legacy-unversioned` を記録できます。
 
@@ -54,7 +55,7 @@ READMEには自由記述の概要に加え、次の2表をexact heading / exact 
 ### Current payload files
 
 | 順序 | ファイル | 種別 |
-| ---: | --- | --- |
+| ---: | -------- | ---- |
 
 templateではbodyを空にし、完成packageでは `materialize` 内部README control builderが全payload rowを生成します。この表はREADME.md自身を含むMANIFESTのpayload file listと完全一致させます。
 
@@ -131,29 +132,31 @@ stable reference列のprefix契約は `_05 §5` を正本とします。全stand
 #### 分析対象機能scope一覧
 
 | Scope ID | 対象機能 / 領域 | UI操作判定 | Behavior Decomposition | 関連UNKNOWN ID | 関連仕様項目ID | 根拠 / 備考 |
-| --- | --- | --- | --- | --- | --- | --- |
+| -------- | --------------- | ---------- | ---------------------- | -------------- | -------------- | ----------- |
 
 標準ID: `SCOPE-xxx`
 
 許可値:
+
 - UI操作判定: あり / なし / 未確定
 - Behavior Decomposition: required / not-applicable / blocked
 
 LLMが意味判断するのは `UI操作判定` です。`Behavior Decomposition` は `あり → required / なし → not-applicable / 未確定 → blocked` の固定対応からhelperが生成し、LLM / Agent入力として独立に指定させません。
 
 固定対応:
+
 - あり → required
 - なし → not-applicable
 - 未確定 → blocked + 関連UNKNOWN ID必須
 
 #### 条件付き必須file applicability
 
-| ファイル | Scope ID | Trigger判定 | 状態 | 関連仕様項目ID | 根拠 / 備考 | 関連UNKNOWN ID |
-| --- | --- | --- | --- | --- | --- | --- |
-| 03_fields_and_validation.md | SCOPE-001 | あり / なし / 未確定 | required / not-applicable / blocked |  |  |  |
-| 04_flows_and_data.md | SCOPE-001 | あり / なし / 未確定 | required / not-applicable / blocked |  |  |  |
-| 05_notifications_and_external_interactions.md | SCOPE-001 | あり / なし / 未確定 | required / not-applicable / blocked |  |  |  |
-| 08_repository_implementation_status.md | SCOPE-001 | あり / なし / 未確定 | required / not-applicable / blocked |  |  |  |
+| ファイル                                      | Scope ID  | Trigger判定          | 状態                                | 関連仕様項目ID | 根拠 / 備考 | 関連UNKNOWN ID |
+| --------------------------------------------- | --------- | -------------------- | ----------------------------------- | -------------- | ----------- | -------------- |
+| 03_fields_and_validation.md                   | SCOPE-001 | あり / なし / 未確定 | required / not-applicable / blocked |                |             |                |
+| 04_flows_and_data.md                          | SCOPE-001 | あり / なし / 未確定 | required / not-applicable / blocked |                |             |                |
+| 05_notifications_and_external_interactions.md | SCOPE-001 | あり / なし / 未確定 | required / not-applicable / blocked |                |             |                |
+| 08_repository_implementation_status.md        | SCOPE-001 | あり / なし / 未確定 | required / not-applicable / blocked |                |             |                |
 
 current Scope IDごとに4fileのrowをexactly 1件ずつ持ちます。LLMが意味判断するのは `Trigger判定` だけです。helperが `あり → required / なし → not-applicable / 未確定 → blocked` を導出し、`状態` をLLM / Agent入力として独立指定させません。`未確定` では関連UNKNOWN IDを1件以上必須にします。Current UNKNOWNが存在しても、このtableまたはscope / behavior rowでblockedへ明示されないscopeは停止しません。
 
@@ -184,7 +187,7 @@ file materializationは全scope rowを集約して決めます。
 #### 案件固有extension file一覧
 
 | ファイル | Slug | 責務 | 分割理由 | 関連Scope ID | 関連仕様項目ID | 関連構造ID | 関連UNKNOWN ID |
-| --- | --- | --- | --- | --- | --- | --- | --- |
+| -------- | ---- | ---- | -------- | ------------ | -------------- | ---------- | -------------- |
 
 extension fileを使う場合だけrowを持ち、templateはheader-onlyにします。
 
@@ -201,7 +204,7 @@ extension fileを使う場合だけrowを持ち、templateはheader-onlyにし�
 #### UI構造一覧
 
 | 構造ID | 種別 | 名称 | 状態軸 | Path / 識別子 | 親構造ID | 関連仕様項目ID | 関連構造ID | 備考 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ------ | ---- | ---- | ------ | ------------- | -------- | -------------- | ---------- | ---- |
 
 `種別` は次のexact enumだけを許可します。
 
@@ -234,34 +237,34 @@ scope単位のsemantic contractは `_08` を正本とします。structured tabl
 #### UI操作一覧
 
 | 操作ID | Scope ID | Actor / Role | 対象構造ID | 操作 | 関連仕様項目ID | 対応UC ID | 状態 | 関連UNKNOWN ID |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ------ | -------- | ------------ | ---------- | ---- | -------------- | --------- | ---- | -------------- |
 
 `対象構造ID` は `_05` のUI構造ID exact prefix集合だけを許可します。UIOPはdomain item IDを直接保持せず、操作に意味上関係するFIELD / RULE / FLOW / NOTIFY / INTERACTは親US / UC / Behavior / ACの `関連構造ID` でLLMが明示します。
 
 #### User Story一覧
 
 | US ID | Scope ID | Actor / Role | Goal | 関連仕様項目ID | 関連構造ID | 状態 | 関連UNKNOWN ID |
-| --- | --- | --- | --- | --- | --- | --- | --- |
+| ----- | -------- | ------------ | ---- | -------------- | ---------- | ---- | -------------- |
 
 #### Use Case一覧
 
 | UC ID | 関連US ID | Use Case | Trigger | Preconditions | Success Postcondition | 関連仕様項目ID | 関連構造ID | 状態 | 関連UNKNOWN ID |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ----- | --------- | -------- | ------- | ------------- | --------------------- | -------------- | ---------- | ---- | -------------- |
 
 #### Behavior一覧
 
 | Behavior ID | UC ID | 関連操作ID | 結果分類 | 振る舞い | Postcondition / Result | 関連仕様項目ID | 関連構造ID | 状態 | 関連UNKNOWN ID |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ----------- | ----- | ---------- | -------- | -------- | ---------------------- | -------------- | ---------- | ---- | -------------- |
 
 #### Use Case振る舞い完全性
 
 | UC ID | 結果分類 | 判定 | 関連Behavior ID | 関連仕様項目ID | 関連UNKNOWN ID | 理由 / 根拠 |
-| --- | --- | --- | --- | --- | --- | --- |
+| ----- | -------- | ---- | --------------- | -------------- | -------------- | ----------- |
 
 #### Acceptance Criteria一覧
 
 | AC ID | Behavior ID | Acceptance Criteria | 関連仕様項目ID | 関連構造ID | 状態 | 関連UNKNOWN ID |
-| --- | --- | --- | --- | --- | --- | --- |
+| ----- | ----------- | ------------------- | -------------- | ---------- | ---- | -------------- |
 
 not-applicable、またはUI操作有無自体が未確定のscopeはUIOP / US / UC / Behavior / ACを確定済みrowとして持ちません。Behavior Decomposition=`not-applicable`のScope IDをこれらのrowがScopeまたはparent chain経由で参照する状態はdeterministic validationでrejectします。required scopeではUIOP / US / UC / Behavior / ACが `current / blocked` 相当のstate modelを持てます。USは自身のfield / UNKNOWNだけでstateを決め、UC / Behavior / ACは自身のblockerに加えてancestor blockedをeffective stateへ決定論伝播します。ancestor由来blockedだけを理由に子へUNKNOWNを複製しません。semantic identityが既知なら同じstable IDをblockedで保持し、ancestor / 自身のblocker解消後に同IDをcurrentへ戻します。semantic identity自体が未確定ならrowを発行せず、Blocking UNKNOWNの置き場所は `_08 §3.1` の階層別規則へ従います。特にUC identity不明は親US、Behavior identity不明はUse Case振る舞い完全性、AC identity不明は親Behaviorを正本とし、Scopeへ一律集約しません。本当に意味上廃止された項目だけをexplicit retireします。
 
@@ -272,7 +275,7 @@ ancestor state propagationの意味契約は `_08 §3.1` を正本とします�
 #### ビジネスルール一覧
 
 | ルールID | 関連Scope ID | ルール名 | ルール詳細 | 適用条件 | 関連仕様項目ID | 関連構造ID | 状態 | 関連UNKNOWN ID | 備考 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| -------- | ------------ | -------- | ---------- | -------- | -------------- | ---------- | ---- | -------------- | ---- |
 
 標準ID: `RULE-xxx`
 
@@ -281,7 +284,7 @@ ancestor state propagationの意味契約は `_08 §3.1` を正本とします�
 #### 項目・バリデーション一覧
 
 | 項目ID | 関連Scope ID | 対象構造ID | ラベル / 名称 | 要素タイプ | 入力 / 表示仕様 | 制約 / バリデーション | 関連仕様項目ID | 状態 | 関連UNKNOWN ID | 備考 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ------ | ------------ | ---------- | ------------- | ---------- | --------------- | --------------------- | -------------- | ---- | -------------- | ---- |
 
 標準ID: `FIELD-xxx`
 
@@ -290,7 +293,7 @@ ancestor state propagationの意味契約は `_08 §3.1` を正本とします�
 #### 処理フロー一覧
 
 | フローID | 関連Scope ID | 処理名 | トリガー / 操作 | 手順 / 状態遷移 | 結果 | 関連仕様項目ID | 関連構造ID | 状態 | 関連UNKNOWN ID | 備考 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| -------- | ------------ | ------ | --------------- | --------------- | ---- | -------------- | ---------- | ---- | -------------- | ---- |
 
 標準ID: `FLOW-xxx`
 
@@ -301,7 +304,7 @@ ancestor state propagationの意味契約は `_08 §3.1` を正本とします�
 #### 通知・外部連携一覧
 
 | 連携ID | 関連Scope ID | 種別 | 名称 | 発火条件 | 宛先 / 遷移先 | 内容 / 挙動 | 関連仕様項目ID | 関連構造ID | 状態 | 関連UNKNOWN ID | 備考 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ------ | ------------ | ---- | ---- | -------- | ------------- | ----------- | -------------- | ---------- | ---- | -------------- | ---- |
 
 標準ID:
 
@@ -317,7 +320,7 @@ ancestor state propagationの意味契約は `_08 §3.1` を正本とします�
 #### 仕様矛盾・保留一覧
 
 | ISSUE ID | 種別 | 内容 | 根拠 | 影響範囲 | 関連仕様項目ID | 関連構造ID | 状態 / 扱い |
-| --- | --- | --- | --- | --- | --- | --- | --- |
+| -------- | ---- | ---- | ---- | -------- | -------------- | ---------- | ----------- |
 
 標準ID: `ISSUE-xxx`
 
@@ -328,7 +331,7 @@ ancestor state propagationの意味契約は `_08 §3.1` を正本とします�
 #### Current UNKNOWN一覧
 
 | UNKNOWN ID | 確認事項 | 根拠 | 影響範囲 | 関連Scope ID | Blocking Scope ID | 関連File | 関連構造ID | 次の扱い |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ---------- | -------- | ---- | -------- | ------------ | ----------------- | -------- | ---------- | -------- |
 
 `UNKNOWN ID` は09の `分類=UNKNOWN` かつ `現在有効か=Yes` のUNKだけを許可します。
 
@@ -343,14 +346,14 @@ ancestor state propagationの意味契約は `_08 §3.1` を正本とします�
 #### Repository確認基準
 
 | Repository | Branch / Ref | Commit / Revision | 確認時点 | 関連Scope ID | 備考 |
-| --- | --- | --- | --- | --- | --- |
+| ---------- | ------------ | ----------------- | -------- | ------------ | ---- |
 
 `Repository確認基準` は0..N rowを許可し、`Repository` keyはpackage内uniqueです。normal updateでこのsectionを省略した場合はexisting row集合をそのまま保持します。更新する場合は `keyed_table_updates[]` のfull-replacement契約に従い、再確認したRepository rowだけ値を変更し、未確認Repository rowはprevious modelの値をそのまま含めます。helperは値を推測せず、current branch / revisionへ自動追従しません。
 
 #### Repository実装状況
 
 | 実装確認ID | Repository | 関連Scope ID | 対象 | 観測事実 | 関連仕様項目ID | 判定 | 証拠 / 参照 | 備考 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ---------- | ---------- | ------------ | ---- | -------- | -------------- | ---- | ----------- | ---- |
 
 標準ID: `IMPL-xxx`
 
@@ -369,12 +372,12 @@ ancestor state propagationの意味契約は `_08 §3.1` を正本とします�
 #### 情報源 / 正本参照一覧
 
 | 参照ID | 情報源 / 正本一覧 | 権威 / 優先順位 | 鮮度 / バージョン | 対象範囲 | 参照 / 備考 |
-| --- | --- | --- | --- | --- | --- |
+| ------ | ----------------- | --------------- | ----------------- | -------- | ----------- |
 
 #### 分析項目
 
 | 項目ID | カテゴリ | 内容 | 分類 | 情報源 / 正本参照 | 現在有効か | 解消先ID | 補足 / 上書き / 置換関係 | 備考 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ------ | -------- | ---- | ---- | ----------------- | ---------- | -------- | ------------------------ | ---- |
 
 UI target modeでは `現在有効か` を `Yes / No` に固定します。
 
@@ -394,12 +397,12 @@ UNKNOWNのlineageは次に固定します。
 #### 現在有効な仕様根拠
 
 | 仕様根拠ID | 種別 | 現在有効な内容 | 適用範囲 | 情報源 / 正本一覧 | 関係 | 関連仕様根拠ID |
-| --- | --- | --- | --- | --- | --- | --- |
+| ---------- | ---- | -------------- | -------- | ----------------- | ---- | -------------- |
 
 #### 後続Skillへの補足
 
 | 項目 | 関連項目ID | 後続Skillへの関連 / 備考 |
-| --- | --- | --- |
+| ---- | ---------- | ------------------------ |
 
 #### Machine Entity（機械証拠）
 
@@ -408,7 +411,11 @@ UNKNOWNのlineageは次に固定します。
 `### Machine Entities: spec-analysis`
 
 ```json
-{"schema_version":"entity-state-v2","skill":"spec-analysis","entities":[]}
+{
+  "schema_version": "entity-state-v2",
+  "skill": "spec-analysis",
+  "entities": []
+}
 ```
 
 `entities` は§9のdeterministic bridge結果をそのまま使用します。LLMがMachine Entity wrapper / fingerprintを計算・再構築しません。`expected_entity_identities` はhelper responseに保持しますが、artifactの `Machine Entities` block schemaへ混入させません。`authority_entities.py` が内部返却する `implementation_fingerprint` は本modeのconsumer契約では使用せず、`build-machine-evidence` の統合responseへ公開しません。
@@ -700,49 +707,66 @@ public operationは§7.3のpackage lock + preflight recovery完了後にcommitte
 stdin:
 
 ```json
-{"operation":"inspect","package_root":"<path>"}
+{ "operation": "inspect", "package_root": "<path>" }
 ```
 
 payload:
 
 ```json
 {
-  "package_schema_version":"ui-target-v1",
-  "package_version":"v15",
-  "previous_package_version":"v14",
-  "completion_status":"partial",
-  "current_scope_ids":["SCOPE-001","SCOPE-002"],
-  "ready_scope_ids":["SCOPE-002"],
-  "blocked_scope_ids":["SCOPE-001"],
-  "scope_readiness":[
-    {"scope_id":"SCOPE-001","status":"blocked","blocking_unknown_ids":["UNK-004"]},
-    {"scope_id":"SCOPE-002","status":"ready","blocking_unknown_ids":[]}
+  "package_schema_version": "ui-target-v1",
+  "package_version": "v15",
+  "previous_package_version": "v14",
+  "completion_status": "partial",
+  "current_scope_ids": ["SCOPE-001", "SCOPE-002"],
+  "ready_scope_ids": ["SCOPE-002"],
+  "blocked_scope_ids": ["SCOPE-001"],
+  "scope_readiness": [
+    {
+      "scope_id": "SCOPE-001",
+      "status": "blocked",
+      "blocking_unknown_ids": ["UNK-004"]
+    },
+    { "scope_id": "SCOPE-002", "status": "ready", "blocking_unknown_ids": [] }
   ],
-  "payload_files":[
-    {"order":1,"path":"README.md","kind":"core"}
+  "payload_files": [
+    { "order": 1, "path": "README.md", "kind": "core" }
   ],
-  "file_applicability":[
-    {"path":"03_fields_and_validation.md","scope_id":"SCOPE-001","trigger":"未確定","status":"blocked","authority_refs":[],"unknown_refs":["UNK-004"]}
+  "file_applicability": [
+    {
+      "path": "03_fields_and_validation.md",
+      "scope_id": "SCOPE-001",
+      "trigger": "未確定",
+      "status": "blocked",
+      "authority_refs": [],
+      "unknown_refs": ["UNK-004"]
+    }
   ],
-  "domain_files":[
-    {"order":10,"path":"10_csv-export.md","slug":"csv-export"}
+  "domain_files": [
+    { "order": 10, "path": "10_csv-export.md", "slug": "csv-export" }
   ],
-  "canonical_item_ids":["SRC-001","SPEC-001","UNK-001"],
-  "current_unknown_ids":["UNK-001"],
-  "resolved_unknown_ids":["UNK-002"],
-  "current_unknown_count":1,
-  "structural_ids":["PAGE-001","SCOPE-001"],
-  "exact_reference_index":[
-    {"target_id":"SPEC-001","file":"02_behavior_and_business_rules.md","section":"Acceptance Criteria一覧","row_index":1,"column":"関連仕様項目ID"}
+  "canonical_item_ids": ["SRC-001", "SPEC-001", "UNK-001"],
+  "current_unknown_ids": ["UNK-001"],
+  "resolved_unknown_ids": ["UNK-002"],
+  "current_unknown_count": 1,
+  "structural_ids": ["PAGE-001", "SCOPE-001"],
+  "exact_reference_index": [
+    {
+      "target_id": "SPEC-001",
+      "file": "02_behavior_and_business_rules.md",
+      "section": "Acceptance Criteria一覧",
+      "row_index": 1,
+      "column": "関連仕様項目ID"
+    }
   ],
-  "update_snapshot":{
-    "package_version":"v15",
-    "payload_file_sha256":[
-      {"path":"README.md","sha256":"<lowercase-64-hex>"}
+  "update_snapshot": {
+    "package_version": "v15",
+    "payload_file_sha256": [
+      { "path": "README.md", "sha256": "<lowercase-64-hex>" }
     ],
-    "manifest_sha256":"<lowercase-64-hex>"
+    "manifest_sha256": "<lowercase-64-hex>"
   },
-  "unresolved_structural_issues":[]
+  "unresolved_structural_issues": []
 }
 ```
 
@@ -769,7 +793,7 @@ public operationは§7.3のpackage lock + preflight recovery完了後にcommitte
 stdin:
 
 ```json
-{"operation":"validate","package_root":"<path>","previous_snapshot":null}
+{ "operation": "validate", "package_root": "<path>", "previous_snapshot": null }
 ```
 
 fresh v00 / standalone検証では `previous_snapshot=null` を許可します。通常更新runでは内容編集前の `inspect.payload.update_snapshot` をそのまま渡します。
@@ -801,57 +825,105 @@ stdin:
 
 ```json
 {
-  "operation":"materialize",
-  "package_root":"<path>",
-  "artifact_mode":"update",
-  "previous_snapshot":{"package_version":"v14","payload_file_sha256":[],"manifest_sha256":"<lowercase-64-hex>"},
-  "change_mode":"normal",
-  "legacy_source_version":null,
-  "migration_retained_ids":[],
-  "legacy_lifecycle_events":[],
-  "change_summary":"<current versionの変更概要本文>",
-  "retire_ids":["PAGE-009"],
-  "table_changes":[
+  "operation": "materialize",
+  "package_root": "<path>",
+  "artifact_mode": "update",
+  "previous_snapshot": {
+    "package_version": "v14",
+    "payload_file_sha256": [],
+    "manifest_sha256": "<lowercase-64-hex>"
+  },
+  "change_mode": "normal",
+  "legacy_source_version": null,
+  "migration_retained_ids": [],
+  "legacy_lifecycle_events": [],
+  "change_summary": "<current versionの変更概要本文>",
+  "retire_ids": ["PAGE-009"],
+  "table_changes": [
     {
-      "file":"02_behavior_and_business_rules.md",
-      "section":"User Story一覧",
-      "rows":[
+      "file": "02_behavior_and_business_rules.md",
+      "section": "User Story一覧",
+      "rows": [
         {
-          "draft_key":"us-login",
-          "identity_action":"new",
-          "reuse_id":null,
-          "external_id":null,
-          "cells":{
-            "Scope ID":"SCOPE-001",
-            "Actor / Role":"管理者",
-            "Goal":"...",
-            "関連仕様項目ID":["SPEC-001"],
-            "関連構造ID":["PAGE-001"],
-            "関連UNKNOWN ID":[]
+          "draft_key": "us-login",
+          "identity_action": "new",
+          "reuse_id": null,
+          "external_id": null,
+          "cells": {
+            "Scope ID": "SCOPE-001",
+            "Actor / Role": "管理者",
+            "Goal": "...",
+            "関連仕様項目ID": ["SPEC-001"],
+            "関連構造ID": ["PAGE-001"],
+            "関連UNKNOWN ID": []
           }
         }
       ]
     }
   ],
-  "keyed_table_updates":[
+  "keyed_table_updates": [
     {
-      "file":"00_scope_and_context.md",
-      "section":"条件付き必須file applicability",
-      "rows":[
-        {"ファイル":"03_fields_and_validation.md","Scope ID":"SCOPE-001","Trigger判定":"あり","関連仕様項目ID":["SPEC-001"],"根拠 / 備考":"入力項目あり","関連UNKNOWN ID":[]},
-        {"ファイル":"04_flows_and_data.md","Scope ID":"SCOPE-001","Trigger判定":"なし","関連仕様項目ID":[],"根拠 / 備考":"対象flowなし","関連UNKNOWN ID":[]},
-        {"ファイル":"05_notifications_and_external_interactions.md","Scope ID":"SCOPE-001","Trigger判定":"未確定","関連仕様項目ID":[],"根拠 / 備考":"外部interaction有無が未確定","関連UNKNOWN ID":["UNK-004"]},
-        {"ファイル":"08_repository_implementation_status.md","Scope ID":"SCOPE-001","Trigger判定":"なし","関連仕様項目ID":[],"根拠 / 備考":"repository evidence未使用","関連UNKNOWN ID":[]}
+      "file": "00_scope_and_context.md",
+      "section": "条件付き必須file applicability",
+      "rows": [
+        {
+          "ファイル": "03_fields_and_validation.md",
+          "Scope ID": "SCOPE-001",
+          "Trigger判定": "あり",
+          "関連仕様項目ID": ["SPEC-001"],
+          "根拠 / 備考": "入力項目あり",
+          "関連UNKNOWN ID": []
+        },
+        {
+          "ファイル": "04_flows_and_data.md",
+          "Scope ID": "SCOPE-001",
+          "Trigger判定": "なし",
+          "関連仕様項目ID": [],
+          "根拠 / 備考": "対象flowなし",
+          "関連UNKNOWN ID": []
+        },
+        {
+          "ファイル": "05_notifications_and_external_interactions.md",
+          "Scope ID": "SCOPE-001",
+          "Trigger判定": "未確定",
+          "関連仕様項目ID": [],
+          "根拠 / 備考": "外部interaction有無が未確定",
+          "関連UNKNOWN ID": ["UNK-004"]
+        },
+        {
+          "ファイル": "08_repository_implementation_status.md",
+          "Scope ID": "SCOPE-001",
+          "Trigger判定": "なし",
+          "関連仕様項目ID": [],
+          "根拠 / 備考": "repository evidence未使用",
+          "関連UNKNOWN ID": []
+        }
       ]
     }
   ],
-  "prose_updates":[
-    {"file":"06_spec_inconsistencies_and_pending.md","section":"<exact heading>","body_markdown":"..."}
+  "prose_updates": [
+    {
+      "file": "06_spec_inconsistencies_and_pending.md",
+      "section": "<exact heading>",
+      "body_markdown": "..."
+    }
   ],
-  "extension_file_updates":[
-    {"draft_key":"domain-csv","identity_action":"new","path":null,"slug":"csv-export","responsibility":"CSV export仕様","split_reason":"標準fileと独立したAuthority / flow / rule集合を持つ","scope_refs":["SCOPE-001"],"authority_refs":["SPEC-001"],"structure_refs":["PAGE-001"],"unknown_refs":[],"body_markdown":"..."}
+  "extension_file_updates": [
+    {
+      "draft_key": "domain-csv",
+      "identity_action": "new",
+      "path": null,
+      "slug": "csv-export",
+      "responsibility": "CSV export仕様",
+      "split_reason": "標準fileと独立したAuthority / flow / rule集合を持つ",
+      "scope_refs": ["SCOPE-001"],
+      "authority_refs": ["SPEC-001"],
+      "structure_refs": ["PAGE-001"],
+      "unknown_refs": [],
+      "body_markdown": "..."
+    }
   ],
-  "extension_file_retirements":["10_legacy-domain.md"]
+  "extension_file_retirements": ["10_legacy-domain.md"]
 }
 ```
 
@@ -882,41 +954,39 @@ table input contract:
 
 固定prefixが1つだけのtracking tableは§5のstandard IDをそのまま使います。同一tableに複数prefixが存在する次の3 sectionだけ、既存semantic fieldからhelperがprefixを決定します。LLM / callerはprefix文字列を入力しません。
 
-| file / section | selector | prefix |
-| --- | --- | --- |
-| `01_ui_structure_and_navigation.md / UI構造一覧` | `種別=PAGE` | `PAGE` |
-| 同上 | `種別=STATE` | `STATE` |
-| 同上 | `種別=VIEW` | `VIEW` |
-| 同上 | `種別=STEP` | `STEP` |
-| 同上 | `種別=MODAL` | `MODAL` |
-| 同上 | `種別=BROWSER-DIALOG` | `BDLG` |
-| 同上 | `種別=PANEL` | `PANEL` |
-| 同上 | `種別=POPOVER` | `PANEL` |
-| 同上 | `種別=GLOBAL UI` | `PANEL` |
-| 同上 | `種別=EXTERNAL` | `EXT` |
-| 同上 | `種別=SHARED PAGE` | `SHARED` |
-| `05_notifications_and_external_interactions.md / 通知・外部連携一覧` | `種別=通知` または `メール` | `NOTIFY` |
-| 同上 | `種別=外部連携` または `外部遷移イベント` | `INTERACT` |
-| `09_authority_and_traceability.md / 分析項目` | `分類=SPEC` | `SPEC` |
-| 同上 | `分類=INFERENCE` | `INF` |
-| 同上 | `分類=UNKNOWN` | `UNK` |
-| 同上 | `分類=DECISION` | `DEC`。`new`禁止、初回取込は`external` |
-| 同上 | `分類=承認済みASM` | `ASM`。`new`禁止、初回取込は`external` |
+| file / section                                                       | selector                                  | prefix                                 |
+| -------------------------------------------------------------------- | ----------------------------------------- | -------------------------------------- |
+| `01_ui_structure_and_navigation.md / UI構造一覧`                     | `種別=PAGE`                               | `PAGE`                                 |
+| 同上                                                                 | `種別=STATE`                              | `STATE`                                |
+| 同上                                                                 | `種別=VIEW`                               | `VIEW`                                 |
+| 同上                                                                 | `種別=STEP`                               | `STEP`                                 |
+| 同上                                                                 | `種別=MODAL`                              | `MODAL`                                |
+| 同上                                                                 | `種別=BROWSER-DIALOG`                     | `BDLG`                                 |
+| 同上                                                                 | `種別=PANEL`                              | `PANEL`                                |
+| 同上                                                                 | `種別=POPOVER`                            | `PANEL`                                |
+| 同上                                                                 | `種別=GLOBAL UI`                          | `PANEL`                                |
+| 同上                                                                 | `種別=EXTERNAL`                           | `EXT`                                  |
+| 同上                                                                 | `種別=SHARED PAGE`                        | `SHARED`                               |
+| `05_notifications_and_external_interactions.md / 通知・外部連携一覧` | `種別=通知` または `メール`               | `NOTIFY`                               |
+| 同上                                                                 | `種別=外部連携` または `外部遷移イベント` | `INTERACT`                             |
+| `09_authority_and_traceability.md / 分析項目`                        | `分類=SPEC`                               | `SPEC`                                 |
+| 同上                                                                 | `分類=INFERENCE`                          | `INF`                                  |
+| 同上                                                                 | `分類=UNKNOWN`                            | `UNK`                                  |
+| 同上                                                                 | `分類=DECISION`                           | `DEC`。`new`禁止、初回取込は`external` |
+| 同上                                                                 | `分類=承認済みASM`                        | `ASM`。`new`禁止、初回取込は`external` |
 
 selector fieldがmissing / unknown、ID prefixとselectorが不一致、`new`でDEC / ASMを採番しようとする入力はwrite前にrejectします。PANEL / POPOVER / GLOBAL UIは意味上の種別を保持したまま同じ`PANEL` prefixを共有します。`分析項目`の`承認済みASM`は外部ownerのapproved ASM mirror専用で、spec-analysisの通常4分類を増やすsemantic classifierとして扱いません。
 
 `keyed_table_updates[]` はstable IDを採番しないview / fixed-key tableの**完成row集合**を対象にし、section単位で全rowを置換します。部分patchは許可しません。exact registryは次です。
 
-
-
-| file / section | key | 固定規則 |
-| --- | --- | --- |
-| `00_scope_and_context.md / 条件付き必須file applicability` | `ファイル + Scope ID` | current Scope IDごとに03 / 04 / 05 / 08の4row exactly。callerは `Trigger判定 / 関連仕様項目ID / 根拠 / 備考 / 関連UNKNOWN ID` を渡し、helperが `状態` を生成する。file順→Scope ID昇順でcanonical sort |
-| `02_behavior_and_business_rules.md / Use Case振る舞い完全性` | `UC ID + 結果分類` | current UCごとに3分類 exactly |
-| `07_current_unknowns.md / Current UNKNOWN一覧` | `UNKNOWN ID` | 09のcurrent UNKNOWN ID集合とexact一致。`Blocking Scope ID` は `関連Scope ID` のsubset。`関連File` はstandard registry pathなら物理file未作成でも許可し、extensionはcurrent宣言 + current実fileを必須とする |
-| `08_repository_implementation_status.md / Repository確認基準` | `Repository` | 0..N row、Repository key duplicate禁止。normal updateでsection省略ならexisting baseline集合を保持する。full replacementで一部Repositoryだけ再確認する場合、未確認rowはprevious値のまま含め、自動でbranch / revisionを更新しない |
-| `09_authority_and_traceability.md / 現在有効な仕様根拠` | `仕様根拠ID` | LLMが確定したCurrent Effective Authorityだけ。09分析項目のcurrent `SPEC / DECISION / 承認済みASM`へ存在参照 |
-| `09_authority_and_traceability.md / 後続Skillへの補足` | `項目` | 項目duplicate禁止。stable refsだけhelper検証 |
+| file / section                                                | key                   | 固定規則                                                                                                                                                                                                                        |
+| ------------------------------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `00_scope_and_context.md / 条件付き必須file applicability`    | `ファイル + Scope ID` | current Scope IDごとに03 / 04 / 05 / 08の4row exactly。callerは `Trigger判定 / 関連仕様項目ID / 根拠 / 備考 / 関連UNKNOWN ID` を渡し、helperが `状態` を生成する。file順→Scope ID昇順でcanonical sort                           |
+| `02_behavior_and_business_rules.md / Use Case振る舞い完全性`  | `UC ID + 結果分類`    | current UCごとに3分類 exactly                                                                                                                                                                                                   |
+| `07_current_unknowns.md / Current UNKNOWN一覧`                | `UNKNOWN ID`          | 09のcurrent UNKNOWN ID集合とexact一致。`Blocking Scope ID` は `関連Scope ID` のsubset。`関連File` はstandard registry pathなら物理file未作成でも許可し、extensionはcurrent宣言 + current実fileを必須とする                      |
+| `08_repository_implementation_status.md / Repository確認基準` | `Repository`          | 0..N row、Repository key duplicate禁止。normal updateでsection省略ならexisting baseline集合を保持する。full replacementで一部Repositoryだけ再確認する場合、未確認rowはprevious値のまま含め、自動でbranch / revisionを更新しない |
+| `09_authority_and_traceability.md / 現在有効な仕様根拠`       | `仕様根拠ID`          | LLMが確定したCurrent Effective Authorityだけ。09分析項目のcurrent `SPEC / DECISION / 承認済みASM`へ存在参照                                                                                                                     |
+| `09_authority_and_traceability.md / 後続Skillへの補足`        | `項目`                | 項目duplicate禁止。stable refsだけhelper検証                                                                                                                                                                                    |
 
 `keyed_table_updates[]` のrowは原則exact header名をJSON keyとして持ち、stable reference列だけstring arrayを受けます。例外として `条件付き必須file applicability` は `状態` をcaller入力に含めず、helperが `Trigger判定` から生成します。stable IDをkey / referenceとして持つcellでは、同requestのnew tracking rowを `@draft:<draft_key>` で参照できます。helperはstable tracking ID割当後にkey / reference内の `@draft` を解決し、未解決draftをrejectします。helperがcanonical key order / Markdown escape / `<br>` serialization / row sortを行います。view tableからrowが消えてもtracking stable IDのretireとは扱いません。tracking lifecycleは `table_changes[] / retire_ids[]` だけで管理します。
 
@@ -946,7 +1016,7 @@ prose input contract:
 - `body_markdown=""` はsection本文を空にするがheading自体は残す
 - standard fileのproseだけを対象とする。extension file全体の自由記述は `extension_file_updates[].body_markdown` を使い、`prose_updates[]` でextension headingを部分編集しない
 - helperはCRLF / CRをLFへ正規化し、最終file byte contractは§7.4に従う
-extension input contract:
+  extension input contract:
 
 - `extension_file_updates[]` のnew rowは `draft_key` unique、`identity_action=new / path=null`、lowercase kebab-case slug、非空responsibility / split_reason / body_markdownと `scope_refs[] / authority_refs[] / structure_refs[] / unknown_refs[]` を要求する。reuseも4参照配列の完成値を渡す。4参照配列では同requestのnew tracking rowを `@draft:<draft_key>` で参照でき、§8のrequest-wide stable draft mapで実IDへ解決してから存在・duplicate・canonical sortを検証する。extension自身のdraft_keyはextension path返却用の別namespaceであり、stable `@draft` 参照先にはしない
 - extension fileはstructured tracking table / custom stable IDを持たない。`table_changes[] / keyed_table_updates[] / prose_updates[]` でextension内部を部分編集しない
@@ -955,7 +1025,7 @@ extension input contract:
 - file order番号自体はstable IDではないため、将来のnew extension採番はその時点のcurrent extension最大番号+1を使用する
 - new extension pathはexisting current extension最大番号+1から、request配列順に連続採番する。同じrequest内で複数追加しても空fileによる番号予約を要求しない
 - helperは最終pathを00の `案件固有extension file一覧` へcanonical orderで生成し、Agent / LLMがtable rowを組み立てない
-stable tracking allocation / lifecycle contract:
+  stable tracking allocation / lifecycle contract:
 
 - new IDはcanonical file order → section order → request row orderで割り当てる。同一JSON inputから同じID割当になる。legacy-migrationでは `migration_retained_ids[]` と `legacy_lifecycle_events[].stable_id` を採番前の使用済み集合へ必ず含め、current rowに存在しないretired / resolved legacy IDを再利用しない
 - unchanged rowはcurrent packageから保持する。requestにない既存rowを削除しない
@@ -993,21 +1063,35 @@ payload:
 
 ```json
 {
-  "changed":true,
-  "replayed":false,
-  "request_fingerprint":"sha256:<lowercase-64-hex>",
-  "completion_status":"partial",
-  "current_scope_ids":["SCOPE-001","SCOPE-002"],
-  "ready_scope_ids":["SCOPE-002"],
-  "blocked_scope_ids":["SCOPE-001"],
-  "scope_readiness":[{"scope_id":"SCOPE-001","status":"blocked","blocking_unknown_ids":["UNK-004"]},{"scope_id":"SCOPE-002","status":"ready","blocking_unknown_ids":[]}],
-  "allocated_ids":[{"draft_key":"us-login","stable_id":"US-003"}],
-  "allocated_extension_files":[{"draft_key":"domain-csv","path":"10_csv-export.md"}],
-  "retired_ids":["PAGE-009"],
-  "retired_extension_files":["10_legacy-domain.md"],
-  "changed_files":["README.md","02_behavior_and_business_rules.md","CHANGELOG.md","MANIFEST.md"],
-  "previous_package_version":"v14",
-  "package_version":"v15"
+  "changed": true,
+  "replayed": false,
+  "request_fingerprint": "sha256:<lowercase-64-hex>",
+  "completion_status": "partial",
+  "current_scope_ids": ["SCOPE-001", "SCOPE-002"],
+  "ready_scope_ids": ["SCOPE-002"],
+  "blocked_scope_ids": ["SCOPE-001"],
+  "scope_readiness": [
+    {
+      "scope_id": "SCOPE-001",
+      "status": "blocked",
+      "blocking_unknown_ids": ["UNK-004"]
+    },
+    { "scope_id": "SCOPE-002", "status": "ready", "blocking_unknown_ids": [] }
+  ],
+  "allocated_ids": [{ "draft_key": "us-login", "stable_id": "US-003" }],
+  "allocated_extension_files": [
+    { "draft_key": "domain-csv", "path": "10_csv-export.md" }
+  ],
+  "retired_ids": ["PAGE-009"],
+  "retired_extension_files": ["10_legacy-domain.md"],
+  "changed_files": [
+    "README.md",
+    "02_behavior_and_business_rules.md",
+    "CHANGELOG.md",
+    "MANIFEST.md"
+  ],
+  "previous_package_version": "v14",
+  "package_version": "v15"
 }
 ```
 
@@ -1033,7 +1117,11 @@ public operationは§7.3のpackage lock + preflight recovery完了後にcommitte
 stdin:
 
 ```json
-{"operation":"build-machine-evidence","package_root":"<path>","scope_ids":null}
+{
+  "operation": "build-machine-evidence",
+  "package_root": "<path>",
+  "scope_ids": null
+}
 ```
 
 `scope_ids` は `null` またはcurrent ready Scope IDのnon-empty arrayです。duplicate / unknown / blocked scope IDを拒否し、helperがcanonical sortします。 `current_scope_ids[]` はread-only outputでcaller入力にはせず、helperがcurrent SCOPE rowから毎回再導出してretired SCOPE IDを含めません。canonical qa-workflowでdownstream `artifact:*:all` runtimeへ渡す場合は、`ready_scope_ids[]` が1件以上の時だけ `scope_ids[]` を渡し、その集合が `inspect.ready_scope_ids[]` とexact一致することを要求します。`ready_scope_ids=[]` ではこのoperationを空配列で呼びません。`current_scope_ids[]` non-emptyの全blocked時はdownstream runtimeをdispatchせず、`current_scope_ids=[]` のzero-scope terminal時はbatch handoffを使わず `_09 §12.3a` のdeletion-only downstream pathへ進みます。一部ready scopeだけのsubset実行をglobal `:all` artifactの代替にしません。
@@ -1062,15 +1150,25 @@ payloadは `scope_ids` で分けます。
 
 ```json
 {
-  "batch_handoff":{
-    "scope_ids":["SCOPE-001","SCOPE-002"],
-    "scope_index":[
-      {"scope_id":"SCOPE-001","target":"ログイン","ui_operation":"あり","authority_refs":["SPEC-001"]},
-      {"scope_id":"SCOPE-002","target":"自動更新","ui_operation":"なし","authority_refs":["SPEC-002"]}
+  "batch_handoff": {
+    "scope_ids": ["SCOPE-001", "SCOPE-002"],
+    "scope_index": [
+      {
+        "scope_id": "SCOPE-001",
+        "target": "ログイン",
+        "ui_operation": "あり",
+        "authority_refs": ["SPEC-001"]
+      },
+      {
+        "scope_id": "SCOPE-002",
+        "target": "自動更新",
+        "ui_operation": "なし",
+        "authority_refs": ["SPEC-002"]
+      }
     ],
-    "normalized_skill_input":{"authorities":[],"acceptance_criteria":[]},
-    "machine_entities":[],
-    "expected_entity_identities":[]
+    "normalized_skill_input": { "authorities": [], "acceptance_criteria": [] },
+    "machine_entities": [],
+    "expected_entity_identities": []
   }
 }
 ```
@@ -1100,17 +1198,18 @@ LLMが09へCurrent Effective Authorityを確定し、02へcurrent US / UC / Beha
 
 Authority部分は既存 `authority_entities.py` のnormalized input / builder契約をそのまま再利用します。09の「現在有効な仕様根拠」tableから `normalized_authorities[]` への変換はhelper内で次に固定します。
 
-| 09 column | normalized Authority field |
-| --- | --- |
-| 仕様根拠ID | `authority_id` |
-| 種別 | `authority_type` |
-| 現在有効な内容 | `active_content={"text":"<cell>"}` |
-| 適用範囲 | `scope` |
-| 情報源 / 正本一覧 | `source_refs[]` |
-| 関係 | `relations[]` |
-| 関連仕様根拠ID | `related_authority_refs[]` |
+| 09 column         | normalized Authority field         |
+| ----------------- | ---------------------------------- |
+| 仕様根拠ID        | `authority_id`                     |
+| 種別              | `authority_type`                   |
+| 現在有効な内容    | `active_content={"text":"<cell>"}` |
+| 適用範囲          | `scope`                            |
+| 情報源 / 正本一覧 | `source_refs[]`                    |
+| 関係              | `relations[]`                      |
+| 関連仕様根拠ID    | `related_authority_refs[]`         |
 
 規則:
+
 - `現在有効な内容` はtrim後の非空文字列を `active_content.text` へ入れ、helperが意味的な再要約・再構成をしない
 - `適用範囲` はtrim後の非空文字列をそのまま `scope` へ入れる。UI target modeでは `null` / objectへ変換しない
 - `情報源 / 正本一覧` は1件以上の `SRC-xxx` stable ID参照を要求し、複数IDは `<br>` 区切り
@@ -1150,9 +1249,9 @@ UIOP / US / UC / Behavior / UI構造 / FIELD / RULE / FLOW / NOTIFY / INTERACT /
 
 ```json
 {
-  "authorities": [{"authority_id":"SPEC-001"}],
+  "authorities": [{ "authority_id": "SPEC-001" }],
   "acceptance_criteria": [
-    {"ac_id":"AC-001","authority_refs":["SPEC-001","DEC-002"]}
+    { "ac_id": "AC-001", "authority_refs": ["SPEC-001", "DEC-002"] }
   ]
 }
 ```
@@ -1219,10 +1318,10 @@ stdin:
 
 ```json
 {
-  "operation":"validate-links",
-  "artifact_markdown":"<question-analysis output>",
-  "current_unknown_ids":["UNK-001"],
-  "resolved_unknown_ids":["UNK-002"]
+  "operation": "validate-links",
+  "artifact_markdown": "<question-analysis output>",
+  "current_unknown_ids": ["UNK-001"],
+  "resolved_unknown_ids": ["UNK-002"]
 }
 ```
 
@@ -1232,8 +1331,8 @@ payload:
 
 ```json
 {
-  "question_links":[{"question_id":"Q-001","unknown_ids":["UNK-001"]}],
-  "unknown_refs":["UNK-001"]
+  "question_links": [{ "question_id": "Q-001", "unknown_ids": ["UNK-001"] }],
+  "unknown_refs": ["UNK-001"]
 }
 ```
 
@@ -1245,32 +1344,32 @@ stdin:
 
 ```json
 {
-  "operation":"materialize",
-  "artifact_mode":"update",
-  "previous_artifact_markdown":"<previous question-analysis output>",
-  "artifact_markdown":"<candidate artifact with narrative sections>",
-  "current_unknown_ids":["UNK-001"],
-  "resolved_unknown_ids":["UNK-002"],
-  "questions":[
+  "operation": "materialize",
+  "artifact_mode": "update",
+  "previous_artifact_markdown": "<previous question-analysis output>",
+  "artifact_markdown": "<candidate artifact with narrative sections>",
+  "current_unknown_ids": ["UNK-001"],
+  "resolved_unknown_ids": ["UNK-002"],
+  "questions": [
     {
-      "draft_key":"q-login-role",
-      "identity_action":"new",
-      "reuse_id":null,
-      "cells":{
-        "問題 / 質問":"...",
-        "根拠":"...",
-        "分類":"要確認",
-        "影響範囲 / 成果物":"...",
-        "関連UNKNOWN ID":["UNK-001"],
-        "Runtime Skill":"",
-        "Runtime Unit Key":"",
-        "Model Key":"",
-        "Target Key":"",
-        "Generation Fingerprint":"",
-        "回答なしの場合の扱い":"",
-        "回答後の正規化先":"SPEC",
-        "再開Skill":"spec-analysis",
-        "再開対象 / 実行範囲":""
+      "draft_key": "q-login-role",
+      "identity_action": "new",
+      "reuse_id": null,
+      "cells": {
+        "問題 / 質問": "...",
+        "根拠": "...",
+        "分類": "要確認",
+        "影響範囲 / 成果物": "...",
+        "関連UNKNOWN ID": ["UNK-001"],
+        "Runtime Skill": "",
+        "Runtime Unit Key": "",
+        "Model Key": "",
+        "Target Key": "",
+        "Generation Fingerprint": "",
+        "回答なしの場合の扱い": "",
+        "回答後の正規化先": "SPEC",
+        "再開Skill": "spec-analysis",
+        "再開対象 / 実行範囲": ""
       }
     }
   ]
@@ -1291,9 +1390,9 @@ payload:
 
 ```json
 {
-  "allocated_ids":[{"draft_key":"q-login-role","question_id":"Q-003"}],
-  "artifact_markdown":"<full artifact with current Q / 質問ID履歴 materialized>",
-  "used_question_ids":["Q-001","Q-002","Q-003"]
+  "allocated_ids": [{ "draft_key": "q-login-role", "question_id": "Q-003" }],
+  "artifact_markdown": "<full artifact with current Q / 質問ID履歴 materialized>",
+  "used_question_ids": ["Q-001", "Q-002", "Q-003"]
 }
 ```
 
@@ -1307,9 +1406,9 @@ stdin:
 
 ```json
 {
-  "operation":"validate-history",
-  "previous_artifact_markdown":"<previous Project Context or null>",
-  "artifact_markdown":"<candidate Project Context>"
+  "operation": "validate-history",
+  "previous_artifact_markdown": "<previous Project Context or null>",
+  "artifact_markdown": "<candidate Project Context>"
 }
 ```
 
@@ -1317,9 +1416,9 @@ payload:
 
 ```json
 {
-  "missing_previous_ids":[],
-  "decision_ids":["DEC-001"],
-  "assumption_ids":["ASM-001"]
+  "missing_previous_ids": [],
+  "decision_ids": ["DEC-001"],
+  "assumption_ids": ["ASM-001"]
 }
 ```
 
@@ -1333,12 +1432,28 @@ stdin:
 
 ```json
 {
-  "operation":"materialize",
-  "artifact_mode":"update",
-  "previous_artifact_markdown":"<previous Project Context>",
-  "artifact_markdown":"<candidate Project Context narrative>",
-  "decisions":[{"draft_key":"dec-auth","identity_action":"new","reuse_id":null,"cells":{"確定内容":"...","状態":"有効","決定根拠":"...","影響範囲":"...","関係":"独立","関連仕様根拠ID":[],"置換先ID":[],"備考":""}}],
-  "assumptions":[]
+  "operation": "materialize",
+  "artifact_mode": "update",
+  "previous_artifact_markdown": "<previous Project Context>",
+  "artifact_markdown": "<candidate Project Context narrative>",
+  "decisions": [
+    {
+      "draft_key": "dec-auth",
+      "identity_action": "new",
+      "reuse_id": null,
+      "cells": {
+        "確定内容": "...",
+        "状態": "有効",
+        "決定根拠": "...",
+        "影響範囲": "...",
+        "関係": "独立",
+        "関連仕様根拠ID": [],
+        "置換先ID": [],
+        "備考": ""
+      }
+    }
+  ],
+  "assumptions": []
 }
 ```
 
@@ -1352,7 +1467,10 @@ stdin:
 payload:
 
 ```json
-{"allocated_ids":[{"draft_key":"dec-auth","stable_id":"DEC-003"}],"artifact_markdown":"<full Project Context with Section 12 / 13 materialized>"}
+{
+  "allocated_ids": [{ "draft_key": "dec-auth", "stable_id": "DEC-003" }],
+  "artifact_markdown": "<full Project Context with Section 12 / 13 materialized>"
+}
 ```
 
 LLM / stakeholder側がsemantic identityのreuse / new、DECISION / ASM区分、決定内容、関係、影響範囲、状態遷移の意味、ASM承認可否を判断します。helperはProject ContextのSection 12 / 13だけを書き換え、その他sectionの意味を変更しません。
@@ -1397,7 +1515,7 @@ exact heading:
 ### Package manifest
 
 | 順序 | ファイル | SHA-256 |
-| ---: | --- | --- |
+| ---: | -------- | ------- |
 
 MANIFEST先頭に次を持ちます。
 
@@ -1416,18 +1534,25 @@ file tableの後にexact heading `### Last materialize receipt` とcanonical JSO
 
 ```json
 {
-  "receipt_version":"materialize-receipt-v1",
-  "request_fingerprint":"sha256:<lowercase-64-hex>",
-  "artifact_mode":"update",
-  "change_mode":"normal",
-  "changed":true,
-  "allocated_ids":[{"draft_key":"us-login","stable_id":"US-003"}],
-  "allocated_extension_files":[{"draft_key":"domain-csv","path":"10_csv-export.md"}],
-  "retired_ids":["PAGE-009"],
-  "retired_extension_files":["10_legacy-domain.md"],
-  "changed_files":["README.md","02_behavior_and_business_rules.md","CHANGELOG.md","MANIFEST.md"],
-  "previous_package_version":"v14",
-  "package_version":"v15"
+  "receipt_version": "materialize-receipt-v1",
+  "request_fingerprint": "sha256:<lowercase-64-hex>",
+  "artifact_mode": "update",
+  "change_mode": "normal",
+  "changed": true,
+  "allocated_ids": [{ "draft_key": "us-login", "stable_id": "US-003" }],
+  "allocated_extension_files": [
+    { "draft_key": "domain-csv", "path": "10_csv-export.md" }
+  ],
+  "retired_ids": ["PAGE-009"],
+  "retired_extension_files": ["10_legacy-domain.md"],
+  "changed_files": [
+    "README.md",
+    "02_behavior_and_business_rules.md",
+    "CHANGELOG.md",
+    "MANIFEST.md"
+  ],
+  "previous_package_version": "v14",
+  "package_version": "v15"
 }
 ```
 
@@ -1456,7 +1581,7 @@ file tableの後にexact heading `### Last materialize receipt` とcanonical JSO
 `### Stable ID changes`
 
 | Stable ID | Change |
-| --- | --- |
+| --------- | ------ |
 
 通常更新ではこのtable全体を `materialize` 内部lifecycle builderが生成します。Agent / LLMはrowを手入力しません。legacy migrationでも `materialize(change_mode=legacy-migration)` がLLMのsemantic mapping結果を受けてtableを生成します。
 

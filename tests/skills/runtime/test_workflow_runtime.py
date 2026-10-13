@@ -18,12 +18,26 @@ runtime = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = runtime
 SPEC.loader.exec_module(runtime)
 
+_make_machine_entity = runtime.make_machine_entity
+
+
+def _make_v2_machine_entity(
+    skill: str, entity_type: str, entity_ref: str, content: dict, **kwargs: object
+) -> dict:
+    if entity_type in {"tr", "tcn", "model", "ci", "tc"}:
+        content = {**content}
+        content.setdefault("scope_refs", [])
+    return _make_machine_entity(skill, entity_type, entity_ref, content, **kwargs)
+
+
+runtime.make_machine_entity = _make_v2_machine_entity
+
 
 def metadata() -> dict:
     return {
         "envelope_version": "1",
         "skill": "qa-workflow",
-        "runtime_contract_version": "runtime-v1",
+        "runtime_contract_version": "runtime-v2",
         "generator_contract_version": "workflow-runtime-v1",
         "runtime_unit_key": "artifact:workflow_runtime:all",
         "model_key": None,
@@ -94,6 +108,7 @@ def structure_state(entities: list[dict]) -> tuple[dict, dict]:
             "model_type": row["content"]["model_type"],
             "technique_slug": row["content"].get("technique_slug"),
             "parent_tcn_id": row["content"]["parent_tcn_id"],
+            "scope_refs": row["content"].get("scope_refs", []),
             "content_fingerprint": row["content_fingerprint"],
         }
         for row in model_entities
@@ -102,7 +117,7 @@ def structure_state(entities: list[dict]) -> tuple[dict, dict]:
         "envelope_version": "1",
         "skill": "test-condition-design",
         "runtime_contract_version": runtime.RUNTIME_CONTRACT_VERSION,
-        "generator_contract_version": "condition-structure-v1",
+        "generator_contract_version": "condition-structure-v2",
         "generator": "condition_structure",
         "runtime_unit_key": "artifact:condition_structure:all",
         "model_key": None,
@@ -215,6 +230,7 @@ class WorkflowRuntimeTests(unittest.TestCase):
         return {
             "metadata": metadata(),
             "input": {
+                "workflow_ref": "00000000-0000-4000-8000-000000000016",
                 "workflow_scopes": [
                     {
                         "skill": "test-condition-design",
@@ -240,6 +256,16 @@ class WorkflowRuntimeTests(unittest.TestCase):
         self.assertEqual(result["issues"], [])
         self.assertEqual(len(result["payload"]["expected_runtime_units"]), 3)
         self.assertEqual(len(result["payload"]["expected_entities"]), 5)
+        self.assertEqual(
+            result["payload"]["workflow_ref"],
+            "00000000-0000-4000-8000-000000000016",
+        )
+
+    def test_workflow_ref_must_be_a_canonical_uuid(self) -> None:
+        request = self._request()
+        request["input"]["workflow_ref"] = "workflow-16"
+        result = run(request)
+        self.assertEqual(result["runtime_status"], "invalid_input")
 
     def test_missing_root_is_a_blocker_and_does_not_hide_other_expected_units(
         self,
@@ -503,6 +529,7 @@ class WorkflowRuntimeTests(unittest.TestCase):
         return {
             "metadata": metadata(),
             "input": {
+                "workflow_ref": "00000000-0000-4000-8000-000000000016",
                 "workflow_scopes": [
                     {
                         "skill": "test-condition-design",
@@ -657,12 +684,25 @@ class WorkflowRuntimeTests(unittest.TestCase):
                 }
             ],
             "previous_tcn_ids": [
-                {"tcn_id": "TCN-001", "status": "active"},
-                {"tcn_id": "TCN-002", "status": "active"},
+                {"tcn_id": "TCN-001", "status": "active", "scope_refs": []},
+                {"tcn_id": "TCN-002", "status": "active", "scope_refs": []},
             ],
             "previous_model_keys": [
-                {"model_key": "ep-001", "model_type": "ep", "status": "active"},
-                {"model_key": "ep-002", "model_type": "ep", "status": "active"},
+                {
+                    "model_key": ref,
+                    "model_type": "ep",
+                    "technique_slug": "ep",
+                    "parent_tcn_id": parent,
+                    "selection_source": "user",
+                    "selection_key": None,
+                    "derived_from_model_key": None,
+                    "status": "active",
+                    "scope_refs": [],
+                }
+                for ref, parent in (("ep-001", "TCN-001"), ("ep-002", "TCN-002"))
+            ],
+            "previous_ci_ids": [
+                {"ci_id": "TCN-001-CI01", "status": "active", "scope_refs": []}
             ],
             "update_scope_tcn_ids": ["TCN-001"],
             "update_scope_model_keys": ["ep-001"],
@@ -690,13 +730,14 @@ class WorkflowRuntimeTests(unittest.TestCase):
                 tr_disposition,
             ],
             "previous_ci_id_state": [
-                {"ci_id": "TCN-001-CI01", "status": "active"},
-                {"ci_id": "TCN-002-CI01", "status": "active"},
+                {"ci_id": "TCN-001-CI01", "status": "active", "scope_refs": []},
+                {"ci_id": "TCN-002-CI01", "status": "active", "scope_refs": []},
             ],
         }
         request = {
             "metadata": metadata(),
             "input": {
+                "workflow_ref": "00000000-0000-4000-8000-000000000016",
                 "workflow_scopes": [
                     {
                         "skill": "test-condition-design",
@@ -941,7 +982,7 @@ class WorkflowRuntimeTests(unittest.TestCase):
         request, parts = self._partial_scope_request()
         old_context = {
             "runtime_contract_version": runtime.RUNTIME_CONTRACT_VERSION,
-            "generator_contract_version": "condition-structure-v1",
+            "generator_contract_version": "condition-structure-v2",
             "runtime_implementation_fingerprint": runtime.implementation_fingerprint(
                 RUNTIME_PATH
             ),
@@ -976,7 +1017,7 @@ class WorkflowRuntimeTests(unittest.TestCase):
         condition_result.update(
             {
                 "runtime_contract_version": runtime.RUNTIME_CONTRACT_VERSION,
-                "generator_contract_version": "condition-structure-v1",
+                "generator_contract_version": "condition-structure-v2",
                 "runtime_implementation_fingerprint": runtime.implementation_fingerprint(
                     RUNTIME_PATH
                 ),
