@@ -40,14 +40,14 @@ The starting Judge result was 4 pass / 15 needs_review / 5 fail. The 20 non-PASS
 
 Starting cause counts were:
 
-| Initial cause | Criteria | Cases |
-| --- | ---: | ---: |
-| Candidate defect | 32 | 15 |
-| Reference / Eval mismatch | 12 | 8 |
-| Context schema effect | 0 | 0 |
-| Rubric mismatch | 0 | 0 |
-| Judge false / unstable | 0 | 0 |
-| Other | 0 | 0 |
+| Initial cause             | Criteria | Cases |
+| ------------------------- | -------: | ----: |
+| Candidate defect          |       32 |    15 |
+| Reference / Eval mismatch |       12 |     8 |
+| Context schema effect     |        0 |     0 |
+| Rubric mismatch           |        0 |     0 |
+| Judge false / unstable    |        0 |     0 |
+| Other                     |        0 |     0 |
 
 Some cases had more than one cause; for example, TCN-SEM-006 and TCN-SEM-010. The follow-up review found that all 12 initial Reference / Eval criteria (8 cases) were genuine fixture/specification gaps, not candidate defects: the old Eval input omitted facts needed to evaluate the reference requirement, or the expected reference detail was too general to map exactly to the fixture. Those Eval inputs and, where necessary, references were made explicit against Plan / current Skill contract. Therefore the prior wording that “references and rubrics were not changed” was too broad: several Eval inputs and four references changed, but no criterion was removed, no criticality or pass threshold was lowered, and the normative requirement was not changed to match a candidate. The global `SEM-TCN-002` rubric description was also clarified to distinguish product-behavior technique selection from deterministic adapter/materialization validation; this was not a rubric defect among the initial 44 criteria and did not change criticality or threshold. The 12 historical issues are resolved: latest candidates pass all 12, and current unresolved Reference / Eval mismatches = 0. See the starting-state appendix retrospective audit for per-criterion evidence.
 
@@ -74,13 +74,13 @@ After the direct-mode unknown-Authority rule was clarified, the five `test-analy
 
 The final result set uses the five latest `test-analysis` results (RISK-SEM-007 from round 8; RISK-SEM-003 through RISK-SEM-006 from round 7), the 17 unaffected passing candidates from the valid full batch, and the rerun current candidates for TCN-SEM-007 and TCN-SEM-008. All 24 latest candidate cases and all 91 applicable criteria pass:
 
-| Group | Cases | Result |
-| --- | --- | --- |
-| test-analysis | RISK-SEM-003 through RISK-SEM-007 | 5/5 pass |
-| test-case-design | TC-SEM-002 | 1/1 pass |
-| adversarial-review | REV-SEM-003 through REV-SEM-008 | 6/6 pass |
-| test-condition-design | TCN-SEM-003 through TCN-SEM-014 | 12/12 pass |
-| **Total** | **24 cases / 91 criteria** | **24/24 cases; 91/91 criteria pass** |
+| Group                 | Cases                             | Result                               |
+| --------------------- | --------------------------------- | ------------------------------------ |
+| test-analysis         | RISK-SEM-003 through RISK-SEM-007 | 5/5 pass                             |
+| test-case-design      | TC-SEM-002                        | 1/1 pass                             |
+| adversarial-review    | REV-SEM-003 through REV-SEM-008   | 6/6 pass                             |
+| test-condition-design | TCN-SEM-003 through TCN-SEM-014   | 12/12 pass                           |
+| **Total**             | **24 cases / 91 criteria**        | **24/24 cases; 91/91 criteria pass** |
 
 Candidate generation used `codex.cmd exec --ephemeral --sandbox read-only -C <repo> -` with only current Skill instructions and the relevant Eval input (plus current runtime output where the case requires it). Latest prompt files were `%TEMP%\pr11-context-semantic-round7-20260923\test-analysis.prompt.txt` (RISK-SEM-003..007) and `%TEMP%\pr11-context-semantic-round8-20260923\RISK-SEM-007.prompt.txt`; the affected TCD prompts for TCN-SEM-007 / TCN-SEM-008 are in round 6. Judge evaluation used this existing runner invocation for each case:
 
@@ -133,10 +133,10 @@ The existing skip behavior and production code were not changed.
 - Implementation/test commit: `18098995376190b14778dc04c55c1d0aae7f3636` (`fix: address deterministic runtime review findings`).
 - Local HEAD and PR head were both `18098995376190b14778dc04c55c1d0aae7f3636` when the following pull_request workflows completed:
 
-| Workflow | Run ID | Result |
-| --- | ---: | --- |
-| Validate Agent Skills | 35852216520 | success |
-| Validate Semantic Output Evals | 35852216454 | success |
+| Workflow                            |      Run ID | Result  |
+| ----------------------------------- | ----------: | ------- |
+| Validate Agent Skills               | 35852216520 | success |
+| Validate Semantic Output Evals      | 35852216454 | success |
 | Validate Deterministic Output Evals | 35852216435 | success |
 
 - Ubuntu symlink check: run 35852216454, job `semantic-output-evals`, step `Run Semantic Eval shared runtime tests`. Both `test_cases_directory_symlink_escape_raises` and `test_symlink_escape_raises` were discovered and reported `... ok`; the shared suite ran 27 tests and finished `OK` with no skips.
@@ -144,20 +144,20 @@ The existing skip behavior and production code were not changed.
 - Windows semantic shared suite still skips the same two symlink tests because of WinError 1314; Ubuntu execution above confirms both tests pass when symlink creation is available.
 - Report-only follow-up commit: `4c9d1f35d3b71e28c47b4e883d19dd24c0307bbf`. Local HEAD, remote branch head, and PR head matched when its workflows completed:
 
-| Workflow | Run ID | Result |
-| --- | ---: | --- |
-| Validate Agent Skills | 35852880189 | success |
-| Validate Semantic Output Evals | 35852880443 | success |
+| Workflow                            |      Run ID | Result  |
+| ----------------------------------- | ----------: | ------- |
+| Validate Agent Skills               | 35852880189 | success |
+| Validate Semantic Output Evals      | 35852880443 | success |
 | Validate Deterministic Output Evals | 35852880423 | success |
 
 - On Ubuntu, run 35852880443, job `semantic-output-evals`, step `Run Semantic Eval shared runtime tests`, reported both `test_cases_directory_symlink_escape_raises` and `test_symlink_escape_raises` as `ok`; 27 shared tests finished `OK` with no skips.
 - PR #11 body was updated after these runs. The PR remained open and Ready for review (`isDraft=false`).
 - Report correction commit `7994ccdebf22b933a655698718bc3ada560e1a62` was pushed; local, remote, and PR heads matched when its workflows completed:
 
-| Workflow | Run ID | Result |
-| --- | ---: | --- |
-| Validate Agent Skills | 35854061285 | success |
-| Validate Semantic Output Evals | 35854061214 | success |
+| Workflow                            |      Run ID | Result  |
+| ----------------------------------- | ----------: | ------- |
+| Validate Agent Skills               | 35854061285 | success |
+| Validate Semantic Output Evals      | 35854061214 | success |
 | Validate Deterministic Output Evals | 35854061253 | success |
 
 - On Ubuntu, run 35854061214's shared semantic runtime step discovered `test_cases_directory_symlink_escape_raises` and `test_symlink_escape_raises`; each reported `ok`, and the 27-test shared suite finished `OK` with no skips.

@@ -130,6 +130,7 @@ handoff recordは `_04c_wcag-observation-handoff-state-contract.md` に従い、
 - origin evaluation revisionが変わったhandoffはstaleとし、旧revisionへresumeしない
 - owner完了 / cleanup後にrequired reservationを逆順releaseし、未release resourceがある状態でcloseしない
 - expected-current-valid-returned、origin currentness、cleanup、reservation releaseから `close_ready` をscript導出し、`closed` CAS成功後にstateを再読込して `may_resume` を判定する
+
 ## 8. 完了条件
 
 - formal WCAG要求がusability-inspectionへ誤routingされない

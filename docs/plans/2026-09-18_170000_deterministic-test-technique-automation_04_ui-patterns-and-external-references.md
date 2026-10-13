@@ -37,17 +37,17 @@ skills/test-condition-design/
 
 ```json
 {
-  "pattern_key":"text-input",
-  "name":"Text Input",
-  "aliases":["input-text"],
-  "identifiers":["input[type=text]","role=textbox"],
-  "candidates":[
+  "pattern_key": "text-input",
+  "name": "Text Input",
+  "aliases": ["input-text"],
+  "identifiers": ["input[type=text]", "role=textbox"],
+  "candidates": [
     {
-      "candidate_key":"required-empty",
-      "category":"validation",
-      "check":"required時の空入力候補",
-      "reference_refs":["HTML"],
-      "requires_product_authority":true
+      "candidate_key": "required-empty",
+      "category": "validation",
+      "check": "required時の空入力候補",
+      "reference_refs": ["HTML"],
+      "requires_product_authority": true
     }
   ]
 }
@@ -80,40 +80,40 @@ catalogとreferenceで同じ一覧を二重管理しません。
 
 UIで一般的に出現し、確認項目の再利用価値が高いものを対象にします。
 
-| UI要素 / pattern | 機械的に提示できる主な確認候補 |
-| --- | --- |
-| Button | enabled / disabled、pointer操作、keyboard activation、focus、二重操作、loading中の状態 |
-| Link | 遷移先、keyboard activation、focus、外部 / 内部遷移、disabled相当表現がある場合の扱い |
-| Text Input | required、空、文字数境界、入力可能文字、readonly / disabled、clear、paste、validation |
-| Textarea | Text Input共通、複数行、改行、max length、resize要件がある場合 |
-| Number Input / Spinbutton | min / max / step、直接入力、増減操作、非数値、decimal |
-| Password | required、長さ・形式、mask表示、表示切替が仕様にある場合、paste可否が仕様にある場合 |
-| Checkbox | checked / unchecked、keyboard、disabled、group制約、初期状態 |
-| Radio Group | 単一選択、初期選択、keyboard移動、disabled option、必須選択 |
-| Switch / Toggle | on / off、keyboard、disabled、labelとの対応 |
-| Select | option一覧、選択、初期値、disabled option、keyboard、未選択 |
-| Combobox / Autocomplete | 入力、候補表示、絞り込み、候補選択、keyboard、focus、no-result、clear |
-| Listbox | option移動、単一 / 複数選択、keyboard、selected state |
-| Slider | min / max / step、keyboard、pointer、表示値、disabled |
-| Date / Time Picker | min / max、禁止日、直接入力、picker選択、timezone要件がある場合 |
-| File Upload | 許可形式、サイズ境界、複数選択、取消、同一ファイル再選択、失敗時 |
-| Dialog / Modal | open / close経路、focus初期位置、focus移動、background操作、confirm / cancel、close control |
-| Alert / Toast / Notification | 表示条件、内容、表示回数、消滅条件、操作可能な場合のfocus |
-| Tabs | selected tab、panel対応、keyboard候補、disabled tab |
-| Accordion / Disclosure | open / close、複数開閉可否、keyboard、state |
-| Menu / Menu Button | open / close、項目選択、keyboard、focus return |
-| Tooltip | 表示trigger、非表示条件、内容、pointer / keyboardでの到達性 |
-| Table | column / row表示、empty state、overflow、headerとの対応 |
-| Grid / Data Grid | focus移動、selection、sort / editがある場合、virtualizationがある場合 |
-| Pagination | first / last、前後、current page、件数変動、境界page |
-| Search | 空検索、完全 / 部分一致等の仕様、clear、0件、特殊文字候補 |
-| Filter | 各値、複数条件、clear、初期値、結果件数、URL / state保持が仕様にある場合 |
-| Sort | 各列、昇順 / 降順、同値時、他sortとの独立性、初期順 |
-| Drag and Drop | drag可否、drop target、順序、取消、境界、keyboard代替が要件にある場合 |
-| Tree / Tree View | expand / collapse、selection、keyboard、階層、leaf |
-| Progress / Status | 初期 / 進行中 / 完了 / 失敗、値範囲、重複表示 |
-| Breadcrumb / Navigation | current、階層、遷移、keyboard、折返し |
-| Form | submit、validation順序、複数field相関、reset、二重submit、エラー後再送信 |
+| UI要素 / pattern             | 機械的に提示できる主な確認候補                                                              |
+| ---------------------------- | ------------------------------------------------------------------------------------------- |
+| Button                       | enabled / disabled、pointer操作、keyboard activation、focus、二重操作、loading中の状態      |
+| Link                         | 遷移先、keyboard activation、focus、外部 / 内部遷移、disabled相当表現がある場合の扱い       |
+| Text Input                   | required、空、文字数境界、入力可能文字、readonly / disabled、clear、paste、validation       |
+| Textarea                     | Text Input共通、複数行、改行、max length、resize要件がある場合                              |
+| Number Input / Spinbutton    | min / max / step、直接入力、増減操作、非数値、decimal                                       |
+| Password                     | required、長さ・形式、mask表示、表示切替が仕様にある場合、paste可否が仕様にある場合         |
+| Checkbox                     | checked / unchecked、keyboard、disabled、group制約、初期状態                                |
+| Radio Group                  | 単一選択、初期選択、keyboard移動、disabled option、必須選択                                 |
+| Switch / Toggle              | on / off、keyboard、disabled、labelとの対応                                                 |
+| Select                       | option一覧、選択、初期値、disabled option、keyboard、未選択                                 |
+| Combobox / Autocomplete      | 入力、候補表示、絞り込み、候補選択、keyboard、focus、no-result、clear                       |
+| Listbox                      | option移動、単一 / 複数選択、keyboard、selected state                                       |
+| Slider                       | min / max / step、keyboard、pointer、表示値、disabled                                       |
+| Date / Time Picker           | min / max、禁止日、直接入力、picker選択、timezone要件がある場合                             |
+| File Upload                  | 許可形式、サイズ境界、複数選択、取消、同一ファイル再選択、失敗時                            |
+| Dialog / Modal               | open / close経路、focus初期位置、focus移動、background操作、confirm / cancel、close control |
+| Alert / Toast / Notification | 表示条件、内容、表示回数、消滅条件、操作可能な場合のfocus                                   |
+| Tabs                         | selected tab、panel対応、keyboard候補、disabled tab                                         |
+| Accordion / Disclosure       | open / close、複数開閉可否、keyboard、state                                                 |
+| Menu / Menu Button           | open / close、項目選択、keyboard、focus return                                              |
+| Tooltip                      | 表示trigger、非表示条件、内容、pointer / keyboardでの到達性                                 |
+| Table                        | column / row表示、empty state、overflow、headerとの対応                                     |
+| Grid / Data Grid             | focus移動、selection、sort / editがある場合、virtualizationがある場合                       |
+| Pagination                   | first / last、前後、current page、件数変動、境界page                                        |
+| Search                       | 空検索、完全 / 部分一致等の仕様、clear、0件、特殊文字候補                                   |
+| Filter                       | 各値、複数条件、clear、初期値、結果件数、URL / state保持が仕様にある場合                    |
+| Sort                         | 各列、昇順 / 降順、同値時、他sortとの独立性、初期順                                         |
+| Drag and Drop                | drag可否、drop target、順序、取消、境界、keyboard代替が要件にある場合                       |
+| Tree / Tree View             | expand / collapse、selection、keyboard、階層、leaf                                          |
+| Progress / Status            | 初期 / 進行中 / 完了 / 失敗、値範囲、重複表示                                               |
+| Breadcrumb / Navigation      | current、階層、遷移、keyboard、折返し                                                       |
+| Form                         | submit、validation順序、複数field相関、reset、二重submit、エラー後再送信                    |
 
 catalogは「よくある挙動一覧」ではなく「確認候補一覧」とします。
 
@@ -179,6 +179,7 @@ CTAL-TA v4.0で扱われるDomain Testing、Base Choice / Pairwise等のCombinat
 - Paul Ammann / Jeff Offutt, *Introduction to Software Testing*, Chapter 5 "Syntax-Based Testing": https://www.cambridge.org/core/services/aop-cambridge-core/content/view/43BC474F5271ECA36F789D65F5243055/9780511809163c5_p170-212_CBO.pdf/syntaxbased_testing.pdf
 
 本Planの`Syntax-Based Testing`は、grammar / BNF等のsyntactic descriptionをmodelとしてvalid artifactを生成し、production Coverageを確認する考え方を根拠にします。mutationで作ったcandidateを製品上のinvalid expected resultへ自動昇格しません。
+
 ### WAI-ARIA Authoring Practices Guide
 
 参照先:

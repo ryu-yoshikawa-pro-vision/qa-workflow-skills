@@ -93,14 +93,14 @@ task / persona / prior knowledgeを必須schemaにしません。
 
 `_05b_usability-inspection-deterministic-runtime.md` に従い、PR #11 current runtime contractを再利用して次を先に実装します。
 
-~~~text
+```text
 skills/usability-inspection/scripts/
 ├── runtime_contract.py
 ├── inspection_structure.py
 ├── observation_contract.py
 ├── measurement.py
 └── criterion_checks.py
-~~~
+```
 
 `assets/test-rule-catalog.json`、`assets/browser-observation-catalog.json`、`assets/wcag-machine-probe-catalog.json` も同時に実装します。`wcag-machine-probe-catalog.json` は `_05j` のfinite inventoryを正本とし、formal machine probe requestを1件以上処理したruntime unitだけcanonical hashを `usability-inspection` の `static_data_versions.wcag_machine_probes` へ保持します。
 

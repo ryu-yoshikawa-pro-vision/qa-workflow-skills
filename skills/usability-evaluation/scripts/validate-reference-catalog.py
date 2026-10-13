@@ -9,7 +9,6 @@ import sys
 from pathlib import Path
 from urllib.parse import urlsplit
 
-
 SOURCE_ID = re.compile(r"^SRC-(\d{3,})$")
 ITEM_ID = re.compile(r"^(SRC-\d{3,})-ITEM-(\d{4,})$")
 REF_ID = re.compile(r"^REF-(\d{4,})$")
@@ -18,20 +17,99 @@ SOURCE_POSITIONS = {"normative", "informative", "advisory", "methodology"}
 SOURCE_STATUSES = {"current", "draft", "proposed", "archived", "superseded", "unknown"}
 ACCESS = {"public", "restricted", "unavailable"}
 ADOPTION = {"adopted", "reference-only", "replaced", "unavailable", "rejected"}
-CANDIDATE_STATUSES = {"pending", "adopted", "reference-only", "rejected", "duplicate", "unavailable", "replaced"}
+CANDIDATE_STATUSES = {
+    "pending",
+    "adopted",
+    "reference-only",
+    "rejected",
+    "duplicate",
+    "unavailable",
+    "replaced",
+}
 ORIGINS = {"seed", "query", "cross-link"}
 COMPLETION = {"completed", "blocked"}
 COVERAGE_STATUS = {"covered", "not-applicable", "blocked"}
-DISPOSITION = {"included", "merged-duplicate", "reference-only", "unavailable", "out-of-scope"}
+DISPOSITION = {
+    "included",
+    "merged-duplicate",
+    "reference-only",
+    "unavailable",
+    "out-of-scope",
+}
 LOCATOR = {"none", "fragment", "section-id", "heading", "page"}
 SEMANTIC = {"pass", "fail", "not-required"}
 
-SOURCE_COLUMNS = ["Source ID", "Name", "Canonical URL", "Publisher / Owner", "Category", "Source Position", "Platform / Product Scope", "Source Status / Lifecycle", "Access State", "Checked At", "Adoption Status", "License / Terms", "Coverage Axes", "Note"]
-CANDIDATE_COLUMNS = ["Candidate Name", "Canonical URL", "Discovery Origin", "Discovery Detail", "Coverage Gap", "Status", "Reason", "Checked At", "Source ID"]
-DISCOVERY_COLUMNS = ["Discovery Type", "Discovery Target", "Discovery Category", "Checked At", "Checked Scope", "Checked Count", "New Candidate Count", "Retrieval Boundary", "Completion", "Block Reason"]
-COVERAGE_COLUMNS = ["Coverage Axis", "Concern / Pattern Family", "Required Source Position", "Selected Source Refs", "Reference Entry Refs", "Coverage Status", "Gap / Reason", "Checked At"]
-ITEM_COLUMNS = ["Source ID", "Source Item Ref", "Name / Section", "Document Canonical URL", "Locator Type", "Locator", "Disposition", "Access State", "Source Status / Lifecycle", "Reference Destination", "Available Dimensions", "Captured Dimensions", "Semantic Validation", "Checked At"]
-ENTRY_SOURCE_COLUMNS = ["Source Item Ref", "Source Position", "Source Status / Maturity", "Applicability"]
+SOURCE_COLUMNS = [
+    "Source ID",
+    "Name",
+    "Canonical URL",
+    "Publisher / Owner",
+    "Category",
+    "Source Position",
+    "Platform / Product Scope",
+    "Source Status / Lifecycle",
+    "Access State",
+    "Checked At",
+    "Adoption Status",
+    "License / Terms",
+    "Coverage Axes",
+    "Note",
+]
+CANDIDATE_COLUMNS = [
+    "Candidate Name",
+    "Canonical URL",
+    "Discovery Origin",
+    "Discovery Detail",
+    "Coverage Gap",
+    "Status",
+    "Reason",
+    "Checked At",
+    "Source ID",
+]
+DISCOVERY_COLUMNS = [
+    "Discovery Type",
+    "Discovery Target",
+    "Discovery Category",
+    "Checked At",
+    "Checked Scope",
+    "Checked Count",
+    "New Candidate Count",
+    "Retrieval Boundary",
+    "Completion",
+    "Block Reason",
+]
+COVERAGE_COLUMNS = [
+    "Coverage Axis",
+    "Concern / Pattern Family",
+    "Required Source Position",
+    "Selected Source Refs",
+    "Reference Entry Refs",
+    "Coverage Status",
+    "Gap / Reason",
+    "Checked At",
+]
+ITEM_COLUMNS = [
+    "Source ID",
+    "Source Item Ref",
+    "Name / Section",
+    "Document Canonical URL",
+    "Locator Type",
+    "Locator",
+    "Disposition",
+    "Access State",
+    "Source Status / Lifecycle",
+    "Reference Destination",
+    "Available Dimensions",
+    "Captured Dimensions",
+    "Semantic Validation",
+    "Checked At",
+]
+ENTRY_SOURCE_COLUMNS = [
+    "Source Item Ref",
+    "Source Position",
+    "Source Status / Maturity",
+    "Applicability",
+]
 
 
 class ValidationError(ValueError):
@@ -102,7 +180,10 @@ def _unescape_list(value: str) -> list[str]:
         else:
             escaped = False
     tokens.append("".join(current).strip())
-    result = [token.replace("\\;", ";").replace("\\|", "|").replace("\\\\", "\\") for token in tokens]
+    result = [
+        token.replace("\\;", ";").replace("\\|", "|").replace("\\\\", "\\")
+        for token in tokens
+    ]
     if not all(result) or len(result) != len(set(result)) or result != sorted(result):
         raise ValidationError("list_field_not_canonical")
     return result
@@ -119,7 +200,13 @@ def _url(value: str, label: str) -> None:
         _ = parts.port
     except ValueError as exc:
         raise ValidationError(f"invalid_url:{label}") from exc
-    if parts.scheme not in {"http", "https"} or not parts.hostname or parts.fragment or parts.username or parts.password:
+    if (
+        parts.scheme not in {"http", "https"}
+        or not parts.hostname
+        or parts.fragment
+        or parts.username
+        or parts.password
+    ):
         raise ValidationError(f"invalid_canonical_url:{label}:{value}")
 
 
@@ -134,7 +221,9 @@ def _entry_records(root: Path) -> tuple[dict[str, dict], list[str]]:
         for index, line in enumerate(lines):
             if "reference-entry-id:" not in line:
                 continue
-            match = re.fullmatch(r"<!-- reference-entry-id: (REF-\d{4,}) -->", line.strip())
+            match = re.fullmatch(
+                r"<!-- reference-entry-id: (REF-\d{4,}) -->", line.strip()
+            )
             if not match:
                 errors.append(f"malformed_reference_id_marker:{path}:{index + 1}")
                 continue
@@ -145,14 +234,25 @@ def _entry_records(root: Path) -> tuple[dict[str, dict], list[str]]:
             if ref in entries:
                 errors.append(f"duplicate_reference_id:{ref}")
                 continue
-            end = next((position for position in range(index + 1, len(lines)) if lines[position].startswith("## ")), len(lines))
-            entry_lines = lines[index - 1:end]
+            end = next(
+                (
+                    position
+                    for position in range(index + 1, len(lines))
+                    if lines[position].startswith("## ")
+                ),
+                len(lines),
+            )
+            entry_lines = lines[index - 1 : end]
             try:
                 rows = _table(entry_lines, "### Source Items", ENTRY_SOURCE_COLUMNS)
             except ValidationError as exc:
                 errors.append(f"{path}:{exc}")
                 continue
-            entries[ref] = {"path": path.relative_to(root).as_posix(), "name": lines[index - 1][3:].strip(), "rows": rows}
+            entries[ref] = {
+                "path": path.relative_to(root).as_posix(),
+                "name": lines[index - 1][3:].strip(),
+                "rows": rows,
+            }
     return entries, errors
 
 
@@ -212,10 +312,20 @@ def validate(references_dir: Path, *, allow_incomplete: bool = False) -> list[st
         if row["Canonical URL"] in url_to_id:
             issues.append(f"duplicate_source_url:{row['Canonical URL']}")
         url_to_id[row["Canonical URL"]] = sid
-        if row["Source Position"] not in SOURCE_POSITIONS or row["Source Status / Lifecycle"] not in SOURCE_STATUSES or row["Access State"] not in ACCESS or row["Adoption Status"] not in ADOPTION:
+        if (
+            row["Source Position"] not in SOURCE_POSITIONS
+            or row["Source Status / Lifecycle"] not in SOURCE_STATUSES
+            or row["Access State"] not in ACCESS
+            or row["Adoption Status"] not in ADOPTION
+        ):
             issues.append(f"invalid_source_enum:{sid}")
-        _date(row["Checked At"], f"source:{sid}") if DATE.fullmatch(row["Checked At"]) else issues.append(f"invalid_source_date:{sid}")
-        if row["Adoption Status"] in {"adopted", "reference-only", "replaced"} and sid == "-":
+        _date(row["Checked At"], f"source:{sid}") if DATE.fullmatch(
+            row["Checked At"]
+        ) else issues.append(f"invalid_source_date:{sid}")
+        if (
+            row["Adoption Status"] in {"adopted", "reference-only", "replaced"}
+            and sid == "-"
+        ):
             issues.append(f"tracked_source_missing_id:{row['Name']}")
         if row["Adoption Status"] in {"unavailable", "rejected"} and sid != "-":
             issues.append(f"untracked_source_has_id:{row['Name']}")
@@ -223,7 +333,14 @@ def validate(references_dir: Path, *, allow_incomplete: bool = False) -> list[st
             _unescape_list(row["Coverage Axes"])
         except ValidationError as exc:
             issues.append(f"source:{sid}:{exc}")
-        for required in ("Name", "Publisher / Owner", "Category", "Platform / Product Scope", "License / Terms", "Note"):
+        for required in (
+            "Name",
+            "Publisher / Owner",
+            "Category",
+            "Platform / Product Scope",
+            "License / Terms",
+            "Note",
+        ):
             if not row[required] or row[required] == "-":
                 issues.append(f"source_missing:{sid}:{required}")
 
@@ -245,7 +362,12 @@ def validate(references_dir: Path, *, allow_incomplete: bool = False) -> list[st
             issues.append(f"invalid_locator_type:{item_ref}")
         elif (row["Locator Type"] == "none") != (row["Locator"] == "-"):
             issues.append(f"locator_type_value_mismatch:{item_ref}")
-        if row["Disposition"] not in DISPOSITION or row["Access State"] not in ACCESS or row["Source Status / Lifecycle"] not in SOURCE_STATUSES or row["Semantic Validation"] not in SEMANTIC:
+        if (
+            row["Disposition"] not in DISPOSITION
+            or row["Access State"] not in ACCESS
+            or row["Source Status / Lifecycle"] not in SOURCE_STATUSES
+            or row["Semantic Validation"] not in SEMANTIC
+        ):
             issues.append(f"invalid_item_enum:{item_ref}")
         if row["Disposition"] in {"included", "merged-duplicate"}:
             try:
@@ -259,7 +381,9 @@ def validate(references_dir: Path, *, allow_incomplete: bool = False) -> list[st
                 issues.append(f"included_item_not_semantically_validated:{item_ref}")
             if row["Reference Destination"] == "-":
                 issues.append(f"included_item_missing_reference_destination:{item_ref}")
-        _date(row["Checked At"], f"item:{item_ref}") if DATE.fullmatch(row["Checked At"]) else issues.append(f"invalid_item_date:{item_ref}")
+        _date(row["Checked At"], f"item:{item_ref}") if DATE.fullmatch(
+            row["Checked At"]
+        ) else issues.append(f"invalid_item_date:{item_ref}")
 
     ref_entries, ref_errors = _entry_records(references_dir)
     issues.extend(ref_errors)
@@ -269,9 +393,16 @@ def validate(references_dir: Path, *, allow_incomplete: bool = False) -> list[st
             _url(row["Canonical URL"], f"candidate:{row['Candidate Name']}")
         except ValidationError as exc:
             issues.append(str(exc))
-        if row["Discovery Origin"] not in ORIGINS or row["Status"] not in CANDIDATE_STATUSES:
+        if (
+            row["Discovery Origin"] not in ORIGINS
+            or row["Status"] not in CANDIDATE_STATUSES
+        ):
             issues.append(f"invalid_candidate_enum:{row['Candidate Name']}")
-        _date(row["Checked At"], f"candidate:{row['Candidate Name']}") if DATE.fullmatch(row["Checked At"]) else issues.append(f"invalid_candidate_date:{row['Candidate Name']}")
+        _date(
+            row["Checked At"], f"candidate:{row['Candidate Name']}"
+        ) if DATE.fullmatch(row["Checked At"]) else issues.append(
+            f"invalid_candidate_date:{row['Candidate Name']}"
+        )
         if row["Status"] in {"adopted", "reference-only", "replaced"}:
             source = source_by_id.get(row["Source ID"])
             if source is None:
@@ -284,31 +415,59 @@ def validate(references_dir: Path, *, allow_incomplete: bool = False) -> list[st
             issues.append(f"pending_candidate:{row['Candidate Name']}")
 
     query_categories = [row["Discovery Category"] for row in runs]
-    if set(query_categories) != {f"Q{i}" for i in range(1, 8)} or len(query_categories) != len(set(query_categories)):
+    if set(query_categories) != {f"Q{i}" for i in range(1, 8)} or len(
+        query_categories
+    ) != len(set(query_categories)):
         issues.append("discovery_runs_must_close_Q1_through_Q7_once_each")
     for row in runs:
-        if row["Completion"] not in COMPLETION or not row["Retrieval Boundary"] or not row["Checked Scope"]:
+        if (
+            row["Completion"] not in COMPLETION
+            or not row["Retrieval Boundary"]
+            or not row["Checked Scope"]
+        ):
             issues.append(f"discovery_run_incomplete:{row['Discovery Category']}")
-        if not row["Checked Count"].isdigit() or not row["New Candidate Count"].isdigit():
+        if (
+            not row["Checked Count"].isdigit()
+            or not row["New Candidate Count"].isdigit()
+        ):
             issues.append(f"discovery_run_count_invalid:{row['Discovery Category']}")
         if row["Completion"] == "blocked" and row["Block Reason"] in {"", "-"}:
-            issues.append(f"discovery_run_block_reason_missing:{row['Discovery Category']}")
+            issues.append(
+                f"discovery_run_block_reason_missing:{row['Discovery Category']}"
+            )
     for row in coverage_rows:
         if row["Coverage Status"] not in COVERAGE_STATUS:
             issues.append(f"invalid_coverage_status:{row['Coverage Axis']}")
-        _date(row["Checked At"], f"coverage:{row['Coverage Axis']}") if DATE.fullmatch(row["Checked At"]) else issues.append(f"invalid_coverage_date:{row['Coverage Axis']}")
+        _date(row["Checked At"], f"coverage:{row['Coverage Axis']}") if DATE.fullmatch(
+            row["Checked At"]
+        ) else issues.append(f"invalid_coverage_date:{row['Coverage Axis']}")
         if row["Coverage Status"] == "blocked" and not allow_incomplete:
             issues.append(f"blocked_coverage:{row['Coverage Axis']}")
         try:
             selected_sources = _unescape_list(row["Selected Source Refs"])
             selected_refs = _unescape_list(row["Reference Entry Refs"])
-            issues.extend(f"coverage_source_unresolved:{value}" for value in selected_sources if value not in known_source_ids)
-            issues.extend(f"coverage_reference_unresolved:{value}" for value in selected_refs if value not in known_refs)
+            issues.extend(
+                f"coverage_source_unresolved:{value}"
+                for value in selected_sources
+                if value not in known_source_ids
+            )
+            issues.extend(
+                f"coverage_reference_unresolved:{value}"
+                for value in selected_refs
+                if value not in known_refs
+            )
         except ValidationError as exc:
             issues.append(f"coverage:{row['Coverage Axis']}:{exc}")
-        if row["Coverage Status"] == "not-applicable" and row["Gap / Reason"] in {"", "-"}:
+        if row["Coverage Status"] == "not-applicable" and row["Gap / Reason"] in {
+            "",
+            "-",
+        }:
             issues.append(f"not_applicable_reason_missing:{row['Coverage Axis']}")
-        if row["Coverage Status"] == "covered" and row["Selected Source Refs"] == "-" and row["Reference Entry Refs"] == "-":
+        if (
+            row["Coverage Status"] == "covered"
+            and row["Selected Source Refs"] == "-"
+            and row["Reference Entry Refs"] == "-"
+        ):
             issues.append(f"covered_without_source_or_reference:{row['Coverage Axis']}")
 
     for ref, entry in ref_entries.items():
@@ -320,15 +479,31 @@ def validate(references_dir: Path, *, allow_incomplete: bool = False) -> list[st
                 issues.append(f"reference_item_unresolved:{ref}:{item_ref}")
             if row["Source Position"] not in SOURCE_POSITIONS:
                 issues.append(f"reference_item_position_invalid:{ref}:{item_ref}")
-            if not row["Source Status / Maturity"] or row["Source Status / Maturity"] == "-" or not row["Applicability"] or row["Applicability"] == "-":
+            if (
+                not row["Source Status / Maturity"]
+                or row["Source Status / Maturity"] == "-"
+                or not row["Applicability"]
+                or row["Applicability"] == "-"
+            ):
                 issues.append(f"reference_item_metadata_missing:{ref}:{item_ref}")
     for item_ref, row in item_by_id.items():
-        destinations = [] if row["Reference Destination"] == "-" else row["Reference Destination"].split(";")
+        destinations = (
+            []
+            if row["Reference Destination"] == "-"
+            else row["Reference Destination"].split(";")
+        )
         for destination in destinations:
             ref, sep, relative = destination.partition(":")
-            if not sep or ref not in ref_entries or ref_entries[ref]["path"] != relative:
+            if (
+                not sep
+                or ref not in ref_entries
+                or ref_entries[ref]["path"] != relative
+            ):
                 issues.append(f"item_destination_unresolved:{item_ref}:{destination}")
-            elif not any(source_row["Source Item Ref"] == item_ref for source_row in ref_entries[ref]["rows"]):
+            elif not any(
+                source_row["Source Item Ref"] == item_ref
+                for source_row in ref_entries[ref]["rows"]
+            ):
                 issues.append(f"item_destination_missing_source_row:{item_ref}:{ref}")
         if row["Disposition"] in {"included", "merged-duplicate"} and not destinations:
             issues.append(f"included_item_orphan:{item_ref}")
@@ -338,9 +513,19 @@ def validate(references_dir: Path, *, allow_incomplete: bool = False) -> list[st
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Validate source and reference catalog contracts.")
-    parser.add_argument("--references-dir", type=Path, default=Path(__file__).resolve().parents[1] / "references")
-    parser.add_argument("--allow-incomplete", action="store_true", help="Validate structure while planned coverage expansion is in progress.")
+    parser = argparse.ArgumentParser(
+        description="Validate source and reference catalog contracts."
+    )
+    parser.add_argument(
+        "--references-dir",
+        type=Path,
+        default=Path(__file__).resolve().parents[1] / "references",
+    )
+    parser.add_argument(
+        "--allow-incomplete",
+        action="store_true",
+        help="Validate structure while planned coverage expansion is in progress.",
+    )
     args = parser.parse_args()
     try:
         issues = validate(args.references_dir, allow_incomplete=args.allow_incomplete)

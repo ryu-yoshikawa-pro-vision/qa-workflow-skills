@@ -52,25 +52,25 @@ catalog row:
 
 semantic layerが追加evidence取得のために指定できるobservation field keyは次だけです。key名は実装時に変更・追加せず、追加が必要なら先にPlanを更新します。formal WCAGのmachine procedureが必要とする固定browser取得はこの自由選択interfaceへ載せず、`_05j_wcag-machine-browser-observation-contract.md` の `machine_probe_key` を `wcag_criterion_plan.py` がprocedureから導出します。
 
-| observation field key | owner probe | request payload | canonical result |
-| --- | --- | --- | --- |
-| `viewport.metrics` | `viewport-state` | なし | viewport width/height、scroll x/y、document scroll width/height、device scale factor |
-| `element.geometry` | `element-geometry` | `target_ref` | x/y/width/height CSS px、取得不能理由 |
-| `element.state` | `element-state` | `target_ref` | visible、enabled/disabled、checked、selected、expanded等のfixed state object |
-| `document.location` | `document-location` | なし | URLのschemeのみを残したredacted value / limitation。current document identityは非extractable keyで計算したopaque token |
-| `document.title` | `document-title` | なし | HTML applicability、最初のHTML title descendantの有無、直接child nodeがtext-onlyか、非空白textを含むかのboolean facts。raw title本文は保持しない |
-| `element.rendered-text` | `element-content` | `target_ref` | Playwright `locator.innerText()` の返却値 |
-| `element.control-value` | `element-content` | `target_ref` | Playwright `locator.inputValue()` の返却値 |
-| `element.selected-values` | `element-content` | `target_ref` | selected optionをDOM順で `{value,label}` 配列化した値 |
-| `accessibility.semantics` | `accessibility-semantics` | `target_ref` | role / accessible name / description / relevant state-property |
-| `focus.state` | `focus-state` | target / before-after context | active target identity、focusable / focus-visible machine values |
-| `computed-style.properties` | `computed-style` | `target_ref`, allowlisted `property_names` | requested property name/value map |
-| `responsive.conditions` | `responsive-conditions` | current document / Authority context | media / container size / style / scroll-state condition rows、source / capability / execution feasibility |
-| `responsive.boundaries` | `responsive-boundaries` | `responsive.conditions` のsize condition | browser-evaluated numeric transition rows / completeness / execution feasibility |
-| `navigation.timing` | `navigation-timing` | なし | allowlisted Navigation Timing fields |
-| `paint.timing` | `paint-timing` | なし | allowlisted Paint Timing entries |
-| `interaction.timing` | `interaction-timing` | fixed predicate payload | same-page clockのstart/end/elapsedとpredicate result |
-| `screenshot.image` | `screenshot` | viewport / target / state context | evidence ref |
+| observation field key       | owner probe               | request payload                            | canonical result                                                                                                                                 |
+| --------------------------- | ------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `viewport.metrics`          | `viewport-state`          | なし                                       | viewport width/height、scroll x/y、document scroll width/height、device scale factor                                                             |
+| `element.geometry`          | `element-geometry`        | `target_ref`                               | x/y/width/height CSS px、取得不能理由                                                                                                            |
+| `element.state`             | `element-state`           | `target_ref`                               | visible、enabled/disabled、checked、selected、expanded等のfixed state object                                                                     |
+| `document.location`         | `document-location`       | なし                                       | URLのschemeのみを残したredacted value / limitation。current document identityは非extractable keyで計算したopaque token                           |
+| `document.title`            | `document-title`          | なし                                       | HTML applicability、最初のHTML title descendantの有無、直接child nodeがtext-onlyか、非空白textを含むかのboolean facts。raw title本文は保持しない |
+| `element.rendered-text`     | `element-content`         | `target_ref`                               | Playwright `locator.innerText()` の返却値                                                                                                        |
+| `element.control-value`     | `element-content`         | `target_ref`                               | Playwright `locator.inputValue()` の返却値                                                                                                       |
+| `element.selected-values`   | `element-content`         | `target_ref`                               | selected optionをDOM順で `{value,label}` 配列化した値                                                                                            |
+| `accessibility.semantics`   | `accessibility-semantics` | `target_ref`                               | role / accessible name / description / relevant state-property                                                                                   |
+| `focus.state`               | `focus-state`             | target / before-after context              | active target identity、focusable / focus-visible machine values                                                                                 |
+| `computed-style.properties` | `computed-style`          | `target_ref`, allowlisted `property_names` | requested property name/value map                                                                                                                |
+| `responsive.conditions`     | `responsive-conditions`   | current document / Authority context       | media / container size / style / scroll-state condition rows、source / capability / execution feasibility                                        |
+| `responsive.boundaries`     | `responsive-boundaries`   | `responsive.conditions` のsize condition   | browser-evaluated numeric transition rows / completeness / execution feasibility                                                                 |
+| `navigation.timing`         | `navigation-timing`       | なし                                       | allowlisted Navigation Timing fields                                                                                                             |
+| `paint.timing`              | `paint-timing`            | なし                                       | allowlisted Paint Timing entries                                                                                                                 |
+| `interaction.timing`        | `interaction-timing`      | fixed predicate payload                    | same-page clockのstart/end/elapsedとpredicate result                                                                                             |
+| `screenshot.image`          | `screenshot`              | viewport / target / state context          | evidence ref                                                                                                                                     |
 
 `browser-observation-catalog.json` の `provided_observation_fields` はこの17-key inventoryの部分集合だけを持ち、全fieldはちょうど1つのprobeへ解決します。unknown key、alias、自然言語field名を受け付けません。これら17 keyはsemantic追加観測interfaceです。WCAG machine procedure内部の固定probe inventoryとは別契約で、LLMへmachine probe keyを返させません。
 
@@ -161,13 +161,13 @@ resolver kindは次だけです。
 
 ### 4.1 resolver payload
 
-| resolver kind | 必須payload | 任意payload | 固定動作 |
-| --- | --- | --- | --- |
-| `role-name` | `role`, `name` | `within_target_ref` | Playwrightのrole / accessible name semanticsを使用し `exact=true`、hiddenを明示要求しない |
-| `label` | `label_text` | `within_target_ref` | Playwrightのlabel semanticsを使用し `exact=true` |
-| `visible-text` | `text` | `within_target_ref` | Playwrightのtext semanticsを使用し `exact=true` |
-| `machine-population-index` | `population_ref`, `population_revision`, `index`, `identity_fingerprint` | なし | 同じcurrent population revision内だけで解決 |
-| `current-session-ref` | `session_target_ref`, `document_identity` | なし | 同一document / session内だけ有効 |
+| resolver kind              | 必須payload                                                              | 任意payload         | 固定動作                                                                                  |
+| -------------------------- | ------------------------------------------------------------------------ | ------------------- | ----------------------------------------------------------------------------------------- |
+| `role-name`                | `role`, `name`                                                           | `within_target_ref` | Playwrightのrole / accessible name semanticsを使用し `exact=true`、hiddenを明示要求しない |
+| `label`                    | `label_text`                                                             | `within_target_ref` | Playwrightのlabel semanticsを使用し `exact=true`                                          |
+| `visible-text`             | `text`                                                                   | `within_target_ref` | Playwrightのtext semanticsを使用し `exact=true`                                           |
+| `machine-population-index` | `population_ref`, `population_revision`, `index`, `identity_fingerprint` | なし                | 同じcurrent population revision内だけで解決                                               |
+| `current-session-ref`      | `session_target_ref`, `document_identity`                                | なし                | 同一document / session内だけ有効                                                          |
 
 text matchingのための独自case folding / whitespace algorithmは実装せず、選択したPlaywright locator APIのdocumented matching semanticsを使います。scriptは `exact=true` を固定し、曖昧なsubstring matchを成功扱いしません。
 
@@ -386,7 +386,7 @@ semantic layerは追加観測が必要な場合、少なくとも次のdraftを�
 - 観測が必要な理由
 - current evidence refs
 
-canonical observation field / predicate keyの選択はsemantic layerの責務です。必要な観測内容の説明はLLMの判断理由として保持しますが、scriptがその自然言語からfield / probeを推論しません。field keyは `browser-observation-catalog.json` の ``provided_observation_fields`` に存在し、一意なprobe ownerへ解決できる必要があります。
+canonical observation field / predicate keyの選択はsemantic layerの責務です。必要な観測内容の説明はLLMの判断理由として保持しますが、scriptがその自然言語からfield / probeを推論しません。field keyは `browser-observation-catalog.json` の `provided_observation_fields` に存在し、一意なprobe ownerへ解決できる必要があります。
 
 browser ownerは宣言済みtarget / origin / role / side-effect scopeの中でuser-facing interactionを使って必要stateへ到達できます。LLMが任意CSS selector、XPath、test id、JavaScript式、hidden implementation stateを追加観測の実行方法として指定する契約にはしません。
 
@@ -429,16 +429,16 @@ Playwright action呼び出しwall-clockで測りません。
 
 predicate keyとpayloadを固定します。
 
-| predicate | 必須field | 固定判定 |
-| --- | --- | --- |
-| `element-visible` | `target_ref` | targetがuniqueでvisible |
-| `element-hidden` | `target_ref` | targetがhidden、または事前に存在したtargetがcurrent documentで消失 |
-| `text-present` | `expected_text` | pageまたは `within_target_ref` 内でPlaywright text semantics + `exact=true` |
-| `attribute-equals` | `target_ref`, `attribute_name`, `expected_value` | current attribute値の完全一致 |
-| `aria-state-equals` | `target_ref`, `state_name`, `expected_value` | fixed ARIA state valueの一致 |
-| `element-enabled` | `target_ref` | unique targetがenabled |
-| `element-disabled` | `target_ref` | unique targetがdisabled |
-| `url-changed` | `baseline_url` | current URLがarm時URLから変化 |
+| predicate           | 必須field                                        | 固定判定                                                                    |
+| ------------------- | ------------------------------------------------ | --------------------------------------------------------------------------- |
+| `element-visible`   | `target_ref`                                     | targetがuniqueでvisible                                                     |
+| `element-hidden`    | `target_ref`                                     | targetがhidden、または事前に存在したtargetがcurrent documentで消失          |
+| `text-present`      | `expected_text`                                  | pageまたは `within_target_ref` 内でPlaywright text semantics + `exact=true` |
+| `attribute-equals`  | `target_ref`, `attribute_name`, `expected_value` | current attribute値の完全一致                                               |
+| `aria-state-equals` | `target_ref`, `state_name`, `expected_value`     | fixed ARIA state valueの一致                                                |
+| `element-enabled`   | `target_ref`                                     | unique targetがenabled                                                      |
+| `element-disabled`  | `target_ref`                                     | unique targetがdisabled                                                     |
+| `url-changed`       | `baseline_url`                                   | current URLがarm時URLから変化                                               |
 
 `text-present` だけ `within_target_ref` を任意fieldとして持てます。`url-changed` はelement targetを要求しません。`baseline_url` はarm時にbrowser ownerが取得し、LLM入力を正本にしません。
 

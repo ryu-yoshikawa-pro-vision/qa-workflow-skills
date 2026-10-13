@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
-
+from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
 RUNNER = REPO_ROOT / "scripts" / "skills" / "evals" / "semantic" / "run.py"
@@ -119,7 +118,9 @@ class SemanticCliTests(unittest.TestCase):
             candidate = tmp_path / "candidate.md"
             candidate.write_text("仕様Aに従う", encoding="utf-8")
             judge = tmp_path / "judge.py"
-            judge.write_text("import sys\nsys.stdin.read()\nprint('not-json')\n", encoding="utf-8")
+            judge.write_text(
+                "import sys\nsys.stdin.read()\nprint('not-json')\n", encoding="utf-8"
+            )
             completed = self.run_cli(skills_root, candidate, judge)
             self.assertEqual(completed.returncode, 2)
             self.assertEqual(completed.stdout, "")

@@ -1,8 +1,11 @@
 # Eval Input
+
 ## Coverage Item
+
 TCN-001-CI01: 有効な新名称を保存したとき、保存成功後の設定一覧に新名称が表示されること。
 
 ## 入力するCI Machine Entity（canonical）
+
 ```json
 {
   "schema_version": "entity-state-v1",
@@ -23,9 +26,9 @@ TCN-001-CI01: 有効な新名称を保存したとき、保存成功後の設定
     }],
     "execution": {
       "action": "save_setting_name",
-      "precondition": {"existing_setting_name": "週次レポート"},
-      "input": {"name": "年次レポート"},
-      "observation": {"settings_list_contains": "年次レポート"}
+      "precondition": { "existing_setting_name": "週次レポート" },
+      "input": { "name": "年次レポート" },
+      "observation": { "settings_list_contains": "年次レポート" }
     },
     "expected_result_root": "settings-list-contains-new-name",
     "priority": "中",
@@ -45,17 +48,21 @@ TCN-001-CI01: 有効な新名称を保存したとき、保存成功後の設定
 ```
 
 ## Authority
+
 - 設定名は1〜50文字。
 - 有効な名称の保存成功時、設定一覧へ新しい名称が表示される。
 - 保存前は設定編集画面に対象設定が存在する。
 - 保存成功時のトースト表示は仕様にない。
 
 ## 前提環境
+
 - `ENV-CHROME-EDITOR`: Chromeで、更新権限を持つ編集者としてログインできる。
 - 対象設定「週次レポート」が存在する。
 
 ## Current Test Data Requirement
+
 - `data:setting-name-valid`: `setting_name` は文字列「年次レポート」を使用する。
 
 ## 目的
+
 初見実施者が実行できるLow-Level Test Caseを作る。

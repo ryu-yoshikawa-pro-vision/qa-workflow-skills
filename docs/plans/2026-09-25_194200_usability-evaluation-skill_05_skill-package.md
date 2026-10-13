@@ -10,7 +10,7 @@ usability-evaluationへbrowser runner、task execution、timing measurement runt
 
 ## 1. 追加するSkill
 
-~~~text
+```text
 skills/usability-evaluation/
 ├── SKILL.md
 ├── references/
@@ -42,7 +42,7 @@ skills/usability-evaluation/
         ├── rubric.json
         ├── evals.json
         └── cases/
-~~~
+```
 
 実装開始時にrepository標準構造がPR #11 / #12 / #13で変わっていれば最新構造へ合わせます。
 
@@ -257,11 +257,12 @@ reference entry、UI / UX評価項目、Findingの根拠追跡ではsource item 
 
 例:
 
-~~~text
+```text
 source ID: SRC-001
 source item ref: SRC-001-ITEM-0001
 reference entry ID: REF-0001
-~~~
+```
+
 ## 7. reference catalog production script / validator
 
 ### reference_catalog.py
@@ -291,9 +292,9 @@ redirect追跡、official canonicalの意味判断、tracking parameter除去は
 
 Output:
 
-~~~json
-{"canonical_url":"https://example.com/path"}
-~~~
+```json
+{ "canonical_url": "https://example.com/path" }
+```
 
 #### next-source-id
 
@@ -309,9 +310,9 @@ Function:
 
 Output:
 
-~~~json
-{"source_id":"SRC-014"}
-~~~
+```json
+{ "source_id": "SRC-014" }
+```
 
 #### next-item-ref
 
@@ -328,9 +329,9 @@ Function:
 
 Output:
 
-~~~json
-{"source_item_ref":"SRC-014-ITEM-0003"}
-~~~
+```json
+{ "source_item_ref": "SRC-014-ITEM-0003" }
+```
 
 #### next-reference-id
 
@@ -346,9 +347,9 @@ Function:
 
 Output:
 
-~~~json
-{"reference_entry_id":"REF-0042"}
-~~~
+```json
+{ "reference_entry_id": "REF-0042" }
+```
 
 #### materialize
 
@@ -385,7 +386,7 @@ Function:
 
 Output:
 
-~~~json
+```json
 {
   "pending_candidates": 0,
   "blocked_coverage": 0,
@@ -394,7 +395,7 @@ Output:
   "reference_entry_count": 0,
   "issues": []
 }
-~~~
+```
 
 全subcommand:
 
@@ -567,6 +568,7 @@ normalized corpusへ採用したitemについてsamplingは使いません。cat
 ことを確認します。
 
 全itemを同じLLM点数へ変換する方式は採用しません。構造網羅性はdeterministic validator、source原文との意味一致は全item semantic validation、Skillの判断品質はsemantic eval caseで分離して検証します。
+
 ## 11. portable Skill
 
 Skill package単独で、

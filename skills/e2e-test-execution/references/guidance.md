@@ -16,12 +16,12 @@ runnerが管理するsetup / teardownをrun外で二重実行しません。実�
 
 Playwrightの値域をworkflow状態と混在させません。公式APIが提供する契約は次のとおりです。
 
-| 情報 | 許可されるraw値 |
-| --- | --- |
-| `TestResult.status` | `passed` / `failed` / `timedOut` / `skipped` / `interrupted` |
-| `TestCase.expectedStatus` | `passed` / `failed` / `timedOut` / `skipped` / `interrupted` |
-| `TestCase.outcome()` | `skipped` / `expected` / `unexpected` / `flaky` |
-| `FullResult.status` / reporterのrun全体status | `passed` / `failed` / `timedout` / `interrupted` |
+| 情報                                          | 許可されるraw値                                              |
+| --------------------------------------------- | ------------------------------------------------------------ |
+| `TestResult.status`                           | `passed` / `failed` / `timedOut` / `skipped` / `interrupted` |
+| `TestCase.expectedStatus`                     | `passed` / `failed` / `timedOut` / `skipped` / `interrupted` |
+| `TestCase.outcome()`                          | `skipped` / `expected` / `unexpected` / `flaky`              |
+| `FullResult.status` / reporterのrun全体status | `passed` / `failed` / `timedout` / `interrupted`             |
 
 `未実行`、`未確認`、`確認不能`、`構造化結果不完全`はPlaywright raw status / outcomeではなく、workflow上の状態または取得不能状態として別列へ保持します。`TestCase.outcome()`はPlaywrightから取得したresolved TestCase単位のraw factです。validatorの補助計算はそのraw factとの整合確認だけに使用し、成果物のoutcomeを生成・置換しません。利用したreporter / APIが直接提供していないraw値をprocess exit codeから作りません。
 

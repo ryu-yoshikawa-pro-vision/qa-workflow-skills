@@ -6,7 +6,7 @@
 
 `test-target-inspection` や `test-execution` の暗黙の追加処理にはしません。
 
-~~~text
+```text
 live Web UI
     ↓
 usability-inspection browser observation
@@ -25,7 +25,7 @@ usability-evaluation
 reference-based UI / UX evaluation
              ↓
 follow-upが必要な場合だけFinding
-~~~
+```
 
 `usability-inspection` が通常inspection中のbrowser / session owner、`usability-evaluation` はread-only evaluatorです。formal WCAG評価では `wcag-conformance-evaluation` がsample / methodologyを所有し、個別sampleのbrowser observationを必要な範囲で `usability-inspection` へ直列委譲します。
 
@@ -76,7 +76,7 @@ current target artifactが存在することだけを理由にusability-inspecti
 
 `test-execution` は詳細TCとexpected resultが正本です。
 
-~~~text
+```text
 test-execution
 詳細step + expected result
 → 指定手順を忠実に実行
@@ -87,7 +87,7 @@ usability-inspection
 → live UIを操作・観測
 → objective fact / measurement / requirement result
 → UI / UX問題候補
-~~~
+```
 
 特定task / flowが依頼に含まれる場合、usability-inspectionでもそのflowを実際に操作できます。
 

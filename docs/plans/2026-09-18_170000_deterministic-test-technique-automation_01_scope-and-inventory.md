@@ -36,34 +36,34 @@ LLMには、仕様の意味理解、要素抽出、仕様根拠の対応付け�
 
 既存技法のCoverage modeや入力形式として自然に表現できるものは既存名を再利用します。独立した問題構造・選択理由・Coverage契約を持つ技法は、正規技法名・成果物契約・deterministic / semantic evalを同時に追加します。
 
-| 対象 | scriptへ移す処理 | LLMへ残す処理 | 本Planでの扱い |
-| --- | --- | --- | --- |
-| プロダクトリスク | 確定済みschemeと入力値からlevel計算、並び替え、範囲検証 | リスク発見、採点根拠、scheme採用判断 | 実装 |
-| 変更影響 / 回帰対象抽出 | 明示済み変更nodeとdependency / traceability edgeから影響候補を抽出 | edge自体の意味、構造外の間接影響判断 | 実装 |
-| テスト技法選択 | 正規化済みproblem signalから技法候補を算出 | problem signal抽出、最終採用 | 実装 |
-| 同値分割 / Each Choice | partition構造検査、代表値候補、Coverage計算 | partitionの意味的定義 | 実装 |
-| 境界値分析 | 2-value / 3-value、包含 / 排他、step / 最小単位に基づく候補生成 | 境界の意味、採用深度 | 実装 |
-| Domain Testing | Reliable Domain Coverageとしてrelation別のON / OFF / IN / OUT等を生成・計算 | domain式、対象border、precisionの意味 | 実装 |
-| Decision Table | rule space、成立不能、未定義、重複、矛盾、Coverage | condition / action / constraint抽出 | 実装 |
-| Decision Table最適化 | action-equivalentなruleのdon't-care統合候補 | 統合で業務意味・Authorityを失わないか | 実装 |
-| 全組合せ / Base Choice / Pairwise / N-wise / mixed-strength | 成立可能tuple、Coverage row、constraint処理 | factor / value / constraint、strength選択 | 実装 |
-| Classification Tree | classification / classから組合せmodelへの機械変換 | classification / classの意味的分解 | 実装 |
-| 状態遷移 / n-switch / Round-trip | 状態・遷移Coverage、sequence、到達可能性、setup prefix | state / event / guard / resetの意味 | 実装 |
-| Use Case / シナリオ | path / node / edge / simple loop / fork-join Coverage | main / alternative分類、業務上の意味 | 実装 |
-| CRUD Testing | CRUD completenessのoperation Coverageと、正規化済みlifecycle / negative sequenceのconsistency Coverage | function / entity / operation / lifecycleの業務意味 | 実装 |
-| Cause-Effect Graph | 構造化済みcause / effectからDecision Table入力へ展開 | cause / effect / 論理関係抽出 | 実装 |
-| Syntax-Based Testing | 明示grammar / BNF相当modelからvalid syntax、production Coverage、明示mutation候補 | grammar作成、mutation結果のinvalid意味判断 | 実装 |
-| JSON Schema / OpenAPI / HTML constraint | 対応subsetのmachine-readable schema / DOM属性を正規化しCoverage候補生成 | そのschema / DOMが製品Authorityとして有効か | 実装 |
-| UI pattern | catalogから一般的な確認候補を生成 | 製品固有expected result、pattern採用判断 | 実装 |
-| テストデータ要求 | role / state / partition / boundary / entity等から要求を統合し矛盾検出 | 実データ選定、準備方法、利用可否 | `test-condition-design`で実装 |
-| テスト環境要求 | browser / role / feature flag / integration等を統合し矛盾検出 | 環境選定、利用可否、運用判断 | `test-analysis`で実装 |
-| Random Testing | 指定domain / distribution / seed / algorithmから再現可能入力列を生成 | operational profile、distribution、oracle、停止条件 | 実装 |
-| Metamorphic Testing | 明示済みrelationからfollow-up inputと期待関係を生成 | relation発見・妥当性 | 実装 |
-| テスト要求の構造処理 | Authority / Risk → TR閉鎖、未知参照、Disposition重複、優先度 | TR本文、分割 / 統合、検証責務 | 実装 |
-| テストケースの構造処理 | TCN / CI → TC閉鎖、未知参照、優先度、Authority対応 | 前提、手順、具体データ、期待結果 | 実装 |
-| 要求追跡 | Authority / Risk → TR → TCN → CI → TCのmissing / orphan / unknown | 意味上のedge作成 | 実装 |
-| 構造的重複 / 統合 | 同一key / assignment / rule / transition等の重複、明示済みmerge groupのunion | 意味上の同一性判断 | 実装 |
-| テスト優先順位 | 採用済み計算式または既存継承規則による計算・sort | scoreモデル設計、リスク採点 | 実装 |
+| 対象                                                        | scriptへ移す処理                                                                                       | LLMへ残す処理                                       | 本Planでの扱い                |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | --------------------------------------------------- | ----------------------------- |
+| プロダクトリスク                                            | 確定済みschemeと入力値からlevel計算、並び替え、範囲検証                                                | リスク発見、採点根拠、scheme採用判断                | 実装                          |
+| 変更影響 / 回帰対象抽出                                     | 明示済み変更nodeとdependency / traceability edgeから影響候補を抽出                                     | edge自体の意味、構造外の間接影響判断                | 実装                          |
+| テスト技法選択                                              | 正規化済みproblem signalから技法候補を算出                                                             | problem signal抽出、最終採用                        | 実装                          |
+| 同値分割 / Each Choice                                      | partition構造検査、代表値候補、Coverage計算                                                            | partitionの意味的定義                               | 実装                          |
+| 境界値分析                                                  | 2-value / 3-value、包含 / 排他、step / 最小単位に基づく候補生成                                        | 境界の意味、採用深度                                | 実装                          |
+| Domain Testing                                              | Reliable Domain Coverageとしてrelation別のON / OFF / IN / OUT等を生成・計算                            | domain式、対象border、precisionの意味               | 実装                          |
+| Decision Table                                              | rule space、成立不能、未定義、重複、矛盾、Coverage                                                     | condition / action / constraint抽出                 | 実装                          |
+| Decision Table最適化                                        | action-equivalentなruleのdon't-care統合候補                                                            | 統合で業務意味・Authorityを失わないか               | 実装                          |
+| 全組合せ / Base Choice / Pairwise / N-wise / mixed-strength | 成立可能tuple、Coverage row、constraint処理                                                            | factor / value / constraint、strength選択           | 実装                          |
+| Classification Tree                                         | classification / classから組合せmodelへの機械変換                                                      | classification / classの意味的分解                  | 実装                          |
+| 状態遷移 / n-switch / Round-trip                            | 状態・遷移Coverage、sequence、到達可能性、setup prefix                                                 | state / event / guard / resetの意味                 | 実装                          |
+| Use Case / シナリオ                                         | path / node / edge / simple loop / fork-join Coverage                                                  | main / alternative分類、業務上の意味                | 実装                          |
+| CRUD Testing                                                | CRUD completenessのoperation Coverageと、正規化済みlifecycle / negative sequenceのconsistency Coverage | function / entity / operation / lifecycleの業務意味 | 実装                          |
+| Cause-Effect Graph                                          | 構造化済みcause / effectからDecision Table入力へ展開                                                   | cause / effect / 論理関係抽出                       | 実装                          |
+| Syntax-Based Testing                                        | 明示grammar / BNF相当modelからvalid syntax、production Coverage、明示mutation候補                      | grammar作成、mutation結果のinvalid意味判断          | 実装                          |
+| JSON Schema / OpenAPI / HTML constraint                     | 対応subsetのmachine-readable schema / DOM属性を正規化しCoverage候補生成                                | そのschema / DOMが製品Authorityとして有効か         | 実装                          |
+| UI pattern                                                  | catalogから一般的な確認候補を生成                                                                      | 製品固有expected result、pattern採用判断            | 実装                          |
+| テストデータ要求                                            | role / state / partition / boundary / entity等から要求を統合し矛盾検出                                 | 実データ選定、準備方法、利用可否                    | `test-condition-design`で実装 |
+| テスト環境要求                                              | browser / role / feature flag / integration等を統合し矛盾検出                                          | 環境選定、利用可否、運用判断                        | `test-analysis`で実装         |
+| Random Testing                                              | 指定domain / distribution / seed / algorithmから再現可能入力列を生成                                   | operational profile、distribution、oracle、停止条件 | 実装                          |
+| Metamorphic Testing                                         | 明示済みrelationからfollow-up inputと期待関係を生成                                                    | relation発見・妥当性                                | 実装                          |
+| テスト要求の構造処理                                        | Authority / Risk → TR閉鎖、未知参照、Disposition重複、優先度                                           | TR本文、分割 / 統合、検証責務                       | 実装                          |
+| テストケースの構造処理                                      | TCN / CI → TC閉鎖、未知参照、優先度、Authority対応                                                     | 前提、手順、具体データ、期待結果                    | 実装                          |
+| 要求追跡                                                    | Authority / Risk → TR → TCN → CI → TCのmissing / orphan / unknown                                      | 意味上のedge作成                                    | 実装                          |
+| 構造的重複 / 統合                                           | 同一key / assignment / rule / transition等の重複、明示済みmerge groupのunion                           | 意味上の同一性判断                                  | 実装                          |
+| テスト優先順位                                              | 採用済み計算式または既存継承規則による計算・sort                                                       | scoreモデル設計、リスク採点                         | 実装                          |
 
 ### 3.2 正規技法名との関係
 

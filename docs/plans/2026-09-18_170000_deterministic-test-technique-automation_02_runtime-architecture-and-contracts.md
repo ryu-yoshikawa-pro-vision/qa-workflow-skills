@@ -179,21 +179,21 @@ runtime対象Skillは、Skill instructionへscript選択表を持ち、次の順
 
 これによりSkill単体コピー時に前工程Skillの成果物生成を強制せず、workflow内で実在するMachine Entity dependencyも失いません。
 
-| Skill | 対象 / 実行範囲 | 条件 | script | 実行 |
-| --- | --- | --- | --- | --- |
-| `test-analysis` | `テスト分析` | Product Riskがある | `risk_matrix.py` | 条件付き |
-| `test-analysis` | `テスト分析` | 技法選択を行う | `technique_candidates.py` | 必須 |
-| `test-analysis` | `テスト分析` | 変更影響graphがある | `change_impact.py` | 条件付き |
-| `test-analysis` | `テスト分析` | 環境要求がある | `environment_requirements.py` | 条件付き |
-| `test-analysis` | `テスト分析` | test-analysis成果物を保存する | `analysis_entities.py` | 必須 |
-| `test-requirement-design` | 単一用途 | 成果物確定前 | `requirement_structure.py` | 必須 |
-| `test-condition-design` | 単一用途 | TCN / model draft作成後 | `condition_structure.py` | 必須 |
-| `test-condition-design` | 単一用途 | active modelの`model_type`が下表のgeneratorを持つ。adapter派生childは親adapterがcurrent `result_status=ready`で対応`derived_child_inputs[]`がちょうど1件ある | model type対応generator | modelごとに必須 |
-| `test-condition-design` | 単一用途 | test data要求が1件以上ある | `test_data_requirements.py` | 条件付き |
-| `test-condition-design` | 単一用途 | TCN配下にactiveなCoverage所有modelが1件以上ある | `materialize_coverage.py` | TCNごとに必須 |
-| `test-case-design` | 単一用途 | 成果物確定前 | `case_structure.py` | 必須 |
-| `coverage-analysis` | `テスト設計` | traceabilityを検査する | `traceability.py` | 必須 |
-| `qa-workflow` | 単一用途 | canonical workflow scopeに本Planruntime対象のSkill / 対象 / 実行範囲が1件以上ある | `workflow_runtime.py` | 条件付き |
+| Skill                     | 対象 / 実行範囲 | 条件                                                                                                                                                         | script                        | 実行            |
+| ------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------- | --------------- |
+| `test-analysis`           | `テスト分析`    | Product Riskがある                                                                                                                                           | `risk_matrix.py`              | 条件付き        |
+| `test-analysis`           | `テスト分析`    | 技法選択を行う                                                                                                                                               | `technique_candidates.py`     | 必須            |
+| `test-analysis`           | `テスト分析`    | 変更影響graphがある                                                                                                                                          | `change_impact.py`            | 条件付き        |
+| `test-analysis`           | `テスト分析`    | 環境要求がある                                                                                                                                               | `environment_requirements.py` | 条件付き        |
+| `test-analysis`           | `テスト分析`    | test-analysis成果物を保存する                                                                                                                                | `analysis_entities.py`        | 必須            |
+| `test-requirement-design` | 単一用途        | 成果物確定前                                                                                                                                                 | `requirement_structure.py`    | 必須            |
+| `test-condition-design`   | 単一用途        | TCN / model draft作成後                                                                                                                                      | `condition_structure.py`      | 必須            |
+| `test-condition-design`   | 単一用途        | active modelの`model_type`が下表のgeneratorを持つ。adapter派生childは親adapterがcurrent `result_status=ready`で対応`derived_child_inputs[]`がちょうど1件ある | model type対応generator       | modelごとに必須 |
+| `test-condition-design`   | 単一用途        | test data要求が1件以上ある                                                                                                                                   | `test_data_requirements.py`   | 条件付き        |
+| `test-condition-design`   | 単一用途        | TCN配下にactiveなCoverage所有modelが1件以上ある                                                                                                              | `materialize_coverage.py`     | TCNごとに必須   |
+| `test-case-design`        | 単一用途        | 成果物確定前                                                                                                                                                 | `case_structure.py`           | 必須            |
+| `coverage-analysis`       | `テスト設計`    | traceabilityを検査する                                                                                                                                       | `traceability.py`             | 必須            |
+| `qa-workflow`             | 単一用途        | canonical workflow scopeに本Planruntime対象のSkill / 対象 / 実行範囲が1件以上ある                                                                            | `workflow_runtime.py`         | 条件付き        |
 
 `materialize_coverage.py`はcurrent machine targetやsemantic itemが0件でも、TCN配下にactiveなCoverage所有modelが1件以上あれば実行します。runtimeなしsemantic modelやtarget 0件のmodelも`model_completion[]`を明示し、空入力をvacuous completeにしません。whole-model `unsupported`は既存のunsupported closure契約で閉じ、成功`model_completion[]`を捏造しません。
 
@@ -201,24 +201,24 @@ runtime対象Skillは、Skill instructionへscript選択表を持ち、次の順
 
 model typeからgeneratorへの対応は次だけを許可します。model runtimeの`expected_runtime_units[]`はこの表から、artifact runtimeの`expected_runtime_units[]`は直前のSkill dispatch表から導出し、両集合を連結します。adapter派生child（`derived_from_model_key != null`）は、親adapter runtimeがcurrent `result_status=ready`で、そのchildに対応する`derived_child_inputs[]` rowがちょうど1件存在する場合だけdispatch対象かつ期待runtime集合へ追加します。親adapterが`unresolved / blocked / stale`、未実行、または対応row欠落の間はchild runtime unitを期待集合へ入れず、親adapter側のissue / freshnessをblockerとして扱います。
 
-| model_type | generator |
-| --- | --- |
-| `ep` | `equivalence_partitions.py` |
-| `bva` | `bva.py` |
-| `domain` | `domain_testing.py` |
-| `decision` | `decision_table.py` |
-| `comb` | `combinatorial.py` |
-| `classification` | `classification_tree.py` |
-| `state` | `state_transition.py` |
-| `flow` | `flow_paths.py` |
-| `crud` | `crud_matrix.py` |
-| `cause-effect` | `cause_effect.py` |
-| `syntax` | `grammar_cases.py` |
-| `schema` | `schema_cases.py` |
-| `ui` | `ui_pattern_candidates.py` |
-| `random` | `random_testing.py` |
-| `metamorphic` | `metamorphic.py` |
-| `error-guessing` | runtime generatorなし |
+| model_type       | generator                   |
+| ---------------- | --------------------------- |
+| `ep`             | `equivalence_partitions.py` |
+| `bva`            | `bva.py`                    |
+| `domain`         | `domain_testing.py`         |
+| `decision`       | `decision_table.py`         |
+| `comb`           | `combinatorial.py`          |
+| `classification` | `classification_tree.py`    |
+| `state`          | `state_transition.py`       |
+| `flow`           | `flow_paths.py`             |
+| `crud`           | `crud_matrix.py`            |
+| `cause-effect`   | `cause_effect.py`           |
+| `syntax`         | `grammar_cases.py`          |
+| `schema`         | `schema_cases.py`           |
+| `ui`             | `ui_pattern_candidates.py`  |
+| `random`         | `random_testing.py`         |
+| `metamorphic`    | `metamorphic.py`            |
+| `error-guessing` | runtime generatorなし       |
 
 `materialize_coverage.py`はruntime generatorを持たないエラー推測やunsupported fallbackのsemantic Coverage Itemだけでもdispatch対象にします。
 
@@ -388,17 +388,17 @@ scriptが実行できた場合、stdoutは次のJSON object 1件だけです。
   "generator_implementation_fingerprint": "sha256:...",
   "upstream_entity_fingerprints": [
     {
-      "skill":"test-requirement-design",
-      "entity_type":"tr",
-      "entity_ref":"TR-001",
-      "content_fingerprint":"sha256:..."
+      "skill": "test-requirement-design",
+      "entity_type": "tr",
+      "entity_ref": "TR-001",
+      "content_fingerprint": "sha256:..."
     }
   ],
   "upstream_runtime_units": [
     {
-      "skill":"test-requirement-design",
-      "runtime_unit_key":"artifact:requirement_structure:all",
-      "generation_fingerprint":"sha256:..."
+      "skill": "test-requirement-design",
+      "runtime_unit_key": "artifact:requirement_structure:all",
+      "generation_fingerprint": "sha256:..."
     }
   ],
   "support_status": "supported",
@@ -444,17 +444,17 @@ strict JSON objectと共通metadataを確定する前に失敗した場合はpre
 
 status対応は次で固定します。
 
-| runtime_status | support_status | result_status | runtime_required | deterministic_generated | 扱い |
-| --- | --- | --- | --- | --- | --- |
-| `ok` | `supported` | `ready` | `true` | `true` | runtime結果を利用可能 |
-| `ok` | `supported` | `unresolved` | `true` | `true` | 質問・意味判断後に再実行 |
-| `ok` | `partial` | `ready`または`unresolved` | `true` | `true` | supported部分を利用し、unsupported itemは後述のclosure契約へ閉じる |
-| `invalid_input` | `unknown` | `blocked` | `true` | `false` | 入力契約違反でsupport判定を完了できない。入力契約を修正 |
-| `unsupported` | `unsupported` | `ready` | `false` | `false` | runtime unitとしてfallback可能。QA成果物全体はfallbackが既存Skill契約へ閉じた場合だけ完了可能 |
-| `limit_exceeded` | `supported`または`partial` | `blocked` | `true` | `false` | decode済みinputの契約上限超過。model分割またはcontract変更が必要 |
-| `limit_exceeded` | `unknown` | `blocked` | `true` | `false` | decode前のbyte / depth上限超過。pre-parse error envelopeを返す |
-| `internal_error` | `unknown` | `blocked` | `true` | `false` | support判定完了前後を問わず安全側でruntime requiredとして扱い、runtime不具合を修正 |
-| `not_run` | `unknown` | `blocked` | `true` | `false` | Python unavailable。成果物metadataだけで表現 |
+| runtime_status   | support_status             | result_status             | runtime_required | deterministic_generated | 扱い                                                                                          |
+| ---------------- | -------------------------- | ------------------------- | ---------------- | ----------------------- | --------------------------------------------------------------------------------------------- |
+| `ok`             | `supported`                | `ready`                   | `true`           | `true`                  | runtime結果を利用可能                                                                         |
+| `ok`             | `supported`                | `unresolved`              | `true`           | `true`                  | 質問・意味判断後に再実行                                                                      |
+| `ok`             | `partial`                  | `ready`または`unresolved` | `true`           | `true`                  | supported部分を利用し、unsupported itemは後述のclosure契約へ閉じる                            |
+| `invalid_input`  | `unknown`                  | `blocked`                 | `true`           | `false`                 | 入力契約違反でsupport判定を完了できない。入力契約を修正                                       |
+| `unsupported`    | `unsupported`              | `ready`                   | `false`          | `false`                 | runtime unitとしてfallback可能。QA成果物全体はfallbackが既存Skill契約へ閉じた場合だけ完了可能 |
+| `limit_exceeded` | `supported`または`partial` | `blocked`                 | `true`           | `false`                 | decode済みinputの契約上限超過。model分割またはcontract変更が必要                              |
+| `limit_exceeded` | `unknown`                  | `blocked`                 | `true`           | `false`                 | decode前のbyte / depth上限超過。pre-parse error envelopeを返す                                |
+| `internal_error` | `unknown`                  | `blocked`                 | `true`           | `false`                 | support判定完了前後を問わず安全側でruntime requiredとして扱い、runtime不具合を修正            |
+| `not_run`        | `unknown`                  | `blocked`                 | `true`           | `false`                 | Python unavailable。成果物metadataだけで表現                                                  |
 
 `stale`は`result_status`ではありません。semantic dependency preflightに成功した現在inputを現在scriptで正常実行したruntime resultは、保存時に`freshness_status=current`とします。`workflow_runtime.py`は保存済みdependency / generation / result projectionをcurrent rerunと共通freshness関数で再検証し、差分があれば`stale`へ変更して下流へ伝播します。Closure、materialize completion、unsupported closure等の現在状態判断には`current_runtime_units[]`だけを使い、保存側projectionをcurrent cacheとして使いません。`qa-workflow`だけをfreshnessの唯一の付与主体にせず、実行直後のcurrent判定と最終集約を分離します。
 
@@ -584,41 +584,41 @@ generator結果に影響する静的データはversionを持ちます。
 
 `technique_slug`はSkill契約上の正規テスト技法だけを表します。
 
-| 正規テスト技法 | technique slug |
-| --- | --- |
-| 同値分割 | `ep` |
-| 境界値分析 | `bva` |
-| Domain Testing | `domain` |
-| デシジョンテーブル | `decision` |
-| Pairwise / 組合せ | `comb` |
-| 状態遷移 | `state` |
-| エラー推測 | `error-guessing` |
-| シナリオ / ユースケース | `scenario` |
-| CRUD Testing | `crud` |
-| Syntax-Based Testing | `syntax` |
-| Random Testing | `random` |
-| Metamorphic Testing | `metamorphic` |
+| 正規テスト技法          | technique slug   |
+| ----------------------- | ---------------- |
+| 同値分割                | `ep`             |
+| 境界値分析              | `bva`            |
+| Domain Testing          | `domain`         |
+| デシジョンテーブル      | `decision`       |
+| Pairwise / 組合せ       | `comb`           |
+| 状態遷移                | `state`          |
+| エラー推測              | `error-guessing` |
+| シナリオ / ユースケース | `scenario`       |
+| CRUD Testing            | `crud`           |
+| Syntax-Based Testing    | `syntax`         |
+| Random Testing          | `random`         |
+| Metamorphic Testing     | `metamorphic`    |
 
 runtime内部identityは`model_type`で分けます。
 
-| model / adapter | model_type | Coverage所有時のtechnique_slug |
-| --- | --- | --- |
-| EP model | `ep` | `ep` |
-| BVA model | `bva` | `bva` |
-| Domain model | `domain` | `domain` |
-| Decision Table model | `decision` | `decision` |
-| combinatorial model | `comb` | `comb` |
-| Classification Tree adapter | `classification` | `null` |
-| state model | `state` | `state` |
-| flow model | `flow` | `scenario` |
-| CRUD model | `crud` | `crud` |
-| Cause-Effect adapter | `cause-effect` | `null` |
-| Syntax model | `syntax` | `syntax` |
-| schema / HTML adapter | `schema` | `null` |
-| UI pattern adapter | `ui` | `null` |
-| Random model | `random` | `random` |
-| Metamorphic model | `metamorphic` | `metamorphic` |
-| エラー推測 semantic model | `error-guessing` | `error-guessing` |
+| model / adapter             | model_type       | Coverage所有時のtechnique_slug |
+| --------------------------- | ---------------- | ------------------------------ |
+| EP model                    | `ep`             | `ep`                           |
+| BVA model                   | `bva`            | `bva`                          |
+| Domain model                | `domain`         | `domain`                       |
+| Decision Table model        | `decision`       | `decision`                     |
+| combinatorial model         | `comb`           | `comb`                         |
+| Classification Tree adapter | `classification` | `null`                         |
+| state model                 | `state`          | `state`                        |
+| flow model                  | `flow`           | `scenario`                     |
+| CRUD model                  | `crud`           | `crud`                         |
+| Cause-Effect adapter        | `cause-effect`   | `null`                         |
+| Syntax model                | `syntax`         | `syntax`                       |
+| schema / HTML adapter       | `schema`         | `null`                         |
+| UI pattern adapter          | `ui`             | `null`                         |
+| Random model                | `random`         | `random`                       |
+| Metamorphic model           | `metamorphic`    | `metamorphic`                  |
+| エラー推測 semantic model   | `error-guessing` | `error-guessing`               |
 
 `model_key=<model_type>-\d{3,}`です。内部adapterは`technique_slug / selection_source / selection_key=null`とし、Coverage所有child modelがcanonical `technique_slug`と技法選択元を持ちます。
 
@@ -788,21 +788,21 @@ nullable factorやtimezoneの既存契約は維持します。
 
 次を契約値として固定します。
 
-| 対象 | 上限 |
-| --- | ---: |
-| 通常runtime入力JSON | 2 MiB |
-| 集約runtime入力JSON（`materialize_coverage.py` / `traceability.py` / `workflow_runtime.py`） | 16 MiB |
-| JSON / schema / ASTのnesting depth | 64 |
-| 1文字列 | 64 KiB |
-| Decision Table / Cause-Effectのassignment | 65,536 |
-| Pairwise / N-wise / mixed-strengthのCoverage target | 100,000 |
-| 探索node | 1,000,000 |
-| 生成row / test data candidate / Domain point | 10,000 |
-| state sequence / flow path | 10,000 |
-| grammar生成case | 10,000 |
-| Random Testing生成case | 10,000 |
-| 1 modelのtarget / row / candidate総数 | 100,000 |
-| stdout JSON | 16 MiB |
+| 対象                                                                                         |      上限 |
+| -------------------------------------------------------------------------------------------- | --------: |
+| 通常runtime入力JSON                                                                          |     2 MiB |
+| 集約runtime入力JSON（`materialize_coverage.py` / `traceability.py` / `workflow_runtime.py`） |    16 MiB |
+| JSON / schema / ASTのnesting depth                                                           |        64 |
+| 1文字列                                                                                      |    64 KiB |
+| Decision Table / Cause-Effectのassignment                                                    |    65,536 |
+| Pairwise / N-wise / mixed-strengthのCoverage target                                          |   100,000 |
+| 探索node                                                                                     | 1,000,000 |
+| 生成row / test data candidate / Domain point                                                 |    10,000 |
+| state sequence / flow path                                                                   |    10,000 |
+| grammar生成case                                                                              |    10,000 |
+| Random Testing生成case                                                                       |    10,000 |
+| 1 modelのtarget / row / candidate総数                                                        |   100,000 |
+| stdout JSON                                                                                  |    16 MiB |
 
 1文字列64 KiB上限は通常のJSON stringに適用する。例外は`verify_runtime_evidence` requestのtop-level `artifact_markdown`と`previous_artifact_markdown`だけであり、この2 fieldは除外する。`normalized_skill_input`、他のrequest field、およびartifactから抽出したMachine Runtime Input / Result / Machine Entities等のJSON stringには通常の64 KiB上限を適用する。artifact全文は候補・previousを合わせたrequest全体の16 MiB上限で制御する。
 
@@ -827,7 +827,7 @@ Coverage母集団から除外するconstraintは1件以上の`authority_refs`を
 ```json
 {
   "constraint_key": "C1",
-  "assignment": {"role": "guest", "visibility": "private"},
+  "assignment": { "role": "guest", "visibility": "private" },
   "authority_refs": ["SPEC-002"]
 }
 ```

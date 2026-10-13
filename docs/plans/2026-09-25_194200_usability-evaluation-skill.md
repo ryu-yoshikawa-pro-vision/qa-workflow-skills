@@ -192,7 +192,7 @@ formal WCAG評価では `wcag-conformance-evaluation` がmethodology / semantic 
 
 `wcag-conformance-evaluation` は「WCAG 2.0 / 2.1 / 2.2の指定levelへ適合しているか評価」のようなformal conformance要求で起動し、WCAG-EM 2.0の評価methodologyを所有します。
 
-~~~text
+```text
 live Web UI
     ↓
 usability-inspection
@@ -209,7 +209,7 @@ UI pattern / standard / Design System knowledge
       expert UI / UX evaluation
              ↓
       follow-upが必要な場合だけFinding
-~~~
+```
 
 `test-target-inspection` / `test-execution` から既存evidenceを `usability-evaluation` へ渡すことはできますが、`usability-inspection` をそれらの追加処理として実行しません。
 
@@ -250,7 +250,7 @@ bundled reference corpusは公開情報だけを対象とします。`references
 
 SKILL.mdには個別パターンの詳細を大量に持たせません。
 
-~~~text
+```text
 SKILL.md
   ↓
 references/index.md
@@ -262,71 +262,71 @@ references/index.md
   ├→ 視覚・レイアウト
   ├→ 状態・feedback・error
   └→ platform / Design System別補足
-~~~
+```
 
 Agentは index.md から現在の対象に必要なreferenceだけを追加で読みます。
 
 ## 構成
 
-1. 目的・現状・責務境界  
+1. 目的・現状・責務境界\
    2026-09-25_194200_usability-evaluation-skill_01_scope-and-responsibilities.md
-1a. usability-inspectionの責務・live inspection契約  
+   1a. usability-inspectionの責務・live inspection契約\
    2026-09-25_194200_usability-evaluation-skill_01a_usability-inspection-scope-and-contract.md
-1b. wcag-conformance-evaluationの責務・WCAG-EM契約  
+   1b. wcag-conformance-evaluationの責務・WCAG-EM契約\
    2026-09-25_194200_usability-evaluation-skill_01b_wcag-conformance-evaluation-scope-and-contract.md
-2. 情報源・reference構造・網羅性契約  
+2. 情報源・reference構造・網羅性契約\
    2026-09-25_194200_usability-evaluation-skill_02_reference-knowledge.md
-2a. 情報源探索・収集・網羅性ゲート  
+   2a. 情報源探索・収集・網羅性ゲート\
    2026-09-25_194200_usability-evaluation-skill_02a_source-acquisition-and-coverage.md
-2b. reference統合・採用item意味検証・完全性  
+   2b. reference統合・採用item意味検証・完全性\
    2026-09-25_194200_usability-evaluation-skill_02b_reference-validation-and-completeness.md
-2c. seed source catalog・公式URL  
+   2c. seed source catalog・公式URL\
    2026-09-25_194200_usability-evaluation-skill_02c_seed-source-catalog.md
-2d. reference artifactの機械可読Markdown schema  
+   2d. reference artifactの機械可読Markdown schema\
    2026-09-25_194200_usability-evaluation-skill_02d_reference-artifact-schema.md
-3. UI / UX評価方法・証拠・判定境界  
+3. UI / UX評価方法・証拠・判定境界\
    2026-09-25_194200_usability-evaluation-skill_03_evaluation-contract.md
-4. 既存Skill / workflow統合  
+4. 既存Skill / workflow統合\
    2026-09-25_194200_usability-evaluation-skill_04_workflow-integration.md
-4a. usability-inspectionのworkflow統合  
+   4a. usability-inspectionのworkflow統合\
    2026-09-25_194200_usability-evaluation-skill_04a_usability-inspection-workflow-integration.md
-4b. wcag-conformance-evaluationのworkflow統合  
+   4b. wcag-conformance-evaluationのworkflow統合\
    2026-09-25_194200_usability-evaluation-skill_04b_wcag-conformance-evaluation-workflow-integration.md
-4c. formal WCAG observation handoffのworkflow state / CAS契約  
+   4c. formal WCAG observation handoffのworkflow state / CAS契約\
    2026-09-25_194200_usability-evaluation-skill_04c_wcag-observation-handoff-state-contract.md
-5. Skill package・成果物・validator  
+5. Skill package・成果物・validator\
    2026-09-25_194200_usability-evaluation-skill_05_skill-package.md
-5a. usability-inspection package・成果物・評価  
+   5a. usability-inspection package・成果物・評価\
    2026-09-25_194200_usability-evaluation-skill_05a_usability-inspection-package-and-evaluation.md
-5b. usability-inspectionの決定論的runtime契約  
+   5b. usability-inspectionの決定論的runtime契約\
    2026-09-25_194200_usability-evaluation-skill_05b_usability-inspection-deterministic-runtime.md
-5c. Web inspectionの実行条件・responsive / mobile・E2E  
+   5c. Web inspectionの実行条件・responsive / mobile・E2E\
    2026-09-25_194200_usability-evaluation-skill_05c_usability-inspection-coverage.md
-5d. general accessibility・WCAG requirement semantics・ARIA / ACT  
+   5d. general accessibility・WCAG requirement semantics・ARIA / ACT\
    2026-09-25_194200_usability-evaluation-skill_05d_accessibility-requirements-and-act.md
-5e. performance / responsiveness measurement  
+   5e. performance / responsiveness measurement\
    2026-09-25_194200_usability-evaluation-skill_05e_performance-measurement.md
-5f. wcag-conformance-evaluation package / sampling / runtime  
+   5f. wcag-conformance-evaluation package / sampling / runtime\
    2026-09-25_194200_usability-evaluation-skill_05f_wcag-conformance-evaluation-package-and-runtime.md
-5g. usability-inspection browser observation request / probe契約  
+   5g. usability-inspection browser observation request / probe契約\
    2026-09-25_194200_usability-evaluation-skill_05g_usability-inspection-browser-observation-contract.md
-5h. formal WCAG Success Criterion評価経路  
+   5h. formal WCAG Success Criterion評価経路\
    2026-09-25_194200_usability-evaluation-skill_05h_wcag-criterion-evaluation-contract.md
-5i. WCAG 2.0 / 2.1 / 2.2全Success Criterionのprocedure inventory  
+   5i. WCAG 2.0 / 2.1 / 2.2全Success Criterionのprocedure inventory\
    2026-09-25_194200_usability-evaluation-skill_05i_wcag-success-criterion-procedure-inventory.md
-5j. formal WCAG machine browser observation契約  
+   5j. formal WCAG machine browser observation契約\
    2026-09-25_194200_usability-evaluation-skill_05j_wcag-machine-browser-observation-contract.md
-5k. formal WCAG criterion固有semantic procedure契約  
+   5k. formal WCAG criterion固有semantic procedure契約\
    2026-09-25_194200_usability-evaluation-skill_05k_wcag-semantic-procedure-contract.md
-5l. EARL 1.0 JSON-LD serialization契約  
+   5l. EARL 1.0 JSON-LD serialization契約\
    2026-09-25_194200_usability-evaluation-skill_05l_earl-jsonld-serialization-contract.md
-6. 評価・CI・実装順序・完了条件  
+6. 評価・CI・実装順序・完了条件\
    2026-09-25_194200_usability-evaluation-skill_06_evaluation-ci-implementation-order.md
-6a. usability-inspectionの実装順序・完了条件  
+   6a. usability-inspectionの実装順序・完了条件\
    2026-09-25_194200_usability-evaluation-skill_06a_usability-inspection-implementation-order.md
-6b. wcag-conformance-evaluationの実装順序・完了条件  
+   6b. wcag-conformance-evaluationの実装順序・完了条件\
    2026-09-25_194200_usability-evaluation-skill_06b_wcag-conformance-evaluation-implementation-order.md
-6c. 3 Skill共通のcanonical live validation・外部実対象検証境界  
+   6c. 3 Skill共通のcanonical live validation・外部実対象検証境界\
    2026-09-25_194200_usability-evaluation-skill_06c_canonical-live-validation.md
 
 ## 今回レビューで固定する追加契約

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import re
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
@@ -46,7 +46,9 @@ def _split_row(line: str) -> list[str]:
 
 def _is_separator(line: str) -> bool:
     cells = _split_row(line)
-    return bool(cells) and all(re.fullmatch(r":?-{3,}:?", c.replace(" ", "")) for c in cells)
+    return bool(cells) and all(
+        re.fullmatch(r":?-{3,}:?", c.replace(" ", "")) for c in cells
+    )
 
 
 def parse_tables(text: str) -> list[MarkdownTable]:
@@ -60,7 +62,11 @@ def parse_tables(text: str) -> list[MarkdownTable]:
             section = stripped.lstrip("#").strip()
             i += 1
             continue
-        if stripped.startswith("|") and i + 1 < len(lines) and _is_separator(lines[i + 1]):
+        if (
+            stripped.startswith("|")
+            and i + 1 < len(lines)
+            and _is_separator(lines[i + 1])
+        ):
             headers = _split_row(lines[i])
             separator = _split_row(lines[i + 1])
             if len(separator) != len(headers):

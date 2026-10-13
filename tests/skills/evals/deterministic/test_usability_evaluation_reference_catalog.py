@@ -6,11 +6,16 @@ import tempfile
 import unittest
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[4]
 SKILL_ROOT = REPO_ROOT / "skills" / "usability-evaluation"
 SCRIPT_ROOT = SKILL_ROOT / "scripts"
-FIXTURE = SKILL_ROOT / "evals" / "deterministic" / "fixtures" / "reference-catalog-dialog.json"
+FIXTURE = (
+    SKILL_ROOT
+    / "evals"
+    / "deterministic"
+    / "fixtures"
+    / "reference-catalog-dialog.json"
+)
 
 
 def load_module(name: str, path: Path):
@@ -22,8 +27,13 @@ def load_module(name: str, path: Path):
     return module
 
 
-catalog = load_module("usability_evaluation_reference_catalog", SCRIPT_ROOT / "reference_catalog.py")
-validator = load_module("usability_evaluation_reference_validator", SCRIPT_ROOT / "validate-reference-catalog.py")
+catalog = load_module(
+    "usability_evaluation_reference_catalog", SCRIPT_ROOT / "reference_catalog.py"
+)
+validator = load_module(
+    "usability_evaluation_reference_validator",
+    SCRIPT_ROOT / "validate-reference-catalog.py",
+)
 
 
 def source_row(key: str, url: str) -> dict:
@@ -59,38 +69,68 @@ class ReferenceCatalogTests(unittest.TestCase):
             catalog.normalize_url("HTTPS://Example.COM:443/a?x=1"),
             "https://example.com/a?x=1",
         )
-        with self.assertRaisesRegex(catalog.CatalogError, "fragment_must_be_a_source_item_locator"):
+        with self.assertRaisesRegex(
+            catalog.CatalogError, "fragment_must_be_a_source_item_locator"
+        ):
             catalog.normalize_url("https://example.com/a#section")
 
-    def test_initial_source_ids_are_canonical_url_ordered_and_input_order_independent(self) -> None:
+    def test_initial_source_ids_are_canonical_url_ordered_and_input_order_independent(
+        self,
+    ) -> None:
         fixture = self.load_fixture()
-        fixture["sources"] = [source_row("z", "https://example.com/z"), source_row("a", "https://example.com/a")]
-        fixture.update({"candidates": [], "discovery_runs": [], "coverage": [], "source_items": [], "references": []})
+        fixture["sources"] = [
+            source_row("z", "https://example.com/z"),
+            source_row("a", "https://example.com/a"),
+        ]
+        fixture.update(
+            {
+                "candidates": [],
+                "discovery_runs": [],
+                "coverage": [],
+                "source_items": [],
+                "references": [],
+            }
+        )
         first = catalog.materialize(fixture, Path(tempfile.mkdtemp()))
         fixture["sources"].reverse()
         second = catalog.materialize(fixture, Path(tempfile.mkdtemp()))
-        self.assertEqual(first["allocated"]["source_ids"], second["allocated"]["source_ids"])
-        self.assertEqual(first["allocated"]["source_ids"], {"a": "SRC-001", "z": "SRC-002"})
+        self.assertEqual(
+            first["allocated"]["source_ids"], second["allocated"]["source_ids"]
+        )
+        self.assertEqual(
+            first["allocated"]["source_ids"], {"a": "SRC-001", "z": "SRC-002"}
+        )
 
     def test_duplicate_canonical_source_url_is_rejected(self) -> None:
         fixture = self.load_fixture()
-        fixture["sources"] = [source_row("one", "https://example.com/"), source_row("two", "https://EXAMPLE.com:443")]
+        fixture["sources"] = [
+            source_row("one", "https://example.com/"),
+            source_row("two", "https://EXAMPLE.com:443"),
+        ]
         with self.assertRaisesRegex(catalog.CatalogError, "duplicate_source_url"):
             catalog.materialize(fixture, Path(tempfile.mkdtemp()))
 
     def test_duplicate_source_item_identity_is_rejected(self) -> None:
         fixture = self.load_fixture()
-        fixture["source_items"].append({**fixture["source_items"][0], "key": "duplicate-item"})
-        with self.assertRaisesRegex(catalog.CatalogError, "duplicate_source_item_identity"):
+        fixture["source_items"].append(
+            {**fixture["source_items"][0], "key": "duplicate-item"}
+        )
+        with self.assertRaisesRegex(
+            catalog.CatalogError, "duplicate_source_item_identity"
+        ):
             catalog.materialize(fixture, Path(tempfile.mkdtemp()))
 
     def test_included_item_requires_dimension_closure(self) -> None:
         fixture = self.load_fixture()
         fixture["source_items"][0]["captured_dimensions"] = ["purpose"]
-        with self.assertRaisesRegex(catalog.CatalogError, "dimension_coverage_mismatch"):
+        with self.assertRaisesRegex(
+            catalog.CatalogError, "dimension_coverage_mismatch"
+        ):
             catalog.materialize(fixture, Path(tempfile.mkdtemp()))
 
-    def test_dialog_vertical_slice_materializes_and_independent_validator_accepts_it(self) -> None:
+    def test_dialog_vertical_slice_materializes_and_independent_validator_accepts_it(
+        self,
+    ) -> None:
         fixture = self.load_fixture()
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -123,7 +163,9 @@ class ReferenceCatalogTests(unittest.TestCase):
         self.assertIn("accessibility/dialog-semantics.md", result["files"])
         self.assertIn("heuristics/user-control-and-freedom.md", result["files"])
 
-    def test_independent_validator_rejects_column_drift_and_broken_cross_reference(self) -> None:
+    def test_independent_validator_rejects_column_drift_and_broken_cross_reference(
+        self,
+    ) -> None:
         fixture = self.load_fixture()
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -134,17 +176,32 @@ class ReferenceCatalogTests(unittest.TestCase):
                 target.write_text(contents, encoding="utf-8")
             catalog_path = root / "source-catalog.md"
             original = catalog_path.read_text(encoding="utf-8")
-            catalog_path.write_text(original.replace("| Source ID | Name |", "| Wrong ID | Name |", 1), encoding="utf-8")
-            self.assertTrue(any("columns_mismatch" in issue for issue in validator.validate(root, allow_incomplete=True)))
+            catalog_path.write_text(
+                original.replace("| Source ID | Name |", "| Wrong ID | Name |", 1),
+                encoding="utf-8",
+            )
+            self.assertTrue(
+                any(
+                    "columns_mismatch" in issue
+                    for issue in validator.validate(root, allow_incomplete=True)
+                )
+            )
             catalog_path.write_text(original, encoding="utf-8")
             coverage_path = root / "source-coverage.md"
             coverage_text = coverage_path.read_text(encoding="utf-8")
             modal_ref = result["allocated"]["reference_entry_ids"]["modal-dialog"]
             coverage_path.write_text(
-                coverage_text.replace(f"{modal_ref}:patterns/", "REF-9999:patterns/", 1),
+                coverage_text.replace(
+                    f"{modal_ref}:patterns/", "REF-9999:patterns/", 1
+                ),
                 encoding="utf-8",
             )
-            self.assertTrue(any("item_destination_unresolved" in issue for issue in validator.validate(root, allow_incomplete=True)))
+            self.assertTrue(
+                any(
+                    "item_destination_unresolved" in issue
+                    for issue in validator.validate(root, allow_incomplete=True)
+                )
+            )
 
 
 if __name__ == "__main__":

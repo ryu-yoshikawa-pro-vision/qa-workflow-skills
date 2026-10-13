@@ -14,7 +14,7 @@
   "evidence_refs": [],
   "unresolved": [],
   "follow_up_refs": [],
-  "cleanup": {"required": false, "status": "対象なし", "evidence_refs": []},
+  "cleanup": { "required": false, "status": "対象なし", "evidence_refs": [] },
   "residual_side_effect": []
 }
 ```

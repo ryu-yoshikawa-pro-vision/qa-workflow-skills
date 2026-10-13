@@ -39,7 +39,7 @@ Markdown本文の説明文をmachine fieldとして推測解析しません。
 column順を固定します。
 
 | Source ID | Name | Canonical URL | Publisher / Owner | Category | Source Position | Platform / Product Scope | Source Status / Lifecycle | Access State | Checked At | Adoption Status | License / Terms | Coverage Axes | Note |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| --------- | ---- | ------------- | ----------------- | -------- | --------------- | ------------------------ | ------------------------- | ------------ | ---------- | --------------- | --------------- | ------------- | ---- |
 
 `Source ID` はadopted / reference-only / replacedとして追跡するsourceで必須です。
 
@@ -48,14 +48,14 @@ column順を固定します。
 ### Candidates
 
 | Candidate Name | Canonical URL | Discovery Origin | Discovery Detail | Coverage Gap | Status | Reason | Checked At | Source ID |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| -------------- | ------------- | ---------------- | ---------------- | ------------ | ------ | ------ | ---------- | --------- |
 
 `Source ID` はadopted / reference-only / replacedへ閉じたcandidateで必要です。それ以外は `-` とします。
 
 ### Discovery Runs
 
 | Discovery Type | Discovery Target | Discovery Category | Checked At | Checked Scope | Checked Count | New Candidate Count | Retrieval Boundary | Completion | Block Reason |
-| --- | --- | --- | --- | --- | --- | ---: | ---: | --- | --- |
+| -------------- | ---------------- | ------------------ | ---------- | ------------- | ------------- | ------------------: | -----------------: | ---------- | ------------ |
 
 0件確認もrowを残します。
 
@@ -66,7 +66,7 @@ column順を固定します。
 ### Capability Coverage
 
 | Coverage Axis | Concern / Pattern Family | Required Source Position | Selected Source Refs | Reference Entry Refs | Coverage Status | Gap / Reason | Checked At |
-| --- | --- | --- | --- | --- | --- | --- | --- |
+| ------------- | ------------------------ | ------------------------ | -------------------- | -------------------- | --------------- | ------------ | ---------- |
 
 `Coverage Status`:
 
@@ -77,7 +77,7 @@ column順を固定します。
 ### Source Items
 
 | Source ID | Source Item Ref | Name / Section | Document Canonical URL | Locator Type | Locator | Disposition | Access State | Source Status / Lifecycle | Reference Destination | Available Dimensions | Captured Dimensions | Semantic Validation | Checked At |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| --------- | --------------- | -------------- | ---------------------- | ------------ | ------- | ----------- | ------------ | ------------------------- | --------------------- | -------------------- | ------------------- | ------------------- | ---------- |
 
 `Document Canonical URL` はfragmentを除いたdocument URLです。
 
@@ -107,15 +107,16 @@ leaf reference fileでは1 entryを次の形で持ちます。
 
 ```markdown
 ## <entry name>
+
 <!-- reference-entry-id: REF-0001 -->
 
 ...
 
 ### Source Items
 
-| Source Item Ref | Source Position | Source Status / Maturity | Applicability |
-| --- | --- | --- | --- |
-| SRC-001-ITEM-0001 | informative | Recommendation | ... |
+| Source Item Ref   | Source Position | Source Status / Maturity | Applicability |
+| ----------------- | --------------- | ------------------------ | ------------- |
+| SRC-001-ITEM-0001 | informative     | Recommendation           | ...           |
 ```
 
 規則:

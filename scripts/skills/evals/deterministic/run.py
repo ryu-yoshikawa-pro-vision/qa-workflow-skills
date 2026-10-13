@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import argparse
 import json
-from pathlib import Path
 import sys
+from pathlib import Path
 
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
     from scripts.skills.evals.deterministic.loader import load_validators
-    from scripts.skills.evals.deterministic.runtime_validator import validate_runtime_evidence
+    from scripts.skills.evals.deterministic.runtime_validator import (
+        validate_runtime_evidence,
+    )
 else:
     from .loader import load_validators
     from .runtime_validator import validate_runtime_evidence
@@ -36,11 +38,19 @@ def grade(skill: str, eval_id: str, output_path: Path) -> dict:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run deterministic output evals against saved Agent outputs.")
+    parser = argparse.ArgumentParser(
+        description="Run deterministic output evals against saved Agent outputs."
+    )
     parser.add_argument("--skill", required=True, choices=[*sorted(VALIDATORS), "all"])
     parser.add_argument("--eval-id", help="Eval ID for single-skill mode")
-    parser.add_argument("--output", type=Path, help="Generated Markdown output for single-skill mode")
-    parser.add_argument("--output-root", type=Path, help="All-mode directory containing <skill>/<eval-id>.md")
+    parser.add_argument(
+        "--output", type=Path, help="Generated Markdown output for single-skill mode"
+    )
+    parser.add_argument(
+        "--output-root",
+        type=Path,
+        help="All-mode directory containing <skill>/<eval-id>.md",
+    )
     parser.add_argument("--result", type=Path, help="Optional JSON result output path")
     args = parser.parse_args()
 

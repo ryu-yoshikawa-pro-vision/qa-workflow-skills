@@ -48,28 +48,28 @@ helperの必須処理が入力不足・実行不能・保存先能力不足で�
 
 ## 工程固有ロジックの担当
 
-| 工程固有ロジック | 担当Skill |
-| --- | --- |
-| 現在有効な仕様根拠 | `spec-analysis` |
-| 不明点・矛盾 / 仮定 | `question-analysis` |
-| プロダクトリスク / テスト重点 | `test-analysis` |
-| テスト要求 | `test-requirement-design` |
-| テスト条件 / カバレッジ基準 / カバレッジ項目 | `test-condition-design` |
-| 詳細テストケース / 期待結果の根拠の具体化 | `test-case-design` |
-| 生きたテスト対象のUI情報・ふるまい収集 / 管理 | `test-target-inspection` |
-| AIによる詳細TCの実行・期待結果比較・結果記録 | `test-execution` |
-| カバレッジ / ギャップ | `coverage-analysis` |
-| 独立レビュー / 重大度 | `adversarial-review` |
-| E2E対象・実装可能性・安全条件 | `e2e-test-inspection` |
-| Playwright E2E実装・静的 / 軽量検証 | `e2e-test-implementation` |
-| E2E安全確認・実行・構造化結果・cleanup | `e2e-test-execution` |
-| E2E実行結果の原因分析・修正routing | `e2e-test-result-analysis` |
-| 検証済みE2E結果の報告 | `e2e-test-reporting` |
-| Regression baseline / membership / Run / Activity | `regression-testing` |
-| Charterに沿ったExploration / Investigation | `exploratory-testing` |
-| 継続QA knowledgeのtriage / lifecycle / lookup | `qa-knowledge` |
-| referenceや既存evidenceに基づくUI / UX評価 | `usability-evaluation` |
-| live Web UIの操作・観測・ユーザビリティ検査 | `usability-inspection` |
+| 工程固有ロジック                                    | 担当Skill                     |
+| --------------------------------------------------- | ----------------------------- |
+| 現在有効な仕様根拠                                  | `spec-analysis`               |
+| 不明点・矛盾 / 仮定                                 | `question-analysis`           |
+| プロダクトリスク / テスト重点                       | `test-analysis`               |
+| テスト要求                                          | `test-requirement-design`     |
+| テスト条件 / カバレッジ基準 / カバレッジ項目        | `test-condition-design`       |
+| 詳細テストケース / 期待結果の根拠の具体化           | `test-case-design`            |
+| 生きたテスト対象のUI情報・ふるまい収集 / 管理       | `test-target-inspection`      |
+| AIによる詳細TCの実行・期待結果比較・結果記録        | `test-execution`              |
+| カバレッジ / ギャップ                               | `coverage-analysis`           |
+| 独立レビュー / 重大度                               | `adversarial-review`          |
+| E2E対象・実装可能性・安全条件                       | `e2e-test-inspection`         |
+| Playwright E2E実装・静的 / 軽量検証                 | `e2e-test-implementation`     |
+| E2E安全確認・実行・構造化結果・cleanup              | `e2e-test-execution`          |
+| E2E実行結果の原因分析・修正routing                  | `e2e-test-result-analysis`    |
+| 検証済みE2E結果の報告                               | `e2e-test-reporting`          |
+| Regression baseline / membership / Run / Activity   | `regression-testing`          |
+| Charterに沿ったExploration / Investigation          | `exploratory-testing`         |
+| 継続QA knowledgeのtriage / lifecycle / lookup       | `qa-knowledge`                |
+| referenceや既存evidenceに基づくUI / UX評価          | `usability-evaluation`        |
+| live Web UIの操作・観測・ユーザビリティ検査         | `usability-inspection`        |
 | WCAG-EM 2.0によるformal WCAG conformance evaluation | `wcag-conformance-evaluation` |
 
 ## ランタイム前提

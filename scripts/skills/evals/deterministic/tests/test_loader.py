@@ -1,10 +1,13 @@
 from __future__ import annotations
 
-from pathlib import Path
 import tempfile
 import unittest
+from pathlib import Path
 
-from scripts.skills.evals.deterministic.loader import discover_output_eval_skills, load_validators
+from scripts.skills.evals.deterministic.loader import (
+    discover_output_eval_skills,
+    load_validators,
+)
 
 
 class ValidatorLoaderTests(unittest.TestCase):
@@ -22,14 +25,22 @@ class ValidatorLoaderTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             skills_root = Path(tmp) / "skills"
             path = self._create_output_manifest(skills_root, "example-skill")
-            self._write_validator(path, "def validate(text, expected, eval_id):\n    return text, expected, eval_id\n")
-            self.assertEqual(discover_output_eval_skills(skills_root), ["example-skill"])
+            self._write_validator(
+                path,
+                "def validate(text, expected, eval_id):\n    return text, expected, eval_id\n",
+            )
+            self.assertEqual(
+                discover_output_eval_skills(skills_root), ["example-skill"]
+            )
 
     def test_loads_validator_from_explicit_skills_root(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             skills_root = Path(tmp) / "skills"
             path = self._create_output_manifest(skills_root, "example-skill")
-            self._write_validator(path, "def validate(text, expected, eval_id):\n    return text, expected, eval_id\n")
+            self._write_validator(
+                path,
+                "def validate(text, expected, eval_id):\n    return text, expected, eval_id\n",
+            )
             validators = load_validators(skills_root)
             self.assertEqual(set(validators), {"example-skill"})
             self.assertEqual(

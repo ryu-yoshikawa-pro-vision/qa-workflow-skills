@@ -6,9 +6,9 @@ Status: closed. This fixture is limited to the declared repository test scope.
 
 ## Scope and closure
 
-| Scope ref | Aspect | Decision | Outcome | Reason | Evidence refs |
-| --- | --- | --- | --- | --- | --- |
-| SCOPE-001 | visual-responsive — visual integrity / responsive | 今回確認する | 問題なし | fixture viewport only | EVID-001 |
+| Scope ref | Aspect                                            | Decision     | Outcome  | Reason                | Evidence refs |
+| --------- | ------------------------------------------------- | ------------ | -------- | --------------------- | ------------- |
+| SCOPE-001 | visual-responsive — visual integrity / responsive | 今回確認する | 問題なし | fixture viewport only | EVID-001      |
 
 ## Objective observations
 

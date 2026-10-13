@@ -59,8 +59,12 @@ Skill | 対象 / 実行範囲 | 状態 | 成果物 / バージョン | ブロッ
 
 ```json
 [
-  {"skill": "adversarial-review", "target": "テスト設計成果物", "state": "完了"},
-  {"skill": "adversarial-review", "target": "E2E実装", "state": "要再検証"}
+  {
+    "skill": "adversarial-review",
+    "target": "テスト設計成果物",
+    "state": "完了"
+  },
+  { "skill": "adversarial-review", "target": "E2E実装", "state": "要再検証" }
 ]
 ```
 

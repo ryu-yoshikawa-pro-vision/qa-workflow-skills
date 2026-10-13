@@ -1,14 +1,19 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import subprocess
 import sys
 import unittest
-
+from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-SCRIPT = REPO_ROOT / "skills" / "test-condition-design" / "scripts" / "equivalence_partitions.py"
+SCRIPT = (
+    REPO_ROOT
+    / "skills"
+    / "test-condition-design"
+    / "scripts"
+    / "equivalence_partitions.py"
+)
 
 
 def metadata() -> dict:
@@ -36,7 +41,9 @@ def metadata() -> dict:
 def run(input_value: dict) -> dict:
     result = subprocess.run(
         [sys.executable, str(SCRIPT)],
-        input=json.dumps({"metadata": metadata(), "input": input_value}, ensure_ascii=False).encode("utf-8"),
+        input=json.dumps(
+            {"metadata": metadata(), "input": input_value}, ensure_ascii=False
+        ).encode("utf-8"),
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         cwd=REPO_ROOT,
@@ -59,7 +66,9 @@ def enum_partition(key: str, values: list[dict], validity: str = "valid") -> dic
 
 
 class EquivalencePartitionRuntimeTests(unittest.TestCase):
-    def test_each_choice_targets_have_self_contained_execution_and_stable_refs(self) -> None:
+    def test_each_choice_targets_have_self_contained_execution_and_stable_refs(
+        self,
+    ) -> None:
         value = {
             "sets": [
                 {
@@ -75,19 +84,39 @@ class EquivalencePartitionRuntimeTests(unittest.TestCase):
         result = run(value)
         self.assertEqual(result["runtime_status"], "ok")
         self.assertEqual(result["result_status"], "ready")
-        self.assertEqual(result["payload"]["coverage_summary"], {"criterion": "each-choice", "required": 2, "covered": 2, "complete": True})
-        self.assertEqual([row["target_key"] for row in result["payload"]["targets"]], ["ep:role:admin", "ep:role:user"])
+        self.assertEqual(
+            result["payload"]["coverage_summary"],
+            {"criterion": "each-choice", "required": 2, "covered": 2, "complete": True},
+        )
+        self.assertEqual(
+            [row["target_key"] for row in result["payload"]["targets"]],
+            ["ep:role:admin", "ep:role:user"],
+        )
         for target in result["payload"]["targets"]:
             self.assertTrue(target["materializable"])
             self.assertIsNotNone(target["execution_fingerprint"])
-            self.assertEqual(target["execution"]["partition"]["key"], target["partition"]["key"])
+            self.assertEqual(
+                target["execution"]["partition"]["key"], target["partition"]["key"]
+            )
             self.assertTrue(target["target_ref"].startswith("sha256:"))
 
     def test_partition_and_set_input_order_does_not_change_result_targets(self) -> None:
         first = {
             "sets": [
-                {"set_key": "b", "label": "B", "partitions": [enum_partition("z", [{"type": "enum", "value": "z"}])]},
-                {"set_key": "a", "label": "A", "partitions": [enum_partition("x", [{"type": "enum", "value": "x"}])]},
+                {
+                    "set_key": "b",
+                    "label": "B",
+                    "partitions": [
+                        enum_partition("z", [{"type": "enum", "value": "z"}])
+                    ],
+                },
+                {
+                    "set_key": "a",
+                    "label": "A",
+                    "partitions": [
+                        enum_partition("x", [{"type": "enum", "value": "x"}])
+                    ],
+                },
             ]
         }
         second = {"sets": list(reversed(first["sets"]))}
@@ -104,7 +133,9 @@ class EquivalencePartitionRuntimeTests(unittest.TestCase):
                     "label": "X",
                     "partitions": [
                         enum_partition("one", [{"type": "enum", "value": 1}]),
-                        enum_partition("also-one", [{"type": "enum", "value": 1}], "invalid"),
+                        enum_partition(
+                            "also-one", [{"type": "enum", "value": 1}], "invalid"
+                        ),
                     ],
                 }
             ]

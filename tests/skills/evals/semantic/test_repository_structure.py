@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from pathlib import Path
 import unittest
-
+from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 SKILLS_ROOT = REPO_ROOT / "skills"
-CANONICAL_SKILLS = tuple(sorted(path.parent.name for path in SKILLS_ROOT.glob("*/SKILL.md")))
+CANONICAL_SKILLS = tuple(
+    sorted(path.parent.name for path in SKILLS_ROOT.glob("*/SKILL.md"))
+)
 
 
 class SemanticRepositoryStructureTests(unittest.TestCase):
