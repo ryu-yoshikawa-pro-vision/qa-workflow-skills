@@ -318,3 +318,15 @@ PR #14後のCIは `skills/*/scripts` を動的compileするため、helper compi
 2026-10-15の追加検証では、zero-scope deletion時のTR / TCN / model `scope_refs=[]`出力、TCD materialize cleanup child unitの期待集合、frozen runtime-v2 history fingerprintの検証を修正・回帰確認した。runtime suiteは362 passed / 2 Windows symlink privilege skips。Scenario 21 attempt-10でsynthetic completed baselineから全scope retire、TCD terminal output、qa-workflow final gate、local baseline commit・immutable revision refetchまで確認したが、TRD / TC / coverage-analysisを通るworkflow全体は未実施のためStep 9 item 32を含む9項目はPARTIALのまま。Semantic candidateは8/8 runtime適合だが、独立Semantic Judge未実施のためStep 3 / 7は未完了。local Codex CLI execpolicy runtime受入も未確認のためStep 8とStep 10は未完了。詳細は分割Plan `_04` の「2026-10-15 継続作業結果（zero-scope terminal persistence / current runtime）」を参照する。
 
 修正commit `192f165034920c3345b9bb9a89678543b24b40bf`ではGitHub CI 10/10 checksが成功した。local Codex CLI execpolicy acceptance、Semantic Judge、Step 9の残り9項目はこのremote CI結果によって完了扱いにしない。
+
+### 2026-10-15 継続作業結果（Step 9 scenario 22 / 23）
+
+最新の開始head `d6582c2606f6937b94d61aa184652778accdc3b6` はGitHub上の最新`main` `dcabbb218cf79f6920f5c8303e60140ab9c15f23`から449 commit ahead / 0 behind。Step 9 item 15のshared-scope blocked / resume / qa-workflow baseline commit・refetchと、item 33のB retire owner-resolution projectionをcurrent-session Agentとproduction helperで追加検証した。item 32のTRD zero-scope terminal evidenceも記録したが、いずれも統合workflow条件が残るためmatrixは41項目中32 PASS / 9 PARTIALを維持する。Semantic candidateは8/8 runtime適合、candidate manifest SHA-256は`5c185ccccb7b2e5010044f5e4fd2d823b086b9c9156e02c96637ea3b8adfcfaf`。外部Semantic Judgeは実行していない。
+
+詳細なシナリオ範囲、missing conditions、hash、実行ログ位置は分割Plan `_04` の「2026-10-15 継続作業結果（TRD zero-scope / shared-scope pause-resume）」と`.artifacts/pr16-step9-matrix.json`に記録した。`.artifacts/` evidenceはignored local dataでPRへ追加しない。Step 3 / 7、local Codex CLI runtime受入を含むStep 8、Step 9、最終レビューStep 10は未完了であり、Planの完了条件は変更していない。
+
+### 2026-10-15 継続作業結果（検証環境再確認）
+
+Python 3.11.9と既存`.venv`を再確認し、runtime 362 tests / 2 Windows symlink privilege skips、deterministic shared 12、deterministic repository 290、semantic dataset 22 Skills / 163 cases、semantic shared 27 / 2 skips、semantic repository 13 / 1 skip、routing 2、trigger 1を個別に実行した。deterministic repository testはsystem PythonにPyYAMLがなかった初回を環境失敗として記録し、既存`.venv`（PyYAML 6.0.3）で再実行してPASSした。formatterは207 tracked files、Ruff 0.16.8、dprint 0.55.2、official `skills-ref` 25/25、Hook syntax、patch whitespaceもPASSした。Codex Harnessは31 tests後にCLI setup errorとなり、sandbox内実CLI acceptanceは未確認のまま。外部送信およびSemantic Judge実行はない。
+
+candidate manifestの8件すべてがruntime適合し、candidate/evidence 272ファイルのhashが一致した。Step 9 matrixの590 evidence rowも欠落・hash不一致なし。今回新しいAgent workflow scenarioは追加していないため、41項目は32 PASS / 9 PARTIALを維持し、未達条件をPASSへ昇格していない。詳細と実行条件は分割Plan `_04` およびignored local run record `.artifacts/pr16-step9-deterministic/RUN_RECORD-2026-10-15-validation-refresh.md`（SHA-256 `f763247cc30bb6808e202f1ef40fcde97f969ab4feaf08a79f4ddf9d0b57f557`）に記録する。Semantic Judge待ちのStep 3 / 7、CLI受入待ちのStep 8、9 PARTIALが残るStep 9、最終Step 10は未完了である。
