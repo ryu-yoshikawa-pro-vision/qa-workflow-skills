@@ -1389,6 +1389,37 @@ class UiTargetPackageTests(unittest.TestCase):
                         rows_for(markdown, "Acceptance Criteria一覧")[1:], []
                     )
 
+    def test_blocked_known_uc_skips_behavior_completeness_closure(self) -> None:
+        with tempfile.TemporaryDirectory(
+            prefix="qa-pr16-blocked-known-uc-"
+        ) as temporary:
+            root = Path(temporary) / "package"
+            created = package._execute_operation(
+                child_identity_unknown_request(root, "ready")
+            )
+            self.assertTrue(created["valid"], created["issues"])
+            model = package._read_package(root)
+
+            for section, id_column, stable_id in (
+                ("UI操作一覧", "操作ID", "UIOP-001"),
+                ("Use Case一覧", "UC ID", "UC-001"),
+                ("Behavior一覧", "Behavior ID", "BH-001"),
+                ("Acceptance Criteria一覧", "AC ID", "AC-001"),
+            ):
+                row = next(
+                    item
+                    for item in model.tables[
+                        ("02_behavior_and_business_rules.md", section)
+                    ]
+                    if item[id_column] == stable_id
+                )
+                row["状態"] = "blocked"
+            model.tables[
+                ("02_behavior_and_business_rules.md", "Use Case振る舞い完全性")
+            ] = []
+
+            package._validate_hierarchies(model)
+
     def test_ui_unknown_can_resolve_and_reopen_with_the_same_id(self) -> None:
         def group(request: dict, file: str, section: str) -> dict:
             return next(

@@ -2224,6 +2224,8 @@ def _validate_hierarchies(model: PackageModel) -> None:
                     f"current ACにcurrent Authorityがありません: {row['AC ID']}",
                 )
     for uc_id, uc in cases.items():
+        if uc["状態"] == "blocked":
+            continue
         rows = [completeness[(uc_id, category)] for category in categories]
         defined = any(row["判定"] == "定義あり" for row in rows)
         unresolved = any(row["判定"] == "未定義" for row in rows)
