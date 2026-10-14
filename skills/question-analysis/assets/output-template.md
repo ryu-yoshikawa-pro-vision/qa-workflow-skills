@@ -10,12 +10,12 @@
 
 ## 不明点 / 質問一覧
 
-| ID | 問題 / 質問 | 根拠 | 分類 | 影響範囲 / 成果物 | 関連UNKNOWN ID | Runtime Skill | Runtime Unit Key | Model Key | Target Key | Generation Fingerprint | 回答なしの場合の扱い | 回答後の正規化先 | 再開Skill | 再開対象 / 実行範囲 |
+| ID  | 問題 / 質問 | 根拠 | 分類 | 影響範囲 / 成果物 | 関連UNKNOWN ID | Runtime Skill | Runtime Unit Key | Model Key | Target Key | Generation Fingerprint | 回答なしの場合の扱い | 回答後の正規化先 | 再開Skill | 再開対象 / 実行範囲 |
 | --- | ----------- | ---- | ---- | ----------------- | -------------- | ------------- | ---------------- | --------- | ---------- | ---------------------- | -------------------- | ---------------- | --------- | ------------------- |
 
 ## 質問ID履歴
 
-| ID |
+| ID  |
 | --- |
 
 ## 仮定候補
