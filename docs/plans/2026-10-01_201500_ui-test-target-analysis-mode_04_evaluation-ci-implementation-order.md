@@ -836,3 +836,12 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - Step 3 / Step 7は独立Semantic Judge待ちのため未完了。未承認外部API送信は実施していない。provider / endpoint / model / 認証 / retention / 費用上限の選定と外部送信承認が残る。
 - HEAD `b95f198a4430c432242ee0d75b183e636147fc95` の最新CIはAnalyze（3 jobs）、CodeQL、Code Quality、Codex Harness（codex-contract / windows-launcher）、Deterministic Output、Semantic Output、Agent Skills validationがすべてPASS。PR checksで再確認した。
 - Step 10最終レビューとStep 9完了判定は、上記PARTIALとSemantic Judgeが残るため未完了。
+
+### 2026-10-15 継続作業結果（Step 9 scenario 14）
+
+- 検証headは`5f6bfd948328378bf903edbf37aa6b39d92fb58c`。Step 9 item 36について、current-session Agentが`spec-analysis/SKILL.md`とUI target guidanceを読み、評価専用の合成入力から「required UI scopeだが操作・画面・UC identityは不明」と判断した。production `ui_target_package.py materialize`はPAGE / UIOP / US / UC / Behavior / ACを捏造せず、zero-UIOP scopeとBlocking UNKNOWNを`valid=true / completion_status=blocked`で保存した。
+- 同じrequired scopeからblocking UNKNOWNと参照を除いた対照requestは`valid=false`で拒否された。clarified synthetic branchではproduction helperがPAGE / UIOP / US / UC / Behavior / ACを採番し、scopeをreadyにし、`build-machine-evidence`がcanonical Authority / AC Machine Entity handoffを生成した。各inputとpackageは評価用合成データであり、実際の過去成果物やproject recordではない。
+- scenario14のinput、Agent判断、3 request、runtime response、projection、source SHAは`.artifacts/pr16-agent-smoke/scenario-14-required-uiop-unknown-agent/`に保存した。evidence manifest SHA-256は`5d6fc3f470bf0a60dc48f5b19fc19c9ad37e9ce52446cdbbb778f79febdff959`。
+- matrixは41項目を維持し、item 36をPASSに更新した。現在は26 PASS / 15 PARTIAL、`step9_complete=false`、`verification_head=5f6bfd948328378bf903edbf37aa6b39d92fb58c`。matrix SHA-256は`c37a8bd54e5f6f4b527b89fd23225aaf52b6a506b6999784ea9dba16efb8f0a9`。残る固定順migration、cross-skill downstream lifecycle、semantic identity / owner経路、provider-native capabilityをPASSへ繰り上げていない。
+- HEAD `5f6bfd948328378bf903edbf37aa6b39d92fb58c` のPR checksはAnalyze 3 jobs、CodeQL status、Code Quality、Codex Harness 2 jobs、Deterministic Output、Semantic Output、Agent Skills validationがPASS。code-qualityは207 tracked targetsを確認した。
+- Semantic candidateは引き続き8/8 runtime適合。Semantic Judgeは未実施であり、Step 3 / 7と最終Step 10は未完了。Step 9の15 PARTIALも残るためPR全体を完了扱いにしない。
