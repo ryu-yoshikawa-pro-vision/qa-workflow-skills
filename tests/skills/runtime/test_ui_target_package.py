@@ -5,6 +5,8 @@ import re
 import subprocess
 import sys
 import tempfile
+import textwrap
+import time
 import unittest
 from pathlib import Path
 
@@ -257,6 +259,322 @@ class UiTargetPackageTests(unittest.TestCase):
                 replay["payload"]["request_fingerprint"],
                 created["payload"]["request_fingerprint"],
             )
+
+    def test_post_commit_process_exit_replays_create_receipt(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="qa-pr16-crash-replay-") as temporary:
+            root = Path(temporary) / "package"
+            request = authority_scope_request(root)
+            code = textwrap.dedent(
+                """
+                import json
+                import os
+                import sys
+                from pathlib import Path
+
+                sys.path.insert(0, sys.argv[1])
+                import ui_target_package as package
+
+                original = package._commit_package
+
+                def commit_then_exit(*args, **kwargs):
+                    original(*args, **kwargs)
+                    os._exit(73)
+
+                package._commit_package = commit_then_exit
+                package._execute_operation(json.load(sys.stdin))
+                """
+            )
+            crashed = subprocess.run(
+                [sys.executable, "-c", code, str(SCRIPT_DIR)],
+                input=json.dumps(request, ensure_ascii=True),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                cwd=ROOT,
+                check=False,
+                timeout=15,
+            )
+            self.assertEqual(crashed.returncode, 73, crashed.stderr)
+
+            before = package._execute_operation(
+                {"operation": "inspect", "package_root": str(root)}
+            )
+            self.assertTrue(before["valid"], before["issues"])
+            manifest_before = (root / "MANIFEST.md").read_bytes()
+
+            replay = package._execute_operation(request)
+            self.assertTrue(replay["valid"], replay["issues"])
+            self.assertTrue(replay["payload"]["replayed"])
+            self.assertEqual(replay["payload"]["package_version"], "v00")
+            self.assertEqual((root / "MANIFEST.md").read_bytes(), manifest_before)
+
+    def test_package_lock_is_exclusive_across_processes_and_released_after_kill(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory(prefix="qa-pr16-process-lock-") as temporary:
+            root = Path(temporary) / "package"
+            created = package._execute_operation(create_request(root))
+            self.assertTrue(created["valid"], created["issues"])
+            marker = Path(temporary) / "lock-held"
+            code = textwrap.dedent(
+                """
+                import sys
+                import time
+                from pathlib import Path
+
+                sys.path.insert(0, sys.argv[1])
+                import ui_target_package as package
+
+                with package._package_lock(Path(sys.argv[2])):
+                    Path(sys.argv[3]).write_text("held", encoding="utf-8")
+                    time.sleep(30)
+                """
+            )
+            holder = subprocess.Popen(
+                [sys.executable, "-c", code, str(SCRIPT_DIR), str(root), str(marker)],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                cwd=ROOT,
+            )
+            try:
+                deadline = time.monotonic() + 10
+                while not marker.exists():
+                    if holder.poll() is not None:
+                        stdout, stderr = holder.communicate(timeout=1)
+                        self.fail(f"lock holder exited early: {stdout} {stderr}")
+                    if time.monotonic() >= deadline:
+                        self.fail("lock holder did not acquire the package lock")
+                    time.sleep(0.01)
+
+                with self.assertRaises(package.PackageError) as caught:
+                    package._execute_operation(
+                        {"operation": "inspect", "package_root": str(root)}
+                    )
+                self.assertEqual(caught.exception.issue_type, "write_locked")
+            finally:
+                if holder.poll() is None:
+                    holder.terminate()
+                holder.communicate(timeout=5)
+
+            inspected = package._execute_operation(
+                {"operation": "inspect", "package_root": str(root)}
+            )
+            self.assertTrue(inspected["valid"], inspected["issues"])
+
+    def test_preflight_recovers_backup_for_each_reader_and_fails_closed_when_ambiguous(
+        self,
+    ) -> None:
+        for operation in ("inspect", "validate", "build-machine-evidence"):
+            with self.subTest(operation=operation):
+                with tempfile.TemporaryDirectory(
+                    prefix=f"qa-pr16-backup-{operation}-"
+                ) as temporary:
+                    root = Path(temporary) / "package"
+                    created = package._execute_operation(authority_scope_request(root))
+                    self.assertTrue(created["valid"], created["issues"])
+                    snapshot = package._execute_operation(
+                        {"operation": "inspect", "package_root": str(root)}
+                    )["payload"]["update_snapshot"]
+                    backup = root.with_name(f".{root.name}.ui-target-backup")
+                    staging = root.with_name(f".{root.name}.ui-target-staging")
+                    root.rename(backup)
+                    staging.mkdir()
+                    (staging / "partial.md").write_text("partial", encoding="utf-8")
+
+                    request = {"operation": operation, "package_root": str(root)}
+                    if operation == "validate":
+                        request["previous_snapshot"] = snapshot
+                    elif operation == "build-machine-evidence":
+                        request["scope_ids"] = ["SCOPE-001", "SCOPE-002"]
+                    result = package._execute_operation(request)
+
+                    self.assertTrue(result["valid"], result["issues"])
+                    self.assertTrue(root.is_dir())
+                    self.assertFalse(backup.exists())
+                    self.assertFalse(staging.exists())
+                    if operation == "build-machine-evidence":
+                        self.assertEqual(
+                            [
+                                row["entity_ref"]
+                                for row in result["payload"]["batch_handoff"][
+                                    "machine_entities"
+                                ]
+                            ],
+                            ["SPEC-001", "SPEC-002"],
+                        )
+
+        with tempfile.TemporaryDirectory(
+            prefix="qa-pr16-ambiguous-recovery-"
+        ) as temporary:
+            root = Path(temporary) / "package"
+            backup = root.with_name(f".{root.name}.ui-target-backup")
+            staging = root.with_name(f".{root.name}.ui-target-staging")
+            backup.mkdir()
+            (backup / "invalid.md").write_text("invalid", encoding="utf-8")
+            staging.mkdir()
+            with self.assertRaises(package.PackageError) as caught:
+                package._execute_operation(
+                    {"operation": "inspect", "package_root": str(root)}
+                )
+            self.assertEqual(caught.exception.issue_type, "write_recovery_failed")
+
+    def test_not_applicable_scope_rejects_lingering_domain_row(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="qa-pr16-not-applicable-") as temporary:
+            root = Path(temporary) / "package"
+            request = authority_scope_request(root)
+            request["table_changes"].append(
+                {
+                    "file": "03_fields_and_validation.md",
+                    "section": "項目・バリデーション一覧",
+                    "rows": [
+                        {
+                            "draft_key": "field-in-na-scope",
+                            "identity_action": "new",
+                            "reuse_id": None,
+                            "external_id": None,
+                            "cells": {
+                                "関連Scope ID": ["@draft:scope-b"],
+                                "対象構造ID": [],
+                                "ラベル / 名称": "email",
+                                "要素タイプ": "text",
+                                "入力 / 表示仕様": "email input",
+                                "制約 / バリデーション": "valid email",
+                                "関連仕様項目ID": ["@draft:spec-b"],
+                                "関連UNKNOWN ID": [],
+                                "備考": "",
+                            },
+                        }
+                    ],
+                }
+            )
+            with self.assertRaises(package.PackageError) as caught:
+                package._execute_operation(request)
+            self.assertEqual(caught.exception.issue_type, "state_transition_required")
+            self.assertFalse(root.exists())
+
+    def test_reader_during_materialize_commit_fails_closed_then_reads_complete_version(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory(prefix="qa-pr16-reader-race-") as temporary:
+            root = Path(temporary) / "package"
+            first = package._execute_operation(create_request(root))
+            self.assertTrue(first["valid"], first["issues"])
+            snapshot = package._execute_operation(
+                {"operation": "inspect", "package_root": str(root)}
+            )["payload"]["update_snapshot"]
+            update = create_request(root)
+            update["artifact_mode"] = "update"
+            update["previous_snapshot"] = snapshot
+            update["change_summary"] = "atomic reader race"
+
+            marker = Path(temporary) / "old-root-moved"
+            release = Path(temporary) / "release-commit"
+            code = textwrap.dedent(
+                """
+                import json
+                import sys
+                import time
+                from pathlib import Path
+
+                sys.path.insert(0, sys.argv[1])
+                import ui_target_package as package
+
+                marker = Path(sys.argv[3])
+                release = Path(sys.argv[4])
+
+                def paused_commit(root, staging, backup, *, had_root):
+                    if not had_root:
+                        raise AssertionError("expected an update commit")
+                    root.rename(backup)
+                    marker.write_text("committing", encoding="utf-8")
+                    deadline = time.monotonic() + 10
+                    while not release.exists():
+                        if time.monotonic() >= deadline:
+                            raise TimeoutError("test did not release commit")
+                        time.sleep(0.01)
+                    staging.rename(root)
+                    package._remove_owned(backup)
+
+                package._commit_package = paused_commit
+                response = package._execute_operation(json.load(sys.stdin))
+                print(json.dumps(response, ensure_ascii=True))
+                """
+            )
+            writer = subprocess.Popen(
+                [
+                    sys.executable,
+                    "-c",
+                    code,
+                    str(SCRIPT_DIR),
+                    str(root),
+                    str(marker),
+                    str(release),
+                ],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                cwd=ROOT,
+            )
+            try:
+                assert writer.stdin is not None
+                writer.stdin.write(json.dumps(update, ensure_ascii=True))
+                writer.stdin.close()
+                deadline = time.monotonic() + 10
+                while not marker.exists():
+                    if writer.poll() is not None:
+                        stdout, stderr = writer.communicate(timeout=1)
+                        self.fail(
+                            f"writer exited before commit pause: {stdout} {stderr}"
+                        )
+                    if time.monotonic() >= deadline:
+                        self.fail(
+                            "writer did not reach the root-to-backup commit point"
+                        )
+                    time.sleep(0.01)
+
+                read = subprocess.run(
+                    [sys.executable, str(SCRIPT_DIR / "ui_target_package.py")],
+                    input=json.dumps(
+                        {"operation": "inspect", "package_root": str(root)}
+                    ),
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    cwd=ROOT,
+                    check=False,
+                    timeout=10,
+                )
+                self.assertEqual(read.returncode, 0, read.stderr)
+                response = json.loads(read.stdout)
+                self.assertFalse(response["valid"])
+                self.assertEqual(response["issues"][0]["issue_type"], "write_locked")
+                self.assertFalse(root.exists())
+
+                release.write_text("continue", encoding="utf-8")
+                stdout, stderr = writer.communicate(timeout=10)
+                self.assertEqual(writer.returncode, 0, stderr)
+                write_response = json.loads(stdout)
+                self.assertTrue(write_response["valid"], write_response["issues"])
+            finally:
+                if writer.poll() is None:
+                    release.write_text("continue", encoding="utf-8")
+                    writer.communicate(timeout=10)
+
+            completed = package._execute_operation(
+                {"operation": "inspect", "package_root": str(root)}
+            )
+            self.assertTrue(completed["valid"], completed["issues"])
+            self.assertEqual(completed["payload"]["package_version"], "v01")
 
     def test_canonical_table_cell_round_trip_and_traversal_rejection(self) -> None:
         value = "first|second\\path\nthird"

@@ -329,6 +329,14 @@ class TestDownstreamState(unittest.TestCase):
                 [],
             )
 
+    def test_scope_removal_rejects_split_as_a_resolution(self) -> None:
+        resolution = _resolution("tcn", "TCN-001")
+        resolution["resolution"] = "split"
+        with self.assertRaisesRegex(
+            downstream_state.InvalidInput, "resolution is duplicated or invalid"
+        ):
+            downstream_state._validate_resolution_rows([resolution], ["SCOPE-001"])
+
     def test_retired_scope_resolution_waits_for_applied_state_and_zero_scope_deletes(
         self,
     ) -> None:
