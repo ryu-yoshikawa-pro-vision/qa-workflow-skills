@@ -686,8 +686,8 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - [x] Step 6: package schema・migration・helper contract validation。package runtime、migration preflight、projectionの再検証を完了。詳細は本節末の追補を参照。
 - [ ] Step 7: deterministic / semantic責務境界の検証
 - [x] Step 8: cross-repository validation（既存記録: runtime 316 passed / 2 Windows symlink privilege skips、deterministic 302 passed、semantic dataset validation 22 Skill / 163 cases、semantic tests 35 passed / 2 Windows symlink privilege skips、routing 1 passed、Codex Harness 36 passed、formatter / Ruff / diff check passed。push後回帰確認: deterministic repository tests 290 passed、projection repository tests 13 passed / 1 Windows symlink privilege skip、実packageのsemantic / deterministic projection CLIと標準formatter / Ruff passed。UTF-8 stdout / Windows cp932 subprocess testも修正してpass。外部Semantic Judgeは含まない。2026-10-13継続作業のlocal test / formatter / Ruff / diff checkとPR head `f45ef4741c2759178c4eab1f1c68b9da12e677ff` の5 CI checksが成功した）
-- [ ] Step 9: 実Agent smoke（spec-analysis packageの1シナリオは成功。migration、routing、resume、scope lifecycle等の残りのPlan scenarioは未実施）
-- [x] Step 10: final review（2026-10-13継続差分についてPlan / runtime boundary / qa-workflow分担 / safety contract / package assetを確認。actionable findingなし。標準formatter / Ruff、staged diff check、runtime / eval回帰は通過。Semantic Judgeと残りのreal Agent scenarioは未検証として保持）
+- [ ] Step 9: 実Agent smoke（2026-10-14時点でscenario 01・02・07を実行。41項目matrixは2 PASS / 39 PARTIAL。migration / cutover、完全なqa-workflow routing、scope lifecycle等のPlan経路が残るため未完了）
+- [ ] Step 10: final review（2026-10-13のレビューは過去差分について完了。2026-10-14の追加検証でもStep 3 / 7 / 9が未完了のため、Plan所定の最終レビューは未完了）
 
 2026-10-13時点でStep 2は未完了です。3つの`runtime_v1_input_reader.py`、TRD / TC cutover helper、関連runtime contractは存在しますが、`skills/test-condition-design/scripts/runtime_v1_cutover.py`が未実装で、TCDの4 phase / `resume` / partial model unit検証を完了していません。このためTCD cutoverを含むStep 2、migration preflightからfinal gateまでのStep 5、および依存する全体完了条件を満たしていません。Step 3 / 7もSemantic Judgeによる意味評価が未実施のため完了扱いにしません。
 
@@ -700,6 +700,22 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - Step 8: current retestはruntime 339 passed / 2 Windows symlink privilege skips、deterministic shared 12 passed、deterministic repository 290 passed、semantic dataset 22 Skill / 163 cases、semantic shared 27 passed / 2 Windows symlink privilege skips、semantic repository 13 passed / 1 Windows symlink privilege skip、routing 2 passed、Codex Harness 36 passed（installed `codex-cli 0.162.0-alpha.17.2`）。`python scripts/format_tracked.py check`は207 tracked targetsでPASS。PR head `f45ef4741c2759178c4eab1f1c68b9da12e677ff` とPlan更新後head `557bc10c351d518818e0ac9db86201ff6c4c3260` のlatest CIは全5 workflow success: Codex Harness Linux / Windows `codex-cli 0.162.1`、各36件成功（LinuxはWindows-only 8件skip）、Code Quality、Deterministic Output、Semantic Output、Agent SkillsがPASS。
 - Step 9: real AgentはUI target packageを1 scenario生成し、blocked UNKNOWNを保持したpartial package、Authority 2件 / current AC 3件のMachine Entity evidence、`SPEC-OUT-003` 21/21 PASSを確認した。migration、routing、resume、複数scope lifecycle等の残りのPlan scenarioは未実施。
 - Step 10: 最終差分・安全契約レビューを実施し、continuation差分にactionable findingがないことを確認した。`format_tracked.py check`と`git diff --cached --check`は成功。Semantic Judge・残りのAgent scenarioはレビュー結果と分離して未完了とする。
+
+### 2026-10-14 残検証の継続結果
+
+この追補は検証状況を記録するもので、Planの仕様、検証要求、完了条件は変更しない。Step 3 / 7 / 9は未完了のままとする。
+
+- Python環境: system Pythonと既存venvはいずれも3.11.9。テストは既存venvを使用し、新規依存の導入は行っていない。
+- Step 8 tests: runtime 345 passed / 2 Windows symlink privilege skips、deterministic shared 12 passed、deterministic repository 290 passed、semantic dataset validation 22 Skills / 163 cases、semantic shared 27 passed / 2 skips、semantic repository 13 passed / 1 skip、qa-workflow routing 2 passed / 69 fixtures synchronized、trigger contract 1 passed、Agent Skills validation 22/22 passed。
+- package transaction regression: create replay、process lock release、backup-only / ambiguous recovery、reader / materialize commit atomicity、not-applicable scopeの残存FIELD拒否、semantic split拒否を追加した。POSIXで追加reader race testがpipeを二重flushしたテスト不具合を修正し、最新headで再実行した。今回の検証では製品runtimeの不具合を確認していない。
+- local formatter: format_tracked.py checkはRuff段階通過後、dprint executableが見つからず完了できなかった。最新headのCode Quality CIはpass。変更Python fileのRuff check / format checkとdiff whitespace checkはpass。
+- local Codex Harness: 31 tests pass。sandbox内でCodex CLIのexecpolicy起動が拒否されたため、そのCLI setup検証は未実施。権限拒否を迂回していない。最新headのcodex-contract / windows-launcher CIはpass。
+- Semantic candidate: 対象8 caseはSPEC-SEM-003〜007、QUESTION-SEM-003〜004、TR-SEM-003。SPEC-003 / 007とQUESTION-003 / 004の4 caseはhelper validationが有効。SPEC-004 / 005は更新元package不足、SPEC-006はretained ID mapping不足、TR-003はcanonical Scope ID不足でblocked / incomplete。input copyとcandidate artifactのhashを記録した。
+- Semantic Judge: 実行しておらず、外部送信はない。run.pyは任意のjudge-commandを受け取るがprovider / endpoint / modelは選定していない。送信する場合、promptにcase input、criteria / rubric、reference、candidateが含まれ得る。case dataはsyntheticで顧客PII / secretは見つけていないが、認証情報の環境継承、providerの保持条件、概算費用はprovider / model選択前には確定できない。今回のAPI費用は0。実行前にprovider / endpoint、model、認証方式、保持条件、cost capの承認が必要。
+- Step 9 matrix: .artifacts/pr16-step9-matrix.jsonに41項目それぞれのscenario、existing / added tests、deterministic evidence、real Agent evidence、missing conditionを記録した。2項目がPASS、39項目がPARTIALで、step9_completeはfalse。matrixとsmoke artifactはignored local evidenceであり、PRには添付していない。
+- Real Agent: current sessionでscenario 01はpackage / Authority / AC Machine Entity生成までpass。scenario 02はready / blocked scope、question回答反映、package更新 / resumeとMachine Entity projectionまでpassしたが、qa-workflow downstream dispatch / baseline commitは未検証。scenario 07はhelperの構造参照エラーを意味判断から分離して修復し、materialize / inspect / Machine Entity projectionがpass。scenario 03〜06相当の完全経路、migration / cutover、完全なrouting、scope inactive / reactivate / retire / zero-scope、splitとidentity-unknown placementは未検証。artifact、input、helper結果、hashは .artifacts/pr16-agent-smoke/ に保存した。
+- latest verification head 661136e90e329febe088aceb90bb275ca32c895e: Analyze、Code Quality、Codex Harness（codex-contract / windows-launcher）、Deterministic Output、Semantic Output、Agent Skills validation、CodeQL status checkがすべてpass。通常push後のPR #16で確認した。
+- Step 10: 追加差分とテストのレビューは行ったが、Plan所定のfinal reviewはStep 3 / 7 / 9の完了後に再確認する。
 
 ## 12. 完了条件
 
