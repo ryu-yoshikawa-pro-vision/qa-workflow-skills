@@ -304,9 +304,7 @@ class RequirementStructureRuntimeTests(unittest.TestCase):
         terminal = run(terminal_input)
         self.assertEqual(terminal["runtime_status"], "ok", terminal)
         self.assertEqual(terminal["payload"]["tr_id_state"][0]["status"], "deleted")
-        self.assertEqual(
-            terminal["payload"]["tr_id_state"][0]["scope_refs"], ["SCOPE-002"]
-        )
+        self.assertEqual(terminal["payload"]["tr_id_state"][0]["scope_refs"], [])
         self.assertEqual(terminal["payload"]["entities"], [])
 
     def test_reuse_new_and_scope_lifecycle_preserve_full_snapshot(self) -> None:

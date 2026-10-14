@@ -331,6 +331,8 @@ def _test_historical_v2_pair_is_checked_before_unscoped_active_state_fails_close
     for scope in source["input"]["workflow_scopes"]:
         for row in scope["current_structure_state"]["runtime_results"]:
             result = row["result"]
+            result["runtime_implementation_fingerprint"] = "sha256:" + "a" * 64
+            result["generator_implementation_fingerprint"] = "sha256:" + "b" * 64
             result["generation_fingerprint"] = module_runtime.generation_fingerprint(
                 generator=result["generator"],
                 input_fp=result["input_fingerprint"],
@@ -372,6 +374,19 @@ def _test_historical_v2_pair_is_checked_before_unscoped_active_state_fails_close
     )
     assert runtime.returncode == 0, runtime.stdout + runtime.stderr
     envelope = json.loads(runtime.stdout)
+    envelope["runtime_implementation_fingerprint"] = "sha256:" + "c" * 64
+    envelope["generator_implementation_fingerprint"] = "sha256:" + "d" * 64
+    envelope["generation_fingerprint"] = module_runtime.generation_fingerprint(
+        generator=envelope["generator"],
+        input_fp=envelope["input_fingerprint"],
+        model_fp=envelope["model_fingerprint"],
+        runtime_contract_version=envelope["runtime_contract_version"],
+        generator_contract_version=envelope["generator_contract_version"],
+        runtime_impl_fp=envelope["runtime_implementation_fingerprint"],
+        generator_impl_fp=envelope["generator_implementation_fingerprint"],
+        upstream=envelope["upstream_entity_fingerprints"],
+        static_data_versions=envelope["static_data_versions"],
+    )
     markdown = (
         module_runtime.render_runtime_input(
             "qa-workflow", source["metadata"], source["input"]

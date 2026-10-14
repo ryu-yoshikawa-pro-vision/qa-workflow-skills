@@ -579,6 +579,8 @@ def generate(input_value: dict, metadata: dict) -> dict:
                     for draft in drafts
                     if mapping[draft["draft_key"]] == row["tr_id"]
                 )
+            elif zero_scope_terminal:
+                scope_refs = []
         elif row["tr_id"] in inactive_set:
             status = "inactive"
         states.append(

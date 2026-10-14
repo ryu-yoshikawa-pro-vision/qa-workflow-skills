@@ -33,12 +33,6 @@ from runtime_contract import (
 
 _SKILL = "qa-workflow"
 _ROOT_ID = "qa-workflow::artifact:workflow_runtime:all"
-_RUNTIME_IMPL = (
-    "sha256:579ed31a1c14700a287e0eb5753a41b9931005a048a367db347e04efeffda75c"
-)
-_GENERATOR_IMPL = (
-    "sha256:0585c52e3089dd02f13c16f101daddd423ac4cb9730c4d00e09e0b1de4d386d6"
-)
 _ALLOWED_FIELDS = {
     "workflow_ref",
     "workflow_state_record",
@@ -265,8 +259,12 @@ def _validate_frozen_pair(
         or result.get("generator") != "workflow_runtime"
         or result.get("runtime_unit_key") != "artifact:workflow_runtime:all"
         or result.get("model_key") is not None
-        or result.get("runtime_implementation_fingerprint") != _RUNTIME_IMPL
-        or result.get("generator_implementation_fingerprint") != _GENERATOR_IMPL
+        or not isinstance(result.get("runtime_implementation_fingerprint"), str)
+        or FULL_DIGEST_RE.fullmatch(result["runtime_implementation_fingerprint"])
+        is None
+        or not isinstance(result.get("generator_implementation_fingerprint"), str)
+        or FULL_DIGEST_RE.fullmatch(result["generator_implementation_fingerprint"])
+        is None
         or result.get("result_status") != "ready"
         or result.get("runtime_status") != "ok"
         or not isinstance(result.get("payload"), dict)
@@ -292,8 +290,8 @@ def _validate_frozen_pair(
         model_fp=expected_model,
         runtime_contract_version="runtime-v2",
         generator_contract_version="workflow-runtime-v1",
-        runtime_impl_fp=_RUNTIME_IMPL,
-        generator_impl_fp=_GENERATOR_IMPL,
+        runtime_impl_fp=result["runtime_implementation_fingerprint"],
+        generator_impl_fp=result["generator_implementation_fingerprint"],
         upstream=upstream,
         static_data_versions=result.get("static_data_versions", {}),
     )

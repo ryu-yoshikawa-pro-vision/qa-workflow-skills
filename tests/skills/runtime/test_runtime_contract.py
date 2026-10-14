@@ -1386,6 +1386,97 @@ class EntityAndEvidenceTests(unittest.TestCase):
             ],
         )
 
+    def test_zero_scope_terminal_derives_cleanup_units_from_previous_tcn_state(
+        self,
+    ) -> None:
+        normalized = {
+            "zero_scope_terminal": True,
+            "previous_tcn_ids": [
+                {"tcn_id": "TCN-001", "status": "active", "scope_refs": ["SCOPE-001"]},
+                {"tcn_id": "TCN-002", "status": "inactive", "scope_refs": []},
+                {"tcn_id": "TCN-003", "status": "deleted", "scope_refs": []},
+            ],
+        }
+        condition_result = {
+            "result_status": "ready",
+            "payload": {
+                "active_model_metadata": [],
+                "tcn_id_state": [
+                    {"tcn_id": "TCN-001", "status": "deleted", "scope_refs": []},
+                    {"tcn_id": "TCN-002", "status": "deleted", "scope_refs": []},
+                    {"tcn_id": "TCN-003", "status": "deleted", "scope_refs": []},
+                ],
+            },
+        }
+        expected = [
+            {
+                "skill": "test-condition-design",
+                "runtime_unit_key": "artifact:condition_structure:all",
+                "model_key": None,
+            }
+        ]
+        issues: list[dict] = []
+
+        runtime._verified_child_units(
+            "test-condition-design",
+            normalized,
+            {
+                "test-condition-design::artifact:condition_structure:all": condition_result
+            },
+            expected,
+            issues=issues,
+        )
+
+        self.assertEqual(issues, [])
+        self.assertEqual(
+            [row["runtime_unit_key"] for row in expected],
+            [
+                "artifact:condition_structure:all",
+                "artifact:materialize_coverage:TCN-001",
+                "artifact:materialize_coverage:TCN-002",
+            ],
+        )
+
+    def test_zero_scope_terminal_rejects_incomplete_previous_tcn_state(self) -> None:
+        expected = [
+            {
+                "skill": "test-condition-design",
+                "runtime_unit_key": "artifact:condition_structure:all",
+                "model_key": None,
+            }
+        ]
+        issues: list[dict] = []
+
+        runtime._verified_child_units(
+            "test-condition-design",
+            {
+                "zero_scope_terminal": True,
+                "previous_tcn_ids": [
+                    {
+                        "tcn_id": "TCN-001",
+                        "status": "active",
+                        "scope_refs": ["SCOPE-001"],
+                    }
+                ],
+            },
+            {
+                "test-condition-design::artifact:condition_structure:all": {
+                    "result_status": "ready",
+                    "payload": {
+                        "active_model_metadata": [],
+                        "tcn_id_state": [],
+                    },
+                }
+            },
+            expected,
+            issues=issues,
+        )
+
+        self.assertEqual(
+            [issue["field"] for issue in issues], ["zero_scope_terminal_state"]
+        )
+        self.assertEqual(len(expected), 1)
+
     def test_malformed_condition_parent_metadata_blocks_expected_derivation(
         self,
     ) -> None:

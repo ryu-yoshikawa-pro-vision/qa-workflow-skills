@@ -184,7 +184,9 @@ class ConditionStructureRuntimeTests(unittest.TestCase):
         )
         self.assertEqual(result["runtime_status"], "ok", result)
         self.assertEqual(result["payload"]["tcn_id_state"][0]["status"], "deleted")
+        self.assertEqual(result["payload"]["tcn_id_state"][0]["scope_refs"], [])
         self.assertEqual(result["payload"]["model_key_state"][0]["status"], "deleted")
+        self.assertEqual(result["payload"]["model_key_state"][0]["scope_refs"], [])
         self.assertEqual(result["payload"]["entities"], [])
         self.assertEqual(result["payload"]["inactive_tcn_history"], [])
 

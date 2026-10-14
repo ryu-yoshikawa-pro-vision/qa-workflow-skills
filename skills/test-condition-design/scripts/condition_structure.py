@@ -1042,6 +1042,8 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
             status = "active" if row["tcn_id"] in reused_tcn else "deleted"
             if status == "active":
                 scope_refs = current_scope_by_tcn[row["tcn_id"]]
+            elif zero_scope_terminal:
+                scope_refs = []
         elif row["tcn_id"] in inactive_tcn_ids:
             status = "inactive"
         tcn_state.append(
@@ -1064,6 +1066,8 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
             status = "active" if row["model_key"] in reused_models else "deleted"
             if status == "active":
                 scope_refs = model_metadata[row["model_key"]]["scope_refs"]
+            elif zero_scope_terminal:
+                scope_refs = []
         elif row["model_key"] in inactive_model_keys:
             status = "inactive"
         model_state.append({**row, "scope_refs": scope_refs, "status": status})

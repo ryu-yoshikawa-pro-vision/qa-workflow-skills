@@ -3566,17 +3566,69 @@ def _verified_child_units(
                         break
                     if technique_slug is not None:
                         materialize_tcn_ids.add(row["parent_tcn_id"])
+            if normalized.get("zero_scope_terminal") is True:
+                previous_tcn_rows = normalized.get("previous_tcn_ids")
+                terminal_tcn_rows = payload.get("tcn_id_state")
+                if not isinstance(previous_tcn_rows, list) or not isinstance(
+                    terminal_tcn_rows, list
+                ):
+                    invalid_projection = True
+                else:
+                    previous_tcn_state: dict[str, dict[str, Any]] = {}
+                    for row in previous_tcn_rows:
+                        if (
+                            not isinstance(row, dict)
+                            or set(row) != {"tcn_id", "status", "scope_refs"}
+                            or not isinstance(row.get("tcn_id"), str)
+                            or re.fullmatch(r"TCN-[0-9]{3}", row["tcn_id"]) is None
+                            or row.get("status")
+                            not in {"active", "inactive", "deleted"}
+                            or not isinstance(row.get("scope_refs"), list)
+                            or row["tcn_id"] in previous_tcn_state
+                        ):
+                            invalid_projection = True
+                            break
+                        previous_tcn_state[row["tcn_id"]] = row
+                    terminal_tcn_state: dict[str, dict[str, Any]] = {}
+                    if not invalid_projection:
+                        for row in terminal_tcn_rows:
+                            if (
+                                not isinstance(row, dict)
+                                or set(row) != {"tcn_id", "status", "scope_refs"}
+                                or not isinstance(row.get("tcn_id"), str)
+                                or re.fullmatch(r"TCN-[0-9]{3}", row["tcn_id"]) is None
+                                or row.get("status") != "deleted"
+                                or row.get("scope_refs") != []
+                                or row["tcn_id"] in terminal_tcn_state
+                            ):
+                                invalid_projection = True
+                                break
+                            terminal_tcn_state[row["tcn_id"]] = row
+                    if not invalid_projection and set(terminal_tcn_state) != set(
+                        previous_tcn_state
+                    ):
+                        invalid_projection = True
+                    if not invalid_projection:
+                        materialize_tcn_ids.update(
+                            tcn_id
+                            for tcn_id, row in previous_tcn_state.items()
+                            if row["status"] in {"active", "inactive"}
+                        )
             if invalid_projection:
                 if issues is None:
                     raise InvalidInput(
-                        "condition_structure active_model_metadata is invalid"
+                        "condition_structure child-unit projection is invalid"
                     )
                 issues.append(
                     {
                         "issue_type": "invalid_runtime_payload",
                         "blocking": True,
                         "runtime_unit": condition_identity,
-                        "field": "active_model_metadata",
+                        "field": (
+                            "zero_scope_terminal_state"
+                            if normalized.get("zero_scope_terminal") is True
+                            else "active_model_metadata"
+                        ),
                     }
                 )
             else:
