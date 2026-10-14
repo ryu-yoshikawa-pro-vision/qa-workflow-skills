@@ -686,7 +686,7 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - [x] Step 6: package schema・migration・helper contract validation。package runtime、migration preflight、projectionの再検証を完了。詳細は本節末の追補を参照。
 - [ ] Step 7: deterministic / semantic責務境界の検証
 - [x] Step 8: cross-repository validation（既存記録: runtime 316 passed / 2 Windows symlink privilege skips、deterministic 302 passed、semantic dataset validation 22 Skill / 163 cases、semantic tests 35 passed / 2 Windows symlink privilege skips、routing 1 passed、Codex Harness 36 passed、formatter / Ruff / diff check passed。push後回帰確認: deterministic repository tests 290 passed、projection repository tests 13 passed / 1 Windows symlink privilege skip、実packageのsemantic / deterministic projection CLIと標準formatter / Ruff passed。UTF-8 stdout / Windows cp932 subprocess testも修正してpass。外部Semantic Judgeは含まない。2026-10-13継続作業のlocal test / formatter / Ruff / diff checkとPR head `f45ef4741c2759178c4eab1f1c68b9da12e677ff` の5 CI checksが成功した）
-- [ ] Step 9: 実Agent smoke（2026-10-14時点でscenario 01・02・07を実行。41項目matrixは2 PASS / 39 PARTIAL。migration / cutover、完全なqa-workflow routing、scope lifecycle等のPlan経路が残るため未完了）
+- [ ] Step 9: 実Agent smoke（2026-10-14時点でscenario 01・02・03・07を実施、scenario 04のmigration helper chainはfixture入力のためpartial。41項目matrixは3 PASS / 38 PARTIAL。qa-workflowの完全routing、migration全境界、scope lifecycle、identity / split等が残るため未完了）
 - [ ] Step 10: final review（2026-10-13のレビューは過去差分について完了。2026-10-14の追加検証でもStep 3 / 7 / 9が未完了のため、Plan所定の最終レビューは未完了）
 
 2026-10-13時点でStep 2は未完了です。3つの`runtime_v1_input_reader.py`、TRD / TC cutover helper、関連runtime contractは存在しますが、`skills/test-condition-design/scripts/runtime_v1_cutover.py`が未実装で、TCDの4 phase / `resume` / partial model unit検証を完了していません。このためTCD cutoverを含むStep 2、migration preflightからfinal gateまでのStep 5、および依存する全体完了条件を満たしていません。Step 3 / 7もSemantic Judgeによる意味評価が未実施のため完了扱いにしません。
@@ -716,6 +716,19 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - Real Agent: current sessionでscenario 01はpackage / Authority / AC Machine Entity生成までpass。scenario 02はready / blocked scope、question回答反映、package更新 / resumeとMachine Entity projectionまでpassしたが、qa-workflow downstream dispatch / baseline commitは未検証。scenario 07はhelperの構造参照エラーを意味判断から分離して修復し、materialize / inspect / Machine Entity projectionがpass。scenario 03〜06相当の完全経路、migration / cutover、完全なrouting、scope inactive / reactivate / retire / zero-scope、splitとidentity-unknown placementは未検証。artifact、input、helper結果、hashは .artifacts/pr16-agent-smoke/ に保存した。
 - latest verification head 661136e90e329febe088aceb90bb275ca32c895e: Analyze、Code Quality、Codex Harness（codex-contract / windows-launcher）、Deterministic Output、Semantic Output、Agent Skills validation、CodeQL status checkがすべてpass。通常push後のPR #16で確認した。
 - Step 10: 追加差分とテストのレビューは行ったが、Plan所定のfinal reviewはStep 3 / 7 / 9の完了後に再確認する。
+
+
+### 2026-10-14 継続検証
+
+この追補は検証結果を記録するもので、実装仕様やPlanの完了条件は変更しない。
+
+- Python: system Pythonと既存`.venv`はいずれも3.11.9。runtime suiteは346 passed / 2 Windows symlink privilege skips。deterministic repository suiteはsystem PythonではPyYAML未導入により失敗したため、依存を追加せず既存`.venv`で再実行し290 passed。UI target deterministic output contractは2 passed、semantic dataset validatorは22 Skills / 163 casesでpass。
+- 修正した不具合: 条件付き必須file applicabilityのTriggerが`未確定`で、同一materialize request内の`@draft:unk-*`を参照すると、keyed input validationがdraftをstable IDとして誤拒否した。`_keyed_row_from_input`でrequestの`allow_draft`契約に従ってUNKNOWN参照を解析するよう修正し、`test_uncertain_file_trigger_accepts_same_request_unknown_draft`を追加した。修正後のruntime / deterministic testsはpass。
+- Step 9 scenario 03: 現sessionのAgentがspec-analysis Skillとui target guidanceを読み、Scope A/B ready、Scope CのGoal UNKNOWN、既知UI操作、未確定03/04 applicabilityを判断した。package materialize / inspect / ready-only Machine Entity projectionがpassし、Goal・UC identityを捏造せず、SCOPE-003をUNK-001でblocked、completionをpartialに保持した。入力、判断、request、response、artifact、verificationとSHA-256は`.artifacts/pr16-agent-smoke/scenario-03-rerun/`に保存した。
+- Step 9 scenario 04: qa-workflow / TCD Skillを読み、migration preflightの`test-condition-design / resume`に従った。production TCD cutover helperがcondition-structureを選択し、v2 runtime後のresumeがmodelsを選択した。ただしv1入力はfrozen test fixtureから生成したため、real-Agent smokeはpartialとし、Plan項目7の完了根拠にはしない。証拠は`.artifacts/pr16-agent-smoke/scenario-04/`。
+- Step 9 matrix: 41項目は削除せず、scenario 05相当のconditional-file partial progressionをPASSへ更新した。現在3 PASS / 38 PARTIAL、`step9_complete=false`。migration全境界、qa-workflow full routing、scope inactivity/reactivation/retirement/zero-scope、split / identity-unknown placement等は未達。
+- Step 3 / 7: 対象8 semantic caseのcandidate準備記録は既存どおり。Semantic Judgeは実行せず、外部送信もしていない。dataset validatorやhelper検証をSemantic Judge PASSとして扱わない。
+- formatter / CI: local `format_tracked.py check`はRuff段階と変更Python fileの形式確認後、dprint executable不在により完了できない。実装・Plan更新をpushした後にCode Quality CIで確認する。Step 3 / 7 / 9未完了のためStep 10最終レビューとPR全体の完了判定は未実施。
 
 ## 12. 完了条件
 

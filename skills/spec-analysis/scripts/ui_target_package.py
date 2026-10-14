@@ -3898,7 +3898,9 @@ def _keyed_row_from_input(
         if expected_state is None:
             fail("invalid_input", "Trigger判定が不正です")
         row["状態"] = expected_state
-        if expected_state == "blocked" and not _refs(row, "関連UNKNOWN ID"):
+        if expected_state == "blocked" and not _split_refs(
+            row["関連UNKNOWN ID"], allow_draft=allow_draft
+        ):
             fail(
                 "state_transition_required",
                 "未確定file applicabilityに関連UNKNOWN IDが必要です",

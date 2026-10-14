@@ -223,6 +223,25 @@ class UiTargetPackageTests(unittest.TestCase):
                     path.name,
                 )
 
+    def test_uncertain_file_trigger_accepts_same_request_unknown_draft(self) -> None:
+        spec = package.TABLE_BY_KEY[
+            ("00_scope_and_context.md", "条件付き必須file applicability")
+        ]
+        row = package._keyed_row_from_input(
+            spec,
+            {
+                "ファイル": "03_fields_and_validation.md",
+                "Scope ID": "@draft:scope-partial",
+                "Trigger判定": "未確定",
+                "関連仕様項目ID": ["@draft:spec-partial"],
+                "根拠 / 備考": "Input-field applicability is unresolved.",
+                "関連UNKNOWN ID": ["@draft:unk-partial"],
+            },
+        )
+
+        self.assertEqual(row["状態"], "blocked")
+        self.assertEqual(row["関連UNKNOWN ID"], "@draft:unk-partial")
+
     def test_package_creation_inspection_and_receipt_replay(self) -> None:
         with tempfile.TemporaryDirectory(prefix="qa-pr16-package-") as temporary:
             root = Path(temporary) / "package"
