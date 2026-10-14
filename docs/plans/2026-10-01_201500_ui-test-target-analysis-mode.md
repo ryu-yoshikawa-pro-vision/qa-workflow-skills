@@ -330,3 +330,11 @@ PR #14後のCIは `skills/*/scripts` を動的compileするため、helper compi
 Python 3.11.9と既存`.venv`を再確認し、runtime 362 tests / 2 Windows symlink privilege skips、deterministic shared 12、deterministic repository 290、semantic dataset 22 Skills / 163 cases、semantic shared 27 / 2 skips、semantic repository 13 / 1 skip、routing 2、trigger 1を個別に実行した。deterministic repository testはsystem PythonにPyYAMLがなかった初回を環境失敗として記録し、既存`.venv`（PyYAML 6.0.3）で再実行してPASSした。formatterは207 tracked files、Ruff 0.16.8、dprint 0.55.2、official `skills-ref` 25/25、Hook syntax、patch whitespaceもPASSした。Codex Harnessは31 tests後にCLI setup errorとなり、sandbox内実CLI acceptanceは未確認のまま。外部送信およびSemantic Judge実行はない。
 
 candidate manifestの8件すべてがruntime適合し、candidate/evidence 272ファイルのhashが一致した。Step 9 matrixの590 evidence rowも欠落・hash不一致なし。今回新しいAgent workflow scenarioは追加していないため、41項目は32 PASS / 9 PARTIALを維持し、未達条件をPASSへ昇格していない。詳細と実行条件は分割Plan `_04` およびignored local run record `.artifacts/pr16-step9-deterministic/RUN_RECORD-2026-10-15-validation-refresh.md`（SHA-256 `f763247cc30bb6808e202f1ef40fcde97f969ab4feaf08a79f4ddf9d0b57f557`）に記録する。Semantic Judge待ちのStep 3 / 7、CLI受入待ちのStep 8、9 PARTIALが残るStep 9、最終Step 10は未完了である。
+
+### 2026-10-15 同一UC内の枝別impact検証
+
+current-session Agentが`test-analysis` Skillのchange-impact契約を読み、評価用の合成入力でUC-001配下のUIOP-A / Behavior-A / AC-A / TR-AとUIOP-B / Behavior-B / AC-B / TR-Bを別identityとして扱った。Aだけを変更対象にしたproduction `skills/test-analysis/scripts/change_impact.py`の実行結果はUIOP-A / BH-A / AC-A / TR-Aのみで、B側と共有UCはimpact集合に含まれなかった。対応する`tests.skills.runtime.test_test_analysis_change_impact`を個別再実行し、2 tests passed。
+
+request、helper response、Agent判断、verification、test logとhash manifestは`.artifacts/pr16-agent-smoke/scenario-24-same-uc-branches/attempt-01/`にある。manifest SHA-256は`bded7ea6f3c110d2e26a9547a70c9eb9cf3e95ffcddc1a5c992dd43922068e14`。matrix item 24はPARTIALを維持する。artifact-mode Machine EntityでAC-A / TR-Aのstale遷移とAC-B / TR-Bのcurrent維持を確認するtest-analysis / test-requirement-design実行、およびpersisted baseline比較が残る。matrixは32 PASS / 9 PARTIAL、`step9_complete=false`、SHA-256は`3b3d1ea13a704c49cdd2ec105cfb332ce2480b15525dfa685c6873a186895254`。
+
+この追補で意味仕様・41項目・完了条件は変更していない。Step 3 / 7の独立Semantic Judge、Step 8 local Codex CLI acceptance、Step 9の他8 PARTIAL、Step 10最終レビューは引き続き未完了。candidate / Judge dataの外部送信は行っていない。

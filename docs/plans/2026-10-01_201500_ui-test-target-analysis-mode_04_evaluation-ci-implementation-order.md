@@ -909,3 +909,10 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - Semantic candidate 8件はすべてruntime適合。manifest配下272 candidate / evidence fileのSHA-256を再照合し、missing / mismatchは0件。candidate manifestは`5c185ccccb7b2e5010044f5e4fd2d823b086b9c9156e02c96637ea3b8adfcfaf`。
 - Step 9 matrix 41項目の既存証拠590行はすべて存在しhash一致。新しいAgent scenarioは今回追加していないため、32 PASS / 9 PARTIALを維持した。current matrix SHA-256は`9c27938d2c9fd72c664e86289c0588a02b87929c7680006c794a613383a8fa62`。詳細はignored local run record `.artifacts/pr16-step9-deterministic/RUN_RECORD-2026-10-15-validation-refresh.md`（SHA-256 `f763247cc30bb6808e202f1ef40fcde97f969ab4feaf08a79f4ddf9d0b57f557`）。
 - Semantic Judgeは実行しておらず、外部送信はない。Step 3 / 7は独立Judge待ちで未完了。Step 9の9項目PARTIALを維持し、Step 10最終レビューも未完了とする。
+
+### 2026-10-15 同一UC内の枝別impact検証
+
+- current-session Agentが`test-analysis` Skillのchange-impact契約を読み、評価用の合成入力でUC-001配下のUIOP-A / Behavior-A / AC-A / TR-AとUIOP-B / Behavior-B / AC-B / TR-Bを別identityとして扱った。Aだけを変更対象にしたproduction `skills/test-analysis/scripts/change_impact.py`の実行結果はUIOP-A / BH-A / AC-A / TR-Aのみで、B側と共有UCはimpact集合に含まれなかった。
+- 対応する`tests.skills.runtime.test_test_analysis_change_impact`を個別再実行し、2 tests passed。request、helper response、Agent判断、verification、test logとhash manifestは`.artifacts/pr16-agent-smoke/scenario-24-same-uc-branches/attempt-01/`にある。manifest SHA-256は`bded7ea6f3c110d2e26a9547a70c9eb9cf3e95ffcddc1a5c992dd43922068e14`。
+- matrix item 24はPARTIALのまま。artifact-mode Machine EntityでAC-A / TR-Aのstale遷移とAC-B / TR-Bのcurrent維持、およびpersisted baseline比較が未確認である。41項目は32 PASS / 9 PARTIALを維持し、`step9_complete=false`。matrix SHA-256は`3b3d1ea13a704c49cdd2ec105cfb332ce2480b15525dfa685c6873a186895254`。
+- 仕様、検証条件、完了条件に変更はない。Step 3 / 7のSemantic Judge、Step 8 local Codex CLI acceptance、Step 9の他8 PARTIAL、Step 10 final reviewは未完了。Judge向けcandidate / referenceの外部送信は行っていない。
