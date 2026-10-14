@@ -350,3 +350,13 @@ request、helper response、Agent判断、verification、test logとhash manifes
 item 31のpersisted B-only baselineを使い、B blocked時のinactive historyと、B retire後のowner resolutionをcurrent-session Agentおよびproduction `downstream_state.py`で確認した。Agentはlast-active B-only contentからownerなしと判断してTCN/modelをdeletedとし、helperはCI childrenをdeletedへ導きつつgenerator materialization gateを維持した。`test_downstream_state` 12 tests（missing-history fail-closed含む）もPASS。詳細は分割Plan `_04` のScenario 33記録とignored evidence `.artifacts/pr16-agent-smoke/scenario-33-b-only-inactive-retire/attempt-01/`を参照する。
 
 Step 9 matrixは34 PASS / 7 PARTIAL、`step9_complete=false`（SHA-256 `9ecd0e74ffee86a8d2f3aefb9d5b59d183d32261581c7795d8feeb4fdeecd826`）。未完了itemは7 / 9 / 15 / 24 / 32 / 34 / 35。Step 3 / 7 Semantic Judge、Step 8 local Codex CLI acceptance、Step 10 final reviewは引き続き未完了。
+
+### 2026-10-15 Scenario 32 / 35 追加検証
+
+最新作業開始headは`360f45ddde3a42766c97ad9f65c6a718848b9c0a`。その後の変更はこの記録を含むPlan追補だけで、runtime / helper / test sourceの変更はない。
+
+Step 9 item 32ではTRD / TCD / TC zero-scope helper、coverage-analysis terminal projection、qa-workflow final gate、production verifier、およびlocal baseline commit / exact refetchを実行した。focused suiteは43 passed、2 skipped（Windows symlink privilege）。一方、active baselineを同じcross-Skill履歴から再構築するattemptはcoverageのAuthority / Risk edge不足でunresolvedになった。意味情報を補って成功扱いにはせず、item 32はPARTIALを維持する。
+
+Step 9 item 35ではreadyなAC-A content changeに対してproduction change-impactがA branchだけを選び、shared Machine Entity freshness helperがTR-001 stale / TR-002 currentを返した。change-impact 2、stale carry-forward 1、CI inactive / zero-terminal history 2 testsは個別PASS。item 24にもこのbranch-specific freshness証拠を追加したが、artifact-modeのpersisted baseline comparisonは未実施のためitem 24 / 35はPARTIALのまま。
+
+Step 9は41項目中34 PASS / 7 PARTIALで`step9_complete=false`。item 7 / 9 / 15 / 24 / 32 / 34 / 35の不足条件は分割Planとignored local matrixに保持した。Semantic candidateは8/8 runtime適合。Semantic Judgeへの外部送信は許可されていないためStep 3 / 7は未完了。sandbox内Codex CLI acceptanceが未確認のためStep 8も未完了で、Step 10の最終レビューは残検証完了後に実施する。matrix・raw artifactは`.artifacts/`以下のignored local evidenceで、PRに含めない。
