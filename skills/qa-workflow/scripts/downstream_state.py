@@ -18,6 +18,7 @@ from runtime_contract import (
     InvalidInput,
     LimitExceeded,
     RuntimeErrorBase,
+    _state_row_map,
     _validate_metadata,
     canonical_json_text,
     canonicalize,
@@ -547,12 +548,17 @@ def _scope_impact(
                 value = payload[field]
                 if not isinstance(value, list):
                     raise InvalidInput("historical state rows are invalid")
-                for row in value:
-                    if (
-                        not isinstance(row, dict)
-                        or set(row) != {id_field, "status", "scope_refs"}
-                        or row["status"] not in {"active", "inactive", "deleted"}
-                    ):
+                # TCD model_key_state preserves the full model identity
+                # metadata alongside status and scope ownership. Reuse the
+                # shared previous-state validator so scope removal accepts
+                # the production runtime shape and still rejects malformed
+                # or unknown state fields.
+                for row in _state_row_map(value, id_field).values():
+                    if not isinstance(row, dict) or row["status"] not in {
+                        "active",
+                        "inactive",
+                        "deleted",
+                    }:
                         raise InvalidInput("historical downstream state row is invalid")
                     identity = (owner_skill, entity_type, row[id_field])
                     if (
@@ -625,38 +631,36 @@ def _scope_impact(
                     ):
                         raise InvalidInput("inactive materialize entry is invalid")
                     materialize_histories[entry["tcn_id"]] = entry
-            if skill == "test-condition-design":
-                for ci in state["previous_ci_id_state"]:
-                    identity = (skill, "ci", ci["ci_id"])
-                    if identity in state_rows:
-                        raise InvalidInput("duplicate CI state")
-                    state_rows[identity] = ci
-                    active_entity = (
-                        current.get(identity) if ci["status"] == "active" else None
-                    )
-                    inactive_entity = None
-                    if ci["status"] == "inactive":
-                        owner = re.match(r"(TCN-[0-9]{3})-CI", ci["ci_id"])
-                        entry = (
-                            materialize_histories.get(owner.group(1)) if owner else None
+        if skill == "test-condition-design":
+            for ci in _state_row_map(state["previous_ci_id_state"], "ci_id").values():
+                identity = (skill, "ci", ci["ci_id"])
+                if identity in state_rows:
+                    raise InvalidInput("duplicate CI state")
+                state_rows[identity] = ci
+                active_entity = (
+                    current.get(identity) if ci["status"] == "active" else None
+                )
+                inactive_entity = None
+                if ci["status"] == "inactive":
+                    owner = re.match(r"(TCN-[0-9]{3})-CI", ci["ci_id"])
+                    entry = materialize_histories.get(owner.group(1)) if owner else None
+                    if isinstance(entry, dict):
+                        inactive_entity = next(
+                            (
+                                row
+                                for row in entry.get("ci_entities", [])
+                                if isinstance(row, dict)
+                                and row.get("entity_ref") == ci["ci_id"]
+                            ),
+                            None,
                         )
-                        if isinstance(entry, dict):
-                            inactive_entity = next(
-                                (
-                                    row
-                                    for row in entry.get("ci_entities", [])
-                                    if isinstance(row, dict)
-                                    and row.get("entity_ref") == ci["ci_id"]
-                                ),
-                                None,
-                            )
-                    entity = active_entity or inactive_entity
-                    if ci["status"] == "active" and entity is None:
-                        raise InvalidInput("active CI has no current Entity")
-                    if ci["status"] == "inactive" and entity is None:
-                        raise InvalidInput("inactive CI materialize history is missing")
-                    if entity is not None:
-                        rows_by_identity[identity] = entity
+                entity = active_entity or inactive_entity
+                if ci["status"] == "active" and entity is None:
+                    raise InvalidInput("active CI has no current Entity")
+                if ci["status"] == "inactive" and entity is None:
+                    raise InvalidInput("inactive CI materialize history is missing")
+                if entity is not None:
+                    rows_by_identity[identity] = entity
     removed = sorted(
         {
             scope

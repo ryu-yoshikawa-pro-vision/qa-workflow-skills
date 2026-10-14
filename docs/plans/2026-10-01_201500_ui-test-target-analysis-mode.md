@@ -308,3 +308,9 @@ PR #14後のCIは `skills/*/scripts` を動的compileするため、helper compi
 - package-local stable IDを持つ複数UI target packageのMachine Entity blockを同一current Entity collectionへ直接mergeせず、必要ならspec-analysisで1つのcurrent canonical package / normalized inputへ意味統合してから下流へ渡す
 - helperがsemantic判断を代替せず、通常spec-analysisの柔軟性を損なわない
 - production helperの公開CLIは独立した実行用途があるoperationだけに限定し、採番・version計算・MANIFEST生成・impact算出等のmaterialize内部処理をfocused useだけのために公開operation化しない
+
+### 2026-10-15 残工程継続結果
+
+現在のStep別状態はStep 3未完了（独立Semantic Judge未実施）、Step 7未完了（責務境界Semantic Judge未実施）、Step 8未完了（最新head CIと実CLI未確認。official skills-ref 25/25 pass）、Step 9は41項目中32 PASS / 9 PARTIAL、Step 10未完了。Step 9 item 22はcurrent-session Agentとproduction helper / runtimeによるscope-removal three-phase経路を確認した。
+
+検証中に判明した`downstream_state.py`のproduction `model_key_state` row validationとCI state重複処理を修正し、回帰testを追加した。runtime suite 360 pass / 2 Windows symlink privilege skips、deterministic repository suite 290 pass、Semantic candidate 8/8 runtime適合。最新のmatrix、個別検証、制約、hashは分割Plan `_04` の2026-10-15追補と`.artifacts/pr16-step9-deterministic/RUN_RECORD-2026-10-15-continuation.md`に記録した。外部Judge送信は行っていない。

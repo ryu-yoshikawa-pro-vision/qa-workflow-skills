@@ -54,7 +54,19 @@ def _scoped_downstream_input() -> dict[str, Any]:
         },
     }
     tcn_state = [{"tcn_id": "TCN-001", "status": "active", "scope_refs": scopes}]
-    model_state = [{"model_key": "ep-001", "status": "active", "scope_refs": scopes}]
+    model_state = [
+        {
+            "model_key": "ep-001",
+            "model_type": "ep",
+            "technique_slug": "ep",
+            "parent_tcn_id": "TCN-001",
+            "selection_source": "condition_design",
+            "selection_key": None,
+            "derived_from_model_key": None,
+            "status": "active",
+            "scope_refs": scopes,
+        }
+    ]
     ci_state = [{"ci_id": "TCN-001-CI01", "status": "active", "scope_refs": scopes}]
     materialize_history = {
         "tcn_id": "TCN-001",
@@ -535,3 +547,29 @@ class TestDownstreamState(unittest.TestCase):
             {row["status"] for row in terminal["scope_removal_state_transitions"]},
             {"deleted"},
         )
+
+    def test_ci_state_is_processed_once_for_a_scope_with_multiple_runtime_results(
+        self,
+    ) -> None:
+        source = _scoped_downstream_input()
+        source["workflow_scopes"][0]["current_structure_state"][
+            "runtime_results"
+        ].append(
+            {
+                "identity": "test-condition-design::model:ep-001",
+                "result": {
+                    "runtime_unit_key": "model:ep-001",
+                    "payload": {},
+                },
+            }
+        )
+        result = downstream_state._scope_impact(
+            source,
+            ["SCOPE-001", "SCOPE-002"],
+            ["SCOPE-002"],
+            [],
+            [],
+        )
+        self.assertEqual(result["inactive_ci_ids"], ["TCN-001-CI01"])
+        self.assertEqual(result["inactive_tcn_ids"], ["TCN-001"])
+        self.assertEqual(result["inactive_model_keys"], ["ep-001"])
