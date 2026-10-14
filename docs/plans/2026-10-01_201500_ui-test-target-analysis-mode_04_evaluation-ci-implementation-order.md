@@ -686,7 +686,7 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - [x] Step 6: package schema・migration・helper contract validation。package runtime、migration preflight、projectionの再検証を完了。詳細は本節末の追補を参照。
 - [ ] Step 7: deterministic / semantic責務境界の検証
 - [ ] Step 8: cross-repository validation（今回のローカル再検証はruntime 360 pass / 2 Windows symlink privilege skips、deterministic / semantic / routing / trigger / formatter各検証がpass。CI-pinned official skills-refは25/25 pass。`ba4898f3a3eab822f450f0c064815e9b1b4a27db`のGitHub checks 10件はすべてPASS。ただしCodex Harnessのlocal `test_execpolicy_cli` setupはsandboxから実CLIを解決できずerrorとなり、local embedded runtime acceptanceは未確認。最新の再push head CIは追補記載のとおり再確認する。）
-- [ ] Step 9: 実Agent smoke（41項目を維持。最新matrixは32 PASS / 9 PARTIAL、`step9_complete=false`。item 22のscope-removal owner → generator適用 → materialization gateはPASS。item 7 / 9 / 15 / 24 / 31–35は未完了。）
+- [ ] Step 9: 実Agent smoke（41項目を維持。最新matrixは34 PASS / 7 PARTIAL、`step9_complete=false`。item 22のscope-removal owner → generator適用 → materialization gate、item 31のall-blocked baseline保持 → B-only persisted-history resume、item 33のB-only inactive-history owner resolutionはPASS。item 7 / 9 / 15 / 24 / 32 / 34 / 35は未完了。）
 - [ ] Step 10: final review（2026-10-13のレビューは過去差分について完了。2026-10-14の追加検証でもStep 3 / 7 / 9が未完了のため、Plan所定の最終レビューは未完了）
 
 2026-10-13時点でStep 2は未完了です。3つの`runtime_v1_input_reader.py`、TRD / TC cutover helper、関連runtime contractは存在しますが、`skills/test-condition-design/scripts/runtime_v1_cutover.py`が未実装で、TCDの4 phase / `resume` / partial model unit検証を完了していません。このためTCD cutoverを含むStep 2、migration preflightからfinal gateまでのStep 5、および依存する全体完了条件を満たしていません。Step 3 / 7もSemantic Judgeによる意味評価が未実施のため完了扱いにしません。
@@ -916,3 +916,18 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - 対応する`tests.skills.runtime.test_test_analysis_change_impact`を個別再実行し、2 tests passed。request、helper response、Agent判断、verification、test logとhash manifestは`.artifacts/pr16-agent-smoke/scenario-24-same-uc-branches/attempt-01/`にある。manifest SHA-256は`bded7ea6f3c110d2e26a9547a70c9eb9cf3e95ffcddc1a5c992dd43922068e14`。
 - matrix item 24はPARTIALのまま。artifact-mode Machine EntityでAC-A / TR-Aのstale遷移とAC-B / TR-Bのcurrent維持、およびpersisted baseline比較が未確認である。41項目は32 PASS / 9 PARTIALを維持し、`step9_complete=false`。matrix SHA-256は`3b3d1ea13a704c49cdd2ec105cfb332ce2480b15525dfa685c6873a186895254`。
 - 仕様、検証条件、完了条件に変更はない。Step 3 / 7のSemantic Judge、Step 8 local Codex CLI acceptance、Step 9の他8 PARTIAL、Step 10 final reviewは未完了。Judge向けcandidate / referenceの外部送信は行っていない。
+
+### 2026-10-15 Scenario 31: all-blocked baseline retention and B-only resume
+
+- current-session Agentが`qa-workflow` routingと`test-condition-design` Skillを確認し、合成A/B completed baselineをimmutable revisionからexact-refetchした。両scope blocked時は`ready_scope_ids=[]`として下流Skill runtimeを起動せず、`downstream_state.py`のinactive projection後もlast-completed bindingが同一であることを確認した。
+- Bだけを再開する際は、committed baselineから検証したinactive historyをTCDへ渡し、同じ`TCN-001` / `ep-001`をreuseしつつcurrent ownershipを`SCOPE-002`だけにした。`condition_structure.py`、`equivalence_partitions.py`、`materialize_coverage.py`、`workflow_runtime.py`がreadyとなり、B-only baseline commitとimmutable artifact exact-refetchまでPASSした。
+- deterministic suitesを独立実行: migration preflight 9 passed、qa-workflow baseline 7 passed / Windows symlink privilege 2 skipped、test-condition structure 7 passed。実Agent / helper evidenceは`.artifacts/pr16-agent-smoke/scenario-31-both-blocked-b-resume/attempt-06/`、hash manifest SHA-256 `5c072748145408f156023ae9842ea1d443347470791380fa411754550ffc51eb`。Windowsの長いnested artifact pathでatomic createが失敗した試行は保持し、短いworkspace-local storeで標準helperを使って再実行した。sandboxやsecurity設定は変更していない。
+- matrix item 31をPASSに更新。Step 9は41項目中33 PASS / 8 PARTIAL、`step9_complete=false`、未完了item 7 / 9 / 15 / 24 / 32 / 33 / 34 / 35、matrix SHA-256 `4cc5c13e240f83570d10e96b120818df22d76838462e431127cbb9f3bbfa614d`。この更新は検証結果の反映であり、41項目や完了条件の変更ではない。
+- item 31の残条件はない。他のStep 9 PARTIAL、Step 3 / 7 Semantic Judge、Step 8 local Codex CLI acceptance、Step 10 final reviewは未完了。外部Judgeへのcandidate送信はしていない。
+
+### 2026-10-15 Scenario 33: B-only inactive-history owner resolution
+
+- item 31でcommit / exact-refetchしたB-only qa-workflow baselineをproduction `downstream_state.py`へ渡した。B blocked時はSCOPE-BだけがTCN-001 / ep-001 / CI01–02をinactiveへ移し、validated inactive historyにB-only last-active contentを保持した。intermediate blockedではcompleted bindingを変更していない。
+- B retire後、current scope Aだけを指定したproduction preflightは、immutable baselineからremoved SCOPE-Bと4 affected entitiesのlast-active contentを抽出した。AgentはB専用条件に他scopeのownerがないためTCN-001 / ep-001をdeletedと判断し、helperはCI childrenもdeletedへ導いた。generatorへの適用前に`requires_materialization=true`を維持した。missing materialize historyのfail-closed testも含む`test_downstream_state` 12件を個別実行して全件PASS。
+- synthetic Agent/helper request、response、owner判断、verification、hashは`.artifacts/pr16-agent-smoke/scenario-33-b-only-inactive-retire/attempt-01/`、manifest SHA-256 `0d22610f47275b5f8dfc65c19843e67ffb323a2f2ef6c9ae1d63373abdef2f45`。item 33をPASSとし、41項目は34 PASS / 7 PARTIAL、未完了 item 7 / 9 / 15 / 24 / 32 / 34 / 35、`step9_complete=false`。matrix SHA-256 `9ecd0e74ffee86a8d2f3aefb9d5b59d183d32261581c7795d8feeb4fdeecd826`。
+- item 33のowner source / fail-closed条件は完了。generator適用そのものはitem 22のthree-phase testで別途検証済み。全scopeのTRD/TCD/TC/coverage cross-Skill chain等、他7 PARTIALは残る。Semantic Judgeと外部送信は未実施。

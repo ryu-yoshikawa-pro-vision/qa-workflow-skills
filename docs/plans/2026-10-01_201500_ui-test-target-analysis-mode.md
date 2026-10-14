@@ -338,3 +338,15 @@ current-session Agentが`test-analysis` Skillのchange-impact契約を読み、�
 request、helper response、Agent判断、verification、test logとhash manifestは`.artifacts/pr16-agent-smoke/scenario-24-same-uc-branches/attempt-01/`にある。manifest SHA-256は`bded7ea6f3c110d2e26a9547a70c9eb9cf3e95ffcddc1a5c992dd43922068e14`。matrix item 24はPARTIALを維持する。artifact-mode Machine EntityでAC-A / TR-Aのstale遷移とAC-B / TR-Bのcurrent維持を確認するtest-analysis / test-requirement-design実行、およびpersisted baseline比較が残る。matrixは32 PASS / 9 PARTIAL、`step9_complete=false`、SHA-256は`3b3d1ea13a704c49cdd2ec105cfb332ce2480b15525dfa685c6873a186895254`。
 
 この追補で意味仕様・41項目・完了条件は変更していない。Step 3 / 7の独立Semantic Judge、Step 8 local Codex CLI acceptance、Step 9の他8 PARTIAL、Step 10最終レビューは引き続き未完了。candidate / Judge dataの外部送信は行っていない。
+
+### 2026-10-15 Step 9 item 31 完了記録
+
+合成A/B completed baseline exact-refetch後、両scope blockedではdownstream Skill runtimeを起動せずcompleted bindingを保持し、B-only resumeではpersisted inactive historyから同じTCN / model / CI IDを復元した。qa-workflow final gate、B-only baseline commit、exact-refetchまでPASSし、関連runtime testsもmigration preflight 9、qa-workflow baseline 7（Windows symlink privilege skips 2）、test-condition structure 7が個別にPASSした。詳細と実行hashは分割Plan `_04` のScenario 31記録とignored local evidence `.artifacts/pr16-agent-smoke/scenario-31-both-blocked-b-resume/attempt-06/`を参照する。
+
+41項目matrixは33 PASS / 8 PARTIAL、`step9_complete=false`（SHA-256 `4cc5c13e240f83570d10e96b120818df22d76838462e431127cbb9f3bbfa614d`）。未完了itemは7 / 9 / 15 / 24 / 32 / 33 / 34 / 35。Step 3 / 7 Judge、Step 8 local Codex CLI acceptance、Step 10 final reviewは未完了で、Semantic Judgeへの外部送信は行っていない。
+
+### 2026-10-15 Step 9 item 33 完了記録
+
+item 31のpersisted B-only baselineを使い、B blocked時のinactive historyと、B retire後のowner resolutionをcurrent-session Agentおよびproduction `downstream_state.py`で確認した。Agentはlast-active B-only contentからownerなしと判断してTCN/modelをdeletedとし、helperはCI childrenをdeletedへ導きつつgenerator materialization gateを維持した。`test_downstream_state` 12 tests（missing-history fail-closed含む）もPASS。詳細は分割Plan `_04` のScenario 33記録とignored evidence `.artifacts/pr16-agent-smoke/scenario-33-b-only-inactive-retire/attempt-01/`を参照する。
+
+Step 9 matrixは34 PASS / 7 PARTIAL、`step9_complete=false`（SHA-256 `9ecd0e74ffee86a8d2f3aefb9d5b59d183d32261581c7795d8feeb4fdeecd826`）。未完了itemは7 / 9 / 15 / 24 / 32 / 34 / 35。Step 3 / 7 Semantic Judge、Step 8 local Codex CLI acceptance、Step 10 final reviewは引き続き未完了。
