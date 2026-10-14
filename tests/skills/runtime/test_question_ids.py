@@ -7,6 +7,7 @@ from pathlib import Path
 SCRIPT_DIR = (
     Path(__file__).resolve().parents[3] / "skills" / "question-analysis" / "scripts"
 )
+ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(SCRIPT_DIR))
 from question_ids import handle  # noqa: E402
 
@@ -59,6 +60,24 @@ def question(
 
 
 class QuestionIdTests(unittest.TestCase):
+    def test_default_output_template_is_accepted_by_materialize(self) -> None:
+        template = (
+            ROOT / "skills" / "question-analysis" / "assets" / "output-template.md"
+        ).read_text(encoding="utf-8")
+        response = handle(
+            {
+                "operation": "materialize",
+                "artifact_mode": "create",
+                "previous_artifact_markdown": None,
+                "artifact_markdown": template,
+                "current_unknown_ids": [],
+                "resolved_unknown_ids": [],
+                "questions": [],
+            }
+        )
+        self.assertTrue(response["valid"], response)
+        self.assertIn("## 質問ID履歴", response["payload"]["artifact_markdown"])
+
     def test_materialize_allocates_and_validates_unknown_links(self) -> None:
         response = handle(
             {

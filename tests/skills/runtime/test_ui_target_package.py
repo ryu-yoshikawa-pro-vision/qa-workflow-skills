@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 import re
 import subprocess
@@ -193,6 +194,270 @@ def authority_scope_request(root: Path) -> dict:
             },
         ]
     )
+    return request
+
+
+def child_identity_unknown_request(root: Path, branch: str) -> dict:
+    request = create_request(root)
+    request["change_summary"] = f"Synthetic identity placement regression: {branch}"
+    groups: dict[tuple[str, str], dict] = {}
+
+    def add(file: str, section: str, draft_key: str, cells: dict) -> None:
+        group = groups.setdefault(
+            (file, section), {"file": file, "section": section, "rows": []}
+        )
+        group["rows"].append(
+            {
+                "draft_key": draft_key,
+                "identity_action": "new",
+                "reuse_id": None,
+                "external_id": None,
+                "cells": cells,
+            }
+        )
+
+    unknown_ref = "@draft:identity-unknown"
+    has_unknown = branch in {"uc", "behavior", "ac"}
+    add(
+        "00_scope_and_context.md",
+        "分析対象機能scope一覧",
+        "scope",
+        {
+            "対象機能 / 領域": "Synthetic sign-in",
+            "UI操作判定": "あり",
+            "関連UNKNOWN ID": [unknown_ref] if has_unknown else [],
+            "関連仕様項目ID": ["@draft:spec"],
+            "根拠 / 備考": "Synthetic identity placement input.",
+        },
+    )
+    add(
+        "01_ui_structure_and_navigation.md",
+        "UI構造一覧",
+        "page",
+        {
+            "種別": "PAGE",
+            "名称": "Sign-in page",
+            "状態軸": "",
+            "Path / 識別子": "/sign-in",
+            "親構造ID": [],
+            "関連仕様項目ID": ["@draft:spec"],
+            "関連構造ID": [],
+            "備考": "Evaluation-only structure.",
+        },
+    )
+    add(
+        "02_behavior_and_business_rules.md",
+        "UI操作一覧",
+        "operation",
+        {
+            "Scope ID": ["@draft:scope"],
+            "Actor / Role": "Member",
+            "対象構造ID": ["@draft:page"],
+            "操作": "Submit valid sign-in information.",
+            "関連仕様項目ID": ["@draft:spec"],
+            "対応UC ID": [] if branch == "uc" else ["@draft:use-case"],
+            "関連UNKNOWN ID": [unknown_ref] if branch == "uc" else [],
+        },
+    )
+    add(
+        "02_behavior_and_business_rules.md",
+        "User Story一覧",
+        "story",
+        {
+            "Scope ID": ["@draft:scope"],
+            "Actor / Role": "Member",
+            "Goal": "Sign in to the account.",
+            "関連仕様項目ID": ["@draft:spec"],
+            "関連構造ID": ["@draft:page"],
+            "関連UNKNOWN ID": [unknown_ref] if branch == "uc" else [],
+        },
+    )
+    if branch != "uc":
+        add(
+            "02_behavior_and_business_rules.md",
+            "Use Case一覧",
+            "use-case",
+            {
+                "関連US ID": ["@draft:story"],
+                "Use Case": "Member signs in.",
+                "Trigger": "Member submits sign-in information.",
+                "Preconditions": "Member account exists.",
+                "Success Postcondition": "The account page is shown.",
+                "関連仕様項目ID": ["@draft:spec"],
+                "関連構造ID": ["@draft:page"],
+                "関連UNKNOWN ID": [],
+            },
+        )
+        add(
+            "02_behavior_and_business_rules.md",
+            "Behavior一覧",
+            "success-behavior",
+            {
+                "UC ID": ["@draft:use-case"],
+                "関連操作ID": ["@draft:operation"],
+                "結果分類": "正常",
+                "振る舞い": "Valid sign-in reaches the account page.",
+                "Postcondition / Result": "The account page is shown.",
+                "関連仕様項目ID": ["@draft:spec"],
+                "関連構造ID": ["@draft:page"],
+                "関連UNKNOWN ID": [unknown_ref] if branch == "ac" else [],
+            },
+        )
+        if branch != "ac":
+            add(
+                "02_behavior_and_business_rules.md",
+                "Acceptance Criteria一覧",
+                "success-ac",
+                {
+                    "Behavior ID": ["@draft:success-behavior"],
+                    "Acceptance Criteria": "After valid sign-in, the member reaches the account page.",
+                    "関連仕様項目ID": ["@draft:spec"],
+                    "関連構造ID": ["@draft:page"],
+                    "関連UNKNOWN ID": [],
+                },
+            )
+
+    source = {
+        "情報源 / 正本一覧": "Synthetic approved sign-in requirement",
+        "権威 / 優先順位": "承認済み正本",
+        "鮮度 / バージョン": "test fixture",
+        "対象範囲": "Synthetic sign-in",
+        "参照 / 備考": "Evaluation-only input; not historical product data.",
+    }
+    add("09_authority_and_traceability.md", "情報源 / 正本参照一覧", "source", source)
+    add(
+        "09_authority_and_traceability.md",
+        "分析項目",
+        "spec",
+        {
+            "カテゴリ": "仕様",
+            "内容": "Valid sign-in reaches the account page.",
+            "分類": "SPEC",
+            "情報源 / 正本参照": ["@draft:source"],
+            "現在有効か": "Yes",
+            "解消先ID": [],
+            "補足 / 上書き / 置換関係": "",
+            "備考": "Synthetic evaluation basis.",
+        },
+    )
+    if has_unknown:
+        add(
+            "09_authority_and_traceability.md",
+            "分析項目",
+            "identity-unknown",
+            {
+                "カテゴリ": "仕様上の不明点",
+                "内容": f"The {branch} child identity is unresolved.",
+                "分類": "UNKNOWN",
+                "情報源 / 正本参照": ["@draft:source"],
+                "現在有効か": "Yes",
+                "解消先ID": [],
+                "補足 / 上書き / 置換関係": "",
+                "備考": "No identity or product behavior is invented.",
+            },
+        )
+    request["table_changes"] = list(groups.values())
+    request["keyed_table_updates"] = [
+        {
+            "file": "00_scope_and_context.md",
+            "section": "条件付き必須file applicability",
+            "rows": [
+                {
+                    "ファイル": file,
+                    "Scope ID": "@draft:scope",
+                    "Trigger判定": "なし",
+                    "関連仕様項目ID": ["@draft:spec"],
+                    "根拠 / 備考": "Not part of this synthetic identity scenario.",
+                    "関連UNKNOWN ID": [],
+                }
+                for file in (
+                    "03_fields_and_validation.md",
+                    "04_flows_and_data.md",
+                    "05_notifications_and_external_interactions.md",
+                    "08_repository_implementation_status.md",
+                )
+            ],
+        },
+        {
+            "file": "07_current_unknowns.md",
+            "section": "Current UNKNOWN一覧",
+            "rows": (
+                [
+                    {
+                        "UNKNOWN ID": unknown_ref,
+                        "確認事項": f"What is the {branch} child identity?",
+                        "根拠": "The synthetic source does not resolve the child identity.",
+                        "影響範囲": "Only this child identity branch.",
+                        "関連Scope ID": ["@draft:scope"],
+                        "Blocking Scope ID": ["@draft:scope"],
+                        "関連File": "02_behavior_and_business_rules.md",
+                        "関連構造ID": ["@draft:page"],
+                        "次の扱い": "Keep the affected scope blocked pending clarification.",
+                    }
+                ]
+                if has_unknown
+                else []
+            ),
+        },
+        {
+            "file": "02_behavior_and_business_rules.md",
+            "section": "Use Case振る舞い完全性",
+            "rows": (
+                []
+                if branch == "uc"
+                else [
+                    {
+                        "UC ID": "@draft:use-case",
+                        "結果分類": "正常",
+                        "判定": "未定義" if branch == "ac" else "定義あり",
+                        "関連Behavior ID": []
+                        if branch == "ac"
+                        else ["@draft:success-behavior"],
+                        "関連仕様項目ID": ["@draft:spec"],
+                        "関連UNKNOWN ID": [unknown_ref] if branch == "ac" else [],
+                        "理由 / 根拠": "The Acceptance Criterion identity is unresolved."
+                        if branch == "ac"
+                        else "The synthetic source defines the successful sign-in result.",
+                    },
+                    {
+                        "UC ID": "@draft:use-case",
+                        "結果分類": "準正常",
+                        "判定": "なし",
+                        "関連Behavior ID": [],
+                        "関連仕様項目ID": ["@draft:spec"],
+                        "関連UNKNOWN ID": [],
+                        "理由 / 根拠": "No abnormal path is in this synthetic input.",
+                    },
+                    {
+                        "UC ID": "@draft:use-case",
+                        "結果分類": "例外",
+                        "判定": "未定義" if branch == "behavior" else "なし",
+                        "関連Behavior ID": [],
+                        "関連仕様項目ID": ["@draft:spec"],
+                        "関連UNKNOWN ID": [unknown_ref] if branch == "behavior" else [],
+                        "理由 / 根拠": "Exceptional Behavior identity is unresolved."
+                        if branch == "behavior"
+                        else "No exceptional path is in this synthetic input.",
+                    },
+                ]
+            ),
+        },
+        {
+            "file": "09_authority_and_traceability.md",
+            "section": "現在有効な仕様根拠",
+            "rows": [
+                {
+                    "仕様根拠ID": "@draft:spec",
+                    "種別": "SPEC",
+                    "現在有効な内容": "Valid sign-in reaches the account page.",
+                    "適用範囲": "Synthetic sign-in",
+                    "情報源 / 正本一覧": ["@draft:source"],
+                    "関係": "独立",
+                    "関連仕様根拠ID": [],
+                }
+            ],
+        },
+    ]
     return request
 
 
@@ -1056,6 +1321,385 @@ class UiTargetPackageTests(unittest.TestCase):
             self.assertEqual(
                 [row["entity_ref"] for row in batch["machine_entities"]],
                 ["SPEC-001", "SPEC-002"],
+            )
+
+    def test_unknown_child_identity_is_kept_at_the_blocking_parent(self) -> None:
+        def rows_for(markdown: str, section: str) -> list[list[str]]:
+            section_text = markdown.split(f"## {section}\n", 1)[1].split("\n## ", 1)[0]
+            rows = []
+            for line in section_text.splitlines():
+                if not line.startswith("| ") or line.startswith("| ---"):
+                    continue
+                rows.append([cell.strip() for cell in line[1:-1].split("|")])
+            return rows
+
+        expected = {
+            "uc": "User Story一覧",
+            "behavior": "Use Case振る舞い完全性",
+            "ac": "Behavior一覧",
+        }
+        for branch, _ in expected.items():
+            with (
+                self.subTest(branch=branch),
+                tempfile.TemporaryDirectory(
+                    prefix=f"qa-pr16-unknown-{branch}-"
+                ) as temporary,
+            ):
+                root = Path(temporary) / "package"
+                result = package._execute_operation(
+                    child_identity_unknown_request(root, branch)
+                )
+                self.assertTrue(result["valid"], result["issues"])
+                self.assertEqual(result["payload"]["blocked_scope_ids"], ["SCOPE-001"])
+                self.assertEqual(
+                    result["payload"]["scope_readiness"][0]["blocking_unknown_ids"],
+                    ["UNK-001"],
+                )
+                markdown = (root / "02_behavior_and_business_rules.md").read_text(
+                    encoding="utf-8"
+                )
+
+                if branch == "uc":
+                    story_rows = rows_for(markdown, expected[branch])
+                    self.assertEqual(len(story_rows), 2)
+                    self.assertEqual(story_rows[1][0], "US-001")
+                    self.assertEqual(story_rows[1][-2:], ["blocked", "UNK-001"])
+                    self.assertEqual(rows_for(markdown, "Use Case一覧")[1:], [])
+                elif branch == "behavior":
+                    completeness = rows_for(markdown, expected[branch])
+                    exceptional = next(
+                        row for row in completeness[1:] if row[1] == "例外"
+                    )
+                    self.assertEqual(exceptional[2], "未定義")
+                    self.assertEqual(exceptional[3], "")
+                    self.assertEqual(exceptional[5], "UNK-001")
+                    behavior_rows = rows_for(markdown, "Behavior一覧")
+                    self.assertEqual(len(behavior_rows), 2)
+                    self.assertEqual(behavior_rows[1][0], "BH-001")
+                else:
+                    behavior_rows = rows_for(markdown, expected[branch])
+                    self.assertEqual(behavior_rows[1][0], "BH-001")
+                    self.assertEqual(behavior_rows[1][-2:], ["blocked", "UNK-001"])
+                    completeness = rows_for(markdown, "Use Case振る舞い完全性")
+                    normal = next(row for row in completeness[1:] if row[1] == "正常")
+                    self.assertEqual(normal[2], "未定義")
+                    self.assertEqual(normal[3], "")
+                    self.assertEqual(normal[5], "UNK-001")
+                    self.assertEqual(
+                        rows_for(markdown, "Acceptance Criteria一覧")[1:], []
+                    )
+
+    def test_ui_unknown_can_resolve_and_reopen_with_the_same_id(self) -> None:
+        def group(request: dict, file: str, section: str) -> dict:
+            return next(
+                item
+                for item in request["table_changes"]
+                if item["file"] == file and item["section"] == section
+            )
+
+        def keyed_group(request: dict, file: str, section: str) -> dict:
+            return next(
+                item
+                for item in request["keyed_table_updates"]
+                if item["file"] == file and item["section"] == section
+            )
+
+        def replace_draft_refs(value: object, ids: dict[str, str]) -> object:
+            if isinstance(value, str) and value.startswith("@draft:"):
+                return ids[value.removeprefix("@draft:")]
+            if isinstance(value, list):
+                return [replace_draft_refs(item, ids) for item in value]
+            if isinstance(value, dict):
+                return {
+                    key: replace_draft_refs(item, ids) for key, item in value.items()
+                }
+            return value
+
+        with tempfile.TemporaryDirectory(
+            prefix="qa-pr16-ui-unknown-life-"
+        ) as temporary:
+            root = Path(temporary) / "package"
+            initial = child_identity_unknown_request(root, "ready")
+            scope = group(initial, "00_scope_and_context.md", "分析対象機能scope一覧")[
+                "rows"
+            ][0]
+            scope["cells"]["関連UNKNOWN ID"] = ["@draft:ui-type-unknown"]
+            analysis = group(initial, "09_authority_and_traceability.md", "分析項目")
+            analysis["rows"].append(
+                {
+                    "draft_key": "ui-type-unknown",
+                    "identity_action": "new",
+                    "reuse_id": None,
+                    "external_id": None,
+                    "cells": {
+                        "カテゴリ": "仕様上の不明点",
+                        "内容": "The saved-view ellipsis control type is unresolved.",
+                        "分類": "UNKNOWN",
+                        "情報源 / 正本参照": ["@draft:source"],
+                        "現在有効か": "Yes",
+                        "解消先ID": [],
+                        "補足 / 上書き / 置換関係": "",
+                        "備考": "Synthetic evaluation input.",
+                    },
+                }
+            )
+            keyed_group(initial, "07_current_unknowns.md", "Current UNKNOWN一覧")[
+                "rows"
+            ] = [
+                {
+                    "UNKNOWN ID": "@draft:ui-type-unknown",
+                    "確認事項": "Is the saved-view ellipsis a popover?",
+                    "根拠": "Synthetic owner evidence does not classify its UI type.",
+                    "影響範囲": "Saved-view actions control only.",
+                    "関連Scope ID": ["@draft:scope"],
+                    "Blocking Scope ID": ["@draft:scope"],
+                    "関連File": "01_ui_structure_and_navigation.md",
+                    "関連構造ID": ["@draft:page"],
+                    "次の扱い": "Keep scope blocked until clarified.",
+                }
+            ]
+
+            created = package._execute_operation(initial)
+            self.assertTrue(created["valid"], created["issues"])
+            ids = {
+                item["draft_key"]: item["stable_id"]
+                for item in created["payload"]["allocated_ids"]
+            }
+            unknown_id = ids["ui-type-unknown"]
+            self.assertEqual(created["payload"]["blocked_scope_ids"], [ids["scope"]])
+
+            first_snapshot = package._execute_operation(
+                {"operation": "inspect", "package_root": str(root)}
+            )["payload"]["update_snapshot"]
+            resolved = copy.deepcopy(initial)
+            resolved["artifact_mode"] = "update"
+            resolved["previous_snapshot"] = first_snapshot
+            resolved["change_summary"] = "Synthetic evidence resolves the UI type."
+            for table in resolved["table_changes"]:
+                for row in table["rows"]:
+                    draft_key = row.get("draft_key")
+                    if row["identity_action"] == "new":
+                        row["reuse_id"] = ids[draft_key]
+                    row["identity_action"] = "reuse"
+                    row["draft_key"] = None
+                    row["cells"] = replace_draft_refs(row["cells"], ids)
+            resolved["keyed_table_updates"] = replace_draft_refs(
+                resolved["keyed_table_updates"], ids
+            )
+            group(resolved, "01_ui_structure_and_navigation.md", "UI構造一覧")[
+                "rows"
+            ].append(
+                {
+                    "draft_key": "resolved-popover",
+                    "identity_action": "new",
+                    "reuse_id": None,
+                    "external_id": None,
+                    "cells": {
+                        "種別": "POPOVER",
+                        "名称": "Saved-view actions",
+                        "状態軸": "",
+                        "Path / 識別子": "saved-view-actions",
+                        "親構造ID": [ids["page"]],
+                        "関連仕様項目ID": [ids["spec"]],
+                        "関連構造ID": [],
+                        "備考": "Synthetic owner clarification.",
+                    },
+                }
+            )
+            unknown_analysis = next(
+                row
+                for row in group(
+                    resolved, "09_authority_and_traceability.md", "分析項目"
+                )["rows"]
+                if row["reuse_id"] == unknown_id
+            )
+            unknown_analysis["cells"]["現在有効か"] = "No"
+            unknown_analysis["cells"]["解消先ID"] = [ids["spec"]]
+            group(resolved, "00_scope_and_context.md", "分析対象機能scope一覧")["rows"][
+                0
+            ]["cells"]["関連UNKNOWN ID"] = []
+            keyed_group(resolved, "07_current_unknowns.md", "Current UNKNOWN一覧")[
+                "rows"
+            ] = []
+
+            resolved_result = package._execute_operation(resolved)
+            self.assertTrue(resolved_result["valid"], resolved_result["issues"])
+            self.assertEqual(resolved_result["payload"]["package_version"], "v01")
+            self.assertEqual(
+                resolved_result["payload"]["ready_scope_ids"], [ids["scope"]]
+            )
+            popover_id = next(
+                item["stable_id"]
+                for item in resolved_result["payload"]["allocated_ids"]
+                if item["draft_key"] == "resolved-popover"
+            )
+            resolved_inspection = package._execute_operation(
+                {"operation": "inspect", "package_root": str(root)}
+            )
+            self.assertTrue(resolved_inspection["valid"], resolved_inspection["issues"])
+            self.assertEqual(resolved_inspection["payload"]["current_unknown_ids"], [])
+            self.assertEqual(
+                resolved_inspection["payload"]["resolved_unknown_ids"], [unknown_id]
+            )
+            self.assertIn(popover_id, resolved_inspection["payload"]["structural_ids"])
+
+            reopened = copy.deepcopy(resolved)
+            reopened["previous_snapshot"] = resolved_inspection["payload"][
+                "update_snapshot"
+            ]
+            reopened["change_summary"] = (
+                "Synthetic retraction reopens the same UNKNOWN."
+            )
+            ui_rows = group(
+                reopened, "01_ui_structure_and_navigation.md", "UI構造一覧"
+            )["rows"]
+            ui_rows[:] = [row for row in ui_rows if row.get("reuse_id") != popover_id]
+            reopened_unknown = next(
+                row
+                for row in group(
+                    reopened, "09_authority_and_traceability.md", "分析項目"
+                )["rows"]
+                if row.get("reuse_id") == unknown_id
+            )
+            reopened_unknown["cells"]["現在有効か"] = "Yes"
+            reopened_unknown["cells"]["解消先ID"] = []
+            group(reopened, "00_scope_and_context.md", "分析対象機能scope一覧")["rows"][
+                0
+            ]["cells"]["関連UNKNOWN ID"] = [unknown_id]
+            keyed_group(reopened, "07_current_unknowns.md", "Current UNKNOWN一覧")[
+                "rows"
+            ] = [
+                {
+                    "UNKNOWN ID": unknown_id,
+                    "確認事項": "Is the saved-view ellipsis a popover?",
+                    "根拠": "The owner withdrew the classification evidence.",
+                    "影響範囲": "Saved-view actions control only.",
+                    "関連Scope ID": [ids["scope"]],
+                    "Blocking Scope ID": [ids["scope"]],
+                    "関連File": "01_ui_structure_and_navigation.md",
+                    "関連構造ID": [ids["page"]],
+                    "次の扱い": "Keep scope blocked until new clarification.",
+                }
+            ]
+            reopened["retire_ids"] = [popover_id]
+
+            reopened_result = package._execute_operation(reopened)
+            self.assertTrue(reopened_result["valid"], reopened_result["issues"])
+            self.assertEqual(reopened_result["payload"]["package_version"], "v02")
+            self.assertEqual(reopened_result["payload"]["retired_ids"], [popover_id])
+            self.assertEqual(
+                reopened_result["payload"]["blocked_scope_ids"], [ids["scope"]]
+            )
+            reopened_inspection = package._execute_operation(
+                {"operation": "inspect", "package_root": str(root)}
+            )
+            self.assertTrue(reopened_inspection["valid"], reopened_inspection["issues"])
+            self.assertEqual(
+                reopened_inspection["payload"]["current_unknown_ids"], [unknown_id]
+            )
+            self.assertEqual(reopened_inspection["payload"]["resolved_unknown_ids"], [])
+            self.assertNotIn(
+                popover_id, reopened_inspection["payload"]["structural_ids"]
+            )
+
+    def test_large_ready_scope_batch_and_exact_io_size_boundary(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="qa-pr16-large-batch-") as temporary:
+            root = Path(temporary) / "package"
+            request = child_identity_unknown_request(root, "ready")
+            acceptance_group = next(
+                row_group
+                for row_group in request["table_changes"]
+                if row_group["section"] == "Acceptance Criteria一覧"
+            )
+            template = acceptance_group["rows"][0]
+            acceptance_group["rows"] = []
+            for index in range(40):
+                row = copy.deepcopy(template)
+                row["draft_key"] = f"large-ac-{index:02d}"
+                row["cells"]["Acceptance Criteria"] = (
+                    f"Synthetic criterion {index}: " + "x" * (60 * 1024)
+                )
+                acceptance_group["rows"].append(row)
+
+            materialize_input = json.dumps(
+                request, ensure_ascii=False, separators=(",", ":")
+            ).encode("utf-8")
+            self.assertGreater(len(materialize_input), 2 * 1024 * 1024)
+            self.assertLess(len(materialize_input), 16 * 1024 * 1024)
+            materialized = subprocess.run(
+                [sys.executable, str(SCRIPT_DIR / "ui_target_package.py")],
+                input=materialize_input,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=ROOT,
+                check=False,
+                timeout=60,
+            )
+            self.assertEqual(materialized.returncode, 0, materialized.stderr)
+            materialize_result = json.loads(materialized.stdout)
+            self.assertTrue(materialize_result["valid"], materialize_result["issues"])
+
+            evidence_request = {
+                "operation": "build-machine-evidence",
+                "package_root": str(root),
+                "scope_ids": ["SCOPE-001"],
+            }
+            evidence_input = json.dumps(
+                evidence_request, ensure_ascii=False, separators=(",", ":")
+            ).encode("utf-8")
+            evidence_process = subprocess.run(
+                [sys.executable, str(SCRIPT_DIR / "ui_target_package.py")],
+                input=evidence_input,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=ROOT,
+                check=False,
+                timeout=60,
+            )
+            self.assertEqual(evidence_process.returncode, 0, evidence_process.stderr)
+            evidence = json.loads(evidence_process.stdout)
+            self.assertTrue(evidence["valid"], evidence["issues"])
+            batch_bytes = len(
+                package.canonical_json_bytes(evidence["payload"]["batch_handoff"])
+            )
+            self.assertGreater(batch_bytes, 2 * 1024 * 1024)
+            self.assertLess(batch_bytes, 16 * 1024 * 1024)
+
+            exact_limit_request = json.dumps(
+                {"operation": "inspect", "package_root": str(root)},
+                ensure_ascii=False,
+                separators=(",", ":"),
+            ).encode("utf-8")
+            exact_limit_request += b" " * (16 * 1024 * 1024 - len(exact_limit_request))
+            self.assertEqual(len(exact_limit_request), 16 * 1024 * 1024)
+            exact_process = subprocess.run(
+                [sys.executable, str(SCRIPT_DIR / "ui_target_package.py")],
+                input=exact_limit_request,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=ROOT,
+                check=False,
+                timeout=60,
+            )
+            self.assertEqual(exact_process.returncode, 0, exact_process.stderr)
+            self.assertTrue(json.loads(exact_process.stdout)["valid"])
+
+            over_limit_process = subprocess.run(
+                [sys.executable, str(SCRIPT_DIR / "ui_target_package.py")],
+                input=exact_limit_request + b" ",
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=ROOT,
+                check=False,
+                timeout=60,
+            )
+            self.assertEqual(
+                over_limit_process.returncode, 0, over_limit_process.stderr
+            )
+            over_limit_result = json.loads(over_limit_process.stdout)
+            self.assertFalse(over_limit_result["valid"])
+            self.assertEqual(
+                over_limit_result["issues"][0]["issue_type"], "limit_exceeded"
             )
 
     def test_cli_emits_one_structured_json_line_for_invalid_input(self) -> None:

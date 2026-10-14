@@ -6,8 +6,11 @@ import json
 import subprocess
 import sys
 import unittest
+from io import BytesIO
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = ROOT / "skills" / "qa-workflow" / "scripts" / "downstream_state.py"
@@ -181,6 +184,124 @@ def _test_duplicate_json_key_is_handled_as_invalid_input() -> None:
     assert result["issues"][0]["issue_type"] == "invalid_input"
 
 
+def _test_cli_enforces_size_limits_and_historical_binding_contracts() -> None:
+    from runtime_contract import MAX_AGGREGATE_INPUT_BYTES
+
+    code, result = _run(json.dumps({**_request(), "unexpected": True}))
+    assert code == 0
+    assert result["valid"] is False
+    assert result["issues"][0]["issue_type"] == "invalid_input"
+
+    oversized = _run(" " * (MAX_AGGREGATE_INPUT_BYTES + 1))
+    assert oversized[0] == 0
+    assert oversized[1]["valid"] is False
+    assert oversized[1]["payload"] is None
+    assert oversized[1]["issues"][0]["issue_type"] == "limit_exceeded"
+
+    too_large_field = _request(workflow_ref="x" * (64 * 1024 + 1))
+    code, result = _run(json.dumps(too_large_field))
+    assert code == 0
+    assert result["valid"] is False
+    assert result["issues"][0]["issue_type"] == "limit_exceeded"
+
+    large_markdown_without_binding = _request(
+        previous_qa_workflow_artifact_markdown="x" * (64 * 1024 + 1)
+    )
+    code, result = _run(json.dumps(large_markdown_without_binding))
+    assert code == 0
+    assert result["valid"] is False
+    assert result["issues"][0]["issue_type"] == "historical_artifact_unexpected"
+
+    binding = {
+        "artifact_ref": "artifact:qa-workflow:test",
+        "artifact_revision": "revision-001",
+        "artifact_sha256": "0" * 64,
+    }
+    state_record = {
+        "workflow_ref": WORKFLOW_REF,
+        "schema_version": "1",
+        "state": {"last_completed_qa_workflow_artifact": binding},
+    }
+    code, result = _run(json.dumps(_request(workflow_state_record=state_record)))
+    assert code == 0
+    assert result["valid"] is False
+    assert result["issues"][0]["issue_type"] == "historical_artifact_required"
+
+    markdown = "# Not a historical QA workflow artifact\n" + ("x" * (64 * 1024 + 1))
+    code, result = _run(
+        json.dumps(
+            _request(
+                workflow_state_record=state_record,
+                previous_qa_workflow_artifact_markdown=markdown,
+            )
+        )
+    )
+    assert code == 0
+    assert result["valid"] is False
+    assert result["issues"][0]["issue_type"] == "historical_artifact_hash_mismatch"
+
+    digest = hashlib.sha256(markdown.encode("utf-8")).hexdigest()
+    state_record["state"]["last_completed_qa_workflow_artifact"]["artifact_sha256"] = (
+        digest
+    )
+    code, result = _run(
+        json.dumps(
+            _request(
+                workflow_state_record=state_record,
+                previous_qa_workflow_artifact_markdown=markdown,
+            )
+        )
+    )
+    assert code == 0
+    assert result["valid"] is False
+    assert result["issues"][0]["issue_type"] == "historical_runtime_invalid"
+
+
+def _test_cli_maps_scope_history_failures_and_internal_errors() -> None:
+    raw_request = json.dumps(_request()).encode("utf-8")
+    cases = [
+        (
+            downstream_state.InvalidInput("scope ownership unavailable"),
+            "scope_ownership_unavailable",
+            0,
+        ),
+        (
+            downstream_state.InvalidInput("inactive materialize history is missing"),
+            "inactive_materialize_history_missing",
+            0,
+        ),
+        (
+            downstream_state.InvalidInput("last-active Entity snapshot is missing"),
+            "scope_removal_history_missing",
+            0,
+        ),
+        (RuntimeError("unexpected failure"), "internal_error", 1),
+    ]
+    for error, issue_type, expected_exit_code in cases:
+        output = BytesIO()
+        with (
+            patch.object(
+                downstream_state.sys,
+                "stdin",
+                SimpleNamespace(buffer=BytesIO(raw_request)),
+            ),
+            patch.object(
+                downstream_state.sys,
+                "stdout",
+                SimpleNamespace(buffer=output),
+            ),
+            patch.object(downstream_state, "evaluate", side_effect=error),
+        ):
+            exit_code = downstream_state.main()
+        result = json.loads(output.getvalue())
+        assert exit_code == expected_exit_code, result
+        assert result["valid"] is False, result
+        assert result["payload"] is None, result
+        assert len(result["issues"]) == 1, result
+        assert result["issues"][0]["issue_type"] == issue_type, result
+        assert result["issues"][0]["blocking"] is True, result
+
+
 def _test_historical_v2_pair_is_checked_before_unscoped_active_state_fails_closed() -> (
     None
 ):
@@ -285,6 +406,12 @@ class TestDownstreamState(unittest.TestCase):
 
     def test_duplicate_json_key_is_handled_as_invalid_input(self) -> None:
         _test_duplicate_json_key_is_handled_as_invalid_input()
+
+    def test_cli_enforces_size_limits_and_historical_binding_contracts(self) -> None:
+        _test_cli_enforces_size_limits_and_historical_binding_contracts()
+
+    def test_cli_maps_scope_history_failures_and_internal_errors(self) -> None:
+        _test_cli_maps_scope_history_failures_and_internal_errors()
 
     def test_historical_v2_pair_is_checked_before_unscoped_active_state_fails_closed(
         self,
