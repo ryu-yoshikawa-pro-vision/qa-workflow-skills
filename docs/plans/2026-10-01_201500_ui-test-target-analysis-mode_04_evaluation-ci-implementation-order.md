@@ -881,3 +881,9 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - local Codex Harnessは31 testsがPASSした後、`test_execpolicy_cli.ExecpolicyCliTests.setUpClass`がCodex CLIをsandboxから解決できずERRORとなった。versionによるskipや拒否の迂回は行っていない。このローカル実CLI契約は未確認であり、過去headのremote CI PASSで代用しない。ログは`.artifacts/pr16-step9-deterministic/codex-harness-local-final.log`。
 - Scenario 21 attempt-10のrequest、response、state、immutable artifact、verification、およびhashは`.artifacts/pr16-agent-smoke/scenario-21-zero-scope-terminal-agent/attempt-10/`と`.artifacts/pr16-s21-store/`にある。manifestは36ファイルのSHA-256を記録する。これらはignored local evidenceであり、Gitへ追加していない。
 - Step 3 / 7は独立Semantic Judge待ちで未完了。Step 8はローカルの実CLI execpolicy runtime受入が未確認のため未完了。Step 9は9項目PARTIALのため未完了。Step 10最終レビューもこれらの未達が残るため未完了。既存remote CI結果を今回の未push差分のCI結果とは扱わない。
+
+### 2026-10-15 継続作業結果（zero-scope修正head CI）
+
+- commit `192f165034920c3345b9bb9a89678543b24b40bf` のGitHub checksは10/10 SUCCESS。Code Quality、CodeQL（actions / javascript-typescript / python / aggregate）、Codex Harness（codex-contract / windows-launcher）、Validate Agent Skills、Deterministic Output、Semantic Outputが成功した。
+- 実行run: [Code Quality](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/38630538998)、[CodeQL](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/38630534351)、[Codex Harness](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/38630540160)、[Agent Skills](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/38630539005)、[Deterministic Output](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/38630538994)、[Semantic Output](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/38630539117)。
+- local `test_execpolicy_cli` setup errorは別範囲のままであり、CI successでsandbox内CLIアクセスを確認済みとは扱わない。Step 8はlocal runtime受入条件が未確認のため未完了。Step 3 / 7のSemantic Judge、Step 9の9 PARTIAL、Step 10も未完了。
