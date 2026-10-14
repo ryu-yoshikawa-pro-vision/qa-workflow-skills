@@ -825,3 +825,14 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - package schema / helper I/O / migration contractが `_06_package-schema-and-helper-contracts.md` と実装で一致
 - current version / new stable ID / MANIFEST / hash等、packageから決定論導出できる値をAgentが手作業で再構築していない
 - 意味判断を固定するrule engine / generic document framework / ZIP runtimeを追加していない
+
+### 2026-10-15 継続作業結果（TCD migration fail-closed / scenario 13）
+
+- branch `feat/ui-test-target-analysis-profile` のHEAD `b95f198a4430c432242ee0d75b183e636147fc95` で確認した。TCD `runtime_v1_cutover.py` が構造化blocking errorを返す箇所で、`InvalidInput`へ未対応の`issue_type`引数を渡し、`TypeError`から`internal_error`になっていた。TCD helper内の該当例外を`RuntimeErrorBase`へ修正し、out-of-order materializeが`valid=false / cutover_dependency_incomplete / blocking=true`、exit 0でfail-closedする回帰assertionを追加した。共通runtime contractは変更していない。
+- Step 9 item 10をcurrent-session Agentで実行した。Agentは`test-condition-design/SKILL.md`を参照し、評価専用の合成summary/detail・CSV/PDF入力からv1 checkpointを用意した。`condition_structure`、TCD cutover、`equivalence_partitions`、`test_data_requirements`、`materialize_coverage`のproduction helperを呼び、途中のmodel / materialize後にresumeが未完了unitだけを再開することと、最終resume、out-of-order拒否を確認した。合成checkpointは実際の過去成果物ではない。実行記録、入力、artifact、検証結果は`.artifacts/pr16-agent-smoke/scenario-13-tcd-migration-phases-agent/`に保持した。
+- TCD cutover focused suiteは9 tests PASS、runtime suiteは355 PASS / 2 Windows symlink privilege skips。`python scripts/format_tracked.py check`は207 tracked filesでPASS。`git diff --check`もPASS。
+- Step 9 matrixは41項目を保持し、25 PASS / 16 PARTIAL、`step9_complete=false`。matrixの`verification_head`は上記HEADへ同期した。Step 9 item 7、9、13、15、20、22、24、26、29–36などに統合workflow / semantic identity / ownership / provider-nativeなどの未確認条件が残る。matrixと詳細Agent evidenceはignored local artifactであり、このPlan更新だけでは公開・再現されない。
+- Semantic candidateは`SPEC-SEM-003`〜`007`、`QUESTION-SEM-003`〜`004`、`TR-SEM-003`の8件がproduction helper/runtime適合済み。SPEC-SEM-004〜006とTR-SEM-003の評価専用previous state / canonical identityは合成fixtureとして明示し、歴史的成果物とは扱っていない。candidate manifest SHA-256は`699230d4529206ef6bf06906e296899c925d6040ef158d2823b3ed45957ba056`で、217件の保存hashを照合した。Semantic Judgeは未実行である。
+- Step 3 / Step 7は独立Semantic Judge待ちのため未完了。未承認外部API送信は実施していない。provider / endpoint / model / 認証 / retention / 費用上限の選定と外部送信承認が残る。
+- HEAD `b95f198a4430c432242ee0d75b183e636147fc95` の最新CIはAnalyze（3 jobs）、CodeQL、Code Quality、Codex Harness（codex-contract / windows-launcher）、Deterministic Output、Semantic Output、Agent Skills validationがすべてPASS。PR checksで再確認した。
+- Step 10最終レビューとStep 9完了判定は、上記PARTIALとSemantic Judgeが残るため未完了。
