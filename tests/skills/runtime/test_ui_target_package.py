@@ -329,6 +329,180 @@ class UiTargetPackageTests(unittest.TestCase):
             self.assertEqual(replay["payload"]["package_version"], "v00")
             self.assertEqual((root / "MANIFEST.md").read_bytes(), manifest_before)
 
+    def test_post_commit_process_exit_replays_update_ids_extensions_and_retirements(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory(prefix="qa-pr16-update-replay-") as temporary:
+            root = Path(temporary) / "package"
+            initial = authority_scope_request(root)
+            initial["extension_file_updates"] = [
+                {
+                    "draft_key": "retained-extension",
+                    "identity_action": "new",
+                    "path": None,
+                    "slug": "retained",
+                    "responsibility": "Record independent scope evidence.",
+                    "split_reason": "Keep this case-specific note outside standard tables.",
+                    "scope_refs": ["@draft:scope-a"],
+                    "authority_refs": ["@draft:spec-a"],
+                    "structure_refs": [],
+                    "unknown_refs": [],
+                    "body_markdown": "# Retained evidence\n\nEvidence for scope A.\n",
+                }
+            ]
+            created = package._execute_operation(initial)
+            self.assertTrue(created["valid"], created["issues"])
+            snapshot = package._execute_operation(
+                {"operation": "inspect", "package_root": str(root)}
+            )["payload"]["update_snapshot"]
+
+            request = create_request(root)
+            request["artifact_mode"] = "update"
+            request["previous_snapshot"] = snapshot
+            request["keyed_table_updates"] = [
+                {
+                    "file": "09_authority_and_traceability.md",
+                    "section": "現在有効な仕様根拠",
+                    "rows": [
+                        {
+                            "仕様根拠ID": "SPEC-001",
+                            "種別": "SPEC",
+                            "現在有効な内容": "Aは独立している",
+                            "適用範囲": "A機能",
+                            "情報源 / 正本一覧": ["SRC-001"],
+                            "関係": "独立",
+                            "関連仕様根拠ID": [],
+                        },
+                        {
+                            "仕様根拠ID": "SPEC-002",
+                            "種別": "SPEC",
+                            "現在有効な内容": "Bは独立している",
+                            "適用範囲": "B機能",
+                            "情報源 / 正本一覧": ["SRC-001"],
+                            "関係": "独立",
+                            "関連仕様根拠ID": [],
+                        },
+                        {
+                            "仕様根拠ID": "@draft:spec-new",
+                            "種別": "SPEC",
+                            "現在有効な内容": "独立scope workflowの追加検証要件",
+                            "適用範囲": "追加検証",
+                            "情報源 / 正本一覧": ["SRC-001"],
+                            "関係": "独立",
+                            "関連仕様根拠ID": [],
+                        },
+                    ],
+                }
+            ]
+            request["table_changes"] = [
+                {
+                    "file": "09_authority_and_traceability.md",
+                    "section": "分析項目",
+                    "rows": [
+                        {
+                            "draft_key": "spec-new",
+                            "identity_action": "new",
+                            "reuse_id": None,
+                            "external_id": None,
+                            "cells": {
+                                "カテゴリ": "仕様",
+                                "内容": "独立scope workflowの追加検証要件",
+                                "分類": "SPEC",
+                                "情報源 / 正本参照": ["SRC-001"],
+                                "現在有効か": "Yes",
+                                "解消先ID": [],
+                                "補足 / 上書き / 置換関係": "",
+                                "備考": "",
+                            },
+                        }
+                    ],
+                }
+            ]
+            request["change_summary"] = "extensionと仕様根拠を更新"
+            request["extension_file_updates"] = [
+                {
+                    "draft_key": "replacement-extension",
+                    "identity_action": "new",
+                    "path": None,
+                    "slug": "replacement",
+                    "responsibility": "Record updated scope evidence.",
+                    "split_reason": "Keep this case-specific note outside standard tables.",
+                    "scope_refs": ["SCOPE-001"],
+                    "authority_refs": ["SPEC-001"],
+                    "structure_refs": [],
+                    "unknown_refs": [],
+                    "body_markdown": "# Replacement evidence\n\nUpdated evidence for scope A.\n",
+                }
+            ]
+            request["extension_file_retirements"] = ["10_retained.md"]
+
+            code = textwrap.dedent(
+                """
+                import json
+                import os
+                import sys
+
+                sys.path.insert(0, sys.argv[1])
+                import ui_target_package as package
+
+                original = package._commit_package
+
+                def commit_then_exit(*args, **kwargs):
+                    original(*args, **kwargs)
+                    os._exit(73)
+
+                package._commit_package = commit_then_exit
+                package._execute_operation(json.load(sys.stdin))
+                """
+            )
+            crashed = subprocess.run(
+                [sys.executable, "-c", code, str(SCRIPT_DIR)],
+                input=json.dumps(request, ensure_ascii=True),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                cwd=ROOT,
+                check=False,
+                timeout=15,
+            )
+            self.assertEqual(crashed.returncode, 73, crashed.stderr)
+
+            committed = package._execute_operation(
+                {"operation": "inspect", "package_root": str(root)}
+            )
+            self.assertTrue(committed["valid"], committed["issues"])
+            self.assertEqual(committed["payload"]["package_version"], "v01")
+            self.assertFalse((root / "10_retained.md").exists())
+            self.assertTrue((root / "11_replacement.md").is_file())
+            manifest_after_commit = (root / "MANIFEST.md").read_bytes()
+
+            replay = package._execute_operation(request)
+            self.assertTrue(replay["valid"], replay["issues"])
+            self.assertTrue(replay["payload"]["replayed"])
+            self.assertEqual(
+                replay["payload"]["allocated_ids"],
+                [{"draft_key": "spec-new", "stable_id": "SPEC-003"}],
+            )
+            self.assertEqual(
+                replay["payload"]["allocated_extension_files"],
+                [{"draft_key": "replacement-extension", "path": "11_replacement.md"}],
+            )
+            self.assertEqual(
+                replay["payload"]["retired_extension_files"], ["10_retained.md"]
+            )
+            self.assertEqual(replay["payload"]["package_version"], "v01")
+            self.assertEqual((root / "MANIFEST.md").read_bytes(), manifest_after_commit)
+            self.assertTrue((root / "11_replacement.md").is_file())
+            self.assertFalse((root / "10_retained.md").exists())
+
+            changed_request = json.loads(json.dumps(request))
+            changed_request["change_summary"] = "同じsnapshotからの別request"
+            with self.assertRaises(package.PackageError) as caught:
+                package._execute_operation(changed_request)
+            self.assertEqual(caught.exception.issue_type, "stale_snapshot")
+
     def test_package_lock_is_exclusive_across_processes_and_released_after_kill(
         self,
     ) -> None:
@@ -442,6 +616,49 @@ class UiTargetPackageTests(unittest.TestCase):
                 )
             self.assertEqual(caught.exception.issue_type, "write_recovery_failed")
 
+    def test_preflight_removes_orphan_staging_for_each_reader(self) -> None:
+        for operation in ("inspect", "validate", "build-machine-evidence"):
+            with self.subTest(operation=operation):
+                with tempfile.TemporaryDirectory(
+                    prefix=f"qa-pr16-orphan-staging-{operation}-"
+                ) as temporary:
+                    root = Path(temporary) / "package"
+                    created = package._execute_operation(authority_scope_request(root))
+                    self.assertTrue(created["valid"], created["issues"])
+                    snapshot = package._execute_operation(
+                        {"operation": "inspect", "package_root": str(root)}
+                    )["payload"]["update_snapshot"]
+                    manifest_before = (root / "MANIFEST.md").read_bytes()
+                    staging = root.with_name(f".{root.name}.ui-target-staging")
+                    staging.mkdir()
+                    (staging / "partial.md").write_text("partial", encoding="utf-8")
+
+                    request = {"operation": operation, "package_root": str(root)}
+                    if operation == "validate":
+                        request["previous_snapshot"] = snapshot
+                    elif operation == "build-machine-evidence":
+                        request["scope_ids"] = ["SCOPE-001", "SCOPE-002"]
+                    result = package._execute_operation(request)
+
+                    self.assertTrue(result["valid"], result["issues"])
+                    self.assertFalse(staging.exists())
+                    self.assertTrue(root.is_dir())
+                    self.assertEqual(
+                        (root / "MANIFEST.md").read_bytes(), manifest_before
+                    )
+                    if operation == "inspect":
+                        self.assertEqual(result["payload"]["package_version"], "v00")
+                    elif operation == "build-machine-evidence":
+                        self.assertEqual(
+                            [
+                                entity["entity_ref"]
+                                for entity in result["payload"]["batch_handoff"][
+                                    "machine_entities"
+                                ]
+                            ],
+                            ["SPEC-001", "SPEC-002"],
+                        )
+
     def test_not_applicable_scope_rejects_lingering_domain_row(self) -> None:
         with tempfile.TemporaryDirectory(prefix="qa-pr16-not-applicable-") as temporary:
             root = Path(temporary) / "package"
@@ -476,12 +693,169 @@ class UiTargetPackageTests(unittest.TestCase):
             self.assertEqual(caught.exception.issue_type, "state_transition_required")
             self.assertFalse(root.exists())
 
+    def test_not_applicable_scope_rejects_lingering_domain_rows_across_sections(
+        self,
+    ) -> None:
+        rows_by_route = {
+            "optional-domain-files": [
+                (
+                    "04_flows_and_data.md",
+                    "処理フロー一覧",
+                    "flow-b",
+                    {
+                        "関連Scope ID": ["@draft:scope-b"],
+                        "処理名": "Flow for not-applicable scope",
+                        "トリガー / 操作": "Start flow",
+                        "手順 / 状態遷移": "Step",
+                        "結果": "Result",
+                        "関連仕様項目ID": ["@draft:spec-b"],
+                        "関連構造ID": [],
+                        "関連UNKNOWN ID": [],
+                        "備考": "",
+                    },
+                ),
+                (
+                    "05_notifications_and_external_interactions.md",
+                    "通知・外部連携一覧",
+                    "interaction-b",
+                    {
+                        "関連Scope ID": ["@draft:scope-b"],
+                        "種別": "外部連携",
+                        "名称": "Outbound request",
+                        "発火条件": "Action",
+                        "宛先 / 遷移先": "Service",
+                        "内容 / 挙動": "Request",
+                        "関連仕様項目ID": ["@draft:spec-b"],
+                        "関連構造ID": [],
+                        "関連UNKNOWN ID": [],
+                        "備考": "",
+                    },
+                ),
+                (
+                    "08_repository_implementation_status.md",
+                    "Repository実装状況",
+                    "implementation-b",
+                    {
+                        "Repository": "frontend",
+                        "関連Scope ID": ["@draft:scope-b"],
+                        "対象": "Page",
+                        "観測事実": "Observation",
+                        "関連仕様項目ID": ["@draft:spec-b"],
+                        "判定": "一致",
+                        "証拠 / 参照": "case evidence",
+                        "備考": "",
+                    },
+                ),
+            ],
+            "behavior-decomposition": [
+                (
+                    "02_behavior_and_business_rules.md",
+                    "UI操作一覧",
+                    "operation-b",
+                    {
+                        "Scope ID": ["@draft:scope-b"],
+                        "Actor / Role": "User",
+                        "対象構造ID": [],
+                        "操作": "Complete a UI action.",
+                        "関連仕様項目ID": ["@draft:spec-b"],
+                        "対応UC ID": ["@draft:use-case-b"],
+                        "関連UNKNOWN ID": [],
+                    },
+                ),
+                (
+                    "02_behavior_and_business_rules.md",
+                    "User Story一覧",
+                    "story-b",
+                    {
+                        "Scope ID": ["@draft:scope-b"],
+                        "Actor / Role": "User",
+                        "Goal": "Complete the represented workflow.",
+                        "関連仕様項目ID": ["@draft:spec-b"],
+                        "関連構造ID": [],
+                        "関連UNKNOWN ID": [],
+                    },
+                ),
+                (
+                    "02_behavior_and_business_rules.md",
+                    "Use Case一覧",
+                    "use-case-b",
+                    {
+                        "関連US ID": ["@draft:story-b"],
+                        "Use Case": "Complete workflow.",
+                        "Trigger": "User begins workflow.",
+                        "Preconditions": "Scope is available.",
+                        "Success Postcondition": "Workflow completes.",
+                        "関連仕様項目ID": ["@draft:spec-b"],
+                        "関連構造ID": [],
+                        "関連UNKNOWN ID": [],
+                    },
+                ),
+                (
+                    "02_behavior_and_business_rules.md",
+                    "Behavior一覧",
+                    "behavior-b",
+                    {
+                        "UC ID": ["@draft:use-case-b"],
+                        "関連操作ID": ["@draft:operation-b"],
+                        "結果分類": "正常",
+                        "振る舞い": "Complete the workflow.",
+                        "Postcondition / Result": "The workflow completes.",
+                        "関連仕様項目ID": ["@draft:spec-b"],
+                        "関連構造ID": [],
+                        "関連UNKNOWN ID": [],
+                    },
+                ),
+                (
+                    "02_behavior_and_business_rules.md",
+                    "Acceptance Criteria一覧",
+                    "acceptance-b",
+                    {
+                        "Behavior ID": ["@draft:behavior-b"],
+                        "Acceptance Criteria": "The workflow completes.",
+                        "関連仕様項目ID": ["@draft:spec-b"],
+                        "関連構造ID": [],
+                        "関連UNKNOWN ID": [],
+                    },
+                ),
+            ],
+        }
+        for route, rows in rows_by_route.items():
+            with self.subTest(route=route):
+                with tempfile.TemporaryDirectory(
+                    prefix=f"qa-pr16-not-applicable-{route}-"
+                ) as temporary:
+                    root = Path(temporary) / "package"
+                    request = authority_scope_request(root)
+                    request["table_changes"].extend(
+                        {
+                            "file": file,
+                            "section": section,
+                            "rows": [
+                                {
+                                    "draft_key": draft_key,
+                                    "identity_action": "new",
+                                    "reuse_id": None,
+                                    "external_id": None,
+                                    "cells": cells,
+                                }
+                            ],
+                        }
+                        for file, section, draft_key, cells in rows
+                    )
+
+                    with self.assertRaises(package.PackageError) as caught:
+                        package._execute_operation(request)
+                    self.assertEqual(
+                        caught.exception.issue_type, "state_transition_required"
+                    )
+                    self.assertFalse(root.exists())
+
     def test_reader_during_materialize_commit_fails_closed_then_reads_complete_version(
         self,
     ) -> None:
         with tempfile.TemporaryDirectory(prefix="qa-pr16-reader-race-") as temporary:
             root = Path(temporary) / "package"
-            first = package._execute_operation(create_request(root))
+            first = package._execute_operation(authority_scope_request(root))
             self.assertTrue(first["valid"], first["issues"])
             snapshot = package._execute_operation(
                 {"operation": "inspect", "package_root": str(root)}
@@ -490,6 +864,30 @@ class UiTargetPackageTests(unittest.TestCase):
             update["artifact_mode"] = "update"
             update["previous_snapshot"] = snapshot
             update["change_summary"] = "atomic reader race"
+            update["keyed_table_updates"] = []
+
+            before = package._execute_operation(
+                {"operation": "inspect", "package_root": str(root)}
+            )
+            self.assertTrue(before["valid"], before["issues"])
+            self.assertEqual(before["payload"]["package_version"], "v00")
+            before_evidence = package._execute_operation(
+                {
+                    "operation": "build-machine-evidence",
+                    "package_root": str(root),
+                    "scope_ids": ["SCOPE-001", "SCOPE-002"],
+                }
+            )
+            self.assertTrue(before_evidence["valid"], before_evidence["issues"])
+            self.assertEqual(
+                [
+                    entity["entity_ref"]
+                    for entity in before_evidence["payload"]["batch_handoff"][
+                        "machine_entities"
+                    ]
+                ],
+                ["SPEC-001", "SPEC-002"],
+            )
 
             marker = Path(temporary) / "old-root-moved"
             release = Path(temporary) / "release-commit"
@@ -560,24 +958,32 @@ class UiTargetPackageTests(unittest.TestCase):
                         )
                     time.sleep(0.01)
 
-                read = subprocess.run(
-                    [sys.executable, str(SCRIPT_DIR / "ui_target_package.py")],
-                    input=json.dumps(
-                        {"operation": "inspect", "package_root": str(root)}
-                    ),
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                    encoding="utf-8",
-                    errors="replace",
-                    cwd=ROOT,
-                    check=False,
-                    timeout=10,
-                )
-                self.assertEqual(read.returncode, 0, read.stderr)
-                response = json.loads(read.stdout)
-                self.assertFalse(response["valid"])
-                self.assertEqual(response["issues"][0]["issue_type"], "write_locked")
+                for reader_request in (
+                    {"operation": "inspect", "package_root": str(root)},
+                    {
+                        "operation": "build-machine-evidence",
+                        "package_root": str(root),
+                        "scope_ids": ["SCOPE-001", "SCOPE-002"],
+                    },
+                ):
+                    read = subprocess.run(
+                        [sys.executable, str(SCRIPT_DIR / "ui_target_package.py")],
+                        input=json.dumps(reader_request),
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True,
+                        encoding="utf-8",
+                        errors="replace",
+                        cwd=ROOT,
+                        check=False,
+                        timeout=10,
+                    )
+                    self.assertEqual(read.returncode, 0, read.stderr)
+                    response = json.loads(read.stdout)
+                    self.assertFalse(response["valid"])
+                    self.assertEqual(
+                        response["issues"][0]["issue_type"], "write_locked"
+                    )
                 self.assertFalse(root.exists())
 
                 release.write_text("continue", encoding="utf-8")
@@ -595,6 +1001,23 @@ class UiTargetPackageTests(unittest.TestCase):
             )
             self.assertTrue(completed["valid"], completed["issues"])
             self.assertEqual(completed["payload"]["package_version"], "v01")
+            after_evidence = package._execute_operation(
+                {
+                    "operation": "build-machine-evidence",
+                    "package_root": str(root),
+                    "scope_ids": ["SCOPE-001", "SCOPE-002"],
+                }
+            )
+            self.assertTrue(after_evidence["valid"], after_evidence["issues"])
+            self.assertEqual(
+                [
+                    entity["entity_ref"]
+                    for entity in after_evidence["payload"]["batch_handoff"][
+                        "machine_entities"
+                    ]
+                ],
+                ["SPEC-001", "SPEC-002"],
+            )
 
     def test_canonical_table_cell_round_trip_and_traversal_rejection(self) -> None:
         value = "first|second\\path\nthird"
