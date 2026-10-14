@@ -928,6 +928,17 @@ class TestTestConditionRuntimeV1Cutover(unittest.TestCase):
             model_request["normalized_runtime_inputs"][0]["runtime_unit_key"],
             "model:ep-001",
         )
+        out_of_order = _run(
+            artifact,
+            "".join(condition_pair),
+            phase="materialize-coverage",
+        )
+        self.assertIs(out_of_order["valid"], False)
+        self.assertEqual(
+            out_of_order["issues"][0]["issue_type"],
+            "cutover_dependency_incomplete",
+        )
+        self.assertIs(out_of_order["issues"][0]["blocking"], True)
         model_pair = _current_pair(
             "model:ep-001",
             "equivalence_partitions",

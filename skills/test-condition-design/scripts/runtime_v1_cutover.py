@@ -1043,7 +1043,7 @@ def _verify_condition_pair(
             )
         return False
     if canonicalize(current["input"]) != source["root_normalized"]:
-        raise InvalidInput(
+        raise RuntimeErrorBase(
             "current v2 condition_structure input differs from cutover projection",
             issue_type="cutover_semantic_drift",
         )
@@ -1060,12 +1060,12 @@ def _verify_condition_pair(
     if set(current_tcn) != set(old_tcn) or any(
         current_tcn[key]["status"] != status for key, status in old_tcn.items()
     ):
-        raise InvalidInput(
+        raise RuntimeErrorBase(
             "current v2 TCN stable identity/state differs from v1",
             issue_type="cutover_semantic_drift",
         )
     if set(current_model) != set(old_model):
-        raise InvalidInput(
+        raise RuntimeErrorBase(
             "current v2 model stable identity set differs from v1",
             issue_type="cutover_semantic_drift",
         )
@@ -1081,7 +1081,7 @@ def _verify_condition_pair(
             "status",
         ):
             if current_row.get(field) != old.get(field):
-                raise InvalidInput(
+                raise RuntimeErrorBase(
                     "current v2 model stable state differs from v1",
                     issue_type="cutover_semantic_drift",
                 )
@@ -1117,7 +1117,7 @@ def _verify_condition_pair(
     if {key: row["tcn_id"] for key, row in normalized_tcn_map.items()} != {
         key: row["tcn_id"] for key, row in old_tcn_map.items()
     }:
-        raise InvalidInput(
+        raise RuntimeErrorBase(
             "current v2 TCN mapping differs from cutover identity",
             issue_type="cutover_semantic_drift",
         )
@@ -1143,7 +1143,7 @@ def _verify_condition_pair(
     if {key: row["model_key"] for key, row in normalized_model_map.items()} != {
         key: row["model_key"] for key, row in old_model_map.items()
     }:
-        raise InvalidInput(
+        raise RuntimeErrorBase(
             "current v2 model mapping differs from cutover identity",
             issue_type="cutover_semantic_drift",
         )
@@ -1156,7 +1156,7 @@ def _verify_condition_pair(
             "derived_from_model_key",
         ):
             if current_row.get(field) != old.get(field):
-                raise InvalidInput(
+                raise RuntimeErrorBase(
                     "current v2 model map semantic identity differs",
                     issue_type="cutover_semantic_drift",
                 )
@@ -1186,7 +1186,7 @@ def _verify_condition_pair(
         key for key, row in old_model.items() if row["status"] == "active"
     }
     if set(active_by_key) != expected_active:
-        raise InvalidInput(
+        raise RuntimeErrorBase(
             "current v2 active model set differs from v1",
             issue_type="cutover_semantic_drift",
         )
@@ -1196,7 +1196,7 @@ def _verify_condition_pair(
             row.get(field) != old.get(field)
             for field in ("model_type", "technique_slug", "parent_tcn_id")
         ):
-            raise InvalidInput(
+            raise RuntimeErrorBase(
                 "current v2 active model metadata differs from v1",
                 issue_type="cutover_semantic_drift",
             )
@@ -1238,7 +1238,7 @@ def _model_phase(
 ) -> tuple[bool, list[dict[str, Any]], set[str]]:
     condition_identity = f"{SKILL}::{CONDITION_UNIT}"
     if not _verify_condition_pair(source, inputs, results):
-        raise InvalidInput(
+        raise RuntimeErrorBase(
             "models phase requires verified condition_structure",
             issue_type="cutover_dependency_incomplete",
         )
@@ -1272,7 +1272,7 @@ def _model_phase(
         if parent is None:
             value = 0
         elif parent not in active_models:
-            raise InvalidInput(
+            raise RuntimeErrorBase(
                 "derived child parent is missing",
                 issue_type="cutover_dependency_incomplete",
             )
@@ -1296,27 +1296,27 @@ def _model_phase(
             if parent_result is None:
                 waiting.add(key)
                 if identity in inputs:
-                    raise InvalidInput(
+                    raise RuntimeErrorBase(
                         "derived model exists before its parent",
                         issue_type="cutover_dependency_incomplete",
                     )
                 continue
             derived = _derived_child_input(parent_result, key, parent, model)
             if derived is None:
-                raise InvalidInput(
+                raise RuntimeErrorBase(
                     "parent result has no matching derived child input",
                     issue_type="cutover_dependency_incomplete",
                 )
             expected_input = canonicalize(derived)
             if expected_input != canonicalize(old_model_inputs[key]):
-                raise InvalidInput(
+                raise RuntimeErrorBase(
                     "derived child input differs from frozen v1 input",
                     issue_type="cutover_semantic_drift",
                 )
         if identity in inputs:
             current_input = inputs[identity]
             if canonicalize(current_input["input"]) != expected_input:
-                raise InvalidInput(
+                raise RuntimeErrorBase(
                     "current model input differs from cutover projection",
                     issue_type="cutover_semantic_drift",
                 )
@@ -1328,12 +1328,12 @@ def _model_phase(
                 or metadata.get("selection_source") != model.get("selection_source")
                 or metadata.get("selection_key") != model.get("selection_key")
             ):
-                raise InvalidInput(
+                raise RuntimeErrorBase(
                     "current model metadata differs from stable model state",
                     issue_type="cutover_semantic_drift",
                 )
             if results[identity].get("result_status") != "ready":
-                raise InvalidInput(
+                raise RuntimeErrorBase(
                     "cutover model result is not ready",
                     issue_type="cutover_dependency_incomplete",
                 )
@@ -1350,7 +1350,7 @@ def _model_phase(
     remaining = set(active_models) - completed
     ready_keys = {row["model_key"] for row in ready}
     if remaining and not ready_keys:
-        raise InvalidInput(
+        raise RuntimeErrorBase(
             "no ready model unit remains in the dependency graph",
             issue_type="cutover_dependency_incomplete",
         )
@@ -1381,13 +1381,13 @@ def _current_targets(
         result = results.get(identity)
         if pair_input is None or result is None:
             if require_complete:
-                raise InvalidInput(
+                raise RuntimeErrorBase(
                     "current model result is missing",
                     issue_type="cutover_dependency_incomplete",
                 )
             continue
         if result.get("result_status") != "ready":
-            raise InvalidInput(
+            raise RuntimeErrorBase(
                 "current model result is not ready",
                 issue_type="cutover_dependency_incomplete",
             )
@@ -1465,12 +1465,12 @@ def _rebase_source_targets(
         ref = row.get("target_ref")
         target = current.get(ref)
         if not isinstance(ref, str) or target is None or ref in seen:
-            raise InvalidInput(
+            raise RuntimeErrorBase(
                 f"{name} target identity drift", issue_type="cutover_semantic_drift"
             )
         source_model = row.get("source_model_key", row.get("model_key"))
         if source_model is not None and source_model != target["model_key"]:
-            raise InvalidInput(
+            raise RuntimeErrorBase(
                 f"{name} source model drift", issue_type="cutover_semantic_drift"
             )
         seen.add(ref)
@@ -1483,7 +1483,7 @@ def _rebase_source_targets(
             projected["generation_fingerprint"] = target["generation_fingerprint"]
         if "execution_fingerprint" in projected:
             if projected["execution_fingerprint"] != target["execution_fingerprint"]:
-                raise InvalidInput(
+                raise RuntimeErrorBase(
                     f"{name} execution identity drift",
                     issue_type="cutover_semantic_drift",
                 )
@@ -1530,12 +1530,12 @@ def _tdr_projection(
             raise InvalidInput("v1 TDR source target row is invalid")
         old_by_ref[row["target_ref"]] = row
     if set(old_by_ref) != set(targets):
-        raise InvalidInput(
+        raise RuntimeErrorBase(
             "TDR target set changed during cutover", issue_type="cutover_semantic_drift"
         )
     for ref, old in old_by_ref.items():
         if old.get("source_model_key") != targets[ref]["model_key"]:
-            raise InvalidInput(
+            raise RuntimeErrorBase(
                 "TDR source model changed during cutover",
                 issue_type="cutover_semantic_drift",
             )
@@ -1556,7 +1556,7 @@ def _tdr_projection(
             not isinstance(source_model_key, str)
             or source_model_key not in source["active_models"]
         ):
-            raise InvalidInput(
+            raise RuntimeErrorBase(
                 "TDR source model identity drift", issue_type="cutover_semantic_drift"
             )
         versions = row.get("source_target_versions")
@@ -1584,7 +1584,7 @@ def _tdr_projection(
             if old is None or old_by_ref[version["target_ref"]][
                 "source_model_key"
             ] != row.get("source_model_key"):
-                raise InvalidInput(
+                raise RuntimeErrorBase(
                     "TDR requirement source identity drift",
                     issue_type="cutover_semantic_drift",
                 )
@@ -1743,7 +1743,7 @@ def _materialize_projection(
             old_input.get("test_data_requirements") != []
             or current_test_data_requirements
         ):
-            raise InvalidInput(
+            raise RuntimeErrorBase(
                 "TDR state changed while materializing cutover",
                 issue_type="cutover_semantic_drift",
             )
@@ -1758,7 +1758,7 @@ def _materialize_projection(
         if [row.get("requirement_key") for row in old_tdr_rows] != [
             row.get("requirement_key") for row in current_test_data_requirements
         ]:
-            raise InvalidInput(
+            raise RuntimeErrorBase(
                 "TDR requirement identity changed during cutover",
                 issue_type="cutover_semantic_drift",
             )
@@ -1770,7 +1770,7 @@ def _materialize_projection(
         in {item["model_key"] for item in current_active_model_metadata}
     }
     if set(old_targets) != set(current_for_tcn):
-        raise InvalidInput(
+        raise RuntimeErrorBase(
             "materialize target set changed during cutover",
             issue_type="cutover_semantic_drift",
         )
@@ -1782,7 +1782,7 @@ def _materialize_projection(
             or old.get("execution") != current.get("execution")
             or old.get("materializable") != current.get("materializable")
         ):
-            raise InvalidInput(
+            raise RuntimeErrorBase(
                 "materialize target execution identity changed",
                 issue_type="cutover_semantic_drift",
             )
@@ -1810,7 +1810,7 @@ def _materialize_projection(
         raise InvalidInput("v1 target_annotations must be an array")
     for row in old_annotations:
         if not isinstance(row, dict) or row.get("target_ref") not in old_targets:
-            raise InvalidInput(
+            raise RuntimeErrorBase(
                 "v1 target annotation has unknown target",
                 issue_type="cutover_semantic_drift",
             )
@@ -1841,7 +1841,7 @@ def _materialize_projection(
         raise InvalidInput("v1 target_dispositions must be an array")
     for row in old_dispositions:
         if not isinstance(row, dict) or row.get("target_ref") not in old_targets:
-            raise InvalidInput(
+            raise RuntimeErrorBase(
                 "v1 target disposition has unknown target",
                 issue_type="cutover_semantic_drift",
             )
@@ -1866,7 +1866,7 @@ def _materialize_projection(
                 covered.get("target_ref") if isinstance(covered, dict) else None
             )
             if covered_ref not in old_targets or covered_ref not in current_for_tcn:
-                raise InvalidInput(
+                raise RuntimeErrorBase(
                     "duplicate disposition target changed",
                     issue_type="cutover_semantic_drift",
                 )
@@ -2011,7 +2011,7 @@ def _materialize_projection(
                 raise InvalidInput("v1 semantic source target row is invalid")
             ref = version["target_ref"]
             if ref not in old_targets or ref not in current_for_tcn:
-                raise InvalidInput(
+                raise RuntimeErrorBase(
                     "semantic target identity changed",
                     issue_type="cutover_semantic_drift",
                 )
@@ -2035,7 +2035,7 @@ def _materialize_projection(
             and mapping.get("mapping_status") == "active"
         ]
         if len(candidates) != 1:
-            raise InvalidInput(
+            raise RuntimeErrorBase(
                 "semantic CI mapping is missing or ambiguous",
                 issue_type="cutover_semantic_drift",
             )
@@ -2097,7 +2097,7 @@ def _materialize_projection(
                 or old_targets[ref]["model_key"] != row.get("model_key")
                 or ref in grouped_targets
             ):
-                raise InvalidInput(
+                raise RuntimeErrorBase(
                     "merge membership changed during cutover",
                     issue_type="cutover_semantic_drift",
                 )
@@ -2182,7 +2182,7 @@ def _phase_inputs(
         or identity.startswith(f"{SKILL}::artifact:materialize_coverage:")
         for identity in inputs
     ):
-        raise InvalidInput(
+        raise RuntimeErrorBase(
             "downstream v2 pair exists before model completion",
             issue_type="cutover_dependency_incomplete",
         )
@@ -2211,7 +2211,7 @@ def _phase_inputs(
             current_tdr_requirements = []
         else:
             if canonicalize(current_tdr["input"]) != tdr_input:
-                raise InvalidInput(
+                raise RuntimeErrorBase(
                     "current v2 TDR input differs from cutover projection",
                     issue_type="cutover_semantic_drift",
                 )
@@ -2229,7 +2229,7 @@ def _phase_inputs(
             if not isinstance(old_rows, list) or [
                 row.get("requirement_key") for row in old_rows
             ] != [row.get("requirement_key") for row in rows]:
-                raise InvalidInput(
+                raise RuntimeErrorBase(
                     "current v2 TDR requirement identity differs from v1",
                     issue_type="cutover_semantic_drift",
                 )
@@ -2264,14 +2264,14 @@ def _phase_inputs(
                     )
                 expected_rows.append(canonicalize(expected_row))
             if canonicalize(rows) != canonicalize(expected_rows):
-                raise InvalidInput(
+                raise RuntimeErrorBase(
                     "current v2 TDR semantic output differs from v1 projection",
                     issue_type="cutover_semantic_drift",
                 )
             current_tdr_requirements = rows
             tdr_complete = True
     if source["tdr"] is not None and tdr_identity in inputs and not condition_ready:
-        raise InvalidInput(
+        raise RuntimeErrorBase(
             "current TDR pair exists before condition_structure",
             issue_type="cutover_dependency_incomplete",
         )
@@ -2290,7 +2290,7 @@ def _phase_inputs(
     if current_materialize_ids and (
         not condition_ready or not model_complete or not tdr_complete
     ):
-        raise InvalidInput(
+        raise RuntimeErrorBase(
             "materialize v2 pair exists before prerequisites",
             issue_type="cutover_dependency_incomplete",
         )
@@ -2331,7 +2331,7 @@ def _phase_inputs(
                 identity in inputs
                 and canonicalize(inputs[identity]["input"]) != expected_input
             ):
-                raise InvalidInput(
+                raise RuntimeErrorBase(
                     "current v2 materialize input differs from cutover projection",
                     issue_type="cutover_semantic_drift",
                 )
@@ -2411,7 +2411,7 @@ def _requested_phase(
         state["condition_ready"] and state["model_complete"] and state["tdr_complete"],
     ]
     if index and not prerequisites[index - 1]:
-        raise InvalidInput(
+        raise RuntimeErrorBase(
             f"{phase} phase has an incomplete predecessor",
             issue_type="cutover_dependency_incomplete",
         )
