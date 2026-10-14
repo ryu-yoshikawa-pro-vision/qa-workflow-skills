@@ -790,6 +790,14 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - Semantic candidateは8/8 runtime適合の既存証拠を再利用する。Semantic Judgeは未実行で外部送信なし。Step 3 / 7は未完了、Step 9に18 PARTIALが残るためStep 10とPR全体の完了判定も未完了。
 - Push前のGitHub CI結果はこの変更を含まない。Local formatterのdprint executableと`skills-ref`は引き続き利用不能であり、CI Code Quality / Agent Skills結果で確認する。
 
+### 2026-10-15 Code Quality failureの修正
+
+- pushしたhead `8db1cc453564a38834d4333578514f995a888f6f` のCode Quality CIが失敗した。dprint 0.55.2は短い`ID`列のseparatorを`--`へ再整形し、GitHub Flavored Markdownの3-hyphen delimiterとproduction `question_ids.py`のschema validationに反した。またPlan末尾に改行がなかった。
+- CIと同じdprint 0.55.2をignored local `.artifacts/pr16-dprint/`へ一時配置して挙動を再現した。質問一覧と質問ID履歴の`ID` headerにNBSPを置き、parserの既存`.strip()`でheader値を従来どおり`ID`へ正規化することで、dprint後も`---` separatorを保つようにした。helper契約やseparator検証は緩和していない。既定template materialize regressionと `question_ids` 5 testsがpassした。
+- dprint 0.55.2でPlan末尾改行と対象templateを整形後、`python scripts/format_tracked.py check`はRuff / dprintともpassし、207 tracked filesは整形済み。runtime suiteは355 pass / Windows symlink privilege skips 2。`git diff --check`もpass。runtime log SHA-256 `f1fe401f509b4c32121eef23289251a9e3992430d67c581eb5a3051e70efb776`。
+- Step 9 matrixは41項目、23 PASS / 18 PARTIAL、`step9_complete=false`を維持。検証対象head `77e492d53a9fbe6e7c61b8435e6e07e7f2863c3a`。ignored local matrix SHA-256 `faa1ca457d67e4d03cea7164d874c37c30ae91c9f71361480f18229fe13b2dfd`。raw `.artifacts`をGitへ追加しない。
+- 新しいsource / Plan commitをpush後にCode Qualityを含む最新head CIを再確認する。Step 3 / 7はSemantic Judge未実施、Step 9に18 PARTIALが残るためStep 10とPR全体は未完了。
+
 ## 12. 完了条件
 
 - 新Skill追加なし
