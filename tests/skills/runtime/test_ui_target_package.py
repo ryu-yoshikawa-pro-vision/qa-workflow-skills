@@ -527,6 +527,7 @@ class UiTargetPackageTests(unittest.TestCase):
                 assert writer.stdin is not None
                 writer.stdin.write(json.dumps(update, ensure_ascii=True))
                 writer.stdin.close()
+                writer.stdin = None
                 deadline = time.monotonic() + 10
                 while not marker.exists():
                     if writer.poll() is not None:
