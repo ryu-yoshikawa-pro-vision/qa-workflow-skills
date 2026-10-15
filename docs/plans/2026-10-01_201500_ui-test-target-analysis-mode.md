@@ -381,3 +381,9 @@ Step 3 / 7は独立Semantic Judge未実施、Step 8はlocal実CLI acceptanceと�
 - runtime identityは`MYCOMPUTER\CodexSandboxOffline`、Pythonは3.11.9。`Get-Command codex`は解決せず、`C:\Users\sella\AppData\Roaming\npm\codex.cmd`のアクセスは拒否された。`Test-Path`のfalseは不存在の根拠にしない。local `test_execpolicy_cli`はsetup errorでCLI試験開始前に停止したためStep 8は未完了。権限変更や別経路のCLI起動はしていない。
 - 作業開始時のlocal headと最後に取得済みtracking refは`6551d85ca26d27bcbc186748d17c1392a03bf111`。検証済みruntime / test差分はlocal commit `081197565e54ab21b452dd18aea51f068026dd7f`、push結果のPlan記録はlocal commit `fbf134e`にある。通常pushは`github.com:443`のconnection failureで完了せず、これらのlocal commitはremoteへ届いていない。GitHub API / remote socketは引き続きnetwork access denialであり、remote最新head / CIと現在のPR本文は未確認。本文を取得できないためPR本文更新も行えていない。古いcrawl結果は最新状態の証拠に使っていない。
 - Semantic Judgeは未実行でcase / candidate / reference / rubricの外部送信なし。独立した許可済みlocal Judgeも見つかっていないためStep 3 / 7は未完了。local差分のレビューと修正確認は実施したが、Step 3 / 7 / 8 / 9およびremote CIが未完了のためStep 10全体完了条件は未成立。
+
+### 2026-10-15 ネットワーク復旧後のPR #16状態
+
+remote branch head `79210d4335ebb82589bdcbe77d1030224e6c0c49`はlocalと一致し、同headのGitHub CIは全6 workflowがSUCCESS。PR本文とPlanの同期、Plan追補の通常push後の最新CI確認を続ける。Step 9は41項目中37 PASS / 4 PARTIAL（7 / 9 / 34 / 35）。item 34ではC-onlyのproduction横断経路を追加確認したが、A+B baseline owner reuseとA再ready後のsame-ID復元を同一の保存済み履歴で完了していないためPARTIALを維持する。Step 3 / 7 Semantic Judge、Step 8 local Codex CLI runtime acceptance、Step 9残項目、Step 10 final reviewは未完了であり、完了条件は変更していない。詳細は分割Plan `_04` の「2026-10-15 ネットワーク復旧後のPR同期と残項目追試」を参照する。
+
+item 9の追加synthetic TCD resume試行では、現行runtimeが空モデルを拒否し、意味上妥当な正のpartitionはsource v1 cutover projectionとのdriftでfail-closedしたため、item 9はPARTIALのままとする。runtime suiteは366 PASS / 2 Windows symlink privilege skips、formatter 207 tracked filesと`git diff --check`はPASS。詳細とraw local evidenceは分割Plan `_04` の2026-10-15追補に記録する。
