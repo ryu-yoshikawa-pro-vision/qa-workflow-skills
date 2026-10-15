@@ -387,3 +387,11 @@ Step 3 / 7は独立Semantic Judge未実施、Step 8はlocal実CLI acceptanceと�
 remote branch head `79210d4335ebb82589bdcbe77d1030224e6c0c49`はlocalと一致し、同headのGitHub CIは全6 workflowがSUCCESS。PR本文とPlanの同期、Plan追補の通常push後の最新CI確認を続ける。Step 9は41項目中37 PASS / 4 PARTIAL（7 / 9 / 34 / 35）。item 34ではC-onlyのproduction横断経路を追加確認したが、A+B baseline owner reuseとA再ready後のsame-ID復元を同一の保存済み履歴で完了していないためPARTIALを維持する。Step 3 / 7 Semantic Judge、Step 8 local Codex CLI runtime acceptance、Step 9残項目、Step 10 final reviewは未完了であり、完了条件は変更していない。詳細は分割Plan `_04` の「2026-10-15 ネットワーク復旧後のPR同期と残項目追試」を参照する。
 
 item 9の追加synthetic TCD resume試行では、現行runtimeが空モデルを拒否し、意味上妥当な正のpartitionはsource v1 cutover projectionとのdriftでfail-closedしたため、item 9はPARTIALのままとする。runtime suiteは366 PASS / 2 Windows symlink privilege skips、formatter 207 tracked filesと`git diff --check`はPASS。詳細とraw local evidenceは分割Plan `_04` の2026-10-15追補に記録する。
+
+### 2026-10-15 PR head CI再確認とitem 9追試
+
+PR APIでlocal head `9540c13bc299f20c30fef9dc83a2daa2fd49929e`との一致を確認し、同headのCode Quality、Codex Harness、Agent Skills、Deterministic Output、Semantic Output、CodeQLをすべてSUCCESSと確認した。直接の`git ls-remote`はこの実行identity `MYCOMPUTER\CodexSandboxOffline`からGitHub:443接続失敗となった。PR APIによるremote確認は成功している。
+
+合成v1 TCD inputからproduction cutoverのcondition structure、models、TDR、materialize phases全体を中断・resumeし、final resumeとout-of-order拒否を実行した。TCD内部migrationはPASSしたが、全Skill固定順の移行・ownership baseline・qa-workflow gateへの一連の接続は未確認のためitem 7 / 9はPARTIALを維持する。item 34 / 35にも同一lineage全下流完了の不足が残り、Step 9は37 PASS / 4 PARTIAL（7 / 9 / 34 / 35）。
+
+focused runtime testsは52 PASS / 2 Windows symlink privilege SKIP。Codex CLIへのsandbox内アクセス拒否も再確認され、Step 8は未完了。Semantic Judgeは未実行で外部送信していないためStep 3 / 7も未完了、Step 10は最終レビュー未完了。詳細とignored local evidence hashは分割Plan `_04` の最新追補を参照する。Plan仕様・41項目・完了条件は変更していない。
