@@ -360,3 +360,24 @@ Step 9 item 32ではTRD / TCD / TC zero-scope helper、coverage-analysis termina
 Step 9 item 35ではreadyなAC-A content changeに対してproduction change-impactがA branchだけを選び、shared Machine Entity freshness helperがTR-001 stale / TR-002 currentを返した。change-impact 2、stale carry-forward 1、CI inactive / zero-terminal history 2 testsは個別PASS。item 24にもこのbranch-specific freshness証拠を追加したが、artifact-modeのpersisted baseline comparisonは未実施のためitem 24 / 35はPARTIALのまま。
 
 Step 9は41項目中34 PASS / 7 PARTIALで`step9_complete=false`。item 7 / 9 / 15 / 24 / 32 / 34 / 35の不足条件は分割Planとignored local matrixに保持した。Semantic candidateは8/8 runtime適合。Semantic Judgeへの外部送信は許可されていないためStep 3 / 7は未完了。sandbox内Codex CLI acceptanceが未確認のためStep 8も未完了で、Step 10の最終レビューは残検証完了後に実施する。matrix・raw artifactは`.artifacts/`以下のignored local evidenceで、PRに含めない。
+
+### 2026-10-15 残工程の検証更新
+
+開始時のlocal headは`6551d85ca26d27bcbc186748d17c1392a03bf111`。追加修正後のruntime suiteは366 passed / 2 Windows symlink privilege skips、deterministic shared 12 passed、deterministic repository 290 passed、semantic dataset 22 Skills / 163 cases、semantic shared 27 passed / 2 skips、semantic repository 13 passed / 1 skip、trigger 1 passed、Agent Skills validation 25/25 passed、Ruff・formatter・compileallもPASS。Codex Harnessは31 tests passed後にexecpolicy test class setupがsandbox identityの`codex.cmd`アクセス拒否で失敗し、local CLI runtime acceptanceは未確認。GitHub API / remote socketへのnetwork denialにより最新PR headとCIは再取得できていない。
+
+既存のproduction変更`skills/qa-workflow/scripts/downstream_state.py`は、複数workflow scopeから重複参照された同一TCD aggregate / CI state rowを一度だけ集約し、競合する重複はfail-closedにする。また`materialize_coverage:<TCN>`履歴を全TCD scopeから探索する。対応するruntime regression testsを追加し、重複同一stateの受理・重複競合の拒否・対応scopeのmaterialize履歴取得を確認した。
+
+Step 9 matrixは41項目中37 PASS / 4 PARTIAL（item 7 / 9 / 34 / 35）、`step9_complete=false`。item 15はA/B blocked / inactive / resume / persisted baselineのcross-Skill経路がPASS。item 24はAC-001のみのartifact-mode更新後、TR-002 stale / TR-001 current、前baseline binding維持、stale downstreamに対するqa-workflow unresolved gateをPASS。item 32ではitem 15のcompleted A/B baselineを基に、TCD materialize runtimeのCI rowsをQA scopeへ追加してproduction `workflow_runtime.py`を再実行し、CIを含む全参照がcurrentのcompleted baselineを作った。revision `sha256:839d2d616c80ce5d64326cb108990c1c4761a79c6336f59ba763e16e44919a7b`をcommit / exact-refetchし、同じrevisionを別storeへ複製したzero-scope branchでTRD / TCD / TC / coverage / qa-workflowの削除専用処理とterminal commit / exact-refetchまでPASSした。item 35はfreshnessとTCDのdeleted-CI ID非再利用を別々のsynthetic historyで確認したが、同一artifact-mode lifecycleをTC / coverage / qa-workflowまで完了していないためPARTIAL。item 7 / 9 / 34の完全な実Agent経路も未完了である。
+
+この追補前のmatrixはSHA-256 `392db8e412a4a61c02de3a2644d54cf139c5ff30758c2b459989a44a7616346b`。その時点のmanifest照合済みverificationはignored local `.artifacts/pr16-step9-validation-2026-10-15/final-review/current-review.json`（SHA-256 `5ff835b2cab0d20556ffdde482ad001fbf67431ea911a0926a4bfc1e521a339b`）と`.artifacts/pr16-agent-smoke/common-baseline/attempt-02/sha256.txt`（SHA-256 `0973669ab5fa4aea93dff53107541544aef0d12730dd32335411ede253bf37be`）にある。`.artifacts/pr16-step9-matrix.json`は最終再確認を反映し、41項目中37 PASS / 4 PARTIAL、`step9_complete=false`を保持する。新旧matrixとraw artifactはGitへ追加しない。
+
+Step 3 / 7は独立Semantic Judge未実施、Step 8はlocal実CLI acceptanceと最新remote CI未確認、Step 9は4 PARTIAL、Step 10 final reviewは未完了。外部Judgeへの評価データ送信は行わず、sandbox / Hook / execpolicy制約を変更・迂回していない。Planの目的・仕様・完了条件は変更していない。
+
+### 2026-10-15 残検証の最終再確認
+
+- 現在のStep 9 matrixは41項目中37 PASS / 4 PARTIAL（7 / 9 / 34 / 35）、`step9_complete=false`。item 15 / 24 / 32のPASS証拠はそれぞれの不変revisionとbranch内で成立している。item 7 / 9 / 34 / 35の既存Agent subscenarioやdeterministic testは確認したが、全Skill固定順migration、全Skill境界resume、A+B→B retire / A blocked / C ready→A再readyの連続owner lifecycle、freshnessとdeleted CI IDの連続artifact lifecycleは成立していない。別履歴のartifactを結合してPASSへ昇格していない。
+- `downstream_state.py`は複数scopeから重複参照された同じaggregate TCD / CI stateを一度だけ処理し、inactive TCN用materialize履歴を全TCD scopeから検索する。同一runtime identityのmaterialize結果は全scopeで一致する場合のみ受理し、競合時はfail-closedとする。`test_downstream_state` 16件、runtime全体366件はPASS。Windows symlink privilegeによるskipは2件。
+- `python scripts/format_tracked.py check`、対象Ruff、`git diff --check`はPASS。formatter / Ruffは既存venv、dprintはignored local toolsの既存binaryをそのcommand内のPATHで利用した。依存追加やsystem PATH変更はしていない。
+- runtime identityは`MYCOMPUTER\CodexSandboxOffline`、Pythonは3.11.9。`Get-Command codex`は解決せず、`C:\Users\sella\AppData\Roaming\npm\codex.cmd`のアクセスは拒否された。`Test-Path`のfalseは不存在の根拠にしない。local `test_execpolicy_cli`はsetup errorでCLI試験開始前に停止したためStep 8は未完了。権限変更や別経路のCLI起動はしていない。
+- GitHub API / remote socketはnetwork access denialとなった。local headと最後に取得済みtracking refは`6551d85ca26d27bcbc186748d17c1392a03bf111`だが、remote最新head / CIは未確認。古いcrawl結果は最新状態の証拠に使っていない。
+- Semantic Judgeは未実行でcase / candidate / reference / rubricの外部送信なし。独立した許可済みlocal Judgeも見つかっていないためStep 3 / 7は未完了。local差分のレビューと修正確認は実施したが、Step 3 / 7 / 8 / 9およびremote CIが未完了のためStep 10全体完了条件は未成立。

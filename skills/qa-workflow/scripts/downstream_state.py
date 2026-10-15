@@ -559,13 +559,8 @@ def _scope_impact(
                     }:
                         raise InvalidInput("historical downstream state row is invalid")
                     identity = (owner_skill, entity_type, row[id_field])
-                    if (
-                        not _IDENTITY_RE[entity_type].fullmatch(str(identity[2]))
-                        or identity in state_rows
-                    ):
-                        raise InvalidInput(
-                            "historical downstream identity is invalid or duplicated"
-                        )
+                    if not _IDENTITY_RE[entity_type].fullmatch(str(identity[2])):
+                        raise InvalidInput("historical downstream identity is invalid")
                     refs = row["scope_refs"]
                     if (
                         not isinstance(refs, list)
@@ -580,6 +575,17 @@ def _scope_impact(
                         raise InvalidInput(
                             "scope ownership unavailable for active downstream Entity"
                         )
+                    previous_state = state_rows.get(identity)
+                    if previous_state is not None:
+                        if previous_state != row:
+                            raise InvalidInput(
+                                "historical downstream identity has conflicting state"
+                            )
+                        # One aggregate TCD artifact can be referenced by
+                        # several workflow scopes. Its exact state projection
+                        # is repeated per scope, but it represents one stable
+                        # identity and must be collected only once.
+                        continue
                     state_rows[identity] = row
                     entity = (
                         current.get(identity)
@@ -628,12 +634,20 @@ def _scope_impact(
                         entry.get("tcn_id"), str
                     ):
                         raise InvalidInput("inactive materialize entry is invalid")
+                    previous_entry = materialize_histories.get(entry["tcn_id"])
+                    if previous_entry is not None and previous_entry != entry:
+                        raise InvalidInput(
+                            "inactive materialize history has conflicting state"
+                        )
                     materialize_histories[entry["tcn_id"]] = entry
         if skill == "test-condition-design":
             for ci in _state_row_map(state["previous_ci_id_state"], "ci_id").values():
                 identity = (skill, "ci", ci["ci_id"])
-                if identity in state_rows:
-                    raise InvalidInput("duplicate CI state")
+                previous_ci = state_rows.get(identity)
+                if previous_ci is not None:
+                    if previous_ci != ci:
+                        raise InvalidInput("conflicting CI state")
+                    continue
                 state_rows[identity] = ci
                 active_entity = (
                     current.get(identity) if ci["status"] == "active" else None
@@ -867,41 +881,45 @@ def _scope_impact(
             continue
         tcn_id = identity[2]
         if tcn_id not in materialize_histories:
-            owner_scope = next(
-                (
-                    row
-                    for row in input_value["workflow_scopes"]
-                    if row["skill"] == "test-condition-design"
-                ),
-                None,
-            )
-            if owner_scope is None:
+            owner_scopes = [
+                row
+                for row in input_value["workflow_scopes"]
+                if row["skill"] == "test-condition-design"
+            ]
+            if not owner_scopes:
                 raise InvalidInput("inactive materialize history is missing")
             found = None
-            for runtime in owner_scope["current_structure_state"]["runtime_results"]:
-                identity_text = runtime["identity"]
-                if (
-                    identity_text
-                    != f"test-condition-design::artifact:materialize_coverage:{tcn_id}"
-                ):
-                    continue
-                result_payload = runtime["result"].get("payload")
-                if isinstance(result_payload, dict):
-                    found = {
-                        "tcn_id": tcn_id,
-                        "ci_entities": result_payload.get("entities"),
-                        "ci_id_state": result_payload.get("ci_id_state"),
-                        "target_mapping_state": result_payload.get(
-                            "target_mapping_state"
-                        ),
-                        "semantic_ci_mapping_state": result_payload.get(
-                            "semantic_ci_mapping_state"
-                        ),
-                        "expected_result_root_state": result_payload.get(
-                            "expected_result_root_state"
-                        ),
-                    }
-                    break
+            for owner_scope in owner_scopes:
+                for runtime in owner_scope["current_structure_state"][
+                    "runtime_results"
+                ]:
+                    identity_text = runtime["identity"]
+                    if (
+                        identity_text
+                        != f"test-condition-design::artifact:materialize_coverage:{tcn_id}"
+                    ):
+                        continue
+                    result_payload = runtime["result"].get("payload")
+                    if isinstance(result_payload, dict):
+                        candidate = {
+                            "tcn_id": tcn_id,
+                            "ci_entities": result_payload.get("entities"),
+                            "ci_id_state": result_payload.get("ci_id_state"),
+                            "target_mapping_state": result_payload.get(
+                                "target_mapping_state"
+                            ),
+                            "semantic_ci_mapping_state": result_payload.get(
+                                "semantic_ci_mapping_state"
+                            ),
+                            "expected_result_root_state": result_payload.get(
+                                "expected_result_root_state"
+                            ),
+                        }
+                        if found is not None and found != candidate:
+                            raise InvalidInput(
+                                "inactive materialize runtime state has conflicting results"
+                            )
+                        found = candidate
             owner_ci_rows = [
                 row
                 for key, row in rows_by_identity.items()

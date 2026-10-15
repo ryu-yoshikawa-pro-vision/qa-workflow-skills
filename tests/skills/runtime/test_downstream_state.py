@@ -465,6 +465,131 @@ class TestDownstreamState(unittest.TestCase):
             ][0]["result"]["payload"]["inactive_materialize_history"],
         )
 
+    def test_identical_aggregate_tcd_state_repeats_across_scopes_are_deduplicated(
+        self,
+    ) -> None:
+        source = _scoped_downstream_input()
+        source["workflow_scopes"].append(
+            json.loads(json.dumps(source["workflow_scopes"][0]))
+        )
+
+        result = downstream_state._scope_impact(
+            source,
+            ["SCOPE-001", "SCOPE-002"],
+            ["SCOPE-002"],
+            [],
+            [],
+        )
+
+        self.assertEqual(result["inactive_tcn_ids"], ["TCN-001"])
+        self.assertEqual(result["inactive_model_keys"], ["ep-001"])
+        self.assertEqual(result["inactive_ci_ids"], ["TCN-001-CI01"])
+
+    def test_inactive_materialize_history_is_found_in_its_tcn_scope(self) -> None:
+        source = _scoped_downstream_input()
+        first_scope = source["workflow_scopes"][0]
+        condition_result = first_scope["current_structure_state"]["runtime_results"][0][
+            "result"
+        ]
+        history = condition_result["payload"]["inactive_materialize_history"][0]
+        condition_result["payload"]["inactive_materialize_history"] = []
+        materialize_result = {
+            "runtime_unit_key": "artifact:materialize_coverage:TCN-001",
+            "payload": {
+                "entities": history["ci_entities"],
+                "ci_id_state": history["ci_id_state"],
+                "target_mapping_state": history["target_mapping_state"],
+                "semantic_ci_mapping_state": history["semantic_ci_mapping_state"],
+                "expected_result_root_state": history["expected_result_root_state"],
+            },
+        }
+        second_scope = json.loads(json.dumps(first_scope))
+        second_scope["current_structure_state"]["runtime_results"] = [
+            {
+                "identity": "test-condition-design::artifact:materialize_coverage:TCN-001",
+                "result": materialize_result,
+            }
+        ]
+        source["workflow_scopes"].extend(
+            [second_scope, json.loads(json.dumps(second_scope))]
+        )
+
+        result = downstream_state._scope_impact(
+            source,
+            ["SCOPE-001", "SCOPE-002"],
+            ["SCOPE-002"],
+            [],
+            [],
+        )
+
+        self.assertEqual(result["inactive_tcn_ids"], ["TCN-001"])
+        self.assertEqual(result["inactive_materialize_history"], [history])
+
+    def test_conflicting_materialize_results_across_scopes_fail_closed(self) -> None:
+        source = _scoped_downstream_input()
+        first_scope = source["workflow_scopes"][0]
+        condition_result = first_scope["current_structure_state"]["runtime_results"][0][
+            "result"
+        ]
+        history = condition_result["payload"]["inactive_materialize_history"][0]
+        condition_result["payload"]["inactive_materialize_history"] = []
+        materialize_result = {
+            "runtime_unit_key": "artifact:materialize_coverage:TCN-001",
+            "payload": {
+                "entities": history["ci_entities"],
+                "ci_id_state": history["ci_id_state"],
+                "target_mapping_state": history["target_mapping_state"],
+                "semantic_ci_mapping_state": history["semantic_ci_mapping_state"],
+                "expected_result_root_state": history["expected_result_root_state"],
+            },
+        }
+        matching_scope = json.loads(json.dumps(first_scope))
+        matching_scope["current_structure_state"]["runtime_results"] = [
+            {
+                "identity": "test-condition-design::artifact:materialize_coverage:TCN-001",
+                "result": materialize_result,
+            }
+        ]
+        conflicting_scope = json.loads(json.dumps(matching_scope))
+        conflicting_scope["current_structure_state"]["runtime_results"][0]["result"][
+            "payload"
+        ]["target_mapping_state"].append(
+            {"target_key": "ep:unexpected:target", "target_ref": "sha256:" + "0" * 64}
+        )
+        source["workflow_scopes"].extend([matching_scope, conflicting_scope])
+
+        with self.assertRaisesRegex(
+            downstream_state.InvalidInput,
+            "inactive materialize runtime state has conflicting results",
+        ):
+            downstream_state._scope_impact(
+                source,
+                ["SCOPE-001", "SCOPE-002"],
+                ["SCOPE-002"],
+                [],
+                [],
+            )
+
+    def test_conflicting_aggregate_tcd_state_repeats_fail_closed(self) -> None:
+        source = _scoped_downstream_input()
+        duplicate = json.loads(json.dumps(source["workflow_scopes"][0]))
+        duplicate["current_structure_state"]["runtime_results"][0]["result"]["payload"][
+            "tcn_id_state"
+        ][0]["scope_refs"] = ["SCOPE-001"]
+        source["workflow_scopes"].append(duplicate)
+
+        with self.assertRaisesRegex(
+            downstream_state.InvalidInput,
+            "historical downstream identity has conflicting state",
+        ):
+            downstream_state._scope_impact(
+                source,
+                ["SCOPE-001", "SCOPE-002"],
+                ["SCOPE-002"],
+                [],
+                [],
+            )
+
     def test_blocked_scope_fails_closed_when_materialize_history_is_missing(
         self,
     ) -> None:
