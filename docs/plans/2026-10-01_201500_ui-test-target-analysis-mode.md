@@ -395,3 +395,7 @@ PR APIでlocal head `9540c13bc299f20c30fef9dc83a2daa2fd49929e`との一致を確
 合成v1 TCD inputからproduction cutoverのcondition structure、models、TDR、materialize phases全体を中断・resumeし、final resumeとout-of-order拒否を実行した。TCD内部migrationはPASSしたが、全Skill固定順の移行・ownership baseline・qa-workflow gateへの一連の接続は未確認のためitem 7 / 9はPARTIALを維持する。item 34 / 35にも同一lineage全下流完了の不足が残り、Step 9は37 PASS / 4 PARTIAL（7 / 9 / 34 / 35）。
 
 focused runtime testsは52 PASS / 2 Windows symlink privilege SKIP。Codex CLIへのsandbox内アクセス拒否も再確認され、Step 8は未完了。Semantic Judgeは未実行で外部送信していないためStep 3 / 7も未完了、Step 10は最終レビュー未完了。詳細とignored local evidence hashは分割Plan `_04` の最新追補を参照する。Plan仕様・41項目・完了条件は変更していない。
+
+### 2026-10-15 Plan同期push後のCI
+
+Plan追補commit `64046d1ca0d997b0981c5f32cec593625ea8b4e2`は既存PR branchへ通常pushし、remote / local / PR API head一致を確認した。同headの5つのPR workflowはSUCCESS。CodeQL check runは直近code-bearing head `9540c13`でSUCCESSを確認しており、Plan-only head `64046d1`のcombined-status endpointはstatus entryを返していない。Step 9は41項目中37 PASS / 4 PARTIAL（7 / 9 / 34 / 35）のままである。
