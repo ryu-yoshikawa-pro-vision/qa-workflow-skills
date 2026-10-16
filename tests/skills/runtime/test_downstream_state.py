@@ -20,6 +20,7 @@ assert _SPEC is not None and _SPEC.loader is not None
 sys.path.insert(0, str(SCRIPT.parent))
 downstream_state = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(downstream_state)
+make_machine_entity = sys.modules["runtime_contract"].make_machine_entity
 
 
 def _scoped_downstream_input() -> dict[str, Any]:
@@ -464,6 +465,181 @@ class TestDownstreamState(unittest.TestCase):
                 "runtime_results"
             ][0]["result"]["payload"]["inactive_materialize_history"],
         )
+
+    def test_saved_partial_baseline_restores_inactive_ci_from_validated_history(
+        self,
+    ) -> None:
+        source = _scoped_downstream_input()
+        scope = source["workflow_scopes"][0]
+        condition_payload = scope["current_structure_state"]["runtime_results"][0][
+            "result"
+        ]["payload"]
+        history = json.loads(
+            json.dumps(condition_payload["inactive_materialize_history"][0])
+        )
+        last_active_ci = history["ci_entities"][0]
+        ci_content = {**last_active_ci["content"], "status": "active"}
+        history["ci_entities"] = [
+            make_machine_entity(
+                "test-condition-design",
+                "ci",
+                "TCN-001-CI01",
+                ci_content,
+                model_key="ep-001",
+            )
+        ]
+        condition_payload["inactive_materialize_history"] = [history]
+        scope["normalized_input"] = {
+            "inactive_ci_ids": ["TCN-001-CI01"],
+            "inactive_materialize_history": [history],
+        }
+        source["current_entities"] = [
+            entity
+            for entity in source["current_entities"]
+            if entity["entity_type"] != "ci"
+        ]
+
+        result = downstream_state._scope_impact(
+            source,
+            ["SCOPE-001", "SCOPE-002"],
+            ["SCOPE-002"],
+            [],
+            [],
+        )
+
+        self.assertEqual(result["inactive_ci_ids"], ["TCN-001-CI01"])
+        self.assertEqual(result["inactive_materialize_history"], [history])
+
+    def test_saved_partial_baseline_preserves_inactive_ci_when_scope_is_ready_again(
+        self,
+    ) -> None:
+        source = _scoped_downstream_input()
+        scope = source["workflow_scopes"][0]
+        condition_payload = scope["current_structure_state"]["runtime_results"][0][
+            "result"
+        ]["payload"]
+        history = json.loads(
+            json.dumps(condition_payload["inactive_materialize_history"][0])
+        )
+        last_active_ci = history["ci_entities"][0]
+        history["ci_entities"] = [
+            make_machine_entity(
+                "test-condition-design",
+                "ci",
+                "TCN-001-CI01",
+                {**last_active_ci["content"], "status": "active"},
+                model_key="ep-001",
+            )
+        ]
+        condition_payload["inactive_materialize_history"] = [history]
+        scope["normalized_input"] = {
+            "inactive_ci_ids": ["TCN-001-CI01"],
+            "inactive_materialize_history": [history],
+        }
+        source["current_entities"] = [
+            entity
+            for entity in source["current_entities"]
+            if entity["entity_type"] != "ci"
+        ]
+
+        result = downstream_state._scope_impact(
+            source,
+            ["SCOPE-001", "SCOPE-002"],
+            [],
+            [],
+            [],
+        )
+
+        self.assertEqual(result["inactive_ci_ids"], ["TCN-001-CI01"])
+        self.assertEqual(result["inactive_materialize_history"], [history])
+
+    def test_saved_partial_baseline_rejects_unbound_inactive_ci_history(self) -> None:
+        source = _scoped_downstream_input()
+        scope = source["workflow_scopes"][0]
+        history = json.loads(
+            json.dumps(
+                scope["current_structure_state"]["runtime_results"][0]["result"][
+                    "payload"
+                ]["inactive_materialize_history"][0]
+            )
+        )
+        last_active_ci = history["ci_entities"][0]
+        ci_content = {**last_active_ci["content"], "status": "active"}
+        history["ci_entities"] = [
+            make_machine_entity(
+                "test-condition-design",
+                "ci",
+                "TCN-001-CI01",
+                ci_content,
+                model_key="ep-001",
+            )
+        ]
+        scope["normalized_input"] = {
+            "inactive_ci_ids": ["TCN-001-CI01"],
+            "inactive_materialize_history": [history],
+        }
+        source["current_entities"] = [
+            entity
+            for entity in source["current_entities"]
+            if entity["entity_type"] != "ci"
+        ]
+
+        with self.assertRaisesRegex(
+            downstream_state.InvalidInput,
+            "inactive materialize history does not match runtime result",
+        ):
+            downstream_state._scope_impact(
+                source,
+                ["SCOPE-001", "SCOPE-002"],
+                ["SCOPE-002"],
+                [],
+                [],
+            )
+
+    def test_saved_partial_baseline_rejects_inactive_ci_missing_previous_state(
+        self,
+    ) -> None:
+        source = _scoped_downstream_input()
+        scope = source["workflow_scopes"][0]
+        condition_payload = scope["current_structure_state"]["runtime_results"][0][
+            "result"
+        ]["payload"]
+        history = json.loads(
+            json.dumps(condition_payload["inactive_materialize_history"][0])
+        )
+        last_active_ci = history["ci_entities"][0]
+        history["ci_entities"] = [
+            make_machine_entity(
+                "test-condition-design",
+                "ci",
+                "TCN-001-CI01",
+                {**last_active_ci["content"], "status": "active"},
+                model_key="ep-001",
+            )
+        ]
+        condition_payload["inactive_materialize_history"] = [history]
+        scope["normalized_input"] = {
+            "inactive_ci_ids": ["TCN-001-CI01"],
+            "inactive_materialize_history": [history],
+        }
+        scope["current_structure_state"]["previous_ci_id_state"] = []
+        source["current_entities"] = [
+            entity
+            for entity in source["current_entities"]
+            if entity["entity_type"] != "ci"
+        ]
+
+        with self.assertRaisesRegex(
+            downstream_state.InvalidInput,
+            "inactive CI state is missing previous identity",
+        ):
+            downstream_state._scope_impact(
+                source,
+                ["SCOPE-001", "SCOPE-002"],
+                ["SCOPE-002"],
+                [],
+                [],
+            )
 
     def test_identical_aggregate_tcd_state_repeats_across_scopes_are_deduplicated(
         self,

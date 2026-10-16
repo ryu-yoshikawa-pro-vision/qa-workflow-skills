@@ -508,6 +508,92 @@ def _entity_rows_by_type(
     ]
 
 
+def _validated_inactive_ci_history(
+    scope: dict[str, Any],
+    materialize_histories: dict[str, dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    normalized = scope.get("normalized_input")
+    if not isinstance(normalized, dict):
+        return {}
+    inactive_ids = normalized.get("inactive_ci_ids", [])
+    if (
+        not isinstance(inactive_ids, list)
+        or any(
+            not isinstance(ci_id, str) or _IDENTITY_RE["ci"].fullmatch(ci_id) is None
+            for ci_id in inactive_ids
+        )
+        or inactive_ids != sorted(set(inactive_ids))
+    ):
+        raise InvalidInput("historical inactive CI identities are invalid")
+    if not inactive_ids:
+        return {}
+
+    raw_history = normalized.get("inactive_materialize_history")
+    if not isinstance(raw_history, list):
+        raise InvalidInput("inactive CI materialize history is missing")
+    normalized_history: dict[str, dict[str, Any]] = {}
+    for entry in raw_history:
+        if (
+            not isinstance(entry, dict)
+            or not isinstance(entry.get("tcn_id"), str)
+            or re.fullmatch(r"TCN-[0-9]{3}", entry["tcn_id"]) is None
+            or entry["tcn_id"] in normalized_history
+        ):
+            raise InvalidInput("historical inactive materialize entry is invalid")
+        normalized_history[entry["tcn_id"]] = entry
+
+    owners: set[str] = set()
+    for ci_id in inactive_ids:
+        match = re.fullmatch(r"(TCN-[0-9]{3})-CI[0-9]{2,}", ci_id)
+        if match is None:
+            raise InvalidInput("historical inactive CI identity is invalid")
+        owners.add(match.group(1))
+    if set(normalized_history) != owners:
+        raise InvalidInput("inactive CI identities do not match materialize history")
+
+    result: dict[str, dict[str, Any]] = {}
+    for ci_id in inactive_ids:
+        match = re.fullmatch(r"(TCN-[0-9]{3})-CI[0-9]{2,}", ci_id)
+        assert match is not None
+        owner = match.group(1)
+        history = normalized_history[owner]
+        persisted_history = materialize_histories.get(owner)
+        if persisted_history is None or canonical_json_text(
+            persisted_history
+        ) != canonical_json_text(history):
+            raise InvalidInput(
+                "inactive materialize history does not match runtime result"
+            )
+        state_rows = _state_row_map(history.get("ci_id_state"), "ci_id")
+        state_row = state_rows.get(ci_id)
+        if state_row is None or state_row["status"] != "active":
+            raise InvalidInput(
+                "inactive materialize CI state is missing last-active identity"
+            )
+        entities = validate_entity_collection(
+            history.get("ci_entities"), expected_skill="test-condition-design"
+        )
+        matching = [
+            entity
+            for entity in entities
+            if entity["entity_type"] == "ci" and entity["entity_ref"] == ci_id
+        ]
+        if len(matching) != 1:
+            raise InvalidInput("inactive CI Entity snapshot is missing or duplicated")
+        content = matching[0]["content"]
+        if (
+            content.get("ci_id") != ci_id
+            or content.get("tcn_id") != owner
+            or content.get("status") != "active"
+            or content.get("scope_refs") != state_row["scope_refs"]
+        ):
+            raise InvalidInput(
+                "inactive CI Entity snapshot does not match last-active state"
+            )
+        result[ci_id] = state_row
+    return result
+
+
 def _scope_impact(
     input_value: dict[str, Any],
     current_scope_ids: list[str],
@@ -641,8 +727,24 @@ def _scope_impact(
                         )
                     materialize_histories[entry["tcn_id"]] = entry
         if skill == "test-condition-design":
-            for ci in _state_row_map(state["previous_ci_id_state"], "ci_id").values():
+            inactive_ci_state = _validated_inactive_ci_history(
+                scope, materialize_histories
+            )
+            previous_ci_rows = _state_row_map(state["previous_ci_id_state"], "ci_id")
+            if set(inactive_ci_state) - set(previous_ci_rows):
+                raise InvalidInput("inactive CI state is missing previous identity")
+            for ci in previous_ci_rows.values():
                 identity = (skill, "ci", ci["ci_id"])
+                if ci["ci_id"] in inactive_ci_state:
+                    if (
+                        ci["status"] == "deleted"
+                        or ci["scope_refs"]
+                        != inactive_ci_state[ci["ci_id"]]["scope_refs"]
+                    ):
+                        raise InvalidInput(
+                            "inactive CI state conflicts with last-active history"
+                        )
+                    ci = {**ci, "status": "inactive"}
                 previous_ci = state_rows.get(identity)
                 if previous_ci is not None:
                     if previous_ci != ci:
