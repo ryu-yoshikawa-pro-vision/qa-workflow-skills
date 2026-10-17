@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import subprocess
 import sys
 import unittest
-
+from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-RUNTIME_PATH = REPO_ROOT / "skills" / "test-condition-design" / "scripts" / "runtime_contract.py"
+RUNTIME_PATH = (
+    REPO_ROOT / "skills" / "test-condition-design" / "scripts" / "runtime_contract.py"
+)
 
 
 def entity_row() -> dict:
@@ -27,7 +28,7 @@ def metadata() -> dict:
     return {
         "envelope_version": "1",
         "skill": "test-condition-design",
-        "runtime_contract_version": "runtime-v1",
+        "runtime_contract_version": "runtime-v2",
         "generator_contract_version": "ep-v1",
         "runtime_unit_key": "model:ep-001",
         "model_key": "ep-001",
@@ -133,7 +134,10 @@ class CliContractTests(unittest.TestCase):
         result = run_request(request)
         envelope = json.loads(result.stdout)
         self.assertEqual(envelope["runtime_status"], "ok")
-        self.assertNotEqual(envelope["upstream_entity_fingerprints"][0]["content_fingerprint"], "sha256:" + "0" * 64)
+        self.assertNotEqual(
+            envelope["upstream_entity_fingerprints"][0]["content_fingerprint"],
+            "sha256:" + "0" * 64,
+        )
 
     def test_unexpected_handler_error_keeps_pairable_runtime_identity(self) -> None:
         result = run_internal_error_request({"metadata": metadata(), "input": {"a": 1}})

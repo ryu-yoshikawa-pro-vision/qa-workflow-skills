@@ -8,15 +8,32 @@ from scripts.skills.evals.deterministic.common import (
     clean,
     nonempty_rows,
 )
-from scripts.skills.evals.deterministic.markdown_parser import find_table, parse_bullets, parse_tables
+from scripts.skills.evals.deterministic.markdown_parser import (
+    find_table,
+    parse_bullets,
+    parse_tables,
+)
 from scripts.skills.evals.deterministic.result import EvalResult
 
-WORKFLOW_STATES = {"未開始", "実行中", "部分完了（ブロック中あり）", "ブロック中", "完了"}
+WORKFLOW_STATES = {
+    "未開始",
+    "実行中",
+    "部分完了（ブロック中あり）",
+    "ブロック中",
+    "完了",
+}
 SKILL_STATES = {"未開始", "実行中", "要再検証", "ブロック中", "完了", "再利用", "省略"}
 SUPPORT_STATUSES = {"supported", "partial", "unsupported", "unknown"}
 RESULT_STATUSES = {"ready", "unresolved", "blocked"}
 FRESHNESS_STATUSES = {"current", "stale"}
-RUNTIME_STATUSES = {"ok", "invalid_input", "unsupported", "limit_exceeded", "internal_error", "not_run"}
+RUNTIME_STATUSES = {
+    "ok",
+    "invalid_input",
+    "unsupported",
+    "limit_exceeded",
+    "internal_error",
+    "not_run",
+}
 
 
 def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
@@ -24,21 +41,42 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     tables = parse_tables(text)
     bullets = parse_bullets(text)
     state_table = find_table(tables, required_headers=("Skill", "状態"))
-    result.add("WF-D009", state_table is not None, "ワークフロー状態表が存在すること", evidence={"missing_table": "ワークフロー状態"} if state_table is None else None)
+    result.add(
+        "WF-D009",
+        state_table is not None,
+        "ワークフロー状態表が存在すること",
+        evidence={"missing_table": "ワークフロー状態"} if state_table is None else None,
+    )
     rows = nonempty_rows(state_table)
-    has_target_column = state_table is not None and "対象 / 実行範囲" in state_table.headers
+    has_target_column = (
+        state_table is not None and "対象 / 実行範囲" in state_table.headers
+    )
     result.add(
         "WF-D015",
         has_target_column,
         "ワークフロー状態表が対象 / 実行範囲列を持つこと",
-        evidence={"required_header": "対象 / 実行範囲"} if not has_target_column else None,
+        evidence={"required_header": "対象 / 実行範囲"}
+        if not has_target_column
+        else None,
     )
 
     overall = clean(bullets.get("ワークフロー全体状態", ""))
-    result.add("WF-D001", overall in WORKFLOW_STATES, "ワークフロー全体状態が許可値であること", evidence=overall if overall not in WORKFLOW_STATES else None)
+    result.add(
+        "WF-D001",
+        overall in WORKFLOW_STATES,
+        "ワークフロー全体状態が許可値であること",
+        evidence=overall if overall not in WORKFLOW_STATES else None,
+    )
     skill_names = [clean(r.get("Skill", "")) for r in rows]
-    invalid_names = sorted({name for name in skill_names if name not in CANONICAL_SKILLS})
-    result.add("WF-D002", not invalid_names, "ワークフローのSkill行が正規Skill名を使用していること", evidence=invalid_names or None)
+    invalid_names = sorted(
+        {name for name in skill_names if name not in CANONICAL_SKILLS}
+    )
+    result.add(
+        "WF-D002",
+        not invalid_names,
+        "ワークフローのSkill行が正規Skill名を使用していること",
+        evidence=invalid_names or None,
+    )
     scoped_keys = []
     invalid_targets = []
     for row in rows:
@@ -48,25 +86,71 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         allowed_targets = MULTI_USE_SKILL_TARGETS.get(skill)
         if allowed_targets is not None:
             if target not in allowed_targets:
-                invalid_targets.append({"skill": skill, "target": target, "allowed": sorted(allowed_targets)})
+                invalid_targets.append(
+                    {
+                        "skill": skill,
+                        "target": target,
+                        "allowed": sorted(allowed_targets),
+                    }
+                )
         elif target:
-            invalid_targets.append({"skill": skill, "target": target, "allowed": ["<空欄>"]})
-    add_duplicate_assertion(result, "WF-D012", scoped_keys, "ワークフローのSkill + 対象 / 実行範囲")
+            invalid_targets.append(
+                {"skill": skill, "target": target, "allowed": ["<空欄>"]}
+            )
+    add_duplicate_assertion(
+        result, "WF-D012", scoped_keys, "ワークフローのSkill + 対象 / 実行範囲"
+    )
     result.add(
         "WF-D016",
         not invalid_targets,
         "複数用途Skillは正規対象を必須とし、単一用途Skillは対象を空欄にできること",
         evidence=invalid_targets or None,
     )
-    add_allowed_assertion(result, "WF-D003", (r.get("状態", "") for r in rows), SKILL_STATES, "Skill状態")
+    add_allowed_assertion(
+        result, "WF-D003", (r.get("状態", "") for r in rows), SKILL_STATES, "Skill状態"
+    )
 
-    blocked = [clean(r.get("Skill", "")) for r in rows if clean(r.get("状態", "")) == "ブロック中"]
-    recheck = [clean(r.get("Skill", "")) for r in rows if clean(r.get("状態", "")) == "要再検証"]
-    in_progress = [clean(r.get("Skill", "")) for r in rows if clean(r.get("状態", "")) == "実行中"]
-    result.add("WF-D004", not (overall == "完了" and (blocked or in_progress)), "ブロック中または実行中が残る場合はワークフローを完了にできないこと", evidence=blocked + in_progress or None)
-    result.add("WF-D005", not (overall == "完了" and recheck), "要再検証が残る場合はワークフローを完了にできないこと", evidence=recheck or None)
-    result.add("WF-D010", not (overall == "部分完了（ブロック中あり）" and not blocked), "部分完了（ブロック中あり）には1件以上のブロック中Skillが必要であること", evidence={"blocked_skills": blocked} if overall == "部分完了（ブロック中あり）" and not blocked else None)
-    result.add("WF-D011", not (overall == "ブロック中" and not blocked), "ワークフロー全体がブロック中の場合は1件以上のブロック中Skillが必要であること", evidence={"blocked_skills": blocked} if overall == "ブロック中" and not blocked else None)
+    blocked = [
+        clean(r.get("Skill", ""))
+        for r in rows
+        if clean(r.get("状態", "")) == "ブロック中"
+    ]
+    recheck = [
+        clean(r.get("Skill", ""))
+        for r in rows
+        if clean(r.get("状態", "")) == "要再検証"
+    ]
+    in_progress = [
+        clean(r.get("Skill", "")) for r in rows if clean(r.get("状態", "")) == "実行中"
+    ]
+    result.add(
+        "WF-D004",
+        not (overall == "完了" and (blocked or in_progress)),
+        "ブロック中または実行中が残る場合はワークフローを完了にできないこと",
+        evidence=blocked + in_progress or None,
+    )
+    result.add(
+        "WF-D005",
+        not (overall == "完了" and recheck),
+        "要再検証が残る場合はワークフローを完了にできないこと",
+        evidence=recheck or None,
+    )
+    result.add(
+        "WF-D010",
+        not (overall == "部分完了（ブロック中あり）" and not blocked),
+        "部分完了（ブロック中あり）には1件以上のブロック中Skillが必要であること",
+        evidence={"blocked_skills": blocked}
+        if overall == "部分完了（ブロック中あり）" and not blocked
+        else None,
+    )
+    result.add(
+        "WF-D011",
+        not (overall == "ブロック中" and not blocked),
+        "ワークフロー全体がブロック中の場合は1件以上のブロック中Skillが必要であること",
+        evidence={"blocked_skills": blocked}
+        if overall == "ブロック中" and not blocked
+        else None,
+    )
 
     exp_start = expected.get("expected_start_skill")
     exp_final = expected.get("expected_final_skill")
@@ -76,9 +160,13 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     actual_final_target = clean(bullets.get("最終対象 / 実行範囲", ""))
     start_mismatch = bool(exp_start and actual_start != exp_start)
     final_mismatch = bool(exp_final and actual_final != exp_final)
-    if "expected_start_target" in expected and actual_start_target != clean(str(expected.get("expected_start_target", ""))):
+    if "expected_start_target" in expected and actual_start_target != clean(
+        str(expected.get("expected_start_target", ""))
+    ):
         start_mismatch = True
-    if "expected_final_target" in expected and actual_final_target != clean(str(expected.get("expected_final_target", ""))):
+    if "expected_final_target" in expected and actual_final_target != clean(
+        str(expected.get("expected_final_target", ""))
+    ):
         final_mismatch = True
     result.add(
         "WF-D006",
@@ -89,7 +177,9 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             "actual_skill": actual_start,
             "expected_target": expected.get("expected_start_target"),
             "actual_target": actual_start_target,
-        } if start_mismatch else None,
+        }
+        if start_mismatch
+        else None,
     )
     result.add(
         "WF-D007",
@@ -100,7 +190,9 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             "actual_skill": actual_final,
             "expected_target": expected.get("expected_final_target"),
             "actual_target": actual_final_target,
-        } if final_mismatch else None,
+        }
+        if final_mismatch
+        else None,
     )
     restart_target_errors = []
     for label, skill, target in (
@@ -109,9 +201,23 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     ):
         allowed_targets = MULTI_USE_SKILL_TARGETS.get(skill)
         if allowed_targets is not None and target not in allowed_targets:
-            restart_target_errors.append({"label": label, "skill": skill, "target": target, "allowed": sorted(allowed_targets)})
+            restart_target_errors.append(
+                {
+                    "label": label,
+                    "skill": skill,
+                    "target": target,
+                    "allowed": sorted(allowed_targets),
+                }
+            )
         elif allowed_targets is None and target:
-            restart_target_errors.append({"label": label, "skill": skill, "target": target, "allowed": ["<空欄>"]})
+            restart_target_errors.append(
+                {
+                    "label": label,
+                    "skill": skill,
+                    "target": target,
+                    "allowed": ["<空欄>"],
+                }
+            )
     result.add(
         "WF-D017",
         not restart_target_errors,
@@ -120,9 +226,18 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     )
 
     expected_skills = set(expected.get("expected_skills", []))
-    actual_used = {clean(r.get("Skill", "")) for r in rows if clean(r.get("状態", "")) not in {"未開始", "省略"}}
+    actual_used = {
+        clean(r.get("Skill", ""))
+        for r in rows
+        if clean(r.get("状態", "")) not in {"未開始", "省略"}
+    }
     missing = sorted(expected_skills - actual_used)
-    result.add("WF-D008", not missing, "期待するルーティング対象Skillが利用・再利用・実行中・完了のいずれかとして表現されていること", evidence=missing or None)
+    result.add(
+        "WF-D008",
+        not missing,
+        "期待するルーティング対象Skillが利用・再利用・実行中・完了のいずれかとして表現されていること",
+        evidence=missing or None,
+    )
 
     overall_specified = "expected_overall_state" in expected
     expected_overall = expected.get("expected_overall_state")
@@ -130,27 +245,47 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         "WF-D013",
         not overall_specified or overall == expected_overall,
         "フィクスチャで期待するワークフロー全体状態が一致すること",
-        evidence={"expected": expected_overall, "actual": overall} if overall_specified and overall != expected_overall else None,
+        evidence={"expected": expected_overall, "actual": overall}
+        if overall_specified and overall != expected_overall
+        else None,
     )
 
     expected_skill_states = expected.get("expected_skill_states", {})
-    actual_skill_states = {clean(row.get("Skill", "")): clean(row.get("状態", "")) for row in rows}
+    _ = {clean(row.get("Skill", "")): clean(row.get("状態", "")) for row in rows}
     state_mismatches = []
     if "expected_skill_states" in expected:
         for skill, expected_state in expected_skill_states.items():
-            actual_states = [clean(row.get("状態", "")) for row in rows if clean(row.get("Skill", "")) == skill]
-            if not actual_states or any(actual_state != expected_state for actual_state in actual_states):
-                state_mismatches.append({"skill": skill, "expected": expected_state, "actual": actual_states or None})
+            actual_states = [
+                clean(row.get("状態", ""))
+                for row in rows
+                if clean(row.get("Skill", "")) == skill
+            ]
+            if not actual_states or any(
+                actual_state != expected_state for actual_state in actual_states
+            ):
+                state_mismatches.append(
+                    {
+                        "skill": skill,
+                        "expected": expected_state,
+                        "actual": actual_states or None,
+                    }
+                )
 
     expected_scoped = expected.get("expected_scoped_skill_states", [])
     if isinstance(expected_scoped, dict):
         expected_scoped = [
-            {"skill": key.split("|", 1)[0].strip(), "target": key.split("|", 1)[1].strip(), "state": value}
+            {
+                "skill": key.split("|", 1)[0].strip(),
+                "target": key.split("|", 1)[1].strip(),
+                "state": value,
+            }
             for key, value in expected_scoped.items()
             if "|" in key
         ]
     actual_scoped_states = {
-        (clean(row.get("Skill", "")), clean(row.get("対象 / 実行範囲", ""))): clean(row.get("状態", ""))
+        (clean(row.get("Skill", "")), clean(row.get("対象 / 実行範囲", ""))): clean(
+            row.get("状態", "")
+        )
         for row in rows
     }
     scoped_mismatches = []
@@ -162,11 +297,25 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         expected_state = clean(str(item.get("state", "")))
         actual_state = actual_scoped_states.get(key)
         if actual_state != expected_state:
-            scoped_mismatches.append({"skill": key[0], "target": key[1], "expected": expected_state, "actual": actual_state})
+            scoped_mismatches.append(
+                {
+                    "skill": key[0],
+                    "target": key[1],
+                    "expected": expected_state,
+                    "actual": actual_state,
+                }
+            )
     state_mismatches.extend(scoped_mismatches)
-    result.add("WF-D014", not state_mismatches, "フィクスチャで期待するSkill状態（必要時は対象別）が一致すること", evidence=state_mismatches or None)
+    result.add(
+        "WF-D014",
+        not state_mismatches,
+        "フィクスチャで期待するSkill状態（必要時は対象別）が一致すること",
+        evidence=state_mismatches or None,
+    )
 
-    runtime_table = find_table(tables, required_headers=("Runtime Unit Key", "Runtime Status"))
+    runtime_table = find_table(
+        tables, required_headers=("Runtime Unit Key", "Runtime Status")
+    )
     runtime_rows = nonempty_rows(runtime_table)
     runtime_issues = []
     runtime_keys = []
@@ -181,40 +330,89 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         deterministic = clean(row.get("Deterministic Generated", ""))
         if key[0] not in CANONICAL_SKILLS or not key[1]:
             runtime_issues.append({"row": key, "reason": "identity"})
-        if support not in SUPPORT_STATUSES or result_status not in RESULT_STATUSES or freshness not in FRESHNESS_STATUSES or runtime_status not in RUNTIME_STATUSES:
+        if (
+            support not in SUPPORT_STATUSES
+            or result_status not in RESULT_STATUSES
+            or freshness not in FRESHNESS_STATUSES
+            or runtime_status not in RUNTIME_STATUSES
+        ):
             runtime_issues.append({"row": key, "reason": "status"})
         if required not in {"Yes", "No"} or deterministic not in {"Yes", "No"}:
             runtime_issues.append({"row": key, "reason": "flags"})
         if required == "Yes" and deterministic != "Yes":
-            runtime_issues.append({"row": key, "reason": "required runtime must be deterministic"})
-        if runtime_status == "unsupported" and (support, result_status, required, deterministic) != ("unsupported", "ready", "No", "No"):
+            runtime_issues.append(
+                {"row": key, "reason": "required runtime must be deterministic"}
+            )
+        if runtime_status == "unsupported" and (
+            support,
+            result_status,
+            required,
+            deterministic,
+        ) != ("unsupported", "ready", "No", "No"):
             runtime_issues.append({"row": key, "reason": "unsupported projection"})
-        if runtime_status == "not_run" and (support, result_status, required, deterministic) != ("unknown", "blocked", "Yes", "No"):
+        if runtime_status == "not_run" and (
+            support,
+            result_status,
+            required,
+            deterministic,
+        ) != ("unknown", "blocked", "Yes", "No"):
             runtime_issues.append({"row": key, "reason": "not_run projection"})
-    result.add("WF-D018", len(runtime_keys) == len(set(runtime_keys)), "runtime状態のSkill + Runtime Unit Keyが一意であること", evidence=runtime_keys if len(runtime_keys) != len(set(runtime_keys)) else None)
-    result.add("WF-D019", not runtime_issues, "runtime状態のstatus projectionが契約どおりであること", evidence=runtime_issues or None)
+    result.add(
+        "WF-D018",
+        len(runtime_keys) == len(set(runtime_keys)),
+        "runtime状態のSkill + Runtime Unit Keyが一意であること",
+        evidence=runtime_keys if len(runtime_keys) != len(set(runtime_keys)) else None,
+    )
+    result.add(
+        "WF-D019",
+        not runtime_issues,
+        "runtime状態のstatus projectionが契約どおりであること",
+        evidence=runtime_issues or None,
+    )
     if runtime_rows and overall == "完了":
         incomplete_runtime = [
             clean(row.get("Runtime Unit Key", ""))
             for row in runtime_rows
-            if clean(row.get("Result Status", "")) != "ready" or clean(row.get("Freshness", "")) != "current"
+            if clean(row.get("Result Status", "")) != "ready"
+            or clean(row.get("Freshness", "")) != "current"
         ]
-        result.add("WF-D020", not incomplete_runtime, "runtime dispatch済みの完了workflowに未完了またはstale unitを残さないこと", evidence=incomplete_runtime or None)
+        result.add(
+            "WF-D020",
+            not incomplete_runtime,
+            "runtime dispatch済みの完了workflowに未完了またはstale unitを残さないこと",
+            evidence=incomplete_runtime or None,
+        )
     expected_runtime = expected.get("expected_runtime_rows", [])
     runtime_expected_issues = []
-    actual_runtime = {(clean(row.get("Skill", "")), clean(row.get("Runtime Unit Key", ""))): row for row in runtime_rows}
+    actual_runtime = {
+        (clean(row.get("Skill", "")), clean(row.get("Runtime Unit Key", ""))): row
+        for row in runtime_rows
+    }
     for item in expected_runtime:
         if not isinstance(item, dict):
             runtime_expected_issues.append({"expected": item})
             continue
-        key = (clean(str(item.get("skill", ""))), clean(str(item.get("runtime_unit_key", ""))))
+        key = (
+            clean(str(item.get("skill", ""))),
+            clean(str(item.get("runtime_unit_key", ""))),
+        )
         row = actual_runtime.get(key)
         if row is None:
             runtime_expected_issues.append({"expected": key, "reason": "missing"})
             continue
-        for field, column in (("support_status", "Support Status"), ("result_status", "Result Status"), ("freshness_status", "Freshness"), ("runtime_status", "Runtime Status")):
+        for field, column in (
+            ("support_status", "Support Status"),
+            ("result_status", "Result Status"),
+            ("freshness_status", "Freshness"),
+            ("runtime_status", "Runtime Status"),
+        ):
             if field in item and clean(row.get(column, "")) != clean(str(item[field])):
                 runtime_expected_issues.append({"unit": key, "field": field})
     if expected_runtime:
-        result.add("WF-D021", not runtime_expected_issues, "runtime状態がfixtureの期待projectionと一致すること", evidence=runtime_expected_issues or None)
+        result.add(
+            "WF-D021",
+            not runtime_expected_issues,
+            "runtime状態がfixtureの期待projectionと一致すること",
+            evidence=runtime_expected_issues or None,
+        )
     return result

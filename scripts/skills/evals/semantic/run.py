@@ -3,9 +3,9 @@ from __future__ import annotations
 import argparse
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
+from pathlib import Path
 
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
@@ -19,7 +19,9 @@ else:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Evaluate a saved Agent output with a Semantic Eval judge command.")
+    parser = argparse.ArgumentParser(
+        description="Evaluate a saved Agent output with a Semantic Eval judge command."
+    )
     parser.add_argument("--skill", required=True)
     parser.add_argument("--eval-id", required=True)
     parser.add_argument("--output", required=True, type=Path)
@@ -39,7 +41,9 @@ def main() -> int:
             raise FileNotFoundError(args.output)
 
         dataset, case = load_semantic_case(args.skill, args.eval_id, args.skills_root)
-        selected_criteria = [dataset["criteria_by_id"][criterion_id] for criterion_id in case["criteria"]]
+        selected_criteria = [
+            dataset["criteria_by_id"][criterion_id] for criterion_id in case["criteria"]
+        ]
         candidate_output = args.output.read_text(encoding="utf-8")
         prompt = build_judge_prompt(
             criteria=selected_criteria,
@@ -66,7 +70,9 @@ def main() -> int:
         if completed.returncode != 0:
             diagnostic = completed.stderr.strip()
             suffix = f": {diagnostic}" if diagnostic else ""
-            raise RuntimeError(f"judge command failed with exit code {completed.returncode}{suffix}")
+            raise RuntimeError(
+                f"judge command failed with exit code {completed.returncode}{suffix}"
+            )
 
         result = normalize_judge_response(
             completed.stdout,

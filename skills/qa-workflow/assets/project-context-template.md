@@ -66,18 +66,18 @@
 ## 5. 情報源の優先順位
 
 | 優先順位 | 情報源 | 役割 / 備考 |
-| --- | --- | --- |
-| 1 |  |  |
-| 2 |  |  |
-| 3 |  |  |
-| 4 |  |  |
-| 5 |  |  |
+| -------- | ------ | ----------- |
+| 1        |        |             |
+| 2        |        |             |
+| 3        |        |             |
+| 4        |        |             |
+| 5        |        |             |
 
 ## 6. 正式用語
 
 | 意味 / 概念 | 正式用語 | 情報源 / 備考 |
-| --- | --- | --- |
-|  |  |  |
+| ----------- | -------- | ------------- |
+|             |          |               |
 
 ## 7. 検証方法の選択
 
@@ -129,22 +129,20 @@
 ## 12. 確定事項（決定事項の正本一覧）
 
 | ID | 確定内容 | 状態 | 決定根拠 | 影響範囲 | 関係 | 関連仕様根拠ID | 置換先ID | 備考 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| DEC-001 |  | 有効 / 撤回 / 置換済み |  |  | 独立 / 補足 / 上書き / 置換 / N/A |  |  |  |
+| -- | -------- | ---- | -------- | -------- | ---- | -------------- | -------- | ---- |
 
 ## 13. 仮定（仮定の正本一覧）
 
 | ID | 仮定 | 状態 | 理由 / 根拠 | 承認根拠 | 影響範囲 | 置換先ID | 備考 |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| ASM-001 |  | 提案 / 承認済み / 撤回 / 置換済み |  |  |  |  |  |
+| -- | ---- | ---- | ----------- | -------- | -------- | -------- | ---- |
 
 ## 14. 既存QA成果物
 
 既存成果物や履歴を固定root scanする場合は、そのrootまたはdirect refを「場所」に記録し、対象範囲と鮮度 / revisionを併記します。Regression baseline / ActivityやExploration Sessionのrootを専用stable keyとして推測追加しません。workflow stateのrootは下記`qa.workflow_state_root`を使います。
 
 | 成果物 | 場所 | 範囲 | 鮮度 / バージョン | 備考 |
-| --- | --- | --- | --- | --- |
-|  |  |  |  |  |
+| ------ | ---- | ---- | ----------------- | ---- |
+|        |      |      |                   |      |
 
 ## 15. 案件固有メモ
 
@@ -155,27 +153,39 @@
 各fieldのstable keyは表示文言・heading・行番号から独立しています。workflowが依存するfieldは、このkeyと正規化値をsnapshotへ記録します。値を未設定のまま利用できると推測しません。`qa.reservation_root`はproject-local reservation artifactの保存先です。resourceのisolation / external reservation / cleanup policyはこのroot値ではなく、Section 4の環境・resource条件へ記録します。
 
 <!-- qa-context-field:start key=qa.regression_scope type=ordered_text -->
+
 （未設定）
+
 <!-- qa-context-field:end -->
 
 <!-- qa-context-field:start key=qa.regression_policy type=scalar -->
+
 （未設定）
+
 <!-- qa-context-field:end -->
 
 <!-- qa-context-field:start key=qa.knowledge_root type=path -->
+
 （未設定）
+
 <!-- qa-context-field:end -->
 
 <!-- qa-context-field:start key=qa.workflow_state_root type=path -->
+
 （未設定）
+
 <!-- qa-context-field:end -->
 
 <!-- qa-context-field:start key=qa.reservation_root type=path -->
+
 （未設定）
+
 <!-- qa-context-field:end -->
 
 <!-- qa-context-field:start key=qa.auxiliary_testware_refs type=ordered_lines -->
+
 （未設定）
+
 <!-- qa-context-field:end -->
 
 root pathはproject-local fixed locationにし、同じ案件内のworkflowから一意に解決できる値を記録します。secret実値は追加しません。

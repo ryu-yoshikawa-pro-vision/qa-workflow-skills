@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
-
+from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 RUNNER = REPO_ROOT / "scripts" / "skills" / "evals" / "deterministic" / "run.py"
@@ -41,22 +40,45 @@ class CliIntegrationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "valid.md"
             path.write_text(VALID_RISK_OUTPUT, encoding="utf-8")
-            completed = self.run_cli("--skill", "test-analysis", "--eval-id", "RISK-OUT-001", "--output", str(path))
-            self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+            completed = self.run_cli(
+                "--skill",
+                "test-analysis",
+                "--eval-id",
+                "RISK-OUT-001",
+                "--output",
+                str(path),
+            )
+            self.assertEqual(
+                completed.returncode, 0, completed.stdout + completed.stderr
+            )
             self.assertEqual(json.loads(completed.stdout)["status"], "pass")
 
     def test_single_invalid_output_exit_one(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "invalid.md"
-            path.write_text(VALID_RISK_OUTPUT.replace("| 4 | 2 | 高 |", "| 4 | 2 | 中 |"), encoding="utf-8")
-            completed = self.run_cli("--skill", "test-analysis", "--eval-id", "RISK-OUT-001", "--output", str(path))
-            self.assertEqual(completed.returncode, 1, completed.stdout + completed.stderr)
+            path.write_text(
+                VALID_RISK_OUTPUT.replace("| 4 | 2 | 高 |", "| 4 | 2 | 中 |"),
+                encoding="utf-8",
+            )
+            completed = self.run_cli(
+                "--skill",
+                "test-analysis",
+                "--eval-id",
+                "RISK-OUT-001",
+                "--output",
+                str(path),
+            )
+            self.assertEqual(
+                completed.returncode, 1, completed.stdout + completed.stderr
+            )
             self.assertEqual(json.loads(completed.stdout)["status"], "fail")
 
     def test_all_mode_missing_output_exit_one(self):
         with tempfile.TemporaryDirectory() as tmp:
             completed = self.run_cli("--skill", "all", "--output-root", tmp)
-            self.assertEqual(completed.returncode, 1, completed.stdout + completed.stderr)
+            self.assertEqual(
+                completed.returncode, 1, completed.stdout + completed.stderr
+            )
             payload = json.loads(completed.stdout)
             self.assertEqual(payload["status"], "fail")
             self.assertTrue(payload["missing_outputs"])

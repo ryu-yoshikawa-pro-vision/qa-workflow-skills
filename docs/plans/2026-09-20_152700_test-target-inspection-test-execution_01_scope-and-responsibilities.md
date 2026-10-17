@@ -85,13 +85,13 @@ Playwrightコード生成を許可するのは、**MCP / CLIでは今回TCに必
 
 一方、次は既存E2E Skillの責務を維持します。
 
-| 目的 | 担当 |
-| --- | --- |
-| 将来も維持するPlaywright E2Eをrepoへ実装 / 更新 | `e2e-test-inspection` → `e2e-test-implementation` |
-| 既存 / 実装済みrepo E2Eを正式なrunner契約で実行 | `e2e-test-execution` |
-| 既存E2E実行異常の原因分析 | `e2e-test-result-analysis` |
-| Playwright runner固有のrun / attempt等の詳細報告 | `e2e-test-reporting` |
-| 人間の手動テスト相当のAI操作とTC結果報告 | `test-execution` |
+| 目的                                             | 担当                                              |
+| ------------------------------------------------ | ------------------------------------------------- |
+| 将来も維持するPlaywright E2Eをrepoへ実装 / 更新  | `e2e-test-inspection` → `e2e-test-implementation` |
+| 既存 / 実装済みrepo E2Eを正式なrunner契約で実行  | `e2e-test-execution`                              |
+| 既存E2E実行異常の原因分析                        | `e2e-test-result-analysis`                        |
+| Playwright runner固有のrun / attempt等の詳細報告 | `e2e-test-reporting`                              |
+| 人間の手動テスト相当のAI操作とTC結果報告         | `test-execution`                                  |
 
 これにより、`test-execution`で一時コードを使えるようにしつつ、既存のE2E資産管理責務を重複させません。
 
@@ -198,4 +198,3 @@ trace / screenshot / page snapshot / ARIA snapshot / video / network等は必要
 - テスト対象資料の独自DB / registry
 - 自動的な案件横断knowledge base
 - E2E既存5 Skillの統廃合
-

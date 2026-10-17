@@ -1,0 +1,19 @@
+{
+  "required_sections": [
+    "Inspection metadata",
+    "Scope and closure",
+    "Objective observations",
+    "Accessibility requirement checks",
+    "Supported test rule results",
+    "Measurements",
+    "Additional observation requests",
+    "Summary and limitations"
+  ],
+  "forbidden_tokens": [
+    "user success rate",
+    "WCAG conformant"
+  ],
+  "required_tokens": [
+    "undetermined"
+  ]
+}

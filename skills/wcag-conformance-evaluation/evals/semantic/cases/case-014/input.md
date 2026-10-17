@@ -1,0 +1,5 @@
+# Case L: supported WCAG versions
+
+WCAG 2.0 / 2.1 / 2.2をそれぞれ指定。
+
+This case runs three isolated synthetic evaluations at level `AA`, one each for WCAG `2.0`, `2.1`, and `2.2`. Their artifact refs are `EVAL-CASE-L-20`, `EVAL-CASE-L-21`, and `EVAL-CASE-L-22`; all use evaluation date `2026-10-01`, evaluator `repository maintainer`, commissioner `repository workflow validation`, target `https://northstar.example.invalid/`, scope `the same finite public demo storefront`, product enclosure `the declared public Web views only`, accessibility-support baseline `Chromium on Windows with keyboard and pointer; no assistive-technology claim`, browser baseline `Chromium 149`, role/environment `unauthenticated isolated fixture`, side effects `no persistent writes`, cleanup `close the page and discard local state`, and period `2026-09-01 through 2026-10-01`. The current catalogs are the only source for version-specific criterion and conformance-requirement sets. This fixture tests version isolation and report-section applicability; it does not assert external product conformance.

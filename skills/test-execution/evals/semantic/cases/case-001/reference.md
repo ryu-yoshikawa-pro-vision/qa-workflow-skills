@@ -1,4 +1,5 @@
 # Reference
+
 - 1つの入力元snapshot内で成果物ローカル参照を一意に割り当て、重複source IDをそのまま保持する。重複だけでは未実行にしない。
 - 入力元identityがない場合は独自hashを作らず、成果物内のTC集合と実行前YAMLをsnapshot正本にする。
 - 操作前にGiven / When / Thenを整理する。中間期待結果と操作を結び付け、判定に影響する観測タイミングはunresolvedに残して該当TCを開始しない。

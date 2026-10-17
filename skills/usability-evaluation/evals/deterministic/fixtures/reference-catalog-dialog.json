@@ -1,0 +1,2556 @@
+{
+  "sources": [
+    {
+      "key": "wcag20",
+      "name": "Web Content Accessibility Guidelines (WCAG) 2.0",
+      "canonical_url": "https://www.w3.org/TR/WCAG20/",
+      "publisher": "W3C",
+      "category": "accessibility standard",
+      "source_position": "normative",
+      "scope": "Web content; version 2.0",
+      "source_status": "current",
+      "access_state": "public",
+      "checked_at": "2026-09-28",
+      "adoption_status": "adopted",
+      "license_terms": "W3C Document License 2023; summarized with attribution",
+      "coverage_axes": [
+        "accessibility",
+        "formal standard"
+      ],
+      "note": "W3C Recommendation 2008-12-11; consult current errata."
+    },
+    {
+      "key": "wcag21",
+      "name": "Web Content Accessibility Guidelines (WCAG) 2.1",
+      "canonical_url": "https://www.w3.org/TR/WCAG21/",
+      "publisher": "W3C",
+      "category": "accessibility standard",
+      "source_position": "normative",
+      "scope": "Web content; version 2.1",
+      "source_status": "current",
+      "access_state": "public",
+      "checked_at": "2026-09-28",
+      "adoption_status": "adopted",
+      "license_terms": "W3C Document License 2023; summarized with attribution",
+      "coverage_axes": [
+        "accessibility",
+        "formal standard"
+      ],
+      "note": "W3C Recommendation; version-specific requirements remain separate."
+    },
+    {
+      "key": "wcag22",
+      "name": "Web Content Accessibility Guidelines (WCAG) 2.2",
+      "canonical_url": "https://www.w3.org/TR/WCAG22/",
+      "publisher": "W3C",
+      "category": "accessibility standard",
+      "source_position": "normative",
+      "scope": "Web content; version 2.2",
+      "source_status": "current",
+      "access_state": "public",
+      "checked_at": "2026-09-28",
+      "adoption_status": "adopted",
+      "license_terms": "W3C Document License 2023; summarized with attribution",
+      "coverage_axes": [
+        "accessibility",
+        "formal standard"
+      ],
+      "note": "W3C Recommendation, updated 2024-12-12; do not merge its SC set with prior versions."
+    },
+    {
+      "key": "wcag-overview",
+      "name": "Web Content Accessibility Guidelines Overview",
+      "canonical_url": "https://www.w3.org/WAI/standards-guidelines/wcag/",
+      "publisher": "W3C WAI",
+      "category": "standard overview",
+      "source_position": "informative",
+      "scope": "WCAG overview and supporting resources",
+      "source_status": "current",
+      "access_state": "public",
+      "checked_at": "2026-09-28",
+      "adoption_status": "adopted",
+      "license_terms": "W3C Document License 2023; summarized with attribution",
+      "coverage_axes": [
+        "accessibility",
+        "formal methodology"
+      ],
+      "note": "Informative navigation and background; not the normative requirements source."
+    },
+    {
+      "key": "wcag-faq",
+      "name": "WCAG 2 FAQ",
+      "canonical_url": "https://www.w3.org/WAI/standards-guidelines/wcag/faq/",
+      "publisher": "W3C WAI",
+      "category": "accessibility guidance",
+      "source_position": "informative",
+      "scope": "Current WAI clarification for WCAG 2",
+      "source_status": "current",
+      "access_state": "public",
+      "checked_at": "2026-09-28",
+      "adoption_status": "adopted",
+      "license_terms": "W3C Document License 2023; summarized with attribution",
+      "coverage_axes": [
+        "accessibility",
+        "version clarification"
+      ],
+      "note": "Used to verify current treatment of WCAG 2.0/2.1 SC 4.1.1."
+    },
+    {
+      "key": "wcag-quickref",
+      "name": "How to Meet WCAG 2 (Quick Reference)",
+      "canonical_url": "https://www.w3.org/WAI/WCAG22/quickref/",
+      "publisher": "W3C WAI",
+      "category": "supporting reference",
+      "source_position": "informative",
+      "scope": "WCAG 2.0 / 2.1 / 2.2 criterion navigation",
+      "source_status": "current",
+      "access_state": "public",
+      "checked_at": "2026-09-28",
+      "adoption_status": "adopted",
+      "license_terms": "W3C Document License 2023; summarized with attribution",
+      "coverage_axes": [
+        "accessibility",
+        "criterion lookup"
+      ],
+      "note": "Customizable navigation aid; not an independent requirements inventory."
+    },
+    {
+      "key": "understanding22",
+      "name": "Understanding WCAG 2.2",
+      "canonical_url": "https://www.w3.org/WAI/WCAG22/Understanding/",
+      "publisher": "W3C WAI",
+      "category": "accessibility guidance",
+      "source_position": "informative",
+      "scope": "WCAG 2.2 success criteria interpretation",
+      "source_status": "current",
+      "access_state": "public",
+      "checked_at": "2026-09-28",
+      "adoption_status": "adopted",
+      "license_terms": "W3C Document License 2023; summarized with attribution",
+      "coverage_axes": [
+        "accessibility"
+      ],
+      "note": "Supporting guidance; WCAG Recommendation remains normative."
+    },
+    {
+      "key": "wcag-em2",
+      "name": "WCAG Evaluation Methodology (WCAG-EM) 2.0",
+      "canonical_url": "https://www.w3.org/TR/wcag-em-2/",
+      "publisher": "W3C",
+      "category": "evaluation methodology",
+      "source_position": "methodology",
+      "scope": "Formal WCAG 2 conformance evaluation",
+      "source_status": "current",
+      "access_state": "public",
+      "checked_at": "2026-09-28",
+      "adoption_status": "reference-only",
+      "license_terms": "W3C Document License 2023; methodology summarized with attribution",
+      "coverage_axes": [
+        "formal methodology"
+      ],
+      "note": "W3C Group Note published 2026-07-23; applies to explicit formal conformance evaluation only."
+    },
+    {
+      "key": "aria12",
+      "name": "WAI-ARIA 1.2",
+      "canonical_url": "https://www.w3.org/TR/wai-aria-1.2/",
+      "publisher": "W3C",
+      "category": "accessibility standard",
+      "source_position": "normative",
+      "scope": "Web accessibility semantics",
+      "source_status": "current",
+      "access_state": "public",
+      "checked_at": "2026-09-28",
+      "adoption_status": "adopted",
+      "license_terms": "W3C Document License 2023; summarized with attribution",
+      "coverage_axes": [
+        "accessibility",
+        "semantics"
+      ],
+      "note": "W3C Recommendation 2023-06-06; draft 1.3 is not treated as equivalent."
+    },
+    {
+      "key": "aria-html",
+      "name": "ARIA in HTML",
+      "canonical_url": "https://www.w3.org/TR/html-aria/",
+      "publisher": "W3C",
+      "category": "author conformance requirements",
+      "source_position": "normative",
+      "scope": "ARIA attributes and roles in HTML",
+      "source_status": "current",
+      "access_state": "public",
+      "checked_at": "2026-09-28",
+      "adoption_status": "adopted",
+      "license_terms": "W3C Document License 2023; summarized with attribution",
+      "coverage_axes": [
+        "accessibility",
+        "HTML semantics"
+      ],
+      "note": "Use current Recommendation author requirements; retain native HTML applicability."
+    },
+    {
+      "key": "accname11",
+      "name": "Accessible Name and Description Computation 1.1",
+      "canonical_url": "https://www.w3.org/TR/accname-1.1/",
+      "publisher": "W3C",
+      "category": "accessibility specification",
+      "source_position": "normative",
+      "scope": "Accessible name and description computation",
+      "source_status": "current",
+      "access_state": "public",
+      "checked_at": "2026-09-28",
+      "adoption_status": "adopted",
+      "license_terms": "W3C Document License 2023; summarized with attribution",
+      "coverage_axes": [
+        "accessibility",
+        "accessible name"
+      ],
+      "note": "Stable Recommendation; draft 1.2 is tracked separately if needed."
+    },
+    {
+      "key": "apg",
+      "name": "WAI-ARIA Authoring Practices Guide",
+      "canonical_url": "https://www.w3.org/WAI/ARIA/apg/",
+      "publisher": "W3C WAI",
+      "category": "pattern guidance",
+      "source_position": "informative",
+      "scope": "Web interaction patterns and widgets",
+      "source_status": "current",
+      "access_state": "public",
+      "checked_at": "2026-09-28",
+      "adoption_status": "adopted",
+      "license_terms": "W3C Document License 2023; short paraphrases with attribution",
+      "coverage_axes": [
+        "UI patterns",
+        "accessibility",
+        "keyboard and focus"
+      ],
+      "note": "Official APG Dialog, Accordion, Disclosure, and Tabs pages reviewed 2026-09-28; informative pattern guidance."
+    },
+    {
+      "key": "act-format",
+      "name": "Accessibility Conformance Testing (ACT) Rules Format 1.1",
+      "canonical_url": "https://www.w3.org/TR/act-rules-format/",
+      "publisher": "W3C",
+      "category": "testing rule format",
+      "source_position": "normative",
+      "scope": "ACT rule format and consistency",
+      "source_status": "current",
+      "access_state": "public",
+      "checked_at": "2026-09-28",
+      "adoption_status": "reference-only",
+      "license_terms": "W3C Document License 2023; summarized with attribution",
+      "coverage_axes": [
+        "accessibility testing"
+      ],
+      "note": "Rule format source; individual ACT Rules remain informative test methods."
+    },
+    {
+      "key": "act-rules",
+      "name": "All Accessibility Conformance Testing Rules",
+      "canonical_url": "https://www.w3.org/WAI/standards-guidelines/act/rules/",
+      "publisher": "W3C WAI",
+      "category": "accessibility test rules",
+      "source_position": "informative",
+      "scope": "Published ACT Rules",
+      "source_status": "current",
+      "access_state": "public",
+      "checked_at": "2026-09-28",
+      "adoption_status": "reference-only",
+      "license_terms": "W3C Document License 2023; summarized with attribution",
+      "coverage_axes": [
+        "accessibility testing"
+      ],
+      "note": "Only explicitly supported rules are executed; listing does not imply full implementation."
+    },
+    {
+      "key": "nng",
+      "name": "10 Usability Heuristics for User Interface Design",
+      "canonical_url": "https://www.nngroup.com/articles/ten-usability-heuristics/",
+      "publisher": "Nielsen Norman Group",
+      "category": "usability heuristics",
+      "source_position": "advisory",
+      "scope": "General interface review",
+      "source_status": "current",
+      "access_state": "public",
+      "checked_at": "2026-09-28",
+      "adoption_status": "adopted",
+      "license_terms": "Copyrighted article; paraphrase and cite, do not reproduce text",
+      "coverage_axes": [
+        "interaction principles",
+        "feedback",
+        "error recovery"
+      ],
+      "note": "All ten heuristic headings and descriptions reviewed on the current NN/g article; last editorial review shown as 2024-01-30."
+    },
+    {
+      "key": "iso110",
+      "name": "ISO 9241-110:2020 Ergonomics of human-system interaction — Interaction principles",
+      "canonical_url": "https://www.iso.org/standard/75258.html",
+      "publisher": "International Organization for Standardization",
+      "category": "interaction standard metadata",
+      "source_position": "advisory",
+      "scope": "Interaction principles; full text is not publicly accessible",
+      "source_status": "current",
+      "access_state": "restricted",
+      "checked_at": "2026-09-28",
+      "adoption_status": "reference-only",
+      "license_terms": "Paid standard; public metadata only, no full-text reproduction or inference",
+      "coverage_axes": [
+        "interaction principles"
+      ],
+      "note": "Official metadata page indicates it remains current; 2025 review/confirmation noted. Do not infer paid text."
+    },
+    {
+      "key": "uswds",
+      "name": "U.S. Web Design System",
+      "canonical_url": "https://designsystem.digital.gov/",
+      "publisher": "U.S. General Services Administration",
+      "category": "public design system",
+      "source_position": "advisory",
+      "scope": "USWDS web components and patterns; no project adoption stated",
+      "source_status": "current",
+      "access_state": "public",
+      "checked_at": "2026-09-28",
+      "adoption_status": "adopted",
+      "license_terms": "Public domain / CC0 terms reviewed; retain source attribution",
+      "coverage_axes": [
+        "UI patterns",
+        "dialog",
+        "visual and responsive"
+      ],
+      "note": "USWDS v3.14.0 pages reviewed 2026-09-28 for Dialog, Accordion, Alert, Form, Search, Breadcrumb, Collection, Side navigation, and Pagination; advisory unless project-adopted."
+    }
+  ],
+  "candidates": [
+    {
+      "name": "WCAG 2.0",
+      "canonical_url": "https://www.w3.org/TR/WCAG20/",
+      "origin": "seed",
+      "discovery_detail": "Core normative source URL and current errata notice checked on official W3C page.",
+      "coverage_gap": "Accessibility requirements and version-specific scope.",
+      "status": "adopted",
+      "reason": "Normative reference for version 2.0 evaluation; kept distinct from later versions.",
+      "checked_at": "2026-09-28",
+      "source_key": "wcag20"
+    },
+    {
+      "name": "WCAG 2.1",
+      "canonical_url": "https://www.w3.org/TR/WCAG21/",
+      "origin": "seed",
+      "discovery_detail": "Core normative source checked on official W3C page.",
+      "coverage_gap": "Accessibility requirements and version-specific scope.",
+      "status": "adopted",
+      "reason": "Normative reference for version 2.1 evaluation; kept distinct from later versions.",
+      "checked_at": "2026-09-28",
+      "source_key": "wcag21"
+    },
+    {
+      "name": "WCAG 2.2",
+      "canonical_url": "https://www.w3.org/TR/WCAG22/",
+      "origin": "seed",
+      "discovery_detail": "Core normative source checked on official W3C page.",
+      "coverage_gap": "Current accessibility requirements.",
+      "status": "adopted",
+      "reason": "Normative reference for version 2.2 evaluation; version 2.2 omits SC 4.1.1.",
+      "checked_at": "2026-09-28",
+      "source_key": "wcag22"
+    },
+    {
+      "name": "WCAG Overview",
+      "canonical_url": "https://www.w3.org/WAI/standards-guidelines/wcag/",
+      "origin": "seed",
+      "discovery_detail": "Official WAI overview and supporting-resource links checked.",
+      "coverage_gap": "Accessible navigation among requirements and supporting guidance.",
+      "status": "adopted",
+      "reason": "Informative overview used to route to normative and supporting documents.",
+      "checked_at": "2026-09-28",
+      "source_key": "wcag-overview"
+    },
+    {
+      "name": "WCAG 2 FAQ",
+      "canonical_url": "https://www.w3.org/WAI/standards-guidelines/wcag/faq/",
+      "origin": "query",
+      "discovery_detail": "Q1 official WAI clarification; checked current 4.1.1 treatment.",
+      "coverage_gap": "Version-specific current clarification.",
+      "status": "adopted",
+      "reason": "Supports the version-specific 4.1.1 contract without replacing normative version catalogs.",
+      "checked_at": "2026-09-28",
+      "source_key": "wcag-faq"
+    },
+    {
+      "name": "WCAG Quick Reference",
+      "canonical_url": "https://www.w3.org/WAI/WCAG22/quickref/",
+      "origin": "seed",
+      "discovery_detail": "Official WAI customizable reference checked.",
+      "coverage_gap": "Criterion navigation across supported WCAG 2 versions.",
+      "status": "adopted",
+      "reason": "Supporting navigation only; normative version sources remain authoritative.",
+      "checked_at": "2026-09-28",
+      "source_key": "wcag-quickref"
+    },
+    {
+      "name": "Understanding WCAG 2.2",
+      "canonical_url": "https://www.w3.org/WAI/WCAG22/Understanding/",
+      "origin": "seed",
+      "discovery_detail": "Official WAI supporting guidance checked.",
+      "coverage_gap": "Interpretive accessibility guidance.",
+      "status": "adopted",
+      "reason": "Informative support for interpreting current criteria.",
+      "checked_at": "2026-09-28",
+      "source_key": "understanding22"
+    },
+    {
+      "name": "WCAG-EM 2.0",
+      "canonical_url": "https://www.w3.org/TR/wcag-em-2/",
+      "origin": "query",
+      "discovery_detail": "Q1 official W3C methodology status checked.",
+      "coverage_gap": "Formal conformance methodology.",
+      "status": "reference-only",
+      "reason": "Required by the separate formal evaluation skill; cataloged without duplicating its runtime contract here.",
+      "checked_at": "2026-09-28",
+      "source_key": "wcag-em2"
+    },
+    {
+      "name": "WAI-ARIA 1.2",
+      "canonical_url": "https://www.w3.org/TR/wai-aria-1.2/",
+      "origin": "seed",
+      "discovery_detail": "Official W3C Recommendation checked.",
+      "coverage_gap": "Accessibility semantics.",
+      "status": "adopted",
+      "reason": "Current normative semantics source.",
+      "checked_at": "2026-09-28",
+      "source_key": "aria12"
+    },
+    {
+      "name": "ARIA in HTML",
+      "canonical_url": "https://www.w3.org/TR/html-aria/",
+      "origin": "seed",
+      "discovery_detail": "Official W3C author conformance source checked.",
+      "coverage_gap": "HTML host-language and ARIA conformance.",
+      "status": "adopted",
+      "reason": "Current author requirements source; APG does not replace it.",
+      "checked_at": "2026-09-28",
+      "source_key": "aria-html"
+    },
+    {
+      "name": "Accessible Name and Description Computation 1.1",
+      "canonical_url": "https://www.w3.org/TR/accname-1.1/",
+      "origin": "seed",
+      "discovery_detail": "Official W3C Recommendation checked.",
+      "coverage_gap": "Accessible name and description semantics.",
+      "status": "adopted",
+      "reason": "Stable normative computation source.",
+      "checked_at": "2026-09-28",
+      "source_key": "accname11"
+    },
+    {
+      "name": "WAI-ARIA Authoring Practices Guide",
+      "canonical_url": "https://www.w3.org/WAI/ARIA/apg/",
+      "origin": "query",
+      "discovery_detail": "Q2 official APG Dialog (Modal) page; About This Pattern and Keyboard Interaction sections reviewed.",
+      "coverage_gap": "Dialog purpose, modal behavior, keyboard and focus pattern.",
+      "status": "adopted",
+      "reason": "Directly informs the Dialog vertical slice as informative pattern guidance.",
+      "checked_at": "2026-09-28",
+      "source_key": "apg"
+    },
+    {
+      "name": "ACT Rules Format 1.1",
+      "canonical_url": "https://www.w3.org/TR/act-rules-format/",
+      "origin": "seed",
+      "discovery_detail": "Official W3C format Recommendation checked.",
+      "coverage_gap": "ACT result and consistency contract.",
+      "status": "reference-only",
+      "reason": "Source for the separate supported-rule implementation contract.",
+      "checked_at": "2026-09-28",
+      "source_key": "act-format"
+    },
+    {
+      "name": "All ACT Rules",
+      "canonical_url": "https://www.w3.org/WAI/standards-guidelines/act/rules/",
+      "origin": "seed",
+      "discovery_detail": "Official WAI rule index checked.",
+      "coverage_gap": "Informative testing method provenance.",
+      "status": "reference-only",
+      "reason": "Cataloged without implying all ACT rules are implemented.",
+      "checked_at": "2026-09-28",
+      "source_key": "act-rules"
+    },
+    {
+      "name": "NN/g 10 Usability Heuristics",
+      "canonical_url": "https://www.nngroup.com/articles/ten-usability-heuristics/",
+      "origin": "query",
+      "discovery_detail": "Q5 public heuristic source; current article metadata reviewed.",
+      "coverage_gap": "General interaction principles and heuristic review.",
+      "status": "adopted",
+      "reason": "Advisory reference; paraphrase only and do not create binding requirements.",
+      "checked_at": "2026-09-28",
+      "source_key": "nng"
+    },
+    {
+      "name": "ISO 9241-110:2020",
+      "canonical_url": "https://www.iso.org/standard/75258.html",
+      "origin": "query",
+      "discovery_detail": "Q5 official metadata page checked; full standard is paywalled.",
+      "coverage_gap": "Interaction principles provenance.",
+      "status": "reference-only",
+      "reason": "Public metadata only; no attempt to obtain or infer paid text.",
+      "checked_at": "2026-09-28",
+      "source_key": "iso110"
+    },
+    {
+      "name": "U.S. Web Design System",
+      "canonical_url": "https://designsystem.digital.gov/",
+      "origin": "query",
+      "discovery_detail": "Q2 / Q3 / Q6 official USWDS Modal component page; v3.14.0 page and usage guidance reviewed.",
+      "coverage_gap": "Dialog vertical slice and common web modal usage.",
+      "status": "adopted",
+      "reason": "Selected as one applicable public Design System source; advisory without project adoption.",
+      "checked_at": "2026-09-28",
+      "source_key": "uswds"
+    },
+    {
+      "name": "GOV.UK Design System",
+      "canonical_url": "https://design-system.service.gov.uk/",
+      "origin": "query",
+      "discovery_detail": "Q3 public Design System discovery; no additional source item needed for the selected Dialog slice.",
+      "coverage_gap": "Public Web design-system coverage.",
+      "status": "rejected",
+      "reason": "No separate coverage gap after selecting directly relevant APG and USWDS modal sources; not project-adopted.",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "name": "Carbon Design System",
+      "canonical_url": "https://carbondesignsystem.com/",
+      "origin": "query",
+      "discovery_detail": "Q3 public Design System discovery.",
+      "coverage_gap": "Public Web design-system coverage.",
+      "status": "rejected",
+      "reason": "Project adoption and distinct required coverage were not established; not bundled as a second competing modal contract.",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "name": "Apple Human Interface Guidelines",
+      "canonical_url": "https://developer.apple.com/design/human-interface-guidelines/",
+      "origin": "query",
+      "discovery_detail": "Q4 platform guidance discovery; official native-platform source checked for applicability.",
+      "coverage_gap": "Target platform-specific interaction guidance.",
+      "status": "rejected",
+      "reason": "Repository target is generic Web and no Apple platform adoption is present.",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "name": "GNOME Human Interface Guidelines",
+      "canonical_url": "https://developer.gnome.org/hig/",
+      "origin": "query",
+      "discovery_detail": "Q4 platform guidance discovery; official native-platform source checked for applicability.",
+      "coverage_gap": "Target platform-specific interaction guidance.",
+      "status": "rejected",
+      "reason": "Repository target is generic Web and no GNOME platform adoption is present.",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "name": "Playwright documentation",
+      "canonical_url": "https://playwright.dev/docs/actionability",
+      "origin": "query",
+      "discovery_detail": "Q7 official browser automation docs checked with locator guidance.",
+      "coverage_gap": "Browser observation and automation behavior.",
+      "status": "rejected",
+      "reason": "Production owner is usability-inspection; this reference package does not own browser execution.",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "name": "Navigation Timing Level 2",
+      "canonical_url": "https://www.w3.org/TR/navigation-timing-2/",
+      "origin": "query",
+      "discovery_detail": "Q7 W3C timing source checked.",
+      "coverage_gap": "Navigation measurement.",
+      "status": "rejected",
+      "reason": "Measurement source belongs to usability-inspection package.",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "name": "Paint Timing",
+      "canonical_url": "https://www.w3.org/TR/paint-timing/",
+      "origin": "query",
+      "discovery_detail": "Q7 W3C timing source checked.",
+      "coverage_gap": "Paint timing measurement.",
+      "status": "rejected",
+      "reason": "Measurement source belongs to usability-inspection package.",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "name": "Web Vitals field measurement guidance",
+      "canonical_url": "https://web.dev/articles/vitals-field-measurement-best-practices",
+      "origin": "query",
+      "discovery_detail": "Q7 official web.dev field measurement guidance checked.",
+      "coverage_gap": "Field/lab distinction and provenance.",
+      "status": "rejected",
+      "reason": "Measurement source belongs to usability-inspection package.",
+      "checked_at": "2026-09-28"
+    }
+  ],
+  "discovery_runs": [
+    {
+      "type": "official-source review",
+      "target": "Current Web accessibility standards and conformance methodology",
+      "category": "Q1",
+      "checked_at": "2026-09-28",
+      "checked_scope": "Official W3C/WAI WCAG 2.0, 2.1, 2.2, overview, FAQ, Quick Reference, Understanding, WAI-ARIA, ARIA in HTML, AccName, WCAG-EM 2.0, ACT Format and WAI ACT rule index pages.",
+      "checked_count": 13,
+      "new_candidate_count": 1,
+      "retrieval_boundary": "Direct-open of listed official W3C/WAI publications and status pages; this records reviewed pages, not an exhaustive web crawl.",
+      "completion": "completed",
+      "block_reason": "-"
+    },
+    {
+      "type": "official pattern review",
+      "target": "Current Web UI pattern and interaction guidance for modal dialogs",
+      "category": "Q2",
+      "checked_at": "2026-09-28",
+      "checked_scope": "Official WAI APG Dialog, Accordion, Disclosure, and Tabs pages; current USWDS v3.14.0 Modal, Accordion, Alert, Form, Search, Breadcrumb, Collection, Side navigation, and Pagination pages.",
+      "checked_count": 12,
+      "new_candidate_count": 0,
+      "retrieval_boundary": "Direct official WAI APG and USWDS pages selected for the documented pattern gaps; no exhaustive component or example crawl.",
+      "completion": "completed",
+      "block_reason": "-"
+    },
+    {
+      "type": "public Design System discovery",
+      "target": "Public Design Systems with reusable Web components and patterns",
+      "category": "Q3",
+      "checked_at": "2026-09-28",
+      "checked_scope": "Official USWDS, GOV.UK Design System and Carbon Design System pages/results relevant to modal guidance.",
+      "checked_count": 3,
+      "new_candidate_count": 2,
+      "retrieval_boundary": "Official public Design System home/component pages inspected; selection limited to the Dialog coverage gap and project adoption context.",
+      "completion": "completed",
+      "block_reason": "-"
+    },
+    {
+      "type": "platform guidance applicability",
+      "target": "Platform HIG relevant to generic Web target",
+      "category": "Q4",
+      "checked_at": "2026-09-28",
+      "checked_scope": "Official Apple HIG and GNOME HIG entry pages; repository context has no native target platform or adopted platform HIG.",
+      "checked_count": 2,
+      "new_candidate_count": 2,
+      "retrieval_boundary": "Official entry pages checked only to resolve target applicability; native HIG content was not imported into Web guidance.",
+      "completion": "completed",
+      "block_reason": "-"
+    },
+    {
+      "type": "public heuristic and methodology review",
+      "target": "Usability heuristic and interaction-principle sources",
+      "category": "Q5",
+      "checked_at": "2026-09-28",
+      "checked_scope": "NN/g 10 Usability Heuristics article, including all ten current headings and descriptions; ISO official metadata only.",
+      "checked_count": 2,
+      "new_candidate_count": 0,
+      "retrieval_boundary": "Public NN/g article and official ISO metadata; paid ISO text was not obtained or inferred.",
+      "completion": "completed",
+      "block_reason": "-"
+    },
+    {
+      "type": "official responsive and visual guidance review",
+      "target": "Responsive, visual, error, feedback and dialog guidance",
+      "category": "Q6",
+      "checked_at": "2026-09-28",
+      "checked_scope": "WCAG 2.2 UI criteria and official WAI Understanding pages for reflow, focus obscuration, labels, and error identification; selected current USWDS form, feedback, navigation, search, and collection pages.",
+      "checked_count": 12,
+      "new_candidate_count": 0,
+      "retrieval_boundary": "Direct official W3C/WAI and selected USWDS pages for recorded gaps; not an exhaustive Design System inventory.",
+      "completion": "completed",
+      "block_reason": "-"
+    },
+    {
+      "type": "official browser and measurement source review",
+      "target": "Playwright and Web performance measurement methodology",
+      "category": "Q7",
+      "checked_at": "2026-09-28",
+      "checked_scope": "Official Playwright actionability, locator and emulation docs, W3C Navigation Timing and Paint Timing, and web.dev field measurement guidance.",
+      "checked_count": 6,
+      "new_candidate_count": 4,
+      "retrieval_boundary": "Official documentation pages directly opened; candidate ownership assigned to usability-inspection, with no browser/runtime source copied into this Skill.",
+      "completion": "completed",
+      "block_reason": "-"
+    }
+  ],
+  "coverage": [
+    {
+      "axis": "accessibility",
+      "concern": "WCAG versions, ARIA semantics, author requirements, APG and ACT",
+      "required_position": "normative",
+      "source_keys": [
+        "wcag20",
+        "wcag21",
+        "wcag22",
+        "wcag-overview",
+        "wcag-faq",
+        "wcag-quickref",
+        "understanding22",
+        "aria12",
+        "aria-html",
+        "accname11",
+        "apg",
+        "act-format",
+        "act-rules"
+      ],
+      "reference_keys": [
+        "dialog-accessibility",
+        "dialog-semantics",
+        "versioned-wcag-requirements",
+        "form-validation",
+        "status-and-feedback",
+        "accessible-names-and-state"
+      ],
+      "status": "covered",
+      "gap_reason": "Versioned WCAG UI criteria, relevant Understanding guidance, WAI-ARIA, current ARIA in HTML, AccName, APG semantics, and ACT method boundaries are normalized. The formal complete procedure inventory belongs to wcag-conformance-evaluation.",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "axis": "common-web-interaction",
+      "concern": "Forms, navigation, search, collections, feedback, error recovery and help",
+      "required_position": "informative",
+      "source_keys": [
+        "nng",
+        "apg",
+        "uswds",
+        "wcag22",
+        "understanding22"
+      ],
+      "reference_keys": [
+        "form-validation",
+        "status-and-feedback",
+        "orientation-and-navigation",
+        "search-and-results",
+        "accordion-disclosure",
+        "tabs"
+      ],
+      "status": "covered",
+      "gap_reason": "Forms, error recovery, feedback, navigation, search, collections, pagination, and disclosure patterns have selected official guidance with traceable source items.",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "axis": "inspection-formal-methodology",
+      "concern": "Live browser observation, performance measurement and formal WCAG-EM",
+      "required_position": "methodology",
+      "source_keys": [
+        "wcag-em2"
+      ],
+      "reference_keys": [],
+      "status": "not-applicable",
+      "gap_reason": "Live browser observation and measurement belong to usability-inspection. WCAG-EM formal evaluation belongs to wcag-conformance-evaluation; its source is cataloged reference-only here.",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "axis": "interaction-principles",
+      "concern": "Understandability, feedback, control and error recovery",
+      "required_position": "advisory",
+      "source_keys": [
+        "nng"
+      ],
+      "reference_keys": [
+        "heuristic-1",
+        "heuristic-2",
+        "dialog-user-control",
+        "heuristic-4",
+        "heuristic-5",
+        "heuristic-6",
+        "heuristic-7",
+        "heuristic-8",
+        "heuristic-9",
+        "heuristic-10"
+      ],
+      "status": "covered",
+      "gap_reason": "All ten NN/g heuristics are separately routed as advisory prompts; none is promoted to a normative requirement.",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "axis": "platform-adoption",
+      "concern": "Project-adopted Design System or platform guidance",
+      "required_position": "advisory",
+      "source_keys": [],
+      "reference_keys": [],
+      "status": "not-applicable",
+      "gap_reason": "Repository context does not identify a target product platform or adopted Design System; platform-specific sources remain conditional.",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "axis": "ui-pattern",
+      "concern": "Dialog purpose, modal interaction, keyboard/focus behavior, role/state and native HTML semantics",
+      "required_position": "informative",
+      "source_keys": [
+        "apg",
+        "uswds",
+        "aria12",
+        "aria-html"
+      ],
+      "reference_keys": [
+        "modal-dialog",
+        "accordion-disclosure",
+        "tabs",
+        "form-validation",
+        "orientation-and-navigation",
+        "search-and-results"
+      ],
+      "status": "covered",
+      "gap_reason": "Dialog, accordion/disclosure, tabs, forms, navigation, search, and result patterns have normalized references. APG informative advice, USWDS advisory guidance, and normative requirements remain distinct.",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "axis": "visual-responsive",
+      "concern": "Layout, hierarchy, responsive behavior, overflow, clipping, focus and status visibility",
+      "required_position": "informative",
+      "source_keys": [
+        "wcag22",
+        "understanding22",
+        "uswds"
+      ],
+      "reference_keys": [
+        "dialog-accessibility",
+        "versioned-wcag-requirements",
+        "form-validation",
+        "orientation-and-navigation"
+      ],
+      "status": "covered",
+      "gap_reason": "Selected criteria cover contrast, reflow, text spacing, focus visibility/obscuration, and status. Images remain limited to visual claims and do not establish semantics.",
+      "checked_at": "2026-09-28"
+    }
+  ],
+  "source_items": [
+    {
+      "key": "apg-dialog-about",
+      "source_key": "apg",
+      "name": "Dialog (Modal) Pattern — About This Pattern",
+      "document_url": "https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/",
+      "locator_type": "heading",
+      "locator": "About This Pattern",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "modal behavior",
+        "purpose",
+        "underlying content interaction"
+      ],
+      "captured_dimensions": [
+        "modal behavior",
+        "purpose",
+        "underlying content interaction"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "apg-dialog-keyboard",
+      "source_key": "apg",
+      "name": "Dialog (Modal) Pattern — Keyboard Interaction",
+      "document_url": "https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/",
+      "locator_type": "heading",
+      "locator": "Keyboard Interaction",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "keyboard",
+        "focus entry",
+        "focus containment",
+        "dismissal",
+        "focus return"
+      ],
+      "captured_dimensions": [
+        "keyboard",
+        "focus entry",
+        "focus containment",
+        "dismissal",
+        "focus return"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "uswds-modal-about",
+      "source_key": "uswds",
+      "name": "USWDS Modal — About the modal component",
+      "document_url": "https://designsystem.digital.gov/components/modal/",
+      "locator_type": "heading",
+      "locator": "About the modal component",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "purpose",
+        "usage conditions",
+        "workflow interruption",
+        "content size"
+      ],
+      "captured_dimensions": [
+        "purpose",
+        "usage conditions",
+        "workflow interruption",
+        "content size"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "aria-dialog-role",
+      "source_key": "aria12",
+      "name": "WAI-ARIA 1.2 — dialog role",
+      "document_url": "https://www.w3.org/TR/wai-aria-1.2/",
+      "locator_type": "fragment",
+      "locator": "#dialog",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "dialog role",
+        "accessible name required",
+        "focusable descendant and focus management guidance",
+        "aria-modal property"
+      ],
+      "captured_dimensions": [
+        "dialog role",
+        "accessible name required",
+        "focusable descendant and focus management guidance",
+        "aria-modal property"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "html-aria-dialog-element",
+      "source_key": "aria-html",
+      "name": "ARIA in HTML — dialog element row",
+      "document_url": "https://www.w3.org/TR/html-aria/",
+      "locator_type": "heading",
+      "locator": "4. Document conformance requirements for use of ARIA attributes in HTML",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "implicit dialog role",
+        "author-allowed roles and aria attributes",
+        "native HTML semantics"
+      ],
+      "captured_dimensions": [
+        "implicit dialog role",
+        "author-allowed roles and aria attributes",
+        "native HTML semantics"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "wcag-dialog-focus-order",
+      "source_key": "wcag22",
+      "name": "WCAG 2.2 — SC 2.4.3 Focus Order",
+      "document_url": "https://www.w3.org/TR/WCAG22/",
+      "locator_type": "fragment",
+      "locator": "#focus-order",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "sequential focus order preserves meaning and operability when sequence matters"
+      ],
+      "captured_dimensions": [
+        "sequential focus order preserves meaning and operability when sequence matters"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "wcag-dialog-focus-visible",
+      "source_key": "wcag22",
+      "name": "WCAG 2.2 — SC 2.4.7 Focus Visible",
+      "document_url": "https://www.w3.org/TR/WCAG22/",
+      "locator_type": "fragment",
+      "locator": "#focus-visible",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "keyboard-operable interface exposes a mode with visible focus indicator"
+      ],
+      "captured_dimensions": [
+        "keyboard-operable interface exposes a mode with visible focus indicator"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "wcag-dialog-focus-obscured",
+      "source_key": "wcag22",
+      "name": "WCAG 2.2 — SC 2.4.11 Focus Not Obscured (Minimum)",
+      "document_url": "https://www.w3.org/TR/WCAG22/",
+      "locator_type": "fragment",
+      "locator": "#focus-not-obscured-minimum",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "keyboard-focused component is not entirely hidden by author-created content"
+      ],
+      "captured_dimensions": [
+        "keyboard-focused component is not entirely hidden by author-created content"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "wcag-dialog-name-role-value",
+      "source_key": "wcag22",
+      "name": "WCAG 2.2 — SC 4.1.2 Name, Role, Value",
+      "document_url": "https://www.w3.org/TR/WCAG22/",
+      "locator_type": "fragment",
+      "locator": "#name-role-value",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "dialog user interface component exposes its name and role; applicable states and properties remain programmatically determinable"
+      ],
+      "captured_dimensions": [
+        "dialog user interface component exposes its name and role; applicable states and properties remain programmatically determinable"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "understanding-dialog-focus-obscured",
+      "source_key": "understanding22",
+      "name": "Understanding WCAG 2.2 SC 2.4.11 — Modal dialogs",
+      "document_url": "https://www.w3.org/WAI/WCAG22/Understanding/focus-not-obscured-minimum",
+      "locator_type": "heading",
+      "locator": "Modal dialogs",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "interpretive guidance on focus entry and containment for a properly constructed modal",
+        "dialog-like overlays that allow focus to escape behind them may risk obscuring focus"
+      ],
+      "captured_dimensions": [
+        "interpretive guidance on focus entry and containment for a properly constructed modal",
+        "dialog-like overlays that allow focus to escape behind them may risk obscuring focus"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "nng-user-control",
+      "source_key": "nng",
+      "name": "NN/g Heuristic 3 — User Control and Freedom",
+      "document_url": "https://www.nngroup.com/articles/ten-usability-heuristics/",
+      "locator_type": "heading",
+      "locator": "3: User Control and Freedom",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "clear exit from an unwanted interaction",
+        "exit discoverability",
+        "undo or cancellation as contextual options"
+      ],
+      "captured_dimensions": [
+        "clear exit from an unwanted interaction",
+        "exit discoverability",
+        "undo or cancellation as contextual options"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "apg-accordion-about",
+      "source_key": "apg",
+      "name": "Accordion Pattern — About This Pattern",
+      "document_url": "https://www.w3.org/WAI/ARIA/apg/patterns/accordion/",
+      "locator_type": "heading",
+      "locator": "About This Pattern",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "accordion purpose",
+        "content sections",
+        "show and hide"
+      ],
+      "captured_dimensions": [
+        "accordion purpose",
+        "content sections",
+        "show and hide"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "apg-accordion-keyboard",
+      "source_key": "apg",
+      "name": "Accordion Pattern — Keyboard Interaction",
+      "document_url": "https://www.w3.org/WAI/ARIA/apg/patterns/accordion/",
+      "locator_type": "heading",
+      "locator": "Keyboard Interaction",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "Enter and Space activation",
+        "Tab reaches focusable panel content"
+      ],
+      "captured_dimensions": [
+        "Enter and Space activation",
+        "Tab reaches focusable panel content"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "apg-disclosure-about",
+      "source_key": "apg",
+      "name": "Disclosure Pattern — About This Pattern",
+      "document_url": "https://www.w3.org/WAI/ARIA/apg/patterns/disclosure/",
+      "locator_type": "heading",
+      "locator": "About This Pattern",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "single show and hide control",
+        "collapsed and expanded content"
+      ],
+      "captured_dimensions": [
+        "single show and hide control",
+        "collapsed and expanded content"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "apg-disclosure-keyboard",
+      "source_key": "apg",
+      "name": "Disclosure Pattern — Keyboard Interaction",
+      "document_url": "https://www.w3.org/WAI/ARIA/apg/patterns/disclosure/",
+      "locator_type": "heading",
+      "locator": "Keyboard Interaction",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "Enter and Space toggle"
+      ],
+      "captured_dimensions": [
+        "Enter and Space toggle"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "apg-tabs-about",
+      "source_key": "apg",
+      "name": "Tabs Pattern — About This Pattern",
+      "document_url": "https://www.w3.org/WAI/ARIA/apg/patterns/tabs/",
+      "locator_type": "heading",
+      "locator": "About This Pattern",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "layered panels",
+        "one active panel",
+        "tab and panel relationship"
+      ],
+      "captured_dimensions": [
+        "layered panels",
+        "one active panel",
+        "tab and panel relationship"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "apg-tabs-keyboard",
+      "source_key": "apg",
+      "name": "Tabs Pattern — Keyboard Interaction",
+      "document_url": "https://www.w3.org/WAI/ARIA/apg/patterns/tabs/",
+      "locator_type": "heading",
+      "locator": "Keyboard Interaction",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "active tab entry",
+        "arrow navigation",
+        "activation model"
+      ],
+      "captured_dimensions": [
+        "active tab entry",
+        "arrow navigation",
+        "activation model"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "uswds-accordion-guidance",
+      "source_key": "uswds",
+      "name": "Accordion — component guidance",
+      "document_url": "https://designsystem.digital.gov/components/accordion/",
+      "locator_type": "heading",
+      "locator": "When to use the accordion component",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "reveal grouped sections",
+        "component selection depends on information architecture"
+      ],
+      "captured_dimensions": [
+        "reveal grouped sections",
+        "component selection depends on information architecture"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "uswds-alert-guidance",
+      "source_key": "uswds",
+      "name": "Alert — component guidance",
+      "document_url": "https://designsystem.digital.gov/components/alert/",
+      "locator_type": "heading",
+      "locator": "When to use the alert component",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "system status and time-sensitive changes",
+        "validation and task completion messages",
+        "long forms need inline validation"
+      ],
+      "captured_dimensions": [
+        "system status and time-sensitive changes",
+        "validation and task completion messages",
+        "long forms need inline validation"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "uswds-form-accessibility",
+      "source_key": "uswds",
+      "name": "Form — accessibility guidance",
+      "document_url": "https://designsystem.digital.gov/components/form/",
+      "locator_type": "heading",
+      "locator": "Accessibility guidance",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "DOM order and visual order",
+        "group related controls",
+        "validation alignment",
+        "required and optional instructions"
+      ],
+      "captured_dimensions": [
+        "DOM order and visual order",
+        "group related controls",
+        "validation alignment",
+        "required and optional instructions"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "uswds-search-guidance",
+      "source_key": "uswds",
+      "name": "Search — component guidance",
+      "document_url": "https://designsystem.digital.gov/components/search/",
+      "locator_type": "heading",
+      "locator": "When to use the search component",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "search discoverability",
+        "query visibility",
+        "labelled search input"
+      ],
+      "captured_dimensions": [
+        "search discoverability",
+        "query visibility",
+        "labelled search input"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "uswds-breadcrumb-guidance",
+      "source_key": "uswds",
+      "name": "Breadcrumb — component guidance",
+      "document_url": "https://designsystem.digital.gov/components/breadcrumb/",
+      "locator_type": "heading",
+      "locator": "When to use the breadcrumb component",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "orientation in hierarchy",
+        "parent navigation",
+        "not a sequence indicator"
+      ],
+      "captured_dimensions": [
+        "orientation in hierarchy",
+        "parent navigation",
+        "not a sequence indicator"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "uswds-collection-guidance",
+      "source_key": "uswds",
+      "name": "Collection — component guidance",
+      "document_url": "https://designsystem.digital.gov/components/collection/",
+      "locator_type": "heading",
+      "locator": "When to use the collection component",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "related content and metadata",
+        "unique descriptive links",
+        "large catalogs need an index"
+      ],
+      "captured_dimensions": [
+        "related content and metadata",
+        "unique descriptive links",
+        "large catalogs need an index"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "uswds-sidenav-guidance",
+      "source_key": "uswds",
+      "name": "Side navigation — component guidance",
+      "document_url": "https://designsystem.digital.gov/components/side-navigation/",
+      "locator_type": "heading",
+      "locator": "When to use the side navigation component",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "one to three level hierarchy",
+        "current page indication",
+        "navigation depth and breadth"
+      ],
+      "captured_dimensions": [
+        "one to three level hierarchy",
+        "current page indication",
+        "navigation depth and breadth"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "uswds-pagination-guidance",
+      "source_key": "uswds",
+      "name": "Pagination — component guidance",
+      "document_url": "https://designsystem.digital.gov/components/pagination/",
+      "locator_type": "heading",
+      "locator": "About the pagination component",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "page-size pagination",
+        "bounded and unbounded result sets",
+        "meaningful content grouping differs"
+      ],
+      "captured_dimensions": [
+        "page-size pagination",
+        "bounded and unbounded result sets",
+        "meaningful content grouping differs"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "wcag20-version-inventory",
+      "source_key": "wcag20",
+      "name": "WCAG 2.0 — versioned criterion set",
+      "document_url": "https://www.w3.org/TR/WCAG20/",
+      "locator_type": "none",
+      "locator": "-",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "version-specific criteria and conformance requirements"
+      ],
+      "captured_dimensions": [
+        "version-specific criteria and conformance requirements"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "wcag21-version-inventory",
+      "source_key": "wcag21",
+      "name": "WCAG 2.1 — versioned criterion set",
+      "document_url": "https://www.w3.org/TR/WCAG21/",
+      "locator_type": "none",
+      "locator": "-",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "version-specific criteria and conformance requirements"
+      ],
+      "captured_dimensions": [
+        "version-specific criteria and conformance requirements"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "wcag22-version-inventory",
+      "source_key": "wcag22",
+      "name": "WCAG 2.2 — versioned criterion set",
+      "document_url": "https://www.w3.org/TR/WCAG22/",
+      "locator_type": "none",
+      "locator": "-",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "version-specific criteria and conformance requirements"
+      ],
+      "captured_dimensions": [
+        "version-specific criteria and conformance requirements"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "wcag22-contrast",
+      "source_key": "wcag22",
+      "name": "WCAG 2.2 — SC 1.4.3 Contrast (Minimum)",
+      "document_url": "https://www.w3.org/TR/WCAG22/",
+      "locator_type": "fragment",
+      "locator": "#contrast-minimum",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "text contrast under criterion conditions"
+      ],
+      "captured_dimensions": [
+        "text contrast under criterion conditions"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "wcag22-reflow",
+      "source_key": "wcag22",
+      "name": "WCAG 2.2 — SC 1.4.10 Reflow",
+      "document_url": "https://www.w3.org/TR/WCAG22/",
+      "locator_type": "fragment",
+      "locator": "#reflow",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "reflow without loss under criterion conditions"
+      ],
+      "captured_dimensions": [
+        "reflow without loss under criterion conditions"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "wcag22-non-text-contrast",
+      "source_key": "wcag22",
+      "name": "WCAG 2.2 — SC 1.4.11 Non-text Contrast",
+      "document_url": "https://www.w3.org/TR/WCAG22/",
+      "locator_type": "fragment",
+      "locator": "#non-text-contrast",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "visual information for controls and states"
+      ],
+      "captured_dimensions": [
+        "visual information for controls and states"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "wcag22-text-spacing",
+      "source_key": "wcag22",
+      "name": "WCAG 2.2 — SC 1.4.12 Text Spacing",
+      "document_url": "https://www.w3.org/TR/WCAG22/",
+      "locator_type": "fragment",
+      "locator": "#text-spacing",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "user-applied text spacing"
+      ],
+      "captured_dimensions": [
+        "user-applied text spacing"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "wcag22-keyboard",
+      "source_key": "wcag22",
+      "name": "WCAG 2.2 — SC 2.1.1 Keyboard",
+      "document_url": "https://www.w3.org/TR/WCAG22/",
+      "locator_type": "fragment",
+      "locator": "#keyboard",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "keyboard operation under criterion conditions"
+      ],
+      "captured_dimensions": [
+        "keyboard operation under criterion conditions"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "wcag22-error-identification",
+      "source_key": "wcag22",
+      "name": "WCAG 2.2 — SC 3.3.1 Error Identification",
+      "document_url": "https://www.w3.org/TR/WCAG22/",
+      "locator_type": "fragment",
+      "locator": "#error-identification",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "automatically detected input error is identified and described in text"
+      ],
+      "captured_dimensions": [
+        "automatically detected input error is identified and described in text"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "wcag22-labels-instructions",
+      "source_key": "wcag22",
+      "name": "WCAG 2.2 — SC 3.3.2 Labels or Instructions",
+      "document_url": "https://www.w3.org/TR/WCAG22/",
+      "locator_type": "fragment",
+      "locator": "#labels-or-instructions",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "labels or instructions for user input"
+      ],
+      "captured_dimensions": [
+        "labels or instructions for user input"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "wcag22-error-suggestion",
+      "source_key": "wcag22",
+      "name": "WCAG 2.2 — SC 3.3.3 Error Suggestion",
+      "document_url": "https://www.w3.org/TR/WCAG22/",
+      "locator_type": "fragment",
+      "locator": "#error-suggestion",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "known correction suggestions under criterion conditions"
+      ],
+      "captured_dimensions": [
+        "known correction suggestions under criterion conditions"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "wcag22-status-messages",
+      "source_key": "wcag22",
+      "name": "WCAG 2.2 — SC 4.1.3 Status Messages",
+      "document_url": "https://www.w3.org/TR/WCAG22/",
+      "locator_type": "fragment",
+      "locator": "#status-messages",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "programmatically exposed status without focus movement"
+      ],
+      "captured_dimensions": [
+        "programmatically exposed status without focus movement"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "understanding-reflow",
+      "source_key": "understanding22",
+      "name": "Understanding WCAG 2.2 SC 1.4.10 — Reflow",
+      "document_url": "https://www.w3.org/WAI/WCAG22/Understanding/reflow",
+      "locator_type": "none",
+      "locator": "-",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "interpretive guidance and criterion exceptions"
+      ],
+      "captured_dimensions": [
+        "interpretive guidance and criterion exceptions"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "understanding-error-identification",
+      "source_key": "understanding22",
+      "name": "Understanding WCAG 2.2 SC 3.3.1 — Error Identification",
+      "document_url": "https://www.w3.org/WAI/WCAG22/Understanding/error-identification",
+      "locator_type": "none",
+      "locator": "-",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "error identification purpose",
+        "presentation examples",
+        "native browser validation limitations"
+      ],
+      "captured_dimensions": [
+        "error identification purpose",
+        "presentation examples",
+        "native browser validation limitations"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "accname-computation",
+      "source_key": "accname11",
+      "name": "Accessible Name and Description Computation 1.1",
+      "document_url": "https://www.w3.org/TR/accname-1.1/",
+      "locator_type": "none",
+      "locator": "-",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "accessible name and description computation"
+      ],
+      "captured_dimensions": [
+        "accessible name and description computation"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "act-format-rules",
+      "source_key": "act-format",
+      "name": "ACT Rules Format 1.1",
+      "document_url": "https://www.w3.org/TR/act-rules-format/",
+      "locator_type": "none",
+      "locator": "-",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "ACT rule applicability and outcome format; not additional WCAG requirements"
+      ],
+      "captured_dimensions": [
+        "ACT rule applicability and outcome format; not additional WCAG requirements"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "act-rules-index",
+      "source_key": "act-rules",
+      "name": "All ACT Rules index",
+      "document_url": "https://www.w3.org/WAI/standards-guidelines/act/rules/",
+      "locator_type": "none",
+      "locator": "-",
+      "disposition": "reference-only",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "catalog navigation to ACT rules"
+      ],
+      "captured_dimensions": [],
+      "semantic_validation": "not-required",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "nng-heuristic-1",
+      "source_key": "nng",
+      "name": "NN/g Heuristic 1 — Visibility of System Status",
+      "document_url": "https://www.nngroup.com/articles/ten-usability-heuristics/",
+      "locator_type": "heading",
+      "locator": "1: Visibility of System Status",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "feedback and status visibility"
+      ],
+      "captured_dimensions": [
+        "feedback and status visibility"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "nng-heuristic-2",
+      "source_key": "nng",
+      "name": "NN/g Heuristic 2 — Match Between the System and the Real World",
+      "document_url": "https://www.nngroup.com/articles/ten-usability-heuristics/",
+      "locator_type": "heading",
+      "locator": "2: Match Between the System and the Real World",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "language and concepts fit the supplied task"
+      ],
+      "captured_dimensions": [
+        "language and concepts fit the supplied task"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "nng-heuristic-4",
+      "source_key": "nng",
+      "name": "NN/g Heuristic 4 — Consistency and Standards",
+      "document_url": "https://www.nngroup.com/articles/ten-usability-heuristics/",
+      "locator_type": "heading",
+      "locator": "4: Consistency and Standards",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "consistency with applicable conventions"
+      ],
+      "captured_dimensions": [
+        "consistency with applicable conventions"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "nng-heuristic-5",
+      "source_key": "nng",
+      "name": "NN/g Heuristic 5 — Error Prevention",
+      "document_url": "https://www.nngroup.com/articles/ten-usability-heuristics/",
+      "locator_type": "heading",
+      "locator": "5: Error Prevention",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "avoid error-prone conditions where practical"
+      ],
+      "captured_dimensions": [
+        "avoid error-prone conditions where practical"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "nng-heuristic-6",
+      "source_key": "nng",
+      "name": "NN/g Heuristic 6 — Recognition Rather than Recall",
+      "document_url": "https://www.nngroup.com/articles/ten-usability-heuristics/",
+      "locator_type": "heading",
+      "locator": "6: Recognition Rather than Recall",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "visible recognition cues"
+      ],
+      "captured_dimensions": [
+        "visible recognition cues"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "nng-heuristic-7",
+      "source_key": "nng",
+      "name": "NN/g Heuristic 7 — Flexibility and Efficiency of Use",
+      "document_url": "https://www.nngroup.com/articles/ten-usability-heuristics/",
+      "locator_type": "heading",
+      "locator": "7: Flexibility and Efficiency of Use",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "flexibility for repeated or experienced use"
+      ],
+      "captured_dimensions": [
+        "flexibility for repeated or experienced use"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "nng-heuristic-8",
+      "source_key": "nng",
+      "name": "NN/g Heuristic 8 — Aesthetic and Minimalist Design",
+      "document_url": "https://www.nngroup.com/articles/ten-usability-heuristics/",
+      "locator_type": "heading",
+      "locator": "8: Aesthetic and Minimalist Design",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "task-relevant content and hierarchy"
+      ],
+      "captured_dimensions": [
+        "task-relevant content and hierarchy"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "nng-heuristic-9",
+      "source_key": "nng",
+      "name": "NN/g Heuristic 9 — Help Users Recognize, Diagnose, and Recover from Errors",
+      "document_url": "https://www.nngroup.com/articles/ten-usability-heuristics/",
+      "locator_type": "heading",
+      "locator": "9: Help Users Recognize, Diagnose, and Recover from Errors",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "recognition and recovery from observed errors"
+      ],
+      "captured_dimensions": [
+        "recognition and recovery from observed errors"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    },
+    {
+      "key": "nng-heuristic-10",
+      "source_key": "nng",
+      "name": "NN/g Heuristic 10 — Help and Documentation",
+      "document_url": "https://www.nngroup.com/articles/ten-usability-heuristics/",
+      "locator_type": "heading",
+      "locator": "10: Help and Documentation",
+      "disposition": "included",
+      "access_state": "public",
+      "source_status": "current",
+      "reference_destination": "-",
+      "available_dimensions": [
+        "findable contextual assistance"
+      ],
+      "captured_dimensions": [
+        "findable contextual assistance"
+      ],
+      "semantic_validation": "pass",
+      "checked_at": "2026-09-28"
+    }
+  ],
+  "references": [
+    {
+      "path": "patterns/disclosure-dialogs-and-overlays.md",
+      "entries": [
+        {
+          "key": "modal-dialog",
+          "name": "Modal Dialog",
+          "body": "### Purpose and applicability\nA modal dialog is a window over a primary application view that makes the underlying content unavailable for interaction while modal. Choose a modal only when the task calls for that interruption; a visible overlay or dialog role alone does not establish that it should be modal. Consider the task, amount of content, whether users need background context, and whether the interruption is reversible.\n\n### Interaction and state\nFor a modal interaction, inspect where focus moves on opening, whether keyboard navigation remains within the dialog while it is modal, how it can be dismissed or completed, and where focus goes after dismissal. APG describes typical keyboard behavior and focus management; the initial focus target depends on content and task. Keep focus observations distinct from DOM semantics and from screenshots.\n\n### Feedback and recovery\nMake the dialog purpose and consequential choices understandable in context. Check whether an exit, cancel, or recovery path is apparent when the task allows one. A long or complex task may be easier to complete in a page or non-modal pattern. These prompts support expert review; APG guidance is informative and USWDS guidance is advisory unless the project adopts USWDS.\n\n### Visual review\nUse screenshots to inspect dialog bounds, hierarchy, readable content, overlay, visible actions, and whether the currently focused component is visibly obscured. A screenshot cannot establish the accessible name, focus order, focus containment, or keyboard operation; use DOM/accessibility and interaction evidence for those claims.\n\n### Evaluation cautions\nConfirm target purpose, current state, keyboard/focus observations, visual presentation, and applicable project Authority before judging. Do not infer usability from a role or a sample implementation checklist. Do not treat APG or USWDS recommendations as project requirements without applicable authority.\n",
+          "source_items": [
+            {
+              "item_key": "apg-dialog-about",
+              "source_position": "informative",
+              "source_status_maturity": "WAI-ARIA APG Dialog (Modal) pattern; checked 2026-09-28",
+              "applicability": "Web dialog purpose and modal behavior guidance; informative pattern advice, not the sole normative implementation contract."
+            },
+            {
+              "item_key": "apg-dialog-keyboard",
+              "source_position": "informative",
+              "source_status_maturity": "WAI-ARIA APG Dialog (Modal) pattern; checked 2026-09-28",
+              "applicability": "Typical keyboard and focus behavior for modal dialogs; initial focus depends on dialog content and task."
+            },
+            {
+              "item_key": "uswds-modal-about",
+              "source_position": "advisory",
+              "source_status_maturity": "USWDS v3.14.0; page updated 2026-08-18",
+              "applicability": "USWDS-specific modal component use guidance; advisory for products that have not adopted USWDS."
+            }
+          ],
+          "existing_reference_id": "REF-0001"
+        },
+        {
+          "key": "accordion-disclosure",
+          "name": "Accordion and Disclosure",
+          "body": "### Purpose and applicability\nAn accordion is a set of section controls that reveal or hide associated content. A disclosure is a single control that shows or hides a section. Similar appearance does not decide the pattern: use the content structure, task, and need to compare sections.\n\n### Interaction and evidence\nUse DOM/accessibility evidence for the button, expanded state, and content relationship; use a keyboard trace for activation and Tab order. APG guidance describes typical Enter/Space activation, while accordion implementations may differ on whether multiple panels stay open.\n\n### Source position\nAPG is informative pattern advice. USWDS advice is advisory unless adopted by the project. Neither establishes that a pattern is appropriate for a given task.",
+          "source_items": [
+            {
+              "item_key": "apg-accordion-about",
+              "source_position": "informative",
+              "source_status_maturity": "WAI-ARIA APG; checked 2026-09-28",
+              "applicability": "Use when a stacked set of content sections can be independently revealed or hidden."
+            },
+            {
+              "item_key": "apg-accordion-keyboard",
+              "source_position": "informative",
+              "source_status_maturity": "WAI-ARIA APG; checked 2026-09-28",
+              "applicability": "Typical APG keyboard interaction; verify actual target behavior."
+            },
+            {
+              "item_key": "apg-disclosure-about",
+              "source_position": "informative",
+              "source_status_maturity": "WAI-ARIA APG; checked 2026-09-28",
+              "applicability": "Use for a single show/hide control when the task and content relationship fit."
+            },
+            {
+              "item_key": "apg-disclosure-keyboard",
+              "source_position": "informative",
+              "source_status_maturity": "WAI-ARIA APG; checked 2026-09-28",
+              "applicability": "APG activation advice; verify behavior from interaction evidence."
+            },
+            {
+              "item_key": "uswds-accordion-guidance",
+              "source_position": "advisory",
+              "source_status_maturity": "USWDS v3.14.0; checked 2026-09-28",
+              "applicability": "USWDS component advice; binding only if adopted."
+            }
+          ]
+        },
+        {
+          "key": "tabs",
+          "name": "Tabs",
+          "body": "### Purpose and applicability\nA tabs widget presents layered panels with one associated panel active at a time. Determine whether the content is mutually selectable panels, a sequence, a navigation hierarchy, or information that should be visible together. Visual similarity alone does not establish applicability.\n\n### Interaction and state\nUse DOM/accessibility evidence for tablist, tab, tabpanel, selected state, and relationships. Use keyboard evidence to determine arrow navigation and whether activation is automatic or manual. Automatic activation is APG advice when the panel appears without noticeable latency.\n\n### Limits\nDo not require ARIA tab semantics for unrelated navigation links. APG guidance does not replace normative WCAG evaluation.",
+          "source_items": [
+            {
+              "item_key": "apg-tabs-about",
+              "source_position": "informative",
+              "source_status_maturity": "WAI-ARIA APG; checked 2026-09-28",
+              "applicability": "Use when layered panels are selected within a tabs widget."
+            },
+            {
+              "item_key": "apg-tabs-keyboard",
+              "source_position": "informative",
+              "source_status_maturity": "WAI-ARIA APG; checked 2026-09-28",
+              "applicability": "Use to review the widget keyboard model; do not infer it from screenshots."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "accessibility/dialog-focus.md",
+      "entries": [
+        {
+          "key": "dialog-accessibility",
+          "name": "Dialog Focus and WCAG 2.2",
+          "body": "### Normative success criteria\nFor sequential navigation where order affects meaning or operation, WCAG 2.2 SC 2.4.3 requires focus order to preserve meaning and operability. SC 2.4.7 requires a visible keyboard focus indicator for keyboard-operable interfaces. SC 2.4.11 (AA) requires that a keyboard-focused component not be entirely hidden due to author-created content. SC 4.1.2 (A) covers name, role, and value for user interface components. Apply each criterion only when its stated conditions apply and keep the criterion's conformance level visible.\n\n### Modal interpretation\nWAI's Understanding guidance says a properly constructed modal takes and maintains focus, preventing interaction outside until dismissal; in that case the focused component is visible and SC 2.4.11 passes. An overlay that allows focus to move behind it while hiding that component is at risk. The informative explanation does not expand or replace the normative SC.\n\n### Evidence boundary\nUse DOM/accessibility evidence for the computed role/name and structural semantics, keyboard observations for focus order/entry/containment/return, and screenshots for visible focus and overlay occlusion. Do not infer keyboard behavior from a static screenshot or infer a conformance result from the pattern label alone. This focused entry does not constitute a WCAG conformance evaluation.",
+          "source_items": [
+            {
+              "item_key": "wcag-dialog-focus-order",
+              "source_position": "normative",
+              "source_status_maturity": "WCAG 2.2 Recommendation; SC 2.4.3, Level A; checked 2026-09-28",
+              "applicability": "Applies when sequential focus order affects meaning or operability; relevant to observed dialog entry, sequence, and return when those conditions hold."
+            },
+            {
+              "item_key": "wcag-dialog-focus-visible",
+              "source_position": "normative",
+              "source_status_maturity": "WCAG 2.2 Recommendation; SC 2.4.7, Level AA; checked 2026-09-28",
+              "applicability": "Applies to keyboard-operable UI; assess whether the keyboard focus indicator is visible in the tested dialog state."
+            },
+            {
+              "item_key": "wcag-dialog-focus-obscured",
+              "source_position": "normative",
+              "source_status_maturity": "WCAG 2.2 Recommendation; SC 2.4.11, Level AA; checked 2026-09-28",
+              "applicability": "Applies when a UI component receives keyboard focus; assess whether author-created content entirely hides it, including when focus can leave an overlay."
+            },
+            {
+              "item_key": "wcag-dialog-name-role-value",
+              "source_position": "normative",
+              "source_status_maturity": "WCAG 2.2 Recommendation; SC 4.1.2, Level A; checked 2026-09-28",
+              "applicability": "Applies to user interface components; evaluate programmatically determinable name, role, and state/value where applicable."
+            },
+            {
+              "item_key": "understanding-dialog-focus-obscured",
+              "source_position": "informative",
+              "source_status_maturity": "WAI Understanding WCAG 2.2 SC 2.4.11; checked 2026-09-28",
+              "applicability": "Interpretive support for SC 2.4.11 modal focus behavior; informative guidance, not a substitute for the Recommendation."
+            }
+          ],
+          "existing_reference_id": "REF-0002"
+        }
+      ]
+    },
+    {
+      "path": "accessibility/dialog-semantics.md",
+      "entries": [
+        {
+          "key": "dialog-semantics",
+          "name": "Dialog Semantics in Web Content",
+          "body": "### WAI-ARIA dialog role\nThe WAI-ARIA 1.2 `dialog` role identifies a descendant window. Authors MUST give a dialog an accessible name. Authors SHOULD ensure it has a focusable descendant, place focus in it when displayed, and manage focus for modal dialogs. `aria-modal` is a supported property of the role; its presence does not itself implement modal focus handling or make outside content non-interactive.\n\n### Native HTML mapping\nIn current ARIA in HTML, the `<dialog>` element has an implicit `dialog` role. The author-conformance table allows `alertdialog`; explicitly specifying the same `dialog` role is allowed but not recommended. The table also permits global ARIA and properties applicable to the dialog role. Preserve native HTML semantics and evaluate the actual accessible name, state, and interaction instead of requiring redundant ARIA.\n\n### Evaluation use\nTreat WAI-ARIA and ARIA in HTML as normative semantics/author-conformance sources. APG remains informative guidance about authoring patterns. Verify computed role and accessible name from DOM/accessibility evidence; verify modal focus behavior separately through interaction evidence.\n",
+          "source_items": [
+            {
+              "item_key": "aria-dialog-role",
+              "source_position": "normative",
+              "source_status_maturity": "WAI-ARIA 1.2 Recommendation; published 2023-06-06; checked 2026-09-28",
+              "applicability": "Applies to custom or native web dialog semantics; MUST accessible name and SHOULD focus-management guidance retain their respective strength."
+            },
+            {
+              "item_key": "html-aria-dialog-element",
+              "source_position": "normative",
+              "source_status_maturity": "ARIA in HTML Recommendation; current version dated 2026-08-11; checked 2026-09-28",
+              "applicability": "HTML author-conformance row for `<dialog>` and its implicit role / allowed ARIA; native role mapping is not a requirement to add a redundant explicit role."
+            }
+          ],
+          "existing_reference_id": "REF-0004"
+        }
+      ]
+    },
+    {
+      "path": "heuristics/user-control-and-freedom.md",
+      "entries": [
+        {
+          "key": "dialog-user-control",
+          "name": "User Control and Freedom",
+          "body": "### Heuristic 3: user control and freedom\nWhen an interaction leaves users in an unwanted state, look for a clearly discoverable way to exit, cancel, or undo when the task allows it. The heuristic can prompt a review of dialog dismissal and recovery. It is advisory, not a WCAG success criterion or project requirement; applicability depends on the task, consequences, and available alternatives.\n\n### Evaluation use\nRecord the user goal and observed controls. Do not assume that users were confused, assert a usability failure from the heuristic alone, or convert its advice into a strict requirement. Pair it with task context and direct evidence.",
+          "source_items": [
+            {
+              "item_key": "nng-user-control",
+              "source_position": "advisory",
+              "source_status_maturity": "NN/g 10 Usability Heuristics, heuristic 3; article reviewed 2024-01-30 and checked 2026-09-28",
+              "applicability": "General advisory prompt for a clear exit or recovery path when relevant to the user's task; not a binding rule."
+            }
+          ],
+          "existing_reference_id": "REF-0003"
+        }
+      ]
+    },
+    {
+      "path": "patterns/forms-and-feedback.md",
+      "entries": [
+        {
+          "key": "form-validation",
+          "name": "Forms and Validation",
+          "body": "### Form task and labels\nUse the supplied goal and project rules to assess field labels, instructions, grouping, required/optional status, and error relationships. Project Authority and applicable WCAG criteria can create binding obligations; USWDS examples remain advisory without adoption.\n\n### Error identification and recovery\nRecord the observed message, which field it identifies, any correction suggestion, and whether the state can be corrected. WCAG 3.3.1 applies to automatically detected input errors; 3.3.2 addresses input labels or instructions; 3.3.3 covers known correction suggestions under its conditions. These criteria do not require one universal placement. A summary, inline messages, or both can fit the task.\n\n### Evidence boundary\nUse DOM/accessibility evidence for label and error relationships, interaction evidence for submit and recovery behavior, and screenshots for alignment or clipping. Do not infer behavior from a mockup or claim that users understood a message without user evidence.",
+          "source_items": [
+            {
+              "item_key": "uswds-form-accessibility",
+              "source_position": "advisory",
+              "source_status_maturity": "USWDS v3.14.0; checked 2026-09-28",
+              "applicability": "Guidance on grouping, reading order, instructions, and validation alignment; binding only when adopted."
+            },
+            {
+              "item_key": "wcag22-error-identification",
+              "source_position": "normative",
+              "source_status_maturity": "WCAG 2.2 SC 3.3.1 Level A; checked 2026-09-28",
+              "applicability": "Apply when an input error is automatically detected."
+            },
+            {
+              "item_key": "wcag22-labels-instructions",
+              "source_position": "normative",
+              "source_status_maturity": "WCAG 2.2 SC 3.3.2 Level A; checked 2026-09-28",
+              "applicability": "Apply when content requires user input."
+            },
+            {
+              "item_key": "wcag22-error-suggestion",
+              "source_position": "normative",
+              "source_status_maturity": "WCAG 2.2 SC 3.3.3 Level AA; checked 2026-09-28",
+              "applicability": "Apply when a known correction exists and exceptions do not apply."
+            },
+            {
+              "item_key": "understanding-error-identification",
+              "source_position": "informative",
+              "source_status_maturity": "WAI Understanding WCAG 2.2 SC 3.3.1; checked 2026-09-28",
+              "applicability": "Interpretive examples only; the normative requirement remains in WCAG."
+            },
+            {
+              "item_key": "nng-heuristic-5",
+              "source_position": "advisory",
+              "source_status_maturity": "NN/g 10 Usability Heuristics; reviewed 2024-01-30, checked 2026-09-28",
+              "applicability": "A prompt to review preventable error conditions, not a binding form rule."
+            },
+            {
+              "item_key": "nng-heuristic-9",
+              "source_position": "advisory",
+              "source_status_maturity": "NN/g 10 Usability Heuristics; reviewed 2024-01-30, checked 2026-09-28",
+              "applicability": "A prompt to review error recognition and recovery, not a claim about user rates."
+            }
+          ]
+        },
+        {
+          "key": "status-and-feedback",
+          "name": "Status and Feedback",
+          "body": "### Match the message to the event\nRecord what changed, whether action is required, when the message appears, and how long it remains available. Distinguish validation, success, warning, and system status. Presentation depends on urgency and the user's current task.\n\n### Accessibility and visual evidence\nWCAG 4.1.3 applies to status messages that meet its definition and requires programmatic exposure without focus movement. It does not require every message to be an alert. Use accessibility evidence for role/state and interaction evidence for timing/focus. Screenshots support visual prominence, clipping, and hierarchy only.\n\n### Advisory prompts\nNN/g visibility-of-status is a heuristic. USWDS Alert is a component example. Neither creates a project requirement unless adopted.",
+          "source_items": [
+            {
+              "item_key": "uswds-alert-guidance",
+              "source_position": "advisory",
+              "source_status_maturity": "USWDS v3.14.0; checked 2026-09-28",
+              "applicability": "Component examples for status and validation; advisory outside adopted USWDS projects."
+            },
+            {
+              "item_key": "wcag22-status-messages",
+              "source_position": "normative",
+              "source_status_maturity": "WCAG 2.2 SC 4.1.3 Level AA; checked 2026-09-28",
+              "applicability": "Apply to status messages as defined by the criterion."
+            },
+            {
+              "item_key": "nng-heuristic-1",
+              "source_position": "advisory",
+              "source_status_maturity": "NN/g 10 Usability Heuristics; reviewed 2024-01-30, checked 2026-09-28",
+              "applicability": "Prompt to review visible status and feedback; not a conformance test."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "patterns/navigation-and-results.md",
+      "entries": [
+        {
+          "key": "orientation-and-navigation",
+          "name": "Orientation and Navigation",
+          "body": "### Match navigation to structure\nCheck the information architecture, current location, routes to parent/sibling content, and whether a control represents hierarchy or a sequence. A breadcrumb can show hierarchy; it is not automatically appropriate for ordered steps. Side navigation can expose a section hierarchy, while overlapping or deep navigation can add complexity.\n\n### Evaluate from the task\nUse the supplied goal and page context to assess destination labels. DOM/accessibility and keyboard evidence support operation and navigation semantics; screenshots support visible hierarchy and responsive layout. USWDS guidance is advisory unless adopted.",
+          "source_items": [
+            {
+              "item_key": "uswds-breadcrumb-guidance",
+              "source_position": "advisory",
+              "source_status_maturity": "USWDS v3.14.0; checked 2026-09-28",
+              "applicability": "Advisory breadcrumb purpose and when-not-to-use guidance."
+            },
+            {
+              "item_key": "uswds-sidenav-guidance",
+              "source_position": "advisory",
+              "source_status_maturity": "USWDS v3.14.0; checked 2026-09-28",
+              "applicability": "Advisory hierarchy and current-location prompts."
+            }
+          ]
+        },
+        {
+          "key": "search-and-results",
+          "name": "Search and Results",
+          "body": "### Search task\nAssess whether search supports the supplied task and has a visible or programmatic label, submit action, and useful result context. Inspect retained query context, result titles, distinguishing metadata, and a route to a broader index when the set is incomplete.\n\n### Collections and pagination\nA compact collection may group related items with metadata; a larger archive may need a separate index or search. Pagination describes page-size splitting, not semantically meaningful groupings or steps. Preserve whether a set is bounded, the current page, and routes to adjacent/last pages.\n\n### Advisory source boundary\nUSWDS guidance is advisory unless adopted. WCAG criteria are assessed separately and are not established by copying a Design System example.",
+          "source_items": [
+            {
+              "item_key": "uswds-search-guidance",
+              "source_position": "advisory",
+              "source_status_maturity": "USWDS v3.14.0; checked 2026-09-28",
+              "applicability": "Advisory site-search guidance including labels and query visibility."
+            },
+            {
+              "item_key": "uswds-collection-guidance",
+              "source_position": "advisory",
+              "source_status_maturity": "USWDS v3.14.0; checked 2026-09-28",
+              "applicability": "Advisory related-content and archive guidance."
+            },
+            {
+              "item_key": "uswds-pagination-guidance",
+              "source_position": "advisory",
+              "source_status_maturity": "USWDS v3.14.0; checked 2026-09-28",
+              "applicability": "Advisory guidance; distinguish page-size pagination from meaningful grouping."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "accessibility/wcag-versioned-requirements.md",
+      "entries": [
+        {
+          "key": "versioned-wcag-requirements",
+          "name": "Versioned WCAG Requirements for UI Evaluation",
+          "body": "### Keep WCAG versions separate\nUse the exact version and level from project Authority or the request. WCAG 2.0, 2.1, and 2.2 are separate normative Recommendations with version-specific criteria. Do not silently replace a named target with the newest version. WCAG 2.2 removed obsolete 4.1.1 Parsing. WAI overview, FAQ, and Quick Reference pages help navigate requirements but do not replace the normative version-specific Recommendation.\n\n### UI-related criteria\nThis is a routing aid, not a complete procedure inventory. Apply criterion text, level, and exceptions from the selected version. Relevant areas can include contrast, reflow, text spacing, keyboard operation, focus order/visibility/obscuration, input errors, labels, component semantics, and status messages.\n\n### Evidence and scope\nUse DOM/accessibility evidence for programmatic semantics, interaction evidence for keyboard order/state transitions, and images for visible contrast, reflow, clipping, or focus visibility. A semantic UX result is not a WCAG conformance claim. Formal WCAG-EM work belongs to `wcag-conformance-evaluation`.",
+          "source_items": [
+            {
+              "item_key": "wcag20-version-inventory",
+              "source_position": "normative",
+              "source_status_maturity": "WCAG 2.0 Recommendation; checked 2026-09-28",
+              "applicability": "Use only when WCAG 2.0 is the selected target; retain its criterion set."
+            },
+            {
+              "item_key": "wcag21-version-inventory",
+              "source_position": "normative",
+              "source_status_maturity": "WCAG 2.1 Recommendation; checked 2026-09-28",
+              "applicability": "Use only when WCAG 2.1 is the selected target; retain its criterion set."
+            },
+            {
+              "item_key": "wcag22-version-inventory",
+              "source_position": "normative",
+              "source_status_maturity": "WCAG 2.2 Recommendation, updated 2024-12-12; checked 2026-09-28",
+              "applicability": "Use when WCAG 2.2 is the selected target; it omits obsolete 4.1.1."
+            },
+            {
+              "item_key": "wcag22-contrast",
+              "source_position": "normative",
+              "source_status_maturity": "WCAG 2.2 Recommendation; SC 1.4.3, Level AA; checked 2026-09-28",
+              "applicability": "Apply when criterion conditions hold."
+            },
+            {
+              "item_key": "wcag22-reflow",
+              "source_position": "normative",
+              "source_status_maturity": "WCAG 2.2 Recommendation; SC 1.4.10, Level AA; checked 2026-09-28",
+              "applicability": "Apply the exact viewport/zoom conditions and exceptions."
+            },
+            {
+              "item_key": "wcag22-non-text-contrast",
+              "source_position": "normative",
+              "source_status_maturity": "WCAG 2.2 Recommendation; SC 1.4.11, Level AA; checked 2026-09-28",
+              "applicability": "Apply to visual information needed to identify components or states."
+            },
+            {
+              "item_key": "wcag22-text-spacing",
+              "source_position": "normative",
+              "source_status_maturity": "WCAG 2.2 Recommendation; SC 1.4.12, Level AA; checked 2026-09-28",
+              "applicability": "Apply specified user-applied spacing values and exceptions."
+            },
+            {
+              "item_key": "wcag22-keyboard",
+              "source_position": "normative",
+              "source_status_maturity": "WCAG 2.2 Recommendation; SC 2.1.1, Level A; checked 2026-09-28",
+              "applicability": "Apply to functionality available through a keyboard interface."
+            },
+            {
+              "item_key": "wcag-dialog-focus-order",
+              "source_position": "normative",
+              "source_status_maturity": "WCAG 2.2 Recommendation; SC 2.4.3, Level A; checked 2026-09-28",
+              "applicability": "Apply when order affects meaning or operation."
+            },
+            {
+              "item_key": "wcag-dialog-focus-visible",
+              "source_position": "normative",
+              "source_status_maturity": "WCAG 2.2 Recommendation; SC 2.4.7, Level AA; checked 2026-09-28",
+              "applicability": "Apply when a keyboard interface is available."
+            },
+            {
+              "item_key": "wcag-dialog-focus-obscured",
+              "source_position": "normative",
+              "source_status_maturity": "WCAG 2.2 Recommendation; SC 2.4.11, Level AA; checked 2026-09-28",
+              "applicability": "Check if a keyboard-focused component is entirely hidden."
+            },
+            {
+              "item_key": "wcag22-error-identification",
+              "source_position": "normative",
+              "source_status_maturity": "WCAG 2.2 Recommendation; SC 3.3.1, Level A; checked 2026-09-28",
+              "applicability": "Apply when an input error is automatically detected."
+            },
+            {
+              "item_key": "wcag22-labels-instructions",
+              "source_position": "normative",
+              "source_status_maturity": "WCAG 2.2 Recommendation; SC 3.3.2, Level A; checked 2026-09-28",
+              "applicability": "Apply when content requires input."
+            },
+            {
+              "item_key": "wcag22-error-suggestion",
+              "source_position": "normative",
+              "source_status_maturity": "WCAG 2.2 Recommendation; SC 3.3.3, Level AA; checked 2026-09-28",
+              "applicability": "Apply when a known correction exists and exceptions do not apply."
+            },
+            {
+              "item_key": "wcag-dialog-name-role-value",
+              "source_position": "normative",
+              "source_status_maturity": "WCAG 2.2 Recommendation; SC 4.1.2, Level A; checked 2026-09-28",
+              "applicability": "Apply to components under the criterion's semantic conditions."
+            },
+            {
+              "item_key": "wcag22-status-messages",
+              "source_position": "normative",
+              "source_status_maturity": "WCAG 2.2 Recommendation; SC 4.1.3, Level AA; checked 2026-09-28",
+              "applicability": "Apply only to messages meeting the criterion definition."
+            },
+            {
+              "item_key": "understanding-reflow",
+              "source_position": "informative",
+              "source_status_maturity": "WAI Understanding WCAG 2.2 SC 1.4.10; checked 2026-09-28",
+              "applicability": "Interpretive guidance only; WCAG carries the normative requirement."
+            },
+            {
+              "item_key": "understanding-dialog-focus-obscured",
+              "source_position": "informative",
+              "source_status_maturity": "WAI Understanding WCAG 2.2 SC 2.4.11; checked 2026-09-28",
+              "applicability": "Informative modal example; not a substitute for the criterion."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "accessibility/semantics-and-test-methods.md",
+      "entries": [
+        {
+          "key": "accessible-names-and-state",
+          "name": "Accessible Names, States, and Test Methods",
+          "body": "### Accessible names and semantics\nUse WAI-ARIA for role, naming, state, and property semantics; ARIA in HTML for HTML author-conformance constraints; and AccName for the name/description computation. Preserve normative strength and native semantics. Do not require redundant explicit ARIA when HTML provides semantics.\n\n### Test methods stay distinct from requirements\nACT Rules Format defines a method format and outcome mapping. ACT rules are informative test methods; they do not add or replace WCAG success criteria. The All ACT Rules index is kept for navigation, but this Skill does not claim to implement every rule.\n\n### Evidence selection\nUse DOM/accessibility evidence for computed names, roles, and states; use targeted interaction evidence for behavior. A pattern label, attribute, or screenshot alone does not establish conformance.",
+          "source_items": [
+            {
+              "item_key": "aria-dialog-role",
+              "source_position": "normative",
+              "source_status_maturity": "WAI-ARIA 1.2 Recommendation; checked 2026-09-28",
+              "applicability": "Normative semantics; retain the source's MUST/SHOULD strength."
+            },
+            {
+              "item_key": "html-aria-dialog-element",
+              "source_position": "normative",
+              "source_status_maturity": "ARIA in HTML Recommendation dated 2026-08-11; checked 2026-09-28",
+              "applicability": "HTML author conformance and native implicit roles."
+            },
+            {
+              "item_key": "accname-computation",
+              "source_position": "normative",
+              "source_status_maturity": "Accessible Name and Description Computation 1.1 Recommendation; checked 2026-09-28",
+              "applicability": "Use for computed accessible-name and description questions."
+            },
+            {
+              "item_key": "act-format-rules",
+              "source_position": "normative",
+              "source_status_maturity": "ACT Rules Format 1.1 Recommendation; checked 2026-09-28",
+              "applicability": "Normative format for ACT rules, not a source of additional WCAG requirements."
+            },
+            {
+              "item_key": "act-rules-index",
+              "source_position": "informative",
+              "source_status_maturity": "WAI All ACT Rules index; checked 2026-09-28",
+              "applicability": "Navigation only; individual rules may be proposed or outside this package."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "heuristics/heuristic-01.md",
+      "entries": [
+        {
+          "key": "heuristic-1",
+          "name": "Heuristic 1: Visibility of System Status",
+          "body": "### Advisory use\nReview whether meaningful current state and interaction outcomes are communicated in time for the task.\n\n### Evidence and applicability\nUse this as an expert-review question connected to supplied goals, context, and observations. Keep it separate from normative criteria, project Authority, and user research.",
+          "source_items": [
+            {
+              "item_key": "nng-heuristic-1",
+              "source_position": "advisory",
+              "source_status_maturity": "NN/g 10 Usability Heuristics; reviewed 2024-01-30, checked 2026-09-28",
+              "applicability": "Advisory prompt, not a binding requirement or measured user outcome."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "heuristics/heuristic-02.md",
+      "entries": [
+        {
+          "key": "heuristic-2",
+          "name": "Heuristic 2: Match Between the System and the Real World",
+          "body": "### Advisory use\nReview whether labels, concepts, and ordering fit the supplied goal; no single metaphor is universal.\n\n### Evidence and applicability\nUse this as an expert-review question connected to supplied goals, context, and observations. Keep it separate from normative criteria, project Authority, and user research.",
+          "source_items": [
+            {
+              "item_key": "nng-heuristic-2",
+              "source_position": "advisory",
+              "source_status_maturity": "NN/g 10 Usability Heuristics; reviewed 2024-01-30, checked 2026-09-28",
+              "applicability": "Advisory prompt, not a binding requirement or measured user outcome."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "heuristics/heuristic-04.md",
+      "entries": [
+        {
+          "key": "heuristic-4",
+          "name": "Heuristic 4: Consistency and Standards",
+          "body": "### Advisory use\nReview consistency with the applicable product convention, and identify the source before claiming a violation.\n\n### Evidence and applicability\nUse this as an expert-review question connected to supplied goals, context, and observations. Keep it separate from normative criteria, project Authority, and user research.",
+          "source_items": [
+            {
+              "item_key": "nng-heuristic-4",
+              "source_position": "advisory",
+              "source_status_maturity": "NN/g 10 Usability Heuristics; reviewed 2024-01-30, checked 2026-09-28",
+              "applicability": "Advisory prompt, not a binding requirement or measured user outcome."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "heuristics/heuristic-05.md",
+      "entries": [
+        {
+          "key": "heuristic-5",
+          "name": "Heuristic 5: Error Prevention",
+          "body": "### Advisory use\nReview avoidable error-prone conditions against the task and consequences; this is not a binding requirement.\n\n### Evidence and applicability\nUse this as an expert-review question connected to supplied goals, context, and observations. Keep it separate from normative criteria, project Authority, and user research.",
+          "source_items": [
+            {
+              "item_key": "nng-heuristic-5",
+              "source_position": "advisory",
+              "source_status_maturity": "NN/g 10 Usability Heuristics; reviewed 2024-01-30, checked 2026-09-28",
+              "applicability": "Advisory prompt, not a binding requirement or measured user outcome."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "heuristics/heuristic-06.md",
+      "entries": [
+        {
+          "key": "heuristic-6",
+          "name": "Heuristic 6: Recognition Rather than Recall",
+          "body": "### Advisory use\nReview whether relevant choices and next steps can be recognized without unnecessary memory.\n\n### Evidence and applicability\nUse this as an expert-review question connected to supplied goals, context, and observations. Keep it separate from normative criteria, project Authority, and user research.",
+          "source_items": [
+            {
+              "item_key": "nng-heuristic-6",
+              "source_position": "advisory",
+              "source_status_maturity": "NN/g 10 Usability Heuristics; reviewed 2024-01-30, checked 2026-09-28",
+              "applicability": "Advisory prompt, not a binding requirement or measured user outcome."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "heuristics/heuristic-07.md",
+      "entries": [
+        {
+          "key": "heuristic-7",
+          "name": "Heuristic 7: Flexibility and Efficiency of Use",
+          "body": "### Advisory use\nReview whether different experience levels have suitable routes without hiding a required novice path.\n\n### Evidence and applicability\nUse this as an expert-review question connected to supplied goals, context, and observations. Keep it separate from normative criteria, project Authority, and user research.",
+          "source_items": [
+            {
+              "item_key": "nng-heuristic-7",
+              "source_position": "advisory",
+              "source_status_maturity": "NN/g 10 Usability Heuristics; reviewed 2024-01-30, checked 2026-09-28",
+              "applicability": "Advisory prompt, not a binding requirement or measured user outcome."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "heuristics/heuristic-08.md",
+      "entries": [
+        {
+          "key": "heuristic-8",
+          "name": "Heuristic 8: Aesthetic and Minimalist Design",
+          "body": "### Advisory use\nReview task relevance and information hierarchy; aesthetic preference alone is not a defect.\n\n### Evidence and applicability\nUse this as an expert-review question connected to supplied goals, context, and observations. Keep it separate from normative criteria, project Authority, and user research.",
+          "source_items": [
+            {
+              "item_key": "nng-heuristic-8",
+              "source_position": "advisory",
+              "source_status_maturity": "NN/g 10 Usability Heuristics; reviewed 2024-01-30, checked 2026-09-28",
+              "applicability": "Advisory prompt, not a binding requirement or measured user outcome."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "heuristics/heuristic-09.md",
+      "entries": [
+        {
+          "key": "heuristic-9",
+          "name": "Heuristic 9: Help Users Recognize, Diagnose, and Recover from Errors",
+          "body": "### Advisory use\nReview recognition and recovery from observed errors; do not claim actual recovery rates without research.\n\n### Evidence and applicability\nUse this as an expert-review question connected to supplied goals, context, and observations. Keep it separate from normative criteria, project Authority, and user research.",
+          "source_items": [
+            {
+              "item_key": "nng-heuristic-9",
+              "source_position": "advisory",
+              "source_status_maturity": "NN/g 10 Usability Heuristics; reviewed 2024-01-30, checked 2026-09-28",
+              "applicability": "Advisory prompt, not a binding requirement or measured user outcome."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "heuristics/heuristic-10.md",
+      "entries": [
+        {
+          "key": "heuristic-10",
+          "name": "Heuristic 10: Help and Documentation",
+          "body": "### Advisory use\nReview whether relevant help is findable; do not assume every interface needs the same help surface.\n\n### Evidence and applicability\nUse this as an expert-review question connected to supplied goals, context, and observations. Keep it separate from normative criteria, project Authority, and user research.",
+          "source_items": [
+            {
+              "item_key": "nng-heuristic-10",
+              "source_position": "advisory",
+              "source_status_maturity": "NN/g 10 Usability Heuristics; reviewed 2024-01-30, checked 2026-09-28",
+              "applicability": "Advisory prompt, not a binding requirement or measured user outcome."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

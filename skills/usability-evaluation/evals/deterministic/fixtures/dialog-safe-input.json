@@ -1,0 +1,168 @@
+{
+  "condition": {
+    "target": {
+      "ref": "TARGET-001",
+      "name": "Preference dialog",
+      "region": "Display settings"
+    },
+    "platform": "Web / saved fixture evidence",
+    "viewport_device": "1280x720 desktop",
+    "locale": "en-US",
+    "current_state": "Display density dialog open",
+    "evidence_refs": [
+      "EV-101",
+      "EV-102",
+      "EV-103"
+    ],
+    "project_authority_refs": [
+      "AUTH-101"
+    ],
+    "adopted_design_system_refs": [
+      "AUTH-101"
+    ],
+    "limitations": [],
+    "user": null,
+    "user_goal_task_flow": "Choose a display density and either save or cancel",
+    "success_condition": "The person can change or cancel the reversible preference without losing place.",
+    "business_outcome": null,
+    "business_rule": null
+  },
+  "aspects": [
+    {
+      "aspect_key": "purpose-understanding",
+      "handling": "対象外",
+      "reason": "This no-issue control evaluates only dialog interaction."
+    },
+    {
+      "aspect_key": "interaction",
+      "handling": "今回評価する",
+      "reason": null
+    },
+    {
+      "aspect_key": "feedback",
+      "handling": "対象外",
+      "reason": "This no-issue control evaluates only dialog interaction."
+    },
+    {
+      "aspect_key": "error-prevention-recovery",
+      "handling": "対象外",
+      "reason": "This no-issue control evaluates only dialog interaction."
+    },
+    {
+      "aspect_key": "accessibility",
+      "handling": "対象外",
+      "reason": "This no-issue control evaluates only dialog interaction."
+    },
+    {
+      "aspect_key": "visual-integrity",
+      "handling": "対象外",
+      "reason": "This no-issue control evaluates only dialog interaction."
+    },
+    {
+      "aspect_key": "cross-pattern-flow",
+      "handling": "対象外",
+      "reason": "This no-issue control evaluates only dialog interaction."
+    }
+  ],
+  "reference_catalog": {
+    "REF-0001": [
+      "SRC-012-ITEM-0001"
+    ]
+  },
+  "pattern_identifications": [
+    {
+      "draft_key": "modal-pattern",
+      "target_ref": "TARGET-001",
+      "pattern_name": "Modal dialog",
+      "purpose": "Temporarily present a task while retaining a safe route to complete or leave it.",
+      "user_goal_relationship": "The settings dialog lets the person save a reversible preference or cancel.",
+      "applicability": "The dialog is used for a focused preference task with explicit Save and Cancel controls.",
+      "source_refs": [
+        {
+          "reference_entry_ref": "REF-0001",
+          "source_item_ref": "SRC-012-ITEM-0001"
+        }
+      ],
+      "not_identified_reason": null
+    }
+  ],
+  "known_refs": {
+    "evidence_refs": [
+      "EV-101",
+      "EV-102",
+      "EV-103"
+    ],
+    "project_authority_refs": [
+      "AUTH-101"
+    ],
+    "test_rule_result_refs": [],
+    "requirement_check_refs": [
+      "REQCHK-001"
+    ],
+    "measurement_refs": [],
+    "inspection_request_refs": [],
+    "owner_activity_refs": [
+      "ACTIVITY-001"
+    ],
+    "finding_refs": [],
+    "scope_refs": [
+      "SCOPE-001"
+    ],
+    "target_refs": [
+      "TARGET-001",
+      "ELEMENT-001"
+    ],
+    "state_basis_refs": [
+      "STATE-001"
+    ]
+  },
+  "findings": [],
+  "existing_additional_observation_links": [],
+  "evaluations": [
+    {
+      "draft_key": "dialog-focus",
+      "aspect_key": "interaction",
+      "target": "Dialog save, cancel, and exit behavior",
+      "user_goal_task_flow_override": null,
+      "basis": [
+        "reference",
+        "user-goal"
+      ],
+      "observed_fact": "Focus enters the named dialog, remains in the dialog during Tab navigation, and returns to the opener after Escape. Save and Cancel are both visible.",
+      "pattern_or_principle": "Modal dialog",
+      "pattern_draft_key": "modal-pattern",
+      "project_authority_refs": [],
+      "applied_references": [
+        {
+          "reference_entry_ref": "REF-0001",
+          "source_item_ref": "SRC-012-ITEM-0001",
+          "reference_position": "informative pattern guidance",
+          "authority_binding_applied": false,
+          "project_authority_refs": []
+        }
+      ],
+      "reference_not_used_reason": null,
+      "expected_characteristic": "The modal interaction supports the stated preference task and offers a route to save or leave without committing.",
+      "difference": "No meaningful difference is supported by the saved evidence.",
+      "expected_impact": "No interaction barrier is identified within the supplied evidence and scope.",
+      "impact_basis": "The DOM/accessibility, keyboard, and screenshot evidence cover the stated interaction checks.",
+      "judgment_reason": "The task is reversible, Save and Cancel are present, and keyboard focus remains within the dialog. Visual resemblance alone is not used as a failure rule.",
+      "additional_observation_links": [],
+      "observed_user_impact": null,
+      "evidence_refs": [
+        "EV-101",
+        "EV-102",
+        "EV-103"
+      ],
+      "test_rule_result_refs": [],
+      "requirement_check_refs": [],
+      "measurement_refs": [],
+      "status": "問題なし",
+      "status_reason": null,
+      "routing": null,
+      "finding_draft_key": null,
+      "note": null,
+      "follow_up_required": false
+    }
+  ]
+}

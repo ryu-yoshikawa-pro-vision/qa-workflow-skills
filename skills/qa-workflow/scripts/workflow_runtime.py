@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+import json
+import subprocess
 import sys
+import uuid
+from pathlib import Path
 from typing import Any
 
+import artifact_graph
 from runtime_contract import (
     FULL_DIGEST_RE,
     InvalidInput,
@@ -13,25 +17,417 @@ from runtime_contract import (
     _expected_entities,
     canonical_json_text,
     canonicalize,
-    evaluate_entity_freshness,
-    evaluate_materialize_completion,
-    evaluate_target_disposition_closure,
-    evaluate_runtime_unit_freshness,
     ensure_list,
     ensure_nonempty_string,
     entity_identity,
+    evaluate_entity_freshness,
+    evaluate_materialize_completion,
+    evaluate_runtime_unit_freshness,
+    evaluate_target_disposition_closure,
     reject_unknown,
     run_cli,
+    runtime_unit_row,
     validate_current_structure_state,
-    validate_unsupported_item_closures,
     validate_entity_collection,
+    validate_unsupported_item_closures,
 )
-
 
 SKILL = "qa-workflow"
 GENERATOR = "workflow_runtime"
 GENERATOR_CONTRACT_VERSION = "workflow-runtime-v1"
 SCRIPT_PATH = Path(__file__).resolve()
+_WCAG_STATE_OPERATIONS = {
+    "register-wcag-evaluation-plan",
+    "read-wcag-evaluation-state",
+    "finalize-wcag-report",
+}
+
+
+def _current_project_context(
+    args: dict[str, Any], metadata: dict[str, Any]
+) -> dict[str, Any]:
+    try:
+        return artifact_graph.workflow_state_context_from_project_context(
+            args["project_context"],
+            args["project_context_ref"],
+            metadata["reference_refs"],
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise InvalidInput(
+            "current Project Context state-root source is required"
+        ) from exc
+
+
+def _wcag_state_operation(
+    input_value: dict[str, Any], metadata: dict[str, Any]
+) -> dict[str, Any]:
+    reject_unknown(input_value, {"operation", "arguments"})
+    operation = input_value.get("operation")
+    args = input_value.get("arguments")
+    if operation not in _WCAG_STATE_OPERATIONS or not isinstance(args, dict):
+        raise InvalidInput("qa-workflow WCAG state operation is invalid")
+    context = _current_project_context(args, metadata)
+    root = context["workflow_state_root"]
+    common_context = {
+        "project_context_ref": context["project_context_ref"],
+        "project_context_revision": context["project_context_revision"],
+        "project_context_fingerprint": context["project_context_fingerprint"],
+        "workflow_state_root_content_identity": context[
+            "workflow_state_root_content_identity"
+        ],
+    }
+    if operation == "register-wcag-evaluation-plan":
+        reject_unknown(
+            args,
+            {
+                "workflow_ref",
+                "project_context",
+                "project_context_ref",
+                "evaluation_initialization",
+                "evaluation_inputs",
+                "product_scope_ref",
+                "scope_coverage",
+                "source_artifacts",
+                "canonical_criterion_plan",
+            },
+            {"previous_evaluation_revision"},
+        )
+        result = artifact_graph.register_wcag_evaluation_plan(
+            root,
+            args["workflow_ref"],
+            evaluation_initialization=args["evaluation_initialization"],
+            evaluation_inputs=args["evaluation_inputs"],
+            product_scope_ref=args["product_scope_ref"],
+            scope_coverage=args["scope_coverage"],
+            source_artifacts=args["source_artifacts"],
+            canonical_criterion_plan=args["canonical_criterion_plan"],
+            previous_evaluation_revision=args.get("previous_evaluation_revision"),
+            **common_context,
+        )
+    elif operation == "read-wcag-evaluation-state":
+        reject_unknown(
+            args,
+            {
+                "workflow_ref",
+                "project_context",
+                "project_context_ref",
+                "evaluation_ref",
+                "evaluation_revision",
+            },
+        )
+        result = artifact_graph.read_wcag_evaluation_state(
+            root,
+            args["workflow_ref"],
+            args["evaluation_ref"],
+            evaluation_revision=args["evaluation_revision"],
+            **common_context,
+        )
+    else:
+        reject_unknown(
+            args,
+            {
+                "workflow_ref",
+                "project_context",
+                "project_context_ref",
+                "expected_provider_revision",
+                "evaluation_ref",
+                "evaluation_revision",
+                "canonical_criterion_plan",
+                "sample_results",
+                "report_closure_inputs",
+            },
+        )
+        result = _execute_and_finalize_wcag_report(
+            root,
+            args,
+            metadata,
+            common_context,
+        )
+    status = result.get("status")
+    result_status = (
+        "ready"
+        if status in {"registered", "current", "complete"}
+        else "blocked"
+        if status in {"blocked", "conflict"}
+        else "unresolved"
+    )
+    return {
+        "runtime_status": "ok",
+        "support_status": "supported" if result_status == "ready" else "partial",
+        "result_status": result_status,
+        "runtime_required": True,
+        "deterministic_generated": True,
+        "payload": {"operation": operation, "result": result},
+        "issues": []
+        if result_status == "ready"
+        else [
+            {
+                "issue_type": "wcag_state_operation_not_closed",
+                "blocking": True,
+                "operation": operation,
+                "reason": result.get("reason", status),
+            }
+        ],
+    }
+
+
+def _runtime_metadata(
+    skill: str,
+    generator_contract_version: str,
+    *,
+    input_mode: str,
+    reference_refs: list[str],
+    upstream_runtime_units: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    return {
+        "envelope_version": "1",
+        "skill": skill,
+        "runtime_contract_version": "runtime-v2",
+        "generator_contract_version": generator_contract_version,
+        "runtime_unit_key": "artifact:workflow_runtime:all"
+        if skill == "qa-workflow"
+        else "artifact:wcag_runtime:all",
+        "model_key": None,
+        "model_type": None,
+        "technique_slug": None,
+        "selection_source": None,
+        "selection_key": None,
+        "scope_key": "all",
+        "input_mode": input_mode,
+        "upstream_entities": [],
+        "upstream_runtime_units": upstream_runtime_units or [],
+        "static_data_versions": {},
+        "authority_refs": [],
+        "reference_refs": reference_refs,
+    }
+
+
+def _invoke_local_runtime(
+    script_path: Path, request: dict[str, Any]
+) -> dict[str, Any] | None:
+    try:
+        completed = subprocess.run(
+            [sys.executable, str(script_path)],
+            input=json.dumps(request, ensure_ascii=False),
+            text=True,
+            encoding="utf-8",
+            capture_output=True,
+            check=False,
+            timeout=60,
+        )
+        if completed.returncode not in {0, 1}:
+            return None
+        result = json.loads(completed.stdout)
+    except (
+        OSError,
+        subprocess.SubprocessError,
+        UnicodeDecodeError,
+        json.JSONDecodeError,
+        TypeError,
+        ValueError,
+    ):
+        return None
+    return result if isinstance(result, dict) else None
+
+
+def _execute_and_finalize_wcag_report(
+    workflow_root: str | Path,
+    args: dict[str, Any],
+    metadata: dict[str, Any],
+    common_context: dict[str, Any],
+) -> dict[str, Any]:
+    """Run WCAG closure through its CLI, CAS-store that result, then finalize from the reread."""
+    workflow_ref = args["workflow_ref"]
+    evaluation_ref = args["evaluation_ref"]
+    evaluation_revision = args["evaluation_revision"]
+    expected_provider_revision = args["expected_provider_revision"]
+    context_ref = args["project_context_ref"]
+    saved = artifact_graph.read_wcag_evaluation_state(
+        workflow_root,
+        workflow_ref,
+        evaluation_ref,
+        evaluation_revision=evaluation_revision,
+        **common_context,
+    )
+    if (
+        saved.get("status") != "current"
+        or saved.get("provider_revision") != expected_provider_revision
+    ):
+        return {
+            "status": "conflict",
+            "reason": "wcag_evaluation_state_changed_before_report_close",
+        }
+    if saved["evaluation"].get("report_status") != "open":
+        return {"status": "blocked", "reason": "wcag_report_not_open"}
+    plan = args["canonical_criterion_plan"]
+    plan_check = artifact_graph.validate_wcag_plan_against_state(
+        saved["evaluation"], plan
+    )
+    if plan_check.get("status") != "current":
+        return {
+            "status": plan_check.get("status", "blocked"),
+            "reason": plan_check.get("reason", "canonical_wcag_plan_invalid"),
+        }
+    try:
+        artifact_graph._wcag_report_result_summary(
+            saved["evaluation"], args["sample_results"]
+        )
+    except (KeyError, TypeError, ValueError):
+        return {
+            "status": "blocked",
+            "reason": "wcag_report_result_set_incomplete_or_stale",
+        }
+    closure_inputs = args.get("report_closure_inputs")
+    allowed_closure_inputs = {
+        "required_steps",
+        "step_outcomes",
+        "example_coverage",
+        "required_criterion_evaluation_refs",
+        "all_occurrence_requirements",
+        "accessible_output_closure",
+    }
+    if (
+        not isinstance(closure_inputs, dict)
+        or not {"required_steps", "step_outcomes", "example_coverage"}.issubset(
+            closure_inputs
+        )
+        or set(closure_inputs) - allowed_closure_inputs
+    ):
+        return {"status": "blocked", "reason": "wcag_em_report_closure_inputs_invalid"}
+
+    qa_read_request = {
+        "metadata": _runtime_metadata(
+            "qa-workflow",
+            "workflow-runtime-v1",
+            input_mode="artifact",
+            reference_refs=[context_ref],
+        ),
+        "input": {
+            "operation": "read-wcag-evaluation-state",
+            "arguments": {
+                "workflow_ref": workflow_ref,
+                "project_context": args["project_context"],
+                "project_context_ref": context_ref,
+                "evaluation_ref": evaluation_ref,
+                "evaluation_revision": evaluation_revision,
+            },
+        },
+    }
+    read_runtime = _invoke_local_runtime(SCRIPT_PATH, qa_read_request)
+    if (
+        read_runtime is None
+        or read_runtime.get("skill") != "qa-workflow"
+        or read_runtime.get("runtime_unit_key") != "artifact:workflow_runtime:all"
+        or read_runtime.get("runtime_status") != "ok"
+        or read_runtime.get("result_status") != "ready"
+    ):
+        return {
+            "status": "blocked",
+            "reason": "current_saved_wcag_evaluation_runtime_required",
+        }
+    read_payload = read_runtime.get("payload")
+    saved_read = read_payload.get("result") if isinstance(read_payload, dict) else None
+    if (
+        not isinstance(saved_read, dict)
+        or saved_read.get("status") != "current"
+        or saved_read.get("workflow_ref") != workflow_ref
+        or saved_read.get("evaluation_ref") != evaluation_ref
+        or saved_read.get("evaluation_revision") != evaluation_revision
+        or saved_read.get("provider_revision") != expected_provider_revision
+        or saved_read.get("evaluation") != saved.get("evaluation")
+    ):
+        return {
+            "status": "conflict",
+            "reason": "current_saved_wcag_evaluation_runtime_mismatch",
+        }
+    try:
+        read_runtime_row = runtime_unit_row(read_runtime)
+    except (InvalidInput, KeyError, TypeError, ValueError):
+        return {
+            "status": "blocked",
+            "reason": "current_saved_wcag_evaluation_runtime_invalid",
+        }
+
+    wcag_scripts = (
+        SCRIPT_PATH.parents[3] / "skills" / "wcag-conformance-evaluation" / "scripts"
+    )
+    wcag_runtime_script = wcag_scripts / "wcag_runtime.py"
+    if not wcag_runtime_script.is_file():
+        return {"status": "blocked", "reason": "wcag_runtime_entrypoint_unavailable"}
+    wcag_metadata = _runtime_metadata(
+        "wcag-conformance-evaluation",
+        "wcag-em-runtime-v1",
+        input_mode="artifact",
+        reference_refs=[context_ref, evaluation_ref],
+        upstream_runtime_units=[
+            {
+                "skill": "qa-workflow",
+                "runtime_unit_key": "artifact:workflow_runtime:all",
+                "generation_fingerprint": read_runtime["generation_fingerprint"],
+                "result_fingerprint": read_runtime_row["result_fingerprint"],
+            }
+        ],
+    )
+    wcag_args = {
+        **closure_inputs,
+        "workflow_ref": workflow_ref,
+        "evaluation_ref": evaluation_ref,
+        "evaluation_revision": evaluation_revision,
+        "canonical_criterion_plan": plan,
+        "sample_results": args["sample_results"],
+        "saved_workflow_state_runtime_result": read_runtime,
+    }
+    wcag_runtime_result = _invoke_local_runtime(
+        wcag_runtime_script,
+        {
+            "metadata": wcag_metadata,
+            "input": {"operation": "close-report", "arguments": wcag_args},
+        },
+    )
+    if (
+        wcag_runtime_result is None
+        or wcag_runtime_result.get("skill") != "wcag-conformance-evaluation"
+        or wcag_runtime_result.get("runtime_unit_key") != "artifact:wcag_runtime:all"
+    ):
+        return {"status": "blocked", "reason": "owner_wcag_runtime_execution_failed"}
+    recorded = artifact_graph._record_wcag_report_runtime_execution(
+        workflow_root,
+        workflow_ref,
+        expected_provider_revision=expected_provider_revision,
+        evaluation_ref=evaluation_ref,
+        evaluation_revision=evaluation_revision,
+        canonical_criterion_plan=plan,
+        sample_results=args["sample_results"],
+        saved_workflow_state_runtime_result=read_runtime,
+        wcag_runtime_result=wcag_runtime_result,
+        **common_context,
+    )
+    if recorded.get("status") != "recorded":
+        return recorded
+    if wcag_runtime_result.get("result_status") != "unresolved":
+        payload = wcag_runtime_result.get("payload")
+        child_result = payload.get("result") if isinstance(payload, dict) else None
+        return {
+            "status": "blocked",
+            "reason": (
+                child_result.get("reason")
+                if isinstance(child_result, dict)
+                else "wcag_em_report_closure_not_complete"
+            ),
+            "runtime_execution_ref": recorded["runtime_execution_ref"],
+            "provider_revision": recorded["provider_revision"],
+        }
+    return artifact_graph.finalize_wcag_report(
+        workflow_root,
+        workflow_ref,
+        expected_provider_revision=recorded["provider_revision"],
+        evaluation_ref=evaluation_ref,
+        evaluation_revision=evaluation_revision,
+        canonical_criterion_plan=plan,
+        sample_results=args["sample_results"],
+        runtime_execution_ref=recorded["runtime_execution_ref"],
+        **common_context,
+    )
 
 
 def _scope_rows(value: Any) -> list[dict[str, Any]]:
@@ -41,16 +437,32 @@ def _scope_rows(value: Any) -> list[dict[str, Any]]:
     for index, row in enumerate(rows):
         if not isinstance(row, dict):
             raise InvalidInput(f"workflow_scopes[{index}]が不正です")
-        reject_unknown(row, {"skill", "target", "execution_range", "input_mode", "normalized_input", "current_structure_state"})
+        reject_unknown(
+            row,
+            {
+                "skill",
+                "target",
+                "execution_range",
+                "input_mode",
+                "normalized_input",
+                "current_structure_state",
+            },
+        )
         skill = ensure_nonempty_string(row["skill"], f"workflow_scopes[{index}].skill")
         if skill == "qa-workflow":
             raise InvalidInput("workflow scopeへqa-workflow自身を含められません")
-        if row["input_mode"] not in {"artifact", "direct"} or not isinstance(row["normalized_input"], dict):
+        if row["input_mode"] not in {"artifact", "direct"} or not isinstance(
+            row["normalized_input"], dict
+        ):
             raise InvalidInput("workflow scope inputが不正です")
         for field in ("target", "execution_range"):
-            if row[field] is not None and (not isinstance(row[field], str) or not row[field].strip()):
+            if row[field] is not None and (
+                not isinstance(row[field], str) or not row[field].strip()
+            ):
                 raise InvalidInput(f"workflow scope {field}が不正です")
-        if row["current_structure_state"] is not None and not isinstance(row["current_structure_state"], dict):
+        if row["current_structure_state"] is not None and not isinstance(
+            row["current_structure_state"], dict
+        ):
             raise InvalidInput("workflow scope current_structure_stateが不正です")
         identity = (skill, str(row["target"]), str(row["execution_range"]))
         if identity in seen:
@@ -64,39 +476,92 @@ def _runtime_rows(value: Any, name: str) -> list[dict[str, Any]]:
     rows = ensure_list(value, name)
     result = []
     seen: set[tuple[str, str]] = set()
-    required = {"skill", "runtime_unit_key", "model_key", "support_status", "result_status", "runtime_status", "runtime_required", "deterministic_generated", "generation_fingerprint", "result_fingerprint", "upstream_entity_fingerprints", "upstream_runtime_units", "unsupported_items", "freshness_status", "model_completion", "target_mappings", "target_dispositions"}
+    required = {
+        "skill",
+        "runtime_unit_key",
+        "model_key",
+        "support_status",
+        "result_status",
+        "runtime_status",
+        "runtime_required",
+        "deterministic_generated",
+        "generation_fingerprint",
+        "result_fingerprint",
+        "upstream_entity_fingerprints",
+        "upstream_runtime_units",
+        "unsupported_items",
+        "freshness_status",
+        "model_completion",
+        "target_mappings",
+        "target_dispositions",
+    }
     for index, row in enumerate(rows):
         if not isinstance(row, dict):
             raise InvalidInput(f"{name}[{index}]が不正です")
         if not required.issubset(row):
             raise InvalidInput(f"{name}[{index}]のruntime rowが不足しています")
         skill = ensure_nonempty_string(row["skill"], f"{name}[{index}].skill")
-        unit = ensure_nonempty_string(row["runtime_unit_key"], f"{name}[{index}].runtime_unit_key")
+        unit = ensure_nonempty_string(
+            row["runtime_unit_key"], f"{name}[{index}].runtime_unit_key"
+        )
         identity = (skill, unit)
         if identity[0] == SKILL or identity in seen:
             raise InvalidInput(f"{name}のruntime identityが重複または不正です")
         seen.add(identity)
-        if row["model_key"] is not None and (not isinstance(row["model_key"], str) or not unit.startswith("model:")):
+        if row["model_key"] is not None and (
+            not isinstance(row["model_key"], str) or not unit.startswith("model:")
+        ):
             raise InvalidInput(f"{name}[{index}]のmodel identityが不正です")
         if unit.startswith("model:") and row["model_key"] != unit.split(":", 1)[1]:
             raise InvalidInput(f"{name}[{index}]のmodel_keyが不一致です")
         if not unit.startswith("model:") and row["model_key"] is not None:
-            raise InvalidInput(f"{name}[{index}]のartifact model_keyはnullである必要があります")
+            raise InvalidInput(
+                f"{name}[{index}]のartifact model_keyはnullである必要があります"
+            )
         if not FULL_DIGEST_RE.fullmatch(str(row["generation_fingerprint"])):
             raise InvalidInput(f"{name}[{index}]のgeneration_fingerprintが不正です")
         if not FULL_DIGEST_RE.fullmatch(str(row["result_fingerprint"])):
             raise InvalidInput(f"{name}[{index}]のresult_fingerprintが不正です")
         if row["freshness_status"] not in {"current", "stale"}:
             raise InvalidInput("freshness_statusが不正です")
-        if row["result_status"] not in {"ready", "unresolved", "blocked"} or row["support_status"] not in {"supported", "partial", "unsupported", "unknown"} or row["runtime_status"] not in {"ok", "invalid_input", "unsupported", "limit_exceeded", "internal_error", "not_run"}:
+        if (
+            row["result_status"] not in {"ready", "unresolved", "blocked"}
+            or row["support_status"]
+            not in {"supported", "partial", "unsupported", "unknown"}
+            or row["runtime_status"]
+            not in {
+                "ok",
+                "invalid_input",
+                "unsupported",
+                "limit_exceeded",
+                "internal_error",
+                "not_run",
+            }
+        ):
             raise InvalidInput("runtime row statusが不正です")
-        if not isinstance(row["runtime_required"], bool) or not isinstance(row["deterministic_generated"], bool):
+        if not isinstance(row["runtime_required"], bool) or not isinstance(
+            row["deterministic_generated"], bool
+        ):
             raise InvalidInput("runtime row booleanが不正です")
-        for field in ("upstream_entity_fingerprints", "upstream_runtime_units", "unsupported_items", "model_completion", "target_mappings", "target_dispositions"):
+        for field in (
+            "upstream_entity_fingerprints",
+            "upstream_runtime_units",
+            "unsupported_items",
+            "model_completion",
+            "target_mappings",
+            "target_dispositions",
+        ):
             if not isinstance(row[field], list):
-                raise InvalidInput(f"{name}[{index}].{field}はarrayである必要があります")
-        if not unit.startswith("artifact:materialize_coverage:") and any(row[field] for field in ("model_completion", "target_mappings", "target_dispositions")):
-            raise InvalidInput("materialize以外のruntime unitはcoverage projectionを持てません")
+                raise InvalidInput(
+                    f"{name}[{index}].{field}はarrayである必要があります"
+                )
+        if not unit.startswith("artifact:materialize_coverage:") and any(
+            row[field]
+            for field in ("model_completion", "target_mappings", "target_dispositions")
+        ):
+            raise InvalidInput(
+                "materialize以外のruntime unitはcoverage projectionを持てません"
+            )
         result.append(canonicalize(row))
     return result
 
@@ -105,10 +570,19 @@ def _current_runtime_rows(value: Any) -> list[dict[str, Any]]:
     rows = ensure_list(value, "current_runtime_units")
     projected: list[dict[str, Any]] = []
     for index, row in enumerate(rows):
-        if not isinstance(row, dict) or not {"skill", "runtime_unit_key", "generation_fingerprint"}.issubset(row):
+        if not isinstance(row, dict) or not {
+            "skill",
+            "runtime_unit_key",
+            "generation_fingerprint",
+        }.issubset(row):
             raise InvalidInput(f"current_runtime_units[{index}]のidentityが不正です")
         normalized = dict(row)
-        normalized.setdefault("model_key", normalized["runtime_unit_key"].split(":", 1)[1] if str(normalized["runtime_unit_key"]).startswith("model:") else None)
+        normalized.setdefault(
+            "model_key",
+            normalized["runtime_unit_key"].split(":", 1)[1]
+            if str(normalized["runtime_unit_key"]).startswith("model:")
+            else None,
+        )
         normalized.setdefault("support_status", "supported")
         normalized.setdefault("result_status", "ready")
         normalized.setdefault("runtime_status", "ok")
@@ -135,14 +609,38 @@ def _entity_rows(value: Any) -> list[dict[str, Any]]:
     result = []
     for skill, skill_rows in grouped.items():
         result.extend(validate_entity_collection(skill_rows, expected_skill=skill))
-    return sorted(result, key=lambda row: entity_identity(row["skill"], row["entity_type"], row["entity_ref"]))
+    return sorted(
+        result,
+        key=lambda row: entity_identity(
+            row["skill"], row["entity_type"], row["entity_ref"]
+        ),
+    )
 
 
 def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, Any]:
-    reject_unknown(input_value, {"workflow_scopes", "runtime_units", "current_entities", "current_runtime_units", "unsupported_item_closures"})
+    reject_unknown(
+        input_value,
+        {
+            "workflow_ref",
+            "workflow_scopes",
+            "runtime_units",
+            "current_entities",
+            "current_runtime_units",
+            "unsupported_item_closures",
+        },
+    )
+    workflow_ref = ensure_nonempty_string(input_value["workflow_ref"], "workflow_ref")
+    try:
+        parsed_workflow_ref = uuid.UUID(workflow_ref)
+    except (AttributeError, ValueError) as exc:
+        raise InvalidInput("workflow_ref must be a canonical UUID") from exc
+    if str(parsed_workflow_ref) != workflow_ref:
+        raise InvalidInput("workflow_ref must be a canonical UUID")
     scopes = _scope_rows(input_value["workflow_scopes"])
     if not scopes:
-        raise InvalidInput("本Plan対象scopeがないworkflowではworkflow_runtimeをdispatchできません")
+        raise InvalidInput(
+            "本Plan対象scopeがないworkflowではworkflow_runtimeをdispatchできません"
+        )
     runtime_rows = _runtime_rows(input_value["runtime_units"], "runtime_units")
     current_runtime_rows = _current_runtime_rows(input_value["current_runtime_units"])
     entities = _entity_rows(input_value["current_entities"])
@@ -165,68 +663,161 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
             current_entities=entities,
             current_runtime_units=current_runtime_rows,
         )
-        expected_units.extend(_default_expected_runtime_units(
-            scope_skill,
-            normalized,
-            "",
-            current_structure_state=scope["current_structure_state"],
-            current_runtime_units=current_runtime_rows,
-        ))
-        expected_entities.extend(_expected_entities(
-            scope_skill,
-            normalized,
-            current_structure_state=scope["current_structure_state"],
-            require_carry_forward_projection=True,
-        ))
-    expected_unit_keys = sorted({(row["skill"], row["runtime_unit_key"]) for row in expected_units})
-    actual_unit_keys = sorted((row["skill"], row["runtime_unit_key"]) for row in runtime_rows)
-    missing_units = [list(value) for value in sorted(set(expected_unit_keys) - set(actual_unit_keys))]
-    extra_units = [list(value) for value in sorted(set(actual_unit_keys) - set(expected_unit_keys))]
-    fresh_rows, freshness_issues = evaluate_runtime_unit_freshness(runtime_rows, current_runtime_rows, entities)
-    current_generation = {(row["skill"], row["runtime_unit_key"]): row.get("generation_fingerprint") for row in current_runtime_rows}
+        expected_units.extend(
+            _default_expected_runtime_units(
+                scope_skill,
+                normalized,
+                "",
+                current_structure_state=scope["current_structure_state"],
+                current_runtime_units=current_runtime_rows,
+            )
+        )
+        expected_entities.extend(
+            _expected_entities(
+                scope_skill,
+                normalized,
+                current_structure_state=scope["current_structure_state"],
+                require_carry_forward_projection=True,
+            )
+        )
+    expected_unit_keys = sorted(
+        {(row["skill"], row["runtime_unit_key"]) for row in expected_units}
+    )
+    actual_unit_keys = sorted(
+        (row["skill"], row["runtime_unit_key"]) for row in runtime_rows
+    )
+    missing_units = [
+        list(value) for value in sorted(set(expected_unit_keys) - set(actual_unit_keys))
+    ]
+    extra_units = [
+        list(value) for value in sorted(set(actual_unit_keys) - set(expected_unit_keys))
+    ]
+    fresh_rows, freshness_issues = evaluate_runtime_unit_freshness(
+        runtime_rows, current_runtime_rows, entities
+    )
+    current_generation = {
+        (row["skill"], row["runtime_unit_key"]): row.get("generation_fingerprint")
+        for row in current_runtime_rows
+    }
     for row in fresh_rows:
         key = (row["skill"], row["runtime_unit_key"])
         if current_generation.get(key) != row.get("generation_fingerprint"):
             row["freshness_status"] = "stale"
-            freshness_issues.append({"issue_type": "current_runtime_generation_mismatch", "blocking": True, "runtime_unit_key": row["runtime_unit_key"], "skill": row["skill"]})
-    entity_freshness = evaluate_entity_freshness(entities, {(row["skill"], row["runtime_unit_key"]): row for row in current_runtime_rows})
-    entity_status = {(row["skill"], row["entity_type"], row["entity_ref"]): row for row in entity_freshness}
+            freshness_issues.append(
+                {
+                    "issue_type": "current_runtime_generation_mismatch",
+                    "blocking": True,
+                    "runtime_unit_key": row["runtime_unit_key"],
+                    "skill": row["skill"],
+                }
+            )
+    entity_freshness = evaluate_entity_freshness(
+        entities,
+        {(row["skill"], row["runtime_unit_key"]): row for row in current_runtime_rows},
+    )
+    entity_status = {
+        (row["skill"], row["entity_type"], row["entity_ref"]): row
+        for row in entity_freshness
+    }
     for row in fresh_rows:
         for dependency in row["upstream_entity_fingerprints"]:
-            entity_key = (dependency.get("skill"), dependency.get("entity_type"), dependency.get("entity_ref"))
+            entity_key = (
+                dependency.get("skill"),
+                dependency.get("entity_type"),
+                dependency.get("entity_ref"),
+            )
             if entity_status.get(entity_key, {}).get("freshness_status") == "stale":
                 row["freshness_status"] = "stale"
-                freshness_issues.append({"issue_type": "stale_entity_propagation", "blocking": True, "runtime_unit_key": row["runtime_unit_key"], "skill": row["skill"], "entity": list(entity_key)})
-    expected_entity_keys = sorted((row["skill"], row["entity_type"], row["entity_ref"]) for row in expected_entities)
-    actual_entity_keys = sorted((row["skill"], row["entity_type"], row["entity_ref"]) for row in entities)
-    missing_entities = [list(value) for value in sorted(set(expected_entity_keys) - set(actual_entity_keys))]
-    extra_entities = [list(value) for value in sorted(set(actual_entity_keys) - set(expected_entity_keys))]
+                freshness_issues.append(
+                    {
+                        "issue_type": "stale_entity_propagation",
+                        "blocking": True,
+                        "runtime_unit_key": row["runtime_unit_key"],
+                        "skill": row["skill"],
+                        "entity": list(entity_key),
+                    }
+                )
+    expected_entity_keys = sorted(
+        (row["skill"], row["entity_type"], row["entity_ref"])
+        for row in expected_entities
+    )
+    actual_entity_keys = sorted(
+        (row["skill"], row["entity_type"], row["entity_ref"]) for row in entities
+    )
+    missing_entities = [
+        list(value)
+        for value in sorted(set(expected_entity_keys) - set(actual_entity_keys))
+    ]
+    extra_entities = [
+        list(value)
+        for value in sorted(set(actual_entity_keys) - set(expected_entity_keys))
+    ]
     issues = []
     if missing_units:
-        issues.append({"issue_type": "missing_runtime_unit", "blocking": True, "runtime_units": missing_units})
+        issues.append(
+            {
+                "issue_type": "missing_runtime_unit",
+                "blocking": True,
+                "runtime_units": missing_units,
+            }
+        )
     if extra_units:
-        issues.append({"issue_type": "extra_runtime_unit", "blocking": True, "runtime_units": extra_units})
+        issues.append(
+            {
+                "issue_type": "extra_runtime_unit",
+                "blocking": True,
+                "runtime_units": extra_units,
+            }
+        )
     if missing_entities:
-        issues.append({"issue_type": "missing_entity", "blocking": True, "entities": missing_entities})
+        issues.append(
+            {
+                "issue_type": "missing_entity",
+                "blocking": True,
+                "entities": missing_entities,
+            }
+        )
     if extra_entities:
-        issues.append({"issue_type": "extra_entity", "blocking": True, "entities": extra_entities})
+        issues.append(
+            {"issue_type": "extra_entity", "blocking": True, "entities": extra_entities}
+        )
     for row in entity_freshness:
         if row["freshness_status"] == "stale":
-            issues.append({
-                "issue_type": "stale_entity", "blocking": True,
-                "skill": row["skill"], "entity_type": row["entity_type"], "entity_ref": row["entity_ref"],
-                "stale_reasons": row["stale_reasons"],
-            })
+            issues.append(
+                {
+                    "issue_type": "stale_entity",
+                    "blocking": True,
+                    "skill": row["skill"],
+                    "entity_type": row["entity_type"],
+                    "entity_ref": row["entity_ref"],
+                    "stale_reasons": row["stale_reasons"],
+                }
+            )
     issues.extend(freshness_issues)
     issues.extend(closure_issues)
     issues.extend(evaluate_target_disposition_closure(current_runtime_rows, entities))
     for scope in scopes:
-        issues.extend(evaluate_materialize_completion(scope["normalized_input"], current_runtime_rows, entities, closures))
+        issues.extend(
+            evaluate_materialize_completion(
+                scope["normalized_input"], current_runtime_rows, entities, closures
+            )
+        )
     if any(row.get("handling") == "ブロック中" for row in closures):
         issues.append({"issue_type": "unsupported_closure_blocked", "blocking": True})
     for row in fresh_rows:
-        if row["result_status"] != "ready" or row["freshness_status"] != "current" or (row["runtime_required"] and not row["deterministic_generated"]):
-            issues.append({"issue_type": "runtime_not_complete", "blocking": True, "skill": row["skill"], "runtime_unit_key": row["runtime_unit_key"]})
+        if (
+            row["result_status"] != "ready"
+            or row["freshness_status"] != "current"
+            or (row["runtime_required"] and not row["deterministic_generated"])
+        ):
+            issues.append(
+                {
+                    "issue_type": "runtime_not_complete",
+                    "blocking": True,
+                    "skill": row["skill"],
+                    "runtime_unit_key": row["runtime_unit_key"],
+                }
+            )
     issues_by_key = {canonical_json_text(row): row for row in issues}
     issues = [issues_by_key[key] for key in sorted(issues_by_key)]
     can_complete = not issues and bool(scopes)
@@ -237,6 +828,7 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
         "runtime_required": True,
         "deterministic_generated": True,
         "payload": {
+            "workflow_ref": workflow_ref,
             "expected_runtime_units": expected_units,
             "runtime_units": fresh_rows,
             "expected_entities": expected_entities,
@@ -245,7 +837,14 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
             "extra_runtime_units": extra_units,
             "missing_entities": missing_entities,
             "extra_entities": extra_entities,
-            "runtime_freshness": [{"skill": row["skill"], "runtime_unit_key": row["runtime_unit_key"], "freshness_status": row["freshness_status"]} for row in fresh_rows],
+            "runtime_freshness": [
+                {
+                    "skill": row["skill"],
+                    "runtime_unit_key": row["runtime_unit_key"],
+                    "freshness_status": row["freshness_status"],
+                }
+                for row in fresh_rows
+            ],
             "entity_freshness": entity_freshness,
             "unsupported_item_closures": canonicalize(closures),
             "can_complete": can_complete,
@@ -255,8 +854,17 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
 
 
 def handler(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, Any]:
-    if metadata["model_key"] is not None or metadata["runtime_unit_key"] != "artifact:workflow_runtime:all" or metadata["scope_key"] != "all":
+    if (
+        metadata["model_key"] is not None
+        or metadata["runtime_unit_key"] != "artifact:workflow_runtime:all"
+        or metadata["scope_key"] != "all"
+    ):
         raise InvalidInput("workflow_runtimeのruntime metadataが不正です")
+    if (
+        isinstance(input_value, dict)
+        and input_value.get("operation") in _WCAG_STATE_OPERATIONS
+    ):
+        return _wcag_state_operation(input_value, metadata)
     return _build(input_value, metadata)
 
 

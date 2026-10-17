@@ -1,0 +1,70 @@
+prefix_rule(
+    pattern = [["gh", "gh.exe"], "api"],
+    decision = "forbidden",
+    justification = "Direct GitHub API access is outside this repository harness. Use a supported gh subcommand instead.",
+    match = [
+        "gh api /repos/owner/repo/issues",
+        "gh.exe api /repos/owner/repo/issues",
+    ],
+    not_match = [
+        "gh pr view 123",
+    ],
+)
+
+prefix_rule(
+    pattern = [["gh", "gh.exe"], "repo", "sync"],
+    decision = "forbidden",
+    justification = "Repository sync can update branches outside the supported development flow. Use explicit Git operations with approval instead.",
+    match = [
+        "gh repo sync owner/repo",
+    ],
+    not_match = [
+        "gh repo view owner/repo",
+    ],
+)
+
+prefix_rule(
+    pattern = [["gh", "gh.exe"], "auth", "token"],
+    decision = "forbidden",
+    justification = "Do not print authentication tokens. Use gh auth status without token output.",
+    match = [
+        "gh auth token",
+        "gh.exe auth token",
+    ],
+    not_match = [
+        "gh auth status",
+    ],
+)
+
+prefix_rule(
+    pattern = [["git", "git.exe"], ["clean", "rm", "update-ref"]],
+    decision = "forbidden",
+    justification = "These Git deletion or ref-update families are outside the supported autonomous workflow.",
+    match = [
+        "git clean -fd",
+        "git.exe clean -fd",
+        "git rm file.txt",
+        "git update-ref -d refs/heads/old",
+        "git.exe update-ref -d refs/heads/old",
+    ],
+    not_match = [
+        "git status",
+        "git restore file.txt",
+    ],
+)
+
+prefix_rule(
+    pattern = [["rm", "del", "erase", "rd", "ri", "Remove-Item", "rmdir", "unlink"]],
+    decision = "forbidden",
+    justification = "Direct deletion commands are not allowed in the repository harness. Use a scoped edit or explicit user-directed operation instead.",
+    match = [
+        "rm file.txt",
+        "del file.txt",
+        "Remove-Item file.txt",
+        "rmdir tmp",
+    ],
+    not_match = [
+        "mv a.txt b.txt",
+        "git status",
+    ],
+)

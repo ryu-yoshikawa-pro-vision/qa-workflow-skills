@@ -483,4 +483,3 @@ routing caseへ最低限、次を追加します。
 - README、EVALS、ASSERTIONS、CIが実装と一致する
 - `PyYAML==6.0.3`をeval専用依存として使用し、実行前YAMLを`yaml.safe_load`で構造検証できる
 - 利用できないruntime経路を未検証として明示し、repo内評価だけで実動作までPASS扱いしない
-

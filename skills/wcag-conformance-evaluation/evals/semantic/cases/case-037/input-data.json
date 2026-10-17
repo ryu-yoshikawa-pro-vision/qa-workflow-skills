@@ -1,0 +1,42 @@
+{
+  "kind": "synthetic-formal-observation-source-facts",
+  "evaluation": {
+    "evaluation_ref": "EVAL-CASE-AI",
+    "origin_revision": "rev-4",
+    "wcag_version": "2.2",
+    "level": "AA"
+  },
+  "target": {
+    "target_ref": "TARGET-CASE-AI",
+    "target_url": "http://127.0.0.1:4173/",
+    "scope_ref": "SCOPE-CASE-AI-HOME",
+    "enclosure": "Repository-controlled canonical home view"
+  },
+  "sample_source_observation": {
+    "draft_key": "case-ai-home",
+    "target_ref": "TARGET-CASE-AI",
+    "state_key": "home/default",
+    "locator": "http://127.0.0.1:4173/",
+    "source_evidence_refs": [
+      "EVD-CASE-AI-HOME-SOURCE"
+    ]
+  },
+  "presentation_condition_source_observation": {
+    "draft_key": "case-ai-home-desktop-baseline",
+    "source_kind": "current-observation",
+    "source_ref": "OBS-CASE-AI-PRESENTATION",
+    "state_identity": "home/default at the current baseline presentation",
+    "variation_description": "Home view at the desktop baseline presentation",
+    "presentation_condition": "Chromium 149; 1280x800 CSS px; en-US; unauthenticated; keyboard and pointer",
+    "environment_ref": "ENV-CASE-AI-CHROMIUM149",
+    "viewport_condition_refs": [
+      "VIEWPORT-CASE-AI-DESKTOP"
+    ],
+    "responsive_condition_refs": [],
+    "required": true,
+    "completeness": "complete",
+    "evidence_refs": [
+      "EVD-CASE-AI-PRESENTATION-SOURCE"
+    ]
+  }
+}

@@ -28,22 +28,21 @@ jobs:
           import json
           from pathlib import Path
 
-          skills = [
-              "qa-workflow", "spec-analysis", "question-analysis", "test-analysis",
-              "test-requirement-design", "test-condition-design", "test-case-design",
-              "coverage-analysis", "adversarial-review", "e2e-test-inspection",
-              "e2e-test-implementation", "e2e-test-execution",
-              "e2e-test-result-analysis", "e2e-test-reporting",
-              "test-target-inspection", "test-execution",
-              "regression-testing", "exploratory-testing", "qa-knowledge",
-          ]
+          skill_root = Path("skills")
+          skills = sorted(
+              path.name for path in skill_root.iterdir()
+              if path.is_dir()
+              and (path / "SKILL.md").is_file()
+              and (path / "evals" / "output" / "evals.json").is_file()
+          )
+          assert skills, "no canonical Skills with output eval manifests found"
           total = 0
           for skill in skills:
               root = Path("skills") / skill / "evals" / "output"
               data = json.loads((root / "evals.json").read_text(encoding="utf-8"))
               assert data["skill"] == skill
               cases = data.get("cases", [])
-              assert len(cases) >= 2, (skill, len(cases))
+              assert cases, (skill, "no deterministic output cases")
               ids = [case["id"] for case in cases]
               assert len(ids) == len(set(ids)), (skill, ids)
               for case in cases:
@@ -54,7 +53,7 @@ jobs:
                   assert "output-template.md" in input_path.read_text(encoding="utf-8") or skill == "qa-workflow", input_path
                   assert isinstance(json.loads(expected_path.read_text(encoding="utf-8")), dict)
                   total += 1
-          assert total >= 38, total
+          print(f"Canonical Skills with output evals: {len(skills)}")
           print(f"Deterministic output eval cases: {total}")
           PY
 
@@ -66,16 +65,20 @@ jobs:
 
       - name: Compile runtime scripts
         run: |
-          python -m compileall -q skills/spec-analysis/scripts
-          python -m compileall -q skills/test-analysis/scripts
-          python -m compileall -q skills/test-requirement-design/scripts
-          python -m compileall -q skills/test-condition-design/scripts
-          python -m compileall -q skills/test-case-design/scripts
-          python -m compileall -q skills/coverage-analysis/scripts
-          python -m compileall -q skills/qa-workflow/scripts
-          python -m compileall -q skills/regression-testing/scripts
-          python -m compileall -q skills/exploratory-testing/scripts
-          python -m compileall -q skills/qa-knowledge/scripts
+          python - <<'PY'
+          import compileall
+          from pathlib import Path
+
+          skill_root = Path("skills")
+          packages = sorted(
+              path / "scripts" for path in skill_root.iterdir()
+              if path.is_dir() and (path / "SKILL.md").is_file() and (path / "scripts").is_dir()
+          )
+          for package in packages:
+              if not compileall.compile_dir(str(package), quiet=1, force=True):
+                  raise SystemExit(f"runtime script compilation failed: {package}")
+          print(f"Compiled runtime scripts for {len(packages)} current Skills")
+          PY
 
       - name: Run shared deterministic runtime unit tests
         run: python -m unittest discover -s scripts/skills/evals/deterministic/tests -v

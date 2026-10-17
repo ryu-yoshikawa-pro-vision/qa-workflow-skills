@@ -1,0 +1,294 @@
+{
+  "kind": "step-4-3-finite-inventory-revision-source",
+  "prior_iteration": {
+    "structured_revision": 1,
+    "structured_sample_refs": [
+      "SAMPLE-007",
+      "SAMPLE-016",
+      "SAMPLE-003",
+      "SAMPLE-017",
+      "SAMPLE-013",
+      "SAMPLE-010",
+      "SAMPLE-014",
+      "SAMPLE-019",
+      "SAMPLE-002",
+      "SAMPLE-021",
+      "SAMPLE-006",
+      "SAMPLE-011",
+      "SAMPLE-001",
+      "SAMPLE-008",
+      "SAMPLE-015",
+      "SAMPLE-004",
+      "SAMPLE-022",
+      "SAMPLE-009",
+      "SAMPLE-020"
+    ],
+    "random_samples": [
+      {
+        "sample_ref": "SAMPLE-023",
+        "freshness_status": "current"
+      },
+      {
+        "sample_ref": "SAMPLE-018",
+        "freshness_status": "current"
+      }
+    ],
+    "candidate_population_fingerprint": "sha256:89a204a6f480a90a2cb4b104447863e3ddb396e503dcf3f79de46c28b3afec2f",
+    "selection_method": "system-random finite inventory selection"
+  },
+  "identity_drafts": [
+    {
+      "draft_key": "STRUCT-P-001",
+      "target_ref": "TARGET-P-001",
+      "state_key": "default",
+      "locator": "https://northstar.example.invalid/target-p-001/default",
+      "source_evidence_refs": [
+        "EVD-CASE-P-COMPLETE-INVENTORY"
+      ]
+    },
+    {
+      "draft_key": "STRUCT-P-002",
+      "target_ref": "TARGET-P-002",
+      "state_key": "default",
+      "locator": "https://northstar.example.invalid/target-p-002/default",
+      "source_evidence_refs": [
+        "EVD-CASE-P-COMPLETE-INVENTORY"
+      ]
+    },
+    {
+      "draft_key": "STRUCT-P-003",
+      "target_ref": "TARGET-P-003",
+      "state_key": "default",
+      "locator": "https://northstar.example.invalid/target-p-003/default",
+      "source_evidence_refs": [
+        "EVD-CASE-P-COMPLETE-INVENTORY"
+      ]
+    },
+    {
+      "draft_key": "STRUCT-P-004",
+      "target_ref": "TARGET-P-004",
+      "state_key": "default",
+      "locator": "https://northstar.example.invalid/target-p-004/default",
+      "source_evidence_refs": [
+        "EVD-CASE-P-COMPLETE-INVENTORY"
+      ]
+    },
+    {
+      "draft_key": "STRUCT-P-005",
+      "target_ref": "TARGET-P-005",
+      "state_key": "default",
+      "locator": "https://northstar.example.invalid/target-p-005/default",
+      "source_evidence_refs": [
+        "EVD-CASE-P-COMPLETE-INVENTORY"
+      ]
+    },
+    {
+      "draft_key": "STRUCT-P-006",
+      "target_ref": "TARGET-P-006",
+      "state_key": "default",
+      "locator": "https://northstar.example.invalid/target-p-006/default",
+      "source_evidence_refs": [
+        "EVD-CASE-P-COMPLETE-INVENTORY"
+      ]
+    },
+    {
+      "draft_key": "STRUCT-P-007",
+      "target_ref": "TARGET-P-007",
+      "state_key": "default",
+      "locator": "https://northstar.example.invalid/target-p-007/default",
+      "source_evidence_refs": [
+        "EVD-CASE-P-COMPLETE-INVENTORY"
+      ]
+    },
+    {
+      "draft_key": "STRUCT-P-008",
+      "target_ref": "TARGET-P-008",
+      "state_key": "default",
+      "locator": "https://northstar.example.invalid/target-p-008/default",
+      "source_evidence_refs": [
+        "EVD-CASE-P-COMPLETE-INVENTORY"
+      ]
+    },
+    {
+      "draft_key": "STRUCT-P-009",
+      "target_ref": "TARGET-P-009",
+      "state_key": "default",
+      "locator": "https://northstar.example.invalid/target-p-009/default",
+      "source_evidence_refs": [
+        "EVD-CASE-P-COMPLETE-INVENTORY"
+      ]
+    },
+    {
+      "draft_key": "STRUCT-P-010",
+      "target_ref": "TARGET-P-010",
+      "state_key": "default",
+      "locator": "https://northstar.example.invalid/target-p-010/default",
+      "source_evidence_refs": [
+        "EVD-CASE-P-COMPLETE-INVENTORY"
+      ]
+    },
+    {
+      "draft_key": "STRUCT-P-011",
+      "target_ref": "TARGET-P-011",
+      "state_key": "default",
+      "locator": "https://northstar.example.invalid/target-p-011/default",
+      "source_evidence_refs": [
+        "EVD-CASE-P-COMPLETE-INVENTORY"
+      ]
+    },
+    {
+      "draft_key": "STRUCT-P-012",
+      "target_ref": "TARGET-P-012",
+      "state_key": "default",
+      "locator": "https://northstar.example.invalid/target-p-012/default",
+      "source_evidence_refs": [
+        "EVD-CASE-P-COMPLETE-INVENTORY"
+      ]
+    },
+    {
+      "draft_key": "STRUCT-P-013",
+      "target_ref": "TARGET-P-013",
+      "state_key": "default",
+      "locator": "https://northstar.example.invalid/target-p-013/default",
+      "source_evidence_refs": [
+        "EVD-CASE-P-COMPLETE-INVENTORY"
+      ]
+    },
+    {
+      "draft_key": "STRUCT-P-014",
+      "target_ref": "TARGET-P-014",
+      "state_key": "default",
+      "locator": "https://northstar.example.invalid/target-p-014/default",
+      "source_evidence_refs": [
+        "EVD-CASE-P-COMPLETE-INVENTORY"
+      ]
+    },
+    {
+      "draft_key": "STRUCT-P-015",
+      "target_ref": "TARGET-P-015",
+      "state_key": "default",
+      "locator": "https://northstar.example.invalid/target-p-015/default",
+      "source_evidence_refs": [
+        "EVD-CASE-P-COMPLETE-INVENTORY"
+      ]
+    },
+    {
+      "draft_key": "STRUCT-P-016",
+      "target_ref": "TARGET-P-016",
+      "state_key": "default",
+      "locator": "https://northstar.example.invalid/target-p-016/default",
+      "source_evidence_refs": [
+        "EVD-CASE-P-COMPLETE-INVENTORY"
+      ]
+    },
+    {
+      "draft_key": "STRUCT-P-017",
+      "target_ref": "TARGET-P-017",
+      "state_key": "default",
+      "locator": "https://northstar.example.invalid/target-p-017/default",
+      "source_evidence_refs": [
+        "EVD-CASE-P-COMPLETE-INVENTORY"
+      ]
+    },
+    {
+      "draft_key": "STRUCT-P-018",
+      "target_ref": "TARGET-P-018",
+      "state_key": "default",
+      "locator": "https://northstar.example.invalid/target-p-018/default",
+      "source_evidence_refs": [
+        "EVD-CASE-P-COMPLETE-INVENTORY"
+      ]
+    },
+    {
+      "draft_key": "STRUCT-P-019",
+      "target_ref": "TARGET-P-019",
+      "state_key": "default",
+      "locator": "https://northstar.example.invalid/target-p-019/default",
+      "source_evidence_refs": [
+        "EVD-CASE-P-COMPLETE-INVENTORY"
+      ]
+    },
+    {
+      "draft_key": "RANDOM-P-020",
+      "target_ref": "TARGET-P-020",
+      "state_key": "default",
+      "locator": "https://northstar.example.invalid/target-p-020/default",
+      "source_evidence_refs": [
+        "EVD-CASE-P-COMPLETE-INVENTORY",
+        "EVD-CASE-P-NEW-TYPE"
+      ]
+    },
+    {
+      "draft_key": "RANDOM-P-021",
+      "target_ref": "TARGET-P-021",
+      "state_key": "default",
+      "locator": "https://northstar.example.invalid/target-p-021/default",
+      "source_evidence_refs": [
+        "EVD-CASE-P-COMPLETE-INVENTORY"
+      ]
+    },
+    {
+      "draft_key": "RANDOM-P-022",
+      "target_ref": "TARGET-P-022",
+      "state_key": "default",
+      "locator": "https://northstar.example.invalid/target-p-022/default",
+      "source_evidence_refs": [
+        "EVD-CASE-P-COMPLETE-INVENTORY"
+      ]
+    },
+    {
+      "draft_key": "RANDOM-P-023",
+      "target_ref": "TARGET-P-023",
+      "state_key": "default",
+      "locator": "https://northstar.example.invalid/target-p-023/default",
+      "source_evidence_refs": [
+        "EVD-CASE-P-COMPLETE-INVENTORY"
+      ]
+    }
+  ],
+  "current_inventory": {
+    "complete": true,
+    "source_refs": [
+      "STRUCT-P-001",
+      "STRUCT-P-002",
+      "STRUCT-P-003",
+      "STRUCT-P-004",
+      "STRUCT-P-005",
+      "STRUCT-P-006",
+      "STRUCT-P-007",
+      "STRUCT-P-008",
+      "STRUCT-P-009",
+      "STRUCT-P-010",
+      "STRUCT-P-011",
+      "STRUCT-P-012",
+      "STRUCT-P-013",
+      "STRUCT-P-014",
+      "STRUCT-P-015",
+      "STRUCT-P-016",
+      "STRUCT-P-017",
+      "STRUCT-P-018",
+      "STRUCT-P-019",
+      "RANDOM-P-020",
+      "RANDOM-P-021",
+      "RANDOM-P-022",
+      "RANDOM-P-023"
+    ],
+    "provenance": {
+      "inventory_activity_ref": "ACT-CASE-P-FINITE-INVENTORY",
+      "inventory_evidence_refs": [
+        "EVD-CASE-P-COMPLETE-INVENTORY"
+      ],
+      "inventory_revision": "same-as-prior",
+      "scope_ref": "SCOPE-CASE-P-FINITE",
+      "completed_at": "2026-10-01"
+    }
+  },
+  "step_4_3": {
+    "structured_revision": 2,
+    "new_structured_sample_source_ref": "RANDOM-P-020",
+    "reason": "New content type and finding group are present in the current exploration.",
+    "evidence_refs": [
+      "EVD-CASE-P-NEW-TYPE"
+    ]
+  }
+}

@@ -1,3 +1,13 @@
 # Auto detect text files and perform LF normalization
 * text=auto
-skills/*/scripts/runtime_contract.py text eol=lf
+
+*.py text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.toml text eol=lf
+*.js text eol=lf
+*.cjs text eol=lf
+*.mjs text eol=lf
+*.jsx text eol=lf

@@ -1,0 +1,492 @@
+{
+  "kind": "repeat-evaluation-current-and-prior-sample-input",
+  "prior_sample_identity_runtime_result": {
+    "samples": [
+      {
+        "sample_ref": "SAMPLE-001",
+        "target_ref": "TARGET-AB-SEARCH",
+        "state_key": "query-b",
+        "source_locators": [
+          "https://northstar.example.invalid/target-ab-search/query-b"
+        ],
+        "identity_fingerprint": "sha256:7277b9f4109eaad80687fb8d45f38026fe8a52d5e97bccf1cf412a3f90673c3c",
+        "source_evidence_refs": [
+          "EVD-CASE-AB-OLD-SAMPLES"
+        ]
+      },
+      {
+        "sample_ref": "SAMPLE-002",
+        "target_ref": "TARGET-AB-CHECKOUT",
+        "state_key": "review",
+        "source_locators": [
+          "https://northstar.example.invalid/target-ab-checkout/review"
+        ],
+        "identity_fingerprint": "sha256:89a587cadf25981a3d201d065982a415e8dc93eafe30595767e42f0824d83c02",
+        "source_evidence_refs": [
+          "EVD-CASE-AB-OLD-SAMPLES"
+        ]
+      },
+      {
+        "sample_ref": "SAMPLE-003",
+        "target_ref": "TARGET-AB-HOME",
+        "state_key": "home",
+        "source_locators": [
+          "https://northstar.example.invalid/target-ab-home/home"
+        ],
+        "identity_fingerprint": "sha256:a2c2d17072f8933ee5a5c7ef12db75991e996a2eab38a41c1d3cabbc22ec3ae8",
+        "source_evidence_refs": [
+          "EVD-CASE-AB-OLD-SAMPLES"
+        ]
+      },
+      {
+        "sample_ref": "SAMPLE-004",
+        "target_ref": "TARGET-AB-CATALOG",
+        "state_key": "default",
+        "source_locators": [
+          "https://northstar.example.invalid/target-ab-catalog/default"
+        ],
+        "identity_fingerprint": "sha256:d263b34ba02db2547585c604fdf0d19bd6904d801480c2566282ec404f1e01c9",
+        "source_evidence_refs": [
+          "EVD-CASE-AB-OLD-SAMPLES"
+        ]
+      },
+      {
+        "sample_ref": "SAMPLE-005",
+        "target_ref": "TARGET-AB-SEARCH",
+        "state_key": "query-a",
+        "source_locators": [
+          "https://northstar.example.invalid/target-ab-search/query-a"
+        ],
+        "identity_fingerprint": "sha256:dd52fdd196263c95820baea87d61cb56847406066b77ee4729068c6854c95ff5",
+        "source_evidence_refs": [
+          "EVD-CASE-AB-OLD-SAMPLES"
+        ]
+      },
+      {
+        "sample_ref": "SAMPLE-006",
+        "target_ref": "TARGET-AB-DETAIL",
+        "state_key": "available",
+        "source_locators": [
+          "https://northstar.example.invalid/target-ab-detail/available"
+        ],
+        "identity_fingerprint": "sha256:fd0ba7c74e9faefb8c2d97e7f41a13e325f214e6561690f3d9c2158df36c2aee",
+        "source_evidence_refs": [
+          "EVD-CASE-AB-OLD-SAMPLES"
+        ]
+      }
+    ],
+    "draft_to_sample_ref": {
+      "prior-home": "SAMPLE-003",
+      "prior-catalog": "SAMPLE-004",
+      "prior-detail-available": "SAMPLE-006",
+      "prior-checkout": "SAMPLE-002",
+      "prior-search-a": "SAMPLE-005",
+      "prior-search-b": "SAMPLE-001"
+    }
+  },
+  "current_sample_identity_runtime_result": {
+    "samples": [
+      {
+        "sample_ref": "SAMPLE-001",
+        "target_ref": "TARGET-AB-SEARCH",
+        "state_key": "query-b",
+        "source_locators": [
+          "https://northstar.example.invalid/target-ab-search/query-b"
+        ],
+        "identity_fingerprint": "sha256:7277b9f4109eaad80687fb8d45f38026fe8a52d5e97bccf1cf412a3f90673c3c",
+        "source_evidence_refs": [
+          "EVD-CASE-AB-CURRENT-INVENTORY"
+        ]
+      },
+      {
+        "sample_ref": "SAMPLE-002",
+        "target_ref": "TARGET-AB-CHECKOUT",
+        "state_key": "review",
+        "source_locators": [
+          "https://northstar.example.invalid/target-ab-checkout/review"
+        ],
+        "identity_fingerprint": "sha256:89a587cadf25981a3d201d065982a415e8dc93eafe30595767e42f0824d83c02",
+        "source_evidence_refs": [
+          "EVD-CASE-AB-CURRENT-INVENTORY"
+        ]
+      },
+      {
+        "sample_ref": "SAMPLE-003",
+        "target_ref": "TARGET-AB-HOME",
+        "state_key": "home",
+        "source_locators": [
+          "https://northstar.example.invalid/target-ab-home/home"
+        ],
+        "identity_fingerprint": "sha256:a2c2d17072f8933ee5a5c7ef12db75991e996a2eab38a41c1d3cabbc22ec3ae8",
+        "source_evidence_refs": [
+          "EVD-CASE-AB-CURRENT-INVENTORY"
+        ]
+      },
+      {
+        "sample_ref": "SAMPLE-004",
+        "target_ref": "TARGET-AB-CATALOG",
+        "state_key": "default",
+        "source_locators": [
+          "https://northstar.example.invalid/target-ab-catalog/default"
+        ],
+        "identity_fingerprint": "sha256:d263b34ba02db2547585c604fdf0d19bd6904d801480c2566282ec404f1e01c9",
+        "source_evidence_refs": [
+          "EVD-CASE-AB-CURRENT-INVENTORY"
+        ]
+      },
+      {
+        "sample_ref": "SAMPLE-005",
+        "target_ref": "TARGET-AB-SEARCH",
+        "state_key": "query-a",
+        "source_locators": [
+          "https://northstar.example.invalid/target-ab-search/query-a"
+        ],
+        "identity_fingerprint": "sha256:dd52fdd196263c95820baea87d61cb56847406066b77ee4729068c6854c95ff5",
+        "source_evidence_refs": [
+          "EVD-CASE-AB-CURRENT-INVENTORY"
+        ]
+      },
+      {
+        "sample_ref": "SAMPLE-006",
+        "target_ref": "TARGET-AB-DETAIL",
+        "state_key": "alternate",
+        "source_locators": [
+          "https://northstar.example.invalid/target-ab-detail/alternate"
+        ],
+        "identity_fingerprint": "sha256:ef5fe40aee7d2ab987844dd9f98204254f902ca954c2dd04a610ccc72c975bea",
+        "source_evidence_refs": [
+          "EVD-CASE-AB-CURRENT-INVENTORY"
+        ]
+      }
+    ],
+    "draft_to_sample_ref": {
+      "current-home": "SAMPLE-003",
+      "current-catalog": "SAMPLE-004",
+      "current-detail-alternate": "SAMPLE-006",
+      "current-checkout": "SAMPLE-002",
+      "current-search-a": "SAMPLE-005",
+      "current-search-b": "SAMPLE-001"
+    }
+  },
+  "prior_population_runtime_result": {
+    "candidates": [
+      {
+        "sample_ref": "SAMPLE-001",
+        "sample_identity": "sha256:7277b9f4109eaad80687fb8d45f38026fe8a52d5e97bccf1cf412a3f90673c3c"
+      },
+      {
+        "sample_ref": "SAMPLE-002",
+        "sample_identity": "sha256:89a587cadf25981a3d201d065982a415e8dc93eafe30595767e42f0824d83c02"
+      },
+      {
+        "sample_ref": "SAMPLE-003",
+        "sample_identity": "sha256:a2c2d17072f8933ee5a5c7ef12db75991e996a2eab38a41c1d3cabbc22ec3ae8"
+      },
+      {
+        "sample_ref": "SAMPLE-004",
+        "sample_identity": "sha256:d263b34ba02db2547585c604fdf0d19bd6904d801480c2566282ec404f1e01c9"
+      },
+      {
+        "sample_ref": "SAMPLE-005",
+        "sample_identity": "sha256:dd52fdd196263c95820baea87d61cb56847406066b77ee4729068c6854c95ff5"
+      },
+      {
+        "sample_ref": "SAMPLE-006",
+        "sample_identity": "sha256:fd0ba7c74e9faefb8c2d97e7f41a13e325f214e6561690f3d9c2158df36c2aee"
+      }
+    ],
+    "provenance": {
+      "activity_ref": "ACT-CASE-AB-OLD-SAMPLES",
+      "revision": 1,
+      "evidence_refs": [
+        "EVD-CASE-AB-OLD-SAMPLES"
+      ]
+    },
+    "candidate_population_fingerprint": "sha256:d0217d818cfaa54f65f7a97cbf84a5089404e0d1d60b2ec75dd216daaae7fb4f"
+  },
+  "prior_sampling_iteration": {
+    "structured_revision": 2,
+    "structured_sample_refs": [
+      "SAMPLE-003",
+      "SAMPLE-004",
+      "SAMPLE-006",
+      "SAMPLE-002"
+    ],
+    "random_samples": [
+      {
+        "sample_ref": "SAMPLE-005",
+        "freshness_status": "current"
+      },
+      {
+        "sample_ref": "SAMPLE-001",
+        "freshness_status": "current"
+      }
+    ],
+    "candidate_population_fingerprint": "sha256:d0217d818cfaa54f65f7a97cbf84a5089404e0d1d60b2ec75dd216daaae7fb4f",
+    "selection_method": "system-random finite inventory selection"
+  },
+  "current_structured_revision": 3,
+  "current_structured_sample_refs": [
+    "SAMPLE-003",
+    "SAMPLE-004",
+    "SAMPLE-006",
+    "SAMPLE-002"
+  ],
+  "current_candidates": [
+    {
+      "sample_ref": "SAMPLE-001",
+      "sample_identity": "sha256:7277b9f4109eaad80687fb8d45f38026fe8a52d5e97bccf1cf412a3f90673c3c"
+    },
+    {
+      "sample_ref": "SAMPLE-002",
+      "sample_identity": "sha256:89a587cadf25981a3d201d065982a415e8dc93eafe30595767e42f0824d83c02"
+    },
+    {
+      "sample_ref": "SAMPLE-003",
+      "sample_identity": "sha256:a2c2d17072f8933ee5a5c7ef12db75991e996a2eab38a41c1d3cabbc22ec3ae8"
+    },
+    {
+      "sample_ref": "SAMPLE-004",
+      "sample_identity": "sha256:d263b34ba02db2547585c604fdf0d19bd6904d801480c2566282ec404f1e01c9"
+    },
+    {
+      "sample_ref": "SAMPLE-005",
+      "sample_identity": "sha256:dd52fdd196263c95820baea87d61cb56847406066b77ee4729068c6854c95ff5"
+    },
+    {
+      "sample_ref": "SAMPLE-006",
+      "sample_identity": "sha256:ef5fe40aee7d2ab987844dd9f98204254f902ca954c2dd04a610ccc72c975bea"
+    }
+  ],
+  "current_provenance": {
+    "activity_ref": "ACT-CASE-AB-CURRENT-INVENTORY",
+    "revision": 2,
+    "evidence_refs": [
+      "EVD-CASE-AB-CURRENT-INVENTORY",
+      "EVD-CASE-AB-NO-SIGNIFICANT-CHANGE"
+    ]
+  },
+  "step_4_2_evaluation_items": [
+    {
+      "item_ref": "ITEM-CASE-AB-HOME",
+      "item_kind": "unchanged-content",
+      "identity_fingerprint": "sha256:a2c2d17072f8933ee5a5c7ef12db75991e996a2eab38a41c1d3cabbc22ec3ae8",
+      "evidence_fingerprint": "sha256:3553e140460557c9900cd682bc6a6d4cf16d0412e37549e8ea463d04571f0985"
+    },
+    {
+      "item_ref": "ITEM-CASE-AB-CATALOG",
+      "item_kind": "unchanged-content",
+      "identity_fingerprint": "sha256:d263b34ba02db2547585c604fdf0d19bd6904d801480c2566282ec404f1e01c9",
+      "evidence_fingerprint": "sha256:5a078d1ab4ec2709f59aaee94422c87f35c1de9e3a5b668e1b43b42722aa24fd"
+    },
+    {
+      "item_ref": "ITEM-CASE-AB-CHECKOUT",
+      "item_kind": "unchanged-content",
+      "identity_fingerprint": "sha256:89a587cadf25981a3d201d065982a415e8dc93eafe30595767e42f0824d83c02",
+      "evidence_fingerprint": "sha256:afe342235c338f9a4851049b7f6c0f895849a54f675c4a897313c687f841f4e5"
+    },
+    {
+      "item_ref": "ITEM-CASE-AB-SEARCH-A",
+      "item_kind": "unchanged-content",
+      "identity_fingerprint": "sha256:dd52fdd196263c95820baea87d61cb56847406066b77ee4729068c6854c95ff5",
+      "evidence_fingerprint": "sha256:56a3ca9c78ca83b4a1a7ff87a4a14c6d6ca306694a7f70702d336939d06e2395"
+    },
+    {
+      "item_ref": "ITEM-CASE-AB-SEARCH-B",
+      "item_kind": "unchanged-content",
+      "identity_fingerprint": "sha256:7277b9f4109eaad80687fb8d45f38026fe8a52d5e97bccf1cf412a3f90673c3c",
+      "evidence_fingerprint": "sha256:434f3568f1a699b7a34c58879f361a70aacd55fe616c2b0394262f4eddeaf80d"
+    },
+    {
+      "item_ref": "ITEM-CASE-AB-DETAIL-ALTERNATE",
+      "item_kind": "changed-content",
+      "identity_fingerprint": "sha256:ef5fe40aee7d2ab987844dd9f98204254f902ca954c2dd04a610ccc72c975bea",
+      "evidence_fingerprint": "sha256:b51e2c091858919c370dedf08cc2f999d4652f72bd6e0b3409de4c64d16efc29"
+    }
+  ],
+  "step_4_2_existing_results": [
+    {
+      "item_ref": "ITEM-CASE-AB-HOME",
+      "result_ref": "RESULT-CASE-AB-OLD-HOME",
+      "identity_fingerprint": "sha256:a2c2d17072f8933ee5a5c7ef12db75991e996a2eab38a41c1d3cabbc22ec3ae8",
+      "evidence_fingerprint": "sha256:3553e140460557c9900cd682bc6a6d4cf16d0412e37549e8ea463d04571f0985",
+      "freshness_status": "current"
+    },
+    {
+      "item_ref": "ITEM-CASE-AB-CATALOG",
+      "result_ref": "RESULT-CASE-AB-OLD-CATALOG",
+      "identity_fingerprint": "sha256:d263b34ba02db2547585c604fdf0d19bd6904d801480c2566282ec404f1e01c9",
+      "evidence_fingerprint": "sha256:5a078d1ab4ec2709f59aaee94422c87f35c1de9e3a5b668e1b43b42722aa24fd",
+      "freshness_status": "current"
+    },
+    {
+      "item_ref": "ITEM-CASE-AB-CHECKOUT",
+      "result_ref": "RESULT-CASE-AB-OLD-CHECKOUT",
+      "identity_fingerprint": "sha256:89a587cadf25981a3d201d065982a415e8dc93eafe30595767e42f0824d83c02",
+      "evidence_fingerprint": "sha256:afe342235c338f9a4851049b7f6c0f895849a54f675c4a897313c687f841f4e5",
+      "freshness_status": "current"
+    },
+    {
+      "item_ref": "ITEM-CASE-AB-SEARCH-A",
+      "result_ref": "RESULT-CASE-AB-OLD-SEARCH-A",
+      "identity_fingerprint": "sha256:dd52fdd196263c95820baea87d61cb56847406066b77ee4729068c6854c95ff5",
+      "evidence_fingerprint": "sha256:56a3ca9c78ca83b4a1a7ff87a4a14c6d6ca306694a7f70702d336939d06e2395",
+      "freshness_status": "current"
+    },
+    {
+      "item_ref": "ITEM-CASE-AB-SEARCH-B",
+      "result_ref": "RESULT-CASE-AB-OLD-SEARCH-B",
+      "identity_fingerprint": "sha256:7277b9f4109eaad80687fb8d45f38026fe8a52d5e97bccf1cf412a3f90673c3c",
+      "evidence_fingerprint": "sha256:434f3568f1a699b7a34c58879f361a70aacd55fe616c2b0394262f4eddeaf80d",
+      "freshness_status": "current"
+    }
+  ],
+  "prior_sample_rows": [
+    {
+      "sample_ref": "SAMPLE-001",
+      "target_ref": "TARGET-AB-SEARCH",
+      "state_key": "query-b",
+      "source_locators": [
+        "https://northstar.example.invalid/target-ab-search/query-b"
+      ],
+      "identity_fingerprint": "sha256:7277b9f4109eaad80687fb8d45f38026fe8a52d5e97bccf1cf412a3f90673c3c",
+      "source_evidence_refs": [
+        "EVD-CASE-AB-OLD-SAMPLES"
+      ]
+    },
+    {
+      "sample_ref": "SAMPLE-002",
+      "target_ref": "TARGET-AB-CHECKOUT",
+      "state_key": "review",
+      "source_locators": [
+        "https://northstar.example.invalid/target-ab-checkout/review"
+      ],
+      "identity_fingerprint": "sha256:89a587cadf25981a3d201d065982a415e8dc93eafe30595767e42f0824d83c02",
+      "source_evidence_refs": [
+        "EVD-CASE-AB-OLD-SAMPLES"
+      ]
+    },
+    {
+      "sample_ref": "SAMPLE-003",
+      "target_ref": "TARGET-AB-HOME",
+      "state_key": "home",
+      "source_locators": [
+        "https://northstar.example.invalid/target-ab-home/home"
+      ],
+      "identity_fingerprint": "sha256:a2c2d17072f8933ee5a5c7ef12db75991e996a2eab38a41c1d3cabbc22ec3ae8",
+      "source_evidence_refs": [
+        "EVD-CASE-AB-OLD-SAMPLES"
+      ]
+    },
+    {
+      "sample_ref": "SAMPLE-004",
+      "target_ref": "TARGET-AB-CATALOG",
+      "state_key": "default",
+      "source_locators": [
+        "https://northstar.example.invalid/target-ab-catalog/default"
+      ],
+      "identity_fingerprint": "sha256:d263b34ba02db2547585c604fdf0d19bd6904d801480c2566282ec404f1e01c9",
+      "source_evidence_refs": [
+        "EVD-CASE-AB-OLD-SAMPLES"
+      ]
+    },
+    {
+      "sample_ref": "SAMPLE-005",
+      "target_ref": "TARGET-AB-SEARCH",
+      "state_key": "query-a",
+      "source_locators": [
+        "https://northstar.example.invalid/target-ab-search/query-a"
+      ],
+      "identity_fingerprint": "sha256:dd52fdd196263c95820baea87d61cb56847406066b77ee4729068c6854c95ff5",
+      "source_evidence_refs": [
+        "EVD-CASE-AB-OLD-SAMPLES"
+      ]
+    },
+    {
+      "sample_ref": "SAMPLE-006",
+      "target_ref": "TARGET-AB-DETAIL",
+      "state_key": "available",
+      "source_locators": [
+        "https://northstar.example.invalid/target-ab-detail/available"
+      ],
+      "identity_fingerprint": "sha256:fd0ba7c74e9faefb8c2d97e7f41a13e325f214e6561690f3d9c2158df36c2aee",
+      "source_evidence_refs": [
+        "EVD-CASE-AB-OLD-SAMPLES"
+      ]
+    }
+  ],
+  "current_sample_rows": [
+    {
+      "sample_ref": "SAMPLE-001",
+      "target_ref": "TARGET-AB-SEARCH",
+      "state_key": "query-b",
+      "source_locators": [
+        "https://northstar.example.invalid/target-ab-search/query-b"
+      ],
+      "identity_fingerprint": "sha256:7277b9f4109eaad80687fb8d45f38026fe8a52d5e97bccf1cf412a3f90673c3c",
+      "source_evidence_refs": [
+        "EVD-CASE-AB-CURRENT-INVENTORY"
+      ]
+    },
+    {
+      "sample_ref": "SAMPLE-002",
+      "target_ref": "TARGET-AB-CHECKOUT",
+      "state_key": "review",
+      "source_locators": [
+        "https://northstar.example.invalid/target-ab-checkout/review"
+      ],
+      "identity_fingerprint": "sha256:89a587cadf25981a3d201d065982a415e8dc93eafe30595767e42f0824d83c02",
+      "source_evidence_refs": [
+        "EVD-CASE-AB-CURRENT-INVENTORY"
+      ]
+    },
+    {
+      "sample_ref": "SAMPLE-003",
+      "target_ref": "TARGET-AB-HOME",
+      "state_key": "home",
+      "source_locators": [
+        "https://northstar.example.invalid/target-ab-home/home"
+      ],
+      "identity_fingerprint": "sha256:a2c2d17072f8933ee5a5c7ef12db75991e996a2eab38a41c1d3cabbc22ec3ae8",
+      "source_evidence_refs": [
+        "EVD-CASE-AB-CURRENT-INVENTORY"
+      ]
+    },
+    {
+      "sample_ref": "SAMPLE-004",
+      "target_ref": "TARGET-AB-CATALOG",
+      "state_key": "default",
+      "source_locators": [
+        "https://northstar.example.invalid/target-ab-catalog/default"
+      ],
+      "identity_fingerprint": "sha256:d263b34ba02db2547585c604fdf0d19bd6904d801480c2566282ec404f1e01c9",
+      "source_evidence_refs": [
+        "EVD-CASE-AB-CURRENT-INVENTORY"
+      ]
+    },
+    {
+      "sample_ref": "SAMPLE-005",
+      "target_ref": "TARGET-AB-SEARCH",
+      "state_key": "query-a",
+      "source_locators": [
+        "https://northstar.example.invalid/target-ab-search/query-a"
+      ],
+      "identity_fingerprint": "sha256:dd52fdd196263c95820baea87d61cb56847406066b77ee4729068c6854c95ff5",
+      "source_evidence_refs": [
+        "EVD-CASE-AB-CURRENT-INVENTORY"
+      ]
+    },
+    {
+      "sample_ref": "SAMPLE-006",
+      "target_ref": "TARGET-AB-DETAIL",
+      "state_key": "alternate",
+      "source_locators": [
+        "https://northstar.example.invalid/target-ab-detail/alternate"
+      ],
+      "identity_fingerprint": "sha256:ef5fe40aee7d2ab987844dd9f98204254f902ca954c2dd04a610ccc72c975bea",
+      "source_evidence_refs": [
+        "EVD-CASE-AB-CURRENT-INVENTORY"
+      ]
+    }
+  ]
+}

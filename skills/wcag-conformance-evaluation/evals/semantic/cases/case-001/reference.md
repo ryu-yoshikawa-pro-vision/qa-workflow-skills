@@ -1,0 +1,3 @@
+# Expected semantic contract
+
+This is a formal product-conformance request, so start with `wcag-conformance-evaluation` as the methodology owner. The request names supported WCAG versions but does not supply one exact version, level, product target, or scope; preserve those as unresolved and request the missing inputs. Do not choose a version, claim that evaluation is complete, or start live observation before its target and permitted scope are available. If a resolved evaluation later requires live observation and `qa-workflow` is available, use its handoff path to `usability-inspection` and resume only after current returned evidence.

@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fixed probe review cases</title>
+    <style>
+      body {
+        font: 16px/1.4 sans-serif;
+      }
+      .pair-target {
+        position: absolute;
+        left: 4px;
+        top: 4px;
+        width: 16px;
+        height: 16px;
+      }
+      .overflow-target {
+        position: absolute;
+        left: 1500px;
+        width: 40px;
+        height: 20px;
+        overflow: hidden;
+      }
+      .clip-target {
+        width: 24px;
+        height: 20px;
+        overflow: hidden;
+        white-space: nowrap;
+      }
+      @keyframes review-pulse {
+        from {
+          opacity: 0.9;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+      #host-b {
+        position: absolute;
+        top: 40px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Fixed probe review cases</h1>
+      <div role="switch" aria-checked="false" aria-label="Review switch" tabindex="-1"></div>
+      <div role="tab" aria-selected="false" aria-label="Review tab" tabindex="-1"></div>
+      <div role="menuitem" aria-label="Review menu item" tabindex="-1"></div>
+      <div role="checkbox" aria-checked="true" aria-label="Review checkbox" tabindex="-1"></div>
+      <div role="radio" aria-checked="false" aria-label="Review radio" tabindex="-1"></div>
+      <div role="slider" aria-valuenow="3" aria-label="Review slider" tabindex="-1"></div>
+      <div role="combobox" aria-label="Review combobox" tabindex="-1"></div>
+      <div role="listbox" aria-label="Review listbox" tabindex="-1"></div>
+      <div role="textbox" aria-label="Review textbox" tabindex="-1"></div>
+      <div role="searchbox" aria-label="Review searchbox" tabindex="-1"></div>
+      <div role="spinbutton" aria-valuenow="2" aria-label="Review spinbutton" tabindex="-1"></div>
+      <button aria-label="ZXQ_PRIVATE_LABEL_UNMATCHED_9f17c3b1d204">Candidate target</button>
+      <audio id="display-none-audio" controls style="display: none"></audio>
+      <video
+        id="offscreen-video"
+        autoplay
+        muted
+        width="16"
+        height="16"
+        style="position: absolute; left: -10000px"
+      ></video>
+      <custom-panel id="host-a"></custom-panel>
+      <custom-panel id="host-b"></custom-panel>
+      <section id="generated"></section>
+    </main>
+    <script>
+      const query = new URLSearchParams(location.search);
+      const boundaryMode = query.get("boundary");
+      const requestedCount = (name, fallback) => {
+        const count = query.get(name);
+        return count !== null && /^(0|[1-9][0-9]{0,3})$/u.test(count) ? Number(count) : fallback;
+      };
+      const main = document.querySelector("main");
+      if (boundaryMode) {
+        main.replaceChildren();
+        const generated = document.createElement("section");
+        generated.id = "generated";
+        main.append(generated);
+      }
+      const generated = document.querySelector("#generated");
+      const pairCount =
+        boundaryMode === "pair" ? requestedCount("pairs", 33) : boundaryMode ? 0 : 33;
+      for (let index = 0; index < pairCount; index += 1) {
+        const button = document.createElement("button");
+        button.className = "pair-target";
+        if (!boundaryMode) button.textContent = `overlapping target ${index + 1}`;
+        if (boundaryMode === "pair" && pairCount === 33) {
+          const pairCase = query.get("pairCase");
+          if (pairCase === "under-499") {
+            button.style.top =
+              index < 29 ? "4px" : index < 31 ? "44px" : index === 31 ? "104px" : "50px";
+          } else if (pairCase === "over-501") {
+            button.style.top =
+              index < 27 ? "4px" : index < 31 ? "44px" : index === 31 ? "104px" : "50px";
+          } else {
+            button.style.top = index < 28 ? "4px" : index < 32 ? "44px" : "104px";
+          }
+        }
+        main.append(button);
+      }
+      const liveCount =
+        boundaryMode === "live" ? requestedCount("live", 201) : boundaryMode ? 0 : 201;
+      const overflowCount =
+        boundaryMode === "reflow" ? requestedCount("overflow", 201) : boundaryMode ? 0 : 201;
+      for (let index = 0; index < Math.max(liveCount, overflowCount); index += 1) {
+        if (index < liveCount) {
+          const region = document.createElement("div");
+          region.setAttribute("aria-live", "polite");
+          region.style.cssText = "width: 1px; height: 1px; animation: review-pulse 1s infinite";
+          if (!boundaryMode) region.textContent = `live candidate ${index + 1}`;
+          generated.append(region);
+        }
+        if (index < overflowCount) {
+          const overflow = document.createElement("div");
+          overflow.className = "overflow-target";
+          if (!boundaryMode) overflow.textContent = `overflow candidate ${index + 1}`;
+          generated.append(overflow);
+        }
+      }
+      const textCount =
+        boundaryMode === "text" || boundaryMode === "color"
+          ? requestedCount("text", 501)
+          : boundaryMode
+            ? 0
+            : 501;
+      for (let index = 0; index < textCount; index += 1) {
+        const text = document.createElement("span");
+        text.textContent = `text owner ${index + 1}`;
+        generated.append(text, document.createElement("br"));
+      }
+      const clipCount =
+        boundaryMode === "spacing" ? requestedCount("clip", 101) : boundaryMode ? 0 : 101;
+      for (let index = 0; index < clipCount; index += 1) {
+        const paragraph = document.createElement("p");
+        paragraph.className = "clip-target";
+        paragraph.textContent = `long text spacing overflow candidate ${index + 1}`;
+        generated.append(paragraph);
+      }
+
+      if (!boundaryMode) {
+        for (const [hostId, prefix] of [
+          ["host-a", "first"],
+          ["host-b", "second"],
+        ]) {
+          const root = document.getElementById(hostId).attachShadow({ mode: "open" });
+          root.innerHTML = `
+          <button aria-label="${prefix} sibling one">One</button>
+          <button aria-label="${prefix} sibling two">Two</button>
+          <div class="nested-host"></div>
+          <audio style="display: none"></audio>
+          <p style="width: 24px; height: 20px; overflow: hidden; white-space: nowrap">shadow text spacing overflow content</p>
+        `;
+          const nestedRoot = root.querySelector(".nested-host").attachShadow({ mode: "open" });
+          nestedRoot.innerHTML =
+            '<button aria-label="nested shadow action">Nested</button><div role="switch" aria-checked="true" aria-label="Nested switch" tabindex="-1"></div>';
+        }
+      }
+    </script>
+  </body>
+</html>

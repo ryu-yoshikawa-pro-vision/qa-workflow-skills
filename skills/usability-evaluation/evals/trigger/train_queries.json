@@ -1,0 +1,50 @@
+[
+  {
+    "query": "このscreenshotのDialogをUI patternとaccessibility referenceに照らして評価して。",
+    "should_trigger": true
+  },
+  {
+    "query": "テスト分析前に保存済みevidenceからUI/UX上の懸念候補を出して。",
+    "should_trigger": true
+  },
+  {
+    "query": "test-executionが取得したevidenceをread-onlyで使ってUXも評価して。",
+    "should_trigger": true
+  },
+  {
+    "query": "このFormのvalidationをAuthority、WCAG、pattern、heuristic別に評価して。",
+    "should_trigger": true
+  },
+  {
+    "query": "TCを実行してPASS/FAILだけ返して。",
+    "should_trigger": false
+  },
+  {
+    "query": "Product Riskのlikelihoodとscoreを決めて。",
+    "should_trigger": false
+  },
+  {
+    "query": "E2Eコードを実装して。",
+    "should_trigger": false
+  },
+  {
+    "query": "live browserでviewportを変えて表示崩れを実操作・観測して。",
+    "should_trigger": false
+  },
+  {
+    "query": "このscreenshotの表示崩れをreferenceに沿って評価して。",
+    "should_trigger": true
+  },
+  {
+    "query": "current UI inventoryだけを更新して。",
+    "should_trigger": false
+  },
+  {
+    "query": "pixel diffだけ実施して。",
+    "should_trigger": false
+  },
+  {
+    "query": "Figmaとspecificationだけからdesign-stage UI evaluationをして。",
+    "should_trigger": true
+  }
+]

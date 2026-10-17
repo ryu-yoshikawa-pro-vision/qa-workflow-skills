@@ -1,1 +1,5 @@
-{"required_e2e_refs":["tests/orders/order.spec.ts > order history"],"tc_absent":true,"require_no_e2e_execution":true}
+{
+  "required_e2e_refs": ["tests/orders/order.spec.ts > order history"],
+  "tc_absent": true,
+  "require_no_e2e_execution": true
+}

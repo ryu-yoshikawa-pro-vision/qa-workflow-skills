@@ -149,7 +149,6 @@ PR #11固有のruntime契約や、PR #11実装時に24/24 PASSだった実Judge�
 
 README側で詳細アルゴリズムを増やさず、担当Skillの一覧と責務だけを同期します。
 
-
 ### 5. workflow-state-template.mdのSkill状態表
 
 `skills/qa-workflow/assets/workflow-state-template.md`のSkill状態表は、`spec-analysis`から`qa-knowledge`まで18 Skillを列挙していますが、`qa-workflow`自身の行がありません。
@@ -193,7 +192,6 @@ PR #11 / #12後の47件に今回14件を加えた61件
 case数やrouting fixture数は変更せず、例えば「現在の追加・拡張責務」「PR #13で14件を追加した61件」のように、`main`で読んでも参照先が明確な表現へ修正します。
 
 同じ節に残る「新規Skill」「新3 Skill」も対象を明示します。`regression-testing` / `exploratory-testing` / `qa-knowledge`を指す場合は、その3 Skill名または「PR #13で追加した3 Skill」と書き、文書単体で参照先が分かる状態へ揃えます。
-
 
 ### 11. regression-testingの正規出力契約
 
@@ -390,7 +388,6 @@ frontmatter変更後はtrigger datasetの回帰確認を実行します。
   - `skills/exploratory-testing/references/guidance.md`
 
 実際に変更するファイルは、補助Planの確認手順で現在の契約を確定してから決めます。
-
 
 ### Regression / QA Knowledge artifact契約
 

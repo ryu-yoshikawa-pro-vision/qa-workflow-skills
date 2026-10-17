@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 from typing import Any
 
-
 RATING_SCALE = """4: 要求を明確に満たしており、実質的な問題がない。
 3: 概ね正しく、軽微な改善余地はあるが成果物の利用に影響しない。
 2: 意味上の実質的な不足があり、修正またはHuman Reviewが必要。

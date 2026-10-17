@@ -1,0 +1,84 @@
+name: Codex Harness
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  codex-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install latest stable Codex CLI
+        run: npm install --global @openai/codex@latest
+
+      - name: Record Codex CLI version
+        run: codex --version
+
+      - name: Check Hook syntax
+        run: node --check .codex/hooks/pre_tool_use_policy.mjs
+
+      - name: Run Codex config, Hook, launcher, and execpolicy contracts
+        run: python -m unittest discover -s tests/codex -p 'test_*.py' -v
+
+      - name: Install official skills-ref
+        run: >-
+          python -m pip install
+          "git+https://github.com/agentskills/agentskills.git@69ef37e9424c0a7ea9dd2293b559e43ec8176379#subdirectory=skills-ref"
+
+      - name: Validate development Agent Skills
+        run: |
+          skills-ref validate .agents/skills/feature-plan
+          skills-ref validate .agents/skills/code-review
+          skills-ref validate .agents/skills/repair-loop
+
+  windows-launcher:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install latest stable Codex CLI
+        run: npm install --global @openai/codex@latest
+
+      - name: Record PowerShell and Codex versions
+        shell: pwsh
+        run: |
+          $windowsPowerShellVersion = powershell.exe -NoProfile -Command '$PSVersionTable.PSVersion.ToString()'
+          $powerShell7Version = pwsh.exe -NoProfile -Command '$PSVersionTable.PSVersion.ToString()'
+          "Windows PowerShell $windowsPowerShellVersion"
+          "PowerShell 7 $powerShell7Version"
+          codex --version
+
+      - name: Check Hook syntax
+        run: node --check .codex/hooks/pre_tool_use_policy.mjs
+
+      - name: Run Windows transport and Codex contracts
+        run: python -m unittest discover -s tests/codex -p 'test_*.py' -v

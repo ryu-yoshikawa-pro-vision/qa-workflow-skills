@@ -1,0 +1,29 @@
+{
+  "skill": "wcag-conformance-evaluation",
+  "criteria": [
+    {
+      "id": "WCAG-SEM-001",
+      "title": "Versioned WCAG scope and required sets are preserved",
+      "description": "The candidate uses the named WCAG 2.0/2.1/2.2 version and level, closes the correct static criterion and conformance-requirement set, and never substitutes another version.",
+      "critical": true
+    },
+    {
+      "id": "WCAG-SEM-002",
+      "title": "WCAG-EM methodology and sample meaning are preserved",
+      "description": "The candidate evaluates product scope, exploration, structured/random sampling, complete processes, comparisons, and report closure without inventing sample identity or completeness.",
+      "critical": true
+    },
+    {
+      "id": "WCAG-SEM-003",
+      "title": "Procedure and evidence roles are correct",
+      "description": "The candidate respects finite machine probes, semantic/manual/AT/external applicability and evidence contracts, and never turns tool limits into conformance results.",
+      "critical": true
+    },
+    {
+      "id": "WCAG-SEM-004",
+      "title": "Handoff, freshness, and report contracts are preserved",
+      "description": "Assess the handoff, freshness, CAS, resume, report, claim, statement, or EARL contract that the case actually exercises. Require formal handoff lifecycle evidence only for a case that starts or resumes such a handoff; require report/claim/statement/EARL output only when its inputs and the case contract make that output applicable. If current inputs or runtime results prevent downstream materialization, the candidate may close that path as unresolved or blocked with its exact reason; do not require unrelated lifecycle or output sections and do not treat a safe expected blocker as a failure.",
+      "critical": true
+    }
+  ]
+}

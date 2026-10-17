@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Northstar Outfitters — usability fixture</title>
+  <link rel="icon" href="/fixture-icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="fixture.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="Northstar Outfitters home">Northstar Outfitters</a>
+    <nav aria-label="Primary navigation">
+      <a href="/?view=overview">Overview</a>
+      <a href="/?view=search">Search</a>
+      <a href="/?view=cart">Cart <span id="cart-count">0</span></a>
+    </nav>
+    <label class="resize-control" for="text-scale">Text size
+      <input id="text-scale" type="range" min="100" max="200" step="10" value="100">
+      <output id="text-scale-value" for="text-scale">100%</output>
+    </label>
+  </header>
+  <main id="product" class="product" data-theme="standard">
+    <div class="content-column">
+      <p class="eyebrow">Repository controlled evaluation fixture</p>
+      <h1>Plan a day outdoors</h1>
+      <p class="intro">Explore a small store journey with several views, responsive layouts, and local-only interactions.</p>
+      <div class="toolbar">
+        <button id="high-contrast" type="button" aria-pressed="false">Use high contrast</button>
+        <a href="/manual-limitations.html">Open visual fallback fixture</a>
+      </div>
+
+      <section id="view-overview" class="view" aria-labelledby="overview-heading">
+        <h2 id="overview-heading">Featured equipment</h2>
+        <div class="cards">
+          <article class="card">
+            <h3>Trail pack</h3>
+            <p>Lightweight day pack with an adjustable fit.</p>
+            <button type="button" data-add="Trail pack">Add trail pack</button>
+          </article>
+          <article class="card">
+            <h3>Water bottle</h3>
+            <p>Reusable bottle for a full day on the trail.</p>
+            <button type="button" data-add="Water bottle">Add water bottle</button>
+          </article>
+        </div>
+        <button id="start-journey" type="button">Start checkout</button>
+      </section>
+
+      <section id="view-search" class="view" aria-labelledby="search-heading" hidden>
+        <h2 id="search-heading">Search equipment</h2>
+        <label for="product-search">Search by product name</label>
+        <input id="product-search" type="search" autocomplete="off">
+        <p id="search-status" role="status">Enter a product name to filter the fixture list.</p>
+        <button id="search-add" type="button">Add Trail pack</button>
+      </section>
+
+      <section id="view-cart" class="view" aria-labelledby="cart-heading" hidden>
+        <h2 id="cart-heading">Your cart</h2>
+        <ul id="cart-items"><li>Your cart is empty.</li></ul>
+        <button id="continue-checkout" type="button">Continue to delivery details</button>
+      </section>
+
+      <section id="view-details" class="view" aria-labelledby="details-heading" hidden>
+        <h2 id="details-heading">Delivery details</h2>
+        <label for="delivery-method">Delivery method</label>
+        <select id="delivery-method">
+          <option value="standard">Standard delivery</option>
+          <option value="pickup">Store pickup</option>
+        </select>
+        <button id="place-order" type="button">Place fixture order</button>
+      </section>
+
+      <section id="view-confirmation" class="view" aria-labelledby="confirmation-heading" hidden>
+        <h2 id="confirmation-heading">Order prepared</h2>
+        <p id="order-outcome" role="status">The local fixture completed the journey. No order was sent.</p>
+        <button id="reset-journey" type="button">Reset fixture journey</button>
+      </section>
+
+      <p id="journey-status" role="status" aria-live="polite">Choose a product or start checkout.</p>
+    </div>
+    <aside class="summary" aria-labelledby="summary-heading">
+      <h2 id="summary-heading">Journey summary</h2>
+      <p>Current view: <strong id="current-view">overview</strong></p>
+      <p>Selected delivery: <strong id="delivery-summary">standard</strong></p>
+      <p>Fixture state stays in this page session.</p>
+    </aside>
+  </main>
+  <footer class="site-footer"><p>Northstar Outfitters is a fictional repository fixture.</p></footer>
+  <script src="fixture.js?v=3" defer></script>
+</body>
+</html>

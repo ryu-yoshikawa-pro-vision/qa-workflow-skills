@@ -4,17 +4,31 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 from pathlib import Path
-import sys
 from typing import Any
 
-from runtime_contract import InvalidInput, canonical_decimal, canonicalize, ensure_list, ensure_nonempty_string, exact_add, post_process_targets, reject_unknown, run_cli, typed_value
-
+from runtime_contract import (
+    InvalidInput,
+    canonical_decimal,
+    ensure_list,
+    ensure_nonempty_string,
+    exact_add,
+    post_process_targets,
+    reject_unknown,
+    run_cli,
+    typed_value,
+)
 
 SKILL = "test-condition-design"
 GENERATOR = "bva"
 GENERATOR_CONTRACT_VERSION = "bva-v1"
 SCRIPT_PATH = Path(__file__).resolve()
-THRESHOLD_TYPES = {"integer", "decimal", "date", "local_datetime", "fixed_offset_datetime"}
+THRESHOLD_TYPES = {
+    "integer",
+    "decimal",
+    "date",
+    "local_datetime",
+    "fixed_offset_datetime",
+}
 STEP_UNITS = {"integer", "decimal", "day", "second"}
 
 
@@ -32,7 +46,13 @@ def _step(value: Any, threshold_type: str, name: str) -> dict[str, Any]:
         raise InvalidInput(f"{name}が不正です")
     unit = value["unit"]
     amount = value["amount"]
-    expected = {"integer": "integer", "decimal": "decimal", "date": "day", "local_datetime": "second", "fixed_offset_datetime": "second"}[threshold_type]
+    expected = {
+        "integer": "integer",
+        "decimal": "decimal",
+        "date": "day",
+        "local_datetime": "second",
+        "fixed_offset_datetime": "second",
+    }[threshold_type]
     if unit != expected:
         raise InvalidInput(f"{name}.unitがthreshold typeと不一致です")
     if unit in {"integer", "day", "second"}:
@@ -48,7 +68,9 @@ def _step(value: Any, threshold_type: str, name: str) -> dict[str, Any]:
     return {"unit": unit, "amount": normalized_amount}
 
 
-def _shift(threshold: dict[str, Any], step: dict[str, Any], direction: int) -> dict[str, Any]:
+def _shift(
+    threshold: dict[str, Any], step: dict[str, Any], direction: int
+) -> dict[str, Any]:
     kind = threshold["type"]
     raw = threshold["value"]
     amount = step["amount"]
@@ -80,7 +102,11 @@ def _shift(threshold: dict[str, Any], step: dict[str, Any], direction: int) -> d
 
 
 def generate(input_value: dict, metadata: dict) -> dict:
-    if metadata["model_key"] is None or metadata["model_type"] != "bva" or metadata["runtime_unit_key"] != f"model:{metadata['model_key']}":
+    if (
+        metadata["model_key"] is None
+        or metadata["model_type"] != "bva"
+        or metadata["runtime_unit_key"] != f"model:{metadata['model_key']}"
+    ):
         raise InvalidInput("bvaのruntime metadataが不正です")
     reject_unknown(input_value, {"boundaries"})
     targets: list[dict[str, Any]] = []
@@ -91,43 +117,119 @@ def generate(input_value: dict, metadata: dict) -> dict:
     for index, row in enumerate(boundaries):
         if not isinstance(row, dict):
             raise InvalidInput(f"boundaries[{index}]が不正です")
-        required = {"boundary_key", "label", "side", "threshold", "inclusive", "step", "mode", "coverage_selection_reason", "authority_refs"}
+        required = {
+            "boundary_key",
+            "label",
+            "side",
+            "threshold",
+            "inclusive",
+            "step",
+            "mode",
+            "coverage_selection_reason",
+            "authority_refs",
+        }
         reject_unknown(row, required)
-        key = ensure_nonempty_string(row["boundary_key"], f"boundaries[{index}].boundary_key")
+        key = ensure_nonempty_string(
+            row["boundary_key"], f"boundaries[{index}].boundary_key"
+        )
         if key in seen:
             raise InvalidInput("boundary_keyが重複しています")
         seen.add(key)
         label = ensure_nonempty_string(row["label"], f"boundaries[{index}].label")
-        if row["side"] not in {"lower", "upper"} or not isinstance(row["inclusive"], bool) or row["mode"] not in {"2-value", "3-value"}:
+        if (
+            row["side"] not in {"lower", "upper"}
+            or not isinstance(row["inclusive"], bool)
+            or row["mode"] not in {"2-value", "3-value"}
+        ):
             raise InvalidInput("boundary metadataが不正です")
         reason = row["coverage_selection_reason"]
         if not isinstance(reason, str) or (row["mode"] == "3-value" and not reason):
             raise InvalidInput("coverage_selection_reasonが不正です")
-        if not isinstance(row["authority_refs"], list) or len(set(row["authority_refs"])) != len(row["authority_refs"]) or not all(isinstance(value, str) and value for value in row["authority_refs"]):
+        if (
+            not isinstance(row["authority_refs"], list)
+            or len(set(row["authority_refs"])) != len(row["authority_refs"])
+            or not all(
+                isinstance(value, str) and value for value in row["authority_refs"]
+            )
+        ):
             raise InvalidInput("boundary authority_refsが不正です")
         threshold = _typed(row["threshold"], f"boundaries[{index}].threshold")
         step = _step(row["step"], threshold["type"], f"boundaries[{index}].step")
         at = threshold
         if row["mode"] == "3-value":
-            positions = [("BELOW", _shift(threshold, step, -1)), ("AT", at), ("ABOVE", _shift(threshold, step, 1))]
+            positions = [
+                ("BELOW", _shift(threshold, step, -1)),
+                ("AT", at),
+                ("ABOVE", _shift(threshold, step, 1)),
+            ]
         else:
-            other_direction = -1 if (row["side"] == "lower" and row["inclusive"]) or (row["side"] == "upper" and not row["inclusive"]) else 1
-            positions = [("AT", at), ("OTHER", _shift(threshold, step, other_direction))]
+            other_direction = (
+                -1
+                if (row["side"] == "lower" and row["inclusive"])
+                or (row["side"] == "upper" and not row["inclusive"])
+                else 1
+            )
+            positions = [
+                ("AT", at),
+                ("OTHER", _shift(threshold, step, other_direction)),
+            ]
         for position, value in positions:
             target_key = f"bva:{key}:{position}"
             execution = {
-                "boundary": {"boundary_key": key, "label": label, "side": row["side"], "threshold": threshold, "inclusive": row["inclusive"], "step": step, "authority_refs": row["authority_refs"]},
+                "boundary": {
+                    "boundary_key": key,
+                    "label": label,
+                    "side": row["side"],
+                    "threshold": threshold,
+                    "inclusive": row["inclusive"],
+                    "step": step,
+                    "authority_refs": row["authority_refs"],
+                },
                 "position": position,
                 "value": value,
             }
-            targets.append({"target_key": target_key, "boundary_key": key, "boundary_label": label, "position": position, "value": value, "authority_refs": row["authority_refs"], "materializable": True, "execution": execution})
-    processed = post_process_targets(metadata["model_key"], sorted(targets, key=lambda row: row["target_key"]))
+            targets.append(
+                {
+                    "target_key": target_key,
+                    "boundary_key": key,
+                    "boundary_label": label,
+                    "position": position,
+                    "value": value,
+                    "authority_refs": row["authority_refs"],
+                    "materializable": True,
+                    "execution": execution,
+                }
+            )
+    processed = post_process_targets(
+        metadata["model_key"], sorted(targets, key=lambda row: row["target_key"])
+    )
     return {
-        "runtime_status": "ok", "support_status": "supported", "result_status": "ready", "runtime_required": True, "deterministic_generated": True,
-        "payload": {"targets": processed, "coverage_summary": {"criterion": "boundary-values", "required": len(processed), "covered": len(processed), "complete": bool(processed)}, "metadata": {"coverage_mode": "2-value-or-3-value"}},
+        "runtime_status": "ok",
+        "support_status": "supported",
+        "result_status": "ready",
+        "runtime_required": True,
+        "deterministic_generated": True,
+        "payload": {
+            "targets": processed,
+            "coverage_summary": {
+                "criterion": "boundary-values",
+                "required": len(processed),
+                "covered": len(processed),
+                "complete": bool(processed),
+            },
+            "metadata": {"coverage_mode": "2-value-or-3-value"},
+        },
         "issues": [],
     }
 
 
 if __name__ == "__main__":
-    raise SystemExit(run_cli(generate, skill=SKILL, generator=GENERATOR, generator_contract_version=GENERATOR_CONTRACT_VERSION, generator_path=SCRIPT_PATH))
+    raise SystemExit(
+        run_cli(
+            generate,
+            skill=SKILL,
+            generator=GENERATOR,
+            generator_contract_version=GENERATOR_CONTRACT_VERSION,
+            generator_path=SCRIPT_PATH,
+        )
+    )

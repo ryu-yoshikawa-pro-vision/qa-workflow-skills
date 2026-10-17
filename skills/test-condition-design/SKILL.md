@@ -20,18 +20,18 @@ description: テスト要求を条件・観点へ展開し、同値分割、境�
 
 `condition_structure`を親runtimeとし、各技法を次のSkill-local runtime unitへdispatchします。
 
-| model_type | runtime_unit_key | 備考 |
-| --- | --- | --- |
-| 同値分割 | `equivalence_partitions` | パーティションと代表値 |
-| 境界値 / ドメイン | `bva` / `domain_testing` | 型・精度を保った境界 |
-| デシジョン / 因果 | `decision_table` / `cause_effect` | 実行可能ルール |
-| CRUD / 文法 | `crud_matrix` / `grammar_cases` | 操作・文法の条件 |
-| 組合せ / 分類木 | `combinatorial` / `classification_tree` | 制約付き2-wiseと木構造 |
-| 状態 / フロー | `state_transition` / `flow_paths` | 有効遷移・経路 |
-| ランダム / メタモルフィック | `random_testing` / `metamorphic` | 再現可能seed・関係 |
-| スキーマ / UI | `schema_cases` / `ui_pattern_candidates` | supported subsetとunsupported |
-| テストデータ要求 | `test_data_requirements` | targetと要件の交差 |
-| materialize | `materialize_coverage` | current model結果からTCN/CIへ統合 |
+| model_type                  | runtime_unit_key                         | 備考                              |
+| --------------------------- | ---------------------------------------- | --------------------------------- |
+| 同値分割                    | `equivalence_partitions`                 | パーティションと代表値            |
+| 境界値 / ドメイン           | `bva` / `domain_testing`                 | 型・精度を保った境界              |
+| デシジョン / 因果           | `decision_table` / `cause_effect`        | 実行可能ルール                    |
+| CRUD / 文法                 | `crud_matrix` / `grammar_cases`          | 操作・文法の条件                  |
+| 組合せ / 分類木             | `combinatorial` / `classification_tree`  | 制約付き2-wiseと木構造            |
+| 状態 / フロー               | `state_transition` / `flow_paths`        | 有効遷移・経路                    |
+| ランダム / メタモルフィック | `random_testing` / `metamorphic`         | 再現可能seed・関係                |
+| スキーマ / UI               | `schema_cases` / `ui_pattern_candidates` | supported subsetとunsupported     |
+| テストデータ要求            | `test_data_requirements`                 | targetと要件の交差                |
+| materialize                 | `materialize_coverage`                   | current model結果からTCN/CIへ統合 |
 
 すべてのruntimeは共通envelope、stable target ID、Machine Entity、freshnessを使用します。adapter childは親modelのgeneration fingerprintとderived child inputに依存し、親と同じ内容を独立再生成しません。`materialize_coverage`はcurrentかつdeterministicなruntime結果だけを統合し、unsupported / stale / legacy / semantic CI不足をcompleteへ昇格しません。
 

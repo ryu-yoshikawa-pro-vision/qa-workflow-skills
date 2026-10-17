@@ -1,0 +1,17 @@
+{
+  "required_sections": [
+    "Evaluation Input",
+    "WCAG-EM Step 1",
+    "WCAG-EM Step 2",
+    "WCAG-EM Step 3",
+    "WCAG-EM Step 4",
+    "WCAG-EM Step 5",
+    "Criterion Evaluation Plan",
+    "Sample Evaluation Results",
+    "Report Closure"
+  ],
+  "forbidden_tokens": [
+    "aggregated score"
+  ],
+  "required_tokens": []
+}

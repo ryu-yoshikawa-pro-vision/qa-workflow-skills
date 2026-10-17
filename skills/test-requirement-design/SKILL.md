@@ -17,7 +17,7 @@ description: 現在有効な仕様根拠とテスト分析から、何を検証�
 
 ## 決定論的runtime dispatch
 
-`requirement_structure`はテスト要求の構造をruntimeで正規化し、`entity-state-v1` Machine Entityを生成します。active / deleted / legacy / update scopeを区別し、親Entityの変更は依存fingerprintを通じて下流のfreshnessへ伝播します。runtimeの成功は入力が妥当で要求構造を生成できたことだけを示し、未解決仕様やブロッカーを要求へ変換して埋めません。
+`requirement_structure`はテスト要求の構造をruntimeで正規化し、`entity-state-v2` Machine Entityを生成します。active / deleted / legacy / update scopeを区別し、親Entityの変更は依存fingerprintを通じて下流のfreshnessへ伝播します。runtimeの成功は入力が妥当で要求構造を生成できたことだけを示し、未解決仕様やブロッカーを要求へ変換して埋めません。
 
 runtime入力・結果はSkill-local `runtime_contract.py`の共通envelopeで受け渡し、入力fingerprint、model fingerprint、generation fingerprint、実装fingerprint、upstream Entity fingerprintを保存します。既存結果を再利用する場合は同じmodel keyとgeneration / dependency fingerprintが一致する`current`結果だけを再利用します。
 

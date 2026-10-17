@@ -24,7 +24,25 @@ description: 新規・変更機能のQA設計と要求されたE2E工程に加�
 
 本Skillは工程固有generatorを再実装せず、対象scopeが1件以上ある場合だけ担当Skillのruntime dispatch結果を統合します。scope 0ではruntimeをdispatchせず、既存のworkflow契約を維持します。統合するMachine Runtime Input / ResultとMachine Entityは、Skill名・runtime unit・Model Key・stable ID・fingerprint・freshnessを持つ機械証拠です。
 
+`workflow_runtime.py`へのnormalized inputは、既存workflow stateと同じcanonical UUIDの`workflow_ref`を必須で渡します。Result payloadも同じ値を返し、別workflowのevidence混在を許しません。
+
 runtimeの`can_complete`はオーケストレーションの要約であり、下流のsemantic coverage、実行結果、報告、cleanup確認を置き換えません。`current`でない上流Entityやruntime結果は再利用せず、変更があれば依存fingerprintから影響対象だけを`要再検証`へ伝播します。
+
+### UIテスト対象分析のroutingとscope readiness
+
+spec-analysisのUI target modeが要求された場合は、package作成・更新後に必ず`ui_target_package.py inspect`を実行し、`current_scope_ids[] / ready_scope_ids[] / blocked_scope_ids[]`をそのまま使います。current UNKNOWN全件や手作業で選んだscope集合からready状態を推定しません。
+
+- migrationが必要なartifactでは`migration_preflight.py`の`migration_status / cutover_next_action`に従い、runtime-v2 cutoverを固定Skill順で先に完了します。TCDの内部phaseは同Skillの`runtime_v1_cutover.py phase=resume`へ委譲します。
+- 既存downstreamにscope ownershipがなく、migration preflightが`scope_ownership_baseline_required`を返した場合は、全current scopeがreadyの時だけ全scopeを含む初回TRD→TCD→TC normalizationを実施します。blocked scopeへownershipを推測配分しません。
+- `ready_scope_ids[]`が1件以上なら、ready scope全件を一括handoffし、test-analysis→TRD→TCD→TC→coverage-analysisを1回ずつ進めます。blocked scopeをhandoffへ含めず、同一Skillをscopeごとに重複dispatchしません。
+- `current_scope_ids[]`がnon-emptyで`ready_scope_ids[]`が空なら全scope blockedです。empty batchやdownstream runtimeを起動せず、最後に完了したbaselineを保持し、question-analysis等の必要な回答先とresume先だけをworkflow stateへ残します。
+- `current_scope_ids[]`が空なら全scope retireです。全blocked経路へ戻しません。既存baselineがあれば`downstream_state.py`でterminal deletionを導出し、owner generatorのdeletion-only path、coverage-analysis、通常のqa-workflow final gateを通します。bindingがない初回workflowは削除runtimeなしでpackageをcompleteにできます。
+
+previous downstream stateはcurrent workflow stateの`last_completed_qa_workflow_artifact` bindingからだけ復元します。local filesystemでは`artifact_graph.py`のexact historical revision readbackを行い、Markdown SHAとworkflow_refを検査してから`downstream_state.py`へ渡します。能力フラグやraw artifactの最新値だけでprevious baselineを選びません。
+
+通常のblocked scopeは`scope_refs[]`に交差するEntityだけをinactiveへ移し、last-active snapshotをhelper出力どおり各generatorへ渡します。inactive自身はcurrent Entity / runtimeへ含めず、それだけでready scopeを停止させません。retired scopeはsemantic ownerのreuse / deletion判断とgenerator適用stateをhelperで照合するまで解決済みにしません。再ready時はEntity history / materialize historyをsemantic identityの比較とstable ID復元に使います。
+
+candidate qa-workflow artifactの`verify_runtime_evidence.valid=true`とruntime payloadの`can_complete=true`を確認した後にだけbaselineを保存します。local単一hostではimmutable snapshotの保存・exact refetch・workflow-ref lock内state revision比較・atomic state updateがすべて成功した場合だけbindingを更新します。失敗・blocked・unresolvedでは直前のbindingを保持します。
 
 ### 最終runtime evidence gate
 
@@ -33,6 +51,10 @@ runtimeの`can_complete`はオーケストレーションの要約であり、�
 ## 継続管理workflowの決定論的処理
 
 persisted workflowのProject Context stable key parse / 必須key検証 / used-field currentness、workflow stateのcanonical path / 初回create、fixed-root scan、state CAS capability gate、mutable operation pre-start claim、shared resource reservationは、Resourcesに記載した`artifact_graph.py` production helperで実行します。これらの処理結果をAgentの意味判断や手計算で置き換えません。
+
+WCAG formal report provenanceでは、`workflow_runtime.py`の`register-wcag-evaluation-plan` / `read-wcag-evaluation-state` / `finalize-wcag-report`を使います。これは既存`qa.workflow_state_root`配下のPython `sqlite3` providerを使う単一ホストlocal filesystem限定のstate operationです。評価refごとのcurrent revision、WCAG target、scope evidence refs、selected sample / variation / process、source refs、canonical Planとreport状態を保存します。generic JSON state / handoff / reservation providerには拡張せず、network filesystem・複数host・state root未設定・provider failureではblockします。保存済みrecordは承認の代替にならず、既存evaluation ownerの入力・scope根拠を確認して登録します。
+
+`finalize-wcag-report`は呼び出し側の`wcag_runtime_result`や`upstream_runtime_units`を完了証拠として受け取りません。QA workflow ownerがcurrent evaluation stateを正式なQA runtimeで再読込し、同じ保存済みPlan・current results・提示されたWCAG-EM工程入力で公式`wcag_runtime.py close-report`を内部実行します。ownerはそのruntime envelopeと有限なclosure入力を生成した実行ref付きで既存SQLite stateへCAS保存し、独立再読込後に保存されたcurrent runを使ってclosureを再検証します。必須工程・accessible output・結果集合がcompleteの場合だけ、別のnative conditional writeと独立再読込でreportを完了します。再実行は新しいrefとなり過去実行を上書きしません。偽造した候補やmetadataの同時入力はfinalize schemaで拒否され、metadata自体は証明に使いません。評価ownerが実行前に与える意味上の工程判断は引き続きWCAG評価責務であり、SQLiteは特権DB writerや分散環境に対する暗号学的真正性を保証しません。WCAG evaluation revisionとSQLite provider revisionは別々に扱います。handoff用のtest-only SQLite providerは引き続きproductionで使いません。
 
 helperの必須処理が入力不足・実行不能・保存先能力不足で失敗した場合、影響するscopeを`incomplete` / `unresolved` / `blocked`として閉じます。LLM fallbackで保存、CAS、claim、reservationを成立したことにしません。
 
@@ -44,34 +66,40 @@ helperの必須処理が入力不足・実行不能・保存先能力不足で�
 
 ## 工程固有ロジックの担当
 
-| 工程固有ロジック | 担当Skill |
-| --- | --- |
-| 現在有効な仕様根拠 | `spec-analysis` |
-| 不明点・矛盾 / 仮定 | `question-analysis` |
-| プロダクトリスク / テスト重点 | `test-analysis` |
-| テスト要求 | `test-requirement-design` |
-| テスト条件 / カバレッジ基準 / カバレッジ項目 | `test-condition-design` |
-| 詳細テストケース / 期待結果の根拠の具体化 | `test-case-design` |
-| 生きたテスト対象のUI情報・ふるまい収集 / 管理 | `test-target-inspection` |
-| AIによる詳細TCの実行・期待結果比較・結果記録 | `test-execution` |
-| カバレッジ / ギャップ | `coverage-analysis` |
-| 独立レビュー / 重大度 | `adversarial-review` |
-| E2E対象・実装可能性・安全条件 | `e2e-test-inspection` |
-| Playwright E2E実装・静的 / 軽量検証 | `e2e-test-implementation` |
-| E2E安全確認・実行・構造化結果・cleanup | `e2e-test-execution` |
-| E2E実行結果の原因分析・修正routing | `e2e-test-result-analysis` |
-| 検証済みE2E結果の報告 | `e2e-test-reporting` |
-| Regression baseline / membership / Run / Activity | `regression-testing` |
-| Charterに沿ったExploration / Investigation | `exploratory-testing` |
-| 継続QA knowledgeのtriage / lifecycle / lookup | `qa-knowledge` |
+| 工程固有ロジック                                    | 担当Skill                     |
+| --------------------------------------------------- | ----------------------------- |
+| 現在有効な仕様根拠                                  | `spec-analysis`               |
+| 不明点・矛盾 / 仮定                                 | `question-analysis`           |
+| プロダクトリスク / テスト重点                       | `test-analysis`               |
+| テスト要求                                          | `test-requirement-design`     |
+| テスト条件 / カバレッジ基準 / カバレッジ項目        | `test-condition-design`       |
+| 詳細テストケース / 期待結果の根拠の具体化           | `test-case-design`            |
+| 生きたテスト対象のUI情報・ふるまい収集 / 管理       | `test-target-inspection`      |
+| AIによる詳細TCの実行・期待結果比較・結果記録        | `test-execution`              |
+| カバレッジ / ギャップ                               | `coverage-analysis`           |
+| 独立レビュー / 重大度                               | `adversarial-review`          |
+| E2E対象・実装可能性・安全条件                       | `e2e-test-inspection`         |
+| Playwright E2E実装・静的 / 軽量検証                 | `e2e-test-implementation`     |
+| E2E安全確認・実行・構造化結果・cleanup              | `e2e-test-execution`          |
+| E2E実行結果の原因分析・修正routing                  | `e2e-test-result-analysis`    |
+| 検証済みE2E結果の報告                               | `e2e-test-reporting`          |
+| Regression baseline / membership / Run / Activity   | `regression-testing`          |
+| Charterに沿ったExploration / Investigation          | `exploratory-testing`         |
+| 継続QA knowledgeのtriage / lifecycle / lookup       | `qa-knowledge`                |
+| referenceや既存evidenceに基づくUI / UX評価          | `usability-evaluation`        |
+| live Web UIの操作・観測・ユーザビリティ検査         | `usability-inspection`        |
+| WCAG-EM 2.0によるformal WCAG conformance evaluation | `wcag-conformance-evaluation` |
 
 ## ランタイム前提
 
-本Skillは、同一のAgentクライアント上で19 Skillすべてが利用可能で、Agentが必要なSkillを追加で読み込み / 利用できる環境を前提とします。これはAgent Skills Specificationが共通Skill-to-Skill APIを保証しているという意味ではありません。
+本Skillは、同一のAgentクライアント上でrepositoryの全Skillが利用可能で、Agentが必要なSkillを追加で読み込み / 利用できる環境を前提とします。これはAgent Skills Specificationが共通Skill-to-Skill APIを保証しているという意味ではありません。
 
 ## リソース
 
 - オーケストレーション詳細: `references/guidance.md`
 - artifact graph / workflow state / currentness / claim / reservation production helper: `scripts/artifact_graph.py`
+- Project ContextがDEC / ASM正本ownerの場合のID materialize / 履歴検証: `scripts/project_context_ids.py`
+- runtime-v2 migration / scope ownershipのnext action: `scripts/migration_preflight.py`
+- previous downstream scope ownership / inactive history / scope removal resolution: `scripts/downstream_state.py`
 - 案件コンテキスト既定形: `assets/project-context-template.md`
 - 任意のワークフロー状態表: `assets/workflow-state-template.md`

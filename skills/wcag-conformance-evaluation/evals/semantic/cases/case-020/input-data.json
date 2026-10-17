@@ -1,0 +1,42 @@
+{
+  "kind": "synthetic-sample-identity-source-observations",
+  "target": {
+    "target_ref": "TARGET-CASE-R-CATALOG",
+    "target_url": "https://northstar.example.invalid/catalog",
+    "scope_ref": "SCOPE-CASE-R-CATALOG"
+  },
+  "observations": [
+    {
+      "source_record_ref": "OBS-CASE-R-ALL",
+      "locator": "Open the catalog page",
+      "observed_url": "https://northstar.example.invalid/catalog",
+      "visible_heading": "All products",
+      "selected_filter": "All products",
+      "visible_product_refs": ["PRODUCT-R-101", "PRODUCT-R-102"],
+      "source_evidence_refs": ["EVD-CASE-R-ALL"]
+    },
+    {
+      "source_record_ref": "OBS-CASE-R-TRAIL-DIRECT",
+      "locator": "Choose Trail in the catalog category filter",
+      "observed_url": "https://northstar.example.invalid/catalog",
+      "visible_heading": "Trail products",
+      "selected_filter": "Trail",
+      "visible_product_refs": ["PRODUCT-R-101", "PRODUCT-R-103"],
+      "source_evidence_refs": ["EVD-CASE-R-TRAIL-DIRECT"]
+    },
+    {
+      "source_record_ref": "OBS-CASE-R-TRAIL-NAV",
+      "locator": "Open Trail products from the site navigation",
+      "observed_url": "https://northstar.example.invalid/catalog",
+      "visible_heading": "Trail products",
+      "selected_filter": "Trail",
+      "visible_product_refs": ["PRODUCT-R-101", "PRODUCT-R-103"],
+      "source_evidence_refs": ["EVD-CASE-R-TRAIL-NAV"]
+    }
+  ],
+  "evidence_scope": {
+    "evidence_ref": "EVD-CASE-R-COMPLETE-OBSERVATIONS",
+    "revision": "rev-1",
+    "synthetic_fixture": true
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "skill": "usability-inspection",
+  "criteria": [
+    {
+      "id": "UI-SEM-001",
+      "title": "Observation, requirement, and UX interpretation are distinct",
+      "description": "The candidate separates objective browser facts, measurement, binding requirement decisions, and semantic UX judgment, with evidence that supports each claim.",
+      "critical": true
+    },
+    {
+      "id": "UI-SEM-002",
+      "title": "Browser ownership and safety are preserved",
+      "description": "The candidate respects existing Playwright ownership, serial operation, side-effect scope, secret handling, cleanup, and no-progress.",
+      "critical": true
+    },
+    {
+      "id": "UI-SEM-003",
+      "title": "Scope, applicability, and evidence are accurate",
+      "description": "The candidate closes only the declared live Web scope, uses the right evidence type, and does not invent user goals, personas, rules, or missing observations.",
+      "critical": true
+    },
+    {
+      "id": "UI-SEM-004",
+      "title": "Routing and result boundaries are preserved",
+      "description": "Evaluate only the routing boundary exercised by the case: detailed TC execution to its owner, formal WCAG conformance to wcag-conformance-evaluation, general live inspection within usability-inspection, or static evidence review to usability-evaluation. Do not require unrelated routing paths that the request does not exercise. Do not claim page/product conformance.",
+      "critical": true
+    }
+  ]
+}

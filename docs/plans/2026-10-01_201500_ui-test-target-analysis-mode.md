@@ -1,0 +1,419 @@
+# UIテスト対象分析モード実装Plan
+
+このPlanは、PR #14マージ後の22 Skill構成を維持したまま、テスト設計前の「仕様理解・テスト対象整理」を再現可能なAgent Skill契約として追加するための実装計画です。特定のAI製品向け連携機構は追加せず、既存のAgent Skills構造の中でAIエージェントが利用できる形にします。
+
+## 対象ブランチ
+
+feat/ui-test-target-analysis-profile
+
+## 基準
+
+- 対象リポジトリ: ryu-yoshikawa-pro-vision/qa-workflow-skills
+- 基準branch: PR #14 merge後のlatest main
+- 先行baseline: PR #14 `feat/usability-evaluation-skill`
+- PR #14確認head: db61c4f0697b07ff9abbba0d2dde2571dfaaddb0
+- 正規Skill数: 22
+- 実装開始前に `_07_pr14-baseline-and-integration.md` のrebase / conflict gateを必ず通す
+- 既存の主責務:
+  - spec-analysis: 現在有効な仕様根拠、SPEC / DECISION / INFERENCE / UNKNOWN
+  - question-analysis: 不明点・矛盾分類、回答正規化、再開先
+  - qa-workflow: 開始点、再利用、routing、変更伝播、完了
+  - test-target-inspection: 生きた実対象のcurrent UI / ふるまい観測
+- 各Skillは既存どおり `skills/<skill-name>/SKILL.md` を持つAgent Skills形式で管理され、AIエージェントが必要なSkillを利用する前提を維持する
+
+## 背景
+
+現在のspec-analysisは、Figma、要件書、Q&A、リポジトリ、リリース資料などを統合し、現在有効な仕様根拠を解決する責務を既に持っています。question-analysisも、解決済み事項を再質問せず、回答をSPEC / DECISION / ASMへ正規化して最も早い責任Skillへ戻す契約を持っています。
+
+一方、実務でテスト設計前に必要になる次の成果物契約は、現在の既定output-templateだけでは十分に固定されていません。
+
+- 画面をURL / path単位のPAGEとして整理する
+- 同一route内の表示差をSTATE / VIEW / STEPとしてPAGEと分離する
+- MODAL、ブラウザ標準dialog、global panel、外部画面、shared pageを分離する
+- 業務ルール、入力制約、通知、外部連携、CSV等の案件固有仕様を複数Markdownへ分割する
+- 資料由来の仕様とrepositoryで観測した実装状況を別レイヤーで管理する
+- UNKNOWNを安定IDで管理し、回答後に本文・不明点一覧・履歴を同期する
+- 更新のたびに差分ファイルではなく完全版を生成する
+- version、CHANGELOG、MANIFESTを揃え、複数ファイル間の状態を一貫させる
+- 既存spec-analysisのcanonical仕様モデル（SRC / SPEC / DECISION / INFERENCE / UNKNOWN / Current Effective Authority / Machine Entity）を維持したまま、人間が利用しやすい複数Markdownへ構造化する
+- テスト分析・テスト条件・テストケースへ先回りせず、「対象理解」の成果物として閉じる
+
+この不足を新Skillで埋めると、spec-analysisとのAuthority解決責務が重複します。またtest-target-inspectionへ統合すると、仕様理解と生きた実対象観測の境界を崩します。
+
+そのため、新Skillは追加せずspec-analysisに条件付きの「UIテスト対象分析モード」を追加します。
+
+## 目的
+
+1. テスト設計前の仕様理解を、案件固有資料・Q&A・実装証拠から追跡可能な複数Markdown packageへ整理できるようにする
+2. UI構造、状態、業務ルール、入力制約、通知・外部連携、不明点、実装状況を同一の責務境界で継続更新しつつ、既存spec-analysisのcanonical Authority / Machine Entity契約を壊さない
+3. question-analysisの回答正規化と連携し、既存UNKNOWNを再質問・再採番せず更新できるようにする
+4. qa-workflowから「仕様理解packageだけ欲しい」要求へ最短routingできるようにする
+5. test-target-inspectionの「生きた実対象観測」と役割を混同しない
+6. PR #14後の既存22 Skill、runtime、artifact graph、Regression / Exploration / QA Knowledge、UI/UX / live usability / formal WCAG契約を壊さない
+
+## 固定方針
+
+LLM / deterministic処理の責務境界は `2026-10-01_201500_ui-test-target-analysis-mode_05_llm-deterministic-boundaries.md` を正本とします。LLMの意味判断をscriptへ移さず、形式・参照・集計・fingerprint等の再現可能な定型処理だけをSkill-local helper / validatorへ移します。LLMはsemantic identity、UI分類、分類未確定時のUNKNOWN、file trigger、UNKNOWNの関連Scope / Blocking Scope / 関連File、required domainの意味上の母集団、Behaviorごとの関連UI操作、known UIOPがUS / UC identity blockerをどの既存UNKNOWNへ閉じるか、extension要否、same-UNK / new-UNK、explicit retire等を判断します。その後のstable ID採番、mixed-prefix tableのprefix selector、row状態導出、Markdown serialization、scope readiness、not-applicableとscope-owned rowの逆方向整合、scope別machine handoff、Stable ID lifecycle / 影響file、README / Machine Entity / MANIFESTはhelperが決定論実行します。後続QA工程へ影響する意味情報をextension proseだけに残さず、standard structured row / 09へ正規化します。Current UNKNOWNの存在だけでpackage全体を停止せず、semantic quality gateはcanonical write前に実施します。Repository baselineは0..N件を扱い、未再確認repositoryを自動更新しません。DEC / ASMはcanonical `DEC-xxx / ASM-xxx` を維持し、Project Contextがownerの場合だけqa-workflow helperで番号決定・materialize・previous ID削除検証を行います。ownerで確定済みDEC / ASMをpackageへ初めて取り込む時だけ`identity_action=external`を使い、package allocatorでは採番しません。packageはDEC / ASMをterminal retireしません。
+
+### 1. 新Skillは追加しない
+
+UIテスト対象分析はspec-analysisの条件付き出力モードとして実装します。
+
+新しいSkill名、23個目のSkill、別のAuthority ownerは作りません。
+
+### 2. spec-analysisの既定出力を置換しない
+
+既存assets/output-template.mdは通常の単一仕様分析に引き続き使用します。
+
+UIテスト設計前の対象理解を継続利用する成果物として残す場合、複数資料を統合して画面・状態・業務ルール・不明点を追跡可能に管理する場合、または既存の対象理解packageを更新する場合にUIテスト対象分析モードを選択します。**継続利用・更新を目的とする場合は、初回時点で単一表に収まる規模でもmodeを優先します。** 単発の仕様要約、Authority競合解消、継続更新しない一時的な仕様整理では既存の通常出力を使います。Markdownという語の有無だけでは選択しません。
+
+### 3. canonical仕様モデルを1箇所に維持する
+
+複数Markdown packageでも、既存 `assets/output-template.md` が持つ `情報源 / 正本参照一覧`、`分析項目`、`現在有効な仕様根拠`、Machine Entityとの対応を失いません。
+
+modeでは `09_authority_and_traceability.md` をcanonical仕様モデルの正本とし、他ファイルはそのstable IDを参照する構造化ビューとします。SPEC / DECISION / INFERENCE / UNKNOWNやCurrent Effective Authorityを複数ファイルで別々に再定義しません。
+
+Authority Machine Entityは既存 `authority_entities.py`、下流handoff用のcurrent Acceptance Criteria Machine Entityは `ui_target_package.py build-machine-evidence` から決定論生成します。`build-machine-evidence` は既存 `render_machine_entities()` を使って `### Machine Entities: spec-analysis` のMarkdown section全体までread-onlyで返します。packageへの書込みは`materialize`内部の同一projectionだけが行い、Agent / callerは返却Markdownをpackageへ直接書き戻しません。US / UC / Behavior自体はMachine Entity化せず、fingerprint / normalized machine input / expected identity / JSON wrapperをLLMが手入力しません。
+
+### 4. 実装は仕様Authorityではない
+
+repository、実画面、Page Object、API実装は既存契約どおり補助証拠です。
+
+案件コンテキストや正本一覧が明示的に実装をAuthorityへ指定しない限り、実装差分を仕様本文へ自動昇格させません。
+
+仕様と実装の差はrepository implementation statusとして分離します。
+
+### 5. test-target-inspectionと統合しない
+
+- spec-analysis: 仕様書、Q&A、repository等から「期待挙動として何が有効か」を整理する
+- test-target-inspection: 生きた実対象へ接続して「現在何が観測できるか」を記録する
+
+currentなUI観測が必要になった場合だけqa-workflowでtest-target-inspectionへroutingし、観測事実をspec-analysisのAuthorityへ自動昇格させません。
+
+### 6. 質問回答はquestion-analysis経由で正規化する
+
+会話回答を生のまま仕様本文へ流しません。
+
+正式決定ならDECISION、更新済みAuthorityならSPEC、暫定前提なら承認済みASMへ正規化してからspec-analysis packageへ反映します。
+
+### 7. packageは完全版を正とする
+
+version更新時は変更ファイルだけではなく、そのversionの完全なpackageを成立させます。
+
+前versionの内容を参照しなければ現在状態を理解できない構造にしません。
+
+### 8. AIエージェント用Skillとして既存Agent Skills構造を維持する
+
+今回追加するmodeは、既存Skillと同じく `SKILL.md` / `references/` / `assets/` の段階的開示で利用できるようにします。
+
+特定のAI製品、connector、remote loader、bootstrap runtimeは追加しません。AIエージェントがSkillを利用する方法そのものは既存のAgent Skills利用前提を継続します。
+
+## Plan分割
+
+- 責務・既存Skill境界:
+  - 2026-10-01_201500_ui-test-target-analysis-mode_01_scope-and-responsibilities.md
+- spec-analysisのUIテスト対象分析package:
+  - 2026-10-01_201500_ui-test-target-analysis-mode_02_spec-analysis-package.md
+- question-analysis / qa-workflow統合:
+  - 2026-10-01_201500_ui-test-target-analysis-mode_03_workflow-integration.md
+- 評価、CI、実装順序、完了条件:
+  - 2026-10-01_201500_ui-test-target-analysis-mode_04_evaluation-ci-implementation-order.md
+- LLM / deterministic処理の責務境界:
+  - 2026-10-01_201500_ui-test-target-analysis-mode_05_llm-deterministic-boundaries.md
+- package schema / helper I/O / legacy migration:
+  - 2026-10-01_201500_ui-test-target-analysis-mode_06_package-schema-and-helper-contracts.md
+- PR #14 baseline / integration:
+  - 2026-10-01_201500_ui-test-target-analysis-mode_07_pr14-baseline-and-integration.md
+- UI操作の振る舞い分解 / Acceptance Criteria traceability:
+  - 2026-10-01_201500_ui-test-target-analysis-mode_08_behavior-decomposition-and-acceptance-traceability.md
+- Acceptance Criterion Machine Entity / shared runtime / test-requirement-design v2:
+  - 2026-10-01_201500_ui-test-target-analysis-mode_09_runtime-entity-and-test-requirement-contracts.md
+
+各詳細Planが担当範囲の正本です。本親Planへ詳細契約を重複記載しません。
+
+## 主な変更対象
+
+### spec-analysis
+
+変更:
+
+- skills/spec-analysis/SKILL.md
+- skills/spec-analysis/references/guidance.md
+- 新規 skills/spec-analysis/references/ui-test-target-analysis.md
+- 新規 skills/spec-analysis/assets/ui-test-target-analysis/*
+- 新規 skills/spec-analysis/scripts/ui_target_package.py（package schema / helper I/O / legacy migration contractは `_06_package-schema-and-helper-contracts.md` を正本とする）
+- skills/spec-analysis/evals/semantic/*
+- skills/spec-analysis/evals/deterministic/validator.py
+- skills/spec-analysis/evals/output/*
+- tests/skills/evals/semantic/*
+- UI target package helper用repository unit test
+
+既存 `skills/spec-analysis/scripts/authority_entities.py` はAuthority Entity生成の正本として再利用します。current AC Entity / spec-analysis normalized_skill_input / expected identityは `ui_target_package.py` が生成します。package-global evidenceとready scope batch handoffは別responseにし、canonical workflowではcurrent `ready_scope_ids[]` 全件をhelperが決定論的にunion / dedupeして既存 `artifact:*:all` runtimeへ1回で渡します。`artifact:analysis_entities:all` / `artifact:requirement_structure:all` はready scope全件を1 requestへ集約するroot runtime unitとして扱い、本PRで各entrypointを `run_cli(..., aggregate=True)` に切り替えてcanonical stdinを16 MiBまで受理します。16 MiB + 1 byteは `limit_exceeded` でfail-closedし、scope別run / subset run / auto splitでは回避しません。その他の通常runtime generatorは既存2 MiB上限を維持し、UI target package / helperの16 MiB上限を一律に通常runtimeへ拡張しません。
+
+### test-requirement-design
+
+変更:
+
+- skills/test-requirement-design/SKILL.md
+- skills/test-requirement-design/references/guidance.md
+- skills/test-requirement-design/assets/output-template.md
+- skills/test-requirement-design/scripts/requirement_structure.py（`requirement-structure-v2`）
+- 新規 skills/test-requirement-design/scripts/runtime_v1_cutover.py
+- skills/test-requirement-design/evals/deterministic/*
+- skills/test-requirement-design/evals/semantic/*
+- skills/test-requirement-design/evals/output/*
+- runtime / repository contract tests
+
+目的はcurrent ACをTRまたは明示的dispositionへ閉じることです。AC freshnessへ含めるFIELD / RULE / FLOW / NOTIFY / INTERACTはAC / Behavior / UC / USの `関連構造ID` にLLMが明示したものだけとし、UIOPの `対象構造ID`、同一PAGE / Scope、名称一致からhelperが逆引きしません。ready scope handoffはscope所属row + 明示stable ref + UI構造parentだけを `_06 §9.3` の固定規則でscopeごとにprojectionし、canonical downstreamではcurrent `ready_scope_ids[]` 全件を1つのbatchへunion / dedupeします。ACはsemantic identityが同じまま一時的に未確定になった場合、同じ `AC-xxx` を `blocked` で保持して解消後に同IDへ戻し、本当に意味上廃止された場合だけretireします。Machine Entity / TRD handoffにはcurrent ACだけを含めます。package-local itemはAC content fingerprintへ寄与させ、Authorityだけをupstream Entity dependencyにします。repository由来のimplementation-only structureもtarget-model dependencyとしてfreshnessには影響しますが、Authorityへ昇格しません。UI target packageからTRDへ進むcanonical workflowはartifact modeとし、AC / parent Behaviorの`関連操作ID`で明示されたlinked UIOP / scope / 明示linked domain item / UI構造ancestor / linked INF / 親Behavior / UC / US / Authority変更をTR freshnessへ伝播させます。同一UC内でもparent Behaviorから参照されないUIOPはそのAC contentへ含めず、無関係TRをstale化しません。direct modeはknown ID / closureを保証し、AC Entityが無い場合のAC semantic cross-run freshnessは保証しません。TRの責務をACの言い換えへ変更しません。
+
+### question-analysis
+
+変更:
+
+- skills/question-analysis/SKILL.md
+- skills/question-analysis/references/guidance.md
+- skills/question-analysis/assets/output-template.md
+- 新規 skills/question-analysis/scripts/question_ids.py
+- skills/question-analysis/evals/semantic/*
+- skills/question-analysis/evals/deterministic/validator.py
+- skills/question-analysis/evals/output/*
+- question-analysis helper用repository unit test
+
+目的はUNKNOWNの安定参照、回答後の差分反映、解消済み履歴とcurrent unknownの分離です。既存の質問分類自体は変更しません。new QとUNKNOWNの意味対応はLLMに残し、Q番号・使用済みQ ID履歴・current Q table serialization・UNKNOWN参照の形式 / 存在検証は `question_ids.py` にまとめて決定論化します。既存成果物更新ではprevious artifactを必須とし、回答済みQがcurrent一覧から消えても過去Q IDを再利用しません。
+
+### shared runtime / Machine Entity contract
+
+PR #14確認headに存在する9個のSkill-local `runtime_contract.py` を同一shared contractとして同期します。
+
+- spec-analysis
+- test-analysis
+- test-requirement-design
+- test-condition-design
+- test-case-design
+- coverage-analysis
+- qa-workflow
+- usability-inspection
+- wcag-conformance-evaluation
+
+変更:
+
+- 上記9個の `runtime_contract.py`
+- `tests/skills/runtime/test_runtime_dispatch.py`
+- `tests/skills/runtime/test_runtime_portability.py`
+- `scripts/skills/evals/deterministic/runtime_validator.py`
+- shared runtime / Machine Entity versionを参照するcurrent Skill文書・asset・eval fixture・repository test
+- requirement-structure contract versionを参照するruntime / fixture / integration tests
+- 新規 skills/test-condition-design/scripts/runtime_v1_cutover.py
+- 新規 skills/test-case-design/scripts/runtime_v1_cutover.py
+- 新規 skills/test-analysis/scripts/runtime_v1_input_reader.py
+- skills/test-condition-design/scripts/condition_structure.py（`condition-structure-v2`）
+- skills/test-condition-design/scripts/materialize_coverage.py（`materialize-coverage-v2`）
+- skills/test-case-design/scripts/case_structure.py（`case-structure-v2`）
+- 新規 skills/qa-workflow/scripts/downstream_state.py
+- 新規 skills/qa-workflow/scripts/migration_preflight.py
+- skills/qa-workflow/scripts/artifact_graph.py（qa-workflow completed baseline専用local single-host snapshot / locked conditional state updateを追加）
+- skills/qa-workflow/scripts/workflow_runtime.py（runtime-v2 input / result payloadへ`workflow_ref`を追加）
+- skills/qa-workflow/assets/workflow-state-template.md（`last_completed_qa_workflow_artifact` bindingを追加）
+- 新規 skills/usability-inspection/scripts/runtime_v1_input_reader.py
+- 新規 skills/wcag-conformance-evaluation/scripts/runtime_v1_input_reader.py
+
+`acceptance_criterion` Entity type、`acceptance_refs` canonicalization、spec-analysis Authority + AC expected Entity導出はshared runtime / Machine Entityの意味契約変更です。そのため9コピーをbyte-identicalに揃え、`RUNTIME_CONTRACT_VERSION` を `runtime-v1` → `runtime-v2`、`ENTITY_SCHEMA_VERSION` を `entity-state-v1` → `entity-state-v2` へ更新します。envelope field shapeとfreshness algorithmは維持します。あわせてTR / TCN / model / CI / TCのstable ID stateを `active / inactive / deleted` へ拡張し、UI target artifact workflowでは各current downstream Entityへ `scope_refs[]` を保持します。TRのAC→TR意味対応とAC参照以外の追加scope ownershipはLLMが判断しますが、artifact modeで参照したAC Entityの `content.scope.scope_id` unionはhelperが必須ownershipとして導出し、TR `scope_refs[]` からの欠落を拒否します。TCN / model / CI / TCは上流参照からscope ownershipを決定論伝播します。`inactive` はblocked scope由来の一時非current状態だけに使い、Machine Entity / current runtime / completion対象へ含めません。SCOPE自体がretireされた場合はaffected downstreamをactive / inactive stateとvalidated historyから決定論抽出し、owner LLMへcanonical last-active contentを渡します。owner LLMはsame identityの `resolved_scope_refs[]` またはsemantic deletionを判断し、意味上のsplitはold identity=`deleted` + replacement=`new` draftとして通常generator updateで表します。reuse後のavailability stateはscriptがresolved ownershipとready / blocked集合から決め、generator適用後のvalidated stateとexact一致するまでresolution完了扱いにしません。inactive state rowはlatest resolved ownershipを保持し、last-active Entity content / old ownershipは `inactive_*_history[]` へ残します。
+
+previous snapshotは現在の `workflow_ref` に紐づくworkflow stateのmachine-owned `last_completed_qa_workflow_artifact` が指す**committed** runtime-v2 qa-workflow artifactだけを使います。provider-nativeではactual historical refetch + native CAS、local single-hostでは既存 `qa.workflow_state_root` 配下のcontent-addressed immutable snapshot + workflow-ref process lock + lock内expected state revision再確認 + atomic replaceでcommitします。PR #14の `local_exact_content_token_not_a_cas_condition` をCASへ読み替えません。shared / network storageはprovider-native history / CASが無ければunsupportedです。binding commit前artifactはcurrent canonical baselineやprevious snapshotへ使いません。historical validationは保存artifact内部のruntime-v2 schema / pair / fingerprint / dependency / Entity / current structure stateの自己整合だけをfrozen規則で確認し、現在disk上のruntime / generator implementation fingerprint一致は要求しません。`downstream_state.py` のexact CLI / failure contractは `_09 §12.3`、local persistenceは `_09 §13.2` を正本とします。Agent / LLMやcurrent inputでの旧artifact再検証からprevious snapshotを再構築しません。`deleted` は従来どおりterminalです。
+
+旧runtime-v1 / entity-state-v1 evidenceをv2 current evidenceとして読み替えません。`migration_preflight.py` はruntime-v1 downstreamの残存、current v2 baseline、UI target package有無、既存active downstreamのscope ownership、current ready / blocked scopeをmachine-generated observationから判定し、cutover / UI target migration / ownership normalization / `scope_ownership_baseline_required` / partial progressionのnext actionを一意に返します。migration順序をLLMへ判断させません。runtime-v1 → v2 cutover中は、固定依存順の先頭からcurrent v2 verificationが連続して成立している部分完了だけを再開可能な状態として扱い、`migration_preflight.py` が最初の未完了Skillを返します。TCD内部の再開phaseはSkill-local `runtime_v1_cutover.py` が決定し、依存順に反するv1/v2混在はfail-closedします。
+
+shared `runtime_contract.py` はv2 schema / canonicalization / validation / freshnessの共通契約を持ち、one-time migrationのSkill固有projectionは持ちません。spec-analysisは既存 `authority_entities.py` にread-only v1 Authority projectionを追加し、canonical `Machine Entities: spec-analysis` blockをfrozen `entity-state-v1` 規則で検証してAuthority `content`だけを取り出し、current v2 `build()`でAuthority Entityを再生成します。v1 blockがmissing / invalidならhuman-readable tableから機械復元せず通常spec-analysis semantic rerunへ戻します。TRD / TCD / TCの `runtime_v1_cutover.py` はcurrent v2 validatorへv1 Entityを渡さず、helper内のread-only legacy readerでfrozen `runtime-v1 / entity-state-v1` schema / fingerprintを検証してv2 inputへ変換します。`test-analysis` / `usability-inspection` / `wcag-conformance-evaluation` はSkill-local `runtime_v1_input_reader.py` で保存済みv1 Runtime Input / Result pairのintegrityだけをfrozen v1規則で検証し、検証済みsemantic inputだけをcurrent v2実行へ渡します。readerはv1 runtime metadata / dependency / fingerprint / Entityをv2へcarry-forwardせず、currentness自体も判定しません。`test-analysis` はcurrent v2 Authority Entityとのidentity / content fingerprint整合を、`usability-inspection` / `wcag-conformance-evaluation` は既存artifact graph / handoff / evidence currentness契約を別途満たす場合だけ保存inputを再利用し、確認できなければ通常rerun / re-observationへ戻します。runtime-v1 downstreamがある場合の順序は `spec-analysis Authority v2再生成 → test-analysis v2再生成 → TRD → TCD → TC v2 full rebuild → coverage-analysis v2再生成 → 必要なusability-inspection / wcag-conformance-evaluation v2再生成 → qa-workflow final gate v2再生成` としてbaselineを成立させ、その後にUI target package migration / AC生成へ進みます。既存active downstreamがunscopedなら全scope readyのone-time ownership normalizationとしてTRD → TCD → TC → coverage-analysis → qa-workflowを再生成し、scope_refs付きbaseline成立後に通常のpartial readiness / stale downstream rerunへ移ります。`coverage-analysis` / `qa-workflow` は保存v1 Runtime Inputを再利用せずcurrent v2 upstream / workflow stateから再生成します。cutover / readerの外側transportはaggregate 16 MiBとtop-level artifact Markdownの64 KiB免除を持ちますが、これらの移行helper自体はgenerator input上限を変更しません。ready-scope batchを受ける `artifact:analysis_entities:all` / `artifact:requirement_structure:all` だけは別途本PRのroot runtime契約としてaggregate 16 MiBへ変更し、その他の通常generatorは2 MiB / string上限を維持します。proseからv2 inputを推測再構築しません。
+
+active Machine Evidence templateはversion文字列だけを置換しません。runtime Skillは `render_runtime_input()` / `render_runtime_result()` / `render_machine_entities()`、spec-analysisは `authority_entities.py` / `build-machine-evidence` の生成結果を正本とし、旧 `entity_schema_version` / `dependencies` / `runtime-contract-v1` / `runtime-envelope-v1` の手書き擬似schemaを削除します。
+
+### qa-workflow
+
+変更:
+
+- skills/qa-workflow/references/guidance.md
+- skills/qa-workflow/assets/project-context-template.md
+- 新規 skills/qa-workflow/scripts/project_context_ids.py
+- skills/qa-workflow/evals/deterministic/routing_cases.json
+- skills/qa-workflow/evals/deterministic/routing_candidate_outputs.json
+- project_context_ids.py用repository unit test
+- routing fixtureの固定件数を検証するrepository test / docs current count
+
+「テスト設計前の仕様理解package」はspec-analysisから開始し、未解決事項があればquestion-analysisへ進み、回答反映後spec-analysisへ戻すroutingを追加します。resolver失効時はspec-analysisがsame-UNK reopen / new UNKをcanonical modelへ先に反映してからquestion-analysisへcurrent UNKNOWN集合を渡します。qa-workflowは通常downstreamへ進む前に `migration_preflight.py` のdeterministic statusを正本にします。UI target canonical downstreamでは `inspect.current_scope_ids[] / ready_scope_ids[] / blocked_scope_ids[]` を正本にし、TR Entityの `scope_refs[]` はLLMが意味上必要なownershipを明示します。ただしartifact modeの参照AC由来Scopeはhelperが必須集合として包含を検証し、TCN / model / CI / TCは参照する上流Entityからscope ownershipを決定論伝播します。SCOPE removalでは`downstream_state.py`がprevious active / inactive stateからaffected identityとvalidated last-active contentを返し、owner LLMはreuse時のresolved ownershipまたはsemantic deletionだけを意味判断します。helperがexpected active / inactive / deletedを導出し、owner generator適用後のmachine-owned state一致まで確認します。blocked由来inactiveは履歴を維持してcurrent Entity/runtimeから外し、block解除後はsemantic identity同一なら同じIDをreuseして`active`へ戻します。UI target packageの `inspect / validate / build-machine-evidence / materialize` は全て同じpackage-local exclusive lockへ参加し、lock取得後に共通preflight recoveryを通してからcommitted rootを読みます。materialize途中のroot一時不存在や旧/new file混在をproduction readerへ見せません。recovery以外のsemantic mutationはmaterializeだけが行います。正式DECISION / 承認済みASMへ正規化する場合、意味判断はquestion-analysis / stakeholder側に残します。Project Contextが実際の正本ownerである場合だけqa-workflow helperがDEC / ASM ID採番とSection 12 / 13 materialize、previous ID削除検証を行います。別ownerでもcanonical Authority IDは `DEC-xxx / ASM-xxx` を維持し、外部record IDをauthority_idへ流用しません。
+
+### repository docs / CI
+
+PR #14後のREADME / EVALS / PROJECT_CONTEXT / CIを編集baselineにします。
+
+変更:
+
+- README.md: mode導線と#14 Skillとの目的境界を必要最小限に追記
+- EVALS.md: PR #16固有の評価差分だけ追記
+- docs/PROJECT_CONTEXT.md: current状態を持つ場合だけ同期
+- tests/skills/evals/semantic/*: critical criterion coverage / mode非選択回帰を追加
+- production helperのrepository unit / portability test
+
+PR #14後のCIは `skills/*/scripts` を動的compileするため、helper compile目的のworkflow個別path追加は行いません。新しいGitHub Actions workflowも追加しません。
+
+## 対象外
+
+- 特定のAI製品向けintegration / connector / remote loader
+- 新しいSkill-to-Skill API
+- 案件固有の仕様資料をqa-workflow-skills repoへ保存する仕組み
+- 任意の複数Markdownをmergeする汎用document framework
+- test-analysis / test-condition-design / test-case-designの責務変更。test-requirement-designにはAC traceability / closureだけを追加する
+- test-target-inspectionのbrowser観測契約変更
+- Agent Skills Specificationの独自拡張
+- ZIP専用runtime。archive出力は利用Agentのartifact機能で行い、Skillの正規処理には含めない
+- 導入先project固有の任意storage provider / external API / connector / process起動 / timeout / 汎用orchestrationを包むwrapper。Skill repoはQA契約固有の決定論処理だけを持つ。ただし既存 `qa.workflow_state_root` のlocal single-host completed baseline保存は今回のqa-workflow state契約そのものなので `artifact_graph.py` に固定実装し、generic storage / transaction abstractionにはしない
+- 既存production scriptへ数行で収まるdefault補完・入力受け渡しだけのadapter script。独立した現在要件を持たない処理は既存scriptへ統合する
+
+## 成功条件
+
+- 新Skillなしで今回の責務をspec-analysisへ収められる
+- UI構造をPAGE / STATE・VIEW・STEP / MODAL / browser dialog / panel / external / sharedへ区別できる。exact分類を安全に確定できない構造は仮typed IDを発行せずUNKNOWNへ閉じ、分類解消後に初めてtyped structural IDを採番できる
+- 仕様Authorityとrepository implementation statusが混同されない
+- UNKNOWNが安定参照され、回答後に解消済み履歴とcurrent unknownが整合する
+- package更新時にpackage schema version、content version、CHANGELOG、MANIFESTと各ファイルの現在状態が一致し、Stable ID lifecycle / 影響fileをLLM手入力に依存しない。同一materialize requestはMANIFEST receiptで既適用判定でき、commit後crashでもnew ID / extensionを二重採番しない
+- 同一tracking tableに複数prefixがある場合もsemantic selector fieldからhelperがprefixを一意に決め、owner確定済みDEC / ASMはpackageで再採番せず初回`external`・以後`reuse`として追跡できる。approved ASMは09分析項目で`分類=承認済みASM`としてmirrorし、通常の4分類をLLMが勝手に拡張しない
+- `inspect / validate / build-machine-evidence / materialize` が同じpackage lock / preflight recovery protocolを使い、commit競合中もreaderが一時不存在やmixed-version packageを観測しない
+- 通常のspec-analysis出力は従来どおり利用できる
+- test-target-inspectionの責務を侵食しない
+- qa-workflowが最短経路でmodeを選択でき、usability-evaluation / usability-inspection / wcag-conformance-evaluationへ誤routeしない
+- package内のcanonical Authority契約が既存spec-analysisと互換であり、Authority + current AC Machine Entity、ready scope batch normalized_skill_input、expected identity、Machine Entities Markdown sectionまでLLM手組みなしで接続できる
+- 複数Markdown packageを既存semantic runnerへ入力できる一意なevaluation projectionが定義されている
+- modeが既存Agent Skills形式のままAIエージェントから利用できる
+- mode導入前のlegacy / unversioned packageをsemantic mapping + deterministic validationでcurrent schemaへ移行できる
+- runtime-v1 → v2 / UI target migration / scope ownership normalizationの現在phaseとnext actionを `migration_preflight.py` がmachine-generated stateから一意に決め、runtime cutover中は固定依存順に沿う部分完了だけを再開対象として最初の未完了Skillを返す。TCD内部はSkill-local helperが`phase=resume`で次phaseを決め、LLMがmigration順序や再開位置を選ばない
+- PR #14後のAgent Skills検証、trigger、semantic、deterministic / workflow routing回帰がPASSする
+- README / EVALS等の現在値を変更した場合はPR #14後のcurrent repositoryから導出した実データと一致する
+- PR #14のusability / WCAG finding・observation・resultを仕様Authorityへ自動昇格しない
+- 機能scopeごとにUI操作有無を判定し、UI操作ありではUS → UC → Behavior → ACを完全に分析する。current Behaviorは意味上関係するUIOPを`関連操作ID`で明示し、同一UC内の無関係UIOPをAC freshnessへ混入させない。情報不足はnot-applicableへ逃げずUNKNOWN / blockedとして残る
+- known UIOPで対応US / UC identityが未確定な場合、同じroot Blocking UNKNOWNをUIOPの `関連UNKNOWN ID` から再利用し、same UIOP IDをblockedで保持できる。原因解消後は同IDでmappedへ戻り、UIOP専用UNKNOWNを重複生成しない
+- US / UC / Behavior / ACはLLMがsemantic identityを維持する限り、子自身の意味を再判断せず親のblocked状態をhelperが決定論的に下流へ伝播する。ancestor由来blockedだけを理由に子へ新しいUNKNOWNを作らず、親block解除後に子自身のblockerがなければ同じstable IDのままcurrentへ戻す
+- SCOPE retire後にsame identityのcurrent ownershipをLLMが再解決し、そのownershipがblockedならscriptがlatest resolved scope_refsを持つinactiveへ遷移できる。last-active historyは旧ownershipを保持し、無関係ready scopeを停止させない
+- child identity自体を確定できない場合は階層ごとのBlocking UNKNOWN位置を一意にする。UC identity不明は親USをblocked + UC 0件、Behavior identity不明はcurrent UCの完全性`未定義 + UNKNOWN` + Behavior 0件、AC identity不明は親Behaviorをblocked + AC 0件とし、Scopeへ一律退避しない
+- UI target packageからtest-requirement-designまで進むcanonical artifact workflowでは、current ACがTRまたは明示的dispositionへ閉じる。AC linkはACだけをcloseし、Authorityは従来どおりTR authority_refsまたはAuthority Dispositionで独立closureする。TRが参照するAC EntityのScopeは必ずTR `scope_refs[]`へ含まれ、LLMはそれ以外の追加ownershipだけを判断できる。AC / 親Behavior / 親UC / 親US / 明示linked domain item / Authority変更は必要なTR freshnessへ伝播する。direct modeはknown AC ID / closureを保証し、AC Entity dependencyが無い場合のAC semantic cross-run freshnessを完了条件にしない。仕様理解packageだけを要求された場合は、このclosureをpackage単体の完了条件にしない
+- 標準package fileはrequired core payload + required control file `MANIFEST.md` + 固定triggerによる条件付き必須とし、Agentの自由裁量で作成有無を変えない
+- conditional fileまたはBehavior Decompositionが`not-applicable`のscopeを参照する対応tracking rowを残さない。複数scope参照rowの一部だけがnot-applicableになった場合もhelperが参照除去・split・retireを推測せず、矛盾をfail-closedしてLLMのsemantic updateへ戻す
+- LLMは仕様意味・UI意味・semantic identity / explicit retire判断に集中し、version / stable ID / Markdown table・known section・標準file materialization / hash /参照整合 / UNKNOWN件数 / MANIFEST / file applicability整合 / Stable ID lifecycle / Machine Entity projection等の定型処理はhelper / validatorへ移る
+- runtime-v2 / entity-state-v2 cutoverでv1 evidence自体はcurrent扱いしない。spec-analysisはcanonical v1 Authority Entityをfrozen規則で検証してsemantic contentだけをcurrent `authority_entities.py`へ渡す。TRD / TCD / TCはSkill-local cutover helperで内容不変のTR / TCN / model / CI / TC stable identityとv1のactive / deleted履歴を維持し、v1に存在しないinactiveは初回v2 inputで空集合とする。test-analysis / usability-inspection / wcag-conformance-evaluationはSkill-local read-only v1 input readerでintegrity確認済みsemantic inputだけをv2再実行へ渡す。coverage-analysis / qa-workflowは保存v1 inputを使わず依存元がcurrent v2になった後に再生成する
+- Project Context ownerのDEC / ASMは撤回 / 置換済みでもID rowを削除せず、previous IDの再利用をhelperが防ぐ
+- current packageがrepository evidenceをcarry-forwardする場合、08の確認revisionを勝手にcurrentへ更新せず保持できる
+- readyだったscopeが一時blockedになっても、current `workflow_ref` のcommitted `last_completed_qa_workflow_artifact` から検証・抽出したprevious snapshotだけを根拠に、`scope_refs[]` がそのscopeと交差する既存TR / TCN / model / CI / TCだけを`inactive`としてstable ID履歴へ残し、current Entity/runtimeから外せる。artifact保存後でもbinding CASに失敗したrunはbaseline未commitとしてprevious snapshotへ使わない
+- SCOPE自体をexplicit retireした場合は、previous active / inactive stateの `scope_refs[]` がcurrent scope universe外を参照する状態を無言carry-forwardしない。helperはaffected identityとvalidated last-active contentを決定論抽出し、owner LLMのreuse / semantic deletion判断後もgenerator stateへの適用一致までfinal gateを許可しない。意味上のsplitはold=`deleted` + replacement通常`new` draftで表し、専用split lineageを作らない
+- local single-hostでは実ファイルのimmutable qa-workflow revisionを保存・exact refetchでき、workflow-ref process lock内のexpected revision比較 + atomic replaceでcompleted baseline bindingをcommitできる。shared/network storageはprovider-native history / CAS無しではunsupportedとする
+- `current_scope_ids[]` non-empty + `ready_scope_ids=[]` は全blockedとして `build-machine-evidence(scope_ids=[])` やtest-analysis以降を起動せず、最後のcompleted bindingを維持する。一方 `current_scope_ids=[]` は全SCOPE retireのzero-scope terminal pathとして、previous scoped downstreamがある場合はdeletion-only TRD / TCD / materialize-coverage / TC、current downstream 0件のcoverage-analysis、qa-workflow current verificationまで実行しterminal baselineへbindingを更新する。binding=nullならcleanup runtime不要、未正規化`scope_refs=[]` downstreamは推測削除せずfail-closedする
+- 同じpackage rootへの`inspect / validate / build-machine-evidence / materialize`はhelper自身が同じpackage-local exclusive process lockへ参加し、lock取得後に共通preflight recoveryを通す。materializeはUTF-8 without BOM / LF / terminal LFのcanonical bytesをstagingへ生成・検証してからpackage単位でcommitし、readerはcommit途中のroot一時不存在や旧版 / 新版混在を観測しない。途中I/O failureで混在した完成packageを残さず、process kill後もlockのstale owner回収を必要としない
+- package-local stable IDを持つ複数UI target packageのMachine Entity blockを同一current Entity collectionへ直接mergeせず、必要ならspec-analysisで1つのcurrent canonical package / normalized inputへ意味統合してから下流へ渡す
+- helperがsemantic判断を代替せず、通常spec-analysisの柔軟性を損なわない
+- production helperの公開CLIは独立した実行用途があるoperationだけに限定し、採番・version計算・MANIFEST生成・impact算出等のmaterialize内部処理をfocused useだけのために公開operation化しない
+
+### 2026-10-15 残工程継続結果
+
+現在のStep別状態はStep 3未完了（独立Semantic Judge未実施）、Step 7未完了（責務境界Semantic Judge未実施）、Step 8未完了（`ba4898f3`のremote CIは全check PASSだが、sandbox内で実CLIのexecpolicy setupがerrorとなりlocal runtime acceptance未確認。official skills-ref 25/25 pass）、Step 9は41項目中32 PASS / 9 PARTIAL、Step 10未完了。Step 9 item 22はcurrent-session Agentとproduction helper / runtimeによるscope-removal three-phase経路を確認した。
+
+検証中に判明した`downstream_state.py`のproduction `model_key_state` row validationとCI state重複処理を修正し、回帰testを追加した。runtime suite 360 pass / 2 Windows symlink privilege skips、deterministic repository suite 290 pass、Semantic candidate 8/8 runtime適合。最新のmatrix、個別検証、制約、hashは分割Plan `_04` の2026-10-15追補と`.artifacts/pr16-step9-deterministic/RUN_RECORD-2026-10-15-continuation.md`に記録した。外部Judge送信は行っていない。
+
+2026-10-15の追加検証では、zero-scope deletion時のTR / TCN / model `scope_refs=[]`出力、TCD materialize cleanup child unitの期待集合、frozen runtime-v2 history fingerprintの検証を修正・回帰確認した。runtime suiteは362 passed / 2 Windows symlink privilege skips。Scenario 21 attempt-10でsynthetic completed baselineから全scope retire、TCD terminal output、qa-workflow final gate、local baseline commit・immutable revision refetchまで確認したが、TRD / TC / coverage-analysisを通るworkflow全体は未実施のためStep 9 item 32を含む9項目はPARTIALのまま。Semantic candidateは8/8 runtime適合だが、独立Semantic Judge未実施のためStep 3 / 7は未完了。local Codex CLI execpolicy runtime受入も未確認のためStep 8とStep 10は未完了。詳細は分割Plan `_04` の「2026-10-15 継続作業結果（zero-scope terminal persistence / current runtime）」を参照する。
+
+修正commit `192f165034920c3345b9bb9a89678543b24b40bf`ではGitHub CI 10/10 checksが成功した。local Codex CLI execpolicy acceptance、Semantic Judge、Step 9の残り9項目はこのremote CI結果によって完了扱いにしない。
+
+### 2026-10-15 継続作業結果（Step 9 scenario 22 / 23）
+
+最新の開始head `d6582c2606f6937b94d61aa184652778accdc3b6` はGitHub上の最新`main` `dcabbb218cf79f6920f5c8303e60140ab9c15f23`から449 commit ahead / 0 behind。Step 9 item 15のshared-scope blocked / resume / qa-workflow baseline commit・refetchと、item 33のB retire owner-resolution projectionをcurrent-session Agentとproduction helperで追加検証した。item 32のTRD zero-scope terminal evidenceも記録したが、いずれも統合workflow条件が残るためmatrixは41項目中32 PASS / 9 PARTIALを維持する。Semantic candidateは8/8 runtime適合、candidate manifest SHA-256は`5c185ccccb7b2e5010044f5e4fd2d823b086b9c9156e02c96637ea3b8adfcfaf`。外部Semantic Judgeは実行していない。
+
+詳細なシナリオ範囲、missing conditions、hash、実行ログ位置は分割Plan `_04` の「2026-10-15 継続作業結果（TRD zero-scope / shared-scope pause-resume）」と`.artifacts/pr16-step9-matrix.json`に記録した。`.artifacts/` evidenceはignored local dataでPRへ追加しない。Step 3 / 7、local Codex CLI runtime受入を含むStep 8、Step 9、最終レビューStep 10は未完了であり、Planの完了条件は変更していない。
+
+### 2026-10-15 継続作業結果（検証環境再確認）
+
+Python 3.11.9と既存`.venv`を再確認し、runtime 362 tests / 2 Windows symlink privilege skips、deterministic shared 12、deterministic repository 290、semantic dataset 22 Skills / 163 cases、semantic shared 27 / 2 skips、semantic repository 13 / 1 skip、routing 2、trigger 1を個別に実行した。deterministic repository testはsystem PythonにPyYAMLがなかった初回を環境失敗として記録し、既存`.venv`（PyYAML 6.0.3）で再実行してPASSした。formatterは207 tracked files、Ruff 0.16.8、dprint 0.55.2、official `skills-ref` 25/25、Hook syntax、patch whitespaceもPASSした。Codex Harnessは31 tests後にCLI setup errorとなり、sandbox内実CLI acceptanceは未確認のまま。外部送信およびSemantic Judge実行はない。
+
+candidate manifestの8件すべてがruntime適合し、candidate/evidence 272ファイルのhashが一致した。Step 9 matrixの590 evidence rowも欠落・hash不一致なし。今回新しいAgent workflow scenarioは追加していないため、41項目は32 PASS / 9 PARTIALを維持し、未達条件をPASSへ昇格していない。詳細と実行条件は分割Plan `_04` およびignored local run record `.artifacts/pr16-step9-deterministic/RUN_RECORD-2026-10-15-validation-refresh.md`（SHA-256 `f763247cc30bb6808e202f1ef40fcde97f969ab4feaf08a79f4ddf9d0b57f557`）に記録する。Semantic Judge待ちのStep 3 / 7、CLI受入待ちのStep 8、9 PARTIALが残るStep 9、最終Step 10は未完了である。
+
+### 2026-10-15 同一UC内の枝別impact検証
+
+current-session Agentが`test-analysis` Skillのchange-impact契約を読み、評価用の合成入力でUC-001配下のUIOP-A / Behavior-A / AC-A / TR-AとUIOP-B / Behavior-B / AC-B / TR-Bを別identityとして扱った。Aだけを変更対象にしたproduction `skills/test-analysis/scripts/change_impact.py`の実行結果はUIOP-A / BH-A / AC-A / TR-Aのみで、B側と共有UCはimpact集合に含まれなかった。対応する`tests.skills.runtime.test_test_analysis_change_impact`を個別再実行し、2 tests passed。
+
+request、helper response、Agent判断、verification、test logとhash manifestは`.artifacts/pr16-agent-smoke/scenario-24-same-uc-branches/attempt-01/`にある。manifest SHA-256は`bded7ea6f3c110d2e26a9547a70c9eb9cf3e95ffcddc1a5c992dd43922068e14`。matrix item 24はPARTIALを維持する。artifact-mode Machine EntityでAC-A / TR-Aのstale遷移とAC-B / TR-Bのcurrent維持を確認するtest-analysis / test-requirement-design実行、およびpersisted baseline比較が残る。matrixは32 PASS / 9 PARTIAL、`step9_complete=false`、SHA-256は`3b3d1ea13a704c49cdd2ec105cfb332ce2480b15525dfa685c6873a186895254`。
+
+この追補で意味仕様・41項目・完了条件は変更していない。Step 3 / 7の独立Semantic Judge、Step 8 local Codex CLI acceptance、Step 9の他8 PARTIAL、Step 10最終レビューは引き続き未完了。candidate / Judge dataの外部送信は行っていない。
+
+### 2026-10-15 Step 9 item 31 完了記録
+
+合成A/B completed baseline exact-refetch後、両scope blockedではdownstream Skill runtimeを起動せずcompleted bindingを保持し、B-only resumeではpersisted inactive historyから同じTCN / model / CI IDを復元した。qa-workflow final gate、B-only baseline commit、exact-refetchまでPASSし、関連runtime testsもmigration preflight 9、qa-workflow baseline 7（Windows symlink privilege skips 2）、test-condition structure 7が個別にPASSした。詳細と実行hashは分割Plan `_04` のScenario 31記録とignored local evidence `.artifacts/pr16-agent-smoke/scenario-31-both-blocked-b-resume/attempt-06/`を参照する。
+
+41項目matrixは33 PASS / 8 PARTIAL、`step9_complete=false`（SHA-256 `4cc5c13e240f83570d10e96b120818df22d76838462e431127cbb9f3bbfa614d`）。未完了itemは7 / 9 / 15 / 24 / 32 / 33 / 34 / 35。Step 3 / 7 Judge、Step 8 local Codex CLI acceptance、Step 10 final reviewは未完了で、Semantic Judgeへの外部送信は行っていない。
+
+### 2026-10-15 Step 9 item 33 完了記録
+
+item 31のpersisted B-only baselineを使い、B blocked時のinactive historyと、B retire後のowner resolutionをcurrent-session Agentおよびproduction `downstream_state.py`で確認した。Agentはlast-active B-only contentからownerなしと判断してTCN/modelをdeletedとし、helperはCI childrenをdeletedへ導きつつgenerator materialization gateを維持した。`test_downstream_state` 12 tests（missing-history fail-closed含む）もPASS。詳細は分割Plan `_04` のScenario 33記録とignored evidence `.artifacts/pr16-agent-smoke/scenario-33-b-only-inactive-retire/attempt-01/`を参照する。
+
+Step 9 matrixは34 PASS / 7 PARTIAL、`step9_complete=false`（SHA-256 `9ecd0e74ffee86a8d2f3aefb9d5b59d183d32261581c7795d8feeb4fdeecd826`）。未完了itemは7 / 9 / 15 / 24 / 32 / 34 / 35。Step 3 / 7 Semantic Judge、Step 8 local Codex CLI acceptance、Step 10 final reviewは引き続き未完了。
+
+### 2026-10-15 Scenario 32 / 35 追加検証
+
+最新作業開始headは`360f45ddde3a42766c97ad9f65c6a718848b9c0a`。その後の変更はこの記録を含むPlan追補だけで、runtime / helper / test sourceの変更はない。
+
+Step 9 item 32ではTRD / TCD / TC zero-scope helper、coverage-analysis terminal projection、qa-workflow final gate、production verifier、およびlocal baseline commit / exact refetchを実行した。focused suiteは43 passed、2 skipped（Windows symlink privilege）。一方、active baselineを同じcross-Skill履歴から再構築するattemptはcoverageのAuthority / Risk edge不足でunresolvedになった。意味情報を補って成功扱いにはせず、item 32はPARTIALを維持する。
+
+Step 9 item 35ではreadyなAC-A content changeに対してproduction change-impactがA branchだけを選び、shared Machine Entity freshness helperがTR-001 stale / TR-002 currentを返した。change-impact 2、stale carry-forward 1、CI inactive / zero-terminal history 2 testsは個別PASS。item 24にもこのbranch-specific freshness証拠を追加したが、artifact-modeのpersisted baseline comparisonは未実施のためitem 24 / 35はPARTIALのまま。
+
+Step 9は41項目中34 PASS / 7 PARTIALで`step9_complete=false`。item 7 / 9 / 15 / 24 / 32 / 34 / 35の不足条件は分割Planとignored local matrixに保持した。Semantic candidateは8/8 runtime適合。Semantic Judgeへの外部送信は許可されていないためStep 3 / 7は未完了。sandbox内Codex CLI acceptanceが未確認のためStep 8も未完了で、Step 10の最終レビューは残検証完了後に実施する。matrix・raw artifactは`.artifacts/`以下のignored local evidenceで、PRに含めない。
+
+### 2026-10-15 残工程の検証更新
+
+開始時のlocal headは`6551d85ca26d27bcbc186748d17c1392a03bf111`。追加修正後のruntime suiteは366 passed / 2 Windows symlink privilege skips、deterministic shared 12 passed、deterministic repository 290 passed、semantic dataset 22 Skills / 163 cases、semantic shared 27 passed / 2 skips、semantic repository 13 passed / 1 skip、trigger 1 passed、Agent Skills validation 25/25 passed、Ruff・formatter・compileallもPASS。Codex Harnessは31 tests passed後にexecpolicy test class setupがsandbox identityの`codex.cmd`アクセス拒否で失敗し、local CLI runtime acceptanceは未確認。GitHub API / remote socketへのnetwork denialにより最新PR headとCIは再取得できていない。
+
+既存のproduction変更`skills/qa-workflow/scripts/downstream_state.py`は、複数workflow scopeから重複参照された同一TCD aggregate / CI state rowを一度だけ集約し、競合する重複はfail-closedにする。また`materialize_coverage:<TCN>`履歴を全TCD scopeから探索する。対応するruntime regression testsを追加し、重複同一stateの受理・重複競合の拒否・対応scopeのmaterialize履歴取得を確認した。
+
+Step 9 matrixは41項目中37 PASS / 4 PARTIAL（item 7 / 9 / 34 / 35）、`step9_complete=false`。item 15はA/B blocked / inactive / resume / persisted baselineのcross-Skill経路がPASS。item 24はAC-001のみのartifact-mode更新後、TR-002 stale / TR-001 current、前baseline binding維持、stale downstreamに対するqa-workflow unresolved gateをPASS。item 32ではitem 15のcompleted A/B baselineを基に、TCD materialize runtimeのCI rowsをQA scopeへ追加してproduction `workflow_runtime.py`を再実行し、CIを含む全参照がcurrentのcompleted baselineを作った。revision `sha256:839d2d616c80ce5d64326cb108990c1c4761a79c6336f59ba763e16e44919a7b`をcommit / exact-refetchし、同じrevisionを別storeへ複製したzero-scope branchでTRD / TCD / TC / coverage / qa-workflowの削除専用処理とterminal commit / exact-refetchまでPASSした。item 35はfreshnessとTCDのdeleted-CI ID非再利用を別々のsynthetic historyで確認したが、同一artifact-mode lifecycleをTC / coverage / qa-workflowまで完了していないためPARTIAL。item 7 / 9 / 34の完全な実Agent経路も未完了である。
+
+この追補前のmatrixはSHA-256 `392db8e412a4a61c02de3a2644d54cf139c5ff30758c2b459989a44a7616346b`。その時点のmanifest照合済みverificationはignored local `.artifacts/pr16-step9-validation-2026-10-15/final-review/current-review.json`（SHA-256 `5ff835b2cab0d20556ffdde482ad001fbf67431ea911a0926a4bfc1e521a339b`）と`.artifacts/pr16-agent-smoke/common-baseline/attempt-02/sha256.txt`（SHA-256 `0973669ab5fa4aea93dff53107541544aef0d12730dd32335411ede253bf37be`）にある。`.artifacts/pr16-step9-matrix.json`は最終再確認を反映し、41項目中37 PASS / 4 PARTIAL、`step9_complete=false`を保持する。新旧matrixとraw artifactはGitへ追加しない。
+
+Step 3 / 7は独立Semantic Judge未実施、Step 8はlocal実CLI acceptanceと最新remote CI未確認、Step 9は4 PARTIAL、Step 10 final reviewは未完了。外部Judgeへの評価データ送信は行わず、sandbox / Hook / execpolicy制約を変更・迂回していない。Planの目的・仕様・完了条件は変更していない。
+
+### 2026-10-15 残検証の最終再確認
+
+- 現在のStep 9 matrixは41項目中37 PASS / 4 PARTIAL（7 / 9 / 34 / 35）、`step9_complete=false`。item 15 / 24 / 32のPASS証拠はそれぞれの不変revisionとbranch内で成立している。item 7 / 9 / 34 / 35の既存Agent subscenarioやdeterministic testは確認したが、全Skill固定順migration、全Skill境界resume、A+B→B retire / A blocked / C ready→A再readyの連続owner lifecycle、freshnessとdeleted CI IDの連続artifact lifecycleは成立していない。別履歴のartifactを結合してPASSへ昇格していない。
+- `downstream_state.py`は複数scopeから重複参照された同じaggregate TCD / CI stateを一度だけ処理し、inactive TCN用materialize履歴を全TCD scopeから検索する。同一runtime identityのmaterialize結果は全scopeで一致する場合のみ受理し、競合時はfail-closedとする。`test_downstream_state` 16件、runtime全体366件はPASS。Windows symlink privilegeによるskipは2件。
+- `python scripts/format_tracked.py check`、対象Ruff、`git diff --check`はPASS。formatter / Ruffは既存venv、dprintはignored local toolsの既存binaryをそのcommand内のPATHで利用した。依存追加やsystem PATH変更はしていない。
+- runtime identityは`MYCOMPUTER\CodexSandboxOffline`、Pythonは3.11.9。`Get-Command codex`は解決せず、`C:\Users\sella\AppData\Roaming\npm\codex.cmd`のアクセスは拒否された。`Test-Path`のfalseは不存在の根拠にしない。local `test_execpolicy_cli`はsetup errorでCLI試験開始前に停止したためStep 8は未完了。権限変更や別経路のCLI起動はしていない。
+- 作業開始時のlocal headと最後に取得済みtracking refは`6551d85ca26d27bcbc186748d17c1392a03bf111`。検証済みruntime / test差分はlocal commit `081197565e54ab21b452dd18aea51f068026dd7f`、push結果のPlan記録はlocal commit `fbf134e`にある。通常pushは`github.com:443`のconnection failureで完了せず、これらのlocal commitはremoteへ届いていない。GitHub API / remote socketは引き続きnetwork access denialであり、remote最新head / CIと現在のPR本文は未確認。本文を取得できないためPR本文更新も行えていない。古いcrawl結果は最新状態の証拠に使っていない。
+- Semantic Judgeは未実行でcase / candidate / reference / rubricの外部送信なし。独立した許可済みlocal Judgeも見つかっていないためStep 3 / 7は未完了。local差分のレビューと修正確認は実施したが、Step 3 / 7 / 8 / 9およびremote CIが未完了のためStep 10全体完了条件は未成立。
+
+### 2026-10-15 ネットワーク復旧後のPR #16状態
+
+remote branch head `79210d4335ebb82589bdcbe77d1030224e6c0c49`はlocalと一致し、同headのGitHub CIは全6 workflowがSUCCESS。PR本文とPlanの同期、Plan追補の通常push後の最新CI確認を続ける。Step 9は41項目中37 PASS / 4 PARTIAL（7 / 9 / 34 / 35）。item 34ではC-onlyのproduction横断経路を追加確認したが、A+B baseline owner reuseとA再ready後のsame-ID復元を同一の保存済み履歴で完了していないためPARTIALを維持する。Step 3 / 7 Semantic Judge、Step 8 local Codex CLI runtime acceptance、Step 9残項目、Step 10 final reviewは未完了であり、完了条件は変更していない。詳細は分割Plan `_04` の「2026-10-15 ネットワーク復旧後のPR同期と残項目追試」を参照する。
+
+item 9の追加synthetic TCD resume試行では、現行runtimeが空モデルを拒否し、意味上妥当な正のpartitionはsource v1 cutover projectionとのdriftでfail-closedしたため、item 9はPARTIALのままとする。runtime suiteは366 PASS / 2 Windows symlink privilege skips、formatter 207 tracked filesと`git diff --check`はPASS。詳細とraw local evidenceは分割Plan `_04` の2026-10-15追補に記録する。
+
+### 2026-10-15 PR head CI再確認とitem 9追試
+
+PR APIでlocal head `9540c13bc299f20c30fef9dc83a2daa2fd49929e`との一致を確認し、同headのCode Quality、Codex Harness、Agent Skills、Deterministic Output、Semantic Output、CodeQLをすべてSUCCESSと確認した。直接の`git ls-remote`はこの実行identity `MYCOMPUTER\CodexSandboxOffline`からGitHub:443接続失敗となった。PR APIによるremote確認は成功している。
+
+合成v1 TCD inputからproduction cutoverのcondition structure、models、TDR、materialize phases全体を中断・resumeし、final resumeとout-of-order拒否を実行した。TCD内部migrationはPASSしたが、全Skill固定順の移行・ownership baseline・qa-workflow gateへの一連の接続は未確認のためitem 7 / 9はPARTIALを維持する。item 34 / 35にも同一lineage全下流完了の不足が残り、Step 9は37 PASS / 4 PARTIAL（7 / 9 / 34 / 35）。
+
+focused runtime testsは52 PASS / 2 Windows symlink privilege SKIP。Codex CLIへのsandbox内アクセス拒否も再確認され、Step 8は未完了。Semantic Judgeは未実行で外部送信していないためStep 3 / 7も未完了、Step 10は最終レビュー未完了。詳細とignored local evidence hashは分割Plan `_04` の最新追補を参照する。Plan仕様・41項目・完了条件は変更していない。
+
+### 2026-10-15 Plan同期push後のCI
+
+Plan追補commit `64046d1ca0d997b0981c5f32cec593625ea8b4e2`は既存PR branchへ通常pushし、remote / local / PR API head一致を確認した。同headの5つのPR workflowはSUCCESS。CodeQL check runは直近code-bearing head `9540c13`でSUCCESSを確認しており、Plan-only head `64046d1`のcombined-status endpointはstatus entryを返していない。Step 9は41項目中37 PASS / 4 PARTIAL（7 / 9 / 34 / 35）のままである。
+
+### 2026-10-17 Semantic Judge・最終状態
+
+PR #16 head 52658edd3fd0b1be332ee4ac0e577bf5dae4c9d0に対し、既存8 candidateをCodex CLI（ChatGPT subscription login、gpt-6-luna、codex-cli 0.160.0）の独立read-only ephemeral processで1回ずつ評価した。39 criteriaは31 pass / 3 needs_review / 1 fail / 4 not_evaluable。candidate manifest SHA-256 5c185ccccb7b2e5010044f5e4fd2d823b086b9c9156e02c96637ea3b8adfcfaf、ignored Judge manifest SHA-256 30084c392b947b6ede3a65ab97cbc773bcff8e2c2fcca1df99889cc02be3a06b。Step 3はcritical semantic failを含むためFAIL。Step 7のdeterministic boundary checksとTR-SEM-003はPASSだが、question semantic coverageにnot_evaluableが残り未完了。Step 8のPR cross-repository checksは既存5 workflow successと今回のformatter / diff checkでPASS。Codex safety-harness fresh interactive runtime acceptanceは別責務で未確認。Step 9は41/41 PASSを再利用し、再実行していない。Step 10 final reviewは実施済みだが、Step 3 / 7が残るためPR全体は未完了。詳細・case別根拠は分割Plan _04の2026-10-17追補に記録する。 Main Plan / _04のlocal更新はstage済みだが、git commitはexecution policyに拒否され、branch・CIは旧headのまま。PR本文には未同期状態を記録した。
+
+### 2026-10-17 Semantic remediation後の最終状態
+
+当初のPlanで評価が止まっていた主因は、candidateの意味上の誤りと、case/referenceに根拠がなく評価不能なcriterionの割当が同じ合否へ混在していたことだった。前段の39 criterion（31 pass / 3 needs_review / 1 fail / 4 not_evaluable）結果は履歴として残し、評価不能をcandidateの誤りへ読み替えず、正本に基づくinput/referenceとcriterionのcase責務を整理した。
+
+修正では、spec-analysis Skillにrequired file/rowを止めるUNKNOWNのreadiness表現と既知row維持の指示を加えた。UI target package helperはprefixなしのinteraction table内にある参照済み`INTERACT-*`をMachine Entity / ownership projectionへ含め、回帰testで固定した。semantic projectionにはcurrent CHANGELOGのStable ID changesを追加し、retired identityがJudge入力から欠落しないようにした。FIELD/FLOWからBehavior/ACへのreference、SPEC-008 retirement reference、Scope Cのtrigger不確実性を明確にした。caseに根拠がないcriterion assignmentを削り、canonical DEC/ASM owner lifecycleを別criterion `SEM-SPEC-011`へ分けた。過去の結果と評価水準は維持した。
+
+更新Skillとcase inputだけから必要candidateを再生成し、production helper/runtimeで適合確認した。最終8 candidateはすべてruntime適合。独立JudgeはChatGPT subscription認証済みCodex CLI、`gpt-6-luna`、`codex-cli 0.160.0`、fresh ephemeral read-only processを使った。候補生成会話は共有せず、candidate、input、reference、criteria、rubric等の合成評価データだけをrunner経由で渡した。結果manifestはignored `.artifacts/pr16-semantic-candidate-remediation-20261017/semantic-judge-final-manifest.json`（SHA-256 `96522e65d0f4b8703c2bb7365001bdcca29ec8987ef539e576db644029041caa`）。現在の8 caseに割り当てられた36 criterionは36 PASS、0 needs_review、0 fail、0 not_evaluable。旧評価のunique criterion IDはすべて保持され、新しいowner lifecycle criterionを加えた。rating 3の2件はScope Cの未知triggerをUNKNOWNとして扱った正しい判断に対する軽微な仮定、および入力にowner IDがないためQUESTION-SEM-003の確認担当名を特定できない点で、意味上の欠陥ではない。
+
+Step判定：Step 3 PASS、Step 7 PASS、Step 8 Plan所定の横断検証PASS、Step 9は既存Agent smoke証拠を再利用して41/41 PASS、Step 10の最終差分reviewで重大な未解決findingなし。fresh interactive Codex safety-harness runtime acceptanceは別責務として未確認であり、Step 8の代替評価に使っていない。既存Agent smoke matrix/raw artifactとsemantic Judge出力はローカルignored `.artifacts`に限られ、Gitに追加していない。
+
+変更後のローカル検証はruntime 371 tests（2 Windows symlink privilege skips）、deterministic repository 290、deterministic shared 12、semantic dataset validator 22 Skills / 163 cases、semantic shared 27（2 skips）、semantic repository 13（1 skip）、projection focused 9（1 skip）、UI package focused 19、routing 2、trigger 1、Agent Skills 22/22、formatter 207 tracked files、`git diff --check`が成功した。remote CIは変更を含むcommit/push後に実行する必要がある。通常commit / push / PR本文同期 / latest-head CIがまだ完了していない場合、PR全体は同期ゲート未達のため完了扱いにしない。`.gitignore`の既存差分をstageせず、ignored evidenceを追加しない。
+
+2026-10-17の同期試行では、対象15ファイルだけをstageし、`.gitignore`未stageとignored evidence保持を確認した。通常commitは実行環境のapproval policyにより`approval required by policy, but AskForApproval is set to Never`で拒否され、commit / push / PR本文更新は未実施。読み取り専用remote確認ではlocal / remote / PR headは`52658edd3fd0b1be332ee4ac0e577bf5dae4c9d0`で一致し、そのheadの10 CI checksはPASS。ただし今回の変更は含まれない。PR本文も今回の評価結果に未同期であり、PR全体は未完了。commitは利用可能な正式承認経路で実施した後、通常push・PR本文同期・最新head CIを行う。

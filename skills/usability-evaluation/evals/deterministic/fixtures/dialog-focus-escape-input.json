@@ -1,0 +1,169 @@
+{
+  "condition": {
+    "target": {
+      "ref": "TARGET-001",
+      "name": "API token settings — remove dialog",
+      "region": "Settings"
+    },
+    "platform": "Web / Chromium fixture",
+    "viewport_device": "1280x720 desktop",
+    "locale": "en-US",
+    "current_state": "Remove API token dialog open",
+    "evidence_refs": [
+      "EV-001",
+      "EV-002",
+      "EV-003",
+      "EV-004"
+    ],
+    "project_authority_refs": [],
+    "adopted_design_system_refs": [],
+    "limitations": [],
+    "user": null,
+    "user_goal_task_flow": "Remove an API token after reviewing the consequence",
+    "success_condition": "Understand the consequence, choose whether to proceed, and safely leave by keyboard.",
+    "business_outcome": null,
+    "business_rule": null
+  },
+  "aspects": [
+    {
+      "aspect_key": "purpose-understanding",
+      "handling": "対象外",
+      "reason": "このfixtureでは評価しない"
+    },
+    {
+      "aspect_key": "interaction",
+      "handling": "今回評価する",
+      "reason": null
+    },
+    {
+      "aspect_key": "feedback",
+      "handling": "対象外",
+      "reason": "このfixtureでは評価しない"
+    },
+    {
+      "aspect_key": "error-prevention-recovery",
+      "handling": "対象外",
+      "reason": "このfixtureでは評価しない"
+    },
+    {
+      "aspect_key": "accessibility",
+      "handling": "対象外",
+      "reason": "このfixtureでは評価しない"
+    },
+    {
+      "aspect_key": "visual-integrity",
+      "handling": "対象外",
+      "reason": "このfixtureでは評価しない"
+    },
+    {
+      "aspect_key": "cross-pattern-flow",
+      "handling": "対象外",
+      "reason": "このfixtureでは評価しない"
+    }
+  ],
+  "reference_catalog": {
+    "REF-0001": [
+      "SRC-012-ITEM-0002"
+    ]
+  },
+  "pattern_identifications": [
+    {
+      "draft_key": "modal-pattern",
+      "target_ref": "TARGET-001",
+      "pattern_name": "Modal dialog",
+      "purpose": "Temporarily place a task above the primary view while preserving a safe way to complete or leave it.",
+      "user_goal_relationship": "The dialog interrupts token settings to confirm a destructive action.",
+      "applicability": "The task interrupts the settings view and presents a modal choice.",
+      "source_refs": [
+        {
+          "reference_entry_ref": "REF-0001",
+          "source_item_ref": "SRC-012-ITEM-0002"
+        }
+      ],
+      "not_identified_reason": null
+    }
+  ],
+  "known_refs": {
+    "evidence_refs": [
+      "EV-001",
+      "EV-002",
+      "EV-003",
+      "EV-004"
+    ],
+    "project_authority_refs": [],
+    "test_rule_result_refs": [
+      "RULE-001"
+    ],
+    "requirement_check_refs": [
+      "REQCHK-001"
+    ],
+    "measurement_refs": [],
+    "inspection_request_refs": [],
+    "owner_activity_refs": [
+      "ACTIVITY-001"
+    ],
+    "finding_refs": [],
+    "scope_refs": [
+      "SCOPE-001"
+    ],
+    "target_refs": [
+      "TARGET-001",
+      "ELEMENT-001"
+    ],
+    "state_basis_refs": [
+      "STATE-001"
+    ]
+  },
+  "findings": [],
+  "existing_additional_observation_links": [],
+  "evaluations": [
+    {
+      "draft_key": "dialog-focus",
+      "aspect_key": "interaction",
+      "target": "Modal dialog focus and keyboard dismissal",
+      "user_goal_task_flow_override": null,
+      "basis": [
+        "reference",
+        "user-goal"
+      ],
+      "observed_fact": "After Tab moved beyond the dialog, the background Create API token button became active while the dialog remained open. Escape left the dialog open.",
+      "pattern_or_principle": "Modal dialog keyboard interaction",
+      "pattern_draft_key": "modal-pattern",
+      "project_authority_refs": [],
+      "applied_references": [
+        {
+          "reference_entry_ref": "REF-0001",
+          "source_item_ref": "SRC-012-ITEM-0002",
+          "reference_position": "informative pattern guidance",
+          "authority_binding_applied": false,
+          "project_authority_refs": []
+        }
+      ],
+      "reference_not_used_reason": null,
+      "expected_characteristic": "Keyboard interaction remains within the modal dialog and provides a way to dismiss or complete the task.",
+      "difference": "Focus escaped to an obscured background control and Escape did not dismiss the dialog.",
+      "expected_impact": "A keyboard user may leave the intended task context and may lack a discoverable way to leave without activating the destructive action.",
+      "impact_basis": "The saved keyboard trace shows focus on the background trigger while the dialog remained open; no user frequency is inferred.",
+      "judgment_reason": "The evidence supports an interaction concern under the informative APG dialog keyboard guidance. This does not change the supplied TC PASS and is not a formal WCAG result.",
+      "additional_observation_links": [],
+      "observed_user_impact": null,
+      "evidence_refs": [
+        "EV-001",
+        "EV-002",
+        "EV-003",
+        "EV-004"
+      ],
+      "test_rule_result_refs": [
+        "RULE-001"
+      ],
+      "requirement_check_refs": [],
+      "measurement_refs": [],
+      "status": "問題を確認",
+      "status_reason": null,
+      "routing": "test-target-inspection",
+      "finding_draft_key": null,
+      "note": "TC-001 remains PASS; this is a separate UI/UX evaluation.",
+      "follow_up_required": false
+    }
+  ]
+}

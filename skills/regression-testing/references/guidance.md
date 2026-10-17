@@ -4,17 +4,17 @@
 
 `regression-testing`は既存のcurrent QA成果物を使って、Regression対象範囲、Suite membership、initial baseline、Run selection、required route、Activity/historyを管理します。新規・改修の仕様分析、Product Risk評価、TC設計、browser操作、execution結果の原因分析は行いません。
 
-| 要求 | owner |
-| --- | --- |
-| 変更影響候補 / Product Risk | `test-analysis` |
-| current TC identity / lifecycle / freshness | PR #11 `test-case-design` runtime |
-| TC設計 / legacy TCの昇格 | `test-case-design` |
-| Regression membership / selection / Activity | `regression-testing` |
-| Regression / TC-to-E2E coverage | `coverage-analysis` |
-| manual TC実行・修正確認 | `test-execution` |
-| E2E実行・cleanup | `e2e-test-execution` |
-| E2E failure analysis | `e2e-test-result-analysis` |
-| orchestration / resume / workflow state | `qa-workflow` |
+| 要求                                         | owner                             |
+| -------------------------------------------- | --------------------------------- |
+| 変更影響候補 / Product Risk                  | `test-analysis`                   |
+| current TC identity / lifecycle / freshness  | PR #11 `test-case-design` runtime |
+| TC設計 / legacy TCの昇格                     | `test-case-design`                |
+| Regression membership / selection / Activity | `regression-testing`              |
+| Regression / TC-to-E2E coverage              | `coverage-analysis`               |
+| manual TC実行・修正確認                      | `test-execution`                  |
+| E2E実行・cleanup                             | `e2e-test-execution`              |
+| E2E failure analysis                         | `e2e-test-result-analysis`        |
+| orchestration / resume / workflow state      | `qa-workflow`                     |
 
 ## Baseline reconciliation
 

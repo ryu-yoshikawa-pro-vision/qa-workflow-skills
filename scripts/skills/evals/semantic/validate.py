@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 import sys
+from pathlib import Path
 
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
-    from scripts.skills.evals.semantic.loader import SKILLS_ROOT, discover_semantic_skills, load_semantic_skill
+    from scripts.skills.evals.semantic.loader import (
+        SKILLS_ROOT,
+        discover_semantic_skills,
+        load_semantic_skill,
+    )
 else:
     from .loader import SKILLS_ROOT, discover_semantic_skills, load_semantic_skill
 
@@ -21,7 +25,9 @@ def validate_skills_root(skills_root: Path) -> tuple[int, int]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Validate Semantic Output Eval datasets.")
+    parser = argparse.ArgumentParser(
+        description="Validate Semantic Output Eval datasets."
+    )
     parser.add_argument("--skills-root", type=Path, default=SKILLS_ROOT)
     args = parser.parse_args()
     try:

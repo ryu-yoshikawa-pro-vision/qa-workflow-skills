@@ -1,0 +1,38 @@
+{
+  "known_authorities": ["SPEC-001"],
+  "required_current_authorities": ["SPEC-001"],
+  "required_package_files": [
+    "00_scope_and_context.md",
+    "01_ui_structure_and_navigation.md",
+    "02_behavior_and_business_rules.md",
+    "06_spec_inconsistencies_and_pending.md",
+    "07_current_unknowns.md",
+    "09_authority_and_traceability.md"
+  ],
+  "required_ui_target_ids": [
+    "SRC-001",
+    "SPEC-001",
+    "UNK-001",
+    "SCOPE-001",
+    "PAGE-001",
+    "UIOP-001",
+    "US-001",
+    "UC-001",
+    "BH-001",
+    "AC-001"
+  ],
+  "required_package_tables": [
+    {
+      "section_contains": "分析対象機能scope一覧",
+      "headers": ["Scope ID", "UI操作判定", "Behavior Decomposition"]
+    },
+    {
+      "section_contains": "UI構造一覧",
+      "headers": ["構造ID", "種別", "状態軸"]
+    },
+    {
+      "section_contains": "Acceptance Criteria一覧",
+      "headers": ["AC ID", "Behavior ID", "Acceptance Criteria"]
+    }
+  ]
+}

@@ -22,16 +22,16 @@ Graph DB、汎用knowledge management framework、汎用artifact registryは追�
 
 再利用したい情報が既存の正本へ属する場合、QA knowledgeへ第二の正本として複製しません。
 
-| 情報 | 優先する正本 |
-| --- | --- |
-| currentな仕様・期待挙動 | `spec-analysis` / Authority |
-| Product Risk / test objective / test focus | `test-analysis` |
-| TR / TCN / CI / TC | 各design Skill |
-| currentなUI情報・実対象で確認したふるまい | `test-target-inspection` |
-| execution / result / evidence | PR #12 / E2E |
-| Regression履歴 | Regression Activity |
-| Exploration履歴 | Exploratory Session |
-| 案件固有の実行条件・方針 | project context |
+| 情報                                       | 優先する正本                |
+| ------------------------------------------ | --------------------------- |
+| currentな仕様・期待挙動                    | `spec-analysis` / Authority |
+| Product Risk / test objective / test focus | `test-analysis`             |
+| TR / TCN / CI / TC                         | 各design Skill              |
+| currentなUI情報・実対象で確認したふるまい  | `test-target-inspection`    |
+| execution / result / evidence              | PR #12 / E2E                |
+| Regression履歴                             | Regression Activity         |
+| Exploration履歴                            | Exploratory Session         |
+| 案件固有の実行条件・方針                   | project context             |
 
 `qa-knowledge`へ保存するのは、複数session / workflowで再利用する価値があり、上記正本へそのまま入れると責務が不自然になる情報だけです。
 
