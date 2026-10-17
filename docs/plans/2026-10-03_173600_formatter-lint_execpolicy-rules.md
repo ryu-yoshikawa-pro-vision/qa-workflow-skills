@@ -4,7 +4,7 @@
 
 このファイルは `docs/plans/2026-10-03_173600_formatter-lint.md` の一部であり、PR #18で追加する `.codex/rules/20-risky-prompt.rules` / `.codex/rules/30-destructive-forbidden.rules` の正本です。
 
-Main Planではexecpolicyの目的、Hookとの責務分離、実装順序、検証、完了条件を管理します。このファイルでは実装時に判断を残さないため、Codex 0.160.0の`prefix_rule`へ落とすpattern / decision / `match` / `not_match`だけを具体化します。
+Main Planではexecpolicyの目的、Hookとの責務分離、実装順序、検証、完了条件を管理します。このファイルでは実装時に判断を残さないため、repository ruleの`prefix_rule`へ落とすpattern / decision / `match` / `not_match`だけを具体化します。Codex CLI versionは固定せず、利用中CLIでruleをloadし、各caseのdecisionを検証します。
 
 Windows実行名はすべてのGit / ghルールで`git` / `git.exe`、`gh` / `gh.exe`をunionで扱います。GitHub CLI公式helpで確認した組み込みaliasのうち、今回のmutation ruleに対応する`gh pr create` / `new`、`pr checkout` / `co`、`issue create` / `new`、`repo create` / `new`、`repo autolink create` / `new`、`secret delete` / `remove`、`variable delete` / `remove`を両実行名で扱います。さらに`gh skill install` / `add`（`gh skills`形式も含む）、`gh attestation` / `at`の公式組み込みaliasも対応する既存`prompt` ruleへ含めます。従来の`gh agent-task` / `agent-tasks` / `agent` / `agents`、`gh release create` / `new`も維持します。
 
@@ -14,7 +14,7 @@ Windows実行名はすべてのGit / ghルールで`git` / `git.exe`、`gh` / `g
 
 `.codex/rules/`はHookの代替ではなく、Hook failure時にも高影響操作を無承認で通しにくくする承認境界として使います。通常のread-only command用`allow` ruleは追加しません。
 
-Codex 0.160.0のexecpolicyはargvのexact prefix matchingであり、pattern要素のunionと`match` / `not_match`を使えます。サブコマンドより前にオプションが入るGit / GitHub CLI形式はprefixに一致しないため、Main Plan「CLIの対応形式とprefix判定」に従ってPreToolUseでdenyします。また、未引用の`HEAD~1` / `*.md`や変数展開を含むshell commandは、execpolicyが内部のGit / ghを抽出できず、元のshell呼出し全体で判定される場合があります。Main Plan「shell解析に失敗する引数の扱い」に従い、既知の非対応形式をHookでdenyします。rule未一致だけを拒否済みの証拠として扱いません。実装者判断を残さないため、今回追加するruleの**pattern / decision / representative match / boundary not_matchをこの節の正本**とします。`match` / `not_match`はrules file自身のload-time testとして同じ内容を保持します。これらは分解済みargvに対するprefix照合の検証であり、`bash -lc "cd ... && git reset HEAD~1"`等の完全なshell commandをCodexが正しく分解した証拠にはなりません。
+Plan作成時にCodex 0.160.0で確認したexecpolicyはargvのexact prefix matchingであり、pattern要素のunionと`match` / `not_match`を使っていました。現行runtimeが同じ機能・挙動を持つとはversion番号から仮定せず、CIと利用可能なruntimeで実CLIのrule loadと分類を確認します。サブコマンドより前にオプションが入るGit / GitHub CLI形式はprefixに一致しないため、Main Plan「CLIの対応形式とprefix判定」に従ってPreToolUseでdenyします。また、未引用の`HEAD~1` / `*.md`や変数展開を含むshell commandは、execpolicyが内部のGit / ghを抽出できず、元のshell呼出し全体で判定される場合があります。Main Plan「shell解析に失敗する引数の扱い」に従い、既知の非対応形式をHookでdenyします。rule未一致だけを拒否済みの証拠として扱いません。実装者判断を残さないため、今回追加するruleの**pattern / decision / representative match / boundary not_matchをこの節の正本**とします。`match` / `not_match`はrules file自身のload-time testとして同じ内容を保持します。これらは分解済みargvに対するprefix照合の検証であり、`bash -lc "cd ... && git reset HEAD~1"`等の完全なshell commandをCodexが正しく分解した証拠にはなりません。
 
 #### `20-risky-prompt.rules`
 
@@ -408,14 +408,14 @@ prefix_rule(
 
 force push、hard reset、commit amendは永久禁止にしません。`git push` / `git reset` / `git commit`のfamily-level `prompt`でユーザー承認へ送り、protected branch上ではPreToolUseのcontextual denyを優先します。`restore` / `checkout` / `switch`は未commit変更の破棄を防ぐため同じ既存ruleの`prompt`に含め、protected branchからの安全な`switch`はHook通過とexecpolicy承認の両方を必要とします。
 
-CIでは固定版Codex CLI自身の`codex execpolicy check --rules ...`で、rules fileの`match` / `not_match`と代表`prompt` / `forbidden`、read-only boundaryを検査します。完全なshell commandの解析・Hook dispatchはargv単体のexecpolicy checkでは証明できないため、既存contract testを必須の回帰証拠とします。fresh runtimeの実施はMain Planの可用条件に従い、対象runtimeを利用できない場合は未検証と記録します。
+CIはnpmの`latest` stable tagから導入したCodex CLIの実versionを記録し、そのCLIの`codex execpolicy check --rules ...`でrules fileの`match` / `not_match`と代表`prompt` / `forbidden`、read-only boundaryを検査します。完全なshell commandの解析・Hook dispatchはargv単体のexecpolicy checkでは証明できないため、既存contract testを必須の回帰証拠とします。fresh runtimeの実施はMain Planの可用条件に従い、対象runtimeを利用できない場合は未検証と記録します。version完全一致は要求せず、必要なexecpolicy機能の欠落は互換性問題として扱います。
 
 このrule集合は今回のrepository開発workflowで使うGit / GitHub CLI / local shell commandを対象にしたguardrailです。Git / GitHub CLIの全subcommand・全option・将来versionの新commandをrepository独自policy engineで再実装しません。
 
 ## 更新時の確認
 
 - Main Planの「承認境界」「実装順序」「検証」「完了条件」と矛盾しないこと
-- Codex 0.160.0の`codex execpolicy check`で全ruleがloadでき、各`match` / `not_match`がPASSすること
+- 利用中の`codex execpolicy check`で全ruleがloadでき、各`match` / `not_match`がPASSすること。version完全一致は要求せず、必要な機能が無い場合は互換性問題として扱う
 - `git` / `git.exe`、`gh` / `gh.exe`で代表`prompt` / `forbidden`が一致すること
 - `git restore .`、`git checkout -- .`、`git switch --discard-changes feature/other`と各`.exe`形式、安全な`git switch -c feature/new-work` / `git switch feature/existing-work`がすべて`prompt`分類になることをcontract testと利用可能な`codex execpolicy check`で確認する。実Codexで破棄操作を実行したり、承認cancelや一時repositoryによる状態不変probeは行わない
 - 正規prefixのexecpolicy `prompt` / `forbidden`分類と、先行オプションおよびshell解析に失敗する展開引数へのPreToolUse denyを、Main Planの既存POSIX / Windows contract testで別々に確認する。fresh runtimeが利用できない場合は未検証と記録する

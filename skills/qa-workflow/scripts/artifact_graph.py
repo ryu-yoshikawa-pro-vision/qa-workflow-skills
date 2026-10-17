@@ -16,7 +16,7 @@ import sqlite3
 import sys
 import tempfile
 import uuid
-from contextlib import closing
+from contextlib import closing, contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -657,6 +657,333 @@ def verify_historical_revision(
             "reason": "historical_artifact_revision_unavailable",
         }
     return {"status": "available", "revision": revision_token}
+
+
+class _LocalBaselineError(RuntimeError):
+    def __init__(self, reason: str):
+        super().__init__(reason)
+        self.reason = reason
+
+
+def _local_baseline_identity(workflow_ref: str) -> str:
+    if not isinstance(workflow_ref, str) or not _UUID.fullmatch(workflow_ref):
+        raise _LocalBaselineError("workflow_ref_invalid")
+    return workflow_ref
+
+
+def _local_baseline_root(workflow_root: str | Path, *, create: bool) -> Path:
+    root = Path(os.path.abspath(workflow_root))
+    _reject_local_symlink_components(root, "workflow_state_root")
+    try:
+        if create:
+            root.mkdir(parents=True, exist_ok=True)
+        _reject_local_symlink_components(root, "workflow_state_root")
+        if not root.is_dir():
+            raise _LocalBaselineError("workflow_state_root_unavailable")
+        return root.resolve(strict=True)
+    except OSError as exc:
+        raise _LocalBaselineError("workflow_state_root_unavailable") from exc
+
+
+def _reject_local_symlink_components(path: Path, reason: str) -> None:
+    current = Path(os.path.abspath(path))
+    while True:
+        if current.is_symlink():
+            raise _LocalBaselineError(reason + "_symlink")
+        if current.parent == current:
+            return
+        current = current.parent
+
+
+def _assert_local_regular_file(path: Path, reason: str) -> None:
+    _reject_local_symlink_components(path, reason)
+    if not path.is_file():
+        raise _LocalBaselineError(reason + "_unavailable")
+
+
+def _ensure_local_directory(path: Path, *, reason: str) -> None:
+    _reject_local_symlink_components(path, reason)
+    try:
+        path.mkdir(exist_ok=True)
+    except OSError as exc:
+        raise _LocalBaselineError(reason + "_unavailable") from exc
+    _reject_local_symlink_components(path, reason)
+    if not path.is_dir():
+        raise _LocalBaselineError(reason + "_unavailable")
+
+
+@contextmanager
+def _workflow_baseline_process_lock(path: Path):
+    import stat
+
+    _reject_local_symlink_components(path, "workflow_state_lock")
+    flags = os.O_CREAT | os.O_RDWR
+    if hasattr(os, "O_BINARY"):
+        flags |= os.O_BINARY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        descriptor = os.open(path, flags, 0o600)
+    except OSError as exc:
+        raise _LocalBaselineError("workflow_state_lock_unavailable") from exc
+    locked = False
+    try:
+        descriptor_stat = os.fstat(descriptor)
+        path_stat = path.lstat()
+        if (
+            not stat.S_ISREG(descriptor_stat.st_mode)
+            or path_stat.st_dev != descriptor_stat.st_dev
+            or path_stat.st_ino != descriptor_stat.st_ino
+        ):
+            raise _LocalBaselineError("workflow_state_lock_symlink")
+        stream = os.fdopen(descriptor, "r+b")
+        descriptor = -1
+    except OSError as exc:
+        os.close(descriptor)
+        raise _LocalBaselineError("workflow_state_lock_unavailable") from exc
+    except _LocalBaselineError:
+        os.close(descriptor)
+        raise
+    try:
+        _reject_local_symlink_components(path, "workflow_state_lock")
+        if os.name == "nt":
+            import msvcrt
+
+            stream.seek(0, os.SEEK_END)
+            if stream.tell() == 0:
+                stream.write(b"\0")
+                stream.flush()
+            stream.seek(0)
+            try:
+                msvcrt.locking(stream.fileno(), msvcrt.LK_NBLCK, 1)
+            except OSError as exc:
+                raise _LocalBaselineError("workflow_state_lock_busy") from exc
+            locked = True
+        else:
+            import fcntl
+
+            try:
+                fcntl.flock(stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError as exc:
+                raise _LocalBaselineError("workflow_state_lock_busy") from exc
+            locked = True
+        yield
+    finally:
+        if locked:
+            try:
+                if os.name == "nt":
+                    import msvcrt
+
+                    stream.seek(0)
+                    msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
+                else:
+                    import fcntl
+
+                    fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
+            except OSError:
+                pass
+        stream.close()
+
+
+def _baseline_document_bytes(document: dict[str, Any]) -> bytes:
+    try:
+        return _json_bytes(document)
+    except (TypeError, ValueError) as exc:
+        raise _LocalBaselineError("workflow_state_not_serializable") from exc
+
+
+def _read_local_workflow_document(
+    path: Path, workflow_ref: str
+) -> tuple[bytes, dict[str, Any]]:
+    _assert_local_regular_file(path, "workflow_state")
+    try:
+        raw = path.read_bytes()
+        document = json.loads(raw.decode("utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise _LocalBaselineError("workflow_state_unreadable") from exc
+    if (
+        not isinstance(document, dict)
+        or set(document) != {"workflow_ref", "schema_version", "state"}
+        or document.get("workflow_ref") != workflow_ref
+        or document.get("schema_version") != "1"
+        or not isinstance(document.get("state"), dict)
+    ):
+        raise _LocalBaselineError("workflow_state_identity_mismatch")
+    return raw, document
+
+
+def commit_qa_workflow_baseline_local(
+    workflow_root: str | Path,
+    workflow_ref: str,
+    expected_state_revision: str,
+    desired_state: dict[str, Any],
+    artifact_markdown: str,
+) -> dict[str, Any]:
+    """Commit a verified qa-workflow artifact as this workflow's local baseline."""
+    try:
+        ref = _local_baseline_identity(workflow_ref)
+        if not isinstance(expected_state_revision, str) or not re.fullmatch(
+            r"sha256:[0-9a-f]{64}", expected_state_revision
+        ):
+            raise _LocalBaselineError("workflow_state_revision_unavailable")
+        if not isinstance(desired_state, dict) or not isinstance(
+            artifact_markdown, str
+        ):
+            raise _LocalBaselineError("workflow_baseline_input_invalid")
+        artifact_bytes = artifact_markdown.encode("utf-8")
+        if len(artifact_bytes) > 16 * 1024 * 1024:
+            raise _LocalBaselineError("workflow_artifact_limit_exceeded")
+
+        root = _local_baseline_root(workflow_root, create=True)
+        artifact_digest = hashlib.sha256(artifact_bytes).hexdigest()
+        artifact_ref = f"qa-workflow-local:{ref}"
+        artifact_revision = f"sha256:{artifact_digest}"
+        binding = {
+            "artifact_ref": artifact_ref,
+            "artifact_revision": artifact_revision,
+            "artifact_sha256": artifact_digest,
+        }
+        state_candidate = dict(desired_state)
+        state_candidate["last_completed_qa_workflow_artifact"] = binding
+        document_bytes = _baseline_document_bytes(
+            {"workflow_ref": ref, "schema_version": "1", "state": state_candidate}
+        )
+
+        artifact_root = root / "artifacts"
+        workflow_artifact_root = artifact_root / ref
+        qa_artifact_root = workflow_artifact_root / "qa-workflow"
+        _ensure_local_directory(artifact_root, reason="workflow_artifact_root")
+        _ensure_local_directory(workflow_artifact_root, reason="workflow_artifact_root")
+        _ensure_local_directory(qa_artifact_root, reason="workflow_artifact_root")
+        artifact_path = qa_artifact_root / f"{artifact_digest}.md"
+        if artifact_path.is_symlink():
+            raise _LocalBaselineError("workflow_artifact_symlink")
+        published = create_if_absent(artifact_path, artifact_bytes)
+        if published["status"] == "blocked":
+            raise _LocalBaselineError("workflow_artifact_publish_unavailable")
+        try:
+            existing_artifact = artifact_path.read_bytes()
+        except OSError as exc:
+            raise _LocalBaselineError("workflow_artifact_readback_failed") from exc
+        if (
+            existing_artifact != artifact_bytes
+            or hashlib.sha256(existing_artifact).hexdigest() != artifact_digest
+        ):
+            raise _LocalBaselineError("workflow_artifact_immutable_conflict")
+
+        state_path = canonical_state_path(root, ref)
+        lock_path = root / f".{ref}.workflow-state.lock"
+        with _workflow_baseline_process_lock(lock_path):
+            current_raw, current_document = _read_local_workflow_document(
+                state_path, ref
+            )
+            current_revision = "sha256:" + hashlib.sha256(current_raw).hexdigest()
+            if current_raw == document_bytes:
+                return {
+                    "status": "committed_replay",
+                    "workflow_ref": ref,
+                    "state_revision": current_revision,
+                    "artifact_ref": artifact_ref,
+                    "artifact_revision": artifact_revision,
+                    "artifact_sha256": artifact_digest,
+                }
+            if current_revision != expected_state_revision:
+                return {
+                    "status": "conflict",
+                    "reason": "state_revision_changed",
+                    "current_revision": current_revision,
+                }
+
+            temporary: str | None = None
+            try:
+                with tempfile.NamedTemporaryFile(
+                    mode="wb", dir=root, prefix=f".{ref}.", suffix=".tmp", delete=False
+                ) as stream:
+                    temporary = stream.name
+                    stream.write(document_bytes)
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                os.replace(temporary, state_path)
+                temporary = None
+            except OSError as exc:
+                raise _LocalBaselineError("workflow_state_replace_failed") from exc
+            finally:
+                if temporary is not None:
+                    try:
+                        os.unlink(temporary)
+                    except OSError:
+                        pass
+
+            try:
+                reread_raw, reread_document = _read_local_workflow_document(
+                    state_path, ref
+                )
+            except _LocalBaselineError as exc:
+                raise _LocalBaselineError("workflow_state_readback_failed") from exc
+            if (
+                reread_raw != document_bytes
+                or reread_document["state"] != state_candidate
+            ):
+                raise _LocalBaselineError("workflow_state_readback_failed")
+            new_revision = "sha256:" + hashlib.sha256(reread_raw).hexdigest()
+            return {
+                "status": "committed",
+                "workflow_ref": ref,
+                "state_revision": new_revision,
+                "artifact_ref": artifact_ref,
+                "artifact_revision": artifact_revision,
+                "artifact_sha256": artifact_digest,
+            }
+    except _LocalBaselineError as exc:
+        return {"status": "blocked", "reason": exc.reason}
+    except (OSError, ValueError):
+        return {"status": "blocked", "reason": "workflow_baseline_io_failed"}
+
+
+def read_qa_workflow_artifact_revision_local(
+    workflow_root: str | Path,
+    workflow_ref: str,
+    artifact_ref: str,
+    artifact_revision: str,
+) -> dict[str, Any]:
+    """Refetch an immutable local qa-workflow artifact from its fixed binding."""
+    try:
+        ref = _local_baseline_identity(workflow_ref)
+        if (
+            artifact_ref != f"qa-workflow-local:{ref}"
+            or not isinstance(artifact_revision, str)
+            or not re.fullmatch(r"sha256:[0-9a-f]{64}", artifact_revision)
+        ):
+            raise _LocalBaselineError("historical_artifact_binding_invalid")
+        root = _local_baseline_root(workflow_root, create=False)
+        digest = artifact_revision.split(":", 1)[1]
+        artifact_root = root / "artifacts"
+        workflow_artifact_root = artifact_root / ref
+        qa_artifact_root = workflow_artifact_root / "qa-workflow"
+        for path in (artifact_root, workflow_artifact_root, qa_artifact_root):
+            if path.is_symlink() or not path.is_dir():
+                raise _LocalBaselineError("historical_artifact_path_unavailable")
+        artifact_path = qa_artifact_root / f"{digest}.md"
+        _assert_local_regular_file(artifact_path, "historical_artifact")
+        raw = artifact_path.read_bytes()
+        if len(raw) > 16 * 1024 * 1024 or hashlib.sha256(raw).hexdigest() != digest:
+            raise _LocalBaselineError("historical_artifact_revision_mismatch")
+        try:
+            artifact_markdown = raw.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise _LocalBaselineError("historical_artifact_not_utf8") from exc
+        return {
+            "status": "current",
+            "workflow_ref": ref,
+            "artifact_ref": artifact_ref,
+            "artifact_revision": artifact_revision,
+            "artifact_sha256": digest,
+            "artifact_markdown": artifact_markdown,
+        }
+    except _LocalBaselineError as exc:
+        return {"status": "blocked", "reason": exc.reason}
+    except (OSError, ValueError):
+        return {"status": "blocked", "reason": "historical_artifact_read_failed"}
 
 
 _SQLITE_WORKFLOW_DB = "workflow-state.sqlite3"

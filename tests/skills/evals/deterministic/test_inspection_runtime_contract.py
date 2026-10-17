@@ -22,7 +22,7 @@ def metadata(*, formal: bool = False) -> dict:
     return {
         "envelope_version": "1",
         "skill": "usability-inspection",
-        "runtime_contract_version": "runtime-v1",
+        "runtime_contract_version": "runtime-v2",
         "generator_contract_version": "usability-inspection-runtime-v2",
         "runtime_unit_key": unit,
         "model_key": None,

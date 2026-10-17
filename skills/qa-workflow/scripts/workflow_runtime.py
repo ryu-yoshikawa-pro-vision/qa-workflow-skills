@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -181,7 +182,7 @@ def _runtime_metadata(
     return {
         "envelope_version": "1",
         "skill": skill,
-        "runtime_contract_version": "runtime-v1",
+        "runtime_contract_version": "runtime-v2",
         "generator_contract_version": generator_contract_version,
         "runtime_unit_key": "artifact:workflow_runtime:all"
         if skill == "qa-workflow"
@@ -620,6 +621,7 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
     reject_unknown(
         input_value,
         {
+            "workflow_ref",
             "workflow_scopes",
             "runtime_units",
             "current_entities",
@@ -627,6 +629,13 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
             "unsupported_item_closures",
         },
     )
+    workflow_ref = ensure_nonempty_string(input_value["workflow_ref"], "workflow_ref")
+    try:
+        parsed_workflow_ref = uuid.UUID(workflow_ref)
+    except (AttributeError, ValueError) as exc:
+        raise InvalidInput("workflow_ref must be a canonical UUID") from exc
+    if str(parsed_workflow_ref) != workflow_ref:
+        raise InvalidInput("workflow_ref must be a canonical UUID")
     scopes = _scope_rows(input_value["workflow_scopes"])
     if not scopes:
         raise InvalidInput(
@@ -819,6 +828,7 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
         "runtime_required": True,
         "deterministic_generated": True,
         "payload": {
+            "workflow_ref": workflow_ref,
             "expected_runtime_units": expected_units,
             "runtime_units": fresh_rows,
             "expected_entities": expected_entities,

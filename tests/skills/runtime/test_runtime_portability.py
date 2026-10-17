@@ -19,6 +19,10 @@ RUNTIME_SKILLS = (
     "coverage-analysis",
     "qa-workflow",
 )
+RUNTIME_CONTRACT_SKILLS = RUNTIME_SKILLS + (
+    "usability-inspection",
+    "wcag-conformance-evaluation",
+)
 
 REPRESENTATIVES = (
     ("spec-analysis", "authority_entities.py", "authority_entities", None),
@@ -65,9 +69,9 @@ def _runtime_metadata(skill: str, unit: str) -> dict:
     bare_unit = unit.split(":", 2)[1] if unit.startswith("artifact:") else unit
     contracts = {
         "analysis_entities": "analysis-entities-v1",
-        "requirement_structure": "requirement-structure-v1",
-        "condition_structure": "condition-structure-v1",
-        "case_structure": "case-structure-v1",
+        "requirement_structure": "requirement-structure-v2",
+        "condition_structure": "condition-structure-v2",
+        "case_structure": "case-structure-v2",
         "traceability": "traceability-v1",
         "workflow_runtime": "workflow-runtime-v1",
     }
@@ -78,7 +82,7 @@ def _runtime_metadata(skill: str, unit: str) -> dict:
     return {
         "envelope_version": "1",
         "skill": skill,
-        "runtime_contract_version": "runtime-v1",
+        "runtime_contract_version": "runtime-v2",
         "generator_contract_version": contracts[bare_unit],
         "runtime_unit_key": unit,
         "model_key": None,
@@ -100,7 +104,7 @@ class RuntimePortabilityTests(unittest.TestCase):
     def test_all_skill_local_contracts_are_byte_identical(self) -> None:
         paths = [
             REPO_ROOT / "skills" / skill / "scripts" / "runtime_contract.py"
-            for skill in RUNTIME_SKILLS
+            for skill in RUNTIME_CONTRACT_SKILLS
         ]
         self.assertTrue(all(path.is_file() for path in paths))
         self.assertEqual(len({path.read_bytes() for path in paths}), 1)
@@ -126,6 +130,8 @@ class RuntimePortabilityTests(unittest.TestCase):
                         if skill == "qa-workflow" and path.name == "workflow_runtime.py"
                         else set()
                     )
+                    if skill == "spec-analysis" and path.name == "ui_target_package.py":
+                        skill_allowed = skill_allowed | {"authority_entities"}
                     for name in names:
                         self.assertIn(name, skill_allowed, f"{path}: {name}")
 

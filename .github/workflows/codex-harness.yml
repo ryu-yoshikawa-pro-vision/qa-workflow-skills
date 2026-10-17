@@ -26,13 +26,11 @@ jobs:
         with:
           node-version: "24"
 
-      - name: Install pinned Codex CLI
-        run: npm install --global @openai/codex@0.160.0
+      - name: Install latest stable Codex CLI
+        run: npm install --global @openai/codex@latest
 
-      - name: Confirm Codex CLI version
-        run: |
-          test "$(codex --version)" = "codex-cli 0.160.0"
-          codex --version
+      - name: Record Codex CLI version
+        run: codex --version
 
       - name: Check Hook syntax
         run: node --check .codex/hooks/pre_tool_use_policy.mjs
@@ -67,8 +65,8 @@ jobs:
         with:
           node-version: "24"
 
-      - name: Install pinned Codex CLI
-        run: npm install --global @openai/codex@0.160.0
+      - name: Install latest stable Codex CLI
+        run: npm install --global @openai/codex@latest
 
       - name: Record PowerShell and Codex versions
         shell: pwsh
@@ -77,7 +75,6 @@ jobs:
           $powerShell7Version = pwsh.exe -NoProfile -Command '$PSVersionTable.PSVersion.ToString()'
           "Windows PowerShell $windowsPowerShellVersion"
           "PowerShell 7 $powerShell7Version"
-          if ((codex --version) -ne 'codex-cli 0.160.0') { throw 'Codex CLI version mismatch' }
           codex --version
 
       - name: Check Hook syntax

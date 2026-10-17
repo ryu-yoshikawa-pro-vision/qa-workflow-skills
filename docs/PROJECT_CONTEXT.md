@@ -4,9 +4,9 @@
 
 このリポジトリは、QA工程を担当するAgent Skill群と、その仕様適合・発火・決定論的出力・意味評価・workflow評価を管理する。`qa-workflow`が開始Skill、再利用、停止・再開、修正routingを判断し、工程固有の意味判断は担当Skillが行う。
 
-## PR #11で導入したruntime契約
+## 現在のruntime契約
 
-現在も使われているruntime実装は、対象Skill内の`scripts/`と対応する`SKILL.md` / referenceを正本とする。Python標準ライブラリだけで動作するSkill-local scriptが、LLMで正規化されたJSONをstdinから受け、stdoutへ1件のruntime envelopeを返す。runtime unitを持つSkillは`test-analysis`、`test-requirement-design`、`test-condition-design`、`test-case-design`、`coverage-analysis`、`qa-workflow`の6つで、`spec-analysis`は`runtime_contract.py`と`authority_entities.py`でAuthority Machine Entityだけを生成する。
+現在も使われているruntime実装は、対象Skill内の`scripts/`と対応する`SKILL.md` / referenceを正本とする。Python標準ライブラリだけで動作するSkill-local scriptが、LLMで正規化されたJSONをstdinから受け、stdoutへ1件のruntime envelopeを返す。shared `runtime_contract.py`は`spec-analysis`、`test-analysis`、`test-requirement-design`、`test-condition-design`、`test-case-design`、`coverage-analysis`、`qa-workflow`、`usability-inspection`、`wcag-conformance-evaluation`の9 Skillに同一内容で置かれている。`spec-analysis`は`authority_entities.py`でAuthority Machine Entityを生成し、`usability-inspection` / `wcag-conformance-evaluation`は各Skill固有のruntime契約と合わせて使用する。
 
 各対象Skillは同一内容の`scripts/runtime_contract.py`を同梱する。canonical JSON、strict decode、exact number、入力・model・generation fingerprint、Machine Entity、target stable ID、freshness、`verify_runtime_evidence`をこのSkill-local helperが所有する。技法固有generatorは同Skillのhelper以外をimportしない。実行時のinterpreter command名やtimeout APIはSkill契約へ固定しない。
 
@@ -30,9 +30,9 @@
 
 ### 現在の構成
 
-現在のrepository eval datasetは19 Skill、trigger 428 query、deterministic output 38 case、semantic 72 caseです。`qa-workflow` routing fixtureは61件です。
+現在のrepository eval datasetは22 Skill、trigger 488 query、deterministic output 46 case、semantic 163 caseです。`qa-workflow` routing fixtureは69件です。
 
-`Validate Agent Skills`は19 Skillの仕様適合とrepository eval structureを確認し、trigger 428 query、semantic datasetを検証します。`Validate Deterministic Output Evals`はdeterministic output 38 caseとvalidator / test構成を確認し、共通・repository deterministic test、runtime test、semantic validationを実行します。compile対象のproduction scriptは`spec-analysis`、PR #11 runtime対象6 Skill、PR #13の`regression-testing` / `exploratory-testing` / `qa-knowledge`です。
+`Validate Agent Skills`はcurrent repositoryの22 Skillから仕様適合とeval structureを導出し、trigger datasetとsemantic datasetを検証します。`Validate Deterministic Output Evals`はcurrent manifestの46 deterministic output caseとvalidator / test構成を確認し、共通・repository deterministic test、runtime test、semantic validationを実行します。compile対象のruntime scriptはcurrent repositoryの`skills/*/scripts`から動的に導出されます。PR #16ではUI target modeのrepository projection、runtime / Entity lifecycle、AC traceabilityおよび8 routing boundaryを追加しています。
 
 ### PR #11実装時の検証実績
 

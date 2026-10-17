@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from scripts.skills.evals.deterministic.common import (
     ID_PATTERNS,
     PRIORITIES,
@@ -15,15 +17,22 @@ from scripts.skills.evals.deterministic.markdown_parser import find_table, parse
 from scripts.skills.evals.deterministic.result import EvalResult
 
 DISPOSITIONS = {"別テストレベル", "残存リスク", "対象外", "ブロック中"}
+ACCEPTANCE_ID_RE = re.compile(r"(?<![A-Za-z0-9_-])AC-\d{3,}(?![A-Za-z0-9_-])")
 
 
 def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     result = EvalResult("test-requirement-design", eval_id)
     tables = parse_tables(text)
+    acceptance_spec = "known_acceptance_criteria" in expected
     tr_table = find_table(
         tables,
         section_contains="テスト要求一覧",
-        required_headers=("テスト要求ID", "現在有効な仕様根拠", "優先度"),
+        required_headers=(
+            "テスト要求ID",
+            "現在有効な仕様根拠",
+            "優先度",
+            *(("関連AC ID",) if acceptance_spec else ()),
+        ),
     )
     disp_table = find_table(
         tables,
@@ -58,10 +67,11 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     risk_spec = "known_product_risks" in expected or "product_risk_levels" in expected
     known_auth = set(expected.get("known_authorities", []))
     known_risks = set(expected.get("known_product_risks", []))
+    known_acceptance = set(expected.get("known_acceptance_criteria", []))
     if isinstance(expected.get("product_risk_levels"), dict):
         known_risks |= set(expected["product_risk_levels"])
 
-    ua, ur = [], []
+    ua, ur, uac = [], [], []
     for row in trs:
         tid = clean(row.get("テスト要求ID", ""))
         for ref in ids_in(row.get("現在有効な仕様根拠", "")):
@@ -70,9 +80,18 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         for ref in ids_in(row.get("関連プロダクトリスク", "")):
             if risk_spec and ref not in known_risks:
                 ur.append({"tr": tid, "reference": ref})
+        for ref in ACCEPTANCE_ID_RE.findall(row.get("関連AC ID", "")):
+            if acceptance_spec and ref not in known_acceptance:
+                uac.append({"tr": tid, "reference": ref})
     result.add("TR-D003", not ua, "仕様根拠参照が存在すること", evidence=ua or None)
     result.add(
         "TR-D004", not ur, "プロダクトリスク参照が存在すること", evidence=ur or None
+    )
+    result.add(
+        "TR-D016",
+        not uac,
+        "Acceptance Criteria参照が指定されたcurrent集合に存在すること",
+        evidence=uac or None,
     )
     add_allowed_assertion(
         result, "TR-D005", (r.get("優先度", "") for r in trs), PRIORITIES, "優先度"
@@ -101,10 +120,12 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         evidence=no_reason or None,
     )
 
-    disposition_known = (known_auth if auth_spec else set()) | (
-        known_risks if risk_spec else set()
+    disposition_known = (
+        (known_auth if auth_spec else set())
+        | (known_risks if risk_spec else set())
+        | (known_acceptance if acceptance_spec else set())
     )
-    disposition_check = auth_spec or risk_spec
+    disposition_check = auth_spec or risk_spec or acceptance_spec
     unknown_disposed = sorted(
         {
             clean(r.get("上流ID", ""))
@@ -133,10 +154,18 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         for ref in ids_in(row.get("関連プロダクトリスク", ""))
         if ref in known_risks
     }
-    linked_upstream = linked_auth | linked_risk
+    linked_acceptance = {
+        ref
+        for row in trs
+        for ref in ACCEPTANCE_ID_RE.findall(row.get("関連AC ID", ""))
+        if ref in known_acceptance
+    }
+    linked_upstream = linked_auth | linked_risk | linked_acceptance
     disposed_ids = {clean(r.get("上流ID", "")) for r in disposed}
-    closure_universe = (known_auth if auth_spec else set()) | (
-        known_risks if risk_spec else set()
+    closure_universe = (
+        (known_auth if auth_spec else set())
+        | (known_risks if risk_spec else set())
+        | (known_acceptance if acceptance_spec else set())
     )
     missing_closure = sorted(closure_universe - linked_upstream - disposed_ids)
     duplicate_closure = sorted(linked_upstream & disposed_ids)
@@ -148,17 +177,28 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     result.add(
         "TR-D009",
         not missing_closure and not duplicate_closure,
-        "フィクスチャの上流仕様根拠 / リスクがテスト要求または扱いのどちらか一方へ閉じること",
+        "フィクスチャのAuthority / Risk / ACが要求または扱いのどちらか一方へ個別に閉じること",
         evidence=closure_evidence,
     )
 
     required_links = set(expected.get("required_linked_upstream_ids", []))
-    missing_required_links = sorted(required_links - linked_auth - linked_risk)
+    missing_required_links = sorted(
+        required_links - linked_auth - linked_risk - linked_acceptance
+    )
     result.add(
         "TR-D014",
         not missing_required_links,
         "フィクスチャで必須の上流IDがテスト要求へ接続されていること",
         evidence=missing_required_links or None,
+    )
+
+    required_acceptance_links = set(expected.get("required_linked_acceptance_ids", []))
+    missing_acceptance_links = sorted(required_acceptance_links - linked_acceptance)
+    result.add(
+        "TR-D017",
+        not missing_acceptance_links,
+        "フィクスチャで必須のAcceptance Criteriaがテスト要求へ接続されていること",
+        evidence=missing_acceptance_links or None,
     )
 
     actual_dispositions = {

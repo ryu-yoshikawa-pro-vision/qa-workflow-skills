@@ -8,6 +8,7 @@ from typing import Any
 
 from runtime_contract import (
     MODEL_TYPES,
+    SCOPE_ID_RE,
     TCN_ID_RE,
     TECHNIQUE_SLUGS,
     TR_ID_RE,
@@ -23,12 +24,13 @@ from runtime_contract import (
     resolve_entity_dependencies,
     run_cli,
     seed_legacy_ids,
+    validate_machine_entity,
     validate_upstream_entities,
 )
 
 SKILL = "test-condition-design"
 GENERATOR = "condition_structure"
-GENERATOR_CONTRACT_VERSION = "condition-structure-v1"
+GENERATOR_CONTRACT_VERSION = "condition-structure-v2"
 SCRIPT_PATH = Path(__file__).resolve()
 ADAPTER_TYPES = {"classification", "cause-effect", "schema", "ui"}
 MODEL_TECHNIQUE = {
@@ -66,12 +68,21 @@ def _unique_strings(value: Any, name: str) -> list[str]:
     return rows
 
 
+def _scope_refs(value: Any, name: str) -> list[str]:
+    refs = _unique_strings(value, name)
+    if any(SCOPE_ID_RE.fullmatch(ref) is None for ref in refs):
+        raise InvalidInput(f"{name}に不正なScope IDがあります")
+    if refs != sorted(refs):
+        raise InvalidInput(f"{name}はcanonical sort済みである必要があります")
+    return refs
+
+
 def _validate_state_rows(rows: Any, kind: str) -> list[dict[str, Any]]:
     values = ensure_list(rows, f"previous_{kind}_ids")
     result = []
     seen: set[str] = set()
     if kind == "tcn":
-        allowed = {"tcn_id", "status"}
+        allowed = {"tcn_id", "status", "scope_refs"}
         for index, row in enumerate(values):
             if not isinstance(row, dict):
                 raise InvalidInput(f"previous_tcn_ids[{index}]が不正です")
@@ -79,10 +90,15 @@ def _validate_state_rows(rows: Any, kind: str) -> list[dict[str, Any]]:
             ref = _validate_id(
                 row["tcn_id"], "tcn", f"previous_tcn_ids[{index}].tcn_id"
             )
-            if row["status"] not in {"active", "deleted"} or ref in seen:
+            scope_refs = _scope_refs(
+                row["scope_refs"], f"previous_tcn_ids[{index}].scope_refs"
+            )
+            if row["status"] not in {"active", "inactive", "deleted"} or ref in seen:
                 raise InvalidInput("previous_tcn_idsのidentity/statusが不正です")
             seen.add(ref)
-            result.append({"tcn_id": ref, "status": row["status"]})
+            result.append(
+                {"tcn_id": ref, "status": row["status"], "scope_refs": scope_refs}
+            )
     else:
         allowed = {
             "model_key",
@@ -93,6 +109,7 @@ def _validate_state_rows(rows: Any, kind: str) -> list[dict[str, Any]]:
             "selection_key",
             "derived_from_model_key",
             "status",
+            "scope_refs",
         }
         for index, row in enumerate(values):
             if not isinstance(row, dict):
@@ -102,15 +119,128 @@ def _validate_state_rows(rows: Any, kind: str) -> list[dict[str, Any]]:
                 row["model_key"], "model", f"previous_model_keys[{index}].model_key"
             )
             _validate_model_metadata(row, f"previous_model_keys[{index}]")
+            scope_refs = _scope_refs(
+                row["scope_refs"], f"previous_model_keys[{index}].scope_refs"
+            )
             _validate_id(
                 row["parent_tcn_id"],
                 "tcn",
                 f"previous_model_keys[{index}].parent_tcn_id",
             )
-            if row["status"] not in {"active", "deleted"} or ref in seen:
+            if row["status"] not in {"active", "inactive", "deleted"} or ref in seen:
                 raise InvalidInput("previous_model_keysのidentity/statusが不正です")
             seen.add(ref)
-            result.append(canonicalize(row))
+            result.append(canonicalize({**row, "scope_refs": scope_refs}))
+    return result
+
+
+def _inactive_ids(rows: Any, name: str, kind: str) -> list[str]:
+    refs = _unique_strings(rows, name)
+    for ref in refs:
+        _validate_id(ref, kind, name)
+    if refs != sorted(refs):
+        raise InvalidInput(f"{name}はcanonical sort済みである必要があります")
+    return refs
+
+
+def _inactive_entity_history(
+    rows: Any, entity_type: str, id_field: str
+) -> dict[str, dict[str, Any]]:
+    result = {}
+    order = []
+    for index, raw_entity in enumerate(
+        ensure_list(rows, f"inactive_{entity_type}_history")
+    ):
+        entity = validate_machine_entity(raw_entity, expected_skill=SKILL)
+        ref = entity["entity_ref"]
+        scope_refs = entity["content"].get("scope_refs")
+        if (
+            entity["entity_type"] != entity_type
+            or ref in result
+            or entity["content"].get(id_field) != ref
+            or not isinstance(scope_refs, list)
+        ):
+            raise InvalidInput(f"inactive_{entity_type}_history[{index}]が不正です")
+        _scope_refs(scope_refs, f"inactive_{entity_type}_history[{index}].scope_refs")
+        result[ref] = entity
+        order.append(ref)
+    if order != sorted(order):
+        raise InvalidInput(
+            f"inactive_{entity_type}_historyはidentity順である必要があります"
+        )
+    return result
+
+
+def _inactive_materialize_history(rows: Any) -> dict[str, dict[str, Any]]:
+    result = {}
+    order = []
+    required = {
+        "tcn_id",
+        "ci_entities",
+        "ci_id_state",
+        "target_mapping_state",
+        "semantic_ci_mapping_state",
+        "expected_result_root_state",
+    }
+    for index, row in enumerate(ensure_list(rows, "inactive_materialize_history")):
+        if not isinstance(row, dict) or set(row) != required:
+            raise InvalidInput(
+                f"inactive_materialize_history[{index}] schemaが不正です"
+            )
+        tcn_id = _validate_id(
+            row["tcn_id"], "tcn", "inactive_materialize_history.tcn_id"
+        )
+        if tcn_id in result:
+            raise InvalidInput("inactive_materialize_history.tcn_idが重複しています")
+        ci_entities = []
+        seen_ci = set()
+        for raw_entity in ensure_list(
+            row["ci_entities"], "inactive_materialize_history.ci_entities"
+        ):
+            entity = validate_machine_entity(raw_entity, expected_skill=SKILL)
+            if entity["entity_type"] != "ci" or not entity["entity_ref"].startswith(
+                tcn_id + "-"
+            ):
+                raise InvalidInput(
+                    "inactive_materialize_history.ci_entities identityが不正です"
+                )
+            if entity["entity_ref"] in seen_ci:
+                raise InvalidInput(
+                    "inactive_materialize_history.ci_entitiesが重複しています"
+                )
+            seen_ci.add(entity["entity_ref"])
+            ci_entities.append(entity)
+        ci_entities.sort(key=lambda entity: entity["entity_ref"])
+        ci_state = ensure_list(
+            row["ci_id_state"], "inactive_materialize_history.ci_id_state"
+        )
+        for state in ci_state:
+            if not isinstance(state, dict) or set(state) != {
+                "ci_id",
+                "status",
+                "scope_refs",
+            }:
+                raise InvalidInput(
+                    "inactive_materialize_history.ci_id_state rowが不正です"
+                )
+            if state["status"] not in {"active", "inactive", "deleted"}:
+                raise InvalidInput(
+                    "inactive_materialize_history.ci_id_state statusが不正です"
+                )
+            _scope_refs(
+                state["scope_refs"],
+                "inactive_materialize_history.ci_id_state.scope_refs",
+            )
+            ci_id = state["ci_id"]
+            if not isinstance(ci_id, str) or not ci_id.startswith(tcn_id + "-"):
+                raise InvalidInput(
+                    "inactive_materialize_history.ci_id_state ownerが不正です"
+                )
+        normalized = canonicalize({**row, "ci_entities": ci_entities})
+        result[tcn_id] = normalized
+        order.append(tcn_id)
+    if order != sorted(order):
+        raise InvalidInput("inactive_materialize_historyはtcn_id順である必要があります")
     return result
 
 
@@ -151,7 +281,9 @@ def _validate_tr_rows(rows: Any) -> dict[str, dict[str, Any]]:
     for index, row in enumerate(ensure_list(rows, "test_requirements")):
         if not isinstance(row, dict):
             raise InvalidInput(f"test_requirements[{index}]が不正です")
-        reject_unknown(row, {"tr_id", "priority", "authority_refs", "risk_refs"})
+        reject_unknown(
+            row, {"tr_id", "priority", "authority_refs", "risk_refs", "scope_refs"}
+        )
         tr_id = row.get("tr_id")
         if not isinstance(tr_id, str) or TR_ID_RE.fullmatch(tr_id) is None:
             raise InvalidInput(f"test_requirements[{index}].tr_idの形式が不正です")
@@ -159,6 +291,7 @@ def _validate_tr_rows(rows: Any) -> dict[str, dict[str, Any]]:
             raise InvalidInput("test_requirements.tr_idが重複しています")
         for field in ("authority_refs", "risk_refs"):
             _unique_strings(row.get(field), f"test_requirements[{index}].{field}")
+        _scope_refs(row.get("scope_refs"), f"test_requirements[{index}].scope_refs")
         result[tr_id] = canonicalize(row)
     return result
 
@@ -410,11 +543,38 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
             "previous_model_keys",
             "update_scope_tcn_ids",
             "update_scope_model_keys",
+            "inactive_tcn_ids",
+            "inactive_model_keys",
+            "inactive_tcn_history",
+            "inactive_model_history",
+            "inactive_materialize_history",
+            "zero_scope_terminal",
         },
         {"legacy_tcn_ids"},
     )
     current_entities = validate_upstream_entities(metadata)
     tr_rows = _validate_tr_rows(input_value["test_requirements"])
+    current_tr_entities = {
+        entity["entity_ref"]: entity
+        for entity in current_entities
+        if entity["skill"] == "test-requirement-design"
+        and entity["entity_type"] == "tr"
+    }
+    for tr_id, row in tr_rows.items():
+        entity = current_tr_entities.get(tr_id)
+        if entity is None:
+            if metadata["input_mode"] == "artifact":
+                raise InvalidInput(
+                    "artifact mode test_requirementsにcurrent TR Entityがありません"
+                )
+            continue
+        if (
+            entity["content"].get("tr_id") != tr_id
+            or entity["content"].get("scope_refs") != row["scope_refs"]
+        ):
+            raise InvalidInput(
+                "test_requirements.scope_refsがcurrent TR Entityと一致しません"
+            )
     selections = _validate_selection_rows(input_value["technique_selections"])
     disposition_rows = _validate_dispositions(
         input_value["requirement_dispositions"],
@@ -428,6 +588,26 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
     model_drafts = _validate_model_drafts(input_value["models"])
     previous_tcn = _validate_state_rows(input_value["previous_tcn_ids"], "tcn")
     previous_models = _validate_state_rows(input_value["previous_model_keys"], "model")
+    inactive_tcn_ids = set(
+        _inactive_ids(input_value["inactive_tcn_ids"], "inactive_tcn_ids", "tcn")
+    )
+    inactive_model_keys = set(
+        _inactive_ids(
+            input_value["inactive_model_keys"], "inactive_model_keys", "model"
+        )
+    )
+    inactive_tcn_history = _inactive_entity_history(
+        input_value["inactive_tcn_history"], "tcn", "tcn_id"
+    )
+    inactive_model_history = _inactive_entity_history(
+        input_value["inactive_model_history"], "model", "model_key"
+    )
+    inactive_materialize_history = _inactive_materialize_history(
+        input_value["inactive_materialize_history"]
+    )
+    if not isinstance(input_value["zero_scope_terminal"], bool):
+        raise InvalidInput("zero_scope_terminalはbooleanである必要があります")
+    zero_scope_terminal = input_value["zero_scope_terminal"]
     update_tcn = set(
         _unique_strings(input_value["update_scope_tcn_ids"], "update_scope_tcn_ids")
     )
@@ -455,22 +635,82 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
         ):
             raise InvalidInput("legacy_tcn_idsは初回direct昇格でのみ使用できます")
         for row in seeded:
-            previous_tcn_map[row["id"]] = {"tcn_id": row["id"], "status": row["status"]}
+            previous_tcn_map[row["id"]] = {
+                "tcn_id": row["id"],
+                "status": row["status"],
+                "scope_refs": [],
+            }
             update_tcn.add(row["id"])
         previous_tcn = sorted(previous_tcn_map.values(), key=lambda row: row["tcn_id"])
     for ref in update_tcn:
-        if ref not in previous_tcn_map or previous_tcn_map[ref]["status"] != "active":
+        if ref not in previous_tcn_map or previous_tcn_map[ref]["status"] not in {
+            "active",
+            "inactive",
+        }:
             raise InvalidInput(
                 "update_scope_tcn_idsがactive previous stateを参照していません"
             )
     for ref in update_model:
-        if (
-            ref not in previous_model_map
-            or previous_model_map[ref]["status"] != "active"
-        ):
+        if ref not in previous_model_map or previous_model_map[ref]["status"] not in {
+            "active",
+            "inactive",
+        }:
             raise InvalidInput(
                 "update_scope_model_keysがactive previous stateを参照していません"
             )
+
+    if inactive_tcn_ids & update_tcn or any(
+        previous_tcn_map.get(ref, {}).get("status") != "active"
+        for ref in inactive_tcn_ids
+    ):
+        raise InvalidInput(
+            "inactive_tcn_idsはupdate scope外のactive previous TCNだけを指定できます"
+        )
+    if inactive_model_keys & update_model or any(
+        previous_model_map.get(ref, {}).get("status") != "active"
+        for ref in inactive_model_keys
+    ):
+        raise InvalidInput(
+            "inactive_model_keysはupdate scope外のactive previous modelだけを指定できます"
+        )
+    expected_inactive_tcn_history = {
+        row["tcn_id"] for row in previous_tcn if row["status"] == "inactive"
+    } | inactive_tcn_ids
+    expected_inactive_model_history = {
+        row["model_key"] for row in previous_models if row["status"] == "inactive"
+    } | inactive_model_keys
+    if set(inactive_tcn_history) != expected_inactive_tcn_history:
+        raise InvalidInput(
+            "inactive_tcn_historyがprevious inactive stateと一致しません"
+        )
+    if set(inactive_model_history) != expected_inactive_model_history:
+        raise InvalidInput(
+            "inactive_model_historyがprevious inactive stateと一致しません"
+        )
+    if zero_scope_terminal and (
+        tcn_drafts
+        or model_drafts
+        or tr_rows
+        or selections
+        or disposition_rows
+        or inactive_tcn_ids
+        or inactive_model_keys
+        or update_tcn
+        != {
+            row["tcn_id"]
+            for row in previous_tcn
+            if row["status"] in {"active", "inactive"}
+        }
+        or update_model
+        != {
+            row["model_key"]
+            for row in previous_models
+            if row["status"] in {"active", "inactive"}
+        }
+    ):
+        raise InvalidInput(
+            "zero_scope_terminalはcurrent inputを空にして全previous active / inactive IDを閉じる場合だけ許可されます"
+        )
 
     used_tcn = set(previous_tcn_map)
     tcn_mapping: dict[str, str] = {}
@@ -481,7 +721,8 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
             if (
                 ref not in update_tcn
                 or ref in reused_tcn
-                or previous_tcn_map.get(ref, {}).get("status") != "active"
+                or previous_tcn_map.get(ref, {}).get("status")
+                not in {"active", "inactive"}
             ):
                 raise InvalidInput("TCN reuse対象がscope内activeではありません")
             reused_tcn.add(ref)
@@ -493,6 +734,17 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
             ]
             ref = _allocate("TCN", used_tcn, max(previous_numbers, default=0) + 1, 999)
         tcn_mapping[draft["draft_key"]] = ref
+
+    current_scope_by_tcn = {
+        tcn_mapping[draft["draft_key"]]: sorted(
+            {
+                scope_ref
+                for tr_id in draft["tr_refs"]
+                for scope_ref in tr_rows.get(tr_id, {}).get("scope_refs", [])
+            }
+        )
+        for draft in tcn_drafts
+    }
 
     model_mapping: dict[str, str] = {}
     model_metadata: dict[str, dict[str, Any]] = {}
@@ -517,7 +769,8 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
             if (
                 ref not in update_model
                 or ref in reused_models
-                or previous_model_map.get(ref, {}).get("status") != "active"
+                or previous_model_map.get(ref, {}).get("status")
+                not in {"active", "inactive"}
             ):
                 raise InvalidInput("model reuse対象がscope内activeではありません")
             previous = previous_model_map[ref]
@@ -579,6 +832,7 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
             "selection_source": draft["selection_source"],
             "selection_key": draft["selection_key"],
             "derived_from_model_key": derived_from,
+            "scope_refs": current_scope_by_tcn[parent_tcn],
             "status": "active",
         }
         model_mapping[draft["draft_key"]] = ref
@@ -670,6 +924,7 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
         tcn_id = tcn_mapping[draft["draft_key"]]
         content = {
             "tcn_id": tcn_id,
+            "scope_refs": current_scope_by_tcn[tcn_id],
             "tr_refs": draft["tr_refs"],
             "condition": draft["condition"],
             "category": draft["category"],
@@ -782,20 +1037,40 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
     tcn_state = []
     for row in previous_tcn:
         status = row["status"]
+        scope_refs = row["scope_refs"]
         if row["tcn_id"] in update_tcn:
             status = "active" if row["tcn_id"] in reused_tcn else "deleted"
-        tcn_state.append({"tcn_id": row["tcn_id"], "status": status})
+            if status == "active":
+                scope_refs = current_scope_by_tcn[row["tcn_id"]]
+            elif zero_scope_terminal:
+                scope_refs = []
+        elif row["tcn_id"] in inactive_tcn_ids:
+            status = "inactive"
+        tcn_state.append(
+            {"tcn_id": row["tcn_id"], "status": status, "scope_refs": scope_refs}
+        )
     for draft in tcn_drafts:
         tcn_state.append(
-            {"tcn_id": tcn_mapping[draft["draft_key"]], "status": "active"}
+            {
+                "tcn_id": tcn_mapping[draft["draft_key"]],
+                "status": "active",
+                "scope_refs": current_scope_by_tcn[tcn_mapping[draft["draft_key"]]],
+            }
         )
     tcn_state = _dedupe_state(tcn_state, "tcn_id")
     model_state = []
     for row in previous_models:
         status = row["status"]
+        scope_refs = row["scope_refs"]
         if row["model_key"] in update_model:
             status = "active" if row["model_key"] in reused_models else "deleted"
-        model_state.append({**row, "status": status})
+            if status == "active":
+                scope_refs = model_metadata[row["model_key"]]["scope_refs"]
+            elif zero_scope_terminal:
+                scope_refs = []
+        elif row["model_key"] in inactive_model_keys:
+            status = "inactive"
+        model_state.append({**row, "scope_refs": scope_refs, "status": status})
     for row in model_metadata.values():
         model_state.append({**row, "status": "active"})
     model_state = _dedupe_state(model_state, "model_key")
@@ -810,6 +1085,7 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
             "model_type": row["model_type"],
             "technique_slug": row["technique_slug"],
             "parent_tcn_id": row["parent_tcn_id"],
+            "scope_refs": row["scope_refs"],
             "content_fingerprint": model_entities[row["model_key"]][
                 "content_fingerprint"
             ],
@@ -823,6 +1099,18 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
             "identity_action": draft["identity_action"],
         }
         for draft in sorted(tcn_drafts, key=lambda row: row["draft_key"])
+    ]
+    next_tcn_status = {row["tcn_id"]: row["status"] for row in tcn_state}
+    next_model_status = {row["model_key"]: row["status"] for row in model_state}
+    current_inactive_tcn_history = [
+        inactive_tcn_history[ref]
+        for ref in sorted(next_tcn_status)
+        if next_tcn_status[ref] == "inactive"
+    ]
+    current_inactive_model_history = [
+        inactive_model_history[ref]
+        for ref in sorted(next_model_status)
+        if next_model_status[ref] == "inactive"
     ]
     model_key_map = [
         {
@@ -880,6 +1168,13 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
             "model_key_map": model_key_map,
             "tcn_id_state": sorted(tcn_state, key=lambda row: row["tcn_id"]),
             "model_key_state": sorted(model_state, key=lambda row: row["model_key"]),
+            "inactive_tcn_history": current_inactive_tcn_history,
+            "inactive_model_history": current_inactive_model_history,
+            "inactive_materialize_history": [
+                inactive_materialize_history[ref]
+                for ref in sorted(inactive_materialize_history)
+                if next_tcn_status.get(ref) != "deleted"
+            ],
             "active_model_metadata": active_model_metadata,
             "violations": violations,
             "expected_entity_identities": [

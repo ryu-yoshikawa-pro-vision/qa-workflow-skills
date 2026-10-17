@@ -7,5 +7,11 @@
   "previous_tcn_ids": [],
   "previous_model_keys": [],
   "update_scope_tcn_ids": [],
-  "update_scope_model_keys": []
+  "update_scope_model_keys": [],
+  "inactive_tcn_ids": [],
+  "inactive_model_keys": [],
+  "inactive_tcn_history": [],
+  "inactive_model_history": [],
+  "inactive_materialize_history": [],
+  "zero_scope_terminal": false
 }

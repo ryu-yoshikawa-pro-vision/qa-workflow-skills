@@ -24,7 +24,25 @@ description: 新規・変更機能のQA設計と要求されたE2E工程に加�
 
 本Skillは工程固有generatorを再実装せず、対象scopeが1件以上ある場合だけ担当Skillのruntime dispatch結果を統合します。scope 0ではruntimeをdispatchせず、既存のworkflow契約を維持します。統合するMachine Runtime Input / ResultとMachine Entityは、Skill名・runtime unit・Model Key・stable ID・fingerprint・freshnessを持つ機械証拠です。
 
+`workflow_runtime.py`へのnormalized inputは、既存workflow stateと同じcanonical UUIDの`workflow_ref`を必須で渡します。Result payloadも同じ値を返し、別workflowのevidence混在を許しません。
+
 runtimeの`can_complete`はオーケストレーションの要約であり、下流のsemantic coverage、実行結果、報告、cleanup確認を置き換えません。`current`でない上流Entityやruntime結果は再利用せず、変更があれば依存fingerprintから影響対象だけを`要再検証`へ伝播します。
+
+### UIテスト対象分析のroutingとscope readiness
+
+spec-analysisのUI target modeが要求された場合は、package作成・更新後に必ず`ui_target_package.py inspect`を実行し、`current_scope_ids[] / ready_scope_ids[] / blocked_scope_ids[]`をそのまま使います。current UNKNOWN全件や手作業で選んだscope集合からready状態を推定しません。
+
+- migrationが必要なartifactでは`migration_preflight.py`の`migration_status / cutover_next_action`に従い、runtime-v2 cutoverを固定Skill順で先に完了します。TCDの内部phaseは同Skillの`runtime_v1_cutover.py phase=resume`へ委譲します。
+- 既存downstreamにscope ownershipがなく、migration preflightが`scope_ownership_baseline_required`を返した場合は、全current scopeがreadyの時だけ全scopeを含む初回TRD→TCD→TC normalizationを実施します。blocked scopeへownershipを推測配分しません。
+- `ready_scope_ids[]`が1件以上なら、ready scope全件を一括handoffし、test-analysis→TRD→TCD→TC→coverage-analysisを1回ずつ進めます。blocked scopeをhandoffへ含めず、同一Skillをscopeごとに重複dispatchしません。
+- `current_scope_ids[]`がnon-emptyで`ready_scope_ids[]`が空なら全scope blockedです。empty batchやdownstream runtimeを起動せず、最後に完了したbaselineを保持し、question-analysis等の必要な回答先とresume先だけをworkflow stateへ残します。
+- `current_scope_ids[]`が空なら全scope retireです。全blocked経路へ戻しません。既存baselineがあれば`downstream_state.py`でterminal deletionを導出し、owner generatorのdeletion-only path、coverage-analysis、通常のqa-workflow final gateを通します。bindingがない初回workflowは削除runtimeなしでpackageをcompleteにできます。
+
+previous downstream stateはcurrent workflow stateの`last_completed_qa_workflow_artifact` bindingからだけ復元します。local filesystemでは`artifact_graph.py`のexact historical revision readbackを行い、Markdown SHAとworkflow_refを検査してから`downstream_state.py`へ渡します。能力フラグやraw artifactの最新値だけでprevious baselineを選びません。
+
+通常のblocked scopeは`scope_refs[]`に交差するEntityだけをinactiveへ移し、last-active snapshotをhelper出力どおり各generatorへ渡します。inactive自身はcurrent Entity / runtimeへ含めず、それだけでready scopeを停止させません。retired scopeはsemantic ownerのreuse / deletion判断とgenerator適用stateをhelperで照合するまで解決済みにしません。再ready時はEntity history / materialize historyをsemantic identityの比較とstable ID復元に使います。
+
+candidate qa-workflow artifactの`verify_runtime_evidence.valid=true`とruntime payloadの`can_complete=true`を確認した後にだけbaselineを保存します。local単一hostではimmutable snapshotの保存・exact refetch・workflow-ref lock内state revision比較・atomic state updateがすべて成功した場合だけbindingを更新します。失敗・blocked・unresolvedでは直前のbindingを保持します。
 
 ### 最終runtime evidence gate
 
@@ -80,5 +98,8 @@ helperの必須処理が入力不足・実行不能・保存先能力不足で�
 
 - オーケストレーション詳細: `references/guidance.md`
 - artifact graph / workflow state / currentness / claim / reservation production helper: `scripts/artifact_graph.py`
+- Project ContextがDEC / ASM正本ownerの場合のID materialize / 履歴検証: `scripts/project_context_ids.py`
+- runtime-v2 migration / scope ownershipのnext action: `scripts/migration_preflight.py`
+- previous downstream scope ownership / inactive history / scope removal resolution: `scripts/downstream_state.py`
 - 案件コンテキスト既定形: `assets/project-context-template.md`
 - 任意のワークフロー状態表: `assets/workflow-state-template.md`

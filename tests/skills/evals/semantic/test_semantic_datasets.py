@@ -76,10 +76,22 @@ class SemanticDatasetTests(unittest.TestCase):
             *(f"RISK-SEM-{index:03d}" for index in range(3, 8)),
             *(f"TCN-SEM-{index:03d}" for index in range(3, 15)),
             *(f"REV-SEM-{index:03d}" for index in range(3, 9)),
+            *(f"SPEC-SEM-{index:03d}" for index in range(3, 8)),
+            "QUESTION-SEM-003",
+            "QUESTION-SEM-004",
+            "TR-SEM-003",
         ]
         for case_id in required_ids:
             with self.subTest(case_id=case_id):
                 self.assertIn(case_id, text)
+        for repository_contract in (
+            "scripts/skills/evals/ui_target_projection.py",
+            "SPEC-OUT-003",
+            "TR-OUT-003",
+            "WF-UI-TARGET-008",
+        ):
+            with self.subTest(repository_contract=repository_contract):
+                self.assertIn(repository_contract, text)
 
 
 if __name__ == "__main__":

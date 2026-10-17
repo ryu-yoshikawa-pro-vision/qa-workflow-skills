@@ -59,6 +59,7 @@ ENTITY_FIELDS = {
 }
 ENTITY_TYPES = {
     "authority",
+    "acceptance_criterion",
     "test_analysis_context",
     "product_risk",
     "technique_selection",
@@ -86,6 +87,7 @@ RECORD_SORT_FIELDS = {
     "partitions": ("partition_key",),
     "technique_selections": ("selection_key",),
     "test_requirements": ("tr_id",),
+    "acceptance_criteria": ("ac_id",),
     "test_conditions": ("draft_key",),
     "source_target_versions": ("target_ref",),
     "target_annotations": ("target_ref",),
@@ -102,11 +104,13 @@ SET_ARRAY_KEYS = {
     "ci_refs",
     "source_refs",
     "related_authority_refs",
+    "acceptance_refs",
     "selected_techniques",
     "changed_node_keys",
     "initial_states",
     "initial_node_keys",
 }
+ENTITY_SCHEMA_VERSION = "entity-state-v2"
 FULL_DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 REPO_ROOT = Path(__file__).resolve().parents[4]
 
@@ -183,6 +187,10 @@ def _canonicalize(value: Any, parent_key: str | None = None) -> Any:
         return {key: normalized[key] for key in sorted(normalized)}
     if isinstance(value, list):
         normalized = [_canonicalize(child, parent_key=parent_key) for child in value]
+        if parent_key in {"authority_refs", "risk_refs", "acceptance_refs"} and all(
+            isinstance(item, str) for item in normalized
+        ):
+            return sorted(normalized)
         if parent_key in SET_ARRAY_KEYS:
             unique = {_canonical_text(item): item for item in normalized}
             return [unique[key] for key in sorted(unique)]
@@ -861,7 +869,7 @@ def validate_runtime_evidence(
                 invalid_entities.append(f"{identity}[{index}]")
                 continue
             if (
-                entity.get("schema_version") != "entity-state-v1"
+                entity.get("schema_version") != ENTITY_SCHEMA_VERSION
                 or entity.get("skill") != identity
                 or entity.get("entity_type") not in ENTITY_TYPES
                 or not isinstance(entity.get("entity_ref"), str)

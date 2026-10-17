@@ -7,6 +7,7 @@ __pycache__/
 /.playwright-cli/
 /.playwright-mcp/
 CHANGELOG.md
+!skills/spec-analysis/assets/ui-test-target-analysis/CHANGELOG.md
 MIGRATION.md
 SECURITY.md
 output/*
@@ -29,6 +30,7 @@ QA_AGENT.md
 .textlintrc.json
 .editorconfig
 .artifacts
+.venv
 
 # Repository-owned Codex development harness
 !AGENTS.md

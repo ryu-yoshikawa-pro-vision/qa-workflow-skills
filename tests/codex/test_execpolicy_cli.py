@@ -1,4 +1,4 @@
-"""Execpolicy rules are loaded and probed by the pinned Codex CLI itself."""
+"""Execpolicy rules are loaded and probed by the installed Codex CLI itself."""
 
 from __future__ import annotations
 
@@ -17,10 +17,11 @@ RULES = [
 ]
 
 
-@unittest.skipUnless(CODEX, "Codex CLI 0.160.0 is required for execpolicy tests")
 class ExecpolicyCliTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
+        if CODEX is None:
+            raise RuntimeError("Codex CLI is required for execpolicy contract tests")
         if os.name == "nt":
             cls.command_prefix = [
                 os.environ.get("COMSPEC", "cmd.exe"),
@@ -37,11 +38,13 @@ class ExecpolicyCliTests(unittest.TestCase):
             text=True,
             check=False,
         )
-        if version.returncode != 0 or version.stdout.strip() != "codex-cli 0.160.0":
+        cls.version = (version.stdout or version.stderr).strip()
+        if version.returncode != 0 or not cls.version:
             raise AssertionError(
-                f"expected codex-cli 0.160.0; got {version.stdout.strip()!r} "
+                f"could not read Codex CLI version; got {cls.version!r} "
                 f"(exit {version.returncode})"
             )
+        print(f"Using Codex CLI: {cls.version}")
 
     def decision(self, *command: str) -> str:
         args = [*self.command_prefix, "execpolicy", "check"]
@@ -57,7 +60,19 @@ class ExecpolicyCliTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         response = json.loads(result.stdout)
-        return response.get("decision", "no_match")
+        self.assertIsInstance(response, dict)
+        return self.classify(response)
+
+    def classify(self, response: dict[str, object]) -> str:
+        decision = response.get("decision")
+        if decision is not None:
+            self.assertIn(decision, {"no_match", "prompt", "forbidden"})
+            return str(decision)
+
+        # Some CLI builds omit the explicit decision only when there are no matches.
+        # Treat that shape as no_match only when the CLI confirms an empty rule list.
+        self.assertEqual(response.get("matchedRules"), [])
+        return "no_match"
 
     def test_each_rules_file_loads_and_runs_its_embedded_match_examples(self) -> None:
         for rule in RULES:
@@ -80,9 +95,9 @@ class ExecpolicyCliTests(unittest.TestCase):
                     check=False,
                 )
                 self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertEqual(
-                    json.loads(result.stdout).get("decision", "no_match"), "no_match"
-                )
+                response = json.loads(result.stdout)
+                self.assertIsInstance(response, dict)
+                self.assertEqual(self.classify(response), "no_match")
 
     def test_git_high_impact_families_prompt(self) -> None:
         cases = (

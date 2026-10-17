@@ -34,7 +34,9 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     result = EvalResult("question-analysis", eval_id)
     tables = parse_tables(text)
     q_table = find_table(
-        tables, section_contains="不明点 / 質問一覧", required_headers=("ID", "分類")
+        tables,
+        section_contains="不明点 / 質問一覧",
+        required_headers=("ID", "分類"),
     )
     a_table = find_table(
         tables, section_contains="仮定候補", required_headers=("仮定候補", "状態")
@@ -366,4 +368,97 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         "質問一覧とブロック中範囲のruntime identityが一致すること",
         evidence=runtime_consistency or None,
     )
+
+    expected_related = expected.get("expected_related_unknowns")
+    known_unknown_ids = expected.get("known_unknown_ids")
+    resolved_unknown_ids = set(expected.get("resolved_unknown_ids", []))
+    if expected_related is not None or known_unknown_ids is not None:
+        related_issues = []
+        if "関連UNKNOWN ID" not in (q_table.headers if q_table else []):
+            related_issues.append(
+                {"issue": "question table is missing related UNKNOWN column"}
+            )
+        else:
+            known = set(known_unknown_ids or [])
+            if known & resolved_unknown_ids:
+                related_issues.append(
+                    {"issue": "known and resolved UNKNOWN sets overlap"}
+                )
+            for row in questions:
+                qid = clean(row.get("ID", ""))
+                raw = clean(row.get("関連UNKNOWN ID", ""))
+                refs = [] if not raw else [part.strip() for part in raw.split("<br>")]
+                malformed = [
+                    ref for ref in refs if not ID_PATTERNS["UNKNOWN"].fullmatch(ref)
+                ]
+                duplicate_refs = sorted({ref for ref in refs if refs.count(ref) > 1})
+                missing_known = (
+                    sorted(set(refs) - known) if known_unknown_ids is not None else []
+                )
+                resolved_only = sorted(set(refs) & resolved_unknown_ids - known)
+                wanted = (
+                    expected_related.get(qid)
+                    if isinstance(expected_related, dict)
+                    else None
+                )
+                wrong_mapping = (
+                    sorted(set(refs)) != sorted(set(wanted))
+                    if wanted is not None
+                    else False
+                )
+                if (
+                    malformed
+                    or duplicate_refs
+                    or missing_known
+                    or resolved_only
+                    or wrong_mapping
+                ):
+                    related_issues.append(
+                        {
+                            "question_id": qid,
+                            "malformed": malformed,
+                            "duplicate": duplicate_refs,
+                            "unknown": missing_known,
+                            "resolved_only": resolved_only,
+                            "expected": wanted,
+                            "actual": sorted(set(refs)),
+                        }
+                    )
+        result.add(
+            "QUESTION-D021",
+            not related_issues,
+            "質問とcurrent UNKNOWNの対応が形式・存在・fixture期待に一致すること",
+            evidence=related_issues or None,
+        )
+
+    expected_history = expected.get("question_id_history")
+    if expected_history is not None:
+        history_table = find_table(
+            tables, section_contains="質問ID履歴", required_headers=("ID",)
+        )
+        actual_history = (
+            [clean(row.get("ID", "")) for row in nonempty_rows(history_table)]
+            if history_table
+            else []
+        )
+        invalid_history = [
+            value
+            for value in actual_history
+            if not ID_PATTERNS["QUESTION"].fullmatch(value)
+        ]
+        history_ok = (
+            history_table is not None
+            and not invalid_history
+            and actual_history == sorted(set(actual_history))
+            and actual_history == expected_history
+            and set(ids).issubset(actual_history)
+        )
+        result.add(
+            "QUESTION-D022",
+            history_ok,
+            "質問ID履歴がcurrent Qを含むcanonicalな使用済みID集合であること",
+            evidence={"expected": expected_history, "actual": actual_history}
+            if not history_ok
+            else None,
+        )
     return result

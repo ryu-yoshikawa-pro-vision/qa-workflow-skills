@@ -20,13 +20,80 @@ from runtime_contract import (
     canonicalize,
     ensure_list,
     ensure_nonempty_string,
+    extract_machine_blocks,
     implementation_fingerprint,
     make_machine_entity,
     reject_unknown,
+    sha256_digest,
     strict_loads,
 )
 
 SCRIPT_PATH = Path(__file__).resolve()
+_V1_ENTITY_FIELDS = {
+    "schema_version",
+    "skill",
+    "entity_type",
+    "entity_ref",
+    "model_key",
+    "content",
+    "content_fingerprint",
+    "upstream_entity_dependencies",
+    "runtime_dependencies",
+}
+
+
+def _authorities_from_v1_artifact(markdown: object) -> list[dict]:
+    if not isinstance(markdown, str):
+        raise InvalidInput("source_artifact_markdown must be a string")
+    blocks = extract_machine_blocks(markdown, "Machine Entities", allow_duplicates=True)
+    selected = [
+        (identity, body) for identity, body in blocks if identity == "spec-analysis"
+    ]
+    if len(selected) != 1:
+        raise InvalidInput(
+            "exactly one v1 spec-analysis Machine Entities block is required"
+        )
+    _identity, wrapper = selected[0]
+    if (
+        set(wrapper) != {"schema_version", "skill", "entities"}
+        or wrapper.get("schema_version") != "entity-state-v1"
+        or wrapper.get("skill") != "spec-analysis"
+        or not isinstance(wrapper.get("entities"), list)
+    ):
+        raise InvalidInput("v1 Machine Entities wrapper is invalid")
+    authorities = []
+    seen: set[str] = set()
+    for index, entity in enumerate(wrapper["entities"]):
+        if (
+            not isinstance(entity, dict)
+            or set(entity) != _V1_ENTITY_FIELDS
+            or entity.get("schema_version") != "entity-state-v1"
+            or entity.get("skill") != "spec-analysis"
+            or entity.get("entity_type") != "authority"
+            or entity.get("model_key") is not None
+            or not isinstance(entity.get("content"), dict)
+            or entity.get("upstream_entity_dependencies") != []
+            or entity.get("runtime_dependencies") != []
+            or entity.get("content_fingerprint") != sha256_digest(entity.get("content"))
+        ):
+            raise InvalidInput(f"v1 Authority Entity[{index}] is invalid")
+        content = entity["content"]
+        if set(content) != {
+            "authority_id",
+            "authority_type",
+            "active_content",
+            "scope",
+            "source_refs",
+            "relations",
+            "related_authority_refs",
+        } or content.get("authority_id") != entity.get("entity_ref"):
+            raise InvalidInput(f"v1 Authority Entity[{index}] content is invalid")
+        authority_id = content["authority_id"]
+        if not isinstance(authority_id, str) or authority_id in seen:
+            raise InvalidInput("v1 Authority identity is duplicated or invalid")
+        seen.add(authority_id)
+        authorities.append(content)
+    return authorities
 
 
 def build(authorities: object) -> dict:
@@ -106,8 +173,15 @@ def main() -> int:
         request = strict_loads(raw, aggregate=True)
         if not isinstance(request, dict):
             raise InvalidInput("top-level JSONはobjectである必要があります")
-        reject_unknown(request, {"authorities"})
-        result = build(request["authorities"])
+        if set(request) == {"authorities"}:
+            result = build(request["authorities"])
+        elif set(request) == {"source_artifact_markdown"}:
+            result = build(
+                _authorities_from_v1_artifact(request["source_artifact_markdown"])
+            )
+        else:
+            reject_unknown(request, {"authorities"}, {"source_artifact_markdown"})
+            raise InvalidInput("request must use one exclusive authority input")
         encoded = canonical_json_bytes(result) + b"\n"
         if len(encoded) > MAX_STDOUT_BYTES:
             raise LimitExceeded("stdout JSONのbyte上限を超えました")

@@ -744,5 +744,77 @@
       "qa-knowledge": "revalidation"
     },
     "states": {}
+  },
+  {
+    "id": "WF-UI-TARGET-001",
+    "start": "spec-analysis",
+    "final": "spec-analysis",
+    "skills": ["spec-analysis"],
+    "overall": "実行中",
+    "targets": {},
+    "states": {}
+  },
+  {
+    "id": "WF-UI-TARGET-002",
+    "start": "spec-analysis",
+    "final": "question-analysis",
+    "skills": ["spec-analysis", "question-analysis"],
+    "overall": "部分完了（ブロック中あり）",
+    "targets": {},
+    "states": { "question-analysis": "ブロック中" }
+  },
+  {
+    "id": "WF-UI-TARGET-003",
+    "start": "question-analysis",
+    "final": "spec-analysis",
+    "skills": ["question-analysis", "spec-analysis"],
+    "overall": "実行中",
+    "targets": {},
+    "states": {}
+  },
+  {
+    "id": "WF-UI-TARGET-004",
+    "start": "test-target-inspection",
+    "final": "test-target-inspection",
+    "skills": ["test-target-inspection"],
+    "overall": "実行中",
+    "targets": {},
+    "states": {}
+  },
+  {
+    "id": "WF-UI-TARGET-005",
+    "start": "spec-analysis",
+    "final": "spec-analysis",
+    "skills": ["spec-analysis"],
+    "overall": "実行中",
+    "targets": {},
+    "states": {}
+  },
+  {
+    "id": "WF-UI-TARGET-006",
+    "start": "usability-evaluation",
+    "final": "usability-evaluation",
+    "skills": ["usability-evaluation"],
+    "overall": "実行中",
+    "targets": {},
+    "states": {}
+  },
+  {
+    "id": "WF-UI-TARGET-007",
+    "start": "usability-inspection",
+    "final": "usability-inspection",
+    "skills": ["usability-inspection"],
+    "overall": "実行中",
+    "targets": { "usability-inspection": "general" },
+    "states": {}
+  },
+  {
+    "id": "WF-UI-TARGET-008",
+    "start": "wcag-conformance-evaluation",
+    "final": "wcag-conformance-evaluation",
+    "skills": ["wcag-conformance-evaluation"],
+    "overall": "実行中",
+    "targets": {},
+    "states": {}
   }
 ]

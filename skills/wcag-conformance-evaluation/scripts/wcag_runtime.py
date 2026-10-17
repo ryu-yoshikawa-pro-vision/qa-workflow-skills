@@ -377,7 +377,7 @@ def _read_current_workflow_evaluation(
         "metadata": {
             "envelope_version": "1",
             "skill": "qa-workflow",
-            "runtime_contract_version": "runtime-v1",
+            "runtime_contract_version": "runtime-v2",
             "generator_contract_version": "workflow-runtime-v1",
             "runtime_unit_key": "artifact:workflow_runtime:all",
             "model_key": None,

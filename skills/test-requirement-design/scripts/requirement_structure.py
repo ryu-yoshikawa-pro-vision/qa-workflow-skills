@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from typing import Any
 
 from runtime_contract import (
     TR_ID_RE,
@@ -18,14 +19,17 @@ from runtime_contract import (
     resolve_entity_dependencies,
     run_cli,
     seed_legacy_ids,
+    validate_machine_entity,
     validate_upstream_entities,
 )
 
 SKILL = "test-requirement-design"
 GENERATOR = "requirement_structure"
-GENERATOR_CONTRACT_VERSION = "requirement-structure-v1"
+GENERATOR_CONTRACT_VERSION = "requirement-structure-v2"
 SCRIPT_PATH = Path(__file__).resolve()
 TR_RE = re.compile(r"^TR-(\d{3})$")
+AC_RE = re.compile(r"^AC-\d{3,}$")
+SCOPE_RE = re.compile(r"^SCOPE-\d{3,}$")
 PRIORITY_ORDER = {"低": 1, "中": 2, "高": 3}
 
 
@@ -35,17 +39,34 @@ def _id(value: object, name: str) -> str:
     return value
 
 
+def _refs(value: object, name: str) -> list[str]:
+    if (
+        not isinstance(value, list)
+        or not all(isinstance(item, str) and item for item in value)
+        or len(set(value)) != len(value)
+    ):
+        raise InvalidInput(f"{name}が不正です")
+    return sorted(value)
+
+
 def _state(rows: object) -> list[dict]:
     result = []
     seen = set()
     for index, row in enumerate(ensure_list(rows, "previous_tr_ids")):
-        if not isinstance(row, dict) or set(row) != {"tr_id", "status"}:
+        if not isinstance(row, dict) or set(row) != {"tr_id", "status", "scope_refs"}:
             raise InvalidInput(f"previous_tr_ids[{index}]が不正です")
         ref = _id(row["tr_id"], f"previous_tr_ids[{index}].tr_id")
-        if ref in seen or row["status"] not in {"active", "deleted"}:
+        scope_refs = _refs(row["scope_refs"], f"previous_tr_ids[{index}].scope_refs")
+        if any(SCOPE_RE.fullmatch(value) is None for value in scope_refs):
+            raise InvalidInput("previous_tr_ids.scope_refsが不正です")
+        if (
+            ref in seen
+            or not isinstance(row["status"], str)
+            or row["status"] not in {"active", "inactive", "deleted"}
+        ):
             raise InvalidInput("previous_tr_idsが重複または不正です")
         seen.add(ref)
-        result.append({"tr_id": ref, "status": row["status"]})
+        result.append({"tr_id": ref, "status": row["status"], "scope_refs": scope_refs})
     return result
 
 
@@ -65,16 +86,26 @@ def _disposition_refs(
                 "ブロック中",
                 "重複",
             },
-            allowed_upstream_entity_types={"authority", "product_risk"},
+            allowed_upstream_entity_types={
+                "authority",
+                "product_risk",
+                "acceptance_criterion",
+            },
             input_mode=input_mode,
         )
         upstream = normalized["upstream_entity"]
         expected_skill = {
             "authority": "spec-analysis",
             "product_risk": "test-analysis",
+            "acceptance_criterion": "spec-analysis",
         }[upstream["entity_type"]]
         if upstream["skill"] != expected_skill:
             raise InvalidInput("TR disposition upstream_entity skill/typeが不一致です")
+        if (
+            upstream["entity_type"] == "acceptance_criterion"
+            and normalized["handling"] == "重複"
+        ):
+            raise InvalidInput("Acceptance Criterion dispositionでは重複を許可しません")
         ref = ensure_nonempty_string(upstream["entity_ref"], "disposition.entity_ref")
         key = (upstream["entity_type"], ref)
         if key in result:
@@ -90,10 +121,15 @@ def generate(input_value: dict, metadata: dict) -> dict:
     required = {
         "authorities",
         "risks",
+        "acceptance_criteria",
+        "scope_ids",
         "test_requirements",
         "dispositions",
         "previous_tr_ids",
         "update_scope_tr_ids",
+        "inactive_tr_ids",
+        "inactive_tr_history",
+        "zero_scope_terminal",
     }
     reject_unknown(input_value, required, {"legacy_tr_ids"})
     authority_ids = set()
@@ -116,17 +152,155 @@ def generate(input_value: dict, metadata: dict) -> dict:
             raise InvalidInput("risk_idが重複しています")
         risk_priorities[row["risk_id"]] = row["mapped_priority"]
     current_entities = validate_upstream_entities(metadata)
+    acceptance_rows: list[dict[str, Any]] = []
+    acceptance_by_id: dict[str, dict[str, Any]] = {}
+    for index, row in enumerate(
+        ensure_list(input_value["acceptance_criteria"], "acceptance_criteria")
+    ):
+        if not isinstance(row, dict) or set(row) != {"ac_id", "authority_refs"}:
+            raise InvalidInput(f"acceptance_criteria[{index}] schemaが不正です")
+        ac_id = row["ac_id"]
+        if not isinstance(ac_id, str) or AC_RE.fullmatch(ac_id) is None:
+            raise InvalidInput(f"acceptance_criteria[{index}].ac_idが不正です")
+        refs = _refs(
+            row["authority_refs"], f"acceptance_criteria[{index}].authority_refs"
+        )
+        if not refs or set(refs) - authority_ids:
+            raise InvalidInput(
+                f"acceptance_criteria[{index}].authority_refsが既知Authority集合外です"
+            )
+        if ac_id in acceptance_by_id:
+            raise InvalidInput("acceptance_criteria ac_idが重複しています")
+        normalized = {"ac_id": ac_id, "authority_refs": refs}
+        acceptance_rows.append(normalized)
+        acceptance_by_id[ac_id] = normalized
+    if [row["ac_id"] for row in acceptance_rows] != sorted(acceptance_by_id):
+        raise InvalidInput("acceptance_criteriaはac_id順である必要があります")
+    scope_ids = input_value["scope_ids"]
+    if (
+        not isinstance(scope_ids, list)
+        or not all(
+            isinstance(value, str) and SCOPE_RE.fullmatch(value) for value in scope_ids
+        )
+        or len(scope_ids) != len(set(scope_ids))
+        or scope_ids != sorted(scope_ids)
+    ):
+        raise InvalidInput(
+            "scope_idsは重複なしのcanonical SCOPE ID配列である必要があります"
+        )
+    scope_id_set = set(scope_ids)
+    upstream_ac_entities = {
+        entity["entity_ref"]: entity
+        for entity in current_entities
+        if entity["skill"] == "spec-analysis"
+        and entity["entity_type"] == "acceptance_criterion"
+    }
+    if metadata["input_mode"] == "artifact":
+        upstream_ac_map = {
+            ac_id: sorted(entity["content"].get("authority_refs", []))
+            for ac_id, entity in upstream_ac_entities.items()
+        }
+        semantic_ac_map = {
+            ac_id: row["authority_refs"] for ac_id, row in acceptance_by_id.items()
+        }
+        if upstream_ac_map != semantic_ac_map:
+            raise InvalidInput(
+                "artifact mode acceptance_criteriaがcurrent AC Entity集合と一致しません"
+            )
     dispositions, disposition_rows = _disposition_refs(
         input_value["dispositions"], current_entities, metadata["input_mode"]
     )
     previous = _state(input_value["previous_tr_ids"])
     previous_map = {row["tr_id"]: row for row in previous}
     update_scope = input_value["update_scope_tr_ids"]
-    if not isinstance(update_scope, list) or len(set(update_scope)) != len(
-        update_scope
+    if (
+        not isinstance(update_scope, list)
+        or not all(isinstance(value, str) for value in update_scope)
+        or len(set(update_scope)) != len(update_scope)
     ):
         raise InvalidInput("update_scope_tr_idsが不正です")
     update_scope_set = {_id(value, "update_scope_tr_ids") for value in update_scope}
+    if any(
+        previous_map.get(ref, {}).get("status") not in {"active", "inactive"}
+        for ref in update_scope_set
+    ):
+        raise InvalidInput(
+            "update_scope_tr_idsはactive / inactive previous stateを参照する必要があります"
+        )
+    inactive_ids = input_value["inactive_tr_ids"]
+    if (
+        not isinstance(inactive_ids, list)
+        or not all(
+            isinstance(value, str) and TR_RE.fullmatch(value) for value in inactive_ids
+        )
+        or len(set(inactive_ids)) != len(inactive_ids)
+        or inactive_ids != sorted(inactive_ids)
+    ):
+        raise InvalidInput("inactive_tr_idsが不正です")
+    inactive_set = set(inactive_ids)
+    if inactive_set & update_scope_set or any(
+        previous_map.get(ref, {}).get("status") != "active" for ref in inactive_set
+    ):
+        raise InvalidInput(
+            "inactive_tr_idsはupdate scope外のactive previous TRだけを指定できます"
+        )
+    if not isinstance(input_value["zero_scope_terminal"], bool):
+        raise InvalidInput("zero_scope_terminalはbooleanである必要があります")
+    zero_scope_terminal = input_value["zero_scope_terminal"]
+    if zero_scope_terminal and (
+        scope_ids
+        or input_value["acceptance_criteria"]
+        or input_value["test_requirements"]
+        or input_value["dispositions"]
+        or input_value["authorities"]
+        or input_value["risks"]
+        or inactive_set
+        or update_scope_set
+        != {row["tr_id"] for row in previous if row["status"] in {"active", "inactive"}}
+    ):
+        raise InvalidInput(
+            "zero_scope_terminalは全current inputが空で全previous active / inactive TRを閉じる場合だけ許可されます"
+        )
+    history_by_id: dict[str, dict[str, Any]] = {}
+    history_order = []
+    for index, raw_entity in enumerate(
+        ensure_list(input_value["inactive_tr_history"], "inactive_tr_history")
+    ):
+        entity = validate_machine_entity(raw_entity, expected_skill=SKILL)
+        content = entity["content"]
+        history_scope_refs = content.get("scope_refs")
+        if (
+            entity["entity_type"] != "tr"
+            or entity["entity_ref"] in history_by_id
+            or content.get("tr_id") != entity["entity_ref"]
+            or not isinstance(history_scope_refs, list)
+            or not all(
+                isinstance(ref, str) and SCOPE_RE.fullmatch(ref)
+                for ref in history_scope_refs
+            )
+            or len(set(history_scope_refs)) != len(history_scope_refs)
+            or history_scope_refs != sorted(history_scope_refs)
+        ):
+            raise InvalidInput(
+                "inactive_tr_historyは重複なしのTR Entity snapshotが必要です"
+            )
+        history_by_id[entity["entity_ref"]] = entity
+        history_order.append(entity["entity_ref"])
+    if history_order != sorted(history_order):
+        raise InvalidInput("inactive_tr_historyはtr_id順である必要があります")
+    expected_inactive_ids = {
+        row["tr_id"]
+        for row in previous
+        if row["status"] == "inactive" or row["tr_id"] in inactive_set
+    }
+    if set(history_by_id) != expected_inactive_ids:
+        raise InvalidInput(
+            "inactive_tr_historyがcurrent inactive TR stateと一致しません"
+        )
+    if zero_scope_terminal and (
+        inactive_set or history_order != sorted(expected_inactive_ids)
+    ):
+        raise InvalidInput("zero_scope_terminalではinactive transitionを開始できません")
     legacy = input_value.get("legacy_tr_ids")
     if legacy is not None:
         if metadata["input_mode"] != "direct" or previous or update_scope_set:
@@ -136,14 +310,10 @@ def generate(input_value: dict, metadata: dict) -> dict:
             previous_map[value["id"]] = {
                 "tr_id": value["id"],
                 "status": value["status"],
+                "scope_refs": [],
             }
             update_scope_set.add(value["id"])
         previous = sorted(previous_map.values(), key=lambda row: row["tr_id"])
-    for ref in update_scope_set:
-        if previous_map.get(ref, {}).get("status") != "active":
-            raise InvalidInput(
-                "update_scope_tr_idsがactive previous stateを参照していません"
-            )
     drafts = []
     seen_drafts = set()
     for index, row in enumerate(
@@ -156,6 +326,8 @@ def generate(input_value: dict, metadata: dict) -> dict:
             "identity_action",
             "reuse_id",
             "text",
+            "acceptance_refs",
+            "scope_refs",
             "authority_refs",
             "risk_refs",
             "priority",
@@ -175,13 +347,30 @@ def generate(input_value: dict, metadata: dict) -> dict:
         elif row["reuse_id"] is not None:
             raise InvalidInput("new TRのreuse_idはnullである必要があります")
         ensure_nonempty_string(row["text"], "TR text")
-        for field in ("authority_refs", "risk_refs"):
+        for field in ("acceptance_refs", "scope_refs", "authority_refs", "risk_refs"):
             if (
                 not isinstance(row[field], list)
-                or len(set(row[field])) != len(row[field])
                 or not all(isinstance(value, str) and value for value in row[field])
+                or len(set(row[field])) != len(row[field])
             ):
                 raise InvalidInput(f"TR {field}が不正です")
+        if set(row["acceptance_refs"]) - set(acceptance_by_id):
+            raise InvalidInput("TR acceptance_refsにunknown ACがあります")
+        if set(row["scope_refs"]) - scope_id_set:
+            raise InvalidInput("TR scope_refsにunknown Scopeがあります")
+        if metadata["input_mode"] == "artifact" and scope_ids and not row["scope_refs"]:
+            raise InvalidInput(
+                "UI target artifact modeのcurrent TRにはscope_refsが必要です"
+            )
+        if metadata["input_mode"] == "artifact":
+            required_scope_refs = {
+                upstream_ac_entities[ac_id]["content"].get("scope", {}).get("scope_id")
+                for ac_id in row["acceptance_refs"]
+            }
+            if None in required_scope_refs or not required_scope_refs.issubset(
+                row["scope_refs"]
+            ):
+                raise InvalidInput("TR scope_refsから参照ACのScopeが欠落しています")
         if row["priority"] not in PRIORITY_ORDER or (
             row["priority_override_reason"] is not None
             and (
@@ -191,6 +380,29 @@ def generate(input_value: dict, metadata: dict) -> dict:
         ):
             raise InvalidInput("TR priorityが不正です")
         drafts.append(canonicalize(row))
+    if metadata["input_mode"] == "direct":
+        referenced_ac_ids = {
+            ac_id for draft in drafts for ac_id in draft["acceptance_refs"]
+        } | {
+            row["upstream_entity"]["entity_ref"]
+            for row, _dependencies in disposition_rows
+            if row["upstream_entity"]["entity_type"] == "acceptance_criterion"
+        }
+        for ac_id in referenced_ac_ids:
+            entity = upstream_ac_entities.get(ac_id)
+            if entity is None:
+                continue
+            semantic = acceptance_by_id.get(ac_id)
+            content = entity["content"]
+            if (
+                semantic is None
+                or content.get("ac_id") != ac_id
+                or sorted(content.get("authority_refs", []))
+                != semantic["authority_refs"]
+            ):
+                raise InvalidInput(
+                    "direct modeの参照AC Entityがsemantic acceptance_criteriaと一致しません"
+                )
     used = set(previous_map)
     mapping = {}
     reused = set()
@@ -251,12 +463,15 @@ def generate(input_value: dict, metadata: dict) -> dict:
         for kind, refs in (
             ("authority", draft["authority_refs"]),
             ("product_risk", draft["risk_refs"]),
+            ("acceptance_criterion", draft["acceptance_refs"]),
         )
         for ref in refs
     }
-    expected = {("authority", ref) for ref in authority_ids} | {
-        ("product_risk", ref) for ref in risk_priorities
-    }
+    expected = (
+        {("authority", ref) for ref in authority_ids}
+        | {("product_risk", ref) for ref in risk_priorities}
+        | {("acceptance_criterion", ref) for ref in acceptance_by_id}
+    )
     for key in sorted(expected):
         if key in linked and key in dispositions:
             violations.append(
@@ -281,6 +496,8 @@ def generate(input_value: dict, metadata: dict) -> dict:
             key: draft[key]
             for key in (
                 "text",
+                "acceptance_refs",
+                "scope_refs",
                 "authority_refs",
                 "risk_refs",
                 "priority",
@@ -299,6 +516,21 @@ def generate(input_value: dict, metadata: dict) -> dict:
             for ref in draft["risk_refs"]
             if ref in risk_priorities
         )
+        for ac_id in draft["acceptance_refs"]:
+            ac_entity = upstream_ac_entities.get(ac_id)
+            if ac_entity is not None:
+                ref_identities.append(("spec-analysis", "acceptance_criterion", ac_id))
+                if metadata["input_mode"] == "artifact":
+                    ref_identities.extend(
+                        (
+                            dependency["skill"],
+                            dependency["entity_type"],
+                            dependency["entity_ref"],
+                        )
+                        for dependency in ac_entity["upstream_entity_dependencies"]
+                        if dependency["skill"] == "spec-analysis"
+                        and dependency["entity_type"] == "authority"
+                    )
         deps = resolve_entity_dependencies(
             ref_identities,
             current_entities,
@@ -338,11 +570,40 @@ def generate(input_value: dict, metadata: dict) -> dict:
     states = []
     for row in previous:
         status = row["status"]
+        scope_refs = row["scope_refs"]
         if row["tr_id"] in update_scope_set:
             status = "active" if row["tr_id"] in reused else "deleted"
-        states.append({"tr_id": row["tr_id"], "status": status})
-    states.extend({"tr_id": ref, "status": "active"} for ref in mapping.values())
+            if status == "active":
+                scope_refs = next(
+                    draft["scope_refs"]
+                    for draft in drafts
+                    if mapping[draft["draft_key"]] == row["tr_id"]
+                )
+            elif zero_scope_terminal:
+                scope_refs = []
+        elif row["tr_id"] in inactive_set:
+            status = "inactive"
+        states.append(
+            {"tr_id": row["tr_id"], "status": status, "scope_refs": scope_refs}
+        )
+    states.extend(
+        {
+            "tr_id": ref,
+            "status": "active",
+            "scope_refs": next(
+                draft["scope_refs"]
+                for draft in drafts
+                if mapping[draft["draft_key"]] == ref
+            ),
+        }
+        for ref in mapping.values()
+    )
     state_map = {row["tr_id"]: row for row in states}
+    inactive_history = [
+        history_by_id[ref]
+        for ref in sorted(state_map)
+        if state_map[ref]["status"] == "inactive"
+    ]
     violations.sort(key=lambda row: row["target_key"])
     return {
         "runtime_status": "ok",
@@ -360,6 +621,7 @@ def generate(input_value: dict, metadata: dict) -> dict:
                 for draft in sorted(drafts, key=lambda row: row["draft_key"])
             ],
             "tr_id_state": [state_map[key] for key in sorted(state_map)],
+            "inactive_tr_history": inactive_history,
             "violations": violations,
             "entities": sorted(entities, key=lambda row: row["entity_ref"]),
         },
@@ -383,5 +645,6 @@ if __name__ == "__main__":
             generator=GENERATOR,
             generator_contract_version=GENERATOR_CONTRACT_VERSION,
             generator_path=SCRIPT_PATH,
+            aggregate=True,
         )
     )

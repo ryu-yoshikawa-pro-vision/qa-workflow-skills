@@ -1,5 +1,8 @@
 {
   "require_blocked_for_blockers": true,
   "expected_classifications": { "Q-001": "ブロッカー" },
-  "expected_normalizations": { "Q-001": "未確定" }
+  "expected_normalizations": { "Q-001": "未確定" },
+  "known_unknown_ids": ["UNK-001"],
+  "expected_related_unknowns": { "Q-001": ["UNK-001"] },
+  "question_id_history": ["Q-001"]
 }

@@ -6,5 +6,8 @@
   "test_cases": [],
   "dispositions": [],
   "previous_tc_ids": [],
-  "update_scope_tc_ids": []
+  "update_scope_tc_ids": [],
+  "inactive_tc_ids": [],
+  "inactive_tc_history": [],
+  "zero_scope_terminal": false
 }

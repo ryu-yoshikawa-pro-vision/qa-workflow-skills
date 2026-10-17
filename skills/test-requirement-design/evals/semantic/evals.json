@@ -12,6 +12,12 @@
       "input": "cases/case-002/input.md",
       "reference": "cases/case-002/reference.md",
       "criteria": ["SEM-TR-001", "SEM-TR-003", "SEM-TR-004", "SEM-TR-005"]
+    },
+    {
+      "id": "TR-SEM-003",
+      "input": "cases/case-003/input.md",
+      "reference": "cases/case-003/reference.md",
+      "criteria": ["SEM-TR-001", "SEM-TR-003", "SEM-TR-004", "SEM-TR-005", "SEM-TR-006"]
     }
   ]
 }

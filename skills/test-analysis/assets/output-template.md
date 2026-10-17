@@ -58,11 +58,4 @@ runtime dispatchを行った場合は、入力・結果・Entityを次の固定�
 
 `test_analysis_context`のMachine Entity contentには、実際に参照したAuthorityの`entity_ref`を`authority_refs[]`へ、同一invocation内のProduct Risk identityを`risk_refs[]`へ記録します。自然言語の残存リスクや重点から依存を推測せず、fingerprintはruntimeがcurrent Entityから決定します。
 
-```text
-<!-- Machine Runtime Input: test-analysis -->
-{ "skill": "test-analysis", "runtime_contract_version": "runtime-contract-v1", "input": {} }
-<!-- Machine Runtime Result: test-analysis / analysis_entities -->
-{ "envelope_version": "runtime-envelope-v1", "runtime_unit_key": "analysis_entities", "input_fingerprint": "sha256:<64 hex>", "generation_fingerprint": "sha256:<64 hex>", "runtime_status": "ok", "result_status": "ready", "freshness_status": "current", "payload": {} }
-<!-- Machine Entities: test-analysis -->
-[{ "entity_schema_version": "entity-state-v1", "skill": "test-analysis", "entity_type": "risk", "entity_ref": "risk:<stable-ref>", "content": {}, "content_fingerprint": "sha256:<64 hex>", "dependencies": [] }]
-```
+`runtime_contract.py::render_runtime_input()`、`render_runtime_result()`、`render_machine_entities()`の戻り値をそのまま配置します。runtime-v2 / entity-state-v2のevidenceを手組みせず、空の例示JSONを成果物へ残しません。

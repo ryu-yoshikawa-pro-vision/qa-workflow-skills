@@ -11,6 +11,7 @@ from runtime_contract import (
     FULL_DIGEST_RE,
     MODEL_GENERATORS,
     MODEL_TYPES,
+    SCOPE_ID_RE,
     STABLE_COMPONENT_RE,
     TECHNIQUE_SLUGS,
     InvalidInput,
@@ -32,12 +33,13 @@ from runtime_contract import (
     typed_value,
     typed_value_compare,
     unsupported_item_key,
+    validate_machine_entity,
     validate_upstream_entities,
 )
 
 SKILL = "test-condition-design"
 GENERATOR = "materialize_coverage"
-GENERATOR_CONTRACT_VERSION = "materialize-coverage-v1"
+GENERATOR_CONTRACT_VERSION = "materialize-coverage-v2"
 SCRIPT_PATH = Path(__file__).resolve()
 TCN_RE = re.compile(r"^TCN-(\d{3})$")
 CI_RE = re.compile(r"^(TCN-\d{3})-CI(\d{2,})$")
@@ -241,7 +243,20 @@ def _digest(value: Any, name: str) -> str:
     return value
 
 
-def _validate_model_metadata(rows: Any, tcn_id: str) -> list[dict[str, Any]]:
+def _scope_refs(value: Any, name: str) -> list[str]:
+    if (
+        not isinstance(value, list)
+        or not all(isinstance(ref, str) and SCOPE_ID_RE.fullmatch(ref) for ref in value)
+        or len(value) != len(set(value))
+        or value != sorted(value)
+    ):
+        raise InvalidInput(f"{name}が不正です")
+    return value
+
+
+def _validate_model_metadata(
+    rows: Any, tcn_id: str, *, allow_empty: bool = False
+) -> list[dict[str, Any]]:
     result = []
     seen: set[str] = set()
     for index, row in enumerate(ensure_list(rows, "active_model_metadata")):
@@ -253,6 +268,7 @@ def _validate_model_metadata(rows: Any, tcn_id: str) -> list[dict[str, Any]]:
             "technique_slug",
             "parent_tcn_id",
             "content_fingerprint",
+            "scope_refs",
         }
         reject_unknown(row, required)
         model_key = ensure_nonempty_string(
@@ -279,6 +295,17 @@ def _validate_model_metadata(rows: Any, tcn_id: str) -> list[dict[str, Any]]:
             ):
                 raise InvalidInput("Coverage model metadataのtechnique_slugが不正です")
         _digest(row["content_fingerprint"], "active_model_metadata.content_fingerprint")
+        scope_refs = row["scope_refs"]
+        if (
+            not isinstance(scope_refs, list)
+            or not all(
+                isinstance(ref, str) and SCOPE_ID_RE.fullmatch(ref)
+                for ref in scope_refs
+            )
+            or len(scope_refs) != len(set(scope_refs))
+            or scope_refs != sorted(scope_refs)
+        ):
+            raise InvalidInput("active_model_metadata.scope_refsが不正です")
         result.append(
             canonicalize(
                 {
@@ -287,11 +314,132 @@ def _validate_model_metadata(rows: Any, tcn_id: str) -> list[dict[str, Any]]:
                     "technique_slug": row["technique_slug"],
                     "parent_tcn_id": tcn_id,
                     "content_fingerprint": row["content_fingerprint"],
+                    "scope_refs": scope_refs,
                 }
             )
         )
-    if not result:
+    if not result and not allow_empty:
         raise InvalidInput("active Coverage modelが1件以上必要です")
+    return result
+
+
+def _validate_inactive_materialize_history(rows: Any) -> dict[str, dict[str, Any]]:
+    required = {
+        "tcn_id",
+        "ci_entities",
+        "ci_id_state",
+        "target_mapping_state",
+        "semantic_ci_mapping_state",
+        "expected_result_root_state",
+    }
+    result = {}
+    order = []
+    for index, row in enumerate(ensure_list(rows, "inactive_materialize_history")):
+        if not isinstance(row, dict) or set(row) != required:
+            raise InvalidInput(
+                f"inactive_materialize_history[{index}] schemaが不正です"
+            )
+        tcn_id = row["tcn_id"]
+        if (
+            not isinstance(tcn_id, str)
+            or TCN_RE.fullmatch(tcn_id) is None
+            or tcn_id in result
+        ):
+            raise InvalidInput(
+                "inactive_materialize_history.tcn_idが不正または重複しています"
+            )
+        ci_entities = []
+        ci_seen = set()
+        for raw_entity in ensure_list(
+            row["ci_entities"], "inactive_materialize_history.ci_entities"
+        ):
+            entity = validate_machine_entity(raw_entity, expected_skill=SKILL)
+            if (
+                entity["entity_type"] != "ci"
+                or CI_RE.fullmatch(entity["entity_ref"]) is None
+                or not entity["entity_ref"].startswith(tcn_id + "-")
+            ):
+                raise InvalidInput(
+                    "inactive_materialize_history.ci_entities identityが不正です"
+                )
+            if entity["entity_ref"] in ci_seen:
+                raise InvalidInput(
+                    "inactive_materialize_history.ci_entitiesが重複しています"
+                )
+            ci_seen.add(entity["entity_ref"])
+            scope_refs = entity["content"].get("scope_refs")
+            if (
+                not isinstance(scope_refs, list)
+                or not all(
+                    isinstance(ref, str) and SCOPE_ID_RE.fullmatch(ref)
+                    for ref in scope_refs
+                )
+                or len(scope_refs) != len(set(scope_refs))
+                or scope_refs != sorted(scope_refs)
+            ):
+                raise InvalidInput(
+                    "inactive_materialize_history.ci_entities scope_refsが不正です"
+                )
+            ci_entities.append(entity)
+        if [entity["entity_ref"] for entity in ci_entities] != sorted(ci_seen):
+            raise InvalidInput(
+                "inactive_materialize_history.ci_entitiesはci_id順である必要があります"
+            )
+        ci_states = ensure_list(
+            row["ci_id_state"], "inactive_materialize_history.ci_id_state"
+        )
+        state_seen = set()
+        for state in ci_states:
+            if not isinstance(state, dict) or set(state) != {
+                "ci_id",
+                "status",
+                "scope_refs",
+            }:
+                raise InvalidInput(
+                    "inactive_materialize_history.ci_id_state schemaが不正です"
+                )
+            ci_id = state["ci_id"]
+            if (
+                not isinstance(ci_id, str)
+                or CI_RE.fullmatch(ci_id) is None
+                or not ci_id.startswith(tcn_id + "-")
+                or ci_id in state_seen
+            ):
+                raise InvalidInput(
+                    "inactive_materialize_history.ci_id_state identityが不正です"
+                )
+            if state["status"] not in {"active", "inactive", "deleted"}:
+                raise InvalidInput(
+                    "inactive_materialize_history.ci_id_state statusが不正です"
+                )
+            scope_refs = state["scope_refs"]
+            if (
+                not isinstance(scope_refs, list)
+                or not all(
+                    isinstance(ref, str) and SCOPE_ID_RE.fullmatch(ref)
+                    for ref in scope_refs
+                )
+                or len(scope_refs) != len(set(scope_refs))
+                or scope_refs != sorted(scope_refs)
+            ):
+                raise InvalidInput(
+                    "inactive_materialize_history.ci_id_state scope_refsが不正です"
+                )
+            state_seen.add(ci_id)
+        if [state["ci_id"] for state in ci_states] != sorted(state_seen):
+            raise InvalidInput(
+                "inactive_materialize_history.ci_id_stateはci_id順である必要があります"
+            )
+        target_state = _validate_previous_map(row["target_mapping_state"], tcn_id)
+        if target_state != row["target_mapping_state"]:
+            raise InvalidInput(
+                "inactive_materialize_history.target_mapping_stateがcanonicalではありません"
+            )
+        normalized = canonicalize({**row, "ci_entities": ci_entities})
+        result[tcn_id] = normalized
+        order.append(tcn_id)
+    if order != sorted(order):
+        raise InvalidInput("inactive_materialize_historyはtcn_id順である必要があります")
     return result
 
 
@@ -1052,11 +1200,42 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
         "previous_ci_ids",
         "previous_expected_result_roots",
         "merge_groups",
+        "inactive_ci_ids",
+        "inactive_materialize_history",
+        "zero_scope_terminal",
     }
     optional = {"legacy_ci_ids", "legacy_ci_seed"}
     reject_unknown(input_value, required, optional)
     tcn_id = _tcn_id(input_value["tcn_id"])
-    models_rows = _validate_model_metadata(input_value["active_model_metadata"], tcn_id)
+    inactive_materialize_history = _validate_inactive_materialize_history(
+        input_value["inactive_materialize_history"]
+    )
+    history_entry = inactive_materialize_history.get(tcn_id)
+    if history_entry is not None and not any(
+        input_value[field]
+        for field in (
+            "previous_target_id_map",
+            "previous_semantic_ci_map",
+            "previous_ci_ids",
+            "previous_expected_result_roots",
+        )
+    ):
+        input_value["previous_target_id_map"] = history_entry["target_mapping_state"]
+        input_value["previous_semantic_ci_map"] = history_entry[
+            "semantic_ci_mapping_state"
+        ]
+        input_value["previous_ci_ids"] = history_entry["ci_id_state"]
+        input_value["previous_expected_result_roots"] = history_entry[
+            "expected_result_root_state"
+        ]
+    if not isinstance(input_value["zero_scope_terminal"], bool):
+        raise InvalidInput("zero_scope_terminalはbooleanである必要があります")
+    zero_scope_terminal = input_value["zero_scope_terminal"]
+    models_rows = _validate_model_metadata(
+        input_value["active_model_metadata"],
+        tcn_id,
+        allow_empty=zero_scope_terminal or bool(input_value["inactive_ci_ids"]),
+    )
     current_upstream_entities = validate_upstream_entities(metadata)
     current_model_entities = {
         (entity["skill"], entity["entity_type"], entity["entity_ref"]): entity
@@ -1079,10 +1258,23 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
             or content.get("model_type") != model["model_type"]
             or content.get("technique_slug") != model["technique_slug"]
             or content.get("parent_tcn_id") != tcn_id
+            or content.get("scope_refs") != model["scope_refs"]
         ):
             raise InvalidInput(
                 "active_model_metadataがcurrent model Machine Entityと不一致です"
             )
+    current_tcn_entities = {
+        (entity["skill"], entity["entity_type"], entity["entity_ref"]): entity
+        for entity in current_upstream_entities
+        if entity["skill"] == SKILL and entity["entity_type"] == "tcn"
+    }
+    current_tcn = current_tcn_entities.get((SKILL, "tcn", tcn_id))
+    if current_tcn is not None:
+        tcn_scope_refs = current_tcn["content"].get("scope_refs")
+        if any(model["scope_refs"] != tcn_scope_refs for model in models_rows):
+            raise InvalidInput("active model scope_refsがparent TCNと一致しません")
+    elif metadata["input_mode"] == "artifact" and models_rows:
+        raise InvalidInput("artifact mode current TCN Entityがありません")
     models = {row["model_key"]: row for row in models_rows}
     model_results = _validate_model_results(input_value["models"], models, tcn_id)
     targets = _validate_targets(model_results, models, tcn_id)
@@ -1143,15 +1335,21 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
     ):
         if (
             not isinstance(row, dict)
-            or set(row) != {"ci_id", "status"}
-            or row["status"] not in {"active", "deleted"}
+            or set(row) != {"ci_id", "status", "scope_refs"}
+            or not isinstance(row.get("status"), str)
+            or row["status"] not in {"active", "inactive", "deleted"}
         ):
             raise InvalidInput(f"previous_ci_ids[{index}]が不正です")
         ci_id = _ci_id(row["ci_id"], tcn_id)
+        scope_refs = _scope_refs(
+            row["scope_refs"], f"previous_ci_ids[{index}].scope_refs"
+        )
         if ci_id in ci_state_seen:
             raise InvalidInput("previous_ci_idsが重複しています")
         ci_state_seen.add(ci_id)
-        previous_ci_rows.append({"ci_id": ci_id, "status": row["status"]})
+        previous_ci_rows.append(
+            {"ci_id": ci_id, "status": row["status"], "scope_refs": scope_refs}
+        )
     previous_roots = ensure_list(
         input_value["previous_expected_result_roots"], "previous_expected_result_roots"
     )
@@ -1212,7 +1410,8 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
             )
         seeded = seed_legacy_ids(legacy_ids, CI_ID_RE, "legacy_ci_ids")
         previous_ci_rows = [
-            {"ci_id": row["id"], "status": row["status"]} for row in seeded
+            {"ci_id": row["id"], "status": row["status"], "scope_refs": []}
+            for row in seeded
         ]
         ci_state_seen = {row["ci_id"] for row in previous_ci_rows}
         for index, row in enumerate(ensure_list(legacy_seed or [], "legacy_ci_seed")):
@@ -1243,6 +1442,66 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
     else:
         if legacy_seed not in (None, []):
             raise InvalidInput("legacy_ci_seedはlegacy_ci_idsと同時に指定します")
+
+    inactive_ci_raw = ensure_list(input_value["inactive_ci_ids"], "inactive_ci_ids")
+    if (
+        not all(isinstance(ref, str) for ref in inactive_ci_raw)
+        or len(set(inactive_ci_raw)) != len(inactive_ci_raw)
+        or inactive_ci_raw != sorted(inactive_ci_raw)
+    ):
+        raise InvalidInput("inactive_ci_idsがcanonical CI ID配列ではありません")
+    inactive_ci_ids = set(inactive_ci_raw)
+    for ci_id in inactive_ci_ids:
+        _ci_id(ci_id, tcn_id)
+    previous_ci_status = {row["ci_id"]: row["status"] for row in previous_ci_rows}
+    if any(previous_ci_status.get(ref) != "active" for ref in inactive_ci_ids):
+        raise InvalidInput("inactive_ci_idsはactive previous CIだけを指定できます")
+    if zero_scope_terminal:
+        if (
+            models_rows
+            or input_value["models"]
+            or input_value["semantic_coverage_items"]
+            or input_value["target_annotations"]
+            or input_value["target_dispositions"]
+            or input_value["test_data_requirements"]
+            or input_value["merge_groups"]
+            or inactive_ci_ids
+            or legacy_ids is not None
+        ):
+            raise InvalidInput(
+                "zero_scope_terminalではcurrent semantic inputとlegacy seedを許可しません"
+            )
+        terminal_state = []
+        for row in previous_ci_rows:
+            status = row["status"]
+            scope_refs = row["scope_refs"]
+            if status in {"active", "inactive"}:
+                status = "deleted"
+                scope_refs = []
+            terminal_state.append(
+                {"ci_id": row["ci_id"], "status": status, "scope_refs": scope_refs}
+            )
+        return {
+            "runtime_status": "ok",
+            "support_status": "supported",
+            "result_status": "ready",
+            "runtime_required": True,
+            "deterministic_generated": True,
+            "payload": {
+                "target_id_map": [],
+                "target_mapping_state": [],
+                "semantic_ci_mapping_state": [],
+                "ci_id_state": sorted(terminal_state, key=lambda row: row["ci_id"]),
+                "expected_result_root_state": [],
+                "test_data_requirements": [],
+                "disposed_target_refs": [],
+                "coverage_item_rows": [],
+                "stale_ci_ids": [],
+                "model_completion": [],
+                "entities": [],
+            },
+            "issues": [],
+        }
 
     previous_by_ref = {row["target_ref"]: row for row in previous_map}
     used_ci = set(ci_state_seen)
@@ -1390,15 +1649,33 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
 
     active_ci_ids = {row["ci_id"] for row in active_mappings}
     active_ci_ids.update(row["ci_id"] for row in active_semantic)
-    ci_state = {row["ci_id"]: row["status"] for row in previous_ci_rows}
+    if inactive_ci_ids & active_ci_ids:
+        raise InvalidInput("current active CIをinactive_ci_idsへ指定できません")
+    ci_scope_sets: dict[str, set[str]] = {}
+    for mapping in active_mappings:
+        ci_scope_sets.setdefault(mapping["ci_id"], set()).update(
+            models[mapping["model_key"]]["scope_refs"]
+        )
+    for item in active_semantic:
+        ci_scope_sets.setdefault(item["ci_id"], set()).update(
+            models[item["model_key"]]["scope_refs"]
+        )
+    ci_state = {row["ci_id"]: dict(row) for row in previous_ci_rows}
     for ci_id in stale_ci_ids:
-        if ci_id not in active_ci_ids:
-            ci_state[ci_id] = "deleted"
+        if ci_id not in active_ci_ids and ci_id not in inactive_ci_ids:
+            ci_state.setdefault(
+                ci_id, {"ci_id": ci_id, "status": "deleted", "scope_refs": []}
+            )["status"] = "deleted"
     for ci_id in active_ci_ids:
-        ci_state[ci_id] = "active"
-    ci_id_state = [
-        {"ci_id": ci_id, "status": status} for ci_id, status in sorted(ci_state.items())
-    ]
+        ci_state[ci_id] = {
+            "ci_id": ci_id,
+            "status": "active",
+            "scope_refs": sorted(ci_scope_sets.get(ci_id, set())),
+        }
+    for ci_id in inactive_ci_ids:
+        ci_state[ci_id]["status"] = "inactive"
+    stale_ci_ids.difference_update(inactive_ci_ids)
+    ci_id_state = [ci_state[ci_id] for ci_id in sorted(ci_state)]
 
     current_roots = {
         row["expected_result_root"]
@@ -1484,6 +1761,7 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
             "ci_id": ci_id,
             "tcn_id": tcn_id,
             "model_key": first["model_key"],
+            "scope_refs": sorted(ci_scope_sets.get(ci_id, set())),
             "source_kind": "runtime_target",
             "covered_targets": covered_targets,
             "execution": target["execution"],
@@ -1532,6 +1810,7 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
             "ci_id": item["ci_id"],
             "tcn_id": tcn_id,
             "model_key": item["model_key"],
+            "scope_refs": sorted(ci_scope_sets.get(item["ci_id"], set())),
             "source_kind": "semantic_item",
             "covered_targets": [],
             "execution": None,
@@ -1748,6 +2027,5 @@ if __name__ == "__main__":
             generator=GENERATOR,
             generator_contract_version=GENERATOR_CONTRACT_VERSION,
             generator_path=SCRIPT_PATH,
-            aggregate=True,
         )
     )

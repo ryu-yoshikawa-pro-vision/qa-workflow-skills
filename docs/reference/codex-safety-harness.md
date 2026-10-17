@@ -1,6 +1,6 @@
 # Codex開発ハーネスの安全境界
 
-この文書は、repository-local Codex開発ハーネスの目的、承認経路、保証範囲を説明します。対象はCodex CLI `0.160.0`です。設定・Hook・execpolicyの具体例は [Main Plan](../plans/2026-10-03_173600_formatter-lint.md) と [execpolicy rule一覧](../plans/2026-10-03_173600_formatter-lint_execpolicy-rules.md) を正本とします。
+この文書は、repository-local Codex開発ハーネスの目的、承認経路、保証範囲を説明します。Codex CLIのversionは固定しません。Codex Harness CIはnpmの`latest` stable tagからCLIを導入し、実行versionを記録してから、Hook・execpolicy・config・launcherの契約を実CLIで検証します。設定・Hook・execpolicyの具体例は [Main Plan](../plans/2026-10-03_173600_formatter-lint.md) と [execpolicy rule一覧](../plans/2026-10-03_173600_formatter-lint_execpolicy-rules.md) を正本とします。
 
 ## 責務の分担
 
@@ -66,7 +66,7 @@ Repository Hookが実行されるには、project trustとCodex CLIによるHook
 
 Windowsのquote-free `command_windows` payloadはtrusted repository内のlauncher sourceを読み込み、script blockとして実行します。PowerShell 5.1の`Restricted` policyでも必要なtransportを動作させるためです。launcherはrepository-local sourceのままtransport-onlyに保ち、通常ユーザーcommandを`Invoke-Expression`で評価しません。
 
-Codex CLI `0.160.0`はruntime qualificationの対象です。実runtime受入を行う場合はversion完全一致と`codex --no-daemon --strict-config`のembedded / non-shared sessionを確認し、managed/shared app-serverを受入済みと扱いません。現在のCLI versionやsession条件が異なる、または取得できない場合はその範囲を未検証とし、`0.160.0` runtime受入済みとは記載しません。PR #18では実行可能な安全確認だけを行い、この未検証だけで実装完了を停止しません。
+実runtime受入を行う場合は、利用versionを記録し、`codex --no-daemon --strict-config`のembedded / non-shared sessionで対象tool modeのHook dispatch、execpolicy分類、sandbox、およびprotected branch / destructive Git guardを確認します。managed/shared app-serverは承認のsession isolationを確認できないため、受入済みと扱いません。version番号だけで検証を停止またはskipせず、必要な機能が存在しない、挙動が変わった、またはsession条件を確認できない場合は、その機能・範囲を未検証または互換性問題として記録します。
 
 Primary profileは`unified_exec = true` / `unified_exec_tty = false`です。#51175のfallback比較は、Plan所定の同一version・同一environment・同一tool modeのsupported runtimeでpositive smokeが実際にFAILした場合だけ適用します。PR #18ではPOSIX runtimeを利用できない場合にfallbackを試さず、その範囲を未検証と記録します。
 
@@ -80,4 +80,4 @@ PR #18では承認UIのprobe、手動cancel、破棄操作の状態不変確認�
 
 ## Validationの証拠
 
-CIのcontract test、利用可能な固定版CLIの`execpolicy check`、公式`skills-ref` validationは静的構造と回帰を検査します。これらはfresh Codex runtime acceptanceを代替せず、PR #18でもそのように記載しません。特にargvだけの`execpolicy check`は完全なPOSIX / Windows shell commandの分解やHook dispatchを証明しません。実runtimeを利用できない、または対象versionと一致しない場合はその範囲を未検証とし、他の完了条件を満たしていればそれだけを理由に実装完了を止めません。実行したruntime検証で不具合を確認した場合はFAILとして修正します。
+CIのcontract test、実行環境にインストールされたCodex CLIの`execpolicy check`、公式`skills-ref` validationは静的構造と回帰を検査します。Codex Harnessは使用versionを記録し、version一致ではなく利用可能なCLI機能と安全contractを検証します。これらはfresh Codex runtime acceptanceを代替せず、PR #18でもそのように記載しません。特にargvだけの`execpolicy check`は完全なPOSIX / Windows shell commandの分解やHook dispatchを証明しません。必要なCLI機能を利用できない、挙動が変わった、またはsession条件を確認できない場合は、その機能・範囲を未検証または互換性問題として記録します。他の完了条件を満たしていれば、version番号だけを理由に実装完了を止めません。実行したruntime検証で不具合を確認した場合はFAILとして修正します。

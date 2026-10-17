@@ -71,7 +71,7 @@ CONFIG = {
         None,
         "all",
         "direct",
-        "requirement-structure-v1",
+        "requirement-structure-v2",
         "skills/test-requirement-design/scripts/requirement_structure.py",
     ),
     "condition_structure": (
@@ -81,7 +81,7 @@ CONFIG = {
         None,
         "all",
         "direct",
-        "condition-structure-v1",
+        "condition-structure-v2",
         "skills/test-condition-design/scripts/condition_structure.py",
     ),
     "equivalence_partitions": (
@@ -251,7 +251,7 @@ CONFIG = {
         None,
         "TCN-001",
         "artifact",
-        "materialize-coverage-v1",
+        "materialize-coverage-v2",
         "skills/test-condition-design/scripts/materialize_coverage.py",
     ),
     "case_structure": (
@@ -261,7 +261,7 @@ CONFIG = {
         None,
         None,
         "direct",
-        "case-structure-v1",
+        "case-structure-v2",
         "skills/test-case-design/scripts/case_structure.py",
     ),
     "traceability": (
@@ -310,6 +310,7 @@ def metadata(config: tuple) -> dict:
             "model_key": "ep-001",
             "model_type": "ep",
             "parent_tcn_id": "TCN-001",
+            "scope_refs": [],
             "selection_key": "SEL-001",
             "selection_source": "analysis",
             "status": "active",
@@ -320,7 +321,7 @@ def metadata(config: tuple) -> dict:
                 "skill": "test-condition-design",
                 "entity_type": "tcn",
                 "entity_ref": "TCN-001",
-                "content": {"tcn_id": "TCN-001"},
+                "content": {"tcn_id": "TCN-001", "scope_refs": []},
             },
             {
                 "skill": "test-condition-design",
@@ -332,7 +333,7 @@ def metadata(config: tuple) -> dict:
     return {
         "envelope_version": "1",
         "skill": skill,
-        "runtime_contract_version": "runtime-v1",
+        "runtime_contract_version": "runtime-v2",
         "generator_contract_version": contract,
         "runtime_unit_key": unit,
         "model_key": model_key,

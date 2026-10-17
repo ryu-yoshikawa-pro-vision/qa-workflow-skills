@@ -11,14 +11,15 @@ description: Figma、要件書、Q&A、リポジトリ、リリース資料な�
 2. 未定義の製品挙動を補完せず、`SPEC` / `DECISION` / `INFERENCE` / `UNKNOWN`を区別します。
 3. テスト要求・テスト条件・テストケースを先回りして作りません。
 4. 通常の仕様抽出、分類、停止条件、最低品質確認は`references/guidance.md`に従います。
-5. 複数の仕様根拠、バージョン差、情報源競合、決定事項の補足 / 上書き / 置換、承認済みASMの適用判断が必要な場合だけ`references/authority-resolution.md`を追加で読みます。
-6. 既定出力形式が必要な場合は`assets/output-template.md`を使用します。案件固有形式がある場合は意味上の出力契約と追跡性を維持する限りそちらを優先します。
-7. 他Skillを参照するときは正規Skill名を使用します。
-8. 最終出力前に、実際に利用した入力が本Skillの入力契約を満たし、停止条件に該当する未解決状態がないか確認します。あわせて、生成した成果物へ本Skill自身の出力契約・品質ゲートを適用して自己検証します。明白かつ局所的で新しい領域固有の判断を必要としない契約違反だけを最大1回修正し、修正後は修正箇所を含めて最終確認します。仕様根拠不足、競合、未確定情報を推測補完したり`SPEC` / `DECISION`へ昇格させたりせず、必要な場合は既存の停止条件・ブロック中・ルーティングに従います。最終確認後も本Skill自身の契約違反が残り、既存の停止条件・ブロック中・ルーティングに該当しない場合は2回目の自動修正を行わず、その成果物を契約適合済み・完成済みとして扱わず、現在残る契約上の制約だけを明示します。自己検証の経緯や修正回数は出力しません。
+5. テスト設計前の対象理解を継続packageとして作成・更新する場合、または複数資料からUI構造・業務ルール・UNKNOWNを追跡可能に整理する場合は`references/ui-test-target-analysis.md`を読みます。単発の仕様要約やMarkdown出力だけを理由にmodeを選びません。
+6. 複数の仕様根拠、バージョン差、情報源競合、決定事項の補足 / 上書き / 置換、承認済みASMの適用判断が必要な場合だけ`references/authority-resolution.md`を追加で読みます。
+7. 通常分析では`assets/output-template.md`、UIテスト対象分析modeではreferenceが指定する`assets/ui-test-target-analysis/`を使用します。案件固有形式がある場合は意味上の出力契約と追跡性を維持する限りそちらを優先します。
+8. 他Skillを参照するときは正規Skill名を使用します。
+9. 最終出力前に、実際に利用した入力が本Skillの入力契約を満たし、停止条件に該当する未解決状態がないか確認します。あわせて、生成した成果物へ本Skill自身の出力契約・品質ゲートを適用して自己検証します。明白かつ局所的で新しい領域固有の判断を必要としない契約違反だけを最大1回修正し、修正後は修正箇所を含めて最終確認します。仕様根拠不足、競合、未確定情報を推測補完したり`SPEC` / `DECISION`へ昇格させたりせず、必要な場合は既存の停止条件・ブロック中・ルーティングに従います。最終確認後も本Skill自身の契約違反が残り、既存の停止条件・ブロック中・ルーティングに該当しない場合は2回目の自動修正を行わず、その成果物を契約適合済み・完成済みとして扱わず、現在残る契約上の制約だけを明示します。自己検証の経緯や修正回数は出力しません。
 
 ## 決定論的runtimeとの関係
 
-本Skillはruntime dispatchを持たず、仕様根拠の意味分析だけを担当します。`authority_entities.py`は仕様根拠、決定事項、推論、不明点をMachine Entityへ変換するSkill-local helperであり、他Skillのruntimeを呼び出しません。下流へ渡すEntityは`entity-state-v1`、安定した`entity_ref`、`content_fingerprint`、依存Entityのfingerprintを持ちます。`stale` / `legacy` / `deleted`を有効成果物として再利用せず、runtime出力の欠落を仕様分析の成功で補完しません。
+本Skillはruntime dispatchを持たず、仕様根拠の意味分析だけを担当します。`authority_entities.py`は仕様根拠、決定事項、推論、不明点をMachine Entityへ変換するSkill-local helperであり、他Skillのruntimeを呼び出しません。下流へ渡すAuthority EntityとUI target modeのAcceptance Criterion Entityは`entity-state-v2`、安定した`entity_ref`、`content_fingerprint`、依存Entityのfingerprintを持ちます。`stale` / `legacy` / `deleted`を有効成果物として再利用せず、runtime出力の欠落を仕様分析の成功で補完しません。
 
 ## インターフェース
 
@@ -38,5 +39,7 @@ description: Figma、要件書、Q&A、リポジトリ、リリース資料な�
 ## リソース
 
 - 通常の仕様分析: `references/guidance.md`
+- UIテスト対象分析mode: `references/ui-test-target-analysis.md`
 - 仕様根拠の競合 / バージョン / 決定事項 / ASMの詳細解決: `references/authority-resolution.md`
 - 既定出力形式: `assets/output-template.md`
+- UIテスト対象分析package assets: `assets/ui-test-target-analysis/`

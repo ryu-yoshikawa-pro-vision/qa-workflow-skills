@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from scripts.skills.evals.deterministic.common import (
     ID_PATTERNS,
     add_allowed_assertion,
@@ -57,6 +59,55 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         }
         if not structure_ok
         else None,
+    )
+
+    required_files = expected.get("required_package_files", [])
+    missing_files = [
+        relative
+        for relative in required_files
+        if f"<!-- FILE: {relative} -->" not in text
+    ]
+    result.add(
+        "SPEC-D020",
+        not missing_files,
+        "UI target package projectionに必須payload fileが含まれること",
+        evidence=missing_files or None,
+    )
+
+    required_ui_ids = expected.get("required_ui_target_ids", [])
+    missing_ui_ids = [
+        stable_id
+        for stable_id in required_ui_ids
+        if re.search(
+            rf"(?<![A-Za-z0-9_-]){re.escape(stable_id)}(?![A-Za-z0-9_-])", text
+        )
+        is None
+    ]
+    result.add(
+        "SPEC-D021",
+        not missing_ui_ids,
+        "UI target package projectionに必須stable IDが参照可能な形で含まれること",
+        evidence=missing_ui_ids or None,
+    )
+
+    required_package_tables = expected.get("required_package_tables", [])
+    missing_package_tables = []
+    for contract in required_package_tables:
+        if not isinstance(contract, dict):
+            missing_package_tables.append(contract)
+            continue
+        table = find_table(
+            tables,
+            section_contains=contract.get("section_contains"),
+            required_headers=tuple(contract.get("headers", [])),
+        )
+        if table is None:
+            missing_package_tables.append(contract)
+    result.add(
+        "SPEC-D022",
+        not missing_package_tables,
+        "UI target package projectionの指定canonical table / headerが存在すること",
+        evidence=missing_package_tables or None,
     )
 
     refs = nonempty_rows(refs_table)

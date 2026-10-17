@@ -8,7 +8,7 @@ TCN-001-CI01: 有効な新名称を保存したとき、保存成功後の設定
 
 ```json
 {
-  "schema_version": "entity-state-v1",
+  "schema_version": "entity-state-v2",
   "skill": "test-condition-design",
   "entity_type": "ci",
   "entity_ref": "TCN-001-CI01",

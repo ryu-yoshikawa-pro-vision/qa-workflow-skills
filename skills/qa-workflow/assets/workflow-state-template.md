@@ -34,7 +34,8 @@
     "resource_conditions": [],
     "mutable_operation_claims": [],
     "handoffs": [],
-    "unresolved": []
+    "unresolved": [],
+    "last_completed_qa_workflow_artifact": null
   }
 }
 ```

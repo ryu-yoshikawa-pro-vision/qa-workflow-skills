@@ -141,7 +141,7 @@ def metadata() -> dict:
     return {
         "envelope_version": "1",
         "skill": "wcag-conformance-evaluation",
-        "runtime_contract_version": "runtime-v1",
+        "runtime_contract_version": "runtime-v2",
         "generator_contract_version": "wcag-em-runtime-v1",
         "runtime_unit_key": "artifact:wcag_runtime:all",
         "model_key": None,
@@ -320,6 +320,7 @@ def invoke(body: dict) -> dict:
         [sys.executable, str(SCRIPT)],
         input=json.dumps(body),
         text=True,
+        encoding="utf-8",
         cwd=ROOT,
         capture_output=True,
         check=False,
@@ -335,7 +336,7 @@ def workflow_metadata(
     return {
         "envelope_version": "1",
         "skill": "qa-workflow",
-        "runtime_contract_version": "runtime-v1",
+        "runtime_contract_version": "runtime-v2",
         "generator_contract_version": "workflow-runtime-v1",
         "runtime_unit_key": "artifact:workflow_runtime:all",
         "model_key": None,
@@ -358,6 +359,7 @@ def invoke_workflow(body: dict) -> dict:
         [sys.executable, str(WORKFLOW_SCRIPT)],
         input=json.dumps(body),
         text=True,
+        encoding="utf-8",
         cwd=ROOT,
         capture_output=True,
         check=False,

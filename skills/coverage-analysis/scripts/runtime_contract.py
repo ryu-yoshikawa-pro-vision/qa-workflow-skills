@@ -17,9 +17,9 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
-RUNTIME_CONTRACT_VERSION = "runtime-v1"
+RUNTIME_CONTRACT_VERSION = "runtime-v2"
 ENVELOPE_VERSION = "1"
-ENTITY_SCHEMA_VERSION = "entity-state-v1"
+ENTITY_SCHEMA_VERSION = "entity-state-v2"
 MAX_NORMAL_INPUT_BYTES = 2 * 1024 * 1024
 MAX_AGGREGATE_INPUT_BYTES = 16 * 1024 * 1024
 MAX_STDOUT_BYTES = 16 * 1024 * 1024
@@ -33,6 +33,7 @@ TR_ID_RE = re.compile(r"^TR-(\d{3})$")
 TCN_ID_RE = re.compile(r"^TCN-(\d{3})$")
 TC_ID_RE = re.compile(r"^TC-(\d{3})$")
 CI_ID_RE = re.compile(r"^(TCN-\d{3})-CI(\d{2,})$")
+SCOPE_ID_RE = re.compile(r"^SCOPE-\d{3,}$")
 
 SUPPORTED_STATUSES = {
     "ok",
@@ -470,7 +471,7 @@ def canonical_json_bytes(value: Any) -> bytes:
 
 
 def _sort_record_array(key: str, values: list[Any]) -> list[Any]:
-    if key in {"authority_refs", "risk_refs"} and all(
+    if key in {"authority_refs", "risk_refs", "acceptance_refs", "scope_refs"} and all(
         isinstance(value, str) for value in values
     ):
         # Keep duplicate semantic references visible to the owning schema
@@ -508,6 +509,7 @@ def _sort_record_array(key: str, values: list[Any]) -> list[Any]:
         "sets": ("set_key",),
         "partitions": ("partition_key",),
         "test_requirements": ("tr_id",),
+        "acceptance_criteria": ("ac_id",),
         "technique_selections": ("selection_key",),
         "test_conditions": ("draft_key",),
         "models": ("parent_tcn_draft_key", "model_type", "draft_key"),
@@ -760,7 +762,7 @@ def typed_value_compare(left: dict[str, Any], right: dict[str, Any]) -> int:
 def constraint_intersection_compatible(constraints: Iterable[dict[str, Any]]) -> bool:
     """Return whether normalized constraints on one dimension have a common value.
 
-    This is the shared runtime-v1 intersection contract used by environment,
+    This is the shared runtime-v2 intersection contract used by environment,
     test-data, merge, and case-level requirement validation.
     """
     rows = list(constraints)
@@ -1710,6 +1712,7 @@ def machine_entity_runtime_dependency(
 
 ALLOWED_ENTITY_TYPES = {
     "authority",
+    "acceptance_criterion",
     "test_analysis_context",
     "product_risk",
     "technique_selection",
@@ -3521,6 +3524,7 @@ def _verified_child_units(
                     "technique_slug",
                     "parent_tcn_id",
                     "content_fingerprint",
+                    "scope_refs",
                 }
                 for row in metadata_rows:
                     if (
@@ -3536,6 +3540,14 @@ def _verified_child_units(
                         or not FULL_DIGEST_RE.fullmatch(
                             str(row.get("content_fingerprint"))
                         )
+                        or not isinstance(row.get("scope_refs"), list)
+                        or not all(
+                            isinstance(scope_ref, str)
+                            and SCOPE_ID_RE.fullmatch(scope_ref) is not None
+                            for scope_ref in row["scope_refs"]
+                        )
+                        or len(row["scope_refs"]) != len(set(row["scope_refs"]))
+                        or row["scope_refs"] != sorted(row["scope_refs"])
                     ):
                         invalid_projection = True
                         break
@@ -3554,17 +3566,69 @@ def _verified_child_units(
                         break
                     if technique_slug is not None:
                         materialize_tcn_ids.add(row["parent_tcn_id"])
+            if normalized.get("zero_scope_terminal") is True:
+                previous_tcn_rows = normalized.get("previous_tcn_ids")
+                terminal_tcn_rows = payload.get("tcn_id_state")
+                if not isinstance(previous_tcn_rows, list) or not isinstance(
+                    terminal_tcn_rows, list
+                ):
+                    invalid_projection = True
+                else:
+                    previous_tcn_state: dict[str, dict[str, Any]] = {}
+                    for row in previous_tcn_rows:
+                        if (
+                            not isinstance(row, dict)
+                            or set(row) != {"tcn_id", "status", "scope_refs"}
+                            or not isinstance(row.get("tcn_id"), str)
+                            or re.fullmatch(r"TCN-[0-9]{3}", row["tcn_id"]) is None
+                            or row.get("status")
+                            not in {"active", "inactive", "deleted"}
+                            or not isinstance(row.get("scope_refs"), list)
+                            or row["tcn_id"] in previous_tcn_state
+                        ):
+                            invalid_projection = True
+                            break
+                        previous_tcn_state[row["tcn_id"]] = row
+                    terminal_tcn_state: dict[str, dict[str, Any]] = {}
+                    if not invalid_projection:
+                        for row in terminal_tcn_rows:
+                            if (
+                                not isinstance(row, dict)
+                                or set(row) != {"tcn_id", "status", "scope_refs"}
+                                or not isinstance(row.get("tcn_id"), str)
+                                or re.fullmatch(r"TCN-[0-9]{3}", row["tcn_id"]) is None
+                                or row.get("status") != "deleted"
+                                or row.get("scope_refs") != []
+                                or row["tcn_id"] in terminal_tcn_state
+                            ):
+                                invalid_projection = True
+                                break
+                            terminal_tcn_state[row["tcn_id"]] = row
+                    if not invalid_projection and set(terminal_tcn_state) != set(
+                        previous_tcn_state
+                    ):
+                        invalid_projection = True
+                    if not invalid_projection:
+                        materialize_tcn_ids.update(
+                            tcn_id
+                            for tcn_id, row in previous_tcn_state.items()
+                            if row["status"] in {"active", "inactive"}
+                        )
             if invalid_projection:
                 if issues is None:
                     raise InvalidInput(
-                        "condition_structure active_model_metadata is invalid"
+                        "condition_structure child-unit projection is invalid"
                     )
                 issues.append(
                     {
                         "issue_type": "invalid_runtime_payload",
                         "blocking": True,
                         "runtime_unit": condition_identity,
-                        "field": "active_model_metadata",
+                        "field": (
+                            "zero_scope_terminal_state"
+                            if normalized.get("zero_scope_terminal") is True
+                            else "active_model_metadata"
+                        ),
                     }
                 )
             else:
@@ -3815,6 +3879,7 @@ def _validate_previous_entity_state(
     skill: str,
     entities: list[dict[str, Any]],
     states: dict[str, dict[str, str]],
+    state_rows: dict[str, dict[str, dict[str, Any]]] | None = None,
 ) -> None:
     for entity_type, state in states.items():
         entity_refs = {
@@ -3826,26 +3891,101 @@ def _validate_previous_entity_state(
             raise InvalidInput(
                 "previous ID state and Machine Entities are inconsistent"
             )
+        if state_rows is None or entity_type not in state_rows:
+            continue
+        entity_by_ref = {
+            row["entity_ref"]: row
+            for row in entities
+            if row["skill"] == skill and row["entity_type"] == entity_type
+        }
+        for ref in entity_refs:
+            content_scope_refs = entity_by_ref[ref]["content"].get("scope_refs")
+            state_scope_refs = state_rows[entity_type][ref]["scope_refs"]
+            if content_scope_refs != state_scope_refs:
+                raise InvalidInput(
+                    "active Machine Entity scope_refs and ID state are inconsistent"
+                )
+
+
+def _state_row_map(rows: Any, id_field: str) -> dict[str, dict[str, Any]]:
+    if not isinstance(rows, list):
+        raise InvalidInput("previous full ID state is invalid")
+    result: dict[str, dict[str, Any]] = {}
+    expected_fields = {id_field, "status", "scope_refs"}
+    if id_field == "model_key":
+        # condition-structure-v2 preserves the complete model identity record
+        # in model_key_state. Those metadata fields are part of the model
+        # identity contract, while status and scope_refs are the evolving
+        # state attached to that identity.
+        expected_fields.update(
+            {
+                "model_type",
+                "technique_slug",
+                "parent_tcn_id",
+                "selection_source",
+                "selection_key",
+                "derived_from_model_key",
+            }
+        )
+    for row in rows:
+        if (
+            not isinstance(row, dict)
+            or set(row) != expected_fields
+            or not isinstance(row.get(id_field), str)
+            or not isinstance(row.get("status"), str)
+            or row["status"] not in {"active", "inactive", "deleted"}
+            or (
+                id_field == "model_key"
+                and (
+                    row.get("model_type") not in MODEL_TYPES
+                    or not row[id_field].startswith(f"{row['model_type']}-")
+                    or not isinstance(row.get("parent_tcn_id"), str)
+                    or TCN_ID_RE.fullmatch(row["parent_tcn_id"]) is None
+                    or row.get("technique_slug") is not None
+                    and row.get("technique_slug") not in TECHNIQUE_SLUGS
+                    or row.get("selection_source") is not None
+                    and row.get("selection_source")
+                    not in {"analysis", "condition_design", "user"}
+                    or row.get("selection_key") is not None
+                    and not isinstance(row.get("selection_key"), str)
+                    or row.get("derived_from_model_key") is not None
+                    and (
+                        not isinstance(row.get("derived_from_model_key"), str)
+                        or re.fullmatch(
+                            r"[a-z][a-z0-9-]*-[0-9]{3,}",
+                            row["derived_from_model_key"],
+                        )
+                        is None
+                    )
+                )
+            )
+        ):
+            raise InvalidInput("previous full ID state is invalid")
+        scope_refs = row["scope_refs"]
+        if (
+            not isinstance(scope_refs, list)
+            or not all(
+                isinstance(ref, str) and SCOPE_ID_RE.fullmatch(ref)
+                for ref in scope_refs
+            )
+            or len(scope_refs) != len(set(scope_refs))
+            or scope_refs != sorted(scope_refs)
+        ):
+            raise InvalidInput("previous full ID state scope_refs are invalid")
+        ref = row[id_field]
+        if ref in result:
+            raise InvalidInput("previous full ID state is duplicated")
+        result[ref] = row
+    return result
 
 
 def _state_map(
     rows: Any, id_field: str, *, state_field: str = "status"
 ) -> dict[str, str]:
-    if not isinstance(rows, list):
-        return {}
-    result: dict[str, str] = {}
-    for row in rows:
-        if (
-            not isinstance(row, dict)
-            or not isinstance(row.get(id_field), str)
-            or row.get(state_field) not in {"active", "deleted"}
-        ):
-            raise InvalidInput("previous full ID state is invalid")
-        ref = row[id_field]
-        if ref in result:
-            raise InvalidInput("previous full ID state is duplicated")
-        result[ref] = row[state_field]
-    return result
+    rows_by_id = _state_row_map(rows, id_field)
+    if state_field != "status":
+        raise InvalidInput("unsupported previous ID state field")
+    return {ref: row[state_field] for ref, row in rows_by_id.items()}
 
 
 def _previous_entity_states(
@@ -3916,7 +4056,11 @@ def _previous_entity_states(
                 if not isinstance(rows, list):
                     raise InvalidInput("previous ci_id_state is invalid")
                 for row in rows:
-                    if not isinstance(row, dict) or set(row) != {id_field, "status"}:
+                    if not isinstance(row, dict) or set(row) != {
+                        id_field,
+                        "status",
+                        "scope_refs",
+                    }:
                         raise InvalidInput("previous ci_id_state row schema is invalid")
                     ci_id = row.get(id_field)
                     if (
@@ -3950,6 +4094,71 @@ def _previous_entity_states(
             raise InvalidInput(f"previous {field} is duplicated")
         source = field_rows[0] if field_rows else []
         output[entity_type] = _state_map(source, id_field)
+    return output
+
+
+def _previous_entity_state_rows(
+    skill: str,
+    normalized: dict[str, Any],
+    previous_result_blocks: Iterable[tuple[str, dict[str, Any]]] | None = None,
+) -> dict[str, dict[str, dict[str, Any]]]:
+    state_fields = {
+        "test-requirement-design": {"tr": ("tr_id_state", "tr_id")},
+        "test-condition-design": {
+            "tcn": ("tcn_id_state", "tcn_id"),
+            "model": ("model_key_state", "model_key"),
+            "ci": ("ci_id_state", "ci_id"),
+        },
+        "test-case-design": {"tc": ("tc_id_state", "tc_id")},
+    }.get(skill, {})
+    normalized_fields = {
+        "tr": "previous_tr_ids",
+        "tcn": "previous_tcn_ids",
+        "model": "previous_model_keys",
+        "tc": "previous_tc_ids",
+        "ci": "previous_ci_ids",
+    }
+    if previous_result_blocks is None:
+        return {
+            entity_type: _state_row_map(
+                normalized.get(normalized_fields[entity_type], []), id_field
+            )
+            for entity_type, (_field, id_field) in state_fields.items()
+        }
+
+    payloads: list[tuple[str, dict[str, Any]]] = []
+    for identity, result in previous_result_blocks:
+        if identity.startswith(skill + "::") and isinstance(
+            result.get("payload"), dict
+        ):
+            payloads.append((identity, result["payload"]))
+    output: dict[str, dict[str, dict[str, Any]]] = {}
+    root_units = {
+        "test-requirement-design": "artifact:requirement_structure:all",
+        "test-condition-design": "artifact:condition_structure:all",
+        "test-case-design": "artifact:case_structure:all",
+    }
+    for entity_type, (field, id_field) in state_fields.items():
+        rows: list[dict[str, Any]] = []
+        expected_identity = _unit_identity(skill, root_units[skill])
+        for identity, payload in payloads:
+            if field not in payload:
+                continue
+            if entity_type != "ci" and identity != expected_identity:
+                raise InvalidInput(
+                    f"previous {field} must come from {expected_identity}"
+                )
+            if entity_type == "ci" and not identity.split("::", 1)[1].startswith(
+                "artifact:materialize_coverage:"
+            ):
+                raise InvalidInput(
+                    "previous ci_id_state must come from materialize result"
+                )
+            value = payload[field]
+            if not isinstance(value, list):
+                raise InvalidInput(f"previous {field} is invalid")
+            rows.extend(value)
+        output[entity_type] = _state_row_map(rows, id_field)
     return output
 
 
@@ -4062,17 +4271,18 @@ def _active_previous_entity_identities(
 ) -> set[tuple[str, str, str]]:
     result: set[tuple[str, str, str]] = set()
     state_types = {
-        "test-requirement-design": (("tr", "update_scope_tr_ids"),),
+        "test-requirement-design": (("tr", "update_scope_tr_ids", "inactive_tr_ids"),),
         "test-condition-design": (
-            ("tcn", "update_scope_tcn_ids"),
-            ("model", "update_scope_model_keys"),
+            ("tcn", "update_scope_tcn_ids", "inactive_tcn_ids"),
+            ("model", "update_scope_model_keys", "inactive_model_keys"),
         ),
-        "test-case-design": (("tc", "update_scope_tc_ids"),),
+        "test-case-design": (("tc", "update_scope_tc_ids", "inactive_tc_ids"),),
     }.get(skill, ())
-    for entity_type, scope_field in state_types:
+    for entity_type, scope_field, inactive_field in state_types:
         scope = set(normalized.get(scope_field, []))
+        inactive = set(normalized.get(inactive_field, []))
         for ref, status in states.get(entity_type, {}).items():
-            if status == "active" and ref not in scope:
+            if status == "active" and ref not in scope and ref not in inactive:
                 result.add((skill, entity_type, ref))
     if skill == "test-condition-design":
         current_tcn = normalized.get("tcn_id")
@@ -4082,6 +4292,8 @@ def _active_previous_entity_identities(
         updated_tcns = set(normalized.get("update_scope_tcn_ids", []))
         for ref, status in states.get("ci", {}).items():
             if status != "active":
+                continue
+            if ref in set(normalized.get("inactive_ci_ids", [])):
                 continue
             match = re.fullmatch(r"(TCN-[0-9]{3})-CI[0-9]{2,}", ref)
             if match is None:
@@ -4109,10 +4321,21 @@ def _carry_forward_machine_entities(
         )
     }
     result: list[dict[str, Any]] = []
+    inactive_refs = {
+        "test-requirement-design": set(normalized.get("inactive_tr_ids", [])),
+        "test-condition-design": (
+            set(normalized.get("inactive_tcn_ids", []))
+            | set(normalized.get("inactive_model_keys", []))
+            | set(normalized.get("inactive_ci_ids", []))
+        ),
+        "test-case-design": set(normalized.get("inactive_tc_ids", [])),
+    }.get(skill, set())
     for row in previous_entities:
         if not isinstance(row, dict) or row.get("skill") != skill:
             continue
         status_map = states.get(row["entity_type"], {})
+        if row["entity_ref"] in inactive_refs:
+            continue
         if (
             row["entity_type"] in states
             and status_map.get(row["entity_ref"]) != "active"
@@ -4357,13 +4580,16 @@ def validate_current_structure_state(
         )
     if skill == "test-condition-design":
         if any(
-            not isinstance(row, dict) or set(row) != {"ci_id", "status"}
+            not isinstance(row, dict) or set(row) != {"ci_id", "status", "scope_refs"}
             for row in raw_previous_ci_state
         ):
             raise InvalidInput(
                 "current_structure_state previous CI state row schema is invalid"
             )
-        previous_ci_state = _state_map(raw_previous_ci_state, "ci_id")
+        previous_ci_rows = _state_row_map(raw_previous_ci_state, "ci_id")
+        previous_ci_state = {
+            ci_id: row["status"] for ci_id, row in previous_ci_rows.items()
+        }
         if any(
             re.fullmatch(r"TCN-[0-9]{3}-CI[0-9]{2,}", ci_id) is None
             for ci_id in previous_ci_state
@@ -4372,7 +4598,11 @@ def validate_current_structure_state(
                 "current_structure_state previous CI identity is invalid"
             )
         if raw_previous_ci_state != [
-            {"ci_id": ci_id, "status": previous_ci_state[ci_id]}
+            {
+                "ci_id": ci_id,
+                "status": previous_ci_state[ci_id],
+                "scope_refs": previous_ci_rows[ci_id]["scope_refs"],
+            }
             for ci_id in sorted(previous_ci_state)
         ]:
             raise InvalidInput(
@@ -4562,8 +4792,12 @@ def validate_current_structure_state(
         "runtime_results": canonicalize(raw_results),
         "carry_forward_entities": carry,
         "previous_ci_id_state": [
-            {"ci_id": ci_id, "status": status}
-            for ci_id, status in sorted(previous_ci_state.items())
+            {
+                "ci_id": ci_id,
+                "status": previous_ci_rows[ci_id]["status"],
+                "scope_refs": previous_ci_rows[ci_id]["scope_refs"],
+            }
+            for ci_id in sorted(previous_ci_state)
         ]
         if skill == "test-condition-design"
         else [],
@@ -4575,6 +4809,7 @@ def _current_structure_state_projection(
     result_blocks: Iterable[tuple[str, dict[str, Any]]],
     carry_forward_entities: list[dict[str, Any]],
     previous_states: dict[str, dict[str, str]],
+    previous_state_rows: dict[str, dict[str, dict[str, Any]]],
 ) -> dict[str, Any]:
     """Expose only fixed runtime results and strictly validated prior entity rows."""
     runtime_results = []
@@ -4587,8 +4822,12 @@ def _current_structure_state_projection(
         "runtime_results": runtime_results,
         "carry_forward_entities": canonicalize(carry_forward_entities),
         "previous_ci_id_state": [
-            {"ci_id": ci_id, "status": status}
-            for ci_id, status in sorted(previous_states.get("ci", {}).items())
+            {
+                "ci_id": ci_id,
+                "status": row["status"],
+                "scope_refs": row["scope_refs"],
+            }
+            for ci_id, row in sorted(previous_state_rows.get("ci", {}).items())
         ]
         if skill == "test-condition-design"
         else [],
@@ -4616,6 +4855,11 @@ def _expected_entities(
     if skill == "spec-analysis":
         for row in normalized.get("authorities", []):
             add("authority", row.get("authority_id") if isinstance(row, dict) else None)
+        for row in normalized.get("acceptance_criteria", []):
+            add(
+                "acceptance_criterion",
+                row.get("ac_id") if isinstance(row, dict) else None,
+            )
     elif skill == "test-analysis":
         result.append(
             {
@@ -5279,7 +5523,7 @@ def verify_runtime_evidence(request: dict[str, Any]) -> dict[str, Any]:
             {
                 "issue_type": "invalid_previous_artifact",
                 "blocking": True,
-                "message": f"{skill} requires partial_rerun=false and previous_artifact_markdown=null in runtime-v1",
+                "message": f"{skill} requires partial_rerun=false and previous_artifact_markdown=null in runtime-v2",
             }
         )
     elif skill in carry_forward_skills and partial_rerun != (previous is not None):
@@ -5297,7 +5541,7 @@ def verify_runtime_evidence(request: dict[str, Any]) -> dict[str, Any]:
             {
                 "issue_type": "invalid_previous_artifact",
                 "blocking": True,
-                "message": f"{skill} does not support previous artifact carry-forward in runtime-v1",
+                "message": f"{skill} does not support previous artifact carry-forward in runtime-v2",
             }
         )
     graph_rows = []
@@ -5510,6 +5754,7 @@ def verify_runtime_evidence(request: dict[str, Any]) -> dict[str, Any]:
         )
     previous_entities: list[dict[str, Any]] = []
     previous_states: dict[str, dict[str, str]] = {}
+    previous_state_rows: dict[str, dict[str, dict[str, Any]]] = {}
     previous_result_blocks: list[tuple[str, dict[str, Any]]] = []
     previous_valid = False
     if previous is not None and skill in no_carry_forward_skills:
@@ -5555,6 +5800,9 @@ def verify_runtime_evidence(request: dict[str, Any]) -> dict[str, Any]:
             previous_states = _previous_entity_states(
                 skill, normalized, previous_result_blocks
             )
+            previous_state_rows = _previous_entity_state_rows(
+                skill, normalized, previous_result_blocks
+            )
             tracked_types = set(previous_states)
             state_keys = {
                 key
@@ -5582,8 +5830,11 @@ def verify_runtime_evidence(request: dict[str, Any]) -> dict[str, Any]:
                     and required_state_fields[entity_type] not in state_keys
                 ):
                     raise InvalidInput("previous full ID state is missing")
-            _validate_previous_entity_state(skill, previous_entities, previous_states)
+            _validate_previous_entity_state(
+                skill, previous_entities, previous_states, previous_state_rows
+            )
             normalized_states = _previous_entity_states(skill, normalized)
+            normalized_state_rows = _previous_entity_state_rows(skill, normalized)
             normalized_state_fields = {
                 "tr": "previous_tr_ids",
                 "tcn": "previous_tcn_ids",
@@ -5620,9 +5871,27 @@ def verify_runtime_evidence(request: dict[str, Any]) -> dict[str, Any]:
                         raise InvalidInput(
                             "normalized previous_ci_ids do not match the current TCN state"
                         )
+                    previous_ci_scope_subset = {
+                        ci_id: row
+                        for ci_id, row in previous_state_rows.get(
+                            entity_type, {}
+                        ).items()
+                        if ci_id.startswith(tcn_id + "-")
+                    }
+                    current_ci_scope_rows = normalized_state_rows.get(entity_type, {})
+                    if current_ci_scope_rows != previous_ci_scope_subset:
+                        raise InvalidInput(
+                            "normalized previous_ci_ids scope_refs do not match the current TCN state"
+                        )
                 elif normalized_states.get(entity_type, {}) != state:
                     raise InvalidInput(
                         "normalized previous ID state does not match previous artifact"
+                    )
+                elif normalized_state_rows.get(
+                    entity_type, {}
+                ) != previous_state_rows.get(entity_type, {}):
+                    raise InvalidInput(
+                        "normalized previous ID scope_refs do not match previous artifact"
                     )
             previous_result_entities = _runtime_result_entities(
                 previous_result_blocks, skill
@@ -5878,8 +6147,15 @@ def verify_runtime_evidence(request: dict[str, Any]) -> dict[str, Any]:
             issues.append(
                 {"issue_type": exc.issue_type, "blocking": True, "message": exc.message}
             )
+    if not previous_state_rows:
+        try:
+            previous_state_rows = _previous_entity_state_rows(skill, normalized)
+        except RuntimeErrorBase as exc:
+            issues.append(
+                {"issue_type": exc.issue_type, "blocking": True, "message": exc.message}
+            )
     current_structure_state = _current_structure_state_projection(
-        skill, result_blocks, carry_rows, previous_states
+        skill, result_blocks, carry_rows, previous_states, previous_state_rows
     )
     if skill in {
         "test-analysis",
