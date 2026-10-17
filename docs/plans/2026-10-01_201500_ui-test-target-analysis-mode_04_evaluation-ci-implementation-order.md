@@ -167,9 +167,9 @@ semantic projection:
 - README
 - 00〜09
 - 10+ current domain files
-- CHANGELOG全体 / MANIFESTは除外
-- current Package VersionのCHANGELOG `変更概要` bodyだけを `CHANGELOG.current_change_summary` control frameとして末尾に追加
-- 過去versionのCHANGELOG、Stable ID changes、影響fileをsemantic Judgeへ混ぜない
+- CHANGELOG全体 / MANIFESTは除外し、current versionの必要な情報だけをcontrol frameで末尾に追加
+- current Package VersionのCHANGELOG `変更概要` bodyを `CHANGELOG.current_change_summary`、`Stable ID changes` bodyを `CHANGELOG.current_stable_id_changes` のcontrol frameとして、この順に末尾へ追加
+- 過去versionのCHANGELOG各sectionと、current versionの`影響file`はsemantic Judgeへ混ぜない
 
 deterministic projection:
 
@@ -183,7 +183,7 @@ deterministic projection:
 1. package root外path / symlink / duplicate / missing fileを拒否する
 2. canonical file orderを使用する
 3. 各fileの前に `<!-- FILE: <relative-path> -->` markerを付ける
-4. semantic change summaryは `<!-- CONTROL: CHANGELOG.current_change_summary -->` markerを使う
+4. semantic projectionのcontrol frameは `<!-- CONTROL: CHANGELOG.current_change_summary -->` と `<!-- CONTROL: CHANGELOG.current_stable_id_changes -->` のmarkerをこの順に使う
 5. UTF-8 textをそのまま連結し、内容の要約・意味変換を行わない
 6. projectionは評価用transportであり、production packageやAuthorityを変更しない
 
@@ -349,7 +349,7 @@ repository unit testで次を必須確認します。
 - `Machine Entities: spec-analysis` blockがexactly one存在し、heading / JSON fence / wrapperを含めhelper再生成Markdownと一致すること
 - 1つのnormalized spec-analysis handoff / current Entity collectionへ複数UI target packageのpackage-local Machine Entity blockを直接mergeしない契約をrepository testで固定すること
 - linked UIOP / UIOP-only Authority / scope / direct structure + ancestor / linked FIELD-RULE-FLOW-NOTIFY-INTERACT / linked INF / 親US-UC-Behavior変更でAC Entity fingerprintまたはAuthority dependencyが変わり、無関係package row変更では変わらないこと
-- repository eval専用 `ui_target_projection.py` がsemantic / deterministic projectionを生成し、semantic projectionではcurrent versionの `変更概要` controlだけを追加し、過去CHANGELOG / Stable ID changes / 影響fileを混ぜないこと
+- repository eval専用 `ui_target_projection.py` がsemantic / deterministic projectionを生成し、semantic projectionではcurrent versionの`変更概要`と`Stable ID changes`だけを別のcontrol frameでこの順に追加すること。過去versionのCHANGELOGとcurrent versionの`影響file`、MANIFESTは含めないこと
 - raw SHA-256はeval projectionから再計算せず、production validate / repository unit testでraw bytesに対して検証すること
 
 ### 8.2 question-analysis / Project Context production helper
