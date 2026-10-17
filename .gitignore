@@ -30,6 +30,7 @@ QA_AGENT.md
 .textlintrc.json
 .editorconfig
 .artifacts
+.venv
 
 # Repository-owned Codex development harness
 !AGENTS.md
