@@ -399,3 +399,21 @@ focused runtime testsは52 PASS / 2 Windows symlink privilege SKIP。Codex CLI�
 ### 2026-10-15 Plan同期push後のCI
 
 Plan追補commit `64046d1ca0d997b0981c5f32cec593625ea8b4e2`は既存PR branchへ通常pushし、remote / local / PR API head一致を確認した。同headの5つのPR workflowはSUCCESS。CodeQL check runは直近code-bearing head `9540c13`でSUCCESSを確認しており、Plan-only head `64046d1`のcombined-status endpointはstatus entryを返していない。Step 9は41項目中37 PASS / 4 PARTIAL（7 / 9 / 34 / 35）のままである。
+
+### 2026-10-17 Semantic Judge・最終状態
+
+PR #16 head 52658edd3fd0b1be332ee4ac0e577bf5dae4c9d0に対し、既存8 candidateをCodex CLI（ChatGPT subscription login、gpt-6-luna、codex-cli 0.160.0）の独立read-only ephemeral processで1回ずつ評価した。39 criteriaは31 pass / 3 needs_review / 1 fail / 4 not_evaluable。candidate manifest SHA-256 5c185ccccb7b2e5010044f5e4fd2d823b086b9c9156e02c96637ea3b8adfcfaf、ignored Judge manifest SHA-256 30084c392b947b6ede3a65ab97cbc773bcff8e2c2fcca1df99889cc02be3a06b。Step 3はcritical semantic failを含むためFAIL。Step 7のdeterministic boundary checksとTR-SEM-003はPASSだが、question semantic coverageにnot_evaluableが残り未完了。Step 8のPR cross-repository checksは既存5 workflow successと今回のformatter / diff checkでPASS。Codex safety-harness fresh interactive runtime acceptanceは別責務で未確認。Step 9は41/41 PASSを再利用し、再実行していない。Step 10 final reviewは実施済みだが、Step 3 / 7が残るためPR全体は未完了。詳細・case別根拠は分割Plan _04の2026-10-17追補に記録する。 Main Plan / _04のlocal更新はstage済みだが、git commitはexecution policyに拒否され、branch・CIは旧headのまま。PR本文には未同期状態を記録した。
+
+### 2026-10-17 Semantic remediation後の最終状態
+
+当初のPlanで評価が止まっていた主因は、candidateの意味上の誤りと、case/referenceに根拠がなく評価不能なcriterionの割当が同じ合否へ混在していたことだった。前段の39 criterion（31 pass / 3 needs_review / 1 fail / 4 not_evaluable）結果は履歴として残し、評価不能をcandidateの誤りへ読み替えず、正本に基づくinput/referenceとcriterionのcase責務を整理した。
+
+修正では、spec-analysis Skillにrequired file/rowを止めるUNKNOWNのreadiness表現と既知row維持の指示を加えた。UI target package helperはprefixなしのinteraction table内にある参照済み`INTERACT-*`をMachine Entity / ownership projectionへ含め、回帰testで固定した。semantic projectionにはcurrent CHANGELOGのStable ID changesを追加し、retired identityがJudge入力から欠落しないようにした。FIELD/FLOWからBehavior/ACへのreference、SPEC-008 retirement reference、Scope Cのtrigger不確実性を明確にした。caseに根拠がないcriterion assignmentを削り、canonical DEC/ASM owner lifecycleを別criterion `SEM-SPEC-011`へ分けた。過去の結果と評価水準は維持した。
+
+更新Skillとcase inputだけから必要candidateを再生成し、production helper/runtimeで適合確認した。最終8 candidateはすべてruntime適合。独立JudgeはChatGPT subscription認証済みCodex CLI、`gpt-6-luna`、`codex-cli 0.160.0`、fresh ephemeral read-only processを使った。候補生成会話は共有せず、candidate、input、reference、criteria、rubric等の合成評価データだけをrunner経由で渡した。結果manifestはignored `.artifacts/pr16-semantic-candidate-remediation-20261017/semantic-judge-final-manifest.json`（SHA-256 `96522e65d0f4b8703c2bb7365001bdcca29ec8987ef539e576db644029041caa`）。現在の8 caseに割り当てられた36 criterionは36 PASS、0 needs_review、0 fail、0 not_evaluable。旧評価のunique criterion IDはすべて保持され、新しいowner lifecycle criterionを加えた。rating 3の2件はScope Cの未知triggerをUNKNOWNとして扱った正しい判断に対する軽微な仮定、および入力にowner IDがないためQUESTION-SEM-003の確認担当名を特定できない点で、意味上の欠陥ではない。
+
+Step判定：Step 3 PASS、Step 7 PASS、Step 8 Plan所定の横断検証PASS、Step 9は既存Agent smoke証拠を再利用して41/41 PASS、Step 10の最終差分reviewで重大な未解決findingなし。fresh interactive Codex safety-harness runtime acceptanceは別責務として未確認であり、Step 8の代替評価に使っていない。既存Agent smoke matrix/raw artifactとsemantic Judge出力はローカルignored `.artifacts`に限られ、Gitに追加していない。
+
+変更後のローカル検証はruntime 371 tests（2 Windows symlink privilege skips）、deterministic repository 290、deterministic shared 12、semantic dataset validator 22 Skills / 163 cases、semantic shared 27（2 skips）、semantic repository 13（1 skip）、projection focused 9（1 skip）、UI package focused 19、routing 2、trigger 1、Agent Skills 22/22、formatter 207 tracked files、`git diff --check`が成功した。remote CIは変更を含むcommit/push後に実行する必要がある。通常commit / push / PR本文同期 / latest-head CIがまだ完了していない場合、PR全体は同期ゲート未達のため完了扱いにしない。`.gitignore`の既存差分をstageせず、ignored evidenceを追加しない。
+
+2026-10-17の同期試行では、対象15ファイルだけをstageし、`.gitignore`未stageとignored evidence保持を確認した。通常commitは実行環境のapproval policyにより`approval required by policy, but AskForApproval is set to Never`で拒否され、commit / push / PR本文更新は未実施。読み取り専用remote確認ではlocal / remote / PR headは`52658edd3fd0b1be332ee4ac0e577bf5dae4c9d0`で一致し、そのheadの10 CI checksはPASS。ただし今回の変更は含まれない。PR本文も今回の評価結果に未同期であり、PR全体は未完了。commitは利用可能な正式承認経路で実施した後、通常push・PR本文同期・最新head CIを行う。

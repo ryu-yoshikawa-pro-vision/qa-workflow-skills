@@ -31,7 +31,8 @@ class UiTargetProjectionTests(unittest.TestCase):
             "09_authority_and_traceability.md": "# Authority\n",
             "CHANGELOG.md": (
                 "# CHANGELOG\n\n## v01\n\n### 変更概要\n\nCurrent summary\n\n"
-                "### Stable ID changes\n\nold summary detail\n\n## v00\n\n"
+                "### Stable ID changes\n\n| Stable ID | Change |\n| --- | --- |\n"
+                "| SPEC-008 | retired |\n\n## v00\n\n"
                 "### 変更概要\n\nHistorical summary\n"
             ),
         }
@@ -53,13 +54,18 @@ class UiTargetProjectionTests(unittest.TestCase):
         )
         (self.root / "MANIFEST.md").write_text(manifest, encoding="utf-8", newline="")
 
-    def test_semantic_projection_omits_history_and_manifest_but_keeps_current_summary(
+    def test_semantic_projection_keeps_current_summary_and_stable_id_lifecycle(
         self,
     ) -> None:
         result = projection.project(self.root, "semantic")
         self.assertIn("<!-- FILE: 00_scope_and_context.md -->", result)
         self.assertIn(
             "<!-- CONTROL: CHANGELOG.current_change_summary -->\nCurrent summary",
+            result,
+        )
+        self.assertIn(
+            "<!-- CONTROL: CHANGELOG.current_stable_id_changes -->\n"
+            "| Stable ID | Change |\n| --- | --- |\n| SPEC-008 | retired |",
             result,
         )
         self.assertNotIn("<!-- FILE: CHANGELOG.md -->", result)

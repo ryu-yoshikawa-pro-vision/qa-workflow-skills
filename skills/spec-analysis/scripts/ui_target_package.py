@@ -2570,7 +2570,10 @@ def _build_machine_entities(
     }
     domains: dict[str, tuple[str, dict[str, str]]] = {}
     for spec in TABLES:
-        if spec.id_column and spec.prefix in DOMAIN_PREFIXES:
+        if spec.id_column and (
+            spec.prefix in DOMAIN_PREFIXES
+            or spec.file == "05_notifications_and_external_interactions.md"
+        ):
             for row in _rows(model, spec.file, spec.section):
                 domains[row[spec.id_column]] = (spec.section, row)
 
@@ -2965,7 +2968,10 @@ def _scope_authority_ids(model: PackageModel, scope_ids: set[str]) -> set[str]:
     acs = _rows(model, "02_behavior_and_business_rules.md", "Acceptance Criteria一覧")
     domain_rows: dict[str, dict[str, str]] = {}
     for spec in TABLES:
-        if spec.id_column and spec.prefix in DOMAIN_PREFIXES:
+        if spec.id_column and (
+            spec.prefix in DOMAIN_PREFIXES
+            or spec.file == "05_notifications_and_external_interactions.md"
+        ):
             for row in _rows(model, spec.file, spec.section):
                 domain_rows[row[spec.id_column]] = row
     extensions = _rows(model, "00_scope_and_context.md", "案件固有extension file一覧")

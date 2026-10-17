@@ -51,14 +51,20 @@
     },
     {
       "id": "SEM-SPEC-009",
-      "title": "repository evidenceとAuthority owner境界",
-      "description": "repository事実を仕様Authorityへ昇格せず、複数Repository baselineとcanonical DEC / ASM ownerを保持しているか。",
+      "title": "repository evidenceのprovenance",
+      "description": "repositoryの実装観測を仕様Authorityへ昇格せず、Repositoryごとのrevision / 確認日を保持し、再確認していないRepository baselineを更新していないか。",
       "critical": true
     },
     {
       "id": "SEM-SPEC-010",
       "title": "conditional file trigger",
       "description": "ファイル機能の適用条件を意味に沿って区別し、未確定triggerをUNKNOWNへ閉じているか。",
+      "critical": true
+    },
+    {
+      "id": "SEM-SPEC-011",
+      "title": "canonical Authority owner lifecycle",
+      "description": "DEC / ASMはownerが提供するcanonical identity lifecycleに従い、canonical lifecycleや安定投影を持たない別システムの外部IDをDEC / ASMへ昇格していないか。",
       "critical": true
     }
   ]

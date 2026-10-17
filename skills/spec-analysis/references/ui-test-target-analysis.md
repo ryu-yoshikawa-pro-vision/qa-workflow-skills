@@ -34,8 +34,8 @@ standard fileのheading集合とstructured tableはassetsの固定schemaを使�
 3. ScopeごとにUI操作の有無を意味判断します。`あり → Behavior Decomposition=required`、`なし → not-applicable`、`未確定 → blocked`はhelperが固定対応で生成します。
 4. UI構造を意味分類します。PAGE、STATE、VIEW、STEP、MODAL、BROWSER-DIALOG、PANEL、POPOVER、GLOBAL UI、EXTERNAL、SHARED PAGEのexact種別を安全に決められるときだけtyped rowを作ります。構造の存在は分かるが種別が未確定なら仮種別・仮prefix・IDを作らず、07にUNKNOWNを記録します。後続を止める場合は該当Scopeを`Blocking Scope ID`にします。分類解決後に同じUNKNOWNをresolveし、そこで確定したtypeのnew IDを割り当てます。
 5. routeが不明なら`PATH-TBD`を使えます。操作フローだけからsame-routeを推定せず、STATEは独立状態軸として記述します。STATEの`状態軸`は必須、その他の種別では空です。
-6. Scopeごとに03 / 04 / 05 / 08のTriggerを`あり / なし / 未確定`で意味判断します。helperがそれぞれ`required / not-applicable / blocked`を導出します。内容不足を理由にTriggerを`未確定`へ戻しません。identityが分かるdomain rowはblocked + UNKNOWNで保持します。identity自体が分からずrowを出せない場合だけ、07のBlocking UNKNOWNにScopeと関連fileを記録します。
-7. 入力資料から識別できるFIELD / RULE / FLOW / NOTIFY / INTERACTを無言で落としません。domainの意味上の母集団と必要性はLLMが判断し、helperの構造closureは意味上の網羅性を代替しません。
+6. Scopeごとに03 / 04 / 05 / 08のTriggerを`あり / なし / 未確定`で意味判断します。helperがそれぞれ`required / not-applicable / blocked`を導出します。Triggerはfileが担当する情報の適用性を表し、UI操作や同じScopeにあることだけから決めません。03はfield、制約、validation等、04は複数step / state transitionに必要なI/O、生成処理、data transformation、非同期process / state flow等、05は通知、browser dialog、user-visibleなdownload delivery、外部destination / interaction等、08は利用するrepository evidenceを扱います。単純な既存fileの選択・downloadは05の対象であり、それだけでは04の業務flow rowを作らず、04を`required`にしません。入力に明記された保存・検証・状態遷移等の業務flowがあれば04を適用します。生成・変換が未確定なら、その事実を04の`Trigger判定=未確定`と同一論点のUNKNOWNで表し、既知のdownload deliveryを05から落としません。未確定なのは影響を受けるfileのTriggerだけに局所化し、該当fileを`blocked`にして同じ論点のUNKNOWNをScopeへ結びます。identityが分かるdomain rowはblocked + UNKNOWNで保持します。identity自体が分からずrowを出せない場合だけ、07のBlocking UNKNOWNにScopeと関連fileを記録します。
+7. 入力資料から識別できるFIELD / RULE / FLOW / NOTIFY / INTERACTを無言で落としません。05が適用されるScopeでは、入力に明記されたuser-visibleなdownload deliveryや外部interactionを05の対応する標準rowへ記録します。UIOPはユーザー操作を表し、INTERACTはdelivery / external interactionを表すため、downloadでは責務に応じて両方を保持できます。04と05へ同一の生成・変換内容を重複記載しません。domainの意味上の母集団と必要性はLLMが判断し、helperの構造closureは意味上の網羅性を代替しません。
 8. UI操作ありのScopeではUS → UC → Behavior → ACを完全に意味分解します。UI操作なしはnot-applicable、未確定はblocked + UNKNOWNです。US / UC / Behavior / ACのsemantic identity、new / reuse / explicit retire、正常 / 準正常 / 例外の意味分類はLLMが判断します。
 9. current Behaviorごとに意味上関係するmapped UIOPを`関連操作ID`で1件以上明示します。同じUC、PAGE、Scopeにあるだけでは関連付けません。ACへのlinked UIOPは親Behaviorの`関連操作ID`からだけ導出されます。
 10. current UCは正常 / 準正常 / 例外を各1行で説明します。`定義あり`はcurrent Behaviorへつなぎ、`なし`はcurrent Authorityと理由を持たせます。`未定義`にはUNKNOWNを結び、対象Scopeをblockedにします。
@@ -53,6 +53,14 @@ stable identityと同一論点の再利用はLLMが判断します。新規ID番
 - `DEC / ASM`は正本ownerが発行したcanonical IDを使い、package helperは採番しません。初回取込だけ`identity_action=external`、以後は`reuse`です。packageから外れてもowner IDをterminal retireしません。
 - UNKNOWNの同じ論点は同じUNK IDでreopen / 再解決します。別論点だけ新規UNKです。current UNKNOWNは07と09で一致し、resolved historyは09に残します。
 - `retire_ids[]`はpackage-owned identityだけに使います。過去retired IDは再利用できません。
+
+legacy移行では、入力にある全stable identityを意味単位で照合し、current identityのretained mapping、新しいidentity、明示retireを分けます。retired IDは正確なIDを`legacy_lifecycle_events[]`へ渡し、helperが生成するCHANGELOGのStable ID changesに`<exact-id> | retired`として残します。「retired identity event」のようなIDを特定しない要約だけでは不十分です。retired IDをcurrent Authority / Machine Entityとして残さず、同じ番号を新しい意味へ割り当てません。materialize後は、current table、CHANGELOG、MANIFESTとsemantic projectionを照合し、retired IDが正確に記録されていることを確認します。
+
+## materialize前の意味crosswalk
+
+canonical writeの前に、各current Behavior / ACについて、意味上依存するFIELD / RULE / FLOW / NOTIFY / INTERACTを対応付けます。package schemaの`関連構造ID`欄は、Plan `_06`の契約上、UI構造IDに加えて該当domain item IDを明示参照できます。関連するdomain itemはその欄へstable IDまたは`@draft:<draft_key>`で直接加えます。関連を同一Scope、Authority、画面、UIOPから推測したり、helperに意味上の対応付けをさせたりしません。関連しないdomain rowは無理に結び付けず、その意味上の理由を判断します。helperの`build-machine-evidence`が返す`linked_domain_items`が空の場合は、意図的な非関連を確認してから続行します。
+
+各Scope・条件付きfileのTrigger判定は、canonical writeの前にapplicability matrixとして一度に見直します。各判定に根拠となる入力・Authorityを対応付け、`あり / なし / 未確定`と関連UNKNOWNを一致させます。「download / export」と書かれていることだけで04を`あり`にせず、生成・変換・集計等が未確定なら04のTriggerも確定しません。逆にdownload actionが明記されているのに、download / external-interactionを扱う05を無言で`not-applicable`にしません。表の出力後は`ui_target_package.py inspect`でhelperの導出結果がAgentの根拠判断と一致することを確認し、不一致なら意味判断へ戻します。
 
 ## 作成・更新の実行
 
@@ -77,7 +85,7 @@ helperは同じpackage rootへの`inspect / validate / build-machine-evidence / 
 
 helperはcurrent Scope集合から`current_scope_ids[]`、`ready_scope_ids[]`、`blocked_scope_ids[]`、`scope_readiness[]`、`completion_status`を導出します。`valid`はschema / referenceの構造妥当性でありcompletionとは異なります。構造validなblocked packageは保存できます。
 
-blocking UNKNOWNのない局所UNKNOWNだけでScopeやpackage全体を止めません。blocked scopeがあってもready scopeは進められます。`current_scope_ids[]`がnon-emptyでreadyが0件なら全blockedとして後続runtimeを起動せず、最後のcompleted baselineを維持します。Scopeが0件になった場合はUI target packageだけからdownstream terminal cleanupを判断せず、`qa-workflow`へ返します。
+blocking UNKNOWNのない局所UNKNOWNだけでScopeやpackage全体を止めません。UNKNOWNの影響を受けるrequired fileやrequired rowが`blocked`なら、そのUNKNOWNを「non-blocking」と説明してScopeをready扱いしません。known rowはcurrentのまま保持できますが、Scope readinessは`inspect`が返す派生状態と説明を一致させます。`not-applicable`や別Scopeへの切り分けは、入力根拠がある場合だけ選びます。blocked scopeがあってもready scopeは進められます。`current_scope_ids[]`がnon-emptyでreadyが0件なら全blockedとして後続runtimeを起動せず、最後のcompleted baselineを維持します。Scopeが0件になった場合はUI target packageだけからdownstream terminal cleanupを判断せず、`qa-workflow`へ返します。
 
 `build-machine-evidence`を使ってcanonical handoffを生成します。
 

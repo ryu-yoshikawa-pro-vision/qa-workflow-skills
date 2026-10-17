@@ -1323,6 +1323,91 @@ class UiTargetPackageTests(unittest.TestCase):
                 ["SPEC-001", "SPEC-002"],
             )
 
+    def test_machine_evidence_projects_linked_interaction_rows(self) -> None:
+        with tempfile.TemporaryDirectory(
+            prefix="qa-pr16-interaction-link-"
+        ) as temporary:
+            root = Path(temporary) / "package"
+            request = child_identity_unknown_request(root, "ready")
+
+            behavior = next(
+                row
+                for table in request["table_changes"]
+                if table["file"] == "02_behavior_and_business_rules.md"
+                and table["section"] == "Behavior一覧"
+                for row in table["rows"]
+            )
+            acceptance = next(
+                row
+                for table in request["table_changes"]
+                if table["file"] == "02_behavior_and_business_rules.md"
+                and table["section"] == "Acceptance Criteria一覧"
+                for row in table["rows"]
+            )
+            behavior["cells"]["関連構造ID"].append("@draft:download-interaction")
+            acceptance["cells"]["関連構造ID"].append("@draft:download-interaction")
+
+            applicability = next(
+                row
+                for table in request["keyed_table_updates"]
+                if table["file"] == "00_scope_and_context.md"
+                and table["section"] == "条件付き必須file applicability"
+                for row in table["rows"]
+                if row["ファイル"] == "05_notifications_and_external_interactions.md"
+            )
+            applicability["Trigger判定"] = "あり"
+            applicability["関連仕様項目ID"] = ["@draft:spec"]
+            applicability["根拠 / 備考"] = (
+                "The synthetic input specifies a user-visible download."
+            )
+            request["table_changes"].append(
+                {
+                    "file": "05_notifications_and_external_interactions.md",
+                    "section": "通知・外部連携一覧",
+                    "rows": [
+                        {
+                            "draft_key": "download-interaction",
+                            "identity_action": "new",
+                            "reuse_id": None,
+                            "external_id": None,
+                            "cells": {
+                                "関連Scope ID": ["@draft:scope"],
+                                "種別": "外部遷移イベント",
+                                "名称": "Synthetic file download",
+                                "発火条件": "The member requests the file.",
+                                "宛先 / 遷移先": "Not specified.",
+                                "内容 / 挙動": "Deliver the requested file.",
+                                "関連仕様項目ID": ["@draft:spec"],
+                                "関連構造ID": ["@draft:page"],
+                                "関連UNKNOWN ID": [],
+                                "備考": "Evaluation-only interaction row.",
+                            },
+                        }
+                    ],
+                }
+            )
+
+            created = package._execute_operation(request)
+            self.assertTrue(created["valid"], created["issues"])
+            result = package._execute_operation(
+                {
+                    "operation": "build-machine-evidence",
+                    "package_root": str(root),
+                    "scope_ids": ["SCOPE-001"],
+                }
+            )
+            self.assertTrue(result["valid"], result["issues"])
+            entities = result["payload"]["batch_handoff"]["machine_entities"]
+            ac = next(
+                entity
+                for entity in entities
+                if entity["entity_type"] == "acceptance_criterion"
+            )
+            self.assertEqual(
+                [item["item_id"] for item in ac["content"]["linked_domain_items"]],
+                ["INTERACT-001"],
+            )
+
     def test_unknown_child_identity_is_kept_at_the_blocking_parent(self) -> None:
         def rows_for(markdown: str, section: str) -> list[list[str]]:
             section_text = markdown.split(f"## {section}\n", 1)[1].split("\n## ", 1)[0]

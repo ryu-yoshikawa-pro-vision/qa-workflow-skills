@@ -224,6 +224,50 @@ def _current_change_summary(text: str, current_version: str) -> str:
     return summary
 
 
+def _current_stable_id_changes(text: str, current_version: str) -> str:
+    lines = text.splitlines()
+    version_heading = re.compile(r"^##\s+" + re.escape(current_version) + r"\s*$")
+    starts = [
+        index for index, line in enumerate(lines) if version_heading.fullmatch(line)
+    ]
+    if len(starts) != 1:
+        raise ProjectionError(
+            "CHANGELOG current package version is missing or duplicated"
+        )
+    start = starts[0] + 1
+    end = next(
+        (
+            index
+            for index in range(start, len(lines))
+            if re.match(r"^##\s+", lines[index])
+        ),
+        len(lines),
+    )
+    section = lines[start:end]
+    headings = [
+        index
+        for index, line in enumerate(section)
+        if line.strip() == "### Stable ID changes"
+    ]
+    if len(headings) != 1:
+        raise ProjectionError(
+            "CHANGELOG current version needs one Stable ID changes section"
+        )
+    body_start = headings[0] + 1
+    body_end = next(
+        (
+            index
+            for index in range(body_start, len(section))
+            if re.match(r"^#{1,6}\s+", section[index])
+        ),
+        len(section),
+    )
+    changes = "\n".join(section[body_start:body_end]).strip()
+    if not changes:
+        raise ProjectionError("CHANGELOG current Stable ID changes is empty")
+    return changes
+
+
 def project(package_root: str | Path, mode: str) -> str:
     if mode not in {"semantic", "deterministic"}:
         raise ProjectionError("projection mode must be semantic or deterministic")
@@ -259,6 +303,13 @@ def project(package_root: str | Path, mode: str) -> str:
     if mode == "semantic":
         summary = _current_change_summary(content["CHANGELOG.md"], current_version)
         chunks.append("<!-- CONTROL: CHANGELOG.current_change_summary -->\n" + summary)
+        stable_id_changes = _current_stable_id_changes(
+            content["CHANGELOG.md"], current_version
+        )
+        chunks.append(
+            "<!-- CONTROL: CHANGELOG.current_stable_id_changes -->\n"
+            + stable_id_changes
+        )
     else:
         chunks.append(f"<!-- FILE: MANIFEST.md -->\n{manifest_text}")
     return "\n\n".join(chunks)

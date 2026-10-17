@@ -680,14 +680,14 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - [x] Step 0: PR #14後の最新main統合とcurrent repository baselineを確認。既存merge commitに最新mainが含まれるためrebaseは行わず、418 commitの公開履歴を書き換えない。実測値と確認した契約は `_07 §12` の2026-10-13結果を参照。
 - [x] Step 1: UI target package schema / materialize基盤
 - [x] Step 2: runtime-v2 / entity-state-v2 transition、AC bridge、generator v2、migration runtime。2026-10-13継続確認: 3 cutover helper / 3 input reader、downstream scope/history、migration preflightとzero-scope pathを実装・runtime suiteで再検証済み。詳細は本節末の追補を参照。
-- [ ] Step 3: spec-analysis semantic / deterministic evaluation
+- [x] Step 3: spec-analysis semantic evaluation — 2026-10-17 remediation rerun: SPEC-SEM-003〜007 assigned criteria pass; see the latest remediation record below. The initial Judge failure remains in the historical record.
 - [x] Step 4: question-analysis UNKNOWN lifecycle / DEC・ASM owner helper
 - [x] Step 5: qa-workflow routing / resume / scope readiness統合。69 routing fixture、partial / historical / retired / zero-scope経路を再検証済み。詳細は本節末の追補を参照。
 - [x] Step 6: package schema・migration・helper contract validation。package runtime、migration preflight、projectionの再検証を完了。詳細は本節末の追補を参照。
-- [ ] Step 7: deterministic / semantic責務境界の検証
-- [ ] Step 8: cross-repository validation（2026-10-15 local refresh: runtime 366 passed / 2 Windows symlink privilege skips、deterministic shared 12 passed、deterministic repository 290 passed、semantic dataset 22 Skills / 163 cases、semantic shared 27 passed / 2 skips、semantic repository 13 passed / 1 skip、trigger 1 passed、Agent Skills validation 25/25 passed、Ruff / formatter / compileall passed。Codex Harnessは31 tests passed後、`test_execpolicy_cli` class setupがsandbox内の`codex.cmd`アクセス拒否でerrorとなり、CLI試験は開始できなかった。local CLI runtime acceptanceは未確認。GitHub API / remote socketも拒否され、最新head CIは確認不能。）
+- [x] Step 7: deterministic / semantic responsibility boundaries — responsibility-boundary checks and all currently assigned semantic criteria pass, including QUESTION-SEM-004; see the latest remediation record below. The initial not_evaluable result remains in the historical record.
+- [x] Step 8: cross-repository validation PASS (2026-10-17: all five PR workflows at inspected head 52658edd3fd0b1be332ee4ac0e577bf5dae4c9d0 succeeded; this local Plan update is not part of that head because commit was denied by execution policy, so no CI has run for this diff. Local tracked formatter and git diff --check are checked for this update.) Fresh interactive Codex safety-harness runtime acceptance is a separate responsibility under docs/reference/codex-safety-harness.md and remains unverified; it is not part of PR Plan Step 8.
 - [x] Step 9: 実Agent smoke（41項目を維持。最新local matrixは41 PASS / 0 PARTIAL、`step9_complete=true`。item 7 / 9をattempt-06の同一migration履歴に部分進行とexact-refetched completed baselineまで接続してPASSとした。詳細は2026-10-16追補を参照。）
-- [ ] Step 10: final review（Step 9は41/41 PASS。PR全体はStep 3 / 7 Semantic JudgeとStep 8 local CLI acceptanceが未完了のため未完了。）
+- [x] Step 10: final review performed after the remediation, local validation, Step 8 cross-repository checks, and retained Step 9 evidence. No unresolved material finding remains in the reviewed diff. PR synchronization and latest-head CI are tracked separately from this local review.
 
 2026-10-13時点でStep 2は未完了です。3つの`runtime_v1_input_reader.py`、TRD / TC cutover helper、関連runtime contractは存在しますが、`skills/test-condition-design/scripts/runtime_v1_cutover.py`が未実装で、TCDの4 phase / `resume` / partial model unit検証を完了していません。このためTCD cutoverを含むStep 2、migration preflightからfinal gateまでのStep 5、および依存する全体完了条件を満たしていません。Step 3 / 7もSemantic Judgeによる意味評価が未実施のため完了扱いにしません。
 
@@ -1050,3 +1050,53 @@ mainが動いていてもPlanを盲目的に適用せず、責務契約が変わ
 - code-bearing head `f71042eb494850c1a373599928029f144a5b723e`のPR workflowは5件すべてSUCCESS: Code Quality `38892385528`、Codex Harness `38892385941`（`codex-contract` / `windows-launcher`両job成功）、Validate Agent Skills `38892385757`、Validate Deterministic Output Evals `38892385666`、Validate Semantic Output Evals `38892385685`。これらはPR headに対するCIで、local runtime suiteとは別に記録する。
 - 今回のローカル検証はfocused downstream-state 20 PASS / 0 SKIP、runtime suite 370 PASS / 2 Windows symlink privilege SKIP、formatter 207 tracked files PASS、`git diff --check` PASS。Step 9 matrixは41 itemすべてPASSで`step9_complete=true`。raw Agent smokeとmatrixの一部はignored local `.artifacts`に限られ、PRから直接取得できない。PlanとPR本文には追跡可能な要約を残し、ローカル専用artifactを公開していない。
 - 最終reviewでは対象3ファイル、失敗再現、fail-closed修正、回帰test、Plan状態、Step 9 matrixのcountを照合し、新たなactionable findingはなかった。Step 3 / 7は独立Semantic Judge未実施、Step 8は`CodexSandboxOffline`から`codex.cmd`へのアクセス拒否のためlocal runtime acceptance未確認。従ってStep 10の変更差分reviewは完了したが、Planの最終完了条件およびPR全体は未完了のままとする。外部API送信、Sandbox / ACL / Hook / execpolicy変更は行っていない。
+
+### 2026-10-17 Semantic Judge・Step 8・最終review結果
+
+- 作業開始時のlocal / remote / PR headは52658edd3fd0b1be332ee4ac0e577bf5dae4c9d0。working treeには以前からの.gitignore差分だけがあり、変更・stageしない。PRはopen / unmergedで、head時点のCode Quality 38892792713、Codex Harness 38892792587、Agent Skills 38892792624、Deterministic Output 38892792688、Semantic Output 38892792606はすべてSUCCESS。Step 9 matrixは変更せず、41/41 PASSを再利用した。
+- Candidate manifest .artifacts/pr16-semantic-candidates/candidate-manifest.json はSHA-256 5c185ccccb7b2e5010044f5e4fd2d823b086b9c9156e02c96637ea3b8adfcfaf。8/8 candidateはproduction helper / runtime適合。217件のcandidate・evidence pathと8件のinput path（合計225 unique paths）を再照合し、欠落0・hash不一致0。candidate生成modelは不明であり、Judgeと異なるmodelだったとは主張しない。
+- 既存scripts/skills/evals/semantic/run.py / result.pyを使い、各caseにfreshなcodex exec --ephemeral --sandbox read-onlyを1回ずつ起動した。CLIはcodex-cli 0.160.0、ChatGPT subscription login、modelは全件gpt-6-luna。Judgeは空のrepository外temporary working directoryで起動し、runnerが組み立てたinput・criteria・reference・candidateだけを--output-schema付きで渡した。resume / fork / --jsonは使わず、candidate生成時の会話は引き継いでいない。API key環境変数はなく、Judge promptにcredentialを含めていない。入力は合成評価データのみ。各criteria・reason・evidence・runner verdictはケース別結果ファイルに保存した。CLI起動error 0、runner protocol error 0。runner exit code 1はfail / needs_review verdictによるもので、実行障害ではない。
+- ignored evidence: .artifacts/pr16-semantic-judge/run-20261017-7d947be330844b278643b8e7f5384386/judge-run-manifest.json SHA-256 30084c392b947b6ede3a65ab97cbc773bcff8e2c2fcca1df99889cc02be3a06b。manifestは各result JSON、candidate、prompt、CLI / model、criteria rating / reason / evidence、runner verdictをhashとともに参照する。case結果の概要:
+
+| Case             | Criteria | Verdict      | pass / needs_review / fail / not_evaluable | 判定メモ                                                                                                                           |
+| ---------------- | -------: | ------------ | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| SPEC-SEM-003     |        6 | needs_review | 5 / 1 / 0 / 0                              | FIELD / FLOWからBehavior / ACへの明示linkがなく、Machine Entity linked_domain_itemsも空。                                          |
+| SPEC-SEM-004     |        4 | needs_review | 3 / 0 / 0 / 1                              | criterionが要求するcanonical DEC / ASM ownerはcase input / referenceに定義されず評価不能。                                         |
+| SPEC-SEM-005     |        4 | needs_review | 3 / 0 / 0 / 1                              | UI decomposition / UNKNOWN closureを評価するcriterionに対する情報がreferenceにない。                                               |
+| SPEC-SEM-006     |        4 | needs_review | 2 / 1 / 0 / 1                              | retired SPEC-008を明示的に予約維持できていない。別criterionもreferenceにrepository authority / canonical owner情報がなく評価不能。 |
+| SPEC-SEM-007     |        5 | fail         | 3 / 1 / 1 / 0                              | Trigger不明のScope Cをrequired / triggerありにし、04を全Scope required、05を全Scope not-applicableとしている。                     |
+| QUESTION-SEM-003 |        6 | pass         | 6 / 0 / 0 / 0                              | 全criterion pass。                                                                                                                 |
+| QUESTION-SEM-004 |        5 | needs_review | 4 / 0 / 0 / 1                              | referenceがUNKNOWN再open / 別論点追加を記す一方、blocker等の分類基準を定義せず評価不能。                                           |
+| TR-SEM-003       |        5 | pass         | 5 / 0 / 0 / 0                              | 全criterion pass。                                                                                                                 |
+
+- 39 criteria合計は31 pass / 3 needs_review / 1 fail / 4 not_evaluable。case verdictは2 pass / 5 needs_review / 1 fail。Judgeのoverall判定をrunnerが正規化した。candidate、rubric、reference、期待結果は変更せず、candidateの品質を上げる目的の再実行もしない。
+- Step 3（SPEC-SEM-003〜007）はcritical failを含みFAIL。明示Behavior / AC linkage、retired identity保持、conditional file triggerの意味判断にcandidate側の不足がある。SPEC-SEM-004 / 005 / 006の一部criterionはreference不足で未評価となった。
+- Step 7の決定論的責務境界検証とTR-SEM-003はPASS。8-case acceptance bundle内のquestion semantic coverageには1 not_evaluableが残るため、独立意味評価全体としてStep 7を完了扱いにしない。問題はreference / criterion coverage不足で、Judge実行protocolやrunnerの不具合ではない。
+- Step 8はPR Planで定めるcross-repository検証（22 Skill構造、trigger、deterministic / semantic dataset・validator、routing、docs count、diff check）を成功CIと今回のlocal formatter / git diff --checkで確認してPASSとする。Codex safety-harnessのfresh interactive runtime acceptanceは別契約であり未確認のまま記録する。CI上のHarness successをlocal runtime受入の代替にはしない。
+- Step 10ではMain Plan / _04 / implementation / helper境界 / CI / Step 9証拠を再照合した。新しいproduction-code不具合は認めなかった。評価で検出したcandidate意味欠陥とreference不足を残課題として明示した。Step 10 review自体は完了したが、Step 3 FAILとStep 7の独立意味評価未完了によりPR全体は未完了。Step 9は再実行していない。
+
+- Git同期: Main Plan / _04の2ファイルをlocalで更新・stageした。git commitは実行前にexecution policyのapproval requiredで拒否され、remote headは52658edd3fd0b1be332ee4ac0e577bf5dae4c9d0のまま。PR本文はJudge結果と未同期状態へ更新した。今回の未commit Plan差分に対するCIは未実施であり、上記5 workflowは旧headの結果として区別する。
+
+### 2026-10-17 Semantic remediation rerun・最終状態
+
+- 当初のPlanで評価が進められなかった理由は、candidate意味評価の失敗と、case/referenceに根拠がないcriterionの割当が同じ合否に混在していたことにある。旧Judge結果（39割当: 31 pass / 3 needs_review / 1 fail / 4 not_evaluable）は履歴として保持し、評価不能をcandidateの失敗へ読み替えず、input/referenceで根拠のある意味判断とcase責務coverageを分けた。
+- 修正内容: spec-analysis Skillは、required file/rowを止めるUNKNOWNをnon-blockingと表現せず、`inspect` readinessと既知のcurrent rowを一致させる指示を追加した。UI target package helperはprefixなしのinteraction table内の参照済み`INTERACT-*`行をMachine Entity / ownership projectionへ含め、回帰testを追加した。semantic projectionはcurrent CHANGELOGのStable ID changesを公開し、retired identityの評価根拠を含める。FIELD/FLOW→Behavior/AC reference、SPEC-008 retirement reference、Scope Cのunknown trigger条件を更新し、根拠不足のcase-local criterion割当を解消した。DEC/ASM canonical ownerは既存provenance criterionと混ぜず専用`SEM-SPEC-011`で評価する。変更は正本にある評価データ・Skill指示・projection contractに限定した。
+- Candidate生成は更新したSkillとcase inputだけを用い、reference / rubric / Judge結果を生成Agentへ渡していない。修正したcaseのcandidateを再生成し、production helper / runtimeで適合を確認した。8件中変更のないQUESTION-SEM-003とTR-SEM-003はcandidate SHAとprompt SHAが既存Judge証拠と一致したため、その正規化結果だけを再利用した。8件すべてruntime適合である。
+- Independent Judgeは各新規caseについてfresh `codex exec --ephemeral --sandbox read-only`、ChatGPT subscription login、`gpt-6-luna`、`codex-cli 0.160.0`を使い、合成評価データのみを評価した。候補生成会話は引き継がず、Judgeは空の一時directoryでrunnerの評価promptのみを受けた。最終manifestはignored local `.artifacts/pr16-semantic-candidate-remediation-20261017/semantic-judge-final-manifest.json`、SHA-256 `96522e65d0f4b8703c2bb7365001bdcca29ec8987ef539e576db644029041caa`。
+
+| Case             | 現在の割当criterion数 | Runner verdict | 結果   |
+| ---------------- | --------------------: | -------------- | ------ |
+| SPEC-SEM-003     |                     6 | PASS           | 6 pass |
+| SPEC-SEM-004     |                     4 | PASS           | 4 pass |
+| SPEC-SEM-005     |                     3 | PASS           | 3 pass |
+| SPEC-SEM-006     |                     3 | PASS           | 3 pass |
+| SPEC-SEM-007     |                     5 | PASS           | 5 pass |
+| QUESTION-SEM-003 |                     6 | PASS           | 6 pass |
+| QUESTION-SEM-004 |                     4 | PASS           | 4 pass |
+| TR-SEM-003       |                     5 | PASS           | 5 pass |
+
+- 現行datasetの割当は合計36 criterion、runner結果は36 pass / 0 needs_review / 0 fail / 0 not_evaluable、8/8 case PASS。旧39割当の重複・根拠外assignmentを整理し、旧評価にあった全unique criterion IDを保持したうえで、canonical owner lifecycleの`SEM-SPEC-011`を追加した。SEM-SPEC-007のminor rating 3はScope Cの未知triggerをUNKNOWNとして維持した正しい判断に対する軽微なprecondition仮定、QUESTION-SEM-003のminor rating 3は根拠入力にowner IDがないため確認担当者名を特定できない点であり、意味上の誤りではない。基準を下げたり、ratingをPASSへ置き換えたりしていない。
+- 判定: Step 3 PASS（SPEC-SEM-003〜007の現在のcriteriaすべてPASS）。Step 7 PASS（決定論的責務境界testおよびQUESTION / TR semantic評価を含む現在の意味評価criteriaすべてPASS）。Step 8 PASS（Plan所定の22 Skill構造、trigger、deterministic、semantic dataset / validator、routing、件数整合、formatter、`git diff --check`を確認）。Codex safety-harnessのfresh interactive runtime acceptanceは別責務のまま未確認であり、Step 8の代替根拠にはしていない。Step 9はAgent smokeを再実行せず、既存matrix 41/41 PASSを再利用した。
+- Step 10の最終差分reviewを再実施し、目的・互換性、UNKNOWN / Authority / stable identity、LLMとhelperの境界、Machine Entity projection、評価契約、Step 9 evidenceを確認した。重大な未解決findingはない。現在のlocal検証はruntime suite 371 tests（2 Windows symlink privilege skips）、deterministic repository 290、deterministic shared 12、semantic dataset validator 22 Skills / 163 cases、semantic shared 27（2 skips）、semantic repository 13（1 skip）、projection focused 9（1 skip）、UI package focused 19、routing 2、trigger 1、Agent Skills 22/22、formatter 207 tracked files、`git diff --check`が成功した。これらの結果詳細と初回環境失敗の区別は作業記録に保持した。
+- Step 8とStep 10のローカル判定は完了しているが、今回の変更を含むremote CIはpush前のため未確認。Step 9 smoke証拠とsemantic result artifactはignored `.artifacts`にあり、Gitへ追加しない。既存`.gitignore`差分も対象外。PR全体を完了とするには、変更を通常commit / pushし、PR本文を更新し、最新head CIを確認する必要がある。実CLI safety-harness fresh interactive acceptanceは独立の未確認事項で、PR Step 8の完了条件ではない。
+- 同期再確認: 対象15ファイルを明示してstageし、`.gitignore`はunstagedのまま、`git diff --cached --check`はPASS。canonical `git commit -m "fix: address UI target semantic evaluation findings"` は`approval required by policy, but AskForApproval is set to Never`で実行前に拒否されたため、commitを作成していない。通常push・PR本文更新は行っていない。読み取り専用`git ls-remote`とPR APIでlocal / remote / PR head `52658edd3fd0b1be332ee4ac0e577bf5dae4c9d0`一致、PR openを確認。`gh pr checks 16`は当該remote headで10 checkすべてPASSだが、このlocal staged diffを含むCIではない。PR本文の`updatedAt`は2026-10-16T15:42:23Zで、今回の評価結果はまだ未反映。安全制御の別経路利用はせず、Step 3 / 7 / 8（Plan横断検証）/ 9 / 10のローカル判定は完了、PR全体はGit同期と変更後CI未完了のため未完了。

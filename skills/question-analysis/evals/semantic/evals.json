@@ -30,7 +30,7 @@
       "id": "QUESTION-SEM-004",
       "input": "cases/case-004/input.md",
       "reference": "cases/case-004/reference.md",
-      "criteria": ["SEM-QUESTION-001", "SEM-QUESTION-002", "SEM-QUESTION-003", "SEM-QUESTION-005", "SEM-QUESTION-006"]
+      "criteria": ["SEM-QUESTION-001", "SEM-QUESTION-003", "SEM-QUESTION-005", "SEM-QUESTION-006"]
     }
   ]
 }
