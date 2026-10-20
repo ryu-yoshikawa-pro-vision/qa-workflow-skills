@@ -1,0 +1,62 @@
+# Read-only commands that should proceed without prompts.
+
+prefix_rule(
+  pattern = ["pwd"],
+  decision = "allow",
+  match = ["pwd"],
+)
+
+prefix_rule(
+  pattern = ["Get-Location"],
+  decision = "allow",
+  match = ["Get-Location"],
+)
+
+prefix_rule(
+  pattern = ["git", "status"],
+  decision = "allow",
+  match = ["git status"],
+  not_match = ["git stash"],
+)
+
+prefix_rule(
+  pattern = ["git", "diff"],
+  decision = "allow",
+  match = ["git diff"],
+)
+
+prefix_rule(
+  pattern = ["git", "log"],
+  decision = "allow",
+  match = ["git log --oneline -5"],
+)
+
+prefix_rule(
+  pattern = ["git", "show"],
+  decision = "allow",
+  match = ["git show HEAD --stat"],
+)
+
+prefix_rule(
+  pattern = ["rg"],
+  decision = "allow",
+  match = ["rg --files docs"],
+)
+
+prefix_rule(
+  pattern = ["Get-ChildItem"],
+  decision = "allow",
+  match = ["Get-ChildItem -Force"],
+)
+
+prefix_rule(
+  pattern = ["Get-Content"],
+  decision = "allow",
+  match = ["Get-Content README.md"],
+)
+
+prefix_rule(
+  pattern = ["Select-String"],
+  decision = "allow",
+  match = ["Select-String -Path AGENTS.md -Pattern 'Safety'"],
+)

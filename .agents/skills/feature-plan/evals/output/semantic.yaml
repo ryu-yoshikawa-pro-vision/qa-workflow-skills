@@ -1,0 +1,97 @@
+schema_version: 1
+skill: feature-plan
+criteria:
+  - id: FP-FACTS
+    assertion: >-
+      The plan's change strategy is consistent with the repository and issue facts that are
+      explicitly supplied in its context; it does not treat an unconfirmed assumption as a fact
+      or propose a strategy that contradicts a stated constraint.
+    source: references/planning-workflow.md
+  - id: FP-SCOPE
+    assertion: >-
+      The plan keeps the requested scope and explicit non-goals intact, and does not smuggle
+      unrelated redesign, implementation, migration, or operational work into the plan.
+    source: references/planning-workflow.md
+  - id: FP-VALIDATION
+    assertion: >-
+      The plan connects each major risk or completion concern to a concrete validation that can
+      establish whether the requested work is complete.
+    source: references/planning-workflow.md
+cases:
+  - id: FP-SEM-001
+    context: |
+      The user requests a plan-only investigation for a parser bug in a repository's report
+      generator. The supplied repository facts are: the parser is in scripts/report-parser.ts;
+      the existing contract test is tests/report-parser.test.ts; and the report format is owned
+      by the repository documentation. The request explicitly says not to change Product Code,
+      not to change the report format, and not to implement the fix until the plan is approved.
+      The planning workflow requires repository mapping, explicit non-goals, a staged change
+      strategy, risks, and a validation plan with completion criteria.
+    candidate_output: |
+      ## Goal
+      Investigate why the report parser mishandles a quoted delimiter and prepare an approvable
+      implementation plan.
+
+      ## Current understanding
+      The relevant entry point is scripts/report-parser.ts, and the existing behavioral contract
+      is covered by tests/report-parser.test.ts. The report format in the repository docs is a
+      supplied constraint, not something this plan may redesign.
+
+      ## Assumptions
+      The failing example can be reproduced from the issue context; if it cannot, the plan will
+      stop and record the missing evidence rather than inventing a root cause.
+
+      ## Non-goals
+      Do not change Product Code, change the report format, add a new parser framework, or apply
+      the fix during this plan-only request.
+
+      ## Change strategy
+      First map the parser, its call sites, the existing contract test, and the documented format.
+      Next compare the failing example with the current parsing path and propose the smallest
+      implementation change. Only after approval, implement that change and update the existing
+      contract test if the approved behavior requires it.
+
+      ## Risks and validation
+      The main risk is changing delimiter handling for valid reports. Validate the plan and later
+      implementation with the existing contract test, a regression case for quoted delimiters,
+      and a format-preservation check. Completion requires those checks to pass without changing
+      the documented report format or adding unrelated files.
+    expected:
+      outcome: pass
+  - id: FP-SEM-002
+    context: |
+      The user requests a plan-only investigation for a parser bug in a repository's report
+      generator. The supplied repository facts are: the parser is in scripts/report-parser.ts;
+      the existing contract test is tests/report-parser.test.ts; and the report format is owned
+      by the repository documentation. The request explicitly says not to change Product Code,
+      not to change the report format, and not to implement the fix until the plan is approved.
+      The planning workflow requires repository mapping, explicit non-goals, a staged change
+      strategy, risks, and a validation plan with completion criteria.
+    candidate_output: |
+      ## Goal
+      Investigate why the report parser mishandles a quoted delimiter and prepare an approvable
+      implementation plan.
+
+      ## Current understanding
+      The relevant parser is scripts/report-parser.ts, the existing contract test is
+      tests/report-parser.test.ts, and the report format is owned by the repository documentation.
+      The quoted-delimiter failure still needs to be reproduced before its root cause is stated.
+
+      ## Non-goals
+      Do not change Product Code, change the documented report format, add a parser framework, or
+      migrate existing reports during this plan-only request.
+
+      ## Change strategy
+      Map the parser, its call sites, the existing contract test, and the documented format. Then
+      implement the smallest parser fix immediately in this same task, before the plan is approved,
+      and update the existing contract test if the fix requires it.
+
+      ## Risks and validation
+      The main risk is changing delimiter handling for valid reports. Validate the plan and later
+      implementation with the existing contract test, a quoted-delimiter regression case, and a
+      format-preservation check. Completion requires those checks to pass without changing the
+      documented report format.
+    expected:
+      outcome: fail
+      failed_criteria:
+        - FP-SCOPE
