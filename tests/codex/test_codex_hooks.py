@@ -364,8 +364,10 @@ class HookTests(unittest.TestCase):
             self.posix_prefix + "git push origin feature/target",
             self.posix_prefix + "git push origin HEAD:feature/target",
             self.posix_prefix + "git push origin feature/existing feature/target",
-            self.posix_prefix + "git push origin HEAD:feature/existing HEAD:feature/target",
-            self.posix_prefix + "git push https://example.invalid/owner/repo.git feature/existing",
+            self.posix_prefix
+            + "git push origin HEAD:feature/existing HEAD:feature/target",
+            self.posix_prefix
+            + "git push https://example.invalid/owner/repo.git feature/existing",
             self.posix_prefix + f"git push '{self.remote.as_posix()}' feature/existing",
             self.posix_prefix + "git push origin feature/*",
             self.posix_prefix + "git push origin 'feature/*'",
@@ -383,12 +385,8 @@ class HookTests(unittest.TestCase):
                 self.assert_denied(command)
 
     def test_push_rejects_an_unconfigured_remote(self) -> None:
-        subprocess.run(
-            ["git", "remote", "remove", "origin"], cwd=self.repo, check=True
-        )
-        self.assert_denied(
-            self.posix_prefix + "git push origin feature/existing"
-        )
+        subprocess.run(["git", "remote", "remove", "origin"], cwd=self.repo, check=True)
+        self.assert_denied(self.posix_prefix + "git push origin feature/existing")
 
     def test_force_bulk_and_other_unsupported_push_options_are_denied(self) -> None:
         unsafe_options = (
@@ -446,9 +444,7 @@ class HookTests(unittest.TestCase):
             cwd=self.repo,
             check=True,
         )
-        self.assert_hook_allows(
-            self.posix_prefix + "git push origin feature/existing"
-        )
+        self.assert_hook_allows(self.posix_prefix + "git push origin feature/existing")
 
     def test_multiple_configured_push_urls_are_denied(self) -> None:
         second_remote = Path(self.temp.name) / "second remote.git"
@@ -459,13 +455,19 @@ class HookTests(unittest.TestCase):
         )
         for remote_url in (self.remote, second_remote):
             subprocess.run(
-                ["git", "remote", "set-url", "--add", "--push", "origin", str(remote_url)],
+                [
+                    "git",
+                    "remote",
+                    "set-url",
+                    "--add",
+                    "--push",
+                    "origin",
+                    str(remote_url),
+                ],
                 cwd=self.repo,
                 check=True,
             )
-        self.assert_denied(
-            self.posix_prefix + "git push origin feature/existing"
-        )
+        self.assert_denied(self.posix_prefix + "git push origin feature/existing")
 
     def test_gh_leading_options_and_token_display_are_denied(self) -> None:
         for command in (
