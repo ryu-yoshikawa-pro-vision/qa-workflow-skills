@@ -392,7 +392,10 @@ function pushConfigurationError(root, remote) {
   }
 
   const recurseSubmodules = gitConfigValues(root, "push.recurseSubmodules");
-  if (!recurseSubmodules || recurseSubmodules.some(value => !SAFE_FALSE_CONFIG_VALUES.has(value.trim().toLowerCase()))) {
+  if (
+    !recurseSubmodules ||
+    recurseSubmodules.some(value => !SAFE_FALSE_CONFIG_VALUES.has(value.trim().toLowerCase()))
+  ) {
     return "Recursive submodule push configuration is unsupported.";
   }
 
