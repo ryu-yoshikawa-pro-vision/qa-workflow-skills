@@ -37,6 +37,20 @@ prefix_rule(
 )
 
 prefix_rule(
+    pattern = [["git", "git.exe"], "commit", "--amend"],
+    decision = "forbidden",
+    justification = "Commit amend rewrites local history and is outside the supported autonomous workflow.",
+    match = [
+        "git commit --amend -m message",
+        "git.exe commit --amend -m message",
+    ],
+    not_match = [
+        "git commit -m message",
+        "git.exe commit -m message",
+    ],
+)
+
+prefix_rule(
     pattern = [["git", "git.exe"], ["clean", "rm", "update-ref"]],
     decision = "forbidden",
     justification = "These Git deletion or ref-update families are outside the supported autonomous workflow.",

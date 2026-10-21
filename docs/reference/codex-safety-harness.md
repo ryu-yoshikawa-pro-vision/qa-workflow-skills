@@ -5,7 +5,7 @@
 ## 責務の分担
 
 - `.codex/config.toml`はgranular approval、4つのcustom agent、`Bash`の`PreToolUse` command Hook、固定profileを宣言します。
-- `.codex/rules/20-risky-prompt.rules`は通常pushを除く高影響Git / GitHub CLI familyを`prompt`へ送り、`.codex/rules/30-destructive-forbidden.rules`は限定した破壊command familyと静的に判別できる危険pushを`forbidden`にします。通常command用の`allow` ruleはありません。
+- `.codex/rules/20-risky-prompt.rules`は通常commit・pull・fetch・pushを除く高影響Git / GitHub CLI familyを`prompt`へ送り、`.codex/rules/30-destructive-forbidden.rules`は限定した破壊command family、commit amendの標準形、静的に判別できる危険pushを`forbidden`にします。通常command用の`allow` ruleはありません。
 - `pre_tool_use_policy.mjs`は実行時にrepository rootやcurrent branchを必要とする誤操作guardrailです。承認分類をexecpolicyと二重実装せず、特定の非対応形式を実行前denyします。
 - Windowsの`.ps1` launcherはJSON stdin、stdout、stderr、exit codeをNode Hookへ転送するtransportだけを担当します。
 - `AGENTS.md`は全作業で必要な短いrepository契約です。Codex標準のproject instruction復元とcompact後の挙動を受け入れます。独自`SessionStart` Hookや独自context-limit overrideは使いません。
@@ -14,7 +14,11 @@
 
 ## execpolicyの承認範囲
 
-Gitのcommit、merge、rebase、pull、fetch、reset、amend、cherry-pick、revert、restore、checkout、switchと、混在するbranch / tag / config / remote / worktree / stash familyは`prompt`へ送ります。作業branchからの安全な通常pushはexecpolicyの承認対象外で、Hookの検証後に進みます。静的に判別できるforce、ref削除、mirror、一括push等は`forbidden`で拒否し、引数位置やGit設定を含む動的な危険条件はHookが拒否します。protected branch上ではHookのcontextual denyが優先します。
+通常commit・pull・fetch・pushはexecpolicyの`prompt`対象外です。commit amendの標準形と静的に判別できる危険pushは`forbidden`で拒否します。`no_match`はHookやsandboxを通過してよいという意味ではありません。Hookはcommitを明示メッセージ付きの通常形式に限定し、amend・未対応option・動的引数を拒否します。pullはprotected branch上で拒否し、明示`--ff-only`、実効`pull.ff=only`、または`pull.ff`未設定時の`merge.ff=only`が確認できる場合だけ許可します。未設定時のGit既定動作には依存せず、rebase、`--no-ff`、squash、実効設定による履歴書換えや追加mergeがあり得る形式は拒否します。
+
+fetchは保護local branchを直接更新しないrefspecに限って許可します。通常の名前付きremote fetchと、そのremoteの`refs/remotes/<remote>/`配下に限られるpruneは許可できます。force、`+refspec`、`--refmap`、`--stdin`、`--prune-tags`、remote tracking以外を指すfetch設定、無効化されていないsubmodule fetchなど判定不能または意図しないref更新・削除につながる形式は拒否します。`fetch.prune`等の削除設定は、remoteのfetch mappingを読み、その削除対象をremote-tracking namespaceに限定できる場合に限って許可します。`.rules`の`no_match`に対する実行可否は引き続きHook・sandbox等の制御を受けます。
+
+merge、rebase、reset、am、cherry-pick、revert、restore、checkout、switchと、混在するbranch / tag / config / remote / worktree / stash familyは従来どおり`prompt`へ送ります。静的に判別できるref削除、mirror、一括push等は`forbidden`で拒否し、引数位置やGit設定を含む動的な危険条件はHookが拒否します。protected branch上のcommit・pull等はHookのcontextual denyが優先し、通常fetchのみ安全なref更新を確認した場合に許可します。
 
 GitHub CLIの変更操作とローカル状態を変える操作は、Planに列挙した組み込みaliasを含めて`prompt`にします。これには`pr co` / `new`、`issue new`、`repo new`、`repo autolink new`、`secret remove`、`variable remove`、`skill add` / `skills add`、`at`、`agent-task`別名、release aliasが含まれます。これらはGitHub CLIの組み込みaliasだけを扱い、ユーザー定義alias、将来追加されるsubcommand、未知のCLI形式を網羅しません。`gh auth status`の通常形もfamily-level `prompt`です。
 
@@ -52,7 +56,7 @@ protected branch上のstate-changing Gitはdenyします。限定例外として
 
 作業branchからの通常pushは、設定済みの名前付きremote 1件、1つの明示refspec、現在のbranchまたは`HEAD`をsourceとし、現在のbranchを宛先とする場合だけ候補になります。例は`git push origin feature/existing`、`git push origin HEAD:feature/existing`、`git push -u origin feature/existing`です。`-u` / `--set-upstream`以外のpush option、refspec後のoption、URLやpathの直接指定、remoteまたはrefspecの省略、複数refspec、wildcard/matching refspec、削除・force prefix、別branchやprotected branch宛はHookがdenyします。
 
-Hookはremoteに有効なpush URLが1件だけあることを確認します。`push.followTags`、`push.recurseSubmodules`、`remote.<name>.mirror`、`remote.<name>.push`が追加更新を起こし得る値の場合や、その設定を解決できない場合もdenyします。非fast-forwardや認証失敗はGit本体またはremoteが拒否します。Hookの通過はpush成功やbranch protectionの解除を意味しません。
+Hookはremoteに有効なpush URLが1件だけあることを確認します。保護対象は`main` / `master`に加え、push先remoteのローカル`refs/remotes/<remote>/HEAD`が示すデフォルトbranchです。このHEAD情報が未設定、読取失敗、不正、またはpush先remoteと不整合なら通常pushをdenyします。判定はローカル記録に基づき、Hook実行時にネットワークでremoteの最新状態を確認しません。`push.followTags`、`push.recurseSubmodules`、`remote.<name>.mirror`、`remote.<name>.push`が追加更新を起こし得る値の場合や、その設定を解決できない場合もdenyします。非fast-forwardや認証失敗はGit本体またはremoteが拒否します。Hookの通過はpush成功やbranch protectionの解除を意味しません。
 
 ## Gitのread-only分類と信頼境界
 

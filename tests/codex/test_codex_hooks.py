@@ -28,6 +28,11 @@ if NODE is None:
 class HookTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory(prefix="hook repository with spaces ")
+        self.empty_git_config = Path(self.temp.name) / "empty.gitconfig"
+        self.empty_git_config.write_text("", encoding="utf-8")
+        self.hook_env = os.environ.copy()
+        self.hook_env["GIT_CONFIG_GLOBAL"] = str(self.empty_git_config)
+        self.hook_env["GIT_CONFIG_NOSYSTEM"] = "1"
         self.repo = Path(self.temp.name) / "repository with spaces"
         self.repo.mkdir()
         self.remote = Path(self.temp.name) / "remote with spaces.git"
@@ -66,6 +71,32 @@ class HookTests(unittest.TestCase):
             check=True,
         )
         subprocess.run(
+            [
+                "git",
+                "config",
+                "--add",
+                "remote.origin.fetch",
+                "+refs/heads/*:refs/remotes/origin/*",
+            ],
+            cwd=self.repo,
+            check=True,
+        )
+        subprocess.run(
+            ["git", "config", "branch.feature/existing.remote", "origin"],
+            cwd=self.repo,
+            check=True,
+        )
+        subprocess.run(
+            [
+                "git",
+                "config",
+                "branch.feature/existing.merge",
+                "refs/heads/feature/existing",
+            ],
+            cwd=self.repo,
+            check=True,
+        )
+        subprocess.run(
             ["git", "switch", "feature/existing"],
             cwd=self.repo,
             check=True,
@@ -97,6 +128,7 @@ class HookTests(unittest.TestCase):
             text=True,
             capture_output=True,
             check=False,
+            env=self.hook_env,
         )
 
     def assert_denied(self, command: str, reason: str | None = None) -> None:
@@ -113,6 +145,279 @@ class HookTests(unittest.TestCase):
         result = self.run_hook(command)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, "", command)
+
+    def add_remote(self, name: str, *, default_branch: str | None = None) -> None:
+        subprocess.run(
+            ["git", "remote", "add", name, str(self.remote)],
+            cwd=self.repo,
+            check=True,
+        )
+        subprocess.run(
+            [
+                "git",
+                "config",
+                "--add",
+                f"remote.{name}.fetch",
+                f"+refs/heads/*:refs/remotes/{name}/*",
+            ],
+            cwd=self.repo,
+            check=True,
+        )
+        if default_branch is not None:
+            subprocess.run(
+                [
+                    "git",
+                    "symbolic-ref",
+                    f"refs/remotes/{name}/HEAD",
+                    f"refs/remotes/{name}/{default_branch}",
+                ],
+                cwd=self.repo,
+                check=True,
+            )
+
+    def test_normal_commit_is_allowed_but_amend_and_unknown_forms_are_denied(
+        self,
+    ) -> None:
+        for command in (
+            self.posix_prefix + 'git commit -m "normal commit"',
+            self.ps_prefix + 'git.exe commit --message "normal commit"',
+            self.posix_prefix + 'git commit -a -m "normal commit"',
+        ):
+            with self.subTest(command=command):
+                self.assert_hook_allows(command)
+
+        for command in (
+            self.posix_prefix + 'git commit --amend -m "rewrite"',
+            self.posix_prefix + 'git commit -m "rewrite" --amend',
+            self.posix_prefix + "git commit --message=rewrite --amend=HEAD",
+            self.ps_prefix + 'git.exe commit --message "rewrite" --Amend',
+            self.posix_prefix + 'git commit --ame -m "rewrite"',
+            self.posix_prefix + 'git commit -m "$MESSAGE"',
+            self.posix_prefix + "git commit --no-verify -m message",
+            self.posix_prefix + "git commit path.txt",
+            "git commit -m message",
+        ):
+            with self.subTest(command=command):
+                self.assert_denied(command)
+
+        subprocess.run(["git", "switch", "main"], cwd=self.repo, check=True)
+        self.assert_denied(
+            self.posix_prefix + 'git commit -m "protected"', "protected branch"
+        )
+        subprocess.run(
+            [
+                "git",
+                "symbolic-ref",
+                "refs/remotes/origin/HEAD",
+                "refs/remotes/origin/develop",
+            ],
+            cwd=self.repo,
+            check=True,
+        )
+        subprocess.run(["git", "branch", "develop"], cwd=self.repo, check=True)
+        subprocess.run(["git", "switch", "develop"], cwd=self.repo, check=True)
+        self.assert_denied(
+            self.ps_prefix + 'git.exe commit -m "protected default"', "protected branch"
+        )
+
+    def test_normal_fetch_is_allowed_but_unsafe_ref_updates_are_denied(self) -> None:
+        for command in (
+            self.posix_prefix + "git fetch",
+            self.posix_prefix + "git fetch origin",
+            self.ps_prefix + "git.exe fetch origin",
+            self.posix_prefix + "git fetch origin feature/existing",
+            self.posix_prefix + "git fetch --dry-run origin",
+            self.posix_prefix + "git fetch --prune origin",
+        ):
+            with self.subTest(command=command):
+                self.assert_hook_allows(command)
+
+        for command in (
+            self.posix_prefix + "git fetch origin main:refs/heads/main",
+            self.posix_prefix + "git fetch origin develop:refs/heads/develop",
+            self.posix_prefix + "git fetch origin +main:refs/remotes/origin/main",
+            self.posix_prefix + "git fetch origin --force",
+            self.ps_prefix + "git.exe fetch -f origin",
+            self.posix_prefix
+            + "git fetch --refmap=refs/heads/main:refs/heads/main origin main",
+            self.posix_prefix
+            + "git fetch --refmap refs/heads/main:refs/heads/main origin main",
+            self.posix_prefix + "git fetch origin --stdin",
+            self.posix_prefix + "git fetch origin --prune-tags",
+            self.ps_prefix + "git.exe fetch -P origin",
+            self.posix_prefix + "git fetch --all",
+            self.posix_prefix + "git fetch --multiple origin",
+            self.posix_prefix + "git fetch origin --upload-pack=custom",
+            self.posix_prefix + "git fetch https://example.invalid/repository.git",
+        ):
+            with self.subTest(command=command):
+                self.assert_denied(command)
+
+        subprocess.run(["git", "switch", "main"], cwd=self.repo, check=True)
+        self.assert_hook_allows(self.posix_prefix + "git fetch origin")
+
+    def test_fetch_pruning_and_effective_configuration_are_scoped_safely(self) -> None:
+        subprocess.run(
+            ["git", "config", "fetch.prune", "true"], cwd=self.repo, check=True
+        )
+        self.assert_hook_allows(self.posix_prefix + "git fetch origin")
+        self.assert_hook_allows(self.posix_prefix + "git fetch --prune origin")
+
+        subprocess.run(
+            ["git", "config", "fetch.pruneTags", "true"], cwd=self.repo, check=True
+        )
+        self.assert_denied(self.posix_prefix + "git fetch --prune origin", "local tags")
+        self.assert_hook_allows(self.posix_prefix + "git fetch --no-prune origin")
+
+        subprocess.run(
+            [
+                "git",
+                "config",
+                "--replace-all",
+                "remote.origin.fetch",
+                "+refs/heads/*:refs/heads/*",
+            ],
+            cwd=self.repo,
+            check=True,
+        )
+        self.assert_denied(
+            self.posix_prefix + "git fetch origin",
+            "remote-tracking namespace",
+        )
+
+        subprocess.run(
+            [
+                "git",
+                "config",
+                "--replace-all",
+                "remote.origin.fetch",
+                "+refs/heads/*:refs/remotes/origin/*",
+            ],
+            cwd=self.repo,
+            check=True,
+        )
+        subprocess.run(
+            ["git", "config", "remote.origin.mirror", "true"],
+            cwd=self.repo,
+            check=True,
+        )
+        self.assert_denied(self.posix_prefix + "git fetch origin", "Mirror fetch")
+
+        subprocess.run(
+            ["git", "config", "--unset-all", "remote.origin.mirror"],
+            cwd=self.repo,
+            check=True,
+        )
+        subprocess.run(
+            ["git", "config", "fetch.recurseSubmodules", "on-demand"],
+            cwd=self.repo,
+            check=True,
+        )
+        self.assert_denied(
+            self.posix_prefix + "git fetch origin", "Recursive submodule"
+        )
+        self.assert_hook_allows(
+            self.posix_prefix + "git fetch --no-prune --no-recurse-submodules origin"
+        )
+
+    def test_safe_pull_requires_fast_forward_only_behavior_and_unprotected_branch(
+        self,
+    ) -> None:
+        for command in (
+            self.posix_prefix + "git pull --ff-only",
+            self.posix_prefix + "git pull --ff-only origin",
+            self.ps_prefix + "git.exe pull --ff-only origin feature/existing",
+        ):
+            with self.subTest(command=command):
+                self.assert_hook_allows(command)
+
+        self.assert_denied(self.posix_prefix + "git pull", "fast-forward-only")
+        self.assert_denied(self.posix_prefix + "git pull origin", "fast-forward-only")
+
+        subprocess.run(["git", "config", "pull.ff", "only"], cwd=self.repo, check=True)
+        self.assert_hook_allows(self.posix_prefix + "git pull")
+        subprocess.run(
+            ["git", "config", "merge.ff", "false"], cwd=self.repo, check=True
+        )
+        self.assert_hook_allows(self.posix_prefix + "git pull")
+        subprocess.run(
+            ["git", "config", "--unset-all", "merge.ff"], cwd=self.repo, check=True
+        )
+        subprocess.run(
+            ["git", "config", "pull.rebase", "false"], cwd=self.repo, check=True
+        )
+        self.assert_hook_allows(self.posix_prefix + "git pull --ff-only")
+        self.assert_hook_allows(self.posix_prefix + "git pull")
+        subprocess.run(["git", "config", "pull.ff", "false"], cwd=self.repo, check=True)
+        subprocess.run(["git", "config", "merge.ff", "only"], cwd=self.repo, check=True)
+        self.assert_denied(self.posix_prefix + "git pull", "fast-forward-only")
+        subprocess.run(
+            ["git", "config", "--unset-all", "pull.ff"], cwd=self.repo, check=True
+        )
+        subprocess.run(
+            ["git", "config", "--unset-all", "merge.ff"], cwd=self.repo, check=True
+        )
+        self.assert_denied(self.posix_prefix + "git pull", "fast-forward-only")
+        subprocess.run(["git", "config", "merge.ff", "only"], cwd=self.repo, check=True)
+        self.assert_hook_allows(self.posix_prefix + "git pull")
+        subprocess.run(
+            ["git", "config", "--unset-all", "merge.ff"], cwd=self.repo, check=True
+        )
+
+        subprocess.run(["git", "switch", "main"], cwd=self.repo, check=True)
+        self.assert_denied(self.posix_prefix + "git pull --ff-only", "protected branch")
+
+    def test_pull_rejects_rebase_no_ff_unsafe_config_and_protected_refspecs(
+        self,
+    ) -> None:
+        for command in (
+            self.posix_prefix + "git pull --rebase",
+            self.posix_prefix + "git pull --rebase=merges",
+            self.ps_prefix + "git.exe pull -r",
+            self.posix_prefix + "git pull --no-rebase",
+            self.posix_prefix + "git pull --no-ff",
+            self.posix_prefix + "git pull --squash",
+            self.posix_prefix + "git pull --autostash",
+            self.posix_prefix + "git pull origin main:refs/heads/main",
+            self.posix_prefix + "git pull origin main other",
+        ):
+            with self.subTest(command=command):
+                self.assert_denied(command)
+
+        unsafe_settings = (
+            ("pull.rebase", "true"),
+            ("pull.rebase", "false"),
+            ("branch.feature/existing.rebase", "true"),
+            ("branch.feature/existing.rebase", "false"),
+            ("pull.ff", "false"),
+            ("merge.ff", "false"),
+            ("branch.feature/existing.mergeOptions", "--no-ff"),
+            ("pull.squash", "true"),
+        )
+        for key, value in unsafe_settings:
+            with self.subTest(key=key, value=value):
+                subprocess.run(
+                    ["git", "config", "--replace-all", key, value],
+                    cwd=self.repo,
+                    check=True,
+                )
+                has_merge_strategy_without_ff_only = value == "false" and (
+                    key in {"pull.ff", "merge.ff", "pull.rebase"}
+                    or key.endswith(".rebase")
+                )
+                pull_command = (
+                    "git pull"
+                    if has_merge_strategy_without_ff_only
+                    else "git pull --ff-only"
+                )
+                self.assert_denied(self.posix_prefix + pull_command)
+                subprocess.run(
+                    ["git", "config", "--unset-all", key],
+                    cwd=self.repo,
+                    check=False,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
 
     def test_malformed_payload_blocks_and_safe_input_is_silent(self) -> None:
         malformed = subprocess.run(
@@ -328,7 +633,13 @@ class HookTests(unittest.TestCase):
         self,
     ) -> None:
         subprocess.run(["git", "switch", "feature/existing"], cwd=self.repo, check=True)
-        for target in ("main", "HEAD:main", "feature/existing:refs/heads/main"):
+        for target in (
+            "main",
+            "HEAD:main",
+            "feature/existing:refs/heads/main",
+            "master",
+            "HEAD:master",
+        ):
             for prefix in (
                 self.posix_prefix + "git push origin ",
                 self.ps_prefix + "git.exe push origin ",
@@ -355,6 +666,95 @@ class HookTests(unittest.TestCase):
         )
         self.assert_hook_allows(
             self.posix_prefix + "git push -u origin feature/existing"
+        )
+
+    def test_push_uses_the_named_remote_default_branch(self) -> None:
+        self.add_remote("secondary", default_branch="develop")
+        self.assert_hook_allows(
+            self.posix_prefix + "git push secondary feature/existing"
+        )
+
+        subprocess.run(["git", "branch", "develop"], cwd=self.repo, check=True)
+        subprocess.run(["git", "switch", "develop"], cwd=self.repo, check=True)
+        self.assert_denied(
+            self.posix_prefix + "git push secondary develop", "protected branch"
+        )
+
+    def test_origin_default_branch_remains_protected_for_local_mutations(self) -> None:
+        subprocess.run(
+            [
+                "git",
+                "symbolic-ref",
+                "refs/remotes/origin/HEAD",
+                "refs/remotes/origin/develop",
+            ],
+            cwd=self.repo,
+            check=True,
+        )
+        subprocess.run(["git", "branch", "develop"], cwd=self.repo, check=True)
+        subprocess.run(["git", "switch", "develop"], cwd=self.repo, check=True)
+        self.assert_denied(self.posix_prefix + "git commit -m test", "protected branch")
+
+    def test_git_context_does_not_ignore_origin_default_read_failure(self) -> None:
+        ref_dir = self.repo / ".git" / "refs" / "remotes" / "origin"
+        ref_dir.mkdir(parents=True, exist_ok=True)
+        (ref_dir / "HEAD").write_text(
+            "ref: refs/remotes/origin/OTHER\n", encoding="utf-8"
+        )
+        (ref_dir / "OTHER").write_text(
+            "ref: refs/remotes/origin/HEAD\n", encoding="utf-8"
+        )
+        self.assert_denied(self.posix_prefix + "git commit -m test", "Could not read")
+
+    def test_push_requires_valid_local_default_branch_metadata(self) -> None:
+        cases = (
+            ("secondary", None, "configured locally"),
+            ("malformed", "refs/remotes/origin/main", "does not match"),
+        )
+        for remote, target, reason in cases:
+            with self.subTest(remote=remote, target=target):
+                self.add_remote(remote)
+                if target is not None:
+                    subprocess.run(
+                        [
+                            "git",
+                            "symbolic-ref",
+                            f"refs/remotes/{remote}/HEAD",
+                            target,
+                        ],
+                        cwd=self.repo,
+                        check=True,
+                    )
+                self.assert_denied(
+                    self.posix_prefix + f"git push {remote} feature/existing", reason
+                )
+
+    def test_push_rejects_remote_default_branch_read_failure(self) -> None:
+        self.add_remote("unreadable")
+        ref_dir = self.repo / ".git" / "refs" / "remotes" / "unreadable"
+        ref_dir.mkdir(parents=True, exist_ok=True)
+        (ref_dir / "HEAD").write_text(
+            "ref: refs/remotes/unreadable/OTHER\n", encoding="utf-8"
+        )
+        (ref_dir / "OTHER").write_text(
+            "ref: refs/remotes/unreadable/HEAD\n", encoding="utf-8"
+        )
+        self.assert_denied(
+            self.posix_prefix + "git push unreadable feature/existing",
+            "Could not read",
+        )
+
+    def test_push_rejects_a_non_symbolic_remote_default_ref(self) -> None:
+        self.add_remote("malformed")
+        ref_dir = self.repo / ".git" / "refs" / "remotes" / "malformed"
+        ref_dir.mkdir(parents=True, exist_ok=True)
+        commit = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=self.repo, text=True
+        ).strip()
+        (ref_dir / "HEAD").write_text(commit + "\n", encoding="utf-8")
+        self.assert_denied(
+            self.posix_prefix + "git push malformed feature/existing",
+            "metadata is invalid",
         )
 
     def test_push_requires_one_explicit_named_remote_and_branch_refspec(self) -> None:
@@ -386,7 +786,10 @@ class HookTests(unittest.TestCase):
 
     def test_push_rejects_an_unconfigured_remote(self) -> None:
         subprocess.run(["git", "remote", "remove", "origin"], cwd=self.repo, check=True)
-        self.assert_denied(self.posix_prefix + "git push origin feature/existing")
+        self.assert_denied(
+            self.posix_prefix + "git push origin feature/existing",
+            "configured named remote",
+        )
 
     def test_force_bulk_and_other_unsupported_push_options_are_denied(self) -> None:
         unsafe_options = (
