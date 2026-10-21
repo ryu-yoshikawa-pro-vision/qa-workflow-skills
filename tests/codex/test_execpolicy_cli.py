@@ -103,8 +103,6 @@ class ExecpolicyCliTests(unittest.TestCase):
         cases = (
             ("git", "commit", "--amend"),
             ("git.exe", "commit", "--amend"),
-            ("git", "push", "--force", "origin", "feature"),
-            ("git.exe", "push", "origin", "feature"),
             ("git", "reset", "--hard", "HEAD~1"),
             ("git.exe", "restore", "."),
             ("git", "checkout", "--", "."),
@@ -118,6 +116,17 @@ class ExecpolicyCliTests(unittest.TestCase):
         for command in cases:
             with self.subTest(command=command):
                 self.assertEqual(self.decision(*command), "prompt")
+
+    def test_safe_branch_push_has_no_execpolicy_match(self) -> None:
+        cases = (
+            ("git", "push", "origin", "feature"),
+            ("git.exe", "push", "origin", "HEAD:feature"),
+            ("git", "push", "-u", "origin", "feature"),
+            ("git.exe", "push", "--set-upstream", "origin", "feature"),
+        )
+        for command in cases:
+            with self.subTest(command=command):
+                self.assertEqual(self.decision(*command), "no_match")
 
     def test_github_cli_builtin_mutation_aliases_prompt_for_both_executables(
         self,
@@ -206,6 +215,18 @@ class ExecpolicyCliTests(unittest.TestCase):
             ("git", "clean", "-fd"),
             ("git.exe", "rm", "file.txt"),
             ("git", "update-ref", "-d", "refs/heads/old"),
+            ("git", "push", "--force", "origin", "feature"),
+            ("git.exe", "push", "-f", "origin", "feature"),
+            ("git", "push", "--force-with-lease", "origin", "feature"),
+            ("git.exe", "push", "--force-if-includes", "origin", "feature"),
+            ("git", "push", "--delete", "origin", "feature"),
+            ("git.exe", "push", "-d", "origin", "feature"),
+            ("git", "push", "--prune", "origin", "feature"),
+            ("git.exe", "push", "--mirror", "origin"),
+            ("git", "push", "--all", "origin"),
+            ("git.exe", "push", "--branches", "origin"),
+            ("git", "push", "--tags", "origin"),
+            ("git.exe", "push", "--follow-tags", "origin", "feature"),
             ("rm", "file.txt"),
             ("Remove-Item", "file.txt"),
         )

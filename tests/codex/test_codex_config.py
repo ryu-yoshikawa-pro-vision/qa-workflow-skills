@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import base64
-import re
 import subprocess
 import tomllib
 import unittest
@@ -11,11 +10,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG_PATH = ROOT / ".codex" / "config.toml"
-COMPANION_PLAN = (
-    ROOT / "docs" / "plans" / "2026-10-03_173600_formatter-lint_execpolicy-rules.md"
-)
-
-
 class CodexConfigTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -94,10 +88,7 @@ class CodexConfigTests(unittest.TestCase):
         self.assertIn("[scriptblock]::Create($source)", payload)
         self.assertNotIn('"', hook["command_windows"])
 
-    def test_execpolicy_files_match_companion_plan_blocks_byte_for_byte(self) -> None:
-        companion = COMPANION_PLAN.read_text(encoding="utf-8")
-        blocks = re.findall(r"```starlark\n(.*?)\n```", companion, re.DOTALL)
-        self.assertEqual(len(blocks), 2)
+    def test_execpolicy_files_have_no_allow_rules(self) -> None:
         actual = [
             (ROOT / ".codex" / "rules" / "20-risky-prompt.rules")
             .read_text(encoding="utf-8")
@@ -106,7 +97,6 @@ class CodexConfigTests(unittest.TestCase):
             .read_text(encoding="utf-8")
             .rstrip(),
         ]
-        self.assertEqual(actual, [block.rstrip() for block in blocks])
         self.assertNotIn('decision = "allow"', "\n".join(actual))
 
     def test_gitignore_only_reopens_repository_owned_harness_paths(self) -> None:

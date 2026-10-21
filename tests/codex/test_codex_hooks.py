@@ -30,6 +30,12 @@ class HookTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(prefix="hook repository with spaces ")
         self.repo = Path(self.temp.name) / "repository with spaces"
         self.repo.mkdir()
+        self.remote = Path(self.temp.name) / "remote with spaces.git"
+        subprocess.run(
+            ["git", "init", "--bare", "-q", str(self.remote)],
+            cwd=self.repo.parent,
+            check=True,
+        )
         subprocess.run(["git", "init", "-q", "-b", "main"], cwd=self.repo, check=True)
         subprocess.run(
             ["git", "config", "user.name", "Hook Test"], cwd=self.repo, check=True
@@ -51,6 +57,11 @@ class HookTests(unittest.TestCase):
                 "refs/remotes/origin/HEAD",
                 "refs/remotes/origin/main",
             ],
+            cwd=self.repo,
+            check=True,
+        )
+        subprocess.run(
+            ["git", "remote", "add", "origin", str(self.remote)],
             cwd=self.repo,
             check=True,
         )
@@ -133,8 +144,11 @@ class HookTests(unittest.TestCase):
         for command in (
             self.posix_prefix + "git push origin feature/existing",
             self.posix_prefix + "git.exe push origin feature/existing",
+            self.posix_prefix + "git push origin HEAD:feature/existing",
+            self.posix_prefix + "git push -u origin feature/existing",
             self.posix_prefix + "git commit -m test",
             self.ps_prefix + "git.exe push origin feature/existing",
+            self.ps_prefix + "git.exe push --set-upstream origin feature/existing",
             "gh pr merge 123 -R owner/repo",
             "gh.exe pr merge 123 -R owner/repo",
             "gh pr view 123 -R owner/repo",
@@ -314,16 +328,7 @@ class HookTests(unittest.TestCase):
         self,
     ) -> None:
         subprocess.run(["git", "switch", "feature/existing"], cwd=self.repo, check=True)
-        targets = (
-            "main",
-            "HEAD:main",
-            "feature/existing:refs/heads/main",
-            ":main",
-            "--delete main",
-            "+HEAD:main",
-            "feature/existing HEAD:refs/heads/main",
-        )
-        for target in targets:
+        for target in ("main", "HEAD:main", "feature/existing:refs/heads/main"):
             for prefix in (
                 self.posix_prefix + "git push origin ",
                 self.ps_prefix + "git.exe push origin ",
@@ -331,9 +336,135 @@ class HookTests(unittest.TestCase):
                 command = prefix + target
                 with self.subTest(command=command):
                     self.assert_denied(command, "protected branch")
+        for target in (
+            ":main",
+            "--delete main",
+            "+HEAD:main",
+            "feature/existing HEAD:refs/heads/main",
+        ):
+            for prefix in (
+                self.posix_prefix + "git push origin ",
+                self.ps_prefix + "git.exe push origin ",
+            ):
+                command = prefix + target
+                with self.subTest(command=command):
+                    self.assert_denied(command)
         self.assert_hook_allows(self.posix_prefix + "git push origin feature/existing")
         self.assert_hook_allows(
             self.posix_prefix + "git push origin HEAD:feature/existing"
+        )
+        self.assert_hook_allows(
+            self.posix_prefix + "git push -u origin feature/existing"
+        )
+
+    def test_push_requires_one_explicit_named_remote_and_branch_refspec(self) -> None:
+        for command in (
+            self.posix_prefix + "git push origin",
+            self.posix_prefix + "git push origin HEAD",
+            self.posix_prefix + "git push origin feature/target",
+            self.posix_prefix + "git push origin HEAD:feature/target",
+            self.posix_prefix + "git push origin feature/existing feature/target",
+            self.posix_prefix + "git push origin HEAD:feature/existing HEAD:feature/target",
+            self.posix_prefix + "git push https://example.invalid/owner/repo.git feature/existing",
+            self.posix_prefix + f"git push '{self.remote.as_posix()}' feature/existing",
+            self.posix_prefix + "git push origin feature/*",
+            self.posix_prefix + "git push origin 'feature/*'",
+            self.posix_prefix + "git push origin HEAD:feature/*",
+            self.posix_prefix + "git push origin 'HEAD:feature/*'",
+            self.posix_prefix + "git push origin :feature/target",
+            self.posix_prefix + "git push origin :",
+            self.posix_prefix + "git push origin +HEAD:feature/target",
+            self.posix_prefix + "git push origin feature/existing --force",
+            self.posix_prefix + "git push origin feature/existing -u",
+            self.posix_prefix + "git push origin --delete feature/target",
+            self.ps_prefix + "git.exe push origin feature/existing --mirror",
+        ):
+            with self.subTest(command=command):
+                self.assert_denied(command)
+
+    def test_push_rejects_an_unconfigured_remote(self) -> None:
+        subprocess.run(
+            ["git", "remote", "remove", "origin"], cwd=self.repo, check=True
+        )
+        self.assert_denied(
+            self.posix_prefix + "git push origin feature/existing"
+        )
+
+    def test_force_bulk_and_other_unsupported_push_options_are_denied(self) -> None:
+        unsafe_options = (
+            "-f",
+            "--force",
+            "--force-with-lease",
+            "--force-if-includes",
+            "-fu",
+            "--delete",
+            "-d",
+            "--prune",
+            "--mirror",
+            "--all",
+            "--branches",
+            "--tags",
+            "--follow-tags",
+        )
+        for option in unsafe_options:
+            for prefix in (
+                self.posix_prefix + "git push ",
+                self.ps_prefix + "git.exe push ",
+            ):
+                command = prefix + option + " origin feature/existing"
+                with self.subTest(command=command):
+                    self.assert_denied(command)
+
+    def test_push_rejects_configuration_that_can_add_remote_updates(self) -> None:
+        cases = (
+            ("push.followTags", "true"),
+            ("push.recurseSubmodules", "on-demand"),
+            ("remote.origin.mirror", "true"),
+            ("remote.origin.push", "HEAD:feature/target"),
+            ("push.followTags", "not-a-boolean"),
+        )
+        for key, value in cases:
+            with self.subTest(key=key, value=value):
+                subprocess.run(
+                    ["git", "config", "--replace-all", key, value],
+                    cwd=self.repo,
+                    check=True,
+                )
+                self.assert_denied(
+                    self.posix_prefix + "git push origin feature/existing"
+                )
+                subprocess.run(
+                    ["git", "config", "--unset-all", key],
+                    cwd=self.repo,
+                    check=False,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+
+        subprocess.run(
+            ["git", "config", "push.recurseSubmodules", "false"],
+            cwd=self.repo,
+            check=True,
+        )
+        self.assert_hook_allows(
+            self.posix_prefix + "git push origin feature/existing"
+        )
+
+    def test_multiple_configured_push_urls_are_denied(self) -> None:
+        second_remote = Path(self.temp.name) / "second remote.git"
+        subprocess.run(
+            ["git", "init", "--bare", "-q", str(second_remote)],
+            cwd=self.repo.parent,
+            check=True,
+        )
+        for remote_url in (self.remote, second_remote):
+            subprocess.run(
+                ["git", "remote", "set-url", "--add", "--push", "origin", str(remote_url)],
+                cwd=self.repo,
+                check=True,
+            )
+        self.assert_denied(
+            self.posix_prefix + "git push origin feature/existing"
         )
 
     def test_gh_leading_options_and_token_display_are_denied(self) -> None:

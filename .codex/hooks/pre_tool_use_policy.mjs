@@ -127,7 +127,8 @@ const GH_SUBCOMMAND_OPTIONS = new Set([
 ]);
 const GH_SUBFAMILIES = new Set(["autolink", "deploy-key"]);
 const DELETE_COMMANDS = new Set(["rm", "del", "erase", "rd", "ri", "remove-item", "rmdir", "unlink"]);
-const PUSH_VALUE_OPTIONS = new Set(["--repo", "--receive-pack", "--exec", "--push-option", "-o"]);
+const SAFE_PUSH_OPTIONS = new Set(["-u", "--set-upstream"]);
+const SAFE_FALSE_CONFIG_VALUES = new Set(["false", "no", "off", "0"]);
 
 function deny(reason) {
   return { hookSpecificOutput: { hookEventName: EVENT, permissionDecision: "deny", permissionDecisionReason: reason } };
@@ -142,6 +143,21 @@ function gitOutput(cwd, args) {
   } catch {
     return null;
   }
+}
+function gitOutputLines(cwd, args) {
+  try {
+    const output = execFileSync("git", ["-C", cwd, ...args], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+      windowsHide: true,
+    }).replace(/\r?\n$/, "");
+    return output ? output.split(/\r?\n/) : [];
+  } catch (error) {
+    return error?.status === 1 ? [] : null;
+  }
+}
+function gitConfigValues(root, key, boolean = false) {
+  return gitOutputLines(root, ["config", ...(boolean ? ["--bool"] : []), "--get-all", key]);
 }
 function repoRoot(cwd) {
   const root = gitOutput(cwd, ["rev-parse", "--show-toplevel"]);
@@ -364,28 +380,80 @@ function readOnlyBranch(args) {
   }
   return true;
 }
-function protectedPushTarget(args, branches) {
-  const positional = [];
-  let deleting = false;
+function pushConfigurationError(root, remote) {
+  const pushUrls = gitOutputLines(root, ["remote", "get-url", "--push", "--all", remote]);
+  if (!pushUrls || pushUrls.length !== 1 || !pushUrls[0] || pushUrls[0].trim() !== pushUrls[0]) {
+    return "Push requires exactly one configured URL for the named remote.";
+  }
+
+  const followTags = gitConfigValues(root, "push.followTags", true);
+  if (!followTags || followTags.some(value => value !== "false")) {
+    return "Push configuration may add tag refs implicitly.";
+  }
+
+  const recurseSubmodules = gitConfigValues(root, "push.recurseSubmodules");
+  if (!recurseSubmodules || recurseSubmodules.some(value => !SAFE_FALSE_CONFIG_VALUES.has(value.trim().toLowerCase()))) {
+    return "Recursive submodule push configuration is unsupported.";
+  }
+
+  const mirror = gitConfigValues(root, `remote.${remote}.mirror`, true);
+  if (!mirror || mirror.some(value => value !== "false")) {
+    return "Mirror push configuration is unsupported.";
+  }
+
+  const configuredPushRefspecs = gitConfigValues(root, `remote.${remote}.push`);
+  if (!configuredPushRefspecs || configuredPushRefspecs.length > 0) {
+    return "Configured remote push refspecs are unsupported.";
+  }
+  return null;
+}
+function pushSafetyError(args, root, context) {
+  let remote = null;
+  let refspec = null;
   for (let i = 0; i < args.length; i += 1) {
-    const v = args[i].value, lo = v.toLowerCase();
-    if (lo === "--delete" || lo === "-d") {
-      deleting = true;
+    const value = args[i].value;
+    if (args[i].dynamic) return "Shell-expanded push arguments are unsupported.";
+    if (SAFE_PUSH_OPTIONS.has(value)) {
+      if (refspec !== null) return "Push options after a refspec are unsupported.";
       continue;
     }
-    if (v.startsWith("-")) {
-      if (PUSH_VALUE_OPTIONS.has(lo) && args[i + 1]) i += 1;
-      continue;
+    if (value === "--" || value.startsWith("-")) {
+      return "Unsupported or destructive push options are blocked.";
     }
-    positional.push(v);
+    if (remote === null) remote = value;
+    else if (refspec === null) refspec = value;
+    else return "Push must contain exactly one refspec.";
   }
-  if (positional.length < 2) return false;
-  for (const ref of positional.slice(1)) {
-    if (deleting && isProtectedRef(ref, branches)) return true;
-    const colon = ref.indexOf(":");
-    if (isProtectedRef(colon >= 0 ? ref.slice(colon + 1) : ref, branches)) return true;
+
+  if (remote === null || refspec === null || !/^[A-Za-z0-9_-]+$/.test(remote)) {
+    return "Push requires a configured named remote and one explicit branch refspec.";
   }
-  return false;
+  const remotes = gitOutputLines(root, ["remote"]);
+  if (!remotes || !remotes.includes(remote)) {
+    return "Push requires a configured named remote.";
+  }
+
+  const parts = refspec.split(":");
+  if (parts.length > 2) return "Push refspec syntax is unsupported.";
+  const source = parts[0];
+  const destination = parts.length === 1 ? parts[0] : parts[1];
+  if (!source || !destination || source.startsWith("+")) {
+    return "Deletion and force refspecs are blocked.";
+  }
+  if (isProtectedRef(destination, context.protectedBranches)) {
+    return "An explicit push to a protected branch is blocked.";
+  }
+  if (destination !== context.current) {
+    return "Push destination must be the current branch.";
+  }
+  if (source !== "HEAD" && source !== context.current) {
+    return "Push source must be the current branch or HEAD.";
+  }
+  if (!validBranch(root, destination)) {
+    return "Push destination must be one explicit branch name.";
+  }
+
+  return pushConfigurationError(root, remote);
 }
 function isProtectedRef(value, branches) {
   const ref = value.replace(/^\+/, "");
@@ -449,8 +517,12 @@ function evaluateGit(tokens, canonical, root) {
   ) return { decision: deny("Interactive and exec-script rebase forms are unsupported."), mutation: true };
   const context = gitContext(root);
   if (!context.current) return { decision: deny("The current local branch could not be resolved."), mutation: true };
-  if (sub === "push" && protectedPushTarget(args, context.protectedBranches)) {
-    return { decision: deny("An explicit push to a protected branch is blocked."), mutation: true };
+  if (sub === "push" && context.protectedBranches.has(context.current)) {
+    return { decision: deny("State-changing Git on a protected branch is blocked."), mutation: true };
+  }
+  if (sub === "push") {
+    const pushError = pushSafetyError(args, root, context);
+    if (pushError) return { decision: deny(pushError), mutation: true };
   }
   if (sub === "branch" && branchTargetMutation(args, context)) {
     return { decision: deny("Changing a protected branch ref is blocked."), mutation: true };

@@ -1,11 +1,11 @@
 # Codex開発ハーネスの安全境界
 
-この文書は、repository-local Codex開発ハーネスの目的、承認経路、保証範囲を説明します。Codex CLIのversionは固定しません。Codex Harness CIはnpmの`latest` stable tagからCLIを導入し、実行versionを記録してから、Hook・execpolicy・config・launcherの契約を実CLIで検証します。設定・Hook・execpolicyの具体例は [Main Plan](../plans/2026-10-03_173600_formatter-lint.md) と [execpolicy rule一覧](../plans/2026-10-03_173600_formatter-lint_execpolicy-rules.md) を正本とします。
+この文書は、repository-local Codex開発ハーネスの目的、承認経路、保証範囲を説明します。Codex CLIのversionは固定しません。Codex Harness CIはnpmの`latest` stable tagからCLIを導入し、実行versionを記録してから、Hook・execpolicy・config・launcherの契約を実CLIで検証します。現在のexecpolicyは`.codex/rules/*.rules`、pushの動的判定は`.codex/hooks/pre_tool_use_policy.mjs`、その期待分類は契約テストを正本とします。[2026-10-03のexecpolicy Plan](../plans/2026-10-03_173600_formatter-lint_execpolicy-rules.md)は導入時点の記録であり、現在のrule全文との一致要件ではありません。
 
 ## 責務の分担
 
 - `.codex/config.toml`はgranular approval、4つのcustom agent、`Bash`の`PreToolUse` command Hook、固定profileを宣言します。
-- `.codex/rules/20-risky-prompt.rules`は高影響Git / GitHub CLI familyを`prompt`へ送り、`.codex/rules/30-destructive-forbidden.rules`は限定した破壊command familyを`forbidden`にします。通常command用の`allow` ruleはありません。
+- `.codex/rules/20-risky-prompt.rules`は通常pushを除く高影響Git / GitHub CLI familyを`prompt`へ送り、`.codex/rules/30-destructive-forbidden.rules`は限定した破壊command familyと静的に判別できる危険pushを`forbidden`にします。通常command用の`allow` ruleはありません。
 - `pre_tool_use_policy.mjs`は実行時にrepository rootやcurrent branchを必要とする誤操作guardrailです。承認分類をexecpolicyと二重実装せず、特定の非対応形式を実行前denyします。
 - Windowsの`.ps1` launcherはJSON stdin、stdout、stderr、exit codeをNode Hookへ転送するtransportだけを担当します。
 - `AGENTS.md`は全作業で必要な短いrepository契約です。Codex標準のproject instruction復元とcompact後の挙動を受け入れます。独自`SessionStart` Hookや独自context-limit overrideは使いません。
@@ -14,7 +14,7 @@
 
 ## execpolicyの承認範囲
 
-Gitのcommit、merge、rebase、pull、push、fetch、reset、amend、cherry-pick、revert、restore、checkout、switchと、混在するbranch / tag / config / remote / worktree / stash familyはPlanに列挙したprefixで承認へ送ります。feature branch上のforce push、hard reset、commit amendも承認対象のままです。protected branch上ではHookのcontextual denyが優先します。
+Gitのcommit、merge、rebase、pull、fetch、reset、amend、cherry-pick、revert、restore、checkout、switchと、混在するbranch / tag / config / remote / worktree / stash familyは`prompt`へ送ります。作業branchからの安全な通常pushはexecpolicyの承認対象外で、Hookの検証後に進みます。静的に判別できるforce、ref削除、mirror、一括push等は`forbidden`で拒否し、引数位置やGit設定を含む動的な危険条件はHookが拒否します。protected branch上ではHookのcontextual denyが優先します。
 
 GitHub CLIの変更操作とローカル状態を変える操作は、Planに列挙した組み込みaliasを含めて`prompt`にします。これには`pr co` / `new`、`issue new`、`repo new`、`repo autolink new`、`secret remove`、`variable remove`、`skill add` / `skills add`、`at`、`agent-task`別名、release aliasが含まれます。これらはGitHub CLIの組み込みaliasだけを扱い、ユーザー定義alias、将来追加されるsubcommand、未知のCLI形式を網羅しません。`gh auth status`の通常形もfamily-level `prompt`です。
 
@@ -50,7 +50,9 @@ Windowsでroot移動が失敗した場合は、`-ErrorAction Stop`により後�
 
 protected branch上のstate-changing Gitはdenyします。限定例外として、新しいlocal非protected branchへの`git switch -c <name>`と、既存local非protected branchへの`git switch <name>`だけをHookが通します。追加start-point、force/discard option、protected branch宛、存在しないbranchはdenyします。例外のswitchもexecpolicyの`prompt`を通す必要があります。
 
-Feature branchからでも明示的にprotected branchをpush先とするrefspec（短縮名、`refs/heads`、削除、force prefix、複数refspecを含む）はHookがdenyします。Hookは暗黙push先、wildcard/matching refspec、Git configによる書換えなど全push先を解決しません。他の高影響pushはexecpolicyの`prompt`とtrusted Git設定へ委譲します。
+作業branchからの通常pushは、設定済みの名前付きremote 1件、1つの明示refspec、現在のbranchまたは`HEAD`をsourceとし、現在のbranchを宛先とする場合だけ候補になります。例は`git push origin feature/existing`、`git push origin HEAD:feature/existing`、`git push -u origin feature/existing`です。`-u` / `--set-upstream`以外のpush option、refspec後のoption、URLやpathの直接指定、remoteまたはrefspecの省略、複数refspec、wildcard/matching refspec、削除・force prefix、別branchやprotected branch宛はHookがdenyします。
+
+Hookはremoteに有効なpush URLが1件だけあることを確認します。`push.followTags`、`push.recurseSubmodules`、`remote.<name>.mirror`、`remote.<name>.push`が追加更新を起こし得る値の場合や、その設定を解決できない場合もdenyします。非fast-forwardや認証失敗はGit本体またはremoteが拒否します。Hookの通過はpush成功やbranch protectionの解除を意味しません。
 
 ## Gitのread-only分類と信頼境界
 
