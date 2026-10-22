@@ -15,6 +15,7 @@ from scripts.skills.evals.agent.common import (
 )
 from scripts.skills.evals.agent.isolation_probe import _live_mount_probe
 from scripts.skills.evals.agent.workspace import (
+    prepare_agent_output_mountpoint,
     profile_fingerprint,
     verify_agent_docker_command,
     verify_judge_docker_command,
@@ -24,6 +25,18 @@ from scripts.skills.evals.agent.workspace import (
 
 
 class WorkspaceIsolationTests(unittest.TestCase):
+    def test_agent_output_mountpoint_is_created_empty_and_rejects_content(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary) / "workspace"
+            workspace.mkdir()
+            output = prepare_agent_output_mountpoint(workspace)
+            self.assertEqual(output, workspace / ".qa-eval-output")
+            self.assertEqual(list(output.iterdir()), [])
+
+            (output / "unexpected").write_text("source content", encoding="utf-8")
+            with self.assertRaisesRegex(AgentEvalError, "must be empty"):
+                prepare_agent_output_mountpoint(workspace)
+
     def test_profile_evidence_is_bound_to_command_and_evaluator_revision(self) -> None:
         profile = {
             "agent": {"skill_roots": ["/workspace/.agents/skills"]},

@@ -60,6 +60,23 @@ def assert_clean_checkout(root: Path, *, expected_revision: str | None = None) -
     return head
 
 
+def prepare_agent_output_mountpoint(workspace_root: Path) -> Path:
+    """Create the empty nested mountpoint before mounting the workspace read-only."""
+    if workspace_root.is_symlink() or not workspace_root.is_dir():
+        raise AgentEvalError("Agent workspace must be a regular directory")
+    output_mountpoint = workspace_root / ".qa-eval-output"
+    if output_mountpoint.is_symlink() or (
+        output_mountpoint.exists() and not output_mountpoint.is_dir()
+    ):
+        raise AgentEvalError("Agent output mountpoint must be a regular directory")
+    if output_mountpoint.exists():
+        if any(output_mountpoint.iterdir()):
+            raise AgentEvalError("Agent output mountpoint must be empty")
+    else:
+        output_mountpoint.mkdir()
+    return output_mountpoint
+
+
 def load_execution_profile(path: Path) -> dict[str, Any]:
     try:
         value = json.loads(path.read_text(encoding="utf-8"))

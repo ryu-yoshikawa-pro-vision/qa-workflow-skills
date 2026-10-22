@@ -38,6 +38,7 @@ if __package__ in {None, ""}:
         create_skill_workspace,
         load_execution_profile,
         named_container_command,
+        prepare_agent_output_mountpoint,
         profile_fingerprint,
         resolve_commit,
         verify_agent_docker_command,
@@ -86,6 +87,7 @@ else:
         create_skill_workspace,
         load_execution_profile,
         named_container_command,
+        prepare_agent_output_mountpoint,
         profile_fingerprint,
         resolve_commit,
         verify_agent_docker_command,
@@ -543,6 +545,7 @@ def run(argv: list[str] | None = None) -> int:
                 }
                 with tempfile.TemporaryDirectory(prefix="agent-eval-") as temporary:
                     agent_workspace = Path(temporary)
+                    prepare_agent_output_mountpoint(agent_workspace)
                     visible_skill_root = agent_workspace / ".agents" / "skills"
                     visible_skill_root.mkdir(parents=True)
                     for visible_skill in routed_skill_names:

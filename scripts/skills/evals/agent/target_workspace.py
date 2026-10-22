@@ -10,7 +10,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from .common import AgentEvalError, canonical_fingerprint, sha256_bytes
-from .workspace import resolve_commit
+from .workspace import prepare_agent_output_mountpoint, resolve_commit
 
 SCENARIO_DIR = (
     Path(__file__).resolve().parent
@@ -349,7 +349,7 @@ def prepare_sanitized_target(
     context_path = destination / "docs/PROJECT_CONTEXT.md"
     context_path.parent.mkdir(parents=True, exist_ok=True)
     context_path.write_text(project_context, encoding="utf-8")
-    (destination / ".qa-eval-output").mkdir()
+    prepare_agent_output_mountpoint(destination)
 
     baseline_manifest = _scan_workspace(destination)
     empty_hooks = destination.parent / f".{destination.name}-empty-hooks"
