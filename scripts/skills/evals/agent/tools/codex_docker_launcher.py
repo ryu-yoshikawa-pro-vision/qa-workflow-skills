@@ -389,10 +389,21 @@ def _probe_image_runtime(
         )
     if not re.fullmatch(r"Python 3\.11\.\d+", python_version):
         raise CodexLauncherError("Agent image must provide Python 3.11")
+    ca_bundle_check = (
+        "import ssl; from pathlib import Path; "
+        "p = ssl.get_default_verify_paths().cafile; "
+        "assert p and Path(p).is_file() and Path(p).stat().st_size; print(p)"
+    )
+    ca_bundle = probe(["python3.11", "-c", ca_bundle_check])
+    if not ca_bundle:
+        raise CodexLauncherError(
+            "Agent image must provide a system CA bundle for HTTPS"
+        )
     return {
         "image_id": image_id,
         "codex_cli_version": cli_version,
         "python_version": python_version,
+        "ca_bundle": ca_bundle,
     }
 
 

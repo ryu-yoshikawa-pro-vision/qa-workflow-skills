@@ -51,6 +51,13 @@ class CodexJudgeDockerLauncherTests(unittest.TestCase):
             if command == ["python3.11", "--version"]:
                 print("Python 3.11.17")
                 raise SystemExit(0)
+            if command[:2] == ["python3.11", "-c"]:
+                if (
+                    os.environ.get("CODEX_JUDGE_LAUNCHER_TEST_CA_BUNDLE", "present")
+                    == "present"
+                ):
+                    print("/etc/ssl/certs/ca-certificates.crt")
+                raise SystemExit(0)
             codex_home_mount = next(
                 item for item in args if item.startswith("type=bind,")
                 and "target=/codex-home" in item
@@ -177,6 +184,10 @@ class CodexJudgeDockerLauncherTests(unittest.TestCase):
             launch_info = json.loads(argv_log.read_text(encoding="utf-8"))
             self.assertEqual(observations["status"], "completed")
             self.assertEqual(observations["image"]["image_id"], "sha256:" + "a" * 64)
+            self.assertEqual(
+                observations["image"]["ca_bundle"],
+                "/etc/ssl/certs/ca-certificates.crt",
+            )
             self.assertEqual(launch_info["image"], "sha256:" + "a" * 64)
             self.assertEqual(launch_info["prompt"], "fixed isolated Judge prompt")
             self.assertTrue(launch_info["auth_file_present"])

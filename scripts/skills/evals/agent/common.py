@@ -164,7 +164,7 @@ def capture_codex_judge_output(
         safe_image = {
             key: value
             for key, value in image.items()
-            if key in {"image_id", "codex_cli_version", "python_version"}
+            if key in {"image_id", "codex_cli_version", "python_version", "ca_bundle"}
             and isinstance(value, str)
         }
     jsonl = observations.get("jsonl")
@@ -315,7 +315,8 @@ def capture_codex_jsonl_trace(
             safe_image = {
                 key: value
                 for key, value in image.items()
-                if key in {"image_id", "codex_cli_version", "python_version"}
+                if key
+                in {"image_id", "codex_cli_version", "python_version", "ca_bundle"}
                 and isinstance(value, str)
             }
         return {

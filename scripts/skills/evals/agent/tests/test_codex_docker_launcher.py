@@ -12,6 +12,8 @@ from unittest.mock import patch
 
 from scripts.skills.evals.agent.common import capture_codex_jsonl_trace
 from scripts.skills.evals.agent.tools.codex_docker_launcher import (
+    CodexLauncherError,
+    _probe_image_runtime,
     launch,
     summarize_codex_jsonl,
 )
@@ -48,6 +50,13 @@ class CodexDockerLauncherTests(unittest.TestCase):
                 raise SystemExit(0)
             if command == ["python3.11", "--version"]:
                 print("Python 3.11.17")
+                raise SystemExit(0)
+            if command[:2] == ["python3.11", "-c"]:
+                if (
+                    os.environ.get("CODEX_LAUNCHER_TEST_CA_BUNDLE", "present")
+                    == "present"
+                ):
+                    print("/etc/ssl/certs/ca-certificates.crt")
                 raise SystemExit(0)
             output_mount = next(
                 item for item in args if item.startswith("type=bind,")
@@ -174,6 +183,7 @@ class CodexDockerLauncherTests(unittest.TestCase):
                         "CODEX_HOME": str(source_codex_home),
                         "OPENAI_API_KEY": "",
                         "CODEX_LAUNCHER_TEST_ARGV": str(argv_log),
+                        "CODEX_LAUNCHER_TEST_CA_BUNDLE": "present",
                     },
                     clear=False,
                 ),
@@ -219,6 +229,10 @@ class CodexDockerLauncherTests(unittest.TestCase):
                 captured["launcher_observations"]["image"]["python_version"],
                 "Python 3.11.17",
             )
+            self.assertEqual(
+                captured["launcher_observations"]["image"]["ca_bundle"],
+                "/etc/ssl/certs/ca-certificates.crt",
+            )
             self.assertTrue(captured["redacted"])
             self.assertTrue(launch_argv["auth_file_present"])
             self.assertEqual(launch_argv["auth_mode_env"], "CODEX_HOME=/codex-home")
@@ -230,6 +244,25 @@ class CodexDockerLauncherTests(unittest.TestCase):
             self.assertNotIn("abcdefghijklmnopqrstuv", stdout.getvalue())
             self.assertFalse(Path(launch_argv["auth_mount_source"]).exists())
             self.assertEqual(list(output.iterdir()), [])
+
+    def test_image_probe_rejects_an_image_without_a_system_ca_bundle(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            docker, _ = self._fake_docker(root)
+            command = [
+                str(docker),
+                "run",
+                "--rm",
+                "sha256:" + "a" * 64,
+                "codex",
+                "exec",
+            ]
+
+            with patch.dict(os.environ, {"CODEX_LAUNCHER_TEST_CA_BUNDLE": "absent"}):
+                with self.assertRaisesRegex(
+                    CodexLauncherError, "system CA bundle for HTTPS"
+                ):
+                    _probe_image_runtime(command, "codex-cli 0.163.0")
 
     def test_launcher_accepts_only_the_selected_writable_skill_in_repair_mode(
         self,

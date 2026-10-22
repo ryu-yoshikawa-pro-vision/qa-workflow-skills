@@ -18,7 +18,7 @@ Agent実行にはLinux Docker環境と利用者が用意したAgent / Judgeコ�
 ## 実行前提
 
 - Python 3.11と、既存deterministic validatorが使う`PyYAML==6.0.3`を評価環境へ用意します。
-- 実Codex imageは[`tools/codex-agent.Dockerfile`](tools/codex-agent.Dockerfile)から作り、Codex CLI `0.163.0`とPython 3.11を固定します。build後に得たimage IDは各launcherが照合・記録し、照合したIDで実行します。
+- 実Codex imageは[`tools/codex-agent.Dockerfile`](tools/codex-agent.Dockerfile)から作り、Codex CLI `0.163.0`、Python 3.11、HTTPS通信用のOS CA bundleを用意します。launcherはimage内のCA bundleもpreflightで確認します。build後に得たimage IDは各launcherが照合・記録し、照合したIDで実行します。
 - 実Agent / Judgeは別々のargv・cwd・実効profileで起動します。どちらも直接`docker run`し、`shell=True`は使いません。
 - Agent containerはread-only root、`/workspace` read-only、`/workspace/.qa-eval-output`のみwrite可能なbind mountにします。Evaluator / Reference / graderをbind mountしません。
 - Judgeは[`tools/codex_judge_docker_launcher.py`](tools/codex_judge_docker_launcher.py)でAgentとは別の使い捨てcontainerに起動します。Judge専用の一時`CODEX_HOME`だけを認証用にmountし、sanitized target・Agent workspace・Evaluator checkoutはmountしません。Judge promptはstdinだけで渡し、stdoutは最終Judge JSONだけにします。
