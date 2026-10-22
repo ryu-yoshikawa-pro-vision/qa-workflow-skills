@@ -17,7 +17,6 @@ from .common import (
     AgentEvalError,
     atomic_write_json,
     capture_codex_jsonl_trace,
-    canonical_fingerprint,
     prepare_run_output_root,
     sanitize_diagnostic,
     sha256_bytes,

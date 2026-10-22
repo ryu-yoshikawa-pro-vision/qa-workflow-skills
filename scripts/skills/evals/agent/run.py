@@ -16,8 +16,8 @@ if __package__ in {None, ""}:
     from scripts.skills.evals.agent.common import (
         AgentEvalError,
         atomic_write_json,
-        capture_codex_jsonl_trace,
         canonical_fingerprint,
+        capture_codex_jsonl_trace,
         prepare_run_output_root,
         sanitize_diagnostic,
         sha256_bytes,
@@ -29,11 +29,11 @@ if __package__ in {None, ""}:
         assert_clean_checkout,
         create_skill_workspace,
         load_execution_profile,
+        named_container_command,
         profile_fingerprint,
         resolve_commit,
         verify_agent_docker_command,
         verify_judge_docker_command,
-        named_container_command,
         verify_profile_evidence,
     )
     from scripts.skills.evals.semantic.loader import (
@@ -45,11 +45,19 @@ if __package__ in {None, ""}:
     from scripts.skills.evals.semantic.prompt_builder import build_judge_prompt
     from scripts.skills.evals.semantic.result import normalize_judge_response
 else:
+    from ..semantic.loader import (
+        REPO_ROOT,
+        SKILLS_ROOT,
+        discover_semantic_skills,
+        load_semantic_skill,
+    )
+    from ..semantic.prompt_builder import build_judge_prompt
+    from ..semantic.result import normalize_judge_response
     from .common import (
         AgentEvalError,
         atomic_write_json,
-        capture_codex_jsonl_trace,
         canonical_fingerprint,
+        capture_codex_jsonl_trace,
         prepare_run_output_root,
         sanitize_diagnostic,
         sha256_bytes,
@@ -61,21 +69,13 @@ else:
         assert_clean_checkout,
         create_skill_workspace,
         load_execution_profile,
+        named_container_command,
         profile_fingerprint,
         resolve_commit,
         verify_agent_docker_command,
         verify_judge_docker_command,
-        named_container_command,
         verify_profile_evidence,
     )
-    from ..semantic.loader import (
-        REPO_ROOT,
-        SKILLS_ROOT,
-        discover_semantic_skills,
-        load_semantic_skill,
-    )
-    from ..semantic.prompt_builder import build_judge_prompt
-    from ..semantic.result import normalize_judge_response
 
 MAX_CASES = 10_000
 SECRET_TEXT_RE = re.compile(

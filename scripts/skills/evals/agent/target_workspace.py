@@ -10,7 +10,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from .common import AgentEvalError, canonical_fingerprint, sha256_bytes
-from .workspace import FULL_SHA_RE, resolve_commit
+from .workspace import resolve_commit
 
 SCENARIO_DIR = Path(__file__).resolve().parent / "scenarios" / "qa-training-store-checkout-payment-web-v1"
 DEFAULT_TARGET_REVISION = "84ce165493649550832731a60cf436f8ae29c56b"

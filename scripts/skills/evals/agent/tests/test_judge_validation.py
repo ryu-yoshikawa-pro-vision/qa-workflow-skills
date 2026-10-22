@@ -6,13 +6,13 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from scripts.skills.evals.agent import judge_validation
 from scripts.skills.evals.agent.judge_validation import (
     load_fixture_catalogue,
     run_validation,
 )
 from scripts.skills.evals.agent.qa_training_store import load_scenario
 from scripts.skills.evals.agent.target_workspace import DEFAULT_TARGET_REVISION
-from scripts.skills.evals.agent import judge_validation
 
 
 def _profile() -> dict:

@@ -6,9 +6,14 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from scripts.skills.evals.agent.executor import ExecutionResult
 from scripts.skills.evals.agent import qa_training_store
-from scripts.skills.evals.agent.qa_training_store import DEFAULT_TARGET_REVISION, load_scenario, run_independent_judges, validate_artifact_index
+from scripts.skills.evals.agent.executor import ExecutionResult
+from scripts.skills.evals.agent.qa_training_store import (
+    DEFAULT_TARGET_REVISION,
+    load_scenario,
+    run_independent_judges,
+    validate_artifact_index,
+)
 
 
 class QATrainingStoreTests(unittest.TestCase):

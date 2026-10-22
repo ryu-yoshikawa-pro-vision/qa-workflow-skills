@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
 import shutil
 import sys
 import time
@@ -20,9 +19,23 @@ from .common import (
     sha256_bytes,
 )
 from .executor import run_command
-from .qa_training_store import SCENARIO_DIR, _file_hash, _read_qa_artifacts, load_scenario, validate_artifact_index
+from .qa_training_store import (
+    SCENARIO_DIR,
+    _file_hash,
+    _read_qa_artifacts,
+    load_scenario,
+    validate_artifact_index,
+)
 from .target_workspace import DEFAULT_TARGET_REVISION, extract_revision_files
-from .workspace import assert_clean_checkout, load_execution_profile, named_container_command, profile_fingerprint, resolve_commit, verify_judge_docker_command, verify_profile_evidence
+from .workspace import (
+    assert_clean_checkout,
+    load_execution_profile,
+    named_container_command,
+    profile_fingerprint,
+    resolve_commit,
+    verify_judge_docker_command,
+    verify_profile_evidence,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 FIXTURE_DEFS = SCENARIO_DIR / "judge-fixtures.json"

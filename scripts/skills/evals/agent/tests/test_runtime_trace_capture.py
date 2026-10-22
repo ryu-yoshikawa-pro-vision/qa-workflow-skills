@@ -1,18 +1,18 @@
 from __future__ import annotations
 
-import json
 import hashlib
+import json
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from scripts.skills.evals.agent import common_runtime_checks
 from scripts.skills.evals.agent.common import (
     capture_codex_jsonl_trace,
     trace_confirms_capture_invocation,
 )
-from scripts.skills.evals.agent import common_runtime_checks
 from scripts.skills.evals.agent.verifier_capture import capture_invocation
 
 

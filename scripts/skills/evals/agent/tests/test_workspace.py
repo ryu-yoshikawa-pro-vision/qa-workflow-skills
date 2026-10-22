@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import tempfile
 import unittest
-import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
-from scripts.skills.evals.agent.common import AgentEvalError, canonical_fingerprint, prepare_run_output_root
+from scripts.skills.evals.agent.common import (
+    AgentEvalError,
+    canonical_fingerprint,
+    prepare_run_output_root,
+)
 from scripts.skills.evals.agent.isolation_probe import _live_mount_probe
 from scripts.skills.evals.agent.workspace import (
     profile_fingerprint,

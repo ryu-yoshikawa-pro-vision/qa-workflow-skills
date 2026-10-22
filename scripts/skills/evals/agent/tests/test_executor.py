@@ -25,7 +25,7 @@ class ExecutorTests(unittest.TestCase):
     def test_timeout_stops_a_fake_agent_process(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             result = run_command(
-                [sys.executable, "-c", "import time; time.sleep(5)"],
+                [sys.executable, "-c", "import time; time.sleep(60)"],
                 input_text="prompt",
                 cwd=Path(temporary),
                 timeout_seconds=1,

@@ -506,7 +506,6 @@ def create_skill_workspace(
     )
     if not skill_names or len(skill_names) != len(set(skill_names)):
         raise AgentEvalError("candidate revision must contain a unique tracked Skill set")
-    skills_root = destination / "skills"
     manifest_files: list[dict[str, Any]] = []
     archive = subprocess.run(
         ["git", "-C", str(evaluator_root), "archive", "--format=tar", revision, "skills"],

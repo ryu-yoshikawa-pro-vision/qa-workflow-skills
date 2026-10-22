@@ -6,7 +6,12 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from .common import AgentEvalError, atomic_write_json, canonical_fingerprint, sanitize_diagnostic
+from .common import (
+    AgentEvalError,
+    atomic_write_json,
+    canonical_fingerprint,
+    sanitize_diagnostic,
+)
 
 
 def _load_result(path: Path) -> tuple[dict[str, Any], Path]:

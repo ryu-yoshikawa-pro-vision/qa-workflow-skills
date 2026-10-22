@@ -14,15 +14,18 @@ from typing import Any
 from .common import (
     AgentEvalError,
     atomic_write_json,
-    capture_codex_jsonl_trace,
     canonical_fingerprint,
+    capture_codex_jsonl_trace,
     ensure_within,
     prepare_run_output_root,
     safe_relative_path,
     sanitize_diagnostic,
     sha256_bytes,
 )
-from .common_runtime_checks import evaluate_runtime_captures, evaluate_workflow_runtime_capture
+from .common_runtime_checks import (
+    evaluate_runtime_captures,
+    evaluate_workflow_runtime_capture,
+)
 from .executor import AgentExecutionError, run_command
 from .prompt_builder import build_generation_prompt
 from .target_workspace import (
@@ -34,11 +37,11 @@ from .target_workspace import (
 from .workspace import (
     assert_clean_checkout,
     create_skill_workspace,
+    create_skill_workspace_from_root,
     load_execution_profile,
+    named_container_command,
     profile_fingerprint,
     resolve_commit,
-    named_container_command,
-    create_skill_workspace_from_root,
     verify_agent_docker_command,
     verify_judge_docker_command,
     verify_profile_evidence,
