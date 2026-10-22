@@ -163,7 +163,18 @@ def _live_mount_probe(argv: list[str], *, evaluator_sentinel: Path) -> dict[str,
         "rm -f /workspace/.qa-eval-output/.isolation-probe; "
         "printf 'isolation-probe:ok\\n'"
     )
-    probe = [*prefix, "--name", name, "--entrypoint", "/bin/sh", image, "-c", script]
+    probe = [
+        *prefix,
+        "--user",
+        f"{os.getuid()}:{os.getgid()}",
+        "--name",
+        name,
+        "--entrypoint",
+        "/bin/sh",
+        image,
+        "-c",
+        script,
+    ]
     cleanup = [argv[0], "rm", "-f", name]
     try:
         completed = subprocess.run(
@@ -191,12 +202,16 @@ def _live_mount_probe(argv: list[str], *, evaluator_sentinel: Path) -> dict[str,
         return {"status": "unverified", "reason": type(exc).__name__}
     output = completed.stdout.decode("utf-8", errors="replace").strip()
     verified = completed.returncode == 0 and output == "isolation-probe:ok"
+    diagnostic = sanitize_diagnostic(
+        completed.stderr.decode("utf-8", errors="replace"), 1000
+    ).strip()
     cleanup_status = "not_required"
     return {
         "status": "verified" if verified else "unverified",
         "return_code": completed.returncode,
         "expected_marker": verified,
         "cleanup_status": cleanup_status,
+        "diagnostic": diagnostic if not verified and diagnostic else None,
         "checks": {
             "evaluator_sentinel_unreadable": verified
             and control_result.returncode == 0,

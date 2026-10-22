@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import tempfile
 import unittest
@@ -126,7 +127,30 @@ class WorkspaceIsolationTests(unittest.TestCase):
         control_argv, agent_argv = (call.args[0] for call in run.call_args_list)
         self.assertTrue(any(str(sentinel) in item for item in control_argv))
         self.assertNotIn(str(sentinel), agent_argv)
+        self.assertEqual(
+            agent_argv[agent_argv.index("--user") + 1],
+            f"{os.getuid()}:{os.getgid()}",
+        )
         self.assertIn("/workspace/.agent-eval-source-write-probe", agent_argv[-1])
+
+    def test_live_probe_records_sanitized_failure_diagnostic(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            sentinel = Path(temporary) / "sentinel.txt"
+            sentinel.write_text("isolation-sentinel", encoding="utf-8")
+            responses = [
+                subprocess.CompletedProcess([], 0, b"", b""),
+                subprocess.CompletedProcess([], 2, b"", b"Permission denied\n"),
+            ]
+            with patch(
+                "scripts.skills.evals.agent.isolation_probe.subprocess.run",
+                side_effect=responses,
+            ):
+                result = _live_mount_probe(
+                    ["docker", "run", "--rm", "codex-image", "codex", "exec"],
+                    evaluator_sentinel=sentinel,
+                )
+        self.assertEqual(result["status"], "unverified")
+        self.assertEqual(result["diagnostic"], "Permission denied")
 
     def test_run_output_allows_only_isolation_evidence_before_evaluation(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
