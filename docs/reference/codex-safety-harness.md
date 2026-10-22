@@ -16,7 +16,9 @@
 
 通常commit・pull・fetch・pushはexecpolicyの`prompt`対象外です。commit amendの標準形と静的に判別できる危険pushは`forbidden`で拒否します。`no_match`はHookやsandboxを通過してよいという意味ではありません。Hookはcommitを明示メッセージ付きの通常形式に限定し、amend・未対応option・動的引数を拒否します。pullはprotected branch上で拒否し、明示`--ff-only`、実効`pull.ff=only`、または`pull.ff`未設定時の`merge.ff=only`が確認できる場合だけ許可します。未設定時のGit既定動作には依存せず、rebase、`--no-ff`、squash、実効設定による履歴書換えや追加mergeがあり得る形式は拒否します。
 
-fetchは保護local branchを直接更新しないrefspecに限って許可します。通常の名前付きremote fetchと、そのremoteの`refs/remotes/<remote>/`配下に限られるpruneは許可できます。force、`+refspec`、`--refmap`、`--stdin`、`--prune-tags`、remote tracking以外を指すfetch設定、無効化されていないsubmodule fetchなど判定不能または意図しないref更新・削除につながる形式は拒否します。`fetch.prune`等の削除設定は、remoteのfetch mappingを読み、その削除対象をremote-tracking namespaceに限定できる場合に限って許可します。`.rules`の`no_match`に対する実行可否は引き続きHook・sandbox等の制御を受けます。
+fetchでは、明示refspecと`remote.<name>.fetch`のマッピングが、指定remoteの`refs/remotes/<remote>/`配下以外を直接更新する形式を拒否します。通常の名前付きremote fetchと、そのremote-tracking ref配下に限定できるpruneは許可候補です。force、`+refspec`、`--refmap`、`--stdin`、`--prune-tags`、対象外のref更新や判定不能なGit設定を拒否します。`fetch.prune`等の設定は、pruneの対象をremote-tracking namespaceに限定できる場合だけ許可します。`fetch.recurseSubmodules`など明示的な再帰設定も検査します。
+
+ただし、Git標準のfetchでは、取得する履歴に関連するタグが自動取得される場合があります。また、`fetch.recurseSubmodules`が未設定の場合、Gitの既定動作は`on-demand`であり、変更されたsubmoduleを再帰取得する場合があります。現行Hookはこの既定動作を完全には遮断しません。したがって、**更新先がremote-tracking refのみであることや、submoduleへの取得が一切発生しないことは保証しません**。詳細は[Git公式のgit-fetch仕様](https://git-scm.com/docs/git-fetch)を参照してください。`.rules`の`no_match`に対する実行可否は引き続きHook・sandbox等の制御を受けます。
 
 merge、rebase、reset、am、cherry-pick、revert、restore、checkout、switchと、混在するbranch / tag / config / remote / worktree / stash familyは従来どおり`prompt`へ送ります。静的に判別できるref削除、mirror、一括push等は`forbidden`で拒否し、引数位置やGit設定を含む動的な危険条件はHookが拒否します。protected branch上のcommit・pull等はHookのcontextual denyが優先し、通常fetchのみ安全なref更新を確認した場合に許可します。
 
@@ -63,6 +65,8 @@ Hookはremoteに有効なpush URLが1件だけあることを確認します。�
 read-only Gitとは、refs、staged contents、working-tree contents、repository config、remote、worktreeをcommandの目的として変更しない形式です。`git status`等が内部でindex stat cacheを更新する可能性までlocal file writeゼロとは保証しません。
 
 Gitはtrusted repository / user configurationやattributesに従い、filter、GPG、pager、Git Hook、credential helper、transport helperなどのprogramを起動する場合があります。このrepository-local Hookはそれらを完全に隔離・認証しません。`core.fsmonitor`、`core.hooksPath`、`filter.*`、`gpg.*`等を網羅するchild-process security frameworkは設けません。`git diff` / `log` / `show`の`--output`、`--ext-diff`、`--textconv`のような既知副作用形式はread-only扱いにしません。
+
+Git aliasの展開は保証対象外です。また、進行中のmergeを`git commit -m`で確定する場合、Hookは`MERGE_HEAD`などの状態から通常commitとmerge commitを区別しません。これらの操作を含むすべての実行経路へ、個別のexecpolicy承認分類が適用されるとは保証しません。
 
 同様に、HookはGitHub CLIのread-only全optionや将来の全alias、任意programの秘密情報出力を完全に分類しません。明示された変更family、unsupported option位置、shell展開形式、token表示flagだけを扱います。
 

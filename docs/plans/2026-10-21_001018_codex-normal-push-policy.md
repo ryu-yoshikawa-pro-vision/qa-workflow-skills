@@ -54,7 +54,9 @@
 6. **既存契約との整合:** `tests/codex/test_codex_config.py` の全文一致チェックを過去Planに依存しない契約へ変更する。過去Planは変更せず、現在の `.rules` の妥当性はルール自体の `match` / `not_match` と `test_execpolicy_cli.py` の分類テストで判定する。`decision = "allow"` 禁止、および対象外Git操作の既存分類を維持する。
 7. **テスト・文書更新:** 既存テストに通常commit・pull・fetch・pushと危険形式の正負例を追加し、README・安全ハーネス文書・このPlanの条件を更新する。実装時の編集対象は上記7項目に限定する。
 
-**追加するcommit・pull・fetch契約:** 通常commitは明示的な`-m` / `--message`と対応optionに限り、amend・未知option・保護branchを拒否する。fetchは名前付きremoteのremote-tracking ref更新を許可し、保護local branchへのrefspec、force、refmap、stdin、prune-tags、無効化されていないsubmodule fetch、判定不能な設定を拒否する。pruneは削除先をそのremoteのremote-tracking namespaceに限定できる場合だけ許可する。pullは保護branchを拒否し、`--ff-only`、実効`pull.ff=only`、または`pull.ff`未設定時の`merge.ff=only`が確認できる場合だけ許可する。未設定時のGit既定動作には依存しない。rebase、`--no-ff`、squash等の履歴書換えや追加mergeにつながる引数・実効設定は拒否する。
+**追加するcommit・pull・fetch契約:** 通常commitは明示的な`-m` / `--message`と対応optionに限り、amend・未知option・保護branchを拒否する。fetchは名前付きremoteのremote-tracking ref更新を許可し、保護local branchへのrefspec、force、refmap、stdin、prune-tags、明示設定により再帰取得が有効な一部の形式、判定不能な設定を拒否する。pruneは削除先をそのremoteのremote-tracking namespaceに限定できる場合だけ許可する。pullは保護branchを拒否し、`--ff-only`、実効`pull.ff=only`、または`pull.ff`未設定時の`merge.ff=only`が確認できる場合だけ許可する。未設定時のGit既定動作には依存しない。rebase、`--no-ff`、squash等の履歴書換えや追加mergeにつながる引数・実効設定は拒否する。
+
+**保証範囲:** `qa-training-store`と同様、Git aliasの展開や進行中のmergeを通常commitで確定する操作まで一律に遮断するものではない。fetchでは、明示refspecとremoteのfetch設定に由来する更新先を検査するが、関連タグの自動取得と、再帰設定が未指定の場合のsubmodule取得（Git既定の`on-demand`）を完全には禁止しない。これらはGit標準動作として扱い、許可したfetchがremote-tracking refのみを更新すると保証しない。
 
 ## 検証
 
