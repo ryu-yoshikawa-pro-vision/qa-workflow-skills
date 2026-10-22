@@ -13,7 +13,9 @@ _SECRET_PATTERNS = (
     re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]{12,}"),
     re.compile(r"\bsk-[A-Za-z0-9_-]{16,}"),
     re.compile(r"\bgh[pousr]_[A-Za-z0-9]{20,}"),
-    re.compile(r"(?i)(api[_-]?key|access[_-]?token|refresh[_-]?token|password)\s*[:=]\s*[^\s,;]+"),
+    re.compile(
+        r"(?i)(api[_-]?key|access[_-]?token|refresh[_-]?token|password)\s*[:=]\s*[^\s,;]+"
+    ),
 )
 
 
@@ -40,7 +42,11 @@ def sha256_file(path: Path) -> str:
 
 def canonical_fingerprint(value: Any) -> str:
     rendered = json.dumps(
-        value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
     ).encode("utf-8")
     return sha256_bytes(rendered)
 
@@ -76,7 +82,9 @@ def load_json(path: Path) -> Any:
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        raise AgentEvalError(f"invalid JSON file: {path.name}: {type(exc).__name__}") from exc
+        raise AgentEvalError(
+            f"invalid JSON file: {path.name}: {type(exc).__name__}"
+        ) from exc
 
 
 def bounded_text(value: str, limit: int = MAX_TEXT_BYTES) -> str:
@@ -103,8 +111,14 @@ def capture_codex_jsonl_trace(
     except json.JSONDecodeError:
         events = []
     event_types = {
-        "thread.started", "turn.started", "turn.completed", "turn.failed",
-        "item.started", "item.completed", "item.updated", "error",
+        "thread.started",
+        "turn.started",
+        "turn.completed",
+        "turn.failed",
+        "item.started",
+        "item.completed",
+        "item.updated",
+        "error",
     }
     if not events or any(
         not isinstance(event, dict) or event.get("type") not in event_types
@@ -146,7 +160,11 @@ def capture_codex_jsonl_trace(
         ):
             continue
         raw_exit = item.get("exit_code", item.get("exitCode"))
-        exit_code = raw_exit if isinstance(raw_exit, int) and not isinstance(raw_exit, bool) else None
+        exit_code = (
+            raw_exit
+            if isinstance(raw_exit, int) and not isinstance(raw_exit, bool)
+            else None
+        )
         command = item["command"]
         commands.append(
             {
@@ -159,7 +177,10 @@ def capture_codex_jsonl_trace(
         )
         if exit_code == 0:
             normalized = command.replace("\\", "/").lower()
-            reader = re.search(r"(?:^|[\s;&|])(?:cat|head|tail|sed|awk|rg|grep|less|more)(?:\s|$)", normalized)
+            reader = re.search(
+                r"(?:^|[\s;&|])(?:cat|head|tail|sed|awk|rg|grep|less|more)(?:\s|$)",
+                normalized,
+            )
             if reader:
                 for name in observed:
                     target = f".agents/skills/{name}/skill.md"
@@ -188,7 +209,10 @@ def trace_confirms_capture_invocation(
     operation = invocation.get("operation")
     request_path = invocation.get("request_relative_path")
     record_path = invocation.get("record_relative_path")
-    if not all(isinstance(item, str) and item for item in (skill, operation, request_path, record_path)):
+    if not all(
+        isinstance(item, str) and item
+        for item in (skill, operation, request_path, record_path)
+    ):
         return False
 
     def option_matches(command: str, option: str, value: str) -> bool:
@@ -220,8 +244,10 @@ def trace_confirms_capture_invocation(
 
 def safe_relative_path(value: str) -> Path:
     path = Path(value)
-    if path.is_absolute() or not path.parts or any(
-        part in {"", ".", ".."} for part in path.parts
+    if (
+        path.is_absolute()
+        or not path.parts
+        or any(part in {"", ".", ".."} for part in path.parts)
     ):
         raise AgentEvalError("path must be a normalized relative path")
     return path
@@ -252,7 +278,9 @@ def prepare_run_output_root(
     try:
         relative = root.relative_to(repository)
     except ValueError as exc:
-        raise AgentEvalError("evaluation output must remain under the Evaluator repository") from exc
+        raise AgentEvalError(
+            "evaluation output must remain under the Evaluator repository"
+        ) from exc
     if len(relative.parts) < 2 or relative.parts[0] != ".agent-eval-runs":
         raise AgentEvalError("evaluation output must be under .agent-eval-runs/")
 
@@ -271,7 +299,11 @@ def prepare_run_output_root(
         if path.is_dir():
             if evidence_path == path or evidence_path.is_relative_to(path):
                 continue
-            raise AgentEvalError("evaluation output root must be empty except for isolation evidence")
+            raise AgentEvalError(
+                "evaluation output root must be empty except for isolation evidence"
+            )
         if path != evidence_path:
-            raise AgentEvalError("evaluation output root must be empty except for isolation evidence")
+            raise AgentEvalError(
+                "evaluation output root must be empty except for isolation evidence"
+            )
     return evidence_path

@@ -33,23 +33,34 @@ class ImprovementGateTests(unittest.TestCase):
             }
         }
         self.assertEqual(_skill_use_for_attempt(attempt, "qa-workflow"), "observed")
-        self.assertEqual(_skill_use_for_attempt(attempt, "test-case-design"), "unverified")
+        self.assertEqual(
+            _skill_use_for_attempt(attempt, "test-case-design"), "unverified"
+        )
         self.assertEqual(_skill_use_for_attempt({}, "qa-workflow"), "unverified")
 
     def test_reproducible_approved_critical_failure_is_selected(self) -> None:
         attempts = [
-            {"attempt": {"attempt_id": f"attempt-{index}"}, "criteria": {"QTS-SEM-006": {"rating": 1, "status": "fail"}}}
+            {
+                "attempt": {"attempt_id": f"attempt-{index}"},
+                "criteria": {"QTS-SEM-006": {"rating": 1, "status": "fail"}},
+            }
             for index in (1, 2)
         ]
-        verified = {"QTS-SEM-006": {"status": "verified", "case_id": "major-violation-006"}}
-        self.assertEqual(_stable_failures(attempts, verified)[0]["criterion"], "QTS-SEM-006")
+        verified = {
+            "QTS-SEM-006": {"status": "verified", "case_id": "major-violation-006"}
+        }
+        self.assertEqual(
+            _stable_failures(attempts, verified)[0]["criterion"], "QTS-SEM-006"
+        )
 
     def test_judge_jitter_or_unverified_fixture_blocks_repair(self) -> None:
         attempts = [
             {"criteria": {"QTS-SEM-006": {"rating": rating, "status": status}}}
             for rating, status in ((1, "fail"), (2, "needs_review"))
         ]
-        self.assertEqual(_stable_failures(attempts, {"QTS-SEM-006": {"status": "verified"}}), [])
+        self.assertEqual(
+            _stable_failures(attempts, {"QTS-SEM-006": {"status": "verified"}}), []
+        )
         stable = [
             {"criteria": {"QTS-SEM-006": {"rating": 1, "status": "fail"}}},
             {"criteria": {"QTS-SEM-006": {"rating": 1, "status": "fail"}}},
@@ -65,7 +76,9 @@ class ImprovementGateTests(unittest.TestCase):
             source.write_text("before\n", encoding="utf-8")
             before = {"qa-workflow/SKILL.md": "old"}
             source.write_text("after\n", encoding="utf-8")
-            changes, _ = _validate_repair_diff(before, skills, "qa-workflow", {"SKILL.md"})
+            changes, _ = _validate_repair_diff(
+                before, skills, "qa-workflow", {"SKILL.md"}
+            )
         self.assertEqual(changes[0]["path"], "SKILL.md")
 
     def test_repair_diff_rejects_unrequested_path(self) -> None:
@@ -75,7 +88,12 @@ class ImprovementGateTests(unittest.TestCase):
             skill.mkdir()
             (skill / "SKILL.md").write_text("changed", encoding="utf-8")
             with self.assertRaises(AgentEvalError):
-                _validate_repair_diff({"qa-workflow/SKILL.md": "old"}, skills, "qa-workflow", {"references/guide.md"})
+                _validate_repair_diff(
+                    {"qa-workflow/SKILL.md": "old"},
+                    skills,
+                    "qa-workflow",
+                    {"references/guide.md"},
+                )
 
 
 if __name__ == "__main__":

@@ -224,6 +224,7 @@ Codex、Claude Code等の起動方法はランナーの実装へ固定しませ�
 OpenAI公式のCodex eval例でも、`codex exec`は自動実行向けに最終結果をstdout、進行をstderrへ出す用途として案内されています。この性質を利用できますが、Codex固有flagはランナーへ埋め込みません。
 
 参考:
+
 - https://developers.openai.com/blog/eval-skills
 
 ### 3. 出力品質評価とSkill発火評価を分離する
@@ -312,7 +313,7 @@ Skill-local verifierはSkill本体にも含まれる。runtimeの再実行と共
 
 ### フェーズ2で固定する共通機械判定
 
-フェーズ2はcase固有`expected.json`がないため、既存の`deterministic/run.py`を架空eval IDで起動しない。代わりに**固定Evaluator内の**`scripts/skills/evals/agent/common_runtime_checks.py`が、回収した成果物本文・artifact manifest・保存request / result・workflow runtime resultを、候補verifierの`valid`とは独立して検査する。
+フェーズ2はcase固有`expected.json`がないため、既存の`deterministic/run.py`を架空eval IDで起動しない。代わりに**固定Evaluator内の** `scripts/skills/evals/agent/common_runtime_checks.py`が、回収した成果物本文・artifact manifest・保存request / result・workflow runtime resultを、候補verifierの`valid`とは独立して検査する。
 
 - JSON fenceの厳格解析、Runtime Input / Resultの一致、Machine Entity構造と重複、input / model / generation / upstream依存fingerprintの再計算、entity / runtime間dependencyの整合は、固定Evaluatorの`deterministic/runtime_validator.py`にある純粋なparser・assertionを再利用または必要な部分を共通関数へ切り出す。`expected.json`に依存した固定caseのexact期待Entity集合検査は流用しない。
 - stable ID一意性、Authority / TR / TCN / CI / TC間の参照、孤立・逆向き・重複edge、coverage / closureは、固定Evaluator側の`skills/coverage-analysis/scripts/traceability.py`のgraph検査・規範を、候補sourceをimportせず再利用する。保存normalized inputと回収した同一attemptのMachine Entity / graph根拠を照合する。固定targetの`BR-CHECKOUT-001..003` / `AC-CHECKOUT-001..003`をEvaluator scenarioから固定し、Agentの入力省略で検証対象が狭まらないようにする。正当にblockedな箇所は未完了として保存し、存在しないtest caseは捏造しない。
@@ -320,7 +321,7 @@ Skill-local verifierはSkill本体にも含まれる。runtimeの再実行と共
 - **候補verifierは生成・鮮度の照合にのみ使う。** 候補`valid=true`だが固定検査FAILなら、具体的な共通assertionを機械品質の非passとする。候補`valid=false`で固定検査PASSでも候補側の契約失敗を隠して全体PASSにはせず、双方の結果を保存する。schemaの意味が異なり共通判定不能な部分は`evaluator_incompatible`とし、必要なら両revision対応の固定Evaluatorで両方を新規実行する。
 
 新しいproduction verifier、全Skill専用parser、独自graph engineは作らない。`common_runtime_checks.py`は共通不変条件の呼出しと結果集計のみを持ち、候補sourceの検証ロジックへ委譲しない。受入テストでは正常baseline、runtime fingerprintのみ変更した候補、`valid=true`を常に返すよう弱体化した候補、重複stable ID・未解決参照・欠けた必須edgeを持つ不正成果物を確認する。弱体化候補が`valid=true`でも固定機械判定FAILになることを要求する。
-main / candidate比較は、**同じEvaluator checkoutを起動したまま**`--skill-revision`だけを変更して2 runを生成する。checkout全体を入れ替えてgraderが変わる方式を採らない。
+main / candidate比較は、**同じEvaluator checkoutを起動したまま** `--skill-revision`だけを変更して2 runを生成する。checkout全体を入れ替えてgraderが変わる方式を採らない。
 
 ### 8. Agent / Judgeの実効実行条件を固定する
 
@@ -437,7 +438,6 @@ docker run --rm -i --read-only --cap-drop=ALL --security-opt=no-new-privileges
 
 `docker version`、イメージ起動、コンテナ内`codex --version` / 認証可否、Python実行、Codex応答、JSONL出力・Skill読取観測、read-denial、source書込み拒否、必要なモデルAPI通信を**実Agent smokeで確認**してから`verified`へ進める。環境未構築・必須のローカル隔離条件未確認なら比較可能なlive評価を完了したとは報告しない。外部egress制御を行えない場合は残留リスクとして記録する。image digest・model ID・実効設定は実行時に取得して固定し、未確認の値をPlanへ作り込まない。
 
-
 ### 10. Skillの実使用を確認できた範囲で記録する
 
 明示的Skill使用を要求する今回の評価では、次の**二つの事実を別々に記録**する。
@@ -446,10 +446,10 @@ docker run --rm -i --read-only --cap-drop=ALL --security-opt=no-new-privileges
 - **Agent内部での実使用観測**：`codex exec --json`の`command_execution`等で`SKILL.md`を読む操作を確認できたときだけ`observed`、確認できなければ`unverified`とし、取得元の非秘密log・pathを記録する。native Skill injectionではOSコマンド読取ログに出ないことがある。`command_execution`の欠落をSkill未使用の証明にしない。
 
 **両attemptでのSkill読取`observed`は成果物品質比較の必須条件としない**。両方で投入したSkill SHAと比較条件を検証できれば成果物品質を比較できる。ただし**Skill改修そのものの改善・悪化・変化なしを判断するには別の証拠が必要**。フェーズ1では変更対象Skill、フェーズ2では変更されたSkillのうちrouting対象のSkillについて、比較する両revisionでファイルの読取・適用を裏付ける実行証拠を要求する。未観測なら成果物差は報告できるがSkill改修効果は`判断不能`とする。複数Skill同時変更の個別寄与や観測済みSkillと結果の因果関係は断定しない。native `description` trigger精度を今回評価したともしない。Native Skill専用の観測基盤・汎用Agent adapterは追加しない。
+
 ## 追加する評価実行コード
 
 評価結果の分析・限定修正の入口は`scripts/skills/evals/agent/improve.py`に分離し、既存`executor.py`と固定Evaluatorの`run.py`を再利用します。分析Agent・修正Agentを採点基準の保管領域から隔離し、許可条件・変更範囲・1回の修正上限・レビュー待ち保存は[改善Plan](./2026-10-03_132700_agent-eval-runner_03_analysis-and-improvement.md)に従います。
-
 
 ### 配置
 
@@ -693,7 +693,6 @@ Judgeの非秘密command fingerprint、image / CLI / model / 推論設定、実�
 
 Judgeの検証結果は改善用判定と分けて`judge-validation/`に保存します。正解データの状態とEvaluator / Judge profileのfingerprintを記録し、**未検証の意味評価criterion**をSkill自動修正の根拠に使いません。決定論的評価だけに依存する修正は、固定grader・expectedの検証を条件として独立に継続できます。[Judge評価・改善Plan](./2026-10-03_132700_agent-eval-runner_04_judge-evaluation-and-improvement.md)参照。
 
-
 既存の評価run成果物は変更しません。改善工程は同じ`--output-root`配下の`improvement/`に`analysis.json`・`analysis.md`、検証済み候補、`experiments/`（**成功・失敗を問わない各修正試行の記録**）、`review-pending/`と再評価結果を別保存します。各試行で安全化した候補差分・判定理由・比較条件・元成果物への参照を保持します。一時worktreeを消しても固定baseline + patchから候補内容を復元できることを確認し、記録確定後にrunが作った一時領域だけを削除します。記録保存に失敗したときは唯一の変更実体を破棄せず、手動対応が必要な状態として報告します。分析Agentによる原判定の上書きは禁止します。詳細は[Skill改善Plan](./2026-10-03_132700_agent-eval-runner_03_analysis-and-improvement.md)を正本とします。
 
 `--output-root`配下へ、少なくとも次を保存します。
@@ -925,7 +924,6 @@ repositoryの既存caseを使い、fake Agentで次を自動検証します。
 固定Evaluator・rubric・Referenceを使い、(1)規範仕様に根拠を持つ正常なQA成果物、(2)Checkout / Paymentの重要なBR / AC・境界条件を意図的に欠落させた成果物、(3)根拠のない動作を追加した成果物を**Evaluator-only fixture**として採点する。期待方向は正常例がpass、重要欠落・捏造例が該当critical criterionで低評価または`needs_review` / `fail`となり、その根拠が規範Referenceに追跡できることとする。既存semantic prompt builder / normalizerは利用するが、Judgeの文章が存在するだけで成功にしない。結果が期待方向と異なればrubric / criteriaを修正し、同じ固定条件でfixtureとbaseline / candidate両方を再実行する。恣意的な「総合点」は導入しない。
 
 deterministicではruntime実装だけを変更した候補（payload / schema / 結果意味は同一）を用い、旧Evaluator graderの固定assertionで**候補sourceと整合するfingerprint**を受け入れつつ、改ざんされたfingerprintと不正なpayloadは検出することを確認する。互換性のないfixtureでは該当機械criteriaだけ`evaluator_incompatible`となり、意味品質の判定を失わないことも検証する。同一Skill / model / inputの`--repeat`で結果の揺れを個別attemptに残し、差を無条件に改善と呼ばないことを検証する。
-
 
 ### 追加の比較・隔離検証
 

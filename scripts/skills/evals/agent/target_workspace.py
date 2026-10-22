@@ -12,7 +12,11 @@ from typing import Any
 from .common import AgentEvalError, canonical_fingerprint, sha256_bytes
 from .workspace import resolve_commit
 
-SCENARIO_DIR = Path(__file__).resolve().parent / "scenarios" / "qa-training-store-checkout-payment-web-v1"
+SCENARIO_DIR = (
+    Path(__file__).resolve().parent
+    / "scenarios"
+    / "qa-training-store-checkout-payment-web-v1"
+)
 DEFAULT_TARGET_REVISION = "84ce165493649550832731a60cf436f8ae29c56b"
 _OMIT_TOP_LEVEL = {".agents", ".codex"}
 _OMIT_EXACT = {
@@ -83,10 +87,24 @@ def extract_revision_files(
     resolved = resolve_commit(source_root, revision)
     if not paths:
         return {}
-    if any(PurePosixPath(path).is_absolute() or ".." in PurePosixPath(path).parts for path in paths):
+    if any(
+        PurePosixPath(path).is_absolute() or ".." in PurePosixPath(path).parts
+        for path in paths
+    ):
         raise AgentEvalError("requested fixed-revision path is unsafe")
     archived = subprocess.run(
-        ["git", "-c", f"safe.directory={source_root.resolve()}", "-C", str(source_root), "archive", "--format=tar", resolved, "--", *paths],
+        [
+            "git",
+            "-c",
+            f"safe.directory={source_root.resolve()}",
+            "-C",
+            str(source_root),
+            "archive",
+            "--format=tar",
+            resolved,
+            "--",
+            *paths,
+        ],
         stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -95,7 +113,9 @@ def extract_revision_files(
         shell=False,
     )
     if archived.returncode != 0 or len(archived.stdout) > max_total_bytes:
-        raise AgentEvalError("fixed-revision reference archive failed or exceeded its size limit")
+        raise AgentEvalError(
+            "fixed-revision reference archive failed or exceeded its size limit"
+        )
     result: dict[str, bytes] = {}
     total = 0
     with tarfile.open(fileobj=io.BytesIO(archived.stdout), mode="r:") as archive:
@@ -104,14 +124,18 @@ def extract_revision_files(
             if member.isdir():
                 continue
             if not member.isfile() or relative not in paths:
-                raise AgentEvalError("fixed-revision reference archive contains an unsafe entry")
+                raise AgentEvalError(
+                    "fixed-revision reference archive contains an unsafe entry"
+                )
             stream = archive.extractfile(member)
             if stream is None:
                 raise AgentEvalError("fixed-revision reference could not be read")
             content = stream.read()
             total += len(content)
             if total > max_total_bytes:
-                raise AgentEvalError("fixed-revision references exceed their size limit")
+                raise AgentEvalError(
+                    "fixed-revision references exceed their size limit"
+                )
             result[relative] = content
     missing = sorted(set(paths) - set(result))
     if missing:
@@ -131,8 +155,16 @@ Checkout / Payment Web workflow evaluation. This file supplies only the stable s
 
 
 def _validate_project_context(project_context: str) -> dict[str, Any]:
-    parser_path = Path(__file__).resolve().parents[4] / "skills" / "qa-workflow" / "scripts" / "artifact_graph.py"
-    spec = importlib.util.spec_from_file_location("qa_eval_fixed_artifact_graph", parser_path)
+    parser_path = (
+        Path(__file__).resolve().parents[4]
+        / "skills"
+        / "qa-workflow"
+        / "scripts"
+        / "artifact_graph.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "qa_eval_fixed_artifact_graph", parser_path
+    )
     if spec is None or spec.loader is None:
         raise AgentEvalError("fixed Project Context parser could not be loaded")
     module = importlib.util.module_from_spec(spec)
@@ -142,18 +174,24 @@ def _validate_project_context(project_context: str) -> dict[str, Any]:
         parsed, ["qa.workflow_state_root"]
     )
     if required["status"] != "resolved":
-        raise AgentEvalError("evaluation Project Context failed the existing stable-key parser")
+        raise AgentEvalError(
+            "evaluation Project Context failed the existing stable-key parser"
+        )
     stable_value = parsed["fields"]["qa.workflow_state_root"]["value"]
     if os.name == "nt":
         # The production target runs in Linux Docker; Windows Path.is_absolute()
         # treats the container's POSIX path as relative, so validate its POSIX form here.
         if not PurePosixPath(stable_value).is_absolute():
-            raise AgentEvalError("evaluation Project Context stable path is not POSIX-absolute")
+            raise AgentEvalError(
+                "evaluation Project Context stable path is not POSIX-absolute"
+            )
         resolved = PurePosixPath(stable_value)
     else:
         resolved = module.workflow_state_root_from_project_context(project_context)
     if str(resolved) != "/workspace/.qa-eval-output/workflow-state":
-        raise AgentEvalError("evaluation Project Context resolved an unexpected workflow root")
+        raise AgentEvalError(
+            "evaluation Project Context resolved an unexpected workflow root"
+        )
     return {"parsed": parsed, "required": required}
 
 
@@ -183,10 +221,14 @@ def _hash_file(path: Path) -> str:
     return "sha256:" + digest.hexdigest()
 
 
-def verify_workspace_unchanged(root: Path, baseline: dict[str, dict[str, Any]]) -> dict[str, Any]:
+def verify_workspace_unchanged(
+    root: Path, baseline: dict[str, dict[str, Any]]
+) -> dict[str, Any]:
     current = _scan_workspace(root)
     changed = sorted(
-        key for key in set(baseline) | set(current) if baseline.get(key) != current.get(key)
+        key
+        for key in set(baseline) | set(current)
+        if baseline.get(key) != current.get(key)
     )
     git_commits = _git(root, ["rev-list", "--count", "HEAD"])
     remotes = _git(root, ["remote"])
@@ -209,12 +251,23 @@ def prepare_sanitized_target(
     revision = resolve_commit(source_root, source_revision)
     if destination.exists():
         if not destination.is_dir() or any(destination.iterdir()):
-            raise AgentEvalError("sanitized target destination must be an empty directory")
+            raise AgentEvalError(
+                "sanitized target destination must be an empty directory"
+            )
     else:
         destination.mkdir(parents=True)
 
     archived = subprocess.run(
-        ["git", "-c", f"safe.directory={source_root.resolve()}", "-C", str(source_root), "archive", "--format=tar", revision],
+        [
+            "git",
+            "-c",
+            f"safe.directory={source_root.resolve()}",
+            "-C",
+            str(source_root),
+            "archive",
+            "--format=tar",
+            revision,
+        ],
         stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -231,7 +284,9 @@ def prepare_sanitized_target(
     with tarfile.open(fileobj=io.BytesIO(archived.stdout), mode="r:") as archive:
         for member in archive.getmembers():
             relative = PurePosixPath(member.name)
-            if relative.is_absolute() or any(part in {"", ".", ".."} for part in relative.parts):
+            if relative.is_absolute() or any(
+                part in {"", ".", ".."} for part in relative.parts
+            ):
                 raise AgentEvalError("target archive contains an unsafe path")
             normalized = relative.as_posix()
             if _is_excluded(normalized):
@@ -248,12 +303,21 @@ def prepare_sanitized_target(
             content = stream.read()
             target.write_bytes(content)
             copied_files.append(
-                {"path": normalized, "size": len(content), "sha256": sha256_bytes(content)}
+                {
+                    "path": normalized,
+                    "size": len(content),
+                    "sha256": sha256_bytes(content),
+                }
             )
 
     required_spec = destination / "docs/spec/features/checkout-and-payment.md"
-    if not required_spec.is_file() or not (destination / "docs/spec/README.md").is_file():
-        raise AgentEvalError("fixed target revision is missing required normative specifications")
+    if (
+        not required_spec.is_file()
+        or not (destination / "docs/spec/README.md").is_file()
+    ):
+        raise AgentEvalError(
+            "fixed target revision is missing required normative specifications"
+        )
 
     candidate_skills_root = candidate_skills_root.resolve()
     if not candidate_skills_root.is_dir():
@@ -299,12 +363,20 @@ def prepare_sanitized_target(
             timeout=30,
             check=True,
             shell=False,
-            env={**os.environ, "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull},
+            env={
+                **os.environ,
+                "GIT_CONFIG_NOSYSTEM": "1",
+                "GIT_CONFIG_GLOBAL": os.devnull,
+            },
         )
         _git(destination, ["config", "core.hooksPath", str(empty_hooks)])
         _git(destination, ["config", "commit.gpgsign", "false"])
         _git(destination, ["add", "--all"])
-        _git(destination, ["commit", "--quiet", "-m", "Evaluator sanitized target baseline"], commit_identity=True)
+        _git(
+            destination,
+            ["commit", "--quiet", "-m", "Evaluator sanitized target baseline"],
+            commit_identity=True,
+        )
         baseline_sha = _git(destination, ["rev-parse", "HEAD"])
         remotes = _git(destination, ["remote"])
         if remotes:

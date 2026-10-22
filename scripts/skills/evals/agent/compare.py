@@ -26,7 +26,8 @@ def _load_result(path: Path) -> tuple[dict[str, Any], Path]:
 
 def _profile_conditions(run: dict[str, Any]) -> dict[str, Any]:
     return {
-        "evaluator_revision": run.get("evaluator", {}).get("revision") or run.get("evaluator_revision"),
+        "evaluator_revision": run.get("evaluator", {}).get("revision")
+        or run.get("evaluator_revision"),
         "suite": run.get("suite"),
         "dataset_fingerprint": run.get("dataset_fingerprint"),
         "scenario_fingerprint": run.get("scenario_fingerprint"),
@@ -36,7 +37,8 @@ def _profile_conditions(run: dict[str, Any]) -> dict[str, Any]:
         "judge_command_fingerprint": run.get("judge_command_fingerprint"),
         "verifier_image": run.get("verifier_image"),
         "isolation": run.get("isolation"),
-        "profile_fingerprint": run.get("profile_fingerprint") or run.get("execution_profile_fingerprint"),
+        "profile_fingerprint": run.get("profile_fingerprint")
+        or run.get("execution_profile_fingerprint"),
         "profile_verification": run.get("profile_verification"),
         "repeat": run.get("repeat"),
         "agent": run.get("agent"),
@@ -101,26 +103,52 @@ def compare_runs(baseline_path: Path, candidate_path: Path) -> dict[str, Any]:
         for key in baseline_conditions
         if baseline_conditions[key] != candidate_conditions[key]
     }
-    if baseline.get("profile_verification") != "verified" or candidate.get("profile_verification") != "verified":
-        mismatches["profile_verification"] = {"baseline": baseline.get("profile_verification"), "candidate": candidate.get("profile_verification")}
+    if (
+        baseline.get("profile_verification") != "verified"
+        or candidate.get("profile_verification") != "verified"
+    ):
+        mismatches["profile_verification"] = {
+            "baseline": baseline.get("profile_verification"),
+            "candidate": candidate.get("profile_verification"),
+        }
     baseline_package = baseline.get("skill_package", {}).get("package_fingerprint")
     candidate_package = candidate.get("skill_package", {}).get("package_fingerprint")
-    if not baseline_package or not candidate_package or baseline_package == candidate_package:
-        baseline_package = baseline.get("skill_package_manifest", {}).get("package_fingerprint", baseline_package)
-        candidate_package = candidate.get("skill_package_manifest", {}).get("package_fingerprint", candidate_package)
-    if not baseline_package or not candidate_package or baseline_package == candidate_package:
-        mismatches["skill_package_content"] = {"reason": "identical_or_unavailable_candidate_package_fingerprint"}
+    if (
+        not baseline_package
+        or not candidate_package
+        or baseline_package == candidate_package
+    ):
+        baseline_package = baseline.get("skill_package_manifest", {}).get(
+            "package_fingerprint", baseline_package
+        )
+        candidate_package = candidate.get("skill_package_manifest", {}).get(
+            "package_fingerprint", candidate_package
+        )
+    if (
+        not baseline_package
+        or not candidate_package
+        or baseline_package == candidate_package
+    ):
+        mismatches["skill_package_content"] = {
+            "reason": "identical_or_unavailable_candidate_package_fingerprint"
+        }
     if baseline.get("skill_revision") == candidate.get("skill_revision"):
         if not (
             candidate.get("skill_candidate_revision_status") == "uncommitted_patch"
             and baseline_package != candidate_package
         ):
-            mismatches["skill_revision"] = {"reason": "candidate_revision_is_not_distinct"}
+            mismatches["skill_revision"] = {
+                "reason": "candidate_revision_is_not_distinct"
+            }
     baseline_attempts = _attempt_index(baseline)
     candidate_attempts = _attempt_index(candidate)
     common = sorted(set(baseline_attempts) & set(candidate_attempts))
     if len(baseline_attempts) < 2 or len(candidate_attempts) < 2:
-        mismatches["repeat"] = {"baseline_attempts": len(baseline_attempts), "candidate_attempts": len(candidate_attempts), "required": 2}
+        mismatches["repeat"] = {
+            "baseline_attempts": len(baseline_attempts),
+            "candidate_attempts": len(candidate_attempts),
+            "required": 2,
+        }
     if set(baseline_attempts) != set(candidate_attempts):
         mismatches["attempt_identity"] = {
             "baseline_only": sorted(set(baseline_attempts) - set(candidate_attempts)),
@@ -134,21 +162,26 @@ def compare_runs(baseline_path: Path, candidate_path: Path) -> dict[str, Any]:
         right_judge = _load_qts_judge(candidate_root, right)
         left_grade = _load_grade(baseline_root, left)
         right_grade = _load_grade(candidate_root, right)
-        rows.append({
-            "identity": list(key),
-            "baseline_status": left.get("status"),
-            "candidate_status": right.get("status"),
-            "status_changed": left.get("status") != right.get("status"),
-            "baseline_judge_verdict": (left_judge or {}).get("status") or (left_judge or {}).get("normalized", {}).get("verdict"),
-            "candidate_judge_verdict": (right_judge or {}).get("status") or (right_judge or {}).get("normalized", {}).get("verdict"),
-            "baseline_grade_status": (left_grade or {}).get("status"),
-            "candidate_grade_status": (right_grade or {}).get("status"),
-            "criterion_comparison_available": bool(left_judge or left_grade) and bool(right_judge or right_grade),
-            "skill_use_observation": {
-                "baseline": left.get("skill_use_observation", "unverified"),
-                "candidate": right.get("skill_use_observation", "unverified"),
-            },
-        })
+        rows.append(
+            {
+                "identity": list(key),
+                "baseline_status": left.get("status"),
+                "candidate_status": right.get("status"),
+                "status_changed": left.get("status") != right.get("status"),
+                "baseline_judge_verdict": (left_judge or {}).get("status")
+                or (left_judge or {}).get("normalized", {}).get("verdict"),
+                "candidate_judge_verdict": (right_judge or {}).get("status")
+                or (right_judge or {}).get("normalized", {}).get("verdict"),
+                "baseline_grade_status": (left_grade or {}).get("status"),
+                "candidate_grade_status": (right_grade or {}).get("status"),
+                "criterion_comparison_available": bool(left_judge or left_grade)
+                and bool(right_judge or right_grade),
+                "skill_use_observation": {
+                    "baseline": left.get("skill_use_observation", "unverified"),
+                    "candidate": right.get("skill_use_observation", "unverified"),
+                },
+            }
+        )
     comparable = not mismatches
     return {
         "schema_version": 1,
@@ -165,7 +198,9 @@ def compare_runs(baseline_path: Path, candidate_path: Path) -> dict[str, Any]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Compare two saved Agent evaluation runs under fixed conditions.")
+    parser = argparse.ArgumentParser(
+        description="Compare two saved Agent evaluation runs under fixed conditions."
+    )
     parser.add_argument("--baseline", type=Path, required=True)
     parser.add_argument("--candidate", type=Path, required=True)
     parser.add_argument("--result", type=Path, required=True)
@@ -174,9 +209,16 @@ def main(argv: list[str] | None = None) -> int:
         result = compare_runs(args.baseline, args.candidate)
         atomic_write_json(args.result, result)
     except (AgentEvalError, OSError, ValueError) as exc:
-        print(f"run comparison failed: {sanitize_diagnostic(str(exc), 1000)}", file=sys.stderr)
+        print(
+            f"run comparison failed: {sanitize_diagnostic(str(exc), 1000)}",
+            file=sys.stderr,
+        )
         return 2
-    print(json.dumps({"result": str(args.result), "status": result["status"]}, ensure_ascii=True))
+    print(
+        json.dumps(
+            {"result": str(args.result), "status": result["status"]}, ensure_ascii=True
+        )
+    )
     return 0 if result["comparable"] else 1
 
 

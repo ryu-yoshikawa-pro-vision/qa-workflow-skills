@@ -31,7 +31,9 @@ case_id: {case_id}
 """
 
 
-def build_repair_prompt(*, analysis: str, allowed_paths: list[str], baseline_sha: str) -> str:
+def build_repair_prompt(
+    *, analysis: str, allowed_paths: list[str], baseline_sha: str
+) -> str:
     allowed = "\n".join(f"- {path}" for path in allowed_paths)
     return f"""指定された1つのSkill packageだけを最小修正してください。
 基準Skill revision: {baseline_sha}

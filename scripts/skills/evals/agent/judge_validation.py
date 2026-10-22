@@ -66,7 +66,9 @@ def load_fixture_catalogue(path: Path = FIXTURE_DEFS) -> dict[str, Any]:
     return value
 
 
-def _approval_map(path: Path | None, catalogue: dict[str, Any]) -> dict[str, dict[str, Any]]:
+def _approval_map(
+    path: Path | None, catalogue: dict[str, Any]
+) -> dict[str, dict[str, Any]]:
     if path is None:
         return {}
     try:
@@ -75,16 +77,30 @@ def _approval_map(path: Path | None, catalogue: dict[str, Any]) -> dict[str, dic
         raise AgentEvalError("Judge approval file is unreadable") from exc
     if not isinstance(raw, dict) or set(raw) != {"dataset_revision", "approvals"}:
         raise AgentEvalError("Judge approval file schema is invalid")
-    if raw["dataset_revision"] != catalogue["dataset_revision"] or not isinstance(raw["approvals"], list):
-        raise AgentEvalError("Judge approvals do not target the current fixed fixture revision")
+    if raw["dataset_revision"] != catalogue["dataset_revision"] or not isinstance(
+        raw["approvals"], list
+    ):
+        raise AgentEvalError(
+            "Judge approvals do not target the current fixed fixture revision"
+        )
     approvals: dict[str, dict[str, Any]] = {}
     for item in raw["approvals"]:
-        if not isinstance(item, dict) or set(item) != {"case_id", "reviewer", "approved_at", "evidence"}:
+        if not isinstance(item, dict) or set(item) != {
+            "case_id",
+            "reviewer",
+            "approved_at",
+            "evidence",
+        }:
             raise AgentEvalError("Judge approval row has invalid fields")
-        if not all(isinstance(item[key], str) and item[key].strip() for key in ("case_id", "reviewer", "approved_at", "evidence")):
+        if not all(
+            isinstance(item[key], str) and item[key].strip()
+            for key in ("case_id", "reviewer", "approved_at", "evidence")
+        ):
             raise AgentEvalError("Judge approval row fields must be non-empty strings")
         try:
-            approved_at = datetime.fromisoformat(item["approved_at"].replace("Z", "+00:00"))
+            approved_at = datetime.fromisoformat(
+                item["approved_at"].replace("Z", "+00:00")
+            )
         except ValueError as exc:
             raise AgentEvalError("Judge approval timestamp must be ISO 8601") from exc
         if approved_at.tzinfo is None:
@@ -99,7 +115,9 @@ def _approval_map(path: Path | None, catalogue: dict[str, Any]) -> dict[str, dic
     for case_id, approval in approvals.items():
         evidence_path = approval["evidence"].split("#", 1)[0]
         if evidence_path not in definitions[case_id]["references"]:
-            raise AgentEvalError("Judge approval evidence must cite a fixed normative reference for that fixture")
+            raise AgentEvalError(
+                "Judge approval evidence must cite a fixed normative reference for that fixture"
+            )
     return approvals
 
 
@@ -127,21 +145,47 @@ def _prepare_fixture(
     if mutation == "skip-required-test-case-design-routing":
         index_path = output / "artifact-index.json"
         index = json.loads(index_path.read_text(encoding="utf-8"))
-        row = next((item for item in index["routing"] if item.get("skill") == "test-case-design"), None)
+        row = next(
+            (
+                item
+                for item in index["routing"]
+                if item.get("skill") == "test-case-design"
+            ),
+            None,
+        )
         if row is None:
             raise AgentEvalError("normal baseline has no test-case-design routing row")
         skipped_ids = set(row.get("artifact_ids", []))
-        row.update({"status": "skipped", "reason": "No test cases are required.", "artifact_ids": []})
-        index["artifacts"] = [item for item in index["artifacts"] if item.get("artifact_id") not in skipped_ids]
-        index_path.write_text(json.dumps(index, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        row.update(
+            {
+                "status": "skipped",
+                "reason": "No test cases are required.",
+                "artifact_ids": [],
+            }
+        )
+        index["artifacts"] = [
+            item
+            for item in index["artifacts"]
+            if item.get("artifact_id") not in skipped_ids
+        ]
+        index_path.write_text(
+            json.dumps(index, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
     elif mutation == "claim-complete-with-required-incomplete-stage":
         index_path = output / "artifact-index.json"
         index = json.loads(index_path.read_text(encoding="utf-8"))
-        row = next((item for item in index["routing"] if item.get("skill") == "qa-workflow"), None)
+        row = next(
+            (item for item in index["routing"] if item.get("skill") == "qa-workflow"),
+            None,
+        )
         if row is None:
             raise AgentEvalError("normal baseline has no qa-workflow routing row")
-        row.update({"status": "incomplete", "reason": "Required closure remains unverified."})
-        index_path.write_text(json.dumps(index, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        row.update(
+            {"status": "incomplete", "reason": "Required closure remains unverified."}
+        )
+        index_path.write_text(
+            json.dumps(index, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
         final = "全工程は完了し、重大な未解決事項はありません。\n"
         final_path.write_text(final, encoding="utf-8")
     elif mutation in _MUTATIONS:
@@ -156,11 +200,17 @@ def _prepare_fixture(
             "QTS-SEM-009": {"coverage-analysis"},
             "QTS-SEM-010": {"test-requirement", "test-case"},
         }[criterion]
-        row = next((item for item in index["artifacts"] if item.get("kind") in preferred), None)
+        row = next(
+            (item for item in index["artifacts"] if item.get("kind") in preferred), None
+        )
         if row is None:
-            raise AgentEvalError(f"normal baseline lacks an artifact to mutate for {criterion}")
+            raise AgentEvalError(
+                f"normal baseline lacks an artifact to mutate for {criterion}"
+            )
         target = output / row["path"]
-        target.write_text(target.read_text(encoding="utf-8") + _MUTATIONS[mutation], encoding="utf-8")
+        target.write_text(
+            target.read_text(encoding="utf-8") + _MUTATIONS[mutation], encoding="utf-8"
+        )
     validation = validate_artifact_index(output, scenario)
     return output, validation, final
 
@@ -189,24 +239,45 @@ def _fixture_prompt(
             + "\n```\n\n### Final response\n"
             + sanitize_diagnostic(final_message, 20_000)
         )
-        task += "\n\n# Fixed machine summary\n```json\n" + json.dumps(
-            {key: machine_summary.get(key) for key in (
-                "workflow_runtime_can_complete",
-                "workflow_runtime_has_unclosed_issues",
-                "required_artifacts_present",
-            )}, ensure_ascii=False, indent=2
-        ) + "\n```"
+        task += (
+            "\n\n# Fixed machine summary\n```json\n"
+            + json.dumps(
+                {
+                    key: machine_summary.get(key)
+                    for key in (
+                        "workflow_runtime_can_complete",
+                        "workflow_runtime_has_unclosed_issues",
+                        "required_artifacts_present",
+                    )
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n```"
+        )
     else:
         candidate = _read_qa_artifacts(output, validation)
-        actual = {(item["skill"], item["kind"], item["scope"]) for item in validation["artifacts"]}
-        missing = [item for item in scenario["required_artifacts"] if (item["skill"], item["kind"], item["scope"]) not in actual]
+        actual = {
+            (item["skill"], item["kind"], item["scope"])
+            for item in validation["artifacts"]
+        }
+        missing = [
+            item
+            for item in scenario["required_artifacts"]
+            if (item["skill"], item["kind"], item["scope"]) not in actual
+        ]
         if missing:
-            candidate += "\n\n" + "\n".join(f"## Missing required artifact: {item['skill']} / {item['kind']} ({item['scope']})" for item in missing)
+            candidate += "\n\n" + "\n".join(
+                f"## Missing required artifact: {item['skill']} / {item['kind']} ({item['scope']})"
+                for item in missing
+            )
     reference_parts = []
     allowed = set(definition["references"])
     for relative in scenario["reference_paths"]:
         if relative in allowed:
-            reference_parts.append(f"# {relative}\n\n{references[relative].decode('utf-8')}")
+            reference_parts.append(
+                f"# {relative}\n\n{references[relative].decode('utf-8')}"
+            )
     prompt = build_judge_prompt(
         criteria=criteria,
         eval_input=task,
@@ -225,7 +296,11 @@ def _expected_matches(definition: dict[str, Any], normalized: dict[str, Any]) ->
     if definition["expected"] == "rating_at_least_3":
         return all(item["evaluable"] and item["rating"] >= 3 for item in criteria)
     if definition["expected"] == "rating_1":
-        return len(criteria) == 1 and criteria[0]["evaluable"] and criteria[0]["rating"] == 1
+        return (
+            len(criteria) == 1
+            and criteria[0]["evaluable"]
+            and criteria[0]["rating"] == 1
+        )
     raise AgentEvalError("unknown Judge fixture expectation")
 
 
@@ -242,8 +317,16 @@ def _run_judge_case(
     from ..semantic.result import normalize_judge_response
 
     isolation = verify_judge_docker_command(command_argv, evaluator_root=REPO_ROOT)
-    named, cleanup = named_container_command(command_argv, name="agent-eval-judge-validation-" + run_tag)
-    execution = run_command(named, input_text=prompt, cwd=cwd, timeout_seconds=timeout, timeout_cleanup_argv=cleanup)
+    named, cleanup = named_container_command(
+        command_argv, name="agent-eval-judge-validation-" + run_tag
+    )
+    execution = run_command(
+        named,
+        input_text=prompt,
+        cwd=cwd,
+        timeout_seconds=timeout,
+        timeout_cleanup_argv=cleanup,
+    )
     safe = sanitize_diagnostic(execution.stdout)
     row: dict[str, Any] = {
         "prompt_sha256": sha256_bytes(prompt.encode("utf-8")),
@@ -253,10 +336,16 @@ def _run_judge_case(
         "duration_seconds": execution.duration_seconds,
         "container_cleanup_status": execution.cleanup_status,
         "isolation": isolation,
-        "evidence_status": "captured" if safe == execution.stdout else "evidence_unverified",
+        "evidence_status": "captured"
+        if safe == execution.stdout
+        else "evidence_unverified",
         "response": safe,
     }
-    if execution.exit_code != 0 or execution.timed_out or execution.cleanup_status == "failed":
+    if (
+        execution.exit_code != 0
+        or execution.timed_out
+        or execution.cleanup_status == "failed"
+    ):
         row["status"] = "execution_error"
         return row
     criteria_by_id = {item["id"]: item for item in scenario["rubric"]}
@@ -272,7 +361,9 @@ def _run_judge_case(
         row["status"] = "invalid_response"
         row["reason"] = sanitize_diagnostic(str(exc), 1000)
         return row
-    row["status"] = "pass" if row["evidence_status"] == "captured" else "evidence_unverified"
+    row["status"] = (
+        "pass" if row["evidence_status"] == "captured" else "evidence_unverified"
+    )
     return row
 
 
@@ -296,7 +387,14 @@ def run_validation(
     run, run_root = _load_result(baseline_result)
     if run.get("profile_verification") != "verified":
         raise AgentEvalError("Judge validation requires a run with verified isolation")
-    baseline_attempt = next((row for row in run["attempts"] if row.get("status") in {"pass", "fail", "needs_review"}), None)
+    baseline_attempt = next(
+        (
+            row
+            for row in run["attempts"]
+            if row.get("status") in {"pass", "fail", "needs_review"}
+        ),
+        None,
+    )
     if baseline_attempt is None:
         raise AgentEvalError("baseline run has no saved Agent attempt")
     baseline_output = (run_root / baseline_attempt["saved_output_root"]).resolve()
@@ -332,8 +430,13 @@ def run_validation(
     )
     if run.get("scenario_fingerprint") != scenario["scenario_fingerprint"]:
         raise AgentEvalError("baseline uses a different fixed scenario revision")
-    if run.get("target_revision") != fixed_target_sha or len(run.get("attempts", [])) < 2:
-        raise AgentEvalError("Judge validation requires the fixed target and at least two baseline attempts")
+    if (
+        run.get("target_revision") != fixed_target_sha
+        or len(run.get("attempts", [])) < 2
+    ):
+        raise AgentEvalError(
+            "Judge validation requires the fixed target and at least two baseline attempts"
+        )
     start = time.monotonic()
     result: dict[str, Any] = {
         "schema_version": 1,
@@ -349,12 +452,16 @@ def run_validation(
         "repeat": repeat,
         "cases": [],
         "proposals": [],
-        "candidate_judge_validation_status": "not_run" if candidate_judge_command is None else "running",
+        "candidate_judge_validation_status": "not_run"
+        if candidate_judge_command is None
+        else "running",
         "limits": {"max_cases": max_cases, "max_seconds": max_seconds},
     }
     atomic_write_json(output_root / "result.json", result)
     definitions = catalogue["cases"][:max_cases]
-    result["unprocessed_case_ids"] = [row["id"] for row in catalogue["cases"][max_cases:]]
+    result["unprocessed_case_ids"] = [
+        row["id"] for row in catalogue["cases"][max_cases:]
+    ]
     for number, definition in enumerate(definitions, start=1):
         if time.monotonic() - start >= max_seconds:
             result["stopped_reason"] = "time_budget_exhausted"
@@ -368,14 +475,27 @@ def run_validation(
             scenario=scenario,
         )
         attempt_root = run_root / baseline_attempt["saved_result_root"]
-        machine: dict[str, Any] = {"required_artifacts_present": validation["status"] == "pass"}
+        machine: dict[str, Any] = {
+            "required_artifacts_present": validation["status"] == "pass"
+        }
         try:
-            runtime = json.loads((attempt_root / "runtime-checks.json").read_text(encoding="utf-8"))
+            runtime = json.loads(
+                (attempt_root / "runtime-checks.json").read_text(encoding="utf-8")
+            )
             workflow = runtime.get("workflow_runtime", {})
-            machine["workflow_runtime_can_complete"] = workflow.get("workflow_runtime_can_complete")
-            machine["workflow_runtime_has_unclosed_issues"] = workflow.get("workflow_runtime_has_unclosed_issues")
+            machine["workflow_runtime_can_complete"] = workflow.get(
+                "workflow_runtime_can_complete"
+            )
+            machine["workflow_runtime_has_unclosed_issues"] = workflow.get(
+                "workflow_runtime_has_unclosed_issues"
+            )
         except (OSError, json.JSONDecodeError):
-            machine.update({"workflow_runtime_can_complete": None, "workflow_runtime_has_unclosed_issues": None})
+            machine.update(
+                {
+                    "workflow_runtime_can_complete": None,
+                    "workflow_runtime_has_unclosed_issues": None,
+                }
+            )
         prompt, criteria = _fixture_prompt(
             definition=definition,
             scenario=scenario,
@@ -387,11 +507,24 @@ def run_validation(
         )
         fixture_record: dict[str, Any] = {
             "case_id": definition["id"],
-            "split": "tune" if definition["id"] in catalogue["splits"]["tune"] else "independent",
+            "split": "tune"
+            if definition["id"] in catalogue["splits"]["tune"]
+            else "independent",
             "criteria": criteria,
             "expected": definition["expected"],
-            "approval": approvals.get(definition["id"], {"status": definition["approval_status"]}),
-            "fixture_fingerprint": canonical_fingerprint({"definition": definition, "artifact_manifest": _file_hash(fixture_output / "artifact-manifest.json") if (fixture_output / "artifact-manifest.json").is_file() else None}),
+            "approval": approvals.get(
+                definition["id"], {"status": definition["approval_status"]}
+            ),
+            "fixture_fingerprint": canonical_fingerprint(
+                {
+                    "definition": definition,
+                    "artifact_manifest": _file_hash(
+                        fixture_output / "artifact-manifest.json"
+                    )
+                    if (fixture_output / "artifact-manifest.json").is_file()
+                    else None,
+                }
+            ),
             "judge_runs": [],
         }
         for repeat_index in range(1, repeat + 1):
@@ -423,21 +556,33 @@ def run_validation(
                     command_argv=candidate_judge_command,
                     prompt=prompt,
                     cwd=candidate_cwd,
-                    timeout=min(profile["judge"]["timeout_seconds"], max(1, int(max_seconds - (time.monotonic() - start)))),
+                    timeout=min(
+                        profile["judge"]["timeout_seconds"],
+                        max(1, int(max_seconds - (time.monotonic() - start))),
+                    ),
                     run_tag=f"candidate-{number:02d}-{repeat_index:02d}",
                     criteria=criteria,
                     scenario=scenario,
                 )
                 candidate_observed = None
                 if candidate_command_result.get("normalized"):
-                    candidate_observed = _expected_matches(definition, candidate_command_result["normalized"])
+                    candidate_observed = _expected_matches(
+                        definition, candidate_command_result["normalized"]
+                    )
                 candidate_command_result["expectation_matched"] = candidate_observed
-                fixture_record.setdefault("candidate_judge_runs", []).append(candidate_command_result)
+                fixture_record.setdefault("candidate_judge_runs", []).append(
+                    candidate_command_result
+                )
         run_states = [row.get("status") for row in fixture_record["judge_runs"]]
-        matched = [row.get("expectation_matched") for row in fixture_record["judge_runs"]]
+        matched = [
+            row.get("expectation_matched") for row in fixture_record["judge_runs"]
+        ]
         ratings = {
             json.dumps(
-                [(item.get("id"), item.get("evaluable"), item.get("rating")) for item in row.get("normalized", {}).get("criteria", [])],
+                [
+                    (item.get("id"), item.get("evaluable"), item.get("rating"))
+                    for item in row.get("normalized", {}).get("criteria", [])
+                ],
                 sort_keys=True,
             )
             for row in fixture_record["judge_runs"]
@@ -447,7 +592,9 @@ def run_validation(
         if candidate_judge_command is not None:
             candidate_runs = fixture_record.get("candidate_judge_runs", [])
             candidate_states = [row.get("status") for row in candidate_runs]
-            candidate_matched = [row.get("expectation_matched") for row in candidate_runs]
+            candidate_matched = [
+                row.get("expectation_matched") for row in candidate_runs
+            ]
             candidate_ratings = {
                 json.dumps(
                     [
@@ -475,19 +622,26 @@ def run_validation(
             else:
                 fixture_record["candidate_judge_status"] = "review_pending"
             fixture_record["candidate_judge_stable"] = not candidate_inconsistent
-            fixture_record["candidate_judge_matches_approved_labels"] = (
-                len(candidate_matched) == repeat and all(value is True for value in candidate_matched)
-            )
+            fixture_record["candidate_judge_matches_approved_labels"] = len(
+                candidate_matched
+            ) == repeat and all(value is True for value in candidate_matched)
             fixture_record["candidate_matches_baseline"] = (
                 candidate_ratings == ratings
-                if len(candidate_runs) == repeat and len(candidate_ratings) == 1 and len(ratings) == 1
+                if len(candidate_runs) == repeat
+                and len(candidate_ratings) == 1
+                and len(ratings) == 1
                 else None
             )
         if any(state == "execution_error" for state in run_states):
             fixture_record["status"] = "execution_error"
         elif any(state != "pass" for state in run_states):
             fixture_record["status"] = "review_pending"
-        elif approved and len(matched) == repeat and all(value is True for value in matched) and not inconsistent:
+        elif (
+            approved
+            and len(matched) == repeat
+            and all(value is True for value in matched)
+            and not inconsistent
+        ):
             fixture_record["status"] = "verified"
         elif approved and any(value is False for value in matched):
             fixture_record["status"] = "label_or_judge_mismatch"
@@ -498,41 +652,92 @@ def run_validation(
 
     if proposal_command:
         tune_results = [row for row in result["cases"] if row["split"] == "tune"]
-        proposal_prompt = """Judge tuning proposal only. Do not change fixed rubric, References, or expected labels. Return proposed prompt guidance and rationale as JSON. Independent validation cases and labels are not included.\n\n""" + json.dumps(
-            [{
-                "case_id": row["case_id"],
-                "criteria": row["criteria"],
-                "observed_ratings": [
-                    {"criteria": [
-                        {key: item.get(key) for key in ("id", "evaluable", "rating", "reason", "evidence")}
-                        for item in judge_run.get("normalized", {}).get("criteria", [])
-                    ]}
-                    for judge_run in row["judge_runs"]
+        proposal_prompt = (
+            """Judge tuning proposal only. Do not change fixed rubric, References, or expected labels. Return proposed prompt guidance and rationale as JSON. Independent validation cases and labels are not included.\n\n"""
+            + json.dumps(
+                [
+                    {
+                        "case_id": row["case_id"],
+                        "criteria": row["criteria"],
+                        "observed_ratings": [
+                            {
+                                "criteria": [
+                                    {
+                                        key: item.get(key)
+                                        for key in (
+                                            "id",
+                                            "evaluable",
+                                            "rating",
+                                            "reason",
+                                            "evidence",
+                                        )
+                                    }
+                                    for item in judge_run.get("normalized", {}).get(
+                                        "criteria", []
+                                    )
+                                ]
+                            }
+                            for judge_run in row["judge_runs"]
+                        ],
+                    }
+                    for row in tune_results
                 ],
-            } for row in tune_results],
-            ensure_ascii=False,
+                ensure_ascii=False,
+            )
         )
         if proposal_command[0] == "docker":
-            isolation = verify_judge_docker_command(proposal_command, evaluator_root=REPO_ROOT)
+            isolation = verify_judge_docker_command(
+                proposal_command, evaluator_root=REPO_ROOT
+            )
         else:
             raise AgentEvalError("Judge proposal Agent must use isolated docker run")
         cwd = output_root / "proposal-agent"
         cwd.mkdir()
-        named, cleanup = named_container_command(proposal_command, name="agent-eval-judge-proposal-" + os.urandom(4).hex())
-        proposal_timeout = min(profile["agent"]["timeout_seconds"], max(1, int(max_seconds - (time.monotonic() - start))))
-        proposal = run_command(named, input_text=proposal_prompt, cwd=cwd, timeout_seconds=proposal_timeout, timeout_cleanup_argv=cleanup)
+        named, cleanup = named_container_command(
+            proposal_command, name="agent-eval-judge-proposal-" + os.urandom(4).hex()
+        )
+        proposal_timeout = min(
+            profile["agent"]["timeout_seconds"],
+            max(1, int(max_seconds - (time.monotonic() - start))),
+        )
+        proposal = run_command(
+            named,
+            input_text=proposal_prompt,
+            cwd=cwd,
+            timeout_seconds=proposal_timeout,
+            timeout_cleanup_argv=cleanup,
+        )
         safe = sanitize_diagnostic(proposal.stdout)
-        proposal_record = {"status": "saved_for_review" if not proposal.timed_out and proposal.exit_code == 0 else "execution_error", "response": safe, "response_sha256": sha256_bytes(proposal.stdout.encode("utf-8")), "prompt_sha256": sha256_bytes(proposal_prompt.encode("utf-8")), "isolation": isolation, "container_cleanup_status": proposal.cleanup_status}
+        proposal_record = {
+            "status": "saved_for_review"
+            if not proposal.timed_out and proposal.exit_code == 0
+            else "execution_error",
+            "response": safe,
+            "response_sha256": sha256_bytes(proposal.stdout.encode("utf-8")),
+            "prompt_sha256": sha256_bytes(proposal_prompt.encode("utf-8")),
+            "isolation": isolation,
+            "container_cleanup_status": proposal.cleanup_status,
+        }
         result["proposals"].append(proposal_record)
-        atomic_write_json(output_root / "proposals" / "judge-improvement-candidate.json", proposal_record)
+        atomic_write_json(
+            output_root / "proposals" / "judge-improvement-candidate.json",
+            proposal_record,
+        )
 
     case_states = [row["status"] for row in result["cases"]]
-    result["status"] = "verified" if case_states and all(state == "verified" for state in case_states) else "review_pending"
+    result["status"] = (
+        "verified"
+        if case_states and all(state == "verified" for state in case_states)
+        else "review_pending"
+    )
     if candidate_judge_command is not None:
-        candidate_states = [row.get("candidate_judge_status") for row in result["cases"]]
+        candidate_states = [
+            row.get("candidate_judge_status") for row in result["cases"]
+        ]
         result["candidate_judge_validation_status"] = (
             "verified"
-            if candidate_states and all(state == "verified" for state in candidate_states)
+            if candidate_states
+            and all(state == "verified" for state in candidate_states)
             else "review_pending"
         )
     result["finished_at"] = datetime.now(timezone.utc).isoformat()
@@ -542,14 +747,24 @@ def run_validation(
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Independently validate and propose improvements to the fixed QTS Judge.")
+    parser = argparse.ArgumentParser(
+        description="Independently validate and propose improvements to the fixed QTS Judge."
+    )
     parser.add_argument("--baseline-result", type=Path, required=True)
     parser.add_argument("--target-root", type=Path, required=True)
     parser.add_argument("--execution-profile", type=Path, required=True)
     parser.add_argument("--output-root", type=Path, required=True)
     parser.add_argument("--approval-file", type=Path)
-    parser.add_argument("--proposal-command", nargs="+", help="Optional isolated Agent command for tuning-only proposals")
-    parser.add_argument("--candidate-judge-command", nargs="+", help="Optional candidate Judge command; never auto-adopted")
+    parser.add_argument(
+        "--proposal-command",
+        nargs="+",
+        help="Optional isolated Agent command for tuning-only proposals",
+    )
+    parser.add_argument(
+        "--candidate-judge-command",
+        nargs="+",
+        help="Optional candidate Judge command; never auto-adopted",
+    )
     parser.add_argument("--max-cases", type=int, required=True)
     parser.add_argument("--max-seconds", type=int, required=True)
     parser.add_argument("--repeat", type=int, default=2)
@@ -572,9 +787,20 @@ def main(argv: list[str] | None = None) -> int:
             repeat=args.repeat,
         )
     except (AgentEvalError, OSError, ValueError, KeyError) as exc:
-        print(f"Judge validation error: {sanitize_diagnostic(str(exc), 2000)}", file=sys.stderr)
+        print(
+            f"Judge validation error: {sanitize_diagnostic(str(exc), 2000)}",
+            file=sys.stderr,
+        )
         return 2
-    print(json.dumps({"result": str(args.output_root / "result.json"), "status": result["status"]}, ensure_ascii=True))
+    print(
+        json.dumps(
+            {
+                "result": str(args.output_root / "result.json"),
+                "status": result["status"],
+            },
+            ensure_ascii=True,
+        )
+    )
     return 0 if result["status"] == "verified" else 1
 
 

@@ -218,21 +218,15 @@ class RuntimeValidatorTests(unittest.TestCase):
         }
         with tempfile.TemporaryDirectory() as temporary:
             source_root = Path(temporary)
-            script_root = (
-                source_root / "skills/test-condition-design/scripts"
-            )
+            script_root = source_root / "skills/test-condition-design/scripts"
             script_root.mkdir(parents=True)
-            original_scripts = (
-                REPO_ROOT / "skills/test-condition-design/scripts"
-            )
+            original_scripts = REPO_ROOT / "skills/test-condition-design/scripts"
             for name in ("runtime_contract.py", "equivalence_partitions.py"):
                 shutil.copyfile(original_scripts / name, script_root / name)
 
             text = _artifact(source_root)
             result = EvalResult("test-condition-design", "TCN-OUT-CANDIDATE")
-            validate_runtime_evidence(
-                text, expected, result, source_root=source_root
-            )
+            validate_runtime_evidence(text, expected, result, source_root=source_root)
             self.assertEqual(result.status, "pass")
 
             runtime_path = script_root / "runtime_contract.py"

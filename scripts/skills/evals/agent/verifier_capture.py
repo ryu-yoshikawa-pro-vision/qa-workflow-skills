@@ -85,7 +85,11 @@ def _expected_script(*, skills_root: Path, skill: str, operation: str) -> Path:
         raise ValueError("capture operation is not allow-listed")
     if operation == "workflow-runtime" and skill != "qa-workflow":
         raise ValueError("workflow-runtime is available only for qa-workflow")
-    filename = "workflow_runtime.py" if operation == "workflow-runtime" else "runtime_contract.py"
+    filename = (
+        "workflow_runtime.py"
+        if operation == "workflow-runtime"
+        else "runtime_contract.py"
+    )
     skill_root = skills_root / skill
     script = _without_symlinks(skill_root / "scripts" / filename)
     try:
@@ -103,8 +107,12 @@ def capture_invocation(
     cwd = Path.cwd().resolve()
     output_root = _without_symlinks(cwd / ".qa-eval-output")
     evidence_root = _without_symlinks(output_root / ".runtime-evidence")
-    request = _without_symlinks(request_path if request_path.is_absolute() else cwd / request_path)
-    record = _without_symlinks(record_path if record_path.is_absolute() else cwd / record_path)
+    request = _without_symlinks(
+        request_path if request_path.is_absolute() else cwd / request_path
+    )
+    record = _without_symlinks(
+        record_path if record_path.is_absolute() else cwd / record_path
+    )
     relative_request = _contained(request, output_root, "request path").as_posix()
     relative_record = _contained(record, evidence_root, "record path").as_posix()
     record_parts = Path(relative_record).parts
@@ -114,17 +122,26 @@ def capture_invocation(
         or not _ARTIFACT_ID_RE.fullmatch(record_parts[1])
         or not _INVOCATION_ID_RE.fullmatch(record_parts[2])
     ):
-        raise ValueError("record path must be .runtime-evidence/<skill>/<artifact-sha256>/<invocation-id>")
+        raise ValueError(
+            "record path must be .runtime-evidence/<skill>/<artifact-sha256>/<invocation-id>"
+        )
     if request != record / "request.json":
-        raise ValueError("request.json must be stored in its invocation record directory")
+        raise ValueError(
+            "request.json must be stored in its invocation record directory"
+        )
     if not request.is_file():
         raise FileNotFoundError("saved runtime request is missing")
 
     record.mkdir(parents=True, exist_ok=True)
     for child in record.iterdir():
         if child != request or child.is_symlink() or not child.is_file():
-            raise ValueError("invocation directory may contain only its request.json before capture")
-    if any((record / name).exists() for name in ("result.json", "invocation.json", "stderr.txt")):
+            raise ValueError(
+                "invocation directory may contain only its request.json before capture"
+            )
+    if any(
+        (record / name).exists()
+        for name in ("result.json", "invocation.json", "stderr.txt")
+    ):
         raise ValueError("invocation id has already been used")
 
     request_bytes = request.read_bytes()
@@ -134,7 +151,10 @@ def capture_invocation(
     request_value = json.loads(request_text)
     if not isinstance(request_value, dict):
         raise ValueError("runtime request must be a JSON object")
-    if operation == "verify" and request_value.get("operation") != "verify_runtime_evidence":
+    if (
+        operation == "verify"
+        and request_value.get("operation") != "verify_runtime_evidence"
+    ):
         raise ValueError("verify capture accepts only verify_runtime_evidence requests")
 
     skills_root = _without_symlinks(cwd / ".agents" / "skills")
@@ -171,9 +191,13 @@ def capture_invocation(
     try:
         parsed_result = json.loads(safe_result)
         if operation == "verify":
-            valid_shape = isinstance(parsed_result, dict) and isinstance(parsed_result.get("valid"), bool)
+            valid_shape = isinstance(parsed_result, dict) and isinstance(
+                parsed_result.get("valid"), bool
+            )
         else:
-            valid_shape = isinstance(parsed_result, dict) and isinstance(parsed_result.get("payload"), dict)
+            valid_shape = isinstance(parsed_result, dict) and isinstance(
+                parsed_result.get("payload"), dict
+            )
     except json.JSONDecodeError:
         pass
     captured = (
@@ -193,15 +217,23 @@ def capture_invocation(
         "artifact_id": record_parts[1],
         "invocation_id": record_parts[2],
         "request_relative_path": Path(relative_request).as_posix(),
-        "record_relative_path": (Path(".runtime-evidence") / relative_record).as_posix(),
-        "result_relative_path": (Path(".runtime-evidence") / relative_record / "result.json").as_posix(),
+        "record_relative_path": (
+            Path(".runtime-evidence") / relative_record
+        ).as_posix(),
+        "result_relative_path": (
+            Path(".runtime-evidence") / relative_record / "result.json"
+        ).as_posix(),
         "command": ["python", f".agents/skills/{skill}/scripts/{script.name}"],
         "exit_code": exit_code,
         "timed_out": timed_out,
         "duration_seconds": round(time.monotonic() - started, 3),
         "request_sha256": _digest(request_bytes),
         "result_sha256": _digest(raw_result),
-        "stderr_status": "sanitized" if safe_stderr != raw_stderr else "captured" if safe_stderr else "empty",
+        "stderr_status": "sanitized"
+        if safe_stderr != raw_stderr
+        else "captured"
+        if safe_stderr
+        else "empty",
         "stderr": safe_stderr,
         "evidence_status": "captured" if captured else "evidence_unverified",
     }
@@ -211,9 +243,13 @@ def capture_invocation(
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Capture a fixed Skill runtime verifier invocation.")
+    parser = argparse.ArgumentParser(
+        description="Capture a fixed Skill runtime verifier invocation."
+    )
     parser.add_argument("--skill", choices=sorted(RUNTIME_SKILLS), required=True)
-    parser.add_argument("--operation", choices=("verify", "workflow-runtime"), required=True)
+    parser.add_argument(
+        "--operation", choices=("verify", "workflow-runtime"), required=True
+    )
     parser.add_argument("--request", type=Path, required=True)
     parser.add_argument("--record", type=Path, required=True)
     args = parser.parse_args(argv)
@@ -227,7 +263,11 @@ def main(argv: list[str] | None = None) -> int:
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"runtime capture failed: {type(exc).__name__}", file=sys.stderr)
         return 2
-    print(json.dumps({"evidence_status": invocation["evidence_status"]}, ensure_ascii=True))
+    print(
+        json.dumps(
+            {"evidence_status": invocation["evidence_status"]}, ensure_ascii=True
+        )
+    )
     return 0 if invocation["evidence_status"] == "captured" else 2
 
 

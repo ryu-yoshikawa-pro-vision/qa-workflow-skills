@@ -112,9 +112,18 @@ def _load_deterministic_cases(skill: str, eval_id: str | None) -> list[dict[str,
                     "input_path": input_path,
                     "expected_path": expected_path,
                     "fingerprint_files": [
-                        (str(input_path.relative_to(REPO_ROOT)), input_path.read_bytes()),
-                        (str(expected_path.relative_to(REPO_ROOT)), expected_path.read_bytes()),
-                        (str(manifest_path.relative_to(REPO_ROOT)), manifest_path.read_bytes()),
+                        (
+                            str(input_path.relative_to(REPO_ROOT)),
+                            input_path.read_bytes(),
+                        ),
+                        (
+                            str(expected_path.relative_to(REPO_ROOT)),
+                            expected_path.read_bytes(),
+                        ),
+                        (
+                            str(manifest_path.relative_to(REPO_ROOT)),
+                            manifest_path.read_bytes(),
+                        ),
                     ],
                 }
             )
@@ -139,10 +148,22 @@ def _load_semantic_cases(skill: str, eval_id: str | None) -> list[dict[str, Any]
                     "case": case,
                     "dataset": dataset,
                     "fingerprint_files": [
-                        (str(case["input_path"].relative_to(REPO_ROOT)), case["input_path"].read_bytes()),
-                        (str(case["reference_path"].relative_to(REPO_ROOT)), case["reference_path"].read_bytes()),
-                        (str(rubric_path.relative_to(REPO_ROOT)), rubric_path.read_bytes()),
-                        (str(evals_path.relative_to(REPO_ROOT)), evals_path.read_bytes()),
+                        (
+                            str(case["input_path"].relative_to(REPO_ROOT)),
+                            case["input_path"].read_bytes(),
+                        ),
+                        (
+                            str(case["reference_path"].relative_to(REPO_ROOT)),
+                            case["reference_path"].read_bytes(),
+                        ),
+                        (
+                            str(rubric_path.relative_to(REPO_ROOT)),
+                            rubric_path.read_bytes(),
+                        ),
+                        (
+                            str(evals_path.relative_to(REPO_ROOT)),
+                            evals_path.read_bytes(),
+                        ),
                     ],
                 }
             )
@@ -181,12 +202,21 @@ def _render_grade(
         reference=eval_case["reference_text"],
         candidate_output=output_path.read_text(encoding="utf-8"),
     )
-    judge_workspace = output_root / "judge-workspaces" / case["suite"] / case["skill"] / case["eval_id"] / f"attempt-{case.get('repeat_index', 1):02d}"
+    judge_workspace = (
+        output_root
+        / "judge-workspaces"
+        / case["suite"]
+        / case["skill"]
+        / case["eval_id"]
+        / f"attempt-{case.get('repeat_index', 1):02d}"
+    )
     judge_workspace.mkdir(parents=True, exist_ok=False)
     judge_isolation = verify_judge_docker_command(
         profile["judge"]["command_argv"], evaluator_root=REPO_ROOT
     )
-    judge_name = "agent-eval-judge-" + sha256_bytes(str(judge_workspace).encode("utf-8"))[7:23]
+    judge_name = (
+        "agent-eval-judge-" + sha256_bytes(str(judge_workspace).encode("utf-8"))[7:23]
+    )
     judge_command, judge_cleanup = named_container_command(
         profile["judge"]["command_argv"], name=judge_name
     )
@@ -229,7 +259,9 @@ def _render_grade(
     ]
 
 
-def _substitute_command(argv: list[str], *, workspace: Path, output_root: Path) -> list[str]:
+def _substitute_command(
+    argv: list[str], *, workspace: Path, output_root: Path
+) -> list[str]:
     replacements = {
         "{workspace}": str(workspace),
         "{output_root}": str(output_root),
@@ -258,7 +290,9 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--agent-model", required=True)
     parser.add_argument("--agent-version")
     parser.add_argument(
-        "--agent-command", nargs=argparse.REMAINDER, required=True,
+        "--agent-command",
+        nargs=argparse.REMAINDER,
+        required=True,
         help="External Agent command argv; must be the final option.",
     )
     args = parser.parse_args(argv)
@@ -268,7 +302,9 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         parser.error("--repeat must be a positive integer")
     if args.repeat > 100 or args.repeat * 100 > MAX_CASES:
         parser.error("requested run exceeds the fixed case limit")
-    if args.skill != "all" and not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", args.skill):
+    if args.skill != "all" and not re.fullmatch(
+        r"[a-z0-9]+(?:-[a-z0-9]+)*", args.skill
+    ):
         parser.error("--skill must be a normalized Skill name or 'all'")
     if args.skill == "all" and args.eval_id:
         parser.error("--eval-id cannot be combined with --skill all")
@@ -283,7 +319,9 @@ def run(argv: list[str] | None = None) -> int:
     result_path = output_root / "result.json"
     output_ready = False
     skill_root = output_root / ".skill-workspace"
-    run_id = f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}-{os.urandom(4).hex()}"
+    run_id = (
+        f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}-{os.urandom(4).hex()}"
+    )
     record: dict[str, Any] = {
         "schema_version": 1,
         "run_id": run_id,
@@ -293,7 +331,11 @@ def run(argv: list[str] | None = None) -> int:
         "skill_revision": args.skill_revision,
         "profile_fingerprint": None,
         "profile_verification": "unverified",
-        "agent": {"name": args.agent_name, "model": args.agent_model, "version": args.agent_version},
+        "agent": {
+            "name": args.agent_name,
+            "model": args.agent_model,
+            "version": args.agent_version,
+        },
         "attempts": [],
         "excluded": [],
     }
@@ -307,8 +349,13 @@ def run(argv: list[str] | None = None) -> int:
             evidence_relative_path=profile["verification"]["evidence_path"],
         )
         output_ready = True
-        if profile["agent"]["name"] != args.agent_name or profile["agent"]["model"] != args.agent_model:
-            raise AgentEvalError("agent name/model does not match the execution profile")
+        if (
+            profile["agent"]["name"] != args.agent_name
+            or profile["agent"]["model"] != args.agent_model
+        ):
+            raise AgentEvalError(
+                "agent name/model does not match the execution profile"
+            )
         if args.suite == "semantic" and not profile["judge"]["command_argv"]:
             raise AgentEvalError("semantic suite requires an independent Judge command")
         profile_verified = verify_profile_evidence(
@@ -334,7 +381,10 @@ def run(argv: list[str] | None = None) -> int:
 
                 evaluator_skill_names = set(VALIDATORS)
             record["excluded"] = [
-                {"skill": name, "reason": f"no {args.suite} eval case in fixed Evaluator"}
+                {
+                    "skill": name,
+                    "reason": f"no {args.suite} eval case in fixed Evaluator",
+                }
                 for name in skill_names
                 if name not in present
             ] + [
@@ -346,7 +396,9 @@ def run(argv: list[str] | None = None) -> int:
             ]
             cases = [case for case in cases if case["skill"] in set(skill_names)]
         elif args.skill not in skill_names:
-            raise AgentEvalError("requested Skill is absent from the candidate revision")
+            raise AgentEvalError(
+                "requested Skill is absent from the candidate revision"
+            )
         if not cases:
             raise AgentEvalError("no matching fixed Evaluator cases were found")
         if len(cases) * args.repeat > MAX_CASES:
@@ -367,27 +419,48 @@ def run(argv: list[str] | None = None) -> int:
                 "profile_verification": "verified",
                 "isolation_evidence": profile["verification"]["evidence_path"],
                 "agent_command_fingerprint": canonical_fingerprint(args.agent_command),
-                "judge_command_fingerprint": canonical_fingerprint(profile["judge"]["command_argv"]),
+                "judge_command_fingerprint": canonical_fingerprint(
+                    profile["judge"]["command_argv"]
+                ),
                 "agent": {
                     key: profile["agent"].get(key)
                     for key in (
-                        "name", "model", "cli_version", "reasoning_effort", "timeout_seconds",
-                        "sandbox_policy", "approval_policy", "network_policy", "tools",
-                        "mcp_servers", "external_instructions", "global_config",
+                        "name",
+                        "model",
+                        "cli_version",
+                        "reasoning_effort",
+                        "timeout_seconds",
+                        "sandbox_policy",
+                        "approval_policy",
+                        "network_policy",
+                        "tools",
+                        "mcp_servers",
+                        "external_instructions",
+                        "global_config",
                     )
                 },
                 "judge": {
                     key: profile["judge"].get(key)
                     for key in (
-                        "model", "cli_version", "reasoning_effort", "timeout_seconds",
-                        "sandbox_policy", "approval_policy", "network_policy", "tools",
-                        "mcp_servers", "external_instructions", "global_config",
+                        "model",
+                        "cli_version",
+                        "reasoning_effort",
+                        "timeout_seconds",
+                        "sandbox_policy",
+                        "approval_policy",
+                        "network_policy",
+                        "tools",
+                        "mcp_servers",
+                        "external_instructions",
+                        "global_config",
                     )
                 },
                 "isolation": {
                     "method": profile["isolation"]["method"],
                     "agent_read_roots": profile["isolation"]["agent_read_roots"],
-                    "evaluator_read_blocked": profile["isolation"]["evaluator_read_blocked"],
+                    "evaluator_read_blocked": profile["isolation"][
+                        "evaluator_read_blocked"
+                    ],
                 },
                 "timeout_seconds": profile["agent"]["timeout_seconds"],
                 "cases_requested": len(cases),
@@ -402,7 +475,13 @@ def run(argv: list[str] | None = None) -> int:
             for repeat_index in range(1, args.repeat + 1):
                 attempt_number += 1
                 attempt_id = f"{attempt_number:04d}"
-                case_dir = output_root / args.suite / case["skill"] / case["id"] / f"attempt-{repeat_index:02d}"
+                case_dir = (
+                    output_root
+                    / args.suite
+                    / case["skill"]
+                    / case["id"]
+                    / f"attempt-{repeat_index:02d}"
+                )
                 case_dir.mkdir(parents=True, exist_ok=True)
                 attempt: dict[str, Any] = {
                     "attempt_id": attempt_id,
@@ -422,9 +501,13 @@ def run(argv: list[str] | None = None) -> int:
                             skill_root / "skills" / visible_skill,
                             visible_skill_root / visible_skill,
                         )
-                    prompt = build_generation_prompt(skill=case["skill"], eval_input=case["input"])
+                    prompt = build_generation_prompt(
+                        skill=case["skill"], eval_input=case["input"]
+                    )
                     command = _substitute_command(
-                        args.agent_command, workspace=agent_workspace, output_root=case_dir
+                        args.agent_command,
+                        workspace=agent_workspace,
+                        output_root=case_dir,
                     )
                     try:
                         attempt["agent_isolation"] = verify_agent_docker_command(
@@ -459,7 +542,11 @@ def run(argv: list[str] | None = None) -> int:
                             (case_dir / "agent.stderr.log").write_text(
                                 execution.stderr, encoding="utf-8"
                             )
-                        if execution.timed_out or execution.exit_code != 0 or execution.cleanup_status == "failed":
+                        if (
+                            execution.timed_out
+                            or execution.exit_code != 0
+                            or execution.cleanup_status == "failed"
+                        ):
                             attempt["status"] = "execution error"
                             attempt["reason"] = (
                                 "agent_timeout"
@@ -476,7 +563,9 @@ def run(argv: list[str] | None = None) -> int:
                             if SECRET_TEXT_RE.search(output_text):
                                 output_text = sanitize_diagnostic(output_text)
                                 attempt["evidence_status"] = "evidence_unverified"
-                                attempt["evidence_reason"] = "secret_redaction_changed_candidate_output"
+                                attempt["evidence_reason"] = (
+                                    "secret_redaction_changed_candidate_output"
+                                )
                                 attempt["status"] = "needs_review"
                             if trace["trace_jsonl"] is not None:
                                 (case_dir / "agent-trace.jsonl").write_text(
@@ -486,18 +575,24 @@ def run(argv: list[str] | None = None) -> int:
                                 "format": trace["format"],
                                 "status": trace["status"],
                                 "redacted": trace["redacted"],
-                                "path": "agent-trace.jsonl" if trace["trace_jsonl"] is not None else None,
+                                "path": "agent-trace.jsonl"
+                                if trace["trace_jsonl"] is not None
+                                else None,
                             }
-                            attempt["skill_use_observation"] = trace["skill_use_observation"].get(
-                                case["skill"], "unverified"
-                            )
+                            attempt["skill_use_observation"] = trace[
+                                "skill_use_observation"
+                            ].get(case["skill"], "unverified")
                             if trace["redacted"]:
                                 attempt["status"] = "needs_review"
                                 attempt["evidence_status"] = "evidence_unverified"
                                 attempt["evidence_reason"] = "agent_trace_was_redacted"
-                            (case_dir / "output.md").write_text(output_text, encoding="utf-8")
+                            (case_dir / "output.md").write_text(
+                                output_text, encoding="utf-8"
+                            )
                             attempt["output"] = {
-                                "path": str((case_dir / "output.md").relative_to(output_root)),
+                                "path": str(
+                                    (case_dir / "output.md").relative_to(output_root)
+                                ),
                                 "sha256": sha256_bytes(output_text.encode("utf-8")),
                             }
                             if attempt["status"] != "needs_review":
@@ -514,9 +609,15 @@ def run(argv: list[str] | None = None) -> int:
                                     profile=profile,
                                     output_root=output_root,
                                 )
-                                atomic_write_json(case_dir / "grade.json", grade["grade"])
+                                atomic_write_json(
+                                    case_dir / "grade.json", grade["grade"]
+                                )
                                 attempt["grade"] = {
-                                    "path": str((case_dir / "grade.json").relative_to(output_root)),
+                                    "path": str(
+                                        (case_dir / "grade.json").relative_to(
+                                            output_root
+                                        )
+                                    ),
                                     "sha256": sha256_bytes(
                                         (case_dir / "grade.json").read_bytes()
                                     ),
@@ -538,7 +639,9 @@ def run(argv: list[str] | None = None) -> int:
         if any(status == "execution error" for status in statuses):
             record["status"] = "execution error"
             exit_code = 2
-        elif any(status in {"fail", "needs_review", "not_comparable"} for status in statuses):
+        elif any(
+            status in {"fail", "needs_review", "not_comparable"} for status in statuses
+        ):
             record["status"] = "needs_review_or_fail"
             exit_code = 1
         elif all(status == "pass" for status in statuses):
@@ -548,13 +651,21 @@ def run(argv: list[str] | None = None) -> int:
             record["status"] = "needs_review_or_fail"
             exit_code = 1
         record["summary"] = {
-            status: statuses.count(status)
-            for status in sorted(set(statuses))
+            status: statuses.count(status) for status in sorted(set(statuses))
         }
         record["exit_code"] = exit_code
         record["finished_at"] = datetime.now(timezone.utc).isoformat()
         atomic_write_json(result_path, record)
-        print(json.dumps({"run_id": run_id, "result": str(result_path), "status": record["status"]}, ensure_ascii=True))
+        print(
+            json.dumps(
+                {
+                    "run_id": run_id,
+                    "result": str(result_path),
+                    "status": record["status"],
+                },
+                ensure_ascii=True,
+            )
+        )
         return exit_code
     except Exception as exc:
         record["status"] = "execution error"

@@ -38,22 +38,45 @@ class WorkspaceIsolationTests(unittest.TestCase):
         }
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            (root / "isolation.json").write_text(json.dumps({
-                "status": "verified",
-                "probe": "scripts/skills/evals/agent/isolation_probe.py",
-                "profile_fingerprint": profile_fingerprint(profile),
-                "agent_command_fingerprint": canonical_fingerprint(agent_command),
-                "judge_command_fingerprint": canonical_fingerprint(profile["judge"]["command_argv"]),
-                "evaluator_revision": "a" * 40,
-                "checks": checks,
-            }), encoding="utf-8")
-            with patch("scripts.skills.evals.agent.workspace.assert_clean_checkout", return_value="a" * 40):
-                self.assertTrue(verify_profile_evidence(profile, root, agent_command_argv=agent_command))
+            (root / "isolation.json").write_text(
+                json.dumps(
+                    {
+                        "status": "verified",
+                        "probe": "scripts/skills/evals/agent/isolation_probe.py",
+                        "profile_fingerprint": profile_fingerprint(profile),
+                        "agent_command_fingerprint": canonical_fingerprint(
+                            agent_command
+                        ),
+                        "judge_command_fingerprint": canonical_fingerprint(
+                            profile["judge"]["command_argv"]
+                        ),
+                        "evaluator_revision": "a" * 40,
+                        "checks": checks,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with patch(
+                "scripts.skills.evals.agent.workspace.assert_clean_checkout",
+                return_value="a" * 40,
+            ):
+                self.assertTrue(
+                    verify_profile_evidence(
+                        profile, root, agent_command_argv=agent_command
+                    )
+                )
                 with self.assertRaises(AgentEvalError):
-                    verify_profile_evidence(profile, root, agent_command_argv=agent_command + ["different"])
-            with patch("scripts.skills.evals.agent.workspace.assert_clean_checkout", return_value="b" * 40):
+                    verify_profile_evidence(
+                        profile, root, agent_command_argv=agent_command + ["different"]
+                    )
+            with patch(
+                "scripts.skills.evals.agent.workspace.assert_clean_checkout",
+                return_value="b" * 40,
+            ):
                 with self.assertRaises(AgentEvalError):
-                    verify_profile_evidence(profile, root, agent_command_argv=agent_command)
+                    verify_profile_evidence(
+                        profile, root, agent_command_argv=agent_command
+                    )
 
     def test_live_probe_checks_sentinel_control_and_agent_mounts(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -65,17 +88,31 @@ class WorkspaceIsolationTests(unittest.TestCase):
             output.mkdir()
             sentinel.write_text("isolation-sentinel", encoding="utf-8")
             argv = [
-                "docker", "run", "--rm", "--read-only", "--network", "bridge",
-                "--workdir", "/workspace",
-                "--mount", f"type=bind,source={workspace},target=/workspace,readonly",
-                "--mount", f"type=bind,source={output},target=/workspace/.qa-eval-output",
-                "python:3.11", "codex", "exec", "-",
+                "docker",
+                "run",
+                "--rm",
+                "--read-only",
+                "--network",
+                "bridge",
+                "--workdir",
+                "/workspace",
+                "--mount",
+                f"type=bind,source={workspace},target=/workspace,readonly",
+                "--mount",
+                f"type=bind,source={output},target=/workspace/.qa-eval-output",
+                "python:3.11",
+                "codex",
+                "exec",
+                "-",
             ]
             completed = [
                 subprocess.CompletedProcess([], 0, b"", b""),
                 subprocess.CompletedProcess([], 0, b"isolation-probe:ok\n", b""),
             ]
-            with patch("scripts.skills.evals.agent.isolation_probe.subprocess.run", side_effect=completed) as run:
+            with patch(
+                "scripts.skills.evals.agent.isolation_probe.subprocess.run",
+                side_effect=completed,
+            ) as run:
                 result = _live_mount_probe(argv, evaluator_sentinel=sentinel)
         self.assertEqual(result["status"], "verified")
         self.assertTrue(result["checks"]["sentinel_control_readable"])
@@ -124,7 +161,9 @@ class WorkspaceIsolationTests(unittest.TestCase):
                     evidence_relative_path=None,
                 )
 
-    def test_agent_container_requires_read_only_workspace_and_single_output_mount(self) -> None:
+    def test_agent_container_requires_read_only_workspace_and_single_output_mount(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             workspace = root / "workspace"
@@ -134,12 +173,26 @@ class WorkspaceIsolationTests(unittest.TestCase):
             output.mkdir()
             evaluator.mkdir()
             argv = [
-                "docker", "run", "--rm", "--read-only", "--network", "bridge", "--workdir", "/workspace",
-                "--mount", f"type=bind,source={workspace},target=/workspace,readonly",
-                "--mount", f"type=bind,source={output},target=/workspace/.qa-eval-output",
-                "python:3.11", "codex", "exec", "-",
+                "docker",
+                "run",
+                "--rm",
+                "--read-only",
+                "--network",
+                "bridge",
+                "--workdir",
+                "/workspace",
+                "--mount",
+                f"type=bind,source={workspace},target=/workspace,readonly",
+                "--mount",
+                f"type=bind,source={output},target=/workspace/.qa-eval-output",
+                "python:3.11",
+                "codex",
+                "exec",
+                "-",
             ]
-            result = verify_agent_docker_command(argv, workspace=workspace, output_root=output, evaluator_root=evaluator)
+            result = verify_agent_docker_command(
+                argv, workspace=workspace, output_root=output, evaluator_root=evaluator
+            )
         self.assertEqual(result["status"], "verified")
         self.assertEqual(result["evaluator_bind_mounts"], 0)
 
@@ -152,14 +205,32 @@ class WorkspaceIsolationTests(unittest.TestCase):
             workspace.mkdir()
             output.mkdir()
             evaluator.mkdir()
-            base = ["docker", "run", "--rm", "--read-only", "--network", "bridge", "--workdir", "/workspace"]
+            base = [
+                "docker",
+                "run",
+                "--rm",
+                "--read-only",
+                "--network",
+                "bridge",
+                "--workdir",
+                "/workspace",
+            ]
             with self.assertRaises(AgentEvalError):
                 verify_agent_docker_command(
-                    base + [
-                        "--mount", f"type=bind,source={workspace},target=/workspace",
-                        "--mount", f"type=bind,source={output},target=/workspace/.qa-eval-output",
-                        "python:3.11", "codex", "exec", "-",
-                    ], workspace=workspace, output_root=output, evaluator_root=evaluator,
+                    base
+                    + [
+                        "--mount",
+                        f"type=bind,source={workspace},target=/workspace",
+                        "--mount",
+                        f"type=bind,source={output},target=/workspace/.qa-eval-output",
+                        "python:3.11",
+                        "codex",
+                        "exec",
+                        "-",
+                    ],
+                    workspace=workspace,
+                    output_root=output,
+                    evaluator_root=evaluator,
                 )
 
     def test_agent_tmpfs_is_limited_to_tmp_and_explicit_codex_home(self) -> None:
@@ -171,20 +242,43 @@ class WorkspaceIsolationTests(unittest.TestCase):
             for path in (workspace, output, evaluator):
                 path.mkdir()
             base = [
-                "docker", "run", "--rm", "--read-only", "--network", "bridge",
-                "--workdir", "/workspace",
-                "--mount", f"type=bind,source={workspace},target=/workspace,readonly",
-                "--mount", f"type=bind,source={output},target=/workspace/.qa-eval-output",
-                "--mount", "type=tmpfs,target=/tmp",
-                "--mount", "type=tmpfs,target=/codex-home",
-                "--env", "CODEX_HOME=/codex-home",
-                "python:3.11", "codex", "exec", "-",
+                "docker",
+                "run",
+                "--rm",
+                "--read-only",
+                "--network",
+                "bridge",
+                "--workdir",
+                "/workspace",
+                "--mount",
+                f"type=bind,source={workspace},target=/workspace,readonly",
+                "--mount",
+                f"type=bind,source={output},target=/workspace/.qa-eval-output",
+                "--mount",
+                "type=tmpfs,target=/tmp",
+                "--mount",
+                "type=tmpfs,target=/codex-home",
+                "--env",
+                "CODEX_HOME=/codex-home",
+                "python:3.11",
+                "codex",
+                "exec",
+                "-",
             ]
-            verify_agent_docker_command(base, workspace=workspace, output_root=output, evaluator_root=evaluator)
+            verify_agent_docker_command(
+                base, workspace=workspace, output_root=output, evaluator_root=evaluator
+            )
             unapproved = list(base)
-            unapproved[unapproved.index("type=tmpfs,target=/tmp")] = "type=tmpfs,target=/workspace"
+            unapproved[unapproved.index("type=tmpfs,target=/tmp")] = (
+                "type=tmpfs,target=/workspace"
+            )
             with self.assertRaises(AgentEvalError):
-                verify_agent_docker_command(unapproved, workspace=workspace, output_root=output, evaluator_root=evaluator)
+                verify_agent_docker_command(
+                    unapproved,
+                    workspace=workspace,
+                    output_root=output,
+                    evaluator_root=evaluator,
+                )
             with self.assertRaises(AgentEvalError):
                 verify_agent_docker_command(
                     base[:2] + ["--tmpfs", "/workspace"] + base[2:],
@@ -196,11 +290,29 @@ class WorkspaceIsolationTests(unittest.TestCase):
     def test_judge_container_has_no_host_bind_mounts(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            argv = ["docker", "run", "--rm", "--read-only", "--network", "bridge", "python:3.11", "codex", "exec", "-"]
-            self.assertEqual(verify_judge_docker_command(argv, evaluator_root=root)["host_bind_mounts"], 0)
+            argv = [
+                "docker",
+                "run",
+                "--rm",
+                "--read-only",
+                "--network",
+                "bridge",
+                "python:3.11",
+                "codex",
+                "exec",
+                "-",
+            ]
+            self.assertEqual(
+                verify_judge_docker_command(argv, evaluator_root=root)[
+                    "host_bind_mounts"
+                ],
+                0,
+            )
             with self.assertRaises(AgentEvalError):
                 verify_judge_docker_command(
-                    argv[:6] + ["--mount", f"type=bind,source={root},target=/data,readonly"] + argv[6:],
+                    argv[:6]
+                    + ["--mount", f"type=bind,source={root},target=/data,readonly"]
+                    + argv[6:],
                     evaluator_root=root,
                 )
 

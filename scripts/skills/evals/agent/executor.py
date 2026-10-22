@@ -74,7 +74,11 @@ def run_command(
 ) -> ExecutionResult:
     if not argv or any(not isinstance(item, str) or not item for item in argv):
         raise AgentExecutionError("command argv must contain non-empty strings")
-    if isinstance(timeout_seconds, bool) or not isinstance(timeout_seconds, int) or timeout_seconds <= 0:
+    if (
+        isinstance(timeout_seconds, bool)
+        or not isinstance(timeout_seconds, int)
+        or timeout_seconds <= 0
+    ):
         raise AgentExecutionError("timeout_seconds must be a positive integer")
     cwd = cwd.resolve()
     if not cwd.is_dir():
@@ -98,7 +102,9 @@ def run_command(
             creationflags=flags,
         )
     except OSError as exc:
-        raise AgentExecutionError(f"could not start external command: {type(exc).__name__}") from exc
+        raise AgentExecutionError(
+            f"could not start external command: {type(exc).__name__}"
+        ) from exc
 
     timed_out = False
     cleanup_status = "not_needed"

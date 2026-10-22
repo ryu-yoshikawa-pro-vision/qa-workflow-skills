@@ -51,7 +51,9 @@ def assert_clean_checkout(root: Path, *, expected_revision: str | None = None) -
         raise AgentEvalError("repository root must be a Git working tree")
     head = _git(root, "rev-parse", "--verify", "HEAD").strip()
     if expected_revision is not None and head != expected_revision:
-        raise AgentEvalError("Git working tree HEAD does not match the required revision")
+        raise AgentEvalError(
+            "Git working tree HEAD does not match the required revision"
+        )
     status = _git(root, "status", "--porcelain=v1", "--untracked-files=all")
     if status.strip():
         raise AgentEvalError("Git working tree and index must be clean")
@@ -62,7 +64,9 @@ def load_execution_profile(path: Path) -> dict[str, Any]:
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        raise AgentEvalError(f"execution profile is unreadable: {type(exc).__name__}") from exc
+        raise AgentEvalError(
+            f"execution profile is unreadable: {type(exc).__name__}"
+        ) from exc
     _validate_profile(value)
     return value
 
@@ -96,7 +100,9 @@ def _string_list(value: Any, name: str, *, allow_empty: bool = True) -> list[str
 def _assert_no_sensitive_argv(value: list[str], name: str) -> None:
     for argument in value:
         if _SENSITIVE_ARG_RE.search(argument):
-            raise AgentEvalError(f"execution profile {name} may not include credentials")
+            raise AgentEvalError(
+                f"execution profile {name} may not include credentials"
+            )
 
 
 def _validate_profile(value: Any) -> None:
@@ -108,15 +114,33 @@ def _validate_profile(value: Any) -> None:
     agent = _required_object(
         root["agent"],
         {
-            "name", "model", "timeout_seconds", "cli_version", "reasoning_effort",
-            "launch_options", "sandbox_policy", "approval_policy", "network_policy",
-            "tools", "mcp_servers", "skill_roots", "external_instructions", "global_config",
+            "name",
+            "model",
+            "timeout_seconds",
+            "cli_version",
+            "reasoning_effort",
+            "launch_options",
+            "sandbox_policy",
+            "approval_policy",
+            "network_policy",
+            "tools",
+            "mcp_servers",
+            "skill_roots",
+            "external_instructions",
+            "global_config",
         },
         "agent",
     )
     for field in (
-        "name", "model", "cli_version", "reasoning_effort", "sandbox_policy",
-        "approval_policy", "network_policy", "external_instructions", "global_config",
+        "name",
+        "model",
+        "cli_version",
+        "reasoning_effort",
+        "sandbox_policy",
+        "approval_policy",
+        "network_policy",
+        "external_instructions",
+        "global_config",
     ):
         _nonempty(agent[field], f"agent.{field}")
     _positive_int(agent["timeout_seconds"], "agent.timeout_seconds")
@@ -126,16 +150,34 @@ def _validate_profile(value: Any) -> None:
     judge = _required_object(
         root["judge"],
         {
-            "model", "command_argv", "cwd", "timeout_seconds", "cli_version",
-            "reasoning_effort", "launch_options", "sandbox_policy", "approval_policy",
-            "network_policy", "skill_roots", "global_config", "tools", "mcp_servers",
+            "model",
+            "command_argv",
+            "cwd",
+            "timeout_seconds",
+            "cli_version",
+            "reasoning_effort",
+            "launch_options",
+            "sandbox_policy",
+            "approval_policy",
+            "network_policy",
+            "skill_roots",
+            "global_config",
+            "tools",
+            "mcp_servers",
             "external_instructions",
         },
         "judge",
     )
     for field in (
-        "model", "cwd", "cli_version", "reasoning_effort", "sandbox_policy",
-        "approval_policy", "network_policy", "global_config", "external_instructions",
+        "model",
+        "cwd",
+        "cli_version",
+        "reasoning_effort",
+        "sandbox_policy",
+        "approval_policy",
+        "network_policy",
+        "global_config",
+        "external_instructions",
     ):
         _nonempty(judge[field], f"judge.{field}")
     _positive_int(judge["timeout_seconds"], "judge.timeout_seconds")
@@ -145,12 +187,18 @@ def _validate_profile(value: Any) -> None:
         _string_list(judge[field], f"judge.{field}")
 
     isolation = _required_object(
-        root["isolation"], {"method", "agent_read_roots", "evaluator_read_blocked"}, "isolation"
+        root["isolation"],
+        {"method", "agent_read_roots", "evaluator_read_blocked"},
+        "isolation",
     )
     _nonempty(isolation["method"], "isolation.method")
-    _string_list(isolation["agent_read_roots"], "isolation.agent_read_roots", allow_empty=False)
+    _string_list(
+        isolation["agent_read_roots"], "isolation.agent_read_roots", allow_empty=False
+    )
     if isolation["evaluator_read_blocked"] is not True:
-        raise AgentEvalError("execution profile must declare evaluator read access blocked")
+        raise AgentEvalError(
+            "execution profile must declare evaluator read access blocked"
+        )
 
     verification = _required_object(
         root["verification"], {"status", "method", "evidence_path"}, "verification"
@@ -211,9 +259,13 @@ def verify_profile_evidence(
         or not required.issubset(checks)
         or any(checks[key] is not True for key in required)
     ):
-        raise AgentEvalError("profile evidence does not verify required isolation checks")
+        raise AgentEvalError(
+            "profile evidence does not verify required isolation checks"
+        )
     if evidence.get("evaluator_revision") != assert_clean_checkout(REPO_ROOT):
-        raise AgentEvalError("profile evidence belongs to a different Evaluator revision")
+        raise AgentEvalError(
+            "profile evidence belongs to a different Evaluator revision"
+        )
     return True
 
 
@@ -253,20 +305,39 @@ def verify_agent_docker_command(
     evaluator_root: Path,
 ) -> dict[str, Any]:
     """Require a direct Docker argv with a read-only Agent workspace and one output mount."""
-    if len(argv) < 3 or Path(argv[0]).name.lower() not in {"docker", "docker.exe"} or argv[1] != "run":
+    if (
+        len(argv) < 3
+        or Path(argv[0]).name.lower() not in {"docker", "docker.exe"}
+        or argv[1] != "run"
+    ):
         raise AgentEvalError("live Agent command must start with direct 'docker run'")
     if "--rm" not in argv or "--read-only" not in argv:
-        raise AgentEvalError("Agent container must be disposable with a read-only root filesystem")
+        raise AgentEvalError(
+            "Agent container must be disposable with a read-only root filesystem"
+        )
     workdir = _option_value(argv, "--workdir") or _option_value(argv, "-w")
     if workdir != "/workspace":
         raise AgentEvalError("Agent container working directory must be /workspace")
     if "--privileged" in argv or "host" in (_option_value(argv, "--network") or ""):
-        raise AgentEvalError("Agent container may not use privileged or host-network access")
+        raise AgentEvalError(
+            "Agent container may not use privileged or host-network access"
+        )
     if any(item in {"-v", "--volume"} or item.startswith("--volume=") for item in argv):
-        raise AgentEvalError("Agent container must use auditable --mount entries, not volume aliases")
-    if any(item in {"--device", "--devices", "--volumes-from", "--cap-add"} or item.startswith(("--device=", "--volumes-from=", "--cap-add=")) for item in argv):
-        raise AgentEvalError("Agent container may not add host devices, volumes, or capabilities")
-    if any(_option_value(argv, option) == "host" for option in ("--pid", "--ipc", "--uts", "--cgroupns")):
+        raise AgentEvalError(
+            "Agent container must use auditable --mount entries, not volume aliases"
+        )
+    if any(
+        item in {"--device", "--devices", "--volumes-from", "--cap-add"}
+        or item.startswith(("--device=", "--volumes-from=", "--cap-add="))
+        for item in argv
+    ):
+        raise AgentEvalError(
+            "Agent container may not add host devices, volumes, or capabilities"
+        )
+    if any(
+        _option_value(argv, option) == "host"
+        for option in ("--pid", "--ipc", "--uts", "--cgroupns")
+    ):
         raise AgentEvalError("Agent container may not join host namespaces")
     if any(item == "--tmpfs" or item.startswith("--tmpfs=") for item in argv):
         raise AgentEvalError("Agent tmpfs mounts must use auditable --mount entries")
@@ -297,10 +368,16 @@ def verify_agent_docker_command(
             target = fields.get("target")
             if _approved_agent_tmpfs(target, codex_home):
                 continue
-            raise AgentEvalError("Agent tmpfs mounts may cover only /tmp or the explicitly configured temporary CODEX_HOME")
+            raise AgentEvalError(
+                "Agent tmpfs mounts may cover only /tmp or the explicitly configured temporary CODEX_HOME"
+            )
         if mount_type != "bind":
-            raise AgentEvalError("Agent container may use only approved bind and tmpfs mounts")
-        if not isinstance(fields.get("source"), str) or not isinstance(fields.get("target"), str):
+            raise AgentEvalError(
+                "Agent container may use only approved bind and tmpfs mounts"
+            )
+        if not isinstance(fields.get("source"), str) or not isinstance(
+            fields.get("target"), str
+        ):
             raise AgentEvalError("Agent bind mount is missing source or target")
         mounts.append(fields)
     workspace_path = workspace.resolve()
@@ -315,14 +392,22 @@ def verify_agent_docker_command(
         if source == workspace_path and target == "/workspace" and read_only:
             read_only_workspace = True
             continue
-        if source == output_path and target == "/workspace/.qa-eval-output" and not read_only:
+        if (
+            source == output_path
+            and target == "/workspace/.qa-eval-output"
+            and not read_only
+        ):
             writable_output = True
             continue
         if source == evaluator_path or evaluator_path in source.parents:
-            raise AgentEvalError("Agent command mounts evaluator-owned files outside the output root")
+            raise AgentEvalError(
+                "Agent command mounts evaluator-owned files outside the output root"
+            )
         raise AgentEvalError("Agent command contains an unapproved bind mount")
     if len(mounts) != 2 or not read_only_workspace or not writable_output:
-        raise AgentEvalError("Agent command must mount only a read-only workspace and writable .qa-eval-output")
+        raise AgentEvalError(
+            "Agent command must mount only a read-only workspace and writable .qa-eval-output"
+        )
     network = _option_value(argv, "--network")
     if network == "host":
         raise AgentEvalError("Agent container may not use host networking")
@@ -337,20 +422,41 @@ def verify_agent_docker_command(
     }
 
 
-def verify_judge_docker_command(argv: list[str], *, evaluator_root: Path) -> dict[str, Any]:
+def verify_judge_docker_command(
+    argv: list[str], *, evaluator_root: Path
+) -> dict[str, Any]:
     """Require a fresh Judge container that receives only the prompt over stdin."""
-    if len(argv) < 3 or Path(argv[0]).name.lower() not in {"docker", "docker.exe"} or argv[1] != "run":
+    if (
+        len(argv) < 3
+        or Path(argv[0]).name.lower() not in {"docker", "docker.exe"}
+        or argv[1] != "run"
+    ):
         raise AgentEvalError("live Judge command must start with direct 'docker run'")
     if "--rm" not in argv or "--read-only" not in argv:
-        raise AgentEvalError("Judge container must be disposable with a read-only root filesystem")
-    if "--privileged" in argv or "host" in (_option_value(argv, "--network") or "") or any(
-        _option_value(argv, option) == "host" for option in ("--pid", "--ipc", "--uts", "--cgroupns")
+        raise AgentEvalError(
+            "Judge container must be disposable with a read-only root filesystem"
+        )
+    if (
+        "--privileged" in argv
+        or "host" in (_option_value(argv, "--network") or "")
+        or any(
+            _option_value(argv, option) == "host"
+            for option in ("--pid", "--ipc", "--uts", "--cgroupns")
+        )
     ):
-        raise AgentEvalError("Judge container may not use privileged or host-network access")
+        raise AgentEvalError(
+            "Judge container may not use privileged or host-network access"
+        )
     if any(item in {"-v", "--volume"} or item.startswith("--volume=") for item in argv):
         raise AgentEvalError("Judge container may not mount host volumes")
-    if any(item in {"--device", "--devices", "--volumes-from", "--cap-add"} or item.startswith(("--device=", "--volumes-from=", "--cap-add=")) for item in argv):
-        raise AgentEvalError("Judge container may not add host devices, volumes, or capabilities")
+    if any(
+        item in {"--device", "--devices", "--volumes-from", "--cap-add"}
+        or item.startswith(("--device=", "--volumes-from=", "--cap-add="))
+        for item in argv
+    ):
+        raise AgentEvalError(
+            "Judge container may not add host devices, volumes, or capabilities"
+        )
     if any(item in {"--pid=host", "--ipc=host", "--uts=host"} for item in argv):
         raise AgentEvalError("Judge container may not join host namespaces")
     mounts: list[str] = []
@@ -366,7 +472,9 @@ def verify_judge_docker_command(argv: list[str], *, evaluator_root: Path) -> dic
         else:
             index += 1
     if any("type=bind" in item or "type=volume" in item for item in mounts):
-        raise AgentEvalError("Judge receives evaluator or source data only through its prompt")
+        raise AgentEvalError(
+            "Judge receives evaluator or source data only through its prompt"
+        )
     if any(str(evaluator_root.resolve()).lower() in item.lower() for item in argv):
         raise AgentEvalError("Judge command contains an Evaluator path")
     return {
@@ -388,18 +496,36 @@ def verify_repair_docker_command(
     output_root: Path,
     skill_name: str,
 ) -> dict[str, Any]:
-    if len(argv) < 3 or Path(argv[0]).name.lower() not in {"docker", "docker.exe"} or argv[1] != "run":
+    if (
+        len(argv) < 3
+        or Path(argv[0]).name.lower() not in {"docker", "docker.exe"}
+        or argv[1] != "run"
+    ):
         raise AgentEvalError("repair command must start with direct 'docker run'")
     if "--rm" not in argv or "--read-only" not in argv:
-        raise AgentEvalError("repair container must be disposable with a read-only root filesystem")
+        raise AgentEvalError(
+            "repair container must be disposable with a read-only root filesystem"
+        )
     if (_option_value(argv, "--workdir") or _option_value(argv, "-w")) != "/workspace":
         raise AgentEvalError("repair container working directory must be /workspace")
-    if "--privileged" in argv or "host" in (_option_value(argv, "--network") or "") or any(
-        _option_value(argv, option) == "host" for option in ("--pid", "--ipc", "--uts", "--cgroupns")
+    if (
+        "--privileged" in argv
+        or "host" in (_option_value(argv, "--network") or "")
+        or any(
+            _option_value(argv, option) == "host"
+            for option in ("--pid", "--ipc", "--uts", "--cgroupns")
+        )
     ):
-        raise AgentEvalError("repair container may not use privileged or host-network access")
-    if any(item in {"-v", "--volume", "--device", "--volumes-from", "--cap-add"} for item in argv):
-        raise AgentEvalError("repair container may not use volume aliases, host devices, or added capabilities")
+        raise AgentEvalError(
+            "repair container may not use privileged or host-network access"
+        )
+    if any(
+        item in {"-v", "--volume", "--device", "--volumes-from", "--cap-add"}
+        for item in argv
+    ):
+        raise AgentEvalError(
+            "repair container may not use volume aliases, host devices, or added capabilities"
+        )
     if any(item == "--tmpfs" or item.startswith("--tmpfs=") for item in argv):
         raise AgentEvalError("repair tmpfs mounts must use auditable --mount entries")
     codex_home = _codex_home_from_argv(argv)
@@ -427,10 +553,18 @@ def verify_repair_docker_command(
             fields[key] = content if separator else True
         if fields.get("type") == "tmpfs":
             if not _approved_agent_tmpfs(fields.get("target"), codex_home):
-                raise AgentEvalError("repair tmpfs mounts may cover only /tmp or the explicitly configured temporary CODEX_HOME")
+                raise AgentEvalError(
+                    "repair tmpfs mounts may cover only /tmp or the explicitly configured temporary CODEX_HOME"
+                )
             continue
-        if fields.get("type") != "bind" or not isinstance(fields.get("source"), str) or not isinstance(fields.get("target"), str):
-            raise AgentEvalError("repair container may use only approved bind and tmpfs mounts")
+        if (
+            fields.get("type") != "bind"
+            or not isinstance(fields.get("source"), str)
+            or not isinstance(fields.get("target"), str)
+        ):
+            raise AgentEvalError(
+                "repair container may use only approved bind and tmpfs mounts"
+            )
         readonly = fields.get("readonly") is True or fields.get("ro") is True
         item = (Path(str(fields["source"])).resolve(), str(fields["target"]), readonly)
         if item not in expected:
@@ -438,7 +572,9 @@ def verify_repair_docker_command(
         expected[item] = True
         bind_count += 1
     if bind_count != 3 or not all(expected.values()):
-        raise AgentEvalError("repair command must mount only read-only workspace, one Skill package, and output root")
+        raise AgentEvalError(
+            "repair command must mount only read-only workspace, one Skill package, and output root"
+        )
     return {
         "status": "verified",
         "workspace_read_only": True,
@@ -450,7 +586,9 @@ def verify_repair_docker_command(
     }
 
 
-def named_container_command(argv: list[str], *, name: str) -> tuple[list[str], list[str]]:
+def named_container_command(
+    argv: list[str], *, name: str
+) -> tuple[list[str], list[str]]:
     if any(item == "--name" or item.startswith("--name=") for item in argv):
         raise AgentEvalError("runner owns the temporary Docker container name")
     if len(argv) < 3 or argv[1] != "run":
@@ -494,7 +632,9 @@ def create_skill_workspace(
         metadata, relative = entry.split("\t", 1)
         mode, object_type, object_sha = metadata.split(" ")
         if mode == "120000" or object_type != "blob":
-            raise AgentEvalError("Skill package may not contain symlinks or non-file entries")
+            raise AgentEvalError(
+                "Skill package may not contain symlinks or non-file entries"
+            )
         rows.append((mode, object_type, object_sha, relative))
 
     skill_names = sorted(
@@ -505,10 +645,20 @@ def create_skill_workspace(
         and PurePosixPath(relative).parts[2] == "SKILL.md"
     )
     if not skill_names or len(skill_names) != len(set(skill_names)):
-        raise AgentEvalError("candidate revision must contain a unique tracked Skill set")
+        raise AgentEvalError(
+            "candidate revision must contain a unique tracked Skill set"
+        )
     manifest_files: list[dict[str, Any]] = []
     archive = subprocess.run(
-        ["git", "-C", str(evaluator_root), "archive", "--format=tar", revision, "skills"],
+        [
+            "git",
+            "-C",
+            str(evaluator_root),
+            "archive",
+            "--format=tar",
+            revision,
+            "skills",
+        ],
         stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -525,7 +675,9 @@ def create_skill_workspace(
     with tarfile.open(fileobj=io.BytesIO(archive.stdout), mode="r:") as package:
         for member in package.getmembers():
             raw_path = PurePosixPath(member.name)
-            if raw_path.is_absolute() or any(part in {"", ".", ".."} for part in raw_path.parts):
+            if raw_path.is_absolute() or any(
+                part in {"", ".", ".."} for part in raw_path.parts
+            ):
                 raise AgentEvalError("candidate archive contains an unsafe path")
             parts = raw_path.parts
             if len(parts) < 3 or parts[0] != "skills" or parts[1] not in allowed_skills:
@@ -533,7 +685,9 @@ def create_skill_workspace(
             if member.isdir():
                 continue
             if not member.isfile():
-                raise AgentEvalError("candidate Skill package contains a non-regular file")
+                raise AgentEvalError(
+                    "candidate Skill package contains a non-regular file"
+                )
             if parts[2] != "SKILL.md" and parts[2] not in ALLOWED_PACKAGE_AREAS:
                 continue
             if len(parts) > 3 and parts[2] not in ALLOWED_PACKAGE_AREAS:
@@ -547,7 +701,11 @@ def create_skill_workspace(
             content = stream.read()
             target.write_bytes(content)
             manifest_files.append(
-                {"path": relative, "size": len(content), "sha256": sha256_bytes(content)}
+                {
+                    "path": relative,
+                    "size": len(content),
+                    "sha256": sha256_bytes(content),
+                }
             )
 
     seen_skills = {
@@ -577,7 +735,9 @@ def create_skill_workspace_from_root(
     source_root = source_root.resolve()
     source_skills = source_root / "skills"
     if not source_skills.is_dir() or source_skills.is_symlink():
-        raise AgentEvalError("candidate package root must contain a regular skills directory")
+        raise AgentEvalError(
+            "candidate package root must contain a regular skills directory"
+        )
     if destination.exists() and any(destination.iterdir()):
         raise AgentEvalError("candidate Skill workspace destination must be empty")
     destination.mkdir(parents=True, exist_ok=True)
@@ -605,9 +765,17 @@ def create_skill_workspace_from_root(
         target = destination / "skills" / skill / Path(*parts[1:])
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(content)
-        manifest_files.append({"path": f"skills/{relative}", "size": len(content), "sha256": sha256_bytes(content)})
+        manifest_files.append(
+            {
+                "path": f"skills/{relative}",
+                "size": len(content),
+                "sha256": sha256_bytes(content),
+            }
+        )
     if present != expected_skills:
-        raise AgentEvalError("candidate package Skill set differs from the fixed parent revision")
+        raise AgentEvalError(
+            "candidate package Skill set differs from the fixed parent revision"
+        )
     manifest_files.sort(key=lambda item: item["path"])
     return {
         "revision": parent_revision,

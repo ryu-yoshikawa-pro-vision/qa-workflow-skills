@@ -12,7 +12,11 @@ class ExecutorTests(unittest.TestCase):
     def test_fake_agent_process_captures_stdout_and_sanitized_stderr(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             result = run_command(
-                [sys.executable, "-c", "import sys; print('candidate output'); print('Bearer abcdefghijklmnopqrstuv', file=sys.stderr)"],
+                [
+                    sys.executable,
+                    "-c",
+                    "import sys; print('candidate output'); print('Bearer abcdefghijklmnopqrstuv', file=sys.stderr)",
+                ],
                 input_text="prompt",
                 cwd=Path(temporary),
                 timeout_seconds=5,

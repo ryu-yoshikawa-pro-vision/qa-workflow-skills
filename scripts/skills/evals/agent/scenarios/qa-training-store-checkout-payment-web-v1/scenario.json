@@ -39,14 +39,14 @@
     "tests/repository-contract/validate-skills.test.ts"
   ],
   "required_artifacts": [
-    {"skill":"spec-analysis","kind":"spec-analysis","scope":"checkout-payment-web"},
-    {"skill":"test-analysis","kind":"test-analysis","scope":"checkout-payment-web"},
-    {"skill":"test-requirement-design","kind":"test-requirement","scope":"checkout-payment-web"},
-    {"skill":"test-condition-design","kind":"test-condition-and-ci","scope":"checkout-payment-web"},
-    {"skill":"test-case-design","kind":"test-case","scope":"checkout-payment-web"},
-    {"skill":"coverage-analysis","kind":"coverage-analysis","scope":"checkout-payment-web"},
-    {"skill":"adversarial-review","kind":"adversarial-review","scope":"checkout-payment-web"},
-    {"skill":"qa-workflow","kind":"workflow-decision","scope":"checkout-payment-web"}
+    { "skill": "spec-analysis", "kind": "spec-analysis", "scope": "checkout-payment-web" },
+    { "skill": "test-analysis", "kind": "test-analysis", "scope": "checkout-payment-web" },
+    { "skill": "test-requirement-design", "kind": "test-requirement", "scope": "checkout-payment-web" },
+    { "skill": "test-condition-design", "kind": "test-condition-and-ci", "scope": "checkout-payment-web" },
+    { "skill": "test-case-design", "kind": "test-case", "scope": "checkout-payment-web" },
+    { "skill": "coverage-analysis", "kind": "coverage-analysis", "scope": "checkout-payment-web" },
+    { "skill": "adversarial-review", "kind": "adversarial-review", "scope": "checkout-payment-web" },
+    { "skill": "qa-workflow", "kind": "workflow-decision", "scope": "checkout-payment-web" }
   ],
   "max_artifact_file_bytes": 5000000,
   "max_artifact_total_bytes": 50000000

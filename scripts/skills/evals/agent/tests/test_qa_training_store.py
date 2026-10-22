@@ -23,17 +23,23 @@ class QATrainingStoreTests(unittest.TestCase):
         for index, required in enumerate(scenario["required_artifacts"]):
             artifact_id = f"artifact-{index:02d}"
             name = f"artifact-{index:02d}.md"
-            (root / name).write_text(f"QA artifact for {required['skill']}\n", encoding="utf-8")
+            (root / name).write_text(
+                f"QA artifact for {required['skill']}\n", encoding="utf-8"
+            )
             artifacts.append({**required, "artifact_id": artifact_id, "path": name})
-            routing.append({
-                "skill": required["skill"],
-                "scope": required["scope"],
-                "status": "executed",
-                "reason": "Required analysis and design output was produced.",
-                "artifact_ids": [artifact_id],
-            })
+            routing.append(
+                {
+                    "skill": required["skill"],
+                    "scope": required["scope"],
+                    "status": "executed",
+                    "reason": "Required analysis and design output was produced.",
+                    "artifact_ids": [artifact_id],
+                }
+            )
         (root / "artifact-index.json").write_text(
-            json.dumps({"schema_version": 1, "artifacts": artifacts, "routing": routing}),
+            json.dumps(
+                {"schema_version": 1, "artifacts": artifacts, "routing": routing}
+            ),
             encoding="utf-8",
         )
         return {"artifacts": artifacts, "routing": routing}
@@ -44,22 +50,34 @@ class QATrainingStoreTests(unittest.TestCase):
             root = Path(temporary)
             self._valid_output(root, scenario)
             self.assertEqual(validate_artifact_index(root, scenario)["status"], "pass")
-            index = json.loads((root / "artifact-index.json").read_text(encoding="utf-8"))
+            index = json.loads(
+                (root / "artifact-index.json").read_text(encoding="utf-8")
+            )
             index["routing"][0]["artifact_ids"] = []
-            (root / "artifact-index.json").write_text(json.dumps(index), encoding="utf-8")
+            (root / "artifact-index.json").write_text(
+                json.dumps(index), encoding="utf-8"
+            )
             result = validate_artifact_index(root, scenario)
         self.assertEqual(result["status"], "needs_review")
-        self.assertIn("artifact_not_linked_from_routing", {row["kind"] for row in result["issues"]})
+        self.assertIn(
+            "artifact_not_linked_from_routing",
+            {row["kind"] for row in result["issues"]},
+        )
 
     def test_missing_index_and_missing_file_are_distinct(self) -> None:
         scenario = load_scenario()
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            self.assertEqual(validate_artifact_index(root, scenario)["reason"], "artifact_index_missing_or_unsafe")
+            self.assertEqual(
+                validate_artifact_index(root, scenario)["reason"],
+                "artifact_index_missing_or_unsafe",
+            )
             output = self._valid_output(root, scenario)
             (root / output["artifacts"][0]["path"]).unlink()
             result = validate_artifact_index(root, scenario)
-        self.assertIn("artifact_missing_or_symlink", {row["kind"] for row in result["issues"]})
+        self.assertIn(
+            "artifact_missing_or_symlink", {row["kind"] for row in result["issues"]}
+        )
 
     def test_two_independent_fake_judges_receive_separate_evidence(self) -> None:
         scenario = load_scenario()
@@ -78,7 +96,9 @@ class QATrainingStoreTests(unittest.TestCase):
             validation["routing"][0]["reason"] = "ROUTING-SECRET-SENTINEL"
             prompts = []
 
-            def fake_judge(argv, *, input_text, cwd, timeout_seconds, timeout_cleanup_argv=None):
+            def fake_judge(
+                argv, *, input_text, cwd, timeout_seconds, timeout_cleanup_argv=None
+            ):
                 prompts.append(input_text)
                 requested = [
                     f"QTS-SEM-{number:03d}"
@@ -86,19 +106,53 @@ class QATrainingStoreTests(unittest.TestCase):
                 ]
                 response = {
                     "criteria": [
-                        {"id": criterion, "evaluable": True, "rating": 3, "reason": "The fixed evidence supports this result.", "evidence": ["artifact-00.md"]}
+                        {
+                            "id": criterion,
+                            "evaluable": True,
+                            "rating": 3,
+                            "reason": "The fixed evidence supports this result.",
+                            "evidence": ["artifact-00.md"],
+                        }
                         for criterion in requested
                     ]
                 }
-                return ExecutionResult(0, json.dumps(response), None, "empty", False, 0.01)
+                return ExecutionResult(
+                    0, json.dumps(response), None, "empty", False, 0.01
+                )
 
-            profile = {"judge": {"command_argv": ["docker", "run", "--rm", "--read-only", "--network", "bridge", "python:3.11", "codex", "exec"], "timeout_seconds": 30}}
-            with patch("scripts.skills.evals.agent.qa_training_store.run_command", side_effect=fake_judge):
+            profile = {
+                "judge": {
+                    "command_argv": [
+                        "docker",
+                        "run",
+                        "--rm",
+                        "--read-only",
+                        "--network",
+                        "bridge",
+                        "python:3.11",
+                        "codex",
+                        "exec",
+                    ],
+                    "timeout_seconds": 30,
+                }
+            }
+            with patch(
+                "scripts.skills.evals.agent.qa_training_store.run_command",
+                side_effect=fake_judge,
+            ):
                 result = run_independent_judges(
-                    scenario=scenario, target_root=target, output_root=output,
-                    validation=validation, final_message="FINAL-SECRET-SENTINEL",
-                    machine_summary={"workflow_runtime_can_complete": True, "workflow_runtime_has_unclosed_issues": False, "required_artifacts_present": True},
-                    profile=profile, judge_root=root / "fake-judge-workspaces",
+                    scenario=scenario,
+                    target_root=target,
+                    output_root=output,
+                    validation=validation,
+                    final_message="FINAL-SECRET-SENTINEL",
+                    machine_summary={
+                        "workflow_runtime_can_complete": True,
+                        "workflow_runtime_has_unclosed_issues": False,
+                        "required_artifacts_present": True,
+                    },
+                    profile=profile,
+                    judge_root=root / "fake-judge-workspaces",
                 )
         self.assertEqual(result["status"], "pass")
         self.assertEqual(len(prompts), 2)
@@ -110,7 +164,10 @@ class QATrainingStoreTests(unittest.TestCase):
 
     def test_invalid_judge_response_and_failed_cleanup_never_pass(self) -> None:
         scenario = load_scenario()
-        for mode, expected_status in (("invalid", "needs_review"), ("cleanup", "execution_error")):
+        for mode, expected_status in (
+            ("invalid", "needs_review"),
+            ("cleanup", "execution_error"),
+        ):
             with self.subTest(mode=mode), tempfile.TemporaryDirectory() as temporary:
                 root = Path(temporary)
                 output = root / "qa-output"
@@ -126,7 +183,14 @@ class QATrainingStoreTests(unittest.TestCase):
                 judge_root = root / "judge-workspaces"
                 judge_root.mkdir()
 
-                def fake_judge(_argv, *, input_text, cwd, timeout_seconds, timeout_cleanup_argv=None):
+                def fake_judge(
+                    _argv,
+                    *,
+                    input_text,
+                    cwd,
+                    timeout_seconds,
+                    timeout_cleanup_argv=None,
+                ):
                     if mode == "invalid":
                         response = "{}"
                         cleanup = "empty"
@@ -136,15 +200,42 @@ class QATrainingStoreTests(unittest.TestCase):
                             if cwd.name == "workflow"
                             else [f"QTS-SEM-{number:03d}" for number in range(3, 11)]
                         )
-                        response = json.dumps({"criteria": [
-                            {"id": criterion, "evaluable": True, "rating": 3, "reason": "Supported.", "evidence": ["artifact-00.md"]}
-                            for criterion in requested
-                        ]})
+                        response = json.dumps(
+                            {
+                                "criteria": [
+                                    {
+                                        "id": criterion,
+                                        "evaluable": True,
+                                        "rating": 3,
+                                        "reason": "Supported.",
+                                        "evidence": ["artifact-00.md"],
+                                    }
+                                    for criterion in requested
+                                ]
+                            }
+                        )
                         cleanup = "failed"
-                    return ExecutionResult(0, response, None, "empty", False, 0.01, cleanup)
+                    return ExecutionResult(
+                        0, response, None, "empty", False, 0.01, cleanup
+                    )
 
-                profile = {"judge": {"command_argv": ["docker", "run", "--rm", "--read-only", "python:3.11", "judge"], "timeout_seconds": 30}}
-                with patch("scripts.skills.evals.agent.qa_training_store.run_command", side_effect=fake_judge):
+                profile = {
+                    "judge": {
+                        "command_argv": [
+                            "docker",
+                            "run",
+                            "--rm",
+                            "--read-only",
+                            "python:3.11",
+                            "judge",
+                        ],
+                        "timeout_seconds": 30,
+                    }
+                }
+                with patch(
+                    "scripts.skills.evals.agent.qa_training_store.run_command",
+                    side_effect=fake_judge,
+                ):
                     result = qa_training_store.run_independent_judges(
                         scenario=scenario,
                         target_root=target,
@@ -176,21 +267,55 @@ class QATrainingStoreTests(unittest.TestCase):
                 profile = {
                     "schema_version": 1,
                     "agent": {
-                        "name": "fake-agent", "model": "fake-model", "timeout_seconds": 30,
-                        "cli_version": "test", "reasoning_effort": "low", "launch_options": [],
-                        "sandbox_policy": "isolated", "approval_policy": "never", "network_policy": "model API only",
-                        "tools": [], "mcp_servers": [], "skill_roots": ["/workspace/.agents/skills"],
-                        "external_instructions": "disabled", "global_config": "disabled",
+                        "name": "fake-agent",
+                        "model": "fake-model",
+                        "timeout_seconds": 30,
+                        "cli_version": "test",
+                        "reasoning_effort": "low",
+                        "launch_options": [],
+                        "sandbox_policy": "isolated",
+                        "approval_policy": "never",
+                        "network_policy": "model API only",
+                        "tools": [],
+                        "mcp_servers": [],
+                        "skill_roots": ["/workspace/.agents/skills"],
+                        "external_instructions": "disabled",
+                        "global_config": "disabled",
                     },
                     "judge": {
-                        "model": "fake-judge", "command_argv": ["docker", "run", "--rm", "--read-only", "python:3.11", "judge"],
-                        "cwd": "isolated", "timeout_seconds": 30, "cli_version": "test", "reasoning_effort": "low",
-                        "launch_options": [], "sandbox_policy": "isolated", "approval_policy": "never",
-                        "network_policy": "model API only", "skill_roots": [], "global_config": "disabled",
-                        "tools": [], "mcp_servers": [], "external_instructions": "disabled",
+                        "model": "fake-judge",
+                        "command_argv": [
+                            "docker",
+                            "run",
+                            "--rm",
+                            "--read-only",
+                            "python:3.11",
+                            "judge",
+                        ],
+                        "cwd": "isolated",
+                        "timeout_seconds": 30,
+                        "cli_version": "test",
+                        "reasoning_effort": "low",
+                        "launch_options": [],
+                        "sandbox_policy": "isolated",
+                        "approval_policy": "never",
+                        "network_policy": "model API only",
+                        "skill_roots": [],
+                        "global_config": "disabled",
+                        "tools": [],
+                        "mcp_servers": [],
+                        "external_instructions": "disabled",
                     },
-                    "isolation": {"method": "fake-test", "agent_read_roots": ["/workspace"], "evaluator_read_blocked": True},
-                    "verification": {"status": "verified", "method": "fake-test", "evidence_path": "isolation.json"},
+                    "isolation": {
+                        "method": "fake-test",
+                        "agent_read_roots": ["/workspace"],
+                        "evaluator_read_blocked": True,
+                    },
+                    "verification": {
+                        "status": "verified",
+                        "method": "fake-test",
+                        "evidence_path": "isolation.json",
+                    },
                 }
                 package_sha = "sha256:" + "a" * 64
 
@@ -198,8 +323,15 @@ class QATrainingStoreTests(unittest.TestCase):
                     skills_root = destination / "skills"
                     skills_root.mkdir(parents=True)
                     (skills_root / "qa-workflow").mkdir()
-                    (skills_root / "qa-workflow" / "SKILL.md").write_text("fake", encoding="utf-8")
-                    return {"revision": revision, "skills": ["qa-workflow"], "files": [], "package_fingerprint": package_sha}
+                    (skills_root / "qa-workflow" / "SKILL.md").write_text(
+                        "fake", encoding="utf-8"
+                    )
+                    return {
+                        "revision": revision,
+                        "skills": ["qa-workflow"],
+                        "files": [],
+                        "package_fingerprint": package_sha,
+                    }
 
                 def fake_prepare(*, destination, source_revision, **kwargs):
                     destination.mkdir(parents=True)
@@ -216,33 +348,109 @@ class QATrainingStoreTests(unittest.TestCase):
                     qa_root = cwd / ".qa-eval-output"
                     qa_root.mkdir(exist_ok=True)
                     self._valid_output(qa_root, scenario)
-                    return ExecutionResult(0, "Agent completed the workflow.", None, "empty", False, 0.01)
+                    return ExecutionResult(
+                        0, "Agent completed the workflow.", None, "empty", False, 0.01
+                    )
 
                 fake_profile = profile
                 with (
-                    patch.object(qa_training_store, "assert_clean_checkout", side_effect=[evaluator_sha, DEFAULT_TARGET_REVISION]),
-                    patch.object(qa_training_store, "resolve_commit", side_effect=lambda _root, revision: revision),
-                    patch.object(qa_training_store, "load_execution_profile", return_value=fake_profile),
-                    patch.object(qa_training_store, "verify_profile_evidence", return_value=True),
-                    patch.object(qa_training_store, "create_skill_workspace", side_effect=fake_package),
-                    patch.object(qa_training_store, "prepare_sanitized_target", side_effect=fake_prepare),
-                    patch.object(qa_training_store, "verify_workspace_unchanged", return_value={"unchanged": True, "changed_paths": [], "commit_count": 1, "remotes": []}),
-                    patch.object(qa_training_store, "verify_agent_docker_command", return_value={"status": "verified"}),
-                    patch.object(qa_training_store, "evaluate_runtime_captures", return_value={"status": "pass", "captures": []}),
-                    patch.object(qa_training_store, "evaluate_workflow_runtime_capture", return_value={"status": "pass", "workflow_runtime_can_complete": True, "workflow_runtime_has_unclosed_issues": False}),
-                    patch.object(qa_training_store, "run_independent_judges", return_value={"status": "pass", "runs": [], "normalized": {"verdict": "pass"}}),
-                    patch.object(qa_training_store, "run_command", side_effect=fake_agent),
+                    patch.object(
+                        qa_training_store,
+                        "assert_clean_checkout",
+                        side_effect=[evaluator_sha, DEFAULT_TARGET_REVISION],
+                    ),
+                    patch.object(
+                        qa_training_store,
+                        "resolve_commit",
+                        side_effect=lambda _root, revision: revision,
+                    ),
+                    patch.object(
+                        qa_training_store,
+                        "load_execution_profile",
+                        return_value=fake_profile,
+                    ),
+                    patch.object(
+                        qa_training_store, "verify_profile_evidence", return_value=True
+                    ),
+                    patch.object(
+                        qa_training_store,
+                        "create_skill_workspace",
+                        side_effect=fake_package,
+                    ),
+                    patch.object(
+                        qa_training_store,
+                        "prepare_sanitized_target",
+                        side_effect=fake_prepare,
+                    ),
+                    patch.object(
+                        qa_training_store,
+                        "verify_workspace_unchanged",
+                        return_value={
+                            "unchanged": True,
+                            "changed_paths": [],
+                            "commit_count": 1,
+                            "remotes": [],
+                        },
+                    ),
+                    patch.object(
+                        qa_training_store,
+                        "verify_agent_docker_command",
+                        return_value={"status": "verified"},
+                    ),
+                    patch.object(
+                        qa_training_store,
+                        "evaluate_runtime_captures",
+                        return_value={"status": "pass", "captures": []},
+                    ),
+                    patch.object(
+                        qa_training_store,
+                        "evaluate_workflow_runtime_capture",
+                        return_value={
+                            "status": "pass",
+                            "workflow_runtime_can_complete": True,
+                            "workflow_runtime_has_unclosed_issues": False,
+                        },
+                    ),
+                    patch.object(
+                        qa_training_store,
+                        "run_independent_judges",
+                        return_value={
+                            "status": "pass",
+                            "runs": [],
+                            "normalized": {"verdict": "pass"},
+                        },
+                    ),
+                    patch.object(
+                        qa_training_store, "run_command", side_effect=fake_agent
+                    ),
                 ):
-                    exit_code = qa_training_store.run([
-                        "--target-root", str(target_source),
-                        "--skill-revision", evaluator_sha,
-                        "--execution-profile", str(Path(temporary) / "profile.json"),
-                        "--verifier-image", "sha256:" + "b" * 64,
-                        "--output-root", str(output_root),
-                        "--repeat", "2",
-                        "--agent-command", "docker", "run", "--rm", "--read-only", "python:3.11", "agent", "exec",
-                    ])
-                saved = json.loads((output_root / "result.json").read_text(encoding="utf-8"))
+                    exit_code = qa_training_store.run(
+                        [
+                            "--target-root",
+                            str(target_source),
+                            "--skill-revision",
+                            evaluator_sha,
+                            "--execution-profile",
+                            str(Path(temporary) / "profile.json"),
+                            "--verifier-image",
+                            "sha256:" + "b" * 64,
+                            "--output-root",
+                            str(output_root),
+                            "--repeat",
+                            "2",
+                            "--agent-command",
+                            "docker",
+                            "run",
+                            "--rm",
+                            "--read-only",
+                            "python:3.11",
+                            "agent",
+                            "exec",
+                        ]
+                    )
+                saved = json.loads(
+                    (output_root / "result.json").read_text(encoding="utf-8")
+                )
         finally:
             if created_parent:
                 try:

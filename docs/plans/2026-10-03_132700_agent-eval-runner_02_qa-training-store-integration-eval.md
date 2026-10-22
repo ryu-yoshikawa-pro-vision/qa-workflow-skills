@@ -281,22 +281,35 @@ Evaluatorは成果物内容を独自schemaへ変換しません。各Skillの既
 
 ### 評価用QA成果物の登録契約
 
-各Skillの既存Markdown本文・runtime保存契約は変えず、フェーズ2だけでAgentに**最小の評価用登録ファイル**`.qa-eval-output/artifact-index.json`を保存させる。root objectは`schema_version=1`、`artifacts[]`、`routing[]`の3キーとする。`artifacts[]`は実在成果物、`routing[]`はAgentが各工程について行った判断を記録する。両方は自己申告であり、Evaluatorが独立して検証する。
+各Skillの既存Markdown本文・runtime保存契約は変えず、フェーズ2だけでAgentに**最小の評価用登録ファイル** `.qa-eval-output/artifact-index.json`を保存させる。root objectは`schema_version=1`、`artifacts[]`、`routing[]`の3キーとする。`artifacts[]`は実在成果物、`routing[]`はAgentが各工程について行った判断を記録する。両方は自己申告であり、Evaluatorが独立して検証する。
 
 ```json
 {
   "schema_version": 1,
   "artifacts": [
-    {"skill":"test-case-design","kind":"test-case","scope":"checkout-payment-web","artifact_id":"tc-design-01","path":"design/test-case-design/tc-01.md"}
+    {
+      "skill": "test-case-design",
+      "kind": "test-case",
+      "scope": "checkout-payment-web",
+      "artifact_id": "tc-design-01",
+      "path": "design/test-case-design/tc-01.md"
+    }
   ],
   "routing": [
-    {"skill":"test-case-design","scope":"checkout-payment-web","status":"executed","reason":"test-condition-designの結果から詳細TCを作成","artifact_ids":["tc-design-01"]}
+    {
+      "skill": "test-case-design",
+      "scope": "checkout-payment-web",
+      "status": "executed",
+      "reason": "test-condition-designの結果から詳細TCを作成",
+      "artifact_ids": ["tc-design-01"]
+    }
   ]
 }
 ```
 
 - `skill`は配置済みSkill集合に含まれる正規名、`kind`は対象Skillの既存出力契約からEvaluator scenarioに固定した成果物種類、`scope`は今回要求・routingで確定した対象 / 実行範囲、`artifact_id`は同一attempt内で一意の非空ASCII識別子、`path`は`.qa-eval-output/`基準の正規化relative pathとする。上例は形式を示すものであり、すべてのTCが固定の名前になるという意味ではない。
 - evaluatorはscenarioに保持する**既存Skill出力契約から導いた`skill -> kind`許可集合**と登録情報を照合する。`artifact_id`・`path`の重複、同一fileの二重登録、未知のSkill / kind / scope、出力root外path、symlink、file不存在、runtime / internal fileへの参照、cross-attempt参照を拒否する。同じSkillで複数成果物があっても`artifact_id`とpathが別なら許可する。file hash・sizeはEvaluatorが現物から算出し、Agentの申告SHAを信用しない。
+
 ### routing判断と必須成果物の判定
 
 `routing[]`の各行は`skill` / `scope` / `status` / `reason` / `artifact_ids[]`を必須とする。`status`は`executed`、`reused`、`skipped`、`blocked`、`incomplete`のいずれかとする。Skill名は正規名、scopeは今回の要求から定めた正規値、reasonは空でない文字列、artifact_idsは上記artifactsのID（重複なし）とする。`executed`では生成した成果物のIDを紐付ける。`reused`では同一attemptで実体・鮮度・元の生成者を検証できる成果物への参照だけ許す。`skipped` / `blocked` / `incomplete`では対応scopeと理由を残し、完了を偽装しない。`qa-workflow`自体の最終判断は最終stdout / workflow runtimeを対応証拠とするため、`artifact_ids=[]`でもよい。
@@ -311,15 +324,16 @@ Evaluatorは成果物内容を独自schemaへ変換しません。各Skillの既
 - `artifact-index.json`の欠落・schema不正・登録漏れ・分類不能は**`evidence_unverified`（`reason=artifact_classification`。Evaluatorが評価入力を確定できない状態）**として記録する。file自体の存在確認と分類不能を分け、必要なQA成果物が実際に未生成と独立確認できた場合のみSkill品質の非passとする。分類不能なfileを黙って`runner_internal`へ変換して『欠落』扱いしない。schemaが誤りでも収集可能な原fileと診断情報は保存する。分類を補うためのLLM推測・自由なpath走査による自動判定は追加しない。
 
 Evaluatorが作る`artifact-manifest.json`は検証済みindexの各登録をpath・size・SHA-256・runtime証拠との関係へ正規化した結果であり、**Agentの自己申告indexとは別物**である。`artifact-index.json`そのものは`runner_internal`として回収し、Judgeへ正規QA成果物として渡さない。JudgeのQA成果物集合を確定できないattemptは完了PASSにしないが、既に評価可能なsemantic criterionは記録する。
+
 ### Judge投入対象と内部証拠の境界
 
 `.qa-eval-output/`の全fileは安全なpath・size・hashを検査して**回収とmanifest記録**を行うが、Judgeへ渡すCandidate Outputは次の規則で選ぶ。拡張子やフォルダ名だけで正規QA成果物を推定しない。
 
-| 分類 | 対象 | Judgeへの投入 |
-|---|---|---|
-| `qa_artifact` | routingが要求した仕様分析、テスト分析、TR、TCN / CI、TC、coverage、adversarial review等の成果物。正規Skill名・生成目的・artifact pathが確定したもの | 対象とする |
-| `runtime_evidence` | `.runtime-evidence/**`のrequest / result / invocation、production verifierの入力・出力、workflow state等の機械検証用データ | 原則投入しない。runtime判定へ使用する |
-| `runner_internal` | `final-message.md`、Codex診断記録、launcher状態、capture記録等の評価実行情報 | 投入しない |
+| 分類               | 対象                                                                                                                                                | Judgeへの投入                         |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| `qa_artifact`      | routingが要求した仕様分析、テスト分析、TR、TCN / CI、TC、coverage、adversarial review等の成果物。正規Skill名・生成目的・artifact pathが確定したもの | 対象とする                            |
+| `runtime_evidence` | `.runtime-evidence/**`のrequest / result / invocation、production verifierの入力・出力、workflow state等の機械検証用データ                          | 原則投入しない。runtime判定へ使用する |
+| `runner_internal`  | `final-message.md`、Codex診断記録、launcher状態、capture記録等の評価実行情報                                                                        | 投入しない                            |
 
 - `.qa-eval-output/.runtime-evidence/**`と`.qa-eval-output/final-message.md`は**常にQA成果物から除外**する。評価用`.qa-eval-tools/**`もQA成果物ではない。`qa-workflow`のworkflow stateは機械判定用とし、Judgeには成果物上の工程・参照関係を評価させる。内部stateやverifier JSONを成果物内容の代用品にしない。
 - `qa_artifact`はscenarioの要求と実際のroutingから期待される成果物単位を確定し、manifestに記録したSkill名・相対path・SHA-256・成果物種類と照合したものに限る。分類不能なfileはQA成果物へ昇格せず、`evidence_unverified`（`reason=artifact_classification`）として回収し、未生成と断定しない。必須成果物欠落も補わない。
@@ -351,6 +365,7 @@ Evaluatorはsanitized target生成時に、正解情報を含まない最小の�
 5. 実行後にEvaluatorは`invocation.json`を含むrecordをmanifestへ回収する。request / result / exit codeの実記録が欠落・破損した場合は`evidence_unverified`に分類する。成果物が存在し、他のgraderで採点できる場合はその判定を残すが、verifierを実行しなかったという事実が観測されない限り**Skillの品質FAILへ転記しない**。
 
 ラッパーは評価用のプロセス入出力transportだけを担い、runtime検証アルゴリズムを再実装しない。標準ライブラリで実装し、CIのfake Agentでfile記録・再試行・欠落・不正なrequest・symlink / path traversal・atomic書込み失敗を検証する。実Codexでは記録済みJSONと`--json` tool traceの実行イベントを照合する。
+
 ### 成果物とproduction verifierの対応・判定
 
 EvaluatorはAgentが作成したartifactだけを見て、必要な成果物や証拠が揃っていると推測しません。**固定scenarioの要求結果と既存Skillの担当契約**から必須成果物の種類・scopeを確定し、申告された`routing[]`、実成果物、最終stdout / runtime状態と照合します。自己申告だけで母集団を縮小しません。条件付きSkillの省略理由は固定ルールまたは`QTS-SEM-001/002`で検証し、根拠不足は完了と扱いません。全Skillを固定順で実行させることもしません。
@@ -475,6 +490,7 @@ scenario定義は現在の`qa-training-store`初回評価を再現するため�
 6. 候補`valid=true`なのに固定検査FAILなら**機械品質非pass**を記録し、候補が緩くなった可能性を差分として示す。候補`valid=false`だが固定検査PASSでも候補側契約を満たさない結果として非passを残す。判定不能なschema差だけ`evaluator_incompatible`とし、両revision共通Evaluatorを更新した場合は両方新規評価する。全共通検査がPASSし、かつ必要なproduction verifier証拠と完了状態を確認できた場合のみruntimeを検証済みPASSとする。
 
 新しいproduction verifierや同等の汎用graph engineは作らない。既存固定コードから抽出・再利用するのは上記不変条件であり、Candidate側の`valid`に依存する判定は共通Evaluator側に置かない。回帰テストでは`valid=true`を常時返すよう弱体化した候補、重複ID、存在しないedge先、欠落した必須link、runtime fingerprintのみ差し替えた互換候補を作り、候補の自己判定とは独立した検出と正常差分の許容を確認する。
+
 ### 意味判断が必要な部分
 
 独立Judgeを使い、固定revisionの規範仕様と上記評価観点を根拠に評価します。
@@ -502,22 +518,23 @@ Referenceはscenarioで固定した上記規範・補助文書からEvaluatorが
 - **QA成果物Judge（`QTS-SEM-003..010`のみ）**：正規`qa_artifact`本文と必須成果物欠落表示のみをCandidate Outputに入れる。`routing[]`、最終回答、workflow完了要約、verifierの内部JSONは**promptへ含めない**。同じ`build_judge_prompt()`を使用し、該当8criterionだけの部分rubricを渡す。正規成果物自体にworkflow記述がある場合も、その正規成果物の一部として評価するが、別管理のrouting記録・stdoutからの補完は行わない。
 - `workflow_runtime.py`の検証済み`can_complete`、currentness / closure、必須成果物の有無をEvaluatorが別に固定機械判定する。**workflow Judgeにだけ**共通機械判定の非秘密要約（完了可否と未閉鎖の有無のみ）を追加し、最終回答で宣言した『完了』または『blocked / incomplete』との矛盾を`QTS-SEM-002`で評価する。内部のruntime JSON / workflow state全文はJudgeへ渡さず、Judgeの評価でmachine PASSを上書きしない。
 - 最終stdoutや`routing[]`に他Skillの内容や仮のMarkdownが記載されていても`artifact-index.json`に登録された実在QA成果物の代わりにしない。stdoutから任意の新fileを生成して回収対象に足さない。**2種類のJudge prompt**について、criterion ID集合・入力区分・順序・内容SHAとJudge応答を別々に保存する。各応答JSONを既存`normalize_judge_response()`で対象criterion集合に照合して過不足・重複・他系統のID混入を拒否したうえで、両応答の生`criteria[]`を全10criterion分だけ結合し、既存`normalize_judge_response()`へ渡して唯一の全体verdictを得る。独自score・集約式を作らない。いずれかのJudgeが失敗・timeout・不正JSONならattempt全体を検証済みPASSにせずJudge execution errorとし、部分的な評価結果があっても診断用に限る。
+
 ### 初回scenarioのsemantic rubric契約
 
 `scripts/skills/evals/agent/scenarios/qa-training-store-checkout-payment-web-v1/rubric.json`には、以下の**10件をID昇順で固定**して登録する。既存`semantic/loader.py`のcriterion形式（`id` / `title` / `description` / `critical`）を使い、下表の対象・重大条件・規範根拠を`description`へ反映する。rubricの項目追加・critical変更はEvaluator revision変更として扱い、旧・新Skillの両方を同じ新Evaluatorで再評価しない限り直接比較しない。
 
-| ID | critical | 評価対象と規範根拠 | rating 1となる重大な条件 |
-|---|---|---|---|
-| `QTS-SEM-001` | true | `qa-workflow`のrouting。要求に必要な分析・設計工程が選択され、不要なE2E実装・実行へ逸脱しない（`qa-workflow/SKILL.md`、固定の評価要求） | 必要な主要工程を根拠なくスキップし、最終QA成果物の意味品質が成立しない |
-| `QTS-SEM-002` | true | workflowの完了判断。未閉鎖・blocked・未完成を完成扱いしない（`qa-workflow/SKILL.md`、正規QA成果物） | 必須の分析・設計成果物がない、または重大な未解決を隠して完了を宣言する |
-| `QTS-SEM-003` | true | Oracle選択と規範の優先順位（`docs/spec/README.md`、`product-scope.md`、`roles-and-permissions.md`） | README / 実装観察 / Unresolvedを正式な期待動作へ昇格し、重大な誤ったテスト期待値を作る |
-| `QTS-SEM-004` | true | Checkout Sessionの再開・置換・24時間期限切れ・再ログイン復帰（`BR-CHECKOUT-001` / `AC-CHECKOUT-001`、`state-and-scenarios.md`、`features/authentication.md`のSession・Role・Return先） | 同じCart / Versionの再開、Version変更時の置換、期限切れのいずれかを欠落させ、主要なテスト条件が成立しない |
-| `QTS-SEM-005` | true | Order確定直前のCart Version / 価格再検証と差戻し（`BR-CHECKOUT-002` / `AC-CHECKOUT-002`、`features/cart.md`） | stale Cartまたは価格不一致でもOrder / Paymentを作ってよいとする、または両方の差戻し境界を欠落させる |
-| `QTS-SEM-006` | true | Mock Payment成功・明確失敗時のOrder / Inventory / History整合（`BR-CHECKOUT-003` / `AC-CHECKOUT-003`、`features/orders.md`、`features/admin-inventory.md`） | TEST-SUCCESS以外で在庫を減らす、成功時のOrder paid・在庫減算を欠く、明確失敗で在庫を変える、購入と在庫履歴の整合を無視する |
-| `QTS-SEM-007` | true | processing中のresume・retry / cancel禁止と最終在庫不足（`BR-CHECKOUT-003` / `AC-CHECKOUT-003`、`state-and-scenarios.md`） | processing中の再試行・Cancelを許容する、processing再開または最終在庫不足の重要境界を欠落させる |
-| `QTS-SEM-008` | false | 分析結果からテスト条件・ケースへの具体化、開始条件・操作・観測可能な期待値（`test-analysis` / `test-condition-design` / `test-case-design`のSkill契約、上記BR / AC） | ケースが実行不能で、必要な入力・操作・PASS/FAIL条件を複数の重要ケースで特定できない |
-| `QTS-SEM-009` | true | Authority → TR → TCN → Coverage Item → TCの意味的な対応と未閉鎖の扱い（各Skill契約、生成した正規QA成果物） | 重要な仕様根拠とテストが対応しない、下流成果物が別要求を根拠にする、重大な未閉鎖を根拠なく解消したと扱う |
-| `QTS-SEM-010` | true | 仕様にない挙動を確定した期待値へしない（`product-scope.md`、`checkout-and-payment.md`、`known-deviations.md`、`unresolved-specifications.md`） | 外部Payment API、実provider、Server-side認可、Backend通信、存在しないToast等を現行の確定仕様として追加する |
+| ID            | critical | 評価対象と規範根拠                                                                                                                                                                     | rating 1となる重大な条件                                                                                                   |
+| ------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `QTS-SEM-001` | true     | `qa-workflow`のrouting。要求に必要な分析・設計工程が選択され、不要なE2E実装・実行へ逸脱しない（`qa-workflow/SKILL.md`、固定の評価要求）                                                | 必要な主要工程を根拠なくスキップし、最終QA成果物の意味品質が成立しない                                                     |
+| `QTS-SEM-002` | true     | workflowの完了判断。未閉鎖・blocked・未完成を完成扱いしない（`qa-workflow/SKILL.md`、正規QA成果物）                                                                                    | 必須の分析・設計成果物がない、または重大な未解決を隠して完了を宣言する                                                     |
+| `QTS-SEM-003` | true     | Oracle選択と規範の優先順位（`docs/spec/README.md`、`product-scope.md`、`roles-and-permissions.md`）                                                                                    | README / 実装観察 / Unresolvedを正式な期待動作へ昇格し、重大な誤ったテスト期待値を作る                                     |
+| `QTS-SEM-004` | true     | Checkout Sessionの再開・置換・24時間期限切れ・再ログイン復帰（`BR-CHECKOUT-001` / `AC-CHECKOUT-001`、`state-and-scenarios.md`、`features/authentication.md`のSession・Role・Return先） | 同じCart / Versionの再開、Version変更時の置換、期限切れのいずれかを欠落させ、主要なテスト条件が成立しない                  |
+| `QTS-SEM-005` | true     | Order確定直前のCart Version / 価格再検証と差戻し（`BR-CHECKOUT-002` / `AC-CHECKOUT-002`、`features/cart.md`）                                                                          | stale Cartまたは価格不一致でもOrder / Paymentを作ってよいとする、または両方の差戻し境界を欠落させる                        |
+| `QTS-SEM-006` | true     | Mock Payment成功・明確失敗時のOrder / Inventory / History整合（`BR-CHECKOUT-003` / `AC-CHECKOUT-003`、`features/orders.md`、`features/admin-inventory.md`）                            | TEST-SUCCESS以外で在庫を減らす、成功時のOrder paid・在庫減算を欠く、明確失敗で在庫を変える、購入と在庫履歴の整合を無視する |
+| `QTS-SEM-007` | true     | processing中のresume・retry / cancel禁止と最終在庫不足（`BR-CHECKOUT-003` / `AC-CHECKOUT-003`、`state-and-scenarios.md`）                                                              | processing中の再試行・Cancelを許容する、processing再開または最終在庫不足の重要境界を欠落させる                             |
+| `QTS-SEM-008` | false    | 分析結果からテスト条件・ケースへの具体化、開始条件・操作・観測可能な期待値（`test-analysis` / `test-condition-design` / `test-case-design`のSkill契約、上記BR / AC）                   | ケースが実行不能で、必要な入力・操作・PASS/FAIL条件を複数の重要ケースで特定できない                                        |
+| `QTS-SEM-009` | true     | Authority → TR → TCN → Coverage Item → TCの意味的な対応と未閉鎖の扱い（各Skill契約、生成した正規QA成果物）                                                                             | 重要な仕様根拠とテストが対応しない、下流成果物が別要求を根拠にする、重大な未閉鎖を根拠なく解消したと扱う                   |
+| `QTS-SEM-010` | true     | 仕様にない挙動を確定した期待値へしない（`product-scope.md`、`checkout-and-payment.md`、`known-deviations.md`、`unresolved-specifications.md`）                                         | 外部Payment API、実provider、Server-side認可、Backend通信、存在しないToast等を現行の確定仕様として追加する                 |
 
 ratingの共通尺度は既存`semantic/prompt_builder.py`に従う。`4`は要求を明確に満たす、`3`は軽微な改善余地のみ、`2`は実質的な不足・要確認、`1`は上表の重大欠落・誤りに該当する。各criterionで**欠落や誤りが局所的か、主要な要件を損なうか**を理由とQA成果物の具体的evidenceに基づいて区別する。重要な条件の部分欠落でも、上表のrating 1条件に達しないならrating 2とし、説明の好みでは下げない。
 
@@ -648,14 +665,14 @@ Judge基準・正解データの作成・再審査と継続改善の詳細は[Ju
 
 固定target revisionの正常なQA成果物を基準に、**Evaluator-only fixture**でJudgeの検出能力を確認する。従来の正常例、`QTS-SEM-006`のPayment整合違反例、`QTS-SEM-010`の仕様外動作例を維持し、未検証の**critical 7件**に対する代表的な重大違反例を追加する。
 
-| 対象criterion | 重大違反fixtureで変更する内容 |
-|---|---|
-| `QTS-SEM-001` | 必須の分析・設計工程を、要求に反する根拠のない理由でroutingから除外し、workflowの意味的な成立を損なう |
-| `QTS-SEM-002` | 重要な未解決・未閉鎖事項が残るのに、最終回答でworkflow完了と宣言する |
-| `QTS-SEM-003` | `unresolved-specifications.md`等の未確定事項を正式なOracleへ昇格させ、重大な誤期待値を作る |
-| `QTS-SEM-004` | Checkout Sessionの再開・置換・24時間期限切れのうち、主要な条件を誤るか重要なテスト条件を欠落させる |
-| `QTS-SEM-005` | stale Cart Versionまたは価格不一致でも、Order / Paymentを確定してよいとする |
-| `QTS-SEM-007` | Payment processing中のretry / cancel禁止やresume条件に反する操作を許容する |
+| 対象criterion | 重大違反fixtureで変更する内容                                                                                     |
+| ------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `QTS-SEM-001` | 必須の分析・設計工程を、要求に反する根拠のない理由でroutingから除外し、workflowの意味的な成立を損なう             |
+| `QTS-SEM-002` | 重要な未解決・未閉鎖事項が残るのに、最終回答でworkflow完了と宣言する                                              |
+| `QTS-SEM-003` | `unresolved-specifications.md`等の未確定事項を正式なOracleへ昇格させ、重大な誤期待値を作る                        |
+| `QTS-SEM-004` | Checkout Sessionの再開・置換・24時間期限切れのうち、主要な条件を誤るか重要なテスト条件を欠落させる                |
+| `QTS-SEM-005` | stale Cart Versionまたは価格不一致でも、Order / Paymentを確定してよいとする                                       |
+| `QTS-SEM-007` | Payment processing中のretry / cancel禁止やresume条件に反する操作を許容する                                        |
 | `QTS-SEM-009` | IDとedgeは形式上正しいまま、Authorityと下流TCを**別の要求の意味**で結び付け、重大なtraceability不整合を発生させる |
 
 - 正常例を基礎に**対象の誤りだけ**を加える。入力は実際のAgent-visible targetへ配置せず、Evaluatorだけが参照する。各fixtureに対象criterion、変更箇所、期待rating、期待evidence、規範Referenceの該当箇所とその根拠を保存する。**Agentはfixture・期待判定・rubric / Referenceの初期案や改善案を作ってよい**。ただし期待判定を正解として使うには、人間による規範仕様・Skill契約との照合、または当該事実を直接確定できる決定論的検証が必要であり、Judge自身の判定を正解にしない。
@@ -665,7 +682,6 @@ Judge基準・正解データの作成・再審査と継続改善の詳細は[Ju
 - **最終回答だけが正しく、正規QA成果物のPayment失敗条件が誤っているfixture**でも、`QTS-SEM-006`の成果物Judgeが最終回答で救済されないことを確認する。各fixtureで実際のJudge rating / reason / evidenceを記録し、人間確認済みの根拠と照合する。Judgeの判定が一致しない・繰り返しで重要判定が揺れる場合は、判定根拠とrubric / Referenceを調査して受入を保留する。
 - AIが作成したJudge基準・fixture・期待判定の候補は、確認済みの正解データと混同せず、根拠と確認状態を記録する。Judge改善時は独立検証用事例でも回帰がないかを確認し、人間が正式採用する
 - fixtureの読込み、対象criterionへの配線、結果正規化・統合は**外部LLMを呼ばないfake Judge / fake Agentの通常CI**で確認する。実際のJudgeの意味判別は既存の**実Codex smoke / Judge受入検証**で確認する。必要な修正でJudge prompt・rubric・Reference等のEvaluator基準を変更した場合は新Evaluator revisionとして固定し、旧・新Skillを同一条件で再評価する。Judgeの自動採用・自動学習基盤、新規採点式、DB、常時LLM CIは追加しない。Judgeの検証と改善候補の作成・再検証はJudge評価・改善Planで扱う。
-
 
 実際のSkill修正・再評価の詳細な手順と判定条件は、親Planの「実際のSkill改善と再評価の受入検証」および改善Planを正本とする。根拠が十分な案件の隔離修正と再評価は自動化するが、改善結果の自動採用、採点基準の緩和は行わない。
 

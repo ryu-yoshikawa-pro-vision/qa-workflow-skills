@@ -31,7 +31,11 @@ class RuntimeTraceCaptureTests(unittest.TestCase):
             },
             {
                 "type": "item.completed",
-                "item": {"id": "item-final", "type": "agent_message", "text": "Final output."},
+                "item": {
+                    "id": "item-final",
+                    "type": "agent_message",
+                    "text": "Final output.",
+                },
             },
             {"type": "turn.completed"},
         ]
@@ -45,7 +49,9 @@ class RuntimeTraceCaptureTests(unittest.TestCase):
         self.assertEqual(captured["skill_use_observation"]["qa-workflow"], "observed")
         self.assertTrue(captured["commands"][0]["successful"])
 
-    def test_nonzero_or_missing_command_exit_code_does_not_confirm_skill_use(self) -> None:
+    def test_nonzero_or_missing_command_exit_code_does_not_confirm_skill_use(
+        self,
+    ) -> None:
         for exit_code in (None, 1):
             with self.subTest(exit_code=exit_code):
                 item = {
@@ -57,33 +63,52 @@ class RuntimeTraceCaptureTests(unittest.TestCase):
                     item["exit_code"] = exit_code
                 raw = json.dumps({"type": "item.completed", "item": item})
                 captured = capture_codex_jsonl_trace(raw, skill_names=["qa-workflow"])
-                self.assertEqual(captured["skill_use_observation"]["qa-workflow"], "unverified")
+                self.assertEqual(
+                    captured["skill_use_observation"]["qa-workflow"], "unverified"
+                )
 
     def test_trace_confirms_exact_completed_wrapper_request_and_record(self) -> None:
         invocation = {
             "skill": "qa-workflow",
             "operation": "verify",
-            "request_relative_path": ".runtime-evidence/qa-workflow/" + "a" * 64 + "/attempt-01/request.json",
-            "record_relative_path": ".runtime-evidence/qa-workflow/" + "a" * 64 + "/attempt-01",
+            "request_relative_path": ".runtime-evidence/qa-workflow/"
+            + "a" * 64
+            + "/attempt-01/request.json",
+            "record_relative_path": ".runtime-evidence/qa-workflow/"
+            + "a" * 64
+            + "/attempt-01",
         }
         good = {
             "successful": True,
             "command": (
                 "python .qa-eval-tools/verifier_capture.py --skill qa-workflow --operation verify "
-                "--request .qa-eval-output/" + invocation["request_relative_path"]
-                + " --record .qa-eval-output/" + invocation["record_relative_path"]
+                "--request .qa-eval-output/"
+                + invocation["request_relative_path"]
+                + " --record .qa-eval-output/"
+                + invocation["record_relative_path"]
             ),
         }
         self.assertTrue(trace_confirms_capture_invocation([good], invocation))
-        self.assertFalse(trace_confirms_capture_invocation([{**good, "successful": False}], invocation))
         self.assertFalse(
             trace_confirms_capture_invocation(
-                [{**good, "command": good["command"].replace("attempt-01", "attempt-02")}],
+                [{**good, "successful": False}], invocation
+            )
+        )
+        self.assertFalse(
+            trace_confirms_capture_invocation(
+                [
+                    {
+                        **good,
+                        "command": good["command"].replace("attempt-01", "attempt-02"),
+                    }
+                ],
                 invocation,
             )
         )
 
-    def test_standalone_wrapper_captures_verify_result_without_turning_valid_false_into_success(self) -> None:
+    def test_standalone_wrapper_captures_verify_result_without_turning_valid_false_into_success(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             skill_root = root / ".agents" / "skills" / "qa-workflow" / "scripts"
@@ -95,26 +120,48 @@ class RuntimeTraceCaptureTests(unittest.TestCase):
                 "print(json.dumps({'valid': False, 'current_structure_state': []}))\n",
                 encoding="utf-8",
             )
-            record = root / ".qa-eval-output" / ".runtime-evidence" / "qa-workflow" / ("b" * 64) / "attempt-01"
+            record = (
+                root
+                / ".qa-eval-output"
+                / ".runtime-evidence"
+                / "qa-workflow"
+                / ("b" * 64)
+                / "attempt-01"
+            )
             record.mkdir(parents=True)
             request = record / "request.json"
-            request_bytes = b'{ "operation": "verify_runtime_evidence", "partial_rerun": false }\n'
+            request_bytes = (
+                b'{ "operation": "verify_runtime_evidence", "partial_rerun": false }\n'
+            )
             request.write_bytes(request_bytes)
             with patch.object(Path, "cwd", return_value=root):
                 result = capture_invocation(
-                    skill="qa-workflow", operation="verify",
-                    request_path=request, record_path=record,
+                    skill="qa-workflow",
+                    operation="verify",
+                    request_path=request,
+                    record_path=record,
                 )
-            saved_result = json.loads((record / "result.json").read_text(encoding="utf-8"))
+            saved_result = json.loads(
+                (record / "result.json").read_text(encoding="utf-8")
+            )
             saved_request = (record / "request.json").read_bytes()
-            invocation = json.loads((record / "invocation.json").read_text(encoding="utf-8"))
+            invocation = json.loads(
+                (record / "invocation.json").read_text(encoding="utf-8")
+            )
         self.assertEqual(result["evidence_status"], "captured")
         self.assertFalse(saved_result["valid"])
         self.assertEqual(saved_request, request_bytes)
-        self.assertEqual(invocation["request_sha256"], "sha256:" + hashlib.sha256(request_bytes).hexdigest())
-        self.assertEqual(invocation["result_relative_path"].split("/")[-1], "result.json")
+        self.assertEqual(
+            invocation["request_sha256"],
+            "sha256:" + hashlib.sha256(request_bytes).hexdigest(),
+        )
+        self.assertEqual(
+            invocation["result_relative_path"].split("/")[-1], "result.json"
+        )
 
-    def test_nested_runtime_capture_is_replayed_only_when_trace_confirms_it(self) -> None:
+    def test_nested_runtime_capture_is_replayed_only_when_trace_confirms_it(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             skill_root = root / ".agents" / "skills" / "qa-workflow" / "scripts"
@@ -125,15 +172,29 @@ class RuntimeTraceCaptureTests(unittest.TestCase):
             )
             artifact_path = "docs/checkout-analysis.md"
             artifact_id = hashlib.sha256(artifact_path.encode("utf-8")).hexdigest()
-            record = root / ".qa-eval-output" / ".runtime-evidence" / "qa-workflow" / artifact_id / "attempt-01"
+            record = (
+                root
+                / ".qa-eval-output"
+                / ".runtime-evidence"
+                / "qa-workflow"
+                / artifact_id
+                / "attempt-01"
+            )
             record.mkdir(parents=True)
             request = record / "request.json"
-            request.write_text('{"operation":"verify_runtime_evidence"}\n', encoding="utf-8")
+            request.write_text(
+                '{"operation":"verify_runtime_evidence"}\n', encoding="utf-8"
+            )
             with patch.object(Path, "cwd", return_value=root):
                 invocation = capture_invocation(
-                    skill="qa-workflow", operation="verify", request_path=request, record_path=record
+                    skill="qa-workflow",
+                    operation="verify",
+                    request_path=request,
+                    record_path=record,
                 )
-            invocation = json.loads((record / "invocation.json").read_text(encoding="utf-8"))
+            invocation = json.loads(
+                (record / "invocation.json").read_text(encoding="utf-8")
+            )
             trace_command = {
                 "successful": True,
                 "command": (
@@ -146,12 +207,18 @@ class RuntimeTraceCaptureTests(unittest.TestCase):
                 patch.object(
                     common_runtime_checks,
                     "run_candidate_verifier_offline",
-                    return_value={"status": "verified", "result": {"valid": False}, "result_sha256": "sha256:" + "0" * 64},
+                    return_value={
+                        "status": "verified",
+                        "result": {"valid": False},
+                        "result_sha256": "sha256:" + "0" * 64,
+                    },
                 ),
                 patch.object(
                     common_runtime_checks,
                     "_run",
-                    return_value=subprocess.CompletedProcess([], 0, b'{"valid":false}', b""),
+                    return_value=subprocess.CompletedProcess(
+                        [], 0, b'{"valid":false}', b""
+                    ),
                 ),
             ):
                 checked = common_runtime_checks.evaluate_runtime_captures(
@@ -159,14 +226,18 @@ class RuntimeTraceCaptureTests(unittest.TestCase):
                     candidate_package_root=root,
                     verifier_image="sha256:" + "b" * 64,
                     fixed_evaluator_root=root,
-                    expected_artifacts=[{"skill": "qa-workflow", "path": artifact_path}],
+                    expected_artifacts=[
+                        {"skill": "qa-workflow", "path": artifact_path}
+                    ],
                     trace_commands=[trace_command],
                 )
         self.assertEqual(invocation["evidence_status"], "captured")
         self.assertEqual(checked["status"], "fail")
         self.assertTrue(checked["captures"][0]["tool_trace_confirmed"])
 
-    def test_nested_workflow_runtime_capture_requires_trace_and_can_replay(self) -> None:
+    def test_nested_workflow_runtime_capture_requires_trace_and_can_replay(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             skill_root = root / ".agents" / "skills" / "qa-workflow" / "scripts"
@@ -177,15 +248,27 @@ class RuntimeTraceCaptureTests(unittest.TestCase):
             )
             artifact_path = "docs/checkout-analysis.md"
             artifact_id = hashlib.sha256(artifact_path.encode("utf-8")).hexdigest()
-            record = root / ".qa-eval-output" / ".runtime-evidence" / "qa-workflow" / artifact_id / "workflow-01"
+            record = (
+                root
+                / ".qa-eval-output"
+                / ".runtime-evidence"
+                / "qa-workflow"
+                / artifact_id
+                / "workflow-01"
+            )
             record.mkdir(parents=True)
             request = record / "request.json"
             request.write_text('{"payload":{"runtime_units":[]}}\n', encoding="utf-8")
             with patch.object(Path, "cwd", return_value=root):
                 invocation = capture_invocation(
-                    skill="qa-workflow", operation="workflow-runtime", request_path=request, record_path=record
+                    skill="qa-workflow",
+                    operation="workflow-runtime",
+                    request_path=request,
+                    record_path=record,
                 )
-            invocation = json.loads((record / "invocation.json").read_text(encoding="utf-8"))
+            invocation = json.loads(
+                (record / "invocation.json").read_text(encoding="utf-8")
+            )
             trace_command = {
                 "successful": True,
                 "command": (
@@ -204,7 +287,9 @@ class RuntimeTraceCaptureTests(unittest.TestCase):
                     candidate_package_root=root,
                     verifier_image="sha256:" + "b" * 64,
                     fixed_evaluator_root=root,
-                    expected_artifacts=[{"skill": "qa-workflow", "path": artifact_path}],
+                    expected_artifacts=[
+                        {"skill": "qa-workflow", "path": artifact_path}
+                    ],
                     trace_commands=[trace_command],
                 )
         self.assertEqual(invocation["evidence_status"], "captured")
@@ -217,8 +302,10 @@ class RuntimeTraceCaptureTests(unittest.TestCase):
             with patch.object(Path, "cwd", return_value=root):
                 with self.assertRaises(ValueError):
                     capture_invocation(
-                        skill="adversarial-review", operation="verify",
-                        request_path=Path("missing.json"), record_path=Path("missing"),
+                        skill="adversarial-review",
+                        operation="verify",
+                        request_path=Path("missing.json"),
+                        record_path=Path("missing"),
                     )
 
 
